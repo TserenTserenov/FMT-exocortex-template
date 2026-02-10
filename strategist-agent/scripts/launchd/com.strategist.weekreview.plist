@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.strategist.weekreview</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{HOME_DIR}}/Github/strategist-agent/scripts/strategist.sh</string>
+        <string>week-review</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{{HOME_DIR}}/logs/strategist/launchd-weekreview.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{HOME_DIR}}/logs/strategist/launchd-weekreview-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>{{HOME_DIR}}</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

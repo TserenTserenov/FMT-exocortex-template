@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(git init:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(gh repo create:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh repo list:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr list:*)",
+      "Bash(ls:*)",
+      "Bash(chmod:*)",
+      "Bash(launchctl load:*)",
+      "Bash(launchctl unload:*)",
+      "Bash(launchctl list:*)",
+      "Bash(claude:*)"
+    ]
+  }
+}
