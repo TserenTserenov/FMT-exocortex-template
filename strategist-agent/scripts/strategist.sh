@@ -7,7 +7,7 @@ set -e
 # Конфигурация
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-WORKSPACE="$HOME/Github/my-strategy"
+WORKSPACE="$HOME/Github/DS-strategy"
 PROMPTS_DIR="$REPO_DIR/prompts"
 LOG_DIR="$HOME/logs/strategist"
 CLAUDE_PATH="{{CLAUDE_PATH}}"

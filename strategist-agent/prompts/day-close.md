@@ -5,9 +5,9 @@
 
 ## Контекст
 
-- **WeekPlan:** ~/Github/my-strategy/current/WeekPlan W*.md
+- **WeekPlan:** ~/Github/DS-strategy/current/WeekPlan W*.md
 - **MEMORY:** MEMORY.md (автозагрузка)
-- **Exocortex backup:** ~/Github/my-strategy/exocortex/
+- **Exocortex backup:** ~/Github/DS-strategy/exocortex/
 
 ## Алгоритм
 
@@ -36,15 +36,15 @@ git -C ~/Github/<repo> log --since="today 00:00" --oneline --no-merges
 
 ```bash
 # Корневой CLAUDE.md
-cp ~/Github/CLAUDE.md ~/Github/my-strategy/exocortex/CLAUDE.md
+cp ~/Github/CLAUDE.md ~/Github/DS-strategy/exocortex/CLAUDE.md
 
 # Memory (Слой 3)
-cp ~/.claude/projects/*/memory/*.md ~/Github/my-strategy/exocortex/
+cp ~/.claude/projects/*/memory/*.md ~/Github/DS-strategy/exocortex/
 ```
 
 ### 5. Закоммитить
 
-- Закоммить все изменения в `my-strategy`
+- Закоммить все изменения в `DS-strategy`
 - Запуши
 
 ## Правила

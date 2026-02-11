@@ -9,13 +9,13 @@
 ## Upstream dependencies
 
 - Pack с описанием агента Стратег (паспорт, сценарии)
-- exocortex-template (формат структуры)
+- FMT-exocortex (формат структуры)
 
 ## Downstream outputs
 
-- my-strategy/ (планы, отчёты, ревью)
+- DS-strategy/ (планы, отчёты, ревью)
 
 ## Non-goals
 
 - Хранение предметных знаний (→ Pack)
-- Хранение планов и отчётов (→ my-strategy)
+- Хранение планов и отчётов (→ DS-strategy)

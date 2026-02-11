@@ -18,11 +18,11 @@
 | Правило для типа репо | memory/repo-type-rules.md |
 | Урок (кросс-системный) | memory/<topic>.md |
 | Урок (одна система) | <repo>/CLAUDE.md |
-| Новый процесс/сценарий | PROCESSES.md (ecosystem-governance или repo) |
+| Новый процесс/сценарий | PROCESSES.md (DS-ops или repo) |
 
 ## Backup
 
-На Close и Day-Close: `memory/*.md + {{WORKSPACE_DIR}}/CLAUDE.md → my-strategy/exocortex/`
+На Close и Day-Close: `memory/*.md + {{WORKSPACE_DIR}}/CLAUDE.md → DS-strategy/exocortex/`
 
 ## Иерархия заголовков
 

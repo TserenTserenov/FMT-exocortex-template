@@ -2,14 +2,14 @@
 
 ## Контекст
 
-- **HUB (личные планы):** ~/Github/my-strategy/current/
+- **HUB (личные планы):** ~/Github/DS-strategy/current/
 - **SPOKE (планы репо):** ~/Github/*/WORKPLAN.md
 - **MEMORY:** MEMORY.md (автозагрузка)
 
 ## Именование файлов в current/
 
 ```
-my-strategy/
+DS-strategy/
 ├── current/
 │   ├── WeekPlan W{N} YYYY-MM-DD.md   # план недели (Пн дата)
 │   ├── WeekReport W{N} YYYY-MM-DD.md # отчёт недели (Вс дата)
@@ -17,7 +17,7 @@ my-strategy/
 ├── archive/                           # старые файлы
 ```
 
-В `current/` — только актуальные файлы. Старые перемещаются в `my-strategy/archive/`.
+В `current/` — только актуальные файлы. Старые перемещаются в `DS-strategy/archive/`.
 
 ## Алгоритм
 
@@ -61,6 +61,6 @@ git -C ~/Github/<repo> log --since="yesterday 00:00" --until="today 00:00" --one
 
 1. Если в `current/` есть предыдущий `DayPlan *.md` — перемести его в `archive/`
 2. Создай новый файл: `current/DayPlan YYYY-MM-DD.md`
-3. Закоммить в my-strategy
+3. Закоммить в DS-strategy
 
 Результат: обновлённый WeekPlan + DayPlan в `current/`.
