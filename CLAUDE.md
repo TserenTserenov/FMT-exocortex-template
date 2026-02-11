@@ -29,7 +29,7 @@ FPF (1-й) → SPF (2-й) → Pack (3-й, знания) → Downstream (4-й, м
 
 ### Реестр
 
-`DS-ops/0.OPS/REPOSITORY-REGISTRY.md`
+`DS-ecosystem-development/0.OPS/REPOSITORY-REGISTRY.md`
 
 > Детали (измерения 2-4, именование, планирование): → `memory/repo-type-rules.md`
 
@@ -177,8 +177,8 @@ FPF (1-й) → SPF (2-й) → Pack (3-й, знания) → Downstream (4-й, м
 
 | Категория | Где |
 |-----------|-----|
-| Пользовательские сценарии | `DS-ops/PROCESSES.md` |
-| Платформенные сценарии | `DS-ops/PROCESSES.md` |
+| Пользовательские сценарии | `DS-ecosystem-development/PROCESSES.md` |
+| Платформенные сценарии | `DS-ecosystem-development/PROCESSES.md` |
 | Внутренние процессы системы | `<repo>/PROCESSES.md` |
 
 ### Правило процесса (ступенчатое)
@@ -187,7 +187,7 @@ FPF (1-й) → SPF (2-й) → Pack (3-й, знания) → Downstream (4-й, м
 |---------|-----------|
 | Баг-фикс, ≤15 мин | Не нужен |
 | Изменение внутри системы | PROCESSES.md этого репо |
-| Межсистемная фича | DS-ops/PROCESSES.md |
+| Межсистемная фича | DS-ecosystem-development/PROCESSES.md |
 | Новая система | Сценарий + процессы + данные (ВДВ) |
 
 ---

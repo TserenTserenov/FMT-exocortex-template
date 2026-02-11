@@ -18,7 +18,7 @@
 | Правило для типа репо | memory/repo-type-rules.md |
 | Урок (кросс-системный) | memory/<topic>.md |
 | Урок (одна система) | <repo>/CLAUDE.md |
-| Новый процесс/сценарий | PROCESSES.md (DS-ops или repo) |
+| Новый процесс/сценарий | PROCESSES.md (DS-ecosystem-development или repo) |
 
 ## Backup
 
