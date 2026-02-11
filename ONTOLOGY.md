@@ -1,6 +1,6 @@
 # Онтология экзокортекса
 
-> Source-of-truth: `exocortex-template/ONTOLOGY.md`
+> Source-of-truth: `FMT-exocortex/ONTOLOGY.md`
 
 ## Сущности
 
@@ -8,7 +8,7 @@
 
 Персональная система управления знаниями и задачами с ИИ-агентами. Развёртывается из этого шаблона через fork + setup.
 
-**Состав:** CLAUDE.md + memory/ + strategist-agent/ + my-strategy/
+**Состав:** CLAUDE.md + memory/ + DS-strategist/ + DS-strategy/
 
 ### Пространства (Spaces)
 
@@ -42,12 +42,12 @@
 
 | Компонент | Путь | Назначение |
 |-----------|------|-----------|
-| Runner | `strategist-agent/scripts/strategist.sh` | Запуск Claude CLI с промптом |
-| Промпты | `strategist-agent/prompts/*.md` | 8 сценариев (стратегия, дневной план, ревью…) |
-| Расписание | `strategist-agent/scripts/launchd/*.plist` | LaunchAgent (утро + воскресенье) |
-| Установщик | `strategist-agent/install.sh` | Копирование plist + загрузка |
+| Runner | `DS-strategist/scripts/strategist.sh` | Запуск Claude CLI с промптом |
+| Промпты | `DS-strategist/prompts/*.md` | 8 сценариев (стратегия, дневной план, ревью…) |
+| Расписание | `DS-strategist/scripts/launchd/*.plist` | LaunchAgent (утро + воскресенье) |
+| Установщик | `DS-strategist/install.sh` | Копирование plist + загрузка |
 
-### Стратегический хаб (my-strategy)
+### Стратегический хаб (DS-strategy)
 
 Governance-хаб для управления задачами и стратегией.
 
@@ -58,7 +58,7 @@ Governance-хаб для управления задачами и стратег
 | `archive/` | Завершённые планы |
 | `exocortex/` | Backup memory/ + CLAUDE.md |
 
-**Паттерн:** Hub-and-Spoke — my-strategy (хаб) координирует, */WORKPLAN.md (споки) в каждом репо.
+**Паттерн:** Hub-and-Spoke — DS-strategy (хаб) координирует, */WORKPLAN.md (споки) в каждом репо.
 
 ## Типы репозиториев
 
@@ -89,11 +89,11 @@ Governance-хаб для управления задачами и стратег
 ## Механизм обновлений
 
 ```
-[upstream] TserenTserenov/exocortex-template
+[upstream] TserenTserenov/FMT-exocortex
     │
     │  git fetch upstream && git merge upstream/main
     ▼
-[fork] user/exocortex-template
+[fork] user/FMT-exocortex
     │
     │  Подстановка переменных (setup.sh, один раз)
     ▼
@@ -102,6 +102,6 @@ Governance-хаб для управления задачами и стратег
 
 **Что обновляется (Platform-space):** промпты, протоколы, скрипты, memory-шаблоны (кроме MEMORY.md).
 
-**Что НЕ обновляется (User-space):** MEMORY.md (содержимое), my-strategy/current/, личные планы, стратегии.
+**Что НЕ обновляется (User-space):** MEMORY.md (содержимое), DS-strategy/current/, личные планы, стратегии.
 
 **Конфликты при merge:** Возможны в файлах, которые пользователь изменил. Git merge показывает конфликты для ручного разрешения.

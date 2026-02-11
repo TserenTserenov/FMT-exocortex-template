@@ -14,7 +14,7 @@
 ## Downstream outputs
 
 - Форки пользователей (персональные экзокортексы)
-- exocortex-setup-agent (агент развёртывания)
+- DS-exocortex-setup (агент развёртывания)
 
 ## Non-goals
 

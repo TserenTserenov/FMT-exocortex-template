@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>{{HOME_DIR}}/Github/strategist-agent/scripts/strategist.sh</string>
+        <string>{{HOME_DIR}}/Github/DS-strategist/scripts/strategist.sh</string>
         <string>week-review</string>
     </array>
 
