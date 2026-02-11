@@ -84,7 +84,7 @@ FPF (1-й) → SPF (2-й) → Pack (3-й, знания) → Downstream (4-й, м
 
 **Шаг 2.** Дождаться согласования.
 
-**Шаг 3.** Определить: файлы/репо, что менять, ограничения.
+**Шаг 3.** Определить: файлы/репо, что менять, ограничения. Если в DayPlan есть ссылка на context file (`DS-strategy/inbox/WP-{N}*.md`) — прочитать его для контекста.
 
 **Исключения:** задачи из п. 2.4; продолжение работы над тем же РП.
 
@@ -125,6 +125,7 @@ FPF (1-й) → SPF (2-й) → Pack (3-й, знания) → Downstream (4-й, м
 7. Закоммитить (с подтверждением)
 8. Обновить `DS-strategy/current/Plan W{N}...` (статусы РП)
 9. Синхронизировать backup: `memory/ + CLAUDE.md → DS-strategy/exocortex/`
+10. **WP Context File:** Если РП in_progress и ≥2 сессий → обновить/создать `DS-strategy/inbox/WP-{N}-{slug}.md`. Если РП done → переместить в `archive/wp-contexts/`
 
 **Шаблон отчёта Close:**
 
@@ -144,6 +145,7 @@ FPF (1-й) → SPF (2-й) → Pack (3-й, знания) → Downstream (4-й, м
 - [ ] DS-strategy/current/Plan обновлён
 - [ ] Captures применены
 - [ ] Backup → DS-strategy/exocortex/ синхронизирован
+- [ ] Context file обновлён (inbox/) или архивирован (archive/wp-contexts/)
 - [ ] Отчёт Close сформирован
 
 Все пункты выполнены → «Сессия закрыта.» Иначе — указать, что осталось.

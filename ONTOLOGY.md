@@ -55,7 +55,9 @@ Governance-хаб для управления задачами и стратег
 |-----------|-----------|
 | `current/` | Текущий WeekPlan |
 | `docs/` | Strategy.md, Dissatisfactions.md, Session Agenda.md |
+| `inbox/WP-*.md` | Файлы контекста РП: накопленная история работы между сессиями |
 | `archive/` | Завершённые планы |
+| `archive/wp-contexts/` | Архивированные контекстные файлы завершённых РП |
 | `exocortex/` | Backup memory/ + CLAUDE.md |
 
 **Паттерн:** Hub-and-Spoke — DS-strategy (хаб) координирует, */WORKPLAN.md (споки) в каждом репо.
