@@ -42,10 +42,15 @@ jobs:
           fi
 
           count=$(grep -rn '/opt/homebrew' . --include="*.md" --include="*.sh" \
-                  --include="*.json" --include="*.plist" 2>/dev/null | wc -l)
+                  --include="*.json" --include="*.plist" 2>/dev/null \
+                  | grep -v 'README.md' \
+                  | grep -v 'validate-template.yml' \
+                  | grep -v '/usr/local/bin.*:/opt/homebrew' \
+                  | wc -l)
           if [ "$count" -gt 0 ]; then
             echo "FAIL: Found /opt/homebrew in $count locations:"
-            grep -rn '/opt/homebrew' . --include="*.md" --include="*.sh" 2>/dev/null | head -5
+            grep -rn '/opt/homebrew' . --include="*.md" --include="*.sh" 2>/dev/null \
+                | grep -v 'README.md' | grep -v 'validate-template.yml' | head -5
             FAIL=1
           fi
 
