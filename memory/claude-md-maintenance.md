@@ -1,11 +1,13 @@
 # Обслуживание экзокортекса (CLAUDE.md + Memory)
 
-## Архитектура
+> Source-of-truth: `DP.EXOCORTEX.001`
+
+## Архитектура (после рефакторинга 2026-02-10)
 
 | Слой | Файл | Лимит | Загрузка |
 |------|------|-------|----------|
 | 1 | MEMORY.md | ≤100 строк | Авто (всегда) |
-| 2 | {{WORKSPACE_DIR}}/CLAUDE.md | ≤300 строк | Авто (всегда) |
+| 2 | ~/Github/CLAUDE.md | ≤300 строк | Авто (всегда) |
 | 3 | memory/*.md | ≤10 файлов, ≤100 строк каждый | По ссылкам |
 
 ## Что куда добавлять
@@ -18,11 +20,15 @@
 | Правило для типа репо | memory/repo-type-rules.md |
 | Урок (кросс-системный) | memory/<topic>.md |
 | Урок (одна система) | <repo>/CLAUDE.md |
-| Новый процесс/сценарий | PROCESSES.md (DS-ecosystem-development или repo) |
+| Новый процесс/сценарий | PROCESSES.md (ecosystem-dev или repo) |
 
 ## Backup
 
-На Close и Day-Close: `memory/*.md + {{WORKSPACE_DIR}}/CLAUDE.md → DS-strategy/exocortex/`
+На Close и Day-Close: `memory/*.md + ~/Github/CLAUDE.md → DS-strategy/exocortex/`
+
+## CLAUDE.md НЕ в git
+
+`~/Github/CLAUDE.md` не находится ни в одном git-репо. `~/Github/` — родительская папка, НЕ репозиторий. **НИКОГДА не делать `git init` в `~/Github/`.** Версионирование — только через backup в `DS-strategy/exocortex/`.
 
 ## Иерархия заголовков
 

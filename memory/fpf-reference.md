@@ -1,6 +1,6 @@
 # FPF (First Principles Framework) — справочник
 
-> Источник: `{{WORKSPACE_DIR}}/FPF/FPF-Spec.md`
+> Источник: `~/Github/FPF/FPF-Spec.md` (4.6 MB, ~50000 строк)
 
 ## Когда читать FPF
 
@@ -18,12 +18,20 @@
 ## Структура FPF
 
 - **Part A** — Kernel: Holon, BoundedContext, Role-Method-Work, Signature Stack
-- **Part B** — Aggregation, Trust, Evolution Loop
-- **Part C** — Domain extensions
+- **Part B** — Aggregation (Γ), Trust (F-G-R), Evolution Loop
+- **Part C** — Domain extensions: Sys-CAL, KD-CAL, Kind-CAL, NQD-CAL
 - **Part D** — Ethics & Conflict
 - **Part E** — Constitution & Authoring
-- **Part F** — Terminology unification
+- **Part F** — Terminology unification (UTS, Bridges)
 - **Part G** — SoTA Kit
+
+## Системная терминология
+
+| Русский | English (FPF) | Описание |
+|---------|---------------|----------|
+| Надсистема | Suprasystem | Содержит SoI (∋) |
+| Целевая система | System-of-Interest (SoI) | То, что создаём |
+| Система создания | Constructor | Создаёт SoI (→) |
 
 ## Универсальные различения
 
@@ -31,8 +39,11 @@
 |------------|--------------|
 | Объект ≠ Модель | Модель — упрощение реальности |
 | Модель ≠ Данные | Структура vs значения |
+| Данные ≠ Представление | Внутреннее vs внешнее |
 | Метод ≠ Инструмент | Способ действия vs средство |
+| Метод ≠ Сценарий | Что делать vs пошаговый план |
 | Знание ≠ Обучение | Pack vs курс |
+| Знание ≠ Информация | Формализовано vs сырые данные |
 | Виды ≠ Характеристики | Классификация vs измеряемое качество |
 
 ## Принципы работы
@@ -43,3 +54,7 @@
 | Ограниченный контекст | A.1.1 | Термин определён в границах контекста |
 | Строгие различения | A.7 | Роль ≠ Метод ≠ Работа |
 | ADI-цикл | B.5 | Абдукция → Дедукция → Индукция |
+
+## Обновление
+
+Периодически: `cd ~/Github/FPF && git pull`
