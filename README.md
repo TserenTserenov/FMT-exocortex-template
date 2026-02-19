@@ -33,11 +33,13 @@
 
 | Инструмент | Проверить | Установить |
 |-----------|-----------|-----------|
-| macOS | — | Необходим для launchd-автоматизации |
-| Git | `git --version` | `xcode-select --install` |
-| GitHub CLI | `gh --version` | `brew install gh` |
+| **ОС** | macOS, Linux или Windows (WSL) | macOS: launchd (авто). Linux: cron. Windows: WSL + cron |
+| Git | `git --version` | macOS: `xcode-select --install` / Linux: `sudo apt install git` / Windows: WSL |
+| GitHub CLI | `gh --version` | macOS: `brew install gh` / Linux: [cli.github.com](https://cli.github.com/) |
 | GitHub аккаунт | `gh auth status` | `gh auth login` |
 | Claude Code | `claude --version` | `npm install -g @anthropic-ai/claude-code` |
+
+> **Автоматизация Стратега:** на macOS — launchd (устанавливается автоматически). На Linux — настройте cron вручную (`crontab -e`). Без автоматизации всё работает — Стратег запускается вручную: `bash strategist-agent/scripts/strategist.sh morning`
 
 ### Шаг 1: Запустить установку (~5 мин)
 
@@ -189,9 +191,46 @@ T1: Старт  →  T2: Изучение  →  T3: Персонализация
 |---|---|---|---|---|---|
 | **Вход** | /start в боте (5 мин) | Подписка на программу | Заполнить Digital Twin (20 мин) | setup.sh (10 мин) | Владелец платформы |
 | **ИИ-роль** | Ассистент | Эксперт | Наставник | Со-мыслитель | Архитектор |
-| **Бот** | Марафон, Лента | + Руководства, Программы | + Персональные ответы | — | — |
+| **Бот** | Марафон, Лента | + Руководства, Программы | + Персональные ответы | Всё из T3 + Claude Code | Всё из T4 |
 | **Рабочее пространство** | Только бот | Бот + контент | + Digital Twin | + Git + Claude Code + Стратег | + исходный код + деплой |
 | **Знания** | Поиск по базе | + полный доступ к гайдам | + персонализация | + свои Pack и DS | + управление standard/ |
+
+---
+
+## Репозитории пользователя
+
+После установки и по мере роста у тебя появятся следующие репозитории:
+
+### Создаются автоматически (setup.sh)
+
+| Репо | Тип | Что это | Откуда |
+|------|-----|---------|--------|
+| **FMT-exocortex-template/** | Format | Твой форк шаблона экзокортекса (источник обновлений, CLAUDE.md, memory/, Стратег) | Fork от [FMT-exocortex-template](https://github.com/TserenTserenov/FMT-exocortex-template) |
+| **DS-strategy/** | Downstream/governance | Стратегический хаб: WeekPlan, DayPlan, inbox, стратегия, неудовлетворённости | Создаётся setup.sh из шаблона `my-strategy/` |
+
+### Создаёшь сам (когда готов)
+
+| Репо | Тип | Когда создавать | Как |
+|------|-----|----------------|-----|
+| **PACK-{твоя-область}/** | Pack | Определил область знаний, которую хочешь формализовать | Из шаблона [SPF/pack-template](https://github.com/TserenTserenov/SPF) |
+| **DS-{твой-проект}/** | Downstream/instrument | Начал строить систему на основе Pack | `gh repo create DS-my-project --private` |
+
+### Клонируешь при необходимости (read-only reference)
+
+| Репо | Тип | Когда нужен | Ссылка |
+|------|-----|-------------|--------|
+| **SPF/** | Framework | Создаёшь первый Pack (нужен pack-template/) | [SPF](https://github.com/TserenTserenov/SPF) |
+| **FPF/** | Framework | Нужны первые принципы (редко, для углублённого изучения) | [FPF](https://github.com/TserenTserenov/FPF) |
+| **ZP/** | Foundation | Нулевые принципы (6 универсальных ограничений) | [ZP](https://github.com/TserenTserenov/ZP) |
+
+### Опциональные агенты (по мере роста)
+
+| Репо | Агент | Когда добавлять | Ссылка |
+|------|-------|----------------|--------|
+| **DS-extractor-agent/** | Экстрактор знаний | Первый Pack создан, 10+ сущностей. Автоматическое извлечение знаний из сессий | [DS-extractor-agent](https://github.com/TserenTserenov/DS-extractor-agent) |
+| **DS-synchronizer/** | Синхронизатор | 3+ репозитория. Кросс-репо синхронизация, code-scan, автоматические проекции | [DS-synchronizer](https://github.com/TserenTserenov/DS-synchronizer) |
+
+> **Принцип:** Начни с минимума (2 репо: FMT-exocortex-template + DS-strategy). Добавляй по мере роста. Не клонируй всё сразу.
 
 ---
 
@@ -240,7 +279,7 @@ T1: Старт  →  T2: Изучение  →  T3: Персонализация
 A: Да, для Claude Code нужна подписка Anthropic (API key). Стратег использует Claude Code для генерации планов.
 
 **Q: Работает ли на Linux/Windows?**
-A: Пока только macOS (из-за launchd для автоматизации Стратега). Linux-поддержка (systemd) — в плане.
+A: Да. Ядро (CLAUDE.md + memory/ + Claude Code) работает на любой ОС. Автоматизация Стратега: macOS — launchd (автоматически), Linux — cron (настроить вручную), Windows — через WSL + cron. Без автоматизации Стратег запускается вручную.
 
 **Q: Что если я не хочу Стратега?**
 A: Можно не устанавливать launchd-агентов. CLAUDE.md и memory/ будут работать и без них — просто не будет автоматических планов.
