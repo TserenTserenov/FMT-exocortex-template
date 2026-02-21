@@ -272,7 +272,44 @@ Digital Twin используется ботом (T3+) для персонали
 
 ---
 
-## 5. ИИ-агенты
+## 5. Роли и ИИ-агенты
+
+### 5.0. Ролецентричный подход
+
+В экзокортексе роль описывается **независимо от исполнителя**. Сначала определяем: что нужно делать, какие обязательства, какие рабочие продукты. Потом выбираем: кто это исполняет (bash-скрипт, Claude, человек).
+
+```
+Роль (ЧТО делать)              Исполнитель (КТО делает)
+├── Стратег                     ← A1 Claude (CLI)
+├── Экстрактор                  ← A1 Claude (CLI)
+├── Синхронизатор               ← I2 bash (Grade 0-1) + A1 Claude (Grade 2)
+├── Шаблонизатор                ← I3 bash (Grade 0) + A1 Claude (Grade 2)
+└── Заказчик                    ← A2 Пользователь (ты)
+```
+
+**Ключевые принципы:**
+- **Роль ≠ Система.** Одно имя (напр. «Синхронизатор») может обозначать и роль, и систему — это разные ракурсы
+- **Один исполнитель — много ролей.** Claude играет роли Стратега, Экстрактора, Кодера, Архитектора
+- **Одна роль — много исполнителей.** Роль Синхронизатора: bash (механика) + Claude (аудит консистентности)
+- **Grade определяет автономность:** 0 = алгоритм, 2 = частичные решения, 4 = полная автономия
+
+**Шаблон описания роли:**
+
+```yaml
+name: "Название"
+type: functional | agential       # Grade 0-1 vs Grade 2+
+suprasystem: "Надсистема"
+obligations: [что ДОЛЖНА делать]
+methods: [КАК выполняет]
+work_products: [ЧТО создаёт и КОМУ]
+scenarios: [ситуации исполнения с min_agency_grade]
+current_holders: [кто СЕЙЧАС играет]
+failure_modes: [что может сломаться]
+```
+
+**Где изучить:**
+- Каталог ролей (20 ролей): DP.AGENT.001 §3.2
+- Архитектурное обоснование: DP.D.033 (Role-Centric Architecture)
 
 ### 5.1. Стратег (DS-strategist-agent)
 
@@ -325,7 +362,7 @@ Digital Twin используется ботом (T3+) для персонали
 |---------|-----------|
 | Fleeting-notes sync | Синхронизация заметок (каждые 2 мин) |
 | Notification dispatch | Уведомления в Telegram для всех агентов |
-| Template sync | Еженедельная синхронизация шаблона (Пн 02:00) |
+| Template sync | Ежедневная синхронизация шаблона (03:30, вызов R9 Шаблонизатора) |
 
 **Где изучить:**
 - [DS-synchronizer/README.md](https://github.com/TserenTserenov/DS-synchronizer) — документация
@@ -359,20 +396,28 @@ Digital Twin используется ботом (T3+) для персонали
 - [DS-pulse-agent/README.md](https://github.com/TserenTserenov/DS-pulse-agent) — метрики, тиры, режимы
 - [DS-pulse-agent/CLAUDE.md](https://github.com/TserenTserenov/DS-pulse-agent/blob/main/CLAUDE.md) — инструкции
 
-### 5.6. Setup Agent (DS-exocortex-setup-agent)
+### 5.6. Шаблонизатор (R9)
 
-**Роль:** Развёртывание экзокортекса для нового пользователя (setup.sh) и синхронизация шаблона (template-sync.sh).
+**Роль:** Поддержание актуальных генеративных шаблонов. Экзокортекс — первый шаблон, могут быть другие.
 
-| Процесс | Скрипт | Когда |
-|---------|--------|-------|
-| Setup | `setup.sh` | Один раз при установке |
-| Update | `update.sh` | По необходимости |
-| Template Sync | `template-sync.sh` | Еженедельно (Пн 02:00) |
-| Validate | `validate-template.sh` | После каждого sync + CI |
+**Итоговый рабочий продукт:** Актуальный генеративный шаблон — репозиторий на GitHub, который в любой момент: актуален (≤24ч), генеративен (fork → setup.sh → работает), чист (нет авторских данных), понятен.
 
-**Где изучить:**
-- [DS-exocortex-setup-agent/CLAUDE.md](https://github.com/TserenTserenov/DS-exocortex-setup-agent) — архитектура обновлений, плейсхолдеры
-- [DS-exocortex-setup-agent/MAPSTRATEGIC.md](https://github.com/TserenTserenov/DS-exocortex-setup-agent/blob/main/MAPSTRATEGIC.md) — дорожная карта
+| Сценарий | Триггер | Grade |
+|----------|---------|-------|
+| Template Sync | Ежедневно (03:30, через R8 Синхронизатор) | 0 |
+| Drift Detection | После sync или по запросу | 2 (ИИ) |
+| Semantic Validation | После sync (если были изменения) | 2 (ИИ) |
+| First-Time Setup | Пользователь: `bash setup.sh` | 0 |
+| User Update | Пользователь: `bash update.sh` | 0 |
+| Generativity Check | CI (GitHub Actions) | 0 |
+
+**Как получить обновления:**
+```bash
+bash update.sh          # Получить последние изменения из upstream
+bash update.sh --check  # Превью без применения
+```
+
+> MEMORY.md **никогда** не перезаписывается при обновлении — пользовательские данные защищены.
 
 ### Схема взаимодействия агентов
 
