@@ -9,7 +9,7 @@
 ## Upstream dependencies
 
 - Ваш Personal Pack (знания о созидателе)
-- Ваш Digital Platform Pack (архитектура агента Стратег)
+- Ваш Digital Platform Pack (архитектура роли Стратег)
 
 ## Downstream outputs
 

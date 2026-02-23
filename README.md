@@ -14,7 +14,7 @@
 |-----------|-----------|
 | **CLAUDE.md** | Правила для Claude Code: как открывать сессию, как фиксировать знания, как закрывать. Claude помнит контекст между сессиями |
 | **memory/** | Оперативная память: текущие задачи, различения, чеклисты, SOTA-практики. Claude читает их в начале каждой сессии |
-| **Стратег** | Агент, который запускается автоматически: утренний план дня, вечернее ревью, недельная сессия стратегирования |
+| **Стратег** | Роль (R1), запускается автоматически: утренний план дня, вечернее ревью, недельная сессия стратегирования |
 | **DS-strategy/** | Твой стратегический хаб: планы недель, отчёты, неудовлетворённости, входящие заметки |
 
 **Как это выглядит на практике:**
@@ -44,7 +44,7 @@
 
 > **WakaTime** трекает время работы: по проектам, категориям (AI Coding, Coding, Writing Docs), редакторам. Интеграция включает три уровня: (1) Claude Code hooks — heartbeat при каждом промпте и tool call, (2) VS Code extension — время редактирования файлов, (3) Desktop App — время фокуса окна (чтение ответов, браузер). Бесплатный план: статистика за 2 недели. Данные используются Стратегом в Week Review (S03) и Morning Check (S42). **Настройка:** `/setup-wakatime` в Claude Code. Подробнее: [wakatime.com](https://wakatime.com).
 
-> **Автоматизация Стратега:** на macOS — launchd (устанавливается автоматически). На Linux — настройте cron вручную (`crontab -e`). Без автоматизации всё работает — Стратег запускается вручную: `bash agents/strategist/scripts/strategist.sh morning`
+> **Автоматизация Стратега:** на macOS — launchd (устанавливается автоматически). На Linux — настройте cron вручную (`crontab -e`). Без автоматизации всё работает — Стратег запускается вручную: `bash roles/strategist/scripts/strategist.sh morning`
 
 ### Шаг 1: Запустить установку (~5 мин)
 
@@ -116,7 +116,7 @@ Claude прочитает CLAUDE.md и memory/ и проведёт тебя че
 5. Замените `{{TIMEZONE_HOUR}}` на час запуска стратега в UTC (напр. `4` для 7:00 MSK)
 6. Замените `{{TIMEZONE_DESC}}` на описание времени (напр. `7:00 MSK`)
 7. Замените `{{CLAUDE_PATH}}` на путь к Claude CLI (напр. `/opt/homebrew/bin/claude`)
-8. Установите launchd-агентов: `cd agents/strategist && bash install.sh`
+8. Установите launchd-агентов: `cd roles/strategist && bash install.sh`
 9. Скопируйте `memory/` в `~/.claude/projects/.../memory/`
 10. Скопируйте `CLAUDE.md` в корень рабочей директории
 
@@ -155,7 +155,7 @@ FMT-exocortex-template/                    ~/Github/ (твоё рабочее п
 ├── memory/*.md          ──── копия ────→   ├── ~/.claude/projects/.../memory/
 │   └── MEMORY.md (скелет)                  │   └── MEMORY.md (★ твой, пустой)
 │                                           │
-├── agents/strategist/   ── install.sh ──→  ├── ~/Library/LaunchAgents/ (расписание)
+├── roles/strategist/   ── install.sh ──→  ├── ~/Library/LaunchAgents/ (расписание)
 │                                           │
 ├── seed/strategy/       ── создаёт репо ─→ ├── DS-strategy/ (★ отдельный приватный репо)
 │                                           │
@@ -201,7 +201,7 @@ FMT-exocortex-template ──── update.sh ──→ Твой fork (git merge
                                ├──→ CLAUDE.md       → ~/Github/CLAUDE.md
                                ├──→ memory/*.md     → ~/.claude/projects/.../
                                │    (MEMORY.md НЕ трогается!)
-                               └──→ agents/prompts/ → остаются в fork
+                               └──→ roles/prompts/ → остаются в fork
 
 DS-strategy/     ← НЕ затрагивается (отдельный репо)
 PACK-{область}/  ← НЕ затрагивается (твой репо)
@@ -335,8 +335,8 @@ FMT-exocortex-template/
 ├── docs/                            # Справочная документация
 │   └── LEARNING-PATH.md             # Путь изучения: принципы, протоколы, SOTA
 │
-├── agents/                          # Агенты (точка расширения)
-│   └── strategist/                  # Агент-стратег
+├── roles/                          # Роли (точка расширения)
+│   └── strategist/                  # Роль: Стратег (R1)
 │       ├── install.sh               # Установка launchd/cron
 │       ├── prompts/                 # 9 сценариев (day-plan, week-review...)
 │       └── scripts/                 # Скрипты запуска + launchd plist
@@ -358,7 +358,7 @@ FMT-exocortex-template/
 
 | Зона | Что | update.sh | Пользователь |
 |------|-----|-----------|-------------|
-| **PLATFORM** | `memory/*.md` (кроме MEMORY.md), `agents/`, `docs/`, `.claude/` | Обновляет | Не трогает |
+| **PLATFORM** | `memory/*.md` (кроме MEMORY.md), `roles/`, `docs/`, `.claude/` | Обновляет | Не трогает |
 | **PERSONAL** | `memory/MEMORY.md` | Не трогает | Редактирует каждую сессию |
 | **SEED** | `seed/strategy/` | N/A | После setup → отдельный репо DS-strategy/ |
 | **ROOT** | `CLAUDE.md`, `README.md`, `ONTOLOGY.md` | CLAUDE.md обновляет | Читает |

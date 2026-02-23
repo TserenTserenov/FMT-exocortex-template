@@ -1,9 +1,9 @@
-# Агент Стратег (R1)
+# Стратег (R1)
 
-> **Модуль шаблона:** `agents/strategist/` в [FMT-exocortex-template](../../README.md)
-> **Роль:** R1 Стратег — планирование и отслеживание (DP.AGENT.001)
+> **Модуль шаблона:** `roles/strategist/` в [FMT-exocortex-template](../../README.md)
+> **Роль:** R1 Стратег — планирование и отслеживание (DP.D.033 §7, DP.AGENT.001)
 
-Агент Стратег автоматизирует операционное планирование: утренние планы, вечерние итоги, недельные обзоры.
+Роль Стратег автоматизирует операционное планирование: утренние планы, вечерние итоги, недельные обзоры. Текущий исполнитель: Claude (A1, Grade 3-4).
 
 ---
 
@@ -11,7 +11,7 @@
 
 ```
 FMT-exocortex-template/              DS-strategy/ (отдельный репо)
-  agents/strategist/                    current/
+  roles/strategist/                     current/
     prompts/                              WeekPlan W{N}.md
       session-prep.md                     WeekReport W{N}.md
       strategy-session.md                 DayPlan YYYY-MM-DD.md

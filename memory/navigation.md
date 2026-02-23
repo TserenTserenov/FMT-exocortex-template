@@ -22,7 +22,7 @@
 | Репо | Путь |
 |------|------|
 | Монорепо ИИ-систем (7 шт.) | `DS-IT-systems/DS-ai-systems/` |
-| — Стратег (Grade 3) | `FMT-exocortex-template/agents/strategist/` |
+| — Стратег (Grade 3) | `FMT-exocortex-template/roles/strategist/` |
 | — Шаблонизатор (Grade 0) | `DS-IT-systems/DS-ai-systems/setup/` |
 | — Наладчик (Grade 2) | `DS-IT-systems/DS-ai-systems/fixer/` |
 | — Статистик (Grade 1) | `DS-IT-systems/DS-ai-systems/pulse/` |
