@@ -1,4 +1,4 @@
-Выполни сценарий Day Plan для агента Стратег.
+Выполни сценарий Day Plan для роли Стратег (R1).
 
 Источник сценария: {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.AGENT.012-strategist/scenarios/scheduled/02-day-plan.md
 

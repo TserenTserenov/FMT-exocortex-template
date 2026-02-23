@@ -1,4 +1,4 @@
-# WORKPLAN: Стратег (agents/strategist)
+# WORKPLAN: Стратег (roles/strategist)
 
 > Рабочие продукты для этого репозитория.
 

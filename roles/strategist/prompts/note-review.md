@@ -1,4 +1,4 @@
-Выполни сценарий «Ежедневный разбор заметок» для агента Стратег.
+Выполни сценарий «Ежедневный разбор заметок» для роли Стратег (R1).
 
 Источник сценария: {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.AGENT.012-strategist/scenarios/scheduled/note-review.md
 

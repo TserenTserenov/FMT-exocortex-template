@@ -33,7 +33,7 @@ IWE — интегрированная среда из 6 компонентов.
 | Компонент | Что делает | Где живёт |
 |-----------|-----------|-----------|
 | **Экзокортекс** | Память и инструкции ИИ: правила, протоколы, различения | `~/Github/CLAUDE.md` + `memory/` |
-| **ИИ-агенты** | Стратег (планы), Экстрактор (знания), Синхронизатор (координация) | `agents/strategist/` (в шаблоне) |
+| **Роли ИИ** | Стратег (планы), Экстрактор (знания), Синхронизатор (координация) | `roles/strategist/` (в шаблоне) |
 | **Инструменты** | Git, MCP, WakaTime, бот — детерминированная инфраструктура | Локально + платформа (L2) |
 | **Методология** | FPF (мышление) + SPF (знания) + протоколы (ОРЗ) | `memory/*.md` + CLAUDE.md |
 | **Рабочее пространство** | Стратегический хаб, Pack, проектные репозитории | `~/Github/DS-strategy/` + `PACK-*/` |
@@ -99,7 +99,7 @@ FMT-exocortex-template/
 ├── docs/                            # Справочная документация
 │   └── LEARNING-PATH.md             # Этот файл
 │
-├── agents/                          # Агенты (точка расширения)
+├── roles/                          # Роли (точка расширения)
 │   └── strategist/                  # Стратег: промпты + скрипты + launchd
 │
 ├── seed/                            # Заготовки → отдельные репо после setup
@@ -114,7 +114,7 @@ FMT-exocortex-template/
 
 | Зона | Что | update.sh | Пользователь |
 |------|-----|-----------|-------------|
-| **PLATFORM** | `memory/*.md` (кроме MEMORY.md), `agents/`, `docs/`, `.claude/` | Обновляет | Не трогает |
+| **PLATFORM** | `memory/*.md` (кроме MEMORY.md), `roles/`, `docs/`, `.claude/` | Обновляет | Не трогает |
 | **PERSONAL** | `memory/MEMORY.md` | Не трогает | Редактирует каждую сессию |
 | **SEED** | `seed/strategy/` | N/A | После setup → отдельный репо DS-strategy/ |
 
@@ -149,7 +149,7 @@ FMT-exocortex-template/
 |-----------|---------|-------|
 | **Протоколы** | Open → Work → Close: как вести сессию | `memory/protocol-*.md` |
 | **Память** | 9 файлов: различения, SOTA, чеклисты, навигация | `memory/*.md` |
-| **Стратег** | 7 сценариев автоматического планирования | `agents/strategist/prompts/` |
+| **Стратег** | 7 сценариев автоматического планирования | `roles/strategist/prompts/` |
 | **Инструменты** | WakaTime hook, Claude Code skills | `.claude/hooks/`, `.claude/skills/` |
 | **Правила** | Архитектура репо, процессы, gates | `CLAUDE.md` |
 
@@ -175,7 +175,7 @@ FMT-exocortex-template (upstream) ──→ update.sh ──→ Твой fork (m
                                          ├──→ CLAUDE.md      → ~/Github/CLAUDE.md
                                          ├──→ memory/*.md    → ~/.claude/projects/.../
                                          │    (MEMORY.md НЕ трогается!)
-                                         └──→ agents/prompts → остаются в fork
+                                         └──→ roles/prompts → остаются в fork
 
 DS-strategy/     ← НЕ затрагивается
 PACK-{область}/  ← НЕ затрагивается
@@ -510,7 +510,7 @@ Open (вход)           →  Work (работа)            →  Close (вых
 **Паттерн Hub-and-Spoke:** DS-strategy (хаб) координирует, WORKPLAN.md в каждом репо (споки).
 
 **Где изучить:**
-- [agents/strategist/prompts/](../agents/strategist/prompts/) — 9 промптов для каждого сценария
+- [roles/strategist/prompts/](../roles/strategist/prompts/) — 9 промптов для каждого сценария
 
 ---
 

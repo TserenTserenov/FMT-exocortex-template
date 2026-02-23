@@ -37,4 +37,4 @@
 | **SOTA-практики** | `memory/sota-reference.md` |
 | Протокол работы | `memory/protocol-work.md` |
 | **Системно-специфичное** | **→ repo/CLAUDE.md** |
-| Стратег | `agents/strategist/README.md` (в шаблоне) |
+| Стратег | `roles/strategist/README.md` (в шаблоне) |
