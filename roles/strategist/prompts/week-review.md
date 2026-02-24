@@ -10,6 +10,14 @@
 - **WeekPlan:** {{WORKSPACE_DIR}}/DS-strategy/current/WeekPlan W*.md
 - **Шаблон:** {{WORKSPACE_DIR}}/PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.AGENT.012-strategist/templates/reviews/weekly-review.md
 
+### 0. WakaTime — время работы за неделю
+
+> Данные автоматически подставляются из WakaTime API.
+> Включи секцию WakaTime в WeekReport после метрик коммитов.
+> Если данных нет — напиши: «WakaTime: нет данных за неделю».
+
+{{WAKATIME_WEEK}}
+
 ## Алгоритм
 
 ### 1. Сбор данных (Стратег собирает сам)
