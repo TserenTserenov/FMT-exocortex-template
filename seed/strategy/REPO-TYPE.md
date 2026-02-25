@@ -1,6 +1,6 @@
 # Тип репозитория
 
-**Тип**: `Downstream/governance`
+**Тип**: `DS/governance`
 **Система (SoI)**: Созидатель
 **Содержание**: text-governance
 **Для кого**: personal

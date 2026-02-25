@@ -1,6 +1,6 @@
 # Тип репозитория
 
-**Тип**: `Format`
+**Тип**: `Base/Форматы`
 **Система (SoI)**: cross-cutting
 **Содержание**: text-description
 **Для кого**: public
