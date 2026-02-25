@@ -19,7 +19,7 @@
 
 ## Этап 0: Подготовка (15-20 мин)
 
-Если у тебя уже установлены Git, Node.js и GitHub CLI — переходи к Этапу 1.
+Если у тебя уже установлены Git, Node.js, GitHub CLI и Claude Code CLI — переходи к Этапу 1.
 
 ### 0.1 Homebrew (только macOS)
 
@@ -106,12 +106,12 @@ claude --version
 
 При первом запуске Claude Code попросит войти в аккаунт Anthropic — следуй инструкциям.
 
-### 0.6 VS Code (рекомендуется)
+### 0.6 VS Code (опционально)
 
-VS Code — редактор, в котором удобно работать с Claude Code.
+> Для установки IWE VS Code **не нужен** — всё работает через терминал. Но если предпочитаешь графический редактор — VS Code удобен для работы с Claude Code.
 
 - Скачай: [code.visualstudio.com](https://code.visualstudio.com/)
-- Установи расширение Claude Code (опционально): `Ctrl+Shift+X` → поиск «Claude Code»
+- Установи расширение Claude Code: `Ctrl+Shift+X` → поиск «Claude Code»
 
 ---
 
@@ -413,8 +413,6 @@ rm -rf ~/Github/DS-strategy
 | Через 2 недели | Создай первый Pack (личная база знаний) | `claude` → «Помоги создать мой первый Pack» |
 | По мере роста | Настрой Экстрактор (автоматическое извлечение знаний) | См. `roles/extractor/README.md` |
 | По желанию | Подключи Синхронизатор (уведомления в TG) | См. `roles/synchronizer/README.md` |
-
----
 
 ---
 
