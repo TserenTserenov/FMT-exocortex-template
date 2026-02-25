@@ -27,6 +27,8 @@
 
 > **Первая установка?** [SETUP-GUIDE.md](docs/SETUP-GUIDE.md) — пошаговое руководство от чистого компьютера (30-60 мин).
 > **Хочешь понять, что за этим стоит?** [LEARNING-PATH.md](docs/LEARNING-PATH.md) — полный путь изучения: принципы, протоколы, агенты, Pack, SOTA и где всё найти.
+> **Быстрая справка / FAQ:** [IWE-HELP.md](docs/IWE-HELP.md) — то же, что знает бот @aist_me_bot.
+> **Почему принципы, а не навыки?** [principles-vs-skills.md](docs/principles-vs-skills.md) — аргументация и генеративная иерархия.
 
 ---
 
@@ -394,7 +396,7 @@ FMT-exocortex-template/
 ## FAQ
 
 **Q: Нужна ли подписка Anthropic?**
-A: Да, для Claude Code нужна подписка Anthropic (API key). Стратег использует Claude Code для генерации планов.
+A: Да. Рекомендуется **Claude Max** (~$100/мес). **Claude Pro** ($20/мес) тоже работает, но с лимитами на количество сообщений. Стратег использует Claude Code для генерации планов.
 
 **Q: Работает ли на Linux/Windows?**
 A: Да. Ядро (CLAUDE.md + memory/ + Claude Code) работает на любой ОС. Автоматизация Стратега: macOS — launchd (автоматически), Linux — cron (настроить вручную), Windows — через WSL + cron. Без автоматизации Стратег запускается вручную.
