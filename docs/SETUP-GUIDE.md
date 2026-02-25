@@ -94,7 +94,7 @@ gh auth status
 
 ### 0.5 Claude Code CLI
 
-Требует подписку Anthropic (~$20/мес, Max plan).
+Требует подписку Anthropic: **Claude Max** (~$100/мес) или **Claude Pro** ($20/мес, с ограничениями). Для полноценной работы рекомендуется Max.
 
 ```bash
 # Установить
@@ -368,7 +368,7 @@ bash update.sh
 ## Часто задаваемые вопросы
 
 **Нужна ли подписка Anthropic?**
-Да, Claude Code требует подписку (~$20/мес, Max plan). Без неё Claude Code не запустится.
+Да, Claude Code требует подписку Anthropic. Рекомендуется **Claude Max** (~$100/мес). **Claude Pro** ($20/мес) тоже работает, но с лимитами на количество сообщений.
 
 **Работает ли на Windows?**
 Через WSL (Windows Subsystem for Linux) — да. Установи WSL, затем следуй инструкции для Linux. Launchd не работает в WSL — используй cron.
@@ -415,6 +415,16 @@ rm -rf ~/Github/DS-strategy
 | По желанию | Подключи Синхронизатор (уведомления в TG) | См. `roles/synchronizer/README.md` |
 
 ---
+
+---
+
+## Дополнительные материалы
+
+| Документ | Что содержит |
+|----------|-------------|
+| [LEARNING-PATH.md](LEARNING-PATH.md) | Полный путь изучения IWE: принципы, протоколы, агенты, Pack, SOTA |
+| [IWE-HELP.md](IWE-HELP.md) | Краткий справочник (FAQ, глоссарий) — то же, что знает бот |
+| [principles-vs-skills.md](principles-vs-skills.md) | Почему навыков недостаточно: принципы и генеративная иерархия |
 
 > **Нужна помощь?** Спроси бота @aist_me_bot — он знает всё про IWE, протоколы и настройку.
 > **Техническая проблема?** Открой issue: [github.com/TserenTserenov/FMT-exocortex-template/issues](https://github.com/TserenTserenov/FMT-exocortex-template/issues)

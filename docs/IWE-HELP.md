@@ -167,3 +167,11 @@ export TELEGRAM_CHAT_ID="your-id"
 | Platform-space | Стандартные файлы, обновляются из upstream |
 | User-space | Личные файлы, никогда не затираются |
 | Routing | Таблица маршрутизации знаний (куда класть captures) |
+
+---
+
+## Дополнительные материалы
+
+- [SETUP-GUIDE.md](SETUP-GUIDE.md) — пошаговая установка (от нуля до работающего IWE)
+- [LEARNING-PATH.md](LEARNING-PATH.md) — полный путь изучения: принципы, протоколы, агенты, Pack, SOTA
+- [principles-vs-skills.md](principles-vs-skills.md) — почему навыков недостаточно: принципы и генеративная иерархия
