@@ -1,6 +1,6 @@
 # Навигация по репозиториям (Слой 3)
 
-> Claude читает этот файл при поиске конкретного файла/репо. Для поиска знаний → `mcp__claude_ai_knowledge-mcp__search`.
+> Claude читает этот файл при поиске конкретного файла/репо. Для поиска знаний → MCP (см. секцию ниже).
 
 ## Ключевые файлы
 
@@ -47,13 +47,23 @@
 | Role-Centric Architecture | DP.D.033 |
 | Runbook ошибок бота | DP.RUNBOOK.001 |
 
-## MCP
+## MCP — доступ к знаниям
 
-| MCP | Путь |
-|-----|------|
-| knowledge-mcp (исходники) | `DS-MCP/knowledge-mcp/src/index.ts` |
-| knowledge-mcp (ingest) | `DS-MCP/knowledge-mcp/scripts/ingest.ts` |
-| guides-mcp (исходники) | `DS-MCP/guides-mcp/src/index.ts` |
+> Конфигурация: `.claude/settings.local.json` → `mcpServers`. Подробнее: CLAUDE.md § 5.
+
+| Что ищу | MCP-инструмент |
+|---------|---------------|
+| Доменное знание, паттерны, архитектура | `knowledge-mcp search("запрос", source_type="pack")` |
+| Конкретный документ по коду (DP.AGENT.001) | `knowledge-mcp get_document("filename")` |
+| Список источников знаний | `knowledge-mcp list_sources()` |
+| Образовательные руководства | `knowledge-mcp search("запрос", source_type="guides")` |
+| Цели ученика, самооценка | `ddt read_digital_twin("1_declarative/1_2_goals")` |
+| Структура метамодели двойника | `ddt describe_by_path("/")` |
+
+| MCP-сервер (исходники) | Путь |
+|------------------------|------|
+| knowledge-mcp | `DS-MCP/knowledge-mcp/src/index.ts` |
+| digital-twin-mcp | `DS-MCP/digital-twin-mcp/src/worker-sse.js` |
 
 ## Стратегия
 

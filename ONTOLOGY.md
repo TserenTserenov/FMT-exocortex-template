@@ -13,7 +13,7 @@
 
 | Вид | Тип (FPF) | Элементы | Без них |
 |-----|-----------|---------|---------|
-| **Системы** | U.System | Claude Code, бот, MCP, WakaTime, Git | Нет исполнения |
+| **Системы** | U.System | Claude Code, бот, MCP-серверы (knowledge-mcp, ddt), WakaTime, Git | Нет исполнения |
 | **Описания** | U.Description | Экзокортекс (CLAUDE.md + memory/), Pack, промпты, методология (FPF/SPF) | ИИ = stateless, вайб-работа |
 | **Роли** | U.RoleAssignment | Стратег (R1), Экстрактор (R2), Синхронизатор (R8), Пользователь | Хаос задач |
 | **Артефакты** | U.Work | DS-strategy/, Pack-репо, проекты, Цифровой двойник | Нет результата |
@@ -63,7 +63,7 @@
 
 ```
 L1: Ecosystem    — платформа + сообщество + все IWE пользователей + МИМ
-  L2: Platform   — инфраструктура и сервисы (бот, MCP, Knowledge Index)
+  L2: Platform   — инфраструктура и сервисы (бот, MCP-серверы, Knowledge Index)
     L3: Template — этот шаблон (CLAUDE.md + memory/ + стратег + DS-strategy/)
       L4: Personal IWE — твой экземпляр (настроенный, с личными Pack и данными)
 ```
@@ -79,9 +79,24 @@ L1: Ecosystem    — платформа + сообщество + все IWE по
 
 | Сервис | Тип | Роль | Продукт |
 |--------|-----|------|---------|
+| knowledge-mcp | MCP-сервер | Поиск по Pack, guides, DS | Результаты hybrid search (~5400 документов) |
+| ddt | MCP-сервер | Цифровой двойник ученика | Метамодель, цели, самооценка (IND.1-4) |
 | WakaTime | Инструмент | Observability работы | Метрики времени по проектам |
 
 > Подробная модель: [DS-ecosystem-development/11-platform-contours.md](https://github.com/TserenTserenov/DS-ecosystem-development)
+
+## MCP — протокол доступа к знаниям
+
+Claude Code подключается к 2 MCP-серверам платформы через HTTP (Cloudflare Workers). Конфигурация: `.claude/settings.local.json` → `mcpServers`. Обновляется через `update.sh`.
+
+| MCP-сервер | URL | Инструменты |
+|------------|-----|-------------|
+| **knowledge-mcp** | `https://knowledge-mcp.aisystant.workers.dev/mcp` | `search`, `get_document`, `list_sources` |
+| **ddt** | `https://digital-twin-mcp.aisystant.workers.dev/mcp` | `describe_by_path`, `read_digital_twin`, `write_digital_twin` |
+
+> Поиск по руководствам: `knowledge-mcp search("запрос", source_type="guides")`. Отдельный guides-mcp не нужен.
+
+**Принцип:** Одна база знаний — бот и экзокортекс работают с одними и теми же MCP-серверами. Поменял знание в Pack → и бот, и Claude Code сразу его видят.
 
 ## Иерархия принципов
 

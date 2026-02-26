@@ -86,7 +86,50 @@ jobs:
           [ "$FAIL" -eq 0 ] && echo "PASS: All required files present"
           exit $FAIL
 
-      # 5. Только допустимые placeholders
+      # 5. MCP-конфигурация
+      - name: Check MCP configuration
+        run: |
+          FAIL=0
+          SETTINGS=".claude/settings.local.json"
+          if [ ! -f "$SETTINGS" ]; then
+            echo "FAIL: $SETTINGS not found"
+            exit 1
+          fi
+
+          # Check mcpServers section exists
+          if ! python3 -c "import json; d=json.load(open('$SETTINGS')); assert 'mcpServers' in d" 2>/dev/null; then
+            echo "FAIL: mcpServers section missing in $SETTINGS"
+            FAIL=1
+          fi
+
+          # Check all 2 MCP servers are configured
+          for server in knowledge-mcp ddt; do
+            if ! python3 -c "import json; d=json.load(open('$SETTINGS')); assert '$server' in d['mcpServers']" 2>/dev/null; then
+              echo "FAIL: MCP server '$server' missing"
+              FAIL=1
+            fi
+          done
+
+          # Check URLs point to aisystant.workers.dev
+          BAD_URLS=$(python3 << 'PYEOF'
+          import json
+          d = json.load(open(".claude/settings.local.json"))
+          for name, cfg in d.get("mcpServers", {}).items():
+              url = cfg.get("url", "")
+              if "aisystant.workers.dev" not in url:
+                  print(name + ": " + url)
+          PYEOF
+          ) || true
+          if [ -n "$BAD_URLS" ]; then
+            echo "FAIL: MCP URLs not pointing to aisystant.workers.dev:"
+            echo "$BAD_URLS"
+            FAIL=1
+          fi
+
+          [ "$FAIL" -eq 0 ] && echo "PASS: MCP configuration valid (2 servers, correct URLs)"
+          exit $FAIL
+
+      # 6. Только допустимые placeholders
       - name: Check placeholders are valid
         run: |
           # Найти все {{...}} и проверить что они из допустимого списка

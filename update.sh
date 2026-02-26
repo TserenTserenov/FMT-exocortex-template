@@ -129,6 +129,42 @@ if [ -d "$EXOCORTEX_DIR/memory" ] && [ -d "$CLAUDE_MEMORY_DIR" ]; then
     echo "  Skipped: memory/MEMORY.md (user data preserved)"
 fi
 
+# Update MCP configuration (.claude/settings.local.json)
+# Strategy: update mcpServers URLs from upstream, preserve user's custom permissions
+SETTINGS_SRC="$EXOCORTEX_DIR/.claude/settings.local.json"
+SETTINGS_DST="$WORKSPACE_DIR/.claude/settings.local.json"
+if [ -f "$SETTINGS_SRC" ]; then
+    if [ -f "$SETTINGS_DST" ]; then
+        # Merge: take mcpServers from upstream, keep user permissions
+        if command -v python3 &>/dev/null; then
+            python3 -c "
+import json, sys
+with open('$SETTINGS_SRC') as f: src = json.load(f)
+with open('$SETTINGS_DST') as f: dst = json.load(f)
+# Update mcpServers from upstream
+dst['mcpServers'] = src.get('mcpServers', {})
+# Merge permissions: add new MCP tools from upstream, keep user's custom permissions
+src_perms = set(src.get('permissions', {}).get('allow', []))
+dst_perms = set(dst.get('permissions', {}).get('allow', []))
+# Add any new permissions from upstream that user doesn't have
+merged = sorted(dst_perms | src_perms)
+dst.setdefault('permissions', {})['allow'] = merged
+with open('$SETTINGS_DST', 'w') as f: json.dump(dst, f, indent=2, ensure_ascii=False)
+print('  Updated: .claude/settings.local.json (merged)')
+" 2>&1
+        else
+            # Fallback: just copy (no merge)
+            cp "$SETTINGS_SRC" "$SETTINGS_DST"
+            echo "  Updated: .claude/settings.local.json (replaced, python3 not found for merge)"
+        fi
+    else
+        # First install: just copy
+        mkdir -p "$(dirname "$SETTINGS_DST")"
+        cp "$SETTINGS_SRC" "$SETTINGS_DST"
+        echo "  Installed: .claude/settings.local.json"
+    fi
+fi
+
 # --- 5. Reinstall roles ---
 echo "[4/5] Reinstalling roles..."
 

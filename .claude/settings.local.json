@@ -23,7 +23,23 @@
       "Bash(launchctl load:*)",
       "Bash(launchctl unload:*)",
       "Bash(launchctl list:*)",
-      "Bash(claude:*)"
+      "Bash(claude:*)",
+      "mcp__knowledge-mcp__search",
+      "mcp__knowledge-mcp__get_document",
+      "mcp__knowledge-mcp__list_sources",
+      "mcp__ddt__describe_by_path",
+      "mcp__ddt__read_digital_twin",
+      "mcp__ddt__write_digital_twin"
     ]
+  },
+  "mcpServers": {
+    "knowledge-mcp": {
+      "type": "url",
+      "url": "https://knowledge-mcp.aisystant.workers.dev/mcp"
+    },
+    "ddt": {
+      "type": "url",
+      "url": "https://digital-twin-mcp.aisystant.workers.dev/mcp"
+    }
   }
 }

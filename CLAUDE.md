@@ -124,7 +124,34 @@ Backup на Close: `memory/ + CLAUDE.md → DS-strategy/exocortex/`
 
 ---
 
-## 5. АрхГейт (ArchGate) — ОБЯЗАТЕЛЬНАЯ оценка
+## 5. MCP — доступ к знаниям
+
+> **2 MCP-сервера** подключены автоматически через `.claude/settings.local.json`. Claude Code получает прямой доступ к базе знаний платформы.
+
+| MCP-сервер | Назначение | Инструменты |
+|------------|-----------|-------------|
+| **knowledge-mcp** | Поиск по Pack, guides, DS (~5400 документов) | `search`, `get_document`, `list_sources` |
+| **ddt** | Цифровой двойник ученика (метамодель, цели, самооценка) | `describe_by_path`, `read_digital_twin`, `write_digital_twin` |
+
+### Когда использовать
+
+| Ситуация | Инструмент |
+|----------|-----------|
+| Доменный вопрос, паттерн, архитектура | `knowledge-mcp search("запрос", source_type="pack")` |
+| Конкретный документ по коду (DP.AGENT.001) | `knowledge-mcp get_document("filename")` |
+| Обучение, методология, руководства | `knowledge-mcp search("запрос", source_type="guides")` |
+| Цели ученика, самооценка, контекст | `ddt read_digital_twin("1_declarative/1_2_goals")` |
+| Структура метамодели двойника | `ddt describe_by_path("/")` |
+
+### Правила
+
+1. **Перед ответом на доменный вопрос** → сначала `knowledge-mcp search`. Не полагаться на память — проверять по базе.
+2. **Перед записью в Pack** → `knowledge-mcp search` + `get_document` → убедиться: нет дубликата, нет противоречия.
+3. **Конфигурация** → `.claude/settings.local.json` (обновляется через `update.sh`).
+
+---
+
+## 6. АрхГейт (ArchGate) — ОБЯЗАТЕЛЬНАЯ оценка
 
 > **БЛОКИРУЮЩЕЕ.** Архитектурное решение → таблица ЭМОГССБ → вывод. Порог ≥8. Слабые (≤7) — НЕ предлагать.
 
@@ -145,7 +172,7 @@ Backup на Close: `memory/ + CLAUDE.md → DS-strategy/exocortex/`
 
 ---
 
-## 6. Обновление этого файла
+## 7. Обновление этого файла
 
 - Новые протоколы → `memory/protocol-*.md`, НЕ сюда
 - Различение (1-3 строки) → сюда
@@ -154,4 +181,4 @@ Backup на Close: `memory/ + CLAUDE.md → DS-strategy/exocortex/`
 
 ---
 
-*Последнее обновление: 2026-02-25*
+*Последнее обновление: 2026-02-26*

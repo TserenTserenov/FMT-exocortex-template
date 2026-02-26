@@ -25,6 +25,7 @@
 1. **Knowledge Extraction** → прочитай и выполни `roles/extractor/prompts/session-close.md`:
    - Собрать отложенные captures + проверить пропущенные
    - Классифицировать → маршрутизировать → формализовать → валидировать
+   - **MCP-проверка:** `knowledge-mcp search` → нет дубликатов в Pack
    - Показать Extraction Report → получить одобрение
    - Применить одобренные (accept → Pack/CLAUDE.md/memory)
 2. Обновить MEMORY.md (статус РП)
@@ -74,6 +75,7 @@
 - [ ] MEMORY.md обновлён (статусы РП)
 - [ ] DS-strategy/current/Plan обновлён
 - [ ] Captures применены
+- [ ] **MCP-проверка:** `knowledge-mcp search` → captures не дублируют существующее в Pack
 - [ ] **Selective Reindex:** Pack изменены? → `selective-reindex.sh`
 - [ ] **Repo CLAUDE.md:** feat-коммиты → новые правила для CLAUDE.md репо?
 - [ ] **WP context:** коммиты реализуют пункт WP-плана → пункт done?

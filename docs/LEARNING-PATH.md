@@ -677,24 +677,45 @@ PACK-{область}/
 - Протокол Close (§ 5.1) — когда активируется Экстрактор
 - [DP.AGENT.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.AGENT.001-ai-agents.md) R2 — полное описание роли
 
-### 6.5. Knowledge MCP: поиск по базе знаний
+### 6.5. MCP-серверы знаний
 
-Knowledge MCP — это сервис для поиска по всем Pack-репозиториям и документации. 9 источников, ~5400 документов.
+Claude Code подключается к 3 MCP-серверам платформы (через `.claude/settings.local.json`). Одна база знаний — бот и экзокортекс работают с одними и теми же серверами.
 
-**Как использовать (в Claude Code):**
+#### knowledge-mcp — поиск по базе знаний
 
-| Команда MCP | Что делает |
-|-------------|-----------|
-| `knowledge-mcp search` | Семантический поиск по всем источникам |
-| `knowledge-mcp get_document` | Получить конкретный документ по имени файла |
-| `knowledge-mcp list_sources` | Список всех доступных источников |
+Hybrid search (vector + keyword) по всем Pack-репозиториям и документации. ~5400 документов.
 
-**Типы источников:**
-- **pack** — доменные знания (PACK-digital-platform, PACK-education и др.)
-- **guides** — образовательные гайды
-- **ds** — процессы и сценарии
+| Инструмент | Что делает | Пример |
+|------------|-----------|--------|
+| `search` | Семантический + keyword поиск | `search("тиры обслуживания", source_type="pack")` → DP.ARCH.002 |
+| `get_document` | Конкретный документ по имени | `get_document("DP.AGENT.001-ai-agents.md")` |
+| `list_sources` | Список всех источников | Показывает количество документов по категориям |
 
-**Пример:** Ищешь, как устроены тиры? → `search("тиры обслуживания", source_type="pack")` → находит DP.ARCH.002.
+**Типы источников:** `pack` (доменные знания), `guides` (руководства), `ds` (процессы).
+
+> Поиск по руководствам: `knowledge-mcp search("запрос", source_type="guides")`. Отдельный guides-сервер не нужен — knowledge-mcp объединяет все источники.
+
+#### ddt — цифровой двойник ученика
+
+Метамодель данных ученика: цели, самооценка, контекст, прогресс.
+
+| Инструмент | Что делает | Пример |
+|------------|-----------|--------|
+| `describe_by_path` | Структура метамодели | `describe_by_path("/")` → 4 категории IND.1-4 |
+| `read_digital_twin` | Чтение данных | `read_digital_twin("1_declarative/1_2_goals")` → цели ученика |
+| `write_digital_twin` | Запись в IND.1 | `write_digital_twin("1_declarative/...", data)` |
+
+> **IND.1 (Declarative)** — единственная записываемая категория. IND.2 (Collected), IND.3 (Derived), IND.4 (Generated) — только чтение.
+
+#### Когда какой MCP использовать
+
+| Ситуация | MCP-инструмент |
+|----------|---------------|
+| Доменный вопрос, паттерн, архитектура | `knowledge-mcp search(query, source_type="pack")` |
+| Конкретный документ по коду (DP.AGENT.001) | `knowledge-mcp get_document("filename")` |
+| Обучение, методология, руководства | `knowledge-mcp search(query, source_type="guides")` |
+| Цели ученика, самооценка | `ddt read_digital_twin("path")` |
+| Перед записью в Pack — проверка дубликатов | `knowledge-mcp search` + `get_document` |
 
 ### 6.6. Онтология: граф знаний
 
@@ -1068,7 +1089,7 @@ gh repo create PACK-my-domain --private --source=. --push
 | Какой тип у этого репо? | Смотри `REPO-TYPE.md` в репо | `<repo>/REPO-TYPE.md` |
 | Это система или эпистема? | Различение #1 | [hard-distinctions.md](../memory/hard-distinctions.md) |
 | Можно ли пропустить WP Gate? | Только если ≤15 мин, исследование, или экстренный баг-фикс | [CLAUDE.md](../CLAUDE.md) § 2 |
-| Как предложить решение? | Сначала ArchGate (6 характеристик) | [CLAUDE.md](../CLAUDE.md) § 5 |
+| Как предложить решение? | Сначала ArchGate (7 характеристик) | [CLAUDE.md](../CLAUDE.md) § 6 |
 | Какой SOTA применим? | Приоритетная тройка | [sota-reference.md](../memory/sota-reference.md) |
 | Где доменное знание? | Pack-репозитории или Knowledge MCP | § 6.5 |
 | Как закончить сессию? | Close Protocol (7 шагов) | § 5.1 |
