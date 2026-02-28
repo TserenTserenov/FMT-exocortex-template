@@ -270,6 +270,9 @@ MEMORY.md        ← НЕ затрагивается
 | Digital Twin | Данные | Бот → `/twin` | Персонализация ответов и планов | Цели, самооценка, контекст |
 | systemsworld.club | Экосистема | Регистрация | Сообщество, семинары | Доступ к материалам |
 | Git + GitHub | Инфраструктура | `setup.sh` (авто) | Версионирование, агенты | Репозитории, CI |
+| Marp | Инструмент | VS Code extension + CLI | Markdown → слайды | Слайдоменты (PDF/HTML) |
+
+**Marp — подготовка презентаций:** Marp превращает Markdown-файлы в слайды (PDF, HTML, PPTX). Workflow: пишешь `.md` с разделителем `---` → предпросмотр в VS Code (Marp extension) → экспорт `marp --pdf slides.md`. Слайдоменты (MIM.WP.001) — текстовые, поэтому Markdown + Git = версии, диффы, правки через Claude Code. Установка: `npm install -g @marp-team/marp-cli` + VS Code → Extensions → «Marp for VS Code».
 
 **Правило IntegrationGate:** Перед добавлением нового инструмента в свой IWE: (1) тип, (2) контур (L2/L3/L4), (3) роли, (4) продукты, (5) процессы.
 
