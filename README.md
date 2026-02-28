@@ -60,18 +60,18 @@ mkdir -p ~/Github
 
 > **Важно:** Эта папка — ваше рабочее пространство. В неё будут клонироваться все репозитории: `FMT-exocortex-template/`, `DS-strategy/`, `PACK-{область}/`, `DS-{проекты}/` и др. CLAUDE.md тоже будет лежать в корне этой папки. Название может быть любым (не обязательно `Github`), но все репо должны быть в одном месте — Claude Code ориентируется на эту структуру.
 
-### Шаг 1: Запустить установку (~5 мин)
+### Шаг 1: Форкнуть и запустить установку (~5 мин)
 
 ```bash
 cd ~/Github    # или ваша рабочая директория из Шага 0
-gh repo clone TserenTserenov/DS-ai-systems -- --depth 1
-cd DS-ai-systems/setup
+gh repo fork TserenTserenov/FMT-exocortex-template --clone --remote
+cd FMT-exocortex-template
 bash setup.sh
 ```
 
 Скрипт спросит:
 - GitHub username
-- Рабочую директорию (по умолчанию `~/Github` — укажите путь из Шага 0)
+- Рабочую директорию (по умолчанию — родительская папка шаблона)
 - Путь к Claude CLI (определяется автоматически)
 - Часовой пояс для Стратега (UTC)
 
@@ -79,12 +79,11 @@ bash setup.sh
 <summary>Что делает setup.sh</summary>
 
 1. Проверяет prerequisites (git, gh, claude)
-2. Форкает `FMT-exocortex-template` → ваш GitHub аккаунт
-3. Заменяет 7 плейсхолдеров (`{{GITHUB_USER}}`, `{{WORKSPACE_DIR}}` и др.)
-4. Копирует `CLAUDE.md` → корень рабочей директории
-5. Копирует `memory/*.md` → `~/.claude/projects/.../memory/`
-6. Устанавливает launchd-агентов для Стратега
-7. Создаёт `DS-strategy/` — приватный репозиторий для стратегирования
+2. Заменяет 7 плейсхолдеров (`{{GITHUB_USER}}`, `{{WORKSPACE_DIR}}` и др.)
+3. Копирует `CLAUDE.md` → корень рабочей директории
+4. Копирует `memory/*.md` → `~/.claude/projects/.../memory/`
+5. Устанавливает launchd-агентов для Стратега
+6. Создаёт `DS-strategy/` — приватный репозиторий для стратегирования
 
 Посмотреть без выполнения: `bash setup.sh --dry-run`
 </details>

@@ -175,14 +175,14 @@ cd ~/Github
 
 > **Важно:** Название может быть любым (не обязательно `Github`), но все репо должны быть в одном месте — Claude Code ориентируется на эту структуру.
 
-### 1.2 Скачай и запусти установщик
+### 1.2 Форкни шаблон и запусти установку
 
-Установщик находится в репозитории [DS-ai-systems](https://github.com/TserenTserenov/DS-ai-systems). В терминале:
+В терминале:
 
 ```bash
-# Скачать репо с установщиком
-gh repo clone TserenTserenov/DS-ai-systems -- --depth 1
-cd DS-ai-systems/setup
+# Форкнуть шаблон на свой GitHub и склонировать
+gh repo fork TserenTserenov/FMT-exocortex-template --clone --remote
+cd FMT-exocortex-template
 
 # Запустить установку
 bash setup.sh
@@ -195,20 +195,18 @@ bash setup.sh
 | Вопрос | Что ввести | Пример |
 |--------|-----------|--------|
 | GitHub username | Твой логин на GitHub | `ivan-petrov` |
-| Workspace directory | Рабочая папка | `~/Github` (просто нажми Enter) |
+| Workspace directory | Рабочая папка | Просто нажми Enter (определяется автоматически) |
 | Claude CLI path | Путь к claude | Просто нажми Enter (определяется автоматически) |
 | Strategist launch hour (UTC) | Час запуска Стратега | `4` (= 7:00 MSK, 8:00 Алматы) |
 | Timezone description | Описание времени | `7:00 MSK` |
 
-Скрипт выполнит 8 шагов:
-1. Создаст твою копию (форк) [шаблона экзокортекса](https://github.com/TserenTserenov/FMT-exocortex-template) на GitHub
-2. Подставит твои данные во все файлы (имя, пути, часовой пояс)
-3. Установит `CLAUDE.md` — правила для Claude Code
-4. Установит `memory/` — оперативную память для Claude Code
-5. Настроит разрешения и MCP-подключение (`.claude/settings.local.json`)
-6. Установит автоматический запуск Стратега (launchd на macOS)
-7. Создаст `DS-strategy/` — твой приватный стратегический репозиторий на GitHub
-8. Проверит MCP-подключение к базе знаний платформы
+Скрипт выполнит 6 шагов:
+1. Подставит твои данные во все файлы (имя, пути, часовой пояс)
+2. Установит `CLAUDE.md` — правила для Claude Code
+3. Установит `memory/` — оперативную память для Claude Code
+4. Настроит разрешения и MCP-подключение (`.claude/settings.local.json`)
+5. Установит автоматический запуск Стратега (launchd на macOS)
+6. Создаст `DS-strategy/` — твой приватный стратегический репозиторий на GitHub
 
 ### 1.3 Проверь установку
 
