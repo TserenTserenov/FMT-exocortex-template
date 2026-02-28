@@ -80,7 +80,8 @@ git -C {{WORKSPACE_DIR}}/<repo> log --since="yesterday 00:00" --until="today 00:
 ### 3. Контекст недели
 
 - Загрузи обновлённый WeekPlan
-- Рассчитай прогресс: done/total РП, оставшийся бюджет
+- Рассчитай прогресс: done/total РП
+- **Бюджет (WakaTime):** Запроси `{{WAKATIME_WEEK}}` (или WakaTime API: `/users/current/summaries?start={Mon}&end={today}`). Суммируй `grand_total.total_seconds` за все дни → `Факт`. Формула: `Осталось = Бюджет_недели - Факт_WakaTime`. Бюджет недели берётся из WeekPlan (строка «Бюджет W{N}»)
 - Учти carry-over из итогов вчера
 
 ### 3а. Контекстные файлы РП
@@ -157,7 +158,7 @@ agent: Стратег
 ## Контекст недели W{N}
 **Прогресс:** X/Y РП done (N%)
 **Ключевые дедлайны:** [список]
-**Осталось:** ~Nh из Nh
+**Бюджет W{N}:** Nh | **Факт (WakaTime):** Xh Ym | **Осталось:** ~Zh
 
 ---
 
