@@ -113,6 +113,21 @@ already_ran_today() {
     [ -f "$LOG_FILE" ] && grep -q "Completed scenario: $scenario" "$LOG_FILE"
 }
 
+# File-based lock to prevent concurrent execution (RunAtLoad + CalendarInterval race)
+LOCK_DIR="$LOG_DIR/locks"
+mkdir -p "$LOCK_DIR"
+
+acquire_lock() {
+    local scenario="$1"
+    local lockfile="$LOCK_DIR/${scenario}.${DATE}.lock"
+    if ! mkdir "$lockfile" 2>/dev/null; then
+        log "SKIP: $scenario already running (lock exists: $lockfile)"
+        exit 0
+    fi
+    # Auto-cleanup lock on exit
+    trap "rmdir '$lockfile' 2>/dev/null" EXIT
+}
+
 # Определяем какой сценарий запускать
 case "$1" in
     "morning")
@@ -123,7 +138,8 @@ case "$1" in
             SCENARIO="day-plan"
         fi
 
-        # Защита от повторного запуска (RunAtLoad + CalendarInterval)
+        # Защита от повторного запуска (RunAtLoad + CalendarInterval race condition)
+        acquire_lock "$SCENARIO"
         if already_ran_today "$SCENARIO"; then
             log "SKIP: $SCENARIO already completed today"
             exit 0
@@ -167,6 +183,7 @@ case "$1" in
         notify_telegram "day-plan"
         ;;
     "note-review")
+        acquire_lock "note-review"
         log "Evening: running note review"
         # Canary: count bold notes before
         FLEETING="$WORKSPACE/inbox/fleeting-notes.md"
