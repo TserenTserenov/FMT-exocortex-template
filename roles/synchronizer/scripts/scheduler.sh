@@ -17,9 +17,23 @@ LOG_DIR="$HOME/logs/synchronizer"
 LOG_FILE="$LOG_DIR/scheduler-$(date +%Y-%m-%d).log"
 
 ROLES_DIR="{{WORKSPACE_DIR}}/FMT-exocortex-template/roles"
-STRATEGIST_SH="$ROLES_DIR/strategist/scripts/strategist.sh"
-EXTRACTOR_SH="$ROLES_DIR/extractor/scripts/extractor.sh"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
+
+# Role runner discovery: reads runner path from role.yaml, fallback to convention
+get_role_runner() {
+    local role="$1"
+    local yaml="$ROLES_DIR/$role/role.yaml"
+    if [ -f "$yaml" ]; then
+        local runner
+        runner=$(grep '^runner:' "$yaml" | sed 's/runner: *//' | tr -d '"' | tr -d "'")
+        [ -n "$runner" ] && echo "$ROLES_DIR/$role/$runner" && return
+    fi
+    # Fallback: convention-based path
+    echo "$ROLES_DIR/$role/scripts/$role.sh"
+}
+
+STRATEGIST_SH="$(get_role_runner strategist)"
+EXTRACTOR_SH="$(get_role_runner extractor)"
 
 # Текущее время
 HOUR=$(date +%H)

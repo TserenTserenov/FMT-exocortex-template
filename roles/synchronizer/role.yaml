@@ -1,0 +1,21 @@
+# Role manifest — Синхронизатор (R8)
+# Source-of-truth: DP.AGENT.001 §3.2
+# Contract: roles/ROLE-CONTRACT.md
+
+name: synchronizer
+id: R8
+type: functional
+display_name: "Синхронизатор"
+
+scripts:
+  - scripts/scheduler.sh
+  - scripts/code-scan.sh
+  - scripts/daily-report.sh
+  - scripts/notify.sh
+  - scripts/sync-files.sh
+
+install:
+  auto: false
+  priority: 3
+
+notify_template: synchronizer.sh

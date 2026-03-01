@@ -229,30 +229,45 @@ else
     fi
 fi
 
-# === 5. Install roles ===
+# === 5. Install roles (autodiscovery via role.yaml) ===
 if $CORE_ONLY; then
     echo "[5/6] Автоматизация... пропущена (--core)"
-    echo "  Установить позже: bash $TEMPLATE_DIR/roles/strategist/install.sh"
+    echo "  Установить позже: см. $TEMPLATE_DIR/roles/ROLE-CONTRACT.md"
 else
     echo "[5/6] Installing roles..."
 
-    # Strategist (always installed in full mode)
-    STRATEGIST_DIR="$TEMPLATE_DIR/roles/strategist"
-    if [ -f "$STRATEGIST_DIR/install.sh" ]; then
-        chmod +x "$STRATEGIST_DIR/scripts/strategist.sh"
-        chmod +x "$STRATEGIST_DIR/install.sh"
-        bash "$STRATEGIST_DIR/install.sh"
-        echo "  ✓ Strategist installed"
-    else
-        echo "  WARN: roles/strategist/install.sh not found, skipping."
-        echo "  Install manually: bash $STRATEGIST_DIR/install.sh"
-    fi
+    MANUAL_ROLES=()
 
-    echo ""
-    echo "  Additional roles (install later when ready):"
-    echo "  - Extractor:     bash $TEMPLATE_DIR/roles/extractor/install.sh"
-    echo "  - Synchronizer:  bash $TEMPLATE_DIR/roles/synchronizer/install.sh"
-    echo "  See: $TEMPLATE_DIR/roles/README.md"
+    # Discover roles by role.yaml manifests (sorted by priority)
+    for role_dir in "$TEMPLATE_DIR"/roles/*/; do
+        [ -d "$role_dir" ] || continue
+        role_yaml="$role_dir/role.yaml"
+        [ -f "$role_yaml" ] || continue
+        role_name=$(basename "$role_dir")
+
+        if grep -q 'auto:.*true' "$role_yaml" 2>/dev/null; then
+            # Auto-install role
+            if [ -f "$role_dir/install.sh" ]; then
+                chmod +x "$role_dir/install.sh"
+                runner=$(grep '^runner:' "$role_yaml" | sed 's/runner: *//' | tr -d '"' | tr -d "'")
+                [ -n "$runner" ] && chmod +x "$role_dir/$runner" 2>/dev/null || true
+                bash "$role_dir/install.sh"
+                echo "  ✓ $role_name installed"
+            else
+                echo "  WARN: $role_name/install.sh not found, skipping."
+            fi
+        else
+            display=$(grep 'display_name:' "$role_yaml" 2>/dev/null | sed 's/display_name: *//' | tr -d '"')
+            MANUAL_ROLES+=("  - ${display:-$role_name}: bash $role_dir/install.sh")
+        fi
+    done
+
+    if [ ${#MANUAL_ROLES[@]} -gt 0 ]; then
+        echo ""
+        echo "  Additional roles (install later when ready):"
+        printf '%s\n' "${MANUAL_ROLES[@]}"
+        echo "  See: $TEMPLATE_DIR/roles/ROLE-CONTRACT.md"
+    fi
 fi
 
 # === 6. Create DS-strategy repo ===

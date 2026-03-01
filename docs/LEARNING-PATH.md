@@ -901,6 +901,17 @@ R8 Синхронизатор (диспетчер)
 - Каталог ролей (21 роль R1-R21): [DP.AGENT.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.AGENT.001-ai-agents.md)
 - Архитектурное обоснование: [DP.D.033](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/01-domain-contract/DP.D.033-role-centric-architecture.md)
 
+### 7.4. Контракт роли (для разработчиков)
+
+Каждая роль в `roles/` следует формальному контракту — спецификации того, что директория роли должна содержать. Контракт обеспечивает автодискавери: `setup.sh` и `update.sh` автоматически находят и обрабатывают роли без hardcoded списков.
+
+**Минимальный набор файлов:**
+- `role.yaml` — машиночитаемый манифест (имя, тип, режим установки)
+- `README.md` — человекочитаемое описание
+- `install.sh` — точка входа установки
+
+**Подробности и схема role.yaml:** [roles/ROLE-CONTRACT.md](../roles/ROLE-CONTRACT.md)
+
 ---
 
 ## 8. Качество и архитектура решений

@@ -1,0 +1,16 @@
+# Role manifest — Стратег (R1)
+# Source-of-truth: DP.AGENT.001 §3.2
+# Contract: roles/ROLE-CONTRACT.md
+
+name: strategist
+id: R1
+type: agential
+display_name: "Стратег"
+
+runner: scripts/strategist.sh
+
+install:
+  auto: true
+  priority: 1
+
+notify_template: strategist.sh

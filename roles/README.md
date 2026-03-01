@@ -79,21 +79,26 @@ export TELEGRAM_CHAT_ID="your-id"
 
 ## Как добавить роль
 
-Роли — точка расширения шаблона. Для добавления новой роли:
+Роли — точка расширения шаблона. Каждая роль следует [контракту](ROLE-CONTRACT.md) — формализованной спецификации структуры.
 
-1. Создай директорию `roles/<name>/`
-2. Добавь `README.md` с описанием
-3. Если роль — ИИ-агент: добавь `prompts/` со сценариями
-4. Если нужна автоматизация: добавь `scripts/` + `install.sh`
-5. Зарегистрируй в `synchronizer/scripts/scheduler.sh` (если нужно расписание)
-6. Добавь шаблон уведомления в `synchronizer/scripts/templates/<name>.sh`
+1. Создай `roles/<name>/`
+2. Создай `role.yaml` по схеме из [ROLE-CONTRACT.md](ROLE-CONTRACT.md)
+3. Добавь `README.md` с описанием (шаблон: [DP.D.033 §3](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/01-domain-contract/DP.D.033-role-centric-architecture.md))
+4. Добавь `install.sh` (скопируй из существующей роли, адаптируй)
+5. Если ИИ-агент: добавь `prompts/` со сценариями
+6. Если нужно расписание: добавь секцию в `synchronizer/config.yaml`
+7. Для уведомлений: добавь шаблон `synchronizer/scripts/templates/<name>.sh`
+
+`setup.sh` обнаружит роль автоматически:
+- `install.auto: true` в role.yaml → установит при полном setup
+- `install.auto: false` → выведет инструкцию для ручной установки
 
 ---
 
 ## Порядок установки
 
 ```
-1. Стратег (базовый, ставится через setup.sh)
+1. Стратег (базовый, install.auto: true → ставится через setup.sh)
    └── Работает автономно, достаточен для старта
 
 2. Экстрактор (после 1-2 недель работы)

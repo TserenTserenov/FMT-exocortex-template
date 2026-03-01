@@ -181,24 +181,18 @@ reinstall_role() {
     fi
 }
 
-# Reinstall roles whose files changed
-if echo "$CHANGED_FILES" | grep -q "^roles/strategist/"; then
-    reinstall_role "strategist"
-else
-    echo "  strategist: no changes"
-fi
+# Reinstall roles whose files changed (autodiscovery)
+for role_dir in "$EXOCORTEX_DIR"/roles/*/; do
+    [ -d "$role_dir" ] || continue
+    role_name=$(basename "$role_dir")
+    [ -f "$role_dir/install.sh" ] || continue
 
-if echo "$CHANGED_FILES" | grep -q "^roles/extractor/"; then
-    reinstall_role "extractor"
-else
-    echo "  extractor: no changes"
-fi
-
-if echo "$CHANGED_FILES" | grep -q "^roles/synchronizer/"; then
-    reinstall_role "synchronizer"
-else
-    echo "  synchronizer: no changes"
-fi
+    if echo "$CHANGED_FILES" | grep -q "^roles/$role_name/"; then
+        reinstall_role "$role_name"
+    else
+        echo "  $role_name: no changes"
+    fi
+done
 
 # --- Done ---
 echo "[5/5] Pushing merge commit..."
