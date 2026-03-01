@@ -37,18 +37,46 @@
 
 ### Требования
 
-| Инструмент | Проверить | Установить |
-|-----------|-----------|-----------|
-| **ОС** | macOS, Linux или Windows (WSL) | macOS: launchd (авто). Linux: cron. Windows: WSL + cron |
-| Git | `git --version` | macOS: `xcode-select --install` / Linux: `sudo apt install git` / Windows: WSL |
-| GitHub CLI | `gh --version` | macOS: `brew install gh` / Linux: [cli.github.com](https://cli.github.com/) |
-| GitHub аккаунт | `gh auth status` | `gh auth login` |
-| Claude Code | `claude --version` | `npm install -g @anthropic-ai/claude-code` |
-| WakaTime (рекомендуется) | `wakatime-cli --version` | `/setup-wakatime` в Claude Code (автоматически) |
+Два режима установки: **core** (минимальный, офлайн) и **full** (полный, с автоматизацией).
 
-> **WakaTime** трекает время работы: по проектам, категориям (AI Coding, Coding, Writing Docs), редакторам. Интеграция включает три уровня: (1) Claude Code hooks — heartbeat при каждом промпте и tool call, (2) VS Code extension — время редактирования файлов, (3) Desktop App — время фокуса окна (чтение ответов, браузер). Бесплатный план: статистика за 2 недели. Данные используются Стратегом в Week Review (S03) и Morning Check (S42). **Настройка:** `/setup-wakatime` в Claude Code. Подробнее: [wakatime.com](https://wakatime.com).
+| Инструмент | Core | Full | Проверить | Установить |
+|-----------|:----:|:----:|-----------|-----------|
+| **ОС** | ✓ | ✓ | macOS, Linux, Windows (WSL) | — |
+| **Git** | ✓ | ✓ | `git --version` | macOS: `xcode-select --install` / Linux: `sudo apt install git` |
+| **AI CLI** | ✓ | ✓ | Любой: Claude Code, Codex, Aider и др. | См. таблицу совместимости ниже |
+| **VS Code** | ✓ | ✓ | `code --version` | [code.visualstudio.com](https://code.visualstudio.com) |
+| GitHub CLI | — | ✓ | `gh --version` | macOS: `brew install gh` / Linux: [cli.github.com](https://cli.github.com/) |
+| GitHub аккаунт | — | ✓ | `gh auth status` | `gh auth login` |
+| Node.js | — | ✓ | `node --version` | Только если AI CLI = Claude Code |
+| WakaTime | — | — | `wakatime-cli --version` | Опционально. `/setup-wakatime` в Claude Code |
 
-> **Автоматизация Стратега:** на macOS — launchd (устанавливается автоматически). На Linux — настройте cron вручную (`crontab -e`). Без автоматизации всё работает — Стратег запускается вручную: `bash roles/strategist/scripts/strategist.sh morning`
+### Совместимость с AI CLI
+
+Ядро экзокортекса (CLAUDE.md, memory/, промпты) — это markdown-файлы. Они работают с **любым** AI CLI, который умеет читать файлы в рабочей директории.
+
+| AI CLI | Интерактивная работа | Автоматизация (Стратег) | MCP-серверы | Примечание |
+|--------|:-------------------:|:----------------------:|:-----------:|------------|
+| **Claude Code** (рекомендуемый) | Полная | Полная | Да | Hooks, skills, settings. `npm install -g @anthropic-ai/claude-code` |
+| **Codex** (OpenAI) | Работает | Через `AI_CLI=codex` | Нет | `npm install -g @openai/codex` |
+| **Aider** | Работает | Через `AI_CLI=aider` | Нет | `pip install aider-chat`. Флаг: `AI_CLI_PROMPT_FLAG=--message` |
+| **Continue.dev** | Работает | Нет | Частично | VS Code extension. Нет CLI для автоматизации |
+| **Cursor** | Работает | Нет | Нет | Встроенный AI. Читает CLAUDE.md как project rules |
+
+> **Как переключить AI CLI для автоматизации Стратега:**
+> ```bash
+> # По умолчанию — Claude Code (ничего менять не нужно)
+> bash roles/strategist/scripts/strategist.sh morning
+>
+> # Codex
+> AI_CLI=codex AI_CLI_PROMPT_FLAG=-p AI_CLI_EXTRA_FLAGS="" bash roles/strategist/scripts/strategist.sh morning
+>
+> # Aider
+> AI_CLI=aider AI_CLI_PROMPT_FLAG=--message AI_CLI_EXTRA_FLAGS="" bash roles/strategist/scripts/strategist.sh morning
+> ```
+
+> **WakaTime** трекает время работы: по проектам, категориям (AI Coding, Coding, Writing Docs), редакторам. Бесплатный план: статистика за 2 недели. Данные используются Стратегом в Week Review и Morning Check. **Настройка:** `/setup-wakatime` в Claude Code. Подробнее: [wakatime.com](https://wakatime.com).
+
+> **Автоматизация Стратега:** на macOS — launchd (устанавливается автоматически при полной установке). На Linux — настройте cron вручную (`crontab -e`). Без автоматизации всё работает — Стратег запускается вручную: `bash roles/strategist/scripts/strategist.sh morning`
 
 ### Шаг 0: Создать рабочую папку
 
@@ -60,20 +88,30 @@ mkdir -p ~/Github
 
 > **Важно:** Эта папка — ваше рабочее пространство. В неё будут клонироваться все репозитории: `FMT-exocortex-template/`, `DS-strategy/`, `PACK-{область}/`, `DS-{проекты}/` и др. CLAUDE.md тоже будет лежать в корне этой папки. Название может быть любым (не обязательно `Github`), но все репо должны быть в одном месте — Claude Code ориентируется на эту структуру.
 
-### Шаг 1: Форкнуть и запустить установку (~5 мин)
+### Шаг 1: Клонировать и запустить установку
+
+**Вариант A: Полная установка (~5 мин)** — git + GitHub + Claude Code + автоматизация Стратега:
 
 ```bash
-cd ~/Github    # или ваша рабочая директория из Шага 0
+cd ~/Github
 gh repo fork TserenTserenov/FMT-exocortex-template --clone --remote
 cd FMT-exocortex-template
 bash setup.sh
 ```
 
+**Вариант B: Минимальная установка (~2 мин)** — только git, без сети, любой AI CLI:
+
+```bash
+cd ~/Github
+git clone https://github.com/TserenTserenov/FMT-exocortex-template.git
+cd FMT-exocortex-template
+bash setup.sh --core
+```
+
 Скрипт спросит:
-- GitHub username
+- GitHub username (можно пропустить в core-режиме)
 - Рабочую директорию (по умолчанию — родительская папка шаблона)
-- Путь к Claude CLI (определяется автоматически)
-- Часовой пояс для Стратега (UTC)
+- Путь к Claude CLI и часовой пояс (только в полном режиме)
 
 <details>
 <summary>Что делает setup.sh</summary>
@@ -409,7 +447,7 @@ FMT-exocortex-template/
 ## FAQ
 
 **Q: Нужна ли подписка Anthropic?**
-A: Да. Рекомендуется начать с **Claude Pro** ($20/мес). Если получите значительный эффект от работы с Claude Code и упрётесь в лимиты — переходите на **Claude Max** (~$100/мес) для работы без ограничений. Стратег использует Claude Code для генерации планов.
+A: Для полной установки (Claude Code) — да, рекомендуется **Claude Pro** ($20/мес). Для минимальной установки (`setup.sh --core`) — нет, работает с любым AI CLI (Codex, Aider, Continue.dev и др.). Ядро экзокортекса — это markdown-файлы, совместимые с любой LLM. Подробнее: таблица совместимости AI CLI выше.
 
 **Q: Работает ли на Linux/Windows?**
 A: Да. Ядро (CLAUDE.md + memory/ + Claude Code) работает на любой ОС. Автоматизация Стратега: macOS — launchd (автоматически), Linux — cron (настроить вручную), Windows — через WSL + cron. Без автоматизации Стратег запускается вручную.

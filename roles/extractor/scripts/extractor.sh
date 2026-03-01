@@ -19,6 +19,11 @@ LOG_DIR="{{HOME_DIR}}/logs/extractor"
 CLAUDE_PATH="{{CLAUDE_PATH}}"
 ENV_FILE="{{HOME_DIR}}/.config/aist/env"
 
+# AI CLI: переопределение через переменные окружения (см. strategist.sh)
+AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
+AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
+AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+
 # Создаём папку для логов
 mkdir -p "$LOG_DIR"
 
@@ -81,10 +86,9 @@ $extra_args"
 
     cd "$WORKSPACE"
 
-    # Запуск Claude Code с промптом
-    "$CLAUDE_PATH" --dangerously-skip-permissions \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
-        -p "$prompt" \
+    # Запуск AI CLI с промптом
+    "$AI_CLI" $AI_CLI_EXTRA_FLAGS \
+        $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1
 
     log "Completed process: $command_file"

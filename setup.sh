@@ -3,33 +3,47 @@
 # Configures a forked FMT-exocortex-template: placeholders, memory, launchd, DS-strategy
 #
 # Usage:
-#   1. Fork this repo: gh repo fork TserenTserenov/FMT-exocortex-template --clone --remote
-#   2. cd FMT-exocortex-template
-#   3. bash setup.sh
+#   bash setup.sh          # Полная установка (git + GitHub CLI + Claude Code + автоматизация)
+#   bash setup.sh --core   # Минимальная установка (только git, без сети)
 #
 set -e
 
-VERSION="0.3.0"
+VERSION="0.4.0"
 DRY_RUN=false
+CORE_ONLY=false
 
 # === Parse arguments ===
-case "${1:-}" in
-    --dry-run)  DRY_RUN=true ;;
-    --version)  echo "exocortex-setup v$VERSION"; exit 0 ;;
-    --help|-h)
-        echo "Usage: setup.sh [OPTIONS]"
-        echo ""
-        echo "Options:"
-        echo "  --dry-run   Show what would be done without making changes"
-        echo "  --version   Show version"
-        echo "  --help      Show this help"
-        exit 0
-        ;;
-esac
+for arg in "$@"; do
+    case "$arg" in
+        --core)     CORE_ONLY=true ;;
+        --dry-run)  DRY_RUN=true ;;
+        --version)  echo "exocortex-setup v$VERSION"; exit 0 ;;
+        --help|-h)
+            echo "Usage: setup.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --core      Минимальная установка: только git, без сети (офлайн)"
+            echo "  --dry-run   Показать что будет сделано, без изменений"
+            echo "  --version   Версия скрипта"
+            echo "  --help      Эта справка"
+            echo ""
+            echo "Режимы:"
+            echo "  full (по умолчанию)  git + GitHub CLI + Claude Code + автоматизация Стратега"
+            echo "  --core               git + любой AI CLI. Без GitHub, без launchd"
+            exit 0
+            ;;
+    esac
+done
 
-echo "=========================================="
-echo "  Exocortex Setup v$VERSION"
-echo "=========================================="
+if $CORE_ONLY; then
+    echo "=========================================="
+    echo "  Exocortex Setup v$VERSION (core)"
+    echo "=========================================="
+else
+    echo "=========================================="
+    echo "  Exocortex Setup v$VERSION"
+    echo "=========================================="
+fi
 echo ""
 
 # === Detect template directory ===
@@ -59,29 +73,43 @@ check_command() {
     local cmd="$1"
     local name="$2"
     local install_hint="$3"
+    local required="${4:-true}"
     if command -v "$cmd" >/dev/null 2>&1; then
         echo "  ✓ $name: $(command -v "$cmd")"
     else
-        echo "  ✗ $name: NOT FOUND"
-        echo "    Install: $install_hint"
-        PREREQ_FAIL=1
+        if [ "$required" = "true" ]; then
+            echo "  ✗ $name: NOT FOUND"
+            echo "    Install: $install_hint"
+            PREREQ_FAIL=1
+        else
+            echo "  ○ $name: не установлен (опционально)"
+            echo "    Install: $install_hint"
+        fi
     fi
 }
 
+# Git — обязателен всегда
 check_command "git" "Git" "xcode-select --install"
-check_command "gh" "GitHub CLI" "brew install gh"
-check_command "node" "Node.js" "brew install node (or https://nodejs.org)"
-check_command "npm" "npm" "Comes with Node.js"
-check_command "claude" "Claude Code" "npm install -g @anthropic-ai/claude-code"
 
-# Check gh auth
-if command -v gh >/dev/null 2>&1; then
-    if gh auth status >/dev/null 2>&1; then
-        echo "  ✓ GitHub CLI: authenticated"
-    else
-        echo "  ✗ GitHub CLI: not authenticated"
-        echo "    Run: gh auth login"
-        PREREQ_FAIL=1
+if $CORE_ONLY; then
+    echo ""
+    echo "  Режим --core: проверяются только обязательные зависимости (git)."
+    echo "  GitHub CLI, Node.js, Claude Code — не требуются."
+else
+    check_command "gh" "GitHub CLI" "brew install gh"
+    check_command "node" "Node.js" "brew install node (or https://nodejs.org)"
+    check_command "npm" "npm" "Comes with Node.js"
+    check_command "claude" "Claude Code" "npm install -g @anthropic-ai/claude-code"
+
+    # Check gh auth
+    if command -v gh >/dev/null 2>&1; then
+        if gh auth status >/dev/null 2>&1; then
+            echo "  ✓ GitHub CLI: authenticated"
+        else
+            echo "  ✗ GitHub CLI: not authenticated"
+            echo "    Run: gh auth login"
+            PREREQ_FAIL=1
+        fi
     fi
 fi
 
@@ -93,20 +121,29 @@ if [ "$PREREQ_FAIL" -eq 1 ]; then
 fi
 
 # === Collect configuration ===
-read -p "GitHub username: " GITHUB_USER
+read -p "GitHub username (или Enter для пропуска): " GITHUB_USER
+GITHUB_USER="${GITHUB_USER:-your-username}"
+
 read -p "Workspace directory [$(dirname "$TEMPLATE_DIR")]: " WORKSPACE_DIR
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
 # Expand ~ to $HOME
 WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 
-read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
-CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
+if $CORE_ONLY; then
+    # Core: используем defaults, не спрашиваем Claude-специфичные параметры
+    CLAUDE_PATH="${AI_CLI:-claude}"
+    TIMEZONE_HOUR="4"
+    TIMEZONE_DESC="4:00 UTC"
+else
+    read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
+    CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
 
-read -p "Strategist launch hour (UTC, 0-23) [4]: " TIMEZONE_HOUR
-TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
+    read -p "Strategist launch hour (UTC, 0-23) [4]: " TIMEZONE_HOUR
+    TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
 
-read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 UTC]: " TIMEZONE_DESC
-TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 UTC}"
+    read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 UTC]: " TIMEZONE_DESC
+    TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 UTC}"
+fi
 
 HOME_DIR="$HOME"
 
@@ -117,21 +154,27 @@ echo ""
 echo "Configuration:"
 echo "  GitHub user:    $GITHUB_USER"
 echo "  Workspace:      $WORKSPACE_DIR"
-echo "  Claude path:    $CLAUDE_PATH"
-echo "  Schedule hour:  $TIMEZONE_HOUR (UTC)"
-echo "  Time desc:      $TIMEZONE_DESC"
+if $CORE_ONLY; then
+    echo "  Mode:           core (offline)"
+else
+    echo "  Claude path:    $CLAUDE_PATH"
+    echo "  Schedule hour:  $TIMEZONE_HOUR (UTC)"
+    echo "  Time desc:      $TIMEZONE_DESC"
+fi
 echo "  Home dir:       $HOME_DIR"
 echo "  Project slug:   $CLAUDE_PROJECT_SLUG"
 echo ""
 
 if $DRY_RUN; then
     echo "[DRY RUN] Would perform the following actions:"
-    echo "  1. Substitute 7 placeholders in all .md, .sh, .json, .plist, .yaml files"
+    echo "  1. Substitute placeholders in all .md, .sh, .json, .plist, .yaml files"
     echo "  2. Copy CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md"
     echo "  3. Copy memory/*.md → $HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory/"
-    echo "  4. Copy .claude/settings.local.json → $WORKSPACE_DIR/.claude/"
-    echo "  5. Install Strategist launchd agent (Extractor + Synchronizer = optional)"
-    echo "  6. Create DS-strategy repo from seed/strategy/ template"
+    if ! $CORE_ONLY; then
+        echo "  4. Copy .claude/settings.local.json → $WORKSPACE_DIR/.claude/"
+        echo "  5. Install Strategist launchd agent (Extractor + Synchronizer = optional)"
+    fi
+    echo "  6. Create DS-strategy repo ($(if $CORE_ONLY; then echo "local only"; else echo "+ GitHub"; fi))"
     exit 0
 fi
 
@@ -173,35 +216,44 @@ cp "$TEMPLATE_DIR/memory/"*.md "$CLAUDE_MEMORY_DIR/"
 echo "  Copied to $CLAUDE_MEMORY_DIR"
 
 # === 4. Copy .claude settings ===
-echo "[4/6] Installing Claude settings..."
-mkdir -p "$WORKSPACE_DIR/.claude"
-if [ -f "$TEMPLATE_DIR/.claude/settings.local.json" ]; then
-    cp "$TEMPLATE_DIR/.claude/settings.local.json" "$WORKSPACE_DIR/.claude/settings.local.json"
-    echo "  Copied to $WORKSPACE_DIR/.claude/settings.local.json"
+if $CORE_ONLY; then
+    echo "[4/6] Claude settings... пропущено (--core)"
 else
-    echo "  WARN: settings.local.json not found in template, skipping."
+    echo "[4/6] Installing Claude settings..."
+    mkdir -p "$WORKSPACE_DIR/.claude"
+    if [ -f "$TEMPLATE_DIR/.claude/settings.local.json" ]; then
+        cp "$TEMPLATE_DIR/.claude/settings.local.json" "$WORKSPACE_DIR/.claude/settings.local.json"
+        echo "  Copied to $WORKSPACE_DIR/.claude/settings.local.json"
+    else
+        echo "  WARN: settings.local.json not found in template, skipping."
+    fi
 fi
 
 # === 5. Install roles ===
-echo "[5/6] Installing roles..."
-
-# Strategist (always installed)
-STRATEGIST_DIR="$TEMPLATE_DIR/roles/strategist"
-if [ -f "$STRATEGIST_DIR/install.sh" ]; then
-    chmod +x "$STRATEGIST_DIR/scripts/strategist.sh"
-    chmod +x "$STRATEGIST_DIR/install.sh"
-    bash "$STRATEGIST_DIR/install.sh"
-    echo "  ✓ Strategist installed"
+if $CORE_ONLY; then
+    echo "[5/6] Автоматизация... пропущена (--core)"
+    echo "  Установить позже: bash $TEMPLATE_DIR/roles/strategist/install.sh"
 else
-    echo "  WARN: roles/strategist/install.sh not found, skipping."
-    echo "  Install manually: bash $STRATEGIST_DIR/install.sh"
-fi
+    echo "[5/6] Installing roles..."
 
-echo ""
-echo "  Additional roles (install later when ready):"
-echo "  - Extractor:     bash $TEMPLATE_DIR/roles/extractor/install.sh"
-echo "  - Synchronizer:  bash $TEMPLATE_DIR/roles/synchronizer/install.sh"
-echo "  See: $TEMPLATE_DIR/roles/README.md"
+    # Strategist (always installed in full mode)
+    STRATEGIST_DIR="$TEMPLATE_DIR/roles/strategist"
+    if [ -f "$STRATEGIST_DIR/install.sh" ]; then
+        chmod +x "$STRATEGIST_DIR/scripts/strategist.sh"
+        chmod +x "$STRATEGIST_DIR/install.sh"
+        bash "$STRATEGIST_DIR/install.sh"
+        echo "  ✓ Strategist installed"
+    else
+        echo "  WARN: roles/strategist/install.sh not found, skipping."
+        echo "  Install manually: bash $STRATEGIST_DIR/install.sh"
+    fi
+
+    echo ""
+    echo "  Additional roles (install later when ready):"
+    echo "  - Extractor:     bash $TEMPLATE_DIR/roles/extractor/install.sh"
+    echo "  - Synchronizer:  bash $TEMPLATE_DIR/roles/synchronizer/install.sh"
+    echo "  See: $TEMPLATE_DIR/roles/README.md"
+fi
 
 # === 6. Create DS-strategy repo ===
 echo "[6/6] Setting up DS-strategy..."
@@ -219,9 +271,14 @@ else
         git add -A
         git commit -m "Initial exocortex: DS-strategy governance hub"
 
-        # Create GitHub repo
-        gh repo create "$GITHUB_USER/DS-strategy" --private --source=. --push 2>/dev/null || \
-            echo "  GitHub repo DS-strategy already exists or creation skipped."
+        if ! $CORE_ONLY; then
+            # Create GitHub repo (full mode only)
+            gh repo create "$GITHUB_USER/DS-strategy" --private --source=. --push 2>/dev/null || \
+                echo "  GitHub repo DS-strategy already exists or creation skipped."
+        else
+            echo "  Локальный репозиторий создан. Для публикации на GitHub:"
+            echo "    cd $MY_STRATEGY_DIR && gh repo create $GITHUB_USER/DS-strategy --private --source=. --push"
+        fi
     else
         echo "  WARN: seed/strategy/ template not found. Creating minimal DS-strategy."
         mkdir -p "$MY_STRATEGY_DIR"/{current,inbox,archive/wp-contexts,docs,exocortex}
@@ -229,32 +286,51 @@ else
         git init
         git add -A
         git commit -m "Initial exocortex: DS-strategy governance hub (minimal)"
-        gh repo create "$GITHUB_USER/DS-strategy" --private --source=. --push 2>/dev/null || \
-            echo "  GitHub repo DS-strategy already exists or creation skipped."
+
+        if ! $CORE_ONLY; then
+            gh repo create "$GITHUB_USER/DS-strategy" --private --source=. --push 2>/dev/null || \
+                echo "  GitHub repo DS-strategy already exists or creation skipped."
+        fi
     fi
 fi
 
 # === Done ===
 echo ""
 echo "=========================================="
-echo "  Setup Complete!"
+if $CORE_ONLY; then
+    echo "  Setup Complete! (core)"
+else
+    echo "  Setup Complete!"
+fi
 echo "=========================================="
 echo ""
 echo "Verify installation:"
-echo "  ✓ CLAUDE.md:  $WORKSPACE_DIR/CLAUDE.md"
-echo "  ✓ Memory:     $CLAUDE_MEMORY_DIR/ ($(ls "$CLAUDE_MEMORY_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ') files)"
+echo "  ✓ CLAUDE.md:   $WORKSPACE_DIR/CLAUDE.md"
+echo "  ✓ Memory:      $CLAUDE_MEMORY_DIR/ ($(ls "$CLAUDE_MEMORY_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ') files)"
 echo "  ✓ DS-strategy: $MY_STRATEGY_DIR/"
-echo "  ✓ Template:   $TEMPLATE_DIR/"
+echo "  ✓ Template:    $TEMPLATE_DIR/"
 echo ""
-echo "Next steps:"
-echo "  1. cd $WORKSPACE_DIR"
-echo "  2. claude"
-echo "  3. Ask Claude: «Проведём первую стратегическую сессию»"
-echo ""
-echo "Strategist will run automatically:"
-echo "  - Morning ($TIMEZONE_DESC): strategy (Mon) / day-plan (Tue-Sun)"
-echo "  - Sunday night: week review"
-echo ""
+
+if $CORE_ONLY; then
+    echo "Next steps:"
+    echo "  1. cd $WORKSPACE_DIR"
+    echo "  2. Запустите ваш AI CLI (Claude Code, Codex, Aider, Continue.dev и др.)"
+    echo "  3. Скажите: «Проведём первую стратегическую сессию»"
+    echo ""
+    echo "Переход на полную установку (GitHub + автоматизация):"
+    echo "  bash $TEMPLATE_DIR/setup.sh"
+    echo ""
+else
+    echo "Next steps:"
+    echo "  1. cd $WORKSPACE_DIR"
+    echo "  2. claude"
+    echo "  3. Ask Claude: «Проведём первую стратегическую сессию»"
+    echo ""
+    echo "Strategist will run automatically:"
+    echo "  - Morning ($TIMEZONE_DESC): strategy (Mon) / day-plan (Tue-Sun)"
+    echo "  - Sunday night: week review"
+    echo ""
+fi
 echo "Update from upstream:"
 echo "  cd $TEMPLATE_DIR && bash update.sh"
 echo ""
