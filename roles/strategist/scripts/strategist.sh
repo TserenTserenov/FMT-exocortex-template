@@ -12,6 +12,14 @@ PROMPTS_DIR="$REPO_DIR/prompts"
 LOG_DIR="$HOME/logs/strategist"
 CLAUDE_PATH="{{CLAUDE_PATH}}"
 
+# AI CLI: переопределение через переменные окружения
+# По умолчанию: Claude Code. Примеры:
+#   AI_CLI=codex AI_CLI_PROMPT_FLAG=--prompt bash strategist.sh morning
+#   AI_CLI=aider AI_CLI_PROMPT_FLAG=--message AI_CLI_EXTRA_FLAGS="" bash strategist.sh morning
+AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
+AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
+AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+
 # Создаём папку для логов
 mkdir -p "$LOG_DIR"
 
@@ -80,10 +88,9 @@ run_claude() {
 
     cd "$WORKSPACE"
 
-    # Запуск Claude Code с содержимым команды как промпт
-    "$CLAUDE_PATH" --dangerously-skip-permissions \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
-        -p "$prompt" \
+    # Запуск AI CLI с содержимым команды как промпт
+    "$AI_CLI" $AI_CLI_EXTRA_FLAGS \
+        $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1
 
     log "Completed scenario: $command_file"
