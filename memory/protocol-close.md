@@ -41,7 +41,7 @@
    - Недоделка по РП → context file (секция «Осталось»)
    - Идея развития системы → `<repo>/MAPSTRATEGIC.md`
    - Новая задача → `DS-strategy/inbox/captures.md` или fleeting-notes.md
-   - Зерно для поста → `DS-strategy/current/draft-list.md` + `drafts/`
+   - Зерно для поста → `DS-strategy/drafts/draft-list.md`
 9. **Draft-list проверка:**
    - Были captures в Pack? → Предложить: «Pack обогащён — добавить черновик для поста?»
    - Обновить draft-list.md если создавались черновики в этой сессии

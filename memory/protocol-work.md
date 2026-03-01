@@ -26,7 +26,7 @@
 | Доменное (архитектура, паттерны) | Соответствующий Pack | Close | Да (KE) |
 | Различение, метод, FM, WP | Соответствующий Pack | Close | Да (KE) |
 | Крупный урок | `memory/<topic>.md` | Close | Нет |
-| Зерно для поста | `DS-strategy/current/draft-list.md` + `drafts/` | Close | Нет |
+| Зерно для поста | `DS-strategy/drafts/draft-list.md` + `drafts/` | Close | Нет |
 
 **Формат:** *«Capture: [что] → [куда]»*
 

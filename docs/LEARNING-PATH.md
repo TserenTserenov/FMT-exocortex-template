@@ -597,11 +597,11 @@ Open (вход)           →  Work (работа)            →  Close (вых
 
 | Папка | Что содержит |
 |-------|-------------|
-| `current/` | Текущий WeekPlan, DayPlan, draft-list |
+| `current/` | Текущий WeekPlan, DayPlan |
 | `inbox/WP-*.md` | Контексты задач (живая история работы) |
 | `docs/Strategy.md` | Твоя общая стратегия |
 | `docs/Dissatisfactions.md` | Неудовлетворённости (триггеры изменений) |
-| `drafts/` | Личные черновики (≤7 дней TTL) |
+| `drafts/` | Личные черновики + draft-list.md (индекс, ≤7 дней TTL) |
 | `archive/` | Завершённые планы |
 | `exocortex/` | Backup memory/ + CLAUDE.md |
 
@@ -669,7 +669,7 @@ Guards проверяются при каждом Note-Review и при созд
 
 | Компонент | Файл |
 |-----------|------|
-| Индекс черновиков | `DS-strategy/current/draft-list.md` |
+| Индекс черновиков | `DS-strategy/drafts/draft-list.md` |
 | Черновики | `DS-strategy/drafts/*.md` |
 | Протокол сортировки | `roles/strategist/prompts/note-review.md` (категория #4) |
 | Протокол Close | `memory/protocol-close.md` (шаг 9: draft-list) |
