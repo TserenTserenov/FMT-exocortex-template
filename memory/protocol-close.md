@@ -41,6 +41,10 @@
    - Недоделка по РП → context file (секция «Осталось»)
    - Идея развития системы → `<repo>/MAPSTRATEGIC.md`
    - Новая задача → `DS-strategy/inbox/captures.md` или fleeting-notes.md
+   - Зерно для поста → `DS-strategy/current/draft-list.md` + `drafts/`
+9. **Draft-list проверка:**
+   - Были captures в Pack? → Предложить: «Pack обогащён — добавить черновик для поста?»
+   - Обновить draft-list.md если создавались черновики в этой сессии
 
 ---
 
@@ -79,6 +83,7 @@
 - [ ] **Selective Reindex:** Pack изменены? → `selective-reindex.sh`
 - [ ] **Repo CLAUDE.md:** feat-коммиты → новые правила для CLAUDE.md репо?
 - [ ] **WP context:** коммиты реализуют пункт WP-плана → пункт done?
+- [ ] **Draft-list:** Pack обогащён → предложить черновик? Черновики из сессии → draft-list обновлён?
 - [ ] Backup → DS-strategy/exocortex/ синхронизирован
 - [ ] Context file: done → `mv inbox/WP-*.md → archive/wp-contexts/` (сразу при Close)
 - [ ] Отчёт Close сформирован
