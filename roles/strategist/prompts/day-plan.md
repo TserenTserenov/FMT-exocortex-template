@@ -128,7 +128,9 @@ git -C {{WORKSPACE_DIR}}/<repo> log --since="yesterday 00:00" --until="today 00:
 1. Если в `current/` есть предыдущий `DayPlan *.md`:
    - Используй `git mv "current/DayPlan YYYY-MM-DD.md" "archive/day-plans/"` (атомарно стейджит удаление + добавление в archive)
 2. Создай новый файл: `current/DayPlan YYYY-MM-DD.md` (дата = сегодня)
-3. Закоммить все изменения: `git add current/ archive/day-plans/ && git commit`
+3. Закоммить ТОЛЬКО эти изменения: `git add current/ archive/day-plans/ && git commit`
+
+> **ЗАПРЕЩЕНО коммитить `inbox/fleeting-notes.md`!** Этот файл модифицируется sync-agent (каждые 2 мин) и Note-Review. Day-Plan его ЧИТАЕТ (шаг 3b), но НЕ изменяет и НЕ стейджит. Включение fleeting-notes.md в коммит приводит к rebase-конфликтам.
 
 **Шаблон DayPlan:**
 

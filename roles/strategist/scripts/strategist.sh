@@ -194,14 +194,34 @@ case "$1" in
 
         # Canary: count bold notes after — if same or more, Step 10 likely failed
         BOLD_AFTER=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || echo 0)
-        log "Canary: $BOLD_AFTER bold notes after note-review (was $BOLD_BEFORE)"
+        log "Canary: $BOLD_AFTER"
+        NON_BOLD=$(grep -c '^[^*#>-]' "$FLEETING" 2>/dev/null || echo 0)
+        log "Non-bold content lines: $NON_BOLD"
         if [ "$BOLD_AFTER" -ge "$BOLD_BEFORE" ] && [ "$BOLD_BEFORE" -gt 0 ]; then
             log "WARN: Note-Review Step 10 may have failed — bold notes did not decrease ($BOLD_BEFORE → $BOLD_AFTER)"
-            # Direct TG alert (bypass notify.sh templates)
+        fi
+
+        # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
+        log "Running deterministic cleanup..."
+        CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
+        log "Cleanup: $CLEANUP_OUTPUT"
+
+        # If cleanup made changes, commit and push
+        if ! git -C "$WORKSPACE" diff --quiet -- inbox/fleeting-notes.md archive/notes/Notes-Archive.md 2>/dev/null; then
+            git -C "$WORKSPACE" add inbox/fleeting-notes.md archive/notes/Notes-Archive.md
+            git -C "$WORKSPACE" commit -m "chore: auto-cleanup processed notes from fleeting-notes.md" >> "$LOG_FILE" 2>&1 || true
+            git -C "$WORKSPACE" pull --rebase >> "$LOG_FILE" 2>&1 && log "Cleanup: pulled (rebase)" || log "WARN: cleanup pull --rebase failed"
+            git -C "$WORKSPACE" push >> "$LOG_FILE" 2>&1 && log "Cleanup: pushed" || log "WARN: cleanup push failed"
+        else
+            log "Cleanup: no changes to commit"
+        fi
+
+        # Alert if LLM failed AND cleanup was needed
+        if [ "$BOLD_AFTER" -ge "$BOLD_BEFORE" ] && [ "$BOLD_BEFORE" -gt 0 ]; then
             ENV_FILE="$HOME/.config/aist/env"
             if [ -f "$ENV_FILE" ]; then
                 set -a; source "$ENV_FILE"; set +a
-                ALERT_TEXT="⚠️ <b>Note-Review canary</b>: Step 10 не сработал ($BOLD_BEFORE → $BOLD_AFTER bold notes). Проверь логи: ~/logs/strategist/"
+                ALERT_TEXT="⚠️ <b>Note-Review canary</b>: Step 10 не сработал ($BOLD_BEFORE → $BOLD_AFTER bold). Deterministic cleanup applied."
                 ALERT_JSON=$(printf '%s' "$ALERT_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
                 curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
                     -H "Content-Type: application/json" \
