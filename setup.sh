@@ -124,6 +124,9 @@ fi
 read -p "GitHub username (или Enter для пропуска): " GITHUB_USER
 GITHUB_USER="${GITHUB_USER:-your-username}"
 
+read -p "Имя вашего экзокортекс-репо [DS-exocortex]: " EXOCORTEX_REPO
+EXOCORTEX_REPO="${EXOCORTEX_REPO:-DS-exocortex}"
+
 read -p "Workspace directory [$(dirname "$TEMPLATE_DIR")]: " WORKSPACE_DIR
 WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
 # Expand ~ to $HOME
@@ -153,6 +156,7 @@ CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
 echo ""
 echo "Configuration:"
 echo "  GitHub user:    $GITHUB_USER"
+echo "  Exocortex repo: $EXOCORTEX_REPO"
 echo "  Workspace:      $WORKSPACE_DIR"
 if $CORE_ONLY; then
     echo "  Mode:           core (offline)"
@@ -168,6 +172,7 @@ echo ""
 if $DRY_RUN; then
     echo "[DRY RUN] Would perform the following actions:"
     echo "  1. Substitute placeholders in all .md, .sh, .json, .plist, .yaml files"
+    echo "  1b. Rename repo to $EXOCORTEX_REPO (if different from current name)"
     echo "  2. Copy CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md"
     echo "  3. Copy memory/*.md → $HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory/"
     if ! $CORE_ONLY; then
@@ -202,6 +207,37 @@ find "$TEMPLATE_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -
 done
 
 echo "  Placeholders substituted."
+
+# === 1b. Rename repo (if name differs from FMT-exocortex-template) ===
+CURRENT_DIR_NAME="$(basename "$TEMPLATE_DIR")"
+if [ "$EXOCORTEX_REPO" != "$CURRENT_DIR_NAME" ]; then
+    echo ""
+    echo "[1b] Renaming repo: $CURRENT_DIR_NAME → $EXOCORTEX_REPO..."
+    TARGET_DIR="$(dirname "$TEMPLATE_DIR")/$EXOCORTEX_REPO"
+
+    if [ -d "$TARGET_DIR" ]; then
+        echo "  WARN: $TARGET_DIR already exists. Skipping rename."
+    else
+        # Replace references in all text files
+        find "$TEMPLATE_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | while read file; do
+            sed -i '' "s|$CURRENT_DIR_NAME|$EXOCORTEX_REPO|g" "$file"
+        done
+
+        # Rename GitHub repo (if gh is available and not core mode)
+        if ! $CORE_ONLY && command -v gh >/dev/null 2>&1; then
+            gh repo rename "$EXOCORTEX_REPO" --yes 2>/dev/null && \
+                echo "  ✓ GitHub repo renamed to $EXOCORTEX_REPO" || \
+                echo "  ○ GitHub rename skipped (rename manually: gh repo rename $EXOCORTEX_REPO)"
+        fi
+
+        # Rename local directory
+        mv "$TEMPLATE_DIR" "$TARGET_DIR"
+        TEMPLATE_DIR="$TARGET_DIR"
+        echo "  ✓ Local directory renamed to $EXOCORTEX_REPO"
+    fi
+else
+    echo "  Repo name unchanged ($CURRENT_DIR_NAME)."
+fi
 
 # === 2. Copy CLAUDE.md to workspace root ===
 echo "[2/6] Installing CLAUDE.md..."
