@@ -109,9 +109,9 @@ done
 0. **Pull** → `cd DS-my-strategy && git pull --rebase`
 1. **Knowledge Extraction** → прочитай и выполни `DS-IT-systems/DS-ai-systems/extractor/prompts/session-close.md`:
    - Собрать отложенные captures + проверить пропущенные
-   - Классифицировать → маршрутизировать → формализовать → валидировать
-   - Показать Extraction Report → получить одобрение
-   - Применить одобренные (accept → Pack/CLAUDE.md/memory)
+   - Классифицировать → **двойной routing** (domain → Pack, implementation → DS docs/) → формализовать → валидировать
+   - Показать Extraction Report (кандидаты → Pack **и** DS docs/) → получить одобрение
+   - Применить одобренные (accept → Pack / DS docs/ / CLAUDE.md / memory)
 2. Обновить MEMORY.md (статус РП) + **WP-REGISTRY.md** (`DS-my-strategy/docs/WP-REGISTRY.md`): обновить статус РП, дату. Если новые РП создавались в Open — проверить, что они уже в реестре
 3. Зафиксировать: что сделано, что осталось
 4. Закоммитить (с подтверждением)
