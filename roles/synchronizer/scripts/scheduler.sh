@@ -183,6 +183,17 @@ dispatch() {
         ran=1
     fi
 
+    # --- Синхронизатор: dt-collect (после code-scan) ---
+    if ! ran_today "synchronizer-dt-collect"; then
+        log "→ synchronizer dt-collect (hour=$HOUR)"
+        if "$SCRIPT_DIR/dt-collect.sh" >> "$LOG_FILE" 2>&1; then
+            mark_done "synchronizer-dt-collect"
+        else
+            log "WARN: dt-collect failed (will retry next dispatch)"
+        fi
+        ran=1
+    fi
+
     # --- Синхронизатор: daily-report (после code-scan и strategist morning) ---
     if ! ran_today "synchronizer-daily-report"; then
         if ran_today "strategist-morning" || (( 10#$HOUR >= 6 )); then

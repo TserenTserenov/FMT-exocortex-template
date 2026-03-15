@@ -10,6 +10,8 @@ display_name: "Синхронизатор"
 scripts:
   - scripts/scheduler.sh
   - scripts/code-scan.sh
+  - scripts/dt-collect.sh
+  - scripts/dt-collect-neon.py
   - scripts/daily-report.sh
   - scripts/notify.sh
   - scripts/sync-files.sh
