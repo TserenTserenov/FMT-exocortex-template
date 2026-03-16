@@ -5,6 +5,19 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.6.3] — 2026-03-16
+
+### Fixed
+- **Cross-platform compat:** `sed -i ''` → `sed_inplace` (setup.sh, update.sh) — GNU sed (Linux)
+- **Cross-platform compat:** `date -v` → `portable_date_offset` (fetch-wakatime.sh, dt-collect.sh, scheduler.sh) — GNU date (Linux)
+- **Cross-platform compat:** `osascript` → fallback notify-send (strategist.sh, extractor.sh) — Linux desktop
+- **Cross-platform compat:** setup.sh шаг 5 пропускается на Linux (нет launchctl)
+
+### Added
+- **docs/PLATFORM-COMPAT.md** — чеклист + обёртки + grep-команды
+- **.githooks/pre-commit** — блокирует коммит с raw платформозависимыми конструкциями
+- **CLAUDE.md §Различения** — правило кроссплатформенности
+
 ## [0.6.2] — 2026-03-16
 
 ### Added
