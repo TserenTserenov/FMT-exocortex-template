@@ -1,0 +1,48 @@
+#!/bin/bash
+# Pre-commit hook: block platform-specific constructs without wrappers
+# Install: git config core.hooksPath .githooks
+# See: docs/PLATFORM-COMPAT.md
+
+ISSUES=0
+
+# Get list of staged .sh files
+STAGED_SH=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null)
+[ -z "$STAGED_SH" ] && exit 0
+
+check_pattern() {
+    local pattern="$1"
+    local description="$2"
+    local exclude="${3:-}"
+
+    for file in $STAGED_SH; do
+        # Skip PLATFORM-COMPAT.md references
+        [ "$(basename "$file")" = "PLATFORM-COMPAT.md" ] && continue
+
+        # Check staged content (not working tree)
+        local matches
+        if [ -n "$exclude" ]; then
+            matches=$(git show ":$file" 2>/dev/null | grep -n "$pattern" | grep -v "$exclude" || true)
+        else
+            matches=$(git show ":$file" 2>/dev/null | grep -n "$pattern" || true)
+        fi
+
+        if [ -n "$matches" ]; then
+            echo "PLATFORM-COMPAT: $description"
+            echo "  File: $file"
+            echo "$matches" | while read line; do echo "  $line"; done
+            echo "  Fix: docs/PLATFORM-COMPAT.md"
+            echo ""
+            ISSUES=1
+        fi
+    done
+}
+
+check_pattern "sed -i ''" "raw sed -i '' (use sed_inplace)" "sed_inplace"
+check_pattern "date -v-" "raw date -v (use portable_date_offset)" "portable_date_offset\|2>/dev/null"
+check_pattern "readlink -f" "readlink -f (not portable)"
+check_pattern "grep -P " "grep -P (GNU-only, use grep -E)"
+
+if [ "$ISSUES" -eq 1 ]; then
+    echo "Commit blocked. See docs/PLATFORM-COMPAT.md for cross-platform wrappers."
+    exit 1
+fi

@@ -235,6 +235,12 @@ done
 
 echo "  Placeholders substituted."
 
+# Enable pre-commit hook for platform compatibility checks
+if [ -d "$TEMPLATE_DIR/.githooks" ]; then
+    git -C "$TEMPLATE_DIR" config core.hooksPath .githooks 2>/dev/null && \
+        echo "  Pre-commit hook enabled (.githooks/)" || true
+fi
+
 # === 1b. Rename repo (if name differs from FMT-exocortex-template) ===
 CURRENT_DIR_NAME="$(basename "$TEMPLATE_DIR")"
 if [ "$EXOCORTEX_REPO" != "$CURRENT_DIR_NAME" ]; then

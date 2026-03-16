@@ -175,6 +175,7 @@ Backup на Close: `memory/ + CLAUDE.md → DS-strategy/exocortex/`
 ## Различения
 
 > **IWE = Intellectual Work Environment** (интеллектуальная рабочая среда). Аналогия: IDE = Integrated Development Environment. НЕ «Intelligent», НЕ «Working».
+> **Кроссплатформенность:** Все `.sh` скрипты должны работать на macOS и Linux. Перед использованием `sed -i`, `date -v`, `osascript`, `readlink -f` — см. `docs/PLATFORM-COMPAT.md`.
 
 ---
 
