@@ -5,6 +5,11 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.8.3] — 2026-03-17
+
+### Added
+- **LEARNING-PATH.md §11** — FAQ: cross-device workflow (ноут + десктоп, кросс-ОС)
+
 ## [0.8.2] — 2026-03-17
 
 ### Added
