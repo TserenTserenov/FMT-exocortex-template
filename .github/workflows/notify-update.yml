@@ -81,8 +81,16 @@ jobs:
 
           echo "$VERSION" > /tmp/changelog_version.txt
 
+          # Проверяем, есть ли записи changelog за эти даты
+          if [ ! -s /tmp/changelog_entry.txt ]; then
+            echo "No changelog entries for $TODAY or $YESTERDAY — skipping notification"
+            echo "has_changelog=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changelog=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Send notification via bot webhook
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'true' && steps.changelog.outputs.has_changelog == 'true'
         env:
           BOT_WEBHOOK_URL: ${{ secrets.BOT_WEBHOOK_URL }}
           TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
