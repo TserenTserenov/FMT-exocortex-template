@@ -9,6 +9,15 @@
             "command": ".claude/hooks/wp-gate-reminder.sh"
           }
         ]
+      },
+      {
+        "description": "Close Gate: при триггере закрытия — compact Session Close или полный Day Close",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/close-gate-reminder.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
