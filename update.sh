@@ -194,6 +194,7 @@ fi
 
 echo "Не затрагиваются:"
 echo "  ✓ memory/MEMORY.md (личная оперативная память)"
+echo "  ✓ CLAUDE.md § «Мои правила» (секция USER-SPACE)"
 echo "  ✓ .secrets/, .mcp.json (ключи и конфигурация)"
 echo "  ✓ .claude/settings.local.json (permissions, MCP)"
 echo "  ✓ personal/ (ваши файлы)"
@@ -238,9 +239,26 @@ for f in "${NEW_FILES[@]}"; do
 done
 
 for f in "${UPDATED_FILES[@]}"; do
-    cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-    case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
-    echo "  ~ $f"
+    # Special handling for CLAUDE.md: preserve USER-SPACE section
+    if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
+        USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$SCRIPT_DIR/$f")
+        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
+        if [ -n "$USER_SECTION" ]; then
+            # Remote file has empty USER-SPACE template — replace it with user's content
+            # Remove the template USER-SPACE block from downloaded file
+            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$SCRIPT_DIR/$f"
+            # Append user's preserved section
+            echo "" >> "$SCRIPT_DIR/$f"
+            echo "$USER_SECTION" >> "$SCRIPT_DIR/$f"
+            echo "  ~ $f (USER-SPACE сохранён)"
+        else
+            echo "  ~ $f"
+        fi
+    else
+        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
+        case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+        echo "  ~ $f"
+    fi
     APPLIED=$((APPLIED + 1))
 done
 
@@ -293,7 +311,16 @@ echo "Обновление platform-space..."
 CLAUDE_UPDATED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = "CLAUDE.md" ]; then
+        # Preserve USER-SPACE from workspace CLAUDE.md (may differ from repo copy)
+        if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
+            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WORKSPACE_DIR/CLAUDE.md")
+        fi
         cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
+        if [ -n "${WS_USER_SECTION:-}" ]; then
+            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WORKSPACE_DIR/CLAUDE.md"
+            echo "" >> "$WORKSPACE_DIR/CLAUDE.md"
+            echo "$WS_USER_SECTION" >> "$WORKSPACE_DIR/CLAUDE.md"
+        fi
         echo "  ✓ $WORKSPACE_DIR/CLAUDE.md обновлён"
         CLAUDE_UPDATED=true
     fi
