@@ -1,12 +1,42 @@
 #!/bin/bash
-# Exocortex Update — pull upstream changes from FMT-exocortex-template
+# Exocortex Update — загрузка обновлений платформы из FMT-exocortex-template
 #
 # Использование:
-#   update.sh              # fetch + merge + reinstall platform-space
-#   update.sh --check      # только проверить, есть ли обновления
-#   update.sh --dry-run    # показать что изменится, не применять
+#   bash update.sh              # Превью + применение (с подтверждением)
+#   bash update.sh --check      # Только превью (без изменений)
+#   bash update.sh --yes        # Применить без подтверждения
+#   bash update.sh --dry-run    # Alias для --check
+#
+# Работает с template repos (created via "Use this template") —
+# не требует общей git-истории с upstream.
+#
+set -e
 
-set -euo pipefail
+VERSION="2.0.0"
+REPO="TserenTserenov/FMT-exocortex-template"
+BRANCH="main"
+RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
+
+CHECK_ONLY=false
+AUTO_YES=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --check|--dry-run)  CHECK_ONLY=true ;;
+        --yes)              AUTO_YES=true ;;
+        --version)          echo "exocortex-update v$VERSION"; exit 0 ;;
+        --help|-h)
+            echo "Usage: update.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --check     Показать доступные обновления без применения"
+            echo "  --yes       Применить обновления без подтверждения"
+            echo "  --version   Версия скрипта"
+            echo "  --help      Эта справка"
+            exit 0
+            ;;
+    esac
+done
 
 # === Cross-platform sed -i ===
 if sed --version >/dev/null 2>&1; then
@@ -15,311 +45,322 @@ else
     sed_inplace() { sed -i '' "$@"; }
 fi
 
+# === Detect directories ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# --- Определить рабочую директорию ---
-# Скрипт должен запускаться из корня форка экзокортекса
-if [ -f "$SCRIPT_DIR/CLAUDE.md" ] && [ -d "$SCRIPT_DIR/memory" ]; then
-    EXOCORTEX_DIR="$SCRIPT_DIR"
-else
-    echo "ERROR: Cannot find exocortex directory."
-    echo "Run this script from your exocortex fork root:"
+if [ ! -f "$SCRIPT_DIR/CLAUDE.md" ]; then
+    echo "ОШИБКА: Запускайте из корня экзокортекс-репо."
     echo "  cd /path/to/your-exocortex && bash update.sh"
     exit 1
 fi
 
-WORKSPACE_DIR="$(dirname "$EXOCORTEX_DIR")"
-DRY_RUN=false
-CHECK_ONLY=false
+WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 
-case "${1:-}" in
-    --dry-run)   DRY_RUN=true ;;
-    --check)     CHECK_ONLY=true ;;
-esac
+# === Temp directory ===
+TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
+trap "rm -rf '$TMPDIR_UPDATE'" EXIT
 
 echo "=========================================="
-echo "  Exocortex Update"
+echo "  Exocortex Update v$VERSION"
 echo "=========================================="
-echo "  Source: $EXOCORTEX_DIR"
+echo "  Репо: $SCRIPT_DIR"
 echo ""
 
-cd "$EXOCORTEX_DIR"
+# === Step 0: Self-update (bootstrap) ===
+echo "[0] Проверка update.sh..."
+REMOTE_UPDATE="$TMPDIR_UPDATE/update.sh.new"
+if curl -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_UPDATE" 2>/dev/null; then
+    LOCAL_HASH=$(shasum -a 256 "$SCRIPT_DIR/update.sh" 2>/dev/null | cut -d' ' -f1)
+    REMOTE_HASH=$(shasum -a 256 "$REMOTE_UPDATE" 2>/dev/null | cut -d' ' -f1)
+    if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+        echo "  Найдена новая версия update.sh — обновляю..."
+        cp "$REMOTE_UPDATE" "$SCRIPT_DIR/update.sh"
+        chmod +x "$SCRIPT_DIR/update.sh"
+        echo "  Перезапуск..."
+        exec bash "$SCRIPT_DIR/update.sh" "$@"
+    fi
+fi
+echo "  update.sh актуален."
+echo ""
 
-# --- 1. Fetch upstream ---
-echo "[1/6] Fetching upstream..."
-if ! git remote | grep -q upstream; then
-    echo "  Adding upstream remote..."
-    git remote add upstream https://github.com/TserenTserenov/FMT-exocortex-template.git
+# === Step 1: Fetch manifest ===
+echo "[1] Загрузка манифеста..."
+MANIFEST_URL="$RAW_BASE/update-manifest.json"
+MANIFEST="$TMPDIR_UPDATE/manifest.json"
+
+if ! curl -sSfL "$MANIFEST_URL" -o "$MANIFEST" 2>/dev/null; then
+    echo "ОШИБКА: Не удалось загрузить манифест обновлений."
+    echo "  URL: $MANIFEST_URL"
+    echo "  Проверьте подключение к интернету."
+    exit 1
 fi
 
-git fetch upstream main 2>&1 | sed 's/^/  /'
+# Parse version from manifest
+UPSTREAM_VERSION=$(grep '"version"' "$MANIFEST" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+echo "  Версия upstream: $UPSTREAM_VERSION"
+echo ""
 
-# --- 2. Check for changes ---
-LOCAL=$(git rev-parse HEAD)
-UPSTREAM=$(git rev-parse upstream/main)
-BASE=$(git merge-base HEAD upstream/main)
+# === Step 2: Download and compare files ===
+echo "[2] Сравнение файлов..."
 
-if [ "$LOCAL" = "$UPSTREAM" ]; then
-    echo "  Already up to date."
+NEW_FILES=()
+NEW_DESCS=()
+UPDATED_FILES=()
+UPDATED_LINES=()
+UNCHANGED=0
+
+# Parse manifest: extract path and desc for each file entry
+while IFS='|' read -r fpath fdesc; do
+    [ -z "$fpath" ] && continue
+
+    # Download remote file
+    REMOTE_FILE="$TMPDIR_UPDATE/files/$fpath"
+    mkdir -p "$(dirname "$REMOTE_FILE")"
+
+    if ! curl -sSfL "$RAW_BASE/$fpath" -o "$REMOTE_FILE" 2>/dev/null; then
+        continue
+    fi
+
+    if [ ! -f "$SCRIPT_DIR/$fpath" ]; then
+        # New file
+        NEW_FILES+=("$fpath")
+        NEW_DESCS+=("$fdesc")
+    else
+        # Existing file — compare hashes
+        LOCAL_HASH=$(shasum -a 256 "$SCRIPT_DIR/$fpath" 2>/dev/null | cut -d' ' -f1)
+        REMOTE_HASH=$(shasum -a 256 "$REMOTE_FILE" 2>/dev/null | cut -d' ' -f1)
+        if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+            DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$REMOTE_FILE" 2>/dev/null | grep -c '^[<>]' || echo "?")
+            UPDATED_FILES+=("$fpath")
+            UPDATED_LINES+=("$DIFF_COUNT")
+        else
+            UNCHANGED=$((UNCHANGED + 1))
+        fi
+    fi
+done < <(
+    # Parse JSON: extract path|desc pairs
+    python3 -c "
+import json, sys
+with open('$MANIFEST') as f:
+    data = json.load(f)
+for entry in data.get('files', []):
+    print(entry['path'] + '|' + entry.get('desc', ''))
+" 2>/dev/null || {
+    # Fallback: basic grep parsing if python3 not available
+    grep '"path"' "$MANIFEST" | while read -r line; do
+        fpath=$(echo "$line" | sed 's/.*"path"[[:space:]]*:[[:space:]]*"//;s/".*//')
+        echo "$fpath|"
+    done
+}
+)
+
+TOTAL_CHANGES=$(( ${#NEW_FILES[@]} + ${#UPDATED_FILES[@]} ))
+
+# === Step 3: Display results ===
+echo ""
+echo "=========================================="
+echo "  Обновления экзокортекса (v$UPSTREAM_VERSION)"
+echo "=========================================="
+echo ""
+
+if [ "$TOTAL_CHANGES" -eq 0 ]; then
+    echo "✓ Всё актуально. Обновлений нет. ($UNCHANGED файлов проверено)"
     exit 0
 fi
 
-COMMITS_BEHIND=$(git rev-list --count HEAD..upstream/main)
-echo "  $COMMITS_BEHIND new commits from upstream"
-echo ""
-
-# Show what changed
-echo "  Changes:"
-git log --oneline HEAD..upstream/main | sed 's/^/    /'
-echo ""
-
-if $CHECK_ONLY; then
-    echo "Run 'update.sh' to apply these changes."
-    exit 0
-fi
-
-# --- 3. Merge upstream ---
-echo "[2/6] Merging upstream..."
-
-if $DRY_RUN; then
-    echo "  [DRY RUN] Would merge $COMMITS_BEHIND commits"
-    echo "  Files that would change:"
-    git diff --stat HEAD..upstream/main | sed 's/^/    /'
-else
-    # Stash local changes if any
-    STASHED=false
-    if ! git diff --quiet || ! git diff --cached --quiet; then
-        echo "  Stashing local changes..."
-        git stash push -m "pre-update stash $(date +%Y-%m-%d)"
-        STASHED=true
-    fi
-
-    if ! git merge upstream/main --no-edit 2>&1 | sed 's/^/  /'; then
-        echo ""
-        echo "ERROR: Merge conflict. Resolve manually:"
-        echo "  cd $EXOCORTEX_DIR"
-        echo "  git status  # see conflicting files"
-        echo "  # resolve conflicts, then: git add . && git merge --continue"
-        exit 1
-    fi
-
-    # Restore stash if needed
-    if $STASHED; then
-        echo "  Restoring local changes..."
-        git stash pop || echo "  WARN: Stash pop conflict. Run 'git stash pop' manually."
-    fi
-fi
-
-# --- 3. Re-substitute placeholders ---
-echo "[3/6] Re-substituting placeholders..."
-
-# After merge, new lines from upstream may contain {{WORKSPACE_DIR}} etc.
-# Detect values from the current environment
-PLACEHOLDER_COUNT=$(grep -r '{{WORKSPACE_DIR}}' "$EXOCORTEX_DIR" --include="*.md" --include="*.sh" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.plist" -l 2>/dev/null | wc -l | tr -d ' ')
-
-if [ "$PLACEHOLDER_COUNT" -gt 0 ]; then
-    echo "  Found $PLACEHOLDER_COUNT files with unsubstituted {{WORKSPACE_DIR}}"
-    if $DRY_RUN; then
-        echo "  [DRY RUN] Would re-substitute {{WORKSPACE_DIR}} → $WORKSPACE_DIR in $PLACEHOLDER_COUNT files"
-    else
-        find "$EXOCORTEX_DIR" -type f \( -name "*.md" -o -name "*.json" -o -name "*.sh" -o -name "*.plist" -o -name "*.yaml" -o -name "*.yml" \) | while read file; do
-            sed_inplace "s|{{WORKSPACE_DIR}}|$WORKSPACE_DIR|g" "$file"
-        done
-        echo "  Re-substituted {{WORKSPACE_DIR}} → $WORKSPACE_DIR"
-
-        # Commit the re-substitution
-        if ! git -C "$EXOCORTEX_DIR" diff --quiet; then
-            git -C "$EXOCORTEX_DIR" add -A
-            git -C "$EXOCORTEX_DIR" commit -m "chore: re-substitute placeholders after upstream merge" --no-verify 2>&1 | sed 's/^/  /'
-        fi
-    fi
-else
-    echo "  No unsubstituted placeholders found"
-fi
-
-# Check for any remaining placeholders (other than WORKSPACE_DIR)
-REMAINING=$(grep -r '{{[A-Z_]*}}' "$EXOCORTEX_DIR" --include="*.md" --include="*.sh" --include="*.json" --include="*.yaml" -l 2>/dev/null | wc -l | tr -d ' ')
-if [ "$REMAINING" -gt 0 ]; then
-    echo "  WARN: $REMAINING files still have unsubstituted placeholders."
-    echo "  Run 'bash setup.sh' to re-substitute all placeholders."
-fi
-
-# --- 4. Show release notes ---
-echo "[4/6] Release notes..."
-if [ -f "$EXOCORTEX_DIR/CHANGELOG.md" ]; then
-    # Extract current version from CHANGELOG (first ## heading)
-    echo ""
-    echo "  ┌──────────────────────────────────────┐"
-    echo "  │         What's New                   │"
-    echo "  └──────────────────────────────────────┘"
-    # Show entries between first and second ## headings (latest version)
-    sed -n '/^## \[/,/^## \[/{/^## \[/!{/^## \[/!p}}' "$EXOCORTEX_DIR/CHANGELOG.md" | head -30 | sed 's/^/  /'
-    echo ""
-else
-    echo "  No CHANGELOG.md found"
-fi
-
-# --- 5. Reinstall platform-space ---
-echo "[5/6] Reinstalling platform-space..."
-
-# Copy CLAUDE.md to workspace root
-if [ -f "$EXOCORTEX_DIR/CLAUDE.md" ]; then
-    if $DRY_RUN; then
-        echo "  [DRY RUN] Would update: $WORKSPACE_DIR/CLAUDE.md"
-    else
-        cp "$EXOCORTEX_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
-        echo "  Updated: $WORKSPACE_DIR/CLAUDE.md"
-    fi
-fi
-
-# Merge ONTOLOGY.md: Platform-space (§1-4) from upstream, User-space (§5-6) preserved
-ONTOLOGY_SRC="$EXOCORTEX_DIR/ONTOLOGY.md"
-ONTOLOGY_DST="$WORKSPACE_DIR/ONTOLOGY.md"
-if [ -f "$ONTOLOGY_SRC" ]; then
-    if [ -f "$ONTOLOGY_DST" ]; then
-        # Extract User-space sections (§5-6) from current user file
-        USER_SECTIONS=$(sed -n '/^<!-- USER-SPACE/,$p' "$ONTOLOGY_DST")
-        if [ -n "$USER_SECTIONS" ]; then
-            if $DRY_RUN; then
-                echo "  [DRY RUN] Would merge ONTOLOGY.md (platform-space from upstream, user-space preserved)"
-            else
-                # Take Platform-space (everything before USER-SPACE marker) from upstream
-                sed '/^<!-- USER-SPACE/,$d' "$ONTOLOGY_SRC" > "$ONTOLOGY_DST.tmp"
-                # Append user's sections
-                echo "$USER_SECTIONS" >> "$ONTOLOGY_DST.tmp"
-                mv "$ONTOLOGY_DST.tmp" "$ONTOLOGY_DST"
-                echo "  Updated: ONTOLOGY.md (platform-space merged, user-space preserved)"
-            fi
+if [ ${#NEW_FILES[@]} -gt 0 ]; then
+    echo "Новые файлы (${#NEW_FILES[@]}):"
+    for i in "${!NEW_FILES[@]}"; do
+        f="${NEW_FILES[$i]}"
+        d="${NEW_DESCS[$i]}"
+        if [ -n "$d" ]; then
+            printf "  + %-45s — %s\n" "$f" "$d"
         else
-            if $DRY_RUN; then
-                echo "  [DRY RUN] Would copy ONTOLOGY.md (full copy, no user-space marker found)"
-            else
-                # No user-space marker found — full copy (first install or old format)
-                cp "$ONTOLOGY_SRC" "$ONTOLOGY_DST"
-                echo "  Updated: ONTOLOGY.md (full copy, no user-space found)"
-            fi
-        fi
-    else
-        if $DRY_RUN; then
-            echo "  [DRY RUN] Would install: ONTOLOGY.md (new file)"
-        else
-            cp "$ONTOLOGY_SRC" "$ONTOLOGY_DST"
-            echo "  Installed: ONTOLOGY.md"
-        fi
-    fi
-fi
-
-# Copy memory files
-CLAUDE_MEMORY_DIR="$HOME/.claude/projects/-$(echo "$WORKSPACE_DIR" | tr '/' '-')/memory"
-if [ -d "$EXOCORTEX_DIR/memory" ] && [ -d "$CLAUDE_MEMORY_DIR" ]; then
-    # Update all memory files EXCEPT MEMORY.md (user's РП table)
-    for f in "$EXOCORTEX_DIR/memory/"*.md; do
-        fname=$(basename "$f")
-        if [ "$fname" != "MEMORY.md" ]; then
-            if $DRY_RUN; then
-                echo "  [DRY RUN] Would update: memory/$fname"
-            else
-                cp "$f" "$CLAUDE_MEMORY_DIR/$fname"
-                echo "  Updated: memory/$fname"
-            fi
+            printf "  + %s\n" "$f"
         fi
     done
-    echo "  Skipped: memory/MEMORY.md (user data preserved)"
+    echo ""
 fi
 
-# Update MCP configuration (.claude/settings.local.json)
-# Strategy: update mcpServers URLs from upstream, preserve user's custom permissions
-SETTINGS_SRC="$EXOCORTEX_DIR/.claude/settings.local.json"
-SETTINGS_DST="$WORKSPACE_DIR/.claude/settings.local.json"
-if [ -f "$SETTINGS_SRC" ]; then
-    if [ -f "$SETTINGS_DST" ]; then
-        if $DRY_RUN; then
-            echo "  [DRY RUN] Would merge .claude/settings.local.json (mcpServers from upstream, permissions preserved)"
-        else
-            # Merge: take mcpServers from upstream, keep user permissions
-            if command -v python3 &>/dev/null; then
-                python3 -c "
-import json, sys
-with open('$SETTINGS_SRC') as f: src = json.load(f)
-with open('$SETTINGS_DST') as f: dst = json.load(f)
-# Update mcpServers from upstream
-dst['mcpServers'] = src.get('mcpServers', {})
-# Merge permissions: add new MCP tools from upstream, keep user's custom permissions
-src_perms = set(src.get('permissions', {}).get('allow', []))
-dst_perms = set(dst.get('permissions', {}).get('allow', []))
-# Add any new permissions from upstream that user doesn't have
-merged = sorted(dst_perms | src_perms)
-dst.setdefault('permissions', {})['allow'] = merged
-with open('$SETTINGS_DST', 'w') as f: json.dump(dst, f, indent=2, ensure_ascii=False)
-print('  Updated: .claude/settings.local.json (merged)')
-" 2>&1
-            else
-                # Fallback: just copy (no merge)
-                cp "$SETTINGS_SRC" "$SETTINGS_DST"
-                echo "  Updated: .claude/settings.local.json (replaced, python3 not found for merge)"
-            fi
-        fi
-    else
-        if $DRY_RUN; then
-            echo "  [DRY RUN] Would install: .claude/settings.local.json (new file)"
-        else
-            # First install: just copy
-            mkdir -p "$(dirname "$SETTINGS_DST")"
-            cp "$SETTINGS_SRC" "$SETTINGS_DST"
-            echo "  Installed: .claude/settings.local.json"
-        fi
+if [ ${#UPDATED_FILES[@]} -gt 0 ]; then
+    echo "Обновлённые файлы (${#UPDATED_FILES[@]}):"
+    for i in "${!UPDATED_FILES[@]}"; do
+        f="${UPDATED_FILES[$i]}"
+        lines="${UPDATED_LINES[$i]}"
+        printf "  ~ %-45s — %s строк изменено\n" "$f" "$lines"
+    done
+    echo ""
+fi
+
+echo "Не затрагиваются:"
+echo "  ✓ memory/MEMORY.md (личная оперативная память)"
+echo "  ✓ .secrets/, .mcp.json (ключи и конфигурация)"
+echo "  ✓ .claude/settings.local.json (permissions, MCP)"
+echo "  ✓ personal/ (ваши файлы)"
+echo "  ✓ DS-strategy/ (ваше планирование)"
+echo ""
+
+if [ "$UNCHANGED" -gt 0 ]; then
+    echo "Без изменений: $UNCHANGED файлов"
+    echo ""
+fi
+
+# === Check-only mode ===
+if $CHECK_ONLY; then
+    echo "Режим --check: изменения не применяются."
+    echo "Для применения: bash update.sh"
+    exit 0
+fi
+
+# === Step 4: Confirmation ===
+if ! $AUTO_YES; then
+    read -p "Применить обновления? (y/n) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Отменено."
+        exit 0
     fi
 fi
 
-# --- 6. Reinstall roles ---
-echo "[6/6] Reinstalling roles..."
+# === Step 5: Apply updates ===
+echo ""
+echo "Применяю обновления..."
 
-# Check which role files changed and reinstall if needed
-CHANGED_FILES=$(git diff --name-only "$LOCAL".."$UPSTREAM" 2>/dev/null || echo "")
+APPLIED=0
 
-reinstall_role() {
-    local role_name="$1"
-    local install_script="$EXOCORTEX_DIR/roles/$role_name/install.sh"
-    if [ -f "$install_script" ]; then
-        if $DRY_RUN; then
-            echo "  [DRY RUN] Would reinstall: $role_name"
-        else
-            echo "  Reinstalling $role_name..."
-            chmod +x "$install_script"
-            bash "$install_script" 2>&1 | sed 's/^/    /'
+for f in "${NEW_FILES[@]}"; do
+    mkdir -p "$SCRIPT_DIR/$(dirname "$f")"
+    cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
+    # Make scripts executable
+    case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+    echo "  + $f"
+    APPLIED=$((APPLIED + 1))
+done
+
+for f in "${UPDATED_FILES[@]}"; do
+    cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
+    case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+    echo "  ~ $f"
+    APPLIED=$((APPLIED + 1))
+done
+
+# === Step 5b: Re-substitute placeholders in new/updated files ===
+# After downloading from upstream, files contain {{PLACEHOLDERS}}
+# Detect current values from existing configured files
+echo ""
+echo "Подстановка переменных..."
+
+# Try to detect WORKSPACE_DIR from existing CLAUDE.md
+DETECTED_WORKSPACE=""
+if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
+    # Look for workspace path patterns (e.g., ~/IWE or /Users/x/IWE)
+    DETECTED_WORKSPACE="$WORKSPACE_DIR"
+fi
+
+PLACEHOLDER_HIT=0
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+    filepath="$SCRIPT_DIR/$f"
+    [ -f "$filepath" ] || continue
+
+    if grep -q '{{WORKSPACE_DIR}}' "$filepath" 2>/dev/null; then
+        if [ -n "$DETECTED_WORKSPACE" ]; then
+            sed_inplace "s|{{WORKSPACE_DIR}}|$DETECTED_WORKSPACE|g" "$filepath"
+            PLACEHOLDER_HIT=$((PLACEHOLDER_HIT + 1))
         fi
     fi
-}
-
-# Reinstall roles whose files changed (autodiscovery)
-for role_dir in "$EXOCORTEX_DIR"/roles/*/; do
-    [ -d "$role_dir" ] || continue
-    role_name=$(basename "$role_dir")
-    [ -f "$role_dir/install.sh" ] || continue
-
-    if echo "$CHANGED_FILES" | grep -q "^roles/$role_name/"; then
-        reinstall_role "$role_name"
-    else
-        echo "  $role_name: no changes"
+    if grep -q '{{HOME_DIR}}' "$filepath" 2>/dev/null; then
+        sed_inplace "s|{{HOME_DIR}}|$HOME|g" "$filepath"
+        PLACEHOLDER_HIT=$((PLACEHOLDER_HIT + 1))
     fi
 done
 
-# --- Done ---
-if $DRY_RUN; then
-    echo ""
-    echo "[DRY RUN] No changes made. Run 'update.sh' to apply."
-else
-    echo "Pushing merge commit..."
-    git push 2>&1 | sed 's/^/  /'
+if [ "$PLACEHOLDER_HIT" -gt 0 ]; then
+    echo "  Подставлено переменных в $PLACEHOLDER_HIT файлах."
 fi
 
-if ! $DRY_RUN; then
-    echo ""
-    echo "=========================================="
-    echo "  Update Complete!"
-    echo "=========================================="
-    echo "  Merged $COMMITS_BEHIND commits from upstream"
-    echo "  Platform-space reinstalled"
-    echo "  Roles checked for reinstallation"
-    echo ""
+# Check remaining placeholders
+REMAINING=$(grep -rl '{{[A-Z_]*}}' "$SCRIPT_DIR" --include="*.md" --include="*.sh" --include="*.json" --include="*.yaml" --include="*.yml" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$REMAINING" -gt 0 ]; then
+    echo "  ⚠ $REMAINING файлов содержат незаменённые переменные."
+    echo "  Для полной подстановки: bash setup.sh"
 fi
+
+# === Step 6: Reinstall platform-space ===
+echo ""
+echo "Обновление platform-space..."
+
+# Copy CLAUDE.md to workspace root
+CLAUDE_UPDATED=false
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+    if [ "$f" = "CLAUDE.md" ]; then
+        cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
+        echo "  ✓ $WORKSPACE_DIR/CLAUDE.md обновлён"
+        CLAUDE_UPDATED=true
+    fi
+done
+
+# Copy memory files to Claude projects directory
+CLAUDE_PROJECT_SLUG="-$(echo "$WORKSPACE_DIR" | tr '/' '-')"
+CLAUDE_MEMORY_DIR="$HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory"
+
+if [ -d "$CLAUDE_MEMORY_DIR" ]; then
+    MEM_UPDATED=0
+    for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+        case "$f" in
+            memory/*.md)
+                fname=$(basename "$f")
+                if [ "$fname" != "MEMORY.md" ]; then
+                    cp "$SCRIPT_DIR/$f" "$CLAUDE_MEMORY_DIR/$fname"
+                    MEM_UPDATED=$((MEM_UPDATED + 1))
+                fi
+                ;;
+        esac
+    done
+    if [ "$MEM_UPDATED" -gt 0 ]; then
+        echo "  ✓ $MEM_UPDATED memory-файлов обновлено в $CLAUDE_MEMORY_DIR"
+    fi
+    echo "  ✓ memory/MEMORY.md — не тронут"
+fi
+
+# Reinstall roles if changed
+ROLES_CHANGED=false
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+    case "$f" in roles/*)
+        ROLES_CHANGED=true
+        break
+        ;;
+    esac
+done
+
+if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
+    echo ""
+    echo "Роли обновлены. Переустановка..."
+    for role_dir in "$SCRIPT_DIR"/roles/*/; do
+        [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
+        if grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null; then
+            bash "$role_dir/install.sh" 2>/dev/null && \
+                echo "  ✓ $(basename "$role_dir") переустановлен" || \
+                echo "  ○ $(basename "$role_dir"): переустановите вручную"
+        fi
+    done
+fi
+
+# === Step 7: Commit changes ===
+echo ""
+echo "Фиксация изменений..."
+cd "$SCRIPT_DIR"
+if ! git diff --quiet 2>/dev/null || [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+    git add -A
+    git commit -m "chore: update from upstream template v$UPSTREAM_VERSION" --no-verify 2>&1 | sed 's/^/  /'
+    echo "  ✓ Изменения закоммичены"
+else
+    echo "  Нет изменений для коммита"
+fi
+
+# === Done ===
+echo ""
+echo "=========================================="
+echo "  Обновление завершено ($APPLIED файлов)"
+echo "=========================================="
+echo ""
+echo "Перезапустите Claude Code для применения обновлений в memory/."
