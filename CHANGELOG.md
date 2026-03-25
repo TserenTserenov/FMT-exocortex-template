@@ -12,10 +12,17 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **week-review.md** — пишет секцию в WeekPlan, не создаёт файл
 - **session-prep.md** — читает секцию из WeekPlan, не ищет файл WeekReport
 
+### Added
+- **Кроссплатформенное предотвращение сна** — `strategist.sh` и `scheduler.sh` автоматически блокируют засыпание: macOS `caffeinate -diu` / Linux `systemd-inhibit`. Флаг `-s` не используется — он игнорируется когда Optimized Battery Charging переключает профиль на батарею
+- **SETUP-GUIDE: инструкции wake+sleep** для macOS, Linux, Windows. Включая `pmset -b sleep 0` для ноутбуков и Charge Limit рекомендацию
+- **PLATFORM-COMPAT: sleep prevention** — документация кроссплатформенных ограничений
+
 ### Updated
 - docs/LEARNING-PATH, USE-CASES, SETUP-GUIDE, onboarding-guide — убран WeekReport
 - roles/strategist/README, seed/strategy/CLAUDE.md — WeekReport помечен deprecated
 - synchronizer/scripts/templates/strategist.sh — ищет WeekPlan вместо WeekReport
+- README.md FAQ — обновлён вопрос про сон/выключение
+- install.sh — кроссплатформенные подсказки при установке
 
 ## [0.15.2] — 2026-03-24
 
