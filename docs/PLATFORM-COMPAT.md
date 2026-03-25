@@ -54,6 +54,8 @@ notify() {
 - **launchd / .plist** — macOS-only. На Linux нужен cron или systemd timer. Setup.sh пропускает шаг 5 на Linux.
 - **~/Library/LaunchAgents** — macOS path. Install-скрипты ролей пока macOS-only.
 - **/opt/homebrew/bin** — Apple Silicon macOS. В plist PATH — подставляется шаблоном, но не универсален.
+- **Предотвращение сна** — скрипты определяют ОС автоматически: `caffeinate -diu` (macOS) / `systemd-inhibit` (Linux). На macOS **не используется** флаг `-s` — он игнорируется когда Optimized Battery Charging переключает профиль питания на батарею.
+- **Пробуждение ноутбука** — macOS: `pmset repeat wakeorpoweron`, Linux: `rtcwake` / systemd timer `WakeSystem=true`, Windows: Task Scheduler. Для macOS-ноутбуков рекомендуется `pmset -b sleep 0` (запрет idle sleep на батарейном профиле).
 
 ## Как проверить
 
