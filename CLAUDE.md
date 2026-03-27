@@ -24,6 +24,8 @@
 | **День** | `/day-open` («открывай») | Между Day Open и Day Close | `/run-protocol day-close` |
 | **Неделя** | — | — | `/run-protocol week-close` |
 
+> **Первая неделя:** Если WeekPlan ещё не создан — работайте на уровне сессий. Day Open и Week Close подключатся после первой стратегической сессии ([SETUP-GUIDE §2](docs/SETUP-GUIDE.md)).
+
 ### Блокирующие правила
 
 1. **WP Gate:** ЛЮБОЕ задание → протокол Открытия → ДО начала работы.
