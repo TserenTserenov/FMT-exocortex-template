@@ -37,6 +37,10 @@ LOG_FILE="$LOG_DIR/scheduler-$(date +%Y-%m-%d).log"
 ROLES_DIR="{{WORKSPACE_DIR}}/FMT-exocortex-template/roles"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
 
+# Таймаут на задачи (сек): предотвращает блокировку dispatch зависшей задачей
+TASK_TIMEOUT_SHORT=300    # 5 мин — bash-скрипты (code-scan, dt-collect, reindex)
+TASK_TIMEOUT_LONG=1800    # 30 мин — Claude CLI (strategist, scout, extractor)
+
 # Role runner discovery: reads runner path from role.yaml, fallback to convention
 get_role_runner() {
     local role="$1"
@@ -61,6 +65,27 @@ WEEK=$(date +%V)
 NOW=$(date +%s)
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+# macOS не имеет GNU timeout — используем perl fallback
+if ! command -v timeout &>/dev/null; then
+    timeout() {
+        local duration="$1"; shift
+        perl -e '
+            use POSIX ":sys_wait_h";
+            my $timeout = shift @ARGV;
+            my $pid = fork();
+            if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
+            eval {
+                local $SIG{ALRM} = sub { die "alarm" };
+                alarm($timeout);
+                waitpid($pid, 0);
+                alarm(0);
+            };
+            if ($@ =~ /alarm/) { kill("TERM", $pid); sleep(1); kill("KILL", $pid); waitpid($pid, WNOHANG); exit(124); }
+            exit($? >> 8);
+        ' "$duration" "$@"
+    }
+fi
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [scheduler] $1" | tee -a "$LOG_FILE"
@@ -148,10 +173,20 @@ dispatch() {
     # --- Pre-archive: убрать вчерашний DayPlan ДО генерации нового ---
     pre_archive_dayplan
 
+    # --- AC sleep check (macOS): на зарядке Mac не должен засыпать ---
+    if [[ "$(uname)" == "Darwin" ]] && ! ran_today "pmset-check"; then
+        local ac_sleep
+        ac_sleep=$(pmset -g custom 2>/dev/null | sed -n '/AC Power/,/Battery Power/p' | grep '^ sleep' | awk '{print $2}')
+        if [ -n "$ac_sleep" ] && [ "$ac_sleep" != "0" ]; then
+            log "⚠️  AC sleep=$ac_sleep (should be 0) — Mac will sleep on charger. Fix: sudo pmset -c sleep 0"
+        fi
+        mark_done "pmset-check"
+    fi
+
     # --- Стратег: week-review (Пн, до morning) ---
     if [ "$DOW" = "1" ] && ! ran_this_week "strategist-week-review"; then
         log "→ strategist week-review (catch-up: hour=$HOUR)"
-        if "$STRATEGIST_SH" week-review >> "$LOG_FILE" 2>&1; then
+        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" week-review >> "$LOG_FILE" 2>&1; then
             mark_done_week "strategist-week-review"
         else
             log "WARN: strategist week-review failed (will retry next dispatch)"
@@ -162,7 +197,7 @@ dispatch() {
     # --- Стратег: morning (04:00-21:59) ---
     if (( 10#$HOUR >= 4 && 10#$HOUR < 22 )) && ! ran_today "strategist-morning"; then
         log "→ strategist morning (catch-up: hour=$HOUR)"
-        if "$STRATEGIST_SH" morning >> "$LOG_FILE" 2>&1; then
+        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" morning >> "$LOG_FILE" 2>&1; then
             mark_done "strategist-morning"
         else
             log "WARN: strategist morning failed (will retry next dispatch)"
@@ -173,7 +208,7 @@ dispatch() {
     # --- Стратег: note-review (22:00+) ---
     if (( 10#$HOUR >= 22 )) && ! ran_today "strategist-note-review"; then
         log "→ strategist note-review (catch-up: hour=$HOUR)"
-        if "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
+        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
             mark_done "strategist-note-review"
         else
             log "WARN: strategist note-review failed (will retry next dispatch)"
@@ -184,7 +219,7 @@ dispatch() {
         yesterday=$(portable_date_offset 1)
         if [ -n "$yesterday" ] && [ ! -f "$STATE_DIR/strategist-note-review-$yesterday" ]; then
             log "→ strategist note-review (catch-up for yesterday $yesterday)"
-            if "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
+            if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
                 echo "$(date '+%H:%M:%S') catch-up" > "$STATE_DIR/strategist-note-review-$yesterday"
             else
                 log "WARN: strategist note-review catch-up failed"
@@ -196,7 +231,7 @@ dispatch() {
     # --- Синхронизатор: code-scan (ежедневно) ---
     if ! ran_today "synchronizer-code-scan"; then
         log "→ synchronizer code-scan (hour=$HOUR)"
-        if "$SCRIPT_DIR/code-scan.sh" >> "$LOG_FILE" 2>&1; then
+        if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/code-scan.sh" >> "$LOG_FILE" 2>&1; then
             mark_done "synchronizer-code-scan"
         else
             log "WARN: code-scan failed (will retry next dispatch)"
@@ -207,7 +242,7 @@ dispatch() {
     # --- Синхронизатор: dt-collect (после code-scan) ---
     if ! ran_today "synchronizer-dt-collect"; then
         log "→ synchronizer dt-collect (hour=$HOUR)"
-        if "$SCRIPT_DIR/dt-collect.sh" >> "$LOG_FILE" 2>&1; then
+        if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/dt-collect.sh" >> "$LOG_FILE" 2>&1; then
             mark_done "synchronizer-dt-collect"
         else
             log "WARN: dt-collect failed (will retry next dispatch)"
@@ -219,7 +254,7 @@ dispatch() {
     if ! ran_today "synchronizer-daily-report"; then
         if ran_today "strategist-morning" || (( 10#$HOUR >= 6 )); then
             log "→ synchronizer daily-report (hour=$HOUR)"
-            if "$SCRIPT_DIR/daily-report.sh" >> "$LOG_FILE" 2>&1; then
+            if timeout "$TASK_TIMEOUT_SHORT" "$SCRIPT_DIR/daily-report.sh" >> "$LOG_FILE" 2>&1; then
                 mark_done "synchronizer-daily-report"
             else
                 log "WARN: daily-report failed (will retry next dispatch)"
@@ -234,7 +269,7 @@ dispatch() {
         elapsed=$(last_run_seconds_ago "extractor-inbox-check")
         if [ "$elapsed" -ge 10800 ]; then
             log "→ extractor inbox-check (${elapsed}s since last)"
-            if "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
+            if timeout "$TASK_TIMEOUT_LONG" "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
                 mark_interval "extractor-inbox-check"
             else
                 log "WARN: extractor inbox-check failed (will retry next dispatch)"
