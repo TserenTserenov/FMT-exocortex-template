@@ -5,6 +5,18 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] — 2026-03-28
+
+### Changed
+- **day-open/SKILL.md v1.1** — carry-over из вчерашнего DayPlan теперь обязательная логика (не конфиг-флаг). Убран `day_close.review_yesterday_close`
+- **day-open/SKILL.md** — алгоритм и шаблоны объединены в один файл. Шаг 2: приоритет входов (carry-over → WeekPlan → mandatory)
+- **day-open/SKILL.md** — `{{GOVERNANCE_REPO}}` вместо prose-текста (формализация)
+- **day-rhythm-config.yaml** — добавлен `calendar_ids: []` (Day Open запрашивает все календари или указанные)
+- **day-rhythm-config.yaml** — убран `day_close` (carry-over = часть алгоритма, не настройка)
+
+### Added
+- **day-open/SKILL.md §6** — ссылки на источники (URL) обязательны в секции «Мир»
+
 ## [0.16.9] — 2026-03-28
 
 ### Added
