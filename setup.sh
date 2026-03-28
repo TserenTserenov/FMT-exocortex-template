@@ -314,7 +314,10 @@ if $DRY_RUN; then
     echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md"
 else
     cp "$TEMPLATE_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
-    echo "  Copied to $WORKSPACE_DIR/CLAUDE.md"
+    # Save base copy for 3-way merge on future updates
+    cp "$TEMPLATE_DIR/CLAUDE.md" "$TEMPLATE_DIR/.claude.md.base"
+    cp "$TEMPLATE_DIR/CLAUDE.md" "$WORKSPACE_DIR/.claude.md.base"
+    echo "  Copied to $WORKSPACE_DIR/CLAUDE.md (+ merge base)"
 fi
 
 # === 3. Copy memory to Claude projects directory ===

@@ -200,7 +200,9 @@ fi
 
 echo "Не затрагиваются:"
 echo "  ✓ memory/MEMORY.md (личная оперативная память)"
-echo "  ✓ CLAUDE.md § «Мои правила» (секция USER-SPACE)"
+echo "  ✓ CLAUDE.md (3-way merge: ваши правки сохраняются)"
+echo "  ✓ extensions/ (ваши расширения протоколов)"
+echo "  ✓ params.yaml (ваши параметры)"
 echo "  ✓ .secrets/, .mcp.json (ключи и конфигурация)"
 echo "  ✓ .claude/settings.local.json (permissions)"
 echo "  ✓ personal/ (ваши файлы)"
@@ -245,20 +247,52 @@ for f in "${NEW_FILES[@]}"; do
 done
 
 for f in "${UPDATED_FILES[@]}"; do
-    # Special handling for CLAUDE.md: preserve USER-SPACE section
+    # Special handling for CLAUDE.md: 3-way merge preserving user customizations
     if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
-        USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$SCRIPT_DIR/$f")
-        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-        if [ -n "$USER_SECTION" ]; then
-            # Remote file has empty USER-SPACE template — replace it with user's content
-            # Remove the template USER-SPACE block from downloaded file
-            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$SCRIPT_DIR/$f"
-            # Append user's preserved section
-            echo "" >> "$SCRIPT_DIR/$f"
-            echo "$USER_SECTION" >> "$SCRIPT_DIR/$f"
-            echo "  ~ $f (USER-SPACE сохранён)"
+        BASE_FILE="$SCRIPT_DIR/.claude.md.base"
+        NEW_FILE="$TMPDIR_UPDATE/files/$f"
+        CURRENT_FILE="$SCRIPT_DIR/$f"
+
+        if [ -f "$BASE_FILE" ] && command -v git >/dev/null 2>&1; then
+            # 3-way merge: base (last update) + current (user's) + new (upstream)
+            # git merge-file modifies the first argument in place
+            MERGE_TMP="$TMPDIR_UPDATE/claude-merge.md"
+            cp "$CURRENT_FILE" "$MERGE_TMP"
+
+            if git merge-file -p "$MERGE_TMP" "$BASE_FILE" "$NEW_FILE" > "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null; then
+                # Clean merge — no conflicts
+                cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                cp "$NEW_FILE" "$BASE_FILE"
+                echo "  ~ $f (3-way merge, чисто)"
+            else
+                CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || echo "0")
+                if [ "$CONFLICT_COUNT" -gt 0 ]; then
+                    # Conflicts detected — save merged file with markers
+                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                    cp "$NEW_FILE" "$BASE_FILE"
+                    echo "  ~ $f (3-way merge, $CONFLICT_COUNT конфликтов — разрешите вручную)"
+                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
+                else
+                    # git merge-file returned non-zero but no conflict markers — treat as success
+                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                    cp "$NEW_FILE" "$BASE_FILE"
+                    echo "  ~ $f (3-way merge)"
+                fi
+            fi
         else
-            echo "  ~ $f"
+            # No base file (first update after migration) — fallback to USER-SPACE preserve
+            USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$CURRENT_FILE")
+            cp "$NEW_FILE" "$CURRENT_FILE"
+            if [ -n "$USER_SECTION" ]; then
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CURRENT_FILE"
+                echo "" >> "$CURRENT_FILE"
+                echo "$USER_SECTION" >> "$CURRENT_FILE"
+                echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
+            else
+                echo "  ~ $f"
+            fi
+            # Save base for next update
+            cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
         fi
     else
         cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
@@ -370,17 +404,42 @@ echo "Обновление platform-space..."
 CLAUDE_UPDATED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = "CLAUDE.md" ]; then
-        # Preserve USER-SPACE from workspace CLAUDE.md (may differ from repo copy)
-        if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
-            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WORKSPACE_DIR/CLAUDE.md")
+        # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+        WS_BASE="$WORKSPACE_DIR/.claude.md.base"
+        WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
+        WS_NEW="$SCRIPT_DIR/CLAUDE.md"
+
+        if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
+            WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
+            cp "$WS_CURRENT" "$WS_MERGE_TMP"
+            if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
+                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+            else
+                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || echo "0")
+                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                if [ "$WS_CONFLICTS" -gt 0 ]; then
+                    echo "  ✓ $WS_CURRENT обновлён (3-way merge, $WS_CONFLICTS конфликтов)"
+                else
+                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+                fi
+            fi
+        else
+            # Fallback: USER-SPACE preserve (first update or no git)
+            if [ -f "$WS_CURRENT" ]; then
+                WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
+            fi
+            cp "$WS_NEW" "$WS_CURRENT"
+            if [ -n "${WS_USER_SECTION:-}" ]; then
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
+                echo "" >> "$WS_CURRENT"
+                echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+            fi
+            cp "$WS_NEW" "$WS_BASE"
+            echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
         fi
-        cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
-        if [ -n "${WS_USER_SECTION:-}" ]; then
-            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WORKSPACE_DIR/CLAUDE.md"
-            echo "" >> "$WORKSPACE_DIR/CLAUDE.md"
-            echo "$WS_USER_SECTION" >> "$WORKSPACE_DIR/CLAUDE.md"
-        fi
-        echo "  ✓ $WORKSPACE_DIR/CLAUDE.md обновлён"
         CLAUDE_UPDATED=true
     fi
 done

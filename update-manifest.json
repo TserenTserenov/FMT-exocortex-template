@@ -1,5 +1,5 @@
 {
-  "version": "0.16.0",
+  "version": "0.18.0",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {"path": ".claude/hooks/close-gate-reminder.sh"},
@@ -10,6 +10,7 @@
     {"path": ".claude/settings.json"},
     {"path": ".claude/skills/archgate/SKILL.md"},
     {"path": ".claude/skills/day-open/SKILL.md"},
+    {"path": ".claude/skills/iwe-update/SKILL.md", "desc": "Агент-обновитель IWE"},
     {"path": ".claude/skills/fpf/SKILL.md"},
     {"path": ".claude/skills/iwe-rules-review/SKILL.md"},
     {"path": ".claude/skills/ke/SKILL.md"},
@@ -24,6 +25,7 @@
     {"path": ".github/workflows/validate-template.yml"},
     {"path": ".gitignore"},
     {"path": "CHANGELOG.md"},
+    {"path": "extensions/README.md", "desc": "Документация расширений протоколов"},
     {"path": "CLAUDE.md"},
     {"path": "ONTOLOGY.md"},
     {"path": "REPO-TYPE.md"},
