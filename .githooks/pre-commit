@@ -5,6 +5,14 @@
 
 ISSUES=0
 
+# === Block secrets file from being committed ===
+if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
+    echo "SECURITY: .exocortex.env is staged for commit — this file contains secrets!"
+    echo "  Remove from staging: git restore --staged .exocortex.env"
+    echo "  The file is in .gitignore — verify it's listed there."
+    exit 1
+fi
+
 # Get list of staged .sh files
 STAGED_SH=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null)
 [ -z "$STAGED_SH" ] && exit 0

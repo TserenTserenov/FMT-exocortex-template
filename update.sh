@@ -317,12 +317,17 @@ if [ -f "$ENV_FILE" ]; then
         echo "  Пересоздайте: bash setup.sh"
     else
         # Read variables safely (only simple KEY=VALUE)
-        while IFS='=' read -r key value; do
+        # Use read -r line + split on first '=' to handle values containing '=' (e.g. URLs, tokens)
+        while IFS= read -r line; do
             # Skip comments and empty lines
-            case "$key" in \#*|"") continue ;; esac
-            # Trim whitespace
+            case "$line" in \#*|"") continue ;; esac
+            # Split on first '=' only
+            key="${line%%=*}"
+            value="${line#*=}"
+            # Trim whitespace from key
             key=$(echo "$key" | tr -d '[:space:]')
-            # Export for use below
+            [ -z "$key" ] && continue
+            # Export for use below (secrets: ORY_TOKEN, L4_DATABASE_URL etc. are loaded but not substituted into files)
             declare "ENV_$key=$value"
         done < "$ENV_FILE"
 
@@ -354,6 +359,35 @@ if [ -f "$ENV_FILE" ]; then
         if [ "$PLACEHOLDER_HIT" -gt 0 ]; then
             echo "  Подставлено переменных в $PLACEHOLDER_HIT файлах."
         fi
+
+        # === Preserve secrets: ORY_TOKEN, L4_BACKEND, L4_DATABASE_URL ===
+        # These are NOT substituted into template files.
+        # If they exist in .exocortex.env, they must NOT be overwritten by update.sh.
+        # (Already loaded into ENV_ORY_TOKEN etc. via the parser above — no action needed here.)
+
+        # === Migrate ~/.iwe-env if present (Ф8 migration scenario) ===
+        IWE_ENV_GLOBAL="$HOME/.iwe-env"
+        if [ -f "$IWE_ENV_GLOBAL" ]; then
+            MIGRATED_KEYS=0
+            # Check which T3+ keys are missing from .exocortex.env
+            for migrate_key in ORY_TOKEN L4_BACKEND L4_DATABASE_URL; do
+                eval "existing=\${ENV_${migrate_key}:-}"
+                if [ -z "$existing" ]; then
+                    # Extract from ~/.iwe-env
+                    migrated_val=$(grep "^${migrate_key}=" "$IWE_ENV_GLOBAL" 2>/dev/null | head -1)
+                    migrated_val="${migrated_val#*=}"
+                    if [ -n "$migrated_val" ]; then
+                        echo "" >> "$ENV_FILE"
+                        echo "${migrate_key}=${migrated_val}" >> "$ENV_FILE"
+                        MIGRATED_KEYS=$((MIGRATED_KEYS + 1))
+                    fi
+                fi
+            done
+            if [ "$MIGRATED_KEYS" -gt 0 ]; then
+                echo "  ✓ Мигрировано $MIGRATED_KEYS ключей из ~/.iwe-env → .exocortex.env"
+                echo "  ~/.iwe-env больше не нужен. Удалить вручную: rm $IWE_ENV_GLOBAL"
+            fi
+        fi
     fi
 else
     # No .exocortex.env — try to detect and generate (migration scenario С5)
@@ -365,6 +399,7 @@ else
 
     cat > "$ENV_FILE" <<ENVEOF
 # Exocortex configuration (auto-detected by update.sh — verify and fix values)
+# SECURITY: chmod 600. Listed in .gitignore. Do NOT commit this file.
 GITHUB_USER=your-username
 EXOCORTEX_REPO=$DETECTED_REPO
 WORKSPACE_DIR=$DETECTED_WORKSPACE
@@ -373,6 +408,11 @@ CLAUDE_PROJECT_SLUG=$(echo "$DETECTED_WORKSPACE" | tr '/' '-')
 TIMEZONE_HOUR=4
 TIMEZONE_DESC=4:00 UTC
 HOME_DIR=$HOME
+
+# === Knowledge Gateway (T3+) — fill in if using personal Pack index ===
+ORY_TOKEN=
+L4_BACKEND=
+L4_DATABASE_URL=
 ENVEOF
     chmod 600 "$ENV_FILE"
     echo "  Конфигурация восстановлена в $ENV_FILE"
@@ -478,6 +518,49 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         ;;
     esac
 done
+
+# === Step 6b: Auto-fix links in user files (migration) ===
+# If WORKSPACE_DIR or EXOCORTEX_REPO changed (rename/move), update references in user files.
+if [ -f "$ENV_FILE" ] && [ -n "${ENV_WORKSPACE_DIR:-}" ] && [ -n "${ENV_EXOCORTEX_REPO:-}" ]; then
+    LINKS_FIXED=0
+
+    # Fix extensions/ files
+    EXT_DIR="$WORKSPACE_DIR/extensions"
+    if [ -d "$EXT_DIR" ]; then
+        for ext_file in "$EXT_DIR"/*.md; do
+            [ -f "$ext_file" ] || continue
+            CHANGED=false
+
+            # Fix old WORKSPACE_DIR references (absolute paths that differ from current)
+            if grep -q '/IWE\b\|/exocortex\b' "$ext_file" 2>/dev/null; then
+                if ! grep -q "${ENV_WORKSPACE_DIR}" "$ext_file" 2>/dev/null || \
+                   grep -qE '/[A-Za-z0-9_-]+/IWE/' "$ext_file" 2>/dev/null; then
+                    sed_inplace "s|${HOME}/[A-Za-z0-9._-]*/|${ENV_WORKSPACE_DIR}/|g" "$ext_file" 2>/dev/null && CHANGED=true
+                fi
+            fi
+
+            # Fix old repo name references in links
+            if grep -q 'FMT-exocortex-template\|github\.com/[A-Za-z0-9_-]*/[A-Za-z0-9_-]*-exocortex' "$ext_file" 2>/dev/null; then
+                sed_inplace "/UPSTREAM-CONST/!s|FMT-exocortex-template|${ENV_EXOCORTEX_REPO}|g" "$ext_file" 2>/dev/null && CHANGED=true
+            fi
+
+            $CHANGED && LINKS_FIXED=$((LINKS_FIXED + 1))
+        done
+    fi
+
+    # Fix memory/ user files (MEMORY.md only — platform files are replaced above)
+    MEMORY_DIR="$HOME/.claude/projects/${CLAUDE_PROJECT_SLUG}/memory"
+    if [ -d "$MEMORY_DIR" ] && [ -f "$MEMORY_DIR/MEMORY.md" ]; then
+        if grep -q 'FMT-exocortex-template' "$MEMORY_DIR/MEMORY.md" 2>/dev/null; then
+            sed_inplace "/UPSTREAM-CONST/!s|FMT-exocortex-template|${ENV_EXOCORTEX_REPO}|g" "$MEMORY_DIR/MEMORY.md" 2>/dev/null
+            LINKS_FIXED=$((LINKS_FIXED + 1))
+        fi
+    fi
+
+    if [ "$LINKS_FIXED" -gt 0 ]; then
+        echo "  ✓ Авто-фикс ссылок: $LINKS_FIXED файлов обновлено"
+    fi
+fi
 
 # Reinstall roles if changed
 ROLES_CHANGED=false

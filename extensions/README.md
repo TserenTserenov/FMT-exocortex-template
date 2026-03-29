@@ -75,9 +75,47 @@
 
 **Пример:** РП с бюджетом 6h/нед, среда (days_left=3) → daily_slot = round(6/3, 0.5) = 2h.
 
+## Несколько расширений одного hook (конфликты имён)
+
+Если нужно два расширения в одной точке — добавьте суффикс через точку:
+
+```
+extensions/day-close.after.md          # основное
+extensions/day-close.after.health.md   # дополнительное (например, от другого пакета)
+```
+
+Загружаются в **алфавитном порядке** — конфликта нет, оба выполнятся.
+
+## Установка чужого расширения (sharing)
+
+Расширения IWE — обычные Markdown-файлы. Установка:
+
+```bash
+cp ~/Downloads/day-close.after.health.md ~/IWE/extensions/
+```
+
+### Формат пакета расширений (bundle)
+
+```
+my-extension-pack/
+  README.md                    # описание, автор, версия
+  extensions/
+    day-close.after.md          # файлы расширений
+  params-defaults.yaml          # рекомендуемые параметры (не применяются автоматически)
+```
+
+Установка bundle:
+
+```bash
+cp my-extension-pack/extensions/* ~/IWE/extensions/
+# Просмотреть params-defaults.yaml и добавить нужные параметры в ~/IWE/params.yaml вручную
+```
+
+Посмотреть все доступные extension points: `/extend`
+
 ## Правила
 
-1. Имена файлов: `<protocol>.<hook>.md` — строго по формату
+1. Имена файлов: `<protocol>.<hook>.md` или `<protocol>.<hook>.<suffix>.md`
 2. Содержимое: markdown, будет вставлен как блок в протокол
 3. `update.sh` не трогает `extensions/` — ваши файлы в безопасности
 4. Несколько расширений одного hook: загружаются в алфавитном порядке
