@@ -381,7 +381,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **README.md:** `git clone` → `gh repo fork --clone` (согласованность с SETUP-GUIDE)
 - **strategist.sh:** `cleanup-processed-notes.py` → `.sh` (файл .py не существовал)
 - **strategist.sh:** хардкод авторского пути к notify.sh → относительный через `$SCRIPT_DIR`
-- **strategist.sh, dt-collect.sh:** `$HOME/IWE` → `/Users/tserentserenov/IWE` (подставляется setup.sh)
+- **strategist.sh, dt-collect.sh:** `$HOME/IWE` → `{{WORKSPACE_DIR}}` (подставляется setup.sh)
 - **update.sh:** нумерация шагов `[1/4],[2/4]` → `[1/6],[2/6]`
 - **setup-wakatime.md:** `wakatime-cli` → `~/.wakatime/wakatime-cli` (полный путь)
 - **SETUP-GUIDE.md:** MCP-команды отделены от bash-блока (пользователи пытались запускать в терминале)
