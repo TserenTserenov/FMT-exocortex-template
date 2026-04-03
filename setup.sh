@@ -8,10 +8,12 @@
 #
 set -e
 
-VERSION="0.5.0"
+VERSION="0.6.0"
 DRY_RUN=false
 CORE_ONLY=false
 INSTALL_LEVEL=""  # T1/T2/T3/T4 — set by --level or interactive prompt
+T4_MODE=""        # direct/gateway — set by --mode or interactive prompt (T4 only)
+VALIDATE_ONLY=false
 
 # === Cross-platform sed -i ===
 # macOS sed requires '' after -i, GNU sed does not
@@ -33,24 +35,157 @@ for arg in "$@"; do
         --level=T2) INSTALL_LEVEL="T2" ;;
         --level=T3) INSTALL_LEVEL="T3" ;;
         --level=T4) INSTALL_LEVEL="T4" ;;
+        --mode=direct)  T4_MODE="direct" ;;
+        --mode=gateway) T4_MODE="gateway" ;;
+        --validate)     VALIDATE_ONLY=true ;;
         --help|-h)
             echo "Usage: setup.sh [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --level=T1  Минимум: Claude Code + экзокортекс (≤15 мин)"
+            echo "  --level=T1  Минимум: git + CLAUDE.md + memory (≤15 мин). LLM через платформу"
             echo "  --level=T2  Стандарт: + ритуалы ОРЗ + extensions/"
-            echo "  --level=T3  Рост: + Pack + бот"
-            echo "  --level=T4  Полный: + роли + автоматизация (launchd)"
+            echo "  --level=T3  Рост: + Pack + ЦД (через бота). Требует ORY_TOKEN"
+            echo "  --level=T4  Полный: + роли + MCP. Два режима: --mode=direct (CLI) или --mode=gateway (URL)"
+            echo "  --mode=direct   T4: Claude Code CLI + MCP + launchd (требует API-ключ)"
+            echo "  --mode=gateway  T4: Gateway URL + GitHub OAuth + MCP-коннектор (без CLI)"
+            echo "  --validate  Проверить текущую установку (env, файлы, extensions, MCP)"
             echo "  --core      Офлайн-установка: только git, без сети"
             echo "  --dry-run   Показать что будет сделано, без изменений"
             echo "  --version   Версия скрипта"
             echo "  --help      Эта справка"
             echo ""
             echo "Без --level: интерактивный вопрос при запуске."
+            echo "Без --mode: интерактивный вопрос при T4."
             exit 0
             ;;
     esac
 done
+
+# === Validate mode ===
+if $VALIDATE_ONLY; then
+    echo "=========================================="
+    echo "  Exocortex Validate v$VERSION"
+    echo "=========================================="
+    echo ""
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    ENV_FILE="$SCRIPT_DIR/.exocortex.env"
+    ERRORS=0
+
+    # Load .exocortex.env
+    if [ -f "$ENV_FILE" ]; then
+        echo "[1/4] Env-конфиг... ✓ .exocortex.env найден"
+        # Safe read: grep KEY=VALUE, no eval/source (values may contain spaces)
+        _env_get() { grep "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-; }
+        INSTALL_LEVEL=$(_env_get INSTALL_LEVEL)
+        T4_MODE=$(_env_get T4_MODE)
+        ORY_TOKEN=$(_env_get ORY_TOKEN)
+        GITHUB_TOKEN=$(_env_get GITHUB_TOKEN)
+        GATEWAY_URL=$(_env_get GATEWAY_URL)
+        # Check required keys
+        [ -z "$INSTALL_LEVEL" ] && INSTALL_LEVEL="T1"
+        for key in GITHUB_USER EXOCORTEX_REPO WORKSPACE_DIR; do
+            val=$(_env_get "$key")
+            if [ -z "$val" ]; then
+                echo "  ✗ $key не задан"
+                ERRORS=$((ERRORS + 1))
+            fi
+        done
+        # T3+ checks
+        case "${INSTALL_LEVEL:-T1}" in T3|T4)
+            if [ -z "$ORY_TOKEN" ]; then
+                echo "  ⚠ ORY_TOKEN не задан (требуется для T3+)"
+            fi
+            ;;
+        esac
+        # T4 Gateway checks
+        if [ "$INSTALL_LEVEL" = "T4" ] && [ "$T4_MODE" = "gateway" ]; then
+            [ -z "$GITHUB_TOKEN" ] && echo "  ⚠ GITHUB_TOKEN не задан (Gateway mode)"
+            [ -z "$GATEWAY_URL" ] && echo "  ⚠ GATEWAY_URL не задан (Gateway mode)"
+        fi
+    else
+        echo "[1/4] Env-конфиг... ✗ .exocortex.env не найден"
+        echo "  Запустите setup.sh для первичной настройки"
+        ERRORS=$((ERRORS + 1))
+    fi
+
+    # Check required files by level
+    echo "[2/4] Файлы..."
+    LEVEL="${INSTALL_LEVEL:-T1}"
+    BASE_FILES="CLAUDE.md memory/MEMORY.md"
+    T2_FILES="memory/protocol-open.md memory/protocol-close.md memory/protocol-work.md"
+    T3_FILES="memory/navigation.md"
+    T4_FILES="memory/roles.md"
+    CHECK_FILES="$BASE_FILES"
+    case "$LEVEL" in
+        T2) CHECK_FILES="$BASE_FILES $T2_FILES" ;;
+        T3) CHECK_FILES="$BASE_FILES $T2_FILES $T3_FILES" ;;
+        T4) CHECK_FILES="$BASE_FILES $T2_FILES $T3_FILES $T4_FILES" ;;
+    esac
+    for f in $CHECK_FILES; do
+        if [ -f "$SCRIPT_DIR/$f" ]; then
+            echo "  ✓ $f"
+        else
+            echo "  ✗ $f отсутствует"
+            ERRORS=$((ERRORS + 1))
+        fi
+    done
+
+    # Check extensions
+    echo "[3/4] Extensions..."
+    if [ "$LEVEL" != "T1" ]; then
+        if [ -d "$SCRIPT_DIR/extensions" ]; then
+            EXT_COUNT=$(find "$SCRIPT_DIR/extensions" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+            echo "  ✓ extensions/ ($EXT_COUNT файлов)"
+        else
+            echo "  ⚠ extensions/ не найдена (опционально)"
+        fi
+        if [ -f "$SCRIPT_DIR/params.yaml" ]; then
+            echo "  ✓ params.yaml"
+        else
+            echo "  ⚠ params.yaml не найден (опционально)"
+        fi
+    else
+        echo "  — пропущено (T1)"
+    fi
+
+    # Check MCP accessibility
+    echo "[4/4] MCP-доступность..."
+    case "$LEVEL" in
+        T1|T2) echo "  — пропущено ($LEVEL)" ;;
+        T3)
+            if command -v curl >/dev/null 2>&1 && [ -n "$ORY_TOKEN" ]; then
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://mcp.aisystant.com/health" 2>/dev/null || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                    echo "  ✓ Knowledge Gateway доступен"
+                else
+                    echo "  ⚠ Knowledge Gateway недоступен (HTTP $HTTP_CODE)"
+                fi
+            else
+                echo "  ⚠ Не могу проверить (curl или ORY_TOKEN отсутствует)"
+            fi
+            ;;
+        T4)
+            if [ "$T4_MODE" = "gateway" ] && [ -n "$GATEWAY_URL" ]; then
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$GATEWAY_URL/health" 2>/dev/null || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                    echo "  ✓ Gateway ($GATEWAY_URL) доступен"
+                else
+                    echo "  ⚠ Gateway недоступен (HTTP $HTTP_CODE)"
+                fi
+            else
+                echo "  — Gateway URL не задан или режим Direct"
+            fi
+            ;;
+    esac
+
+    echo ""
+    if [ "$ERRORS" -eq 0 ]; then
+        echo "✓ Валидация пройдена ($LEVEL)"
+    else
+        echo "✗ Найдено ошибок: $ERRORS"
+    fi
+    exit "$ERRORS"
+fi
 
 if $CORE_ONLY; then
     echo "=========================================="
@@ -141,10 +276,10 @@ fi
 if [ -z "$INSTALL_LEVEL" ] && ! $CORE_ONLY; then
     echo "Выбери уровень установки (можно добавить следующий уровень позже):"
     echo ""
-    echo "  T1  Минимум      Claude Code + экзокортекс. Требует ≤15 мин."
+    echo "  T1  Минимум      git + CLAUDE.md + memory (≤15 мин). LLM через платформу"
     echo "  T2  Стандарт     + ритуалы ОРЗ (Day Open/Close, WeekPlan) + extensions/"
-    echo "  T3  Рост         + Pack + бот (Telegram)"
-    echo "  T4  Полный       + роли + launchd-автоматизация (Стратег, Синхронизатор)"
+    echo "  T3  Рост         + Pack + ЦД (через бота). Требует ORY_TOKEN"
+    echo "  T4  Полный       + роли + MCP. Два режима: Direct (CLI) или Gateway (URL)"
     echo ""
     while true; do
         read -p "Уровень [T2]: " INSTALL_LEVEL
@@ -159,7 +294,26 @@ elif $CORE_ONLY; then
     INSTALL_LEVEL="T1"
 fi
 
+# === Select T4 mode ===
+if [ "$INSTALL_LEVEL" = "T4" ] && [ -z "$T4_MODE" ]; then
+    echo "Режим T4:"
+    echo ""
+    echo "  direct   Claude Code CLI + MCP + launchd (требует свой API-ключ Anthropic)"
+    echo "  gateway  Gateway URL + GitHub OAuth + MCP-коннектор (без CLI, LLM через платформу)"
+    echo ""
+    while true; do
+        read -p "Режим [direct]: " T4_MODE
+        T4_MODE="${T4_MODE:-direct}"
+        case "$T4_MODE" in
+            direct|gateway) break ;;
+            *) echo "  Введи direct или gateway." ;;
+        esac
+    done
+    echo ""
+fi
+
 echo "  Уровень: $INSTALL_LEVEL"
+[ -n "$T4_MODE" ] && echo "  Режим T4: $T4_MODE"
 echo ""
 
 # === Collect configuration ===
@@ -239,6 +393,8 @@ fi
 ORY_TOKEN=""
 L4_BACKEND=""
 L4_DATABASE_URL=""
+GITHUB_TOKEN=""
+GATEWAY_URL=""
 if ! $CORE_ONLY && ! $DRY_RUN; then
     case "$INSTALL_LEVEL" in T3|T4)
         echo "Knowledge Gateway (T3+):"
@@ -254,6 +410,17 @@ if ! $CORE_ONLY && ! $DRY_RUN; then
         echo ""
         ;;
     esac
+    # T4 Gateway mode: GitHub OAuth + Gateway URL
+    if [ "$INSTALL_LEVEL" = "T4" ] && [ "$T4_MODE" = "gateway" ]; then
+        echo "Gateway mode (T4):"
+        echo "  GitHub OAuth используется для автоматического форка шаблона."
+        echo "  Gateway URL выдаётся платформой после активации T4."
+        echo ""
+        read -p "  GITHUB_TOKEN (gh auth token, или Enter): " GITHUB_TOKEN
+        read -p "  GATEWAY_URL [https://mcp.aisystant.com]: " GATEWAY_URL
+        GATEWAY_URL="${GATEWAY_URL:-https://mcp.aisystant.com}"
+        echo ""
+    fi
 fi
 
 # === Save configuration to .exocortex.env ===
@@ -277,6 +444,11 @@ TIMEZONE_HOUR=$TIMEZONE_HOUR
 TIMEZONE_DESC=$TIMEZONE_DESC
 HOME_DIR=$HOME_DIR
 INSTALL_LEVEL=$INSTALL_LEVEL
+T4_MODE=$T4_MODE
+
+# === Platform LLM Proxy (T1+, optional own API key for unlimited usage) ===
+PLATFORM_LLM_PROXY_URL=https://llm.aisystant.com/v1
+# ANTHROPIC_API_KEY=  # Optional: own key for unlimited usage (Direct MCP mode)
 
 # === MCP (substituted into .mcp.json) ===
 # Platform MCP packages — update version here, run update.sh to apply
@@ -292,6 +464,12 @@ ORY_TOKEN=$ORY_TOKEN
 L4_BACKEND=$L4_BACKEND
 # L4_DATABASE_URL: connection string for personal Pack index (may contain '=' chars — safe to store here)
 L4_DATABASE_URL=$L4_DATABASE_URL
+
+# === T4 Gateway mode (NOT substituted into files) ===
+# GITHUB_TOKEN: GitHub OAuth token for auto-forking template. Only needed in gateway mode.
+GITHUB_TOKEN=$GITHUB_TOKEN
+# GATEWAY_URL: platform MCP gateway endpoint
+GATEWAY_URL=$GATEWAY_URL
 ENVEOF
     chmod 600 "$ENV_FILE"
     echo "  Configuration saved to $ENV_FILE"
