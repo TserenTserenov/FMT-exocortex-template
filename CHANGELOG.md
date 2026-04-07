@@ -5,6 +5,18 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.23.0] — 2026-04-07
+
+### Added
+- **protocol-artifact-validate.sh** — PreToolUse hook (Bash matcher) блокирует `git commit` если DayPlan невалиден: 11 секций, mandatory check, бюджет в формате. Кодовый enforcement вместо промпт-инструкций
+- **run-protocol SKILL.md** — шаг 1b Extension Loading: автоматическая загрузка `extensions/{protocol}.before/after/checks.md` при исполнении любого протокола. Маршрутизация: протоколы с Skill-файлом читают полный алгоритм
+- **day-open SKILL.md** — шаг 5a2 (видео-сканирование), шаг 7 разбит на 7a-7d (Write → Checks → Commit → Dashboard)
+
+### Changed
+- **day-open/protocol-open/protocol-close** — HTML-комментарии `<!-- EXTENSION POINT -->` заменены на видимый markdown `**EXTENSION POINT:**` — агент их читает и исполняет
+- **wp-gate-reminder.sh** — при Day Open инжектирует extension loading reminder
+- **settings.json** — добавлен PreToolUse Bash matcher для protocol-artifact-validate.sh
+
 ## [0.22.0] — 2026-04-06
 
 ### Added
