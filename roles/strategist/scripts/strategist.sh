@@ -200,17 +200,17 @@ case "$1" in
 
         if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
             log "Strategy day ($STRATEGY_DAY_NAME): running session prep"
-            run_claude "session-prep" || exit 1
+            run_claude "session-prep"
             notify_telegram "session-prep"
         else
             log "Morning: running day plan"
-            run_claude "day-plan" || exit 1
+            run_claude "day-plan"
             notify_telegram "day-plan"
         fi
         ;;
     "evening")
         log "Evening: running evening review"
-        run_claude "evening" || exit 1
+        run_claude "evening"
         notify_telegram "evening"
         ;;
     "week-review")
@@ -220,7 +220,7 @@ case "$1" in
             exit 0
         fi
         log "Sunday: running week review"
-        run_claude "week-review" || exit 1
+        run_claude "week-review"
         # Fallback push for Knowledge Index (week-review creates a post there)
         # KI_REPO may not exist for all users — guard with [ -d ]
         KI_REPO="$HOME/IWE/DS-Knowledge-Index"
@@ -231,12 +231,12 @@ case "$1" in
         ;;
     "session-prep")
         log "Manual: running session prep"
-        run_claude "session-prep" || exit 1
+        run_claude "session-prep"
         notify_telegram "session-prep"
         ;;
     "day-plan")
         log "Manual: running day plan"
-        run_claude "day-plan" || exit 1
+        run_claude "day-plan"
         notify_telegram "day-plan"
         ;;
     "note-review")
@@ -248,7 +248,7 @@ case "$1" in
         BOLD_NEW_BEFORE=$(grep -vc '🔄' <(grep '^\*\*' "$FLEETING" 2>/dev/null) 2>/dev/null || echo 0)
         log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄)"
 
-        run_claude "note-review" || exit 1
+        run_claude "note-review"
 
         # Canary: count bold notes after (needs to be visible for alert at line ~274)
         BOLD_AFTER=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || echo 0)
@@ -295,12 +295,12 @@ case "$1" in
         ;;
     "day-close")
         log "Manual: running day close"
-        run_claude "day-close" || exit 1
+        run_claude "day-close"
         notify_telegram "day-close"
         ;;
     "strategy-session")
         log "Manual: running strategy session (interactive)"
-        run_claude "strategy-session" || exit 1
+        run_claude "strategy-session"
         ;;
     *)
         echo "Usage: $0 {morning|note-review|week-review|session-prep|strategy-session|day-plan|day-close}"
