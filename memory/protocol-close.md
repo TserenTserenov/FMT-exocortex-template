@@ -364,6 +364,7 @@ done
 ### Дополнительные шаги Week Close (поверх Week Review)
 
 > **Исполнение:** через `/run-protocol week-close`. Week Review (`week-review.md`) + шаги ниже.
+> **R-вопросник Week Close:** см. [r-questionnaire.md](r-questionnaire.md) раздел «Week Close — 7 вопросов» (промотировано из WP-217). Аналогично для Month: раздел «Month Close — 6 доп. вопросов».
 
 **EXTENSION POINT:** Проверить `extensions/week-close.before.md`. Если существует → `Read` и выполнить.
 
