@@ -1,3 +1,7 @@
+---
+valid_from: 2026-04-13
+originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+---
 # Навигация по репозиториям (Слой 3)
 
 > Claude читает этот файл при поиске конкретного файла/репо. Для поиска знаний → `mcp__claude_ai_knowledge-mcp__search`.

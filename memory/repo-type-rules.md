@@ -1,3 +1,7 @@
+---
+valid_from: 2026-04-09
+originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+---
 # Правила работы по типам репозиториев
 
 > **Source-of-truth полной маршрутизации:** `PACK-digital-platform/02-domain-entities/DP.KR.001-knowledge-routing.md`

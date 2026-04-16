@@ -1,3 +1,7 @@
+---
+valid_from: 2026-04-06
+originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+---
 # Роли платформы (lookup)
 
 > Source-of-truth: DP.ROLE.001 §3.2. Здесь — компактная шпаргалка для быстрого выбора.

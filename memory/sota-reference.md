@@ -1,3 +1,7 @@
+---
+valid_from: 2026-03-14
+originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+---
 # SOTA-практики (операционный справочник)
 
 > **Источник:** Pack DP (`06-sota/DP.SOTA.*`) + SPF.SPEC.003
