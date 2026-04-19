@@ -14,16 +14,7 @@
       "mcp__railway__list-variables",
       "mcp__ext-linear__search_issues"
     ],
-    "additionalDirectories": [
-      "/Users/tserentserenov",
-      "/Users/tserentserenov/.claude/projects/-Users-tserentserenov-IWE/memory",
-      "/Users/tserentserenov/IWE/FMT-exocortex-template/.claude/skills/day-open",
-      "/Users/tserentserenov/IWE/.claude/skills/archgate",
-      "/Users/tserentserenov/IWE/.claude/skills",
-      "/Users/tserentserenov/IWE/FMT-exocortex-template/.claude/skills",
-      "/Users/tserentserenov/IWE/FMT-exocortex-template/.claude",
-      "/Users/tserentserenov/IWE/FMT-exocortex-template/.claude/skills/archgate"
-    ]
+    "additionalDirectories": []
   },
   "hooks": {
     "UserPromptSubmit": [

@@ -230,7 +230,7 @@ print(json.dumps(result))
 # ============================================================
 
 collect_sessions() {
-    local SESSION_LOG="$WORKSPACE/DS-my-strategy/inbox/open-sessions.log"
+    local SESSION_LOG="$WORKSPACE/DS-strategy/inbox/open-sessions.log"
 
     python3 -c "
 import json, os, re
