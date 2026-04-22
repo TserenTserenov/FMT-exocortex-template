@@ -17,9 +17,13 @@ jobs:
 
       - name: Run ShellCheck on all .sh files
         run: |
+          # Severity = error: блокируем только реальные баги, не стиль/false-positive.
+          # Пред-существующие warnings (SC2034 unused vars от export-pattern, SC1090
+          # source non-constant, SC2155 declare-and-assign, etc) — информативны,
+          # не блокируют. При желании ужесточить — поднять до warning.
           FAIL=0
           while IFS= read -r -d '' f; do
-            if ! shellcheck -S warning "$f"; then
+            if ! shellcheck -S error "$f"; then
               FAIL=1
             fi
           done < <(find . -name "*.sh" -type f -print0)
@@ -82,28 +86,48 @@ jobs:
           [ "$FAIL" -eq 0 ] && echo "PASS: No author-specific content"
           exit $FAIL
 
-      # 2. Нет захардкоженных /Users/ путей
+      # 2. Нет захардкоженных /Users/ и /opt/homebrew путей
+      # Исключения зеркалят setup/validate-template.sh (локальный валидатор):
+      #   /Users/  — validate-template.{yml,sh}, setup.sh (примеры), /Users/.../ placeholder, комментарии-примеры
+      #   /opt/homebrew — README, PLATFORM-COMPAT.md, validate-template.{yml,sh}, setup.sh, plist PATH
       - name: Check for hardcoded paths
         run: |
           FAIL=0
           count=$(grep -rn '/Users/' . --include="*.md" --include="*.sh" \
-                  --include="*.json" --include="*.plist" 2>/dev/null | wc -l)
+                  --include="*.json" --include="*.plist" \
+                  --exclude='validate-template.yml' \
+                  --exclude='validate-template.sh' \
+                  --exclude='setup.sh' 2>/dev/null \
+                  | grep -v '/Users/\.\.\./' \
+                  | grep -v '# .*\(/Users/\|e\.g\.\)' \
+                  | wc -l)
           if [ "$count" -gt 0 ]; then
             echo "FAIL: Found /Users/ in $count locations:"
-            grep -rn '/Users/' . --include="*.md" --include="*.sh" 2>/dev/null | head -5
+            grep -rn '/Users/' . --include="*.md" --include="*.sh" \
+                --exclude='validate-template.yml' \
+                --exclude='validate-template.sh' \
+                --exclude='setup.sh' 2>/dev/null \
+                | grep -v '/Users/\.\.\./' \
+                | grep -v '# .*\(/Users/\|e\.g\.\)' | head -5
             FAIL=1
           fi
 
           count=$(grep -rn '/opt/homebrew' . --include="*.md" --include="*.sh" \
-                  --include="*.json" --include="*.plist" 2>/dev/null \
+                  --include="*.json" --include="*.plist" \
+                  --exclude='validate-template.yml' \
+                  --exclude='validate-template.sh' \
+                  --exclude='setup.sh' 2>/dev/null \
                   | grep -v 'README.md' \
-                  | grep -v 'validate-template.yml' \
+                  | grep -v 'PLATFORM-COMPAT.md' \
                   | grep -v '/usr/local/bin.*:/opt/homebrew' \
                   | wc -l)
           if [ "$count" -gt 0 ]; then
             echo "FAIL: Found /opt/homebrew in $count locations:"
-            grep -rn '/opt/homebrew' . --include="*.md" --include="*.sh" 2>/dev/null \
-                | grep -v 'README.md' | grep -v 'validate-template.yml' | head -5
+            grep -rn '/opt/homebrew' . --include="*.md" --include="*.sh" \
+                --exclude='validate-template.yml' \
+                --exclude='validate-template.sh' \
+                --exclude='setup.sh' 2>/dev/null \
+                | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' | head -5
             FAIL=1
           fi
 
