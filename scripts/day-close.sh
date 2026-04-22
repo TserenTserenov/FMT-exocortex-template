@@ -19,9 +19,11 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 DS_STRATEGY="$WORKSPACE_DIR/DS-strategy"
 MEMORY_SRC="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory"
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
-SELECTIVE_REINDEX="$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh"
-SOURCES_JSON="$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources.json"
-SOURCES_PERSONAL_JSON="$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources-personal.json"
+# MCP reindex — опциональный компонент (WP-187 iwe-knowledge Gateway заменяет локальный knowledge-mcp).
+# Переопределить путь можно через env IWE_SELECTIVE_REINDEX.
+SELECTIVE_REINDEX="${IWE_SELECTIVE_REINDEX:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh}"
+SOURCES_JSON="${IWE_SOURCES_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources.json}"
+SOURCES_PERSONAL_JSON="${IWE_SOURCES_PERSONAL_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources-personal.json}"
 # Linear sync: путь читается из params.yaml (ключ linear_sync_path)
 PARAMS_YAML="$WORKSPACE_DIR/params.yaml"
 LINEAR_SYNC=""
@@ -31,7 +33,7 @@ if [ -f "$PARAMS_YAML" ]; then
     LINEAR_SYNC="${_raw/#\~/$HOME}"
   fi
 fi
-LOG_FILE="$WORKSPACE_DIR/DS-agent-workspace/scheduler/day-close.log"
+LOG_FILE="${IWE_DAY_CLOSE_LOG:-$HOME/logs/day-close.log}"
 # === /КОНФИГУРАЦИЯ ===
 
 # Цвета

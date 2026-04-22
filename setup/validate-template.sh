@@ -26,19 +26,40 @@ grep_count() {
 # 1. Нет автор-специфичного контента
 echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
-for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-Knowledge-Index-Tseren" "DS-IT-systems" "DS-ai-systems"; do
-    # Исключаем: github.com URLs (публичные ссылки), validate-template.sh (содержит паттерны поиска)
+
+# Глобальные (запрет везде, кроме CHANGELOG и GitHub URLs)
+for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
+               "DS-Knowledge-Index-Tseren" "DS-IT-systems" "DS-ai-systems" \
+               "DS-my-strategy" "engines/tailor"; do
     count=$(grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-            --include="*.json" --include="*.plist" --include="*.yaml" \
-            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' 2>/dev/null \
+            --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'github.com/' | grep -v 'docs/adr/' | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
-        echo "  Found '$pattern' in $count non-URL locations:"
+        echo "  Found '$pattern' (global) in $count locations:"
         grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-            --include="*.json" --include="*.plist" \
-            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' 2>/dev/null \
+            --include="*.py" --include="*.json" --include="*.plist" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'github.com/' | grep -v 'docs/adr/' | head -3 || true
+        CHECK1_FAIL=1
+        FAIL=1
+    fi
+done
+
+# Protocol-only — запрет в протоколах/скиллах/хуках/CLAUDE.md (разрешено в README/docs/onboarding как упоминание продукта)
+for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
+               "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
+    count=$(cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
+            | grep -v 'CHANGELOG.md' | wc -l | tr -d ' ' || true)
+    if [ "$count" -gt 0 ]; then
+        [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
+        echo "  Found '$pattern' (protocol-only) in $count locations:"
+        (cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null | head -3) || true
         CHECK1_FAIL=1
         FAIL=1
     fi

@@ -23,7 +23,11 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-WORKSPACE = Path.home() / "IWE" / "DS-my-strategy"
+import os
+
+_workspace_root = Path(os.environ.get("IWE_WORKSPACE", str(Path.home() / "IWE")))
+_gov_repo = os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
+WORKSPACE = _workspace_root / _gov_repo
 FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
 

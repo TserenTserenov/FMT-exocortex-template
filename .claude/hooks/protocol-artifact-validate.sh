@@ -28,10 +28,16 @@ if ! echo "$TOOL_INPUT" | grep -qE 'git (add.*&&.*git )?commit'; then
   exit 0
 fi
 
-# Check if we're in DS-my-strategy (protocol governance repo)
+# Governance-репо: из env $IWE_GOVERNANCE_REPO (по умолчанию DS-strategy).
+# Workspace: из env $IWE_WORKSPACE (по умолчанию ~/IWE).
+GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
+GOV_PATH="$WORKSPACE/$GOV_REPO"
+
+# Check if we're in governance repo (protocol-managed)
 if ! echo "$TOOL_INPUT" | grep -q 'DayPlan\|day-open\|day-close\|WeekPlan'; then
   # Also check pwd context — look for staged DayPlan files
-  STAGED=$(cd ~/IWE/DS-my-strategy 2>/dev/null && git diff --cached --name-only 2>/dev/null || echo "")
+  STAGED=$(cd "$GOV_PATH" 2>/dev/null && git diff --cached --name-only 2>/dev/null || echo "")
   if ! echo "$STAGED" | grep -qE 'DayPlan|WeekPlan'; then
     echo '{}'
     exit 0
@@ -39,7 +45,7 @@ if ! echo "$TOOL_INPUT" | grep -q 'DayPlan\|day-open\|day-close\|WeekPlan'; then
 fi
 
 # --- DayPlan Validation ---
-DAYPLAN=$(ls ~/IWE/DS-my-strategy/current/DayPlan\ *.md 2>/dev/null | head -1)
+DAYPLAN=$(ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null | head -1)
 
 if [ -z "$DAYPLAN" ]; then
   echo '{}'
@@ -50,15 +56,10 @@ fi
 SECTIONS=(
   "План на сегодня"
   "Календарь"
-  "Здоровье платформы"
   "IWE за ночь"
   "Наработки Scout"
-  "Контент-план"
   "Разбор заметок"
   "Итоги вчера"
-  "Мир"
-  "Контекст недели"
-  "Требует внимания"
 )
 
 MISSING=()
@@ -84,11 +85,6 @@ if [ "$CALENDAR_CONTENT" -lt 3 ]; then
   ERRORS+=("Секция 'Календарь' пустая или слишком короткая (${CALENDAR_CONTENT} строк)")
 fi
 
-# Здоровье платформы: должна содержать числа или "нет данных"
-if ! awk '/Здоровье платформы/,/^<\/details>/' "$DAYPLAN" 2>/dev/null | grep -qE '\|[[:space:]]*[0-9]|нет данных'; then
-  ERRORS+=("Секция 'Здоровье платформы' не содержит данных (таблица с числами или 'нет данных')")
-fi
-
 # Scout: должна содержать хотя бы упоминание находок или "нет находок"
 if ! awk '/Наработки Scout/,/^<\/details>/' "$DAYPLAN" 2>/dev/null | grep -qE 'наход|capture|статус|нет|find'; then
   ERRORS+=("Секция 'Наработки Scout' пустая")
@@ -109,7 +105,7 @@ if ! grep -qE "~[0-9]+\.?[0-9]*h РП" "$DAYPLAN"; then
 fi
 
 # --- Ф3 Check 5: Carry-over цитата (если есть предыдущий DayPlan) ---
-PREV_DAYPLAN=$(ls ~/IWE/DS-my-strategy/current/DayPlan\ *.md 2>/dev/null | sort | tail -2 | head -1)
+PREV_DAYPLAN=$(ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null | sort | tail -2 | head -1)
 if [ -n "$PREV_DAYPLAN" ] && [ "$PREV_DAYPLAN" != "$DAYPLAN" ]; then
   # Предыдущий DayPlan существует — текущий должен содержать Carry-over
   if ! grep -qiE 'carry.over|carry_over' "$DAYPLAN"; then

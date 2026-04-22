@@ -31,19 +31,48 @@ jobs:
       - uses: actions/checkout@v4
 
       # 1. Нет автор-специфичного контента
+      # Патерны делятся на глобальные (запрет везде) и "protocol-only" (запрет в скиллах/
+      # хуках/шаблонах/скриптах, но разрешено в README/onboarding/docs/CHANGELOG как продукт).
       - name: Check for author-specific content
         run: |
           FAIL=0
-          for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-Knowledge-Index-Tseren"; do
+
+          # Глобальные — автор-только имена и приватные репо. Запрещены везде.
+          for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
+                         "DS-Knowledge-Index-Tseren" "DS-my-strategy" \
+                         "engines/tailor"; do
             count=$(grep -rn "$pattern" . --include="*.md" --include="*.sh" \
-                    --include="*.json" --include="*.plist" --include="*.yaml" 2>/dev/null | wc -l)
+                    --include="*.py" --include="*.json" --include="*.plist" \
+                    --include="*.yaml" --include="*.yml" 2>/dev/null \
+                    | grep -v 'CHANGELOG.md' \
+                    | wc -l)
             if [ "$count" -gt 0 ]; then
               echo "FAIL: Found '$pattern' in $count locations:"
               grep -rn "$pattern" . --include="*.md" --include="*.sh" \
-                  --include="*.json" --include="*.plist" 2>/dev/null | head -5
+                  --include="*.py" --include="*.json" --include="*.plist" \
+                  --include="*.yaml" --include="*.yml" 2>/dev/null \
+                  | grep -v 'CHANGELOG.md' | head -5
               FAIL=1
             fi
           done
+
+          # Protocol-only — имена продуктовых сервисов автора. Разрешены в README/docs/onboarding/
+          # (как упоминание продукта), запрещены в протоколах/скиллах/хуках/шаблонах планов/CLAUDE.md.
+          PROTOCOL_PATHS=".claude/skills .claude/hooks .claude/rules memory CLAUDE.md"
+          for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
+                         "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
+            # shellcheck disable=SC2086
+            count=$(grep -rn "$pattern" $PROTOCOL_PATHS 2>/dev/null \
+                    | grep -v 'CHANGELOG.md' \
+                    | wc -l)
+            if [ "$count" -gt 0 ]; then
+              echo "FAIL: Found '$pattern' in protocol-space ($count locations — OK в README/docs, не в скиллах/хуках/шаблонах):"
+              # shellcheck disable=SC2086
+              grep -rn "$pattern" $PROTOCOL_PATHS 2>/dev/null | head -5
+              FAIL=1
+            fi
+          done
+
           [ "$FAIL" -eq 0 ] && echo "PASS: No author-specific content"
           exit $FAIL
 
@@ -117,7 +146,77 @@ jobs:
             exit 1
           fi
 
-      # 6. Только допустимые placeholders
+      # 6. Smoke-test: хуки не падают на чистом пользовательском окружении.
+      # Имитируем pristine user: DS-strategy вместо DS-my-strategy, DayPlan с минимальным шаблоном.
+      - name: Smoke-test protocol hooks on clean user env
+        run: |
+          FAIL=0
+          TMP=$(mktemp -d)
+          export IWE_WORKSPACE="$TMP"
+          export IWE_GOVERNANCE_REPO="DS-strategy"
+          mkdir -p "$TMP/DS-strategy/current"
+
+          # Минимальный DayPlan, удовлетворяющий SECTIONS из хука
+          cat > "$TMP/DS-strategy/current/DayPlan 2026-04-22.md" <<'DAYPLAN'
+          ---
+          type: daily-plan
+          date: 2026-04-22
+          ---
+
+          # Day Plan: 22 апреля 2026
+
+          <details open>
+          <summary><b>План на сегодня</b></summary>
+
+          **Бюджет дня:** ~4h РП / ~3h физ / Плановый мультипликатор ~1.3x
+          mandatory: WP-7 + контент
+          carry-over: —
+          </details>
+          <details>
+          <summary><b>Календарь (22 апр)</b></summary>
+
+          | 10:00 | событие | 1h |
+          </details>
+          <details>
+          <summary><b>IWE за ночь (светофор)</b></summary>
+
+          | Scheduler | 🟢 | ok |
+          </details>
+          <details>
+          <summary><b>Наработки Scout (разбор)</b></summary>
+
+          нет находок
+          </details>
+          <details>
+          <summary><b>Разбор заметок</b></summary>
+
+          все обработаны
+          </details>
+          <details>
+          <summary><b>Итоги вчера</b></summary>
+
+          коммитов: 3
+          </details>
+          DAYPLAN
+
+          # Прогон хука: имитируем PreToolUse с git commit DayPlan
+          INPUT=$(jq -n --arg cmd "git add DS-strategy/current/DayPlan\\ 2026-04-22.md && git commit -m test" \
+                  '{tool_name: "Bash", tool_input: {command: $cmd}}')
+          RESULT=$(echo "$INPUT" | bash .claude/hooks/protocol-artifact-validate.sh)
+          DECISION=$(echo "$RESULT" | jq -r '.decision // "allow"')
+
+          if [ "$DECISION" = "block" ]; then
+            echo "FAIL: hook blocked commit on clean user env:"
+            echo "$RESULT" | jq -r '.reason'
+            FAIL=1
+          else
+            echo "PASS: hook allows commit on clean DS-strategy env"
+          fi
+
+          rm -rf "$TMP"
+          exit $FAIL
+
+      # 7. Только допустимые placeholders
       - name: Check placeholders are valid
         run: |
           # Найти все {{...}} и проверить что они из допустимого списка
