@@ -143,13 +143,15 @@ case "$1" in
         # Быстрая проверка: есть ли captures в inbox
         CAPTURES_FILE="$WORKSPACE/DS-strategy/inbox/captures.md"
         if [ -f "$CAPTURES_FILE" ]; then
-            PENDING=$(grep -c '^### ' "$CAPTURES_FILE" 2>/dev/null) || PENDING=0
-            PROCESSED=$(grep -c '\[processed' "$CAPTURES_FILE" 2>/dev/null) || PROCESSED=0
-            ANALYZED=$(grep -c '\[analyzed' "$CAPTURES_FILE" 2>/dev/null) || ANALYZED=0
-            ACTUAL_PENDING=$((PENDING - PROCESSED - ANALYZED))
+            # Маркеры имеют вид `[analyzed 2026-MM-DD]`, `[processed 2026-MM-DD]`, `[duplicate]`, `[defer]` —
+            # используем `\b` (word boundary), а не `\]`, чтобы ловить датированные маркеры.
+            # Старый подход (PENDING - PROCESSED - ANALYZED с `grep -c '\[analyzed'`) ловил подстроки
+            # в описаниях/цитатах → получался мультисчёт и ложные «N pending» срабатывания.
+            ACTUAL_PENDING=$(grep -E '^### ' "$CAPTURES_FILE" 2>/dev/null | grep -vE '\[(analyzed|processed|duplicate|defer)\b' | wc -l | tr -d ' ')
+            ACTUAL_PENDING=${ACTUAL_PENDING:-0}
 
             if [ "$ACTUAL_PENDING" -le 0 ]; then
-                log "SKIP: No pending captures in inbox (total=$PENDING, processed=$PROCESSED)"
+                log "SKIP: No pending captures in inbox"
                 exit 0
             fi
 

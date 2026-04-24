@@ -28,7 +28,7 @@
 ### Шаг 1: Проверить inbox
 
 1. Прочитай `{{WORKSPACE_DIR}}/DS-strategy/inbox/captures.md`
-2. Найди все pending записи (секции `### ...` без метки `[processed]`)
+2. Найди все pending записи: секции `### ...` БЕЗ любого из 4 маркеров статуса на той же строке (`[analyzed]`, `[processed]`, `[duplicate]`, `[defer]`). Если стоит хоть один — capture уже в workflow, пропускай.
 3. Если pending записей нет → сообщение `No pending captures in inbox` выводи через stdout (его поймает `extractor.sh` и запишет в `{{HOME_DIR}}/logs/extractor/YYYY-MM-DD.log`). **НЕ создавай отдельный лог-файл** в `DS-strategy/` или где-либо ещё. Заверши работу.
 4. Если pending > 5 → возьми первые 5 (по порядку в файле)
 
