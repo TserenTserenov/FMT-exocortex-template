@@ -5,6 +5,25 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.27.7] — 2026-04-24
+
+### Fixed
+- **`roles/extractor/scripts/extractor.sh` + `roles/extractor/prompts/inbox-check.md`** (WP-7 Ф-1) — подсчёт pending captures и дефиниция в промпте. Старая логика `grep -c '\[analyzed'` ловила substring в описаниях/цитатах captures.md (например, в тексте капчи мог быть `[analyzed` как часть описания), не только реальные маркеры-статусы. На реальном файле: 166 заголовков, substring-match ≠ реальному счёту маркеров. Формула `PENDING - PROCESSED - ANALYZED` давала ложные числа → каждые 3 часа LLM запускался «на 80 pending» и отвечал «all marked». Fix: прямой подсчёт заголовков БЕЗ любого из 4 маркеров на той же строке (`grep -E '^### ' | grep -vE '\[(analyzed|processed|duplicate|defer)\b'`). Regex `\b` (word boundary) ловит датированные маркеры типа `[analyzed 2026-04-10]`, которые `\]` пропускал. Промпт обновлён на все 4 маркера. Sync from DS-ai-systems 437048b.
+
+## [0.27.6] — 2026-04-24
+
+### Fixed
+- **`roles/synchronizer/scripts/daily-report.sh`** (WP-7 I2) — `mv SchedulerReport → archive/` падал при отсутствующем `archive/`. Под `set -euo pipefail` это прерывало скрипт с non-zero exit → `scheduler.sh` логировал `WARN: daily-report failed` каждые 3 часа. Добавлен `mkdir -p "$ARCHIVE_DIR"` в `archive_old_reports()`.
+- **`roles/strategist/scripts/strategist.sh`** (WP-7 I1) — `BOLD_BEFORE=$(grep -c ... || echo 0)` при exit 1 от grep (0 matches) давал мультистрочный `"0\n0"` → `$(( BOLD_BEFORE - BOLD_NEW_BEFORE ))` падал с `line 249: 0: syntax error`, `[ -ge ]` — с `integer expression expected`. Fix: `|| true; VAR=${VAR:-0}` (5 точек: BOLD_BEFORE, BOLD_NEW_BEFORE, BOLD_AFTER, BOLD_NEW_AFTER, NON_BOLD).
+- **Тот же антипаттерн `grep -c ... || echo N)` в 11 точках 7 файлов** (субагент-ревью после I1+I2): `setup/validate-template.sh`, `.claude/hooks/protocol-artifact-validate.sh`, `roles/synchronizer/scripts/templates/{synchronizer,extractor}.sh`, `update.sh` (3 точки: DIFF_COUNT, CONFLICT_COUNT, WS_CONFLICTS), `.github/workflows/{cloud-scheduler,validate-template}.yml`. Все использовались в `[ -gt N ]` / арифметике → потенциальные баги того же класса.
+
+Commits: 150be24 (I1+I2 sync из DS-ai-systems), 731471f (I3 sweep 11 точек).
+
+## [0.27.5] — 2026-04-24
+
+### Changed
+- **`roles/strategist/scripts/strategist.sh` переименован концептуально (не файл):** context-файл зонтичного WP-7 в авторском governance-репо переехал `archive/wp-contexts/WP-7-bot-tech-debt.md` → `inbox/WP-7-platform-tech-debt.md`. Для шаблона это не blocker (пилоты используют свой `WP-N-*.md`), но в документации `PROCESSES.md` бота обновлена ссылка. Причина: WP-7 давно стал зонтом всей платформы (не только бота) + ошибочно жил в archive/, хотя active (`umbrella: true`). Подтверждено субагентом.
+
 ## [0.27.4] — 2026-04-24
 
 ### Fixed
