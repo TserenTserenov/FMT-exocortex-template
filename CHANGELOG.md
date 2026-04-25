@@ -5,6 +5,17 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.28.2] — 2026-04-25
+
+### Added
+- **`memory/t-checklist.md`** — реестр T-действий ТО IWE: 22 действия в Session/Day/Week/Month Close, owner/trigger/symptom-if-skipped для каждого. Класс T (True maintenance, идемпотентно, автопилот). Verification — Haiku R23 (формальная проверка чеклиста). Источник: WP-217 Ф3 (промотировано из staging S-31, обкатка 14 дней).
+- **`memory/r-questionnaire.md`** — R-вопросник Week/Month Close: 3 недельных + 6 месячных вопросов для переосмысления (не yes/no, экзоскелетный режим — агент даёт факты, человек судит). Класс R (Review/judgment). Включает M6 decommission-триаж (active → dormant → archived).
+- **`.claude/sync-manifest.yaml`** — реестр пар «источник → производное» для `iwe-drift.sh`. Шаблон с 3 generic-парами (protocols-to-skills, protocol-open-to-day-open-skill, staging-validated-to-fmt) + закомментированные шаблоны для Pack↔DS, root-CLAUDE↔instrument, instrument-docs↔code. Секция `activity_checks:` для decommission-триажа в Month Close.
+- **`scripts/iwe-drift.sh`** — R23-детектор drift'а пар (mtime-lag, без LLM). MVP-версия: shell + git + stat + awk, без внешних зависимостей. Usage: `bash scripts/iwe-drift.sh [--critical|--top N|--manifest PATH]`. Markdown-вывод для прямой вставки в DayPlan/Week Report.
+
+### Changed
+- Регламент техобслуживания IWE (элемент #15 культуры работы) теперь промотирован в шаблон: пользователи получают T-checklist, R-вопросник, drift-механизм при `update.sh`. Класс T/S/R закреплён в `.claude/rules/distinctions.md` HD «ТО ≠ Sync ≠ Review».
+
 ## [0.28.1] — 2026-04-25
 
 ### Changed

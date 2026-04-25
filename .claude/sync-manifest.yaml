@@ -1,0 +1,126 @@
+# .claude/sync-manifest.yaml — реестр пар "источник → производное" для iwe-drift.sh
+#
+# Манифест — реестр пар для ДЕТЕКЦИИ, не для исполнения.
+# Детектор (`scripts/iwe-drift.sh`) выводит отчёт; оператор (template-sync, update.sh,
+# собственные скрипты) применяет fix отдельно. Разделение ролей: R23 детектор ≠ R8 оператор.
+#
+# Формат записи пары:
+#   id:              уникальный kebab-case
+#   source:          path (absolute или относительно $IWE_ROOT)
+#   derived:         path (то же)
+#   relation:        replication | projection | reference | reconciliation
+#   check:           mtime-lag | content-diff | script:<path>
+#   threshold_days:  lag до warn
+#   critical_days:   lag до critical
+#   owner_role:      R1 | R5 | R8 | human | agent
+#   symptom:         как заметит пользователь при пропуске
+#   notes:           опционально
+#
+# Формат activity_check (decommission-триаж в Month Close):
+#   id:                     уникальный kebab-case
+#   action:                 человекочитаемое название
+#   expected_per_period:    ожидаемое число исполнений
+#   period_days:            размер окна
+#   commit_pattern_regex:   как опознать исполнение в git log / mtime
+#   dormant_after_periods:  пустых окон → dormant
+#   archive_after_periods:  пустых окон в dormant → archived
+
+version: 1
+
+pairs:
+
+  # 1. Протоколы (memory/) ↔ скиллы (.claude/skills/) — реализация должна следовать описанию
+  - id: protocols-to-skills
+    source: memory/protocol-close.md
+    derived: .claude/skills/day-close/
+    relation: reference
+    check: mtime-lag
+    threshold_days: 3
+    critical_days: 10
+    owner_role: agent
+    symptom: "Скилл выполняет протокол не так, как описано в memory/protocol-close.md"
+
+  - id: protocol-open-to-day-open-skill
+    source: memory/protocol-open.md
+    derived: .claude/skills/day-open/
+    relation: reference
+    check: mtime-lag
+    threshold_days: 3
+    critical_days: 10
+    owner_role: agent
+    symptom: "Day Open работает не по protocol-open.md"
+
+  # 2. Staging ↔ FMT (валидированные правила должны быть промотированы)
+  - id: staging-validated-to-fmt
+    source: STAGING.md
+    derived: FMT-exocortex-template/
+    relation: reconciliation
+    check: mtime-lag
+    threshold_days: 7
+    critical_days: 21
+    owner_role: human
+    symptom: "Правило `validated` в STAGING.md не промотировано в FMT более 3 недель"
+    notes: "Если у вас нет локального FMT-зеркала — пара бесполезна, удалите."
+
+# ---------------------------------------------------------------------------
+# Шаблоны для ваших собственных пар. Раскомментируйте и адаптируйте под свой репо-набор.
+# ---------------------------------------------------------------------------
+#
+#   # Pack ↔ DS (доменное знание → реализационные репо)
+#   - id: pack-to-ds-instrument
+#     source: <Pack-репо>/
+#     derived: <DS-instrument-репо>/
+#     relation: reference
+#     check: mtime-lag
+#     threshold_days: 7
+#     critical_days: 21
+#     owner_role: R1
+#     symptom: "DS использует устаревшие термины/SC из Pack"
+#
+#   # Корневой CLAUDE.md ↔ CLAUDE.md DS-репо (реплика платформенных правил)
+#   - id: root-claude-md-to-instrument
+#     source: CLAUDE.md
+#     derived: <DS-instrument-репо>/CLAUDE.md
+#     relation: replication
+#     check: mtime-lag
+#     threshold_days: 7
+#     critical_days: 14
+#     owner_role: agent
+#     symptom: "DS-репо не знает про новые правила из корневого CLAUDE.md"
+#
+#   # docs/ ↔ код в DS-instrument репо
+#   - id: instrument-docs-to-code
+#     source: <DS-instrument-репо>/
+#     derived: <DS-instrument-репо>/docs/
+#     relation: reference
+#     check: mtime-lag
+#     threshold_days: 7
+#     critical_days: 21
+#     owner_role: agent
+#     symptom: "docs/ отстаёт от кода более 1 недели"
+
+# ---------------------------------------------------------------------------
+# activity_checks — декомиссия мёртвых T-действий.
+# Drift-скрипт предлагает кандидатов, R-вопросник Month Close (M6) собирает решение,
+# человек подтверждает (active → dormant → archived).
+# ---------------------------------------------------------------------------
+
+activity_checks:
+
+  - id: lesson-hygiene
+    action: "Lesson Hygiene (ротация, архивация, сжатие MEMORY.md)"
+    expected_per_period: 1
+    period_days: 7
+    commit_pattern_regex: "(lesson|memory|lessons_).*(archive|rotate|clean|hygiene)"
+    dormant_after_periods: 3
+    archive_after_periods: 1
+    notes: "Trigger: /week-close. Симптом мёртвости — MEMORY.md раздувается >100 строк."
+
+  - id: staging-promotion
+    action: "Staging-промоция validated правил в FMT"
+    expected_per_period: 1
+    period_days: 14
+    commit_pattern_regex: "(STAGING|staging|promote).*S-[0-9]+"
+    dormant_after_periods: 3
+    archive_after_periods: 1
+    notes: "Trigger: /week-close. Симптом мёртвости — S-NN validated >21 дня без промоции."
