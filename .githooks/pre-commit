@@ -13,6 +13,60 @@ if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
     exit 1
 fi
 
+# === CHANGELOG ↔ update-manifest.json version sync ===
+# Корень бага (25 апр): drift на 5 версий между CHANGELOG (0.27.7) и
+# manifest (0.26.1) — update.sh --check отдавал «нет обновлений», пока
+# пользователь не словил это вручную. Память не помогает; нужен harness-гейт.
+# Правило: top version в CHANGELOG.md == version в update-manifest.json. Всегда.
+# Допущение: новая секция в CHANGELOG.md ВСЕГДА вверху (Keep-a-Changelog convention).
+# Если кто-то вставит секцию НЕ в начало — top-grep вернёт старую версию, drift
+# не задетектится. Это сознательный trade-off (alternative — счёт секций — даёт FP).
+
+# (C) Hard-fail при переименовании/перемещении: эти файлы имеют контракт с update.sh,
+# двигать их нельзя.
+RENAMED_RELEASE_FILES=$(git diff --cached --name-status 2>/dev/null \
+    | grep -E '^R[0-9]*[[:space:]].*(CHANGELOG\.md|update-manifest\.json)' || true)
+if [ -n "$RENAMED_RELEASE_FILES" ]; then
+    echo "RELEASE-SYNC: обнаружен rename CHANGELOG.md или update-manifest.json"
+    echo "  Эти файлы имеют контракт с update.sh — путь должен быть в корне репо."
+    echo "  Затронуто: $RENAMED_RELEASE_FILES"
+    exit 1
+fi
+
+STAGED_RELEASE_FILES=$(git diff --cached --name-only 2>/dev/null \
+    | grep -E '^(CHANGELOG\.md|update-manifest\.json)$' || true)
+if [ -n "$STAGED_RELEASE_FILES" ]; then
+    if [ -f "CHANGELOG.md" ] && [ -f "update-manifest.json" ]; then
+        CHANGELOG_VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md \
+            | sed 's/^## \[//;s/\]$//' || true)
+        MANIFEST_VERSION=$(grep -m1 '"version"' update-manifest.json \
+            | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//' || true)
+
+        if [ -z "$CHANGELOG_VERSION" ]; then
+            echo "RELEASE-SYNC: не удалось извлечь version из CHANGELOG.md (top section)"
+            echo "  Ожидаем строку вида: ## [X.Y.Z] — YYYY-MM-DD"
+            exit 1
+        fi
+        if [ -z "$MANIFEST_VERSION" ]; then
+            echo "RELEASE-SYNC: не удалось извлечь version из update-manifest.json"
+            exit 1
+        fi
+        if [ "$CHANGELOG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "RELEASE-SYNC: рассинхрон версий!"
+            echo "  CHANGELOG.md top:        $CHANGELOG_VERSION"
+            echo "  update-manifest.json:    $MANIFEST_VERSION"
+            echo ""
+            echo "  update.sh --check парсит manifest, не CHANGELOG. При расхождении"
+            echo "  пользователи не получают обновлений (drift 25 апр: 5 версий)."
+            echo ""
+            echo "  Fix: bump version в update-manifest.json до $CHANGELOG_VERSION"
+            echo "       (или откатить новую секцию в CHANGELOG, если bump преждевременный)"
+            exit 1
+        fi
+        echo "RELEASE-SYNC: PASS ($CHANGELOG_VERSION)"
+    fi
+fi
+
 # Get list of staged .sh files
 STAGED_SH=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null)
 [ -z "$STAGED_SH" ] && exit 0

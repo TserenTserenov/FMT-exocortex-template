@@ -7,6 +7,36 @@ on:
     branches: [main]
 
 jobs:
+  # Defense-in-depth для случая --no-verify в pre-commit + прямого push.
+  # Отдельный job, чтобы шёл независимо от validate/shellcheck (не зависит от их успеха).
+  release-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check CHANGELOG/manifest version sync
+        run: |
+          if [ ! -f "CHANGELOG.md" ] || [ ! -f "update-manifest.json" ]; then
+            echo "SKIP: CHANGELOG.md или update-manifest.json не найдены"
+            exit 0
+          fi
+          CHANGELOG_VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md \
+              | sed 's/^## \[//;s/\]$//' || true)
+          MANIFEST_VERSION=$(grep -m1 '"version"' update-manifest.json \
+              | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//' || true)
+          if [ -z "$CHANGELOG_VERSION" ] || [ -z "$MANIFEST_VERSION" ]; then
+            echo "FAIL: не удалось извлечь версии (CHANGELOG=$CHANGELOG_VERSION, manifest=$MANIFEST_VERSION)"
+            exit 1
+          fi
+          if [ "$CHANGELOG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "FAIL: рассинхрон версий!"
+            echo "  CHANGELOG.md top:     $CHANGELOG_VERSION"
+            echo "  update-manifest.json: $MANIFEST_VERSION"
+            echo "  update.sh --check парсит manifest — пользователи не получат обновлений."
+            echo "  Fix: bump version в update-manifest.json до $CHANGELOG_VERSION"
+            exit 1
+          fi
+          echo "PASS: CHANGELOG/manifest version sync ($CHANGELOG_VERSION)"
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:
