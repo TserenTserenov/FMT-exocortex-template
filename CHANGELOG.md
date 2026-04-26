@@ -5,6 +5,16 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.28.7] — 2026-04-26
+
+### Fixed (sub-agent deep audit, 2 ❌ в migrate-initial-marker.sh)
+
+- **`scripts/migrate-initial-marker.sh` — broken frontmatter (один `---`).** Раньше при некорректном frontmatter (только открывающий `---` без закрывающего) awk не находил второго `---`, не вставлял маркер, но скрипт выдавал «✓ Маркер добавлен» — false positive. Файл оставался без маркера. Фикс: добавлен `grep -c '^---$'` pre-check; если меньше двух `---` — fallback на вставку в начало (как для случая «нет frontmatter»). Также добавлен sanity check `[ ! -s "$TMP" ]` — защита от silent corruption.
+- **`scripts/migrate-initial-marker.sh` — read-only файл молча перезаписывался.** На macOS `mv "$TMP" "$TARGET"` заменяет read-only target если у owner'а есть write-permission на parent dir. Фикс: ранний exit 1 с понятным сообщением + подсказка `chmod u+w` если `[ ! -w "$TARGET" ]`.
+
+### Why
+Третий sub-agent аудит (deep, adversarial QA) прогнал 10 fuzz-cases против `migrate-initial-marker.sh` 0.28.6. Два cases дали реальные регрессии: (g) broken frontmatter — false positive completion; (i) read-only file — silent overwrite. Оба зафиксились ровно той же эвристикой что должна работать в edge cases.
+
 ## [0.28.6] — 2026-04-26
 
 ### Fixed (red-team Евгения round 2: 1 release-blocker + 2 edge-cases)

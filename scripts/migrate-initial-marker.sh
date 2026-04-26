@@ -62,6 +62,12 @@ if [ ! -f "$TARGET" ]; then
     exit 1
 fi
 
+if [ ! -w "$TARGET" ]; then
+    echo "Ошибка: $TARGET — read-only (нет прав на запись)." >&2
+    echo "Снимите защиту: chmod u+w \"$TARGET\"" >&2
+    exit 1
+fi
+
 # Уже есть маркер?
 if grep -qF 'IWE-INITIAL-NEEDED' "$TARGET"; then
     echo "✓ Маркер уже присутствует в $TARGET — миграция не нужна."
@@ -90,22 +96,36 @@ BACKUP="${TARGET}.pre-marker.$(date +%Y%m%d-%H%M%S)"
 cp "$TARGET" "$BACKUP"
 echo "Backup: $BACKUP"
 
-# Вставить маркер после frontmatter (после второго `---`)
-# Если frontmatter нет — вставить в самое начало.
+# Вставить маркер после frontmatter (после второго `---`).
+# Если frontmatter нет ИЛИ broken (только один `---`) — вставить в начало.
 TMP=$(mktemp)
+INSERTED_AFTER_FM=0
 if head -1 "$TARGET" | grep -q '^---$'; then
-    # frontmatter есть, найти второй ---
-    awk -v marker="$MARKER" '
-        BEGIN { fm_count = 0; inserted = 0 }
-        /^---$/ { fm_count++; print; if (fm_count == 2 && !inserted) { print ""; print marker; inserted = 1 } ; next }
-        { print }
-    ' "$TARGET" > "$TMP"
-else
+    # frontmatter есть, ищем второй ---
+    if [ "$(grep -c '^---$' "$TARGET")" -ge 2 ]; then
+        awk -v marker="$MARKER" '
+            BEGIN { fm_count = 0; inserted = 0 }
+            /^---$/ { fm_count++; print; if (fm_count == 2 && !inserted) { print ""; print marker; inserted = 1 } ; next }
+            { print }
+        ' "$TARGET" > "$TMP"
+        INSERTED_AFTER_FM=1
+    fi
+fi
+
+if [ "$INSERTED_AFTER_FM" -eq 0 ]; then
+    # Нет frontmatter ИЛИ broken (один ---) — вставить в самое начало.
     {
         echo "$MARKER"
         echo ""
         cat "$TARGET"
     } > "$TMP"
+fi
+
+# Sanity check: TMP не должен быть пустым (защита от silent corruption)
+if [ ! -s "$TMP" ]; then
+    echo "Ошибка: миграция произвела пустой результат — оригинал не тронут." >&2
+    rm -f "$TMP"
+    exit 1
 fi
 
 mv "$TMP" "$TARGET"
