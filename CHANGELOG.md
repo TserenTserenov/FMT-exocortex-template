@@ -11,6 +11,10 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **`.claude/hooks/protocol-artifact-validate.sh`** — проверка секции «Наработки Scout» теперь conditional: если секция отсутствует в DayPlan (Scout не сконфигурирован, нет `DS-agent-workspace`), валидатор не блокирует. Маркеры `disabled` / `not configured` принимаются как валидные.
 - **`roles/synchronizer/scripts/dt-collect.sh:233`** — `collect_sessions()` использовал hardcoded `$WORKSPACE/DS-strategy/inbox/open-sessions.log`, минуя `$GOVERNANCE_DIR`. Параметризовано как остальные функции файла.
 - **`setup.sh:480-499`** — auto-detect governance repo упрощён: убран literal `DS-my-strategy` из priority-list (legacy случай покрывается wildcard `DS-*strategy*` ниже). Снимает FAIL чека 1 в `validate-template.sh`.
+- **`templates/strategy-skeleton/README.md:17,20`** — literal `~/IWE/DS-my-strategy/` → `~/IWE/DS-strategy/` (стандартное имя для пилота из CLAUDE.md §9; `DS-my-strategy` — авторское исключение, держится в global-blacklist валидатора). Файл добавлен в `cb22aaa` и не прошёл следующий же template-sync — фикс закрывает регрессию.
+
+### Changed
+- **`.githooks/pre-commit`** — добавлен блок «template validation»: если в staging есть `*.md|sh|py|json|plist|yaml`, прогоняется полный `setup/validate-template.sh`. Раньше hook проверял только секреты, CHANGELOG↔manifest sync и кросс-платформу в `.sh`; ручные коммиты в FMT с author-specific литералами проходили мимо валидации, ошибку ловил только `template-sync.sh` пост-фактум (cb22aaa — наглядный пример). Escape hatch: `git commit --no-verify`.
 
 ### Added
 - **`docs/migrations/strategy-v0.27.0.md`** — migration path для пользователей, у которых `DS-strategy/docs/Strategy.md` создан до v0.27.0. Объясняет, какие блоки v0.27.0 (фаза стратегической позиции, калибр личности, источник НЭП-триады) добавить вручную (≤15 мин) или делегировать Claude через diff `seed/` ↔ `DS-strategy/`.
