@@ -5,6 +5,19 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- `.claude/lib/capture_writer.sh` — убран hardcoded fallback `DS-IT-systems/activity-hub/.env`. Теперь читается из `${IWE_DB_ENV_FILE:-}` env-var (sync с авторской копией).
+- `.claude/detectors/detector_decision.sh` — fallback на governance-репо параметризован через `${IWE_GOVERNANCE_REPO:-}` (вместо hardcoded `DS-my-strategy`).
+- `.claude/detectors/README.md` — пример dry-run переписан с `/Users/you/IWE/DS-my-strategy/...` на `/Users/.../IWE/<governance-repo>/...` (placeholder-формат, проходит validate-template.sh). Удалена ссылка на авторский WP-документ из header'а.
+- `memory/t-checklist.md` — упоминание `knowledge-mcp` заменено на generic «MCP-сервер».
+- `scripts/iwe-drift-helpers/check-arch-version.sh` — захардкоженный список `PACK-digital-platform`/`PACK-personal`/`PACK-MIM`/`DS-my-strategy/inbox` заменён на auto-discover `PACK-*/` + `${IWE_GOVERNANCE_REPO}/inbox`. Добавлен ранний exit 0 при пустом массиве (предотвращает unbound-variable crash под `set -eu` у нового пользователя).
+- `scripts/iwe-drift-helpers/check-status-legend.sh` — `REGISTRY` параметризован через `${IWE_GOVERNANCE_REPO}`. Добавлен exit 0 с понятным сообщением при незаданном env (вместо `$IWE_ROOT//docs/...` с двойным слэшем).
+
+### Why
+Validation FAIL'ы template-sync (после промоций L3→FMT) приводили к шторму TG-уведомлений: scheduler.sh ретраил sync на каждом wake (11×/день) при стабильном FAIL, отправляя уведомление каждый раз. Системно: авторские константы в FMT → исключены через env-vars; дополнительно scheduler различает терминальный exit (3=validation) vs transient (1/2/124) — терминальный → mark_done без ретрая, transient → ретрай.
+
 ## [0.28.3] — 2026-04-25
 
 ### Added
