@@ -5,6 +5,16 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.28.9] — 2026-04-26
+
+### Changed (validator hardening — `validate-template.sh` rule 6/6)
+
+- **Третий паттерн в правиле 6/6 — `bash (~|$HOME)/IWE/scripts/`.** Раньше валидатор ловил только `FMT-exocortex-template/scripts` и `FMT-exocortex-template/roles/[a-z]*/scripts`. Bare-invocations типа `bash IWE/scripts/iwe-drift.sh` (без fallback на `$IWE_SCRIPTS`) проходили валидацию, но падали в user-mode с `command not found`. Новый паттерн ловит bare-bash-вызовы с тильдой или `$HOME`. False positives отсутствуют — паттерн `${IWE_SCRIPTS:-$HOME/IWE/scripts}` не матчится (после `bash ` идёт `${`, не тильда/`$HOME`).
+- **Enumerate-all вместо first-fail.** Раньше при FAIL'е выводилось `head -3` нарушений ОДНОГО паттерна, остальные паттерны проверялись, но их вывод тоже обрезался. Теперь все hits аккумулируются в `$CHECK6_HITS` и выводятся списком в конце с разделителями `--- Pattern: $pattern ---`. Один FAIL = полный список нарушений → одна правка → один sync.
+
+### Why
+Инцидент 26 апр: `template-sync` 4 раза подряд пушил `audit-installation/SKILL.md` (commits `56ceabd`, `faa1d6e`, `066d866`, `7744b7b`), потому что итеративная правка fallback-цепочки в одном файле триггерила sync на каждом сохранении. Хотя root cause был в стиле редактирования, а не в валидаторе, правило 6/6 не покрывало bare-invocations класса `bash IWE/scripts/X.sh`. Расширение паттерна предотвращает регрессии того же класса в будущих скиллах. Параллельно отрефакторен авторский `month-close/SKILL.md` (3 строки 51/97/115) — `bash IWE/scripts/iwe-drift.sh` → `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/iwe-drift.sh`. Скилл локальный (не в `FMT/.claude/skills/`), поэтому в этот релиз не входит.
+
 ## [0.28.8] — 2026-04-26
 
 ### Fixed (pilot feedback Дмитрий — `/audit-installation` UX)
