@@ -62,6 +62,30 @@ pairs:
     symptom: "Правило `validated` в STAGING.md не промотировано в FMT более 3 недель"
     notes: "Если у вас нет локального FMT-зеркала — пара бесполезна, удалите."
 
+  # 3. ARCH-якорь ↔ downstream `derived_from:` (helper из scripts/iwe-drift-helpers/)
+  - id: arch-version-drift
+    source: <Pack-репо>/02-domain-entities/
+    derived: <Pack-репо>/
+    relation: reference
+    check: script:scripts/iwe-drift-helpers/check-arch-version.sh
+    threshold_days: 7
+    critical_days: 21
+    owner_role: R1
+    symptom: "ARCH-документ обновлён (bump version), но downstream-документы с `derived_from: <ID>@vX.Y` не пересмотрены"
+    notes: "Helper извлекает `version:` из ARCH-frontmatter и ищет несовпадения в downstream `derived_from:` якорях. Требует явных `version: vX.Y` в frontmatter каждого ARCH-документа. Если у вас нет ARCH-документов с derived_from-якорями — пара бесполезна, удалите."
+
+  # 4. WP-status легенда (REGISTRY) ↔ format-compliance таблицы (helper из scripts/iwe-drift-helpers/)
+  - id: wp-status-legend-drift
+    source: <Governance-репо>/docs/WP-REGISTRY.md
+    derived: <Governance-репо>/docs/WP-REGISTRY.md
+    relation: reconciliation
+    check: script:scripts/iwe-drift-helpers/check-status-legend.sh
+    threshold_days: 7
+    critical_days: 14
+    owner_role: R1
+    symptom: "Скрипты-потребители (linear-sync, day-close) перестают сходиться с реестром: новый статус-эмодзи не задокументирован в легенде, или active-id строка имеет terminal-status (или наоборот)"
+    notes: "Helper проверяет 3 invariant: I1 legend completeness, I2/I3 format compliance (id-format ↔ status). Терминальные статусы захардкожены в helper'е (✅ 📦 ↗️) — список короче и стабильнее, чем active. Любой новый статус по умолчанию active. Адаптируйте путь REGISTRY под свою структуру (env REGISTRY=...)."
+
 # ---------------------------------------------------------------------------
 # Шаблоны для ваших собственных пар. Раскомментируйте и адаптируйте под свой репо-набор.
 # ---------------------------------------------------------------------------
