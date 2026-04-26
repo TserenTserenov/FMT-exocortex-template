@@ -5,6 +5,20 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **`.claude/hooks/protocol-artifact-validate.sh`** — проверка секции «Наработки Scout» теперь conditional: если секция отсутствует в DayPlan (Scout не сконфигурирован, нет `DS-agent-workspace`), валидатор не блокирует. Маркеры `disabled` / `not configured` принимаются как валидные.
+- **`roles/synchronizer/scripts/dt-collect.sh:233`** — `collect_sessions()` использовал hardcoded `$WORKSPACE/DS-strategy/inbox/open-sessions.log`, минуя `$GOVERNANCE_DIR`. Параметризовано как остальные функции файла.
+- **`setup.sh:480-499`** — auto-detect governance repo упрощён: убран literal `DS-my-strategy` из priority-list (legacy случай покрывается wildcard `DS-*strategy*` ниже). Снимает FAIL чека 1 в `validate-template.sh`.
+
+### Added
+- **`docs/migrations/strategy-v0.27.0.md`** — migration path для пользователей, у которых `DS-strategy/docs/Strategy.md` создан до v0.27.0. Объясняет, какие блоки v0.27.0 (фаза стратегической позиции, калибр личности, источник НЭП-триады) добавить вручную (≤15 мин) или делегировать Claude через diff `seed/` ↔ `DS-strategy/`.
+- **Расширенные NL-триггеры в `.claude/skills/strategy-session/SKILL.md`** + упоминание `/strategy-session` slash-команды и альтернатив в `docs/QUICK-START.md`. Покрытие глаголов («запустим/начнём/откроем»), сокращения «стратсессия», «strategy planning».
+
+### Why
+Перепроверка evidence pack пилота `boberru@gmail.com` после релиза 0.28.4 нашла три пропуска (Scout / dt-collect / migration), которые в первом проходе оказались за горизонтом «приоритетных 4 пунктов». Все три — узкие места с малым blast-радиусом, но ломали UX отдельных сценариев.
+
 ## [0.28.4] — 2026-04-26
 
 ### Fixed
