@@ -409,13 +409,14 @@ else
     fi
 fi
 
-# === 4b. Propagate skills, hooks, rules to workspace ===
-echo "[4b] Installing skills, hooks, rules..."
+# === 4b. Propagate skills, hooks, rules, lib, config, detectors to workspace ===
+echo "[4b] Installing skills, hooks, rules, lib, config, detectors..."
 if $DRY_RUN; then
-    echo "  [DRY RUN] Would copy .claude/skills/, .claude/hooks/, .claude/rules/ → $WORKSPACE_DIR/.claude/"
+    echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,lib,config,detectors}/ → $WORKSPACE_DIR/.claude/"
 else
     mkdir -p "$WORKSPACE_DIR/.claude"
-    for subdir in skills hooks rules; do
+    # lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов
+    for subdir in skills hooks rules lib config detectors; do
         if [ -d "$TEMPLATE_DIR/.claude/$subdir" ]; then
             cp -r "$TEMPLATE_DIR/.claude/$subdir" "$WORKSPACE_DIR/.claude/"
             echo "  ✓ .claude/$subdir/ → $WORKSPACE_DIR/.claude/$subdir/"
@@ -476,9 +477,32 @@ IWE_ENV_FILE="$HOME/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
 IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
 
+# Auto-detect governance repo (DS-strategy / DS-my-strategy / first DS-*-strategy/) for env-var
+# Используется в .claude/lib/capture_writer.sh, .claude/detectors/detector_decision.sh,
+# scripts/iwe-drift-helpers/check-arch-version.sh, check-status-legend.sh.
+GOVERNANCE_REPO=""
+for candidate in DS-strategy DS-my-strategy; do
+    if [ -d "$WORKSPACE_DIR/$candidate" ]; then
+        GOVERNANCE_REPO="$candidate"
+        break
+    fi
+done
+if [ -z "$GOVERNANCE_REPO" ]; then
+    # Fallback: ищем любой DS-*-strategy / DS-strategy-like
+    for d in "$WORKSPACE_DIR"/DS-*; do
+        case "${d##*/}" in
+            DS-*strategy*|DS-strategy)
+                GOVERNANCE_REPO="${d##*/}"
+                break
+                ;;
+        esac
+    done
+fi
+
 if $DRY_RUN; then
-    echo "  [DRY RUN] Would write $IWE_ENV_FILE with IWE_WORKSPACE/IWE_TEMPLATE/IWE_SCRIPTS/IWE_ROLES"
+    echo "  [DRY RUN] Would write $IWE_ENV_FILE with IWE_WORKSPACE/IWE_TEMPLATE/IWE_SCRIPTS/IWE_ROLES/IWE_GOVERNANCE_REPO"
     echo "  [DRY RUN] Would ensure $ZSHENV_FILE sources $IWE_ENV_FILE"
+    [ -n "$GOVERNANCE_REPO" ] && echo "  [DRY RUN] Detected governance repo: $GOVERNANCE_REPO"
 else
     cat > "$IWE_ENV_FILE" <<IWEENV_EOF
 # IWE environment variables
@@ -489,6 +513,7 @@ export IWE_WORKSPACE="$WORKSPACE_DIR"
 export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
 export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
+export IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO"
 IWEENV_EOF
     echo "  ✓ $IWE_ENV_FILE written"
 
