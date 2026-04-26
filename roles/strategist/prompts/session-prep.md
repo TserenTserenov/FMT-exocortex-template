@@ -45,7 +45,7 @@ DS-strategy/
 
 - Прочитай `DS-strategy/inbox/fleeting-notes.md`
 - Прочитай ВСЕ файлы из `DS-strategy/inbox/` (кроме .DS_Store и .docx)
-- **(опционально)** Прочитай QA-отчёт бота: `{{WORKSPACE_DIR}}/DS-agent-workspace/scheduler/feedback-triage/` (последний по дате) — структурированный отчёт из feedback_triage DB: замечания (✏️) первые, urgent (high/critical) вторые, кластеры проблем третьи. Auto-triage уже выполнен ботом → Session-Prep проверяет кластеры (≥3 = **urgent** → WP-debt) и помечает resolved. **Пропустить** если `[ ! -d "{{WORKSPACE_DIR}}/DS-agent-workspace" ]`.
+- Прочитай QA-отчёт бота: `DS-agent-workspace/scheduler/feedback-triage/` (последний по дате) — **структурированный отчёт** из feedback_triage DB: замечания (✏️) первые, urgent (high/critical) вторые, кластеры проблем третьи. Auto-triage уже выполнен ботом → Session-Prep проверяет кластеры (≥3 = **urgent** → WP-debt) и помечает resolved
 - Для каждой заметки/файла определи: → в план недели? → capture в Pack? → в повестку для обсуждения? → удалить?
 - **Недельная агрегация Inbox Triage:**
   > Это НЕ дубль ежедневного triage Note-Review. Note-Review классифицирует заметки и пишет предложения в целевые документы. Session-Prep агрегирует результаты за неделю из этих документов + добавляет unsatisfied-questions.

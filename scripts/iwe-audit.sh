@@ -140,24 +140,43 @@ emit_inventory_row "memory/protocol-work.md" 1 ""
 emit_inventory_row "memory/protocol-close.md" 1 ""
 
 # Скрипты
-# update.sh: на user-инсталляции живёт в scripts/. На автор-инсталляции
-# (params.yaml: author_mode: true) — в FMT-exocortex-template/. Адаптивно.
+# update.sh ЖИВЁТ ТОЛЬКО в FMT-exocortex-template/update.sh для всех режимов
+# (он сам резолвит SCRIPT_DIR=FMT-template, WORKSPACE_DIR=parent). Никогда не
+# пропагируется в workspace/scripts/. Аналогично iwe-drift.sh: для user-mode
+# живёт только в FMT-template/scripts/, в author-mode дублируется в workspace/scripts/.
 AUTHOR_MODE=0
 if [ -f "$IWE_ROOT/params.yaml" ] && grep -qE "^author_mode:[[:space:]]*true" "$IWE_ROOT/params.yaml"; then
     AUTHOR_MODE=1
 fi
-if [ "$AUTHOR_MODE" = "1" ]; then
-    if exists_any "$IWE_ROOT/FMT-exocortex-template/update.sh"; then
-        TOTAL=$((TOTAL + 1)); FOUND=$((FOUND + 1))
-        printf "| \`%s\` | %s | %s |\n" "scripts/update.sh" "✅" "author_mode: source в FMT-exocortex-template/update.sh"
-    else
-        TOTAL=$((TOTAL + 1)); CRITICAL_MISSING=$((CRITICAL_MISSING + 1))
-        printf "| \`%s\` | %s | %s |\n" "scripts/update.sh" "❌" "author_mode: не найден ни в scripts/, ни в FMT-exocortex-template/"
-    fi
+
+# update.sh — всегда в FMT-template (для обоих режимов)
+TOTAL=$((TOTAL + 1))
+if exists_any "$IWE_ROOT/FMT-exocortex-template/update.sh"; then
+    FOUND=$((FOUND + 1))
+    printf "| \`%s\` | %s | %s |\n" "FMT-exocortex-template/update.sh" "✅" "self-update запускается отсюда"
 else
-    emit_inventory_row "scripts/update.sh" 1 ""
+    CRITICAL_MISSING=$((CRITICAL_MISSING + 1))
+    printf "| \`%s\` | %s | %s |\n" "FMT-exocortex-template/update.sh" "❌" "не найден — обновления невозможны"
 fi
-emit_inventory_row "scripts/iwe-drift.sh" 1 ""
+
+# iwe-drift.sh: проверяем оба возможных места (user-mode → только FMT-template, author-mode → оба)
+TOTAL=$((TOTAL + 1))
+DRIFT_FMT="$IWE_ROOT/FMT-exocortex-template/scripts/iwe-drift.sh"
+DRIFT_WS="$IWE_ROOT/scripts/iwe-drift.sh"
+if exists_any "$DRIFT_FMT"; then
+    FOUND=$((FOUND + 1))
+    if [ "$AUTHOR_MODE" = "1" ] && exists_any "$DRIFT_WS"; then
+        printf "| \`%s\` | %s | %s |\n" "scripts/iwe-drift.sh" "✅" "author_mode: workspace + FMT (template-sync экспортирует workspace → FMT)"
+    else
+        printf "| \`%s\` | %s | %s |\n" "scripts/iwe-drift.sh" "✅" "FMT-exocortex-template/scripts/iwe-drift.sh (source-of-truth для user-mode)"
+    fi
+elif exists_any "$DRIFT_WS"; then
+    FOUND=$((FOUND + 1))
+    printf "| \`%s\` | %s | %s |\n" "scripts/iwe-drift.sh" "⚠️" "только в workspace/scripts/ (FMT-template отсутствует)"
+else
+    CRITICAL_MISSING=$((CRITICAL_MISSING + 1))
+    printf "| \`%s\` | %s | %s |\n" "scripts/iwe-drift.sh" "❌" "не найден ни в FMT-template, ни в workspace"
+fi
 
 # params.yaml — конфиг
 emit_inventory_row "params.yaml" 1 ""
@@ -187,18 +206,11 @@ echo ""
 echo "## 2. L1 drift (платформа vs FMT)"
 echo ""
 
-# B10 fix (0.28.5): drift-скрипт живёт в FMT-репо, не в workspace root.
-# Поддержка обоих layouts: legacy ($IWE_ROOT/scripts) + canonical ($IWE_TEMPLATE/scripts).
-DRIFT_SCRIPT=""
-for candidate in \
-    "$IWE_ROOT/FMT-exocortex-template/scripts/iwe-drift.sh" \
-    "$IWE_ROOT/scripts/iwe-drift.sh" \
-    "${IWE_TEMPLATE:-}/scripts/iwe-drift.sh"; do
-    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
-        DRIFT_SCRIPT="$candidate"
-        break
-    fi
-done
+# Ищем iwe-drift.sh: предпочитаем workspace (author-mode source-of-truth), фоллбэк на FMT-template (user-mode).
+DRIFT_SCRIPT="$IWE_ROOT/scripts/iwe-drift.sh"
+if [ ! -f "$DRIFT_SCRIPT" ] && [ -f "$IWE_ROOT/FMT-exocortex-template/scripts/iwe-drift.sh" ]; then
+    DRIFT_SCRIPT="$IWE_ROOT/FMT-exocortex-template/scripts/iwe-drift.sh"
+fi
 if [ -f "$DRIFT_SCRIPT" ]; then
     # Не валим весь скрипт если iwe-drift падает — set -eu выключаем точечно
     set +e

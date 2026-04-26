@@ -12,12 +12,7 @@
 
 set -euo pipefail
 
-# Default = parent dir этого скрипта (т.е. корень FMT-репо при вызове из setup/).
-# Раньше было `$HOME/IWE/FMT-exocortex-template` — author-specific; ломалось
-# в CI / на чужом checkout / при cwd-неоднозначности.
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEFAULT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="${1:-$DEFAULT_ROOT}"
+TEMPLATE_DIR="${1:-$HOME/IWE/FMT-exocortex-template}"
 FAIL=0
 
 echo "=== Validating: $TEMPLATE_DIR ==="
