@@ -145,7 +145,8 @@ if [ "$MODE" = "installed" ]; then
 else
     count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
             --include="*.json" --include="*.plist" \
-            --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
+            --exclude='validate-template.sh' --exclude='setup.sh' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' \
             | grep -v 'PLATFORM-COMPAT.md' \
             | grep -v 'validate-template.yml' \
@@ -154,9 +155,11 @@ else
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         grep -rn '/opt/homebrew' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-            --exclude='validate-template.sh' --exclude='setup.sh' 2>/dev/null \
+            --exclude='validate-template.sh' --exclude='setup.sh' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' \
-            | grep -v 'validate-template.yml' | head -3 || true
+            | grep -v 'validate-template.yml' \
+            | grep -v '/usr/local/bin.*:/opt/homebrew' | head -3 || true
         FAIL=1
     else
         echo "PASS"

@@ -104,6 +104,19 @@ if $VALIDATE_ONLY; then
     echo "  MCP подключается через claude.ai/settings/connectors"
     echo "  Проверьте командой /mcp в Claude Code"
 
+    # Delegate структурные инварианты валидатору шаблона (installed-режим:
+    # пропускает чеки, легитимно нарушаемые после setup — /Users/, /opt/homebrew, MEMORY skeleton).
+    # См. setup/validate-template.sh — единый источник чеков 1, 5, 6, 7.
+    if [ -x "$SCRIPT_DIR/setup/validate-template.sh" ] || [ -f "$SCRIPT_DIR/setup/validate-template.sh" ]; then
+        echo ""
+        echo "[5/5] Структурные инварианты (delegate → validate-template.sh --mode=installed)..."
+        if bash "$SCRIPT_DIR/setup/validate-template.sh" --mode=installed "$SCRIPT_DIR" 2>&1 | sed 's/^/  /'; then
+            :
+        else
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+
     echo ""
     if [ "$ERRORS" -eq 0 ]; then
         echo "✓ Валидация пройдена"
