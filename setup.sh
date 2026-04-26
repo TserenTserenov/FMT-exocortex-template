@@ -477,18 +477,16 @@ IWE_ENV_FILE="$HOME/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
 IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
 
-# Auto-detect governance repo (DS-strategy / DS-my-strategy / first DS-*-strategy/) for env-var
+# Auto-detect governance repo для env-var IWE_GOVERNANCE_REPO.
 # Используется в .claude/lib/capture_writer.sh, .claude/detectors/detector_decision.sh,
 # scripts/iwe-drift-helpers/check-arch-version.sh, check-status-legend.sh.
+# Стратегия: (1) DS-strategy (default-имя из шаблона), (2) wildcard DS-*-strategy*
+# (ловит legacy/локальные конвенции, например `DS-foo-strategy` или старое `DS-*-strategy`-имя).
 GOVERNANCE_REPO=""
-for candidate in DS-strategy DS-my-strategy; do
-    if [ -d "$WORKSPACE_DIR/$candidate" ]; then
-        GOVERNANCE_REPO="$candidate"
-        break
-    fi
-done
+if [ -d "$WORKSPACE_DIR/DS-strategy" ]; then
+    GOVERNANCE_REPO="DS-strategy"
+fi
 if [ -z "$GOVERNANCE_REPO" ]; then
-    # Fallback: ищем любой DS-*-strategy / DS-strategy-like
     for d in "$WORKSPACE_DIR"/DS-*; do
         case "${d##*/}" in
             DS-*strategy*|DS-strategy)
