@@ -108,3 +108,23 @@ if [ "$ISSUES" -eq 1 ]; then
     echo "Commit blocked. See docs/PLATFORM-COMPAT.md for cross-platform wrappers."
     exit 1
 fi
+
+# === Template validation (author-specific leaks, hardcoded paths, hooks cross-ref) ===
+# Корень бага (26 апр): литерал `DS-my-strategy` попал в новый
+# templates/strategy-skeleton/README.md (commit cb22aaa); валидатор зовётся
+# только из template-sync.sh — ручные коммиты в FMT валидацию обходили.
+# Гейт: если staged хоть один файл из расширений, что сканит validate-template.sh,
+# прогнать полную валидацию шаблона. Escape hatch: `git commit --no-verify`.
+STAGED_TEMPLATE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '\.(md|sh|py|json|plist|yaml)$' || true)
+if [ -n "$STAGED_TEMPLATE" ] && [ -x "setup/validate-template.sh" ]; then
+    if ! bash setup/validate-template.sh >/tmp/iwe-validate.$$ 2>&1; then
+        echo "TEMPLATE-VALIDATE: FAIL"
+        cat /tmp/iwe-validate.$$
+        rm -f /tmp/iwe-validate.$$
+        echo ""
+        echo "  Commit blocked. Fix issues above or override with: git commit --no-verify"
+        exit 1
+    fi
+    rm -f /tmp/iwe-validate.$$
+fi
