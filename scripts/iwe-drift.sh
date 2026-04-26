@@ -195,6 +195,23 @@ TMP_ROWS=$(mktemp)
 trap 'rm -f "$TMP_RECORDS" "$TMP_ROWS"' EXIT
 
 parse_manifest "$MANIFEST" > "$TMP_RECORDS"
+
+# Если pairs:-секция отсутствует ИЛИ пуста — записей нет. Сообщить явно,
+# а не выдавать молчаливый пустой отчёт.
+if [ ! -s "$TMP_RECORDS" ]; then
+    if ! grep -qE '^pairs:[[:space:]]*$' "$MANIFEST"; then
+        echo "## Drift-отчёт ($(date +%Y-%m-%d))"
+        echo ""
+        echo "⚠ В манифесте отсутствует секция \`pairs:\` — drift-сверка не выполнена."
+        echo "_Манифест: $MANIFEST_"
+        exit 1
+    fi
+    echo "## Drift-отчёт ($(date +%Y-%m-%d))"
+    echo ""
+    echo "_Секция \`pairs:\` пуста — записей для сверки нет._"
+    exit 0
+fi
+
 collect "$TMP_RECORDS" > "$TMP_ROWS"
 
 # Фильтрация

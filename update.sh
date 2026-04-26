@@ -365,15 +365,21 @@ if [ -f "$ENV_FILE" ]; then
         # === Auto-add GOVERNANCE_REPO + IWE_TEMPLATE to legacy .exocortex.env (0.28.5+) ===
         # Если .exocortex.env создан до 0.28.5 — этих ключей нет; дописать.
         if ! grep -q '^GOVERNANCE_REPO=' "$ENV_FILE" 2>/dev/null; then
-            DETECTED_GOV="DS-strategy"
-            if [ -n "${ENV_WORKSPACE_DIR:-}" ] && [ -d "${ENV_WORKSPACE_DIR}/DS-strategy" ]; then
+            # Resolve workspace: ENV_WORKSPACE_DIR (если есть) → fallback dirname $SCRIPT_DIR
+            DETECT_WS="${ENV_WORKSPACE_DIR:-$(dirname "$SCRIPT_DIR")}"
+            DETECTED_GOV=""
+            if [ -d "${DETECT_WS}/DS-strategy" ]; then
                 DETECTED_GOV="DS-strategy"
-            elif [ -n "${ENV_WORKSPACE_DIR:-}" ]; then
-                for d in "${ENV_WORKSPACE_DIR}"/DS-*; do
+            else
+                for d in "${DETECT_WS}"/DS-*; do
                     case "${d##*/}" in
                         DS-*strategy*) DETECTED_GOV="${d##*/}"; break ;;
                     esac
                 done
+            fi
+            if [ -z "$DETECTED_GOV" ]; then
+                DETECTED_GOV="DS-strategy"
+                echo "  ⚠ Governance repo не найден в $DETECT_WS — fallback DS-strategy. Проверьте .exocortex.env вручную."
             fi
             echo "GOVERNANCE_REPO=$DETECTED_GOV" >> "$ENV_FILE"
             echo "  ✓ Добавлено GOVERNANCE_REPO=$DETECTED_GOV в .exocortex.env (миграция 0.28.5)"
