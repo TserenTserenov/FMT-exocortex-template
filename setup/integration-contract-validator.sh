@@ -40,7 +40,9 @@ cd "$TEMPLATE_DIR"
 
 VIOLATIONS=0
 log() { echo "$@"; }
-verbose() { $VERBOSE && echo "  $@" || true; }
+# SC2145 fix: используем $* (склеивает с IFS) внутри строки с literal-префиксом,
+# чтобы не получать «mixes string and array» от shellcheck.
+verbose() { if $VERBOSE; then echo "  $*"; fi; }
 
 log "=== Integration Contract Validator (WP-273 R4.8) ==="
 log ""

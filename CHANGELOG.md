@@ -5,6 +5,15 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.1] — 2026-04-27
+
+### Fixed (CI green — pilot feedback Евгений)
+
+- **`setup/integration-contract-validator.sh:43`** — ShellCheck SC2145 («Argument mixes string and array») в `verbose() { $VERBOSE && echo "  $@" || true; }`. `"  $@"` смешивает literal-префикс и массив `$@`. Заменено на `if $VERBOSE; then echo "  $*"; fi` — `$*` склеивает с IFS как одну строку, без mixing. Заодно убрана антипаттерн-цепочка `cmd && X || true`, которая маскирует ошибки внутри X.
+
+### Why
+Validate Template на main падал на `0.29.0` — блокирует релиз для пилотов, которые ждут green CI перед обновлением.
+
 ## [0.29.0] — 2026-04-27
 
 ### Added (Generated runtime architecture — WP-273 Этап 2, ArchGate v2 → F)
