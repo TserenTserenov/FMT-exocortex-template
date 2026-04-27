@@ -5,6 +5,15 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.28.11] — 2026-04-27
+
+### Fixed (pilot feedback Евгений Round 4 R4.1 — manifest 404 на runtime-файлах)
+
+- **`generate-manifest.sh` теперь использует `git ls-files` вместо `find`.** Раньше скрипт собирал ВСЕ файлы в дереве (включая runtime-артефакты вроде `.exocortex.env`, `.claude.md.base`, `.claude/logs/capture_log.jsonl`, помещённые в `.gitignore`), потом полагался на ручные `EXCLUDE_PATTERNS`. После одного цикла `setup.sh` runtime-файлы попадали в `update-manifest.json`, а у пользователя `update.sh` ходил по ним в GitHub Contents API и получал 404. Переключение на `git ls-files` гарантирует, что в манифест попадают ТОЛЬКО tracked-файлы — runtime никогда не попадёт в принципе.
+
+### Why
+Round 4 пилотного red-team'а Евгения после clean reinstall main `b0ead81` / 0.28.10: `update-manifest.json` содержал 3 пути, отсутствующих в репо (все в `.gitignore`), `update.sh` показывал «N файлов не найдены». Точечный фикс «удалить 3 пути из манифеста» закрыл бы только эти 3 имени; завтра появится `.claude/cache/` или новый артефакт setup'а — снова попадёт в манифест. Системный фикс через `git ls-files` закрывает класс «runtime в манифесте» полностью. Это Этап 1 WP-273 (закрытие 4-го корня Spec↔State drift) — блокер пользователей. Этап 2 (релиз 0.29.0) с архитектурными артефактами (vocabulary.yaml, load-extensions.sh, integration-contract-validator.sh) идёт отдельно после ArchGate.
+
 ## [0.28.10] — 2026-04-26
 
 ### Fixed (pilot feedback Евгений — UX-trap двух валидаторов на свежей 0.28.8)

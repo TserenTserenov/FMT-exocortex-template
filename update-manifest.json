@@ -1,8 +1,7 @@
 {
-  "version": "0.28.10",
+  "version": "0.28.11",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
-    {"path": ".claude.md.base"},
     {"path": ".claude/capture-config.sh.example"},
     {"path": ".claude/config/capture-detectors.sh"},
     {"path": ".claude/detectors/README.md"},
@@ -24,7 +23,6 @@
     {"path": ".claude/lib/capture_writer.sh"},
     {"path": ".claude/lib/log_formatter.sh"},
     {"path": ".claude/lib/resolve_target_repo.sh"},
-    {"path": ".claude/logs/capture_log.jsonl"},
     {"path": ".claude/rules/distinctions.md"},
     {"path": ".claude/rules/formatting.md"},
     {"path": ".claude/settings.json"},
@@ -45,7 +43,6 @@
     {"path": ".claude/skills/week-close/SKILL.md"},
     {"path": ".claude/skills/wp-new/SKILL.md"},
     {"path": ".claude/sync-manifest.yaml"},
-    {"path": ".exocortex.env"},
     {"path": ".githooks/pre-commit"},
     {"path": ".github/ISSUE_TEMPLATE/bug_report.md"},
     {"path": ".github/ISSUE_TEMPLATE/feature_request.md"},

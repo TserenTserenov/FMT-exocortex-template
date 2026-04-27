@@ -48,12 +48,12 @@ EXCLUDE_EXACT=(
     "extensions/mcp-user.json"
 )
 
-# Собираем файлы
+# Собираем файлы.
+# Источник: `git ls-files` — гарантирует, что в манифест попадут ТОЛЬКО tracked-файлы.
+# .gitignore-файлы (.exocortex.env, .claude.md.base, .claude/logs/, settings.local.json)
+# автоматически исключаются git'ом, что закрывает класс «runtime в манифесте» (WP-273 R4.1).
 FILES=()
-while IFS= read -r filepath; do
-    # Относительный путь
-    rel="${filepath#$SCRIPT_DIR/}"
-
+while IFS= read -r rel; do
     # Проверяем исключения
     skip=false
     for pattern in "${EXCLUDE_PATTERNS[@]}"; do
@@ -72,7 +72,7 @@ while IFS= read -r filepath; do
 
     $skip && continue
     FILES+=("$rel")
-done < <(find "$SCRIPT_DIR" -type f -not -path '*/.git/*' -not -name '.DS_Store' | sort)
+done < <(git -C "$SCRIPT_DIR" ls-files | sort)
 
 # Генерируем JSON
 {
