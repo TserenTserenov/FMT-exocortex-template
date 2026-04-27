@@ -1,5 +1,5 @@
 {
-  "version": "0.29.6",
+  "version": "0.29.7",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {"path": ".claude/capture-config.sh.example"},

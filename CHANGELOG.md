@@ -5,6 +5,29 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.7] — 2026-04-27
+
+### Fixed (Round 5 Евгения — 4 платформенных хвоста после migration на 0.29.6)
+
+После прогона `update.sh` на 0.29.6 в реальном пилотском IWE Евгений нашёл 4 хвоста миграции. Все системные, разной глубины.
+
+**R5.1 — `migrate-to-runtime-target.sh --dry-run` падает на ERROR:** dry-run не копирует `.exocortex.env` в workspace (по логике «без записей»), но потом передаёт `build-runtime --env-file "$WORKSPACE_DIR/.exocortex.env"` принудительно — файла нет, build-runtime exit 2. Прямой `build-runtime --dry-run` с legacy env path работает.
+- **Фикс:** после Step 3 пересчитываю `ENV_FILE` по принципу «что реально есть на диске» (workspace → FMT legacy → exit). Dry-run использует существующий source без побочных эффектов.
+
+**R5.2 — `BACKUP_DIR: unbound variable` в clean-FMT ветке:** `BACKUP_DIR=` объявлялся только в `DIRTY_COUNT > 0`-ветке (Step 5), но печатался безусловно в финальном hint (line 205) под `set -eu` → bash валится при clean-FMT повторном запуске.
+- **Фикс:** инициализация `BACKUP_DIR=""` в начале + защита печати условием `[ -n "$BACKUP_DIR" ] && echo …`. Hint не показывается при clean-FMT — там и backup'а нет.
+
+**R5.3 — `~/.iwe-paths` не апгрейдится при миграции 0.28→0.29:** `setup.sh [4d]` пишет полный набор IWE_* переменных (включая `IWE_RUNTIME`), но миграция 0.28→0.29 идёт через `migrate-to-runtime-target.sh`, который вообще не трогает `~/.iwe-paths`. Старый файл остаётся без `export IWE_RUNTIME` → `install.sh` для launchd-ролей видит неполный env.
+- **Корневая причина:** OwnerIntegrity нарушен — source-of-truth для `~/.iwe-paths` дублировался в `setup.sh [4d]` и должен быть в migrate, но не был.
+- **Фикс системный:** новый хелпер `setup/install-iwe-paths.sh` — единственный writer `~/.iwe-paths`. Вызывается из `setup.sh [4d]` (рефакторинг) и из `migrate-to-runtime-target.sh` Step 6 (новый шаг). Идемпотентный, поддерживает `--dry-run`. update.sh может тоже его вызывать при следующих апгрейдах без новой логики.
+
+**R5.4 — strategist/extractor/synchronizer launchd plist'ы не экспортируют IWE_***: `EnvironmentVariables` в plist'ах содержал только `PATH+HOME`. Дочерний скрипт `strategist.sh` / `extractor.sh` / `scheduler.sh` под launchd не видел `IWE_TEMPLATE/IWE_WORKSPACE/IWE_RUNTIME` — launchctl не читает `~/.zshenv` / `~/.iwe-paths`. Скрипты падали в fallback-warning.
+- **Фикс:** в исходных plist'ах (`roles/*/scripts/launchd/*.plist`, substituted) добавлены ключи `IWE_TEMPLATE/IWE_WORKSPACE/IWE_RUNTIME` в `EnvironmentVariables` как `{{IWE_TEMPLATE}}/{{WORKSPACE_DIR}}/{{IWE_RUNTIME}}`-плейсхолдеры. build-runtime подставит per-host значения. Плисты становятся **self-contained**: launchd-runner'ы больше не зависят от shell env.
+
+### Why
+
+Round 5 закрыл паттерн «launchd зависит от shell env» (R5.4) — это устойчивый класс багов, который ловил Евгения каждый раз. Системная очистка через self-contained plist'ы делает дочерние скрипты воспроизводимыми независимо от того, как открывался процесс. R5.3 закрыл OwnerIntegrity-нарушение в генерации `~/.iwe-paths` — теперь один writer на все три триггера (setup/migrate/update).
+
 ## [0.29.6] — 2026-04-27
 
 ### Fixed (R6.1** — критический блокер от sub-agent post-release verify 0.29.5)

@@ -34,6 +34,7 @@ DEFAULT_WORKSPACE="$(dirname "$TEMPLATE_DIR")"
 
 WORKSPACE_DIR="$DEFAULT_WORKSPACE"
 DRY_RUN=false
+BACKUP_DIR=""  # set в Step 5 при clean→dirty ветке; защита от unbound в финальном hint под set -eu
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -77,10 +78,10 @@ DIRTY_FILES=$(git -C "$TEMPLATE_DIR" status --porcelain | grep -E '^[ M]M ' | aw
 DIRTY_COUNT=$(echo "$DIRTY_FILES" | grep -c . || true)
 
 if [ "$DIRTY_COUNT" -eq 0 ]; then
-    echo "[1/5] FMT clean — миграция не требуется."
+    echo "[1/6] FMT clean — миграция не требуется."
     # Continue to step 3 anyway: возможно .exocortex.env в FMT нужно мигрировать
 else
-    echo "[1/5] Detected dirty FMT: $DIRTY_COUNT файлов с изменениями."
+    echo "[1/6] Detected dirty FMT: $DIRTY_COUNT файлов с изменениями."
     if [ "$DIRTY_COUNT" -le 10 ]; then
         echo "$DIRTY_FILES" | head -10 | sed 's/^/    /'
     else
@@ -91,7 +92,7 @@ fi
 echo ""
 
 # === Step 3: Migrate .exocortex.env from FMT to workspace (if needed) ===
-echo "[2/5] .exocortex.env location..."
+echo "[2/6] .exocortex.env location..."
 if [ -f "$TEMPLATE_DIR/.exocortex.env" ] && [ ! -f "$WORKSPACE_DIR/.exocortex.env" ]; then
     if $DRY_RUN; then
         echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/.exocortex.env → $WORKSPACE_DIR/.exocortex.env"
@@ -109,9 +110,21 @@ else
 fi
 echo ""
 
+# === Determine effective ENV_FILE (resilient к dry-run, где copy не выполнялся) ===
+# Real-run: workspace/.exocortex.env уже создан или существовал → используем его.
+# Dry-run без workspace-файла: legacy FMT/.exocortex.env как source для build-runtime --dry-run.
+# Без этого dry-run падает с exit 2 "не найден" сразу после "Would copy" hint'а.
+if [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
+    ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
+elif [ -f "$TEMPLATE_DIR/.exocortex.env" ]; then
+    ENV_FILE="$TEMPLATE_DIR/.exocortex.env"
+else
+    echo "  ⚠ .exocortex.env не найден ни в workspace, ни в FMT. Прерываюсь." >&2
+    exit 0
+fi
+
 # === Step 4: Add IWE_RUNTIME to .exocortex.env (if missing) ===
-echo "[3/5] IWE_RUNTIME placeholder..."
-ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
+echo "[3/6] IWE_RUNTIME placeholder..."
 if grep -q '^IWE_RUNTIME=' "$ENV_FILE" 2>/dev/null; then
     echo "  ✓ IWE_RUNTIME уже в .exocortex.env"
 else
@@ -128,7 +141,7 @@ echo ""
 if [ "$DIRTY_COUNT" -gt 0 ]; then
     BACKUP_DIR="$WORKSPACE_DIR/.iwe-runtime-migration-backup"
 
-    echo "[4/5] Backup dirty FMT + git restore..."
+    echo "[4/6] Backup dirty FMT + git restore..."
     if $DRY_RUN; then
         echo "  [DRY RUN] Would backup dirty files to $BACKUP_DIR/"
         echo "  [DRY RUN] Would: launchctl unload IWE plists (com.strategist.*, com.extractor.*, com.exocortex.*)"
@@ -160,18 +173,34 @@ if [ "$DIRTY_COUNT" -gt 0 ]; then
     fi
     echo ""
 else
-    echo "[4/5] FMT уже clean — skip backup/restore"
+    echo "[4/6] FMT уже clean — skip backup/restore"
     echo ""
 fi
 
 # === Step 6: Build runtime ===
-echo "[5/5] build-runtime.sh..."
+echo "[5/6] build-runtime.sh..."
 if $DRY_RUN; then
     bash "$TEMPLATE_DIR/setup/build-runtime.sh" \
         --dry-run --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /'
 else
     bash "$TEMPLATE_DIR/setup/build-runtime.sh" \
         --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /'
+fi
+echo ""
+
+# === Step 7: Refresh ~/.iwe-paths (R5.3 Евгения, 27 апр) ===
+# 0.28.x clone не знал про IWE_RUNTIME — после миграции ~/.iwe-paths остаётся без
+# export IWE_RUNTIME, и launchd install.sh / scheduler видят неполный env.
+# Source-of-truth: setup/install-iwe-paths.sh (вызывается также из setup.sh [4d]).
+echo "[6/6] Refreshing ~/.iwe-paths..."
+GOVERNANCE_REPO_VAL=$(grep '^GOVERNANCE_REPO=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+GOVERNANCE_REPO_VAL="${GOVERNANCE_REPO_VAL:-DS-strategy}"
+if $DRY_RUN; then
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" \
+        --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO_VAL" --dry-run 2>&1 | sed 's/^/  /'
+else
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" \
+        --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO_VAL" 2>&1 | sed 's/^/  /'
 fi
 echo ""
 
@@ -201,6 +230,5 @@ else
     echo ""
     echo "  Если install.sh отказывается с 'plist содержит {{IWE_RUNTIME}}' —"
     echo "  значит шаг 1 (source) пропущен. Не скопировался env."
-    echo ""
-    echo "  Backup dirty FMT: $BACKUP_DIR/"
+    [ -n "$BACKUP_DIR" ] && echo "" && echo "  Backup dirty FMT: $BACKUP_DIR/"
 fi
