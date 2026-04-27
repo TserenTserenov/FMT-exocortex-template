@@ -1,5 +1,5 @@
 {
-  "version": "0.29.2",
+  "version": "0.29.3",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {"path": ".claude/capture-config.sh.example"},
@@ -172,6 +172,7 @@
     {"path": "setup/optional/setup-agent-workspace.sh"},
     {"path": "setup/optional/setup-calendar.sh"},
     {"path": "setup/optional/setup-cloud-scheduler.sh"},
+    {"path": "setup/smoke-test-fresh-install.sh"},
     {"path": "setup/validate-template.sh"},
     {"path": "templates/strategy-skeleton/CLAUDE.md"},
     {"path": "templates/strategy-skeleton/README.md"},

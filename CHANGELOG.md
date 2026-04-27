@@ -5,6 +5,29 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.3] — 2026-04-27
+
+### Added (Этап 3 WP-273 — test coverage + observability)
+
+После Round 5 sub-agent assessment явно назвал три паттерна риска: (1) env-зависимость как неявный контракт между шагами, (2) validator страдает от drift'а сам, (3) silent degradation в runner fallback chains. Этап 3 закрывает эти три класса без архитектурного пересмотра — добавлением test coverage, уточнением детекторов и WARNING'ов при legacy fallback.
+
+**Новые артефакты:**
+- `setup/smoke-test-fresh-install.sh` — e2e smoke test архитектуры F. Имитирует пилота: создаёт чистый workspace, запускает build-runtime, проверяет idempotency, runner резолвит PROMPTS_DIR в FMT (не runtime), install.sh fail-fast без env. 6 тестов в одном скрипте, цель — ловить R5.x regressions до релиза. Запускать локально или в CI workflow.
+
+**Новые детекторы в integration-contract-validator.sh** (4 → 6):
+- **Detector #5 `runner_readonly`** — runners (strategist.sh, extractor.sh) резолвят PROMPTS_DIR через `$IWE_TEMPLATE`; scheduler.sh имеет `ROLES_DIR_TEMPLATE` для role.yaml lookup. Закрывает R5.1 regression class.
+- **Detector #6 `install_failfast`** — все 3 install.sh имеют `grep -qE '\{\{[A-Z_]+\}\}'` check на PLIST_SRC. Закрывает R5.2 regression class.
+
+### Fixed (validator false positives)
+- **Detector #3 `extension_table` regex** — раньше терминировался на первом `` ` `` в строке, пропускал EXTENSION POINT'ы где в строке было несколько backtick'ов (например `` ДО `git commit` проверить `extensions/X.md` ``). Расширили: ищем `extensions/X.md` независимо от «EXTENSION POINT» маркера. Из 6 false positive WARN — теперь 0.
+- **Detector #4 `hook_artifact` regex** — раньше ловил любой `grep TOOL_INPUT`, включая легитимный gating «это git commit вообще?». Уточнён до конкретного антипаттерна R4.5: grep на artifact-имена (`DayPlan|WeekPlan|day-close|day-open|week-close|week-open`). Из 1 false positive WARN — 0.
+
+### Changed (silent degradation guards)
+- **3× runners** (strategist.sh, extractor.sh, scheduler.sh): WARNING в stderr при использовании legacy fallback (когда `$IWE_TEMPLATE` не экспортирована). Раньше runner молча резолвил на `$HOME/IWE/FMT-exocortex-template` — пилот не видел что env неполная. Теперь явное предупреждение с подсказкой `source ~/.zshenv`.
+
+### Why
+Вопрос «сколько ещё таких проблем будет?» — sub-agent post-release verify 0.29.2 явно назвал три паттерна риска. Архитектура F остаётся правильной (source/runtime separation, OwnerIntegrity, Data Portability), но контракт между шагами и наблюдаемость legacy-paths требовали усиления. Прогноз Round 6: 1-2 проблемы вместо 4-5, кривая стабилизируется.
+
 ## [0.29.2] — 2026-04-27
 
 ### Fixed (Round 5 Евгения — runtime/automation path blockers)

@@ -39,6 +39,10 @@ LOG_FILE="$LOG_DIR/scheduler-$(date +%Y-%m-%d).log"
 # браться из FMT через $IWE_TEMPLATE. notify.sh — также read-only.
 ROLES_DIR_RUNTIME="{{IWE_RUNTIME}}/roles"
 ROLES_DIR_TEMPLATE="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/roles"
+# WP-273 0.29.3: silent degradation guard. Если IWE_TEMPLATE пуста — env неполная.
+if [ -z "${IWE_TEMPLATE:-}" ]; then
+    echo "[$(date '+%H:%M:%S')] WARN: \$IWE_TEMPLATE не задана, scheduler использует fallback $HOME/IWE/FMT-exocortex-template. source ~/.zshenv?" >&2
+fi
 ROLES_DIR="$ROLES_DIR_RUNTIME"  # backward-compat alias для downstream-логики
 # notify.sh — read-only, не substituted
 if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then

@@ -22,8 +22,12 @@ if [ -n "${IWE_TEMPLATE:-}" ] && [ -d "$IWE_TEMPLATE/roles/strategist/prompts" ]
     PROMPTS_DIR="$IWE_TEMPLATE/roles/strategist/prompts"
 elif [ -d "$HOME/IWE/FMT-exocortex-template/roles/strategist/prompts" ]; then
     PROMPTS_DIR="$HOME/IWE/FMT-exocortex-template/roles/strategist/prompts"
+    # WP-273 0.29.3 (sub-agent assessment R3): silent degradation guard.
+    # Если IWE_TEMPLATE не экспортирована — env неполная, дальше будут проблемы.
+    echo "[$(date '+%H:%M:%S')] WARN: \$IWE_TEMPLATE не задана, fallback на $HOME/IWE/FMT-exocortex-template. source ~/.zshenv?" >&2
 else
     PROMPTS_DIR="$REPO_DIR/prompts"  # legacy: same dir as runner (pre-WP-273)
+    echo "[$(date '+%H:%M:%S')] WARN: legacy PROMPTS_DIR fallback на $PROMPTS_DIR (pre-WP-273). Запустите migrate-to-runtime-target.sh." >&2
 fi
 
 LOG_DIR="$HOME/logs/strategist"

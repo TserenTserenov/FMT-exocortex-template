@@ -22,8 +22,10 @@ if [ -n "${IWE_TEMPLATE:-}" ] && [ -d "$IWE_TEMPLATE/roles/extractor/prompts" ];
     PROMPTS_DIR="$IWE_TEMPLATE/roles/extractor/prompts"
 elif [ -d "$WORKSPACE/FMT-exocortex-template/roles/extractor/prompts" ]; then
     PROMPTS_DIR="$WORKSPACE/FMT-exocortex-template/roles/extractor/prompts"
+    echo "[$(date '+%H:%M:%S')] WARN: \$IWE_TEMPLATE не задана, fallback на $WORKSPACE/FMT-exocortex-template. source ~/.zshenv?" >&2
 else
     PROMPTS_DIR="$REPO_DIR/prompts"
+    echo "[$(date '+%H:%M:%S')] WARN: legacy PROMPTS_DIR fallback на $PROMPTS_DIR (pre-WP-273). Запустите migrate-to-runtime-target.sh." >&2
 fi
 
 LOG_DIR="{{HOME_DIR}}/logs/extractor"
