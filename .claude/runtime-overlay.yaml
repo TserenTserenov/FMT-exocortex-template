@@ -71,7 +71,8 @@ placeholders:
   - TIMEZONE_DESC
   - GITHUB_USER
   - GOVERNANCE_REPO
-  - IWE_TEMPLATE
+  - IWE_TEMPLATE      # путь к FMT (read-only upstream)
+  - IWE_RUNTIME       # путь к $WORKSPACE_DIR/.iwe-runtime/ (writable substituted)
 
 # === Runtime layout (что появляется в $WORKSPACE_DIR/ после build-runtime.sh) ===
 #

@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor/scripts/extractor.sh</string>
+        <string>{{IWE_RUNTIME}}/roles/extractor/scripts/extractor.sh</string>
         <string>inbox-check</string>
     </array>
 

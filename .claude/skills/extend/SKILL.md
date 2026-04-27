@@ -35,7 +35,7 @@ cat {{WORKSPACE_DIR}}/params.yaml 2>/dev/null
 
 | Протокол | Hook | Файл для создания | Когда выполняется |
 |----------|------|-------------------|-------------------|
-| `protocol-close` | `checks` | `extensions/protocol-close.checks.md` | После commit+push, перед статусами |
+| `protocol-close` | `checks` | `extensions/protocol-close.checks.md` | **ДО** commit+push — pre-commit gate (R4.3, WP-273) |
 | `protocol-close` | `after` | `extensions/protocol-close.after.md` | После чеклиста, перед верификацией |
 | `day-open` | `before` | `extensions/day-open.before.md` | Перед шагом 1 — утренние ритуалы |
 | `day-open` | `after` | `extensions/day-open.after.md` | После «Требует внимания», перед DayPlan |

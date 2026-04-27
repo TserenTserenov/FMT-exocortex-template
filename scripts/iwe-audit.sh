@@ -231,6 +231,48 @@ else
 fi
 echo ""
 
+# ---------- Раздел 2b: Generated runtime drift (WP-273 Этап 2) ----------
+
+echo "## 2b. Generated runtime (.iwe-runtime/) drift"
+echo ""
+
+BUILD_RUNTIME="$IWE_ROOT/FMT-exocortex-template/setup/build-runtime.sh"
+RUNTIME_DIR="$IWE_ROOT/.iwe-runtime"
+
+if [ ! -f "$BUILD_RUNTIME" ]; then
+    echo "_N/A — \`setup/build-runtime.sh\` не найден (clone до WP-273 Этап 2)._"
+elif [ ! -d "$RUNTIME_DIR" ]; then
+    echo "⚠️ \`$RUNTIME_DIR/\` не существует. Запустите:"
+    echo ""
+    echo '```bash'
+    echo "bash $BUILD_RUNTIME --workspace $IWE_ROOT"
+    echo '```'
+else
+    set +e
+    DRIFT_OUTPUT=$(bash "$BUILD_RUNTIME" --diff --workspace "$IWE_ROOT" --quiet 2>&1)
+    DRIFT_RC=$?
+    set -e
+
+    if [ "$DRIFT_RC" -eq 0 ]; then
+        echo "✅ runtime in sync (build-runtime --diff: 0 changes)"
+    elif [ "$DRIFT_RC" -eq 5 ]; then
+        echo "⚠️ runtime drift detected (FMT обновился, но \`.iwe-runtime/\` устарел):"
+        echo ""
+        echo '```'
+        echo "$DRIFT_OUTPUT" | head -20
+        echo '```'
+        echo ""
+        echo "**Действие:** \`bash $BUILD_RUNTIME --workspace $IWE_ROOT\`"
+    else
+        echo "❌ build-runtime --diff упал (rc=$DRIFT_RC):"
+        echo ""
+        echo '```'
+        echo "$DRIFT_OUTPUT" | head -10
+        echo '```'
+    fi
+fi
+echo ""
+
 # ---------- Раздел 3: DS-strategy ----------
 
 echo "## 3. DS-strategy"

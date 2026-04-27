@@ -34,14 +34,14 @@ GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 GOV_PATH="$WORKSPACE/$GOV_REPO"
 
-# Check if we're in governance repo (protocol-managed)
-if ! echo "$TOOL_INPUT" | grep -q 'DayPlan\|day-open\|day-close\|WeekPlan'; then
-  # Also check pwd context — look for staged DayPlan files
-  STAGED=$(cd "$GOV_PATH" 2>/dev/null && git diff --cached --name-only 2>/dev/null || echo "")
-  if ! echo "$STAGED" | grep -qE 'DayPlan|WeekPlan'; then
-    echo '{}'
-    exit 0
-  fi
+# R4.5 fix (WP-273): trigger ТОЛЬКО по staged files, НЕ по тексту команды.
+# Старая логика грепала TOOL_INPUT на «DayPlan|day-close» — false positive
+# на любой коммит файла `day-close/SKILL.md` или сообщения с «day-close».
+# Принцип: «hook trigger = artifact (staged file), не TOOL_INPUT текст» (memory/hooks-design.md).
+STAGED=$(cd "$GOV_PATH" 2>/dev/null && git diff --cached --name-only 2>/dev/null || echo "")
+if ! echo "$STAGED" | grep -qE '^current/DayPlan.*\.md$|^current/WeekPlan.*\.md$'; then
+  echo '{}'
+  exit 0
 fi
 
 # --- DayPlan Validation ---

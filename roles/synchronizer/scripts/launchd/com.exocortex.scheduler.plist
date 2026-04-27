@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/synchronizer/scripts/scheduler.sh</string>
+        <string>{{IWE_RUNTIME}}/roles/synchronizer/scripts/scheduler.sh</string>
         <string>dispatch</string>
     </array>
 

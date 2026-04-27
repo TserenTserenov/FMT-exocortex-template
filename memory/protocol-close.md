@@ -31,8 +31,9 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 
 ### Шаги (4 обязательных)
 
+> **EXTENSION POINT (pre-commit gate):** ДО `git commit` проверить `extensions/protocol-close.checks.md`. Если существует → `Read` и выполнить. Это последняя точка остановить commit, если кастомные проверки фейлят (R4.3 ordering fix, WP-273).
+
 1. **Commit + Push** — все изменения зафиксированы
-   **EXTENSION POINT:** Проверить `extensions/protocol-close.checks.md`. Если существует → `Read` и выполнить.
 
 2. **WP Context File** — обновить секцию «Осталось» (structured формат):
    - in_progress → structured handoff

@@ -4,7 +4,7 @@
 
 schedules:
   strategist:
-    script: "{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/strategist/scripts/strategist.sh"
+    script: "{{IWE_RUNTIME}}/roles/strategist/scripts/strategist.sh"
     scenarios:
       morning:
         type: daily
@@ -20,7 +20,7 @@ schedules:
         hour: 0
 
   extractor:
-    script: "{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor/scripts/extractor.sh"
+    script: "{{IWE_RUNTIME}}/roles/extractor/scripts/extractor.sh"
     scenarios:
       inbox-check:
         type: interval

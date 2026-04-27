@@ -5,6 +5,52 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.0] — 2026-04-27
+
+### Added (Generated runtime architecture — WP-273 Этап 2, ArchGate v2 → F)
+
+**Принцип:** FMT = clean upstream (immutable, regenerable). `$WORKSPACE_DIR/.iwe-runtime/` = derived state (regenerated at every setup/update). `$WORKSPACE_DIR/.exocortex.env` = single source of user state. Аналог Nix derivation: одни и те же входы → identical output.
+
+**Новые артефакты:**
+- `.claude/runtime-overlay.yaml` — реестр overlay-файлов (16 substituted + 2 copied_to_workspace + 10 placeholders, включая новый `IWE_RUNTIME`).
+- `setup/build-runtime.sh` — idempotent rebuild `.iwe-runtime/` из FMT + `.exocortex.env`. Поддерживает `--dry-run`, `--diff` (drift detection), `--workspace`, `--env-file`, `--quiet`. Atomic swap через temp + mv. Bash 3.2-compatible.
+- `scripts/migrate-to-runtime-target.sh` — миграция с dirty FMT (≤0.28.x) на Generated runtime. Backup + git restore + build-runtime.
+- `setup/integration-contract-validator.sh` — 4 детектора Spec↔State drift (R4.8, manifest paths / seed refs / extension table / hook artifact). Закрывает класс «корень → детектор откладывается → следующий round находит то же».
+- `.claude/scripts/load-extensions.sh` — wildcard suffix loader (R4.4): возвращает sorted list `extensions/<protocol>.<hook>*.md` (закрывает обещание из extensions/README.md о `day-close.after.health.md`).
+- `memory/hooks-design.md` — принципы проектирования хуков (trigger = artifact, не TOOL_INPUT).
+- `seed/strategy/decisions/.gitkeep` — закрывает R4.2.
+
+### Changed (рефакторинг под архитектуру F)
+
+- **`setup.sh`** v0.7.0: убран sed-cycle по `$TEMPLATE_DIR` (FMT остаётся clean upstream). `.exocortex.env` сохраняется в `$WORKSPACE_DIR/`, не в FMT. После сохранения env — вызов `build-runtime.sh`. CLAUDE.md substituted single-file (не sed по дереву). `~/.iwe-paths` экспортирует `IWE_RUNTIME=$WORKSPACE_DIR/.iwe-runtime`.
+- **`update.sh`** v2.1.0: убран substitution-цикл по NEW/UPDATED файлам. Поиск `.exocortex.env` сначала в workspace, потом FMT (legacy). После git apply — вызов `build-runtime.sh` (R4.6 self-heal: повторный запуск чинит drift). Автомиграция: копирует `.exocortex.env` из FMT в workspace + добавляет `IWE_RUNTIME`.
+- **3× `roles/{strategist,extractor,synchronizer}/install.sh`**: `LAUNCHD_DIR` через `$IWE_RUNTIME/roles/<role>/scripts/launchd/` с fallback на `$IWE_WORKSPACE/.iwe-runtime/...` и `$SCRIPT_DIR/scripts/launchd` (legacy ≤0.28.x). Скрипты-исполнители тоже из `$IWE_RUNTIME`.
+- **6× substituted runtime-файлов** (plists, config.yaml, scheduler.sh): hardcoded `{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/...` → `{{IWE_RUNTIME}}/roles/...` (R4.7 закрытие, ликвидирует hardcoded имя FMT-репо).
+- **`roles/extractor/scripts/extractor.sh:50`** — `notify_script` через `$IWE_RUNTIME` с fallback на `$WORKSPACE/.iwe-runtime/` и legacy FMT.
+- **`memory/protocol-close.md`** — EXTENSION POINT для `extensions/protocol-close.checks.md` перенесён ДО Step 1 (Commit + Push). Pre-commit gate, как обещает run-protocol skill (R4.3 закрытие).
+- **`extensions/README.md` + `.claude/skills/extend/SKILL.md`** — таблица hook-orderings обновлена («ДО commit+push» для protocol-close.checks).
+- **`.claude/hooks/protocol-artifact-validate.sh`** — trigger исключительно по `git diff --cached --name-only`, не по `TOOL_INPUT` тексту (R4.5 закрытие). Принцип «trigger = artifact» из `memory/hooks-design.md`.
+- **`scripts/iwe-audit.sh`** — добавлен Раздел 2b «Generated runtime drift» через `build-runtime.sh --diff`.
+
+### Migration (для пилотов на ≤0.28.x)
+
+После обновления:
+```bash
+bash $IWE_TEMPLATE/scripts/migrate-to-runtime-target.sh
+```
+
+Скрипт:
+1. Detect dirty FMT (substituted значения после старого setup).
+2. Backup в `$WORKSPACE_DIR/.iwe-runtime-migration-backup/`.
+3. `launchctl unload` IWE-агентов (предотвращает запуск битых скриптов после restore).
+4. `git restore` FMT → clean upstream.
+5. Migrate `.exocortex.env` из FMT в workspace + добавить `IWE_RUNTIME`.
+6. `build-runtime.sh` → создаёт `.iwe-runtime/`.
+7. Hint: `bash roles/strategist/install.sh` etc. — переустановить launchd с новых путей.
+
+### Why
+WP-273 Этап 2. ArchGate v2 (sub-agent oversight) выбрал F (Generated runtime) над D (Гибрид) — F устраняет split-brain, дублирование имён файлов, нарушение принципа #24 Data Portability. Генерируемый runtime пересоздаётся атомарно из (FMT + .exocortex.env), не drift'ит между source и runtime. Закрывает 5-й системный корень WP-273 (Source↔Runtime confusion) + R4.2-R4.8 от Round 4 red-team Евгения + BUG-1 от Дмитрия.
+
 ## [0.28.12] — 2026-04-27
 
 ### Fixed (pilot feedback Дмитрий — Linux first-class support, 4 hotfix)

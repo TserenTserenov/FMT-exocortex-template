@@ -39,7 +39,7 @@ fi
 
 | Протокол | Hook | Когда выполняется |
 |----------|------|-------------------|
-| `protocol-close` | `checks` | После Step 1 (commit+push), перед Step 2 (статусы) |
+| `protocol-close` | `checks` | **ДО** Step 1 (commit+push) — pre-commit gate (R4.3 fix, WP-273) |
 | `protocol-close` | `after` | После основного чеклиста, перед верификацией |
 | `day-open` | `before` | Перед шагом 1 (Вчера) — утренние ритуалы, подготовка |
 | `day-open` | `after` | После шага 6b (Требует внимания), перед записью DayPlan |
