@@ -24,7 +24,7 @@ Day Open = протокол. Исполнять ТОЛЬКО пошагово ч
 ## Алгоритм
 
 ### 0. Extensions (before)
-Проверить: `ls extensions/day-open.before.md`. Если существует → `Read extensions/day-open.before.md` → выполнить содержимое как первые шаги. Не существует → пропустить.
+Загрузить: `bash .claude/scripts/load-extensions.sh day-open before`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить содержимое как первые шаги. Exit 1 → пропустить. Поддерживает `extensions/day-open.before.md` И `extensions/day-open.before.<suffix>.md`.
 
 ### 1. Вчера
 Прочитать вчерашний DayPlan (`archive/day-plans/` или `current/`). Взять:
@@ -110,11 +110,11 @@ Scout report. Не проревьюен → «Требует внимания».
 Собрать из шагов 1–6. Нет → не выводить.
 
 ### 6c. Extensions (after)
-Проверить: `ls extensions/day-open.after.md`. Если существует → `Read extensions/day-open.after.md` → выполнить содержимое (smoke-тесты, Scout gate, доп. проверки). Не существует → пропустить.
+Загрузить: `bash .claude/scripts/load-extensions.sh day-open after`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить содержимое (smoke-тесты, Scout gate, доп. проверки). Exit 1 → пропустить. Поддерживает `extensions/day-open.after.md` И `extensions/day-open.after.<suffix>.md`.
 
 ### 7. Запись
 **7a.** Записать DayPlan: `<governance-repo>/current/DayPlan YYYY-MM-DD.md` по шаблону ниже. Предыдущий → `archive/day-plans/`.
-**7b.** Проверить: `ls extensions/day-open.checks.md`. Если существует → `Read extensions/day-open.checks.md` → выполнить верификацию. БЛОКИРУЮЩЕЕ: commit запрещён до прохождения checks.
+**7b.** Загрузить: `bash .claude/scripts/load-extensions.sh day-open checks`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить верификацию. Exit 1 → пропустить. БЛОКИРУЮЩЕЕ: commit запрещён до прохождения всех checks. Поддерживает `extensions/day-open.checks.md` И `extensions/day-open.checks.<suffix>.md`.
 **7c.** `git commit` + `git push`.
 **7d.** Compact dashboard → вывести в VS Code по шаблону ниже.
 
