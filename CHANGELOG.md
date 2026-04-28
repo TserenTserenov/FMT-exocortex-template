@@ -5,6 +5,32 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.10] — 2026-04-28
+
+### Fixed (Linux portability — bug-report от пилота Дмитрия)
+
+После 0.29.9 Дмитрий обнаружил два cross-platform бага при запуске `iwe-drift.sh` + `iwe-audit.sh` на Linux после `update.sh`:
+
+- **`scripts/iwe-drift.sh`** функция `dir_newest_mtime_days_ago` безусловно вызывала `xargs -0 stat -f %m` (BSD-only). На Linux GNU stat `-f` = filesystem info → текст «Inodes: ...» → арифметика падала с `unbound variable`.
+- **`scripts/iwe-audit.sh:227`** опечатка `$DRIFT_RC_` (trailing underscore) под `set -u` парсилась как имя переменной `DRIFT_RC_` → unbound при ненулевом exit code drift-скрипта.
+
+**Round 1 фикс ([`a967b7e`](https://github.com/TserenTserenov/FMT-exocortex-template/commit/a967b7e)):** cross-platform детект BSD/GNU stat через exit-check `if stat -f %m / >/dev/null 2>&1`; опечатка → `${DRIFT_RC}_`.
+
+**Round 2 фикс ([`9112c6a`](https://github.com/TserenTserenov/FMT-exocortex-template/commit/9112c6a)):** red-team subagent (Sonnet, isolated, adversarial deep audit) нашёл регрессию для Alpine/busybox — busybox stat толерантен к неизвестным флагам, exit-check возвращал 0 даже без поддержки `-f %m`. Финальный фикс:
+- Probe через **format-check** (`[[ "$_probe" =~ ^[0-9]+$ ]]`) вместо exit-check — отвергает мусор «Inodes: 99», даже если exit=0.
+- Detection вынесен на load-time → global array `STAT_MTIME_FLAGS` (один probe вместо повторов).
+- `stat $stat_fmt` (unquoted word-split) → `stat "${STAT_MTIME_FLAGS[@]}"` (массив, future-proof).
+- `mtime_days_ago` тоже переведён на массив (был тот же exit-check).
+- Probe на `/dev/null` вместо `/` (портативнее).
+
+**Verification:**
+- macOS smoke (BSD): `iwe-drift.sh --top 5` + `iwe-audit.sh` PASS.
+- macOS regression-mock (PATH override, fake busybox `stat -f` → «Inodes: 99», exit 0): format-check отверг мусор → GNU branch → drift-таблица c числовым lag. Alpine-регрессия закрыта.
+- `validate-template.sh` PASS.
+- Linux подтверждение от Дмитрия — ожидается после `update.sh`.
+
+**Мета-урок:** Round 1 author-blind на macOS закрыл оригинальные баги Дмитрия, но red-team round 2 нашёл регрессию для подмножества Linux (Alpine/busybox). Каждый «не-author» = новый класс ошибок; cross-platform pipeline (author macOS → пилот Linux/Alpine/WSL) требует валидации на каждой платформе деплоя. Кандидат в РП «IWE release discipline» (W19+): GitHub Actions matrix `[macos-latest, ubuntu-latest]` для validate-template.sh + smoke ключевых скриптов. Подтверждение мета-урока Round 1+2+3 Евгения (26 апр): «Two-pass sub-agent verification > one-pass; adversarial deep audit > standard QA».
+
 ## [0.29.9] — 2026-04-28
 
 ### Fixed (R5.5 — Suffix extensions native, WP-273 reopened по триггеру Евгения)
