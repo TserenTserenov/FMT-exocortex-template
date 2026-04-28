@@ -32,7 +32,7 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 ### Шаги (4 обязательных)
 
 1. **Commit + Push** — все изменения зафиксированы
-   **EXTENSION POINT:** Проверить `extensions/protocol-close.checks.md`. Если существует → `Read` и выполнить.
+   **EXTENSION POINT (protocol-close checks):** `bash .claude/scripts/load-extensions.sh protocol-close checks` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.checks.md` И `extensions/protocol-close.checks.<suffix>.md`.
 
 2. **WP Context File** — обновить секцию «Осталось» (structured формат):
    - in_progress → structured handoff
@@ -71,7 +71,7 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 **РП:** #N — [название]
 **Статус:** done / in_progress
 **Git:** закоммичено + запушено ✅
-**EXTENSION POINT:** Проверить `extensions/protocol-close.after.md`. Если существует → `Read` и выполнить.
+**EXTENSION POINT (protocol-close after):** `bash .claude/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`.
 **Handoff:** → WP context «Осталось» обновлён / done
 ```
 
