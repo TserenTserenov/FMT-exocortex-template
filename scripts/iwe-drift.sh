@@ -44,19 +44,7 @@ if [ ! -f "$MANIFEST" ]; then
     exit 1
 fi
 
-# Cross-platform stat mtime flags (BSD `-f %m` vs GNU `-c %Y`).
-# Format-check, не exit-check: busybox stat толерантен к неизвестным флагам
-# (возвращает 0 даже на `-f %m` без поддержки) → проверяем формат вывода.
-# Один раз на загрузку скрипта, results в global array STAT_MTIME_FLAGS.
-_probe=$(stat -f %m /dev/null 2>/dev/null || true)
-if [[ "$_probe" =~ ^[0-9]+$ ]]; then
-    STAT_MTIME_FLAGS=(-f %m)   # macOS / BSD
-else
-    STAT_MTIME_FLAGS=(-c %Y)   # Linux / GNU (incl. busybox / Alpine)
-fi
-unset _probe
-
-# Получить mtime файла в днях от сегодня
+# Получить mtime файла в днях от сегодня (macOS stat -f, Linux stat -c)
 mtime_days_ago() {
     local path="$1"
     if [ ! -e "$path" ]; then
@@ -64,7 +52,11 @@ mtime_days_ago() {
         return
     fi
     local mtime
-    mtime=$(stat "${STAT_MTIME_FLAGS[@]}" "$path")
+    if stat -f %m "$path" >/dev/null 2>&1; then
+        mtime=$(stat -f %m "$path")
+    else
+        mtime=$(stat -c %Y "$path")
+    fi
     local now
     now=$(date +%s)
     echo $(( (now - mtime) / 86400 ))
@@ -79,7 +71,7 @@ dir_newest_mtime_days_ago() {
     fi
     local newest
     newest=$(find "$dir" -type f -not -path '*/.git/*' -print0 2>/dev/null \
-        | xargs -0 stat "${STAT_MTIME_FLAGS[@]}" 2>/dev/null \
+        | xargs -0 stat -f %m 2>/dev/null \
         | sort -nr | head -1)
     if [ -z "${newest:-}" ]; then
         echo "-1"
