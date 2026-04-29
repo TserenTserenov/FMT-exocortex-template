@@ -5,6 +5,18 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.20] — 2026-04-29
+
+### Fixed — protocol-close.md: pre-commit checks ambiguity (Eugene's report)
+
+`memory/protocol-close.md` шаг 1 был неоднозначен: checks и commit описывались в одном блоке, непонятно — checks до commit'а или после?
+
+- Шаг 1 разбит на два явных подшага:
+  - **1a. Pre-commit checks (БЛОКИРУЮЩЕЕ)** — load-extensions checks, при ❌ commit запрещён
+  - **1b. Commit + Push** — только после прохождения checks
+- Семантика идентична Day/Week Close (как описано в `run-protocol/SKILL.md` Шаг 1b)
+- Commit: `51b06a0` (прямой коммит в FMT, минуя broken template-sync pipeline)
+
 ## [0.29.19] — 2026-04-29
 
 ### Fixed (sub-agent post-release verify 0.29.18)

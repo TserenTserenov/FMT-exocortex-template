@@ -1,5 +1,5 @@
 {
-  "version": "0.29.19",
+  "version": "0.29.20",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
