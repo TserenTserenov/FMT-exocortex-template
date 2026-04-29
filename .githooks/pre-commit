@@ -110,6 +110,24 @@ if [ -n "$STAGED_VALIDATOR_SCOPE" ] && [ -x "setup/integration-contract-validato
     rm -f /tmp/iwe-icv.$$
 fi
 
+# === Detector regex regression tests (0.29.18) ===
+# Если staged изменения в integration-contract-validator.sh ИЛИ в detector-fixtures/
+# — прогнать test-detectors.sh. Ловит regex-gap регрессии в самих detector'ах.
+STAGED_DETECTOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '^setup/(integration-contract-validator\.sh|detector-fixtures/|test-detectors\.sh)' || true)
+if [ -n "$STAGED_DETECTOR_SCOPE" ] && [ -x "setup/test-detectors.sh" ]; then
+    if ! bash setup/test-detectors.sh >/tmp/iwe-detector-tests.$$ 2>&1; then
+        echo "DETECTOR-REGEX-TESTS: FAIL"
+        cat /tmp/iwe-detector-tests.$$
+        rm -f /tmp/iwe-detector-tests.$$
+        echo ""
+        echo "  Detector regex регрессировал — historical fixture больше не ловится."
+        echo "  Override: git commit --no-verify"
+        exit 1
+    fi
+    rm -f /tmp/iwe-detector-tests.$$
+fi
+
 # Get list of staged .sh files
 STAGED_SH=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null)
 [ -z "$STAGED_SH" ] && exit 0

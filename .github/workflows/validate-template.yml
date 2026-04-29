@@ -43,15 +43,74 @@ jobs:
   # код в FMT, валидаторы НЕ были в CI — Євгений нашёл на fresh clone, у нас
   # commit прошёл. Гейт: те же 2 скрипта что Євгений запускает локально.
   integration-contract:
-    runs-on: ubuntu-latest
+    # OS matrix (0.29.18): пилоты на macOS И Linux. CI на ubuntu-latest пропускал
+    # портабельность-баги (0.28.12 BUG-2..4 на Linux). Прогон на обеих ОС.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3 jq
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install jq  # python3 preinstalled
       - name: Run integration-contract-validator (8 detectors)
         run: bash setup/integration-contract-validator.sh
       - name: Run smoke-test-fresh-install (14 checks)
         run: bash setup/smoke-test-fresh-install.sh
+      - name: Run detector regression fixtures (regex gap guard)
+        run: bash setup/test-detectors.sh
+
+  # Upgrade-flow regression test (0.29.18).
+  # Корень бага (0.29.13): template-sync перезаписал FMT файлы — smoke-test fresh
+  # build не ловит это, потому что build-runtime создаёт `.iwe-runtime` с нуля,
+  # а пилот делает upgrade поверх существующего состояния. Этот job симулирует:
+  # checkout previous version → setup → checkout HEAD → re-run validator.
+  upgrade-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history для git log
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3 jq
+      - name: Determine previous version
+        id: prev
+        run: |
+          # Найти предыдущий коммит, поднявший version в update-manifest.json.
+          # Логика: git log -p update-manifest.json → найти второй "version" bump
+          # → его commit hash. Это предыдущая опубликованная версия.
+          PREV_SHA=$(git log --format=%H -- update-manifest.json | sed -n '2p')
+          if [ -z "$PREV_SHA" ]; then
+            echo "SKIP: нет предыдущей версии в истории update-manifest.json"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          PREV_VER=$(git show "$PREV_SHA:update-manifest.json" 2>/dev/null \
+            | grep -m1 '"version"' | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+          echo "PREVIOUS: $PREV_VER ($PREV_SHA)"
+          echo "sha=$PREV_SHA" >> $GITHUB_OUTPUT
+          echo "ver=$PREV_VER" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+      - name: Upgrade simulation — checkout prev → smoke → checkout HEAD → validate
+        if: steps.prev.outputs.skip != 'true'
+        run: |
+          # Шаг 1: build-runtime на предыдущей версии (имитация уже-установленного пилота).
+          git checkout ${{ steps.prev.outputs.sha }}
+          bash setup/smoke-test-fresh-install.sh > /tmp/prev_smoke.log 2>&1 || {
+            echo "WARN: previous version smoke-test FAILED (это OK — мы тестируем upgrade-flow)"
+            tail -20 /tmp/prev_smoke.log
+          }
+          # Шаг 2: возврат на HEAD, прогон ТЕКУЩЕГО validator + smoke.
+          # Если HEAD-validator прошёл fresh + после prev-smoke build-runtime — upgrade OK.
+          git checkout -
+          bash setup/integration-contract-validator.sh
+          bash setup/smoke-test-fresh-install.sh
+          echo "PASS: upgrade ${{ steps.prev.outputs.ver }} → HEAD не ломает контракт"
 
   shellcheck:
     runs-on: ubuntu-latest

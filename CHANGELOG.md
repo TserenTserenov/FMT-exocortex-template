@@ -5,6 +5,48 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.18] — 2026-04-29
+
+### Added — 5 уровней автоматизации проверок (закрывает функции, которые ранее держал Євгений вручную)
+
+После 0.29.16 валидаторы запускаются на pre-commit + CI, но Євгений всё равно может ловить классы регрессий, которые наши гейты не покрывают. Этот релиз закрывает 5 таких классов автоматизацией.
+
+**1. OS matrix в CI (item 2):**
+- `integration-contract` job теперь идёт на `[ubuntu-latest, macos-latest]`. macOS preinstall: `brew install jq`.
+- Ловит портабельность-баги, которые были в 0.28.12 (BUG-2..4 на Linux).
+
+**2. Upgrade-flow regression test в CI (item 1):**
+- Новый job `upgrade-test`: checkout previous version (по `git log update-manifest.json`) → smoke на ней → checkout HEAD → re-run validator + smoke. Симулирует upgrade-сценарий (а не fresh build).
+- Ловит класс 0.29.13 (template-sync перетёр стабильный код).
+
+**3. Detector regex regression tests (item 3):**
+- `setup/detector-fixtures/` — historical positive samples, которые detectors ДОЛЖНЫ ловить. Первый: `detector_07/positive_backtick_slash.md` (regression sample 0.29.14).
+- `setup/test-detectors.sh` — runner, прогоняет каждый detector regex на fixtures.
+- В `pre-commit` (если staged изменения в validator/fixtures) и в CI.
+- Ловит regex-gap регрессии в самих detector'ах (как 0.29.14 backtick+slash gap).
+
+**4. Scheduled adversarial audit workflow (item 4):**
+- `.github/workflows/post-release-audit.yml` — на каждый push изменяющий `update-manifest.json` (= релиз) auto-создаёт GitHub Issue с adversarial-промптом. Также `workflow_dispatch` для ручного триггера.
+- `setup/release-audit-prompt.md` — единый промпт-template для adversarial audit (10 классов проверок).
+- Автор/пилот прогоняет в Claude session, найденные классы → +detector в `integration-contract-validator.sh`.
+
+**5. UX walkthrough prompt template (item 5):**
+- `setup/ux-walkthrough-prompt.md` — symulator «новый пилот час 0» проходит онбординг буквально, фиксирует UX-провалы (broken links, скрытые prerequisites, jargon без расшифровки).
+- Запускается вручную через subagent (item 5 не покрывается автоматически — UX требует human-like reasoning).
+
+### Verified
+
+`integration-contract-validator.sh` → ✅ PASS (8/8)
+`smoke-test-fresh-install.sh` → ✅ PASS (14/14)
+`test-detectors.sh` → ✅ PASS (1 fixture)
+
+### Что осталось у Євгения после 0.29.18
+
+- Реальная установка на пилотской ОС/железе (не CI sandbox)
+- Тестирование long-tail сценариев накопленным use'ом
+- Различия mental models — другие blind spots чем у автора + sub-agent
+- Final UX-judge: «понятно ли реальному человеку»
+
 ## [0.29.17] — 2026-04-29
 
 ### Fixed (sub-agent post-release verify 0.29.16 — 2 minor)

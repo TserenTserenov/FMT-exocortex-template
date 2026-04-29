@@ -1,0 +1,96 @@
+name: Post-Release Adversarial Audit
+
+# Триггеры:
+#   1. Manual: workflow_dispatch — автор запускает после релиза.
+#   2. Auto: на каждый push в main, если изменился update-manifest.json (version bump).
+# Цель: создать issue с adversarial-промптом → автор прогоняет в Claude session
+# → находит классы регрессий, которые 8 detectors не ловят.
+# Корень бага (0.29.13): валидаторы ловят ИЗВЕСТНЫЕ классы. Євгений ловил
+# НЕИЗВЕСТНЫЕ. Этот workflow автоматизирует «напомнить запустить adversarial».
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Релизная версия для аудита (например 0.29.18)'
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'update-manifest.json'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  create-audit-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VER=$(grep -m1 '"version"' update-manifest.json \
+              | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+            echo "version=$VER" >> $GITHUB_OUTPUT
+          fi
+      - name: Create or update audit reminder issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const version = '${{ steps.ver.outputs.version }}';
+            const promptBody = fs.readFileSync('setup/release-audit-prompt.md', 'utf8');
+
+            const title = `Post-release adversarial audit: v${version}`;
+            const body = `> **Автоматический triage-issue.** Релиз v${version} опубликован — нужен adversarial audit субагентом или внешним пилотом.
+            >
+            > Цель: найти классы регрессий, которые 8 detectors + smoke 14 НЕ ловят.
+
+            ## Шаги
+
+            1. Открыть Claude Code сессию в FMT-exocortex-template
+            2. Скопировать промпт ниже и адаптировать <TARGET-VERSION>
+            3. Прогнать через \`Agent\` или sub-agent
+            4. Найденные классы → +detector в \`integration-contract-validator.sh\`
+            5. Закрыть issue с комментарием: STABLE / X classes found
+
+            ## Промпт
+
+            <details>
+            <summary>Развернуть промпт</summary>
+
+            \`\`\`
+            ${promptBody}
+            \`\`\`
+
+            </details>
+
+            ---
+
+            После добавления detector'а — закрыть issue.`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'release-audit'
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              console.log(`Issue already exists: #${existing.number}`);
+            } else {
+              const { data } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['release-audit']
+              });
+              console.log(`Created issue #${data.number}: ${data.html_url}`);
+            }

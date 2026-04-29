@@ -1,5 +1,5 @@
 {
-  "version": "0.29.17",
+  "version": "0.29.18",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -154,6 +154,9 @@
     },
     {
       "path": ".github/workflows/notify-update.yml"
+    },
+    {
+      "path": ".github/workflows/post-release-audit.yml"
     },
     {
       "path": ".github/workflows/validate-template.yml"
@@ -501,6 +504,12 @@
       "path": "setup/build-runtime.sh"
     },
     {
+      "path": "setup/detector-fixtures/README.md"
+    },
+    {
+      "path": "setup/detector-fixtures/detector_07/positive_backtick_slash.md"
+    },
+    {
       "path": "setup/install-iwe-paths.sh"
     },
     {
@@ -531,7 +540,16 @@
       "path": "setup/optional/setup-cloud-scheduler.sh"
     },
     {
+      "path": "setup/release-audit-prompt.md"
+    },
+    {
       "path": "setup/smoke-test-fresh-install.sh"
+    },
+    {
+      "path": "setup/test-detectors.sh"
+    },
+    {
+      "path": "setup/ux-walkthrough-prompt.md"
     },
     {
       "path": "setup/validate-template.sh"
