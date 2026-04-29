@@ -97,7 +97,7 @@ fi
 # Запускаем только если staged файлы из scope валидатора (roles/, .claude/, setup/,
 # memory/, extensions/, update-manifest.json).
 STAGED_VALIDATOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
-    | grep -E '^(roles/|\.claude/|setup/|memory/|extensions/|update-manifest\.json)' || true)
+    | grep -E '^(roles/|\.claude/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
 if [ -n "$STAGED_VALIDATOR_SCOPE" ] && [ -x "setup/integration-contract-validator.sh" ]; then
     if ! bash setup/integration-contract-validator.sh >/tmp/iwe-icv.$$ 2>&1; then
         echo "INTEGRATION-CONTRACT-VALIDATOR: FAIL"

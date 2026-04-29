@@ -5,6 +5,24 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.17] — 2026-04-29
+
+### Fixed (sub-agent post-release verify 0.29.16 — 2 minor)
+
+**SA-6 — `day-close after` orphan hook:**
+- `extensions/README.md` table декларировал `day-close.after.md` как extension point, но `.claude/skills/day-close/SKILL.md` не имел caller'а — пилот, создавший `extensions/day-close.after.md`, не получал вызова.
+- Добавлен шаг 9c `Extensions (after)` с `load-extensions.sh day-close after` (между шагами 9 «Запись итогов» и 10 «Закоммитить» — параллельно `week-close` структуре).
+- Detector #3 не ловил это, потому что mention `extensions/day-close.after.md` встречался в текстовых примерах README.
+
+**SA-7 — pre-commit scope filter не покрывал `seed/`:**
+- Detector #2 (`seed_references`) проверяет ссылки `seed/...` в `protocol-*.md`. Изменение в `seed/` не триггерило валидатор → drift возможен silently.
+- Расширен filter: `roles/|.claude/|setup/|memory/|extensions/|seed/|update-manifest.json`.
+
+### Verified
+
+`integration-contract-validator.sh` → ✅ PASS (8/8)
+`smoke-test-fresh-install.sh` → ✅ PASS (14/14)
+
 ## [0.29.16] — 2026-04-29
 
 ### Fixed (Євгений Round 3 + sub-agent broader audit)

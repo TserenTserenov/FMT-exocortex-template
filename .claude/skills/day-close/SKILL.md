@@ -160,6 +160,10 @@ SCRIPT="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/check-index-health.py"
 - Порядок: свежие итоги СВЕРХУ (обратная хронология)
 - Содержание: таблица коммитов по репо, закрытые РП, продвинутые РП, мультипликатор
 
+### 9c. Extensions (after)
+
+Загрузить: `bash .claude/scripts/load-extensions.sh day-close after`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/day-close.after.md` И `extensions/day-close.after.<suffix>.md`.
+
 ### 10. Закоммитить {{GOVERNANCE_REPO}}
 
 ### 11. Верификация (Haiku R23)
