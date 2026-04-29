@@ -1,5 +1,5 @@
 {
-  "version": "0.29.18",
+  "version": "0.29.19",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -508,6 +508,9 @@
     },
     {
       "path": "setup/detector-fixtures/detector_07/positive_backtick_slash.md"
+    },
+    {
+      "path": "setup/detector-regex.sh"
     },
     {
       "path": "setup/install-iwe-paths.sh"

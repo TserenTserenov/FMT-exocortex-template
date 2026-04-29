@@ -1,5 +1,8 @@
 name: Post-Release Adversarial Audit
 
+# see VR.SC.006 (release-verification-protocol), VR.M.006 (5-layer verification, слой 5)
+# see AR.203 (release verification trigger)
+#
 # Триггеры:
 #   1. Manual: workflow_dispatch — автор запускает после релиза.
 #   2. Auto: на каждый push в main, если изменился update-manifest.json (version bump).

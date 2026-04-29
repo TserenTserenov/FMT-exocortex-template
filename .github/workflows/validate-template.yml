@@ -1,5 +1,8 @@
 name: Validate Template
 
+# see VR.SC.006 (release-verification-protocol), VR.M.006 (5-layer verification)
+# see AR.203 (release verification trigger)
+
 on:
   push:
     branches: [main]

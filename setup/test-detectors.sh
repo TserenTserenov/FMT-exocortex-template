@@ -1,6 +1,9 @@
 #!/bin/bash
 # test-detectors.sh — regression test для detector regex'ов в integration-contract-validator.sh
 #
+# # see VR.SC.006 (release-verification-protocol), VR.M.006 (5-layer verification, слой 4)
+# # see AR.203 (release verification trigger)
+#
 # Назначение: ловить regex-gap регрессии (как 0.29.14 backtick+slash).
 # Каждый detector тестируется на исторических positive/negative samples в
 # setup/detector-fixtures/.
@@ -30,9 +33,10 @@ cd "$TEMPLATE_DIR"
 FAIL=0
 PASS=0
 
-# Detector #7 regex: prompts_python_coverage (актуальный, 0.29.14)
-# Источник: setup/integration-contract-validator.sh:237
-DETECTOR_07_REGEX='`DS-strategy[`/]|/DS-strategy/| DS-strategy[ /]'
+# Detector regex'ы — shared source (0.29.19 DRY fix).
+# При добавлении detector_08+ — пополнять detector-regex.sh.
+# shellcheck source=detector-regex.sh
+. "$SCRIPT_DIR/detector-regex.sh"
 
 run_test() {
     local detector_id="$1"

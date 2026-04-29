@@ -5,6 +5,33 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.19] — 2026-04-29
+
+### Fixed (sub-agent post-release verify 0.29.18)
+
+**SA-8 — DRY-нарушение detector regex:**
+- `DETECTOR_07_REGEX` дублировался в `setup/integration-contract-validator.sh:238` и `setup/test-detectors.sh:35`. При правке regex в одном месте второе расходилось → ложный pass на регрессии.
+- Вынесен в `setup/detector-regex.sh` как shared source. Оба скрипта теперь `source` его. Изменение regex → автоматическая sync.
+
+### Added — Pack documentation (retro-fix IntegrationGate skip P10)
+
+После 0.29.13-0.29.18 был сделан 5-слойный verification protocol, но описание системы лежало только в CHANGELOG + коде. Это нарушение IntegrationGate (CLAUDE.md §2): прыжок в реализацию минуя (1) обещание → (2) сценарии → (3) роль → (4) реализация. Retro-fix:
+
+| Артефакт | Pack | Описывает |
+|----------|------|-----------|
+| `VR.SC.006-release-verification-protocol.md` | PACK-verification | Обещание: 5-слойная верификация при каждом release |
+| `VR.M.006-five-layer-post-release-verification.md` | PACK-verification | Метод: 8 detectors → smoke → upgrade → fixtures → adversarial |
+| `VR.R.002-auditor.md` (extension) | PACK-verification | + сценарий «Release FMT-шаблона» для существующего Аудитора |
+| `AR.203-release-verification-trigger.md` | PACK-agent-rules | Блокирующее правило: version bump → 5-слойный прогон обязателен |
+
+**Cross-references** добавлены в FMT файлы (`integration-contract-validator.sh`, `test-detectors.sh`, `validate-template.yml`, `post-release-audit.yml`) как `# see VR.SC.006, VR.M.006, AR.203`.
+
+### Verified
+
+`integration-contract-validator.sh` → ✅ PASS (8/8)
+`smoke-test-fresh-install.sh` → ✅ PASS (14/14)
+`test-detectors.sh` → ✅ PASS (1 fixture, через shared regex source)
+
 ## [0.29.18] — 2026-04-29
 
 ### Added — 5 уровней автоматизации проверок (закрывает функции, которые ранее держал Євгений вручную)

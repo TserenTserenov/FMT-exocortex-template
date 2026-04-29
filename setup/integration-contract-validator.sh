@@ -1,6 +1,9 @@
 #!/bin/bash
 # integration-contract-validator.sh — детектор Spec↔State drift.
 #
+# # see VR.SC.006 (release-verification-protocol), VR.M.006 (5-layer verification, слой 1)
+# # see AR.203 (release verification trigger)
+#
 # WP-273 R4.8 (proposal Евгения, Round 4 red-team). Закрывает 4-й системный корень:
 # докуменация говорит А, код делает Б — нужен автоматический детектор расхождений
 # до релиза.
@@ -28,6 +31,10 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE_DIR="$(dirname "$SCRIPT_DIR")"  # FMT-exocortex-template/
 VERBOSE=false
+
+# Detector regex'ы — shared source (0.29.19 DRY fix).
+# shellcheck source=detector-regex.sh
+. "$SCRIPT_DIR/detector-regex.sh"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -235,7 +242,8 @@ while IFS= read -r prompt; do
     [ -f "$prompt" ] || continue
     # Hits: bare 'DS-strategy/' или ' DS-strategy ' или '`DS-strategy`' или '`DS-strategy/'
     # WP-279 fix: расширен паттерн — ранее пропускал `DS-strategy/path` (backtick+slash).
-    if grep -qE '`DS-strategy[`/]|/DS-strategy/| DS-strategy[ /]' "$prompt" 2>/dev/null; then
+    # 0.29.19 DRY fix: regex source — setup/detector-regex.sh ($DETECTOR_07_REGEX).
+    if grep -qE "$DETECTOR_07_REGEX" "$prompt" 2>/dev/null; then
         # Game допустима если параллельно есть {{GOVERNANCE_REPO}} (миграционная стадия)
         log "  ⚠ $prompt: bare DS-strategy без {{GOVERNANCE_REPO}}"
         COVERAGE_VIOLATIONS=$((COVERAGE_VIOLATIONS + 1))
