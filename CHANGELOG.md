@@ -5,6 +5,24 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.21] — 2026-04-30
+
+### Added — WP-217 Ф10: Memory Lifecycle Protocol
+
+Четыре скрипта валидации и управления памятью (`scripts/`):
+
+- **`memory-validate.sh`** — frontmatter-гейт: проверяет 9 обязательных полей (name, description, type, horizon, domains, status, valid_from, owner, schema_version), допустимые значения, инвариант `superseded→superseded_by`
+- **`memory-health.sh`** — метрики: кол-во файлов, HOT-лимит (≤150 строк), orphans%, распределение по горизонтам
+- **`memory-bleed.sh`** — детектор нарушений: HOT overflow, orphans без frontmatter, superseded без ссылки, TTL-кандидаты на понижение горизонта
+- **`memory-migrate.sh`** — автодобавление отсутствующих полей (type/horizon/domains/status/owner/schema_version/name/description/valid_from) с инференцией по имени файла; `--dry-run` и `--all` режимы
+
+Интеграция в Close-протоколы:
+
+- **`week-close/SKILL.md`** — добавлен шаг **7c Memory Validate** (T22b): `bash ${IWE_SCRIPTS}/memory-bleed.sh`; нарушения → исправить до коммита, кандидаты понижения → информативно
+- **`month-close/SKILL.md`** — обновлён шаг **1f**: конкретные команды `memory-health.sh` + `memory-bleed.sh` вместо описательного текста
+
+Commit: `84dd6dc`
+
 ## [0.29.20] — 2026-04-29
 
 ### Fixed — protocol-close.md: pre-commit checks ambiguity (Eugene's report)
