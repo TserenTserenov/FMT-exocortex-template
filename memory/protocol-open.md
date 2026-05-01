@@ -1,20 +1,28 @@
 ---
 valid_from: 2026-04-07
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+
+type: protocol
+horizon: warm
+domains: [protocol]
+status: active
+owner: user
+schema_version: 1
+
+name: "Протокол: open"
+description: "Протокол ОРЗ — пошаговые инструкции для ритуала"
 ---
 # Протокол Open (ОРЗ-фрактал)
 
 > **Два масштаба:** День и Сессия. Триггер определяет масштаб.
 > **Источник:** CLAUDE.md § 2 (slim) → этот файл.
 
----
 
 ## § Масштаб: День → skill `/day-open`
 
 > **Триггер:** «открывай» / «открывай день». Полный алгоритм → `.claude/skills/day-open/SKILL.md`.
 > **Исполнение:** пошагово через TodoWrite (каждый шаг = задача, блокирующее). Аналогично Close.
 
----
 
 ## § Масштаб: Сессия (Session Open)
 
@@ -52,7 +60,6 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 - ≤15 мин, вопросы без изменений файлов, экстренные баг-фиксы
 - Второе задание в исключении → *«Перерастает в РП. Записать?»*
 
----
 
 ### Ритуал согласования
 
@@ -89,7 +96,6 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 
 > Продолжение работы над тем же РП — повторный Ритуал не нужен.
 
----
 
 ## Зонтичные РП
 
@@ -102,6 +108,5 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 - **Review (Grade 3):** structured report + 2 файловых intake
 - **Прямая команда:** «запиши замечание: X» → fleeting-notes.md
 
----
 
 <!-- Шаблоны DayPlan/WeekPlan вынесены в skill /day-open (lazy loading, экономия ~8K токенов) -->

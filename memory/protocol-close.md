@@ -4,6 +4,12 @@ description: Slim-ядро протокола Close — триггеры, мар
 type: reference
 valid_from: 2026-04-13
 originSessionId: b5655b53-7d87-478a-aad9-437479e81691
+
+horizon: warm
+domains: [protocol]
+status: active
+owner: user
+schema_version: 1
 ---
 # Протокол Close (ОРЗ-фрактал)
 
@@ -21,7 +27,6 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 
 > **`close` без уточнения** → Quick Close (сессия) по умолчанию.
 
----
 
 ## Quick Close (сессия, inline)
 
@@ -93,7 +98,6 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 - [ ] MEMORY.md: статус РП обновлён
 - [ ] Decision log: прочитать записи сессии в `decisions/decision-log-YYYY-MM.md`, скорректировать если неточно
 
----
 
 ## Deferred (отложены до Day Close)
 
@@ -101,7 +105,6 @@ originSessionId: b5655b53-7d87-478a-aad9-437479e81691
 > KE включён (шаг 2.5) — знание теряется при откладывании на Day Close.
 > Причина (ADR-207): атомарные шаги выполняются всегда > длинный список, из которого половина пропускается.
 
----
 
 ## Exit Protocol (при завершении любой роли)
 

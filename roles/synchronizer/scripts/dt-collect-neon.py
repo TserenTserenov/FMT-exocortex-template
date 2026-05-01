@@ -74,22 +74,31 @@ def _write_psycopg2(neon_url, user_id, collected_data):
                     updated_at = NOW()
             """, (user_id, json.dumps(collected_data), json.dumps(collected_data)))
 
-            # ADR-009: dual-write snapshot в user_events (закрытие антипаттерна §4.4)
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            external_id = f"dt-collect-{user_id}-{today}"
-            cur.execute("""
-                INSERT INTO development.user_events
-                    (user_id, user_uuid, event_type, source, payload,
-                     confidence, created_at, external_id)
-                VALUES (0, %s::uuid, 'dt_collect_snapshot', 'iwe', %s::jsonb,
-                        1.0, NOW(), %s)
-                ON CONFLICT (source, external_id)
-                    WHERE external_id IS NOT NULL
-                DO NOTHING
-            """, (user_id, json.dumps(collected_data), external_id))
+        # Commit digital_twins write before attempting dual-write (different schema)
+        conn.commit()
+        print(f"OK: written for user {user_id}")
 
+        # ADR-009: dual-write snapshot в user_events (закрытие антипаттерна §4.4)
+        # development.user_events живёт в platform DB, а не в indicators.
+        # Отдельная транзакция — не ломает основную запись при отсутствии схемы.
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        external_id = f"dt-collect-{user_id}-{today}"
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO development.user_events
+                        (user_id, user_uuid, event_type, source, payload,
+                         confidence, created_at, external_id)
+                    VALUES (0, %s::uuid, 'dt_collect_snapshot', 'iwe', %s::jsonb,
+                            1.0, NOW(), %s)
+                    ON CONFLICT (source, external_id)
+                        WHERE external_id IS NOT NULL
+                    DO NOTHING
+                """, (user_id, json.dumps(collected_data), external_id))
             conn.commit()
-            print(f"OK: written for user {user_id}")
+        except Exception as e:
+            conn.rollback()
+            print(f"WARN: dual-write to development.user_events skipped: {e}", file=sys.stderr)
     finally:
         conn.close()
 
@@ -101,42 +110,49 @@ def _write_asyncpg(neon_url, user_id, collected_data):
     async def write():
         conn = await asyncpg.connect(neon_url)
         try:
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS digital_twins (
-                    user_id TEXT PRIMARY KEY,
-                    data JSONB NOT NULL DEFAULT '{}',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-            """)
+            async with conn.transaction():
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS digital_twins (
+                        user_id TEXT PRIMARY KEY,
+                        data JSONB NOT NULL DEFAULT '{}',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
 
-            await conn.execute("""
-                INSERT INTO digital_twins (user_id, data, created_at, updated_at)
-                VALUES ($1, jsonb_build_object('2_collected', $2::jsonb), NOW(), NOW())
-                ON CONFLICT (user_id) DO UPDATE SET
-                    data = COALESCE(digital_twins.data, '{}'::jsonb)
-                        || jsonb_build_object('2_collected',
-                            COALESCE(digital_twins.data->'2_collected', '{}'::jsonb)
-                            || $2::jsonb
-                        ),
-                    updated_at = NOW()
-            """, user_id, json.dumps(collected_data))
-
-            # ADR-009: dual-write snapshot в user_events (закрытие антипаттерна §4.4)
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            external_id = f"dt-collect-{user_id}-{today}"
-            await conn.execute("""
-                INSERT INTO development.user_events
-                    (user_id, user_uuid, event_type, source, payload,
-                     confidence, created_at, external_id)
-                VALUES (0, $1::uuid, 'dt_collect_snapshot', 'iwe', $2::jsonb,
-                        1.0, NOW(), $3)
-                ON CONFLICT (source, external_id)
-                    WHERE external_id IS NOT NULL
-                DO NOTHING
-            """, user_id, json.dumps(collected_data), external_id)
+                await conn.execute("""
+                    INSERT INTO digital_twins (user_id, data, created_at, updated_at)
+                    VALUES ($1, jsonb_build_object('2_collected', $2::jsonb), NOW(), NOW())
+                    ON CONFLICT (user_id) DO UPDATE SET
+                        data = COALESCE(digital_twins.data, '{}'::jsonb)
+                            || jsonb_build_object('2_collected',
+                                COALESCE(digital_twins.data->'2_collected', '{}'::jsonb)
+                                || $2::jsonb
+                            ),
+                        updated_at = NOW()
+                """, user_id, json.dumps(collected_data))
 
             print(f"OK: written for user {user_id}")
+
+            # ADR-009: dual-write snapshot в user_events (закрытие антипаттерна §4.4)
+            # development.user_events живёт в platform DB, не в indicators.
+            # Отдельная транзакция — не ломает основную запись.
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            external_id = f"dt-collect-{user_id}-{today}"
+            try:
+                async with conn.transaction():
+                    await conn.execute("""
+                        INSERT INTO development.user_events
+                            (user_id, user_uuid, event_type, source, payload,
+                             confidence, created_at, external_id)
+                        VALUES (0, $1::uuid, 'dt_collect_snapshot', 'iwe', $2::jsonb,
+                                1.0, NOW(), $3)
+                        ON CONFLICT (source, external_id)
+                            WHERE external_id IS NOT NULL
+                        DO NOTHING
+                    """, user_id, json.dumps(collected_data), external_id)
+            except Exception as e:
+                print(f"WARN: dual-write to development.user_events skipped: {e}", file=sys.stderr)
         finally:
             await conn.close()
 

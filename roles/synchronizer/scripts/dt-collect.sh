@@ -31,7 +31,7 @@ portable_date_offset() {
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="$HOME/IWE"
-GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/{{GOVERNANCE_REPO}}}"
+GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/DS-strategy}"
 LOG_DIR="$HOME/logs/synchronizer"
 DATE=$(date +%Y-%m-%d)
 LOG_FILE="$LOG_DIR/dt-collect-$DATE.log"
@@ -48,7 +48,8 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [dt-collect] $1" | tee -a "$LOG_FILE"
+    # tee → stderr, чтобы лог не попадал в $(collect_*) и не ломал JSON.
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [dt-collect] $1" | tee -a "$LOG_FILE" >&2
 }
 
 log "=== DT Collect Started ==="
@@ -230,7 +231,7 @@ print(json.dumps(result))
 # ============================================================
 
 collect_sessions() {
-    local SESSION_LOG="$WORKSPACE/{{GOVERNANCE_REPO}}/inbox/open-sessions.log"
+    local SESSION_LOG="$WORKSPACE/DS-strategy/inbox/open-sessions.log"
 
     python3 -c "
 import json, os, re
@@ -493,7 +494,8 @@ def parse_weekplan_budget_for_date(date_str, gov_dir):
         os.path.join(gov_dir, 'archive', 'week-plans', 'WeekPlan W*.md'),
         os.path.join(gov_dir, 'current', 'WeekPlan W*.md'),
     ]
-    section_re = re.compile(rf'Итоги\s+\S+\s+{day_num}\s+{month_ru}')
+    # \S+ матчил "W16:" в "Итоги W16: 13 апр" раньше дневного "Итоги пн 13 апр" — block-split bug
+    section_re = re.compile(rf'Итоги\s+(?:пн|вт|ср|чт|пт|сб|вс)\s+{day_num}\s+{month_ru}', re.IGNORECASE)
     for pat in wp_patterns:
         for wp in glob.glob(pat):
             with open(wp) as f:
@@ -910,7 +912,7 @@ if knowledge:
     result['2_9_knowledge'] = knowledge
 
 print(json.dumps(result, indent=2, ensure_ascii=False))
-" 2>/dev/null)
+" 2>>"$LOG_FILE")
 
 if [ -z "$MERGED" ] || [ "$MERGED" = "{}" ]; then
     log "ERROR: empty merge result"

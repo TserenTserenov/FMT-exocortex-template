@@ -1,6 +1,16 @@
 ---
 valid_from: 2026-04-09
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+
+type: reference
+horizon: warm
+domains: [reference]
+status: active
+owner: user
+schema_version: 1
+
+name: "repo-type-rules"
+description: "Операционный файл памяти IWE"
 ---
 # Правила работы по типам репозиториев
 
@@ -89,7 +99,6 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 
 **0.9.Inbox:** только материалы к обсуждению с командой (повестки, предложения, вопросы). НЕ хранить WP-context файлы — они в DS-strategy/inbox/. Подробно: DP.KR.001 §5.3.
 
----
 
 ## Repository-first режим
 
@@ -101,7 +110,6 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 
 Если контекст не найден → скажи "в репозитории нет источника", предложи создать документ.
 
----
 
 ## Context Pack (формат)
 
@@ -115,15 +123,12 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 - Документ X — не релевантен, т.к. ...
 ```
 
----
 
 ## Frontmatter (базовый)
 
 ```yaml
----
 type: doc    # doc, spec, process, report
 status: draft # draft, active, archived
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
----
 ```

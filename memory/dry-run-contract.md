@@ -1,6 +1,16 @@
 ---
 valid_from: 2026-04-26
 related: [VR.SC.005, DP.ARCH.001]
+
+type: protocol
+horizon: warm
+domains: [reference]
+status: active
+owner: user
+schema_version: 1
+
+name: "dry-run-contract"
+description: "Операционный файл памяти IWE"
 ---
 # Dry-run контракт для скиллов с побочными эффектами
 

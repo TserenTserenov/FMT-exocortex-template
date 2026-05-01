@@ -1,6 +1,16 @@
 ---
 valid_from: 2026-03-14
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+
+type: reference
+horizon: warm
+domains: [reference]
+status: active
+owner: user
+schema_version: 1
+
+name: "sota-reference"
+description: "Операционный файл памяти IWE"
 ---
 # SOTA-практики (операционный справочник)
 

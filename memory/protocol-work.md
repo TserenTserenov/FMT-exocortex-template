@@ -1,13 +1,22 @@
 ---
 valid_from: 2026-04-10
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+
+type: protocol
+horizon: warm
+domains: [protocol]
+status: active
+owner: user
+schema_version: 1
+
+name: "Протокол: work"
+description: "Протокол ОРЗ — пошаговые инструкции для ритуала"
 ---
 # Протокол Работы (ОРЗ-фрактал)
 
 > **Два масштаба:** День и Сессия.
 > **Источник:** CLAUDE.md § 2 (slim) → этот файл.
 
----
 
 ## § Масштаб: День (Day Work)
 
@@ -25,7 +34,6 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 | 5 | **Сверка с планом** | Между сессиями: «Я ещё на плане дня?» Если нет — осознанное решение, не дрифт |
 | 6 | **День стратегии** | Проверить `day-rhythm-config.yaml → day_open.strategy_day`. Если сегодня — не пропустить сессию стратегирования |
 
----
 
 ## § Масштаб: Сессия (Session Work)
 
@@ -243,6 +251,5 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 - **Без Obsidian (DS-strategy):** Просмотр через VS Code, НЕ Obsidian.
 - **Push:** Незапушенные коммиты → ОБЯЗАН спросить «Запушить?».
 
----
 
 *Создано: 2026-02-23*

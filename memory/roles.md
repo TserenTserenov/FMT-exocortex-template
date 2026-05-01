@@ -1,6 +1,16 @@
 ---
 valid_from: 2026-04-06
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
+
+type: reference
+horizon: warm
+domains: [reference]
+status: active
+owner: user
+schema_version: 1
+
+name: "roles"
+description: "Операционный файл памяти IWE"
 ---
 # Роли платформы (lookup)
 
@@ -66,7 +76,6 @@ originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 | R25 | Рецензент-верификатор | Чел. | — | Экспертная оценка содержания (ИИ Opus или человек) |
 | R26 | Приёмщик | Чел. | — | Решение pass/fail на основе verdict (обычно = R15 Валидатор) |
 
----
 
 ## Специфика: R4 Автор — презентации (МИМ)
 
