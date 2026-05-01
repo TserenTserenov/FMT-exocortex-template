@@ -5,6 +5,17 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.23] — 2026-05-01
+
+### Added — WP-245 Ф28.2: скиллы personal-guide-start и personal-guide-render
+
+- **`/personal-guide-start`** — bootstrap репо `personal-guide` на GitHub пилота (один раз). Создаёт репо через Aisystant MCP, делегирует наполнение render-скиллу.
+- **`/personal-guide-render`** — наполнение 6 файлов (profile, worldview, methods, README, weekly/, daily/) из Память.Derived + Персона. Вызывается повторно при обновлениях.
+
+Пилот в своём Claude Code: `/personal-guide-start` → GitHub OAuth → 6 файлов в репо.
+
+Commit: `150ed2c`
+
 ## [0.29.22] — 2026-05-01
 
 ### Fixed — WP-139 Ф8.1: парсер мультипликатора (block-split bug)
