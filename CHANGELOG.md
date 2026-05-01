@@ -5,6 +5,19 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.22] — 2026-05-01
+
+### Fixed — WP-139 Ф8.1: парсер мультипликатора (block-split bug)
+
+В `roles/synchronizer/scripts/dt-collect.sh` функция `parse_weekplan_budget_for_date`:
+
+- **Было:** `section_re = re.compile(rf'Итоги\s+\S+\s+{day_num}\s+{month_ru}')` — `\S+` матчил `W16:` в заголовке недели «Итоги W16: 13 апр» раньше дневного «Итоги пн 13 апр»
+- **Стало:** `re.compile(rf'Итоги\s+(?:пн|вт|ср|чт|пт|сб|вс)\s+{day_num}\s+{month_ru}', re.IGNORECASE)` — матчит только дневные итоги с именованным днём недели
+
+**Эффект:** недельный бюджет за W16 = 116.05h → 132.55h (Пн 13 апр теперь находится). Множитель Week Close корректен без ручной корректировки.
+
+Commit: `8e79aa0`
+
 ## [0.29.21] — 2026-04-30
 
 ### Added — WP-217 Ф10: Memory Lifecycle Protocol
