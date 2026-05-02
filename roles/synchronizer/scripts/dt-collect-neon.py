@@ -16,7 +16,6 @@ dt-collect-neon.py — запись собранных данных активн
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 
 def main():
@@ -74,31 +73,8 @@ def _write_psycopg2(neon_url, user_id, collected_data):
                     updated_at = NOW()
             """, (user_id, json.dumps(collected_data), json.dumps(collected_data)))
 
-        # Commit digital_twins write before attempting dual-write (different schema)
         conn.commit()
         print(f"OK: written for user {user_id}")
-
-        # ADR-009: dual-write snapshot в user_events (закрытие антипаттерна §4.4)
-        # development.user_events живёт в platform DB, а не в indicators.
-        # Отдельная транзакция — не ломает основную запись при отсутствии схемы.
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        external_id = f"dt-collect-{user_id}-{today}"
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO development.user_events
-                        (user_id, user_uuid, event_type, source, payload,
-                         confidence, created_at, external_id)
-                    VALUES (0, %s::uuid, 'dt_collect_snapshot', 'iwe', %s::jsonb,
-                            1.0, NOW(), %s)
-                    ON CONFLICT (source, external_id)
-                        WHERE external_id IS NOT NULL
-                    DO NOTHING
-                """, (user_id, json.dumps(collected_data), external_id))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"WARN: dual-write to development.user_events skipped: {e}", file=sys.stderr)
     finally:
         conn.close()
 
@@ -133,26 +109,6 @@ def _write_asyncpg(neon_url, user_id, collected_data):
                 """, user_id, json.dumps(collected_data))
 
             print(f"OK: written for user {user_id}")
-
-            # ADR-009: dual-write snapshot в user_events (закрытие антипаттерна §4.4)
-            # development.user_events живёт в platform DB, не в indicators.
-            # Отдельная транзакция — не ломает основную запись.
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            external_id = f"dt-collect-{user_id}-{today}"
-            try:
-                async with conn.transaction():
-                    await conn.execute("""
-                        INSERT INTO development.user_events
-                            (user_id, user_uuid, event_type, source, payload,
-                             confidence, created_at, external_id)
-                        VALUES (0, $1::uuid, 'dt_collect_snapshot', 'iwe', $2::jsonb,
-                                1.0, NOW(), $3)
-                        ON CONFLICT (source, external_id)
-                            WHERE external_id IS NOT NULL
-                        DO NOTHING
-                    """, user_id, json.dumps(collected_data), external_id)
-            except Exception as e:
-                print(f"WARN: dual-write to development.user_events skipped: {e}", file=sys.stderr)
         finally:
             await conn.close()
 
