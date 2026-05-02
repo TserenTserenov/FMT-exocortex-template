@@ -5,6 +5,21 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.24] — 2026-05-02
+
+### Fixed — Architecture A: IWE_GOVERNANCE_REPO env var in launchd plist templates
+
+- **`roles/strategist/scripts/launchd/com.strategist.morning.plist`** и **`com.strategist.weekreview.plist`**: добавлен `IWE_GOVERNANCE_REPO={{GOVERNANCE_REPO}}` в `EnvironmentVariables`. launchd не загружает `~/.zshenv`, без этого `strategist.sh` использовал fallback `DS-strategy` вместо реального имени governance-репо пользователя.
+
+### Changed — WP-268 Ф8 + Architecture A: миграция strategist на template-форму
+
+- **`roles/strategist/scripts/strategist.sh`**: перевод на template-форму (`{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`, `{{CLAUDE_PATH}}`). Конкретные значения теперь только в `.iwe-runtime/` (генерируется `build-runtime.sh`).
+- **`roles/strategist/prompts/*.md`** (10 файлов): `DS-strategy` → `{{GOVERNANCE_REPO}}`. `strategist.sh` подставляет `$IWE_GOVERNANCE_REPO` через sed в runtime.
+- **`roles/strategist/scripts/cleanup-processed-notes.py`**: читает `IWE_GOVERNANCE_REPO` из env (fallback: `DS-strategy`).
+- **`roles/synchronizer/scripts/dt-collect-neon.py`**: удалены ADR-009 dual-write блоки к `development.user_events` (WP-268 cleanup).
+
+Коммиты: `404a304`, `7c6960a`
+
 ## [0.29.23] — 2026-05-01
 
 ### Added — WP-245 Ф28.2: скиллы personal-guide-start и personal-guide-render
