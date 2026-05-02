@@ -17,33 +17,13 @@ Keep rules:
   - everything else → processed, ARCHIVE
 """
 
-import os
 import re
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-
-def _resolve_workspace() -> Path:
-    """WP-273 0.29.5 R6.1* fix: Резолвим workspace через env-vars, не хардкод.
-    Order: $IWE_WORKSPACE (главный) → $WORKSPACE_DIR → $HOME/IWE.
-    Резолвим governance repo: $IWE_GOVERNANCE_REPO → читаем из .exocortex.env → fallback DS-strategy.
-    """
-    iwe_ws = os.environ.get("IWE_WORKSPACE") or os.environ.get("WORKSPACE_DIR") or str(Path.home() / "IWE")
-    gov_repo = os.environ.get("IWE_GOVERNANCE_REPO")
-    if not gov_repo:
-        env_file = Path(iwe_ws) / ".exocortex.env"
-        if env_file.is_file():
-            for line in env_file.read_text().splitlines():
-                if line.startswith("GOVERNANCE_REPO="):
-                    gov_repo = line.split("=", 1)[1].strip()
-                    break
-    gov_repo = gov_repo or "DS-strategy"
-    return Path(iwe_ws) / gov_repo
-
-
-WORKSPACE = _resolve_workspace()
+WORKSPACE = Path.home() / "IWE" / "{{GOVERNANCE_REPO}}"
 FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
 
