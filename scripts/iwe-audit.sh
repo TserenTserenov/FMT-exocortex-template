@@ -181,20 +181,20 @@ fi
 # params.yaml — конфиг
 emit_inventory_row "params.yaml" 1 ""
 
-# {{GOVERNANCE_REPO}} — директория с .git
-DS_DIR="$IWE_ROOT/{{GOVERNANCE_REPO}}"
+# DS-strategy — директория с .git
+DS_DIR="$IWE_ROOT/DS-strategy"
 TOTAL=$((TOTAL + 1))
 if [ -d "$DS_DIR" ]; then
     if [ -d "$DS_DIR/.git" ]; then
         FOUND=$((FOUND + 1))
-        printf "| \`%s\` | %s | %s |\n" "{{GOVERNANCE_REPO}}/" "✅" "git-репо (is_git=true)"
+        printf "| \`%s\` | %s | %s |\n" "DS-strategy/" "✅" "git-репо (is_git=true)"
     else
         OPTIONAL_MISSING=$((OPTIONAL_MISSING + 1))
-        printf "| \`%s\` | %s | %s |\n" "{{GOVERNANCE_REPO}}/" "⚠️" "директория есть, но не git-репо"
+        printf "| \`%s\` | %s | %s |\n" "DS-strategy/" "⚠️" "директория есть, но не git-репо"
     fi
 else
     CRITICAL_MISSING=$((CRITICAL_MISSING + 1))
-    printf "| \`%s\` | %s | %s |\n" "{{GOVERNANCE_REPO}}/" "❌" "директория не найдена"
+    printf "| \`%s\` | %s | %s |\n" "DS-strategy/" "❌" "директория не найдена"
 fi
 
 echo ""
@@ -237,7 +237,7 @@ echo "## 3. DS-strategy"
 echo ""
 
 if [ ! -d "$DS_DIR/.git" ]; then
-    echo "❌ \`{{GOVERNANCE_REPO}}\` не git-репо (или директория отсутствует)"
+    echo "❌ \`DS-strategy\` не git-репо (или директория отсутствует)"
 else
     set +e
     DS_STATUS=$(git -C "$DS_DIR" status --short 2>&1)

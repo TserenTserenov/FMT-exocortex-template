@@ -31,7 +31,7 @@ portable_date_offset() {
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE="$HOME/IWE"
-GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/{{GOVERNANCE_REPO}}}"
+GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/DS-strategy}"
 LOG_DIR="$HOME/logs/synchronizer"
 DATE=$(date +%Y-%m-%d)
 LOG_FILE="$LOG_DIR/dt-collect-$DATE.log"
@@ -231,7 +231,7 @@ print(json.dumps(result))
 # ============================================================
 
 collect_sessions() {
-    local SESSION_LOG="$WORKSPACE/{{GOVERNANCE_REPO}}/inbox/open-sessions.log"
+    local SESSION_LOG="$WORKSPACE/DS-strategy/inbox/open-sessions.log"
 
     python3 -c "
 import json, os, re
