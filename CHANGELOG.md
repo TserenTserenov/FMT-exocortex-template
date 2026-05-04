@@ -5,6 +5,15 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.25] — 2026-05-04
+
+### Added — WP-196 Ф13: цикл Month Close → Strategy Session
+
+- **`roles/strategist/prompts/strategy-session-weekly.md`**: добавлен Шаг 0 (БЛОКИРУЮЩЕЕ) — «Если первая сессия месяца — прочитать архив прошлого месяца» (4 подшага: найти `archive/MonthClose YYYY-MM.md`, прочитать ДО шага 1, прочитать `archive/multiplier-trend.md`, использовать как контекст для шагов 5-6). Закрывает разрыв ВДВ-каскада v9: стадия 7 (Month Close) → стадия 2 (Strategy Session).
+- **`memory/r-questionnaire.md`**: Month Close блок переработан — M1-M3+M6 заполняются агентом автоматически из данных (с указанием источника), M4-M5 — субъективные, спрашиваются у пользователя.
+
+Коммит: `f0e2add`
+
 ## [0.29.24] — 2026-05-02
 
 ### Fixed — Architecture A: IWE_GOVERNANCE_REPO env var in launchd plist templates
