@@ -60,7 +60,10 @@ argument-hint: "[code|archgate|capture|wp|chain|adversarial|auto] [путь ил
 - Прочитать WP context file (`DS-strategy/inbox/WP-{N}-*.md`)
 - Прочитать артефакт РП
 - Передать sub-agent'у: артефакт + критерии done + чеклист wp
-- Модель sub-agent'а: по verification_class
+- Модель sub-agent'а: по verification_class:
+  - `trivial` → Haiku
+  - `closed-loop` / `open-loop` → Sonnet
+  - `problem-framing` → Opus
 
 **Для `chain` (CoVe — Chain-of-Verification, Meta ACL 2024):**
 - Прочитать `git diff` изменённых файлов
