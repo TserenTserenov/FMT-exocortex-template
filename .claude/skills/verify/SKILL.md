@@ -60,7 +60,16 @@ argument-hint: "[code|archgate|capture|wp|chain|adversarial|auto] [путь ил
 - Прочитать WP context file (`DS-strategy/inbox/WP-{N}-*.md`)
 - Прочитать артефакт РП
 - Передать sub-agent'у: артефакт + критерии done + чеклист wp
-- Модель sub-agent'а: по verification_class
+- Модель sub-agent'а: по `verification_class` из WP context:
+
+  | verification_class | Модель | Когда применять |
+  |--------------------|--------|-----------------|
+  | `trivial` | Haiku | Бинарная проверка (критерии да/нет, формальный чеклист) |
+  | `closed-loop` | Sonnet | Известный эталон, eval по критериям (тесты, smoke-test, sample comparison) |
+  | `open-loop` | Sonnet | Эталон сформулирован абстрактно, требуется суждение по принципам |
+  | `problem-framing` | Opus | Постановка задачи неоднозначна, нужна декомпозиция и рефлексия по альтернативам |
+
+  Если `verification_class` отсутствует в WP context → СТОП. Спросить у автора РП, не угадывать.
 
 **Для `chain` (CoVe — Chain-of-Verification, Meta ACL 2024):**
 - Прочитать `git diff` изменённых файлов
