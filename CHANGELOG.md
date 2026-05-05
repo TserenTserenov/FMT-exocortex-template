@@ -5,6 +5,14 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.26] — 2026-05-05
+
+### Changed — Day Close: фильтрация шума в git log (шаг 1)
+
+- **`.claude/skills/day-close/SKILL.md`**: шаг 1 «Сбор данных» — добавлены два `grep -vE` для исключения служебных коммитов и путей. Фильтр убирает: (а) Conventional Commits префиксы `docs|chore|ci|style|perf|test`; (б) пути `memory/`, `.claude/rules/`, `template-sync`, `backup`, `reindex`. `|| true` гарантирует exit 0 при пустом результате. Эффект: сокращение объёма вывода git log на 40-60%, снижение токенов в Day Close. Edge case: пользователи, делающие предметную работу через `docs:`-коммиты, увидят неполный отчёт — кандидат на параметр `git_log_filter` в `params.yaml` при появлении запроса.
+
+Коммит: `fe0220c`
+
 ## [0.29.25] — 2026-05-04
 
 ### Added — WP-196 Ф13: цикл Month Close → Strategy Session

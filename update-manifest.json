@@ -1,5 +1,5 @@
 {
-  "version": "0.29.25",
+  "version": "0.29.26",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -640,5 +640,5 @@
       "reason": "strategist-agent directory removed"
     }
   ],
-  "changelog": "CHANGELOG.md#0.29.25"
+  "changelog": "CHANGELOG.md#0.29.26"
 }
