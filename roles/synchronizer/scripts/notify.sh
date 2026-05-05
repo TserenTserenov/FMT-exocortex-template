@@ -13,7 +13,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEMPLATES_DIR="$SCRIPT_DIR/templates"
+TEMPLATES_DIR="${TEMPLATES_DIR:-$SCRIPT_DIR/templates}"
 ENV_FILE="$HOME/.config/aist/env"
 
 AVAILABLE=$(ls "$TEMPLATES_DIR"/*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
