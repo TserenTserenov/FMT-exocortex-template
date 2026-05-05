@@ -5,6 +5,17 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.28] — 2026-05-05
+
+### Added — `scripts/template-sync.sh`: автосинхронизация авторского IWE → FMT
+
+- **`scripts/template-sync.sh`** (новый, ~50 строк): синхронизация `$IWE_WORKSPACE/CLAUDE.md` → `$IWE_TEMPLATE/CLAUDE.md` с placeholder-подстановкой ($HOME → {{HOME_DIR}}, $IWE_GOVERNANCE_REPO → DS-strategy) и strip §9 авторского. Режимы: без флагов = sync, `--dry-run` = показать diff, `--check` = проверить drift (exit 1). Требует `IWE_GOVERNANCE_REPO` через `${VAR:?msg}`. Закрывает gap: скрипт был удалён при архивировании `DS-exocortex-setup-agent` (2026-04-27), но §9 ссылался на него как на существующий → автор правил FMT напрямую с риском забыть placeholder.
+
+### Changed — `CLAUDE.md`: промотированы L1-правила из авторского runtime
+
+- **`CLAUDE.md` §2 Pre-action Gates**: добавлен **Routing Gate** (создание/размещение артефакта → DP.KR.001 §5).
+- **`CLAUDE.md` §2 IntegrationGate чеклист**: добавлены пункт 1 (Service Clause) и пункт 3 (Role) с детализацией.
+
 ## [0.29.27] — 2026-05-05
 
 ### Changed — Pull-on-Touch: расширение с write на read+write
