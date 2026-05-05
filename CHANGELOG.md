@@ -5,6 +5,12 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.29.27] — 2026-05-05
+
+### Changed — Pull-on-Touch: расширение с write на read+write
+
+- **`CLAUDE.md` §2 п.4**: правило `Pull-on-Touch` расширено с «первого изменения» на «первое обращение» (любое — `ls`/`Read`/`find`/`grep`/Edit/commit). Применяется ко всем git-репо в `{{HOME_DIR}}/IWE/*`, один раз на репо за сессию (lazy). Добавлена обработка dirty state (stash или «potentially stale»), rebase conflict (стоп + отчёт), network fail (работать с локальной копией). Причина: 5 мая 2026 агент сделал `ls` в DS-my-strategy без pull, origin был на 3 коммита впереди → ложный диагноз «Day Open не выполнен», написан ложный баг-отчёт. Дыра: исходное правило покрывало только write-операции, read оставался без защиты.
+
 ## [0.29.26] — 2026-05-05
 
 ### Changed — Day Close: фильтрация шума в git log (шаг 1)
