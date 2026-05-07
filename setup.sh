@@ -212,28 +212,40 @@ if [ "$PREREQ_FAIL" -eq 1 ]; then
 fi
 
 # === Collect configuration ===
-read -p "GitHub username (или Enter для пропуска): " GITHUB_USER
-GITHUB_USER="${GITHUB_USER:-your-username}"
-
-read -p "Workspace directory [$(dirname "$TEMPLATE_DIR")]: " WORKSPACE_DIR
-WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
-# Expand ~ to $HOME
-WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
-
-if $CORE_ONLY; then
-    # Core: используем defaults, не спрашиваем Claude-специфичные параметры
-    CLAUDE_PATH="${AI_CLI:-claude}"
-    TIMEZONE_HOUR="4"
-    TIMEZONE_DESC="4:00 UTC"
-else
-    read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
-    CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
-
-    read -p "Strategist launch hour (UTC, 0-23) [4]: " TIMEZONE_HOUR
+# SETUP_CI=1: non-interactive mode for smoke tests and CI.
+# All values read from env vars; interactive prompts skipped.
+if [ -n "${SETUP_CI:-}" ]; then
+    GITHUB_USER="${GITHUB_USER:-smoke-test}"
+    WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
+    WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
+    CLAUDE_PATH="${CLAUDE_PATH:-claude}"
     TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
+    TIMEZONE_DESC="${TIMEZONE_DESC:-4:00 UTC}"
+    echo "  [CI] GITHUB_USER=$GITHUB_USER WORKSPACE_DIR=$WORKSPACE_DIR"
+else
+    read -p "GitHub username (или Enter для пропуска): " GITHUB_USER
+    GITHUB_USER="${GITHUB_USER:-your-username}"
 
-    read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 UTC]: " TIMEZONE_DESC
-    TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 UTC}"
+    read -p "Workspace directory [$(dirname "$TEMPLATE_DIR")]: " WORKSPACE_DIR
+    WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
+    # Expand ~ to $HOME
+    WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
+
+    if $CORE_ONLY; then
+        # Core: используем defaults, не спрашиваем Claude-специфичные параметры
+        CLAUDE_PATH="${AI_CLI:-claude}"
+        TIMEZONE_HOUR="4"
+        TIMEZONE_DESC="4:00 UTC"
+    else
+        read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
+        CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
+
+        read -p "Strategist launch hour (UTC, 0-23) [4]: " TIMEZONE_HOUR
+        TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
+
+        read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 UTC]: " TIMEZONE_DESC
+        TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 UTC}"
+    fi
 fi
 
 HOME_DIR="$HOME"
@@ -278,8 +290,8 @@ echo "  Home dir:       $HOME_DIR"
 echo "  Project slug:   $CLAUDE_PROJECT_SLUG"
 echo ""
 
-# === Data Policy acceptance (skip in dry-run) ===
-if ! $DRY_RUN; then
+# === Data Policy acceptance (skip in dry-run and CI) ===
+if ! $DRY_RUN && [ -z "${SETUP_CI:-}" ]; then
     echo "Data Policy"
     echo "  IWE collects and processes data as described in docs/DATA-POLICY.md"
     echo "  Summary: profile, sessions, and learning data are stored on the platform (Neon DB)."
@@ -400,7 +412,8 @@ echo "[3/6] Installing memory..."
 CLAUDE_MEMORY_DIR="$HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory"
 if $DRY_RUN; then
     MEM_COUNT=$(ls "$TEMPLATE_DIR/memory/"*.md 2>/dev/null | wc -l | tr -d ' ')
-    echo "  [DRY RUN] Would copy $MEM_COUNT memory files → $CLAUDE_MEMORY_DIR/"
+    YAML_COUNT=$(ls "$TEMPLATE_DIR/memory/"*.yaml "$TEMPLATE_DIR/memory/"*.yml 2>/dev/null | wc -l | tr -d ' ')
+    echo "  [DRY RUN] Would copy $MEM_COUNT .md + $YAML_COUNT .yaml/.yml memory files → $CLAUDE_MEMORY_DIR/"
     if [ ! -e "$WORKSPACE_DIR/memory" ]; then
         echo "  [DRY RUN] Would create symlink: $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
     else
@@ -409,6 +422,10 @@ if $DRY_RUN; then
 else
     mkdir -p "$CLAUDE_MEMORY_DIR"
     cp "$TEMPLATE_DIR/memory/"*.md "$CLAUDE_MEMORY_DIR/"
+    # Deliver yaml/yml configs (e.g. day-rhythm-config.yaml) alongside .md files
+    for f in "$TEMPLATE_DIR/memory/"*.yaml "$TEMPLATE_DIR/memory/"*.yml; do
+        [ -f "$f" ] && cp "$f" "$CLAUDE_MEMORY_DIR/"
+    done
     echo "  Copied to $CLAUDE_MEMORY_DIR"
 
     # Create symlink so CLAUDE.md references (memory/protocol-open.md etc.) resolve from workspace root
@@ -452,14 +469,15 @@ else
     fi
 fi
 
-# === 4b. Propagate skills, hooks, rules, lib, config, detectors to workspace ===
-echo "[4b] Installing skills, hooks, rules, lib, config, detectors..."
+# === 4b. Propagate skills, hooks, rules, lib, config, detectors, scripts to workspace ===
+echo "[4b] Installing skills, hooks, rules, lib, config, detectors, scripts..."
 if $DRY_RUN; then
-    echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,lib,config,detectors}/ → $WORKSPACE_DIR/.claude/"
+    echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,lib,config,detectors,scripts,agents}/ → $WORKSPACE_DIR/.claude/"
 else
     mkdir -p "$WORKSPACE_DIR/.claude"
     # lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов
-    for subdir in skills hooks rules lib config detectors; do
+    # scripts — требуется скиллами (напр. load-extensions.sh)
+    for subdir in skills hooks rules lib config detectors scripts agents; do
         if [ -d "$TEMPLATE_DIR/.claude/$subdir" ]; then
             cp -r "$TEMPLATE_DIR/.claude/$subdir" "$WORKSPACE_DIR/.claude/"
             echo "  ✓ .claude/$subdir/ → $WORKSPACE_DIR/.claude/$subdir/"
@@ -670,4 +688,22 @@ else
     echo "Update from upstream:"
     echo "  cd $TEMPLATE_DIR && bash update.sh"
     echo ""
+
+    # === Post-install validation (WP-265 Ф8) ===
+    # Не запускаем автоматически — это interactive prompt. Skip в --core (нет gh/claude).
+    if ! $CORE_ONLY; then
+        echo "Финальная проверка инсталляции (рекомендуется):"
+        echo "  validate-режим setup.sh проверит: env-конфиг, обязательные файлы,"
+        echo "  extensions, доступность MCP, структурные инварианты."
+        echo ""
+        read -p "Запустить проверку сейчас? (y/n) " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo ""
+            bash "$TEMPLATE_DIR/setup.sh" --validate
+        else
+            echo "Пропущено. Запустить позже: cd $TEMPLATE_DIR && bash setup.sh --validate"
+        fi
+        echo ""
+    fi
 fi

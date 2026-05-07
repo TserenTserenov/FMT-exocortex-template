@@ -97,7 +97,33 @@ schema_version: 1
 - [ ] KE: «Что узнали» маршрутизировано (или «нет нового знания»)
 - [ ] MEMORY.md: статус РП обновлён
 - [ ] Decision log: прочитать записи сессии в `decisions/decision-log-YYYY-MM.md`, скорректировать если неточно
+- [ ] **Docs Gate (условный):** РП затрагивал поведение онбординга (skills, MCP-сервисы, бот `/start`)? → обновить онбординг-документацию в governance-репо + `/verify` обновлённый файл. Владелец: пользователь. Если не затрагивал → пропустить молча.
 
+
+## Week Close (Неделя)
+
+> **Роль:** R1 Стратег. **Бюджет:** ~20-30 мин. **Триггер:** «закрываю неделю» / `/week-close`.
+> Полный алгоритм — `.claude/skills/week-close/SKILL.md`. Здесь — slim-ядро для маршрутизации.
+
+### Шаги Week Close
+
+1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа)
+2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by)
+3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки:
+   - `distinctions.md` строк **> 80** = drift-флаг (нарушение DP.KR.001 §6). Фиксировать в Week Report.
+   - `MEMORY.md` строк **> 200** = флаг превышения лимита. Предложить архивацию.
+   - `memory/*.md` без обращения > 14 дней, > 5 файлов = кандидаты на понижение horizon.
+   - Флаги информативны — пользователь решает действие.
+4. **iwe-drift.sh** — полный drift-отчёт в Week Report (S)
+5. **STAGING.md** — есть `validated`? → предложить промоцию (S+T)
+6. **iwe-rules-review** — какие правила обходились? (S)
+7. **R-вопросник** (`memory/r-questionnaire.md`) → ответы в Week Report
+8. **Архивация done-WP** → `archive/wp-contexts/` (T)
+9. **Запись итогов в WeekPlan** + создание carry-over секции
+
+### Симптом пропуска
+
+STAGING.md заморожен ≥2 недель с `validated` / Week Report без R-ответов / distinctions.md > 80 строк без флага 2+ недели подряд.
 
 ## Deferred (отложены до Day Close)
 

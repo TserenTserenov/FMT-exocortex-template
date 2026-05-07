@@ -29,9 +29,9 @@ if ! echo "$TOOL_INPUT" | grep -qE 'git (add.*&&.*git )?commit'; then
 fi
 
 # Governance-репо: из env $IWE_GOVERNANCE_REPO (по умолчанию DS-strategy).
-# Workspace: из env $IWE_WORKSPACE (по умолчанию ~/IWE).
+# Workspace: $IWE_WORKSPACE или $IWE_ROOT (синонимы), default ~/IWE.
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
+WORKSPACE="${IWE_WORKSPACE:-${IWE_ROOT:-$HOME/IWE}}"
 GOV_PATH="$WORKSPACE/$GOV_REPO"
 
 # R4.5 fix (WP-273): trigger ТОЛЬКО по staged files, НЕ по тексту команды.
@@ -44,13 +44,12 @@ if ! echo "$STAGED" | grep -qE '^current/DayPlan.*\.md$|^current/WeekPlan.*\.md$
   exit 0
 fi
 
-# --- DayPlan Validation ---
+# --- DayPlan Validation (выполняется только если DayPlan-файл существует) ---
 DAYPLAN=$(ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null | head -1)
+MISSING=()
+ERRORS=()
 
-if [ -z "$DAYPLAN" ]; then
-  echo '{}'
-  exit 0
-fi
+if [ -n "$DAYPLAN" ]; then
 
 # Required sections (parameterized — update this list when format changes).
 # Scout раздел опционален: проверяется отдельно ниже (см. блок "Scout").
@@ -62,7 +61,6 @@ SECTIONS=(
   "Итоги вчера"
 )
 
-MISSING=()
 for section in "${SECTIONS[@]}"; do
   if ! grep -q "$section" "$DAYPLAN"; then
     MISSING+=("$section")
@@ -70,7 +68,6 @@ for section in "${SECTIONS[@]}"; do
 done
 
 # Check mandatory format elements
-ERRORS=()
 
 # --- Ф3 Check 1: collapsible <details> блоки ---
 DETAILS_COUNT=$(grep -c '<details' "$DAYPLAN" 2>/dev/null || true); DETAILS_COUNT=${DETAILS_COUNT:-0}
@@ -116,6 +113,54 @@ if [ -n "$PREV_DAYPLAN" ] && [ "$PREV_DAYPLAN" != "$DAYPLAN" ]; then
   fi
 fi
 
+fi  # endif [ -n "$DAYPLAN" ]
+
+# --- WeekPlan Validation (Ф6.1 WP-265) ---
+WEEKPLAN=$(ls "$GOV_PATH"/current/WeekPlan\ *.md 2>/dev/null | sort | tail -1)
+if [ -n "$WEEKPLAN" ]; then
+  WP_LINES=$(wc -l < "$WEEKPLAN" | tr -d ' ')
+  WP_ERRORS=()
+  WP_MISSING_LIST=()
+
+  # Детектор (а): >80 строк без достаточного числа <details>
+  WP_DETAILS_COUNT=$(grep -c '<details' "$WEEKPLAN" 2>/dev/null || true); WP_DETAILS_COUNT=${WP_DETAILS_COUNT:-0}
+  if [ "$WP_LINES" -gt 80 ] && [ "$WP_DETAILS_COUNT" -lt 3 ]; then
+    WP_ERRORS+=("WeekPlan >80 строк ($WP_LINES) но collapsible секций < 3 ($WP_DETAILS_COUNT). Используй <details>/<summary> (formatting.md)")
+  fi
+
+  # Детектор (б): баланс <details> / </details>
+  DETAILS_OPEN=$(grep -c '<details' "$WEEKPLAN" 2>/dev/null || true); DETAILS_OPEN=${DETAILS_OPEN:-0}
+  DETAILS_CLOSE=$(grep -c '</details>' "$WEEKPLAN" 2>/dev/null || true); DETAILS_CLOSE=${DETAILS_CLOSE:-0}
+  if [ "$DETAILS_OPEN" != "$DETAILS_CLOSE" ]; then
+    WP_ERRORS+=("WeekPlan: несбалансированные <details> (открытий=$DETAILS_OPEN, закрытий=$DETAILS_CLOSE)")
+  fi
+
+  # Детектор (в): обязательные секции WeekPlan (5 минимальных по templates-dayplan.md)
+  WP_REQUIRED=(
+    "Итоги"
+    "Повестка"
+    "Inbox Triage"
+    "План на неделю"
+    "Контент-план"
+  )
+  for wp_section in "${WP_REQUIRED[@]}"; do
+    if ! grep -q "$wp_section" "$WEEKPLAN"; then
+      WP_MISSING_LIST+=("$wp_section")
+    fi
+  done
+
+  if [ ${#WP_MISSING_LIST[@]} -gt 0 ] || [ ${#WP_ERRORS[@]} -gt 0 ]; then
+    WP_MISSING_STR=$(IFS=', '; echo "${WP_MISSING_LIST[*]:-}")
+    WP_ERRORS_STR=$(IFS=', '; echo "${WP_ERRORS[*]:-}")
+    WP_MSG="⛔ WEEKPLAN VALIDATION FAILED."
+    [ ${#WP_MISSING_LIST[@]} -gt 0 ] && WP_MSG="$WP_MSG Пропущены секции (${#WP_MISSING_LIST[@]}): $WP_MISSING_STR."
+    [ ${#WP_ERRORS[@]} -gt 0 ] && WP_MSG="$WP_MSG Ошибки структуры: $WP_ERRORS_STR."
+    WP_MSG="$WP_MSG Исправь WeekPlan перед коммитом."
+    jq -n --arg reason "$WP_MSG" '{"decision": "block", "reason": $reason}'
+    exit 0
+  fi
+fi
+
 # Report results
 if [ ${#MISSING[@]} -gt 0 ] || [ ${#ERRORS[@]} -gt 0 ]; then
   MISSING_STR=$(printf ', %s' "${MISSING[@]}")
@@ -128,9 +173,7 @@ if [ ${#MISSING[@]} -gt 0 ] || [ ${#ERRORS[@]} -gt 0 ]; then
   [ ${#ERRORS[@]} -gt 0 ] && MSG="$MSG Ошибки формата/структуры: $ERRORS_STR."
   MSG="$MSG Исправь DayPlan перед коммитом."
 
-  cat <<EOF
-{"decision": "block", "reason": "$MSG"}
-EOF
+  jq -n --arg reason "$MSG" '{"decision": "block", "reason": $reason}'
 else
   cat <<'EOF'
 {"additionalContext": "✅ DayPlan прошёл валидацию: секции, collapsible, непустые блоки, мультипликатор, carry-over."}

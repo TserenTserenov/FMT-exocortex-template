@@ -6,7 +6,20 @@
 
 ```bash
 DATE=$(date +%Y-%m-%d)
-DAYPLAN_FILE="$HOME/IWE/{{GOVERNANCE_REPO}}/current/DayPlan $DATE.md"
+GOV="$HOME/IWE/{{GOVERNANCE_REPO}}"
+DAYPLAN_FILE="$GOV/current/DayPlan $DATE.md"
+
+# Страховочная сетка: архивировать вчерашние/старые DayPlan'ы из current/
+# (Day Close мог не отработать — не оставлять мусор для следующего carry-over)
+for old in "$GOV"/current/DayPlan\ 20*.md; do
+  [ -f "$old" ] || continue
+  base=$(basename "$old")
+  fdate="${base#DayPlan }"; fdate="${fdate%.md}"
+  if [ "$fdate" != "$DATE" ]; then
+    git -C "$GOV" mv "$old" "archive/day-plans/" 2>/dev/null || mv "$old" "$GOV/archive/day-plans/"
+    echo "pre-archive: $base → archive/day-plans/"
+  fi
+done
 
 # Если файла нет — создать через scaffold
 if [ ! -f "$DAYPLAN_FILE" ]; then

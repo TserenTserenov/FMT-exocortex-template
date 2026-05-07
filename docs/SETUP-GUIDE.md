@@ -5,6 +5,8 @@
 >
 > **Source-of-truth:** `DP.IWE.002` (Pack). При расхождении с этим файлом — приоритет у Pack.
 > Через Gateway: `knowledge_search("установка IWE шаблон")`.
+>
+> **Конденсированная версия (15 мин, для лендинга WP-188):** `iwe-quickstart.md` в `DS-ecosystem-development/.../2.1.2. Onboarding/`. Это руководство — полная версия с 7 этапами.
 
 <details open>
 <summary><b>Где ты сейчас и куда идёшь</b></summary>

@@ -23,7 +23,7 @@
 ### Шаг 0: Прочитать конфигурацию
 
 1. Прочитай `{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor/config/routing.md` — таблицы маршрутизации.
-2. Прочитай `{{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor/config/feedback-log.md` — лог отклонённых кандидатов. Если capture похож на ранее отклонённый → пропусти.
+2. Прочитай `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/feedback-log.md` — лог отклонённых кандидатов (пишет R15 через /apply-captures). Если capture похож на ранее отклонённый → пропусти. Если файл не существует — продолжай без него.
 
 ### Шаг 1: Проверить inbox
 

@@ -213,14 +213,18 @@ for _, path in repos:
     ins_7d += i
     dels_7d += d
 
-# ADR-009 (WP-109 Ф3): commits_today/7d/30d теперь агрегируются
-# из user_events через dt_sync. Здесь -- только уникальные поля
-# (repos_active, files_changed, lines), которых нет в sync-iwe.
+# ADR-009 (WP-109 Ф3) REVERT (6 май 2026): commits возвращены в локальный сбор.
+# GitHub App webhooks для IWE-репо не доходят → commits_30d = 0 через dt_sync.
+# Fallback: считаем из локального git log. Если webhook pipeline заработает —
+# dt_calc.py возьмёт max(local, webhook) или webhook-значение приоритетом.
 result = {
     'repos_active_7d': repos_7d[:15],
     'files_changed_7d': files_7d,
     'lines_added_7d': ins_7d,
     'lines_removed_7d': dels_7d,
+    'commits_today': commits_today,
+    'commits_7d': commits_7d,
+    'commits_30d': commits_30d,
 }
 print(json.dumps(result))
 " 2>/dev/null || echo "{}"
@@ -231,7 +235,7 @@ print(json.dumps(result))
 # ============================================================
 
 collect_sessions() {
-    local SESSION_LOG="$GOVERNANCE_DIR/inbox/open-sessions.log"
+    local SESSION_LOG="$WORKSPACE/DS-strategy/inbox/open-sessions.log"
 
     python3 -c "
 import json, os, re
@@ -328,50 +332,13 @@ print(json.dumps(result))
 }
 
 # ============================================================
-# 5. Scheduler Health
+# 5. Scheduler Health — REMOVED 2026-05-07
 # ============================================================
-
-collect_health() {
-    local STATE_DIR="$HOME/.local/state/exocortex"
-    python3 -c "
-import json, os
-from datetime import datetime
-
-state_dir = '$STATE_DIR'
-today = datetime.now().strftime('%Y-%m-%d')
-health = 'green'
-uptime = 0
-
-if os.path.isdir(state_dir):
-    markers = [f for f in os.listdir(state_dir) if not f.startswith('.')]
-    dates = set()
-    for m in markers:
-        parts = m.rsplit('-', 3)
-        if len(parts) >= 3:
-            date_part = '-'.join(parts[-3:])
-            if len(date_part) == 10:
-                dates.add(date_part)
-    uptime = len(dates)
-
-    # Check if key tasks ran today
-    expected = ['code-scan', 'strategist-morning']
-    missing = []
-    for task in expected:
-        found = any(task in m and today in m for m in markers)
-        if not found:
-            missing.append(task)
-    if len(missing) > 0:
-        health = 'yellow'
-    if len(missing) > 1:
-        health = 'red'
-
-result = {
-    'scheduler_health': health,
-    'exocortex_uptime_days': uptime,
-}
-print(json.dumps(result))
-" 2>/dev/null || echo "{}"
-}
+# Функция collect_health() читала маркеры старого монолитного scheduler.sh
+# (~/.local/state/exocortex/), но scheduler отключён 10 марта 2026.
+# Маркеры code-scan/strategist-morning больше не пишутся → health всегда red.
+# Удалено вместе с блоком «Scheduler» в дашборде DayPlan (WP-7 SCHED-3).
+# Per-role launchd агенты пишут собственные логи в ~/logs/{strategist,pulse,...}/.
 
 # ============================================================
 # 6. Multiplier & Budgets (from DayPlan)
@@ -494,7 +461,7 @@ def parse_weekplan_budget_for_date(date_str, gov_dir):
         os.path.join(gov_dir, 'archive', 'week-plans', 'WeekPlan W*.md'),
         os.path.join(gov_dir, 'current', 'WeekPlan W*.md'),
     ]
-    # \S+ матчил "W16:" в "Итоги W16: 13 апр" раньше дневного "Итоги пн 13 апр" — block-split bug
+    # \\S+ матчил W16: в Итоги W16: 13 апр раньше дневного Итоги пн 13 апр — block-split bug
     section_re = re.compile(rf'Итоги\s+(?:пн|вт|ср|чт|пт|сб|вс)\s+{day_num}\s+{month_ru}', re.IGNORECASE)
     for pat in wp_patterns:
         for wp in glob.glob(pat):
@@ -839,8 +806,6 @@ log "Collecting Claude sessions..."
 SESSIONS_JSON=$(collect_sessions)
 log "Collecting WP stats..."
 WP_JSON=$(collect_wp)
-log "Collecting scheduler health..."
-HEALTH_JSON=$(collect_health)
 log "Collecting multiplier data..."
 MULT_JSON=$(collect_multiplier)
 log "Collecting registry stats..."
@@ -860,7 +825,6 @@ waka = json.loads('''$WAKA_JSON''')
 git = json.loads('''$GIT_JSON''')
 sessions = json.loads('''$SESSIONS_JSON''')
 wp = json.loads('''$WP_JSON''')
-health = json.loads('''$HEALTH_JSON''')
 mult = json.loads('''$MULT_JSON''')
 registry = json.loads('''$REGISTRY_JSON''')
 pack = json.loads('''$PACK_JSON''')
@@ -873,7 +837,7 @@ p_eco = json.loads('''$plugin_eco_arr''')
 p_know = json.loads('''$plugin_know_arr''')
 
 # 2_7_iwe: core + plugins
-iwe = {**git, **sessions, **wp, **health, **mult, **registry, **sched}
+iwe = {**git, **sessions, **wp, **mult, **registry, **sched}
 for p in p_iwe:
     iwe.update(p)
 

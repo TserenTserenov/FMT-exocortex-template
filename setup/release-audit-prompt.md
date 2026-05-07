@@ -87,6 +87,5 @@ CHANGELOG автора.
 |------|--------|-------------|-----------|
 | 2026-04-29 | 0.29.13 | Євгений (manual fresh clone) | 8 violations найдено, → 0.29.14/15/16/17 |
 | 2026-04-29 | 0.29.16 | sub-agent (этот промпт) | 2 minor найдены, → 0.29.17 |
-| 2026-05-06 | 0.29.29 | sub-agent (issue #52, fork pilot WP-32) | 5 классов после truth-check: Scout fix unreleased (HEAD ≠ manifest bump), `.DS_Store` tracked, 2 broken memory refs (`claude-md-maintenance.md`, `wp-gate-lesson.md`), `iwe-drift.sh:74` + `memory-bleed.sh:158` `stat -f` без cross-platform fallback (Linux mtime breakage). → +4 detectors (#9 version_bump_consistency, #10 tracked_artifacts, #11 memory_internal_refs, #12 stat_portability) |
 
 Каждая запись = новый класс регрессий → +1 detector в `integration-contract-validator.sh`.

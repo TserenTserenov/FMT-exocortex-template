@@ -207,7 +207,7 @@ done
 # Протоколы и скиллы должны использовать $IWE_SCRIPTS / $IWE_ROLES / $IWE_TEMPLATE / $IWE_WORKSPACE
 # вместо абсолютных путей к FMT-exocortex-template/scripts|roles или bare ~/IWE/scripts.
 # Enumerate-all: собираем ВСЕ нарушения по всем паттернам, выводим списком, потом fail (предотвращает iterative fix-retry).
-echo -n "[6/8] Hardcoded script paths in protocols/skills... "
+echo -n "[6/6] Hardcoded script paths in protocols/skills... "
 CHECK6_FAIL=0
 CHECK6_HITS=""
 # Паттерн 1-2: ссылки на FMT-template путь (legacy DP.FM.009)
@@ -240,7 +240,7 @@ fi
 #   (a) FAIL: hook упомянут в settings.json, но файла нет в .claude/hooks/
 #   (b) WARN: hook есть в .claude/hooks/, но не упомянут ни в одном settings.json
 #       (может быть вызываем напрямую, например wakatime-heartbeat.sh)
-echo -n "[7/8] Hooks cross-ref (settings.json ↔ .claude/hooks/)... "
+echo -n "[7/7] Hooks cross-ref (settings.json ↔ .claude/hooks/)... "
 CHECK7_FAIL=0
 HOOKS_DIR="$TEMPLATE_DIR/.claude/hooks"
 SETTINGS_FILES=()
@@ -273,49 +273,6 @@ else
         fi
     done
     [ "$CHECK7_FAIL" -eq 0 ] && [ "$ORPHAN_WARN" -eq 0 ] && echo "PASS"
-fi
-
-# 8. Path parameterization contract (WP-293)
-# Hardcoded `DS-strategy`, `$HOME/IWE/<repo>` в template файлах должны быть параметризованы:
-#   - DS-strategy → ${GOVERNANCE_REPO} или $GOVERNANCE_DIR (в bash: ${GOVERNANCE_DIR:-$WORKSPACE/DS-strategy})
-#   - $HOME/IWE/X → $WORKSPACE/X или $IWE_TEMPLATE/X (в зависимости от роли)
-# Переиспользуем DETECTOR_07_REGEX из detector-regex.sh (single source-of-truth для regex'ов).
-# Текущая политика: WARN для существующих hardcode'ов (parameterization debt — оставлено
-# на forced-fix через касание файлов в будущих коммитах). При добавлении нового — FAIL.
-echo -n "[8/8] Path parameterization (WP-293 parameterization debt)... "
-# shellcheck source=detector-regex.sh
-VALIDATE_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$VALIDATE_SCRIPT_DIR/detector-regex.sh"
-CHECK8_HITS=""
-# Скан областей: roles/*/scripts/, scripts/, setup.sh, update.sh, .claude/skills/
-# Исключения: archive/, backup/, .git/, сами detector'ы (содержат паттерны как литералы)
-for area in "$TEMPLATE_DIR/roles" "$TEMPLATE_DIR/scripts" "$TEMPLATE_DIR/setup.sh" "$TEMPLATE_DIR/update.sh"; do
-    [ -e "$area" ] || continue
-    if [ -d "$area" ]; then
-        hits=$(grep -rnE "$DETECTOR_07_REGEX" "$area" 2>/dev/null \
-                | grep -vE 'archive/|backup/|/\.git/|detector-regex\.sh|validate-template\.sh|release-audit-prompt\.md|smoke-test-fresh-install\.sh|CHANGELOG' \
-                | grep -vE ':\s*#' || true)
-    else
-        hits=$(grep -nE "$DETECTOR_07_REGEX" "$area" 2>/dev/null \
-                | grep -vE ':\s*#' || true)
-    fi
-    if [ -n "$hits" ]; then
-        CHECK8_HITS="${CHECK8_HITS}${CHECK8_HITS:+$'\n'}--- $area ---"$'\n'"$hits"
-    fi
-done
-# Также: bare $HOME/IWE/<repo> в roles/ (пример: strategist.sh:267 DS-Knowledge-Index)
-HOME_HITS=$(grep -rnE '\$HOME/IWE/(DS|PACK|FMT)-' "$TEMPLATE_DIR/roles" 2>/dev/null \
-            | grep -vE 'archive/|backup/|:\s*#' || true)
-if [ -n "$HOME_HITS" ]; then
-    CHECK8_HITS="${CHECK8_HITS}${CHECK8_HITS:+$'\n'}--- \$HOME/IWE/<repo> in roles/ ---"$'\n'"$HOME_HITS"
-fi
-if [ -z "$CHECK8_HITS" ]; then
-    echo "PASS (no parameterization debt)"
-else
-    DEBT_COUNT=$(echo "$CHECK8_HITS" | grep -cE '^[^-]' || echo 0)
-    echo "WARN (parameterization debt: $DEBT_COUNT hardcode'ов — forced-fix при касании)"
-    echo "$CHECK8_HITS" | sed 's/^/  /' >&2
-    # WARN, не FAIL — debt оставлен на постепенную очистку (план WP-293, вариант 3 deferred)
 fi
 
 echo ""

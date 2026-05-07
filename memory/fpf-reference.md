@@ -10,7 +10,7 @@ owner: user
 schema_version: 1
 
 name: "fpf-reference"
-description: "Операционный файл памяти IWE"
+description: "Справочник FPF паттернов применимых в IWE: структура, ключевые Part C (C.11-C.28), трансляция терминов"
 ---
 # FPF (First Principles Framework) — справочник
 
@@ -33,11 +33,23 @@ description: "Операционный файл памяти IWE"
 
 - **Part A** — Kernel: Holon, BoundedContext, Role-Method-Work, Signature Stack
 - **Part B** — Aggregation (Γ), Trust (F-G-R), Evolution Loop
-- **Part C** — Domain extensions: Sys-CAL, KD-CAL, Kind-CAL, NQD-CAL
+- **Part C** — Domain extensions: Sys-CAL, KD-CAL, Kind-CAL, NQD-CAL, CausalUse-CAL
 - **Part D** — Ethics & Conflict
 - **Part E** — Constitution & Authoring
 - **Part F** — Terminology unification (UTS, Bridges)
 - **Part G** — SoTA Kit
+
+### Ключевые паттерны Part C (актуальные для IWE)
+
+| Код | Название | Статус | Назначение в IWE |
+|-----|----------|--------|-----------------|
+| C.11 | Decision Theory (Decsn-CAL) | Stable | Выбор альтернатив в ArchGate, Strategy Session |
+| C.16 | MM-CHR Measurement & Metrics | Stable | Измерения RCS, baseline, показатели пилота |
+| C.19 | Explore–Exploit Governor | Stable | Pool-политика экспериментов и методов |
+| C.24 | Agentic Tool-Use & Call-Planning | Stable | Протокол Claude Code tool-use бюджет |
+| C.26 | Quantum-Like Modeling Lens | Stable | Probe-coupled взаимодействия, order effects |
+| C.27 | Temporal Claim Adequacy | Stable | Утверждения о скорости, ритме, трендах |
+| C.28 | **CausalUse-CAL** | Stable | **Причинные утверждения: M1 улучшает X, рычаг даёт Y** |
 
 ## Системная терминология
 
@@ -68,6 +80,45 @@ description: "Операционный файл памяти IWE"
 | Ограниченный контекст | A.1.1 | Термин определён в границах контекста |
 | Строгие различения | A.7 | Роль ≠ Метод ≠ Работа |
 | ADI-цикл | B.5 | Абдукция → Дедукция → Индукция |
+| CausalUse-CAL | C.28 | Причинные утверждения: рунг, доказательная база, допустимое использование |
+
+## C.28 CausalUse-CAL — практическое применение в IWE
+
+> Добавлен в FPF 2026-05-05 (pull +4138 строк). Источник ailev: systemsworld.club.
+> Полный текст: `FPF-Spec.md:45197`
+
+**Суть.** Три коллапса, которые C.28 предотвращает:
+1. **Rung collapse** — ассоциация, интервенция и контрфактик смешаны в одном «причина X→Y»
+2. **Support collapse** — наблюдение, эксперимент, симуляция — одна «доказательная база»
+3. **Use collapse** — результат, допустимый для reporting, используется для деплоя/сертификации
+
+**Лестница причинности (Pearl Causal Hierarchy):**
+| Рунг | Вопрос | Пример в IWE |
+|------|--------|-------------|
+| 1 Ассоциация | «Что вместе встречается?» | «Пилоты с M1 чаще достигают ступени 3» |
+| 2 Интервенция | «Что случится, если сделать X?» | «Добавив M1, пилот поднимет baseline» |
+| 3 Контрфактик | «Что было бы, если бы X?» | «Без M4 пилот бы не достиг калибра 3» |
+
+**Активация C.28** — когда утверждение меняет то, что допустимо для публикации, деплоя, аудита, бенчмарка.
+
+**Быстрый тест (CausalUseTriageRecord):**
+1. Есть ли каузальное использование? yes/no/unclear
+2. Какой рунг? (1=ассоциация / 2=интервенция / 3=контрфактик)
+3. Какая доказательная база? (observational / interventional / realized-counterfactual / identified-estimate / simulation-only)
+4. Что допустимо? Что НЕ допустимо? (supportedUse / unsupportedUse — всегда пара)
+5. nextMove: cheapStop (переформулировать как ассоциацию) или escalate (открыть DurableCard)
+
+**Применения в IWE/Pack:**
+
+| Контекст | Типичная ошибка | C.28 fix |
+|---------|----------------|---------|
+| WP-151 рычаги (M1/M4) | «M1 поднимает собранность» — рунг 2 без доказательства | Переписать как рунг 1: «ассоциировано с ростом baseline в выборке N» |
+| Портной рекомендации | «Добавь помидоры — улучшишь ступень» — rung 2 pretend | Добавить: «по корреляции в N=k пилотов, интервенционных данных нет» |
+| ArchGate аргументы | «Если внедрить X, получим Y» — rung 3 без SCM | Явно указать рунг, basis, unsupportedUse |
+| Strategy Session | «Эта практика сработала в апреле» | Rung 1 (ассоциация), rival causes не исключены |
+| Измерения dt_snapshot_rcs | Snapshot ≠ каузальное доказательство | basis = observationalAssociation, не interventional |
+
+**Маршрут в FPF:** C.28 → **builds on** A.10, B.3, C.11, C.19, C.24, C.26, C.27, D.5, G.5, G.9
 
 ## Трансляция FPF → engineering-язык
 

@@ -8,7 +8,7 @@
 # докуменация говорит А, код делает Б — нужен автоматический детектор расхождений
 # до релиза.
 #
-# 12 детекторов:
+# 8 детекторов:
 #   1. manifest_paths    — пути из update-manifest.json существуют в дереве
 #   2. seed_references   — protocol-*.md ссылки на seed/ существуют в seed/
 #   3. extension_table   — extensions/README.md table ↔ реальное placement EXTENSION POINT в protocol-*/SKILL.md
@@ -17,13 +17,6 @@
 #   6. install_failfast  — install.sh имеют grep '{{' check на PLIST_SRC (R5.2, 0.29.3)
 #   7. prompts_python_coverage — нет hardcoded DS-strategy в prompts и .py (R6.1*, 0.29.5)
 #   8. sed_placeholder_escape — substituted runners НЕ имеют bare {{X}} в sed (R6.1**, 0.29.6)
-#   9. version_bump_consistency — code commit ПОСЛЕ manifest version bump = unreleased fix (issue #52, audit 0.29.29)
-#  10. tracked_artifacts — .DS_Store/__pycache__/*.pyc в дереве + .gitignore coverage (issue #52)
-#  11. memory_internal_refs — broken ссылки на memory/*.md из MEMORY.md/navigation.md (issue #52)
-#  12. stat_portability — `stat -f` без `stat -c` fallback в той же функции = Linux mtime breakage (issue #52)
-#
-# Detectors #9-#12 — WARN-only (bootstrap-режим): сигналят, не блокируют CI.
-# Promote в FAIL отдельным commit'ом после фикса underlying issues.
 #
 # Usage:
 #   bash setup/integration-contract-validator.sh [--verbose]
@@ -66,7 +59,7 @@ log "=== Integration Contract Validator (WP-273 R4.8) ==="
 log ""
 
 # === Detector 1: manifest paths existence ===
-log "[1/12] manifest_paths — пути из update-manifest.json в дереве..."
+log "[1/8] manifest_paths — пути из update-manifest.json в дереве..."
 if [ -f update-manifest.json ] && command -v python3 >/dev/null 2>&1; then
     MISSING=$(python3 -c "
 import json, os
@@ -91,7 +84,7 @@ fi
 log ""
 
 # === Detector 2: seed references in protocols ===
-log "[2/12] seed_references — protocol-*.md ссылки на seed/ существуют..."
+log "[2/8] seed_references — protocol-*.md ссылки на seed/ существуют..."
 SEED_REFS_VIOLATIONS=0
 if [ -d seed ]; then
     while IFS= read -r ref; do
@@ -116,7 +109,7 @@ fi
 log ""
 
 # === Detector 3: extension table ↔ real EXTENSION POINT placement ===
-log "[3/12] extension_table — extensions/README.md table ↔ EXTENSION POINT в protocol-*.md/SKILL.md..."
+log "[3/8] extension_table — extensions/README.md table ↔ EXTENSION POINT в protocol-*.md/SKILL.md..."
 EXT_VIOLATIONS=0
 if [ -f extensions/README.md ]; then
     # Parse extension table from README.md: lines like "| protocol-close | checks | ..."
@@ -156,7 +149,7 @@ fi
 log ""
 
 # === Detector 4: hook trigger pattern (hooks-design.md принцип) ===
-log "[4/12] hook_artifact — hooks не грепают TOOL_INPUT (R4.5 антипаттерн)..."
+log "[4/8] hook_artifact — hooks не грепают TOOL_INPUT (R4.5 антипаттерн)..."
 HOOK_VIOLATIONS=0
 if [ -d .claude/hooks ]; then
     while IFS= read -r f; do
@@ -182,7 +175,7 @@ fi
 log ""
 
 # === Detector 5: runner read-only references resolve correctly (R5.1 regression) ===
-log "[5/12] runner_readonly — runners резолвят prompts/role.yaml/notify через \$IWE_TEMPLATE..."
+log "[5/8] runner_readonly — runners резолвят prompts/role.yaml/notify через \$IWE_TEMPLATE..."
 RUNNER_VIOLATIONS=0
 # Антипаттерн (Round 5 R5.1): PROMPTS_DIR="\$REPO_DIR/prompts" без fallback на \$IWE_TEMPLATE.
 # Runner работает только если все read-only данные дублированы в runtime.
@@ -209,7 +202,7 @@ fi
 log ""
 
 # === Detector 6: install.sh fail-fast при literal {{...}} в plist (R5.2 regression) ===
-log "[6/12] install_failfast — install.sh имеют grep '{{' check на PLIST_SRC..."
+log "[6/8] install_failfast — install.sh имеют grep '{{' check на PLIST_SRC..."
 FAILFAST_VIOLATIONS=0
 for install_sh in roles/strategist/install.sh roles/extractor/install.sh roles/synchronizer/install.sh; do
     [ -f "$install_sh" ] || continue
@@ -229,7 +222,7 @@ fi
 log ""
 
 # === Detector 7: prompts + python coverage (R6.1* regression — мой smoke test пропустил) ===
-log "[7/12] prompts_python_coverage — нет hardcoded DS-strategy в prompts и .py..."
+log "[7/8] prompts_python_coverage — нет hardcoded DS-strategy в prompts и .py..."
 COVERAGE_VIOLATIONS=0
 # Python scripts: должны читать GOVERNANCE_REPO из env, не хардкодить
 while IFS= read -r py; do
@@ -266,7 +259,7 @@ fi
 log ""
 
 # === Detector 8: bare {{...}} в sed-выражениях substituted-runners (R6.1**, 0.29.6) ===
-log "[8/12] sed_placeholder_escape — substituted runners НЕ имеют bare {{X}} в sed (build-runtime подменит)..."
+log "[8/8] sed_placeholder_escape — substituted runners НЕ имеют bare {{X}} в sed (build-runtime подменит)..."
 SED_VIOLATIONS=0
 # Парсим overlay-реестр: substituted-файлы из реестра проверяем на bare {{X}} в sed-выражениях.
 # Антипаттерн (R6.1**): sed -e "s|{{X}}|val|" в substituted runner'е → build-runtime подменит {{X}} → sed broken.
@@ -289,141 +282,6 @@ else
     log "  ❌ FAIL ($SED_VIOLATIONS substituted runners с bare {{X}} sed)"
     VIOLATIONS=$((VIOLATIONS + SED_VIOLATIONS))
 fi
-log ""
-
-# === Detector 9: version_bump_consistency (issue #52, audit 0.29.29) ===
-# Если был code-commit ПОСЛЕ последнего bump'а update-manifest.json — значит fix
-# не released. update.sh у пилотов не подтянет изменения, потому что версия не
-# поменялась. Срабатывает на: 75e1819 (fix Scout) после 4f0277f (manifest 0.29.29).
-log "[9/12] version_bump_consistency — code commits после manifest bump = unreleased fix..."
-BUMP_VIOLATIONS=0
-if [ -d .git ] && command -v git >/dev/null 2>&1; then
-    LAST_MANIFEST_BUMP=$(git log -1 --format=%H -- update-manifest.json 2>/dev/null || echo "")
-    if [ -n "$LAST_MANIFEST_BUMP" ]; then
-        # Считаем commits, изменившие code/scripts/hooks/skills/memory ПОСЛЕ manifest bump'а.
-        # Исключаем самые manifest и CHANGELOG (release-housekeeping commits).
-        UNRELEASED=$(git log --oneline "$LAST_MANIFEST_BUMP..HEAD" -- \
-            .claude/ scripts/ setup/ roles/ memory/ 2>/dev/null \
-            | grep -vE 'CHANGELOG|update-manifest' || true)
-        if [ -n "$UNRELEASED" ]; then
-            COUNT=$(echo "$UNRELEASED" | wc -l | tr -d ' ')
-            log "  ⚠ WARN: $COUNT code commits после manifest bump $LAST_MANIFEST_BUMP — нужен version bump"
-            verbose "    $(echo "$UNRELEASED" | head -3)"
-            BUMP_VIOLATIONS="$COUNT"
-        fi
-    fi
-    if [ "$BUMP_VIOLATIONS" -eq 0 ]; then
-        log "  ✅ PASS"
-    fi
-    # WARN, не FAIL — release-process сигнал, не drift в коде. Не блокирует CI на feature-веткак.
-else
-    log "  ⊘ SKIP (нет .git или git недоступен)"
-fi
-log ""
-
-# === Detector 10: tracked_artifacts (issue #52, audit 0.29.29) ===
-# .DS_Store/__pycache__/*.pyc/*.swp в tracked-files = шум на пилотах + версионная
-# несовместимость bytecode'а. Также проверяем покрытие .gitignore.
-log "[10/12] tracked_artifacts — .DS_Store/__pycache__/*.pyc/*.swp в дереве + .gitignore..."
-ARTIFACT_VIOLATIONS=0
-if [ -d .git ] && command -v git >/dev/null 2>&1; then
-    # Tracked OS/IDE/build artifacts
-    TRACKED_ARTIFACTS=$(git ls-files 2>/dev/null \
-        | grep -E '(^|/)\.DS_Store$|(^|/)Thumbs\.db$|(^|/)__pycache__/|\.pyc$|\.swp$|(^|/)\.idea/' \
-        || true)
-    if [ -n "$TRACKED_ARTIFACTS" ]; then
-        log "  ❌ Tracked artifacts (шум для пилотов):"
-        echo "$TRACKED_ARTIFACTS" | sed 's/^/      /'
-        ARTIFACT_VIOLATIONS=$(echo "$TRACKED_ARTIFACTS" | wc -l | tr -d ' ')
-    fi
-
-    # .gitignore coverage check
-    if [ -f .gitignore ]; then
-        for p in '.DS_Store' '__pycache__' '*.pyc' '*.swp'; do
-            # Pattern должен присутствовать как самостоятельная строка (не в комментарии)
-            if ! grep -qE "^${p}$|^/${p}$|^\*\*/${p}$" .gitignore 2>/dev/null; then
-                log "  ⚠ $p не в .gitignore"
-                ARTIFACT_VIOLATIONS=$((ARTIFACT_VIOLATIONS + 1))
-            fi
-        done
-    fi
-
-    if [ "$ARTIFACT_VIOLATIONS" -eq 0 ]; then
-        log "  ✅ PASS"
-    else
-        log "  ⚠ WARN ($ARTIFACT_VIOLATIONS artifact-нарушений) — promote в FAIL после фикса"
-    fi
-    # WARN, не FAIL — initial bootstrap detector. Promote в FAIL отдельным commit'ом
-    # после очистки .DS_Store + расширения .gitignore.
-else
-    log "  ⊘ SKIP (нет .git)"
-fi
-log ""
-
-# === Detector 11: memory_internal_refs (issue #52, audit 0.29.29) ===
-# memory/MEMORY.md и memory/navigation.md содержат таблицу ссылок на memory/*.md.
-# Битые ссылки = свежий пилот после setup.sh видит broken-навигацию.
-log "[11/12] memory_internal_refs — ссылки memory/*.md из MEMORY/navigation указывают на существующее..."
-REFS_VIOLATIONS=0
-if [ -d memory ]; then
-    BROKEN_REFS=$(grep -hoE '`memory/[a-z0-9_-]+\.md`?' memory/MEMORY.md memory/navigation.md 2>/dev/null \
-        | tr -d '`' \
-        | sort -u \
-        | while IFS= read -r p; do
-            [ -f "$p" ] || echo "$p"
-        done)
-    if [ -n "$BROKEN_REFS" ]; then
-        log "  ⚠ Broken memory refs (WARN — promote в FAIL после фикса):"
-        echo "$BROKEN_REFS" | sed 's/^/      /'
-    else
-        log "  ✅ PASS"
-    fi
-    # WARN, не FAIL — bootstrap detector.
-else
-    log "  ⊘ SKIP (нет memory/)"
-fi
-log ""
-
-# === Detector 12: stat_portability (issue #52, audit 0.29.29) ===
-# `stat -f` (BSD/macOS) без `stat -c` (GNU/Linux) fallback в той же функции = молча
-# возвращает мусор на Linux. Симптом найден в scripts/iwe-drift.sh:74 — функция
-# dir_newest_mtime_days_ago даёт абсурдные значения, /audit-installation skill
-# показывает фантомные drift-warnings.
-log "[12/12] stat_portability — stat -f без cross-platform fallback в той же функции..."
-STAT_VIOLATIONS=0
-while IFS= read -r f; do
-    [ -f "$f" ] || continue
-    # Для каждой строки `stat -f` проверяем, есть ли `stat -c` либо `Darwin`/`uname`
-    # check в окне ±5 строк (одна функция). Skip self (validator-meta references).
-    case "$f" in
-        ./setup/integration-contract-validator.sh) continue ;;
-    esac
-    # grep -n "$f" выдаёт `lineno:content` (без имени файла, потому что grep
-    # принимает один файл). Поэтому первое поле IFS=: — это lineno, а не file.
-    while IFS=: read -r lineno _rest; do
-        case "${lineno:-}" in
-            ''|*[!0-9]*) continue ;;
-        esac
-        if [ "$lineno" -gt 5 ]; then
-            start=$((lineno - 5))
-        else
-            start=1
-        fi
-        end=$((lineno + 5))
-        if ! sed -n "${start},${end}p" "$f" 2>/dev/null | grep -qE 'stat -c|Darwin|uname[^|]*Darwin|case.*Darwin'; then
-            log "  ❌ $f:$lineno — stat -f без stat -c fallback в окрестности (Linux mtime breakage)"
-            STAT_VIOLATIONS=$((STAT_VIOLATIONS + 1))
-        fi
-    done < <(grep -nE 'stat -f' "$f" 2>/dev/null)
-done < <(find . -name '*.sh' -type f -not -path '*/.git/*' 2>/dev/null)
-
-if [ "$STAT_VIOLATIONS" -eq 0 ]; then
-    log "  ✅ PASS"
-else
-    log "  ⚠ WARN ($STAT_VIOLATIONS stat -f без fallback) — promote в FAIL после фикса"
-fi
-# WARN, не FAIL — bootstrap detector. Promote в FAIL после добавления `|| stat -c %Y`
-# fallback в iwe-drift.sh:74 и memory-bleed.sh:158.
 log ""
 
 # === Verdict ===

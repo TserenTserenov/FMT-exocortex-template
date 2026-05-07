@@ -190,7 +190,7 @@ for dir in "$TEMPLATE_DIR"/.claude/*/; do
     [ -d "$dir" ] || continue
     dirname=$(basename "$dir")
     case "$dirname" in
-        agents|projects|context-cache|logs) continue ;; # workspace-local / runtime-only, не propagate
+        projects|context-cache|logs) continue ;; # workspace-local / runtime-only, не propagate
     esac
     if ! echo "$PATTERN_LINE" | grep -q "\.claude/$dirname/\*"; then
         MISSING_DIRS="$MISSING_DIRS $dirname"
@@ -329,6 +329,77 @@ else
 fi
 
 rm -rf "$EXT_TEST_WS"
+
+# === Test 9: e2e setup.sh delivery — реальный запуск + проверка workspace ===
+# Единственный тест, который ловит gap setup.sh→workspace так же как fresh-clone пилота.
+# Запускает setup.sh --core с SETUP_CI=1 в изолированный tmpdir, затем проверяет
+# что все обязательные файлы реально оказались в workspace.
+echo "[9] e2e setup.sh delivery (SETUP_CI=1 --core)..."
+E2E_WS="/tmp/iwe-smoke-e2e-$$"
+E2E_MEM="$HOME/.claude/projects/$(echo "$E2E_WS" | tr '/' '-')/memory"
+mkdir -p "$E2E_WS"
+E2E_RC=0
+E2E_OUT=$(SETUP_CI=1 GITHUB_USER=smoke-e2e WORKSPACE_DIR="$E2E_WS" \
+    GIT_AUTHOR_NAME="smoke-e2e" GIT_AUTHOR_EMAIL="smoke@test.local" \
+    GIT_COMMITTER_NAME="smoke-e2e" GIT_COMMITTER_EMAIL="smoke@test.local" \
+    bash "$TEMPLATE_DIR/setup.sh" --core 2>&1) || E2E_RC=$?
+if [ "$E2E_RC" -ne 0 ]; then
+    fail "e2e setup.sh --core завершился с rc=$E2E_RC: $(echo "$E2E_OUT" | tail -5)"
+else
+    pass "e2e setup.sh --core exit 0"
+    # Проверяем обязательные файлы в workspace
+    for f in \
+        ".claude/scripts/load-extensions.sh" \
+        ".claude/agents" \
+        ".claude/skills" \
+        ".claude/hooks" \
+        ".claude/rules" \
+        "CLAUDE.md"; do
+        if [ -e "$E2E_WS/$f" ]; then
+            pass "e2e workspace: $f доставлен"
+        else
+            fail "e2e workspace: $f ОТСУТСТВУЕТ (delivery gap)"
+        fi
+    done
+    # Проверяем memory/*.yaml в claude projects dir
+    if [ -f "$E2E_MEM/day-rhythm-config.yaml" ]; then
+        pass "e2e memory: day-rhythm-config.yaml доставлен"
+    else
+        fail "e2e memory: day-rhythm-config.yaml ОТСУТСТВУЕТ в $E2E_MEM"
+    fi
+fi
+rm -rf "$E2E_WS" "$E2E_MEM" 2>/dev/null || true
+
+# === Test 8: setup.sh delivery completeness (meta-detector, баг 08e4803) ===
+# Евгений нашёл два delivery gap: .claude/scripts/ и memory/*.yaml не копировались при fresh install.
+# Этот тест — статический анализ setup.sh: проверяет что все .claude/*/ субдиректории
+# и memory/*.yaml перечислены в командах копирования step 4b и step 3.
+echo "[8a] setup.sh step 4b копирует все .claude/*/ субдиректории..."
+SETUP_SH="$TEMPLATE_DIR/setup.sh"
+SUBDIR_LINE=$(grep -E '^[[:space:]]*for subdir in ' "$SETUP_SH" | head -1)
+SETUP8A_MISS=""
+for dir in "$TEMPLATE_DIR"/.claude/*/; do
+    [ -d "$dir" ] || continue
+    dirname=$(basename "$dir")
+    case "$dirname" in
+        projects|context-cache|logs|settings.json) continue ;; # workspace-local / runtime-only
+    esac
+    if ! echo "$SUBDIR_LINE" | grep -qw "$dirname"; then
+        SETUP8A_MISS="$SETUP8A_MISS $dirname"
+    fi
+done
+if [ -z "$SETUP8A_MISS" ]; then
+    pass "setup.sh step 4b: все .claude/*/ субдиректории включены"
+else
+    fail "setup.sh step 4b: не включены в for-loop (не будут скопированы при fresh install):$SETUP8A_MISS"
+fi
+
+echo "[8b] setup.sh step 3 копирует memory/*.yaml и *.yml..."
+if grep -A5 'cp.*memory/.*\.md' "$SETUP_SH" | grep -qE '\.yaml|\.yml'; then
+    pass "setup.sh step 3: memory/*.yaml/.yml копируются"
+else
+    fail "setup.sh step 3: memory/*.yaml/.yml НЕ копируются (day-rhythm-config.yaml не доставляется)"
+fi
 
 echo ""
 echo "=========================================="

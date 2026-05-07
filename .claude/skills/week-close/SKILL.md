@@ -92,6 +92,22 @@ bash ${IWE_SCRIPTS}/memory-bleed.sh
 **Нарушения** (HOT-лимит, orphans, superseded_by без ссылки) → исправить до коммита Week Close.
 **Кандидаты на понижение горизонта** → информативно, пользователь решает при следующем Month Close.
 
+#### 7d. ТО памяти (T, SC.024.3 §5)
+
+> Проверка здоровья статической нагрузки контекста. Флаги — информативно, пользователь решает.
+
+```bash
+echo "=== distinctions.md ===" && wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md
+echo "=== MEMORY.md ===" && wc -l {{MEMORY_DIR}}/MEMORY.md
+echo "=== memory/ файлы (mtime >14д) ===" && find {{MEMORY_DIR}} -name "*.md" -mtime +14 -not -name "MEMORY.md" -not -path "*/archive/*" | sort
+```
+
+| Метрика | Порог | Действие |
+|---------|-------|---------|
+| distinctions.md строк | **> 80** | Drift-флаг: нарушено правило DP.KR.001 §6 (1-3 строки на различение). Зафиксировать в Week Report, добавить задачу в техдолг. |
+| MEMORY.md строк | **> 200** | Флаг превышения лимита. Предложить архивацию старых feedback в `archive/`. |
+| memory/*.md без обращения > 14д | **> 5 файлов** | Предложить понизить `horizon: warm` (пользователь решает при Month Close). |
+
 ### 8. Запись итогов в WeekPlan
 
 Дописать секцию «Итоги W{N}» в текущий WeekPlan (структура — см. `roles/strategist/prompts/week-review.md`).
@@ -123,6 +139,7 @@ cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} && git add -A && git commit -m "week-cl
 - [ ] Drift-scan недели: устаревшие факты обновлены
 - [ ] iCloud backup выполнен (если macOS)
 - [ ] Dirty repos: 0 (или явно проигнорированы)
+- [ ] ТО памяти: distinctions.md/MEMORY.md/memory/*.md проверены, флаги зафиксированы (или «норма»)
 - [ ] Итоги W{N} записаны в WeekPlan
 - [ ] Extensions `.after.md` выполнены (если есть)
 - [ ] Governance-репо закоммичено
