@@ -308,20 +308,21 @@ if os.path.exists(memory_path):
     with open(memory_path) as f:
         in_table = False
         for line in f:
-            # Look for the WP table
-            if '| # | РП' in line or '| --- |' in line:
+            # Look for the WP table (ActiveРП sweep or Archive section)
+            if '| РП |' in line or '| --- |' in line:
                 in_table = True
                 continue
             if in_table:
-                if line.strip() == '' or line.startswith('---'):
+                if line.strip() == '' or line.startswith('---') or line.startswith('>'):
                     in_table = False
                     continue
-                if '| done' in line.lower() or '~~done~~' in line.lower():
+                # Read ✅ emoji (done marker per formatting.md)
+                # Done rows: zerowidth ~ prefix ~~#~~ | ~~name~~ | ✅ | ~~done~~ |
+                if '✅' in line:
                     done += 1
-                elif 'in_progress' in line.lower():
+                # Read 🔄, ↗️, 📦 as in_progress (active WP markers)
+                elif any(emoji in line for emoji in ['🔄', '↗️', '📦']):
                     in_progress += 1
-                elif '| done |' in line:
-                    done += 1
 
 result = {
     'wp_completed_total': done,

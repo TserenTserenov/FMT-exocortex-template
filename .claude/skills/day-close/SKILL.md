@@ -160,10 +160,28 @@ SCRIPT="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/check-index-health.py"
 
 **Валидация «Завтра начать с» (ADR-207):** поле не пустое + каждый pending РП упомянут + каждый содержит конкретный next action (не «продолжить работу»).
 
+**Postcondition 9a (машинная проверка — НЕ пропускать):**
+```bash
+TODAY=$(date +%Y-%m-%d)
+grep -l "Итоги дня" {{HOME_DIR}}/IWE/{{GOVERNANCE_REPO}}/archive/day-plans/DayPlan\ ${TODAY}.md 2>/dev/null \
+  | xargs grep -l "${TODAY}" 2>/dev/null \
+  | grep -q . && echo "9a OK" || echo "9a FAIL: итоги не найдены в DayPlan ${TODAY}"
+```
+Результат `9a FAIL` → шаг НЕ помечать completed, вернуться к записи.
+
 **9b.** Дописать сводку итогов в WeekPlan:
 - Формат: `<details><summary><b>Итоги {день} {дата}</b></summary>...</details>`
 - Порядок: свежие итоги СВЕРХУ (обратная хронология)
 - Содержание: таблица коммитов по репо, закрытые РП, продвинутые РП, мультипликатор
+
+**Postcondition 9b (машинная проверка — НЕ пропускать):**
+```bash
+TODAY=$(date +%Y-%m-%d)
+DAY_NUM=$(date +%-d)
+grep -rl "Итоги.*${DAY_NUM}" {{HOME_DIR}}/IWE/{{GOVERNANCE_REPO}}/current/WeekPlan\ W*.md 2>/dev/null \
+  | grep -q . && echo "9b OK" || echo "9b FAIL: итоги не найдены в WeekPlan"
+```
+Результат `9b FAIL` → шаг НЕ помечать completed, вернуться к записи.
 
 ### 9c. Extensions (after)
 
@@ -203,9 +221,9 @@ SCRIPT="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/check-index-health.py"
 - [ ] Backup: `day-close.sh` выполнен
 - [ ] Верификация compliance: /verify запускался сегодня?
 - [ ] WakaTime + Мультипликатор: часы, бюджет, остаток недели
-- [ ] Итоги дня записаны в DayPlan
+- [ ] Итоги дня записаны в DayPlan **(postcondition 9a: grep подтверждён)**
 - [ ] Handoff-валидация: «Завтра начать с» содержит ВСЕ pending РП с конкретным next action
-- [ ] Сводка итогов записана в WeekPlan (`<details>`, обратная хронология)
+- [ ] Сводка итогов записана в WeekPlan (`<details>`, обратная хронология) **(postcondition 9b: grep подтверждён)**
 - [ ] Новое репо → MAPSTRATEGIC.md + Strategy.md
 
 Все ✅ → «День закрыт.» Иначе — указать что осталось.
