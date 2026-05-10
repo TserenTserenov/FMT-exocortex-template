@@ -10,10 +10,28 @@
 
 set -euo pipefail
 
+# Guard: валидация IWE_TEMPLATE (не должна быть временной директорией)
+if [[ "${IWE_TEMPLATE:-}" =~ ^/tmp/iwe-smoke ]]; then
+    echo "[ERROR] IWE_TEMPLATE указывает на удалённую smoke-тестовую директорию: $IWE_TEMPLATE" >&2
+    echo "Используется fallback: \$HOME/IWE/FMT-exocortex-template" >&2
+    unset IWE_TEMPLATE
+fi
+
 IWE="${IWE_WORKSPACE:-$HOME/IWE}"
 FMT_DIR="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
 SRC="$IWE/CLAUDE.md"
 FMT="$FMT_DIR/CLAUDE.md"
+
+# Валидация файлов
+if [ ! -f "$SRC" ]; then
+    echo "[ERROR] Исходный файл не найден: $SRC" >&2
+    exit 1
+fi
+
+if [ ! -f "$FMT" ]; then
+    echo "[ERROR] Файл шаблона не найден: $FMT" >&2
+    exit 1
+fi
 
 # Авторское имя governance-репо (из env, обязательно) → template default
 GOV_REPO_AUTHOR="${IWE_GOVERNANCE_REPO:?IWE_GOVERNANCE_REPO must be set (your governance repo name, e.g. DS-strategy)}"
