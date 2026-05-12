@@ -808,6 +808,29 @@ if [ -f "$ENV_FILE" ]; then
     fi
 fi
 
+# === Step 8: macOS-compat check for new/updated scripts ===
+MACOS_ISSUES=()
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+    case "$f" in *.sh)
+        FILEPATH="$SCRIPT_DIR/$f"
+        [ -f "$FILEPATH" ] || continue
+        # Check for macOS-only date syntax
+        if grep -qE 'date\s+-v|date\s+-j' "$FILEPATH" 2>/dev/null; then
+            MACOS_ISSUES+=("$f")
+        fi
+        ;;
+    esac
+done
+if [ ${#MACOS_ISSUES[@]} -gt 0 ]; then
+    echo ""
+    echo "⚠ macOS-only date syntax найден в ${#MACOS_ISSUES[@]} скриптах:"
+    for f in "${MACOS_ISSUES[@]}"; do
+        echo "    $f"
+    done
+    echo "  Эти скрипты могут не работать на Linux (WSL)."
+    echo "  Сообщите автору шаблона: https://github.com/$REPO/issues"
+fi
+
 # === Done ===
 echo ""
 echo "=========================================="

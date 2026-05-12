@@ -155,7 +155,11 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     [ -z "$vf" ] && continue
 
     # Используем mtime как прокси для "последнего обращения"
-    mtime=$(stat -f "%Sm" -t "%Y-%m-%d" "$f" 2>/dev/null || date -r "$f" +%Y-%m-%d 2>/dev/null || echo "$vf")
+    if stat -f "%Sm" "$f" >/dev/null 2>&1; then
+        mtime=$(stat -f "%Sm" -t "%Y-%m-%d" "$f")
+    else
+        mtime=$(date -d "$(stat -c %y "$f" | cut -d. -f1)" +%Y-%m-%d 2>/dev/null || echo "$vf")
+    fi
     age=$(days_since "$mtime")
 
     rec=""

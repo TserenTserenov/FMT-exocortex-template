@@ -62,12 +62,19 @@ fi
 
 mkdir -p "$DRAFT_DIR"
 
-# Вычисляем даты Пн-Вс текущей ISO-недели
-MON_DATE=$(date -v-$(($(date +%u)-1))d +%Y-%m-%d 2>/dev/null || date -d "monday this week" +%Y-%m-%d)
-SUN_DATE=$(date -v+$((7-$(date +%u)))d +%Y-%m-%d 2>/dev/null || date -d "sunday this week" +%Y-%m-%d)
+# Обёртка (PLATFORM-COMPAT)
+portable_date_offset() {
+    local days="$1"
+    local fmt="${2:-%Y-%m-%d}"
+    date -v-${days}d +"$fmt" 2>/dev/null || date -d "$days days ago" +"$fmt" 2>/dev/null
+}
 
-MON_DAY=$(date -j -f %Y-%m-%d "$MON_DATE" +%d 2>/dev/null | sed 's/^0//')
-SUN_DAY=$(date -j -f %Y-%m-%d "$SUN_DATE" +%d 2>/dev/null | sed 's/^0//')
+# Вычисляем даты Пн-Вс текущей ISO-недели
+DOW=$(date +%u)  # 1=Пн ... 7=Вс
+MON_DATE=$(portable_date_offset "$((DOW-1))")
+SUN_DATE=$(portable_date_offset "$((DOW-7))")
+MON_DAY=$(echo "$MON_DATE" | sed 's/.*-0*\([0-9]*\)/\1/')
+SUN_DAY=$(echo "$SUN_DATE" | sed 's/.*-0*\([0-9]*\)/\1/')
 MONTH_FOR_DATES="${MONTH_NAME:0:3}"
 
 cat > "$DRAFT_FILE" <<EOF
