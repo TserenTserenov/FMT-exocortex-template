@@ -7,6 +7,7 @@
 1. **WP Gate:** Задание → проверь РП в таблице ниже → нет = СТОП (CLAUDE.md § 2)
 2. **Close:** push ≠ закрытие → capture-to-pack + подтверждение + backup (CLAUDE.md § 2)
 3. **ArchGate ≥8:** Предлагать ТОЛЬКО решения с оценкой ≥8 по ArchGate (ЭМОГСС). Слабые решения (≤7) — НЕ предлагать.
+4. **Routing Gate:** Перед Write нового файла → `memory/routing-vocab.md` (fast-path). Miss → `memory/repo-type-rules.md`. Аналогия с соседним файлом запрещена (P5).
 
 ## ВАЖНЫЕ (проверяй на рубежах)
 

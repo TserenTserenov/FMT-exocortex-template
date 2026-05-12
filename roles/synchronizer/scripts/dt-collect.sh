@@ -29,7 +29,7 @@ portable_date_offset() {
     date -v-${days}d +"$fmt" 2>/dev/null || date -d "$days days ago" +"$fmt" 2>/dev/null
 }
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 WORKSPACE="$HOME/IWE"
 GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/DS-strategy}"
 LOG_DIR="$HOME/logs/synchronizer"
@@ -295,51 +295,136 @@ print(json.dumps(result))
 # ============================================================
 
 collect_wp() {
+    # Источник: WP-REGISTRY.md (после ОПТ-4/WP-297 Ф6.3 таблица РП удалена из MEMORY.md).
+    # Формат строки: | <NNN> | <P> | <Название> | <Ст> | <Репо> | <Бюджет> |
+    # Статусы: ✅ done · 🔄 in_progress · ⏳ pending · 📦 archived · ↗️ merged · 🧪 testing
+    local REGISTRY_FILE="$GOVERNANCE_DIR/docs/WP-REGISTRY.md"
     local MEMORY_FILE="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/MEMORY.md"
 
     python3 -c "
-import json, os, re
+import json, os
 
+registry_path = '$REGISTRY_FILE'
 memory_path = '$MEMORY_FILE'
 done = 0
 in_progress = 0
+pending = 0
 
-if os.path.exists(memory_path):
-    with open(memory_path) as f:
+def parse_registry(path):
+    d = ip = pn = 0
+    with open(path, encoding='utf-8') as f:
         in_table = False
         for line in f:
-            # Look for the WP table (ActiveРП sweep or Archive section)
-            if '| РП |' in line or '| --- |' in line:
+            # Заголовок: | # | P | Название | Ст | Репо | Бюджет |
+            if line.lstrip().startswith('| #') and ' Ст ' in line:
+                in_table = True
+                continue
+            if not in_table:
+                continue
+            # Сепаратор строк таблицы пропускаем
+            if line.lstrip().startswith('|---') or line.lstrip().startswith('| ---'):
+                continue
+            if not line.lstrip().startswith('|'):
+                in_table = False
+                continue
+            cells = [c.strip() for c in line.strip().strip('|').split('|')]
+            if len(cells) < 4:
+                continue
+            status = cells[3]
+            # ↗️ merged и 🧪 testing — не учитываем в done/active
+            if '✅' in status:
+                d += 1
+            elif '🔄' in status:
+                ip += 1
+            elif '⏳' in status:
+                pn += 1
+            elif '📦' in status:
+                # archived = терминальный успешный, считаем как done
+                d += 1
+    return d, ip, pn
+
+def parse_memory_legacy(path):
+    # Совместимость с инсталляциями где MEMORY.md ещё содержит таблицу РП
+    d = ip = 0
+    with open(path, encoding='utf-8') as f:
+        in_table = False
+        for line in f:
+            if '| # | РП' in line:
                 in_table = True
                 continue
             if in_table:
-                if line.strip() == '' or line.startswith('---') or line.startswith('>'):
+                if line.strip() == '' or line.startswith('---'):
                     in_table = False
                     continue
-                # Read ✅ emoji (done marker per formatting.md)
-                # Done rows: zerowidth ~ prefix ~~#~~ | ~~name~~ | ✅ | ~~done~~ |
-                if '✅' in line:
-                    done += 1
-                # Read 🔄, ↗️, 📦 as in_progress (active WP markers)
-                elif any(emoji in line for emoji in ['🔄', '↗️', '📦']):
-                    in_progress += 1
+                low = line.lower()
+                if '✅' in line or '| done' in low or '~~done~~' in low:
+                    d += 1
+                elif '🔄' in line or 'in_progress' in low:
+                    ip += 1
+    return d, ip
+
+try:
+    if os.path.exists(registry_path):
+        done, in_progress, pending = parse_registry(registry_path)
+    elif os.path.exists(memory_path):
+        done, in_progress = parse_memory_legacy(memory_path)
+except Exception:
+    pass
 
 result = {
     'wp_completed_total': done,
     'wp_in_progress_count': in_progress,
+    'wp_pending_count': pending,
 }
 print(json.dumps(result))
 " 2>/dev/null || echo "{}"
 }
 
 # ============================================================
-# 5. Scheduler Health — REMOVED 2026-05-07
+# 5. Scheduler Health
 # ============================================================
-# Функция collect_health() читала маркеры старого монолитного scheduler.sh
-# (~/.local/state/exocortex/), но scheduler отключён 10 марта 2026.
-# Маркеры code-scan/strategist-morning больше не пишутся → health всегда red.
-# Удалено вместе с блоком «Scheduler» в дашборде DayPlan (WP-7 SCHED-3).
-# Per-role launchd агенты пишут собственные логи в ~/logs/{strategist,pulse,...}/.
+
+collect_health() {
+    local STATE_DIR="$HOME/.local/state/exocortex"
+    python3 -c "
+import json, os
+from datetime import datetime
+
+state_dir = '$STATE_DIR'
+today = datetime.now().strftime('%Y-%m-%d')
+health = 'green'
+uptime = 0
+
+if os.path.isdir(state_dir):
+    markers = [f for f in os.listdir(state_dir) if not f.startswith('.')]
+    dates = set()
+    for m in markers:
+        parts = m.rsplit('-', 3)
+        if len(parts) >= 3:
+            date_part = '-'.join(parts[-3:])
+            if len(date_part) == 10:
+                dates.add(date_part)
+    uptime = len(dates)
+
+    # Check if key tasks ran today
+    expected = ['code-scan', 'strategist-morning']
+    missing = []
+    for task in expected:
+        found = any(task in m and today in m for m in markers)
+        if not found:
+            missing.append(task)
+    if len(missing) > 0:
+        health = 'yellow'
+    if len(missing) > 1:
+        health = 'red'
+
+result = {
+    'scheduler_health': health,
+    'exocortex_uptime_days': uptime,
+}
+print(json.dumps(result))
+" 2>/dev/null || echo "{}"
+}
 
 # ============================================================
 # 6. Multiplier & Budgets (from DayPlan)
@@ -807,6 +892,8 @@ log "Collecting Claude sessions..."
 SESSIONS_JSON=$(collect_sessions)
 log "Collecting WP stats..."
 WP_JSON=$(collect_wp)
+log "Collecting scheduler health..."
+HEALTH_JSON=$(collect_health)
 log "Collecting multiplier data..."
 MULT_JSON=$(collect_multiplier)
 log "Collecting registry stats..."
@@ -826,6 +913,7 @@ waka = json.loads('''$WAKA_JSON''')
 git = json.loads('''$GIT_JSON''')
 sessions = json.loads('''$SESSIONS_JSON''')
 wp = json.loads('''$WP_JSON''')
+health = json.loads('''$HEALTH_JSON''')
 mult = json.loads('''$MULT_JSON''')
 registry = json.loads('''$REGISTRY_JSON''')
 pack = json.loads('''$PACK_JSON''')
@@ -838,9 +926,15 @@ p_eco = json.loads('''$plugin_eco_arr''')
 p_know = json.loads('''$plugin_know_arr''')
 
 # 2_7_iwe: core + plugins
-iwe = {**git, **sessions, **wp, **mult, **registry, **sched}
+iwe = {**git, **sessions, **wp, **health, **mult, **registry, **sched}
 for p in p_iwe:
     iwe.update(p)
+
+# WakaTime raw fields — всегда добавлять если есть (WP-299 Ф4)
+for k in ('coding_seconds_today', 'coding_seconds_7d', 'coding_seconds_30d', 'coding_active_days_30d'):
+    v = waka.get(k)
+    if v is not None:
+        iwe[k] = v
 
 # Daily multiplier
 waka_today = waka.get('coding_seconds_today', 0)

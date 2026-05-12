@@ -114,27 +114,30 @@ schema_version: 1
 ## Week Close (Неделя)
 
 > **Роль:** R1 Стратег. **Бюджет:** ~20-30 мин. **Триггер:** «закрываю неделю» / `/week-close`.
-> Полный алгоритм — `.claude/skills/week-close/SKILL.md`. Здесь — slim-ядро для маршрутизации.
+> Выполняется через `.claude/skills/week-close/SKILL.md` + платформенные шаги.
 
 ### Шаги Week Close
 
 1. **Бэкап + грязные репо** — `backup-icloud.sh` + `check-dirty-repos.sh` (платформа)
 2. **Memory Validate** — `memory-bleed.sh` (HOT-лимит, orphans, superseded_by)
 3. **ТО памяти (T, SC.024.3)** — проверка здоровья статической нагрузки:
-   - `distinctions.md` строк **> 80** = drift-флаг (нарушение DP.KR.001 §6). Фиксировать в Week Report.
-   - `MEMORY.md` строк **> 200** = флаг превышения лимита. Предложить архивацию.
-   - `memory/*.md` без обращения > 14 дней, > 5 файлов = кандидаты на понижение horizon.
-   - Флаги информативны — пользователь решает действие.
+   - `wc -l {{WORKSPACE_DIR}}/.claude/rules/distinctions.md` → **> 80 строк = drift-флаг** (по правилу DP.KR.001 §6: 1-3 строки на различение). Предложить аудит в WP-7.
+   - `wc -l ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md` → **> 200 строк = флаг** (превышен лимит).
+   - Feedback/lessons файлы в `memory/` с `mtime > 14 дней` без обращения → предложить понизить `horizon: warm`.
+   - Флаги — информативно. Пользователь решает действие.
 4. **iwe-drift.sh** — полный drift-отчёт в Week Report (S)
 5. **STAGING.md** — есть `validated`? → предложить промоцию (S+T)
 6. **iwe-rules-review** — какие правила обходились? (S)
-7. **R-вопросник** (`memory/r-questionnaire.md`) → ответы в Week Report
+7. **R-вопросник** (5-7 вопросов, `memory/r-questionnaire.md`) → ответы в Week Report
 8. **Архивация done-WP** → `archive/wp-contexts/` (T)
-9. **Запись итогов в WeekPlan** + создание carry-over секции
+9. **Обновить WeekPlan** — пометить итоги, создать carry-over секцию
 
-### Симптом пропуска
+### Симптом пропуска Week Close
 
-STAGING.md заморожен ≥2 недель с `validated` / Week Report без R-ответов / distinctions.md > 80 строк без флага 2+ недели подряд.
+- STAGING.md заморожен ≥2 недель с `validated`
+- distinctions.md > 80 строк без флага в Week Report
+- Week Report без R-ответов
+- MEMORY.md > 200 строк уже 2+ недели подряд
 
 ## Deferred (отложены до Day Close)
 

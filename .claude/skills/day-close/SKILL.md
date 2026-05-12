@@ -129,7 +129,7 @@ SCRIPT="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/check-index-health.py"
 **Алгоритм:**
 
 1. **WakaTime** — физическое время за день:
-   - Сначала CLI: `wakatime --today`
+   - Сначала CLI: `~/.wakatime/wakatime-cli --today` (CLI не в PATH, бинарник в `~/.wakatime/`)
    - Если CLI недоступен → **fallback Neon**: `SELECT payload->>'human_readable', payload->>'total_seconds' FROM public.domain_event WHERE event_type='coding_time' AND account_id='{DT_USER_ID}' AND external_id='wakatime:{DT_USER_ID}:{YYYY-MM-DD}'` (БД `learning`)
    - Если Neon тоже пуст (данные синхронизируются ночью) → пометить «pending Neon» и пересчитать при следующей сессии
    - Поле: `payload->>'human_readable'` (напр. «9 hrs»); `total_seconds` для мультипликатора

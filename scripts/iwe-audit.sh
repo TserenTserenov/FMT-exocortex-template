@@ -497,6 +497,119 @@ if [ $UPD_WARN -gt 0 ]; then
     OPTIONAL_MISSING=$((OPTIONAL_MISSING + UPD_WARN))
 fi
 
+# ---------- Раздел 6: Cross-platform path leaks (WP-5/WP-7 Stability-4) ----------
+#
+# Детектор: на Linux-сервере не должно быть macOS-путей `/Users/...` или
+# slug `{{CLAUDE_PROJECT_SLUG}}` в systemd-юнитах, конфигах, env-файлах.
+# Источник: 12 мая 2026, MEMORY_SRC в template-sync.sh указывал на macOS slug
+# на Linux-сервере → молчаливый WARN: Source not found каждую ночь.
+#
+# Запускается ТОЛЬКО на Linux. На macOS — пропускается (paths нормальны).
+
+echo "## 6. Cross-platform path leaks"
+echo ""
+
+OS_NAME="$(uname -s)"
+if [ "$OS_NAME" != "Linux" ]; then
+    echo "_Пропущено (этот хост — $OS_NAME, проверка релевантна только для Linux-серверов)._"
+    echo ""
+else
+    LEAK_COUNT=0
+    LEAK_LOCATIONS=""
+
+    # Места поиска (общие точки конфигурации). Шаблоны утечек — в grep ниже.
+    LEAK_TARGETS="
+/etc/systemd/system
+/etc/iwe
+$HOME/.config
+$HOME/.iwe-runtime
+$IWE_ROOT/.iwe-runtime
+$IWE_ROOT/.claude
+"
+
+    echo "| Локация | Утечек | Пример |"
+    echo "|---|---|---|"
+    for target in $LEAK_TARGETS; do
+        [ -e "$target" ] || continue
+        set +e
+        HITS=$(grep -rIl --include='*.sh' --include='*.env' --include='*.service' \
+            --include='*.timer' --include='*.json' --include='*.yaml' --include='*.yml' \
+            -e "{{HOME_DIR}}" -e "{{CLAUDE_PROJECT_SLUG}}" \
+            "$target" 2>/dev/null | head -5)
+        set -e
+        if [ -n "$HITS" ]; then
+            HITS_COUNT=$(echo "$HITS" | wc -l | tr -d ' ')
+            LEAK_COUNT=$((LEAK_COUNT + HITS_COUNT))
+            FIRST=$(echo "$HITS" | head -1)
+            printf "| \`%s\` | %s | \`%s\` |\n" "$target" "$HITS_COUNT" "$FIRST"
+            LEAK_LOCATIONS="$LEAK_LOCATIONS\n$HITS"
+        else
+            printf "| \`%s\` | 0 | — |\n" "$target"
+        fi
+    done
+    echo ""
+
+    if [ $LEAK_COUNT -gt 0 ]; then
+        echo "**Найдено $LEAK_COUNT файлов с macOS-путями.** Решение: заменить на \`\$HOME\`, \`{{HOME_DIR}}\` или \`\$IWE_ROOT\`. Возможные молчаливые сбои в скриптах."
+        OPTIONAL_MISSING=$((OPTIONAL_MISSING + 1))
+    else
+        echo "✅ macOS-путей не найдено — конфигурация корректна для Linux."
+    fi
+fi
+echo ""
+
+# ---------- Раздел 7: Repo permissions integrity (WP-5/WP-7 Stability-4b) ----------
+#
+# Детектор: файлы в .git/objects/ должны быть owned пользователем, который запускает
+# pull/commit. Если в результате ssh-as-root операции (или sudo без -u) появились
+# root-owned объекты — последующий pull под обычным юзером падает с
+# "insufficient permission for adding an object to repository database".
+#
+# Источник: 11→12 мая 2026, dirty pull-repos warnings на tsekh-1 — корень оказался
+# в root-owned .git/objects после ssh-as-root команд из mac.
+#
+# Релевантно для Linux (где ssh может ходить под разными user). На macOS обычно
+# всё под одним юзером — пропускаем.
+
+echo "## 7. Repo permissions integrity"
+echo ""
+
+if [ "$OS_NAME" != "Linux" ]; then
+    echo "_Пропущено (этот хост — $OS_NAME, проверка релевантна для multi-user Linux-серверов)._"
+    echo ""
+else
+    EXPECTED_USER="${IWE_AUDIT_USER:-$(whoami)}"
+    PERM_VIOLATIONS=0
+    echo "Ожидаемый владелец: \`$EXPECTED_USER\` (override: IWE_AUDIT_USER=...)"
+    echo ""
+
+    echo "| Репо | Чужих файлов в .git | Пример |"
+    echo "|---|---|---|"
+    for repo_git in $(find -L "$IWE_ROOT" -maxdepth 3 -type d -name '.git' 2>/dev/null); do
+        repo="${repo_git%/.git}"
+        repo_name="${repo#$IWE_ROOT/}"
+        set +e
+        # find -not -user может не работать на NixOS если whoami не в /etc/passwd
+        FOREIGN=$(find "$repo_git" -not -user "$EXPECTED_USER" 2>/dev/null | head -5)
+        set -e
+        if [ -n "$FOREIGN" ]; then
+            FOREIGN_COUNT=$(echo "$FOREIGN" | wc -l | tr -d ' ')
+            PERM_VIOLATIONS=$((PERM_VIOLATIONS + 1))
+            FIRST=$(echo "$FOREIGN" | head -1)
+            printf "| \`%s\` | %s | \`%s\` |\n" "$repo_name" "$FOREIGN_COUNT" "$FIRST"
+        fi
+    done
+    echo ""
+
+    if [ $PERM_VIOLATIONS -gt 0 ]; then
+        echo "**Найдено $PERM_VIOLATIONS репо с чужими файлами в .git/.** Решение: \`sudo chown -R $EXPECTED_USER:$EXPECTED_USER <repo>/.git\`. Профилактика: ssh не под root, либо явный \`sudo -u $EXPECTED_USER git ...\`."
+        OPTIONAL_MISSING=$((OPTIONAL_MISSING + 1))
+    else
+        echo "✅ Все репо имеют корректного владельца .git/."
+    fi
+fi
+echo ""
+
 # ---------- Exit code ----------
 
 # 2 = критичные gaps; 1 = warnings; 0 = ОК

@@ -6,7 +6,7 @@
 - **HUB (личные планы):** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/
 - **Документы стратегии:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/ (Strategy.md, Dissatisfactions.md, Session Agenda.md)
 - **Inbox:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/
-- **SPOKE (планы репо):** {{WORKSPACE_DIR}}/*/WORKPLAN.md
+- **Активные РП:** `bash {{WORKSPACE_DIR}}/scripts/active-wp-sweep.sh` (агрегатор по `{{GOVERNANCE_REPO}}/inbox/WP-*.md` + git-активность 7д)
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
 ## Предусловие
@@ -130,11 +130,10 @@
 
 - Пользователь подтверждает план
 - Смени `status: draft` → `status: confirmed` в WeekPlan
-- Обнови WORKPLAN.md в целевых репо (обратная синхронизация)
-- **ОБЯЗАТЕЛЬНО:** Обнови MEMORY.md → секция «РП текущей недели» (актуальный список РП + статусы)
+- **ОБЯЗАТЕЛЬНО:** Обнови MEMORY.md → секция «РП текущей недели» через `bash {{WORKSPACE_DIR}}/scripts/memory-active-wp-update.sh` (single source — `{{GOVERNANCE_REPO}}/inbox/WP-*.md`)
 - **ОБЯЗАТЕЛЬНО:** Если добавлена работа, не отражённая в Strategy.md → обнови Strategy.md (приоритеты месяца, фазы, Q1 результаты)
 - **ОБЯЗАТЕЛЬНО:** Очисти обработанные из fleeting-notes.md и inbox/
 - **ОБЯЗАТЕЛЬНО:** Обратная синхронизация MAPSTRATEGIC.md — если элемент из MAPSTRATEGIC взят в работу (создан РП) → обнови статус фазы в `<repo>/MAPSTRATEGIC.md` (пометь как in-progress, добавь ссылку на РП). Если фаза завершена (РП done) → пометь как done.
 - Закоммить изменения в {{GOVERNANCE_REPO}} и затронутых репо
 
-**Результат:** утверждённый WeekPlan W{N} (`status: confirmed`), обновлённые Strategy.md, WORKPLAN.md, MEMORY.md, MAPSTRATEGIC.md, очищенный inbox.
+**Результат:** утверждённый WeekPlan W{N} (`status: confirmed`), обновлённые Strategy.md, MEMORY.md, MAPSTRATEGIC.md, очищенный inbox.

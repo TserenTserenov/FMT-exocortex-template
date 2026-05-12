@@ -6,20 +6,7 @@
 
 ```bash
 DATE=$(date +%Y-%m-%d)
-GOV="$HOME/IWE/{{GOVERNANCE_REPO}}"
-DAYPLAN_FILE="$GOV/current/DayPlan $DATE.md"
-
-# Страховочная сетка: архивировать вчерашние/старые DayPlan'ы из current/
-# (Day Close мог не отработать — не оставлять мусор для следующего carry-over)
-for old in "$GOV"/current/DayPlan\ 20*.md; do
-  [ -f "$old" ] || continue
-  base=$(basename "$old")
-  fdate="${base#DayPlan }"; fdate="${fdate%.md}"
-  if [ "$fdate" != "$DATE" ]; then
-    git -C "$GOV" mv "$old" "archive/day-plans/" 2>/dev/null || mv "$old" "$GOV/archive/day-plans/"
-    echo "pre-archive: $base → archive/day-plans/"
-  fi
-done
+DAYPLAN_FILE="$HOME/IWE/{{GOVERNANCE_REPO}}/current/DayPlan $DATE.md"
 
 # Если файла нет — создать через scaffold
 if [ ! -f "$DAYPLAN_FILE" ]; then
@@ -93,7 +80,7 @@ git push
 - ❌ **НЕ останавливаться** если файл DayPlan уже существует — заполни PENDING секции (не пересоздавай)
 - ❌ **НЕ просить подтверждения** — все решения по алгоритму
 - ✅ Все решения принимай по skill /day-open (`{{WORKSPACE_DIR}}/.claude/skills/day-open/SKILL.md`)
-- ✅ Финал: SUCCESS + git push + Telegram (через notify.sh strategist day-plan)
+- ✅ Финал: SUCCESS + git push (Telegram-уведомление отправляет strategist.sh автоматически после завершения)
 
 ## Источники (на сервере tsekh-1)
 
