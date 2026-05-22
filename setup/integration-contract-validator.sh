@@ -394,7 +394,8 @@ if command -v grep >/dev/null 2>&1; then
     if [ "$PROMPT_SCRIPT_VIOLATIONS" -eq 0 ]; then
         log "  ✅ PASS"
     else
-        log "  ⚠ WARN ($PROMPT_SCRIPT_VIOLATIONS script(s) referenced in prompts but absent from FMT/scripts/ — add via script-promote.sh)"
+        log "  ❌ FAIL ($PROMPT_SCRIPT_VIOLATIONS script(s) referenced in prompts but absent from FMT/scripts/ — add via script-promote.sh or use if-exists guard)"
+        VIOLATIONS=$((VIOLATIONS + PROMPT_SCRIPT_VIOLATIONS))
     fi
 else
     log "  ⊘ SKIP (grep недоступен)"

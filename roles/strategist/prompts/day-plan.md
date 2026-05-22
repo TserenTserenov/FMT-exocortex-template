@@ -9,14 +9,20 @@ DATE=$(date +%Y-%m-%d)
 _IWE="${IWE_WORKSPACE:-$HOME/IWE}"
 DAYPLAN_FILE="$_IWE/{{GOVERNANCE_REPO}}/current/DayPlan $DATE.md"
 
-# Если файла нет — создать через scaffold
+# Если файла нет — создать через scaffold (если доступен)
 if [ ! -f "$DAYPLAN_FILE" ]; then
-  bash "$_IWE/scripts/day-open-scaffold.sh" "$DATE" > "$DAYPLAN_FILE"
-  SCAFFOLD_EXIT=$?
-  if [ "$SCAFFOLD_EXIT" -eq 2 ]; then
-    rm -f "$DAYPLAN_FILE"
-    echo "Сегодня strategy_day, DayPlan не создаётся (план в WeekPlan)."
-    exit 0
+  _SCAFFOLD="$_IWE/scripts/day-open-scaffold.sh"
+  if [ -f "$_SCAFFOLD" ]; then
+    bash "$_SCAFFOLD" "$DATE" > "$DAYPLAN_FILE"
+    SCAFFOLD_EXIT=$?
+    if [ "$SCAFFOLD_EXIT" -eq 2 ]; then
+      rm -f "$DAYPLAN_FILE"
+      echo "Сегодня strategy_day, DayPlan не создаётся (план в WeekPlan)."
+      exit 0
+    fi
+  else
+    echo "WARN: day-open-scaffold.sh not found at $_IWE/scripts/ — создаю пустой DayPlan, PENDING-маркеры заполнит LLM"
+    touch "$DAYPLAN_FILE"
   fi
 fi
 ```
