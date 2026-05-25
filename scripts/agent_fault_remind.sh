@@ -1,4 +1,6 @@
 #!/bin/bash
+# routing: helper  skill=day-open  called-by=sonnet
+# see DP.SC.159, DP.ROLE.059
 # WP-316: Agent Fault Profile reminder wrapper
 # Usage: bash scripts/agent_fault_remind.sh [open|close|work]
 

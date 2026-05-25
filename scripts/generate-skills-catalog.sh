@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=extend  called-by=script
+# see DP.SC.159, DP.ROLE.059
 # generate-skills-catalog.sh — генератор skills-catalog.yaml
 # see DP.SC.153
 #

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=week-close  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # changelog-flush.sh — переименовывает [Unreleased] → конкретную версию в CHANGELOG.md
 #
 # Использование:

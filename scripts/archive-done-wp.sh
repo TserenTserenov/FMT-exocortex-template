@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=week-close  called-by=sonnet
+# see DP.SC.159, DP.ROLE.059
 # archive-done-wp.sh — атомарная архивация завершённого РП
 # see DP.M.010, DP.SC.033 (WP-297)
 #

@@ -1,4 +1,6 @@
 #!/bin/bash
+# routing: helper  skill=day-close  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # day-close.sh — Автоматические шаги Day Close (backup + reindex + linear sync)
 #
 # Вызывается Claude из протокола Day Close (protocol-close.md § День, шаг 4).

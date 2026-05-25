@@ -5,6 +5,7 @@ user_invocable: true
 routing:
   executor: script
   deterministic: true
+  script_path: ".claude/skills/setup-wakatime/setup.sh"
 ---
 
 # Setup WakaTime Time Tracking

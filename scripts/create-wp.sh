@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=wp-new  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # create-wp.sh — атомарное создание РП в 4 местах (inbox, REGISTRY, WeekPlan, Linear)
 # see DP.M.010, DP.ROLE.037
 # see DP.M.010, DP.ROLE.037

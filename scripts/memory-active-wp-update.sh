@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=day-close,week-close  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # memory-active-wp-update.sh — обновление секции «Текущие РП» в MEMORY.md
 # из результатов active-wp-sweep.sh.
 # see WP-283 Ф8 (DS-strategy/inbox/WP-283-server-day-open-crossplatform.md)

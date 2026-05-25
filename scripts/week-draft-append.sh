@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=week-close  called-by=sonnet
+# see DP.SC.159, DP.ROLE.059
 # week-draft-append.sh — обновить метрики текущего дня в черновике недельного поста.
 #
 # Собирает: WakaTime (--today), коммиты (all repos, since today 00:00),

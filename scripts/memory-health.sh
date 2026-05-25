@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=audit-installation  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # memory-health.sh — метрики здоровья memory/ (WP-217 Ф10.2)
 #
 # Показывает: распределение по горизонтам, HOT-лимит, orphans, age-distribution.

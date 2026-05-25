@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=audit-installation  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # validate-skill.sh — валидация SKILL.md v2 (pre-promote checklist)
 # see DP.SC.153, DP.ROLE.057
 #

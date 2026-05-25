@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=week-close,day-close  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # changelog-append.sh — идемпотентное обновление секции [Unreleased] в CHANGELOG.md
 #
 # Собирает git-коммиты с даты последней версии → пишет/заменяет блок [Unreleased].

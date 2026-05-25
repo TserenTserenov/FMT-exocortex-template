@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=week-close  called-by=sonnet
+# see DP.SC.159, DP.ROLE.059
 # week-draft-init.sh — создать пустой черновик недельного поста для новой недели.
 #
 # Использование:

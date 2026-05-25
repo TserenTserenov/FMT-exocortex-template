@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=audit-installation  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # iwe-audit.sh — оркестратор аудита инсталляции IWE
 #
 # WP-265 Ф2, 2026-04-26.

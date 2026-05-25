@@ -5,6 +5,7 @@ argument-hint: "[описание проблемы]"
 routing:
   executor: script
   deterministic: true
+  script_path: "scripts/iwe-bug-report.sh"
 ---
 
 # Отчёт об ошибке платформы IWE

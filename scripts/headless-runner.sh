@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  executor=script  called-by=agent-inbox-dispatcher
+# see DP.SC.159, DP.ROLE.059
 # headless-runner.sh — точка входа Headless-адаптера (DP.IWE.011-adapter-headless)
 #
 # Устанавливает env по контракту DP.IWE.011, затем вызывает iwe-agent-dispatcher.py

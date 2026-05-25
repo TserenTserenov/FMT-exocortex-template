@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=day-open,strategy-session  called-by=sonnet
+# see DP.SC.159, DP.ROLE.059
 # active-wp-sweep.sh — heartbeat sweep активных РП
 # see DP.M.010, DP.SC.033 (WP-297)
 #

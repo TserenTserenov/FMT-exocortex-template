@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=day-open  called-by=sonnet
+# see DP.SC.159, DP.ROLE.059
 # day-open-scaffold.sh — детерминированная генерация скелета DayPlan
 # see WP-264 (~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-264-day-open-enforcement.md), Ф2
 #

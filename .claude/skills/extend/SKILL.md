@@ -7,6 +7,7 @@ version: 1.0.0
 routing:
   executor: script
   deterministic: true
+  script_path: ".claude/skills/extend/show-catalog.sh"
 ---
 
 # /extend — Каталог расширяемости IWE

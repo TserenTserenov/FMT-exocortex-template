@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# routing: helper  skill=day-close  called-by=haiku
+# see DP.SC.159, DP.ROLE.059
 # iwe-backup-check.sh — Проверка здоровья системы резервного копирования IWE
 #
 # WP-317 supplement, 2026-05-18.
