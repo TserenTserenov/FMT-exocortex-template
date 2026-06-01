@@ -51,6 +51,18 @@ hash_file() {
     sha256sum "$1" 2>/dev/null | cut -d' ' -f1
 }
 
+# Личные L4-конфиги в memory/: update.sh сеет их при ОТСУТСТВИИ (новая инсталляция),
+# но НИКОГДА не перезаписывает поверх существующего — там персональные правки
+# пользователя (напр. calendar_ids, slot-настройки в day-rhythm-config.yaml).
+# Файл сам объявляет себя «L4 Personal. Override defaults from IWE Template».
+# MEMORY.md защищён отдельной проверкой ниже. См. issue про clobber day-rhythm-config.
+is_personal_config() {
+    case "$1" in
+        day-rhythm-config.yaml) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # === Detect directories ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -603,8 +615,12 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
             memory/*.md|memory/*.yaml|memory/*.yml)
                 fname=$(basename "$f")
                 if [ "$fname" != "MEMORY.md" ]; then
-                    cp "$SCRIPT_DIR/$f" "$CLAUDE_MEMORY_DIR/$fname"
-                    MEM_UPDATED=$((MEM_UPDATED + 1))
+                    if is_personal_config "$fname" && [ -f "$CLAUDE_MEMORY_DIR/$fname" ]; then
+                        echo "  ✓ $fname — личный L4-конфиг, не перезаписан"
+                    else
+                        cp "$SCRIPT_DIR/$f" "$CLAUDE_MEMORY_DIR/$fname"
+                        MEM_UPDATED=$((MEM_UPDATED + 1))
+                    fi
                 fi
                 ;;
         esac
@@ -650,6 +666,8 @@ while IFS='|' read -r fpath _; do
                     cp "$SCRIPT_DIR/$fpath" "$mem_dst"
                     echo "  ⟲ $fpath → memory/ (repair)"
                     REPAIRED=$((REPAIRED + 1))
+                elif is_personal_config "$fname"; then
+                    : # личный L4-конфиг существует — НЕ stale-repair (персонализация ≠ дефолт по хешу)
                 elif [ -r "$mem_dst" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$mem_dst")" ]; then
                     cp "$SCRIPT_DIR/$fpath" "$mem_dst"
                     echo "  ⟲ $fpath → memory/ (stale repair)"
