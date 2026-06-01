@@ -74,13 +74,55 @@ if ! gh auth status >/dev/null 2>&1; then
 fi
 
 # Запрос issues
+# Note: gh issue list --label "X,Y" применяет AND-логику (issue должен иметь оба label).
+# Нам нужен OR — issue хотя бы с одним из label'ов. Используем gh api repos/.../issues?labels=
+# (REST API также AND) с отдельным запросом per label + jq merge с dedup.
 set +e
-ISSUES_JSON=$(gh issue list -R "$REPO" --state open --label "$LABEL_QUERY" --json number,title,labels,url 2>&1)
-GH_RC=$?
+LABELS_ARRAY=()
+IFS=',' read -ra LABELS_ARRAY <<< "$LABEL_QUERY"
+if [ ${#LABELS_ARRAY[@]} -eq 0 ] || { [ ${#LABELS_ARRAY[@]} -eq 1 ] && [ -z "${LABELS_ARRAY[0]}" ]; }; then
+    echo "Error: --labels is empty" >&2
+    exit 2
+fi
+TMP_JSONS=()
+for label in "${LABELS_ARRAY[@]}"; do
+    tmp=$(mktemp)
+    label_trim=$(echo "$label" | tr -d '[:space:]')
+    encoded_label=$(printf '%s' "$label_trim" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read()))")
+    gh api "repos/${REPO}/issues?state=open&labels=${encoded_label}" \
+        --jq '[.[] | select(.pull_request == null) | {number, title, labels: [.labels[].name], url: .html_url}]' \
+        > "$tmp" 2>/dev/null
+    api_rc=$?
+    if [ $api_rc -ne 0 ]; then
+        echo "Error: gh api failed for label='$label_trim' (rc=$api_rc)" >&2
+        rm -f "$tmp"
+        if [ ${#TMP_JSONS[@]} -gt 0 ]; then
+            rm -f "${TMP_JSONS[@]}"
+        fi
+        exit 2
+    fi
+    TMP_JSONS+=("$tmp")
+done
+
+# Merge + dedup by number
+ISSUES_JSON=$(python3 -c "
+import json, sys
+seen = set()
+out = []
+for f in sys.argv[1:]:
+    with open(f) as fh:
+        for i in json.load(fh):
+            if i['number'] not in seen:
+                seen.add(i['number'])
+                out.append(i)
+print(json.dumps(out, ensure_ascii=False))
+" "${TMP_JSONS[@]}" 2>&1)
+PY_RC=$?
+rm -f "${TMP_JSONS[@]}"
 set -e
 
-if [ $GH_RC -ne 0 ]; then
-    echo "Error: gh issue list failed (rc=$GH_RC):" >&2
+if [ $PY_RC -ne 0 ]; then
+    echo "Error: failed to merge label-query results (python rc=$PY_RC):" >&2
     echo "$ISSUES_JSON" >&2
     exit 2
 fi
@@ -91,7 +133,7 @@ COUNT=$(echo "$ISSUES_JSON" | jq 'length' 2>&1)
 JQ_RC=$?
 set -e
 if [ $JQ_RC -ne 0 ]; then
-    echo "Error: invalid JSON from gh (jq rc=$JQ_RC). Output:" >&2
+    echo "Error: invalid JSON (jq rc=$JQ_RC). Output:" >&2
     echo "$ISSUES_JSON" | head -5 >&2
     exit 2
 fi
@@ -106,13 +148,16 @@ echo "## ⚠️ FMT критические issues ($COUNT)"
 echo ""
 echo "| # | Issue | Labels |"
 echo "|---|---|---|"
-echo "$ISSUES_JSON" | jq -r '.[] | "| #\(.number) | [\(.title)](\(.url)) | \([.labels[].name] | join(", ")) |"'
+echo "$ISSUES_JSON" | jq -r '.[] | "| #\(.number) | [\(.title)](\(.url)) | \(.labels | join(", ")) |"'
 echo ""
 
 # Telegram alert (MVP)
 if $SEND_TG; then
-    if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
-        echo "_TG alert skipped:_ TG_BOT_TOKEN or TG_CHAT_ID not set in environment."
+    # Fallback chain: TG_BOT_TOKEN → TELEGRAM_BOT_TOKEN (legacy/IWE-standard name from ~/.exocortex.env)
+    TG_TOKEN="${TG_BOT_TOKEN:-${TELEGRAM_BOT_TOKEN:-}}"
+    TG_CHAT="${TG_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
+    if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+        echo "_TG alert skipped:_ TG_BOT_TOKEN/TELEGRAM_BOT_TOKEN or TG_CHAT_ID/TELEGRAM_CHAT_ID not set in environment."
         exit 1
     fi
 
@@ -124,8 +169,8 @@ if $SEND_TG; then
 
     # Send
     set +e
-    TG_RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-        -d "chat_id=${TG_CHAT_ID}" \
+    TG_RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+        -d "chat_id=${TG_CHAT}" \
         --data-urlencode "text=${TG_MSG}" 2>&1)
     CURL_RC=$?
     set -e
@@ -137,7 +182,9 @@ if $SEND_TG; then
 
     OK=$(echo "$TG_RESPONSE" | jq -r '.ok // false' 2>/dev/null)
     if [ "$OK" = "true" ]; then
-        echo "_TG alert sent:_ chat ${TG_CHAT_ID}"
+        # Маскируем chat_id в STDOUT (DayPlan/WeekReport коммитятся в Git — PII-сигнал).
+        TG_CHAT_MASKED="${TG_CHAT:0:3}***"
+        echo "_TG alert sent:_ chat ${TG_CHAT_MASKED}"
     else
         echo "_TG alert response:_ $TG_RESPONSE"
         exit 1
