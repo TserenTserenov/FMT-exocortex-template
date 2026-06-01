@@ -654,6 +654,9 @@
       "path": "scripts/iwe-agent-dispatcher.py"
     },
     {
+      "path": "scripts/fmt-critical-alert.sh"
+    },
+    {
       "path": "scripts/iwe-audit.sh"
     },
     {

@@ -155,6 +155,17 @@ echo "=== memory/ файлы (mtime >14д) ===" && find {{MEMORY_DIR}} -name "*.
 | MEMORY.md строк | **> 200** | Флаг превышения лимита. Предложить архивацию старых feedback в `archive/`. |
 | memory/*.md без обращения > 14д | **> 5 файлов** | Предложить понизить `horizon: warm` (пользователь решает при Month Close). |
 
+### 7f. FMT critical issues review (peer-session 2026-06-01-18)
+
+> **Принцип:** Week Close = последний рубеж перед новой неделей. Критические/deadline issues в шаблоне IWE должны быть видны заказчику до планирования.
+
+```bash
+bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram
+```
+
+- Если 0 critical/deadline → ✅ переход к шагу 8.
+- Если ≥1 → принять explicit decision: добавить в WeekPlan W{N+1} (fix), отложить с триггером (defer), или закрыть (wontfix). Без явного решения не оставлять.
+
 ### 8. Запись итогов в WeekReport (split, ОПТ-5)
 
 > **Split (WP-297 ОПТ-5):** факты недели живут в `WeekReport W{N}`, не в WeekPlan. WeekPlan — только намерения.
