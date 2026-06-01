@@ -138,6 +138,20 @@ bash {{WORKSPACE_DIR}}/scripts/route-task.sh --skill <skill-name>
 
 > Продолжение работы над тем же РП — повторный Ритуал не нужен.
 
+---
+
+## § Обслуживание экзокортекса (ритуалное)
+
+> **Триггер:** каждые N сессий или при подозрении на drift. Не блокирует открытие.
+
+| Компонент | Проверка | Частота | Команда |
+|-----------|----------|---------|---------|
+| Hindsight | Лог retain/recall, health container | 1×/неделю (Week Close) | `cat ~/.iwe/hindsight.log \| tail -20` + `docker ps \| grep iwe-hindsight` |
+| Memory drift | distinctions.md/MEMORY.md строки | Week Close | см. week-close §7e |
+| Dirty repos | Незакоммиченные изменения | Day Open / Week Close | `check-dirty-repos.sh` |
+
+**Hindsight:** если `hindsight.log` содержит `FAIL` — проверить `docker logs iwe-hindsight`. Если `OPENAI_API_KEY` expired — обновить `~/.iwe/hindsight.env`.
+
 
 ## Зонтичные РП
 

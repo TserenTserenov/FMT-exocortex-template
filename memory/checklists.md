@@ -93,6 +93,16 @@ description: "Операционный файл памяти IWE"
 
 > **Урок (2026-02-20):** Написал пост, закоммитил, запушил — но забыл обновить README.md. Правило уже было в CLAUDE.md репо (§4, §5), но не выполнил. **Причина:** Exit Protocol поста = 4 шага, пропустил первый. Также путь в CLAUDE.md был неверный (`docs/{YYYY}/README.md` вместо `docs/README.md`), исправлено.
 
+## При создании нового скилла
+
+- [ ] SKILL.md заполнен (description, обещание, алгоритм, режим отказа)
+- [ ] `validate-skill.sh` проходит
+- [ ] Smoke-test: вызов `/skill-id` работает
+- [ ] **Hindsight:** если скилл — стратегический, фасилитационный или решает repeating-задачу → добавить id в `RECALL_SKILLS` (`hindsight_trigger.py`)
+
+> **Правило:** Hindsight retain = стоимость ~$0.001–0.05/вызов. Если скилл вызывается редко И не несёт стратегического знания — не добавлять. Чем короче whitelist, тем выше SNR.
+> **Текущий whitelist:** `run-protocol`, `week-close`, `peer-conversation`, `archgate`, `apply-captures`, `strategy-session`.
+
 ## Close (дополнение к CLAUDE.md § 2)
 
 > **ПРАВИЛО:** Перед выполнением Close — ПЕРЕЧИТАЙ CLAUDE.md § 2 чеклист Close. Не выполняй по памяти.
