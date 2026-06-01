@@ -47,11 +47,12 @@ jobs:
     steps:
       - name: Checkout strategy repo
         if: env.STRATEGY_REPO != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.STRATEGY_REPO }}
           token: ${{ secrets.STRATEGY_REPO_TOKEN }}
           fetch-depth: 1
+          persist-credentials: true
 
       - name: Backup memory files
         if: env.STRATEGY_REPO != ''
@@ -104,11 +105,12 @@ jobs:
     steps:
       - name: Checkout strategy repo
         if: env.STRATEGY_REPO != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.STRATEGY_REPO }}
           token: ${{ secrets.STRATEGY_REPO_TOKEN }}
           fetch-depth: 100
+          persist-credentials: true
 
       - name: Checkout additional repos
         if: env.STRATEGY_REPO != ''
