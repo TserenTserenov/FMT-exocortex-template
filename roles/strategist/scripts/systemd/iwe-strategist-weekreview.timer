@@ -1,0 +1,10 @@
+[Unit]
+Description=IWE Strategist — weekly review в понедельник 00:00
+
+[Timer]
+OnCalendar=Mon *-*-* 00:00:00
+Persistent=true
+Unit=iwe-strategist-weekreview.service
+
+[Install]
+WantedBy=timers.target
