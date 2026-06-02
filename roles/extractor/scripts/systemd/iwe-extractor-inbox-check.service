@@ -1,0 +1,15 @@
+[Unit]
+Description=IWE Extractor — inbox-check (3h interval)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{IWE_RUNTIME}}/roles/extractor/scripts/extractor.sh inbox-check
+Environment=HOME={{HOME_DIR}}
+Environment=IWE_TEMPLATE={{IWE_TEMPLATE}}
+Environment=IWE_WORKSPACE={{WORKSPACE_DIR}}
+Environment=IWE_RUNTIME={{IWE_RUNTIME}}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
+StandardOutput=append:{{HOME_DIR}}/logs/extractor/systemd-inbox-check.log
+StandardError=append:{{HOME_DIR}}/logs/extractor/systemd-inbox-check-error.log

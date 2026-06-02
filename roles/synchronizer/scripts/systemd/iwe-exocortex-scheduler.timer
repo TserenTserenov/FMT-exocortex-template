@@ -1,0 +1,19 @@
+[Unit]
+Description=IWE Synchronizer — 10 dispatch points per day
+
+[Timer]
+OnCalendar=*-*-* 00:00:00
+OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-* {{TIMEZONE_HOUR}}:00:00
+OnCalendar=*-*-* 06:00:00
+OnCalendar=*-*-* 09:00:00
+OnCalendar=*-*-* 12:00:00
+OnCalendar=*-*-* 15:00:00
+OnCalendar=*-*-* 18:00:00
+OnCalendar=*-*-* 21:00:00
+OnCalendar=*-*-* 23:00:00
+Persistent=true
+Unit=iwe-exocortex-scheduler.service
+
+[Install]
+WantedBy=timers.target

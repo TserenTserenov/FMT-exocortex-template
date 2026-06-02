@@ -49,7 +49,48 @@ fi
 
 # Skip on non-macOS or headless CI without launchctl
 if ! command -v launchctl >/dev/null 2>&1; then
-    echo "  ⊠ launchctl not available (non-macOS), skipping $ROLE_NAME install"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        echo "Installing $ROLE_NAME systemd user service (Linux)..."
+        SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+
+        if [ -n "${IWE_RUNTIME:-}" ] && [ -d "$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd" ]; then
+            SYSTEMD_SRC="$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd"
+        elif [ -n "${IWE_WORKSPACE:-}" ] && [ -d "$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd" ]; then
+            SYSTEMD_SRC="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd"
+        else
+            echo "ERROR: systemd units not found. Run setup.sh first." >&2
+            exit 1
+        fi
+
+        if grep -qrE '\{\{[A-Z_]+\}\}' "$SYSTEMD_SRC" 2>/dev/null; then
+            echo "ERROR: systemd units contain unsubstituted placeholders" >&2
+            exit 2
+        fi
+
+        mkdir -p "$SYSTEMD_USER_DIR"
+        mkdir -p "$HOME/.local/state/exocortex"
+        mkdir -p "$HOME/logs/synchronizer"
+
+        cp "$SYSTEMD_SRC"/*.service "$SYSTEMD_SRC"/*.timer "$SYSTEMD_USER_DIR/"
+        systemctl --user daemon-reload
+        systemctl --user enable --now iwe-exocortex-scheduler.timer
+
+        echo "  ✓ Installed: iwe-exocortex-scheduler.timer"
+        echo "  ✓ Schedule: 10 dispatch points per day"
+        echo "  ✓ State: ~/.local/state/exocortex/"
+        echo "  ✓ Logs: ~/logs/synchronizer/"
+        echo ""
+        echo "Verify: systemctl --user list-timers | grep exocortex"
+        echo "Status: bash $SCRIPTS_DIR_RUNTIME/scheduler.sh status"
+        echo ""
+        echo "Auto-wake (recommended): sudo rtcwake -m no -t \$(date -d 'tomorrow 03:55' +%s)"
+        echo ""
+        echo "Telegram (optional): create ~/.config/aist/env with:"
+        echo "  export TELEGRAM_BOT_TOKEN=\"your-token\""
+        echo "  export TELEGRAM_CHAT_ID=\"your-id\""
+        exit 0
+    fi
+    echo "  ⊠ launchctl not available (non-macOS/Linux), skipping $ROLE_NAME install"
     exit 0
 fi
 
