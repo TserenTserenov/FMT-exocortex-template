@@ -30,15 +30,24 @@ case "$FILE_PATH" in
     *) exit 0 ;;
 esac
 
-# Path-схема — идентична scripts/day-close.sh (v0.35.2): HOME_SLUG + override через env.
+# Path-схема: override через env > симлинк $WORKSPACE_DIR/memory > пересборка slug.
+# ВАЖНО: Claude Code слугифицирует путь проекта, заменяя на '-' не только '/', но и
+# '_' и '.'. Если в $HOME есть '_' (напр. username john_doe), реальная папка проекта —
+# '-home-john-doe-IWE', а 'tr / -' даёт фантом '-home-john_doe-IWE' → зеркало не пишется.
+# Поэтому slug = tr '/_.' '-', а первичный источник — симлинк (не зависит от слугификации).
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
-HOME_SLUG=$(echo "$HOME" | tr '/' '-')
+HOME_SLUG=$(echo "$HOME" | tr '/_.' '-')
 MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${HOME_SLUG}-IWE/memory}"
 EXOCORTEX_DST="$WORKSPACE_DIR/$GOVERNANCE_REPO/exocortex"
 
-# Канонический реальный путь memory/ (резолвим симлинк $WORKSPACE_DIR/memory → auto-memory)
-MEMORY_REAL=$(cd "$MEMORY_SRC" 2>/dev/null && pwd -P) || exit 0
+# Канонический реальный путь memory/. Приоритет — симлинк $WORKSPACE_DIR/memory
+# (указывает на auto-memory независимо от правил слугификации); fallback — MEMORY_SRC.
+if [ -z "${IWE_MEMORY_SRC:-}" ] && [ -d "$WORKSPACE_DIR/memory" ]; then
+    MEMORY_REAL=$(cd "$WORKSPACE_DIR/memory" 2>/dev/null && pwd -P) || exit 0
+else
+    MEMORY_REAL=$(cd "$MEMORY_SRC" 2>/dev/null && pwd -P) || exit 0
+fi
 
 # Реальный каталог изменённого файла (резолвим возможный симлинк-путь)
 FILE_DIR=$(cd "$(dirname "$FILE_PATH")" 2>/dev/null && pwd -P) || exit 0

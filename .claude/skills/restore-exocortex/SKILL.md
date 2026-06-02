@@ -36,7 +36,7 @@ related: ["#125"]
 - Governance-репо: аргумент пользователя, иначе `$WORKSPACE_DIR/${GOVERNANCE_REPO:-DS-strategy}`. Убедиться, что `<gov>/exocortex/` существует.
 
 ### Шаг 2. Pre-flight (judgment — здесь LLM уместен)
-- Определить целевую auto-memory: `~/.claude/projects/$(echo "$HOME" | tr '/' '-')-IWE/memory`.
+- Определить целевую auto-memory: `~/.claude/projects/$(echo "$HOME" | tr '/_.' '-')-IWE/memory` (Claude Code слугифицирует `/`, `_`, `.` → `-`; `tr '/' '-'` промахнётся при `_` в username).
 - **Пусто/нет** → свежее устройство, восстановление без `--force`.
 - **Населена** → существующая инсталляция. Это destructive: показать `--dry-run` и **спросить подтверждение** перед `--force` (Правило 7, исключение «необратимое»).
 

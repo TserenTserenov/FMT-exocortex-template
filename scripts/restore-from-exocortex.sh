@@ -38,7 +38,11 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 DS_STRATEGY="${GOV_ARG:-$WORKSPACE_DIR/$GOVERNANCE_REPO}"
 EXOCORTEX_SRC="$DS_STRATEGY/exocortex"
-HOME_SLUG=$(echo "$HOME" | tr '/' '-')
+# Claude Code слугифицирует путь проекта, заменяя на '-' не только '/', но и '_' и '.'.
+# Если в $HOME есть '_' (напр. username john_doe), реальная папка — '-home-john-doe-IWE'.
+# tr '/' '-' дал бы фантом '-home-john_doe-IWE' → restore промахнётся мимо auto-memory.
+# Здесь symlink-резолв непригоден: на новой машине $WORKSPACE_DIR/memory ещё не создан.
+HOME_SLUG=$(echo "$HOME" | tr '/_.' '-')
 MEMORY_DST="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${HOME_SLUG}-IWE/memory}"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
