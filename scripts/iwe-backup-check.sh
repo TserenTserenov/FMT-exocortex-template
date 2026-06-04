@@ -57,6 +57,11 @@
 
 set -euo pipefail
 
+# Bootstrap: load .exocortex.env via IWE_ROOT (set -Ux in fish, universal)
+if [ -n "${IWE_ROOT:-}" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+  set -a; . "$IWE_ROOT/.exocortex.env"; set +a
+fi
+
 # ---------- Конфигурация ----------
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
 WARN_DAYS=7

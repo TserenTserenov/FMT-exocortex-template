@@ -164,10 +164,21 @@ fi
 # коммиты пропускали проверку и пускали leak в FMT.
 STAGED_TEMPLATE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
     | grep -E '\.(md|sh|py|json|plist|yaml)$' || true)
+# Bootstrap TEMPLATE_DIR from .exocortex.env (parent of this repo) — no env var required
+if [ -z "${TEMPLATE_DIR:-}" ]; then
+  _repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  _env_file="$(dirname "${_repo_root:-}")/.exocortex.env"
+  if [ -f "$_env_file" ]; then
+    _td=$(grep '^IWE_TEMPLATE=' "$_env_file" | head -1 | cut -d= -f2-)
+    [ -n "${_td:-}" ] && export TEMPLATE_DIR="$_td"
+    unset _td
+  fi
+  unset _repo_root _env_file
+fi
 if [ -n "$STAGED_TEMPLATE" ] && [ -x "setup/validate-template.sh" ]; then
     # --mode=staged: проверяет только staged файлы. Предотвращает ложные блокировки
     # от unstaged WIP параллельных агентов (мультиагентная среда IWE). CI использует pristine.
-    if ! bash setup/validate-template.sh --mode=staged >/tmp/iwe-validate.$$ 2>&1; then
+    if ! bash setup/validate-template.sh "${TEMPLATE_DIR:-}" --mode=staged >/tmp/iwe-validate.$$ 2>&1; then
         echo "TEMPLATE-VALIDATE: FAIL"
         cat /tmp/iwe-validate.$$
         rm -f /tmp/iwe-validate.$$

@@ -133,32 +133,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+## [Unreleased] — обновлено 2026-06-03
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- `e17ce68` feat(linux): port role agents from launchd to systemd user services
 
 ## [0.35.0] — 2026-06-01
 
@@ -235,6 +212,7 @@ Cross-agent peer-сессии (DP.SC.154) теперь работают «из �
 - `d4e3db2` feat(WP-348): Ф3 — SKILL.md v2 шаблон + генератор каталога + мигратор
 - `2136141` feat: settings-promote.sh + pre-commit HOOK-PATH-CONVENTION gate
 - `333c83d` feat(strategist): complete runner migration — run_skill() for day-open/day-close/week-close/strategy-session
+- `f550e9b` feat(pack-templates): DP.ROLE.NNN Constraint Analyst + DP.SC.NNN + DP.WP.NNN
 
 ### Changed
 
@@ -255,6 +233,7 @@ Cross-agent peer-сессии (DP.SC.154) теперь работают «из �
 
 ### Fixed
 
+- `e46c696` fix(linux): bootstrap .exocortex.env in 8 scripts + pre-commit hook
 - `f112f0d` fix: iwe-audit portability + release-audit-log.md (closes #24, #142) (#144)
 - `575ae4e` fix(notify): make TEMPLATES_DIR overridable via environment (#49)
 - `934e9c9` fix(verify): add model mapping for verification_class in wp type (#47)

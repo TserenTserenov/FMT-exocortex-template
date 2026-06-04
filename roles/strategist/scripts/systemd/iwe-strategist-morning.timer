@@ -1,0 +1,10 @@
+[Unit]
+Description=IWE Strategist — morning run в {{TIMEZONE_HOUR}}:00 UTC
+
+[Timer]
+OnCalendar=*-*-* {{TIMEZONE_HOUR}}:00:00
+Persistent=true
+Unit=iwe-strategist-morning.service
+
+[Install]
+WantedBy=timers.target

@@ -19,6 +19,11 @@
 
 set -uo pipefail
 
+# Bootstrap: load .exocortex.env via IWE_ROOT (set -Ux in fish, universal)
+if [ -n "${IWE_ROOT:-}" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+  set -a; . "$IWE_ROOT/.exocortex.env"; set +a
+fi
+
 IWE="${IWE_ROOT:-$HOME/IWE}"
 DATE="${1:-$(date +%Y-%m-%d)}"
 CONFIG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml"

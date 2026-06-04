@@ -16,6 +16,11 @@
 
 set -euo pipefail
 
+# Bootstrap: load .exocortex.env via IWE_ROOT (set -Ux in fish, universal)
+if [ -n "${IWE_ROOT:-}" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+  set -a; . "$IWE_ROOT/.exocortex.env"; set +a
+fi
+
 # === КОНФИГУРАЦИЯ (настроить при установке) ===
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"

@@ -43,7 +43,40 @@ done
 
 # Skip on non-macOS or headless CI without launchctl
 if ! command -v launchctl >/dev/null 2>&1; then
-    echo "  ⊠ launchctl not available (non-macOS), skipping $ROLE_NAME install"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        echo "Installing $ROLE_NAME systemd user services (Linux)..."
+        SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+
+        if [ -n "${IWE_RUNTIME:-}" ] && [ -d "$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd" ]; then
+            SYSTEMD_SRC="$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd"
+        elif [ -n "${IWE_WORKSPACE:-}" ] && [ -d "$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd" ]; then
+            SYSTEMD_SRC="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd"
+        else
+            echo "ERROR: systemd units not found. Run setup.sh first." >&2
+            exit 1
+        fi
+
+        if grep -qrE '\{\{[A-Z_]+\}\}' "$SYSTEMD_SRC" 2>/dev/null; then
+            echo "ERROR: systemd units contain unsubstituted placeholders" >&2
+            exit 2
+        fi
+
+        mkdir -p "$SYSTEMD_USER_DIR"
+        mkdir -p "$HOME/logs/strategist"
+
+        cp "$SYSTEMD_SRC"/*.service "$SYSTEMD_SRC"/*.timer "$SYSTEMD_USER_DIR/"
+        systemctl --user daemon-reload
+        systemctl --user enable --now iwe-strategist-morning.timer
+        systemctl --user enable --now iwe-strategist-weekreview.timer
+
+        echo "  ✓ Installed: iwe-strategist-morning.timer (daily)"
+        echo "  ✓ Installed: iwe-strategist-weekreview.timer (Mon 00:00)"
+        echo "  ✓ Logs: ~/logs/strategist/"
+        echo ""
+        echo "Verify: systemctl --user list-timers | grep strategist"
+        exit 0
+    fi
+    echo "  ⊠ launchctl not available (non-macOS/Linux), skipping $ROLE_NAME install"
     exit 0
 fi
 

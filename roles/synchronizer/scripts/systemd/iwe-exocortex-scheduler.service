@@ -1,0 +1,15 @@
+[Unit]
+Description=IWE Synchronizer — scheduler dispatch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{IWE_RUNTIME}}/roles/synchronizer/scripts/scheduler.sh dispatch
+Environment=HOME={{HOME_DIR}}
+Environment=IWE_TEMPLATE={{IWE_TEMPLATE}}
+Environment=IWE_WORKSPACE={{WORKSPACE_DIR}}
+Environment=IWE_RUNTIME={{IWE_RUNTIME}}
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
+StandardOutput=append:{{HOME_DIR}}/logs/synchronizer/systemd-scheduler.log
+StandardError=append:{{HOME_DIR}}/logs/synchronizer/systemd-scheduler-error.log

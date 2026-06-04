@@ -7,6 +7,11 @@
 
 set -euo pipefail
 
+# Bootstrap: load .exocortex.env via IWE_ROOT (set -Ux in fish, universal)
+if [ -n "${IWE_ROOT:-}" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+  set -a; . "$IWE_ROOT/.exocortex.env"; set +a
+fi
+
 IWE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 DIRTY=0
 UNPUSHED=0

@@ -15,6 +15,11 @@
 
 set -eu
 
+# Bootstrap: load .exocortex.env via IWE_ROOT (set -Ux in fish, universal)
+if [ -n "${IWE_ROOT:-}" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+  set -a; . "$IWE_ROOT/.exocortex.env"; set +a
+fi
+
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
 MEMORY_DIR="$IWE_ROOT/memory"
 HOT_LIMIT=150

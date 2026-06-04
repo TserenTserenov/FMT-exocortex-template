@@ -13,6 +13,11 @@
 
 set -euo pipefail
 
+# Bootstrap: load .exocortex.env via IWE_ROOT (set -Ux in fish, universal)
+if [ -n "${IWE_ROOT:-}" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+  set -a; . "$IWE_ROOT/.exocortex.env"; set +a
+fi
+
 REPO_ROOT="${IWE_DS_MY_STRATEGY:-$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 SESSIONS_DIR="$REPO_ROOT/inbox/agent/sessions"
 CUTOVER_DATE="${SESSION_CUTOVER_DATE:-2026-05-29}"   # ISO date

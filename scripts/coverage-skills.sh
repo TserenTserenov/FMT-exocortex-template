@@ -54,7 +54,7 @@ done
 #   IWE_GOVERNANCE_REPO_TMPL    — имя шаблонного governance-репо (default: DS-strategy)
 NORM_HOME='/Users\|/home'
 NORM_GOV_AUTHOR="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-NORM_GOV_TMPL="DS-strategy"
+NORM_GOV_TMPL="${IWE_GOVERNANCE_REPO_TMPL:-DS-strategy}"
 normalize_for_diff() {
     sed -E "
         s|\\{\\{[A-Z_]+\\}\\}|<placeholder>|g
