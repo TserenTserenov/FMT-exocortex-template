@@ -17,6 +17,7 @@ gate: auto
 ## Инструкция для Claude
 
 > Метод: `PD.METHOD.018` § Механизм рекомендации Стратегом. Различение C_vis vs C_act — `PD.FORM.091 §6.1`.
+> **Согласие:** перед чтением метрик ЦД — сверить согласие, см. [../appendix/consent-check.md](../appendix/consent-check.md). При `denied`/`null` — degraded (калибр на самооценке, без записи).
 
 1. **Прочитать трекер:** `docs/Caliber-artifacts-tracker.md` (если нет — создай из шаблона)
 

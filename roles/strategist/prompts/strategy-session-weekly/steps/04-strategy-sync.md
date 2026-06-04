@@ -18,7 +18,7 @@ gate: user
 
 1. **Прочитать:**
    - `docs/Strategy.md` — фокусы года, Q1 цели, приоритеты месяца
-   - `context/session-context-YYYY-MM-DD.md` (если есть — DT + Guide срез из session-prep)
+   - `context/session-context-YYYY-MM-DD.md` (если есть — DT + Guide срез из session-prep; формат и предусловие согласия — [../appendix/dt-guide-prep.md](../appendix/dt-guide-prep.md)). При denied/null согласии файл отсутствует → degraded ([../appendix/consent-check.md](../appendix/consent-check.md)).
    - MonthClose-сводку (если шаг 00 сработал)
 
 2. **Если первая сессия месяца:**
