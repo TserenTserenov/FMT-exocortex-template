@@ -29,10 +29,7 @@
 set -euo pipefail
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -z "${IWE_ROOT:-}" ] && [ -f "$SCRIPT_DIR/../../.claude/lib/iwe-env-bootstrap.sh" ]; then
-  source "$SCRIPT_DIR/../../.claude/lib/iwe-env-bootstrap.sh" || true
-fi
-IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
+source "$SCRIPT_DIR/../../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 CLAUDE_MD="$IWE_ROOT/CLAUDE.md"
 BLOCKS_MD="$IWE_ROOT/AGENTS-agent-blocks.md"
 OUT_MD="$IWE_ROOT/AGENTS.md"
