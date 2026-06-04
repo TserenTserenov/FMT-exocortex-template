@@ -686,10 +686,10 @@ for entry in data.get('files', []):
 
 # (Step 6b removed — repo rename no longer supported, no link migration needed)
 
-# === Step 6b2: Ensure ~/.iwe-paths exists (WP-219, DP.FM.009) ===
+# === Step 6b2: Ensure $WORKSPACE_DIR/.iwe-paths exists (WP-219, DP.FM.009) ===
 # Lookup-слой env-переменных для путей к скриптам. Генерируется setup.sh,
 # но при обновлении со старой версии (до WP-219) файл может отсутствовать.
-IWE_PATHS_FILE="$HOME/.iwe-paths"
+IWE_PATHS_FILE="$WORKSPACE_DIR/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
 if [ ! -f "$IWE_PATHS_FILE" ]; then
     cat > "$IWE_PATHS_FILE" <<IWEPATHS_EOF
@@ -698,22 +698,25 @@ if [ ! -f "$IWE_PATHS_FILE" ]; then
 # Do not edit manually — changes will be lost.
 
 export IWE_WORKSPACE="$WORKSPACE_DIR"
-export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
+export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex"
 export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
+export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"
 IWEPATHS_EOF
     echo "  ✓ Миграция WP-219: создан $IWE_PATHS_FILE"
 
-    # Ensure ~/.zshenv sources ~/.iwe-paths (idempotent)
+    # Ensure ~/.zshenv sources $WORKSPACE_DIR/.iwe-paths (idempotent)
     if [ -f "$ZSHENV_FILE" ] && grep -qF '.iwe-paths' "$ZSHENV_FILE"; then
         : # already present
     else
-        cat >> "$ZSHENV_FILE" <<'ZSHENV_EOF'
+        cat >> "$ZSHENV_FILE" <<ZSHENV_EOF
 
 # IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам
-[ -f "$HOME/.iwe-paths" ] && source "$HOME/.iwe-paths"
+_IWE_ROOT="$WORKSPACE_DIR"
+[ -f "\$_IWE_ROOT/.iwe-paths" ] && source "\$_IWE_ROOT/.iwe-paths"
+unset _IWE_ROOT
 ZSHENV_EOF
-        echo "  ✓ Миграция WP-219: $ZSHENV_FILE → sources \$HOME/.iwe-paths"
+        echo "  ✓ Миграция WP-219: $ZSHENV_FILE → sources \$WORKSPACE_DIR/.iwe-paths"
         echo "  ℹ  Перезапустите shell: source $ZSHENV_FILE"
     fi
 fi
@@ -832,8 +835,8 @@ done
 if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
     echo ""
     echo "Роли обновлены. Переустановка..."
-    # Source ~/.iwe-paths (если есть) — гарантирует IWE_RUNTIME/IWE_TEMPLATE в env для install.sh
-    [ -f "$HOME/.iwe-paths" ] && . "$HOME/.iwe-paths"
+    # Source $WORKSPACE_DIR/.iwe-paths (если есть) — гарантирует IWE_RUNTIME/IWE_TEMPLATE в env для install.sh
+    [ -f "$WORKSPACE_DIR/.iwe-paths" ] && . "$WORKSPACE_DIR/.iwe-paths"
     for role_dir in "$SCRIPT_DIR"/roles/*/; do
         [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
         if grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null; then
