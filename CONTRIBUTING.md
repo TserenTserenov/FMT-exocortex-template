@@ -16,6 +16,32 @@ Thank you for your interest in contributing to IWE! This document explains how t
 
 Use [GitHub Issues](https://github.com/TserenTserenov/FMT-exocortex-template/issues) with the appropriate template.
 
+**Before filing a new issue:**
+
+1. **Read the [Roadmap & Backlog Focus](https://github.com/TserenTserenov/FMT-exocortex-template/issues/147)** (pinned) — it lists active focus areas grouped by category. Your bug may already be tracked.
+2. **Search closed issues** for prior analyses:
+   ```
+   is:closed your-keyword                    # full-text closed
+   is:closed label:stale-archive             # archived during 2026-06-01 cleanup
+   is:closed label:triaged-2026-06-01        # all triaged issues (incl. closed)
+   ```
+3. **Include in the bug report:** OS, IWE version (`bash update.sh --check`), reproducing command, expected vs actual behavior.
+
+Maintainer responds within 1 week, applies a categorization label, and either schedules a fix or marks as `needs-reproduction` / `needs-discussion`.
+
+### Stale & lifecycle
+
+To keep the backlog actionable, a [stale-bot](.github/workflows/stale.yml) runs daily:
+
+- **`needs-reproduction` without reply for 30 days** → labeled `stale-needs-reproduction` with a reminder comment. After **+14 days** without reply (44d total) → auto-closed. Re-open with reproduction details if still relevant.
+- **Any open issue 14+ days without `triaged-*` label** → labeled `stale-unattended` (warn-only, no close). This is a maintainer-side signal: «you missed this one».
+
+**Opt out:** apply `keep-alive` label to any issue where the conversation is active but slow. The bot will skip it.
+
+**Exempt labels (never stale):** `keep-alive`, `critical`, `deadline`, `roadmap`, `pinned`, `triaged-accepted`.
+
+**Notification channel:** if you maintain a fork, you can set `TG_BOT_TOKEN` / `TG_CHAT_ID` (or `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`) env vars and run `bash scripts/fmt-critical-alert.sh` in your Day Open / Week Close — it'll Telegram you any open `critical` or `deadline` issues. Useful for weekend-P0 detection.
+
 ### Share Your Setup
 
 Show how you use IWE in [GitHub Discussions](https://github.com/TserenTserenov/FMT-exocortex-template/discussions):

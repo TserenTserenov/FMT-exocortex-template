@@ -4,7 +4,10 @@
 # WP-265 Ф5.2 (ArchGate v3 — вариант F3 sentinel-only).
 #
 # Назначение: блокировать write-tools при наличии валидного sentinel-файла.
-# Sentinel: /tmp/iwe-dry-run-${CLAUDE_SESSION_ID:-noid}.flag
+# Sentinel: любой файл /tmp/iwe-dry-run-*.flag (sentinel-agnostic).
+# Причина glob-имени: CLAUDE_SESSION_ID не пробрасывается в окружение
+# субагентов, поэтому session-bound имя (iwe-dry-run-${SID}.flag) ненадёжно
+# в самом частом пути smoke-теста. TTL чистит застрявшие sentinel'ы.
 # TTL: 600 секунд (10 минут) от mtime.
 #
 # Принципы:
@@ -21,26 +24,35 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 2
 fi
 
-# SESSION_ID — от Claude Code или fallback
-SID="${CLAUDE_SESSION_ID:-noid}"
-SENTINEL="/tmp/iwe-dry-run-${SID}.flag"
+# Discovery: найти любой sentinel /tmp/iwe-dry-run-*.flag.
+# Не привязываемся к CLAUDE_SESSION_ID — он не пробрасывается в субагентов.
+shopt -s nullglob
+SENTINELS=( /tmp/iwe-dry-run-*.flag )
+shopt -u nullglob
 
-# Если sentinel не существует — dry-run неактивен, allow всё
-[ ! -f "$SENTINEL" ] && exit 0
+# Ни одного sentinel — dry-run неактивен, allow всё
+[ ${#SENTINELS[@]} -eq 0 ] && exit 0
 
-# TTL: проверить mtime, удалить и allow если старше 600s
+# Найти первый не-истёкший sentinel; устаревшие удалить попутно.
 NOW=$(date +%s)
-case "$(uname)" in
-    Darwin) MTIME=$(stat -f %m "$SENTINEL" 2>/dev/null) ;;
-    *)      MTIME=$(stat -c %Y "$SENTINEL" 2>/dev/null) ;;
-esac
-if [ -n "$MTIME" ]; then
+SENTINEL=""
+for f in "${SENTINELS[@]}"; do
+    case "$(uname)" in
+        Darwin) MTIME=$(stat -f %m "$f" 2>/dev/null) ;;
+        *)      MTIME=$(stat -c %Y "$f" 2>/dev/null) ;;
+    esac
+    [ -z "$MTIME" ] && continue
     AGE=$((NOW - MTIME))
     if [ "$AGE" -gt 600 ]; then
-        rm -f "$SENTINEL" 2>/dev/null
-        exit 0
+        rm -f "$f" 2>/dev/null
+    else
+        SENTINEL="$f"
+        break
     fi
-fi
+done
+
+# Все sentinel'ы оказались устаревшими и удалены — dry-run неактивен.
+[ -z "$SENTINEL" ] && exit 0
 
 # Прочитать tool_name и tool_input из stdin
 INPUT=$(cat)

@@ -118,6 +118,7 @@ echo "Следующие шаги:"
 echo "  1. Заполнить SKILL.md (description, обещание, алгоритм, режим отказа)"
 echo "  2. bash validate-skill.sh ${skill_id}"
 echo "  3. Smoke-test: вызвать /${skill_id} и убедиться что работает"
+echo "  4. Если скилл входит в стратегические/фасилитационные категории — добавить id в RECALL_SKILLS hindsight_trigger.py для LLM-retain"
 if [[ "$layer" == "L1" ]]; then
     FMT_DIR="${IWE_TEMPLATE:-${IWE}/FMT-exocortex-template}"
     echo "  4. bash ${FMT_DIR}/scripts/skill-promote.sh ${skill_dir}/"

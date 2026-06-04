@@ -60,7 +60,7 @@ try:
     with open(registry, "r", encoding="utf-8") as f:
         for line in f:
             # Ищем строки вида | 297 | или | ~~297~~ |
-            m = re.match(r"^\|\s*~*(\d+)~*\s*\|", line)
+            m = re.match(r"^\|\s*(?:\*\*)?~*(\d+)~*(?:\*\*)?\s*\|", line)
             if m:
                 n = int(m.group(1))
                 if n > max_num:

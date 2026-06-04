@@ -1,0 +1,144 @@
+name: Stale Issues Bot
+
+# routing: github-actions  trigger=cron  deterministic=true
+# Connected to peer-session 2026-06-01-25 (WP-386 hardening).
+#
+# Goals:
+# 1) needs-reproduction: автор не ответил 30d → stale-needs-reproduction → +14d close (autoclose).
+# 2) maintainer-unattended: issue open 14d без любого triaged-* label → stale-unattended (warn only, no close).
+#
+# Anti-pattern guards (peer-consensus Kimi):
+# - keep-alive label = opt-out, никогда не stale
+# - exempt: critical, deadline, roadmap, pinned, triaged-accepted
+# - operations-per-run: 30 (предотвращает comment-spam если 30+ issues станут stale)
+# - remove-stale-when-updated: true (автоматическая отмена при ответе)
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # daily at 08:00 UTC (11:00 МСК)
+  workflow_dispatch: {}    # manual trigger для тестов
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  stale-needs-reproduction:
+    name: Auto-close needs-reproduction (30d to stale, +14d close)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          only-labels: 'needs-reproduction'
+          days-before-issue-stale: 30
+          days-before-issue-close: 14
+          stale-issue-label: 'stale-needs-reproduction'
+          exempt-issue-labels: 'keep-alive,critical,deadline,roadmap,pinned,triaged-accepted'
+          stale-issue-message: |
+            This issue has been waiting for reproduction info for **30 days** without response from the original reporter.
+
+            Closing automatically in 14 more days if no reply.
+
+            If still relevant — comment with: OS, IWE version (`bash update.sh --check`), reproducing command, expected vs actual behavior.
+
+            To opt out of stale-bot for this issue, apply label `keep-alive`.
+          close-issue-message: |
+            Auto-closed after 44 days without response.
+
+            Reopen with reproduction details if still relevant.
+          operations-per-run: 30
+          remove-stale-when-updated: true
+          ascending: true
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+
+  stale-unattended:
+    name: Flag unattended issues (14d to stale-unattended, warn-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const STALE_DAYS = 14;
+            const EXEMPT_LABELS = ['keep-alive', 'critical', 'deadline', 'roadmap', 'pinned', 'triaged-accepted', 'stale-needs-reproduction', 'stale-unattended'];
+            const OPS_LIMIT = 30;
+
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - STALE_DAYS);
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'asc',
+              per_page: 100,
+            });
+
+            let ops = 0;
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+              if (ops >= OPS_LIMIT) break;
+
+              const labels = issue.labels.map(l => typeof l === 'string' ? l : l.name);
+
+              if (EXEMPT_LABELS.some(e => labels.includes(e))) continue;
+              if (labels.some(l => l.startsWith('triaged-'))) continue;
+
+              const created = new Date(issue.created_at);
+              if (created > cutoff) continue;
+
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['stale-unattended'],
+                });
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `This issue has been open for **${STALE_DAYS}+ days** without maintainer triage (no \`triaged-*\` label applied).\n\nFlagging as \`stale-unattended\` for visibility. Maintainer will respond within 1 week per [CONTRIBUTING.md](/${context.repo.owner}/${context.repo.repo}/blob/main/CONTRIBUTING.md).\n\nTo opt out: apply label \`keep-alive\`.`,
+                });
+                ops++;
+                console.log(`Flagged #${issue.number} as stale-unattended`);
+              } catch (e) {
+                console.error(`Failed on #${issue.number}: ${e.message}`);
+              }
+            }
+            console.log(`Total flagged: ${ops}`);
+
+  remove-stale-on-triage:
+    name: Remove stale-unattended when triaged label applied
+    runs-on: ubuntu-latest
+    needs: stale-unattended   # sequential ordering: cleanup AFTER apply-pass
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { data: stale } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'stale-unattended',
+              per_page: 100,
+            });
+
+            for (const issue of stale) {
+              const labels = issue.labels.map(l => typeof l === 'string' ? l : l.name);
+              const hasTriaged = labels.some(l => l.startsWith('triaged-'));
+              if (hasTriaged) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: 'stale-unattended',
+                  });
+                  console.log(`Removed stale-unattended from #${issue.number} (now triaged)`);
+                } catch (e) {
+                  console.error(`Failed to remove stale-unattended from #${issue.number}: ${e.message}`);
+                }
+              }
+            }

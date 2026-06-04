@@ -15,7 +15,7 @@ jobs:
   release-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check CHANGELOG/manifest version sync
         run: |
           if [ ! -f "CHANGELOG.md" ] || [ ! -f "update-manifest.json" ]; then
@@ -39,6 +39,8 @@ jobs:
             exit 1
           fi
           echo "PASS: CHANGELOG/manifest version sync ($CHANGELOG_VERSION)"
+      - name: Check README version badge sync
+        run: bash scripts/sync-version-badge.sh --check
 
   # Integration contract validator + fresh-install smoke-test.
   # Defense-in-depth для случая `git commit --no-verify` в pre-commit.
@@ -63,7 +65,7 @@ jobs:
     env:
       SMOKE_GOVERNANCE_REPO: ${{ matrix.gov_repo }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3 jq
@@ -85,7 +87,7 @@ jobs:
   upgrade-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # full history для git log
       - name: Install dependencies
@@ -127,7 +129,7 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
@@ -149,7 +151,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # C1 fix (0.28.6): CI source-of-truth = local validator (setup/validate-template.sh).
       # Раньше CI имел собственный inline blacklist, который расходился с local — например,

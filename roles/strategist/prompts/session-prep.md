@@ -6,7 +6,7 @@
 - **HUB (личные планы):** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/
 - **Документы стратегии:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/ (ВСЕ файлы: Strategy.md, Dissatisfactions.md, Session Agenda.md)
 - **Inbox:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/ ([fleeting-notes.md](https://github.com/{{GITHUB_USER}}/{{GOVERNANCE_REPO}}/blob/main/inbox/fleeting-notes.md) + свежие файлы за неделю)
-- **SPOKE (планы репо):** {{WORKSPACE_DIR}}/*/WORKPLAN.md
+- **Активные РП:** `bash {{WORKSPACE_DIR}}/scripts/active-wp-sweep.sh` (агрегатор по `{{GOVERNANCE_REPO}}/inbox/WP-*.md` + git-активность 7д)
 - **Стратегические карты:** {{WORKSPACE_DIR}}/*/MAPSTRATEGIC.md (если есть в репо)
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
@@ -79,11 +79,15 @@
 - Проверь: соответствуют ли текущие РП стратегическому направлению?
 - Отметь расхождения (РП без привязки к стратегии, или стратегия без РП)
 
-#### 5. Обход WORKPLAN.md (Hub-and-Spoke)
+#### 5. Агрегация активных РП
 
-- Прочитай `{{WORKSPACE_DIR}}/*/WORKPLAN.md` из каждого репо
-- Собери все РП со статусом pending/in-progress
-- Выяви расхождения с HUB-планом
+> Источник: `bash {{WORKSPACE_DIR}}/scripts/active-wp-sweep.sh`
+>
+> Скрипт обходит все `inbox/WP-*.md`, кросс-проверяет git-активность за 7 дней,
+> выдаёт markdown-таблицу активных РП со статусами и бюджетами.
+
+- Запусти `active-wp-sweep.sh` и используй результат как вход для формирования плана
+- Расхождения с HUB-планом отметь для обсуждения на сессии
 
 #### 6. Проверить нерегулярные блоки (Session Agenda)
 
@@ -99,9 +103,9 @@
 
 #### 7. Сформировать черновик WeekPlan
 
-- Выбери РП из месячных приоритетов + WORKPLAN.md + carry-over + inbox
+- Выбери РП из месячных приоритетов + active-wp-sweep + carry-over + inbox
 - **Нет Л-задач.** Всё = РП. Личные задачи (налоги, счета, документы) тоже получают номер РП и WP context file. Без номера задача теряется при carry-over.
-- **Актуализация статусов:** Для каждого РП в таблице проверь `inbox/WP-{N}-*.md` (WP context file). Если есть — бери статус и описание оттуда (source-of-truth прогресса), а не из WORKPLAN.md или предыдущего WeekPlan. WP context file > WORKPLAN.md > carry-over.
+- **Актуализация статусов:** Для каждого РП в таблице проверь `inbox/WP-{N}-*.md` (WP context file). Если есть — бери статус и описание оттуда (source-of-truth прогресса). WP context file > carry-over.
 - Сформируй таблицу с бюджетом
 - Сформируй повестку сессии стратегирования (все блоки из шагов 1-6)
 - Сформулируй вопросы для обсуждения с пользователем
@@ -221,18 +225,19 @@ agent: Стратег
 
 **Результат:** черновик WeekPlan (`status: draft`) с повесткой сессии в `current/`.
 
-> Следующий шаг: сессия стратегирования с пользователем → `prompts/strategy-session.md`.
+> Следующий шаг: сессия стратегирования с пользователем → `prompts/strategy-session-weekly.md`.
+> Если первая сессия месяца → `prompts/strategy-session-monthly.md`.
 
 ---
 
 ## Post-session sync (выполняется Стратегом после утверждения WeekPlan)
 
-> **Правило:** По итогам стратегирования обновлять Strategy.md и все затронутые WORKPLAN.md. Это гарантирует, что данные не устаревают между сессиями.
+> **Правило:** По итогам стратегирования обновить Strategy.md и статусы затронутых WP context files. Это гарантирует, что данные не устаревают между сессиями.
 
 1. **Strategy.md** — обновить «Приоритеты месяца» (статусы, бюджеты, новые приоритеты)
-2. **WORKPLAN.md** — для каждого репо, упомянутого в WeekPlan:
-   - Обновить статусы РП (done/in_progress/pending)
-   - Добавить новые РП
+2. **inbox/WP-NNN.md** — для каждого РП, упомянутого в WeekPlan:
+   - Обновить `status:` (done/in_progress/pending)
+   - Добавить новые РП (если появились в ходе сессии)
    - Убрать done/archived
 3. **MEMORY.md** — синхронизировать таблицу «РП текущей недели»
 4. Закоммитить все изменения

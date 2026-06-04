@@ -260,7 +260,7 @@ copy_to_workspace_file() {
     local dst="$BUILD_DIR/workspace/$rel"
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
-    if [ -x "$src" ]; then chmod +x "$dst"; fi
+    case "$dst" in *.sh) chmod +x "$dst" ;; esac
 }
 
 # Process substituted

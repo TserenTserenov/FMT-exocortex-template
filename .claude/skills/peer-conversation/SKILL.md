@@ -53,6 +53,20 @@ routing:
 
 Если РП найден → продолжать без ожидания.
 
+**Определение рекомендуемой модели писателя (WP-394 Ф4.6):**
+```
+# informational — pilot selects model at Claude Code startup, not auto-applied here
+verification_class = из WP контекста или из описания задачи
+WRITER_MODEL_RECOMMENDED = "sonnet"   # default: закрытые задачи с тестами/чёткой проверкой
+if verification_class in ("open-loop", "problem-framing"):
+    WRITER_MODEL_RECOMMENDED = "opus"
+```
+Анонсировать пилоту:
+```
+Модель писателя (рекомендуется): <WRITER_MODEL_RECOMMENDED>
+(Класс задачи: <verification_class>. Выбери модель при запуске Claude Code.)
+```
+
 ---
 
 ## Шаг 1. Инициализация
@@ -98,6 +112,7 @@ implementation_pipeline: false
 review_iterations: 0
 verify_status: ""
 deploy_shas: {}
+writer_model_recommended: "sonnet"  # informational — pilot selects model at startup, not auto-applied; opus only for open-loop|problem-framing
 # Sequential role-discovery (WP-367) — заполняется во время Opening:
 # Если пилот задал явно — сразу заполни `roles`.
 # Если не задал — initiator в ход 0 заполняет `proposed_roles` в frontmatter 00-writer.md;
@@ -527,6 +542,7 @@ extensions:
 Задача сессии: <задача>
 
 Прочитай все файлы реплик в <SESSION_DIR> (00-writer.md, 01-peer.md, ...) в порядке нумерации.
+Прочитай `meta.yaml` — извлеки `roles`, `ad_hoc_roles`, `discovery_turns` для §1.5.
 Если в папке есть `_outcome.md` — прочитай его, он обязателен для §6.
 Если есть review-NN.md / verify-NN.md — включи как якоря в §5/§6.
 Напиши <SESSION_DIR>/report.md строго по схеме ниже.
@@ -548,6 +564,9 @@ confidence_basis: <обязателен если confidence <= med; иначе o
 ttl_event: <«до merge PR-NNN» | «до WP-NNN» | «до отмены пилотом» | omit>
 cost_usd: <если известно; иначе omit>
 cost_source: api | estimated | missing
+roles: <из meta.yaml: roles — {agent_id: [DP.ROLE.NNN, ...]} или omit если пусто>
+ad_hoc_roles: <из meta.yaml: ad_hoc_roles — {role_name: {agent_id, rationale, first_used_turn}} или omit если пусто>
+discovery_turns: <из meta.yaml: discovery_turns, целое; omit если 0>
 ---
 
 # Итоговый отчёт
@@ -555,6 +574,22 @@ cost_source: api | estimated | missing
 ## 1. Исходная постановка
 - **Задача:** <цитата из задания пилота, дословно>
 - **Первоначальная позиция писателя:** <если зафиксирована в 00-writer.md; omit если нет>
+
+## 1.5 Роли участников
+Omit если `roles` пусто и `ad_hoc_roles` пусто.
+
+**Форменные роли:**
+- Писатель: <writer_agent>
+- Напарник (критик): <peer_agent>
+
+**Содержательные роли (content-roles):**
+- <agent_id>: <роль> (источник: Pack `DP.ROLE.NNN` | ad-hoc | не назначена)
+- ...
+
+**Ad-hoc роли (если есть):**
+- «<имя>» — <agent_id>, <рационал>, впервые использована в ходе <first_used_turn>
+
+**Discovery:** <discovery_turns> ходов ушло на согласование ролей (не считались в лимит).
 
 ## 2. Позиции по темам
 Под каждой темой (затронута обеими сторонами и повлияла на итог):

@@ -197,7 +197,7 @@ if [ -d "$DS_DIR" ]; then
     fi
 else
     CRITICAL_MISSING=$((CRITICAL_MISSING + 1))
-    printf "| \`%s\` | %s | %s |\n" "DS-strategy/" "❌" "директория не найдена"
+    printf "| \`%s\` | %s | %s |\n" "$GOV_REPO/" "❌" "директория не найдена"
 fi
 
 echo ""
@@ -227,20 +227,20 @@ if [ -f "$DRIFT_SCRIPT" ]; then
     set -e
     if [ $DRIFT_RC -ne 0 ]; then
         echo ""
-        echo "_iwe-drift.sh exit code: $DRIFT_RC_"
+        echo "_iwe-drift.sh exit code: ${DRIFT_RC}_"
     fi
 else
     echo "❌ \`scripts/iwe-drift.sh\` не найден — drift-сверка пропущена"
 fi
 echo ""
 
-# ---------- Раздел 3: DS-strategy ----------
+# ---------- Раздел 3: Governance repo ----------
 
-echo "## 3. DS-strategy"
+echo "## 3. $GOV_REPO"
 echo ""
 
 if [ ! -d "$DS_DIR/.git" ]; then
-    echo "❌ \`DS-strategy\` не git-репо (или директория отсутствует)"
+    echo "❌ \`$GOV_REPO\` не git-репо (или директория отсутствует)"
 else
     set +e
     DS_STATUS=$(git -C "$DS_DIR" status --short 2>&1)

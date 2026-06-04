@@ -5,11 +5,14 @@ name: Post-Release Adversarial Audit
 #
 # Триггеры:
 #   1. Manual: workflow_dispatch — автор запускает после релиза.
-#   2. Auto: на каждый push в main, если изменился update-manifest.json (version bump).
-# Цель: создать issue с adversarial-промптом → автор прогоняет в Claude session
-# → находит классы регрессий, которые 8 detectors не ловят.
-# Корень бага (0.29.13): валидаторы ловят ИЗВЕСТНЫЕ классы. Євгений ловил
-# НЕИЗВЕСТНЫЕ. Этот workflow автоматизирует «напомнить запустить adversarial».
+#   2. Auto-trigger DISABLED 2026-06-01 (peer-session triage):
+#      Раньше создавал новый issue на каждый push update-manifest.json,
+#      но это создаёт inflated backlog (22 audit issues накопилось).
+#      Теперь audit status трекается в docs/release-audit-log.md (single source).
+#      Для запуска вручную — Actions tab → Run workflow.
+#
+# Цель: создать reminder с adversarial-промптом → автор прогоняет в Claude session
+# → находит классы регрессий, которые detectors не ловят.
 
 on:
   workflow_dispatch:
@@ -18,10 +21,6 @@ on:
         description: 'Релизная версия для аудита (например 0.29.18)'
         required: true
         type: string
-  push:
-    branches: [main]
-    paths:
-      - 'update-manifest.json'
 
 permissions:
   issues: write
@@ -31,7 +30,7 @@ jobs:
   create-audit-issue:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Determine version
         id: ver
         run: |
@@ -43,7 +42,7 @@ jobs:
             echo "version=$VER" >> $GITHUB_OUTPUT
           fi
       - name: Create or update audit reminder issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -51,9 +50,11 @@ jobs:
             const promptBody = fs.readFileSync('setup/release-audit-prompt.md', 'utf8');
 
             const title = `Post-release adversarial audit: v${version}`;
-            const body = `> **Автоматический triage-issue.** Релиз v${version} опубликован — нужен adversarial audit субагентом или внешним пилотом.
+            const body = `> **Manual-triggered reminder.** Релиз v${version} опубликован — нужен adversarial audit субагентом или внешним пилотом.
             >
             > Цель: найти классы регрессий, которые 8 detectors + smoke 14 НЕ ловят.
+            >
+            > **После audit — обновить \`docs/release-audit-log.md\`** (status + findings + result), затем закрыть этот issue.
 
             ## Шаги
 

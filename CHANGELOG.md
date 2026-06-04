@@ -8,24 +8,114 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+## [Unreleased] — обновлено 2026-06-04
+
+### Added
+
+- `fccd93f` feat(WP-388 Ф8-Ф10): трёхслойная архитектура стиля + enforce
+- `b11ea42` feat(wp-394): Ф4.3-4.5 — промоция паттернов в шаблон + восстановление дрифта
+- `e4a8645` feat(wp-394): Ф4.2 — single-source автоген AGENTS.md из ядра CLAUDE.md
+- `88d9e33` feat(wp-394): Ф3.1+Ф4.6 — IWE instructions tiering + model tiering in peer sessions
+- `7295b6f` feat(roles/strategy): WP-393 Ф5+Ф6 — role-boundaries, калибр, ценность, cycles, OKR
+- `0ac4a91` feat(strategist/prompts): WP-393 Ф3 остатки — ВДВ-структура для 6 промптов
+- `b623b3a` feat(WP-391 Ф5): browser mass-user MVP — CI template + skill index
+- `b51fe40` feat(skills): migrate 5 skills to FMT (WP-387 Ф3)
+- `eafefd3` feat(WP-393 Ф4+Ф2c): обновление шаблонов + appendix
+- `8bb8ade` feat(strategist): WP-393 Ф2 stepwise strategy session (monthly + weekly)
+- `672f36d` feat(style): sync communication-style rules to AGENTS.md and CLAUDE.md
+- `53ea30a` feat(style): sync CLAUDE.md with WP-code format rule and communication-style ref
+- `0f45e0d` feat(communication-style): add WP-code format rule and self-check
+- `cc7c196` feat: auto-sync version badge via CI + local script
+- `03363b7` feat(0.35.3): communication-style-base + sync script + downstream markers
+- `cd1e268` feat(0.35.3): community-facing communication style
+- `ea6625e` feat(0.35.1): promote response-style rules to template (S-37 v2 + AGENTS.md)
+- `996df2a` feat(peer-skill): content-roles §1.5 + frontmatter ad_hoc_roles/discovery_turns
+- `08d6f2e` feat(hardening): stale-bot + TG alert env fallback (peer-session 2026-06-01-25) (#148)
+- `cb45d31` feat: WP-337/З Ф6 — peer-session инфраструктура в шаблоне (v0.35.0)
+- `7e9aa78` feat(triage): post-2026-06-01 backlog cleanup infrastructure
+- `dc18e90` feat(detection): MVP FMT critical/deadline issues alert (peer-session 2026-06-01-18) (#145)
+- `6be164d` feat(hindsight): WP-337/А.13 FMT template — docker-compose, start, launchd, docs
+- `43e8268` feat(WP-377): promote pack-creator + org-dev + spf-guard
+- `f47bf49` feat(WP-348): promote apply-captures defer_until invariant to L1
+- `bc5686f` feat(L1): B-005 reliability обхода Backlog и pending-фаз
+- `fbc5585` feat(L1): promote DP.D.052 v2 формулировок из peer-сессии 2026-05-31-11
+
+### Changed
+
+- `5840624` refactor: externalize downstream paths from sync script to yaml config (WP-388)
+- `b6ddac7` refactor: FMT-копия стиля → проекция Pack SoT + обобщённый sync (WP-388 Ф8)
+- `7c7768f` docs: РП-394 Ф4.3-4.5 — PREFIX/BODY/TAIL + memory-lifecycle + Hermes coordination в шаблон [no-registry-touch]
+- `79defa3` refactor(WP-393): правки Клода — ВДВ в intro блоков, /diagnose-iwe, R{N}-цель, _не задано_
+- `0631439` refactor(session-prep): WP-393 Ф3 remove WORKPLAN anti-pattern
+- `1e3cd92` docs(dispatcher): OUTDATED comment — canonical at workspace scripts/
+- `0a15c8a` docs(skills): Ф4 WP-386 — явный Шаг 1 Extensions checks + WHY-комментарий dry-run sentinel
+- `c54ff45` ci: migrate actions/checkout@v4 → v6, github-script@v7 → v8
+- `76be56b` docs(CHANGELOG): корректировки 0.35.0 по post-deploy verify
+- `22cdd0d` chore(WP-377): R29 Детектор → R47 в hooks/lib/detectors
+
+### Fixed
+
+- `0ce1864` fix(wp-393): resolve 3 medium review findings
+- `8168e05` fix(peer-infra): synthesis 4.2 stdout-only — остаточный High из баг-репорта WP-393
+- `830ff9d` fix(peer-infra): адаптер passthrough --permission-mode + SKILL.md stdout-only
+- `cb39a82` fix(day-close): backup AGENTS.md to exocortex alongside CLAUDE.md
+- `fa8878d` fix(communication-style): merge rule 1a into rule 2, fix numbering
+- `190802e` fix(peer): add negative scope guard to kimi-peer-writer SKILL.md Шаг 3.1
+- `103a14f` fix(peer-writer): close-signal detector, explicit mv, Python path fix, pre-commit guard
+- `64376e3` fix(peer-writer): add 180s timeout to report synthesis subprocess
+- `f28a6da` fix(server-news): silent exit when news.enabled=false
+- `8a0a5c6` fix(create-wp): учитывать жирный шрифт **NNN** при парсинге номеров РП
+- `1ead2bc` fix: update version badge to 0.35.3
+- `46a7606` fix(scripts): remove author-specific paths from sync-communication-style template
+- `15ff497` fix(0.35.2): hotfix S-37 — A1-A11 labels in CLAUDE.md + frontmatter cleanup
+- `7e0ebd6` fix(build-runtime): remove leftover conflict markers from PR #50 merge
+- `480b277` fix: chmod +x all .sh files in build-runtime
+- `35c473f` fix(update): add .claude/scripts/ to workspace propagation
+- `f112f0d` fix: iwe-audit portability + release-audit-log.md (closes #24, #142) (#144)
+- `575ae4e` fix(notify): make TEMPLATES_DIR overridable via environment (#49)
+- `934e9c9` fix(verify): add model mapping for verification_class in wp type (#47)
+- `4a00339` fix(dt-collect): replace hardcoded DS-strategy with $GOVERNANCE_DIR (#46)
+- `065e60a` fix(day-close): portability — HOME_SLUG + rsync --delete (#119)
+- `df591ea` fix(dry-run-gate): make sentinel discovery session-agnostic (closes #59) (#60)
+- `bffd92c` fix(skill): quote pack-new description in SKILL.md frontmatter (#137)
 
 
+## [0.35.3] — 2026-06-01
 
+### Added
 
+- `memory/feedback_community_communication_style.md` — стиль общения агентов с участниками сообщества (community-facing). 5 правил inline + полный набор в externalized memory: таблица переводов терминов (deploy → развернуть, disambiguation marker → маркер различения и др.), особенности каналов (Telegram бот vs документы), примеры «было/стало». Компактный формат: главное наверху, детали в спойлерах.
+- `AGENTS.md` — новая секция **Response Style — Community-Facing** (симметрично пилот-режиму).
+- `CLAUDE.md §S-38 «Стиль общения с участниками сообщества»` — inline-правила для Claude-агента, ссылка на полный набор в memory.
 
+### Notes
 
+- Архитектура доставки — та же, что и для пилот-режима (WP-388 Ф7): компактный inline (≤15 строк) + externalized memory с деталями. Экономия токенов: пилот-режим и community-режим не смешиваются, каждый агент загружает только нужную аудиторию.
+- Источник — актуализация WP-388 «Стиль общения агентов IWE» (1 июня 2026).
 
+## [0.35.2] — 2026-06-01
 
+### Fixed (hotfix по verify-агенту 0.35.1)
 
+- `memory/feedback_response_clarity_for_pilot.md` frontmatter: удалена утечка `originSessionId` (локальный id Claude Code-сессии, не часть схемы memory-lifecycle), `description` синхронизирован с телом (`10 правил` → `11 правил A1-A11`).
+- `CLAUDE.md §9 «Режим на пальцах (S-37)»`: в bullet-list правил режима добавлены метки `(A1)`...`(A11)` symmetric с `AGENTS.md` и `memory/feedback_response_clarity_for_pilot.md` — устранён drift между тремя источниками.
 
+### Notes
 
+- Источник правок — verify-агент (cold-context Sonnet) и research-агент (general-purpose с WebSearch+WebFetch на 8 источников, включая Jaroslawicz et al. 2025 IFScale). Полные отчёты — в `WP-388-agent-communication-style.md` авторского governance-репо.
 
+## [0.35.1] — 2026-06-01
 
+### Added
 
+- `AGENTS.md` (новый файл для Kimi-агента) — структурное место для правил, симметричное `CLAUDE.md` для Claude. Содержит: коммит-атрибуция Kimi, git staging без `-u/-A/-.`, координация через MCP Local Gateway (lock/peer-status), Drift Reporting, Working Directory, Language, Calendar Events, **Response Style — Pilot-Facing** (12 паттернов + 11 правил A1-A11 + детектор канала).
+- `memory/feedback_response_clarity_for_pilot.md` — общеплатформенное правило для всех агентов в одном файле: 12 паттернов клаттера + 11 правил A1-A11 (как писать пилоту: путь не подлежащее, англицизмы в скобках после русского описания, `exit 0`/`PASS`/`SHA` → русские слова, активный залог при ошибках) + детектор канала (стенограмма / синтез / чат / commit). Источник — peer-сессия `2026-06-01-27-agent-response-style`.
+- `CLAUDE.md §9 «Режим на пальцах (S-37)»` — расширен: добавлен детектор канала (technical mode vs «на пальцах» по словам в сообщении пилота); расширены правила (запрет пути как подлежащего, требование расшифровки имени сущности при первом упоминании, замена английских маркеров статуса, запрет пассивного залога при ошибках); ссылка на полный набор правил в `memory/feedback_response_clarity_for_pilot.md`.
 
+### Notes
 
-
-
+- `template-sync.sh` отрезает §9 при синхронизации, поэтому правки §9 в этом релизе сделаны прямой правкой `FMT/CLAUDE.md`, не через sync.
+- `update-manifest.json`: +2 пути (`AGENTS.md`, `memory/feedback_response_clarity_for_pilot.md`); версия `0.35.0 → 0.35.1`.
 
 
 
@@ -45,9 +135,33 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — обновлено 2026-06-03
 
-### Added
-
 - `e17ce68` feat(linux): port role agents from launchd to systemd user services
+
+## [0.35.0] — 2026-06-01
+
+### Added — WP-337 направление З Ф6: Peer-session инфраструктура в шаблоне
+
+Cross-agent peer-сессии (DP.SC.154) теперь работают «из коробки» после `update.sh`:
+
+- `scripts/kimi-peer-adapter.sh` — bridge для вызова Kimi из Claude-писателя (скилл `/peer-conversation`).
+  Multi-platform KIMI_BIN auto-detect (macOS / Linux / Windows VS Code Code-extension paths + PATH + `KIMI_BIN` env override).
+  Hindsight retain — opt-in через `IWE_HINDSIGHT_RETAIN=1`, gracefully skipped когда `hindsight_trigger.py` отсутствует.
+- `scripts/claude-peer-adapter.sh` — bridge для вызова Claude из Kimi-писателя (скилл `/peer-writer`).
+  CLAUDE_BIN auto-detect через PATH + стандартные npm-global / homebrew / `~/.local/bin` локации + `CLAUDE_BIN` env override.
+- `scripts/peer-adapter-filter.py` — `.agentigore` фильтр + PII sanity-check (16 content + 6 filename hard-block паттернов: токены, ключи, JWT, URL Basic Auth, СНИЛС, файлы `*.pem`/`*.key`/`*.token`).
+  Применяется только в `kimi-peer-adapter.sh` (защита перед отправкой данных в Kimi). При вызове Claude как напарника фильтр не запускается — Claude обеспечивает access control через `--permission-mode acceptEdits`.
+- `sessions/00-index.md` — пустой журнал peer-сессий (заголовок таблицы).
+- В манифест добавлены ранее промотированные `.claude/skills/peer-conversation/SKILL.md` и `.claude/skills/kimi-peer-writer/SKILL.md` (закрыт drift от 30 мая).
+
+### Известное требование к клиентам
+
+- **`IWE_GOVERNANCE_REPO`:** если ваш governance-репозиторий называется не `DS-strategy` (default fallback), установите env-var `IWE_GOVERNANCE_REPO=<имя>` — иначе скиллы `/peer-conversation` и `/peer-writer` не найдут адаптеры по пути `$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/`.
+
+### Added — Прочее
+
+- `7e9aa78` feat(triage): post-2026-06-01 backlog cleanup infrastructure
+- `dc18e90` feat(detection): MVP FMT critical/deadline issues alert (peer-session 2026-06-01-18) (#145)
+- `6be164d` feat(hindsight): WP-337/А.13 FMT template — docker-compose, start, launchd, docs *(автору FMT: файлы добавлены в репо, но НЕ в `update-manifest.json` — клиентам не доставляются; отдельный РП для делегирования или для записи в excluded_paths)*
 - `43e8268` feat(WP-377): promote pack-creator + org-dev + spf-guard
 - `f47bf49` feat(WP-348): promote apply-captures defer_until invariant to L1
 - `bc5686f` feat(L1): B-005 reliability обхода Backlog и pending-фаз
@@ -102,6 +216,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `scripts/validate-fmt-scripts.sh` — добавлена **Проверка 5**: ловит хардкоды `$HOME/IWE/<author-repo>/(scripts|sessions|docs|current)/` и `~/IWE/...` (Python `expanduser`) в `.claude/skills/*/SKILL.md` без env-fallback `${IWE_GOVERNANCE_REPO:-...}`. Исключает строки с `#`, `export`, `echo`, `printf` (документация). Структурный фикс лазейки промоции скиллов.
 - `22cdd0d` chore(WP-377): R29 Детектор → R47 в hooks/lib/detectors
 - `b9e1658` docs(release): метрика fix-коммитов в RELEASE-PROCESS.md (PD-4, WP-347)
 - `33537d6` docs(promotion): B12 class + pair-on-promote convention (PZ-5)
@@ -119,6 +234,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - `e46c696` fix(linux): bootstrap .exocortex.env in 8 scripts + pre-commit hook
+- `f112f0d` fix: iwe-audit portability + release-audit-log.md (closes #24, #142) (#144)
+- `575ae4e` fix(notify): make TEMPLATES_DIR overridable via environment (#49)
+- `934e9c9` fix(verify): add model mapping for verification_class in wp type (#47)
+- `4a00339` fix(dt-collect): replace hardcoded DS-strategy with $GOVERNANCE_DIR (#46)
+- `065e60a` fix(day-close): portability — HOME_SLUG + rsync --delete (#119)
+- `df591ea` fix(dry-run-gate): make sentinel discovery session-agnostic (closes #59) (#60)
+- `bffd92c` fix(skill): quote pack-new description in SKILL.md frontmatter (#137)
 - `6b164f6` fix(promote): settings-promote --dry-run пропускает existence check (WP-347 PD-2 followup)
 - `c2e96e6` fix(promote): regenerate FMT skills-catalog.yaml (B12a)
 - `0ccb1e2` fix(catalog): generate-executor-catalog.py — раскрывать env IWE_GOVERNANCE_REPO в DEFAULT_OUTPUT

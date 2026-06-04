@@ -98,6 +98,8 @@ Coverage: N/4
    ```
 2. **Создать sentinel:**
    ```bash
+   # SID гарантирует сессионную изоляцию при параллельных аудитах.
+   # Хук использует glob *.flag — intentional asymmetry. См. dry-run-gate.sh:30.
    echo "{\"created_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"session_id\":\"$SID\",\"initiator\":\"audit-installation\"}" > /tmp/iwe-dry-run-${SID}.flag
    ```
 3. **Запустить subagent** через Agent tool (subagent_type=general-purpose, модель Sonnet) с промптом:

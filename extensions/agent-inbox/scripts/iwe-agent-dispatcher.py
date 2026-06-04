@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# OUTDATED: canonical copy at workspace scripts/iwe-agent-dispatcher.py
+# See #143 for RC1-RC5 fixes. Do not use this file in production.
 """
 iwe-agent-dispatcher.py — диспетчер Agent Inbox IWE (WP-324 Ф8).
 

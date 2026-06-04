@@ -1,0 +1,75 @@
+# Skill Index — Browser IWE Suggestion Loop
+# Maps keywords/tags to skill names for auto-suggestion in browser sessions.
+# Suggestion rule: propose exactly ONE skill per response, most specific match wins.
+# Only skills with browser: true are suggested in browser context.
+
+skills:
+  - name: day-open
+    browser: false
+    keywords: ["day open", "открытие дня", "утро", "план на день", "day plan"]
+    description: "Morning planning ritual: gather context, set priorities, create DayPlan. Requires local FS."
+
+  - name: day-close
+    browser: false
+    keywords: ["day close", "закрытие дня", "вечер", "итоги дня", "summary"]
+    description: "Evening retrospective: review completions, carry-over, energy check. Requires local FS."
+
+  - name: week-close
+    browser: false
+    keywords: ["week close", "закрытие недели", "ретро", "retrospective", "итоги недели"]
+    description: "Weekly retrospective: achievements, bottlenecks, next week planning. Requires local FS."
+
+  - name: archgate
+    browser: true
+    keywords: ["archgate", "архгейт", "архитектура", "оценка решения", "architecture decision"]
+    description: "Evaluate architecture decisions across 7 characteristics (ЭМОГССБ v3)."
+
+  - name: verify
+    browser: true
+    keywords: ["verify", "верификация", "проверка", "audit", "проверь"]
+    description: "Verify artifact against Pack reference with context isolation."
+
+  - name: apply-captures
+    browser: true
+    keywords: ["apply captures", "применить находки", "extraction report", "ke"]
+    description: "Process pending-review extraction reports: accept/reject/defer."
+
+  - name: wp-new
+    browser: true
+    keywords: ["new wp", "новый рп", "создать рп", "новая задача", "spawn wp"]
+    description: "Create new work product atomically across 5 locations."
+
+  - name: run-protocol
+    browser: false
+    keywords: ["protocol", "протокол", "орз", "ritual", "ритуал"]
+    description: "Step-by-step protocol execution. Requires local FS and hooks."
+
+  - name: fpf
+    browser: true
+    keywords: ["fpf", "principle", "принцип", "first principles"]
+    description: "Load applicable first-principles for a task from Pack hierarchy."
+
+  - name: think
+    browser: true
+    keywords: ["think", "подумаем", "adi", "abduction", "reasoning", "рассуждение"]
+    description: "Structured reasoning cycle: Abduction-Deduction-Induction-Audit-Decide."
+
+  - name: decompose
+    browser: true
+    keywords: ["decompose", "декомпозиция", "разложить на этапы", "phases", "этапы"]
+    description: "Decompose activity into phases with physical artifacts and checklists."
+
+  - name: strategy-session
+    browser: true
+    keywords: ["strategy", "стратегия", "стратегическая сессия", "week plan", "план недели"]
+    description: "Strategic session dispatcher: initial or weekly flow."
+
+  - name: iwe-bug-report
+    browser: true
+    keywords: ["bug", "баг", "ошибка платформы", "report bug", "сообщить об ошибке"]
+    description: "Report a platform bug to FMT-exocortex-template GitHub issue."
+
+  - name: bottleneck-pick
+    browser: true
+    keywords: ["bottleneck", "горлышко", "constraint", "ограничение", "toc"]
+    description: "Identify system bottleneck using Theory of Constraints."

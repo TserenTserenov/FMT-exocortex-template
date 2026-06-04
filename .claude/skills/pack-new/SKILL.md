@@ -1,6 +1,6 @@
 ---
 name: pack-new
-description: Создание нового Pack — guided flow по SPF: выбор домена, имя Pack, scaffold структуры, дорожная карта наполнения.
+description: "Создание нового Pack — guided flow по SPF: выбор домена, имя Pack, scaffold структуры, дорожная карта наполнения."
 argument-hint: "[область знания или домен]"
 ---
 

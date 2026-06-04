@@ -43,6 +43,8 @@ Fallback: файла нет → пропустить, работать из ко
 `gh issue list` по всем репо (включая вложенным). Фильтр 2 дня. Связь с РП по ключевым словам.
 **Только actionable:** пропускать read-only и upstream без push-доступа.
 
+**Critical FMT issues (детектор):** `bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram` — выводит markdown-таблицу открытых issues с label `critical`/`deadline` в FMT-exocortex-template. Если `TG_BOT_TOKEN` и `TG_CHAT_ID` настроены — убрать `--no-telegram` для дублирования в Telegram (MVP detection chain для weekend P0). Источник: peer-session 2026-06-01-18.
+
 ### 1c. Inbox Triage (ежедневный — WP-196 Ф11 п4)
 
 > Явный шаг: разобрать новые входы, поступившие в `inbox/` за ночь и в начале дня.

@@ -1,5 +1,5 @@
 {
-  "version": "0.34.1",
+  "version": "0.35.3",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -102,10 +102,10 @@
       "path": ".claude/skills/_template/SKILL.md"
     },
     {
-      "path": ".claude/skills/apply-captures/SKILL.md"
+      "path": ".claude/skills/agent-fault/SKILL.md"
     },
     {
-      "path": ".claude/skills/agent-fault/SKILL.md"
+      "path": ".claude/skills/apply-captures/SKILL.md"
     },
     {
       "path": ".claude/skills/archgate/SKILL.md"
@@ -138,10 +138,16 @@
       "path": ".claude/skills/ke/SKILL.md"
     },
     {
+      "path": ".claude/skills/kimi-peer-writer/SKILL.md"
+    },
+    {
       "path": ".claude/skills/month-close/SKILL.md"
     },
     {
       "path": ".claude/skills/pack-new/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/peer-conversation/SKILL.md"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md"
@@ -211,6 +217,9 @@
     },
     {
       "path": ".stignore"
+    },
+    {
+      "path": "AGENTS.md"
     },
     {
       "path": "CHANGELOG.md"
@@ -340,6 +349,12 @@
     },
     {
       "path": "memory/dry-run-contract.md"
+    },
+    {
+      "path": "memory/feedback_response_clarity_for_pilot.md"
+    },
+    {
+      "path": "memory/feedback_community_communication_style.md"
     },
     {
       "path": "memory/fpf-reference.md"
@@ -624,6 +639,9 @@
       "path": "scripts/check-setup-update-parity.sh"
     },
     {
+      "path": "scripts/claude-peer-adapter.sh"
+    },
+    {
       "path": "scripts/create-skill.sh"
     },
     {
@@ -634,6 +652,9 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh"
+    },
+    {
+      "path": "scripts/fmt-critical-alert.sh"
     },
     {
       "path": "scripts/generate-executor-catalog.py"
@@ -675,6 +696,9 @@
       "path": "scripts/iwe-trace.py"
     },
     {
+      "path": "scripts/kimi-peer-adapter.sh"
+    },
+    {
       "path": "scripts/memory-active-wp-update.sh"
     },
     {
@@ -702,16 +726,13 @@
       "path": "scripts/pack-ci-install.sh"
     },
     {
+      "path": "scripts/peer-adapter-filter.py"
+    },
+    {
       "path": "scripts/route-task.sh"
     },
     {
       "path": "scripts/script-promote.sh"
-    },
-    {
-      "path": "scripts/smoke-clean-env.sh"
-    },
-    {
-      "path": "scripts/test-route-task.sh"
     },
     {
       "path": "scripts/server-calendar.sh"
@@ -732,10 +753,16 @@
       "path": "scripts/skills-pull.sh"
     },
     {
+      "path": "scripts/smoke-clean-env.sh"
+    },
+    {
       "path": "scripts/sync_feedback_to_memory.py"
     },
     {
       "path": "scripts/template-sync.sh"
+    },
+    {
+      "path": "scripts/test-route-task.sh"
     },
     {
       "path": "scripts/validate-fmt-scripts.sh"
@@ -748,6 +775,9 @@
     },
     {
       "path": "scripts/week-draft-init.sh"
+    },
+    {
+      "path": "sessions/00-index.md"
     },
     {
       "path": "setup.sh"

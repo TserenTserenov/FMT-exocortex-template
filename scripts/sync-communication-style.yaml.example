@@ -1,0 +1,22 @@
+# Downstream targets for sync-communication-style.py
+# Copy as sync-communication-style.yaml and fill in your paths.
+#
+# Fields:
+#   path:  relative to IWE root
+#   type:  markdown | js
+#   layer: l0 (base only) | l0+l1 (base + author layer)
+
+downstream:
+  - path: "FMT-exocortex-template/CLAUDE.md"
+    type: markdown
+    layer: l0
+
+  # Bot config (replace with your bot repo)
+  - path: "YOUR-BOT-REPO/config/standard_claude.md"
+    type: markdown
+    layer: l0
+
+  # Gateway MCP (replace with your gateway repo)
+  - path: "YOUR-GATEWAY-REPO/src/index.ts"
+    type: js
+    layer: l0

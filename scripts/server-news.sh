@@ -52,7 +52,10 @@ CUTOFF = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
 try:
     with open(CONFIG) as f:
         d = yaml.safe_load(f)
-    topics = d.get("news", {}).get("topics", [])
+    news_cfg = d.get("news", {})
+    if not news_cfg.get("enabled", True):
+        sys.exit(0)  # news.enabled=false → секция не рендерится, без PENDING
+    topics = news_cfg.get("topics", [])
 except Exception as e:
     print(f"**Мир:** ⚠️ PENDING — ошибка конфига: {e}")
     sys.exit(0)

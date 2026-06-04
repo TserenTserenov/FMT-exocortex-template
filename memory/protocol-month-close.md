@@ -3,6 +3,7 @@ name: protocol-month-close
 description: Slim-ядро протокола Month Close — триггеры, позиция в ВДВ v9, минимальный алгоритм
 type: reference
 valid_from: 2026-04-24
+
 horizon: warm
 domains: [protocol]
 status: active
@@ -35,7 +36,7 @@ schema_version: 1
 2. **Предусловие:** Week Close предыдущей недели выполнен. Без свежего Report W{N-1} Month Close не запускается.
 3. **Не слияние со Strategy Session.** Последовательно: сначала `/month-close`, потом Strategy Session. Разные роли (R23 Верификатор / R1 Стратег), разные артефакты.
 4. **Не автозапуск.** Ручной вызов, документированный в DayPlan первого Пн (строка «Month Close YYYY-MM», 0.75h).
-5. **Выход — два артефакта.** (1) обновлённый Strategy.md § Результаты месяца (R1-RN закрыты / перенесены / созданы новые). (2) `<governance-repo>/archive/MonthClose YYYY-MM.md` — самостоятельный отчёт месяца.
+5. **Выход — два артефакта.** (1) обновлённый Strategy.md § Результаты месяца (R1-RN закрыты / перенесены / созданы новые). (2) `DS-strategy/archive/MonthClose YYYY-MM.md` — самостоятельный отчёт месяца.
 
 ## Минимальный алгоритм (8 шагов)
 
