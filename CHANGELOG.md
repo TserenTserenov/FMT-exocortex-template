@@ -18,10 +18,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+
+
 ## [Unreleased] — обновлено 2026-06-08
 
 ### Added
 
+- `bfa7172` feat(WP-405 Ф2): translate all 39 SKILL.md descriptions to English
 - `321bab6` feat(distinctions): Gateway с одной ответственностью ≠ Gateway с прикладной логикой
 - `a24f295` feat: memory sync hook + exocortex restore (closes #125)
 - `274e1cf` feat(catalogs): generate-catalogs.py + публичные каталоги скиллов/скриптов/ролей
@@ -66,10 +69,6 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - `7e9aa78` feat(triage): post-2026-06-01 backlog cleanup infrastructure
 - `dc18e90` feat(detection): MVP FMT critical/deadline issues alert (peer-session 2026-06-01-18) (#145)
 - `6be164d` feat(hindsight): WP-337/А.13 FMT template — docker-compose, start, launchd, docs
-- `43e8268` feat(WP-377): promote pack-creator + org-dev + spf-guard
-- `f47bf49` feat(WP-348): promote apply-captures defer_until invariant to L1
-- `bc5686f` feat(L1): B-005 reliability обхода Backlog и pending-фаз
-- `fbc5585` feat(L1): promote DP.D.052 v2 формулировок из peer-сессии 2026-05-31-11
 
 ### Changed
 
@@ -88,10 +87,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - `0a15c8a` docs(skills): Ф4 WP-386 — явный Шаг 1 Extensions checks + WHY-комментарий dry-run sentinel
 - `c54ff45` ci: migrate actions/checkout@v4 → v6, github-script@v7 → v8
 - `76be56b` docs(CHANGELOG): корректировки 0.35.0 по post-deploy verify
-- `22cdd0d` chore(WP-377): R29 Детектор → R47 в hooks/lib/detectors
 
 ### Fixed
 
+- `5600848` fix(strategy-session): системный фикс — СТОП в step-файлах, resume-механизм, устранение молчаливых переходов
+- `8a29f3b` fix(strategy-session): БЛОКИРУЮЩЕЕ — один шаг за раз, ждать ответа пилота перед следующим
+- `a80c7d1` fix(skills): translate ke/fpf descriptions to English for SkillHub compatibility
+- `b354254` fix(strategy-session): стиль «на пальцах» + подавление MonthClose в weekly
+- `ca72920` fix(strategy-session): WP-393 Ф7.1 — переключение на новый процесс + обход Backlog в шаге 07
+- `c881f06` fix(diagnose-iwe): drill-down уточняет ВСЕ слабые срезы (РП5 Ф-26)
 - `1d65a90` fix(cross-platform): Ф-25 WP-5 — три дефекта Windows/Linux совместимости
 - `38fd6b0` fix(strategist): WP-5 Ф-27 — два бага в notify-шаблоне дайджеста
 - `1a6a1be` fix(update): protect personal L4 config day-rhythm-config.yaml from clobber
