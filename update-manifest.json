@@ -84,6 +84,9 @@
       "path": ".claude/lib/capture_writer.sh"
     },
     {
+      "path": ".claude/lib/iwe-env-bootstrap.sh"
+    },
+    {
       "path": ".claude/lib/log_formatter.sh"
     },
     {

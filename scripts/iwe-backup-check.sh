@@ -57,14 +57,15 @@
 
 set -euo pipefail
 
-# Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
+# Load unified environment: IWE_OS, IWE_ROOT, IWE_ICLOUD_BACKUP_DIR, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 
 # ---------- Конфигурация ----------
 WARN_DAYS=7
 CRITICAL_DAYS=14
-CHECK_ICLOUD=1
+# Auto-disable iCloud check on non-macOS; can be overridden via --no-icloud
+[ "$IWE_OS" = "macos" ] && CHECK_ICLOUD=1 || CHECK_ICLOUD=0
 
 # ---------- Аргументы ----------
 while [ $# -gt 0 ]; do
@@ -110,7 +111,7 @@ CRITICALS=0
 # ---------- Раздел 1: iCloud-бэкапы ----------
 
 if [ "$CHECK_ICLOUD" -eq 1 ]; then
-    ICLOUD_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs/IWE-backups"
+    ICLOUD_DIR="$IWE_ICLOUD_BACKUP_DIR"
 
     echo "## 1. iCloud-бэкапы"
     echo ""
@@ -163,7 +164,7 @@ if [ "$CHECK_ICLOUD" -eq 1 ]; then
 else
     echo "## 1. iCloud-бэкапы"
     echo ""
-    info "Пропущено (--no-icloud)"
+    info "N/A (платформа: $IWE_OS — iCloud доступен только на macOS)"
     echo ""
 fi
 
