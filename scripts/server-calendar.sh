@@ -341,7 +341,7 @@ if week_mode:
         print("| 🚦 | Время | Событие | Длит. | Тип |")
         print("|----|-------|---------|-------|-----|")
         for e in evs:
-            s = e["summary"].replace("|", "\\|")
+            s = e["summary"].replace("|", chr(92) + "|")
             t = "встреча" if e["type"] == "meeting" else "задача"
             print(f"| {e['status_emoji']} | {e['start_time']} | {s} | {e['duration']} | {t} |")
         print()
@@ -361,7 +361,7 @@ if meetings:
     print("| 🚦 | Время | Событие | Длит. | Связь с РП |")
     print("|----|-------|---------|-------|------------|")
     for e in meetings:
-        s = e["summary"].replace("|", "\\|")
+        s = e["summary"].replace("|", chr(92) + "|")
         print(f"| {e['status_emoji']} | {e['start_time']} | {s} | {e['duration']} | — |")
     print()
 else:
@@ -373,7 +373,7 @@ if tasks:
     print("| 🚦 | Время | Что | Длит. | Результат |")
     print("|----|-------|-----|-------|-----------|")
     for e in tasks:
-        s = e["summary"].replace("|", "\\|")
+        s = e["summary"].replace("|", chr(92) + "|")
         print(f"| {e['status_emoji']} | {e['start_time']} | {s} | {e['duration']} | — |")
     print()
 else:
