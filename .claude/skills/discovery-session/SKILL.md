@@ -1,7 +1,7 @@
-# see DP.SC.030, DP.ROLE.012, DP.METHOD.053
 ---
 name: discovery-session
-description: Conversation to unpack dissatisfactions (discovery strategizing). Socratic analysis of raw reflections and notes into the Problem/Dissatisfaction/Emotion triad → pilot state → monthly priorities (WHAT/WHY). R1 Strategist role, DP.METHOD.053 method. Triggers: 'analyze dissatisfactions', 'help with monthly strategy', 'what matters to me now', '/discovery-session'.
+description: "Conversation to unpack dissatisfactions (discovery strategizing). Socratic analysis of raw reflections and notes into the Problem/Dissatisfaction/Emotion triad → pilot state → monthly priorities (WHAT/WHY). R1 Strategist role, DP.METHOD.053 method. Triggers: 'analyze dissatisfactions', 'help with monthly strategy', 'what matters to me now', '/discovery-session'."
+see: [DP.SC.030, DP.ROLE.012, DP.METHOD.053]
 version: 1.0.0
 layer: L1
 status: active
