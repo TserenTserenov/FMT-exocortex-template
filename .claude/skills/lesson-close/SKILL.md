@@ -1,6 +1,6 @@
 ---
 name: lesson-close
-description: Close a lesson opened with /lesson. Finalizes workbook/YYYY-MM-DD.md (frontmatter status, time metadata, duration), commits + pushes to the personal-guide repo. Triggers the closed delivery loop: push → GitHub webhook → sync_one_user_to_dt → Digital Twin updates in Neon. Use when pilot says 'close', 'done', 'finish', 'close lesson' — or after explicit task completion in /lesson.
+description: "Close a lesson opened with /lesson. Finalizes workbook/YYYY-MM-DD.md (frontmatter status, time metadata, duration), commits + pushes to the personal-guide repo. Triggers the closed delivery loop: push → GitHub webhook → sync_one_user_to_dt → Digital Twin updates in Neon. Use when pilot says 'close', 'done', 'finish', 'close lesson' — or after explicit task completion in /lesson."
 argument-hint: "[необязательно: дата урока YYYY-MM-DD; по умолчанию сегодня; либо --skipped если урок был пропущен; --no-push для локального commit без push]"
 experimental: true
 sunset: "после WP-301 Ф6 (E2E smoke) и WP-149 Block D (ИИ-агент-носитель Портного)"
