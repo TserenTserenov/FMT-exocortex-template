@@ -105,7 +105,9 @@ notify() {
     if [ -n "${NOTIFY_SH_PATH:-}" ] && [ -x "$NOTIFY_SH_PATH" ]; then
         "$NOTIFY_SH_PATH" "$title" "$message" 2>/dev/null || true
     else
-        printf 'display notification "%s" with title "%s"' "$message" "$title" | osascript 2>/dev/null || true
+        printf 'display notification "%s" with title "%s"' "$message" "$title" | osascript 2>/dev/null \
+            || notify-send "$title" "$message" 2>/dev/null \
+            || true
     fi
 }
 
