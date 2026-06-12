@@ -252,8 +252,23 @@ SCRIPT="$HOME/IWE/.claude/scripts/rule-classifier.py"
 
 ### 12. Верификация (Haiku R23)
 
-Запустить sub-agent Haiku в роли R23 Верификатор (context isolation).
-Передать: (1) чеклист Day Close, (2) черновик итогов, (3) список обновлённых файлов.
+**12a. Собрать факты (основной агент — ДО вызова Haiku):**
+```bash
+DAYPLAN="current/DayPlan $(date +%Y-%m-%d).md"
+WEEKREPORT=$(ls current/WeekReport*.md 2>/dev/null | tail -1)
+# postcondition 9a: итоги дня записаны
+grep -c "Итоги дня" "$DAYPLAN" 2>/dev/null || echo "0"
+# postcondition 9b: WeekReport обновлён сегодня
+grep -c "$(date +%Y-%m-%d)" "$WEEKREPORT" 2>/dev/null || echo "0"
+# коммит сегодня есть
+git log --oneline --since="$(date +%Y-%m-%d) 00:00" | wc -l | tr -d ' '
+# DayPlan заархивирован
+ls "archive/day-plans/DayPlan $(date +%Y-%m-%d).md" 2>/dev/null && echo "archived" || echo "NOT archived"
+```
+
+**12b. Вызвать sub-agent Haiku (context isolation) с фактами:**
+Передать Haiku: (1) чеклист Day Close, (2) факты из шага 12a, (3) список обновлённых файлов.
+Haiku оценивает по **фактам**, не догадывается о состоянии файлов.
 По ❌ — исправить до показа пользователю.
 
 ---
