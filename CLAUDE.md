@@ -529,7 +529,7 @@ schema_version: 1
 
 ### Планировщик датозависимых процессов
 
-> ОС-зависим. Установщики ролей (`roles/*/install.sh`) выбирают **systemd user timers** на Linux (`systemctl --user`) или **launchd** на macOS (по наличию `launchctl` / `uname -s`). Так ставятся таймеры strategist (morning/weekreview), extractor (inbox-check), synchronizer (scheduler), secaudit-watchdog. Роли auditor и verifier — on-demand, без расписания.
+> ОС-зависим. Установщики ролей (`roles/*/install.sh`) выбирают **systemd user timers** на Linux (`systemctl --user`) или **launchd** на macOS (по наличию `launchctl` / `uname -s`). Так ставятся таймеры strategist (morning/weekreview), extractor (inbox-check), synchronizer (scheduler). Роли auditor и verifier — on-demand, без расписания.
 
 **Проверка:** `systemctl --user list-timers` (Linux) · `launchctl list` (macOS).
 **Логи:** `journalctl --user -u <unit>.service` (Linux).
