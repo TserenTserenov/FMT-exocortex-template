@@ -215,9 +215,11 @@ SCRIPT="{{HOME_DIR}}/IWE/.claude/scripts/check-index-health.py"
 **Postcondition 9a (машинная проверка — НЕ пропускать):**
 ```bash
 TODAY=$(date +%Y-%m-%d)
-grep -l "Итоги дня" ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan\ ${TODAY}.md 2>/dev/null \
-  | xargs grep -l "${TODAY}" 2>/dev/null \
-  | grep -q . && echo "9a OK" || echo "9a FAIL: итоги не найдены в DayPlan ${TODAY}"
+GOV="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+DAYPLAN="$GOV/archive/day-plans/DayPlan ${TODAY}.md"
+# Без xargs: имя файла содержит пробел («DayPlan 2026-06-13.md»), xargs резал его по whitespace → ложный FAIL (#173).
+[ -f "$DAYPLAN" ] && grep -q "Итоги дня" "$DAYPLAN" && grep -q "${TODAY}" "$DAYPLAN" \
+  && echo "9a OK" || echo "9a FAIL: итоги за ${TODAY} не найдены в archive/day-plans/DayPlan ${TODAY}.md"
 ```
 Результат `9a FAIL` → шаг НЕ помечать completed, вернуться к записи.
 
@@ -232,10 +234,14 @@ grep -l "Итоги дня" ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/da
 ```bash
 TODAY=$(date +%Y-%m-%d)
 DAY_NUM=$(date +%-d)
-# Сначала проверь WeekReport (split ОПТ-5), fallback на WeekPlan
-( grep -rl "Итоги.*${DAY_NUM}" ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekReport\ W*.md 2>/dev/null \
-  || grep -rl "Итоги.*${DAY_NUM}" ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekPlan\ W*.md 2>/dev/null ) \
-  | grep -q . && echo "9b OK" || echo "9b FAIL: итоги не найдены ни в WeekReport, ни в WeekPlan"
+GOV="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+# 9b намеренно через glob (WeekReport W*.md), НЕ xargs: glob раскрывается шеллом по-аргументно и сохраняет
+# границы имён с пробелами (в отличие от word-splitting в xargs, #173). Не «чинить» на xargs.
+# Токен дня ограничен ([^0-9]+ слева, [^0-9]|$ справа): «1» не матчит «31»/«12». Не упрощать до .*${DAY_NUM}.
+# Сначала WeekReport (split ОПТ-5), fallback на WeekPlan.
+( grep -rlE "Итоги[^0-9]+${DAY_NUM}([^0-9]|$)" "$GOV"/current/WeekReport\ W*.md 2>/dev/null \
+  || grep -rlE "Итоги[^0-9]+${DAY_NUM}([^0-9]|$)" "$GOV"/current/WeekPlan\ W*.md 2>/dev/null ) \
+  | grep -q . && echo "9b OK" || echo "9b FAIL: итоги за день ${DAY_NUM} не найдены ни в WeekReport, ни в WeekPlan"
 ```
 Результат `9b FAIL` → шаг НЕ помечать completed, вернуться к записи.
 
@@ -252,8 +258,26 @@ SCRIPT="$HOME/IWE/.claude/scripts/rule-classifier.py"
 
 ### 12. Верификация (Haiku R23)
 
-Запустить sub-agent Haiku в роли R23 Верификатор (context isolation).
-Передать: (1) чеклист Day Close, (2) черновик итогов, (3) список обновлённых файлов.
+**12a. Собрать факты (основной агент — ДО вызова Haiku):**
+```bash
+TODAY=$(date +%Y-%m-%d)
+GOV="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+DAYPLAN="$GOV/archive/day-plans/DayPlan ${TODAY}.md"   # тот же путь, что 9a (archive/, не current/)
+# postcondition 9a: итоги дня записаны (grep -c при 0 совпадений сам печатает 0 и выходит !=0 → отдельный if, без двойного «0»)
+if [ -f "$DAYPLAN" ]; then grep -c "Итоги дня" "$DAYPLAN"; else echo 0; fi
+# postcondition 9b: сегодняшняя сводка в WeekReport, fallback WeekPlan (зеркалит 9b — тот же двухуровневый путь)
+DAY_NUM=$(date +%-d)
+( grep -rlE "Итоги[^0-9]+${DAY_NUM}([^0-9]|$)" "$GOV"/current/WeekReport\ W*.md 2>/dev/null \
+  || grep -rlE "Итоги[^0-9]+${DAY_NUM}([^0-9]|$)" "$GOV"/current/WeekPlan\ W*.md 2>/dev/null ) | grep -q . && echo 1 || echo 0
+# коммит за сегодня есть (governance-репо)
+git -C "$GOV" log --oneline --since="${TODAY} 00:00" | wc -l | tr -d ' '
+# DayPlan заархивирован
+[ -f "$DAYPLAN" ] && echo "archived" || echo "NOT archived"
+```
+
+**12b. Вызвать sub-agent Haiku (context isolation) с фактами:**
+Передать Haiku: (1) чеклист Day Close, (2) факты из шага 12a, (3) список обновлённых файлов.
+Haiku оценивает по **фактам**, не догадывается о состоянии файлов.
 По ❌ — исправить до показа пользователю.
 
 ---
