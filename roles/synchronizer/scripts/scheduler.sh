@@ -55,7 +55,9 @@ if [ -z "${IWE_TEMPLATE:-}" ]; then
     echo "[$(date '+%H:%M:%S')] WARN: \$IWE_TEMPLATE не задана, scheduler использует fallback $HOME/IWE/FMT-exocortex-template. source ~/.zshenv?" >&2
 fi
 ROLES_DIR="$ROLES_DIR_RUNTIME"  # backward-compat alias для downstream-логики
-# notify.sh — read-only, не substituted
+# notify.sh — read-only, не substituted (берётся из FMT, не из .iwe-runtime).
+# Поэтому notify.sh САМ резолвит шаблоны из .iwe-runtime (см. #169): иначе его
+# $SCRIPT_DIR/templates указывает на FMT-копии с неразрешёнными {{WORKSPACE_DIR}}.
 if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then
     NOTIFY_SH="$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh"
 elif [ -f "$HOME/IWE/FMT-exocortex-template/roles/synchronizer/scripts/notify.sh" ]; then

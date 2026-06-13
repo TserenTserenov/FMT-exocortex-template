@@ -12,8 +12,26 @@
 
 set -e
 
+# #169: эмодзи (🚦🔴🟡🟢⚫) из DayPlan ломают python3 (json.dumps/html.escape) при локали C/POSIX
+# — UnicodeEncodeError: surrogates not allowed. Форсим UTF-8 для всех python3 в процессе,
+# включая sourced-шаблон (escape_html, urllib.quote).
+export PYTHONUTF8=1
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEMPLATES_DIR="${TEMPLATES_DIR:-$SCRIPT_DIR/templates}"
+
+# #169: scheduler.sh зовёт notify.sh из FMT (read-only), а FMT-шаблоны держат неразрешённые
+# {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}} → путь к DayPlan не резолвится, сообщение пустое.
+# Берём шаблоны из .iwe-runtime, куда build-runtime.sh подставил реальные пути
+# (runtime-overlay.yaml: templates/*.sh в списке substituted). Якорь: IWE_RUNTIME → IWE_WORKSPACE → $HOME/IWE.
+RUNTIME_TEMPLATES="${IWE_RUNTIME:-${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime}/roles/synchronizer/scripts/templates"
+if [ -z "${TEMPLATES_DIR:-}" ]; then
+    if [ -d "$RUNTIME_TEMPLATES" ]; then
+        TEMPLATES_DIR="$RUNTIME_TEMPLATES"
+    else
+        TEMPLATES_DIR="$SCRIPT_DIR/templates"
+        echo "WARN: notify.sh fell back to FMT templates (.iwe-runtime not built?). Run setup/build-runtime.sh." >&2
+    fi
+fi
 ENV_FILE="$HOME/.config/aist/env"
 
 AVAILABLE=$(ls "$TEMPLATES_DIR"/*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
