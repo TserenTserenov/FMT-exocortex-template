@@ -2,13 +2,13 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-06-08T06:52:09Z
+generated: 2026-06-15T11:23:38Z
 skills_dir: .claude/skills
 
 skills:
   - id: agent-fault
     name: "agent-fault"
-    description: "Регистрация косяка агента в системе учёта WP-316 L1. Без LLM — детерминированный скрипт."
+    description: "Register an agent fault in the WP-316 tracking system (L1). No LLM — deterministic script."
     version: 0.0.0
     layer: unknown
     status: active
@@ -18,7 +18,7 @@ skills:
     invoked_by: []
   - id: apply-captures
     name: "apply-captures"
-    description: "Разбор extraction-reports со status pending-review — решение R15 (accept/reject/defer), запись в Pack, обновление статуса, коммит. Вызывать при Close при наличии N>0 pending-review отчётов."
+    description: "Process extraction reports with pending-review status — R15 decision (accept/reject/defer), write to Pack, update status, commit. Call during Close when N>0 pending-review reports exist."
     version: 1.0.0
     layer: L1
     status: active
@@ -31,7 +31,7 @@ skills:
     - apply-captures
   - id: archgate
     name: "archgate"
-    description: "Оценка архитектурного решения по 7 характеристикам ЭМОГССБ (v3 — профиль без агрегатного балла, conjunctive screening). Используй когда пользователь предлагает архитектурное решение, новый инструмент или системное изменение."
+    description: "Evaluate an architectural decision against 7 ECOGSSS characteristics (v3 — profile without aggregate score, conjunctive screening). Use when the pilot proposes an architectural decision, new tool, or system change."
     version: 0.0.0
     layer: unknown
     status: active
@@ -45,7 +45,7 @@ skills:
     - decompose
   - id: audit-docs
     name: "audit-docs"
-    description: "Аудит документации репо: детекция drift'а между кодом и docs, отчёт coverage по категориям. Запускается вручную или по triggered drift critical."
+    description: "Audit repository documentation: detect drift between code and docs, report coverage by category. Run manually or on triggered drift critical."
     version: 0.1.0
     layer: L3
     status: active
@@ -57,7 +57,7 @@ skills:
     - audit-docs
   - id: audit-installation
     name: "audit-installation"
-    description: "Аудит пользовательской инсталляции IWE. Запускает scripts/iwe-audit.sh + MCP healthcheck + smoke-test ритуала через sentinel-механику (контракт dry-run-contract.md), передаёт отчёт subagent'у в роли VR.R.002 Аудитор (context isolation) → verdict ✅/⚠️/❌ по 6 компонентам (Inventory, L1 drift, DS-strategy, L3 customizations, MCP, ритуал). Используй после restore из бэкапа, после update.sh, или при еженедельной сверке."
+    description: "Audit a user's IWE installation. Runs scripts/iwe-audit.sh + MCP healthcheck + ritual smoke-test via sentinel mechanism (dry-run-contract.md), passes report to a VR.R.002 Auditor subagent (context isolation) → verdict pass/warn/fail across 6 components (Inventory, L1 drift, DS-strategy, L3 customizations, MCP, ritual). Use after restore from backup, after update.sh, or for weekly verification."
     version: 1.0.0
     layer: L1
     status: active
@@ -69,7 +69,7 @@ skills:
     - audit-installation
   - id: bottleneck-pick
     name: "bottleneck-pick"
-    description: "Скилл IWE — см. тело файла"
+    description: "Identify the pilot's development bottleneck across cp-profile slots and recommend the next growth step."
     version: 1.0.0
     layer: L1
     status: active
@@ -82,7 +82,7 @@ skills:
     - platform-bottleneck
   - id: check-secret
     name: "check-secret"
-    description: "Проверка фрагмента текста на возможные секреты (API keys, tokens, passwords) ПЕРЕД отправкой в чат / коммитом / публикацией. Третий слой защиты поверх pre-commit hook (B7.7a) и PostToolUse redact (B7.7b). Manual gate — пользователь явно вызывает на потенциально чувствительный текст."
+    description: "Check a text fragment for potential secrets (API keys, tokens, passwords) BEFORE sending to chat / committing / publishing. Third protection layer on top of pre-commit hook (B7.7a) and PostToolUse redact (B7.7b). Manual gate — user explicitly calls on potentially sensitive text."
     version: 1.0.0
     layer: L1
     status: active
@@ -94,7 +94,7 @@ skills:
     - check-secret
   - id: consent
     name: "consent"
-    description: "Управление consent в learning.tracking_consent — opt-in / opt-out / status / revoke. Обязательное условие для работы stage_evaluator worker (WP-253 Блок 2). GDPR-совместимо."
+    description: "Manage consent in learning.tracking_consent — opt-in / opt-out / status / revoke. Required for the stage_evaluator worker (WP-253 Block 2). GDPR-compliant."
     version: 1.0.0
     layer: L1
     status: active
@@ -106,7 +106,7 @@ skills:
     - consent
   - id: day-close
     name: "day-close"
-    description: "Протокол закрытия дня (Day Close). Алиас для /run-protocol close day — симметрия с /day-open."
+    description: "Day Close protocol. Alias for /run-protocol close day — symmetric with /day-open."
     version: 1.0.0
     layer: L1
     status: active
@@ -120,7 +120,7 @@ skills:
     - day-close
   - id: day-open
     name: "day-open"
-    description: "Протокол открытия дня (Day Open). Собирает вчерашние коммиты, issues, заметки, календарь, бота QA, Scout, мир — формирует DayPlan и compact dashboard."
+    description: "Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — builds DayPlan and compact dashboard."
     version: 1.1.0
     layer: unknown
     status: active
@@ -136,7 +136,7 @@ skills:
     - day-open
   - id: decompose
     name: "decompose"
-    description: "Декомпозиция деятельности на этапы с физическими артефактами и чеклистами приёмки. Детектор разрывов. Используй при открытии РП ≥3h (open-loop/problem-framing) или явном запросе «разложи на этапы». Носитель роли R29 Декомпозитор."
+    description: "Decompose work into stages with physical artifacts and acceptance checklists. Gap detector. Use when opening a WP ≥3h (open-loop/problem-framing) or on explicit request to break into stages. Executes R29 Decomposer role."
     version: 1.0.0
     layer: L3
     status: active
@@ -149,7 +149,7 @@ skills:
     - decompose
   - id: diagnose-iwe
     name: "diagnose-iwe"
-    description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1) прямо в VS Code / claude.ai. До 7 вопросов, ~7 мин. Сохраняет cp-профиль в цифровой двойник (browser) или Neon (VS Code). Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose-iwe» — или ПРОАКТИВНО когда видишь пустой cp_profile или нового пользователя без данных."
+    description: "Diagnose mastery level (Diagnostician R28, FORM.089 §6.1) directly in VS Code / claude.ai. Up to 7 questions, ~7 min. Saves cp-profile to digital twin (browser) or Neon (VS Code). Launch when pilot says 'run diagnostics', 'what is my level', '/diagnose-iwe' — or PROACTIVELY when you see an empty cp_profile or a new user without data."
     version: 1.0.0
     layer: L1
     status: active
@@ -175,7 +175,7 @@ skills:
     - strategy-session
   - id: extend
     name: "extend"
-    description: "Каталог расширяемости IWE: что можно настроить, какие extension points существуют, какие параметры доступны, как установить чужое расширение."
+    description: "IWE extensibility catalog: what can be customized, which extension points exist, which parameters are available, how to install a third-party extension."
     version: 1.0.0
     layer: unknown
     status: active
@@ -186,7 +186,7 @@ skills:
     - extend
   - id: fpf
     name: "fpf"
-    description: "Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантные принципы перед принятием решения."
+    description: "Loads applicable principles for a task from the Pack → SPF → FPF hierarchy. Use when you need to find relevant first principles before making a decision."
     version: 0.0.0
     layer: unknown
     status: active
@@ -199,7 +199,7 @@ skills:
     - fpf
   - id: iwe-bug-report
     name: "iwe-bug-report"
-    description: "Сообщить об ошибке или проблеме платформы IWE. Создаёт GitHub issue в FMT-exocortex-template."
+    description: "Report a bug or platform issue in IWE. Creates a GitHub issue in FMT-exocortex-template."
     version: 0.0.0
     layer: unknown
     status: active
@@ -210,7 +210,7 @@ skills:
     - iwe-bug-report
   - id: iwe-rules-review
     name: "iwe-rules-review"
-    description: "Еженедельное ревью культуры работы IWE (элемент 14 — Эволюция системы). Запускается при Week Close."
+    description: "Weekly review of IWE work culture (element 14 — System Evolution). Runs during Week Close."
     version: 1.0.0
     layer: unknown
     status: active
@@ -220,7 +220,7 @@ skills:
     invoked_by: []
   - id: iwe-update
     name: "iwe-update"
-    description: "Обновление IWE с объяснением изменений. Агент вызывает update.sh, парсит CHANGELOG, объясняет что изменилось, помогает адаптировать обновления к кастомизациям пользователя."
+    description: "Update IWE with change explanations. Agent calls update.sh, parses CHANGELOG, explains what changed, helps adapt updates to user customizations."
     version: 1.0.0
     layer: unknown
     status: active
@@ -232,7 +232,7 @@ skills:
     - day-open
   - id: ke
     name: "ke"
-    description: "Knowledge Extraction — извлечение и маршрутизация знания на рубеже работы. Используй когда обнаружен паттерн, принято решение, найдено различение или завершена подзадача."
+    description: "Knowledge Extraction — captures and routes knowledge at work boundaries. Use when you discover a pattern, make a decision, find a distinction, or complete a sub-task."
     version: 0.0.0
     layer: unknown
     status: active
@@ -257,7 +257,7 @@ skills:
     invoked_by: []
   - id: lesson-close
     name: "lesson-close"
-    description: "Закрыть занятие, открытое скиллом /lesson. Финализирует workbook/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в /lesson."
+    description: "Close a lesson opened with /lesson. Finalizes workbook/YYYY-MM-DD.md (frontmatter status, time metadata, duration), commits + pushes to the personal-guide repo. Triggers the closed delivery loop: push → GitHub webhook → sync_one_user_to_dt → Digital Twin updates in Neon. Use when pilot says 'close', 'done', 'finish', 'close lesson' — or after explicit task completion in /lesson."
     version: 1.0.0
     layer: L1
     status: active
@@ -270,7 +270,7 @@ skills:
     - personal-guide-render
   - id: month-close
     name: "month-close"
-    description: "Протокол закрытия месяца (Month Close). Стадия 7 каскада ВДВ v9 (PD.METHOD.008). Запускается в первый Пн месяца, до Strategy Session."
+    description: "Month Close protocol. Stage 7 of the OWC v9 cascade (PD.METHOD.008). Runs on the first Monday of the month, before Strategy Session."
     version: 1.0.0
     layer: unknown
     status: active
@@ -282,7 +282,7 @@ skills:
     - month-close
   - id: org-dev
     name: "org-dev"
-    description: "|"
+    description: "Organizational Development Manager (R31): guides the subject from an organizational change request (self/team/organization) to a concrete first step from SE/SM/PE. Step 0 — system type classifier (MIM.M.030, 7 questions). Step 3 — routing-table (MIM.M.031)."
     version: 1.0.0
     layer: L3
     status: active
@@ -294,7 +294,7 @@ skills:
     - org-dev
   - id: pack-creator
     name: "pack-creator"
-    description: "|"
+    description: "Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybrid/full SPF) and leads through phases. Protects the read-only upstream invariant via PreToolUse hook."
     version: 1.0.0
     layer: L3
     status: active
@@ -306,7 +306,7 @@ skills:
     - pack-creator
   - id: pack-new
     name: "pack-new"
-    description: "Создание нового Pack — guided flow по SPF: выбор домена, имя Pack, scaffold структуры, дорожная карта наполнения."
+    description: "Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap."
     version: 0.0.0
     layer: unknown
     status: active
@@ -318,7 +318,7 @@ skills:
     - pack-creator
   - id: peer-conversation
     name: "peer-conversation"
-    description: "Многотуровый диалог писателя (Claude) с напарником (Kimi) по задаче пилота (DP.SC.154). Ведёт turn-loop, обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
+    description: "Multi-turn dialog between writer (Claude) and partner (Kimi) on the pilot's task (DP.SC.154). Manages turn-loop, detects CONSENSUS/ESCALATE, after consensus — Decision Gate (record vs implement → review → verify → deploy), synthesizes report.md via Agent tool."
     version: 1.2.0
     layer: L3
     status: active
@@ -331,7 +331,7 @@ skills:
     - kimi-peer-writer
   - id: personal-guide-render
     name: "personal-guide-render"
-    description: "Собирает (или пересобирает) персональное руководство в УЖЕ существующем репо `personal-guide` (плоское имя, один на пилота) — читает RCS из Память.Derived, выбирает заготовки stage×domain, пишет 6 файлов через personal_write. Используй когда пилот просит «пересобери руководство», «обнови мой план», «обнови methods» — или когда репо создан, а контента ещё нет."
+    description: "Builds (or rebuilds) the personal guide in an EXISTING personal-guide repo (flat name, one per pilot) — reads RCS from Memory.Derived, selects stage×domain templates, writes 6 files via personal_write. Use when pilot asks 'rebuild guide', 'update my plan', 'update methods' — or when repo is created but has no content yet."
     version: 1.0.0
     layer: L1
     status: active
@@ -345,7 +345,7 @@ skills:
     - personal-guide-render
   - id: personal-guide-start
     name: "personal-guide-start"
-    description: "Bootstrap-обёртка — создаёт пустой репо `personal-guide` под аккаунтом пилота (плоское имя, без логина в названии; если ещё нет), затем вызывает /personal-guide-render для наполнения 6 файлами. Используй когда пилот в первый раз просит «создай мне персональное руководство», «хочу начать программу личного развития», «собери мне стартовый план»."
+    description: "Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in the name; if not yet created), then calls /personal-guide-render to populate 6 files. Use when pilot first asks 'create my personal guide', 'I want to start a personal development program', 'build me a starter plan'."
     version: 0.0.0
     layer: unknown
     status: active
@@ -358,7 +358,7 @@ skills:
     - personal-guide-render
   - id: platform-bottleneck
     name: "platform-bottleneck"
-    description: "Alias для /bottleneck-pick --layer platform. Deprecated — используйте /bottleneck-pick напрямую."
+    description: "Alias for /bottleneck-pick --layer platform. Deprecated — use /bottleneck-pick directly."
     version: 1.0.0
     layer: L3
     status: active
@@ -370,7 +370,7 @@ skills:
     - platform-bottleneck
   - id: restore-exocortex
     name: "restore-exocortex"
-    description: "Восстановление памяти IWE из exocortex-бэкапа на новом устройстве/после потери — NL-обёртка над restore-from-exocortex.sh."
+    description: "Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-from-exocortex.sh."
     version: 1.0.0
     layer: L1
     status: active
@@ -382,7 +382,7 @@ skills:
     - restore-exocortex
   - id: run-protocol
     name: "run-protocol"
-    description: "Пошаговое выполнение протокола ОРЗ с обязательной отметкой каждого шага. Предотвращает пропуск шагов (включая верификацию)."
+    description: "Step-by-step execution of the OWC protocol with mandatory checkpoint at each step. Prevents skipping steps (including verification)."
     version: 0.0.0
     layer: unknown
     status: active
@@ -395,7 +395,7 @@ skills:
     - audit-installation
   - id: setup-wakatime
     name: "setup-wakatime"
-    description: "Настройка WakaTime time-tracking для Claude Code и VS Code"
+    description: "Set up WakaTime time-tracking for Claude Code and VS Code."
     version: 0.0.0
     layer: unknown
     status: active
@@ -406,7 +406,7 @@ skills:
     - setup-wakatime
   - id: strategy-session
     name: "strategy-session"
-    description: "Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). День-1+ → weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
+    description: "Strategy session — dispatcher. Day 0 (no Strategy.md/WeekPlan) → initial flow (goals, dissatisfactions, first WeekPlan). Day 1+ → weekly flow (requires draft from session-prep). Triggers: 'run strategy session', 'first strategy session', 'strategy session', 'let's strategize'."
     version: 1.0.0
     layer: L1
     status: active
@@ -419,7 +419,7 @@ skills:
     - strategy-session
   - id: think
     name: "think"
-    description: "ADI-цикл структурированного рассуждения (Abduction-Deduction-Induction-Audit-Decide). Используй для сложных решений, когда нужно рассмотреть несколько гипотез."
+    description: "ADI-cycle structured reasoning (Abduction-Deduction-Induction-Audit-Decide). Use for complex decisions when multiple hypotheses need to be considered."
     version: 0.0.0
     layer: unknown
     status: active
@@ -429,7 +429,7 @@ skills:
     invoked_by: []
   - id: transcribe
     name: "transcribe"
-    description: "Транскрипция аудио/видео файлов через MLX Whisper (Apple Silicon). Использование: /transcribe path/to/file.mp3"
+    description: "Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3"
     version: 1.0.0
     layer: L1
     status: active
@@ -441,7 +441,7 @@ skills:
     - transcribe
   - id: verify
     name: "verify"
-    description: "Верификация артефакта по эталону из Pack. Загружает роль VR.R.001 (Верификатор) с context isolation — проверяет результат, а не процесс создания."
+    description: "Verify an artifact against a Pack standard. Loads VR.R.001 (Verifier) role with context isolation — checks the result, not the creation process."
     version: 0.0.0
     layer: unknown
     status: active
@@ -458,7 +458,7 @@ skills:
     - audit-docs
   - id: w-reflection
     name: "w-reflection"
-    description: "Записать W-рефлексию (мировоззренческий слот RCS) в learning.w_reflections. Используется Диагностом R28 (MIM.R.009) или вызывается пользователем после рефлексивной сессии. Влияет на gate Д→П (FORM.089 §5.2)."
+    description: "Record a W-reflection (worldview slot of RCS) in learning.w_reflections. Used by Diagnostician R28 (MIM.R.009) or called by the user after a reflective session. Affects the D→P gate (FORM.089 §5.2)."
     version: 1.0.0
     layer: L1
     status: active
@@ -470,7 +470,7 @@ skills:
     - w-reflection
   - id: week-close-pilot
     name: "week-close-pilot"
-    description: "Скилл IWE — см. тело файла"
+    description: "Run the pilot-facing Week Close protocol with progress review and carry-over."
     version: 1.0.0
     layer: L3
     status: active
@@ -482,7 +482,7 @@ skills:
     - week-close-pilot
   - id: week-close
     name: "week-close"
-    description: "Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап, dirty repos)."
+    description: "Week Close protocol. 7-day retrospective + carry-over to new week + platform steps (backup, dirty repos)."
     version: 1.2.0
     layer: L1
     status: active
@@ -498,7 +498,7 @@ skills:
     - week-close
   - id: wp-new
     name: "wp-new"
-    description: "Создание нового рабочего продукта (РП) с записью в 5 мест атомарно. Используй когда появляется новая задача, которой нет в плане недели."
+    description: "Create a new Work Product (WP) with atomic registration in 5 places. Use when a new task appears that is not in the week plan."
     version: 1.0.0
     layer: L1
     status: active

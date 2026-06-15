@@ -1,6 +1,6 @@
 ---
 name: kimi-peer-writer
-description: Peer session DP.SC.154 where Kimi = writer, Claude = partner. Launched with a simple phrase. Includes OWC Opening and Closing, turn-loop, escalations, Decision Gate (record vs implement → review → verify → deploy), deferred finalization and verification.
+description: Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Opening и Closing, turn-loop, эскалации, Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), отложенную финализацию и верификацию.
 argument-hint: "<описание задачи> | --list | --interrupt <session_id> | --finalize <session_id>"
 version: 1.2.0
 layer: L1
@@ -29,8 +29,8 @@ routing:
 Определить режим из `$ARGUMENTS`:
 
 - `--list` → прочитать `${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/00-index.md`, вывести таблицу. Стоп.
-- `--interrupt <id>` → Read `.claude/skills/kimi-peer-writer/modes.md`. Перейти к **Шагу 5 (interrupt-режим)**. Стоп после.
-- `--finalize <id>` → Read `.claude/skills/kimi-peer-writer/modes.md`. Перейти к **Шагу 6 (finalize-режим)**. Стоп после.
+- `--interrupt <id>` → перейти к **Шагу 5 (interrupt-режим)**. Стоп после.
+- `--finalize <id>` → перейти к **Шагу 6 (finalize-режим)**. Стоп после.
 - Иначе → новая сессия, продолжать к Шагу 0б.
 
 ---
@@ -511,6 +511,7 @@ with open(meta_path, encoding='utf-8') as f:
             meta[k.strip()] = v.strip().strip('"').strip("'")
 
 writer_agent = meta.get('writer_agent', '')
+peer_agent = meta.get('peer_agent', '')
 start_time = meta.get('start_time', '')
 escalations_count = meta.get('escalations_count', '0')
 task_desc = meta.get('task_description', '')
@@ -561,9 +562,9 @@ Verify-якоря обязательны для код-ссылок (file:line-r
 ---
 schema_version: 1
 session_id: {session_id}
-generated_at: {datetime.datetime.utcnow().isoformat()}Z
+generated_at: {datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', '')}Z
 writer: {writer_agent}
-peer: <из meta.yaml: peer_agent>
+peer: {peer_agent}
 duration_min: <(end_time − start_time) в минутах, целое>
 escalations_count: {escalations_count}
 result_class: agreed | partial | escalated | not-agreed
@@ -572,8 +573,8 @@ confidence_basis: <обязателен если confidence <= med; иначе o
 ttl_event: <«до merge PR-NNN» | «до WP-NNN» | «до отмены пилотом» | omit>
 cost_usd: <если известно; иначе omit>
 cost_source: api | estimated | missing
-roles: <из meta.yaml: roles — {agent_id: [DP.ROLE.NNN, ...]} или omit если пусто>
-ad_hoc_roles: <из meta.yaml: ad_hoc_roles — {role_name: {agent_id, rationale, first_used_turn}} или omit если пусто>
+roles: <из meta.yaml: roles — {{agent_id: [DP.ROLE.NNN, ...]}} или omit если пусто>
+ad_hoc_roles: <из meta.yaml: ad_hoc_roles — {{role_name: {{agent_id, rationale, first_used_turn}}}} или omit если пусто>
 discovery_turns: <из meta.yaml: discovery_turns, целое; omit если 0>
 ---
 
@@ -669,7 +670,7 @@ finally:
     os.unlink(tmp_path)
 
 if result.returncode != 0 or os.path.getsize(report_file) == 0:
-    now = datetime.datetime.utcnow().isoformat() + 'Z'
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', '') + 'Z'
     with open(report_file, 'w', encoding='utf-8') as f:
         f.write(f"""---
 session_id: {session_id}
@@ -782,4 +783,35 @@ git push
 
 ---
 
-> Режимы `--interrupt`, `--finalize` и верификация → `.claude/skills/kimi-peer-writer/modes.md`
+## Шаг 5. Interrupt-режим
+
+При `--interrupt <session_id>`:
+
+1. Извлечь месяц из id: `MONTH=$(echo "$session_id" | cut -c1-7)` → найти `sessions/$MONTH/$session_id/meta.yaml`.
+2. Обновить (Bash sed): `status: interrupted`, `end_time: <now>`, `turns_count: <число файлов>`.
+3. Найти строку с `<session_id>` в `sessions/00-index.md` и заменить: статус → `interrupted`, report → `—`.
+4. Commit + push.
+
+---
+
+## Шаг 6. Finalize-режим
+
+При `--finalize <session_id>`:
+
+1. Извлечь месяц: `MONTH=$(echo "$session_id" | cut -c1-7)`. Проверить что папка `sessions/$MONTH/$session_id` существует и содержит хотя бы `00-writer.md`.
+2. Прочитать `meta.yaml` — взять `task_description`, `start_time`, `escalations_count`.
+3. Выполнить **Шаг 4.2** (синтез report-draft.md через `claude-peer-adapter.sh`) с теми же инвариантами и fallback.
+4. Обновить `meta.yaml` (Bash sed): `status: completed`, `end_time: <now>`, `turns_count: <число файлов>`.
+5. Обновить строку в `sessions/00-index.md`: статус → `completed`, report → ссылка.
+6. Commit + push.
+
+Используется для восстановления прерванных сессий без перезапуска turn-loop.
+
+---
+
+## Верификация отчёта
+
+Для проверки любого существующего report.md написать в чат:
+«проверь отчёт сессии `<session_id>`»
+
+Запустить субагент (Sonnet, context isolation): прочитать все файлы сессии + report.md, сверить с инвариантами schema_version=1 (frontmatter, §4 непустой при agreed, verify-якоря).

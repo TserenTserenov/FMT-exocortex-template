@@ -28,177 +28,27 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+
 ## [Unreleased] — обновлено 2026-06-15
 
 ### Added
 
+- `5e21531` feat(WP-7/SP1): refactor skill-promote.sh — safety, validation, tests
 - `53cd985` feat(day-open): add ТВС labeling step to skill template (§6b2)
 - `36febfd` feat(strategy): модель ТВС в шаблон (стратегирование + ОРЗ)
 - `673474d` feat(WP-388): проекция базы стиля — 4 новых элемента регистра (зеркало L0)
-- `dd117c5` feat(styles): WP-412 Ф11 — дисциплина языковых стилей в шаблон IWE
-- `83434ea` feat: promote pull-on-touch.sh — детерминированный Pull-on-Touch (CLAUDE.md §2 п.5)
-- `1f0eba6` feat(linux): cross-platform portability — env-bootstrap + systemd + OS-aware (clean integration of #179/#181)
-- `6ef52a7` feat(hooks): destructive-guard + check-trash (focused, extracted from #176)
-- `213065e` feat(day-open): smoke-tests integration — шаг 5 SKILL больше не PENDING (bug-2026-06-12)
-- `ba94993` feat(WP-7/DOA1): осознанная синхронизация day-open-scaffold.sh
-- `47ec08b` feat: model lifecycle (analysis/testing/active/archived) for local-llm stack (РП404 Ф2)
-- `0ce2cda` feat: promote local-llm stack to template (РП404 Ф3)
-- `7ca6e2e` feat(wp7): MFC4 — auto-manifest generation + verify + CI gate
-- `7a87f87` feat(conveyor): PR template surfacing 6 stations to reviewer
-- `34c6e36` feat(docs): add developer-guide and conveyor-card template
-- `23b0494` feat(FMT): auto-manifest generation with excluded_paths (WP-7 MFC4)
-- `a969580` feat: promote check-wp-format.py to platform (WP-7 follow-up)
-- `718ee1f` feat: token optimization — lazy-load roles, distinctions, peer session modes
-- `bdd5ec2` feat(setup): авторизация MCP по тирам — T3/T4 CLI, T1-T2 OAuth
-- `7b33865` feat: density-reinjection стиля + блок-режим детектора (peer-session 2026-06-08-23)
-- `bfa7172` feat(WP-405 Ф2): translate all 39 SKILL.md descriptions to English
-- `321bab6` feat(distinctions): Gateway с одной ответственностью ≠ Gateway с прикладной логикой
-- `a24f295` feat: memory sync hook + exocortex restore (closes #125)
-- `274e1cf` feat(catalogs): generate-catalogs.py + публичные каталоги скиллов/скриптов/ролей
-- `40db8e7` feat(WP-7-DAP1B): day-close --sessions + scaffold sessions-today integration
-- `d533a9e` feat(agents): self-check после peer-сессии — разговорный стиль (DP.SC.050)
-- `d3727f5` feat(peer): стиль report.md — разговорный для пилота (DP.SC.050)
-- `4eea41e` feat(WP-7): active-wp-sweep awaiting-batch + WeekPlan union + scaffold compact dashboard
-- `61c46f3` feat(peer): sync kimi-peer-adapter.sh v3 from DS-my-strategy (selective merge)
-- `42e015f` feat(WP-356): промоция артефактов Day Open pipeline (5 скриптов + 1 хук)
-- `e5c86a0` feat(WP-378): навык /discovery-session + распаковка strategy-session
-- `4f6a0b9` feat(strategy-session): РП393 Ф2c appendix consent-check + dt-guide-prep
-- `bce2037` feat(roles): распаковка R1 — Стратег сужен, добавлен Плановик (DP.ROLE.066)
-- `edda5a3` feat(wp-398): Ф4 — тесты CLI-слоя agent-dashboard.py + фикс normalize_file_path
-- `9ae1746` feat(wp398-f5): командный дашборд --repo + Agent Core инструкция
-- `754a203` feat(wp-383): promote routing hint в peer-conversation skill (L1)
-- `9a04944` feat(wp-7): WP-REGISTRY Naming rule в Agent Core SYNC-CORE
-- `77f5052` feat(wp-7): close-wp.sh + create-wp.sh archive-заготовка
-- `be7b9ce` feat(multi-agent): поддержка Kimi Code и Hermes в точках входа
-- `8d0d8e5` feat(style): правило #5 «— это» + детектор R5-emdash в response-clarity-hook
-- `57f6ee7` feat(wp-395): Ф4 — универсальный дашборд agent-dashboard.py для IWE-шаблона
-- `560c357` feat(template-sync): Status Reporting (WP-395) + staged validator mode
-- `fccd93f` feat(WP-388 Ф8-Ф10): трёхслойная архитектура стиля + enforce
-- `b11ea42` feat(wp-394): Ф4.3-4.5 — промоция паттернов в шаблон + восстановление дрифта
-- `e4a8645` feat(wp-394): Ф4.2 — single-source автоген AGENTS.md из ядра CLAUDE.md
-- `88d9e33` feat(wp-394): Ф3.1+Ф4.6 — IWE instructions tiering + model tiering in peer sessions
-- `7295b6f` feat(roles/strategy): WP-393 Ф5+Ф6 — role-boundaries, калибр, ценность, cycles, OKR
-- `0ac4a91` feat(strategist/prompts): WP-393 Ф3 остатки — ВДВ-структура для 6 промптов
-- `b623b3a` feat(WP-391 Ф5): browser mass-user MVP — CI template + skill index
-- `b51fe40` feat(skills): migrate 5 skills to FMT (WP-387 Ф3)
-- `eafefd3` feat(WP-393 Ф4+Ф2c): обновление шаблонов + appendix
-- `8bb8ade` feat(strategist): WP-393 Ф2 stepwise strategy session (monthly + weekly)
-- `672f36d` feat(style): sync communication-style rules to AGENTS.md and CLAUDE.md
-- `53ea30a` feat(style): sync CLAUDE.md with WP-code format rule and communication-style ref
-- `0f45e0d` feat(communication-style): add WP-code format rule and self-check
-- `cc7c196` feat: auto-sync version badge via CI + local script
-- `03363b7` feat(0.35.3): communication-style-base + sync script + downstream markers
-- `cd1e268` feat(0.35.3): community-facing communication style
-- `ea6625e` feat(0.35.1): promote response-style rules to template (S-37 v2 + AGENTS.md)
-- `996df2a` feat(peer-skill): content-roles §1.5 + frontmatter ad_hoc_roles/discovery_turns
-- `08d6f2e` feat(hardening): stale-bot + TG alert env fallback (peer-session 2026-06-01-25) (#148)
-- `cb45d31` feat: WP-337/З Ф6 — peer-session инфраструктура в шаблоне (v0.35.0)
-- `7e9aa78` feat(triage): post-2026-06-01 backlog cleanup infrastructure
-- `dc18e90` feat(detection): MVP FMT critical/deadline issues alert (peer-session 2026-06-01-18) (#145)
-- `6be164d` feat(hindsight): WP-337/А.13 FMT template — docker-compose, start, launchd, docs
-- `43e8268` feat(WP-377): promote pack-creator + org-dev + spf-guard
-- `f47bf49` feat(WP-348): promote apply-captures defer_until invariant to L1
 
 ### Changed
 
 - `6c8a4cd` docs(WP-362 Ф8.1): developer/README — тиры T1-T4 → T0-T4 (консистентность с каноном)
 - `6fdb1b0` docs(WP-362): Ф8 — FMT/docs self-contained онбординг
-- `8b5d570` refactor(day-open+manifest): SHLC1 dead code + DOPD1 lazy templates
-- `3922f45` refactor(COL-06): rename communication style levels L0/L1/L2 → S0/S1/S2
-- `5b617a9` docs: #171 правки гайда для внешнего контрибьютора + #177 §9 реальный планировщик (#189)
-- `8b982d1` Merge pull request #186 from TserenTserenov/chore/credit-denis-linux
-- `da65556` docs(changelog): credit @TriplEight for Linux portability (#179/#181) + safety hooks (#176)
-- `5ca5e7b` Merge pull request #183 from TserenTserenov/feat/destructive-guard-focused
-- `4f4c232` Merge pull request #184 from TserenTserenov/feat/linux-portability-clean
-- `44f4261` chore(fpf): обновление fpf-reference.md до commit 093d30e
-- `cf9d198` docs(conveyor): update README links after guide.md -> developer-guide.md
-- `62b36df` docs(conveyor): rename guide.md -> developer-guide.md
-- `1b92003` docs(conveyor): convert guide.md code-paths to real markdown links
-- `35fbbca` docs(conveyor): list stations at first mention + honest 'agent knows framework' claim
-- `3841a2f` docs(conveyor): fix links to docs/developer/ + repo-loading step content
-- `66fc7fd` docs(conveyor): collect developer docs under docs/developer/ + add repo-loading step
-- `c3df606` docs(readme): link conveyor onboarding for T4+ developers
-- `d951be1` docs(conveyor): add 'work in your own IWE' + T4 vs T1-T3 framing
-- `04ff150` docs(conveyor): single entry point + fix author-leak/class-scheme
-- `96003c5` Merge pull request #166 from TserenTserenov/fix/pr-164-blockers
-- `51f609d` docs(WP-349 Ф31): web-onboarding v2 — freemium, две оси, без триала
-- `ba4f5e6` docs(WP-349): Ф34 — онбординг-доки под канон двух осей
-- `6a634a8` chore: обновление promotion-status (peer-conversation skill)
-- `8b683de` docs(readme): упрощена формулировка про другие агенты
-- `e76758e` docs(portability): audience-based descriptions + Hermes CLI (Вариант В)
-- `0acb88d` chore: sync rules + protocols from template-sync (2026-06-04)
-- `5840624` refactor: externalize downstream paths from sync script to yaml config (WP-388)
-- `b6ddac7` refactor: FMT-копия стиля → проекция Pack SoT + обобщённый sync (WP-388 Ф8)
-- `7c7768f` docs: РП-394 Ф4.3-4.5 — PREFIX/BODY/TAIL + memory-lifecycle + Hermes coordination в шаблон [no-registry-touch]
-- `79defa3` refactor(WP-393): правки Клода — ВДВ в intro блоков, /diagnose-iwe, R{N}-цель, _не задано_
-- `0631439` refactor(session-prep): WP-393 Ф3 remove WORKPLAN anti-pattern
-- `1e3cd92` docs(dispatcher): OUTDATED comment — canonical at workspace scripts/
-- `0a15c8a` docs(skills): Ф4 WP-386 — явный Шаг 1 Extensions checks + WHY-комментарий dry-run sentinel
-- `c54ff45` ci: migrate actions/checkout@v4 → v6, github-script@v7 → v8
-- `76be56b` docs(CHANGELOG): корректировки 0.35.0 по post-deploy verify
-- `22cdd0d` chore(WP-377): R29 Детектор → R47 в hooks/lib/detectors
 
 ### Fixed
 
+- `a823c51` fix(WP-7): setup/validate-template.sh delivery, CLAUDE.md conflict hard-fail, manifest coverage
 - `8073146` fix(WP-7): FMT delivery — .claude/styles propagation, manifest sync, smoke Test 6e
 - `cb8a1a6` fix(COL-06): communication-style-base.md — L1 → S1 (авторский слой)
 - `06b9d79` fix(WP-376): A52/A49/A50/A51 — template hygiene и agentigore sample
-- `c869a3c` fix(pull-on-touch): autostash вместо пропуска-на-грязном — тянет даже на dirty-репо
-- `5cd2c24` fix(day-open): уточнить guard и добавить backlink в templates.md
-- `158b31b` fix(backup): #172 cloud-scheduler stops clobbering exocortex/CLAUDE.md (#188)
-- `9725133` fix(notify): #169 DayPlan Telegram broken — resolve templates from .iwe-runtime + force UTF-8 (#187)
-- `4cf41d7` fix(day-close): #173 xargs false-FAIL in 9a + incorporate #180 facts-for-Haiku (#185)
-- `8e5c49e` fix: regenerate update-manifest.json for destructive-guard + check-trash hooks
-- `b02fd7b` fix(linux): regenerate update-manifest.json for systemd units + bootstrap
-- `599caa7` fix: установщик читал старый ключ каталога candidates вместо models (РП404)
-- `c7b92f4` fix(wp7): generate-manifest.sh skips [Unreleased], add verify-manifest.sh to excluded_paths
-- `e814373` fix(FMT): close manifest coverage gap (WP-7 MFC1-MFC3)
-- `d12febc` fix(manifest): register 4 new lazy-load files from PR #164/#166
-- `9a795af` fix: typo in role-prefixes + trim protocol-open to ≤150 lines
-- `1ad08db` fix(pr-164): remove duplicate templates.md, empty facts-gathering; add memory index entries
-- `5600848` fix(strategy-session): системный фикс — СТОП в step-файлах, resume-механизм, устранение молчаливых переходов
-- `8a29f3b` fix(strategy-session): БЛОКИРУЮЩЕЕ — один шаг за раз, ждать ответа пилота перед следующим
-- `a80c7d1` fix(skills): translate ke/fpf descriptions to English for SkillHub compatibility
-- `b354254` fix(strategy-session): стиль «на пальцах» + подавление MonthClose в weekly
-- `ca72920` fix(strategy-session): WP-393 Ф7.1 — переключение на новый процесс + обход Backlog в шаге 07
-- `c881f06` fix(diagnose-iwe): drill-down уточняет ВСЕ слабые срезы (РП5 Ф-26)
-- `1d65a90` fix(cross-platform): Ф-25 WP-5 — три дефекта Windows/Linux совместимости
-- `38fd6b0` fix(strategist): WP-5 Ф-27 — два бага в notify-шаблоне дайджеста
-- `1a6a1be` fix(update): protect personal L4 config day-rhythm-config.yaml from clobber
-- `be4a84c` fix: batch fix for issues #161 #162 #35 #57 #17 + pipeline improvement
-- `20f0afa` fix(checks): anchored grep ^status: prevents false-positive from report body text
-- `b2c42ea` fix(template): replace DS-my-strategy with {{GOVERNANCE_REPO}} in peer-conversation SKILL.md
-- `1392b9b` fix(day-close): step 1c → 1b + исправить skip-сообщение check-index-health
-- `b24c91e` fix(peer): PPID fallback + idle/peer-session status guards в kimi-peer-adapter.sh
-- `ac4e3af` fix(#160,#159,#158): security gate B7.3 + day-close after hook + missing scripts
-- `6fd9e77` fix(peer): pidfile fallback uses PPID, remove orphan cleanup
-- `a85cf57` fix(fmt7): pre-commit валидирует только staged-скрипты (#150 collateral)
-- `efadfa0` fix(fmt): триаж 4 issues + сигнальный канал Day Open
-- `136c4b1` fix(day-close): шаг 3c — явное done-форматирование строк WP-REGISTRY
-- `e4e3c96` fix(wp-395): recursive-retry guard в get_agents() — max 1 refresh
-- `0ce1864` fix(wp-393): resolve 3 medium review findings
-- `8168e05` fix(peer-infra): synthesis 4.2 stdout-only — остаточный High из баг-репорта WP-393
-- `830ff9d` fix(peer-infra): адаптер passthrough --permission-mode + SKILL.md stdout-only
-- `cb39a82` fix(day-close): backup AGENTS.md to exocortex alongside CLAUDE.md
-- `fa8878d` fix(communication-style): merge rule 1a into rule 2, fix numbering
-- `190802e` fix(peer): add negative scope guard to kimi-peer-writer SKILL.md Шаг 3.1
-- `103a14f` fix(peer-writer): close-signal detector, explicit mv, Python path fix, pre-commit guard
-- `64376e3` fix(peer-writer): add 180s timeout to report synthesis subprocess
-- `f28a6da` fix(server-news): silent exit when news.enabled=false
-- `8a0a5c6` fix(create-wp): учитывать жирный шрифт **NNN** при парсинге номеров РП
-- `1ead2bc` fix: update version badge to 0.35.3
-- `46a7606` fix(scripts): remove author-specific paths from sync-communication-style template
-- `15ff497` fix(0.35.2): hotfix S-37 — A1-A11 labels in CLAUDE.md + frontmatter cleanup
-- `7e0ebd6` fix(build-runtime): remove leftover conflict markers from PR #50 merge
-- `480b277` fix: chmod +x all .sh files in build-runtime
-- `35c473f` fix(update): add .claude/scripts/ to workspace propagation
-- `f112f0d` fix: iwe-audit portability + release-audit-log.md (closes #24, #142) (#144)
-- `575ae4e` fix(notify): make TEMPLATES_DIR overridable via environment (#49)
-- `934e9c9` fix(verify): add model mapping for verification_class in wp type (#47)
-- `4a00339` fix(dt-collect): replace hardcoded DS-strategy with $GOVERNANCE_DIR (#46)
-- `065e60a` fix(day-close): portability — HOME_SLUG + rsync --delete (#119)
-- `df591ea` fix(dry-run-gate): make sentinel discovery session-agnostic (closes #59) (#60)
-- `bffd92c` fix(skill): quote pack-new description in SKILL.md frontmatter (#137)
 
 
 ## [0.35.4] — 2026-06-15
