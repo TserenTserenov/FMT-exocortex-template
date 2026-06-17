@@ -38,10 +38,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+
+
 ## [Unreleased] — обновлено 2026-06-17
 
 ### Added
 
+- `d2dd196` feat(WP-422/SP1): promote skill iwe-restore to platform (L1)
 - `a3ecd21` feat(skills): promote agent-fault + apply-captures to L1 (WP-422 Ф7 audit)
 - `157f483` feat(agent-trace): promote uploader+recorder hook fixes to platform
 - `8793f64` feat(skill-creator): add Step 2.5 update mode for existing skills (sync from IWE WP-422 Ф7)
@@ -56,6 +59,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `ed2cca0` docs: add KIMI-SETUP.md — инструкция по подключению Kimi к IWE
 - `d98c62e` chore(skill-creator): bump version to 0.3.0 (sync from IWE)
 - `f820cb9` docs(local-llm): sync ADR-001 venv-Python note from author SoT (WP-404 Ф4)
 - `a512810` chore(day-close): commit dirty changes from 2026-06-15

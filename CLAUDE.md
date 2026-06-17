@@ -161,6 +161,10 @@ git add .
 git add -A
 ```
 
+**Before every commit: verify staged scope.**
+Run `git diff --cached --name-only` and confirm that all staged files belong to the current session's WP/context.
+If unexpected files appear — `git restore --staged <file>` before committing.
+
 ## Artifact Naming
 
 **Do not invent artifact names.** Names for sections, documents, RPs, and deliverables must come from the plan/task you received. If the task is silent on a name — report "need clarification on name" instead of making one up.
