@@ -257,6 +257,25 @@ fi
 
 # Get list of staged .sh files
 STAGED_SH=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null)
+
+# Executable-bit guard: every tracked shell script must be committed as 100755.
+# Prevents regressions where new .sh files arrive as 100644 and fail at runtime.
+if [ -n "$STAGED_SH" ]; then
+    NON_EXEC_SH=""
+    for file in $STAGED_SH; do
+        mode=$(git ls-files -s -- "$file" | awk '{print $1}' | head -1)
+        if [ "$mode" != "100755" ]; then
+            NON_EXEC_SH="${NON_EXEC_SH}${file} (${mode:-missing})\n"
+        fi
+    done
+    if [ -n "$NON_EXEC_SH" ]; then
+        echo "EXECUTABLE-BIT: FAIL — staged .sh files must be executable (100755)"
+        printf "%b" "$NON_EXEC_SH" | sed 's/^/  /'
+        echo "  Fix: git update-index --chmod=+x <file>"
+        exit 1
+    fi
+fi
+
 [ -z "$STAGED_SH" ] && exit 0
 
 check_pattern() {
