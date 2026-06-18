@@ -11,17 +11,18 @@
 # TTL: 600 секунд (10 минут) от mtime.
 #
 # Принципы:
-# - fail-CLOSED при отсутствии jq (контракт §Fail-safe)
-# - exit 0 = allow (sentinel отсутствует / TTL истёк)
+# - jq отсутствует → skip с явной диагностикой (setup должен ставить jq; см. issue #192)
+# - exit 0 = allow (sentinel отсутствует / TTL истёк / gate skipped из-за missing jq)
 # - exit 2 = block (с диагностикой в stderr)
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# Fail-CLOSED: jq обязателен
+# jq нужен для разбора payload. Если его нет, не брикуем все write-tools:
+# setup/requirements должны установить jq, а gate явно сообщает, что проверка пропущена.
 if ! command -v jq >/dev/null 2>&1; then
-    echo "[dry-run-gate] FAIL-CLOSED: jq missing, blocking by default" >&2
-    exit 2
+    echo "[dry-run-gate] SKIPPED: jq missing; install jq to enable dry-run protection" >&2
+    exit 0
 fi
 
 # Discovery: найти любой sentinel /tmp/iwe-dry-run-*.flag.
@@ -137,11 +138,19 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
     [ -z "$CMD" ] && exit 0
 
+    # Cleanup-исключение: разрешить строго cleanup собственного dry-run sentinel и ничего больше.
+    # Примеры allowed: rm -f /tmp/iwe-dry-run-abc.flag, rm -f '/tmp/iwe-dry-run-*.flag'
+    CLEANUP_CMD=$(echo "$CMD" | sed -E "s/[\"']//g; s/[[:space:]]+/ /g; s/^ //; s/ $//")
+    if echo "$CLEANUP_CMD" | grep -qE '^rm -f /tmp/iwe-dry-run-[A-Za-z0-9._*-]+\.flag$'; then
+        exit 0
+    fi
+
     # Удалить «> /dev/null» из команды для проверки опасных redirect'ов
     CHECK=$(echo "$CMD" | sed -E 's@>[[:space:]]*/dev/null@@g; s@2>&1@@g')
 
-    # Опасные паттерны
-    if echo "$CHECK" | grep -qE '(^|[[:space:]&;|])git[[:space:]]+(commit|push|pull|reset|merge|rebase|checkout[[:space:]]+-)([[:space:]]|$)'; then
+    # Опасные паттерны. Учитываем git global opts: -C, --git-dir, --work-tree.
+    GIT_GLOBAL_OPTS='(-C[[:space:]]+[^[:space:]]+|--git-dir(=|[[:space:]]+)[^[:space:]]+|--work-tree(=|[[:space:]]+)[^[:space:]]+)'
+    if echo "$CHECK" | grep -qE "(^|[[:space:]&;|])git([[:space:]]+${GIT_GLOBAL_OPTS})*[[:space:]]+(add|commit|push|pull|reset|merge|rebase|checkout[[:space:]]+-|mv|rm)([[:space:]]|$)"; then
         block "$CMD"
     fi
     if echo "$CHECK" | grep -qE '[[:space:]]>[[:space:]]'; then
