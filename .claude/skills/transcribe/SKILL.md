@@ -13,9 +13,20 @@ routing:
   deterministic: true
   script_path: "scripts/iwe-transcribe.sh"
   optimization_priority: 2
+agents: none
+interaction: one-shot
+gates_required: []
+gates_enforced: []
+gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
 ---
 
 # Транскрипция аудио/видео
+
+## When to use
+
+Используй, когда нужно локально расшифровать аудио или видеофайл через MLX Whisper на Apple Silicon.
+
+## Algorithm
 
 Транскрипция через MLX Whisper на Apple Silicon. Работает локально, без облака.
 
