@@ -11,26 +11,42 @@ block() {
   exit 2
 }
 
+git_segment() {
+  # Return only the shell segment containing `git <global-opts> <subcmd>`.
+  # This prevents flags from neighbouring commands (`[ -f file ]`, `rm -f`)
+  # from being attributed to `git push`.
+  local subcmd="$1"
+  SUBCMD="$subcmd" perl -ne '
+    my $subcmd = quotemeta($ENV{"SUBCMD"});
+    while (/(?:^|[;&|]\s*|\s+)(git(?:\s+(?:-C\s+\S+|--git-dir(?:=|\s+)\S+|--work-tree(?:=|\s+)\S+))*\s+$subcmd\b[^;&|]*)/g) {
+      print "$1\n";
+      exit 0;
+    }
+  ' <<< "$CMD"
+}
+
 is_git_subcmd() {
-  # git, optionally with -C <dir>, then the subcommand
-  echo "$CMD" | grep -qE "(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+$1"
+  [ -n "$(git_segment "$1")" ]
 }
 
 # git push --force / -f (allow the safe --force-with-lease)
-if is_git_subcmd push; then
-  if echo "$CMD" | grep -qE -- '(--force([[:space:]]|=|$)|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|$))' \
-     && ! echo "$CMD" | grep -qE -- '--force-with-lease'; then
+PUSH_SEGMENT=$(git_segment push)
+if [ -n "$PUSH_SEGMENT" ]; then
+  PUSH_FORCE_SCAN=$(echo "$PUSH_SEGMENT" | sed -E 's/--force-with-lease(=[^[:space:]]*)?//g')
+  if echo "$PUSH_FORCE_SCAN" | grep -qE -- '(^|[[:space:]])(--force([[:space:]]|=|$)|-[a-zA-Z]*f[a-zA-Z]*([[:space:]]|$))'; then
     block "git push --force запрещён. Используй --force-with-lease или согласуй с владельцем (CLAUDE.md §2)."
   fi
 fi
 
 # git reset --hard
-if is_git_subcmd reset && echo "$CMD" | grep -qE -- '--hard'; then
+RESET_SEGMENT=$(git_segment reset)
+if [ -n "$RESET_SEGMENT" ] && echo "$RESET_SEGMENT" | grep -qE -- '(^|[[:space:]])--hard([[:space:]]|$)'; then
   block "git reset --hard запрещён (теряет незакоммиченное). Используй git stash."
 fi
 
 # git clean with delete flags (-f/-d/-x)
-if is_git_subcmd clean && echo "$CMD" | grep -qE -- '(^|[[:space:]])-[a-zA-Z]*[dfx]'; then
+CLEAN_SEGMENT=$(git_segment clean)
+if [ -n "$CLEAN_SEGMENT" ] && echo "$CLEAN_SEGMENT" | grep -qE -- '(^|[[:space:]])-[a-zA-Z]*[dfx]'; then
   block "git clean -fdx запрещён (удаляет неотслеживаемые файлы). Согласуй с владельцем."
 fi
 
