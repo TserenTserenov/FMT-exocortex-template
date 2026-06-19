@@ -1,6 +1,6 @@
 ---
 name: org-dev
-description: Organizational Development Manager (R31): guides the subject from an organizational change request (self/team/organization) to a concrete first step from SE/SM/PE. Step 0 — system type classifier (MIM.M.030, 7 questions). Step 3 — routing-table (MIM.M.031).
+description: "Organizational Development Manager (R31): guides the subject from an organizational change request (self/team/organization) to a concrete first step from SE/SM/PE. Step 0 — system type classifier (MIM.M.030, 7 questions). Step 3 — routing-table (MIM.M.031)."
 argument-hint: "[необязательно: фраза-запрос об оргизменении]"
 related: [WP-377, WP-369, DP.SC.049, DP.ROLE.063, MIM.M.030, MIM.M.031]
 version: 1.0.0
@@ -24,9 +24,20 @@ related_roles:
 routing:
   executor: sonnet
   deterministic: false
+agents: single
+interaction: multi-step
+gates_required: []
+gates_enforced: []
+gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
 ---
 
 # /org-dev — Менеджер оргразвития (R31)
+
+## When to use
+
+Используй, когда субъект просит помочь с организационным изменением: себя, команды или организации. Скилл ведёт от запроса к конкретному первому шагу через классификацию типа системы и routing-table.
+
+## Algorithm
 
 > ⚡ **Алгоритм, не свободный разговор.** Шаги 0a → 0 → 1 → 2 → 3 → 4 последовательно. Ждать ответа после каждого вопроса. Не выдавать рекомендации до прохождения applicability.
 
