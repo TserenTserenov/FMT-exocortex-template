@@ -109,7 +109,7 @@ while IFS= read -r rel; do
 
     $is_files_exclude && continue
     FILES+=("$rel")
-done < <(git -C "$SCRIPT_DIR" ls-files | sort)
+done < <(git -C "$SCRIPT_DIR" ls-files | LC_ALL=C sort)
 
 # Читаем существующий манифест для deprecated_files (ручное управление)
 DEPRECATED_JSON="[]"
