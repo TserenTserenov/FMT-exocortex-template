@@ -334,10 +334,18 @@ else
         fi
     done
 
+    # Hooks intentionally user-deployed (installed to ~/.claude/hooks/ via skill,
+    # registered in user settings.local.json — not project settings.json by design).
+    USER_DEPLOYED_HOOKS=("wakatime-heartbeat.sh")
+
     ORPHAN_WARN=0
     for hook in "$HOOKS_DIR"/*.sh; do
         [ -f "$hook" ] || continue
         name=$(basename "$hook")
+        # Skip known user-deployed hooks (see .claude/skills/setup-wakatime/SKILL.md)
+        skip=0
+        for ud in "${USER_DEPLOYED_HOOKS[@]}"; do [ "$name" = "$ud" ] && skip=1 && break; done
+        [ "$skip" -eq 1 ] && continue
         if ! grep -q "\.claude/hooks/$name" "${SETTINGS_FILES[@]}" 2>/dev/null; then
             if [ "$ORPHAN_WARN" -eq 0 ]; then
                 [ "$CHECK7_FAIL" -eq 0 ] && echo "PASS (with warnings)"
