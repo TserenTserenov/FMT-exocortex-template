@@ -253,8 +253,8 @@ acquire_lock() {
         local pid
         pid=$(cat "$lockdir/pid" 2>/dev/null)
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            log "SKIP: $scenario already running (PID $pid)"
-            exit 2  # non-zero → scheduler won't mark_done
+            log "SKIP: $scenario already running (PID $pid) — exiting 0 so scheduler marks done"
+            exit 0  # task is being handled by concurrent process → treat as success
         else
             log "WARN: removing stale lock (PID $pid no longer exists): $lockdir"
             rm -rf "$lockdir"
