@@ -271,7 +271,18 @@ fi
 echo "$OUR_PID" > "$LOCK_FILE"
 
 # agent-status-report.sh (optional — guard on existence for standalone installs)
-_IWE_ARS="$HOME/IWE/scripts/agent-status-report.sh"
+_IWE_ROOT="${IWE_WORKSPACE:-${IWE_ROOT:-$HOME/IWE}}"
+_IWE_ARS=""
+for _candidate in \
+  "${IWE_AGENT_STATUS_REPORT:-}" \
+  "${IWE_SCRIPTS:-}/agent-status-report.sh" \
+  "$_IWE_ROOT/scripts/agent-status-report.sh" \
+  "${IWE_TEMPLATE:-$_IWE_ROOT/FMT-exocortex-template}/scripts/agent-status-report.sh"; do
+  if [ -n "$_candidate" ] && [ -x "$_candidate" ]; then
+    _IWE_ARS="$_candidate"
+    break
+  fi
+done
 
 # Cleanup: удалить lock и temp при любом выходе
 cleanup_peer() {

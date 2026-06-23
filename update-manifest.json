@@ -1036,6 +1036,8 @@
     "scripts/restore-from-exocortex.sh",
     "scripts/route-task.sh",
     "scripts/script-promote.sh",
+    "scripts/agent-status-report.sh",
+    "scripts/day-open-preflight.sh",
     "scripts/server-calendar.sh",
     "scripts/server-news.sh",
     "scripts/session-dispatcher-tsekh.py",
