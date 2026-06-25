@@ -31,10 +31,8 @@ WORKSPACE_DIR = Path(
     or os.environ.get("IWE_WORKSPACE")
     or Path.home() / "IWE"
 ).expanduser()
-GOVERNANCE_REPO = (
-    os.environ.get("GOVERNANCE_REPO")
-    or os.environ.get("IWE_GOVERNANCE_REPO")
-    or "DS-strategy"
+GOVERNANCE_REPO = os.environ.get(
+    "GOVERNANCE_REPO", os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
 )
 DS_MY_STRATEGY = WORKSPACE_DIR / GOVERNANCE_REPO
 SESSIONS_DIR = DS_MY_STRATEGY / "sessions"

@@ -32,10 +32,8 @@ def resolve_db_path() -> Path:
         or os.environ.get("IWE_DIR")
         or Path.home() / "IWE"
     ).expanduser()
-    governance_repo = (
-        os.environ.get("GOVERNANCE_REPO")
-        or os.environ.get("IWE_GOVERNANCE_REPO")
-        or "DS-strategy"
+    governance_repo = os.environ.get(
+        "GOVERNANCE_REPO", os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
     )
     return workspace / governance_repo / "exocortex" / "agent-fault-profile" / "iwe_memory.db"
 
