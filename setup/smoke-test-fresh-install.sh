@@ -191,7 +191,7 @@ echo "[6d] все .claude/*/ каталоги в update.sh:609 паттерне.
 # Контракт: при добавлении нового подкаталога в .claude/X/ его обязаны добавить в паттерн
 # на строке `case "$f" in .claude/skills/*|...` в update.sh, иначе файлы X не попадут
 # в workspace при `update.sh` (баг 0.29.28: .claude/scripts/* пропущен).
-PATTERN_LINE=$(grep -E 'case "\$f" in \.claude/skills/' "$TEMPLATE_DIR/update.sh" 2>/dev/null | head -1)
+PATTERN_LINE=$(grep -E '^[[:space:]]*\.claude/skills/\*\|.*\.claude/settings\.json\)' "$TEMPLATE_DIR/update.sh" 2>/dev/null | head -1)
 MISSING_DIRS=""
 for dir in "$TEMPLATE_DIR"/.claude/*/; do
     [ -d "$dir" ] || continue

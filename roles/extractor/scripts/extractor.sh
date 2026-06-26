@@ -29,8 +29,24 @@ else
 fi
 
 LOG_DIR="{{HOME_DIR}}/logs/extractor"
-CLAUDE_PATH="{{CLAUDE_PATH}}"
+# На установленной системе резолвим нативный Claude CLI; {{CLAUDE_PATH}} — только последний fallback из setup.
+if [ -n "${CLAUDE_CLI_PATH:-}" ]; then
+    CLAUDE_PATH="$CLAUDE_CLI_PATH"
+elif command -v claude &>/dev/null; then
+    CLAUDE_PATH="$(command -v claude)"
+elif [ -x "$HOME/.npm-global/bin/claude" ]; then
+    CLAUDE_PATH="$HOME/.npm-global/bin/claude"
+else
+    CLAUDE_PATH="{{CLAUDE_PATH}}"
+fi
 ENV_FILE="{{HOME_DIR}}/.config/aist/env"
+
+# Guard: FMT runner is a template. It must not run before placeholder substitution.
+if [[ "$WORKSPACE$LOG_DIR$ENV_FILE$CLAUDE_PATH" == *"{{"* ]]; then
+    echo "ERROR: unresolved IWE template placeholders in extractor runner." >&2
+    echo "Run generated runtime instead: \$HOME/IWE/.iwe-runtime/roles/extractor/scripts/extractor.sh" >&2
+    exit 2
+fi
 
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"

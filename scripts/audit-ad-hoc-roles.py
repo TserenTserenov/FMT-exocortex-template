@@ -26,10 +26,18 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
-DS_MY_STRATEGY = Path.home() / "IWE" / "${IWE_GOVERNANCE_REPO:-DS-strategy}"
+WORKSPACE_DIR = Path(
+    os.environ.get("WORKSPACE_DIR")
+    or os.environ.get("IWE_WORKSPACE")
+    or Path.home() / "IWE"
+).expanduser()
+GOVERNANCE_REPO = os.environ.get(
+    "GOVERNANCE_REPO", os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
+)
+DS_MY_STRATEGY = WORKSPACE_DIR / GOVERNANCE_REPO
 SESSIONS_DIR = DS_MY_STRATEGY / "sessions"
 INBOX_DIR = DS_MY_STRATEGY / "inbox"
-CREATE_WP_SCRIPT = Path.home() / "IWE" / "FMT-exocortex-template" / "scripts" / "create-wp.sh"
+CREATE_WP_SCRIPT = WORKSPACE_DIR / "FMT-exocortex-template" / "scripts" / "create-wp.sh"
 
 FREQ_THRESHOLD = 3  # минимум сессий с одной ad-hoc ролью для создания WP
 

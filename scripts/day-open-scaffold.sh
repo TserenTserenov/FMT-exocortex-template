@@ -43,8 +43,26 @@ DATE="${1:-$(date +%Y-%m-%d)}"
 CONFIG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml"
 SERVER_MODE="${IWE_SERVER_MODE:-0}"  # WP-283: 1 = Linux server, Mac-only MCP недоступен
 
+resolve_iwe_script() {
+  local name="$1"
+  local candidate
+  for candidate in \
+    "${IWE_SCRIPTS:-}/$name" \
+    "$IWE/scripts/$name" \
+    "${IWE_TEMPLATE:-}/scripts/$name" \
+    "$IWE/FMT-exocortex-template/scripts/$name"; do
+    [ -n "$candidate" ] && [ -x "$candidate" ] && { echo "$candidate"; return 0; }
+  done
+  return 1
+}
+
 # --- Pre-flight healthcheck (WP-7 ФDay-Open-Hardening) ---
-PREFLIGHT_JSON=$(bash "$IWE/scripts/day-open-preflight.sh" "$DATE" "$CONFIG" 2>/dev/null || echo '{"calendar":"unknown","scout":"unknown","triage":"unknown"}')
+PREFLIGHT_SCRIPT=$(resolve_iwe_script "day-open-preflight.sh" || true)
+if [ -n "$PREFLIGHT_SCRIPT" ]; then
+  PREFLIGHT_JSON=$(bash "$PREFLIGHT_SCRIPT" "$DATE" "$CONFIG" 2>/dev/null || echo '{"calendar":"unknown","scout":"unknown","triage":"unknown","memory":"unknown"}')
+else
+  PREFLIGHT_JSON='{"calendar":"unknown","scout":"unknown","triage":"unknown","memory":"unknown"}'
+fi
 CALENDAR_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.calendar // "unknown"')
 SCOUT_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.scout // "unknown"')
 TRIAGE_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.triage // "unknown"')
@@ -609,10 +627,15 @@ INCEOF
     echo "| active-wp | ⚪ | статус не определён |"
   fi
 
-  # update.sh check (FMT)
+  # update.sh check (FMT) — bounded: Day Open scaffold must not hang on network/update checks.
   if [ -d "$IWE/FMT-exocortex-template" ]; then
-    local upd_status
-    upd_status=$(cd "$IWE/FMT-exocortex-template" && bash update.sh --check 2>&1 | grep -oE '[0-9]+ обновлен|нет обновлен|актуал' | head -1)
+    local upd_status upd_output
+    if command -v timeout >/dev/null 2>&1; then
+      upd_output=$(cd "$IWE/FMT-exocortex-template" && timeout 20 bash update.sh --check 2>&1 || true)
+    else
+      upd_output=$(cd "$IWE/FMT-exocortex-template" && bash update.sh --check 2>&1 || true)
+    fi
+    upd_status=$(printf '%s\n' "$upd_output" | grep -oE '[0-9]+ обновлен|нет обновлен|актуал|Всё актуально' | head -1)
     echo "| Update IWE | 🟢 | ${upd_status:-проверено} |"
   fi
 

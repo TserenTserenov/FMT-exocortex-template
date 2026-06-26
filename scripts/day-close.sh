@@ -28,11 +28,11 @@ DS_STRATEGY="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 HOME_SLUG=$(echo "$HOME" | tr '/' '-')
 MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${HOME_SLUG}-IWE/memory}"
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
-# MCP reindex — опциональный компонент (WP-187 iwe-knowledge Gateway заменяет локальный knowledge-mcp).
-# Переопределить путь можно через env IWE_SELECTIVE_REINDEX.
-SELECTIVE_REINDEX="${IWE_SELECTIVE_REINDEX:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh}"
-SOURCES_JSON="${IWE_SOURCES_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources.json}"
-SOURCES_PERSONAL_JSON="${IWE_SOURCES_PERSONAL_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources-personal.json}"
+# MCP reindex — опциональный компонент.
+# Legacy local reindex backend retired; configure env explicitly to enable.
+SELECTIVE_REINDEX="${IWE_SELECTIVE_REINDEX:-}"
+SOURCES_JSON="${IWE_SOURCES_JSON:-}"
+SOURCES_PERSONAL_JSON="${IWE_SOURCES_PERSONAL_JSON:-}"
 # Linear sync: путь читается из params.yaml (ключ linear_sync_path)
 PARAMS_YAML="$WORKSPACE_DIR/params.yaml"
 LINEAR_SYNC=""
