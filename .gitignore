@@ -16,3 +16,7 @@ scripts/sync-communication-style.yaml
 
 # Backup copies created by skill-promote.sh — local safety net, not for git
 .backups/
+
+# Python bytecode cache — build artifact, not for git
+__pycache__/
+*.pyc
