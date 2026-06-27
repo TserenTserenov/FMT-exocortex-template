@@ -37,7 +37,7 @@ triggers:
 # {name}
 
 Этот скилл использует путь /Users/testuser/IWE/scripts/helper.sh
-и ссылается на репо DS-strategy.
+и ссылается на репо DS-strategy.  # validate-fmt-scripts: allow-governance-literal
 
 ```bash
 bash /Users/testuser/IWE/scripts/helper.sh

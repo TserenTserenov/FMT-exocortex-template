@@ -155,26 +155,26 @@ bash "$TEMPLATE_DIR/setup/build-runtime.sh" --workspace "$TEST_WS" --env-file "$
 if grep -rq 'DS-pilot-strategy' "$TEST_WS/.iwe-runtime/roles/" 2>/dev/null; then
     pass "GOVERNANCE_REPO=DS-pilot-strategy подставлен в .iwe-runtime/"
 else
-    fail "GOVERNANCE_REPO не подставлен — хардкод DS-strategy остался (R6.1 regression)"
+    fail "GOVERNANCE_REPO не подставлен — хардкод DS-strategy остался (R6.1 regression)"  # validate-fmt-scripts: allow-governance-literal
 fi
 # Дополнительно: НЕ должно быть literal /DS-strategy/ в .iwe-runtime/ (если только не GOVERNANCE_REPO=DS-strategy).
 # Bash gotcha: `... | head -1 >/dev/null` всегда exit 0 даже на пустом stdin.
 # Используем grep -q . — true ТОЛЬКО если есть хоть один матч.
-LITERAL_HARDCODES=$(grep -rE '/DS-strategy[/"]' "$TEST_WS/.iwe-runtime/roles/" 2>/dev/null | grep -v ':#' || true)
+LITERAL_HARDCODES=$(grep -rE '/DS-strategy[/"]' "$TEST_WS/.iwe-runtime/roles/" 2>/dev/null | grep -v ':#' || true)  # validate-fmt-scripts: allow-governance-literal
 if [ -n "$LITERAL_HARDCODES" ]; then
-    fail "literal /DS-strategy/ остался в runtime (хардкод не убран): $LITERAL_HARDCODES"
+    fail "literal /DS-strategy/ остался в runtime (хардкод не убран): $LITERAL_HARDCODES"  # validate-fmt-scripts: allow-governance-literal
 else
-    pass "no literal /DS-strategy/ в runtime"
+    pass "no literal /DS-strategy/ в runtime"  # validate-fmt-scripts: allow-governance-literal
 fi
 
 # WP-293: расширение 6a — проверка template источников в roles/*/scripts/.
 # `dt-collect.sh` и аналоги не попадают в .iwe-runtime/ (используются напрямую cron'ом),
 # поэтому проверка только runtime-зоны выше пропускает hardcode'ы вроде dt-collect.sh:234.
-LITERAL_IN_TEMPLATE=$(grep -rE '/DS-strategy[/"]' "$TEMPLATE_DIR/roles/"*/scripts/ 2>/dev/null | grep -v ':#' || true)
+LITERAL_IN_TEMPLATE=$(grep -rE '/DS-strategy[/"]' "$TEMPLATE_DIR/roles/"*/scripts/ 2>/dev/null | grep -v ':#' || true)  # validate-fmt-scripts: allow-governance-literal
 if [ -n "$LITERAL_IN_TEMPLATE" ]; then
-    fail "literal /DS-strategy/ в template roles/*/scripts/ (use \$GOVERNANCE_DIR): $LITERAL_IN_TEMPLATE"
+    fail "literal /DS-strategy/ в template roles/*/scripts/ (use \$GOVERNANCE_DIR): $LITERAL_IN_TEMPLATE"  # validate-fmt-scripts: allow-governance-literal
 else
-    pass "no literal /DS-strategy/ в template roles/*/scripts/"
+    pass "no literal /DS-strategy/ в template roles/*/scripts/"  # validate-fmt-scripts: allow-governance-literal
 fi
 
 # === Test 6b: REMAINING placeholder check sanity (R6.2 regression guard) ===
@@ -274,7 +274,7 @@ print(mod.WORKSPACE)
 if echo "$PY_RESULT" | grep -q "DS-pilot-strategy"; then
     pass "Python script резолвит GOVERNANCE_REPO=DS-pilot-strategy"
 else
-    fail "Python script хардкод DS-strategy остался: $PY_RESULT"
+    fail "Python script хардкод DS-strategy остался: $PY_RESULT"  # validate-fmt-scripts: allow-governance-literal
 fi
 
 # === Test 6: install.sh С env проходит fail-fast check ===

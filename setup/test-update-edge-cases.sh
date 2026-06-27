@@ -47,7 +47,7 @@ mkdir -p "$TEST_WS"
 
 # Build a minimal fake governance repo that update.sh can find
 setup_fake_governance() {
-    local gov="$TEST_WS/DS-strategy"
+    local gov="$TEST_WS/DS-strategy"  # validate-fmt-scripts: allow-governance-literal
     mkdir -p "$gov"
     git -C "$gov" init -q
     git -C "$gov" config user.email "test@test"
@@ -164,7 +164,7 @@ rm -f "$RUNTIME_DIR/orphan-test.plist" "$RUNTIME_DIR/clean-test.plist"
 # ============================================================
 echo "--- T3: conflict-marker stacking guard ---"
 
-gov3="$TEST_WS/DS-strategy-t3"
+gov3="$TEST_WS/DS-strategy-t3"  # validate-fmt-scripts: allow-governance-literal
 mkdir -p "$gov3"
 git -C "$gov3" init -q
 git -C "$gov3" config user.email "test@test"
