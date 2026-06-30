@@ -88,12 +88,33 @@ Before contributing, understand how IWE is structured:
 - **Markdown:** Russian for user-facing docs (with English translations where needed). Technical comments in English are fine
 - **Commit messages:** `feat:`, `fix:`, `docs:`, `chore:` prefixes. Brief, in English or Russian
 
+### Privacy & Placeholders
+
+Platform files (L1) are shared across all IWE users — never include personal data:
+
+- ❌ Real email addresses, calendar IDs, account usernames, domain names
+- ❌ Local paths containing your username (`/home/yourname/`, `/Users/yourname/`)
+- ❌ API tokens, client IDs, OAuth credentials of any kind
+
+User-specific values must use `{{PLACEHOLDER}}` syntax and be read from `params.yaml`
+or `day-rhythm-config.yaml` at runtime. Example:
+
+```
+✅  day-rhythm-config.yaml → calendar_ids
+❌  user@company.com, person@service.io
+```
+
+A `check-pii-in-platform.sh` pre-commit hook enforces this automatically. If you need
+to include an email address in documentation (not as a real runtime value), add
+`# pii-exempt` on the same line to bypass the check.
+
 ### What Makes a Good PR
 
 - **One concern per PR** — don't mix bug fixes with new features
 - **Test your changes** — run `bash setup.sh --validate` before submitting
 - **Update docs** — if your change affects user-facing behavior, update the relevant docs
 - **Respect the layers** — platform changes (L1) require discussion; extension examples (L3) are welcome directly
+- **No personal data** — see §Privacy & Placeholders above
 
 ### Review Process
 

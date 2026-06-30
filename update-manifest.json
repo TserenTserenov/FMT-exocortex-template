@@ -36,6 +36,9 @@
       "path": ".claude/hooks/check-trash.sh"
     },
     {
+      "path": ".claude/hooks/check-pii-in-platform.sh"
+    },
+    {
       "path": ".claude/hooks/close-gate-reminder.sh"
     },
     {
