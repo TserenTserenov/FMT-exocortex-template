@@ -82,22 +82,36 @@ Expected: tool blocked by contract, this is rehearsal failure point
 \bsed\s+-i
 ```
 
-### MCP-write whitelist
+### MCP-write matcher
 
-Точное имя tool (полный список — все, что НЕ read-only):
+**IWE Gateway (`iwe-knowledge`, `mcp.aisystant.com/mcp`) — сверка по ДЕЙСТВИЮ, не по префиксу.**
+
+Префикс MCP-инструмента дрейфует между способами подключения к одному и тому же Gateway,
+поэтому exact-list по полному имени устаревает при каждой миграции namespace:
+
+| Namespace | Откуда | Пример |
+|---|---|---|
+| `mcp__claude_ai_IWE__<action>` | legacy connector с именем «IWE» | `mcp__claude_ai_IWE__personal_write` |
+| `mcp__iwe_knowledge_<action>` | OMP runtime (одинарный разделитель `_`) | `mcp__iwe_knowledge_personal_write` |
+| `mcp__iwe-knowledge__<action>` | project `.mcp.json` (server id `iwe-knowledge`) | `mcp__iwe-knowledge__personal_write` |
+| `mcp__claude_ai_https_..._mcp__<action>` | connector с именем, производным от URL | `mcp__claude_ai_https_mcp_aisystant_com_mcp__personal_write` |
+
+Хук блокирует по **действию** — суффиксу после последнего разделителя (`*_<action>` ловит и
+`__<action>`, и OMP-вариант `_<action>`). Список действий (все write / side-effect):
 
 ```
-mcp__claude_ai_IWE__personal_write
-mcp__claude_ai_IWE__personal_delete
-mcp__claude_ai_IWE__personal_create_pack
-mcp__claude_ai_IWE__personal_propose_capture
-mcp__claude_ai_IWE__personal_reindex_source
-mcp__claude_ai_IWE__personal_scaffold_notes
-mcp__claude_ai_IWE__dt_write_digital_twin
-mcp__claude_ai_IWE__create_repository
-mcp__claude_ai_IWE__github_connect
-mcp__claude_ai_IWE__github_disconnect
-mcp__claude_ai_IWE__knowledge_feedback
+personal_write  personal_delete  personal_create_pack  personal_propose_capture
+personal_reindex_source  personal_scaffold_notes  personal_connect_source
+personal_disconnect_source  personal_purge_source  personal_generate_fault_remind
+dt_write_digital_twin  create_repository  github_connect  github_disconnect
+knowledge_feedback  knowledge_reindex_source  send_telegram_message
+run_strategist  run_extractor  capture_trace  grant_consent
+agent_status_update  request_equipment_upgrade
+```
+
+**Vendor MCP — exact tool_name** (префиксы вендоров стабильны):
+
+```
 mcp__claude_ai_Gmail__create_draft
 mcp__claude_ai_Gmail__create_label
 mcp__claude_ai_Gmail__label_message
