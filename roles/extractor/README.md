@@ -45,11 +45,11 @@ bash install.sh
 ### 3. Ручной запуск
 
 ```bash
-# Inbox-check (без launchd)
-bash {{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor/scripts/extractor.sh inbox-check
+# Inbox-check (без launchd) — через собранную runtime-копию, НЕ сырой файл в FMT
+bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" inbox-check
 
 # Knowledge Audit
-bash {{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor/scripts/extractor.sh audit
+bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" audit
 ```
 
 ## Как работает

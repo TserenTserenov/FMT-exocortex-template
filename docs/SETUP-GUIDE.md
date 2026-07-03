@@ -649,11 +649,11 @@ bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh note-re
 # Итоги недели
 bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh week-review
 
-# Экстрактор: извлечь знания из текущей сессии
-bash ~/IWE/FMT-exocortex-template/roles/extractor/scripts/extractor.sh session-close
+# Экстрактор: извлечь знания из текущей сессии (собранная runtime-копия, не сырой файл в FMT)
+bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" session-close
 
 # Экстрактор: проверить inbox
-bash ~/IWE/FMT-exocortex-template/roles/extractor/scripts/extractor.sh inbox-check
+bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" inbox-check
 
 # Синхронизатор: статус всех задач
 bash ~/IWE/FMT-exocortex-template/roles/synchronizer/scripts/scheduler.sh status
