@@ -69,10 +69,12 @@ done
 
 # Check mandatory format elements
 
-# --- Ф3 Check 1: ## заголовки секций (Obsidian-совместимый формат вместо <details>) ---
-HEADINGS_COUNT=$(grep -cE '^## ' "$DAYPLAN" 2>/dev/null || true); HEADINGS_COUNT=${HEADINGS_COUNT:-0}
+# --- Ф3 Check 1: заголовки секций — ## (Obsidian-совместимый) или <summary> (сворачиваемые секции, formatting.md) ---
+# issue #221: formatting.md требует <details><summary> для DayPlan/WeekPlan (более новое решение,
+# заменившее старый Obsidian-only запрет на HTML-теги) — считаем оба варианта заголовком секции.
+HEADINGS_COUNT=$(grep -cE '^## |^[[:space:]]*<summary>' "$DAYPLAN" 2>/dev/null || true); HEADINGS_COUNT=${HEADINGS_COUNT:-0}
 if [ "$HEADINGS_COUNT" -lt 3 ]; then
-  ERRORS+=("Секций (##) < 3 найдено: $HEADINGS_COUNT. DayPlan должен иметь структуру из заголовков ##")
+  ERRORS+=("Секций (## или <summary>) < 3 найдено: $HEADINGS_COUNT. DayPlan должен иметь структуру из заголовков секций")
 fi
 
 # --- Ф3 Check 2: непустые обязательные секции ---
@@ -128,10 +130,10 @@ if [ -n "$WEEKPLAN" ]; then
   WP_ERRORS=()
   WP_MISSING_LIST=()
 
-  # Детектор (а): >80 строк без достаточного числа ## заголовков (Obsidian-совместимый формат)
-  WP_HEADINGS_COUNT=$(grep -cE '^## ' "$WEEKPLAN" 2>/dev/null || true); WP_HEADINGS_COUNT=${WP_HEADINGS_COUNT:-0}
+  # Детектор (а): >80 строк без достаточного числа заголовков — ## или <summary> (issue #221, см. Check 1 выше)
+  WP_HEADINGS_COUNT=$(grep -cE '^## |^[[:space:]]*<summary>' "$WEEKPLAN" 2>/dev/null || true); WP_HEADINGS_COUNT=${WP_HEADINGS_COUNT:-0}
   if [ "$WP_LINES" -gt 80 ] && [ "$WP_HEADINGS_COUNT" -lt 3 ]; then
-    WP_ERRORS+=("WeekPlan >80 строк ($WP_LINES) но секций (##) < 3 ($WP_HEADINGS_COUNT). Используй ## заголовки для структурирования.")
+    WP_ERRORS+=("WeekPlan >80 строк ($WP_LINES) но секций (## или <summary>) < 3 ($WP_HEADINGS_COUNT). Используй ## заголовки или <details><summary> для структурирования.")
   fi
 
   # Детектор (в): обязательные секции WeekPlan (по templates-dayplan.md)
