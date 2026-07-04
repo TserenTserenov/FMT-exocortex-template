@@ -115,12 +115,14 @@ PYEOF
     fi
   fi
 
+  # issue #217: обратная подстановка $HOME -> {{HOME_DIR}} делает бэкап ОС-агностичным
+  # (симметрично прямой подстановке в setup.sh и restore-from-exocortex.sh).
   if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
-    cp "$WORKSPACE_DIR/CLAUDE.md" "$EXOCORTEX_DST/CLAUDE.md"
+    sed "s|$HOME|{{HOME_DIR}}|g" "$WORKSPACE_DIR/CLAUDE.md" > "$EXOCORTEX_DST/CLAUDE.md"
   fi
 
   if [ -f "$WORKSPACE_DIR/AGENTS.md" ]; then
-    cp "$WORKSPACE_DIR/AGENTS.md" "$EXOCORTEX_DST/AGENTS.md"
+    sed "s|$HOME|{{HOME_DIR}}|g" "$WORKSPACE_DIR/AGENTS.md" > "$EXOCORTEX_DST/AGENTS.md"
   fi
 
   local count

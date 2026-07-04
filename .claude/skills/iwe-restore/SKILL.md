@@ -140,12 +140,15 @@ rsync -av --exclude='CLAUDE.md' --exclude='AGENTS.md' \
 
 ### 4c. Копировать CLAUDE.md
 
+> issue #217: подстановка `{{HOME_DIR}}` → `$HOME` делает восстановление ОС-агностичным
+> (бэкап пишется на плейсхолдере в `day-close.sh`, симметрично `setup.sh`).
+
 ```bash
 WORKSPACE_DIR="${IWE_WORKSPACE:-$HOME/IWE}"
 if [ -f "$EXOCORTEX/CLAUDE.md" ]; then
   # Если CLAUDE.md уже есть — показать: «CLAUDE.md уже существует. Перезаписать?»
   # При согласии:
-  cp "$EXOCORTEX/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
+  sed "s|{{HOME_DIR}}|$HOME|g" "$EXOCORTEX/CLAUDE.md" > "$WORKSPACE_DIR/CLAUDE.md"
 fi
 ```
 
@@ -153,7 +156,7 @@ fi
 
 ```bash
 if [ -f "$EXOCORTEX/AGENTS.md" ]; then
-  cp "$EXOCORTEX/AGENTS.md" "$WORKSPACE_DIR/AGENTS.md"
+  sed "s|{{HOME_DIR}}|$HOME|g" "$EXOCORTEX/AGENTS.md" > "$WORKSPACE_DIR/AGENTS.md"
 fi
 ```
 
