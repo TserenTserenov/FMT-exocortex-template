@@ -1,7 +1,7 @@
 # IWE — Intellectual Work Environment
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.35.4-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.35.5-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(WSL)-lightgrey.svg)]()
 [![EN sync](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/TserenTserenov/FMT-exocortex-template/en-draft/badge-data.json)](https://github.com/TserenTserenov/FMT-exocortex-template/tree/en-draft)
 
