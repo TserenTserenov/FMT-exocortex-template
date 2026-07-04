@@ -110,6 +110,11 @@ jobs:
           echo "sha=$PREV_SHA" >> $GITHUB_OUTPUT
           echo "ver=$PREV_VER" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
+      - name: Check rename coverage (issue #218)
+        if: steps.prev.outputs.skip != 'true'
+        run: |
+          git show "${{ steps.prev.outputs.sha }}:update-manifest.json" > /tmp/prev-manifest.json
+          python3 scripts/check-manifest-rename-coverage.py /tmp/prev-manifest.json update-manifest.json
       - name: Upgrade simulation — checkout prev → smoke → checkout HEAD → validate
         if: steps.prev.outputs.skip != 'true'
         run: |

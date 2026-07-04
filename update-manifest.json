@@ -1007,6 +1007,7 @@
     "scripts/check-component-parity.sh",
     "scripts/check-dirty-repos.sh",
     "scripts/check-manifest-coverage.py",
+    "scripts/check-manifest-rename-coverage.py",
     "scripts/check-open-sessions.sh",
     "scripts/check-script-collisions.sh",
     "scripts/check-setup-update-parity.sh",
