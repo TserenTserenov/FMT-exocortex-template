@@ -1091,6 +1091,7 @@
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_translate_delta.py",
+    "scripts/tests/test_translate_parse.py",
     "scripts/translate.py",
     "scripts/validate-fmt-scripts.sh",
     "scripts/validate-skill.sh",

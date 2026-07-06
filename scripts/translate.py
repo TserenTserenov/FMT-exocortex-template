@@ -30,6 +30,13 @@ import openai
 import yaml
 
 DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"
+# claude-sonnet-4.6 supports up to 128K completion tokens on OpenRouter
+# (verified via /api/v1/models); 16K turned out to be an arbitrary self-
+# imposed cap, not a model limit — it truncated the largest current doc
+# (docs/LEARNING-PATH.md, ~1700 lines) with no error until the
+# TranslationTruncated check above was added. 64K leaves headroom above
+# that file's real need without approaching the model's own ceiling.
+MAX_OUTPUT_TOKENS = 65536
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # OpenRouter grants the standard (non-strict) rate limit only when these
 # attribution headers are present (see iwe-translation-engine lesson, 2026-06-22)
@@ -135,6 +142,14 @@ def _make_client() -> openai.OpenAI:
     )
 
 
+class TranslationTruncated(RuntimeError):
+    """The model hit MAX_OUTPUT_TOKENS before finishing — output is a partial
+    document, not a translation. Must never be written to disk silently
+    (caught 2026-07-06: docs/LEARNING-PATH.md shipped cut off at line 455
+    of 1705, no error, no signal — the truncated finish_reason went
+    unchecked)."""
+
+
 def translate_with_retry(
     client: openai.OpenAI,
     system_prompt: str,
@@ -148,13 +163,19 @@ def translate_with_retry(
         try:
             response = client.chat.completions.create(
                 model=model,
-                max_tokens=8192,
+                max_tokens=MAX_OUTPUT_TOKENS,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
             )
-            return response.choices[0].message.content or ""
+            choice = response.choices[0]
+            if choice.finish_reason == "length":
+                raise TranslationTruncated(
+                    f"model output hit the {MAX_OUTPUT_TOKENS}-token cap before "
+                    "finishing — source is too long for a single translation call"
+                )
+            return choice.message.content or ""
         except openai.RateLimitError:
             if attempt == max_retries - 1:
                 raise
@@ -176,21 +197,24 @@ def _parse_translation_response(
     """Split combined FM+body LLM response. Returns (translated_fm_dict, body_text).
 
     If LLM did not use XML markers (fallback), uses full response as body.
+    `translate_file` always wraps the body in `<body>...</body>` regardless
+    of whether there's frontmatter to translate, so the marker strip below
+    must run unconditionally too — an earlier `if not fm_values: return`
+    shortcut here skipped it, leaking the literal `<body>` tag into every
+    frontmatter-less file's output (caught 2026-07-06, 13/38 files affected).
     """
-    if not fm_values:
-        return {}, response
-
     fm_translated: dict[str, str] = {}
-    fm_match = re.search(
-        r"<frontmatter_values>(.*?)</frontmatter_values>", response, re.DOTALL
-    )
-    if fm_match:
-        for line in fm_match.group(1).strip().split("\n"):
-            if ":" in line:
-                k, _, v = line.partition(":")
-                k, v = k.strip(), v.strip()
-                if k in translate_keys:
-                    fm_translated[k] = v
+    if fm_values:
+        fm_match = re.search(
+            r"<frontmatter_values>(.*?)</frontmatter_values>", response, re.DOTALL
+        )
+        if fm_match:
+            for line in fm_match.group(1).strip().split("\n"):
+                if ":" in line:
+                    k, _, v = line.partition(":")
+                    k, v = k.strip(), v.strip()
+                    if k in translate_keys:
+                        fm_translated[k] = v
 
     body_match = re.search(r"<body>(.*?)</body>", response, re.DOTALL)
     if body_match:
@@ -253,7 +277,10 @@ def translate_file(
             f"limit ~{MAX_PROMPT_CHARS // 4 // 1000}k tokens"
         ]
 
-    raw = translate_with_retry(client, system_prompt, user_content, model)
+    try:
+        raw = translate_with_retry(client, system_prompt, user_content, model)
+    except TranslationTruncated as e:
+        return "", [f"translation_truncated: {e}"]
     fm_translated, en_body = _parse_translation_response(raw, fm_values, translate_keys)
 
     en_meta = dict(meta)
@@ -435,12 +462,16 @@ def run_translate(args: argparse.Namespace, manifest: dict, glossary: dict) -> i
             file_path, system_prompt, translate_keys, client, model
         )
 
-        if violations and violations[0].startswith("file_too_large"):
+        if violations and violations[0].startswith(("file_too_large", "translation_truncated")):
             print(f"  SKIP {violations[0]}", file=sys.stderr)
             # Write a marker file so CI can detect skipped files
             out_path.write_text(
                 f"# TRANSLATION SKIPPED\n# {violations[0]}\n", encoding="utf-8"
             )
+            # A skipped file is a missing translation, not a cosmetic nit —
+            # visible at the same rc=2 tier as ASCII-guard warnings rather
+            # than a silent exit 0 (both prior skip paths did this).
+            exit_code = 2
             continue
 
         out_path.write_text(translated, encoding="utf-8")
