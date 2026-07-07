@@ -1,27 +1,53 @@
-name: Translate Sync (RU → EN)
+name: Canon Sync (RU → EN iwesys / RU mirror MimEcoSys)
 
-# see WP-415 Ф-В2 (translation pipeline automation, keystone-independent)
-# Peer-session: sessions/2026-07/2026-07-01-12-wp415-translation-pipeline-automation/report.md
+# see WP-415 Ф-В2 (translation pipeline automation) + Ф-В7/spec (МИМ mirror)
+# and WP-401 (aisystant/iwesys/MimEcoSys org split)
+# Peer-sessions:
+#   sessions/2026-07/2026-07-01-12-wp415-translation-pipeline-automation/report.md
+#   sessions/2026-07/2026-07-07-11-wp415-pipeline-2-3-design/report.md
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "README.md"
-      - "docs/**"
 
 concurrency:
-  group: translate-sync-${{ github.ref }}
+  group: canon-sync-${{ github.ref }}
   cancel-in-progress: false
 
-# Loop-guard: the bot only ever pushes to en-draft, which this workflow does
-# not watch, so branch-scoping is the actual defense today. Kept as a second
-# line of defense in case the trigger ever grows to include en-draft pushes —
-# do not delete as "dead code" without checking the trigger above first.
+# Loop-guard: the bot only ever pushes to en-draft, which this trigger does
+# not watch (branches: [main]), so branch-scoping is the actual defense
+# today. Kept as a second line of defense in case the trigger ever grows to
+# include en-draft pushes — do not delete as "dead code" without checking
+# the trigger above first.
 jobs:
+  detect-changes:
+    # Trigger is unconditional push-to-main (mirror-to-mim must mirror every
+    # commit, not just docs changes) — this job scopes the *translation*
+    # jobs back down to doc changes only, so they don't run needlessly on
+    # every unrelated push (scripts/, tests/, etc.).
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      # dorny/paths-filter only uses the GitHub API on pull_request events;
+      # on push it diffs local git history, so it needs the repo checked
+      # out first (missing this made `docs` output empty/wrong — sync
+      # would never run). Default depth is enough: push events only need
+      # the pushed commit and its parent to diff.
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs:
+              - "README.md"
+              - "docs/**"
+
   sync:
+    needs: detect-changes
     if: >-
+      needs.detect-changes.outputs.docs == 'true' &&
       github.actor != 'github-actions[bot]' &&
       !contains(github.event.head_commit.message, '[skip-translate]')
     runs-on: ubuntu-latest
@@ -135,3 +161,107 @@ jobs:
           # `git worktree add ../en-draft origin/en-draft` produces when
           # the branch already exists on the remote
           git push origin HEAD:en-draft
+
+  # Publishes the en-draft branch (already gated by sync's delivery_checks
+  # above — this job only runs if sync succeeded) as the default branch of
+  # the public EN repo in iwesys. Target repo name and creation are a
+  # one-time manual bootstrap step (WP-415); until it exists this job warns
+  # and no-ops rather than failing every push.
+  publish-to-iwesys:
+    needs: sync
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: iwesys/FMT-exocortex-template-en
+    steps:
+      - name: Generate iwesys installation token
+        id: iwesys_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.CANON_SYNC_APP_ID }}
+          private-key: ${{ secrets.CANON_SYNC_APP_KEY }}
+          owner: iwesys
+
+      - name: Checkout en-draft
+        uses: actions/checkout@v6
+        with:
+          ref: en-draft
+          fetch-depth: 0
+
+      - name: Check target repo exists
+        id: target_check
+        env:
+          GH_TOKEN: ${{ steps.iwesys_token.outputs.token }}
+        run: |
+          if gh repo view "$TARGET_REPO" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::$TARGET_REPO ещё не создан (bootstrap-чеклист WP-415) — публикация в iwesys пропущена."
+          fi
+
+      - name: Push en-draft as main to iwesys
+        if: steps.target_check.outputs.exists == 'true'
+        run: |
+          git remote add iwesys "https://x-access-token:${{ steps.iwesys_token.outputs.token }}@github.com/$TARGET_REPO.git"
+          git push iwesys HEAD:refs/heads/main --force
+
+  # Honest mirror of main into MimEcoSys — no translation, no history
+  # rewrite (peer-session 2026-07-07-11: content-identity is the real
+  # correlation signal, not commit SHAs; rewriting metadata breaks git
+  # blame/traceability for MИМ authors without actually hiding the link).
+  # Explicit refspec only — NOT `git push --mirror`, which would also push
+  # en-draft, tags, and any other refs the private repo happens to hold.
+  # Runs on every push to main regardless of which paths changed (unlike
+  # sync/publish-to-iwesys, which are docs-scoped) — MimEcoSys must not
+  # silently drift behind on non-docs commits.
+  mirror-to-mim:
+    needs: detect-changes
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      !contains(github.event.head_commit.message, '[skip-translate]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check MIM target configured
+        id: mim_target
+        run: |
+          if [ -z "${{ vars.MIM_MIRROR_REPO }}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::MIM_MIRROR_REPO ещё не задан (решение пилота по имени репозитория в MimEcoSys — WP-415/WP-401) — mirror пропущен."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate MimEcoSys installation token
+        id: mim_token
+        if: steps.mim_target.outputs.configured == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.CANON_SYNC_APP_ID }}
+          private-key: ${{ secrets.CANON_SYNC_APP_KEY }}
+          owner: MimEcoSys
+
+      - name: Checkout main (full history — honest mirror, no shallow rewrite)
+        if: steps.mim_target.outputs.configured == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check target repo exists
+        id: target_check
+        if: steps.mim_target.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ steps.mim_token.outputs.token }}
+        run: |
+          if gh repo view "MimEcoSys/${{ vars.MIM_MIRROR_REPO }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::MimEcoSys/${{ vars.MIM_MIRROR_REPO }} ещё не создан (bootstrap-чеклист WP-415) — mirror пропущен."
+          fi
+
+      - name: Mirror main to MimEcoSys (explicit refspec, no history rewrite)
+        if: steps.mim_target.outputs.configured == 'true' && steps.target_check.outputs.exists == 'true'
+        run: |
+          git remote add mim "https://x-access-token:${{ steps.mim_token.outputs.token }}@github.com/MimEcoSys/${{ vars.MIM_MIRROR_REPO }}.git"
+          git push mim '+refs/heads/main:refs/heads/main'
