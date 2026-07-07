@@ -80,6 +80,7 @@ if [[ "$MODE" != "settings-json" ]]; then
         #   - os.environ.get("GOVERNANCE_REPO", "DS-strategy")  (python fallback)
         #   - GOV_REPO_TMPL="DS-strategy"          (template identity literal)
         #   - VAR="DS-strategy" \                  (env override в команде, line cont)
+        #   - строка с маркером validate-fmt-scripts: allow-governance-literal (тестовая фикстура)
         # Запрещено: буквальное имя governance-репо вне fallback-паттерна в исполняемых строках
         # Комментарии (#) пропускаются — документация не влияет на поведение
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
@@ -90,6 +91,7 @@ if [[ "$MODE" != "settings-json" ]]; then
                 | grep -vE '^[0-9]*:[[:space:]]*[A-Z_]+_TMPL=' \
                 | grep -vE "os\.environ\.get\([^)]*,[[:space:]]*[\"']" \
                 | grep -vE '^[0-9]*:\s*[A-Z_][A-Z0-9_]*="[^"]*"[[:space:]]*[\\]$' \
+                | grep -v 'validate-fmt-scripts: allow-governance-literal' \
                 || true)
             if [[ -n "$bad_lines" ]]; then
                 echo "  ❌ $fname: '$AUTHOR_GOV_REPO' без env fallback в коде" >&2
