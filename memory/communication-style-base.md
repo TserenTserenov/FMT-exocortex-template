@@ -2,7 +2,7 @@
 name: communication-style-base
 description: "ПРОЕКЦИЯ S0 базового стиля IWE. SoT: PACK-digital-platform/.../02-domain-entities/communication-style-base.md"
 type: reference
-horizon: hot
+horizon: warm
 domains: [communication, ux]
 status: active
 valid_from: 2026-06-01

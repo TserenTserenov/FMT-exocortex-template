@@ -21,7 +21,7 @@ EXIT_GENERAL=1
 
 trap 'echo "ОШИБКА: update.sh прервался на строке ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
-VERSION="2.3.0"  # fix #226: CLAUDE.md conflict no longer aborts delivery/commit; repair-pass reachable on "up to date"; branch guard before commit
+VERSION="2.4.0"  # fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
 REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
@@ -91,6 +91,15 @@ is_personal_config() {
 
 # === Detect directories ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# issue #229: shared frontmatter reader (get_field), sourced by SCRIPT_DIR-relative
+# path. Soft here (no || exit 1): an install upgrading from a pre-2.4.0 version
+# won't have this file locally yet on its very first run — Step 0 self-update
+# replaces update.sh itself and re-execs it before any file propagation happens,
+# so this line runs before the file can exist on disk. Step 5 Apply delivers it
+# (it's now in the manifest) and re-sources it below, right after copying files —
+# that call is the hard-required one, by which point the file is guaranteed present.
+[ -f "$SCRIPT_DIR/.claude/lib/frontmatter.sh" ] && source "$SCRIPT_DIR/.claude/lib/frontmatter.sh"
 
 if [ ! -f "$SCRIPT_DIR/CLAUDE.md" ]; then
     echo "ОШИБКА: Запускайте из корня экзокортекс-репо."
@@ -183,8 +192,10 @@ repair_pass() {
                         cp "$SCRIPT_DIR/$fpath" "$mem_dst"
                         echo "  ⟲ $fpath → memory/ (repair)"
                         REPAIRED=$((REPAIRED + 1))
+                    elif [ -r "$mem_dst" ] && [ "$(get_field "$mem_dst" owner)" = "user" ]; then
+                        : # issue #229: owner: user в frontmatter — пилот владеет файлом, stale-repair не применяется никогда
                     elif is_personal_config "$fname"; then
-                        : # личный L4-конфиг существует — НЕ stale-repair (персонализация ≠ дефолт по хешу)
+                        : # личный L4-конфиг без frontmatter (day-rhythm-config.yaml) — НЕ stale-repair
                     elif [ -r "$mem_dst" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$mem_dst")" ]; then
                         cp "$SCRIPT_DIR/$fpath" "$mem_dst"
                         echo "  ⟲ $fpath → memory/ (stale repair)"
@@ -509,6 +520,17 @@ for f in "${UPDATED_FILES[@]}"; do
     APPLIED=$((APPLIED + 1))
 done
 
+# issue #229: hard-require frontmatter.sh now — NEW_FILES/UPDATED_FILES above have
+# just delivered it to disk if this is the first run after upgrading from a
+# pre-2.4.0 install (the soft source near SCRIPT_DIR could not find it yet then).
+# Everything below this point (repair_pass, Step 6 memory copy, hot-budget
+# validator) calls get_field(), so a missing file here is a real delivery bug
+# (manifest/git tracking), not a bootstrap-ordering race — fail loudly.
+source "$SCRIPT_DIR/.claude/lib/frontmatter.sh" || {
+    echo "ОШИБКА: .claude/lib/frontmatter.sh отсутствует после применения обновлений." >&2
+    exit 1
+}
+
 # Detect pre-existing nested conflict markers before we propagate merged files.
 # This prevents stacking new 3-way merges on top of unresolved ones (issue #31).
 conflict_marker_files=()
@@ -796,11 +818,17 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
         case "$f" in
             memory/*.md|memory/*.yaml|memory/*.yml)
                 fname=$(basename "$f")
+                dst="$CLAUDE_MEMORY_DIR/$fname"
                 if [ "$fname" != "MEMORY.md" ]; then
-                    if is_personal_config "$fname" && [ -f "$CLAUDE_MEMORY_DIR/$fname" ]; then
+                    # issue #229: same owner:user guard as repair_pass() — this loop runs on
+                    # every update.sh call (not just repair), so it's the more common path
+                    # that was clobbering user-owned memory files.
+                    if [ -f "$dst" ] && [ "$(get_field "$dst" owner)" = "user" ]; then
+                        echo "  ✓ $fname — owner: user, не перезаписан"
+                    elif is_personal_config "$fname" && [ -f "$dst" ]; then
                         echo "  ✓ $fname — личный L4-конфиг, не перезаписан"
                     else
-                        cp "$SCRIPT_DIR/$f" "$CLAUDE_MEMORY_DIR/$fname"
+                        cp "$SCRIPT_DIR/$f" "$dst"
                         MEM_UPDATED=$((MEM_UPDATED + 1))
                     fi
                 fi
@@ -868,6 +896,32 @@ done
 # Выполняется ПОСЛЕ propagation, чтобы repair не дублировал работу NEW_FILES/UPDATED_FILES.
 # Определение функции — см. repair_pass() перед Step 2 (нужна там же для early-exit ветки).
 repair_pass
+
+# === Step 5e: Hot-budget validator (issue #228) ===
+# Политика CLAUDE.md §4: суммарно ≤150 строк в memory/*.md с horizon: hot.
+# Warning-only (не hard-fail) — превышение не должно блокировать доставку остального
+# (тот же принцип, что и CLAUDE.md conflict handling, issue #226).
+HOT_BUDGET_LIMIT=150
+if [ -d "$CLAUDE_MEMORY_DIR" ]; then
+    HOT_LINES=0
+    HOT_FILES=()
+    for mem_file in "$CLAUDE_MEMORY_DIR"/*.md; do
+        [ -f "$mem_file" ] || continue
+        if [ "$(get_field "$mem_file" horizon)" = "hot" ]; then
+            # awk NR (not wc -l) — wc -l counts newlines and undercounts by 1
+            # for files without a trailing newline, silently hiding an overrun.
+            n=$(awk 'END{print NR}' "$mem_file")
+            HOT_LINES=$((HOT_LINES + n))
+            HOT_FILES+=("$(basename "$mem_file"): $n")
+        fi
+    done
+    if [ "$HOT_LINES" -gt "$HOT_BUDGET_LIMIT" ]; then
+        echo ""
+        echo "  ⚠ HOT-бюджет превышен: $HOT_LINES строк (лимит $HOT_BUDGET_LIMIT) в $CLAUDE_MEMORY_DIR"
+        for entry in "${HOT_FILES[@]}"; do echo "      - $entry"; done
+        echo "    Понизьте horizon: hot → warm для части файлов или сократите содержимое."
+    fi
+fi
 
 # (Step 6b removed — repo rename no longer supported, no link migration needed)
 

@@ -7,6 +7,8 @@
 #   T3: CLAUDE.md with pre-existing conflict markers blocks update (stacking guard)
 #   T4: role install failure surfaces a visible warning (not silently swallowed)
 #   T5: network-independent --check works with a cached manifest
+#   T6: memory file with owner: user survives a hash mismatch (issue #229)
+#   T7: hot-budget sum over threshold is detectable (issue #228)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -242,6 +244,108 @@ else
     fail "T5: manifest cache file is invalid or missing"
 fi
 rm -f "$CACHE_MANIFEST"
+
+# ============================================================================
+# T6: memory file with owner: user survives a hash mismatch (issue #229)
+# ============================================================================
+echo "--- T6: owner:user memory file is not stale-repaired ---"
+
+source "$TEMPLATE_DIR/.claude/lib/frontmatter.sh"
+
+T6_UPSTREAM="$TEST_WS/upstream-fake.md"
+T6_DEPLOYED="$TEST_WS/deployed-fake.md"
+
+cat > "$T6_UPSTREAM" <<'HEREDOC'
+---
+owner: platform
+horizon: hot
+---
+Upstream content (would overwrite deployed if copied).
+HEREDOC
+
+cat > "$T6_DEPLOYED" <<'HEREDOC'
+---
+owner: 'user'
+horizon: hot
+---
+Pilot's own edit — must never be overwritten by stale-repair.
+HEREDOC
+
+# Same conditional update.sh's repair_pass() / Step 6 propagation use: owner:user guard first.
+if [ "$(get_field "$T6_DEPLOYED" owner)" = "user" ]; then
+    T6_PROTECTED=true
+else
+    T6_PROTECTED=false
+fi
+
+if [ "$T6_PROTECTED" = "true" ]; then
+    pass "T6: get_field detects owner:user (single-quoted) — repair_pass would skip this file"
+else
+    fail "T6: get_field failed to detect owner:user — file would be clobbered"
+fi
+
+# Wiring check: the helper working in isolation doesn't prove update.sh still
+# calls it in the right place. Grep for the actual guard at both call sites
+# (repair_pass() and the Step 6 memory-copy loop) so a future refactor that
+# drops or reorders the check fails this test even though get_field itself
+# is untouched.
+T6_WIRED_COUNT=$(grep -cE 'get_field "\$[a-z_]*dst" owner' "$TEMPLATE_DIR/update.sh")
+if [ "$T6_WIRED_COUNT" -eq 2 ]; then
+    pass "T6: owner:user guard is wired into both repair_pass() and Step 6 propagation"
+else
+    fail "T6: expected owner:user guard at 2 call sites in update.sh, found $T6_WIRED_COUNT"
+fi
+
+# ============================================================================
+# T7: hot-budget sum over threshold is detectable (issue #228)
+# ============================================================================
+echo "--- T7: hot-budget validator sums horizon:hot lines ---"
+
+T7_DIR="$TEST_WS/hot-budget-memory"
+mkdir -p "$T7_DIR"
+
+# Two hot files summing to 160 lines (over the 150 limit)
+python3 -c "
+print('---')
+print('horizon: hot')
+print('---')
+for i in range(97): print(f'line {i}')
+" > "$T7_DIR/hot-a.md"   # 100 lines total (3 frontmatter + 97 body)
+
+python3 -c "
+print('---')
+print('horizon: hot')
+print('---')
+for i in range(57): print(f'line {i}')
+" > "$T7_DIR/hot-b.md"   # 60 lines total
+
+cat > "$T7_DIR/warm-c.md" <<'HEREDOC'
+---
+horizon: warm
+---
+This file's lines must NOT count toward the hot budget.
+HEREDOC
+
+T7_HOT_LINES=0
+for mem_file in "$T7_DIR"/*.md; do
+    if [ "$(get_field "$mem_file" horizon)" = "hot" ]; then
+        n=$(wc -l < "$mem_file" | tr -d ' ')
+        T7_HOT_LINES=$((T7_HOT_LINES + n))
+    fi
+done
+
+if [ "$T7_HOT_LINES" -gt 150 ]; then
+    pass "T7: hot-budget validator sums to $T7_HOT_LINES (>150), warning would fire"
+else
+    fail "T7: expected hot sum >150, got $T7_HOT_LINES"
+fi
+
+# Confirm warm file is excluded from the sum (160 hot + 4 warm would be 164 if miscounted)
+if [ "$T7_HOT_LINES" -lt 164 ]; then
+    pass "T7: warm-c.md correctly excluded from hot sum"
+else
+    fail "T7: warm file was incorrectly counted into hot sum"
+fi
 
 # ============================================================
 # Summary
