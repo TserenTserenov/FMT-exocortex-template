@@ -143,8 +143,12 @@ jobs:
           FALLBACK_NAME: ${{ github.actor }}
           FALLBACK_EMAIL: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
         run: |
+          # github.event.commits does not exist on workflow_dispatch runs —
+          # toJSON() then yields the literal "null", which jq's `.[]` cannot
+          # iterate (caught live 2026-07-09: run 29009566080 failed on this).
+          # `(. // [])` treats a null input as an empty array instead.
           MATCH=$(echo "$COMMITS_JSON" | jq -c \
-            '[.[] | select((.added + .modified + .removed) | any(test("^(README\\.md$|docs/)")))] | last // empty')
+            '(. // []) | [.[] | select((.added + .modified + .removed) | any(test("^(README\\.md$|docs/)")))] | last // empty')
           if [ -n "$MATCH" ] && [ "$MATCH" != "null" ]; then
             echo "name=$(echo "$MATCH" | jq -r '.author.name')" >> "$GITHUB_OUTPUT"
             echo "email=$(echo "$MATCH" | jq -r '.author.email')" >> "$GITHUB_OUTPUT"
