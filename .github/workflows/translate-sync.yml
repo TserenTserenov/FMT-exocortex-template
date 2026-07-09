@@ -30,6 +30,7 @@ jobs:
   sync:
     if: >-
       github.actor != 'github-actions[bot]' &&
+      github.actor != 'canon-sync[bot]' &&
       !contains(github.event.head_commit.message, '[skip-translate]')
     runs-on: ubuntu-latest
     permissions:
@@ -126,18 +127,55 @@ jobs:
           {"schemaVersion":1,"label":"EN sync","message":"$message","color":"$color"}
           EOF
 
+      - name: Determine source commit author (WP-415, DP.SC.189)
+        id: source_author
+        if: always() && steps.en_draft.outcome == 'success'
+        env:
+          # head_commit is only the LAST commit of the push, not necessarily
+          # the one that touched a translated path (docs/**, README.md) —
+          # wrong on batch pushes and on ordinary (non-squash) merge commits,
+          # where the merge commit is attributed to whoever clicked Merge,
+          # not to the content's author (review finding, 2026-07-09). Scan
+          # every commit in the push for one that actually changed a
+          # translated path; env: keeps commit-message content out of the
+          # shell parser (untrusted, could contain shell metacharacters).
+          COMMITS_JSON: ${{ toJSON(github.event.commits) }}
+          FALLBACK_NAME: ${{ github.actor }}
+          FALLBACK_EMAIL: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
+        run: |
+          MATCH=$(echo "$COMMITS_JSON" | jq -c \
+            '[.[] | select((.added + .modified + .removed) | any(test("^(README\\.md$|docs/)")))] | last // empty')
+          if [ -n "$MATCH" ] && [ "$MATCH" != "null" ]; then
+            echo "name=$(echo "$MATCH" | jq -r '.author.name')" >> "$GITHUB_OUTPUT"
+            echo "email=$(echo "$MATCH" | jq -r '.author.email')" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=$FALLBACK_NAME" >> "$GITHUB_OUTPUT"
+            echo "email=$FALLBACK_EMAIL" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Commit and push to en-draft
         if: always() && steps.en_draft.outcome == 'success'
+        env:
+          # Committer stays canon-sync[bot] (the entity that operates this
+          # pipeline); author becomes the human who made the source change
+          # (previous step), so public commits show real attribution instead
+          # of a generic bot (IT-meeting feedback, 2026-07-09).
+          AUTHOR_NAME: ${{ steps.source_author.outputs.name }}
+          AUTHOR_EMAIL: ${{ steps.source_author.outputs.email }}
         run: |
           cd ../en-draft
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Committer = canon-sync (the pipeline), author = source-repo human.
+          # GitHub renders "Authored by X, committed by canon-sync[bot]" —
+          # the standard cherry-pick/backport-bot pattern, not an anonymous commit.
+          git config user.name "canon-sync[bot]"
+          git config user.email "canon-sync[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
             echo "No translation changes to commit."
             exit 0
           fi
-          git commit -m "chore(translate-sync): sync EN draft from $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD) [skip-translate]"
+          git commit --author="${AUTHOR_NAME} <${AUTHOR_EMAIL}>" \
+            -m "chore(translate-sync): sync EN draft from $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD) [skip-translate]"
           # HEAD:en-draft also covers the detached worktree that
           # `git worktree add ../en-draft origin/en-draft` produces when
           # the branch already exists on the remote
