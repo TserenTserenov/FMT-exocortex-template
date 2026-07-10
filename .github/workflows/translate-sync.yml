@@ -147,6 +147,8 @@ jobs:
             sed -i '\|extensions/README.md|d' "$R"
             # Pack deep-links lead to Russian-language repos.
             sed -i '\|github.com/TserenTserenov/PACK-digital-platform|d' "$R"
+            # Install command: EN readers fork the EN distribution.
+            sed -i 's|gh repo fork TserenTserenov/FMT-exocortex-template|gh repo fork iwesys/IWE|' "$R"
           fi
 
       - name: Write EN-only community redirect stubs to en-draft
