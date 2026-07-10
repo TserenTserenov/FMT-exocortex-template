@@ -1,13 +1,14 @@
 # translation-manifest.yaml — WP-415 Фаза В1 Bootstrap
 # RU source: TserenTserenov/FMT-exocortex-template (authoritative)
-# EN target:  iwesys/FMT-exocortex-template (pipeline output, do not edit by hand)
+# EN target:  iwesys/IWE (pipeline output, do not edit by hand; renamed from
+#             iwe-template 2026-07-10, GitHub keeps a redirect from the old name)
 # Created: peer-session 2026-06-19-03-wp415
 
 schema_version: 1
 source_lang: ru
 target_lang: en
 target_org: iwesys
-target_repo: FMT-exocortex-template
+target_repo: IWE
 
 # EXCLUSION LIST — identifiers never to translate
 # Rule: if in doubt, add here. Over-exclusion beats under-exclusion.

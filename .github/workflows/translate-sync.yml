@@ -222,7 +222,7 @@ jobs:
     needs: sync
     runs-on: ubuntu-latest
     env:
-      TARGET_REPO: iwesys/iwe-template
+      TARGET_REPO: iwesys/IWE
     steps:
       - name: Generate iwesys installation token
         id: iwesys_token
