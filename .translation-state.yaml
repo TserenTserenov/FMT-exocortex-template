@@ -1,9 +1,4 @@
-files_translated:
-- CODE_OF_CONDUCT.md
-- SECURITY.md
-- PRIVACY.md
-- docs/onboarding/architecture-layers.md
-- docs/onboarding/onboarding-guide.md
-last_run_utc: '2026-07-10T07:40:03Z'
-last_synced_sha: e4a23f0855b20281ea9cecf6341493becacb9b34
+files_translated: []
+last_run_utc: '2026-07-10T08:28:37Z'
+last_synced_sha: 65e5534afa51af45116b2d875e50cdee5d09ba89
 schema_version: 1
