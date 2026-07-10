@@ -135,7 +135,7 @@ IWE is for those who want to change that:
 
 ```bash
 mkdir -p ~/IWE && cd ~/IWE
-gh repo fork TserenTserenov/FMT-exocortex-template --clone
+gh repo fork iwesys/IWE --clone
 cd FMT-exocortex-template
 bash setup.sh
 ```
