@@ -39,6 +39,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 | `code` | Проверка кода | Качество кода: логика, edge cases, безопасность, coupling |
 | `archgate` | Проверка реализации АрхГейта | Код соответствует ЭМОГССБ-оценке, принципы воплощены |
 | `capture` | Проверка capture-candidate | UL, полнота, непротиворечивость с Pack |
+| `pack` | Проверка Package-адекватности | Проверяет 11 координат E.4.DPF.DA seed-пакета (Ф1-Ф3 артефакты): SoTA, decision-record, seed-маркер, их достаточность. Используется из `/verify pack` или `pack-creator` Шаг 4 |
 | `wp` | Приёмка рабочего продукта | Критерии done из WP context file |
 | `chain` | Data flow check | Прочитаны ли downstream consumers? Контракты совпадают? (CoVe stage 3) |
 | `adversarial` | Scope & bias check | Scope определён анализом или выводом? Что НЕ прочитано? (Pre-mortem) |
@@ -83,6 +84,16 @@ gates_rationale: "операционный скилл; WP Gate применим 
 - Прочитать manifest целевого Pack
 - Передать sub-agent'у: candidate + manifest + чеклист capture
 - Модель sub-agent'а: Sonnet
+
+**Для `pack`:**
+- Прочитать WP-контекст пакета (WP-474.md или папка пакета)
+- Прочитать файлы артефактов Ф1-Ф3:
+  - `06-sota/{slug}-sota-sheet.md` (Ф1: SoTA-лист)
+  - `.pfad-decision.md` (Ф2: decision record)
+  - `01B-distinctions.md` с маркером `**Maturity:** seed` (Ф3: seed-маркер + mature-lite чек-лист)
+- Передать sub-agent'у промпт: `verify-pack-adequacy-subsection.md` + данные из контекста
+- Модель sub-agent'а: Sonnet
+- **Verdict**: PASS/CONDITIONAL/FAIL по координатам D1-D11 (WP-474 §4)
 
 **Для `wp`:**
 - Прочитать WP context file (`{{GOVERNANCE_REPO}}/inbox/WP-{N}-*.md`)
