@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use IWE (Intellectual Work Environment) in your work, please cite it as below."
+title: "IWE: Intellectual Work Environment"
+type: software
+authors:
+  - family-names: "Tserenov"
+    given-names: "Tseren"
+repository-code: "https://github.com/TserenTserenov/FMT-exocortex-template"
+url: "https://github.com/TserenTserenov/FMT-exocortex-template"
+license: MIT
+version: "0.35.5"
+date-released: "2026-06-30"

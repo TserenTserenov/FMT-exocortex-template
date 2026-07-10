@@ -1,4 +1,9 @@
-files_translated: []
-last_run_utc: '2026-07-09T10:09:21Z'
-last_synced_sha: 4dea62e261d77d5892862cc5d90a7ab27decb733
+files_translated:
+- CODE_OF_CONDUCT.md
+- SECURITY.md
+- PRIVACY.md
+- docs/onboarding/architecture-layers.md
+- docs/onboarding/onboarding-guide.md
+last_run_utc: '2026-07-10T07:40:03Z'
+last_synced_sha: e4a23f0855b20281ea9cecf6341493becacb9b34
 schema_version: 1
