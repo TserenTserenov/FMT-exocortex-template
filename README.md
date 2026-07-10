@@ -53,7 +53,7 @@ Just as an IDE combines an editor, compiler, and debugger into a single environm
 | **ArchGate** | Structured Assessment of architectural decisions across 7 characteristics (instead of "I think this looks good") |
 | **Strategist** | An AI agent that automatically drafts day/week plans and tracks Progress |
 
-Full glossary: [ONTOLOGY.md](ONTOLOGY.md)
+Full glossary: [ONTOLOGY.md](https://github.com/TserenTserenov/FMT-exocortex-template/blob/main/ONTOLOGY.md)
 
 ---
 
@@ -195,7 +195,7 @@ Read more: [extensions/README.md](https://github.com/TserenTserenov/FMT-exocorte
 | **[DATA-POLICY.md](docs/DATA-POLICY.md)** | Data policy: what is collected, where it is stored, how to delete it. |
 | **[IWE-HELP.md](docs/IWE-HELP.md)** | Quick reference and FAQ. |
 | **[principles-vs-skills.md](docs/principles-vs-skills.md)** | Why principles matter more than Skills: the generative hierarchy. |
-| **[ONTOLOGY.md](ONTOLOGY.md)** | Ontology: all IWE terms and abbreviations. |
+| **[ONTOLOGY.md](https://github.com/TserenTserenov/FMT-exocortex-template/blob/main/ONTOLOGY.md)** | Ontology: all IWE terms and abbreviations. |
 | **[CHANGELOG.md](CHANGELOG.md)** | Template change history. |
 
 ---
