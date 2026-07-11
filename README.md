@@ -191,10 +191,13 @@ multiplier_enabled: true    # Мультипликатор IWE
 | **[SETUP-GUIDE.md](docs/SETUP-GUIDE.md)** | Пошаговая установка от чистого компьютера. Требования, режимы (core/full), проверка |
 | **[LEARNING-PATH.md](docs/LEARNING-PATH.md)** | Путь изучения IWE: архитектура, принципы, протоколы, Pack, роли |
 | **[DATA-POLICY.md](docs/DATA-POLICY.md)** | Политика данных: что собирается, где хранится, как удалить |
+| **[DATA-RESIDENCY.md](docs/DATA-RESIDENCY.md)** | Принцип резидентности: данные, которые вы приносите в IWE извне (здоровье, календарь, рабочее время) — куда им можно и нельзя уходить |
 | **[IWE-HELP.md](docs/IWE-HELP.md)** | Быстрая справка и FAQ |
 | **[principles-vs-skills.md](docs/principles-vs-skills.md)** | Почему принципы важнее навыков: генеративная иерархия |
 | **[ONTOLOGY.md](ONTOLOGY.md)** | Онтология: все термины и аббревиатуры IWE |
 | **[CHANGELOG.md](CHANGELOG.md)** | История изменений шаблона |
+
+> Два документа покрывают смежные темы: `DATA-POLICY.md` — про данные, которые платформа собирает о вас; `DATA-RESIDENCY.md` — про данные, которые вы сами приносите в IWE извне.
 
 ---
 
