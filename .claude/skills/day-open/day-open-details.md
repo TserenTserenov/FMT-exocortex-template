@@ -117,8 +117,9 @@ bash $IWE_SCRIPTS/server-calendar.sh --week YYYY-MM-DD
 
 **Проверка обновлений IWE:**
 ```bash
-cd "$IWE_TEMPLATE" && bash update.sh --check 2>&1
+cd "$IWE_TEMPLATE" && bash update.sh --check --fast 2>&1
 ```
+`--fast` (issue #230, v2.5.0) сравнивает только версию манифеста — секунда вместо 2+ минут полного пофайлового сравнения на 300+ файлах. Для полного списка изменений — `bash update.sh --check` (без `--fast`), отдельно, не в составе Day Open.
 Если доступно обновление → «Требует внимания»: «Доступно обновление IWE → `/iwe-update`».
 
 **Проверка Base-репо (FPF, SPF, ZP):**
