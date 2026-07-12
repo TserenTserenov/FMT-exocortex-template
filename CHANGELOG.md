@@ -96,10 +96,11 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — обновлено 2026-07-12
 
-Спасибо den317 за репорты #247, #249, #250: без них Close-протоколы продолжали бы рапортовать «закоммичено ✅» на грязном дереве, `.claude/state/` намусоривал бы git status у каждого пилота, а `validate-template.sh` прятал бы совпадения в *.json/*.plist без единой показанной строки. #247 (excluded_paths) остаётся открытым — решение архитектурного вопроса за пилотом.
+Спасибо den317 за репорты #247, #248, #249, #250 и VxxxlBxxxxv за #251, #252: без них Close-протоколы продолжали бы рапортовать «закоммичено ✅» на грязном дереве, WeekPlan-валидатор блокировал бы любой коммит DayPlan из-за не относящегося к делу старого WeekPlan, обновление шаблона осциллировало бы на `docs/DATA-RESIDENCY.md`, а L2-память (Hindsight) молча не работала бы даже при поднятом контейнере. #247 (excluded_paths) остаётся открытым — решение архитектурного вопроса за пилотом.
 
 ### Added
 
+- `dd011fa` feat(hindsight): deliver hindsight_trigger.py + hindsight_adapter.py, closing L2 integration gap (#252)
 - `50eeef1` feat(wp-450-ф5): промоция 3 rules-lazy файлов (drift-guard, new-files-guard, wp-stop-list)
 - `695033d` feat(residency-gate): ResidencyGate full implementation
 - `c286e98` feat: promote day-open-pipeline.sh to platform
@@ -127,6 +128,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `67571f3` docs(changelog): thank den317 for #247/#249/#250 reports
+- `3c62228` docs(changelog): sync Unreleased section — #247/#249/#250 fixes
 - `9f0f31c` docs(changelog): sync Unreleased section — scripts/ delivery fix (#247)
 - `e1c1924` refine(note-review-d6): уточнить текст правила (не существует вместо пуст, дальние сроки → WeekPlan)
 - `0fafee4` docs(changelog): sync Unreleased section — FMT issues #230-246 batch
@@ -145,6 +148,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `2ea3510` fix(manifest): drop stale deprecated_files[] entry for docs/DATA-RESIDENCY.md (#251)
+- `0bb38e5` fix(hooks): WeekPlan validator checks staged artifact, not latest-on-disk (#248)
 - `ae960a2` fix(close-protocols): move final commit after knowledge-write steps (#249)
 - `914a39b` fix(validate-template): checks 2/3 print same file types they count (#247)
 - `e98f152` fix(gitignore): cover .claude/state/ — create-wp.sh consent-sentinels leave untracked tail (#250)
