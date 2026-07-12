@@ -1,8 +1,8 @@
 """ResidencyGate consent controller - Point A (activation) and Point B (lazy)."""
 
 from typing import List, Tuple, Optional, Callable
-from parser import DataNeed
-from state import ResidencyState, ConsentStatus
+from .parser import DataNeed
+from .state import ResidencyState, ConsentStatus
 
 
 class ResidencyGate:

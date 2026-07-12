@@ -6,12 +6,11 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-lib_path = Path(__file__).parent / "lib"
-sys.path.insert(0, str(lib_path))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from parser import ManifestParser, DataNeed
-from state import ResidencyState
-from consent import ResidencyGate
+from lib.parser import ManifestParser, DataNeed
+from lib.state import ResidencyState
+from lib.consent import ResidencyGate
 
 
 def main():
