@@ -148,6 +148,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `cec81a3` fix(hooks): DayPlan resolution had the same latest-on-disk bug as #248
 - `2ea3510` fix(manifest): drop stale deprecated_files[] entry for docs/DATA-RESIDENCY.md (#251)
 - `0bb38e5` fix(hooks): WeekPlan validator checks staged artifact, not latest-on-disk (#248)
 - `ae960a2` fix(close-protocols): move final commit after knowledge-write steps (#249)
