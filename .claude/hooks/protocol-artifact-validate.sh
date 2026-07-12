@@ -44,12 +44,19 @@ if ! echo "$STAGED" | grep -qE '^current/DayPlan.*\.md$|^current/WeekPlan.*\.md$
   exit 0
 fi
 
-# --- DayPlan Validation (выполняется только если DayPlan-файл существует) ---
-DAYPLAN=$(ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null | head -1)
+# --- DayPlan Validation (выполняется только если DayPlan застейджен в этом коммите) ---
+# issue #248 (тот же корень, что чинили для WeekPlan/WeekReport ниже): `ls | head -1`
+# резолвил алфавитно первый (= самый старый по ISO-дате) DayPlan на диске, а не тот,
+# что реально коммитится — не мигрированный старый DayPlan в current/ ложно блокировал
+# коммит корректного застейженного DayPlan (или коммит WeekPlan, раз DayPlan вообще
+# не участвовал). Резолвим из $STAGED, как WEEKPLAN/WEEKREPORT.
+DAYPLAN_STAGED=$(echo "$STAGED" | grep -E '^current/DayPlan.*\.md$' | sort | tail -1)
+DAYPLAN=""
+[ -n "$DAYPLAN_STAGED" ] && DAYPLAN="$GOV_PATH/$DAYPLAN_STAGED"
 MISSING=()
 ERRORS=()
 
-if [ -n "$DAYPLAN" ]; then
+if [ -n "$DAYPLAN" ] && [ -f "$DAYPLAN" ]; then
 
 # Required sections (parameterized — update this list when format changes).
 # Scout раздел опционален: проверяется отдельно ниже (см. блок "Scout").
