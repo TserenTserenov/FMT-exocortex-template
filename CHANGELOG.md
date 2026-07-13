@@ -94,13 +94,14 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-07-12
 
-Спасибо den317 за репорты #247, #248, #249, #250 и VxxxlBxxxxv за #251, #252: без них Close-протоколы продолжали бы рапортовать «закоммичено ✅» на грязном дереве, WeekPlan-валидатор блокировал бы любой коммит DayPlan из-за не относящегося к делу старого WeekPlan, обновление шаблона осциллировало бы на `docs/DATA-RESIDENCY.md`, а L2-память (Hindsight) молча не работала бы даже при поднятом контейнере. #247 (excluded_paths) остаётся открытым — решение архитектурного вопроса за пилотом.
+## [Unreleased] — обновлено 2026-07-13
 
 ### Added
 
 - `dd011fa` feat(hindsight): deliver hindsight_trigger.py + hindsight_adapter.py, closing L2 integration gap (#252)
+- `046aec3` feat(wp-450-ф5): промоция hooks-bypass-gate.md + integration-gate.md
+- `a7f5f9d` feat: promote 8 personal utility scripts to platform
 - `50eeef1` feat(wp-450-ф5): промоция 3 rules-lazy файлов (drift-guard, new-files-guard, wp-stop-list)
 - `695033d` feat(residency-gate): ResidencyGate full implementation
 - `c286e98` feat: promote day-open-pipeline.sh to platform
@@ -128,6 +129,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `806ba4c` docs(changelog): add cec81a3 (DayPlan follow-up to #248)
+- `82b1cc8` docs(changelog): sync Unreleased section — #248/#251/#252 fixes, thank VxxxlBxxxxv
 - `67571f3` docs(changelog): thank den317 for #247/#249/#250 reports
 - `3c62228` docs(changelog): sync Unreleased section — #247/#249/#250 fixes
 - `9f0f31c` docs(changelog): sync Unreleased section — scripts/ delivery fix (#247)
@@ -148,12 +151,20 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `7cbd225` fix: 3 template bugs from bot-flagged issue sweep (#253, #255, #256)
+- `f87061e` fix(memory): исправить дрейф терминологии FPF — P2W (WP-481 Ф11)
+- `3a1b5ec` fix(hindsight): передать HINDSIGHT_API_LLM_API_KEY в контейнер
+- `3703abd` fix(residency-gate): replace hand-rolled YAML parsing with real yaml library
+- `9169115` fix(residency-gate): consistent package-relative imports
+- `658cfde` fix(residency-gate): test assertion referenced stale example name
 - `cec81a3` fix(hooks): DayPlan resolution had the same latest-on-disk bug as #248
 - `2ea3510` fix(manifest): drop stale deprecated_files[] entry for docs/DATA-RESIDENCY.md (#251)
 - `0bb38e5` fix(hooks): WeekPlan validator checks staged artifact, not latest-on-disk (#248)
+- `781e8bb` fix(wp474): D1/D9 addressed-критерии — плейсхолдер-конвенция расширена
 - `ae960a2` fix(close-protocols): move final commit after knowledge-write steps (#249)
 - `914a39b` fix(validate-template): checks 2/3 print same file types they count (#247)
 - `e98f152` fix(gitignore): cover .claude/state/ — create-wp.sh consent-sentinels leave untracked tail (#250)
+- `cd240eb` fix(script-promote.sh): bound smoke-test with 5s alarm, daemon scripts hung it forever
 - `242ec42` fix(manifest): deliver scripts/ by default instead of blanket-excluding it (#247, root #246)
 - `a5c6d0f` fix(day-open-scaffold): bound remaining unprotected network calls (#241 residual)
 - `b0ad33b` fix(update.sh): git-based author_diverged() guard replaces path whitelist (#238)
@@ -209,6 +220,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - `84858e4` fix(release): sync-version-badge.sh --fix broken on macOS BSD sed + README badge drift
 - `0b5e140` fix(extractor): guard против запуска сырого файла шаблона + правка примеров
 - `b4d08a2` fix(v0.35.5): orphan-detection TypeError + DS-strategy validator + root detection (#214 #215)
+- `212fa2f` fix(setup): include rules-lazy in dry-run and section message
+- `b7d75a8` fix(template): verify-template-integrity mirrors CI contract+smoke jobs
+- `0200a93` fix(template): close manifest drift + setup/update rules-lazy gap, wire parity gate
 
 
 ## [0.35.5] — 2026-06-30
