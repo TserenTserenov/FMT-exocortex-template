@@ -76,19 +76,34 @@ case "$TOOL_NAME" in
         ;;
 esac
 
-# === MCP-write whitelist (точные совпадения tool_name) ===
+# === MCP-write: IWE Gateway tools (namespace-agnostic action match) ===
+# Префикс MCP-инструмента дрейфует между способами подключения к одному Gateway
+# (server "iwe-knowledge", mcp.aisystant.com/mcp):
+#   mcp__claude_ai_IWE__<action>            — legacy connector с именем "IWE"
+#   mcp__iwe_knowledge_<action>             — OMP runtime (одинарный разделитель "_")
+#   mcp__iwe-knowledge__<action>            — project .mcp.json (server id "iwe-knowledge")
+#   mcp__claude_ai_https_..._mcp__<action>  — connector с именем из URL
+# Exact-list по префиксу устаревает при каждой миграции namespace и пропускает
+# write-инструменты (bug: gate не блокировал mcp__iwe-knowledge__personal_write и др.).
+# Решение: сверять ДЕЙСТВИЕ (суффикс после последнего разделителя), а не полное имя.
+# Паттерн "*_<action>" ловит и "__<action>" (двойной разделитель), и "_<action>" (OMP).
+if [[ "$TOOL_NAME" == mcp__* ]]; then
+    for action in \
+        personal_write personal_delete personal_create_pack personal_propose_capture \
+        personal_reindex_source personal_scaffold_notes personal_connect_source \
+        personal_disconnect_source personal_purge_source personal_generate_fault_remind \
+        dt_write_digital_twin create_repository github_connect github_disconnect \
+        knowledge_feedback knowledge_reindex_source send_telegram_message \
+        run_strategist run_extractor capture_trace grant_consent \
+        agent_status_update request_equipment_upgrade; do
+        if [[ "$TOOL_NAME" == *"_${action}" ]]; then
+            block "$TOOL_NAME (action: $action)"
+        fi
+    done
+fi
+
+# === MCP-write: vendor tools (exact tool_name — префиксы вендоров стабильны) ===
 case "$TOOL_NAME" in
-    mcp__claude_ai_IWE__personal_write|\
-    mcp__claude_ai_IWE__personal_delete|\
-    mcp__claude_ai_IWE__personal_create_pack|\
-    mcp__claude_ai_IWE__personal_propose_capture|\
-    mcp__claude_ai_IWE__personal_reindex_source|\
-    mcp__claude_ai_IWE__personal_scaffold_notes|\
-    mcp__claude_ai_IWE__dt_write_digital_twin|\
-    mcp__claude_ai_IWE__create_repository|\
-    mcp__claude_ai_IWE__github_connect|\
-    mcp__claude_ai_IWE__github_disconnect|\
-    mcp__claude_ai_IWE__knowledge_feedback|\
     mcp__claude_ai_Gmail__create_draft|\
     mcp__claude_ai_Gmail__create_label|\
     mcp__claude_ai_Gmail__label_message|\
