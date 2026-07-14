@@ -63,11 +63,11 @@ bash "$AUDIT_SCRIPT" $([ "${ARGUMENTS:-}" = "--critical" ] && echo "--critical")
 | Tool | Параметры | Уровень | Что считаем |
 |------|-----------|---------|-------------|
 | `mcp__claude_ai_IWE__knowledge_search` | `query: "test"`, `limit: 1` | бесплатный | ✅ если ответ <15s |
-| `mcp__claude_ai_IWE__github_status` | (без параметров) | бесплатный | ✅ если ответ |
+| `mcp__claude_ai_IWE__github_status` | (без параметров) | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
 | `mcp__claude_ai_IWE__personal_search` | `query: "ping"`, `limit: 1` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
 | `mcp__claude_ai_IWE__dt_read_digital_twin` | `path: "1_declarative"` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
 
-**Подписочное гейтование (DP.SC.112).** `personal_*` и `dt_*` требуют активной БР в `subscription_grants`. Без подписки — это **не сбой инсталляции**, а ожидаемый отказ. Помечать как ⏸️ subscription_required, не ❌. Coverage считать только по доступным для пользователя tool'ам.
+**Подписочное гейтование (DP.SC.112).** `personal_*`, `dt_*` и `github_status` требуют активной БР в `subscription_grants`. Без подписки — это **не сбой инсталляции**, а ожидаемый отказ. Помечать как ⏸️ subscription_required, не ❌. Coverage считать только по доступным для пользователя tool'ам.
 
 Сформировать markdown-секцию `## 4. MCP healthcheck`:
 
