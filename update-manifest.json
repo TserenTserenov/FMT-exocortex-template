@@ -1107,6 +1107,9 @@
       "path": "scripts/fmt-critical-alert.sh"
     },
     {
+      "path": "scripts/gate-metrics.sh"
+    },
+    {
       "path": "scripts/generate-catalogs.py"
     },
     {

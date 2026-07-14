@@ -95,10 +95,12 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-07-13
+
+## [Unreleased] — обновлено 2026-07-14
 
 ### Added
 
+- `39421f0` feat(strategist): вызвать week-open-day-section-patch после session-prep (WP-484 Ф3)
 - `dd011fa` feat(hindsight): deliver hindsight_trigger.py + hindsight_adapter.py, closing L2 integration gap (#252)
 - `046aec3` feat(wp-450-ф5): промоция hooks-bypass-gate.md + integration-gate.md
 - `a7f5f9d` feat: promote 8 personal utility scripts to platform
@@ -151,6 +153,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `a007d15` fix(create-wp): три отставших фикса из root-версии — папка WP-434, consent-file, WeekPlan replace-limit
+- `3c82107` fix(day-open): CP_PROFILE указывал на несуществующий cp-profile.json
 - `7cbd225` fix: 3 template bugs from bot-flagged issue sweep (#253, #255, #256)
 - `f87061e` fix(memory): исправить дрейф терминологии FPF — P2W (WP-481 Ф11)
 - `3a1b5ec` fix(hindsight): передать HINDSIGHT_API_LLM_API_KEY в контейнер
@@ -222,7 +226,6 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - `b4d08a2` fix(v0.35.5): orphan-detection TypeError + DS-strategy validator + root detection (#214 #215)
 - `212fa2f` fix(setup): include rules-lazy in dry-run and section message
 - `b7d75a8` fix(template): verify-template-integrity mirrors CI contract+smoke jobs
-- `0200a93` fix(template): close manifest drift + setup/update rules-lazy gap, wire parity gate
 
 
 ## [0.35.5] — 2026-06-30
