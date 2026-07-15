@@ -1,39 +1,75 @@
-Выполни сценарий Day Close для роли Стратег (R1).
+> **DEPRECATED (WP-98, 2026-03-14).** Day Close перенесён в `memory/protocol-close.md § День` (ОРЗ-фрактал).
+> Этот файл сохранён для справки. При триггере «закрываю день» → читать `protocol-close.md`.
 
-> **Триггер:** Ручной — по запросу пользователя (`/day-close` или `./scripts/strategist.sh day-close`).
-> **Вход:** Текущий день (коммиты, статусы РП, WeekPlan).
-> **Выход:** Обновлённый WeekPlan + краткий итог на экран.
+Выполни сценарий Day-Close для роли Стратег (R1).
 
-## ВДВ-шаг
+> **Триггер:** Ручной — по запросу пользователя (`./scripts/strategist.sh day-close`).
+> Отдельный файл отчёта НЕ создаётся. Итоги дня войдут в DayPlan следующего утра.
 
-| Шаг | Вход | Действие | Выход |
-|-----|------|----------|-------|
-| 1 | Триггер от пользователя | Вызвать `skills/day-close/SKILL.md` | Результат skill или fallback |
+
+## Контекст
+
+- **WeekPlan:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md (последний по дате)
+- **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
+- **Exocortex backup:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/
 
 ## Алгоритм
 
-### 1. Делегировать в skill
+### 1. Сбор коммитов за сегодня
 
 ```bash
-# Проверить наличие skill
-SKILL="${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/day-close/SKILL.md"
-if [ -f "$SKILL" ]; then
-  # Делегировать выполнение skill /day-close
-  # Skill сам обновляет WeekPlan, делает backup, выводит итоги
-  echo "Делегирую в skills/day-close/SKILL.md"
-  # LLM-агент: прочитай SKILL.md и выполни его алгоритм целиком
-else
-  echo "WARN: skills/day-close/SKILL.md не найден — выполняю fallback (inline-чеклист)"
-fi
+# Для КАЖДОГО репо в {{WORKSPACE_DIR}}/:
+git -C {{WORKSPACE_DIR}}/<repo> log --since="today 00:00" --oneline --no-merges
 ```
 
-### 2. Fallback (если skill недоступен)
+- Пройди по ВСЕМ репозиториям в `{{WORKSPACE_DIR}}/`
+- Сгруппируй коммиты по репозиториям
+- Сопоставь с РП из недельного плана
+- Определи статус каждого затронутого РП: done / partial / not started
+- Выведи итоги на экран (не в файл)
 
-Если `skills/day-close/SKILL.md` не найден:
+### 2. Обновить WeekPlan
 
-1. **Собрать коммиты за сегодня** — `git log --since="today 00:00" --oneline` по всем репо в `{{WORKSPACE_DIR}}/`
-2. **Обновить WeekPlan** — пометить done/partial, добавить carry-over
-3. **Вывести краткий итог** на экран (шаблон ниже)
+Найди текущий `WeekPlan W*.md` в `{{GOVERNANCE_REPO}}/current/` и обнови:
+
+- Пометь завершённые РП как **done**
+- Обнови статусы partial с описанием прогресса
+- Добавь carry-over (что переносится на завтра) — в конец файла
+- **НЕ удаляй** ничего — только помечай и дописывай
+
+### 3. Обновить MEMORY.md
+
+Синхронизируй статусы РП в MEMORY.md с обновлённым WeekPlan:
+- done → done
+- partial → in_progress (с пометкой прогресса)
+- Удали завершённые РП из pending, если они в done
+
+### 4. Backup экзокортекса
+
+Скопируй актуальные файлы в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/`:
+
+```bash
+# Корневой CLAUDE.md
+cp {{WORKSPACE_DIR}}/CLAUDE.md {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/CLAUDE.md
+
+# Memory (Слой 3)
+cp ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/MEMORY.md
+cp ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/*.md {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/exocortex/
+```
+
+### 5. Закоммитить
+
+- Закоммить все изменения в `{{GOVERNANCE_REPO}}` (WeekPlan + exocortex backup)
+- Запуши
+
+## Правила
+
+- **Ничего не удалять** из WeekPlan — только помечать и дописывать
+- **Не создавать отдельный файл отчёта** — итоги дня войдут в DayPlan следующего утра (шаг 1 day-plan)
+- Если коммитов за день нет — написать «Нет активности» и всё равно сделать backup
+- Выводить итоги на экран для пользователя
+
+## Вывод на экран (шаблон)
 
 ```
 📋 Day-Close: DD месяца YYYY
@@ -44,17 +80,9 @@ fi
 РП обновлены в WeekPlan:
 - #N: статус → новый статус
 
+MEMORY.md: синхронизирован ✅
+Exocortex backup: скопирован ✅
 Git: закоммичен и запушен ✅
 ```
 
-## Правила
-
-- **Ничего не удалять** из WeekPlan — только помечать и дописывать
-- **Не создавать отдельный файл отчёта** — итоги дня войдут в DayPlan следующего утра
-- Если коммитов за день нет — написать «Нет активности» и всё равно обновить WeekPlan
-
-## Источники
-
-- **Skill (primary):** `{{WORKSPACE_DIR}}/.claude/skills/day-close/SKILL.md`
-- **WeekPlan:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md`
-- **WP-Registry:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/WP-REGISTRY.md`
+Результат: обновлённый WeekPlan + MEMORY.md + backup экзокортекса.

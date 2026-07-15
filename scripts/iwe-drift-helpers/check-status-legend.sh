@@ -75,7 +75,7 @@ extract_legend_emojis() {
 # Возвращает по одному эмодзи на строку (с дубликатами — кому надо, тот фильтрует sort -u).
 extract_table_emojis() {
     awk '
-        /^\|[[:space:]]*(~~)?(\*\*)?(WP-)?[0-9]+/ {
+        /^\|[[:space:]]*(~~)?[0-9]+/ {
             # Колонка статуса = поле 5 (после header `| # | P | Название | Ст |`)
             n = split($0, fields, "|")
             if (n >= 5) {
@@ -92,7 +92,7 @@ extract_table_emojis() {
 # id_format: "active" если plain `| 263 |`, "terminal" если crossed `| ~~263~~ |`.
 extract_id_status_pairs() {
     awk '
-        /^\|[[:space:]]*(~~)?(\*\*)?(WP-)?[0-9]+/ {
+        /^\|[[:space:]]*(~~)?[0-9]+/ {
             n = split($0, fields, "|")
             if (n < 5) next
             id_field = fields[2]
@@ -101,28 +101,11 @@ extract_id_status_pairs() {
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", status_field)
             gsub(/~~/, "", status_field)
 
-            # issue #220: id может быть обёрнут **...** и/или содержать префикс WP-,
-            # независимо друг от друга (`| **WP-58** |`, `| ~~**WP-60**~~ |`,
-            # `| WP-61 |`, `| ~~WP-62~~ |`) — не только plain-numeric. Cold-review
-            # (2026-07-04) нашёл, что WP-N без ** тихо выпадал из парсинга — добавлены
-            # две ветки без **, симметрично уже имеющимся с **.
             if (match(id_field, /^~~[0-9]+~~$/)) {
                 id_format = "terminal"
                 gsub(/~~/, "", id_field)
             } else if (match(id_field, /^[0-9]+$/)) {
                 id_format = "active"
-            } else if (match(id_field, /^~~\*\*(WP-)?[0-9]+\*\*~~$/)) {
-                id_format = "terminal"
-                gsub(/~~|\*\*|WP-/, "", id_field)
-            } else if (match(id_field, /^\*\*(WP-)?[0-9]+\*\*$/)) {
-                id_format = "active"
-                gsub(/\*\*|WP-/, "", id_field)
-            } else if (match(id_field, /^~~WP-[0-9]+~~$/)) {
-                id_format = "terminal"
-                gsub(/~~|WP-/, "", id_field)
-            } else if (match(id_field, /^WP-[0-9]+$/)) {
-                id_format = "active"
-                gsub(/WP-/, "", id_field)
             } else {
                 next  # некорректный формат, пропускаем
             }
@@ -219,18 +202,6 @@ echo ""
 echo "- ✅ format-compliance OK: $ok_count"
 echo "- ⚠️ undocumented status emoji (I1): $undocumented_count"
 echo "- ⚠️ format-compliance violations (I2+I3): $mismatch_count"
-
-# issue #220: 0 строк распарсено при найденной легенде — раньше тихо трактовалось как
-# «всё ок» (ok_count=0, mismatch_count=0 → ветка ниже не срабатывает, exit 0). Это
-# неотличимо от «реестр реально пуст» (валидный edge-case для нового репо) — сознательно
-# выбираем fail-loud: ложная тревога на пустом реестре безопаснее тихого пропуска
-# нераспознанного id-формата (сам баг issue #220).
-if [ "$ok_count" -eq 0 ] && [ "$mismatch_count" -eq 0 ] && [ -s "$TMP_LEGEND" ]; then
-    echo ""
-    echo "⚠ ФОРМАТ: легенда найдена, но 0 строк распознано в таблице WP-REGISTRY —"
-    echo "  либо реестр пуст, либо id-формат не покрыт парсером. I2/I3 НЕ проверены."
-    exit 3
-fi
 
 if [ "$undocumented_count" -gt 0 ] || [ "$mismatch_count" -gt 0 ]; then
     exit 2

@@ -30,8 +30,7 @@
 
 | Тема | Файл |
 |------|------|
-| Различения (жёсткие + авторские warm) | `memory/hard-distinctions.md`, `memory/distinctions-warm.md` |
-| Роли (детали R27–R31) | `memory/roles-detail.md` |
+| Различения (жёсткие пары) | `memory/hard-distinctions.md` |
 | FPF (навигация, принципы) | `memory/fpf-reference.md` |
 | Правила по типам репо | `memory/repo-type-rules.md` |
 | Чеклисты | `memory/checklists.md` |

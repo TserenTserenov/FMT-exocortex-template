@@ -1,51 +1,45 @@
 #!/bin/bash
 # Dry-run Gate Hook (PreToolUse)
 # Контракт: memory/dry-run-contract.md
-# WP-265 Ф5.2 (ArchGate v3 — вариант F3 sentinel-only). v2: WP-7/BUGTRIAGE2 (issue #237).
+# WP-265 Ф5.2 (ArchGate v3 — вариант F3 sentinel-only).
 #
 # Назначение: блокировать write-tools при наличии валидного sentinel-файла.
-# Sentinel: единый файл /tmp/iwe-dry-run.flag (не session-bound).
-# Причина единого имени: CLAUDE_SESSION_ID не пробрасывается в окружение
-# субагентов, поэтому session-bound имя было ненадёжно в самом частом пути
-# smoke-теста — sentinel создавал главный агент, subagent Stop-хук снимал
-# по своему (пустому) SID, чужой sentinel оставался и залипал на весь TTL.
-# Единый файл убирает рассинхрон создания/очистки одним ходом (issue #237 п.2).
+# Sentinel: /tmp/iwe-dry-run-${CLAUDE_SESSION_ID:-noid}.flag
 # TTL: 600 секунд (10 минут) от mtime.
 #
 # Принципы:
-# - jq отсутствует → skip с явной диагностикой (setup должен ставить jq; см. issue #192)
-# - exit 0 = allow (sentinel отсутствует / TTL истёк / gate skipped из-за missing jq)
+# - fail-CLOSED при отсутствии jq (контракт §Fail-safe)
+# - exit 0 = allow (sentinel отсутствует / TTL истёк)
 # - exit 2 = block (с диагностикой в stderr)
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-SENTINEL=/tmp/iwe-dry-run.flag
-
-# jq нужен для разбора payload. Если его нет, не брикуем все write-tools:
-# setup/requirements должны установить jq, а gate явно сообщает, что проверка пропущена.
+# Fail-CLOSED: jq обязателен
 if ! command -v jq >/dev/null 2>&1; then
-    echo "[dry-run-gate] SKIPPED: jq missing; install jq to enable dry-run protection" >&2
-    exit 0
+    echo "[dry-run-gate] FAIL-CLOSED: jq missing, blocking by default" >&2
+    exit 2
 fi
 
-# Sentinel отсутствует — dry-run неактивен, allow всё
-[ -f "$SENTINEL" ] || exit 0
+# SESSION_ID — от Claude Code или fallback
+SID="${CLAUDE_SESSION_ID:-noid}"
+SENTINEL="/tmp/iwe-dry-run-${SID}.flag"
 
+# Если sentinel не существует — dry-run неактивен, allow всё
+[ ! -f "$SENTINEL" ] && exit 0
+
+# TTL: проверить mtime, удалить и allow если старше 600s
+NOW=$(date +%s)
 case "$(uname)" in
     Darwin) MTIME=$(stat -f %m "$SENTINEL" 2>/dev/null) ;;
     *)      MTIME=$(stat -c %Y "$SENTINEL" 2>/dev/null) ;;
 esac
-
-if [ -z "$MTIME" ]; then
-    # Файл исчез между test и stat (race с параллельной очисткой) — allow.
-    exit 0
-fi
-
-NOW=$(date +%s)
-if [ $((NOW - MTIME)) -gt 600 ]; then
-    rm -f "$SENTINEL" 2>/dev/null
-    exit 0
+if [ -n "$MTIME" ]; then
+    AGE=$((NOW - MTIME))
+    if [ "$AGE" -gt 600 ]; then
+        rm -f "$SENTINEL" 2>/dev/null
+        exit 0
+    fi
 fi
 
 # Прочитать tool_name и tool_input из stdin
@@ -127,109 +121,38 @@ case "$TOOL_NAME" in
 esac
 
 # === Bash matchers ===
-#
-# v2 (issue #237): вместо grep по всей строке команды — три прохода:
-#  1) вырезать кавычные спаны (текст внутри '...'/"..." не может изображать
-#     команду — раньше `echo "see: git commit"` ложно матчился, issue #237 п.4);
-#  2) разбить нормализованную строку на простые команды по разделителям
-#     ; & | && || ( ) { } $( ` — раньше `(git commit -am x)` в скобках
-#     проходил незамеченным, issue #237 п.1;
-#  3) классифицировать каждый фрагмент по первому слову (после пропуска
-#     VAR=val/command/env/nohup/time/sudo), а не искать подстроку где попало.
-#
-# Единственное исключение из шага 1 — psql: SQL живёт внутри кавычек, поэтому
-# SQL-write матчится по НЕнормализованной команде, но только когда первое
-# слово фрагмента — psql (иначе `grep "psql -c INSERT" file` снова ложно бьёт).
 if [ "$TOOL_NAME" = "Bash" ]; then
     CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
     [ -z "$CMD" ] && exit 0
 
-    # Шаг 1: убрать кавычные спаны и безвредные redirect-в-null.
-    NORM=$(printf '%s' "$CMD" | sed -E \
-        -e "s/'[^']*'/ QSTR /g" \
-        -e 's/"[^"]*"/ QSTR /g' \
-        -e 's@[0-9]?>[[:space:]]*/dev/null@ @g' \
-        -e 's@2>&1@ @g')
+    # Удалить «> /dev/null» из команды для проверки опасных redirect'ов
+    CHECK=$(echo "$CMD" | sed -E 's@>[[:space:]]*/dev/null@@g; s@2>&1@@g')
 
-    # Редирект в реальный файл — проверяем по нормализованной строке целиком
-    # (позиционно-независим относительно сегментации ниже, как и раньше).
-    if echo "$NORM" | grep -qE '[[:space:]]>>?[[:space:]]'; then
+    # Опасные паттерны
+    if echo "$CHECK" | grep -qE '(^|[[:space:]&;|])git[[:space:]]+(commit|push|pull|reset|merge|rebase|checkout[[:space:]]+-)([[:space:]]|$)'; then
+        block "$CMD"
+    fi
+    if echo "$CHECK" | grep -qE '[[:space:]]>[[:space:]]'; then
         block "$CMD (redirect to file)"
     fi
-
-    # Шаг 2: разбить на простые команды.
-    SPLIT=$(printf '%s\n' "$NORM" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
-
-    while IFS= read -r SEG; do
-        [ -z "$SEG" ] && continue
-        # shellcheck disable=SC2086
-        set -- $SEG
-        # Пропустить VAR=val / command / env / nohup / time / sudo — переход к реальной команде.
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                *=*) shift ;;
-                command|env|nohup|time|sudo) shift ;;
-                *) break ;;
-            esac
-        done
-        [ $# -eq 0 ] && continue
-        W0=$1
-
-        case "$W0" in
-            git)
-                shift
-                # Пропустить global opts: -C dir, --git-dir=X, --work-tree=X, -c key=val
-                while [ $# -gt 0 ]; do
-                    case "$1" in
-                        -C|--git-dir|--work-tree) shift 2 ;;
-                        --git-dir=*|--work-tree=*) shift ;;
-                        -c) shift 2 ;;
-                        -c*) shift ;;
-                        *) break ;;
-                    esac
-                done
-                case "${1:-}" in
-                    add|commit|push|pull|reset|merge|rebase|mv|rm) block "$CMD (git write)" ;;
-                    checkout) case "${2:-}" in -*) block "$CMD (git checkout -)" ;; esac ;;
-                esac
-                ;;
-            rm|mv)
-                shift
-                ARGS=""
-                for a in "$@"; do
-                    case "$a" in
-                        -*) ;;
-                        *) ARGS="$ARGS $a" ;;
-                    esac
-                done
-                # Cleanup-исключение: собственный dry-run sentinel — единственный allow.
-                [ "$ARGS" = " $SENTINEL" ] && continue
-                block "$CMD (filesystem mutation)"
-                ;;
-            tee)
-                case "${2:-}" in
-                    /dev/null) ;;
-                    *) block "$CMD (tee write)" ;;
-                esac
-                ;;
-            sed)
-                echo "$SEG" | grep -qE '(^|[[:space:]])-[a-zA-Z]*i' && block "$CMD (sed in-place)"
-                ;;
-            curl)
-                echo "$SEG" | grep -qE '(-X[[:space:]]*)?(POST|PUT|DELETE|PATCH)|--data|(^|[[:space:]])-d([[:space:]]|$)' \
-                    && block "$CMD (HTTP write)"
-                ;;
-            psql)
-                # SQL живёт в кавычках исходной команды — проверяем оригинал $CMD,
-                # но только т.к. первое слово фрагмента уже подтверждено как psql.
-                echo "$CMD" | grep -qiE '(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)[[:space:]]' \
-                    && block "$CMD (SQL write)"
-                ;;
-            bash|sh|zsh|eval|source|.|xargs)
-                block "$CMD (indirect execution under dry-run)"
-                ;;
-        esac
-    done <<< "$SPLIT"
+    if echo "$CHECK" | grep -qE '[[:space:]]>>[[:space:]]'; then
+        block "$CMD (append to file)"
+    fi
+    if echo "$CHECK" | grep -qiE 'psql.*-c.*("|'\'')[^"'\'']*\\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)\\b'; then
+        block "$CMD (SQL write)"
+    fi
+    if echo "$CHECK" | grep -qE 'curl[[:space:]]+(-X[[:space:]]*)?(POST|PUT|DELETE|PATCH)|curl[[:space:]]+.*(--data|-d[[:space:]])'; then
+        block "$CMD (HTTP write)"
+    fi
+    if echo "$CHECK" | grep -qE '(^|[[:space:]&;|])(rm|mv)([[:space:]]+-[a-zA-Z]+)?[[:space:]]+[^[:space:]]'; then
+        block "$CMD (filesystem mutation)"
+    fi
+    if echo "$CHECK" | grep -qE '(^|[[:space:]&;|])tee([[:space:]]+-[a-zA-Z]+)?[[:space:]]+[^[:space:]]'; then
+        block "$CMD (tee write)"
+    fi
+    if echo "$CHECK" | grep -qE '(^|[[:space:]&;|])sed[[:space:]]+(-[a-zA-Z]*i)([[:space:]]|$)'; then
+        block "$CMD (sed in-place)"
+    fi
 fi
 
 # Read-only: allow

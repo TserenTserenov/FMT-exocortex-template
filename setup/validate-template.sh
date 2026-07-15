@@ -18,29 +18,26 @@
 
 set -euo pipefail
 
-# Parse args: --mode=pristine|installed|staged (default pristine) + позиционный TEMPLATE_DIR
+# Parse args: --mode=pristine|installed (default pristine) + позиционный TEMPLATE_DIR
 MODE="pristine"
 TEMPLATE_DIR=""
 for arg in "$@"; do
     case "$arg" in
-        --mode=pristine|--mode=installed|--mode=staged) MODE="${arg#--mode=}" ;;
+        --mode=pristine|--mode=installed) MODE="${arg#--mode=}" ;;
         --mode=*)
-            echo "ERROR: unknown mode '${arg#--mode=}'. Use --mode=pristine, --mode=installed, or --mode=staged." >&2
+            echo "ERROR: unknown mode '${arg#--mode=}'. Use --mode=pristine or --mode=installed." >&2
             exit 2
             ;;
         --help|-h)
-            echo "Usage: validate-template.sh [--mode=pristine|installed|staged] [TEMPLATE_DIR]"
-            echo "  Default mode: pristine (CI, author sync, fresh clone — scans full tree)"
+            echo "Usage: validate-template.sh [--mode=pristine|installed] [TEMPLATE_DIR]"
+            echo "  Default mode: pristine (CI, author sync, fresh clone)"
             echo "  Use --mode=installed for post-setup checks (skips placeholder-substitution-related rules)."
-            echo "  Use --mode=staged for pre-commit in multi-agent environments: checks ONLY staged files."
-            echo "    Prevents false-positive failures from unstaged WIP of parallel agents."
-            echo "    Unstaged forbidden content → WARN only (not blocking) so parallel work continues."
             exit 0
             ;;
         *) [ -z "$TEMPLATE_DIR" ] && TEMPLATE_DIR="$arg" ;;
     esac
 done
-TEMPLATE_DIR="${TEMPLATE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+TEMPLATE_DIR="${TEMPLATE_DIR:-$HOME/IWE/FMT-exocortex-template}"
 FAIL=0
 
 # Guard: post-setup state + default pristine mode → подсказать installed-режим и выйти.
@@ -71,16 +68,6 @@ grep_count() {
     grep -rn "$pattern" "$@" 2>/dev/null | wc -l | tr -d ' ' || true
 }
 
-# Staged-режим: список staged файлов (относительные пути). Пусто если не в git или нет staged.
-STAGED_FILES=""
-if [ "$MODE" = "staged" ]; then
-    STAGED_FILES=$(cd "$TEMPLATE_DIR" && git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
-    if [ -z "$STAGED_FILES" ]; then
-        echo "=== staged mode: нет staged файлов — skip ==="
-        exit 0
-    fi
-fi
-
 # 1. Нет автор-специфичного контента
 echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
@@ -89,44 +76,19 @@ CHECK1_FAIL=0
 for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                "DS-Knowledge-Index-Tseren" "DS-IT-systems" "DS-ai-systems" \
                "DS-my-strategy" "engines/tailor"; do
-    if [ "$MODE" = "staged" ]; then
-        # staged-режим: проверяем только содержимое staged-файлов (git show :path)
-        count=0
-        hits=""
-        while IFS= read -r f; do
-            case "$f" in
-                *.md|*.sh|*.py|*.json|*.plist|*.yaml) ;;
-                *) continue ;;
-            esac
-            case "$(basename "$f")" in
-                validate-template.sh|LEARNING-PATH.md|CHANGELOG.md) continue ;;
-            esac
-            file_hits=$(cd "$TEMPLATE_DIR" && git show ":$f" 2>/dev/null \
-                | grep -n "$pattern" | grep -v 'github.com/' | grep -v 'docs/adr/' || true)
-            if [ -n "$file_hits" ]; then
-                count=$((count + $(echo "$file_hits" | wc -l | tr -d ' ')))
-                hits="${hits}${f}:"$'\n'"${file_hits}"$'\n'
-            fi
-        done <<< "$STAGED_FILES"
-    else
-        count=$(grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" \
-                --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
-                --exclude='CHANGELOG.md' 2>/dev/null \
-                | grep -v 'github.com/' | grep -v 'docs/adr/' | wc -l | tr -d ' ' || true)
-    fi
+    count=$(grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
+            --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
+            | grep -v 'github.com/' | grep -v 'docs/adr/' | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
         echo "  Found '$pattern' (global) in $count locations:"
-        if [ "$MODE" = "staged" ]; then
-            echo "$hits" | head -3 || true
-        else
-            grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                --include="*.py" --include="*.json" --include="*.plist" \
-                --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
-                --exclude='CHANGELOG.md' 2>/dev/null \
-                | grep -v 'github.com/' | grep -v 'docs/adr/' | head -3 || true
-        fi
+        grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
+            --include="*.py" --include="*.json" --include="*.plist" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' 2>/dev/null \
+            | grep -v 'github.com/' | grep -v 'docs/adr/' | head -3 || true
         CHECK1_FAIL=1
         FAIL=1
     fi
@@ -135,60 +97,19 @@ done
 # Protocol-only — запрет в протоколах/скиллах/хуках/CLAUDE.md (разрешено в README/docs/onboarding как упоминание продукта)
 for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
                "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
-    if [ "$MODE" = "staged" ]; then
-        count=0
-        hits=""
-        while IFS= read -r f; do
-            case "$f" in
-                .claude/skills/*|.claude/hooks/*|.claude/rules/*|memory/*|CLAUDE.md) ;;
-                *) continue ;;
-            esac
-            case "$(basename "$f")" in CHANGELOG.md) continue ;; esac
-            file_hits=$(cd "$TEMPLATE_DIR" && git show ":$f" 2>/dev/null | grep -n "$pattern" || true)
-            if [ -n "$file_hits" ]; then
-                count=$((count + $(echo "$file_hits" | wc -l | tr -d ' ')))
-                hits="${hits}${f}:"$'\n'"${file_hits}"$'\n'
-            fi
-        done <<< "$STAGED_FILES"
-    else
-        count=$(cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
-                .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
-                | grep -v 'CHANGELOG.md' | wc -l | tr -d ' ' || true)
-    fi
+    count=$(cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
+            | grep -v 'CHANGELOG.md' | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
         echo "  Found '$pattern' (protocol-only) in $count locations:"
-        if [ "$MODE" = "staged" ]; then
-            echo "$hits" | head -3 || true
-        else
-            (cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
-                .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null | head -3) || true
-        fi
+        (cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null | head -3) || true
         CHECK1_FAIL=1
         FAIL=1
     fi
 done
-
-# staged-режим: WARN о unstaged forbidden content (не блокирует — параллельные агенты)
-if [ "$MODE" = "staged" ] && [ "$(cd "$TEMPLATE_DIR" && git status --porcelain 2>/dev/null | grep -c '^.M')" -gt 0 ]; then
-    UNSTAGED_WARN=0
-    for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-IT-systems"; do
-        warn_count=$(grep -rn "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                     --include="*.py" --include="*.yaml" \
-                     --exclude='validate-template.sh' --exclude='CHANGELOG.md' 2>/dev/null \
-                     | grep -v 'github.com/' | wc -l | tr -d ' ' || true)
-        if [ "$warn_count" -gt 0 ]; then
-            [ "$UNSTAGED_WARN" -eq 0 ] && echo "  WARN (staged mode): unstaged files contain forbidden patterns — OK for parallel-agent workflow, review before next commit"
-            UNSTAGED_WARN=1
-        fi
-    done
-fi
 [ "$CHECK1_FAIL" -eq 0 ] && echo "PASS"
-
-# Общий список расширений для чеков 2 и 3 (issue #247 п.2: count и print раньше
-# сканировали разные наборы --include, из-за чего FAIL (N hits) мог не показать
-# ни одной строки, если попадание было только в *.json/*.plist).
-HARDCODE_SCAN_INCLUDES=(--include="*.md" --include="*.sh" --include="*.json" --include="*.plist")
 
 # 2. Нет захардкоженных /Users/ путей [pristine only]
 # В installed-режиме setup.sh легитимно подставил $WORKSPACE_DIR → /Users/<user>/...
@@ -196,7 +117,8 @@ echo -n "[2/5] Hardcoded /Users/ paths... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — /Users/ подставлен setup'ом)"
 else
-    count=$(grep -rn '/Users/' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
+    count=$(grep -rn '/Users/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
+            --include="*.json" --include="*.plist" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v '/Users/\.\.\./' \
@@ -204,7 +126,7 @@ else
             | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
-        grep -rn '/Users/' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
+        grep -rn '/Users/' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v '/Users/\.\.\./' \
@@ -221,7 +143,8 @@ echo -n "[3/5] Hardcoded /opt/homebrew paths... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — CLAUDE_PATH может быть /opt/homebrew/...)"
 else
-    count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
+    count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
+            --include="*.json" --include="*.plist" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' \
@@ -231,7 +154,7 @@ else
             | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
-        grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
+        grep -rn '/opt/homebrew' "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' \
@@ -337,18 +260,10 @@ else
         fi
     done
 
-    # Hooks intentionally user-deployed (installed to ~/.claude/hooks/ via skill,
-    # registered in user settings.local.json — not project settings.json by design).
-    USER_DEPLOYED_HOOKS=("wakatime-heartbeat.sh")
-
     ORPHAN_WARN=0
     for hook in "$HOOKS_DIR"/*.sh; do
         [ -f "$hook" ] || continue
         name=$(basename "$hook")
-        # Skip known user-deployed hooks (see .claude/skills/setup-wakatime/SKILL.md)
-        skip=0
-        for ud in "${USER_DEPLOYED_HOOKS[@]}"; do [ "$name" = "$ud" ] && skip=1 && break; done
-        [ "$skip" -eq 1 ] && continue
         if ! grep -q "\.claude/hooks/$name" "${SETTINGS_FILES[@]}" 2>/dev/null; then
             if [ "$ORPHAN_WARN" -eq 0 ]; then
                 [ "$CHECK7_FAIL" -eq 0 ] && echo "PASS (with warnings)"

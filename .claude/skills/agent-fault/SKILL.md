@@ -16,7 +16,7 @@ gates_rationale: "детерминированный script-executor; WP Gate и
 routing:
   executor: script
   deterministic: true
-  script_path: "${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/iwe_checklist_memory.py"
+  script_path: "DS-strategy/scripts/iwe_checklist_memory.py"
 ---
 
 # /agent-fault — регистрация косяка агента
@@ -40,6 +40,3 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/iwe_checklist_memory.py" \
 
 При отсутствии `$IWE_SCRIPTS` использовать явный путь:
 `$HOME/IWE/scripts/iwe_checklist_memory.py`
-
-<!-- USER-SPACE -->
-<!-- /USER-SPACE -->
