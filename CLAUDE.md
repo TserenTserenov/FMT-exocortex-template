@@ -14,6 +14,7 @@
 **Fallback Chain:** DS → Pack → Base (SPF → FPF → ZP). **Pack = source-of-truth доменного знания.**
 **Лестница принципов (уровень специфичности):** ZPF → FPF → SPF → TPF → LPF
 где: ZPF/FPF/SPF-методология → Base · SPF-инстанс → Pack · TPF → DS + операционный слой агента · LPF → партикулярные практики роли (тест: без носителя данной роли — бессмысленны); детали → `memory/repo-type-rules.md`
+> Словарь ailev ↔ IWE (DPF ≈ Pack, переименование не планируется) → `memory/fpf-reference.md`.
 **Pack Creation Gate:** хочешь Pack → `/pack-new`. Имя = существительное-домен.
 Детали типов: → `memory/repo-type-rules.md`
 
@@ -65,6 +66,7 @@
 | Pack-репо | `memory/repo-type-rules.md` |
 | Терминология | `memory/hard-distinctions.md` |
 | FPF/SOTA/Роли | `memory/fpf-reference.md`, `memory/sota-reference.md`, `memory/roles.md` |
+| Документ/чеклист | `memory/checklists.md` |
 
 Политика: ≤15 HOT+WARM, суммарно ≤150 строк hot. CLAUDE.md = ядро (цель ≤150). `memory/` = симлинк auto-memory.
 
