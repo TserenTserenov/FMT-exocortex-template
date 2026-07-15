@@ -1035,6 +1035,9 @@
       "path": "scripts/backup-icloud.sh"
     },
     {
+      "path": "scripts/build-active-wp.py"
+    },
+    {
       "path": "scripts/changelog-append.sh"
     },
     {
@@ -1119,6 +1122,9 @@
       "path": "scripts/generate-executor-catalog.py"
     },
     {
+      "path": "scripts/generate-hot-files-list.sh"
+    },
+    {
       "path": "scripts/generate-skills-catalog.sh"
     },
     {
@@ -1132,6 +1138,9 @@
     },
     {
       "path": "scripts/hook-promote.sh"
+    },
+    {
+      "path": "scripts/hot-files.list"
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py"
@@ -1183,6 +1192,9 @@
     },
     {
       "path": "scripts/llm-proxy-launcher.sh"
+    },
+    {
+      "path": "scripts/median-ratio.conf"
     },
     {
       "path": "scripts/memory-active-wp-update.sh"
@@ -1299,6 +1311,9 @@
       "path": "scripts/validate-skill.sh"
     },
     {
+      "path": "scripts/verify-context-budget.sh"
+    },
+    {
       "path": "scripts/verify-manifest.sh"
     },
     {
@@ -1348,18 +1363,6 @@
     },
     {
       "path": "update.sh"
-    },
-    {
-      "path": "scripts/verify-context-budget.sh"
-    },
-    {
-      "path": "scripts/generate-hot-files-list.sh"
-    },
-    {
-      "path": "scripts/hot-files.list"
-    },
-    {
-      "path": "scripts/median-ratio.conf"
     }
   ],
   "excluded_paths": [

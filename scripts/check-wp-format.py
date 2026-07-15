@@ -53,6 +53,45 @@ def parse_cells(line):
     # parts[0] пустой (до первого |), parts[-1] пустой (после последнего |)
     return [p.strip() for p in parts[1:-1]]
 
+# Фолбэк-индексы для канонической 6-колоночной схемы
+# (# | P | Название | Ст | Репо | Бюджет) — используются только если заголовок
+# таблицы не найден/не распознан (см. find_column_indices).
+FALLBACK_INDICES = {"#": 0, "P": 1, "Название": 2, "Ст": 3, "Репо": 4, "Бюджет": 5}
+
+def find_column_indices(lines):
+    """Определить позиции колонок по строке заголовка (| # | P | Название | ... |).
+
+    issue #263: раньше индекс колонки «Название» был хардкожен (cells[2]) под
+    актуальную 6-колоночную схему — на реестре со старой/другой схемой (например,
+    | # | Название | Статус | Активация |) это тихо проверяло/чистило не ту ячейку.
+    Вместо хардкода — читаем реальный заголовок таблицы и вычисляем индексы по нему,
+    так проверка остаётся верной для любой схемы конкретного REGISTRY.
+
+    Возвращает (indices, warning) — indices всегда заполнен (fallback при неудаче),
+    warning — строка с пояснением, если пришлось использовать fallback, иначе None.
+    """
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("| #"):
+            cells = parse_cells(line)
+            found = {name: i for i, name in enumerate(cells)}
+            # Точечный fallback: колонку, которой нет в заголовке этой конкретной
+            # таблицы, подставляем из канонической схемы — но найденные колонки
+            # (например «Название» в старой 4-колоночной схеме) не теряем ради
+            # недостающих соседей (P/Репо там просто отсутствуют по смыслу схемы).
+            missing = [name for name in FALLBACK_INDICES if name not in found]
+            indices = {name: found.get(name, FALLBACK_INDICES[name]) for name in FALLBACK_INDICES}
+            if missing:
+                return indices, (
+                    f"заголовок таблицы не содержит колонок {missing} "
+                    f"— для них использую индексы канонической схемы как fallback"
+                )
+            return indices, None
+    return FALLBACK_INDICES, (
+        "заголовок таблицы (строка «| # | ...») не найден — "
+        "использую индексы канонической 6-колоночной схемы как fallback"
+    )
+
 def is_done_row(cells):
     """Строка со статусом done (✅/↗️/📦)."""
     for cell in cells:
@@ -64,13 +103,17 @@ def has_strikethrough(text):
     """Текст обёрнут в ~~ ... ~~."""
     return "~~" in text
 
-def check_t2(cells, line_num):
+def check_t2(cells, line_num, indices):
     """T2: done-строки должны иметь ~~ на полях #, P, Название, Репо."""
     issues = []
     if not is_done_row(cells):
         return issues
-    # Проверяем ячейки 0 (номер), 1 (приоритет), 2 (название), 4 (репо)
-    check_indices = [0, 1, 2, 4] if len(cells) >= 5 else range(min(3, len(cells)))
+    # Проверяем ячейки #, P, Название, Репо — позиции берутся из фактического
+    # заголовка таблицы (indices), не хардкодятся (issue #263).
+    if len(cells) >= 5:
+        check_indices = sorted({indices["#"], indices["P"], indices["Название"], indices["Репо"]})
+    else:
+        check_indices = range(min(3, len(cells)))
     for i in check_indices:
         if i >= len(cells):
             continue
@@ -90,12 +133,12 @@ def check_t2(cells, line_num):
                 })
     return issues
 
-def check_nc(cells, line_num):
-    """NC: загрязнение имён — служебные данные в колонке «Название» (индекс 2)."""
+def check_nc(cells, line_num, name_col):
+    """NC: загрязнение имён — служебные данные в колонке «Название»."""
     issues = []
-    if len(cells) < 3:
+    if name_col >= len(cells):
         return issues
-    name_cell = cells[2]
+    name_cell = cells[name_col]
     for pattern in NAME_CONTAMINATION_PATTERNS:
         if pattern.search(name_cell):
             issues.append({
@@ -129,12 +172,13 @@ def clean_name_cell(name_cell):
     return cleaned.strip()
 
 
-def fix_t2_row(parts, cells):
-    """Добавить ~~ вокруг ячеек done-строки без strikethrough (индексы 0,1,4 в cells → 1,2,5 в parts)."""
+def fix_t2_row(parts, cells, indices):
+    """Добавить ~~ вокруг ячеек done-строки без strikethrough (#, P, Репо — не Название,
+    её вручную оборачивать рискованно из-за markdown-разметки внутри)."""
     # Маппинг: cell_index → part_index (parts[0] пустой, parts[-1] пустой, ячейки с 1)
     cell_to_part = {i: i + 1 for i in range(len(cells))}
     changed = False
-    for cell_idx in [0, 1, 4]:
+    for cell_idx in sorted({indices["#"], indices["P"], indices["Репо"]}):
         if cell_idx >= len(cells):
             continue
         part_idx = cell_to_part[cell_idx]
@@ -159,6 +203,11 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
     with open(registry_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
+    indices, warning = find_column_indices(lines)
+    if warning:
+        print(f"⚠️  {warning}", file=sys.stderr)
+    name_col = indices["Название"]
+
     all_issues = []
     new_lines = list(lines)
 
@@ -170,23 +219,23 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
         if len(cells) < 3:
             continue
 
-        t2_issues = check_t2(cells, line_num)
-        nc_issues = check_nc(cells, line_num)
+        t2_issues = check_t2(cells, line_num, indices)
+        nc_issues = check_nc(cells, line_num, name_col)
         all_issues.extend(t2_issues)
         all_issues.extend(nc_issues)
 
         if fix_t2 and t2_issues and is_done_row(cells):
             parts = new_lines[i].rstrip("\n").split("|")
-            parts, changed = fix_t2_row(parts, cells)
+            parts, changed = fix_t2_row(parts, cells, indices)
             if changed:
                 new_lines[i] = "|".join(parts) + "\n"
 
         if fix and nc_issues:
             # Исправить NC в этой строке
             parts = line.rstrip("\n").split("|")
-            if len(parts) >= 4:
-                # Ячейка 2 (индекс 3 в parts из-за пустого первого элемента)
-                original_cell = parts[3]
+            name_part = name_col + 1  # parts[0] пустой из-за ведущего "|"
+            if len(parts) >= name_part + 1:
+                original_cell = parts[name_part]
                 stripped_content = original_cell.strip()
 
                 # Разобраться с ~~...~~ обёрткой
@@ -217,7 +266,7 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
                     else:
                         cleaned_cell = cleaned
 
-                parts[3] = f" {cleaned_cell} "
+                parts[name_part] = f" {cleaned_cell} "
                 new_lines[i] = "|".join(parts) + "\n"
 
     if (fix or fix_t2) and any(new_lines[i] != lines[i] for i in range(len(lines))):

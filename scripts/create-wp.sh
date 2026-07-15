@@ -155,6 +155,7 @@ budget: ${BUDGET}
 created: ${TODAY}
 last_session: ${TODAY}
 related: []
+activation: on-demand
 ---
 
 # WP-${WP_NUM}: ${TITLE}
@@ -218,7 +219,7 @@ echo "   ✅ $ARCHIVE_STUB"
 # --- Шаг 3: WP-REGISTRY.md ---
 echo "3/6 WP-REGISTRY.md..."
 
-python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" <<'PYEOF'
+if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" <<'PYEOF'
 import sys
 registry_path, wp_num, priority, title, repo, budget, gov_repo = sys.argv[1:8]
 
@@ -227,13 +228,46 @@ with open(registry_path, "r", encoding="utf-8") as f:
 
 # Найти строку-разделитель после заголовка таблицы (|---|---|...)
 insert_at = None
+header_line = None
 for i, line in enumerate(lines):
     if line.strip().startswith("|---") and i > 0 and lines[i-1].strip().startswith("| #"):
         insert_at = i + 1
+        header_line = lines[i-1]
         break
 
 if insert_at is None:
     print("❌ Не найден заголовок таблицы REGISTRY", file=sys.stderr)
+    sys.exit(1)
+
+# Схема-гард (issue #263): create-wp.sh пишет 6-колоночную строку
+# (# | P | Название | Ст | Репо | Бюджет). Если заголовок REGISTRY этой репо
+# ещё не приведён к актуальной схеме (например, старый формат
+# | # | Название | Статус | Активация |) — молча вставленная 6-колоночная
+# строка ломает таблицу. Лучше остановиться с понятной подсказкой, чем
+# незаметно испортить реестр.
+EXPECTED_COLS = 6
+header_cols = [c.strip() for c in header_line.strip().strip("|").split("|")]
+if len(header_cols) != EXPECTED_COLS:
+    print(
+        "❌ WP-REGISTRY.md использует нестандартную схему таблицы: {} колонок вместо {}.".format(
+            len(header_cols), EXPECTED_COLS
+        ),
+        file=sys.stderr,
+    )
+    print("   Заголовок: {}".format(header_line.strip()), file=sys.stderr)
+    print(
+        "   create-wp.sh пишет строки формата | # | P | Название | Ст | Репо | Бюджет | —",
+        file=sys.stderr,
+    )
+    print(
+        "   вставка в таблицу другой формы испортит её вместо добавления строки.",
+        file=sys.stderr,
+    )
+    print(
+        "   Приведите заголовок и существующие строки REGISTRY к актуальной 6-колоночной",
+        file=sys.stderr,
+    )
+    print("   схеме вручную, затем повторите создание РП.", file=sys.stderr)
     sys.exit(1)
 
 repo_cell = repo if repo else "{}/inbox/WP-{}/".format(gov_repo, wp_num)
@@ -247,11 +281,16 @@ with open(registry_path, "w", encoding="utf-8") as f:
 
 print("   ✅ REGISTRY: строка {} добавлена".format(wp_num))
 PYEOF
+then
+  exit 1
+fi
 
 # Post-write verification (issue #256): create-wp.sh once reported success here
 # without the row actually landing in REGISTRY — the writer above has no retry/lock,
 # so confirm the row is really there before moving on.
-if ! grep -qF "| ${WP_NUM} |" "$REGISTRY"; then
+# issue #263: некоторые репо исторически пишут номер РП с префиксом (| WP-N |),
+# не голым числом (| N |) — grep должен принимать оба формата.
+if ! grep -qE "\| \*?\*?(WP-)?${WP_NUM}\*?\*? \|" "$REGISTRY"; then
   echo "❌ REGISTRY write verification FAILED: строка WP-${WP_NUM} не найдена после записи" >&2
   exit 1
 fi
