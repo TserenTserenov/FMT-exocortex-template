@@ -190,7 +190,6 @@ L1: Ecosystem    — the entire system: Platform + community + all IWE users
 | **L4: Personal IWE** | Your work, plans, knowledge | ~/IWE/CLAUDE.md, DS-strategy/ | Only you (User-space) |
 
 **Where to learn more:**
-- [ONTOLOGY.md](../ONTOLOGY.md) § "System Perimeters"
 - `DS-ecosystem-development/11-platform-contours.md` — full architectural model (ecosystem governance repo, created locally during Deployment, not published to GitHub)
 
 ### 2.2. From Template to Workspace

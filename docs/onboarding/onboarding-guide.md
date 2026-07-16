@@ -390,7 +390,6 @@ You can start using IWE **without** a deep Understanding of these Concepts. But 
 | What IWE is | Core definition, Architecture, perimeters | [DP.IWE.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.IWE.001-intelligent-working-environment.md) |
 | Template and setup | Components, Roles, FAQ | [DP.IWE.002](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md) |
 | Principles vs Skills | Why principles matter more than tools | [principles-vs-skills.md](../principles-vs-skills.md) |
-| Terminology | IWE glossary | [ONTOLOGY.md](../../ONTOLOGY.md) |
 
 ### Usage Scenarios
 

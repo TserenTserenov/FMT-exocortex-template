@@ -500,7 +500,7 @@ video:
 | Application | Typical Path (macOS) |
 |-------------|----------------------|
 | Zoom | `~/Documents/Zoom` |
-| Yandex.Telemost | a localized (Russian-named) folder under `~/Documents` or your home directory |
+| Yandex.Telemost | a folder with a localized name under `~/Documents` or your home directory |
 | Google Meet | Recordings in Google Drive (not local) |
 | OBS | Configured in OBS → Settings → Output |
 
