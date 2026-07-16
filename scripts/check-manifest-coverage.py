@@ -6,6 +6,11 @@
 # Файлы без покрытия = в git, но не в manifest["files"] и не в exclusions.
 # Исправление: добавить в manifest["files"] или manifest["excluded_paths"].
 # excluded_paths принимает список строк: ["path/to/file.md", ...]
+#
+# issue #247: update.sh (step 6e) replaces update-manifest.json wholesale on
+# every update, so user edits to excluded_paths do not survive. Fork-local
+# exclusions belong in update-manifest.local.json (same directory, same
+# excluded_paths schema) — update.sh never touches it, this checker merges it.
 
 from __future__ import annotations
 
@@ -50,6 +55,7 @@ _ALWAYS_EXCLUDED_NAMES = frozenset({
     "params.yaml",
     "generate-manifest.sh",
     "update-manifest.json",
+    "update-manifest.local.json",
 })
 
 # Точные пути для исключения.
@@ -126,6 +132,21 @@ def main() -> None:
     deprecated_files = {entry["path"] for entry in manifest.get("deprecated_files", [])}
     extra_exclusions = _parse_excluded_paths(manifest.get("excluded_paths", []))
 
+    # Fork-local exclusions survive update.sh (which replaces the main manifest
+    # wholesale at step 6e). Malformed JSON is a loud error, not a silent skip:
+    # otherwise a typo would silently re-enable blocking on excluded files.
+    local_path = Path(manifest_path).parent / "update-manifest.local.json"
+    if local_path.is_file():
+        try:
+            with open(local_path, encoding="utf-8") as fh:
+                local_manifest = json.load(fh)
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: {local_path} is not valid JSON: {exc}", file=sys.stderr)
+            sys.exit(2)
+        extra_exclusions += _parse_excluded_paths(
+            local_manifest.get("excluded_paths", [])
+        )
+
     repo_files = [line.strip() for line in sys.stdin if line.strip()]
 
     if not repo_files:
@@ -155,7 +176,9 @@ def main() -> None:
         for g in sorted(gaps):
             print(f"  {g}", file=sys.stderr)
         print(
-            '  → Добавить в manifest["files"] или manifest["excluded_paths"]',
+            '  → Добавить в manifest["files"] или manifest["excluded_paths"];\n'
+            "    личные файлы форка — в update-manifest.local.json "
+            '("excluded_paths": [...]), его update.sh не перезаписывает',
             file=sys.stderr,
         )
         sys.exit(1)

@@ -1219,6 +1219,8 @@ fi
 # === Step 6e: Replace local manifest with downloaded remote manifest ===
 # Replaces entire manifest (files + deprecated_files + version), not just version field.
 # This ensures validators (D1/D9/D10) and future updates see the correct file list.
+# Fork-local exclusions live in update-manifest.local.json (issue #247) —
+# never written by this script, merged by check-manifest-coverage.py and 6f below.
 if [ -f "$MANIFEST" ]; then
     cp "$MANIFEST" "$SCRIPT_DIR/update-manifest.json" \
         && echo "  • update-manifest.json: заменён remote manifest (v$UPSTREAM_VERSION)"
@@ -1244,6 +1246,21 @@ known = {_path(e) for e in manifest.get("files", [])}
 deprecated = {_path(e) for e in manifest.get("deprecated_files", [])}
 all_known = known | deprecated
 
+# Fork-local exclusions (issue #247): files the user deliberately keeps in L1
+# directories are not orphans. Same schema as manifest excluded_paths.
+local_manifest_path = os.path.join(script_dir, "update-manifest.local.json")
+local_excluded = []
+if os.path.isfile(local_manifest_path):
+    try:
+        with open(local_manifest_path) as f:
+            local_excluded = [_path(e) for e in json.load(f).get("excluded_paths", [])]
+    except (json.JSONDecodeError, TypeError) as exc:
+        print(f"  [warn] update-manifest.local.json unreadable, ignored: {exc}")
+
+def _locally_excluded(rel):
+    return any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/")
+               for e in local_excluded)
+
 L1_DIRS = [".claude/hooks", ".claude/rules", ".claude/skills"]
 L1_PREFIXES = ["memory/protocol-"]
 
@@ -1256,7 +1273,7 @@ for base in L1_DIRS:
         for fname in files:
             full = os.path.join(root, fname)
             rel = os.path.relpath(full, script_dir)
-            if rel not in all_known:
+            if rel not in all_known and not _locally_excluded(rel):
                 tag = "[maybe-L3]" if "extensions/" in rel else "[orphan]"
                 orphans.append((tag, rel))
 

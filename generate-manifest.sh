@@ -25,6 +25,7 @@ SKIP_PATTERNS=(
     ".DS_Store"
     "generate-manifest.sh"
     "update-manifest.json"
+    "update-manifest.local.json"
     "seed/"
     "templates/"
 )
