@@ -1062,6 +1062,9 @@
       "path": "scripts/check-wp-format.py"
     },
     {
+      "path": "scripts/check-wp-transfer-completeness.sh"
+    },
+    {
       "path": "scripts/claude-peer-adapter.sh"
     },
     {

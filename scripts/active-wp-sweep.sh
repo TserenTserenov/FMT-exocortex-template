@@ -97,6 +97,35 @@ _wp_done_in_registry() {
   grep -qE "^\| ~~0*${wp_num}~~" "$REGISTRY_FILE" 2>/dev/null
 }
 
+# --- Discovery helpers for two-level inbox structure ---
+# _gather_wp_files: enumerates all candidate WP context files from both
+#   inbox/WP-NNN.md (flat) and inbox/WP-NNN/WP-NNN.md (nested folder).
+#   Duplicates handled upstream via SEEN_WP_NUMS.
+_gather_wp_files() {
+  local inbox="$1"
+  # Flat files at top level
+  for f in "$inbox"/WP-*.md; do [[ -f "$f" ]] && echo "$f"; done
+  # Nested files: inbox/WP-NNN/WP-NNN.md (folder name == file name)
+  for d in "$inbox"/WP-*/; do
+    [[ -d "$d" ]] || continue
+    local dname num
+    dname=$(basename "$d")   # WP-426
+    num="${dname#WP-}"       # 426
+    local nested="${d%/}/WP-${num}.md"
+    [[ -f "$nested" ]] && echo "$nested"
+  done
+}
+
+# _find_wp_context: given a WP number, returns the path to its context file.
+#   Checks flat path first, then nested — matches INBOX-CONVENTION.md rules.
+_find_wp_context() {
+  local inbox="$1" num="$2"
+  local flat="$inbox/WP-${num}.md"
+  local nested="$inbox/WP-${num}/WP-${num}.md"
+  [[ -f "$flat" ]] && echo "$flat" && return
+  [[ -f "$nested" ]] && echo "$nested"
+}
+
 # --- Union: WP-IDs из текущего WeekPlan (для pending-РП в плане недели) ---
 # Находит первый файл WeekPlan W*.md в current/ и извлекает все WP-NNN из него.
 _weekplan_wp_ids() {
@@ -114,8 +143,7 @@ DRIFT_ROWS=""
 OUTPUT_ROWS=""
 SEEN_WP_NUMS=""
 
-for WP_FILE in "$INBOX"/WP-*.md; do
-  [[ -f "$WP_FILE" ]] || continue
+while IFS= read -r WP_FILE; do
 
   # Быстрый grep: есть ли нужный статус?
   grep -qE "^status: (in_progress|active|awaiting-batch)" "$WP_FILE" 2>/dev/null || continue
@@ -164,7 +192,7 @@ for WP_FILE in "$INBOX"/WP-*.md; do
 
   OUTPUT_ROWS="${OUTPUT_ROWS}| **${WP_LABEL}** ${WP_TITLE} | ${GIT_CELL} |
 "
-done
+done < <(_gather_wp_files "$INBOX")
 
 # --- Union: добавить pending-РП из WeekPlan, которых ещё нет в результатах ---
 if [[ -n "$WEEKPLAN_IDS" ]]; then
@@ -175,8 +203,8 @@ if [[ -n "$WEEKPLAN_IDS" ]]; then
     # Пропустить если помечен ✅ в REGISTRY
     _wp_done_in_registry "$WP_NUM" && continue
     # Найти inbox-файл
-    WP_FILE=$(ls "$INBOX/WP-${WP_NUM}"*.md 2>/dev/null | head -1)
-    [[ -f "$WP_FILE" ]] || continue
+    WP_FILE=$(_find_wp_context "$INBOX" "$WP_NUM")
+    [[ -n "$WP_FILE" ]] || continue
     META=$(_extract_wp_meta "$WP_FILE")
     WP_TITLE="${META##*|}"
     [[ -z "$WP_TITLE" ]] && WP_TITLE="WP-${WP_NUM}"

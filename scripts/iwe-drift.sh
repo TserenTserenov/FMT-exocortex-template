@@ -17,14 +17,28 @@
 #   bash iwe-drift.sh --critical       # только critical
 #   bash iwe-drift.sh --top N          # топ N по lag
 #   bash iwe-drift.sh --manifest PATH  # указать путь к манифесту
+#   bash iwe-drift.sh --activity       # кандидаты на "спящий" режим (§ activity_checks:)
 #
 # Требования: bash, git, stat, awk (POSIX). Без внешних зависимостей.
 # Формат вывода: markdown-таблица, пригодная для вставки в DayPlan/Week Report.
 
 set -eu
 
-# Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
+# Detect stat mtime flag once — GNU/Linux uses -c %Y, BSD/macOS uses -f %m.
+# NOTE: GNU stat accepts `-f %m` too (it prints the mount point), so we must
+# detect GNU first by testing the flag it supports and BSD does not.
+# Use unquoted $_STAT_FLAG in xargs pipelines (word-split is required for multi-token flags).
+if stat -c %Y /dev/null >/dev/null 2>&1; then
+    _STAT_FLAG="-c %Y"  # GNU/Linux
+else
+    _STAT_FLAG="-f %m"  # BSD/macOS
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# iwe-env-bootstrap.sh sets its own top-level SCRIPT_DIR when sourced, clobbering ours —
+# save this script's own directory under a distinct name before sourcing (issue #259).
+IWE_DRIFT_SCRIPT_DIR="$SCRIPT_DIR"
+# shellcheck source=/dev/null
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 MANIFEST="${MANIFEST:-$IWE_ROOT/.claude/sync-manifest.yaml}"
 MODE="all"
@@ -33,6 +47,7 @@ TOP_N=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --critical) MODE="critical"; shift ;;
+        --activity) MODE="activity"; shift ;;
         --top) TOP_N="$2"; shift 2 ;;
         --manifest) MANIFEST="$2"; shift 2 ;;
         -h|--help)
@@ -48,7 +63,87 @@ if [ ! -f "$MANIFEST" ]; then
     exit 1
 fi
 
-# Получить mtime файла в днях от сегодня (macOS stat -f, Linux stat -c)
+# Парсинг секции activity_checks: (независимая от pairs: секции выше в манифесте)
+parse_activity() {
+    local manifest="$1"
+    awk '
+        /^activity_checks:/ { started = 1; next }
+        !started { next }
+        /^  - id:/ {
+            if (id != "") print_record()
+            id = clean_prefix($0, "^  - id:")
+        }
+        /^    action:/           { action = clean_quoted(clean_prefix($0, "^    action:")) }
+        /^    expected_per_period:/ { expected = clean_prefix($0, "^    expected_per_period:") }
+        /^    period_days:/      { period = clean_prefix($0, "^    period_days:") }
+        /^    commit_pattern_regex:/ { regex = clean_quoted(clean_prefix($0, "^    commit_pattern_regex:")) }
+        /^    dormant_after_periods:/ { dormant = clean_prefix($0, "^    dormant_after_periods:") }
+        END { if (id != "") print_record() }
+
+        function clean_prefix(line, pat,    v) {
+            v = line
+            sub(pat, "", v)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            return v
+        }
+        function clean_quoted(v) {
+            gsub(/^"|"$/, "", v)
+            return v
+        }
+        function print_record() {
+            printf "%s\t%s\t%s\t%s\t%s\t%s\n", id, action, expected, period, regex, dormant
+            id=""; action=""; expected=""; period=""; regex=""; dormant=""
+        }
+    ' "$manifest"
+}
+
+# Кандидаты в "спящий режим": N окон подряд (dormant_after_periods) без
+# коммита, совпавшего с commit_pattern_regex, считая от сегодня назад.
+report_activity() {
+    local manifest="$1"
+    local tmp
+    tmp=$(mktemp)
+    parse_activity "$manifest" > "$tmp"
+
+    echo "## Кандидаты в «спящий» режим ($(date +%Y-%m-%d))"
+    echo ""
+
+    local found=0
+    while IFS=$'\t' read -r id action expected period regex dormant; do
+        [ -z "$id" ] && continue
+
+        local window all_windows_empty=1 since_days until_days count
+        for window in $(seq 0 $(( dormant - 1 ))); do
+            since_days=$(( (window + 1) * period ))
+            until_days=$(( window * period ))
+            count=$(git -C "$IWE_ROOT" log --oneline -E \
+                --since="${since_days} days ago" --until="${until_days} days ago" \
+                --grep="$regex" 2>/dev/null | wc -l | tr -d '[:space:]')
+            if [ "$count" -ge "$expected" ]; then
+                all_windows_empty=0
+                break
+            fi
+        done
+
+        if [ "$all_windows_empty" -eq 1 ]; then
+            found=1
+            printf -- "- **%s** (%s): не сработало %s окон подряд (по %s дней) — предъявить пользователю в M6.\n" \
+                "$id" "$action" "$dormant" "$period"
+        fi
+    done < "$tmp"
+    rm -f "$tmp"
+
+    if [ "$found" -eq 0 ]; then
+        echo "_Кандидатов нет — все T-действия сработали хотя бы раз в последних окнах._"
+    fi
+}
+
+if [ "$MODE" = "activity" ]; then
+    report_activity "$MANIFEST"
+    exit 0
+fi
+
+# Получить mtime файла в днях от сегодня (использует $_STAT_FLAG, определяется выше)
 mtime_days_ago() {
     local path="$1"
     if [ ! -e "$path" ]; then
@@ -56,11 +151,8 @@ mtime_days_ago() {
         return
     fi
     local mtime
-    if stat -f %m "$path" >/dev/null 2>&1; then
-        mtime=$(stat -f %m "$path")
-    else
-        mtime=$(stat -c %Y "$path")
-    fi
+    # shellcheck disable=SC2086  # $_STAT_FLAG intentionally unquoted (multi-token flag)
+    mtime=$(stat $_STAT_FLAG "$path")
     local now
     now=$(date +%s)
     echo $(( (now - mtime) / 86400 ))
@@ -74,8 +166,9 @@ dir_newest_mtime_days_ago() {
         return
     fi
     local newest
+    # shellcheck disable=SC2086  # $_STAT_FLAG intentionally unquoted (multi-token flag)
     newest=$(find "$dir" -type f -not -path '*/.git/*' -print0 2>/dev/null \
-        | xargs -0 stat -f %m 2>/dev/null \
+        | xargs -0 stat $_STAT_FLAG 2>/dev/null \
         | sort -nr | head -1)
     if [ -z "${newest:-}" ]; then
         echo "-1"
@@ -123,6 +216,33 @@ collect() {
 
     while IFS=$'\t' read -r id source derived relation check thresh crit owner symptom; do
         [ -z "$id" ] && continue
+
+        # issue #220: check: script:<path> раньше читался, но никогда не исполнялся —
+        # такие пары молча трактовались как mtime-lag (source==derived → lag всегда 0 → всегда "ok").
+        case "$check" in
+            script:*)
+                # issue #259: хелперы шаблонные (живут рядом со scripts/iwe-drift.sh), а не
+                # часть workspace-root — резолвим относительно SCRIPT_DIR, не IWE_ROOT.
+                local helper_path="$IWE_DRIFT_SCRIPT_DIR/../${check#script:}"
+                local script_status
+                if [ ! -f "$helper_path" ]; then
+                    script_status="missing"
+                elif bash "$helper_path" >/dev/null 2>&1; then
+                    script_status="ok"
+                else
+                    case "$?" in
+                        2) script_status="critical" ;;
+                        # 1/3: хелпер нашёлся и запустился, но источник пары не подходит для
+                        # этой инсталляции (например нет WP-REGISTRY.md) — не путать с "missing"
+                        # (сам хелпер не найден).
+                        1|3) script_status="unavailable" ;;
+                        *) script_status="missing" ;;
+                    esac
+                fi
+                printf "%s\t%s\t%s\t%s\t%s\t%s\n" "?" "$id" "$relation" "$script_status" "$owner" "$symptom"
+                continue
+                ;;
+        esac
 
         local src_path="$source"
         local dst_path="$derived"

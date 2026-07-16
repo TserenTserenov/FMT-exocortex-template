@@ -199,7 +199,7 @@ if [ -d "$DS_DIR" ]; then
     fi
 else
     CRITICAL_MISSING=$((CRITICAL_MISSING + 1))
-    printf "| \`%s\` | %s | %s |\n" "DS-strategy/" "❌" "директория не найдена"
+    printf "| \`%s\` | %s | %s |\n" "$GOV_REPO/" "❌" "директория не найдена"
 fi
 
 echo ""
@@ -229,20 +229,20 @@ if [ -f "$DRIFT_SCRIPT" ]; then
     set -e
     if [ $DRIFT_RC -ne 0 ]; then
         echo ""
-        echo "_iwe-drift.sh exit code: $DRIFT_RC_"
+        echo "_iwe-drift.sh exit code: ${DRIFT_RC}_"
     fi
 else
     echo "❌ \`scripts/iwe-drift.sh\` не найден — drift-сверка пропущена"
 fi
 echo ""
 
-# ---------- Раздел 3: DS-strategy ----------
+# ---------- Раздел 3: Governance repo ----------
 
-echo "## 3. DS-strategy"
+echo "## 3. $GOV_REPO"
 echo ""
 
 if [ ! -d "$DS_DIR/.git" ]; then
-    echo "❌ \`DS-strategy\` не git-репо (или директория отсутствует)"
+    echo "❌ \`$GOV_REPO\` не git-репо (или директория отсутствует)"
 else
     set +e
     DS_STATUS=$(git -C "$DS_DIR" status --short 2>&1)
@@ -316,7 +316,7 @@ echo ""
 # ---------- Раздел 4: User customizations (L3) ----------
 #
 # L3 живёт в 3-х местах: extensions/, params.yaml (отличия от skeleton),
-# AUTHOR-ONLY зоны в .claude/rules/distinctions.md.
+# AUTHOR-ONLY зоны в extensions/*.md.
 # Цель — показать, что после restore личные кастомизации на месте.
 # Это **информационная** секция: отсутствие L3 ≠ failure (новый пилот ещё
 # ничего не настроил). Verdict выносит Аудитор содержательно.
@@ -379,28 +379,56 @@ else
 fi
 echo ""
 
-# 4c. AUTHOR-ONLY зоны в distinctions.md
-echo "### AUTHOR-ONLY зоны"
+# 4c. AUTHOR-ONLY zones in extensions/
+echo "### AUTHOR-ONLY зоны (extensions/)"
 echo ""
-DIST_FILE="$IWE_ROOT/.claude/rules/distinctions.md"
-if [ ! -f "$DIST_FILE" ]; then
-    echo "_distinctions.md не найден_"
+EXTENSIONS_DIR="$IWE_ROOT/extensions"
+if [ ! -d "$EXTENSIONS_DIR" ]; then
+    echo "_extensions/ не найдена (нормально для нового пилота)_"
 else
-    # Считаем строки внутри блоков <!-- AUTHOR-ONLY --> ... <!-- /AUTHOR-ONLY -->
-    # ИЛИ под заголовком "## Различения (авторские" (текущая авторская конвенция)
-    # grep -c возвращает rc=1 при 0 матчей, что в связке с || echo даёт "0\n0"
     set +e
-    AUTHOR_HEADER=$(grep -c "^## Различения (авторские" "$DIST_FILE" 2>/dev/null)
-    AUTHOR_BLOCKS=$(grep -c "<!-- AUTHOR-ONLY" "$DIST_FILE" 2>/dev/null)
+    AUTHOR_FILES=$(find "$EXTENSIONS_DIR" -name "*.md" -print0 2>/dev/null | xargs -0 grep -l "<!-- AUTHOR-ONLY" 2>/dev/null | wc -l | tr -d ' ')
+    AUTHOR_BLOCKS=$(find "$EXTENSIONS_DIR" -name "*.md" -print0 2>/dev/null | xargs -0 grep -c "<!-- AUTHOR-ONLY" 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
     set -e
-    [ -z "$AUTHOR_HEADER" ] && AUTHOR_HEADER=0
+    [ -z "$AUTHOR_FILES" ] && AUTHOR_FILES=0
     [ -z "$AUTHOR_BLOCKS" ] && AUTHOR_BLOCKS=0
-    if [ "$AUTHOR_HEADER" -eq 0 ] && [ "$AUTHOR_BLOCKS" -eq 0 ]; then
-        echo "_Авторских/L3-различений не найдено (нормально для нового пилота)_"
+    if [ "$AUTHOR_BLOCKS" -eq 0 ]; then
+        echo "_AUTHOR-ONLY зон не найдено в extensions/ (нормально для нового пилота)_"
     else
-        echo "✅ Найдены маркеры L3:"
-        [ "$AUTHOR_HEADER" -gt 0 ] && echo "- секция \`## Различения (авторские)\` присутствует"
-        [ "$AUTHOR_BLOCKS" -gt 0 ] && echo "- блоков \`<!-- AUTHOR-ONLY -->\`: $AUTHOR_BLOCKS"
+        echo "✅ Найдены маркеры AUTHOR-ONLY в extensions/:"
+        echo "- файлов с маркерами: $AUTHOR_FILES"
+        echo "- блоков \`<!-- AUTHOR-ONLY -->\`: $AUTHOR_BLOCKS"
+    fi
+fi
+echo ""
+
+# 4d. USER-SPACE zones in L1 FMT skills
+echo "### USER-SPACE зоны в L1-скиллах"
+echo ""
+FMT_SKILLS_DIR="$IWE_ROOT/FMT-exocortex-template/.claude/skills"
+if [ ! -d "$FMT_SKILLS_DIR" ]; then
+    echo "_FMT-exocortex-template/ не найден — пропуск_"
+else
+    total_l1=0
+    with_markers=0
+    without_markers=0
+    while IFS= read -r -d '' md_file; do
+        if grep -qE '^layer:[[:space:]]*L1' "$md_file" 2>/dev/null; then
+            total_l1=$((total_l1 + 1))
+            if grep -q '^<!-- USER-SPACE -->' "$md_file" 2>/dev/null; then
+                with_markers=$((with_markers + 1))
+            else
+                without_markers=$((without_markers + 1))
+            fi
+        fi
+    done < <(find "$FMT_SKILLS_DIR" -name "SKILL.md" -print0 2>/dev/null)
+    if [ "$total_l1" -eq 0 ]; then
+        echo "_L1-скиллов не найдено_"
+    elif [ "$without_markers" -eq 0 ]; then
+        echo "✅ USER-SPACE маркеры: $with_markers/$total_l1 L1-скиллов"
+    else
+        echo "⚠️ USER-SPACE маркеры отсутствуют в $without_markers/$total_l1 L1-скиллах"
+        echo "  Запусти: bash \$IWE_ROOT/FMT-exocortex-template/scripts/add-skill-markers.sh"
     fi
 fi
 echo ""

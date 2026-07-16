@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# routing: helper  skill=day-close  called-by=haiku
+# routing: helper  skill=week-close  called-by=sonnet  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 # iwe-backup-check.sh — Проверка здоровья системы резервного копирования IWE
 #
@@ -46,6 +46,9 @@
 #   --warn-days N       Порог "предупреждения" для бэкапа в днях (default: 7)
 #   --critical-days N   Порог "критично" для бэкапа в днях (default: 14)
 #   --no-icloud         Пропустить проверку iCloud (Linux / headless)
+#   --reset-baseline    Установить baseline (число файлов в архиве) для проверки
+#                       целостности ротации. Требует локально доступный (не
+#                       iCloud-заглушку) архив. Коммитит + пушит baseline-файл.
 #   -h, --help          Показать эту справку
 #
 # EXIT CODES:
@@ -64,6 +67,7 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 # ---------- Конфигурация ----------
 WARN_DAYS=7
 CRITICAL_DAYS=14
+MODE="check"
 # Auto-disable iCloud check on non-macOS; can be overridden via --no-icloud
 [ "$IWE_OS" = "macos" ] && CHECK_ICLOUD=1 || CHECK_ICLOUD=0
 
@@ -74,7 +78,8 @@ while [ $# -gt 0 ]; do
         --warn-days) WARN_DAYS="$2"; shift 2 ;;
         --critical-days) CRITICAL_DAYS="$2"; shift 2 ;;
         --no-icloud) CHECK_ICLOUD=0; shift ;;
-        -h|--help) sed -n '/^# ═══/,/^# ═══/p' "$0" | sed 's/^# //'; exit 0 ;;
+        --reset-baseline) MODE="reset-baseline"; shift ;;
+        -h|--help) sed -n '/^# ═══/,/^[^#]/p' "$0" | sed -e '/^[^#]/d' -e 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -83,6 +88,15 @@ if [ ! -d "$IWE_ROOT" ]; then
     echo "❌ IWE_ROOT not found: $IWE_ROOT" >&2
     exit 2
 fi
+
+# Baseline живёт в governance-репо (New-files guard: коммит требует тега
+# [allow:current]). Путь абсолютный, от IWE_ROOT (не от SCRIPT_DIR — тот
+# перезаписывается iwe-env-bootstrap.sh на своё расположение при source выше;
+# вычислен ПОСЛЕ парсинга аргументов, чтобы --root учитывался).
+REPO_DIR="${IWE_DS_MY_STRATEGY:-$IWE_ROOT/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
+BASELINE_FILE="$REPO_DIR/current/backup-baseline.json"
+BASELINE_THRESHOLD_PCT=80
+ICLOUD_DIR="$IWE_ICLOUD_BACKUP_DIR"
 
 # ---------- Helpers ----------
 now_epoch=$(date +%s)
@@ -103,6 +117,78 @@ stat_mtime() {
     fi
 }
 
+# Последний архив IWE-backup-*.tar.gz в iCloud (пусто, если директории/архивов нет)
+find_latest_icloud_archive() {
+    [ -d "$ICLOUD_DIR" ] || return 0
+    find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | sort | tail -1
+}
+
+# du -k возвращает 0 для iCloud-заглушки (Optimize Mac Storage — файл не
+# скачан локально). Отличаем "заглушка" от "реально пустой/битый файл".
+archive_local_size_kb() {
+    du -k "$1" 2>/dev/null | cut -f1
+}
+
+# Установка baseline: сколько файлов "нормально" содержит архив ротации.
+# Требует локально доступный (не заглушку) архив. Идемпотентна — повторный
+# вызов без изменений сообщает об этом и завершается штатно (ход 20 BAK1).
+reset_baseline() {
+    local latest size_kb file_count existing_count
+
+    latest=$(find_latest_icloud_archive)
+    if [ -z "$latest" ]; then
+        crit "Нет архива IWE-backup-*.tar.gz в $ICLOUD_DIR — нечего использовать как baseline"
+        return 2
+    fi
+
+    size_kb=$(archive_local_size_kb "$latest")
+    if [ -z "$size_kb" ] || [ "$size_kb" -eq 0 ]; then
+        crit "Архив $(basename "$latest") — iCloud-заглушка (0 KB локально). Принудительно скачайте файл (открыть в Finder) и повторите --reset-baseline"
+        return 2
+    fi
+
+    if ! tar -tzf "$latest" >/dev/null 2>&1; then
+        crit "Архив $(basename "$latest") повреждён — tar -tzf провалился, baseline не установлен"
+        return 2
+    fi
+
+    file_count=$(tar -tzf "$latest" 2>/dev/null | wc -l | tr -d '[:space:]')
+
+    if [ -f "$BASELINE_FILE" ]; then
+        existing_count=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['file_count'])" 2>/dev/null || echo "")
+        if [ "$existing_count" = "$file_count" ]; then
+            info "Baseline не изменился ($file_count файлов) — обновление не требуется"
+            return 0
+        fi
+    fi
+
+    if ! python3 -c "import json, datetime; json.dump({'file_count': $file_count, 'baseline_date': datetime.date.today().isoformat()}, open('$BASELINE_FILE', 'w'), indent=2)"; then
+        crit "Не удалось записать baseline-файл $BASELINE_FILE"
+        return 1
+    fi
+
+    if ! git -C "$REPO_DIR" add -- current/backup-baseline.json; then
+        crit "git add провалился для $BASELINE_FILE"
+        return 1
+    fi
+    if ! git -C "$REPO_DIR" commit -m "chore(backup): reset baseline to $file_count files [allow:current]" -- current/backup-baseline.json; then
+        crit "git commit провалился для $BASELINE_FILE"
+        return 1
+    fi
+    if ! git -C "$REPO_DIR" push; then
+        crit "git push провалился для baseline-коммита — закоммичено локально, не отправлено"
+        return 1
+    fi
+
+    pass "Baseline установлен: $file_count файлов ($(basename "$latest")), закоммичено и запушено"
+    return 0
+}
+
+if [ "$MODE" = "reset-baseline" ]; then
+    reset_baseline
+    exit $?
+fi
+
 # ---------- Состояние ----------
 EXIT_CODE=0
 WARNINGS=0
@@ -111,8 +197,6 @@ CRITICALS=0
 # ---------- Раздел 1: iCloud-бэкапы ----------
 
 if [ "$CHECK_ICLOUD" -eq 1 ]; then
-    ICLOUD_DIR="$IWE_ICLOUD_BACKUP_DIR"
-
     echo "## 1. iCloud-бэкапы"
     echo ""
 
@@ -121,7 +205,7 @@ if [ "$CHECK_ICLOUD" -eq 1 ]; then
         CRITICALS=$((CRITICALS + 1))
     else
         # Последний архив
-        LATEST=$(find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | sort | tail -1)
+        LATEST=$(find_latest_icloud_archive)
         TOTAL_ARCHIVES=$(find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | wc -l | tr -d ' ')
 
         if [ -z "$LATEST" ]; then
@@ -157,6 +241,41 @@ if [ "$CHECK_ICLOUD" -eq 1 ]; then
                 WARNINGS=$((WARNINGS + 1))
             else
                 pass "Ротация: $TOTAL_ARCHIVES архив(а)"
+            fi
+
+            # du -k == 0 → iCloud-заглушка (Optimize Mac Storage, файл не скачан
+            # локально). Целостность и подсчёт файлов на заглушке не проверить —
+            # не ошибка, а N/A (ход 22 BAK1: раньше это давало ложный "0 файлов").
+            LATEST_SIZE_KB=$(archive_local_size_kb "$LATEST")
+            if [ -z "$LATEST_SIZE_KB" ] || [ "$LATEST_SIZE_KB" -eq 0 ]; then
+                info "Архив — iCloud-заглушка (не скачан локально): smoke-тест и сравнение с baseline пропущены"
+            else
+                if tar -tzf "$LATEST" >/dev/null 2>&1; then
+                    pass "Smoke-тест целостности архива (tar -tzf) — OK"
+                else
+                    crit "Архив повреждён — tar -tzf провалился"
+                    CRITICALS=$((CRITICALS + 1))
+                fi
+
+                if [ ! -f "$BASELINE_FILE" ]; then
+                    info "Baseline не установлен — запустите: $0 --reset-baseline"
+                else
+                    BASELINE_COUNT=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['file_count'])" 2>/dev/null || echo "")
+                    BASELINE_DATE=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['baseline_date'])" 2>/dev/null || echo "")
+                    if [ -z "$BASELINE_COUNT" ]; then
+                        warn "Baseline-файл повреждён ($BASELINE_FILE) — запустите --reset-baseline"
+                        WARNINGS=$((WARNINGS + 1))
+                    else
+                        CURRENT_COUNT=$(tar -tzf "$LATEST" 2>/dev/null | wc -l | tr -d '[:space:]')
+                        THRESHOLD_COUNT=$(( BASELINE_COUNT * BASELINE_THRESHOLD_PCT / 100 ))
+                        if [ "$CURRENT_COUNT" -lt "$THRESHOLD_COUNT" ]; then
+                            crit "Архив содержит $CURRENT_COUNT файлов — меньше $BASELINE_THRESHOLD_PCT% от baseline ($BASELINE_COUNT, установлен $BASELINE_DATE)"
+                            CRITICALS=$((CRITICALS + 1))
+                        else
+                            pass "Архив: $CURRENT_COUNT файлов (≥$BASELINE_THRESHOLD_PCT% от baseline $BASELINE_COUNT, установлен $BASELINE_DATE)"
+                        fi
+                    fi
+                fi
             fi
         fi
     fi
