@@ -98,7 +98,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-07-15
+
+## [Unreleased] — обновлено 2026-07-16
 
 ### Added
 
@@ -136,6 +137,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `750eaf6` chore: remove __pycache__ .pyc from tree + gitignore (sync 238a5c1 garbage)
+- `8e69322` docs: regenerate [Unreleased] CHANGELOG after #263 fix
 - `806ba4c` docs(changelog): add cec81a3 (DayPlan follow-up to #248)
 - `82b1cc8` docs(changelog): sync Unreleased section — #248/#251/#252 fixes, thank VxxxlBxxxxv
 - `67571f3` docs(changelog): thank den317 for #247/#249/#250 reports
@@ -158,6 +161,12 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `1c62621` fix(day-close): language-tolerant postcondition patterns 9a/9b (#234)
+- `5ab284f` fix(executor-catalog): VALID_EXECUTORS += agent, script+judgment (#222)
+- `655d385` fix(setup,update): quote env values (#223) + merge-managed base↔remote detector (#254)
+- `6ffb54a` fix(pre-commit): manifest-coverage — block только staged, whole-repo WARN (#240)
+- `e67ca20` fix(dry-run-gate): restore #237 v2 matcher + whitelist read-only bash helpers (#264)
+- `8a611bf` fix(validate-template): restore staged mode + dynamic TEMPLATE_DIR (sync 238a5c1 regression)
 - `7e5be12` fix: resolve WP-REGISTRY schema drift cluster (#263)
 - `fc763e4` fix(WP-450): promote missing checklists.md pointer + ailev↔IWE glossary
 - `8b61285` fix(changelog): restore 0200a93 entry dropped by the auto-regeneration step
@@ -237,6 +246,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - `84858e4` fix(release): sync-version-badge.sh --fix broken on macOS BSD sed + README badge drift
 - `0b5e140` fix(extractor): guard против запуска сырого файла шаблона + правка примеров
 - `b4d08a2` fix(v0.35.5): orphan-detection TypeError + DS-strategy validator + root detection (#214 #215)
+- `212fa2f` fix(setup): include rules-lazy in dry-run and section message
+- `b7d75a8` fix(template): verify-template-integrity mirrors CI contract+smoke jobs
+- `0200a93` fix(template): close manifest drift + setup/update rules-lazy gap, wire parity gate
 
 
 ## [0.35.5] — 2026-06-30
