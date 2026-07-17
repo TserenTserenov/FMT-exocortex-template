@@ -1167,6 +1167,9 @@
       "path": "scripts/archive-done-wp.sh"
     },
     {
+      "path": "scripts/artifactor.py"
+    },
+    {
       "path": "scripts/backup-icloud.sh"
     },
     {
@@ -1239,6 +1242,9 @@
       "path": "scripts/day-open-pipeline.sh"
     },
     {
+      "path": "scripts/day-open-preflight.sh"
+    },
+    {
       "path": "scripts/day-open-scaffold.sh"
     },
     {
@@ -1296,6 +1302,9 @@
       "path": "scripts/iwe-bug-report.sh"
     },
     {
+      "path": "scripts/iwe-consent.sh"
+    },
+    {
       "path": "scripts/iwe-drift-helpers/check-arch-version.sh"
     },
     {
@@ -1312,6 +1321,9 @@
     },
     {
       "path": "scripts/iwe-transcribe.sh"
+    },
+    {
+      "path": "scripts/iwe-w-reflection.sh"
     },
     {
       "path": "scripts/ke-classify.sh"
