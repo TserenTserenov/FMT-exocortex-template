@@ -1563,6 +1563,9 @@
       "path": "scripts/hot-files.list"
     },
     {
+      "path": "scripts/install-codex-runtime.sh"
+    },
+    {
       "path": "scripts/iwe-agent-dispatcher.py"
     },
     {

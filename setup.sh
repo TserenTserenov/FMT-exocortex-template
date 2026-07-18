@@ -566,13 +566,7 @@ else
         cp "$TEMPLATE_DIR/.claude/settings.json" "$WORKSPACE_DIR/.claude/settings.json"
         echo "  ✓ .claude/settings.json"
     fi
-    for codex_dir in .agents .codex; do
-        if [ -d "$TEMPLATE_DIR/$codex_dir" ]; then
-            mkdir -p "$WORKSPACE_DIR/$codex_dir"
-            cp -r "$TEMPLATE_DIR/$codex_dir/." "$WORKSPACE_DIR/$codex_dir/"
-            echo "  ✓ $codex_dir/ → $WORKSPACE_DIR/$codex_dir/"
-        fi
-    done
+    bash "$TEMPLATE_DIR/scripts/install-codex-runtime.sh" "$WORKSPACE_DIR"
 fi
 
 # Resolves IWE_TIER: env var → ~/.iwe/config.yaml → default T1
