@@ -275,7 +275,7 @@ case "$1" in
             # prompt is fallback ONLY — it ignores priorities.yaml and the scaffold, which
             # was the root cause of the 2026-06-21 structure/priority drift.
             log "Morning: running canonical Day Open pipeline"
-            DAY_OPEN_PIPELINE="$HOME/IWE/DS-strategy/scripts/day-open-pipeline.sh"
+            DAY_OPEN_PIPELINE="$WORKSPACE/scripts/day-open-pipeline.sh"
             if [ -f "$DAY_OPEN_PIPELINE" ] && bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1; then
                 log "Morning: Day Open pipeline OK (scaffold + llm-fill)"
             else
