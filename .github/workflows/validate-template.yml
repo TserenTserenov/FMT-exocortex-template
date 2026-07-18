@@ -74,6 +74,17 @@ jobs:
         run: brew install jq  # python3 preinstalled
       - name: Run integration-contract-validator (8 detectors)
         run: bash setup/integration-contract-validator.sh
+      - name: Check generated agent instructions and Codex skills
+        run: |
+          IWE_ROOT="$PWD" bash scripts/sync-agent-instructions.sh --check
+          bash scripts/sync-codex-skills.sh --check
+      - name: Run Codex portability contracts
+        run: |
+          bash setup/test-ai-cli-detection.sh
+          bash setup/test-codex-portability.sh
+          bash scripts/test-agent-backends.sh
+          if [ -f setup/test-codex-hooks.sh ]; then bash setup/test-codex-hooks.sh; fi
+          if [ -f setup/test-update-codex-sync.sh ]; then bash setup/test-update-codex-sync.sh; fi
       - name: Run smoke-test-fresh-install (GOVERNANCE_REPO=${{ matrix.gov_repo }})
         run: bash setup/smoke-test-fresh-install.sh
       - name: Run detector regression fixtures (regex gap guard)

@@ -40,11 +40,12 @@ if [ ! -x "$EXTRACTOR_SH" ]; then
 fi
 ok "extractor.sh найден"
 
-if ! command -v claude >/dev/null 2>&1; then
-    fail "claude CLI не установлен (https://docs.anthropic.com/en/docs/claude-code)"
+AGENT_PROVIDER="${IWE_AGENT_PROVIDER:-claude}"
+if ! command -v "$AGENT_PROVIDER" >/dev/null 2>&1; then
+    fail "$AGENT_PROVIDER CLI не установлен"
     exit 1
 fi
-ok "claude CLI: $(command -v claude)"
+ok "$AGENT_PROVIDER CLI: $(command -v "$AGENT_PROVIDER")"
 
 PLATFORM=$(uname -s)
 case "$PLATFORM" in

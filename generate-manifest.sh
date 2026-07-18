@@ -94,6 +94,11 @@ FILES_EXCLUDE_EXACT=(
     "extensions/mcp-user.json"
 )
 
+# Codex runtime is deliberately not excluded: AGENTS.md, .agents/skills/,
+# .codex/ and their scripts are L1 platform assets and must reach existing
+# installations through update.sh. User-owned .codex config is protected by
+# update.sh's seed-only policy rather than omitted from the manifest.
+
 # Собираем файлы.
 FILES=()
 EXCLUDED_PATHS=()

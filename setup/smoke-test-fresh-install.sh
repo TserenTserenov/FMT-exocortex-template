@@ -364,7 +364,11 @@ else
         ".claude/skills" \
         ".claude/hooks" \
         ".claude/rules" \
-        "CLAUDE.md"; do
+        ".agents/skills/day-open/SKILL.md" \
+        ".codex/config.toml" \
+        ".codex/hooks.json" \
+        "CLAUDE.md" \
+        "AGENTS.md"; do
         if [ -e "$E2E_WS/$f" ]; then
             pass "e2e workspace: $f доставлен"
         else

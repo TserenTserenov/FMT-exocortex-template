@@ -21,7 +21,7 @@ EXIT_GENERAL=1
 
 trap 'echo "ОШИБКА: update.sh прервался на строке ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
-VERSION="2.4.0"  # fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
+VERSION="2.5.0"  # Codex runtime delivery: AGENTS.md, .agents/skills and .codex assets; user config remains seed-only
 REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
@@ -90,6 +90,24 @@ is_personal_config() {
         day-rhythm-config.yaml) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# Copy a generated instruction/skill file while retaining the explicitly marked
+# user-owned tail. This is also used by repair-pass, so an interrupted update is
+# healed without erasing local instructions.
+copy_preserving_user_space() {
+    local src="$1" dst="$2"
+    local user_section=""
+    if [ -f "$dst" ]; then
+        user_section=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$dst" 2>/dev/null || true)
+    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    if [ -n "$user_section" ]; then
+        perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$dst"
+        perl -i -0pe 's/\n+$/\n/' "$dst"
+        printf '\n%s\n' "$user_section" >> "$dst"
+    fi
 }
 
 # is_author_mode — true когда WORKSPACE_DIR/params.yaml объявляет author_mode: true.
@@ -257,24 +275,30 @@ repair_pass() {
                     fi
                 fi
                 ;;
-            .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*)
+            AGENTS.md|.agents/skills/*|.codex/hooks/*|.claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*)
                 dst="$WORKSPACE_DIR/$fpath"
                 if [ ! -f "$dst" ]; then
                     mkdir -p "$(dirname "$dst")"
-                    cp "$SCRIPT_DIR/$fpath" "$dst"
+                    case "$fpath" in
+                        AGENTS.md|.agents/skills/*/SKILL.md) copy_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" ;;
+                        *) cp "$SCRIPT_DIR/$fpath" "$dst" ;;
+                    esac
                     case "$fpath" in *.sh) chmod +x "$dst" ;; esac
                     echo "  ⟲ $fpath → workspace (repair)"
                     REPAIRED=$((REPAIRED + 1))
                 elif [ -r "$dst" ] && is_author_mode && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$dst")" ]; then
                     echo "  ⚠ $fpath — author_mode: рабочая копия не тронута. Сверь: diff \"$SCRIPT_DIR/$fpath\" \"$dst\""
                 elif [ -r "$dst" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$dst")" ]; then
-                    cp "$SCRIPT_DIR/$fpath" "$dst"
+                    case "$fpath" in
+                        AGENTS.md|.agents/skills/*/SKILL.md) copy_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" ;;
+                        *) cp "$SCRIPT_DIR/$fpath" "$dst" ;;
+                    esac
                     case "$fpath" in *.sh) chmod +x "$dst" ;; esac
                     echo "  ⟲ $fpath → workspace (stale repair)"
                     REPAIRED=$((REPAIRED + 1))
                 fi
                 ;;
-            .claude/settings.json)
+            .claude/settings.json|.codex/config.toml|.codex/hooks.json)
                 # bug-2026-07-11: settings.json mixes L1 platform defaults with L4 user
                 # hooks/permissions (custom security hooks, additionalDirectories, allow-list).
                 # Treating it like a pure-L1 path (skills/hooks/rules/...) made every "hash
@@ -604,7 +628,7 @@ for f in "${UPDATED_FILES[@]}"; do
             # Save base for next update
             cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
         fi
-    elif [[ "$f" == .claude/skills/*/SKILL.md ]]; then
+    elif [[ "$f" == .claude/skills/*/SKILL.md || "$f" == .agents/skills/*/SKILL.md || "$f" == "AGENTS.md" ]]; then
         # USER-SPACE preserve for L1 skill spec files (no install_constants in SCRIPT_DIR — already {{KEY}})
         CURR_SKILL_FILE="$SCRIPT_DIR/$f"
         if [ -f "$CURR_SKILL_FILE" ]; then
@@ -869,7 +893,8 @@ fi
 echo ""
 echo "Обновление platform-space..."
 
-# Copy CLAUDE.md to workspace root
+# Copy agent instruction roots to workspace. CLAUDE.md uses its historical
+# 3-way merge; AGENTS.md is generated and preserves only explicit USER-SPACE.
 CLAUDE_UPDATED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = "CLAUDE.md" ]; then
@@ -920,6 +945,19 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     fi
 done
 
+for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+    if [ "$f" = "AGENTS.md" ]; then
+        src="$SCRIPT_DIR/AGENTS.md"
+        dst="$WORKSPACE_DIR/AGENTS.md"
+        if is_author_mode && [ -f "$dst" ]; then
+            echo "  ⚠ AGENTS.md — author_mode: рабочая копия не тронута. Сверь: diff \"$src\" \"$dst\""
+        else
+            copy_preserving_user_space "$src" "$dst"
+            echo "  ✓ AGENTS.md → workspace (USER-SPACE preserved)"
+        fi
+    fi
+done
+
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     MEM_UPDATED=0
@@ -958,7 +996,7 @@ fi
 # lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов.
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     case "$f" in
-        .claude/skills/*/SKILL.md)
+        .claude/skills/*/SKILL.md|.agents/skills/*/SKILL.md)
             src="$SCRIPT_DIR/$f"
             dst="$WORKSPACE_DIR/$f"
             if is_author_mode && [ -f "$dst" ]; then
@@ -999,7 +1037,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
                 echo "  ✓ $f → workspace"
             fi
             ;;
-        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*)
+        .agents/skills/*|.codex/hooks/*|.claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*)
             src="$SCRIPT_DIR/$f"
             dst="$WORKSPACE_DIR/$f"
             if is_author_mode && [ -f "$dst" ]; then
@@ -1010,7 +1048,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
             cp "$src" "$dst"
             echo "  ✓ $f → workspace"
             ;;
-        .claude/settings.json)
+        .claude/settings.json|.codex/config.toml|.codex/hooks.json)
             # See repair_pass() comment above (bug-2026-07-11) — never blind-overwrite,
             # workspace copy carries user hooks/permissions the template doesn't have.
             dst="$WORKSPACE_DIR/$f"
@@ -1019,7 +1057,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
                 cp "$SCRIPT_DIR/$f" "$dst"
                 echo "  ✓ $f → workspace (new install)"
             else
-                echo "  ⚠ $f — платформа обновила hooks/permissions, workspace-копия НЕ тронута (несёт пользовательские хуки). Сверь вручную: diff \"$SCRIPT_DIR/$f\" \"$dst\""
+                echo "  ⚠ $f — шаблон обновлён, workspace-копия НЕ тронута (несёт пользовательские настройки). Сверь вручную: diff \"$SCRIPT_DIR/$f\" \"$dst\""
             fi
             ;;
     esac
@@ -1261,7 +1299,8 @@ def _locally_excluded(rel):
     return any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/")
                for e in local_excluded)
 
-L1_DIRS = [".claude/hooks", ".claude/rules", ".claude/skills"]
+L1_DIRS = [".claude/hooks", ".claude/rules", ".claude/skills",
+           ".agents/skills", ".codex/hooks"]
 L1_PREFIXES = ["memory/protocol-"]
 
 orphans = []

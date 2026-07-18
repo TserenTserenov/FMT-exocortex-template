@@ -109,6 +109,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Codex platform adapter: agent-neutral `AGENTS.md`, project configuration and
+  MCP, full `.agents/skills` parity, lifecycle-hook adapters, safe headless
+  execution, setup/update delivery, and cross-runtime regression tests.
 - `5aabac2` feat(wp483): sync guide-kit v0.1.1 into template
 - `ae900f3` feat(wp485): доставить 4 скрипта Kimi Standalone из root в шаблон
 - `262c313` feat(l1-skills): добавить USER-SPACE маркеры в agent-fault и audit-installation

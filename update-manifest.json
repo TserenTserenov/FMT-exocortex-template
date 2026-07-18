@@ -1476,6 +1476,9 @@
       "path": "scripts/close-wp.sh"
     },
     {
+      "path": "scripts/codex-headless-adapter.sh"
+    },
+    {
       "path": "scripts/content-filter-apply.py"
     },
     {
@@ -1563,6 +1566,9 @@
       "path": "scripts/iwe-agent-dispatcher.py"
     },
     {
+      "path": "scripts/iwe-agent-exec.sh"
+    },
+    {
       "path": "scripts/iwe-audit.sh"
     },
     {
@@ -1594,6 +1600,9 @@
     },
     {
       "path": "scripts/iwe-w-reflection.sh"
+    },
+    {
+      "path": "scripts/iwe_agent_backend.py"
     },
     {
       "path": "scripts/ke-classify.sh"
@@ -1732,6 +1741,9 @@
     },
     {
       "path": "scripts/sync_feedback_to_memory.py"
+    },
+    {
+      "path": "scripts/test-agent-backends.sh"
     },
     {
       "path": "scripts/test-route-task.sh"

@@ -19,19 +19,21 @@ import os
 import re
 import sys
 
+from iwe_agent_backend import invoke as invoke_agent
+
 
 # ── constants ─────────────────────────────────────────────────────────────────
 
 DEFAULT_N = 3
 MAX_CONCURRENT = 3  # asyncio.Semaphore cap — avoids API throttle storms on N=5
-DEFAULT_MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-sonnet-4-6"]
+DEFAULT_MODELS = ["high", "medium", "medium"]
 BUDGET_TOKENS = 5000  # per-path hint passed in system note
 
 OPEN_LOOP_CLASSES = {"open-loop", "problem-framing"}
 ALLOWED_SELECTORS = {"heuristic", "archgate"}
 
 # archgate (LLM-as-Judge) constants
-DEFAULT_JUDGE_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_JUDGE_MODEL = "low"
 ARCHGATE_SKIP_THRESHOLD = 0.30  # skip judge if heuristic gap > this
 
 # reflect constants
@@ -116,13 +118,7 @@ def pick_best_index(responses: list[str], scores: list[float]) -> int:
 async def _judge_pairwise(task: str, resp_a: str, resp_b: str, model: str) -> str:
     """Compare two responses via LLM. Returns 'A' or 'B'."""
     prompt = _JUDGE_PROMPT.format(task=task, resp_a=resp_a, resp_b=resp_b)
-    proc = await asyncio.create_subprocess_exec(
-        "claude", "-p", prompt, "--model", model,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, _ = await proc.communicate()
-    raw = stdout.decode("utf-8", errors="replace").strip()
+    _, raw = await asyncio.to_thread(invoke_agent, prompt, model)
     m = re.search(r"\b([AB])\b", raw)
     if m:
         return m.group(1)
@@ -173,13 +169,7 @@ async def _pick_archgate(task: str, responses: list[str], scores: list[float],
 async def _reflect_once(task: str, text: str, model: str) -> tuple[str, str]:
     """One Reflexion cycle. Returns (critique, revised)."""
     prompt = _REFLECT_PROMPT.format(task=task, text=text)
-    proc = await asyncio.create_subprocess_exec(
-        "claude", "-p", prompt, "--model", model,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, _ = await proc.communicate()
-    raw = stdout.decode("utf-8", errors="replace").strip()
+    _, raw = await asyncio.to_thread(invoke_agent, prompt, model)
 
     if "REVISED:" not in raw:
         return "", raw  # parse failure — treat entire output as revised
@@ -209,16 +199,11 @@ async def _run_one(task: str, model: str, path_index: int, budget: int,
     note = f"[Multi-path path {path_index + 1}, budget ~{budget} tokens] "
     prompt = note + task
     async with sem:
-        proc = await asyncio.create_subprocess_exec(
-            "claude", "-p", prompt, "--model", model,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-    if proc.returncode != 0 and not stdout.strip():
-        err = stderr.decode("utf-8", errors="replace").strip()[:200]
+        ok, output = await asyncio.to_thread(invoke_agent, prompt, model)
+    if not ok:
+        err = output.strip()[:200]
         return f"{_FAIL_PREFIX} {err}]"
-    return stdout.decode("utf-8", errors="replace").strip()
+    return output.strip()
 
 
 async def _run_all(task: str, n: int, models: list[str], budget: int) -> list[str]:
