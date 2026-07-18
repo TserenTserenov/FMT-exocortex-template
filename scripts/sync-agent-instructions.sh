@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see WP-394 Ф4.2, DP.SC.159
-# sync-agent-instructions.sh — генерация AGENTS.md из единого ядра CLAUDE.md + agent-blocks
+# sync-agent-instructions.sh — генерация нейтрального AGENTS.md из общего ядра + agent-blocks
 #
 # Single-source инструкций агентов (WP-394 Ф4.2). Устраняет молчаливую дивергенцию
-# между CLAUDE.md (Claude), AGENTS.md (Kimi) и инструкциями Hermes.
+# между CLAUDE.md (Claude), AGENTS.md (Codex/Kimi и другие совместимые агенты)
+# и инструкциями Hermes.
 #
 # Сборка (полная регенерация, НЕ маркерная вставка):
 #   AGENTS.md = [header] + [SYNC-CORE из CLAUDE.md] + [AGENTS-agent-blocks.md]
 #
 # Источники (в $IWE_ROOT, default $HOME/IWE):
 #   CLAUDE.md             — секция между <!-- SYNC-CORE-START --> и <!-- SYNC-CORE-END -->
-#   AGENTS-agent-blocks.md — агент-специфика (commit attribution, MCP, instructions level)
+#   AGENTS-agent-blocks.md — общие и явно помеченные runtime-specific дополнения
 #
 # Использование:
 #   ./sync-agent-instructions.sh            # dry-run: unified diff, без записи (DEFAULT)
@@ -94,7 +95,8 @@ build_agents() {
 # AGENTS.md
 
 > **Сгенерировано `scripts/sync-agent-instructions.sh` (WP-394 Ф4.2). НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ.**
-> Общее ядро → блок `<!-- SYNC-CORE -->` в `CLAUDE.md`. Агент-специфика → `AGENTS-agent-blocks.md`.
+> Этот файл предназначен для Codex, Kimi Code и других агентов, поддерживающих `AGENTS.md`.
+> Общее ядро → блок `<!-- SYNC-CORE -->` в `CLAUDE.md`. Дополнения → `AGENTS-agent-blocks.md`.
 
 HEADER
   extract_core
