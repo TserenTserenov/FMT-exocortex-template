@@ -10,7 +10,7 @@ IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="$SCRIPT_DIR/hot-files.list"
 
-GOVERNANCE_REPO="DS-strategy"
+GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 if [ -f "$IWE_ROOT/.exocortex.env" ]; then
   gov="$(grep -E '^GOVERNANCE_REPO=' "$IWE_ROOT/.exocortex.env" | tail -1 | cut -d= -f2-)"
   [ -n "$gov" ] && GOVERNANCE_REPO="$gov"
