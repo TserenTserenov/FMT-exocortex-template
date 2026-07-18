@@ -50,4 +50,14 @@ python3 -c 'import json,sys; assert json.load(sys.stdin)=={}' <<<"$OUT" \
   && ok "Stop always emits valid JSON when no continuation is needed" \
   || fail "Stop always emits valid JSON when no continuation is needed"
 
+MEM_ROOT=$(mktemp -d)
+mkdir -p "$MEM_ROOT/.codex/iwe-memory"
+printf '# Shared marker\nMEMORY-BRIDGE-OK\n' > "$MEM_ROOT/.codex/iwe-memory/MEMORY.md"
+OUT=$(printf '%s' '{"hook_event_name":"SessionStart","session_id":"test","cwd":"'"$MEM_ROOT"'"}' \
+  | CODEX_PROJECT_DIR="$MEM_ROOT" IWE_CLAUDE_HOOKS="$TMP/empty" python3 "$ADAPTER" SessionStart)
+python3 -c 'import json,sys; d=json.load(sys.stdin); assert "MEMORY-BRIDGE-OK" in d["hookSpecificOutput"]["additionalContext"]' <<<"$OUT" \
+  && ok "SessionStart injects shared Claude/IWE memory" \
+  || fail "SessionStart injects shared Claude/IWE memory"
+rm -rf "$MEM_ROOT"
+
 printf '1..%d\n' "$PASS"

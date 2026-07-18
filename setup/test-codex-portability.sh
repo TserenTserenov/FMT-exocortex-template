@@ -16,15 +16,20 @@ bash -n "$REPO_ROOT/scripts/install-codex-runtime.sh"
 
 install_target="$(mktemp -d)"
 trap 'rm -rf "$install_target"' EXIT
-bash "$REPO_ROOT/scripts/install-codex-runtime.sh" "$install_target" >/dev/null
+IWE_CLAUDE_MEMORY_DIR="$install_target/.test-claude-memory" \
+  bash "$REPO_ROOT/scripts/install-codex-runtime.sh" "$install_target" >/dev/null
 [ -f "$install_target/AGENTS.md" ]
 [ -f "$install_target/.agents/skills/day-open/SKILL.md" ]
 [ -f "$install_target/.codex/config.toml" ]
 [ -f "$install_target/.codex/hooks/iwe-hook-adapter.py" ]
+[ -L "$install_target/memory" ]
+[ -L "$install_target/.codex/iwe-memory" ]
 # Existing user config is seed-only and must survive a refresh.
 printf '# user config\n' > "$install_target/.codex/config.toml"
-bash "$REPO_ROOT/scripts/install-codex-runtime.sh" "$install_target" >/dev/null
+IWE_CLAUDE_MEMORY_DIR="$install_target/.test-claude-memory" \
+  bash "$REPO_ROOT/scripts/install-codex-runtime.sh" "$install_target" >/dev/null
 grep -q '^# user config$' "$install_target/.codex/config.toml"
+grep -q '^memories = true$' "$install_target/.codex/config.toml"
 
 source_skill_count="$(find "$REPO_ROOT/.claude/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)"
 codex_skill_count="$(find "$REPO_ROOT/.agents/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)"

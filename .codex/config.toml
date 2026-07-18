@@ -3,6 +3,11 @@
 
 [features]
 hooks = true
+memories = true
+
+[memories]
+generate_memories = true
+use_memories = true
 
 [mcp_servers.iwe-knowledge]
 enabled = true

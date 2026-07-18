@@ -106,6 +106,20 @@ def contexts_from(value: dict[str, Any]) -> list[str]:
     return result
 
 
+def iwe_memory_context() -> str:
+    """Load shared IWE operational memory through the workspace alias."""
+    candidates = [ROOT / ".codex" / "iwe-memory" / "MEMORY.md", ROOT / "memory" / "MEMORY.md"]
+    for path in candidates:
+        try:
+            if path.is_file():
+                content = path.read_text(encoding="utf-8").strip()
+                if content:
+                    return "IWE shared operational memory (Claude/Codex):\n\n" + content[:12000]
+        except OSError:
+            continue
+    return ""
+
+
 def main() -> int:
     event = sys.argv[1] if len(sys.argv) > 1 else ""
     source = load_input()
@@ -119,6 +133,11 @@ def main() -> int:
     })
     contexts: list[str] = []
     block_reason = ""
+
+    if event == "SessionStart":
+        memory = iwe_memory_context()
+        if memory:
+            contexts.append(memory)
 
     for name in select_hooks(event, source):
         script = CLAUDE_HOOKS / name
