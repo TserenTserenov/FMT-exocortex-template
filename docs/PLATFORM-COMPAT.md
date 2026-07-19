@@ -1,21 +1,21 @@
 # Platform Compatibility Checklist
 
-> The Template must work on macOS and Linux. Check this checklist before committing.
+> The Template must work on macOS and Linux. Check this list before committing.
 
-## Forbidden Constructs (Without a Wrapper)
+## Prohibited Constructs (without a wrapper)
 
 | Construct | Problem | Replacement |
 |-----------|---------|-------------|
 | `sed -i '' ...` | GNU sed does not accept `''` | `sed_inplace` (defined in setup.sh, update.sh) |
-| `date -v-Nd` | BSD-only (macOS) | `portable_date_offset N` (defined in role scripts) |
+| `date -v-Nd` | BSD-only (macOS) | `portable_date_offset N` (defined in role Scripts) |
 | `osascript` | macOS-only | `osascript \|\| notify-send \|\| true` |
 | `launchctl` | macOS-only | Wrap in a `command -v launchctl` guard |
 | `readlink -f` | BSD readlink does not support `-f` | `cd "$(dirname "$0")" && pwd` |
 | `grep -P` | GNU-only (Perl regex) | `grep -E` (Extended regex) |
 | `stat -c` / `stat -f` | GNU vs BSD | Avoid; use `wc`, `ls -l`, `find` |
-| `mktemp -d -t` | Inconsistent behavior | `mktemp -d` (no Template) |
+| `mktemp -d -t` | Different behavior | `mktemp -d` (no template) |
 
-## Wrappers (Copy-Paste to the Top of the Script)
+## Wrappers (copy-paste to the top of the Script)
 
 ### sed_inplace
 
@@ -51,11 +51,12 @@ notify() {
 
 ## Architectural Constraints
 
-- **launchd / .plist** — macOS-only. Linux requires cron or a systemd timer. Setup.sh skips step 5 on Linux.
-- **~/Library/LaunchAgents** — macOS path. Role install scripts are currently macOS-only.
-- **/opt/homebrew/bin** — Apple Silicon macOS. Substituted by the Template in the plist PATH, but not universal.
-- **Sleep prevention** — Scripts detect the OS automatically: `caffeinate -diu` (macOS) / `systemd-inhibit` (Linux). On macOS, the `-s` flag is **not used** — it is ignored when Optimized Battery Charging switches the power profile to battery.
-- **Laptop wake** — macOS: `pmset repeat wakeorpoweron`, Linux: `rtcwake` / systemd timer `WakeSystem=true`, Windows: Task Scheduler. For macOS laptops, `pmset -b sleep 0` is recommended (disables idle sleep on the battery power profile).
+- **launchd / .plist** — macOS-only. On Linux, use cron or a systemd timer. Setup.sh skips step 5 on Linux.
+- **~/Library/LaunchAgents** — macOS path. Role install Scripts are currently macOS-only.
+- **/opt/homebrew/bin** — Apple Silicon macOS. In the plist PATH — substituted by the Template, but not universal.
+- **Sleep prevention** — Scripts detect the OS automatically: `caffeinate -diu` (macOS) / `systemd-inhibit` (Linux). On macOS the `-s` flag is **not used** — it is ignored when Optimized Battery Charging switches the power profile to battery.
+- **Laptop wake** — macOS: `pmset repeat wakeorpoweron`, Linux: `rtcwake` / systemd timer `WakeSystem=true`, Windows: Task Scheduler. For macOS laptops, `pmset -b sleep 0` is recommended (disables idle sleep on the battery profile).
+- **`scripts/kimi-whisper-safe.sh`** — optional dependencies `ffmpeg` + `openai-whisper` (Python package), not included in the base Template installation. The Script checks for `ffprobe`/`whisper` in PATH and exits with a clear error if they are missing — install as needed.
 
 ## How to Check
 

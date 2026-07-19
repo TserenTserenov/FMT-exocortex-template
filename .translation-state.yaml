@@ -1,4 +1,9 @@
-files_translated: []
-last_run_utc: '2026-07-17T04:55:11Z'
-last_synced_sha: 917d9502276224ba16c3d65e1d4383cd2cb99b8c
+files_translated:
+- docs/KIMI-SETUP.md
+- docs/PLATFORM-COMPAT.md
+- docs/roles-catalog.md
+- docs/scripts-catalog.md
+- docs/skills-catalog.md
+last_run_utc: '2026-07-19T04:00:48Z'
+last_synced_sha: b08403db8f2b2eef626749166bbdb9e235c27cf2
 schema_version: 1
