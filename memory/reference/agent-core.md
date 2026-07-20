@@ -47,6 +47,8 @@ git diff --cached --name-only
 
 ## State-Transition Gate — cross-axis (CLAUDE.md Pre-action Gates)
 
+> Этот раздел — не восстановление из M2-слима (правило появилось позже, WP-457, и в дo-слимовой версии CLAUDE.md его не было). Источник — `memory/protocol-open.md` (актуальная версия), продублировано сюда как элаборация ссылки «cross-axis → agent-core.md» из CLAUDE.md.
+
 Модель осей — `archive/wp-contexts/WP-457/CONCEPT-user-states.md §5` (в авторском governance-репо). Если действие затрагивает несколько осей одновременно (permission/belonging/engagement/mastery) — фиксировать переход как `provisional` до прохождения ArchGate (Ф9), не выбирать одну ось произвольно.
 
 ## Status Reporting — командный режим и fail-safe (CLAUDE.md SYNC-CORE)
@@ -86,4 +88,4 @@ agent_status_update(agent="claude-code", status=working, task="WP-X фаза", f
 
 ## Источник
 
-Восстановлено из `git show fee0f85^:CLAUDE.md` (родительский коммит перед M2-слимом 2026-07-16, WP-7 HOTBUDGET-M2). Коммит `fee0f85` перенёс слим-версии в CLAUDE.md, но не создал этот файл-приёмник — issue #283.
+Большая часть содержимого восстановлена из `git show fee0f85^:CLAUDE.md` (родительский коммит перед M2-слимом 2026-07-16, WP-7 HOTBUDGET-M2) — Pull-on-Touch, Git Staging, Status Reporting, WP-REGISTRY Naming, Calendar Events, Code Style. Коммит `fee0f85` перенёс слим-версии в CLAUDE.md, но не создал этот файл-приёмник — issue #283. Раздел State-Transition Gate — отдельный источник, см. пометку внутри раздела.
