@@ -80,6 +80,14 @@ hash_file() {
     sha256sum "$1" 2>/dev/null | cut -d' ' -f1
 }
 
+# sed_escape_replacement STR — экранирует &, | и \ для безопасной подстановки
+# STR как replacement в `sed s|...|STR|` (issue #269 verify-фикс). Без этого
+# значение из .exocortex.env, содержащее & (sed: «весь мэтч») или | (наш
+# разделитель) тихо портит подстановку вместо явной ошибки.
+sed_escape_replacement() {
+    printf '%s' "$1" | sed -e 's/[\&|]/\\&/g'
+}
+
 # substitute_claude_placeholders SRC DST — копирует SRC в DST с подставленными
 # {{PLACEHOLDER}} (issue #269). setup.sh подставляет их в workspace/CLAUDE.md И
 # в .claude.md.base при установке; update.sh раньше копировал upstream-файл в
@@ -107,16 +115,16 @@ substitute_claude_placeholders() {
     done < "$env_file"
 
     sed_inplace \
-        -e "s|{{GITHUB_USER}}|${SUBST_GITHUB_USER:-}|g" \
-        -e "s|{{WORKSPACE_DIR}}|${SUBST_WORKSPACE_DIR:-$WORKSPACE_DIR}|g" \
-        -e "s|{{CLAUDE_PATH}}|${SUBST_CLAUDE_PATH:-}|g" \
-        -e "s|{{CLAUDE_PROJECT_SLUG}}|${SUBST_CLAUDE_PROJECT_SLUG:-$CLAUDE_PROJECT_SLUG}|g" \
-        -e "s|{{TIMEZONE_HOUR}}|${SUBST_TIMEZONE_HOUR:-}|g" \
-        -e "s|{{TIMEZONE_DESC}}|${SUBST_TIMEZONE_DESC:-}|g" \
-        -e "s|{{HOME_DIR}}|${SUBST_HOME_DIR:-$HOME}|g" \
-        -e "s|{{GOVERNANCE_REPO}}|${SUBST_GOVERNANCE_REPO:-}|g" \
-        -e "s|{{IWE_TEMPLATE}}|${SUBST_IWE_TEMPLATE:-$SCRIPT_DIR}|g" \
-        -e "s|{{IWE_RUNTIME}}|${SUBST_IWE_RUNTIME:-}|g" \
+        -e "s|{{GITHUB_USER}}|$(sed_escape_replacement "${SUBST_GITHUB_USER:-}")|g" \
+        -e "s|{{WORKSPACE_DIR}}|$(sed_escape_replacement "${SUBST_WORKSPACE_DIR:-$WORKSPACE_DIR}")|g" \
+        -e "s|{{CLAUDE_PATH}}|$(sed_escape_replacement "${SUBST_CLAUDE_PATH:-}")|g" \
+        -e "s|{{CLAUDE_PROJECT_SLUG}}|$(sed_escape_replacement "${SUBST_CLAUDE_PROJECT_SLUG:-$CLAUDE_PROJECT_SLUG}")|g" \
+        -e "s|{{TIMEZONE_HOUR}}|$(sed_escape_replacement "${SUBST_TIMEZONE_HOUR:-}")|g" \
+        -e "s|{{TIMEZONE_DESC}}|$(sed_escape_replacement "${SUBST_TIMEZONE_DESC:-}")|g" \
+        -e "s|{{HOME_DIR}}|$(sed_escape_replacement "${SUBST_HOME_DIR:-$HOME}")|g" \
+        -e "s|{{GOVERNANCE_REPO}}|$(sed_escape_replacement "${SUBST_GOVERNANCE_REPO:-}")|g" \
+        -e "s|{{IWE_TEMPLATE}}|$(sed_escape_replacement "${SUBST_IWE_TEMPLATE:-$SCRIPT_DIR}")|g" \
+        -e "s|{{IWE_RUNTIME}}|$(sed_escape_replacement "${SUBST_IWE_RUNTIME:-}")|g" \
         "$dst"
 }
 
@@ -936,6 +944,10 @@ CLAUDE_UPDATED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     if [ "$f" = "CLAUDE.md" ]; then
         # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+        # WS_NEW уже подставлен (issue #269) — Step 5 выше записал substituted-версию
+        # в $SCRIPT_DIR/CLAUDE.md через substitute_claude_placeholders(); повторный
+        # вызов здесь не нужен и был бы избыточен. Это зависимость от порядка
+        # выполнения циклов, не самодостаточный код — не переставлять Step 5/6 местами.
         WS_BASE="$WORKSPACE_DIR/.claude.md.base"
         WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
         WS_NEW="$SCRIPT_DIR/CLAUDE.md"
