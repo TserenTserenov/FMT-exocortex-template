@@ -89,12 +89,13 @@ if [ ! -d "$IWE_ROOT" ]; then
     exit 2
 fi
 
-# Baseline живёт в governance-репо (New-files guard: коммит требует тега
-# [allow:current]). Путь абсолютный, от IWE_ROOT (не от SCRIPT_DIR — тот
-# перезаписывается iwe-env-bootstrap.sh на своё расположение при source выше;
-# вычислен ПОСЛЕ парсинга аргументов, чтобы --root учитывался).
+# Baseline — локальный runtime-счётчик, не пилот-читаемый артефакт и не в git
+# (2026-07-20: current/ зарезервирована под ежедневное чтение пилотом). Путь
+# абсолютный, от IWE_ROOT (не от SCRIPT_DIR — тот перезаписывается
+# iwe-env-bootstrap.sh на своё расположение при source выше; вычислен ПОСЛЕ
+# парсинга аргументов, чтобы --root учитывался).
 REPO_DIR="${IWE_DS_MY_STRATEGY:-$IWE_ROOT/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
-BASELINE_FILE="$REPO_DIR/current/backup-baseline.json"
+BASELINE_FILE="$REPO_DIR/.state/backup-baseline.json"
 BASELINE_THRESHOLD_PCT=80
 ICLOUD_DIR="$IWE_ICLOUD_BACKUP_DIR"
 
@@ -162,25 +163,13 @@ reset_baseline() {
         fi
     fi
 
+    mkdir -p "$(dirname "$BASELINE_FILE")"
     if ! python3 -c "import json, datetime; json.dump({'file_count': $file_count, 'baseline_date': datetime.date.today().isoformat()}, open('$BASELINE_FILE', 'w'), indent=2)"; then
         crit "Не удалось записать baseline-файл $BASELINE_FILE"
         return 1
     fi
 
-    if ! git -C "$REPO_DIR" add -- current/backup-baseline.json; then
-        crit "git add провалился для $BASELINE_FILE"
-        return 1
-    fi
-    if ! git -C "$REPO_DIR" commit -m "chore(backup): reset baseline to $file_count files [allow:current]" -- current/backup-baseline.json; then
-        crit "git commit провалился для $BASELINE_FILE"
-        return 1
-    fi
-    if ! git -C "$REPO_DIR" push; then
-        crit "git push провалился для baseline-коммита — закоммичено локально, не отправлено"
-        return 1
-    fi
-
-    pass "Baseline установлен: $file_count файлов ($(basename "$latest")), закоммичено и запушено"
+    pass "Baseline установлен: $file_count файлов ($(basename "$latest")), записан в $BASELINE_FILE"
     return 0
 }
 
