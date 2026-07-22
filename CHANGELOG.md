@@ -110,7 +110,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-07-20
+## [0.36.1] — 2026-07-22
 
 ### Added
 
