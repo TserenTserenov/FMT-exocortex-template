@@ -22,7 +22,8 @@ set -euo pipefail
 # === Defaults ===
 PROTOCOL=""
 TASK_ID=""
-MODEL="${IWE_DEFAULT_MODEL:-sonnet}"
+MODEL="${IWE_DEFAULT_MODEL:-medium}"
+PROVIDER="${IWE_AGENT_PROVIDER:-claude}"
 WORKDIR="${IWE_DISPATCHER_WORKDIR:-/tmp/iwe-headless}"
 DRY_RUN=0
 STATE_DIR="${IWE_STATE_DIR:-$HOME/.iwe/state}"
@@ -35,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --protocol)  PROTOCOL="$2"; shift 2 ;;
     --task)      TASK_ID="$2"; shift 2 ;;
     --model)     MODEL="$2"; shift 2 ;;
+    --provider)  PROVIDER="$2"; shift 2 ;;
     --workdir)   WORKDIR="$2"; shift 2 ;;
     --dry-run)   DRY_RUN=1; shift ;;
     --help|-h)
@@ -64,6 +66,7 @@ export AGENT_SESSION_ID
 export CLAUDE_TASK_ID="${TASK_ID}"  # CC-совместимость для agent-trace-recorder.sh
 export AGENT_TASK_ID="${TASK_ID}"
 export AGENT_MODEL_ID="${MODEL}"
+export IWE_AGENT_PROVIDER="$PROVIDER"
 export IWE_STATE_DIR="${STATE_DIR}"
 
 # === Write session env file (совместимость с хуками) ===

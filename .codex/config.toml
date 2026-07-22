@@ -1,0 +1,15 @@
+# Project-scoped Codex configuration for IWE.
+# Codex loads this file only after the repository is marked as trusted.
+
+[features]
+hooks = true
+memories = true
+
+[memories]
+generate_memories = true
+use_memories = true
+
+[mcp_servers.iwe-knowledge]
+enabled = true
+required = false
+url = "https://mcp.aisystant.com/mcp"

@@ -58,6 +58,7 @@ ENV_FILE="$HOME/.config/aist/env"
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+AGENT_EXEC="${IWE_AGENT_EXEC:-${IWE_TEMPLATE:-$WORKSPACE/FMT-exocortex-template}/scripts/iwe-agent-exec.sh}"
 
 # issue #17: load NOTIFY_SH_PATH from params.yaml if not already set in environment
 if [ -z "${NOTIFY_SH_PATH:-}" ]; then
@@ -161,8 +162,9 @@ $extra_args"
     cd "$WORKSPACE"
 
     # Запуск AI CLI с промптом
-    "$AI_CLI" $AI_CLI_EXTRA_FLAGS \
-        $AI_CLI_PROMPT_FLAG "$prompt" \
+    printf '%s' "$prompt" | IWE_AGENT_WORKDIR="$WORKSPACE" IWE_CLAUDE_BIN="$AI_CLI" \
+        IWE_CLAUDE_EXTRA_FLAGS="$AI_CLI_EXTRA_FLAGS" \
+        bash "$AGENT_EXEC" \
         >> "$LOG_FILE" 2>&1
 
     log "Completed process: $command_file"

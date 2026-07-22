@@ -52,6 +52,7 @@ else
     CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime должен был подставить
 fi
 CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
+AGENT_EXEC="${IWE_AGENT_EXEC:-${IWE_TEMPLATE:-$WORKSPACE/FMT-exocortex-template}/scripts/iwe-agent-exec.sh}"
 
 # macOS не имеет GNU timeout — используем perl fallback
 if ! command -v timeout &>/dev/null; then
@@ -158,17 +159,15 @@ ${prompt}"
 
     # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
-    local model_args=()
     if [ -n "$model_override" ]; then
-        model_args=(--model "$model_override")
         log "Model override: $model_override"
     fi
     # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
     # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
-    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
-        "${model_args[@]}" \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
-        -p "$prompt" \
+    printf '%s' "$prompt" | IWE_AGENT_WORKDIR="$WORKSPACE" \
+        IWE_AGENT_MODEL="$model_override" IWE_CLAUDE_BIN="$CLAUDE_PATH" \
+        IWE_CLAUDE_EXTRA_FLAGS="--allowedTools Read,Write,Edit,Glob,Grep,Bash" \
+        timeout "$CLAUDE_TIMEOUT" bash "$AGENT_EXEC" \
         >> "$LOG_FILE" 2>&1 || rc=$?
 
     if [ $rc -eq 124 ]; then
@@ -267,7 +266,7 @@ case "$1" in
 
         if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
             log "Strategy day ($STRATEGY_DAY_NAME): running session prep"
-            run_claude "session-prep" "claude-sonnet-4-6"
+            run_claude "session-prep" "medium"
             notify_telegram "session-prep"
         else
             # Canonical Day Open pipeline: deterministic scaffold (reads priorities.yaml,
@@ -280,7 +279,7 @@ case "$1" in
                 log "Morning: Day Open pipeline OK (scaffold + llm-fill)"
             else
                 log "WARN: Day Open pipeline unavailable/failed — fallback to free-form day-plan prompt"
-                run_claude "day-plan" "claude-sonnet-4-6"
+                run_claude "day-plan" "medium"
                 notify_telegram "day-plan"
             fi
         fi
@@ -297,7 +296,7 @@ case "$1" in
             exit 0
         fi
         log "Sunday: running week review"
-        run_claude "week-review" "claude-opus-4-7"
+        run_claude "week-review" "high"
         # Fallback push for Knowledge Index (week-review creates a post there)
         # KI_REPO may not exist for all users — guard with [ -d ]
         KI_REPO="$HOME/IWE/DS-Knowledge-Index"
@@ -308,12 +307,12 @@ case "$1" in
         ;;
     "session-prep")
         log "Manual: running session prep"
-        run_claude "session-prep" "claude-sonnet-4-6"
+        run_claude "session-prep" "medium"
         notify_telegram "session-prep"
         ;;
     "day-plan")
         log "Manual: running day plan"
-        run_claude "day-plan" "claude-sonnet-4-6"
+        run_claude "day-plan" "medium"
         notify_telegram "day-plan"
         ;;
     "note-review")
@@ -327,7 +326,7 @@ case "$1" in
         BOLD_NEW_BEFORE=$(grep -vc '🔄' <(grep '^\*\*' "$FLEETING" 2>/dev/null) 2>/dev/null || true); BOLD_NEW_BEFORE=${BOLD_NEW_BEFORE:-0}
         log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄)"
 
-        run_claude "note-review" "claude-haiku-4-5-20251001"
+        run_claude "note-review" "low"
 
         # Canary: count bold notes after (needs to be visible for alert at line ~274)
         BOLD_AFTER=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || true); BOLD_AFTER=${BOLD_AFTER:-0}
@@ -374,7 +373,7 @@ case "$1" in
         ;;
     "day-close")
         log "Manual: running day close"
-        run_claude "day-close" "claude-sonnet-4-6"
+        run_claude "day-close" "medium"
         notify_telegram "day-close"
         ;;
     "strategy-session")

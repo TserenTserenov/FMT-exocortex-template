@@ -3,6 +3,237 @@
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
+      "path": ".agents/skills/SKILL-INDEX.yaml"
+    },
+    {
+      "path": ".agents/skills/_template/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/agent-fault/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/apply-captures/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/archgate/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/artifactor/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/audit-docs/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/audit-installation/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/author-mode/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/bottleneck-pick/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/check-secret/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/check-secret/check.sh"
+    },
+    {
+      "path": ".agents/skills/consent/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/day-close/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/day-close/day-close-details.md"
+    },
+    {
+      "path": ".agents/skills/day-close/day-close/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/day-open/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/day-open/day-open-details.md"
+    },
+    {
+      "path": ".agents/skills/day-open/templates.md"
+    },
+    {
+      "path": ".agents/skills/decompose/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/diagnose/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/discovery-session/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/extend/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/fpf/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/integration-gate/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/iwe-bug-report/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/iwe-restore/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/iwe-rules-review/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/iwe-update/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/ke/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/kimi-peer-writer/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/lesson-close/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/local-llm/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/month-close/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/org-dev/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/org-dev/test_skill.sh"
+    },
+    {
+      "path": ".agents/skills/pack-creator/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/pack-creator/test_guard.sh"
+    },
+    {
+      "path": ".agents/skills/pack-new/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/peer-conversation/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/personal-guide-render/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/personal-guide-render/templates/reflection-template.md"
+    },
+    {
+      "path": ".agents/skills/personal-guide-start/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/platform-bottleneck/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/residency-gate/__init__.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/lib/__init__.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/lib/consent.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/lib/parser.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/lib/state.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/pre-grant.yaml"
+    },
+    {
+      "path": ".agents/skills/residency-gate/residency-gate.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/tests/test_parser.py"
+    },
+    {
+      "path": ".agents/skills/residency-gate/tests/test_pre_grant.py"
+    },
+    {
+      "path": ".agents/skills/restore-exocortex/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/run-protocol/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/setup-wakatime/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/skill-creator/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/skill-creator/assets/skill-scaffold-full.md"
+    },
+    {
+      "path": ".agents/skills/skill-creator/assets/skill-scaffold-minimal.md"
+    },
+    {
+      "path": ".agents/skills/skill-creator/scripts/batch-fix-skills.py"
+    },
+    {
+      "path": ".agents/skills/skill-creator/scripts/content-audit.sh"
+    },
+    {
+      "path": ".agents/skills/skill-creator/scripts/scaffold-init.sh"
+    },
+    {
+      "path": ".agents/skills/skill-creator/scripts/verify-skill.sh"
+    },
+    {
+      "path": ".agents/skills/strategy-session/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/think/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/transcribe/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/vdv/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/vdv/test_cases.md"
+    },
+    {
+      "path": ".agents/skills/verify/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/verify/verify-fpf-subsection.md"
+    },
+    {
+      "path": ".agents/skills/verify/verify-pack-adequacy-subsection.md"
+    },
+    {
+      "path": ".agents/skills/verify/verify-pedagogy-subsection.md"
+    },
+    {
+      "path": ".agents/skills/w-reflection/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/week-close-pilot/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/week-close/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/week-close/week-close/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/wp-new/SKILL.md"
+    },
+    {
       "path": ".claude/agents/wp-sync-actualizer.md"
     },
     {
@@ -427,6 +658,15 @@
     },
     {
       "path": ".claude/templates/drr-template.md"
+    },
+    {
+      "path": ".codex/config.toml"
+    },
+    {
+      "path": ".codex/hooks.json"
+    },
+    {
+      "path": ".codex/hooks/iwe-hook-adapter.py"
     },
     {
       "path": ".githooks/pre-commit"
@@ -1272,6 +1512,9 @@
       "path": "scripts/close-wp.sh"
     },
     {
+      "path": "scripts/codex-headless-adapter.sh"
+    },
+    {
       "path": "scripts/content-filter-apply.py"
     },
     {
@@ -1356,7 +1599,13 @@
       "path": "scripts/hot-files.list"
     },
     {
+      "path": "scripts/install-codex-runtime.sh"
+    },
+    {
       "path": "scripts/iwe-agent-dispatcher.py"
+    },
+    {
+      "path": "scripts/iwe-agent-exec.sh"
     },
     {
       "path": "scripts/iwe-audit.sh"
@@ -1390,6 +1639,9 @@
     },
     {
       "path": "scripts/iwe-w-reflection.sh"
+    },
+    {
+      "path": "scripts/iwe_agent_backend.py"
     },
     {
       "path": "scripts/ke-classify.sh"
@@ -1515,6 +1767,9 @@
       "path": "scripts/sync-agent-instructions.sh"
     },
     {
+      "path": "scripts/sync-codex-skills.sh"
+    },
+    {
       "path": "scripts/sync-communication-style.py"
     },
     {
@@ -1525,6 +1780,9 @@
     },
     {
       "path": "scripts/sync_feedback_to_memory.py"
+    },
+    {
+      "path": "scripts/test-agent-backends.sh"
     },
     {
       "path": "scripts/test-route-task.sh"

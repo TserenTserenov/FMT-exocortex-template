@@ -38,6 +38,8 @@ import sys
 import time
 from pathlib import Path
 
+from iwe_agent_backend import invoke as invoke_agent
+
 # === Конфигурация (можно переопределить через env vars или CLI args) ===
 GOV_REPO_URL = os.environ.get("IWE_DISPATCHER_REPO_URL", "")  # обязательно задать через env
 GOV_BRANCH = os.environ.get("IWE_DISPATCHER_REPO_BRANCH", "main")
@@ -454,19 +456,9 @@ def build_prompt(task_path: Path, repo_dir: Path) -> str:
     return full_prompt
 
 
-def invoke_claude(prompt: str, model: str) -> tuple[bool, str]:
-    """Возвращает (ok, output)."""
-    cmd = ["claude", "-p", prompt, "--model", model, "--output-format", "text"]
-    try:
-        r = subprocess.run(
-            cmd, capture_output=True, text=True,
-            timeout=CLAUDE_TIMEOUT_SEC,
-        )
-        return (r.returncode == 0), r.stdout + ("\n" + r.stderr if r.stderr else "")
-    except subprocess.TimeoutExpired:
-        return False, f"TIMEOUT after {CLAUDE_TIMEOUT_SEC}s"
-    except FileNotFoundError:
-        return False, "claude CLI not found in PATH"
+def invoke_claude(prompt: str, model: str, cwd: Path | None = None) -> tuple[bool, str]:
+    """Backward-compatible name for provider-neutral invocation."""
+    return invoke_agent(prompt, model, cwd=cwd, timeout=CLAUDE_TIMEOUT_SEC)
 
 
 def write_result(repo_dir: Path, task_id: str, fm: dict,
@@ -531,7 +523,7 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
         [task_path])
 
     # Invoke claude
-    ok, output = invoke_claude(prompt, model)
+    ok, output = invoke_claude(prompt, model, repo_dir)
     finished_at = now_utc()
     log(f"claude done ok={ok} duration={(finished_at - started_at).total_seconds():.0f}s")
 
@@ -848,7 +840,7 @@ def _process_session_turn(
     _heartbeat_ping(db_conn, session_id)
 
     started_at = now_utc()
-    ok, output = invoke_claude(prompt, MODEL_DEFAULT)
+    ok, output = invoke_claude(prompt, MODEL_DEFAULT, repo_dir)
     finished_at = now_utc()
     log(f"claude done ok={ok} dur={(finished_at-started_at).total_seconds():.0f}s")
 

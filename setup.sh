@@ -3,7 +3,7 @@
 # Configures a forked FMT-exocortex-template: placeholders, memory, launchd, DS-strategy
 #
 # Usage:
-#   bash setup.sh          # Полная установка (git + GitHub CLI + Claude Code + автоматизация)
+#   bash setup.sh          # Полная установка (git + GitHub CLI + AI-агент + автоматизация)
 #   bash setup.sh --core   # Минимальная установка (только git, без сети)
 #
 set -e
@@ -204,30 +204,37 @@ check_command "jq" "jq" "brew install jq (Linux: apt install jq / dnf install jq
 if $CORE_ONLY; then
     echo ""
     echo "  Режим --core: проверяются только обязательные зависимости (git)."
-    echo "  GitHub CLI, Node.js, Claude Code — не требуются."
+    echo "  GitHub CLI, Node.js и AI CLI — не требуются."
 else
-    # В CI-режиме (SETUP_CI=1) node/npm/claude — необязательны: Test 10 проверяет delivery
+    # В CI-режиме (SETUP_CI=1) node/npm/AI CLI — необязательны: Test 10 проверяет delivery
     # и role-installation, а не наличие runtime-инструментов на машине.
     # Паттерн уже установлен для gh auth ниже (строка с SETUP_CI).
     _TOOL_REQUIRED="${SETUP_CI:+false}"; _TOOL_REQUIRED="${_TOOL_REQUIRED:-true}"
     check_command "gh" "GitHub CLI" "brew install gh" "$_TOOL_REQUIRED"
     check_command "node" "Node.js" "brew install node (or https://nodejs.org)" "$_TOOL_REQUIRED"
     check_command "npm" "npm" "Comes with Node.js" "$_TOOL_REQUIRED"
-    # Multi-agent support: Claude Code, Kimi Code, Hermes — любой из них подходит
-    AI_CLI_CANDIDATES="${AI_CLI_CANDIDATES:-claude kimi-code kimi hermes}"
-    _AGENT_FOUND=false
+    # Multi-agent support: любой из перечисленных CLI подходит для интерактивной работы.
+    # Порядок определяет приоритет автообнаружения; можно переопределить через окружение.
+    AI_CLI_CANDIDATES="${AI_CLI_CANDIDATES:-claude codex kimi-code kimi hermes}"
+    AI_CLI_FOUND=false
+    AI_CLI_COMMAND=""
+    AI_CLI_VERSION=""
     for _agent_cmd in $AI_CLI_CANDIDATES; do
         if command -v "$_agent_cmd" >/dev/null 2>&1; then
-            echo "  ✓ AI Agent: $_agent_cmd ($(command -v "$_agent_cmd"))"
-            _AGENT_FOUND=true
+            AI_CLI_COMMAND="$_agent_cmd"
+            AI_CLI_VERSION=$("$_agent_cmd" --version 2>&1 | tail -1 || true)
+            echo "  ✓ AI Agent: $AI_CLI_COMMAND ($(command -v "$AI_CLI_COMMAND"))"
+            [ -n "$AI_CLI_VERSION" ] && echo "    Version: $AI_CLI_VERSION"
+            AI_CLI_FOUND=true
             break
         fi
     done
-    if ! $_AGENT_FOUND; then
+    if ! $AI_CLI_FOUND; then
         if [ "${_TOOL_REQUIRED:-true}" = "true" ]; then
             echo "  ✗ AI Agent: не найден"
             echo "    Установи один из поддерживаемых агентов:"
             echo "      Claude Code: npm install -g @anthropic-ai/claude-code"
+            echo "      Codex:       npm install -g @openai/codex"
             echo "      Kimi Code:   расширение Kimi Code в VS Code"
             echo "      Hermes:      см. https://hermes-agent.nousresearch.com/"
             echo "    Или задай AI_CLI_CANDIDATES=<команда-агента> в окружении"
@@ -280,12 +287,14 @@ else
     WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 
     if $CORE_ONLY; then
-        # Core: используем defaults, не спрашиваем Claude-специфичные параметры
+        # Core: используем defaults, не спрашиваем параметры legacy Claude-автоматизации.
         CLAUDE_PATH="${AI_CLI:-claude}"
         TIMEZONE_HOUR="4"
         TIMEZONE_DESC="4:00 UTC"
     else
-        read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
+        # CLAUDE_PATH остаётся отдельным legacy-контрактом существующих strategist runners.
+        # Не подменяем его AI_CLI_COMMAND: Codex требует другой headless-адаптер и аргументы.
+        read -p "Claude CLI path for legacy automation [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
         CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
 
         read -p "Strategist launch hour (UTC, 0-23) [4]: " TIMEZONE_HOUR
@@ -330,7 +339,10 @@ echo "  Workspace:      $WORKSPACE_DIR"
 if $CORE_ONLY; then
     echo "  Mode:           core (offline)"
 else
-    echo "  Claude path:    $CLAUDE_PATH"
+    if [ -n "${AI_CLI_COMMAND:-}" ]; then
+        echo "  AI CLI:         $AI_CLI_COMMAND${AI_CLI_VERSION:+ ($AI_CLI_VERSION)}"
+    fi
+    echo "  Claude path:    $CLAUDE_PATH (legacy automation)"
     echo "  Schedule hour:  $TIMEZONE_HOUR (UTC)"
     echo "  Time desc:      $TIMEZONE_DESC"
 fi
@@ -431,13 +443,14 @@ fi
 
 # (Repo rename removed — folder stays as FMT-exocortex-template)
 
-# === 2. Copy CLAUDE.md to workspace root (with substitution) ===
+# === 2. Copy agent instructions to workspace root (with substitution) ===
 # FMT/CLAUDE.md остаётся clean upstream (плейсхолдеры). В workspace/CLAUDE.md
 # плейсхолдеры подставляются (single-file substitution, не sed по дереву).
 # .base копии — substituted (для 3-way merge).
-echo "[2/6] Installing CLAUDE.md..."
+echo "[2/6] Installing CLAUDE.md and AGENTS.md..."
 if $DRY_RUN; then
     echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md (substituted)"
+    echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/AGENTS.md → $WORKSPACE_DIR/AGENTS.md (substituted)"
 else
     cp "$TEMPLATE_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
     sed_inplace \
@@ -456,6 +469,17 @@ else
     cp "$WORKSPACE_DIR/CLAUDE.md" "$WORKSPACE_DIR/.claude.md.base"
     cp "$WORKSPACE_DIR/CLAUDE.md" "$TEMPLATE_DIR/.claude.md.base"  # legacy compat for update.sh
     echo "  Copied to $WORKSPACE_DIR/CLAUDE.md (+ merge base, substituted)"
+
+    # Codex, Kimi and other AGENTS-compatible runtimes use the generated adapter.
+    cp "$TEMPLATE_DIR/AGENTS.md" "$WORKSPACE_DIR/AGENTS.md"
+    sed_inplace \
+        -e "s|{{WORKSPACE_DIR}}|$WORKSPACE_DIR|g" \
+        -e "s|{{HOME_DIR}}|$HOME_DIR|g" \
+        -e "s|{{GOVERNANCE_REPO}}|$GOVERNANCE_REPO|g" \
+        -e "s|{{IWE_TEMPLATE}}|$IWE_TEMPLATE_PATH|g" \
+        -e "s|{{IWE_RUNTIME}}|$IWE_RUNTIME_PATH|g" \
+        "$WORKSPACE_DIR/AGENTS.md"
+    echo "  Copied to $WORKSPACE_DIR/AGENTS.md (substituted)"
 fi
 
 # === 3. Copy memory to Claude projects directory ===
@@ -520,10 +544,11 @@ else
     fi
 fi
 
-# === 4b. Propagate skills, hooks, rules, lib, config, detectors, scripts, styles to workspace ===
-echo "[4b] Installing skills, hooks, rules, rules-lazy, lib, config, detectors, scripts, styles..."
+# === 4b. Propagate agent runtimes to workspace ===
+echo "[4b] Installing Claude and Codex runtime files..."
 if $DRY_RUN; then
     echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,rules-lazy,lib,config,detectors,scripts,agents,styles}/ → $WORKSPACE_DIR/.claude/"
+    echo "  [DRY RUN] Would copy .agents/skills/ and .codex/ → $WORKSPACE_DIR/"
 else
     mkdir -p "$WORKSPACE_DIR/.claude"
     # lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов
@@ -541,6 +566,7 @@ else
         cp "$TEMPLATE_DIR/.claude/settings.json" "$WORKSPACE_DIR/.claude/settings.json"
         echo "  ✓ .claude/settings.json"
     fi
+    bash "$TEMPLATE_DIR/scripts/install-codex-runtime.sh" "$WORKSPACE_DIR"
 fi
 
 # Resolves IWE_TIER: env var → ~/.iwe/config.yaml → default T1
@@ -853,6 +879,7 @@ else
     echo ""
     echo "Verify installation:"
     echo "  ✓ CLAUDE.md:   $WORKSPACE_DIR/CLAUDE.md"
+    echo "  ✓ AGENTS.md:   $WORKSPACE_DIR/AGENTS.md"
     echo "  ✓ Memory:      $CLAUDE_MEMORY_DIR/ ($(ls "$CLAUDE_MEMORY_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ') files)"
     echo "  ✓ Symlink:     $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
     echo "  ✓ DS-strategy: $MY_STRATEGY_DIR/"
@@ -865,8 +892,8 @@ else
         echo "  2. Запустите ваш AI CLI (Claude Code, Codex, Aider, Continue.dev и др.)"
         echo "  3. Скажите: «Проведём первую стратегическую сессию»"
     else
-        echo "  2. claude"
-        echo "  3. Ask Claude: «Проведём первую стратегическую сессию»"
+        echo "  2. ${AI_CLI_COMMAND:-claude}"
+        echo "  3. Скажите агенту: «Проведём первую стратегическую сессию»"
         echo ""
         echo "Strategist will run automatically:"
         echo "  - Morning ($TIMEZONE_DESC): strategy (Mon) / day-plan (Tue-Sun)"

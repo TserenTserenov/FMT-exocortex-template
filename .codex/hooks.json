@@ -1,0 +1,39 @@
+{
+  "description": "IWE lifecycle, safety, capture, protocol, and persistence hooks for Codex.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/iwe-hook-adapter.py\" SessionStart", "timeout": 30, "statusMessage": "Checking IWE session prerequisites"}]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/iwe-hook-adapter.py\" UserPromptSubmit", "timeout": 30, "statusMessage": "Loading IWE prompt context"}]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*|.*",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/iwe-hook-adapter.py\" PreToolUse", "timeout": 150, "statusMessage": "Applying IWE safety policies"}]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*|.*",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/iwe-hook-adapter.py\" PostToolUse", "timeout": 150, "statusMessage": "Updating IWE derived state"}]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/iwe-hook-adapter.py\" PreCompact", "timeout": 30, "statusMessage": "Checkpointing IWE context"}]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/iwe-hook-adapter.py\" Stop", "timeout": 150, "statusMessage": "Running IWE completion gates"}]
+      }
+    ]
+  }
+}

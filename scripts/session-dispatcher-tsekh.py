@@ -16,6 +16,9 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
+
+from iwe_agent_backend import invoke as invoke_agent
 
 # ---------------------------------------------------------------------------
 # Config from environment
@@ -314,7 +317,8 @@ def build_prompt(session_id: str, tg_chat_id: str, turns: list[dict],
 
 
 def invoke_claude(prompt: str) -> tuple[bool, str]:
-    if not os.path.exists(CLAUDE_BIN):
+    provider = os.environ.get("IWE_AGENT_PROVIDER", "claude").lower()
+    if provider == "claude" and not os.path.exists(CLAUDE_BIN):
         log(f"claude not found at {CLAUDE_BIN}", "ERROR")
         return False, ""
     env = os.environ.copy()
@@ -330,21 +334,24 @@ def invoke_claude(prompt: str) -> tuple[bool, str]:
     # Ensure ~/.local/bin is in PATH (needed on NixOS where systemd has minimal PATH)
     local_bin = os.path.expanduser("~/.local/bin")
     env["PATH"] = local_bin + ":" + env.get("PATH", "/usr/local/bin:/usr/bin:/bin")
-    cmd = [CLAUDE_BIN, "-p", prompt]
+    old_bin = os.environ.get("IWE_CLAUDE_BIN")
+    old_key = os.environ.get("ANTHROPIC_API_KEY")
+    os.environ["IWE_CLAUDE_BIN"] = CLAUDE_BIN
+    if env.get("ANTHROPIC_API_KEY"):
+        os.environ["ANTHROPIC_API_KEY"] = env["ANTHROPIC_API_KEY"]
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True, text=True, timeout=270, env=env,
-            stdin=subprocess.DEVNULL,
-        )
-        ok = result.returncode == 0
-        return ok, result.stdout + result.stderr
-    except subprocess.TimeoutExpired:
-        log("claude timed out (270s)", "ERROR")
-        return False, ""
-    except Exception as exc:
-        log(f"claude error: {exc}", "ERROR")
-        return False, ""
+        return invoke_agent(prompt, os.environ.get("IWE_SESSION_MODEL", "medium"),
+                            cwd=Path(os.environ.get("IWE_WORKSPACE", os.getcwd())),
+                            timeout=270, provider=provider)
+    finally:
+        if old_bin is None:
+            os.environ.pop("IWE_CLAUDE_BIN", None)
+        else:
+            os.environ["IWE_CLAUDE_BIN"] = old_bin
+        if old_key is None:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+        else:
+            os.environ["ANTHROPIC_API_KEY"] = old_key
 
 
 def extract_tg_response(output: str) -> str:

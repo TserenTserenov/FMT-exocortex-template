@@ -36,7 +36,7 @@ mkdir -p "$TEST_ROOT" "$FAKE_HOME"
 # Fixture: fake "upstream" tree (what curl will serve)
 # ------------------------------------------------------------------
 UPSTREAM="$TEST_ROOT/upstream"
-mkdir -p "$UPSTREAM/.claude/hooks"
+mkdir -p "$UPSTREAM/.claude/hooks" "$UPSTREAM/.claude/lib"
 
 cat > "$UPSTREAM/CLAUDE.md" <<'EOF'
 # Template CLAUDE.md
@@ -50,6 +50,7 @@ cat > "$UPSTREAM/.claude/hooks/dummy-hook.sh" <<'EOF'
 #!/bin/bash
 echo "dummy hook v2"
 EOF
+cp "$(dirname "$SELF_DIR")/.claude/lib/frontmatter.sh" "$UPSTREAM/.claude/lib/frontmatter.sh"
 
 mkdir -p "$UPSTREAM/memory"
 cat > "$UPSTREAM/memory/dummy-memo.md" <<'EOF'
@@ -63,6 +64,7 @@ manifest = {
     'files': [
         {'path': 'CLAUDE.md'},
         {'path': '.claude/hooks/dummy-hook.sh'},
+        {'path': '.claude/lib/frontmatter.sh'},
         {'path': 'memory/dummy-memo.md'},
     ],
     'deprecated_files': [],
@@ -75,9 +77,10 @@ with open('$UPSTREAM/update-manifest.json', 'w') as f:
 # Fixture: SCRIPT_DIR (local FMT-exocortex-template copy) — "old" state
 # ------------------------------------------------------------------
 SCRIPT_DIR="$TEST_ROOT/repo/FMT-exocortex-template"
-mkdir -p "$SCRIPT_DIR/.claude/hooks" "$SCRIPT_DIR/memory"
+mkdir -p "$SCRIPT_DIR/.claude/hooks" "$SCRIPT_DIR/.claude/lib" "$SCRIPT_DIR/memory"
 cp "$UPDATE_SH_REAL" "$SCRIPT_DIR/update.sh"
 chmod +x "$SCRIPT_DIR/update.sh"
+cp "$(dirname "$SELF_DIR")/.claude/lib/frontmatter.sh" "$SCRIPT_DIR/.claude/lib/frontmatter.sh"
 
 cat > "$SCRIPT_DIR/CLAUDE.md" <<'EOF'
 # Template CLAUDE.md

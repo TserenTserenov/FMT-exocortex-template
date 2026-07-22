@@ -1,7 +1,7 @@
 <!-- AGENT-SPECIFIC-START -->
 <!--
-  Агент-специфичные блоки AGENTS.md (WP-394 Ф4.2).
-  НЕ синхронизируется из CLAUDE.md — у каждого агента своё.
+  Дополнительные блоки AGENTS.md (WP-394 Ф4.2).
+  НЕ синхронизируются из CLAUDE.md. Runtime-specific правила явно помечаются.
   Врезается скриптом scripts/sync-agent-instructions.sh после SYNC-CORE.
 -->
 
@@ -36,7 +36,15 @@ git commit -m "feat: description" --trailer "Co-Authored-By: Hermes <noreply@nou
 
 **Hermes Agent** — оркестратор в экосистеме IWE (РП392). Подключён к Aisystant MCP, работает через CLI/Telegram. Hermes НЕ заменяет Claude Code или Kimi Code в кодинге — он координирует, запоминает и даёт мобильный доступ.
 
-## IWE Instructions Level (Kimi headless)
+## Codex Runtime
+
+Codex использует этот `AGENTS.md` как постоянные проектные инструкции. При работе в Codex:
+
+- проектные skills искать в `.agents/skills/`; наличие одноимённого Claude skill в `.claude/skills/` не означает, что он доступен в Codex;
+- не считать slash-команды и hooks Claude Code доступными автоматически — использовать их Codex-эквиваленты, если они настроены в проекте;
+- если MCP Gateway или его инструменты блокировок недоступны, не имитировать вызов: проверить `git status`, ограничить правки файлами текущей задачи и сообщить о пересечении изменений.
+
+## Kimi Runtime — IWE Instructions Level (headless)
 
 # IWE workspace with 5000+ docs and multiple Packs — use experienced level.
 # Revisit if a new small repo (< 1000 docs) is added to {{HOME_DIR}}/IWE/.
@@ -52,9 +60,10 @@ get_instructions(level="experienced")
 This applies to all Kimi sessions: peer (via kimi-peer-adapter.sh) and standalone.
 Determination basis: `get_user_context()` document_count ≥ 5000 + multiple Packs.
 
-## Coordination Protocol (MCP Gateway)
+## Coordination Protocol (MCP Gateway, when available)
 
-> Для агентов с доступом к Local Gateway (Claude Code, Kimi). Hermes НЕ имеет MCP Gateway
+> Только для агентов, которым фактически доступны инструменты Local Gateway (обычно Claude Code и Kimi).
+> Codex следует этому протоколу лишь при наличии этих инструментов. Hermes НЕ имеет MCP Gateway
 > (`acquire_file_lock` / `release_file_lock`) — он использует `terminal` + `patch` напрямую,
 > а при конфликте на push сообщает пилоту.
 
