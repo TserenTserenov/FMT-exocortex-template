@@ -241,6 +241,21 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;
+            */*)
+                # issue найден /audit-installation smoke-test (2026-07-23): прямой
+                # запуск исполняемого скрипта по пути (без интерпретатора bash/sh/zsh
+                # первым словом) не матчился ни одним паттерном выше и проходил
+                # гейт необнаруженным. Тот же whitelist-принцип, что и для
+                # bash|sh|zsh <script> — только явно вычитанный read-only хелпер
+                # разрешён, остальное — block. Не покрывает вызовы git/rm/mv/... по
+                # полному пути (например /usr/bin/git) — это отдельная, более
+                # широкая дыра в этом же гейте, зафиксирована отдельно, не в этом фиксе.
+                WL_ABS="$HOME/IWE/.claude/scripts/load-extensions.sh"
+                case "$W0" in
+                    .claude/scripts/load-extensions.sh|"$WL_ABS") ;;
+                    *) block "$CMD (indirect execution under dry-run)" ;;
+                esac
+                ;;
             eval|source|.|xargs)
                 block "$CMD (indirect execution under dry-run)"
                 ;;

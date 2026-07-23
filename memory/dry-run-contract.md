@@ -86,6 +86,11 @@ sed -i*
 curl -X (POST|PUT|DELETE|PATCH) | curl --data | curl -d
 psql ... (INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)   # матчится по оригиналу (SQL в кавычках)
 bash|sh|zsh <script>              # indirect execution — block, КРОМЕ whitelist ниже (issue #264)
+<путь>/<script>                   # прямой запуск executable без bash/sh/zsh впереди —
+                                   # тот же whitelist, что и bash|sh|zsh (найдено при
+                                   # /audit-installation smoke-test, 2026-07-23: раньше
+                                   # не матчилось НИ ОДНИМ паттерном и проходило gate
+                                   # необнаруженным)
 eval|source|.|xargs               # indirect execution — payload неинспектируем после quote-strip
 
 Whitelist read-only helpers (issue #264) — разрешены под dry-run, т.к. write-путей
@@ -202,6 +207,11 @@ Subagent после прогона ритуала анализирует transcr
 - **Гарантия что ритуал работает корректно содержательно** (pas-fail logic). Это open-loop verification, не closed-loop. Smoke-тест проверяет инициируемость, не правильность.
 - **Покрытие тонких side-effects** — например, скилл может прочитать `/tmp` файл, в нём `mktemp` (создаёт временный файл, формально write). Хук таких не блокирует. Принцип: блокируем то, что меняет user-data, не temp-state.
 - **Защита от malicious extensions.** Контракт работает в условиях добросовестных пилотов. Если extension намеренно обходит хук (например, через `python -c 'open(...,"w")'`) — это вне модели угроз.
+
+## Известные ограничения matcher'а (не зафикшены, зафиксированы для будущего review)
+
+- **Полный путь к известной команде обходит её специфичную проверку.** `git`/`rm`/`mv`/`tee`/`sed`/`curl`/`psql` матчатся по первому слову фрагмента ровно как bareword (`git`, не `/usr/bin/git`). Вызов `/usr/bin/git commit` не матчит ветку `git)` и уходит в `*/*)` — там он получит грубую блокировку «indirect execution» (безопасно, просто ложное срабатывание), но это значит специфичная git-логика (allow read, block write-подкоманды) для full-path вызова не применяется. Не исправлено этим фиксом (2026-07-23) — требует отдельного review.
+- **Quoted-аргументы всегда блокируются, даже для whitelisted-скриптов.** Шаг 1 (quote-strip) заменяет ЛЮБОЙ `"..."`/`'...'` спан на `QSTR` ДО классификации — значит `bash "$IWE_SCRIPTS/day-close-prepare.sh"` теряет весь путь и матчит `*` (block), даже если бы путь был в whitelist. Whitelist реально работает только для голого нецитированного пути (как `load-extensions.sh` сейчас и вызывается). Не исправлено этим фиксом — требует пересмотра quote-strip логики с риском повторить false-positive из issue #237 п.4, если делать наспех.
 
 ## История
 
