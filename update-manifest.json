@@ -1152,6 +1152,9 @@
       "path": "scripts/check-script-collisions.sh"
     },
     {
+      "path": "scripts/check-seed-drift.sh"
+    },
+    {
       "path": "scripts/check-setup-update-parity.sh"
     },
     {
