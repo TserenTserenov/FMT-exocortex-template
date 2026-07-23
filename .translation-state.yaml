@@ -1,5 +1,7 @@
 files_translated:
-- docs/RELEASE-PROCESS.md
-last_run_utc: '2026-07-20T08:40:23Z'
-last_synced_sha: 1d83cb971f522ca35cfd0713ba4e95b96d2651c9
+- docs/roles-catalog.md
+- docs/scripts-catalog.md
+- docs/skills-catalog.md
+last_run_utc: '2026-07-23T06:58:32Z'
+last_synced_sha: e2eb552c0ad6084ace8054b04267f20e9e72578d
 schema_version: 1
