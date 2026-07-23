@@ -30,6 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # iwe-env-bootstrap.sh sets its own top-level SCRIPT_DIR when sourced below, clobbering
 # ours — save this script's own directory under a distinct name first (issue #262).
 TEMPLATE_SCRIPTS_DIR="$SCRIPT_DIR"
+source "$TEMPLATE_SCRIPTS_DIR/lib/common.sh"
 # Bootstrap sets IWE_ROOT/WORKSPACE_DIR/etc. It may be ABSENT on some hosts — tsekh-1's
 # extension sync does not copy .claude/lib/ — so source it only if present and never let
 # its absence abort the scaffold (the old `|| exit 1` killed every run on tsekh-1, which
@@ -614,8 +615,11 @@ render_iwe_status() {
   last_feedback_triage_log=$(ls -t "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/logs/feedback-triage"*.log 2>/dev/null | head -1 || echo "")
   # issue #261: старая маска ловила только legacy-метки (iwe.scheduler и т.п.), под которые
   # не попадают ни current per-role юниты, ни даже шаблонный com.exocortex.scheduler.plist.
+  # WP-5 Ubuntu-audit факт #4: launchctl unconditionally also meant Linux always saw this
+  # as false (launchctl doesn't exist there) — iwe_scheduler_active() (lib/common.sh)
+  # branches launchd/systemd by what's actually on PATH.
   local has_launchd_unit=false
-  if launchctl list 2>/dev/null | grep -qE "com\.(exocortex\.scheduler|strategist\.morning|strategist\.weekreview|extractor\.inbox-check)"; then
+  if iwe_scheduler_active; then
     has_launchd_unit=true
   fi
 
@@ -1020,7 +1024,10 @@ render_compact_dashboard() {
 
   # Светофор — критические позиции
   echo "**IWE за ночь:**"
-  echo "  Scheduler: $(launchctl list 2>/dev/null | grep -qE 'iwe\.(scheduler|feedback)' && echo '🟢' || echo '🔴 не запущен')"
+  # WP-5 Ubuntu-audit факт #4: this used the same pre-#261 legacy label regex as
+  # the OTHER launchctl check in this file (fixed above) — AND was unconditional
+  # launchctl, so Linux always read 🔴 regardless of the actual systemd timers.
+  echo "  Scheduler: $(iwe_scheduler_active && echo '🟢' || echo '🔴 не запущен')"
   local fpf_status fpf_fetch_ok
   # issue #241 (остаточная дыра): та же незащищённая git fetch, тот же класс зависания.
   # run_bounded не пробрасывает exit-код — результат передаём через маркер в stdout.

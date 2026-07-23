@@ -10,6 +10,41 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# WP-5 Ubuntu-audit факт #4: this used to write a macOS plist unconditionally
+# on any OS, then `launchctl load ... || true` swallowed the "command not
+# found" (launchctl doesn't exist on Linux) and printed "Installed" anyway —
+# a false success with no autostart actually configured.
+if [ "$(uname -s)" = "Linux" ]; then
+    UNIT_DIR="$HOME/.config/systemd/user"
+    mkdir -p "$UNIT_DIR"
+    cat > "$UNIT_DIR/iwe-hindsight.service" <<EOF
+[Unit]
+Description=IWE Hindsight (docker compose up -d)
+[Service]
+Type=oneshot
+WorkingDirectory=$SCRIPT_DIR
+Environment=OPENAI_API_KEY=${OPENAI_API_KEY:-}
+ExecStart=/bin/bash $SCRIPT_DIR/start.sh
+RemainAfterExit=yes
+[Install]
+WantedBy=default.target
+EOF
+    systemctl --user daemon-reload
+    systemctl --user enable iwe-hindsight.service
+    echo "Installed: $UNIT_DIR/iwe-hindsight.service"
+    echo "Hindsight will start automatically on next login (systemd --user)."
+    echo "To start now: systemctl --user start iwe-hindsight.service"
+    echo "To disable: systemctl --user disable --now iwe-hindsight.service"
+    exit 0
+fi
+
+if ! command -v launchctl >/dev/null 2>&1; then
+    echo "ERROR: neither launchctl (macOS) nor a recognized Linux systemd --user setup found." >&2
+    echo "Start Hindsight manually: bash $SCRIPT_DIR/start.sh" >&2
+    exit 1
+fi
+
 PLIST_NAME="com.iwe.hindsight.plist"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_NAME"
 

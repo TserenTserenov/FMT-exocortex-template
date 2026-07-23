@@ -5,7 +5,15 @@
 
 set -euo pipefail
 
-LOG_DIR="${HOME}/Library/Application Support/Code/logs"
+# WP-5 Ubuntu-audit факт #4: hardcoded to the macOS VS Code log path — on Linux
+# LOG_DIR silently didn't exist, `find` always returned nothing, and the main
+# loop below (find_latest_log empty → sleep 5 → continue) ran forever with no
+# signal that the watchdog was doing nothing at all.
+case "$(uname -s)" in
+  Darwin) LOG_DIR="${HOME}/Library/Application Support/Code/logs" ;;
+  Linux)  LOG_DIR="${HOME}/.config/Code/logs" ;;
+  *)      LOG_DIR="${HOME}/.config/Code/logs" ;;
+esac
 # Находим самый свежий лог-файл Kimi Code
 find_latest_log() {
   find "${LOG_DIR}" -name "7-Kimi Code*.log" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1
@@ -14,8 +22,17 @@ find_latest_log() {
 send_notification() {
   local title="$1"
   local message="$2"
-  osascript -e "display notification \"${message}\" with title \"${title}\" sound name \"Glass\"" 2>/dev/null || true
+  if command -v osascript >/dev/null 2>&1; then
+    osascript -e "display notification \"${message}\" with title \"${title}\" sound name \"Glass\"" 2>/dev/null || true
+  elif command -v notify-send >/dev/null 2>&1; then
+    notify-send "${title}" "${message}" 2>/dev/null || true
+  fi
 }
+
+if [ ! -d "${LOG_DIR}" ]; then
+  echo "kimi-compaction-watchdog: LOG_DIR not found ($LOG_DIR) — nothing to watch, exiting instead of looping silently forever." >&2
+  exit 1
+fi
 
 LAST_LOG=""
 LAST_POS=0

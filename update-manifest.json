@@ -1380,9 +1380,6 @@
       "path": "scripts/route-task.sh"
     },
     {
-      "path": "scripts/safe-pull.sh"
-    },
-    {
       "path": "scripts/script-promote.sh"
     },
     {

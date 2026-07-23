@@ -18,6 +18,7 @@ Install:
 """
 
 import json
+import shutil
 import subprocess
 import time
 from base64 import b64encode
@@ -129,9 +130,18 @@ def save_state(state: dict):
 
 
 def notify(title: str, message: str):
-    """Send macOS notification via osascript."""
-    script = f'display notification "{message}" with title "{title}" sound name "Purr"'
-    subprocess.run(["osascript", "-e", script], check=False)
+    """Send a desktop notification: osascript (macOS) or notify-send (Linux).
+
+    WP-5 Ubuntu-audit факт #4: subprocess.run(["osascript", ...], check=False)
+    still raises FileNotFoundError when the binary itself is missing —
+    check=False only suppresses a non-zero exit code, not a missing
+    executable — so this crashed every 5-minute launchd/cron tick on Linux.
+    """
+    if shutil.which("osascript"):
+        script = f'display notification "{message}" with title "{title}" sound name "Purr"'
+        subprocess.run(["osascript", "-e", script], check=False)
+    elif shutil.which("notify-send"):
+        subprocess.run(["notify-send", title, message], check=False)
 
 
 def main():

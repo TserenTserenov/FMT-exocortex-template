@@ -311,7 +311,7 @@ $DIAG"
 # Include git HEAD so that any new commits in repo invalidate the hash
 HEAD_HASH=$(cd "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" && git rev-parse HEAD 2>/dev/null || echo "no-git")
 INPUT_HASH_FILE="$IWE/.tmp/day-open-input-hash-$DATE.txt"
-INPUT_HASH=$( (cat "$SCAFFOLD_TEMP" "$WEEKPLAN_PATH" "$CALENDAR_OUT" 2>/dev/null; echo "$HEAD_HASH") | shasum -a 256 | awk '{print $1}' )
+INPUT_HASH=$( (cat "$SCAFFOLD_TEMP" "$WEEKPLAN_PATH" "$CALENDAR_OUT" 2>/dev/null; echo "$HEAD_HASH") | iwe_sha256 )
 if [ -f "$INPUT_HASH_FILE" ]; then
   PREV_HASH=$(cat "$INPUT_HASH_FILE")
   if [ "$PREV_HASH" = "$INPUT_HASH" ]; then

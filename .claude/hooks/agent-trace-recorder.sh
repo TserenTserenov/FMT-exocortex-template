@@ -106,7 +106,14 @@ case "$HOOK_EVENT" in
                 fi
 
                 # input_hash = sha256(canonicalized tool_input)
-                INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | shasum -a 256 | cut -d' ' -f1)"
+                # GNU-first (sha256sum, coreutils — every Linux, absent on macOS by default),
+                # shasum -a 256 fallback (macOS default) — WP-5 Ubuntu-audit факт #4: bare
+                # shasum with no fallback silently broke on Ubuntu installs without it.
+                if command -v sha256sum >/dev/null 2>&1; then
+                    INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | sha256sum | cut -d' ' -f1)"
+                else
+                    INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | shasum -a 256 | cut -d' ' -f1)"
+                fi
                 # response_size_bytes = TRUE pre-cap size (capped object would report ~80 bytes).
                 RESPONSE_SIZE="$raw_response_size"
 

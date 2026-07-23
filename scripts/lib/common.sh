@@ -22,9 +22,48 @@ iwe_resolve_root() {
   echo "${1:-${IWE_WORKSPACE:-${IWE_ROOT:-$HOME/IWE}}}"
 }
 
+# iwe_sha256 — sha256 of stdin, printed alone (no filename column).
+# GNU-first (sha256sum, coreutils — on every Linux, absent on macOS by
+# default) then shasum -a 256 (macOS default, also present on Linux only if
+# perl's Digest::SHA happens to be installed — WP-5 Ubuntu-audit факт #4:
+# 3 callers used bare `shasum -a 256` with no fallback, so a minimal Ubuntu
+# install without it silently broke dedup/hash checks depending on it).
+# lessons_stat_f_gnu_bsd_fallback_order.md: GNU-first is deliberate — the
+# reverse order previously broke Linux checks the same way for `stat -f/-c`.
+iwe_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+  else
+    shasum -a 256 | awk '{print $1}'
+  fi
+}
+
 # iwe_resolve_governance_repo [EXPLICIT] — canonical governance-repo name.
 iwe_resolve_governance_repo() {
   echo "${1:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
+}
+
+# iwe_scheduler_active — is any IWE role scheduler (strategist/synchronizer/
+# extractor) registered AND active with the launcher this OS actually uses?
+# Returns 0 (active) / 1 (not active).
+#
+# WP-5 Ubuntu-audit факт #4: day-open-scaffold.sh checked `launchctl list`
+# unconditionally — on Linux launchctl doesn't exist, so the check silently
+# saw empty output and reported the scheduler as down (🔴) every single day
+# even when the equivalent systemd --user timer was running fine. Two
+# independent call sites had ALSO drifted from each other on macOS (one used
+# the current per-role launchd labels post-issue-#261, the other still used
+# the pre-#261 legacy iwe.scheduler/iwe.feedback labels that don't match any
+# plist actually shipped) — this is now the single source of truth for both.
+iwe_scheduler_active() {
+  if command -v launchctl >/dev/null 2>&1; then
+    launchctl list 2>/dev/null | grep -qE "com\.(exocortex\.scheduler|strategist\.morning|strategist\.weekreview|extractor\.inbox-check)"
+  elif command -v systemctl >/dev/null 2>&1; then
+    systemctl --user list-timers --all --no-legend 2>/dev/null \
+      | grep -qE "iwe-(exocortex-scheduler|strategist-morning|strategist-weekreview|extractor-inbox-check)\.timer"
+  else
+    return 1
+  fi
 }
 
 # tg_notify MESSAGE — best-effort Telegram alert via TELEGRAM_BOT_TOKEN/
