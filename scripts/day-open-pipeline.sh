@@ -13,7 +13,9 @@
 
 set -uo pipefail
 
-IWE="${IWE_ROOT:-$HOME/IWE}"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
+IWE="$(iwe_resolve_root)"
 CONFIG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml"
 
 # ============================================
@@ -48,21 +50,12 @@ while [[ $# -gt 0 ]]; do
 done
 DATE="${DATE:-$(date +%Y-%m-%d)}"
 
-# --- Helper: send TG notification (safe JSON via jq) ---
-# MUST be defined before first call (regression fix 2026-06-29).
-tg_notify() {
-  local msg="$1"
-  if [ -n "${TG_TOKEN:-}" ] && [ -n "${TG_CHAT:-}" ]; then
-    local payload
-    payload=$(jq -n --arg chat "$TG_CHAT" --arg text "$msg" '{chat_id: $chat, text: $text, parse_mode: "Markdown"}')
-    curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-      -H "Content-Type: application/json" \
-      -d "$payload" > /dev/null
-  fi
-}
+# tg_notify() comes from lib/common.sh (sourced above) — reads
+# TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID directly, no local TG_TOKEN/TG_CHAT
+# copy needed.
 
 # --- Secrets (must load before the first tg_notify call below — WP-5 Ubuntu-audit
-# П2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
+# П2, 2026-07-22: secrets used to be sourced after both the D2-dedup and
 # pipeline-started notifications, so those two silently no-op'd every run) ---
 AIST_ENV="$HOME/.config/aist/env"
 if [ -f "$AIST_ENV" ]; then
@@ -78,9 +71,6 @@ if [ -f "$ANTHROPIC_ENV" ]; then
   source "$ANTHROPIC_ENV"
   set +a
 fi
-
-TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-TG_CHAT="${TELEGRAM_CHAT_ID:-}"
 
 # --- Guard: already committed today (D2 dedup) ---
 # Checks by file presence in git history, not commit message prefix —
@@ -399,7 +389,9 @@ cd "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" || abort "Cannot cd to repo"
 # tsekh-1 (see git-dirty-guard.sh header). The guard either self-heals a stale mirror
 # or confirms real uncommitted work is present; a plain pull is only safe after that.
 bash "$IWE/scripts/git-dirty-guard.sh" "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" || abort "git-dirty-guard found real uncommitted work — not safe to pull/commit this round"
-git pull --rebase || abort "Git pull --rebase failed"
+# iwe_safe_pull (lib/common.sh) adds same-patch-different-hash drop protection
+# a bare `git pull --rebase` doesn't have — see WP-5 П4 audit факт #5.
+iwe_safe_pull -C "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" || abort "iwe_safe_pull failed (see output above)"
 
 # Archive stale DayPlans (move + overwrite, and record the deletion).
 # Bug history (feedback_dayplan_archive_silent_skip.md): `git mv ... || true` silently

@@ -30,28 +30,27 @@ fi
 
 fail=0
 checked=0
-for f in "$SEED_DIR"/*; do
-    [ -f "$f" ] || continue
-    fname=$(basename "$f")
+while IFS= read -r -d '' f; do
+    rel="${f#"$SEED_DIR"/}"
     if ! grep -qF "$MARKER" "$f"; then
         continue
     fi
-    src="$SCRIPTS_DIR/$fname"
+    src="$SCRIPTS_DIR/$rel"
     if [ ! -f "$src" ]; then
-        echo "FAIL: $fname помечен SNAPSHOT, но scripts/$fname отсутствует"
+        echo "FAIL: $rel помечен SNAPSHOT, но scripts/$rel отсутствует"
         fail=1
         continue
     fi
     checked=$((checked + 1))
     if ! diff -q <(grep -vF "$MARKER" "$f") "$src" >/dev/null 2>&1; then
-        echo "FAIL: seed/strategy/scripts/$fname разошёлся с scripts/$fname"
+        echo "FAIL: seed/strategy/scripts/$rel разошёлся с scripts/$rel"
         echo "  diff:"
         diff <(grep -vF "$MARKER" "$f") "$src" | head -20 | sed 's/^/    /'
-        echo "  Фикс: скопировать scripts/$fname в seed/strategy/scripts/$fname"
+        echo "  Фикс: скопировать scripts/$rel в seed/strategy/scripts/$rel"
         echo "        (сохранив маркерную строку после shebang/в начале файла)."
         fail=1
     fi
-done
+done < <(find "$SEED_DIR" -type f -print0)
 
 if [ "$checked" -eq 0 ]; then
     echo "SKIP: ни один файл в $SEED_DIR не несёт маркер SNAPSHOT"

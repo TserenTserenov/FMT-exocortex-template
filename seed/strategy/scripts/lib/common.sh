@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
+# routing: library  deterministic=true
+# lib/common.sh — shared shell helpers for IWE template scripts.
+# Source, don't execute: `source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"`
+#
+# WP-5 Ubuntu-portability audit (2026-07-22, факт #5): 132 scripts, no shared
+# library — IWE workspace root was resolved 5 different ways (IWE_WORKSPACE/
+# IWE_ROOT/IWE_ROOT_ARG env vars, in varying precedence), governance-repo
+# default duplicated with 4 variable names, and Telegram notification existed
+# in 3 incompatible conventions (jq-built JSON vs hand-escaped, TG_TOKEN vs
+# TELEGRAM_BOT_TOKEN directly) — some alert paths silently dropped messages
+# because a caller used a convention no other caller tested. Pilot migration
+# (this file) covers day-open-pipeline.sh + day-open-preflight.sh; the other
+# ~40 call sites are backlog (WP-5 П4), not blind-swept in one pass.
+
+# iwe_resolve_root [EXPLICIT] — canonical $IWE workspace root.
+# Precedence: explicit arg > IWE_WORKSPACE > IWE_ROOT > $HOME/IWE.
+# (IWE_ROOT_ARG, a third variant seen in some scripts, is intentionally NOT
+# consulted here — callers that need a positional-arg override should pass
+# it as EXPLICIT instead of adding a 4th env var to this precedence chain.)
+iwe_resolve_root() {
+  echo "${1:-${IWE_WORKSPACE:-${IWE_ROOT:-$HOME/IWE}}}"
+}
+
+# iwe_resolve_governance_repo [EXPLICIT] — canonical governance-repo name.
+iwe_resolve_governance_repo() {
+  echo "${1:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
+}
+
+# tg_notify MESSAGE — best-effort Telegram alert via TELEGRAM_BOT_TOKEN/
+# TELEGRAM_CHAT_ID. No-op, not an error, when either is unset — most callers
+# run in contexts (CI, smoke-tests, fresh installs) that never configure them.
+# jq-built payload (not hand-escaped JSON) so a message containing a quote or
+# newline can't produce malformed JSON that silently drops the alert.
+tg_notify() {
+  local msg="$1"
+  if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+    local payload
+    payload=$(jq -n --arg chat "$TELEGRAM_CHAT_ID" --arg text "$msg" \
+      '{chat_id: $chat, text: $text, parse_mode: "Markdown"}')
+    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+      -H "Content-Type: application/json" -d "$payload" > /dev/null
+  fi
+}
+
+# iwe_safe_pull [-C REPO] — git pull --rebase that refuses to silently DROP a
+# local commit whose patch is already upstream under a different hash (the
+# case a plain `git rebase` mishandles: same change, different SHA, dropped
+# without warning). Returns non-zero instead of exiting the calling script —
+# callers keep their own `|| abort "..."` / cleanup-trap flow.
+#
+# Folded in from the formerly-standalone scripts/safe-pull.sh (found with
+# zero callers in the same audit, факт #5) rather than deleted: this exact
+# failure mode is a live, open risk this pilot's own sessions hit twice on
+# 2026-07-23 (see feedback_parallel_agents_shared_workdir_git_race.md), and
+# several callers were still doing a naive `git pull --rebase`. Non-interactive
+# callers (cron/launchd — no tty) abort on genuine divergence rather than
+# hang on the confirmation prompt real diverge handling would otherwise need.
+#
+# Scope: fast-forward and "only local ahead" cases are handled fully. A true
+# two-sided divergence returns 2 with the situation printed — the caller
+# decides whether to escalate (this is deliberately not fully automatic:
+# an unattended rebase across real divergence is its own risk).
+iwe_safe_pull() {
+  local repo="."
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -C) repo="$2"; shift 2 ;;
+      *) echo "iwe_safe_pull: unknown argument: $1" >&2; return 1 ;;
+    esac
+  done
+
+  ( set -eu
+    cd "$repo"
+
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo "iwe_safe_pull: not inside a git repository ($repo)" >&2
+      exit 1
+    fi
+
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$branch" = "HEAD" ]; then
+      echo "iwe_safe_pull: detached HEAD; refusing to guess a branch" >&2
+      exit 1
+    fi
+
+    if ! git diff --quiet --ignore-submodules || ! git diff --cached --quiet --ignore-submodules; then
+      echo "iwe_safe_pull: working tree or index is dirty; commit or stash first" >&2
+      exit 1
+    fi
+
+    upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+    if [ -z "$upstream" ]; then
+      if git show-ref --verify --quiet refs/remotes/origin/main; then
+        upstream=origin/main
+      elif git show-ref --verify --quiet refs/remotes/origin/master; then
+        upstream=origin/master
+      else
+        echo "iwe_safe_pull: no tracked upstream and no origin/main or origin/master" >&2
+        exit 1
+      fi
+    fi
+
+    remote=${upstream%%/*}
+    git fetch --quiet "$remote"
+
+    ahead=$(git rev-list --count "$upstream"..HEAD 2>/dev/null || echo 0)
+    behind=$(git rev-list --count HEAD.."$upstream" 2>/dev/null || echo 0)
+
+    if [ "$ahead" -eq 0 ] && [ "$behind" -eq 0 ]; then
+      echo "iwe_safe_pull: already up to date with $upstream"
+      exit 0
+    fi
+
+    if [ "$ahead" -eq 0 ] && [ "$behind" -gt 0 ]; then
+      echo "iwe_safe_pull: only upstream ahead ($behind) — fast-forwarding"
+      git merge --ff-only "$upstream"
+      exit 0
+    fi
+
+    if [ "$behind" -eq 0 ] && [ "$ahead" -gt 0 ]; then
+      echo "iwe_safe_pull: only local ahead ($ahead) — nothing to pull"
+      exit 0
+    fi
+
+    # Diverged: both sides have commits.
+    already_upstream=$(git cherry "$upstream" HEAD | grep -c '^-' || true)
+    if [ "$already_upstream" -gt 0 ]; then
+      echo "iwe_safe_pull: $already_upstream local commit(s) already have an equivalent patch in $upstream." >&2
+      echo "  A plain rebase would DROP them. Review: git log --cherry-mark --oneline --right-only $upstream...HEAD" >&2
+      exit 2
+    fi
+
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+      echo "iwe_safe_pull: diverged ($ahead local / $behind upstream) and not interactive — refusing to auto-rebase" >&2
+      exit 2
+    fi
+
+    orig_pids=()
+    while IFS= read -r sha; do
+      [ -n "$sha" ] || continue
+      orig_pids+=("$(git diff-tree -p "$sha" | git patch-id --stable | awk '{print $1}')")
+    done < <(git rev-list --reverse "$upstream"..HEAD)
+
+    echo "iwe_safe_pull: diverged ($ahead local / $behind upstream). Rebasing $branch onto $upstream..."
+    if ! git rebase "$upstream"; then
+      echo "iwe_safe_pull: rebase stopped (conflict) — resolve manually or 'git rebase --abort'" >&2
+      exit 3
+    fi
+
+    # Defense-in-depth: the pre-check above catches same-patch-different-hash
+    # drops before they happen; this re-check catches any OTHER way the
+    # rebase could have lost a commit (e.g. a mid-rebase --skip) rather than
+    # trusting a clean `git rebase` exit code alone.
+    new_pids=()
+    while IFS= read -r sha; do
+      [ -n "$sha" ] || continue
+      new_pids+=("$(git diff-tree -p "$sha" | git patch-id --stable | awk '{print $1}')")
+    done < <(git rev-list --reverse "$upstream"..HEAD)
+
+    missing=0
+    for opid in "${orig_pids[@]}"; do
+      found=0
+      for npid in "${new_pids[@]}"; do
+        [ "$opid" = "$npid" ] && { found=1; break; }
+      done
+      [ "$found" -eq 0 ] && { echo "iwe_safe_pull: ERROR — local patch $opid was lost during rebase" >&2; missing=1; }
+    done
+
+    if [ "$missing" -ne 0 ]; then
+      echo "iwe_safe_pull: rebase dropped local commit(s). Recover: git rebase --abort, or inspect: git reflog $branch" >&2
+      exit 4
+    fi
+
+    echo "iwe_safe_pull: rebase complete, ${#orig_pids[@]} local patch(es) verified preserved"
+  )
+}

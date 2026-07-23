@@ -1,6 +1,6 @@
 # Каталог скиллов IWE
 
-> Автогенерировано `scripts/generate-catalogs.py` · 2026-07-18 · НЕ редактировать вручную.
+> Автогенерировано `scripts/generate-catalogs.py` · 2026-07-23 · НЕ редактировать вручную.
 > Источник: `.claude/skills/*/SKILL.md`. Скилл вызывается командой `/<id>`.
 
 | Скилл | Что делает |
@@ -48,10 +48,11 @@
 | `/transcribe` | Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3 |
 | `/vdv` | ВДВ-скилл — генератор и аудитор описания стадийного процесса по 6 принципам Вход·Действие·Выход. Используй дл… |
 | `/verify` | Верификация артефакта по эталону из Pack. Загружает роль VR.R.001 (Верификатор) с context isolation — проверя… |
+| `/verify-hypotheses` | Сверка журнала гипотез (hypotheses-log.md) по запросу вне ритма week-close. Фильтрует записи со статусом «на… |
 | `/w-reflection` | Записать W-рефлексию (мировоззренческий слот RCS) в learning.w_reflections. Используется Диагностом R28 (MIM.… |
 | `/week-close` | Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап,… |
 | `/week-close-pilot` | Run the pilot-facing Week Close protocol with progress review and carry-over. |
 | `/wp-new` | Создание нового рабочего продукта (РП) с записью в 5 мест атомарно. Используй когда появляется новая задача,… |
 
-_Всего скиллов: 47_
+_Всего скиллов: 48_
 

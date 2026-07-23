@@ -1242,6 +1242,9 @@
       "path": "scripts/generate-skills-catalog.sh"
     },
     {
+      "path": "scripts/git-dirty-guard.sh"
+    },
+    {
       "path": "scripts/headless-runner.sh"
     },
     {
@@ -1318,6 +1321,9 @@
     },
     {
       "path": "scripts/lesson-close.sh"
+    },
+    {
+      "path": "scripts/lib/common.sh"
     },
     {
       "path": "scripts/llm-proxy-launcher.sh"
@@ -1554,6 +1560,10 @@
     "sessions/2026-06/2026-06-17-01-kimi-setup/report.md"
   ],
   "deprecated_files": [
+    {
+      "path": "scripts/safe-pull.sh",
+      "reason": "zero callers (WP-5 audit), logic folded into scripts/lib/common.sh iwe_safe_pull(), removed in v0.36.2"
+    },
     {
       "path": "LEARNING-PATH.md",
       "reason": "moved to docs/LEARNING-PATH.md"

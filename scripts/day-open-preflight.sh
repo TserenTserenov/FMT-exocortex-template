@@ -10,6 +10,8 @@
 
 set -uo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
 # portable_date_offset <days_back> [format] — BSD `date -v` (macOS) vs GNU `date -d` (Linux)
 portable_date_offset() {
   local days="$1" fmt="${2:-%Y-%m-%d}"
@@ -25,8 +27,8 @@ if [ -f "$AIST_ENV" ]; then
 fi
 
 DATE="${1:-$(date +%Y-%m-%d)}"
-IWE="${IWE_ROOT:-$HOME/IWE}"
-GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+IWE="$(iwe_resolve_root)"
+GOV_REPO="$(iwe_resolve_governance_repo)"
 CONFIG="${2:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
 
 # --- Calendar: server-calendar.sh ---
@@ -71,11 +73,7 @@ elif [ -n "$SCOUT_LOG" ]; then
   else
     SCOUT_STATUS="fail"
     SCOUT_REASON="last log $LOG_DATE (expected $DATE), backlog has pending tasks"
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-      curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-        -H "Content-Type: application/json" \
-        -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"🚨 Scout silent failure: last log $LOG_DATE (expected $DATE), backlog has pending tasks\"}" > /dev/null
-    fi
+    tg_notify "🚨 Scout silent failure: last log $LOG_DATE (expected $DATE), backlog has pending tasks"
   fi
 else
   if [ "$HAS_PENDING" = "false" ]; then
@@ -83,11 +81,7 @@ else
   else
     SCOUT_STATUS="fail"
     SCOUT_REASON="no scout logs found at all, backlog has pending tasks"
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-      curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-        -H "Content-Type: application/json" \
-        -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"🚨 Scout silent failure: no logs found at all, backlog has pending tasks\"}" > /dev/null
-    fi
+    tg_notify "🚨 Scout silent failure: no logs found at all, backlog has pending tasks"
   fi
 fi
 
@@ -111,10 +105,8 @@ else
   fi
   YESTERDAY=$(portable_date_offset 1)
   YESTERDAY_FILE="$IWE/DS-agent-workspace/scheduler/feedback-triage/$YESTERDAY.md"
-  if [ ! -f "$YESTERDAY_FILE" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-      -H "Content-Type: application/json" \
-      -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"🚨 Feedback-triage silent failure: no reports since before $YESTERDAY\"}" > /dev/null
+  if [ ! -f "$YESTERDAY_FILE" ]; then
+    tg_notify "🚨 Feedback-triage silent failure: no reports since before $YESTERDAY"
   fi
 fi
 
