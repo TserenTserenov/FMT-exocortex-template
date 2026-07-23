@@ -99,7 +99,7 @@ if [ "$HUMAN_MODE" = "true" ]; then
   case "$SCHED" in
     ok)               sched_emoji="🟢"; sched_desc="scheduler-pulse свежий (<26h)" ;;
     registered-no-pulse) sched_emoji="🟡"; sched_desc="scheduler зарегистрирован, но нет локального pulse-файла" ;;
-    missing)          sched_emoji="🔴"; sched_desc="Mode A: scheduler не зарегистрирован в launchctl" ;;
+    missing)          sched_emoji="🔴"; sched_desc="Mode A: scheduler не зарегистрирован (launchd/systemd)" ;;
     stale:*)          sched_emoji="🟡"; sched_desc="scheduler-pulse устарел ($SCHED)" ;;
     *)                sched_emoji="❓"; sched_desc="unknown: $SCHED" ;;
   esac

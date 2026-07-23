@@ -228,6 +228,17 @@ jobs:
           done < <(find . -path ./guide-kit -prune -o -name "*.sh" -type f -print0)
           exit $FAIL
 
+  # WP-5 Ubuntu-audit факт #4/#6: docs/PLATFORM-COMPAT.md listed the safe
+  # patterns for macOS-only constructs (osascript, launchctl, date -v, etc.)
+  # but nothing enforced them — every concrete bug this audit found was a
+  # case the checklist already named. Turns the checklist into a gate.
+  platform-compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check docs/PLATFORM-COMPAT.md constructs are guarded
+        run: bash scripts/check-platform-compat.sh
+
   validate:
     runs-on: ubuntu-latest
     steps:

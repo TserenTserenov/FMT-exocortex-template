@@ -69,7 +69,10 @@ fi
 # === Фильтрация --add-dir через .agentigore + PII sanity-check ===
 
 FILTERED_DIRS=()
-TMP_ROOT=$(mktemp -d -t kimi-peer-XXXXXX)
+# `-t template` is BSD/GNU compatible in practice but its exact semantics
+# differ (docs/PLATFORM-COMPAT.md) — a fully-qualified template path avoids
+# `-t` entirely and is identical on both.
+TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/kimi-peer-XXXXXX")
 
 # Merged .agentigore (union: ~/.iwe → git-root → session_dir)
 MERGED_AGENTIGORE="$TMP_ROOT/.agentigore"
