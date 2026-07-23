@@ -64,13 +64,21 @@ if ! command -v launchctl >/dev/null 2>&1; then
         mkdir -p "$SYSTEMD_USER_DIR"
         mkdir -p "$HOME/logs/strategist"
 
-        cp "$SYSTEMD_SRC"/*.service "$SYSTEMD_SRC"/*.timer "$SYSTEMD_USER_DIR/"
-        systemctl --user daemon-reload
-        systemctl --user enable --now iwe-strategist-morning.timer
-        systemctl --user enable --now iwe-strategist-weekreview.timer
-
-        echo "  ✓ Installed: iwe-strategist-morning.timer (daily)"
-        echo "  ✓ Installed: iwe-strategist-weekreview.timer (Mon 00:00)"
+        # issue #285 (same class of bug, Linux equivalent): пользователь мог явно
+        # выключить таймер (`systemctl --user disable iwe-strategist-morning.timer`)
+        # — `systemctl --user is-enabled` тогда вернёт "disabled" (не "not-found",
+        # это отличает «выключено» от «ещё не установлено»). Безусловный re-enable
+        # при каждом апдейте роли отменял бы выбор пользователя молча.
+        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+            if [ "$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)" = "disabled" ]; then
+                echo "  ⊘ $unit.timer — disabled by user, пропускаю (systemctl --user enable --now $unit.timer, чтобы включить обратно)"
+                continue
+            fi
+            cp "$SYSTEMD_SRC/$unit.service" "$SYSTEMD_SRC/$unit.timer" "$SYSTEMD_USER_DIR/"
+            systemctl --user daemon-reload
+            systemctl --user enable --now "$unit.timer"
+            echo "  ✓ Installed: $unit.timer"
+        done
         echo "  ✓ Logs: ~/logs/strategist/"
         echo ""
         echo "Verify: systemctl --user list-timers | grep strategist"
@@ -82,22 +90,26 @@ fi
 
 mkdir -p "$TARGET_DIR"
 
-# Unload old agents if present
-launchctl unload "$TARGET_DIR/com.strategist.morning.plist" 2>/dev/null || true
-launchctl unload "$TARGET_DIR/com.strategist.weekreview.plist" 2>/dev/null || true
-
-# Copy new plist files
-cp "$LAUNCHD_DIR/com.strategist.morning.plist" "$TARGET_DIR/"
-cp "$LAUNCHD_DIR/com.strategist.weekreview.plist" "$TARGET_DIR/"
-
 # Make script executable (runtime path)
 if [ -f "$SCRIPT_TARGET" ]; then
     chmod +x "$SCRIPT_TARGET"
 fi
 
-# Load agents
-launchctl load "$TARGET_DIR/com.strategist.morning.plist"
-launchctl load "$TARGET_DIR/com.strategist.weekreview.plist"
+# issue #285: пользователь отключает агента документированным способом
+# (launchctl unload + переименование в <label>.plist.disabled — та же конвенция,
+# что уже применяется к com.strategist.scout.plist.disabled). update.sh реагирует
+# на изменения в roles/ и безусловно перезапускает install.sh каждой auto-роли —
+# без этой проверки .disabled-маркер молча игнорировался, отключённый агент
+# возвращался и перезагружался при каждом апдейте шаблона.
+for label in com.strategist.morning com.strategist.weekreview; do
+    if [ -f "$TARGET_DIR/$label.plist.disabled" ]; then
+        echo "  ⊘ $label — disabled by user (найден $label.plist.disabled), пропускаю"
+        continue
+    fi
+    launchctl unload "$TARGET_DIR/$label.plist" 2>/dev/null || true
+    cp "$LAUNCHD_DIR/$label.plist" "$TARGET_DIR/"
+    launchctl load "$TARGET_DIR/$label.plist"
+done
 
 echo "Done. Agents loaded:"
 launchctl list | grep strategist
