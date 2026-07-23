@@ -1,8 +1,6 @@
 files_translated:
-- README.md
-- docs/IWE-HELP.md
-- docs/LEARNING-PATH.md
-- docs/SETUP-GUIDE.md
-last_run_utc: '2026-07-23T09:17:27Z'
-last_synced_sha: 3e74990171542b707a747f758c51b8bfc5ad33a9
+- docs/developer/code-style.md
+- docs/developer/developer-guide.md
+last_run_utc: '2026-07-23T23:54:53Z'
+last_synced_sha: e5086a2d751cc1e0579aaff78401fa1784b5be8c
 schema_version: 1
