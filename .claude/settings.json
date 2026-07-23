@@ -49,6 +49,22 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/lazy-context-loader.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject-communication-style.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject-fault-profile.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -109,6 +125,15 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pack-creator-spf-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject-code-style.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -129,6 +154,14 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/memory-exocortex-sync.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/agent-trace-recorder.sh"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -145,6 +178,22 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/capture-bus.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/agent-trace-recorder.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/response-clarity-hook.sh"
           }
         ]
       }
