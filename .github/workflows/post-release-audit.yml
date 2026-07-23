@@ -29,6 +29,7 @@ permissions:
 jobs:
   create-audit-issue:
     runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     steps:
       - uses: actions/checkout@v6
       - name: Determine version

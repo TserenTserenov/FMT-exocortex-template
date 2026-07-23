@@ -25,6 +25,7 @@ permissions:
 jobs:
   weekly-bump:
     runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     steps:
       - uses: actions/checkout@v4
         with:
