@@ -456,6 +456,9 @@
       "path": "REPO-TYPE.md"
     },
     {
+      "path": "aisystant-sync-targets.yaml"
+    },
+    {
       "path": "docs/AGENT-FAULT-PROCESS.md"
     },
     {
@@ -1278,6 +1281,9 @@
       "path": "scripts/content-filter-map.txt"
     },
     {
+      "path": "scripts/copy-to-aisystant.py"
+    },
+    {
       "path": "scripts/coverage-skills.sh"
     },
     {
@@ -1616,6 +1622,7 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
     "scripts/tests/test_agent_dashboard.py",
+    "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
@@ -1867,6 +1874,34 @@
     {
       "path": "sessions/2026-06/2026-06-17-01-kimi-setup/report.md",
       "reason": "session transcripts archived, removed by WP-401 Ф6.1 2026-07-22"
+    },
+    {
+      "path": "docs/BROWSER-CI-TEMPLATE.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+    },
+    {
+      "path": "docs/maintaining-skills.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+    },
+    {
+      "path": "docs/release-audit-log.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+    },
+    {
+      "path": "docs/developer/README.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+    },
+    {
+      "path": "docs/developer/card-template.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+    },
+    {
+      "path": "docs/developer/developer-guide.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+    },
+    {
+      "path": "docs/developer/testing-as-spec.md",
+      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
     }
   ]
 }
