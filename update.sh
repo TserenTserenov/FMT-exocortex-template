@@ -966,58 +966,69 @@ echo "Обновление platform-space..."
 
 # Copy CLAUDE.md to workspace root
 CLAUDE_UPDATED=false
-for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    if [ "$f" = "CLAUDE.md" ]; then
-        # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
-        # WS_NEW уже подставлен (issue #269) — Step 5 выше записал substituted-версию
-        # в $SCRIPT_DIR/CLAUDE.md через substitute_claude_placeholders(); повторный
-        # вызов здесь не нужен и был бы избыточен. Это зависимость от порядка
-        # выполнения циклов, не самодостаточный код — не переставлять Step 5/6 местами.
-        WS_BASE="$WORKSPACE_DIR/.claude.md.base"
-        WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
-        WS_NEW="$SCRIPT_DIR/CLAUDE.md"
-
-        if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
-            WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
-            cp "$WS_CURRENT" "$WS_MERGE_TMP"
-            if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
-                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                cp "$WS_NEW" "$WS_BASE"
-                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-            else
-                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
-                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                cp "$WS_NEW" "$WS_BASE"
-                CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
-                if [ "$WS_CONFLICTS" -gt 0 ]; then
-                    # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
-                    # artifact, not a reason to skip the rest of the delivery (memory/hooks/
-                    # skills propagation, repair-pass, commit). Warn now, fail at the end.
-                    echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
-                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-                    CLAUDE_CONFLICT_DETECTED=true
-                    CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
-                else
-                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-                fi
-            fi
-        else
-            # Fallback: USER-SPACE preserve (first update or no git)
-            if [ -f "$WS_CURRENT" ]; then
-                WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
-            fi
-            cp "$WS_NEW" "$WS_CURRENT"
-            if [ -n "${WS_USER_SECTION:-}" ]; then
-                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
-                echo "" >> "$WS_CURRENT"
-                echo "$WS_USER_SECTION" >> "$WS_CURRENT"
-            fi
-            cp "$WS_NEW" "$WS_BASE"
-            echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
-        fi
-        CLAUDE_UPDATED=true
+# issue #289: раньше это было гейтом по членству "CLAUDE.md" в NEW_FILES/
+# UPDATED_FILES этого прогона — если Step 5 упал на конфликте, пилот разрешил
+# маркеры вручную и перезапустил update.sh, FMT-копия во втором прогоне уже ==
+# upstream → в UPDATED_FILES ничего не попадает → Step 6 молча пропускался,
+# workspace-копия и её .claude.md.base замирали навсегда без предупреждения.
+# Теперь триггер — реальное расхождение база/FMT-копия, а не факт правки в
+# ЭТОМ прогоне: закрывает и обрыв-и-перезапуск, и любой другой пропуск Step 5.
+NEEDS_WS_CLAUDE_SYNC=false
+if [ -f "$SCRIPT_DIR/CLAUDE.md" ]; then
+    if [ ! -f "$WORKSPACE_DIR/.claude.md.base" ] || ! diff -q "$WORKSPACE_DIR/.claude.md.base" "$SCRIPT_DIR/CLAUDE.md" >/dev/null 2>&1; then
+        NEEDS_WS_CLAUDE_SYNC=true
     fi
-done
+fi
+if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
+    # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+    # WS_NEW уже подставлен (issue #269) — Step 5 выше записал substituted-версию
+    # в $SCRIPT_DIR/CLAUDE.md через substitute_claude_placeholders(); повторный
+    # вызов здесь не нужен и был бы избыточен. Это зависимость от порядка
+    # выполнения циклов, не самодостаточный код — не переставлять Step 5/6 местами.
+    WS_BASE="$WORKSPACE_DIR/.claude.md.base"
+    WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
+    WS_NEW="$SCRIPT_DIR/CLAUDE.md"
+
+    if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
+        WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
+        cp "$WS_CURRENT" "$WS_MERGE_TMP"
+        if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
+            cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+            cp "$WS_NEW" "$WS_BASE"
+            echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+        else
+            WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
+            cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+            cp "$WS_NEW" "$WS_BASE"
+            CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
+            if [ "$WS_CONFLICTS" -gt 0 ]; then
+                # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
+                # artifact, not a reason to skip the rest of the delivery (memory/hooks/
+                # skills propagation, repair-pass, commit). Warn now, fail at the end.
+                echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
+                echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
+                CLAUDE_CONFLICT_DETECTED=true
+                CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
+            else
+                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+            fi
+        fi
+    else
+        # Fallback: USER-SPACE preserve (first update or no git)
+        if [ -f "$WS_CURRENT" ]; then
+            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
+        fi
+        cp "$WS_NEW" "$WS_CURRENT"
+        if [ -n "${WS_USER_SECTION:-}" ]; then
+            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
+            echo "" >> "$WS_CURRENT"
+            echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+        fi
+        cp "$WS_NEW" "$WS_BASE"
+        echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
+    fi
+    CLAUDE_UPDATED=true
+fi
 
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
