@@ -1,7 +1,8 @@
 files_translated:
-- docs/roles-catalog.md
-- docs/scripts-catalog.md
-- docs/skills-catalog.md
-last_run_utc: '2026-07-23T06:58:32Z'
-last_synced_sha: e2eb552c0ad6084ace8054b04267f20e9e72578d
+- README.md
+- docs/IWE-HELP.md
+- docs/LEARNING-PATH.md
+- docs/SETUP-GUIDE.md
+last_run_utc: '2026-07-23T09:17:27Z'
+last_synced_sha: 3e74990171542b707a747f758c51b8bfc5ad33a9
 schema_version: 1
