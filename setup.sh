@@ -101,9 +101,12 @@ if $VALIDATE_ONLY; then
     done
 
     # Check extensions
+    # issue: extensions/ живёт в рабочем пространстве (WORKSPACE_GUESS), не в
+    # самом шаблоне — так их ищет load-extensions.sh в рантайме. Проверка по
+    # $SCRIPT_DIR всегда находила бандл шаблона и маскировала пустой workspace/extensions.
     echo "[3/4] Extensions..."
-    if [ -d "$SCRIPT_DIR/extensions" ]; then
-        EXT_COUNT=$(find "$SCRIPT_DIR/extensions" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    if [ -d "$WORKSPACE_GUESS/extensions" ]; then
+        EXT_COUNT=$(find "$WORKSPACE_GUESS/extensions" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
         echo "  ✓ extensions/ ($EXT_COUNT файлов)"
     else
         echo "  ⚠ extensions/ не найдена (опционально)"
