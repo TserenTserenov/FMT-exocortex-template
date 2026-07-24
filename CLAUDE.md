@@ -98,6 +98,10 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 **NEVER `git add -u`, `git add .`, `git add -A`** — подхватывают изменения ДРУГИХ агентов (Kimi/Hermes работают параллельно) → неверная атрибуция. Стейджить только конкретные файлы; перед коммитом `git diff --cached --name-only`, лишнее — `git restore --staged`. Примеры → `memory/reference/agent-core.md`.
 
+## Pull Request Template — CRITICAL
+
+**При создании PR всегда используй структуру из корневого `.github/pull_request_template.md`.** Обязательно заполняй блоки «Целевая система», «DRR» (Design-Rationale Record — обоснование выбранного решения) и генерируй блок «Capture» (Двойной выход — какое знание зафиксировано в Pack).
+
 ## Artifact Naming
 
 **Do not invent artifact names.** Names for sections, documents, RPs, and deliverables must come from the plan/task you received. If the task is silent on a name — report "need clarification on name" instead of making one up.
