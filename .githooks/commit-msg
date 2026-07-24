@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# .githooks/commit-msg
+# Part of WP-453: Конвейер обновления раздела 7 guide
+# Триггер Т3: Явная разметка [guide-update: S7.SS_N] в commit message
+#
+# Парсит commit message и обновляет section-state.yaml в DS-my-strategy
+# при наличии тега [guide-update: S7.SS_N]
+
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+
+# Detect if we're in FMT template or a derived installation
+FMT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+REGISTRY_REPO="${IWE_REGISTRY_REPO:-$HOME/IWE/DS-my-strategy}"
+
+# Check if fp453-t3 script is available
+T3_SCRIPT="${REGISTRY_REPO}/scripts/fp453-t3-mark-guide-update.sh"
+if [[ ! -f "$T3_SCRIPT" ]]; then
+  # This is OK - WP-453 conveyor might not be installed in this instance
+  exit 0
+fi
+
+# Read commit message
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE" 2>/dev/null || echo "")
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+# Pass to WP-453 T3 handler
+"$T3_SCRIPT" "$COMMIT_MSG" "$COMMIT_SHA" || true
+
+exit 0
