@@ -1,6 +1,6 @@
 files_translated:
-- docs/developer/code-style.md
 - docs/developer/developer-guide.md
-last_run_utc: '2026-07-23T23:54:53Z'
-last_synced_sha: e5086a2d751cc1e0579aaff78401fa1784b5be8c
+- docs/developer/working-with-claude.md
+last_run_utc: '2026-07-24T09:27:22Z'
+last_synced_sha: 6cd4950dee99e9c443a1a2f53c70e1f71a577b5c
 schema_version: 1
