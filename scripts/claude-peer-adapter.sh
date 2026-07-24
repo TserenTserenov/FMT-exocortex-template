@@ -7,8 +7,11 @@
 # передаёт Claude headless (-p), возвращает ответ в stdout.
 #
 # Использование (из скрипта Kimi-писателя):
-#   echo "$peer_prompt" | bash scripts/claude-peer-adapter.sh \
-#     --add-dir "$SESSION_DIR" 2>/dev/null > "$PEER_FILE"
+#   bash scripts/claude-peer-adapter.sh --add-dir "$SESSION_DIR" \
+#     < "${SESSION_DIR}/peer-prompt.md" > "$PEER_FILE" 2>/dev/null
+# Промпт передаётся файлом, не inline `echo "$peer_prompt" | ...` — иначе текст
+# промпта попадает в командную строку и хук B7.7c ложно блокирует повторные
+# вызовы (bug-2026-06-30-peer-adapter-b77c-block).
 
 set -euo pipefail
 
