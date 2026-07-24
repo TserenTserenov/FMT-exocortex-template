@@ -128,26 +128,108 @@ esac
 
 # === Bash matchers ===
 #
-# v2 (issue #237): вместо grep по всей строке команды — три прохода:
-#  1) вырезать кавычные спаны (текст внутри '...'/"..." не может изображать
-#     команду — раньше `echo "see: git commit"` ложно матчился, issue #237 п.4);
+# v3 (2026-07-23, /audit-installation follow-up): два фикса поверх v2 (issue #237):
+#  A) Кавычные спаны раньше стирались в фиксированный "QSTR" ДО классификации —
+#     это защищало сегментацию (шаг 2) от метасимволов внутри строк, но заодно
+#     стирало путь у legit-вызовов вида `bash "$IWE_SCRIPTS/script.sh"`, из-за
+#     чего whitelist read-only хелперов (issue #264) никогда не матчился для
+#     цитированных путей — только для голых. Теперь каждый кавычный спан
+#     заменяется на ИНДЕКСИРОВАННЫЙ плейсхолдер (__Q0__, __Q1__, ...), исходный
+#     текст сохраняется в QVALS[] и разворачивается обратно точечно, только при
+#     проверке whitelist — сегментация по-прежнему видит безопасный плейсхолдер
+#     вместо сырых метасимволов, но классификация может свериться с оригиналом.
+#  B) git/rm/mv/tee/sed/curl/psql/bash/sh/zsh матчились только как bareword —
+#     вызов по полному пути (напр. /usr/bin/git) не матчил ничего и утекал
+#     необнаруженным. Теперь классификация идёт по basename (${W0##*/}), путь
+#     не имеет значения для распознавания команды.
+#
+# Итого три прохода (структура v2 сохранена):
+#  1) вырезать кавычные спаны в индексированные плейсхолдеры (см. A выше);
 #  2) разбить нормализованную строку на простые команды по разделителям
 #     ; & | && || ( ) { } $( ` — раньше `(git commit -am x)` в скобках
 #     проходил незамеченным, issue #237 п.1;
-#  3) классифицировать каждый фрагмент по первому слову (после пропуска
-#     VAR=val/command/env/nohup/time/sudo), а не искать подстроку где попало.
+#  3) классифицировать каждый фрагмент по basename первого слова (после
+#     пропуска VAR=val/command/env/nohup/time/sudo), а не bareword и не
+#     искать подстроку где попало.
 #
 # Единственное исключение из шага 1 — psql: SQL живёт внутри кавычек, поэтому
 # SQL-write матчится по НЕнормализованной команде, но только когда первое
 # слово фрагмента — psql (иначе `grep "psql -c INSERT" file` снова ложно бьёт).
+
+# QVALS[i] — исходный (нерасширенный, как написано в команде) текст i-го
+# кавычного спана. Заполняется normalize_cmd(), читается только внутри
+# check_indirect() для whitelist-сверки — нигде не eval'ится и не расширяется,
+# чистая substring-операция, инъекция переменных через окружение хука невозможна.
+declare -a QVALS=()
+# Результат normalize_cmd() — глобальная переменная, НЕ $(...). Функция пишет
+# в QVALS (ассоциативный побочный эффект по индексам) и вызов через command
+# substitution породил бы subshell, где эта запись мгновенно терялась бы —
+# NORM тогда оставался пуст (тихий баг, найден этим же прогоном тестов).
+NORM_RAW=""
+
+normalize_cmd() {
+    local s="$1" out="" c q content i=0 j len idx=0
+    len=${#s}
+    while [ "$i" -lt "$len" ]; do
+        c="${s:$i:1}"
+        if [ "$c" = "'" ] || [ "$c" = '"' ]; then
+            q="$c"
+            j=$((i + 1))
+            while [ "$j" -lt "$len" ] && [ "${s:$j:1}" != "$q" ]; do
+                j=$((j + 1))
+            done
+            content="${s:$((i + 1)):$((j - i - 1))}"
+            QVALS[$idx]="$content"
+            out="${out}__Q${idx}__"
+            idx=$((idx + 1))
+            i=$((j + 1))
+        else
+            out="${out}${c}"
+            i=$((i + 1))
+        fi
+    done
+    NORM_RAW="$out"
+}
+
+# check_indirect <candidate> — общий whitelist-or-block для «непрямого запуска»
+# (bash/sh/zsh <script> И прямой запуск скрипта по пути без интерпретатора).
+# Список синхронизирован с memory/dry-run-contract.md §Bash matchers;
+# добавление нового read-only хелпера = правка контракта + этой функции +
+# code review на отсутствие write-путей в коде скрипта (redirect/tee/sed -i/mv/rm).
+# Абсолютные пути привязаны к $HOME/IWE и захардкожены буквально (review-01 High,
+# review-02 H1): glob */.claude/... пропускал /tmp-подделку, а ${IWE_ROOT:-...}
+# открывал тот же обход через env-инъекцию — здесь та же дисциплина сохранена.
+check_indirect() {
+    local candidate="$1" idx
+    case "$candidate" in
+        __Q[0-9]*__)
+            idx="${candidate#__Q}"
+            idx="${idx%__}"
+            case "$idx" in
+                ''|*[!0-9]*) ;;  # не чисто число — не разворачиваем, candidate остаётся плейсхолдером (не матчит whitelist → block)
+                *) candidate="${QVALS[$idx]:-}" ;;
+            esac
+            ;;
+    esac
+    case "$candidate" in
+        .claude/scripts/load-extensions.sh) return 0 ;;
+        "$HOME/IWE/.claude/scripts/load-extensions.sh") return 0 ;;
+        FMT-exocortex-template/scripts/day-close-prepare.sh) return 0 ;;
+        "$HOME/IWE/FMT-exocortex-template/scripts/day-close-prepare.sh") return 0 ;;
+        '$IWE_SCRIPTS/day-close-prepare.sh') return 0 ;;
+        *) block "$CMD (indirect execution under dry-run)" ;;
+    esac
+}
+
 if [ "$TOOL_NAME" = "Bash" ]; then
     CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
     [ -z "$CMD" ] && exit 0
 
-    # Шаг 1: убрать кавычные спаны и безвредные redirect-в-null.
-    NORM=$(printf '%s' "$CMD" | sed -E \
-        -e "s/'[^']*'/ QSTR /g" \
-        -e 's/"[^"]*"/ QSTR /g' \
+    # Шаг 1: кавычные спаны → индексированные плейсхолдеры, плюс безвредные redirect-в-null.
+    # normalize_cmd вызывается КАК ОБЫЧНАЯ функция (не $(...)) — иначе QVALS[]
+    # заполнялся бы в subshell и мгновенно терялся для check_indirect() ниже.
+    normalize_cmd "$CMD"
+    NORM=$(printf '%s' "$NORM_RAW" | sed -E \
         -e 's@[0-9]?>[[:space:]]*/dev/null@ @g' \
         -e 's@2>&1@ @g')
 
@@ -174,8 +256,9 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         done
         [ $# -eq 0 ] && continue
         W0=$1
+        W0B="${W0##*/}"
 
-        case "$W0" in
+        case "$W0B" in
             git)
                 shift
                 # Пропустить global opts: -C dir, --git-dir=X, --work-tree=X, -c key=val
@@ -226,23 +309,22 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     && block "$CMD (SQL write)"
                 ;;
             bash|sh|zsh)
-                # Whitelist read-only helpers (issue #264): явно перечисленные
-                # read-only скрипты-перечислители разрешены под dry-run — их
-                # payload инспектируем по коду скрипта (write-путей нет).
-                # Список синхронизирован с memory/dry-run-contract.md §Bash matchers;
-                # добавление = правка контракта + этого case + code review.
-                # Абсолютный путь привязан к $HOME/IWE и захардкожен (review-01 High,
-                # review-02 H1): glob */.claude/... пропускал /tmp-подделку, а
-                # ${IWE_ROOT:-...} открывал тот же обход через env-инъекцию.
                 shift
-                WL_ABS="$HOME/IWE/.claude/scripts/load-extensions.sh"
-                case "${1:-}" in
-                    .claude/scripts/load-extensions.sh|"$WL_ABS") ;;
-                    *) block "$CMD (indirect execution under dry-run)" ;;
-                esac
+                check_indirect "${1:-}"
                 ;;
             eval|source|.|xargs)
                 block "$CMD (indirect execution under dry-run)"
+                ;;
+            *)
+                # Не распознанная как watched-команда basename'ом — если W0 сам
+                # выглядит как путь к скрипту (прямой запуск без интерпретатора,
+                # issue найден /audit-installation smoke-test 2026-07-23), тот же
+                # whitelist-or-block, что и для bash|sh|zsh <script>. Голые команды
+                # без слэша (ls, cat, python3 и т.п.) вне зоны ответственности этого
+                # гейта — не трогаем.
+                case "$W0" in
+                    */*) check_indirect "$W0" ;;
+                esac
                 ;;
         esac
     done <<< "$SPLIT"

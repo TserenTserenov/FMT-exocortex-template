@@ -114,22 +114,30 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- feat(wp483): sync guide-kit v0.1.2 into template (снимок Ф9 система №16 + слияние приоритета Портного + degree-контекст)
+- `1d83cb9` feat(wp-5): еженедельный авто-бамп версии вместо ручного релиза
+- `efa3d32` feat(wp483): sync guide-kit v0.1.2 into template
+- `859304a` feat(skills): новый скилл verify-hypotheses — сверка гипотез по запросу
+- `f788971` feat(week-close): шаг 6a сверка журнала гипотез + метрика калибровки
+- `b381a6e` feat(strategist): Note-Review распознаёт категорию «Гипотеза» (8-е правило)
 - `4484b4c` feat(skill-promote): защита L3-констант через inline-маркер (WP-5)
-- `5aabac2` feat(wp483): sync guide-kit v0.1.1 into template
 
 ### Changed
 
+- `6b430fe` refactor(backup): baseline-файл переезжает в .state/, перестаёт быть git-артефактом
+- `d491613` chore(memory): fpf-reference.md valid_from bump 2026-07-19
 - `c40b041` docs(changelog): thank SDaiBots (#217/#221/#224/#228), AONarchuk (#215), trover97 (#218) — пропущены в прошлых раундах благодарностей
 - `b08403d` chore: release 0.36.0
-- `fb9afa6` docs(changelog): regenerate [Unreleased] after guide-kit v0.1.1 sync
 
 ### Fixed
 
+- `d6c6440` fix(strategist): откатить регресс WORKPLAN.md в шаблоне (S-33, разрешение пилота)
+- `500909e` fix(update.sh): экранировать sed-спецсимволы в substitute_claude_placeholders (независимая верификация)
+- `d7ccfcf` fix(memory): точная атрибуция источника в agent-core.md (независимая проверка issue #283)
+- `cd776e3` fix(WP-7): 5 issues шаблона IWE — sentinel drift, agent-core.md, priorities.yaml, CLAUDE.md placeholders, --help
+- `fbcb42e` fix(update-pipeline): 8 issue funnel fixes — manifest sync, false-positive hooks, WP lifecycle
+- `e3f5918` fix(skills): verify-hypotheses — inline YAML triggers/description формат
+- `09b43b8` fix(skill-promote): безопасная обработка спецсимволов в L3-значениях
 - `3f91860` fix(release): sync README version badge to 0.36.0
-- `b0f675b` fix(scripts): env-fallback для GOVERNANCE_REPO в generate-hot-files-list.sh
-- `1b29b19` fix(strategist): убрать хардкод DS-strategy в DAY_OPEN_PIPELINE (регрессия 238a5c1)
-- `5cd5695` fix(roles): runtime-резолв путей в extractor/synchronizer вместо build-time плейсхолдеров
 
 
 ## [0.36.0] — 2026-07-19

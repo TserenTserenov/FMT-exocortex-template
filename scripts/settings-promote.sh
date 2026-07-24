@@ -109,11 +109,18 @@ fi
 # Валидация JSON перед записью
 echo "$UPDATED" | jq . > /dev/null 2>&1 || { echo "❌ Результат невалидный JSON" >&2; exit 1; }
 
+# Записываем на диск (backup для отката, если пост-валидация не пройдёт)
+cp "$SETTINGS" "$SETTINGS.bak"
+echo "$UPDATED" > "$SETTINGS"
+
 # Проверка hook-path конвенции через validate-fmt-scripts.sh --settings-json.
 # --settings-json запускает только проверку 3 (settings.json) — не затрагивает скрипты.
 if ! bash "$FMT_DIR/scripts/validate-fmt-scripts.sh" --settings-json; then
+    mv "$SETTINGS.bak" "$SETTINGS"
+    echo "❌ Валидация не пройдена — settings.json откачен" >&2
     exit 1
 fi
+rm -f "$SETTINGS.bak"
 
 CHANGELOG_SCRIPT="$FMT_DIR/scripts/changelog-append.sh"
 if [[ -f "$CHANGELOG_SCRIPT" ]]; then bash "$CHANGELOG_SCRIPT"; fi

@@ -15,10 +15,14 @@ git_segment() {
   # Return only the shell segment containing `git <global-opts> <subcmd>`.
   # This prevents flags from neighbouring commands (`[ -f file ]`, `rm -f`)
   # from being attributed to `git push`.
+  # `(?:\S*\/)?` before `git` (2026-07-23): optional path prefix so
+  # `/usr/bin/git push --force` / `./git push --force` are recognised the same
+  # as bare `git push --force` — the boundary check previously required git to
+  # be preceded by whitespace/`;&|`/start-of-string, which a leading `/…/` defeated.
   local subcmd="$1"
   SUBCMD="$subcmd" perl -ne '
     my $subcmd = quotemeta($ENV{"SUBCMD"});
-    while (/(?:^|[;&|]\s*|\s+)(git(?:\s+(?:-C\s+\S+|--git-dir(?:=|\s+)\S+|--work-tree(?:=|\s+)\S+))*\s+$subcmd\b[^;&|]*)/g) {
+    while (/(?:^|[;&|]\s*|\s+)((?:\S*\/)?git(?:\s+(?:-C\s+\S+|--git-dir(?:=|\s+)\S+|--work-tree(?:=|\s+)\S+))*\s+$subcmd\b[^;&|]*)/g) {
       print "$1\n";
       exit 0;
     }

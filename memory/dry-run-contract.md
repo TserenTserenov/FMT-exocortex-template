@@ -68,15 +68,33 @@ Expected: tool blocked by contract, this is rehearsal failure point
 
 ### Bash matchers
 
-v2 (WP-7/BUGTRIAGE2, issue #237): не regex по всей строке команды, а три прохода —
-(1) вырезать кавычные спаны (`'...'`/`"..."` → `QSTR`, кроме psql — SQL матчится по
-оригиналу), (2) разбить нормализованную строку на простые команды по `; & | && || ( ) { } $( ``,
-(3) классифицировать каждый фрагмент по первому слову (после пропуска `VAR=val`/
-`command`/`env`/`nohup`/`time`/`sudo`). Закрывает одновременно subshell-обход
-(`(git commit)`) и ложные срабатывания на текст внутри кавычек (`echo "git commit"`).
-Реализация — `.claude/hooks/dry-run-gate.sh`, секция «Bash matchers».
+**v3 (2026-07-23, /audit-installation follow-up):** два фикса поверх v2 (issue #237):
 
-Классифицируемые команды (по первому слову фрагмента):
+- **Квотинг сохраняет содержимое.** v2 стирал каждый кавычный спан в фиксированный
+  `QSTR` ДО классификации — защищало сегментацию от метасимволов внутри строк, но
+  заодно стирало путь у legit-вызовов вида `bash "$IWE_SCRIPTS/script.sh"`, из-за
+  чего whitelist read-only хелперов (issue #264) не матчился для цитированных
+  путей, только для голых. v3 заменяет каждый спан на ИНДЕКСИРОВАННЫЙ плейсхолдер
+  (`__Q0__`, `__Q1__`, ...), исходный текст сохраняется в массиве `QVALS[]` и
+  разворачивается обратно точечно, только внутри проверки whitelist —
+  сегментация по-прежнему видит безопасный плейсхолдер, а не сырые метасимволы.
+- **Классификация по basename.** git/rm/mv/tee/sed/curl/psql/bash/sh/zsh
+  матчились только как bareword — вызов по полному пути (напр. `/usr/bin/git`)
+  не матчил ничего и утекал необнаруженным. v3 классифицирует по `${W0##*/}`
+  (basename первого слова фрагмента), путь не имеет значения для распознавания
+  команды.
+
+Три прохода (структура v2 сохранена, детали см. выше):
+(1) вырезать кавычные спаны в индексированные плейсхолдеры, (2) разбить
+нормализованную строку на простые команды по `; & | && || ( ) { } $( ``,
+(3) классифицировать каждый фрагмент по basename первого слова (после пропуска
+`VAR=val`/`command`/`env`/`nohup`/`time`/`sudo`). Закрывает subshell-обход
+(`(git commit)`), ложные срабатывания на текст внутри кавычек (`echo "git commit"`)
+и full-path обход (`/usr/bin/git commit`).
+Реализация — `.claude/hooks/dry-run-gate.sh`, функции `normalize_cmd`/`check_indirect`,
+секция «Bash matchers».
+
+Классифицируемые команды (по basename первого слова фрагмента):
 
 ```
 git (add|commit|push|pull|reset|merge|rebase|mv|rm), git checkout -*
@@ -86,27 +104,36 @@ sed -i*
 curl -X (POST|PUT|DELETE|PATCH) | curl --data | curl -d
 psql ... (INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)   # матчится по оригиналу (SQL в кавычках)
 bash|sh|zsh <script>              # indirect execution — block, КРОМЕ whitelist ниже (issue #264)
+<путь>/<script>                   # прямой запуск executable без bash/sh/zsh впереди —
+                                   # тот же whitelist, что и bash|sh|zsh
 eval|source|.|xargs               # indirect execution — payload неинспектируем после quote-strip
+> файл / >> файл                  # редирект в реальный файл (не /dev/null)
+```
 
 Whitelist read-only helpers (issue #264) — разрешены под dry-run, т.к. write-путей
 в коде скрипта нет (проверяется при добавлении, см. правило ниже):
 
 ```
-.claude/scripts/load-extensions.sh                    # относительный, от workspace-root
-$HOME/IWE/.claude/scripts/load-extensions.sh          # абсолютный, захардкожен
+.claude/scripts/load-extensions.sh                              # относительный, от workspace-root
+$HOME/IWE/.claude/scripts/load-extensions.sh                     # абсолютный, захардкожен
+FMT-exocortex-template/scripts/day-close-prepare.sh              # относительный (то же самое, что резолвит $IWE_SCRIPTS)
+$HOME/IWE/FMT-exocortex-template/scripts/day-close-prepare.sh    # абсолютный, захардкожен ($HOME/IWE + путь $IWE_SCRIPTS)
+$IWE_SCRIPTS/day-close-prepare.sh                                 # литерал как в SKILL.md, НЕ развёрнутая переменная —
+                                                                   # сверяется по точному тексту, хук её не разворачивает
 ```
 
-Абсолютный паттерн захардкожен в `$HOME/IWE`, не glob `*/.claude/...` и не
+Абсолютные паттерны захардкожены в `$HOME/IWE`, не glob `*/.claude/...` и не
 `$IWE_ROOT` — иначе подложный `/tmp/.claude/scripts/load-extensions.sh` или
 env-инъекция `IWE_ROOT=/tmp/evil` прошли бы gate (review-01 High, review-02 H1).
+Литеральная форма `$IWE_SCRIPTS/day-close-prepare.sh` сверяется как текст, а не
+раскрывается — хук никогда не вызывает `eval`/expansion над входной командой,
+поэтому переменные окружения самого хука не влияют на результат сравнения.
 Пользователи с нестандартным расположением workspace вызывают helper
 относительным путём из корня workspace.
 
-Правило whitelist: добавление только через (1) строку здесь + (2) ветку в case
-`bash|sh|zsh` в dry-run-gate.sh + (3) code review на отсутствие write-путей
+Правило whitelist: добавление только через (1) строку здесь + (2) паттерн в
+`check_indirect()` в dry-run-gate.sh + (3) code review на отсутствие write-путей
 (redirect/tee/sed -i/mv/rm в коде скрипта).
-> файл / >> файл             # редирект в реальный файл (не /dev/null)
-```
 
 ### MCP-write whitelist
 
@@ -202,6 +229,23 @@ Subagent после прогона ритуала анализирует transcr
 - **Гарантия что ритуал работает корректно содержательно** (pas-fail logic). Это open-loop verification, не closed-loop. Smoke-тест проверяет инициируемость, не правильность.
 - **Покрытие тонких side-effects** — например, скилл может прочитать `/tmp` файл, в нём `mktemp` (создаёт временный файл, формально write). Хук таких не блокирует. Принцип: блокируем то, что меняет user-data, не temp-state.
 - **Защита от malicious extensions.** Контракт работает в условиях добросовестных пилотов. Если extension намеренно обходит хук (например, через `python -c 'open(...,"w")'`) — это вне модели угроз.
+
+## Ограничения matcher'а, закрытые в v3 (2026-07-23)
+
+Обе находки из первого прохода audit-installation исправлены (см. «Bash matchers»
+выше за деталями реализации):
+
+- ~~Полный путь к известной команде обходит её специфичную проверку~~ — классификация
+  теперь по basename (`${W0##*/}`), `/usr/bin/git commit` матчит ту же ветку `git)`,
+  что и bareword `git commit`.
+- ~~Quoted-аргументы всегда блокируются, даже для whitelisted-скриптов~~ — кавычные
+  спаны теперь индексированные плейсхолдеры с сохранением исходного текста
+  (`QVALS[]`), whitelist сверяется с реальным содержимым, а не с потерянным `QSTR`.
+
+Регресс проверен: 25 тестов (сценарии из issue #237 п.1/п.4, git read/write bareword
+и full-path, whitelist bareword/quoted/direct-exec, sentinel cleanup, redirect,
+psql/curl/sed, отсутствие sentinel) — все зелёные, до и после фикса поведение
+идентично там, где не должно было меняться.
 
 ## История
 

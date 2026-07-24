@@ -298,6 +298,10 @@ check_pattern() {
     for file in $STAGED_SH; do
         # Skip PLATFORM-COMPAT.md references
         [ "$(basename "$file")" = "PLATFORM-COMPAT.md" ] && continue
+        # Skip check-platform-compat.sh — its own doc-comments and pattern-string
+        # literals name every construct it checks for, which would otherwise
+        # self-match (mirrors that script's own self-exclusion, scripts/check-platform-compat.sh:35-39)
+        [ "$(basename "$file")" = "check-platform-compat.sh" ] && continue
 
         # Check staged content (not working tree)
         local matches
