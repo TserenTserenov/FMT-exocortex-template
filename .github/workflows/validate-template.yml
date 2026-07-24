@@ -78,6 +78,8 @@ jobs:
         run: bash setup/smoke-test-fresh-install.sh
       - name: Run detector regression fixtures (regex gap guard)
         run: bash setup/test-detectors.sh
+      - name: Run DayPlan-validator hook regression (trigger gap guard)
+        run: bash setup/test-hook-dayplan-validator.sh
 
   # Upgrade-flow regression test (0.29.18).
   # Корень бага (0.29.13): template-sync перезаписал FMT файлы — smoke-test fresh
