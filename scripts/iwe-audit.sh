@@ -275,6 +275,21 @@ else
     fi
 
     echo ""
+    echo "### Git hooks (core.hooksPath)"
+    echo ""
+    # WP-484 Ф9 (2026-07-23/24): core.hooksPath drifting from .githooks/ once
+    # silently disabled the pre-push force-push guard (WP-436) on a live host —
+    # the "guard exists but isn't wired up" gap stayed invisible until an incident.
+    HOOKS_PATH=$(git -C "$DS_DIR" config --get core.hooksPath 2>/dev/null || echo "")
+    if [ "$HOOKS_PATH" != ".githooks" ]; then
+        echo "⚠️ \`core.hooksPath\` = \`${HOOKS_PATH:-<не задан>}\`, ожидается \`.githooks\` — pre-push force-push guard (WP-436) может быть отключён. Почини: \`bash scripts/install-hooks.sh\` внутри \`$GOV_REPO\`."
+    elif [ ! -x "$DS_DIR/.githooks/pre-push" ]; then
+        echo "⚠️ \`core.hooksPath\` верный, но \`.githooks/pre-push\` отсутствует или не исполняемый."
+    else
+        echo "✅ \`core.hooksPath=.githooks\`, \`pre-push\` guard подключён"
+    fi
+
+    echo ""
     echo "### Diff с FMT-strategy-template"
     echo ""
 

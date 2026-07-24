@@ -28,6 +28,38 @@ IWE="${2:-$IWE_ROOT}"
 INBOX="${1:-$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox}"
 GIT_DAYS="${WP_SWEEP_GIT_DAYS:-7}"
 
+# WP-484 Ф8 (2026-07-24): the O(WP x repo) git-log scan below hung for minutes
+# once the active-WP count crossed ~100 across ~67 repos. Parallelism/caching
+# are deliberately out of scope for this pass (need real design work) — this
+# is just a deadline so a stall degrades to an honest PENDING marker instead
+# of hanging whatever caller invoked this script.
+SWEEP_TIMEOUT_SEC="${WP_SWEEP_TIMEOUT_SEC:-60}"
+SWEEP_DEADLINE=$(( $(date +%s) + SWEEP_TIMEOUT_SEC ))
+SWEEP_TIMED_OUT=0
+
+# macOS has no GNU timeout — same perl-based polyfill already used in
+# strategist.sh (this file's header claims macOS compat, so the per-repo
+# `timeout 5 git log` below needs the same fallback, not a silent no-op).
+if ! command -v timeout &>/dev/null; then
+    timeout() {
+        local duration="$1"; shift
+        perl -e '
+            use POSIX ":sys_wait_h";
+            my $timeout = shift @ARGV;
+            my $pid = fork();
+            if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
+            eval {
+                local $SIG{ALRM} = sub { kill "TERM", $pid; die "timeout\n"; };
+                alarm $timeout;
+                waitpid($pid, 0);
+                alarm 0;
+            };
+            if ($@ && $@ eq "timeout\n") { waitpid($pid, WNOHANG); exit 124; }
+            exit ($? >> 8);
+        ' "$duration" "$@"
+    }
+fi
+
 # --- Найти python3 с yaml ---
 _find_python3() {
   if python3 -c "import yaml" 2>/dev/null; then echo "python3"; return; fi
@@ -123,8 +155,19 @@ SEEN_WP_NUMS=""
 _git_activity_cell() {
   local wp_num="$1" git_info="" git_dir repo_dir hit
   while IFS= read -r git_dir; do
+    # WP-484 Ф8 (cold-review 2026-07-24): the outer while-loops only check
+    # SWEEP_DEADLINE between WPs — with ~67 repos and a 5s per-repo timeout,
+    # ONE slow WP could otherwise burn up to repo_count*5s here before control
+    # ever returns there, blowing well past the stated budget. Check the same
+    # deadline per-repo too, so a stall anywhere bails out promptly.
+    if [[ $(date +%s) -ge $SWEEP_DEADLINE ]]; then
+      SWEEP_TIMED_OUT=1
+      break
+    fi
     repo_dir="$(dirname "$git_dir")"
-    hit=$(git -C "$repo_dir" log \
+    # WP-484 Ф8: defense-in-depth — a single stuck/corrupt repo shouldn't hang
+    # the whole sweep on top of the overall SWEEP_DEADLINE above.
+    hit=$(timeout 5 git -C "$repo_dir" log \
       --since="${GIT_DAYS} days ago" --oneline --grep="WP-${wp_num}" --all 2>/dev/null | head -1)
     if [[ -n "$hit" ]]; then git_info="$hit"; break; fi
   done < <(find "$IWE" -maxdepth 2 -name ".git" -type d 2>/dev/null)
@@ -133,6 +176,11 @@ _git_activity_cell() {
 
 while IFS=$'\x1f' read -r WP_NUM WP_TITLE STATUS_RAW REGISTRY_DONE WP_FILE; do
   [[ -z "$WP_NUM" ]] && continue
+
+  if [[ $(date +%s) -ge $SWEEP_DEADLINE ]]; then
+    SWEEP_TIMED_OUT=1
+    break
+  fi
 
   case "$STATUS_RAW" in
     in_progress|active|awaiting-batch) ;;
@@ -166,6 +214,12 @@ done <<< "$WP_LIST_US"
 if [[ -n "$WEEKPLAN_IDS" ]]; then
   while IFS= read -r WP_NUM; do
     [[ -z "$WP_NUM" ]] && continue
+
+    if [[ $(date +%s) -ge $SWEEP_DEADLINE ]]; then
+      SWEEP_TIMED_OUT=1
+      break
+    fi
+
     # Пропустить если уже найден через inbox-статус
     [[ " $SEEN_WP_NUMS " == *" $WP_NUM "* ]] && continue
     ROW=$(_wp_list_row "$WP_NUM")
@@ -184,7 +238,11 @@ if [[ -n "$WEEKPLAN_IDS" ]]; then
 fi
 
 # --- Вывод ---
-if [[ $FOUND -eq 0 ]] && [[ -z "$DRIFT_ROWS" ]]; then
+# WP-484 Ф8: a timed-out sweep with zero results so far is NOT the same as
+# "no active WPs" — the empty-result exit belongs only to the honest case
+# where the scan actually completed and found nothing (invariant: no data →
+# explicit marker, never a silent pass).
+if [[ $FOUND -eq 0 ]] && [[ -z "$DRIFT_ROWS" ]] && [[ $SWEEP_TIMED_OUT -eq 0 ]]; then
   echo "<!-- active-wp-sweep: активных РП не найдено -->"
   exit 0
 fi
@@ -207,4 +265,9 @@ if [[ -n "$DRIFT_ROWS" ]]; then
   echo "|----|-------------|"
   printf '%s' "$DRIFT_ROWS"
   echo ""
+fi
+
+if [[ $SWEEP_TIMED_OUT -eq 1 ]]; then
+  echo ""
+  echo "<!-- active-wp-sweep: PENDING — таймаут ${SWEEP_TIMEOUT_SEC}с, обработана только часть активных РП, остаток не проверен (WP-484 Ф8) -->"
 fi
