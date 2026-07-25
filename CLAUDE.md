@@ -98,9 +98,19 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 **NEVER `git add -u`, `git add .`, `git add -A`** — подхватывают изменения ДРУГИХ агентов (Kimi/Hermes работают параллельно) → неверная атрибуция. Стейджить только конкретные файлы; перед коммитом `git diff --cached --name-only`, лишнее — `git restore --staged`. Примеры → `memory/reference/agent-core.md`.
 
-## Pull Request Template — CRITICAL
+## Pull Request & Issue Protocol — CRITICAL
 
 **При создании PR всегда используй структуру из корневого `.github/PULL_REQUEST_TEMPLATE.md`.** Обязательно заполняй блоки «Целевая система», «DRR» (Design-Rationale Record — обоснование выбранного решения) и генерируй блок «Capture» (Двойной выход — какое знание зафиксировано в Pack).
+
+**Двуязычное оформление (Bilingual Engineering Protocol).** Действует на все создаваемые PR и Issues (заголовки, описания, комментарии):
+
+1. **Строго на английском** — структурные теги и термины, от которых зависят CI-линтеры и совместимость с Conventional Commits:
+   - префиксы заголовков: `feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`
+   - названия ключевых FPF-секций: `System of Interest`, `DRR (Design-Rationale Record)`, `Evidence (V&V)`, `Enabling Systems`, `WP-Gate`
+2. **Строго на естественном русском инженерном языке** — весь смысловой и описательный контент (образец — PR #304 и PR #309):
+   - развёрнутые объяснения «почему» и «зачем» (DRR)
+   - описание крайних случаев и результатов проверок (Evidence)
+   - суть изменений и анализ влияния на смежные системы
 
 ## Artifact Naming
 
