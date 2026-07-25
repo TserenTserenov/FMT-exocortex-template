@@ -654,6 +654,14 @@ render_iwe_status() {
     else
       echo "| Scheduler/триаж | 🟡 | Mode B: feedback-triage зарегистрирован, но лог не обновлялся ${last_log_age_days}д — возможно cron skipped |"
     fi
+  elif [ "$has_launchd_unit" = "true" ] && [ -z "$last_watchdog_log" ] && [ -z "$last_feedback_triage_log" ]; then
+    # issue #292 follow-up to #261: юнит(ы) планировщика зарегистрированы (кто-то
+    # разворачивал роли на этой машине), но НИ ОДНОГО лога feedback-triage не было
+    # НИКОГДА (не только сегодня/недавно — ls -t по всей истории пуст). Это не
+    # «cron не отработал» (Mode A), это «роль feedback-triage не развёрнута на
+    # этой инсталляции» — отсутствие роли не авария, ⚪. Настоящий Mode A (cron
+    # infra целиком отсутствует) остаётся ниже, под has_launchd_unit=false.
+    echo "| Scheduler/триаж | ⚪ | роль feedback-triage не развёрнута на этой машине (юнит планировщика есть, логов триажа не было никогда) |"
   else
     # Mode A: cron не запущен (нет юнита в launchctl) + нет свежих логов
     local last_log_age_days="∞"
@@ -664,9 +672,15 @@ render_iwe_status() {
     fi
     echo "| Scheduler/триаж | 🔴 | **Mode A** (cron не отработал): юнит feedback-triage не зарегистрирован в launchctl, последний лог ${last_log_age_days}д назад |"
 
-    # Auto-create incident-файл если ещё нет за сегодня
+    # Auto-create incident-файл если ещё нет за сегодня И не подавлен явно (issue
+    # #292: имя файла содержит дату — [ ! -f incident_file ] никогда не срабатывало
+    # на «сегодня другая дата» повторно, `status: deferred` в файле вчерашней даты
+    # не переживал смену даты. Отдельный маркер без даты — переживает.
+    local incident_suppress="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/.incident-suppress-scheduler-cron-not-fired"
     local incident_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/INCIDENT-scheduler-cron-not-fired-$DATE.md"
-    if [ ! -f "$incident_file" ]; then
+    if [ -f "$incident_suppress" ]; then
+      echo "  (инцидент подавлен: $incident_suppress — удалите файл, чтобы возобновить авто-создание)"
+    elif [ ! -f "$incident_file" ]; then
       mkdir -p "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox"
       cat > "$incident_file" <<INCEOF
 ---
@@ -698,8 +712,13 @@ auto_generated: true
 
 ## Auto-generation note
 
-Этот файл создан автоматически day-open-scaffold.sh при каждом обнаружении Mode A.
-Если решено отложить fix — поставить \`status: deferred\` и убрать \`auto_generated\` поле, чтобы скаффолд не перезаписывал контекст.
+Этот файл создан автоматически day-open-scaffold.sh при каждом обнаружении Mode A — имя файла содержит дату, поэтому завтрашний Mode A создаст НОВЫЙ файл с новой датой независимо от того, что вы сделаете с этим (правка frontmatter внутри датированного файла не переживает смену даты — issue #292).
+
+Если решено отложить fix и не получать новый инцидент-файл каждый день — создайте маркер:
+\`\`\`bash
+touch "\${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/.incident-suppress-scheduler-cron-not-fired"
+\`\`\`
+Удалите маркер, чтобы возобновить авто-создание.
 INCEOF
     fi
   fi
