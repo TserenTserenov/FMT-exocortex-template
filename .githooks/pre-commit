@@ -13,6 +13,44 @@ if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
     exit 1
 fi
 
+# === AUTO-FIX: version badge + manifest sync ===
+# Пилот запросил (25.07): вместо того чтобы только ругаться на рассинхрон
+# README-бейджа/манифеста, чинить его сразу и включать фикс в тот же коммит —
+# ручной правки быть не должно. Блокирующие проверки ниже (RELEASE-SYNC) и
+# в CI (release-sync job, validate B2) остаются последним рубежом — на случай,
+# если этот хук обойдут (--no-verify) или коммит придёт не через git-хуки
+# (веб-интерфейс, другой инструмент).
+STAGED_FOR_AUTOFIX=$(git diff --cached --name-only 2>/dev/null \
+    | grep -E '^(CHANGELOG\.md|docs/)' || true)
+if [ -n "$STAGED_FOR_AUTOFIX" ]; then
+    if [ -x "scripts/sync-version-badge.sh" ]; then
+        if ! bash scripts/sync-version-badge.sh --fix >/tmp/iwe-badge-autofix.$$ 2>&1; then
+            echo "AUTO-FIX: scripts/sync-version-badge.sh --fix упал"
+            cat /tmp/iwe-badge-autofix.$$
+            rm -f /tmp/iwe-badge-autofix.$$
+            exit 1
+        fi
+        if ! git diff --quiet -- README.md 2>/dev/null; then
+            git add README.md
+            echo "AUTO-FIX: README.md badge обновлён и включён в этот коммит"
+        fi
+        rm -f /tmp/iwe-badge-autofix.$$
+    fi
+    if [ -x "generate-manifest.sh" ]; then
+        if ! bash generate-manifest.sh >/tmp/iwe-manifest-autofix.$$ 2>&1; then
+            echo "AUTO-FIX: generate-manifest.sh упал"
+            cat /tmp/iwe-manifest-autofix.$$
+            rm -f /tmp/iwe-manifest-autofix.$$
+            exit 1
+        fi
+        if ! git diff --quiet -- update-manifest.json 2>/dev/null; then
+            git add update-manifest.json
+            echo "AUTO-FIX: update-manifest.json пересобран и включён в этот коммит"
+        fi
+        rm -f /tmp/iwe-manifest-autofix.$$
+    fi
+fi
+
 # === CHANGELOG ↔ update-manifest.json version sync ===
 # Корень бага (25 апр): drift на 5 версий между CHANGELOG (0.27.7) и
 # manifest (0.26.1) — update.sh --check отдавал «нет обновлений», пока
