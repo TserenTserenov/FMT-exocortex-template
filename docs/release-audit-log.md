@@ -1,15 +1,15 @@
 # Release Audit Log
 
-> Adversarial post-release audits. Process: after each release, the auto-issue `Post-release adversarial audit: vX.Y.Z` now migrates into this table. Trigger: `verify-before-promote.sh` warn gate fires on PASS-merge with no entry in the log.
+> Adversarial post-release audits. Process: after each release, an auto-issue `Post-release adversarial audit: vX.Y.Z` now migrates into this table. Trigger: `verify-before-promote.sh` warn gate fires on PASS-merge without a log entry.
 
 ## Purpose
 
-Adversarial audit — a sub-agent or external pilot searches for regressions outside existing coverage:
+Adversarial audit — a sub-agent or external pilot searches for regressions outside current coverage:
 - 8 detectors (`integration-detectors.sh`)
 - smoke 14 (`integration-smoke.sh`)
 - promote-checks (`validate-fmt-scripts.sh`)
 
-Any regression class found → new detector in `integration-detectors.sh` (if reproducible in CI) or smoke (if it requires a pilot Environment).
+Any discovered regression class → new detector in `integration-detectors.sh` (if reproducible in CI) or smoke (if it requires a pilot environment).
 
 ## Process
 
@@ -42,17 +42,17 @@ release tag vX.Y.Z → auto-issue (legacy) | new practice → entry here
 
 ## Hidden Observation From Migrated Issues
 
-During spot-check of migrated issues (peer-session [2026-06-01-18](https://github.com/TserenTserenov/DS-my-strategy/tree/main/sessions/2026-06/2026-06-01-18-fmt-issues-triage-verify)): M-checklist #75 (M1.6) contains confirmation that **the adversarial audit on 2026-05-06 found 40 findings and all were fixed** (status: ✅ Fixed across C1-C4, H2, ...). This means one of the migrated audits was actually completed — it is not "skipped-unverified", it is **completed with no entry in the public log**. The entry has been restored in the `v0.29.x (round-2)` row.
+During a spot-check of migrated issues (peer-session 2026-06-01-18, author governance repo, session transcript not published): M-checklist #75 (M1.6) contains confirmation that **the adversarial audit on 2026-05-06 found 40 findings and all were fixed** (status: ✅ Fixed across C1-C4, H2, ...). This means one of the migrated audits was actually completed — it is not `skipped-unverified`, it is **completed with no entry in the public log**. The entry has been restored in the `v0.29.x (round-2)` row.
 
 ## Ongoing Use
 
-- Each new release → one row in this table (instead of auto-issue).
-- `verify-before-promote.sh` warn-gate: if a promotion is attempted with no entry for the previous release — warning (not a block).
-- Once per quarter — review log: `skipped-unverified` entries older than 90 days → make a decision (run-now / accept-debt / wontfix).
+- Each new release → add a row to this table (instead of creating an auto-issue).
+- `verify-before-promote.sh` warn-gate: if a promotion is attempted without a log entry for the previous release — warning (not a block).
+- Quarterly log review: `skipped-unverified` entries older than 90 days → make a decision (run-now / accept-debt / wontfix).
 
 ## Related
 
 - `verify-before-promote.sh` — gate for record-keeping
 - `integration-detectors.sh` — where audit findings are returned
 - `TESTING.md` — overall strategy
-- Peer-session [2026-06-01-18](https://github.com/TserenTserenov/DS-my-strategy/tree/main/sessions/2026-06/2026-06-01-18-fmt-issues-triage-verify) — Migration from 22 open issues
+- Peer-session 2026-06-01-18 (author governance repo) — migration from 22 open issues
