@@ -5,53 +5,53 @@
 
 | Skill | What it does |
 |-------|--------------|
-| `/agent-fault` | Register an agent fault in the WP-316 L1 tracking system. No LLM — deterministic Script with no WP Gate. |
-| `/apply-captures` | Process extraction-reports with status pending-review — R15 decision (accept/reject/defer) by LIVE PILOT, record… |
-| `/archgate` | Evaluate an architectural decision against 7 ЕМОГССБ characteristics (v3 — Profile without aggregate score, conjunctive s… |
+| `/agent-fault` | Registers an agent fault in the WP-316 L1 tracking system. No LLM — deterministic Script, no WP Gate. |
+| `/apply-captures` | Processes extraction-reports with status pending-review — R15 decision (accept/reject/defer) by a LIVE PILOT, with recording… |
+| `/archgate` | Evaluates an architectural decision across 7 EMOGSSB characteristics (v3 — Profile without aggregate score, conjunctive s… |
 | `/artifactor` | Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, rout… |
 | `/audit-docs` | Audit repository documentation: detect drift between code and docs, report coverage by category. Run manually… |
-| `/audit-installation` | Audit a user's IWE installation. Runs scripts/iwe-audit.sh + MCP healthcheck + smoke-test of ritual… |
-| `/author-mode` | Instructions for an IWE Template author: staging channel (trial run → FMT), author rules L3, Extensions Gate. Load… |
-| `/bottleneck-pick` | Constraint analyst (DP.ROLE.054): identifies the main constraint (bottleneck) of a specific Pipeline via TOC… |
+| `/audit-installation` | Audit of the user's IWE installation. Runs scripts/iwe-audit.sh + MCP healthcheck + smoke-test of rituals… |
+| `/author-mode` | Instructions for the IWE Template author: staging channel (testing → FMT), author rules L3, Extensions Gate. Loads… |
+| `/bottleneck-pick` | Constraints analyst (DP.ROLE.054): finds the main Constraint (bottleneck) of a specific Pipeline via TOC… |
 | `/check-secret` | Check a text fragment for potential secrets (API keys, tokens, passwords) BEFORE sending to chat / committing… |
-| `/consent` | Manage consent in learning.tracking_consent — opt-in / opt-out / status / revoke. Required for… |
+| `/consent` | Manages consent in learning.tracking_consent — opt-in / opt-out / status / revoke. Required for… |
 | `/day-close` | Day Close Protocol. Alias for /run-protocol close day — symmetric with /day-open. |
 | `/day-open` | Day Open protocol. Collects yesterday's commits, issues, notes, calendar, bot QA, Scout, world events — build… |
 | `/decompose` | Decompose work into stages with physical artifacts and acceptance checklists. Gap detector. Use when opening… |
-| `/diagnose` | Mastery stage diagnostics (Diagnostician R28, FORM.089 §6.1 v5.0) directly in VS Code / claude.ai. Up to 6 questions,… |
-| `/discovery-session` | Discovery conversation — unpacking dissatisfactions (discovery-strategizing). Socratic breakdown of raw reflection and… |
+| `/diagnose` | Mastery stage diagnostics (Diagnostician R28, FORM.089 §6.1 v5.0) directly in VS Code / claude.ai. Up to 6 questions… |
+| `/discovery-session` | Unpacking conversation for dissatisfactions (discovery-strategizing). Socratic analysis of raw reflection and… |
 | `/extend` | IWE extensibility catalog: what can be customized, which extension points exist, which parameters are availab… |
-| `/fpf` | Load applicable principles for a task from the Pack → SPF → FPF hierarchy. Use when you need to find relevant… |
+| `/fpf` | Loads applicable principles for a task from the Pack → SPF → FPF hierarchy. Use when you need to find relevant… |
 | `/integration-gate` | IntegrationGate — mandatory checklist (4 steps) when designing a new tool, agent, detector, or… |
-| `/iwe-bug-report` | Report a bug or issue in the IWE Platform. Creates a GitHub issue in FMT-exocortex-template. |
-| `/iwe-restore` | Restore agent Memory from an exocortex Backup when moving to a new device. Finds DS-strategy/exocor… |
+| `/iwe-bug-report` | Report a bug or IWE Platform issue. Creates a GitHub issue in FMT-exocortex-template. |
+| `/iwe-restore` | Restores agent Memory from an exocortex Backup when moving to a new device. Locates DS-strategy/exocor… |
 | `/iwe-rules-review` | Weekly review of IWE work culture (element 14 — System Evolution). Runs during Week Close. |
 | `/iwe-update` | Update IWE with change explanations. Agent calls update.sh, parses CHANGELOG, explains what changed, helps ad… |
 | `/ke` | Knowledge Extraction — captures and routes knowledge at work boundaries. Use when you discover a pattern, mak… |
-| `/kimi-peer-writer` | Peer Session DP.SC.154 where Kimi = writer, Claude = Peer partner. Started with a simple phrase. Includes Opening (ORZ)… |
-| `/lesson-close` | Close a lesson opened by the /lesson skill. Finalizes lesson/YYYY-MM-DD.md (frontmatter status, metadata… |
-| `/local-llm` | Local LLM stack on Mac (Apple Silicon, MLX) for privacy and fallback mode. NL entry point for installation/launch/… |
-| `/month-close` | Month Close Protocol. Stage 7 of the VDV cascade v9 (PD.METHOD.008). Runs on the first Monday of the month… |
+| `/kimi-peer-writer` | Peer Session DP.SC.154 where Kimi = writer, Claude = Peer partner. Launched with a simple phrase. Includes OWC Opening… |
+| `/lesson-close` | Close a lesson opened with /lesson. Finalizes lesson/YYYY-MM-DD.md (frontmatter status, metadata… |
+| `/local-llm` | Local LLM stack on Mac (Apple Silicon, MLX) for privacy and fallback mode. NL entry point for install/run/… |
+| `/month-close` | Month Close Protocol. Stage 7 of the OWC cascade v9 (PD.METHOD.008). Runs on the first Monday of the month… |
 | `/org-dev` | Organizational Development Manager (R31): guides the subject from an organizational change request (self/team… |
 | `/pack-creator` | Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybr… |
 | `/pack-new` | Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap. |
-| `/peer-conversation` | Multi-turn dialogue between a writer (Claude) and a Peer partner (Kimi) on a pilot task (DP.SC.154). Manages turn-loop, detects… |
-| `/personal-guide-render` | Thin client — assembles a pilot's personal guide via local gateway (mcp__iwe-local-gateway__render… |
-| `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in the… |
-| `/platform-bottleneck` | IWE Skill — see file body |
+| `/peer-conversation` | Multi-turn dialogue between writer (Claude) and Peer partner (Kimi) on a pilot task (DP.SC.154). Manages turn-loop, detects… |
+| `/personal-guide-render` | The guide is assembled automatically on the Platform server on a schedule; the Skill checks delivery and explains the current state (manual rebuild — after the server tool is released). |
+| `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in th… |
+| `/platform-bottleneck` | IWE Skill — see file body. |
 | `/restore-exocortex` | Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-fr… |
 | `/run-protocol` | Step-by-step execution of the OWC protocol with mandatory checkpoint at each step. Prevents skipping steps (i… |
 | `/setup-wakatime` | Set up WakaTime time-tracking for Claude Code and VS Code. |
 | `/skill-creator` | | |
-| `/strategy-session` | Strategy Session dispatcher. Day-0 (no Strategy.md/WeekPlan) → initial flow (goals, dissatisfactions… |
+| `/strategy-session` | Strategy Session — dispatcher. Day-0 (no Strategy.md/WeekPlan) → initial flow (goals, dissatisfactions… |
 | `/think` | ADI-cycle structured reasoning (Abduction-Deduction-Induction-Audit-Decide). Use for complex decisions when m… |
 | `/transcribe` | Transcribe audio/video files via MLX Whisper (Apple Silicon). Usage: /transcribe path/to/file.mp3 |
-| `/vdv` | VDV Skill — generator and auditor for a staged process description based on the 6 principles of Entry·Action·Output. Use for… |
-| `/verify` | Verify an Artifact against a Pack reference. Loads Role VR.R.001 (Verifier) with context isolation — checks… |
-| `/verify-hypotheses` | Review the hypotheses log (hypotheses-log.md) on demand outside the week-close rhythm. Filters entries with status "pending… |
-| `/w-reflection` | Record a W-reflection (worldview slot RCS) in learning.w_reflections. Used by Diagnostician R28 (MIM.… |
-| `/week-close` | Week Close Protocol. 7-day Retrospective + carry-over to the new week + platform steps (Backup,… |
+| `/vdv` | OWC Skill — generator and auditor for staged process descriptions using the 6 Input·Action·Output principles. Use for… |
+| `/verify` | Verifies an Artifact against a Pack reference. Loads Role VR.R.001 (Verifier) with context isolation — checks… |
+| `/verify-hypotheses` | Reviews the hypotheses log (hypotheses-log.md) on demand outside the week-close rhythm. Filters entries with status "pending… |
+| `/w-reflection` | Records a W-reflection (worldview slot RCS) in learning.w_reflections. Used by Diagnostician R28 (MIM.… |
+| `/week-close` | Week Close Protocol. 7-day Retrospective + carry-over into the new week + platform steps (Backup,… |
 | `/week-close-pilot` | Run the pilot-facing Week Close protocol with progress review and carry-over. |
-| `/wp-new` | Create a new Work Product (WP) with atomic writes to 5 locations. Use when a new task appears,… |
+| `/wp-new` | Creates a new Work Product (WP) with atomic writes to 5 locations. Use when a new task appears… |
 
 _Total skills: 48_

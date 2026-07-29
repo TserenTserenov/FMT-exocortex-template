@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-07-29T16:15:38Z'
-last_synced_sha: 0b7720146c55a5c0bff6d0a8387e91ad8a3ec96f
+files_translated:
+- docs/skills-catalog.md
+last_run_utc: '2026-07-29T16:27:42Z'
+last_synced_sha: 9cf5c683c0dba2e3da47acc229bee90901c8ed14
 schema_version: 1
