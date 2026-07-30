@@ -1,5 +1,5 @@
 ---
-valid_from: 2026-07-23
+valid_from: 2026-07-29
 originSessionId: 9a0e726a-951e-4408-9e02-94d7eeffbf74
 
 type: reference
@@ -8,8 +8,8 @@ domains: [reference]
 status: active
 owner: user
 schema_version: 1
-fpf_version: "44dd88188a07646ef23aca32627a3f670525853f"
-fpf_synced_at: 2026-07-13
+fpf_version: "2ada413629b846ef308222d16489a82cb5b40a71"
+fpf_synced_at: 2026-07-29
 
 name: "fpf-reference"
 description: "Справочник FPF паттернов применимых в IWE: структура, ключевые Part C (C.11-C.28), трансляция терминов"

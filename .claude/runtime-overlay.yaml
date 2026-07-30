@@ -26,15 +26,24 @@ substituted:
   # Strategist (стратегические сессии, планирование)
   - roles/strategist/scripts/launchd/com.strategist.morning.plist
   - roles/strategist/scripts/launchd/com.strategist.weekreview.plist
+  # issue #319: symmetric Linux units, launchd/*.plist macOS-only until now
+  - roles/strategist/scripts/systemd/iwe-strategist-morning.service
+  - roles/strategist/scripts/systemd/iwe-strategist-morning.timer
+  - roles/strategist/scripts/systemd/iwe-strategist-weekreview.service
+  - roles/strategist/scripts/systemd/iwe-strategist-weekreview.timer
   - roles/strategist/scripts/strategist.sh
 
   # Extractor (извлечение знаний)
   - roles/extractor/scripts/launchd/com.extractor.inbox-check.plist
+  - roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
+  - roles/extractor/scripts/systemd/iwe-extractor-inbox-check.timer
   - roles/extractor/scripts/extractor.sh
   - roles/extractor/config/routing.md
 
   # Synchronizer (фоновая синхронизация, scheduler)
   - roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist
+  - roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service
+  - roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.timer
   - roles/synchronizer/scripts/scheduler.sh
   - roles/synchronizer/scripts/code-scan.sh
   - roles/synchronizer/scripts/daily-report.sh
@@ -47,7 +56,10 @@ substituted:
 
 # === COPIED_TO_WORKSPACE: FMT → $WORKSPACE_DIR/<path> (без substitution) ===
 # Файлы, которые скрипты ищут в $WORKSPACE_DIR/ (BUG-1 fix). Без substitution
-# просто копируются. При update.sh — переcопируются если изменились в FMT.
+# просто копируются. При update.sh — пересопируются если изменились в FMT,
+# КРОМЕ файлов из is_protected_user_file() (build-runtime.sh) — те сеются
+# только при отсутствии, существующая пользовательская копия не трогается
+# (issue #327: params.yaml затирался при каждом update.sh).
 copied_to_workspace:
   - .claude/sync-manifest.yaml
   - params.yaml

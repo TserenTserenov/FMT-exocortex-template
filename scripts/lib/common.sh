@@ -55,18 +55,34 @@ iwe_resolve_governance_repo() {
 # the current per-role launchd labels post-issue-#261, the other still used
 # the pre-#261 legacy iwe.scheduler/iwe.feedback labels that don't match any
 # plist actually shipped) — this is now the single source of truth for both.
+#
+# issue #314 (third recurrence of the same class after #261/#292): the
+# template ships no launcher-detection branch for cron, so a WSL install
+# where the pilot hand-rolls a crontab entry (no launchd, no systemd --user
+# timers there) always fell through to `return 1` → daily false Mode A +
+# auto-incident even though the scheduler ran fine. Two independent signals
+# added: (1) crontab, the launcher WSL installs actually use; (2) a generic
+# evidence fallback — a scheduler log written in the last 2 days under
+# ~/logs/synchronizer/, regardless of which launcher wrote it — so the next
+# unenumerated launch mechanism doesn't reopen this same bug class again.
 iwe_scheduler_active() {
-  if command -v launchctl >/dev/null 2>&1; then
-    launchctl list 2>/dev/null | grep -qE "com\.(exocortex\.scheduler|strategist\.morning|strategist\.weekreview|extractor\.inbox-check)"
-  elif command -v systemctl >/dev/null 2>&1; then
+  if command -v launchctl >/dev/null 2>&1 \
+    && launchctl list 2>/dev/null | grep -qE "com\.(exocortex\.scheduler|strategist\.morning|strategist\.weekreview|extractor\.inbox-check)"; then
+    return 0
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
     # No --all: list-timers without it already restricts to loaded+active
     # units. --all would also match a disabled/stopped timer, reporting a
     # dead scheduler as 🟢.
     systemctl --user list-timers --no-legend 2>/dev/null \
-      | grep -qE "iwe-(exocortex-scheduler|strategist-morning|strategist-weekreview|extractor-inbox-check)\.timer"
-  else
-    return 1
+      | grep -qE "iwe-(exocortex-scheduler|strategist-morning|strategist-weekreview|extractor-inbox-check)\.timer" && return 0
   fi
+  if command -v crontab >/dev/null 2>&1 \
+    && crontab -l 2>/dev/null | grep -qE "scheduler\.sh|iwe-(exocortex-scheduler|strategist|extractor)"; then
+    return 0
+  fi
+  find "$HOME/logs/synchronizer" -maxdepth 1 -iname "*scheduler*.log" -mtime -2 2>/dev/null | grep -q . && return 0
+  return 1
 }
 
 # tg_notify MESSAGE — best-effort Telegram alert via TELEGRAM_BOT_TOKEN/

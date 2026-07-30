@@ -2,10 +2,10 @@
 name: communication-style-personal
 description: "S2 пользовательский слой разговорного стиля - личные правила поверх S0 платформы"
 type: reference
-horizon: hot
+horizon: warm
 domains: [communication, ux, personal]
 status: active
-valid_from: "{{DATE}}"
+valid_from: 2026-06-03
 owner: user
 schema_version: 1
 layer: S2

@@ -2,7 +2,7 @@
 name: feedback_community_communication_style
 description: Стиль общения с участниками сообщества - понятный русский, без служебного шума, компактная структура
 type: feedback
-horizon: hot
+horizon: warm
 domains: [communication, community, ux]
 status: active
 valid_from: 2026-06-01

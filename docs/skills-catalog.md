@@ -36,7 +36,7 @@
 | `/pack-creator` | Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybr… |
 | `/pack-new` | Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap. |
 | `/peer-conversation` | Многотуровый диалог писателя (Claude) с напарником (Kimi) по задаче пилота (DP.SC.154). Ведёт turn-loop, обна… |
-| `/personal-guide-render` | Тонкий клиент — собирает персональное руководство пилота через локальный шлюз (mcp__iwe-local-gateway__render… |
+| `/personal-guide-render` | Руководство собирается автоматически на сервере платформы по расписанию; скилл проверяет доставку и объясняет состояние (ручной пересбор — после выхода серверного инструмента) |
 | `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in th… |
 | `/platform-bottleneck` | Скилл IWE — см. тело файла |
 | `/restore-exocortex` | Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-fr… |

@@ -61,6 +61,8 @@ gates_rationale: "операционный скилл; WP Gate применим 
 - **Приоритет:** критический / высокий / средний / низкий
 - **Результат месяца:** (только для РП ≥3h) к какому результату месяца (R1, R2, …) привязан? Допустимые ответы: R{N}, поддержка, off-plan. Source-of-truth маппинга: `${IWE_GOVERNANCE_REPO:-DS-strategy}/docs/Strategy.md` → «РП → Результаты»
 - **Критерий готовности:** что должно получиться
+- **Ставка — переход состояния (WP-457, WP-505):** ось из `docs/state-axes-registry.yaml` (только `gate_ready`: permission/Доверие, belonging/Оснащённость, engagement/Увлечённость, mastery/Компетентность) + формулировка «из → в» одной строкой; субъект перехода — пользователь платформы / пилот / команда. **Обязательно**, если файл реестра осей существует — скрипт заблокирует создание без `--state`. Файла нет (типовая установка) → пропустить.
+- **Гипотеза:** номер `H-NNN` из `current/hypotheses-log.md` (если журнал ведётся), либо «—» — осознанное «ставки нет» (инфраструктура/техдолг). Попадает в frontmatter и колонку «Ставка» реестра.
 
 ## Шаг 2. Нумерация
 
@@ -72,13 +74,14 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Шаг 4. Запись — запустить `scripts/create-wp.sh`
 
-Все шаги ниже автоматизированы скриптом `scripts/create-wp.sh`. Скрипт пишет в 5 мест:
+Все шаги ниже автоматизированы скриптом `scripts/create-wp.sh`. Скрипт пишет в 4 места:
 
 1. **`inbox/WP-{N}/WP-{N}.md`** → context file (всегда папка — WP-434, см. INBOX-CONVENTION)
-2. **`archive/wp-contexts/WP-{N}-{slug}.md`** → заготовка §Закрытия (stub с frontmatter)
-3. **`docs/WP-REGISTRY.md`** → новая строка таблицы
-4. **`current/WeekPlan W{N}…md`** → новая строка в таблице РП
-5. **`current/active-wp.md`** → пересобирается автоматически (`build-active-wp.py`)
+2. **`docs/WP-REGISTRY.md`** → новая строка таблицы
+3. **`current/WeekPlan W{N}…md`** → новая строка в таблице РП
+4. **`current/active-wp.md`** → пересобирается автоматически (`build-active-wp.py`)
+
+> **issue #280:** до этого фикса скрипт дополнительно создавал заготовку `archive/wp-contexts/WP-{N}-{slug}.md` (§Закрытия stub). Эта заготовка больше не создаётся при регистрации — `close-wp.sh` сам создаёт файл заново при закрытии РП, канонический путь `git mv` из `protocol-close.md` не конфликтует с существующим файлом. Пустые заготовки, найденные в `archive/wp-contexts/` с датой до этого фикса, — след старого поведения, не действующая норма.
 
 **После скрипта — агент вызывает MCP (не вручную):**
 - **Linear issue** — вызвать `mcp__claude_ai_linear__save_issue`:
@@ -93,6 +96,8 @@ bash scripts/create-wp.sh \
   --title "Название РП" \
   --budget 5h \
   --priority P2 \
+  --state "belonging (Оснащённость): пилот без Х → с Х" \  # обязателен при наличии docs/state-axes-registry.yaml
+  --hypothesis H-101 \ # необязательно; по умолчанию «—» (нет ставки)
   --result R3 \        # необязательно; если ≥3h — передать для автовставки в Strategy.md
   --repo "DS-repo"     # необязательно
 ```
@@ -108,6 +113,8 @@ budget: {Nh}
 created: {YYYY-MM-DD}
 last_session: {YYYY-MM-DD}
 related: []
+state_transition: "{ось (Русское имя): из → в}"
+hypothesis: "{H-NNN или —}"
 ---
 
 # WP-{N}: {название}
@@ -121,7 +128,7 @@ related: []
 
 ## Шаг 5. Подтверждение
 
-Выведи: *«РП #{N} создан. Скрипт записал в 5 местах: context file, archive stub, Registry, WeekPlan, active-wp пересобран. Linear — {TSR-NN}.»*
+Выведи: *«РП #{N} создан. Скрипт записал в 4 местах: context file, Registry, WeekPlan, active-wp пересобран. Linear — {TSR-NN}.»*
 Если ≥3h и `--result` не передан: добавить «+ добавить маппинг в Strategy.md вручную».
 
 ```bash

@@ -171,6 +171,20 @@ $extra_args"
     local strategy_dir="$WORKSPACE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
     if [ -d "$strategy_dir/.git" ]; then
+        # WP-429 Ф6.5: пре-фильтры на новых extraction-reports ДО commit — advisory,
+        # не блокирует (WP-429 паттерн: детектор предлагает, не правит; решение по
+        # находке — R15 на /apply-captures). Только реально новые (untracked) отчёты
+        # этого прогона, не весь каталог — иначе шумит на старых уже прошедших отчётах.
+        local prefilter_script="$SCRIPT_DIR/wp429-extractor-prefilters.py"
+        if [ -f "$prefilter_script" ] && command -v python3 >/dev/null 2>&1; then
+            local new_report
+            for new_report in $(git -C "$strategy_dir" ls-files --others --exclude-standard -- inbox/extraction-reports/ 2>/dev/null); do
+                python3 "$prefilter_script" --report "$strategy_dir/$new_report" >> "$LOG_FILE" 2>&1 \
+                    && log "Pre-filters clean: $new_report" \
+                    || log "Pre-filters found signals (advisory): $new_report — см. $LOG_FILE"
+            done
+        fi
+
         # Очистить staging area
         git -C "$strategy_dir" reset --quiet 2>/dev/null || true
 

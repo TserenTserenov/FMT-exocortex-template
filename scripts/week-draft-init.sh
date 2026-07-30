@@ -65,8 +65,14 @@ fi
 mkdir -p "$DRAFT_DIR"
 
 # Вычисляем даты Пн-Вс текущей ISO-недели
-MON_DATE=$(date -v-$(($(date +%u)-1))d +%Y-%m-%d 2>/dev/null || date -d "monday this week" +%Y-%m-%d)
-SUN_DATE=$(date -v+$((7-$(date +%u)))d +%Y-%m-%d 2>/dev/null || date -d "sunday this week" +%Y-%m-%d)
+# Баг-фикс 24.07: "monday this week"/"sunday this week" в GNU date не якорятся на текущую
+# календарную неделю — это "следующее вхождение дня недели", которое зависит от того, прошёл
+# ли этот день недели уже сегодня. В пятницу (%u=5) Пн (день 1) уже прошёл → "monday this week"
+# прыгает на СЛЕДУЮЩИЙ понедельник, а Вс (день 7) ещё не наступило → "sunday this week" остаётся
+# в ТЕКУЩЕЙ неделе — на выходе несогласованный диапазон (напр. «27-26 июля», Пн из будущей недели
+# + Вс из текущей). Фикс: то же смещение в днях от сегодня, что уже верно работает в ветке -v (BSD).
+MON_DATE=$(date -v-$(($(date +%u)-1))d +%Y-%m-%d 2>/dev/null || date -d "today - $(($(date +%u)-1)) days" +%Y-%m-%d)
+SUN_DATE=$(date -v+$((7-$(date +%u)))d +%Y-%m-%d 2>/dev/null || date -d "today + $((7-$(date +%u))) days" +%Y-%m-%d)
 
 # issue #155: || fallback на GNU date (Linux) — иначе date -j падает, 2>/dev/null глушит, день пустой
 MON_DAY=$(date -j -f %Y-%m-%d "$MON_DATE" +%d 2>/dev/null || date -d "$MON_DATE" +%d 2>/dev/null); MON_DAY=${MON_DAY#0}

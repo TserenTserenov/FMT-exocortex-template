@@ -4,7 +4,7 @@ description: 12 паттернов засорения ответов агент�
 metadata: 
   node_type: memory
   type: feedback
-  horizon: hot
+  horizon: warm
   domains: 
     - communication
     - agent-behaviour

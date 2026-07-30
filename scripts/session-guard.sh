@@ -190,7 +190,11 @@ if [ "$CMD" = "open" ]; then
   while IFS= read -r STALE; do
     [ -z "$STALE" ] && continue
     [ -f "$STALE" ] || continue
-    STALE_MTIME=$(stat -f %m "$STALE" 2>/dev/null || stat -c %Y "$STALE" 2>/dev/null || echo "")
+    # GNU stat first: `stat -f %m` on GNU coreutils means --file-system mode
+    # (ignores %m as an mtime format, prints a multi-line filesystem report
+    # instead) — it exits 0 with garbage, so a BSD-first `||` order never
+    # falls through to the working branch on Linux (found 2026-07-25).
+    STALE_MTIME=$(stat -c %Y "$STALE" 2>/dev/null || stat -f %m "$STALE" 2>/dev/null || echo "")
     [ -z "$STALE_MTIME" ] && continue
     STALE_AGE=$(( $(date +%s) - STALE_MTIME ))
     if [ "$STALE_AGE" -gt 1800 ]; then

@@ -101,12 +101,9 @@ if $VALIDATE_ONLY; then
     done
 
     # Check extensions
-    # issue: extensions/ живёт в рабочем пространстве (WORKSPACE_GUESS), не в
-    # самом шаблоне — так их ищет load-extensions.sh в рантайме. Проверка по
-    # $SCRIPT_DIR всегда находила бандл шаблона и маскировала пустой workspace/extensions.
     echo "[3/4] Extensions..."
-    if [ -d "$WORKSPACE_GUESS/extensions" ]; then
-        EXT_COUNT=$(find "$WORKSPACE_GUESS/extensions" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    if [ -d "$SCRIPT_DIR/extensions" ]; then
+        EXT_COUNT=$(find "$SCRIPT_DIR/extensions" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
         echo "  ✓ extensions/ ($EXT_COUNT файлов)"
     else
         echo "  ⚠ extensions/ не найдена (опционально)"
@@ -679,6 +676,17 @@ else
     echo "[4e] Generating executor-catalog.yaml..."
     if CATALOG_OUTPUT=$(IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" python3 "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" 2>&1); then
         echo "$CATALOG_OUTPUT" | sed 's/^/  /'
+    elif echo "$CATALOG_OUTPUT" | grep -q "No module named 'yaml'"; then
+        # Голая Ubuntu/Debian не тащит PyYAML в system python3 (issue найден живым
+        # прогоном WP-5, 2026-07-27) — сырой traceback пугает новичка без подсказки.
+        echo "  ⚠ executor-catalog.yaml не сгенерирован — не хватает библиотеки PyYAML для python3."
+        if [ "$(uname)" = "Linux" ]; then
+            echo "    Установи: sudo apt install python3-yaml (или: pip3 install pyyaml, если pip3 уже стоит)"
+        else
+            echo "    Установи: pip3 install pyyaml"
+        fi
+        echo "    Потом выполни вручную:"
+        echo "    python3 $TEMPLATE_DIR/scripts/generate-executor-catalog.py"
     else
         echo "$CATALOG_OUTPUT" | sed 's/^/  /'
         echo "  ⚠ executor-catalog.yaml не сгенерирован — запусти вручную:"
@@ -775,12 +783,33 @@ elif $DRY_RUN; then
     fi
 else
     if [ -d "$STRATEGY_TEMPLATE" ]; then
+        # bug (issue #305): $MY_STRATEGY_DIR can exist as a plain non-git dir on a
+        # rerun after a prior failed setup.sh left it via the "seed/strategy not
+        # found" fallback below (mkdir -p .../{current,inbox,...}). `cp -r src dst`
+        # then nests src INSIDE an existing dst instead of merging — reproduces the
+        # reported "DS-strategy/strategy/..." double-nesting. Fail loud instead of
+        # silently producing a broken layout; `cp -r src/. dst/` copies contents
+        # correctly whether dst pre-exists (empty, after this guard) or not.
+        if [ -d "$MY_STRATEGY_DIR" ] && [ -n "$(ls -A "$MY_STRATEGY_DIR" 2>/dev/null)" ]; then
+            echo "  ERROR: $MY_STRATEGY_DIR already exists and is not a git repo (partial/failed prior run?)."
+            echo "  Fix: inspect and clean it up (or rename it aside), then re-run setup.sh."
+            exit 1
+        fi
         # Copy my-strategy template into its own repo
-        cp -r "$STRATEGY_TEMPLATE" "$MY_STRATEGY_DIR"
+        mkdir -p "$MY_STRATEGY_DIR"
+        cp -r "$STRATEGY_TEMPLATE"/. "$MY_STRATEGY_DIR"/
         cd "$MY_STRATEGY_DIR"
         git init
         git add -A
         git commit -m "Initial exocortex: DS-strategy governance hub"
+
+        # Enable secrets-check pre-commit hook (issue #317: install-iwe-paths.sh
+        # runs at step [4d], before this repo exists — its auto-enable loop can't
+        # see it on first setup.sh run, and update.sh never calls that script).
+        if [ -d "$MY_STRATEGY_DIR/.githooks" ]; then
+            git config core.hooksPath .githooks 2>/dev/null && \
+                echo "  Pre-commit hook enabled (.githooks/)" || true
+        fi
 
         if ! $CORE_ONLY; then
             # Create GitHub repo (full mode only)

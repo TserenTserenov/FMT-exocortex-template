@@ -34,14 +34,23 @@ escape_html() {
 table_to_list() {
     local file="$1"
     local section="$2"
+    # dayplan: 🚦 | ТВС | # | РП | h | Статус (2 leading columns vs weekplan)
+    # weekplan (default): # | РП | Бюджет | Статус | Дедлайн | Репо
+    local format="${3:-weekplan}"
 
     sed -n -E "/^## ${section}|<summary>.*${section}/,/^---|^<\/details>/p" "$file" \
         | grep '^|' \
         | tail -n +3 \
-        | while IFS='|' read -r _ num rp budget priority status _rest; do
+        | while IFS='|' read -r _ f1 f2 f3 f4 f5 f6 _rest; do
+            local num rp hours status
+            if [ "$format" = "dayplan" ]; then
+                num="$f3"; rp="$f4"; hours="$f5"; status="$f6"
+            else
+                num="$f1"; rp="$f2"; hours="$f3"; status="$f4"
+            fi
             num=$(echo "$num" | xargs)
             rp=$(echo "$rp" | xargs | sed 's/\*\*//g')
-            budget=$(echo "$budget" | xargs | sed 's/\*\*//g')
+            hours=$(echo "$hours" | xargs | sed 's/\*\*//g')
             status=$(echo "$status" | xargs)
 
             local icon="⬜"
@@ -51,7 +60,7 @@ table_to_list() {
                 *pending*) icon="⬜" ;;
             esac
 
-            printf "%s #%s %s (%s)\n" "$icon" "$num" "$rp" "$budget"
+            printf "%s #%s %s (%s)\n" "$icon" "$num" "$rp" "$hours"
         done
 }
 
@@ -89,7 +98,7 @@ build_message() {
             local title
             title=$(grep '^# ' "$file" | head -1 | sed 's/^# //' | escape_html)
             local plan_items
-            plan_items=$(table_to_list "$file" "План на сегодня" | escape_html)
+            plan_items=$(table_to_list "$file" "План на сегодня" "dayplan" | escape_html)
 
             printf "<b>📋 %s</b>\n\n" "$title"
             printf "<b>План:</b>\n%s" "$plan_items"

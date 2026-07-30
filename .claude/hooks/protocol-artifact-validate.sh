@@ -106,17 +106,38 @@ if grep -q "Наработки Scout" "$DAYPLAN" 2>/dev/null; then
 fi
 
 # --- Ф3 Check 3: формат мультипликатора ---
-if ! grep -qE "~[0-9]+\.?[0-9]*x" "$DAYPLAN"; then
-  ERRORS+=("Мультипликатор не найден — нужен формат '~N.Nx' в строке бюджета")
+# issue #328: без сконфигурированного учёта времени мультипликатор считать не из
+# чего — принуждение к числу даёт фиктивное '~1.0x', которое через месяц читается
+# как измерение. Явная текстовая оговорка ("мультипликатор не считаю"/"не
+# настроен") — такое же честное состояние поля, как и само число.
+if ! grep -qE "~[0-9]+\.?[0-9]*x" "$DAYPLAN" && ! grep -qiE "мультипликатор.*(не считаю|не наст)" "$DAYPLAN"; then
+  ERRORS+=("Мультипликатор не найден — нужен формат '~N.Nx' в строке бюджета, либо явная оговорка 'мультипликатор не считаю'")
 fi
 
 # --- Ф3 Check 4 (legacy): mandatory check и бюджет ---
-if ! grep -qi "mandatory" "$DAYPLAN"; then
-  ERRORS+=("Mandatory check (WP-7 + контентный РП) не найден")
+# issue #328: "mandatory" был зашит текстом одной конкретной установки (WP-7 +
+# авторский контентный РП). Источник истины — mandatory_daily_wps в
+# day-rhythm-config.yaml; закомментирован/пуст → пользователь явно сконфигурировал
+# "обязательных РП нет", секцию в DayPlan не требуем.
+MANDATORY_WPS_CONFIGURED=false
+DAY_RHYTHM_CONFIG="$WORKSPACE/memory/day-rhythm-config.yaml"
+if [ -f "$DAY_RHYTHM_CONFIG" ] && command -v python3 >/dev/null 2>&1; then
+  if python3 -c "
+import yaml, sys
+d = yaml.safe_load(open(sys.argv[1])) or {}
+sys.exit(0 if d.get('mandatory_daily_wps') else 1)
+" "$DAY_RHYTHM_CONFIG" 2>/dev/null; then
+    MANDATORY_WPS_CONFIGURED=true
+  fi
+fi
+if [ "$MANDATORY_WPS_CONFIGURED" = "true" ] && ! grep -qi "mandatory" "$DAYPLAN"; then
+  ERRORS+=("Mandatory check не найден (mandatory_daily_wps сконфигурирован в day-rhythm-config.yaml)")
 fi
 
-if ! grep -qE "~[0-9]+\.?[0-9]*h РП" "$DAYPLAN"; then
-  ERRORS+=("Бюджет дня не в формате '~Xh РП / ~Yh физ'")
+# issue #328: русская 'ч' — стандартный формат formatting.md, латинская 'h' — старый
+# формат, оставлена для обратной совместимости с уже существующими артефактами.
+if ! grep -qE "~[0-9]+\.?[0-9]* ?[hч] РП" "$DAYPLAN"; then
+  ERRORS+=("Бюджет дня не в формате '~Xч РП / ~Yч физ' (латинская 'h' тоже принимается)")
 fi
 
 # --- Ф3 Check 5: Carry-over цитата (если есть предыдущий DayPlan) ---
@@ -149,19 +170,12 @@ if [ -n "$WEEKPLAN" ] && [ -f "$WEEKPLAN" ]; then
     WP_ERRORS+=("WeekPlan >80 строк ($WP_LINES) но секций (## или <summary>) < 3 ($WP_HEADINGS_COUNT). Используй ## заголовки или <details><summary> для структурирования.")
   fi
 
-  # Детектор (в): обязательные секции WeekPlan (по templates-dayplan.md)
-  # ОПТ-5 (WP-297, 8 май): «Итоги» переехали в WeekReport — больше не required в WeekPlan
-  WP_REQUIRED=(
-    "Повестка|Agenda"
-    "Inbox Triage"
-    "План на неделю|Week Plan"
-    "Контент-план|Content Plan"
-  )
-  for wp_section in "${WP_REQUIRED[@]}"; do
-    if ! grep -qE "$wp_section" "$WEEKPLAN"; then
-      WP_MISSING_LIST+=("$wp_section")
-    fi
-  done
+  # Детектор (в) — обязательные секции WeekPlan — удалён (issue #318 hotfix,
+  # 2026-07-28): список заголовков дважды подряд отставал от реальной структуры
+  # и при проверке на всей истории пилота блокировал 23 из 24 архивных файлов
+  # (секции вроде "## Carry-over" появляются только на Week Close, не в течение
+  # недели). Структура WeekPlan меняется слишком часто для жёсткого gate по
+  # именам заголовков — детектор (а) выше остаётся, он от них не зависит.
 
   # Детектор (г): WeekReport валидация (ОПТ-5 WP-297)
   # issue #248: та же болезнь — раньше брался ПОСЛЕДНИЙ WeekReport на диске,

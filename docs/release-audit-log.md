@@ -42,7 +42,7 @@ release tag vX.Y.Z → auto-issue (legacy) | новая практика → з�
 
 ## Скрытое наблюдение из мигрированных issues
 
-При spot-check мигрируемых issue (peer-session [2026-06-01-18](https://github.com/TserenTserenov/DS-my-strategy/tree/main/sessions/2026-06/2026-06-01-18-fmt-issues-triage-verify)) обнаружено: M-checklist #75 (M1.6) содержит подтверждение что **adversarial audit 2026-05-06 нашёл 40 findings и все они зафиксированы** (status: ✅ Fixed по C1-C4, H2, ...). То есть один из мигрированных аудитов был реально проведён — это не «skipped-unverified», это **completed без записи в публичный log**. Запись восстановлена в строке `v0.29.x (round-2)`.
+При spot-check мигрируемых issue (peer-session 2026-06-01-18, авторский governance-репо, session-транскрипт не публикуется) обнаружено: M-checklist #75 (M1.6) содержит подтверждение что **adversarial audit 2026-05-06 нашёл 40 findings и все они зафиксированы** (status: ✅ Fixed по C1-C4, H2, ...). То есть один из мигрированных аудитов был реально проведён — это не «skipped-unverified», это **completed без записи в публичный log**. Запись восстановлена в строке `v0.29.x (round-2)`.
 
 ## Дальнейшее использование
 
@@ -55,4 +55,4 @@ release tag vX.Y.Z → auto-issue (legacy) | новая практика → з�
 - `verify-before-promote.sh` — gate для record-keeping
 - `integration-detectors.sh` — куда возвращаются находки audit'а
 - `TESTING.md` — общая стратегия
-- Peer-session [2026-06-01-18](https://github.com/TserenTserenov/DS-my-strategy/tree/main/sessions/2026-06/2026-06-01-18-fmt-issues-triage-verify) — миграция из 22 open issues
+- Peer-session 2026-06-01-18 (авторский governance-репо) — миграция из 22 open issues

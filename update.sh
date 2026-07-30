@@ -114,6 +114,13 @@ substitute_claude_placeholders() {
         case "$line" in \#*|"") continue ;; esac
         key="${line%%=*}"; value="${line#*=}"
         key=$(echo "$key" | tr -d '[:space:]')
+        # issue #316-fix2: значения в .exocortex.env процитированы с #223 —
+        # этот парсер читает файл строкой, не через `source`, поэтому кавычки
+        # остаются частью значения буквально (не синтаксис, а данные) и
+        # подставились бы в CLAUDE.md как есть, напр. {{TIMEZONE_DESC}} → "4:00 UTC".
+        # Тот же паттерн снятия кавычек, что уже применён к этому файлу в другом
+        # non-source парсере (см. ENV_WS/ENV_GOV ниже по файлу).
+        value=$(echo "$value" | tr -d '"' | tr -d "'")
         [ -z "$key" ] && continue
         declare "SUBST_$key=$value"
     done < "$env_file"
@@ -675,8 +682,11 @@ for f in "${NEW_FILES[@]}"; do
     mkdir -p "$SCRIPT_DIR/$(dirname "$f")"
     cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
     APPLIED_PATHS+=("$f")
-    # Make scripts executable
-    case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+    # Make scripts executable — files arrive via raw `curl -o` (no file-mode
+    # metadata survives), so the +x bit must be reapplied explicitly here.
+    # issue #308: .githooks/* is not cosmetic (git silently skips a non-executable
+    # hook); wp-list.py/check-claude-md-links.py are git-tracked 755 upstream.
+    case "$f" in *.sh|.githooks/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
     echo "  + $f"
     APPLIED=$((APPLIED + 1))
 done
@@ -728,19 +738,26 @@ for f in "${UPDATED_FILES[@]}"; do
                 fi
             fi
         else
-            # No base file (first update after migration) — fallback to USER-SPACE preserve
+            # issue #336: no base file (first migration or lost .claude.md.base) — a
+            # blind `cp $NEW_FILE $CURRENT_FILE` silently discarded any pilot edit to
+            # §8/§9 that wasn't wrapped in explicit <!-- USER-SPACE --> markers (those
+            # markers don't exist in the real §8/§9 format). Without a real base there
+            # is no safe 3-way merge — leave the pilot's file untouched and surface it
+            # the same way an unresolved merge conflict is surfaced, instead of guessing.
             USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$CURRENT_FILE")
-            cp "$NEW_FILE" "$CURRENT_FILE"
             if [ -n "$USER_SECTION" ]; then
+                cp "$NEW_FILE" "$CURRENT_FILE"
                 sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CURRENT_FILE"
                 echo "" >> "$CURRENT_FILE"
                 echo "$USER_SECTION" >> "$CURRENT_FILE"
+                cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
                 echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
             else
-                echo "  ~ $f"
+                cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
+                CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + 1))
+                echo "  ⚠ $f НЕ тронут — базовый файл для слияния отсутствовал."
+                echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
             fi
-            # Save base for next update
-            cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
         fi
     elif [[ "$f" == .claude/skills/*/SKILL.md ]]; then
         # USER-SPACE preserve for L1 skill spec files (no install_constants in SCRIPT_DIR — already {{KEY}})
@@ -761,7 +778,8 @@ for f in "${UPDATED_FILES[@]}"; do
         fi
     else
         cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-        case "$f" in *.sh) chmod +x "$SCRIPT_DIR/$f" ;; esac
+        # issue #308: same +x reapply as the NEW_FILES loop above (curl fetch drops file mode).
+        case "$f" in *.sh|.githooks/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
         echo "  ~ $f"
     fi
     APPLIED=$((APPLIED + 1))
@@ -794,11 +812,14 @@ fi
 
 # CLAUDE.md conflict (issue #226): warn and remember, but keep going — propagation
 # and commit of everything else must not be blocked by one unresolved merge.
+# issue #336: this counter now also covers the missing-base case (§740 above) —
+# no <<<<<<< markers there, the file was simply left untouched.
 if [ "$CLAUDE_CONFLICTS" -gt 0 ]; then
     echo ""
-    echo "ОШИБКА: CLAUDE.md содержит неразрешённые конфликты слияния."
-    echo "  Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-    echo "  Разрешите их вручную в $SCRIPT_DIR/CLAUDE.md после завершения обновления."
+    echo "ОШИБКА: CLAUDE.md требует вашего внимания перед следующим обновлением."
+    echo "  Либо неразрешённые конфликты слияния (обозначены <<<<<<< / ======= / >>>>>>>),"
+    echo "  либо файл не тронут из-за отсутствующего базового файла для слияния — см. вывод выше."
+    echo "  Разберите вручную в $SCRIPT_DIR/CLAUDE.md после завершения обновления."
     CLAUDE_CONFLICT_DETECTED=true
     CLAUDE_CONFLICT_FILES+=("$SCRIPT_DIR/CLAUDE.md")
 fi
@@ -866,6 +887,10 @@ if [ -f "$ENV_FILE" ]; then
             value="${line#*=}"
             # Trim whitespace from key
             key=$(echo "$key" | tr -d '[:space:]')
+            # issue #316-fix2: см. тот же комментарий в substitute_claude_placeholders() —
+            # non-source парсер, кавычки из процитированных (#223) значений остаются
+            # буквально в строке и ломают DETECT_WS/[ -d ... ] ниже без снятия.
+            value=$(echo "$value" | tr -d '"' | tr -d "'")
             [ -z "$key" ] && continue
             # Export for use below (secrets: L4_DATABASE_URL etc. are loaded but not substituted into files)
             declare "ENV_$key=$value"
@@ -960,16 +985,19 @@ else
     DETECTED_WORKSPACE="$WORKSPACE_DIR"
     DETECTED_REPO="$(basename "$SCRIPT_DIR")"
 
+    # issue #316: значения ВСЕГДА в кавычках — тот же паттерн, что setup.sh
+    # применил для #223. Непроцитированное значение с пробелом (напр.
+    # TIMEZONE_DESC=4:00 UTC) ломает sourcing ('UTC: command not found').
     cat > "$ENV_FILE" <<ENVEOF
 # Exocortex configuration (auto-detected by update.sh — verify and fix values)
 # SECURITY: chmod 600. Listed in .gitignore. Do NOT commit this file.
-GITHUB_USER=your-username
-WORKSPACE_DIR=$DETECTED_WORKSPACE
-CLAUDE_PATH=$(command -v claude 2>/dev/null || echo 'claude')
-CLAUDE_PROJECT_SLUG=$(echo "$DETECTED_WORKSPACE" | tr '/' '-')
-TIMEZONE_HOUR=4
-TIMEZONE_DESC=4:00 UTC
-HOME_DIR=$HOME
+GITHUB_USER="your-username"
+WORKSPACE_DIR="$DETECTED_WORKSPACE"
+CLAUDE_PATH="$(command -v claude 2>/dev/null || echo 'claude')"
+CLAUDE_PROJECT_SLUG="$(echo "$DETECTED_WORKSPACE" | tr '/' '-')"
+TIMEZONE_HOUR="4"
+TIMEZONE_DESC="4:00 UTC"
+HOME_DIR="$HOME"
 
 # === Knowledge Gateway (T3+) — fill in if using personal Pack index ===
 L4_BACKEND=
@@ -1057,19 +1085,34 @@ if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
                 echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
             fi
         fi
-    else
-        # Fallback: USER-SPACE preserve (first update or no git)
-        if [ -f "$WS_CURRENT" ]; then
-            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
-        fi
+    elif [ ! -f "$WS_CURRENT" ]; then
+        # No workspace CLAUDE.md yet — first install, nothing of the pilot's to lose.
         cp "$WS_NEW" "$WS_CURRENT"
-        if [ -n "${WS_USER_SECTION:-}" ]; then
+        cp "$WS_NEW" "$WS_BASE"
+        echo "  ✓ $WS_CURRENT создан"
+    else
+        # issue #336: WS_CURRENT already exists but .claude.md.base is missing/lost
+        # (e.g. re-clone, migration gap) — a blind `cp $WS_NEW $WS_CURRENT` silently
+        # discarded any pilot edit to §8/§9 that wasn't wrapped in explicit
+        # <!-- USER-SPACE --> markers (those markers don't exist in the real §8/§9
+        # format). Without a real base there is no safe 3-way merge — leave the
+        # pilot's file untouched and surface it the same way an unresolved merge
+        # conflict is surfaced, instead of guessing.
+        WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
+        if [ -n "$WS_USER_SECTION" ]; then
+            cp "$WS_NEW" "$WS_CURRENT"
             sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
             echo "" >> "$WS_CURRENT"
             echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+            cp "$WS_NEW" "$WS_BASE"
+            echo "  ✓ $WS_CURRENT обновлён (USER-SPACE сохранён, базовый файл создан)"
+        else
+            cp "$WS_NEW" "$WS_BASE"
+            CLAUDE_CONFLICT_DETECTED=true
+            CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
+            echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
+            echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
         fi
-        cp "$WS_NEW" "$WS_BASE"
-        echo "  ✓ $WS_CURRENT обновлён (базовый файл создан)"
     fi
     CLAUDE_UPDATED=true
 fi
@@ -1247,17 +1290,9 @@ ZSHENV_EOF
     fi
 fi
 
-# === Step 6c: Regenerate .mcp.json in workspace (if template .mcp.json updated) ===
-# .mcp.json is immune from direct overwrite — but if the template version changed,
-# we regenerate the workspace copy with fresh variable substitution + user merge.
 MCP_TEMPLATE="$SCRIPT_DIR/.mcp.json"
 MCP_WORKSPACE="$WORKSPACE_DIR/.mcp.json"
 MCP_USER="$WORKSPACE_DIR/extensions/mcp-user.json"
-
-MCP_TEMPLATE_CHANGED=false
-for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-    if [ "$f" = ".mcp.json" ]; then MCP_TEMPLATE_CHANGED=true; break; fi
-done
 
 # === Step 6c: Migrate workspace .mcp.json to Gateway ===
 # Strategy: migrate in-place first (preserving user servers), then fallback to template copy.
@@ -1523,6 +1558,19 @@ if [ -f "$ENV_FILE" ]; then
             echo "    bash $SCRIPT_DIR/scripts/migrate-initial-marker.sh"
         fi
     fi
+fi
+
+# === Step 7.6: Re-run install-iwe-paths.sh auto-enable (issue #317) ===
+# CHANGELOG 0.28.5 promised this ("update.sh может тоже его вызывать при
+# следующих апгрейдах"), but the call was never added — so a DS-strategy
+# repo that shipped with .githooks/ after this update had no way to get
+# core.hooksPath enabled without a fresh setup.sh run.
+if ! $CHECK_ONLY; then
+    bash "$SCRIPT_DIR/setup/install-iwe-paths.sh" \
+        --workspace "$WORKSPACE_DIR" --governance "${IWE_GOVERNANCE_REPO:-DS-strategy}" --quiet 2>&1 | sed 's/^/  /'
+    INSTALL_PATHS_STATUS="${PIPESTATUS[0]}"
+    [ "$INSTALL_PATHS_STATUS" -eq 0 ] || \
+        echo "  ⚠ install-iwe-paths.sh завершился с ошибкой (exit $INSTALL_PATHS_STATUS). Запустите вручную: bash $SCRIPT_DIR/setup/install-iwe-paths.sh --workspace $WORKSPACE_DIR --governance ${IWE_GOVERNANCE_REPO:-DS-strategy}"
 fi
 
 # === Done ===

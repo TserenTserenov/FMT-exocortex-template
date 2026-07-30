@@ -86,6 +86,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 3.5. **Предложить связки с активными РП.** Прочитать WeekPlan W{N}.md → grep на тематические пересечения. Таблица: РП / сила (🔴 сильная / 🟡 средняя / 🟢 слабая) / тип (handoff, dependency, продукт-следствие, валидационный случай). Если ни одной связи >🟢 — отметить «РП изолирован» (сигнал: ревизировать формулировку).
 4. Предложить перестановку если бюджет ограничен
 5. Записать **в 5 мест** (атомарно): MEMORY.md, WP-REGISTRY.md, WeekPlan, WP-context file (`verification_class: trivial|closed-loop|open-loop|problem-framing`), Linear (`mcp__linear__create_issue`)
+5b. **Мостик Ритуал → файлы (WP-505):** объявленные в Ритуале «Целевой переход состояния» и «Гипотеза» обязаны попасть в frontmatter карточки (`state_transition:`, `hypothesis:`) и колонку «Ставка» реестра (если она есть). Создание — только `create-wp.sh --state "…" --hypothesis H-NNN`; при наличии `docs/state-axes-registry.yaml` скрипт блокирует создание без `--state`.
 6. Нумерация: только последовательные целые (74, 75…). Буквенные суффиксы запрещены
 
 #### Исключения (РП не нужен)
@@ -101,6 +102,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 > **Работа:** [что] — конкретный предмет текущего рассуждения (не «весь проект», если вопрос не о нём целиком); если существенно — окно/контекст, в котором ответ действует.
 > **РП:** [артефакт]
 > **Целевой переход состояния:** `{ось, из→в}` — permission/belonging/engagement/mastery (WP-457, State-Transition Gate). Ссылка на `states-map-draft.md` или declared FSM-owner; cross-axis — помечать `provisional` до ArchGate (Ф9). Опционально: `signal` — наблюдаемый признак подтверждения перехода (пример: `"нет спонтанных разлогинов 2 недели"`).
+> **Гипотеза:** `H-NNN` из `current/hypotheses-log.md` или «—» (осознанное «ставки нет» — инфраструктура/техдолг). На какую запись журнала гипотез работает РП (WP-505).
 > **Режим (ТВС):** [текущее / важное / срочное] — по конвейерной модели ([[Текущее ≠ Важное ≠ Срочное (ТВС)]])
 > **Класс:** [verification_class]
 > **Метод:** [как]
@@ -133,7 +135,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 
 **Шаг 4.5. Артефактор (автоматический).** Если класс ∈ {open-loop, problem-framing} И оценка ≥3h → выполнить `/artifactor` inline (без вопроса пользователю). Этапную карту вставить в WP context file (секция `## Этапы` в конец файла). Если класс trivial/closed-loop ИЛИ оценка <3h → пропустить молча. [[narrative]]
 
-**EXTENSION POINT (protocol-open after):** `bash .claude/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[narrative]]
+**EXTENSION POINT (protocol-open after):** `bash .claude/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[gate]]
 
 > Продолжение работы над тем же РП — повторный Ритуал не нужен.
 

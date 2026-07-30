@@ -48,7 +48,7 @@ schema_version: 1
 
 **Нет раннера** (типовая установка) — выполнять шаги 1-2.6+ ниже вручную по тексту; названия шагов раннера в скобках — справочные, не требуют самого раннера.
 
-### Шаги (4 обязательных)
+### Шаги (5 обязательных)
 
 1. **Pre-commit checks → Commit + Push** (шаги раннера `precommit-checks` → `commit-push` → `commit-push-check`)
 
@@ -91,6 +91,8 @@ schema_version: 1
    **Защита от дубля:** если за сессию уже был ручной `/ke` или `/apply-captures` — feeder пропустить (по маркерам в текущем `captures.md`).
 
 3. **MEMORY.md (часть шага `memory-update` — ai-контракт: вход `[wp_status]`, выход `[memory_line]`)** — обновить статус РП (одна строка: `in_progress` / `done`) [[gate]]
+
+4. **EXTENSION POINT (protocol-close after).** `bash .claude/scripts/load-extensions.sh protocol-close after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-close.after.md` И `extensions/protocol-close.after.<suffix>.md`. [[gate]]
 
 ### Формат «Осталось»
 

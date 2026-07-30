@@ -90,44 +90,20 @@ case "$HOOK_EVENT" in
             Bash|WebFetch|WebSearch|mcp__*)
                 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
                 TOOL_INPUT=$(echo "$INPUT" | jq -c '.tool_input // {}' 2>/dev/null || echo "{}")
-                TOOL_RESPONSE=$(echo "$INPUT" | jq -c '.tool_response // {}' 2>/dev/null || echo "{}")
-
-                # Sanitize tool_response: ensure valid JSON and cap size to avoid malformed NDJSON.
-                if ! echo "$TOOL_RESPONSE" | jq -e . >/dev/null 2>&1; then
-                    TOOL_RESPONSE='{"truncated":true,"reason":"invalid_json"}'
-                fi
-                # PostgreSQL JSON rejects NULL byte \u0000; strip it from tool_response.
-                TOOL_RESPONSE=$(echo "$TOOL_RESPONSE" | jq -c 'walk(if type == "string" then gsub("\u0000"; "") else . end)' 2>/dev/null || echo "$TOOL_RESPONSE")
-                raw_response_size=$(echo -n "$TOOL_RESPONSE" | wc -c | tr -d ' ')
-                if [ "$raw_response_size" -gt 8192 ]; then
-                    TOOL_RESPONSE=$(echo "$TOOL_RESPONSE" | jq -c --argjson size "$raw_response_size" \
-                        '{truncated: true, original_size_bytes: $size, preview: (. | tostring | .[0:1024])}' \
-                        2>/dev/null || echo '{"truncated":true,"reason":"cap_failed"}')
-                fi
-
-                # input_hash = sha256(canonicalized tool_input)
-                # GNU-first (sha256sum, coreutils — every Linux, absent on macOS by default),
-                # shasum -a 256 fallback (macOS default) — WP-5 Ubuntu-audit факт #4: bare
-                # shasum with no fallback silently broke on Ubuntu installs without it.
-                if command -v sha256sum >/dev/null 2>&1; then
-                    INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | sha256sum | cut -d' ' -f1)"
-                else
-                    INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | shasum -a 256 | cut -d' ' -f1)"
-                fi
-                # response_size_bytes = TRUE pre-cap size (capped object would report ~80 bytes).
-                RESPONSE_SIZE="$raw_response_size"
+                # WP-500 Ф1: не сохраняем response-body в трейсах.
+                # Оставляем только input_hash и response_size_bytes для replay-кэша и метрик.
+                RAW_TOOL_RESPONSE=$(echo "$INPUT" | jq -c '.tool_response // {}' 2>/dev/null || echo "{}")
+                RESPONSE_SIZE=$(echo -n "$RAW_TOOL_RESPONSE" | wc -c | tr -d ' ')
+                INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | shasum -a 256 | cut -d' ' -f1)"
 
                 jq -nc \
                     --arg sid "$SESSION_UUID" --arg tn "$TOOL_NAME" --arg ih "$INPUT_HASH" \
-                    --argjson tin "$TOOL_INPUT" --argjson tres "$TOOL_RESPONSE" \
                     --argjson rsz "$RESPONSE_SIZE" --arg ts "$NOW" \
                     '{event_type: "agent_tool_called", schema_version: "v1", emitted_at: $ts, payload: {
                         session_id: $sid,
                         decision_id: null,
                         tool_name: $tn,
                         input_hash: $ih,
-                        input_payload: $tin,
-                        response: $tres,
                         response_size_bytes: $rsz,
                         called_at: $ts
                     }}' >> "$NDJSON" 2>/dev/null || true

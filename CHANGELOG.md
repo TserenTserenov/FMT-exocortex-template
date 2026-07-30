@@ -110,34 +110,75 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+
+
+## [Unreleased] — обновлено 2026-07-29
+
+### Added
+
+- `8ab5386` feat(wp499): Ф16 — доставка iwe-local-gateway в шаблон: setup/optional/setup-local-gateway.sh (клон на пин v0.1.0, сборка, запуск демона, блок для .mcp.json), правка docs/AGENT-VENDOR-SETUP.md (шаг 3.2 больше не ссылается на несуществующую запись), секция в setup/optional/README.md
+- `813dbbf` fix(wp499): Ф16 фиксы по независимому ревью — liveness-проба демона (сокет-файл переживает ребут), lock против гонки двух запусков, скрипт добавлен в update-manifest.json (доставка существующим инсталляциям), workspace из положения скрипта, пин по SHA, проверка версии node
+- `3cd8d01` feat(wp-429-f6.5): пре-фильтры фабрикации ID и cross-report дублей в extractor.sh
+- `9fcc6d9` feat(apply-captures): Ф6.4 фасетный классификатор (шаг 4в-0) + routing.yaml как SoT для 4в
+- `35944f3` feat(wp505): create-wp.sh --state (обязателен при реестре осей) + --hypothesis, ячейка «Ставка»; /wp-new и protocol-open — ставка и гипотеза в ритуале создания РП
+
+### Changed
+
+- `c34f8ab` chore(release): weekly auto-bump to v0.36.2
+- `da9faad` sync: iwe-agent-dispatcher.py from DS-my-strategy (WP-503 Ф5.1/5.2)
+- `c516145` security: WP-500 Ф1 — синхронизировать фикс утечки трейсов в облако
+- `5e13c05` docs(changelog): thank vakungur (#312/#311/#310) and VxxxlBxxxxv (#308)
+
+### Fixed
+
+- `7717c76` fix(mcp): утечка личного пути автора в .mcp.json (→ {{HOME_DIR}}) + скилл personal-guide-render указывал на несуществующий инструмент локального шлюза
+- `0873dde` fix: promote day-open-pipeline.sh — facts_digest guard fix (WP-484)
+- `cef6352` fix(hooks): revert WeekPlan section-list gate — broke 23/24 real WeekPlans (issue #318 hotfix)
+- `fe0b908` fix(setup): githooks provisioning for DS-strategy + WeekPlan validator drift (#317, #318)
+- `022d290` fix(apply-captures): привести гейт 4а.1 к дословному эталону из bug-файла
+- `c0113ce` fix(apply-captures): гейт Forces/Bias-Annotation для новых карточек методов
+- `afdce30` fix(create-wp): три дефекта в WeekPlan-writer и slug-обрезке
+- `16edace` fix(setup): понятная подсказка вместо traceback при отсутствии PyYAML (шаг 4e)
+- `a73e9e8` fix(cloud-scheduler): явный skip backup-memory job, если exocortex/ в .gitignore
+- `d3f63d2` fix(seed-drift): синхронизировать seed-копию day-open-scaffold.sh
+- `877c587` fix(ci): устранить 2 красных джоба на main — hardcode-паттерн + badge-дрейф
+- `4303c8e` fix(template): genericize username in examples + narrow author-check exemption
+- `c7a0494` fix(#315,#316): регрессии из ee0795c — независимый код-ревью субагентом
+- `be48c84` fix(template): de-link private-repo references + close case-sensitivity gap in validator
+- `ffed001` fix(template): remove author-specific DS-my-strategy leak (validate-template FAIL)
+- `ee0795c` fix(#316,#315,#314): issue funnel — 3 бага свежих установок
+- `9324f54` fix(review): 2 regressions in e190ba2 found by independent code review
+- `c4e4152` fix: добавить поддержку колонки «Ставка» в create-wp.sh (WP-505)
+- `e190ba2` fix(#312,#311,#308): issue funnel — устаревшая инструкция, ложный блок гейта, author-leak на ADR + exec-bit
+- `c02f663` fix(strategist): table_to_list() column mapping — DayPlan/WeekPlan diverged formats
+
+
+## [0.36.2] — 2026-07-26
+
+Спасибо **vakungur** за три находки: #312 (`/wp-new` обещал заготовку §Закрытия в архиве, которую `create-wp.sh` больше не создаёт с #280 — инструкция скилла обновлена на актуальные 4 места записи), #311 (Extensions Gate блокировал создание СВОЕГО навыка — документированный `extend/SKILL.md` путь реально не работал; хук теперь сверяется с манифестом платформы, а не блокирует по одной лишь маске каталога). Отдельно поднятый вопрос #310 (IntegrationGate заявлен блокирующим, а детектор нигде не подключён к хукам) подтверждён, но требует решения по объёму фикса — issue остаётся открытым.
+
+Спасибо **VxxxlBxxxxv** за #308 — поставляемые `docs/adr/*.md` попадали под собственный pre-commit-чек на author-leak (`DS-ai-systems`), хотя это апстримные исторические документы, не пользовательская правка. Заодно найдена и починена потеря бита исполнения на `.githooks/commit-msg` и 2 скриптах при `update.sh` (файлы доставляются через `curl`, без file-mode метаданных).
+
 ## [0.36.1] — 2026-07-22
 
 ### Added
 
-- `1d83cb9` feat(wp-5): еженедельный авто-бамп версии вместо ручного релиза
-- `efa3d32` feat(wp483): sync guide-kit v0.1.2 into template
-- `859304a` feat(skills): новый скилл verify-hypotheses — сверка гипотез по запросу
-- `f788971` feat(week-close): шаг 6a сверка журнала гипотез + метрика калибровки
-- `b381a6e` feat(strategist): Note-Review распознаёт категорию «Гипотеза» (8-е правило)
+- feat(wp483): sync guide-kit v0.1.2 into template (снимок Ф9 система №16 + слияние приоритета Портного + degree-контекст)
 - `4484b4c` feat(skill-promote): защита L3-констант через inline-маркер (WP-5)
+- `5aabac2` feat(wp483): sync guide-kit v0.1.1 into template
 
 ### Changed
 
-- `6b430fe` refactor(backup): baseline-файл переезжает в .state/, перестаёт быть git-артефактом
-- `d491613` chore(memory): fpf-reference.md valid_from bump 2026-07-19
 - `c40b041` docs(changelog): thank SDaiBots (#217/#221/#224/#228), AONarchuk (#215), trover97 (#218) — пропущены в прошлых раундах благодарностей
 - `b08403d` chore: release 0.36.0
+- `fb9afa6` docs(changelog): regenerate [Unreleased] after guide-kit v0.1.1 sync
 
 ### Fixed
 
-- `d6c6440` fix(strategist): откатить регресс WORKPLAN.md в шаблоне (S-33, разрешение пилота)
-- `500909e` fix(update.sh): экранировать sed-спецсимволы в substitute_claude_placeholders (независимая верификация)
-- `d7ccfcf` fix(memory): точная атрибуция источника в agent-core.md (независимая проверка issue #283)
-- `cd776e3` fix(WP-7): 5 issues шаблона IWE — sentinel drift, agent-core.md, priorities.yaml, CLAUDE.md placeholders, --help
-- `fbcb42e` fix(update-pipeline): 8 issue funnel fixes — manifest sync, false-positive hooks, WP lifecycle
-- `e3f5918` fix(skills): verify-hypotheses — inline YAML triggers/description формат
-- `09b43b8` fix(skill-promote): безопасная обработка спецсимволов в L3-значениях
 - `3f91860` fix(release): sync README version badge to 0.36.0
+- `b0f675b` fix(scripts): env-fallback для GOVERNANCE_REPO в generate-hot-files-list.sh
+- `1b29b19` fix(strategist): убрать хардкод DS-strategy в DAY_OPEN_PIPELINE (регрессия 238a5c1)
+- `5cd5695` fix(roles): runtime-резолв путей в extractor/synchronizer вместо build-time плейсхолдеров
 
 
 ## [0.36.0] — 2026-07-19

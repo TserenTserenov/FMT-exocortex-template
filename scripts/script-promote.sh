@@ -129,11 +129,18 @@ promote_one() {
     # нашлось на kimi-session-watchdog.sh, script-promote.sh завис на смоук-тесте.
     echo "   smoke-test с шаблонным окружением..."
     smoke_result=0
+    # PATH inherited from the caller's own environment, not a hardcoded macOS list
+    # (WP-484, 2026-07-28): the previous "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+    # has no `date`, `git`, or `which` on NixOS (tsekh-1) — any promotion run from
+    # that host hit exit 127 here regardless of the script being promoted, live-
+    # reproduced blocking a WP-484 fix. env -i still clears everything else, so
+    # the smoke test's own environment isolation is unchanged, only PATH now comes
+    # from wherever script-promote.sh itself is actually running.
     env -i \
         HOME="/tmp/iwe-smoke-user" \
         IWE="/tmp/iwe-smoke-user/IWE" \
         IWE_GOVERNANCE_REPO="DS-strategy" \
-        PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin" \
+        PATH="$PATH" \
         perl -e 'alarm 5; exec @ARGV' -- bash "$tmp_file" --help > /dev/null 2>&1 || smoke_result=$?
 
     # exit 0 = OK, exit 1 = validation error (приемлемо — скрипт без аргументов)
