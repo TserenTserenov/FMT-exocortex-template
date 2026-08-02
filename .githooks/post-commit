@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# .githooks/post-commit
+# Part of WP-453: Конвейер обновления раздела 7 guide
+# Триггер Т3: явная разметка [guide-update: S7.SS_N] в commit message.
+# Триггер Т1: промоция практики с меткой [guide-impact: S7.SS_N] в файле.
+#
+# Вызывается ПОСЛЕ создания коммита: HEAD уже новый коммит — в section-state.yaml
+# попадает правильный SHA (в commit-msg попадал SHA предыдущего коммита — баг,
+# найден Codex в пир-сессии 2026-07-31-22-wp453-t3-hook-test). Плюс: падение
+# другого хука до завершения коммита больше не оставляет ложный триггер.
+#
+# Блоки Т3 и Т1 независимы: отсутствие одного скрипта не отключает другой,
+# единственный exit 0 — в конце (Codex, пир-сессия 2026-08-01).
+
+set -uo pipefail  # без -e: сбой побочного конвейера не должен валить git-поток
+
+REGISTRY_REPO="${IWE_REGISTRY_REPO:-$HOME/IWE/DS-my-strategy}"
+REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+
+COMMIT_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+# === Т3: явная разметка в commit message ===
+T3_SCRIPT="${REGISTRY_REPO}/scripts/fp453-t3-mark-guide-update.sh"
+if [[ -f "$T3_SCRIPT" ]]; then
+  if ! "$T3_SCRIPT" "$COMMIT_MSG" "$COMMIT_SHA"; then
+    # Не блокируем (post-commit не должен валить коммит из-за
+    # внешнего registry-репо), но и не молчим (Codex, 2026-07-31-22).
+    echo "WARN: WP-453 T3 trigger failed for commit ${COMMIT_SHA:0:8} — см. $T3_SCRIPT" >&2
+  fi
+fi
+
+# === Т1: метка [guide-impact] в committed blobs ===
+# Сканируем ВСЕ добавленные/изменённые файлы коммита, а не фильтруем по слову
+# "promote" в subject: ручное сообщение может отличаться, а цена сканирования
+# при малом числе файлов ничтожна (Codex, 2026-08-01). Merge-коммиты
+# пропускаем (diff-tree на merge без -m пуст; промоции мерджами не делаются).
+T1_SCRIPT="${REGISTRY_REPO}/scripts/fp453-t1-check-guide-impact.sh"
+if [[ -f "$T1_SCRIPT" && -n "$REPO_DIR" ]]; then
+  PARENTS=$(git rev-list --parents -n 1 HEAD 2>/dev/null | wc -w | tr -d ' ')
+  if [[ "$PARENTS" -le 2 ]]; then
+    git diff-tree --root --no-commit-id -r --diff-filter=ACMR -z --name-only HEAD 2>/dev/null \
+      | while IFS= read -r -d '' path; do
+          # Пропуск файлов >1MB (метки живут в текстовых файлах практик)
+          size=$(git cat-file -s "HEAD:$path" 2>/dev/null || echo 0)
+          [[ "$size" -gt 1048576 ]] && continue
+          if ! "$T1_SCRIPT" "$REPO_DIR" "$path"; then
+            echo "WARN: WP-453 T1 trigger failed for $path — см. $T1_SCRIPT" >&2
+          fi
+        done
+  fi
+fi
+
+exit 0

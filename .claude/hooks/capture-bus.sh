@@ -47,6 +47,25 @@ export CAPTURE_CWD="$CWD"
 export CAPTURE_TOOL_FILE="$TOOL_FILE"
 export CAPTURE_SESSION_ID="$SESSION_ID"
 
+# Timeout command detection (gtimeout on macOS coreutils, timeout on Linux).
+# issue #339: a hung detector used to block the whole capture-bus hook silently.
+TIMEOUT_CMD=""
+if command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="gtimeout"
+elif command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="timeout"
+fi
+# Default lives in capture-detectors.sh (CAPTURE_DETECTOR_TIMEOUT_SECONDS), next to CAPTURE_COST_LEVEL.
+DETECTOR_TIMEOUT_SECONDS="$CAPTURE_DETECTOR_TIMEOUT_SECONDS"
+
+# Warn once per run (not per detector) if no timeout binary is available.
+if [ -z "$TIMEOUT_CMD" ]; then
+  log_jsonl "$LOG_FILE" \
+    detector="capture-bus" \
+    status=detector_warn \
+    reason="timeout command unavailable (CAPTURE_DETECTOR_TIMEOUT_SECONDS=${DETECTOR_TIMEOUT_SECONDS}s)"
+fi
+
 for entry in "${DETECTORS[@]}"; do
   IFS='|' read -r name path event_type cost_class enabled triggers <<< "$entry"
 
@@ -71,18 +90,30 @@ for entry in "${DETECTORS[@]}"; do
     continue
   fi
 
-  # Запускаем детектор
+  # Запускаем детектор с таймаутом
   start_ns=$(perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000000000' 2>/dev/null || echo 0)
 
-  if detector_out=$(echo "$INPUT" | "$detector_path" 2>/tmp/capture_detector_err.$$); then
+  if [ -n "$TIMEOUT_CMD" ]; then
+    detector_cmd=("$TIMEOUT_CMD" "$DETECTOR_TIMEOUT_SECONDS" "$detector_path")
+  else
+    detector_cmd=("$detector_path")
+  fi
+
+  if detector_out=$(echo "$INPUT" | "${detector_cmd[@]}" 2>/tmp/capture_detector_err.$$); then
     :
   else
+    detector_rc=$?
     err=$(cat /tmp/capture_detector_err.$$ 2>/dev/null | head -c 500)
     rm -f /tmp/capture_detector_err.$$
+    if [ -n "$TIMEOUT_CMD" ] && [ "$detector_rc" -eq 124 ]; then
+      reason="timeout (${DETECTOR_TIMEOUT_SECONDS}s)"
+    else
+      reason="${err:-nonzero_exit}"
+    fi
     log_jsonl "$LOG_FILE" \
       detector="$name" \
       status=detector_error \
-      reason="${err:-nonzero_exit}"
+      reason="$reason"
     continue
   fi
   rm -f /tmp/capture_detector_err.$$

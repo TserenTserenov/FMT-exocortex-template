@@ -54,6 +54,15 @@ hash_dir() {
     fi
 }
 
+# Copy of update.sh:is_protected_user_file() — build-runtime.sh runs as a separate
+# subprocess (not sourced), so the two lists must be kept in sync manually (issue #327).
+is_protected_user_file() {
+    case "$1" in
+        params.yaml|memory/MEMORY.md|.claude/settings.local.json|sessions/00-index.md) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # === Detect directories ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE_DIR="$(dirname "$SCRIPT_DIR")"  # FMT-exocortex-template/
@@ -144,8 +153,18 @@ fi
 # === Load .exocortex.env ===
 # Safe parse: только KEY=VALUE, никакого eval/source.
 # Bash 3.2-compatible: используем функцию env_get вместо associative array.
+# issue #319: значения в .exocortex.env конвенционально в кавычках
+# (WORKSPACE_DIR="/home/iwe/IWE") — без strip кавычки попадали буквально в
+# каждую substituted-подстановку. Снимаем только ПАРНЫЕ внешние кавычки
+# (один и тот же символ в начале и в конце), внутренние не трогаем.
 env_get() {
-    grep "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-
+    local raw
+    raw=$(grep "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    case "$raw" in
+        \"*\") [ ${#raw} -ge 2 ] && raw="${raw#\"}" && raw="${raw%\"}" ;;
+        \'*\') [ ${#raw} -ge 2 ] && raw="${raw#\'}" && raw="${raw%\'}" ;;
+    esac
+    printf '%s' "$raw"
 }
 
 # === Parse overlay-реестр ===
@@ -367,7 +386,9 @@ for f in "${COPIED_FILES[@]}"; do
     src="$BUILD_DIR/workspace/$f"
     dst="$WORKSPACE_DIR/$f"
     mkdir -p "$(dirname "$dst")"
-    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+    if [ -f "$dst" ] && is_protected_user_file "$f"; then
+        : # skip — protected file already exists, seed-on-first-install only (issue #327)
+    elif [ -f "$dst" ] && cmp -s "$src" "$dst"; then
         : # skip — identical
     else
         cp "$src" "$dst"

@@ -45,7 +45,8 @@ SKIP_PATTERNS=(
 # не растущий с каждым новым skill (в отличие от прежнего allow-list на *доставку*).
 EXCLUDED_PATTERNS=(
     "scripts/tests/"
-    "docs/"        # WP-401 Ф6.1: documentation pipeline deprecated, consolidated in memory/ (was: only docs/developer/)
+    "docs/developer/"    # never delivered since the first manifest commit (23b0494, WP-7 MFC4) —
+                          # unrelated to the WP-401 Ф6.1 docs/ freeze below, keep excluded
     "sessions/2026-06/"    # WP-401 Ф6.1: archived transcript, not for delivery. NOTE: sessions/00-index.md
                             # stays OUT of this exclusion on purpose — it's a protected seed-once-then-never-
                             # touch file like memory/MEMORY.md (see is_protected_user_file() in update.sh),
@@ -72,8 +73,6 @@ EXCLUDED_EXACT=(
     "promotion-status.yaml"
     "scripts/guide-kit-sync-state.yaml"         # provenance vendored-копии guide-kit/ — нужен CI drift-check, не пользователям
     "AGENTS-agent-blocks.md"
-    "CHANGELOG.md"                              # WP-401 Ф6.1: consolidated in CLAUDE.md and memory/ files
-    "ONTOLOGY.md"                                # WP-401 Ф6.1: consolidated in CLAUDE.md and memory/ files
     "${EXCLUDED_SCRIPTS[@]}"
 )
 
@@ -98,11 +97,37 @@ FILES_EXCLUDE_EXACT=(
     "extensions/mcp-user.json"
 )
 
+# issue #325: .github/ и setup/ are blanket-excluded below (CI-only / install-time),
+# but cloud-scheduler is a documented, maintained feature living in both namespaces —
+# its workflow and install script never reached users despite fix #188. Explicit
+# per-file include, same technique as setup/validate-template.sh below.
+GITHUB_EXPLICIT_INCLUDE=(
+    ".github/workflows/cloud-scheduler.yml"
+)
+SETUP_EXPLICIT_INCLUDE=(
+    "setup/validate-template.sh"
+    "setup/optional/setup-cloud-scheduler.sh"   # install-time, but requires one-time delivery — issue #325
+    "setup/optional/setup-local-gateway.sh"     # referenced by delivered docs/AGENT-VENDOR-SETUP.md (WP-499 Ф16), same class as #325
+)
+
+is_explicit_include() {
+    local rel="$1"; shift
+    local item
+    for item in "$@"; do
+        [ "$rel" = "$item" ] && return 0
+    done
+    return 1
+}
+
 # Собираем файлы.
 FILES=()
 EXCLUDED_PATHS=()
 while IFS= read -r rel; do
     # Пропускаем мусор/инструментарий
+    if is_explicit_include "$rel" "${GITHUB_EXPLICIT_INCLUDE[@]}"; then
+        FILES+=("$rel")
+        continue
+    fi
     skip=false
     for pattern in "${SKIP_PATTERNS[@]}"; do
         case "$rel" in
@@ -112,9 +137,10 @@ while IFS= read -r rel; do
     [[ "$(basename "$rel")" == ".gitkeep" ]] && skip=true
     $skip && continue
 
-    # setup/ contains install-time scripts; skip all except validate-template.sh,
-    # which is referenced by .githooks/pre-commit and update.sh after delivery.
-    if [[ "$rel" == setup/* && "$rel" != "setup/validate-template.sh" ]]; then
+    # setup/ contains install-time scripts; skip all except explicit includes
+    # (validate-template.sh referenced by .githooks/pre-commit and update.sh
+    # after delivery; setup-cloud-scheduler.sh — see SETUP_EXPLICIT_INCLUDE above).
+    if [[ "$rel" == setup/* ]] && ! is_explicit_include "$rel" "${SETUP_EXPLICIT_INCLUDE[@]}"; then
         continue
     fi
 

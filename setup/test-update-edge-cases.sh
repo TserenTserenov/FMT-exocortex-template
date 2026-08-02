@@ -9,6 +9,10 @@
 #   T5: network-independent --check works with a cached manifest
 #   T6: memory file with owner: user survives a hash mismatch (issue #229)
 #   T7: hot-budget sum over threshold is detectable (issue #228)
+#   T8: build-runtime.sh does not clobber an edited params.yaml (issue #327)
+#   T9: .mcp.json migration preserves a third-party server like ext-figma (issue #335)
+#   T10: CLAUDE.md fallback-merge (no .base) never silently drops §8/§9 edits (issue #336)
+#   T11: protocol-artifact-validate.sh DayPlan checks (multiplier/mandatory/budget, issue #328)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -345,6 +349,299 @@ if [ "$T7_HOT_LINES" -lt 164 ]; then
     pass "T7: warm-c.md correctly excluded from hot sum"
 else
     fail "T7: warm file was incorrectly counted into hot sum"
+fi
+
+# ============================================================================
+# T8: build-runtime.sh does not clobber an edited params.yaml (issue #327)
+# ============================================================================
+echo "--- T8: copied_to_workspace protects an existing params.yaml ---"
+
+T8_WS="$TEST_WS/t8-workspace"
+mkdir -p "$T8_WS"
+
+# Pilot's own edit — must survive a build-runtime.sh run, same as a fresh install
+# would seed it if absent.
+cat > "$T8_WS/params.yaml" <<'HEREDOC'
+github_user: pilot-own-value
+author_mode: false
+HEREDOC
+
+cp "$TEMPLATE_DIR/.exocortex.env" "$T8_WS/.exocortex.env" 2>/dev/null || cat > "$T8_WS/.exocortex.env" <<HEREDOC
+HOME_DIR=$HOME
+WORKSPACE_DIR=$T8_WS
+CLAUDE_PATH=/usr/bin/claude
+CLAUDE_PROJECT_SLUG=test
+TIMEZONE_HOUR=3
+TIMEZONE_DESC=UTC
+GITHUB_USER=test-user
+GOVERNANCE_REPO=DS-strategy
+HEREDOC
+
+bash "$TEMPLATE_DIR/setup/build-runtime.sh" \
+    --workspace "$T8_WS" \
+    --env-file "$T8_WS/.exocortex.env" \
+    --quiet >/dev/null 2>&1
+
+if grep -q "github_user: pilot-own-value" "$T8_WS/params.yaml" 2>/dev/null; then
+    pass "T8: existing params.yaml survives build-runtime.sh (edit not overwritten)"
+else
+    fail "T8: params.yaml was reset to template defaults — edit lost"
+fi
+
+# Wiring check: is_protected_user_file must actually gate the copy, not just exist.
+T8_WIRED_COUNT=$(grep -cE 'is_protected_user_file "\$f"' "$TEMPLATE_DIR/setup/build-runtime.sh")
+if [ "$T8_WIRED_COUNT" -ge 1 ]; then
+    pass "T8: is_protected_user_file guard is wired into copied_to_workspace loop"
+else
+    fail "T8: is_protected_user_file exists but is not called in the copy loop"
+fi
+
+# ============================================================================
+# T9: .mcp.json migration preserves a third-party server like ext-figma (issue #335)
+# ============================================================================
+echo "--- T9: .mcp.json migration keeps user-added servers ---"
+
+T9_MCP="$TEST_WS/t9-mcp.json"
+cat > "$T9_MCP" <<'HEREDOC'
+{
+  "mcpServers": {
+    "ext-figma": {
+      "type": "http",
+      "url": "http://127.0.0.1:3845/mcp"
+    },
+    "knowledge-mcp": {
+      "command": "old-stdio-server"
+    }
+  }
+}
+HEREDOC
+
+# Extracts the actual Step 6c python block from update.sh (between its unique
+# markers) and runs it as a real file — not a copy of the logic re-typed into
+# this test, which would pass even if update.sh's real code diverged. A file
+# (not `python3 -c "$VAR"`) sidesteps bash re-quoting/escaping issues with the
+# block's embedded '\n' and mixed quotes.
+T9_PY_BLOCK=$(awk '/^# === Step 6c: Migrate workspace \.mcp\.json to Gateway ===$/{found=1} found' "$TEMPLATE_DIR/update.sh" | \
+              sed -n '/^    python3 -c "$/,/^" 2>\/dev\/null$/p' | sed '1d;$d')
+if [ -z "$T9_PY_BLOCK" ]; then
+    fail "T9: could not extract Step 6c migration block from update.sh — marker comment moved?"
+else
+    T9_PYFILE="$TEST_WS/t9-migration.py"
+    printf '%s' "$T9_PY_BLOCK" | sed "s|\$MCP_WORKSPACE|$T9_MCP|g" > "$T9_PYFILE"
+    python3 "$T9_PYFILE" >/dev/null 2>&1
+
+    if python3 -c "
+import json
+with open('$T9_MCP') as f:
+    data = json.load(f)
+servers = data.get('mcpServers', {})
+assert 'ext-figma' in servers, 'ext-figma missing'
+assert 'knowledge-mcp' not in servers, 'old stdio server not removed'
+assert 'iwe-knowledge' in servers, 'iwe-knowledge not added'
+" 2>/dev/null; then
+        pass "T9: ext-figma survives migration, knowledge-mcp removed, iwe-knowledge added"
+    else
+        fail "T9: migration logic mishandled server keys"
+    fi
+fi
+
+# Wiring check: the actual Step 6c code in update.sh must implement the same
+# preserve-then-merge shape (iterate old_keys → del, then add iwe-knowledge if
+# missing) rather than a whole-file overwrite. Greps for the two defining lines
+# so a future rewrite that drops the preserve step fails this test even if the
+# extraction above somehow still matched a stale block.
+T9_WIRED_DEL=$(grep -c "for k in old_keys:" "$TEMPLATE_DIR/update.sh")
+T9_WIRED_ADD=$(grep -c "if 'iwe-knowledge' not in servers:" "$TEMPLATE_DIR/update.sh")
+if [ "$T9_WIRED_DEL" -ge 1 ] && [ "$T9_WIRED_ADD" -ge 1 ]; then
+    pass "T9: update.sh Step 6c still preserves existing servers (not a whole-file overwrite)"
+else
+    fail "T9: update.sh Step 6c no longer matches the preserve-then-merge shape this test verified"
+fi
+
+# ============================================================================
+# T10: CLAUDE.md fallback-merge (no .base) never silently drops §8/§9 edits (issue #336)
+# ============================================================================
+echo "--- T10: CLAUDE.md fallback path without .base does not clobber pilot edits ---"
+
+# Copy of update.sh's cross-platform sed_inplace() (defined locally there,
+# not in a sourceable lib — update.sh itself can't be sourced without running
+# its whole network-dependent body). The extracted blocks below call this.
+if sed --version >/dev/null 2>&1; then
+    sed_inplace() { sed -i "$@"; }
+else
+    sed_inplace() { sed -i '' "$@"; }
+fi
+
+# Extracts the real Step 5 ($SCRIPT_DIR copy) and Step 6 ($WORKSPACE_DIR copy)
+# fallback blocks from update.sh via unique line-content markers, and sources
+# each as bash against live fixture files — not a re-typed copy of the logic.
+# A prior version of this test hand-wrote a byte-for-byte copy of the if/else
+# shape; a second review round proved experimentally that copy silently
+# diverges from update.sh (it kept passing after the real code was reverted
+# to the pre-fix unconditional-copy bug). Extraction removes that gap: if
+# update.sh's fallback branch is edited without updating this test, the
+# extracted block picks up the edit automatically.
+t10_extract_step5_block() {
+    awk '
+        /^            USER_SECTION=\$\(sed -n/{found=1}
+        found{print}
+        found && /^            fi$/{exit}
+    ' "$TEMPLATE_DIR/update.sh"
+}
+t10_extract_step6_block() {
+    awk '
+        /^        WS_USER_SECTION=\$\(sed -n/{found=1}
+        found{print}
+        found && /^        fi$/{exit}
+    ' "$TEMPLATE_DIR/update.sh"
+}
+
+T10_DIR="$TEST_WS/t10-claude-md"
+mkdir -p "$T10_DIR"
+
+T10_STEP5_BLOCK=$(t10_extract_step5_block)
+T10_STEP6_BLOCK=$(t10_extract_step6_block)
+
+if [ -z "$T10_STEP5_BLOCK" ] || [ -z "$T10_STEP6_BLOCK" ]; then
+    fail "T10: could not extract fallback block(s) from update.sh — line markers moved? Step5 empty: $([ -z "$T10_STEP5_BLOCK" ] && echo yes || echo no), Step6 empty: $([ -z "$T10_STEP6_BLOCK" ] && echo yes || echo no)"
+else
+    T10_STEP5_FILE="$T10_DIR/step5-block.sh"
+    T10_STEP6_FILE="$T10_DIR/step6-block.sh"
+    printf '%s\n' "$T10_STEP5_BLOCK" > "$T10_STEP5_FILE"
+    printf '%s\n' "$T10_STEP6_BLOCK" > "$T10_STEP6_FILE"
+
+    # Case A (Step 5 shape): pilot's file has real §8/§9 content, NO
+    # <!-- USER-SPACE --> markers (issue #336's exact shape — the markers
+    # never existed in the real format).
+    T10_CURRENT="$T10_DIR/current.md"
+    T10_NEW="$T10_DIR/new.md"
+    cat > "$T10_CURRENT" <<'HEREDOC'
+## 8. Staging
+Полный раздел про staging-канал, четыре шага промоции
+## 9. Авторское
+- Комментарии кода — только EN
+HEREDOC
+    cat > "$T10_NEW" <<'HEREDOC'
+## 8. Staging
+Одна строка вместо полного раздела
+## 9. Авторское
+HEREDOC
+
+    CURRENT_FILE="$T10_CURRENT" NEW_FILE="$T10_NEW" SCRIPT_DIR="$T10_DIR" f="CLAUDE.md" \
+        CLAUDE_BASE_MISSING_FILES=()
+    source "$T10_STEP5_FILE"
+
+    if grep -q "EN" "$T10_CURRENT" && grep -q "Полный раздел" "$T10_CURRENT"; then
+        pass "T10: Step 5 — pilot's §8/§9 content survives the real fallback branch"
+    else
+        fail "T10: Step 5 — pilot's §8/§9 content was overwritten (extracted from update.sh)"
+    fi
+    if grep -q "Одна строка" "$T10_CURRENT"; then
+        fail "T10: Step 5 — fallback branch copied upstream over the pilot's file — no-USER-SPACE case should leave it untouched"
+    fi
+    if [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -eq 1 ]; then
+        pass "T10: Step 5 — CLAUDE_BASE_MISSING_FILES tracked (feeds the disambiguated final summary, issue #336 follow-up)"
+    else
+        fail "T10: Step 5 — expected CLAUDE_BASE_MISSING_FILES to have 1 entry, got ${#CLAUDE_BASE_MISSING_FILES[@]}"
+    fi
+
+    # Case B (Step 6 shape): pilot's file DOES use USER-SPACE markers — must
+    # still merge as before (issue #336's fix must not regress the one case
+    # that already worked). Exercises the $WORKSPACE_DIR copy's own block
+    # (different variable names: WS_CURRENT/WS_NEW/WS_USER_SECTION) so a
+    # divergence between the two nearly-identical fallback sites is caught.
+    T10_CURRENT_B="$T10_DIR/current-b.md"
+    T10_NEW_B="$T10_DIR/new-b.md"
+    cat > "$T10_CURRENT_B" <<'HEREDOC'
+## 8. Staging
+<!-- USER-SPACE -->
+my custom staging note
+<!-- /USER-SPACE -->
+HEREDOC
+    cat > "$T10_NEW_B" <<'HEREDOC'
+## 8. Staging
+Upstream replaced this section entirely.
+HEREDOC
+
+    WS_CURRENT="$T10_CURRENT_B" WS_NEW="$T10_NEW_B" WS_BASE="$T10_DIR/ws-base.md" \
+        CLAUDE_BASE_MISSING_FILES=()
+    source "$T10_STEP6_FILE"
+
+    if grep -q "Upstream replaced" "$T10_CURRENT_B" && grep -q "my custom staging note" "$T10_CURRENT_B"; then
+        pass "T10: Step 6 — USER-SPACE case still merges upstream + preserves the marked section"
+    else
+        fail "T10: Step 6 — USER-SPACE merge path regressed (extracted from update.sh)"
+    fi
+fi
+
+# ============================================================================
+# T11: protocol-artifact-validate.sh DayPlan checks (issue #328)
+# ============================================================================
+echo "--- T11: DayPlan multiplier/mandatory/budget checks (issue #328) ---"
+
+HOOK_FILE="$TEMPLATE_DIR/.claude/hooks/protocol-artifact-validate.sh"
+
+# Extracts the real Check 3/4 block from the hook (between its unique section
+# markers) and sources it as bash — not a re-typed copy, so the test breaks if
+# the real checks diverge. Requires DAYPLAN/WORKSPACE/ERRORS to be set by the
+# caller, exactly like the hook itself expects them from its own preamble.
+T11_CHECKS_BLOCK=$(awk '
+/^# --- Ф3 Check 3: формат мультипликатора ---$/{found=1}
+/^# --- Ф3 Check 5:/{found=0}
+found' "$HOOK_FILE")
+
+if [ -z "$T11_CHECKS_BLOCK" ]; then
+    fail "T11: could not extract Check 3/4 block from protocol-artifact-validate.sh — marker comments moved?"
+else
+    T11_CHECKS_FILE="$TEST_WS/t11-checks.sh"
+    printf '%s\n' "$T11_CHECKS_BLOCK" > "$T11_CHECKS_FILE"
+
+    # Case A: default installation (mandatory_daily_wps commented out in the
+    # template default), DayPlan uses the real pilot phrasing from issue #328.
+    T11_DIR="$TEST_WS/t11-dayplan"
+    mkdir -p "$T11_DIR/memory" "$T11_DIR/current"
+    cp "$TEMPLATE_DIR/memory/day-rhythm-config.yaml" "$T11_DIR/memory/day-rhythm-config.yaml"
+    cat > "$T11_DIR/current/DayPlan.md" <<'HEREDOC'
+## Бюджет
+~1.25 ч РП всего / 0 ч физической работы. Мультипликатор не считаю.
+HEREDOC
+
+    DAYPLAN="$T11_DIR/current/DayPlan.md"
+    WORKSPACE="$T11_DIR"
+    ERRORS=()
+    source "$T11_CHECKS_FILE"
+
+    if [ "${#ERRORS[@]}" -eq 0 ]; then
+        pass "T11: default-install DayPlan (no multiplier, no mandatory config, ч-budget) passes all three checks"
+    else
+        fail "T11: default-install DayPlan unexpectedly failed: ${ERRORS[*]}"
+    fi
+
+    # Case B (negative): mandatory_daily_wps IS configured, DayPlan lacks the
+    # section — must still fail. Proves Case A isn't passing because the
+    # checks were silently disabled, not because the config was honored.
+    T11_DIR_B="$TEST_WS/t11-dayplan-b"
+    mkdir -p "$T11_DIR_B/memory" "$T11_DIR_B/current"
+    cat > "$T11_DIR_B/memory/day-rhythm-config.yaml" <<'HEREDOC'
+mandatory_daily_wps:
+  - wp: 7
+    min_minutes: 30
+HEREDOC
+    cat > "$T11_DIR_B/current/DayPlan.md" <<'HEREDOC'
+## Бюджет
+~1.25 ч РП всего / 0 ч физической работы. Мультипликатор не считаю.
+HEREDOC
+
+    DAYPLAN="$T11_DIR_B/current/DayPlan.md"
+    WORKSPACE="$T11_DIR_B"
+    ERRORS=()
+    source "$T11_CHECKS_FILE"
+
+    if [ "${#ERRORS[@]}" -eq 1 ] && [[ "${ERRORS[0]}" == *"Mandatory"* ]]; then
+        pass "T11: DayPlan with mandatory_daily_wps configured still requires the mandatory section"
+    else
+        fail "T11: expected exactly 1 mandatory-check error, got ${#ERRORS[@]}: ${ERRORS[*]:-none}"
+    fi
 fi
 
 # ============================================================

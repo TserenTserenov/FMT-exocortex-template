@@ -28,7 +28,7 @@ IWE="${IWE_ROOT:-$HOME/IWE}"
 # --- Определить governance-репо ---
 # Приоритет: (1) явная переменная IWE_GOVERNANCE_REPO → (2) DS-strategy (конвенция по умолчанию)
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-if [[ -z "$IWE_GOVERNANCE_REPO" ]] && [[ ! -d "$IWE/$GOV_REPO" ]]; then
+if [[ -z "${IWE_GOVERNANCE_REPO:-}" ]] && [[ ! -d "$IWE/$GOV_REPO" ]]; then
   echo "ERROR: IWE_GOVERNANCE_REPO not set and $GOV_REPO not found in $IWE" >&2
   exit 1
 fi
@@ -163,6 +163,11 @@ fi
 
 echo "📋 Следующий номер WP: $WP_NUM"
 
+# issue #338 п.4: без паддинга "WP-9" в листинге сортируется после "WP-10".
+# WP_ID — только для строк с префиксом "WP-" (пути, заголовки); frontmatter
+# wp:, consent-файл и колонки "#" REGISTRY/WeekPlan остаются bare-числом.
+WP_ID=$(printf '%03d' "$WP_NUM")
+
 # --- Проверка consent ---
 CONSENT_FILE="$STATE_DIR/wp-consent-${WP_NUM}"
 if [[ "$SKIP_CONSENT" -eq 0 ]]; then
@@ -201,12 +206,12 @@ fi
 
 # Inbox convention (WP-434): every WP is a folder inbox/WP-N/ with main file WP-N.md.
 # Slug is dropped from the filename (lives in title: frontmatter); archive stub keeps it.
-WP_DIR="$INBOX/WP-${WP_NUM}"
-WP_FILE="$WP_DIR/WP-${WP_NUM}.md"
+WP_DIR="$INBOX/WP-${WP_ID}"
+WP_FILE="$WP_DIR/WP-${WP_ID}.md"
 mkdir -p "$WP_DIR"
 
-echo "🚀 Создаю WP-${WP_NUM}: $TITLE"
-echo "   Папка: inbox/WP-${WP_NUM}/WP-${WP_NUM}.md"
+echo "🚀 Создаю WP-${WP_ID}: $TITLE"
+echo "   Папка: inbox/WP-${WP_ID}/WP-${WP_ID}.md"
 echo "   Бюджет: $BUDGET | Приоритет: $PRIORITY"
 
 # --- Сформировать строки таблицы связок ---
@@ -251,7 +256,7 @@ ${FM_STAKE}
 activation: on-demand
 ---
 
-# WP-${WP_NUM}: ${TITLE}
+# WP-${WP_ID}: ${TITLE}
 
 ## Проблема
 
@@ -294,7 +299,7 @@ echo "   ✅ $WP_FILE"
 echo "2/6 archive stub..."
 
 ARCHIVE_DIR="$STRATEGY/archive/wp-contexts"
-ARCHIVE_STUB="$ARCHIVE_DIR/WP-${WP_NUM}-${SLUG}.md"
+ARCHIVE_STUB="$ARCHIVE_DIR/WP-${WP_ID}-${SLUG}.md"
 cat > "$ARCHIVE_STUB" <<ARCHEOF
 ---
 wp: ${WP_NUM}
@@ -303,7 +308,7 @@ created: ${TODAY}
 status: pending
 ---
 
-# WP-${WP_NUM}: ${TITLE} — §Закрытие
+# WP-${WP_ID}: ${TITLE} — §Закрытие
 
 *(заполняется при закрытии РП)*
 ARCHEOF
@@ -312,9 +317,9 @@ echo "   ✅ $ARCHIVE_STUB"
 # --- Шаг 3: WP-REGISTRY.md ---
 echo "3/6 WP-REGISTRY.md..."
 
-if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" "$STAKE_CELL" <<'PYEOF'
+if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" "$STAKE_CELL" "$WP_ID" <<'PYEOF'
 import sys
-registry_path, wp_num, priority, title, repo, budget, gov_repo, stake = sys.argv[1:9]
+registry_path, wp_num, priority, title, repo, budget, gov_repo, stake, wp_id = sys.argv[1:10]
 
 with open(registry_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
@@ -381,7 +386,7 @@ if missing_names:
     print("   доп. колонки — свободные), затем повторите создание РП.", file=sys.stderr)
     sys.exit(1)
 
-repo_cell = repo if repo else "{}/inbox/WP-{}/".format(gov_repo, wp_num)
+repo_cell = repo if repo else "{}/inbox/WP-{}/".format(gov_repo, wp_id)
 values_by_name = {
     "#": wp_num,
     "P": priority,
@@ -442,7 +447,7 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # issue (2026-07-27, WP-507 registration): the old writer matched a text anchor
 # ("**Бюджет недели:**"/"**Бюджет итого:**") and a fixed 7-field column order —
 # neither exists in the current WeekPlan format (summary line is now "**Бюджет:**",
-# table header is "🚦 | # | РП | P | h | Статус | Результат"). Locate the table by
+# table header is "🚦 | # | РП | h | Источник | P | Статус | Результат"). Locate the table by
 # its actual header instead, same name-based technique as the REGISTRY writer, so
 # column order/extra columns don't silently corrupt the row.
 header_line = None
@@ -461,8 +466,9 @@ else:
         "🚦": flag,
         "#": wp_num,
         "РП": "**{}** — [описание]".format(title),
-        "P": priority,
         "h": h_val,
+        "Источник": "—",
+        "P": priority,
         "Статус": "pending",
         "Результат": "[заполнить]",
     }
@@ -486,18 +492,12 @@ echo "5/6 Strategy.md..."
 BUDGET_H=$(echo "$BUDGET" | sed 's/[^0-9]//g')
 if [[ -n "$RESULT" && "${BUDGET_H:-0}" -ge 3 ]]; then
   STRATEGY_FILE="$STRATEGY/docs/Strategy.md"
-  python3 - "$STRATEGY_FILE" "$WP_NUM" "$REPO" "$RESULT" <<'PYEOF'
-import sys, datetime
+  python3 - "$STRATEGY_FILE" "$WP_ID" "$REPO" "$RESULT" <<'PYEOF'
+import sys
 
-strategy_path, wp_num, repo, result = sys.argv[1:5]
+strategy_path, wp_id, repo, result = sys.argv[1:5]
 
-RU_MONTHS = {
-    1: "январь", 2: "февраль", 3: "март", 4: "апрель",
-    5: "май", 6: "июнь", 7: "июль", 8: "август",
-    9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь"
-}
-today = datetime.date.today()
-section_anchor = "### РП → Результаты ({} {})".format(RU_MONTHS[today.month], today.year)
+section_anchor = "### РП → Результаты"
 
 with open(strategy_path, "r", encoding="utf-8") as f:
     content = f.read()
@@ -514,12 +514,12 @@ if table_sep == -1:
 
 insert_at = content.index("\n", table_sep) + 1
 repo_cell = repo if repo else "—"
-new_row = "| WP-{} | {} | {} | pending |\n".format(wp_num, repo_cell, result)
+new_row = "| WP-{} | {} | {} | pending |\n".format(wp_id, repo_cell, result)
 content = content[:insert_at] + new_row + content[insert_at:]
 
 with open(strategy_path, "w", encoding="utf-8") as f:
     f.write(content)
-print("   ✅ Strategy.md: WP-{} → {} добавлен".format(wp_num, result))
+print("   ✅ Strategy.md: WP-{} → {} добавлен".format(wp_id, result))
 PYEOF
 elif [[ "${BUDGET_H:-0}" -ge 3 ]]; then
   echo "   ℹ️  РП ≥3h, но --result не задан — добавить маппинг в Strategy.md вручную"
@@ -530,18 +530,25 @@ fi
 # --- Шаг 6: active-wp.md ---
 echo "6/6 active-wp.md..."
 
+BUILD_ACTIVE_WP=""
 if [[ -f "$STRATEGY/scripts/build-active-wp.py" ]]; then
-  python3 "$STRATEGY/scripts/build-active-wp.py" \
+  BUILD_ACTIVE_WP="$STRATEGY/scripts/build-active-wp.py"
+elif [[ -f "$IWE/FMT-exocortex-template/scripts/build-active-wp.py" ]]; then
+  BUILD_ACTIVE_WP="$IWE/FMT-exocortex-template/scripts/build-active-wp.py"
+fi
+
+if [[ -n "$BUILD_ACTIVE_WP" ]]; then
+  python3 "$BUILD_ACTIVE_WP" \
     && echo "   ✅ active-wp.md пересобран" \
     || echo "   ⚠️  build-active-wp.py завершился с ошибкой — пересобрать вручную" >&2
 else
-  echo "   ⚠️  scripts/build-active-wp.py не найден — пересобрать вручную" >&2
+  echo "   ⚠️  scripts/build-active-wp.py не найден (искали в \`$STRATEGY/scripts/\` и \`$IWE/FMT-exocortex-template/scripts/\`) — пересобрать вручную" >&2
 fi
 
 # --- Linear (ручной шаг) ---
 echo ""
 echo "ℹ️  Linear: создать issue вручную или через MCP"
-echo "   Linear MCP → create_issue title='WP-${WP_NUM} ${TITLE}' teamId=TSR"
+echo "   Linear MCP → create_issue title='WP-${WP_ID} ${TITLE}' teamId=TSR"
 
 # --- Consent file остаётся в папке WP для аудит-следа ---
 # Ранее consent file удалялся здесь; это ломало последующие wp-gate-check
@@ -552,8 +559,8 @@ if [[ "$SKIP_CONSENT" -eq 0 && -f "$CONSENT_FILE" ]]; then
 fi
 
 echo ""
-echo "✅ WP-${WP_NUM} создан: $TITLE"
-echo "   context: inbox/WP-${WP_NUM}/WP-${WP_NUM}.md"
-echo "   archive: archive/wp-contexts/WP-${WP_NUM}-${SLUG}.md"
+echo "✅ WP-${WP_ID} создан: $TITLE"
+echo "   context: inbox/WP-${WP_ID}/WP-${WP_ID}.md"
+echo "   archive: archive/wp-contexts/WP-${WP_ID}-${SLUG}.md"
 echo "   Следующий шаг: заполнить «Проблема», «Артефакт», «Фазы» в context file"
 echo "   Не забыть: Linear issue"

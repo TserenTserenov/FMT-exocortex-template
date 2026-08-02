@@ -16,6 +16,8 @@
 
 CAPTURE_BUS_VERSION=1
 CAPTURE_COST_LEVEL="${CAPTURE_COST_LEVEL:-free}"
+# issue #339: таймаут на вызов детектора (gtimeout/timeout) — 0 < N секунд.
+CAPTURE_DETECTOR_TIMEOUT_SECONDS="${CAPTURE_DETECTOR_TIMEOUT_SECONDS:-30}"
 
 DETECTORS=(
   "incident|.claude/detectors/detector_incident.sh|agent_incident|free|true|PostToolUse,Stop"

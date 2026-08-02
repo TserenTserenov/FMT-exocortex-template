@@ -131,6 +131,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `cd92300` fix(wp499): Ф16 хвост — bump iwe-local-gateway пин к v0.1.1 (демон писал pid всегда в ~/.iwe/gateway.pid независимо от кастомного сокета, issue TserenTserenov/iwe-local-gateway#1; фикс портирован в канонический репо, ранее ушёл только в приватный репо-двойник)
 - `7717c76` fix(mcp): утечка личного пути автора в .mcp.json (→ {{HOME_DIR}}) + скилл personal-guide-render указывал на несуществующий инструмент локального шлюза
 - `0873dde` fix: promote day-open-pipeline.sh — facts_digest guard fix (WP-484)
 - `cef6352` fix(hooks): revert WeekPlan section-list gate — broke 23/24 real WeekPlans (issue #318 hotfix)

@@ -282,7 +282,11 @@ else
     # the "guard exists but isn't wired up" gap stayed invisible until an incident.
     HOOKS_PATH=$(git -C "$DS_DIR" config --get core.hooksPath 2>/dev/null || echo "")
     if [ "$HOOKS_PATH" != ".githooks" ]; then
-        echo "⚠️ \`core.hooksPath\` = \`${HOOKS_PATH:-<не задан>}\`, ожидается \`.githooks\` — pre-push force-push guard (WP-436) может быть отключён. Почини: \`bash scripts/install-hooks.sh\` внутри \`$GOV_REPO\`."
+        if [ -x "$DS_DIR/scripts/install-hooks.sh" ]; then
+            echo "⚠️ \`core.hooksPath\` = \`${HOOKS_PATH:-<не задан>}\`, ожидается \`.githooks\` — pre-push force-push guard (WP-436) может быть отключён. Почини: \`bash \"$DS_DIR/scripts/install-hooks.sh\"\`."
+        else
+            echo "⚠️ \`core.hooksPath\` = \`${HOOKS_PATH:-<не задан>}\`, ожидается \`.githooks\` — pre-push force-push guard (WP-436) может быть отключён. Почини: \`git -C \"$DS_DIR\" config core.hooksPath .githooks\`."
+        fi
     elif [ ! -x "$DS_DIR/.githooks/pre-push" ]; then
         echo "⚠️ \`core.hooksPath\` верный, но \`.githooks/pre-push\` отсутствует или не исполняемый."
     else
@@ -347,7 +351,7 @@ if [ ! -d "$EXT_DIR" ]; then
     echo "_extensions/ директория отсутствует — расширения не настроены_"
 else
     set +e
-    EXT_FILES=$(find "$EXT_DIR" -maxdepth 1 -type f -name "*.md" ! -name "README.md" 2>/dev/null | sort)
+    EXT_FILES=$(find -L "$EXT_DIR" -maxdepth 1 -type f -name "*.md" ! -name "README.md" 2>/dev/null | sort)
     set -e
     if [ -z "$EXT_FILES" ]; then
         echo "_В extensions/ только README — пользовательских хуков нет_"
@@ -355,12 +359,20 @@ else
         EXT_COUNT=$(printf '%s\n' "$EXT_FILES" | wc -l | tr -d ' ')
         echo "**Найдено хуков:** $EXT_COUNT"
         echo ""
-        echo "| Hook | Размер |"
-        echo "|---|---|"
+        echo "| Hook | Размер | Источник |"
+        echo "|---|---|---|"
         printf '%s\n' "$EXT_FILES" | while read -r ext_file; do
             ext_name=$(basename "$ext_file")
             ext_size=$(wc -l < "$ext_file" | tr -d ' ')
-            printf "| \`%s\` | %s строк |\n" "$ext_name" "$ext_size"
+            # issue #341 п.1: расширения часто держат в governance-репо и линкуют
+            # сюда — молча показывать их как обычный файл скрывает, где на самом
+            # деле живёт кастомизация (важно при разборе после restore/update).
+            if [ -L "$ext_file" ]; then
+                ext_target=$(readlink "$ext_file")
+                printf "| \`%s\` | %s строк | симлинк → \`%s\` |\n" "$ext_name" "$ext_size" "$ext_target"
+            else
+                printf "| \`%s\` | %s строк | файл |\n" "$ext_name" "$ext_size"
+            fi
         done
     fi
 fi

@@ -1,0 +1,23 @@
+#!/bin/bash
+# pre-push hook — force-push guard (WP-436)
+# Blocks non-fast-forward pushes to protect shared repo history from agent overwrites.
+# Install: git config core.hooksPath .githooks (see scripts/install-hooks.sh)
+# Override: ALLOW_FORCE_PUSH=1 git push --force
+
+set -uo pipefail
+
+[ -n "${ALLOW_FORCE_PUSH:-}" ] && exit 0
+
+while read local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+  [ "$remote_sha" = "0000000000000000000000000000000000000000" ] && continue
+  if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo ""
+    echo "❌ Push blocked: $remote_ref is not a fast-forward."
+    echo "   This overwrites history and may destroy parallel agent work."
+    echo "   Override (if authorized): ALLOW_FORCE_PUSH=1 git push --force"
+    exit 1
+  fi
+done
+
+exit 0

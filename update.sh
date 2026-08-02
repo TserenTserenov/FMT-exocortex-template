@@ -445,6 +445,11 @@ CLAUDE_CONFLICTS=0  # unresolved CLAUDE.md merge conflict counter (WP-7)
 # Collect it here and fail at the very end instead of exiting mid-script.
 CLAUDE_CONFLICT_DETECTED=false
 CLAUDE_CONFLICT_FILES=()
+# issue #336: a missing .claude.md.base (no real 3-way merge possible) is a
+# different failure than an actual merge conflict — no <<<<<<< markers, the
+# file was simply left untouched. Tracked separately so the final summary
+# doesn't tell the pilot to look for markers that were never written.
+CLAUDE_BASE_MISSING_FILES=()
 
 # Count total files for progress display
 TOTAL_FILES=$(python3 -c "
@@ -754,7 +759,7 @@ for f in "${UPDATED_FILES[@]}"; do
                 echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
             else
                 cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
-                CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + 1))
+                CLAUDE_BASE_MISSING_FILES+=("$CURRENT_FILE")
                 echo "  ⚠ $f НЕ тронут — базовый файл для слияния отсутствовал."
                 echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
             fi
@@ -1108,8 +1113,7 @@ if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
             echo "  ✓ $WS_CURRENT обновлён (USER-SPACE сохранён, базовый файл создан)"
         else
             cp "$WS_NEW" "$WS_BASE"
-            CLAUDE_CONFLICT_DETECTED=true
-            CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
+            CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
             echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
             echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
         fi
@@ -1596,5 +1600,18 @@ if $CLAUDE_CONFLICT_DETECTED; then
     echo "⚠ CLAUDE.md содержит неразрешённые конфликты слияния в:"
     for cf in "${CLAUDE_CONFLICT_FILES[@]}"; do echo "  - $cf"; done
     echo "  Разрешите их вручную (маркеры <<<<<<< / ======= / >>>>>>>) и закоммитьте отдельно."
+fi
+
+# issue #336: отдельный случай — не конфликт (нет маркеров), файл не тронут
+# из-за отсутствующего базового файла для слияния. Разное сообщение не путает
+# пилота поиском несуществующих <<<<<<< маркеров.
+if [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
+    echo ""
+    echo "⚠ CLAUDE.md не тронут (нет базового файла для слияния) в:"
+    for cf in "${CLAUDE_BASE_MISSING_FILES[@]}"; do echo "  - $cf"; done
+    echo "  Сверьте свои правки §8/§9 вручную (см. diff-команду в выводе выше) и закоммитьте отдельно."
+fi
+
+if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
     exit "$EXIT_CONFLICT"
 fi

@@ -21,8 +21,8 @@ set -euo pipefail
 # GATEWAY_SHA дублирует тег: тег можно передвинуть force-push'ем, SHA — нельзя;
 # несовпадение = подмена тега, установка останавливается.
 GATEWAY_REPO_URL="https://github.com/TserenTserenov/iwe-local-gateway.git"
-GATEWAY_REF="v0.1.0"   # бамп только вместе со строкой в CHANGELOG шаблона
-GATEWAY_SHA="930d5ae0bb8f88e79df678719d16f285f2123330"
+GATEWAY_REF="v0.1.1"   # бамп только вместе со строкой в CHANGELOG шаблона
+GATEWAY_SHA="e3f1697b59691e13108850a1277379a713594990"
 
 # Workspace = корень репозитория, в котором лежит этот скрипт (setup/optional/../..) —
 # тот же приём, что setup-calendar.sh; env-переменная переопределяет.
@@ -35,9 +35,9 @@ SOCK="${IWE_GATEWAY_SOCKET:-$HOME/.iwe/gateway.sock}"
 SOCK_DEFAULT="$HOME/.iwe/gateway.sock"
 SOCK_DIR="$(dirname "$SOCK")"
 DAEMON_LOG="$SOCK_DIR/gateway-daemon.log"
-# Демон v0.1.0 пишет pid ВСЕГДА в ~/.iwe/gateway.pid, независимо от пути сокета
-# (daemon.ts: PID_PATH от os.homedir, только SOCKET_PATH берёт env).
-PID_FILE="$HOME/.iwe/gateway.pid"
+# С v0.1.1 pid-файл живёт рядом с сокетом (daemon-paths.ts: resolveDaemonPaths) —
+# тот же приём, что SOCK_DIR, кастомный IWE_GATEWAY_SOCKET больше не путает pid.
+PID_FILE="$SOCK_DIR/gateway.pid"
 
 echo "========================================"
 echo "  Локальный шлюз координации агентов"

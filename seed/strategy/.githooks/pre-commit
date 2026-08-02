@@ -1,0 +1,12 @@
+#!/bin/bash
+# Pre-commit hook: block secrets file from being committed
+# Install: git config core.hooksPath .githooks (done automatically by setup.sh)
+
+if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
+    echo "SECURITY: .exocortex.env is staged for commit — this file contains secrets!"
+    echo "  Remove from staging: git restore --staged .exocortex.env"
+    echo "  The file is in .gitignore — verify it's listed there."
+    exit 1
+fi
+
+exit 0

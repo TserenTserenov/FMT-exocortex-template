@@ -62,6 +62,36 @@ rm ~/Library/LaunchAgents/com.exocortex.pomodoro-alert.plist
 
 ---
 
+## Локальный шлюз координации агентов (iwe-local-gateway)
+
+Если в одной рабочей директории работает несколько ИИ-агентов одновременно (Claude Code, Kimi, Hermes) — нужен общий менеджер файловых блокировок, чтобы они не перезаписывали правки друг друга. Полное описание сценария — [docs/AGENT-VENDOR-SETUP.md](../../docs/AGENT-VENDOR-SETUP.md).
+
+### Установка
+
+```bash
+bash setup/optional/setup-local-gateway.sh
+```
+
+Скрипт клонирует шлюз на закреплённую версию, собирает его, запускает демон и выводит блок для ручной вставки в `.mcp.json` (существующий файл не переписывается автоматически — только показывается точная запись для копирования). Повторный запуск безопасен: уже установленный шлюз не переустанавливается.
+
+### Uninstall
+
+```bash
+kill "$(cat ~/.iwe/gateway.pid)"          # остановить демон
+rm -rf ~/IWE/DS-MCP/local-gateway         # удалить код шлюза
+rm -f ~/.iwe/gateway.sock ~/.iwe/gateway-daemon.log ~/.iwe/gateway.pid
+```
+
+Затем вручную удалите запись `iwe-local-gateway` из `.mcp.json`.
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `setup-local-gateway.sh` | клон + сборка + запуск демона + инструкция для `.mcp.json` |
+
+---
+
 ## Day Rhythm Config
 
 The file `memory/day-rhythm-config.yaml` controls several Day Open features:
@@ -79,42 +109,7 @@ This file is read by Claude during Day Open (`protocol-open.md § День`). No
 
 IWE автоматика в облаке — работает даже когда Mac выключен. Базовый уровень: backup + health check. $0/мес.
 
-**Сценарий:** [DP.SC.019](../../../PACK-digital-platform/pack/digital-platform/08-service-clauses/DP.SC.019-autonomous-cloud-runtime.md)
-
-### Что делает
-
-- **Backup memory:** ежедневно копирует `memory/` → `exocortex/` (git commit + push)
-- **Health check:** проверяет наличие DayPlan, WeekPlan, свежесть backup, незакрытые сессии
-- **Telegram-уведомления** (опционально): отправляет health report в Telegram
-
-### Установка
-
-```bash
-bash setup/optional/setup-cloud-scheduler.sh
-```
-
-Скрипт проверит gh CLI, настроит секреты и запустит тестовый workflow.
-
-### Ручная настройка
-
-1. Убедитесь, что `.github/workflows/cloud-scheduler.yml` запушен в ваш DS-strategy репо
-2. (Опционально) Настройте Telegram:
-   ```bash
-   gh secret set TELEGRAM_BOT_TOKEN --repo ВАШ_РЕПО --body "ТОКЕН"
-   gh secret set TELEGRAM_CHAT_ID --repo ВАШ_РЕПО --body "ВАШ_ID"
-   ```
-3. Тестовый запуск: `gh workflow run cloud-scheduler.yml --repo ВАШ_РЕПО`
-
-### Расписание
-
-Ежедневно в 04:00 MSK (01:00 UTC): backup + health check.
-
-### Files
-
-| File | Purpose |
-|------|---------|
-| `cloud-scheduler.yml` | GitHub Actions workflow (backup + health check) |
-| `setup-cloud-scheduler.sh` | Скрипт настройки (gh secrets + тест) |
+Полная инструкция (доставляется через update.sh — issue #325): [docs/CLOUD-SCHEDULER.md](../../docs/CLOUD-SCHEDULER.md)
 
 ---
 

@@ -435,6 +435,9 @@
       "path": ".githooks/commit-msg"
     },
     {
+      "path": ".githooks/post-commit"
+    },
+    {
       "path": ".githooks/pre-commit"
     },
     {
@@ -1651,6 +1654,30 @@
     },
     {
       "path": "update.sh"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_registry_coherence.sh"
+    },
+    {
+      "path": "scripts/tests/test_capture_bus_detector_timeout.sh"
+    },
+    {
+      "path": "scripts/tests/test_critical_alert_disabled_tracker.sh"
+    },
+    {
+      "path": "scripts/run-regression-tests.sh"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_contract.sh"
+    },
+    {
+      "path": "scripts/tests/test_capture_bus_contract.sh"
+    },
+    {
+      "path": "scripts/tests/test_critical_alert_contract.sh"
+    },
+    {
+      "path": "scripts/tests/validate_manifest_coverage.sh"
     }
   ],
   "excluded_paths": [
@@ -1676,11 +1703,13 @@
     "scripts/tests/conftest.py",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
+    "scripts/tests/test_create_wp_number_padding.py",
     "scripts/tests/test_create_wp_weekplan_writer.py",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dry_run_gate.py",
+    "scripts/tests/test_install_hooks.py",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_translate_delta.py",

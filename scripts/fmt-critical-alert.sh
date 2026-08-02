@@ -25,7 +25,8 @@
 # Exit code:
 #   0 — нет critical/deadline issues (или они есть и оповещение отправлено)
 #   1 — есть critical issues, но TG_BOT_TOKEN/TG_CHAT_ID не настроены (warning только в stdout)
-#   2 — ошибка вызова gh (нет авторизации, repo недоступен)
+#   2 — ошибка вызова gh (нет авторизации, repo недоступен, issue tracker отключён)
+#      или issue tracker отключён (issue #340 — отличаем от «0 issues»).
 #
 # Требования: bash, gh, curl, jq. Без внешних зависимостей.
 
@@ -75,6 +76,41 @@ if ! gh auth status >/dev/null 2>&1; then
     exit 2
 fi
 
+# --- Repo verification: detect forks and disabled issue trackers ---
+# issue #340: a user's fork with an empty tracker was reported as "clean" forever.
+# Resolve the actual upstream for forks and refuse to silently treat a disabled
+# tracker as "no issues".
+set +e
+REPO_INFO=$(gh api "repos/${REPO}" --jq '{fork: .fork, parent: .parent.full_name, has_issues: .has_issues}' 2>&1)
+REPO_INFO_RC=$?
+set -e
+if [ $REPO_INFO_RC -ne 0 ]; then
+    echo "Error: cannot fetch repo info for ${REPO} (gh rc=$REPO_INFO_RC): ${REPO_INFO}" >&2
+    exit 2
+fi
+
+ISSUE_REPO="$REPO"
+FORK_PARENT=$(echo "$REPO_INFO" | jq -r '.parent // empty')
+if [ -n "$FORK_PARENT" ]; then
+    echo "_Note: ${REPO} is a fork; querying upstream ${FORK_PARENT} for critical issues._"
+    ISSUE_REPO="$FORK_PARENT"
+fi
+
+set +e
+ISSUE_REPO_INFO=$(gh api "repos/${ISSUE_REPO}" --jq '{has_issues: .has_issues}' 2>&1)
+ISSUE_REPO_INFO_RC=$?
+set -e
+if [ $ISSUE_REPO_INFO_RC -ne 0 ]; then
+    echo "Error: cannot fetch repo info for ${ISSUE_REPO} (gh rc=$ISSUE_REPO_INFO_RC): ${ISSUE_REPO_INFO}" >&2
+    exit 2
+fi
+
+HAS_ISSUES=$(echo "$ISSUE_REPO_INFO" | jq -r '.has_issues // "unknown"')
+if [ "$HAS_ISSUES" != "true" ]; then
+    echo "_FMT critical/deadline/stale issues:_ tracker disabled for ${ISSUE_REPO} (⚠️ cannot check)"
+    exit 2
+fi
+
 # Запрос issues
 # Note: gh issue list --label "X,Y" применяет AND-логику (issue должен иметь оба label).
 # Нам нужен OR — issue хотя бы с одним из label'ов. Используем gh api repos/.../issues?labels=
@@ -91,12 +127,12 @@ for label in "${LABELS_ARRAY[@]}"; do
     tmp=$(mktemp)
     label_trim=$(echo "$label" | tr -d '[:space:]')
     encoded_label=$(printf '%s' "$label_trim" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read()))")
-    gh api "repos/${REPO}/issues?state=open&labels=${encoded_label}" \
+    gh api "repos/${ISSUE_REPO}/issues?state=open&labels=${encoded_label}" \
         --jq '[.[] | select(.pull_request == null) | {number, title, labels: [.labels[].name], url: .html_url}]' \
         > "$tmp" 2>/dev/null
     api_rc=$?
     if [ $api_rc -ne 0 ]; then
-        echo "Error: gh api failed for label='$label_trim' (rc=$api_rc)" >&2
+        echo "Error: gh api failed for label='$label_trim' (rc=$api_rc) on repo ${ISSUE_REPO}" >&2
         rm -f "$tmp"
         if [ ${#TMP_JSONS[@]} -gt 0 ]; then
             rm -f "${TMP_JSONS[@]}"
