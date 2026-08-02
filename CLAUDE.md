@@ -59,7 +59,7 @@
 Файлы/репо → `memory/navigation.md` · Pack-репо → `memory/repo-type-rules.md` · терминология → `memory/hard-distinctions.md` · FPF/SOTA/Роли → `memory/fpf-reference.md`, `memory/sota-reference.md`, `memory/roles.md` · документ/чеклист → `memory/checklists.md`.
 
 Политика: ≤11 файлов; построчно проверяется только distinctions.md (≤150), остальное — суммарным M1/M2-бюджетом (WP-7 NR1.2); lazy-reference без лимита. Горизонты/frontmatter → `memory/memory-lifecycle-spec.md`; temporal metadata → `memory/protocol-work.md §2`.
-Рабочая директория: `{{HOME_DIR}}/IWE/`; `memory/` = симлинк на auto-memory.
+Рабочая директория: `/home/lokplvl/IWE/`; `memory/` = симлинк на auto-memory.
 
 ## 5. АрхГейт — ОБЯЗАТЕЛЬНАЯ оценка
 
@@ -69,7 +69,7 @@
 
 ## Контекстный бюджет IWE (WP-445)
 
-Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2). Изменил файл из `hot-files.list` (оба CLAUDE.md, rules/*.md) → перед коммитом `{{IWE_TEMPLATE}}/scripts/verify-context-budget.sh`.
+Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2). Изменил файл из `hot-files.list` (оба CLAUDE.md, rules/*.md) → перед коммитом `/home/lokplvl/IWE/FMT-exocortex-template/scripts/verify-context-budget.sh`.
 
 ## 7. Обновление этого файла
 
@@ -92,11 +92,31 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 ## State-Transition Gate — CRITICAL
 
-**Перед любым нетривиальным действием или РП назвать целевой переход состояния пользователя** `{тип состояния, из→в}` (WP-457) — **применимо, если в `{{GOVERNANCE_REPO}}/docs/state-axes-registry.yaml` описаны оси состояний** (авторский артефакт, не шипится в шаблон по умолчанию). Если файл есть — типы только из него, допустимы только `gate_ready: true`; ссылка на declared FSM-owner обязательна, свободный текст не принимается; нет ссылки или тип не `gate_ready` → действие = inventory → СТОП/отложить. **Файла нет (типовая установка)** → гейт неактивен, действовать по остальным Pre-action Gates без остановки. Модель осей (авторский пример) → `archive/wp-contexts/WP-457/CONCEPT-user-states.md §5`; cross-axis → `memory/reference/agent-core.md`.
+**Перед любым нетривиальным действием или РП назвать целевой переход состояния пользователя** `{тип состояния, из→в}` (WP-457) — **применимо, если в `DS-strategy/docs/state-axes-registry.yaml` описаны оси состояний** (авторский артефакт, не шипится в шаблон по умолчанию). Если файл есть — типы только из него, допустимы только `gate_ready: true`; ссылка на declared FSM-owner обязательна, свободный текст не принимается; нет ссылки или тип не `gate_ready` → действие = inventory → СТОП/отложить. **Файла нет (типовая установка)** → гейт неактивен, действовать по остальным Pre-action Gates без остановки. Модель осей (авторский пример) → `archive/wp-contexts/WP-457/CONCEPT-user-states.md §5`; cross-axis → `memory/reference/agent-core.md`.
 
 ## Git Staging — CRITICAL
 
 **NEVER `git add -u`, `git add .`, `git add -A`** — подхватывают изменения ДРУГИХ агентов (Kimi/Hermes работают параллельно) → неверная атрибуция. Стейджить только конкретные файлы; перед коммитом `git diff --cached --name-only`, лишнее — `git restore --staged`. Примеры → `memory/reference/agent-core.md`.
+
+## Pull Request & Issue Protocol — CRITICAL
+
+**При создании PR всегда используй структуру из корневого `.github/PULL_REQUEST_TEMPLATE.md`.** Обязательно заполняй блоки «Целевая система», «DRR» (Design-Rationale Record — обоснование выбранного решения) и генерируй блок «Capture» (Двойной выход — какое знание зафиксировано в Pack).
+
+**Онтологический аудит (Ontological Alignment Check, FPF + ISO/IEC 15288).** Перед генерацией текста PR или Issue агент обязан провести аудит содержимого по секциям — не заполнять их формально, а проверить онтологическое соответствие:
+- **System of Interest (SoI):** запрещено перечислять список изменённых файлов — указывается сама воплощённая целевая система, её физические/логические границы и функционал.
+- **DRR (Design-Rationale Record):** запрещено пересказывать diff/код — фиксируется архитектурное обоснование «почему выбрано именно это решение» и какой системный инвариант оно защищает.
+- **Evidence (V&V):** фиксируются строгие факты верификации — число прогонов, сценарии песочницы, проверенные крайние случаи.
+- **Enabling Systems:** изменения в системах обеспечения (CI/CD, хуки, доступы) чётко отделяются от изменений в самой SoI — не смешивать в одном пункте.
+
+**Двуязычное оформление (Bilingual Engineering Protocol).** Действует на все создаваемые PR и Issues (заголовки, описания, комментарии):
+
+1. **Строго на английском** — структурные теги и термины, от которых зависят CI-линтеры и совместимость с Conventional Commits:
+   - префиксы заголовков: `feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`
+   - названия ключевых FPF-секций: `System of Interest`, `DRR (Design-Rationale Record)`, `Evidence (V&V)`, `Enabling Systems`, `WP-Gate`
+2. **Строго на естественном русском инженерном языке** — весь смысловой и описательный контент (образец — PR #304 и PR #309):
+   - развёрнутые объяснения «почему» и «зачем» (DRR)
+   - описание крайних случаев и результатов проверок (Evidence)
+   - суть изменений и анализ влияния на смежные системы
 
 ## Artifact Naming
 

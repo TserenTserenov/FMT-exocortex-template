@@ -1,0 +1,66 @@
+name: PR Template Lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  check-hybrid-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверить обязательные секции гибридного шаблона
+        env:
+          # Тело PR передаётся через env, а не подставляется в текст скрипта —
+          # это чужой, потенциально враждебный текст (в т.ч. от внешних
+          # контрибьюторов), прямая интерполяция в run: была бы injection.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+
+          check_section() {
+            local pattern="$1" label="$2"
+            if ! grep -qiE "$pattern" <<< "$PR_BODY"; then
+              missing+=("$label")
+            fi
+          }
+
+          check_section 'Карточка и Суть|System of Interest'   'Карточка и Суть (System of Interest)'
+          check_section 'Двойной выход|DRR|Capture'            'Двойной выход и Архитектурное обоснование (DRR / Capture)'
+          check_section 'Верификация|V&V'                      'Верификация и Доказательства (V&V)'
+          check_section 'Станции конвейера|WP-Gate'            'Станции конвейера (WP-Gate)'
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "❌ В описании PR не хватает обязательных секций гибридного шаблона (.github/PULL_REQUEST_TEMPLATE.md):"
+            for section in "${missing[@]}"; do
+              echo "  - $section"
+            done
+            echo ""
+            echo "Заполни описание PR по структуре .github/PULL_REQUEST_TEMPLATE.md — все 4 секции обязательны."
+            exit 1
+          fi
+
+          echo "✓ Все обязательные секции гибридного шаблона присутствуют."
+
+          # --- Проверка 2: не остались ли незаполненные placeholder-скобки ---
+          # Шаблон подсказывает текстом в квадратных скобках — [Опишите...],
+          # [Ссылка на inbox/tasks/...] и т.д. Чекбоксы конвейера ([ ] / [x]) и
+          # markdown-ссылки ([текст](url)) — не placeholder-ы, исключаем их до
+          # проверки: ссылки вырезаем целиком, чекбоксы отсекаются длиной (≥3
+          # символа внутри скобок, "x"/" " — 1 символ, не матчит).
+          BODY_NO_LINKS=$(sed -E 's/\[[^]]*\]\([^)]*\)//g' <<< "$PR_BODY")
+          placeholders=$(grep -oE '\[[^][]{3,}\]' <<< "$BODY_NO_LINKS" | sort -u || true)
+
+          if [ -n "$placeholders" ]; then
+            echo "❌ В описании PR остались незаполненные placeholder-скобки шаблона:"
+            echo "$placeholders" | sed 's/^/  /'
+            echo ""
+            echo "Замени текст в квадратных скобках на реальное содержание (или убери пункт, если он неприменим)."
+            exit 1
+          fi
+
+          echo "✓ Placeholder-скобок не осталось."

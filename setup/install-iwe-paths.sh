@@ -1,5 +1,9 @@
 #!/bin/bash
-# install-iwe-paths.sh — генерация $HOME/.iwe-paths + sourcing из ~/.zshenv.
+# install-iwe-paths.sh — генерация $HOME/.iwe-paths + подключение через ~/.zshenv,
+# ~/.bashrc (interactive/non-Claude-Code non-interactive shells) и
+# .claude/settings.json env.BASH_ENV (Claude Code Bash tool — единственный
+# механизм, который реально читает non-interactive bash-сессия, issue найден
+# /audit-installation smoke-test 2026-07-23).
 #
 # Source-of-truth для IWE_* path-переменных (WP-219, DP.FM.009).
 # Вызывается из:
@@ -51,11 +55,13 @@ GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
 
 IWE_ENV_FILE="$WORKSPACE_DIR/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
+BASHRC_FILE="$HOME/.bashrc"
 IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
 
 if $DRY_RUN; then
     $QUIET || echo "  [DRY RUN] Would write $IWE_ENV_FILE (workspace=$WORKSPACE_DIR, governance=$GOVERNANCE_REPO)"
     $QUIET || echo "  [DRY RUN] Would ensure $ZSHENV_FILE sources \$WORKSPACE_DIR/.iwe-paths"
+    $QUIET || echo "  [DRY RUN] Would ensure $BASHRC_FILE sources \$WORKSPACE_DIR/.iwe-paths (prepended, before interactive-guard)"
     exit 0
 fi
 
@@ -86,6 +92,65 @@ _IWE_ROOT="$WORKSPACE_DIR"
 unset _IWE_ROOT
 ZSHENV_EOF
     $QUIET || echo "  ✓ $ZSHENV_FILE → sources \$WORKSPACE_DIR/.iwe-paths"
+fi
+
+# Ensure ~/.bashrc sources $WORKSPACE_DIR/.iwe-paths — прописано ДО стандартного
+# interactive-guard'а (`case $- in *i*) ;; *) return;; esac`), не после, как
+# зафиксировано выше для .zshenv. Причина: неинтерактивные bash-сессии (Claude
+# Code Bash tool и аналоги) вообще не доходят до строк после guard'а — тест
+# 2026-07-23 (/audit-installation smoke-test) показал переменную unset даже
+# при добавлении блока в конец файла; после переноса в начало — подхватывается.
+# zsh не читает .bashrc вовсе, так что этот блок не мешает zsh-пользователям;
+# добавляется безусловно, т.к. Claude Code Bash tool использует bash независимо
+# от логин-шелла пользователя.
+if [ -f "$BASHRC_FILE" ] && grep -qF "$IWE_ENV_MARKER" "$BASHRC_FILE"; then
+    $QUIET || echo "  ○ $BASHRC_FILE already sources \$WORKSPACE_DIR/.iwe-paths"
+else
+    BASHRC_BLOCK="$IWE_ENV_MARKER
+# Прописано ДО interactive-guard намеренно (см. install-iwe-paths.sh) —
+# неинтерактивные bash-сессии не доходят дальше guard'а ниже.
+_IWE_ROOT=\"$WORKSPACE_DIR\"
+[ -f \"\$_IWE_ROOT/.iwe-paths\" ] && . \"\$_IWE_ROOT/.iwe-paths\"
+unset _IWE_ROOT
+"
+    if [ -f "$BASHRC_FILE" ]; then
+        BASHRC_PERM=$(stat -c %a "$BASHRC_FILE" 2>/dev/null || stat -f %Lp "$BASHRC_FILE" 2>/dev/null || echo 644)
+        TMP_BASHRC=$(mktemp)
+        printf '%s\n\n' "$BASHRC_BLOCK" > "$TMP_BASHRC"
+        cat "$BASHRC_FILE" >> "$TMP_BASHRC"
+        mv "$TMP_BASHRC" "$BASHRC_FILE"
+        chmod "$BASHRC_PERM" "$BASHRC_FILE"
+    else
+        printf '%s\n' "$BASHRC_BLOCK" > "$BASHRC_FILE"
+    fi
+    $QUIET || echo "  ✓ $BASHRC_FILE → sources \$WORKSPACE_DIR/.iwe-paths (prepended, before interactive-guard)"
+fi
+
+# Ensure $WORKSPACE_DIR/.claude/settings.json sets env.BASH_ENV — the actual
+# mechanism Claude Code's own Bash tool honors. Confirmed empirically
+# (2026-07-23): the Bash tool's shell is non-interactive (`$-` has no `i`),
+# so it never reads ~/.bashrc/~/.zshenv/--rcfile at all (bash only reads
+# those for interactive shells) — the .bashrc block above helps every OTHER
+# non-interactive caller (cron, CI, ssh host cmd), but not this one. BASH_ENV
+# is the one bash variable non-interactive shells DO honor. settings.json is
+# copied from the template earlier in setup.sh (step before [4d]), so it
+# already exists here on a fresh install.
+SETTINGS_FILE="$WORKSPACE_DIR/.claude/settings.json"
+if ! command -v jq >/dev/null 2>&1; then
+    $QUIET || echo "  ○ jq not found — skipping env.BASH_ENV in settings.json (add manually: {\"env\":{\"BASH_ENV\":\"$IWE_ENV_FILE\"}})"
+elif [ ! -f "$SETTINGS_FILE" ]; then
+    $QUIET || echo "  ○ $SETTINGS_FILE not found — skipping env.BASH_ENV"
+elif [ "$(jq -r '.env.BASH_ENV // empty' "$SETTINGS_FILE" 2>/dev/null)" = "$IWE_ENV_FILE" ]; then
+    $QUIET || echo "  ○ $SETTINGS_FILE already has env.BASH_ENV=$IWE_ENV_FILE"
+else
+    TMP_SETTINGS=$(mktemp)
+    if jq --arg v "$IWE_ENV_FILE" '.env = ((.env // {}) + {BASH_ENV: $v})' "$SETTINGS_FILE" > "$TMP_SETTINGS" 2>/dev/null; then
+        mv "$TMP_SETTINGS" "$SETTINGS_FILE"
+        $QUIET || echo "  ✓ $SETTINGS_FILE → env.BASH_ENV=$IWE_ENV_FILE"
+    else
+        rm -f "$TMP_SETTINGS"
+        $QUIET || echo "  ⚠ $SETTINGS_FILE — jq merge failed (malformed JSON?), env.BASH_ENV not set"
+    fi
 fi
 
 # Auto-enable pre-commit hooks for IWE repos that have .githooks/

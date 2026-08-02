@@ -817,11 +817,14 @@ fi
 
 # CLAUDE.md conflict (issue #226): warn and remember, but keep going — propagation
 # and commit of everything else must not be blocked by one unresolved merge.
+# issue #336: this counter now also covers the missing-base case (§740 above) —
+# no <<<<<<< markers there, the file was simply left untouched.
 if [ "$CLAUDE_CONFLICTS" -gt 0 ]; then
     echo ""
-    echo "ОШИБКА: CLAUDE.md содержит неразрешённые конфликты слияния."
-    echo "  Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-    echo "  Разрешите их вручную в $SCRIPT_DIR/CLAUDE.md после завершения обновления."
+    echo "ОШИБКА: CLAUDE.md требует вашего внимания перед следующим обновлением."
+    echo "  Либо неразрешённые конфликты слияния (обозначены <<<<<<< / ======= / >>>>>>>),"
+    echo "  либо файл не тронут из-за отсутствующего базового файла для слияния — см. вывод выше."
+    echo "  Разберите вручную в $SCRIPT_DIR/CLAUDE.md после завершения обновления."
     CLAUDE_CONFLICT_DETECTED=true
     CLAUDE_CONFLICT_FILES+=("$SCRIPT_DIR/CLAUDE.md")
 fi
