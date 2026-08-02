@@ -142,7 +142,7 @@ class TestRenderDashboardRepoMode(unittest.TestCase):
                 "summary": {"working": 1, "total": 1},
             }
         ]
-        output = self._capture(agents, repo="TserenTserenov/my-governance")
+        output = self._capture(agents, repo="some/my-governance")
         self.assertIn("Ильшат", output)
 
     def test_conflict_block_present(self):
@@ -168,7 +168,7 @@ class TestRenderDashboardRepoMode(unittest.TestCase):
                 "summary": {"working": 1, "total": 1},
             },
         ]
-        output = self._capture(agents, repo="TserenTserenov/my-governance")
+        output = self._capture(agents, repo="some/my-governance")
         # Блок конфликтов присутствует
         self.assertIn("⚠️", output)
         # marathon.py упомянут в конфликте
