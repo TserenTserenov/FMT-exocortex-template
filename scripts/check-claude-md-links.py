@@ -27,6 +27,7 @@ ALLOWLIST = {
     "PACK-agent-rules/rules/AR.NNN.md",
     ".claude/rules-registry.yaml",
     "archive/wp-contexts/WP-457/CONCEPT-user-states.md",
+    "DS-strategy/docs/state-axes-registry.yaml",
 }
 
 manifest_files = set()
