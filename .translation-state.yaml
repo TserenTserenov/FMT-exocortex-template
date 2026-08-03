@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-07-30T08:27:59Z'
-last_synced_sha: 5d69acf49e909aa29a55de6e56f1098b6b775bd6
+files_translated:
+- docs/developer/developer-guide.md
+last_run_utc: '2026-08-03T05:50:39Z'
+last_synced_sha: 867aa5db3d148c5ab543e431c385a7d9ca91431b
 schema_version: 1
