@@ -30,8 +30,6 @@ description: "Операционный файл памяти IWE"
 | Week Close (полный алгоритм) | `.claude/skills/week-close/SKILL.md` |
 | Шаблоны DayPlan/WeekPlan | `memory/templates-dayplan.md` |
 | Нулевые принципы + иерархия | `ZP/README.md` |
-| Кодирование сущностей | `SPF/spec/SPF.SPEC.001-entity-coding.md` |
-| Масштабируемость Pack | `SPF/spec/SPF.SPEC.003-pack-scalability.md` |
 
 ## Репозитории
 

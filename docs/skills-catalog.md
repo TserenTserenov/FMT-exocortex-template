@@ -20,7 +20,7 @@
 | `/diagnose` | Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов,… |
 | `/discovery-session` | Разговор-распаковка неудовлетворённостей (discovery-стратегирование). Сократический разбор сырой рефлексии и… |
 | `/extend` | IWE extensibility catalog: what can be customized, which extension points exist, which parameters are availab… |
-| `/fpf` | Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантны… |
+| `/fpf` | Загрузка применимых принципов для задачи из иерархии Pack → FPF. Используй когда нужно найти релевантны… |
 | `/iwe-bug-report` | Report a bug or platform issue in IWE. Creates a GitHub issue in FMT-exocortex-template. |
 | `/iwe-restore` | Восстановление памяти агента из exocortex-бэкапа при переезде на новое устройство. Находит DS-strategy/exocor… |
 | `/iwe-rules-review` | Weekly review of IWE work culture (element 14 — System Evolution). Runs during Week Close. |
@@ -30,8 +30,6 @@
 | `/lesson-close` | Закрыть занятие, открытое скиллом /lesson. Финализирует workbook/YYYY-MM-DD.md (frontmatter status, метаданны… |
 | `/month-close` | Month Close protocol. Stage 7 of the OWC v9 cascade (PD.METHOD.008). Runs on the first Monday of the month, b… |
 | `/org-dev` | Organizational Development Manager (R31): guides the subject from an organizational change request (self/team… |
-| `/pack-creator` | Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybr… |
-| `/pack-new` | Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap. |
 | `/peer-conversation` | Multi-turn dialog between writer (Claude) and partner (Kimi) on the pilot's task (DP.SC.154). Manages turn-lo… |
 | `/personal-guide-render` | Builds (or rebuilds) the personal guide in an EXISTING personal-guide repo (flat name, one per pilot) — reads… |
 | `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in th… |
@@ -50,5 +48,5 @@
 | `/week-close-pilot` | Run the pilot-facing Week Close protocol with progress review and carry-over. |
 | `/wp-new` | Создание нового рабочего продукта (РП) с записью в 5 мест атомарно. Используй когда появляется новая задача,… |
 
-_Всего скиллов: 44_
+_Всего скиллов: 42_
 

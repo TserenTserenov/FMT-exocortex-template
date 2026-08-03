@@ -194,7 +194,6 @@ skills:
     depends_on: []
     invoked_by:
     - diagnose
-    - pack-creator
   - id: discovery-session
     name: "discovery-session"
     description: "Разговор-распаковка неудовлетворённостей (discovery-стратегирование). Сократический разбор сырой рефлексии и заметок на триаду Проблема/Неудовлетворённость/Эмоция → состояние пилота → приоритеты месяца (WHAT/WHY). Роль R1 Стратег, метод DP.METHOD.053. Триггеры — «разбери неудовлетворённости», «помоги со стратегией месяца», «что для меня сейчас важно», «/discovery-session»."
@@ -221,7 +220,7 @@ skills:
     - extend
   - id: fpf
     name: "fpf"
-    description: "Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантные принципы перед принятием решения."
+    description: "Загрузка применимых принципов для задачи из иерархии Pack → FPF. Используй когда нужно найти релевантные принципы перед принятием решения."
     version: 1.0.0
     layer: L1
     status: active
@@ -231,7 +230,6 @@ skills:
     depends_on: []
     invoked_by:
     - CLAUDE.md
-    - pack-new
     - fpf
   - id: integration-gate
     name: "integration-gate"
@@ -302,9 +300,7 @@ skills:
     depends_on: []
     invoked_by:
     - ke
-    - pack-new
     - apply-captures
-    - pack-creator
   - id: kimi-peer-writer
     name: "kimi-peer-writer"
     description: "Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Opening и Closing, turn-loop, эскалации, Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), отложенную финализацию и верификацию."
@@ -365,31 +361,6 @@ skills:
     depends_on: []
     invoked_by:
     - org-dev
-  - id: pack-creator
-    name: "pack-creator"
-    description: "Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybrid/full SPF) and leads through phases. Protects the read-only upstream invariant via PreToolUse hook."
-    version: 1.0.0
-    layer: L3
-    status: active
-    triggers:
-      slash:
-        - /pack-creator
-    depends_on: []
-    invoked_by:
-    - pack-creator
-  - id: pack-new
-    name: "pack-new"
-    description: "Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap."
-    version: 0.0.0
-    layer: unknown
-    status: active
-    triggers:
-      slash: []
-    depends_on: []
-    invoked_by:
-    - CLAUDE.md
-    - skill-creator
-    - pack-creator
   - id: peer-conversation
     name: "peer-conversation"
     description: "Многотуровый диалог писателя (Claude) с напарником (Kimi) по задаче пилота (DP.SC.154). Ведёт turn-loop, обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
@@ -560,7 +531,6 @@ skills:
     - verify
     - kimi-peer-writer
     - skill-creator
-    - pack-creator
     - audit-docs
   - id: w-reflection
     name: "w-reflection"
@@ -615,5 +585,4 @@ skills:
     depends_on: []
     invoked_by:
     - wp-new
-    - pack-creator
     - decompose

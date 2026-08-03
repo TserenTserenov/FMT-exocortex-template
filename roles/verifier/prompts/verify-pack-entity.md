@@ -9,16 +9,16 @@
 ## Входы
 
 1. **Артефакт:** Pack-сущность (файл из `02-domain-entities/`, `03-methods/`, `04-work-products/`, `05-failure-modes/`)
-2. **Эталон:** SPF pack-template + принципы домена из этого Pack (bounded context, UL)
+2. **Эталон:** доменные принципы Pack + FPF (bounded context, UL)
 
 ## Алгоритм
 
 ### Формальная проверка (VT.001)
 
 - [ ] frontmatter: id, name, kind, status, created — все поля присутствуют
-- [ ] id соответствует формату `{CONTEXT}.{KIND}.{NNN}` (SPF.SPEC.001)
+- [ ] id соответствует формату `{CONTEXT}.{KIND}.{NNN}` (доменные принципы Pack + FPF)
 - [ ] kind валиден для этого Pack
-- [ ] Нет дидактики: "step", "lesson", "module", "exercise" (SPF Hard Ban)
+- [ ] Нет дидактики: "step", "lesson", "module", "exercise" (доменные принципы Pack + FPF)
 - [ ] Нет путаницы типов: Method ≠ Tool, System ≠ Episteme (FPF A.7)
 
 ### Содержательная проверка (VT.002)
@@ -36,7 +36,7 @@
 
 **Результат:** pass / fail / conditional
 **Артефакт:** [ID и имя]
-**Эталон:** SPF pack-template + [BC этого Pack]
+**Эталон:** доменные принципы Pack + FPF
 **Тип верификации:** formal + content
 
 ### Несоответствия

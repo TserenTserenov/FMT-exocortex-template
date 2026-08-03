@@ -66,9 +66,6 @@
       "path": ".claude/hooks/memory-exocortex-sync.sh"
     },
     {
-      "path": ".claude/hooks/pack-creator-spf-guard.sh"
-    },
-    {
       "path": ".claude/hooks/precompact-checkpoint.sh"
     },
     {
@@ -291,15 +288,6 @@
       "path": ".claude/skills/org-dev/test_skill.sh"
     },
     {
-      "path": ".claude/skills/pack-creator/SKILL.md"
-    },
-    {
-      "path": ".claude/skills/pack-creator/test_guard.sh"
-    },
-    {
-      "path": ".claude/skills/pack-new/SKILL.md"
-    },
-    {
       "path": ".claude/skills/peer-conversation/SKILL.md"
     },
     {
@@ -393,9 +381,6 @@
       "path": ".claude/skills/verify/verify-fpf-subsection.md"
     },
     {
-      "path": ".claude/skills/verify/verify-pack-adequacy-subsection.md"
-    },
-    {
       "path": ".claude/skills/verify/verify-pedagogy-subsection.md"
     },
     {
@@ -469,9 +454,6 @@
     },
     {
       "path": "docs/LEARNING-PATH.md"
-    },
-    {
-      "path": "docs/PACK-CREATION.md"
     },
     {
       "path": "docs/PLATFORM-COMPAT.md"

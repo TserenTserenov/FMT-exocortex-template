@@ -105,7 +105,7 @@ Check PACK repo for files matching `DP.SC.*` and `DP.ROLE.*`. If missing:
 
 ```
 Service Clause (DP.SC.*) и Role (DP.ROLE.*) не найдены.
-Создайте их сейчас через /pack-new или соответствующий процесс.
+Создайте их сейчас в соответствующем Pack.
 Для продолжения без них скажите явно: «пропусти gate».
 ```
 

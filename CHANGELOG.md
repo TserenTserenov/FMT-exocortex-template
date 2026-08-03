@@ -103,8 +103,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+## [Unreleased] — обновлено 2026-08-03
 
-## [Unreleased] — обновлено 2026-07-17
+### Removed
+
+- Уровень принципов SPF полностью удалён из платформы. DPF/Pack теперь зависит только от FPF; лестница принципов стала `ZPF → FPF → (DPF/TPF/LPF)`, fallback-цепочка — `DS → Pack → Base (FPF → ZP)`, Base — `(ZP, FPF, FMT-*)`
+- Удалены скиллы `/pack-new` и `/pack-creator`, роль R30 «Создатель паков», хук `pack-creator-spf-guard.sh`
+- `setup.sh` больше не клонирует репозиторий SPF (клонируется только FPF)
 
 ### Added
 

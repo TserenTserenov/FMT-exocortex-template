@@ -691,8 +691,8 @@ INCEOF
     echo "| Update IWE | 🟢 | ${upd_status:-проверено} |"
   fi
 
-  # Base repos (FPF/SPF/ZP) — fetch + behind count
-  for repo in FPF SPF ZP; do
+  # Base repos (FPF/ZP) — fetch + behind count
+  for repo in FPF ZP; do
     local d="$IWE/$repo"
     if [ -d "$d/.git" ]; then
       git -C "$d" fetch --quiet 2>/dev/null

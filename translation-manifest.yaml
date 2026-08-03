@@ -41,7 +41,6 @@ exclusions:
     - PACK-agent-rules
     - PACK-digital-platform
     - PACK-personal
-    - SPF
     - FPF
     - ZP
     - IWE

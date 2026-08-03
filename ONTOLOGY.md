@@ -1,7 +1,7 @@
 # Онтология: Экзокортекс-шаблон IWE
 
-> Downstream-онтология по SPF.SPEC.002 §4.3.
-> Ссылается на понятия Pack DP (Digital Platform) и SPF. Собственные понятия не вводит — только реализационные.
+> Downstream-онтология.
+> Ссылается на понятия Pack DP (Digital Platform). Собственные понятия не вводит — только реализационные.
 > **§1-4: Platform-space** (обновляется через `update.sh`). **§5-6: User-space** (только локально).
 
 ---
@@ -10,7 +10,6 @@
 
 | Upstream | Уровень | Что используется |
 |----------|---------|-----------------|
-| SPF (SPF.SPEC.002) | Base | Виды сущностей, правила онтологии, аббревиатуры |
 | PACK-digital-platform (DP) | Pack | Доменные понятия, различения, архитектура платформы |
 
 ---
@@ -68,13 +67,12 @@
 | Аббревиатура | Расшифровка (RU) | Full form (EN) | Уровень |
 |-------------|-----------------|----------------|---------|
 | FPF | Фреймворк первых принципов | First Principles Framework | FPF |
-| SPF | Фреймворк вторых принципов | Second Principles Framework | SPF |
 | UL | Единый язык | Ubiquitous Language | FPF (DDD) |
 | BC | Ограниченный контекст | Bounded Context | FPF (DDD) |
-| KE | Экстракция знаний | Knowledge Extraction | SPF |
-| FM | Режим ошибки | Failure Mode | SPF |
-| WP | Рабочий продукт | Work Product | SPF |
-| IPO | Вход-Обработка-Выход | Input-Processing-Output | SPF |
+| KE | Экстракция знаний | Knowledge Extraction | FPF |
+| FM | Режим ошибки | Failure Mode | FPF |
+| WP | Рабочий продукт | Work Product | FPF |
+| IPO | Вход-Обработка-Выход | Input-Processing-Output | FPF |
 | DP | Цифровая платформа | Digital Platform | Pack |
 | IWE | Среда интеллектуальной работы | Intellectual Work Environment | Pack |
 | MCP | Протокол контекста модели | Model Context Protocol | Pack |
@@ -92,7 +90,7 @@
 | CLI | Интерфейс командной строки | Command-Line Interface | общее |
 | API | Программный интерфейс | Application Programming Interface | общее |
 | LMS | Система управления обучением | Learning Management System | Pack |
-| S2R | Формат «Системы-к-ролям» | Systems-to-Roles | SPF |
+| S2R | Формат «Системы-к-ролям» | Systems-to-Roles | FPF |
 | PII | Персональные данные | Personally Identifiable Information | общее |
 | RSS | Лента новостей | Really Simple Syndication | общее |
 | TG | Telegram | Telegram | общее |
@@ -125,4 +123,4 @@
 
 ---
 
-_Downstream-онтология по SPF.SPEC.002 §4.3. Upstream: Pack DP (Digital Platform)_
+_Downstream-онтология. Upstream: Pack DP (Digital Platform)_

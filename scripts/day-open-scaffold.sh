@@ -729,8 +729,8 @@ INCEOF
     echo "| Update IWE | 🟢 | ${upd_status:-проверено} |"
   fi
 
-  # Base repos (FPF/SPF/ZP) — fetch + behind count
-  for repo in FPF SPF ZP; do
+  # Base repos (FPF/ZP) — fetch + behind count
+  for repo in FPF ZP; do
     local d="$IWE/$repo"
     if [ -d "$d/.git" ]; then
       run_bounded "${ISSUE_SWEEP_TIMEOUT:-10}" git -C "$d" fetch --quiet >/dev/null 2>&1
@@ -876,7 +876,7 @@ render_attention() {
   fi
 
   # IWE-светофор: любая строка 🟡/🔴 в уже отрендеренной таблице (Scout, Scheduler/триаж,
-  # Update IWE, FPF/SPF/ZP и т.д.) — таблица сама уже несёт конкретику, просто цитируем её.
+  # Update IWE, FPF/ZP и т.д.) — таблица сама уже несёт конкретику, просто цитируем её.
   local status_row
   while IFS= read -r status_row; do
     [ -z "$status_row" ] && continue

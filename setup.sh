@@ -787,8 +787,8 @@ else
     fi
 fi
 
-# === 7. Clone Base repos (FPF + SPF) ===
-echo "[7/7] Installing Base repos (FPF, SPF)..."
+# === 7. Clone Base repos (FPF) ===
+echo "[7/7] Installing Base repos (FPF)..."
 if $CORE_ONLY; then
     echo "  пропущено (core mode)"
 elif ! command -v gh >/dev/null 2>&1; then
@@ -813,7 +813,6 @@ else
     }
 
     clone_base_repo "FPF" "ailev/FPF"
-    clone_base_repo "SPF" "TserenTserenov/SPF"
 fi
 
 # === Done ===

@@ -4,12 +4,10 @@
 
 ## 1. Архитектура репозиториев
 
-**Base** (ZP, FPF, SPF, FMT-*) = принципы + форматы, первоисточник платформы · **Pack** = паспорт предметной области, первоисточник пользователя · **DS** (instrument/governance/surface) = код, планы, курсы — производное от Pack.
+**Base** (ZP, FPF, FMT-*) = принципы + форматы, первоисточник платформы · **Pack** = паспорт предметной области, первоисточник пользователя · **DS** (instrument/governance/surface) = код, планы, курсы — производное от Pack.
 
-**Fallback Chain (где SoT):** DS → Pack → Base (SPF → FPF → ZP). **Pack = source-of-truth для доменного знания; DS меняется вслед за Pack.**
-**Лестница принципов:** ZPF → FPF → SPF → TPF → LPF — полная таблица уровней → `memory/repo-type-rules.md`; словарь ailev ↔ IWE → `memory/fpf-reference.md`.
-
-**Pack Creation Gate:** хочешь создать Pack → `/pack-new` (структура `SPF/pack-template/`, процесс `SPF/process/01-11`, FPF/SPF клонируются автоматически). Имя = существительное-домен (не тема, не инструмент).
+**Fallback Chain (где SoT):** DS → Pack → Base (FPF → ZP). **Pack = source-of-truth для доменного знания; DS меняется вслед за Pack.**
+**Лестница принципов:** ZPF → FPF → (DPF/TPF/LPF) — полная таблица уровней → `memory/repo-type-rules.md`; словарь ailev ↔ IWE → `memory/fpf-reference.md`.
 
 ## 2. ОРЗ-фрактал (Открытие → Работа → Закрытие)
 

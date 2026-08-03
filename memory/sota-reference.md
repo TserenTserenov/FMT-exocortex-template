@@ -14,7 +14,7 @@ description: "Операционный файл памяти IWE"
 ---
 # SOTA-практики (операционный справочник)
 
-> **Источник:** Pack DP (`06-sota/DP.SOTA.*`) + SPF.SPEC.003
+> **Источник:** Pack DP (`06-sota/DP.SOTA.*`)
 > **Edition:** 2026-02 | **Обновлять:** при появлении новой SOTA или устаревании существующей
 
 ## Приоритетная тройка (ВСЕГДА применяй)
@@ -49,17 +49,6 @@ description: "Операционный файл памяти IWE"
 | SOTA.012 | Multi-Representation Arch | SOTA | Pack → multiple views (vector, graph, hierarchical) |
 | SOTA.013 | SAI (Superhuman Adaptable Intelligence) | Emerging (LeCun 2026) | Evolvability как главная характеристика AI. Не AGI (повторить человека) и не ASI (превзойти на тех же задачах), а SAI — быстро осваивать новые классы задач, включая недоступные людям. World models + adaptability. Пересекается с Эволюционируемостью в АрхГейте. |
 | SOTA.020 | Quantum-Like Modeling Lens (FPF C.26*, Илевский 2026) | SOTA (live extension к FPF, edition 2026-04) | Probe-coupled state change, order effects, incompatibility, entanglement-like non-separability в социотехнических системах. Линза, не онтология. Применяется при ArchGate / проектировании метрик / диагностики / observability — после исчерпания классического набора. Полный метод применения: DP.METHOD.050. |
-
-## Полная таблица: Pack Architecture SOTA (SPF.SPEC.003)
-
-| Метод | Источник | Реализация в Pack |
-|-------|----------|-------------------|
-| RAPTOR (Hierarchical Indexing) | Stanford 2024 | manifest → MAP → entity cards (3 layers) |
-| Contextual Chunking | Anthropic 2024 | `summary` в frontmatter каждой entity |
-| Hybrid Retrieval (dense+BM25) | Production 2025 | Vector search по summary + поиск по ID-кодам |
-| LightRAG | HKUDS, EMNLP 2025 | Typed `related:` = рёбра графа для traversal |
-| MemGPT/Letta | UCB 2023 | 3-layer memory: core (manifest) + recall (MAP) + archival (cards) |
-| llms.txt | llmstxt.org 2024 | Manifest как machine-readable index |
 
 ## Операционные правила (derived from SOTA)
 

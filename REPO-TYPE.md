@@ -9,7 +9,6 @@
 ## Upstream dependencies
 
 - FPF (First Principles Framework)
-- SPF (Second Principles Framework)
 
 ## Downstream outputs
 
