@@ -1,5 +1,7 @@
 files_translated:
-- README.md
-last_run_utc: '2026-08-04T08:55:11Z'
-last_synced_sha: f1a0798489f0085f1f540f6ae1a4c31d35994f1f
+- docs/roles-catalog.md
+- docs/scripts-catalog.md
+- docs/skills-catalog.md
+last_run_utc: '2026-08-04T12:29:41Z'
+last_synced_sha: 3d96d0024057549ff8da31d5017163adfe935d4f
 schema_version: 1
