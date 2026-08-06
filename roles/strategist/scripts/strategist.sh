@@ -46,10 +46,16 @@ if [ -n "${CLAUDE_CLI_PATH:-}" ]; then
     CLAUDE_PATH="$CLAUDE_CLI_PATH"
 elif command -v claude &>/dev/null; then
     CLAUDE_PATH="$(command -v claude)"
+elif [ -x "$HOME/.local/bin/claude" ]; then
+    CLAUDE_PATH="$HOME/.local/bin/claude"  # нативный инсталлер (curl -fsSL claude.ai/install.sh)
 elif [ -x "$HOME/.npm-global/bin/claude" ]; then
     CLAUDE_PATH="$HOME/.npm-global/bin/claude"
 else
     CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime должен был подставить
+fi
+if [ ! -x "$CLAUDE_PATH" ]; then
+    echo "[$(date '+%H:%M:%S')] ERROR: claude CLI не найден ни по одному пути (CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/фолбэк='$CLAUDE_PATH'). Задайте CLAUDE_CLI_PATH в plist." >&2
+    exit 127
 fi
 CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
 
