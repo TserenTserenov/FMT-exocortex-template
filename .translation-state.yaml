@@ -1,7 +1,5 @@
 files_translated:
-- docs/roles-catalog.md
 - docs/scripts-catalog.md
-- docs/skills-catalog.md
-last_run_utc: '2026-08-06T14:41:19Z'
-last_synced_sha: dad57557c57847aeac047c345dc2095dcf07b00a
+last_run_utc: '2026-08-06T15:33:39Z'
+last_synced_sha: 9e3f8a8cd2f2b6a9d165b648d6513b8aa2c93439
 schema_version: 1
