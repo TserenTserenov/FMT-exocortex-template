@@ -1,5 +1,7 @@
 files_translated:
-- docs/KIMI-BROWSER-SETUP.md
-last_run_utc: '2026-08-06T11:08:48Z'
-last_synced_sha: d26bdc7c16eec332c690b43c1a4136aba045779e
+- docs/roles-catalog.md
+- docs/scripts-catalog.md
+- docs/skills-catalog.md
+last_run_utc: '2026-08-06T14:41:19Z'
+last_synced_sha: dad57557c57847aeac047c345dc2095dcf07b00a
 schema_version: 1
