@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-08-05T04:12:26Z'
-last_synced_sha: 5efe7a3579f4b40e6aa5cfd4f1ef4e06febbab61
+files_translated:
+- docs/onboarding/web-connect-guide.md
+last_run_utc: '2026-08-06T10:51:17Z'
+last_synced_sha: f2d7218ddae596b9c37b27b5927c038ced799d79
 schema_version: 1
