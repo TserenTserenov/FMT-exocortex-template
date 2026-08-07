@@ -1530,6 +1530,9 @@
       "path": "scripts/migrate-initial-marker.sh"
     },
     {
+      "path": "scripts/migrate-nested-strategy.sh"
+    },
+    {
       "path": "scripts/migrate-skills-to-v2.sh"
     },
     {
