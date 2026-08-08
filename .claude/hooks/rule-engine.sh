@@ -129,36 +129,8 @@ check_autonomy() {
     fi
 }
 
-check_arch_gate() {
-    # AR.003: архитектурное решение → /archgate ПЕРЕД финализацией
-    local ctx="${RULE_CONTEXT:-}"
-    [ -z "$ctx" ] && ctx='{}'
-    local file_path
-    file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
-
-    # Создание нового Pack → ArchGate обязателен
-    if echo "$file_path" | grep -qE '/PACK-[^/]+/(00-pack-manifest|pack-manifest)'; then
-        emit_verdict "warn" "AR.003" "создание нового Pack — ArchGate обязателен ДО начала (CLAUDE.md §5). Запусти /archgate → ЭМОГССБ профиль"
-        return
-    fi
-    # new_system_creation (крупная система) → ArchGate обязателен
-    local event="${RULE_EVENT:-}"
-    if [[ "$event" == "new_system_creation" ]]; then
-        local archgate_done
-        archgate_done=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("archgate_done",False)).lower())' 2>/dev/null)
-        if [ "$archgate_done" != "true" ]; then
-            emit_verdict "warn" "AR.003" "создание новой системы без /archgate — запусти /archgate ДО реализации (CLAUDE.md §5, DP.ARCH.001 §7)"
-            return
-        fi
-    fi
-    # new_tool_creation — IntegrationGate (AR.013) достаточен, ArchGate только если сложная архитектура
-    # arch_decision_attempt — всегда проверяем
-    if [[ "$event" == "arch_decision_attempt" ]]; then
-        emit_verdict "warn" "AR.003" "архитектурное решение — /archgate ПЕРЕД финализацией (CLAUDE.md §5)"
-        return
-    fi
-    emit_verdict "ok" "AR.003" "arch gate N/A for this event (${event})"
-}
+# AR.003 (ArchGate) снят 2026-08-08: оценочного гейта перед архитектурным решением нет.
+# Принятое решение фиксируется записью DRR (.claude/templates/drr-template.md) — не блокирует.
 
 check_push() {
     # AR.004: «заливай»/«запуши» → commit + push без доп. вопросов
@@ -1078,7 +1050,7 @@ print(d.get("file_content","") + "\n" + d.get("command",""))
     echo "$content" | grep -qiE "consent_grants|privacy\.consent|gdpr_consent" && has_consent=1
 
     if [ "$has_create_table" -eq 1 ] && [ "$has_pii_col" -eq 1 ] && [ "$has_consent" -eq 0 ]; then
-        emit_verdict "warn" "AR.113" "CREATE TABLE содержит PII-колонку (${pii_cols}) без ссылки на consent_grants — требуется двухступенчатый opt-in (B7.3): implicit consent в схеме + explicit per-action. Проверь ArchGate §Б чеклист ДО реализации"
+        emit_verdict "warn" "AR.113" "CREATE TABLE содержит PII-колонку (${pii_cols}) без ссылки на consent_grants — требуется двухступенчатый opt-in (B7.3): implicit consent в схеме + explicit per-action. Пройди .claude/rules-lazy/security-checklist.md ДО реализации"
         return
     fi
 
@@ -1345,14 +1317,6 @@ for r in reg.get('rules', []):
         run_test 22 "инцидент в ${IWE_GOVERNANCE_REPO:-DS-strategy} → ok" "ok" \
             RULE_EVENT="incident_creation_attempt" \
             RULE_CONTEXT="{\"file_path\":\"$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/incident-001.md\"}"
-
-        # AR.003 ArchGate
-        run_test 23 "new_tool_creation → warn (archgate required)" "warn" \
-            RULE_EVENT="new_tool_creation" \
-            RULE_CONTEXT='{"file_path":""}'
-        run_test 24 "non-arch event → ok" "ok" \
-            RULE_EVENT="pii_touch_attempt" \
-            RULE_CONTEXT='{"file_path":""}'
 
         # AR.107 Auto Verify Code
         run_test 25 "изменён .py файл → warn (verify before commit)" "warn" \

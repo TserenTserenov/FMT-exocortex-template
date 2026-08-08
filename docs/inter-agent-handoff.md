@@ -44,7 +44,7 @@ git commit -m "feat: ..." \
 ## Workflow по умолчанию
 
 ```
-Claude (оценка / archgate / think)
+Claude (оценка / think)
   → git commit --trailer "Co-Authored-By: Claude ..."
   → Kimi читает git log / .handoff.md
   → Kimi (реализация / coding / tests)

@@ -91,11 +91,6 @@ case "$EVENT_TYPE" in
     REL_PATH=".claude/logs/gate-log-${YYYY_MM}.jsonl"
     FORMAT="jsonl"
     ;;
-  archgate_result)
-    SLUG=$(echo "$EVENT" | jq -r '.payload.slug // "unknown"')
-    REL_PATH="inbox/archgate-$(date +%Y-%m-%d)-${SLUG}.md"
-    FORMAT="markdown"
-    ;;
   verification_result)
     SLUG=$(echo "$EVENT" | jq -r '.payload.slug // "unknown"')
     REL_PATH="inbox/verify-$(date +%Y-%m-%d)-${SLUG}.md"

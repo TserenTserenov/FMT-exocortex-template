@@ -29,7 +29,7 @@ IWE разделён на три слоя. Слой определяет, нас
 
 **Кастомизация для Kimi:** клади свои инструкции в `extensions/` или в `AGENTS-agent-blocks.md`. Они попадут в `AGENTS.md` после запуска `bash scripts/sync-agent-instructions.sh`. Не редактируй `AGENTS.md` вручную — он перезапишется.
 
-**Что не работает через Kimi:** скиллы (`/day-open`, `/ke`, `/archgate`) и хуки — это механизм Claude Code CLI. Для них нужен Claude Code.
+**Что не работает через Kimi:** скиллы (`/day-open`, `/ke`, `/verify`) и хуки — это механизм Claude Code CLI. Для них нужен Claude Code.
 
 ---
 
@@ -59,7 +59,7 @@ hermes mcp login aisystant
 
 - **Формат CLAUDE.md** — читается Claude Code при старте. Kimi читает `AGENTS.md` (уже в шаблоне). Другие ассистенты используют иные форматы (`.cursorrules`, системный промпт и т.д.)
 - **`.claude/hooks/`** — события (pre-commit, post-tool) — механизм Claude Code CLI
-- **Скиллы и слэш-команды** (`/day-open`, `/ke`, `/archgate`) — работают только внутри Claude Code
+- **Скиллы и слэш-команды** (`/day-open`, `/ke`, `/verify`) — работают только внутри Claude Code
 - **MCP-серверы** — Hermes поддерживает. Другие ассистенты — зависит от реализации.
 - **Выбор модели** (Opus / Sonnet / Haiku) — специфика Anthropic API
 

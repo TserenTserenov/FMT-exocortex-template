@@ -94,7 +94,7 @@ target_path: PACK-digital-platform/pack/.../02-domain-entities/DP.D.NNN.md
 reason: "дубликат PD.METHOD.006"
 pattern: "проверять существующие METHOD перед предложением нового"
 # --- при defer ---
-reason: "ждёт ArchGate WP-245"
+reason: "ждёт решения по WP-245"
 defer_until: "после WP-245 Ф22"     # ОБЯЗАТЕЛЬНО — дата YYYY-MM-DD или событие
 ```
 

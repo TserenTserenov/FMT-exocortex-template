@@ -144,6 +144,9 @@
       "path": ".claude/rules-lazy/role-prefixes-full.md"
     },
     {
+      "path": ".claude/rules-lazy/security-checklist.md"
+    },
+    {
       "path": ".claude/rules-lazy/wp-stop-list.md"
     },
     {
@@ -190,9 +193,6 @@
     },
     {
       "path": ".claude/skills/apply-captures/SKILL.md"
-    },
-    {
-      "path": ".claude/skills/archgate/SKILL.md"
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md"

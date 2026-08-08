@@ -1,7 +1,7 @@
 ---
 name: verify
 description: Верификация артефакта по эталону из Pack. Загружает роль VR.R.001 (Верификатор) с context isolation — проверяет результат, а не процесс создания.
-argument-hint: "[code|archgate|capture|wp|chain|adversarial|subsection|section|guide|auto] [путь или id]"
+argument-hint: "[code|capture|wp|chain|adversarial|subsection|section|guide|auto] [путь или id]"
 version: 1.0.0
 layer: L1
 status: active
@@ -37,7 +37,6 @@ gates_rationale: "операционный скилл; WP Gate применим 
 | Аргумент | Тип | Что проверяет |
 |----------|-----|---------------|
 | `code` | Проверка кода | Качество кода: логика, edge cases, безопасность, coupling |
-| `archgate` | Проверка реализации АрхГейта | Код соответствует ЭМОГССБ-оценке, принципы воплощены |
 | `capture` | Проверка capture-candidate | UL, полнота, непротиворечивость с Pack |
 | `wp` | Приёмка рабочего продукта | Критерии done из WP context file |
 | `chain` | Data flow check | Прочитаны ли downstream consumers? Контракты совпадают? (CoVe stage 3) |
@@ -48,12 +47,11 @@ gates_rationale: "операционный скилл; WP Gate применим 
 | `auto` или пусто | Автоопределение | По типу файла и контексту сессии |
 
 **Автоопределение:**
-- Был АрхГейт в текущей сессии → `archgate`
 - Указан путь к .py/.ts/.sh файлу → `code`
 - Указан путь к Pack-сущности → `capture`
 - Указан путь к WP context → `wp`
 - Изменения >1 файла + cross-component → предложить `chain`
-- После АрхГейта + код → предложить `adversarial`
+- Крупное архитектурное изменение + код → предложить `adversarial`
 - Путь содержит `subsection_id: PD.GUIDE.N.SX.SSY` во frontmatter, или один файл подраздела руководства → `subsection`
 - Путь — папка раздела (`S{N}-*/`) или указан `section_id` во frontmatter → `section`
 - Путь — `structure-guide-N.md` или папка руководства целиком → `guide`
@@ -70,13 +68,6 @@ gates_rationale: "операционный скилл; WP Gate применим 
 - Прочитать `CLAUDE.md` затронутого репо
 - Передать sub-agent'у: diff + CLAUDE.md + чеклист code
 - Модель sub-agent'а: Sonnet
-
-**Для `archgate`:**
-- Найти ЭМОГССБ-таблицу из текущей сессии (или запросить)
-- Прочитать изменённые файлы реализации
-- Прочитать DP.ARCH.001 §7 (21 принцип)
-- Передать sub-agent'у: файлы + таблица + принципы + чеклист archgate
-- Модель sub-agent'а: Opus
 
 **Для `capture`:**
 - Прочитать capture-candidate
@@ -114,7 +105,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
   2. Какие файлы/компоненты НЕ прочитаны, но могут быть затронуты?
   3. Предположи, что этот фикс сломается в production. 3 наиболее вероятные причины?
   4. Есть ли альтернативные объяснения проблемы, которые не были рассмотрены?
-  5. Заявленный scope («1 файл», «не архгейт», «простой фикс») — соответствует реальному?
+  5. Заявленный scope («1 файл», «простой фикс») — соответствует реальному?
 
 **Для `subsection` (один подраздел руководства, WP-322 Ф0.10):**
 
@@ -261,14 +252,14 @@ Sub-agent получает промпт с заполненными данным
 - Задание создателя
 - Промежуточные рассуждения
 
-**Для `code`, `capture`, `wp`, `archgate`** — определить эталон:
+**Для `code`, `capture`, `wp`** — определить эталон:
 
 | Тип артефакта | Эталон |
 |---------------|--------|
 | Pack-сущность | доменные принципы Pack + FPF |
 | Описание метода | карточка метода Pack + FPF |
 | Код (DS) | CLAUDE.md репо + Pack-описания сервисов |
-| Архитектурное решение | DP.ARCH.001 §7 (→ используй /archgate вместо /verify) |
+| Архитектурное решение | Запись DRR: заявленное решение против реализованного |
 | План (WeekPlan/DayPlan) | Протоколы Open/Close |
 | Подраздел руководства (SS) | `DS-principles-curriculum/specs/v4-reference/CHECKLIST-subsection-v1.md` (v1.2+) |
 | Раздел руководства (S) | `DS-principles-curriculum/specs/v4-reference/CHECKLIST-section-v1.md` |

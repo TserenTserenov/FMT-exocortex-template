@@ -42,8 +42,7 @@
 - Пользовательский сценарий → **SC Gate:** какое обещание (08-service-clauses/) затронуто?
 - Создание/размещение артефакта → **Routing Gate:** карта DP.KR.001 §5; «по аналогии с соседним» запрещено.
 - Первое содержательное действие в репо → **Repo-Touch Gate:** прочитать `<repo>/CLAUDE.md`; блок «обязательно загружай» → загрузить ДО ответа.
-- Архитектурное решение → **АрхГейт** `/archgate`.
-- РП затрагивает PII → **Security Gate (B7.3):** §Б чеклист ArchGate ДО реализации; логирование PII = блокер.
+- РП затрагивает PII → **Security Gate (B7.3):** `.claude/rules-lazy/security-checklist.md` ДО реализации; логирование PII = блокер.
 - РП ≥3h → **Priority Gate:** к какому R{N} ведёт?
 - Новый инструмент/агент/система → **IntegrationGate (БЛОКИРУЮЩЕЕ):** только (1) обещание → (2) сценарии → (3) роль → (4) реализация → `.claude/rules-lazy/integration-gate.md`.
 - Замена legacy-компонента → **LegacyPortGate (БЛОКИРУЮЩЕЕ):** сначала 15-мин субагент «как это работает сейчас?» → `memory/feedback_behaviour.md` П.10.
@@ -59,9 +58,9 @@
 Политика: ≤11 файлов; построчно проверяется только distinctions.md (≤150), остальное — суммарным M1/M2-бюджетом (WP-7 NR1.2); lazy-reference без лимита. Горизонты/frontmatter → `memory/memory-lifecycle-spec.md`; temporal metadata → `protocol-work.md §2`.
 Рабочая директория: `{{HOME_DIR}}/IWE/`; `memory/` = симлинк на auto-memory.
 
-## 5. АрхГейт — ОБЯЗАТЕЛЬНАЯ оценка
+## 5. Запись архитектурного решения
 
-> **БЛОКИРУЮЩЕЕ.** Архитектурное решение → `/archgate`: принципы DP.ARCH.001 §7 → профиль ЭМОГССБ (✅/⚠️/❌) → conjunctive screening; чеклист современности (SOTA.002/001/011 + CGUS/PUA) — внутри `.claude/skills/archgate/SKILL.md`. Без агрегатного балла — `feedback_decision_gates.md`.
+Оценочного гейта перед архитектурным решением нет (АрхГейт снят 2026-08-08). Принятое решение **фиксируется записью**: что выбрано, почему, что отвергнуто, когда пересмотреть (`review_date` / `superseded_by`). Шаблон — `.claude/templates/drr-template.md`. Не блокирует работу.
 
 ## 6. Форматирование → `.claude/rules/formatting.md` · Различения → `.claude/rules/distinctions.md`
 
@@ -172,7 +171,7 @@ Respond in Russian unless the user writes in English.
 - **WP Entry Filter (S-47, БЛОКИРУЮЩЕЕ):** новый РП — только при явной связи с R1-R6 месяца или внешнем заказчике; иначе → `inbox/backlog-with-triggers.md`. Исключения: spin-off закрытого РП; прямое поручение пилота.
 - **Именование РП:** существительное-артефакт, только русский (Pack-ID допустим); реестр ≤80 символов → SYNC-CORE; переименование — синхронно REGISTRY+MEMORY.md+WeekPlan+DayPlan+WP-context.
 - **Память (S-35):** новые `memory/*.md` — обязательный frontmatter; шаблон и горизонты → `memory/memory-lifecycle-spec.md` (единственный источник).
-- **Security Audit Cadence (WP-212, S-36):** per-ArchGate (§Б B7.1 + STRIDE) · Week Close (`security-posture.md §3`) · Daily (tsekh-1) · Month Close (VR.R.002).
+- **Security Audit Cadence (WP-212, S-36):** per-РП с PII/секретами (`.claude/rules-lazy/security-checklist.md` + STRIDE) · Week Close (`security-posture.md §3`) · Daily (tsekh-1) · Month Close (VR.R.002).
 - **WeekPlan/WeekReport split (WP-297):** WeekPlan = только интенты, WeekReport = только факты; при создании WeekPlan итоги уезжают в WeekReport.
 - **Режим «на пальцах» (S-37):** триггеры «объясни», «на пальцах», «что сделали», «простыми словами» → Response Style + `memory/feedback_response_clarity_for_pilot.md`.
 - **Календарный конвейер (WP-357):** SoT — `DS-strategy/calendar/process-catalog.yaml` (+ derived `date-ledger.yaml`, не редактировать); новый процесс = каталог + plist; спецификация → `docs/calendar-pipeline.md`.

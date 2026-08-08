@@ -27,7 +27,6 @@ DETECTORS=(
   # `.claude/hooks/p5-stop-reminder.sh` (S-29 в STAGING.md, обкатка до Week Close W18).
   # "permission_request|.claude/detectors/detector_permission_request.sh|agent_incident|free|true|Stop"
   # "gate_fired|.claude/detectors/detector_gate.sh|gate_fired|free|false|PreToolUse"
-  # "archgate|.claude/detectors/detector_archgate.sh|archgate_result|free|false|Stop"
   # "verification|.claude/detectors/detector_verify.sh|verification_result|free|false|Stop"
   # "drift|.claude/detectors/detector_drift.sh|drift_detected|free|false|Stop"
 )

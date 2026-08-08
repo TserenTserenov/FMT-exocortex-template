@@ -45,7 +45,7 @@ description: "Справочник FPF паттернов применимых �
 
 | Код | Название | Статус | Назначение в IWE |
 |-----|----------|--------|-----------------|
-| C.11 | Decision Theory (Decsn-CAL) | Stable | Выбор альтернатив в ArchGate, Strategy Session |
+| C.11 | Decision Theory (Decsn-CAL) | Stable | Выбор альтернатив в архитектурных решениях, Strategy Session |
 | C.16 | MM-CHR Measurement & Metrics | Stable | Измерения RCS, baseline, показатели пилота |
 | C.19 | Explore–Exploit Governor | Stable | Pool-политика экспериментов и методов |
 | C.24 | Agentic Tool-Use & Call-Planning | Stable | Протокол Claude Code tool-use бюджет |
@@ -116,7 +116,7 @@ description: "Справочник FPF паттернов применимых �
 |---------|----------------|---------|
 | WP-151 рычаги (M1/M4) | «M1 поднимает собранность» — рунг 2 без доказательства | Переписать как рунг 1: «ассоциировано с ростом baseline в выборке N» |
 | Портной рекомендации | «Добавь помидоры — улучшишь ступень» — rung 2 pretend | Добавить: «по корреляции в N=k пилотов, интервенционных данных нет» |
-| ArchGate аргументы | «Если внедрить X, получим Y» — rung 3 без SCM | Явно указать рунг, basis, unsupportedUse |
+| Архитектурные аргументы | «Если внедрить X, получим Y» — rung 3 без SCM | Явно указать рунг, basis, unsupportedUse |
 | Strategy Session | «Эта практика сработала в апреле» | Rung 1 (ассоциация), rival causes не исключены |
 | Измерения dt_snapshot_rcs | Snapshot ≠ каузальное доказательство | basis = observationalAssociation, не interventional |
 
@@ -139,7 +139,7 @@ description: "Справочник FPF паттернов применимых �
 | Mereology | Отношение «часть-целое» между компонентами | Архитектура, composition |
 | Affordance | Что компонент позволяет делать пользователю | API design, UX |
 | ADI-цикл (B.5) | Гипотеза → проверка логикой → проверка данными | Принятие решений (/think) |
-| Lawful Comparison (A.19) | Сравнение вариантов по одинаковым критериям | Выбор архитектуры (/archgate) |
+| Lawful Comparison (A.19) | Сравнение вариантов по одинаковым критериям | Выбор архитектуры |
 | Strict Distinction (A.7) | Разные вещи — разные имена. Не смешивать в одном типе/enum | Code review, именование |
 
 ## Терминология ailev ↔ IWE (DPF/TPF/LPF, WP-448 Ф8)

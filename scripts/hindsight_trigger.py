@@ -29,7 +29,6 @@ RECALL_SKILLS = {
     "run-protocol",
     "week-close",
     "peer-conversation",
-    "archgate",
     "apply-captures",
     "strategy-session",
 }

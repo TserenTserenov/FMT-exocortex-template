@@ -19,11 +19,6 @@ skills:
     keywords: ["week close", "закрытие недели", "ретро", "retrospective", "итоги недели"]
     description: "Weekly retrospective: achievements, bottlenecks, next week planning. Requires local FS."
 
-  - name: archgate
-    browser: true
-    keywords: ["archgate", "архгейт", "архитектура", "оценка решения", "architecture decision"]
-    description: "Evaluate architecture decisions across 7 characteristics (ЭМОГССБ v3)."
-
   - name: verify
     browser: true
     keywords: ["verify", "верификация", "проверка", "audit", "проверь"]

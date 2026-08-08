@@ -7,7 +7,6 @@
 |-------|------------|
 | `/agent-fault` | Регистрация косяка агента в системе учёта WP-316 L1. Без LLM — детерминированный скрипт без WP Gate. |
 | `/apply-captures` | Разбор extraction-reports со status pending-review — решение R15 (accept/reject/defer), запись в Pack, обновл… |
-| `/archgate` | Оценка архитектурного решения по 7 характеристикам ЭМОГССБ (v3 — профиль без агрегатного балла, conjunctive s… |
 | `/artifactor` | Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, rout… |
 | `/audit-docs` | Audit repository documentation: detect drift between code and docs, report coverage by category. Run manually… |
 | `/audit-installation` | Audit a user's IWE installation. Runs scripts/iwe-audit.sh + MCP healthcheck + ritual smoke-test via sentinel… |

@@ -29,7 +29,7 @@
 | Цифровой двойник | Digital Twin | DP.CONCEPT.001 | MCP ddt — метамодель, цели, самооценка |
 | Навигация знаний | Knowledge Navigation | DP.NAV.001 | Gateway iwe-knowledge (mcp.aisystant.com/mcp) — hybrid search по Pack и guides |
 | IPO-паттерн | IPO Pattern | DP.ARCH.001 | Контракт описания компонентов в CLAUDE.md |
-| Архитектурная характеристика | Architectural Characteristic | DP.D.010 | АрхГейт (ЭМОГССБ) в CLAUDE.md §5 |
+| Архитектурная характеристика | Architectural Characteristic | DP.D.010 | Свойство решения, фиксируемое в записи DRR |
 | Файл контекста РП | WP Context File | DP.EXOCORTEX.001 | inbox/WP-*.md в DS-strategy |
 | Harness (упряжь) | Harness | DP.D.025 | IWE как harness для интеллектуальной работы |
 | ИИ-система | AI System | DP.ROLE.001 | Claude Code, бот — исполнители ролей |
@@ -48,7 +48,7 @@
 | Ритуал ОРЗ | ORZ Ritual | Реализация протокола сессии: Открытие → Работа → Закрытие | DP.M.003 |
 | WP Gate | WP Gate | Блокирующая проверка наличия РП в плане перед началом работы | DP.EXOCORTEX.001 |
 | Capture-to-Pack | Capture-to-Pack | Рубежная проверка: есть ли знание для записи в Pack | DP.M.001 |
-| АрхГейт (ЭМОГССБ) | ArchGate | Обязательная оценка архитектурного решения по 7 характеристикам, порог ≥8 | DP.M.005 |
+| Запись решения (DRR) | Decision Record + Rationale | Фиксация принятого решения: выбор, альтернативы, последствия, дата пересмотра | DP.M.005 |
 | Стратегический хаб | Strategy Hub | DS-strategy — governance-репо для планов, ревью, сессий | DP.ROLE.012 |
 | Placeholder-переменная | Placeholder Variable | `{{VAR}}` — подставляется setup.sh при развёртывании шаблона | — (реализационное) |
 | Контракт роли | Role Contract | role.yaml + промпты + скрипты в roles/<name>/ | DP.ROLE.001 |
@@ -79,7 +79,6 @@
 | ОРЗ | Открытие-Работа-Закрытие | Open-Work-Close | Pack |
 | РП | Рабочий продукт (экземпляр) | Work Product (instance) | Pack |
 | ЦД | Цифровой двойник | Digital Twin | Pack |
-| ЭМОГССБ | 7 арх. характеристик | Evolvability, Scalability, Learnability, Generativity, Speed, Modernity, Security | Pack |
 | DS | Downstream-репозиторий | Downstream Repository | Template |
 | FMT | Формат (шаблон) | Format (Template) | Template |
 | TTL | Срок жизни артефакта | Time To Live | Template |

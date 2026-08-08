@@ -19,7 +19,7 @@ graph TB
 
     subgraph culture["<b>КУЛЬТУРА РАБОТЫ</b>"]
         direction LR
-        PROTOCOLS["<b>Протоколы</b><br/>ОРЗ, АрхГейт<br/>Day Open/Close"]
+        PROTOCOLS["<b>Протоколы</b><br/>ОРЗ<br/>Day Open/Close"]
         SKILLS["<b>Навыки</b><br/>Capture, Self-correction<br/>Различения"]
         FORMATS["<b>Форматы</b><br/>Pack-структура<br/>WP-context"]
     end
@@ -111,7 +111,6 @@ graph TD
 
         subgraph protocols["<b>Протоколы</b> (делаешь по шагам)"]
             P1["ОРЗ"]
-            P2["АрхГейт"]
             P3["Day Open/Close"]
             P4["Week Close"]
         end

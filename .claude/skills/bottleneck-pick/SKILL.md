@@ -283,7 +283,7 @@ Injection: ... (в assumption, не в action)
 - —
 
 **3. Правила (Policy):**
-- работа C → требует /archgate
+- работа C → требует архитектурного решения
 
 **4. Навыки (Cognitive):**
 - —
@@ -446,7 +446,7 @@ bottleneck_shifted_to: null                # заполняется через 2
 
 ## Интеграция
 
-- **Bottleneck = архитектурное решение** (тип Policy с alternatives) → предложить `/archgate`
+- **Bottleneck = архитектурное решение** (тип Policy с alternatives) → зафиксировать выбор записью DRR (`.claude/templates/drr-template.md`)
 - **Stage Map содержит open-loop работу ≥3h** → предложить Декомпозитору (`/decompose`) для декомпозиции на физические артефакты
 - **Bottleneck = нет покрывающего РП** → предложить WP Gate ритуал
 - **Bottleneck-shift detection** (повторное применение к той же target после fix) → DP.M.061 переоценка слоя (tech/operational/usage/поведенческий)

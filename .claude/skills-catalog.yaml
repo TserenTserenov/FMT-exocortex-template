@@ -33,22 +33,6 @@ skills:
     - ke
     - kimi-peer-writer
     - apply-captures
-  - id: archgate
-    name: "archgate"
-    description: "Оценка архитектурного решения по 7 характеристикам ЭМОГССБ (v3 — профиль без агрегатного балла, conjunctive screening). Используй когда пользователь предлагает архитектурное решение, новый инструмент или системное изменение."
-    version: 1.0.0
-    layer: L1
-    status: active
-    triggers:
-      slash:
-        - /archgate
-    depends_on: []
-    invoked_by:
-    - CLAUDE.md
-    - verify
-    - bottleneck-pick
-    - archgate
-    - decompose
   - id: artifactor
     name: "artifactor"
     description: "Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, routing_tag, resolution_path}. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."

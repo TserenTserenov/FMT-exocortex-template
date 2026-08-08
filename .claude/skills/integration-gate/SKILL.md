@@ -14,7 +14,6 @@ triggers:
     - "новый метод"
     - "integration gate"
     - "IntegrationGate"
-related: [archgate]
 ---
 
 # /integration-gate — IntegrationGate

@@ -27,7 +27,7 @@
 
 ## L1 — Платформа (не трогай без причины)
 
-**Что здесь:** скиллы (`/day-open`, `/wp-new`, `/archgate`), протоколы (`memory/protocol-*.md`), хуки (`.claude/hooks/`), правила (`.claude/rules/`), §1–§7 в `CLAUDE.md`.
+**Что здесь:** скиллы (`/day-open`, `/wp-new`, `/verify`), протоколы (`memory/protocol-*.md`), хуки (`.claude/hooks/`), правила (`.claude/rules/`), §1–§7 в `CLAUDE.md`.
 
 **Кто обновляет:** `update.sh`. Разработчик платформы выпускает новую версию → ты запускаешь `/iwe-update` → L1-файлы обновляются автоматически.
 

@@ -10,7 +10,7 @@
 | R2 | **Экстрактор** | KE в Pack, inbox check, ontology sync |
 | R3 | **Консультант** | Q&A ученика, проверка ДЗ, генерация контента ленты/марафона |
 | R4 | **Автор** | Посты, презентации, питчи, описания |
-| R5 | **Архитектор** | ArchGate, ADR, BC-mapping, SOTA-update |
+| R5 | **Архитектор** | Запись решения (DRR), ADR, BC-mapping, SOTA-update |
 | R6 | **Кодировщик** | Код, рефакторинг, баг-фикс |
 | R7 | **Триажёр** | Auto-triage feedback, triage-session |
 | R8 | **Синхронизатор** | Scheduler, code-scan, pack projection, notify |

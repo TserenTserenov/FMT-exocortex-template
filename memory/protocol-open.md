@@ -100,7 +100,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 > **Роль Claude:** [DP.ROLE.001]
 > **Работа:** [что] — конкретный предмет текущего рассуждения (не «весь проект», если вопрос не о нём целиком); если существенно — окно/контекст, в котором ответ действует.
 > **РП:** [артефакт]
-> **Целевой переход состояния:** `{ось, из→в}` — permission/belonging/engagement/mastery (WP-457, State-Transition Gate). Ссылка на `states-map-draft.md` или declared FSM-owner; cross-axis — помечать `provisional` до ArchGate (Ф9). Опционально: `signal` — наблюдаемый признак подтверждения перехода (пример: `"нет спонтанных разлогинов 2 недели"`).
+> **Целевой переход состояния:** `{ось, из→в}` — permission/belonging/engagement/mastery (WP-457, State-Transition Gate). Ссылка на `states-map-draft.md` или declared FSM-owner; cross-axis — помечать `provisional` до решения по Ф9. Опционально: `signal` — наблюдаемый признак подтверждения перехода (пример: `"нет спонтанных разлогинов 2 недели"`).
 > **Режим (ТВС):** [текущее / важное / срочное] — по конвейерной модели ([[Текущее ≠ Важное ≠ Срочное (ТВС)]])
 > **Класс:** [verification_class]
 > **Метод:** [как]
