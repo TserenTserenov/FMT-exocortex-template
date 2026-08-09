@@ -2,9 +2,9 @@
 
 ## Overview
 
-ResidencyGate is a universal mechanism for features that work with personal data of types 2.1–2.4. A feature declares what data it needs, and ResidencyGate guarantees:
+ResidencyGate is a universal mechanism for features that work with personal data of types 2.1–2.4. A feature declares what data it needs, and ResidencyGate ensures:
 
-1. **Point A (activation-time):** when the feature is enabled → pilot consent check
+1. **Point A (activation-time):** when a feature is enabled → pilot consent check
 2. **Point B (lazy):** when data is actually requested → interactive check if consent is missing
 
 ---
@@ -23,8 +23,8 @@ data_needs:
 
 **Fields:**
 - `type`: one of types 2.1/2.2/2.3/2.4 (from WP-475)
-- `flow`: `inbound` (Platform → IWE) or `outbound` (IWE → Platform)
-- `name`: unique need name (for logging)
+- `flow`: `inbound` (platform → IWE) or `outbound` (IWE → platform)
+- `name`: unique name for the need (used for logging)
 - `schema_version` (optional): schema version (default: 1)
 
 ### For bash hooks
@@ -42,7 +42,9 @@ data_needs:
 
 ## Step 2. Integrate Point A Into Startup
 
-If the feature can operate **autonomously** (without the pilot in the loop), use the activation-time check:
+**Skills invoked via Claude Code (Skill tool) — no manual integration required.** From 09.08.2026, the `residency-gate-skill-adapter.sh` hook (PreToolUse, matcher `Skill`) automatically checks `data_needs` from `SKILL.md` before the skill code runs — declaring the block in Step 1 is sufficient. Previously this check was cognitive (the author could forget to insert `source`); now it is mechanical. Clean installation test: `scripts/tests/test_residency_gate_skill_adapter.py`.
+
+If a feature runs **outside Claude Code** (day-open pipeline on launchd, a bot handler, or any process Claude Code does not launch) — Claude Code does not observe its start, there is no automatic check, and you must integrate manually:
 
 ```bash
 #!/bin/bash
@@ -56,14 +58,14 @@ source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/d
 
 ---
 
-## Step 3. Integrate Point B Into the Data Access Code
+## Step 3. Integrate Point B Into Data Access Code
 
-If the feature is **interactive** or requires consent at a specific moment:
+If a feature is **interactive** or requires consent at a specific moment:
 
 ```bash
 #!/bin/bash
 
-# When attempting to read data:
+# On attempting to read data:
 bash ~/.claude/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "digital-twin"
 
 # If exit code = 0 → access granted
@@ -72,7 +74,7 @@ bash ~/.claude/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "dig
 
 ---
 
-## Step 4. Consent Management (for the Pilot)
+## Step 4. Consent Management (for the pilot)
 
 ### Grant consent
 
@@ -131,11 +133,11 @@ functions:
 
 source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/day-open/SKILL.md"
 
-# If we reach this point — consent is granted, continue
+# If execution reaches this point — consent is granted, continue
 # ...rest of day-open logic...
 ```
 
-### Example 2: Personal Guides with Point B
+### Example 2: Personal guide rendering with Point B
 
 ```python
 # render-pilot-guides.py
@@ -162,10 +164,10 @@ def get_digital_twin():
 
 ## Versioning (schema_version)
 
-If the need's schema changes (new fields, different format), increment `schema_version` in the declaration. ResidencyGate will automatically:
+If a data need's schema changes (new fields, different format), increment `schema_version` in the declaration. ResidencyGate will automatically:
 
 1. Detect the version incompatibility
-2. Reset the consent status for the feature (return it to `not_asked`)
+2. Reset the consent status for the feature (revert to `not_asked`)
 3. Require new consent on the next run
 
 ---
@@ -175,7 +177,7 @@ If the need's schema changes (new fields, different format), increment `schema_v
 | Scenario | Use |
 |----------|-----|
 | Feature is autonomous, no pilot in the loop | Point A (activation-time) |
-| Feature is interactive or handles a one-time request | Point B (lazy) |
+| Feature is interactive or makes a one-time request | Point B (lazy) |
 | Both needs apply (rare) | Both mechanisms |
 
 ---
@@ -205,10 +207,10 @@ Returns:
 
 ---
 
-## Integration Checklist for a New Feature
+## Integrating a New Feature: Checklist
 
 - [ ] Declare `data_needs` in SKILL.md or bash frontmatter
 - [ ] Add Point A (activation) OR Point B (lazy) depending on the feature type
 - [ ] Test the denied consent case
-- [ ] Document needs in the feature README
-- [ ] At release — pilot runs `grant` or `deny` for each need
+- [ ] Document data needs in the feature README
+- [ ] At release — the pilot runs `grant` or `deny` for each need
