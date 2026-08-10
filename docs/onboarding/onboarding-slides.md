@@ -112,8 +112,8 @@ theme: default
 # What to Expect
 
 1. **IWE map** — what it consists of (visual overview)
-2. **Your problem** — why your current approach does not work
-3. **How IWE solves it** — connecting problems to components
+2. **Your problem** — why the current approach does not work
+3. **How IWE solves it** — the link between problems and components
 4. **Path from zero** — 5 steps to a working OS
 5. **Do not be afraid** — why this is simpler than it looks
 6. **Theories and work culture** — the foundation that changes everything
@@ -122,7 +122,7 @@ theme: default
 
 <!-- _class: accent -->
 
-# The IWE Map
+# IWE Map
 
 ## Four components. Theories + culture + tool.
 
@@ -141,15 +141,15 @@ theme: default
   </div>
   <div class="box box-green" style="width: 180px;">
     <b style="color: #43a047 !important;">Mastery Model</b><br/>
-    <span style="font-size: 0.85em;">Learner→…→Illuminator<br/>Where you grow</span>
+    <span style="font-size: 0.85em;">Apprentice→…→Enlightener<br/>Where you grow</span>
   </div>
   <div class="box box-blue" style="width: 180px;">
     <b style="color: #1e88e5 !important;">Community</b><br/>
-    <span style="font-size: 0.85em;">Environment of Creators<br/>Exchange, Review</span>
+    <span style="font-size: 0.85em;">Creator environment<br/>Exchange, review</span>
   </div>
 </div>
 
-> IWE is a **tool**. But behind the tool are **theories** and **work culture**. Without them — it is just a notebook with AI.
+> IWE is a **tool**. But behind the tool are **theories** and **work culture**. Without them — it is just a notepad with AI.
 
 ---
 
@@ -157,11 +157,11 @@ theme: default
 
 | What | Why | Source |
 |------|-----|--------|
-| **Theories** | Systems Thinking, methodology, management | Courses from the School of Systems Management |
+| **Theories** | Systems Thinking, methodology, management | Engineer-Manager Workshop courses |
 | **Exocortex** | Your second memory. AI reads and updates it | IWE distribution |
-| **Pack** | Structured Knowledge Domain base | You create it |
+| **Pack** | Structured knowledge base for a domain | You create it |
 
-> Theories are embedded in AI rules (ZP principles → FPF). You study the same theories — the same principles for both of you.
+> Theories are embedded in AI rules (ZP principles → FPF). You study the same theories — one set of principles for both.
 
 ---
 
@@ -169,24 +169,24 @@ theme: default
 
 | Type | What it is | Examples |
 |------|-----------|---------|
-| **Protocols** | You follow step-by-step | ORZ, ArchGate, Day Open/Close |
-| **Skills** | You build through practice | Capture, Self-correction, Distinctions |
-| **Formats** | You apply a standard structure | Pack structure, WP-context |
+| **Protocols** | Work step by step | ОРЗ, АрхГейт, Day Open/Close |
+| **Skills** | Build through practice | Capture, self-correction, distinctions |
+| **Formats** | Structure to a standard | Pack structure, WP-context |
 
 > Work culture is what people pay for. A tool can be copied. An established culture cannot.
 
 ---
 
-# Tools (Delivery Mechanisms)
+# Tools (Delivery Means)
 
 | What | Why | Analogy |
 |------|-----|---------|
 | **Claude Code adapter** | AI assistant that reads your files and remembers context | Peer partner, not a search engine |
 | **VS Code** | Free editor — you write ordinary text | A notepad, but smarter |
 | **GitHub** | Cloud storage with full change history | Google Drive + time machine |
-| **Bot @aist_me_bot** | Assistant in Telegram: questions, reminders | A mentor in your pocket |
+| **@aist_me_bot** | Telegram assistant: questions, reminders | Mentor in your pocket |
 
-> Tools are not IWE. They are delivery mechanisms for the four components. Like hardware that runs an OS.
+> Tools are not IWE. They are delivery means for the four components. Like hardware that runs the OS.
 
 ---
 
@@ -201,26 +201,26 @@ theme: default
 # Knowledge Gets Lost
 
 - You read a book → take notes → cannot find them a month later
-- Notion, a notebook, your phone, a napkin — **everywhere and nowhere**
+- Notion, notebook, phone, napkin — **everywhere and nowhere**
 - No structure, no connections between ideas
-- You "start from scratch" every time
+- Every time you "start from scratch"
 
 ---
 
 # Plans Do Not Work
 
-- You make a plan for the week → by Wednesday it is outdated
+- You make a plan for the week → by Wednesday it is irrelevant
 - New tasks push out old ones
-- No Review → the feeling of "never getting anything done"
+- No review → the feeling of "I never get anything done"
 - No priority system
 
 ---
 
-# AI Does Not Truly Help
+# AI Does Not Really Help
 
 - ChatGPT / Claude give polished but **generic** answers
-- You start **from scratch** every time
-- AI does not know: your projects, your goals, what you have already tried
+- Every time you start **from zero**
+- AI does not know: your projects, goals, what you have already tried
 - It is like talking to a new person every day
 
 ---
@@ -235,8 +235,8 @@ theme: default
 
 | Problem | IWE Component | How |
 |---------|--------------|-----|
-| Knowledge gets lost | **Thinking Core** (exocortex + Pack) | Every unit of Knowledge has its place. History in GitHub |
-| Plans do not work | **Work Culture** (ORZ rituals) | Plan in the morning, results in the evening, weekly Review |
+| Knowledge gets lost | **Thinking core** (exocortex + Pack) | Every unit of knowledge has its place. History in GitHub |
+| Plans do not work | **Work culture** (ОРЗ rituals) | Morning plan, evening summary, weekly review |
 | AI does not help | **Core + culture** (Claude Code + exocortex) | Reads YOUR files, knows YOUR goals, remembers YOUR history |
 
 ---
@@ -266,7 +266,7 @@ theme: default
   <div style="font-size: 2em; color: #43a047;">→</div>
   <div class="box box-orange" style="width: 150px;">
     <span class="big-number">3</span><br/>
-    <b>First Session</b><br/>
+    <b>First session</b><br/>
     <em>30 min</em>
   </div>
   <div style="font-size: 2em; color: #fb8c00;">→</div>
@@ -279,7 +279,7 @@ theme: default
   <div class="box box-red" style="width: 150px;">
     <span class="big-number">5</span><br/>
     <b>Thinking</b><br/>
-    <em>your pace</em>
+    <em>your own pace</em>
   </div>
 </div>
 
@@ -294,7 +294,7 @@ Three actions:
 2. Create a GitHub account *(free)*
 3. Run one command
 
-> **AI will help.** Tell Claude Code: "Help me install IWE" — it will walk you through every step.
+> **AI will help.** Tell Claude Code: "Help me install IWE" — it will guide you through every step.
 
 *Detailed instructions: SETUP-GUIDE.md*
 
@@ -304,7 +304,7 @@ Three actions:
 
 After installation you:
 
-- Fill out a strategic document *(who you are, what matters, where you are headed)*
+- Fill in a strategic document *(who you are, what matters, where you are headed)*
 - Formulate 3–5 tasks for the coming week
 - AI structures this into a plan
 
@@ -314,13 +314,13 @@ After installation you:
 
 # Step 4. Daily Practice
 
-Each day follows one rhythm:
+Every day — one rhythm:
 
 | Time | Action | What happens |
 |------|--------|-------------|
-| **Morning** | "Open the day" | Claude shows your plan, events, context |
-| **Work** | You work | You capture conclusions at Work milestones |
-| **Evening** | "Close the day" | Claude records results, updates plans |
+| **Morning** | "Open the day" | Claude shows the plan, events, context |
+| **Work** | You work | Capture conclusions at work milestones |
+| **Evening** | "Close the day" | Claude records outcomes, updates plans |
 
 > After one week: nothing is lost. Everything is in its place.
 
@@ -337,47 +337,47 @@ Each day follows one rhythm:
 You do not need to be.
 
 - VS Code is simply a convenient editor for **text**
-- GitHub is simply reliable **storage**
+- GitHub is simply a reliable **storage**
 - You **will not** write code
 
 > IWE is an OS for intellectual work, not for programming.
 
 ---
 
-# "GitHub, CLI, Terminal — These Sound Scary"
+# "GitHub, CLI, Terminal — These Are Scary"
 
 Only the first time.
 
 | Term | What it actually is |
-|------|---------------------|
+|------|-------------------|
 | **GitHub** | Google Drive with change history |
 | **Terminal** | A window where you type text (Claude tells you what) |
-| **CLI** | Communicating with your computer by text instead of buttons |
+| **CLI** | Communicating with a computer by text instead of buttons |
 
-> After installation, you communicate with Claude Code **in your own language**.
+> After installation you communicate with Claude Code **in your own language**.
 
 ---
 
 # This Is Not a Monolith — It Is a Constructor
 
-The path to connecting IWE — add components as you need them:
+The IWE connection path — add components as needed:
 
 | Stage | What you connect | What you get |
-|-------|----------------|--------------|
-| **Stage 1** | Claude Code + exocortex | An AI assistant that remembers you |
-| **Stage 2** | + ORZ rituals | Structured work |
+|-------|----------------|-------------|
+| **Stage 1** | Claude Code + exocortex | AI assistant that remembers you |
+| **Stage 2** | + ОРЗ rituals | Structured work |
 | **Stage 3** | + Pack + bot | Knowledge base + mobile access |
 | **Stage 4** | + roles + automation | AI agents work independently |
 
-> This is a local Environment assembly, not an access tier (T0→T4, DP.ARCH.002) and not a Mastery stage (FORM.089).
+> This is a local environment assembly, not an access tier (T0→T4, DP.ARCH.002) and not a mastery stage (FORM.089).
 
 ---
 
-# Exoskeleton, Not a Prosthetic
+# Exoskeleton, Not a Prosthesis
 
 <div style="display: flex; gap: 40px; justify-content: center; margin-top: 30px;">
   <div class="box box-red" style="width: 280px; text-align: left;">
-    <b style="color: #e53935 !important;">Prosthetic</b><br/><br/>
+    <b style="color: #e53935 !important;">Prosthesis</b><br/><br/>
     Replaces a capability.<br/>
     AI thinks <b>for you</b>.<br/>
     You stop developing.
@@ -385,12 +385,12 @@ The path to connecting IWE — add components as you need them:
   <div class="box box-green" style="width: 280px; text-align: left;">
     <b style="color: #43a047 !important;">Exoskeleton (IWE)</b><br/><br/>
     Extends a capability.<br/>
-    Partner on your laptop, phone, in a robot.<br/>
-    AI handles <b>routine</b>, you think better.
+    Partner on laptop, phone, in a robot.<br/>
+    AI takes <b>routine</b>, you think better.
   </div>
 </div>
 
-> Your thinking is the primary resource. AI helps you avoid wasting it.
+> Your thinking is the main resource. AI helps you not to waste it.
 
 ---
 
@@ -404,14 +404,14 @@ The path to connecting IWE — add components as you need them:
 
 # Theories Stand Behind the Tool
 
-| Theory | What it provides | Where in IWE |
-|--------|----------------|--------------|
-| **Systems Thinking** | See the whole, not just the parts | Planning, Distinctions |
-| **Methodology** | Method descriptions, Work Products | ORZ, formats, Pack |
+| Theory | What it gives | Where in IWE |
+|--------|--------------|-------------|
+| **Systems Thinking** | See the whole, not just the parts | Planning, distinctions |
+| **Methodology** | Method descriptions, work products | ОРЗ, formats, Pack |
 | **Management** | Roles, leadership, strategizing | Roles, strategic sessions |
 | **Enterprise engineering** | How organizations are structured | Architecture, integrations |
 
-> Courses: [School of Systems Management](https://system-school.ru/) — "Systemic Self-Development", "Systems Thinking", "Methodology".
+> Courses: [Engineer-Manager Workshop](https://system-school.ru/) — "Systemic Self-Development", "Systems Thinking", "Methodology".
 
 ---
 
@@ -420,15 +420,15 @@ The path to connecting IWE — add components as you need them:
 | Level | Who creates | Who uses | Example |
 |-------|-------------|---------|---------|
 | **Zero (ZP)** | IWE | You + AI | Basic thinking rules |
-| **First (FPF)** | IWE | You + AI | Framework, Distinctions |
-| **Second (Pack)** | **You** | You + AI | Your Knowledge by Domain |
+| **First (FPF)** | IWE | You + AI | Framework, distinctions |
+| **Second (Pack)** | **You** | You + AI | Your domain knowledge |
 | **Third (DS)** | You + AI | You + AI | Plans, code, processes |
 
-> Principles flow **top-down** (from zero to third). Knowledge flows **bottom-up** (from your Experience back into Pack).
+> Principles flow **top-down** (from zero to third). Knowledge flows **bottom-up** (from your experience back into Pack).
 
 ---
 
-# You + AI = a Pair on Shared Principles
+# You + AI = a Pair on One Set of Principles
 
 <div style="display: flex; gap: 40px; justify-content: center; margin-top: 30px;">
   <div class="box" style="width: 280px; text-align: left; border-color: #8e24aa; background: #f3e5f5;">
@@ -436,18 +436,18 @@ The path to connecting IWE — add components as you need them:
     Study principles →<br/>
     gain <b>Systems Thinking</b>.<br/>
     Make decisions.<br/>
-    Create Knowledge (Pack).
+    Create knowledge (Pack).
   </div>
   <div class="box box-blue" style="width: 280px; text-align: left;">
     <b style="color: #1e88e5 !important;">AI assistant</b><br/><br/>
-    Principles are <b>embedded</b> in its rules.<br/>
+    Principles are <b>embedded</b> in rules.<br/>
     Amplifies, structures.<br/>
-    Uses your Knowledge (Pack).<br/>
+    Uses your knowledge (Pack).<br/>
     Grows smarter with you.
   </div>
 </div>
 
-> The more you study — the smarter your AI Peer partner becomes, because you fill Pack with Knowledge.
+> The more you study — the smarter your AI peer partner becomes, because you fill Pack with knowledge.
 
 ---
 
@@ -457,9 +457,9 @@ The ability to see the **whole**, not only the parts.
 
 | Without | With theories and work culture |
 |---------|-------------------------------|
-| Week = a list of tasks | Week = connected tasks with priorities |
-| Book = a digest of quotes | Book = principles for different contexts |
-| AI = random questions | AI = precise requests based on structure |
+| Week = list of tasks | Week = connected tasks with priorities |
+| Book = summary of quotes | Book = principles for different contexts |
+| AI = random questions | AI = precise queries based on structure |
 
 > Systems Thinking is not a subject to memorize. It is the **result** of studying theories and applying work culture in practice within IWE.
 
@@ -470,14 +470,14 @@ The ability to see the **whole**, not only the parts.
 <div style="display: flex; gap: 24px; justify-content: center; margin-top: 30px;">
   <div class="box box-blue" style="width: 240px;">
     <b>Week 1</b><br/>
-    <span style="font-size: 0.85em;">Simply use IWE.<br/>Get comfortable with the rituals.</span>
+    <span style="font-size: 0.85em;">Simply use IWE.<br/>Get used to the rituals.</span>
   </div>
   <div class="box box-green" style="width: 240px;">
     <b>Week 2</b><br/>
     <span style="font-size: 0.85em;">Read "Principles vs Skills"<br/>(10 minutes).</span>
   </div>
   <div class="box box-orange" style="width: 240px;">
-    <b>After that</b><br/>
+    <b>Next</b><br/>
     <span style="font-size: 0.85em;">LEARNING-PATH §3 at your own pace.<br/>The bot will help with questions.</span>
   </div>
 </div>
@@ -490,7 +490,7 @@ The ability to see the **whole**, not only the parts.
 
 ## Installation: SETUP-GUIDE.md
 ## Learning: LEARNING-PATH.md
-## Questions: @aist_me_bot in Telegram
+## Questions: @aist_me_bot on Telegram
 
 *IWE is a tool. But behind it are theories and work culture that change how you think and work.*
 
@@ -508,5 +508,5 @@ The ability to see the **whole**, not only the parts.
 | OS compatibility | PLATFORM-COMPAT.md |
 
 **Cost:** basic AI access is included in the BR subscription. Your own LLM key (e.g., Claude Pro ~$20/month) is optional, for Direct MCP. Free tier (freemium) — no subscription required.
-**Is programming required:** No.
+**Programming required:** No.
 

@@ -1,4 +1,6 @@
-files_translated: []
-last_run_utc: '2026-08-09T12:12:21Z'
-last_synced_sha: b18d8eb6b547e152aa44731f0b544fbe0f2d5590
+files_translated:
+- docs/onboarding/onboarding-guide.md
+- docs/onboarding/onboarding-slides.md
+last_run_utc: '2026-08-10T12:27:57Z'
+last_synced_sha: 7bfa0e6678e0de5de9561f1649dcba07fd1eebe3
 schema_version: 1
