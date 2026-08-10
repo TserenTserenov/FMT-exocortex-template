@@ -2165,7 +2165,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "76411d857d15d31129b105b99ff8c5bfb947e80d0fa043490a10c9a464b21232"
+      "sha256": "23da8351561672483086c2f067d90441da80ac6fa165931fc07e63ad5f0542a6"
     },
     {
       "path": "scripts/settings-promote.sh",

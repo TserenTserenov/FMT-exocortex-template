@@ -581,49 +581,58 @@ if [ "$CMD" = "close" ]; then
     fail "ORZ не прошёл валидацию. Исправь замечания выше и повтори close. Семафор остаётся активным." 5
   fi
 
-  # Quick Close — не текстовая декларация: именно терминальная карточка раннера
-  # доказывает, что эта сессия прошла обязательный процесс. Сопоставление по slug
-  # не даёт чужой параллельной карточке закрыть текущую сессию.
-  RUNNER_CARD="$IWE_ROOT/$GOV_REPO/inbox/agent/tasks/RUN-quick-close-${SLUG}"'*.md'
-  RUNNER_OK=""
-  for card in $RUNNER_CARD; do
-    [ -f "$card" ] || continue
-    grep -q '^process_id: quick-close$' "$card" || continue
-    grep -q '^status: completed$' "$card" || continue
-    RUNNER_OK="$card"
-    break
-  done
-
-  # --force-no-reflection (WP-484, 08.08, пилот): рефлексия про настроение дня
-  # блокирует close, даже когда содержательная работа (commit+push) уже
-  # подтверждена картой раннера — живой разбор показал, что вопрос рефлексии
-  # часто рендерится ПОСЛЕ команды «закрывай», пилот её физически не видит.
-  # Bypass узкий и предметный, не общий «пропусти карту раннера»: требует
-  # ИМЕННО блокировку на этом шаге и подтверждённый push — другой сбой раннера
-  # (упавший push, отменённый до commit-push прогон) этим флагом не спрятать.
-  if [ -z "$RUNNER_OK" ] && [ -n "$FORCE_NO_REFLECTION" ]; then
+  # issue #356: терминальная карточка требуется, только когда инсталляция
+  # поставляет и раннер, и граф Quick Close. Иначе ручной маршрут остаётся
+  # штатным и явно фиксируется в выводе вместо ложной блокировки.
+  RUNNER_PATH="$IWE_ROOT/$GOV_REPO/scripts/process-runner.py"
+  RUNNER_GRAPH="$IWE_ROOT/$GOV_REPO/scripts/processes/quick-close.yaml"
+  if [ ! -f "$RUNNER_PATH" ] || [ ! -f "$RUNNER_GRAPH" ]; then
+    echo "Quick Close: runner_check=not_applicable (раннер или граф не установлен); выполнить протокол вручную" >&2
+  else
+    # Quick Close — не текстовая декларация: именно терминальная карточка раннера
+    # доказывает, что эта сессия прошла обязательный процесс. Сопоставление по slug
+    # не даёт чужой параллельной карточке закрыть текущую сессию.
+    RUNNER_CARD="$IWE_ROOT/$GOV_REPO/inbox/agent/tasks/RUN-quick-close-${SLUG}"'*.md'
+    RUNNER_OK=""
     for card in $RUNNER_CARD; do
       [ -f "$card" ] || continue
       grep -q '^process_id: quick-close$' "$card" || continue
-      grep -q '^current_step: blocked-witness-unavailable$' "$card" || continue
-      grep -qE '^[[:space:]]*all_pushed: true$' "$card" || continue
+      grep -q '^status: completed$' "$card" || continue
       RUNNER_OK="$card"
-      FORCED_CARD="$card"
       break
     done
-    if [ -z "$RUNNER_OK" ]; then
-      fail "force-no-reflection: не нашёл RUN-quick-close-${SLUG}*.md с current_step=blocked-witness-unavailable и all_pushed=true — этот флаг обходит только эту конкретную блокировку, не любой сбой раннера." 7
-    fi
-    FORCE_EVENT=$(python3 -c '
+
+    # --force-no-reflection (WP-484, 08.08, пилот): рефлексия про настроение дня
+    # блокирует close, даже когда содержательная работа (commit+push) уже
+    # подтверждена картой раннера — живой разбор показал, что вопрос рефлексии
+    # часто рендерится ПОСЛЕ команды «закрывай», пилот её физически не видит.
+    # Bypass узкий и предметный, не общий «пропусти карту раннера»: требует
+    # ИМЕННО блокировку на этом шаге и подтверждённый push — другой сбой раннера
+    # (упавший push, отменённый до commit-push прогон) этим флагом не спрятать.
+    if [ -z "$RUNNER_OK" ] && [ -n "${FORCE_NO_REFLECTION:-}" ]; then
+      for card in $RUNNER_CARD; do
+        [ -f "$card" ] || continue
+        grep -q '^process_id: quick-close$' "$card" || continue
+        grep -q '^current_step: blocked-witness-unavailable$' "$card" || continue
+        grep -qE '^[[:space:]]*all_pushed: true$' "$card" || continue
+        RUNNER_OK="$card"
+        FORCED_CARD="$card"
+        break
+      done
+      if [ -z "$RUNNER_OK" ]; then
+        fail "force-no-reflection: не нашёл RUN-quick-close-${SLUG}*.md с current_step=blocked-witness-unavailable и all_pushed=true — этот флаг обходит только эту конкретную блокировку, не любой сбой раннера." 7
+      fi
+      FORCE_EVENT=$(python3 -c '
 import json, sys
 print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], "card": sys.argv[4], "reason": sys.argv[5]}))
 ' "$WP" "$SLUG" "$AGENT" "$FORCED_CARD" "$FORCE_NO_REFLECTION")
-    bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" session_closed_no_reflection "$FORCE_EVENT" session-guard
-    echo "force-no-reflection: закрываю без рефлексии ($FORCED_CARD) — причина записана в ledger" >&2
-  fi
+      bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" session_closed_no_reflection "$FORCE_EVENT" session-guard
+      echo "force-no-reflection: закрываю без рефлексии ($FORCED_CARD) — причина записана в ledger" >&2
+    fi
 
-  if [ -z "$RUNNER_OK" ]; then
-    fail "Quick Close не завершён для slug '$SLUG': нет terminal RUN-quick-close-${SLUG}*.md. Сначала запусти process-runner.py start quick-close с тем же --slug." 7
+    if [ -z "$RUNNER_OK" ]; then
+      fail "Quick Close не завершён для slug '$SLUG': нет terminal RUN-quick-close-${SLUG}*.md. Сначала запусти process-runner.py start quick-close с тем же --slug." 7
+    fi
   fi
 
   # agent status idle
