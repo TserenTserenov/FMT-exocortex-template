@@ -1,6 +1,8 @@
 files_translated:
-- docs/onboarding/onboarding-guide.md
-- docs/onboarding/onboarding-slides.md
-last_run_utc: '2026-08-10T12:27:57Z'
-last_synced_sha: 7bfa0e6678e0de5de9561f1649dcba07fd1eebe3
+- docs/LEARNING-PATH.md
+- docs/roles-catalog.md
+- docs/scripts-catalog.md
+- docs/skills-catalog.md
+last_run_utc: '2026-08-10T13:01:54Z'
+last_synced_sha: e2335033bfa5f14658ee4c4787dab249b078f275
 schema_version: 1
