@@ -1788,6 +1788,12 @@ validate_no_install_values_in_applied_additions() {
     for key in WORKSPACE_DIR HOME_DIR CLAUDE_PATH IWE_TEMPLATE IWE_RUNTIME; do
         value=$(grep -E "^${key}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | sed -E 's/^"//; s/"$//; s/^'"'"'//; s/'"'"'$//')
         [ -n "$value" ] || continue
+        # A missing Claude executable is intentionally recorded as the command
+        # name "claude". It is not an installation path, and matching that
+        # short token against applied lines would falsely match .claude/ paths.
+        if [ "$key" = "CLAUDE_PATH" ] && [[ "$value" != */* ]]; then
+            continue
+        fi
         install_keys+=("$key")
         install_values+=("$value")
     done

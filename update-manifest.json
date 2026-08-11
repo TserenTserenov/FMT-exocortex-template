@@ -213,7 +213,7 @@
     },
     {
       "path": ".claude/rules/distinctions.md",
-      "sha256": "caf30f66b3dea6622b185cb13a9620826c59d9eae9bf407f3a2541cdd833f8e0"
+      "sha256": "0d1f5a28dbaf38475828ab98e462354848cf8ceb4fc1fb293ea560efae69175d"
     },
     {
       "path": ".claude/rules/formatting.md",
@@ -345,7 +345,7 @@
     },
     {
       "path": ".claude/skills/diagnose/SKILL.md",
-      "sha256": "96869bf63c83d4eae98cc68f7d56d2f4372a9c43a4f493d6e5c80897c5acdd4d"
+      "sha256": "9b5f55fee4692f841af68d92a76f44ef0eca7b7f304a0124654c5e6cfcb43f3d"
     },
     {
       "path": ".claude/skills/discovery-session/SKILL.md",
@@ -613,7 +613,7 @@
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "d6e6f5357a971f34798deb057aa2a4c60f6c230564cba8337102a165ce00aae8"
+      "sha256": "0605b87f81e8f2770955bcccb972f689468d26f307a568013cb4544f520b1e9d"
     },
     {
       "path": ".gitignore",
@@ -633,7 +633,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "dbd53ddae1ac708b21402976fd3658d15ed603e27feab6695144885440364b77"
+      "sha256": "061dd49c3eb0b4e5d93d95cb016e94fe6ff167e8c3e6d93d396d6dda94a9f0c5"
     },
     {
       "path": "CLAUDE.md",
@@ -689,7 +689,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "37d714cde0eb5a1f22b31e42fadb6b083678c94f81c2424f34c6c4bc370a72fa"
+      "sha256": "18f375546a49c38e8e405ff8c490671ebfab781f67fc77cfad81753c60d2a5dc"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -777,11 +777,11 @@
     },
     {
       "path": "docs/onboarding/onboarding-guide.md",
-      "sha256": "802526f46bea6f1bfae7eee4d5d1bfdafa81bc3a2d41f699500b161ab0d1ccf2"
+      "sha256": "cef88560d5c8afc182532a7a03d7fbf6aa0b447faca8abd45b70c03a3e994ca5"
     },
     {
       "path": "docs/onboarding/onboarding-slides.md",
-      "sha256": "c86f0cde68d8e1e085786449f29098e6f5d9b68a0569127b20901d004c1ada1b"
+      "sha256": "58985e3d7fd2338b6815c777b834bdeb55bf8826c9fce43efc2d8afbb1a5492e"
     },
     {
       "path": "docs/onboarding/web-connect-guide.md",
@@ -801,15 +801,15 @@
     },
     {
       "path": "docs/roles-catalog.md",
-      "sha256": "e59069e8351269385e002e4699c1e1fb62a2c3fd64c49627090adb048f391d2f"
+      "sha256": "5fcee4ddcde9d6566038609330b404f9346fdcddd0d996f5c4f71a52fc60ed34"
     },
     {
       "path": "docs/scripts-catalog.md",
-      "sha256": "8ad5944e7dde20d2b41b49bdd561748baf571e7db9cb89b54abe2fcc0374ca5d"
+      "sha256": "e866b32a63c270103512b06a354a4cb61a238d28390b990e3bf67d7ba2b471df"
     },
     {
       "path": "docs/skills-catalog.md",
-      "sha256": "ca3b429d96a06bc94d9aa9ff5263e1c8196165134a826da447aa6a09751ce3a4"
+      "sha256": "71cc1326718812f3b7ef1689b798dafd3d873205529bb522f0769056d836e17c"
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
@@ -1325,7 +1325,7 @@
     },
     {
       "path": "memory/roles.md",
-      "sha256": "17cf34585b2312ab5c52c2ce11af1f0a6b7090812d0f30f804f1546e43b56276"
+      "sha256": "622d760028ee78a7b86078134dc440a79cdbc444e1825db18dccdbadfcdeebd9"
     },
     {
       "path": "memory/routing-vocab.md",
@@ -1845,7 +1845,7 @@
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
-      "sha256": "591d5bd6d2fe9cd2cb82bc9122db2dfbb46f1f7fde26e738cd5295c556fa9d3d"
+      "sha256": "4cf626ca5615f49465fbf9255b3be6033e025bf9268009aa49eb99c464e905b0"
     },
     {
       "path": "scripts/close-wp.sh",
@@ -2085,7 +2085,7 @@
     },
     {
       "path": "scripts/memory-bleed.sh",
-      "sha256": "b9a74648959ad49da45b64cbf67886b4b1a7956aa6c0c043e62dcca5f086cb06"
+      "sha256": "e5dd1319cd42ef79a3f299e3747a0628a1af07ba3a6231a903439aab6896b47e"
     },
     {
       "path": "scripts/memory-health.sh",
@@ -2165,7 +2165,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "14467b4605b6ae06ac4d7cd82ef46863f91b054ff06e5acb2fc0cc7ad845dd48"
+      "sha256": "23da8351561672483086c2f067d90441da80ac6fa165931fc07e63ad5f0542a6"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2373,7 +2373,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "fcd35d0d72afe32ec6b44c9c04bdd124e58c522ba80dedcc00e0de6fe8e274f5"
+      "sha256": "d671125627043e9ee4cadebd3cd9d5e7b038c67daa648d8b173ce810d7da6f59"
     }
   ],
   "excluded_paths": [
