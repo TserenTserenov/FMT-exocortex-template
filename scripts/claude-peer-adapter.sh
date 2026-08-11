@@ -64,7 +64,7 @@ done
 # WP-510 Ф17: text-only must be fail-closed. `plan` plus a deny-list did not
 # provide that boundary: Claude could still call Agent, whose child discovered
 # ToolSearch and MCP, then the parent timed out without stdout. `--safe-mode`
-# removes project customizations/hooks/MCP, while the EMPTY `--tools` allow-list
+# removes project customizations/hooks/MCP, while the empty `--allowedTools` allow-list
 # disables every tool namespace (including future tools not known today).
 # `--no-session-persistence` prevents this ephemeral reviewer from leaving a
 # resumable conversation. --add-dir remains forbidden above.
@@ -80,7 +80,7 @@ trap 'rm -f "$CLAUDE_STDERR"' EXIT
 CLAUDE_OUTPUT=$(perl -e 'alarm 300; exec @ARGV' -- \
   "$CLAUDE_BIN" -p \
   --safe-mode \
-  --tools "" \
+  --allowedTools "" \
   --permission-mode dontAsk \
   --max-turns 1 \
   --no-session-persistence \
@@ -106,9 +106,16 @@ if grep -qE "$AUTH_PATTERN" "$CLAUDE_STDERR" 2>/dev/null || \
   exit 4
 fi
 
-# Empty output must stay a zero-byte file (contract: exit≠0 + empty file →
-# caller reports "peer didn't answer") — printf with %s\n would otherwise
-# write a lone newline for a truly empty CLAUDE_OUTPUT, found in cold review
-# of peer-session 2026-08-04-08-wp7-f44-sandbox-review.
-[ -n "$CLAUDE_OUTPUT" ] && printf '%s\n' "$CLAUDE_OUTPUT"
-exit "$CLAUDE_EXIT"
+if [ "$CLAUDE_EXIT" -ne 0 ]; then
+  echo "ERROR: Claude peer call failed with exit code $CLAUDE_EXIT." >&2
+  [ -s "$CLAUDE_STDERR" ] && tail -20 "$CLAUDE_STDERR" >&2
+  exit "$CLAUDE_EXIT"
+fi
+
+if [ -z "$CLAUDE_OUTPUT" ]; then
+  echo "ERROR: Claude peer call returned no response." >&2
+  [ -s "$CLAUDE_STDERR" ] && tail -20 "$CLAUDE_STDERR" >&2
+  exit 5
+fi
+
+printf '%s\n' "$CLAUDE_OUTPUT"

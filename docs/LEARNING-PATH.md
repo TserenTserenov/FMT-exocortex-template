@@ -1005,14 +1005,14 @@ Hybrid search (vector + keyword) по всем Pack-репозиториям и 
 
 > Поиск по руководствам: `knowledge_search("запрос", source_type="guides")`. Отдельный guides-сервер не нужен — Gateway объединяет все источники.
 
-#### digital-twin — цифровой двойник ученика
+#### digital-twin — цифровой двойник участника
 
-Метамодель данных ученика: цели, самооценка, контекст, прогресс.
+Метамодель данных участника: цели, самооценка, контекст, прогресс.
 
 | Инструмент | Что делает | Пример |
 |------------|-----------|--------|
 | `dt_describe_by_path` | Структура метамодели | `dt_describe_by_path("/")` → 4 категории IND.1-4 |
-| `dt_read_digital_twin` | Чтение данных | `dt_read_digital_twin("1_declarative/1_2_goals")` → цели ученика |
+| `dt_read_digital_twin` | Чтение данных | `dt_read_digital_twin("1_declarative/1_2_goals")` → цели участника |
 | `dt_write_digital_twin` | Запись в IND.1 | `dt_write_digital_twin("1_declarative/...", data)` |
 
 > **IND.1 (Declarative)** — единственная записываемая категория. IND.2 (Collected), IND.3 (Derived), IND.4 (Generated) — только чтение.
@@ -1024,7 +1024,7 @@ Hybrid search (vector + keyword) по всем Pack-репозиториям и 
 | Доменный вопрос, паттерн, архитектура | `knowledge_search(query, source_type="pack")` |
 | Конкретный документ по коду (DP.ROLE.001) | `knowledge_get_document("filename")` |
 | Обучение, методология, руководства | `knowledge_search(query, source_type="guides")` |
-| Цели ученика, самооценка | `dt_read_digital_twin("path")` |
+| Цели участника, самооценка | `dt_read_digital_twin("path")` |
 | Перед записью в Pack — проверка дубликатов | `knowledge_search` + `knowledge_get_document` |
 
 ### 6.6. Онтология: граф знаний
