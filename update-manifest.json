@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
-      "sha256": "09d0eebe89ddc5f243273ce528b37a3965c0bac8f0f7d3fce204e9472bdd0ee8"
+      "sha256": "71164815dcb5c5a8d09963600edb85300c88d5678836933e9e284baee98a558d"
     },
     {
       "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
@@ -573,7 +573,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "8f1a77cfabfa7d318b20330fe6279df029259662f2759a4703f952adbb12db87"
+      "sha256": "06edf17ec6a251ef4b3272dfd63a7497856d1b3f7510e94b46cf3c7866618b76"
     },
     {
       "path": ".claude/styles/p05-core.md",
@@ -1280,6 +1280,10 @@
       "sha256": "951872ce350cb40e619a095e2d4de282735d81d5a0370256b380b31eded62986"
     },
     {
+      "path": "memory/lpf-hypothesis-log.md",
+      "sha256": "b1129f15550404676230f434a47f70d90be3a82e6835eb3b17c8423833131c97"
+    },
+    {
       "path": "memory/memory-lifecycle-spec.md",
       "sha256": "f794f558a747135450061c71eca078e7868de9b3b446facf553b7b33c7a9d230"
     },
@@ -1549,7 +1553,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/01-review.md",
-      "sha256": "8707f34284ecb778569ff6bd12071380fbd32a9342db6a14eb141a6cbf470cc0"
+      "sha256": "dc411c53b7757f8e2d05944de276779bb1747fc03ab6558d5e8c0a30af762d31"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/02-inbox.md",
@@ -1561,7 +1565,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/04-strategy-sync.md",
-      "sha256": "8e52735f4432a340ab206c599578241dab9b20025c7467591c07c4264a3cf8f1"
+      "sha256": "c038f69525068e872edd430607c07340c1ac1378909d8188cc675675946547c6"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05a-measurement.md",
@@ -1585,7 +1589,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06c-finalize.md",
-      "sha256": "c1de1b2709bc6c541b8e5b65d5094a7b4d3c8efa001a14fd796a12a5f8bbd463"
+      "sha256": "18e1c1778cf1bbaa2699a9db1482067c2e78a3ba3aedd9d5721aa9e5a816f24b"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/07-irregular.md",
@@ -1781,7 +1785,7 @@
     },
     {
       "path": "scripts/artifactor.py",
-      "sha256": "6a5581dd00607278d83aa5d0a064c70aaeb0435685c735e1e867fd98ca1f32fd"
+      "sha256": "4b4098e2ea3568b5e13e314ded98f82a910ad174ca86f7729502cde65c31c594"
     },
     {
       "path": "scripts/backup-icloud.sh",
@@ -1881,7 +1885,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "479edd4aad04a6e4d43801cab939ac7a9b5fe1eb851571923cf76f57af9ad67d"
+      "sha256": "ad7248f77b8433a6f00bc85a474f6077b961cddfed78ae4bf1aa0dd35164f04d"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2165,7 +2169,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "23da8351561672483086c2f067d90441da80ac6fa165931fc07e63ad5f0542a6"
+      "sha256": "70f818fbc18c8238afc6ab67fca23b9ee97b4d289c8e38ac62245e6ba72edfd7"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2248,6 +2252,10 @@
       "sha256": "cb8ae42e06dbeb141d8566a9cd808874798cb01f0d8c7395aeee05e270fe83c2"
     },
     {
+      "path": "scripts/tests/test_create_wp_hypothesis_relation.sh",
+      "sha256": "2265e5dda20c17e17ea66d2c870fa0f97e3a053f741239fe61beaa785f944a58"
+    },
+    {
       "path": "scripts/tests/test_create_wp_registry_coherence.sh",
       "sha256": "852828b4b741b9922fd0a72b5089214a3ee1663874d7950976ed8115958adb69"
     },
@@ -2278,6 +2286,10 @@
     {
       "path": "scripts/tests/test_hook_classification.sh",
       "sha256": "99c99c821223e70a8a0b1cb89ce9a72f2bd1e5eebd011c2f42eadde056125491"
+    },
+    {
+      "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
+      "sha256": "45d241902da232578652c576f3240088936fb165a4ada29917089e802df61edb"
     },
     {
       "path": "scripts/tests/test_update_install_path_guard.sh",

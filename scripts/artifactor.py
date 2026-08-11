@@ -186,6 +186,9 @@ def main() -> None:
             "schema_version": 2,
             "expected_result_kind": expected_result_kind,
             "result_kind_resolution": result_kind_resolution,
+            # Стратегическая связь не выводится из ключевых слов: Артефактор
+            # передаёт обязательный вопрос в WP Gate, а не приписывает H-NNN.
+            "hypothesis_relation": "unclassified",
         }
         print(json.dumps(result, ensure_ascii=False))
         sys.exit(0)

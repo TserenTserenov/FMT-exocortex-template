@@ -137,11 +137,13 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     "scripts/tests/lib/seed_strategy_fixture.sh"
     "scripts/tests/test_critical_alert_failure_matrix.sh"
     "scripts/tests/test_create_wp_repeat_and_cwd.sh"
+    "scripts/tests/test_create_wp_hypothesis_relation.sh"
     "scripts/tests/test_day_close_lock_timezone.sh"
     "scripts/tests/test_fresh_seed_reproduction.sh"
     "scripts/tests/test_hook_classification.sh"
     "scripts/tests/test_update_install_path_guard.sh"
     "scripts/tests/test_upgrade_worktree_cleanup.sh"
+    "scripts/tests/test_session_guard_hypothesis_gate.sh"
 )
 
 is_explicit_include() {

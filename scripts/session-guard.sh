@@ -326,6 +326,23 @@ if [ "$CMD" = "open" ]; then
 
   [ -z "$WP" ] && fail "--wp обязателен для open" 2
 
+  # WP-518: создание РП и начало работы — разные решения. Новый создатель
+  # карточек пишет `hypothesis_relation: unclassified`, пока пилот не выбрал
+  # смысл работы в контуре ставок. Такой РП можно зарегистрировать и
+  # обсудить, но нельзя открыть для изменения файлов: иначе значение
+  # обязательного поля превращается в необязательную пометку.
+  #
+  # Отсутствующее поле намеренно не блокируется: это карточка, созданная до
+  # введения контракта, и массовое дообогащение исторических РП не является
+  # безопасным побочным эффектом открытия одной сессии.
+  WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP/$WP.md"
+  if [ ! -f "$WP_CARD" ]; then
+    WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP.md"
+  fi
+  if [ -f "$WP_CARD" ] && grep -qE "^hypothesis_relation:[[:space:]]*['\"]?unclassified['\"]?[[:space:]]*$" "$WP_CARD"; then
+    fail "РП $WP не классифицирована по гипотезе. До открытия выберите tests, enables, responds, researches или operational в $WP_CARD" 1
+  fi
+
   # Report stale semaphores of the same agent — WITHOUT quarantining them.
   #
   # WP-484 Ф49 (04.08): this loop used to `mv` every semaphore older than the

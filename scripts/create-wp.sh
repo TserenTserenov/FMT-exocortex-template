@@ -8,7 +8,7 @@
 #
 # Использование:
 #   bash create-wp.sh --title "Название" --budget 5h --priority P3 [--slug slug] [--repo "репо"] [--related "WP-150:dependency,WP-167:продукт"]
-#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --state "belonging (Оснащённость): из → в" [--hypothesis H-101]
+#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --state "belonging (Оснащённость): из → в" [--hypothesis H-101] [--hypothesis-relation tests]
 #   bash create-wp.sh --title "Название" --budget 5h --priority P3 --no-consent-check
 #
 # --state (WP-505): target state transition (WP-457 State-Transition Gate).
@@ -16,6 +16,9 @@
 #   optional otherwise (typical user install — gate inactive per template contract).
 #   Must mention at least one gate_ready axis code from the registry file.
 # --hypothesis (WP-505): H-NNN from current/hypotheses-log.md, or "—" (default).
+# --hypothesis-relation: tests|enables|responds|researches|operational|unclassified.
+# New work must resolve unclassified before it is started; the default preserves
+# older callers while making the missing strategic basis visible in frontmatter.
 #
 # Предусловие: consent state file должен существовать:
 #   touch ${IWE:-$HOME/IWE}/.claude/state/wp-consent-{N}
@@ -49,6 +52,7 @@ RELATED=""
 RESULT=""
 STATE=""
 HYPOTHESIS=""
+HYPOTHESIS_RELATION="unclassified"
 SKIP_CONSENT=0
 
 while [[ $# -gt 0 ]]; do
@@ -62,6 +66,7 @@ while [[ $# -gt 0 ]]; do
     --result)   RESULT="$2";   shift 2 ;;
     --state)    STATE="$2";    shift 2 ;;
     --hypothesis) HYPOTHESIS="$2"; shift 2 ;;
+    --hypothesis-relation) HYPOTHESIS_RELATION="$2"; shift 2 ;;
     --no-consent-check) SKIP_CONSENT=1; shift ;;
     *) echo "Неизвестный флаг: $1" >&2; exit 1 ;;
   esac
@@ -69,9 +74,29 @@ done
 
 # --- Валидация ---
 if [[ -z "$TITLE" || -z "$BUDGET" ]]; then
-  echo "Использование: $0 --title \"Название\" --budget 5h [--priority P3] [--slug slug] [--repo репо] [--related \"WP-NNN:тип\"] [--result R3] [--state \"ось: из → в\"] [--hypothesis H-NNN]" >&2
+  echo "Использование: $0 --title \"Название\" --budget 5h [--priority P3] [--slug slug] [--repo репо] [--related \"WP-NNN:тип\"] [--result R3] [--state \"ось: из → в\"] [--hypothesis H-NNN] [--hypothesis-relation tests]" >&2
   exit 1
 fi
+
+case "$HYPOTHESIS_RELATION" in
+  tests|enables|responds)
+    [[ "${HYPOTHESIS:-—}" =~ ^H-[0-9]{3}$ ]] || {
+      echo "❌ Для связи '$HYPOTHESIS_RELATION' нужен --hypothesis H-NNN" >&2
+      exit 1
+    }
+    ;;
+  researches|operational)
+    [[ -z "$HYPOTHESIS" || "$HYPOTHESIS" == "—" ]] || {
+      echo "❌ Для связи '$HYPOTHESIS_RELATION' укажите --hypothesis —" >&2
+      exit 1
+    }
+    ;;
+  unclassified) ;;
+  *)
+    echo "❌ Неизвестная связь с гипотезой: $HYPOTHESIS_RELATION" >&2
+    exit 1
+    ;;
+esac
 
 # --- State-Transition Gate (WP-457 / WP-505) ---
 # When the axes registry exists, --state is mandatory and must reference a
@@ -282,7 +307,8 @@ if [[ -n "$STATE" ]]; then
   FM_STAKE="state_transition: \"${STATE}\"
 "
 fi
-FM_STAKE="${FM_STAKE}hypothesis: \"${HYPOTHESIS:-—}\""
+FM_STAKE="${FM_STAKE}hypothesis: \"${HYPOTHESIS:-—}\"
+hypothesis_relation: \"${HYPOTHESIS_RELATION}\""
 
 if ! cat > "$WP_FILE" <<WPEOF
 ---
@@ -341,6 +367,9 @@ then
 fi
 
 echo "   ✅ $WP_FILE"
+if [[ "$HYPOTHESIS_RELATION" == "unclassified" ]]; then
+  echo "   ⚠️  Связь с гипотезой не определена: до начала РП выберите tests/enables/responds/researches/operational" >&2
+fi
 
 # --- Шаг 2: archive stub ---
 echo "2/6 archive stub..."

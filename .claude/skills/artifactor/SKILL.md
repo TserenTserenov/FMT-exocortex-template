@@ -1,7 +1,7 @@
 ---
 # see DP.SC.160, DP.ROLE.058
 name: artifactor
-description: "Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, routing_tag, resolution_path}. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."
+description: "Classifies raw pilot request → structured request with routing and an explicit unresolved strategic-basis gate. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."
 version: 1.0.0
 layer: L1
 status: active
@@ -31,7 +31,9 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## When to use
 
-Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, routing_tag, resolution_path}. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor.
+Classifies raw pilot request → structured JSON with routing. The later WP Gate must
+also resolve how the work relates to a hypothesis; Artifactor does not invent that
+relation from keywords. Does NOT create WP or call executor.
 
 ## Обещание (контракт)
 
@@ -55,6 +57,24 @@ Classifies raw pilot request → structured JSON {task_type, class, artifact, bu
 - `confidence=high` только при keyword-пути; `confidence=low` при LLM-пути
 - При запросе <5 слов: вернуть `{"error": "INSUFFICIENT_INPUT"}`, стоп
 - `budget_estimate: "?"` только при `problem-framing` или полной неопределённости
+- В handoff к WP Gate передать `hypothesis_relation: "unclassified"`. До выбора
+  `tests | enables | responds | researches | operational` РП остаётся pending,
+  а не запускается в работу.
+
+## Стратегическое основание РП
+
+Артефактор не вправе приписать РП гипотезу без решения пилота. Он обязан
+передать в WP Gate вопрос о типе связи:
+
+- `tests H-NNN` — РП проверяет одну ставку;
+- `enables H-NNN` — делает её проверку измеримой или возможной;
+- `responds H-NNN` — следует из вердикта;
+- `researches` — ищет основание для новой гипотезы;
+- `operational` — поддерживает норму, устраняет инцидент или исполняет обязанность.
+
+Для первых трёх нужен один `H-NNN`. Для двух последних номер гипотезы не
+подставляется. Связь `unclassified` видна в карточке РП и блокирует её запуск,
+но не создание: это сохраняет обратимость и не ломает старые автоматизации.
 
 ## Algorithm
 
