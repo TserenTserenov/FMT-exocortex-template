@@ -213,7 +213,7 @@
     },
     {
       "path": ".claude/rules/distinctions.md",
-      "sha256": "caf30f66b3dea6622b185cb13a9620826c59d9eae9bf407f3a2541cdd833f8e0"
+      "sha256": "0d1f5a28dbaf38475828ab98e462354848cf8ceb4fc1fb293ea560efae69175d"
     },
     {
       "path": ".claude/rules/formatting.md",
@@ -689,7 +689,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "37d714cde0eb5a1f22b31e42fadb6b083678c94f81c2424f34c6c4bc370a72fa"
+      "sha256": "18f375546a49c38e8e405ff8c490671ebfab781f67fc77cfad81753c60d2a5dc"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -777,11 +777,11 @@
     },
     {
       "path": "docs/onboarding/onboarding-guide.md",
-      "sha256": "802526f46bea6f1bfae7eee4d5d1bfdafa81bc3a2d41f699500b161ab0d1ccf2"
+      "sha256": "cef88560d5c8afc182532a7a03d7fbf6aa0b447faca8abd45b70c03a3e994ca5"
     },
     {
       "path": "docs/onboarding/onboarding-slides.md",
-      "sha256": "c86f0cde68d8e1e085786449f29098e6f5d9b68a0569127b20901d004c1ada1b"
+      "sha256": "58985e3d7fd2338b6815c777b834bdeb55bf8826c9fce43efc2d8afbb1a5492e"
     },
     {
       "path": "docs/onboarding/web-connect-guide.md",
@@ -801,15 +801,15 @@
     },
     {
       "path": "docs/roles-catalog.md",
-      "sha256": "e59069e8351269385e002e4699c1e1fb62a2c3fd64c49627090adb048f391d2f"
+      "sha256": "5fcee4ddcde9d6566038609330b404f9346fdcddd0d996f5c4f71a52fc60ed34"
     },
     {
       "path": "docs/scripts-catalog.md",
-      "sha256": "8ad5944e7dde20d2b41b49bdd561748baf571e7db9cb89b54abe2fcc0374ca5d"
+      "sha256": "e866b32a63c270103512b06a354a4cb61a238d28390b990e3bf67d7ba2b471df"
     },
     {
       "path": "docs/skills-catalog.md",
-      "sha256": "ca3b429d96a06bc94d9aa9ff5263e1c8196165134a826da447aa6a09751ce3a4"
+      "sha256": "71cc1326718812f3b7ef1689b798dafd3d873205529bb522f0769056d836e17c"
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
@@ -1325,7 +1325,7 @@
     },
     {
       "path": "memory/roles.md",
-      "sha256": "17cf34585b2312ab5c52c2ce11af1f0a6b7090812d0f30f804f1546e43b56276"
+      "sha256": "622d760028ee78a7b86078134dc440a79cdbc444e1825db18dccdbadfcdeebd9"
     },
     {
       "path": "memory/routing-vocab.md",
@@ -1845,7 +1845,7 @@
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
-      "sha256": "591d5bd6d2fe9cd2cb82bc9122db2dfbb46f1f7fde26e738cd5295c556fa9d3d"
+      "sha256": "4cf626ca5615f49465fbf9255b3be6033e025bf9268009aa49eb99c464e905b0"
     },
     {
       "path": "scripts/close-wp.sh",
