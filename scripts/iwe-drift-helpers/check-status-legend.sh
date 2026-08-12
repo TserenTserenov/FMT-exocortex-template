@@ -51,18 +51,37 @@ if [ ! -f "$REGISTRY" ]; then
     exit 1
 fi
 
-# Извлечь множество эмодзи из легенды (таблица «| Статус | Расшифровка |»).
+# Извлечь множество эмодзи из легенды.
+# Поддерживаются обе поставляемые формы: «Статус | Расшифровка» и
+# «Эмодзи | Статус | Что значит». Заголовок определяет колонку с emoji.
 # Возвращает по одному эмодзи на строку.
 extract_legend_emojis() {
     awk '
-        /^\| Статус \| Расшифровка \|/ { in_legend = 1; next }
+        function trim(value) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+        /^\|/ {
+            n = split($0, fields, "|")
+            if (in_legend == 0) {
+                for (i = 2; i < n; i++) {
+                    header = trim(fields[i])
+                    if (header == "Эмодзи") emoji_col = i
+                    if (header == "Расшифровка") has_description = 1
+                    if (header == "Статус") status_col = i
+                }
+                if (emoji_col > 0 || (status_col > 0 && has_description)) {
+                    if (emoji_col == 0) emoji_col = status_col
+                    in_legend = 1
+                    next
+                }
+            }
+        }
         in_legend && /^\|---/ { next }
         in_legend && /^\|/ {
-            # Поле 2 = эмодзи, между | и |
             n = split($0, fields, "|")
-            if (n >= 3) {
-                emoji = fields[2]
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", emoji)
+            if (n >= emoji_col) {
+                emoji = trim(fields[emoji_col])
                 if (emoji != "") print emoji
             }
             next

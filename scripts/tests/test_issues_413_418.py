@@ -59,6 +59,36 @@ def test_status_legend_finds_reordered_status_column(tmp_path: Path):
     assert "format-compliance OK: 2" in result.stdout
 
 
+def test_status_legend_accepts_skeleton_legend_format(tmp_path: Path):
+    registry = tmp_path / "WP-REGISTRY.md"
+    registry.write_text(
+        "\n".join(
+            (
+                "| Эмодзи | Статус | Что значит |",
+                "|---|---|---|",
+                "| 🔄 | in_progress | активен |",
+                "| ✅ | done | завершён |",
+                "",
+                "| # | P | Название | Ст |",
+                "|---|---|---|---|",
+                "| 418 | Проверка | легенды | 🔄 |",
+                "| ~~417~~ | P2 | Готово | ✅ |",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", str(STATUS_LEGEND), "--registry", str(registry), "--critical-only"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_day_open_uses_priority_draft_from_template_contract(tmp_path: Path):
     governance = tmp_path / "DS-strategy"
     drafts = governance / "drafts"
