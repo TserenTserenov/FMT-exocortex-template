@@ -2021,7 +2021,7 @@
     },
     {
       "path": "scripts/iwe-drift-helpers/check-status-legend.sh",
-      "sha256": "3a20ed7301bc59312aa47e2bd2a1942a1864f983cc02efcbed8c1a02f3c5da9b"
+      "sha256": "4b025b18accb86c1bba5cf6d9284e6ccfe4ca58b32881cb5979b7d49260078f6"
     },
     {
       "path": "scripts/iwe-drift.sh",
@@ -2297,7 +2297,7 @@
     },
     {
       "path": "scripts/tests/test_issues_413_418.py",
-      "sha256": "11c81d661b3b1bfe98f7cd33a70429f7aeb3fd2909ca13fec6f731eafbc9ebd5"
+      "sha256": "deccd502f68f06f7d95c8382e5daf25bb0ce62bd5df2ac3e9729f91c4a7f7d4e"
     },
     {
       "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",

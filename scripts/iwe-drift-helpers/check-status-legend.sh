@@ -7,9 +7,9 @@
 #   I1. **Legend completeness:** все статус-эмодзи, встречающиеся в таблице WP-REGISTRY.md,
 #       задокументированы в легенде вверху файла. Новый эмодзи без записи в легенде → DRIFT.
 #   I2. **Format compliance — active id:** строки с plain id `| <num> |` имеют active статус
-#       (НЕ из терминального множества {✅, 📦, ↗️}).
+#       (НЕ из терминального множества {✅, 📦, ↗️, ❌}).
 #   I3. **Format compliance — terminal id:** строки с crossed id `| ~~<num>~~ |` имеют
-#       терминальный статус из {✅, 📦, ↗️}.
+#       терминальный статус из {✅, 📦, ↗️, ❌}.
 #
 # I2 + I3 — invariant id-format ↔ status (см. .claude/rules/formatting.md «Таблицы с РП»).
 # Сломан = расхождение row-format и status, что ломает счётчики (linear-sync.sh, day-close.sh).
@@ -32,7 +32,7 @@ MODE="${MODE:-all}"
 
 # Терминальные статусы — закрытие РП. Источник: легенда WP-REGISTRY.md.
 # Изменение этого списка = архитектурное решение об эволюции lifecycle РП.
-TERMINAL_STATUSES=("✅" "📦" "↗️")
+TERMINAL_STATUSES=("✅" "📦" "↗️" "❌")
 
 while [ $# -gt 0 ]; do
     case "$1" in

@@ -89,6 +89,36 @@ def test_status_legend_accepts_skeleton_legend_format(tmp_path: Path):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_status_legend_accepts_cancelled_wp_as_terminal(tmp_path: Path):
+    registry = tmp_path / "WP-REGISTRY.md"
+    registry.write_text(
+        "\n".join(
+            (
+                "| Статус | Расшифровка |",
+                "|---|---|",
+                "| 🔄 | in_progress |",
+                "| ❌ | cancelled |",
+                "",
+                "| # | Название | Ст |",
+                "|---|---|---|",
+                "| ~~405~~ | Отменённая работа | ❌ |",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", str(STATUS_LEGEND), "--registry", str(registry), "--critical-only"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "format-compliance OK: 1" in result.stdout
+
+
 def test_day_open_uses_priority_draft_from_template_contract(tmp_path: Path):
     governance = tmp_path / "DS-strategy"
     drafts = governance / "drafts"
