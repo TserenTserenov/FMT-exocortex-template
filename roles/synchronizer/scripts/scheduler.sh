@@ -29,7 +29,20 @@ if [[ "$(uname)" == "Darwin" ]]; then
 elif command -v systemd-inhibit &>/dev/null; then
     systemd-inhibit --what=idle:sleep --who=scheduler --why="agent dispatch" --mode=block sleep infinity &
     _INHIBIT_PID=$!
-    trap 'kill $_INHIBIT_PID 2>/dev/null' EXIT
+    # Under polkit a background service cannot get interactive authorisation, so the inhibitor
+    # can die on the spot. Check it survived rather than assuming it did: a missing inhibitor
+    # is a fact about the environment, not a failed dispatch.
+    sleep 0.2
+    if kill -0 "$_INHIBIT_PID" 2>/dev/null; then
+        # `|| true` is load-bearing. Without it the trap's kill runs on an already-dead PID,
+        # returns non-zero, and under `set -e` that becomes the exit status of the whole
+        # script - so a dispatch that did all its work reports failure. Every "failure" of
+        # this unit on 2026-08-12 was this and nothing else.
+        trap 'kill "$_INHIBIT_PID" 2>/dev/null || true' EXIT
+    else
+        unset _INHIBIT_PID
+        echo "scheduler: запрет сна недоступен (требуется интерактивная авторизация) - продолжаю без него" >&2
+    fi
 fi
 
 # Cross-platform date offset: portable_date_offset <days_back> <format>
