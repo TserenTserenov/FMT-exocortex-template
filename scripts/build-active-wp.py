@@ -53,10 +53,38 @@ def norm_status(token: str) -> str:
 
 # Строка-РП: `| 312 | P2 | **Название** | 🔄 | repo | 8h |`
 # Done-вариант: `| ~~306~~ | ~~P3~~ | ~~Название~~ | ✅ | ~~repo~~ | ~~4h~~ |`
-ROW_RE = re.compile(r"^\|\s*(?:~~)?(?:\*\*)?(\d{1,4})(?:\*\*)?(?:~~)?\s*\|")
+ROW_RE = re.compile(
+    r"^\|\s*(?:~~)?(?:\*\*)?(?:WP-)?(\d{1,4})(?:(?:[-.][A-Za-z0-9]+)+)?(?:\*\*)?(?:~~)?\s*\|"
+)
 
 # Имя файла WP в inbox/archive: WP-NNN-... .md или WP-NNN.md или папка WP-NNN/
 WP_NAME_RE = re.compile(r"^WP-(\d{1,4})(?:[-.].*|/)?$")
+
+COLUMN_SYNONYMS = {
+    "Приоритет": "P",
+    "Статус": "Ст",
+    "Репозитории": "Репо",
+    "Репозиторий": "Репо",
+}
+
+
+def find_registry_columns(lines: list[str]) -> dict[str, int] | None:
+    """Возвращает позиции колонок основной таблицы реестра по её заголовку.
+
+    Старые реестры могли хранить только ``# | Название | Статус`` или
+    дополняться новыми колонками в конце. Поэтому порядок колонок не является
+    частью контракта: обязательны только номер, название и статус.
+    """
+    for index, line in enumerate(lines[:-1]):
+        headers = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if "#" not in headers or not lines[index + 1].strip().startswith("|---"):
+            continue
+        columns: dict[str, int] = {}
+        for column_index, name in enumerate(headers):
+            columns.setdefault(COLUMN_SYNONYMS.get(name, name), column_index)
+        if {"#", "Название", "Ст"}.issubset(columns):
+            return columns
+    return None
 
 
 def parse_registry(text: str) -> tuple[list[dict], list[str]]:
@@ -64,13 +92,27 @@ def parse_registry(text: str) -> tuple[list[dict], list[str]]:
     непарсибельные попадают в rows (для orphan-детекции) + в problems (PARSE-WARN)."""
     rows: list[dict] = []
     problems: list[str] = []
-    for lineno, line in enumerate(text.splitlines(), 1):
+    lines = text.splitlines()
+    columns = find_registry_columns(lines)
+    if columns is None:
+        problems.append(
+            "Заголовок основной таблицы реестра не распознан; используется "
+            "устаревшая позиционная схема."
+        )
+
+    def cell(cells: list[str], name: str, fallback: int | None = None) -> str:
+        index = columns.get(name) if columns is not None else fallback
+        if index is None or index >= len(cells):
+            return "—"
+        return cells[index].strip()
+
+    for lineno, line in enumerate(lines, 1):
         m = ROW_RE.match(line)
         if not m:
             continue
         wp = int(m.group(1))
         cols = [c.strip() for c in line.strip("|").split("|")]
-        if len(cols) < 6:
+        if columns is None and len(cols) < 6:
             problems.append(
                 f"WP-{wp} (строка {lineno}): колонок < 6 — строка учтена в реестре, "
                 f"но не попадает в active-wp.md."
@@ -78,7 +120,7 @@ def parse_registry(text: str) -> tuple[list[dict], list[str]]:
             cols = cols + [""] * (6 - len(cols))
         # Очистка от ~~ и пробелов; берём только первый токен, чтобы
         # принять варианты вида "🔄 Ф4" (статус + пометка фазы).
-        status_raw = cols[3].replace("~~", "").strip()
+        status_raw = cell(cols, "Ст", 3).replace("~~", "").strip()
         token = status_raw.split()[0] if status_raw else ""
         status = norm_status(token)
         if status not in ALL_STATUSES:
@@ -88,24 +130,29 @@ def parse_registry(text: str) -> tuple[list[dict], list[str]]:
             )
         rows.append({
             "wp": wp,
-            "project": cols[1].replace("~~", "").strip(),
-            "name": cols[2].strip(),
+            "id_display": cell(cols, "#", 0),
+            "project": cell(cols, "P", 1).replace("~~", "").strip(),
+            "name": cell(cols, "Название", 2),
             "status": status,
             "status_display": token,
-            "repo": cols[4].strip(),
-            "budget": cols[5].strip(),
+            "repo": cell(cols, "Репо", 4),
+            "budget": cell(cols, "Бюджет", 5),
             "raw": line,
         })
     return rows, problems
 
 
-def clean_status_in_row(raw: str, status: str) -> str:
-    """Заменяет содержимое колонки «Ст» на очищенный статус и обрезает лишние колонки."""
-    parts = raw.split("|")
-    if len(parts) >= 6:
-        parts[4] = f" {status} "
-        parts = parts[:7]
-    return "|".join(parts) + "|"
+def render_registry_row(row: dict) -> str:
+    """Рендерит строку производного списка в его каноническом порядке колонок."""
+    cells = [
+        row["id_display"],
+        row["project"],
+        row["name"],
+        row["status_display"],
+        row["repo"],
+        row["budget"],
+    ]
+    return "| " + " | ".join(cells) + " |"
 
 
 def render(rows: list[dict]) -> str:
@@ -126,7 +173,7 @@ def render(rows: list[dict]) -> str:
         out = ["| # | P | Название | Ст | Репо | Бюджет |",
                "|---:|---|------------------|:--:|------------------|------:|"]
         for r in items:
-            out.append(clean_status_in_row(r["raw"], r["status_display"]))
+            out.append(render_registry_row(r))
         return "\n".join(out) + "\n"
 
     lines = [

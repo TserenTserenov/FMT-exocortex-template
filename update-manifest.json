@@ -1801,7 +1801,7 @@
     },
     {
       "path": "scripts/build-active-wp.py",
-      "sha256": "ab896aa1b981955bc42daa507abc44da084a0d0328a49dfc73c2c4d19341d974"
+      "sha256": "a0c8516167c5aa8b67fcb8eb9d460898940c3d9d616e9b261420973b08d4d592"
     },
     {
       "path": "scripts/changelog-append.sh",
@@ -1929,7 +1929,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "cc6ba46e9ff10ed40e6b334483f798f565e098119cbeb1cfbd623500e3b121d5"
+      "sha256": "b18329a4284f70bacce1b34d22d2cc381ae0bccfdafa35e1a8aeb2b40dbc46fb"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2418,6 +2418,7 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
     "scripts/tests/test_agent_dashboard.py",
+    "scripts/tests/test_build_active_wp_registry_columns.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_create_wp_number_padding.py",
     "scripts/tests/test_create_wp_weekplan_writer.py",
