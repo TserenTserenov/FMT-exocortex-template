@@ -65,9 +65,30 @@ _EMOJI_TO_STATUS = {
 }
 
 
+_TEXT_STATUS_PATTERNS = (
+    ("in_progress", re.compile(r"\bin[ _-]?progress\b", re.IGNORECASE)),
+    ("in_progress", re.compile(r"\bactive\b", re.IGNORECASE)),
+    ("pending", re.compile(r"\bpending\b", re.IGNORECASE)),
+    ("blocked", re.compile(r"\bblocked\b", re.IGNORECASE)),
+    ("done", re.compile(r"\b(?:done|closed|complete(?:d)?)\b", re.IGNORECASE)),
+)
+
+
 def normalize_status(raw: str) -> str:
-    """Эмодзи-значение → канонический текстовый статус; текст возвращается как есть."""
-    return _EMOJI_TO_STATUS.get(raw, raw)
+    """Extract the canonical state from a status cell or frontmatter value.
+
+    A table cell may include a visual status plus an explanation (for example,
+    ``🔄 — waiting for review``). The explanation is not a state and must not
+    create a false drift against the card's ``status: in_progress``.
+    """
+    cleaned = re.sub(r"[*~`_]", "", raw).strip()
+    for emoji, status in _EMOJI_TO_STATUS.items():
+        if emoji in cleaned:
+            return status
+    for status, pattern in _TEXT_STATUS_PATTERNS:
+        if pattern.search(cleaned):
+            return status
+    return cleaned
 
 
 def find_status_column(header_line: str) -> int | None:
@@ -151,6 +172,7 @@ def scan(memory_path: Path, governance_repo: Path) -> list[str]:
         context_status = read_context_status(context_path)
         if context_status is None:
             continue
+        context_status = normalize_status(context_status)
         if context_status != memory_status:
             drifts.append(
                 f"- РП-{wp_num}: MEMORY.md=`{memory_status}` vs "

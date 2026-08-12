@@ -202,7 +202,12 @@ fi
 # --- Шаг 3: обновить статус в inbox/WP-NNN*.md ---
 echo "3/3 Обновляю inbox/WP-${WP_NUM}..."
 
-INBOX_FILE=$(find "$STRATEGY/inbox" -maxdepth 2 -name "WP-${WP_NUM}.md" -o -name "WP-${WP_NUM}-*.md" 2>/dev/null | grep -v "^$STRATEGY/inbox/WP-${WP_NUM}/" | sort | head -1)
+CANONICAL_INBOX_FILE="$STRATEGY/inbox/WP-${WP_NUM}/WP-${WP_NUM}.md"
+if [[ -f "$CANONICAL_INBOX_FILE" ]]; then
+  INBOX_FILE="$CANONICAL_INBOX_FILE"
+else
+  INBOX_FILE=$(find "$STRATEGY/inbox" -maxdepth 2 -type f \( -name "WP-${WP_NUM}.md" -o -name "WP-${WP_NUM}-*.md" \) -print 2>/dev/null | sort | head -1)
+fi
 
 if [[ -n "$INBOX_FILE" ]]; then
   python3 - "$INBOX_FILE" "$TODAY" <<'PYEOF4'

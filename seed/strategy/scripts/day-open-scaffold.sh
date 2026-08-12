@@ -1122,8 +1122,9 @@ render_compact_dashboard() {
 }
 
 # --- Section: Саморазвитие (active draft, deterministic) ---
-# The active draft comes from draft-list.md, not the LLM. Handing this to the LLM
-# with the file absent produced a hallucinated "D-001" (2026-07-01). "Где остановился"
+# The active draft comes from the first entry in the "Приоритетные" table, not the LLM.
+# The template's full collection has a status column but does not define an "черновик"
+# value, while the priority table is the explicit current-work list. "Где остановился"
 # is the pilot's own progress — we never fabricate it (see feedback_no_invented_personal_history).
 render_self_dev() {
   local draft_list="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/drafts/draft-list.md"
@@ -1131,20 +1132,24 @@ render_self_dev() {
     echo "**Активный черновик:** нет данных (drafts/draft-list.md не найден)"
     return
   fi
-  # Registry rows are newest-first; take the first one whose stage column is "черновик".
+  # Take the first data row from the template-defined "Приоритетные" table.
   local row
-  row=$(awk -F'|' '
-    /^\| *\*\*D-[0-9]+\*\*/ {
-      stage=$4; gsub(/^[ \t]+|[ \t]+$/, "", stage);
-      if (stage=="черновик") { print; exit }
+  row=$(awk '
+    /^## Приоритетные/ { in_priorities = 1; next }
+    in_priorities && /^## / { exit }
+    in_priorities && /^\|/ {
+      if ($0 ~ /^\|[[:space:]]*#/) next
+      if ($0 ~ /^\|[[:space:]]*-+/) next
+      print
+      exit
     }' "$draft_list")
   if [ -z "$row" ]; then
-    echo "**Активный черновик:** нет активных черновиков в draft-list.md"
+    echo "**Активный черновик:** нет приоритетных черновиков в draft-list.md"
     return
   fi
   local dnum path
   dnum=$(echo "$row" | grep -oE 'D-[0-9]+' | head -1)
-  path=$(echo "$row" | grep -oE '\(\./[^)]+\)' | head -1 | tr -d '()' | sed 's#^\./#drafts/#')
+  path=$(echo "$row" | grep -oE '\([^)]*D-[0-9][^)]*\.md\)' | head -1 | tr -d '()' | sed 's#^\./#drafts/#')
   if [ -n "$path" ]; then
     echo "**Активный черновик:** [$dnum]($path)"
   else

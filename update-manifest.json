@@ -61,7 +61,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "082102b3fa6ebf3cae4a968f6556f4fc0b03c80edf0351ea8b57e540752e8a19"
+      "sha256": "3fd94e91db31347513df92e1070fe09a48fce4b8db0b321f7bc67e3ffcc1829c"
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
@@ -213,7 +213,7 @@
     },
     {
       "path": ".claude/rules/distinctions.md",
-      "sha256": "caf30f66b3dea6622b185cb13a9620826c59d9eae9bf407f3a2541cdd833f8e0"
+      "sha256": "1d6ee021e782bf17cffb1883fb03e50a963f6038b94354d6ed330fd01837c4ab"
     },
     {
       "path": ".claude/rules/formatting.md",
@@ -245,7 +245,7 @@
     },
     {
       "path": ".claude/scripts/memory-drift-scan.py",
-      "sha256": "fbe797ff59dd6260f8c3187ee3902cab37d35a37a70aff494996b4cbaff734bb"
+      "sha256": "e1a484a888fc81be5ffa8acb3d2d375e8bec7794385982b11d4d71f24a0d69b8"
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
@@ -689,7 +689,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "37d714cde0eb5a1f22b31e42fadb6b083678c94f81c2424f34c6c4bc370a72fa"
+      "sha256": "06d5ecabc6b4a51c88e99b9fc72c3d272ad42b0cb364e7ca49e4ed7e7216b66a"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -801,7 +801,7 @@
     },
     {
       "path": "docs/roles-catalog.md",
-      "sha256": "e59069e8351269385e002e4699c1e1fb62a2c3fd64c49627090adb048f391d2f"
+      "sha256": "1a5a54b20ba0511dc7032db5530d9a3a872840482ab38b34bda0dc9904a45390"
     },
     {
       "path": "docs/scripts-catalog.md",
@@ -1277,7 +1277,7 @@
     },
     {
       "path": "memory/roles.md",
-      "sha256": "17cf34585b2312ab5c52c2ce11af1f0a6b7090812d0f30f804f1546e43b56276"
+      "sha256": "622d760028ee78a7b86078134dc440a79cdbc444e1825db18dccdbadfcdeebd9"
     },
     {
       "path": "memory/routing-vocab.md",
@@ -1801,7 +1801,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "448b1a68971b4ef9a69e44a38384d745bca38cf72cce94afed700df2bf15fc48"
+      "sha256": "57ac198f937530a9a692cf9baf98729006ae5576e628d2c19323dce6ef11dcac"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -1869,7 +1869,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "cc6ba46e9ff10ed40e6b334483f798f565e098119cbeb1cfbd623500e3b121d5"
+      "sha256": "3162a76478126c69759defd417fa2523af7fbbb8777721db6787c4b89ba85c99"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -1961,7 +1961,7 @@
     },
     {
       "path": "scripts/iwe-drift-helpers/check-status-legend.sh",
-      "sha256": "8f39d9857944ae166eb08c813b665f3b51404f2d1d8663566a4be5f37858d21a"
+      "sha256": "6ce9ffce2809db44e5a978d205afcf5d28f63335ce81edfddf9c40f849c72017"
     },
     {
       "path": "scripts/iwe-drift.sh",
@@ -2230,6 +2230,10 @@
     {
       "path": "scripts/tests/test_hook_classification.sh",
       "sha256": "99c99c821223e70a8a0b1cb89ce9a72f2bd1e5eebd011c2f42eadde056125491"
+    },
+    {
+      "path": "scripts/tests/test_issues_413_418.py",
+      "sha256": "952a6d87c7ae4665182a123cc5f68e70722448b4e83e490e37fab4c0ebe9f4d3"
     },
     {
       "path": "scripts/tests/test_update_install_path_guard.sh",

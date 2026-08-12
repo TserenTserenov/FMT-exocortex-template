@@ -71,16 +71,33 @@ extract_legend_emojis() {
     ' "$REGISTRY"
 }
 
-# Извлечь множество эмодзи из колонки «Ст» в таблице WP (4-я колонка).
+# Извлечь множество эмодзи из колонки «Ст»/«Статус» в таблице WP.
+# Колонка определяется по заголовку: порядок колонок — настраиваемая часть
+# реестра, поэтому фиксированный индекс здесь давал ложные нарушения.
 # Возвращает по одному эмодзи на строку (с дубликатами — кому надо, тот фильтрует sort -u).
 extract_table_emojis() {
     awk '
-        /^\|[[:space:]]*(~~)?[0-9]+/ {
-            # Колонка статуса = поле 5 (после header `| # | P | Название | Ст |`)
+        function trim(value) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+        /^\|/ {
             n = split($0, fields, "|")
-            if (n >= 5) {
-                status = fields[5]
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", status)
+            if (trim(fields[2]) == "#") status_col = 0
+            if (status_col == 0) {
+                for (i = 2; i < n; i++) {
+                    header = trim(fields[i])
+                    if (header == "Ст" || header == "Статус") {
+                        status_col = i
+                        next
+                    }
+                }
+            }
+        }
+        /^\|[[:space:]]*(~~)?[0-9]+/ {
+            n = split($0, fields, "|")
+            if (status_col > 0 && n >= status_col) {
+                status = trim(fields[status_col])
                 gsub(/~~/, "", status)
                 if (status != "") print status
             }
@@ -92,13 +109,30 @@ extract_table_emojis() {
 # id_format: "active" если plain `| 263 |`, "terminal" если crossed `| ~~263~~ |`.
 extract_id_status_pairs() {
     awk '
+        function trim(value) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+        /^\|/ {
+            n = split($0, fields, "|")
+            if (trim(fields[2]) == "#") status_col = 0
+            if (status_col == 0) {
+                for (i = 2; i < n; i++) {
+                    header = trim(fields[i])
+                    if (header == "Ст" || header == "Статус") {
+                        status_col = i
+                        next
+                    }
+                }
+            }
+        }
         /^\|[[:space:]]*(~~)?[0-9]+/ {
             n = split($0, fields, "|")
-            if (n < 5) next
+            if (status_col == 0 || n < status_col) next
             id_field = fields[2]
-            status_field = fields[5]
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", id_field)
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", status_field)
+            status_field = fields[status_col]
+            id_field = trim(id_field)
+            status_field = trim(status_field)
             gsub(/~~/, "", status_field)
 
             if (match(id_field, /^~~[0-9]+~~$/)) {
