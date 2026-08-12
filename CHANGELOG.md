@@ -118,10 +118,12 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+
 ## [Unreleased] — обновлено 2026-08-12
 
 ### Added
 
+- `cbe7cf1` feat: promote day-open-pipeline.sh to platform
 - `2ceca19` feat(wp510): Ф23 — identity-блок конструктивных реализаций + Codex четвёртым агентом ядра (S-33, разрешение пилота 07.08)
 
 ### Changed
