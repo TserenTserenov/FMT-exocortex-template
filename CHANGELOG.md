@@ -117,6 +117,25 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
+
+## [Unreleased] — обновлено 2026-08-12
+
+### Added
+
+- `2ceca19` feat(wp510): Ф23 — identity-блок конструктивных реализаций + Codex четвёртым агентом ядра (S-33, разрешение пилота 07.08)
+
+### Changed
+
+- `4efe5df` ci: add nightly template audit
+- `4d24c03` docs: sync README version badge
+
+### Fixed
+
+- `b8918de` fix: harden staged install-path guard parsing
+- `b088037` fix: scope install-path guard to update diff
+- `8f4f0eb` fix: harden template update and runtime contracts
+
+
 ## [0.38.1] — 2026-08-08
 
 ### Added

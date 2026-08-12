@@ -629,7 +629,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "295118cb899952ee0deac8b6a5522b7dcb560e86bee4c3a146fa92f47c8172df"
+      "sha256": "e88f5b2e1f24cd6c28702d1e2a87a195b975c1b9bf2b4c7e9fe245f6d4c386ad"
     },
     {
       "path": "CLAUDE.md",
@@ -1213,7 +1213,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "908f238afce26cbb6be8e81e45423bda07c5ec87abd96f1f4cecd3b6f16c90f6"
+      "sha256": "2e856243679d624f429d553987dac0ea9e6c3c288af458174cc97110418e9d79"
     },
     {
       "path": "memory/fpf-term-map.yaml",
@@ -1857,7 +1857,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "1e187e32dcccea33e89b6f1e5df211864ca886d78b3ecb3c6efc5828e7415427"
+      "sha256": "88d5480323bdf73935aed1e2a0726d3e384632948f19f148b3be35304efe424a"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2033,7 +2033,7 @@
     },
     {
       "path": "scripts/memory-bleed.sh",
-      "sha256": "179645de69277a6abf82cce9673fce70df9b0ccdf8825a2910633cf80b46b94a"
+      "sha256": "e5dd1319cd42ef79a3f299e3747a0628a1af07ba3a6231a903439aab6896b47e"
     },
     {
       "path": "scripts/memory-health.sh",
@@ -2113,7 +2113,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "14467b4605b6ae06ac4d7cd82ef46863f91b054ff06e5acb2fc0cc7ad845dd48"
+      "sha256": "76411d857d15d31129b105b99ff8c5bfb947e80d0fa043490a10c9a464b21232"
     },
     {
       "path": "scripts/settings-promote.sh",

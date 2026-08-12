@@ -13,14 +13,7 @@
 
 set -uo pipefail
 
-# A promoted runtime copy can set IWE_WORKSPACE via ~/.iwe-paths. Resolve it through
-# the shared library instead of silently falling back to IWE_ROOT-only behavior.
-# shellcheck source=lib/common.sh
-_PIPELINE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
-[ -f "$_PIPELINE_LIB" ] || { echo "ОШИБКА: не найден $_PIPELINE_LIB" >&2; exit 1; }
-source "$_PIPELINE_LIB"
-
-IWE="$(iwe_resolve_root)"
+IWE="${IWE_ROOT:-$HOME/IWE}"
 CONFIG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml"
 # shellcheck source=lib/ledger-path.sh
 . "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/lib/ledger-path.sh"
@@ -78,11 +71,22 @@ tg_notify() {
     return 0
   fi
   if [ -n "${TG_TOKEN:-}" ] && [ -n "${TG_CHAT:-}" ]; then
-    local payload
-    payload=$(jq -n --arg chat "$TG_CHAT" --arg text "$msg" '{chat_id: $chat, text: $text, parse_mode: "Markdown"}')
-    curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+    local payload resp http_code
+    # No parse_mode: Markdown 400s on any unpaired _/*/` in dynamic text (DIAG,
+    # LLM warns) — same failure class month-open-night-run.sh hit live on 27.07.
+    payload=$(jq -n --arg chat "$TG_CHAT" --arg text "$msg" '{chat_id: $chat, text: $text}')
+    resp=$(curl -s -w '\n%{http_code}' -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
       -H "Content-Type: application/json" \
-      -d "$payload" > /dev/null
+      -d "$payload")
+    http_code=$(printf '%s' "$resp" | tail -n1)
+    # WP-484 F64: a fired curl is not a delivered message — verify and say so.
+    if [ "$http_code" != "200" ] || ! printf '%s' "$resp" | grep -q '"ok":true'; then
+      echo "  [tg delivery FAILED http=$http_code] $msg" | head -2
+      return 1
+    fi
+  else
+    echo "  [no tg credentials] $msg" | head -1
+    return 1
   fi
 }
 
@@ -149,6 +153,11 @@ source_env_if_present "$HOME/IWE/.secrets/anthropic_key.env"  # Anthropic API ke
 # chain silently resolved to empty and the authorized probe 401'd (found live
 # 2026-08-05 running --probe ahead of a scheduled test run).
 source_env_if_present "$HOME/.iwe/.proxy-env"
+# WP-484 F64 (06.08): TELEGRAM_* live in ~/.secrets/tg-bots (canonical source per
+# lib/telegram.sh) — none of the three files above carry them on tsekh-1, so every
+# tg_notify on the server (incl. the "День открыт" digest and all aborts) was a
+# silent no-op since the migration. Same fix as day-open-pipeline-watchdog.sh.
+source_env_if_present "$HOME/.secrets/tg-bots"
 
 TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TG_CHAT="${TELEGRAM_CHAT_ID:-}"
@@ -488,6 +497,38 @@ if [ -d "$DS_STRATEGY/.githooks" ] && [ -n "$(ls -A "$DS_STRATEGY/.githooks" 2>/
 fi
 
 # ============================================
+# 1.3. Input freshness self-heal (WP-484 Ф90, 2026-08-12): priorities.yaml and
+# WP-REGISTRY.md are read straight off local disk by LLM Fill below. On a
+# shared checkout (tsekh-1) a live agent session can hold the tree's sync
+# semaphore for hours after finishing its own work (found live: 11h46m past
+# report.md completion) — the periodic sync timer correctly refuses to touch
+# the tree while that semaphore stands, so these two files silently go stale
+# for however long the semaphore lasts, and Day Open builds tonight's plan
+# from yesterday's data. `git show <ref>:<path>` reads a blob straight from
+# the object database without touching the working tree or index at all — no
+# lock, no semaphore, safe regardless of what any other session is doing.
+# Scoped to exactly these two inputs (not a general pull): a full sync still
+# needs the semaphore respected, this only unblocks what Day Open itself
+# reads. `git fetch` above (D2 dedup guard) already refreshed origin/main's
+# ref; if that fetch failed offline, this diff is silently a no-op against a
+# stale ref, which is the same degradation the rest of this pipeline already
+# accepts everywhere else fetch can fail.
+# ============================================
+echo "=== 1.3. Input freshness self-heal ==="
+for _f_rel in current/priorities.yaml docs/WP-REGISTRY.md; do
+  _f_abs="$DS_STRATEGY/$_f_rel"
+  _f_origin=$(cd "$DS_STRATEGY" && git show "origin/main:$_f_rel" 2>/dev/null || true)
+  if [ -z "$_f_origin" ]; then
+    echo "  skipped (origin/main unreadable, e.g. offline): $_f_rel"
+  elif diff -q <(printf '%s' "$_f_origin") "$_f_abs" >/dev/null 2>&1; then
+    echo "  already fresh: $_f_rel"
+  else
+    printf '%s' "$_f_origin" > "$_f_abs"
+    echo "  refreshed from origin/main (local was stale): $_f_rel"
+  fi
+done
+
+# ============================================
 # 2. Ensure LLM Proxy available
 # ============================================
 echo "=== 2. LLM Proxy healthcheck ==="
@@ -625,7 +666,10 @@ $DIAG"
 HEAD_HASH=$(cd "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" && git rev-parse HEAD 2>/dev/null || echo "no-git")
 INPUT_HASH_FILE="$IWE/.tmp/day-open-input-hash-$DATE.txt"
 INPUT_HASH=$( (cat "$SCAFFOLD_TEMP" "$WEEKPLAN_PATH" "$CALENDAR_OUT" 2>/dev/null; echo "$HEAD_HASH") | shasum -a 256 | awk '{print $1}' )
-if [ -f "$INPUT_HASH_FILE" ]; then
+# --force must beat BOTH guards: the D2 guard above already honors it, and its
+# own user-facing message ("Use --force to regenerate") promises a regenerate —
+# without this bypass the promise died here on unchanged inputs (review F64).
+if [ "$FORCE" != "true" ] && [ -f "$INPUT_HASH_FILE" ]; then
   PREV_HASH=$(cat "$INPUT_HASH_FILE")
   if [ "$PREV_HASH" = "$INPUT_HASH" ]; then
     echo "  Input hash unchanged — DayPlan already generated for this data set. Skipping."
@@ -634,12 +678,11 @@ if [ -f "$INPUT_HASH_FILE" ]; then
     exit 0
   fi
 fi
-# WP-484 night-cycle-day.sh --probe independent review (28.07): a probe run must
-# never write the real day's input-hash marker — a subsequent real run with the
-# same inputs would silently "already up-to-date" skip generating the actual DayPlan.
-if [ "$PROBE" != "true" ]; then
-  echo "$INPUT_HASH" > "$INPUT_HASH_FILE"
-fi
+# WP-484 F64 (06.08): the hash write itself moved AFTER a successful push (step 6).
+# Writing it here poisoned every retry when a run died between scaffold and push
+# (live case 06.08 03:03: runner timeout kill after LLM fill, before commit —
+# each rerun then skipped with "already generated" while nothing was published).
+# Same bug class as the probe-hash leak fixed 28.07.
 
 # Move scaffold to target
 mv "$SCAFFOLD_TEMP" "$DAYPLAN_PATH"
@@ -767,7 +810,13 @@ else
 if ! bash "$IWE/scripts/git-dirty-guard.sh" "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"; then
   tg_notify "⚠️ Day Open: git-dirty-guard нашёл незакоммиченную работу — pull пропущен, но уже отрендеренный DayPlan сохраняется (не абортим pipeline, WP-484 fix 26.07)"
 else
-  git pull --rebase || tg_notify "⚠️ Day Open: git pull --rebase failed — continuing without pull (WP-484 fix 26.07)"
+  # Sync failures are reported out-of-repo only. Appending sync_skipped to the
+  # tracked ledger here would make the next git-dirty-guard invocation reject the
+  # pipeline's own diagnostic write and turn a transient failure into a permanent
+  # dirty-tree loop. The periodic sync service owns persistent failure counters.
+  git pull --rebase || {
+    tg_notify "⚠️ Day Open: git pull --rebase failed — continuing without pull (WP-484 fix 26.07)"
+  }
 fi
 
 # Archive stale DayPlans (move + overwrite, and record the deletion).
@@ -842,6 +891,12 @@ git add "$ARCHIVE_DIR/" 2>/dev/null || true
 git commit -m "feat(dayplan): $DATE — auto Day Open (WP-356) [allow:current]" --trailer "Co-Authored-By: Kimi <noreply@moonshot.ai>" -- "$DAYPLAN_PATH" "$ARCHIVE_DIR/" ${ARCHIVED_PATHS[@]+"${ARCHIVED_PATHS[@]}"} || abort "Git commit failed"
 
 git push || abort "Git push failed"
+
+# WP-484 F64: input-hash means "this data set is PUBLISHED", so it is recorded
+# only after the remote accepted the commit (see the guard comment at step 3).
+if [ "$PROBE" != "true" ]; then
+  echo "$INPUT_HASH" > "$INPUT_HASH_FILE"
+fi
 
 bash "$IWE/scripts/session-guard.sh" close --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
 
