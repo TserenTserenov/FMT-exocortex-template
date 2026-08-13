@@ -4,13 +4,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
+GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-mkdir -p "$TMP_DIR/DS-strategy/inbox/WP-001"
+mkdir -p "$TMP_DIR/$GOVERNANCE_REPO/inbox/WP-001"
 printf '%s\n' 'hypothesis_relation: "unclassified"' \
-  > "$TMP_DIR/DS-strategy/inbox/WP-001/WP-001.md"
+  > "$TMP_DIR/$GOVERNANCE_REPO/inbox/WP-001/WP-001.md"
 
-if IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO="DS-strategy" \
+if IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" \
   bash "$ROOT_DIR/scripts/session-guard.sh" open --wp WP-001 --agent kimi \
   >/dev/null 2>&1; then
   echo "FAIL: unclassified WP opened a session" >&2
@@ -18,8 +19,8 @@ if IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO="DS-strategy" \
 fi
 
 printf '%s\n' 'hypothesis_relation: "tests"' \
-  > "$TMP_DIR/DS-strategy/inbox/WP-001/WP-001.md"
-IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO="DS-strategy" \
+  > "$TMP_DIR/$GOVERNANCE_REPO/inbox/WP-001/WP-001.md"
+IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" \
   bash "$ROOT_DIR/scripts/session-guard.sh" open --wp WP-001 --agent kimi \
   >/dev/null
 

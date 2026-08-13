@@ -22,6 +22,7 @@
 set -euo pipefail
 
 TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
+SETUP_GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
 # --- Part 1: seed/strategy + create-wp.sh ---
 
@@ -153,7 +154,7 @@ CLAUDE_PROJECT_SLUG="contract-test"
 TIMEZONE_HOUR="4"
 TIMEZONE_DESC="4:00 UTC"
 HOME_DIR="$SETUP_TMP/home"
-GOVERNANCE_REPO="DS-strategy"
+GOVERNANCE_REPO="$SETUP_GOVERNANCE_REPO"
 IWE_TEMPLATE="$TEMPLATE_COPY"
 IWE_RUNTIME="$WORKSPACE/.iwe-runtime"
 ENVEOF
@@ -177,7 +178,7 @@ fi
 for anchor in \
   '[1/6] Building generated runtime...' \
   '[4d] Installing IWE environment variables...' \
-  '[6/6] Setting up DS-strategy...' \
+  "[6/6] Setting up $SETUP_GOVERNANCE_REPO..." \
   '[7/7] Installing Base repos' \
   '[DRY RUN] No changes made.'
 do
@@ -213,7 +214,7 @@ for artifact in \
   "$WORKSPACE/.claude" \
   "$WORKSPACE/.mcp.json" \
   "$WORKSPACE/.iwe-paths" \
-  "$WORKSPACE/DS-strategy" \
+  "$WORKSPACE/$SETUP_GOVERNANCE_REPO" \
   "$WORKSPACE/ZP" \
   "$WORKSPACE/FPF" \
   "$WORKSPACE/SPF" \

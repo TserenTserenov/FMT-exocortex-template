@@ -13,6 +13,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+GOVERNANCE_REPO = os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
 STATUS_LEGEND = ROOT / "scripts" / "iwe-drift-helpers" / "check-status-legend.sh"
 DAY_OPEN = ROOT / "scripts" / "day-open-scaffold.sh"
 CLOSE_WP = ROOT / "scripts" / "close-wp.sh"
@@ -90,7 +91,7 @@ def test_status_legend_accepts_skeleton_legend_format(tmp_path: Path):
 
 
 def test_day_open_uses_priority_draft_from_template_contract(tmp_path: Path):
-    governance = tmp_path / "DS-strategy"
+    governance = tmp_path / GOVERNANCE_REPO
     drafts = governance / "drafts"
     drafts.mkdir(parents=True)
     (drafts / "draft-list.md").write_text(
@@ -116,7 +117,7 @@ def test_day_open_uses_priority_draft_from_template_contract(tmp_path: Path):
             **os.environ,
             "IWE_WORKSPACE": str(tmp_path),
             "IWE_ROOT": str(tmp_path),
-            "IWE_GOVERNANCE_REPO": "DS-strategy",
+            "IWE_GOVERNANCE_REPO": GOVERNANCE_REPO,
         },
         capture_output=True,
         text=True,
@@ -130,7 +131,7 @@ def test_day_open_uses_priority_draft_from_template_contract(tmp_path: Path):
 
 def test_memory_drift_scan_ignores_status_cell_annotation(tmp_path: Path):
     memory = tmp_path / "MEMORY.md"
-    governance = tmp_path / "DS-strategy"
+    governance = tmp_path / GOVERNANCE_REPO
     card = governance / "inbox" / "WP-414" / "WP-414.md"
     card.parent.mkdir(parents=True)
     card.write_text("---\nstatus: in_progress\n---\n", encoding="utf-8")
@@ -145,7 +146,7 @@ def test_memory_drift_scan_ignores_status_cell_annotation(tmp_path: Path):
 
 def test_memory_drift_scan_keeps_real_status_difference_visible(tmp_path: Path):
     memory = tmp_path / "MEMORY.md"
-    governance = tmp_path / "DS-strategy"
+    governance = tmp_path / GOVERNANCE_REPO
     card = governance / "inbox" / "WP-414" / "WP-414.md"
     card.parent.mkdir(parents=True)
     card.write_text("---\nstatus: in_progress\n---\n", encoding="utf-8")
@@ -158,8 +159,30 @@ def test_memory_drift_scan_keeps_real_status_difference_visible(tmp_path: Path):
     assert len(module.scan(memory, governance)) == 1
 
 
+def test_delivered_scripts_pass_hook_path_convention():
+    delivered_scripts = (
+        ROOT / "setup.sh",
+        ROOT / ".claude" / "scripts" / "memory-drift-scan.py",
+        ROOT / "scripts" / "tests" / "test_fresh_seed_reproduction.sh",
+        ROOT / "scripts" / "tests" / "test_issues_413_418.py",
+        ROOT / "scripts" / "tests" / "test_session_guard_hypothesis_gate.sh",
+    )
+    template_default = os.environ.get("FMT_TEST_GOVERNANCE_REPO", "DS-strategy")
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts" / "validate-fmt-scripts.sh"), "--files", *map(str, delivered_scripts)],
+        cwd=ROOT,
+        env={**os.environ, "IWE_GOVERNANCE_REPO": template_default},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_close_wp_updates_canonical_folder_card(tmp_path: Path):
-    governance = tmp_path / "DS-strategy"
+    governance = tmp_path / GOVERNANCE_REPO
     (governance / "docs").mkdir(parents=True)
     card = governance / "inbox" / "WP-413" / "WP-413.md"
     card.parent.mkdir(parents=True)
@@ -171,7 +194,7 @@ def test_close_wp_updates_canonical_folder_card(tmp_path: Path):
 
     result = subprocess.run(
         ["bash", str(CLOSE_WP), "--wp", "413", "--summary", "готово"],
-        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": "DS-strategy"},
+        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": GOVERNANCE_REPO},
         capture_output=True,
         text=True,
         check=False,
@@ -184,7 +207,7 @@ def test_close_wp_updates_canonical_folder_card(tmp_path: Path):
 
 
 def test_close_wp_reuses_transferred_context_and_marks_done(tmp_path: Path):
-    governance = tmp_path / "DS-strategy"
+    governance = tmp_path / GOVERNANCE_REPO
     (governance / "docs").mkdir(parents=True)
     archive = governance / "archive" / "wp-contexts"
     archive.mkdir(parents=True)
@@ -197,7 +220,7 @@ def test_close_wp_reuses_transferred_context_and_marks_done(tmp_path: Path):
 
     result = subprocess.run(
         ["bash", str(CLOSE_WP), "--wp", "425", "--summary", "готово"],
-        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": "DS-strategy"},
+        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": GOVERNANCE_REPO},
         capture_output=True,
         text=True,
         check=False,
@@ -212,7 +235,7 @@ def test_close_wp_reuses_transferred_context_and_marks_done(tmp_path: Path):
 
 
 def test_close_wp_refuses_ambiguous_transferred_contexts(tmp_path: Path):
-    governance = tmp_path / "DS-strategy"
+    governance = tmp_path / GOVERNANCE_REPO
     (governance / "docs").mkdir(parents=True)
     archive = governance / "archive" / "wp-contexts"
     archive.mkdir(parents=True)
@@ -224,7 +247,7 @@ def test_close_wp_refuses_ambiguous_transferred_contexts(tmp_path: Path):
 
     result = subprocess.run(
         ["bash", str(CLOSE_WP), "--wp", "425", "--summary", "готово"],
-        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": "DS-strategy"},
+        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": GOVERNANCE_REPO},
         capture_output=True,
         text=True,
         check=False,

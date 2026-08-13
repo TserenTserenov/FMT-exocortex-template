@@ -245,7 +245,7 @@
     },
     {
       "path": ".claude/scripts/memory-drift-scan.py",
-      "sha256": "e1a484a888fc81be5ffa8acb3d2d375e8bec7794385982b11d4d71f24a0d69b8"
+      "sha256": "f4b95de077e9d00f58028835d3db1c50e432edec16908bfe2396bc847cb03a1c"
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "57ac198f937530a9a692cf9baf98729006ae5576e628d2c19323dce6ef11dcac"
+      "sha256": "1aee1aed7985b3b958f36495341e6c721fe147ef9136eb6060c1dbe7b658398c"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -2289,7 +2289,7 @@
     },
     {
       "path": "scripts/tests/test_fresh_seed_reproduction.sh",
-      "sha256": "4d2e8834838166733d45f9bab1edb5ea19f804159a9f63b187d4deecb7766d6a"
+      "sha256": "c11dc4c1c4cd7e77fbdc4e50dc6c16d9c77a489b243a407afcf667ede592b310"
     },
     {
       "path": "scripts/tests/test_hook_classification.sh",
@@ -2297,15 +2297,15 @@
     },
     {
       "path": "scripts/tests/test_issues_413_418.py",
-      "sha256": "11c81d661b3b1bfe98f7cd33a70429f7aeb3fd2909ca13fec6f731eafbc9ebd5"
+      "sha256": "406f9a3957cf90600b4580b53e00a6e7df7738345a96af351f99695eb74488bd"
     },
     {
       "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
-      "sha256": "45d241902da232578652c576f3240088936fb165a4ada29917089e802df61edb"
+      "sha256": "3f5975113f25078298247e4b4b620c4d37c7afb459de3935c36554efbbb766ca"
     },
     {
       "path": "scripts/tests/test_update_install_path_guard.sh",
-      "sha256": "d8e59a1836aaea9642f8a380c2dad3de2ae29104c1db337077eeb92b59f966d6"
+      "sha256": "b1769afadf3bfaa803218243420f600b92085a2da61a2f40c93e12a21ce0aa24"
     },
     {
       "path": "scripts/tests/test_upgrade_worktree_cleanup.sh",
@@ -2357,7 +2357,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "e1617e4fc32c145856785463d38aa167e3b275691bebf12595ba1e3a6eb6717c"
+      "sha256": "a02439acb2062ab3156d1f16f037beda39cd5cd8563b3d2148af8c934cc1e392"
     },
     {
       "path": "setup/build-runtime.sh",

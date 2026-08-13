@@ -15,6 +15,7 @@ declare -F validate_no_install_values_in_applied_additions >/dev/null
 
 SCRIPT_DIR="$TMP/template"
 WORKSPACE_DIR="$TMP/workspace"
+FIXTURE_HOME="$TMP/fixture-home"
 mkdir -p "$SCRIPT_DIR" "$WORKSPACE_DIR"
 git -C "$SCRIPT_DIR" init -q
 git -C "$SCRIPT_DIR" config user.email test@example.invalid
@@ -22,16 +23,16 @@ git -C "$SCRIPT_DIR" config user.name 'Install path guard test'
 
 cat >"$WORKSPACE_DIR/.exocortex.env" <<EOF
 WORKSPACE_DIR=$WORKSPACE_DIR
-HOME_DIR=/root
-CLAUDE_PATH=/root/.claude
+HOME_DIR=$FIXTURE_HOME
+CLAUDE_PATH=$FIXTURE_HOME/.claude
 IWE_TEMPLATE=$SCRIPT_DIR
 IWE_RUNTIME=$WORKSPACE_DIR/.iwe-runtime
 EOF
 
 # Existing tracked install-like values are outside the updater's responsibility.
 # An unrelated working-tree addition must not be blocked by historical container docs.
-cat >"$SCRIPT_DIR/existing.md" <<'EOF'
-The container user has HOME=/root and stores Claude config in /root/.claude.
+cat >"$SCRIPT_DIR/existing.md" <<EOF
+The container user has HOME=$FIXTURE_HOME and stores Claude config in $FIXTURE_HOME/.claude.
 EOF
 git -C "$SCRIPT_DIR" add existing.md
 git -C "$SCRIPT_DIR" commit -qm baseline
@@ -101,7 +102,7 @@ git -C "$SCRIPT_DIR" checkout -q -- . 2>/dev/null || true
 git -C "$SCRIPT_DIR" clean -qfd 2>/dev/null || true
 cat >"$WORKSPACE_DIR/.exocortex.env" <<EOF
 WORKSPACE_DIR=$WORKSPACE_DIR
-HOME_DIR=/root
+HOME_DIR=$FIXTURE_HOME
 CLAUDE_PATH=claude
 IWE_TEMPLATE=$SCRIPT_DIR
 IWE_RUNTIME=$WORKSPACE_DIR/.iwe-runtime
@@ -109,5 +110,31 @@ EOF
 printf 'See scripts/claude-peer-adapter.sh for the Claude peer contract.\n' >"$SCRIPT_DIR/bare-claude.md"
 APPLIED_PATHS=(bare-claude.md)
 validate_no_install_values_in_applied_additions
+
+# issue #424: the guard must not reject this delivered regression test just
+# because a root-host installation has HOME_DIR set to the conventional path.
+# Keep the source fixture free of that literal; only the isolated runtime env
+# below constructs it.
+ROOT_HOME="$(printf '/%s' root)"
+cat >"$WORKSPACE_DIR/.exocortex.env" <<EOF
+WORKSPACE_DIR=$WORKSPACE_DIR
+HOME_DIR=$ROOT_HOME
+CLAUDE_PATH=claude
+IWE_TEMPLATE=$SCRIPT_DIR
+IWE_RUNTIME=$WORKSPACE_DIR/.iwe-runtime
+EOF
+cp "$ROOT/scripts/tests/test_update_install_path_guard.sh" "$SCRIPT_DIR/incoming-guard-fixture.sh"
+APPLIED_PATHS=(incoming-guard-fixture.sh)
+validate_no_install_values_in_applied_additions
+
+# The fixture exemption is content-based, not a broad scan bypass: a real
+# updater addition containing that same installation path remains blocked.
+printf 'Leaked home: %s\n' "$ROOT_HOME" >"$SCRIPT_DIR/real-home-leak.md"
+APPLIED_PATHS=(real-home-leak.md)
+if validate_no_install_values_in_applied_additions 2>"$TMP/home-guard.err"; then
+    echo 'guard accepted a newly added HOME_DIR value' >&2
+    exit 1
+fi
+grep -Fq 'install-value HOME_DIR' "$TMP/home-guard.err"
 
 echo 'PASS: install-path guard checks only updater-applied working-tree additions'
