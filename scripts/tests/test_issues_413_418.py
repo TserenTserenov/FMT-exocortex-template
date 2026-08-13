@@ -183,6 +183,58 @@ def test_close_wp_updates_canonical_folder_card(tmp_path: Path):
     assert "closed_date:" in content
 
 
+def test_close_wp_reuses_transferred_context_and_marks_done(tmp_path: Path):
+    governance = tmp_path / "DS-strategy"
+    (governance / "docs").mkdir(parents=True)
+    archive = governance / "archive" / "wp-contexts"
+    archive.mkdir(parents=True)
+    transferred_context = archive / "WP-425-transferred-context.md"
+    transferred_context.write_text("# Transferred context\n", encoding="utf-8")
+    (governance / "docs" / "WP-REGISTRY.md").write_text(
+        "| # | P | Название | Ст |\n|---|---|---|---|\n| 425 | P1 | Новый заголовок | ⏳ |\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", str(CLOSE_WP), "--wp", "425", "--summary", "готово"],
+        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": "DS-strategy"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert list(archive.glob("WP-425-*.md")) == [transferred_context]
+    assert "## Закрытие" in transferred_context.read_text(encoding="utf-8")
+    registry = (governance / "docs" / "WP-REGISTRY.md").read_text(encoding="utf-8")
+    assert "✅" in registry
+    assert "⏳" not in registry
+
+
+def test_close_wp_refuses_ambiguous_transferred_contexts(tmp_path: Path):
+    governance = tmp_path / "DS-strategy"
+    (governance / "docs").mkdir(parents=True)
+    archive = governance / "archive" / "wp-contexts"
+    archive.mkdir(parents=True)
+    (archive / "WP-425-first.md").write_text("one\n", encoding="utf-8")
+    (archive / "WP-425-second.md").write_text("two\n", encoding="utf-8")
+    registry = governance / "docs" / "WP-REGISTRY.md"
+    original = "| # | P | Название | Ст |\n|---|---|---|---|\n| 425 | P1 | Заголовок | ⏳ |\n"
+    registry.write_text(original, encoding="utf-8")
+
+    result = subprocess.run(
+        ["bash", str(CLOSE_WP), "--wp", "425", "--summary", "готово"],
+        env={**os.environ, "IWE_ROOT": str(tmp_path), "IWE_GOVERNANCE_REPO": "DS-strategy"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "несколько архивных контекстов" in result.stderr
+    assert registry.read_text(encoding="utf-8") == original
+
+
 @pytest.mark.skipif(not shutil.which("jq"), reason="destructive guard requires jq")
 def test_destructive_guard_ignores_quoted_git_argument_and_allows_no_loss_reset(tmp_path: Path):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)

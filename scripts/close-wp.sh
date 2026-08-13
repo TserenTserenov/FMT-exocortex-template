@@ -37,6 +37,45 @@ fi
 
 TODAY=$(date +%Y-%m-%d)
 
+# --- Preflight: resolve the archive context before changing the registry ---
+# A transferred context can have a historical slug that no longer matches the
+# current registry title. Reusing the only WP-NNN context prevents a second file
+# from being created. Several matches are unsafe to choose between, so fail
+# before changing the registry rather than silently adding another duplicate.
+CONTEXT_SLUG=$(python3 - "$REGISTRY" "$WP_NUM" <<'PYEOF0'
+import re
+import sys
+
+registry_path, wp_num = sys.argv[1], sys.argv[2]
+with open(registry_path, "r", encoding="utf-8") as handle:
+    for line in handle:
+        match = re.match(r"^(\|\s*)(\*\*)?(" + re.escape(wp_num) + r")(\*\*)?(\s*\|)", line)
+        pipe_pos = line.find("|", 1)
+        if not match or (pipe_pos != -1 and "~~" in line[:pipe_pos]):
+            continue
+        parts = line.split("|")
+        name = parts[3].strip().strip("~").strip("*").strip() if len(parts) >= 4 else ""
+        slug = re.sub(r"[^a-zа-яёА-ЯЁ0-9\s-]", "", name.lower())
+        slug = re.sub(r"\s+", "-", slug.strip())[:40].strip("-")
+        print(slug or "context")
+        break
+    else:
+        print("context")
+PYEOF0
+)
+CONTEXT_FILE="$ARCHIVE_DIR/WP-${WP_NUM}-${CONTEXT_SLUG}.md"
+if [[ -d "$ARCHIVE_DIR" ]]; then
+  EXISTING_CONTEXTS=$(find "$ARCHIVE_DIR" -maxdepth 1 -type f -name "WP-${WP_NUM}-*.md" -print | sort)
+  CONTEXT_COUNT=$(printf '%s\n' "$EXISTING_CONTEXTS" | awk 'NF { count++ } END { print count + 0 }')
+  if [[ "$CONTEXT_COUNT" -eq 1 ]]; then
+    CONTEXT_FILE=$(printf '%s\n' "$EXISTING_CONTEXTS" | sed -n '1p')
+  elif [[ "$CONTEXT_COUNT" -gt 1 ]]; then
+    echo "Ошибка: найдено несколько архивных контекстов для WP-${WP_NUM}; закрытие остановлено до изменения REGISTRY:" >&2
+    printf '%s\n' "$EXISTING_CONTEXTS" | sed 's/^/  /' >&2
+    exit 1
+  fi
+fi
+
 # --- Шаг 1: зачеркнуть строку в REGISTRY ---
 echo "1/3 Обновляю REGISTRY..."
 
@@ -57,8 +96,12 @@ for i, line in enumerate(lines):
         # Паттерн: разбить по | и обернуть каждую ячейку в ~~...~~ (кроме эмодзи-статуса)
         def strikethrough_cell(cell):
             stripped = cell.strip()
-            # Не трогать: пустые, эмодзи-статусы (✅ ↗️ 📦 ⏳), разделители ---
-            if not stripped or stripped in ("✅", "↗️", "📦", "⏳", "🔄"):
+            # Не трогать пустые и разделители. Статус закрываемой WP всегда
+            # становится ✅: оставлять ⏳/🔄 означало бы, что закрытая работа
+            # всё ещё ожидает действия.
+            if stripped in ("✅", "↗️", "📦", "⏳", "🔄"):
+                return " ✅ "
+            if not stripped:
                 return " " + stripped + " "
             # Убрать существующие ** вокруг содержимого
             stripped = re.sub(r"^\*\*(.+)\*\*$", r"\1", stripped)
@@ -108,27 +151,6 @@ echo "2/3 Создаю archive/wp-contexts..."
 
 mkdir -p "$ARCHIVE_DIR"
 
-# Определить slug из REGISTRY
-SLUG=$(python3 - "$REGISTRY" "$WP_NUM" <<'PYEOF2'
-import sys, re
-registry_path, wp_num = sys.argv[1], sys.argv[2]
-with open(registry_path, "r", encoding="utf-8") as f:
-    for line in f:
-        # Ищем строку с этим WP (теперь уже зачёркнутую)
-        if re.search(r"~~" + re.escape(wp_num) + r"~~", line):
-            # Извлечь название из колонки имени (3-я колонка)
-            parts = line.split("|")
-            if len(parts) >= 4:
-                name = parts[3].strip().strip("~").strip("*").strip()
-                # Сделать slug
-                slug = re.sub(r"[^a-zа-яёА-ЯЁ0-9\s-]", "", name.lower())
-                slug = re.sub(r"\s+", "-", slug.strip())[:40].strip("-")
-                print(slug or "context")
-                sys.exit(0)
-print("context")
-PYEOF2
-)
-CONTEXT_FILE="$ARCHIVE_DIR/WP-${WP_NUM}-${SLUG}.md"
 if [[ -f "$CONTEXT_FILE" ]]; then
   echo "   ℹ️  Файл уже существует (повторный запуск close-wp.sh?), дописываю в него"
 else
