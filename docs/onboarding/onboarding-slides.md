@@ -169,7 +169,7 @@ theme: default
 
 | Type | What it is | Examples |
 |------|-----------|---------|
-| **Protocols** | Work step by step | ОРЗ, АрхГейт, Day Open/Close |
+| **Protocols** | Work step by step | Open-Work-Close rituals, ArchGate, Day Open/Close |
 | **Skills** | Build through practice | Capture, self-correction, distinctions |
 | **Formats** | Structure to a standard | Pack structure, WP-context |
 
@@ -236,7 +236,7 @@ theme: default
 | Problem | IWE Component | How |
 |---------|--------------|-----|
 | Knowledge gets lost | **Thinking core** (exocortex + Pack) | Every unit of knowledge has its place. History in GitHub |
-| Plans do not work | **Work culture** (ОРЗ rituals) | Morning plan, evening summary, weekly review |
+| Plans do not work | **Work culture** (Open-Work-Close rituals) | Morning plan, evening summary, weekly review |
 | AI does not help | **Core + culture** (Claude Code + exocortex) | Reads YOUR files, knows YOUR goals, remembers YOUR history |
 
 ---
@@ -365,7 +365,7 @@ The IWE connection path — add components as needed:
 | Stage | What you connect | What you get |
 |-------|----------------|-------------|
 | **Stage 1** | Claude Code + exocortex | AI assistant that remembers you |
-| **Stage 2** | + ОРЗ rituals | Structured work |
+| **Stage 2** | + Open-Work-Close rituals | Structured work |
 | **Stage 3** | + Pack + bot | Knowledge base + mobile access |
 | **Stage 4** | + roles + automation | AI agents work independently |
 
@@ -407,7 +407,7 @@ The IWE connection path — add components as needed:
 | Theory | What it gives | Where in IWE |
 |--------|--------------|-------------|
 | **Systems Thinking** | See the whole, not just the parts | Planning, distinctions |
-| **Methodology** | Method descriptions, work products | ОРЗ, formats, Pack |
+| **Methodology** | Method descriptions, work products | Open-Work-Close, formats, Pack |
 | **Management** | Roles, leadership, strategizing | Roles, strategic sessions |
 | **Enterprise engineering** | How organizations are structured | Architecture, integrations |
 
@@ -509,4 +509,3 @@ The ability to see the **whole**, not only the parts.
 
 **Cost:** basic AI access is included in the BR subscription. Your own LLM key (e.g., Claude Pro ~$20/month) is optional, for Direct MCP. Free tier (freemium) — no subscription required.
 **Programming required:** No.
-

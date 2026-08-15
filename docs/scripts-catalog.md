@@ -9,7 +9,7 @@
 | `add-secret.sh` | `scripts/add-secret.sh` | Single method to store any API key/token in ~/.secrets/ |
 | `add-skill-markers.sh` | `scripts/add-skill-markers.sh` | inject empty USER-SPACE block into L1 SKILL.md files that lack it. |
 | `agent-heartbeat.sh` | `scripts/agent-heartbeat.sh` | agent-heartbeat.sh |
-| `agent-status-report.sh` | `scripts/agent-status-report.sh` | РП-395 Ф3 fail-safe writer. |
+| `agent-status-report.sh` | `scripts/agent-status-report.sh` | WP-395 Phase 3 fail-safe writer. |
 | `agent_fault_remind.sh` | `scripts/agent_fault_remind.sh` | WP-316: Agent Fault Profile reminder wrapper |
 | `archive-done-wp.sh` | `scripts/archive-done-wp.sh` | Atomic archiving of a completed Work Product |
 | `backup-icloud.sh` | `scripts/backup-icloud.sh` | Backup IWE to iCloud Drive (excludes .git, node_modules, .venv) |
@@ -18,7 +18,7 @@
 | `check-component-parity.sh` | `scripts/check-component-parity.sh` | asserts setup.sh (fresh install) and update.sh |
 | `check-dirty-repos.sh` | `scripts/check-dirty-repos.sh` | Scans all IWE repositories for uncommitted changes |
 | `check-index-health.py` | `.claude/scripts/check-index-health.py` | Bloated index file detector. |
-| `check-open-sessions.sh` | `scripts/check-open-sessions.sh` | WP-358 Ф10 — detector for unclosed external sessions. |
+| `check-open-sessions.sh` | `scripts/check-open-sessions.sh` | WP-358 Phase 10 — detector for unclosed external sessions. |
 | `check-orphan-hooks.sh` | `scripts/check-orphan-hooks.sh` | Verifies that every Hook in .claude/hooks/ is actually called |
 | `check-platform-compat.sh` | `scripts/check-platform-compat.sh` | enforces docs/PLATFORM-COMPAT.md as a CI gate, |
 | `check-script-collisions.sh` | `scripts/check-script-collisions.sh` | Check script collisions between the author zone and the FMT template. |
@@ -31,7 +31,7 @@
 | `coverage-skills.sh` | `scripts/coverage-skills.sh` | B12a/B12b/B12c/B12d (promotion coverage) detector |
 | `create-skill.sh` | `scripts/create-skill.sh` | Create scaffold for a new IWE skill (SKILL.md v2) |
 | `create-wp.sh` | `scripts/create-wp.sh` | Atomic Work Product creation in local locations (inbox, REGISTRY, WeekPlan); |
-| `day-close-lock.sh` | `scripts/day-close-lock.sh` | git-native cross-machine lock against duplicate Day Close runs (WP-484 Ф2). |
+| `day-close-lock.sh` | `scripts/day-close-lock.sh` | git-native cross-machine lock against duplicate Day Close runs (WP-484 Phase 2). |
 | `day-close-prepare.sh` | `scripts/day-close-prepare.sh` | one-call data digest for the Day Close protocol (issue #234). |
 | `day-close.sh` | `scripts/day-close.sh` | Automated Day Close steps (backup + reindex + linear sync + sessions) |
 | `day-open-checks-runner.sh` | `scripts/day-open-checks-runner.sh` | Parser and executor of bash blocks from extensions/day-open.checks.md |
@@ -67,21 +67,21 @@
 | `kimi-standalone-preflight.sh` | `scripts/kimi-standalone-preflight.sh` | kimi-standalone-preflight.sh |
 | `kimi-whisper-safe.sh` | `scripts/kimi-whisper-safe.sh` | Safe wrapper for whisper with protection against |
 | `lesson-close.sh` | `scripts/lesson-close.sh` | Close a lesson in the daily file (lesson/<date>.md) |
-| `llm-proxy-launcher.sh` | `scripts/llm-proxy-launcher.sh` | Wrapper for launching llm-proxy.py with OpenRouter secrets (WP-366 Ф4.A) |
-| `load-extensions.sh` | `.claude/scripts/load-extensions.sh` | unified loader for suffix extensions (R4.4 fix, WP-273 Этап 2). |
+| `llm-proxy-launcher.sh` | `scripts/llm-proxy-launcher.sh` | Wrapper for launching llm-proxy.py with OpenRouter secrets (WP-366 Phase 4.A) |
+| `load-extensions.sh` | `.claude/scripts/load-extensions.sh` | unified loader for suffix extensions (R4.4 fix, WP-273 Phase 2). |
 | `memory-active-wp-update.sh` | `scripts/memory-active-wp-update.sh` | Update the "Current Work Products" section in MEMORY.md |
-| `memory-bleed.sh` | `scripts/memory-bleed.sh` | Detector for memory/ violations (WP-217 Ф10.2) |
+| `memory-bleed.sh` | `scripts/memory-bleed.sh` | Detector for memory/ violations (WP-217 Phase 10.2) |
 | `memory-drift-scan.py` | `.claude/scripts/memory-drift-scan.py` | Detector for status drift between MEMORY.md and WP-context. |
-| `memory-health.sh` | `scripts/memory-health.sh` | memory/ health metrics (WP-217 Ф10.2) |
-| `memory-migrate.sh` | `scripts/memory-migrate.sh` | Add missing frontmatter fields (WP-217 Ф10.2/Ф10.4) |
-| `memory-validate.sh` | `scripts/memory-validate.sh` | Validate frontmatter in memory/*.md (WP-217 Ф10.2) |
+| `memory-health.sh` | `scripts/memory-health.sh` | memory/ health metrics (WP-217 Phase 10.2) |
+| `memory-migrate.sh` | `scripts/memory-migrate.sh` | Add missing frontmatter fields (WP-217 Phase 10.2/Phase 10.4) |
+| `memory-validate.sh` | `scripts/memory-validate.sh` | Validate frontmatter in memory/*.md (WP-217 Phase 10.2) |
 | `migrate-initial-marker.sh` | `scripts/migrate-initial-marker.sh` | Add the IWE-INITIAL-NEEDED skeleton marker to Strategy.md |
 | `migrate-skills-to-v2.sh` | `scripts/migrate-skills-to-v2.sh` | Migration of existing skills to SKILL.md v2 standard |
 | `migrate-to-runtime-target.sh` | `scripts/migrate-to-runtime-target.sh` | Migration from dirty FMT (≤0.28.x) to Generated runtime (≥0.29.0). |
 | `pack-ci-install.sh` | `scripts/pack-ci-install.sh` | Installs the CI guard (ID collision detector) in all Pack repositories under ~/IWE/ |
 | `peer-session-finalize.sh` | `scripts/peer-session-finalize.sh` | finalize / interrupt for peer sessions (DP.SC.154) |
 | `pending-phases-sweep.sh` | `scripts/pending-phases-sweep.sh` | Traverses active WP-context files and outputs pending phases |
-| `post-update-check-skills.sh` | `scripts/post-update-check-skills.sh` | post-update detector for SKILL.md routing blocks (WP-350 Ф18) |
+| `post-update-check-skills.sh` | `scripts/post-update-check-skills.sh` | post-update detector for SKILL.md routing blocks (WP-350 Phase 18) |
 | `pre-commit-secret-scan.sh` | `scripts/pre-commit-secret-scan.sh` | Pre-commit Hook: blocks accidental commits of secrets. |
 | `promote-common.sh` | `scripts/promote-common.sh` | Shared library for promote scripts |
 | `restore-from-exocortex.sh` | `scripts/restore-from-exocortex.sh` | Restore IWE memory from an exocortex Backup (closes #125) |
@@ -97,19 +97,19 @@
 | `skills-pull.sh` | `scripts/skills-pull.sh` | Sync L1 skills from FMT into personal IWE |
 | `smoke-clean-env.sh` | `scripts/smoke-clean-env.sh` | Smoke-test for new scripts/*.sh in FMT. see WP-347 PD-1. |
 | `staging-audit.sh` | `scripts/staging-audit.sh` | B12e Decay drift detector in STAGING.md |
-| `style-check-post-run.sh` | `scripts/style-check-post-run.sh` | Kimi response style check after a peer session (WP-388 Ф9) |
+| `style-check-post-run.sh` | `scripts/style-check-post-run.sh` | Kimi response style check after a peer session (WP-388 Phase 9) |
 | `style-promote.sh` | `scripts/style-promote.sh` | Promotion of a style snapshot file into the IWE platform template |
 | `sync-agent-instructions.sh` | `scripts/sync-agent-instructions.sh` | Generate AGENTS.md from the unified CLAUDE.md core + agent-blocks |
 | `sync-version-badge.sh` | `scripts/sync-version-badge.sh` | Sync the version badge in README.md with CHANGELOG.md |
-| `test-route-task.sh` | `scripts/test-route-task.sh` | 10 test cases for route-task.sh (WP-350 Ф14) |
+| `test-route-task.sh` | `scripts/test-route-task.sh` | 10 test cases for route-task.sh (WP-350 Phase 14) |
 | `validate-fmt-scripts.sh` | `scripts/validate-fmt-scripts.sh` | Check FMT for personal hardcodes and convention violations |
 | `validate-skill.sh` | `scripts/validate-skill.sh` | Validate SKILL.md v2 (pre-promote checklist) |
-| `verify-context-budget.sh` | `scripts/verify-context-budget.sh` | M1 contract: hot-framework ≤55K tokens per session (WP-445 Ф6) |
+| `verify-context-budget.sh` | `scripts/verify-context-budget.sh` | M1 contract: hot-framework ≤55K tokens per session (WP-445 Phase 6) |
 | `verify-manifest.sh` | `scripts/verify-manifest.sh` | Verifies that update-manifest.json is synchronized with the git tree. |
 | `verify-template-integrity.sh` | `scripts/verify-template-integrity.sh` | local mirror of the CI template-integrity gate. |
 | `week-draft-append.sh` | `scripts/week-draft-append.sh` | Update current-day metrics in the weekly post draft. |
 | `week-draft-init.sh` | `scripts/week-draft-init.sh` | Create an empty weekly post draft for a new week. |
 | `wp-sync-bundle.sh` | `.claude/scripts/wp-sync-bundle.sh` | Deterministic Work Product context bundler for the WP Gate sync phase |
-| `wp499-agent-coordination-test.sh` | `scripts/wp499-agent-coordination-test.sh` | Reproducible N-agent coordination test for IWE (WP-499 Ф7/Ф11, extended in Ф17 items 3–4, |
+| `wp499-agent-coordination-test.sh` | `scripts/wp499-agent-coordination-test.sh` | Reproducible N-agent coordination test for IWE (WP-499 Phase 7/Phase 11, extended in Phase 17 items 3–4, |
 
 _Total scripts: 106_

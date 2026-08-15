@@ -36,6 +36,6 @@
 | R28 | **Diagnostician** | Determines Mastery stage (0–4) and bottleneck through dialogue |
 | R29 | **Artifactor** | Stage-by-stage activity decomposition, material I/O, acceptance checklist, gap detector |
 | R30 | **Pack Creator** | LLM support for the PACK-X author through the SPF cycle 01–11; mode by cp-profile (assembly/hybrid/full); read-only upst… protection |
-| R31 | **Org Development Manager** | Guides from an org-change request (self/team/organization) to a concrete first step from СИ/СМ/ИЛ. Step 0 — MIM.M.0… |
+| R31 | **Org Development Manager** | Guides from an org-change request (self/team/organization) to a concrete first step from Systems, Methods, and Instruments. Step 0 — MIM.M.0… |
 
 _Total roles: 31_

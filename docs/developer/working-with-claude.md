@@ -193,7 +193,7 @@ Committing the solution so the mistake is not repeated.
 ## Example of a Good Session (closed-loop, simple case)
 
 ```
-[WP-452 Ф2] Write a validator for user_input
+[WP-452 Phase 2] Write a validator for user_input
 
 Claude: Read the tests. Clarifying questions:
   - Email syntax only (SMTP)?
@@ -210,7 +210,7 @@ Claude: ✅ Done. Anything worth capturing?
 
 Pilot: Nothing special. Standard validator.
 
-[Commit] Fix: validate_user_input for WP-452 (Ф2 done)
+[Commit] Fix: validate_user_input for WP-452 (Phase 2 done)
 ```
 
 **What worked:**
@@ -260,7 +260,7 @@ In WP-context or peer-session report:
 - Discussed exponential backoff vs Circuit Breaker.
 - Chose exponential (option A — simpler, fits your scale).
 - Risk: conflict with LB timeout → assert in tests.
-Decision: WP-452 Ф2, merged.
+Decision: WP-452 Phase 2, merged.
 ```
 
 ## Resources
@@ -274,4 +274,4 @@ Decision: WP-452 Ф2, merged.
 
 ---
 
-*Version: 2026-07-24, Ф3. Context: WP-452 (IWE Developer Guide), section 4 (Work).*
+*Version: 2026-07-24, Phase 3. Context: WP-452 (IWE Developer Guide), section 4 (Work).*

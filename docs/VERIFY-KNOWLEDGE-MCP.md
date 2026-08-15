@@ -48,7 +48,7 @@ Check the following in the response:
 2. **`github_url`** — link to the original source (for example, `https://github.com/ailev/FPF/blob/main/FPF-Spec.md`). Open it and verify that the found fragment is actually present there, verbatim or close to the text.
 3. **`score`** — relevance of the found fragment to the query (0–1). If the score for an exact term is noticeably below 0.5, the index may be stale or the term may be absent from the source document.
 
-**Live verification example (28.07.2026):** the query `"Episteme A.2.1 система в роли"` with `source="FPF"` returned an exact quote from `FPF-Spec.md::A.2 - Role Taxonomy` with a correct link to `github.com/ailev/FPF` and a score of 0.79 — content confirmed by verbatim match with the original source.
+**Live verification example (28.07.2026):** the query `"Episteme A.2.1 system in a role"` with `source="FPF"` returned an exact quote from `FPF-Spec.md::A.2 - Role Taxonomy` with a correct link to `github.com/ailev/FPF` and a score of 0.79 — content confirmed by verbatim match with the original source.
 
 ## If something does not match
 
@@ -61,4 +61,3 @@ In all three cases the problem is not in your Repository (Template) — it is in
 ## Related documents
 
 - `docs/AGENT-VENDOR-SETUP.md` — connecting an agent to MCP tools in general.
-

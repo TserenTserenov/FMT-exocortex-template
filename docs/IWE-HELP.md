@@ -25,7 +25,7 @@ IWE (Intellectual Work Environment) is an intelligent work Environment. It is de
 | **Methods** | "How to do it" Procedures | Opening/Work/Closing Protocol, Capture-to-Pack, ArchGate, KE, Note-Review |
 | **Work Products** | What is produced | DS-strategy, Pack documents, DS-projects, digital twin events |
 
-Full architectural model: [LEARNING-PATH.md § 1.2](LEARNING-PATH.md). Source-of-truth: `DP.IWE.001` (via Gateway: `knowledge_search("IWE архитектура")`).
+Full architectural model: [LEARNING-PATH.md § 1.2](LEARNING-PATH.md). Source-of-truth: `DP.IWE.001` (via Gateway: `knowledge_search("IWE architecture")`).
 
 ---
 
@@ -76,7 +76,7 @@ MCP connects via https://claude.ai/settings/connectors (see SETUP-GUIDE §1.3b).
 ## Three Roles in IWE
 
 > The exocortex Template includes **3 Roles** available immediately: Strategist, Extractor, Synchronizer. The Platform supports 21 Roles — they are activated as the system develops.
-> Full Role Registry: `DP.ROLE.001` (via Gateway: `knowledge_search("реестр ролей агентов")`).
+> Full Role Registry: `DP.ROLE.001` (via Gateway: `knowledge_search("agent role registry")`).
 
 ### Strategist (R1)
 Planning and reflection. Every morning (Tue–Sun) generates a day plan from yesterday's commits. Monday — preparation for the weekly Session. Evening (23:00) — processes notes from Telegram.

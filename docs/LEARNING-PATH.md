@@ -784,7 +784,7 @@ The Strategist is Role R1, executed by Claude Code on schedule (launchd on macOS
 | `archive/` | Completed plans |
 | `exocortex/` | Backup memory/ + CLAUDE.md |
 
-**Single-source pattern:** DS-strategy (hub) is the sole Registry (`WP-REGISTRY.md` + `inbox/WP-*.md`), aggregated via `scripts/active-wp-sweep.sh`. Hub-and-spoke with WORKPLAN.md was deprecated by WP-283 Ф-H (May 2026).
+**Single-source pattern:** DS-strategy (hub) is the sole Registry (`WP-REGISTRY.md` + `inbox/WP-*.md`), aggregated via `scripts/active-wp-sweep.sh`. Hub-and-spoke with WORKPLAN.md was deprecated by WP-283 Phase H (May 2026).
 
 #### Configuring the strategy day
 
@@ -933,7 +933,7 @@ SPF defines the Pack creation process:
 | 10 | Map maintenance | Entity relationship graph |
 | 11 | Review and evolution cycle | Continuous update protocol |
 
-**Quick start:** `/pack-new` — the Skill walks you through domain selection, Pack name, creates the scaffold, and shows the Roadmap Ф1–Ф6.
+**Quick start:** `/pack-new` — the Skill walks you through domain selection, Pack name, creates the scaffold, and shows the Phase 1–6 Roadmap.
 
 **Where to learn:**
 - [SPF/process/](https://github.com/TserenTserenov/SPF/tree/main/process) — all 11 stages
@@ -1348,18 +1348,18 @@ The Skill walks you through 5 steps:
 2. Defines the domain through 3 questions (SPF §01)
 3. Proposes 2–3 name options → you choose
 4. Creates the `PACK-{slug}/` scaffold + starter files
-5. Shows the Ф1–Ф6 content Roadmap
+5. Shows the Phase 1–6 content Roadmap
 
 **Roadmap after creation:**
 
 | Phase | What to do | Time |
 |-------|-----------|------|
-| Ф1. Distinctions | 7–10 domain Distinctions (SPF §03) | 1–2h |
-| Ф2. Entities | Roles, Work Products, Methods — inventory (SPF §04) | 1–2h |
-| Ф3. Methods | Describe key Methods (SPF §07) | 2–4h |
-| Ф4. Work Products | Artifacts + Definition of Done (SPF §07) | 1–2h |
-| Ф5. Failure modes | 5–10 typical errors (SPF §08) | 1h |
-| Ф6. SoTA | Sources, knowledge version (SPF §09) | 1–2h |
+| Phase 1. Distinctions | 7–10 domain Distinctions (SPF §03) | 1–2h |
+| Phase 2. Entities | Roles, Work Products, Methods — inventory (SPF §04) | 1–2h |
+| Phase 3. Methods | Describe key Methods (SPF §07) | 2–4h |
+| Phase 4. Work Products | Artifacts + Definition of Done (SPF §07) | 1–2h |
+| Phase 5. Failure modes | 5–10 typical errors (SPF §08) | 1h |
+| Phase 6. SoTA | Sources, knowledge version (SPF §09) | 1–2h |
 
 Tool for content creation: `/ke` — records knowledge in Pack as you work.
 
