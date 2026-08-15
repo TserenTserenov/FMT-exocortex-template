@@ -119,7 +119,8 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-08-12
+
+## [Unreleased] — обновлено 2026-08-15
 
 ### Added
 
@@ -128,6 +129,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `896553b` chore: regenerate CHANGELOG/manifest after day-open-pipeline.sh promotion
 - `4efe5df` ci: add nightly template audit
 - `4d24c03` docs: sync README version badge
 
