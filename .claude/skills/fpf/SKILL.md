@@ -2,29 +2,20 @@
 name: fpf
 description: Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантные принципы перед принятием решения.
 argument-hint: "<запрос или тема>"
-version: 1.0.0
+version: 1.1.0
 layer: L1
 status: active
 triggers:
   slash: [/fpf]
-  phrases: []
+  phrases: [принципы FPF, сверь с FPF, по FPF]
 routing:
   executor: haiku
   deterministic: false
-agents: single
-interaction: multi-step
-gates_required: []
-gates_enforced: []
-gates_rationale: "операционный скилл; WP Gate применим только при создании нового РП, не для операционных вызовов"
 ---
 
 # Загрузка принципов
 
 Запрос: $ARGUMENTS
-
-## When to use
-
-Загрузка применимых принципов для задачи из иерархии Pack → SPF → FPF. Используй когда нужно найти релевантные принципы перед принятием решения.
 
 ## Fallback Chain
 
@@ -49,35 +40,29 @@ Pack (предметное) → SPF (корректность) → FPF (перв
 - Неизвестные (TransformerRole, senseFamily, Γ_*, ReferencePlane и т.п.): перевести по контексту, добавить `(FPF: <оригинал>)`. Не оставлять FPF-термин без перевода.
 - **Тест перед выводом:** пробежать output — есть ли термин, непонятный инженеру без FPF? Если да — перевести.
 
-## Algorithm
+## Алгоритм
 
-### 1. Определи режим
+1. **Определи режим** по таблице выше. Если неясно — режим lookup.
 
-По таблице выше. Если неясно — режим lookup.
+2. **Классифицируй источник:**
+   - Предметное знание (архитектура, домен, сервис) → source_type=pack
+   - Форма, процесс, корректность → source=SPF
+   - Базовые различения, первые принципы → source=FPF
 
-### 2. Классифицируй источник
+3. **Ищи через iwe-knowledge:**
+   - `iwe-knowledge search(query="<запрос>", source_type="pack")` -- по всем Pack
+   - `iwe-knowledge search(query="<запрос>", source="SPF")` -- по SPF
+   - `iwe-knowledge search(query="<запрос>", source="FPF")` -- по FPF
+   - Если первый уровень не дал результатов -- спускайся по fallback chain
 
-- Предметное знание (архитектура, домен, сервис) → source_type=pack
-- Форма, процесс, корректность → source=SPF
-- Базовые различения, первые принципы → source=FPF
+4. **Если iwe-knowledge недоступен** (нет в `/mcp`):
+   - Pack: читай файлы `PACK-*/pack/` через Glob + Read
+   - SPF: читай `SPF/docs/` через Glob + Read
+   - FPF: читай `FPF/Readme.md` (обзор) или ищи через Grep по `FPF/`
 
-### 3. Ищи через iwe-knowledge
+5. **Покажи** релевантные принципы с пояснением, как они применимы к задаче. Включай ссылку на источник (github_url из результата поиска или путь к файлу). **Переводи FPF-термины** в engineering-язык.
 
-- `iwe-knowledge search(query="<запрос>", source_type="pack")` -- по всем Pack
-- `iwe-knowledge search(query="<запрос>", source="SPF")` -- по SPF
-- `iwe-knowledge search(query="<запрос>", source="FPF")` -- по FPF
-- Если первый уровень не дал результатов -- спускайся по fallback chain
-
-### 4. Если iwe-knowledge недоступен
-
-(нет в `/mcp`):
-- Pack: читай файлы `PACK-*/pack/` через Glob + Read
-- SPF: читай `SPF/docs/` через Glob + Read
-- FPF: читай `FPF/Readme.md` (обзор) или ищи через Grep по `FPF/`
-
-### 5. Покажи результат
-
-Релевантные принципы с пояснением, как они применимы к задаче. Включай ссылку на источник (github_url из результата поиска или путь к файлу). **Переводи FPF-термины** в engineering-язык.
+6. **Без line-anchor в память/Pack (БЛОКИРУЮЩЕЕ):** при записи находки из FPF/SPF в `memory/*.md` или Pack — НЕ кэшировать `file:NNNN`. Это апстрим-репо, которым владеет внешний автор (ailev/FPF, TserenTserenov/SPF) — периодический пул может переписать десятки тысяч строк разом (ontological refactoring), и номер строки молча уедет на другую секцию без ошибки. Ссылайся кодом паттерна (`C.28`, `A.7`) — он переживает рефакторинг, номер строки нет. Резолвить позицию заново при каждом обращении: `knowledge_search(query=<код>, source="FPF"/"SPF")` или `grep -n "^## <код> -" FPF-Spec.md`. Инцидент: `memory/feedback_no_line_anchors_fpf.md` (2026-08-15, якорь `FPF-Spec.md:45197` уехал на +12067 строк после пула 42 коммитов).
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->

@@ -58,8 +58,11 @@ CLAUDE.md: `bash $IWE_SCRIPTS/template-sync.sh` (sync / `--dry-run` / `--check`)
 
 ### Именование (плейсхолдеры)
 
+**Правило применимо и к контрибьюторам:** все, кто отправляет PR в FMT, являются авторами в смысле этих правил. Плейсхолдеры и PII Gate обязательны для всех.
+
 - `{{GOVERNANCE_REPO}}` — личный governance-хаб
 - `{{HOME_DIR}}/IWE/` — рабочая директория
+- Пользовательские значения (email, calendar IDs, домены) → ключ в `day-rhythm-config.yaml` или `params.yaml`, не хардкод
 
 ### Блокирующие (авторские)
 
