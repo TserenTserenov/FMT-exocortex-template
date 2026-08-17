@@ -195,6 +195,18 @@ trap 'rm -f "$CLAUDE_STDERR"' EXIT
 # binary failing --version must not kill the adapter under set -e + pipefail.
 CLAUDE_VERSION="$("$CLAUDE_BIN" --version </dev/null 2>/dev/null | head -1 || true)"
 
+# Claude CLI 2.1.0+ accepts the peer text as the positional argument to `-p`.
+# It no longer reliably turns stdin into that prompt: a call can exit 0 with
+# an empty response, silently discarding an otherwise valid peer turn. Read
+# stdin before launching the CLI (the version probe above deliberately did
+# not consume it), then pass the text explicitly. Command substitution removes
+# only terminal newlines, which are irrelevant to Markdown parsing here.
+PEER_PROMPT="$(</dev/stdin)"
+if ! printf '%s' "$PEER_PROMPT" | grep -q '[[:alnum:]]'; then
+  echo "ERROR: Claude peer prompt is empty or non-substantive." >&2
+  exit 64
+fi
+
 adapter_diagnostic() {
   local cli_exit="$1"
   local stdout_bytes stderr_bytes
@@ -213,6 +225,7 @@ CLAUDE_OUTPUT=$(run_with_deadline "$IWE_PEER_TIMEOUT_SECONDS" \
   --no-session-persistence \
   --append-system-prompt "$TEXT_ONLY_HINT" \
   ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} \
+  "$PEER_PROMPT" \
   "$@" 2>"$CLAUDE_STDERR") && CLAUDE_EXIT=0 || CLAUDE_EXIT=$?
 
 # Auth-failure detection (peer-session 2026-08-04-08-wp7-f44-sandbox-review):
