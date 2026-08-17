@@ -1,5 +1,5 @@
 files_translated:
-- docs/adr/ADR-004-data-domain-map.md
-last_run_utc: '2026-08-16T11:31:42Z'
-last_synced_sha: f88a582abbaa2034485165151b9cb27dc13f70f6
+- docs/hindsight-setup.md
+last_run_utc: '2026-08-17T05:52:29Z'
+last_synced_sha: 6f980e06ad6b7e6330a523f50b921ce9e72155e9
 schema_version: 1
