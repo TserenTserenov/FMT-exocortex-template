@@ -7,7 +7,7 @@ IWE automation in the cloud — runs even when your Mac is off. Base level: back
 ## What It Does
 
 - **Backup memory:** copies `memory/` → `exocortex/` daily (git commit + push)
-- **Health check:** verifies the presence of DayPlan and WeekPlan, checks backup freshness, and detects unclosed sessions
+- **Health check:** verifies that DayPlan and WeekPlan exist, checks backup freshness, and flags unclosed sessions
 - **Telegram notifications** (optional): sends a health report to Telegram
 
 ## Installation
@@ -16,11 +16,11 @@ IWE automation in the cloud — runs even when your Mac is off. Base level: back
 bash setup/optional/setup-cloud-scheduler.sh
 ```
 
-The Script checks the gh CLI, configures secrets, and runs a test workflow.
+The Script verifies the gh CLI, configures secrets, and runs a test workflow.
 
 ## Manual Setup
 
-1. Make sure `.github/workflows/cloud-scheduler.yml` is pushed to your DS-strategy repo
+1. Make sure `.github/workflows/cloud-scheduler.yml` is pushed to your DS-strategy repository — **your own separate repository, not a fork of FMT-exocortex-template** (issue #454: the workflow only runs where `STRATEGY_REPO` is configured — a template fork does not set it by default and will receive an explanatory Skip rather than silent inaction)
 2. (Optional) Configure Telegram:
    ```bash
    gh secret set TELEGRAM_BOT_TOKEN --repo YOUR_REPO --body "TOKEN"

@@ -1,5 +1,5 @@
 files_translated:
-- README.md
-last_run_utc: '2026-08-17T08:42:57Z'
-last_synced_sha: 3aa200bdb3254833985d700d47ef85c8659a210c
+- docs/CLOUD-SCHEDULER.md
+last_run_utc: '2026-08-17T13:05:35Z'
+last_synced_sha: bda0f2cebaf31e0a601fa912a15739822f7fe574
 schema_version: 1
