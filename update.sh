@@ -21,7 +21,7 @@ EXIT_GENERAL=1
 
 trap 'echo "ОШИБКА: update.sh прервался на строке ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
-VERSION="2.4.1"  # fix (WP-401): deprecated-file removal now checks is_protected_user_file() — a protected file (e.g. sessions/00-index.md) listed in deprecated_files by mistake could previously be deleted despite the "Не затрагиваются" report claiming otherwise; fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
+VERSION="2.5.0"  # feat: git worktree delivery — one `git fetch` replaces ~600 per-file raw requests (Fastly edge rate-limits bursts: 502@#10, 429@#171 on 2026-08-18); curl stays as fallback for non-git installs. Prior: fix (WP-401): deprecated-file removal now checks is_protected_user_file(); fix #229: repair-pass no longer stale-repairs memory files with owner: user; fix #228: hot-budget validator warns on horizon:hot overflow
 REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
@@ -200,6 +200,44 @@ is_protected_user_file() {
 is_upstream_git_mirror() {
     git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
     git -C "$SCRIPT_DIR" remote get-url upstream >/dev/null 2>&1
+}
+
+# === Git worktree delivery (rate-limit-safe source) ===
+# raw.githubusercontent.com (Fastly edge) throttles the per-file burst: on
+# 2026-08-18 a full run died with HTTP 502 at request #10 and HTTP 429 at #171
+# (evidence in the linked PR), and retries only escalated the throttle because
+# every run re-downloads all ~600 files. One `git fetch` moves the whole
+# delivery over a single connection; the download loop then reads files from a
+# detached worktree. Curl remains the fallback for non-git installs.
+GIT_SOURCE_DIR=""
+
+init_git_source() {
+    # Sets GIT_SOURCE_DIR on success; returns 1 to let the caller try the next
+    # remote or fall back to curl. Remote `upstream` is preferred (canonical),
+    # `origin` covers a plain clone of the canonical repo.
+    local remote="$1" wt
+    command -v git >/dev/null 2>&1 || return 1
+    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+    git -C "$SCRIPT_DIR" remote get-url "$remote" >/dev/null 2>&1 || return 1
+    # Fetch the pinned delivery SHA when resolved (issue #398 consistency for
+    # the git path too — a branch tip that moved past the pinned commit may
+    # legitimately differ from the manifest, e.g. a post-release push).
+    # GitHub allows fetching an exact reachable SHA; fall back to the branch.
+    if ! git -C "$SCRIPT_DIR" fetch --quiet "$remote" "${DELIVERY_REF:-$BRANCH}" 2>/dev/null; then
+        git -C "$SCRIPT_DIR" fetch --quiet "$remote" "$BRANCH" || return 1
+    fi
+    wt=$(mktemp -d "${TMPDIR:-/tmp}/iwe-update-src.XXXXXX") || return 1
+    if ! git -C "$SCRIPT_DIR" worktree add --detach --quiet "$wt" FETCH_HEAD 2>/dev/null; then
+        rmdir "$wt" 2>/dev/null
+        return 1
+    fi
+    GIT_SOURCE_DIR="$wt"
+}
+
+remove_git_source() {
+    [ -n "$GIT_SOURCE_DIR" ] || return 0
+    git -C "$SCRIPT_DIR" worktree remove --force "$GIT_SOURCE_DIR" >/dev/null 2>&1
+    GIT_SOURCE_DIR=""
 }
 
 # Личные L4-конфиги в memory/: update.sh сеет их при ОТСУТСТВИИ (новая инсталляция),
@@ -647,6 +685,7 @@ assert_self_unmutated() {
 # hashes from one revision with content from another (issue #398).
 resolve_delivery_ref() {
     local resolved_ref
+    DELIVERY_REF=""
     if ! py_available; then
         echo "  ⚠ Нет python3: поставка проверяется по подвижной ветке $BRANCH."
         return 0
@@ -660,6 +699,7 @@ if not re.fullmatch(r"[0-9a-f]{40}", sha):
     raise SystemExit(1)
 print(sha)'); then
         RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
+        DELIVERY_REF="$resolved_ref"
         echo "  Снимок поставки: ${resolved_ref:0:12}"
     else
         echo "  ⚠ Не удалось закрепить $BRANCH по commit SHA; используется подвижная ветка."
@@ -670,6 +710,7 @@ print(sha)'); then
 TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
 cleanup_update() {
     local status=$?
+    remove_git_source
     rm -rf "$TMPDIR_UPDATE"
     if [ "$UPDATE_TRANSACTION_STARTED" = true ] && [ "$status" -ne 0 ] && [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
         echo "⚠ Обновление завершилось не полностью; маркер сохранён: $UPDATE_INCOMPLETE_MARKER" >&2
@@ -718,10 +759,25 @@ echo ""
 # === Step 1: Fetch manifest ===
 echo "[1] Загрузка манифеста..."
 resolve_delivery_ref
+
+# Prefer a git worktree mirror of the delivery: one fetch instead of ~600 raw
+# requests (rate-limit evidence 2026-08-18, see init_git_source). Manifest and
+# files come from the same FETCH_HEAD commit, so the manifest↔file consistency
+# guarantee of issue #398 holds even if the branch moved between the ref
+# resolution above and this fetch.
+for _git_remote in upstream origin; do
+    if init_git_source "$_git_remote"; then
+        echo "  Источник файлов: git worktree (remote: $_git_remote)"
+        break
+    fi
+done
+
 MANIFEST_URL="$RAW_BASE/update-manifest.json"
 MANIFEST="$TMPDIR_UPDATE/manifest.json"
 
-if ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$MANIFEST_URL" -o "$MANIFEST" 2>/dev/null; then
+if [ -n "$GIT_SOURCE_DIR" ] && [ -f "$GIT_SOURCE_DIR/update-manifest.json" ]; then
+    cp "$GIT_SOURCE_DIR/update-manifest.json" "$MANIFEST"
+elif ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$MANIFEST_URL" -o "$MANIFEST" 2>/dev/null; then
     echo "ОШИБКА: Не удалось загрузить манифест обновлений."
     echo "  URL: $MANIFEST_URL"
     echo "  Проверьте подключение к интернету."
@@ -1017,7 +1073,10 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     # no list at all, not even the UNCHANGED counter, so the preview said nothing about
     # it while a later run (network back) applied it. "Could not check" is not "up to
     # date"; it now gets its own list and taints the verdict below.
-    if ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/$fpath" -o "$REMOTE_FILE" 2>/dev/null; then
+    if [ -n "$GIT_SOURCE_DIR" ] && [ -f "$GIT_SOURCE_DIR/$fpath" ]; then
+        # git worktree delivery: same commit as the manifest, no per-file request
+        cp "$GIT_SOURCE_DIR/$fpath" "$REMOTE_FILE"
+    elif ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/$fpath" -o "$REMOTE_FILE" 2>/dev/null; then
         SKIPPED_DOWNLOAD+=("$fpath")
         continue
     fi

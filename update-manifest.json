@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "7881aab93ca6f0d8a20d10f587b5faa731a5445244b950a02abe9e79fe3a0f10"
+      "sha256": "6b5babc08bd705b10a11fcf60b333199cb05031d3cef37330fb86a2bd217cb89"
     },
     {
       "path": ".claude/settings.json",
@@ -2497,7 +2497,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "b6671f02b3ebb87b166711ecebc3f3af991681831ea64e20456071dfc088c495"
+      "sha256": "d849a97264180db81a60804d823433c065a247b877d2ed455bf37d6f95858fac"
     }
   ],
   "excluded_paths": [
