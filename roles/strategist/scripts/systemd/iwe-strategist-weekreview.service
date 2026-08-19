@@ -5,6 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# bug-2026-08-18/19: exit 2 = сценарий уже выполняется другим вызывателем — не сбой.
+SuccessExitStatus=2
 ExecStart={{IWE_RUNTIME}}/roles/strategist/scripts/strategist.sh week-review
 Environment=HOME={{HOME_DIR}}
 Environment=IWE_TEMPLATE={{IWE_TEMPLATE}}

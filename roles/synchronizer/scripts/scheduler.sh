@@ -155,6 +155,23 @@ mark_interval() {
     echo "$NOW" > "$STATE_DIR/$1-last"
 }
 
+# bug-2026-08-18/19 (гонка двух вызывателей): при пробуждении машины systemd-сервис
+# (iwe-strategist-morning) и hourly dispatch стартуют одновременно; проигравший
+# получает от strategist.sh exit 2 («mkdir-lock занят живым PID»), что не сбой.
+# Классификация: 0 = выполнено (ставим отметку); 2 = выполняется другим вызывателем
+# (отметку НЕ ставим — следующий dispatch перепроверит already_ran_today);
+# иное = сбой (WARN, will retry).
+run_strategist_task() {
+    local task="$1" rc=0
+    timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" "$task" >> "$LOG_FILE" 2>&1 || rc=$?
+    if [ "$rc" -eq 2 ]; then
+        log "OK: strategist $task уже выполняется другим вызывателем (lock held) — не провал"
+    elif [ "$rc" -ne 0 ]; then
+        log "WARN: strategist $task failed rc=$rc (will retry next dispatch)"
+    fi
+    return "$rc"
+}
+
 # === Очистка старых маркеров (>7 дней) ===
 
 cleanup_state() {
@@ -197,10 +214,8 @@ dispatch() {
     # --- Стратег: week-review (Пн, до morning) ---
     if [ "$DOW" = "1" ] && ! ran_this_week "strategist-week-review"; then
         log "→ strategist week-review (catch-up: hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" week-review >> "$LOG_FILE" 2>&1; then
+        if run_strategist_task week-review; then
             mark_done_week "strategist-week-review"
-        else
-            log "WARN: strategist week-review failed (will retry next dispatch)"
         fi
         ran=1
     fi
@@ -208,10 +223,8 @@ dispatch() {
     # --- Стратег: morning (04:00-21:59) ---
     if (( 10#$HOUR >= 4 && 10#$HOUR < 22 )) && ! ran_today "strategist-morning"; then
         log "→ strategist morning (catch-up: hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" morning >> "$LOG_FILE" 2>&1; then
+        if run_strategist_task morning; then
             mark_done "strategist-morning"
-        else
-            log "WARN: strategist morning failed (will retry next dispatch)"
         fi
         ran=1
     fi
@@ -219,10 +232,8 @@ dispatch() {
     # --- Стратег: note-review (22:00+) ---
     if (( 10#$HOUR >= 22 )) && ! ran_today "strategist-note-review"; then
         log "→ strategist note-review (catch-up: hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
+        if run_strategist_task note-review; then
             mark_done "strategist-note-review"
-        else
-            log "WARN: strategist note-review failed (will retry next dispatch)"
         fi
         ran=1
     elif (( 10#$HOUR < 12 )); then
@@ -230,10 +241,8 @@ dispatch() {
         yesterday=$(portable_date_offset 1)
         if [ -n "$yesterday" ] && [ ! -f "$STATE_DIR/strategist-note-review-$yesterday" ]; then
             log "→ strategist note-review (catch-up for yesterday $yesterday)"
-            if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
+            if run_strategist_task note-review; then
                 echo "$(date '+%H:%M:%S') catch-up" > "$STATE_DIR/strategist-note-review-$yesterday"
-            else
-                log "WARN: strategist note-review catch-up failed"
             fi
             ran=1
         fi

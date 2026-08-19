@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# bug-2026-08-18/19: exit 2 = сценарий уже выполняется другим вызывателем
+# (гонка с hourly dispatch при пробуждении машины) — это успех, не сбой юнита.
+SuccessExitStatus=2
 ExecStart={{IWE_RUNTIME}}/roles/strategist/scripts/strategist.sh morning
 Environment=HOME={{HOME_DIR}}
 Environment=IWE_TEMPLATE={{IWE_TEMPLATE}}
