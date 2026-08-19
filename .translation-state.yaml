@@ -1,5 +1,6 @@
 files_translated:
-- README.md
-last_run_utc: '2026-08-18T07:03:22Z'
-last_synced_sha: 70523055b29840ab41eeb8833e42b288dd606b20
+- docs/developer/developer-guide.md
+- docs/developer/proposal-process.md
+last_run_utc: '2026-08-19T14:40:44Z'
+last_synced_sha: f0eb4ec2255e71bad26d0f46ebc5d6cb9969d985
 schema_version: 1
