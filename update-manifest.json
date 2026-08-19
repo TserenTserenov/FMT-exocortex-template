@@ -1693,7 +1693,7 @@
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
-      "sha256": "977321695ba576f19214ccf219f98e6101cd94eae5c0de54fe374ad3738c2577"
+      "sha256": "fd73e2838e4c59e32e4032f6d3d7d56b09c6c12ee4559068def6cb2d2f10ed25"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.timer",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.service",
-      "sha256": "f300d3ea098e2bb653e1d3b8ba7c544811a7deaa65ecb51d81d9d55cbf270b49"
+      "sha256": "db576169df9041629a783bad9fbfa92818e3bad951535092fb8a23eb767ca62d"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.timer",
@@ -1753,7 +1753,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "57f8fa8ccaabd2c97bbcf9caa128a246dee46e05b25d2ce5e5d3de59cc15c6f1"
+      "sha256": "5d41a9c9aa31d1f81737add89f3217612935e019fd90ad98f89ddacc5b8d6869"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -2225,7 +2225,7 @@
     },
     {
       "path": "scripts/pending-phases-sweep.sh",
-      "sha256": "503709e24f6e191c571bd7adb407866dabe0ee596ea14c79368d8bcf4a43c3b2"
+      "sha256": "9e2434ef4b64154fc15cb3874588b086670c89d74993ecdb778fbd8a4e5e42b2"
     },
     {
       "path": "scripts/post-update-check-skills.sh",
@@ -2261,7 +2261,7 @@
     },
     {
       "path": "scripts/server-calendar.sh",
-      "sha256": "2fa9d4e61c38320150fc262806a87dc8ca56d3eed25f625d3a4a50e39539b9ff"
+      "sha256": "27e1c8f6c2a2d7b35f2a025d56f0f488132746f4fe79c7db7e0a5f53a3e4fa33"
     },
     {
       "path": "scripts/server-news.sh",
