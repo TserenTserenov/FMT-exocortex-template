@@ -160,6 +160,21 @@ jobs:
           fetch-depth: 20  # WP-529 Ф9: check-delivery-route-label.sh needs a resolvable prior commit for its smoke run below
       - name: Install dependencies
         run: brew install jq  # python3 preinstalled
+      # WP-529 Ф9 (found live by this job's own first real run, 20.08):
+      # check-critical-files-map.sh/check-delivery-route-label.sh both go
+      # through find-python3.sh, which hard-requires PyYAML importable —
+      # this job installed jq but never PyYAML, so the resolver failed
+      # before reaching either script's own logic (exit 2, not the bash3.2
+      # class this job exists to catch). Same 3-step fallback the `validate`
+      # job already uses for the identical dependency (import check → pip
+      # --user → OS-level install), macOS-adapted: Homebrew's python3 is
+      # PEP668-managed, so --user alone can still refuse — --break-system-
+      # packages is the documented escape hatch for exactly this case.
+      - name: Ensure PyYAML available (find-python3.sh contract)
+        run: |
+          python3 -c "import yaml" 2>/dev/null && exit 0
+          python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
+          python3 -m pip install --user --break-system-packages pyyaml && python3 -c "import yaml"
       - name: Run integration-contract-validator (8 detectors)
         run: bash setup/integration-contract-validator.sh
       - name: Run smoke-test-fresh-install (GOVERNANCE_REPO=${{ matrix.gov_repo }})
