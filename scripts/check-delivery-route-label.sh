@@ -123,8 +123,12 @@ for arr in "${CURATED_ARRAYS[@]}"; do
     # since Ф2, never exercised on real macOS before this CI job started
     # actually running these two scripts there. `eval` is the traditional,
     # maximally-portable indirect-array-access idiom (works since Bash 2).
-    old_sorted=$(eval "printf '%s\n' \"\${$old_var[@]}\"" | sort)
-    new_sorted=$(eval "printf '%s\n' \"\${$new_var[@]}\"" | sort)
+    # `:-` guard is load-bearing, not defensive fluff: under `set -u`, Bash
+    # 3.2 treats `${empty_arr[@]}` itself as unbound (fixed in Bash 4.4+) —
+    # hit live on `NEW_GITHUB_EXPLICIT_INCLUDE` (empty on this diff range),
+    # second real crash from the same CI run that caught the first.
+    old_sorted=$(eval "printf '%s\n' \"\${${old_var}[@]:-}\"" | sort)
+    new_sorted=$(eval "printf '%s\n' \"\${${new_var}[@]:-}\"" | sort)
     if [ "$old_sorted" != "$new_sorted" ]; then
         cat_id=$(awk -F'\t' -v k="$arr" '$1==k{print $2; exit}' "$TMP_ARRAY_MAP")
         if [ -z "$cat_id" ]; then
