@@ -74,7 +74,14 @@ if ! command -v launchctl >/dev/null 2>&1; then
         if ! iwe_systemd_user_bus_ok; then
             echo "  ⚠ systemd --user недоступен (нет пользовательской сессионной шины — типично для WSL2/контейнера/сервера без активного логина)"
             echo "  Installing $ROLE_NAME via cron fallback (issue #454)..."
-            mapfile -t cron_lines < <(
+            # WP-529 Ф9 (Evgenii 20.08): mapfile is bash4-only — this branch is
+            # exactly the one macOS (stock /bin/bash 3.2, no systemd) takes,
+            # so the previous line silently crashed the cron-fallback install
+            # on the platform it exists to serve.
+            cron_lines=()
+            while IFS= read -r cron_line; do
+                cron_lines+=("$cron_line")
+            done < <(
                 iwe_timer_to_cron_lines "$SYSTEMD_SRC/iwe-strategist-morning.timer" \
                     "$(iwe_cron_env_prefix) $SCRIPT_TARGET morning >> $HOME/logs/strategist/cron-morning.log 2>&1"
                 iwe_timer_to_cron_lines "$SYSTEMD_SRC/iwe-strategist-weekreview.timer" \

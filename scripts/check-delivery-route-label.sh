@@ -117,10 +117,14 @@ IMPLICATED=()
 for arr in "${CURATED_ARRAYS[@]}"; do
     old_var="OLD_$arr"
     new_var="NEW_$arr"
-    old_ref="${old_var}[@]"
-    new_ref="${new_var}[@]"
-    old_sorted=$(printf '%s\n' "${!old_ref}" | sort)
-    new_sorted=$(printf '%s\n' "${!new_ref}" | sort)
+    # WP-529 Ф9 (found live by this job's own first real run on system
+    # /bin/bash, 20.08): `"${!ref}"` indirect array expansion (ref holding
+    # "VAR[@]") crashed with "unbound variable" under Bash 3.2 — pre-existing
+    # since Ф2, never exercised on real macOS before this CI job started
+    # actually running these two scripts there. `eval` is the traditional,
+    # maximally-portable indirect-array-access idiom (works since Bash 2).
+    old_sorted=$(eval "printf '%s\n' \"\${$old_var[@]}\"" | sort)
+    new_sorted=$(eval "printf '%s\n' \"\${$new_var[@]}\"" | sort)
     if [ "$old_sorted" != "$new_sorted" ]; then
         cat_id=$(awk -F'\t' -v k="$arr" '$1==k{print $2; exit}' "$TMP_ARRAY_MAP")
         if [ -z "$cat_id" ]; then

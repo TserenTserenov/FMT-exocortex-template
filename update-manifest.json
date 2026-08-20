@@ -1553,7 +1553,7 @@
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "c8ecd86b705c6a85dc7ce848ff2b927939de77fc90b04f920c43eea436b4387f"
+      "sha256": "d95a06571d86f5721030f959938d0cb910e22fc0f7cbe19b033f39b7c6ae2b60"
     },
     {
       "path": "roles/strategist/prompts/add-wp.md",
@@ -1721,7 +1721,7 @@
     },
     {
       "path": "roles/synchronizer/install.sh",
-      "sha256": "d849c55d4acd1d6e0e6913d95c209801bbfe54f84a289c9a5986e9b2b421fd42"
+      "sha256": "a2deb61e38527f67f3647d3ba2ecda52a82ec6bab6dd5610197ff1538e3e13b3"
     },
     {
       "path": "roles/synchronizer/role.yaml",
@@ -1877,7 +1877,7 @@
     },
     {
       "path": "scripts/check-delivery-route-label.sh",
-      "sha256": "c6b5e30914e947035ac6951de389c9272714c62d448ae855a6a1ea5fede987ea"
+      "sha256": "2bf13a1d337a835a681bb7a5e85d74b2f55bcf547add43982c763a672a6e7134"
     },
     {
       "path": "scripts/check-dirty-repos.sh",
