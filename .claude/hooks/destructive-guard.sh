@@ -14,6 +14,10 @@ block() {
   exit 2
 }
 
+# Bypass: только из реального шелла пилота (тот же контракт, что secret-leak-block.sh —
+# хук читает свой процессный env, не текст команды, агент не может выставить это сам себе).
+[ -n "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" ] && exit 0
+
 # #362: a top-level `cd` persists between Bash calls in Claude Code. Strip
 # quoted spans before detecting command segments; `(cd ... && ...)` remains
 # allowed because the opening parenthesis is not a top-level separator.
@@ -180,6 +184,34 @@ fi
 CLEAN_SEGMENT=$(git_segment clean)
 if [ -n "$CLEAN_SEGMENT" ] && echo "$CLEAN_SEGMENT" | grep -qE -- '(^|[[:space:]])-[a-zA-Z]*[dfx]'; then
   block "git clean -fdx запрещён (удаляет неотслеживаемые файлы). Согласуй с владельцем."
+fi
+
+# rm с одновременным recursive (-r/-R/--recursive) и force (-f/--force), в любом
+# сочетании флагов (слитных или раздельных) — вне временных/scratch-путей, где это
+# штатная уборка (пир-сессия с Codex, WP-544 Ф1, 20.08).
+if echo "$CMD" | grep -qE '(^|[[:space:]])rm([[:space:]]|$)' \
+  && echo "$CMD" | grep -qE -- '(^|[[:space:]])(-[^[:space:]]*[rR][^[:space:]]*|--recursive)([[:space:]]|$)' \
+  && echo "$CMD" | grep -qE -- '(^|[[:space:]])(-[^[:space:]]*f[^[:space:]]*|--force)([[:space:]]|$)' \
+  && ! echo "$CMD" | grep -qE '(/tmp/|/scratchpad/|\.claude/worktrees/)'; then
+  block "rm -r -f (в любом сочетании флагов) вне /tmp, scratchpad или worktree запрещён — удаление необратимо. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# psql: DROP/TRUNCATE — необратимая потеря структуры/данных.
+if echo "$CMD" | grep -qiE '\bpsql\b' && echo "$CMD" | grep -qiE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
+  block "DROP/TRUNCATE через psql запрещён — необратимая потеря данных. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# psql: DELETE FROM без WHERE в том же операторе (эвристика: сегмент до ближайшего
+# ';' или конца строки — не защищает от WHERE в другом statement той же команды).
+if echo "$CMD" | grep -qiE '\bpsql\b' \
+  && echo "$CMD" | grep -qiE 'DELETE[[:space:]]+FROM' \
+  && ! echo "$CMD" | grep -qiE 'DELETE[[:space:]]+FROM[^;]*[[:space:]]WHERE([[:space:]]|$)'; then
+  block "DELETE FROM без WHERE через psql запрещён — удалит всю таблицу. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# удаление репозитория на GitHub — необратимо.
+if echo "$CMD" | grep -qE '\bgh[[:space:]]+repo[[:space:]]+delete\b'; then
+  block "gh repo delete запрещён — необратимо. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 exit 0
