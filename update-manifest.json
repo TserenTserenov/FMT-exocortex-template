@@ -1877,7 +1877,7 @@
     },
     {
       "path": "scripts/check-delivery-route-label.sh",
-      "sha256": "2bf13a1d337a835a681bb7a5e85d74b2f55bcf547add43982c763a672a6e7134"
+      "sha256": "8cae460f2ded9cbbf22a458942ce5fed6517b3576cc75e12aa394e109c03cfe6"
     },
     {
       "path": "scripts/check-dirty-repos.sh",
