@@ -16,7 +16,10 @@ block() {
 
 # Bypass: только из реального шелла пилота (тот же контракт, что secret-leak-block.sh —
 # хук читает свой процессный env, не текст команды, агент не может выставить это сам себе).
-[ -n "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" ] && exit 0
+# Строгое сравнение с "1" (не -n) — та же несогласованность в secret-leak-block.sh
+# (там -n) допустима для существующего кода, но не стоит копировать её в новый
+# (пир-ревью Codex, WP-544 Ф1, 20.08): -n пропустил бы CC_ALLOW_DESTRUCTIVE_INPUT=0 как bypass.
+[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && exit 0
 
 # #362: a top-level `cd` persists between Bash calls in Claude Code. Strip
 # quoted spans before detecting command segments; `(cd ... && ...)` remains
