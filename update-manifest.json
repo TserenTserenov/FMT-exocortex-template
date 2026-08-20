@@ -653,7 +653,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c0a2e824f0c22ccf7afddc4f1147ec715d47397b366df577cfcf1fcc48923f95"
+      "sha256": "21385aa8f67794b226c57a8b988cdec9d3f7af43364d20b2a4128d8aab4e50a4"
     },
     {
       "path": "CLAUDE.md",
@@ -2593,7 +2593,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "9940a3b11d1cdb6240a4b3d4e70cb9f7da69b8884e22b52451ba22c492410b50"
+      "sha256": "cd9453206840a3429b0bc03d9674643a07c2c343e5364d240b177ece84a8052e"
     }
   ],
   "excluded_paths": [
@@ -2618,6 +2618,7 @@
     "scripts/iwe-trace.py",
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
+    "scripts/tests/lib/extract-update-fetch-worker.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_day_close_prepare.py",
@@ -2635,6 +2636,10 @@
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",
+    "scripts/tests/test_update_fetch_delivery_failure_failclosed.sh",
+    "scripts/tests/test_update_fetch_hash_mismatch_failclosed.sh",
+    "scripts/tests/test_update_fetch_missing_status_failclosed.sh",
+    "scripts/tests/test_update_fetch_worker_exit_code_under_set_e.sh",
     "scripts/tests/test_update_install_path_guard_provenance.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",
     "scripts/translate.py",

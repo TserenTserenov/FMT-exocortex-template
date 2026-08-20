@@ -1024,9 +1024,168 @@ with open(sys.argv[1]) as f:
 print(len(data.get('files', [])))
 " "$MANIFEST" 2>/dev/null || echo "?")
 fi
-DOWNLOAD_IDX=0
 
-# Parse manifest: extract path and desc for each file entry
+# WP-546 F2: manifest parsed once into a file, not a process substitution —
+# Phase B below needs a second pass over it after Phase A has fetched
+# everything, and a process substitution can only be consumed once.
+MANIFEST_PARSED="$TMPDIR_UPDATE/manifest-parsed.txt"
+if py_available; then
+    # Parse JSON: extract path|desc|sha256 lines. Path via argv (issue #402,
+    # defect 2), not interpolated into the -c string — see FILES_MATCH above.
+    $PY_BIN -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+for entry in data.get('files', []):
+    print(entry['path'] + '|' + entry.get('desc', '') + '|' + entry.get('sha256', ''))
+" "$MANIFEST" 2>/dev/null > "$MANIFEST_PARSED"
+else
+    # Fallback: basic grep parsing if no working python interpreter.
+    # No sha256 in this path — integrity check is skipped downstream (already
+    # documented via a fetch-failed status, not silently trusted).
+    grep '"path"' "$MANIFEST" | while read -r line; do
+        fpath=$(echo "$line" | sed 's/.*"path"[[:space:]]*:[[:space:]]*"//;s/".*//')
+        echo "$fpath||"
+    done > "$MANIFEST_PARSED"
+fi
+
+# --- Phase A (WP-546 F2, peer-session 2026-08-20-06-wp546-wp529-update-parallel):
+# fetch ~8 files concurrently instead of one curl at a time. The worker below is
+# materialized fresh into $TMPDIR_UPDATE on every run, NOT delivered via the
+# manifest — Step 2 depends on it to fetch manifest files (potentially including
+# a future copy of itself), so shipping it as a scripts/lib/*.sh file would create
+# a bootstrap gap on the very first upgrade that introduces it (the file wouldn't
+# exist locally yet on the run that needs it). A separate file (not a shared bash
+# function) is deliberate too: xargs -P spawns real subprocesses, and `export -f`
+# to hand them a function is unreliable on bash <4.2 (still the default on macOS).
+IWE_UPDATE_FILES_DIR="$TMPDIR_UPDATE/files"
+IWE_UPDATE_STATUS_DIR="$TMPDIR_UPDATE/status"
+mkdir -p "$IWE_UPDATE_FILES_DIR" "$IWE_UPDATE_STATUS_DIR"
+IWE_UPDATE_WORKER="$TMPDIR_UPDATE/fetch-worker.sh"
+cat > "$IWE_UPDATE_WORKER" <<'FETCH_WORKER_EOF'
+#!/bin/bash
+# One manifest file, one `xargs -P` job. Retry lives here, inside this single
+# job, so the orchestrator dispatches once per file and never requeues — one
+# final status line is written no matter how many curl attempts ran.
+# Args: $1 = "<fpath>|<expected_hash>" (expected_hash may be empty)
+# Env: RAW_BASE, CURL_BASE_OPTS, _CURL_SSL_OPT, SCRIPT_DIR,
+#      IWE_UPDATE_FILES_DIR, IWE_UPDATE_STATUS_DIR (exported by caller)
+set -uo pipefail
+
+hash_file() {
+    shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || \
+    sha256sum "$1" 2>/dev/null | cut -d' ' -f1
+}
+write_status() {
+    # $1=status_file $2=status $3=fpath $4=detail_code
+    # Atomic: a worker killed mid-write must not leave a half-written line
+    # for update.sh's preflight (Phase B) to trust.
+    printf '%s\t%s\t%s\t\n' "$2" "$3" "${4:-}" > "$1.tmp"
+    mv -f "$1.tmp" "$1"
+}
+
+IFS='|' read -r fpath expected_hash <<<"${1:?usage: fetch-worker.sh '<fpath>|<expected_hash>'}"
+expected_hash="${expected_hash%$'\r'}"  # issue #402 defect 3 — trailing \r on Windows Git Bash
+
+remote_file="$IWE_UPDATE_FILES_DIR/$fpath"
+status_file="$IWE_UPDATE_STATUS_DIR/$fpath.status"
+mkdir -p "$(dirname "$remote_file")" "$(dirname "$status_file")"
+local_path="$SCRIPT_DIR/$fpath"
+
+# skip-if-hash-matches: local candidate already equals the manifest's expected
+# content — no network trip. Copy into staging so the classifier's existing
+# hash_file($remote_file) comparisons work unchanged (a cache-hit trivially
+# resolves to UNCHANGED downstream — same verdict as a real download that
+# turned out identical).
+if [ -n "$expected_hash" ] && [ -f "$local_path" ]; then
+    local_hash=$(hash_file "$local_path")
+    if [ "$local_hash" = "$expected_hash" ]; then
+        cp "$local_path" "$remote_file"
+        write_status "$status_file" "cache-hit" "$fpath" "local_hash_match"
+        exit 0
+    fi
+fi
+
+attempt=1
+while :; do
+    if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/$fpath" -o "$remote_file" 2>/dev/null; then
+        break
+    fi
+    if [ "$attempt" -ge 2 ]; then
+        write_status "$status_file" "fetch-failed" "$fpath" "fetch_failed_after_retry"
+        exit 0
+    fi
+    attempt=$((attempt + 1))
+done
+
+if [ -n "$expected_hash" ]; then
+    remote_hash=$(hash_file "$remote_file")
+    if [ "$remote_hash" != "$expected_hash" ]; then
+        rm -f "$remote_file"
+        write_status "$status_file" "hash-mismatch" "$fpath" "sha256_mismatch"
+        exit 0
+    fi
+fi
+
+write_status "$status_file" "fetched" "$fpath" "download_success"
+exit 0
+FETCH_WORKER_EOF
+chmod +x "$IWE_UPDATE_WORKER"
+
+UPDATE_FETCH_ENTRIES="$TMPDIR_UPDATE/fetch-entries.txt"
+: > "$UPDATE_FETCH_ENTRIES"
+while IFS='|' read -r fpath fdesc expected_hash; do
+    [ -z "$fpath" ] && continue
+    expected_hash="${expected_hash%$'\r'}"
+    # Protected user files (issue #154): never overwrite if they already exist
+    # locally. is_protected_user_file() is the actual skip-if-exists guard
+    # (shared with the deprecated-file removal loop below) — checked here,
+    # single-threaded, same as before. These files never reach Phase A, not
+    # even as a cache-hit.
+    if is_protected_user_file "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
+        continue
+    fi
+    printf '%s|%s\n' "$fpath" "$expected_hash" >> "$UPDATE_FETCH_ENTRIES"
+done < "$MANIFEST_PARSED"
+
+FETCH_TOTAL=$(wc -l < "$UPDATE_FETCH_ENTRIES" | tr -d ' ')
+if [ "$FETCH_TOTAL" -gt 0 ]; then
+    echo "  Скачивание $FETCH_TOTAL файлов (до 8 параллельно)…"
+    export RAW_BASE CURL_BASE_OPTS _CURL_SSL_OPT SCRIPT_DIR
+    export IWE_UPDATE_FILES_DIR IWE_UPDATE_STATUS_DIR
+    # `|| true`: xargs (and `set -e`) would otherwise abort the whole script
+    # on a single worker's non-zero exit — exactly the "one bad file sinks
+    # the other 631" failure this Step exists to avoid (issue #350). The
+    # preflight right below already treats any worker that didn't finish
+    # cleanly as fetch-failed; this just lets it actually run.
+    xargs -P 8 -I{} bash "$IWE_UPDATE_WORKER" {} < "$UPDATE_FETCH_ENTRIES" || true
+
+    # Preflight: a worker killed by signal/OOM/xargs timeout leaves no status
+    # file at all. A single missing file must not abort the whole update
+    # (issue #350's principle — one bad file doesn't sink the other 631) but
+    # must still show up as unverified, not silently pass classification.
+    MISSING_STATUS_COUNT=0
+    MISSING_STATUS_SAMPLE=()
+    while IFS='|' read -r fpath expected_hash; do
+        [ -z "$fpath" ] && continue
+        status_file="$IWE_UPDATE_STATUS_DIR/$fpath.status"
+        if [ ! -f "$status_file" ]; then
+            mkdir -p "$(dirname "$status_file")"
+            printf 'fetch-failed\t%s\tmissing-status-synthesized\t\n' "$fpath" > "$status_file"
+            MISSING_STATUS_COUNT=$((MISSING_STATUS_COUNT + 1))
+            [ "${#MISSING_STATUS_SAMPLE[@]}" -lt 5 ] && MISSING_STATUS_SAMPLE+=("$fpath")
+        fi
+    done < "$UPDATE_FETCH_ENTRIES"
+    if [ "$MISSING_STATUS_COUNT" -gt 0 ]; then
+        echo "  ⚠ $MISSING_STATUS_COUNT файл(ов) не дали статус (воркер прерван?) — считаю как сбой доставки: ${MISSING_STATUS_SAMPLE[*]}" >&2
+    fi
+fi
+
+# --- Phase B: sequential classification — unchanged logic (merge-base
+# detector, diff-count, CLAUDE_CONFLICT_* handling all stay exactly as
+# before); only the source of "did we get the file" moves from an inline
+# curl to reading Phase A's status file. ---
+CLASSIFY_IDX=0
 while IFS='|' read -r fpath fdesc expected_hash; do
     [ -z "$fpath" ] && continue
     # issue #402 (defect 3): native Windows Python prints \r\n even inside a
@@ -1035,38 +1194,38 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     # silently skipping all 593 manifest files. Strip unconditionally; a no-op
     # on real Unix output.
     expected_hash="${expected_hash%$'\r'}"
-    # Protected user files (issue #154): never overwrite if they already exist locally.
-    # The "Не затрагиваются" list below is cosmetic; is_protected_user_file() is the
-    # actual skip-if-exists guard (shared with the deprecated-file removal loop below).
     if is_protected_user_file "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
         UNCHANGED=$((UNCHANGED + 1))
         continue
     fi
-    DOWNLOAD_IDX=$((DOWNLOAD_IDX + 1))
-    printf "  (%s/%s) %s\r" "$DOWNLOAD_IDX" "$TOTAL_FILES" "$fpath"
+    CLASSIFY_IDX=$((CLASSIFY_IDX + 1))
+    printf "  (%s/%s) %s\r" "$CLASSIFY_IDX" "$TOTAL_FILES" "$fpath"
 
-    # Download remote file
-    REMOTE_FILE="$TMPDIR_UPDATE/files/$fpath"
-    mkdir -p "$(dirname "$REMOTE_FILE")"
+    REMOTE_FILE="$IWE_UPDATE_FILES_DIR/$fpath"
+    STATUS_FILE="$IWE_UPDATE_STATUS_DIR/$fpath.status"
+    FETCH_STATUS=""
+    [ -f "$STATUS_FILE" ] && FETCH_STATUS=$(cut -f1 "$STATUS_FILE")
 
     # issue #350: a failed download used to `continue` silently — the file landed in
     # no list at all, not even the UNCHANGED counter, so the preview said nothing about
     # it while a later run (network back) applied it. "Could not check" is not "up to
     # date"; it now gets its own list and taints the verdict below.
-    if ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/$fpath" -o "$REMOTE_FILE" 2>/dev/null; then
-        SKIPPED_DOWNLOAD+=("$fpath")
-        continue
-    fi
-
-    if [ -n "$expected_hash" ]; then
-        REMOTE_HASH=$(hash_file "$REMOTE_FILE")
-        if [ "$REMOTE_HASH" != "$expected_hash" ]; then
+    case "$FETCH_STATUS" in
+        fetched|cache-hit)
+            ;;  # eligible for classification below
+        hash-mismatch)
             echo "  ⚠ $fpath: sha256 не совпадает с манифестом" >&2
             SKIPPED_DOWNLOAD+=("$fpath (ошибка целостности)")
-            rm -f "$REMOTE_FILE"
             continue
-        fi
-    fi
+            ;;
+        fetch-failed|*)
+            # Empty/unrecognized FETCH_STATUS (malformed status line) is
+            # treated the same as an explicit fetch-failed — fail-closed,
+            # never silently trusted.
+            SKIPPED_DOWNLOAD+=("$fpath")
+            continue
+            ;;
+    esac
 
     if [ ! -f "$SCRIPT_DIR/$fpath" ]; then
         # New file
@@ -1096,27 +1255,7 @@ while IFS='|' read -r fpath fdesc expected_hash; do
             UNCHANGED=$((UNCHANGED + 1))
         fi
     fi
-done < <(
-    # Parse JSON: extract path|desc|sha256 lines. Path via argv (issue #402,
-    # defect 2), not interpolated into the -c string — see FILES_MATCH above.
-    if py_available; then
-        $PY_BIN -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    data = json.load(f)
-for entry in data.get('files', []):
-    print(entry['path'] + '|' + entry.get('desc', '') + '|' + entry.get('sha256', ''))
-" "$MANIFEST" 2>/dev/null
-    else
-        # Fallback: basic grep parsing if no working python interpreter.
-        # No sha256 in this path — integrity check below is skipped (already
-        # documented via SKIPPED_DOWNLOAD, not silently trusted).
-        grep '"path"' "$MANIFEST" | while read -r line; do
-            fpath=$(echo "$line" | sed 's/.*"path"[[:space:]]*:[[:space:]]*"//;s/".*//')
-            echo "$fpath|"
-        done
-    fi
-)
+done < "$MANIFEST_PARSED"
 printf "\n"
 
 # === Step 2b: Deprecated files (устаревшие L1-файлы к удалению) ===
