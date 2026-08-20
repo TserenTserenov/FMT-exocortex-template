@@ -156,6 +156,8 @@ jobs:
       SMOKE_GOVERNANCE_REPO: ${{ matrix.gov_repo }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 20  # WP-529 Ф9: check-delivery-route-label.sh needs a resolvable prior commit for its smoke run below
       - name: Install dependencies
         run: brew install jq  # python3 preinstalled
       - name: Run integration-contract-validator (8 detectors)
@@ -164,6 +166,39 @@ jobs:
         run: bash setup/smoke-test-fresh-install.sh
       - name: Run detector regression fixtures (regex gap guard)
         run: bash setup/test-detectors.sh
+
+      # WP-529 Ф9 (Evgenii 20.08): these two scripts used to hard-fail on
+      # stock macOS /bin/bash (3.2, `declare -A`/`mapfile`) — the `validate`
+      # job already runs them, but only on ubuntu-latest, so the exact defect
+      # class Evgenii reported went unexercised. Pinned to `/bin/bash`
+      # explicitly (not bare `bash`) so this actually hits the system
+      # interpreter the finding is about, not a newer Homebrew bash the
+      # runner's PATH might expose. `--map-consistency`-only concern here —
+      # the ubuntu `validate` job already checks correctness against the real
+      # PR base; this smoke run only needs SOME resolvable prior commit to
+      # exercise the array-diff code path (the part that used to crash).
+      - name: Run check-critical-files-map.sh on system /bin/bash (3.2)
+        run: /bin/bash scripts/check-critical-files-map.sh
+      - name: Run check-delivery-route-label.sh on system /bin/bash (3.2)
+        run: |
+          # This step cares whether the INTERPRETER chokes (the actual class
+          # of bug), not whether the smoke SHA happens to have an unlabeled
+          # category change (a legitimate business-rule exit 1 on synthetic
+          # data, not a defect) — `set -euo pipefail` makes both look like
+          # "exit 1" from the outside, so distinguish by grepping stderr for
+          # a real interpreter crash signature instead of trusting the exit
+          # code alone.
+          SMOKE_BASE=$(git rev-list --max-count=1 --skip=5 HEAD 2>/dev/null)
+          [ -n "$SMOKE_BASE" ] || SMOKE_BASE=$(git rev-list --max-count=1 HEAD~1 2>/dev/null || git rev-parse HEAD)
+          if ! /bin/bash scripts/check-delivery-route-label.sh "$SMOKE_BASE" > /tmp/route-label-smoke.log 2>&1; then
+            if grep -qiE 'invalid option|command not found|bad substitution|unbound variable' /tmp/route-label-smoke.log; then
+              echo "Interpreter-level crash under system bash — see log below:" >&2
+              cat /tmp/route-label-smoke.log >&2
+              exit 1
+            fi
+            echo "Non-zero exit but no crash signature — treating as a legitimate business-rule result on synthetic smoke data:"
+            cat /tmp/route-label-smoke.log
+          fi
 
   # Upgrade-flow regression test (0.29.18).
   # Корень бага (0.29.13): template-sync перезаписал FMT файлы — smoke-test fresh
@@ -485,6 +520,13 @@ jobs:
             BASE=""
           fi
           bash scripts/check-delivery-route-label.sh "$BASE"
+
+      # WP-529 Ф9 (Evgenii 20.08): anti-regression ratchet, not a compliance
+      # proof — stops the count of bare python3/python .py-invocations from
+      # growing past the ~15 legacy sites already baselined (see the script's
+      # own header for the baseline-update recipe and known blind spots).
+      - name: Check python-resolver contract (no new bare python3 calls)
+        run: bash scripts/check-python-resolver-contract.sh
 
       # setup.sh ↔ update.sh parity. Root (29 июня, peer-session 2026-06-29-03):
       # rules-lazy доставлялся через update.sh, но отсутствовал в setup.sh for-loop —

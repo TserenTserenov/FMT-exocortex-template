@@ -1,0 +1,15 @@
+roles/strategist/scripts/strategist.sh	CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
+roles/synchronizer/scripts/dt-collect.sh	python3 "$SCRIPT_DIR/dt-collect-neon.py" "$DT_USER_ID" "$MERGED" 2>>"$LOG_FILE"
+scripts/agent_fault_remind.sh	python3 scripts/agent_fault_remind.py --protocol "$PROTOCOL"
+scripts/codex-peer-adapter.sh	if python3 "$TEMPLATE_SCRIPTS/content-filter-apply.py" "$CONTENT_FILTER_MAP" \
+scripts/codex-peer-adapter.sh	python3 "$TEMPLATE_SCRIPTS/peer-adapter-filter.py"
+scripts/day-open-pipeline.sh	(python3 "$DS_STRATEGY/scripts/update-derived-snapshot.py" --if-stale-days 10 \
+scripts/day-open-pipeline.sh	python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
+scripts/day-open-pipeline.sh	python3 "$DS_STRATEGY/scripts/day-open-ledger-render-patch.py" \
+scripts/kimi-peer-adapter.sh	if python3 "$SCRIPT_DIR/content-filter-apply.py" "$CONTENT_FILTER_MAP" \
+scripts/kimi-peer-adapter.sh	python3 "$SCRIPT_DIR/peer-adapter-filter.py"
+scripts/tests/test_generate_manifest_registers_setup_exclusions.sh	if ( cd "$SCRATCH" && git ls-files | python3 scripts/check-manifest-coverage.py update-manifest.json ) >/tmp/coverage-out-$$.log 2>&1; then
+scripts/tests/test_issue_463_pyyaml_explicit_diagnostics.sh	OUTPUT=$(PYTHONPATH="$TMP/fakelib" python3 "$ROOT/.claude/scripts/memory-drift-scan.py" --memory /nonexistent 2>&1)
+scripts/wp499-agent-coordination-test.sh	report=$(python3 "$HOME/IWE/$GOVERNANCE_REPO/scripts/lib/gateway-config-report.py" "$agent")
+setup/test-update-edge-cases.sh	T28_REPORT=$(python3 "$TEMPLATE_DIR/.claude/scripts/settings-merge-preview.py" \
+setup/test-update-edge-cases.sh	if python3 "$TEMPLATE_DIR/.claude/scripts/settings-merge-preview.py" \

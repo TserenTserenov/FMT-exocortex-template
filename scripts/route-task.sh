@@ -134,18 +134,36 @@ PYEOF
 # Executors
 # ---------------------------------------------------------------------------
 
+# WP-529 Ф9 (Evgenii 20.08): most .py entrypoints don't need PyYAML (6 of 33
+# top-level scripts/*.py do) — RESOLVER hard-requires it (see find-python3.sh),
+# so a blanket switch to $RESOLVER here would hard-fail the majority on any
+# machine lacking PyYAML. Best-effort only: try the resolver (fixes the
+# Apple-Silicon wrong-interpreter class for scripts that DO need yaml),
+# fall back to plain `python3` + warn otherwise. Entrypoints known to require
+# yaml unconditionally (iwe-agent-dispatcher.py via headless-runner.sh) use
+# the resolver directly with a hard failure instead of this fallback.
+_resolve_python3() {
+    local resolved
+    if resolved=$("$RESOLVER" 2>/dev/null); then
+        printf '%s\n' "$resolved"
+    else
+        warn "PyYAML-capable python3 not found (checked PATH/homebrew/nix) — falling back to plain python3; scripts that import yaml may fail"
+        printf '%s\n' "python3"
+    fi
+}
+
 _resolve_interpreter() {
     local script_path="$1"
     local ext="${script_path##*.}"
     if [[ "$ext" == "py" ]]; then
-        echo "python3"
+        _resolve_python3
     elif [[ "$ext" == "rb" ]]; then
         echo "ruby"
     elif [[ -r "$script_path" ]]; then
         local shebang
         shebang=$(head -n1 "$script_path" 2>/dev/null)
         if [[ "$shebang" =~ ^#!/usr/bin/env[[:space:]]+python ]]; then
-            echo "python3"
+            _resolve_python3
         elif [[ "$shebang" =~ ^#!/usr/bin/env[[:space:]]+ruby ]]; then
             echo "ruby"
         else

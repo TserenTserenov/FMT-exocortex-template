@@ -61,7 +61,8 @@ dump_arrays() {
 }
 
 TMP_BASE_GEN=$(mktemp)
-trap 'rm -f "$TMP_BASE_GEN"' EXIT
+TMP_ARRAY_MAP=$(mktemp)
+trap 'rm -f "$TMP_BASE_GEN" "$TMP_ARRAY_MAP"' EXIT
 
 if ! git -C "$SCRIPT_DIR" show "$BASE:generate-manifest.sh" > "$TMP_BASE_GEN" 2>/dev/null; then
     echo "  ℹ generate-manifest.sh не существовал на base-ревизии — проверка меток пропущена"
@@ -90,10 +91,11 @@ done
 # soft skip like day-open-scaffold.sh's best-effort sites).
 RESOLVED_PYTHON3=$("$SCRIPT_DIR/scripts/lib/find-python3.sh" 2>/dev/null) || RESOLVED_PYTHON3=""
 [ -n "$RESOLVED_PYTHON3" ] || { echo "ERROR: python3 с библиотекой PyYAML не найден (pip install pyyaml)"; exit 2; }
-declare -A ARRAY_TO_CATEGORY
-while IFS=$'\t' read -r cat_id array_name; do
-    ARRAY_TO_CATEGORY["$array_name"]="$cat_id"
-done < <("$RESOLVED_PYTHON3" - "$MAP" <<'PY'
+# WP-529 Ф9 (Evgenii 20.08, bash 3.2 finding): было `declare -A` — Bash 3.2
+# (stock macOS /bin/bash) не умеет ассоциативные массивы. CURATED_ARRAYS
+# короткий (7 записей), и лукап идёт только внутри его цикла, не на каждый
+# git-tracked файл — лукап через awk по TSV-файлу вместо hash.
+"$RESOLVED_PYTHON3" - "$MAP" > "$TMP_ARRAY_MAP" <<'PY'
 import re
 import sys
 import yaml
@@ -108,9 +110,8 @@ for cat in data.get("categories", []):
     for name in re.split(r",\s*", val):
         name = name.strip()
         if name:
-            print(f"{cat['id']}\t{name}")
+            print(f"{name}\t{cat['id']}")
 PY
-)
 
 IMPLICATED=()
 for arr in "${CURATED_ARRAYS[@]}"; do
@@ -121,7 +122,7 @@ for arr in "${CURATED_ARRAYS[@]}"; do
     old_sorted=$(printf '%s\n' "${!old_ref}" | sort)
     new_sorted=$(printf '%s\n' "${!new_ref}" | sort)
     if [ "$old_sorted" != "$new_sorted" ]; then
-        cat_id="${ARRAY_TO_CATEGORY[$arr]:-}"
+        cat_id=$(awk -F'\t' -v k="$arr" '$1==k{print $2; exit}' "$TMP_ARRAY_MAP")
         if [ -z "$cat_id" ]; then
             echo "  ❌ $arr изменился, но не сопоставлен ни одной категории в $MAP — карта разошлась с гейтом" >&2
             exit 1
@@ -136,7 +137,12 @@ done
 # and both map to dev-only-excluded. That is one route decision, not two;
 # dedupe so the same category is not reported/required twice.
 if [ "${#IMPLICATED[@]}" -gt 0 ]; then
-    mapfile -t IMPLICATED < <(printf '%s\n' "${IMPLICATED[@]}" | sort -u)
+    # WP-529 Ф9 (Evgenii 20.08, bash 3.2 finding): mapfile — bash4-only.
+    IMPLICATED_DEDUP=()
+    while IFS= read -r cat_id; do
+        IMPLICATED_DEDUP+=("$cat_id")
+    done < <(printf '%s\n' "${IMPLICATED[@]}" | sort -u)
+    IMPLICATED=("${IMPLICATED_DEDUP[@]}")
 fi
 
 # deprecated_files — manually curated list, not derived from a bash array at

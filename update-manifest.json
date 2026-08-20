@@ -5,7 +5,7 @@
   "files": [
     {
       "path": ".agentigore",
-      "sha256": "0ff17cd114799723fe755215eeab25d7b4dbb8b2c3ed2f29458f7302d802fc86"
+      "sha256": "40f8b3d924848fac222b26506975f69213d608924104ff0236a7bc26bd43994c"
     },
     {
       "path": ".claude/agents/wp-sync-actualizer.md",
@@ -1873,11 +1873,11 @@
     },
     {
       "path": "scripts/check-critical-files-map.sh",
-      "sha256": "21644640c579969f8f3c85e3ddc5f08139658977e93c1450eed48a8e866024b7"
+      "sha256": "4df7b76009591c8c861917a049fa0706ed0a6c7d508f26b07afcb7517bbda4b5"
     },
     {
       "path": "scripts/check-delivery-route-label.sh",
-      "sha256": "6f6940a4c18e6995c25bf09eb256b9d1bf4ae17abf8d91365ad5e08917b0c31f"
+      "sha256": "c6b5e30914e947035ac6951de389c9272714c62d448ae855a6a1ea5fede987ea"
     },
     {
       "path": "scripts/check-dirty-repos.sh",
@@ -1898,6 +1898,10 @@
     {
       "path": "scripts/check-platform-compat.sh",
       "sha256": "df7aa7df671db2824880ec2888bebfdc9ae21c2c5c7faf185d7ed86a083a25e2"
+    },
+    {
+      "path": "scripts/check-python-resolver-contract.sh",
+      "sha256": "a557ac123401a7a73e353d0dcddceb3bc3e868ebf1f0b4da8c461f1b8c28d34a"
     },
     {
       "path": "scripts/check-script-collisions.sh",
@@ -2041,7 +2045,7 @@
     },
     {
       "path": "scripts/headless-runner.sh",
-      "sha256": "badcac85d3f91910eb8565de495b7007a8da8ed674ac5084b78f301961a61899"
+      "sha256": "5a79a6d1fe9735bd7a6675d79aeb31d0fb4112f32a639c434f1e406ac14582ff"
     },
     {
       "path": "scripts/hermes-peer-adapter.sh",
@@ -2257,7 +2261,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "59e065c3eb4e37b873cd52849c8562468f9ac95c0feccdd05e5b3bb4869b0333"
+      "sha256": "2ab3cbce4679c6d9fdf300570487d89e3dec725fa320b515962a52fb7b1f1514"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -2618,6 +2622,7 @@
     "scripts/iwe-trace.py",
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
+    "scripts/tests/fixtures/python-resolver-baseline.txt",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
@@ -2629,6 +2634,7 @@
     "scripts/tests/test_dry_run_gate.py",
     "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",
     "scripts/tests/test_install_hooks.py",
+    "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_receipt.sh",
