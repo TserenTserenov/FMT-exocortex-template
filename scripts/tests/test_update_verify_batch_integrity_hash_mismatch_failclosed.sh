@@ -20,7 +20,10 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 UPDATE_SH="$ROOT/update.sh"
 CLEANUP_DIRS=()
 SERVER_PID=""
-trap '[ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; for d in "${CLEANUP_DIRS[@]}"; do rm -rf "$d" 2>/dev/null; done' EXIT
+# ${arr[@]+...} idiom: a bare "${CLEANUP_DIRS[@]}" on an EMPTY array is an
+# unbound-variable error under set -u on Bash 3.2 (fixed in 4.4+) — the trap
+# then dies mid-cleanup and masks the test's real failure (WP-529 F9 class).
+trap '[ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null; for d in ${CLEANUP_DIRS[@]+"${CLEANUP_DIRS[@]}"}; do rm -rf "$d" 2>/dev/null; done' EXIT
 
 # shellcheck source=lib/extract-update-download-batch.sh
 . "$ROOT/scripts/tests/lib/extract-update-download-batch.sh"
@@ -38,6 +41,13 @@ CLEANUP_DIRS+=("$FUNCS")
 }
 # shellcheck disable=SC1090
 . "$FUNCS"
+
+# download_batch's serial/parallel switch lives in update.sh's MAIN BODY
+# (WP-546 parallelization), not inside the extracted function — without it the
+# first `if $USE_PARALLEL_DOWNLOAD` dies as unbound under set -u (live red CI
+# on main, run 32470798303). Pin the serial path: these cases assert the
+# fail-closed download contract, which must hold identically in both modes.
+USE_PARALLEL_DOWNLOAD=false
 
 TMPDIR_UPDATE=$(mktemp -d)
 CLEANUP_DIRS+=("$TMPDIR_UPDATE")
