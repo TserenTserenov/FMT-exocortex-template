@@ -30,6 +30,12 @@ trap 'echo "ОШИБКА: update.sh прервался на строке ${LINEN
 VERSION="2.4.1"  # fix (WP-401): deprecated-file removal now checks is_protected_user_file() — a protected file (e.g. sessions/00-index.md) listed in deprecated_files by mistake could previously be deleted despite the "Не затрагиваются" report claiming otherwise; fix #229: repair-pass no longer stale-repairs memory files with owner: user in frontmatter; fix #228: hot-budget validator warns when memory/*.md horizon:hot lines exceed threshold
 REPO="TserenTserenov/FMT-exocortex-template" # UPSTREAM-CONST: do not substitute
 BRANCH="main"
+# Delivery channel (WP-529 F7, pilot decision 2026-08-21, prompted by an
+# external user's report): "release" (default) pins the delivery to the last
+# published release tag — users must not receive unreleased, possibly red,
+# main. IWE_UPDATE_CHANNEL=main opts back into the moving branch (author/dev
+# workflow, and the automatic fallback when no release exists yet).
+UPDATE_CHANNEL="${IWE_UPDATE_CHANNEL:-release}"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 API_BASE="https://api.github.com/repos/$REPO"
 
@@ -703,7 +709,32 @@ exit_clean() {
 # that immutable commit, so a push between manifest and file requests cannot mix
 # hashes from one revision with content from another (issue #398).
 resolve_delivery_ref() {
-    local resolved_ref
+    local resolved_ref release_tag
+    if [ "$UPDATE_CHANNEL" = "release" ]; then
+        # sed, not python: the tag must be resolvable even on installs where
+        # py_available fails — a release tag is already an immutable-enough
+        # pin, unlike the moving branch the no-python path degrades to below.
+        # shellcheck disable=SC2086
+        release_tag=$(curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$API_BASE/releases/latest" 2>/dev/null | \
+            sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        if [ -n "$release_tag" ]; then
+            if py_available && resolved_ref=$(curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$API_BASE/commits/$release_tag" 2>/dev/null | \
+                "$PY_BIN" -c '
+import json, re, sys
+sha = json.load(sys.stdin).get("sha", "")
+if not re.fullmatch(r"[0-9a-f]{40}", sha):
+    raise SystemExit(1)
+print(sha)'); then
+                RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
+                echo "  Канал поставки: релиз $release_tag (снимок ${resolved_ref:0:12})"
+            else
+                RAW_BASE="https://raw.githubusercontent.com/$REPO/$release_tag"
+                echo "  Канал поставки: релиз $release_tag (закреплён по тегу)"
+            fi
+            return 0
+        fi
+        echo "  ⚠ Не удалось определить последний релиз (нет релизов или API недоступен) — откат на ветку $BRANCH."
+    fi
     if ! py_available; then
         echo "  ⚠ Нет python3: поставка проверяется по подвижной ветке $BRANCH."
         return 0

@@ -2641,7 +2641,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "a0e1a18ef40ca37c54b9897bff7cd83475232e2abd6b5ea808d14cee486bcd99"
+      "sha256": "2ffe40bd30d55c5816a4e65cf6b288ca04fcb087f30bcde794865bf5e94bdab7"
     }
   ],
   "excluded_paths": [
@@ -2723,6 +2723,7 @@
     "setup/test-detectors.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-release-channel.sh",
     "setup/ux-walkthrough-prompt.md"
   ],
   "deprecated_files": [

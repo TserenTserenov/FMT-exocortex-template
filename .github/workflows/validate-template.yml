@@ -587,6 +587,13 @@ jobs:
       - name: Run Day Open delivery-closure acceptance test
         run: bash setup/test-day-open-delivery-closure.sh
 
+      # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
+      # last published release by default, moving main only via explicit
+      # IWE_UPDATE_CHANNEL=main or as an announced fallback when no release
+      # exists. Stubbed-curl cases over the real resolve_delivery_ref().
+      - name: Run update.sh release-channel test
+        run: bash setup/test-update-release-channel.sh
+
       # PR #385: cloud install paths may occur legitimately in old tracked text;
       # only additions made by the current updater run are publication blockers.
       - name: Test staged install-path guard
