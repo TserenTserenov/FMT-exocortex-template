@@ -144,6 +144,8 @@ jobs:
         run: bash setup/smoke-test-fresh-install.sh
       - name: Run detector regression fixtures (regex gap guard)
         run: bash setup/test-detectors.sh
+      - name: Run DayPlan-validator hook regression (trigger gap guard)
+        run: bash setup/test-hook-dayplan-validator.sh
 
   integration-contract-macos:
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'

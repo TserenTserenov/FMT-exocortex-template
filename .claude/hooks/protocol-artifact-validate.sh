@@ -39,6 +39,53 @@ GOV_PATH="$WORKSPACE/$GOV_REPO"
 # на любой коммит файла `day-close/SKILL.md` или сообщения с «day-close».
 # Принцип: «hook trigger = artifact (staged file), не TOOL_INPUT текст» (memory/hooks-design.md).
 STAGED=$(cd "$GOV_PATH" 2>/dev/null && git diff --cached --name-only 2>/dev/null || echo "")
+
+# bug-2026-07-24 fix: индекс читается ДО запуска команды, поэтому связка
+# `git add X && git commit` проходила без валидации — на момент проверки индекс
+# ещё пуст, и хук выходил на строке ниже. Дополняем фактический индекс путями,
+# которые команда собирается застейджить сама.
+#
+# Принцип WP-273 не нарушается: парсится не весь текст команды, а ТОЛЬКО
+# сегменты, начинающиеся с `git add`. Сообщение коммита с упоминанием DayPlan
+# false positive не даёт, потому что сегмент `git commit -m ...` не парсится.
+extract_git_add_paths() {
+  local segments seg args toks tok out=""
+  # Разбиваем команду на сегменты по разделителям — валидируем только `git add`.
+  # awk, а не `sed 's/&&/\n/g'`: BSD sed (macOS) вставил бы литерал «n».
+  segments=$(printf '%s\n' "$TOOL_INPUT" | awk '{gsub(/&&|\|\||;|\|/, "\n"); print}')
+  while IFS= read -r seg; do
+    echo "$seg" | grep -qE '(^|[[:space:]])git[[:space:]]+add([[:space:]]|$)' || continue
+    args=${seg#*git}
+    args=${args#*add}
+    # xargs разбирает кавычки по-шелловски — пути с пробелами не рвутся.
+    toks=$(printf '%s' "$args" | xargs -n1 2>/dev/null) || toks=""
+    while IFS= read -r tok; do
+      [ -z "$tok" ] && continue
+      case "$tok" in
+        # Массовый стейджинг (запрещён CLAUDE.md, но дыру не оставляем):
+        # берём изменённые артефакты из рабочего дерева.
+        .|-A|--all|-u|--update)
+          # -uall: без него неотслеживаемый каталог схлопывается в `current/`
+          # и новый DayPlan не виден.
+          out="$out$(cd "$GOV_PATH" 2>/dev/null && git status --porcelain -uall 2>/dev/null \
+            | sed -e 's/^...//' -e 's/^.* -> //' -e 's/^"//' -e 's/"$//')"$'\n'
+          continue
+          ;;
+        -*) continue ;;
+      esac
+      tok=${tok#./}
+      # Абсолютный или вложенный путь -> repo-relative.
+      case "$tok" in
+        */current/*) tok="current/${tok#*/current/}" ;;
+      esac
+      out="$out$tok"$'\n'
+    done <<< "$toks"
+  done <<< "$segments"
+  printf '%s' "$out"
+}
+
+STAGED=$(printf '%s\n%s\n' "$STAGED" "$(extract_git_add_paths)" | sed '/^$/d' | sort -u)
+
 if ! echo "$STAGED" | grep -qE '^current/DayPlan.*\.md$|^current/WeekPlan.*\.md$'; then
   echo '{}'
   exit 0
