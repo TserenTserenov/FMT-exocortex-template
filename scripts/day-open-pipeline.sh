@@ -15,6 +15,9 @@ set -uo pipefail
 
 DS_STRATEGY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IWE="${IWE_ROOT:-$(cd "$DS_STRATEGY/.." && pwd)}"
+# Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
+# a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
+export IWE_ROOT="$IWE"
 CONFIG="$DS_STRATEGY/exocortex/day-rhythm-config.yaml"
 # shellcheck source=lib/ledger-path.sh
 . "$DS_STRATEGY/scripts/lib/ledger-path.sh"
@@ -817,6 +820,14 @@ fi
 echo "=== 4.2. Bottleneck patch ==="
 bash "$DS_STRATEGY/scripts/day-open-bottleneck-patch.sh" "$DAYPLAN_PATH" 2>&1 || true
 
+
+# Shared resolver for the deterministic patch steps below (4.3, 4.55-4.57).
+# WP-529 F7 port (peer session 2026-08-21-17): ledger-render imports yaml, so a
+# bare `python3` can be a yaml-less interpreter (same defect class as F6/F9);
+# the stdlib-only patches get the same binary with a soft fallback — a missing
+# resolver must not break steps that never needed PyYAML in the first place.
+_PATCH_PY=$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh" 2>/dev/null) || _PATCH_PY=""
+[ -n "$_PATCH_PY" ] || _PATCH_PY=python3
 # ============================================
 # 4.3. Ledger render (deterministic, AFTER LLM Fill — same reason as 4.2 above:
 # WP-484 Ф16.2 2b). Appends render-open.py's ledger sections (Итоги вчера/Очередь
@@ -828,7 +839,7 @@ bash "$DS_STRATEGY/scripts/day-open-bottleneck-patch.sh" "$DAYPLAN_PATH" 2>&1 ||
 # own docstring for the graceful-degradation design.
 # ============================================
 echo "=== 4.3. Ledger render ==="
-python3 "$DS_STRATEGY/scripts/day-open-ledger-render-patch.py" \
+"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-ledger-render-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --date "$DATE" 2>&1 || true
 
@@ -839,6 +850,49 @@ echo "=== 4.5. Budget patch ==="
 python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
+
+# ============================================
+# 4.55. Priorities patch (deterministic — WP-484, pilot instruction 16.08: Day
+# Open must never fail to run because of a priorities discrepancy; the finding
+# belongs in the DayPlan itself, not as a commit-blocking exit 1). Writes into
+# «Требует внимания» while the section header is still guaranteed to exist
+# (before archive/sync can touch the file) — same slot pattern as 4.5 above.
+# Ported from the author pipeline (WP-529 F7): resolver-based interpreter, not
+# bare python3 — see _PATCH_PY above.
+# ============================================
+echo "=== 4.55. Priorities patch ==="
+"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-priorities-patch.py" \
+  --dayplan "$DAYPLAN_PATH" \
+  --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
+
+# ============================================
+# 4.56. Close-error patch (deterministic — WP-484 F113: the night runner exports
+# IWE_CLOSE_ERROR instead of stopping before this pipeline when the Close half
+# fails. Empty/unset in every other invocation (manual runs, probes, installs
+# without a night cycle) — no-op then. Same non-blocking pattern as 4.55.
+# ============================================
+echo "=== 4.56. Close-error patch ==="
+"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-close-error-patch.py" \
+  --dayplan "$DAYPLAN_PATH" \
+  --error "${IWE_CLOSE_ERROR:-}" 2>&1 || true
+
+# ============================================
+# 4.57. Version-check patch (deterministic — WP-484 stage-0 wiring: a stale
+# checkout is a visible finding, not a silent commit block). Template port
+# guard (WP-529 F7, peer consensus 2026-08-21-17): comparing HEAD..origin/main
+# only makes sense when such a remote ref exists. A template/offline install
+# without it is a NORMAL mode, not a pipeline error — diagnose to stderr and
+# move on, never non-zero, never a DayPlan «Требует внимания» entry.
+# ============================================
+echo "=== 4.57. Version-check patch ==="
+if git -C "$DS_STRATEGY" remote get-url origin >/dev/null 2>&1 \
+   && git -C "$DS_STRATEGY" rev-parse --verify --quiet origin/main >/dev/null 2>&1; then
+  "$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-version-check-patch.py" \
+    --dayplan "$DAYPLAN_PATH" \
+    --repo "$DS_STRATEGY" 2>&1 || true
+else
+  echo "version-check: no origin/main to compare against — skipped (comparison context unavailable, normal for template/offline installs)" >&2
+fi
 
 # ============================================
 # 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Ф2)

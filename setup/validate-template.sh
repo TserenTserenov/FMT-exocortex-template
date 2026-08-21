@@ -291,7 +291,7 @@ elif [ "$MODE" = "staged" ]; then
     # scripts/lib/find-python3.sh: sanctioned exception (WP-529 F6, #453/#463) —
     # the resolver's whole job is enumerating STANDARD system python locations
     # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    count=$(hardcode_scan_staged '/opt/homebrew' 'README\.md|PLATFORM-COMPAT\.md|validate-template\.yml|/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
+    count=$(hardcode_scan_staged '/opt/homebrew' 'README\.md|PLATFORM-COMPAT\.md|validate-template\.yml|/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK3_HITS_FILE" || true

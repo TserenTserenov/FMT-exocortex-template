@@ -657,7 +657,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9e14f11e65d250442261d94cd181c41cdc97b6b02173b36d257d793c7648240f"
+      "sha256": "00fcd62b44a3436cdf16f81d9fce2f5333d656882ea294454c0895d2c1cfe124"
     },
     {
       "path": "CLAUDE.md",
@@ -1984,6 +1984,10 @@
       "sha256": "1356efd3881354be0417024145922259752c741a6445531d24a73c24a2ecb333"
     },
     {
+      "path": "scripts/day-open-bottleneck-patch.sh",
+      "sha256": "9050b6df2664f3683b71be868b2c17a0c85e36ccb64d1d847b09ea7a0934e4d7"
+    },
+    {
       "path": "scripts/day-open-budget-patch.py",
       "sha256": "c02cc64e6c108eca4aaed8e7fecd7d6da36b81ac5ef2a27a70ba61a9a28720cc"
     },
@@ -1992,16 +1996,28 @@
       "sha256": "81bbf1810e8e34c710d9bc9b28a93d5cbae7640feb66ded888bfdae1c20b0abd"
     },
     {
+      "path": "scripts/day-open-close-error-patch.py",
+      "sha256": "83d32007bd512f80032471eebff89adace920625e689980c0e847271176b13a6"
+    },
+    {
+      "path": "scripts/day-open-ledger-render-patch.py",
+      "sha256": "395224010927ec5dd5a2625b6c99f58c27045a5dd6bd7090acc0919c4841b90b"
+    },
+    {
       "path": "scripts/day-open-llm-fill.py",
       "sha256": "ace948428d1e5f797c9fc70333971541394fee9646b389b3548d51b78fa9eb0f"
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "94dbb4cae8ca368d640d66f3f429ede706229f951fe6f9cbb4cd9891825c4b4c"
+      "sha256": "dd1f1c5bdd8bf14106ba1de7063dd4bb9a8f97c1c1b0d7c9a574f1f2ea346189"
     },
     {
       "path": "scripts/day-open-preflight.sh",
       "sha256": "ff38d44cfb2aad74a7b4b675443a630234eb0fe12cbcceacca1ae8ce47f564d1"
+    },
+    {
+      "path": "scripts/day-open-priorities-patch.py",
+      "sha256": "65b036a83e164a0bbeb9b8cc421c4c00f1646d7284bdc0879ae551fc0338a872"
     },
     {
       "path": "scripts/day-open-scaffold.sh",
@@ -2014,6 +2030,10 @@
     {
       "path": "scripts/day-open-smoke.sh",
       "sha256": "fc7780833a9aacb15cc104c61f8e2ca974577a0f70e35fdeb0d037cebce771a7"
+    },
+    {
+      "path": "scripts/day-open-version-check-patch.py",
+      "sha256": "4324e682ec690e2ef565f7c99ba580e5d80556bccb73d36ca39b8ee096a2decf"
     },
     {
       "path": "scripts/external-tracker.py",
@@ -2074,6 +2094,10 @@
     {
       "path": "scripts/hot-files.list",
       "sha256": "19780ebdac77af24e345d17a1e9799e5dd3db56c97cd50dd53001860d0e3cfe2"
+    },
+    {
+      "path": "scripts/install-hooks.sh",
+      "sha256": "426472dc6b3e6a0999b075b8ffc64b33bbc3dd68d08a06df7eecc035703c2ad9"
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
@@ -2180,6 +2204,10 @@
       "sha256": "0e4ebc302e7a8819af2e71c8643887bdc887fb87d06d865d27258c7c5482fece"
     },
     {
+      "path": "scripts/lib/ledger_path.py",
+      "sha256": "864b0352e097e767b8ed27001b1750cfb507b191aeff04f9063318e821068bc4"
+    },
+    {
       "path": "scripts/lib/network-wait.sh",
       "sha256": "beefa7845cd7d386a0b272bc147a01c0223211cf574dfc95054533461d191ea4"
     },
@@ -2190,6 +2218,10 @@
     {
       "path": "scripts/lib/telegram.sh",
       "sha256": "4c5c0546b87a7bbe6dbff6af7ca011c561a1c2f5a2e5db4c4fedcd183bc9de3e"
+    },
+    {
+      "path": "scripts/lib/wp_inbox.py",
+      "sha256": "c22ac737ed5a35131f0ed45518f071deaa3c89c0e100a85d8b9114250210ec6d"
     },
     {
       "path": "scripts/llm-proxy-launcher.sh",
@@ -2686,6 +2718,7 @@
     "setup/promote-fixtures/sample-skill/scripts/sample-tool.sh",
     "setup/release-audit-prompt.md",
     "setup/smoke-test-fresh-install.sh",
+    "setup/test-day-open-delivery-closure.sh",
     "setup/test-delivery-route-label.sh",
     "setup/test-detectors.sh",
     "setup/test-update-edge-cases.sh",
