@@ -916,6 +916,10 @@
       "sha256": "36df5255c46647e969b7aa69137bc996790b47619f7a808640e3dd584346b897"
     },
     {
+      "path": "extensions/day-open.checks.md",
+      "sha256": "6019e609a4345e3699e67d63173c45774c012e352fbfac18c6f7efa87d5630d1"
+    },
+    {
       "path": "extensions/local-llm/ADR-001-local-llm-stack.md",
       "sha256": "70849c5b4ce154361e4745fb8edcfdd585fc93802a2e5e4fd13da4a1e618a243"
     },

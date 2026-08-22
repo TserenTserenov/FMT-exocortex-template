@@ -125,6 +125,28 @@ if [ -f "$MANIFEST" ]; then
   [ "$n" -eq 1 ] && pass "manifest exactly once: scripts/lib/find-python3.sh" || fail "manifest entries for scripts/lib/find-python3.sh: $n (expected 1)"
 fi
 
+# --- 2c. Default checks file (data dependency of the Checks step) -------------
+# The checks runner blocks on "found 0 bash blocks" but degrades to "nothing to
+# check" when NO checks file exists at all — a fresh install shipped none
+# (external user report, 2026-08-21). The default must exist, carry at least
+# one bash block, and be in the manifest exactly once.
+echo "=== 2c. Default day-open.checks.md delivery ==="
+DEFAULT_CHECKS="$REPO_ROOT/extensions/day-open.checks.md"
+if [ -f "$DEFAULT_CHECKS" ]; then
+  pass "delivered: extensions/day-open.checks.md"
+  if grep -q '^```bash$' "$DEFAULT_CHECKS"; then
+    pass "default checks file carries executable bash block(s)"
+  else
+    fail "extensions/day-open.checks.md has no \`\`\`bash blocks — runner would block on 0 blocks"
+  fi
+else
+  fail "extensions/day-open.checks.md not delivered — Checks step degrades to 'nothing to check' on fresh installs"
+fi
+if [ -f "$MANIFEST" ]; then
+  n=$(grep -c '"extensions/day-open.checks.md"' "$MANIFEST") || true
+  [ "$n" -eq 1 ] && pass "manifest exactly once: extensions/day-open.checks.md" || fail "manifest entries for extensions/day-open.checks.md: $n (expected 1)"
+fi
+
 # --- 3. Entry points run from a foreign cwd with a clean PYTHONPATH -----------
 echo "=== 3. Foreign-cwd smoke (clean PYTHONPATH) ==="
 RESOLVED_PY=""
