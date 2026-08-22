@@ -629,7 +629,7 @@
     },
     {
       "path": ".github/workflows/notify-update.yml",
-      "sha256": "672316f4226d43912c77b9ad2b2a66c90e987f6939688e83a7bfd40859cb797f"
+      "sha256": "d38bf9caa7b4eaccf0f86a6c96142d4b191c5919af95746eef57a341d288fa31"
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
@@ -657,7 +657,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "75769715b411bc5a6b842a2822c3035ce04ed10c88041482dde578d2230f7625"
+      "sha256": "3e23c9ca0b8b46d8bb5f9c98a5ced1f27ca94516ac80a06da9616408c6b4e1ad"
     },
     {
       "path": "CLAUDE.md",
@@ -985,7 +985,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "fa5b37637ba1c5af0e544134e08184e69245073e6aaef545fd9e93d1b46d8e4d"
+      "sha256": "dcb50518ecd9a13491d87f8f2bf060f1e8b2f84007e7c753aad0764c710cc961"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2577,7 +2577,7 @@
     },
     {
       "path": "scripts/verify-manifest.sh",
-      "sha256": "177485c72f35275624de93289e6e651e7ad079f7c86f3619be08c13e8bbec25e"
+      "sha256": "613546c9b12201bd1bac9fef97c159586bdf08cb7fd947d93ed50856196c557a"
     },
     {
       "path": "scripts/week-draft-append.sh",
@@ -2645,7 +2645,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "2ffe40bd30d55c5816a4e65cf6b288ca04fcb087f30bcde794865bf5e94bdab7"
+      "sha256": "632590a53e7e297d62ef687eac310c8ce9fca7ed67f088bc9f8202da595d1f12"
     }
   ],
   "excluded_paths": [
@@ -2697,12 +2697,6 @@
     "scripts/tests/test_validate_hypothesis_priority.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/00-writer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/01-peer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/02-writer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/03-peer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/meta.yaml",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/report.md",
     "setup/detector-fixtures/README.md",
     "setup/detector-fixtures/detector_07/positive_backtick_slash.md",
     "setup/detector-regex.sh",
@@ -2728,6 +2722,7 @@
     "setup/test-update-edge-cases.sh",
     "setup/test-update-issue-226.sh",
     "setup/test-update-release-channel.sh",
+    "setup/test-update-self-overwrite.sh",
     "setup/ux-walkthrough-prompt.md"
   ],
   "deprecated_files": [
@@ -2830,22 +2825,6 @@
     {
       "path": "sessions/2026-06/2026-06-17-01-kimi-setup/report.md",
       "reason": "session transcripts archived, removed by WP-401 Ф6.1 2026-07-22"
-    },
-    {
-      "path": "docs/developer/README.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
-    },
-    {
-      "path": "docs/developer/card-template.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
-    },
-    {
-      "path": "docs/developer/developer-guide.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
-    },
-    {
-      "path": "docs/developer/testing-as-spec.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
     }
   ]
 }

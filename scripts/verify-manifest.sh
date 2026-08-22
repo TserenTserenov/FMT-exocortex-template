@@ -54,6 +54,27 @@ with open('$TMP_MANIFEST', 'w') as f:
 # Восстанавливаем оригинальный манифест (generate-manifest.sh его перезаписал)
 cp "$BACKUP" "$MANIFEST"
 
+# 2026-08-22 (external report, live 10-file deletion): deprecated_files must
+# never intersect the delivered set OR the git-tracked tree — update.sh would
+# delete files the canon still ships with every fresh clone. generate-manifest
+# filters this at write time; this check fails closed on a bad committed one.
+DEP_CONFLICTS=$(python3 - "$MANIFEST" <<'PYCHECK'
+import json, subprocess, sys
+m = json.load(open(sys.argv[1]))
+delivered = {e['path'] for e in m.get('files', [])}
+tracked = set(subprocess.run(['git', 'ls-files'], capture_output=True, text=True).stdout.splitlines())
+bad = [e['path'] for e in m.get('deprecated_files', []) if e.get('path') in delivered or e.get('path') in tracked]
+print('\n'.join(bad))
+PYCHECK
+)
+if [ -n "$DEP_CONFLICTS" ]; then
+    echo "❌ manifest-verify: deprecated_files пересекается с поставкой/деревом git:"
+    printf '  %s
+' $DEP_CONFLICTS
+    echo "→ Либо файл больше не deprecated (убери запись), либо удали его из дерева (git rm)"
+    exit 1
+fi
+
 # Сравниваем backup с сгенерированным
 if diff -q "$BACKUP" "$TMP_MANIFEST" >/dev/null 2>&1; then
     echo "✅ manifest-verify: update-manifest.json синхронизирован с git tree"

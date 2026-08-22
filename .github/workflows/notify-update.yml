@@ -48,8 +48,22 @@ jobs:
           TODAY=$(date -u +%Y-%m-%d)
           YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d)
 
-          # Первая (самая новая) версия — для заголовка
-          VERSION=$(grep -m1 '^## \[' CHANGELOG.md | sed 's/## //')
+          # Первая (самая новая) РЕАЛЬНО ВЫПУЩЕННАЯ версия — для заголовка
+          # (см. блок ниже: заголовок тоже не имеет права опережать тег).
+          VERSION=""
+
+          # 2026-08-22 (live: анонс v0.38.7 ушёл 32 подписчикам, пока тега и
+          # GitHub Release не существовало): дайджест обязан опираться на факт
+          # выпуска, не на заголовок CHANGELOG. Секции версий без существующего
+          # git-тега (v<ver> или <ver>) исключаются из рассылки целиком.
+          git tag > /tmp/existing_tags.txt
+          while IFS= read -r hdr; do
+            ver=$(printf '%s' "$hdr" | sed -E 's/^\[([^]]+)\].*/\1/')
+            if grep -qx "v$ver" /tmp/existing_tags.txt || grep -qx "$ver" /tmp/existing_tags.txt; then
+              VERSION="$hdr"
+              break
+            fi
+          done < <(grep '^## \[' CHANGELOG.md | sed 's/## //')
 
           # Все записи с датами today или yesterday
           # Собираем все блоки между ## [...] заголовками, фильтруя по дате
@@ -60,19 +74,28 @@ jobs:
           entries = []
           current_block = []
           current_date = None
+          tags = set(open('/tmp/existing_tags.txt').read().split())
+          def released(ver):
+              # Unreleased-секция и версии без тега не анонсируются;
+              # исторические теги встречаются и с 'v', и без.
+              if not ver or ver.lower() == 'unreleased':
+                  return False
+              return ('v' + ver) in tags or ver in tags
+          current_ver = None
           with open('CHANGELOG.md') as f:
               for line in f:
                   if line.startswith('## ['):
-                      if current_block and current_date in (today, yesterday):
+                      if current_block and current_date in (today, yesterday) and released(current_ver):
                           entries.extend(current_block)
                       current_block = []
                       # Extract date from '## [0.8.7] — 2026-03-17'
                       parts = line.split('—')
                       current_date = parts[-1].strip() if len(parts) > 1 else ''
+                      current_ver = line.split('[', 1)[-1].split(']', 1)[0].strip()
                   elif current_date is not None:
                       current_block.append(line)
               # Last block
-              if current_block and current_date in (today, yesterday):
+              if current_block and current_date in (today, yesterday) and released(current_ver):
                   entries.extend(current_block)
           result = ''.join(entries).strip()
           # Limit to ~50 lines

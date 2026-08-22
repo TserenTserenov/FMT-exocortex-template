@@ -780,6 +780,12 @@ if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
 fi
 
 # === Step 0: Self-update (bootstrap) ===
+# issue #505 root, part 1: the channel must be resolved BEFORE self-update.
+# Step 0 used to fetch update.sh from the DEFAULT moving main while Step 1
+# then pinned the delivery to the release snapshot — so the local update.sh
+# ping-ponged between the main and release versions on every run, and Step 5
+# always saw update.sh as "updated" (see part 2 at the apply loop).
+resolve_delivery_ref
 echo "[0] Проверка update.sh..."
 # Capture hash before any network activity — used for --check integrity guard below (fix #205)
 SELF_HASH_BEFORE=$(hash_file "$SCRIPT_DIR/update.sh")
@@ -805,7 +811,6 @@ echo ""
 
 # === Step 1: Fetch manifest ===
 echo "[1] Загрузка манифеста..."
-resolve_delivery_ref
 MANIFEST_URL="$RAW_BASE/update-manifest.json"
 MANIFEST="$TMPDIR_UPDATE/manifest.json"
 
@@ -1536,9 +1541,19 @@ done < <(
 import json, sys
 with open(sys.argv[1]) as f:
     data = json.load(f)
+# 2026-08-22 (external report): a path present in BOTH the delivered files
+# set and deprecated_files is a generator inconsistency — removal deleted 10
+# files HEAD still ships, right after a clean no-change update. Delivery wins;
+# the conflict is reported, never acted on. generate-manifest.sh now filters
+# this at the source; this guard protects against a bad published manifest.
+delivered = {e.get('path') for e in data.get('files', [])}
 for entry in data.get('deprecated_files', []):
-    print(entry.get('path','') + '|' + entry.get('reason',''))
-" "$MANIFEST" 2>/dev/null || true
+    path = entry.get('path','')
+    if path in delivered:
+        print('  ⚠ %s: и в поставке, и в deprecated_files — удаление пропущено (несогласованный манифест)' % path, file=sys.stderr)
+        continue
+    print(path + '|' + entry.get('reason',''))
+" "$MANIFEST" || true
     fi)
 fi
 
@@ -1784,6 +1799,20 @@ for f in "${UPDATED_FILES[@]}"; do
         echo "  ⚠ $f — author_mode: несмёрженные правки, файл не тронут."
         echo "    Сверь: diff \"$TMPDIR_UPDATE/files/$f\" \"$SCRIPT_DIR/$f\""
         AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
+        continue
+    fi
+    # issue #505 root, part 2: update.sh is delivered ONLY by Step 0's
+    # self-update (fetch, compare, replace, re-exec). Applying it here did two
+    # kinds of damage at once: `cp` truncated the very inode bash was still
+    # reading (execution continued into garbage — "line 1875: command not
+    # found", rc=127, stale .update-incomplete), and the placeholder
+    # substitution pass below then baked the install's real paths into the
+    # freshly applied copy's own {{KEY}} sed templates — after which the local
+    # hash never matches upstream again and every run re-applies it. A
+    # residual diff here (e.g. an already-baked local copy) is healed by the
+    # next run's Step 0, which fetches the clean snapshot copy.
+    if [ "$f" = "update.sh" ]; then
+        echo "  ~ $f — пропущен: доставляется только самообновлением Шага 0 (issue #505)"
         continue
     fi
     APPLIED_PATHS+=("$f")
@@ -2107,6 +2136,10 @@ ENVEOF
 
     # Still substitute what we can (HOME_DIR and WORKSPACE_DIR)
     for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+        # issue #505: update.sh CONTAINS {{KEY}} sed templates as its own code —
+        # substituting into it bakes this install's paths into the updater and
+        # permanently desyncs its hash from upstream. Never touch it here.
+        [ "$f" = "update.sh" ] && continue
         filepath="$SCRIPT_DIR/$f"
         [ -f "$filepath" ] || continue
         sed_inplace \

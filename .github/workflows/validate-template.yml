@@ -594,6 +594,13 @@ jobs:
       - name: Run update.sh release-channel test
         run: bash setup/test-update-release-channel.sh
 
+      # issue #505 (live user-blocking): update.sh is delivered ONLY by Step 0
+      # self-update — Step 5 must skip it (generic cp clobbered the running
+      # inode; the placeholder pass baked install paths into its sed
+      # templates). Full-run E2E against a sandboxed fixture.
+      - name: Run update.sh self-overwrite regression test
+        run: bash setup/test-update-self-overwrite.sh
+
       # PR #385: cloud install paths may occur legitimately in old tracked text;
       # only additions made by the current updater run are publication blockers.
       - name: Test staged install-path guard

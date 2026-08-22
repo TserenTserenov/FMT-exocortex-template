@@ -144,35 +144,18 @@ Refs: WP-NNN
 
 
 ## [0.38.7] — 2026-08-22
-
 ### Added
-
+- `90fa53b` feat(day-open): ship a default day-open.checks.md — the Checks step must have something to run on a fresh install (WP-529 F7) (#509)
+- `4500dda` feat(day-open): контракт доставки Day Open графа (WP-529 Ф7) + un-red main (Ф4 tests) (#504)
 - `9fa32ce` feat(week-close): проактивный сторож каденции архивации карточек (WP-545 Ф3)
 - `86a1c01` feat(day-close): чек-лист — синхронизация рабочих копий ↔ GitHub кроме живых сессий (поручение пилота 21.08)
 - `a16106a` feat(hooks): git add -A/-u/. guard in destructive-guard.sh (WP-544 Ф1 Д5) (#497)
 - `f6d4132` feat(hooks): расширить защиту от необратимых действий (WP-544 Ф1) (#495)
 - `8112b1a` feat(update.sh): параллелизация скачивания манифеста + skip-if-hash-matches
-- `088aaad` feat(dev): явный список Python-зависимостей + инструкция venv
-
-### Changed
-
-- `f64dd72` Merge pull request #493 from TserenTserenov/wp529-f4-fail-closed-tests-2026-08-20
-- `0958b5f` test(wp529): fail-closed tests for update.sh parallel fetch (Ф4)
-- `2733422` chore(release): weekly auto-bump to v0.38.6
-- `1e88c48` docs(changelog): собрать [Unreleased] с 18.08 перед внеплановым релизом
-- `abd056e` Merge pull request #488 from TserenTserenov/wp529-merge-478-480
-- `43e170a` chore(wp529): regenerate manifest after merging #478+#480
-- `8e3bc40` Merge branch 'pr480' into wp529-merge-478-480
-- `c1c5bd3` Merge branch 'pr478' into wp529-merge-478-480
-- `56a28f8` chore(wp529): пустой коммит для нового прогона CI
-- `67bde25` chore(wp529): пересобрать манифест после ребейза на main
-- `f0eb4ec` Merge pull request #483 from TserenTserenov/wp452-f5-proposal-process
-- `11876de` chore: перегенерировать манифест после Ф5 и venv-инструкции
-- `3e53700` docs(wp452): добавить GitHub issue-шаблон для предложений разработчика
-- `5443f7c` docs(wp452): Ф5 — процесс предложений разработчика IWE
-
 ### Fixed
-
+- update.sh: доставка update.sh — только самообновлением Шага 0 (issue #505: cp затирал работающий скрипт, подстановка запекала личные пути в его sed-шаблоны); канал резолвится ДО самообновления; deprecated_files не может пересекаться с git-деревом (10 живых файлов удалялись после no-change update); релизная цепочка замкнута (анти-рекурсия workflow_run), дайджест анонсирует только существующие теги; Bash 3.2 фиксы тестовой обвязки (эта запись — PR #511)
+- `621e5ba` fix(release): bump commit now syncs the README badge and rebuilds the manifest — weekly release can go green without a manual follow-up (WP-529) (#510)
+- `de34d6d` fix(wp545): решения пилота по находкам 1 и 3 (хвост 5/5 приложения)
 - `9630b5a` fix(wp545): починить счётчик в r-questionnaire.md (хвост 5/5, находка 2)
 - `c8d20e8` fix(update.sh): закрыть 2 тестовых долга ревью параллелизации (WP-546 Ф5)
 - `7996b69` fix(update.sh): 5 находок независимого ревью параллелизации (WP-546 Ф4)
@@ -180,17 +163,10 @@ Refs: WP-NNN
 - `d0f9a4d` fix(wp529): Ф9 — python3-resolver contract + bash 3.2 compat (2 confirmed sites) (#494)
 - `52a5189` fix(update): shellcheck-safe comment + real unbound-variable bug it caught
 - `7fd3837` fix(update): restore integrity-mismatch message + fix curl shim for -K batch mode
+- `0958b5f` test(wp529): fail-closed tests for update.sh parallel fetch (Ф4)
 - `68d8d88` fix(day-open,calendar,manifest): closes #477, #489, #486
-- `f0c8ee3` fix(release): sync README badge + regenerate manifest for v0.38.6 bump
-- `9a6e60a` fix(wp529): register 2 issue-tests in delivery contract (cold review find)
-- `ea4551c` fix(wp-545): исключить временные worktree из iCloud-бэкапа
-- `4d3727c` fix(WP-529): delivery-route-label фикстура должна нести find-python3.sh рядом с копией чекера
-- `4da487e` fix(WP-529): T11-фикстура должна нести find-python3.sh для изолированного source
-- `6908df9` fix(WP-529): перевести оставшихся heredoc-потребителей PyYAML на общий резолвер
-- `becf4e4` fix(wp529): удалить дубль-файл теста, застрявший в предыдущем коммите
-- `76d2cdd` fix(WP-529): закрыть 5 находок Red Team-ревью Евгения (раунд 2, 19.08)
-- `1a6ca46` fix(WP-529 Ф6): конвейер доставки — фиксы по находкам Евгения 18.08
-
+### Changed
+- `7566a1d` chore(release): weekly auto-bump to v0.38.7
 
 ## [0.38.6] — 2026-08-20
 

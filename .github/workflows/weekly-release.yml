@@ -100,12 +100,27 @@ jobs:
           git commit -m "chore(release): weekly auto-bump to v${{ steps.bump.outputs.version }}"
           git push origin main
 
-      - name: Trigger CI on the bump commit
-        # Bot push doesn't auto-trigger Validate Template (anti-recursion,
-        # see file header). Fire-and-forget: this job doesn't wait for the
-        # result — release.yml is subscribed to Validate Template's
-        # completion and creates the tag/release itself only if it passed.
+      - name: Validate the bump commit and close the release chain
+        # 2026-08-22, live half-release v0.38.7: a Validate run dispatched
+        # with GITHUB_TOKEN completes WITHOUT emitting workflow_run events
+        # (GitHub anti-recursion), so release.yml never fired for the bump
+        # commit — the version bumped, the tag never appeared, and the daily
+        # notify announced a release that did not exist. Fire-and-forget is
+        # not an option with the default token: wait for that exact Validate
+        # run and dispatch release.yml explicitly (API dispatches DO run).
         if: steps.check.outputs.has_content == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run validate-template.yml --ref main
+        run: |
+          BUMP_SHA=$(git rev-parse HEAD)
+          gh workflow run validate-template.yml --ref main
+          sleep 20
+          RUN_ID=""
+          for i in $(seq 1 30); do
+            RUN_ID=$(gh run list --workflow validate-template.yml --branch main               --json databaseId,headSha,event               --jq ".[] | select(.headSha==\"$BUMP_SHA\" and .event==\"workflow_dispatch\") | .databaseId" | head -1)
+            [ -n "$RUN_ID" ] && break
+            sleep 10
+          done
+          [ -n "$RUN_ID" ] || { echo "Validate run for bump commit $BUMP_SHA never appeared"; exit 1; }
+          gh run watch "$RUN_ID" --exit-status
+          gh workflow run release.yml --ref main -f version="${{ steps.bump.outputs.version }}"

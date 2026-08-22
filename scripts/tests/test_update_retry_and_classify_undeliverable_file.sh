@@ -104,7 +104,12 @@ serialize_array() {
 }
 
 set +e
-( set -e
+# set +u inside the subshell: the extracted glue is update.sh code, and
+# update.sh runs WITHOUT -u by contract — on Bash 3.2 (macOS /bin/bash) an
+# empty-array expansion like "${UPDATED_FILES[@]}" is an unbound-variable
+# error under -u (fixed in 4.4+), so keeping the harness's -u inside the
+# glue tests an environment the real code never runs in.
+( set -e; set +u
   # shellcheck disable=SC1090
   . "$GLUE"
   # Re-export the arrays a subshell can't hand back to the parent — write

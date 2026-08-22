@@ -301,6 +301,28 @@ data = {
     'deprecated_files': json.loads('''$DEPRECATED_JSON'''),
 }
 
+# 2026-08-22 (external report): deprecated_files is hand-managed and carried
+# over from the previous manifest — a path that came BACK into the delivered
+# tree stayed listed as deprecated, and update.sh deleted 10 files HEAD still
+# ships. A path cannot be delivered and deprecated at once: delivery wins,
+# the stale deprecation entry is dropped with a warning.
+import subprocess
+import sys
+delivered_now = {e['path'] for e in data['files']}
+# Same class, wider net (the live 10-file incident): a path still TRACKED in
+# git HEAD ships with every fresh clone — deprecating it makes update.sh
+# delete what the canon still distributes, leaving clones with tracked
+# deletions. Deprecated may only list paths git no longer carries.
+tracked_now = set(subprocess.run(
+    ['git', 'ls-files'], capture_output=True, text=True, cwd='$SCRIPT_DIR'
+).stdout.splitlines())
+kept, dropped = [], []
+for entry in data['deprecated_files']:
+    (dropped if entry.get('path') in delivered_now or entry.get('path') in tracked_now else kept).append(entry)
+for entry in dropped:
+    print('  ⚠ deprecated_files: %s снова в поставке — запись удалена из deprecated' % entry.get('path'), file=sys.stderr)
+data['deprecated_files'] = kept
+
 # Убираем пустые массивы
 if not data['excluded_paths']:
     del data['excluded_paths']
