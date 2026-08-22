@@ -79,12 +79,24 @@ jobs:
         if: steps.check.outputs.has_content == 'true'
         run: bash scripts/changelog-flush.sh --version "${{ steps.bump.outputs.version }}"
 
+      # 2026-08-20 rake, reproduced empirically before this fix (WP-529): the
+      # bump commit changed version+CHANGELOG only. README badge stayed on the
+      # old version (release-sync red) and the manifest still carried the
+      # pre-flush CHANGELOG.md sha256 (validate B2 red) — release.yml, which
+      # is subscribed to a GREEN Validate Template, never fired, and every
+      # release needed a manual follow-up commit.
+      - name: Sync version badge and rebuild manifest for the bump commit
+        if: steps.check.outputs.has_content == 'true'
+        run: |
+          bash scripts/sync-version-badge.sh --fix
+          bash generate-manifest.sh
+
       - name: Commit and push
         if: steps.check.outputs.has_content == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add update-manifest.json CHANGELOG.md
+          git add update-manifest.json CHANGELOG.md README.md
           git commit -m "chore(release): weekly auto-bump to v${{ steps.bump.outputs.version }}"
           git push origin main
 
