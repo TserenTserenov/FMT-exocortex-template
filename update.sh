@@ -799,8 +799,16 @@ if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_U
             echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
         else
             echo "  Найдена новая версия update.sh — обновляю..."
-            cp "$REMOTE_UPDATE" "$SCRIPT_DIR/update.sh"
-            chmod +x "$SCRIPT_DIR/update.sh"
+            # issue #505 class (residual, found in the same sweep): replace
+            # the RUNNING script via sibling tmp + mv — rename swaps the
+            # directory entry and this process keeps its old inode; a plain cp
+            # truncates the very file bash is executing. Historically survived
+            # only because the few remaining commands sat in bash's read
+            # buffer.
+            _boot_staged="$SCRIPT_DIR/.update.sh.staged.$$"
+            cp "$REMOTE_UPDATE" "$_boot_staged"
+            chmod +x "$_boot_staged"
+            mv -f "$_boot_staged" "$SCRIPT_DIR/update.sh"
             echo "  Перезапуск..."
             exec bash "$SCRIPT_DIR/update.sh" "$@"
         fi
