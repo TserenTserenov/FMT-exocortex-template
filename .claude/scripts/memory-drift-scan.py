@@ -20,9 +20,10 @@ pending/in_progress/done) или сокращённое «ст» (пользов
 Usage:
     memory-drift-scan.py [--memory PATH] [--governance-repo PATH]
 
---memory: путь к MEMORY.md (default: ~/IWE/memory/MEMORY.md)
+--memory: путь к MEMORY.md
+    (default: $IWE_WORKSPACE/memory/MEMORY.md, иначе ~/IWE/memory/MEMORY.md)
 --governance-repo: корень governance-репо, где искать inbox/WP-N/
-    (default: ~/IWE/DS-strategy, переопределяется $IWE_GOVERNANCE_REPO)
+    (default: $IWE_WORKSPACE/${IWE_GOVERNANCE_REPO:-DS-strategy})
 
 Exit code:
     0 — дрейфов не найдено
@@ -221,16 +222,17 @@ def scan(memory_path: Path, governance_repo: Path) -> list[str]:
 
 
 def main() -> int:
+    workspace_dir = Path(os.environ.get("IWE_WORKSPACE", Path.home() / "IWE"))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--memory",
         type=Path,
-        default=Path.home() / "IWE" / "memory" / "MEMORY.md",
+        default=workspace_dir / "memory" / "MEMORY.md",
     )
     parser.add_argument(
         "--governance-repo",
         type=Path,
-        default=Path.home() / "IWE" / os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy"),
+        default=workspace_dir / os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy"),
     )
     args = parser.parse_args()
 

@@ -305,12 +305,11 @@ USER_NAME="$(id -un)"
 CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
 
 # Auto-detect governance repo (used in placeholder substitution + .exocortex.env).
-# Стратегия: (1) DS-strategy (default), (2) wildcard DS-*-strategy* (legacy/локальные имена).
-# Если ни один не найден — default DS-strategy (будет создан при первом seed-ритуале).
-GOVERNANCE_REPO=""
-if [ -d "$WORKSPACE_DIR/DS-strategy" ]; then
-    GOVERNANCE_REPO="DS-strategy"
-fi
+# Стратегия: (0) $IWE_GOVERNANCE_REPO, если задан явно — override имеет приоритет
+# над автодетектом; (1) wildcard DS-*-strategy* (legacy/локальные имена), включая
+# сам DS-strategy; (2) default DS-strategy (будет создан при первом seed-ритуале) —
+# покрывает и случай "DS-strategy уже существует", раз итоговое значение то же.
+GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-}"
 if [ -z "$GOVERNANCE_REPO" ]; then
     for d in "$WORKSPACE_DIR"/DS-*; do
         case "${d##*/}" in
@@ -804,7 +803,7 @@ else
     fi
 fi
 
-# === 6. Create DS-strategy repo ===
+# === 6. Create governance repo ===
 echo "[6/6] Setting up $GOVERNANCE_REPO..."
 MY_STRATEGY_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"

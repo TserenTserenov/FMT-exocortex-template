@@ -76,6 +76,9 @@ if [[ "$MODE" != "settings-json" ]]; then
         fi
 
         # Проверка 2: голое имя авторского governance-репо (без env-var fallback)
+        # Тестовые фикстуры (scripts/tests/*, test_*.py|.sh) исключены: буквальный
+        # "DS-strategy" там — ожидаемое значение по умолчанию, которое тест проверяет
+        # (env override рендерится в default), а не хардкод-протечка (2026-08-17).
         # Допустимо:
         #   - ${IWE_GOVERNANCE_REPO:-DS-strategy}  (bash default)
         #   - ${IWE_GOVERNANCE_REPO:?...}          (bash required)
@@ -85,23 +88,20 @@ if [[ "$MODE" != "settings-json" ]]; then
         #   - cmd || echo "DS-strategy"            (bare fallback после ||, issue #275)
         #   - if [ -d "$DIR/DS-strategy" ]; ... case DS-strategy)  (auto-detect идиома,
         #     физическая проверка существования репо, не хардкод-протечка, issue #275)
-        #   - строка со ссылкой на переменную $IWE_GOVERNANCE_REPO или её dict-ключом
-        #     "IWE_GOVERNANCE_REPO": — структурно демонстрирует переопределение, не
-        #     просто содержит имя переменной где-то в комментарии (issues #446/#450)
-        #   - файл лежит в scripts/tests/ — тестовая фикстура легитимно использует литерал
-        #     дефолтного имени как значение, не как утечку личного репо (issues #446/#450)
         # Запрещено: буквальное имя governance-репо вне fallback-паттерна в исполняемых строках
         # Комментарии (#) пропускаются — документация не влияет на поведение
         #
         # issue #275: паттерны "|| echo <literal>" и "if [ -d .../<literal> ]" исключаются
-        # только когда <литерал> встречается на строке РОВНО ОДИН раз — иначе, например,
+        # только когда <literal> встречается на строке РОВНО ОДИН раз — иначе, например,
         # `cd ".../DS-strategy" || echo "DS-strategy"` (реальный хардкод в cd, замаскированный
         # безопасным fallback-хвостом) прошёл бы незамеченным, т.к. хвост строки матчит
         # safe-паттерн, даже когда начало строки содержит отдельный, опасный хардкод.
-        case "$f" in
-            scripts/tests/*|*/scripts/tests/*) : ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.claude/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
-            *)
-        if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
+        if [[ "$f" == */tests/* || "$fname" == test_* || "$fname" == test-* ]]; then
+            is_test_fixture=1
+        else
+            is_test_fixture=0
+        fi
+        if [[ "$is_test_fixture" -eq 0 ]] && grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
             bad_lines=$(grep -n "$AUTHOR_GOV_REPO" "$f" \
                 | grep -v '^\s*#\|^[0-9]*:\s*#' \
                 | grep -v '\${[^}]*:-' \
@@ -109,7 +109,6 @@ if [[ "$MODE" != "settings-json" ]]; then
                 | grep -vE '^[0-9]*:[[:space:]]*[A-Z_]+_TMPL=' \
                 | grep -vE "os\.environ\.get\([^)]*,[[:space:]]*[\"']" \
                 | grep -vE '^[0-9]*:\s*[A-Z_][A-Z0-9_]*="[^"]*"[[:space:]]*[\\]$' \
-                | grep -vE '\$IWE_GOVERNANCE_REPO|"IWE_GOVERNANCE_REPO"[[:space:]]*:' \
                 || true)
             if [[ -n "$bad_lines" ]]; then
                 bad_lines=$(echo "$bad_lines" | while IFS= read -r bl; do
@@ -125,19 +124,6 @@ if [[ "$MODE" != "settings-json" ]]; then
                         if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*[A-Za-z0-9_*|-]*\|?'"$AUTHOR_GOV_REPO"'\)[[:space:]]*$'; then
                             continue
                         fi
-                        # auto-detect идиома, продолжение (issue #450): follow-up
-                        # присваивание ВНУТРИ уже безопасного `if [ -d .../LITERAL" ]; then`
-                        # (сам if строкой выше уже matчит паттерн на 2 проверки раньше) — тот
-                        # же физический detect, не отдельный хардкод. Безопасно только для
-                        # голого `VAR="LITERAL"` без хвоста — не расширяет паттерн на строки
-                        # с чем-то ещё после литерала.
-                        if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*[A-Z_][A-Z0-9_]*="'"$AUTHOR_GOV_REPO"'"[[:space:]]*$'; then
-                            lineno="${bl%%:*}"
-                            prev_line=$(sed -n "$((lineno - 1))p" "$f" 2>/dev/null)
-                            if echo "$prev_line" | grep -qE '^[[:space:]]*if \[ -d "[^"]*/'"$AUTHOR_GOV_REPO"'" \]; then$'; then
-                                continue
-                            fi
-                        fi
                     fi
                     echo "$bl"
                 done)
@@ -148,8 +134,6 @@ if [[ "$MODE" != "settings-json" ]]; then
                 errors=$((errors + 1))
             fi
         fi
-            ;;
-        esac
 
         # Проверка 4: set -e + ((VAR++)) без || true → silent exit при VAR==0 (B8 gap)
         # $((VAR + 1)) — безопасно (арифметика, не команда).
