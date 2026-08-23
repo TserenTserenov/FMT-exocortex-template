@@ -105,7 +105,7 @@ chmod +x "$SHIM_DIR/curl"
 
 echo "--- Scenario A: build-runtime fails during a real update ---"
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-a.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-a.log" 2>&1
 RC_A=$?
 set -e
 
@@ -136,7 +136,7 @@ echo "--- Scenario A2: --check must not clear the marker left by the failed run 
 # next step after a failure — update.sh --check — silently cleared the marker
 # without repair or build-runtime, disarming the contract it now carries.
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-a2.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-a2.log" 2>&1
 RC_A2=$?
 set -e
 
@@ -160,7 +160,7 @@ EOF
 chmod +x "$SCRIPT_DIR/setup/build-runtime.sh"
 
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-b.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-b.log" 2>&1
 RC_B=$?
 set -e
 
@@ -200,7 +200,7 @@ if [ -f "$SCRIPT_DIR/.update-incomplete" ]; then
 fi
 
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-c.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-c.log" 2>&1
 RC_C=$?
 set -e
 

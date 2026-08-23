@@ -43,6 +43,7 @@ run_case() {
         RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
         CURL_BASE_OPTS="--max-time 2"
         _CURL_SSL_OPT=""
+        EXIT_NETWORK=2
         UPDATE_CHANNEL="$channel"
         PY_BIN="$(command -v python3 || echo python3)"
         HAS_RELEASES="$has_releases"
@@ -72,10 +73,15 @@ OUT=$(run_case release yes yes)
 echo "$OUT" | grep -q "RAW_BASE=.*/$TAG_SHA$" && pass "RAW_BASE pinned to release SHA" || fail "expected release SHA pin, got: $OUT"
 echo "$OUT" | grep -q "релиз v9.9.9" && pass "announces the release tag" || fail "no release announcement: $OUT"
 
-echo "=== 2. release channel, no releases published: explicit fallback to main ==="
-OUT=$(run_case release no yes)
-echo "$OUT" | grep -q "RAW_BASE=.*/$MAIN_SHA$" && pass "falls back to pinned main SHA" || fail "expected main fallback, got: $OUT"
-echo "$OUT" | grep -q "Не удалось определить последний релиз" && pass "fallback is announced, not silent" || fail "silent fallback: $OUT"
+echo "=== 2. release channel, no releases published: FAIL-CLOSED abort (#501) ==="
+# no errexit here: the harness runs under `set -uo pipefail` WITHOUT -e —
+# enabling it after this case would abort cases 3-4 on any non-zero and
+# swallow the final Result line (cold review, Medium 4)
+OUT=$(run_case release no yes 2>&1)
+RC2=$?
+[ "$RC2" -ne 0 ] && pass "resolver aborts non-zero instead of falling back (#501)" || fail "expected non-zero abort, got rc=0: $OUT"
+echo "$OUT" | grep -q "IWE_UPDATE_CHANNEL=main" && pass "abort message carries the explicit main-channel hint" || fail "no actionable hint in abort: $OUT"
+echo "$OUT" | grep -q "RAW_BASE=" && fail "fallback still resolved a RAW_BASE: $OUT" || pass "no delivery base resolved on failed release lookup"
 
 echo "=== 3. IWE_UPDATE_CHANNEL=main: the old moving-branch contract, pinned ==="
 OUT=$(run_case main yes yes)

@@ -89,6 +89,34 @@ if [ -n "$DEP_CONFLICTS" ]; then
     exit 1
 fi
 
+# 2026-08-23 (v0.38.7 матрица, находка 4): сторож, который доставляется без
+# своего обязательного файла данных, на установке из манифеста падает — CI
+# этого не видел, потому что работает в полном чекауте. Парные поставки
+# объявлены явно; каждая пара либо доставляется целиком, либо целиком нет.
+PAIRED_DELIVERY="scripts/check-python-resolver-contract.sh=scripts/tests/fixtures/python-resolver-baseline.txt"
+for pair in $PAIRED_DELIVERY; do
+    tool="${pair%%=*}"; datafile="${pair#*=}"
+    # Обе стороны пары считаем по files[] (доставляемое), не по всему JSON:
+    # инструмент, осознанно выведенный из поставки, делает пару вакуумной,
+    # а не ложно-нарушенной.
+    t=$(python3 - "$MANIFEST" "$tool" <<'PYCHK'
+import json, sys
+m = json.load(open(sys.argv[1]))
+print(sum(1 for e in m.get('files', []) if e['path'] == sys.argv[2]))
+PYCHK
+)
+    d=$(python3 - "$MANIFEST" "$datafile" <<'PYCHK'
+import json, sys
+m = json.load(open(sys.argv[1]))
+print(sum(1 for e in m.get('files', []) if e['path'] == sys.argv[2]))
+PYCHK
+)
+    if [ "$t" -ge 1 ] && [ "$d" -eq 0 ]; then
+        echo "❌ manifest-verify: $tool доставляется без обязательного $datafile (парная поставка нарушена)"
+        exit 1
+    fi
+done
+
 # Сравниваем backup с сгенерированным
 if diff -q "$BACKUP" "$TMP_MANIFEST" >/dev/null 2>&1; then
     echo "✅ manifest-verify: update-manifest.json синхронизирован с git tree"

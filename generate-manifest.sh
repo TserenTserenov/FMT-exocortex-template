@@ -131,6 +131,10 @@ SETUP_EXPLICIT_INCLUDE=(
 # real release would have shipped a template without its own test gate and
 # nobody would have noticed until a user hit the bug the gate exists to catch.
 SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
+    # 2026-08-23 (v0.38.7 матрица, находка 4): check-python-resolver-contract.sh
+    # доставляется, а его обязательный baseline сидел в excluded — на установке
+    # строго из манифеста сторож падал rc=2. Ratchet-снимок — часть поставки.
+    "scripts/tests/fixtures/python-resolver-baseline.txt"
     "scripts/tests/test_create_wp_registry_coherence.sh"
     "scripts/tests/test_check_orphan_hooks.sh"
     "scripts/tests/test_capture_bus_detector_timeout.sh"

@@ -244,7 +244,7 @@ chmod +x "$SHIM_DIR/curl"
 echo "--- Scenario A: CLAUDE.md conflict + non-default branch ---"
 HEAD_A_BEFORE=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-a.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-a.log" 2>&1
 RC_A=$?
 set -e
 
@@ -319,7 +319,7 @@ cp "$UPSTREAM/CLAUDE.md" "$WORKSPACE_DIR/.claude.md.base"
 git -C "$SCRIPT_DIR" add -A; git -C "$SCRIPT_DIR" commit -q -m "simulate: already at upstream version"
 
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-b.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-b.log" 2>&1
 RC_B=$?
 set -e
 
@@ -369,7 +369,7 @@ with open(manifest_path, "w", encoding="utf-8") as handle:
     json.dump(manifest, handle)
 PY
 
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check --fast > "$TEST_ROOT/out-c-fast.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check --fast > "$TEST_ROOT/out-c-fast.log" 2>&1
 if grep -q "Состав манифеста изменился" "$TEST_ROOT/out-c-fast.log"; then
     pass "C: --check --fast detects a content-only change at the same version/path"
 else
@@ -389,7 +389,7 @@ with open(path, "w", encoding="utf-8") as handle:
     json.dump(manifest, handle)
 PY
 
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-c-integrity.log" 2>&1 || true
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-c-integrity.log" 2>&1 || true
 if grep -q "sha256 не совпадает" "$TEST_ROOT/out-c-integrity.log" && \
    grep -q "Проверка неполная" "$TEST_ROOT/out-c-integrity.log"; then
     pass "C: full check rejects a downloaded file that does not match manifest sha256"
@@ -426,7 +426,7 @@ owner: user
 Pilot-owned content that intentionally differs.
 EOF
 
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d.log" 2>&1 || true
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d.log" 2>&1 || true
 if grep -q "owner: user, НЕ обновлён, но шаблонная версия отличается" "$TEST_ROOT/out-d.log" && \
    grep -q 'Сверьте: diff' "$TEST_ROOT/out-d.log"; then
     pass "D: owner:user drift is visible with a comparison command on an unchanged run"
@@ -465,7 +465,7 @@ MEMO_BEFORE=$(cat "$SCRIPT_DIR/memory/dummy-memo.md")
 MANIFEST_HASH_BEFORE=$(sha256sum "$SCRIPT_DIR/update-manifest.json" | cut -d' ' -f1)
 
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e.log" 2>&1
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e.log" 2>&1
 RC_E=$?
 set -e
 
@@ -519,7 +519,7 @@ with open(manifest_path, 'w') as f:
     json.dump(manifest, f)
 "
 rm -f "$TEST_ROOT/shim-trace.log"
-CURL_SHIM_PARALLEL_SUPPORTED=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-f.log" 2>&1
+CURL_SHIM_PARALLEL_SUPPORTED=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-f.log" 2>&1
 RC_F=$?
 
 if [ "$RC_F" -eq 0 ]; then
@@ -561,7 +561,7 @@ with open(manifest_path, 'w') as f:
     json.dump(manifest, f)
 "
 rm -f "$TEST_ROOT/shim-trace.log"
-CURL_SHIM_PARALLEL_SUPPORTED=0 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-g.log" 2>&1
+CURL_SHIM_PARALLEL_SUPPORTED=0 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-g.log" 2>&1
 RC_G=$?
 
 if [ "$RC_G" -eq 0 ]; then
@@ -623,7 +623,7 @@ EOF
 
 rm -f "$TEST_ROOT/shim-trace.log"
 set +e
-PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h.log" 2>&1
+PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h.log" 2>&1
 RC_H=$?
 set -e
 
@@ -672,7 +672,7 @@ cat > "$UPSTREAM/update-manifest.json" <<'EOF'
 }
 EOF
 set +e
-PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h-normal.log" 2>&1
+PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h-normal.log" 2>&1
 RC_H_NORMAL=$?
 set -e
 
@@ -694,7 +694,7 @@ cat > "$UPSTREAM/update-manifest.json" <<'EOF'
 {"schema_version": 2, "version": "0.99.0-test-226", "files": [{"path": "single.md", "sha256": "0"}], "deprecated_files": []}
 EOF
 set +e
-PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h-singlefile.log" 2>&1
+PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h-singlefile.log" 2>&1
 RC_H_SINGLEFILE=$?
 set -e
 
@@ -717,7 +717,7 @@ cat > "$UPSTREAM/update-manifest.json" <<'EOF'
 {"schema_version": 2, "version": "0.99.0-test-226", "files": [], "deprecated_files": []}
 EOF
 set +e
-PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h-nopath.log" 2>&1
+PATH="$NO_PY_DIR:$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-h-nopath.log" 2>&1
 RC_H_NOPATH=$?
 set -e
 

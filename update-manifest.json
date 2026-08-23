@@ -985,7 +985,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "36d9944bcdd9e207b9af4789951f2f85731e1ac00fb01d0b95776503e7c3ebc6"
+      "sha256": "08dab8e3387acc51f14d8d1f02ba1f86ade86970700e5367e442423042a54a70"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2392,6 +2392,10 @@
       "sha256": "f2ae015d394a447778e1ed75ecfa16d80fe98e1164655b3431940c7e783d206c"
     },
     {
+      "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
+      "sha256": "6f1c7bd4afdcc899d875cc162e66b418bcacdbe356836ce56676e0b541afc94f"
+    },
+    {
       "path": "scripts/tests/lib/capture_fixture.sh",
       "sha256": "edf6eba925d890e2aa52541be8fff27fb48ab11f5c7c69a8a3b1b001408978cd"
     },
@@ -2525,7 +2529,7 @@
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
-      "sha256": "cf3d6a0132c4265691f22adfb49f405e378161ee3029c41d5ce59d2d7139fc73"
+      "sha256": "69cb3b529071b3612e9a9224c4a2ac5698e35aa2e1ce78a26241c7da9c9ac926"
     },
     {
       "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
@@ -2577,7 +2581,7 @@
     },
     {
       "path": "scripts/verify-manifest.sh",
-      "sha256": "07b2a7317edc1c17ec52fd3d2e0a3f62fd80217cd8bcea437338143efd3444ee"
+      "sha256": "224777b7b735b0b1be3048957b10738cd4eefb88dd30fbced42322c7d223747d"
     },
     {
       "path": "scripts/week-draft-append.sh",
@@ -2605,7 +2609,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "e73a22e88b5f4150a43938d48e6b5024fddfb7fa7e9c640e9d9dee02c42c1a70"
+      "sha256": "0b1a77f34d84bba032b11875e3de043dd49b37b2b1bfb231bb13081f31d60090"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -2645,7 +2649,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "591665153c549c89eb73c4e9eadf6d1c9a8d6298c27f310cd18ab9f5702ec429"
+      "sha256": "084f5b44c007db2f5dfb75bf4c47dc2667bf942fa8fd522a7b4d080613616cff"
     }
   ],
   "excluded_paths": [
@@ -2670,7 +2674,6 @@
     "scripts/iwe-trace.py",
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
-    "scripts/tests/fixtures/python-resolver-baseline.txt",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
@@ -2687,6 +2690,7 @@
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
+    "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",

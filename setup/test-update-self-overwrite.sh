@@ -195,6 +195,80 @@ else
   fail "$BAKED sandbox path(s) baked into update.sh — {{KEY}} templates substituted"
 fi
 
+# --- Scenario 2: Step 0 self-update — inode + behavioural negative control ---
+# The v0.38.7 matrix (external user) proved scenario 1 blind to Step 0: it
+# serves the CURRENT update.sh at the *.new fetch, so self-update never runs.
+# Here the shim serves the MARKED update.sh EVERYWHERE: Step 0 must replace
+# the running script via staged rename (inode CHANGES — a cp keeps the inode
+# and is exactly the #505 class), re-exec the marked copy, and that copy must
+# carry the whole update to a clean finish (behavioural control, codex В2).
+echo "--- Scenario 2: Step 0 self-update (inode + re-exec survival) ---"
+SCRIPT_DIR2="$TEST_ROOT/repo2/FMT-exocortex-template"
+mkdir -p "$SCRIPT_DIR2/.claude/hooks" "$SCRIPT_DIR2/.claude/lib" "$SCRIPT_DIR2/scripts/lib"
+cp "$UPDATE_SH_REAL" "$SCRIPT_DIR2/update.sh"
+cp "$SELF_DIR/../.claude/lib/frontmatter.sh" "$SCRIPT_DIR2/.claude/lib/frontmatter.sh"
+cp "$SELF_DIR/../scripts/lib/common.sh" "$SCRIPT_DIR2/scripts/lib/common.sh"
+chmod +x "$SCRIPT_DIR2/update.sh"
+cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR2/CLAUDE.md"
+cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR2/.claude.md.base"
+WORKSPACE_DIR2="$TEST_ROOT/repo2"
+cp "$UPSTREAM/CLAUDE.md" "$WORKSPACE_DIR2/CLAUDE.md"
+cp "$UPSTREAM/CLAUDE.md" "$WORKSPACE_DIR2/.claude.md.base"
+git -C "$SCRIPT_DIR2" init -q
+git -C "$SCRIPT_DIR2" config user.email t@t; git -C "$SCRIPT_DIR2" config user.name t
+git -C "$SCRIPT_DIR2" add -A; git -C "$SCRIPT_DIR2" commit -q -m init
+git -C "$SCRIPT_DIR2" branch -M main
+git -C "$SCRIPT_DIR2" remote add origin "$REMOTE_GIT"
+git -C "$SCRIPT_DIR2" fetch -q origin
+git -C "$SCRIPT_DIR2" branch -q -u origin/main main
+
+SHIM2_DIR="$TEST_ROOT/shim2"
+mkdir -p "$SHIM2_DIR"
+# The shim was written through an UNQUOTED heredoc: sandbox paths inside it
+# are already literal. The only line serving the CURRENT update.sh is the
+# *.new branch — repoint it at the marked copy.
+sed "s|$SCRIPT_DIR/update.sh|$UPSTREAM/update.sh|" "$SHIM_DIR/curl" > "$SHIM2_DIR/curl"
+if diff -q "$SHIM_DIR/curl" "$SHIM2_DIR/curl" >/dev/null 2>&1; then
+  echo "FATAL: shim2 rewrite changed nothing — serve anchor moved" >&2; exit 2
+fi
+chmod +x "$SHIM2_DIR/curl"
+
+inode_of() { stat -c %i "$1" 2>/dev/null || stat -f %i "$1"; }
+INODE_BEFORE=$(inode_of "$SCRIPT_DIR2/update.sh")
+set +e
+PATH="$SHIM2_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR2/update.sh" --yes > "$TEST_ROOT/out2.log" 2>&1
+RC2=$?
+set -e
+INODE_AFTER=$(inode_of "$SCRIPT_DIR2/update.sh")
+
+if [ "$RC2" -eq 0 ]; then
+  pass "S2: self-updated run finishes cleanly (rc=0)"
+else
+  fail "S2: rc=$RC2; tail: $(tail -3 "$TEST_ROOT/out2.log" | tr '\n' ' ')"
+fi
+if grep -q "Перезапуск" "$TEST_ROOT/out2.log"; then
+  pass "S2: Step 0 actually replaced and re-exec'ed the updater"
+else
+  fail "S2: self-update path never ran — scenario is blind again"
+fi
+if [ "$INODE_BEFORE" != "$INODE_AFTER" ]; then
+  pass "S2: inode changed — staged rename semantics (a cp would keep it: #505 class)"
+else
+  fail "S2: inode unchanged — Step 0 overwrote the running inode (cp semantics)"
+fi
+if grep -q "self-overwrite-regression-marker issue-505" "$SCRIPT_DIR2/update.sh"; then
+  pass "S2: final update.sh is the manifest-bound (marked) version"
+else
+  fail "S2: final update.sh is not the fetched version"
+fi
+if grep -q "command not found" "$TEST_ROOT/out2.log"; then
+  fail "S2: mid-flight corruption in output"
+else
+  pass "S2: no mid-flight corruption"
+fi
+[ -f "$SCRIPT_DIR2/.update-incomplete" ] && fail "S2: stale .update-incomplete left" || pass "S2: no stale incomplete marker"
+
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"
 [ "$FAIL_COUNT" -eq 0 ] && exit 0 || exit 1

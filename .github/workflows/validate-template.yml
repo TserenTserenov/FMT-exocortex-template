@@ -601,6 +601,12 @@ jobs:
       - name: Run update.sh self-overwrite regression test
         run: bash setup/test-update-self-overwrite.sh
 
+      # v0.38.7 matrix finding 6: a foreign exported IWE_RUNTIME redirected
+      # setup's hot-files generation into another workspace. Invariant with a
+      # discriminating control (the old call shape must still leak).
+      - name: Run setup runtime-isolation invariant test
+        run: bash scripts/tests/test_setup_runtime_isolation.sh
+
       # issue #505 residual (Codex peer-review 2026-08-22): the test above
       # deliberately makes Step 0 a no-op, so the replacement itself had no
       # coverage. This one serves a DIFFERENT update.sh to the self-update

@@ -33,8 +33,9 @@ BRANCH="main"
 # Delivery channel (WP-529 F7, pilot decision 2026-08-21, prompted by an
 # external user's report): "release" (default) pins the delivery to the last
 # published release tag — users must not receive unreleased, possibly red,
-# main. IWE_UPDATE_CHANNEL=main opts back into the moving branch (author/dev
-# workflow, and the automatic fallback when no release exists yet).
+# main. IWE_UPDATE_CHANNEL=main is the ONLY way onto the moving branch
+# (author/dev workflow) — a failed release lookup aborts fail-closed (#501),
+# it never falls back to main automatically.
 UPDATE_CHANNEL="${IWE_UPDATE_CHANNEL:-release}"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 API_BASE="https://api.github.com/repos/$REPO"
@@ -733,7 +734,15 @@ print(sha)'); then
             fi
             return 0
         fi
-        echo "  ⚠ Не удалось определить последний релиз (нет релизов или API недоступен) — откат на ветку $BRANCH."
+        # #501 (fail-closed, матрица внешнего пользователя по v0.38.7): молчаливый
+        # откат на подвижную ветку превращал сбой резолва релиза в тихую доставку
+        # непроверенного main — ровно то, от чего release-канал защищает. Явный
+        # main-канал остаётся единственной дорогой к подвижной ветке.
+        echo "ОШИБКА: не удалось определить последний релиз (нет релизов или API недоступен)." >&2
+        echo "  Release-канал работает только от опубликованного релиза (fail-closed, #501)." >&2
+        echo "  Повторите позже, либо осознанно выберите подвижную ветку:" >&2
+        echo "    IWE_UPDATE_CHANNEL=main bash update.sh" >&2
+        exit "$EXIT_NETWORK"
     fi
     if ! py_available; then
         echo "  ⚠ Нет python3: поставка проверяется по подвижной ветке $BRANCH."

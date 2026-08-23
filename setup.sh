@@ -742,7 +742,12 @@ if $DRY_RUN; then
     echo "[DRY RUN] Would regenerate hot-files.list (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
 else
     echo "[4f] Regenerating hot-files.list..."
-    if HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" bash "$TEMPLATE_DIR/scripts/generate-hot-files-list.sh" 2>&1); then
+    # POLICY (2026-08-23, матрица v0.38.7 находка 6, консенсус с codex):
+    # критичные IWE_*-переменные передаются генераторам ЯВНО из переменных
+    # самого setup — унаследованный env другого workspace не должен решать,
+    # куда пишет установка. Живой случай: exported IWE_RUNTIME workspace A
+    # побеждал переданный IWE_ROOT, и hot-files.list уезжал в чужой runtime.
+    if HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_RUNTIME="$IWE_RUNTIME_PATH" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" bash "$TEMPLATE_DIR/scripts/generate-hot-files-list.sh" 2>&1); then
         echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
     else
         echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
@@ -765,6 +770,13 @@ else
     # в env для role install.sh (тот же паттерн что в update.sh:836).
     # Без этого install.sh падает в legacy fallback и видит {{плейсхолдеры}}.
     [ -f "$WORKSPACE_DIR/.iwe-paths" ] && . "$WORKSPACE_DIR/.iwe-paths"
+    # Same isolation policy as step 4f: role install.sh scripts read
+    # IWE_RUNTIME/IWE_WORKSPACE from env — pin them to THIS install's targets
+    # explicitly, so a foreign exported value (or a missing .iwe-paths) can
+    # never redirect a role install into another workspace.
+    export IWE_WORKSPACE="$WORKSPACE_DIR"
+    export IWE_RUNTIME="$IWE_RUNTIME_PATH"
+    export IWE_TEMPLATE="$TEMPLATE_DIR"
 
     MANUAL_ROLES=()
 
