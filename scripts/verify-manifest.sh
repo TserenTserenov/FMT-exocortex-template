@@ -34,8 +34,16 @@ CURRENT_VERSION=$(python3 -c "import json; print(json.load(open('$MANIFEST'))['v
 TMP_MANIFEST=$(mktemp)
 trap 'rm -f "$BACKUP" "$TMP_MANIFEST"' EXIT
 
-# Генерируем новый манифест во временный файл
-bash "$GENERATOR" >/dev/null 2>&1 || true
+# Генерируем новый манифест во временный файл.
+# 2026-08-22 (Codex peer-review): было `|| true` — падение генератора
+# глоталось, и сравнение ниже могло пройти на СТАРОМ манифесте (fail-open в
+# проверке, заявленной fail-closed). Теперь любой отказ генератора = ошибка
+# проверки; оригинальный манифест восстанавливаем перед выходом.
+if ! bash "$GENERATOR" >/dev/null 2>&1; then
+    cp "$BACKUP" "$MANIFEST"
+    echo "❌ manifest-verify: generate-manifest.sh завершился с ошибкой — проверка невозможна (fail-closed)"
+    exit 1
+fi
 
 # Копируем сгенерированный манифест во временный файл
 cp "$MANIFEST" "$TMP_MANIFEST"
@@ -62,7 +70,13 @@ DEP_CONFLICTS=$(python3 - "$MANIFEST" <<'PYCHECK'
 import json, subprocess, sys
 m = json.load(open(sys.argv[1]))
 delivered = {e['path'] for e in m.get('files', [])}
-tracked = set(subprocess.run(['git', 'ls-files'], capture_output=True, text=True).stdout.splitlines())
+# 2026-08-22 (Codex peer-review): git ls-files без проверки кода возврата —
+# при сбое git множество tracked молча становилось пустым, и проверка
+# «deprecated ∩ дерево» деградировала fail-open. Теперь сбой git = сбой проверки.
+r = subprocess.run(['git', 'ls-files'], capture_output=True, text=True)
+if r.returncode != 0:
+    sys.exit('git ls-files failed: ' + r.stderr.strip())
+tracked = set(r.stdout.splitlines())
 bad = [e['path'] for e in m.get('deprecated_files', []) if e.get('path') in delivered or e.get('path') in tracked]
 print('\n'.join(bad))
 PYCHECK

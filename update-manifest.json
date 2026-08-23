@@ -985,7 +985,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "dcb50518ecd9a13491d87f8f2bf060f1e8b2f84007e7c753aad0764c710cc961"
+      "sha256": "36d9944bcdd9e207b9af4789951f2f85731e1ac00fb01d0b95776503e7c3ebc6"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2577,7 +2577,7 @@
     },
     {
       "path": "scripts/verify-manifest.sh",
-      "sha256": "613546c9b12201bd1bac9fef97c159586bdf08cb7fd947d93ed50856196c557a"
+      "sha256": "07b2a7317edc1c17ec52fd3d2e0a3f62fd80217cd8bcea437338143efd3444ee"
     },
     {
       "path": "scripts/week-draft-append.sh",
@@ -2723,6 +2723,7 @@
     "setup/test-update-issue-226.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
+    "setup/test-update-step0-staged-rename.sh",
     "setup/ux-walkthrough-prompt.md"
   ],
   "deprecated_files": [

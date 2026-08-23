@@ -313,9 +313,15 @@ delivered_now = {e['path'] for e in data['files']}
 # git HEAD ships with every fresh clone — deprecating it makes update.sh
 # delete what the canon still distributes, leaving clones with tracked
 # deletions. Deprecated may only list paths git no longer carries.
-tracked_now = set(subprocess.run(
+# 2026-08-22 (Codex peer-review): git ls-files без проверки кода возврата —
+# при сбое git tracked_now молча становился пустым, и фильтр «deprecated ∩
+# дерево» деградировал fail-open. Сбой git = отказ генерации (fail-closed).
+_ls = subprocess.run(
     ['git', 'ls-files'], capture_output=True, text=True, cwd='$SCRIPT_DIR'
-).stdout.splitlines())
+)
+if _ls.returncode != 0:
+    sys.exit('generate-manifest: git ls-files failed: ' + _ls.stderr.strip())
+tracked_now = set(_ls.stdout.splitlines())
 kept, dropped = [], []
 for entry in data['deprecated_files']:
     (dropped if entry.get('path') in delivered_now or entry.get('path') in tracked_now else kept).append(entry)

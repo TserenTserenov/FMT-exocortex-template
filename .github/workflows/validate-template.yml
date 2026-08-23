@@ -601,6 +601,14 @@ jobs:
       - name: Run update.sh self-overwrite regression test
         run: bash setup/test-update-self-overwrite.sh
 
+      # issue #505 residual (Codex peer-review 2026-08-22): the test above
+      # deliberately makes Step 0 a no-op, so the replacement itself had no
+      # coverage. This one serves a DIFFERENT update.sh to the self-update
+      # fetch: Step 0 must stage+rename it over the running script, re-exec,
+      # and finish cleanly (#517: staged rename instead of cp).
+      - name: Run update.sh Step 0 staged-rename test
+        run: bash setup/test-update-step0-staged-rename.sh
+
       # PR #385: cloud install paths may occur legitimately in old tracked text;
       # only additions made by the current updater run are publication blockers.
       - name: Test staged install-path guard

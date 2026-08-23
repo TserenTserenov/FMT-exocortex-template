@@ -123,4 +123,10 @@ jobs:
           done
           [ -n "$RUN_ID" ] || { echo "Validate run for bump commit $BUMP_SHA never appeared"; exit 1; }
           gh run watch "$RUN_ID" --exit-status
-          gh workflow run release.yml --ref main -f version="${{ steps.bump.outputs.version }}"
+          # 2026-08-22 (Codex peer-review of the v0.38.7 post-mortem): pass the
+          # validated SHA explicitly — a bare `--ref main` dispatch would tag
+          # whatever main's tip is when release.yml starts, so a commit landing
+          # between the green Validate and the dispatch would ride into the
+          # release unvalidated. release.yml pins checkout (and therefore the
+          # tag) to this SHA.
+          gh workflow run release.yml --ref main -f version="${{ steps.bump.outputs.version }}" -f sha="$BUMP_SHA"

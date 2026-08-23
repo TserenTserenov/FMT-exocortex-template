@@ -25,6 +25,10 @@ on:
         description: "Version to release (e.g. 0.35.5). Leave empty to read from manifest."
         required: false
         default: ""
+      sha:
+        description: "Commit to tag (the validated bump commit). Leave empty to tag the dispatch ref tip."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -51,9 +55,12 @@ jobs:
         with:
           # workflow_run: pin to the exact commit Validate Template just
           # verified — this is what makes the gate actually mean something.
-          # workflow_dispatch (manual override): github.sha is the ref that
-          # was dispatched against, same as before this change.
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          # workflow_dispatch with explicit sha (weekly-release.yml closes the
+          # chain this way): pin to that validated commit — a bare ref tip
+          # could have moved past what Validate saw.
+          # workflow_dispatch without sha (manual override): github.sha is the
+          # ref that was dispatched against, same as before this change.
+          ref: ${{ github.event.inputs.sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.sha }}
           fetch-depth: 0  # full history to check existing tags
 
       - name: Determine version
