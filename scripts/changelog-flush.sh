@@ -28,8 +28,17 @@ if [[ -z "$version" ]]; then
     exit 1
 fi
 
-if ! grep -q '## \[Unreleased\]' "$CHANGELOG" 2>/dev/null; then
-    echo "⚠️  Блок [Unreleased] не найден. Сначала запусти: bash changelog-append.sh" >&2
+# #9 High-2 (ревью Ф14): после первого flush пустой заголовок [Unreleased]
+# остаётся навсегда — проверка «заголовок существует» стала бы мёртвой и
+# позволила бы чеканить пустые релизы. Сторож требует НЕПУСТОГО содержимого
+# между [Unreleased] и следующим версионным заголовком.
+UNRELEASED_CONTENT=$(awk '
+    /^## \[Unreleased\]/ { in_u=1; next }
+    in_u && /^## \[/ { exit }
+    in_u && NF { print }
+' "$CHANGELOG" 2>/dev/null)
+if [ -z "$UNRELEASED_CONTENT" ]; then
+    echo "⚠️  Секция [Unreleased] пуста или отсутствует. Сначала запусти: bash changelog-append.sh" >&2
     exit 1
 fi
 
@@ -42,15 +51,21 @@ if $dry_run; then
     exit 0
 fi
 
-# Кросс-платформенный wrapper (docs/PLATFORM-COMPAT.md)
-# macOS BSD sed: exit 0 но без "GNU" в выводе
-if sed --version 2>&1 | grep -q GNU; then
-    sed_inplace() { sed -i "$@"; }
-else
-    sed_inplace() { sed -i '' "$@"; }
-fi
-sed_inplace "s|## \[Unreleased\].*|$new_header|" "$CHANGELOG"
+# 2026-08-23 (живой сбой перед v0.38.8): flush ПЕРЕИМЕНОВЫВАЛ заголовок
+# [Unreleased] в версию — секция исчезала, changelog-append писал в пустоту,
+# следующий бамп видел «нечего выпускать». awk вместо sed: заголовок остаётся
+# на месте пустой секцией, версия вставляется новой секцией под ним
+# (переносы строк в replacement непортируемы между GNU и BSD sed).
+_flush_tmp="$CHANGELOG.flush.$$"
+awk -v hdr="$new_header" '
+    !done && /^## \[Unreleased\]/ { print "## [Unreleased]"; print ""; print hdr; done=1; next }
+    { print }
+' "$CHANGELOG" > "$_flush_tmp" && mv "$_flush_tmp" "$CHANGELOG" || {
+    echo "❌ flush не применён (сбой awk/mv)" >&2
+    rm -f "$_flush_tmp"
+    exit 1
+}
 
-echo "✅ [Unreleased] → [$version] ($today)"
+echo "✅ [Unreleased] → [$version] ($today), пустой заголовок [Unreleased] сохранён"
 echo "Следующий шаг:"
 echo "  cd $FMT_DIR && git add CHANGELOG.md && git commit -m 'chore: release v$version'"

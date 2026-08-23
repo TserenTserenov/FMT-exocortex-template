@@ -126,7 +126,7 @@
    - Если фронтматтер WP-файла не совпадает с MEMORY.md → обновить фронтматтер перед перемещением
 6. **Полная очистка inbox/ (еженедельно, единственный владелец — Session-Prep):**
    - `extraction-reports/` — учитывай `status` во frontmatter (инвариант «capture не исчезает без решения»):
-     - `status ∈ {applied, rejected, no-pending}` и старше 7 дней → удали (решение принято, информация в Pack/feedback-log)
+     - `status ∈ {applied, rejected, no-pending}` и старше 7 дней → **архивируй** в `archive/extraction-reports/` (та же конвенция и владелец чистки, что у captures ниже; НЕ удалять — отчёт это вторая половина того же аудитного следа «capture → решение», issue #507)
      - `status ∈ {pending-review, partially-applied, deferred}` → **не трогай** (ждут разбора через `/apply-captures`)
      - Без frontmatter или без поля `status` → оставить (считать pending-review)
    - `captures.md` — записи с `[processed ...]` старше 14 дней → **архивируй** в `archive/captures/captures-{period}.md` (НЕ удалять — это аудитный след записи в Pack). Записи с `[rejected ...]` старше 14 дней → архивируй туда же.

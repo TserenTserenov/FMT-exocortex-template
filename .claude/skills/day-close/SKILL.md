@@ -114,7 +114,12 @@ TODAY_DAYPLAN="${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan $(d
 `bash .claude/scripts/load-extensions.sh day-close after` → exit 0: `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/day-close.after.md` И `extensions/day-close.after.<suffix>.md`. Симметрично week-close (шаг 9): вызывается ДО финального коммита (10b), чтобы правки расширений попадали в тот же коммит, не оставались незакоммиченным хвостом (issue #320/#322).
 
 ### 10b. Финальный коммит (все затронутые репозитории, не только governance)
-`git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`{{HOME_DIR}}/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное (включая правки шага 10a) → `git add <specific paths>` → commit → push. Переходить к шагу 11 только когда `git status` чист во всех репо.
+`git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`{{HOME_DIR}}/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное (включая правки шага 10a) → `git add <specific paths>` → **сторож индекса** → commit → **сторож содержимого** → push. Переходить к шагу 11 только когда `git status` чист во всех репо.
+
+> **Двойной сторож коммита (#511, дважды воспроизведённый класс «git mv + правка → пустой/устаревший дифф», корень не установлен — ишью остаётся открытым до поимки под сторожем):**
+> 1. ПЕРЕД commit: `git diff --cached --stat` — пустой вывод при непустом намерении = СТОП (ничего не застейджилось: та самая тихая потеря). Ошибку любого `git add` НЕ проглатывать — упавший add по старому пути после `git mv` означает, что часть правок не в индексе.
+> 2. ПОСЛЕ commit: сверить, что правки реально в HEAD — `git show HEAD --stat` содержит перемещённый файл, и `git diff HEAD -- <файл>` пуст (на диске нет незакоммиченных остатков правок).
+> 3. Любое срабатывание → СТОП + собрать диагностику в отчёт дня: `git status`, `git diff`, `git log -1 --stat`, точная последовательность выполненных команд — и сообщить пилоту. Это материал для установления корня #511.
 
 ### 10c. Heartbeat для Day Open guard
 Пишется ПОСЛЕ push шага 10b — DayPlan уже реально закоммичен. day-open-pipeline.sh на следующий день читает этот файл как сигнал «Day Close сделан» (fallback — присутствие архивного DayPlan в git, симметрично day-open):

@@ -79,6 +79,22 @@ validate_file() {
         fi
     done
 
+    # Проверка 2b (#513): каноническая форма — плоская. Вложенный metadata:
+    # (его пишет системная инструкция Claude Code, запретить нельзя) читается
+    # единым reader'ом; конфликт «один ключ в обеих формах с разными
+    # значениями» — ошибка, тихий приоритет запрещён.
+    if awk '/^---/{f++; next} f!=1{next} /^metadata:[ \t\r]*$/{found=1; exit} END{exit !found}' "$file"; then
+        for field in $REQUIRED_FIELDS; do
+            flat=$(awk '/^---/{f++; next} f!=1{next} /^'"$field"':/{gsub(/^[^:]+: */,""); gsub(/["'"'"']/,""); print; exit}' "$file")
+            nested=$(awk '/^---/{f++; next} f!=1{next} /^metadata:[ \t\r]*$/{m=1; next} m && /^[^ \t]/{m=0} m && /^[ \t]+'"$field"':/{gsub(/^[ \t]*[^:]+: */,""); gsub(/["'"'"']/,""); print; exit}' "$file")
+            if [ -n "$flat" ] && [ -n "$nested" ] && [ "$flat" != "$nested" ]; then
+                errs="$errs\n  ❌ конфликт форм: '$field' задан и плоско ('$flat'), и в metadata: ('$nested')"
+                errors=$((errors + 1))
+            fi
+        done
+        [ "${QUIET:-0}" -eq 0 ] && echo "  ℹ️  $file: вложенная форма metadata: (канонична плоская — spec §3); reader нормализует, перезапись сериализует плоско"
+    fi
+
     # Проверка 3: допустимые значения type
     type_val=$(get_field "$file" "type")
     if [ -n "$type_val" ]; then

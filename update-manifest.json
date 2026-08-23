@@ -333,7 +333,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "cee825b58e29923b49a50b7ea981c766a1d90cd9e3dad37df506f7139f23675c"
+      "sha256": "f066bc7aab7f1f349c6af07ac4ad9a75adb282665282fc73675f5c655803b846"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -441,7 +441,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
-      "sha256": "387b668e75a70621937fe148e44c2d1362e4ebe2127cea703e8d4d4e7993307e"
+      "sha256": "a8b3cbf4b31dd603095e3b260cda86bf714f27628ae6fce4d8b40c1520765a26"
     },
     {
       "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
@@ -1321,7 +1321,7 @@
     },
     {
       "path": "memory/feedback_response_clarity_for_pilot.md",
-      "sha256": "7993b0ca4c51ea81d1ab65ecae83993e65bc454ee11ebc3ded45d30cbf1523c7"
+      "sha256": "6d4dc548120e7a7b46f4040c9bff72bad20e07e4f1213da11272e52afee118fb"
     },
     {
       "path": "memory/fpf-reference.md",
@@ -1345,7 +1345,7 @@
     },
     {
       "path": "memory/memory-lifecycle-spec.md",
-      "sha256": "f794f558a747135450061c71eca078e7868de9b3b446facf553b7b33c7a9d230"
+      "sha256": "68dfa01867f40cce0bf66e7276bbc7c1af96d4657c1659feb5004399d640f60b"
     },
     {
       "path": "memory/navigation.md",
@@ -1353,7 +1353,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "8f8164bcefa2cce3bfb14efe1905ab9b6ce6b46c5d230e68ca297a2b363ffbf5"
+      "sha256": "42a408e8c174b3b72b5056cdeb6304002ca4a8bd59d3b35504ee4db271ccd735"
     },
     {
       "path": "memory/protocol-dt-integration.md",
@@ -1593,7 +1593,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "9fb6fa9dbe414bb90082d0c3bed3055e9261f4a5380b2e97f1ac708c718ca676"
+      "sha256": "5f92502a1261c092054cdfc5f50a62faaa833e36d540db235a4ba792c2fc0421"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -1877,7 +1877,7 @@
     },
     {
       "path": "scripts/changelog-flush.sh",
-      "sha256": "be0c54ea7f13fbe6e42262ec466f6073125a7ca36e6102e520623f09199eef5b"
+      "sha256": "0b20d2a3e268c49ed6ad5098c5d847486de46997993f9523ffbc665da434bcb7"
     },
     {
       "path": "scripts/check-claude-md-links.py",
@@ -2241,7 +2241,7 @@
     },
     {
       "path": "scripts/memory-bleed.sh",
-      "sha256": "e5dd1319cd42ef79a3f299e3747a0628a1af07ba3a6231a903439aab6896b47e"
+      "sha256": "6e17b5d41562ce24326cd4b1556d30c0ef2ae60f5a83e31012f05982ca6a16e8"
     },
     {
       "path": "scripts/memory-health.sh",
@@ -2253,7 +2253,7 @@
     },
     {
       "path": "scripts/memory-validate.sh",
-      "sha256": "50b8be9d9980e6db7a01f83da6503a433c79a0e2dfbf775fa2e4fd3f7ef061bf"
+      "sha256": "b64ca8dc78fa4a4f02a669728cca3b8b2a0c3356d96f52312afcb54c7eb7dd49"
     },
     {
       "path": "scripts/migrate-initial-marker.sh",
@@ -2565,7 +2565,7 @@
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
-      "sha256": "92f14a84bbca323c9cc7ca5cdec55ecfd48dd54be7db855e969662682bd3075a"
+      "sha256": "0e41119a385f0010624cfb8bcff5c4bcfc8739907c6dbc214b45e0fba475d933"
     },
     {
       "path": "scripts/validate-hypothesis-priority.sh",

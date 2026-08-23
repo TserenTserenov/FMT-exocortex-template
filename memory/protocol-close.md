@@ -40,6 +40,14 @@ schema_version: 1
 ### Раннер — условный драйвер (WP-482 Ф3+Ф5, issue #356)
 
 ```bash
+# #512: для установки с author_mode: false исход известен заранее — раннер
+# это личный инструмент мейнтейнера (issue #306/#356), в шаблон не поставляется.
+# Ветвление по params.yaml убирает файловую пере-проверку из горячего пути
+# каждого закрытия; file-probe остаётся только когда флаг не читается.
+AUTHOR_MODE=$(grep -E '^author_mode:' "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml" 2>/dev/null | awk '{print $2}')
+if [ "$AUTHOR_MODE" = "false" ]; then
+  echo "Quick Close: author_mode=false — раннер не поставляется, шаги протокола вручную (штатный режим шаблона)"
+else
 RUNNER="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/process-runner.py"
 GRAPH="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/processes/quick-close.yaml"
 if [ -f "$RUNNER" ] && [ -f "$GRAPH" ]; then
@@ -48,6 +56,7 @@ if [ -f "$RUNNER" ] && [ -f "$GRAPH" ]; then
       --input '{"agent":"<agent>","wp":"<WP-N сессии или null, если сессия без своего РП>","slug":"<slug>","session_file":"<путь или null>","repos":["<repo1>", ...]}'
 else
   echo "Quick Close: раннер не поставляется этой инсталляцией; выполнить шаги протокола вручную"
+fi
 fi
 ```
 

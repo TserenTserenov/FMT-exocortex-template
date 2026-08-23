@@ -100,6 +100,7 @@ if [[ "$MODE" != "settings-json" ]]; then
         # safe-паттерн, даже когда начало строки содержит отдельный, опасный хардкод.
         case "$f" in
             scripts/tests/*|*/scripts/tests/*) : ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.claude/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
+            setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) : ;;  # issue #499: тест-обвязки setup/ по именной конвенции — их fail-сообщения и grep-паттерны СОДЕРЖАТ литерал как предмет собственной проверки; классовое путевое исключение (не эвристика по строке), остальной setup/ сканируется как прежде.
             *)
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
             bad_lines=$(grep -n "$AUTHOR_GOV_REPO" "$f" \

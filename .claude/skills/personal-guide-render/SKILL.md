@@ -37,7 +37,14 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Шаг 0. Проверить предусловие (setup завершён)
 
-Вызови `personal_search(source: "personal-guide", path: ".claude/skills/personal-guide-start/SKILL.md")`.
+Вызови `personal_search(source: "personal-guide", path: "README.md")`.
+
+> #503: раньше здесь проверялся платформенный путь `.claude/skills/...` —
+> он живёт в шаблоне (слой L1) и в пользовательский репозиторий personal-guide
+> не копируется никогда, проверка гарантированно возвращала пусто и блокировала
+> все следующие шаги. Реальный признак завершённого bootstrap — README.md:
+> его создаёт сам bootstrap при создании репозитория (notes-структура
+> Gateway: inbox/, docs/, README.md), т.е. он существует ДО первого рендера.
 
 Если файл **не найден** → сообщить пилоту:
 ```
