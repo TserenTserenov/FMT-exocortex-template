@@ -2,10 +2,10 @@
 
 ## Overview
 
-ResidencyGate is a universal mechanism for features that work with personal data of types 2.1–2.4. A feature declares what data it needs, and ResidencyGate ensures:
+ResidencyGate is a universal mechanism for features that work with personal data of types 2.1–2.4. A feature declares what data it needs, and ResidencyGate guarantees:
 
-1. **Point A (activation-time):** when a feature is enabled → pilot consent check
-2. **Point B (lazy):** when data is actually requested → interactive check if consent is missing
+1. **Point A (activation-time):** when the feature is enabled → pilot consent check
+2. **Point B (lazy):** when data is actually requested → interactive check if consent is absent
 
 ---
 
@@ -24,10 +24,10 @@ data_needs:
 **Fields:**
 - `type`: one of types 2.1/2.2/2.3/2.4 (from WP-475)
 - `flow`: `inbound` (platform → IWE) or `outbound` (IWE → platform)
-- `name`: unique name for the need (used for logging)
+- `name`: unique need name (for logging)
 - `schema_version` (optional): schema version (default: 1)
 
-### For bash hooks
+### For a bash hook
 
 ```bash
 #!/bin/bash
@@ -42,9 +42,9 @@ data_needs:
 
 ## Step 2. Integrate Point A Into Startup
 
-**Skills invoked via Claude Code (Skill tool) — no manual integration required.** From 09.08.2026, the `residency-gate-skill-adapter.sh` hook (PreToolUse, matcher `Skill`) automatically checks `data_needs` from `SKILL.md` before the skill code runs — declaring the block in Step 1 is sufficient. Previously this check was cognitive (the author could forget to insert `source`); now it is mechanical. Clean installation test: `scripts/tests/test_residency_gate_skill_adapter.py`.
+**A Skill invoked via the Claude Code adapter (Skill tool) — no integration required.** From 09.08.2026, the `residency-gate-skill-adapter.sh` hook (PreToolUse, matcher `Skill`) checks `data_needs` from `SKILL.md` automatically, before the Skill code runs — declaring the block in Step 1 is sufficient. Previously this check was cognitive (the author could forget to insert `source`); now it is mechanical. The clean-install test is `scripts/tests/test_residency_gate_skill_adapter.py`.
 
-If a feature runs **outside Claude Code** (day-open pipeline on launchd, a bot handler, or any process Claude Code does not launch) — Claude Code does not observe its start, there is no automatic check, and you must integrate manually:
+If a feature runs **outside Claude Code** (a day-open Pipeline on launchd, a bot handler, or any process that Claude Code does not launch) — Claude Code does not see its startup, there is no automatic check, and you must integrate manually:
 
 ```bash
 #!/bin/bash
@@ -58,14 +58,14 @@ source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/d
 
 ---
 
-## Step 3. Integrate Point B Into Data Access Code
+## Step 3. Integrate Point B Into the Data-Access Code
 
-If a feature is **interactive** or requires consent at a specific moment:
+If the feature is **interactive** or requires consent at a specific moment:
 
 ```bash
 #!/bin/bash
 
-# On attempting to read data:
+# When attempting to read data:
 bash ~/.claude/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "digital-twin"
 
 # If exit code = 0 → access granted
@@ -74,9 +74,9 @@ bash ~/.claude/hooks/residency-gate-lazy.sh "render-guides" "2.1" "inbound" "dig
 
 ---
 
-## Step 4. Consent Management (for the pilot)
+## Step 4. Consent Management (for the Pilot)
 
-### Grant consent
+### Grant Consent
 
 ```bash
 python3 ~/.claude/skills/residency-gate/residency-gate.py grant \
@@ -89,20 +89,20 @@ python3 ~/.claude/skills/residency-gate/residency-gate.py grant \
   day-open 2.2 inbound daily-summary
 ```
 
-### Revoke consent
+### Revoke Consent
 
 ```bash
 python3 ~/.claude/skills/residency-gate/residency-gate.py revoke \
   <function_id> <type> <flow_direction> <name> "reason"
 ```
 
-### List all consents
+### List All Consents
 
 ```bash
 python3 ~/.claude/skills/residency-gate/residency-gate.py list
 ```
 
-### For a specific feature
+### For a Specific Feature
 
 ```bash
 python3 ~/.claude/skills/residency-gate/residency-gate.py list day-open
@@ -112,7 +112,33 @@ python3 ~/.claude/skills/residency-gate/residency-gate.py list day-open
 
 ## Consent State
 
-Consent is stored in the **gitignored** file `~/IWE/current/data-residency.yaml`:
+Consent is stored locally, outside Git and the workspace:
+`${IWE_STATE_HOME:-$HOME/.iwe/state}/data-residency.yaml`. The directory is
+accessible only to the owner (`0700`); the file is `0600`.
+
+On first run, ResidencyGate migrates the previous
+`<IWE workspace>/current/data-residency.yaml` (the workspace is resolved from
+`IWE_WORKSPACE`, then `IWE_ROOT`/`IWE`, otherwise `$HOME/IWE`) to the new
+location and stores an exact recoverable copy at
+`migration-backups/data-residency.yaml.legacy`. Subsequent runs are idempotent.
+If the old and new files differ, or either is corrupted, automatic merging is
+prohibited: the gate stops and both source files remain unchanged.
+
+During the atomic transfer, the old file receives a quarantine name inside the
+private `IWE_STATE_HOME`, not inside the Git repository. If the old and new
+stores reside on different filesystems, automatic migration stops: an atomic
+rename between them is not possible. Symbolic links below the old workspace root
+and files with multiple hard links are also rejected, so that consent cannot be
+read or modified through an alternative path. Every read re-checks the old
+address: a late-starting old version cannot silently restore revoked consent.
+
+The primary file and the migration copy are intentionally excluded from Git and
+from IWE automatic Backups. To transfer or back them up, copy them explicitly
+to a secure local or encrypted store and preserve `0600` permissions. The `list`
+command is for Audit purposes and is not a recoverable Backup. Note that the
+state may contain user-supplied denial reasons (`denied_reason`).
+
+Example content:
 
 ```yaml
 functions:
@@ -133,11 +159,11 @@ functions:
 
 source ~/.claude/hooks/residency-gate-init.sh "day-open" "$HOME/.claude/skills/day-open/SKILL.md"
 
-# If execution reaches this point — consent is granted, continue
+# If we reach this point — consent is granted, continue
 # ...rest of day-open logic...
 ```
 
-### Example 2: Personal guide rendering with Point B
+### Example 2: Personal Guide with Point B
 
 ```python
 # render-pilot-guides.py
@@ -164,11 +190,11 @@ def get_digital_twin():
 
 ## Versioning (schema_version)
 
-If a data need's schema changes (new fields, different format), increment `schema_version` in the declaration. ResidencyGate will automatically:
+If the need's schema changes (new fields, different format), increment `schema_version` in the declaration. ResidencyGate automatically:
 
-1. Detect the version incompatibility
-2. Reset the consent status for the feature (revert to `not_asked`)
-3. Require new consent on the next run
+1. Detects the version incompatibility
+2. Resets the consent status for the feature (returns it to `not_asked`)
+3. Requires new consent on the next run
 
 ---
 
@@ -177,7 +203,7 @@ If a data need's schema changes (new fields, different format), increment `schem
 | Scenario | Use |
 |----------|-----|
 | Feature is autonomous, no pilot in the loop | Point A (activation-time) |
-| Feature is interactive or makes a one-time request | Point B (lazy) |
+| Feature is interactive or involves a one-time request | Point B (lazy) |
 | Both needs apply (rare) | Both mechanisms |
 
 ---
@@ -211,6 +237,7 @@ Returns:
 
 - [ ] Declare `data_needs` in SKILL.md or bash frontmatter
 - [ ] Add Point A (activation) OR Point B (lazy) depending on the feature type
-- [ ] Test the denied consent case
-- [ ] Document data needs in the feature README
-- [ ] At release — the pilot runs `grant` or `deny` for each need
+- [ ] Test the denied-consent case
+- [ ] Document needs in the feature README
+- [ ] On release — the pilot runs `grant` or `deny` for each need
+

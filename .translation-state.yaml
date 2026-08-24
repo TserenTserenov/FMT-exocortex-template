@@ -1,5 +1,8 @@
 files_translated:
 - README.md
-last_run_utc: '2026-08-24T09:05:11Z'
-last_synced_sha: 6ff3932d20c753bc09e056e6bc2f6f3d51367770
+- docs/LEARNING-PATH.md
+- docs/RESIDENCY-GATE-USAGE.md
+- docs/SETUP-GUIDE.md
+last_run_utc: '2026-08-24T18:20:02Z'
+last_synced_sha: 8a26f6782317e0ce5b39230515792e0e54d75b94
 schema_version: 1
