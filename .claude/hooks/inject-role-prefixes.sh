@@ -23,8 +23,11 @@ command -v jq >/dev/null 2>&1 || { echo '{}'; exit 0; }
 
 INPUT=$(cat 2>/dev/null || echo '{}')
 
-# Extract user prompt (first 100 chars is enough for prefix detection)
-PROMPT=$(echo "$INPUT" | jq -r '.message // empty' 2>/dev/null | head -c 100 || echo "")
+# Extract user prompt (first 100 chars is enough for prefix detection).
+# Field is `.prompt`, not `.message` (issue #525) — confirmed by the official
+# UserPromptSubmit contract and by the three sibling hooks on the same event
+# (wp-gate-reminder.sh, close-gate-reminder.sh, lazy-context-loader.sh).
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null | head -c 100 || echo "")
 [ -n "$PROMPT" ] || { echo '{}'; exit 0; }
 
 # Locate the full roles file

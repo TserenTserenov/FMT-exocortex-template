@@ -44,19 +44,58 @@ MANIFEST="$PROJECT_ROOT/.claude/skills/$SKILL_NAME/SKILL.md"
 RESIDENCY_GATE_PY="$PROJECT_ROOT/.claude/skills/residency-gate/residency-gate.py"
 [ -f "$RESIDENCY_GATE_PY" ] || exit 0
 
-RESULT=$(python3 "$RESIDENCY_GATE_PY" check-activation "$SKILL_NAME" "$MANIFEST" 2>&1) && RC=0 || RC=$?
+# Resolved once, before residency-gate.py runs at all (issue #521A, the exact
+# hook from the live traceback in the issue report): a missing PyYAML then
+# reads as a dependency error here, not a fabricated "requires data consent"
+# from a crash three layers down.
+PY3=$("$PROJECT_ROOT/scripts/lib/find-python3.sh" 2>&1) || {
+  echo "BLOCKED: ResidencyGate dependency error — skill '$SKILL_NAME' could not be checked." >&2
+  echo "  $PY3" >&2
+  exit 2
+}
+
+RESULT=$("$PY3" "$RESIDENCY_GATE_PY" check-activation "$SKILL_NAME" "$MANIFEST" 2>&1) && RC=0 || RC=$?
 
 if [ "$RC" -eq 0 ]; then
   exit 0
 fi
 
-# check-activation exits 1 on both "blocked" and "malformed declaration"
-# (ManifestError) — the library's own fail-closed choice (see residency-gate.py
-# check-activation: a malformed manifest blocks activation, it does not warn
-# and continue). This hook does not second-guess that: any non-zero exit here
-# blocks the skill the same way, with the library's own reason surfaced.
-BLOCKING=$(jq -r '.blocking // [] | join("; ")' <<<"$RESULT" 2>/dev/null || echo "$RESULT")
-echo "BLOCKED: ResidencyGate — skill '$SKILL_NAME' requires data consent not yet granted." >&2
-echo "  $BLOCKING" >&2
-echo "  Выдать согласие: python3 $RESIDENCY_GATE_PY grant $SKILL_NAME <type> <flow> <name>" >&2
+# check-activation exits non-zero for four distinct reasons now (issue #521A
+# contract: 1 policy_denial, 2 invalid_manifest, 3 dependency_error, 4
+# runtime_error) — this hook does not second-guess any of them (any non-zero
+# exit still blocks the skill, the library's own fail-closed choice), but it
+# no longer claims "requires data consent" for a reason that isn't consent.
+# `jq -e . <<<"$RESULT"` is a distinct check from the field extraction below:
+# it tells apart valid JSON with no error_class (a genuine policy_denial —
+# residency-gate.py's own contract) from $RESULT not being JSON at all (a
+# crash outside that contract entirely, e.g. a SyntaxError in a corrupted
+# lib/*.py — caught here with `2>&1`, unlike the other two hooks). Without
+# this check the second case fell into the same branch as the first and
+# printed "requires data consent" — and the grant hint below — for a reason
+# that has nothing to do with consent (found in second-round cold review).
+if jq -e . <<<"$RESULT" >/dev/null 2>&1; then
+  ERROR_CLASS=$(jq -r '.error_class // empty' <<<"$RESULT" 2>/dev/null || echo "")
+else
+  ERROR_CLASS="unparseable"
+fi
+case "$ERROR_CLASS" in
+  dependency_error) HEADER="ResidencyGate dependency error" ;;
+  invalid_manifest) HEADER="ResidencyGate declaration error" ;;
+  runtime_error) HEADER="ResidencyGate runtime error" ;;
+  unparseable) HEADER="ResidencyGate crashed — skill '$SKILL_NAME' could not be checked" ;;
+  *) HEADER="ResidencyGate — skill '$SKILL_NAME' requires data consent not yet granted." ;;
+esac
+# `|| DETAIL=""` guards the whole pipeline, not just `jq`: this script runs
+# under `pipefail` (line 26), and $RESULT can be non-JSON (a stray stderr
+# line merged by the `2>&1` above, from something outside residency-gate.py's
+# own JSON contract) — jq then fails, pipefail propagates that through `grep`
+# and `head`, and an unguarded assignment would abort the script under `set
+# -e` before the BLOCKED message below ever prints (found in cold review).
+DETAIL=$(jq -r '(.blocking // [] | join("; ")), .error // empty' <<<"$RESULT" 2>/dev/null | grep -v '^$' | head -1) || DETAIL=""
+[ -n "$DETAIL" ] || DETAIL="$RESULT"
+echo "BLOCKED: $HEADER" >&2
+echo "  $DETAIL" >&2
+# The grant hint only makes sense for an actual consent decision — a broken
+# manifest or a runtime crash isn't fixed by granting consent to it.
+[ -z "$ERROR_CLASS" ] && echo "  Выдать согласие: python3 $RESIDENCY_GATE_PY grant $SKILL_NAME <type> <flow> <name>" >&2
 exit 2

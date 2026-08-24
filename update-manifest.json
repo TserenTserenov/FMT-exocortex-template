@@ -89,7 +89,7 @@
     },
     {
       "path": ".claude/hooks/inject-role-prefixes.sh",
-      "sha256": "310386f4f5f64781978a75d1743ab43096135026a674ddbfbf00876d26be0758"
+      "sha256": "cc439d8a81737f586145bd6a88a0a0fd63eea258e38e0318610d81a08a2f6b7a"
     },
     {
       "path": ".claude/hooks/lazy-context-loader.sh",
@@ -125,15 +125,15 @@
     },
     {
       "path": ".claude/hooks/residency-gate-init.sh",
-      "sha256": "582eb27ec1d4bd812c148ac538d6bfd1f12b4318cadb3aee9b5cdecbd18b95b9"
+      "sha256": "8064b5d769306c51c718212e24c2584373d358ebc4843e9d840bfac8a9b5359b"
     },
     {
       "path": ".claude/hooks/residency-gate-lazy.sh",
-      "sha256": "030aaa6fe19acc24103744cd1026c93955a2c5ed5ff6cd8dc933c8886ed3339a"
+      "sha256": "d134fb417f2640e746778f2c208d5a833ab1d91a1d9eb1245bfc8af9ddee1f3c"
     },
     {
       "path": ".claude/hooks/residency-gate-skill-adapter.sh",
-      "sha256": "8e8258e78bb943c05c368736595e3d4a96623ee4dd2e36a53bdc1477b290ffd5"
+      "sha256": "31753b2a377c973825c12f9076a0c4d33ff5ceaeb04c11cd96d6894740caac26"
     },
     {
       "path": ".claude/hooks/response-clarity-hook.sh",
@@ -481,7 +481,11 @@
     },
     {
       "path": ".claude/skills/residency-gate/residency-gate.py",
-      "sha256": "df6730f7bfd4d7c004d9db527660ce6f9d0c6d5e80b93d986d733575f5ac41b9"
+      "sha256": "d872395147af2e46789e58abe48b1538b8a8bf4efdd0b545efab4455676ec02d"
+    },
+    {
+      "path": ".claude/skills/residency-gate/tests/test_cli_error_contract.py",
+      "sha256": "dbea13069496a262efe36f0753dee0f38f4104dbacf764a951ddd48d93a835fe"
     },
     {
       "path": ".claude/skills/residency-gate/tests/test_parser.py",

@@ -32,6 +32,7 @@
 #   T31: extensions-gate is fail-closed: traversal/symlink/broken-manifest/manifest-edit block (WP-7 F71)
 #   T32: settings-merge-apply.sh applies with backup, rolls back on broken input (WP-7 F71 stage B)
 #   T33: update.sh wires stage-B flags with consensus safeguards (WP-7 F71)
+#   T36: inject-role-prefixes.sh reads .prompt on a real UserPromptSubmit payload (issue #525)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -2078,6 +2079,37 @@ then
     pass "T35: /extend lists all 16 invoked extension points"
 else
     fail "T35: /extend catalog differs from invoked extension points"
+fi
+
+# ============================================================
+# T36: inject-role-prefixes.sh reads .prompt, not .message (issue #525)
+# ============================================================
+echo ""
+echo "--- T36: inject-role-prefixes reads the real UserPromptSubmit field (#525) ---"
+
+if t16_run inject-role-prefixes.sh '{"session_id":"t36-role","prompt":"Навигатор, привет"}'; then
+    T36_EV=$(t16_json "d['hookSpecificOutput']['hookEventName']")
+    T36_LEN=$(t16_json "len(d['hookSpecificOutput']['additionalContext'])")
+    if [ "$T36_EV" = "UserPromptSubmit" ] && [ "${T36_LEN:-0}" -gt 100 ]; then
+        pass "T36: inject-role-prefixes injects role context on a real .prompt payload"
+    else
+        fail "T36: inject-role-prefixes event='$T36_EV' ctx_len='${T36_LEN:-none}'"
+    fi
+fi
+
+# A prompt without a role prefix must stay a no-op ({}) — proves the field
+# read is real, not accidentally matching everything.
+T36_NOOP=$(printf '%s' '{"session_id":"t36-plain","prompt":"обычный вопрос без префикса"}' | \
+    HOME="$T16_HOME" CLAUDE_PROJECT_DIR="$T16_PROJ" bash "$TEMPLATE_DIR/.claude/hooks/inject-role-prefixes.sh" 2>/dev/null)
+[ "$T36_NOOP" = "{}" ] \
+    && pass "T36: inject-role-prefixes stays a no-op without a role prefix" \
+    || fail "T36: inject-role-prefixes should return {} for a plain prompt, got '$T36_NOOP'"
+
+# Regression guard for #525 itself: the field name must be .prompt, not .message.
+if grep -q "jq -r '\.message" "$TEMPLATE_DIR/.claude/hooks/inject-role-prefixes.sh"; then
+    fail "T36: inject-role-prefixes.sh still reads .message (issue #525 regressed)"
+else
+    pass "T36: inject-role-prefixes.sh reads .prompt, not .message"
 fi
 
 # ============================================================
