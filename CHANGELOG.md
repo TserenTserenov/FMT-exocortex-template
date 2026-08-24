@@ -143,6 +143,11 @@ Refs: WP-NNN
 
 
 
+
+## [Unreleased]
+### Fixed
+- `6c4f52b` fix(template): batch of nine small user-reported defects (#515 #514 #513 #503 #499 #507 #512 #511 + flush) — WP-529 F14, peer session with Kimi (#520)
+
 ## [0.38.8] — 2026-08-23
 ### Fixed
 - `8364a30` fix(update,setup): fail-closed release channel (#501), Step 0 double negative control, resolver-baseline delivery, IWE_RUNTIME isolation (WP-529 F13, v0.38.7 matrix) (#519)
