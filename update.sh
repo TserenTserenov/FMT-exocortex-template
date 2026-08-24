@@ -2626,7 +2626,7 @@ echo "Проверка применённых изменений..."
 
 validate_no_install_values_in_applied_additions() {
     local env_file="$WORKSPACE_DIR/.exocortex.env"
-    local key value fpath applied_additions added_line historical_lines upstream_ref
+    local key value fpath applied_additions added_line historical_lines upstream_ref target_sha256
     local i failed=0
     local -a install_keys=() install_values=()
 
@@ -2665,7 +2665,75 @@ validate_no_install_values_in_applied_additions() {
     # раньше ни в одной прошлой upstream-версии этого же файла.
     upstream_ref=$(git -C "$SCRIPT_DIR" rev-parse --verify --quiet '@{upstream}' 2>/dev/null || true)
 
+    # issue #524 (P0, WP-529 Ф16): git-history эвристика выше слепа к файлам,
+    # которых в ЭТОМ локальном чекауте раньше не было вообще (old target upgrade
+    # добавил файл целиком) — historical_lines пуст, и ЛЮБАЯ строка с
+    # install-значением в новом файле блокируется, даже если она байт-в-байт
+    # каноничное содержимое target-релиза. Провенанс через сам манифест: если
+    # ВЕСЬ файл на диске побайтово совпадает с sha256, который target release
+    # заявил для этого пути в $MANIFEST — каждая его строка гарантированно
+    # пришла из upstream (иначе хэш не совпал бы), exempt всего файла целиком.
+    # Не срабатывает (mismatch/no entry/no manifest) → падаем в прежнюю
+    # построчную git-history проверку без изменений — fail-closed по умолчанию
+    # не ослаблен, exempt только ДОБАВЛЯЕТ разрешение на доказуемых байтах.
+    #
+    # Детерминированно в обоих окружениях (peer-review Codex, 2026-08-24-07):
+    # python-путь и shell-фоллбек дают одинаковый результат на одном манифесте
+    # — P0 не остаётся воспроизводимым только в окружениях без python3/python.
+    manifest_sha256_for_path() {
+        local want="$1"
+        if py_available; then
+            "$PY_BIN" - "$MANIFEST" "$want" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as f:
+        data = json.load(f)
+except Exception:
+    sys.exit(1)
+matches = [e.get('sha256') for e in data.get('files', []) if e.get('path') == sys.argv[2]]
+uniq = set(m for m in matches if m)
+if len(uniq) != 1:
+    sys.exit(1)
+print(uniq.pop())
+PYEOF
+            return $?
+        fi
+        # Shell-фоллбек (нет python3/python): не общий JSON-парсер — опирается
+        # на фиксированный layout нашего же generate-manifest.sh
+        # (json.dump(indent=2), "path" непосредственно перед "sha256" в одном
+        # объекте, один ключ на строку). Если формат манифеста когда-нибудь
+        # разъедется с этим предположением — E2E-тест на no-python окружение
+        # это поймает (WP-529 Ф16, В3 codex).
+        awk -v want="$want" '
+            /"path"[[:space:]]*:/ {
+                line = $0
+                sub(/^[^"]*"path"[[:space:]]*:[[:space:]]*"/, "", line)
+                sub(/".*$/, "", line)
+                cur_path = line
+                next
+            }
+            /"sha256"[[:space:]]*:/ && cur_path == want {
+                line = $0
+                sub(/^[^"]*"sha256"[[:space:]]*:[[:space:]]*"/, "", line)
+                sub(/".*$/, "", line)
+                if (found && line != found_val) { ambiguous = 1 }
+                found = 1
+                found_val = line
+            }
+            END {
+                if (found && !ambiguous) { print found_val; exit 0 }
+                exit 1
+            }
+        ' "$MANIFEST"
+    }
+
     for fpath in "${APPLIED_PATHS[@]}"; do
+        if [ -f "$SCRIPT_DIR/$fpath" ] && target_sha256=$(manifest_sha256_for_path "$fpath") \
+           && [ "$(hash_file "$SCRIPT_DIR/$fpath")" = "$target_sha256" ]; then
+            echo "  install-path guard: $fpath exempt (byte-identical to target manifest sha256)" >&2
+            continue
+        fi
+        echo "  install-path guard: $fpath -- no manifest hash match, falling back to history check" >&2
         # Полное текущее содержимое файла на диске, не git-diff working
         # tree против HEAD. Cold-context review нашёл живую дыру: если файл
         # уже ЗАКОММИЧЕН до этого прогона (второй прогон update.sh после

@@ -2649,7 +2649,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "084f5b44c007db2f5dfb75bf4c47dc2667bf942fa8fd522a7b4d080613616cff"
+      "sha256": "8b38ed930131b878aa1c5f87f1145c13f0c4bdf1ef5da9e5e9a4b446b64e268c"
     }
   ],
   "excluded_paths": [
@@ -2724,6 +2724,7 @@
     "setup/test-delivery-route-label.sh",
     "setup/test-detectors.sh",
     "setup/test-update-edge-cases.sh",
+    "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-226.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
