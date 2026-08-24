@@ -141,7 +141,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "fad98a4ff583ef53ab7a11e752d6dd792869fcbb6d55e9555a91719dc504c5e9"
+      "sha256": "4cd7b1c9856fa0153536b8fd443af2fcb28a7dd436bb33c0f492108099752c74"
     },
     {
       "path": ".claude/hooks/session-end-status.sh",
