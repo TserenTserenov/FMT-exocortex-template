@@ -6,7 +6,10 @@
 # bare python3/python call on a repo-owned .py file, (3) NOT flag an
 # already-baselined call as new, (4) NOT flag a call that goes through the
 # resolver ($PYTHON3/$RESOLVED_PYTHON3), (5) cover dynamic script variables in
-# .claude/hooks and .claude/skills. Runs against an isolated copy of the scan
+# .claude/hooks and .claude/skills, (6) cover the same bare call written
+# inside a .md instruction file (SKILL.md-style, added 26.08 for issue #541
+# hvost 3 — an agent executes a Markdown code-fence's bash line literally,
+# same risk as a .sh file). Runs against an isolated copy of the scan
 # perimeter (REPO_ROOT override), not the real tree — a mutation test that
 # edits tracked files in place would be its own footgun.
 set -uo pipefail
@@ -113,6 +116,27 @@ else
     fi
 fi
 rm -f /tmp/scenario5-out-$$
+
+# --- Сценарий 6 (issue #541 hvost 3, Evgenii 26.08): голый python3-вызов
+# внутри .md (SKILL.md-стиль инструкции) тоже должен ловиться — агент читает
+# Markdown и выполняет его bash-строки буквально, тот же риск, что и в .sh. ---
+cat > "$TEST_ROOT/.claude/skills/example/SKILL.md" <<'EOF'
+# Example Skill
+
+```bash
+python3 "scripts/example-target.py"
+```
+EOF
+if bash "$TEST_ROOT/scripts/check-python-resolver-contract.sh" >/tmp/scenario6-out-$$ 2>&1; then
+    fail "сценарий 6: голый python3-вызов внутри SKILL.md не пойман — .md вне периметра гейта"
+else
+    if grep -q "example-target.py" /tmp/scenario6-out-$$ && grep -q "SKILL.md" /tmp/scenario6-out-$$; then
+        pass "сценарий 6: голый python3-вызов внутри SKILL.md пойман тем же гейтом, что и .sh"
+    else
+        fail "сценарий 6: гейт упал, но не назвал SKILL.md как источник (см. /tmp/scenario6-out-$$)"
+    fi
+fi
+rm -f /tmp/scenario6-out-$$
 
 if [ "$FAIL" -eq 0 ]; then
     echo "python-resolver-contract: все сценарии прошли"

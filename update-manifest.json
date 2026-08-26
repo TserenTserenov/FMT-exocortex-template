@@ -309,7 +309,7 @@
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
-      "sha256": "71164815dcb5c5a8d09963600edb85300c88d5678836933e9e284baee98a558d"
+      "sha256": "4b298838d8cf592204a5288ad97c75b02877c44d8900f96e5adfb734959aca05"
     },
     {
       "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
@@ -345,11 +345,11 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "d70f99826094a25afff821a6c360216a8fbdddd42b47ceca95e5abe4da58039e"
+      "sha256": "7e35ad4d26cda3fa0f0906bf175dfc776bcc2557e8056a2bb5aa6c372aedbd5b"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
-      "sha256": "713dc55f0a433eceb921d629e45680acb8156911e1bf2ac4dd36f0e5e74a4c5b"
+      "sha256": "128dc6f26933025c79460e3d2c818b6aeda1233d43c25918221ae4102f30fec4"
     },
     {
       "path": ".claude/skills/day-close/day-close/SKILL.md",
@@ -497,7 +497,7 @@
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
-      "sha256": "90e6fb1909c12be4d1d95e681543603c73d92941cf7f19eca3df6407477af5f0"
+      "sha256": "4e107b8d611d8e18c610bbe790b398edebb573fce991ce798ef6e8bf9019ad80"
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
@@ -669,7 +669,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "c5e6bae7e7a974fb1e54ccf8df5027c15d149de7565d1435ce53fd336838e484"
+      "sha256": "6ff687ffd0cebf32df38e41be9f11c41641b38ad770348b71cffb0b25c49eac3"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -2017,7 +2017,7 @@
     },
     {
       "path": "scripts/check-python-resolver-contract.sh",
-      "sha256": "b6c0d475e68c131609681d2e6be26187dc0b7e3be09d6ed6df64544060cf33ed"
+      "sha256": "6a8d56b16da06ec42597a01cba20622e333545840f1827a430ac7741d0ba5861"
     },
     {
       "path": "scripts/check-script-collisions.sh",

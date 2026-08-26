@@ -12,12 +12,18 @@
 # `path:trimmed-line-content`, not line number, so unrelated edits elsewhere
 # in a baselined file don't cause spurious baseline drift.
 #
-# Scope: scripts/**/*.sh, setup/**/*.sh, roles/**/*.sh, .claude/hooks/**/*.sh,
-# .claude/skills/**/*.sh — every delivered shell perimeter that can invoke a
-# repo-owned Python program. The .claude perimeter was missing until issue
-# #521, so all three ResidencyGate adapters escaped the original ratchet.
-# Deliberately NOT .github/workflows/** — different execution context (CI step
-# installs PyYAML explicitly), different format (YAML `run:`, not a .sh file).
+# Scope: scripts/**/*.{sh,md}, setup/**/*.{sh,md}, roles/**/*.{sh,md},
+# .claude/hooks/**/*.{sh,md}, .claude/skills/**/*.{sh,md} — every delivered
+# shell perimeter that can invoke a repo-owned Python program. The .claude
+# perimeter was missing until issue #521, so all three ResidencyGate adapters
+# escaped the original ratchet. The *.md half was added 26.08 (Evgenii's
+# v0.38.11 letter, WP-529 hvost 3/5, issue #541 context): an agent reading a
+# SKILL.md instruction and running its literal `python3 script.py` line hits
+# the exact same silent-PyYAML-domain-error failure as a bare call inside a
+# .sh file — the contract does not care which file format carried the bare
+# call into an agent's shell. Deliberately NOT .github/workflows/** —
+# different execution context (CI step installs PyYAML explicitly),
+# different format (YAML `run:`, not a .sh/.md file).
 #
 # A literal interpreter followed by a dynamic script variable (`python3
 # "$SCRIPT_PY"`) is covered. The remaining documented blind spot is an
@@ -42,7 +48,11 @@ MODE="${1:-check}"
 # not the literal word "python"/"python3").
 # These are regular-expression literals; shell expansion would corrupt them.
 # shellcheck disable=SC2016
-LITERAL_PATH_PATTERN='(^|[^$A-Za-z0-9_."'"'"'-])python3?[[:space:]]+"?[A-Za-z0-9_./${}-]*\.py\b'
+# `~` added 26.08 (issue #541 hvost 3 cold-review): a leading `~/...` path
+# (e.g. `~/IWE/.claude/scripts/fp-stats.py`) fell through this class
+# entirely — same repo-owned-.py risk, just spelled with a home-dir shortcut
+# instead of $HOME or an absolute path.
+LITERAL_PATH_PATTERN='(^|[^$A-Za-z0-9_."'"'"'-])python3?[[:space:]]+"?[A-Za-z0-9_./${}~-]*\.py\b'
 # shellcheck disable=SC2016
 VARIABLE_PATH_PATTERN='(^|[^$A-Za-z0-9_."'"'"'-])python3?[[:space:]]+"?\$\{?[A-Za-z_][A-Za-z0-9_]*\}?'
 
@@ -61,8 +71,8 @@ scan() {
         "$SCRIPT_DIR/.claude/skills"
     )
     {
-        grep -rnE "$LITERAL_PATH_PATTERN" "${scan_dirs[@]}" --include="*.sh" 2>/dev/null || true
-        grep -rnE "$VARIABLE_PATH_PATTERN" "${scan_dirs[@]}" --include="*.sh" 2>/dev/null || true
+        grep -rnE "$LITERAL_PATH_PATTERN" "${scan_dirs[@]}" --include="*.sh" --include="*.md" 2>/dev/null || true
+        grep -rnE "$VARIABLE_PATH_PATTERN" "${scan_dirs[@]}" --include="*.sh" --include="*.md" 2>/dev/null || true
     } \
         | grep -vE ':[0-9]+:[[:space:]]*#' \
         | grep -v "/$SELF_TEST_BASENAME:" \

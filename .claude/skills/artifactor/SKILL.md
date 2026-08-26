@@ -83,7 +83,8 @@ relation from keywords. Does NOT create WP or call executor.
 Запустить скрипт (возвращает JSON или сигнал):
 
 ```bash
-python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$ARGUMENTS"
+S="${IWE_SCRIPTS:-$HOME/IWE/scripts}"
+PY3="$(bash "$S/lib/find-python3.sh")" && "$PY3" "$S/artifactor.py" "$ARGUMENTS"
 ```
 
 Интерпретация результата:

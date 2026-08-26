@@ -1,13 +1,22 @@
 .claude/hooks/inject-code-style.sh	FRAGMENT=$(python3 "$DISPATCHER" --event pretooluse-edit --quiet --no-cache 2>/dev/null)
 .claude/hooks/inject-communication-style.sh	FRAGMENT=$(python3 "$DISPATCHER" --event userpromptsubmit-ide --quiet --no-cache 2>/dev/null)
-.claude/hooks/inject-fault-profile.sh	REMIND_OUT=$(gtimeout 5 python3 "$REMIND_SCRIPT" --protocol open 2>/dev/null || echo "")
-.claude/hooks/inject-fault-profile.sh	REMIND_OUT=$(python3 "$REMIND_SCRIPT" --protocol open 2>/dev/null || echo "")
-.claude/hooks/inject-fault-profile.sh	REMIND_OUT=$(timeout 5 python3 "$REMIND_SCRIPT" --protocol open 2>/dev/null || echo "")
 .claude/hooks/rule-engine.sh	_IG_CTX="$ctx_arg" python3 "$classifier" 2>/dev/null || echo '{"phase":"unknown","skip_detected":false,"reason":"classifier error","missing":[]}'
+.claude/skills/apply-captures/SKILL.md	python3 inbox/WP-429/f2-poc/detector.py --check-candidate \
+.claude/skills/day-close/SKILL.md	- [ ] **Rule-engine FP-stats** (WP-272 Ф2.5): `[ -f ~/IWE/.claude/scripts/fp-stats.py ] && python3 ~/IWE/.claude/scripts/fp-stats.py --date $(date +%Y-%m-%d) || echo "skip: fp-stats.py требует rule-classifier.py"` → если есть `⚠️ REVISE` → **спросить пилота по факту флага** (WP-545 Ф5, 21.08 — заменяет прежний еженедельный R8-вопрос, который спрашивал вслепую по расписанию, не по конкретному сигналу): «правило `<X>` — это ложные срабатывания детектора, или реальный, но неудобный сигнал?» Ответ → в «Завтра начать с» вместе с решением (переформулировать правило / оставить как есть)
+.claude/skills/day-close/SKILL.md	`SCRIPT="$HOME/IWE/.claude/scripts/rule-classifier.py"; [ -f "$SCRIPT" ] && python3 "$SCRIPT" || echo "skip: rule-classifier.py требует ручной установки (claude CLI + PACK-agent-rules)"` (идемпотентно, kill если >60 сек). **ДО коммита** — иначе его правки уходят в незакоммиченный хвост (issue #249).
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py cross-guide --scope guide --id "$GUIDE_ID" specs/v4-reference/
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py cross-guide specs/v4-reference/
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py graph build --scope guide --id "$GUIDE_ID" --out-json /tmp/guide-graph.json specs/v4-reference/
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py graph build specs/v4-reference/ --out-json /tmp/graph.json
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py guide --id "$GUIDE_ID" --pack "$PACK_FORM_089" specs/v4-reference/
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py pack-drift --scope guide --id "$GUIDE_ID" --pack "$PACK_FORM_089" specs/v4-reference/
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py pack-drift specs/v4-reference/ --pack "$PACK_FORM_089"
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py porter <subsection.md>
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py prerequisites-graph --scope section --id <section-id> specs/v4-reference/
+.claude/skills/verify/SKILL.md	python3 tools/v4-lint.py section --id <section-id> specs/v4-reference/
 roles/extractor/scripts/extractor.sh	python3 "$prefilter_script" --report "$strategy_dir/$new_report" >> "$LOG_FILE" 2>&1 \
 roles/strategist/scripts/strategist.sh	CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
 roles/synchronizer/scripts/dt-collect.sh	python3 "$SCRIPT_DIR/dt-collect-neon.py" "$DT_USER_ID" "$MERGED" 2>>"$LOG_FILE"
-scripts/agent_fault_remind.sh	python3 scripts/agent_fault_remind.py --protocol "$PROTOCOL"
 scripts/archive-done-wp.sh	WP_CARD=$(python3 "$WP_LIST_SCRIPT" --list-cards --source inbox --fields wp,card --format tsv \
 scripts/codex-peer-adapter.sh	_LANG_RESULT=$(printf '%s' "$CODEX_OUTPUT" | python3 "$_LANG_CHECK" 2>/dev/null || true)
 scripts/codex-peer-adapter.sh	if python3 "$TEMPLATE_SCRIPTS/content-filter-apply.py" "$CONTENT_FILTER_MAP" \
@@ -28,6 +37,12 @@ scripts/tests/test_generate_manifest_registers_setup_exclusions.sh	if ( cd "$SCR
 scripts/tests/test_issue_463_pyyaml_explicit_diagnostics.sh	OUTPUT=$(PYTHONPATH="$TMP/fakelib" python3 "$ROOT/.claude/scripts/memory-drift-scan.py" --memory /nonexistent 2>&1)
 scripts/wp-pool-cascade.sh	WP_LIST_OUT=$(python3 "$WP_LIST_SCRIPT" --list-cards --governance-repo "$GOV_REPO" \
 scripts/wp499-agent-coordination-test.sh	report=$(python3 "$HOME/IWE/$GOVERNANCE_REPO/scripts/lib/gateway-config-report.py" "$agent")
+setup/optional/COVER-IMAGES.md	python setup/optional/generate-post-image.py path/to/post.md
+setup/optional/COVER-IMAGES.md	python setup/optional/generate-post-image.py path/to/post.md --dry-run
+setup/optional/COVER-IMAGES.md	python setup/optional/generate-post-image.py path/to/post.md --prompt "мост между двумя мирами знаний"
+setup/optional/COVER-IMAGES.md	python setup/optional/generate-post-image.py path/to/post.md --quality high
+setup/optional/COVER-IMAGES.md	python setup/optional/generate-post-image.py path/to/post.md --size 1024x1024
+setup/optional/README.md	python setup/optional/generate-post-image.py path/to/post.md
 setup/test-update-edge-cases.sh	T28_REPORT=$(python3 "$TEMPLATE_DIR/.claude/scripts/settings-merge-preview.py" \
 setup/test-update-edge-cases.sh	if python3 "$TEMPLATE_DIR/.claude/scripts/settings-merge-preview.py" \
 setup/test-update-edge-cases.sh	python3 "$T9_PYFILE" "$T9_MCP" >/dev/null 2>&1

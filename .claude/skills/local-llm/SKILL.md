@@ -90,7 +90,8 @@ bash "$BUNDLE/iwe-local-llm.sh" archive <model-id># вывести в архив
 ### Шаг 4 — мониторинг новых моделей (суждение → LLM-работа)
 
 ```bash
-python3 "$BUNDLE/model-monitor.py"    # дайджест трендовых моделей, которых нет в каталоге
+BUNDLE="${IWE_LOCAL_LLM_DIR:-$HOME/IWE/extensions/local-llm}"
+PY3="$(bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh")" && "$PY3" "$BUNDLE/model-monitor.py"    # дайджест трендовых моделей, которых нет в каталоге
 ```
 
 Монитор только **находит** кандидатов. Решение об adopt — суждение агента (это и есть LLM-работа, ради которой скилл существует):
