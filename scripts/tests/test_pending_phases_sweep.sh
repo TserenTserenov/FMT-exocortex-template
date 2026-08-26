@@ -10,6 +10,13 @@ set -euo pipefail
 # headings, letter suffixes on phase numbers, prose lines starting with a
 # bolded "ФN", checklist-style trigger lists without checkboxes, and
 # Russian morphology on closing words ("закрыта" vs "закрыто").
+#
+# issue #541 (regression of #458, found by external red-team review
+# 2026-08-26): a "### ФN" section whose heading already says "✅ DONE", or
+# that has an earlier checked "[x]" item, permanently latched as "closed"
+# and silently swallowed any later forgotten "- [ ]" in the same section.
+# Fixture 6 reproduces this against real cards found in the wild
+# (WP-529/WP-545).
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 SWEEP="$ROOT/scripts/pending-phases-sweep.sh"
@@ -166,5 +173,82 @@ status=$(run_sweep)
 grep -Fq 'Ф3 —' "$TMP/stdout.txt"
 ! grep -Fq 'Ф1 —' "$TMP/stdout.txt" || { echo '"закрыта" (feminine) not recognized as closed' >&2; exit 1; }
 ! grep -Fq 'Ф2 —' "$TMP/stdout.txt" || { echo '"закрыт" (masculine) not recognized as closed' >&2; exit 1; }
+
+# --- Fixture 6: issue #541 (regression of #458) — a "### ФN" heading section
+#     whose OWN title already claims "✅ DONE" (or that contains an earlier
+#     already-checked "[x]" item) but still has a forgotten open checkbox
+#     somewhere in its body must be reported pending. The earlier version
+#     latched section_closed permanently on the first "done" signal found
+#     anywhere in the section — heading text, prose, or a sibling checked
+#     item — so any later "- [ ]" in the same section was silently
+#     swallowed. Live examples this reproduces: WP-529 "### Ф2 — ... ✅
+#     DONE" with an orphaned "- [ ] Acceptance-критерий" underneath, and
+#     WP-545 "### Ф2" (no DONE marker at all) whose first checklist item is
+#     "[x]" and second is "[ ]". Ф3 below is the negative control: a section
+#     with only checked items and no open checkbox must stay silent. ---
+rm -rf "$INBOX/WP-104"
+mkdir -p "$INBOX/WP-105"
+cat >"$INBOX/WP-105/WP-105.md" <<'EOF'
+---
+status: in_progress
+---
+# WP-105
+
+## Ф1 — ✅ DONE (закрыта 01.08.2026)
+
+- [x] Пункт 1 сделан
+- [ ] Забытый пункт
+
+## Ф2 — обычная секция без DONE в заголовке
+
+- [x] Первый пункт сделан
+- [ ] Второй пункт не сделан
+
+## Ф3 — по-настоящему закрыта
+
+- [x] Всё сделано
+- [x] Реально всё
+EOF
+
+status=$(run_sweep)
+[ "$status" = "0" ] || { echo "done-heading-with-orphan-checkbox: expected exit 0, got $status"; cat "$TMP/stderr.txt" >&2; exit 1; }
+grep -Fq 'Ф1 —' "$TMP/stdout.txt" || { echo '"✅ DONE" heading with a forgotten open checkbox wrongly stayed silent (issue #541)'; exit 1; }
+grep -Fq 'Ф2 —' "$TMP/stdout.txt" || { echo 'section with an earlier [x] item followed by a later [ ] item wrongly stayed silent (issue #541)'; exit 1; }
+! grep -Fq 'Ф3 —' "$TMP/stdout.txt" || { echo 'fully-closed section (all [x], no open checkbox) wrongly reported as pending'; exit 1; }
+
+# --- Fixture 7: known, deliberate trade-off (issue #541 cold-review). A
+#     section can be genuinely fully closed (every real item is "[x]") and
+#     still quote checkbox syntax as documentation prose ("Пример: `- [ ]
+#     пункт`"). A line-based parser cannot tell that quote apart from a real
+#     forgotten item without fenced-code-block awareness, so it is reported
+#     pending too. This is intentional, not a bug to silently "fix" back
+#     toward the #541 regression: a false positive here just costs the pilot
+#     one glance at an already-done section; a false negative (the original
+#     bug) silently hid real incomplete work from Week Close. This fixture
+#     pins the current, accepted behavior so a future change doesn't
+#     accidentally reintroduce the #541 false negative while "fixing" this
+#     false positive. ---
+rm -rf "$INBOX/WP-105"
+mkdir -p "$INBOX/WP-106"
+cat >"$INBOX/WP-106/WP-106.md" <<'EOF'
+---
+status: in_progress
+---
+# WP-106
+
+## Ф1 — полностью закрыта, документирует формат чекбоксов
+
+- [x] Пункт 1 сделан
+- [x] Пункт 2 сделан
+
+Пример синтаксиса чекбокса для документации:
+- [ ] пример пункта, не реальная работа
+
+Итог: секция закрыта 20.08.2026.
+EOF
+
+status=$(run_sweep)
+[ "$status" = "0" ] || { echo "documentation-quoted-checkbox: expected exit 0, got $status"; cat "$TMP/stderr.txt" >&2; exit 1; }
+grep -Fq 'Ф1 —' "$TMP/stdout.txt" || { echo 'known trade-off regressed: a quoted checkbox example no longer flags its section pending (see code comment above section_open_checkbox)'; exit 1; }
 
 echo 'PASS: pending-phases-sweep.sh recognizes table/checklist/heading formats without false positives on real-world phrasing'
