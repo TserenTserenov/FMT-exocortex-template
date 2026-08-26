@@ -2222,6 +2222,108 @@ for entry in data.get('files', []):
     return 0
 }
 
+# issue #541 hvost 2 (Evgenii Red Team v0.38.11, #540): this used to be plain
+# inline Step 6 code, reachable ONLY from the main apply-path below. Both
+# TOTAL_CHANGES=0 early-exit branches (Step 2) call `repair_pass()` and then
+# print success/no-op WITHOUT ever reaching Step 6 — so a workspace whose
+# CLAUDE.md/.claude.md.base had drifted (while the FMT template copy itself
+# was already fully up to date, hence TOTAL_CHANGES=0) had this exact
+# reconciliation silently skipped and got told "Всё актуально" anyway.
+# Wrapped in a function so both the early-exit paths and Step 6 can call it.
+sync_workspace_claude_md() {
+    CLAUDE_UPDATED=false
+    # issue #289: раньше это было гейтом по членству "CLAUDE.md" в NEW_FILES/
+    # UPDATED_FILES этого прогона — если Step 5 упал на конфликте, пилот разрешил
+    # маркеры вручную и перезапустил update.sh, FMT-копия во втором прогоне уже ==
+    # upstream → в UPDATED_FILES ничего не попадает → Step 6 молча пропускался,
+    # workspace-копия и её .claude.md.base замирали навсегда без предупреждения.
+    # Теперь триггер — реальное расхождение база/FMT-копия, а не факт правки в
+    # ЭТОМ прогоне: закрывает и обрыв-и-перезапуск, и любой другой пропуск Step 5.
+    NEEDS_WS_CLAUDE_SYNC=false
+    if [ -f "$SCRIPT_DIR/CLAUDE.md" ]; then
+        WS_NEW="$TMPDIR_UPDATE/ws-claude-new-substituted.md"
+        substitute_claude_placeholders "$SCRIPT_DIR/CLAUDE.md" "$WS_NEW"
+        if [ ! -f "$WORKSPACE_DIR/.claude.md.base" ] || ! diff -q "$WORKSPACE_DIR/.claude.md.base" "$WS_NEW" >/dev/null 2>&1; then
+            NEEDS_WS_CLAUDE_SYNC=true
+        fi
+    fi
+    if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
+        # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
+        WS_BASE="$WORKSPACE_DIR/.claude.md.base"
+        WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
+
+        if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
+            WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
+            cp "$WS_CURRENT" "$WS_MERGE_TMP"
+            if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
+                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+            else
+                WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
+                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
+                if [ "$WS_CONFLICTS" -gt 0 ]; then
+                    # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
+                    # artifact, not a reason to skip the rest of the delivery (memory/hooks/
+                    # skills propagation, repair-pass, commit). Warn now, fail at the end.
+                    echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
+                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
+                    CLAUDE_CONFLICT_DETECTED=true
+                    CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
+                else
+                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+                fi
+            fi
+        elif [ ! -f "$WS_CURRENT" ]; then
+            # No workspace CLAUDE.md yet — first install, nothing of the pilot's to lose.
+            cp "$WS_NEW" "$WS_CURRENT"
+            cp "$WS_NEW" "$WS_BASE"
+            echo "  ✓ $WS_CURRENT создан"
+        else
+            # issue #336: WS_CURRENT already exists but .claude.md.base is missing/lost
+            # (e.g. re-clone, migration gap) — a blind `cp $WS_NEW $WS_CURRENT` silently
+            # discarded any pilot edit to §8/§9 that wasn't wrapped in explicit
+            # <!-- USER-SPACE --> markers (those markers don't exist in the real §8/§9
+            # format). Without a real base there is no safe 3-way merge — leave the
+            # pilot's file untouched and surface it the same way an unresolved merge
+            # conflict is surfaced, instead of guessing.
+            WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
+            if [ -n "$WS_USER_SECTION" ]; then
+                cp "$WS_NEW" "$WS_CURRENT"
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
+                echo "" >> "$WS_CURRENT"
+                echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+                cp "$WS_NEW" "$WS_BASE"
+                echo "  ✓ $WS_CURRENT обновлён (USER-SPACE сохранён, базовый файл создан)"
+            else
+                # issue #541 hvost 2 (Evgenii Red Team v0.38.11): same false-ancestry
+                # bug as the FMT-copy branch above — writing WS_BASE = WS_NEW here
+                # while leaving WS_CURRENT untouched would let the next run's 3-way
+                # merge treat the still-stale WS_CURRENT as an intentional pilot
+                # edit and clear .update-incomplete without ever really syncing it.
+                # Leave the base absent so the drift keeps surfacing until resolved.
+                CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
+                echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
+                echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
+            fi
+        fi
+        CLAUDE_UPDATED=true
+    fi
+}
+
+# issue #541 cold-review (P2, DP.SC.172): the CLAUDE.md conflict/missing-base
+# check-then-exit-49 idiom now has 3 call sites (the two new early-exit gates
+# below, plus the pre-existing final gate at the end of the script) — third
+# repetition, extract instead of copy-pasting a fourth time.
+claude_conflict_gate() {
+    if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
+        echo "  ⚠ Workspace-копия CLAUDE.md требует ручной сверки (см. предупреждения выше)."
+        exit "$EXIT_CONFLICT"
+    fi
+}
+
 # === Step 2: Download and compare files ===
 echo "[2] Сравнение файлов..."
 
@@ -2796,12 +2898,18 @@ if [ "$TOTAL_CHANGES" -eq 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
         # Same three calls, same order, as the branch below.
         begin_update_transaction
         repair_pass
+        # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
+        # this early-exit branch, so the workspace CLAUDE.md/.claude.md.base
+        # reconciliation has to happen here too, before we can honestly claim
+        # success.
+        sync_workspace_claude_md
         run_build_runtime_or_die
         if ! run_post_apply_backfills_or_die; then
             exit "$EXIT_RUNTIME"
         fi
         finish_update_transaction
         report_settings_merge_drift
+        claude_conflict_gate
     fi
     exit 0
 fi
@@ -2830,6 +2938,11 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         # not the message).
         begin_update_transaction
         repair_pass
+        # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
+        # this early-exit branch, so the workspace CLAUDE.md/.claude.md.base
+        # reconciliation has to happen here too, before we can honestly claim
+        # "Всё актуально".
+        sync_workspace_claude_md
         # issue #279: TOTAL_CHANGES=0 сравнивает только содержимое файлов, не
         # версию в update-manifest.json — без этого локальный манифест навсегда
         # остаётся на старой версии, и --check --fast (сравнивающий только версию)
@@ -2855,6 +2968,14 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         # failed run without repair or build-runtime, disarming the contract
         # this marker now carries (runtime freshness + role-runner guard).
         finish_update_transaction
+        # issue #541 hvost 2 (#540): a stale workspace CLAUDE.md caught by
+        # sync_workspace_claude_md above must not be reported as "Всё актуально" —
+        # that was exactly the false success Evgenii's retry test found. Same
+        # placement as the sibling branch above: inside the non-$CHECK_ONLY
+        # else, since sync_workspace_claude_md (like repair_pass) never ran
+        # under --check and the tracking vars would otherwise still be at
+        # their initial empty/false state here regardless.
+        claude_conflict_gate
     fi
     # Флаги stage B осмысленны и когда обновлений нет: workspace-копии могли
     # отстать от уже актуального шаблона (repair_pass выше их классифицировал).
@@ -3047,7 +3168,16 @@ for f in "${UPDATED_FILES[@]}"; do
                 cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
                 echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
             else
-                cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
+                # issue #541 hvost 2 (Evgenii Red Team v0.38.11): a retry right
+                # after this exact run used to silently "succeed". Writing
+                # .claude.md.base = NEW_FILE here while leaving CURRENT_FILE
+                # untouched creates a false ancestry — the next run's 3-way
+                # merge sees base == upstream and treats the untouched, still-
+                # stale CURRENT_FILE as an intentional pilot customization,
+                # merging cleanly and clearing .update-incomplete without
+                # CLAUDE.md ever actually catching up. Leave the base absent
+                # too, so every retry keeps re-detecting the same missing-base
+                # state honestly until the pilot resolves it by hand.
                 CLAUDE_BASE_MISSING_FILES+=("$CURRENT_FILE")
                 echo "  ⚠ $f НЕ тронут — базовый файл для слияния отсутствовал."
                 echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
@@ -3345,81 +3475,7 @@ echo ""
 echo "Обновление platform-space..."
 
 # Copy CLAUDE.md to workspace root
-CLAUDE_UPDATED=false
-# issue #289: раньше это было гейтом по членству "CLAUDE.md" в NEW_FILES/
-# UPDATED_FILES этого прогона — если Step 5 упал на конфликте, пилот разрешил
-# маркеры вручную и перезапустил update.sh, FMT-копия во втором прогоне уже ==
-# upstream → в UPDATED_FILES ничего не попадает → Step 6 молча пропускался,
-# workspace-копия и её .claude.md.base замирали навсегда без предупреждения.
-# Теперь триггер — реальное расхождение база/FMT-копия, а не факт правки в
-# ЭТОМ прогоне: закрывает и обрыв-и-перезапуск, и любой другой пропуск Step 5.
-NEEDS_WS_CLAUDE_SYNC=false
-if [ -f "$SCRIPT_DIR/CLAUDE.md" ]; then
-    WS_NEW="$TMPDIR_UPDATE/ws-claude-new-substituted.md"
-    substitute_claude_placeholders "$SCRIPT_DIR/CLAUDE.md" "$WS_NEW"
-    if [ ! -f "$WORKSPACE_DIR/.claude.md.base" ] || ! diff -q "$WORKSPACE_DIR/.claude.md.base" "$WS_NEW" >/dev/null 2>&1; then
-        NEEDS_WS_CLAUDE_SYNC=true
-    fi
-fi
-if [ "$NEEDS_WS_CLAUDE_SYNC" = "true" ]; then
-    # 3-way merge for workspace CLAUDE.md (same logic as repo copy)
-    WS_BASE="$WORKSPACE_DIR/.claude.md.base"
-    WS_CURRENT="$WORKSPACE_DIR/CLAUDE.md"
-
-    if [ -f "$WS_BASE" ] && [ -f "$WS_CURRENT" ] && command -v git >/dev/null 2>&1; then
-        WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
-        cp "$WS_CURRENT" "$WS_MERGE_TMP"
-        if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
-            cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-            cp "$WS_NEW" "$WS_BASE"
-            echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-        else
-            WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
-            cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-            cp "$WS_NEW" "$WS_BASE"
-            CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
-            if [ "$WS_CONFLICTS" -gt 0 ]; then
-                # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
-                # artifact, not a reason to skip the rest of the delivery (memory/hooks/
-                # skills propagation, repair-pass, commit). Warn now, fail at the end.
-                echo "  ~ $WS_CURRENT ($WS_CONFLICTS конфликтов — разрешите вручную)"
-                echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
-                CLAUDE_CONFLICT_DETECTED=true
-                CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
-            else
-                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
-            fi
-        fi
-    elif [ ! -f "$WS_CURRENT" ]; then
-        # No workspace CLAUDE.md yet — first install, nothing of the pilot's to lose.
-        cp "$WS_NEW" "$WS_CURRENT"
-        cp "$WS_NEW" "$WS_BASE"
-        echo "  ✓ $WS_CURRENT создан"
-    else
-        # issue #336: WS_CURRENT already exists but .claude.md.base is missing/lost
-        # (e.g. re-clone, migration gap) — a blind `cp $WS_NEW $WS_CURRENT` silently
-        # discarded any pilot edit to §8/§9 that wasn't wrapped in explicit
-        # <!-- USER-SPACE --> markers (those markers don't exist in the real §8/§9
-        # format). Without a real base there is no safe 3-way merge — leave the
-        # pilot's file untouched and surface it the same way an unresolved merge
-        # conflict is surfaced, instead of guessing.
-        WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
-        if [ -n "$WS_USER_SECTION" ]; then
-            cp "$WS_NEW" "$WS_CURRENT"
-            sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
-            echo "" >> "$WS_CURRENT"
-            echo "$WS_USER_SECTION" >> "$WS_CURRENT"
-            cp "$WS_NEW" "$WS_BASE"
-            echo "  ✓ $WS_CURRENT обновлён (USER-SPACE сохранён, базовый файл создан)"
-        else
-            cp "$WS_NEW" "$WS_BASE"
-            CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
-            echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
-            echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
-        fi
-    fi
-    CLAUDE_UPDATED=true
-fi
+sync_workspace_claude_md
 
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then

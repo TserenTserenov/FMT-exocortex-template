@@ -520,10 +520,13 @@ t10_extract_step5_block() {
     ' "$TEMPLATE_DIR/update.sh"
 }
 t10_extract_step6_block() {
+    # issue #541 hvost 2: this block moved inside sync_workspace_claude_md()
+    # (called from both the early no-op path and Step 6), one indent level
+    # deeper (8 -> 12 spaces) than before the refactor.
     awk '
-        /^        WS_USER_SECTION=\$\(sed -n/{found=1}
+        /^            WS_USER_SECTION=\$\(sed -n/{found=1}
         found{print}
-        found && /^        fi$/{exit}
+        found && /^            fi$/{exit}
     ' "$TEMPLATE_DIR/update.sh"
 }
 
@@ -575,6 +578,15 @@ HEREDOC
     else
         fail "T10: Step 5 — expected CLAUDE_BASE_MISSING_FILES to have 1 entry, got ${#CLAUDE_BASE_MISSING_FILES[@]}"
     fi
+    # issue #541 hvost 1 (Evgenii Red Team v0.38.11): this branch used to write
+    # .claude.md.base = NEW_FILE here even though CURRENT_FILE was left stale —
+    # a false ancestry that made an immediate retry's 3-way merge treat the
+    # still-stale file as an intentional pilot edit and silently "succeed".
+    if [ ! -e "$T10_DIR/.claude.md.base" ]; then
+        pass "T10: Step 5 — no false-ancestry base file written while CURRENT_FILE stayed stale (issue #541)"
+    else
+        fail "T10: Step 5 — .claude.md.base was created despite CURRENT_FILE never being reconciled (issue #541 regression)"
+    fi
 
     # Case B (Step 6 shape): pilot's file DOES use USER-SPACE markers — must
     # still merge as before (issue #336's fix must not regress the one case
@@ -602,6 +614,36 @@ HEREDOC
         pass "T10: Step 6 — USER-SPACE case still merges upstream + preserves the marked section"
     else
         fail "T10: Step 6 — USER-SPACE merge path regressed (extracted from update.sh)"
+    fi
+
+    # Case C (Step 6, no markers — issue #541 hvost 2): same false-ancestry bug
+    # as Case A above, but for the $WORKSPACE_DIR copy. WS_BASE must not be
+    # created here, and WS_CURRENT must stay untouched, or an immediate retry
+    # would 3-way-merge against a base that already equals upstream and
+    # silently treat the still-stale WS_CURRENT as reconciled.
+    T10_CURRENT_C="$T10_DIR/current-c.md"
+    T10_NEW_C="$T10_DIR/new-c.md"
+    cat > "$T10_CURRENT_C" <<'HEREDOC'
+## 8. Staging
+Полный раздел про staging-канал, без маркеров
+HEREDOC
+    cat > "$T10_NEW_C" <<'HEREDOC'
+## 8. Staging
+Одна строка вместо полного раздела
+HEREDOC
+    WS_CURRENT="$T10_CURRENT_C" WS_NEW="$T10_NEW_C" WS_BASE="$T10_DIR/ws-base-c.md" \
+        CLAUDE_BASE_MISSING_FILES=()
+    source "$T10_STEP6_FILE"
+
+    if grep -q "без маркеров" "$T10_CURRENT_C"; then
+        pass "T10: Step 6 — no-markers case leaves WS_CURRENT untouched (issue #541)"
+    else
+        fail "T10: Step 6 — no-markers case overwrote WS_CURRENT despite no base for a safe merge"
+    fi
+    if [ ! -e "$T10_DIR/ws-base-c.md" ]; then
+        pass "T10: Step 6 — no false-ancestry WS_BASE written while WS_CURRENT stayed stale (issue #541)"
+    else
+        fail "T10: Step 6 — WS_BASE was created despite WS_CURRENT never being reconciled (issue #541 regression)"
     fi
 fi
 
