@@ -30,6 +30,18 @@ portable_date_offset() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+
+# notify.sh — read-only, берётся из FMT, а не из .iwe-runtime (issue #271, тот же
+# резолв, что в scheduler.sh). Без него $SCRIPT_DIR/notify.sh указывает в собранную
+# среду, где notify.sh отсутствует, и оповещение молча гасится через 2>/dev/null.
+if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then
+    NOTIFY_SH="$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh"
+elif [ -f "$HOME/IWE/FMT-exocortex-template/roles/synchronizer/scripts/notify.sh" ]; then
+    NOTIFY_SH="$HOME/IWE/FMT-exocortex-template/roles/synchronizer/scripts/notify.sh"
+else
+    NOTIFY_SH="$SCRIPT_DIR/notify.sh"  # legacy fallback
+fi
+
 WORKSPACE="$HOME/IWE"
 GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/DS-strategy}"
 LOG_DIR="$HOME/logs/synchronizer"
@@ -998,7 +1010,7 @@ EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
     log "=== DT Collect Completed Successfully ==="
-    "$SCRIPT_DIR/notify.sh" synchronizer dt-collect 2>/dev/null || true
+    "$NOTIFY_SH" synchronizer dt-collect 2>/dev/null || true
 else
     log "ERROR: dt-collect-neon.py exited with $EXIT_CODE"
 fi

@@ -13,6 +13,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# notify.sh — read-only, берётся из FMT, а не из .iwe-runtime (issue #271, тот же
+# резолв, что в scheduler.sh). Без него $SCRIPT_DIR/notify.sh указывает в собранную
+# среду, где notify.sh отсутствует, и оповещение молча гасится через 2>/dev/null.
+if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then
+    NOTIFY_SH="$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh"
+elif [ -f "$HOME/IWE/FMT-exocortex-template/roles/synchronizer/scripts/notify.sh" ]; then
+    NOTIFY_SH="$HOME/IWE/FMT-exocortex-template/roles/synchronizer/scripts/notify.sh"
+else
+    NOTIFY_SH="$SCRIPT_DIR/notify.sh"  # legacy fallback
+fi
+
 # WP-273 0.29.4 R6.1 fix (issue #271): runtime-резолв вместо build-time {{WORKSPACE_DIR}} — как в strategist.sh.
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 LOG_DIR="$HOME/logs/synchronizer"
@@ -85,7 +97,7 @@ scan_repos() {
 
     # Уведомление в Telegram
     if [ "$DRY_RUN" = false ] && [ "$total_repos" -gt 0 ]; then
-        "$SCRIPT_DIR/notify.sh" synchronizer code-scan 2>/dev/null || true
+        "$NOTIFY_SH" synchronizer code-scan 2>/dev/null || true
     fi
 }
 
