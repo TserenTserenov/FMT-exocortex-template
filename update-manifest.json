@@ -953,7 +953,7 @@
     },
     {
       "path": "extensions/README.md",
-      "sha256": "052c517cc9a934a2f4236019a688637b502ba55006a09e16fc57a2486bbc1221"
+      "sha256": "a01398ab546d402096b7ac7e416677811a3a943b05040a763fd5ce9d4630d66d"
     },
     {
       "path": "extensions/agent-inbox/README.md",
@@ -2101,11 +2101,15 @@
     },
     {
       "path": "scripts/day-open-checks-runner.sh",
-      "sha256": "81bbf1810e8e34c710d9bc9b28a93d5cbae7640feb66ded888bfdae1c20b0abd"
+      "sha256": "e6e03924c9fd59cceb5104e1ef240b1a99233138e4789d66a9de1cc64fa2cefd"
     },
     {
       "path": "scripts/day-open-close-error-patch.py",
       "sha256": "83d32007bd512f80032471eebff89adace920625e689980c0e847271176b13a6"
+    },
+    {
+      "path": "scripts/day-open-hooks-runner.sh",
+      "sha256": "cc630fdd33d46be16b11771028277be6b205834833c0ba42bcc78deeee8f584d"
     },
     {
       "path": "scripts/day-open-ledger-render-patch.py",
@@ -2117,7 +2121,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "e1fefaa73a190fee21e3e0027ac58907973aea4163c57fa796a61a0d4d2bd4bc"
+      "sha256": "86bf8e09d107d10f37f15374e5531830ae06cee1f3c3cc3302b0c08214cf3048"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2298,6 +2302,10 @@
     {
       "path": "scripts/lib/common.sh",
       "sha256": "a2c08644cb85a947671ac6e2f61bb293af4ed67bc6af2ecabdb85a992d0a6515"
+    },
+    {
+      "path": "scripts/lib/day-open-hooks.sh",
+      "sha256": "be3e05551867bb8b265ad6c0117dbe14262559f254241bd7df2e6bf8807114b2"
     },
     {
       "path": "scripts/lib/find-python3.sh",

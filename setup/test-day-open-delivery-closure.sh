@@ -5,8 +5,8 @@
 # transitive closure over python imports and shell sources — not just the files
 # someone remembered to list. Spec: peer sessions 2026-08-20-42 (5-point fixture
 # spec) and 2026-08-21-17 (baseline->promote->green protocol, codex amendments:
-# dynamic call sites, +x/shebang, manifest duplicates, extension-graph strict
-# xfail until ArchGate Q1).
+# dynamic call sites, +x/shebang, manifest duplicates). Section 5 (extension
+# graph) implemented WP-529 F11 — see scripts/day-open-hooks-runner.sh.
 #
 # Bash 3.2 compatible on purpose (macOS /bin/bash): no declare -A, no mapfile.
 #
@@ -21,10 +21,8 @@ MANIFEST="$REPO_ROOT/update-manifest.json"
 
 FAIL_COUNT=0
 PASS_COUNT=0
-XFAIL_COUNT=0
 fail() { echo "  ❌ FAIL: $*" >&2; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 pass() { echo "  ✅ PASS: $*"; PASS_COUNT=$((PASS_COUNT + 1)); }
-xfail() { echo "  ⏸  XFAIL (expected until ArchGate): $*"; XFAIL_COUNT=$((XFAIL_COUNT + 1)); }
 
 [ -f "$PIPELINE" ] || { echo "FATAL: $PIPELINE not found" >&2; exit 2; }
 
@@ -307,22 +305,206 @@ else
   fail "update-manifest.json not found"
 fi
 
-# --- 5. Extension graph: strict xfail until ArchGate question 1 ---------------
-# The before/core/after/checks hook order is NOT implemented yet by design —
-# ArchGate question 1 (WP-529 F7, peer session 2026-08-20-42 §4). If a dispatcher
-# appears, this XPASS must fail loudly so the test is consciously updated with
-# the decided contract, never silently blessed (no unnoticed XPASS).
-echo "=== 5. Extension graph (ArchGate Q1) ==="
-if grep -qE 'load-extensions\.sh[[:space:]]+day-open|extension-graph' "$PIPELINE"; then
-  fail "XPASS: extension dispatcher appeared in pipeline — update this test per ArchGate Q1 decision before merging"
+# --- 5. Extension graph (WP-529 F11, ArchGate Q1 implemented) -----------------
+# before/after now dispatch through scripts/day-open-hooks-runner.sh (same
+# bash-block-in-Markdown mechanism "checks" already used, so it also runs
+# correctly unattended with no LLM present — see scripts/lib/day-open-hooks.sh
+# header comment). "core" is not a hook point — it is the built-in pipeline
+# body between before and after (same shape as day-close: before/checks/after,
+# no "core" call there either).
+echo "=== 5. Extension graph (WP-529 F11) ==="
+HOOKS_RUNNER="$REPO_ROOT/scripts/day-open-hooks-runner.sh"
+
+# Dynamic extraction, same defensive pattern as section 1: an empty match
+# means the pipeline no longer calls the dispatcher (renamed, refactored
+# away) and every check below would pass while testing nothing.
+DISPATCH_CALLS=$(grep -oE 'day-open-hooks-runner\.sh"[[:space:]]+(before|after)' "$PIPELINE" | grep -oE '(before|after)$' | sort -u)
+if [ -z "$DISPATCH_CALLS" ]; then
+  fail "day-open-pipeline.sh does not call day-open-hooks-runner.sh at all — extraction found nothing"
 else
-  xfail "extension-graph before/core/after/checks not dispatched by pipeline — ArchGate Q1 pending"
+  for hook in before after; do
+    if echo "$DISPATCH_CALLS" | grep -qx "$hook"; then
+      pass "pipeline dispatches the '$hook' hook"
+    else
+      fail "pipeline does not dispatch the '$hook' hook"
+    fi
+  done
 fi
+[ -f "$HOOKS_RUNNER" ] || fail "scripts/day-open-hooks-runner.sh not found"
+
+HOOKS_WORK=$(mktemp -d)
+trap 'rm -rf "$HOOKS_WORK"' EXIT
+mkdir -p "$HOOKS_WORK/extensions"
+
+# 5a. No hook files -> silent no-op (exit 0, no output).
+HOOKS_OUT=$(IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" before 2>&1)
+HOOKS_EXIT=$?
+if [ "$HOOKS_EXIT" -eq 0 ] && [ -z "$HOOKS_OUT" ]; then
+  pass "no hook files: silent no-op"
+else
+  fail "no hook files: expected silent exit 0, got exit=$HOOKS_EXIT output='$HOOKS_OUT'"
+fi
+
+# 5b. A passing hook runs and its bash block actually executes (not just
+# "didn't crash" — P1: assert the observable side effect).
+MARKER="$HOOKS_WORK/marker.txt"
+cat > "$HOOKS_WORK/extensions/day-open.before.md" <<EOF
+\`\`\`bash
+echo "ran" > "$MARKER"
+\`\`\`
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" before >/dev/null 2>&1
+if [ "$?" -eq 0 ] && [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "ran" ]; then
+  pass "passing before-hook: block executed, exit 0"
+else
+  fail "passing before-hook: expected marker file with 'ran', exit 0"
+fi
+rm -f "$MARKER" "$HOOKS_WORK/extensions/day-open.before.md"
+
+# 5c. A failing hook block makes the runner exit nonzero — this is what the
+# pipeline calls above use to decide whether to abort (a before/after hook
+# can mutate DS_STRATEGY state, so a silent WARN-and-continue would let a
+# half-failed mutation get committed — Codex review, 2026-08-28).
+cat > "$HOOKS_WORK/extensions/day-open.after.md" <<'EOF'
+```bash
+exit 1
+```
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" after >/dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+  pass "failing after-hook: runner exits nonzero"
+else
+  fail "failing after-hook: runner exited 0, pipeline would commit past a failed hook"
+fi
+rm -f "$HOOKS_WORK/extensions/day-open.after.md"
+
+# 5c2. A failing command FOLLOWED by a successful one must still be caught —
+# not just a block whose only/last statement fails (Codex review, 2026-08-28,
+# High regression: `if ! ( set -e; eval "$block" ); then` suppresses errexit
+# for a subshell that is itself the condition of `if`/`!`, so `false` followed
+# by a successful command silently "passed" even with `set -e` re-declared
+# inside the subshell — a genuine footgun, not a hypothetical one).
+cat > "$HOOKS_WORK/extensions/day-open.after.md" <<'EOF'
+```bash
+false
+echo "survived"
+```
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" after >/dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+  pass "failing command followed by a successful one is still caught (errexit-in-condition footgun)"
+else
+  fail "a failing command followed by a successful one was NOT caught — errexit-in-condition footgun"
+fi
+rm -f "$HOOKS_WORK/extensions/day-open.after.md"
+
+# 5d. Exact-name matching: day-open.beforeevil.md must NOT match the
+# "before" hook (the literal dot after the hook name is part of the glob).
+cat > "$HOOKS_WORK/extensions/day-open.beforeevil.md" <<'EOF'
+```bash
+exit 1
+```
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" before >/dev/null 2>&1
+if [ "$?" -eq 0 ]; then
+  pass "day-open.beforeevil.md does not false-match the 'before' hook"
+else
+  fail "day-open.beforeevil.md incorrectly matched the 'before' hook"
+fi
+rm -f "$HOOKS_WORK/extensions/day-open.beforeevil.md"
+
+# 5e. Split-file convention (day-open.<hook>.<suffix>.md) runs in LC_ALL=C
+# sorted order — same convention "checks" already documents.
+ORDER_FILE="$HOOKS_WORK/order.txt"
+cat > "$HOOKS_WORK/extensions/day-open.after.a-first.md" <<EOF
+\`\`\`bash
+echo "a" >> "$ORDER_FILE"
+\`\`\`
+EOF
+cat > "$HOOKS_WORK/extensions/day-open.after.b-second.md" <<EOF
+\`\`\`bash
+echo "b" >> "$ORDER_FILE"
+\`\`\`
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" after >/dev/null 2>&1
+if [ "$(tr '\n' ',' < "$ORDER_FILE" 2>/dev/null)" = "a,b," ]; then
+  pass "split hook files run in sorted (a-first, b-second) order"
+else
+  fail "split hook files did not run in sorted order: $(cat "$ORDER_FILE" 2>/dev/null | tr '\n' ',')"
+fi
+rm -f "$ORDER_FILE" "$HOOKS_WORK/extensions/day-open.after.a-first.md" "$HOOKS_WORK/extensions/day-open.after.b-second.md"
+
+# 5f. A hook file that contributes zero bash blocks is an error, not a
+# silent pass (same fencing-typo trap issue #466 fixed for "checks").
+cat > "$HOOKS_WORK/extensions/day-open.before.md" <<'EOF'
+No bash blocks here, just prose.
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" before >/dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+  pass "hook file with zero bash blocks fails loudly (fencing-typo trap)"
+else
+  fail "hook file with zero bash blocks silently passed"
+fi
+rm -f "$HOOKS_WORK/extensions/day-open.before.md"
+
+# 5g. Bash 3.2 (macOS system bash) compatibility — the runner and the shared
+# lib must work under the same interpreter the macOS CI matrix pins to.
+if command -v /bin/bash >/dev/null 2>&1 && /bin/bash -c '[[ "${BASH_VERSINFO[0]}" -lt 4 ]]' 2>/dev/null; then
+  cat > "$HOOKS_WORK/extensions/day-open.before.md" <<EOF
+\`\`\`bash
+echo "ran" > "$MARKER"
+\`\`\`
+EOF
+  IWE_ROOT="$HOOKS_WORK" /bin/bash "$HOOKS_RUNNER" before >/dev/null 2>&1
+  if [ "$?" -eq 0 ] && [ -f "$MARKER" ]; then
+    pass "runs under /bin/bash 3.2"
+  else
+    fail "does not run under /bin/bash 3.2"
+  fi
+  rm -f "$MARKER" "$HOOKS_WORK/extensions/day-open.before.md"
+fi
+
+# 5h. A well-formed hook file must not mask a sibling with zero bash blocks
+# for the SAME hook (Codex review, 2026-08-28, High: a shared "any blocks
+# ran at all" check across the whole set let a fencing-typo file in a split
+# day-open.<hook>.<suffix>.md set pass silently as long as another file in
+# the set had valid blocks).
+cat > "$HOOKS_WORK/extensions/day-open.before.md" <<EOF
+\`\`\`bash
+echo "valid" > "$MARKER"
+\`\`\`
+EOF
+cat > "$HOOKS_WORK/extensions/day-open.before.custom.md" <<'EOF'
+prose, no fencing — oops
+EOF
+IWE_ROOT="$HOOKS_WORK" bash "$HOOKS_RUNNER" before >/dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+  pass "zero-block sibling file is not masked by a valid one"
+else
+  fail "zero-block sibling file was silently masked by a valid one in the same hook"
+fi
+rm -f "$MARKER" "$HOOKS_WORK/extensions/day-open.before.md" "$HOOKS_WORK/extensions/day-open.before.custom.md"
+
+# 5i. A missing/unreadable extensions/ directory is a failure, not the same
+# "no hooks" no-op as a legitimately empty one (Codex review, 2026-08-28,
+# High: every install ships extensions/, so its absence means a broken
+# install, and find's stderr was being discarded either way).
+MISSING_EXT_ROOT=$(mktemp -d)
+rmdir "$MISSING_EXT_ROOT"
+IWE_ROOT="$MISSING_EXT_ROOT" bash "$HOOKS_RUNNER" before >/dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+  pass "missing extensions/ directory fails, not treated as 'no hooks'"
+else
+  fail "missing extensions/ directory was silently treated as 'no hooks'"
+fi
+
+rm -rf "$HOOKS_WORK"
+trap - EXIT
 
 # --- 6. Workspace-root references: inventory only (ArchGate question 2) -------
 echo "=== 6. \$IWE-root references (out of contract until ArchGate Q2) ==="
 grep -o '\$IWE/scripts/[a-zA-Z0-9._/-]*' "$PIPELINE" | sort -u | sed 's/^/  ℹ️  /'
 
 echo
-echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL, $XFAIL_COUNT XFAIL"
+echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"
 [ "$FAIL_COUNT" -eq 0 ] && exit 0 || exit 1
