@@ -485,7 +485,7 @@
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
-      "sha256": "b7927256507f165067a6611341c9f1ff452e5862474595a6ee9a44cec5468723"
+      "sha256": "cac71cab338380475f49bf784e02facdf5510fc63b6843d89e6011342ba6978f"
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
@@ -781,7 +781,7 @@
     },
     {
       "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
-      "sha256": "45d88d5f96f662d4708c1db7dae448a1afdffe8340f926b7028d39b60ec245d2"
+      "sha256": "26ccae3560fc8b722e5f110a80267fedc8d5ee83b3f88270355cad39f130c14a"
     },
     {
       "path": "docs/DATA-POLICY.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "5557957af5744ec4765e5a26a2c0e377613cc1aab480e9e1462199ef6a595deb"
+      "sha256": "7ffe57af50d065b3d32e9e4a940fe6c9c827838b93051d4f3805729fc2e1d2ac"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
@@ -2445,7 +2445,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "466355dbb777c04e09fc1a4ec6b97d9c6808f68d90f6969c9d04d985136a0108"
+      "sha256": "995fc5868b336eb59c9289df5fffba807cf65052249246c1f8770c5c79a3c5a1"
     },
     {
       "path": "scripts/skill-promote.sh",
