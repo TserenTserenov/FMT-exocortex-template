@@ -962,6 +962,13 @@ if [ "$CMD" = "renew" ]; then
 fi
 
 if [ "$CMD" = "audit" ]; then
+  # WP-526 Ф2 fix (29.08, peer-session 2026-08-29-06-wp526-worktree-guard-continue):
+  # open (line ~482) and close (line ~668) already re-resolve ORZ_DIR through
+  # resolve_orz_sessions_dir() before using it -- audit never did, so it kept
+  # reading the top-level legacy default (line 110) even on an install that
+  # already migrated to MC-sessions. Same one-line fix, same place in the
+  # command, as the other two commands.
+  ORZ_DIR="$(resolve_orz_sessions_dir)"
   if [ "$CLEANUP_ORPHANS" -eq 1 ]; then
     sweep_orphaned_semaphores
     echo
