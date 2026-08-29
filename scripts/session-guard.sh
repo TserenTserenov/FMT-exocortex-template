@@ -45,9 +45,10 @@ IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 SESSION_DIR="$IWE_ROOT/.iwe-runtime/sessions"
 OPEN_LOG="$IWE_ROOT/$GOV_REPO/inbox/open-sessions.log"
-ORZ_DIR="$IWE_ROOT/$GOV_REPO/sessions"
 AGENT_STATUS_SCRIPT="$IWE_ROOT/scripts/agent-status-report.sh"
-mkdir -p "$SESSION_DIR" "$(dirname "$OPEN_LOG")" "$ORZ_DIR"
+# ORZ_DIR resolved further down by resolve_orz_sessions_dir(), once fail()
+# exists -- not created here, see that function's docstring for why.
+mkdir -p "$SESSION_DIR" "$(dirname "$OPEN_LOG")"
 
 CMD="${1:-}"
 shift || true
@@ -57,6 +58,56 @@ now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_date() { date +"%Y-%m-%d"; }
 now_month() { date +"%Y-%m"; }
 fail() { echo "session-guard: $1" >&2; exit "${2:-1}"; }
+
+# resolve_orz_sessions_dir -- forward-port from ~/IWE/scripts/session-guard.sh
+# (WP-526 Ф2, 29.08; this FMT copy stays on the reduced/freeze-canonical
+# variant per WP-546, so only this one function is ported, not the file).
+# Three-way resolver for the sessions-content root: MC-sessions is created
+# "on demand", not by setup.sh (pilot decision 18.08), so an install that
+# never adopted it must keep working exactly as before this function existed.
+#   1. IWE_SESSIONS_ROOT set explicitly -- always fail-closed if broken,
+#      never falls back: an explicit override is a deliberate choice, a
+#      silent bypass of it would hide a real misconfiguration.
+#   2. Default path ($IWE_ROOT/MC-sessions) exists and is a valid git repo
+#      -- the normal case for an already-migrated checkout.
+#   3. Default path exists but ISN'T a valid git repo -- looks like a
+#      broken migration, not a fresh install. Fail-closed: falling back
+#      here would create a second, undetected source of truth for an
+#      already-migrated user.
+#   4. Default path doesn't exist at all -- genuinely unmigrated. Legacy
+#      fallback to "$GOV_REPO/sessions" with a visible WARN, same
+#      behaviour as before this function existed.
+resolve_orz_sessions_dir() {
+  if [ -n "${IWE_SESSIONS_ROOT:-}" ]; then
+    if [ -d "$IWE_SESSIONS_ROOT" ] && git -C "$IWE_SESSIONS_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+      echo "$IWE_SESSIONS_ROOT"
+      return 0
+    fi
+    fail "IWE_SESSIONS_ROOT=$IWE_SESSIONS_ROOT задан явно, но недоступен или не git-репозиторий"
+  fi
+
+  local default_mc="$IWE_ROOT/MC-sessions"
+  if [ -d "$default_mc" ]; then
+    if git -C "$default_mc" rev-parse --git-dir >/dev/null 2>&1; then
+      echo "$default_mc"
+      return 0
+    fi
+    fail "MC-sessions существует ($default_mc), но не похож на git-репозиторий -- похоже на сломанную мигрированную установку, не откатываюсь на legacy-путь молча"
+  fi
+
+  echo "WARN: MC-sessions не найден ($default_mc) -- использую legacy-путь \$GOV_REPO/sessions (обычное поведение немигрированной установки шаблона)" >&2
+  local legacy="$IWE_ROOT/$GOV_REPO/sessions"
+  mkdir -p "$legacy"
+  echo "$legacy"
+}
+# Passive default here (no resolver call, no side effect) -- this line runs
+# for EVERY subcommand, including ones unrelated to sessions storage
+# (pre-commit-check fires on every git commit as a hook; note-file,
+# lock-hot-file don't touch ORZ_DIR at all). Calling the strict resolver
+# unconditionally would print its WARN on every commit for an unmigrated
+# install, and hard-fail unrelated git operations for a broken migration.
+# `open` (the only writer) calls resolve_orz_sessions_dir() itself, below.
+ORZ_DIR="$IWE_ROOT/$GOV_REPO/sessions"
 
 semaphore_epoch() {
   local semaphore="$1" timestamp=""
@@ -425,6 +476,10 @@ if [ "$CMD" = "open" ]; then
   CLEAN_SLUG="${SLUG:-$WP}"
   CLEAN_SLUG="${CLEAN_SLUG#"$(now_date)"-}"
   ORZ_BASENAME="$(now_month)/$(now_date)-${CLEAN_SLUG}.md"
+  # WP-526 Ф2 (29.08): `open` is the only writer, so it's the only place that
+  # needs the strict (fail-closed-if-broken) resolution -- overrides the
+  # passive default set at the top of the script for read-only commands.
+  ORZ_DIR="$(resolve_orz_sessions_dir)"
   ORZ_FILE="$ORZ_DIR/$ORZ_BASENAME"
   mkdir -p "$(dirname "$ORZ_FILE")"
   {
@@ -603,6 +658,14 @@ if [ "$CMD" = "close" ]; then
     OPENED_DATE="${OPENED_DATE:-$(now_date)}"
     ORZ_BASENAME="${OPENED_DATE:0:7}/${OPENED_DATE}-${SLUG:-$WP}.md"
   fi
+  # WP-526 Ф2 (29.08): must resolve the same way `open` did, or `close` looks
+  # for the ORZ file at the passive legacy default while `open` actually
+  # wrote it under MC-sessions -- validate_orz below would then fail on an
+  # existing, correctly-written file. This semaphore has no orz_sessions_dir
+  # field (root's more evolved variant does) to read the resolved dir back
+  # from, but the resolver is a pure function of current filesystem state,
+  # so recomputing it here agrees with what `open` computed moments earlier.
+  ORZ_DIR="$(resolve_orz_sessions_dir)"
   ORZ_FILE="$ORZ_DIR/$ORZ_BASENAME"
 
   echo "Session CLOSE: проверяю ORZ $ORZ_FILE ..."
