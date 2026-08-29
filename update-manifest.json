@@ -857,7 +857,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "7ffe57af50d065b3d32e9e4a940fe6c9c827838b93051d4f3805729fc2e1d2ac"
+      "sha256": "6f3e81b8ec098c654924cac612881c1b3c60d00d1dab44e94f95c710d561c40a"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
@@ -2437,7 +2437,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "387949a41e39aff4fb3dac1395092b5b5fa0fefe79fc7d318ea539cb96210782"
+      "sha256": "f1026ff6cebb294a1afa22b355db4fda8163a37f25cedbcd6267b19850c67249"
     },
     {
       "path": "scripts/settings-promote.sh",
