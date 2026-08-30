@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "b4db8952fe634387388dfa59acf04bde612bc918291fbeba642b35dcb78547fe"
+      "sha256": "45325b52ede9fab9a7cf65cc68ecfe58f619ef281a336f005474e7c7805eed19"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -321,7 +321,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "a1428543371c0a4673a154a4733592a4fc92e018a0ca5e09e0cde91038fadc56"
+      "sha256": "931d80593488a1eb60090ddcad18ede87fce1fcf3b8e6c5e1bb0e424199bc606"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -525,7 +525,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "b3d61c6491905c28a5f2a0eea0a8efd4960593a9941860711d1c3c6beea1090c"
+      "sha256": "db6cc671503ddb51b8b045a8eafff77ecf3cbdb12f2f0b2d6c851b8a95c2232c"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -713,7 +713,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "9ebf408d9c75c8e1a62b905339b869d476528bfccd52e99d44a50f1a3c73153b"
+      "sha256": "c5616d747ad3c08b1a450d415f46545de9bb32987db3901b10d5b9d2095d824d"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "extensions/day-open.checks.md",
-      "sha256": "6019e609a4345e3699e67d63173c45774c012e352fbfac18c6f7efa87d5630d1"
+      "sha256": "9b007e3e07ed952e743d6d5a4770829678ec13f5617cfb1a8a3fa8b6206869cf"
     },
     {
       "path": "extensions/local-llm/ADR-001-local-llm-stack.md",
@@ -1969,7 +1969,7 @@
     },
     {
       "path": "scripts/build-active-wp.py",
-      "sha256": "548934ec48e1c9b257cd6dee9ff30018d5d83f309054140c0d474c6bbd51165c"
+      "sha256": "39188448fa00e5d70f1bddd157a5467b7b44c2eea3b15a4b33efca6ef2f23c81"
     },
     {
       "path": "scripts/changelog-append.sh",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
-      "sha256": "be3e05551867bb8b265ad6c0117dbe14262559f254241bd7df2e6bf8807114b2"
+      "sha256": "fe64d2c112e40c9695884c3ceb6dac14e1ca41ad1da3bdc561b4fe84987d9964"
     },
     {
       "path": "scripts/lib/find-python3.sh",
@@ -2809,7 +2809,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "a193b9452e63414fb93f775735b3b29f39adade79a996ad9c992d56918b06322"
+      "sha256": "32496926d7a7d32103bcd7c336678346d7008c97e5589e84e8485a066024264b"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
