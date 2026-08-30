@@ -1950,10 +1950,13 @@ T31_EXTERNAL="$TEST_WS/t31-external"
 T31_PREFIX_COLLISION="$TEST_WS/t31-ws-other"
 mkdir -p "$T31_WS/.claude/hooks" "$T31_WS/.claude/skills/my-skill" \
          "$T31_WS/.claude/skills/day-open" "$T31_WS/memory" \
+         "$T31_WS/FMT-exocortex-template" \
          "$T31_EXTERNAL/.claude/skills/my-skill" \
          "$T31_PREFIX_COLLISION/.claude/skills/day-open"
 cp "$TEMPLATE_DIR/.claude/hooks/extensions-gate.sh" "$T31_WS/.claude/hooks/"
-printf '%s\n' '{"files": [{"path": ".claude/skills/day-open/SKILL.md"}]}' > "$T31_WS/update-manifest.json"
+# issue #564: the gate reads the manifest from the template CLONE, never from
+# the workspace root (nothing ever delivered a root copy on real installs).
+printf '%s\n' '{"files": [{"path": ".claude/skills/day-open/SKILL.md"}]}' > "$T31_WS/FMT-exocortex-template/update-manifest.json"
 touch "$T31_WS/.claude/skills/my-skill/SKILL.md" "$T31_WS/.claude/skills/day-open/SKILL.md" \
       "$T31_WS/memory/protocol-open.md" \
       "$T31_EXTERNAL/.claude/skills/my-skill/SKILL.md" \
@@ -1964,7 +1967,10 @@ ln -s "$T31_WS/.claude/skills/day-open/SKILL.md" "$T31_WS/.claude/skills/my-skil
 ln -s "$T31_EXTERNAL/external-target.md" "$T31_WS/.claude/skills/my-skill/external-link.md"
 ln -s "$T31_WS/.claude/skills/day-open/SKILL.md" "$T31_EXTERNAL/.claude/skills/platform-link.md"
 t31_gate() {
-    printf '{"tool_input": {"file_path": "%s"}}' "$1" | bash "$T31_WS/.claude/hooks/extensions-gate.sh"
+    # env -u: the author's real IWE_TEMPLATE/IWE_SCRIPTS would otherwise let
+    # the resolver chain (#564) find the REAL manifest and pollute fixtures.
+    printf '{"tool_input": {"file_path": "%s"}}' "$1" \
+        | env -u IWE_TEMPLATE -u IWE_SCRIPTS bash "$T31_WS/.claude/hooks/extensions-gate.sh"
 }
 t31_blocked() {
     local out
@@ -2008,13 +2014,13 @@ t31_blocked "$T31_WS/update-manifest.json"                            "manifest 
 t31_blocked "$T31_WS/.claude/skills/my-skill/link.md"                 "symlink into a platform skill is blocked by real path"
 t31_allowed "$T31_WS/.claude/skills/my-skill/external-link.md"        "symlink to external user territory is allowed"
 t31_blocked "$T31_EXTERNAL/.claude/skills/platform-link.md"           "external symlink into platform skill is blocked by real path"
-rm -f "$T31_WS/update-manifest.json"
-t31_blocked_reason "$T31_WS/.claude/skills/my-skill/SKILL.md"         "missing manifest names the real failure" "update-manifest.json отсутствует"
-printf '%s\n' '{broken' > "$T31_WS/update-manifest.json"
+rm -f "$T31_WS/FMT-exocortex-template/update-manifest.json"
+t31_blocked_reason "$T31_WS/.claude/skills/my-skill/SKILL.md"         "missing manifest names the real failure" "не найден ни в одном известном месте шаблона"
+printf '%s\n' '{broken' > "$T31_WS/FMT-exocortex-template/update-manifest.json"
 t31_blocked "$T31_WS/.claude/skills/my-skill/SKILL.md"                "broken manifest fails closed (no allow on tool failure)"
-printf '%s\n' '{"files": []}' > "$T31_WS/update-manifest.json"
+printf '%s\n' '{"files": []}' > "$T31_WS/FMT-exocortex-template/update-manifest.json"
 t31_blocked "$T31_WS/.claude/skills/my-skill/SKILL.md"                "empty manifest .files fails closed"
-printf '%s\n' '{"files": [{"path": ".claude/skills/day-open/SKILL.md"}]}' > "$T31_WS/update-manifest.json"
+printf '%s\n' '{"files": [{"path": ".claude/skills/day-open/SKILL.md"}]}' > "$T31_WS/FMT-exocortex-template/update-manifest.json"
 t31_allowed "$T31_WS/.claude/skills/my-skill/SKILL.md"                "restoring the manifest restores the allow"
 if grep -Fq '"defaultMode": "default"' "$TEMPLATE_DIR/.claude/settings.json"; then
     pass "T31: template settings.json ships defaultMode=default (not acceptEdits)"
