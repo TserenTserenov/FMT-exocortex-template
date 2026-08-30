@@ -33,6 +33,9 @@ EXOCORTEX_DST="$DS_STRATEGY/exocortex"
 # Переопределить путь можно через env IWE_SELECTIVE_REINDEX.
 # do_reindex() exit code for "some branches indexed, some failed" (see do_reindex).
 readonly RC_REINDEX_PARTIAL=3
+# A step that cannot run (missing script/dir/interpreter) is a SKIP, not an
+# ok: the summary and log must distinguish "done" from "not attempted" (#559).
+readonly RC_STEP_SKIPPED=90
 SELECTIVE_REINDEX="${IWE_SELECTIVE_REINDEX:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh}"
 SOURCES_JSON="${IWE_SOURCES_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources.json}"
 SOURCES_PERSONAL_JSON="${IWE_SOURCES_PERSONAL_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources-personal.json}"
@@ -1476,12 +1479,12 @@ do_reindex() {
 
   if [ ! -x "$SELECTIVE_REINDEX" ]; then
     warn "  selective-reindex.sh не найден: $SELECTIVE_REINDEX — пропуск"
-    return 0
+    return "$RC_STEP_SKIPPED"
   fi
 
   if [ -z "$RESOLVED_PYTHON3" ]; then
     warn "  reindex: пропущено — pyyaml не найден (см. предупреждение выше)"
-    return 0
+    return "$RC_STEP_SKIPPED"
   fi
 
   # Маппинг dir→source+config из L2 (sources.json) и L4 (sources-personal.json)
@@ -1578,7 +1581,7 @@ do_linear() {
 
   if [ ! -x "$LINEAR_SYNC" ]; then
     warn "  linear-sync.sh не найден: $LINEAR_SYNC — пропуск"
-    return 0
+    return "$RC_STEP_SKIPPED"
   fi
 
   "$LINEAR_SYNC"
@@ -1590,7 +1593,7 @@ do_session_consolidation() {
 
   if [ -z "$RESOLVED_PYTHON3" ]; then
     warn "  Консолидация сессий: пропущено — pyyaml не найден (см. предупреждение выше)"
-    return 0
+    return "$RC_STEP_SKIPPED"
   fi
 
   local today
@@ -1602,7 +1605,7 @@ do_session_consolidation() {
 
   if [ ! -d "$sessions_root" ]; then
     warn "  Папка sessions/$month_dir не найдена — пропуск"
-    return 0
+    return "$RC_STEP_SKIPPED"
   fi
 
   # Сканируем meta.yaml для сессий сегодняшнего дня
