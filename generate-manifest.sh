@@ -210,6 +210,10 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     "scripts/tests/test_update_build_runtime_fail_closed.sh"
     "scripts/tests/test_update_delivers_python_resolver_before_roles.sh"
     "scripts/tests/test_role_runner_update_marker_guard.sh"
+    # issue #557 (30.08): zsh regression for the day-close commit guard —
+    # runs in CI via run-issue-tests.sh, must ship with the template like its
+    # bash sibling above.
+    "scripts/tests/test_issue_557_zsh_special_vars.sh"
 )
 
 is_explicit_include() {

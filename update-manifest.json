@@ -1073,7 +1073,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "ccc13cf5f1ecbf804065215ea088672180038d34c7f7b346f41df52da669a15f"
+      "sha256": "ab0d1f026bd9f8b1b1e2a8af4884a5faf8c860be40ee6de46449e26cd8d7c100"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2089,7 +2089,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "c7b5cda3c21aa1eacc8696fcba77ad4802b92d4d72b3890ecbc99def411d45b5"
+      "sha256": "6b6062d5c666dd4689896452d1866c5ab190a16888c2c13e70c114d7b21ee98a"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
@@ -2640,6 +2640,10 @@
       "sha256": "512108486010ace38c9de67ce6dbb0568618966f8b09feb9511a51818e0d62cd"
     },
     {
+      "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
+      "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
+    },
+    {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
       "sha256": "4b44a9bbcb4eb3247e10bea7c133ce8ea0f866421445f6e539c42dc48617ecd6"
     },
@@ -2865,7 +2869,6 @@
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
     "scripts/tests/test_issue_532_dayplan_strategy_gate.sh",
-    "scripts/tests/test_issue_557_zsh_special_vars.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",
