@@ -240,14 +240,14 @@ commit_extractor_changes() {
     # Не трогаем файлы экстрактора, если их уже подготовил другой процесс.
     # `commit --only` сохраняет staging всех остальных путей без ручного reset.
     if ! git -C "$strategy_dir" diff --cached --quiet -- \
-        inbox/captures.md inbox/extraction-reports/; then
+        inbox/captures.md inbox/captures/ inbox/extraction-reports/; then
         log "SKIP: extractor paths are already staged; skipping commit"
         EXTRACTOR_COMMIT_RESULT="blocked"
         return 0
     fi
 
     target_changes=$(git -C "$strategy_dir" status --porcelain --untracked-files=all -- \
-        inbox/captures.md inbox/extraction-reports/)
+        inbox/captures.md inbox/captures/ inbox/extraction-reports/)
     if [ -z "$target_changes" ]; then
         log "No new changes to commit in $repo_name"
         EXTRACTOR_COMMIT_RESULT="no_changes"
@@ -264,7 +264,7 @@ commit_extractor_changes() {
 
     # `git commit --only` does not discover a brand-new report directory. Stage only
     # extractor-owned paths; `--only` below still leaves every foreign staged path intact.
-    if ! git -C "$strategy_dir" add -- inbox/captures.md inbox/extraction-reports/ >> "$LOG_FILE" 2>&1; then
+    if ! git -C "$strategy_dir" add -- inbox/captures.md inbox/captures/ inbox/extraction-reports/ >> "$LOG_FILE" 2>&1; then
         log "WARN: cannot stage extractor changes for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
         return 1
@@ -272,7 +272,7 @@ commit_extractor_changes() {
 
     if ! git -C "$strategy_dir" commit --only \
         -m "inbox-check: extraction report $DATE" -- \
-        inbox/captures.md inbox/extraction-reports/ >> "$LOG_FILE" 2>&1; then
+        inbox/captures.md inbox/captures/ inbox/extraction-reports/ >> "$LOG_FILE" 2>&1; then
         log "WARN: git commit failed for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
         return 1
@@ -369,8 +369,7 @@ cleanup_isolated_inbox_worktree() {
 }
 
 pending_capture_count() {
-    local captures_file="$1"
-
+    # Accepts one or more capture files; awk accumulates pending across all.
     awk '
       /^### / && !/\[(analyzed|processed|duplicate|defer)/ {
         found = 0
@@ -383,7 +382,19 @@ pending_capture_count() {
         if (found) pending++
       }
       END { print pending+0 }
-    ' "$captures_file" 2>/dev/null
+    ' "$@" 2>/dev/null
+}
+
+# WP-526 rotation: capture sources = legacy captures.md + monthly
+# inbox/captures/YYYY-MM.md files (whitelist by name, other files in the
+# directory are not inbox material).
+capture_source_files() {
+    local inbox_dir="$1"
+    [ -f "$inbox_dir/captures.md" ] && printf '%s\n' "$inbox_dir/captures.md"
+    if [ -d "$inbox_dir/captures" ]; then
+        find "$inbox_dir/captures" -maxdepth 1 -type f \
+            -name '[0-9][0-9][0-9][0-9]-[0-9][0-9].md' | sort
+    fi
 }
 
 run_inbox_check_isolated() {
@@ -445,7 +456,14 @@ run_inbox_check_isolated() {
         return 1
     fi
 
-    actual_pending=$(pending_capture_count "$worktree/inbox/captures.md")
+    local capture_sources=()
+    while IFS= read -r src; do
+        capture_sources+=("$src")
+    done < <(capture_source_files "$worktree/inbox")
+    actual_pending=0
+    if [ "${#capture_sources[@]}" -gt 0 ]; then
+        actual_pending=$(pending_capture_count "${capture_sources[@]}")
+    fi
     actual_pending=${actual_pending:-0}
     if [ "$actual_pending" -le 0 ]; then
         log "SKIP: No pending captures in refreshed inbox"
@@ -534,16 +552,17 @@ case "$1" in
     "session-close-feed")
         # WP-247 Ф-MULTI-SOURCE.1: feeder-режим (non-interactive).
         # Извлекает кандидатов из транскрипта + git diff,
-        # пишет ###-блоки в captures.md с маркером [feed:session-close YYYY-MM-DD].
+        # пишет ###-блоки в помесячный inbox/captures/YYYY-MM.md (ротация
+        # WP-526; без ротации — в captures.md) с маркером [feed:session-close].
         # Не создаёт extraction-report — это работа inbox-check потом.
-        log "Running session-close FEED (non-interactive, writes to captures.md)"
+        log "Running session-close FEED (non-interactive, writes to captures inbox)"
         run_claude "session-close-feed" "${2:-}"
         notify_telegram "session-close-feed"
         ;;
 
     "git-diff-feed")
         # WP-247 Ф-MULTI-SOURCE.2: git-diff feeder (cron 06:00/21:00).
-        # Извлекает кандидатов из git log за окно и пишет ###-блоки в captures.md.
+        # Извлекает кандидатов из git log за окно и пишет ###-блоки в captures-inbox.
         # Окно: $2 (по умолчанию "12 hours ago").
         SINCE="${2:-12 hours ago}"
         log "Running git-diff FEED (since: $SINCE)"

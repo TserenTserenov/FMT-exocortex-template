@@ -38,6 +38,31 @@ build_message() {
             printf "<b>🔍 Knowledge Audit завершён</b>\n\n📅 %s\n\nПроверьте лог: ~/logs/extractor/%s.log" "$DATE" "$DATE"
             ;;
 
+        "session-close-feed"|"git-diff-feed")
+            # Feed scenarios append ###-blocks to the captures inbox (monthly
+            # file under the WP-526 rotation, flat captures.md without it).
+            # Count today's blocks by the feed marker so the pilot sees intake
+            # volume, not just "the feed ran".
+            local feed_marker="feed:${process%-feed}"
+            local inbox_dir="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox"
+            local captures_target="$inbox_dir/captures/$(date +%Y-%m).md"
+            [ -f "$captures_target" ] || captures_target="$inbox_dir/captures.md"
+            local captured=0
+            if [ -f "$captures_target" ]; then
+                captured=$(grep -c "\[${feed_marker} ${DATE}\]" "$captures_target" 2>/dev/null || true)
+                captured=${captured:-0}
+            fi
+
+            printf "<b>🔍 Knowledge Feeder: %s</b>\n\n" "$process"
+            printf "📅 %s\n\n" "$DATE"
+            if [ "$captured" -gt 0 ]; then
+                printf "Захвачено кандидатов за сегодня: %s\n" "$captured"
+                printf "Файл: <code>%s</code>" "${captures_target#"$inbox_dir/"}"
+            else
+                printf "Новых кандидатов нет."
+            fi
+            ;;
+
         *)
             echo ""
             ;;

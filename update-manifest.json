@@ -1589,11 +1589,11 @@
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
-      "sha256": "5a090cdf87b6fd8c8b4fa33aca5d46ac707a69760208d3853e1035d8f5827330"
+      "sha256": "b51365aedcd3c3fcc726e6077dd68b2241770b230bc72df7caff2dffb4781b89"
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
-      "sha256": "e0d869263a97a5541d5a24635572490e2e9f37a59ac62ea36d387284cfcd9074"
+      "sha256": "ffd1faf3ca2ba625fab9fe491a430f3ecb0a724c6364cabb9fd00dfe76dd48cb"
     },
     {
       "path": "roles/extractor/prompts/knowledge-audit.md",
@@ -1605,11 +1605,11 @@
     },
     {
       "path": "roles/extractor/prompts/session-close-feed.md",
-      "sha256": "ab7c3c62f9a155e9f99e4998d228b7fbfaf64b1cf85eb5b8c820abc94980ecc4"
+      "sha256": "e3d4517e09b60a99a81f25ea2cc734770d453cd1ba66e825d883744157bf8e28"
     },
     {
       "path": "roles/extractor/prompts/session-close.md",
-      "sha256": "72ec9ae9d9553d1b00a0b8b5011291ce1438c3e1a300739d5a019d2b56f9a68a"
+      "sha256": "5721090b978bb0a5f1273a43c2bac938002d77671932f514d4cc923cc1222dc9"
     },
     {
       "path": "roles/extractor/role.yaml",
@@ -1617,7 +1617,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "a63006b35ff917c73853c7db1bce5ce91dcc1c791d43e55b16f790e02a77aa38"
+      "sha256": "9905bcac0889bca52c461330ba0cbdc35df6d236a1ff35e207fd93998a41dc28"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1869,7 +1869,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/extractor.sh",
-      "sha256": "e1753f1e5f38b10f5b115882ed85a8fe7d820985136988e8d118d03662181b8e"
+      "sha256": "b06348f4b90945d739974f470f92614164a271188513d64c0aa4ddd39e78eacd"
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
