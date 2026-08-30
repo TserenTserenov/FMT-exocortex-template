@@ -1242,11 +1242,15 @@ render_self_dev() {
     in_priorities && /^\|/ {
       if ($0 ~ /^\|[[:space:]]*#/) next
       if ($0 ~ /^\|[[:space:]]*-+/) next
+      # Skip finished rows: the priority table is ordered by draft number, so
+      # old published entries sit on top; taking the first row regardless of
+      # status resurfaced a May publication as "active" (#560, regression of #417).
+      if ($0 ~ /✅|опубликован|published/) next
       print
       exit
     }' "$draft_list")
   if [ -z "$row" ]; then
-    echo "**Активный черновик:** нет приоритетных черновиков в draft-list.md"
+    echo "**Активный черновик:** нет активных черновиков (приоритетные пусты или все завершены)"
     return
   fi
   local dnum path
