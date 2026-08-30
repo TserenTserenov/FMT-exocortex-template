@@ -62,6 +62,19 @@ run_day_open_hook_files() {
 
   while IFS= read -r hook_file; do
     [ -n "$hook_file" ] || continue
+
+    # issue #546: a checks file may be addressed to the AGENT, not to this
+    # bash runner (prose instructions; pre-#509 installs still carry such a
+    # file — extensions/ is user space, update.sh never rewrites it). Zero
+    # bash blocks in such a file is not_applicable here, not a failure. The
+    # declaration must be explicit (`executor: agent`, plain or inside an
+    # HTML comment, in the first 15 lines) — an UNdeclared zero-block file
+    # stays a failure: it may equally be a fencing typo or a corrupt file.
+    if head -15 "$hook_file" | grep -qE '^(<!--[[:space:]]*)?executor:[[:space:]]*agent([[:space:]]*-->)?[[:space:]]*$'; then
+      echo "day-open-hooks: $hook_file declares executor: agent — checks run by the agent (step 7b), not this runner; skipping (not a failure)" >&2
+      continue
+    fi
+
     blocks_in_file=0
 
     awk '
