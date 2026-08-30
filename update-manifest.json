@@ -489,7 +489,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "26001b5676421b36876c30d3f1abc03833ad80f087daa9d3529cb4ca6fb86089"
+      "sha256": "346be37334a21bf0656cb97b440b3a26b0e5e6abdcc8cb5a2d18a426998213e3"
     },
     {
       "path": ".claude/skills/lesson-close/SKILL.md",
@@ -525,7 +525,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "db6cc671503ddb51b8b045a8eafff77ecf3cbdb12f2f0b2d6c851b8a95c2232c"
+      "sha256": "24ab785cc6359bf38ded91b292c1e43d26382d76561645451e19fe63bd8d24f4"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -677,7 +677,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "440e04cfafd260a4985d27e7713c7bdc49637b46bbeb83c826fecdd2478cbbf4"
+      "sha256": "88596339af3a82d40f4fdc6340e1f0d5f7990d31f7ebac58c4a7963133fc6d46"
     },
     {
       "path": ".claude/styles/p05-core.md",
@@ -2077,7 +2077,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "4652a5dee092c6e8f29506125e999e823aef049c8fc890011f6a65b721626aca"
+      "sha256": "c855565180efcd81933c3fcb22fee0d7fbb0ed25060d69b9e2eeafeb5c70c8f5"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2089,7 +2089,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "6b6062d5c666dd4689896452d1866c5ab190a16888c2c13e70c114d7b21ee98a"
+      "sha256": "8f9d73f8a9b90e7ae6c97deedd155cbb81d48dc8c1b2709886ef7a55c3c3b8ba"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",

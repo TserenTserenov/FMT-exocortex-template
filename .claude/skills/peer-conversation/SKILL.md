@@ -178,7 +178,7 @@ Slug = первые 4 латинских слова из задачи строч
 
 ```bash
 IWE_AGENT=claude-code bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" open \
-  --wp "<WP-NNN из Шага 0б>" --agent claude-code \
+  --wp "<WP-NNN из Шага 0б>" --agent claude-code --close-path peer-session \
   --task "<задача одной строкой>" --slug "$SESSION_ID"
 ```
 

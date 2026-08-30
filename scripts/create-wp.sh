@@ -22,7 +22,7 @@
 # older callers while making the missing strategic basis visible in frontmatter.
 #
 # Предусловие: consent state file должен существовать:
-#   touch ${IWE:-$HOME/IWE}/.claude/state/wp-consent-{N}
+#   touch ${IWE_ROOT:-$HOME/IWE}/.claude/state/wp-consent-{N}
 #
 # Совместимость: bash 3.2+ (macOS), bash 4+ (Linux)
 

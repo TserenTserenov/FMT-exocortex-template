@@ -1740,16 +1740,33 @@ main() {
     case "$reindex_rc" in
       0)                     reindex_status="ok" ;;
       "$RC_REINDEX_PARTIAL") reindex_status="partial" ;;
+      "$RC_STEP_SKIPPED")    reindex_status="skip" ;;
       *)                     reindex_status="fail" ;;
     esac
   fi
 
+  # skip must not read as fail: a template install legitimately lacks the
+  # optional components these steps need (#559 follow-up — cold review found
+  # the RC_STEP_SKIPPED returns landed without this mapping, turning the old
+  # false-ok into a false-FAIL with exit 1).
   if $run_linear; then
-    if do_linear; then linear_status="ok"; else linear_status="fail"; fi
+    local linear_rc=0
+    do_linear || linear_rc=$?
+    case "$linear_rc" in
+      0)                  linear_status="ok" ;;
+      "$RC_STEP_SKIPPED") linear_status="skip" ;;
+      *)                  linear_status="fail" ;;
+    esac
   fi
 
   if $run_sessions; then
-    if do_session_consolidation; then sessions_status="ok"; else sessions_status="fail"; fi
+    local sessions_rc=0
+    do_session_consolidation || sessions_rc=$?
+    case "$sessions_rc" in
+      0)                  sessions_status="ok" ;;
+      "$RC_STEP_SKIPPED") sessions_status="skip" ;;
+      *)                  sessions_status="fail" ;;
+    esac
   fi
 
   write_log "$backup_status" "$reindex_status" "$linear_status" "$sessions_status"
