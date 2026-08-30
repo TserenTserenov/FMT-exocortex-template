@@ -68,6 +68,7 @@ WP_NAME_RE = re.compile(r"^WP-(\d{1,4})(?:[-.].*|/)?$")
 # теперь определяется по имени колонки из строки-заголовка.
 HEADER_RE = re.compile(r"^\|\s*#\s*\|")
 _COLUMN_ALIASES = {
+    "wp": {"#", "№"},
     "name": {"название"},
     "status": {"статус", "ст"},
     "repo": {"репо"},
@@ -158,20 +159,18 @@ def parse_registry(text: str) -> tuple[list[dict], list[str]]:
             "budget": cell("budget"),
             "raw": line,
             "_status_col": columns.get("status"),
+            # Original cell text (markup intact) for re-rendering exactly the
+            # header's six roles in active-wp.md (#558) — the raw line carries
+            # ALL registry columns and overflowed the 6-column header,
+            # spilling everything right of "Бюджет" outside the table. The
+            # "wp" role falls back to the numeric id when the registry header
+            # names its first column something un-aliased.
+            "_view_cells": {
+                role: (cell(role) or (str(wp) if role == "wp" else ""))
+                for role in ("wp", "project", "name", "repo", "budget")
+            },
         })
     return rows, problems
-
-
-def clean_status_in_row(raw: str, status: str, status_col: int) -> str:
-    """Заменяет содержимое колонки статуса на очищенный статус, не трогая
-    остальные колонки (issue #473: старая версия обрезала строку до 7
-    сегментов через parts[:7] - молча теряла всё после 6-й колонки на
-    реестрах с 7+ колонками, например "Бюджет" после добавленной "Ставка")."""
-    parts = raw.split("|")
-    cell_index = status_col + 1  # +1 - до первого "|" всегда пустой сегмент
-    if 0 <= cell_index < len(parts):
-        parts[cell_index] = f" {status} "
-    return "|".join(parts)
 
 
 def render(rows: list[dict]) -> str:
@@ -189,10 +188,19 @@ def render(rows: list[dict]) -> str:
     def table(items: list[dict]) -> str:
         if not items:
             return "_нет_\n"
+        # Rows are built from exactly the six roles the header declares (#558):
+        # printing the raw registry line spilled every column right of
+        # "Бюджет" (the registry has 10) outside the table as plain text.
+        # find_header_columns() already reads the registry schema dynamically —
+        # a schema change now affects cell PICKING, not the rendered width.
         out = ["| # | P | Название | Ст | Репо | Бюджет |",
                "|---:|---|------------------|:--:|------------------|------:|"]
         for r in items:
-            out.append(clean_status_in_row(r["raw"], r["status_display"], r["_status_col"]))
+            v = r["_view_cells"]
+            out.append(
+                f"| {v['wp']} | {v['project']} | {v['name']} "
+                f"| {r['status_display']} | {v['repo']} | {v['budget']} |"
+            )
         return "\n".join(out) + "\n"
 
     lines = [
