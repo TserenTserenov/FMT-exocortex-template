@@ -44,7 +44,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 Определить режим из `$ARGUMENTS`:
 
-- `--list` → прочитать `${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/00-index.md`, вывести таблицу. Стоп.
+- `--list` → прочитать `${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/00-index.md`, вывести таблицу. Файла нет → явно сообщить «индекс сессий ещё не создан (его создаст первая пир-сессия, шаг 1.3); прошлые сессии смотри в дереве sessions/YYYY-MM/DD/» — не молчать (issue #568). Стоп.
 - `--interrupt <id>` → перейти к **Шагу 5 (interrupt-режим)**. Стоп после.
 - `--finalize <id>` → перейти к **Шагу 6 (finalize-режим)**. Стоп после.
 - Иначе → новая сессия, продолжать к Шагу 0в.
@@ -253,6 +253,23 @@ swap_history: []     # [{turn, from, to, reason}] — журнал SWAP_WRITER �
 Запись в `meta.yaml.ad_hoc_roles` идёт независимо от выбора (для back-up на уровне 2 — Week Close audit). Если пилот выбрал А — после сессии писатель открывает отдельный РП и делает формализацию.
 
 **1.3 Добавить строку в `sessions/00-index.md`** сверху таблицы (первая строка таблицы после `|---|`). Колонка «Агенты» — при `PEER_COUNT>=2` напарники соединяются через `+`:
+
+> **Файла нет — создать его сейчас** (issue #568: установка индекс не создаёт, и до этой правки шаг молча не исполнялся — восемь сессий подряд без единой записи). Временная мера до РП-526 (семейство MC переведёт индекс на snapshot-механику — при миграции этот блок удалить). Создаваемый файл обязан честно объявлять свою неполноту прямо в себе (не в stdout — вывод теряется, а файл читают через недели):
+> ```bash
+> IDX="${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/00-index.md"
+> if [ ! -f "$IDX" ]; then
+>   mkdir -p "$(dirname "$IDX")"
+>   {
+>     echo "# Индекс пир-сессий"
+>     echo ""
+>     echo "<!-- index regenerated on $(date +%Y-%m-%d): created empty by peer-conversation step 1.3 (issue #568) — sessions before this date exist on disk but are NOT backfilled here; the folder tree sessions/YYYY-MM/DD/ is the authoritative record -->"
+>     echo ""
+>     echo "| Дата | Сессия | Задача | Агенты | Ходы | Эскалации | Статус | Отчёт |"
+>     echo "|------|--------|--------|--------|------|-----------|--------|-------|"
+>   } > "$IDX"
+> fi
+> ```
+
 ```
 | <TODAY> | <SESSION_ID> | <задача ≤50 симв> | claude-code / <PEER_VENDOR1>[+<PEER_VENDOR2>...] | 0 | 0 | started | — |
 ```
@@ -1001,7 +1018,7 @@ Omit если `implementation_pipeline: false` в meta.yaml.
 
 ### 4.3 Обновить sessions/00-index.md
 
-Найти строку с `<SESSION_ID>` и заменить целиком (колонка «Агенты» — та же `+`-склейка при PEER_COUNT>=2, что в Шаге 1.3):
+Файла нет (сессия шла в обход Шага 1.3 или индекс удалён) → сначала создать его тем же блоком, что в Шаге 1.3 (идемпотентно, issue #568), затем добавить строку как новую. Иначе — найти строку с `<SESSION_ID>` и заменить целиком (колонка «Агенты» — та же `+`-склейка при PEER_COUNT>=2, что в Шаге 1.3):
 ```
 | <TODAY> | <SESSION_ID> | <задача ≤50> | claude-code / <PEER_VENDOR1>[+<PEER_VENDOR2>...] | <TURNS/ROUNDS> | <ESCALATIONS> | completed | [report.md](<MONTH>/<DAY>/<SESSION_ID>/report.md) |
 ```
