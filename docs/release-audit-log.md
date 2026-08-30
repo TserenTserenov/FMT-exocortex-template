@@ -30,6 +30,7 @@ release tag vX.Y.Z → auto-issue (legacy) | новая практика → з�
 
 | Version | Status | Date | Findings | Result | Notes |
 |---------|--------|------|----------|--------|-------|
+| v0.39.1 | **completed** | 2026-08-30 | 0 P0/P1, 3 low-severity (pre-existing, not caused by this delta) | GO | issue #576 (self-run by implementing agent, pilot-waived); independent context-isolated re-audit of the delta (PR #585 f896701 + PR #586 10c9732, personal-guide rename) — separate GO, findings: stale `docs/skills-catalog.md` (pre-existing), `org-dev/SKILL.md` references unrelated `PACK-personal/personal-guide/` path (needs owner confirmation it's intentionally distinct), `seed/strategy/scripts/day-open-scaffold.sh` not covered by manifest B2 (pre-existing gap) |
 | v0.34.1 | skipped-unverified | — | — | — | migrated from #133 |
 | v0.34.0 | skipped-unverified | — | — | — | migrated from #130 |
 | v0.33.x | skipped-unverified | — | — | — | migrated from #129, #127 |
