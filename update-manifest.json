@@ -745,7 +745,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "05f871db855238fcfaf6da8deca36ff0333077c23d0bf72760ac164f22321951"
+      "sha256": "bea81c2b021233f7f471511bf3c8e5c882dcca8200b133cecf85f21bc306b033"
     },
     {
       "path": "CLAUDE.md",
@@ -1413,7 +1413,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "d753b57b1a500861034bdd4a522773979b1a8665135ba679afc02ecaeca9f3f9"
+      "sha256": "fc8267c72ec944f4f749f1dd58500b44d89db9a4cb87d2a1cbdb243e9e3fcab1"
     },
     {
       "path": "memory/fpf-term-map.yaml",
