@@ -211,6 +211,28 @@ restore_claude_placeholders() {
     done
 }
 
+# detect_claude_silent_loss BASE PRE_MERGE_CURRENT MERGED — issue #555: a
+# "clean" `git merge-file` exit (no <<<<<<< markers) can still make a pilot's
+# customized line vanish from the result — reported live with a stale
+# `.claude.md.base` where diff3 resolved a genuine conflict in the platform's
+# favor without ever surfacing markers. This does not try to explain WHY
+# (diff3's line-alignment heuristic is opaque and was not reliably
+# reproducible in isolation) — it verifies the OUTCOME instead: every line
+# the pilot added or changed relative to BASE must still be present
+# somewhere in MERGED. Prints one warning line per lost line to stderr,
+# echoes the lost-line count to stdout for the caller to branch on.
+detect_claude_silent_loss() {
+    local base="$1" before="$2" merged="$3" lost=0 line
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        grep -qF -- "$line" "$merged" || {
+            echo "    ⚠ пользовательская строка пропала при слиянии без маркеров конфликта: $line" >&2
+            lost=$((lost + 1))
+        }
+    done < <(LC_ALL=C comm -13 <(LC_ALL=C sort -u "$base") <(LC_ALL=C sort -u "$before"))
+    echo "$lost"
+}
+
 # Protected user files (issue #154): once seeded, these hold user-authored content
 # (permissions, memory, peer-session journal) — update.sh must never touch them again,
 # neither overwrite (download loop) nor delete (deprecated-file cleanup). Single source
@@ -2256,9 +2278,16 @@ sync_workspace_claude_md() {
             WS_MERGE_TMP="$TMPDIR_UPDATE/ws-claude-merge.md"
             cp "$WS_CURRENT" "$WS_MERGE_TMP"
             if git merge-file -p "$WS_MERGE_TMP" "$WS_BASE" "$WS_NEW" > "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null; then
-                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                cp "$WS_NEW" "$WS_BASE"
-                echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+                WS_SILENT_LOSS=$(detect_claude_silent_loss "$WS_BASE" "$WS_CURRENT" "$TMPDIR_UPDATE/ws-claude-merged.md")
+                if [ "$WS_SILENT_LOSS" -gt 0 ]; then
+                    CLAUDE_SILENT_LOSS_FILES+=("$WS_CURRENT")
+                    echo "  ⚠ $WS_CURRENT НЕ тронут — слияние потеряло бы $WS_SILENT_LOSS строк(и) без маркеров конфликта."
+                    echo "    Сверьте вручную: diff \"$WS_CURRENT\" \"$WS_NEW\""
+                else
+                    cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                    cp "$WS_NEW" "$WS_BASE"
+                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
+                fi
             else
                 WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
                 cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
@@ -2318,7 +2347,7 @@ sync_workspace_claude_md() {
 # below, plus the pre-existing final gate at the end of the script) — third
 # repetition, extract instead of copy-pasting a fourth time.
 claude_conflict_gate() {
-    if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
+    if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
         echo "  ⚠ Workspace-копия CLAUDE.md требует ручной сверки (см. предупреждения выше)."
         exit "$EXIT_CONFLICT"
     fi
@@ -2344,6 +2373,12 @@ CLAUDE_CONFLICT_FILES=()
 # file was simply left untouched. Tracked separately so the final summary
 # doesn't tell the pilot to look for markers that were never written.
 CLAUDE_BASE_MISSING_FILES=()
+# issue #555: a THIRD failure class, distinct from both of the above — a real
+# base existed, `git merge-file` reported success, no markers, but a pilot's
+# customized line still vanished from the result. Also left untouched and
+# reported separately (detect_claude_silent_loss above), so the summary
+# points at the right cause instead of "no base file" or "look for markers".
+CLAUDE_SILENT_LOSS_FILES=()
 
 # WP-546 (peer-session 2026-08-20-11, WP-546 Ф2 consensus with Codex): the
 # manifest loop used to run one `curl` per file, sequentially — 632 files at
@@ -3132,10 +3167,18 @@ for f in "${UPDATED_FILES[@]}"; do
             cp "$RAW_CURRENT_FILE" "$MERGE_TMP"
 
             if git merge-file -p "$MERGE_TMP" "$RAW_BASE_FILE" "$NEW_FILE" > "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null; then
-                # Clean merge — no conflicts
-                cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
-                cp "$NEW_FILE" "$BASE_FILE"
-                echo "  ~ $f (3-way merge, чисто)"
+                # Clean merge — no conflict markers. Still verify no pilot line
+                # silently vanished (issue #555) before trusting "clean".
+                SILENT_LOSS=$(detect_claude_silent_loss "$RAW_BASE_FILE" "$RAW_CURRENT_FILE" "$TMPDIR_UPDATE/claude-merged.md")
+                if [ "$SILENT_LOSS" -gt 0 ]; then
+                    CLAUDE_SILENT_LOSS_FILES+=("$CURRENT_FILE")
+                    echo "  ⚠ $f НЕ тронут — слияние потеряло бы $SILENT_LOSS строк(и) без маркеров конфликта."
+                    echo "    Сверьте вручную: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
+                else
+                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
+                    cp "$NEW_FILE" "$BASE_FILE"
+                    echo "  ~ $f (3-way merge, чисто)"
+                fi
             else
                 CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || true); CONFLICT_COUNT=${CONFLICT_COUNT:-0}
                 if [ "$CONFLICT_COUNT" -gt 0 ]; then
@@ -4062,7 +4105,16 @@ if [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
     echo "  Сверьте свои правки §8/§9 вручную (см. diff-команду в выводе выше) и закоммитьте отдельно."
 fi
 
-if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ]; then
+# issue #555: separate from both blocks above — base existed, merge reported
+# clean, but a pilot line still vanished (see detect_claude_silent_loss).
+if [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
+    echo ""
+    echo "⚠ CLAUDE.md не тронут (слияние потеряло бы вашу правку без предупреждения) в:"
+    for cf in "${CLAUDE_SILENT_LOSS_FILES[@]}"; do echo "  - $cf"; done
+    echo "  Пропавшие строки — в предупреждениях выше. Сверьте вручную и закоммитьте отдельно."
+fi
+
+if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
     exit "$EXIT_CONFLICT"
 fi
 

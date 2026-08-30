@@ -1,10 +1,10 @@
 ---
 name: lesson-close
-description: Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо DS-personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в /lesson.
+description: Закрыть текущее занятие. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо DS-personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в текущем lesson-файле.
 argument-hint: "[необязательно: дата урока YYYY-MM-DD; по умолчанию сегодня; либо --skipped если урок был пропущен; --no-push для локального commit без push]"
 experimental: true
 sunset: "после WP-301 Ф6 (E2E smoke) и WP-149 Block D (ИИ-агент-носитель Портного)"
-related: [WP-149, WP-175, WP-245, WP-301, lesson, PD.METHOD.008]
+related: [WP-149, WP-175, WP-245, WP-301, PD.METHOD.008]
 version: 1.0.0
 layer: L1
 status: active
@@ -29,13 +29,13 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## When to use
 
-Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо DS-personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в /lesson.
+Закрыть текущее занятие. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо DS-personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в текущем lesson-файле.
 
 ## Контракт скилла
 
-- **Вход:** существующий `lesson/YYYY-MM-DD.md` в репо `DS-personal-guide` со статусом `status: in_progress` (создан скиллом `/lesson`). Активный git remote с правом push.
+- **Вход:** существующий `lesson/YYYY-MM-DD.md` в репо `DS-personal-guide` со статусом `status: in_progress`. Активный git remote с правом push.
 - **Выход:** lesson-файл с финализированным frontmatter (`status: done|partial|skipped`, `finished_at`, `duration_min`) + git commit + git push. На сервере: webhook triggered → `sync_one_user_to_dt(user_id)` → Neon `digital_twins.data['2_collected']` обновлён + событие в `public.domain_event`.
-- **Время:** ≤2 мин (быстрая финализация после `/lesson`).
+- **Время:** ≤2 мин (быстрая финализация занятия).
 - **Не делает:** не оценивает качество ответа (Оценщик R12 — отдельно, асинхронно); не генерирует assignment на завтра (Портной, ночной рендер).
 
 ## Algorithm
@@ -85,7 +85,7 @@ bash "$IWE_SCRIPTS/route-task.sh" --skill lesson-close --args "<YYYY-MM-DD> [--n
 
 ## Связь с другими механизмами
 
-- **`/lesson`** — парный скилл, открывает занятие, создаёт lesson-скелет.
+- **Открытие занятия** выполняется отдельным процессом; `/lesson-close` требует уже существующий lesson-файл со статусом `in_progress`.
 - **GitHub webhook** — handler в бот-репозитории (`oauth_server.py`, роут `POST /webhook/github/workbook`). HMAC-секрет = `GITHUB_WORKBOOK_WEBHOOK_SECRET` в env. Регистрируется один раз в `DS-personal-guide` репо: Settings → Webhooks.
 - **Активность в Neon:** webhook записывает событие в `public.domain_event` (source=`iwe`, event_type=`lesson_closed`) и триггерит `sync_one_user_to_dt(user_id)` → пишет в `digital_twins.data['2_collected']`.
 - **Профайлер (асинхронно):** отдельный сервис пересчитывает `3_derived` на основе обновлённого `2_collected`. Запускается отдельным cron.

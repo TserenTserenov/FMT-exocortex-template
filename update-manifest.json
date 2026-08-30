@@ -497,7 +497,7 @@
     },
     {
       "path": ".claude/skills/lesson-close/SKILL.md",
-      "sha256": "cbcb057371f7dc02c7322316662045956a85a88354b5eb4c8095558eda820949"
+      "sha256": "cf87b710578bd9fb2b9df38c9da9d9f43507bd92b8c01fbeabf1f39e3a6ddd34"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -2833,7 +2833,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "994eaafb76e4a9a40a5d3871551a1f988180d085f63795bb7fc64662e6b029ff"
+      "sha256": "489ec46304d6d8d4eafe8cbeb5c97e62085f7ff18ddf7ca849c6512702f2c178"
     }
   ],
   "excluded_paths": [
@@ -2873,6 +2873,7 @@
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
     "scripts/tests/test_issue_532_dayplan_strategy_gate.sh",
+    "scripts/tests/test_issue_555_claude_silent_loss.sh",
     "scripts/tests/test_issue_583_dayopen_yaml.sh",
     "scripts/tests/test_issue_584_build_version.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
