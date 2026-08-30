@@ -37,7 +37,7 @@
 | `/pack-new` | Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap. |
 | `/peer-conversation` | Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/c… |
 | `/personal-guide-render` | Персональное руководство пилота собирается автоматически на сервере платформы по расписанию. Используй когда… |
-| `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in th… |
+| `/personal-guide-start` | Bootstrap wrapper — creates an empty DS-personal-guide repo under the pilot's account (flat name, no login in… |
 | `/platform-bottleneck` | Скилл IWE — см. тело файла |
 | `/restore-exocortex` | Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-fr… |
 | `/run-protocol` | Step-by-step execution of the OWC protocol with mandatory checkpoint at each step. Prevents skipping steps (i… |

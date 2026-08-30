@@ -1314,7 +1314,7 @@ generated_by: day-open-scaffold.sh (WP-264 Ф2)
 <details>
 <summary><b>Саморазвитие</b></summary>
 
-- **Изучи персональное руководство:** личное руководство (репозиторий \`personal-guide\` на твоём GitHub — см. \`/connect-guide\`)
+- **Изучи персональное руководство:** личное руководство (репозиторий \`DS-personal-guide\`, либо \`personal-guide\` у ранних немигрированных пользователей — см. \`/connect-guide\`)
 
 $SELF_DEV_BLOCK
 
