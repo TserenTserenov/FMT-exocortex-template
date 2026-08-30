@@ -35,9 +35,18 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
 # Guard: IWE_GOVERNANCE_REPO mismatch (Claude peer-review, 2026-05-26)
-EXPECTED_GOV=$(grep 'IWE_GOVERNANCE_REPO=' "$HOME/.iwe-paths" 2>/dev/null | sed 's/.*="//;s/"$//' || echo "DS-strategy")
+# Two defects fixed here: (1) install-iwe-paths.sh writes .iwe-paths into
+# $WORKSPACE_DIR, never into $HOME, so the old lookup missed the file on every
+# layout where the workspace is not $HOME itself; (2) `grep … | sed … || echo`
+# never reached its fallback — the `||` binds to the pipeline, and sed exits 0
+# on empty input — so EXPECTED_GOV came out empty and the guard fired a bogus
+# "expected " warning on every scheduled run.
+IWE_PATHS_FILE="${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths"
+[ -f "$IWE_PATHS_FILE" ] || IWE_PATHS_FILE="$HOME/.iwe-paths"
+EXPECTED_GOV=$(sed -n 's/^export IWE_GOVERNANCE_REPO="\(.*\)"$/\1/p' "$IWE_PATHS_FILE" 2>/dev/null | tail -1)
+EXPECTED_GOV="${EXPECTED_GOV:-DS-strategy}"
 if [ "${IWE_GOVERNANCE_REPO:-}" ] && [ "$IWE_GOVERNANCE_REPO" != "$EXPECTED_GOV" ]; then
-    echo "WARN: IWE_GOVERNANCE_REPO=$IWE_GOVERNANCE_REPO, expected $EXPECTED_GOV (from ~/.iwe-paths)" >&2
+    echo "WARN: IWE_GOVERNANCE_REPO=$IWE_GOVERNANCE_REPO, expected $EXPECTED_GOV (from $IWE_PATHS_FILE)" >&2
 fi
 
 # WP-529 F6 (Evgenii post-update defect #1, 18.08): update.sh reinstalls
@@ -267,8 +276,16 @@ acquire_lock() {
     trap "rm -rf \"$lockdir\" 2>/dev/null" EXIT
 }
 
-# Читаем strategy_day из конфига (L4 Personal)
-RHYTHM_CONFIG="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/day-rhythm-config.yaml"
+# Читаем strategy_day из конфига (L4 Personal).
+# The legacy path below hardcodes the macOS Claude project slug (-Users-<login>-IWE),
+# which never matches on a workspace outside $HOME (Windows/Git-Bash: the slug carries
+# the full drive-qualified path). Resolve through $IWE_WORKSPACE first — memory/ there
+# is the symlink to auto-memory on every platform — and keep the old path as fallback
+# so existing macOS installs are untouched.
+RHYTHM_CONFIG="${IWE_WORKSPACE:-$HOME/IWE}/memory/day-rhythm-config.yaml"
+if [ ! -f "$RHYTHM_CONFIG" ]; then
+    RHYTHM_CONFIG="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/day-rhythm-config.yaml"
+fi
 STRATEGY_DAY_NAME=$(grep 'strategy_day:' "$RHYTHM_CONFIG" 2>/dev/null | awk '{print $2}' || echo "monday")
 # Конвертируем имя дня в номер (1=Mon..7=Sun)
 case "$STRATEGY_DAY_NAME" in
