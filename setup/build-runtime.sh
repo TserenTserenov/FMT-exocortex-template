@@ -265,7 +265,7 @@ INPUT_HASH=$(
     } | (command -v shasum >/dev/null && shasum -a 256 || sha256sum) | cut -d' ' -f1
 )
 
-FMT_VERSION=$(grep -m1 '^## \[' "$TEMPLATE_DIR/CHANGELOG.md" | sed 's/.*\[\(.*\)\].*/\1/')
+FMT_VERSION=$(grep '^## \[' "$TEMPLATE_DIR/CHANGELOG.md" | grep -v '^## \[Unreleased\]' | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
 
 # === Apply substitutions ===
 build_substituted_file() {

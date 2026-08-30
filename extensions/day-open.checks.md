@@ -22,7 +22,8 @@
 
 ```bash
 [ -s "$FILE" ] || { echo "  ❌ DayPlan пуст или отсутствует: $FILE"; exit 1; }
-head -1 "$FILE" | grep -q '^# ' || { echo "  ❌ DayPlan не начинается с '# '-заголовка: $(head -1 "$FILE")"; exit 1; }
+FIRST_H1=$(grep -m1 '^# ' "$FILE" || true)
+[ -n "$FIRST_H1" ] || { echo "  ❌ В DayPlan нет ни одного '# '-заголовка первого уровня"; exit 1; }
 LINES=$(wc -l < "$FILE" | tr -d ' ')
 [ "$LINES" -ge 5 ] || { echo "  ❌ DayPlan подозрительно короткий ($LINES строк) — похоже на оборванную генерацию"; exit 1; }
 echo "  ✅ DayPlan существует, заголовок на месте, $LINES строк"
@@ -37,7 +38,8 @@ echo "  ✅ DayPlan существует, заголовок на месте, $L
 ```bash
 FNAME_DATE=$(basename "$FILE" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
 [ -n "$FNAME_DATE" ] || { echo "  ✅ Имя файла без даты — проверка неприменима"; exit 0; }
-H1_DATE=$(head -1 "$FILE" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+FIRST_H1=$(grep -m1 '^# ' "$FILE" || true)
+H1_DATE=$(printf '%s\n' "$FIRST_H1" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)
 if [ -n "$H1_DATE" ] && [ "$H1_DATE" != "$FNAME_DATE" ]; then
   echo "  ❌ Дата в заголовке ($H1_DATE) не совпадает с именем файла ($FNAME_DATE) — проверяется не тот план?"
   exit 1

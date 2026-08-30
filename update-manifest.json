@@ -1009,7 +1009,7 @@
     },
     {
       "path": "extensions/day-open.checks.md",
-      "sha256": "9b007e3e07ed952e743d6d5a4770829678ec13f5617cfb1a8a3fa8b6206869cf"
+      "sha256": "41fd9c38d4a29c02ee99b7ff5eb849841215dd026711eb50fb1b93bfde57c48d"
     },
     {
       "path": "extensions/local-llm/ADR-001-local-llm-stack.md",
@@ -2797,7 +2797,7 @@
     },
     {
       "path": "setup/build-runtime.sh",
-      "sha256": "818f7ed16d24e87fea34a028d093709bdd09e41ba6a6afec23f8460c4b6ebe20"
+      "sha256": "6609c5b6b41d4b6916dd6895bd5e5e7397717d34b81a290ba3a47f67ba9c18df"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -2873,6 +2873,8 @@
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
     "scripts/tests/test_issue_532_dayplan_strategy_gate.sh",
+    "scripts/tests/test_issue_583_dayopen_yaml.sh",
+    "scripts/tests/test_issue_584_build_version.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",
