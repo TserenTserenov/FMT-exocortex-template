@@ -100,9 +100,36 @@ case "$REL_PATH" in
   if printf '%s' "$REL_PATH" | grep -qE '^\.claude/skills/[^/]+/'; then
     SKILL_NAME="${REL_PATH#\.claude/skills/}"
     SKILL_NAME="${SKILL_NAME%%/*}"
-    MANIFEST="$WORKSPACE_DIR/update-manifest.json"
-    if [ ! -f "$MANIFEST" ]; then
-      block "update-manifest.json отсутствует в корне workspace — принадлежность скилла не доказать, блокирую. Восстанови манифест через update.sh и повтори."
+    # Manifest resolution (#564): update.sh never delivered the manifest to
+    # the workspace root, so the old root-only lookup fail-closed EVERY user
+    # skill edit on 0.38.11. The authoritative copy lives inside the template
+    # clone. Priority (peer consensus): explicit $IWE_TEMPLATE → derived from
+    # $IWE_SCRIPTS (only a scripts/ dir whose parent holds the manifest) →
+    # default clone location. Deliberately NO fallback to a root copy: a
+    # stale root copy is exactly the failure mode this issue is about.
+    MANIFEST=""
+    MANIFEST_TRIED=""
+    _mf_candidates=""
+    [ -n "${IWE_TEMPLATE:-}" ] && _mf_candidates="$IWE_TEMPLATE"
+    if [ -n "${IWE_SCRIPTS:-}" ] && [ "$(basename "$IWE_SCRIPTS")" = "scripts" ]; then
+      _mf_candidates="$_mf_candidates
+$(dirname "$IWE_SCRIPTS")"
+    fi
+    _mf_candidates="$_mf_candidates
+$WORKSPACE_DIR/FMT-exocortex-template"
+    while IFS= read -r _mf_root; do
+      [ -n "$_mf_root" ] || continue
+      _mf_real=$(cd "$_mf_root" 2>/dev/null && pwd -P) || { MANIFEST_TRIED="$MANIFEST_TRIED $_mf_root (нет каталога);"; continue; }
+      if [ -f "$_mf_real/update-manifest.json" ]; then
+        MANIFEST="$_mf_real/update-manifest.json"
+        break
+      fi
+      MANIFEST_TRIED="$MANIFEST_TRIED $_mf_real (нет манифеста);"
+    done <<EOF_MF
+$_mf_candidates
+EOF_MF
+    if [ -z "$MANIFEST" ]; then
+      block "update-manifest.json не найден ни в одном известном месте шаблона:${MANIFEST_TRIED} — принадлежность скилла не доказать, блокирую. Задай IWE_TEMPLATE=<путь к клону FMT-exocortex-template> (или восстанови клон через update.sh) и повтори."
     fi
     if [ -n "$SKILL_NAME" ]; then
       # Разрешение только при ДОКАЗАННО прочитанном манифесте: сначала проверка,
