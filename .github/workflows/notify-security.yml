@@ -44,6 +44,20 @@ jobs:
           TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
           SECURITY_LINES: ${{ steps.extract.outputs.lines }}
         run: |
+          # issue #547: forks have no author secrets — every delivery with
+          # security lines went red there forever. Same principle as #454:
+          # gate on the CONFIGURED-CHANNEL fact, not on the repository name
+          # (a name check breaks the legitimate own-repo scenario). Skip is
+          # ONLY the precisely-empty state; exactly one secret set is a
+          # half-configured channel and must fail loudly, not skip.
+          if [ -z "${BOT_WEBHOOK_URL}" ] && [ -z "${TEMPLATE_WEBHOOK_SECRET}" ]; then
+            echo "Skip: канал уведомлений не настроен (BOT_WEBHOOK_URL и TEMPLATE_WEBHOOK_SECRET пусты — форк без секретов автора)."
+            exit 0
+          fi
+          if [ -z "${BOT_WEBHOOK_URL}" ] || [ -z "${TEMPLATE_WEBHOOK_SECRET}" ]; then
+            echo "ERROR: настроен только один из двух секретов канала (BOT_WEBHOOK_URL / TEMPLATE_WEBHOOK_SECRET) — это полунастроенное состояние, не skip." >&2
+            exit 1
+          fi
           VERSION=$(grep -m1 '^## \[' CHANGELOG.md | sed 's/## //')
           MESSAGE="🔒 СРОЧНО — обнаружены security-изменения:
           $SECURITY_LINES"

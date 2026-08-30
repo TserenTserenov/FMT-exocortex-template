@@ -82,6 +82,34 @@ if [ "$MODE" = "staged" ]; then
     fi
 fi
 
+# issue #547: paths the manifest deliberately freezes out of delivery
+# (excluded_paths) never get refreshed on forks — an author-content hit there
+# is permanent and unactionable for a fork owner, so excluding a path from
+# delivery while including it in this scan makes the two rules contradict
+# each other forever. Scope: ONLY check [1/5] (author-content); the other
+# checks below intentionally still see excluded paths — this must not become
+# a general validation bypass.
+EXCLUDED_LIST=$(jq -r '.excluded_paths[]? // empty' "$TEMPLATE_DIR/update-manifest.json" 2>/dev/null || true)
+is_excluded_path() {
+    local rel="$1" ex
+    [ -n "$EXCLUDED_LIST" ] || return 1
+    while IFS= read -r ex; do
+        [ -n "$ex" ] || continue
+        [ "$rel" = "$ex" ] && return 0
+        case "$rel" in "$ex"/*) return 0 ;; esac
+    done <<< "$EXCLUDED_LIST"
+    return 1
+}
+filter_excluded_hits() {
+    # stdin: grep -r output "<abs-path>:<line>:<text>" — drop excluded_paths rows
+    local line abs rel
+    while IFS= read -r line; do
+        abs="${line%%:*}"
+        rel="${abs#"$TEMPLATE_DIR"/}"
+        is_excluded_path "$rel" || printf '%s\n' "$line"
+    done
+}
+
 # 1. Нет автор-специфичного контента
 echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
@@ -101,6 +129,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
             case "$f" in
                 guide-kit/*) continue ;;  # vendored copy is derived-only (WP-483) — checked by its upstream CI
             esac
+            is_excluded_path "$f" && continue  # frozen out of delivery (#547)
             case "$f" in
                 *.md|*.sh|*.py|*.json|*.plist|*.yaml) ;;
                 *) continue ;;
@@ -129,7 +158,8 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                 --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
                 --exclude='translation-manifest.yaml' --exclude-dir='guide-kit' 2>/dev/null \
                 | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' | wc -l | tr -d ' ' || true)
+                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
+                | filter_excluded_hits | wc -l | tr -d ' ' || true)
     fi
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
@@ -143,7 +173,8 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                 --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
                 --exclude='translation-manifest.yaml' --exclude-dir='guide-kit' 2>/dev/null \
                 | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' | head -3 || true
+                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
+                | filter_excluded_hits | head -3 || true
         fi
         CHECK1_FAIL=1
         FAIL=1
