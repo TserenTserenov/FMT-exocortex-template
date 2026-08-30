@@ -55,6 +55,12 @@ if [ ! -f "$SENTINEL" ]; then
         {
             echo "[dry-run-gate] BLOCKED: dry-run sentinel missing while owner file $(basename "$OWNER_FILE") still present"
             echo "Reason: protection lost mid-rehearsal (TTL/crash/race) — fail-closed per contract"
+            # issue #549 stage 1: this branch is fail-closed FOREVER by design
+            # (no TTL — elapsed time proves nothing about completion), and the
+            # gate blocks the agent's own rm before the whitelist is reached,
+            # so recovery is only possible from the pilot's own terminal.
+            # Name the exact command instead of leaving the user to guess.
+            printf 'Recovery (pilot terminal only, after confirming no dry-run is actually active):\n  rm -f %q\n' "$OWNER_FILE"
         } >&2
         exit 2
     fi

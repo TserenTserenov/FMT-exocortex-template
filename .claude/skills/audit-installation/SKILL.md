@@ -107,7 +107,12 @@ Coverage: N/4
 
 1. **Создать sentinel** (единое имя для gate + capability владельца, issue #369):
    ```bash
-   DRY_SID="${CLAUDE_SESSION_ID:-noid}"
+   # issue #549 stage 1: never fall back to a shared "noid" — the Stop-hook
+   # cleans owner files by session id, and a mismatched id left the owner
+   # orphaned, permanently fail-closing every write tool. A self-generated
+   # gate id is unique per run; CLAUDE_SESSION_ID is used when present so the
+   # Stop-hook match still works in environments that do export it.
+   DRY_SID="${CLAUDE_SESSION_ID:-dry-$(date +%s)-$$}"
    DRY_SAFE_SID=$(printf '%s' "$DRY_SID" | tr -cd 'A-Za-z0-9._-')
    DRY_TOKEN=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
    DRY_OWNER="/tmp/iwe-dry-run-owner-${DRY_SAFE_SID:-noid}.token"
