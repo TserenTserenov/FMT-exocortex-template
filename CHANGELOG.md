@@ -147,6 +147,11 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Fixed
+
+- `f896701` fix(skills): personal-guide -> DS-personal-guide в шаблонных скиллах (#585)
+  - `personal-guide-start`, `personal-guide-render`, `lesson-close`, `week-close-pilot` — литеральное имя личного репозитория новых пользователей переведено на канон `DS-personal-guide`; `docs/SETUP-GUIDE.md` и её тест-контракт обновлены вместе с манифестом
+
 ## [0.39.1] — 2026-08-30
 
 Hotfix on top of v0.39.0: the cold-context review follow-up (PR #575,
