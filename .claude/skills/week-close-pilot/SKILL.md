@@ -16,8 +16,8 @@ routing:
 Перед выполнением проверить:
 ```bash
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
-if [ ! -d "$IWE_ROOT/personal-guide" ]; then
-  echo "⚠️ personal-guide не найден в $IWE_ROOT. Скилл требует personal-guide репозиторий."
+if [ ! -d "$IWE_ROOT/DS-personal-guide" ]; then
+  echo "⚠️ DS-personal-guide не найден в $IWE_ROOT. Скилл требует DS-personal-guide репозиторий."
   exit 0
 fi
 ```
@@ -41,7 +41,7 @@ fi
 2. Определи:
    - **Текущая неделя:** W{N} (недельный номер ISO)
    - **Прошлая неделя:** W{N-1}
-   - **Пилот:** `${PILOT_NAME:-Пилот}` (`personal-guide` репозиторий на GitHub)
+   - **Пилот:** `${PILOT_NAME:-Пилот}` (`DS-personal-guide` репозиторий на GitHub)
    - **Account ID:** из `DT_USER_ID` (env) или `dt_read_digital_twin` path `1_declarative/1_1_identity`
 
 **Выход:** Две недельные метки, готовность к шагу 2.
@@ -53,7 +53,7 @@ fi
 Собрать три источника данных за W{N-1}:
 
 **2a) Текущий weekly-файл:**
-- Путь: `personal-guide/weekly/<YYYY-Www>.md` (год — текущий, ISO-неделя)
+- Путь: `DS-personal-guide/weekly/<YYYY-Www>.md` (год — текущий, ISO-неделя)
 - Это — weekly пилота прошлой недели, где зафиксированы рабочие продукты, ритм, гипотеза в начало недели
 - Прочитать его полностью (разделы: Гипотеза, Рабочие продукты, Ритм, Метрики, Что вышло)
 
@@ -98,7 +98,7 @@ fi
 
 Переместить прошлый weekly из `weekly/` в `history/`:
 
-1. Прочитай `personal-guide/weekly/<YYYY>-Www.md` (для W{N-1})
+1. Прочитай `DS-personal-guide/weekly/<YYYY>-Www.md` (для W{N-1})
 2. Добавь в начало файла **Итоги раздел** (сверху):
    ```markdown
    ## Итоги W{N-1}
@@ -145,7 +145,7 @@ fi
   - Метрики (какие метрики отслеживать на неделю)
   - Комментарий (что проверить в конце недели)
 
-**Выход:** новый weekly написан в `personal-guide` репо.
+**Выход:** новый weekly написан в `DS-personal-guide` репо.
 
 ---
 
