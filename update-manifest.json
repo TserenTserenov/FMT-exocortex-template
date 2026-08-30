@@ -2265,7 +2265,7 @@
     },
     {
       "path": "scripts/ke-queue-stats.sh",
-      "sha256": "dca248d321a3737fe9b0afc9a623036de290bcbaa343cbc1f6bbcb3dbd3eb143"
+      "sha256": "5428c6cc329add702e5d2ff91ba7af2114a8cd023f9cb5c921a9f6b1720e89df"
     },
     {
       "path": "scripts/kimi-auto-heartbeat.sh",

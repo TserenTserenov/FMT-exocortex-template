@@ -61,11 +61,32 @@ if [ "$COUNT" -eq 0 ]; then
   exit 0
 fi
 
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  OLDEST_TS=$(echo "$PENDING_FILES" | xargs -I{} stat -f "%m" "{}" 2>/dev/null | sort -n | head -1)
-else
-  OLDEST_TS=$(echo "$PENDING_FILES" | tr '\n' '\0' | xargs -0 stat -c "%Y" 2>/dev/null | sort -n | head -1)
-fi
+# Age comes from the report's frontmatter `date:` — file mtime lies after any
+# clone/checkout/history rewrite (a fresh `git clone` resets every mtime to
+# checkout time, so a 13-day-old pending report reads as "0 days" right after
+# a restore or a machine move — found 2026-08-30, WP-170). mtime is the
+# fallback for reports without a parsable date.
+oldest_report_ts() {
+  local ts best=""
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    local fm_date
+    fm_date=$(awk '/^---/{if(seen)exit;seen=1;next} seen && /^date:/{gsub(/["'\'' ]/,"",$2);print $2;exit}' "$f")
+    if [[ "$fm_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+      ts=$(date -d "$fm_date" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$fm_date" +%s 2>/dev/null)
+    else
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        ts=$(stat -f "%m" "$f" 2>/dev/null)
+      else
+        ts=$(stat -c "%Y" "$f" 2>/dev/null)
+      fi
+    fi
+    [ -n "$ts" ] && { [ -z "$best" ] || [ "$ts" -lt "$best" ]; } && best="$ts"
+  done <<<"$1"
+  echo "$best"
+}
+
+OLDEST_TS=$(oldest_report_ts "$PENDING_FILES")
 NOW_TS=$(date +%s)
 if [ -z "$OLDEST_TS" ]; then
   OLDEST_DAYS=-1
