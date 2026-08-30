@@ -703,7 +703,7 @@ if [ "$CMD" = "close" ]; then
   # 4.5.1/4.5.2) прямой git commit, не раннер. Без этого обхода close требовал
   # у пир-сессии карточку чужого ритуала (живой отказ 30.08). close_path
   # записан этим же скриптом при open — достаточное свидетельство.
-  if [ -z "$RUNNER_OK" ] && grep -q '^close_path: peer-session$' "$SEM_FILE" 2>/dev/null; then
+  if [ -z "$RUNNER_OK" ] && grep -q '^close_path: peer-session$' "${SEM_FILE:-}" 2>/dev/null; then
     RUNNER_OK="declared-peer-session:$SLUG"
     echo "Session CLOSE: close_path=peer-session объявлен при open — раннер не требуется (WP-484 Ф118)." >&2
   fi
