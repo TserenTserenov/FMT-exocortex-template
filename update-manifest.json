@@ -73,7 +73,7 @@
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
-      "sha256": "97ff533083afd493722299fb627a120f607656ef23159c9eea4b69aac8b2ba2e"
+      "sha256": "7e564cbee9a85835ec26124c5f33035e103572ea79c99f3b8e287884e5f0f6ca"
     },
     {
       "path": ".claude/hooks/inject-code-style.sh",
@@ -141,7 +141,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "4cd7b1c9856fa0153536b8fd443af2fcb28a7dd436bb33c0f492108099752c74"
+      "sha256": "3903cd2bb5eb8dd412cbf0e219cd6b676da2cbe0113765ea6920a43b58e48e83"
     },
     {
       "path": ".claude/hooks/session-end-status.sh",
@@ -321,7 +321,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "35b4de61d8d83dc3e28c7d624e4b8d130598787365f07e6812c4dc30096f7b71"
+      "sha256": "a1428543371c0a4673a154a4733592a4fc92e018a0ca5e09e0cde91038fadc56"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -345,7 +345,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "7e35ad4d26cda3fa0f0906bf175dfc776bcc2557e8056a2bb5aa6c372aedbd5b"
+      "sha256": "dda02523ffe5bc9fd5c412e023364a07710539cba4ea7ee6839b1bba03deef3e"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -357,7 +357,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "a328a261ab9f377526ad1ae5535b67e7475acfdf9758eca425fa8c40b1b0da84"
+      "sha256": "c5309ba2ae2cff0ede10980711066efd3144eac6b863e9abb3bbf4a144758376"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -489,7 +489,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "50961a5c7ef49101dc594bfeb9a35164e1aef4468dfc9e3e48067b98c645bbb5"
+      "sha256": "26001b5676421b36876c30d3f1abc03833ad80f087daa9d3529cb4ca6fb86089"
     },
     {
       "path": ".claude/skills/lesson-close/SKILL.md",
@@ -585,7 +585,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "4e1cf3cb33c20d1f10c15ca81fb4ba842da7716d4b16fd50fa0af17ea8afd387"
+      "sha256": "b5f4651d9919af5c9a01f1e49c38ff526c657e9afa3631737569fea99cf9e0ad"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -669,7 +669,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "6ff687ffd0cebf32df38e41be9f11c41641b38ad770348b71cffb0b25c49eac3"
+      "sha256": "5e9abc97bd9000ff19167eedbd001ceff59c76b89565e0bf703683fb58064fdc"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -677,7 +677,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "02d6265b087f452adf7c3a71c4122caec1f6f833de84f7b062fc3e61c021639a"
+      "sha256": "440e04cfafd260a4985d27e7713c7bdc49637b46bbeb83c826fecdd2478cbbf4"
     },
     {
       "path": ".claude/styles/p05-core.md",
@@ -1789,7 +1789,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "6757b6f6c139250ed446adf84785742a009113a156ec6cfcae92d1384e72318d"
+      "sha256": "3faf6b4cdbd657567a0acb5e17eb3c779a0e855315220782f40afa42f1531c41"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2085,7 +2085,7 @@
     },
     {
       "path": "scripts/day-close-prepare.sh",
-      "sha256": "04c718796ef21ff626127bf6d2632a8f31d02d86b38955d4db02712ef6b868f1"
+      "sha256": "f93ff8f21e5af567d790382745134350c602871cf489a443c90f433b84c318bd"
     },
     {
       "path": "scripts/day-close.sh",
@@ -2133,7 +2133,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "a271c33bf0cc2fd077a518cbda7e3471176f145b7a522daad84073e6e098c9d1"
+      "sha256": "1c4b8e030fa943c671f7d921df586b552c8a22450b1ecb653ea1365bc7e0e21e"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2141,7 +2141,7 @@
     },
     {
       "path": "scripts/day-open-smoke.sh",
-      "sha256": "fc7780833a9aacb15cc104c61f8e2ca974577a0f70e35fdeb0d037cebce771a7"
+      "sha256": "75e5fabf1ab91b0503dd7dcd653a247f9d99ca5c4b9501a4a4090f4005590c51"
     },
     {
       "path": "scripts/day-open-version-check-patch.py",
@@ -2640,10 +2640,6 @@
       "sha256": "512108486010ace38c9de67ce6dbb0568618966f8b09feb9511a51818e0d62cd"
     },
     {
-      "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
-      "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
-    },
-    {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
       "sha256": "4b44a9bbcb4eb3247e10bea7c133ce8ea0f866421445f6e539c42dc48617ecd6"
     },
@@ -2869,6 +2865,7 @@
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
     "scripts/tests/test_issue_532_dayplan_strategy_gate.sh",
+    "scripts/tests/test_issue_557_zsh_special_vars.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",
