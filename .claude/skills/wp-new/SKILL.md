@@ -91,7 +91,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 **Синтаксис скрипта:**
 ```bash
-touch ~/.claude/state/wp-consent-{N}   # WP Gate — обязательно перед запуском
+touch "${IWE:-$HOME/IWE}/.claude/state/wp-consent-{N}"   # WP Gate — обязательно перед запуском (тот же путь, что проверяет create-wp.sh, — НЕ ~/.claude, issue #556)
 bash "$IWE_SCRIPTS/create-wp.sh" \
   --title "Название РП" \
   --budget 5h \
