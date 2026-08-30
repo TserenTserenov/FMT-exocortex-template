@@ -20,9 +20,9 @@ routing:
 
 ## БЛОКИРУЮЩЕЕ: пошаговое исполнение
 
-Day Close = протокол. Исполнять ТОЛЬКО пошагово через TodoWrite.
-**Шаг 0 — ПЕРВОЕ действие:** создать список задач прямо сейчас (до любых других действий).
-Каждый шаг алгоритма → отдельная задача (pending → in_progress → completed).
+Day Close = протокол. Блокирующее требование — наблюдаемое свойство: **ни один шаг не пропущен молча**; каждый шаг отмечается ДО перехода к следующему.
+**Шаг 0 — ПЕРВОЕ действие:** зафиксировать список шагов прямо сейчас (до любых других действий) — в TodoWrite, а при его недоступности явной нумерацией в ответе.
+Инструмент по умолчанию — TodoWrite: каждый шаг алгоритма → отдельная задача (pending → in_progress → completed). **TodoWrite недоступен** (штатная ситуация, зависит от сборки клиента) → сообщить пилоту одной строкой, вести шаги явной нумерацией («Шаг X из Y: <название> — выполнен»), факт замены зафиксировать в отчёте закрытия (issues #561, #563).
 Переход к следующему — ТОЛЬКО после отметки текущего. Шаг невозможен → blocked (не пропускать молча).
 
 ## Алгоритм
@@ -125,14 +125,17 @@ assert_staged_scope_or_stop() {
   fi
   local repo="$1"
   shift
-  local status staged_path staged_path_after allowed_path path normalized_path display_path
-  while IFS= read -r -d '' status; do
+  # Variable names deliberately avoid zsh special parameters: `path` shadows
+  # PATH (git stops resolving) and `status` is read-only in zsh (#557); the
+  # agent sources these functions in the pilot's login shell, not bash.
+  local staged_status staged_path staged_path_after allowed_path commit_path normalized_path display_path
+  while IFS= read -r -d '' staged_status; do
     IFS= read -r -d '' staged_path || {
       echo "STOP: staged index status could not be parsed" >&2
       return 76
     }
     staged_path_after=""
-    case "$status" in
+    case "$staged_status" in
       R*|C*)
         IFS= read -r -d '' staged_path_after || {
           echo "STOP: staged rename/copy status could not be parsed" >&2
@@ -141,8 +144,8 @@ assert_staged_scope_or_stop() {
         ;;
     esac
     allowed_path=false
-    for path in "$@"; do
-      normalized_path="${path#./}"
+    for commit_path in "$@"; do
+      normalized_path="${commit_path#./}"
       if [ "$staged_path" = "$normalized_path" ] || \
          [ "$staged_path_after" = "$normalized_path" ]; then
         allowed_path=true
@@ -170,35 +173,35 @@ stage_and_commit_or_stop() {
     return 64
   fi
 
-  local path normalized_path tracked_descendant
-  for path in "$@"; do
-    case "$path" in
+  local commit_path normalized_path tracked_descendant
+  for commit_path in "$@"; do
+    case "$commit_path" in
       .|./|-A|--all|-u|--update)
-        echo "STOP: broad git-add path/options are forbidden: $path" >&2
+        echo "STOP: broad git-add path/options are forbidden: $commit_path" >&2
         return 65
         ;;
     esac
-    if [ -d "$repo/$path" ]; then
-      echo "STOP: explicit commit scope requires files, not a directory: $path" >&2
+    if [ -d "$repo/$commit_path" ]; then
+      echo "STOP: explicit commit scope requires files, not a directory: $commit_path" >&2
       return 65
     fi
-    normalized_path="${path#./}"
+    normalized_path="${commit_path#./}"
     normalized_path="${normalized_path%/}"
     tracked_descendant=""
     while IFS= read -r -d '' tracked_descendant; do
       break
     done < <(git -C "$repo" ls-files -z -- "$normalized_path/")
     if [ -n "$tracked_descendant" ]; then
-      echo "STOP: explicit commit scope resolves to tracked descendants, not one file: $path" >&2
+      echo "STOP: explicit commit scope resolves to tracked descendants, not one file: $commit_path" >&2
       return 65
     fi
     local path_status=""
-    if ! path_status=$(git -C "$repo" status --porcelain=v1 --untracked-files=all -- "$path"); then
-      echo "STOP: path status could not be inspected: $path" >&2
+    if ! path_status=$(git -C "$repo" status --porcelain=v1 --untracked-files=all -- "$commit_path"); then
+      echo "STOP: path status could not be inspected: $commit_path" >&2
       return 66
     fi
     if [ -z "$path_status" ]; then
-      echo "STOP: explicit path has no pending or staged change: $path" >&2
+      echo "STOP: explicit path has no pending or staged change: $commit_path" >&2
       return 67
     fi
   done
@@ -212,14 +215,14 @@ stage_and_commit_or_stop() {
     echo "STOP: git add failed; commit was not attempted" >&2
     return 68
   fi
-  for path in "$@"; do
-    if git -C "$repo" diff --cached --quiet --exit-code -- "$path"; then
-      echo "STOP: explicit path has no staged content: $path" >&2
+  for commit_path in "$@"; do
+    if git -C "$repo" diff --cached --quiet --exit-code -- "$commit_path"; then
+      echo "STOP: explicit path has no staged content: $commit_path" >&2
       return 69
     else
       local path_diff_rc=$?
       if [ "$path_diff_rc" -ne 1 ]; then
-        echo "STOP: staged content could not be inspected for: $path" >&2
+        echo "STOP: staged content could not be inspected for: $commit_path" >&2
         return 70
       fi
     fi
@@ -244,6 +247,7 @@ stage_and_commit_or_stop() {
 
 > **Двойной сторож коммита (#511, дважды воспроизведённый класс «git mv + правка → пустой/устаревший дифф»):** механизм 21.08 доказан — `git mv` уже положил rename в индекс, правка нового пути осталась только в worktree, `git add` старого пути упал, но отдельный commit проигнорировал ошибку и зафиксировал прежний staged rename. Функция выше устраняет именно этот путь: commit недостижим после failed add. Механизм 18.08 по имеющейся фактуре всё ещё не установлен, поэтому issue остаётся открытым.
 > 1. ПЕРЕД commit: функция сначала запрещает staged-пути вне явного списка, затем сама проверяет код `git add`, непустой общий staged diff и непустой staged-контент каждого явно переданного пути (`git diff --cached -- <path>`). `git add -- <явные пути>` после этой проверки не может добавить чужой путь; повторная проверка по именам после add дала бы ложный отказ для rename, который Git переклассифицировал в delete+add после изменения содержимого. Не повторять commit вручную после отказа функции.
+> 1a. **После `git mv` в этом же ходе передавать ТОЛЬКО новый (текущий) путь файла** — старый путь больше не существует на диске, `git add` по нему падает (код 68) и коммит корректно останавливается. Для staged-rename проверка области видимости сверяет обе стороны переименования и принимает новый путь (issue #557, замечание к архивации DayPlan).
 > 2. ПОСЛЕ commit: сверить, что правки реально в HEAD — `git show HEAD --stat` содержит перемещённый файл, и `git diff HEAD -- <файл>` пуст (на диске нет незакоммиченных остатков правок).
 > 3. Любое срабатывание → СТОП + собрать диагностику в отчёт дня: `git status`, `git diff`, `git log -1 --stat`, точная последовательность выполненных команд — и сообщить пилоту. Индекс намеренно не сбрасывать автоматически: там может быть доказательство инцидента или ранее сделанный `git mv`. После диагностики исправить список путей и повторить единую функцию. Это материал для установления корня #511.
 
