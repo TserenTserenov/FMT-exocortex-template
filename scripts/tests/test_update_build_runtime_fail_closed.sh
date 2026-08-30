@@ -244,6 +244,8 @@ cp "$ROOT/seed/strategy/scripts/agent_fault_remind.py" \
     "$SCRIPT_DIR/seed/strategy/scripts/agent_fault_remind.py"
 cp "$ROOT/seed/strategy/scripts/agent_fault_remind.sh" \
     "$SCRIPT_DIR/seed/strategy/scripts/agent_fault_remind.sh"
+cp "$ROOT/seed/strategy/scripts/generate-executor-catalog.py" \
+    "$SCRIPT_DIR/seed/strategy/scripts/generate-executor-catalog.py"
 cp "$ROOT/scripts/agent-fault/iwe_checklist_memory.py" \
     "$SCRIPT_DIR/scripts/agent-fault/iwe_checklist_memory.py"
 cp "$ROOT/scripts/lib/find-python3.sh" "$SCRIPT_DIR/scripts/lib/find-python3.sh"
@@ -261,6 +263,7 @@ chmod +x \
     "$SCRIPT_DIR/seed/strategy/scripts/sync_feedback_to_memory.py" \
     "$SCRIPT_DIR/seed/strategy/scripts/agent_fault_remind.py" \
     "$SCRIPT_DIR/seed/strategy/scripts/agent_fault_remind.sh" \
+    "$SCRIPT_DIR/seed/strategy/scripts/generate-executor-catalog.py" \
     "$SCRIPT_DIR/scripts/agent-fault/iwe_checklist_memory.py" \
     "$SCRIPT_DIR/scripts/lib/find-python3.sh" \
     "$SCRIPT_DIR/scripts/generate-executor-catalog.py" \

@@ -16,6 +16,7 @@ set -uo pipefail
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SELF_DIR")"
 PIPELINE="$REPO_ROOT/scripts/day-open-pipeline.sh"
+DAY_OPEN_SCAFFOLD_SCRIPT="${DAY_OPEN_SCAFFOLD_SCRIPT:-$REPO_ROOT/scripts/day-open-scaffold.sh}"
 SEED_SCRIPTS="$REPO_ROOT/seed/strategy/scripts"
 MANIFEST="$REPO_ROOT/update-manifest.json"
 
@@ -264,6 +265,54 @@ else
   fail "stale inherited workspace identity escaped into snapshot updater"
 fi
 rm -rf "$PIPELINE_ENV_FIXTURE"
+
+# --- 2f. Content-cleanup output excludes resolved archive sections -----------
+# Run the actual delivered function, with an override for checking the author
+# runtime source through the same fixture. Closed CC entries retain their
+# <summary> markup, so the section boundary—not a ✅ marker—is the contract.
+echo "=== 2f. Content-cleanup archive boundaries ==="
+CONTENT_CLEANUP_FIXTURE=$(mktemp -d)
+CONTENT_CLEANUP_GOV="$CONTENT_CLEANUP_FIXTURE/custom-governance"
+CONTENT_CLEANUP_FILE="$CONTENT_CLEANUP_GOV/current/content-cleanup-backlog.md"
+CONTENT_CLEANUP_DRIVER="$CONTENT_CLEANUP_FIXTURE/render-content-cleanup.sh"
+mkdir -p "$(dirname "$CONTENT_CLEANUP_FILE")"
+
+CONTENT_CLEANUP_START=$(grep -n '^render_content_cleanup()' "$DAY_OPEN_SCAFFOLD_SCRIPT" | head -1 | cut -d: -f1)
+CONTENT_CLEANUP_END=$(grep -n '^render_attention()' "$DAY_OPEN_SCAFFOLD_SCRIPT" | head -1 | cut -d: -f1)
+if [ -z "$CONTENT_CLEANUP_START" ] || [ -z "$CONTENT_CLEANUP_END" ] \
+    || [ "$CONTENT_CLEANUP_START" -ge "$CONTENT_CLEANUP_END" ]; then
+  fail "render_content_cleanup() extraction markers not found in $DAY_OPEN_SCAFFOLD_SCRIPT"
+else
+  pass "render_content_cleanup() extracted from the runtime script"
+  {
+    echo '#!/bin/bash'
+    echo "IWE=\"$CONTENT_CLEANUP_FIXTURE\""
+    echo 'IWE_GOVERNANCE_REPO="custom-governance"'
+    sed -n "${CONTENT_CLEANUP_START},$((CONTENT_CLEANUP_END - 2))p" "$DAY_OPEN_SCAFFOLD_SCRIPT"
+    echo 'render_content_cleanup'
+  } > "$CONTENT_CLEANUP_DRIVER"
+
+  check_content_cleanup_boundary() {
+    boundary="$1"
+    cat > "$CONTENT_CLEANUP_FILE" <<EOF
+<details><summary><strong>CC-201 — открытый сигнал</strong></summary></details>
+## $boundary
+<details><summary><strong>CC-202 — закрытый сигнал</strong></summary></details>
+EOF
+    output=$(bash "$CONTENT_CLEANUP_DRIVER")
+    if echo "$output" | grep -q 'CC-201 — открытый сигнал' \
+        && ! echo "$output" | grep -q 'CC-202 — закрытый сигнал' \
+        && echo "$output" | grep -q '\*\*1 на разбор\*\*'; then
+      pass "content cleanup stops at the first ## $boundary boundary"
+    else
+      fail "content cleanup leaked a resolved entry across ## $boundary: $output"
+    fi
+  }
+
+  check_content_cleanup_boundary "Архив"
+  check_content_cleanup_boundary "Разобрано"
+fi
+rm -rf "$CONTENT_CLEANUP_FIXTURE"
 
 # --- 3. Entry points run from a foreign cwd with a clean PYTHONPATH -----------
 echo "=== 3. Foreign-cwd smoke (clean PYTHONPATH) ==="

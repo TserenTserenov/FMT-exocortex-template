@@ -1460,6 +1460,10 @@ backfill_day_open_fault_reader() {
     backfill_governance_seed_script "scripts/day-open-llm-fill.py"
 }
 
+backfill_executor_catalog_generator() {
+    backfill_governance_seed_script "scripts/generate-executor-catalog.py"
+}
+
 # #533: update is the one reliable point at which an existing private fault
 # profile can be brought onto the current schema and permission contract.  The
 # canonical CLI's no-create observational `stats` command is used here: it
@@ -1542,6 +1546,13 @@ run_post_apply_backfills_or_die() {
     echo "Derived snapshot updater (upgrade backfill)..."
     if ! backfill_derived_snapshot_updater; then
         echo "  ОШИБКА: governance snapshot updater не обновлён; обновление оставлено незавершённым." >&2
+        return 1
+    fi
+
+    echo ""
+    echo "Executor catalog generator (upgrade backfill)..."
+    if ! backfill_executor_catalog_generator; then
+        echo "  ОШИБКА: generator executor catalog не обновлён; обновление оставлено незавершённым." >&2
         return 1
     fi
 
@@ -1644,10 +1655,11 @@ print_extra_write_targets() {
     echo "  • $governance_dir/.githooks/pre-commit и pre-push — platform hooks"
     echo "  • $governance_dir/scripts/day-open-llm-fill.py — platform reader профиля ошибок для Day Open"
     echo "  • $governance_dir/scripts/update-derived-snapshot.py — обновлятор derived snapshot"
+    echo "  • $governance_dir/scripts/generate-executor-catalog.py — генератор каталога исполнителей"
     echo "  • $governance_dir/scripts/executor-catalog.yaml — каталог исполнителей"
     echo "  • $governance_dir/exocortex/agent-fault-profile/ — только миграция/права существующей приватной БД; отсутствующий профиль не создаётся"
     echo "    Symlink-пути блокируют backfill. Отличающиеся installer/hooks сохраняются в .git/hook-backups/ и заменяются."
-    echo "    Локально изменённые Day Open reader/snapshot updater блокируют обновление; executor-catalog.yaml — генерируемый файл и заменяется при смысловом расхождении."
+    echo "    Локально изменённые Day Open reader/snapshot updater/executor-catalog generator блокируют обновление; executor-catalog.yaml — генерируемый файл и заменяется при смысловом расхождении."
     echo "  Расхождение рабочей копии с шаблоном чинится независимо от списков выше."
     echo ""
 }

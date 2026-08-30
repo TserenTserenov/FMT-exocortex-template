@@ -218,7 +218,9 @@ CUSTOM_SKILLS="$CUSTOM_WORKSPACE/.claude/skills"
 CUSTOM_CATALOG="$CUSTOM_WORKSPACE/custom-governance/scripts/executor-catalog.yaml"
 mkdir -p "$CUSTOM_SKILLS"
 cp -R "$FAKE_HOME/IWE/.claude/skills/smoke-fixture" "$CUSTOM_SKILLS/"
-mkdir -p "$CUSTOM_SKILLS/agent-mode" "$CUSTOM_SKILLS/hybrid-mode"
+mkdir -p "$CUSTOM_SKILLS/agent-mode" "$CUSTOM_SKILLS/hybrid-mode" \
+    "$CUSTOM_SKILLS/skip-explicit" "$CUSTOM_SKILLS/skip-destructive" \
+    "$CUSTOM_SKILLS/skip-no-frontmatter" "$CUSTOM_SKILLS/skip-no-skill"
 cat > "$CUSTOM_SKILLS/agent-mode/SKILL.md" <<'EOF'
 ---
 name: agent-mode
@@ -238,6 +240,23 @@ routing:
   deterministic: false
 ---
 EOF
+cat > "$CUSTOM_SKILLS/skip-explicit/SKILL.md" <<'EOF'
+---
+name: skip-explicit
+description: Explicitly non-routable fixture.
+skip_reason: requires-pilot
+---
+EOF
+cat > "$CUSTOM_SKILLS/skip-destructive/SKILL.md" <<'EOF'
+---
+name: skip-destructive
+description: Interactive destructive fixture.
+destructive: true
+interactive: true
+---
+EOF
+printf 'Fixture without YAML frontmatter.\n' \
+    > "$CUSTOM_SKILLS/skip-no-frontmatter/SKILL.md"
 DIRECT_OUT=$(IWE_ROOT="$CUSTOM_WORKSPACE" IWE_GOVERNANCE_REPO=custom-governance \
     "$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" 2>&1)
 DIRECT_STATUS=$?
@@ -267,6 +286,33 @@ if echo "$AGENT_ROUTE" | grep -q 'ROUTE_TO_AGENT skill=agent-mode model=sonnet' 
 else
     fail "compound executor dispatch mismatch: agent=[$AGENT_ROUTE] hybrid=[$HYBRID_ROUTE]"
 fi
+if "$RESOLVED" - "$CUSTOM_CATALOG" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    catalog = yaml.safe_load(stream)
+
+expected = {
+    "skip-explicit": "requires-pilot",
+    "skip-destructive": "destructive-interactive",
+    "skip-no-frontmatter": "no-frontmatter",
+    "skip-no-skill": "no-SKILL.md",
+}
+actual = {
+    item["name"]: item["skip_reason"]
+    for item in catalog["skipped"]
+    if set(item) == {"name", "skip_reason"}
+}
+assert catalog["reflexes"] == []
+assert actual == expected, (actual, expected)
+assert catalog["skipped_no_routing"] == len(expected)
+PY
+then
+    pass "fresh catalog contains empty reflexes and detailed skip records"
+else
+    fail "fresh catalog lost detailed skip records or did not initialize reflexes"
+fi
 
 DIRECT_CATALOG_COPY="$TEST_ROOT/direct-catalog-first.yaml"
 cp "$CUSTOM_CATALOG" "$DIRECT_CATALOG_COPY"
@@ -278,6 +324,83 @@ if [ "$DIRECT_SECOND_STATUS" -eq 0 ] && cmp -s "$DIRECT_CATALOG_COPY" "$CUSTOM_C
     pass "unchanged executor input keeps catalog byte-stable across reruns"
 else
     fail "unchanged direct generator rewrote catalog (status=$DIRECT_SECOND_STATUS): $DIRECT_SECOND_OUT"
+fi
+
+echo "--- generator state boundary: preserve only reflexes and fail closed on bad output ---"
+"$RESOLVED" - "$CUSTOM_CATALOG" <<'PY'
+import sys
+import yaml
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as stream:
+    catalog = yaml.safe_load(stream)
+catalog["reflexes"] = [{"trigger": "fixture", "action": "preserve"}]
+catalog["foreign_runtime_section"] = [{"must": "drop"}]
+catalog["total_entries"] = 999
+catalog["entries"] = []
+catalog["skipped"] = []
+with open(path, "w", encoding="utf-8") as stream:
+    yaml.safe_dump(catalog, stream, allow_unicode=True, sort_keys=False)
+PY
+PRESERVE_OUT=$(IWE_ROOT="$CUSTOM_WORKSPACE" IWE_GOVERNANCE_REPO=custom-governance \
+    "$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" 2>&1)
+PRESERVE_STATUS=$?
+if [ "$PRESERVE_STATUS" -eq 0 ] && "$RESOLVED" - "$CUSTOM_CATALOG" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    catalog = yaml.safe_load(stream)
+assert catalog["reflexes"] == [{"trigger": "fixture", "action": "preserve"}]
+assert "foreign_runtime_section" not in catalog
+assert catalog["total_entries"] == 3
+assert {entry["name"] for entry in catalog["entries"]} == {
+    "agent-mode", "hybrid-mode", "smoke-fixture"
+}
+assert len(catalog["skipped"]) == 4
+PY
+then
+    pass "regeneration preserves only reflexes and rebuilds every derived field"
+else
+    fail "preserved-state boundary mismatch (status=$PRESERVE_STATUS): $PRESERVE_OUT"
+fi
+
+assert_invalid_catalog_rejected() {
+    local label="$1"
+    local content="$2"
+    local invalid_path="$TEST_ROOT/invalid-$label.yaml"
+    local before_path="$TEST_ROOT/invalid-$label.before"
+    local invalid_out invalid_status
+
+    printf '%s' "$content" > "$invalid_path"
+    cp "$invalid_path" "$before_path"
+    invalid_out=$(IWE_ROOT="$CUSTOM_WORKSPACE" IWE_GOVERNANCE_REPO=custom-governance \
+        "$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+        --skills-dir "$CUSTOM_SKILLS" --output "$invalid_path" 2>&1)
+    invalid_status=$?
+    if [ "$invalid_status" -ne 0 ] && cmp -s "$before_path" "$invalid_path"; then
+        pass "invalid existing catalog ($label) is rejected without byte changes"
+    else
+        fail "invalid existing catalog ($label) was accepted or modified (status=$invalid_status): $invalid_out"
+    fi
+}
+
+assert_invalid_catalog_rejected "yaml" $'reflexes: [\n'
+assert_invalid_catalog_rejected "nonmapping" $'- item\n'
+assert_invalid_catalog_rejected "missing-reflexes" $'schema_version: "1.0"\n'
+assert_invalid_catalog_rejected "nonlist-reflexes" $'reflexes: {}\n'
+
+VALIDATE_OUTPUT="$TEST_ROOT/validate-input-only.yaml"
+printf 'reflexes: [\n' > "$VALIDATE_OUTPUT"
+cp "$VALIDATE_OUTPUT" "$VALIDATE_OUTPUT.before"
+VALIDATE_OUT=$(IWE_ROOT="$CUSTOM_WORKSPACE" IWE_GOVERNANCE_REPO=custom-governance \
+    "$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --validate --skills-dir "$CUSTOM_SKILLS" --output "$VALIDATE_OUTPUT" 2>&1)
+VALIDATE_STATUS=$?
+if [ "$VALIDATE_STATUS" -eq 0 ] && cmp -s "$VALIDATE_OUTPUT.before" "$VALIDATE_OUTPUT"; then
+    pass "--validate checks input only and leaves an invalid output path untouched"
+else
+    fail "--validate read or changed the output path (status=$VALIDATE_STATUS): $VALIDATE_OUT"
 fi
 
 echo "--- update.sh backfill: same resolved Python and explicit installed paths ---"
@@ -293,7 +416,8 @@ awk '
   capture { print }
 ' "$ROOT/update.sh" > "$UPDATE_FUNCTIONS"
 if ! grep -q '^backfill_executor_catalog()' "$UPDATE_FUNCTIONS" \
-    || ! grep -q '^backfill_derived_snapshot_updater()' "$UPDATE_FUNCTIONS"; then
+    || ! grep -q '^backfill_derived_snapshot_updater()' "$UPDATE_FUNCTIONS" \
+    || ! grep -q '^backfill_executor_catalog_generator()' "$UPDATE_FUNCTIONS"; then
     fail "could not extract update backfill functions"
 fi
 
@@ -308,6 +432,7 @@ UPDATE_SNIPPET="$TEST_ROOT/update-catalog-snippet.sh"
     cat "$UPDATE_FUNCTIONS"
     echo 'EFFECTIVE_GOVERNANCE_REPO=$(effective_governance_repo)'
     echo "backfill_derived_snapshot_updater"
+    echo "backfill_executor_catalog_generator"
     echo "backfill_executor_catalog"
 } > "$UPDATE_SNIPPET"
 chmod +x "$UPDATE_SNIPPET"
@@ -341,6 +466,38 @@ if cmp -s "$ROOT/seed/strategy/scripts/update-derived-snapshot.py" \
 else
     fail "governance snapshot updater stayed on the old literal-path implementation"
 fi
+if cmp -s "$ROOT/scripts/generate-executor-catalog.py" \
+        "$ROOT/seed/strategy/scripts/generate-executor-catalog.py" \
+    && cmp -s "$ROOT/seed/strategy/scripts/generate-executor-catalog.py" \
+        "$UPDATE_GOVERNANCE/scripts/generate-executor-catalog.py"; then
+    pass "setup source, seed payload, and update-backfilled generator are byte-identical"
+else
+    fail "executor catalog generator drifted between setup, seed, and update backfill"
+fi
+SETUP_CATALOG="$FAKE_HOME/IWE/irrelevant-for-this-snippet/scripts/executor-catalog.yaml"
+if "$RESOLVED" - "$SETUP_CATALOG" "$UPDATE_CATALOG" <<'PY'
+import sys
+import yaml
+
+catalogs = []
+for path in sys.argv[1:]:
+    with open(path, encoding="utf-8") as stream:
+        catalog = yaml.safe_load(stream)
+    catalog.pop("generated_at", None)
+    catalogs.append(catalog)
+assert catalogs[0] == catalogs[1], catalogs
+PY
+then
+    pass "fresh setup and update backfill generate the same semantic catalog"
+else
+    fail "fresh setup and update backfill catalog payloads differ"
+fi
+if grep -Fq '"path": "seed/strategy/scripts/generate-executor-catalog.py"' \
+    "$ROOT/update-manifest.json"; then
+    pass "update manifest delivers the seed generator required by backfill"
+else
+    fail "update manifest omits the seed generator required by backfill"
+fi
 if [ ! -e "$UPDATE_WORKSPACE/DS-strategy" ]; then
     pass ".exocortex governance value wins without exported IWE_GOVERNANCE_REPO"
 else
@@ -348,7 +505,8 @@ else
 fi
 
 git -C "$UPDATE_GOVERNANCE" add -- \
-    scripts/executor-catalog.yaml scripts/update-derived-snapshot.py
+    scripts/executor-catalog.yaml scripts/generate-executor-catalog.py \
+    scripts/update-derived-snapshot.py
 git -C "$UPDATE_GOVERNANCE" commit -qm "accept first update backfill"
 UPDATE_CATALOG_COPY="$TEST_ROOT/update-catalog-first.yaml"
 cp "$UPDATE_CATALOG" "$UPDATE_CATALOG_COPY"

@@ -58,52 +58,53 @@ def load_registry_kind_ids():
     ids = {m.group(1) for line in lines if (m := KIND_ID_LINE_RE.match(line))}
     return ids or None
 
-# Третий элемент — expected kind_id (WP-481 Ф7). Единственный источник карты
-# task_type → kind_id: держать её здесь, не в параллельном словаре, который
-# может разойтись с KEYWORD_MAP. None + запись в SPECIAL_RESOLUTION — для двух
-# осознанных исключений (peer_session, spec_writing), не «забыли заполнить».
+# Третий элемент — expected kind_id (WP-481 Ф7), четвёртый — название
+# артефакта. Оба значения живут в одной карте: отдельный словарь названий
+# незаметно разошёлся бы с маршрутизацией. None + запись в SPECIAL_RESOLUTION
+# — для двух осознанных исключений (peer_session, spec_writing), не «забыли
+# заполнить».
 KEYWORD_MAP = {
     # trivial — WorkDone: детерминированный трейс завершённого протокола
-    "day-open": ("day_open", "trivial", "WorkDone"),
-    "day open": ("day_open", "trivial", "WorkDone"),
-    "открывай день": ("day_open", "trivial", "WorkDone"),
-    "week-close": ("week_close", "trivial", "WorkDone"),
-    "week close": ("week_close", "trivial", "WorkDone"),
-    "закрывай неделю": ("week_close", "trivial", "WorkDone"),
-    "month-close": ("month_close", "trivial", "WorkDone"),
-    "peer-сессия": ("peer_session", "trivial", None),  # SPECIAL_RESOLUTION: deferred-to-session
-    "peer сессия": ("peer_session", "trivial", None),
+    "day-open": ("day_open", "trivial", "WorkDone", "План дня"),
+    "day open": ("day_open", "trivial", "WorkDone", "План дня"),
+    "открывай день": ("day_open", "trivial", "WorkDone", "План дня"),
+    "week-close": ("week_close", "trivial", "WorkDone", "Итоги недели"),
+    "week close": ("week_close", "trivial", "WorkDone", "Итоги недели"),
+    "закрывай неделю": ("week_close", "trivial", "WorkDone", "Итоги недели"),
+    "month-close": ("month_close", "trivial", "WorkDone", "Итоги месяца"),
+    "peer-сессия": ("peer_session", "trivial", None, "Итоговый отчёт пир-сессии"),  # SPECIAL_RESOLUTION: deferred-to-session
+    "peer сессия": ("peer_session", "trivial", None, "Итоговый отчёт пир-сессии"),
     # closed-loop
-    "бот упал": ("bot_fix", "closed-loop", "WorkDone"),
-    "ошибк бота": ("bot_fix", "closed-loop", "WorkDone"),     # matches «ошибка» and «ошибки»
-    "фиксы": ("bug_fix", "closed-loop", "WorkDone"),
-    "устранить": ("bug_fix", "closed-loop", "WorkDone"),
-    "доделать рп": ("wp_finish", "closed-loop", "WorkDone"),
-    "хвосты рп": ("wp_finish", "closed-loop", "WorkDone"),
-    "закрыть рп": ("wp_close", "closed-loop", "WorkDone"),
-    "передать андрею": ("wp_close", "closed-loop", "WorkDone"),
-    "актуализация wp": ("wp_actualize", "closed-loop", "WorkDone"),
-    "ревью рп": ("code_review", "closed-loop", "Episteme"),
-    "ревью работы": ("code_review", "closed-loop", "Episteme"),
-    "разбор ke": ("ke_review", "closed-loop", "ChoiceResult"),  # R15 accept/reject/defer, не граф claim'ов
-    "триаж": ("wp_triage", "closed-loop", "ChoiceResult"),
-    "реализация плана": ("wp_implement", "closed-loop", "WorkDone"),
-    "миграция": ("wp_implement", "closed-loop", "WorkDone"),
-    "создай pack": ("pack_create", "closed-loop", "Episteme"),
-    "новый pack": ("pack_create", "closed-loop", "Episteme"),
-    "ротация секретов": ("ops_security", "closed-loop", "WorkDone"),
-    "fmt remaining": ("fmt_deploy", "closed-loop", "WorkDone"),
+    "бот упал": ("bot_fix", "closed-loop", "WorkDone", "Исправление бота"),
+    "ошибк бота": ("bot_fix", "closed-loop", "WorkDone", "Исправление бота"),     # matches «ошибка» and «ошибки»
+    "фиксы": ("bug_fix", "closed-loop", "WorkDone", "Исправление дефекта"),
+    "устранить": ("bug_fix", "closed-loop", "WorkDone", "Исправление дефекта"),
+    "доделать рп": ("wp_finish", "closed-loop", "WorkDone", "Завершённая фаза РП"),
+    "хвосты рп": ("wp_finish", "closed-loop", "WorkDone", "Завершённая фаза РП"),
+    "закрыть рп": ("wp_close", "closed-loop", "WorkDone", "Отчёт о закрытии РП"),
+    "передать андрею": ("wp_close", "closed-loop", "WorkDone", "Переданный результат РП"),
+    "актуализация wp": ("wp_actualize", "closed-loop", "WorkDone", "Актуализированная карточка РП"),
+    "ревью рп": ("code_review", "closed-loop", "Episteme", "Отчёт ревью"),
+    "ревью работы": ("code_review", "closed-loop", "Episteme", "Отчёт ревью"),
+    "разбор ke": ("ke_review", "closed-loop", "ChoiceResult", "Решение по кандидатам знаний"),  # R15 accept/reject/defer, не граф claim'ов
+    "триаж": ("wp_triage", "closed-loop", "ChoiceResult", "Решение по триажу РП"),
+    "реализация плана": ("wp_implement", "closed-loop", "WorkDone", "Реализованный план"),
+    "миграция": ("wp_implement", "closed-loop", "WorkDone", "Миграция"),
+    "создай pack": ("pack_create", "closed-loop", "Episteme", "Паспорт Pack"),
+    "новый pack": ("pack_create", "closed-loop", "Episteme", "Паспорт Pack"),
+    "ротация секретов": ("ops_security", "closed-loop", "WorkDone", "Ротированные секреты"),
+    "fmt remaining": ("fmt_deploy", "closed-loop", "WorkDone", "Доставленный шаблон"),
     # open-loop
-    "диагностика": ("diagnosis", "open-loop", "Episteme"),
-    "темы для пост": ("content_plan", "open-loop", "ChoiceResult"),   # matches «поста» and «постов»; выбор темы+аудитории+дня, не просто перечень
-    "темы, идеи": ("content_plan", "open-loop", "ChoiceResult"),
-    "темы идеи": ("content_plan", "open-loop", "ChoiceResult"),
-    "сценарии тз": ("spec_writing", "open-loop", None),  # SPECIAL_RESOLUTION: unresolved — ни один из 6 kind-ов не подходит (найдено на WP-421)
-    "стратег": ("strategy", "open-loop", "ChoiceResult"),
+    "диагностика": ("diagnosis", "open-loop", "Episteme", "Диагностический отчёт"),
+    "темы для пост": ("content_plan", "open-loop", "ChoiceResult", "План публикаций"),   # matches «поста» and «постов»; выбор темы+аудитории+дня, не просто перечень
+    "темы, идеи": ("content_plan", "open-loop", "ChoiceResult", "План публикаций"),
+    "темы идеи": ("content_plan", "open-loop", "ChoiceResult", "План публикаций"),
+    "сценарии тз": ("spec_writing", "open-loop", None, "Техническое задание"),  # SPECIAL_RESOLUTION: unresolved — ни один из 6 kind-ов не подходит (найдено на WP-421)
+    "стратег": ("strategy", "open-loop", "ChoiceResult", "Актуализированная стратегия"),
     # problem-framing
-    "придумать": ("design", "problem-framing", "ProblemCard"),
-    "что-то с": ("design", "problem-framing", "ProblemCard"),
-    "надо что-то": ("design", "problem-framing", "ProblemCard"),
+    "придумать": ("design", "problem-framing", "ProblemCard", "Карточка проблемы"),
+    "что-то с": ("design", "problem-framing", "ProblemCard", "Карточка проблемы"),
+    "надо что-то": ("design", "problem-framing", "ProblemCard", "Карточка проблемы"),
 }
 
 # task_type → почему expected_result_kind = None. Единственное легитимное
@@ -121,14 +122,16 @@ BUDGET_BY_CLASS = {
 }
 
 
-def classify(text: str) -> tuple[str, str, str]:
-    """Return (task_type, cls, kind_id) or (None, None, None). kind_id may be
-    None (see SPECIAL_RESOLUTION) even when task_type matched."""
+def classify(text: str) -> tuple[str, str, str | None, str] | tuple[None, None, None, None]:
+    """Return (task_type, cls, kind_id, artifact) or four None values.
+
+    kind_id may be None (see SPECIAL_RESOLUTION) even when task_type matched.
+    """
     lower = text.lower()
-    for kw, (task_type, cls, kind_id) in KEYWORD_MAP.items():
+    for kw, (task_type, cls, kind_id, artifact) in KEYWORD_MAP.items():
         if kw in lower:
-            return task_type, cls, kind_id
-    return None, None, None
+            return task_type, cls, kind_id, artifact
+    return None, None, None, None
 
 
 def resolve_result_kind(task_type: str, kind_id: str | None) -> tuple[str | None, str]:
@@ -172,13 +175,13 @@ def main() -> None:
 
     # Keyword check first — short protocol triggers (e.g. "day-open") must be recognised
     # before the length guard fires.
-    task_type, cls, kind_id = classify(text)
+    task_type, cls, kind_id, artifact = classify(text)
     if task_type is not None:
         expected_result_kind, result_kind_resolution = resolve_result_kind(task_type, kind_id)
         result = {
             "task_type": task_type,
             "class": cls,
-            "artifact": "",
+            "artifact": artifact,
             "budget_estimate": BUDGET_BY_CLASS.get(cls, "?"),
             "confidence": "high",
             "routing_tag": task_type,

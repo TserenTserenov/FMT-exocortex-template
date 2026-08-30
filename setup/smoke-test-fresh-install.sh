@@ -593,6 +593,35 @@ else
     else
         fail "e2e full mode: executor catalog is absent or untracked"
     fi
+    if git -C "$E2E_GOV10" ls-files --error-unmatch -- \
+            scripts/generate-executor-catalog.py >/dev/null 2>&1 \
+        && cmp -s "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" \
+            "$E2E_GOV10/scripts/generate-executor-catalog.py"; then
+        pass "e2e full mode: installed catalog generator matches the template source"
+    else
+        fail "e2e full mode: installed catalog generator is absent, untracked, or drifted"
+    fi
+    if [ -n "${SMOKE_PYTHON:-}" ] && \
+        "$SMOKE_PYTHON" - "$E2E_GOV10/scripts/executor-catalog.yaml" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    catalog = yaml.safe_load(stream)
+assert catalog["reflexes"] == []
+assert catalog["skipped_no_routing"] == len(catalog["skipped"])
+assert all(
+    set(item) == {"name", "skip_reason"}
+    and isinstance(item["name"], str)
+    and isinstance(item["skip_reason"], str)
+    for item in catalog["skipped"]
+)
+PY
+    then
+        pass "e2e full mode: fresh catalog has detailed skips and empty reflexes"
+    else
+        fail "e2e full mode: fresh catalog state schema is incomplete"
+    fi
     E2E_ROUTE_OUT=$(IWE_EXECUTOR_CATALOG="$E2E_GOV10/scripts/executor-catalog.yaml" \
         bash "$TEMPLATE_DIR/scripts/route-task.sh" --validate 2>&1) || E2E_ROUTE_RC=$?
     E2E_ROUTE_RC="${E2E_ROUTE_RC:-0}"

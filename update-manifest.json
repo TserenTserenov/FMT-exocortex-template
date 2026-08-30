@@ -1077,7 +1077,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "ab0d1f026bd9f8b1b1e2a8af4884a5faf8c860be40ee6de46449e26cd8d7c100"
+      "sha256": "21463b0ddacde3ed8b9df6649e9d0d949c57c6b7c83a849a01cbf00555a835fd"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1953,7 +1953,7 @@
     },
     {
       "path": "scripts/artifactor.py",
-      "sha256": "4b4098e2ea3568b5e13e314ded98f82a910ad174ca86f7729502cde65c31c594"
+      "sha256": "1f15087c32da05fe1a929c8e1ad078ea3fdee950240facce206a5aee32919dd0"
     },
     {
       "path": "scripts/attestation-build-statement.sh",
@@ -2173,7 +2173,7 @@
     },
     {
       "path": "scripts/generate-executor-catalog.py",
-      "sha256": "8f8d7f3862d7fb21c4f0a2eab19eedf4b5bfa9afc00b96e60462cc50262040a6"
+      "sha256": "775b126e54d95531c9abc2f8ac97534ec92cdba312764356431bb149ed2c7145"
     },
     {
       "path": "scripts/generate-hot-files-list.sh",
@@ -2613,7 +2613,7 @@
     },
     {
       "path": "scripts/tests/test_issue_463_setup_reuses_resolved_python3.sh",
-      "sha256": "f8f8205ad1ed364d39a97407af27a82252724d05c5a5de7edca30d91648cfa83"
+      "sha256": "2f57fc6e6ace9c4bac9c13a7e1e2865b7c26f50f0bf8bc0778a276a266a7ee20"
     },
     {
       "path": "scripts/tests/test_issue_469_settings_merge_hook_identity.py",
@@ -2629,7 +2629,7 @@
     },
     {
       "path": "scripts/tests/test_issue_473_wp_sync_bundle_status.sh",
-      "sha256": "d0089cbef011707d4ac4a04a302dd7285d49ed55d57355b975a2d30aa00738ce"
+      "sha256": "b6cf4944b3902cc9e2063a0159858bb7c681c38714e34870146b932a6d45949e"
     },
     {
       "path": "scripts/tests/test_issue_511_day_close_commit_guard.sh",
@@ -2669,7 +2669,7 @@
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
-      "sha256": "610bdb4af8d97fe3c66c84323518590279c49ac33f2603ed548b3c61b3634917"
+      "sha256": "f1fc7a6ad4233f71ec5d259a2ac5473bf62db39df2dc379b586169e09ab197f5"
     },
     {
       "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
@@ -2772,6 +2772,10 @@
       "sha256": "a6179a0d089486a9685b94964a56ed66cbe8791b9ee50c25a6a9ecd4bc0d32d1"
     },
     {
+      "path": "seed/strategy/scripts/generate-executor-catalog.py",
+      "sha256": "775b126e54d95531c9abc2f8ac97534ec92cdba312764356431bb149ed2c7145"
+    },
+    {
       "path": "seed/strategy/scripts/install-hooks.sh",
       "sha256": "516c29f4fe4c41723b714d244c508bdcc8143032331a56eb4666461b2851a9d4"
     },
@@ -2833,7 +2837,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "489ec46304d6d8d4eafe8cbeb5c97e62085f7ff18ddf7ca849c6512702f2c178"
+      "sha256": "8bca5933d5bc5cd905ef6109fd12e67fa95e07190b1286baacda3536f33e0c02"
     }
   ],
   "excluded_paths": [

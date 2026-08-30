@@ -131,6 +131,7 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     # #533: existing installations need the subject-scoped Day Open reader.
     "seed/strategy/scripts/day-open-llm-fill.py"
     "seed/strategy/scripts/update-derived-snapshot.py"
+    "seed/strategy/scripts/generate-executor-catalog.py"
 )
 # #533: unlike ordinary seed content, these are platform-owned delivery and
 # upgrade infrastructure.  Keep each path explicit so the blanket seed/
