@@ -289,7 +289,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "3868726466047addb13df7524aafbe469e38ef42dbbb8c45b26ff68f621a6063"
+      "sha256": "d52f42e2e946e035b1e8fd3c411e75d25cd014f470dbb106a73c37885b19f304"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -497,7 +497,7 @@
     },
     {
       "path": ".claude/skills/lesson-close/SKILL.md",
-      "sha256": "cbb62662634ad282bc6773ba34a101542123be2f75ef4b62d0cec0aa7dca27d6"
+      "sha256": "cbcb057371f7dc02c7322316662045956a85a88354b5eb4c8095558eda820949"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -533,7 +533,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
-      "sha256": "a8b3cbf4b31dd603095e3b260cda86bf714f27628ae6fce4d8b40c1520765a26"
+      "sha256": "31e9da0c4ce0540ba53ad8a0d7e195addb326543240032f120a850da76ecd526"
     },
     {
       "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
@@ -541,7 +541,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-start/SKILL.md",
-      "sha256": "68782ad4332015d0c01d1877042e35459aec944c1327fe25e654f855778b10dd"
+      "sha256": "072e63fdfccea99d768e0b0fa3c1b4a28274d41d0740c4bae5192cd55965af2f"
     },
     {
       "path": ".claude/skills/platform-bottleneck/SKILL.md",
@@ -669,7 +669,7 @@
     },
     {
       "path": ".claude/skills/week-close-pilot/SKILL.md",
-      "sha256": "5b0ff7a1f2d462722aa0dfb006c82842fe8c87da5c12f7600d55854784d86757"
+      "sha256": "7702849a06589ed7ca5c9de7b1371f9266d4e94ea944cc38d669b29021f39336"
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
@@ -841,7 +841,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "639fed47620b7a26ad5951f21a0a993134c2e56dafc3841d70ac92a056f05dd3"
+      "sha256": "4a4d388ec10cac79ce0ccea0d61c2ea0c9175b961a862ba375b1d7f9c68b164d"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -937,7 +937,7 @@
     },
     {
       "path": "docs/skills-catalog.md",
-      "sha256": "71cc1326718812f3b7ef1689b798dafd3d873205529bb522f0769056d836e17c"
+      "sha256": "95f6f2036cab1a21c1a710965cd29d8947c80692c526078b185ae363d216d052"
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
@@ -2137,7 +2137,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "1c4b8e030fa943c671f7d921df586b552c8a22450b1ecb653ea1365bc7e0e21e"
+      "sha256": "382a4b93acf9eb84932fbc7604f04f37bcd3187b9f3fa49452c031a70d22094f"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2585,7 +2585,7 @@
     },
     {
       "path": "scripts/tests/test_hindsight_docs_contract.sh",
-      "sha256": "6a9150003c9384abebb31af4861bc7bea0a9cb55b5a2042ad057207b90c72997"
+      "sha256": "042e7689fd88c3eaa1f5d02f9ea46310536972ae5ab6780949edd68a1b793ba6"
     },
     {
       "path": "scripts/tests/test_hook_classification.sh",
