@@ -697,6 +697,17 @@ if [ "$CMD" = "close" ]; then
     break
   done
 
+  # WP-484 Ф118 / WP-530 Ф18 (порт из авторского source, 30.08.2026): сессия,
+  # открытая с "open --close-path peer-session", по определению никогда не
+  # создаёт RUN-quick-close-*.md — её протокол закрытия (DP.SC.154 Шаг
+  # 4.5.1/4.5.2) прямой git commit, не раннер. Без этого обхода close требовал
+  # у пир-сессии карточку чужого ритуала (живой отказ 30.08). close_path
+  # записан этим же скриптом при open — достаточное свидетельство.
+  if [ -z "$RUNNER_OK" ] && grep -q '^close_path: peer-session$' "$SEM_FILE" 2>/dev/null; then
+    RUNNER_OK="declared-peer-session:$SLUG"
+    echo "Session CLOSE: close_path=peer-session объявлен при open — раннер не требуется (WP-484 Ф118)." >&2
+  fi
+
   # --force-no-reflection (WP-484, 08.08, пилот): рефлексия про настроение дня
   # блокирует close, даже когда содержательная работа (commit+push) уже
   # подтверждена картой раннера — живой разбор показал, что вопрос рефлексии
