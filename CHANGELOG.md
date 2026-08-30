@@ -147,6 +147,25 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.39.1] — 2026-08-30
+
+Hotfix on top of v0.39.0: the cold-context review follow-up (PR #575,
+`084a381`) merged one commit after the v0.39.0 release cut and did not make
+the tag — v0.39.0 ships a known regression it fixes.
+
+### Fixed
+
+- `084a381` fix: cold-review follow-up — wire skip status, restore seed marker, 3 corrections
+  - **regression fix (#559):** day-close mapped a skipped optional step to
+    `fail` with exit 1 on installs without linear-sync/DS-MCP/pyyaml —
+    v0.39.0 fails every automated Day Close on such installs; now `skip`, rc 0
+  - seed snapshot day-open-scaffold.sh re-gains its SNAPSHOT marker (was
+    silently outside check-seed-drift coverage)
+  - peer-conversation declares `--close-path peer-session` at open (the
+    session-guard bypass was dead code in the template flow)
+  - kimi-peer-writer calls the real delivered preflight via `${IWE_SCRIPTS:-...}`
+  - wp-new consent path uses `IWE_ROOT` (the variable create-wp.sh reads)
+
 ## [0.39.0] — 2026-08-30
 
 ### Added
