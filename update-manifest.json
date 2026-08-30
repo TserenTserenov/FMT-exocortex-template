@@ -725,7 +725,7 @@
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "0605b87f81e8f2770955bcccb972f689468d26f307a568013cb4544f520b1e9d"
+      "sha256": "c01d2e59b832da6d692780cca4c97b42cf3050af7529f4e100c9f55f67438cb8"
     },
     {
       "path": ".gitignore",
