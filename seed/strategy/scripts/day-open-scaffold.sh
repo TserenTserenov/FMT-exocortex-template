@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
 # routing: helper  skill=day-open  called-by=haiku  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 # day-open-scaffold.sh — детерминированная генерация скелета DayPlan
@@ -1243,11 +1242,15 @@ render_self_dev() {
     in_priorities && /^\|/ {
       if ($0 ~ /^\|[[:space:]]*#/) next
       if ($0 ~ /^\|[[:space:]]*-+/) next
+      # Skip finished rows: the priority table is ordered by draft number, so
+      # old published entries sit on top; taking the first row regardless of
+      # status resurfaced a May publication as "active" (#560, regression of #417).
+      if ($0 ~ /✅|опубликован|published/) next
       print
       exit
     }' "$draft_list")
   if [ -z "$row" ]; then
-    echo "**Активный черновик:** нет приоритетных черновиков в draft-list.md"
+    echo "**Активный черновик:** нет активных черновиков (приоритетные пусты или все завершены)"
     return
   fi
   local dnum path
