@@ -4,10 +4,23 @@
 
 set -e
 
-# Предотвращаем сон: -i (idle, работает на батарее) -d (display) -u (user activity)
-# Флаг -s (system sleep) не используем — он НЕ работает на батарее (OBC может переключить профиль)
-# Linux: caffeinate отсутствует — guard через command -v (на Linux достаточно, что cron/systemd сам управляет sleep)
-command -v caffeinate >/dev/null 2>&1 && caffeinate -diu -w $$ &
+# Sleep inhibitor for the WHOLE script lifetime (issue #553: direct launchd
+# units invoke this script bypassing scheduler.sh, so the inhibitor must live
+# here too — parity with roles/synchronizer/scripts/scheduler.sh).
+# macOS: caffeinate -diu (idle+display+user; works on battery; -s is NOT used —
+# it is ignored on battery power). `-w $$` ties the inhibitor to this shell
+# process, which stays alive for the entire scenario incl. the commit→push tail.
+# Known OS limit: lid-close on battery cannot be held by caffeinate at all
+# (-s works on AC only) — schedule night runs on AC or with the lid open.
+# Linux: systemd-inhibit when available; direct systemd timers do not inhibit
+# sleep by themselves.
+if [[ "$(uname)" == "Darwin" ]]; then
+    caffeinate -diu -w $$ &
+elif command -v systemd-inhibit &>/dev/null; then
+    systemd-inhibit --what=idle:sleep --who=strategist --why="agent scenario" --mode=block sleep infinity &
+    _INHIBIT_PID=$!
+    trap 'kill $_INHIBIT_PID 2>/dev/null' EXIT
+fi
 
 # Конфигурация
 # WP-273 R5 fix (Round 5 Евгения): substituted runner живёт в .iwe-runtime/,
