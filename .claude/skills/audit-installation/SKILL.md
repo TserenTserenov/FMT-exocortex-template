@@ -47,10 +47,12 @@ Verdict выносит subagent в роли Аудитора, читая отч�
 Найти и запустить `iwe-audit.sh` через fallback-цепочку (author-mode → workspace, user-mode → `$IWE_SCRIPTS` из `~/.iwe-paths`):
 
 ```bash
-if [ -f "$HOME/IWE/scripts/iwe-audit.sh" ]; then
-    AUDIT_SCRIPT="$HOME/IWE/scripts/iwe-audit.sh"
-elif [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/iwe-audit.sh" ]; then
+if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/iwe-audit.sh" ]; then
+    # $IWE_SCRIPTS first (#566): the hardcoded workspace copy, when it exists at
+    # all, is a stale leftover — the installer points IWE_SCRIPTS at the template.
     AUDIT_SCRIPT="$IWE_SCRIPTS/iwe-audit.sh"
+elif [ -f "$HOME/IWE/scripts/iwe-audit.sh" ]; then
+    AUDIT_SCRIPT="$HOME/IWE/scripts/iwe-audit.sh"
 else
     echo "iwe-audit.sh не найден. Если \$IWE_SCRIPTS не выставлен — выполни 'source \$HOME/.iwe-paths' (или перезапусти shell), затем повтори. Если файла .iwe-paths нет — запусти setup.sh из FMT-шаблона."
     exit 1
@@ -219,11 +221,9 @@ Coverage: N/4
 
 1. **Сохранить полный отчёт + verdict в файл:**
    ```bash
-   # Приоритет: workspace/scripts/ → $IWE_SCRIPTS (FMT-template/scripts/ для user-mode) → $HOME/IWE
-   if [ -d "$HOME/IWE/scripts" ]; then
-       AUDIT_LOG_DIR="$HOME/IWE/scripts"
-   elif [ -n "${IWE_SCRIPTS:-}" ] && [ -d "$IWE_SCRIPTS" ]; then
-       AUDIT_LOG_DIR="$IWE_SCRIPTS"
+   # Priority (#566): $IWE_SCRIPTS convention first, hardcode only as fallback → $HOME/IWE
+   if [ -d "${IWE_SCRIPTS:-$HOME/IWE/scripts}" ]; then
+       AUDIT_LOG_DIR="${IWE_SCRIPTS:-$HOME/IWE/scripts}"
    else
        AUDIT_LOG_DIR="$HOME/IWE"
    fi

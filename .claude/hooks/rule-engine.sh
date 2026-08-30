@@ -101,7 +101,7 @@ load_rules_for_event() {
     # bare-python3 fallback: the resolver's own first candidate is already
     # bare `python3` from PATH.
     local _resolved_python3
-    _resolved_python3=$("$HOME/IWE/scripts/lib/find-python3.sh" 2>/dev/null) || _resolved_python3=""
+    _resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _resolved_python3=""
     [ -n "$_resolved_python3" ] || { echo "[]"; return; }
     _LRE_EVENT="$event" _LRE_REG="$REGISTRY" "$_resolved_python3" - << 'PYEOF' 2>/dev/null || echo "[]"
 import yaml, json, os
@@ -774,7 +774,7 @@ check_schema_registration_gate() {
     # completeness concern): same lazy-placement + no-fallback rationale as
     # the other sites in this migration.
     local _stg_resolved_python3
-    _stg_resolved_python3=$("$HOME/IWE/scripts/lib/find-python3.sh" 2>/dev/null) || _stg_resolved_python3=""
+    _stg_resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _stg_resolved_python3=""
     in_scope=$([ -n "$_stg_resolved_python3" ] && _STG_CFG="$cfg" _STG_PATH="$target_path" "$_stg_resolved_python3" - <<'PYEOF' 2>/dev/null || echo "error"
 import os, fnmatch
 cfg = os.environ["_STG_CFG"]
@@ -1430,7 +1430,7 @@ PYEOF
         # is_in_scope above): explicit CLI subcommand, invoked by a human —
         # fails loudly rather than degrading silently, matching require_python()
         # in route-task.sh (same resolver contract).
-        _lr_resolved_python3=$("$HOME/IWE/scripts/lib/find-python3.sh" 2>/dev/null) || _lr_resolved_python3=""
+        _lr_resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _lr_resolved_python3=""
         if [ -z "$_lr_resolved_python3" ]; then
             echo "ERROR: python3 с библиотекой PyYAML не найден (pip install pyyaml)" >&2
             exit 1
@@ -1717,7 +1717,7 @@ for r in reg.get('rules', []):
         # No bare-python3 fallback — same rationale as the other sites in
         # this migration: an unresolved interpreter fails the dogfood check
         # explicitly, it does not fall through to a bare-python3 retry.
-        DOGFOOD_RESOLVED_PYTHON3=$("$HOME/IWE/scripts/lib/find-python3.sh" 2>/dev/null) || DOGFOOD_RESOLVED_PYTHON3=""
+        DOGFOOD_RESOLVED_PYTHON3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || DOGFOOD_RESOLVED_PYTHON3=""
         if [ -z "$DOGFOOD_RESOLVED_PYTHON3" ]; then
             DOGFOOD="FAIL no python3 with PyYAML found"
         else
