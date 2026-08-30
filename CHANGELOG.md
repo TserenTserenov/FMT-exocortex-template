@@ -144,7 +144,77 @@ Refs: WP-NNN
 
 
 
+
 ## [Unreleased]
+
+## [0.39.0] — 2026-08-30
+
+### Added
+
+- `903f636` feat(ke): маршрутизация captures.md на помесячные файлы (WP-526) (#565)
+- `495a177` feat(security): WP-529 Ф11 — Day Open extension graph (before/after hooks)
+- `c4d2010` feat(security): WP-529 Ф21 — signed red-team attestation (digest + sign workflow)
+- `aec1730` feat(skills): deliver iwe-platform-redteam to the template (Evgeny Seliverstov's Red Team methodology)
+
+### Changed
+
+- `7048b27` chore(manifest): resync hash for the T31 fixture adaptation
+- `acd70b0` test(edge-cases): T31 fixtures follow the clone-manifest contract (#564)
+- `43fddfc` chore(manifest): resync hashes for batch-2 fixes
+- `79fbd8c` chore(manifest): ship the #557 test via SCRIPT_CONTRACT_EXPLICIT_INCLUDE
+- `ce8d324` chore(seed): sync day-open-scaffold seed snapshot with #560 fix
+- `69693d4` chore(manifest): resync content hashes after batch-1 fixes
+- `25dd084` docs(structure): PD/MC families for new users — README term, ADR-004 role→family map, fix stale 2.5/2.6 homes (Этап 6, WP-526)
+- `bc0092b` chore(seed): resync day-open-pipeline.sh/checks-runner.sh snapshots
+- `e96474a` chore(manifest): fixture hash after PyYAML resolver fix
+- `2638a13` chore(manifest): update.sh hash after workspace-reconciliation fix
+- `3f8d464` docs(quick-start): add Remote Control connection instructions
+- `1834166` docs(developer): доступ внешнего разработчика/кандидата к Pack'ам (WP-452 Ф6)
+- `507589e` chore(manifest): resync hash after agent-fault fixture fix
+- `9d2cdac` chore(manifest): resync hashes after route-task.sh executor fix
+- `e5bf32c` chore(manifest): resync hashes after rebase onto main abce59b
+- `d249b61` chore(sync): убрать мёртвый USER-SPACE маркер (template-sync.sh)
+
+### Fixed
+
+- `c701ed4` fix(session-guard): peer-session bypass survives set -u harness extraction (T22)
+- `7c092e6` fix(session-guard): close honors close_path=peer-session — port WP-484 F118 bypass from author source
+- `ac593c0` fix(peer-conversation): session index is created idempotently, declares its own incompleteness (#568)
+- `c297f01` fix(dry-run-gate): stage 1 for #549 — unique gate id, named recovery command
+- `3faaae2` fix(ci): fork hygiene — author-scan honors excluded_paths, notify-security skips unconfigured channel (#547)
+- `4cb6d90` fix(build-active-wp): render rows from the header's six roles (#558)
+- `e0ff3f6` fix(day-open): agent-prose checks files declare executor and skip cleanly (#546)
+- `a30712b` fix(day-close): a step that cannot run reports skip, not ok (#559)
+- `47c2c39` fix(extensions-gate): read the manifest from the template clone, not workspace root (#564)
+- `cce55b0` fix(day-close): zsh regression test for the commit guard + manifest entry (#557)
+- `e666ea5` fix(protocols): step tracking is an observable property, TodoWrite optional (#561, #563)
+- `ee81129` fix(strategist): cross-platform sleep inhibitor, parity with scheduler.sh (#553)
+- `3b34774` fix: route script calls via IWE_SCRIPTS convention, drop phantom preflight (#566)
+- `459f464` fix(day-close): lesson counter matches real lesson file names (#559)
+- `c85ce67` fix(day-open): ke_stats counts only pending reports, GNU stat on Linux (#548)
+- `7498f82` fix(day-open): skip finished rows when picking the active draft (#560)
+- `cc00347` fix(wp-new): consent-file path in SKILL.md matches create-wp.sh (#556)
+- `b6b9996` fix(scripts): ke-queue-stats.sh age from report frontmatter, not file mtime (#572)
+- `8b9315b` fix(extractor): teach KE pipeline the monthly captures rotation (WP-526/WP-170) (#570)
+- `59d9fe6` fix(session-guard): audit resolves MC-sessions like open/close (#569)
+- `a2e23e0` fix(session-guard): forward-port MC-sessions resolver from root (WP-526 Ф2) (#567)
+- `d42178d` fix(hooks): recognize monthly captures.md chunks in extractor trigger
+- `97f5bb7` fix: PyYAML resolver contract for Markdown-embedded python3 calls, issue 541 hvost 3
+- `afa835f` fix: update.sh CLAUDE.md workspace-reconciliation gate, issue 541 hvost 2 (540)
+- `1f173f4` fix: pending-phases-sweep.sh regression 541 closed-latch, plus test fixtures
+- `798d01a` fix(scripts): verify-manifest.sh deprecated-files check ignored invoker cwd
+- `955fb57` fix(security): attestation digest sort breaks on GNU sort (Ubuntu CI)
+- `de0c303` fix(security): WP-529 Ф21 tail-up — golden vector, CI matrix, dead CODEOWNERS
+- `1a41861` fix(skills): add USER-SPACE marker to iwe-platform-redteam SKILL.md
+- `e965368` fix(tests): install real agent-fault script into synthetic route-task.sh workspace fixture
+- `939fafb` fix(router): dispatch and validate agent/script+judgment executors
+- `78343b9` fix(manifest): preserve deprecated_files across files[] -> excluded_paths[] moves
+- `4b84445` fix(manifest): regenerate update-manifest.json (WP-7 Ф92)
+- `3902254` fix(hooks): grep -P check in pre-commit false-positives on pgrep -P
+- `2ee3a11` fix(platform-compat): grep -P check false-positives on pgrep -P
+- `2489161` fix(session-guard): explicit fail on unrecognized flag instead of silent shift
+- `c869233` fix(session-guard): портировать поддержку --close-path/harness_session_id из корня
+
 
 ## [0.38.11] — 2026-08-24
 
