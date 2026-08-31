@@ -41,4 +41,9 @@ else
     fi
 fi
 
+hook_dir="$(dirname "$0")"
+if [ -x "$hook_dir/pre-commit-deny-legacy-sessions.sh" ]; then
+    "$hook_dir/pre-commit-deny-legacy-sessions.sh" || exit 1
+fi
+
 exit 0
