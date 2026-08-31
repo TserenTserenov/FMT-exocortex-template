@@ -2229,7 +2229,7 @@
     },
     {
       "path": "scripts/install-hooks.sh",
-      "sha256": "516c29f4fe4c41723b714d244c508bdcc8143032331a56eb4666461b2851a9d4"
+      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
@@ -2609,7 +2609,7 @@
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
-      "sha256": "9c91a95bdc2b6314671b0e609680841e9fadd5f4e9bcd66186dd76a9272d5ed3"
+      "sha256": "afe084887934053e9208edd7702b9e25e14cf855dc17fc513012aeb0cd83aacd"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
@@ -2797,7 +2797,7 @@
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
-      "sha256": "516c29f4fe4c41723b714d244c508bdcc8143032331a56eb4666461b2851a9d4"
+      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
     },
     {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",
