@@ -73,6 +73,12 @@ _STAGE_INT_TO_LABEL = {
 # RCS slots tracked in rcs_indices (M3/IT/A are rarely bottlenecks but included for completeness).
 _RCS_SLOTS = ["W", "M1", "M2", "M3", "M4", "IT", "A"]
 
+# Claude Code registers MCP tools as mcp__<server>__<tool>; the short tool name
+# alone never matches --allowedTools, so a headless call is silently denied at
+# the permission gate (no TTY to prompt) and every retry fails the same way.
+# See bug-2026-07-12-digital-twin-fetch-fails-headless.md.
+_ALLOWED_TOOL_DT_READ = "mcp__claude_ai_IWE__dt_read_digital_twin"
+
 
 def _is_stale(stale_days: int) -> bool:
     """Return True if snapshot is missing or older than stale_days."""
@@ -100,7 +106,7 @@ def _fetch_derived_via_headless_claude() -> dict:
     )
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt, "--allowedTools", "dt_read_digital_twin",
+            ["claude", "-p", prompt, "--allowedTools", _ALLOWED_TOOL_DT_READ,
              "--output-format", "text"],
             capture_output=True, text=True, timeout=120,
         )
@@ -143,8 +149,13 @@ def _parse_qualification(response: dict) -> dict:
         if isinstance(data, dict) and key in data and isinstance(data[key], dict):
             data = data[key]
 
-    # Locate 3_4_qualification — may be nested or top-level.
-    qual = data.get("3_4_qualification") or data.get("3_derived", {}).get("3_4_qualification") or data
+    # Locate 3_4_qualification — may be nested or top-level, under either the
+    # current key or the pre-WP-462 name (render-pilot-guides.py:_rcs_from_digital_twin
+    # hit the same profiler rename and checks both; mirrored here).
+    def _find_qual(d: dict):
+        return d.get("3_4_qualification_estimate") or d.get("3_4_qualification")
+
+    qual = _find_qual(data) or _find_qual(data.get("3_derived", {})) or data
     if not isinstance(qual, dict):
         raise RuntimeError(f"Cannot locate 3_4_qualification in response: {str(response)[:300]}")
 
@@ -157,18 +168,36 @@ def _parse_qualification(response: dict) -> dict:
         raise RuntimeError(f"Unknown stage_id '{stage_id}' and no fallback stage in response")
 
     rcs = qual.get("rcs_indices", {})
-    slot_vals = {s: rcs.get(s, 0) for s in _RCS_SLOTS if rcs.get(s) is not None}
+    if isinstance(rcs, str):
+        rcs = json.loads(rcs)
+    if not isinstance(rcs, dict):
+        raise RuntimeError(f"rcs_indices has unexpected type {type(rcs).__name__}")
+    # Each slot is {"idx": N, ...metadata} (calibrated/streak/events), not a bare
+    # number — same shape render-pilot-guides.py:_rcs_from_digital_twin already
+    # unwraps. Surfaced only once the fetch itself started working (bug-2026-07-12):
+    # the old `rcs.get(s, 0)` returned the dict itself, TypeError on min() below.
+    slot_vals = {
+        s: rcs[s]["idx"] for s in _RCS_SLOTS
+        if isinstance(rcs.get(s), dict) and "idx" in rcs[s]
+    }
     if not slot_vals:
         raise RuntimeError("rcs_indices missing or empty in qualification data")
 
     # Bottleneck = slot with minimum value; M1 preferred on ties.
     bottleneck = min(slot_vals, key=lambda k: (slot_vals[k], k != "M1"))
 
+    # bottleneck can land on a rare slot (M3/IT/A, kept in _RCS_SLOTS "for
+    # completeness") not among the 4 always shown — keep it in rcs too, so
+    # bottleneck_slot never names a key absent from the snapshot's own rcs.
+    rcs_keys = ["W", "M1", "M2", "M4"]
+    if bottleneck not in rcs_keys:
+        rcs_keys.append(bottleneck)
+
     return {
         "stage_raw": stage,
         "stage_label": _STAGE_INT_TO_LABEL.get(stage, f"Ступень {stage}"),
         "bottleneck_slot": bottleneck,
-        "rcs": {s: slot_vals[s] for s in ["W", "M1", "M2", "M4"] if s in slot_vals},
+        "rcs": {s: slot_vals[s] for s in rcs_keys if s in slot_vals},
     }
 
 
@@ -213,14 +242,17 @@ def main() -> int:
     logging.info("Fetching 3_derived via headless claude...")
     try:
         response = _fetch_derived_via_headless_claude()
-    except RuntimeError as exc:
+    except Exception as exc:
+        # Broad on purpose: this is a cron/launchd entry point — any unexpected
+        # failure (incl. shapes we didn't anticipate) must log one clean line,
+        # not a raw traceback, so the cron log stays scannable.
         logging.error("Fetch failed: %s", exc)
         return 1
 
     logging.info("Parsing 3_4_qualification...")
     try:
         parsed = _parse_qualification(response)
-    except RuntimeError as exc:
+    except Exception as exc:
         logging.error("Parse failed: %s", exc)
         return 1
 

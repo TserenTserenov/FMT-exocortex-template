@@ -617,8 +617,26 @@ def fill_chunk(chunk: dict, weekplan: str, active_wps: str, calendar: str,
     header = chunk["header"]
     content = "".join(chunk["lines"][1:])  # без заголовка
 
-    # Consolidated prompt with JSON facts for today_plan
-    is_today_plan = "План на сегодня" in header or "today_plan" in header.lower()
+    # Consolidated prompt with JSON facts for today_plan.
+    # `header` is usually the bare "<details>"/"<details open>" tag (chunking
+    # stores the <summary> title in `content`, not `header`) — checking
+    # `header` alone means this branch never fires for that shape, and the
+    # plan table falls through to the generic per-section prompt, which
+    # leaves the scaffold's example placeholders (N/NNN/X) unreplaced instead
+    # of computing a real seq/hours value per WP. Checking `content` alone
+    # would instead miss a plain "## План на сегодня" heading (chunk header
+    # can carry the title directly there) if the body never repeats the
+    # phrase — Codex review, WP-484 backfill-regression-fix session, 31.08.
+    # Checking both covers each chunking shape without betting on which one
+    # is live. Regressed and re-fixed three times in a consumer's installed
+    # copy (2026-07-09, then 26.08, then 31.08) — each time only that copy
+    # was patched, so this canonical source kept re-seeding the bug on the
+    # next backfill; fixed here too (WP-484, peer-session with Codex, same
+    # day) to close that loop.
+    is_today_plan = (
+        "План на сегодня" in content or "today_plan" in content.lower()
+        or "План на сегодня" in header or "today_plan" in header.lower()
+    )
     if is_today_plan and wp_facts:
         prompt = build_today_plan_prompt(header, content, weekplan, wp_facts,
                                          calendar, cp_profile, fault_profile)
