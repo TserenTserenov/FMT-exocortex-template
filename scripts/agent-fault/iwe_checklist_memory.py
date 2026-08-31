@@ -858,6 +858,35 @@ def _validate_subject(kind: str, subject_id: str) -> tuple[str, str]:
     return kind, value
 
 
+def _post_m15_practiced_fact(paths: ProfilePaths, fault: str) -> None:
+    """WP-522 (раздел М, пир-сессия 2026-08-31-30): за завершённую запись
+    косяка агента (М15 «зафиксировал инцидент или паттерн ошибки в журнале»)
+    отчитаться в чек-лист участника экосистемы — best-effort, не влияет на
+    уже сохранённую в SQLite запись косяка (вызывается ПОСЛЕ commit).
+    Специфично для персонального проекта этого пилота (writer живёт в
+    governance-репо, не в этом платформенном шаблоне) — молча пропустить,
+    если writer не установлен, вместо ошибки для остальных пользователей IWE."""
+    writer = paths.governance / "scripts" / "post-culture-fact.py"
+    if not writer.is_file():
+        return
+    try:
+        # Короткий таймаут (не 10с, как у самого writer'а — код-ревью 31.08,
+        # High): запись косяка не должна заметно виснуть на медленной сети
+        # ради best-effort побочного отчёта.
+        subprocess.run(
+            [sys.executable, str(writer), "--element", "M15", "--mode", "record", "--evidence", fault],
+            timeout=3,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        # Code review 31.08 (Critical): `str(TimeoutExpired)` включает полный
+        # cmd, а значит и `fault` (может нести чувствительные детали
+        # инцидента) — логировать только тип и таймаут, не текст исключения.
+        print("culture_element_practiced (M15): writer call timed out", file=sys.stderr)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"culture_element_practiced (M15): writer call failed: {type(e).__name__}", file=sys.stderr)
+
+
 def record_fault(paths: ProfilePaths, args: argparse.Namespace) -> None:
     fault = _join_words(args.fault, "fault", required=True)
     citation = _join_words(args.source_citation, "source-citation", required=False)
@@ -981,6 +1010,7 @@ def record_fault(paths: ProfilePaths, args: argparse.Namespace) -> None:
         raise
     finally:
         _close(connection, paths)
+    _post_m15_practiced_fact(paths, fault)
     print(f"OK: fault {action} ({subject_kind}:{subject_id}, n={count})")
 
 

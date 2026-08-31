@@ -1929,7 +1929,11 @@
     },
     {
       "path": "scripts/agent-fault/iwe_checklist_memory.py",
-      "sha256": "0e498f9aa925f3a91c031fd2a10823a53f0d350d6fdb09b086d703ae4035ea79"
+      "sha256": "783bd2969693df8c2cbd58300624b88df4da95fb94114c974ddfd3649f800b3f"
+    },
+    {
+      "path": "scripts/agent-fault/test_iwe_checklist_memory_m15.py",
+      "sha256": "8d6c3c9d81c93b4da051cd2f6e15089c6b429650c908459d81becf08e4ee425e"
     },
     {
       "path": "scripts/agent-heartbeat.sh",
