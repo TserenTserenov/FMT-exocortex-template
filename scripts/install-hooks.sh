@@ -18,13 +18,20 @@
 # create-wp.sh already use) and by refusing to claim success if a hook is
 # still missing afterwards.
 #
+# WP-484 (31.08.2026): a hook that exists but differs from canonical is never
+# overwritten anymore — only a MISSING hook gets copied. The previous
+# behavior force-synced content on every drift, which discarded a governance
+# repo's own repo-specific composite pre-commit hook during an unrelated
+# core.hooksPath repair. Divergent local content is assumed intentional; the
+# backup-then-overwrite dance existed only to make that destructive overwrite
+# less bad, so it's gone along with it.
+#
 # see WP-436 (force-push guard) + seed/strategy/.githooks/
 
 set -euo pipefail
 
 REPO="${1:-${PWD}}"
 HOOK_DIR="$REPO/.githooks"
-BACKUP_DIR="$REPO/.git/hook-backups"
 
 if [ -L "$REPO" ] || [ -L "$REPO/.git" ] || [ ! -d "$REPO/.git" ]; then
   echo "❌ Not a git repo: $REPO"
@@ -57,8 +64,8 @@ if [ -n "$MISSING_SOURCE" ]; then
   exit 1
 fi
 
-if [ -L "$HOOK_DIR" ] || [ -L "$BACKUP_DIR" ]; then
-  echo "❌ Refusing symlink hook or backup directory in $REPO" >&2
+if [ -L "$HOOK_DIR" ]; then
+  echo "❌ Refusing symlink hook directory in $REPO" >&2
   echo "   core.hooksPath не изменён." >&2
   exit 1
 fi
@@ -69,7 +76,7 @@ for hook in pre-commit pre-push; do
     exit 1
   fi
 done
-mkdir -p "$HOOK_DIR" "$BACKUP_DIR"
+mkdir -p "$HOOK_DIR"
 
 copy_hook_atomically() {
   local source_hook="$1" target="$2" temporary
@@ -87,19 +94,10 @@ for hook in pre-commit pre-push; do
   target="$HOOK_DIR/$hook"
   source_hook="$CANONICAL_HOOKS_DIR/$hook"
 
-  if [ -f "$target" ] && ! cmp -s "$source_hook" "$target"; then
-    backup="$BACKUP_DIR/$hook.backup.$(date +%s)"
-    backup_index=0
-    while [ -e "$backup" ]; do
-      backup_index=$((backup_index + 1))
-      backup="$BACKUP_DIR/$hook.backup.$(date +%s).$backup_index"
-    done
-    cp "$target" "$backup"
-    echo "📝 Existing $hook backed up to: $backup"
-  fi
-
-  if [ ! -f "$target" ] || ! cmp -s "$source_hook" "$target"; then
+  if [ ! -f "$target" ]; then
     copy_hook_atomically "$source_hook" "$target"
+  elif ! cmp -s "$source_hook" "$target"; then
+    echo "⚠️  $hook отличается от канонического шаблона — оставляю локальную версию (не самолечу контент, см. WP-484 в комментарии выше)."
   fi
 
   [ -f "$target" ] && chmod +x "$target"

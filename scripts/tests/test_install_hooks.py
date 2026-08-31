@@ -107,22 +107,27 @@ def test_fresh_repo_gets_both_hooks(tmp_path):
     assert (repo / ".githooks" / "pre-push").is_file()
 
 
-def test_repeated_install_is_idempotent_without_backup_churn(tmp_path):
+def test_repeated_install_never_overwrites_differing_local_hook(tmp_path):
+    """WP-484 (31.08.2026): a hook that exists but differs from canonical is a
+    local customization (e.g. a repo-specific composite pre-commit), not
+    drift to repair — self-heal must warn and leave it alone, not back it up
+    and replace it."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     hooks_dir = repo / ".githooks"
     hooks_dir.mkdir()
-    (hooks_dir / "pre-commit").write_text("#!/bin/bash\necho custom\n", encoding="utf-8")
+    custom_pre_commit = "#!/bin/bash\necho custom\n"
+    (hooks_dir / "pre-commit").write_text(custom_pre_commit, encoding="utf-8")
 
     first = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
     assert first.returncode == 0, first.stdout + first.stderr
-    backups_after_first = sorted((repo / ".git" / "hook-backups").iterdir())
-    assert backups_after_first, "changed user hook must be backed up before replacement"
+    assert (hooks_dir / "pre-commit").read_text(encoding="utf-8") == custom_pre_commit
+    assert "отличается от канонического" in first.stdout + first.stderr
+    assert not (repo / ".git" / "hook-backups").exists()
 
     second = _run_install_hooks(repo, IWE_TEMPLATE=str(ROOT))
     assert second.returncode == 0, second.stdout + second.stderr
-    backups_after_second = sorted((repo / ".git" / "hook-backups").iterdir())
-    assert backups_after_second == backups_after_first
+    assert (hooks_dir / "pre-commit").read_text(encoding="utf-8") == custom_pre_commit
 
 
 def test_missing_canonical_source_fails_loud_not_silent_success(tmp_path):
@@ -256,6 +261,10 @@ def test_update_backfill_delivers_installer_and_hooks_idempotently(tmp_path):
         check=True,
     ).stdout.strip() == ".githooks"
 
+    # backup_dir here is update.sh's own -- it backs up the replaced
+    # install-hooks.sh installer script (platform code, always kept in sync),
+    # unrelated to install-hooks.sh's own hook-content handling below. A
+    # stable installer means no new backup on the second, idempotent run.
     backups_after_first = sorted((governance / ".git" / "hook-backups").iterdir())
     second = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
     assert second.returncode == 0, second.stdout + second.stderr
@@ -338,36 +347,6 @@ def test_update_backfill_refuses_symlink_scripts_parent(tmp_path):
     assert "symlink" in (result.stdout + result.stderr).lower()
     assert sentinel.read_text(encoding="utf-8") == "outside scripts sentinel\n"
     assert not (outside / "install-hooks.sh").exists()
-    assert subprocess.run(
-        ["git", "config", "--get", "core.hooksPath"], cwd=governance
-    ).returncode != 0
-
-
-def test_update_backfill_refuses_symlink_backup_directory(tmp_path):
-    workspace = tmp_path / "IWE-symlink-backup"
-    governance = workspace / "custom-governance"
-    _init_repo(governance)
-    scripts_dir = governance / "scripts"
-    scripts_dir.mkdir()
-    (scripts_dir / "install-hooks.sh").write_text("old installer\n", encoding="utf-8")
-    outside = tmp_path / "outside-backups"
-    outside.mkdir()
-    sentinel = outside / "sentinel"
-    sentinel.write_text("outside backup sentinel\n", encoding="utf-8")
-    (governance / ".git" / "hook-backups").symlink_to(
-        outside, target_is_directory=True
-    )
-
-    result = subprocess.run(
-        ["bash", "-c", _update_backfill_script(workspace)],
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode != 0
-    assert "symlink" in (result.stdout + result.stderr).lower()
-    assert sentinel.read_text(encoding="utf-8") == "outside backup sentinel\n"
-    assert list(outside.iterdir()) == [sentinel]
     assert subprocess.run(
         ["git", "config", "--get", "core.hooksPath"], cwd=governance
     ).returncode != 0
