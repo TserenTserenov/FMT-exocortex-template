@@ -2761,7 +2761,7 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "b52c3095b14d589223b1651cb5d573242cea22aa9fb7a2df0f2b010a950be8f4"
+      "sha256": "6bb072687ea8a23171de1630b1e51e18b87799232932c3628e8ca713c627cd0f"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
