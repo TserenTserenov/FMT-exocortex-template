@@ -833,7 +833,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "a9cbdaff5d184302e7c83585521432a821134ee7899d8f77ba8c04a37bff0d64"
+      "sha256": "c920f1dc8a269623a6e395f5839f90fb92b64272f70450acf5fe972b39846fc3"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -1449,7 +1449,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "42a408e8c174b3b72b5056cdeb6304002ca4a8bd59d3b35504ee4db271ccd735"
+      "sha256": "256a0bbf0e19d1c06141c4acf8cb6bf72d53f952bd1494639b2b2e2357aa7ccf"
     },
     {
       "path": "memory/protocol-dt-integration.md",
@@ -1457,7 +1457,7 @@
     },
     {
       "path": "memory/protocol-month-close.md",
-      "sha256": "f64ceb9eb79523ae4800727c1e3765317da634ee767680388ca0ef1ff51b3980"
+      "sha256": "a9dcf9bc0c7df5c205cff6246c63212c691ccefbe31e0afccab01822244d9868"
     },
     {
       "path": "memory/protocol-open.md",
