@@ -1014,9 +1014,17 @@ else
         fi
     }
 
-    clone_base_repo "ZP" "TserenTserenov/ZP"
-    clone_base_repo "FPF" "ailev/FPF"
-    clone_base_repo "SPF" "TserenTserenov/SPF"
+    # Declarative list instead of 3 hardcoded calls (WP-526 Ф6). PD-*/MC-*
+    # repo families are NOT added here — they are created on-demand by
+    # WP-527, not at install time (see hint printed at the end of setup).
+    BOOTSTRAP_REPOS=(
+        "ZP:TserenTserenov/ZP"
+        "FPF:ailev/FPF"
+        "SPF:TserenTserenov/SPF"
+    )
+    for entry in "${BOOTSTRAP_REPOS[@]}"; do
+        clone_base_repo "${entry%%:*}" "${entry#*:}"
+    done
 fi
 
 # === Done ===
@@ -1063,6 +1071,10 @@ else
     echo ""
     echo "Update from upstream:"
     echo "  cd $TEMPLATE_DIR && bash update.sh"
+    echo ""
+
+    echo "Личные (PD-*) и служебные (MC-*) репозитории (WP-526/WP-527):"
+    echo "  создаются по запросу, не при установке — см. README.md § «5 семей репозиториев»"
     echo ""
 
     # === Post-install validation (WP-265 Ф8) ===
