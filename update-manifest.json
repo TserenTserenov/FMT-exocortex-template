@@ -2813,7 +2813,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "a32cc0a57ff6dd081cb2db2e1581855331b5f9c1b17db855afd4dccbb896ac64"
+      "sha256": "78b5d12b52c4aa10db3b2ca6a1e3f25cb7ed219cc32ed33c470936aca20677ed"
     },
     {
       "path": "setup/build-runtime.sh",
