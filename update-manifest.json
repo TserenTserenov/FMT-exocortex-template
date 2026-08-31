@@ -309,7 +309,7 @@
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
-      "sha256": "07bdd193b77c1a63831655f7547928461dee7343cf7e6e68c8d26068984b1267"
+      "sha256": "2517b773a326ac7a4a668366dbe0266fbbbed406c2a33fc20a821275c921928b"
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
@@ -697,7 +697,7 @@
     },
     {
       "path": ".claude/templates/drr-template.md",
-      "sha256": "001aae991a6afc5fa75dd7c338b72fb53aff8bd4c4469c94da5f9deb78b060f3"
+      "sha256": "54356facf8d596bad78889791927b0d8977d75a836cffbcc184d7611905af673"
     },
     {
       "path": ".githooks/commit-msg",
