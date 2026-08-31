@@ -2125,7 +2125,7 @@
     },
     {
       "path": "scripts/day-open-llm-fill.py",
-      "sha256": "0f12094cd1b447669c4dd0d1331f22806f27c2afc7fb96fdf3d1a14acda9bf32"
+      "sha256": "0cd2567d6f6066d3dc0af23e30d1acc3b7a896bfc59a425895a1a2ae3fb63e1a"
     },
     {
       "path": "scripts/day-open-pipeline.sh",
@@ -2717,7 +2717,7 @@
     },
     {
       "path": "scripts/update-derived-snapshot.py",
-      "sha256": "de307912328167d0cb9cb9022e57bed873cb8cc2e2b14fd4d10b181bb51cb39c"
+      "sha256": "0d5e7404bc60b4830de2f096e0b15d08712d6fd4405a3176b3d563f5a25f9252"
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
@@ -2785,7 +2785,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-llm-fill.py",
-      "sha256": "a6179a0d089486a9685b94964a56ed66cbe8791b9ee50c25a6a9ecd4bc0d32d1"
+      "sha256": "c9e59fc04fa83950662cb3c266313387a9642fafa031294b3cee0adad8b0f4c2"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
@@ -2805,7 +2805,7 @@
     },
     {
       "path": "seed/strategy/scripts/update-derived-snapshot.py",
-      "sha256": "d8d273c6ab6f7429f194fb184baaea15405364eeb051234ea5b0e708c927e4c8"
+      "sha256": "b1c7ca80792acfa1e4b0ae528148ca2cf3ebbff6589ab699ec63b36611a438d8"
     },
     {
       "path": "sessions/00-index.md",
