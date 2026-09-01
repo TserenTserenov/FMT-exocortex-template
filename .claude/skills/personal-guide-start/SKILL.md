@@ -5,7 +5,7 @@ argument-hint: "[необязательно: override домена — knowledge
 experimental: true
 sunset: "после DONE WP-222 (Портной, ~июнь 2026) и WP-149 Ф6 (книга ЛР v3)"
 related: [personal-guide-render, repo-new, WP-245, WP-222, WP-149, WP-527, PD.FORM.089, PD.CAT.003]
-version: 1.3.1
+version: 1.3.2
 layer: L1
 status: active
 triggers:
@@ -54,7 +54,7 @@ Bootstrap-обёртка — создаёт пустой репо `DS-personal-g
 - name: `DS-personal-guide` (константа для всех подписчиков — не подставлять GitHub-логин; один личный аккаунт = один репо)
 - `template_type`: `notes`
 - privacy: `private`
-- назначение: личное пространство участника программы ЛР
+- назначение: личное пространство участника программы МИМ; `description` для `create_repository` дословно: «Персональное руководство пилота программы МИМ» (WP-527 Ф7, поправлено 01.09 — раньше было «программы ЛР (IWE)»)
 - data domains: личные материалы участника (детализация — Step 3 `/repo-new`)
 - writer/owner/readers: writer = подписчик (правки) + `/personal-guide-render` (пересборка); owner = подписчик; readers = подписчик, его агенты сессии
 - registry mode: без регистрации в `REPOSITORY-REGISTRY.md` (Step 7 `/repo-new`, исключение по `repo_class: personal-subscriber`)
@@ -112,7 +112,7 @@ personal_write(
 
 > **Класс:** личное пространство данных пилота. **Назначение:** персональное руководство — план, методы, история занятий пилота. **Писатель:** пилот (правки) + render-скилл `/personal-guide-render` (пересборка). **Владелец:** пилот. **Читатели:** пилот, его агенты сессии.
 
-Создан через `/personal-guide-start` (быстрый bootstrap для этого конкретного случая — не общий гейт создания репозитория).
+Создан через `/personal-guide-start` — UX-обёртка над общим гейтом создания репозитория `/repo-new` с предзаполненными параметрами (WP-527 Ф4/Ф5).
 
 ## Работа с этим репозиторием
 
