@@ -444,12 +444,13 @@ skills:
     - personal-guide-render
   - id: personal-guide-start
     name: "personal-guide-start"
-    description: "Bootstrap wrapper — creates an empty DS-personal-guide repo under the pilot's account (flat name, no login in the name; if not yet created), then calls /personal-guide-render to populate 6 files. Use when pilot first asks 'create my personal guide', 'I want to start a personal development program', 'build me a starter plan'."
-    version: 0.0.0
-    layer: unknown
+    description: "Bootstrap-обёртка — создаёт пустой репо `DS-personal-guide` под аккаунтом пилота (плоское имя, без логина в названии; если ещё нет), затем вызывает /personal-guide-render для наполнения 6 файлами. Используй когда пилот в первый раз просит «создай мне персональное руководство», «хочу начать программу личного развития», «собери мне стартовый план»."
+    version: 1.3.0
+    layer: L1
     status: active
     triggers:
-      slash: []
+      slash:
+        - /personal-guide-start
     depends_on: []
     invoked_by:
     - bottleneck-pick
@@ -467,6 +468,19 @@ skills:
     depends_on: []
     invoked_by:
     - platform-bottleneck
+  - id: repo-new
+    name: "repo-new"
+    description: "Гейт создания любого нового репозитория IWE (экосистемного или личного пространства). Проводит запрос через: классификацию намерения (Pack / SpacePlan / именованный проект / экосистемный DS), проверку имени и класса, разметку данных (типы 2.1-2.6, карантин), объявление писатель/владелец/читатели, решение о публичности, обязательный Decision Gate (по умолчанию — одобрение пилота, для CI — ограниченное делегирование), затем исполнение (создание, регистрация, развёртывание скелета). Используй когда пилот хочет создать новый репозиторий, или спрашивает, куда и как разместить новый вид данных. Не для расширения существующего репозитория (→ Repo-Touch/Residency Gate) и не для Pack-репозиториев (делегируется `/pack-new`)."
+    version: 0.2.0
+    layer: L2
+    status: experimental
+    triggers:
+      slash:
+        - repo-new
+    depends_on: []
+    invoked_by:
+    - personal-guide-start
+    - repo-new
   - id: restore-exocortex
     name: "restore-exocortex"
     description: "Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-from-exocortex.sh."
