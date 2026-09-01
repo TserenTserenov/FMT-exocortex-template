@@ -427,8 +427,24 @@ case "$1" in
         else
             cleanup_script="$SCRIPT_DIR/cleanup-processed-notes.py"  # legacy fallback
         fi
+        # cleanup-processed-notes.py only needs the stdlib (no PyYAML import) —
+        # same STDLIB_PYTHON3 idiom as day-close.sh, not the yaml-requiring
+        # scripts/lib/find-python3.sh resolver (would wrongly report "no
+        # python3" on a system that has one without PyYAML installed).
+        cleanup_python3=""
+        for _cleanup_python_candidate in python3 python; do
+            if command -v "$_cleanup_python_candidate" >/dev/null 2>&1; then
+                cleanup_python3="$_cleanup_python_candidate"
+                break
+            fi
+        done
+        unset _cleanup_python_candidate
         log "Running deterministic cleanup..."
-        CLEANUP_OUTPUT=$(python3 "$cleanup_script" 2>&1) || true
+        if [ -n "$cleanup_python3" ]; then
+            CLEANUP_OUTPUT=$("$cleanup_python3" "$cleanup_script" 2>&1) || true
+        else
+            CLEANUP_OUTPUT="no python3 interpreter found — skipped"
+        fi
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push
