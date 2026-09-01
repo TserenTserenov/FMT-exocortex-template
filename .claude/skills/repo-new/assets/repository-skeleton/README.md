@@ -2,7 +2,7 @@
 
 **Класс:** {{repo_class}} <!-- Base | Pack | DS/instrument | DS/governance | DS/surface | PD-{{slug}} | MC-{{slug}} -->
 **Назначение:** {{purpose}} <!-- одно предложение простыми словами: что здесь лежит и зачем, не служебная классификация -->
-**Создан:** {{created_date}} через `/repo-new` (WP-527)
+**Создан:** {{created_date}} через `/repo-new`
 
 ## Домены данных
 

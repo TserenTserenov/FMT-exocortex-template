@@ -553,11 +553,11 @@
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
-      "sha256": "dce17cf77d015b274c895df7e8a5d6bddaf55d6bd2d97f8456ee5ff2efeb1613"
+      "sha256": "a6c1687494de1166b92a0fd2cdd9fab51701ba58be77b7ddf91238d46751c76f"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/README.md",
-      "sha256": "d77be95b8bc467349e3a1b3007226de4f2f575834295b9d0fb2ab649bc2cf21a"
+      "sha256": "5e11a250b1854c8dfa8053478c6ce895537b8af61f4e818372d30faa6fb71e6f"
     },
     {
       "path": ".claude/skills/residency-gate/__init__.py",
