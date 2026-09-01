@@ -112,6 +112,15 @@ mkdir -p "$LOG_DIR"
 # Определяем день недели и тип сценария
 DAY_OF_WEEK=$(date +%u)  # 1=Mon, 7=Sun
 DATE=$(date +%Y-%m-%d)
+# issue #616: "первый Пн месяца" — календарная арифметика, не факт даты;
+# LLM однажды вывела её из головы и ошиблась (последний Пн августа принят за
+# первый Пн сентября). Считаем детерминированно здесь и передаём как готовый
+# факт (тот же принцип, что DAY_OF_WEEK ниже) — модели больше не нужно её
+# выводить самой.
+IS_FIRST_MONDAY_OF_MONTH="нет"
+if [ "$DAY_OF_WEEK" = "1" ] && [ "$(date +%d)" -le 7 ]; then
+    IS_FIRST_MONDAY_OF_MONTH="да"
+fi
 
 # Лог файл
 LOG_FILE="$LOG_DIR/$DATE.log"
@@ -180,7 +189,7 @@ months = ['января','февраля','марта','апреля','мая','
 d = datetime.date.today()
 print(f'{d.day} {months[d.month-1]} {d.year}, {days[d.weekday()]}')
 ")
-    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
+    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). Первый Пн месяца: ${IS_FIRST_MONDAY_OF_MONTH} (посчитано командой date, не выводи это значение сам — issue #616). ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
 
 ${prompt}"
 
@@ -315,13 +324,22 @@ case "$1" in
             # prompt is fallback ONLY — it ignores priorities.yaml and the scaffold, which
             # was the root cause of the 2026-06-21 structure/priority drift.
             log "Morning: running canonical Day Open pipeline"
-            DAY_OPEN_PIPELINE="$WORKSPACE/scripts/day-open-pipeline.sh"
+            # $IWE_SCRIPTS first (matches the interactive day-open skill's own
+            # resolution order), $WORKSPACE/scripts/ as legacy fallback for
+            # installs that still deliver a workspace-root copy. #598: this
+            # function used to read $WORKSPACE only, so $IWE_SCRIPTS-only
+            # installs fell back to free-form silently, every morning, with
+            # no escalation (found live: 37 consecutive days, 88 runs).
+            DAY_OPEN_PIPELINE="${IWE_SCRIPTS:-}/day-open-pipeline.sh"
+            if [ -z "${IWE_SCRIPTS:-}" ] || [ ! -f "$DAY_OPEN_PIPELINE" ]; then
+                DAY_OPEN_PIPELINE="$WORKSPACE/scripts/day-open-pipeline.sh"
+            fi
             if [ ! -f "$DAY_OPEN_PIPELINE" ]; then
                 # WP-529 F6: on user installs workspace-root scripts/ is not
                 # delivered at all (Evgenii defects #2/#3, 18.08) — say so
                 # instead of a generic "unavailable/failed". The delivery
                 # graph itself is WP-529 F7 scope, no silent bridge here.
-                log "WARN: Day Open pipeline not found at $DAY_OPEN_PIPELINE — canonical pipeline is not delivered on this install (WP-529 F7); fallback to free-form day-plan prompt"
+                log "WARN: Day Open pipeline not found at \$IWE_SCRIPTS or $WORKSPACE/scripts — canonical pipeline is not delivered on this install (WP-529 F7); fallback to free-form day-plan prompt"
                 run_claude "day-plan" "claude-sonnet-4-6"
                 notify_telegram "day-plan"
             elif bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1; then
@@ -398,8 +416,19 @@ case "$1" in
         ) || true
 
         # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
+        # cleanup-processed-notes.py has no placeholders, so it is read-only
+        # data from FMT (same rule as notify.sh above) and build-runtime does
+        # not deliver it next to this runtime copy of strategist.sh — resolving
+        # it via $SCRIPT_DIR silently no-op'd every run (#597).
+        if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/strategist/scripts/cleanup-processed-notes.py" ]; then
+            cleanup_script="$IWE_TEMPLATE/roles/strategist/scripts/cleanup-processed-notes.py"
+        elif [ -f "$HOME/IWE/FMT-exocortex-template/roles/strategist/scripts/cleanup-processed-notes.py" ]; then
+            cleanup_script="$HOME/IWE/FMT-exocortex-template/roles/strategist/scripts/cleanup-processed-notes.py"
+        else
+            cleanup_script="$SCRIPT_DIR/cleanup-processed-notes.py"  # legacy fallback
+        fi
         log "Running deterministic cleanup..."
-        CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
+        CLEANUP_OUTPUT=$(python3 "$cleanup_script" 2>&1) || true
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push
