@@ -505,23 +505,30 @@ fi
 # ============================================
 # 1.1b. Week Close race guard (WP-484 Ф46, found 2026-08-02/03: 3x "LLM Proxy
 # authorized probe failed" Telegram alerts near midnight on a Sunday). Late
-# Sunday night, week-open-orchestrator.sh (meant to run ~23:50) is closing the
-# outgoing week and opening the next one; if this pipeline also runs for that
-# same Sunday's date while that cycle is mid-flight (or hasn't started at all
-# yet), it can burn an attempt on an LLM Proxy call that's about to become
-# moot, or produce a plan for a day whose week context is still in flux.
+# Sunday night, an author-only night-cycle orchestrator (week-open-orchestrator.sh,
+# ~23:50, not delivered by this template -- it depends on the author's shared-
+# checkout publish gateway and a private LLM proxy, same class of author-only
+# infra as issue #595) closes the outgoing week and opens the next one on the
+# author's own install; if this pipeline also runs for that same Sunday's date
+# while that cycle is mid-flight, it can burn an attempt on an LLM Proxy call
+# that's about to become moot, or produce a plan for a day whose week context
+# is still in flux. On a template install without that orchestrator, WeekReport
+# is produced earlier and by a different, delivered path: week-review.md, Пн
+# 00:00 (issue #596) -- so this guard only matters in practice for that
+# orchestrator's ~23:50 Sunday window; it's a no-op wait otherwise.
 #
 # Signal choice (2026-08-03, peer session with Codex+Hermes, corrected during
-# implementation): week-open-orchestrator.sh commits an EMPTY "week-close-start:
-# $WEEK" lock at its own STEP 0, before any real closing work happens
-# (week-open-orchestrator.sh:95,123) -- that marker means "cycle started", not
-# "week closed"; using it here would pass almost immediately after the cycle
-# begins, defeating the guard. The real completion signal is STEP 5's commit
-# ("week-close: $WEEK -> $NEXT_WEEK", week-open-orchestrator.sh:401), which
-# lands together with current/WeekReport {WEEK}.md. Checking for that file's
-# presence (not commit message text) follows this same file's own §1.1 lesson
-# (WP-5, 2026-07-22): a commit-message regex silently breaks on wording drift;
-# a concrete artifact doesn't.
+# implementation): a start-of-cycle marker would pass almost immediately after
+# the cycle begins, defeating the guard -- the real completion signal is the
+# WeekReport file's presence itself (not a commit message, which silently
+# breaks on wording drift per this same file's own §1.1 lesson, WP-5 2026-07-22).
+#
+# issue #596: the exact filename here (`WeekReport {ISO-year}-W{ISO-week}.md`,
+# e.g. "WeekReport 2026-W35.md") never matched the real naming convention used
+# everywhere else (`WeekReport W{N} YYYY-MM-DD.md`, N = ISO week number, date =
+# that week's Monday, e.g. "WeekReport W35 2026-08-24.md") -- this guard could
+# never find the file it was checking for and always deferred. Fixed to build
+# the real filename.
 #
 # exit 7 = confirmed not closed yet -> defer, same contract as §1.1 above
 #          (scheduler retries next tick, this run doesn't burn the daily marker).
@@ -531,7 +538,10 @@ fi
 TARGET_DOW=$(portable_date_field "$DATE" "+%u")
 CURRENT_HOUR=$(TZ=Asia/Nicosia date +%H)
 if [ "$FORCE" != "true" ] && [ "${TARGET_DOW:-0}" = "7" ] && [ "$((10#$CURRENT_HOUR))" -ge 23 ]; then
-  TARGET_WEEK=$(portable_date_field "$DATE" "+%Y-W%V")
+  TARGET_WEEK_NUM=$((10#$(portable_date_field "$DATE" "+%V")))
+  TARGET_WEEK_MONDAY=$(date -j -v-6d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
+    || date -d "$DATE - 6 day" "+%Y-%m-%d" 2>/dev/null)
+  TARGET_WEEK="W${TARGET_WEEK_NUM} ${TARGET_WEEK_MONDAY}"
   if ! (cd "$DS_STRATEGY" && git fetch origin main --quiet 2>/dev/null); then
     echo "  Week Close guard: cannot refresh origin/main for week $TARGET_WEEK -- failing closed"
     tg_notify "🚨 Day Open $DATE заблокирован: не смог обновить origin/main, чтобы проверить закрытие недели $TARGET_WEEK. Нужна ручная проверка сети/репозитория."
