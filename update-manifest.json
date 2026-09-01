@@ -2209,7 +2209,7 @@
     },
     {
       "path": "scripts/generate-skills-catalog.sh",
-      "sha256": "9317c613a92abfae4c3166cb2b9d786d6f83a14d03bf02c927a0316f4f47d8a7"
+      "sha256": "8809f5a65e200f683eb80ef35b1054fc859e8dcad0492c195aa1c3d561fd44a0"
     },
     {
       "path": "scripts/git-dirty-guard.sh",
