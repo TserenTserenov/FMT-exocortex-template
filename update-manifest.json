@@ -2922,6 +2922,7 @@
     "scripts/tests/test_issue_582_audit_promoted_layout.sh",
     "scripts/tests/test_issue_583_dayopen_yaml.sh",
     "scripts/tests/test_issue_584_build_version.sh",
+    "scripts/tests/test_issue_596_weekreport_filename.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",

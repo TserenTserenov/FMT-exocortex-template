@@ -119,7 +119,7 @@
 
 1. Перемести предыдущий `WeekPlan W*.md` из `current/` в `archive/week-plans/`
 2. Перемести предыдущий `DayPlan *.md` из `current/` в `archive/day-plans/` (если есть)
-3. ~~WeekReport~~ — отдельный файл больше не создаётся (deprecated). Итоги — секция в WeekPlan.
+3. Перемести предыдущий `WeekReport W*.md` из `current/` в `archive/week-reports/` (issue #596: создаётся week-review.md, Пн 00:00, до этого шага — должен уже лежать в `current/` к моменту session-prep)
 4. Перемести предыдущий `SchedulerReport *.md` из `current/` в `archive/scheduler-reports/` (если есть и не текущий)
 5. **Архивация WP context files (safety net — Close уже архивирует done-файлы):**
    - Для каждого `inbox/WP-*.md` сверь статус с MEMORY.md (source-of-truth)
