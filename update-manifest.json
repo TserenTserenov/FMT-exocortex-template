@@ -637,7 +637,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "e2967c9df1fa2cf6e4bffa1ccb6f0fc8829a3409f36b0b7490dc6a10d80a5d0f"
+      "sha256": "a56b98a17f1394cead4b320a5614df12bd8ca04938eea1a5214bd1e73d130765"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -765,7 +765,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3f8c21daeda31f0889b29cfda3beb867db6a701c3de8e77914efa547afe11172"
+      "sha256": "2be88deba4c2361764dd7a3f2bf3e462631c01f6de9d10efbd20f0fb1d861ea0"
     },
     {
       "path": "CLAUDE.md",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "5f92502a1261c092054cdfc5f50a62faaa833e36d540db235a4ba792c2fc0421"
+      "sha256": "380062b78a0373286575c4a7c24ca9e88a9745789705175bf24842714385add9"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -1809,7 +1809,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "cf6cfc2de937429e4c966a3495fc20911c1d7e9c1500d8c1075dea8da773956a"
+      "sha256": "67dbfdbfd87757399878ecb3717750885462925a7f5f27a59f7106fc9a2e2a06"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2161,7 +2161,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "bb08a935dcdffb045df29b4d27d3fb87e5bfd2c05caafedc5adf42171b72e9b2"
+      "sha256": "c182e63bc254feb79f8c390f29e33e8a751d6f94a947048a80df799ff3d4b582"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
