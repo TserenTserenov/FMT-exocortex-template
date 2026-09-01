@@ -376,8 +376,13 @@ read_morning_priorities() {
 # Если сегодня strategy_day → не генерировать DayPlan (SKILL.md шаг 4).
 # Возвращает exit 2; extension обрабатывает этот код и выводит сообщение Claude.
 # DAY_OPEN_FORCE_STRATEGY_DAY=1 bypasses the guard without changing default behavior —
-# needed by week-open-day-section-patch.sh (WP-484 Ф3), which reuses this same
-# scaffold to build the "Открытие дня" section inside WeekPlan on strategy_day.
+# an extension point for a caller that wants this scaffold's output on a
+# strategy_day too (e.g. to build an "Открытие дня" section inside WeekPlan).
+# issue #595: an earlier version of this comment named a specific caller
+# script (week-open-day-section-patch.sh, WP-484 Ф3) that depends on
+# author-only infrastructure (a shared-checkout publish gateway, a private
+# LLM proxy) not delivered by this template — the caller itself is out of
+# scope here, this flag is the generic, delivered part of the extension point.
 STRATEGY_DAY_NAME=$(read_yaml "day_open.strategy_day" || true)
 case "${STRATEGY_DAY_NAME:-monday}" in
   monday)    STRATEGY_DOW=1 ;;
