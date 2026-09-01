@@ -2473,7 +2473,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "af34b3bb132ffeb0d8093df829e5aae092832daa764f8fe0ab60265893baecfc"
+      "sha256": "f219b0ec7746e12d98f677d4984a2ad02eb573e0c2c5e5b41ca22724f465b3f3"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2900,6 +2900,7 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
     "scripts/tests/lib/extract-update-download-batch.sh",
+    "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_day_close_prepare.py",

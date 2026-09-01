@@ -572,9 +572,20 @@ EOF
 fi
 
 # --- helpers for ORZ validation ---
-validate_orz() {
+# Ported from ~/IWE/scripts/session-guard.sh (root commit 2779845553, WP-484
+# line AC, 31.08): batches the git-tracked lookup for `audit` (one
+# `git ls-files` instead of one per file) and reads each file once with
+# bash builtin pattern matching instead of ~13 grep/sed/head subprocesses.
+# Root's function already carried the WP-520 case-8 remote-refs fallback
+# below (published-but-unstaged ORZ files) before this batching commit --
+# ported together since it is the same function body, not a separate
+# addition to this session's scope.
+validate_orz() { # <orz-path> <agent> [orz-base-dir, default $ORZ_DIR] [tracked-set-file, optional]
   local orz="$1"
   local agent="$2"
+  local orz_base_dir="${3:-$ORZ_DIR}"
+  orz_base_dir="${orz_base_dir%/}"
+  local tracked_set_file="${4:-}"
   local errors=0
 
   # 1. file exists
@@ -583,19 +594,38 @@ validate_orz() {
     return 1
   fi
 
+  # Checks 2-4 read the file once into a bash variable and use builtin
+  # pattern matching instead of one grep/sed/head subprocess per check.
+  # `$'\n'` is prepended so "key at the very start of the file" and "key
+  # after a newline" are the same substring match, matching what the old
+  # `grep -qE "^key:"` anchor covered without needing multiline `^`.
+  local nl=$'\n'
+  local content
+  content="$(<"$orz")" 2>/dev/null || content=""
+  local content_nl="${nl}${content}"
+
   # 2. frontmatter keys
   local keys=("date:" "type:" "wp:" "duration_h:" "artifacts:" "agent:")
   for key in "${keys[@]}"; do
-    if ! grep -qE "^${key}" "$orz"; then
-      echo "  ❌ в frontmatter отсутствует ключ '$key'" >&2
-      errors=$((errors + 1))
-    fi
+    case "$content_nl" in
+      *"${nl}${key}"*) : ;;
+      *)
+        echo "  ❌ в frontmatter отсутствует ключ '$key'" >&2
+        errors=$((errors + 1))
+        ;;
+    esac
   done
 
   # 3. agent value
-  local orz_agent
-  orz_agent=$(grep -E "^agent:" "$orz" | sed 's/^agent: *//' | head -1 || true)
-  if [ -n "$orz_agent" ]; then
+  # `[ -n "$agent" ]` guard: a caller that doesn't care about agent identity
+  # (the archival `audit` scan) passes "" and skips this comparison outright,
+  # instead of re-deriving the file's own value and comparing it to itself
+  # (a self-match that could never fail -- the bug this port also fixes).
+  local orz_agent="" agent_re="${nl}agent:[[:space:]]*([^${nl}]*)"
+  if [[ "$content_nl" =~ $agent_re ]]; then
+    orz_agent="${BASH_REMATCH[1]}"
+  fi
+  if [ -n "$agent" ] && [ -n "$orz_agent" ]; then
     if [ "$orz_agent" != "$agent" ] && \
        ! { [ "$agent" = "kimi" ] && [ "$orz_agent" = "kimi-headless" ]; }; then
       echo "  ❌ agent в ORZ ('$orz_agent') не совпадает с агентом сессии ('$agent')" >&2
@@ -606,18 +636,55 @@ validate_orz() {
   # 4. required sections
   local sections=("## Главный инсайт" "## Контекст" "## Достигнуто" "## Ключевые решения")
   for sec in "${sections[@]}"; do
-    if ! grep -qF "$sec" "$orz"; then
-      echo "  ❌ отсутствует секция '$sec'" >&2
-      errors=$((errors + 1))
-    fi
+    case "$content" in
+      *"$sec"*) : ;;
+      *)
+        echo "  ❌ отсутствует секция '$sec'" >&2
+        errors=$((errors + 1))
+        ;;
+    esac
   done
 
   # 5. git tracked
   local rel
-  rel="$(python3 -c "import os,sys; print(os.path.relpath(sys.argv[2], sys.argv[3]))" -- "$orz" "$ORZ_DIR")"
-  if ! git -C "$ORZ_DIR" ls-files --error-unmatch "$rel" >/dev/null 2>&1; then
-    echo "  ❌ ORZ-файл не добавлен в git index (git add $rel)" >&2
-    errors=$((errors + 1))
+  local is_tracked=1
+  if [ -n "$tracked_set_file" ] && [ -s "$tracked_set_file" ]; then
+    # Batch path (audit call site): one `git ls-files` snapshot up front
+    # instead of one `git ls-files --error-unmatch` + python3 relpath per
+    # file. Safe to inline the relpath here because this call site's `orz`
+    # always comes from `find "$ORZ_DIR" ...`, so it is always a literal
+    # `$orz_base_dir/...` path; the fallback below (other callers) keeps
+    # os.path.relpath for the non-prefixed cases it covers.
+    rel="${orz#"$orz_base_dir"/}"
+    grep -qxF "$rel" "$tracked_set_file" && is_tracked=0
+  else
+    rel="$(python3 -c "import os,sys; print(os.path.relpath(sys.argv[2], sys.argv[3]))" -- "$orz" "$orz_base_dir")"
+    git -C "$orz_base_dir" ls-files --error-unmatch "$rel" >/dev/null 2>&1 && is_tracked=0
+  fi
+  if [ "$is_tracked" -ne 0 ]; then
+    # A file whose commit went to main through an isolated worktree cannot
+    # be staged in the live checkout (busy on a foreign branch). A file
+    # present in ANY published remote-tracking ref is a strictly stronger
+    # proof than a staged-only file: accept it as the index-equivalent.
+    local published_ref=""
+    local remote_ref
+    while IFS= read -r remote_ref; do
+      [ -z "$remote_ref" ] && continue
+      # Content must match too -- path-only acceptance would let a locally
+      # edited copy pass on legacy semaphores with no registered `file:`
+      # line for the scope gate's cmp to catch.
+      if git -C "$orz_base_dir" cat-file -e "$remote_ref:./$rel" 2>/dev/null &&
+         git -C "$orz_base_dir" cat-file blob "$remote_ref:./$rel" 2>/dev/null | cmp -s - "$orz"; then
+        published_ref="$remote_ref"
+        break
+      fi
+    done <<< "$(git -C "$orz_base_dir" for-each-ref --format='%(refname)' refs/remotes 2>/dev/null)"
+    if [ -n "$published_ref" ]; then
+      echo "  ✓ ORZ-файл не в git index, но побайтно совпадает с опубликованным blob в '$published_ref' — принят как эквивалент" >&2
+    else
+      echo "  ❌ ORZ-файл не добавлен в git index (git add $rel) и не совпадает ни с одним blob в refs/remotes/*" >&2
+      errors=$((errors + 1))
+    fi
   fi
 
   return $errors
@@ -1027,15 +1094,24 @@ if [ "$CMD" = "audit" ]; then
 
   # 3. ORZ-файлы с невалидным frontmatter/секциями
   echo "ORZ-файлы с дефектами (после $SINCE):"
+  # Ported alongside validate_orz() (root commit 2779845553): one `git
+  # ls-files` snapshot for the whole tree instead of one per file inside
+  # validate_orz. No agent extraction here either -- validate_orz's own
+  # "agent value" check always re-derived the value from this same file
+  # and compared it against whatever was passed, so a self-fed value could
+  # never fail; passing "" skips that no-op comparison instead of redoing
+  # the extraction to feed it.
+  AUDIT_TRACKED_SET=$(mktemp)
+  git -C "$ORZ_DIR" ls-files > "$AUDIT_TRACKED_SET" 2>/dev/null
   find "$ORZ_DIR" -maxdepth 2 -mindepth 2 -name '*.md' -type f ! -name '00-index.md' -newermt "$SINCE" 2>/dev/null | while read -r orz; do
     tmp_errors=$(mktemp)
-    orz_agent=$(grep -E "^agent:" "$orz" | sed 's/^agent: *//' | head -1 || true)
-    if ! validate_orz "$orz" "${orz_agent:-unknown}" >"$tmp_errors" 2>&1 && [ -s "$tmp_errors" ]; then
+    if ! validate_orz "$orz" "" "$ORZ_DIR" "$AUDIT_TRACKED_SET" >"$tmp_errors" 2>&1 && [ -s "$tmp_errors" ]; then
       echo "  $(basename "$orz"):"
       sed 's/^/    /' "$tmp_errors"
     fi
     rm -f "$tmp_errors"
   done
+  rm -f "$AUDIT_TRACKED_SET"
   echo
 
   # 4. Untracked ORZ-файлы
