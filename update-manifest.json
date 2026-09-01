@@ -1665,7 +1665,7 @@
     },
     {
       "path": "roles/strategist/README.md",
-      "sha256": "f84808beb207a6675d32c8fa000d776c8ffba6702d8a38e587e46f71bf5e2e44"
+      "sha256": "e7a13b44f9d0a2bd4af4c19094b201cf5cb804653bb7c01b7ea988e468887329"
     },
     {
       "path": "roles/strategist/install.sh",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "380062b78a0373286575c4a7c24ca9e88a9745789705175bf24842714385add9"
+      "sha256": "424ef6e16894d82c61b90c6450d12007beb5863c3a1f6df42148ac286000bd60"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -1785,7 +1785,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "ea9534dc4bde0a09b0a63acabaf8f37bc728b2d854662238b52e106992425ba5"
+      "sha256": "a09434082d56b7210db75a155a4098871e7889aba127c7d8735a313b3a34121a"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -2149,7 +2149,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "f02ba1422171ac34fd110b8bff22502db7f7cd69f8ad582c74abbfff0c56a396"
+      "sha256": "cc3900d2985006fa92bb21eb3405add820aaa017c0343470dbdcf07f7f7a8f39"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2922,6 +2922,7 @@
     "scripts/tests/test_issue_582_audit_promoted_layout.sh",
     "scripts/tests/test_issue_583_dayopen_yaml.sh",
     "scripts/tests/test_issue_584_build_version.sh",
+    "scripts/tests/test_issue_596_weekreport_filename.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",
