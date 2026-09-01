@@ -1,4 +1,5 @@
 #!/bin/bash
+# SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
 # ledger-append.sh <scale> <period> <kind> <json-data> [<source>] [--dedup-by-kind|--dedup-by-kind-and-date]
 #
 # Appends one event to machine/ledger/<scale>-<period>.yaml (append-only, flock-protected).

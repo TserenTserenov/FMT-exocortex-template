@@ -2144,8 +2144,12 @@
       "sha256": "0cd2567d6f6066d3dc0af23e30d1acc3b7a896bfc59a425895a1a2ae3fb63e1a"
     },
     {
+      "path": "scripts/day-open-multiplier-backfill-patch.py",
+      "sha256": "98e4c83e08eeea19d3fc8f3b7b9d96400f5a9087add8729620d65d27368b7dc1"
+    },
+    {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "86bf8e09d107d10f37f15374e5531830ae06cee1f3c3cc3302b0c08214cf3048"
+      "sha256": "f02ba1422171ac34fd110b8bff22502db7f7cd69f8ad582c74abbfff0c56a396"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2325,7 +2329,7 @@
     },
     {
       "path": "scripts/ledger-append.sh",
-      "sha256": "a502981e45fa7589f0093e9ea9949da89a270108b1bb4fce00642c3647dac951"
+      "sha256": "6a7f4f22ce6281e3b195d4f15930bf96cc92ae873303ae06143528242175c5eb"
     },
     {
       "path": "scripts/lesson-close.sh",

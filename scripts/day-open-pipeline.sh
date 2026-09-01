@@ -916,6 +916,21 @@ else
 fi
 
 # ============================================
+# 4.59. Multiplier backfill patch (deterministic — WP-484 Ф117, pilot decision
+# 18.08 + peer-session 2026-09-01-18-wp484-backlog-continue: wakatime-cli only
+# supports --today, so a Close that ran late or on a host without the CLI
+# leaves yesterday's multiplier honestly PENDING. This backfills it from the
+# WakaTime HTTP API once synced. Same non-blocking-finding pattern as the
+# patches above — never blocks Open, never fabricates a value.
+# ============================================
+echo "=== 4.59. Multiplier backfill patch ==="
+"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-multiplier-backfill-patch.py" \
+  --dayplan "$DAYPLAN_PATH" \
+  --ledger-root "$DS_STRATEGY/machine/ledger/day" \
+  --date "$DATE" \
+  --ledger-append "$DS_STRATEGY/scripts/ledger-append.sh" 2>&1 || true
+
+# ============================================
 # 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Ф2)
 # BUGFIX (2026-07-13): this used to run in step 6, AFTER Checks (step 5) — but one of
 # the checks (day-open.checks.md «current/ без зависших DayPlan») hard-blocks commit
