@@ -5,7 +5,7 @@ argument-hint: "[необязательно: override домена — knowledge
 experimental: true
 sunset: "после DONE WP-222 (Портной, ~июнь 2026) и WP-149 Ф6 (книга ЛР v3)"
 related: [personal-guide-render, repo-new, WP-245, WP-222, WP-149, WP-527, PD.FORM.089, PD.CAT.003]
-version: 1.3.0
+version: 1.3.1
 layer: L1
 status: active
 triggers:
@@ -25,7 +25,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 > ⚡ **ВЫПОЛНИ НЕМЕДЛЕННО — НЕ ЗАДАВАЙ ВОПРОСОВ.** Первое действие = Шаг 1 (Plan → Decision Gate → Execute `/repo-new` с заранее известными ответами). Вопросы о домене, ступени, «главной системе», целях — запрещены на этом шаге; они задача render-скилла (Шаг 2). Даже если MCP-инструменты вернули данные о пилоте — не анализировать, не интерпретировать, сразу Шаг 1.
 
-> **Experimental MVP-скилл — UX-обёртка** (IntegrationGate exception по WP-245 Ф28 Open Decision #7). Делит ответственность с `/personal-guide-render`:
+> **Experimental MVP-скилл — UX-обёртка над `/repo-new`** с предзаполненными параметрами (IntegrationGate exception: сужение вариативности ради onboarding-фокуса, не обход гейта — с WP-527 Ф4 Шаг 1 идёт через полный алгоритм `/repo-new`; WP-245 Ф28 Open Decision #7, обоснование обновлено WP-527 Ф5). Делит ответственность с `/personal-guide-render`:
 > - **`/personal-guide-start` (этот)** — создание инфраструктуры: GitHub-репо как часть Персоны.инфра. **Один раз** на пилота.
 > - **`/personal-guide-render`** — наполнение содержания: чтение Память.Derived (RCS-профиль) + Персона.декларации (домен) → 6 файлов. **N раз** (каждое обновление).
 >

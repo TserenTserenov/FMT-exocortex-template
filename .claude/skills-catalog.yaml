@@ -445,7 +445,7 @@ skills:
   - id: personal-guide-start
     name: "personal-guide-start"
     description: "Bootstrap-обёртка — создаёт пустой репо `DS-personal-guide` под аккаунтом пилота (плоское имя, без логина в названии; если ещё нет), затем вызывает /personal-guide-render для наполнения 6 файлами. Используй когда пилот в первый раз просит «создай мне персональное руководство», «хочу начать программу личного развития», «собери мне стартовый план»."
-    version: 1.3.0
+    version: 1.3.1
     layer: L1
     status: active
     triggers:
