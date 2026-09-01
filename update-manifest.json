@@ -789,7 +789,7 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "79ac7d26c4dc2c40c5edcabb731016ae587c1445fd797493f73a888fd860b4f1"
+      "sha256": "338fdbf324c5bb42b87218ee8f59baf32eb3ecb6ceb2aa0cd23e17bc7c06ac78"
     },
     {
       "path": "docs/BROWSER-CI-TEMPLATE.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "4a4d388ec10cac79ce0ccea0d61c2ea0c9175b961a862ba375b1d7f9c68b164d"
+      "sha256": "5d85774b43fa53f574a43caf401bd60b5d762dae1d45765cccee353bda02eb71"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
