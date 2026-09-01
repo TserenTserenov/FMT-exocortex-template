@@ -37,8 +37,14 @@ gates_rationale: "операционный скилл; WP Gate применим 
 - `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md`
 - `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md`
 
-Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца:
-`grep -rl "strategy-session\|Strategy Session" {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/sessions/$(date +%Y-%m)/ 2>/dev/null` — пусто → первая сессия месяца.
+Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца. Записи двух легальных раскладок (issue #608, тот же корень, что #545 в day-open-scaffold.sh): плоские файлы Strategy/Day-сессий (`sessions/YYYY-MM-DD.md`) и подпапка по месяцу для peer-сессий (`sessions/YYYY-MM/`) — искать нужно по обоим адресам, иначе плоская раскладка (дефолт по `memory/routing-vocab.md`) всегда даёт «не найдено» и месячная сверка не срабатывает ни разу:
+```bash
+SESSIONS_DIR=$(source {{WORKSPACE_DIR}}/scripts/lib/common.sh 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/sessions"
+grep -rl "strategy-session\|Strategy Session" \
+  "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
+  "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
+```
+Пусто → первая сессия месяца.
 
 > **Найдено платформенным аудитом 17.08.2026:** до этого исправления диспетчер знал только про initial/weekly — monthly-вариант (`strategy-session-monthly.md`) был реализован, но ничем не вызывался, кроме редкой ручной эскалации из weekly-stop-gate. Результат — шаги, привязанные только к monthly (стратегическая сверка, линза калибра/lifework-пакет, разбор inbox), фактически никогда не запускались ни у одного пользователя. Этот шаг — фикс маршрутизации, не новая функциональность.
 >
