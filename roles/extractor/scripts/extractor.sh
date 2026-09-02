@@ -705,10 +705,18 @@ case "$1" in
         if ! acquire_inbox_lock "$feed_lock_dir" "session-close-feed"; then
             exit 0
         fi
+        # Cold-context review (02.09): under this file's `set -e`, run_claude
+        # failing (exit 1 on a missing prompt file, or its own `return 1` on
+        # an AI CLI failure -- a live, not hypothetical, case per its own
+        # WP-5 Ф46 comment) aborted the script before release_inbox_lock ever
+        # ran, leaving the lock held by a now-dead PID until the next call's
+        # stale-reclaim path. Not a permanent deadlock, but a genuine
+        # concurrent run in between was wrongly told "already running", with
+        # nothing reported. The trap covers every exit path uniformly.
+        trap 'release_inbox_lock "$feed_lock_dir" "session-close-feed"' EXIT
         log "Running session-close FEED (non-interactive, writes to captures inbox)"
         run_claude "session-close-feed" "${2:-}"
         notify_telegram "session-close-feed"
-        release_inbox_lock "$feed_lock_dir" "session-close-feed"
         ;;
 
     "git-diff-feed")
