@@ -247,6 +247,41 @@ $extra_args"
     notify "KE: $command_file" "Процесс завершён"
 }
 
+# WP-5 Ф48 follow-up (found live 02.09 on the first real test run after the
+# origin/main-alignment fix above): the shared pre-commit hook's Scope gate
+# (session-guard.sh pre-commit-check) refuses any new/modified path that
+# isn't registered under an active session semaphore. This was invisible
+# before today because the origin/main equality check always fired first and
+# the commit never reached this hook. extractor runs headless with no
+# interactive session open, so it needs its own lightweight housekeeping
+# semaphore -- the exact pattern session-guard.sh's own note-file error
+# message documents, and the one already used by process-runner.py's
+# terminal-card auto-commit (bug-2026-08-21-process-runner-auto-commit-
+# scope-gate.md). Registration is repo-relative (scope_has_path compares
+# plain strings from `git diff --cached --name-only`), so it stays valid
+# through publish_commit's own cherry-pick in a separate disposable worktree
+# -- close only after publish, not right after the local commit.
+extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason>
+    local strategy_dir="$1" agent="$2" reason="$3"
+    local guard="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh"
+    [ -x "$guard" ] || return 1
+    bash "$guard" open --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1 || return 1
+    local rel
+    for rel in inbox/captures.md inbox/captures inbox/extraction-reports; do
+        [ -e "$strategy_dir/$rel" ] || continue
+        bash "$guard" note-file "$strategy_dir/$rel" --agent "$agent" >> "$LOG_FILE" 2>&1 \
+            || log "WARN: note-file failed for $rel ($agent/$reason) — commit may still be blocked by the Scope gate"
+    done
+    return 0
+}
+
+extractor_scope_close() {  # <strategy_dir> <agent> <reason>
+    local strategy_dir="$1" agent="$2" reason="$3"
+    local guard="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh"
+    [ -x "$guard" ] || return 0
+    bash "$guard" close --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1
+}
+
 commit_extractor_changes() {
     local strategy_dir="$1"
     local repo_name="$2"
@@ -307,11 +342,19 @@ commit_extractor_changes() {
         return 0
     fi
 
+    local scope_agent="extractor" scope_reason="commit-$$" scope_opened=0
+    if extractor_scope_open_and_note "$strategy_dir" "$scope_agent" "$scope_reason"; then
+        scope_opened=1
+    else
+        log "WARN: cannot open housekeeping session-guard session for $repo_name; commit may be blocked by the pre-commit Scope gate"
+    fi
+
     # `git commit --only` does not discover a brand-new report directory. Stage only
     # extractor-owned paths; `--only` below still leaves every foreign staged path intact.
     if ! git -C "$strategy_dir" add -- inbox/captures.md inbox/captures/ inbox/extraction-reports/ >> "$LOG_FILE" 2>&1; then
         log "WARN: cannot stage extractor changes for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
         return 1
     fi
 
@@ -320,6 +363,7 @@ commit_extractor_changes() {
         inbox/captures.md inbox/captures/ inbox/extraction-reports/ >> "$LOG_FILE" 2>&1; then
         log "WARN: git commit failed for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
         return 1
     fi
 
@@ -327,6 +371,7 @@ commit_extractor_changes() {
        [ "$head_after" = "$head_before" ]; then
         log "WARN: commit did not advance HEAD for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
         return 1
     fi
     log "Committed $repo_name ($head_after)"
@@ -335,7 +380,10 @@ commit_extractor_changes() {
     # fast-forward-only push. ds-publish.sh/isolate-push.sh fetches fresh
     # origin/main, cherry-picks this commit's patch onto it in a disposable
     # worktree, and pushes -- the same mechanism day-open/day-close/
-    # peer-conversation already rely on for exactly this class of race.
+    # peer-conversation already rely on for exactly this class of race. The
+    # housekeeping registration above stays open through this step (its
+    # repo-relative paths cover the cherry-picked commit too, not just this
+    # worktree's own) and is closed once, right after, regardless of outcome.
     local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
     if [ ! -f "$publish_gate" ]; then
         log "WARN: publish-gate.sh not found at $publish_gate; falling back to raw push for $repo_name"
@@ -345,15 +393,21 @@ commit_extractor_changes() {
         else
             log "WARN: git push failed; only the extractor commit was offered"
             EXTRACTOR_COMMIT_RESULT="failed"
-            return 1
         fi
-        return 0
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+        [ "$EXTRACTOR_COMMIT_RESULT" = "published" ] && return 0 || return 1
     fi
     # shellcheck source=/dev/null
     . "$publish_gate"
 
+    # ds-publish.sh resolves its own IWE_WORKSPACE from the environment
+    # (LOCK_FILE/QUEUE_DIR/canon-refresh paths), not from the $strategy_dir
+    # argument. run_inbox_check_isolated() exports IWE_WORKSPACE pointing at
+    # its own throwaway sandbox for run_claude's benefit -- ds-publish.sh must
+    # not inherit that; it needs the real canonical workspace.
     if is_ds_repo_by_origin "$strategy_dir" \
-        && publish_commit "$strategy_dir" "$head_after" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+        && IWE_WORKSPACE="${IWE_ROOT:-$HOME/IWE}" \
+           publish_commit "$strategy_dir" "$head_after" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
         log "Published $repo_name via ds-publish.sh (local commit $head_after)"
         EXTRACTOR_COMMIT_RESULT="published"
     elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
@@ -362,8 +416,9 @@ commit_extractor_changes() {
     else
         log "WARN: publish failed for $repo_name — commit stays local, см. $LOG_FILE"
         EXTRACTOR_COMMIT_RESULT="failed"
-        return 1
     fi
+    [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+    [ "$EXTRACTOR_COMMIT_RESULT" = "published" ] && return 0 || return 1
 }
 
 release_inbox_lock() {
