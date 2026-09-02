@@ -2224,6 +2224,10 @@
       "sha256": "ff03d395fa0c0526ba0492230a170d96ee6a5757fc7af065bca80ffcddbf4ba4"
     },
     {
+      "path": "scripts/governance-repo-contract.json",
+      "sha256": "c41ac16e71abeab7575f7c75dbb8fff87e8662abb062ca3561a8420835873f26"
+    },
+    {
       "path": "scripts/headless-runner.sh",
       "sha256": "5a79a6d1fe9735bd7a6675d79aeb31d0fb4112f32a639c434f1e406ac14582ff"
     },
@@ -2837,7 +2841,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "3c8051f85afa8cdfc459ca74f38fc269a709174850aa02df2014728d9406a119"
+      "sha256": "224ca399b3923f9c5caa259c8cdd52d606d6eb18db1f7ac819a379cbe276321f"
     },
     {
       "path": "setup/build-runtime.sh",
