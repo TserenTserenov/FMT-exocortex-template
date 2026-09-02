@@ -261,17 +261,17 @@ $extra_args"
 # plain strings from `git diff --cached --name-only`), so it stays valid
 # through publish_commit's own cherry-pick in a separate disposable worktree
 # -- close only after publish, not right after the local commit.
-extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason>
-    local strategy_dir="$1" agent="$2" reason="$3"
+extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason> <changed-paths (newline-separated, repo-relative)>
+    local strategy_dir="$1" agent="$2" reason="$3" changed_paths="$4"
     local guard="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh"
     [ -x "$guard" ] || return 1
     bash "$guard" open --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1 || return 1
     local rel
-    for rel in inbox/captures.md inbox/captures inbox/extraction-reports; do
-        [ -e "$strategy_dir/$rel" ] || continue
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
         bash "$guard" note-file "$strategy_dir/$rel" --agent "$agent" >> "$LOG_FILE" 2>&1 \
             || log "WARN: note-file failed for $rel ($agent/$reason) — commit may still be blocked by the Scope gate"
-    done
+    done <<< "$changed_paths"
     return 0
 }
 
@@ -342,8 +342,17 @@ commit_extractor_changes() {
         return 0
     fi
 
+    # WP-5 Ф48 review fix: derive the paths to register from $target_changes
+    # (porcelain output, so every entry is a real file that exists right now)
+    # instead of a static guess list. The static list silently skipped a path
+    # via `[ -e ... ] || continue` on a repo/run where e.g. inbox/captures/
+    # didn't exist yet -- reintroducing the exact Scope-gate block this whole
+    # function exists to avoid, with no warning.
+    local changed_paths
+    changed_paths=$(awk '{print substr($0, 4)}' <<< "$target_changes")
+
     local scope_agent="extractor" scope_reason="commit-$$" scope_opened=0
-    if extractor_scope_open_and_note "$strategy_dir" "$scope_agent" "$scope_reason"; then
+    if extractor_scope_open_and_note "$strategy_dir" "$scope_agent" "$scope_reason" "$changed_paths"; then
         scope_opened=1
     else
         log "WARN: cannot open housekeeping session-guard session for $repo_name; commit may be blocked by the pre-commit Scope gate"
