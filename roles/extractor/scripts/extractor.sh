@@ -430,14 +430,14 @@ commit_extractor_changes() {
     [ "$EXTRACTOR_COMMIT_RESULT" = "published" ] && return 0 || return 1
 }
 
-release_inbox_lock() {
-    local lock_dir="$1"
+release_inbox_lock() {  # <lock_dir> [label]
+    local lock_dir="$1" label="${2:-inbox-check}"
     rm -f "$lock_dir/pid"
-    rmdir "$lock_dir" 2>/dev/null || log "WARN: cannot release inbox-check lock: $lock_dir"
+    rmdir "$lock_dir" 2>/dev/null || log "WARN: cannot release $label lock: $lock_dir"
 }
 
-acquire_inbox_lock() {
-    local lock_dir="$1"
+acquire_inbox_lock() {  # <lock_dir> [label]
+    local lock_dir="$1" label="${2:-inbox-check}"
     local owner_pid=""
 
     if mkdir "$lock_dir" 2>/dev/null; then
@@ -449,7 +449,7 @@ acquire_inbox_lock() {
         owner_pid=$(tr -d '[:space:]' < "$lock_dir/pid")
     fi
     if [[ "$owner_pid" =~ ^[0-9]+$ ]] && kill -0 "$owner_pid" 2>/dev/null; then
-        log "SKIP: inbox-check is already running (pid $owner_pid)"
+        log "SKIP: $label is already running (pid $owner_pid)"
         return 1
     fi
 
@@ -458,17 +458,17 @@ acquire_inbox_lock() {
     if [ -n "$owner_pid" ]; then
         rm -f "$lock_dir/pid"
         if ! rmdir "$lock_dir" 2>/dev/null; then
-            log "SKIP: stale inbox-check lock needs manual review: $lock_dir"
+            log "SKIP: stale $label lock needs manual review: $lock_dir"
             return 1
         fi
         if mkdir "$lock_dir" 2>/dev/null; then
             printf '%s\n' "$$" > "$lock_dir/pid"
-            log "WARN: reclaimed stale inbox-check lock from pid $owner_pid"
+            log "WARN: reclaimed stale $label lock from pid $owner_pid"
             return 0
         fi
     fi
 
-    log "SKIP: inbox-check lock is unavailable: $lock_dir"
+    log "SKIP: $label lock is unavailable: $lock_dir"
     return 1
 }
 
@@ -695,9 +695,20 @@ case "$1" in
         # пишет ###-блоки в помесячный inbox/captures/YYYY-MM.md (ротация
         # WP-526; без ротации — в captures.md) с маркером [feed:session-close].
         # Не создаёт extraction-report — это работа inbox-check потом.
+        #
+        # WP-5 follow-up (02.09): quick-close's own handler (session-close-
+        # feeder.sh) now launches this call as a detached background job
+        # instead of waiting synchronously -- multiple session closes can fire
+        # in quick succession without one blocking on the other's completion.
+        # Without a lock they'd race writing the same monthly captures.md.
+        feed_lock_dir="${IWE_EXTRACTOR_FEED_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-session-close-feed.lock}"
+        if ! acquire_inbox_lock "$feed_lock_dir" "session-close-feed"; then
+            exit 0
+        fi
         log "Running session-close FEED (non-interactive, writes to captures inbox)"
         run_claude "session-close-feed" "${2:-}"
         notify_telegram "session-close-feed"
+        release_inbox_lock "$feed_lock_dir" "session-close-feed"
         ;;
 
     "git-diff-feed")
