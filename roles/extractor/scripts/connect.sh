@@ -62,9 +62,18 @@ save_token() {
 }
 
 read_token_interactively() {
-    local token
+    local token line
     read -rsp "Вставьте токен, напечатанный выше (ввод скрыт): " token
     echo >&2
+    # A long token wraps across several terminal lines when the window is
+    # narrow; pasting the whole block delivers all of them at once, so the
+    # rest is already sitting in the input buffer right behind the first
+    # line. Manual single-line entry leaves nothing queued, so the
+    # non-blocking read below times out immediately and changes nothing.
+    while IFS= read -rs -t 0.3 line; do
+        [ -n "$line" ] || break
+        token="${token}${line}"
+    done
     # Paste often carries a trailing newline or surrounding spaces.
     token="$(printf '%s' "$token" | tr -d '[:space:]')"
     [ -n "$token" ] || die "пусто — ничего не сохранено."

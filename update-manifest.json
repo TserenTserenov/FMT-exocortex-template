@@ -1637,7 +1637,7 @@
     },
     {
       "path": "roles/extractor/scripts/connect.sh",
-      "sha256": "b3a93c3ac772e400d864af080242e79df6683895e91554868ceebf54ef7ef73d"
+      "sha256": "8a24dba34d40db361b793bd706187cb74c5ad03f99da2456f1b9ec36806ac6a1"
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
