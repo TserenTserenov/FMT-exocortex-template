@@ -82,7 +82,12 @@ HOUR=$(date +%H)
 LOG_FILE="$LOG_DIR/$DATE.log"
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+    # `|| true`: a transient failure writing $LOG_FILE (seen live: macOS
+    # "Operation not permitted" on a handful of runs, cause unconfirmed) must
+    # not kill the whole run under `set -e` — every headless caller of this
+    # script treats extractor failure as best-effort, not fatal, and this is
+    # only the logger, not the work itself.
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE" 2>/dev/null || true
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
@@ -126,6 +131,36 @@ load_env() {
         source "$ENV_FILE"
         set +a
     fi
+    # WP-5 Ф46: subscription token saved by scripts/connect.sh lives in its own
+    # 600-mode file (add-secret.sh convention), not in ENV_FILE. An explicit
+    # env var (launchd plist, shell) still wins over the file.
+    local token_file="$HOME/.secrets/claude_code_oauth_token"
+    if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$token_file" ]; then
+        CLAUDE_CODE_OAUTH_TOKEN="$(<"$token_file")"
+        export CLAUDE_CODE_OAUTH_TOKEN
+    fi
+}
+
+# AI_CLI may be overridden to a non-Claude CLI (see strategist.sh) — then
+# Claude auth checks and hints are meaningless.
+ai_cli_is_claude() {
+    [ "$AI_CLI" = "$CLAUDE_PATH" ]
+}
+
+# WP-5 Ф46: preflight before any headless run. `claude auth status` is the
+# vendor's own answer to "is any login configured?" (env token, API key,
+# keychain on macOS, credentials file) — no API call, exit 1 when nothing is
+# set up. Without it an unauthenticated run dies deep inside run_claude with a
+# generic "AI CLI failed" that a regular user never reads.
+check_auth() {
+    ai_cli_is_claude || return 0
+    local status_out
+    if status_out=$("$AI_CLI" auth status --json 2>&1); then
+        return 0
+    fi
+    log "ERROR: Claude Code не подключён — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
+    log "Выполните: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+    return 1
 }
 
 run_claude() {
@@ -172,6 +207,14 @@ $extra_args"
         $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1; then
         log "ERROR: AI CLI failed for $command_file"
+        # WP-5 Ф46: an expired/revoked subscription token is the most likely
+        # cause (TTL is undocumented, seen live) and would otherwise drown in
+        # the generic failure above. Live wording of the CLI error:
+        # "Failed to authenticate. API Error: 401 OAuth access token is invalid."
+        if ai_cli_is_claude && tail -n 20 "$LOG_FILE" | \
+           grep -qiE "failed to authenticate|\b401\b|invalid.?api.?key|unauthorized|not logged in|token is (invalid|expired|revoked)"; then
+            log "ERROR: похоже, токен подписки протух или отозван. Переподключите: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+        fi
         return 1
     fi
 
@@ -518,6 +561,11 @@ is_work_hours() {
 
 # Загружаем env
 load_env
+
+# Показ usage (без аргумента/-h) не требует входа — только реальные команды ниже.
+if [ -n "${1:-}" ] && [ "$1" != "-h" ] && [ "$1" != "--help" ]; then
+    check_auth || exit 1
+fi
 
 # launchd загружает минимальное окружение. Совместимость сохранена для старого
 # GOVERNANCE_REPO, но все последующие пути используют единое имя репозитория.

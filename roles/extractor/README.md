@@ -33,7 +33,21 @@
 | Мой домен | PACK-my-domain | MD | {{WORKSPACE_DIR}}/PACK-my-domain/pack/my-domain/ |
 ```
 
-### 2. (Опционально) Установи автоматический inbox-check
+### 2. Подключи Экстрактор к своей подписке (нужно для Headless-сценариев)
+
+Headless-сценарии (Inbox-Check, launchd/systemd) запускают Claude Code без интерактивного логина — нужен долгоживущий токен вашей подписки Claude Code (Pro/Max/Team/Enterprise):
+
+```bash
+bash "$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+```
+
+Одна команда, один вход в браузере — скрипт объяснит, что делать, попросит вставить напечатанный токен и сам проверит подключение тестовым вызовом. Токен сохраняется локально в `~/.secrets/claude_code_oauth_token` (права 600) — та же конвенция, что и для остальных секретов шаблона (`scripts/add-secret.sh`).
+
+Токен со временем может протухнуть (срок жизни официально не документирован) — если Inbox-Check начал падать, `extractor.sh` покажет в логе подсказку перезапустить `connect.sh`. Проверить сохранённый токен без нового входа: `connect.sh --check`.
+
+Интерактивные сценарии (Session-Close, On-Demand) подключения не требуют — они выполняются внутри вашей уже открытой сессии Claude Code.
+
+### 3. (Опционально) Установи автоматический inbox-check
 
 ```bash
 cd {{WORKSPACE_DIR}}/FMT-exocortex-template/roles/extractor
@@ -42,7 +56,7 @@ bash install.sh
 
 Это установит launchd-агент для проверки inbox каждые 3 часа.
 
-### 3. Ручной запуск
+### 4. Ручной запуск
 
 ```bash
 # Inbox-check (без launchd) — через собранную runtime-копию, НЕ сырой файл в FMT
