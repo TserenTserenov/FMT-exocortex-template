@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 мин. Сохраняет cp-профиль в цифровой двойник (browser) или Neon (VS Code). Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда видишь пустой cp_profile или нового пользователя без данных."
+description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 мин. Сохраняет cp-профиль в канонический журнал learning.cp_assessments — через MCP-инструмент (browser) или напрямую в Neon (VS Code). Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда видишь пустой cp_profile или нового пользователя без данных."
 argument-hint: "[необязательно: --check для просмотра профиля без нового опроса]"
 related: [WP-318, WP-370, DP.ROLE.042, DP.SC.132, PD.FORM.089]
 version: 5.0.0
@@ -39,7 +39,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Определить интерфейс (ПЕРВЫМ действием)
 
-**Браузер (claude.ai):** инструмент Bash недоступен → сохранение через `dt_write_digital_twin`.
+**Браузер (claude.ai):** инструмент Bash недоступен → сохранение через `learning_ctx_record_cp_assessment` (канонический журнал).
 **VS Code / локальный:** Bash доступен → сохранение в Neon через psycopg2 (+ локальный fallback).
 
 Проверка: попробовать Bash. Если недоступен — работаем в браузерном режиме.
@@ -50,12 +50,11 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ### Браузерный режим
 
-Вызвать `mcp__claude_ai_IWE__dt_read_digital_twin` с path `1_declarative/cp_profile`.
+Вызвать `mcp__claude_ai_IWE__learning_ctx_get_onboarding_state` (читает из того же канона `learning.cp_assessments`, куда пишет Шаг 5).
 
-Если возвращает данные с полем `assessed_at` — проверить возраст:
-- Профиль есть и моложе 7 дней → показать, предложить пройти заново (кнопка «Повторить»).
+- `has_diagnosis: true` → показать текущий `cp_stage`, предложить пройти заново (кнопка «Повторить»). Инструмент не отдаёт `assessed_at` — точный 7-дневный кулдаун (как в VS Code режиме) здесь не проверить; решение «повторять или нет» оставить пилоту.
 - `--check` → показать и завершить.
-- Нет профиля или старше 7 дней → продолжить с Шага 1.
+- `has_diagnosis: false` → продолжить с Шага 1.
 
 ### VS Code режим
 
@@ -270,32 +269,23 @@ cp.iwe [N] | cp.int [N] | cp.agt [N]
 
 Затем сохранить — путь зависит от интерфейса:
 
-### Браузерный режим (claude.ai) — сохранить через dt_write_digital_twin
+### Браузерный режим (claude.ai) — сохранить через learning_ctx_record_cp_assessment
 
-Вычислить `assessed_at` (сегодняшняя дата ISO) и `valid_until` (+180 дней).
+Вычислить `occurred_at` (сейчас, ISO UTC). Сгенерировать `event_id` для идемпотентности: `diagnose-browser-<occurred_at>` (ISO-время без разделителей допустимо, важно только не повторить в рамках одной сессии).
 
-Вызвать `mcp__claude_ai_IWE__dt_write_digital_twin`:
-- **path:** `1_declarative/cp_profile`
-- **data:**
-```json
-{
-  "stage": <N>,
-  "bottleneck_slot": "<cp.xxx или 'none'>",
-  "recommended_stream": "<SN или 'РР'>",
-  "skip_to_stage": <N>,
-  "cp_scores": {
-    "cp.rhy": <N>, "cp.wld": <N>, "cp.skl": <N>,
-    "cp.iwe": <N>, "cp.int": <N>, "cp.agt": <N>
-  },
-  "source": "self_report",
-  "interface": "browser",
-  "rcs_version": "v5.0",
-  "assessed_at": "YYYY-MM-DD",
-  "valid_until": "YYYY-MM-DD"
-}
-```
+Вызвать `mcp__claude_ai_IWE__learning_ctx_record_cp_assessment` (пишет в канонический журнал `learning.cp_assessments`, тот же, что и VS Code режим ниже — не в личный цифровой двойник):
+- **event_id:** `<сгенерированный>`
+- **stage:** `<N>`
+- **cp_scores:** `{"cp.rhy": <N>, "cp.wld": <N>, "cp.skl": <N>, "cp.iwe": <N>, "cp.int": <N>, "cp.agt": <N>}`
+- **bottleneck_slot:** `<cp.xxx или 'none'>`
+- **recommended_stream:** `<SN или 'РР'>`
+- **skip_to_stage:** `<N>`
+- **questions_count:** `<число заданных вопросов>`
+- **rcs_version:** `v5.0`
+- **occurred_at:** `<occurred_at>`
+- **written_by:** `browser`
 
-Если `dt_write_digital_twin` вернул успех → сообщить: `✅ Профиль сохранён в цифровой двойник`.
+Если вызов вернул успех → сообщить: `✅ Профиль сохранён` (без упоминания «цифровой двойник» — запись идёт в общий журнал).
 Если ошибка → показать профиль в чате и попросить пользователя скопировать его вручную.
 
 ### VS Code режим — сохранить в Neon через Bash
@@ -381,14 +371,14 @@ if not saved:
 | Пилот не отвечает числом 1-5 | Переспросить: «Выбери цифру от 1 до 5» |
 | Пилот хочет пропустить вопрос | Присвоить дефолт 2 (conservative), перейти дальше |
 | Менее 4 mandatory-ответов | Показать «Диагностика не завершена», предложить `/diagnose` заново |
-| dt_write_digital_twin недоступен | Показать профиль в чате, попросить скопировать |
+| learning_ctx_record_cp_assessment недоступен | Показать профиль в чате, попросить скопировать |
 | psycopg2 не установлен (VS Code) | Сохранить в `~/.aist/cp-assessments/YYYY-MM-DD.json` |
 | Профиль уже есть (< 7 дней) | Показать и спросить: «Пройти заново?» |
 
 ## Проактивный триггер
 
 Claude должен предложить `/diagnose` **без явного запроса** когда:
-1. В `dt_read_digital_twin` по path `1_declarative/cp_profile` нет данных или `stage = null`
+1. В `learning_ctx_get_onboarding_state` — `has_diagnosis: false` или `cp_stage = null`
 2. В `day-open` IWE-данные пустые или `stage = null`
 3. Пилот говорит «с чего начать», «как мне развиваться», «что делать дальше» — без контекста ступени
 
