@@ -50,12 +50,11 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ### Браузерный режим
 
-Вызвать `mcp__claude_ai_IWE__dt_read_digital_twin` с path `1_declarative/cp_profile`.
+Вызвать `mcp__claude_ai_IWE__learning_ctx_get_onboarding_state` (читает из того же канона `learning.cp_assessments`, куда пишет Шаг 5).
 
-Если возвращает данные с полем `assessed_at` — проверить возраст:
-- Профиль есть и моложе 7 дней → показать, предложить пройти заново (кнопка «Повторить»).
+- `has_diagnosis: true` → показать текущий `cp_stage`, предложить пройти заново (кнопка «Повторить»). Инструмент не отдаёт `assessed_at` — точный 7-дневный кулдаун (как в VS Code режиме) здесь не проверить; решение «повторять или нет» оставить пилоту.
 - `--check` → показать и завершить.
-- Нет профиля или старше 7 дней → продолжить с Шага 1.
+- `has_diagnosis: false` → продолжить с Шага 1.
 
 ### VS Code режим
 
@@ -379,7 +378,7 @@ if not saved:
 ## Проактивный триггер
 
 Claude должен предложить `/diagnose` **без явного запроса** когда:
-1. В `dt_read_digital_twin` по path `1_declarative/cp_profile` нет данных или `stage = null`
+1. В `learning_ctx_get_onboarding_state` — `has_diagnosis: false` или `cp_stage = null`
 2. В `day-open` IWE-данные пустые или `stage = null`
 3. Пилот говорит «с чего начать», «как мне развиваться», «что делать дальше» — без контекста ступени
 
