@@ -163,6 +163,7 @@ Refs: WP-NNN
 
 ### Fixed
 
+- fix(changelog): режим записи `changelog-append.sh` теперь требует явный `IWE_TEMPLATE` и не может молча изменить канонический FMT из изолированного worktree; штатные promote-скрипты передают выбранную цель явно
 - `f896701` fix(skills): personal-guide -> DS-personal-guide в шаблонных скиллах (#585)
   - `personal-guide-start`, `personal-guide-render`, `lesson-close`, `week-close-pilot` — литеральное имя личного репозитория новых пользователей переведено на канон `DS-personal-guide`; `docs/SETUP-GUIDE.md` и её тест-контракт обновлены вместе с манифестом
 - `91b7a2e` fix(day-open/day-close): читатели журналов сессий следуют контракту писателя + единый источник календаря (#545, #581)

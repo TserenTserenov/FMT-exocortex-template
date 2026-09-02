@@ -91,14 +91,28 @@ def make_test_skill(tmp_path: Path, name: str = "test-skill") -> Path:
     return skill_dir
 
 
-def run_promote(skill_src: Path, tmp_fmt: Path, dry_run: bool = False) -> subprocess.CompletedProcess:
+def run_promote(
+    skill_src: Path,
+    tmp_fmt: Path,
+    dry_run: bool = False,
+    explicit_template: bool = True,
+) -> subprocess.CompletedProcess:
     """Запускает skill-promote.sh в изолированном окружении."""
     env = os.environ.copy()
     tmp_iwe = tmp_fmt.parent / "iwe"
     tmp_iwe.mkdir(parents=True, exist_ok=True)
     (tmp_iwe / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
     env["IWE_WORKSPACE"] = str(tmp_iwe)
-    env["IWE_TEMPLATE"] = str(tmp_fmt)
+    if explicit_template:
+        env["IWE_TEMPLATE"] = str(tmp_fmt)
+        expected_changelog_target = tmp_fmt
+    else:
+        env.pop("IWE_TEMPLATE", None)
+        fallback_template = tmp_iwe / "FMT-exocortex-template"
+        if not fallback_template.exists():
+            fallback_template.symlink_to(tmp_fmt, target_is_directory=True)
+        expected_changelog_target = fallback_template
+    env["EXPECTED_CHANGELOG_TARGET"] = str(expected_changelog_target)
     # Pin HOME so the personal-path substitution ($HOME/IWE -> ${IWE:-$HOME/IWE}) has a
     # deterministic match for the /Users/testuser/IWE paths the fixtures hard-code,
     # independent of the runner's real HOME (/home/runner in CI, /Users/<dev> locally).
@@ -170,3 +184,114 @@ def test_git_status_warning_when_dirty(isolated_env):
     result = run_promote(skill_src, tmp_fmt)
     assert result.returncode == 0, result.stderr + result.stdout
     assert "FMT-репо имеет незакоммиченные изменения" in result.stdout
+
+
+def test_real_promote_passes_fallback_target_explicitly_to_changelog(isolated_env):
+    skill_src, tmp_fmt = isolated_env
+    (tmp_fmt / "scripts" / "changelog-append.sh").write_text(
+        """#!/usr/bin/env bash
+if [[ "${IWE_TEMPLATE:-}" != "${EXPECTED_CHANGELOG_TARGET:-}" ]]; then
+    echo "wrong changelog target: ${IWE_TEMPLATE:-unset}" >&2
+    exit 91
+fi
+echo "TARGET_HANDOFF_OK"
+""",
+        encoding="utf-8",
+    )
+
+    result = run_promote(skill_src, tmp_fmt, explicit_template=False)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "TARGET_HANDOFF_OK" in result.stdout
+
+
+def make_changelog_worktrees(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Create a canonical clone and a linked worktree containing the helper."""
+    fake_home = tmp_path / "home"
+    canonical = fake_home / "IWE" / "FMT-exocortex-template"
+    canonical.mkdir(parents=True)
+    shutil.copy2(FMT_ROOT / "scripts" / "changelog-append.sh", canonical / "changelog-append.sh")
+    (canonical / "CHANGELOG.md").write_text(CHANGELOG_HEADER, encoding="utf-8")
+    (canonical / "feature.txt").write_text("candidate\n", encoding="utf-8")
+
+    subprocess.run(["git", "init", "-q", str(canonical)], check=True)
+    subprocess.run(["git", "-C", str(canonical), "add", "--", "CHANGELOG.md", "changelog-append.sh", "feature.txt"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(canonical),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-q",
+            "-m",
+            "feat: changelog target fixture",
+        ],
+        check=True,
+    )
+
+    isolated = tmp_path / "isolated-worktree"
+    subprocess.run(
+        ["git", "-C", str(canonical), "worktree", "add", "-q", "-b", "isolated-test", str(isolated)],
+        check=True,
+    )
+    return fake_home, canonical, isolated
+
+
+def run_changelog(script: Path, fake_home: Path, *args: str, target: Path | None = None) -> subprocess.CompletedProcess:
+    """Run changelog-append without inheriting an author's checkout variables."""
+    env = os.environ.copy()
+    env.pop("IWE_TEMPLATE", None)
+    env.pop("IWE_WORKSPACE", None)
+    env["HOME"] = str(fake_home)
+    if target is not None:
+        env["IWE_TEMPLATE"] = str(target)
+    return subprocess.run(
+        ["bash", str(script), *args],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
+def test_changelog_append_write_without_explicit_template_fails_closed(tmp_path):
+    fake_home, canonical, isolated = make_changelog_worktrees(tmp_path)
+    canonical_before = (canonical / "CHANGELOG.md").read_bytes()
+    isolated_before = (isolated / "CHANGELOG.md").read_bytes()
+
+    result = run_changelog(isolated / "changelog-append.sh", fake_home)
+
+    assert result.returncode == 2
+    assert "IWE_TEMPLATE=/path/to/FMT" in result.stderr
+    assert (canonical / "CHANGELOG.md").read_bytes() == canonical_before
+    assert (isolated / "CHANGELOG.md").read_bytes() == isolated_before
+
+
+def test_changelog_append_dry_run_without_template_warns_and_preserves_files(tmp_path):
+    fake_home, canonical, isolated = make_changelog_worktrees(tmp_path)
+    canonical_before = (canonical / "CHANGELOG.md").read_bytes()
+    isolated_before = (isolated / "CHANGELOG.md").read_bytes()
+
+    result = run_changelog(isolated / "changelog-append.sh", fake_home, "--dry-run")
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "dry-run читает fallback" in result.stderr
+    assert (canonical / "CHANGELOG.md").read_bytes() == canonical_before
+    assert (isolated / "CHANGELOG.md").read_bytes() == isolated_before
+
+
+def test_changelog_append_explicit_template_updates_only_target(tmp_path):
+    fake_home, canonical, isolated = make_changelog_worktrees(tmp_path)
+    canonical_before = (canonical / "CHANGELOG.md").read_bytes()
+    isolated_before = (isolated / "CHANGELOG.md").read_bytes()
+
+    result = run_changelog(isolated / "changelog-append.sh", fake_home, target=isolated)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert (canonical / "CHANGELOG.md").read_bytes() == canonical_before
+    assert (isolated / "CHANGELOG.md").read_bytes() != isolated_before
+    assert "## [Unreleased]" in (isolated / "CHANGELOG.md").read_text(encoding="utf-8")

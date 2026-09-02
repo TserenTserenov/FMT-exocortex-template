@@ -7,21 +7,33 @@
 # Идемпотентен: можно вызывать сколько угодно раз подряд — дубликатов не будет.
 #
 # Использование:
-#   bash changelog-append.sh [--dry-run]
+#   IWE_TEMPLATE=/path/to/FMT bash changelog-append.sh
+#   bash changelog-append.sh --dry-run
 #
 # Для фиксации версии (Unreleased → X.Y.Z):
 #   bash changelog-flush.sh --version 0.32.0
 
 set -uo pipefail
 
-FMT_DIR="${IWE_TEMPLATE:-${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template}"
-CHANGELOG="$FMT_DIR/CHANGELOG.md"
 dry_run=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in --dry-run) dry_run=true ;; esac
     shift
 done
+
+# Write mode must never guess the target checkout. In author worktrees the
+# historical fallback pointed at the canonical clone and silently modified it.
+FMT_DIR="${IWE_TEMPLATE:-}"
+if [[ -z "$FMT_DIR" ]]; then
+    if ! $dry_run; then
+        echo "❌ Режим записи требует явную цель: IWE_TEMPLATE=/path/to/FMT" >&2
+        exit 2
+    fi
+    FMT_DIR="${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template"
+    echo "⚠️  IWE_TEMPLATE не задан; dry-run читает fallback: $FMT_DIR" >&2
+fi
+CHANGELOG="$FMT_DIR/CHANGELOG.md"
 
 if [[ ! -f "$CHANGELOG" ]]; then
     echo "❌ CHANGELOG.md не найден: $CHANGELOG" >&2

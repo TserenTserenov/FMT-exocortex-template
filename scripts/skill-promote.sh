@@ -229,7 +229,7 @@ if [[ -f "$CATALOG_SCRIPT" ]]; then
 fi
 
 CHANGELOG_SCRIPT="$FMT_DIR/scripts/changelog-append.sh"
-if [[ -f "$CHANGELOG_SCRIPT" ]]; then bash "$CHANGELOG_SCRIPT"; fi
+if [[ -f "$CHANGELOG_SCRIPT" ]]; then IWE_TEMPLATE="$FMT_DIR" bash "$CHANGELOG_SCRIPT"; fi
 
 # ── Шаг 8. Запись в promotion-status.yaml (WP-7/PZ-6) ────────────────────────
 PROMOTE_COMMON="$FMT_DIR/scripts/promote-common.sh"

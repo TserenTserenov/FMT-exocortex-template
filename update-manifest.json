@@ -765,7 +765,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bcb3abc9c2e6ab3003411e6125791419d10791346c876fa3e47461ac31d20f43"
+      "sha256": "a24abd1e011dcfe38bc3b43c057a34515f711459ea770b54f2a421092146d556"
     },
     {
       "path": "CLAUDE.md",
@@ -2001,7 +2001,7 @@
     },
     {
       "path": "scripts/changelog-append.sh",
-      "sha256": "c559e833e45c8c68e0386971f5518e05c943992d40c4b7cf5a3cdf0b3294a1ac"
+      "sha256": "53fd0abc41b738a69f9e85607c09918f552fe8eb071404b098706bf7f1514884"
     },
     {
       "path": "scripts/changelog-diff-lines.sh",
@@ -2009,7 +2009,7 @@
     },
     {
       "path": "scripts/changelog-flush.sh",
-      "sha256": "0b20d2a3e268c49ed6ad5098c5d847486de46997993f9523ffbc665da434bcb7"
+      "sha256": "853e53618ac0776ba23cbbbdba051a26110004f0b1c4efdac49f4725253e69eb"
     },
     {
       "path": "scripts/check-claude-md-links.py",
@@ -2245,7 +2245,7 @@
     },
     {
       "path": "scripts/hook-promote.sh",
-      "sha256": "6f4b6a151d5b2ae0f6c251ead840321bad1decbebfccca0fcc54a60bfbad4d48"
+      "sha256": "9279d09adf07d3fe065b71d4292808888c0a6f20c8256d769cfceb0ef9172d4c"
     },
     {
       "path": "scripts/hot-files.list",
@@ -2469,7 +2469,7 @@
     },
     {
       "path": "scripts/script-promote.sh",
-      "sha256": "769bf6c659d27ef4b6775db03bbf3ed880bfdf85f9ace2243b8a7d4d9a425e5a"
+      "sha256": "1d92da239f78e9225a7a2f651c977ce5956050d52576ebb066429fe336f43da9"
     },
     {
       "path": "scripts/server-calendar.sh",
@@ -2485,7 +2485,7 @@
     },
     {
       "path": "scripts/settings-promote.sh",
-      "sha256": "20b3e2bdadc0439b5920f5f788a04794b14e21d89a38a1f23901bd020fa80df8"
+      "sha256": "1ac13a8ed2345257c53f4fb3ce5f37637663bfaf3e321d651087066dc61f0082"
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
@@ -2493,7 +2493,7 @@
     },
     {
       "path": "scripts/skill-promote.sh",
-      "sha256": "59c22f6dbea6a85fac523693b351e807a9d115c795b2aa3f4ac0cf5571b58511"
+      "sha256": "b3f0a897e18ed6294f23b33dc408794a1594afcc1a08d611f00c408b63c90512"
     },
     {
       "path": "scripts/skills-pull.sh",

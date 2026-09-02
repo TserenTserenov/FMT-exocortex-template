@@ -38,7 +38,7 @@ UNRELEASED_CONTENT=$(awk '
     in_u && NF { print }
 ' "$CHANGELOG" 2>/dev/null)
 if [ -z "$UNRELEASED_CONTENT" ]; then
-    echo "⚠️  Секция [Unreleased] пуста или отсутствует. Сначала запусти: bash changelog-append.sh" >&2
+    echo "⚠️  Секция [Unreleased] пуста или отсутствует. Сначала запусти: IWE_TEMPLATE=\"$FMT_DIR\" bash \"$FMT_DIR/scripts/changelog-append.sh\"" >&2
     exit 1
 fi
 
