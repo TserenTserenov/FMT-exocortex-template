@@ -703,6 +703,7 @@ jobs:
           python3 -m pytest -q \
             scripts/tests/test_issue_*.py \
             scripts/tests/test_install_hooks.py \
+            scripts/tests/test_skill_promote.py \
             scripts/tests/test_residency_gate_skill_adapter.py
           # The skill directory contains a hyphen, so pytest cannot import it
           # as a package reliably; both files are executable unit suites.
