@@ -1641,7 +1641,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "3474f35ccdfe93cf170ac0c2fcb91b5fbdf192855ecc54896478e3b10eaf1318"
+      "sha256": "c1f5010fda6a63ad545d8cb3f476910adf89950dc52413517ac3bc219b869903"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
