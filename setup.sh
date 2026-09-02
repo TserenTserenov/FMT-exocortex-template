@@ -918,9 +918,84 @@ echo "[6/6] Setting up $GOVERNANCE_REPO..."
 MY_STRATEGY_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
 
+# WP-560 Ф5-Phase-1: the browser path (create_personal_data_space via
+# github-integration-service, family-catalog.ts) creates the same governance
+# repository under the same canonical name, independently of this script. A user
+# who started in the browser and then installs VS Code used to hit
+# `gh repo create` failing on "already exists" while a second, unrelated local
+# repo got initialised. Adopt the existing remote instead — but only after
+# proving it is ours (owner = GITHUB_USER) and shaped like a governance repo
+# (seed markers). Anything else aborts loudly; nothing is ever pushed over it.
+GOVERNANCE_MARKERS=("REPO-TYPE.md" "docs/WP-REGISTRY.md")
+
+remote_governance_repo_exists() {
+    ! $CORE_ONLY && command -v gh >/dev/null 2>&1 \
+        && gh repo view "$GITHUB_USER/$GOVERNANCE_REPO" --json name >/dev/null 2>&1
+}
+
+governance_markers_missing() {
+    local root="$1" m
+    for m in "${GOVERNANCE_MARKERS[@]}"; do
+        [ -e "$root/$m" ] || echo "$m"
+    done
+}
+
+adopt_existing_governance_repo() {
+    local owner_login
+    owner_login=$(gh repo view "$GITHUB_USER/$GOVERNANCE_REPO" --json owner --jq '.owner.login' 2>/dev/null)
+    if [ "$owner_login" != "$GITHUB_USER" ]; then
+        echo "  ERROR: GitHub repo $GITHUB_USER/$GOVERNANCE_REPO resolves to owner '$owner_login', expected '$GITHUB_USER'."
+        echo "  Refusing to adopt a repository that is not yours. Set GOVERNANCE_REPO to another name and re-run."
+        exit 1
+    fi
+    if [ -d "$MY_STRATEGY_DIR" ] && [ -n "$(ls -A "$MY_STRATEGY_DIR" 2>/dev/null)" ]; then
+        echo "  ERROR: $MY_STRATEGY_DIR exists, is not a git repo, and is not empty — cannot clone into it."
+        echo "  Fix: inspect and clean it up (or rename it aside), then re-run setup.sh."
+        exit 1
+    fi
+    if $DRY_RUN; then
+        echo "  [DRY RUN] Remote $GITHUB_USER/$GOVERNANCE_REPO exists → would clone it into $MY_STRATEGY_DIR"
+        echo "  [DRY RUN] Would verify governance markers: ${GOVERNANCE_MARKERS[*]}"
+        generate_executor_catalog_for_governance
+        return
+    fi
+    echo "  Remote $GITHUB_USER/$GOVERNANCE_REPO already exists (created elsewhere, e.g. from the browser) — adopting it."
+    if ! gh repo clone "$GITHUB_USER/$GOVERNANCE_REPO" "$MY_STRATEGY_DIR" -- --quiet 2>/dev/null; then
+        echo "  ERROR: could not clone $GITHUB_USER/$GOVERNANCE_REPO. Check network/access and re-run."
+        exit 1
+    fi
+    local missing
+    missing=$(governance_markers_missing "$MY_STRATEGY_DIR")
+    if ! find "$MY_STRATEGY_DIR" -mindepth 1 -maxdepth 1 ! -name .git -print -quit | grep -q .; then
+        # Empty remote (browser created the repository but nothing landed yet): seed it.
+        echo "  Remote is empty — seeding governance structure into it."
+        cp -r "$STRATEGY_TEMPLATE"/. "$MY_STRATEGY_DIR"/
+        generate_executor_catalog_for_governance
+        (cd "$MY_STRATEGY_DIR" && git add -A && git commit -q -m "Initial exocortex: $GOVERNANCE_REPO governance hub" && git push -q -u origin HEAD) || {
+            echo "  ERROR: seeded $MY_STRATEGY_DIR but could not commit/push. Fix manually: cd $MY_STRATEGY_DIR && git push -u origin HEAD"
+            exit 1
+        }
+    elif [ -n "$missing" ]; then
+        echo "  ERROR: $GITHUB_USER/$GOVERNANCE_REPO exists but does not look like an IWE governance repo — missing:"
+        printf '    - %s\n' $missing
+        echo "  It was left untouched in $MY_STRATEGY_DIR (cloned, nothing pushed)."
+        echo "  Fix: either point GOVERNANCE_REPO at a different name, or bring this repo to the seed structure and re-run."
+        exit 1
+    else
+        echo "  ✓ $GOVERNANCE_REPO adopted: owner and structure verified."
+        generate_executor_catalog_for_governance
+    fi
+    if [ -d "$MY_STRATEGY_DIR/.githooks" ]; then
+        (cd "$MY_STRATEGY_DIR" && git config core.hooksPath .githooks 2>/dev/null) && \
+            echo "  Pre-commit hook enabled (.githooks/)" || true
+    fi
+}
+
 if [ -d "$MY_STRATEGY_DIR/.git" ]; then
     echo "  $GOVERNANCE_REPO already exists as git repo."
     generate_executor_catalog_for_governance
+elif [ -d "$STRATEGY_TEMPLATE" ] && remote_governance_repo_exists; then
+    adopt_existing_governance_repo
 elif $DRY_RUN; then
     if [ -d "$STRATEGY_TEMPLATE" ]; then
         echo "  [DRY RUN] Would create $GOVERNANCE_REPO from seed/strategy → $MY_STRATEGY_DIR"
