@@ -41,7 +41,7 @@ done
 
 DATE="${DATE_ARG:-$(date +%Y-%m-%d)}"
 IWE="${IWE_ROOT:-$HOME/IWE}"
-CONFIG="${CONFIG_ARG:-$IWE/DS-strategy/exocortex/day-rhythm-config.yaml}"
+CONFIG="${CONFIG_ARG:-$IWE/.iwe-runtime/day-rhythm-config.yaml}"
 SECRETS_FILE="${HOME}/.secrets/google-calendar"
 
 # --- Выбираем python3 с PyYAML (общий резолвер, WP-529 F6 / #453 #463) ---

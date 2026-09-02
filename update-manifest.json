@@ -2429,7 +2429,7 @@
     },
     {
       "path": "scripts/pending-phases-sweep.sh",
-      "sha256": "793b9b888fdb62d82c9c6b0947f0ce9a7a6648de1e4725f410e4dea5ce68e620"
+      "sha256": "d6b914259b2bf4a6ee1f1a4bcd1c0907e2807cd9924c62c624bf46b2d256bab0"
     },
     {
       "path": "scripts/post-update-check-skills.sh",
@@ -2465,7 +2465,7 @@
     },
     {
       "path": "scripts/server-calendar.sh",
-      "sha256": "e6293844d736a01853d429eea4f367411bff414bf9154ab7ecd01f7ea1093c40"
+      "sha256": "7e2c56557c61a308af111fe5a0a8036ceb388b1235ca9b1a1868eef58b8dd1a8"
     },
     {
       "path": "scripts/server-news.sh",
