@@ -1613,7 +1613,7 @@
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
-      "sha256": "ffd1faf3ca2ba625fab9fe491a430f3ecb0a724c6364cabb9fd00dfe76dd48cb"
+      "sha256": "1e883a4e13e094540a0d9c3860e30c6731ceb4ffe60781d718c9c9ff268d81a8"
     },
     {
       "path": "roles/extractor/prompts/knowledge-audit.md",
