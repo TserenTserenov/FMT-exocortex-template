@@ -21,6 +21,17 @@ else
     echo "  ⚠ Legacy mode: используются плейсхолдеры из FMT-substituted (запустите setup.sh ≥0.29.0 для архитектуры F)"
 fi
 
+# WP-5 Ф46: the scheduled run is headless — warn now (not blocking) if Claude
+# Code has no login at all, instead of a silent failure at the first 3h tick.
+# The saved subscription token is picked up by extractor.sh load_env, so its
+# presence counts even though `claude auth status` here does not see it.
+if [ ! -f "$HOME/.secrets/claude_code_oauth_token" ] \
+   && command -v claude >/dev/null 2>&1 \
+   && ! claude auth status --json >/dev/null 2>&1; then
+    echo "  ⚠ Claude Code не подключён — автоматический inbox-check не сможет войти."
+    echo "    Выполните: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+fi
+
 echo "Installing Extractor launchd agent..."
 echo "  PLIST_SRC: $PLIST_SRC"
 

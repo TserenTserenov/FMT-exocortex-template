@@ -765,7 +765,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2be88deba4c2361764dd7a3f2bf3e462631c01f6de9d10efbd20f0fb1d861ea0"
+      "sha256": "bcb3abc9c2e6ab3003411e6125791419d10791346c876fa3e47461ac31d20f43"
     },
     {
       "path": "CLAUDE.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "5d85774b43fa53f574a43caf401bd60b5d762dae1d45765cccee353bda02eb71"
+      "sha256": "8038fd267bd9508502bcdf1ef0c86114e388fb0d0a2054855a8c2ffefd50e5a0"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1593,7 +1593,7 @@
     },
     {
       "path": "roles/extractor/README.md",
-      "sha256": "476fe3428963138adfee8430a34e954e152471a694942ae9b0ed733d6cbf69ae"
+      "sha256": "6edc4207a6d0f4aefbaa588b8d26c94614f0411e96306ccdf46c18d5fea7afad"
     },
     {
       "path": "roles/extractor/config/feedback-log.md",
@@ -1605,7 +1605,7 @@
     },
     {
       "path": "roles/extractor/install.sh",
-      "sha256": "5f3d16cd570eed659ae86e40e99417137d2be0e4128dc2cf88dc55de3681bb66"
+      "sha256": "b151686a7f233b15c5d462b453575d156b66521a554cf5eaaa412f0009fea32f"
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
@@ -1636,8 +1636,12 @@
       "sha256": "36a89cf11dd18e1e80ac30ba9c9e9262d223ed6b9ac5fd399b19e90c06589e4b"
     },
     {
+      "path": "roles/extractor/scripts/connect.sh",
+      "sha256": "b3a93c3ac772e400d864af080242e79df6683895e91554868ceebf54ef7ef73d"
+    },
+    {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "9905bcac0889bca52c461330ba0cbdc35df6d236a1ff35e207fd93998a41dc28"
+      "sha256": "216a2121cd67a329dc2e1ac95a4719d63ec125871d1cc11fa4a4af1146d8393f"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2837,7 +2841,7 @@
     },
     {
       "path": "setup/build-runtime.sh",
-      "sha256": "6609c5b6b41d4b6916dd6895bd5e5e7397717d34b81a290ba3a47f67ba9c18df"
+      "sha256": "c858557329da9e9b8d1e665ab9f69994b2ebdc1da52cc7e0f014db633f32c83b"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -2960,6 +2964,7 @@
     "setup/smoke-test-fresh-install.sh",
     "setup/test-attestation-build-statement.sh",
     "setup/test-attestation-canonical-digest.sh",
+    "setup/test-build-runtime-preserves-live-state.sh",
     "setup/test-day-open-delivery-closure.sh",
     "setup/test-delivery-route-label.sh",
     "setup/test-detectors.sh",
