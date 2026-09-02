@@ -251,10 +251,9 @@ commit_extractor_changes() {
     local strategy_dir="$1"
     local repo_name="$2"
     local commit_mode="${3:-main}"
-    local branch head_before origin_before head_after origin_after target_changes
+    local branch head_before head_after target_changes
 
     EXTRACTOR_COMMIT_RESULT=""
-    EXTRACTOR_PUBLISHED_SHA=""
 
     if ! branch=$(git -C "$strategy_dir" branch --show-current 2>/dev/null); then
         log "WARN: cannot determine branch for $repo_name; skipping commit"
@@ -268,14 +267,18 @@ commit_extractor_changes() {
         return 0
     fi
 
-    if ! head_before=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null) || \
-       ! origin_before=$(git -C "$strategy_dir" rev-parse origin/main 2>/dev/null); then
-        log "WARN: cannot resolve HEAD or origin/main for $repo_name; skipping commit"
-        EXTRACTOR_COMMIT_RESULT="blocked"
-        return 0
-    fi
-    if [ "$head_before" != "$origin_before" ]; then
-        log "SKIP: $repo_name is not aligned with origin/main; skipping commit"
+    # WP-5 Ф48: no longer requires HEAD == origin/main before attempting a
+    # commit. That equality check made every commit fail on a busy day --
+    # origin/main routinely advances during the 2-8 minute Claude analysis
+    # window (dozens of concurrent sessions publishing elsewhere), so by the
+    # time this function runs the worktree is "stale" by definition, even
+    # though the extractor's own paths (inbox/captures*, inbox/extraction-
+    # reports/*) never touch the same lines as unrelated WP work. Staleness
+    # is now handled downstream by publish_commit (fetch + cherry-pick onto
+    # fresh origin/main + bounded retry, scripts/lib/publish-gate.sh) instead
+    # of being refused upfront.
+    if ! head_before=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null); then
+        log "WARN: cannot resolve HEAD for $repo_name; skipping commit"
         EXTRACTOR_COMMIT_RESULT="blocked"
         return 0
     fi
@@ -298,8 +301,7 @@ commit_extractor_changes() {
     fi
 
     if ! head_after=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null) || \
-       ! origin_after=$(git -C "$strategy_dir" rev-parse origin/main 2>/dev/null) || \
-       [ "$head_after" != "$head_before" ] || [ "$origin_after" != "$origin_before" ]; then
+       [ "$head_after" != "$head_before" ]; then
         log "SKIP: $repo_name changed before extractor commit"
         EXTRACTOR_COMMIT_RESULT="blocked"
         return 0
@@ -327,14 +329,38 @@ commit_extractor_changes() {
         EXTRACTOR_COMMIT_RESULT="failed"
         return 1
     fi
-    log "Committed $repo_name"
+    log "Committed $repo_name ($head_after)"
 
-    if git -C "$strategy_dir" push origin "$head_after:refs/heads/main" >> "$LOG_FILE" 2>&1; then
-        log "Pushed $repo_name"
+    # WP-5 Ф48: publish through the shared coordination gate instead of a raw
+    # fast-forward-only push. ds-publish.sh/isolate-push.sh fetches fresh
+    # origin/main, cherry-picks this commit's patch onto it in a disposable
+    # worktree, and pushes -- the same mechanism day-open/day-close/
+    # peer-conversation already rely on for exactly this class of race.
+    local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
+    if [ ! -f "$publish_gate" ]; then
+        log "WARN: publish-gate.sh not found at $publish_gate; falling back to raw push for $repo_name"
+        if git -C "$strategy_dir" push origin "$head_after:refs/heads/main" >> "$LOG_FILE" 2>&1; then
+            log "Pushed $repo_name ($head_after)"
+            EXTRACTOR_COMMIT_RESULT="published"
+        else
+            log "WARN: git push failed; only the extractor commit was offered"
+            EXTRACTOR_COMMIT_RESULT="failed"
+            return 1
+        fi
+        return 0
+    fi
+    # shellcheck source=/dev/null
+    . "$publish_gate"
+
+    if is_ds_repo_by_origin "$strategy_dir" \
+        && publish_commit "$strategy_dir" "$head_after" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+        log "Published $repo_name via ds-publish.sh (local commit $head_after)"
         EXTRACTOR_COMMIT_RESULT="published"
-        EXTRACTOR_PUBLISHED_SHA="$head_after"
+    elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
+        log "Pushed $repo_name ($head_after)"
+        EXTRACTOR_COMMIT_RESULT="published"
     else
-        log "WARN: git push failed; only the extractor commit was offered"
+        log "WARN: publish failed for $repo_name — commit stays local, см. $LOG_FILE"
         EXTRACTOR_COMMIT_RESULT="failed"
         return 1
     fi
@@ -445,7 +471,7 @@ run_inbox_check_isolated() {
     local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
     local canonical_repo="$canonical_workspace/$repo_name"
     local lock_dir="${IWE_EXTRACTOR_INBOX_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-inbox-check.lock}"
-    local run_root worktree isolated_workspace branch_name run_id isolated_template remote_sha actual_pending
+    local run_root worktree isolated_workspace branch_name run_id isolated_template actual_pending
 
     case "$repo_name" in
         ""|.*|*/*)
@@ -529,12 +555,14 @@ run_inbox_check_isolated() {
 
     case "${EXTRACTOR_COMMIT_RESULT:-}" in
         published)
-            remote_sha=$(git -C "$canonical_repo" ls-remote origin refs/heads/main 2>/dev/null | awk 'NR == 1 { print $1 }')
-            if [ "$remote_sha" != "$EXTRACTOR_PUBLISHED_SHA" ]; then
-                log "WARN: remote main did not confirm extractor commit; worktree preserved: $worktree"
-                release_inbox_lock "$lock_dir"
-                return 1
-            fi
+            # WP-5 Ф48: no ls-remote SHA check here anymore. publish_commit
+            # routes through ds-publish.sh/isolate-push.sh, which cherry-picks
+            # this worktree's commit onto a fresh origin/main in its own
+            # disposable worktree -- the SHA that lands on origin is a new one
+            # (different parent), so comparing it against EXTRACTOR_PUBLISHED_SHA
+            # would always mismatch. ds-publish.sh already confirms its own
+            # push before returning 0; commit_extractor_changes() only sets
+            # EXTRACTOR_COMMIT_RESULT=published after that 0.
             cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
                 "$isolated_workspace" "$repo_name" "$run_root" || true
             ;;
