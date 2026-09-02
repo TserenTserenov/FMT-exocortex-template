@@ -311,6 +311,44 @@ USER_NAME="$(id -un)"
 # Compute Claude project slug: /Users/alice/IWE → -Users-alice-IWE
 CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
 
+# === Governance repo contract (WP-560 Ф5-Phase-2) ===
+# Single machine-readable source for the governance repo's default name and
+# the content markers that identify one as "the" governance repo — shared
+# with the server side (aisystant/github-integration-service,
+# src/governance-repo-contract.json). That repo's CI keeps this vendored copy
+# in sync (scheduled + on-push check against the public raw file here); a
+# mismatch there is a signal to update this file, not something this script
+# can detect on its own.
+GOVERNANCE_CONTRACT_FILE="$TEMPLATE_DIR/scripts/governance-repo-contract.json"
+if [ ! -f "$GOVERNANCE_CONTRACT_FILE" ]; then
+    echo "ERROR: governance contract not found: $GOVERNANCE_CONTRACT_FILE" >&2
+    echo "  Run 'git pull' in the template or re-clone, then re-run setup.sh." >&2
+    exit 1
+fi
+if ! GOVERNANCE_CONTRACT_SCHEMA_VERSION=$(jq -r '.schemaVersion // empty' "$GOVERNANCE_CONTRACT_FILE"); then
+    echo "ERROR: governance contract is not valid JSON: $GOVERNANCE_CONTRACT_FILE" >&2
+    exit 1
+fi
+if [ "$GOVERNANCE_CONTRACT_SCHEMA_VERSION" != "1" ]; then
+    echo "ERROR: unsupported governance contract schemaVersion: ${GOVERNANCE_CONTRACT_SCHEMA_VERSION:-<missing>}" >&2
+    exit 1
+fi
+GOVERNANCE_CONTRACT_DEFAULT_REPO=$(jq -r '.defaultRepoName // empty' "$GOVERNANCE_CONTRACT_FILE")
+if [ -z "$GOVERNANCE_CONTRACT_DEFAULT_REPO" ]; then
+    echo "ERROR: governance contract missing defaultRepoName" >&2
+    exit 1
+fi
+GOVERNANCE_MARKERS=()
+_governance_markers_raw=$(jq -r '.requiredMarkers[]? // empty' "$GOVERNANCE_CONTRACT_FILE")
+while IFS= read -r _governance_marker; do
+    [ -n "$_governance_marker" ] && GOVERNANCE_MARKERS+=("$_governance_marker")
+done <<< "$_governance_markers_raw"
+if [ "${#GOVERNANCE_MARKERS[@]}" -eq 0 ]; then
+    echo "ERROR: governance contract has no requiredMarkers" >&2
+    exit 1
+fi
+unset _governance_markers_raw _governance_marker
+
 # Honor an explicit governance repo, then preserve an existing installation's
 # config, then a trusted runtime override; only then auto-detect/default. This
 # makes setup reruns converge on arbitrary safe governance names instead of
@@ -334,9 +372,16 @@ case "$GOVERNANCE_REPO" in
         exit 1
         ;;
 esac
-if [ -z "$GOVERNANCE_REPO" ] && [ -d "$WORKSPACE_DIR/DS-strategy" ]; then
-    GOVERNANCE_REPO="DS-strategy"
+if [ -z "$GOVERNANCE_REPO" ] && [ -d "$WORKSPACE_DIR/$GOVERNANCE_CONTRACT_DEFAULT_REPO" ]; then
+    GOVERNANCE_REPO="$GOVERNANCE_CONTRACT_DEFAULT_REPO"
 fi
+# Scope note (WP-560 Ф5-Phase-2 review, 02.09): this local name-glob picks the
+# first DS-*strategy* directory it finds and does not consult the contract's
+# ambiguityPolicy (0/1/2+, enforced server-side in governance-repo-resolver.ts
+# against GitHub content markers). The two mechanisms differ in kind — this one
+# checks local directory names, not remote content markers — so the policy
+# isn't mechanically portable here; unifying them is an open follow-up on the
+# WP-560 card, not done in this change.
 if [ -z "$GOVERNANCE_REPO" ]; then
     for d in "$WORKSPACE_DIR"/DS-*; do
         case "${d##*/}" in
@@ -347,7 +392,7 @@ if [ -z "$GOVERNANCE_REPO" ]; then
         esac
     done
 fi
-GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
+GOVERNANCE_REPO="${GOVERNANCE_REPO:-$GOVERNANCE_CONTRACT_DEFAULT_REPO}"
 if [ -L "$WORKSPACE_DIR/$GOVERNANCE_REPO" ]; then
     echo "ОШИБКА: governance repo не может быть символической ссылкой: $WORKSPACE_DIR/$GOVERNANCE_REPO" >&2
     exit 1
@@ -926,7 +971,8 @@ STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
 # repo got initialised. Adopt the existing remote instead — but only after
 # proving it is ours (owner = GITHUB_USER) and shaped like a governance repo
 # (seed markers). Anything else aborts loudly; nothing is ever pushed over it.
-GOVERNANCE_MARKERS=("REPO-TYPE.md" "docs/WP-REGISTRY.md")
+# GOVERNANCE_MARKERS itself is loaded from the shared contract earlier in this
+# script (WP-560 Ф5-Phase-2) — not redefined here.
 
 remote_governance_repo_exists() {
     ! $CORE_ONLY && command -v gh >/dev/null 2>&1 \

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "familyId": "DS",
+  "defaultRepoName": "DS-strategy",
+  "requiredMarkers": ["REPO-TYPE.md", "docs/WP-REGISTRY.md"],
+  "ref": "default_branch",
+  "ambiguityPolicy": {
+    "zero": "fail_closed",
+    "one": "use",
+    "twoOrMore": "fail_closed"
+  }
+}
