@@ -2145,7 +2145,7 @@
     },
     {
       "path": "scripts/day-open-llm-fill.py",
-      "sha256": "0cd2567d6f6066d3dc0af23e30d1acc3b7a896bfc59a425895a1a2ae3fb63e1a"
+      "sha256": "c1c4592e652db242ec2698b157d70e2e649e9ae38b2543b850198d913e048da9"
     },
     {
       "path": "scripts/day-open-multiplier-backfill-patch.py",
@@ -2809,7 +2809,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-llm-fill.py",
-      "sha256": "c9e59fc04fa83950662cb3c266313387a9642fafa031294b3cee0adad8b0f4c2"
+      "sha256": "21fdc689599ba88fff4215cf590e5baaa0efa1d0f552e7c7e9be311bab7e41cf"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
