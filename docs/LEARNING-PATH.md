@@ -983,6 +983,8 @@ PACK-{область}/
 2. При Close → Claude активирует роль Экстрактора (R2) и показывает Extraction Report
 3. Ты одобряешь → сущности записываются в Pack
 
+**Inbox-Check работает без тебя** — headless-запуск по расписанию (каждые 3 часа) не может использовать твой интерактивный вход в Claude Code, ему нужен отдельный долгоживущий токен подписки. Подключается один раз: `cd ~/IWE/FMT-exocortex-template && bash roles/extractor/scripts/connect.sh` (после `roles/extractor/install.sh`, см. [roles/extractor/README.md](../roles/extractor/README.md)). Session-Close, On-Demand и Bulk-Extraction работают в твоей уже открытой сессии — подключения не требуют.
+
 **Где изучить:**
 - Протокол Close (§ 5.1) — когда активируется Экстрактор
 - [DP.ROLE.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ROLE.001-platform-roles.md) R2 — полное описание роли

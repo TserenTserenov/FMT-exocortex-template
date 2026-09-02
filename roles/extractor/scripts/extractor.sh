@@ -158,8 +158,8 @@ check_auth() {
     if status_out=$("$AI_CLI" auth status --json 2>&1); then
         return 0
     fi
-    log "ERROR: Claude Code не подключён — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
-    log "Выполните: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+    log "ERROR: проверка входа Claude Code не прошла — headless-запуск невозможен. Ответ 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
+    log "Если это не сетевой/временный сбой, а подписка правда не подключена: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
     return 1
 }
 
