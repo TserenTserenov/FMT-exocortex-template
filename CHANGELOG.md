@@ -138,6 +138,49 @@ Refs: WP-NNN
 
 
 
+
+
+## [Unreleased] — обновлено 2026-08-24
+
+### Added
+
+- `22f25c4` feat(hooks): расширить защиту от необратимых действий (WP-544 Ф1)
+- `8112b1a` feat(update.sh): параллелизация скачивания манифеста + skip-if-hash-matches
+- `088aaad` feat(dev): явный список Python-зависимостей + инструкция venv
+
+### Changed
+
+- `0958b5f` test(wp529): fail-closed tests for update.sh parallel fetch (Ф4)
+- `2733422` chore(release): weekly auto-bump to v0.38.6
+- `1e88c48` docs(changelog): собрать [Unreleased] с 18.08 перед внеплановым релизом
+- `abd056e` Merge pull request #488 from TserenTserenov/wp529-merge-478-480
+- `43e170a` chore(wp529): regenerate manifest after merging #478+#480
+- `8e3bc40` Merge branch 'pr480' into wp529-merge-478-480
+- `c1c5bd3` Merge branch 'pr478' into wp529-merge-478-480
+- `56a28f8` chore(wp529): пустой коммит для нового прогона CI
+- `67bde25` chore(wp529): пересобрать манифест после ребейза на main
+- `f0eb4ec` Merge pull request #483 from TserenTserenov/wp452-f5-proposal-process
+- `11876de` chore: перегенерировать манифест после Ф5 и venv-инструкции
+- `3e53700` docs(wp452): добавить GitHub issue-шаблон для предложений разработчика
+- `5443f7c` docs(wp452): Ф5 — процесс предложений разработчика IWE
+
+### Fixed
+
+- `52a5189` fix(update): shellcheck-safe comment + real unbound-variable bug it caught
+- `7fd3837` fix(update): restore integrity-mismatch message + fix curl shim for -K batch mode
+- `68d8d88` fix(day-open,calendar,manifest): closes #477, #489, #486
+- `f0c8ee3` fix(release): sync README badge + regenerate manifest for v0.38.6 bump
+- `9a6e60a` fix(wp529): register 2 issue-tests in delivery contract (cold review find)
+- `ea4551c` fix(wp-545): исключить временные worktree из iCloud-бэкапа
+- `4d3727c` fix(WP-529): delivery-route-label фикстура должна нести find-python3.sh рядом с копией чекера
+- `4da487e` fix(WP-529): T11-фикстура должна нести find-python3.sh для изолированного source
+- `6908df9` fix(WP-529): перевести оставшихся heredoc-потребителей PyYAML на общий резолвер
+- `becf4e4` fix(wp529): удалить дубль-файл теста, застрявший в предыдущем коммите
+- `76d2cdd` fix(WP-529): закрыть 5 находок Red Team-ревью Евгения (раунд 2, 19.08)
+- `1a6ca46` fix(WP-529 Ф6): конвейер доставки — фиксы по находкам Евгения 18.08
+- `2654bfa` fix(manifest): фиксы дрейфа манифеста, найденного Евгением 19.08
+
+
 ## [0.38.6] — 2026-08-20
 
 ### Added
