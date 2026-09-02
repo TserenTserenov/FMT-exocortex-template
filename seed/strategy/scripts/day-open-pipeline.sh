@@ -79,32 +79,28 @@ done
 DATE="${DATE:-$(date +%Y-%m-%d)}"
 PROBE_START_S=$SECONDS
 
-# --- Helper: send TG notification (safe JSON via jq) ---
-# MUST be defined before first call (regression fix 2026-06-29).
+# --- Helper: send TG notification, transport unified onto lib/telegram.sh ---
+# MUST be defined before first call (regression fix 2026-06-29). WP-538 Ф3:
+# was a raw curl POST duplicating http_code/ok:true checking that
+# scripts/lib/telegram.sh already does, with 3x retry instead of one shot.
+# Template note: the admission-gate rate limiter (telegram_send_gated) lives
+# only in the author's personal governance repo so far, not this template's
+# notification-render.sh — this promotion carries the transport fix only, not
+# a gated call site.
+# shellcheck source=lib/telegram.sh
+. "$DS_STRATEGY/scripts/lib/telegram.sh"
+
 tg_notify() {
   local msg="$1"
   if [ "$PROBE" = "true" ]; then
     echo "  [probe: TG suppressed] $msg" | head -1
     return 0
   fi
-  if [ -n "${TG_TOKEN:-}" ] && [ -n "${TG_CHAT:-}" ]; then
-    local payload resp http_code
-    # No parse_mode: Markdown 400s on any unpaired _/*/` in dynamic text (DIAG,
-    # LLM warns) — same failure class month-open-night-run.sh hit live on 27.07.
-    payload=$(jq -n --arg chat "$TG_CHAT" --arg text "$msg" '{chat_id: $chat, text: $text}')
-    resp=$(curl -s -w '\n%{http_code}' -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-      -H "Content-Type: application/json" \
-      -d "$payload")
-    http_code=$(printf '%s' "$resp" | tail -n1)
-    # WP-484 F64: a fired curl is not a delivered message — verify and say so.
-    if [ "$http_code" != "200" ] || ! printf '%s' "$resp" | grep -q '"ok":true'; then
-      echo "  [tg delivery FAILED http=$http_code] $msg" | head -2
-      return 1
-    fi
-  else
+  if [ -z "${TG_TOKEN:-}" ] || [ -z "${TG_CHAT:-}" ]; then
     echo "  [no tg credentials] $msg" | head -1
     return 1
   fi
+  telegram_send "$msg" || { echo "  [tg delivery FAILED] $msg" | head -2; return 1; }
 }
 
 # --- Helper: portable single-field read from a Y-m-d date string ---
