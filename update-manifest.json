@@ -825,7 +825,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "4990040c4505bbba9b520177bb4aa2f105ea1e91546ba3cae1d31b2bf822434a"
+      "sha256": "45d551ccc33148a0cda1262b23613586afe3fcda9dc9b664e35ed90fb86f6f4b"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "8038fd267bd9508502bcdf1ef0c86114e388fb0d0a2054855a8c2ffefd50e5a0"
+      "sha256": "0fdcee057931141ba27cd97c81fa013194230e8d0aa6998e52e62b15c0e0e671"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "216a2121cd67a329dc2e1ac95a4719d63ec125871d1cc11fa4a4af1146d8393f"
+      "sha256": "3474f35ccdfe93cf170ac0c2fcb91b5fbdf192855ecc54896478e3b10eaf1318"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",

@@ -341,7 +341,7 @@ cd ~/IWE/FMT-exocortex-template
 # Экстрактор — извлечение знаний из сессий, проверка inbox (каждые 3 часа)
 bash roles/extractor/install.sh
 # Проверка inbox идёт без тебя (headless) — нужен отдельный вход в подписку один раз:
-bash "$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+bash roles/extractor/scripts/connect.sh
 
 # Синхронизатор — центральный scheduler: расписание агентов, уведомления, code-scan
 bash roles/synchronizer/install.sh

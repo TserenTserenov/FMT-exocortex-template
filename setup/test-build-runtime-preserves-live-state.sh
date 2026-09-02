@@ -54,6 +54,10 @@ echo "--- Сею живое состояние, которое build-runtime.sh 
 mkdir -p "$TEST_WORKSPACE/.iwe-runtime/sessions" "$TEST_WORKSPACE/.iwe-runtime/isolate-push-attempts"
 echo "live-session-marker" > "$TEST_WORKSPACE/.iwe-runtime/sessions/claude-code-999.open"
 echo "live-isolate-attempt" > "$TEST_WORKSPACE/.iwe-runtime/isolate-push-attempts/attempt.json"
+# A top-level FILE, not just directories (open-sessions.log lives exactly like
+# this in the real .iwe-runtime/) — the fix's `[ -e ... ] || mv` check must not
+# assume every surviving entry is a directory.
+echo "live-log-line" > "$TEST_WORKSPACE/.iwe-runtime/open-sessions.log"
 
 echo "--- Вторая сборка: должна пересобрать roles/, но не тронуть живое состояние ---"
 if bash "$BUILD_SCRIPT" --workspace "$TEST_WORKSPACE" --env-file "$ENV_FILE" --quiet >"$TEST_WORKSPACE/build2.log" 2>&1; then
@@ -73,6 +77,13 @@ if [ -f "$TEST_WORKSPACE/.iwe-runtime/isolate-push-attempts/attempt.json" ]; the
     pass "isolate-push-attempts/ пережил пересборку"
 else
     fail "isolate-push-attempts/ ПОТЕРЯН при пересборке"
+fi
+
+if [ -f "$TEST_WORKSPACE/.iwe-runtime/open-sessions.log" ] \
+   && [ "$(cat "$TEST_WORKSPACE/.iwe-runtime/open-sessions.log")" = "live-log-line" ]; then
+    pass "живой файл верхнего уровня (не директория) пережил пересборку"
+else
+    fail "живой файл верхнего уровня ПОТЕРЯН при пересборке"
 fi
 
 [ -d "$TEST_WORKSPACE/.iwe-runtime/roles/extractor" ] && pass "roles/extractor всё ещё на месте после второй сборки" \
