@@ -679,6 +679,13 @@ jobs:
       - name: Test the orphan-hook guard itself (marker + allowlist + real orphan)
         run: bash scripts/tests/test_check_orphan_hooks.sh
 
+      # АрхГейт 03.09 (WP-5): изолированная песочница inbox-check теперь
+      # монтирует Pack-репозитории для проверки дублей — read-only должен быть
+      # реальным (файловая система), не только текстом промпта, иначе тот же
+      # класс дыры, что в bug-2026-07-07-r15-decisions-bypassed-pilot.md.
+      - name: Test read-only Pack mount is filesystem-enforced
+        run: bash scripts/tests/test_mount_readonly_packs.sh
+
       # WP-529 Ф6 (находки Евгения 18.08): PyYAML — заявленная зависимость
       # (requirements.txt, #463), но CI её не гарантировал, а вся семья
       # scripts/tests/test_issue_*.sh лежала в репо не подключённой — тот же

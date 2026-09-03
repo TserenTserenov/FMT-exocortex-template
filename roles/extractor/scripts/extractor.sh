@@ -489,6 +489,19 @@ cleanup_isolated_inbox_worktree() {
         log "WARN: published inbox-check branch was preserved for review: $branch_name"
     fi
 
+    # Read-only Pack clones (see mount_readonly_packs()) are chmod a-w
+    # recursively, including the directories themselves -- removing entries
+    # from a directory needs write permission on that directory, so restore
+    # it (owner-only, u+w) before rm -rf, or cleanup silently fails and the
+    # final rmdir below leaves the whole run_root behind as a "cannot remove"
+    # WARN forever.
+    local pack_clone
+    for pack_clone in "$isolated_workspace"/PACK-*; do
+        [ -d "$pack_clone" ] || continue
+        chmod -R u+w "$pack_clone" 2>/dev/null
+        rm -rf "$pack_clone"
+    done
+
     rm -f "$isolated_workspace/$repo_name" \
         "$isolated_workspace/FMT-exocortex-template/roles/extractor/config/routing.md" \
         "$isolated_workspace/FMT-exocortex-template/roles/extractor/prompts/session-close.md"
@@ -499,6 +512,36 @@ cleanup_isolated_inbox_worktree() {
     rmdir "$isolated_workspace/FMT-exocortex-template" 2>/dev/null || true
     rmdir "$isolated_workspace" 2>/dev/null || log "WARN: cannot remove isolated workspace shell: $isolated_workspace"
     rmdir "$run_root" 2>/dev/null || log "WARN: cannot remove isolated run directory: $run_root"
+}
+
+# AR-gate 03.09 (архгейт, см. bug-2026-07-07-r15-decisions-bypassed-pilot.md):
+# inbox-check.md never writes into a Pack -- headless steps only ever vote
+# accept/reject/defer into the report, the actual write happens exclusively
+# in the separate, pilot-triggered "Применение отчёта" session. Mounting
+# Packs here only lets the headless vote be an informed one (duplicate/
+# bounded-context checks Step 2d already requires) instead of blanket defer
+# for "not mounted". Read-only is enforced by the filesystem (chmod), not
+# prompt wording -- run_claude launches Claude with
+# --dangerously-skip-permissions and Write/Edit in --allowedTools, so a
+# prompt-only "don't write here" instruction is not a real control (the
+# exact class of gap the cited bug found in a different skill). Each Pack
+# gets its own disposable shallow clone, never the live checkout, so even a
+# stray write attempt lands on a throwaway copy, not shared state other
+# sessions might be editing concurrently.
+mount_readonly_packs() {
+    local canonical_workspace="$1"
+    local isolated_workspace="$2"
+    local pack_dir pack_name
+    for pack_dir in "$canonical_workspace"/PACK-*; do
+        [ -d "$pack_dir/.git" ] || continue
+        pack_name=$(basename "$pack_dir")
+        if git clone -q --depth 1 --no-tags "$pack_dir" "$isolated_workspace/$pack_name" >> "$LOG_FILE" 2>&1; then
+            chmod -R a-w "$isolated_workspace/$pack_name"
+            log "Mounted read-only Pack for duplicate-check: $pack_name"
+        else
+            log "WARN: could not clone $pack_name for read-only mount; inbox-check will see it as absent"
+        fi
+    done
 }
 
 pending_capture_count() {
@@ -606,6 +649,8 @@ run_inbox_check_isolated() {
         return 0
     fi
     log "Found $actual_pending pending captures in refreshed inbox"
+
+    mount_readonly_packs "$canonical_workspace" "$isolated_workspace"
 
     local WORKSPACE="$isolated_workspace"
     local IWE_WORKSPACE="$isolated_workspace"
