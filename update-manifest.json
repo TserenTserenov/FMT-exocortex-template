@@ -2677,7 +2677,7 @@
     },
     {
       "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
-      "sha256": "521093c91327e96abbf67f28d367a40788f638f543a0dfcc7162858b831b39fd"
+      "sha256": "749983afa7e82590c905615fb002a148b277bb02657e82efb147c1c189d5a358"
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",
