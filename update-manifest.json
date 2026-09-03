@@ -2489,7 +2489,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "995fc5868b336eb59c9289df5fffba807cf65052249246c1f8770c5c79a3c5a1"
+      "sha256": "37c698a49413f1466d9ef7ec67dbba9c2eb015051e89a5181d7f462e16e19642"
     },
     {
       "path": "scripts/skill-promote.sh",
