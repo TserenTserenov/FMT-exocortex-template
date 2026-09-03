@@ -160,7 +160,7 @@ if [ "$DIRTY_COUNT" -gt 0 ]; then
 
         # Unload launchd-агенты (предотвращает запуск битых substituted-скриптов)
         if command -v launchctl >/dev/null 2>&1; then
-            for plist in com.strategist.morning com.strategist.weekreview com.extractor.inbox-check com.exocortex.scheduler; do
+            for plist in com.strategist.morning com.strategist.weekreview com.extractor.inbox-check com.extractor.git-diff-feed com.exocortex.scheduler; do
                 launchctl unload "$HOME/Library/LaunchAgents/${plist}.plist" 2>/dev/null || true
             done
             echo "  ✓ launchd: IWE-агенты выгружены"

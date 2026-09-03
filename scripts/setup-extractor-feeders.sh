@@ -124,12 +124,7 @@ if [ "$PLATFORM" = "Darwin" ]; then
         CLAUDE_BIN_DIR="$(dirname "$(command -v claude)")"
         PLIST_PATH="$CLAUDE_BIN_DIR:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
         IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-        # Unload ДО перезаписи файла: unload читает Label из ТЕКУЩЕГО содержимого
-        # на диске. Если Label когда-нибудь изменится в heredoc ниже, unload
-        # после перезаписи снял бы задачу по НОВОМУ Label (которого ещё нет в
-        # реестре launchd), и старая задача осталась бы висеть орфаном.
-        launchctl unload "$PLIST" 2>/dev/null || warn "launchctl unload: задача не была загружена (норма при первой установке)"
-        cat > "$PLIST" <<PLIST
+        NEW_PLIST_CONTENT=$(cat <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -160,8 +155,28 @@ if [ "$PLATFORM" = "Darwin" ]; then
     </dict>
 </dict></plist>
 PLIST
-        launchctl load "$PLIST" 2>/dev/null || warn "launchctl load failed (повторите вручную)"
-        ok "launchd plist установлен в $PLIST"
+)
+        # Idempotency (WP-5, found 03.09 — setup.sh now calls this on every
+        # run, not just a one-off manual invocation): re-installing an
+        # unchanged, already-loaded job would still unload/reload it, which
+        # could kill a run in flight at exactly 06:00/21:00. Skip only when
+        # content is unchanged AND the job is actually loaded -- content
+        # unchanged but not loaded (e.g. a prior `launchctl unload` left it
+        # stopped) must still fall through to `load`.
+        if [ -f "$PLIST" ] && [ "$(cat "$PLIST")" = "$NEW_PLIST_CONTENT" ] \
+            && launchctl list "com.extractor.git-diff-feed" >/dev/null 2>&1; then
+            ok "launchd plist уже установлен и активен, без изменений"
+        else
+            # Unload ДО перезаписи файла: unload читает Label из ТЕКУЩЕГО
+            # содержимого на диске. Если Label когда-нибудь изменится в
+            # heredoc выше, unload после перезаписи снял бы задачу по НОВОМУ
+            # Label (которого ещё нет в реестре launchd), и старая задача
+            # осталась бы висеть орфаном.
+            launchctl unload "$PLIST" 2>/dev/null || warn "launchctl unload: задача не была загружена (норма при первой установке)"
+            printf '%s\n' "$NEW_PLIST_CONTENT" > "$PLIST"
+            launchctl load "$PLIST" 2>/dev/null || warn "launchctl load failed (повторите вручную)"
+            ok "launchd plist установлен в $PLIST"
+        fi
     fi
 elif [ "$PLATFORM" = "Linux" ]; then
     UNIT_DIR="$HOME/.config/systemd/user"

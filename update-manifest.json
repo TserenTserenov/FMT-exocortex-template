@@ -2421,7 +2421,7 @@
     },
     {
       "path": "scripts/migrate-to-runtime-target.sh",
-      "sha256": "ca08e524cad094189a133f51cd9d802ee89ad8d4f74ab26ad2dbda3b37247fed"
+      "sha256": "108012b32f8783027c08e3395c640c9fe55d8ce2907a3766d9578d1996de7ac0"
     },
     {
       "path": "scripts/pack-ci-install.sh",
@@ -2489,7 +2489,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "37c698a49413f1466d9ef7ec67dbba9c2eb015051e89a5181d7f462e16e19642"
+      "sha256": "6a73a17201951293542388d78cb4c903a5149fd1d78c31eb0e7730253ecf3826"
     },
     {
       "path": "scripts/skill-promote.sh",
@@ -2841,7 +2841,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "224ca399b3923f9c5caa259c8cdd52d606d6eb18db1f7ac819a379cbe276321f"
+      "sha256": "4393a39c0a75c10a23ed11c8a5b4e52fd1d02b73977e4b190bf2e5e01863d737"
     },
     {
       "path": "setup/build-runtime.sh",
