@@ -1641,7 +1641,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "212a74c11af1882a763fb3d857878bde54030a5ce6f795532f2a927ad645e29b"
+      "sha256": "7bcf1d6bc39ef4d5dac790504c85aac61c8ee5cb215a6d25d43f0cf8d05c69a4"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2932,6 +2932,7 @@
     "scripts/tests/test_issue_583_dayopen_yaml.sh",
     "scripts/tests/test_issue_584_build_version.sh",
     "scripts/tests/test_issue_596_weekreport_filename.sh",
+    "scripts/tests/test_issue_633_resolve_governance_branch.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_pending_phases_sweep.sh",
