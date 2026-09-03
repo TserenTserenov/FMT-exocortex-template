@@ -1429,12 +1429,12 @@ def test_real_route_records_multi_token_russian_fault_exactly(tmp_path: Path):
     workspace, governance_dir = _install_seed(tmp_path, "DS-custom")
     catalog = governance_dir / "scripts" / "executor-catalog.yaml"
     _write_catalog(catalog, _skill_script_path())
-    # route-task.sh resolves a relative script_path against IWE_DIR (the
-    # synthetic workspace here), not IWE_SCRIPTS — mirror that layout by
-    # installing the real skill script where a genuine deployment would have
-    # it, same pattern as _install_workspace_cli() below.
+    # route-task.sh resolves a relative script_path against IWE_TEMPLATE
+    # (defaults to $IWE_DIR/FMT-exocortex-template, issue #634 fix) - mirror
+    # that nested layout, same pattern used by
+    # test_protocol_extensions_execute_cli_from_template_runtime above.
     real_skill_script = ROOT / _skill_script_path()
-    installed_skill_script = workspace / _skill_script_path()
+    installed_skill_script = workspace / "FMT-exocortex-template" / _skill_script_path()
     installed_skill_script.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(real_skill_script, installed_skill_script)
     fault = "агент потерял многословное русское описание ошибки"

@@ -269,7 +269,7 @@
     },
     {
       "path": ".claude/scripts/memory-drift-scan.py",
-      "sha256": "8c0b5d81add179ca03aa3e590a33a9b92c36b97b49d9030f0c2eba808a29fea0"
+      "sha256": "65200a4f0e2f496d59c9206840cdb323eeb3e7e66fdbbc05a0612975af26f33c"
     },
     {
       "path": ".claude/scripts/settings-merge-apply.sh",
@@ -2129,7 +2129,7 @@
     },
     {
       "path": "scripts/day-open-checks-runner.sh",
-      "sha256": "e6e03924c9fd59cceb5104e1ef240b1a99233138e4789d66a9de1cc64fa2cefd"
+      "sha256": "b16b1357161a0a94ac855541f94cef7016d708a38d69c37af1a157b8ec6d19bf"
     },
     {
       "path": "scripts/day-open-close-error-patch.py",
@@ -2461,7 +2461,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "e82346bbb334e2bcce42b24546282a886e31648ece8a19b0b6777bab9eb8fe69"
+      "sha256": "b1b6c165cf378ced7c5a9b2b69c84b0b70d98ff57c8fd3e81f7c60b05b642b44"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -2677,7 +2677,7 @@
     },
     {
       "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
-      "sha256": "521093c91327e96abbf67f28d367a40788f638f543a0dfcc7162858b831b39fd"
+      "sha256": "749983afa7e82590c905615fb002a148b277bb02657e82efb147c1c189d5a358"
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",

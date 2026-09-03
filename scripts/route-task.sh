@@ -18,6 +18,7 @@
 set -euo pipefail
 
 IWE_DIR="${IWE_DIR:-$HOME/IWE}"
+IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE_DIR/FMT-exocortex-template}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog.yaml}"
 AUDIT_LOG="${IWE_ROUTER_AUDIT:-${IWE_DIR}/${GOV_REPO}/logs/routing-path-distribution.tsv}"
@@ -163,9 +164,11 @@ run_script() {
     local allow_fallback="${4:-true}"
     local routing_path="${5:-$skill_name → script}"
 
-    # Resolve relative path from IWE_DIR
+    # executor-catalog.yaml is generated from template SKILL.md frontmatter,
+    # so relative script_path is relative to the template root, not the
+    # workspace root (issue #634).
     if [[ "$script_path" != /* ]]; then
-        script_path="$IWE_DIR/$script_path"
+        script_path="$IWE_TEMPLATE/$script_path"
     fi
 
     if [[ ! -f "$script_path" ]]; then
