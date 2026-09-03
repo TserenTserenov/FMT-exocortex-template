@@ -282,11 +282,37 @@ extractor_scope_close() {  # <strategy_dir> <agent> <reason>
     bash "$guard" close --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1
 }
 
+# issue #633: 'main' used to be hardcoded as the governance repo's default
+# branch in eight places across this file. A repo whose real default branch
+# is something else (e.g. master) silently never got fetched/pushed/read --
+# inbox-check exited immediately on every run, no capture ever processed.
+# Resolve it once per repo, in order: explicit override -> the repo's real
+# remote-tracking default -> whatever is currently checked out -> the
+# historical 'main' default as a last resort (keeps old repos working
+# unchanged).
+resolve_governance_branch() {
+    local repo="$1"
+    if [ -n "${IWE_GOVERNANCE_BRANCH:-}" ]; then
+        printf '%s\n' "$IWE_GOVERNANCE_BRANCH"
+        return 0
+    fi
+    local ref
+    if ref=$(git -C "$repo" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null); then
+        printf '%s\n' "${ref#origin/}"
+        return 0
+    fi
+    if ref=$(git -C "$repo" branch --show-current 2>/dev/null) && [ -n "$ref" ]; then
+        printf '%s\n' "$ref"
+        return 0
+    fi
+    printf '%s\n' "main"
+}
+
 commit_extractor_changes() {
     local strategy_dir="$1"
     local repo_name="$2"
     local commit_mode="${3:-main}"
-    local branch head_before head_after target_changes
+    local branch head_before head_after target_changes gov_branch
 
     EXTRACTOR_COMMIT_RESULT=""
 
@@ -295,9 +321,10 @@ commit_extractor_changes() {
         EXTRACTOR_COMMIT_RESULT="blocked"
         return 0
     fi
-    if [ "$branch" != "main" ] && \
+    gov_branch=$(resolve_governance_branch "$strategy_dir")
+    if [ "$branch" != "$gov_branch" ] && \
        { [ "$commit_mode" != "isolated-inbox" ] || [[ "$branch" != extractor/inbox-check-* ]]; }; then
-        log "SKIP: $repo_name is on branch '$branch', expected 'main'"
+        log "SKIP: $repo_name is on branch '$branch', expected '$gov_branch'"
         EXTRACTOR_COMMIT_RESULT="blocked"
         return 0
     fi
@@ -396,7 +423,7 @@ commit_extractor_changes() {
     local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
     if [ ! -f "$publish_gate" ]; then
         log "WARN: publish-gate.sh not found at $publish_gate; falling back to raw push for $repo_name"
-        if git -C "$strategy_dir" push origin "$head_after:refs/heads/main" >> "$LOG_FILE" 2>&1; then
+        if git -C "$strategy_dir" push origin "$head_after:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
             log "Pushed $repo_name ($head_after)"
             EXTRACTOR_COMMIT_RESULT="published"
         else
@@ -535,7 +562,7 @@ run_inbox_check_isolated() {
     local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
     local canonical_repo="$canonical_workspace/$repo_name"
     local lock_dir="${IWE_EXTRACTOR_INBOX_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-inbox-check.lock}"
-    local run_root worktree isolated_workspace branch_name run_id isolated_template actual_pending
+    local run_root worktree isolated_workspace branch_name run_id isolated_template actual_pending gov_branch
 
     case "$repo_name" in
         ""|.*|*/*)
@@ -551,8 +578,9 @@ run_inbox_check_isolated() {
         return 0
     fi
 
-    if ! git -C "$canonical_repo" fetch origin main >> "$LOG_FILE" 2>&1; then
-        log "WARN: cannot refresh origin/main; isolated inbox-check was not started"
+    gov_branch=$(resolve_governance_branch "$canonical_repo")
+    if ! git -C "$canonical_repo" fetch origin "$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot refresh origin/$gov_branch; isolated inbox-check was not started"
         release_inbox_lock "$lock_dir"
         return 1
     fi
@@ -568,12 +596,12 @@ run_inbox_check_isolated() {
     branch_name="extractor/inbox-check-$run_id"
     isolated_template="${IWE_TEMPLATE:-$canonical_workspace/FMT-exocortex-template}"
 
-    if ! git -C "$canonical_repo" worktree add -b "$branch_name" "$worktree" origin/main >> "$LOG_FILE" 2>&1; then
+    if ! git -C "$canonical_repo" worktree add -b "$branch_name" "$worktree" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
         log "WARN: cannot create isolated inbox-check worktree; run directory preserved: $run_root"
         release_inbox_lock "$lock_dir"
         return 1
     fi
-    git -C "$worktree" branch --set-upstream-to=origin/main "$branch_name" >> "$LOG_FILE" 2>&1 || true
+    git -C "$worktree" branch --set-upstream-to="origin/$gov_branch" "$branch_name" >> "$LOG_FILE" 2>&1 || true
 
     if ! mkdir "$isolated_workspace" || \
        ! ln -s "$worktree" "$isolated_workspace/$repo_name" || \
