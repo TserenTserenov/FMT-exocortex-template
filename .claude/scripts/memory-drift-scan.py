@@ -220,17 +220,30 @@ def scan(memory_path: Path, governance_repo: Path) -> list[str]:
     return drifts
 
 
+def _default_workspace() -> Path:
+    """Resolve the workspace root the same way the shell tooling does
+    (iwe-env-bootstrap.sh): explicit env var wins, ~/IWE is only a last
+    resort. Without this, an install at a non-default path always fails
+    with "MEMORY.md не найден" (issue #638)."""
+    for var in ("IWE_WORKSPACE", "IWE_ROOT", "WORKSPACE_DIR"):
+        value = os.environ.get(var)
+        if value:
+            return Path(value)
+    return Path.home() / "IWE"
+
+
 def main() -> int:
+    workspace = _default_workspace()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--memory",
         type=Path,
-        default=Path.home() / "IWE" / "memory" / "MEMORY.md",
+        default=workspace / "memory" / "MEMORY.md",
     )
     parser.add_argument(
         "--governance-repo",
         type=Path,
-        default=Path.home() / "IWE" / os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy"),
+        default=workspace / os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy"),
     )
     args = parser.parse_args()
 

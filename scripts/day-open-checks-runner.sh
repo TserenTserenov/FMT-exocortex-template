@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/day-open-hooks.sh"
 
 IWE="${IWE_ROOT:-$HOME/IWE}"
+IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
 EXT_DIR="$IWE/extensions"
 DAYPLAN="${1:-}"
 
@@ -37,8 +38,24 @@ export IWE
 CHECKS_FILES=$(find_day_open_hook_files "$EXT_DIR" "checks")
 FIND_STATUS=$?
 
+# extensions/ is deliberately empty until the user adds a customization
+# (extensions/README.md: "update.sh never touches this dir") — setup.sh does
+# not seed it, so a fresh install has no $EXT_DIR/day-open.checks*.md at all.
+# The template still ships its own universal-invariant default (WP-529 Ф7);
+# fall back to it ONLY when the workspace copy has nothing, so a pilot who
+# has customized their own extensions/day-open.checks.md keeps using theirs
+# unchanged (issue #635).
 if [ "$FIND_STATUS" -ne 0 ] || [ -z "$CHECKS_FILES" ]; then
-  echo "❌ day-open-checks-runner: no day-open.checks*.md found in $EXT_DIR — nothing to check"
+  TEMPLATE_EXT_DIR="$IWE_TEMPLATE/extensions"
+  CHECKS_FILES=$(find_day_open_hook_files "$TEMPLATE_EXT_DIR" "checks")
+  FIND_STATUS=$?
+  if [ "$FIND_STATUS" -eq 0 ] && [ -n "$CHECKS_FILES" ]; then
+    echo "  ℹ️  $EXT_DIR has no day-open.checks*.md — using template default from $TEMPLATE_EXT_DIR"
+  fi
+fi
+
+if [ "$FIND_STATUS" -ne 0 ] || [ -z "$CHECKS_FILES" ]; then
+  echo "❌ day-open-checks-runner: no day-open.checks*.md found in $EXT_DIR or $IWE_TEMPLATE/extensions — nothing to check"
   exit 1
 fi
 
