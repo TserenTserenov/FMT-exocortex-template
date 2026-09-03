@@ -1641,7 +1641,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "7bcf1d6bc39ef4d5dac790504c85aac61c8ee5cb215a6d25d43f0cf8d05c69a4"
+      "sha256": "9b03702993e3250cadc32871d20633d486cc77649444d3dddf12d3d659edf491"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2935,6 +2935,7 @@
     "scripts/tests/test_issue_633_resolve_governance_branch.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
+    "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
