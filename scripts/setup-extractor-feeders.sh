@@ -118,6 +118,17 @@ if [ "$PLATFORM" = "Darwin" ]; then
     elif [ "$MODE" = "--uninstall" ]; then
         if [ -f "$PLIST" ]; then launchctl unload "$PLIST" 2>/dev/null || true; rm "$PLIST"; ok "launchd plist удалён"; fi
     else
+        # launchd не наследует login-shell PATH (WP-5, найдено 03.09 — job падал
+        # exit 127 "claude CLI не найден"), поэтому PATH нужно прописать явно, а
+        # не полагаться на окружение launchd по умолчанию (/usr/bin:/bin:/usr/sbin:/sbin).
+        CLAUDE_BIN_DIR="$(dirname "$(command -v claude)")"
+        PLIST_PATH="$CLAUDE_BIN_DIR:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+        IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        # Unload ДО перезаписи файла: unload читает Label из ТЕКУЩЕГО содержимого
+        # на диске. Если Label когда-нибудь изменится в heredoc ниже, unload
+        # после перезаписи снял бы задачу по НОВОМУ Label (которого ещё нет в
+        # реестре launchd), и старая задача осталась бы висеть орфаном.
+        launchctl unload "$PLIST" 2>/dev/null || warn "launchctl unload: задача не была загружена (норма при первой установке)"
         cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -136,6 +147,17 @@ if [ "$PLATFORM" = "Darwin" ]; then
     </array>
     <key>StandardOutPath</key><string>$HOME/logs/extractor/launchd-git-diff-feed.log</string>
     <key>StandardErrorPath</key><string>$HOME/logs/extractor/launchd-git-diff-feed-error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>$PLIST_PATH</string>
+        <key>HOME</key><string>$HOME</string>
+        <key>USER</key><string>${USER:-$(whoami)}</string>
+        <key>LOGNAME</key><string>${USER:-$(whoami)}</string>
+        <key>IWE_TEMPLATE</key><string>$IWE_TEMPLATE_DIR</string>
+        <key>IWE_WORKSPACE</key><string>$HOME/IWE</string>
+        <key>IWE_GOVERNANCE_REPO</key><string>$GOVERNANCE_REPO</string>
+        <key>IWE_RUNTIME</key><string>$IWE_RUNTIME</string>
+    </dict>
 </dict></plist>
 PLIST
         launchctl load "$PLIST" 2>/dev/null || warn "launchctl load failed (повторите вручную)"
