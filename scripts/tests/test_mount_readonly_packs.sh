@@ -88,17 +88,18 @@ fi
 # Exercise the REAL cleanup_isolated_inbox_worktree() end to end, with the
 # same shape of arguments run_inbox_check_isolated() actually passes it --
 # not a hand-rolled chmod+rm -rf standing in for it.
-GOV_REPO="$WORKSPACE/DS-my-strategy"
+GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+GOV_REPO="$WORKSPACE/$GOVERNANCE_REPO"
 git init -q -b main "$GOV_REPO"
 git -C "$GOV_REPO" config user.email "test@example.invalid"
 git -C "$GOV_REPO" config user.name "Pack mount regression"
 git -C "$GOV_REPO" commit -q --allow-empty -m init
-GOV_WORKTREE="$TMP/run_root/DS-my-strategy"
+GOV_WORKTREE="$TMP/run_root/$GOVERNANCE_REPO"
 mkdir -p "$TMP/run_root"
 git -C "$GOV_REPO" worktree add -q -b extractor/inbox-check-test "$GOV_WORKTREE" main
 
 cleanup_isolated_inbox_worktree "$GOV_REPO" "$GOV_WORKTREE" "extractor/inbox-check-test" \
-    "$ISOLATED" "DS-my-strategy" "$TMP/run_root"
+    "$ISOLATED" "$GOVERNANCE_REPO" "$TMP/run_root"
 
 if [ -d "$ISOLATED/PACK-test" ]; then
     echo "FAIL: cleanup_isolated_inbox_worktree() left the read-only Pack clone behind"
