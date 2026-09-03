@@ -1148,6 +1148,26 @@ else
     done
 fi
 
+# === 8. Enable Knowledge Extractor feeders (WP-5) ===
+# Onboarding gap found live 03.09: setup.sh never called this script, so a
+# fresh install never got git-diff-feed/inbox-check running at all -- the
+# whole automated capture-to-Pack pipeline (Ф46-Ф52) silently never started
+# for a new user, with nothing in setup's own output to say so.
+echo "[8/8] Enabling Knowledge Extractor feeders..."
+if $CORE_ONLY; then
+    echo "  пропущено (core mode)"
+else
+    EXTRACTOR_MODE="install"
+    $DRY_RUN && EXTRACTOR_MODE="--check"
+    if IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" IWE_RUNTIME="$IWE_RUNTIME_PATH" \
+        bash "$TEMPLATE_DIR/scripts/setup-extractor-feeders.sh" "$EXTRACTOR_MODE"; then
+        :
+    else
+        echo "  ⚠ setup-extractor-feeders.sh завершился с ошибкой — Экстрактор не запустится автоматически"
+        echo "    Повторить вручную: bash $TEMPLATE_DIR/scripts/setup-extractor-feeders.sh"
+    fi
+fi
+
 # === Done ===
 echo ""
 if $DRY_RUN; then
