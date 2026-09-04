@@ -147,6 +147,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.39.2] — 2026-09-04
+
 ### Added
 
 - `c4bbbb4` feat(archgate): v3.1 — фильтр допуска, атрибут-сценарии, advice log, fitness-вопрос (#605)
