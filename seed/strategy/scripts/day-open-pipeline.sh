@@ -788,6 +788,29 @@ if [ "$PROBE" = "true" ]; then
   DAY_OPEN_LOG=$(mktemp)  # probe runs must not write real artifacts
 fi
 mkdir -p "$(dirname "$DAY_OPEN_LOG")"
+
+# PD-dashboard sync (WP-417 tile source). read_dashboard_snapshot()
+# (dashboard_render.py) reads the latest local daily/*.yaml and already
+# degrades softly if the repo/file is missing or stale (falls back to the
+# latest available snapshot, or skips the tile entirely) -- a failed sync
+# here must not block the DayPlan, same principle as the ${IWE_GOVERNANCE_REPO:-DS-strategy} git
+# pull below. Found live 04.09 (WP-417 peer-session
+# 2026-09-04-09-wp417-panel-verify-close): the repo was never cloned on
+# tsekh-1 at all, so the tile silently showed "not calculated" every day.
+# PD_DASHBOARD_CLONE_URL is per-installation (e.g. a read-only deploy-key SSH
+# alias) -- unset means this reader wasn't provisioned, skip quietly, same as
+# any other unconfigured optional integration in this pipeline.
+PD_DASHBOARD_DIR="$IWE/${DASHBOARD_REPO_NAME:-PD-dashboard}"
+if [ -d "$PD_DASHBOARD_DIR/.git" ]; then
+  if ! git -C "$PD_DASHBOARD_DIR" pull --ff-only >>"$DAY_OPEN_LOG" 2>&1; then
+    echo "  [pd-dashboard-sync] git pull failed -- панель покажет последний доступный снимок" | tee -a "$DAY_OPEN_LOG"
+  fi
+elif [ -n "${PD_DASHBOARD_CLONE_URL:-}" ]; then
+  if ! git clone "$PD_DASHBOARD_CLONE_URL" "$PD_DASHBOARD_DIR" >>"$DAY_OPEN_LOG" 2>&1; then
+    echo "  [pd-dashboard-sync] git clone failed -- тайл табло будет пропущен" | tee -a "$DAY_OPEN_LOG"
+  fi
+fi
+
 FILL_ERR_TMP=$(mktemp)
 FILL_EXIT=0
 # WP-529 (continuation, 19.08): day-open-llm-fill.py imports yaml — resolved
