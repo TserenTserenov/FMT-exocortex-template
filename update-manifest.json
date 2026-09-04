@@ -2492,6 +2492,10 @@
       "sha256": "6a73a17201951293542388d78cb4c903a5149fd1d78c31eb0e7730253ecf3826"
     },
     {
+      "path": "scripts/setup-vscode-auto-mode.sh",
+      "sha256": "7be9a3950bba650181f2134e57d97b29946b8ba50de7b0cf6c0b686d865d76c0"
+    },
+    {
       "path": "scripts/skill-promote.sh",
       "sha256": "b3f0a897e18ed6294f23b33dc408794a1594afcc1a08d611f00c408b63c90512"
     },
@@ -2841,7 +2845,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "4393a39c0a75c10a23ed11c8a5b4e52fd1d02b73977e4b190bf2e5e01863d737"
+      "sha256": "31a75c3d8f7acc21a711ea4c40a037ec9ac3e81a868b8da4f56c95324bc0c0ba"
     },
     {
       "path": "setup/build-runtime.sh",

@@ -1168,6 +1168,24 @@ else
     fi
 fi
 
+# === 8b. VS Code default permission mode (WP-406, onboarding VS Code track) ===
+# Without this, every new VS Code window starts the Claude Code extension in
+# Manual (ask before each edit) — a newcomer picking Auto in one window sees
+# it reset in the next, because the extension's own default is Manual.
+if $CORE_ONLY; then
+    :
+else
+    echo "[8b] Настройка VS Code (режим Auto по умолчанию)..."
+    VSCODE_AUTO_MODE_ARG="apply"
+    $DRY_RUN && VSCODE_AUTO_MODE_ARG="--check"
+    if bash "$TEMPLATE_DIR/scripts/setup-vscode-auto-mode.sh" "$VSCODE_AUTO_MODE_ARG"; then
+        :
+    else
+        echo "  ⚠ setup-vscode-auto-mode.sh завершился с ошибкой — Auto-режим не выставлен, VS Code не тронут"
+        echo "    Повторить вручную: bash $TEMPLATE_DIR/scripts/setup-vscode-auto-mode.sh"
+    fi
+fi
+
 # === Done ===
 echo ""
 if $DRY_RUN; then
