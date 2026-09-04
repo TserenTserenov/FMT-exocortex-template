@@ -549,7 +549,7 @@
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
-      "sha256": "d9d4ad924350d67b2c50681230b2181d005cb84b49ab54d6355b5e85ed8a2252"
+      "sha256": "33685a979e9fa1befa582b75fcecee28a340df7b0ebcf3a9ab865f1d0551c6e8"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
@@ -557,7 +557,7 @@
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/README.md",
-      "sha256": "5e11a250b1854c8dfa8053478c6ce895537b8af61f4e818372d30faa6fb71e6f"
+      "sha256": "6c2d4dc2186bf9d97d4949218fcf13d35e68a7f691c54c14b55518139709d943"
     },
     {
       "path": ".claude/skills/residency-gate/__init__.py",
