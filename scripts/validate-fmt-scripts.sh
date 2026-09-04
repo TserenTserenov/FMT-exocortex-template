@@ -139,6 +139,43 @@ if [[ "$MODE" != "settings-json" ]]; then
                                 continue
                             fi
                         fi
+                        # issue #665: bare literal as a positional fallback-default
+                        # argument to a helper call, split across lines —
+                        # `_selected_env(values, "IWE_GOVERNANCE_REPO",
+                        # "GOVERNANCE_REPO", "DS-strategy")`. The literal's own line
+                        # carries no env-var reference, but the call it belongs to
+                        # does (same "structural override, not a mystery hardcode"
+                        # reasoning as the $IWE_GOVERNANCE_REPO exception above).
+                        # Safe only when the override key literal sits in the SAME
+                        # call — walk back through the immediately preceding,
+                        # unbroken run of non-blank, non-comment lines (a blank or
+                        # `#`-only line marks a statement boundary) and stop looking
+                        # there. Cold-context review finding: a plain fixed-size
+                        # lookback window matched an unrelated `#`-comment mention of
+                        # "IWE_GOVERNANCE_REPO" a few lines above a genuine hardcode
+                        # in a different call — the statement-boundary stop closes
+                        # that false negative.
+                        if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*"'"$AUTHOR_GOV_REPO"'"[[:space:]]*,?[[:space:]]*\)?[[:space:]]*,?[[:space:]]*$'; then
+                            lineno="${bl%%:*}"
+                            found_override_key=0
+                            check_line=$((lineno - 1))
+                            steps=0
+                            while [ "$check_line" -ge 1 ] && [ "$steps" -lt 6 ]; do
+                                context_line=$(sed -n "${check_line}p" "$f" 2>/dev/null)
+                                if echo "$context_line" | grep -qE '^[[:space:]]*$|^[[:space:]]*#'; then
+                                    break
+                                fi
+                                if echo "$context_line" | grep -qE '"IWE_GOVERNANCE_REPO"'; then
+                                    found_override_key=1
+                                    break
+                                fi
+                                check_line=$((check_line - 1))
+                                steps=$((steps + 1))
+                            done
+                            if [ "$found_override_key" -eq 1 ]; then
+                                continue
+                            fi
+                        fi
                     fi
                     echo "$bl"
                 done)

@@ -792,11 +792,11 @@ agent_fault_legacy_hash_is_blessed() {
 }
 
 scan_legacy_agent_fault_import_consumers() {
-    if [ "$#" -ne 1 ] || [ -z "${PY_BIN:-}" ]; then
+    if [ "$#" -ne 2 ] || [ -z "${PY_BIN:-}" ]; then
         echo "agent-fault consumer scan requires Python 3" >&2
         return 2
     fi
-    local scripts_dir="$1"
+    local scripts_dir="$1" workspace_dir="$2"
     [ -d "$scripts_dir" ] || return 0
     # PY_BIN can intentionally be the two-word Windows launcher `py -3`.
     # shellcheck disable=SC2086
@@ -807,10 +807,32 @@ import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
+# issue #661: a FILE symlink whose target resolves INSIDE the workspace
+# (e.g. a script shared between two sibling governance repos) is not the
+# escape hazard this scan guards against — only a symlink whose target
+# resolves outside the workspace can expose content the scan was never
+# meant to read. Boundary is the workspace root, not scripts_dir itself: a
+# legitimate shared script commonly lives in a sibling repo under the same
+# workspace, not under this scripts_dir.
+#
+# Directory symlinks stay unconditionally refused, in- or out-of-workspace
+# (cold-context review finding): os.walk(followlinks=False) never descends
+# into a symlinked directory regardless of this boundary check, so
+# "allowing" one would silently skip scanning its contents — a legacy
+# `iwe_checklist_memory` import hiding behind such a directory would slip
+# past with no warning instead of forcing a human to look. Refusing keeps
+# the previous, safer behavior for directories; only individual file
+# symlinks (whose content os.walk DOES read either way) get the new
+# workspace-boundary leniency.
+workspace_real = os.path.realpath(sys.argv[2])
 matches = []
 
 def is_legacy_module(name):
     return name == "iwe_checklist_memory" or name.endswith(".iwe_checklist_memory")
+
+def resolves_inside_workspace(path):
+    real = os.path.realpath(path)
+    return real == workspace_real or real.startswith(workspace_real + os.sep)
 
 try:
     for directory, names, files in os.walk(root, followlinks=False):
@@ -826,9 +848,9 @@ try:
             if not name.endswith(".py"):
                 continue
             candidate = Path(directory, name)
-            if candidate.is_symlink():
+            if candidate.is_symlink() and not resolves_inside_workspace(candidate):
                 print(
-                    f"consumer scan refused symlinked Python file: {candidate}",
+                    f"consumer scan refused symlinked Python file escaping workspace: {candidate}",
                     file=sys.stderr,
                 )
                 raise SystemExit(2)
@@ -858,7 +880,7 @@ except OSError as exc:
     print(f"consumer scan failed: {exc}", file=sys.stderr)
     raise SystemExit(2)
 print("\n".join(matches))
-' "$scripts_dir"
+' "$scripts_dir" "$workspace_dir"
 }
 
 print_legacy_agent_fault_manual_remediation() {
@@ -1029,7 +1051,7 @@ preflight_legacy_agent_fault_shims() {
         blocked=1
     done
 
-    if ! consumer_matches=$(scan_legacy_agent_fault_import_consumers "$governance_dir/scripts"); then
+    if ! consumer_matches=$(scan_legacy_agent_fault_import_consumers "$governance_dir/scripts" "$WORKSPACE_DIR"); then
         echo "  ✗ legacy import consumer scan failed; no compatibility shim was changed." >&2
         blocked=1
     elif [ -n "$consumer_matches" ]; then
@@ -2596,6 +2618,63 @@ if [ -n "$DUPLICATE_PATHS" ]; then
     exit "$EXIT_RUNTIME"
 fi
 
+# issue #660: update-manifest.local.json's excluded_paths was previously read
+# ONLY by the orphan detector (Step 6f below) — a fork declaring a path there
+# got no effect on delivery itself, so update.sh kept silently overwriting
+# the very file the fork asked to keep, with no distinct signal in the
+# preview (the line looked like an ordinary update, not a revert). Loading
+# the same list here, before the file classification loop, lets a
+# fork-owned path skip application — reported separately below, not folded
+# into an unremarkable "unchanged".
+FORK_OWNED_PATHS_FILE="$TMPDIR_UPDATE/fork-owned-paths.txt"
+: > "$FORK_OWNED_PATHS_FILE"
+if py_available && [ -f "$SCRIPT_DIR/update-manifest.local.json" ]; then
+    # Cold-context review finding: this ran unguarded under `set -e` — a
+    # malformed local manifest (top-level list instead of object; an
+    # excluded_paths entry missing "path") raised an uncaught Python
+    # exception and killed the ENTIRE update, not just this feature. The
+    # narrow except below only ever covered "file unreadable", not "file
+    # readable but wrong shape". `if ! ... ; then` + a broad except make this
+    # match the orphan detector's already-established fail-soft pattern
+    # (Step 6f below): a malformed local manifest degrades to "no fork-owned
+    # paths declared", it does not abort the run.
+    if ! $PY_BIN -c "
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        data = json.load(f)
+    for entry in data.get('excluded_paths', []):
+        print(entry['path'] if isinstance(entry, dict) else entry)
+except (json.JSONDecodeError, OSError, AttributeError, KeyError, TypeError) as exc:
+    print(f'  [warn] update-manifest.local.json unreadable, ignored: {exc}', file=sys.stderr)
+" "$SCRIPT_DIR/update-manifest.local.json" > "$FORK_OWNED_PATHS_FILE"; then
+        echo "  ⚠ update-manifest.local.json: не удалось разобрать excluded_paths — fork-owned защита для этого запуска пропущена." >&2
+        : > "$FORK_OWNED_PATHS_FILE"
+    fi
+fi
+FORK_OWNED_PATHS=()
+while IFS= read -r fork_owned_entry; do
+    [ -n "$fork_owned_entry" ] && FORK_OWNED_PATHS+=("$fork_owned_entry")
+done < "$FORK_OWNED_PATHS_FILE"
+FORK_PROTECTED_SKIPPED=()
+
+# is_fork_owned_path REL — true when REL equals a declared excluded_paths
+# entry or sits under one as a directory prefix. Same semantics as Step 6f's
+# Python _locally_excluded() below — kept in bash here since this runs inside
+# the per-file classification loop, not the Python orphan scan.
+is_fork_owned_path() {
+    local rel="$1" entry
+    for entry in "${FORK_OWNED_PATHS[@]}"; do
+        entry="${entry%/}"
+        if [ "$rel" = "$entry" ] || [ "${rel#"$entry"/}" != "$rel" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 while IFS='|' read -r fpath fdesc expected_hash; do
     [ -z "$fpath" ] && continue
     # issue #402 (defect 3): native Windows Python prints \r\n even inside a
@@ -2609,6 +2688,17 @@ while IFS='|' read -r fpath fdesc expected_hash; do
     # actual skip-if-exists guard (shared with the deprecated-file removal loop below).
     if is_protected_user_file "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
         UNCHANGED=$((UNCHANGED + 1))
+        continue
+    fi
+    # Fork-declared ownership (issue #660): only meaningful once the file
+    # actually diverges from upstream — a declared-but-unchanged path is
+    # nothing to report, so it counts as an ordinary unchanged file.
+    if is_fork_owned_path "$fpath" && [ -f "$SCRIPT_DIR/$fpath" ]; then
+        if [ -n "$expected_hash" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$expected_hash" ]; then
+            FORK_PROTECTED_SKIPPED+=("$fpath")
+        else
+            UNCHANGED=$((UNCHANGED + 1))
+        fi
         continue
     fi
     # skip-if-hash-matches (WP-546 Ф2): a manifest sha256 that already matches
@@ -2852,6 +2942,12 @@ while IFS='|' read -r fpath freason; do
     # deleted either, even if a future manifest lists it as deprecated by mistake
     # (bug found 2026-07-23 — sessions/00-index.md was listed, protection didn't apply).
     is_protected_user_file "$fpath" && continue
+    # issue #660 (cold-context review finding): without this, a fork-declared
+    # excluded_paths entry protected a file from being silently OVERWRITTEN
+    # but not from being silently DELETED if a future upstream manifest
+    # listed the same path under deprecated_files — defeating the guarantee
+    # this whole feature exists to give.
+    is_fork_owned_path "$fpath" && continue
     if [ -f "$SCRIPT_DIR/$fpath" ]; then
         DEPRECATED_FOUND+=("$fpath")
         DEPRECATED_REASONS+=("${freason:-устарел}")
@@ -2895,6 +2991,18 @@ if [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
         printf "  ? %s — файл не скачался, состояние неизвестно\n" "$f"
     done
     echo "  Эти файлы могут отличаться от upstream и быть перезаписаны при обычном запуске."
+    echo ""
+fi
+
+# issue #660: a fork-owned path (declared in update-manifest.local.json's
+# excluded_paths) that actually diverges from upstream needs its own line —
+# folding it into an ordinary "updated" entry is exactly the silent-revert
+# report that made the fork lose the same local edit twice in one day.
+if [ ${#FORK_PROTECTED_SKIPPED[@]} -gt 0 ]; then
+    echo "Защищены форк-локальной правкой, не применены (${#FORK_PROTECTED_SKIPPED[@]}):"
+    for f in "${FORK_PROTECTED_SKIPPED[@]}"; do
+        printf "  ~ %s — локальная версия отличается от upstream, оставлена как есть (excluded_paths)\n" "$f"
+    done
     echo ""
 fi
 

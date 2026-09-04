@@ -549,7 +549,7 @@
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
-      "sha256": "d9d4ad924350d67b2c50681230b2181d005cb84b49ab54d6355b5e85ed8a2252"
+      "sha256": "33685a979e9fa1befa582b75fcecee28a340df7b0ebcf3a9ab865f1d0551c6e8"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
@@ -557,7 +557,7 @@
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/README.md",
-      "sha256": "5e11a250b1854c8dfa8053478c6ce895537b8af61f4e818372d30faa6fb71e6f"
+      "sha256": "6c2d4dc2186bf9d97d4949218fcf13d35e68a7f691c54c14b55518139709d943"
     },
     {
       "path": ".claude/skills/residency-gate/__init__.py",
@@ -1813,7 +1813,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "c3026aa7494a064854d937324046749706f444131eb3968387574fc7b6c4807c"
+      "sha256": "ea4f00b8a5c80b93bdccd81e29eb489b33a9d3943460c9a8996f61cb5f2be866"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2401,11 +2401,11 @@
     },
     {
       "path": "scripts/memory-health.sh",
-      "sha256": "c3efa7ca8f8934c58bf97872a6ba67c275d7a3354dbf4664451f49debcc695d9"
+      "sha256": "cf0844f0fff0392081714d2766c0367937ef505992a5e8a56fd55c1c1e6748de"
     },
     {
       "path": "scripts/memory-migrate.sh",
-      "sha256": "d1660b7588cd10561526cae1d61bda634bcf7b68f1b7d819dca7ba41d5da69d2"
+      "sha256": "b5affc00bda0be96dcfcdc7bf55481c0c68aa9150cd27d7fe22b0e1142dd0305"
     },
     {
       "path": "scripts/memory-validate.sh",
@@ -2677,7 +2677,7 @@
     },
     {
       "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
-      "sha256": "749983afa7e82590c905615fb002a148b277bb02657e82efb147c1c189d5a358"
+      "sha256": "df11abbbe08ad4ce2a456bd8cb42ef03039b73fd9697305bec36ebde7c561d7c"
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",
@@ -2749,7 +2749,7 @@
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
-      "sha256": "0e41119a385f0010624cfb8bcff5c4bcfc8739907c6dbc214b45e0fba475d933"
+      "sha256": "6f4b86a03150000c5d1d7da7631412ba927f539e605188718e821188cfdb89eb"
     },
     {
       "path": "scripts/validate-hypothesis-priority.sh",
@@ -2881,7 +2881,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8bca5933d5bc5cd905ef6109fd12e67fa95e07190b1286baacda3536f33e0c02"
+      "sha256": "60bf249aaf4a965b4d2b85361fc5c6a2a03602b01e682ae32e8f2c8d02a52a52"
     }
   ],
   "excluded_paths": [
@@ -2933,6 +2933,9 @@
     "scripts/tests/test_issue_584_build_version.sh",
     "scripts/tests/test_issue_596_weekreport_filename.sh",
     "scripts/tests/test_issue_633_resolve_governance_branch.sh",
+    "scripts/tests/test_issue_657.sh",
+    "scripts/tests/test_issue_660.sh",
+    "scripts/tests/test_issue_665.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",

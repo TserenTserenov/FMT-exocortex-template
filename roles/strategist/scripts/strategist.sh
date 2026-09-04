@@ -4,6 +4,24 @@
 
 set -e
 
+# issue #657: this script needs more than one independent EXIT cleanup (kill
+# the sleep inhibitor below; remove acquire_lock()'s concurrency lock
+# directory further down) — plain `trap ... EXIT` only keeps the LAST
+# handler registered for a signal, so the second one silently replaced the
+# first on every ordinary run, not just on kill -9/orphaning as first
+# suspected. Register cleanups here instead of calling `trap` directly.
+_EXIT_CLEANUPS=()
+add_exit_cleanup() {
+    _EXIT_CLEANUPS+=("$1")
+}
+run_exit_cleanups() {
+    local cmd
+    for cmd in "${_EXIT_CLEANUPS[@]}"; do
+        eval "$cmd" 2>/dev/null || true
+    done
+}
+trap run_exit_cleanups EXIT
+
 # Sleep inhibitor for the WHOLE script lifetime (issue #553: direct launchd
 # units invoke this script bypassing scheduler.sh, so the inhibitor must live
 # here too — parity with roles/synchronizer/scripts/scheduler.sh).
@@ -13,13 +31,19 @@ set -e
 # Known OS limit: lid-close on battery cannot be held by caffeinate at all
 # (-s works on AC only) — schedule night runs on AC or with the lid open.
 # Linux: systemd-inhibit when available; direct systemd timers do not inhibit
-# sleep by themselves.
+# sleep by themselves. `timeout 4h` around `sleep infinity` is a second line
+# of defense on top of the EXIT trap above (issue #657): a parent killed with
+# SIGKILL or reaped by init before bash processes the trap leaves the trap
+# unrun no matter how it is composed — bash cannot catch SIGKILL. Bounding
+# the held process itself is the only thing that guarantees it cannot
+# outlive a single scenario run indefinitely.
 if [[ "$(uname)" == "Darwin" ]]; then
     caffeinate -diu -w $$ &
 elif command -v systemd-inhibit &>/dev/null; then
-    systemd-inhibit --what=idle:sleep --who=strategist --why="agent scenario" --mode=block sleep infinity &
+    systemd-inhibit --what=idle:sleep --who=strategist --why="agent scenario" --mode=block \
+        timeout 4h sleep infinity &
     _INHIBIT_PID=$!
-    trap 'kill $_INHIBIT_PID 2>/dev/null' EXIT
+    add_exit_cleanup 'kill $_INHIBIT_PID 2>/dev/null'
 fi
 
 # Конфигурация
@@ -279,7 +303,7 @@ acquire_lock() {
         fi
     fi
     echo $$ > "$lockdir/pid" || { rm -rf "$lockdir"; log "ERROR: failed to write PID for $scenario"; exit 1; }
-    trap "rm -rf \"$lockdir\" 2>/dev/null" EXIT
+    add_exit_cleanup "rm -rf \"$lockdir\" 2>/dev/null"
 }
 
 # Читаем strategy_day из конфига (L4 Personal)
