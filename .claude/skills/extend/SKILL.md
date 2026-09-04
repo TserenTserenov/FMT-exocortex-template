@@ -4,6 +4,7 @@ description: "IWE extensibility catalog: what can be customized, which extension
 argument-hint: "[название протокола или пустое для полного каталога]"
 user_invocable: true
 version: 1.0.0
+browser_safe: false
 routing:
   executor: sonnet
   deterministic: false

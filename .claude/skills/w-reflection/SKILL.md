@@ -5,6 +5,7 @@ argument-hint: "<quality 1..5> [depth 1..3]"
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/w-reflection]
   phrases: []

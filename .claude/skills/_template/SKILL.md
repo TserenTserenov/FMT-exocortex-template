@@ -6,6 +6,7 @@ description: "One line — used in CLAUDE.md system-reminder and the skill catal
 version: 1.0.0                    # semver; увеличивать при изменении обещания
 layer: L3                         # L1 = платформенный (FMT); L3 = авторский (личный)
 status: active                    # active | experimental | deprecated
+browser_safe: true
 triggers:
   slash: [/skill-id]              # slash-команды (/skill-id)
   phrases: []                     # фразы для авто-детекции (опционально)

@@ -5,6 +5,7 @@ argument-hint: "[code|archgate|capture|pack|wp|chain|adversarial|subsection|sect
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/verify]
   phrases: []

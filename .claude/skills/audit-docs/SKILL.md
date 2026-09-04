@@ -5,6 +5,7 @@ argument-hint: "--repo <path> | . | --init --repo <path>"
 version: 0.2.0
 layer: L3
 status: active
+browser_safe: false
 triggers:
   slash: [/audit-docs]
   phrases: []

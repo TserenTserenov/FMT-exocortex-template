@@ -8,6 +8,7 @@ related: [personal-guide-render, repo-new, WP-245, WP-222, WP-149, WP-527, PD.FO
 version: 1.3.2
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/personal-guide-start]
   phrases: []

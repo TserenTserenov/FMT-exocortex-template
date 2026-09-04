@@ -6,6 +6,7 @@ user_invocable: true
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/iwe-restore]
   phrases: ["восстанови память", "восстановить IWE", "перенести на новое устройство"]

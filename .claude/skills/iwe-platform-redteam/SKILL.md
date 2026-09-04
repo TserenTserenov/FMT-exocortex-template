@@ -5,6 +5,7 @@ argument-hint: "[--claim <text>] [--target <disposable-fixture-root>]"
 version: 1.0.0
 layer: L1
 status: experimental
+browser_safe: false
 triggers:
   slash: [/iwe-platform-redteam]
   phrases: []

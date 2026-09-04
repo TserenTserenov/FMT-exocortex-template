@@ -4,6 +4,7 @@ description: "Скилл IWE — см. тело файла"
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/platform-bottleneck]
   phrases: []

@@ -5,6 +5,7 @@ description: Разговор-распаковка неудовлетворён�
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 argument-hint: "[сырьё: заметки/рефлексия, опционально]"
 triggers:
   slash: [/discovery-session]

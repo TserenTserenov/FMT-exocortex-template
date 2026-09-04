@@ -6,6 +6,7 @@ related: [WP-318, WP-370, DP.ROLE.042, DP.SC.132, PD.FORM.089]
 version: 5.0.0
 layer: L1
 status: active
+browser_safe: true
 triggers:
   slash: [/diagnose]
   phrases: []

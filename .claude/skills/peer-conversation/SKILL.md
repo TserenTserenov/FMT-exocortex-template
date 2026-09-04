@@ -5,6 +5,7 @@ argument-hint: "<описание задачи> [--peer kimi|codex|hermes|claude
 version: 1.5.5
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/peer-conversation]
   phrases: ["начни peer-сессию", "запусти диалог с Кими", "запусти диалог с Codex", "peer-сессия"]

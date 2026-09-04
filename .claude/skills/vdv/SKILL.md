@@ -5,6 +5,7 @@ argument-hint: "[build | audit] [описание процесса или дея
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: true
 service_clause: DP.SC.052
 triggers:
   slash: [/vdv, /vdv build, /vdv audit]

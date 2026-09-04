@@ -4,6 +4,7 @@ description: "Update IWE with change explanations. Agent calls update.sh, parses
 argument-hint: ""
 user_invocable: true
 version: 1.0.0
+browser_safe: false
 routing:
   executor: haiku
   deterministic: false
