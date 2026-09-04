@@ -145,41 +145,125 @@ Refs: WP-NNN
 
 
 
-## [Unreleased]
+
+
+## [Unreleased] — обновлено 2026-09-04
 
 ### Added
 
-- `c4bbbb4` feat(archgate): v3.1 — фильтр допуска, атрибут-сценарии, advice log, fitness-вопрос (#605)
-  - Сверка чек-листа ЭМОГССБ с мировой практикой архитектурного ревью (ATAM, Advice Process, Evolutionary Architecture, Левенчук/ailev): Шаг 0-А — фильтр допуска по стоимости изменения с быстрым треком для дешёвых решений; Шаг 1 — третий вопрос про затронутые стороны (advice log); Шаг 2а — атрибут-сценарии для критичных характеристик; Шаг 4.6 п.7 — вопрос про автоматическую охрану характеристики после внедрения; DRR-шаблон дополнен секциями advice log и Fast-track
-- `f7b4692` feat(wp526): декларативный цикл bootstrap-repo в setup.sh (#610)
-  - 3 захардкоженных вызова `clone_base_repo` (ZP/FPF/SPF) заменены декларативным массивом + циклом; добавлена подсказка про 5 семейств репозиториев после установки
-- `f9644fc` feat(wp522): `/agent-fault` пишет факт М15 в чек-лист участника после записи косяка (#612)
-- `dbbe073` feat(skills): `repo-new` — гейт создания репозитория (WP-527) (#620)
-  - Живая обкатка подтверждена 01.09 (Plan → Decision Gate → Execute, запись в реестр, развёртывание скелета)
+- `7019e5a` feat(onboarding): default VS Code Claude Code extension to Auto mode on setup (#670)
+- `0c8ff57` feat(extractor): mount Packs read-only in isolated inbox-check sandbox (WP-5) (#659)
+- `9bddc7c` feat(setup): read governance repo name/markers from shared contract (WP-560 Ф5-Phase-2) (#646)
+- `f064b48` feat(day-open): inject_panel_tile переключён на PD-dashboard (WP-417 Ф-cutover-switch) (#644)
+- `775fc03` feat(setup): adopt an existing governance repo instead of creating a second one (WP-560 Ф5) (#641)
+- `b230c14` feat(wp527): repo-new — /personal-guide-start проходит через гейт (#628)
 - `24e704e` feat(day-open): Ф117 — автодосчёт мультипликатора дня через WakaTime API (#621)
-  - Закрытие после полуночи или без `wakatime-cli` больше не оставляет мультипликатор в вечном PENDING — новый шаг 4.59 досчитывает его через HTTP API WakaTime
-- feat(extractor): `connect.sh` — одна команда подключает headless-запуски Экстрактора (Inbox-Check, session-close feeder) к подписке Claude Code через `claude setup-token`, без ручного редактирования системных файлов (WP-5 Ф46)
-  - `extractor.sh`: preflight через штатную `claude auth status`, подсказка «переподключите» при протухшем токене вместо тихого падения
+- `dbbe073` feat(skills): repo-new — гейт создания репозитория (WP-527) (#620)
+- `f9644fc` feat(wp522): /agent-fault пишет факт М15 в чек-лист участника после записи косяка (#612)
+- `f7b4692` feat(wp526): declarative bootstrap-repo loop in setup.sh (#610)
+- `c4bbbb4` feat(archgate): v3.1 — фильтр допуска, атрибут-сценарии, advice log, fitness-вопрос (WP-548) (#605)
+- `3f0ce96` feat(seed): deny-legacy-sessions guard for new-user governance repos (#604)
+- `1bdc7a0` feat(day-plan): connector-first calendar step in the autonomous morning scenario (issue #581)
+- `1be19c8` feat(dry-run): state-machine redesign — canonical state, exclusive gate, capability completion, provable orphan sweep (issue #549 stage 2)
+- `5bb37f8` feat(ci): notify pilot via bot when a real red-team audit issue is created (#589)
+- `be4a486` feat(hooks): self-installing SessionStart hook for .githooks activation (WP-559 Ф2)
+
+### Changed
+
+- `07d8a8a` docs(onboarding): уточнить UI-шаг установки GitHub-приложения (#631)
+- `62a8b9a` docs(setup): подключение не-Claude агентов и установка из РФ (#625)
+- `966ba39` port(session-guard): audit -- eliminate per-file subprocess spawns [source: root 2779845553] (#624)
+- `dd47da4` docs(repo-new): document known bypass exemptions + policy storage spec (#623)
+- `0a6499a` sync(personal-guide-start): привести копию в шаблоне к авторской версии (#619)
+- `5c6a101` docs(adr): ADR-004 — строка домена 2.5 приведена к поправке 18.08 (machine-dialogue) (#618)
+- `b069fce` docs(changelog): запись [Unreleased] для archgate v3.1 (WP-548) (#606)
+- `0613ad9` Merge pull request #603 from TserenTserenov/fix/weekly-bump-pr-flow
+- `a9e86a5` Merge pull request #601 from TserenTserenov/fix/nightly-gitleaks-test-fixture-fp
+- `c7fd9a4` Merge pull request #602 from TserenTserenov/fix/sqlite-busy-timeout
+- `846d37c` Merge pull request #599 from TserenTserenov/fix/issue-549-dryrun-redesign
+- `8f47a67` chore(manifest): regenerate hashes after .gitleaks.toml addition
+- `e922639` chore(manifest): regenerate hashes after stat-фикс (#549)
+- `1b7c756` Merge pull request #600 from TserenTserenov/fix/issue-581-calendar-connector
+- `f5dce74` test(545): pin strategy_day in scaffold fixture — fails on Mondays otherwise
+- `6fccac2` chore(manifest): regenerate hashes after dry-run redesign (#549)
+- `81aa17a` Merge pull request #594 from TserenTserenov/fix/issue-544-staged-precommit
+- `d6fd2cd` Merge pull request #593 from TserenTserenov/fix/issues-581-545-calendar-sessions
+- `b4f790f` Merge pull request #592 from TserenTserenov/fix/issue-582-audit-iwe-scripts-layout
+- `b6a1a2f` chore(manifest): regenerate hashes after iwe-audit.sh change (#582)
+- `712259a` docs(audit-log): v0.39.1 completed — independent delta re-audit GO (#588)
+- `10c9732` docs(changelog): record personal-guide rename (#585) in Unreleased (#586)
+- `bea5f51` Merge pull request #578 from TserenTserenov/wp559-fork-template-hook
+- [behavior] `60ed1ab` chore: release v0.39.1
+- `d4cc031` chore: release v0.39.0 (#574)
+- `7048b27` chore(manifest): resync hash for the T31 fixture adaptation
+- `acd70b0` test(edge-cases): T31 fixtures follow the clone-manifest contract (#564)
+- `43fddfc` chore(manifest): resync hashes for batch-2 fixes
+- `79fbd8c` chore(manifest): ship the #557 test via SCRIPT_CONTRACT_EXPLICIT_INCLUDE
+- `ce8d324` chore(seed): sync day-open-scaffold seed snapshot with #560 fix
+- `69693d4` chore(manifest): resync content hashes after batch-1 fixes
 
 ### Fixed
 
-- fix(changelog): режим записи `changelog-append.sh` теперь требует явный `IWE_TEMPLATE` и не может молча изменить канонический FMT из изолированного worktree; штатные promote-скрипты передают выбранную цель явно
+- `11cf3f7` fix: FMT issue-funnel batch (#665, #661, #660, #658-i, #657) (#668)
+- `b35e606` fix(day-open): портировать фикс «Портфель в работе» (WP-484 Ф148) (#666)
+- `a3a980e` fix(onboarding): wire Knowledge Extractor into setup.sh (WP-5) (#663)
+- `4829a7d` fix(tests): neutral fixture name in pack-mount regression test (#662)
+- `2c00e5c` fix(extractor): resolve governance branch instead of hardcoding main (#633) (#656)
+- `2b27406` fix(wp5): git-diff-feed launchd job missing PATH — exit 127 (#655)
+- `a255280` fix(paths): resolve workspace/template paths for non-default installs (#654)
+- `56963ae` fix(changelog): require explicit write target (#653)
+- `920bef1` fix(wp5): session-close-feed — trap освобождает замок на любом исходе (#652)
+- `4b4bae5` fix(wp5): session-close-feed — блокировка от параллельных запусков (#651)
+- `01d1d9c` fix(wp5): 2 находки холодного ревью PR #647 (промпт-фенс + scope-gate список путей) (#650)
+- `96e0f55` fix(wp5): экстрактор публикует через ds-publish.sh вместо строгого raw push (#647)
+- `84fab07` fix(diagnose): fix stale digital-twin read path after canon write cutover (#649)
+- `d5370fe` fix(diagnose): браузерный режим пишет в канонический журнал, не в цифровой двойник (#648)
+- `049a074` fix(extractor): connect.sh no longer truncates a wrapped multi-line token paste (#645)
+- [behavior] `688a4a2` fix(extractor): follow-up from Layer 5 adversarial audit of PR #642 (#643)
+- `8c8da85` fix(day-open): unify Telegram transport onto lib/telegram.sh (WP-538 Ф3) (#640)
+- [behavior] `bcb68d2` fix(extractor): headless subscription connect + build-runtime data-loss fix (#642)
+- `d73ee24` fix(wp527): personal-guide-start — Ф7 живая обкатка, текстовые правки (#632)
+- `816a193` fix(wp527): personal-guide-start — Ф5 хвосты 3/4 (#630)
+- `f25f9f9` fix: un-deprecate WeekReport (WP-297) + Week Close guard filename (#596, #609) (#629)
+- `24b6deb` fix: peer-session issue triage — #598, #597, #608, #595, #616 + CHANGELOG catch-up (#626)
+- `260df81` fix(scripts): generate-skills-catalog.sh — блок-скаляр description + список slash (#622)
+- `9826b50` fix(hooks): install-hooks.sh never overwrites an existing differing hook (#613)
+- `d94bfc4` fix(wp484): restore 6 regressions in update-derived-snapshot.py, fix day-open-llm-fill.py is_today_plan (#611)
+- `91318f3` fix(ci): weekly-bump opens a PR instead of pushing to main directly
+- `f844bb9` fix(agent-fault): sqlite busy_timeout 5s -> 30s for concurrent hook writers
+- `3405de8` fix(ci): allowlist known test-fixture false positives in nightly secret scan
+- `3002383` fix(dry-run): uname-switched stat calls — GNU stat -f prints fs info and exits 0
+- `84935db` fix(hooks): real pre-commit validates staged artifacts regardless of add/commit form (issue #544)
+- `8ed0bcc` fix(day-open): escape $IWE_SCRIPTS in the calendar PENDING comment (#581)
+- `91b7a2e` fix(day-open/day-close): sessions readers follow the writer's root contract + calendar single source (issues #545, #581)
+- `d02a60d` fix(audit): section 3b follows actual $IWE_SCRIPTS execution layout (issue #582)
+- `79e3096` fix(wp485): reconcile runtime template delivery (#591)
+- `dbb7ded` fix: CLAUDE.md 3-way merge silent line loss + dangling /lesson reference (#590)
+- `756a0a1` fix: day-open.checks.md YAML-frontmatter false positive + build-runtime Unreleased stamp (#587)
 - `f896701` fix(skills): personal-guide -> DS-personal-guide в шаблонных скиллах (#585)
-  - `personal-guide-start`, `personal-guide-render`, `lesson-close`, `week-close-pilot` — литеральное имя личного репозитория новых пользователей переведено на канон `DS-personal-guide`; `docs/SETUP-GUIDE.md` и её тест-контракт обновлены вместе с манифестом
-- `91b7a2e` fix(day-open/day-close): читатели журналов сессий следуют контракту писателя + единый источник календаря (#545, #581)
-  - Флоу-регресс: писатель после миграции переходит на `MC-sessions`, читатели искали жёстко в `<репо>/sessions` — перенос со вчера пропадал молча на мигрированных установках
-- `d94bfc4` fix(wp484): восстановлены 6 регрессий в `update-derived-snapshot.py`, исправлена проверка `is_today_plan` в `day-open-llm-fill.py` (#611)
-- `9826b50` fix(hooks): `install-hooks.sh` больше не перезаписывает существующий изменённый хук (#613)
-- `260df81` fix(scripts): `generate-skills-catalog.sh` — разбор блок-скаляра `description` и списочного стиля `slash` (#622)
-- `966ba39` fix(session-guard): аудит — устранены точечные вызовы subprocess на файл (порт из корня) (#624)
-- `0a6499a` fix(skills): `personal-guide-start` приведён к актуальной версии — доставка `lesson`/`lesson-close`/`connect-guide`/`render` в репозиторий участника, недостающие поля манифеста (#619)
-- fix(day-open): `strategist.sh morning` сначала ищет конвейер Открытия дня через `$IWE_SCRIPTS`, каталог governance-репо — запасной путь (issue #598)
-  - Раньше путь собирался только из governance-репо — на установках, где канонический конвейер доставляется через `$IWE_SCRIPTS`, автономный утренний запуск 37 дней подряд молча уходил в свободную генерацию плана
-- fix(day-open): очистка обработанных заметок (`cleanup-processed-notes.py`) резолвится из `$IWE_TEMPLATE`, как `notify.sh` — раньше искалась рядом с раннером в `.iwe-runtime`, куда `build-runtime` её не доставляет (issue #597)
-- fix(strategy-session): проверка «первая сессия месяца» ищет записи и в плоской раскладке (`sessions/YYYY-MM-DD.md`), и в подпапке по месяцу — раньше смотрела только в подпапку и не находила ничего на установке с плоскими файлами, поэтому диспетчер всегда выбирал полный месячный сценарий (issue #608, тот же корень, что #545)
-- fix(day-open): комментарий про обход strategy_day-гейта (`DAY_OPEN_FORCE_STRATEGY_DAY=1`) больше не называет недоставленный в шаблон скрипт — вызывающая сторона зависит от авторской инфраструктуры (шлюз публикации, приватный LLM-прокси) вне области поставки (issue #595)
-- fix(session-prep): «первый Пн месяца» теперь считается командой `date` и передаётся модели готовым фактом, а не выводится ею из диалога — 31.08 автономный сценарий принял последний Пн августа за первый Пн сентября (issue #616)
-- fix(setup): `build-runtime.sh` больше не стирает живое состояние других процессов при пересборке `.iwe-runtime/` — раньше подмена директории удаляла ВСЮ старую копию целиком, включая не заявленные в `runtime-overlay.yaml` операционные подкаталоги (`session-guard.sh`: маркеры открытых сессий, isolate-push-состояние и т.п.); теперь при подмене переносится вперёд всё, что свежая сборка сама не производит (bug-2026-09-02-build-runtime-wipes-live-session-state, найден живьём — пересборка стёрла маркеры открытых сессий других агентов)
+- `084a381` fix: cold-review follow-up — wire skip status, restore seed marker, 3 corrections
+- `c701ed4` fix(session-guard): peer-session bypass survives set -u harness extraction (T22)
+- `7c092e6` fix(session-guard): close honors close_path=peer-session — port WP-484 F118 bypass from author source
+- `ac593c0` fix(peer-conversation): session index is created idempotently, declares its own incompleteness (#568)
+- `c297f01` fix(dry-run-gate): stage 1 for #549 — unique gate id, named recovery command
+- `3faaae2` fix(ci): fork hygiene — author-scan honors excluded_paths, notify-security skips unconfigured channel (#547)
+- `4cb6d90` fix(build-active-wp): render rows from the header's six roles (#558)
+- `e0ff3f6` fix(day-open): agent-prose checks files declare executor and skip cleanly (#546)
+- `a30712b` fix(day-close): a step that cannot run reports skip, not ok (#559)
+- `47c2c39` fix(extensions-gate): read the manifest from the template clone, not workspace root (#564)
+- `cce55b0` fix(day-close): zsh regression test for the commit guard + manifest entry (#557)
+- `e666ea5` fix(protocols): step tracking is an observable property, TodoWrite optional (#561, #563)
+- `ee81129` fix(strategist): cross-platform sleep inhibitor, parity with scheduler.sh (#553)
+- `3b34774` fix: route script calls via IWE_SCRIPTS convention, drop phantom preflight (#566)
+- `459f464` fix(day-close): lesson counter matches real lesson file names (#559)
+- `c85ce67` fix(day-open): ke_stats counts only pending reports, GNU stat on Linux (#548)
+- `7498f82` fix(day-open): skip finished rows when picking the active draft (#560)
+- `cc00347` fix(wp-new): consent-file path in SKILL.md matches create-wp.sh (#556)
+- `b6b9996` fix(scripts): ke-queue-stats.sh age from report frontmatter, not file mtime (#572)
+- `8b9315b` fix(extractor): teach KE pipeline the monthly captures rotation (WP-526/WP-170) (#570)
+- `59d9fe6` fix(session-guard): audit resolves MC-sessions like open/close (#569)
+- `a2e23e0` fix(session-guard): forward-port MC-sessions resolver from root (WP-526 Ф2) (#567)
+
 
 ## [0.39.1] — 2026-08-30
 
