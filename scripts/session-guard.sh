@@ -774,6 +774,11 @@ if [ "$CMD" = "close" ]; then
   # semaphore stub; empty path -> grep fails -> bypass correctly not taken.
   if [ -z "$RUNNER_OK" ] && grep -q '^close_path: peer-session$' "${SEM_FILE:-}" 2>/dev/null; then
     RUNNER_OK="declared-peer-session:$SLUG"
+    # WP-484 Ф133 (порт из авторского source, найдено 04.09.2026, пир-сессия
+    # 2026-09-04-23-wp561-peer-session-closed-ledger-gap): без FORCED_CARD
+    # блок ledger session_closed_direct ниже не срабатывает для этой ветки —
+    # пир-сессии молча оставались без записи о закрытии в дневном журнале.
+    FORCED_CARD="declared-peer-session:$SLUG"
     echo "Session CLOSE: close_path=peer-session объявлен при open — раннер не требуется (WP-484 Ф118)." >&2
   fi
 
@@ -847,6 +852,27 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
 $_repo"
     _warn_unpushed "$_repo"
   done < <(cat "$_sem_read" 2>/dev/null || true)
+
+  # Best-effort атрибуция ТОЛЬКО для закрытий, обошедших process-runner.py
+  # (порт из авторского source, WP-484 Ф133 — найдено 04.09.2026, пир-сессия
+  # 2026-09-04-23-wp561-peer-session-closed-ledger-gap: этот блок в FMT-копии
+  # отсутствовал вовсе, из-за чего пир-сессии молча не попадали в дневной
+  # журнал). FORCED_CARD непустой на bypass-путях выше (peer-session,
+  # force-no-reflection). Условие обязательно: без него событие писалось бы и
+  # для нормального завершённого раннера, задваивая r23_verdict тем же
+  # смыслом под другим именем. Никогда не проваливает close.
+  if [ -n "${FORCED_CARD:-}" ] && [ -f "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" ]; then
+    _cp_from_sem=$(grep "^close_path: " "$_sem_read" 2>/dev/null | cut -d' ' -f2- || echo "unknown")
+    _direct_event=$(python3 -c '
+import json, sys
+print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], "close_path": sys.argv[4]}))
+' "$WP" "$SLUG" "$AGENT" "$_cp_from_sem" 2>/dev/null) || _direct_event=""
+    if [ -n "$_direct_event" ]; then
+      bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" session_closed_direct "$_direct_event" session-guard \
+        >/dev/null 2>&1 || echo "  ⚠️  ledger session_closed_direct не записан (best-effort, не блокирует close)" >&2
+    fi
+  fi
+
   exit 0
 fi
 
