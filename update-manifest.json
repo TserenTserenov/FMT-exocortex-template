@@ -2153,7 +2153,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "3b8be616bd947060ea89efbaf2b45def3054f8234e77d0f15547335ebbf9e9c8"
+      "sha256": "680e6ac1bfcd9d37856498ec00dd49041dfe4d352d249093a4269a00fdee69d3"
     },
     {
       "path": "scripts/day-open-preflight.sh",
