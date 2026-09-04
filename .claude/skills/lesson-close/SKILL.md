@@ -8,6 +8,7 @@ related: [WP-149, WP-175, WP-245, WP-301, PD.METHOD.008]
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/lesson-close]
   phrases: []

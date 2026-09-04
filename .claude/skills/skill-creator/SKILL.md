@@ -8,6 +8,7 @@ description: |
   shows a draft, writes files, and reminds about verify-skill.sh.
 version: 0.3.2
 status: experimental
+browser_safe: false
 layer: L1
 agents: single
 interaction: multi-step

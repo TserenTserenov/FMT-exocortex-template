@@ -4,6 +4,7 @@ description: "Run the pilot-facing Week Close protocol with progress review and 
 version: 1.0.0
 layer: L3
 status: active
+browser_safe: false
 triggers:
   slash: [/week-close-pilot]
   phrases: []

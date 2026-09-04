@@ -5,6 +5,7 @@ argument-hint: "[описание решения]"
 version: 1.1.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/archgate]
   phrases: []

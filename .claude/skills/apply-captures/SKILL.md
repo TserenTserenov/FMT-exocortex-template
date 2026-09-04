@@ -5,6 +5,7 @@ argument-hint: "[путь к конкретному отчёту | пусто = 
 version: 1.3.0
 layer: L1
 status: active
+browser_safe: false
 agents: single
 interaction: multi-step
 triggers:

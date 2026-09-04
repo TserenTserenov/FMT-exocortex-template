@@ -5,6 +5,7 @@ argument-hint: "[--skip-mcp] [--critical]"
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/audit-installation]
   phrases: []

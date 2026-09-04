@@ -7,6 +7,7 @@ related: [WP-149, personal-guide-start, DP.SC.187]
 version: 2.1.0
 layer: L1
 status: awaiting-server-tool
+browser_safe: true
 supersedes: "v2.0.0 (вызов mcp render_personal_guide — инструмент не опубликован на сервере платформы, см. «Текущее состояние»)"
 triggers:
   slash: [/personal-guide-render]

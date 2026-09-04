@@ -5,6 +5,7 @@ description: "Classifies raw pilot request → structured request with routing a
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/artifactor]
   phrases: []

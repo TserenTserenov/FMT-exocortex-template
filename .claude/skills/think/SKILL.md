@@ -2,6 +2,7 @@
 name: think
 description: ADI-cycle structured reasoning (Abduction-Deduction-Induction-Audit-Decide). Use for complex decisions when multiple hypotheses need to be considered.
 argument-hint: "[задача или вопрос]"
+browser_safe: true
 routing:
   executor: opus
   deterministic: false

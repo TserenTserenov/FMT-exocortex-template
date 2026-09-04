@@ -4,6 +4,7 @@ description: Регистрация косяка агента в системе 
 argument-hint: "record --severity {critical|major|minor} --fault <description> --subject-kind {personality|runtime|system} --subject-id <stable-id>"
 version: 0.2.0
 status: active
+browser_safe: false
 layer: L1
 agents: none
 interaction: one-shot

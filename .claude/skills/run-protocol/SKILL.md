@@ -2,6 +2,7 @@
 name: run-protocol
 description: Step-by-step execution of the OWC protocol with mandatory checkpoint at each step. Prevents skipping steps (including verification).
 argument-hint: "[open|close] [day|session]"
+browser_safe: false
 routing:
   executor: sonnet
   deterministic: false

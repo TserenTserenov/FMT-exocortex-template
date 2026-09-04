@@ -5,6 +5,7 @@ argument-hint: "<описание задачи> | --list | --interrupt <session_
 version: 1.3.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/peer-writer]
   phrases: ["начни peer-сессию", "запусти диалог с Клодом", "peer-сессия", "вместе с Клодом", "с Клодом", "привлеки Клода"]

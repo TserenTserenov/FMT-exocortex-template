@@ -3,6 +3,7 @@ name: iwe-rules-review
 description: "Weekly review of IWE work culture (element 14 — System Evolution). Runs during Week Close."
 argument-hint: ""
 version: 1.0.0
+browser_safe: false
 routing:
   executor: haiku
   deterministic: false
