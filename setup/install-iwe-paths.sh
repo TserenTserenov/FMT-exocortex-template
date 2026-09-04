@@ -70,6 +70,7 @@ export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
 export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"
 export IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO"
+export IWE_SESSIONS_ROOT="\$IWE_WORKSPACE/MC-sessions"
 IWEENV_EOF
 
 $QUIET || echo "  ✓ $IWE_ENV_FILE written (workspace=$WORKSPACE_DIR)"
