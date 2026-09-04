@@ -2125,7 +2125,7 @@
     },
     {
       "path": "scripts/day-open-budget-patch.py",
-      "sha256": "c02cc64e6c108eca4aaed8e7fecd7d6da36b81ac5ef2a27a70ba61a9a28720cc"
+      "sha256": "648688fcb06a3409b3d54a453cb6164e996a15584c37fffaadabd50890f3f221"
     },
     {
       "path": "scripts/day-open-checks-runner.sh",
