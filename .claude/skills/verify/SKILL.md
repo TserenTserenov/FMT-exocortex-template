@@ -105,7 +105,7 @@ bash .claude/scripts/load-extensions.sh verify before
   - `01B-distinctions.md` с маркером `**Maturity:** seed` (Ф3: seed-маркер + mature-lite чек-лист)
 - Передать sub-agent'у промпт: `verify-pack-adequacy-subsection.md` + данные из контекста
 - Модель sub-agent'а: Sonnet
-- **Verdict**: PASS/CONDITIONAL/FAIL по координатам D1-D11 (WP-474 §4)
+- **Verdict**: `DPFPackageAdequacyStatus` — `admissibleForDeclaredDPFUse` / `seedOnly` / `repairBeforeDPFUse` (авто) + эскалационные `holdForPFADDecision` / `holdForCoreAmendmentDecision` / `refreshNeeded` — по координатам D1-D11, порядковая шкала 0-5 (WP-474 Ф8.1/Ф8.3, пир-сессия 2026-09-05-27)
 
 **Для `wp`:**
 - Прочитать WP context file (`{{GOVERNANCE_REPO}}/inbox/WP-{N}-*.md`)
