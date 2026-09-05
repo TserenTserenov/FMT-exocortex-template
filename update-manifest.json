@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills/pack-creator/SKILL.md",
-      "sha256": "debd8a564b128cf23b5a59c7c87e62369ab118b07dc13a2e7bfd0035836eb53a"
+      "sha256": "a56f0d3df845ab06cadd38e1d905b8d1e50f90d5c7d382fb4b7a0bfb026f94ae"
     },
     {
       "path": ".claude/skills/pack-creator/test_guard.sh",
@@ -525,7 +525,7 @@
     },
     {
       "path": ".claude/skills/pack-new/SKILL.md",
-      "sha256": "b13b8b7e240801b5f445a4c522f5167f5eae62b9db073cd1c44b5c79f4670cff"
+      "sha256": "2d3721d177cc2d55871b26ada6f425257686e4d5b9f00a365a694a406e6a0497"
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
@@ -661,7 +661,7 @@
     },
     {
       "path": ".claude/skills/verify/SKILL.md",
-      "sha256": "98832996078075232e60513f7bb09a07d62c5b1579bfc69c91d669456a02261c"
+      "sha256": "872c7043f4bfe9908a84d173bca2b40fbcaa3336855f3de678d0610e282e804a"
     },
     {
       "path": ".claude/skills/verify/verify-fpf-subsection.md",
@@ -669,7 +669,7 @@
     },
     {
       "path": ".claude/skills/verify/verify-pack-adequacy-subsection.md",
-      "sha256": "fd105286bcba402aed001d4c13cf93661ed225927d26219fda55e391c321d015"
+      "sha256": "36155a54a1b255c82e3a4a2aaa58e75bb877cfbdff71569bb3f77d642a062bde"
     },
     {
       "path": ".claude/skills/verify/verify-pedagogy-subsection.md",
