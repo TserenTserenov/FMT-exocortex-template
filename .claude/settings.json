@@ -27,7 +27,13 @@
       "Bash(git diff:*)",
       "Bash(git show:*)",
       "Bash(git branch:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(bash ~/IWE/scripts/session-guard.sh open:*)",
+      "Bash(bash ~/IWE/scripts/session-guard.sh close:*)",
+      "Bash(bash ~/IWE/scripts/session-guard.sh renew:*)",
+      "Bash(bash ~/IWE/scripts/session-guard.sh note-file:*)",
+      "Bash(bash ~/IWE/scripts/session-guard.sh audit:*)",
+      "Bash(bash ~/IWE/scripts/agent-heartbeat.sh:*)"
     ],
     "additionalDirectories": []
   },
