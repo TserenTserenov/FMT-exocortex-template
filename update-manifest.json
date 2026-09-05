@@ -285,7 +285,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "280fa18d9d5e4188569c1a30e3dfe31e992975e295c9817e438dca3c66ae4b81"
+      "sha256": "13355f13f96a1cfaf7dc8f0856269d612ae624ce0b8dc3c82ac3157924f5bec2"
     },
     {
       "path": ".claude/skills-catalog.yaml",
