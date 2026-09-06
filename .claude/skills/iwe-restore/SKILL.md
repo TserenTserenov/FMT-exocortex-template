@@ -141,7 +141,7 @@ rsync -av --exclude='CLAUDE.md' --exclude='AGENTS.md' \
 
 ### 4c. Копировать CLAUDE.md
 
-> issue #217: подстановка `{{HOME_DIR}}` → `$HOME` делает восстановление ОС-агностичным
+> issue #217: подстановка `$HOME` → `$HOME` делает восстановление ОС-агностичным
 > (бэкап пишется на плейсхолдере в `day-close.sh`, симметрично `setup.sh`).
 > `$HOME` стоит в replacement-части `sed s///` — экранируем `&`/`\`, иначе `$HOME`
 > с `&` трактуется как «весь совпавший текст» и портит путь (cold-review находка).
@@ -152,7 +152,7 @@ HOME_SED_SAFE=$(printf '%s' "$HOME" | sed 's/[&\]/\\&/g')
 if [ -f "$EXOCORTEX/CLAUDE.md" ]; then
   # Если CLAUDE.md уже есть — показать: «CLAUDE.md уже существует. Перезаписать?»
   # При согласии:
-  sed "s|{{HOME_DIR}}|$HOME_SED_SAFE|g" "$EXOCORTEX/CLAUDE.md" > "$WORKSPACE_DIR/CLAUDE.md"
+  sed "s|$HOME|$HOME_SED_SAFE|g" "$EXOCORTEX/CLAUDE.md" > "$WORKSPACE_DIR/CLAUDE.md"
 fi
 ```
 
@@ -160,7 +160,7 @@ fi
 
 ```bash
 if [ -f "$EXOCORTEX/AGENTS.md" ]; then
-  sed "s|{{HOME_DIR}}|$HOME_SED_SAFE|g" "$EXOCORTEX/AGENTS.md" > "$WORKSPACE_DIR/AGENTS.md"
+  sed "s|$HOME|$HOME_SED_SAFE|g" "$EXOCORTEX/AGENTS.md" > "$WORKSPACE_DIR/AGENTS.md"
 fi
 ```
 
