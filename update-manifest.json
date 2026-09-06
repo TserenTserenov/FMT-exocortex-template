@@ -2489,7 +2489,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "6a73a17201951293542388d78cb4c903a5149fd1d78c31eb0e7730253ecf3826"
+      "sha256": "170efdf27b5a7874a87bdaae0c7d70e2de5c6843d4663725a60f884b5059d109"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -2885,7 +2885,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "4791c1064bb66731e50d34527ca8ab59e1836f66bd3d7f497788dd443eaecbc9"
+      "sha256": "e89d3534943369502b20b364909c28640cbe2503c8c4fd8f9b3db92f54429653"
     }
   ],
   "excluded_paths": [

@@ -1597,8 +1597,15 @@ run_post_apply_backfills_or_die() {
 # (which would kill a run in flight at exactly 06:00/21:00).
 backfill_extractor_feeders() {
     local feeders="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
-    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
+    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-}"
     local feeders_output
+
+    # Two steps, not one: `local x="$(f)"` would swallow a failing f, and an
+    # empty repo name silently becomes the wrong default one level down.
+    if [ -z "$governance_repo" ] && ! governance_repo=$(effective_governance_repo); then
+        echo "  ○ Экстрактор: governance-репозиторий не определён, backfill пропущен."
+        return 0
+    fi
 
     if [ "${IWE_SKIP_EXTRACTOR_FEEDERS:-0}" = "1" ]; then
         echo "  ○ Экстрактор: пропущен (IWE_SKIP_EXTRACTOR_FEEDERS=1)."
@@ -1617,7 +1624,15 @@ backfill_extractor_feeders() {
         return 0
     fi
 
-    if feeders_output=$(IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$governance_repo"         IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime"         bash "$feeders" install 2>&1); then
+    # --schedule-only, not install: an update may add the periodic job, but must
+    # not redo the install-time decisions (the global git hook template, the
+    # init.templateDir pointer, seeding fleeting-notes) on every single run.
+    # IWE_WORKSPACE is deliberately not passed: the feeders script never reads
+    # it, so passing it would only pretend the workspace is configurable here.
+    if feeders_output=$(
+        IWE_GOVERNANCE_REPO="$governance_repo" \
+        IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+        bash "$feeders" --schedule-only 2>&1); then
         printf '%s\n' "$feeders_output" | sed 's/^/  /'
         return 0
     fi

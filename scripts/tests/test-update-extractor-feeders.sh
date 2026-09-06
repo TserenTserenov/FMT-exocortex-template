@@ -34,7 +34,7 @@ FEEDERS="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
 write_feeders() {  # $1 = exit code the stub reports
     cat > "$FEEDERS" <<STUB
 #!/usr/bin/env bash
-printf '%s|%s|%s|%s\n' "\$1" "\$IWE_WORKSPACE" "\$IWE_GOVERNANCE_REPO" "\$IWE_RUNTIME" > "$TMP/feeders-call"
+printf '%s|%s|%s\n' "\$1" "\${IWE_GOVERNANCE_REPO:-}" "\${IWE_RUNTIME:-}" > "$TMP/feeders-call"
 echo "  launchd plist установлен"
 exit $1
 STUB
@@ -44,12 +44,38 @@ printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/bin/claude"
 chmod +x "$TMP/bin/claude"
 PATH="$TMP/bin:$PATH"
 
-# 1. Happy path: feeders installed with the workspace's own governance/runtime.
+# 1. Happy path: the periodic job only, with the workspace's own runtime.
+# An update must NOT rerun the install-time steps (global git hook template,
+# init.templateDir, fleeting-notes seeding) -- that is what --schedule-only buys.
 write_feeders 0
 OUT=$(backfill_extractor_feeders)
-EXPECTED="install|$WORKSPACE_DIR|DS-my-strategy|$WORKSPACE_DIR/.iwe-runtime"
+EXPECTED="--schedule-only|DS-my-strategy|$WORKSPACE_DIR/.iwe-runtime"
 if [ "$(cat "$TMP/feeders-call")" != "$EXPECTED" ]; then
     echo "feeders invoked with wrong mode or environment: $(cat "$TMP/feeders-call")" >&2
+    exit 1
+fi
+
+# A stub that agrees with its caller proves nothing about the shipped script:
+# check the real one parses the mode and guards both install-time steps with it.
+# Structural, not executed -- running it for real would install a launchd job
+# on whatever machine the suite runs on.
+REAL_FEEDERS="$ROOT/scripts/setup-extractor-feeders.sh"
+if ! grep -q 'SCHEDULE_ONLY=true' "$REAL_FEEDERS"; then
+    echo 'setup-extractor-feeders.sh does not implement --schedule-only' >&2
+    exit 1
+fi
+if ! grep -q 'if \$SCHEDULE_ONLY; then' "$REAL_FEEDERS"; then
+    echo 'git-templates step is not guarded by --schedule-only' >&2
+    exit 1
+fi
+if ! grep -q '! \$SCHEDULE_ONLY' "$REAL_FEEDERS"; then
+    echo 'fleeting-notes step is not guarded by --schedule-only' >&2
+    exit 1
+fi
+# The launchd job cannot start without its log directory -- only the Linux
+# branch of roles/extractor/install.sh used to create it.
+if ! grep -q 'mkdir -p "\$HOME/logs/extractor"' "$REAL_FEEDERS"; then
+    echo 'feeders script does not create the launchd log directory' >&2
     exit 1
 fi
 if ! grep -Fq 'launchd plist установлен' <(printf '%s' "$OUT"); then
