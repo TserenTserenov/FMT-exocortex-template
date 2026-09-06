@@ -29,7 +29,7 @@ Day Close = протокол. Блокирующее требование — н
 ## Алгоритм
 
 ### 0. Extensions (before)
-`bash .claude/scripts/load-extensions.sh day-close before` → exit 0: `Read` каждый файл из вывода (alphabetic) → выполнить как первые шаги. Поддерживает `extensions/day-close.before.md` И `extensions/day-close.before.<suffix>.md`.
+`bash .claude/scripts/load-extensions.sh day-close before` → exit 0: `Read` каждый файл из вывода (alphabetic) → выполнить как первые шаги. Exit 1/3 (нет совпадений / нет каталога `extensions/` — штатно для новой установки, либо каталог повреждён) → пропустить молча. Поддерживает `extensions/day-close.before.md` И `extensions/day-close.before.<suffix>.md`.
 
 ### 0б. Дайджест — token discipline (issue #234)
 `bash "$IWE_SCRIPTS/day-close-prepare.sh"` — один вызов вместо ~10 скан-запросов. Пронумерованные секции дайджеста ЗАМЕНЯЮТ скан-команды внутри шагов ниже (сами шаги исполняются — но берут данные из дайджеста, не перезапускают сканы): §1→шаг 1, §2→10b, §3→2d, §4→4б, §5→4в, §6→4, §7→6, §8→6 (prerequisite), §9-10→3, §11→2f. Реагировать только на flagged-пункты; drift-хит, который реально «ждёт X», — не drift. Скрипт отсутствует → legacy: inline-команды шагов.
@@ -43,7 +43,7 @@ Day Close = протокол. Блокирующее требование — н
 <!-- Детали: day-close-details.md § Шаг 0в -->
 
 ### 1. Сбор данных
-**Strategy_day (шаг 0в) → неприменимо, пропустить** (нет DayPlan, сверять таблицу «На сегодня» не с чем). Иначе: запустить bash-скрипт сбора коммитов за день по всем git-репо в `{{HOME_DIR}}/IWE/`. Сопоставить с таблицей «На сегодня» из DayPlan → определить статусы.
+**Strategy_day (шаг 0в) → неприменимо, пропустить** (нет DayPlan, сверять таблицу «На сегодня» не с чем). Иначе: запустить bash-скрипт сбора коммитов за день по всем git-репо в `$HOME/IWE/`. Сопоставить с таблицей «На сегодня» из DayPlan → определить статусы.
 <!-- Детали: day-close-details.md § Шаг 1 -->
 
 ### 2. Governance batch
@@ -55,7 +55,7 @@ Day Close = протокол. Блокирующее требование — н
 **2f.** WeekReport — если есть `WeekReport W{N}.md`: добавить `<details><summary><b>Итоги {День} {Дата}</b></summary>` **перед** предыдущими итогами (обратная хронология).
 <!-- Детали 2f: day-close-details.md § Шаг 2f -->
 
-**EXTENSION POINT (checks):** `bash .claude/scripts/load-extensions.sh day-close checks` → exit 0: `Read` каждый файл → выполнить.
+**EXTENSION POINT (checks):** `bash .claude/scripts/load-extensions.sh day-close checks` → exit 0: `Read` каждый файл → выполнить. Exit 1/3 (нет совпадений / нет каталога `extensions/` — штатно для новой установки, либо каталог повреждён) → пропустить молча.
 
 ### 3. Архивация
 - **Strategy_day (шаг 0в) → архивацию DayPlan сегодня пропустить** (не создавался — нечего архивировать). DayPlan'ы прошлых дней в `current/` (мусор) — заархивировать в любом случае.
@@ -65,13 +65,13 @@ Day Close = протокол. Блокирующее требование — н
 
 ### 4б. Memory Drift Scan
 Две независимые проверки (issue #326 — лексическая одна пропускала расхождения статуса без триггерных слов):
-1. **Структурная:** `T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/memory-drift-scan.py"` — сверяет колонку «Статус» MEMORY.md с полем `status` WP-context по номеру РП. Exit 1 → для каждой найденной строки обновить устаревшее.
+1. **Структурная:** `T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/memory-drift-scan.py"` — сверяет колонку «Статус» MEMORY.md с полем `status` WP-context по номеру РП. Exit 1 → для каждой найденной строки обновить устаревшее.
 2. **Лексическая:** Grep MEMORY.md на паттерны «ждёт/блокер/blocked/остановлен» (ловит текстовые блокеры без изменения статуса — отдельный класс, скрипт п.1 их не видит). Для каждого: найти WP-context, проверить статус, обновить устаревшее.
 Анонс при 0 расхождений по обеим проверкам: *«Drift-scan: N паттернов + M структурных, устаревших нет»*.
 <!-- Детали: day-close-details.md § Шаг 4б -->
 
 ### 4в. Index Health Check
-`T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/check-index-health.py"` — для каждого FAIL/WARN: диагностика (дамп vs жанр) → перенести или пометить skip.
+`T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/check-index-health.py"` — для каждого FAIL/WARN: диагностика (дамп vs жанр) → перенести или пометить skip.
 <!-- Детали: day-close-details.md § Шаг 4в -->
 
 ### 4. Lesson Hygiene
@@ -112,10 +112,10 @@ TODAY_DAYPLAN="${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan $(d
 `SCRIPT="$HOME/IWE/.claude/scripts/rule-classifier.py"; [ -f "$SCRIPT" ] && python3 "$SCRIPT" || echo "skip: rule-classifier.py требует ручной установки (claude CLI + PACK-agent-rules)"` (идемпотентно, kill если >60 сек). **ДО коммита** — иначе его правки уходят в незакоммиченный хвост (issue #249).
 
 ### 10a. Extensions (after)
-`bash .claude/scripts/load-extensions.sh day-close after` → exit 0: `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/day-close.after.md` И `extensions/day-close.after.<suffix>.md`. Симметрично week-close (шаг 9): вызывается ДО финального коммита (10b), чтобы правки расширений попадали в тот же коммит, не оставались незакоммиченным хвостом (issue #320/#322).
+`bash .claude/scripts/load-extensions.sh day-close after` → exit 0: `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1/3 (нет совпадений / нет каталога `extensions/` — штатно для новой установки, либо каталог повреждён) → пропустить. Поддерживает `extensions/day-close.after.md` И `extensions/day-close.after.<suffix>.md`. Симметрично week-close (шаг 9): вызывается ДО финального коммита (10b), чтобы правки расширений попадали в тот же коммит, не оставались незакоммиченным хвостом (issue #320/#322).
 
 ### 10b. Финальный коммит (все затронутые репозитории, не только governance)
-`git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`{{HOME_DIR}}/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное (включая правки шага 10a) стадировать и коммитить только одной fail-closed командой ниже: ненулевой код = СТОП, отдельный `git commit` после него запрещён. Переходить к шагу 11 только когда `git status` чист во всех репо.
+`git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`$HOME/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное (включая правки шага 10a) стадировать и коммитить только одной fail-closed командой ниже: ненулевой код = СТОП, отдельный `git commit` после него запрещён. Переходить к шагу 11 только когда `git status` чист во всех репо.
 
 <!-- issue-511-guard:start -->
 ```bash
@@ -267,7 +267,7 @@ jq -n \
 ### 11. Верификация (Haiku R23)
 Sub-agent Haiku R23 (context isolation): передать чеклист + черновик итогов + список обновлённых файлов. По ❌ — исправить до показа пользователю.
 
-**EXTENSION POINT (checks):** `bash .claude/scripts/load-extensions.sh day-close checks` → exit 0: `Read` каждый файл → выполнить.
+**EXTENSION POINT (checks):** `bash .claude/scripts/load-extensions.sh day-close checks` → exit 0: `Read` каждый файл → выполнить. Exit 1/3 (нет совпадений / нет каталога `extensions/` — штатно для новой установки, либо каталог повреждён) → пропустить молча.
 
 ---
 

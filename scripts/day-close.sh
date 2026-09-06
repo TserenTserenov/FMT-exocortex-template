@@ -1397,13 +1397,45 @@ PYEOF
   atomic_copy_file "$rhythm_src" "$rhythm_dst" "day-rhythm-config.yaml"
 }
 
+# resolve_memory_src_fallback — issue #637: WORKSPACE_SLUG matches Claude's
+# project key only when the CLI was launched from WORKSPACE_DIR itself; launched
+# from a parent (e.g. workspace at ~/projects/IWE, CLI started in ~/projects)
+# the key slugs the launch cwd instead and the primary guess misses by one
+# level. Tries, in order: (1) the exact WORKSPACE_SLUG match already computed
+# into MEMORY_SRC, (2) the sole memory/ dir among ~/.claude/projects/*/ if
+# there is exactly one (ambiguous with 2+, so skipped rather than guessed),
+# (3) $GOVERNANCE_REPO/memory (the memory/ symlink CLAUDE.md §4 documents).
+# Prints which tier matched to stderr so a chosen fallback is never silent.
+resolve_memory_src_fallback() {
+  local d candidates=()
+  for d in "$HOME"/.claude/projects/*/memory; do
+    [ -d "$d" ] && candidates+=("$d")
+  done
+  if [ "${#candidates[@]}" -eq 1 ]; then
+    warn "  memory source: WORKSPACE_SLUG guess missed, using sole match ${candidates[0]}"
+    printf '%s\n' "${candidates[0]}"
+    return 0
+  fi
+  if [ -d "$DS_STRATEGY/memory" ]; then
+    warn "  memory source: WORKSPACE_SLUG guess missed, using $DS_STRATEGY/memory"
+    printf '%s\n' "$DS_STRATEGY/memory"
+    return 0
+  fi
+  return 1
+}
+
 # --- Шаг 1: Backup memory/ + CLAUDE.md → exocortex/ ---
 do_backup() {
   log "Шаг 1/3: Backup memory/ → exocortex/"
 
   if [ ! -d "$MEMORY_SRC" ]; then
-    err "Memory source not found: $MEMORY_SRC"
-    return 1
+    local fallback
+    if fallback="$(resolve_memory_src_fallback)"; then
+      MEMORY_SRC="$fallback"
+    else
+      warn "Memory source not found: $MEMORY_SRC (no unambiguous fallback either) — backup skipped"
+      return "$RC_STEP_SKIPPED"
+    fi
   fi
 
   mkdir -p "$EXOCORTEX_DST"
@@ -1742,6 +1774,7 @@ main() {
     case "$backup_rc" in
       0)                     backup_status="ok" ;;
       "$RC_BACKUP_WARNING") backup_status="warn" ;;
+      "$RC_STEP_SKIPPED")    backup_status="skip" ;;
       *)                     backup_status="fail" ;;
     esac
   fi
