@@ -825,7 +825,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "efd538321fe3ac5694117fea2ea6df29954a3e453a9ed60984d01a5ebf55e06b"
+      "sha256": "4721d6476467d5193d8a1e8d34e55264434e205a22a702fc98222add07405ff9"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -957,7 +957,7 @@
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
-      "sha256": "eeb56198fe7e70f8de1f881d5b519dd5aed02c30e1be57d17ef9a4a63e310bc5"
+      "sha256": "69ec77264dc2b6597ad92508b129048ab005a43271567d29a9b7c19889833507"
     },
     {
       "path": "exocortex/hindsight/docker-compose.yml",
@@ -1509,7 +1509,7 @@
     },
     {
       "path": "memory/sota-reference.md",
-      "sha256": "e2301014fb9ef1f04e0ad47bb9717977562166c3c69d129ae237fdf819d052f5"
+      "sha256": "389eb94de3c30d0b05b8bac0a6b3b2af81c088a1028ea356e320ed589b33450a"
     },
     {
       "path": "memory/t-checklist.md",
