@@ -40,7 +40,7 @@ description: "Операционный файл памяти IWE"
 | SOTA.003 | Open API Specs | SOTA (зрелые) | Проектирование MCP, API-контракты между системами |
 | SOTA.004 | GraphRAG + KG | SOTA | Проектирование retrieval, typed `related:`, MCP tools |
 | SOTA.005 | AI-Native Org Design | SOTA (emerging) | Организация агентов, distribution of responsibility |
-| SOTA.006 | Agentic Development | SOTA (defining) | Архитектура multi-agent, оркестрация, IPO-паттерн. **Amdahl Law:** multi-agent оправдан ТОЛЬКО при (1) context isolation, (2) parallelism gain, (3) tool specialization. Иначе coordination cost > benefit. Start single-agent. (Anthropic 2026, Левенчук). **Coordination Cost Check** (АрхГейт Шаг 2b): применять на обоих масштабах ОРЗ — День (агенты дневного цикла) и Сессия (sub-agents задачи). |
+| SOTA.006 | Agentic Development | SOTA (defining) | Архитектура multi-agent, оркестрация, IPO-паттерн. **Amdahl Law:** multi-agent оправдан ТОЛЬКО при (1) context isolation, (2) parallelism gain, (3) tool specialization. Иначе coordination cost > benefit. Start single-agent. (Anthropic 2026, Левенчук). **Coordination Cost Check** (АрхГейт Шаг 2b): применять на тех масштабах ОРЗ, где работают агенты — День (агенты дневного цикла) и Сессия (sub-agents задачи). |
 | SOTA.007 | AI-Accelerated Ontology | SOTA (breakthrough) | KE pipeline, ontology generation, validation |
 | SOTA.008 | Real-Time Knowledge Capture | SOTA (консенсус) | Протокол Work, capture-to-pack, рубежи |
 | SOTA.009 | Knowledge-Based Digital Twins | Emerging | DDT архитектура, Pack + данные + агенты |
