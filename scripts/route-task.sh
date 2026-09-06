@@ -199,7 +199,44 @@ run_script() {
     fi
     local script_exit=0
     if [[ -n "$args" ]]; then
-        read -r -a ARGS_ARRAY <<< "$args"
+        # issue #679: `read -r -a` splits только по IFS — не понимает кавычки
+        # внутри $args, поэтому `--fault "текст с пробелами"` рассыпался на 4
+        # элемента массива вместо 2. Первая попытка фикса (`eval`) отклонена
+        # на ревью: исполняет ЛЮБОЙ shell-синтаксис в $args ($(...), `` ` ``,
+        # ;, &&), а $args может прийти из agent-fault SKILL.md, где --fault —
+        # свободный текст описания косяка агента, не фиксированный литерал.
+        # Вторая попытка (shlex.split + newline-delimited + mapfile) тоже
+        # отклонена: mapfile — bash4+, системный /bin/bash на macOS без
+        # Homebrew — 3.2; и newline-разделитель ломает токен с буквальным
+        # переносом строки внутри (многоабзацное --fault-описание).
+        # NUL — единственный байт, которого не бывает ни в одном bash-токене
+        # и который shlex-токен тоже не может содержать, поэтому безопасен
+        # как разделитель; временный файл (не $()) — NUL не переживает
+        # command substitution. `while read -d ''` — bash3.2-совместимо.
+        local ARGS_ARRAY=() shlex_tmp shlex_err
+        shlex_tmp=$(mktemp "${TMPDIR:-/tmp}/route-task-args.XXXXXX") || die "mktemp failed"
+        if ! shlex_err=$(python3 -c '
+import shlex, sys
+try:
+    toks = shlex.split(sys.argv[1])
+except ValueError as exc:
+    print(f"unbalanced quotes: {exc}", file=sys.stderr)
+    sys.exit(1)
+with open(sys.argv[2], "wb") as f:
+    for tok in toks:
+        f.write(tok.encode())
+        f.write(b"\0")
+' "$args" "$shlex_tmp" 2>&1); then
+            rm -f "$shlex_tmp"
+            warn "failed to parse args for $skill_name: $shlex_err"
+            emit_error "$skill_name" "EXEC_FAILED" "args parse error: $shlex_err"
+            emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+            return 1
+        fi
+        while IFS= read -r -d '' tok; do
+            ARGS_ARRAY+=("$tok")
+        done < "$shlex_tmp"
+        rm -f "$shlex_tmp"
         "$interpreter" "$script_path" "${ARGS_ARRAY[@]}" || script_exit=$?
     else
         "$interpreter" "$script_path" || script_exit=$?
@@ -294,11 +331,21 @@ dispatch_skill() {
         die "catalog lookup failed (exit=$lookup_exit)"
     fi
 
-    local executor script_path="" model=""
+    local executor script_path="" model="" deterministic=""
     executor=$(echo "$lookup_result" | grep "^executor=" | cut -d= -f2)
     script_path=$(echo "$lookup_result" | grep "^script_path=" | cut -d= -f2- || true)
     model=$(echo "$lookup_result" | grep "^model=" | cut -d= -f2- || true)
+    deterministic=$(echo "$lookup_result" | grep "^deterministic=" | cut -d= -f2- || true)
     routing_path="${routing_path}${executor}"
+
+    # issue #679: deterministic:true в каталоге раньше ничего не решал — LLM-
+    # фоллбек при ненайденном скрипте зависел только от того, каким флагом
+    # вызвали роутер (--skill/--tag), не от контракта самого skill-а. Запись,
+    # обещающая "без LLM", могла тихо получить LLM-подмену, если её позвали
+    # через --tag. Каталог теперь важнее выбора вызывающего.
+    if [[ "$deterministic" == "true" ]]; then
+        allow_fallback="false"
+    fi
 
     case "$executor" in
         script)
