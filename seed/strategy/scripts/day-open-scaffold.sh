@@ -1260,10 +1260,16 @@ render_compact_dashboard() {
 # The template's full collection has a status column but does not define an "черновик"
 # value, while the priority table is the explicit current-work list. "Где остановился"
 # is the pilot's own progress — we never fabricate it (see feedback_no_invented_personal_history).
+# Sets globals SELF_DEV_BLOCK (details-section body) and SELF_DEV_TABLE_THEME
+# (short table-row cell, issue #636) from the same source in one pass. A plain
+# `echo`-per-line function called via `SELF_DEV_BLOCK=$(render_self_dev)` would
+# run in a subshell, discarding any other global it tries to set — so this
+# builds SELF_DEV_BLOCK as a string instead of relying on captured stdout.
 render_self_dev() {
   local draft_list="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/drafts/draft-list.md"
   if [ ! -f "$draft_list" ]; then
-    echo "**Активный черновик:** нет данных (drafts/draft-list.md не найден)"
+    SELF_DEV_TABLE_THEME="тема не задана — обсудить с пилотом (drafts/draft-list.md не найден)"
+    SELF_DEV_BLOCK="**Активный черновик:** нет данных (drafts/draft-list.md не найден)"
     return
   fi
   # Take the first data row from the template-defined "Приоритетные" table.
@@ -1282,21 +1288,33 @@ render_self_dev() {
       exit
     }' "$draft_list")
   if [ -z "$row" ]; then
-    echo "**Активный черновик:** нет активных черновиков (приоритетные пусты или все завершены)"
+    SELF_DEV_TABLE_THEME="тема не задана — обсудить с пилотом (нет активных черновиков)"
+    SELF_DEV_BLOCK="**Активный черновик:** нет активных черновиков (приоритетные пусты или все завершены)"
     return
   fi
   local dnum path
   dnum=$(echo "$row" | grep -oE 'D-[0-9]+' | head -1)
   path=$(echo "$row" | grep -oE '\([^)]*D-[0-9][^)]*\.md\)' | head -1 | tr -d '()' | sed 's#^\./#drafts/#')
+  SELF_DEV_TABLE_THEME="$dnum"
+  local draft_line
   if [ -n "$path" ]; then
-    echo "**Активный черновик:** [$dnum]($path)"
+    draft_line="**Активный черновик:** [$dnum]($path)"
   else
-    echo "**Активный черновик:** $dnum (ссылка не распознана в draft-list.md)"
+    draft_line="**Активный черновик:** $dnum (ссылка не распознана в draft-list.md)"
   fi
-  echo "**Где остановился:** открой файл черновика — прогресс ведёт пилот."
-  echo "**Сегодня:** 60-90 мин на редактирование / структурирование."
+  SELF_DEV_BLOCK="$draft_line
+**Где остановился:** открой файл черновика — прогресс ведёт пилот.
+**Сегодня:** 60-90 мин на редактирование / структурирование."
 }
-SELF_DEV_BLOCK=$(render_self_dev)
+# issue #636: table-row theme (SELF_DEV_TABLE_THEME) is deterministic, same
+# source as the details block — a scaffold with no real draft used to leave a
+# bare [тема] placeholder that the LLM filled in on its own, and the invented
+# topic then carried over via Day Close carry-over for weeks
+# (feedback_no_invented_personal_history). Called directly, not via `$(...)`,
+# so both globals land in this shell rather than a discarded subshell.
+SELF_DEV_TABLE_THEME=""
+SELF_DEV_BLOCK=""
+render_self_dev
 
 # --- Pre-compute sweep list (single call, reused below) ---
 # SWEEP_WP_FULL: raw active-wp-sweep.sh output, kept only as input to SWEEP_WP_LIST below.
@@ -1379,7 +1397,7 @@ ${MANDATORY_DAILY_WPS:-  (не задано — day-rhythm-config.yaml не со
 
 | 🚦 | ТВС | # | РП | h | Статус |
 |----|-----|---|-----|---|--------|
-| ⚫ | В | N | **Саморазвитие** — [тема] | 1-2 | pending |
+| ⚫ | В | N | **Саморазвитие** — $SELF_DEV_TABLE_THEME | 1-2 | pending |
 | 🔴 | С | NNN | **<!-- PENDING -->** | X | pending |
 
 > ТВС: **В** = Важное (развитие / критичное для R1-R6) · **Т** = Текущее (плановая работа) · **С** = Срочное (угроза конвейеру, дублируется в шапке 🚨)

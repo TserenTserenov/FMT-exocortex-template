@@ -53,7 +53,7 @@ bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram
 - `<governance-repo>/inbox/captures.md` — знаниевые кандидаты (если есть)
 - `<governance-repo>/inbox/extraction-reports/*.md` со `status: pending-review` — отчёты Экстрактора (если есть)
 
-**Категоризация заметок** по PD.FORM.083 (7 категорий): НЭП / Задача / Знание доменное / Знание реализационное / Черновик / Личные данные / Шум. Полная справка → `memory/feedback_note_review_routing.md`. НЕ удалять.
+**Категоризация заметок** по PD.FORM.083 (8 категорий): НЭП / Задача / Гипотеза / Знание доменное / Знание реализационное / Черновик / Личные данные / Шум. Полная справка → `memory/feedback_note_review_routing.md`. НЕ удалять.
 
 **Carry-over заметок из вчерашнего DayPlan:** проверить по git log (`note-review`), были ли обработаны. Если да → секция «Разбор заметок» = «все обработаны» (с ссылкой на коммит). Не переносить обработанные заметки как carry-over.
 
