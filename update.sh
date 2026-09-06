@@ -3976,7 +3976,10 @@ for base in L1_DIRS:
     for root, dirs, files in os.walk(full_base):
         for fname in files:
             full = os.path.join(root, fname)
-            rel = os.path.relpath(full, script_dir)
+            # issue #680: manifest paths always use "/" (JSON convention);
+            # os.path.relpath returns "\" on Windows, so every file compared
+            # false-orphan there without this normalization.
+            rel = os.path.relpath(full, script_dir).replace(os.sep, "/")
             if rel not in all_known and not _locally_excluded(rel):
                 tag = "[maybe-L3]" if "extensions/" in rel else "[orphan]"
                 orphans.append((tag, rel))

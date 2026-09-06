@@ -12,6 +12,11 @@
 # Использование (как hook): event-specific обёртки делают source этого файла и вызывают
 # dispatch_event. Прямой запуск тоже доступен — для тестов.
 #
+# CLI exit codes: dispatch/list-rules/session-summary/session-clear/test — 0.
+# check-trace-satisfaction|list-gates|mark-gate — 3 (NOT_IMPLEMENTED, issue #678:
+# protocol-close.md ссылается на них, механика ещё не реализована). Неизвестная
+# подкоманда — 1 (usage).
+#
 # REGISTRY: ~/IWE/.claude/rules-registry.yaml (генерируется из PACK-agent-rules/)
 
 set -uo pipefail
@@ -1750,6 +1755,18 @@ PYEOF
         echo ""
         echo "=== Results: $PASS PASS / $FAIL FAIL (total $((PASS+FAIL))) ==="
         [ "$FAIL" -eq 0 ] && exit 0 || exit 1
+        ;;
+    check-trace-satisfaction|list-gates|mark-gate)
+        # issue #678: memory/protocol-close.md ссылается на эти три
+        # подкоманды (Quick/Week/Month Close, gate-трассировка WP-481 Ф5.1),
+        # но механика никогда не была реализована. Раньше это падало в
+        # безымянную ветку *) ниже с generic usage — на практике неотличимо
+        # от опечатки в имени подкоманды и не сообщает, что именно не
+        # работает. Явная ветка с понятным сообщением вместо тихой догадки:
+        # проверка гейтов реально не произошла, это не «прошла с exit 1».
+        echo "NOT_IMPLEMENTED: '$1' (rule-engine.sh) — gate-трассировка (WP-481 Ф5.1) описана в protocol-close.md, но не реализована (issue #678)." >&2
+        echo "Гейты этой секции НЕ проверены автоматически — Close-протокол должен считать этот шаг непройденным, не пропущенным." >&2
+        exit 3
         ;;
     *)
         echo "Usage: rule-engine.sh {dispatch|list-rules|test|session-summary|session-clear}"

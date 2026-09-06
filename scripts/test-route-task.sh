@@ -34,7 +34,7 @@ chmod +x "$FIXTURE_IWE/scripts/consent-fixture.sh" "$FIXTURE_IWE/scripts/agent-f
 cat > "$FIXTURE_IWE/$FIXTURE_GOV/scripts/executor-catalog.yaml" <<'YAML'
 schema_version: '1.0'
 generated_at: '2026-08-24T00:00:00Z'
-total_entries: 3
+total_entries: 4
 entries:
   - name: consent
     routing:
@@ -46,6 +46,11 @@ entries:
       executor: script
       script_path: scripts/intentionally-missing.sh
       deterministic: true
+  - name: connect-guide-flex
+    routing:
+      executor: script
+      script_path: scripts/intentionally-missing.sh
+      deterministic: false
   - name: agent-fault
     routing:
       executor: script
@@ -92,8 +97,16 @@ run_test "T3: --tag unknown_skill (flex → fallback Sonnet, exit 0)" 0 --tag un
 # 4. Missing script — strict (--skill)
 run_test "T4: --skill connect-guide (missing script → exit 2)" 2 --skill connect-guide
 
-# 5. Missing script — flex (--tag)
-run_test "T5: --tag connect-guide (missing script → fallback Haiku, exit 0)" 0 --tag connect-guide
+# 5. Missing script, non-deterministic — flex (--tag)
+run_test "T5: --tag connect-guide-flex (missing script, deterministic:false → fallback Haiku, exit 0)" 0 --tag connect-guide-flex
+
+# 5b. Missing script, deterministic:true — flex (--tag). issue #679: the
+# catalog's deterministic flag must block LLM fallback regardless of which
+# CLI flag invoked the router, not only under --skill (which already forced
+# allow_fallback=false before this fix existed and so never exercised the
+# bug — a f-string bug printed Python's True/False instead of true/false,
+# so the bash-side comparison never matched a real YAML boolean).
+run_test "T5b: --tag connect-guide (missing script, deterministic:true → EXEC_FAILED, exit 2)" 2 --tag connect-guide
 
 # 6. Empty tag
 run_test "T6: --tag '' (empty → unknown → fallback Sonnet, exit 0)" 0 --tag ""
