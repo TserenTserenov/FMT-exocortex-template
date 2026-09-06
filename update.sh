@@ -1581,6 +1581,50 @@ run_post_apply_backfills_or_die() {
     echo ""
     echo "Executor catalog (upgrade backfill)..."
     backfill_executor_catalog || true
+
+    echo ""
+    echo "Knowledge Extractor feeders (upgrade backfill)..."
+    backfill_extractor_feeders || true
+}
+
+# WP-5 F55 (High finding of F54, 03.09): setup.sh got the extractor feeders
+# step, update.sh did not -- so every already-configured machine (the ones
+# where the gap actually showed up) kept getting updates with the capture
+# pipeline still not scheduled, forever. Runs from the post-apply chain, which
+# also fires in the TOTAL_CHANGES=0 recovery branches, so an install that is
+# otherwise up to date still gets its feeders. Re-running is safe: the feeders
+# script skips an unchanged, already-loaded launchd job instead of unload/load
+# (which would kill a run in flight at exactly 06:00/21:00).
+backfill_extractor_feeders() {
+    local feeders="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
+    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
+    local feeders_output
+
+    if [ "${IWE_SKIP_EXTRACTOR_FEEDERS:-0}" = "1" ]; then
+        echo "  ○ Экстрактор: пропущен (IWE_SKIP_EXTRACTOR_FEEDERS=1)."
+        return 0
+    fi
+    if [ ! -f "$feeders" ]; then
+        echo "  ○ Экстрактор: scripts/setup-extractor-feeders.sh не найден, backfill пропущен."
+        return 0
+    fi
+    # The feeders script exits 1 without the CLI; on update that is a normal
+    # state (CLI not installed yet), not an update failure -- say what to run
+    # later instead of printing its error.
+    if ! command -v claude >/dev/null 2>&1; then
+        echo "  ○ Экстрактор: claude CLI не установлен — расписание не заводим."
+        echo "    После установки CLI: bash $feeders"
+        return 0
+    fi
+
+    if feeders_output=$(IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$governance_repo"         IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime"         bash "$feeders" install 2>&1); then
+        printf '%s\n' "$feeders_output" | sed 's/^/  /'
+        return 0
+    fi
+
+    printf '%s\n' "$feeders_output" | sed 's/^/  /' >&2
+    echo "  ⚠ Экстрактор не запустится автоматически — повторите вручную: bash $feeders" >&2
+    return 1
 }
 
 record_rule_workspace_state() {

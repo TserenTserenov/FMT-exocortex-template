@@ -2885,7 +2885,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "2f16473f2e4e6575e4d00451e3e3e665d72a8c14347b19d3d9dd3d56dbd7d7aa"
+      "sha256": "4791c1064bb66731e50d34527ca8ab59e1836f66bd3d7f497788dd443eaecbc9"
     }
   ],
   "excluded_paths": [
@@ -2913,6 +2913,7 @@
     "scripts/tests/conftest.py",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
+    "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",

@@ -645,6 +645,12 @@ jobs:
       - name: Test staged install-path guard
         run: bash scripts/tests/test_update_install_path_guard.sh
 
+      # WP-5 F55: the Extractor feeders step existed only in setup.sh, so every
+      # already-configured machine kept updating without the capture pipeline
+      # ever being scheduled. Guards the wiring plus install/opt-out/no-CLI paths.
+      - name: Test Extractor feeders backfill in update.sh
+        run: bash scripts/tests/test-update-extractor-feeders.sh
+
       # WP-529 Ф3: release-receipt.sh (the release-receipt job below) must
       # fail closed — success/skipped on every mandatory check to publish,
       # anything else blocks. Tested here the same way every other guard in
