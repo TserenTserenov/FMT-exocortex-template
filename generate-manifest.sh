@@ -132,6 +132,36 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/scripts/day-open-llm-fill.py"
     "seed/strategy/scripts/update-derived-snapshot.py"
     "seed/strategy/scripts/generate-executor-catalog.py"
+    # issue #693: full transitive call graph of day-open-pipeline.sh (the live
+    # Day Open pipeline) — every entry below is `source`d or invoked by
+    # day-open-pipeline.sh, day-open-scaffold.sh, or one of the two *-runner.sh
+    # it calls. Missing any one of them reproduces the FATAL that
+    # scripts/iwe-audit.sh §3b already warns about for lib/common.sh (a stale
+    # or absent lib/ breaks the scaffold identically to an outdated one), but
+    # the audit only ever checked 3 of these 22 files — this list is the
+    # verified full closure, not a re-scoped subset.
+    "seed/strategy/scripts/day-open-pipeline.sh"
+    "seed/strategy/scripts/day-open-scaffold.sh"
+    "seed/strategy/scripts/day-open-hooks-runner.sh"
+    "seed/strategy/scripts/day-open-checks-runner.sh"
+    "seed/strategy/scripts/day-open-bottleneck-patch.sh"
+    "seed/strategy/scripts/day-open-budget-patch.py"
+    "seed/strategy/scripts/day-open-close-error-patch.py"
+    "seed/strategy/scripts/day-open-ledger-render-patch.py"
+    "seed/strategy/scripts/day-open-multiplier-backfill-patch.py"
+    "seed/strategy/scripts/day-open-priorities-patch.py"
+    "seed/strategy/scripts/day-open-version-check-patch.py"
+    "seed/strategy/scripts/ledger-append.sh"
+    "seed/strategy/scripts/llm-proxy-launcher.sh"
+    "seed/strategy/scripts/lib/common.sh"
+    "seed/strategy/scripts/lib/day-open-hooks.sh"
+    "seed/strategy/scripts/lib/find-python3.sh"
+    "seed/strategy/scripts/lib/ledger-path.sh"
+    "seed/strategy/scripts/lib/ledger_path.py"
+    "seed/strategy/scripts/lib/network-wait.sh"
+    "seed/strategy/scripts/lib/notification-render.sh"
+    "seed/strategy/scripts/lib/telegram.sh"
+    "seed/strategy/scripts/lib/wp_inbox.py"
 )
 # #533: unlike ordinary seed content, these are platform-owned delivery and
 # upgrade infrastructure.  Keep each path explicit so the blanket seed/

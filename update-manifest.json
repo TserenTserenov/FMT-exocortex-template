@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "1f3f2d75cd688dceddfc407eafc3f8bec4075beeb5d618fe30ae6e92e6589a10"
+      "sha256": "2e3dd292d23af97801d664565f6add12cad1b39030b110ed21e20c944372241a"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -145,7 +145,7 @@
     },
     {
       "path": ".claude/hooks/session-end-status.sh",
-      "sha256": "07b157c5d7614939f027aa50080cabe4531aba4ebae8886038f167620daba6b9"
+      "sha256": "6b54f91929897e8416d82b14454e301290dd90b6af87a7596fd71765404aa2af"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -341,7 +341,7 @@
     },
     {
       "path": ".claude/skills/check-secret/check.sh",
-      "sha256": "7c5dace7bf1e9bd8769c87d6115a7a917f837db872bc2069af64562d4744da5c"
+      "sha256": "8cf83e63b49b05ed5ed4bbb9bd79c83c1af34dde0e5aaec770ffc66e79864e55"
     },
     {
       "path": ".claude/skills/consent/SKILL.md",
@@ -1093,7 +1093,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "21463b0ddacde3ed8b9df6649e9d0d949c57c6b7c83a849a01cbf00555a835fd"
+      "sha256": "f56e4a8b449c955d311ba4ec31a5716585450733b79d7210491d8d54d12a08d0"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2816,8 +2816,52 @@
       "sha256": "1d012b3c06b4baba52fd2f3c8f8f870ec3815bad3a02fdbaf904ff9425352796"
     },
     {
+      "path": "seed/strategy/scripts/day-open-bottleneck-patch.sh",
+      "sha256": "49490626d44a6201b40603de6d97d814e9bb4232a5e2033fdb8f442b9f208825"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-budget-patch.py",
+      "sha256": "9c23b83674f01faf006c32201203576a889cc9eb59de10fa6688d8bdbbcfbe16"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-checks-runner.sh",
+      "sha256": "dc4fdb2f7f8e1b057315cac5643f53fc61375166dc3a0cb4486867ae5f6216e9"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-close-error-patch.py",
+      "sha256": "00b1c0b4f506808f853a7a4a52cb4de48579b970afdbdb9ca137d19c7ecdd15a"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-hooks-runner.sh",
+      "sha256": "cc630fdd33d46be16b11771028277be6b205834833c0ba42bcc78deeee8f584d"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-ledger-render-patch.py",
+      "sha256": "bf178689e45a1242c3a1780c78b0b5b776abb3ccf5dc61e1d55e3b717a6ba726"
+    },
+    {
       "path": "seed/strategy/scripts/day-open-llm-fill.py",
       "sha256": "21fdc689599ba88fff4215cf590e5baaa0efa1d0f552e7c7e9be311bab7e41cf"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-multiplier-backfill-patch.py",
+      "sha256": "7c70a9c6412966041ac6fe22ed524327e210670556a2c7a4891aaa0d3f5d7bdf"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-pipeline.sh",
+      "sha256": "6049cc47d001a313fd328c4f3a25fdae7fd03a8c5592816b23153bb9b9e58577"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-priorities-patch.py",
+      "sha256": "49505bf205ebde8c101334a0fe968f5613b57861b26c601749bdc27592765ade"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-scaffold.sh",
+      "sha256": "ae3f40c40b31d5bdfa1c1c4e9a87a10415f731982ac5bf348d319d9503de1651"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-version-check-patch.py",
+      "sha256": "bc380db1c7cc5c9c44840bfd1815320dec1f850a4f47264e0510a87cb024f6ef"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
@@ -2830,6 +2874,50 @@
     {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",
       "sha256": "daa7fe5442175b7eb2fd08798353bb3c58c71e7f84f05881a35dc3183f89160a"
+    },
+    {
+      "path": "seed/strategy/scripts/ledger-append.sh",
+      "sha256": "ec7d819c6b8c27bf90dbc7a18bcd3ac042663075e944f71b160c79a1423f8700"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/common.sh",
+      "sha256": "ac0700709a939e4f0fc8c9bb504c9918e4f0a7d17694d65a7b7682ebb4979bf1"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
+      "sha256": "be3e05551867bb8b265ad6c0117dbe14262559f254241bd7df2e6bf8807114b2"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/find-python3.sh",
+      "sha256": "0d11e4e5a7e96e8125f2679632dca144c7cdf614221c536947b58d95943d6e13"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/ledger-path.sh",
+      "sha256": "ed4e4441ac98b118b5b5ae356ee971a12e54e6a3331901bc36ad821ba10244e4"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/ledger_path.py",
+      "sha256": "aeb09c29f6e8188e905b5bfea09b2522e9c1fda655b0561656c8b6732a492ed5"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/network-wait.sh",
+      "sha256": "de561522e0d8e04f415f983ffd81498ca94e6c0bb801ad58e92d0ffecdf56b63"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/notification-render.sh",
+      "sha256": "50752c9b300b59d430e64d1cc03271c65b65640c4414d4628728831edeb79fe5"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/telegram.sh",
+      "sha256": "a9463b647f354379c4939a9ca24f9c6837faedc9d11f5dbe3579666f6668de2e"
+    },
+    {
+      "path": "seed/strategy/scripts/lib/wp_inbox.py",
+      "sha256": "3b931db73def4e6eb925940489dfa8dd04757d94638085a6822b01ad06bf4bb9"
+    },
+    {
+      "path": "seed/strategy/scripts/llm-proxy-launcher.sh",
+      "sha256": "1bf4ea8a3db5d5fa170642fe7faf2afbe69ed18bd9e19409e0ceb16a969610af"
     },
     {
       "path": "seed/strategy/scripts/sync_feedback_to_memory.py",
@@ -2853,7 +2941,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "523cd10448bbd0a2bf8a5458e26d2d56bacc9c7ab72bb9fc7d1690d3ee7f6aab"
+      "sha256": "8f4839935293ecfcbf8c981619d2d24832291a646f943a37ee34cf077a92bb67"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
