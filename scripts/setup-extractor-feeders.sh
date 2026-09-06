@@ -25,6 +25,17 @@ FLEETING="$HOME/IWE/$GOVERNANCE_REPO/inbox/fleeting-notes.md"
 
 MODE="${1:-install}"
 
+# --schedule-only (WP-5 F55): install just the periodic job. update.sh runs this
+# script on EVERY update now, and the two steps below it -- taking over
+# ~/.git-templates/hooks/post-commit and the global init.templateDir -- are
+# install-time decisions, not something an update may redo behind the user's
+# back on a machine where either already points somewhere of their own.
+SCHEDULE_ONLY=false
+if [ "$MODE" = "--schedule-only" ]; then
+    SCHEDULE_ONLY=true
+    MODE="install"
+fi
+
 log() { echo "[setup-extractor] $*"; }
 ok() { echo "  ✅ $*"; }
 warn() { echo "  ⚠️  $*"; }
@@ -55,6 +66,12 @@ esac
 
 # === 2. Git-templates (post-commit hook) ===
 
+if $SCHEDULE_ONLY; then
+    log "2/4 Git-templates — пропущено (режим только расписания)"
+else
+# Body deliberately left at its original indentation: it contains a quoted
+# heredoc (HOOK) whose leading whitespace would end up inside the generated
+# git hook. The block ends at `fi  # SCHEDULE_ONLY` below.
 log "2/4 Git-templates для post-commit hook"
 
 GIT_TEMPLATES="$HOME/.git-templates"
@@ -106,6 +123,7 @@ HOOK
     fi
     git config --global init.templateDir "$GIT_TEMPLATES" || warn "не смог установить init.templateDir"
 fi
+fi  # SCHEDULE_ONLY
 
 # === 3. Cron для git-diff-feed (06:00 / 21:00) ===
 
@@ -118,6 +136,11 @@ if [ "$PLATFORM" = "Darwin" ]; then
     elif [ "$MODE" = "--uninstall" ]; then
         if [ -f "$PLIST" ]; then launchctl unload "$PLIST" 2>/dev/null || true; rm "$PLIST"; ok "launchd plist удалён"; fi
     else
+        # launchd не создаёт каталог для StandardOutPath сам и без него не
+        # стартует. Раньше каталог появлялся только в Linux-ветке
+        # roles/extractor/install.sh, то есть на чистом Маке задача ставилась
+        # и молча не запускалась (WP-5 F55, находка холодного ревью).
+        mkdir -p "$HOME/logs/extractor"
         # launchd не наследует login-shell PATH (WP-5, найдено 03.09 — job падал
         # exit 127 "claude CLI не найден"), поэтому PATH нужно прописать явно, а
         # не полагаться на окружение launchd по умолчанию (/usr/bin:/bin:/usr/sbin:/sbin).
@@ -213,7 +236,7 @@ fi
 
 log "4/4 Fleeting-notes inbox"
 
-if [ "$MODE" != "--check" ] && [ "$MODE" != "--uninstall" ]; then
+if [ "$MODE" != "--check" ] && [ "$MODE" != "--uninstall" ] && ! $SCHEDULE_ONLY; then
     if [ ! -f "$FLEETING" ]; then
         mkdir -p "$(dirname "$FLEETING")"
         cat > "$FLEETING" <<'FN'

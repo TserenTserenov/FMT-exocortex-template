@@ -2489,7 +2489,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "6a73a17201951293542388d78cb4c903a5149fd1d78c31eb0e7730253ecf3826"
+      "sha256": "170efdf27b5a7874a87bdaae0c7d70e2de5c6843d4663725a60f884b5059d109"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -2885,7 +2885,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "2f16473f2e4e6575e4d00451e3e3e665d72a8c14347b19d3d9dd3d56dbd7d7aa"
+      "sha256": "e89d3534943369502b20b364909c28640cbe2503c8c4fd8f9b3db92f54429653"
     }
   ],
   "excluded_paths": [
@@ -2913,6 +2913,7 @@
     "scripts/tests/conftest.py",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
+    "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
