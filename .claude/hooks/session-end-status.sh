@@ -9,7 +9,7 @@ CLAUDE_DIR="$(cd "${HOOK_DIR}/.." && pwd)"
 # shellcheck source=../lib/iwe-env-bootstrap.sh
 source "$CLAUDE_DIR/lib/iwe-env-bootstrap.sh" 2>/dev/null || { echo '{}'; exit 0; }
 
-STATUS_SCRIPT="$IWE_ROOT/scripts/agent-status-report.sh"
+STATUS_SCRIPT="$IWE_SCRIPTS/agent-status-report.sh"
 [ -x "$STATUS_SCRIPT" ] && bash "$STATUS_SCRIPT" claude-code idle 2>/dev/null
 
 echo '{}'
