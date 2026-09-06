@@ -253,7 +253,7 @@
     },
     {
       "path": ".claude/scripts/check-index-health.py",
-      "sha256": "1aa1b9ee4f0031d82164d616c30869cd90be1d5924fd8f12773472fd1313ad16"
+      "sha256": "2b12c530f0fa5ee19c349901807e0b9a55fb6ed4c37b7e8ed2d0ed4fe9e91203"
     },
     {
       "path": ".claude/scripts/classify-workspace-copy.sh",

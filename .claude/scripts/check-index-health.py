@@ -183,7 +183,11 @@ def check_file(path: Path) -> dict:
     return out
 
 
-def classify(findings: dict, size_warn: int, size_fail: int) -> str:
+def classify(findings: dict, size_warn: int = SIZE_WARN, size_fail: int = SIZE_FAIL) -> str:
+    # Defaults keep the pre-#677 single-arg call signature working for
+    # existing external callers (setup/test-update-edge-cases.sh T20) that
+    # never needed MEMORY.md's separate thresholds — main() below still
+    # passes them explicitly for that one filename.
     size = 0 if findings["size_skip"] else findings["size"]
     max_line = max((n for _, n in findings["long_lines"]), default=0)
     max_cell = max((n for _, _, n in findings["long_cells"]), default=0)
