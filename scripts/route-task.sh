@@ -118,7 +118,13 @@ for entry in cat.get("entries", []):
     if entry["name"] == skill_name:
         r = entry["routing"]
         print(f"executor={r['executor']}")
-        print(f"deterministic={r.get('deterministic', 'false')}")
+        # YAML `true`/`false` parse as Python bool — an f-string prints
+        # "True"/"False" (capitalized), which the bash-side comparison
+        # `[[ "$deterministic" == "true" ]]` (issue #679 deterministic-gate)
+        # never matches. Every real entry in executor-catalog.yaml writes
+        # the plain YAML boolean, not a quoted string, so this silently
+        # disabled the gate for 100% of deterministic:true entries.
+        print(f"deterministic={'true' if r.get('deterministic') else 'false'}")
         if "script_path" in r:
             print(f"script_path={r['script_path']}")
         if "model" in r:
