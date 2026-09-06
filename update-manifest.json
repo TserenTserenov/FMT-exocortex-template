@@ -141,7 +141,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "3903cd2bb5eb8dd412cbf0e219cd6b676da2cbe0113765ea6920a43b58e48e83"
+      "sha256": "304caca86a807c7022911bd9091895015717d76aa2d785a4bd2d6e0410495533"
     },
     {
       "path": ".claude/hooks/session-end-status.sh",
@@ -253,7 +253,7 @@
     },
     {
       "path": ".claude/scripts/check-index-health.py",
-      "sha256": "348db830188a04e76c2ff02ca6f2d52c93072f628290c1ac4f2818c2a264269a"
+      "sha256": "1aa1b9ee4f0031d82164d616c30869cd90be1d5924fd8f12773472fd1313ad16"
     },
     {
       "path": ".claude/scripts/classify-workspace-copy.sh",
@@ -1433,7 +1433,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "d753b57b1a500861034bdd4a522773979b1a8665135ba679afc02ecaeca9f3f9"
+      "sha256": "8e5eeecdf45745cabc8cca6ec69ec902f56922ad0e3bc96383864500d249db17"
     },
     {
       "path": "memory/fpf-term-map.yaml",
@@ -2461,7 +2461,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "b1b6c165cf378ced7c5a9b2b69c84b0b70d98ff57c8fd3e81f7c60b05b642b44"
+      "sha256": "e2e5ce2d1d52663e1bd6862fd7c97747997345c837b780c8fabab57cf22aa9d1"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -2541,7 +2541,7 @@
     },
     {
       "path": "scripts/test-route-task.sh",
-      "sha256": "8b42da27ee36905e4b426edfcd1dd9d66e3a70f851d07a8e558e03a38cbe3c94"
+      "sha256": "05c714c8dfe530f1954bcd87fa4b312c15e235c341f8ffd3e12b6aeca00afe9c"
     },
     {
       "path": "scripts/test_archive_cadence_sweep.py",
@@ -2885,7 +2885,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "60bf249aaf4a965b4d2b85361fc5c6a2a03602b01e682ae32e8f2c8d02a52a52"
+      "sha256": "2f16473f2e4e6575e4d00451e3e3e665d72a8c14347b19d3d9dd3d56dbd7d7aa"
     }
   ],
   "excluded_paths": [
