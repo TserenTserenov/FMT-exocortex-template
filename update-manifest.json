@@ -825,7 +825,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "45d551ccc33148a0cda1262b23613586afe3fcda9dc9b664e35ed90fb86f6f4b"
+      "sha256": "efd538321fe3ac5694117fea2ea6df29954a3e453a9ed60984d01a5ebf55e06b"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -957,7 +957,7 @@
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
-      "sha256": "69859c5b129bafcaa1bd53dc6aae360a95bfa9639e6aa50275608ab2e490ca46"
+      "sha256": "eeb56198fe7e70f8de1f881d5b519dd5aed02c30e1be57d17ef9a4a63e310bc5"
     },
     {
       "path": "exocortex/hindsight/docker-compose.yml",
