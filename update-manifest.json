@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "1f3f2d75cd688dceddfc407eafc3f8bec4075beeb5d618fe30ae6e92e6589a10"
+      "sha256": "2e3dd292d23af97801d664565f6add12cad1b39030b110ed21e20c944372241a"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -2853,7 +2853,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "523cd10448bbd0a2bf8a5458e26d2d56bacc9c7ab72bb9fc7d1690d3ee7f6aab"
+      "sha256": "8f4839935293ecfcbf8c981619d2d24832291a646f943a37ee34cf077a92bb67"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
