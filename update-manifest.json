@@ -2165,7 +2165,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "c182e63bc254feb79f8c390f29e33e8a751d6f94a947048a80df799ff3d4b582"
+      "sha256": "cb5daecc19c2bd2123694312a7c17a8e3b7f0df5418113cad5bf4a5e4c41ef01"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
