@@ -365,7 +365,7 @@
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
-      "sha256": "37172dfebeb48f276963e129120aec72f824632346e75ee1abb7d0d55e9e7f89"
+      "sha256": "da638dcaa9f59acae47733326471d36d1059f1324c574d673c6afe515b5c7baa"
     },
     {
       "path": ".claude/skills/day-open/templates.md",
@@ -1689,7 +1689,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "d31d486744b069d87b3f964228547d40e12120ab6f3db0f5bf8a3e9885b9d52d"
+      "sha256": "6c0977b3101e3bad10b743e472c003f8ce4ac2fcc4a7c119d8d206a99b7cc3b7"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "roles/strategist/prompts/note-review.md",
-      "sha256": "5031dd3ed708521f6f377f8ae47dd4b03150e999ff52b2c07bd141c7df8e37e4"
+      "sha256": "86e4a69544fd12ad37b99279b0438efb08d7a6f767a9511d17ca54aef871ac78"
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
