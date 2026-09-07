@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "431bed387ac29e09d5e568de3f308815b3def0d23a8e6d566c0b1df0fee29266"
+      "sha256": "8a9fb07aa39992a06a896a65f0307eff9bf9c9b6c61493b737f462603903b423"
     },
     {
       "path": ".claude/settings.json",
@@ -3029,6 +3029,7 @@
     "scripts/tests/test_issue_657.sh",
     "scripts/tests/test_issue_660.sh",
     "scripts/tests/test_issue_665.sh",
+    "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",
