@@ -87,11 +87,11 @@ fi
 ### Шаг 7 — сохранение и коммит
 
 ```bash
-cd "${IWE_WORKSPACE:-$HOME/IWE}/{{GOVERNANCE_REPO}}"
-git add current/DayPlan*.md
-git commit -m "day-plan: $DATE автономный полный (strategist morning)"
-git pull --rebase  # на случай если Mac тоже что-то закоммитил
-git push
+REPO_DIR="${IWE_WORKSPACE:-$HOME/IWE}/{{GOVERNANCE_REPO}}"
+git -C "$REPO_DIR" add current/DayPlan*.md
+git -C "$REPO_DIR" commit -m "day-plan: $DATE автономный полный (strategist morning)"
+git -C "$REPO_DIR" pull --rebase  # на случай если Mac тоже что-то закоммитил
+git -C "$REPO_DIR" push
 ```
 
 ## АВТОНОМНЫЙ РЕЖИМ (БЛОКИРУЮЩЕЕ)
