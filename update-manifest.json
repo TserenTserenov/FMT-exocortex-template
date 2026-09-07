@@ -2973,7 +2973,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "e89d3534943369502b20b364909c28640cbe2503c8c4fd8f9b3db92f54429653"
+      "sha256": "0c953d6146d07d38dd39bfd1f5e0cb3c5a80d6b23b5c6ee31ff528ba6c38a1d4"
     }
   ],
   "excluded_paths": [
@@ -3029,6 +3029,7 @@
     "scripts/tests/test_issue_657.sh",
     "scripts/tests/test_issue_660.sh",
     "scripts/tests/test_issue_665.sh",
+    "scripts/tests/test_issue_711_conflict_base.sh",
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
