@@ -145,7 +145,7 @@
     },
     {
       "path": ".claude/hooks/session-end-status.sh",
-      "sha256": "07b157c5d7614939f027aa50080cabe4531aba4ebae8886038f167620daba6b9"
+      "sha256": "6b54f91929897e8416d82b14454e301290dd90b6af87a7596fd71765404aa2af"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -341,7 +341,7 @@
     },
     {
       "path": ".claude/skills/check-secret/check.sh",
-      "sha256": "7c5dace7bf1e9bd8769c87d6115a7a917f837db872bc2069af64562d4744da5c"
+      "sha256": "8cf83e63b49b05ed5ed4bbb9bd79c83c1af34dde0e5aaec770ffc66e79864e55"
     },
     {
       "path": ".claude/skills/consent/SKILL.md",
