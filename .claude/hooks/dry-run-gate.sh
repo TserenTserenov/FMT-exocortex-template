@@ -285,7 +285,7 @@ if [ ! -f "$SENTINEL" ]; then
                 echo "[dry-run-gate] BLOCKED: dry-run sentinel missing while state gate_id=$gate_id is still active"
                 echo "Reason: owner alive or orphanhood not proven — fail-closed per contract"
                 printf 'Recovery (pilot terminal only, after confirming no dry-run is actually active):\n  bash %q %s manual-recovery\n' \
-                    "$HOME/IWE/FMT-exocortex-template/scripts/dry-run-complete.sh" "$gate_id"
+                    "$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/dry-run-complete.sh" "$gate_id"
             } >&2
             exit 2
         fi
@@ -510,16 +510,22 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # (подтверждено code review: без этого фикс путь 5 блокирует день. close на
     # первом же шаге — читай-только скрипты, а не место реального write).
     #
-    # Точный `$HOME`-путь в паттерне, НЕ wildcard: `[^}]*` вместо конкретного
+    # Точный путь в паттерне, НЕ wildcard: `[^}]*` вместо конкретного
     # default-значения разрешал бы `${IWE_TEMPLATE:-$(cmd)}/...` — command
     # substitution внутри default оказывался бы проглочен маркером ДО того, как
     # шаг 2 успевает его сегментировать и опознать (round-2 review, живое
     # воспроизведение: `${IWE_TEMPLATE:-$(touch /tmp/PWNED)}/...` проходил как
     # allow). Тот же урок, что уже применён к `WL_ABS`/`WL_ABS2` ниже (review-01
     # High/review-02 H1) — whitelist только по точной строке, не по glob.
-    WL_TEMPLATE_ABS="$HOME/IWE/FMT-exocortex-template"
+    # issue #694: якорь — $IWE_ROOT_GUESS (путь самого хука, вычислен строкой
+    # ~27 из BASH_SOURCE), не $HOME/IWE — тот же приём, что уже используется
+    # для GATE_LOG выше. Не env-переменная (IWE_WORKSPACE/IWE_TEMPLATE
+    # инжектируемы вызывающим окружением — тот самый обход, который
+    # review-01/review-02 закрыли отказом от env-default в этом whitelist).
+    WL_TEMPLATE_ABS="$IWE_ROOT_GUESS/FMT-exocortex-template"
     NORM=$(printf '%s' "$CMD" | sed -E \
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
+        -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
         -e "s/'[^']*'/ QSTR /g" \
@@ -607,25 +613,30 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # payload инспектируем по коду скрипта (write-путей нет).
                 # Список синхронизирован с memory/dry-run-contract.md §Bash matchers;
                 # добавление = правка контракта + этого case + code review.
-                # Абсолютный путь привязан к $HOME/IWE и захардкожен (review-01 High,
-                # review-02 H1): glob */.claude/... пропускал /tmp-подделку, а
-                # ${IWE_ROOT:-...} открывал тот же обход через env-инъекцию.
+                # Абсолютный путь захардкожен по точной строке, не по glob
+                # (review-01 High, review-02 H1): glob */.claude/... пропускал
+                # /tmp-подделку, а ${IWE_ROOT:-...}/${IWE_WORKSPACE:-...} открывал
+                # тот же обход через env-инъекцию (вызывающее окружение может
+                # подставить произвольный env перед Bash-вызовом). Якорь —
+                # $IWE_ROOT_GUESS (issue #694): путь самого хука через
+                # BASH_SOURCE (строка ~27), нестандартный WORKSPACE_DIR
+                # резолвится сам, инъекция через env невозможна.
                 shift
-                WL_ABS="$HOME/IWE/.claude/scripts/load-extensions.sh"
+                WL_ABS="$IWE_ROOT_GUESS/.claude/scripts/load-extensions.sh"
                 # Реальный deployed путь — вложенный клон, не workspace-root
                 # (scripts/ не копируется в $WORKSPACE_DIR, в отличие от .claude/;
                 # см. IWE_SCRIPTS default в .claude/lib/iwe-env-bootstrap.sh:86).
-                WL_ABS2="$HOME/IWE/FMT-exocortex-template/scripts/day-close-prepare.sh"
+                WL_ABS2="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/day-close-prepare.sh"
                 # issue #549 stage 2: штатное завершение репетиции — переход
                 # active→completed через helper (rm sentinel внутри него идёт
                 # уже после completed, поэтому сам он безопасен под гейтом;
                 # его внутренний `rm -f "$SENTINEL"` покрыт cleanup-исключением
                 # ветки rm выше).
-                WL_ABS3="$HOME/IWE/FMT-exocortex-template/scripts/dry-run-complete.sh"
+                WL_ABS3="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/dry-run-complete.sh"
                 case "${1:-}" in
                     .claude/scripts/load-extensions.sh|"$WL_ABS") ;;
                     scripts/day-close-prepare.sh|"$WL_ABS2"|__WL_DAY_CLOSE_PREPARE__) ;;
-                    scripts/dry-run-complete.sh|"$WL_ABS3") ;;
+                    scripts/dry-run-complete.sh|"$WL_ABS3"|__WL_DRY_RUN_COMPLETE__) ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;
