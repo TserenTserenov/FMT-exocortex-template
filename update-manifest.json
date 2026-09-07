@@ -325,7 +325,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "650596be95602ce2398c0ace07ac2332e0235e50dc32ab5b4f5374ac1476eedf"
+      "sha256": "0d1e7dfb68f71fca83fd71e21947573e34835ba06c5c7b0f1a16cfdecf4de23e"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -349,7 +349,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "a8100ce0dc32e67c699e8e35200af75f8daa7f61330929584dce7ac5d559c220"
+      "sha256": "03d5467543065220642d6fe03838015a48b5ca4cf4945c4b6c5000f9d48f4609"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
