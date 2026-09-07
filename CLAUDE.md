@@ -97,6 +97,8 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 **NEVER `git add -u`, `git add .`, `git add -A`** — подхватывают изменения ДРУГИХ агентов (Kimi/Hermes работают параллельно) → неверная атрибуция. Стейджить только конкретные файлы; перед коммитом `git diff --cached --name-only`, лишнее — `git restore --staged`. Примеры → `memory/reference/agent-core.md`.
 
+**После `git mv` в этом же ходе — сверять содержимое, не только имя (issue #511).** Список имён из `--name-only` может выглядеть верным, а диф — пустым (rename без правок) или устаревшим (правки Edit'ом ушли не в тот путь). Если этим ходом был `git mv` любого из коммитуемых файлов: перед `git commit` прогнать `git diff --cached <новый_путь>` и убедиться, что нужные правки внутри; коммитить только новый путь после `git mv`, не старый; отдельно проверить код возврата `git add` перед переходом к `git commit`.
+
 ## Artifact Naming
 
 **Do not invent artifact names.** Names for sections, documents, RPs, and deliverables must come from the plan/task you received. If the task is silent on a name — report "need clarification on name" instead of making one up.

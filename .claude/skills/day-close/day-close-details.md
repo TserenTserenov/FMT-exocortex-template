@@ -42,7 +42,7 @@
 
 **Проверка (в начале алгоритма, до шага 1).** `date +%A` — локале-зависимо (под `ru_RU.UTF-8` вернёт «четверг», не «thursday», и сравнение с англоязычным именем из конфига никогда не совпадёт — тот же баг однажды уже был найден и исправлен в `day-open-scaffold.sh`, здесь используется тот же паттерн: числовой день недели `date +%u` (1=Пн…7=Вс, локале-независимо) + карта имя→число):
 ```bash
-T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"
+T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 # issue #541 hvost 3 (Evgenii, cold-review 26.08): бывший голый `python3 -c` со
 # сглатыванием stderr тихо возвращал "monday", даже если реальный
 # day-rhythm-config.yaml называет другой день — на хосте без PyYAML это была
@@ -79,9 +79,9 @@ fi
 ## Шаг 1: Сбор данных
 
 ```bash
-for repo in $(ls {{HOME_DIR}}/IWE/); do
-  if [ -d {{HOME_DIR}}/IWE/$repo/.git ]; then
-    commits=$(git -C {{HOME_DIR}}/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null \
+for repo in $(ls $HOME/IWE/); do
+  if [ -d $HOME/IWE/$repo/.git ]; then
+    commits=$(git -C $HOME/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null \
       | grep -vE "^(docs|chore|ci|style|perf|test)(\\(|:| )" \
       | grep -vE "memory/|\.claude/rules/|template-sync|backup|reindex" \
       || true)
@@ -108,7 +108,7 @@ done
 
 ```bash
 grep -nE "→ ждёт|ждёт|dep:|блокер|blocked:|остановлен|ждёт согласования" \
-  {{HOME_DIR}}/.claude/projects/*/memory/MEMORY.md 2>/dev/null
+  $HOME/.claude/projects/*/memory/MEMORY.md 2>/dev/null
 ```
 
 Для каждого найденного паттерна:
@@ -128,7 +128,7 @@ grep -nE "→ ждёт|ждёт|dep:|блокер|blocked:|остановлен|
 > Правило: [feedback_memory_index_discipline.md](../../../memory/feedback_memory_index_discipline.md)
 
 ```bash
-T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"
+T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/check-index-health.py"
 ```
 

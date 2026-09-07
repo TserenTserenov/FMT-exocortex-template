@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
-      "sha256": "4dee948e5d20002fa90703fb7b4a426ff9bcc0d35b4a4d6cc2e83f043e8640bf"
+      "sha256": "cfb24705ebf731d80dfc545946b97707964beb3948c33dd5f887a14f95c747b9"
     },
     {
       "path": ".claude/skills/bottleneck-pick/SKILL.md",
@@ -349,11 +349,11 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "760e7c05c4789d3c413efc48437d1f2fbc02e7d58d4254fbbe2540b2398bbd5c"
+      "sha256": "a8100ce0dc32e67c699e8e35200af75f8daa7f61330929584dce7ac5d559c220"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
-      "sha256": "128dc6f26933025c79460e3d2c818b6aeda1233d43c25918221ae4102f30fec4"
+      "sha256": "c1b2e300632f6000b1e6138e2274d758d22d2d7be4240a7e125b05868607cbe7"
     },
     {
       "path": ".claude/skills/day-close/day-close/SKILL.md",
@@ -505,7 +505,7 @@
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
-      "sha256": "5df8c865120eba4860ad6b3f0a8cdf8ad1eeaf150128f06547593559202fcba3"
+      "sha256": "ff60223bd3ad419da836435e1adb806198859cdb1227b17f61a30ad4516ae13f"
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
@@ -761,7 +761,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "2c837f98d656019a7db7b9ef7faad05710abfbcb6407c9e3fce389da64bfbed6"
+      "sha256": "08401337942bfbb8469007f2a9d7d68465ec6c64037442fbd25d3b16c5e25035"
     },
     {
       "path": "CHANGELOG.md",
@@ -769,7 +769,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "7051cbfb4b12e88c196a014967e5bd860ab68bdc04a787acb9f13717aedd57fa"
+      "sha256": "9911196ea6c77c9c3ea0e2e0657b306a0c8a995f7b02750d0ab55c4b81091894"
     },
     {
       "path": "ONTOLOGY.md",
@@ -2117,7 +2117,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "9b73293b523d7d86322e0714f1efdd7d42276a000a754e63c50c8793d65465e8"
+      "sha256": "a7ddfb9d63694001bf7f75997ee10c4edabf2689bbca1ee4d6e6922cfe0b4377"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
