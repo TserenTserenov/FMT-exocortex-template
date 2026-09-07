@@ -123,7 +123,10 @@ SETUP_EXPLICIT_INCLUDE=(
 # issue #502/#508.2: seed/ is user-owned by default, but these files are
 # platform delivery infrastructure. Existing installations need their target
 # release bytes before update.sh can migrate hooks and the derived-snapshot
-# updater into the governance repo.
+# updater into the governance repo. Routed via docs/critical-files-map.yaml
+# category 'platform-hooks-explicit-include' — any future addition/removal
+# here needs a matching `Delivery-Route: platform-hooks-explicit-include`
+# trailer (scripts/check-delivery-route-label.sh, WP-529 Ф2).
 PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/.githooks/pre-commit"
     "seed/strategy/.githooks/pre-push"
