@@ -1676,8 +1676,8 @@ EOF
 HOME="$T25_HOME" bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" --workspace "$T25_WS" --governance GOV --quiet
 if grep -qF "_IWE_ROOT=\"$T25_WS\"" "$T25_HOME/.zshenv" && \
    ! grep -qF '[ -f "$HOME/.iwe-paths" ]' "$T25_HOME/.zshenv" && \
-   [ "$(grep -c '^export IWE_' "$T25_WS/.iwe-paths")" -eq 6 ]; then
-    pass "T25: legacy HOME source is replaced by the six-variable workspace SoT"
+   [ "$(grep -c '^export IWE_' "$T25_WS/.iwe-paths")" -eq 7 ]; then
+    pass "T25: legacy HOME source is replaced by the seven-variable workspace SoT"
 else
     fail "T25: install-iwe-paths left the legacy source or incomplete workspace env"
 fi
