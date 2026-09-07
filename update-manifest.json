@@ -2117,7 +2117,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "e498dc1b41355cc09b9a32b8280b668279dd11f4b7599062c1988d101d592b8d"
+      "sha256": "a7ddfb9d63694001bf7f75997ee10c4edabf2689bbca1ee4d6e6922cfe0b4377"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",

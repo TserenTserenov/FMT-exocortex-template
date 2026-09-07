@@ -1429,6 +1429,14 @@ do_backup() {
   log "Шаг 1/3: Backup memory/ → exocortex/"
 
   if [ ! -d "$MEMORY_SRC" ]; then
+    # issue #536 regression test asserts an explicit IWE_MEMORY_SRC override
+    # that doesn't exist is a real misconfiguration (hard fail, not silent
+    # skip) — the fallback chain below is only for the auto-guessed default
+    # missing its target, not for a caller who named a specific path.
+    if [ -n "${IWE_MEMORY_SRC:-}" ]; then
+      err "Memory source not found: $MEMORY_SRC"
+      return 1
+    fi
     local fallback
     if fallback="$(resolve_memory_src_fallback)"; then
       MEMORY_SRC="$fallback"
