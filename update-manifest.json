@@ -145,7 +145,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
-      "sha256": "197518ab8fefae73ba69e4448438d89932d711212c27a97911864b66bad14738"
+      "sha256": "b21c7bcdbe97c87d991232c4309f8cb4ac82f477f56bf596fd84dc461b5267f4"
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
@@ -2597,7 +2597,7 @@
     },
     {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
-      "sha256": "42d937baf40ba1d439f8c49c8b94751381acf679ee0ce67f175c058fa4de9d78"
+      "sha256": "f6386eb4913a3e5530c68610483954635f6dc05bcc62ac7dde35bf07d033a6e3"
     },
     {
       "path": "scripts/tests/lib/capture_fixture.sh",
