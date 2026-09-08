@@ -572,6 +572,21 @@ else
         else
             pass "e2e full mode: все plist'ы без placeholders"
         fi
+        # WP-529 Ф94 (peer-session 2026-09-08-32): an empty substitution
+        # (missing key in .exocortex.env, env_get returns "") leaves no
+        # literal {{PLACEHOLDER}} behind, so the check above alone would not
+        # have caught setup.sh's heredoc missing IWE_SCRIPTS — assert the
+        # rendered value directly, on the real setup.sh output.
+        E2E_MORNING_PLIST=$(find "$E2E_LAUNCHDIR" -name 'com.strategist.morning.plist' 2>/dev/null | head -1)
+        if [ -n "$E2E_MORNING_PLIST" ]; then
+            if grep -A1 '<key>IWE_SCRIPTS</key>' "$E2E_MORNING_PLIST" | grep -q '<string>.\+</string>'; then
+                pass "e2e full mode: IWE_SCRIPTS renders non-empty in com.strategist.morning.plist"
+            else
+                fail "e2e full mode: IWE_SCRIPTS is missing or empty in com.strategist.morning.plist"
+            fi
+        else
+            warn "e2e full mode: com.strategist.morning.plist not found under $E2E_LAUNCHDIR"
+        fi
     else
         warn "e2e full mode: LaunchAgents dir не создан (возможно, ни одна auto-role не установлена)"
     fi

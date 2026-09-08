@@ -59,9 +59,17 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
 # Guard: IWE_GOVERNANCE_REPO mismatch (Claude peer-review, 2026-05-26)
-EXPECTED_GOV=$(grep 'IWE_GOVERNANCE_REPO=' "$HOME/.iwe-paths" 2>/dev/null | sed 's/.*="//;s/"$//' || echo "DS-strategy")
+# WP-529 Ф94 (peer-session 2026-09-08-32, Evgenii's report): $HOME/.iwe-paths
+# is a legacy path install-iwe-paths.sh stopped writing (canonical file is
+# $WORKSPACE_DIR/.iwe-paths, see WORKSPACE above). Read the current path, and
+# read it without a pipe: `grep|sed || echo` masked grep's exit code behind
+# sed's (sed exits 0 on empty stdin), so the "|| echo DS-strategy" fallback
+# never fired and EXPECTED_GOV silently ended up empty instead.
+IWE_PATHS_FILE="${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths"
+EXPECTED_GOV=$(awk -F'"' '/^export IWE_GOVERNANCE_REPO=/{print $2; exit}' "$IWE_PATHS_FILE" 2>/dev/null)
+EXPECTED_GOV="${EXPECTED_GOV:-DS-strategy}"
 if [ "${IWE_GOVERNANCE_REPO:-}" ] && [ "$IWE_GOVERNANCE_REPO" != "$EXPECTED_GOV" ]; then
-    echo "WARN: IWE_GOVERNANCE_REPO=$IWE_GOVERNANCE_REPO, expected $EXPECTED_GOV (from ~/.iwe-paths)" >&2
+    echo "WARN: IWE_GOVERNANCE_REPO=$IWE_GOVERNANCE_REPO, expected $EXPECTED_GOV (from $IWE_PATHS_FILE)" >&2
 fi
 
 # WP-529 F6 (Evgenii post-update defect #1, 18.08): update.sh reinstalls

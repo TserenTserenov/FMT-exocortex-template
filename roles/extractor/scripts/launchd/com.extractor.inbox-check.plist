@@ -38,6 +38,8 @@
         <string>{{GOVERNANCE_REPO}}</string>
         <key>IWE_RUNTIME</key>
         <string>{{IWE_RUNTIME}}</string>
+        <key>IWE_SCRIPTS</key>
+        <string>{{IWE_SCRIPTS}}</string>
     </dict>
 
     <key>RunAtLoad</key>

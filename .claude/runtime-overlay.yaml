@@ -83,9 +83,15 @@ placeholders:
   - TIMEZONE_HOUR
   - TIMEZONE_DESC
   - GITHUB_USER
-  - GOVERNANCE_REPO
+  - GOVERNANCE_REPO   # launchd env var is named IWE_GOVERNANCE_REPO — same
+                      # value, deliberately different key name, not a separate
+                      # placeholder (peer-session 2026-09-08-32)
   - IWE_TEMPLATE      # путь к FMT (read-only upstream)
   - IWE_RUNTIME       # путь к $WORKSPACE_DIR/.iwe-runtime/ (writable substituted)
+  - IWE_SCRIPTS       # $IWE_TEMPLATE/scripts — shared scripts read-only from FMT
+                      # (peer-session 2026-09-08-32: missing here meant no
+                      # generated plist could ever carry it, so the launchd
+                      # jobs silently ran without it — issue found via Evgenii)
 
 # === Runtime layout (что появляется в $WORKSPACE_DIR/ после build-runtime.sh) ===
 #

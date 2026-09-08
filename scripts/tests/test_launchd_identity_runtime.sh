@@ -23,6 +23,7 @@ USER_NAME="runtime-test-user"
 GOVERNANCE_REPO="DS-strategy"
 IWE_TEMPLATE="$ROOT"
 IWE_RUNTIME="$WORKSPACE/.iwe-runtime"
+IWE_SCRIPTS="$ROOT/scripts"
 EOF
 
 bash "$ROOT/setup/build-runtime.sh" --quiet --workspace "$WORKSPACE" --env-file "$ENV_FILE"
@@ -55,7 +56,18 @@ for rel in "${PLISTS[@]}"; do
     [ -f "$plist" ] || { echo "FAIL: missing rendered plist $rel" >&2; exit 1; }
     assert_plist_identity "$plist" USER runtime-test-user
     assert_plist_identity "$plist" LOGNAME runtime-test-user
-    if [ "$rel" = "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist" ]; then
+    # WP-529 Ф94 (peer-session 2026-09-08-32): every scheduled agent job reads
+    # IWE_SCRIPTS (day-open-pipeline.sh lookup, extractor, ~10 other scripts).
+    # It was never in a shipped plist, so this asserts the key itself is
+    # present — the class of defect the substitution engine's own
+    # unfilled-placeholder scan does NOT catch (a key that's simply absent
+    # renders no placeholder to flag).
+    assert_plist_identity "$plist" IWE_SCRIPTS "$ROOT/scripts"
+    if [ "$rel" = "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist" ] || \
+       [ "$rel" = "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist" ]; then
+        # WP-529 Ф94: scheduler.plist ended at IWE_RUNTIME and never passed
+        # IWE_GOVERNANCE_REPO, though it execs strategist.sh as a child
+        # process that reads it (strategist.sh:59).
         assert_plist_identity "$plist" IWE_GOVERNANCE_REPO DS-strategy
     fi
     if command -v plutil >/dev/null 2>&1 && ! plutil -lint "$plist" >/dev/null; then

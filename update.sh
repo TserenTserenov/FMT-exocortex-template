@@ -3648,6 +3648,16 @@ if [ -f "$ENV_FILE" ]; then
             ENV_IWE_TEMPLATE="$SCRIPT_DIR"
         fi
 
+        # === Auto-add IWE_SCRIPTS (peer-session 2026-09-08-32, Evgenii's Day
+        # Open report) === Was never in placeholders: before this fix, so no
+        # generated plist could ever carry it — the launchd jobs silently ran
+        # without it (strategist.sh:357-366 fell back to the free-form prompt).
+        if ! grep -q '^IWE_SCRIPTS=' "$ENV_FILE" 2>/dev/null; then
+            echo "IWE_SCRIPTS=$SCRIPT_DIR/scripts" >> "$ENV_FILE"
+            echo "  ✓ Добавлено IWE_SCRIPTS=$SCRIPT_DIR/scripts в .exocortex.env (WP-529 Ф94)"
+            ENV_IWE_SCRIPTS="$SCRIPT_DIR/scripts"
+        fi
+
         # === WP-273 Этап 2: IWE_RUNTIME для Generated runtime architecture (F) ===
         if ! grep -q '^IWE_RUNTIME=' "$ENV_FILE" 2>/dev/null; then
             DETECT_WS_RT="${ENV_WORKSPACE_DIR:-$WORKSPACE_DIR}"
@@ -4022,11 +4032,21 @@ done
 if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
     echo ""
     echo "Роли обновлены. Переустановка..."
-    # Source ~/.iwe-paths (если есть) — гарантирует IWE_RUNTIME/IWE_TEMPLATE в env для install.sh
-    [ -f "$HOME/.iwe-paths" ] && . "$HOME/.iwe-paths"
+    # WP-529 Ф94 (peer-session 2026-09-08-32): $HOME/.iwe-paths is a legacy
+    # path install-iwe-paths.sh stopped writing — sourcing it here silently
+    # no-op'd (`[ -f ... ] && .` is not an error if the file is absent), so
+    # role installers ran without IWE_RUNTIME/IWE_TEMPLATE/IWE_SCRIPTS in
+    # their environment. update.sh already knows all of these; pass them
+    # explicitly instead of relying on a file that may not exist.
+    ROLE_REINSTALL_GOV="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
     for role_dir in "$SCRIPT_DIR"/roles/*/; do
         [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
         if grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null; then
+            IWE_WORKSPACE="$WORKSPACE_DIR" \
+            IWE_TEMPLATE="$SCRIPT_DIR" \
+            IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
+            IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+            IWE_GOVERNANCE_REPO="$ROLE_REINSTALL_GOV" \
             bash "$role_dir/install.sh" 2>/dev/null && \
                 echo "  ✓ $(basename "$role_dir") переустановлен" || \
                 echo "  ○ $(basename "$role_dir"): переустановите вручную"
