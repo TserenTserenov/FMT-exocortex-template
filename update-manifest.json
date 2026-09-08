@@ -293,7 +293,7 @@
     },
     {
       "path": ".claude/runtime-overlay.yaml",
-      "sha256": "8a7a0cfcd3606ab80d76fbf3aaf8dec71c2079c01070130ad50913e9e1e30b36"
+      "sha256": "836a2413a5e3c3ff7122f633c7ec58dc56de4df72360d8b1ddca322eb2bb5272"
     },
     {
       "path": ".claude/scripts/check-index-health.py",
@@ -1689,11 +1689,11 @@
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
-      "sha256": "0f698455a221d847c195a22d3207c1ae348c338c86f2f6e1ba7cba8b7b37a45e"
+      "sha256": "4c89964e2b8b1a70bfd6489aaff13d1a23a12e02875f639f40af5f016eaa9f85"
     },
     {
       "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service",
-      "sha256": "f99b4c0accd17a2498587226fbb775f6e535ed968e6d5722854e5300bcadce49"
+      "sha256": "ef72b2366f91afda3d66c71e35b49a8deb23b8279a62333306fd1114e1bf767a"
     },
     {
       "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.timer",
@@ -1849,19 +1849,19 @@
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist",
-      "sha256": "a79e22b95bd917fa194695500ee8ed28f32df180bb56bd62313b776b67970677"
+      "sha256": "0324eb6af0de9d4ed63e7c9144aabf1668f38d5d49145260d6777afdb196ca03"
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.weekreview.plist",
-      "sha256": "0cb4af08c5f63d01bfcbc07736453383ccb9be35b2e804e0f660eb10424ae637"
+      "sha256": "b96cd7bf763ff8e37be359d528bbb33507b93f4e286e034147027711fe7ffb37"
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "ea4f00b8a5c80b93bdccd81e29eb489b33a9d3943460c9a8996f61cb5f2be866"
+      "sha256": "16e0e520f9f8537237dec68f9e5861c4fb7783b0d79e3063e2aac48c174250a9"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
-      "sha256": "977321695ba576f19214ccf219f98e6101cd94eae5c0de54fe374ad3738c2577"
+      "sha256": "b49a03afcdbdfadf8cb6b97ddefa22f5183f41c05cb2c43ad6c169d0a7f4fad2"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.timer",
@@ -1869,7 +1869,7 @@
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.service",
-      "sha256": "f300d3ea098e2bb653e1d3b8ba7c544811a7deaa65ecb51d81d9d55cbf270b49"
+      "sha256": "0274a04d10a40c849af5f226513fb63948dce4253e77398af0008859280994f5"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.timer",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
-      "sha256": "0f555d8af7de37467ac34955e2d58c3f2deb0141b69e2e956e54a15bfdd54293"
+      "sha256": "b76fdb7251e00560f230514011e27bd59c237e1af838db9d35707ebc170c7ba4"
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
@@ -1929,7 +1929,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service",
-      "sha256": "d80079cce7ea8f26d4d3b8d6490487a526e809f99b9538dc7badae0e2dba8eba"
+      "sha256": "be33f1ac25bb038c90fc1486bc2c0a57a9a36202b0d115a599cf09439bbdc702"
     },
     {
       "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.timer",
@@ -2753,7 +2753,7 @@
     },
     {
       "path": "scripts/tests/test_launchd_identity_runtime.sh",
-      "sha256": "a4c14370c1817b6010fb31d35916cd72e028349427f1c14e72a10bfd3144593e"
+      "sha256": "433e3a77becb80cc5f9b296a387180777a0cc722d2d9a9611bf30eab7b139509"
     },
     {
       "path": "scripts/tests/test_role_runner_update_marker_guard.sh",
@@ -2985,7 +2985,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "31a75c3d8f7acc21a711ea4c40a037ec9ac3e81a868b8da4f56c95324bc0c0ba"
+      "sha256": "6c5de026806d7d7e11aa4c28c78dae620fc904ce97ca2faeffb53e5f934cf220"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -2993,7 +2993,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "8f4839935293ecfcbf8c981619d2d24832291a646f943a37ee34cf077a92bb67"
+      "sha256": "672677e388baf0e6d4839fd857dbebb85b053fea7b5f660eaf1be472709532c9"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3025,7 +3025,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "660b3ee006bdbd7095562232153d50c700f79b7d8a2a157b9c209faab4ece9b0"
+      "sha256": "657fe5f8ab4af7c127d556249d651021a229b346f745d10238dfa602822c9985"
     }
   ],
   "excluded_paths": [

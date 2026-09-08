@@ -23,6 +23,7 @@ USER_NAME="runtime-test-user"
 GOVERNANCE_REPO="DS-strategy"
 IWE_TEMPLATE="$ROOT"
 IWE_RUNTIME="$WORKSPACE/.iwe-runtime"
+IWE_SCRIPTS="$ROOT/scripts"
 EOF
 
 bash "$ROOT/setup/build-runtime.sh" --quiet --workspace "$WORKSPACE" --env-file "$ENV_FILE"
@@ -55,7 +56,18 @@ for rel in "${PLISTS[@]}"; do
     [ -f "$plist" ] || { echo "FAIL: missing rendered plist $rel" >&2; exit 1; }
     assert_plist_identity "$plist" USER runtime-test-user
     assert_plist_identity "$plist" LOGNAME runtime-test-user
-    if [ "$rel" = "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist" ]; then
+    # WP-529 Ф94 (peer-session 2026-09-08-32): every scheduled agent job reads
+    # IWE_SCRIPTS (day-open-pipeline.sh lookup, extractor, ~10 other scripts).
+    # It was never in a shipped plist, so this asserts the key itself is
+    # present — the class of defect the substitution engine's own
+    # unfilled-placeholder scan does NOT catch (a key that's simply absent
+    # renders no placeholder to flag).
+    assert_plist_identity "$plist" IWE_SCRIPTS "$ROOT/scripts"
+    if [ "$rel" = "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist" ] || \
+       [ "$rel" = "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist" ]; then
+        # WP-529 Ф94: scheduler.plist ended at IWE_RUNTIME and never passed
+        # IWE_GOVERNANCE_REPO, though it execs strategist.sh as a child
+        # process that reads it (strategist.sh:59).
         assert_plist_identity "$plist" IWE_GOVERNANCE_REPO DS-strategy
     fi
     if command -v plutil >/dev/null 2>&1 && ! plutil -lint "$plist" >/dev/null; then
@@ -64,6 +76,34 @@ for rel in "${PLISTS[@]}"; do
     fi
     if grep -q '{{USER_NAME}}' "$plist"; then
         echo "FAIL: $rel retains USER_NAME placeholder" >&2
+        exit 1
+    fi
+done
+
+# WP-529 Ф94: the Linux equivalent of these 4 launchd jobs is a matching
+# systemd unit per role (build-runtime.sh substitutes both regardless of
+# host OS — it's plain text substitution). Same defect class, same fix,
+# needed its own assertion: nothing here was covering .service files at all.
+SERVICES=(
+    roles/strategist/scripts/systemd/iwe-strategist-morning.service
+    roles/strategist/scripts/systemd/iwe-strategist-weekreview.service
+    roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service
+    roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
+)
+assert_service_env() {
+    local unit="$1" key="$2" value="$3"
+    grep -Fxq "Environment=$key=$value" "$unit" || {
+        echo "FAIL: $unit does not render Environment=$key=$value" >&2
+        exit 1
+    }
+}
+for rel in "${SERVICES[@]}"; do
+    unit="$WORKSPACE/.iwe-runtime/$rel"
+    [ -f "$unit" ] || { echo "FAIL: missing rendered systemd unit $rel" >&2; exit 1; }
+    assert_service_env "$unit" IWE_SCRIPTS "$ROOT/scripts"
+    assert_service_env "$unit" IWE_GOVERNANCE_REPO DS-strategy
+    if grep -q '{{[A-Z_]*}}' "$unit"; then
+        echo "FAIL: $rel retains an unfilled placeholder" >&2
         exit 1
     fi
 done

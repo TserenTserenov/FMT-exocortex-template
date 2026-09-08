@@ -41,6 +41,8 @@
         <string>{{WORKSPACE_DIR}}</string>
         <key>IWE_RUNTIME</key>
         <string>{{IWE_RUNTIME}}</string>
+        <key>IWE_SCRIPTS</key>
+        <string>{{IWE_SCRIPTS}}</string>
         <key>IWE_GOVERNANCE_REPO</key>
         <string>{{GOVERNANCE_REPO}}</string>
     </dict>
