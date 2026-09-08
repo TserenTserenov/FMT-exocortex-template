@@ -145,7 +145,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
-      "sha256": "b21c7bcdbe97c87d991232c4309f8cb4ac82f477f56bf596fd84dc461b5267f4"
+      "sha256": "5e00fb93f8cc28967b2af1a43d49c9acedac4c748bd511cf292a02c392d5a666"
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
