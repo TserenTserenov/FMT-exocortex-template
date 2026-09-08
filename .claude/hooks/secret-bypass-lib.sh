@@ -1960,7 +1960,7 @@ def self_test():
         "printenv | grep TOKEN",
         "railway variables",
         "railway variables --kv",
-        "railway variables --service aist_me_bot --kv",
+        "railway variables --service example-service --kv",
         "railway variable list",
         "bash -c \"env\"",
         # Перенаправление вместо конвейера: тот же дамп, и это первый обходной
@@ -1996,7 +1996,7 @@ def self_test():
         "env FOO=bar somecommand --flag",
         "railway login",
         "railway deploy",
-        "railway run --service aist_me_bot -- python3 script.py",
+        "railway run --service example-service -- python3 script.py",
         "printf %s \"env | sort\"",
         # Перенаправление у чужой команды остаётся обычным перенаправлением.
         "sort file.txt > out.txt",
