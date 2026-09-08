@@ -101,6 +101,7 @@ if [[ "$MODE" != "settings-json" ]]; then
         case "$f" in
             scripts/tests/*|*/scripts/tests/*) : ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.claude/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
             setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) : ;;  # issue #499: тест-обвязки setup/ по именной конвенции — их fail-сообщения и grep-паттерны СОДЕРЖАТ литерал как предмет собственной проверки; классовое путевое исключение (не эвристика по строке), остальной setup/ сканируется как прежде.
+            setup/validate-template.sh|*/setup/validate-template.sh) : ;;  # WP-544 Д28: тот же класс, что #499 — этот файл сам сканирует репо на автор-специфичные литералы (проверка [1/5]) через строковой массив в for-цикле; свой собственный список паттернов — предмет проверки, не хардкод. Не цитировать литералы буквально в этом комментарии — это же ловит [1/5] в самом validate-fmt-scripts.sh.
             *)
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
             bad_lines=$(grep -n "$AUTHOR_GOV_REPO" "$f" \
