@@ -58,6 +58,7 @@ pomodoro:
   break_minutes: 5
   long_break_minutes: 15
   sessions_before_long_break: 4
+  session_alert_minutes: 50     # Remind to take a break after this many minutes
 
 # issue #720: memory/protocol-work.md § 2a Decision Capture references this
 # key for its Nudge check but the key never shipped in the default config —
@@ -67,4 +68,3 @@ pomodoro:
 # after observing real daily decision-weight sums.
 cognitive_budget:
   daily_decision_points: 15
-  session_alert_minutes: 50     # Remind to take a break after this many minutes
