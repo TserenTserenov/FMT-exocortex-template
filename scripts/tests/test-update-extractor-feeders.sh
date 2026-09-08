@@ -27,7 +27,7 @@ declare -F backfill_extractor_feeders >/dev/null
 
 SCRIPT_DIR="$TMP/template"
 WORKSPACE_DIR="$TMP/workspace"
-EFFECTIVE_GOVERNANCE_REPO="DS-my-strategy"
+EFFECTIVE_GOVERNANCE_REPO="DS-strategy"
 mkdir -p "$SCRIPT_DIR/scripts" "$WORKSPACE_DIR" "$TMP/bin"
 
 FEEDERS="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
@@ -49,7 +49,7 @@ PATH="$TMP/bin:$PATH"
 # init.templateDir, fleeting-notes seeding) -- that is what --schedule-only buys.
 write_feeders 0
 OUT=$(backfill_extractor_feeders)
-EXPECTED="--schedule-only|DS-my-strategy|$WORKSPACE_DIR/.iwe-runtime"
+EXPECTED="--schedule-only|DS-strategy|$WORKSPACE_DIR/.iwe-runtime"
 if [ "$(cat "$TMP/feeders-call")" != "$EXPECTED" ]; then
     echo "feeders invoked with wrong mode or environment: $(cat "$TMP/feeders-call")" >&2
     exit 1
