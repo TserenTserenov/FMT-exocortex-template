@@ -66,7 +66,11 @@ WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 # sed's (sed exits 0 on empty stdin), so the "|| echo DS-strategy" fallback
 # never fired and EXPECTED_GOV silently ended up empty instead.
 IWE_PATHS_FILE="${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths"
-EXPECTED_GOV=$(awk -F'"' '/^export IWE_GOVERNANCE_REPO=/{print $2; exit}' "$IWE_PATHS_FILE" 2>/dev/null)
+# `|| true` guards against awk's own exit code (e.g. file not found) tripping
+# `set -e` on this assignment — not a pipe, so no exit-code-masking risk;
+# the value fallback below is the actual default, this only keeps the script
+# alive to reach it.
+EXPECTED_GOV=$(awk -F'"' '/^export IWE_GOVERNANCE_REPO=/{print $2; exit}' "$IWE_PATHS_FILE" 2>/dev/null || true)
 EXPECTED_GOV="${EXPECTED_GOV:-DS-strategy}"
 if [ "${IWE_GOVERNANCE_REPO:-}" ] && [ "$IWE_GOVERNANCE_REPO" != "$EXPECTED_GOV" ]; then
     echo "WARN: IWE_GOVERNANCE_REPO=$IWE_GOVERNANCE_REPO, expected $EXPECTED_GOV (from $IWE_PATHS_FILE)" >&2
