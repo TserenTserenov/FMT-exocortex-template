@@ -1093,7 +1093,15 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "787854a63d26e4977f7d3863d9d2b4f614ed9829aa67749ab297560bc837deae"
+      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
+    },
+    {
+      "path": "generate-manifest.sh",
+      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
+    },
+    {
+      "path": "generate-manifest.sh",
+      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1413,7 +1421,7 @@
     },
     {
       "path": "memory/day-rhythm-config.yaml",
-      "sha256": "90d3bb465ef90b19a14dc17849fedd51473e356a2d67f3df7b339c1e500a41e3"
+      "sha256": "aeff2de8c59dae0238c1b3c6a678e0cdd97903ebe284aa0041a01513672e2b69"
     },
     {
       "path": "memory/distinctions-warm.md",
@@ -2694,6 +2702,10 @@
     {
       "path": "scripts/tests/test_issue_718_sync_canary.sh",
       "sha256": "79aabff7ed9bf948e16e76e3de86168d62eb4c572fbbc65a3d327ac0ebc0c36c"
+    },
+    {
+      "path": "scripts/tests/test_issue_720_decision_log_sot.sh",
+      "sha256": "b38448f83b4ee3a7cefe3cf40eea41e56153f50134fd91f78c28bc2643318686"
     },
     {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
