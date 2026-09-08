@@ -322,7 +322,13 @@ elif [ "$MODE" = "staged" ]; then
     # The shipped resolver copies are sanctioned exceptions (WP-529 F6,
     # #453/#463): their job is enumerating STANDARD system Python locations
     # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
+    # secret-bypass-lib.sh (WP-544 Д28) is the same class: it resolves
+    # jq/python3 across the standard FHS locations on macOS (both Intel
+    # /usr/local/bin and Apple Silicon /opt/homebrew/bin) and Linux (/usr/bin,
+    # /bin), falling back to PATH-based `command -v` only for non-standard
+    # layouts (NixOS) — an absolute-path-first resolver by design, not a
+    # hardcoded personal path.
+    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^\.claude/hooks/secret-bypass-lib\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK3_HITS_FILE" || true
@@ -338,6 +344,7 @@ else
     count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
+            --exclude='secret-bypass-lib.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' \
             | grep -v 'PLATFORM-COMPAT.md' \
@@ -349,6 +356,7 @@ else
         grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
+            --exclude='secret-bypass-lib.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' \
             | grep -v 'validate-template.yml' \

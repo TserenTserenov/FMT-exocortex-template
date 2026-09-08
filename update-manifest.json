@@ -61,11 +61,11 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "aaab111b500049cd078a86752e790083ff7a464c098eea5ab23cf5f3b4cdd3c5"
+      "sha256": "a6d9468071cdd50436125384eb1820d7444a5b33a07688548c34dc193ea45877"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
-      "sha256": "9012de5deeaae4c6fdbbbbc5c955e5554d5d20f374fb8c1c7fbfeaf2a939b068"
+      "sha256": "f9a85fee4f794c78eb4c98755cc8b033ac02a4e9a938f1fca08a5bee3c3477a7"
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
@@ -144,12 +144,52 @@
       "sha256": "304caca86a807c7022911bd9091895015717d76aa2d785a4bd2d6e0410495533"
     },
     {
+      "path": ".claude/hooks/secret-bypass-lib.sh",
+      "sha256": "197518ab8fefae73ba69e4448438d89932d711212c27a97911864b66bad14738"
+    },
+    {
+      "path": ".claude/hooks/secret-file-read-block.sh",
+      "sha256": "1680968fa2110916e7e2137d5a0f44566c2128bd68694a4cf4e10ed03d2c58ce"
+    },
+    {
+      "path": ".claude/hooks/secret-leak-block.sh",
+      "sha256": "f4b355d6c48d0360b377c168f7dc782fd3c2830c0f47e8033b542e731ac0cc07"
+    },
+    {
+      "path": ".claude/hooks/secret-mcp-dump-guard.sh",
+      "sha256": "730fae15e05a71f88653619735adbd3cd4a273c386dfa402adf6f24e89d26864"
+    },
+    {
       "path": ".claude/hooks/session-end-status.sh",
       "sha256": "6b54f91929897e8416d82b14454e301290dd90b6af87a7596fd71765404aa2af"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
       "sha256": "9ced3b69e749eef98bf2ccdc5a666f11064d62eb3b2dd5c20d837ef7e5a453d3"
+    },
+    {
+      "path": ".claude/hooks/sql-pii-guard.sh",
+      "sha256": "f081e4d19a64ccf2de50c979e2df48dfe6c3f7534700bce48174fc955c14a19e"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
+      "sha256": "45c20e7e22b0821113a9eb34c14c3c5280c6998f50eb926d180f1031a8fe6772"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh",
+      "sha256": "0111dc0a410cccae5af57d3f5ac21c2c85c6d60de19ec57852f731e0c4421fe7"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-malformed-json.sh",
+      "sha256": "734f278323a451ed934bb6784afc1ceb6c62336c764df37b60e43e309756a7e4"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",
+      "sha256": "604c42d167de4ac40ea2d48b1f97c1dca000357b16000b7567477406876abe82"
+    },
+    {
+      "path": ".claude/hooks/tests/test-secret-leak-block-unparsed-input.sh",
+      "sha256": "5f95cd160628f1fa7a50bdba49bdfb687c45965919bd129275d1758533f4fe97"
     },
     {
       "path": ".claude/hooks/wp-gate-reminder.sh",
@@ -232,6 +272,10 @@
       "sha256": "33fa9411f59599ceca457041631f06ba026295e94a8682723157e66dd1dd485f"
     },
     {
+      "path": ".claude/rules-registry.yaml",
+      "sha256": "1432f90b078bf57a08d660b9a10b420d8de25b4b1c04f078c4e5328487580352"
+    },
+    {
       "path": ".claude/rules/distinctions.md",
       "sha256": "92782bac92674f695a667af1890fbd2c8ba0684163038f63cff46a7ef91e1a77"
     },
@@ -285,7 +329,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "13355f13f96a1cfaf7dc8f0856269d612ae624ce0b8dc3c82ac3157924f5bec2"
+      "sha256": "ad0766e994b872150f91fbfaaee0e125189ba33d2757e05fc6e61b7688e8fa5e"
     },
     {
       "path": ".claude/skills-catalog.yaml",
@@ -2761,7 +2805,7 @@
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
-      "sha256": "6f4b86a03150000c5d1d7da7631412ba927f539e605188718e821188cfdb89eb"
+      "sha256": "87f6a07fac9ebf21bf2d410ebe58310073de2d0aca0a4db98f602935331494cd"
     },
     {
       "path": "scripts/validate-hypothesis-priority.sh",
@@ -2961,7 +3005,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "32496926d7a7d32103bcd7c336678346d7008c97e5589e84e8485a066024264b"
+      "sha256": "e50c0a022390ba07a2d101187cc4881feaf72ee1466f416977a92007e009ee27"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
