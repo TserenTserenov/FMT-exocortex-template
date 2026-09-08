@@ -80,6 +80,34 @@ for rel in "${PLISTS[@]}"; do
     fi
 done
 
+# WP-529 Ф94: the Linux equivalent of these 4 launchd jobs is a matching
+# systemd unit per role (build-runtime.sh substitutes both regardless of
+# host OS — it's plain text substitution). Same defect class, same fix,
+# needed its own assertion: nothing here was covering .service files at all.
+SERVICES=(
+    roles/strategist/scripts/systemd/iwe-strategist-morning.service
+    roles/strategist/scripts/systemd/iwe-strategist-weekreview.service
+    roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service
+    roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
+)
+assert_service_env() {
+    local unit="$1" key="$2" value="$3"
+    grep -Fxq "Environment=$key=$value" "$unit" || {
+        echo "FAIL: $unit does not render Environment=$key=$value" >&2
+        exit 1
+    }
+}
+for rel in "${SERVICES[@]}"; do
+    unit="$WORKSPACE/.iwe-runtime/$rel"
+    [ -f "$unit" ] || { echo "FAIL: missing rendered systemd unit $rel" >&2; exit 1; }
+    assert_service_env "$unit" IWE_SCRIPTS "$ROOT/scripts"
+    assert_service_env "$unit" IWE_GOVERNANCE_REPO DS-strategy
+    if grep -q '{{[A-Z_]*}}' "$unit"; then
+        echo "FAIL: $rel retains an unfilled placeholder" >&2
+        exit 1
+    fi
+done
+
 MISSING_ENV="$TMP/missing-user.env"
 grep -v '^USER_NAME=' "$ENV_FILE" > "$MISSING_ENV"
 FALLBACK_USER=$(id -un)
