@@ -265,5 +265,8 @@
         ]
       }
     ]
+  },
+  "env": {
+    "BASH_ENV": "/home/barracuda/IWE/.iwe-paths"
   }
 }
