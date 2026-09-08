@@ -1093,7 +1093,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "0be98cd6b67502bea3ceb1edd91487635538b906ab81c3412c322b58fefacf7b"
+      "sha256": "3356ec4df8c503a89da0a7ff8c7b8b5458efde22625b98729f8c58cf575af299"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1413,7 +1413,7 @@
     },
     {
       "path": "memory/day-rhythm-config.yaml",
-      "sha256": "90d3bb465ef90b19a14dc17849fedd51473e356a2d67f3df7b339c1e500a41e3"
+      "sha256": "aeff2de8c59dae0238c1b3c6a678e0cdd97903ebe284aa0041a01513672e2b69"
     },
     {
       "path": "memory/distinctions-warm.md",
@@ -2690,6 +2690,10 @@
     {
       "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
       "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
+    },
+    {
+      "path": "scripts/tests/test_issue_720_decision_log_sot.sh",
+      "sha256": "b38448f83b4ee3a7cefe3cf40eea41e56153f50134fd91f78c28bc2643318686"
     },
     {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
