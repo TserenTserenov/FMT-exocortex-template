@@ -1,21 +1,32 @@
 name: Release
 
-# Triggered by a version bump in update-manifest.json.
-# On push to main: if the manifest version is new (no matching tag), create a
-# git tag v{version} and a GitHub release using the matching CHANGELOG section.
+# Triggered by Validate Template finishing green on main: if the manifest
+# version at the validated commit is new (no matching tag), create a git tag
+# v{version} and a GitHub release using the matching CHANGELOG section.
+#
+# WP-7 Ф62 (10.08.2026): previously triggered directly on `push:
+# paths:[update-manifest.json]`, independent of CI — a release could ship
+# while CI was still running or had already failed. Switched to workflow_run
+# so a release only happens after Validate Template reports success FOR THAT
+# EXACT COMMIT (github.event.workflow_run.head_sha) — no polling, no manual
+# SHA matching, the link comes straight from the triggering event.
 #
 # Manual trigger: workflow_dispatch with explicit version input lets maintainers
 # re-tag or create a release for an already-pushed version.
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Validate Template"]
+    types: [completed]
     branches: [main]
-    paths:
-      - update-manifest.json
   workflow_dispatch:
     inputs:
       version:
         description: "Version to release (e.g. 0.35.5). Leave empty to read from manifest."
+        required: false
+        default: ""
+      sha:
+        description: "Commit to tag (the validated bump commit). Leave empty to tag the dispatch ref tip."
         required: false
         default: ""
 
@@ -25,10 +36,31 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    # workflow_run fires for EVERY completed run of Validate Template
+    # (push, pull_request, schedule, workflow_dispatch) — gate on conclusion
+    # and on it being either a push or an explicit workflow_dispatch (the
+    # only way weekly-release.yml's bot-commit gets validated at all, since
+    # GitHub's anti-recursion policy blocks its own push from auto-triggering
+    # Validate Template — see that workflow's `on:` comment). schedule/PR runs
+    # never carry a version bump worth releasing; excluding them isn't a
+    # safety measure, just avoids a pointless "tag already exists" no-op.
+    if: >
+      github.repository == 'TserenTserenov/FMT-exocortex-template' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
     steps:
       - uses: actions/checkout@v4
         with:
+          # workflow_run: pin to the exact commit Validate Template just
+          # verified — this is what makes the gate actually mean something.
+          # workflow_dispatch with explicit sha (weekly-release.yml closes the
+          # chain this way): pin to that validated commit — a bare ref tip
+          # could have moved past what Validate saw.
+          # workflow_dispatch without sha (manual override): github.sha is the
+          # ref that was dispatched against, same as before this change.
+          ref: ${{ github.event.inputs.sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.sha }}
           fetch-depth: 0  # full history to check existing tags
 
       - name: Determine version

@@ -5,6 +5,7 @@ description: "Restore IWE memory from an exocortex backup on a new device or aft
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/restore-exocortex]
   phrases: ["восстанови экзокортекс", "восстанови память", "восстановить exocortex", "restore exocortex", "подними память на новом устройстве"]

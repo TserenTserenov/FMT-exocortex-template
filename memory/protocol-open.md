@@ -5,7 +5,7 @@ type: protocol
 horizon: warm
 domains: [protocol]
 status: active
-owner: user
+owner: platform
 schema_version: 1
 name: "Протокол: open"
 description: "Протокол ОРЗ — пошаговые инструкции для ритуала"
@@ -31,8 +31,10 @@ description: "Протокол ОРЗ — пошаговые инструкци�
 > **Пропустить (перейти к WP Gate):** свободный текст без явного тега — сначала нужно определить РП.
 
 ```bash
-IWE_EXECUTOR_CATALOG={{WORKSPACE_DIR}}/DS-strategy/scripts/executor-catalog.yaml \
-bash {{WORKSPACE_DIR}}/scripts/route-task.sh --skill <skill-name>
+: "${IWE_WORKSPACE:?source .iwe-paths before protocol-open}"
+: "${IWE_SCRIPTS:?source .iwe-paths before protocol-open}"
+IWE_EXECUTOR_CATALOG="$IWE_WORKSPACE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/executor-catalog.yaml" \
+bash "$IWE_SCRIPTS/route-task.sh" --skill <skill-name>
 ```
 **Если тег задан** → Маршрутизатор находит `executor` в executor-catalog.yaml → запускает нужный путь:
 - `executor: script` → прямой вызов script_path (без LLM); `haiku|sonnet|opus` → передать задание нужной модели через SKILL.md; `mcp-direct` → вызов MCP-инструмента напрямую
@@ -57,14 +59,24 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 #### Совпадает — работаем
 
 1. Ссылаемся на номер РП.
-2. **DayPlan Gate:** РП нет в DayPlan → добавить строку. strategy_day → пропустить. [[gate]]
+2. **DayPlan Gate:** до любого поиска или создания DayPlan прочитать
+   `${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml`
+   → `day_open.strategy_day`. Если файл отсутствует, нечитаем, не разбирается
+   как YAML или значение не входит в карту ниже → **inventory/STOP только для
+   DayPlan-действия**: DayPlan не искать, не создавать и не изменять; назвать
+   причину пилоту. Только отсутствующий ключ имеет безопасный default `monday`.
+   Сравнить значение с сегодняшним днём через локале-независимый `date +%u` и
+   полную карту `monday=1, tuesday=2, wednesday=3, thursday=4, friday=5,
+   saturday=6, sunday=7`. Совпало → гейт неприменим: DayPlan не искать и не
+   создавать. Не совпало → только тогда проверить DayPlan; РП нет → добавить
+   строку. [[gate]]
 3. **Sync Gate (актуализация контекста РП).** Прочитать контекст РП и связанных РП → синхронизировать открытые фазы с тем, что фактически сделано. **Цель:** исключить дублирование работы, ложные блокеры, неверные оценки в Ритуале. [[gate]]
 
    **Race-guard:** если state-файл `.claude/state/wp-sync-<N>.done` существует И его mtime моложе 8 часов — пропустить (sync уже выполнен в этой сессии). Если файл есть, но mtime старше 8h — считать stale: `rm -f` и продолжить заново. Проверка: `find .claude/state/wp-sync-<N>.done -mmin -480 2>/dev/null` (пустой вывод = нет файла или stale → запускать; непустой = свежий → пропускать).
 
    **Шаг 3a — Bundle.** Запустить детерминированный сборщик контекста:
    ```bash
-   bash .claude/scripts/wp-sync-bundle.sh WP-N > /tmp/wp-sync-bundle-$$.md
+   bash "${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/wp-sync-bundle.sh" WP-N > /tmp/wp-sync-bundle-$$.md
    ```
    Exit 0 → читать вывод. Exit 1 → РП не найден → перейти к Ритуалу с пометкой «контекст не найден». Exit 2 → ошибка парсинга → перейти к Ритуалу, поднять stderr в «Требует внимания».
 
@@ -85,7 +97,8 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 2. Вывести таблицу РП; спросить: артефакт, формулировка, репо, бюджет
 3.5. **Предложить связки с активными РП.** Прочитать WeekPlan W{N}.md → grep на тематические пересечения. Таблица: РП / сила (🔴 сильная / 🟡 средняя / 🟢 слабая) / тип (handoff, dependency, продукт-следствие, валидационный случай). Если ни одной связи >🟢 — отметить «РП изолирован» (сигнал: ревизировать формулировку).
 4. Предложить перестановку если бюджет ограничен
-5. Записать **в 5 мест** (атомарно): MEMORY.md, WP-REGISTRY.md, WeekPlan, WP-context file (`verification_class: trivial|closed-loop|open-loop|problem-framing`), Linear (`mcp__linear__create_issue`)
+5. Записать **в 4 места** (атомарно): MEMORY.md, WP-REGISTRY.md, WeekPlan, WP-context file (`verification_class: trivial|closed-loop|open-loop|problem-framing`)
+5a. **Пост-шаг (условный): внешний трекер.** Если MCP внешнего трекера подключён (например Linear → `mcp__linear__create_issue`) — создать issue ПОСЛЕ локальной записи. Отсутствие/недоступность MCP — штатное состояние, не ошибка: локальную запись не откатывать, в отчёте шага отметить «внешний трекер: не подключён» (issue #321)
 5b. **Мостик Ритуал → файлы (WP-505):** объявленные в Ритуале «Целевой переход состояния» и «Гипотеза» обязаны попасть в frontmatter карточки (`state_transition:`, `hypothesis:`) и колонку «Ставка» реестра (если она есть). Создание — только `create-wp.sh --state "…" --hypothesis H-NNN`; при наличии `docs/state-axes-registry.yaml` скрипт блокирует создание без `--state`.
 6. Нумерация: только последовательные целые (74, 75…). Буквенные суффиксы запрещены
 

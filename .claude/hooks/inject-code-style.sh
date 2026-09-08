@@ -106,9 +106,15 @@ CONTEXT="## 🔧 Инженерный стиль кода IWE (L0 база + L1 
 
 $FRAGMENT"
 
-# Хард-кап: обрезка по последнему полному предложению до HARD_CAP символов
-# (защита от молчаливой ампутации правила на лимите PreToolUse, консенсус Kimi)
-CTX_LEN=$(printf '%s' "$CONTEXT" | wc -c | tr -d ' ')
+# Хард-кап: считаем и обрезаем в Unicode-символах. `wc -c` считал байты,
+# тогда как Python ниже срезает символы: на кириллице это давало ложное
+# превышение капа и добавляло маркер обрезки к уже допустимому контексту.
+# (За пределами этого блока CUR_BYTES намеренно остаётся байтовым счётчиком:
+# это отдельный порог роста transcript для переинъекции.)
+if ! CTX_LEN=$(printf '%s' "$CONTEXT" | python3 -c 'import sys; print(len(sys.stdin.read()))'); then
+  echo '{}'
+  exit 0
+fi
 if [ "$CTX_LEN" -gt "$HARD_CAP" ]; then
   echo "inject-code-style: context $CTX_LEN > cap $HARD_CAP — обрезаю по предложению" >&2
   CONTEXT=$(CTX="$CONTEXT" CAP="$HARD_CAP" python3 - <<'PY'

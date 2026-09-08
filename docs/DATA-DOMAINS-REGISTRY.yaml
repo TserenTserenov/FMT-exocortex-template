@@ -1,0 +1,211 @@
+# Машиночитаемая карта доменов данных IWE — источник истины для ADR-004.
+# Человекочитаемое резюме: docs/adr/ADR-004-data-domain-map.md
+#
+# Происхождение: РП-526 (Новая структура IWE) Ф2/Ф3, пир-сессии Claude+Kimi и Claude+Codex
+# (2026-08-16). Схема прошла архитектурную оценку и код-ревью в исходном контексте пользователя;
+# перенесена сюда как рекомендуемая структура для новых пользователей IWE.
+#
+# `homes` использует ролевые метки хранилищ (см. ADR-004 § «Роли хранилищ»), а не имена
+# конкретных репозиториев — имя репозитория выбирает сам пользователь.
+layer: L1
+
+schema_version: 1
+generated: "2026-08-16"
+updated: "2026-08-28"
+# 2026-08-28: homes доменов 2.5/2.6 исправлены с "governance-personal" на
+# "machine-dialogue" — отражает поправку пилота от 2026-08-18 (WP-526 Ф5),
+# не отражённую в шаблоне до этой правки. См. ADR-004 § «Поправка 2026-08-18».
+# Роль → семья репозитория (префикс): governance-personal → DS-*,
+# personal-data/personal-declarative → PD-*, promoted-knowledge → PACK-*,
+# machine-dialogue → MC-* (на старте один репозиторий MC-sessions, расширение
+# семьи требует отдельного ADR), platform-runtime → вне git.
+
+# Политика уровней чувствительности (стиль NIST SP 800-122, адаптировано под личный масштаб
+# одного носителя данных). Каждый tier определяет минимальный контроль и цикл пересмотра один
+# раз здесь — домены ниже только ссылаются на tier по имени (`sensitivity:`).
+sensitivity_policy:
+  public:
+    min_controls: "нет обязательных — можно публиковать/шарить открыто"
+    review_cadence: annual
+  internal:
+    min_controls: "доступ ограничен пользователем и его агентами сессии; не публиковать вовне"
+    review_cadence: annual
+  confidential:
+    min_controls: "доступ на чтение ограничен пользователем; альтернативные контроли допустимы вместо физического карантина — см. enforcement конкретного домена"
+    review_cadence: quarterly
+  restricted:
+    min_controls: "доступ только по явному согласию/только для юридических вопросов; физическая изоляция или шифрование обязательны; логирование доступа обязательно"
+    review_cadence: monthly
+
+# Правило производности: sensitivity — источник истины, quarantine — производное поле.
+# restricted => quarantine=true всегда, без исключений. confidential => quarantine может быть
+# false, если у домена есть альтернативный контроль (указан в его enforcement).
+# internal/public => quarantine=false.
+quarantine_derivation: "restricted=>quarantine=true (без исключений); confidential=>quarantine по месту (см. enforcement); internal/public=>quarantine=false"
+
+data_domains:
+  - domain: "2.1 факты о носителе"
+    type: "2.1"
+    quarantine: false
+    sensitivity: confidential
+    owner: personal
+    tempo: warm
+    allowed_flows: ["read-own", "write-own", "aggregate-anonymized"]
+    homes: ["personal-declarative (git)", "platform-runtime (опционально)"]
+    enforcement: "planned"
+    maturity: planned
+
+  - domain: "2.2 события/телеметрия"
+    type: "2.2"
+    quarantine: false
+    sensitivity: confidential
+    owner: personal
+    tempo: hot
+    allowed_flows: ["read-own", "aggregate-anonymized"]
+    homes: ["personal-data (git, append-only)", "platform-runtime (опционально)"]
+    enforcement: "pre-commit hook (git-дом) + RLS (platform-дом, если используется)"
+    maturity: planned
+    notes: "confidential, не restricted — данные о себе, субъект данных = сам владелец; отдельные потоки (например здоровье) могут требовать индивидуального повышения tier"
+
+  - domain: "2.3 знания/captures"
+    type: "2.3"
+    quarantine: false
+    sensitivity: internal
+    owner: personal
+    tempo: warm
+    allowed_flows: ["read-own", "read-promoted", "write-own"]
+    homes: ["вне-git память", "promoted-knowledge (Pack)"]
+    enforcement: "planned"
+    maturity: planned
+
+  - domain: "2.4 неформализуемое"
+    type: "2.4"
+    quarantine: true
+    sensitivity: restricted
+    owner: personal
+    tempo: none
+    allowed_flows: []
+    homes: ["явный карантин — не размещать"]
+    enforcement: "policy-only"
+    maturity: implemented
+
+  - domain: "2.5 диалоговые артефакты"
+    type: "2.5"
+    quarantine: false
+    sensitivity: confidential
+    owner: personal
+    tempo: "warm->cold"
+    allowed_flows: ["read-own", "read-KE"]
+    homes: ["machine-dialogue (MC-sessions)"]
+    enforcement: "planned (архивация в cold со временем, без удаления)"
+    maturity: partial
+    notes: "homes исправлен 2026-08-28: было governance-personal (sessions/) до поправки пилота 2026-08-18 (WP-526 Ф5) — см. ADR-004"
+
+  - domain: "2.6 карантин-диалоги"
+    type: "2.5-subset"
+    quarantine: true
+    sensitivity: restricted
+    owner: personal
+    tempo: none
+    allowed_flows: []
+    homes: ["machine-dialogue (тот же репозиторий физически, что у домена 2.5, с отдельным access-контролем)"]
+    enforcement: "planned"
+    residual_risk: high
+    maturity: planned
+    notes: "homes исправлен 2026-08-28: было governance-personal — см. ADR-004"
+
+  - domain: "runtime/state"
+    type: "infra"
+    quarantine: false
+    sensitivity: internal
+    owner: personal
+    tempo: hot
+    allowed_flows: ["read-own", "write-own"]
+    homes: ["вне git (runtime-каталог платформы)"]
+    enforcement: "implemented (вне git по конструкции)"
+    maturity: implemented
+
+  - domain: "платформенные БД (опционально)"
+    type: "infra"
+    quarantine: false
+    sensitivity: confidential
+    owner: personal
+    tempo: "hot/warm"
+    allowed_flows: ["read-own", "write-own"]
+    homes: ["platform-runtime — не репозиторий"]
+    enforcement: "per-db RLS"
+    maturity: partial
+
+  - domain: "карантин вне оси"
+    type: "outside-axis"
+    quarantine: true
+    sensitivity: restricted
+    owner: personal
+    tempo: none
+    allowed_flows: []
+    homes: ["вне-git секреты/платёжное", "personal-data (data_type: outside-axis, вне git)"]
+    enforcement: "implemented (для секретов/платёжного — общепринятая практика)"
+    maturity: implemented
+
+  - domain: "код/скрипты — рабочая копия"
+    type: "code"
+    quarantine: false
+    sensitivity: internal
+    owner: personal
+    tempo: hot
+    allowed_flows: ["read-any-agent", "write-own-session"]
+    homes: ["рабочий репозиторий пользователя, scripts/"]
+    enforcement: "none"
+    maturity: implemented
+
+  - domain: "код/скрипты — промотированная копия"
+    type: "code"
+    quarantine: false
+    sensitivity: internal
+    owner: personal
+    tempo: warm
+    allowed_flows: ["read-any-agent"]
+    homes: ["FMT-exocortex-template/scripts/"]
+    enforcement: "script-promote.sh (gate on write)"
+    maturity: implemented
+    notes: "internal, не public — публикация шаблона как открытого проекта отдельное решение"
+
+  - domain: "планы/рабочие контексты"
+    type: "governance"
+    quarantine: false
+    sensitivity: confidential
+    owner: personal
+    tempo: hot
+    allowed_flows: ["read-own", "write-own"]
+    homes: ["governance-personal (без активного потока телеметрии, без единого растущего файла знаний внутри)"]
+    enforcement: "planned"
+    maturity: planned
+    notes: "confidential — планы часто содержат рабочую информацию об идентифицируемых третьих лицах (команда, партнёры), не только о владельце"
+
+# L1/L2/L3 — секции внутри CLAUDE.md шаблона (платформа/staging/авторское), не отдельные
+# репозитории (другой уровень гранулярности). Sensitivity не применяется — это конфигурационные
+# слои платформы, не данные.
+governance_layers:
+  - domain: "L1 платформа"
+    type: "layer"
+    tempo: cold
+    allowed_flows: ["read-any"]
+    homes: ["CLAUDE.md, секции платформы"]
+    enforcement: "update.sh"
+    maturity: planned
+
+  - domain: "L2 staging"
+    type: "layer"
+    tempo: warm
+    allowed_flows: ["read-any"]
+    homes: ["CLAUDE.md, секция staging"]
+    enforcement: "none"
+    maturity: planned
+
+  - domain: "L3 авторское"
+    type: "layer"
+    tempo: hot
+    allowed_flows: ["read-any"]
+    homes: ["CLAUDE.md, авторская секция"]
+    enforcement: "none"
+    maturity: planned

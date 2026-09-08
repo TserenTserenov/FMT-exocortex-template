@@ -1,6 +1,6 @@
 ---
 schema_version: 1
-updated_at: 2026-07-19T06:33:41Z
+updated_at: 2026-08-06T15:31:57Z
 ---
 # promotion-status.yaml — журнал промоций артефактов из author IWE в FMT
 # see WP-7/PZ-6 (peer-session 2026-05-29-20)
@@ -321,3 +321,9 @@ promotions:
     fmt_sha: ""
     promoted_at: 2026-07-19T06:32:43Z
     verified_in_clean_env: na
+  - artifact_path: scripts/add-secret.sh
+    type: script
+    source_sha: "58a429c99"
+    fmt_sha: "1af1c2a"
+    promoted_at: 2026-08-06T15:31:57Z
+    verified_in_clean_env: true

@@ -1,9 +1,10 @@
 ---
 name: strategy-session
-description: Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). День-1+ → weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать».
+description: Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать».
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/strategy-session]
   phrases: []
@@ -19,11 +20,11 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 # Strategy Session — диспетчер
 
-> Один skill, два режима. Выбор по факту наличия артефактов в `{{GOVERNANCE_REPO}}/`.
+> Один skill, три режима. Выбор по факту наличия артефактов в `{{GOVERNANCE_REPO}}/` + календарной позиции сессии.
 
 ## When to use
 
-Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). День-1+ → weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать».
+Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца → полный monthly flow (стратегическая сверка + линза калибра, ~45-60 мин). Остальные сессии → короткий weekly flow (требует черновик от session-prep, ~15-20 мин). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать».
 
 ## Algorithm
 
@@ -37,10 +38,24 @@ gates_rationale: "операционный скилл; WP Gate применим 
 - `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md`
 - `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md`
 
+Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца. Записи двух легальных раскладок (issue #608, тот же корень, что #545 в day-open-scaffold.sh): плоские файлы Strategy/Day-сессий (`sessions/YYYY-MM-DD.md`) и подпапка по месяцу для peer-сессий (`sessions/YYYY-MM/`) — искать нужно по обоим адресам, иначе плоская раскладка (дефолт по `memory/routing-vocab.md`) всегда даёт «не найдено» и месячная сверка не срабатывает ни разу:
+```bash
+SESSIONS_DIR=$(source {{WORKSPACE_DIR}}/scripts/lib/common.sh 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/sessions"
+grep -rl "strategy-session\|Strategy Session" \
+  "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
+  "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
+```
+Пусто → первая сессия месяца.
+
+> **Найдено платформенным аудитом 17.08.2026:** до этого исправления диспетчер знал только про initial/weekly — monthly-вариант (`strategy-session-monthly.md`) был реализован, но ничем не вызывался, кроме редкой ручной эскалации из weekly-stop-gate. Результат — шаги, привязанные только к monthly (стратегическая сверка, линза калибра/lifework-пакет, разбор inbox), фактически никогда не запускались ни у одного пользователя. Этот шаг — фикс маршрутизации, не новая функциональность.
+>
+> **Известное ограничение (policy, не баг, peer-review с Codex 17.08.2026):** триггер идемпотентен относительно УСПЕШНОГО запуска (файл сессии записан в `sessions/`), но не относительно прерванного/aborted запуска до записи файла — следующая попытка в том же месяце снова увидит «нет записей» и снова пойдёт в monthly. Осознанный компромисс: at-least-once per month лучше, чем zero-times (баг, который этот фикс и устраняет). Ужесточение до exactly-once — отдельный РП при появлении живого сигнала, что дублирование monthly реально мешает.
+
 | Состояние | Режим | Куда дальше |
 |-----------|-------|-------------|
 | Нет ни Strategy.md, ни WeekPlan | **initial** (день-0) | §2 этого файла |
-| Есть Strategy.md и/или WeekPlan со `status: draft` | **weekly** | `roles/strategist/prompts/strategy-session-weekly.md` |
+| Есть Strategy.md и/или WeekPlan, и это первая сессия календарного месяца | **monthly** (полный вариант) | `roles/strategist/prompts/strategy-session-monthly.md` |
+| Есть Strategy.md и/или WeekPlan со `status: draft`, не первая сессия месяца | **weekly** | `roles/strategist/prompts/strategy-session-weekly.md` |
 | Есть Strategy.md, но нет draft WeekPlan | weekly без draft | сообщи пользователю: «нет черновика, запустить session-prep?» |
 
 ---

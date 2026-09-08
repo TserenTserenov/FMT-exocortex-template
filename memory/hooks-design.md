@@ -2,7 +2,12 @@
 name: hooks-design
 description: Принципы проектирования хуков IWE — trigger = artifact, не TOOL_INPUT текст
 type: reference
+horizon: warm
+domains: [reference, hooks]
+status: active
 valid_from: 2026-04-27
+owner: platform
+schema_version: 1
 originSessionId: WP-273-stage-2
 ---
 # Hooks Design Principles

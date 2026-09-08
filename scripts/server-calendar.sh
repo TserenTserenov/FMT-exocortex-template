@@ -14,7 +14,8 @@
 # Требует:
 #   env: GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 #   или файл ~/.secrets/google-calendar (строки KEY=VALUE)
-#   config: day-rhythm-config.yaml → calendar_ids
+#   config: day-rhythm-config.yaml → calendar_ids (пустой список = все
+#     доступные календари через calendarList, отсутствующий ключ = ошибка)
 #
 # Использование:
 #   bash server-calendar.sh YYYY-MM-DD [CONFIG_PATH]
@@ -40,24 +41,21 @@ done
 
 DATE="${DATE_ARG:-$(date +%Y-%m-%d)}"
 IWE="${IWE_ROOT:-$HOME/IWE}"
-CONFIG="${CONFIG_ARG:-$IWE/DS-strategy/exocortex/day-rhythm-config.yaml}"
+CONFIG="${CONFIG_ARG:-$IWE/.iwe-runtime/day-rhythm-config.yaml}"
 SECRETS_FILE="${HOME}/.secrets/google-calendar"
 
-# --- Выбираем python3 с PyYAML ---
-_find_python3() {
-  if python3 -c "import yaml" 2>/dev/null; then echo "python3"; return; fi
-  local p
-  for p in \
-    /nix/store/aj1smkrsnv16lbz9g8qancb04b3kv0va-python3-3.12.8-env/bin/python3 \
-    /usr/bin/python3 /usr/local/bin/python3; do
-    [[ -x "$p" ]] && "$p" -c "import yaml" 2>/dev/null && { echo "$p"; return; }
-  done
-  find /nix/store -maxdepth 3 -name "python3" -path "*env*/bin/*" 2>/dev/null | while read -r p; do
-    "$p" -c "import yaml" 2>/dev/null && { echo "$p"; return; }
-  done
-  echo "python3"
-}
-PYTHON3=$(_find_python3)
+# --- Выбираем python3 с PyYAML (общий резолвер, WP-529 F6 / #453 #463) ---
+RESOLVER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
+if ! PYTHON3=$("$RESOLVER"); then
+  # Explicit dependency error instead of the old lie: a yaml-less interpreter
+  # used to surface later as "calendar_ids не найдены в конфиге" (Evgenii,
+  # 18.08). Same PENDING+exit 0 contract as the credentials branch below —
+  # the section must always render.
+  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — не найден python3 с библиотекой PyYAML. Установить: pip3 install pyyaml (или sudo apt install python3-yaml); см. requirements.txt"
+  echo ""
+  echo "⏱ Свободных блоков ≥1h: **не определено**"
+  exit 0
+fi
 
 # --- Загружаем credentials ---
 if [[ -f "$SECRETS_FILE" ]]; then
@@ -93,22 +91,79 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
 fi
 
 # --- Читаем calendar_ids из конфига ---
-CALENDAR_IDS=$($PYTHON3 -c "
+# issue #489: пустой calendar_ids документирован как "все доступные календари",
+# не как "не настроено" — sentinel различает отсутствие ключа (MISSING) от
+# явного пустого списка (пустой stdout, но не MISSING).
+CONFIG_READ=$($PYTHON3 -c "
 import yaml, sys
 try:
-    with open('$CONFIG') as f: d = yaml.safe_load(f)
-    ids = d.get('calendar_ids') or d.get('day_open', {}).get('calendar_ids', [])
+    with open('$CONFIG') as f: d = yaml.safe_load(f) or {}
+    if 'calendar_ids' in d:
+        ids = d.get('calendar_ids')
+    elif 'calendar_ids' in d.get('day_open', {}):
+        ids = d['day_open']['calendar_ids']
+    else:
+        print('MISSING')
+        sys.exit(0)
     for cid in (ids or []):
         print(cid)
 except Exception as e:
-    pass
-" 2>/dev/null)
+    print(f'server-calendar: config read failed: {e}', file=sys.stderr)
+    print('MISSING')
+")
 
-if [[ -z "$CALENDAR_IDS" ]]; then
-  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — calendar_ids не найдены в конфиге"
+if [[ "$CONFIG_READ" == "MISSING" ]]; then
+  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — ключ calendar_ids отсутствует в конфиге ($CONFIG)"
   echo ""
   echo "⏱ Свободных блоков ≥1h: **не определено**"
   exit 0
+fi
+
+CALENDAR_IDS="$CONFIG_READ"
+
+if [[ -z "$CALENDAR_IDS" ]]; then
+  # Пустой список = документированное "все доступные календари" (day-rhythm-config.yaml
+  # комментарий), не ошибка конфигурации — запрашиваем полный список у Google.
+  CALENDAR_IDS=$($PYTHON3 << PYEOF
+import subprocess, urllib.parse, json, sys
+access_token = "${ACCESS_TOKEN}"
+url = "https://www.googleapis.com/calendar/v3/users/me/calendarList"
+page_token = ""
+ids = []
+while True:
+    params = "minAccessRole=reader"
+    if page_token:
+        params += f"&pageToken={urllib.parse.quote(page_token)}"
+    result = subprocess.run(
+        ["curl", "-s", "-H", f"Authorization: Bearer {access_token}", f"{url}?{params}"],
+        capture_output=True, text=True, timeout=15
+    )
+    if result.returncode != 0:
+        print(f"server-calendar: calendarList curl failed: {result.stderr}", file=sys.stderr)
+        break
+    try:
+        data = json.loads(result.stdout)
+    except Exception as e:
+        print(f"server-calendar: calendarList parse failed: {e}", file=sys.stderr)
+        break
+    if "error" in data:
+        print(f"server-calendar: calendarList API error: {data['error'].get('message', data['error'])}", file=sys.stderr)
+        break
+    for item in data.get("items", []):
+        ids.append(item["id"])
+    page_token = data.get("nextPageToken", "")
+    if not page_token:
+        break
+for cid in ids:
+    print(cid)
+PYEOF
+  )
+  if [[ -z "$CALENDAR_IDS" ]]; then
+    echo "📅 **Календарь ($DATE):** ⚠️ PENDING — calendar_ids пуст (все доступные календари), но автоопределение через calendarList не вернуло ни одного календаря"
+    echo ""
+    echo "⏱ Свободных блоков ≥1h: **не определено**"
+    exit 0
+  fi
 fi
 
 # --- Временной диапазон ---
@@ -226,6 +281,23 @@ for cid in calendar_ids:
         continue
 
     if "error" in data:
+        # Evgenii Red Team review 2026-08-19 (defect #4): this continue was
+        # silent — no cid, no error code, unlike the curl/json branches two
+        # steps up. issue #453 (below) fixed the same class of drop for a
+        # single event's visibility, not for a whole calendar's API error
+        # (403 on a calendar the token lacks access to, 404 on a deleted
+        # calendar, etc.) — that one stayed silent.
+        #
+        # Cold review 2026-08-19: Google's error envelope is normally
+        # {"error": {"code": ...}}, but a malformed/truncated response body
+        # (or a non-standard error shape from a proxy) could put a string or
+        # null there instead of a dict — calling .get() on a non-dict raises
+        # AttributeError and would crash the whole calendar loop on one bad
+        # response instead of recording it as an error like every other item
+        # here.
+        error_field = data.get("error")
+        err_code = error_field.get("code", "?") if isinstance(error_field, dict) else "?"
+        errors.append(f"calendar API error for {cid}: code={err_code}")
         continue
 
     for item in data.get("items", []):
@@ -234,6 +306,11 @@ for cid in calendar_ids:
         end = item.get("end", {})
         visibility = item.get("visibility", "")
         if visibility == "private":
+            # issue #453: record the drop — a silently vanished event is
+            # indistinguishable from a consistent count downstream. Re-applied
+            # after the 2026-08-19 template-sync reverted commit 4744cb1
+            # (root↔template drift; see WP-529 F6 / WP-485).
+            errors.append(f"skipped private event: {summary}")
             continue
 
         start_dt = parse_dt(start.get("dateTime"))
@@ -301,6 +378,21 @@ errors = data.get("errors", [])
 date_str = "${DATE}"
 week_mode = True if "${WEEK_MODE}" == "true" else False
 
+# Cold review 2026-08-19 (Codex, WP-529 Red Team round 2): this script always
+# exited 0 regardless of errors[] — the current caller (day-open-pipeline.sh)
+# runs it with a trailing "|| true" and reads errors from this JSON, so a
+# non-zero exit would not break it — but the script had no exit-status
+# signal at all for interactive runs, cron/monitoring, or future callers.
+# Only the "calendar API error" class (defect #4 above: 403/5xx-style
+# Google API errors on a
+# whole calendar, not a single event) counts as degraded — curl/json parse
+# errors and skipped-private-event notices are the same partial-result class
+# this script already tolerated before this fix and stay non-fatal, matching
+# Codex's "не следует превращать любой непустой errors[] в fatal" concern
+# from turn 1. String-prefix match, not a new typed error field: the errors[]
+# list stays flat strings, only this one class has a distinguishing prefix.
+has_calendar_api_error = any(e.startswith("calendar API error for") for e in errors)
+
 months = ["","января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"]
 try:
     dt = datetime.strptime(date_str, "%Y-%m-%d")
@@ -341,14 +433,16 @@ if week_mode:
         print("| 🚦 | Время | Событие | Длит. | Тип |")
         print("|----|-------|---------|-------|-----|")
         for e in evs:
-            s = e["summary"].replace("|", "\\|")
+            s = e["summary"].replace("|", "\\\\|")
             t = "встреча" if e["type"] == "meeting" else "задача"
             print(f"| {e['status_emoji']} | {e['start_time']} | {s} | {e['duration']} | {t} |")
         print()
 
     if errors:
-        print(f"> ⚠️ Пропущено календарей: {len(errors)} (нет доступа или ошибка)")
-    sys.exit(0)
+        print(f"> ⚠️ Пропущено при разборе: {len(errors)}")
+        for err in errors:
+            print(f">   - {err}")
+    sys.exit(1 if has_calendar_api_error else 0)
 
 # ============ РЕЖИМ ДНЯ ============
 n = len(events)
@@ -361,7 +455,7 @@ if meetings:
     print("| 🚦 | Время | Событие | Длит. | Связь с РП |")
     print("|----|-------|---------|-------|------------|")
     for e in meetings:
-        s = e["summary"].replace("|", "\\|")
+        s = e["summary"].replace("|", "\\\\|")
         print(f"| {e['status_emoji']} | {e['start_time']} | {s} | {e['duration']} | — |")
     print()
 else:
@@ -373,7 +467,7 @@ if tasks:
     print("| 🚦 | Время | Что | Длит. | Результат |")
     print("|----|-------|-----|-------|-----------|")
     for e in tasks:
-        s = e["summary"].replace("|", "\\|")
+        s = e["summary"].replace("|", "\\\\|")
         print(f"| {e['status_emoji']} | {e['start_time']} | {s} | {e['duration']} | — |")
     print()
 else:
@@ -431,5 +525,9 @@ else:
 
 if errors:
     print()
-    print(f"> ⚠️ Пропущено календарей: {len(errors)} (нет доступа или ошибка)")
+    print(f"> ⚠️ Пропущено при разборе: {len(errors)}")
+    for err in errors:
+        print(f">   - {err}")
+
+sys.exit(1 if has_calendar_api_error else 0)
 PYEOF

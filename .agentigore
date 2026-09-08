@@ -1,0 +1,11 @@
+# .agentigore — файлы, которые peer-adapter-filter.py не копирует в проекцию
+# для агентов-напарников (peer-сессии DP.SC.154). fnmatch-паттерны, по одному в строке.
+#
+# Шаблон-строка авторизованного git-URL в этом скрипте ложно матчится
+# PII-паттерном «Basic Auth URL» — сам файл секретов не содержит,
+# но верификатору-напарнику он и не нужен.
+scripts/copy-to-aisystant.py
+scripts/iwe-grep-secret.sh
+.github/workflows/cloud-scheduler.yml
+guide-kit/structurer/test_quarantine.py
+scripts/add-secret.sh

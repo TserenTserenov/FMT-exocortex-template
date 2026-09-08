@@ -2,6 +2,7 @@
 name: pack-new
 description: "Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap."
 argument-hint: "[область знания или домен]"
+browser_safe: false
 realized_by:
   - DP.SC.048
 ---

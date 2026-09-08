@@ -2,9 +2,10 @@
 name: kimi-peer-writer
 description: Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Opening и Closing, turn-loop, эскалации, Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), отложенную финализацию и верификацию.
 argument-hint: "<описание задачи> | --list | --interrupt <session_id> | --finalize <session_id>"
-version: 1.2.0
+version: 1.3.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/peer-writer]
   phrases: ["начни peer-сессию", "запусти диалог с Клодом", "peer-сессия", "вместе с Клодом", "с Клодом", "привлеки Клода"]
@@ -51,6 +52,17 @@ Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напар�
 
 ---
 
+## Шаг 0а. Preflight Gate (WP-484 Ф33 item Г, обязательно ДО любых других действий)
+
+Та же проверка, что `~/.kimi-code/skills/session-open/SKILL.md` уже делает для standalone-сессий Kimi (Ф33, 31.07) — до этой правки у пир-сессий Kimi-писателя не было НИКАКОЙ проверки, что сессия открыта честно (тот же класс дыры, что Ф28). Скрипт поставляется шаблоном; звать по конвенции путей (#566 — фантомным был только хардкод `$HOME/IWE/scripts/...`, сам скрипт существует и входит в манифест):
+
+```bash
+bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/kimi-standalone-preflight.sh"
+```
+
+- Exit ≠ 0 (`ERROR: Kimi standalone session is NOT OPEN`) → **СТОП.** Не переходить к Шагу 0б, не открывать WP Gate, не создавать `meta.yaml`/`00-writer.md`, не трогать файлы. Показать пилоту команду открытия из stderr скрипта (`bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" open --wp WP-N --task "..." --agent kimi`) и ждать, пока сессия не будет открыта явно.
+- Exit 0 (в т.ч. с предупреждением про устаревшую/stale-сессию) → продолжать к Шагу 0б.
+
 ## Шаг 0б. Открытие (WP Gate — только для новой сессии)
 
 Найти WP по задаче: прочитать `${IWE_GOVERNANCE_REPO:-DS-strategy}/WP-REGISTRY.md` (grep по ключевым словам) и `${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekPlan W{N}.md`.
@@ -77,15 +89,16 @@ Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напар�
 SESSIONS_DIR="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions"
 TODAY=$(date +%Y-%m-%d)
 MONTH=$(date +%Y-%m)
-MONTH_DIR="$SESSIONS_DIR/$MONTH"
-mkdir -p "$MONTH_DIR"
-NUM=$(printf "%02d" $(( $(find "$MONTH_DIR" -maxdepth 1 -type d -name "${TODAY}-[0-9][0-9]-*" 2>/dev/null | wc -l | tr -d ' ') + 1 )))
+DAY=$(date +%d)
+DAY_DIR="$SESSIONS_DIR/$MONTH/$DAY"
+mkdir -p "$DAY_DIR"
+NUM=$(printf "%02d" $(( $(find "$DAY_DIR" -maxdepth 1 -type d -name "${TODAY}-[0-9][0-9]-*" 2>/dev/null | wc -l | tr -d ' ') + 1 )))
 ```
 
 Slug = первые 4 латинских слова из задачи строчными буквами через дефис (не-латиница и дата убираются). Никакой даты в slug — она уже в SESSION_ID. Если латиницы нет → `session`.
 
 `SESSION_ID="${TODAY}-${NUM}-${SLUG}"`
-`SESSION_DIR="${MONTH_DIR}/${SESSION_ID}"`
+`SESSION_DIR="${DAY_DIR}/${SESSION_ID}"`
 
 **1.1 Создать папку:**
 ```bash
@@ -171,26 +184,9 @@ consensus: none
 ### 3.1 Вызов Claude
 
 Прочитать все предыдущие реплики из `SESSION_DIR` в порядке нумерации.
+Составить промпт:
 
-Промпт передаётся **файлом**, не inline. Зачем (bug-2026-06-30-peer-adapter-b77c-block):
-inline-паттерн `echo "<промпт>" | bash adapter.sh` помещает весь текст промпта внутрь
-bash-команды, а хук B7.7c (`secret-leak-block.sh`) сканирует всю строку — случайные
-слова из списка read-инструментов (`cut`, `tr`, `fmt`...) + упоминание `.env`/`.secrets`
-в тексте промпта давали ложный deny на повторных ходах. Файловый вызов оставляет в
-командной строке только пути — хук не срабатывает.
-
-**3.1.а Записать промпт в `${SESSION_DIR}/peer-prompt.md`** (Write).
-Шаблон:
-
-```markdown
-## Открытие (WP Gate)
-
-- Задача: <задача>
-- РП: WP-NNN «<название>» (или: не найден в плане недели)
-- Дата: <TODAY>
-
----
-
+```
 КРИТИЧНО: Твоя задача — ТОЛЬКО написать одну peer-реплику в stdout с frontmatter.
 Запрещено: редактировать файлы, делать commit, git push, создавать файлы в SESSION_DIR.
 Весь твой ответ = одна реплика в stdout. Ничего больше.
@@ -220,13 +216,13 @@ CONSENSUS: <резюме> — если считаешь что договори�
 ESCALATE_TO_USER: <причина> — если писатель игнорирует существенное возражение
 ```
 
-**3.1.б Вызов Claude через Bash** (stdin-редирект из файла):
+Перед вызовом Claude писатель добавляет в промпт минимальную текстовую проекцию предыдущих реплик и фактов. Claude не читает `SESSION_DIR` и не использует инструменты.
+
+Вызов Claude через Bash:
 ```bash
 PEER_FILE="${SESSION_DIR}/$(printf '%02d' $TURN)-peer.md"
-bash "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
-  --add-dir "$SESSION_DIR" \
-  < "${SESSION_DIR}/peer-prompt.md" \
-  > "$PEER_FILE" 2>/dev/null
+echo "<промпт>" | bash "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
+  > "$PEER_FILE" 2> "${PEER_FILE%.md}.err"
 ```
 
 Если файл пустой или exit ≠ 0 → сообщить пилоту: «Claude не ответил. Повторить или прервать?»
@@ -380,7 +376,7 @@ Cold-context code review результатов peer-сессии <SESSION_ID>.
 Изменённые файлы:
 <CHANGED_FILES>
 
-Прочитай каждый файл (используй Read tool через add-dir; для файлов вне SESSION_DIR — абсолютный путь).
+У тебя нет файловых инструментов и доступа к каталогу сессии — весь нужный код уже вставлен выше, в `<CHANGED_FILES>` (диф и фрагменты файлов, добавляет писатель перед вызовом).
 Проверь по чек-листу:
 1. asyncio runtime: ищи 'wait_for(coro)' без 'shield' → coroutine reuse. Fire-and-forget tasks читающие/пишущие одну строку БД из разных мест.
 2. Shell ordering: function call ДО function definition. 'set -u' соблюдён?
@@ -398,12 +394,10 @@ EOF
 )
 
 echo "$REVIEW_PROMPT" | bash "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
-  --add-dir "$SESSION_DIR" \
-  --add-dir "<repo path1>" --add-dir "<repo path2>" \
-  2>/dev/null > "$REVIEW_FILE"
+  > "$REVIEW_FILE" 2> "${REVIEW_FILE%.md}.err"
 ```
 
-`--add-dir` для каждого репо где есть изменённые файлы (иначе Claude не сможет их прочитать).
+Добавь в `REVIEW_PROMPT` точечный diff и нужные фрагменты файлов. Нельзя передавать каталоги: Claude получает только текстовую проекцию.
 
 ### 3.6.3 Review Outcome
 
@@ -448,11 +442,10 @@ EOF
 )
 
 echo "$VERIFY_PROMPT" | bash "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
-  --add-dir "$SESSION_DIR" \
-  --add-dir "<repo path1>" --add-dir "<repo path2>" \
-  --permission-mode acceptEdits \
-  2>/dev/null > "$VERIFY_FILE"
+  > "$VERIFY_FILE" 2> "${VERIFY_FILE%.md}.err"
 ```
+
+Claude в этом вызове не запускает smoke-тесты: он может только оценить переданный текст. Исполняемую проверку запускает писатель локально по отдельному протоколу.
 
 **Результат:**
 - PASS → перейти к 3.6.5.
@@ -507,6 +500,40 @@ git push
 ```
 
 Этот файл будет включён синтезатором (Шаг 4.2) как обязательная секция при `implementation_pipeline: true`.
+
+---
+
+## Шаг 3.7. Рефлексия перед финализацией (WP-484, решение пилота 30.07)
+
+> **Почему здесь:** пир-сессия — тоже сессия работы, вопрос рефлексии обязателен так же, как и в обычной Quick Close (Ф18) — этот же разрыв найден и закрыт 30.07 в `peer-conversation/SKILL.md` (Claude-писатель); здесь тот же фикс для симметричного случая (Kimi-писатель, Claude-напарник). Порог и формулировка идентичны — Claude (напарник) остаётся тем, у кого есть живой канал с пилотом и доступ к Skill/Bash, поэтому шаг ниже исполняет напарник, не писатель.
+
+**Порог:** та же формула, что в `peer-conversation/SKILL.md` §3.7 (переиспользует починенный в `gather-session-facts.sh`, WP-484 Ф26, разбор даты — не изобретать заново):
+```bash
+START_TIME=$(grep '^start_time:' "$SESSION_DIR/meta.yaml" | sed -E 's/^start_time: *"?([^"]*)"?$/\1/')
+NOW_EPOCH=$(date -u +%s)
+START_EPOCH=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$START_TIME" +%s 2>/dev/null \
+    || date -u -d "$START_TIME" +%s 2>/dev/null \
+    || echo "$NOW_EPOCH")
+DURATION_MIN=$(( (NOW_EPOCH - START_EPOCH) / 60 ))
+```
+Если `DURATION_MIN ≤ 15` — пропустить, перейти к Шагу 4 молча.
+
+Если `duration_min > 15`:
+
+1. Показать пилоту краткий итог (2-3 строки, суть сессии, не пересказ turn-файлов).
+2. Спросить: «Что в этой сессии стоит запомнить на будущее — не про саму задачу, а про то, как шла работа?» (дословно Ф18, `CONCEPT-night-cycle.md §18`).
+3. Записать ответ (issue #409: скрипт есть не на каждой установке — не блокировать при отсутствии):
+   ```bash
+   LEDGER_SCRIPT="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/ledger-append.sh"
+   if [ -f "$LEDGER_SCRIPT" ]; then
+     bash "$LEDGER_SCRIPT" day "$(date +%F)" session_reflection "{\"wp\": \"<WP-NNN>\", \"answer\": <экранированный ответ>}" kimi-peer-writer
+   else
+     echo "ledger-append.sh недоступен на этой установке — рефлексия не записана в дневной ledger"
+   fi
+   ```
+4. Сказать пилоту: «Ты свободен, дальше закрываю сессию сам» — продолжить Шаг 4 без дальнейшего участия пилота.
+
+Пропуск ответа — не блокировать: `"answer": "нет ответа"`, продолжить Шаг 4.
 
 ---
 
@@ -692,22 +719,43 @@ report_file = os.path.join(session_dir, 'report-draft.md')
 gov_repo = os.environ.get('IWE_GOVERNANCE_REPO', 'DS-strategy')
 adapter = os.path.expanduser(f'~/IWE/{gov_repo}/scripts/claude-peer-adapter.sh')
 
+# synth_prompt above already inlines the full transcript, meta.yaml fields and
+# _outcome.md into stdin — claude-peer-adapter.sh is a text-only reviewer by
+# contract (WP-458) and unconditionally rejects --add-dir (exit 64). Passing
+# it here made every synthesis call fail deterministically, not just under
+# some failure condition; found via code review, confirmed by Codex reading
+# the same two files independently, peer-session
+# 2026-08-04-08-wp7-f44-sandbox-review. stderr is now captured (not
+# discarded) so a future regression leaves an actual diagnostic in the
+# fallback stub below instead of the same generic guess every time.
+stderr_path = tmp_path + '.err'
 try:
-    with open(tmp_path, 'r', encoding='utf-8') as stdin_f, open(report_file, 'w', encoding='utf-8') as stdout_f:
+    with open(tmp_path, 'r', encoding='utf-8') as stdin_f, \
+         open(report_file, 'w', encoding='utf-8') as stdout_f, \
+         open(stderr_path, 'w', encoding='utf-8') as stderr_f:
         try:
             result = subprocess.run(
-                ['bash', adapter, '--add-dir', session_dir],
+                ['bash', adapter],
                 stdin=stdin_f,
                 stdout=stdout_f,
-                stderr=subprocess.DEVNULL,
+                stderr=stderr_f,
                 timeout=180
             )
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, OSError):
+            # Any launch failure, not just a timeout, folds into the same
+            # returncode=1 path below — that branch already reads and cleans
+            # up stderr_path; a narrower except here left it leaking on the
+            # rarer OSError case (found in cold review, same peer-session).
             result = subprocess.CompletedProcess(args=[], returncode=1)
 finally:
     os.unlink(tmp_path)
 
 if result.returncode != 0 or os.path.getsize(report_file) == 0:
+    stderr_tail = ''
+    if os.path.exists(stderr_path):
+        with open(stderr_path, encoding='utf-8') as f:
+            stderr_tail = f.read()[-2000:]
+        os.unlink(stderr_path)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', '') + 'Z'
     with open(report_file, 'w', encoding='utf-8') as f:
         f.write(f"""---
@@ -720,12 +768,22 @@ note: синтез не выполнен (Claude недоступен, верн�
 
 Стенограмма: см. файлы реплик в папке сессии.
 Повтори синтез: `/peer-writer --finalize {session_id}`
+
+## Диагностика (stderr адаптера, для отладки — не для пилота)
+
+```
+returncode: {result.returncode}
+{stderr_tail if stderr_tail else '(stderr пуст)'}
+```
 """)
     sys.exit(1)
+else:
+    if os.path.exists(stderr_path):
+        os.unlink(stderr_path)
 PYEOF
 ```
 
-> **Fallback:** заглушка `report-draft.md` записывается изнутри python-блока выше (строки `if result.returncode != 0 or os.path.getsize(report_file) == 0`). Внешнего bash-fallback не нужно — `sys.exit(1)` уведомляет shell, но скилл идёт дальше к Шагу 4.3 (заглушка уже на диске).
+> **Fallback:** заглушка `report-draft.md` записывается изнутри python-блока выше (строки `if result.returncode != 0 or os.path.getsize(report_file) == 0`). Внешнего bash-fallback не нужно — `sys.exit(1)` уведомляет shell, но скилл идёт дальше к Шагу 4.3 (заглушка уже на диске). Заглушка теперь несёт код возврата и хвост stderr адаптера — секция «Диагностика» служебная (для отладки), синтезатор её не видит и не переносит в финальный report.md.
 
 ### 4.2a Правило отложенной финализации (post-2026-05-22)
 
@@ -760,14 +818,14 @@ extensions:
 
 **Запрещено:**
 - Создавать `report-v1.md`, `report-v2.md` — одна сессия = один отчёт.
-- Создавать supplement-директории — `sessions/YYYY-MM/<id>/` = единое пространство.
+- Создавать supplement-директории — `sessions/YYYY-MM/DD/<id>/` = единое пространство.
 - Продолжать писать `-writer.md`/`-peer.md` при `status: completed` — статус меняется только после Close-сигнала.
 
 ### 4.3 Обновить sessions/00-index.md
 
 Найти строку с `<SESSION_ID>` и заменить целиком:
 ```
-| <TODAY> | <SESSION_ID> | <задача ≤50> | kimi / claude-code | <TURNS> | <ESCALATIONS> | completed | [report.md](<MONTH>/<SESSION_ID>/report.md) |
+| <TODAY> | <SESSION_ID> | <задача ≤50> | kimi / claude-code | <TURNS> | <ESCALATIONS> | completed | [report.md](<MONTH>/<DAY>/<SESSION_ID>/report.md) |
 ```
 (Bash awk — безопасен для строк с `|`.)
 
@@ -775,7 +833,7 @@ extensions:
 
 Slug-часть (без даты и номера): `SESSION_SLUG=$(echo "$SESSION_ID" | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-//')`
 
-Записать `${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/<MONTH>/<TODAY>-<SESSION_SLUG>.md` (Write):
+Записать `${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/<MONTH>/<TODAY>-<SESSION_SLUG>.md` (Write) — Quick Close файл плоский под месячной папкой, без DD/ (симметрично session-guard.sh; DD/ — только для peer-session-папок):
 ```markdown
 ---
 date: <TODAY>
@@ -783,7 +841,7 @@ type: peer-session
 writer: kimi-headless
 peer: claude-code
 duration_h: <(end_time - start_time) в часах, 1 знак>
-artifacts: sessions/<MONTH>/<SESSION_ID>/report.md
+artifacts: sessions/<MONTH>/<DAY>/<SESSION_ID>/report.md
 session_id: <SESSION_ID>
 wp: <WP-NNN или unknown>
 ---
@@ -812,7 +870,7 @@ test "$INDEX_COUNT" -eq 1 \
 
 # pathspec после `--`: commit ТОЛЬКО файлы сессии (mis-attribution, 2026-06-20-39)
 # PR flow (WP-436 Ф2): push to feature branch + auto-merge PR → branch protection on main.
-PATHS=("sessions/$MONTH/$SESSION_ID/" "sessions/00-index.md" "sessions/$MONTH/${TODAY}-${SESSION_SLUG}.md")
+PATHS=("sessions/$MONTH/$DAY/$SESSION_ID/" "sessions/00-index.md" "sessions/$MONTH/${TODAY}-${SESSION_SLUG}.md")
 BRANCH="peer/$SESSION_ID"
 git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
 git add "${PATHS[@]}"
@@ -824,7 +882,7 @@ gh pr create --title "feat(peer): $SESSION_ID" \
   || echo "WARN: gh pr create failed — merge manually or check gh auth"
 ```
 
-Показать пилоту: «Сессия завершена. Отчёт: `sessions/$MONTH/$SESSION_ID/report.md`»
+Показать пилоту: «Сессия завершена. Отчёт: `sessions/$MONTH/$DAY/$SESSION_ID/report.md`»
 
 ---
 
@@ -832,7 +890,7 @@ gh pr create --title "feat(peer): $SESSION_ID" \
 
 При `--interrupt <session_id>`:
 
-1. Извлечь месяц из id: `MONTH=$(echo "$session_id" | cut -c1-7)` → найти `sessions/$MONTH/$session_id/meta.yaml`.
+1. Извлечь месяц и день из id: `MONTH=$(echo "$session_id" | cut -c1-7)`, `DAY=$(echo "$session_id" | cut -c9-10)` → найти `sessions/$MONTH/$DAY/$session_id/meta.yaml`.
 2. Обновить (Bash sed): `status: interrupted`, `end_time: <now>`, `turns_count: <число файлов>`.
 3. Найти строку с `<session_id>` в `sessions/00-index.md` и заменить: статус → `interrupted`, report → `—`.
 4. Commit + push.
@@ -843,7 +901,7 @@ gh pr create --title "feat(peer): $SESSION_ID" \
 
 При `--finalize <session_id>`:
 
-1. Извлечь месяц: `MONTH=$(echo "$session_id" | cut -c1-7)`. Проверить что папка `sessions/$MONTH/$session_id` существует и содержит хотя бы `00-writer.md`.
+1. Извлечь месяц и день: `MONTH=$(echo "$session_id" | cut -c1-7)`, `DAY=$(echo "$session_id" | cut -c9-10)`. Проверить что папка `sessions/$MONTH/$DAY/$session_id` существует и содержит хотя бы `00-writer.md`.
 2. Прочитать `meta.yaml` — взять `task_description`, `start_time`, `escalations_count`.
 3. Выполнить **Шаг 4.2** (синтез report-draft.md через `claude-peer-adapter.sh`) с теми же инвариантами и fallback.
 4. Обновить `meta.yaml` (Bash sed): `status: completed`, `end_time: <now>`, `turns_count: <число файлов>`.

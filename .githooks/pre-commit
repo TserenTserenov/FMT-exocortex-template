@@ -33,9 +33,22 @@ if [ -n "$RENAMED_RELEASE_FILES" ]; then
     exit 1
 fi
 
+# A fork with a conventional `upstream` remote never receives CHANGELOG.md
+# locally (WP-401 Ф6.1 — /iwe-update reads it by raw URL instead), so its
+# copy is frozen at whatever version it had when that delivery stopped while
+# update.sh keeps bumping update-manifest.json on every install. The version
+# match this guardrail checks becomes permanently unsatisfiable there,
+# blocking every post-update commit (issues #449, #451) — the check still
+# does its job in canon, where CHANGELOG.md is edited by hand for every
+# release and the drift it was built to catch remains real.
+IS_UPSTREAM_MIRROR=false
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git remote get-url upstream >/dev/null 2>&1; then
+    IS_UPSTREAM_MIRROR=true
+fi
+
 STAGED_RELEASE_FILES=$(git diff --cached --name-only 2>/dev/null \
     | grep -E '^(CHANGELOG\.md|update-manifest\.json)$' || true)
-if [ -n "$STAGED_RELEASE_FILES" ]; then
+if [ -n "$STAGED_RELEASE_FILES" ] && [ "$IS_UPSTREAM_MIRROR" = false ]; then
     if [ -f "CHANGELOG.md" ] && [ -f "update-manifest.json" ]; then
         CHANGELOG_VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md \
             | sed 's/^## \[//;s/\]$//' || true)
@@ -296,15 +309,18 @@ check_pattern() {
     local exclude="${3:-}"
 
     for file in $STAGED_SH; do
-        # Skip PLATFORM-COMPAT.md references
-        [ "$(basename "$file")" = "PLATFORM-COMPAT.md" ] && continue
+        # The canonical checker necessarily carries forbidden patterns as its
+        # own rule data and already excludes itself during repository scans.
+        # Match the exact path: an unrelated same-named script must not bypass
+        # the staged guard (issue #530).
+        [ "$file" = "scripts/check-platform-compat.sh" ] && continue
 
         # Check staged content (not working tree)
         local matches
         if [ -n "$exclude" ]; then
-            matches=$(git show ":$file" 2>/dev/null | grep -n "$pattern" | grep -v "$exclude" || true)
+            matches=$(git show ":$file" 2>/dev/null | grep -nE "$pattern" | grep -v "$exclude" || true)
         else
-            matches=$(git show ":$file" 2>/dev/null | grep -n "$pattern" || true)
+            matches=$(git show ":$file" 2>/dev/null | grep -nE "$pattern" || true)
         fi
 
         if [ -n "$matches" ]; then
@@ -321,7 +337,7 @@ check_pattern() {
 check_pattern "sed -i ''" "raw sed -i '' (use sed_inplace)" "sed_inplace"
 check_pattern "date -v-" "raw date -v (use portable_date_offset)" "portable_date_offset\|2>/dev/null"
 check_pattern "readlink -f" "readlink -f (not portable)"
-check_pattern "grep -P " "grep -P (GNU-only, use grep -E)"
+check_pattern "(^|[^a-zA-Z])grep -P " "grep -P (GNU-only, use grep -E)"
 
 if [ "$ISSUES" -eq 1 ]; then
     echo "Commit blocked. See docs/PLATFORM-COMPAT.md for cross-platform wrappers."

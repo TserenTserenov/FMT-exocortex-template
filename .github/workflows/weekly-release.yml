@@ -2,16 +2,32 @@ name: Weekly Release
 
 # Еженедельно (Вс 20:00 UTC = Пн 00:00 MSK+1) проверяет CHANGELOG.md:
 # если секция [Unreleased] непустая — бампает patch-версию в
-# update-manifest.json и коммитит, затем явно запускает release.yml,
-# который создаёт тег и GitHub Release.
+# update-manifest.json и открывает PR с этим бампом.
 #
-# Явный запуск (не push-триггер): коммит идёт от github-actions[bot] через
-# стандартный GITHUB_TOKEN, а такие коммиты по политике GitHub не каскадируют
-# в другие workflow (anti-recursion), поэтому release.yml сам не подхватится.
+# WP-529 (31.08.2026): main с 27.08 требует обязательное ревью от code
+# owner'а на каждый мердж (защита ветки, часть слоя принуждения red-team
+# гейта) — прямой `git push origin main` от бота больше физически не
+# проходит (`GH006: Protected branch update failed`). Раньше здесь же был
+# прямой push + явный dispatch validate-template.yml/release.yml (нужен
+# был из-за anti-recursion policy: коммит от github-actions[bot] через
+# стандартный GITHUB_TOKEN не каскадирует в push-триггеры сам по себе) —
+# убрано вместе с прямым push. Теперь job останавливается на открытии PR;
+# CODEOWNERS назначается автоматически, а как только пилот вручную
+# смерджит PR — обычный merge-коммит от GitHub (не от GITHUB_TOKEN
+# Actions-рана) штатно триггерит push-подписки validate-template.yml, а
+# та в свою очередь — release.yml (workflow_run) без какого-либо ручного
+# dispatch: та же цепочка, что и для любого другого мерджа в main.
 #
-# Причина: раньше версия бампалась только вручную — паузы между
-# выпусками доходили до 2-3 недель, хотя коммиты в [Unreleased]
-# шли почти ежедневно (см. docs/RELEASE-PROCESS.md).
+# WP-7 Ф62 (10.08.2026): исходная причина вообще звать validate перед
+# релизом — раньше бамп версии никак не тестировался перед тем, как
+# release.yml создавал тег. Это по-прежнему так: PR проходит все
+# обязательные проверки (включая release-receipt) прежде чем его можно
+# смерджить.
+#
+# Причина автоматизации в целом: раньше версия бампалась только вручную —
+# паузы между выпусками доходили до 2-3 недель, хотя коммиты в
+# [Unreleased] шли почти ежедневно (см. docs/RELEASE-PROCESS.md). Теперь
+# ручной шаг — только мердж уже готового PR, не сборка бампа с нуля.
 
 on:
   schedule:
@@ -20,7 +36,7 @@ on:
 
 permissions:
   contents: write
-  actions: write
+  pull-requests: write
 
 jobs:
   weekly-bump:
@@ -70,17 +86,42 @@ jobs:
         if: steps.check.outputs.has_content == 'true'
         run: bash scripts/changelog-flush.sh --version "${{ steps.bump.outputs.version }}"
 
-      - name: Commit and push
+      # 2026-08-20 rake, reproduced empirically before this fix (WP-529): the
+      # bump commit changed version+CHANGELOG only. README badge stayed on the
+      # old version (release-sync red) and the manifest still carried the
+      # pre-flush CHANGELOG.md sha256 (validate B2 red) — release.yml, which
+      # is subscribed to a GREEN Validate Template, never fired, and every
+      # release needed a manual follow-up commit.
+      - name: Sync version badge and rebuild manifest for the bump commit
         if: steps.check.outputs.has_content == 'true'
         run: |
+          bash scripts/sync-version-badge.sh --fix
+          bash generate-manifest.sh
+
+      - name: Commit to a release branch
+        if: steps.check.outputs.has_content == 'true'
+        id: commit
+        run: |
+          BRANCH="release/v${{ steps.bump.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add update-manifest.json CHANGELOG.md
+          git checkout -b "$BRANCH"
+          git add update-manifest.json CHANGELOG.md README.md
           git commit -m "chore(release): weekly auto-bump to v${{ steps.bump.outputs.version }}"
-          git push origin main
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger Release workflow
+      - name: Open release PR
+        # main требует ревью code owner'а (branch protection, WP-529) —
+        # смердженный PR даёт обычный push-коммит, который штатно
+        # запускает validate-template.yml → release.yml, тот же путь, что
+        # и любой другой мердж. Явный dispatch здесь больше не нужен.
         if: steps.check.outputs.has_content == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run release.yml --ref main
+        run: |
+          gh pr create \
+            --title "chore(release): weekly auto-bump to v${{ steps.bump.outputs.version }}" \
+            --body "Еженедельный автобамп версии. Мердж запускает обычный релизный конвейер (validate → release) через штатный push-триггер." \
+            --base main \
+            --head "${{ steps.commit.outputs.branch }}"

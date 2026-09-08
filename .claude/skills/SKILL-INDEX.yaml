@@ -2,6 +2,18 @@
 # Maps keywords/tags to skill names for auto-suggestion in browser sessions.
 # Suggestion rule: propose exactly ONE skill per response, most specific match wins.
 # Only skills with browser: true are suggested in browser context.
+#
+# WP-560 Ф11 (2026-09-04): reconciled against the per-skill `browser_safe`
+# frontmatter field added the same day (source of truth = an actual read of each
+# skill's mandatory Algorithm steps, not the skill's name/description). 8 entries
+# below were `browser: true` here but read as browser-unsafe in their current
+# SKILL.md body — each has at least one mandatory Bash/git/local-file step with no
+# MCP-only path (archgate/verify/strategy-session: unconditional
+# `bash .claude/scripts/load-extensions.sh` shell-out; apply-captures: `find`+
+# `git commit`; wp-new: `create-wp.sh`; iwe-bug-report: `gh issue create`;
+# bottleneck-pick: `git log`/`cat`/`ls` for non-pilot targets; integration-gate:
+# repo file writes). Flipped to `false`. If a skill is later reworked to route
+# through MCP tools only, flip it back and note why.
 
 skills:
   - name: day-open
@@ -20,22 +32,22 @@ skills:
     description: "Weekly retrospective: achievements, bottlenecks, next week planning. Requires local FS."
 
   - name: archgate
-    browser: true
+    browser: false
     keywords: ["archgate", "архгейт", "архитектура", "оценка решения", "architecture decision"]
     description: "Evaluate architecture decisions across 7 characteristics (ЭМОГССБ v3)."
 
   - name: verify
-    browser: true
+    browser: false
     keywords: ["verify", "верификация", "проверка", "audit", "проверь"]
     description: "Verify artifact against Pack reference with context isolation."
 
   - name: apply-captures
-    browser: true
+    browser: false
     keywords: ["apply captures", "применить находки", "extraction report", "ke"]
     description: "Process pending-review extraction reports: accept/reject/defer."
 
   - name: wp-new
-    browser: true
+    browser: false
     keywords: ["new wp", "новый рп", "создать рп", "новая задача", "spawn wp"]
     description: "Create new work product atomically across 5 locations."
 
@@ -60,22 +72,22 @@ skills:
     description: "Decompose activity into phases with physical artifacts and checklists."
 
   - name: strategy-session
-    browser: true
+    browser: false
     keywords: ["strategy", "стратегия", "стратегическая сессия", "week plan", "план недели"]
     description: "Strategic session dispatcher: initial or weekly flow."
 
   - name: iwe-bug-report
-    browser: true
+    browser: false
     keywords: ["bug", "баг", "ошибка платформы", "report bug", "сообщить об ошибке"]
     description: "Report a platform bug to FMT-exocortex-template GitHub issue."
 
   - name: bottleneck-pick
-    browser: true
+    browser: false
     keywords: ["bottleneck", "горлышко", "constraint", "ограничение", "toc"]
     description: "Identify system bottleneck using Theory of Constraints."
 
   - name: integration-gate
-    browser: true
+    browser: false
     keywords: ["integration gate", "новый инструмент", "новый агент", "новая система", "новый детектор", "IntegrationGate"]
     description: "4-step checklist for new tools/agents/systems: Service Clause → Scenarios → Role → Implementation."
 

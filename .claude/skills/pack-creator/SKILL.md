@@ -13,6 +13,7 @@ related_methods:
 version: 1.0.0
 layer: L3
 status: active
+browser_safe: false
 triggers:
   slash: [/pack-creator]
   phrases:

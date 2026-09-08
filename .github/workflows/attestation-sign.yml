@@ -1,0 +1,139 @@
+name: Attestation — sign (trusted)
+
+# Blocking half of WP-529 Ф21 (see the WP-529 red-team enforcement design
+# record and its implementation session in this project's governance
+# history for the full rationale).
+#
+# Manual `workflow_dispatch`, gated by the `red-team-auditors` GitHub
+# environment (Settings → Environments → red-team-auditors → required
+# reviewers) — start that allowlist with the repo owner, expand explicitly
+# per DRR "Круг проверяющих" decision. This file cannot create that
+# protection rule itself (it is GitHub repo configuration, not
+# version-controlled); until it exists, this job runs for anyone who can
+# dispatch it, so treat setting it up as a precondition, not optional
+# hardening.
+#
+# Trust boundary (peer-session 2026-08-27-14-wp529-f21-implement-attestation,
+# turns 1-3): every step in this job runs from `main` (this workflow file
+# itself, plus attestation-canonical-digest.sh and
+# attestation-build-statement.sh) — the PR under review is fetched and read
+# as git objects only (`git fetch` + the digest script's own `git cat-file`
+# calls), never checked out as a working tree, never executed. The digest
+# computed here is independent of, and never trusts, whatever the
+# diagnostic-only attestation-compute.yml printed for the same PR.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to attest"
+        required: true
+      verdict:
+        description: "Red-team verdict"
+        required: true
+        type: choice
+        options:
+          - pass
+          - fail
+          - conditional
+        default: "pass"
+
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write
+  attestations: write
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    environment: red-team-auditors
+    steps:
+      - name: Checkout trusted ref (main) — never the PR
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve PR head/base SHA and repository ID from the GitHub API
+        id: meta
+        # PR_NUMBER goes through env, never interpolated directly into the
+        # script by GitHub's template engine — a raw `${{ inputs.pr_number }}`
+        # in `run:` is a script-injection vector regardless of who is
+        # authorized to dispatch the workflow (peer-session
+        # 2026-08-27-14-wp529-f21-implement-attestation, turn 7: an
+        # environment reviewer approves the already-templated job, not the
+        # raw shell, so the injection happens before review has any effect).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: pr_number must be a positive integer, got '$PR_NUMBER'" >&2
+            exit 1
+          fi
+          gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" \
+            --jq '{head: .head.sha, base: .base.sha}' > pr.json
+          HEAD_SHA="$(jq -r .head pr.json)"
+          BASE_SHA="$(jq -r .base pr.json)"
+          for sha in "$HEAD_SHA" "$BASE_SHA"; do
+            if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "ERROR: unexpected SHA format from GitHub API: '$sha'" >&2
+              exit 1
+            fi
+          done
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          repo_id="$(gh api "repos/${{ github.repository }}" --jq '.id')"
+          echo "repo_id=$repo_id" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch PR head as data — no checkout, no execution
+        run: git fetch origin "${{ steps.meta.outputs.head_sha }}"
+
+      - name: Compute canonical digest (trusted, independent recomputation)
+        id: digest
+        run: |
+          set -euo pipefail
+          DIGEST="$(bash scripts/attestation-canonical-digest.sh "${{ steps.meta.outputs.head_sha }}" "")"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Compute red-team policy digest
+        id: policy
+        run: |
+          set -euo pipefail
+          POLICY_DIGEST="$(sha256sum .claude/skills/iwe-platform-redteam/SKILL.md | awk '{print $1}')"
+          echo "digest=$POLICY_DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Build and validate the attestation predicate
+        # VERDICT through env, same reasoning as PR_NUMBER above — `type:
+        # choice` restricts the Actions UI, but the workflow_dispatch API
+        # can still be called directly with an arbitrary string, so the
+        # shell-side check stays.
+        env:
+          VERDICT: ${{ inputs.verdict }}
+        run: |
+          set -euo pipefail
+          case "$VERDICT" in
+            pass|fail|conditional) ;;
+            *) echo "ERROR: verdict must be pass, fail, or conditional, got '$VERDICT'" >&2; exit 1 ;;
+          esac
+          bash scripts/attestation-build-statement.sh \
+            --subject-digest "${{ steps.digest.outputs.digest }}" \
+            --repo-name "${{ github.repository }}" \
+            --repo-id "${{ steps.meta.outputs.repo_id }}" \
+            --head-sha "${{ steps.meta.outputs.head_sha }}" \
+            --base-sha "${{ steps.meta.outputs.base_sha }}" \
+            --policy-id "iwe-platform-redteam-v1" \
+            --policy-digest "${{ steps.policy.outputs.digest }}" \
+            --verdict "$VERDICT" \
+            > statement.json
+          jq '.predicate' statement.json > predicate.json
+
+      - name: Sign and publish via GitHub Attestations API
+        uses: actions/attest@v4
+        with:
+          subject-name: "${{ github.repository }}@${{ steps.meta.outputs.head_sha }}"
+          subject-digest: "sha256:${{ steps.digest.outputs.digest }}"
+          predicate-type: "https://aisystant.io/WP-529/red-team-attestation/v1"
+          predicate-path: predicate.json

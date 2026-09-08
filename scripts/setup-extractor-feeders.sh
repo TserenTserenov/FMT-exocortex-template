@@ -79,7 +79,7 @@ else
         cat > "$TEMPLATE_HOOK" <<'HOOK'
 #!/bin/bash
 # post-commit hook — WP-247 Ф-TRIGGER-BASED
-# При изменении inbox/captures.md или fleeting-notes.md → запускает extractor inbox-check
+# При изменении inbox/captures.md (или его помесячных чанков inbox/captures/YYYY-MM.md) либо fleeting-notes.md → запускает extractor inbox-check
 set -uo pipefail
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
@@ -90,7 +90,7 @@ REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 REPO_NAME=$(basename "$REPO_DIR")
 GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 if [ "$REPO_NAME" = "$GOVERNANCE_REPO" ]; then
-    CHANGED=$(git diff-tree --no-commit-id -r --name-only HEAD 2>/dev/null | grep -E '^inbox/(captures|fleeting-notes)\.md$' || true)
+    CHANGED=$(git diff-tree --no-commit-id -r --name-only HEAD 2>/dev/null | grep -E '^inbox/(captures(/[0-9]{4}-[0-9]{2})?|fleeting-notes)\.md$' || true)
     if [ -n "$CHANGED" ]; then
         EXTRACTOR_SH="$IWE_ROOT/.iwe-runtime/roles/extractor/scripts/extractor.sh"
         [ -x "$EXTRACTOR_SH" ] && (nohup "$EXTRACTOR_SH" inbox-check >/dev/null 2>&1 &) 2>/dev/null
@@ -118,7 +118,13 @@ if [ "$PLATFORM" = "Darwin" ]; then
     elif [ "$MODE" = "--uninstall" ]; then
         if [ -f "$PLIST" ]; then launchctl unload "$PLIST" 2>/dev/null || true; rm "$PLIST"; ok "launchd plist удалён"; fi
     else
-        cat > "$PLIST" <<PLIST
+        # launchd не наследует login-shell PATH (WP-5, найдено 03.09 — job падал
+        # exit 127 "claude CLI не найден"), поэтому PATH нужно прописать явно, а
+        # не полагаться на окружение launchd по умолчанию (/usr/bin:/bin:/usr/sbin:/sbin).
+        CLAUDE_BIN_DIR="$(dirname "$(command -v claude)")"
+        PLIST_PATH="$CLAUDE_BIN_DIR:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+        IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        NEW_PLIST_CONTENT=$(cat <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -136,10 +142,41 @@ if [ "$PLATFORM" = "Darwin" ]; then
     </array>
     <key>StandardOutPath</key><string>$HOME/logs/extractor/launchd-git-diff-feed.log</string>
     <key>StandardErrorPath</key><string>$HOME/logs/extractor/launchd-git-diff-feed-error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key><string>$PLIST_PATH</string>
+        <key>HOME</key><string>$HOME</string>
+        <key>USER</key><string>${USER:-$(whoami)}</string>
+        <key>LOGNAME</key><string>${USER:-$(whoami)}</string>
+        <key>IWE_TEMPLATE</key><string>$IWE_TEMPLATE_DIR</string>
+        <key>IWE_WORKSPACE</key><string>$HOME/IWE</string>
+        <key>IWE_GOVERNANCE_REPO</key><string>$GOVERNANCE_REPO</string>
+        <key>IWE_RUNTIME</key><string>$IWE_RUNTIME</string>
+    </dict>
 </dict></plist>
 PLIST
-        launchctl load "$PLIST" 2>/dev/null || warn "launchctl load failed (повторите вручную)"
-        ok "launchd plist установлен в $PLIST"
+)
+        # Idempotency (WP-5, found 03.09 — setup.sh now calls this on every
+        # run, not just a one-off manual invocation): re-installing an
+        # unchanged, already-loaded job would still unload/reload it, which
+        # could kill a run in flight at exactly 06:00/21:00. Skip only when
+        # content is unchanged AND the job is actually loaded -- content
+        # unchanged but not loaded (e.g. a prior `launchctl unload` left it
+        # stopped) must still fall through to `load`.
+        if [ -f "$PLIST" ] && [ "$(cat "$PLIST")" = "$NEW_PLIST_CONTENT" ] \
+            && launchctl list "com.extractor.git-diff-feed" >/dev/null 2>&1; then
+            ok "launchd plist уже установлен и активен, без изменений"
+        else
+            # Unload ДО перезаписи файла: unload читает Label из ТЕКУЩЕГО
+            # содержимого на диске. Если Label когда-нибудь изменится в
+            # heredoc выше, unload после перезаписи снял бы задачу по НОВОМУ
+            # Label (которого ещё нет в реестре launchd), и старая задача
+            # осталась бы висеть орфаном.
+            launchctl unload "$PLIST" 2>/dev/null || warn "launchctl unload: задача не была загружена (норма при первой установке)"
+            printf '%s\n' "$NEW_PLIST_CONTENT" > "$PLIST"
+            launchctl load "$PLIST" 2>/dev/null || warn "launchctl load failed (повторите вручную)"
+            ok "launchd plist установлен в $PLIST"
+        fi
     fi
 elif [ "$PLATFORM" = "Linux" ]; then
     UNIT_DIR="$HOME/.config/systemd/user"

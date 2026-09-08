@@ -14,7 +14,11 @@ services:
       - hindsight-data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8888/health"]
+      # ghcr.io/vectorize-io/hindsight:latest carries curl, not wget — the
+      # wget probe always failed inside the container (executable not found),
+      # so `docker ps` showed "unhealthy" for a live, healthy service (found
+      # peer-session 2026-08-03-03-wp149-hindsight-fixes).
+      test: ["CMD", "curl", "-sf", "http://localhost:8888/health"]
       interval: 30s
       timeout: 10s
       retries: 3

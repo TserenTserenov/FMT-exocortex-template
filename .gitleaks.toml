@@ -1,0 +1,16 @@
+title = "gitleaks config for FMT-exocortex-template"
+
+[extend]
+useDefault = true
+
+# Both files below are unit tests for the platform's own secret-quarantine
+# detector (guide-kit/structurer/quarantine.py). They intentionally embed
+# fake AWS/API-key-shaped strings as test input so the detector has
+# something to catch — the strings never touch a real credential. Verified
+# live 2026-08-31 (WP-529 red-team prep) against the SARIF from the failing
+# Nightly Audit run: every finding pointed at these two files.
+[allowlist]
+paths = [
+  '''guide-kit/structurer/test_quarantine\.py''',
+  '''setup/test-update-release-channel\.sh''',
+]

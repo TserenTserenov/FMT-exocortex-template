@@ -23,13 +23,19 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <string>{{HOME_DIR}}/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
         <key>HOME</key>
         <string>{{HOME_DIR}}</string>
+        <key>USER</key>
+        <string>{{USER_NAME}}</string>
+        <key>LOGNAME</key>
+        <string>{{USER_NAME}}</string>
         <key>IWE_TEMPLATE</key>
         <string>{{IWE_TEMPLATE}}</string>
         <key>IWE_WORKSPACE</key>
         <string>{{WORKSPACE_DIR}}</string>
+        <key>IWE_GOVERNANCE_REPO</key>
+        <string>{{GOVERNANCE_REPO}}</string>
         <key>IWE_RUNTIME</key>
         <string>{{IWE_RUNTIME}}</string>
     </dict>

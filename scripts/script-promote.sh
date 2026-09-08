@@ -171,7 +171,7 @@ promote_one() {
 
 finalize() {
     local changelog_script="$FMT_DIR/scripts/changelog-append.sh"
-    [[ -f "$changelog_script" ]] && bash "$changelog_script"
+    [[ -f "$changelog_script" ]] && IWE_TEMPLATE="$FMT_DIR" bash "$changelog_script"
 
     local manifest_script="$FMT_DIR/generate-manifest.sh"
     if [[ -f "$manifest_script" ]]; then

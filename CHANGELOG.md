@@ -5,8 +5,21 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+Классификация записей (WP-7 Ф62 п.4): пункт получает метку `security`/
+`migration`/`behavior`/`optional` через git trailer в теле коммита —
+`Changelog-Tag: <tag>`. **Trailer обязан быть в последнем непрерывном
+блоке строк вида `key: value` в самом конце сообщения** (git-конвенция
+trailer-парсинга) — если после него идёт ещё один абзац (например,
+`Refs:`), git его не распознает и коммит останется без метки:
+```
+fix(area): краткое описание
 
+Тело коммита с объяснением.
 
+Changelog-Tag: security
+Refs: WP-NNN
+```
+Отсутствие метки не означает «безопасно» — просто «не классифицировано».
 
 
 
@@ -112,7 +125,473 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 
 
-## [Unreleased] — обновлено 2026-07-29
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## [Unreleased]
+
+## [0.39.2] — 2026-09-04
+
+### Added
+
+- `c4bbbb4` feat(archgate): v3.1 — фильтр допуска, атрибут-сценарии, advice log, fitness-вопрос (#605)
+  - Сверка чек-листа ЭМОГССБ с мировой практикой архитектурного ревью (ATAM, Advice Process, Evolutionary Architecture, Левенчук/ailev): Шаг 0-А — фильтр допуска по стоимости изменения с быстрым треком для дешёвых решений; Шаг 1 — третий вопрос про затронутые стороны (advice log); Шаг 2а — атрибут-сценарии для критичных характеристик; Шаг 4.6 п.7 — вопрос про автоматическую охрану характеристики после внедрения; DRR-шаблон дополнен секциями advice log и Fast-track
+- `f7b4692` feat(wp526): декларативный цикл bootstrap-repo в setup.sh (#610)
+  - 3 захардкоженных вызова `clone_base_repo` (ZP/FPF/SPF) заменены декларативным массивом + циклом; добавлена подсказка про 5 семейств репозиториев после установки
+- `f9644fc` feat(wp522): `/agent-fault` пишет факт М15 в чек-лист участника после записи косяка (#612)
+- `dbbe073` feat(skills): `repo-new` — гейт создания репозитория (WP-527) (#620)
+  - Живая обкатка подтверждена 01.09 (Plan → Decision Gate → Execute, запись в реестр, развёртывание скелета)
+- `24e704e` feat(day-open): Ф117 — автодосчёт мультипликатора дня через WakaTime API (#621)
+  - Закрытие после полуночи или без `wakatime-cli` больше не оставляет мультипликатор в вечном PENDING — новый шаг 4.59 досчитывает его через HTTP API WakaTime
+- feat(extractor): `connect.sh` — одна команда подключает headless-запуски Экстрактора (Inbox-Check, session-close feeder) к подписке Claude Code через `claude setup-token`, без ручного редактирования системных файлов (WP-5 Ф46)
+  - `extractor.sh`: preflight через штатную `claude auth status`, подсказка «переподключите» при протухшем токене вместо тихого падения
+
+### Fixed
+
+- fix(changelog): режим записи `changelog-append.sh` теперь требует явный `IWE_TEMPLATE` и не может молча изменить канонический FMT из изолированного worktree; штатные promote-скрипты передают выбранную цель явно
+- `f896701` fix(skills): personal-guide -> DS-personal-guide в шаблонных скиллах (#585)
+  - `personal-guide-start`, `personal-guide-render`, `lesson-close`, `week-close-pilot` — литеральное имя личного репозитория новых пользователей переведено на канон `DS-personal-guide`; `docs/SETUP-GUIDE.md` и её тест-контракт обновлены вместе с манифестом
+- `91b7a2e` fix(day-open/day-close): читатели журналов сессий следуют контракту писателя + единый источник календаря (#545, #581)
+  - Флоу-регресс: писатель после миграции переходит на `MC-sessions`, читатели искали жёстко в `<репо>/sessions` — перенос со вчера пропадал молча на мигрированных установках
+- `d94bfc4` fix(wp484): восстановлены 6 регрессий в `update-derived-snapshot.py`, исправлена проверка `is_today_plan` в `day-open-llm-fill.py` (#611)
+- `9826b50` fix(hooks): `install-hooks.sh` больше не перезаписывает существующий изменённый хук (#613)
+- `260df81` fix(scripts): `generate-skills-catalog.sh` — разбор блок-скаляра `description` и списочного стиля `slash` (#622)
+- `966ba39` fix(session-guard): аудит — устранены точечные вызовы subprocess на файл (порт из корня) (#624)
+- `0a6499a` fix(skills): `personal-guide-start` приведён к актуальной версии — доставка `lesson`/`lesson-close`/`connect-guide`/`render` в репозиторий участника, недостающие поля манифеста (#619)
+- fix(day-open): `strategist.sh morning` сначала ищет конвейер Открытия дня через `$IWE_SCRIPTS`, каталог governance-репо — запасной путь (issue #598)
+  - Раньше путь собирался только из governance-репо — на установках, где канонический конвейер доставляется через `$IWE_SCRIPTS`, автономный утренний запуск 37 дней подряд молча уходил в свободную генерацию плана
+- fix(day-open): очистка обработанных заметок (`cleanup-processed-notes.py`) резолвится из `$IWE_TEMPLATE`, как `notify.sh` — раньше искалась рядом с раннером в `.iwe-runtime`, куда `build-runtime` её не доставляет (issue #597)
+- fix(strategy-session): проверка «первая сессия месяца» ищет записи и в плоской раскладке (`sessions/YYYY-MM-DD.md`), и в подпапке по месяцу — раньше смотрела только в подпапку и не находила ничего на установке с плоскими файлами, поэтому диспетчер всегда выбирал полный месячный сценарий (issue #608, тот же корень, что #545)
+- fix(day-open): комментарий про обход strategy_day-гейта (`DAY_OPEN_FORCE_STRATEGY_DAY=1`) больше не называет недоставленный в шаблон скрипт — вызывающая сторона зависит от авторской инфраструктуры (шлюз публикации, приватный LLM-прокси) вне области поставки (issue #595)
+- fix(session-prep): «первый Пн месяца» теперь считается командой `date` и передаётся модели готовым фактом, а не выводится ею из диалога — 31.08 автономный сценарий принял последний Пн августа за первый Пн сентября (issue #616)
+- fix(setup): `build-runtime.sh` больше не стирает живое состояние других процессов при пересборке `.iwe-runtime/` — раньше подмена директории удаляла ВСЮ старую копию целиком, включая не заявленные в `runtime-overlay.yaml` операционные подкаталоги (`session-guard.sh`: маркеры открытых сессий, isolate-push-состояние и т.п.); теперь при подмене переносится вперёд всё, что свежая сборка сама не производит (bug-2026-09-02-build-runtime-wipes-live-session-state, найден живьём — пересборка стёрла маркеры открытых сессий других агентов)
+
+## [0.39.1] — 2026-08-30
+
+Hotfix on top of v0.39.0: the cold-context review follow-up (PR #575,
+`084a381`) merged one commit after the v0.39.0 release cut and did not make
+the tag — v0.39.0 ships a known regression it fixes.
+
+### Fixed
+
+- `084a381` fix: cold-review follow-up — wire skip status, restore seed marker, 3 corrections
+  - **regression fix (#559):** day-close mapped a skipped optional step to
+    `fail` with exit 1 on installs without linear-sync/DS-MCP/pyyaml —
+    v0.39.0 fails every automated Day Close on such installs; now `skip`, rc 0
+  - seed snapshot day-open-scaffold.sh re-gains its SNAPSHOT marker (was
+    silently outside check-seed-drift coverage)
+  - peer-conversation declares `--close-path peer-session` at open (the
+    session-guard bypass was dead code in the template flow)
+  - kimi-peer-writer calls the real delivered preflight via `${IWE_SCRIPTS:-...}`
+  - wp-new consent path uses `IWE_ROOT` (the variable create-wp.sh reads)
+
+## [0.39.0] — 2026-08-30
+
+### Added
+
+- `903f636` feat(ke): маршрутизация captures.md на помесячные файлы (WP-526) (#565)
+- `495a177` feat(security): WP-529 Ф11 — Day Open extension graph (before/after hooks)
+- `c4d2010` feat(security): WP-529 Ф21 — signed red-team attestation (digest + sign workflow)
+- `aec1730` feat(skills): deliver iwe-platform-redteam to the template (Evgeny Seliverstov's Red Team methodology)
+
+### Changed
+
+- `7048b27` chore(manifest): resync hash for the T31 fixture adaptation
+- `acd70b0` test(edge-cases): T31 fixtures follow the clone-manifest contract (#564)
+- `43fddfc` chore(manifest): resync hashes for batch-2 fixes
+- `79fbd8c` chore(manifest): ship the #557 test via SCRIPT_CONTRACT_EXPLICIT_INCLUDE
+- `ce8d324` chore(seed): sync day-open-scaffold seed snapshot with #560 fix
+- `69693d4` chore(manifest): resync content hashes after batch-1 fixes
+- `25dd084` docs(structure): PD/MC families for new users — README term, ADR-004 role→family map, fix stale 2.5/2.6 homes (Этап 6, WP-526)
+- `bc0092b` chore(seed): resync day-open-pipeline.sh/checks-runner.sh snapshots
+- `e96474a` chore(manifest): fixture hash after PyYAML resolver fix
+- `2638a13` chore(manifest): update.sh hash after workspace-reconciliation fix
+- `3f8d464` docs(quick-start): add Remote Control connection instructions
+- `1834166` docs(developer): доступ внешнего разработчика/кандидата к Pack'ам (WP-452 Ф6)
+- `507589e` chore(manifest): resync hash after agent-fault fixture fix
+- `9d2cdac` chore(manifest): resync hashes after route-task.sh executor fix
+- `e5bf32c` chore(manifest): resync hashes after rebase onto main abce59b
+- `d249b61` chore(sync): убрать мёртвый USER-SPACE маркер (template-sync.sh)
+
+### Fixed
+
+- `c701ed4` fix(session-guard): peer-session bypass survives set -u harness extraction (T22)
+- `7c092e6` fix(session-guard): close honors close_path=peer-session — port WP-484 F118 bypass from author source
+- `ac593c0` fix(peer-conversation): session index is created idempotently, declares its own incompleteness (#568)
+- `c297f01` fix(dry-run-gate): stage 1 for #549 — unique gate id, named recovery command
+- `3faaae2` fix(ci): fork hygiene — author-scan honors excluded_paths, notify-security skips unconfigured channel (#547)
+- `4cb6d90` fix(build-active-wp): render rows from the header's six roles (#558)
+- `e0ff3f6` fix(day-open): agent-prose checks files declare executor and skip cleanly (#546)
+- `a30712b` fix(day-close): a step that cannot run reports skip, not ok (#559)
+- `47c2c39` fix(extensions-gate): read the manifest from the template clone, not workspace root (#564)
+- `cce55b0` fix(day-close): zsh regression test for the commit guard + manifest entry (#557)
+- `e666ea5` fix(protocols): step tracking is an observable property, TodoWrite optional (#561, #563)
+- `ee81129` fix(strategist): cross-platform sleep inhibitor, parity with scheduler.sh (#553)
+- `3b34774` fix: route script calls via IWE_SCRIPTS convention, drop phantom preflight (#566)
+- `459f464` fix(day-close): lesson counter matches real lesson file names (#559)
+- `c85ce67` fix(day-open): ke_stats counts only pending reports, GNU stat on Linux (#548)
+- `7498f82` fix(day-open): skip finished rows when picking the active draft (#560)
+- `cc00347` fix(wp-new): consent-file path in SKILL.md matches create-wp.sh (#556)
+- `b6b9996` fix(scripts): ke-queue-stats.sh age from report frontmatter, not file mtime (#572)
+- `8b9315b` fix(extractor): teach KE pipeline the monthly captures rotation (WP-526/WP-170) (#570)
+- `59d9fe6` fix(session-guard): audit resolves MC-sessions like open/close (#569)
+- `a2e23e0` fix(session-guard): forward-port MC-sessions resolver from root (WP-526 Ф2) (#567)
+- `d42178d` fix(hooks): recognize monthly captures.md chunks in extractor trigger
+- `97f5bb7` fix: PyYAML resolver contract for Markdown-embedded python3 calls, issue 541 hvost 3
+- `afa835f` fix: update.sh CLAUDE.md workspace-reconciliation gate, issue 541 hvost 2 (540)
+- `1f173f4` fix: pending-phases-sweep.sh regression 541 closed-latch, plus test fixtures
+- `798d01a` fix(scripts): verify-manifest.sh deprecated-files check ignored invoker cwd
+- `955fb57` fix(security): attestation digest sort breaks on GNU sort (Ubuntu CI)
+- `de0c303` fix(security): WP-529 Ф21 tail-up — golden vector, CI matrix, dead CODEOWNERS
+- `1a41861` fix(skills): add USER-SPACE marker to iwe-platform-redteam SKILL.md
+- `e965368` fix(tests): install real agent-fault script into synthetic route-task.sh workspace fixture
+- `939fafb` fix(router): dispatch and validate agent/script+judgment executors
+- `78343b9` fix(manifest): preserve deprecated_files across files[] -> excluded_paths[] moves
+- `4b84445` fix(manifest): regenerate update-manifest.json (WP-7 Ф92)
+- `3902254` fix(hooks): grep -P check in pre-commit false-positives on pgrep -P
+- `2ee3a11` fix(platform-compat): grep -P check false-positives on pgrep -P
+- `2489161` fix(session-guard): explicit fail on unrecognized flag instead of silent shift
+- `c869233` fix(session-guard): портировать поддержку --close-path/harness_session_id из корня
+
+
+## [0.38.11] — 2026-08-24
+
+### Security
+- [security] Профиль ошибок агента переведён на единый нейтральный CLI с ленивой приватной SQLite-БД, безопасной миграцией старых записей и доставкой в fresh/update и нестандартные workspace-пути (#533).
+- [security] Обновление шаблона использует `GH_TOKEN`, затем `GITHUB_TOKEN` или авторизованный `gh` для всех GitHub API-запросов; секреты не попадают в аргументы и трассировку, а ошибка авторизации не маскируется анонимным запросом (#538).
+
+### Fixed
+- [data-safety] Day Close сохраняет `day-rhythm-config.yaml` и `params.yaml` побайтово, удаляет только собственные неизменённые копии и восстанавливается после коллизий, гонок и прерванной транзакции без потери пользовательских данных (#536).
+
+## [0.38.10] — 2026-08-24
+
+### Security
+- [security] Состояние согласий вынесено из Git в закрытое локальное хранилище с атомарной миграцией, повторной проверкой старых писателей и защитой от ссылок; усилены границы hook-доставки, commit/owner/self-scan и DayPlan-гейтов (#502 #511 #521 #529 #530 #532).
+
+### Fixed
+- [behavior] Закрыт пакет пользовательских дефектов: ленивый State-Transition Gate, полный lifecycle АрхГейта, каталог extensions, опциональные Hindsight/Obsidian-пути, происхождение манифеста, role-prefix, scheduler и точный статус index-health (#481 #490 #508 #522 #523 #524 #525 #527 #528 #531).
+- [migration] Fresh-install и update/recovery теперь одинаково доставляют `AGENTS.md`, lazy-правило, Python-resolver и governance hooks, включая повторный запуск после частичного обновления (#481 #502 #508 #521).
+
+## [0.38.9] — 2026-08-24
+### Fixed
+- `6c4f52b` fix(template): batch of nine small user-reported defects (#515 #514 #513 #503 #499 #507 #512 #511 + flush) — WP-529 F14, peer session with Kimi (#520)
+
+## [0.38.8] — 2026-08-23
+### Fixed
+- `8364a30` fix(update,setup): fail-closed release channel (#501), Step 0 double negative control, resolver-baseline delivery, IWE_RUNTIME isolation (WP-529 F13, v0.38.7 matrix) (#519)
+- `c36bd90` fix(release,manifest): pin release tag to the validated SHA; fail-closed manifest verification (post-v0.38.7 peer review) (#518)
+- `fdd7a55` fix(update): Step 0 self-update replaces the running script via staged rename, not cp (issue #505 residual) (#517)
+
+## [0.38.7] — 2026-08-22
+### Added
+- `90fa53b` feat(day-open): ship a default day-open.checks.md — the Checks step must have something to run on a fresh install (WP-529 F7) (#509)
+- `4500dda` feat(day-open): контракт доставки Day Open графа (WP-529 Ф7) + un-red main (Ф4 tests) (#504)
+- `9fa32ce` feat(week-close): проактивный сторож каденции архивации карточек (WP-545 Ф3)
+- `86a1c01` feat(day-close): чек-лист — синхронизация рабочих копий ↔ GitHub кроме живых сессий (поручение пилота 21.08)
+- `a16106a` feat(hooks): git add -A/-u/. guard in destructive-guard.sh (WP-544 Ф1 Д5) (#497)
+- `f6d4132` feat(hooks): расширить защиту от необратимых действий (WP-544 Ф1) (#495)
+- `8112b1a` feat(update.sh): параллелизация скачивания манифеста + skip-if-hash-matches
+### Fixed
+- update.sh: доставка update.sh — только самообновлением Шага 0 (issue #505: cp затирал работающий скрипт, подстановка запекала личные пути в его sed-шаблоны); канал резолвится ДО самообновления; deprecated_files не может пересекаться с git-деревом (10 живых файлов удалялись после no-change update); релизная цепочка замкнута (анти-рекурсия workflow_run), дайджест анонсирует только существующие теги; Bash 3.2 фиксы тестовой обвязки (эта запись — PR #511)
+- `621e5ba` fix(release): bump commit now syncs the README badge and rebuilds the manifest — weekly release can go green without a manual follow-up (WP-529) (#510)
+- `de34d6d` fix(wp545): решения пилота по находкам 1 и 3 (хвост 5/5 приложения)
+- `9630b5a` fix(wp545): починить счётчик в r-questionnaire.md (хвост 5/5, находка 2)
+- `c8d20e8` fix(update.sh): закрыть 2 тестовых долга ревью параллелизации (WP-546 Ф5)
+- `7996b69` fix(update.sh): 5 находок независимого ревью параллелизации (WP-546 Ф4)
+- `e129754` fix(session-guard): select_semaphore() -- строгая конъюнкция wp+slug
+- `d0f9a4d` fix(wp529): Ф9 — python3-resolver contract + bash 3.2 compat (2 confirmed sites) (#494)
+- `52a5189` fix(update): shellcheck-safe comment + real unbound-variable bug it caught
+- `7fd3837` fix(update): restore integrity-mismatch message + fix curl shim for -K batch mode
+- `0958b5f` test(wp529): fail-closed tests for update.sh parallel fetch (Ф4)
+- `68d8d88` fix(day-open,calendar,manifest): closes #477, #489, #486
+### Changed
+- `7566a1d` chore(release): weekly auto-bump to v0.38.7
+
+## [0.38.6] — 2026-08-20
+
+### Added
+
+- `088aaad` feat(dev): явный список Python-зависимостей + инструкция venv
+- `3fa093f` feat(pipeline): promote wp-pool-cascade.sh + ledger primitives from author IWE
+- `81fb1c1` feat(WP-529 Ф3): fail-closed release receipt для критичных CI-проверок
+- `8bf8801` feat(#461): preflight-проверка памяти в iwe-audit.sh
+- `f578fac` feat(delivery): WP-529 Ф2 — предрелизный гейт для карты критичных путей
+- `57d351d` feat(delivery): WP-529 Ф1 — карта критичных путей доставки шаблона
+
+### Changed
+
+- `abd056e` Merge pull request #488 from TserenTserenov/wp529-merge-478-480
+- `43e170a` chore(wp529): regenerate manifest after merging #478+#480
+- `8e3bc40` Merge branch 'pr480' into wp529-merge-478-480
+- `c1c5bd3` Merge branch 'pr478' into wp529-merge-478-480
+- `56a28f8` chore(wp529): пустой коммит для нового прогона CI
+- `67bde25` chore(wp529): пересобрать манифест после ребейза на main
+- `f0eb4ec` Merge pull request #483 from TserenTserenov/wp452-f5-proposal-process
+- `11876de` chore: перегенерировать манифест после Ф5 и venv-инструкции
+- `3e53700` docs(wp452): добавить GitHub issue-шаблон для предложений разработчика
+- `5443f7c` docs(wp452): Ф5 — процесс предложений разработчика IWE
+- `6228705` Merge pull request #476 from TserenTserenov/fix/issue-funnel-batch-18aug
+- `14fbe1f` merge: sync with main before landing issue-funnel fixes
+- `cc86bc9` chore: перегенерировать манифест — актуализировать после всех фиксов сессии
+- `713c81e` Merge pull request #475 from TserenTserenov/wp503-f13-pipeline-template-scope
+- `bf6a23e` merge: sync with main before landing WP-503 Ф13 pipeline slice
+- `2812ce0` merge: land orphaned fixes for #426, #466, #460 (paths 1-2)
+- `2f0a511` Merge pull request #472 from TserenTserenov/wp529-f3-release-receipt
+- `7052305` Merge pull request #467 from TserenTserenov/fix-issues-456-458-459
+- `0a1f342` chore(release): sync README version badge to 0.38.5
+- `31a3e8c` docs(#461): назвать минимальные требования к памяти в README
+
+### Fixed
+
+- `9a6e60a` fix(wp529): register 2 issue-tests in delivery contract (cold review find)
+- `ea4551c` fix(wp-545): исключить временные worktree из iCloud-бэкапа
+- `4d3727c` fix(WP-529): delivery-route-label фикстура должна нести find-python3.sh рядом с копией чекера
+- `4da487e` fix(WP-529): T11-фикстура должна нести find-python3.sh для изолированного source
+- `6908df9` fix(WP-529): перевести оставшихся heredoc-потребителей PyYAML на общий резолвер
+- `becf4e4` fix(wp529): удалить дубль-файл теста, застрявший в предыдущем коммите
+- `76d2cdd` fix(WP-529): закрыть 5 находок Red Team-ревью Евгения (раунд 2, 19.08)
+- `1a6ca46` fix(WP-529 Ф6): конвейер доставки — фиксы по находкам Евгения 18.08
+- `2654bfa` fix(manifest): фиксы дрейфа манифеста, найденного Евгением 19.08
+- `3f23a21` fix(ci): синхронизировать seed-снимки после фиксов #434/#455
+- `75ee3bd` fix(ci): обезличить фикстуру теста #473 — validate-template.sh ловил DS-my-strategy
+- `5a9ed97` fix(#473): усилить по итогам код-ревью Кодекса — валидация номера + защита шапки
+- `1e0310b` fix(#473): парсинг WP-REGISTRY.md по именам колонок из шапки, не по позиции
+- `7159d97` fix(#469): settings-merge-preview.py — дедупликация хуков по смыслу, не по тексту
+- `8df6eff` fix(#434): day-open-pipeline.sh — флаг --scaffold-only для установок без LLM Proxy
+- `2f8ed96` fix(#471): drift-scan — слово статуса в пояснении не перебивает ведущий значок
+- `530ec7c` fix(#463): задекларировать pyyaml и дать понятную диагностику при отсутствии
+- `5b1a893` fix(seed): resync day-open-checks-runner.sh seed snapshot after merging main
+- `43d9db9` fix(#455): day-open-scaffold.sh — отсутствие lib/common.sh теперь фатально
+- `49eda5e` fix(#470): memory/roles.md больше не мигрирует блайндом owner:user → platform
+- `4744cb1` fix(#453): server-calendar.sh — приватные события больше не теряются молча
+- `98763af` fix(manifest): resync update-manifest.json after merging main
+- `7522a46` fix(#465): перегенерировать манифест — sha256 устарели, не рассинхрон схем
+- `3ed8711` fix(pipeline): resolve ledger-append.sh/telegram.sh via FMT, not the recipient's governance repo
+- `3677189` fix(#460): dry-run-gate paths 3, 5, 6 — close remaining fail-open holes
+- `0815502` fix(wp-sync-bundle): F19 — расширить fallback-цепочку ref_date (WP-503)
+- `765fa42` fix(#460): dry-run-gate.sh fails closed on jq-missing and lost-sentinel
+- `c8fe5ab` fix(#466): day-open-checks-runner.sh no longer fakes success on 0 checks
+- `60337bb` fix(#426): day-open-preflight.sh resolves server-calendar.sh relative to itself
+- `ecdfb51` fix: три замечания пользователей шаблона (#456, #458, #459)
+- `1b17c36` fix(delivery): restage check-delivery-route-label.sh after review fixes
+- `1fd9b32` fix(update): regenerate stale manifest + atomic fail-fast on partial fetch
+- `bda0f2c` fix(#457): iwe-bug-report — nonexistent docs label, cd blocked by own hook
+- `a230296` fix(#454): cron fallback for Linux hosts without a systemd --user bus
+- `34b8e43` fix(strategy-session): route to monthly mode + fix tracker path docs/->Lifework/
+- `a222ff3` fix(validate-fmt-scripts): recognize the auto-detect follow-up assignment
+- `4bb183a` fix(setup): section 6 respects the auto-detected governance-repo name
+- `70d4f70` fix(validate-fmt-scripts): harden the #446/#450 exemptions after cold-context review
+- `a5bd0cc` fix(build-active-wp): recognize WP-NNN registry rows, not just bare numbers
+- `8ffd545` fix(validate-fmt-scripts): stop flagging test fixtures and self-documenting docstrings
+- `6640870` fix(pre-commit): RELEASE-SYNC does not block forks where CHANGELOG.md is intentionally frozen
+
+
+## [0.38.5] — 2026-08-18
+
+### Fixed
+
+- Регламент журнала гипотез теперь объясняет значения приоритетов П1-П4, и новый валидатор отклоняет запись с недопустимым значением (#456).
+- `pending-phases-sweep.sh` распознаёт таблицы, чек-листы и заголовки любого уровня с любым суффиксом номера фазы; проверено на реальных данных — 0 ложных срабатываний (#458).
+- Сторож `update.sh` больше не путает случайное текстовое совпадение с реальной подстановкой личного пути установки; заодно исправлена дыра, где уже закоммиченная утечка проходила проверку незамеченной (#459).
+
+## [0.38.4] — 2026-08-16
+
+### Added
+
+- [behavior] `14ef9f6` feat(update): этап Б конвейера обновления — --apply-settings-merge и --refresh-stale
+- [behavior] `59e859d` feat(update): этап А наблюдаемости конвейера обновления — классификация author_mode-пропусков и предпросмотр слияния settings.json
+- `82394ba` feat(release): классификация CHANGELOG (security/migration/behavior/optional)
+- `c578eb8` feat: promote day-open-pipeline.sh to platform
+- `0c1cfba` feat(wp518): link work packages to hypotheses
+- `52887e6` feat(create-wp): Hypothesis Gate (WP-496 Ф8) — --hypothesis обязателен при наличии журнала гипотез
+- `86daabe` feat(strategy-cycle): WP-agnostic decision-package contract + hypothesis-log regulation
+
+### Changed
+
+- [optional] `1bcfdf2` chore(manifest): перегенерация после автосинка адаптеров 2026-08-15 (B2 gate)
+- [optional] `c26b8a7` chore(manifest): перегенерация — settings-merge-apply.sh попал в git после генерации (B2)
+- [optional] `0063969` chore(manifest): перегенерация после no-history-фикса классификатора и session-guard (B2 gate)
+- [behavior] `c370fde` docs(changelog): задокументировать конвенцию Changelog-Tag trailer
+- `9bf3db4` Merge pull request #421 from TserenTserenov/codex/fix-manifest-after-420-delivery
+- `88e447c` Merge pull request #420 from TserenTserenov/codex/fix-issues-413-418-main
+- `b8b903f` Merge remote-tracking branch 'origin/main'
+- `6402816` revert(create-wp): откат Hypothesis Gate (52887e6) — заменён механизмом РП518
+- `1ca4fe0` Merge remote-tracking branch 'origin/main'
+- `b69feb8` docs: sync README version badge to 0.38.3
+- `e233503` Ревизия внешнего позиционирования: ученик -> участник вне ступеней/ролей
+- `43aba30` ci(release): gate tag/release creation on Validate Template passing
+- `042e254` ci(audit): re-enable post-release audit trigger, throttled to minor/major bumps
+- `144ff18` ci(update): wire test-update-issue-226.sh into CI
+
+### Fixed
+
+- `update.sh` распознаёт git-зеркало с remote `upstream` и не удаляет из него файлы, которые ещё должен удалить канон (#428).
+- Расхождение шаблонного и рабочего `.claude/settings.json` теперь видно после предварительной синхронизации форка; безопасный предпросмотр слияния не зависит от списка скачанных файлов (#399).
+- Загрузка манифеста и файлов закрепляется на одном commit SHA, поэтому push в `main` не создаёт ложный отказ проверки целостности (#398).
+- `create-wp.sh` больше не создаёт pending-архив, а `close-wp.sh` закрывает `WP-009` по bare ID `9` без второго контекстного файла (#425, #431).
+- `update.sh`: repair-pass снова работает в системном Bash 3.2 macOS; один ремонт закрывает #433 и #438 без потери диагностик.
+- `inject-code-style.sh`: ограничение контекста считает и обрезает Unicode-символы в одной единице, поэтому кириллица не вызывает ложную обрезку (#435).
+- `/extend`: каталог включает все 16 реально вызываемых точек расширения, в том числе проверки day-open, month-close и strategy-session (#436).
+- `AGENTS-agent-blocks.md` снова входит в поставку; манифест пересобран по актуальному дереву (#437).
+- CI-workflow ночного аудита явно помечен как недоставляемый, поэтому собственный валидатор манифеста больше не отвергает релиз (#423).
+- Seed-копия `day-open-pipeline.sh` синхронизирована с каноническим скриптом, поэтому новая установка не получает отставший конвейер (#427).
+- `cdb7c29` fix(day-open): reap stale .git/HEAD.lock before commit + clearer race-guard message (WP-484 Ф95)
+- [behavior] `978d382` fix(update): --apply-settings-merge работает и на повторном прогоне
+- [security] `4a934aa` fix(security): defaultMode=default вместо acceptEdits + fail-closed extensions-gate
+- `6ec4c40` fix(day-open): push с повтором fetch+rebase против гонки с занятым origin (промоция из авторского IWE, v0.38.3)
+- `b4f24c6` fix(dayopen): коммитить только файлы этого прогона, не весь archive/day-plans (WP-484)
+- `a6e4c36` fix(#405): treat cancelled WPs as terminal (#422)
+- `6c3d493` fix: regenerate manifest after #420
+- `89f1b84` fix: resolve regressions #413-#418
+- `a4cbca7` fix(#406): Update IWE светофор day-open-scaffold.sh был вечнозелёным
+- `0e58249` fix(#411,#412,#404,#408,#409,#410,#397,#402): issue funnel — hook/detector/skill/update.sh fixes
+- `7bfa0e6` fix(onboarding): correct МИМ name in template docs — Мастерская, not Школа
+
+
+## [0.38.3] — 2026-08-11
+
+### Added
+
+- Контракт цикла стратегирования (`extensions/strategy-cycle/`): форма события закрытия периода и пакета решений (≤10 позиций, обязательная деградация на пустой producer) без привязки к конкретным номерам рабочих продуктов — статус `draft`, ждёт живой приёмки на инсталляции без выделенного сервера.
+- `memory/lpf-hypothesis-log.md`: регламент журнала гипотез (4 обязательных поля, запрет правки задним числом, норма 8-15 живых записей, входной фильтр по ставке, событийная дисциплина вердикт/исправление/отзыв/замена). Закрывает год висевшую сломанную ссылку из `verify-hypotheses/SKILL.md`.
+
+### Changed
+
+- Шаги недельной стратегической сессии (`03-dissatisfactions.md`, `06a-pool.md`, `06b-budget.md`): правило принудительного выбора по неудовлетворённостям без движения 8+ недель, колонка «ставка» на гипотезу в пуле кандидатов, обязательный срок/триггер пересмотра для решений «не берём».
+- `week-close/SKILL.md`: инструкция не оставлять таблицу «Сверка РП↔НЭП» пустой заглушкой — явный алгоритм заполнения по списку закрытых РП недели.
+
+## [0.38.2] — 2026-08-09
+
+### Changed
+
+- `guide-kit` обновлён до `v0.1.3`: прикладная дорожка (вход `domain_traits` в планировщик, продакшн-адаптер `profile.yaml` → `HorizonContext`, проброс текста прикладной мини-секции, разложение прикладных источников, персонализация по здоровью) — работа РП-483/495, до этого релиза жившая только в исходном репозитории.
+
+### Fixed
+
+- `guide-kit` планировщик больше не отдаёт занятие без элемента каталога **в установках без учебного каталога**. Дефолтное узкое место RCS-профиля ведёт в область «Ограничения», где нет ни одной практики CAT.002/003; если при этом не задан `GUIDE_KIT_CURRICULUM_PATH` (переносимый профиль без платформы — штатный случай, описанный в самом модуле), мировоззренческий каталог пуст, и занятие собиралось без опоры на каталог вообще. Добавлен кросс-областной запасной путь: берётся обслуживаемая область с наибольшим остаточным разрывом, поэтому реальный прогресс продолжает направлять выбор. **В установке с подключённым каталогом дефект не проявлялся** — там область «Ограничения» обслуживается мировоззренческими элементами.
+- `guide-kit` разложение прикладных источников больше не выбрасывает журнал решений (он не попадал в результат, хотя обещан контрактом модуля) и не падает на объявленном, но пустом списке секций — отсутствующий ключ и пустой список разведены.
+
+## [0.38.1] — 2026-08-08
+
+### Added
+
+- `audit-docs`: утверждаемый владельцем пример `.audit-context.yaml`, встроенная схема, валидация и bootstrap (`#365`).
+- Манифест v2 с SHA-256 для каждого доставляемого файла и проверкой целостности загрузки (`#378`).
+
+### Changed
+
+- Реестры РП приведены к шестиколоночному контракту; `create-wp.sh` безопасно мигрирует старые таблицы, сохраняя дополнительные колонки (`#364`).
+- `multiplier_enabled: false` теперь исключает физическое время, WakaTime и мультипликатор из DayPlan, WeekPlan и Close-отчётов (`#376`).
+- Именованные гейты протокола Работы внесены в enforcement-инвентарь; CI проверяет обратную связь декларация → инвентарь (`#360`).
+
+### Fixed
+
+- Закрыты разрывы путей и переносимости: fail-closed root/memory resolution, GNU/BSD mtime, native Claude PATH, runtime input hash и workspace `.iwe-paths` (`#300`, `#361`–`#363`, `#366`, `#368`, `#371`, `#374`, `#377`).
+- Исправлены безопасность обновления и восстановления: capability-owned dry-run sentinel, резервные копии и USER-SPACE правил, отдельный restore rules, raw template merge-base и запрет install paths в публичном форке (`#369`, `#379`–`#381`).
+- Восстановлены Persona v2 и актуальная FPF-навигация; owner:user memory drift теперь виден без перезаписи (`#372`, `#373`, `#375`).
+- Критические задачи читают `.exocortex.env`; в форки доставляются пользовательские workflow и bootstrap-скрипты (`#382`, `#383`).
+
+
+## [0.38.0] — 2026-08-06
+
+### Added
+
+- `1af1c2a` feat: promote add-secret.sh from staging (L3 → L1)
+- `53b6238` feat: promote napkin-illustrate.sh from staging (L3 → L1)
+
+### Changed
+
+- `9e3f8a8` chore: complete napkin-illustrate.sh removal — manifest, catalog, promotion log
+- `1e40608` revert: remove napkin-illustrate.sh — wrongly promoted, personal-only tool
+- `dad5755` chore: record napkin-illustrate.sh promotion in promotion-status.yaml
+- `6da8e63` chore: release v0.37.0
+- `e456466` sync(dispatcher): mirror fail-closed security policy
+- `d26bdc7` docs: обновить браузерный вход через стенд МИМ
+- `f2d7218` Merge pull request #358 from TserenTserenov/fix/web-connect-troubleshooting
+- `c91c1ed` docs(onboarding): раздел «Если не подключается» в web-connect-guide
+
+### Fixed
+
+- `3fd0f36` fix: report canonical WP phases in sync bundle
+- `2abb4c5` fix: restore day-open root resolution and seed parity
+- `e099b33` fix: deliver platform protocols and runner fallback (#354 #356)
+- `e28bd04` fix: resolve update and index health regressions (#353 #357)
+
+
+## [0.37.0] — 2026-08-06
+
+### Added
+
+- `53b6238` feat: promote napkin-illustrate.sh from staging (L3 → L1)
+- `5efe7a3` feat: promote day-open-pipeline.sh to platform (proxy-env secret fix, WP-484)
+- `6d1e1e2` feat(wp481): extend verifier acceptance contracts
+- `7a8db41` feat(wp509): promote peer-conversation v1.5.5 to L1
+- `adc5dd8` feat(WP-7/SP1): promote skill kimi-peer-writer to platform (L1)
+- `041bd11` feat: promote day-open-pipeline.sh to platform (WP-7 orphan-semaphore quarantine)
+- `e680497` feat(WP-7 Этап 2): контрактные тесты доведены до реально проходящих + rollback create-wp.sh
+- `7291b9f` feat(WP-7 Этап 2): контрактные тесты с failure injection
+
+### Changed
+
+- `e456466` sync(dispatcher): mirror fail-closed security policy
+- `d26bdc7` docs: обновить браузерный вход через стенд МИМ
+- `f2d7218` Merge pull request #358 from TserenTserenov/fix/web-connect-troubleshooting
+- `c91c1ed` docs(onboarding): раздел «Если не подключается» в web-connect-guide
+- `c529c98` test(T16): диагностика clarity-падения в CI — rc и stderr хука в FAIL-сообщениях
+- `3d96d00` chore: перегенерация каталогов generate-catalogs.py
+- `867aa5d` docs(wp-452): Ф4 — связь с разделом 7 универсального руководства
+- `8cca208` chore(release): weekly auto-bump to v0.36.3
+- `e48389e` chore(week-close): синхронизация справочника FPF, список hot-файлов, восстановлен исполняемый бит контрактных тестов
+
+### Fixed
+
+- `3fd0f36` fix: report canonical WP phases in sync bundle
+- `2abb4c5` fix: restore day-open root resolution and seed parity
+- `e099b33` fix: deliver platform protocols and runner fallback (#354 #356)
+- `e28bd04` fix: resolve update and index health regressions (#353 #357)
+- `70a9667` fix: protect shared exocortex data and unify decision log
+- `4d39d6f` fix(session-guard): доставить восстановление карантинной сессии
+- `15a38b9` fix(hooks): A10-детектор слеп в C.UTF-8 — кириллический диапазон в grep невалиден
+- `720d30f` fix(#310,#321,#323,#347,#350): честный enforcement гейтов, доставка хуков, аудит промотированных копий
+- `80c4a25` fix(#348): образец params.yaml.example признан пользовательским пространством
+- `21d82ad` fix(#348,#310,#323): params.yaml перестал быть файлом шаблона; сторож неподключённых хуков
+- `f1a0798` fix(#343,#347,#350,#348): зелёный CI, бэкап памяти, четыре состояния планировщика, честное превью
+- `b804fb3` fix(peer): remove --add-dir from peer-session-finalize.sh synthesis call
+- `58a1fb0` fix(peer): portable mkdir-lock for kimi OAuth serialization, no lockf
+- `9233e65` fix(peer): drop kimi log-tail heuristic, add claude auth-failure detection
+- `d8dfacf` fix(peer): document sandbox setup for peer adapters
+- `e65e942` fix(session): quarantine dead-pid semaphores
+- `5b2fd66` fix(strategy-session-weekly): gate status:confirmed on strategy-session-checks-runner.sh (WP-484 Ф47)
+- `f457907` fix(wp7): deliver canonical protocol scripts
+- `1748a6f` fix(WP-7 Этап 2): фикстуры независимы от update.sh, откат сверяется побайтово
+- `945b7f8` fix(day-open): preserve extension hook diagnostics
+- `bb9656d` fix(#346): day-close calendar day follows install timezone, not global UTC
+- `14b4010` fix(#345): explicit non-hook classification for 4 orphan-warning files in .claude/hooks
+- `90d887f` fix(#344): preserve HEAD form across upgrade-simulation smoke rollback
+- `58666a7` fix(WP-7 Этап 2): доставка тестов гейта в манифест + честный smoke-тест setup.sh
+- `3280bef` fix(hindsight): убрать ключ из автозапуска, резолвить docker динамически, curl-healthcheck
+- `7e04b0b` fix(day-close): изоляция кодов возврата реиндексации + различение частичного отказа
+- `8a2e9da` fix(peer): restrict Claude adapter to text-only review
+
+
+## [0.36.3] — 2026-08-02
 
 ### Added
 

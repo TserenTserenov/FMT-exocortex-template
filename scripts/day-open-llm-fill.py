@@ -38,9 +38,49 @@ from wp_inbox import wp_card_paths  # noqa: E402 — lib path set above
 DEFAULT_PROXY_URL = "http://localhost:18765"
 SECTION_TIMEOUT_S = 60
 TOTAL_TIMEOUT_S = 300
-FAULT_PROFILE_SCRIPT = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "agent_fault_remind.py"
-)
+
+
+def _validated_pipeline_workspace() -> Path | None:
+    """Return a physical IWE_ROOT supplied by the installed Day Open pipeline."""
+
+    raw = os.environ.get("IWE_ROOT", "").strip()
+    if not raw or "\x00" in raw:
+        return None
+    candidate = Path(raw).expanduser()
+    if candidate.is_symlink():
+        return None
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    return resolved if resolved.is_dir() else None
+
+
+PIPELINE_WORKSPACE = _validated_pipeline_workspace()
+
+
+def _fault_profile_workspace() -> Path:
+    configured = os.environ.get("IWE_WORKSPACE") or os.environ.get("WORKSPACE_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    return PIPELINE_WORKSPACE or Path.home() / "IWE"
+
+
+def _fault_profile_script() -> str:
+    """Resolve the one agent-neutral CLI in installed and template layouts."""
+
+    script_dir = Path(__file__).resolve().parent
+    workspace = _fault_profile_workspace()
+    configured_scripts = Path(os.environ.get("IWE_SCRIPTS") or workspace / "scripts")
+    candidates = (
+        script_dir / "agent-fault" / "iwe_checklist_memory.py",
+        configured_scripts / "agent-fault" / "iwe_checklist_memory.py",
+        workspace / "FMT-exocortex-template" / "scripts" / "agent-fault" / "iwe_checklist_memory.py",
+    )
+    return str(next((candidate for candidate in candidates if candidate.is_file()), candidates[0]))
+
+
+FAULT_PROFILE_SCRIPT = _fault_profile_script()
 
 
 def read_file(path: str | None, default: str = "") -> str:
@@ -51,27 +91,53 @@ def read_file(path: str | None, default: str = "") -> str:
 
 
 def load_fault_profile() -> str:
-    """Run agent_fault_remind.py --protocol open and return top fault rules.
+    """Run the unified agent-fault CLI and return this subject's top rules.
 
     Returns empty string on failure. Logs reason to stderr so silent disable
-    (caused by interpreter mismatch, regex drift, or remind-script breakage)
+    (caused by interpreter mismatch, regex drift, or CLI breakage)
     surfaces in pipeline logs instead of vanishing.
 
     Symmetric with .claude/hooks/inject-fault-profile.sh: same data source
-    (iwe_memory.db via agent_fault_remind.py), filtered to CRITICAL/MAJOR
+    (iwe_memory.db via the unified CLI), filtered to CRITICAL/MAJOR
     with n>=3.
     """
+    subject_kind = os.environ.get("IWE_FAULT_SUBJECT_KIND", "")
+    subject_id = os.environ.get("IWE_FAULT_SUBJECT_ID", "")
+    if subject_kind not in {"personality", "runtime", "system"} or not subject_id:
+        print("[INFO] fault-profile: explicit subject is not configured — skipped", file=sys.stderr)
+        return ""
     if not os.path.isfile(FAULT_PROFILE_SCRIPT):
         print(f"[INFO] fault-profile: {FAULT_PROFILE_SCRIPT} not found — skipped",
               file=sys.stderr)
         return ""
     try:
+        child_env = os.environ.copy()
+        if (
+            not child_env.get("IWE_WORKSPACE")
+            and not child_env.get("WORKSPACE_DIR")
+            and PIPELINE_WORKSPACE is not None
+        ):
+            # The governance pipeline derives IWE_ROOT from its own physical
+            # location. Adapt that trusted runtime fact to the canonical CLI's
+            # unchanged IWE_WORKSPACE → WORKSPACE_DIR → HOME/IWE contract.
+            child_env["IWE_WORKSPACE"] = str(PIPELINE_WORKSPACE)
         result = subprocess.run(
-            [sys.executable, FAULT_PROFILE_SCRIPT, "--protocol", "open"],
+            [
+                sys.executable,
+                FAULT_PROFILE_SCRIPT,
+                "remind",
+                "--protocol",
+                "open",
+                "--subject-kind",
+                subject_kind,
+                "--subject-id",
+                subject_id,
+            ],
+            env=child_env,
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode != 0:
-            print(f"[WARN] fault-profile: agent_fault_remind.py exit={result.returncode}, "
+            print(f"[WARN] fault-profile: unified CLI exit={result.returncode}, "
                   f"stderr={result.stderr.strip()[:200]}", file=sys.stderr)
             return ""
         lines = [
@@ -79,7 +145,7 @@ def load_fault_profile() -> str:
             if re.match(r"^🔴 \[(CRITICAL|MAJOR) \| n=\d+\]", line)
         ]
         if not lines:
-            print("[WARN] fault-profile: agent_fault_remind.py output had 0 lines "
+            print("[WARN] fault-profile: unified CLI output had 0 lines "
                   "matching CRITICAL/MAJOR n>=3 regex — possible format drift",
                   file=sys.stderr)
             return ""
@@ -169,15 +235,19 @@ def rebuild_compact_dashboard(text: str) -> str:
     return "\n".join(out)
 
 
-def _panel_yesterday_iso() -> str:
-    """Вчера по московскому календарю — та же конвенция, что у ночного воркера (Ф3.3)."""
-    from datetime import datetime, timedelta, timezone
+def _dashboard_today_iso() -> str:
+    """Сегодня по московскому календарю -- дата, под которой dashboard_worker.py
+    пишет ночной снимок (запуск 07:30 MSK, WP-417 Ф-cutover-switch 2026-09-02).
+    Заменяет _panel_yesterday_iso() -- старая панель считала за ВЧЕРА (target_date
+    в panel_worker.py), PD-dashboard пишет файл под датой самого запуска."""
+    from datetime import datetime, timezone
     try:
         from zoneinfo import ZoneInfo
         now = datetime.now(ZoneInfo("Europe/Moscow"))
     except Exception:  # noqa: BLE001 — zoneinfo нет → Москва = UTC+3 (без DST с 2014)
+        from datetime import timedelta
         now = datetime.now(timezone.utc) + timedelta(hours=3)
-    return (now.date() - timedelta(days=1)).isoformat()
+    return now.date().isoformat()
 
 
 def _strip_panel_block(text: str, begin: str, end: str) -> str:
@@ -245,33 +315,38 @@ def inject_gate_metrics(text: str) -> str:
 
 
 def inject_panel_tile(text: str) -> str:
-    """Врезать тайл табло (WP-417 Ф3.4) в Compact Dashboard перед END-маркером.
+    """Врезать тайл табло (WP-417 Ф-cutover-switch, 2026-09-02) в Compact Dashboard
+    перед END-маркером.
 
-    Локальный режим: читает самую свежую панель из panel.db (вариант A data-ready
-    gate) и рендерит блок. Идемпотентно — старый блок <!-- panel-tile --> вырезается
-    и заменяется свежим (повторный Day Open не дублирует). Деградирует мягко: нет БД
-    или ошибка чтения → тайл пропускается, открытие дня не падает (P4: причина в лог).
-    Общий scaffold не трогаем — врезка только в локальном пайплайне ${IWE_GOVERNANCE_REPO:-DS-strategy}.
+    Источник -- PD-dashboard (git, ночной писатель dashboard_worker.py), не
+    panel.db/Neon (старый WP-417 Ф3.4 источник superseded архитектурным пивотом
+    18.08-01.09, см. inbox/WP-417/WP-417.md "Актуализация и решение пилота о
+    составе табло"). Идемпотентно -- старый блок <!-- panel-tile --> вырезается
+    и заменяется свежим (повторный Day Open не дублирует). Деградирует мягко:
+    нет PD-dashboard/файла на сегодня -> тайл пропускается, открытие дня не
+    падает (P4: причина в лог). Общий scaffold не трогаем -- врезка только в
+    локальном пайплайне ${IWE_GOVERNANCE_REPO:-DS-strategy}.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
     try:
-        from panel_render import PANEL_BEGIN, PANEL_END, read_panel, render_panel_block
-    except Exception:  # noqa: BLE001 — panel-модулей нет → тайл просто не показываем
-        print("[inject_panel_tile] panel-модули недоступны — тайл пропущен", file=sys.stderr)
+        from dashboard_render import (
+            PANEL_BEGIN, PANEL_END, read_dashboard_snapshot, render_dashboard_panel_block,
+        )
+    except Exception:  # noqa: BLE001 — dashboard-модули недоступны → тайл просто не показываем
+        print("[inject_panel_tile] dashboard-модули недоступны — тайл пропущен", file=sys.stderr)
         return text
 
     marker = "---END-COMPACT-DASHBOARD---"
     if marker not in text:
         return text  # нет дашборда (необычный scaffold) — некуда врезать
 
-    account_id = os.environ.get("PANEL_ACCOUNT_ID", "local")
     try:
-        panel = read_panel(account_id)
-    except Exception:  # noqa: BLE001 — БД недоступна → тайл пропускаем, день не валим
-        print("[inject_panel_tile] чтение panel.db не удалось — тайл пропущен", file=sys.stderr)
+        snapshot = read_dashboard_snapshot(_fault_profile_workspace())
+    except Exception:  # noqa: BLE001 — PD-dashboard недоступен → тайл пропускаем, день не валим
+        print("[inject_panel_tile] чтение PD-dashboard не удалось — тайл пропущен", file=sys.stderr)
         return text
 
-    block = render_panel_block(panel, _panel_yesterday_iso())
+    block = render_dashboard_panel_block(snapshot, _dashboard_today_iso())
     text = _strip_panel_block(text, PANEL_BEGIN, PANEL_END)
     idx = text.find(marker)
     return text[:idx] + block + "\n" + text[idx:]
@@ -551,8 +626,26 @@ def fill_chunk(chunk: dict, weekplan: str, active_wps: str, calendar: str,
     header = chunk["header"]
     content = "".join(chunk["lines"][1:])  # без заголовка
 
-    # Consolidated prompt with JSON facts for today_plan
-    is_today_plan = "План на сегодня" in header or "today_plan" in header.lower()
+    # Consolidated prompt with JSON facts for today_plan.
+    # `header` is usually the bare "<details>"/"<details open>" tag (chunking
+    # stores the <summary> title in `content`, not `header`) — checking
+    # `header` alone means this branch never fires for that shape, and the
+    # plan table falls through to the generic per-section prompt, which
+    # leaves the scaffold's example placeholders (N/NNN/X) unreplaced instead
+    # of computing a real seq/hours value per WP. Checking `content` alone
+    # would instead miss a plain "## План на сегодня" heading (chunk header
+    # can carry the title directly there) if the body never repeats the
+    # phrase — Codex review, WP-484 backfill-regression-fix session, 31.08.
+    # Checking both covers each chunking shape without betting on which one
+    # is live. Regressed and re-fixed three times in a consumer's installed
+    # copy (2026-07-09, then 26.08, then 31.08) — each time only that copy
+    # was patched, so this canonical source kept re-seeding the bug on the
+    # next backfill; fixed here too (WP-484, peer-session with Codex, same
+    # day) to close that loop.
+    is_today_plan = (
+        "План на сегодня" in content or "today_plan" in content.lower()
+        or "План на сегодня" in header or "today_plan" in header.lower()
+    )
     if is_today_plan and wp_facts:
         prompt = build_today_plan_prompt(header, content, weekplan, wp_facts,
                                          calendar, cp_profile, fault_profile)

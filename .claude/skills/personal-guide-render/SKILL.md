@@ -7,6 +7,7 @@ related: [WP-149, personal-guide-start, DP.SC.187]
 version: 2.1.0
 layer: L1
 status: awaiting-server-tool
+browser_safe: true
 supersedes: "v2.0.0 (вызов mcp render_personal_guide — инструмент не опубликован на сервере платформы, см. «Текущее состояние»)"
 triggers:
   slash: [/personal-guide-render]
@@ -37,7 +38,14 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Шаг 0. Проверить предусловие (setup завершён)
 
-Вызови `personal_search(source: "personal-guide", path: ".claude/skills/personal-guide-start/SKILL.md")`.
+Вызови `personal_search(source: "DS-personal-guide", path: "README.md")`.
+
+> #503: раньше здесь проверялся платформенный путь `.claude/skills/...` —
+> он живёт в шаблоне (слой L1) и в пользовательский репозиторий DS-personal-guide
+> не копируется никогда, проверка гарантированно возвращала пусто и блокировала
+> все следующие шаги. Реальный признак завершённого bootstrap — README.md:
+> его создаёт сам bootstrap при создании репозитория (notes-структура
+> Gateway: inbox/, docs/, README.md), т.е. он существует ДО первого рендера.
 
 Если файл **не найден** → сообщить пилоту:
 ```
@@ -52,7 +60,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Шаг 2. Проверить, доехало ли руководство
 
-Проверь в репо `personal-guide` пилота наличие файлов `guide/<date>.md` (по понедельникам) или `lesson/<date>.md` (в остальные дни) и `panel/<date>.md`.
+Проверь в репо `DS-personal-guide` пилота наличие файлов `guide/<date>.md` (по понедельникам) или `lesson/<date>.md` (в остальные дни) и `panel/<date>.md`.
 
 **Если файлы есть:**
 ```

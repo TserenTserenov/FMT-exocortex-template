@@ -11,6 +11,16 @@
 #   CODEX_BIN     — override codex binary path
 #   IWE_TEMPLATE  — path to FMT-exocortex-template (default: $HOME/IWE/FMT-exocortex-template)
 #   IWE_PEER_LOCK_DIR, IWE_HINDSIGHT_RETAIN — same as kimi-peer-adapter.sh
+#   CODEX_PEER_REASONING_EFFORT — model_reasoning_effort passed to `codex exec`
+#     via -c (default: medium). Overrides whatever ~/.codex/config.toml sets
+#     globally (found live 2026-08-20: a host-wide "ultra" default made every
+#     peer-turn slow enough to outrun the caller's own tool-level timeout,
+#     misread as "codex returned empty output" — it was still thinking).
+#   CODEX_PEER_TIMEOUT_SEC — internal watchdog deadline in seconds (default:
+#     270). Deliberately shorter than the peer-conversation contract's
+#     documented "5 minutes" (SKILL.md §3.1) so the adapter's own timeout
+#     fires first and leaves time to write diagnostics before any outer
+#     caller-side deadline would kill the whole tree less gracefully.
 #
 # Exit codes (same contract as kimi-peer-adapter.sh):
 #   0 — OK
@@ -47,16 +57,42 @@ if [ -z "$CODEX_BIN" ] || [ ! -x "$CODEX_BIN" ]; then
   exit 1
 fi
 
+# Auto-source OpenRouter key (hosts without a ChatGPT login route codex
+# through OpenRouter, see reference_codex_peer_openrouter_linux.md).
+CODEX_USES_OPENROUTER=false
+grep -q '^env_key = "OPENROUTER_API_KEY"' "$HOME/.codex/config.toml" 2>/dev/null && CODEX_USES_OPENROUTER=true
+
+if [ -z "${OPENROUTER_API_KEY:-}" ] && [ "$CODEX_USES_OPENROUTER" = true ]; then
+  OPENROUTER_KEY_FILE="$HOME/.secrets/openrouter_key.env"
+  if [ -f "$OPENROUTER_KEY_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$OPENROUTER_KEY_FILE"
+    set +a
+  fi
+fi
+
 ADD_DIRS=()
 MODEL_ARG=()
 
+# WP-516 Ф5: межвендорский whitelist (§0в.1) = {-p, --model, --add-dir}.
+# Неизвестный флаг — явная ошибка, не молчаливый игнор: иначе запрошенный
+# режим (напр. безопасности) может не примениться незаметно для вызывающего.
+# --permission-mode исключён из whitelist: способен ослабить read-only
+# гарантию sandbox; claude-адаптер отклоняет его всегда (exit 64).
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -p)                shift ;;
-    --model)           MODEL_ARG=("--model" "$2"); shift 2 ;;
-    --add-dir)         ADD_DIRS+=("$2"); shift 2 ;;
-    --permission-mode) shift 2 ;;
-    *)                 shift ;;
+    --model)
+      [ $# -ge 2 ] || { echo "ERROR: --model requires a value" >&2; exit 1; }
+      MODEL_ARG=("--model" "$2"); shift 2 ;;
+    --add-dir)
+      [ $# -ge 2 ] || { echo "ERROR: --add-dir requires a value" >&2; exit 1; }
+      ADD_DIRS+=("$2"); shift 2 ;;
+    *)
+      echo "ERROR: unknown flag '$1'. Known: -p, --model, --add-dir" >&2
+      exit 1
+      ;;
   esac
 done
 
@@ -175,13 +211,20 @@ _IWE_ARS="$HOME/IWE/scripts/agent-status-report.sh"
 
 cleanup_peer() {
   rm -f "$LOCK_FILE"
-  [ -x "$_IWE_ARS" ] && bash "$_IWE_ARS" --session-id "$CODEX_SESSION_ID" codex idle 2>/dev/null &
+  # Redirect BOTH stdout and stdin, not just stderr: a background job that
+  # inherits the parent's stdout keeps a caller-side `OUT=$(...)` command
+  # substitution open until this job's fd closes, even after the parent has
+  # exited — found live 2026-08-20 (WP-530 watchdog work made the parent's
+  # own lifetime long enough for this pre-existing gap to actually bite:
+  # `OUT=$(... | bash codex-peer-adapter.sh)` hung ~15s per call instead of
+  # ~2s once this status-report fire-and-forget started outliving its parent).
+  [ -x "$_IWE_ARS" ] && bash "$_IWE_ARS" --session-id "$CODEX_SESSION_ID" codex idle </dev/null >/dev/null 2>&1 &
   rm -rf "$TMP_ROOT"
 }
 trap cleanup_peer EXIT INT TERM
-[ -x "$_IWE_ARS" ] && bash "$_IWE_ARS" --session-id "$CODEX_SESSION_ID" codex peer-session "$CODEX_TASK" 2>/dev/null &
+[ -x "$_IWE_ARS" ] && bash "$_IWE_ARS" --session-id "$CODEX_SESSION_ID" codex peer-session "$CODEX_TASK" </dev/null >/dev/null 2>&1 &
 
-# === Запуск Codex headless: `codex exec`, -o для чистого файла с финальным ответом + 5min timeout ===
+# === Запуск Codex headless: `codex exec`, -o для чистого файла с финальным ответом + process-group watchdog ===
 OUT_FILE="$TMP_ROOT/codex-output.txt"
 # BUGFIX (found by review, issue #296): -C is Codex's sandbox root — Codex reads
 # from and writes to whatever this points at. Using $ADD_DIRS[0] (the RAW,
@@ -189,9 +232,23 @@ OUT_FILE="$TMP_ROOT/codex-output.txt"
 # above: FILTERED_DIRS holds the scrubbed copies in $TMP_ROOT, but the sandbox
 # root itself was still the unfiltered source. Must be the FILTERED copy of the
 # first --add-dir (FILTERED_DIRS[1] — [0] is the literal "--add-dir" token).
-PRIMARY_DIR="${FILTERED_DIRS[1]:-$PWD}"
+#
+# WP-516 Ф5 (peer-session 2026-08-11-22-wp516-f5-contract-adapter): без
+# --add-dir корнем sandbox был $PWD писателя, причём в режиме workspace-write —
+# неявный write-доступ к рабочему дереву писателя. Теперь: без --add-dir
+# корень = пустой временный каталог; режим ВСЕГДА read-only (контракт §0в.1:
+# peer не пишет файлы; --add-dir даёт чтение контекста, не согласие на запись).
+if [ ${#FILTERED_DIRS[@]} -ge 2 ]; then
+  PRIMARY_DIR="${FILTERED_DIRS[1]}"
+else
+  PRIMARY_DIR="$TMP_ROOT/empty-root"
+  mkdir -p "$PRIMARY_DIR"
+fi
 
-CODEX_EXEC_ARGS=(exec -s workspace-write -C "$PRIMARY_DIR" -o "$OUT_FILE")
+# --skip-git-repo-check: PRIMARY_DIR is the PII-filtered temp copy (mktemp -d
+# above), never a git worktree — codex exec otherwise refuses with
+# "Not inside a trusted directory" and the adapter reports it as empty output.
+CODEX_EXEC_ARGS=(exec -s read-only -C "$PRIMARY_DIR" --skip-git-repo-check -o "$OUT_FILE")
 # Start at 3, not 1: FILTERED_DIRS[0..1] is the pair already consumed as
 # PRIMARY_DIR above — re-adding it as --add-dir would just be a harmless-but-
 # redundant duplicate, skip it.
@@ -201,19 +258,97 @@ done
 if [ ${#MODEL_ARG[@]} -ge 2 ]; then
   CODEX_EXEC_ARGS+=("-m" "${MODEL_ARG[1]}")
 fi
+CODEX_EXEC_ARGS+=(-c "model_reasoning_effort=${CODEX_PEER_REASONING_EFFORT:-medium}")
 CODEX_EXEC_ARGS+=("-")
 
-perl -e 'alarm 300; exec @ARGV' -- "$CODEX_BIN" "${CODEX_EXEC_ARGS[@]}" < "$PROMPT_FILE" >/dev/null 2>&1
-PERL_EXIT=$?
+# WP-530 (2026-08-20, peer-session with Codex): the old `perl -e 'alarm 300;
+# exec @ARGV'` only ever kills the perl-exec'd process itself — `codex exec`
+# spawns node, which spawns the actual codex-darwin-arm64 binary, and neither
+# grandchild is in perl's kill path. Reproduced live: on SIGALRM the sleeping
+# grandchild survives as an orphan (see test-codex-peer-adapter-orphan-smoke.sh).
+#
+# `set -m` + `kill -- -PGID` looked like the fix but isn't portable enough:
+# live testing found hosts/shells where a backgrounded job's process group id
+# does not equal its own PID even with job control on, so `-PGID` misses the
+# real descendants. `pgrep -P` walks the actual parent-child tree instead —
+# no dependency on process-group semantics, no job control requirement. Two
+# passes because a still-spawning multi-level tree (bash -> bash -> codex)
+# can have children appear between the first pgrep and the first kill.
+kill_tree() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+    kill_tree "$child"
+  done
+  kill -TERM "$pid" 2>/dev/null || true
+}
 
-if [ "$PERL_EXIT" -eq 142 ]; then
-  echo "ERROR: Codex peer call timed out after 5 minutes (SIGALRM)" >&2
-  echo "CODEX_TIMEOUT: peer call exceeded 5min limit — check for network problems" >&2
+CODEX_TIMEOUT_SEC="${CODEX_PEER_TIMEOUT_SEC:-270}"
+CODEX_CALL_START=$(date -u +%s)
+CODEX_TIMEOUT_MARKER="$TMP_ROOT/.watchdog-fired"
+(
+  exec "$CODEX_BIN" "${CODEX_EXEC_ARGS[@]}" < "$PROMPT_FILE" >/dev/null 2>&1
+) &
+CODEX_JOB_PID=$!
+CODEX_TIMED_OUT=false
+(
+  sleep "$CODEX_TIMEOUT_SEC"
+  kill -0 "$CODEX_JOB_PID" 2>/dev/null || exit 0
+  # Marker written BEFORE the kill, not inferred afterward from exit code +
+  # elapsed time: a real (non-timeout) CLI crash that happens to land right
+  # at the deadline would otherwise be misdiagnosed as a timeout by that
+  # heuristic (review finding, WP-530 2026-08-20).
+  touch "$CODEX_TIMEOUT_MARKER" 2>/dev/null || true
+  kill_tree "$CODEX_JOB_PID"
+  sleep 0.3
+  kill -0 "$CODEX_JOB_PID" 2>/dev/null && kill_tree "$CODEX_JOB_PID"
+) &
+CODEX_WATCHDOG_PID=$!
+wait "$CODEX_JOB_PID"
+CODEX_EXIT=$?
+# The watchdog subshell itself is a multi-command sequence (sleep, kill -0,
+# touch, kill_tree, sleep, kill -0, kill_tree) — bash does NOT collapse it
+# into a single process the way it does for a lone `( exec foo )`. `$!` only
+# names the subshell wrapper; a plain `kill` on it leaves its own
+# still-running internal `sleep` as an orphan holding stdout open (found live
+# 2026-08-20: this exact gap is what made `OUT=$(... | codex-peer-adapter.sh)`
+# hang for minutes on the success path even after the adapter itself had
+# exited).
+kill_tree "$CODEX_WATCHDOG_PID"
+wait "$CODEX_WATCHDOG_PID" 2>/dev/null
+CODEX_CALL_ELAPSED=$(( $(date -u +%s) - CODEX_CALL_START ))
+
+[ -f "$CODEX_TIMEOUT_MARKER" ] && CODEX_TIMED_OUT=true
+
+if [ "$CODEX_TIMED_OUT" = true ]; then
+  # Diagnostics without the prompt text itself (S-33 secrets discipline: this
+  # goes to stderr, which callers may log — never echo prompt content here).
+  PROMPT_BYTES=$(wc -c < "$PROMPT_FILE" 2>/dev/null | tr -d ' ')
+  echo "ERROR: Codex peer call timed out after ${CODEX_CALL_ELAPSED}s (internal watchdog, limit ${CODEX_TIMEOUT_SEC}s)" >&2
+  echo "CODEX_TIMEOUT: reasoning_effort=${CODEX_PEER_REASONING_EFFORT:-medium} prompt_bytes=$PROMPT_BYTES add_dirs=$(( ${#FILTERED_DIRS[@]} / 2 )) elapsed_s=$CODEX_CALL_ELAPSED" >&2
+  exit 1
+fi
+
+# WP-516 Ф5 (§0в.1, находка Codex 12.08): non-timeout ненулевой exit CLI
+# обязан нормализоваться в 1 — иначе упавший CLI с непустым output-файлом
+# мог вернуть успешный 0 адаптера.
+if [ "$CODEX_EXIT" -ne 0 ]; then
+  echo "ERROR: Codex peer call failed with exit code $CODEX_EXIT (cli_exit=$CODEX_EXIT, elapsed_s=$CODEX_CALL_ELAPSED)" >&2
   exit 1
 fi
 
 if [ ! -s "$OUT_FILE" ]; then
-  echo "ERROR: codex returned empty output (network/auth/quota?)" >&2
+  # WP-524 Ф1 (12.08): reproduced live — provider is OpenRouter on hosts without
+  # a ChatGPT login (see reference_codex_peer_openrouter_linux.md), and a missing
+  # OPENROUTER_API_KEY in the caller's shell produces this exact symptom with no
+  # other signal. Distinguishing it here turns a silent bootstrap failure into an
+  # actionable message instead of leaving the caller to guess network/auth/quota.
+  if [ -z "${OPENROUTER_API_KEY:-}" ] && [ "$CODEX_USES_OPENROUTER" = true ]; then
+    echo "ERROR: codex returned empty output — OPENROUTER_API_KEY is not set." >&2
+    echo "HINT: this adapter already tried auto-sourcing ~/.secrets/openrouter_key.env and it didn't take." >&2
+    echo "  Check the file exists and is readable: ls -la ~/.secrets/openrouter_key.env" >&2
+  else
+    echo "ERROR: codex returned empty output (network/auth/quota?)" >&2
+  fi
   exit 1
 fi
 
@@ -226,6 +361,33 @@ if [ "${IWE_HINDSIGHT_RETAIN:-}" = "1" ] && [ -n "$CODEX_OUTPUT" ] && [ -f "$HIN
     echo "{\"action\":\"retain\",\"source\":\"codex-peer\",\"text\":$(echo "$CODEX_OUTPUT" | head -c 4000 | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" \
     | python3 "$HINDSIGHT_SCRIPT" 2>/dev/null || true
   } &
+fi
+
+# WP-516 Ф5 (§0в.1): stdout обязан начинаться с frontmatter; ответ без
+# frontmatter = нарушение формата → exit 1 с диагностикой.
+# Проверка — для peer-реплик turn-loop. Служебные вызовы писателя
+# (review/verify/synth), чей вывод — НЕ peer-реплика, отключают её
+# через IWE_PEER_PLAIN=1 (слой IWE-интеграции, §0в.1).
+if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
+  # awk одним процессом: 'sed | head' под pipefail ловит SIGPIPE на длинной
+  # валидной реплике и роняет адаптер без диагностики (review-02, WP-516 Ф5).
+  _FIRST_LINE=$(printf '%s\n' "$CODEX_OUTPUT" | awk 'length { print; exit }')
+  _FM_FENCES=$(printf '%s\n' "$CODEX_OUTPUT" | grep -c '^---$' || true)
+  if [ "$_FIRST_LINE" != "---" ] || [ "${_FM_FENCES:-0}" -lt 2 ]; then
+    echo "ERROR: peer response missing frontmatter (first non-empty line must be '---' with a closing '---')." >&2
+    exit 1
+  fi
+
+  # WP-484 Ф89: alert-only self-check — доля кириллицы в ответе после
+  # вычитания кода/путей/A2-глосс. Никогда не блокирует вывод, только
+  # предупреждает в stderr — не peer-реплика (IWE_PEER_PLAIN=1) её не видит.
+  _LANG_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/language-check.py"
+  if [ -f "$_LANG_CHECK" ]; then
+    _LANG_RESULT=$(printf '%s' "$CODEX_OUTPUT" | python3 "$_LANG_CHECK" 2>/dev/null || true)
+    if printf '%s' "$_LANG_RESULT" | grep -q '"alert": true'; then
+      echo "WARNING: peer response may not be in Russian (language-check alert) — $_LANG_RESULT" >&2
+    fi
+  fi
 fi
 
 # cleanup_peer() через trap удалит lock и temp

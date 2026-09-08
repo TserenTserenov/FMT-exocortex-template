@@ -1,17 +1,10 @@
 #!/bin/bash
-# scheduler.sh — ⚠️ LEGACY (отключён 10 марта 2026)
+# scheduler.sh — центральный диспетчер роли Synchronizer
 #
-# Архитектура мигрировала с монолитного scheduler.sh на per-role launchd агенты:
-#   com.strategist.{morning,notereview,weekreview}
-#   com.exocortex.pomodoro-alert
-#   com.iwe.rule-classifier
-#   com.aisystant.profiler.recalculate
-#   com.pulse.{alerts,weekly}
-#   com.claude.env
-#
-# Plist `com.exocortex.scheduler.plist.disabled` в ~/Library/LaunchAgents/.
-# Скрипт оставлен для возможного ручного запуска (`scheduler.sh dispatch|status`),
-# но автоматически не запускается. Для нового кода — использовать per-role plists.
+# Lifecycle: `roles/synchronizer/install.sh` активирует этот скрипт через
+# launchd (macOS), systemd --user (Linux) или cron fallback. Роль опциональна:
+# без её установки скрипт остаётся доступен только для ручного запуска
+# (`scheduler.sh dispatch|status`).
 #
 # Состояние: ~/.local/state/exocortex/ (маркеры запуска)
 #
@@ -135,6 +128,28 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [scheduler] $1" | tee -a "$LOG_FILE"
 }
 
+# Strategist exit 2 means that its own non-blocking lock is already held by a
+# live run. This is a neutral skip: keep the marker absent so a later dispatch
+# retries, but do not report the concurrent healthy run as a failure (#527).
+run_strategist_scenario() {
+    local scenario="$1"
+    local rc=0
+
+    timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" "$scenario" >> "$LOG_FILE" 2>&1 || rc=$?
+    case "$rc" in
+        0)
+            return 0
+            ;;
+        2)
+            log "SKIP: strategist $scenario already running (lock held; will retry next dispatch)"
+            ;;
+        *)
+            log "WARN: strategist $scenario failed (rc=$rc; will retry next dispatch)"
+            ;;
+    esac
+    return "$rc"
+}
+
 # === Управление состоянием ===
 
 ran_today() {
@@ -210,10 +225,8 @@ dispatch() {
     # --- Стратег: week-review (Пн, до morning) ---
     if [ "$DOW" = "1" ] && ! ran_this_week "strategist-week-review"; then
         log "→ strategist week-review (catch-up: hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" week-review >> "$LOG_FILE" 2>&1; then
+        if run_strategist_scenario "week-review"; then
             mark_done_week "strategist-week-review"
-        else
-            log "WARN: strategist week-review failed (will retry next dispatch)"
         fi
         ran=1
     fi
@@ -221,10 +234,8 @@ dispatch() {
     # --- Стратег: morning (04:00-21:59) ---
     if (( 10#$HOUR >= 4 && 10#$HOUR < 22 )) && ! ran_today "strategist-morning"; then
         log "→ strategist morning (catch-up: hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" morning >> "$LOG_FILE" 2>&1; then
+        if run_strategist_scenario "morning"; then
             mark_done "strategist-morning"
-        else
-            log "WARN: strategist morning failed (will retry next dispatch)"
         fi
         ran=1
     fi
@@ -232,10 +243,8 @@ dispatch() {
     # --- Стратег: note-review (22:00+) ---
     if (( 10#$HOUR >= 22 )) && ! ran_today "strategist-note-review"; then
         log "→ strategist note-review (catch-up: hour=$HOUR)"
-        if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
+        if run_strategist_scenario "note-review"; then
             mark_done "strategist-note-review"
-        else
-            log "WARN: strategist note-review failed (will retry next dispatch)"
         fi
         ran=1
     elif (( 10#$HOUR < 12 )); then
@@ -243,10 +252,8 @@ dispatch() {
         yesterday=$(portable_date_offset 1)
         if [ -n "$yesterday" ] && [ ! -f "$STATE_DIR/strategist-note-review-$yesterday" ]; then
             log "→ strategist note-review (catch-up for yesterday $yesterday)"
-            if timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
+            if run_strategist_scenario "note-review"; then
                 echo "$(date '+%H:%M:%S') catch-up" > "$STATE_DIR/strategist-note-review-$yesterday"
-            else
-                log "WARN: strategist note-review catch-up failed"
             fi
             ran=1
         fi

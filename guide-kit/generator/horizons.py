@@ -173,6 +173,46 @@ class QualificationDegree:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Domain traits — applied-mastery track input (WP-493 domain-traits-process.md
+# Step 8 output format; guide-kit consumes it, does not redefine it)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DOMAIN_TRAIT_STATUSES = frozenset({"measured", "no_source_yet", "dormant-no-source"})
+
+
+@dataclass
+class DomainTrait:
+    """One applied-domain characteristic, as produced by the Lab's per-domain
+    process (WP-493 domain-traits-process.md Step 8): {characteristic, domain,
+    checklist verdict, rung}. `status`/`rung` gate whether the trait is usable —
+    a trait that hasn't passed the 6-point activation checklist (dormant-no-source)
+    must not drive the tailor's choice."""
+
+    characteristic: str
+    domain: str
+    status: str          # one of DOMAIN_TRAIT_STATUSES
+    rung: int = 0         # 0 = not yet calibrated (hypothesis rung)
+    state: str = ""       # domain scale state this trait gates, e.g. "swimmer"
+
+    def __post_init__(self):
+        if self.status not in DOMAIN_TRAIT_STATUSES:
+            raise ValueError(
+                f"DomainTrait.status={self.status!r} not in {sorted(DOMAIN_TRAIT_STATUSES)} "
+                f"(characteristic={self.characteristic!r}, domain={self.domain!r})"
+            )
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "DomainTrait":
+        return cls(
+            characteristic=str(d["characteristic"]),
+            domain=str(d["domain"]),
+            status=str(d.get("status", "no_source_yet")),
+            rung=int(d.get("rung", 0)),
+            state=str(d.get("state", "")),
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Orchestrator triggers
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -275,6 +315,7 @@ class HorizonContext:
     artifacts: ArtifactsSummary = field(default_factory=ArtifactsSummary)
     summary_events: str = ""    # events from render-pilot-guides.py (B2)
     mastery_by_area: dict = field(default_factory=dict)  # Phase 4.1: {area_key: depth} from Memory.Derived
+    domain_traits: list[DomainTrait] = field(default_factory=list)  # Ф5b: applied track, WP-493 Step 8
     pilot_reflection: str = ""  # pilot's reflection from yesterday (history/YYYY-MM-DD-reflection.txt)
     reflection_learned: list[str] = field(default_factory=list)  # Q3 "What I learned" over 7 days
     tomorrow_intention: str = ""  # Q5 "What's next" from the latest reflection

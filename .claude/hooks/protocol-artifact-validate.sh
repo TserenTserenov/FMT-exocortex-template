@@ -121,8 +121,14 @@ fi
 # "обязательных РП нет", секцию в DayPlan не требуем.
 MANDATORY_WPS_CONFIGURED=false
 DAY_RHYTHM_CONFIG="$WORKSPACE/memory/day-rhythm-config.yaml"
-if [ -f "$DAY_RHYTHM_CONFIG" ] && command -v python3 >/dev/null 2>&1; then
-  if python3 -c "
+if [ -f "$DAY_RHYTHM_CONFIG" ]; then
+  # WP-529 (continuation, 19.08): resolved here, inside the existing
+  # [ -f "$DAY_RHYTHM_CONFIG" ] guard — same lazy-placement rationale as the
+  # other sites in this migration (peer-session 2026-08-19-29, codex turn 1).
+  # No bare-python3 fallback: the resolver's own first candidate is already
+  # bare `python3` from PATH.
+  _RESOLVED_PYTHON3=$("$WORKSPACE/scripts/lib/find-python3.sh" 2>/dev/null) || _RESOLVED_PYTHON3=""
+  if [ -n "$_RESOLVED_PYTHON3" ] && "$_RESOLVED_PYTHON3" -c "
 import yaml, sys
 d = yaml.safe_load(open(sys.argv[1])) or {}
 sys.exit(0 if d.get('mandatory_daily_wps') else 1)

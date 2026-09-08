@@ -1,59 +1,72 @@
 #!/usr/bin/env bash
-# Regression test for bug #339: capture-bus.sh должен иметь timeout для детекторов.
-# Проверка: зависший детектор выходит через timeout, не блокирует конвейер.
+# Regression test for bug #339: capture-bus.sh must have a timeout for detectors.
+# Verify a hung detector is cut off by timeout/gtimeout and does not block the
+# rest of the dispatch.
+#
+# Earlier version copied capture-bus.sh alone into a bare tmpdir. HOOK_DIR/
+# CLAUDE_DIR are resolved from the script's own location (dirname of
+# BASH_SOURCE), so a lone copy resolves CLAUDE_DIR to the tmpdir's PARENT
+# (the system temp root) and the bootstrap `source` fails immediately — the
+# test then "passed" only because the resulting fast exit-1 happened to be
+# under the elapsed-time threshold, not because timeout logic ever ran (found
+# 03.08: this stderr line was visible in the old run: ".../T/lib/iwe-env-
+# bootstrap.sh: No such file or directory"). Now uses the same real .claude/
+# tree fixture as test_capture_bus_contract.sh, so the timeout path is what's
+# actually exercised.
 
 set -euo pipefail
+
+TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
+
+if ! command -v timeout >/dev/null 2>&1 && ! command -v gtimeout >/dev/null 2>&1; then
+  echo "SKIP: neither timeout nor gtimeout available — this machine cannot enforce the timeout capture-bus.sh relies on"
+  exit 0
+fi
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-cd "$TMPDIR"
+# shellcheck source=lib/capture_fixture.sh
+source "$TEMPLATE_ROOT/scripts/tests/lib/capture_fixture.sh"
+setup_capture_fixture "$TEMPLATE_ROOT" "$TMPDIR"
 
-# Создать фикстуру: config с одним детектором, который спит 60 сек (дольше дефолт 30с)
-cat > capture-config.yaml <<'EOF'
-detectors:
-  - name: sleepy-detector
-    path: ./sleepy.sh
-    event_type: capture
-    cost_class: free
-    enabled: true
-    triggers: []
-EOF
+mkdir -p "$TMPDIR/detectors"
 
-# Детектор, который спит дольше таймаута
-cat > sleepy.sh <<'EOF'
-#!/bin/bash
+cat > "$TMPDIR/detectors/sleepy.sh" <<EOF
+#!/usr/bin/env bash
 sleep 60
-echo "unreachable"
+: > "$TMPDIR/sleep-completed"
 EOF
-chmod +x sleepy.sh
+cat > "$TMPDIR/detectors/after.sh" <<EOF
+#!/usr/bin/env bash
+: > "$TMPDIR/after.ran"
+EOF
+chmod +x "$TMPDIR"/detectors/*.sh
 
-# Создать скелет hook capture-bus.sh (скопировать из шаблона или создать минимальный)
-CAPTURE_BUS="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/.claude/hooks/capture-bus.sh"
-if [ -f "$CAPTURE_BUS" ]; then
-  cp "$CAPTURE_BUS" ./capture-bus.sh
-else
-  echo "ERROR: capture-bus.sh not found in template" >&2
-  exit 1
-fi
+cat > "$TMPDIR/.claude/config/capture-detectors.sh" <<'EOF'
+CAPTURE_COST_LEVEL=free
+CAPTURE_DETECTOR_TIMEOUT_SECONDS=2
+DETECTORS=(
+  "sleepy|detectors/sleepy.sh|capture|free|true|PostToolUse"
+  "after|detectors/after.sh|capture|free|true|PostToolUse"
+)
+EOF
 
-# Запустить hook с таймаутом 30 сек (дефолт для детектора)
-export CAPTURE_DETECTOR_TIMEOUT_SECONDS=2  # Короткий таймаут для теста
-export CAPTURE_CONFIG_FILE="./capture-config.yaml"
-export IWE_SCRIPTS="${IWE_SCRIPTS:-$HOME/IWE/scripts}"
+INPUT='{"hook_event_name":"PostToolUse","session_id":"timeout","tool_name":"Write","cwd":"/tmp","tool_input":{"file_path":"x"}}'
 
-# Ожидаемое: hook завершится ~2 сек (timeout), не 60 сек
 START=$(date +%s)
-bash ./capture-bus.sh 2>&1 | head -20 || true
-END=$(date +%s)
-ELAPSED=$((END - START))
+printf '%s\n' "$INPUT" | bash "$TMPDIR/.claude/hooks/capture-bus.sh"
+ELAPSED=$(( $(date +%s) - START ))
 
 echo "Elapsed: ${ELAPSED}s"
 
-# Проверка: если детектор выполнился полностью, это заняло бы 60+ сек; с таймаутом ~2-5 сек
-if [ $ELAPSED -lt 10 ]; then
-  echo "✓ Detector timed out correctly (${ELAPSED}s < 10s)"
-else
-  echo "FAIL: Detector did not timeout (elapsed ${ELAPSED}s)" >&2
-  exit 1
-fi
+[ "$ELAPSED" -lt 10 ] ||
+  { echo "FAIL: dispatcher did not time out (elapsed ${ELAPSED}s)" >&2; exit 1; }
+[ ! -e "$TMPDIR/sleep-completed" ] ||
+  { echo "FAIL: sleepy detector was allowed to run to completion" >&2; exit 1; }
+[ -e "$TMPDIR/after.ran" ] ||
+  { echo "FAIL: dispatcher did not continue past the timed-out detector" >&2; exit 1; }
+grep -q 'timeout (2s)' "$CAPTURE_LOG_FILE" ||
+  { echo "FAIL: timeout was not recorded in the log" >&2; exit 1; }
+
+echo "✓ Detector timed out correctly (${ELAPSED}s < 10s), dispatch continued, timeout logged"

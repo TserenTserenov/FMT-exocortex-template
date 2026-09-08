@@ -7,21 +7,33 @@
 # Идемпотентен: можно вызывать сколько угодно раз подряд — дубликатов не будет.
 #
 # Использование:
-#   bash changelog-append.sh [--dry-run]
+#   IWE_TEMPLATE=/path/to/FMT bash changelog-append.sh
+#   bash changelog-append.sh --dry-run
 #
 # Для фиксации версии (Unreleased → X.Y.Z):
 #   bash changelog-flush.sh --version 0.32.0
 
 set -uo pipefail
 
-FMT_DIR="${IWE_TEMPLATE:-${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template}"
-CHANGELOG="$FMT_DIR/CHANGELOG.md"
 dry_run=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in --dry-run) dry_run=true ;; esac
     shift
 done
+
+# Write mode must never guess the target checkout. In author worktrees the
+# historical fallback pointed at the canonical clone and silently modified it.
+FMT_DIR="${IWE_TEMPLATE:-}"
+if [[ -z "$FMT_DIR" ]]; then
+    if ! $dry_run; then
+        echo "❌ Режим записи требует явную цель: IWE_TEMPLATE=/path/to/FMT" >&2
+        exit 2
+    fi
+    FMT_DIR="${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template"
+    echo "⚠️  IWE_TEMPLATE не задан; dry-run читает fallback: $FMT_DIR" >&2
+fi
+CHANGELOG="$FMT_DIR/CHANGELOG.md"
 
 if [[ ! -f "$CHANGELOG" ]]; then
     echo "❌ CHANGELOG.md не найден: $CHANGELOG" >&2
@@ -40,7 +52,11 @@ fi
 since_date=$(date -d "$last_date - 1 day" +%Y-%m-%d 2>/dev/null \
     || date -v-1d -j -f "%Y-%m-%d" "$last_date" +%Y-%m-%d 2>/dev/null \
     || echo "$last_date")
-commits=$(git -C "$FMT_DIR" log --after="$since_date" --format="%h %s" 2>/dev/null || true)
+# WP-7 Ф62 п.4: %(trailers:key=Changelog-Tag) достаёт классификацию (security/
+# migration/behavior/optional) одним проходом вместе с hash+subject — DRR
+# decisions/2026-08/2026-08-10-wp-7-arhgeyt-changelog-klassifikaciya-bez-lts.md.
+commits=$(git -C "$FMT_DIR" log --after="$since_date" \
+    --format='%h%x09%s%x09%(trailers:key=Changelog-Tag,valueonly,separator=%x2c)' 2>/dev/null || true)
 
 if [[ -z "$commits" ]]; then
     echo "ℹ️  Нет новых коммитов с $last_date — [Unreleased] не нужен."
@@ -52,16 +68,57 @@ added=""
 fixed=""
 changed=""
 
-while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    hash="${line%% *}"
-    msg="${line#* }"
+VALID_CHANGELOG_TAGS="security migration behavior optional"
+
+is_valid_changelog_tag() {
+    local candidate="$1"
+    for valid in $VALID_CHANGELOG_TAGS; do
+        [[ "$candidate" == "$valid" ]] && return 0
+    done
+    return 1
+}
+
+while IFS=$'\t' read -r hash msg rawtag; do
+    [[ -z "$hash" ]] && continue
+
+    # Берём первое значение trailer'а, входящее в allowlist; остальное игнорируем.
+    # Нет валидного тега → рендерим БЕЗ бирки, не подставляем "optional" молча
+    # (DRR: "нет метки ≠ безопасно, просто не классифицировано").
+    tag=""
+    if [[ -n "$rawtag" ]]; then
+        IFS=',' read -ra tag_candidates <<< "$rawtag"
+        for candidate in "${tag_candidates[@]}"; do
+            # найдено code review 13.08: "security, migration" (пробел после
+            # запятой) даёт кандидата " migration" — без trim он не совпадёт
+            # с allowlist и валидный тег молча потеряется, если стоит вторым.
+            candidate="${candidate#"${candidate%%[![:space:]]*}"}"
+            candidate="${candidate%"${candidate##*[![:space:]]}"}"
+            if is_valid_changelog_tag "$candidate"; then
+                tag="$candidate"
+                break
+            fi
+        done
+        # Диагностика только на реальной неоднозначности (несколько значений)
+        # или невалидном единственном значении — не шумим на валидном одиночном
+        # случае (пир-ревью с Codex, 2026-08-13).
+        if [[ -n "$tag" && "${#tag_candidates[@]}" -gt 1 ]]; then
+            # найдено verify-подагентом 13.08: тег фактически найден и
+            # отрендерен — сообщение не должно говорить "без метки".
+            echo "⚠️  Changelog-Tag неоднозначен в коммите $hash: '$rawtag' — беру первый валидный '$tag'" >&2
+        elif [[ -z "$tag" ]]; then
+            echo "⚠️  Changelog-Tag невалиден в коммите $hash: '$rawtag' — рендерю без метки" >&2
+        fi
+    fi
+
+    prefix=""
+    [[ -n "$tag" ]] && prefix="[$tag] "
+
     case "$msg" in
-        feat*|feat\(*) added+="- \`$hash\` $msg"$'\n' ;;
-        fix*|fix\(*)   fixed+="- \`$hash\` $msg"$'\n' ;;
-        test*|docs*)   changed+="- \`$hash\` $msg"$'\n' ;;
+        feat*|feat\(*) added+="- ${prefix}\`$hash\` $msg"$'\n' ;;
+        fix*|fix\(*)   fixed+="- ${prefix}\`$hash\` $msg"$'\n' ;;
+        test*|docs*)   changed+="- ${prefix}\`$hash\` $msg"$'\n' ;;
         template-sync*) ;;  # авто-коммиты template-sync — пропускаем
-        *)             changed+="- \`$hash\` $msg"$'\n' ;;
+        *)             changed+="- ${prefix}\`$hash\` $msg"$'\n' ;;
     esac
 done <<< "$commits"
 

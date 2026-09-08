@@ -1,8 +1,15 @@
 ---
-type: review-questionnaire
+name: r-questionnaire
+description: "Вопросы пересмотра для недельного и месячного закрытия"
+type: protocol
+horizon: warm
+domains: [reference, review]
+status: active
 wp: 217
 promoted: 2026-04-25
 valid_from: 2026-04-12
+owner: platform
+schema_version: 1
 ---
 # R-вопросник
 
@@ -68,4 +75,4 @@ M5. **Что в IWE сработало неожиданно хорошо? Что
 
 ---
 
-**Всего:** 7 (неделя) + 6 (месяц) = 13 вопросов. M6 добавлен 10 апр для decommission-триажа (решение 6).
+**Всего:** 3 (неделя) + 6 (месяц) = 9 вопросов. Week-блок сокращён с 7 до 3 (13 апр 2026, по обратной связи — см. заметку выше). M6 добавлен 10 апр для decommission-триажа (решение 6).

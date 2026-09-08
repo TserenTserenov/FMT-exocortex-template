@@ -1,66 +1,85 @@
 #!/bin/bash
 # routing: hook  trigger=pre-commit  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# Pre-commit hook: блокирует случайный коммит секретов.
+# Blocks staged additions that match the canonical secret corpus.
 #
-# Канонический шаблон. Копия в <repo>/.githooks/pre-commit для каждого репо.
-# Расширение паттернов — править здесь, потом распространить копированием.
+# The hook reports only pattern identifiers and counts. It must never echo a
+# matched diff line, secret value or content-derived digest.
 #
-# Покрывает:
-#   - Better Stack API token: ust_<≥20 alnum>
-#   - Telegram bot token:     <8-10 digits>:<35 alnum/_/->
-#   - Hex secret (≥32) присвоенный в *_SECRET / *_HMAC / *_TOKEN / *_API_KEY
-#   - Neon API key:           napi_<≥30 alnum>
-#   - DATABASE_URL с user:pass: postgresql(ql)?://user:pass@...
-#   - Anthropic API key:      sk-ant-api<NN>-<chars>
-#   - GitHub token:           ghp_/gho_/ghs_/ghr_/ghu_ + alnum
-#   - AWS access key:         AKIA + 16 alphanum
-#   - Generic 40-char API token в *_API_KEY/*_TOKEN присвоении
+# Activation: git config core.hooksPath .githooks
+# Bypass:     git commit --no-verify (only as an explicit operator decision)
 #
-# Активация: git config core.hooksPath .githooks
-# Bypass:    git commit --no-verify  (только осознанно)
+# This is local defense in depth: it deliberately uses the helper from the
+# current working tree, so protected-branch CI remains the independent control
+# against a staged helper modification or an explicit --no-verify bypass.
 
-staged_diff=$(git diff --cached --diff-filter=ACM)
+set -uo pipefail
+umask 077
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+
+if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+  printf 'Pre-commit secret scan unavailable: repository root is unknown.\n' >&2
+  exit 2
+fi
+
+SECRET_LIB="$repo_root/.claude/hooks/secret-bypass-lib.sh"
+if [ ! -r "$SECRET_LIB" ]; then
+  SECRET_LIB="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/secret-bypass-lib.sh"
+fi
+if [ ! -r "$SECRET_LIB" ]; then
+  printf 'Pre-commit secret scan unavailable: canonical pattern library is missing.\n' >&2
+  exit 2
+fi
+# shellcheck source=../.claude/hooks/secret-bypass-lib.sh
+# shellcheck disable=SC1090,SC1091
+. "$SECRET_LIB"
+if ! command -v secret_pattern_process >/dev/null 2>&1 \
+  || [ ! -x "$SECRET_BYPASS_JQ" ] \
+  || [ ! -x "$SECRET_BYPASS_PYTHON" ]; then
+  printf 'Pre-commit secret scan unavailable: validated helpers are missing.\n' >&2
+  exit 2
+fi
+
+if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --unified=0 -- .); then
+  printf 'Pre-commit secret scan unavailable: staged diff could not be read.\n' >&2
+  exit 2
+fi
 if [ -z "$staged_diff" ]; then
-    exit 0
+  exit 0
 fi
 
-added_lines=$(echo "$staged_diff" | grep -E '^\+' | grep -vE '^\+\+\+ ')
-
-violations=""
-
-check_pattern() {
-    local label="$1"
-    local pattern="$2"
-    local hits
-    hits=$(echo "$added_lines" | grep -nE "$pattern" || true)
-    if [ -n "$hits" ]; then
-        violations="${violations}
-[$label]
-$hits
-"
-    fi
-}
-
-check_pattern "Better Stack API token"          'ust_[A-Za-z0-9]{20,}'
-check_pattern "Telegram bot token"              '[0-9]{8,10}:[A-Za-z0-9_-]{35}'
-check_pattern "Hex secret в env-присваивании"   '(_SECRET|_HMAC|_TOKEN|_API_KEY)[[:space:]]*=[[:space:]]*"?[a-f0-9]{32,}'
-check_pattern "Neon API key"                    'napi_[A-Za-z0-9]{30,}'
-check_pattern "DATABASE_URL с user:pass"        'postgresql(ql)?://[^:[:space:]]+:[^@[:space:]]{4,}@'
-check_pattern "Anthropic API key"               'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{30,}'
-check_pattern "GitHub token"                    'gh[poshru]_[A-Za-z0-9]{30,}'
-check_pattern "AWS access key"                  'AKIA[0-9A-Z]{16}'
-check_pattern "Generic 40+ char API token"      '(_API_KEY|_TOKEN|_KEY)[[:space:]]*=[[:space:]]*"?[A-Za-z0-9_-]{40,}"?'
-
-if [ -n "$violations" ]; then
-    echo ""
-    echo "🚫 Pre-commit BLOCKED: возможный секрет в staged изменениях."
-    echo "$violations"
-    echo "Если это плейсхолдер/тест — отрегулируй паттерн в .githooks/pre-commit"
-    echo "Канонический шаблон: ~/IWE/scripts/pre-commit-secret-scan.sh"
-    echo "Bypass (осознанно): git commit --no-verify"
-    echo ""
-    exit 1
+# Drop diff metadata and the leading "+" marker. Line indexes returned by the
+# helper are internal only; the hook intentionally omits source lines entirely.
+added_lines=$(printf '%s\n' "$staged_diff" | sed -n '/^+++ /d; s/^+//p')
+if [ -z "$added_lines" ]; then
+  exit 0
 fi
 
-exit 0
+if ! analysis=$(printf '%s' "$added_lines" | secret_pattern_process detect-text 2>/dev/null) \
+  || ! printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -e '
+      type == "object"
+      and (.pattern_ids | type == "array" and all(.[]; type == "string"))
+      and (.patterns | type == "array" and all(.[];
+        type == "object"
+        and (.pattern_id | type == "string")
+        and (.count | type == "number" and . >= 1 and floor == .)))
+      and (.match_count | type == "number" and . >= 0 and floor == .)
+    ' >/dev/null 2>&1; then
+  printf 'Pre-commit secret scan unavailable: staged analysis failed closed.\n' >&2
+  exit 2
+fi
+
+match_count=$(printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -r '.match_count')
+if [ "$match_count" -eq 0 ]; then
+  exit 0
+fi
+
+pattern_count=$(printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -r '.pattern_ids | length')
+printf 'Pre-commit BLOCKED: %s possible secret(s) in %s pattern class(es).\n' \
+  "$match_count" "$pattern_count" >&2
+printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -r '
+  .patterns[] | "- \(.pattern_id): \(.count) match(es)"
+' >&2
+printf 'Matched values and source lines are intentionally hidden.\n' >&2
+printf 'Use git commit --no-verify only after an explicit operator review.\n' >&2
+exit 1

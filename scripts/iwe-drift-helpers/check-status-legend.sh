@@ -7,9 +7,9 @@
 #   I1. **Legend completeness:** все статус-эмодзи, встречающиеся в таблице WP-REGISTRY.md,
 #       задокументированы в легенде вверху файла. Новый эмодзи без записи в легенде → DRIFT.
 #   I2. **Format compliance — active id:** строки с plain id `| <num> |` имеют active статус
-#       (НЕ из терминального множества {✅, 📦, ↗️}).
+#       (НЕ из терминального множества {✅, 📦, ↗️, ❌}).
 #   I3. **Format compliance — terminal id:** строки с crossed id `| ~~<num>~~ |` имеют
-#       терминальный статус из {✅, 📦, ↗️}.
+#       терминальный статус из {✅, 📦, ↗️, ❌}.
 #
 # I2 + I3 — invariant id-format ↔ status (см. .claude/rules/formatting.md «Таблицы с РП»).
 # Сломан = расхождение row-format и status, что ломает счётчики (linear-sync.sh, day-close.sh).
@@ -32,7 +32,7 @@ MODE="${MODE:-all}"
 
 # Терминальные статусы — закрытие РП. Источник: легенда WP-REGISTRY.md.
 # Изменение этого списка = архитектурное решение об эволюции lifecycle РП.
-TERMINAL_STATUSES=("✅" "📦" "↗️")
+TERMINAL_STATUSES=("✅" "📦" "↗️" "❌")
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,18 +51,37 @@ if [ ! -f "$REGISTRY" ]; then
     exit 1
 fi
 
-# Извлечь множество эмодзи из легенды (таблица «| Статус | Расшифровка |»).
+# Извлечь множество эмодзи из легенды.
+# Поддерживаются обе поставляемые формы: «Статус | Расшифровка» и
+# «Эмодзи | Статус | Что значит». Заголовок определяет колонку с emoji.
 # Возвращает по одному эмодзи на строку.
 extract_legend_emojis() {
     awk '
-        /^\| Статус \| Расшифровка \|/ { in_legend = 1; next }
+        function trim(value) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+        /^\|/ {
+            n = split($0, fields, "|")
+            if (in_legend == 0) {
+                for (i = 2; i < n; i++) {
+                    header = trim(fields[i])
+                    if (header == "Эмодзи") emoji_col = i
+                    if (header == "Расшифровка") has_description = 1
+                    if (header == "Статус") status_col = i
+                }
+                if (emoji_col > 0 || (status_col > 0 && has_description)) {
+                    if (emoji_col == 0) emoji_col = status_col
+                    in_legend = 1
+                    next
+                }
+            }
+        }
         in_legend && /^\|---/ { next }
         in_legend && /^\|/ {
-            # Поле 2 = эмодзи, между | и |
             n = split($0, fields, "|")
-            if (n >= 3) {
-                emoji = fields[2]
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", emoji)
+            if (n >= emoji_col) {
+                emoji = trim(fields[emoji_col])
                 if (emoji != "") print emoji
             }
             next
@@ -71,16 +90,33 @@ extract_legend_emojis() {
     ' "$REGISTRY"
 }
 
-# Извлечь множество эмодзи из колонки «Ст» в таблице WP (4-я колонка).
+# Извлечь множество эмодзи из колонки «Ст»/«Статус» в таблице WP.
+# Колонка определяется по заголовку: порядок колонок — настраиваемая часть
+# реестра, поэтому фиксированный индекс здесь давал ложные нарушения.
 # Возвращает по одному эмодзи на строку (с дубликатами — кому надо, тот фильтрует sort -u).
 extract_table_emojis() {
     awk '
-        /^\|[[:space:]]*(~~)?[0-9]+/ {
-            # Колонка статуса = поле 5 (после header `| # | P | Название | Ст |`)
+        function trim(value) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+        /^\|/ {
             n = split($0, fields, "|")
-            if (n >= 5) {
-                status = fields[5]
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", status)
+            if (trim(fields[2]) == "#") status_col = 0
+            if (status_col == 0) {
+                for (i = 2; i < n; i++) {
+                    header = trim(fields[i])
+                    if (header == "Ст" || header == "Статус") {
+                        status_col = i
+                        next
+                    }
+                }
+            }
+        }
+        /^\|[[:space:]]*(~~)?[0-9]+/ {
+            n = split($0, fields, "|")
+            if (status_col > 0 && n >= status_col) {
+                status = trim(fields[status_col])
                 gsub(/~~/, "", status)
                 if (status != "") print status
             }
@@ -92,13 +128,30 @@ extract_table_emojis() {
 # id_format: "active" если plain `| 263 |`, "terminal" если crossed `| ~~263~~ |`.
 extract_id_status_pairs() {
     awk '
+        function trim(value) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            return value
+        }
+        /^\|/ {
+            n = split($0, fields, "|")
+            if (trim(fields[2]) == "#") status_col = 0
+            if (status_col == 0) {
+                for (i = 2; i < n; i++) {
+                    header = trim(fields[i])
+                    if (header == "Ст" || header == "Статус") {
+                        status_col = i
+                        next
+                    }
+                }
+            }
+        }
         /^\|[[:space:]]*(~~)?[0-9]+/ {
             n = split($0, fields, "|")
-            if (n < 5) next
+            if (status_col == 0 || n < status_col) next
             id_field = fields[2]
-            status_field = fields[5]
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", id_field)
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", status_field)
+            status_field = fields[status_col]
+            id_field = trim(id_field)
+            status_field = trim(status_field)
             gsub(/~~/, "", status_field)
 
             if (match(id_field, /^~~[0-9]+~~$/)) {

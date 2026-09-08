@@ -4,6 +4,6 @@
 # The copy itself is derived-only: never edit guide-kit/ in place — change
 # the source repo, release a tag, re-run the sync.
 source_repo: https://github.com/iwesys/guide-kit.git
-tag: v0.1.2
-commit: cb855beaf1f58523a8499f6f5ed49468ceda62c9
-synced_at: 2026-07-20T06:39:45Z
+tag: v0.1.3
+commit: c25171639e8ef97d9294e918506bc3c951ab17db
+synced_at: 2026-08-09T12:09:57Z

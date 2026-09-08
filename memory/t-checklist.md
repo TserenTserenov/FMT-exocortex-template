@@ -1,8 +1,15 @@
 ---
-type: operational-checklist
+name: t-checklist
+description: "Операционный чеклист обслуживания для закрывающих протоколов"
+type: protocol
+horizon: warm
+domains: [reference, maintenance]
+status: active
 wp: 217
 promoted: 2026-04-25
 valid_from: 2026-04-10
+owner: platform
+schema_version: 1
 ---
 # T-чеклист (single source для skill /close)
 
@@ -35,10 +42,10 @@ valid_from: 2026-04-10
 | T10 | Downstream sync (update.sh — reindex + pack-project + template) | агент | день при изменениях Pack | MCP-сервер отдаёт устаревший Pack, template-sync ломается |
 | T11 | Linear sync (статусы linear ↔ git) | агент | день | Linear отражает не то, что в git |
 | T12 | Governance batch: WeekPlan/DayPlan/WP-REGISTRY/open-sessions.log обновлены | агент | день | план-факт расходится |
-| T13 | Drift top-3 critical в Day Report (`iwe-drift.sh --top 3 --critical`) | агент (S-вставка) | день | drift копится невидимо |
+| ~~T13~~ | ~~Drift top-3 critical в Day Report~~ **снят (WP-545 Ф5, 21.08, решение пилота)** — дублировал T18 (полная недельная сверка тем же `iwe-drift.sh`); дневная гранулярность поверх недельной избыточна, не встроена в текущий порядок Day Close | — | — | — |
 | T14 | Day Open файл завтра готов (pre-populate календарь, заметки) | агент | конец дня | Day Open утром стартует с нуля |
 
-**Верификация:** Haiku R23 проверяет чеклист + что все 14 пунктов отмечены.
+**Верификация:** Haiku R23 проверяет чеклист + что все 8 активных пунктов отмечены (T13 снят 21.08, см. выше).
 
 ## Week Close (воскресенье)
 

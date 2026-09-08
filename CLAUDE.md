@@ -23,7 +23,7 @@
 1. **WP Gate:** ЛЮБОЕ задание → `memory/protocol-open.md` ДО начала работы. Новый РП → Ритуал согласования → явное «да»/«делаем»/«открывай»; без этого не регистрировать.
 2. **Push:** «заливай»/«запуши»/«закрывай» → commit + push без вопросов, ДО отчёта Закрытия. Любой Close: `git status --short` по всем репо → незафиксированное commit + push ДО следующего шага.
 3. **Close:** Триггер Закрытия → протокол Закрытия → выполнить.
-4. **Pull-on-Touch:** `git pull --rebase` при первом обращении к репо за сессию (все `{{WORKSPACE_DIR}}/*`). Dirty → stash; конфликт → `memory/reference/agent-core.md`.
+4. **Pull-on-Touch:** PreToolUse-хук автоматически делает best-effort `git pull --rebase --autostash` один раз на репо. Не выполняй ручной `cd && git pull`; при сбое хук сообщает `potentially stale`, процедура → `memory/reference/agent-core.md`.
 5. **Чеклист-верификация:** Quick/Day Close — sub-agent Haiku R23 сверяет с чеклистом. Исключения: ≤15 мин или без изменений файлов.
 6. **Hooks/Scripts Bypass Gate (S-33):** без явного разрешения не менять `.claude/hooks|scripts/`, `.iwe-runtime/`, `FMT-exocortex-template/`, не обходить хуки; блок хука → bug-файл + пилоту + ждать. → `.claude/rules-lazy/hooks-bypass-gate.md`.
 7. **Автономность:** не спрашивать подтверждения — выполни → отчитайся. Исключения: необратимо-разрушительное; WP Gate Ритуал; choice-question. Полный текст → `.claude/rules-lazy/blocking-rules-full.md` п.7.
@@ -40,7 +40,6 @@
 > Полные формулировки → `.claude/rules-lazy/blocking-rules-full.md`.
 
 - Начало работы → какие сервисы (MAP.002) затронуты?
-- Нетривиальное действие/РП → **State-Transition Gate (WP-457):** `{тип состояния, из→в}`, только `gate_ready: true` → Agent Core ниже.
 - Пользовательский сценарий → **SC Gate:** какое обещание (08-service-clauses/) затронуто?
 - Создание/размещение артефакта → **Routing Gate:** карта DP.KR.001 §5; «по аналогии с соседним» запрещено.
 - Первое содержательное действие в репо → **Repo-Touch Gate:** прочитать `<repo>/CLAUDE.md`; блок «обязательно загружай» → загрузить ДО ответа.
@@ -82,7 +81,7 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 ## Agent Core (SYNC-CORE → AGENTS.md)
 
-> **WP-394 Ф4.2.** Единое ядро для всех агентов (Claude, Kimi, Hermes). `AGENTS.md` генерируется отсюда скриптом `scripts/sync-agent-instructions.sh` — **не редактировать `AGENTS.md` вручную**. Элаборация → `memory/reference/agent-core.md`.
+> **WP-394 Ф4.2.** Единое ядро для всех агентов (Claude, Kimi, Codex, Hermes). `AGENTS.md` генерируется отсюда скриптом `scripts/sync-agent-instructions.sh` — **не редактировать `AGENTS.md` вручную**. Элаборация → `memory/reference/agent-core.md`.
 
 <!-- SYNC-CORE-START -->
 
@@ -92,7 +91,7 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 ## State-Transition Gate — CRITICAL
 
-**Перед любым нетривиальным действием или РП назвать целевой переход состояния пользователя** `{тип состояния, из→в}` (WP-457) — **применимо, если в `DS-strategy/docs/state-axes-registry.yaml` описаны оси состояний** (авторский артефакт, не шипится в шаблон по умолчанию). Если файл есть — типы только из него, допустимы только `gate_ready: true`; ссылка на declared FSM-owner обязательна, свободный текст не принимается; нет ссылки или тип не `gate_ready` → действие = inventory → СТОП/отложить. **Файла нет (типовая установка)** → гейт неактивен, действовать по остальным Pre-action Gates без остановки. Модель осей (авторский пример) → `archive/wp-contexts/WP-457/CONCEPT-user-states.md §5`; cross-axis → `memory/reference/agent-core.md`.
+**Есть `DS-strategy/docs/state-axes-registry.yaml` → до любого нетривиального действия или РП полностью прочитать и выполнить `.claude/rules-lazy/state-transition-gate.md`; lazy-файл отсутствует или нечитаем → только inventory, СТОП. Реестра нет → гейт неактивен.**
 
 ## Git Staging — CRITICAL
 
@@ -132,7 +131,7 @@ Discrepancy found (file ≠ plan, stale content): **report to pilot, do not sile
 
 ## Status Reporting — Agent Status Registry (РП-395)
 
-**Primary (обязательно):** в начале задачи `agent_status_update(agent=<claude-code|kimi|hermes>, status=working, task=<кратко>, files=[...])`; по завершении — `status=idle`. Статусы: `idle|working|peer-session|blocked`; пилот видит всех через `agent_status_list`. Командный режим (`repo=`) и fail-safe скрипт → `memory/reference/agent-core.md`.
+**Primary (обязательно):** в начале задачи `agent_status_update(agent=<claude-code|kimi|codex|hermes>, status=working, task=<кратко>, files=[...])`; по завершении — `status=idle`. Статусы: `idle|working|peer-session|blocked`; пилот видит всех через `agent_status_list`. Командный режим (`repo=`) и fail-safe скрипт → `memory/reference/agent-core.md`.
 
 ## Long Operation Protocol — 180 s Silence Threshold
 
@@ -185,11 +184,11 @@ Respond in Russian unless the user writes in English.
 
 > Элаборации всех пунктов → `memory/reference/agent-core.md`.
 
-- **Без Obsidian (DS-strategy):** просмотр через VS Code.
+- **Obsidian:** поддерживаемый vault — отдельный governance-репозиторий `{{GOVERNANCE_REPO}}`; корень `{{WORKSPACE_DIR}}` не открывать как vault из-за больших Markdown-файлов (например, `FPF/FPF-Spec.md`). Весь workspace просматривать через VS Code.
 - **Комментарии кода — только EN (решение Андрея, 14.06.2026):** весь `{{WORKSPACE_DIR}}/**`; исключение — user-facing строки по языку интерфейса.
-- **Различения (авторские):** `.claude/rules/distinctions.md` (секция «Авторские») + `memory/distinctions-warm.md` (в т.ч. «Бот = интерфейс, не место агентов»).
+- **Различения (авторские):** `memory/distinctions-warm.md` и `extensions/`; `.claude/rules/distinctions.md` — поставляемый платформенный hot-слой, пользовательские правки допустимы только внутри явного `USER-SPACE` блока.
 - **Именование:** governance-репо называется `DS-strategy` по умолчанию; рабочая директория `{{HOME_DIR}}/IWE/`.
-- **Extensions Gate (БЛОКИРУЮЩЕЕ):** пользователи кастомизируют ТОЛЬКО `extensions/*.md` + `params.yaml` (правка `.claude/skills/` или `memory/protocol-*.md` = ошибка); автор (`author_mode: true`) редактирует L1 напрямую — авторский IWE = SoT, доставка в FMT через `template-sync.sh`.
+- **Extensions Gate (БЛОКИРУЮЩЕЕ для Edit/Write; советующее в целом):** пользовательские правила и настройки идут в `extensions/*.md` + `params.yaml`; новый project-local skill допустим в `.claude/skills/<name>/`, только если этот каталог отсутствует в `update-manifest.json` (issue #311). Существующий платформенный skill или `memory/protocol-*.md` напрямую не править; автор (`author_mode: true`) редактирует L1 как SoT и доставляет через `template-sync.sh`. Хук перехватывает `Edit|Write`, но не разбирает произвольные Bash-команды: это guardrail от случайной правки, не tool-independent security boundary.
 - **README.md (FMT-exocortex-template):** изменение структуры — по согласованию с владельцем.
 - **WP Entry Filter (S-47, БЛОКИРУЮЩЕЕ):** новый РП — только при явной связи с R1-R6 месяца или внешнем заказчике; иначе → `inbox/backlog-with-triggers.md`. Исключения: spin-off закрытого РП; прямое поручение пилота.
 - **Именование РП:** существительное-артефакт, только русский (Pack-ID допустим); реестр ≤80 символов → SYNC-CORE; переименование — синхронно REGISTRY+MEMORY.md+WeekPlan+DayPlan+WP-context.

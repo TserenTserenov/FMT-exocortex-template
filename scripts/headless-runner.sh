@@ -29,6 +29,13 @@ STATE_DIR="${IWE_STATE_DIR:-$HOME/.iwe/state}"
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCHER="$SCRIPTS_DIR/iwe-agent-dispatcher.py"
 
+# WP-529 Ф9 (Evgenii 20.08): dispatcher imports yaml unconditionally, so a
+# plain `python3` here can silently pick a yaml-less interpreter (same class
+# as #453/#463) — unlike route-task.sh's per-skill interpreter resolution,
+# this entrypoint always needs PyYAML, so it hard-fails instead of falling
+# back.
+PYTHON3="$("$SCRIPTS_DIR/lib/find-python3.sh")" || exit 1
+
 # === Parse args ===
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -149,8 +156,8 @@ DISPATCHER_ARGS=(
 )
 [[ $DRY_RUN -eq 1 ]] && DISPATCHER_ARGS+=(--dry-run)
 
-echo "[headless-runner] Запускаю dispatcher: python3 $DISPATCHER ${DISPATCHER_ARGS[*]}"
-python3 "$DISPATCHER" "${DISPATCHER_ARGS[@]}"
+echo "[headless-runner] Запускаю dispatcher: $PYTHON3 $DISPATCHER ${DISPATCHER_ARGS[*]}"
+"$PYTHON3" "$DISPATCHER" "${DISPATCHER_ARGS[@]}"
 EXIT_CODE=$?
 
 # === Log завершения ===

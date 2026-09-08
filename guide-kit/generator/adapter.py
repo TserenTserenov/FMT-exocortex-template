@@ -25,6 +25,7 @@ import yaml
 from horizons import (
     ArtifactsSummary,
     DayEvents,
+    DomainTrait,
     HorizonContext,
     MonthThemes,
     OrchestratorTrigger,
@@ -304,6 +305,29 @@ def _from_dict_safe(cls, d: dict):
     return cls(**{k: v for k, v in d.items() if k in known})
 
 
+def _parse_domain_traits(raw) -> list[DomainTrait]:
+    """Structurally broken entries (not a dict, missing 'characteristic'/'domain') get
+    the same honest-degradation treatment as the rest of this file (see _read_yaml):
+    log + skip that entry, don't crash the whole profile. An invalid *status*
+    (a typo like 'Measured') stays loud — DomainTrait.__post_init__'s ValueError
+    is intentional (Ф5b: a misspelled status must not silently pass as active).
+
+    A non-list `domain_traits` (e.g. a number or a bare dict — a plausible
+    YAML authoring mistake) gets the same treatment at the container level,
+    not just per-entry: one clear log, not a crash or per-character/per-key
+    junk from iterating something that isn't a list of records."""
+    if not isinstance(raw, list):
+        logger.error("domain_traits is not a list (got %s) — treating as empty", type(raw).__name__)
+        return []
+    traits = []
+    for entry in raw:
+        try:
+            traits.append(DomainTrait.from_dict(entry))
+        except (TypeError, KeyError) as e:
+            logger.error("malformed domain_traits entry %r: %s — skipping", entry, e)
+    return traits
+
+
 def build_horizon_context(profile: dict) -> HorizonContext:
     """profile.yaml (2.1-2.4 axes) → HorizonContext. An empty profile → RCSProfile() + empty horizons."""
     rcs_dict = profile.get("rcs") or {}
@@ -323,6 +347,7 @@ def build_horizon_context(profile: dict) -> HorizonContext:
         day=_from_dict_safe(DayEvents, profile.get("day") or {}),
         artifacts=_from_dict_safe(ArtifactsSummary, profile.get("artifacts") or {}),
         mastery_by_area=profile.get("mastery_by_area") or {},
+        domain_traits=_parse_domain_traits(profile.get("domain_traits") or []),
         pilot_reflection=profile.get("pilot_reflection", ""),
         reflection_learned=profile.get("reflection_learned") or [],
         tomorrow_intention=profile.get("tomorrow_intention", ""),
@@ -416,11 +441,17 @@ def render_markdown(
     decision_log: list[dict],
     onboarding_appendix: str = "",
     work_section_markdown: str = "",
+    applied_note: str = "",
 ) -> str:
     """work_section_markdown sits in the body, after the visible
     plan and before onboarding_appendix — unlike the appendix, it DOES carry
     provenance (each listed item has a decision_log entry), so it belongs among
     the guide's regular content, not after it.
+
+    applied_note (WP-483 Ф5b) is the applied-mastery mini-section text, present
+    only when plan_skeleton.applied_section was non-null — it sits right after
+    the assignment list, framed as a side practice (WP-495 Ф3: "дополняет
+    мыслительный урок, не заменяет"), never merged into the main narrative.
 
     onboarding_appendix sits after everything else and before
     the decision_log comment — it carries no provenance and is outside the
@@ -431,6 +462,8 @@ def render_markdown(
         tomatoes = item.get("tomatoes", 1)
         rationale = item.get("rationale", "")
         lines.append(f"- **{label}** ({tomatoes} помидорок) — {rationale}")
+    if applied_note:
+        lines += ["", "## Прикладная практика", "", applied_note]
     if work_section_markdown:
         lines += ["", work_section_markdown]
     if onboarding_appendix:
@@ -548,6 +581,8 @@ def generate_daily_plan(
 
     narrative = llm_output.get("narrative", "")
     plan_day = llm_output.get("plan_day", [])
+    applied_note_raw = llm_output.get("applied_note")
+    applied_note = applied_note_raw if isinstance(applied_note_raw, str) else ""
     if not narrative or not plan_day:
         # decision_log only checks the PROVENANCE of a fact, not whether the LLM
         # actually returned something — valid JSON with an empty plan_day would
@@ -565,7 +600,7 @@ def generate_daily_plan(
         )
 
     onboarding_appendix = render_onboarding_ctas(config)
-    markdown = render_markdown(narrative, plan_day, decision_log, onboarding_appendix, work_section_markdown)
+    markdown = render_markdown(narrative, plan_day, decision_log, onboarding_appendix, work_section_markdown, applied_note)
     return GuideResult(ok=True, markdown=markdown)
 
 

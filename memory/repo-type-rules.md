@@ -6,7 +6,7 @@ type: reference
 horizon: warm
 domains: [reference]
 status: active
-owner: user
+owner: platform
 schema_version: 1
 
 name: "repo-type-rules"

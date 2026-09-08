@@ -23,8 +23,8 @@ command -v jq >/dev/null 2>&1 || { echo '{}'; exit 0; }
 
 INPUT=$(cat 2>/dev/null || echo '{}')
 
-# Extract user prompt (first 100 chars is enough for prefix detection)
-PROMPT=$(echo "$INPUT" | jq -r '.message // empty' 2>/dev/null | head -c 100 || echo "")
+# Extract the UserPromptSubmit prompt (first 100 chars is enough for prefix detection)
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null | head -c 100 || echo "")
 [ -n "$PROMPT" ] || { echo '{}'; exit 0; }
 
 # Locate the full roles file

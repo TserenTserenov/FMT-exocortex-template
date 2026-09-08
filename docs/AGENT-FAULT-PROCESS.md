@@ -47,7 +47,20 @@ schema_version: 1
 
 **Кто:** Пользователь (рекомендуется) или агент (если self-correction).
 
-**Где:** `exocortex/feedback_YYYY-MM-DD-тема.md`
+**Прямая запись:** единый платформенный CLI требует явно назвать владельца
+ошибки; модель не определяет его из самоотчёта:
+
+```bash
+python3 scripts/agent-fault/iwe_checklist_memory.py record \
+  --severity major \
+  --fault агент пропустил обязательный чеклист \
+  --source-citation AGENTS.md:точная-цитата-правила \
+  --subject-kind runtime \
+  --subject-id claude-code
+```
+
+**Пакетная фиксация:** `exocortex/feedback_YYYY-MM-DD-тема.md`, затем явный
+импорт на шаге 3.
 
 **Формат:**
 
@@ -99,7 +112,8 @@ python3 scripts/sync_feedback_to_memory.py
 - Сканирует все `feedback_*.md` в `exocortex/` и `memory/`
 - Извлекает правила и журналы
 - Считает частоту повторений (trust_score)
-- Пишет в SQLite: `exocortex/agent-fault-profile/iwe_memory.db`
+- Передаёт записи единому CLI как `system:feedback-import`
+- Пишет только в приватную SQLite: `exocortex/agent-fault-profile/iwe_memory.db`
 
 **Идемпотентность:** повторный запуск не дублирует записи.
 
@@ -111,11 +125,13 @@ python3 scripts/sync_feedback_to_memory.py
 
 **Команда:**
 ```bash
+export IWE_FAULT_SUBJECT_KIND=runtime
+export IWE_FAULT_SUBJECT_ID=claude-code
 bash scripts/agent_fault_remind.sh close   # или open / work
 ```
 
 **Что происходит:**
-- SQLite выдаёт топ-3 косяка по trust_score
+- SQLite выдаёт топ-3 активных косяка только указанного субъекта
 - 🔴 (≥0.8) = критический, часто повторяется
 - 🟡 (0.65–0.79) = внимание
 - 🟢 (<0.65) = на заметку
@@ -143,11 +159,41 @@ bash scripts/agent_fault_remind.sh close   # или open / work
 
 | Скрипт | Назначение | Зависимости |
 |--------|-----------|-------------|
-| `sync_feedback_to_memory.py` | Парсит feedback → SQLite | Python 3, sqlite3 (stdlib) |
-| `agent_fault_remind.py` | Выдаёт топ-N напоминаний | Python 3, sqlite3 (stdlib) |
-| `agent_fault_remind.sh` | Wrapper для удобства | bash |
+| `scripts/agent-fault/iwe_checklist_memory.py` | Единственный writer/reader SQLite | Python 3, sqlite3 (stdlib) |
+| `sync_feedback_to_memory.py` | Тонкая обёртка явного feedback-import | Python 3 |
+| `agent_fault_remind.py` | Совместимая обёртка remind/`--stats` | Python 3 |
+| `agent_fault_remind.sh` | Совместимая shell-обёртка | bash |
 
 **Zero external dependencies.** Работает на любом Mac/Linux с Python 3.
+
+Профиль и SQLite получают права `0700`/`0600`; локальный `.gitignore`
+защищает все runtime-файлы. Если база уже отслеживается Git, CLI блокирует
+доступ и показывает ручную команду `git rm --cached`, не меняя индекс сам.
+Обычная запись не создаёт Markdown-аудит. Полный снимок создаётся только явно:
+
+```bash
+python3 scripts/agent-fault/iwe_checklist_memory.py export
+```
+
+Пороговую выборку активных ошибок можно получить без создания отсутствующей
+базы:
+
+```bash
+python3 scripts/agent-fault/iwe_checklist_memory.py escalation-check \
+  --threshold 3 \
+  --subject-kind runtime \
+  --subject-id claude-code
+```
+
+Локальные Python-потребители не должны импортировать прежние `DB_PATH` или
+`init_db`. Публичная функция `read_faults(...)` канонического модуля читает
+только точного субъекта, возвращает неизменяемые записи и не создаёт профиль.
+
+Новая установка получает четыре прежних имени скриптов как тонкие обёртки над
+каноническим CLI. При обновлении они заменяются только единым пакетом: допустимы
+отсутствующие, уже совпадающие или побайтово известные платформенные версии.
+Неизвестный файл, символьная ссылка либо оставшийся импорт старого модуля
+останавливает миграцию до любой записи и выводит порядок ручной проверки.
 
 ---
 
@@ -168,20 +214,24 @@ bash scripts/agent_fault_remind.sh close   # или open / work
 
 **Перед protocol-open:**
 ```bash
+export IWE_FAULT_SUBJECT_KIND=runtime
+export IWE_FAULT_SUBJECT_ID=claude-code
 bash scripts/agent_fault_remind.sh open
 ```
 → Вставить вывод в system prompt.
 
 **После protocol-close:**
 ```bash
-# Если были косяки — записать их через checklist_memory.py
-# или вручную создать feedback-файл
+# Если были косяки — вызвать /agent-fault с явным subject
+# или вручную создать feedback-файл для следующего explicit import
 ```
 
 **В Week Close:**
 ```bash
 python3 scripts/sync_feedback_to_memory.py
-bash scripts/agent_fault_remind.sh --stats
+IWE_FAULT_SUBJECT_KIND=runtime \
+IWE_FAULT_SUBJECT_ID=claude-code \
+  bash scripts/agent_fault_remind.sh --stats
 ```
 → Обсудить динамику на стратегической сессии.
 
@@ -191,7 +241,8 @@ bash scripts/agent_fault_remind.sh --stats
 
 - [ ] Создать первый feedback-файл (фиксация косяка из последней сессии)
 - [ ] Запустить `sync_feedback_to_memory.py` (проверить, что SQLite создалась)
-- [ ] Запустить `agent_fault_remind.sh work` (увидеть топ-3)
+- [ ] Задать `IWE_FAULT_SUBJECT_KIND`/`IWE_FAULT_SUBJECT_ID`
+- [ ] Запустить `agent_fault_remind.sh work` (увидеть топ-3 своего субъекта)
 - [ ] Провести 1 сессию с напоминаниями (проверить, что агент их видит)
 - [ ] Через 5 дней: smoke-test (3 с remind vs 3 без)
 - [ ] Через 2 недели: ретро + решение о доставке в шаблон

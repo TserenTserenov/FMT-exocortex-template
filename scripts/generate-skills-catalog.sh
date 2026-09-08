@@ -30,27 +30,56 @@ done
 
 log() { echo "$*" >&2; }
 
-# Извлечь значение поля из YAML frontmatter (первое вхождение)
+# Извлечь значение поля из YAML frontmatter (первое вхождение).
+# Поддерживает block scalar (`field: |` / `field: >`) — читает следующие
+# более-отступленные строки до дедента и схлопывает их в одну строку
+# (найдено 01.09, WP-527: `description: |` в repo-new/skill-creator
+# ломался в буквальное значение "|", а не читался как блок).
 get_field() {
     local file="$1" field="$2"
-    sed -n "/^---$/,/^---$/p" "$file" 2>/dev/null \
-      | grep "^${field}:" \
-      | head -1 \
-      | sed "s/^${field}: *//" \
-      | sed 's/^"\(.*\)"$/\1/' \
-      | sed "s/^'\(.*\)'$/\1/"
+    local block value
+    block=$(sed -n "/^---$/,/^---$/p" "$file" 2>/dev/null)
+    value=$(echo "$block" | grep "^${field}:" | head -1 | sed "s/^${field}: *//")
+    case "$value" in
+        '|'|'>'|'|-'|'>-'|'|+'|'>+')
+            echo "$block" | awk -v field="^${field}:" '
+                BEGIN{found=0}
+                $0 ~ field {found=1; next}
+                found==1 {
+                    if ($0 !~ /^[ \t]/ || $0 == "") { exit }
+                    gsub(/^[ \t]+/, "");
+                    printf "%s ", $0
+                }
+            ' | sed 's/ *$//'
+            ;;
+        *)
+            echo "$value" | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
+            ;;
+    esac
 }
 
-# Извлечь список (slash или phrases) из triggers блока
+# Извлечь список (slash) из triggers блока. Поддерживает и inline-стиль
+# (`slash: [/a, /b]`), и YAML-список (`slash:` + `- item` строками ниже —
+# формат, который выдаёт scaffold-init.sh; найден 01.09 WP-527, раньше давал
+# мусор вида "- slash:" вместо реальных триггеров).
 get_triggers_slash() {
     local file="$1"
-    # Ищем triggers.slash как inline список [/skill]
-    sed -n '/^triggers:/,/^[a-z]/p' "$file" 2>/dev/null \
-      | grep "slash:" \
-      | sed 's/.*slash: *\[//;s/\].*//' \
-      | tr ',' '\n' \
-      | sed 's/^ *//;s/ *$//;s/^\/\?/\//' \
-      | grep -v '^$' || true
+    local block inline
+    block=$(sed -n '/^triggers:/,/^[a-z]/p' "$file" 2>/dev/null)
+    inline=$(echo "$block" | grep "slash: *\[" | sed 's/.*slash: *\[//;s/\].*//' \
+        | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$')
+    if [[ -n "$inline" ]]; then
+        echo "$inline" | sed 's/^\/\?/\//'
+        return
+    fi
+    echo "$block" | awk '
+        /slash:[ \t]*$/ {insl=1; next}
+        insl==1 {
+            if ($0 ~ /^[ \t]*-[ \t]*/) {
+                sub(/^[ \t]*-[ \t]*/, ""); print; next
+            } else { insl=0 }
+        }
+    ' | sed 's/^ *//;s/ *$//;s/^\/\?/\//' | grep -v '^$' || true
 }
 
 # Собрать все файлы где упоминается скилл (для invoked_by)

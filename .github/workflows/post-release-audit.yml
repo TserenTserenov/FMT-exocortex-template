@@ -5,16 +5,22 @@ name: Post-Release Adversarial Audit
 #
 # Триггеры:
 #   1. Manual: workflow_dispatch — автор запускает после релиза.
-#   2. Auto-trigger DISABLED 2026-06-01 (peer-session triage):
-#      Раньше создавал новый issue на каждый push update-manifest.json,
-#      но это создаёт inflated backlog (22 audit issues накопилось).
-#      Теперь audit status трекается в docs/release-audit-log.md (single source).
-#      Для запуска вручную — Actions tab → Run workflow.
+#   2. Auto: push update-manifest.json, НО только когда patch=0 (x.y.0 —
+#      minor/major). Re-enabled 2026-08-10 (WP-7 Ф62) после того, как безусловный
+#      триггер на КАЖДЫЙ push (включая еженедельный авто-бамп patch-версии)
+#      вырубили 2026-06-01: 22 issue накопились нечитанными, потому что частота
+#      сама по себе (1-7 дней) не оставляла шанса разобрать. weekly-release.yml
+#      бампает только patch — этот фильтр не даёт рутинным patch-релизам создавать
+#      issue, но ловит любой minor/major bump (они всегда осознанные, не авто-cron).
 #
 # Цель: создать reminder с adversarial-промптом → автор прогоняет в Claude session
 # → находит классы регрессий, которые detectors не ловят.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - update-manifest.json
   workflow_dispatch:
     inputs:
       version:
@@ -42,7 +48,21 @@ jobs:
               | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
             echo "version=$VER" >> $GITHUB_OUTPUT
           fi
+      - name: Skip routine patch bumps on auto-trigger (patch != 0)
+        id: gate
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+          if [ "$PATCH" != "0" ]; then
+            echo "SKIP: $VERSION — patch-релиз (weekly auto-bump), не minor/major. Явный запуск доступен вручную."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Create or update audit reminder issue
+        if: github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true'
+        id: issue
         uses: actions/github-script@v8
         with:
           script: |
@@ -57,15 +77,14 @@ jobs:
             >
             > **После audit — обновить \`docs/release-audit-log.md\`** (status + findings + result), затем закрыть этот issue.
 
-            ## Шаги
+            ## Шаги (минимум ручной работы)
 
-            1. Открыть Claude Code сессию в FMT-exocortex-template
-            2. Скопировать промпт ниже и адаптировать <TARGET-VERSION>
-            3. Прогнать через \`Agent\` или sub-agent
-            4. Найденные классы → +detector в \`integration-contract-validator.sh\`
-            5. Закрыть issue с комментарием: STABLE / X classes found
+            1. Открой НОВЫЙ чат с агентом (не тот, где делались правки релиза) — независимость проверяющего от автора важна.
+            2. Скажи одной фразой: «прогони red team проверку из задачи #<номер этой задачи> в FMT-exocortex-template». Агент сам откроет эту задачу, прочитает промпт ниже и выполнит его — копировать текст руками не нужно.
+            3. Найденные классы регрессий → +detector в \`integration-contract-validator.sh\`.
+            4. Закрыть issue с комментарием: STABLE / X classes found.
 
-            ## Промпт
+            ## Промпт (агент прочитает сам — не для ручного копирования)
 
             <details>
             <summary>Развернуть промпт</summary>
@@ -89,6 +108,9 @@ jobs:
             const existing = issues.find(i => i.title === title);
             if (existing) {
               console.log(`Issue already exists: #${existing.number}`);
+              core.setOutput('created', 'false');
+              core.setOutput('number', existing.number);
+              core.setOutput('url', existing.html_url);
             } else {
               const { data } = await github.rest.issues.create({
                 owner: context.repo.owner,
@@ -98,4 +120,52 @@ jobs:
                 labels: ['release-audit']
               });
               console.log(`Created issue #${data.number}: ${data.html_url}`);
+              core.setOutput('created', 'true');
+              core.setOutput('number', data.number);
+              core.setOutput('url', data.html_url);
             }
+
+      - name: Notify pilot via bot (new issue only)
+        if: steps.issue.outputs.created == 'true'
+        env:
+          BOT_WEBHOOK_URL: ${{ secrets.BOT_WEBHOOK_URL }}
+          TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          ISSUE_URL: ${{ steps.issue.outputs.url }}
+        run: |
+          # Same channel-detection rule as notify-security.yml (issue #547/#454):
+          # gate on whether the channel is CONFIGURED, not on repo name — a
+          # fork with no author secrets must skip silently, a half-configured
+          # channel (exactly one secret set) must fail loudly, not skip.
+          if [ -z "${BOT_WEBHOOK_URL}" ] && [ -z "${TEMPLATE_WEBHOOK_SECRET}" ]; then
+            echo "Skip: канал уведомлений не настроен (форк без секретов автора)."
+            exit 0
+          fi
+          if [ -z "${BOT_WEBHOOK_URL}" ] || [ -z "${TEMPLATE_WEBHOOK_SECRET}" ]; then
+            echo "ERROR: настроен только один из двух секретов канала — это полунастроенное состояние, не skip." >&2
+            exit 1
+          fi
+          MESSAGE="🔴 Нужна независимая проверка (red team) для выпуска v${VERSION}.
+          Задача: ${ISSUE_URL}
+
+          Открой новый чат и скажи: «прогони red team проверку из задачи #${ISSUE_NUMBER} в FMT-exocortex-template»."
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BOT_WEBHOOK_URL}/api/template-update" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: ${TEMPLATE_WEBHOOK_SECRET}" \
+            -d "$(jq -n \
+              --arg version "$VERSION" \
+              --arg changelog "$MESSAGE" \
+              --arg commit_count "1" \
+              '{version: $version, changelog: $changelog, commit_count: ($commit_count | tonumber)}')")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Audit reminder notification sent: $BODY"
+          else
+            echo "Audit reminder notification failed (HTTP $HTTP_CODE): $BODY"
+            exit 1
+          fi

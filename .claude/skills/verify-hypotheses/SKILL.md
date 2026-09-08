@@ -3,6 +3,7 @@ name: verify-hypotheses
 description: Сверка журнала гипотез (hypotheses-log.md) по запросу вне ритма week-close. Фильтрует записи со статусом «на сверке» и наступившей датой, сверяет критерий фальсификации с доступной фактурой, предлагает вердикт, пилот подтверждает, вердикт пишется новой записью. Вызывать на явную фразу пилота, не автоматически.
 version: 0.1.0
 status: experimental
+browser_safe: false
 layer: L1
 agents: single
 interaction: multi-step

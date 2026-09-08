@@ -116,7 +116,7 @@ if ! bash "$FMT_DIR/scripts/validate-fmt-scripts.sh" --settings-json; then
 fi
 
 CHANGELOG_SCRIPT="$FMT_DIR/scripts/changelog-append.sh"
-if [[ -f "$CHANGELOG_SCRIPT" ]]; then bash "$CHANGELOG_SCRIPT"; fi
+if [[ -f "$CHANGELOG_SCRIPT" ]]; then IWE_TEMPLATE="$FMT_DIR" bash "$CHANGELOG_SCRIPT"; fi
 
 echo "✅ Зарегистрирован: $HOOK_PATH → $EVENT"
 echo "Следующий шаг:"

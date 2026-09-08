@@ -4,6 +4,7 @@ description: "Инструкции для автора шаблона IWE: stagi
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/author-mode]
   phrases:
@@ -67,7 +68,7 @@ CLAUDE.md: `bash $IWE_SCRIPTS/template-sync.sh` (sync / `--dry-run` / `--check`)
 
 ### Различения (авторские)
 
-> Хранятся в `.claude/rules/distinctions.md` в секции «Авторские» — не затираются при `update.sh`.
+> Хранятся в `memory/distinctions-warm.md` и `extensions/`. Файл `.claude/rules/distinctions.md` принадлежит платформенному hot-слою; `update.sh` сохраняет только явно размеченный `USER-SPACE` блок.
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->

@@ -1,10 +1,11 @@
 ---
 name: check-secret
-description: Check a text fragment for potential secrets (API keys, tokens, passwords) BEFORE sending to chat / committing / publishing. Third protection layer on top of pre-commit hook (B7.7a) and PostToolUse redact (B7.7b). Manual gate — user explicitly calls on potentially sensitive text.
+description: Check a text fragment for potential secrets (API keys, tokens, passwords) BEFORE sending to chat / committing / publishing. Second protection layer on top of the pre-commit hook — manual gate, user explicitly calls on potentially sensitive text.
 argument-hint: "<text-or-file-path>"
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/check-secret]
   phrases: []
@@ -15,9 +16,9 @@ routing:
   optimization_priority: 2
 ---
 
-# Check Secret — manual gate (B7.7c, WP-212)
+# Check Secret — manual gate (WP-212)
 
-> **Принцип:** B7.7a блокирует Bash-команды с секретами; B7.7b редактирует tool output; этот skill закрывает третий gap — **проверка произвольного текста** который пользователь готовится опубликовать (commit message, slack post, docs paragraph, чат-ответ).
+> **Принцип (issue #410, актуализировано 2026-08-12):** в поставке реально работает один автоматический слой — pre-commit хук (`scripts/pre-commit-secret-scan.sh`), который проверяет только то, что попадает в git-коммит. Этот skill закрывает соседний gap — **проверка произвольного текста до публикации** (commit message, slack post, docs paragraph, чат-ответ), который никогда не пойдёт в коммит и потому мимо хука. B7.7a (блок Bash-команд с секретами) и B7.7b (PostToolUse redact tool output) в поставке не существуют — если появятся, вернуть формулировку «третий слой».
 >
 > **Покрывает паттерны:** Better Stack `ust_`, Telegram bot token, hex secret в env, Neon `napi_`, DATABASE_URL с user:pass, Anthropic `sk-ant-api`, GitHub `ghp_/gho_/ghs_/ghr_/ghu_`, AWS `AKIA`, generic 40+ char API token.
 >
@@ -58,7 +59,7 @@ bash "$IWE_SCRIPTS/route-task.sh" --skill check-secret --args "$ARGUMENTS"
 
 ## Связи
 
-- **Расширение:** B7.7a (`secret-leak-block.sh`) и B7.7b (`secret-leak-redact.sh`) — три-слойная защита.
+- **Слои защиты (issue #410, актуализировано 2026-08-12):** ровно два, не три — pre-commit хук (`scripts/pre-commit-secret-scan.sh`, автоматический) и этот скилл (ручной, до вставки в чат/публикацию). B7.7a (блок Bash) и B7.7b (PostToolUse redact) в поставке не существуют — если появятся, дописать сюда третьим слоем.
 - **Правило поведения:** Правило 25 в `memory/feedback_behaviour.md` — secrets никогда в чат как плейнтекст.
 - **Runbook:** `DP.RUNBOOK.003-cascade-secret-rotation.md` для процедуры reactive ротации.
 - **Канон паттернов:** `$IWE_SCRIPTS/pre-commit-secret-scan.sh` — единая точка для regex-паттернов; check.sh использует тот же набор.

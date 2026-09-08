@@ -78,12 +78,24 @@ normalize_wp_num() {
   echo "${arg#WP-}" | tr -d ' '
 }
 
+wp_path_label() {
+  local filepath="$1"
+  case "$filepath" in
+    "$STRATEGY_DIR"/*) echo "${filepath#"$STRATEGY_DIR"/}" ;;
+    *) echo "$filepath" ;;
+  esac
+}
+
 find_wp_file() {
   local num="$1"
   local found=""
 
   if [[ -d "$INBOX_DIR" ]]; then
-    found=$(grep -rl "^wp: ${num}$" "$INBOX_DIR" 2>/dev/null | head -1 || true)
+    # WP-434: a canonical folder card wins over stale flat duplicates.
+    found=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
+    if [[ -z "$found" ]]; then
+      found=$(grep -rl "^wp: ${num}$" "$INBOX_DIR" 2>/dev/null | head -1 || true)
+    fi
     if [[ -z "$found" ]]; then
       found=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}.md" 2>/dev/null | head -1 || true)
     fi
@@ -106,22 +118,19 @@ find_wp_file() {
   fi
 
   if [[ -z "$found" && -d "$ARCHIVE_DIR" ]]; then
-    found=$(grep -rl "^wp: ${num}$" "$ARCHIVE_DIR" 2>/dev/null | head -1 || true)
+    found=$(find "$ARCHIVE_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
     if [[ -z "$found" ]]; then
-      found=$(find "$ARCHIVE_DIR" -maxdepth 1 -name "WP-${num}*.md" 2>/dev/null | head -1 || true)
+      found=$(grep -rl "^wp: ${num}$" "$ARCHIVE_DIR" 2>/dev/null | head -1 || true)
+    fi
+    if [[ -z "$found" ]]; then
+      # A numeric prefix is not an ID boundary: `WP-46*.md` also matches
+      # `WP-469-*.md`.  Only the exact flat filename or a hyphenated slug is
+      # a valid legacy archive candidate for this WP.
+      found=$(find "$ARCHIVE_DIR" -maxdepth 1 \( -name "WP-${num}.md" -o -name "WP-${num}-*.md" \) 2>/dev/null | sort | head -1 || true)
     fi
   fi
 
   echo "$found"
-}
-
-file_location_label() {
-  local filepath="$1"
-  case "$filepath" in
-    "$INBOX_DIR"*) echo "inbox" ;;
-    "$ARCHIVE_DIR"*) echo "archive/wp-contexts" ;;
-    *) echo "unknown" ;;
-  esac
 }
 
 extract_fm_field() {
@@ -175,14 +184,46 @@ grep_body_wps() {
     || true
 }
 
+# issue #473: колонка статуса регистра — по шапке `| # | ... |`, не по
+# жёсткой позиции (совпадает по духу с find_header_columns() в
+# scripts/build-active-wp.py: разные реестры называют/переставляют колонки).
+registry_status_column() {
+  local header
+  header=$(grep -E '^\|[[:space:]]*#[[:space:]]*\|' "$REGISTRY_FILE" 2>/dev/null | head -1)
+  [[ -z "$header" ]] && return 1
+  awk -F'|' -v h="$header" 'BEGIN {
+    n = split(h, cells, "|")
+    for (i = 1; i <= n; i++) {
+      c = cells[i]; gsub(/^[ \t]+|[ \t]+$/, "", c)
+      lc = tolower(c)
+      if (lc == "статус" || lc == "ст") { print i; exit }
+    }
+  }'
+}
+
 registry_status() {
   local num="$1"
+  # Найдено пир-сессией с Codex (ход 3): единственный вызывающий (строка ~514)
+  # сейчас всегда передаёт голое число (та же инвариантность проверяется
+  # соседним `grep -cE '^[0-9]+$'` на строке ~608), но публичная функция не
+  # обязана полагаться на дисциплину вызывающего — "WP-47" тихо не находился бы.
+  num="${num#WP-}"
+  num="${num#wp-}"
+  if [[ ! "$num" =~ ^[0-9]{1,4}$ ]]; then
+    echo "_некорректный номер РП: ${1}_"
+    return
+  fi
   if [[ ! -f "$REGISTRY_FILE" ]]; then
     echo "_нет файла REGISTRY_"
     return
   fi
+  # issue #473: раньше строка искалась через `grep "WP-${num}[^0-9]"` —
+  # подстрока, которая срабатывает и на прозу ЧУЖИХ строк (например,
+  # "открыт как спин-офф WP-47" в статусе WP-49 возвращал статус WP-49 при
+  # запросе WP-47). Строка опознаётся по СВОЕЙ первой ячейке (номер РП),
+  # тем же приёмом, что ROW_RE в build-active-wp.py.
   local line
-  line=$(grep -E "WP-${num}[^0-9]" "$REGISTRY_FILE" 2>/dev/null | head -1 || true)
+  line=$(grep -E "^\|[[:space:]]*(~~)?(\*\*)?${num}(\*\*)?(~~)?[[:space:]]*\|" "$REGISTRY_FILE" 2>/dev/null | head -1 || true)
   if [[ -z "$line" ]]; then
     echo "_не в реестре_"
     return
@@ -191,16 +232,29 @@ registry_status() {
     echo "~~done~~ (зачёркнут)"
     return
   fi
-  if echo "$line" | grep -q '✅'; then
+  local status_col status_cell
+  status_col=$(registry_status_column)
+  if [[ -z "$status_col" ]]; then
+    echo "_колонка статуса не найдена в шапке реестра_"
+    return
+  fi
+  # Статус берётся из СВОЕЙ ячейки, не грепом эмодзи по всей строке —
+  # эмодзи в описании соседней колонки раньше мог перебить вердикт.
+  status_cell=$(echo "$line" | awk -F'|' -v col="$status_col" '{ v=$col; gsub(/^[ \t]+|[ \t]+$/, "", v); print v }')
+  if echo "$status_cell" | grep -q '✅'; then
     echo "✅ done"
-  elif echo "$line" | grep -q '🔄'; then
+  elif echo "$status_cell" | grep -q '🔄'; then
     echo "🔄 in_progress"
-  elif echo "$line" | grep -q '⏳'; then
+  elif echo "$status_cell" | grep -q '⏳'; then
     echo "⏳ pending"
-  elif echo "$line" | grep -q '📦'; then
+  elif echo "$status_cell" | grep -q '📦'; then
     echo "📦 archived"
+  elif echo "$status_cell" | grep -q '⏹'; then
+    echo "⏹ снят"
+  elif echo "$status_cell" | grep -q '🔁'; then
+    echo "🔁 свёрнут в спринт"
   else
-    echo "$line" | grep -oE '(done|in_progress|pending|closed|open)' | head -1 || echo "_статус неизвестен_"
+    echo "$status_cell" | grep -oE '(done|in_progress|pending|closed|open)' | head -1 || echo "_статус неизвестен_"
   fi
 }
 
@@ -226,18 +280,71 @@ git_log_for_file() {
 
 extract_open_phases() {
   local file="$1"
-  awk '/^---$/{fm++; next} fm<2{next} {print}' "$file" 2>/dev/null \
-    | grep -E '^\s*- \[ \]' \
-    | sed 's/^\s*- \[ \] //' \
-    | head -20 \
-    || true
+  if has_structured_phases "$file"; then
+    extract_structured_open_phases "$file" | head -20
+  else
+    awk '/^---$/{fm++; next} fm<2{next} {print}' "$file" 2>/dev/null \
+      | grep -E '^\s*- \[ \]' \
+      | sed 's/^\s*- \[ \] //' \
+      | head -20 \
+      || true
+  fi
 }
 
 count_open_phases() {
   local file="$1"
   local cnt
-  cnt=$(awk '/^---$/{fm++; next} fm<2{next} /- \[ \]/{count++} END{print count+0}' "$file" 2>/dev/null || echo "0")
+  if has_structured_phases "$file"; then
+    cnt=$(extract_structured_open_phases "$file" | wc -l | tr -d ' ')
+  else
+    cnt=$(awk '/^---$/{fm++; next} fm<2{next} /- \[ \]/{count++} END{print count+0}' "$file" 2>/dev/null || echo "0")
+  fi
   echo "$cnt"
+}
+
+has_structured_phases() {
+  local file="$1"
+  awk '
+    /^---$/ { fm++; if (fm == 2) exit; next }
+    fm != 1 { next }
+    /^phases:[[:space:]]*$/ { in_phases=1; next }
+    in_phases && /^- id:[[:space:]]*/ { found=1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$file" 2>/dev/null
+}
+
+extract_structured_open_phases() {
+  local file="$1"
+  awk '
+    function emit() {
+      if (id != "" && (status == "pending" || status == "in_progress" || status == "blocked")) {
+        print id " (" status ")"
+      }
+    }
+    /^---$/ { fm++; if (fm == 2) exit; next }
+    fm != 1 { next }
+    /^phases:[[:space:]]*$/ { in_phases=1; next }
+    in_phases && /^[A-Za-z_][A-Za-z0-9_-]*:/ {
+      emit(); in_phases=0; id=""; status=""; next
+    }
+    !in_phases { next }
+    /^- id:[[:space:]]*/ {
+      emit()
+      id=$0
+      sub(/^- id:[[:space:]]*/, "", id)
+      status=""
+      next
+    }
+    /^  status:[[:space:]]*/ {
+      status=$0
+      sub(/^  status:[[:space:]]*/, "", status)
+      sub(/[[:space:]]+#.*/, "", status)
+      sub(/^[[:space:]]+/, "", status)
+      sub(/[[:space:]]+$/, "", status)
+      next
+    }
+    END { emit() }
+  ' "$file" 2>/dev/null
 }
 
 # ---------------------------------------------------------------------------
@@ -315,16 +422,22 @@ main() {
     exit 2
   fi
 
-  local location
-  location=$(file_location_label "$wp_file")
-  local basename_file
-  basename_file=$(basename "$wp_file")
+  local wp_path
+  wp_path=$(wp_path_label "$wp_file")
 
-  local status name spawned updated
+  local status name spawned updated created last_session
   status=$(extract_fm_field "$wp_file" "status")
   name=$(extract_fm_field "$wp_file" "name")
   spawned=$(extract_fm_field "$wp_file" "spawned")
   updated=$(extract_fm_field "$wp_file" "updated")
+  # F19 (REVIEW-ARCHITECTURE.md, WP-503 Ф6.6 план): карточки без `updated:` в
+  # frontmatter (created вручную, не auto-touched) молча выключали drift-детектор
+  # №2 ("коммиты завершения после ref_date") — сам ref_date оставался пустым для
+  # них, включая WP-503. `created`/`last_session` расширяют цепочку без изменения
+  # приоритета уже используемых полей (updated по-прежнему первый — самый свежий
+  # признак реальной активности карточки).
+  created=$(extract_fm_field "$wp_file" "created")
+  last_session=$(extract_fm_field "$wp_file" "last_session")
 
   [[ -z "$status" ]] && status="_не указан_"
   [[ -z "$name" ]] && name="_не указано_"
@@ -357,7 +470,7 @@ main() {
   local _df="$drift_file"
   trap 'rm -f "${_df:-}"' EXIT
 
-  local ref_date="${updated:-$spawned}"
+  local ref_date="${updated:-${last_session:-${spawned:-$created}}}"
 
   # ---------------------------------------------------------------------------
   # Output header
@@ -365,7 +478,7 @@ main() {
   echo "# WP Sync Bundle для WP-${wp_num}"
   echo ""
   echo "## Текущий РП"
-  echo "- Файл: \`${location}/${basename_file}\`"
+  echo "- Файл: \`${wp_path}\`"
   echo "- Название: ${name}"
   echo "- Status: ${status}"
   echo "- Spawned: ${spawned}"
@@ -374,7 +487,7 @@ main() {
   echo ""
 
   if [[ "$open_phases_count" -gt 0 ]]; then
-    echo "## Открытые фазы (незакрытые чекбоксы)"
+    echo "## Открытые фазы"
     local phases_list
     phases_list=$(extract_open_phases "$wp_file")
     if [[ -n "$phases_list" ]]; then
@@ -416,15 +529,14 @@ main() {
         echo "- Status (REGISTRY): ${reg_status}"
         echo "- Recent commits (${GIT_LOG_DAYS}д): _файл не найден, skip_"
       else
-        local rloc rbasename rstatus rname
-        rloc=$(file_location_label "$rfile")
-        rbasename=$(basename "$rfile")
+        local rpath rstatus rname
+        rpath=$(wp_path_label "$rfile")
         rstatus=$(extract_fm_field "$rfile" "status")
         rname=$(extract_fm_field "$rfile" "name")
         [[ -z "$rstatus" ]] && rstatus="_не указан_"
         [[ -z "$rname" ]] && rname="_не указано_"
 
-        echo "- Файл: \`${rloc}/${rbasename}\`"
+        echo "- Файл: \`${rpath}\`"
         echo "- Название: ${rname}"
         echo "- Status (frontmatter): ${rstatus}"
         echo "- Status (REGISTRY): ${reg_status}"

@@ -1,0 +1,49 @@
+name: Attestation — compute digest (diagnostic)
+
+# Untrusted, informational only — WP-529 Ф21 (see the WP-529 red-team
+# enforcement design record in this project's governance history).
+#
+# Runs on `pull_request` (not `pull_request_target`), so the default
+# GITHUB_TOKEN carries no write access and no secrets are exposed to
+# PR-controlled code — the checkout below is read-only data, the compute
+# script it runs is read-only data too. This job gives the PR author an
+# early look at the digest their change would produce; it establishes
+# NOTHING about trust or authorization. The actual gate is
+# attestation-sign.yml, which independently recomputes this same digest
+# from a pinned trusted ref and never trusts this job's output (peer-session
+# 2026-08-27-14-wp529-f21-implement-attestation, turn 1: a signer that
+# trusts a PR-context computation lets the PR author forge a pass).
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compute-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute canonical digest (diagnostic only)
+        run: |
+          set -euo pipefail
+          if DIGEST=$(bash scripts/attestation-canonical-digest.sh \
+              "${{ github.event.pull_request.head.sha }}" ""); then
+            {
+              echo "### Attestation digest (diagnostic, not a gate)"
+              echo ""
+              echo "\`$DIGEST\`"
+              echo ""
+              echo "This is not a security check. The trusted, blocking recomputation happens in attestation-sign.yml, run separately by a red-team auditor."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Attestation digest — computation failed"
+              echo ""
+              echo "attestation-canonical-digest.sh exited nonzero. See job log above."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

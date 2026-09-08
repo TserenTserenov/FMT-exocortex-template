@@ -1,60 +1,77 @@
 #!/usr/bin/env bash
-# Regression test for bug #340: fmt-critical-alert.sh должен отличить отключённый трекер от "нет задач".
-# Проверка: форк с отключённым issue tracker возвращает exit 2 (ошибка), не exit 0 (успех).
+# Regression test for bug #340: fmt-critical-alert.sh must distinguish a fork
+# whose upstream has issues disabled from "0 open issues" — exit 2, not the
+# silent "0 (✅ clean)" a naive empty-list read would produce.
+#
+# Earlier version's mock branched on jq-filter substrings (".has_issues",
+# ".parent") that never appear literally in the real invocation (the script
+# uses one combined --jq '{fork:...,parent:...,has_issues:...}' filter per
+# call) and was never actually named `gh`, nor did REPO (the env var it set)
+# match what the script reads (IWE_FMT_REPO). The mock was never invoked; the
+# old "pass" came from the script's real environment, not the injected
+# scenario. This version mirrors the script's real two-call sequence: first
+# repos/<fork> to detect the fork+parent, then repos/<upstream> for the
+# tracker status that actually decides the exit code.
 
 set -euo pipefail
 
-# Мок gh API для форка
+TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
+ALERT_SCRIPT="$TEMPLATE_ROOT/scripts/fmt-critical-alert.sh"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-cat > "$TMPDIR/mock-gh.sh" <<'EOF'
-#!/bin/bash
-# Минимальный мок gh для теста
-if [[ "$*" == *"repos/"* ]]; then
-  if [[ "$*" == *".has_issues"* ]]; then
-    # Форк: has_issues=false (отключён)
-    echo '{"has_issues": false}'
-  elif [[ "$*" == *".parent"* ]]; then
-    # Форк с upstream
-    echo '{"parent": {"full_name": "upstream/repo"}}'
-  elif [[ "$*" == *"issues"* ]]; then
-    # Нет задач (но это не должно быть обработано без проверки has_issues)
-    echo '[]'
-  fi
-else
-  echo "ERROR: unexpected gh call: $*" >&2
-  exit 2
-fi
+REAL_JQ=$(command -v jq)
+REAL_CURL=$(command -v curl)
+cat > "$TMPDIR/jq" <<EOF
+#!/usr/bin/env bash
+exec "$REAL_JQ" "\$@"
 EOF
-chmod +x "$TMPDIR/mock-gh.sh"
+cat > "$TMPDIR/curl" <<EOF
+#!/usr/bin/env bash
+exec "$REAL_CURL" "\$@"
+EOF
 
-# Получить исходный скрипт fmt-critical-alert.sh
-ALERT_SCRIPT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts/fmt-critical-alert.sh"
-if [ ! -f "$ALERT_SCRIPT" ]; then
-  echo "ERROR: fmt-critical-alert.sh not found" >&2
-  exit 1
-fi
+cat > "$TMPDIR/gh" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status")
+    exit 0
+    ;;
+esac
 
-# Запустить скрипт с мок gh (форк с отключённым трекером)
-export REPO="myusername/my-fork"
-export PATH="$TMPDIR:$PATH"  # Мок gh будет найден первым
-export GH_PAGER=""  # Отключить pager
+case "$*" in
+  *"repos/myuser/my-fork"*)
+    printf '%s\n' '{"fork":true,"parent":"upstream-owner/upstream-repo","has_issues":true}'
+    exit 0
+    ;;
+  *"repos/upstream-owner/upstream-repo"*)
+    printf '%s\n' '{"has_issues":false}'
+    exit 0
+    ;;
+esac
 
-# Ожидаемое: exit 2 (ошибка: трекер отключён), не exit 0 (успех)
-bash "$ALERT_SCRIPT" > "$TMPDIR/output.txt" 2>&1 || EXIT_CODE=$?
-EXIT_CODE=${EXIT_CODE:-0}
+echo "unexpected gh call: $*" >&2
+exit 97
+EOF
+chmod +x "$TMPDIR/gh" "$TMPDIR/jq" "$TMPDIR/curl"
+
+set +e
+PATH="$TMPDIR:/usr/bin:/bin" \
+IWE_FMT_REPO="myuser/my-fork" \
+bash "$ALERT_SCRIPT" --no-telegram >"$TMPDIR/output.txt" 2>&1
+EXIT_CODE=$?
+set -e
 
 cat "$TMPDIR/output.txt"
+echo "Exit code: $EXIT_CODE"
 
-if [ $EXIT_CODE -eq 2 ]; then
-  echo ""
-  echo "✓ Correctly returned exit 2 for disabled tracker"
-elif [ $EXIT_CODE -eq 0 ]; then
-  echo ""
-  echo "FAIL: Returned exit 0 for disabled tracker (bug #340)" >&2
-  exit 1
-else
-  echo ""
-  echo "WARN: Unexpected exit code $EXIT_CODE (expected 0 or 2)" >&2
-fi
+[ "$EXIT_CODE" -eq 2 ] ||
+  { echo "FAIL: expected exit 2 for disabled upstream tracker, got $EXIT_CODE" >&2; exit 1; }
+grep -q "tracker disabled" "$TMPDIR/output.txt" ||
+  { echo "FAIL: disabled-tracker reason not stated in output" >&2; exit 1; }
+grep -q "upstream-owner/upstream-repo" "$TMPDIR/output.txt" ||
+  { echo "FAIL: fork→upstream redirect not visible in output" >&2; exit 1; }
+! grep -q "✅ clean" "$TMPDIR/output.txt" ||
+  { echo "FAIL: disabled tracker reported as clean (issue #340 regression)" >&2; exit 1; }
+
+echo "✓ Correctly returned exit 2 for fork with disabled upstream tracker"

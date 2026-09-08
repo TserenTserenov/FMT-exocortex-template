@@ -1,4 +1,5 @@
 #!/bin/bash
+# claude-hook: false — библиотека-диспетчер для event-specific wrappers и тестов
 # rule-engine.sh — единый диспатчер правил агента (WP-272 Ф1)
 #
 # Входы (env vars):
@@ -14,6 +15,7 @@
 # REGISTRY: ~/IWE/.claude/rules-registry.yaml (генерируется из PACK-agent-rules/)
 
 set -uo pipefail
+umask 077
 
 REGISTRY="${RULE_REGISTRY:-$HOME/IWE/.claude/rules-registry.yaml}"
 JOURNAL_DIR="${RULE_JOURNAL_DIR:-$HOME/logs/rule-engine}"
@@ -32,6 +34,29 @@ log_journal() {
     local rule_id="$1" verdict="$2" reason="$3"
     local ctx="${RULE_CONTEXT:-{\}}"
     [ -z "$ctx" ] && ctx='{}'
+    # SQL files may contain real user data or credentials in data migrations.
+    # Keep only non-content evidence; never create a second raw copy in logs.
+    if [ "${RULE_EVENT:-}" = "sql_file_write" ]; then
+        ctx=$(printf '%s' "$ctx" | python3 -c '
+import hashlib
+import json
+import sys
+
+try:
+    raw = json.load(sys.stdin)
+    content = str(raw.get("file_content", ""))
+    command = str(raw.get("command", ""))
+    print(json.dumps({
+        "file_path": raw.get("file_path", ""),
+        "file_content_length": len(content),
+        "file_content_sha256": hashlib.sha256(content.encode()).hexdigest(),
+        "command_length": len(command),
+        "content_redacted": True,
+    }))
+except Exception:
+    print(json.dumps({"content_redacted": True, "context_parse_error": True}))
+' 2>/dev/null) || ctx='{"content_redacted":true,"context_parse_error":true}'
+    fi
     # WP-272 Ф1 fix (R23 audit #4): ensure_ascii=False для читаемости в логах
     printf '{"ts":"%s","event":"%s","rule":"%s","verdict":"%s","reason":%s,"context":%s}\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -70,7 +95,15 @@ load_rules_for_event() {
         echo "[]"
         return
     fi
-    _LRE_EVENT="$event" _LRE_REG="$REGISTRY" python3 - << 'PYEOF' 2>/dev/null || echo "[]"
+    # WP-529 (continuation, 19.08): resolved here, inside the existing REGISTRY
+    # existence check — same lazy-placement rationale as the other sites in
+    # this migration (peer-session 2026-08-19-29, codex turn 1). No
+    # bare-python3 fallback: the resolver's own first candidate is already
+    # bare `python3` from PATH.
+    local _resolved_python3
+    _resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _resolved_python3=""
+    [ -n "$_resolved_python3" ] || { echo "[]"; return; }
+    _LRE_EVENT="$event" _LRE_REG="$REGISTRY" "$_resolved_python3" - << 'PYEOF' 2>/dev/null || echo "[]"
 import yaml, json, os
 with open(os.environ['_LRE_REG']) as f:
     reg = yaml.safe_load(f)
@@ -736,7 +769,13 @@ check_schema_registration_gate() {
     # is_in_scope: тот же конфиг, что читает обёртка-хук (single-source membership)
     local cfg="${SCHEMA_TRIGGERS_CONFIG:-$HOME/IWE/.claude/hooks/schema-triggers.yaml}"
     local in_scope
-    in_scope=$(_STG_CFG="$cfg" _STG_PATH="$target_path" python3 - <<'PYEOF' 2>/dev/null || echo "error"
+    # WP-529 (continuation, 19.08, cold review — missed in the initial `import
+    # yaml` survey, found by a second full-file grep after codex's turn-1
+    # completeness concern): same lazy-placement + no-fallback rationale as
+    # the other sites in this migration.
+    local _stg_resolved_python3
+    _stg_resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _stg_resolved_python3=""
+    in_scope=$([ -n "$_stg_resolved_python3" ] && _STG_CFG="$cfg" _STG_PATH="$target_path" "$_stg_resolved_python3" - <<'PYEOF' 2>/dev/null || echo "error"
 import os, fnmatch
 cfg = os.environ["_STG_CFG"]
 base = os.path.basename(os.environ["_STG_PATH"])
@@ -1020,69 +1059,236 @@ check_secret_in_chat() {
     emit_verdict "ok" "AR.111" "no secret signals detected"
 }
 
+sql_security_analysis() {
+    # Statement-aware, dependency-free scanner shared by AR.112 and AR.113.
+    # Comments and string literals are removed before matching so that a WHERE
+    # or consent-looking word in documentation cannot create a false pass.
+    python3 - <<'PYEOF'
+import json
+import os
+import re
+import sys
+
+
+def split_sql(text):
+    statements, buf = [], []
+    i, state, dollar_tag = 0, "normal", None
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        if state == "line_comment":
+            if ch == "\n":
+                state = "normal"
+                buf.append(" ")
+            i += 1
+            continue
+        if state == "block_comment":
+            if ch == "*" and nxt == "/":
+                state = "normal"
+                buf.append(" ")
+                i += 2
+            else:
+                i += 1
+            continue
+        if state == "single_quote":
+            if ch == "'" and nxt == "'":
+                i += 2
+            elif ch == "'":
+                state = "normal"
+                buf.append(" __literal__ ")
+                i += 1
+            else:
+                i += 1
+            continue
+        if state == "dollar_quote":
+            if text.startswith(dollar_tag, i):
+                state = "normal"
+                buf.append(" __literal__ ")
+                i += len(dollar_tag)
+            else:
+                i += 1
+            continue
+
+        if ch == "-" and nxt == "-":
+            state = "line_comment"
+            i += 2
+        elif ch == "/" and nxt == "*":
+            state = "block_comment"
+            i += 2
+        elif ch == "'":
+            state = "single_quote"
+            i += 1
+        elif ch == "$":
+            match = re.match(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$", text[i:])
+            if match:
+                dollar_tag = match.group(0)
+                state = "dollar_quote"
+                i += len(dollar_tag)
+            else:
+                buf.append(ch)
+                i += 1
+        elif ch == '"':
+            # Preserve quoted identifier content, but not the quote delimiters.
+            i += 1
+            while i < len(text):
+                if text[i] == '"' and i + 1 < len(text) and text[i + 1] == '"':
+                    buf.append('"')
+                    i += 2
+                elif text[i] == '"':
+                    i += 1
+                    break
+                else:
+                    buf.append(text[i])
+                    i += 1
+        elif ch == ";":
+            statement = "".join(buf).strip()
+            if statement:
+                statements.append(statement)
+            buf = []
+            i += 1
+        else:
+            buf.append(ch)
+            i += 1
+
+    if state in {"block_comment", "single_quote", "dollar_quote"}:
+        raise ValueError("unterminated SQL comment or string literal")
+    statement = "".join(buf).strip()
+    if statement:
+        statements.append(statement)
+    return statements
+
+
+try:
+    context = json.loads(os.environ.get("RULE_CONTEXT", "{}") or "{}")
+    content = f'{context.get("file_content", "")}\n{context.get("command", "")}'
+    statements = split_sql(content)
+    pii_table = re.compile(
+        r"(?:\blearning\s*\.\s*(?:users|accounts|person_accounts|sessions)\b"
+        r"|\bpayment\s*\.\s*(?:accounts|subscriptions)\b"
+        r"|\brewards\s*\.\s*accounts\b"
+        r"|\bpublic\s*\.\s*users\b"
+        r"|\b(?:public\s*\.\s*)?(?:domain_event|ory_identity)\b"
+        r"|\b(?:users|accounts|person_accounts|sessions|subscriptions|profiles|contacts|"
+        r"user_events|persona|stage_transitions|graduation_log|dt_tokens|"
+        r"github_connections|digital_twins|google_calendar|google_calendar_connections)\b"
+        r"|\b[A-Za-z0-9_]*(?:user|account|profile|contact|persona|session|subscription|"
+        r"identity|token|connection|event|customer|member|person|payment)s?"
+        r"(?:_[A-Za-z0-9_]*)?\b)",
+        re.I,
+    )
+    pii_operation = re.compile(
+        r"\b(?:select|table|insert|update|delete|merge|copy|truncate|drop|alter|refresh|import)\b",
+        re.I,
+    )
+    dynamic_sql = re.compile(
+        r"\bdo\b|\bexecute\b|\bcall\b|"
+        r"\bcreate\s+(?:or\s+replace\s+)?(?:function|procedure)\b",
+        re.I,
+    )
+    privilege_or_rls_change = re.compile(
+        r"\b(?:create|alter|drop)\s+(?:role|user|group)\b|\bbypassrls\b|\bnoinherit\b|\bsecurity\s+definer\b|"
+        r"\b(?:enable|disable|force|no\s+force)\s+row\s+level\s+security\b|"
+        r"\bset\s+(?:local\s+|session\s+)?role\b|"
+        r"\bset\s+session\s+authorization\b|"
+        r"\bset\s+(?:local\s+|session\s+)?row_security\b|"
+        r"\b(?:create|alter|drop)\s+policy\b|"
+        r"\b(?:grant|revoke)\b|\balter\s+default\s+privileges\b|"
+        r"\bimport\s+foreign\s+schema\b|\brefresh\s+materialized\s+view\b|"
+        r"\balter\s+(?:table|database|schema|sequence|view|materialized\s+view|function|procedure|type)\b[\s\S]*\bowner\s+to\b|"
+        r"\bdrop\s+owned\s+by\b|\breassign\s+owned\s+by\b|"
+        r"\balter\s+table\b[\s\S]*\b(?:enable|disable)\s+trigger\b",
+        re.I,
+    )
+    raw_privilege_change = re.compile(
+        r"\bset_config\s*\(|\bset\s+(?:local\s+|session\s+)?row_security\b",
+        re.I,
+    )
+
+    direct_pii_terms = {
+        "email", "username", "phone", "mobile", "name", "passport", "inn",
+        "snils", "dob", "birth", "address", "postal", "telegram", "ip",
+        "device", "tax", "national", "evidence",
+    }
+
+    def has_pii_identifier(statement):
+        for identifier in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", statement):
+            normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", identifier)
+            parts = set(normalized.lower().split("_"))
+            if parts & direct_pii_terms:
+                return True
+        return False
+
+    unsafe_rls = sorted({
+        index
+        for index, statement in enumerate(statements, 1)
+        if (
+            raw_privilege_change.search(content)
+            or dynamic_sql.search(statement)
+            or privilege_or_rls_change.search(statement)
+            or (
+                pii_operation.search(statement)
+                and (pii_table.search(statement) or has_pii_identifier(statement))
+            )
+        )
+    })
+
+    create_table = re.compile(r"\bcreate\s+table\b", re.I)
+    alter_add_column = re.compile(
+        r"\balter\s+table\b[\s\S]*\badd\s+(?:column\s+)?\b", re.I
+    )
+    pii_schema_change = [
+        index
+        for index, statement in enumerate(statements, 1)
+        if (
+            create_table.search(statement) or alter_add_column.search(statement)
+        ) and (has_pii_identifier(statement) or pii_table.search(statement))
+    ]
+    print(json.dumps({
+        "status": "ok",
+        "statement_count": len(statements),
+        "unsafe_rls_statements": unsafe_rls,
+        "pii_schema_statements": pii_schema_change,
+    }))
+except Exception as exc:
+    print(json.dumps({"status": "error", "error_type": type(exc).__name__}))
+    sys.exit(2)
+PYEOF
+}
+
 check_bypassrls_explicit_where() {
-    # AR.112: SQL с BYPASSRLS / SET ROLE nologin на PII-таблице без явного WHERE
-    # RULE_CONTEXT: {"file_path": "...", "file_content": "...", "command": "..."}
-    local ctx="${RULE_CONTEXT:-}"
-    [ -z "$ctx" ] && ctx='{}'
-
-    local content
-    content=$(echo "$ctx" | python3 -c '
-import sys, json
-d = json.loads(sys.stdin.read() or "{}")
-print(d.get("file_content","") + "\n" + d.get("command",""))
-' 2>/dev/null)
-
-    [ -z "$content" ] && { emit_verdict "ok" "AR.112" "no SQL content in context"; return; }
-
-    # PII-таблицы платформы (sources: PACK-agent-rules AR.112)
-    local pii_tables="learning\.(users|accounts|person_accounts|sessions)|payment\.(accounts|subscriptions)|rewards\.(accounts)"
-    local bypassrls_pattern="BYPASSRLS|SET ROLE.*nologin|SET LOCAL ROLE"
-
-    local has_bypassrls=0 has_pii=0 has_where=0
-    echo "$content" | grep -qiE "$bypassrls_pattern" && has_bypassrls=1
-    echo "$content" | grep -qiE "$pii_tables"        && has_pii=1
-    # WHERE считается достаточным, если есть хотя бы одно WHERE на PII-операцию
-    echo "$content" | grep -qiE "(WHERE|FILTER|LIMIT)[[:space:]]" && has_where=1
-
-    if [ "$has_bypassrls" -eq 1 ] && [ "$has_pii" -eq 1 ] && [ "$has_where" -eq 0 ]; then
-        emit_verdict "warn" "AR.112" "BYPASSRLS/SET ROLE на PII-таблице без явного WHERE — добавь фильтр по user_id/email/tenant ДО отправки запроса (WP-212 incident, feedback_behaviour §Security)"
+    # AR.112: a regex can find PII access but cannot prove SQL identity scope.
+    local analysis status unsafe_count
+    if ! analysis=$(sql_security_analysis 2>/dev/null); then
+        emit_verdict "warn" "AR.112" "SQL detector failed — privileged PII operation requires manual review"
         return
     fi
-
-    emit_verdict "ok" "AR.112" "BYPASSRLS check passed (no unsafe RLS pattern detected)"
+    status=$(printf '%s' "$analysis" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status", "error"))' 2>/dev/null)
+    [ "$status" != "ok" ] && { emit_verdict "warn" "AR.112" "SQL detector returned an invalid analysis — manual review required"; return; }
+    unsafe_count=$(printf '%s' "$analysis" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("unsafe_rls_statements", [])))' 2>/dev/null)
+    case "$unsafe_count" in ''|*[!0-9]*) emit_verdict "warn" "AR.112" "SQL detector returned an invalid count — manual review required"; return ;; esac
+    if [ "$unsafe_count" -gt 0 ]; then
+        emit_verdict "warn" "AR.112" "$unsafe_count PII/dynamic SQL statement(s) require manual identity-scope review — regex evidence cannot prove safe boolean, alias, CTE or dynamic-SQL semantics"
+        return
+    fi
+    emit_verdict "ok" "AR.112" "no known PII data operation or dynamic SQL detected"
 }
 
 check_pii_consent_two_tier() {
-    # AR.113: CREATE TABLE с PII-колонками без consent_grants схемы
-    # RULE_CONTEXT: {"file_path": "...", "file_content": "...", "command": "..."}
-    local ctx="${RULE_CONTEXT:-}"
-    [ -z "$ctx" ] && ctx='{}'
-
-    local content
-    content=$(echo "$ctx" | python3 -c '
-import sys, json
-d = json.loads(sys.stdin.read() or "{}")
-print(d.get("file_content","") + "\n" + d.get("command",""))
-' 2>/dev/null)
-
-    [ -z "$content" ] && { emit_verdict "ok" "AR.113" "no SQL content in context"; return; }
-
-    # PII columns: direct identifiers
-    local pii_cols="email|telegram_id|phone(_number)?|full_name|first_name|last_name|passport|inn\b|snils"
-    local has_create_table=0 has_pii_col=0 has_consent=0
-
-    echo "$content" | grep -qiE "CREATE TABLE" && has_create_table=1
-    echo "$content" | grep -qiE "$pii_cols"   && has_pii_col=1
-    # Consent schema check: references to consent_grants or privacy.consent
-    echo "$content" | grep -qiE "consent_grants|privacy\.consent|gdpr_consent" && has_consent=1
-
-    if [ "$has_create_table" -eq 1 ] && [ "$has_pii_col" -eq 1 ] && [ "$has_consent" -eq 0 ]; then
-        emit_verdict "warn" "AR.113" "CREATE TABLE содержит PII-колонку (${pii_cols}) без ссылки на consent_grants — требуется двухступенчатый opt-in (B7.3): implicit consent в схеме + explicit per-action. Проверь ArchGate §Б чеклист ДО реализации"
+    # AR.113: SQL can detect a PII schema, but cannot prove valid user consent.
+    local analysis status create_count
+    if ! analysis=$(sql_security_analysis 2>/dev/null); then
+        emit_verdict "warn" "AR.113" "SQL detector failed — PII schema requires manual Security Gate review"
         return
     fi
-
-    emit_verdict "ok" "AR.113" "PII consent check passed"
+    status=$(printf '%s' "$analysis" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status", "error"))' 2>/dev/null)
+    [ "$status" != "ok" ] && { emit_verdict "warn" "AR.113" "SQL detector returned an invalid analysis — manual Security Gate review required"; return; }
+    create_count=$(printf '%s' "$analysis" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("pii_schema_statements", [])))' 2>/dev/null)
+    case "$create_count" in ''|*[!0-9]*) emit_verdict "warn" "AR.113" "SQL detector returned an invalid count — manual Security Gate review required"; return ;; esac
+    if [ "$create_count" -gt 0 ]; then
+        emit_verdict "warn" "AR.113" "$create_count schema statement(s) define direct PII columns — SQL cannot prove two-tier consent; complete a manual Security Gate review"
+        return
+    fi
+    emit_verdict "ok" "AR.113" "no direct PII CREATE TABLE statement detected"
 }
 
 check_git_staged_only() {
@@ -1220,7 +1426,16 @@ PYEOF
         [ -f "$WARN_LOG" ] && rm -f "$WARN_LOG" && echo "cleared: $WARN_LOG" || echo "nothing to clear"
         ;;
     list-rules)
-        python3 -c "
+        # WP-529 (continuation, 19.08, cold review — same second-pass grep as
+        # is_in_scope above): explicit CLI subcommand, invoked by a human —
+        # fails loudly rather than degrading silently, matching require_python()
+        # in route-task.sh (same resolver contract).
+        _lr_resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _lr_resolved_python3=""
+        if [ -z "$_lr_resolved_python3" ]; then
+            echo "ERROR: python3 с библиотекой PyYAML не найден (pip install pyyaml)" >&2
+            exit 1
+        fi
+        "$_lr_resolved_python3" -c "
 import yaml
 with open('$REGISTRY') as f:
     reg = yaml.safe_load(f)
@@ -1378,6 +1593,87 @@ for r in reg.get('rules', []):
             RULE_EVENT="secret_in_chat_detected" \
             RULE_CONTEXT='{"user_message":"запусти psql и покажи таблицы","tool_input":""}'
 
+        # AR.112/AR.113 statement-aware SQL security (WP-544 D6.1-D6.2)
+        run_test D6.2a "WHERE in another statement does not scope PII query → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events LIMIT 1; SELECT 1 WHERE account_id = 1;"}'
+        run_test D6.2b "scoped PII query still requires semantic review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events WHERE account_id = current_setting('"'"'app.current_user_id'"'"');"}'
+        run_test D6.2c "commented WHERE does not scope PII query → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events /* WHERE account_id = 1 */ LIMIT 1;"}'
+        run_test D6.2d "PII CREATE TABLE always requires manual review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE TABLE profile (date_of_birth date, address text); -- consent_grants"}'
+        run_test D6.2e "non-PII CREATE TABLE → ok" "ok" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE TABLE counters (counter_id uuid, value integer);"}'
+        run_test D6.2f "unterminated SQL literal fails visible → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events WHERE account_id = '"'"'broken;"}'
+        run_test D6.2g "unscoped UNION branch cannot borrow scope → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events WHERE account_id = 1 UNION ALL SELECT * FROM user_events;"}'
+        run_test D6.2h "OR can broaden an identity predicate → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events WHERE true OR account_id = 1;"}'
+        run_test D6.2i "self-comparison is not identity scope → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET ROLE privileged; SELECT * FROM user_events WHERE account_id = account_id;"}'
+        run_test D6.2j "bare PII table without role marker → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SELECT * FROM users;"}'
+        run_test D6.2k "canonical event table requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SELECT * FROM public.domain_event WHERE account_id = 1;"}'
+        run_test D6.2l "ALTER TABLE adding PII requires consent review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"ALTER TABLE profiles ADD COLUMN telegram_username text, ADD COLUMN ip_address inet;"}'
+        run_test D6.2m "COPY from PII table requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"COPY user_events TO STDOUT;"}'
+        run_test D6.2n "RLS policy DDL requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE POLICY all_access ON user_events USING (true);"}'
+        run_test D6.2o "compound PII column names require consent review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE TABLE people (contact_email text, legal_full_name text, national_id text);"}'
+        run_test D6.2p "PostgreSQL TABLE shorthand requires PII review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"TABLE user_events;"}'
+        run_test D6.2q "cursor TABLE shorthand requires PII review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"DECLARE c CURSOR FOR TABLE user_events;"}'
+        run_test D6.2r "materialized view over PII requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE MATERIALIZED VIEW archive AS TABLE user_events;"}'
+        run_test D6.2s "SET row_security TO off requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET row_security TO off;"}'
+        run_test D6.2t "set_config call requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SELECT set_config('"'"'row_security'"'"','"'"'off'"'"',true);"}'
+        run_test D6.2u "GRANT on PII table requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"GRANT ALL PRIVILEGES ON TABLE user_events TO exporter;"}'
+        run_test D6.2v "default privileges change requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO exporter;"}'
+        run_test D6.2w "PII SELECT column on neutral table requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SELECT email FROM audit_log;"}'
+        run_test D6.2x "PII INSERT column on neutral table requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"INSERT INTO audit_log (email) VALUES ('"'"'synthetic@example.invalid'"'"');"}'
+        run_test D6.2y "PII UPDATE column on neutral table requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"UPDATE audit_log SET phone_number = '"'"'synthetic'"'"';"}'
+        run_test D6.2z "evidence JSONB read requires indirect-PII review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SELECT evidence FROM audit_log;"}'
+        run_test D6.2aa "quoted camelCase PII identifier requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SELECT \"emailAddress\" FROM audit_log;"}'
+        run_test D6.2ab "PostgreSQL CREATE USER alias requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE USER exporter LOGIN;"}'
+        run_test D6.2ac "foreign schema import requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"IMPORT FOREIGN SCHEMA remote FROM SERVER analytics INTO public;"}'
+        run_test D6.2ad "materialized view refresh requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"REFRESH MATERIALIZED VIEW archive;"}'
+        run_test D6.2ae "row_security=false requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET row_security TO false;"}'
+        run_test D6.2af "row_security=0 requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET row_security = 0;"}'
+        run_test D6.2ag "quoted row_security off requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET row_security = '"'"'off'"'"';"}'
+        run_test D6.2ah "row_security=no requires review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"SET LOCAL row_security TO no;"}'
+        run_test D6.2ai "PostgreSQL CREATE GROUP alias requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"CREATE GROUP exporters;"}'
+        run_test D6.2aj "table ownership transfer requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"ALTER TABLE audit_log OWNER TO exporter;"}'
+        run_test D6.2ak "DROP OWNED requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"DROP OWNED BY exporter;"}'
+        run_test D6.2al "REASSIGN OWNED requires privilege review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"REASSIGN OWNED BY exporter TO app;"}'
+        run_test D6.2am "disabling table triggers requires security review → warn" "warn" \
+            RULE_EVENT="sql_file_write" RULE_CONTEXT='{"file_path":"migration.sql","file_content":"ALTER TABLE audit_log DISABLE TRIGGER ALL;"}'
+
+
         # AR.013 IntegrationGate phase-skip classifier
         run_test 31 "impl без SC/Role → warn (phase skip)" "warn" \
             RULE_EVENT="new_tool_creation" \
@@ -1413,7 +1709,19 @@ for r in reg.get('rules', []):
 
         # AR.234 dogfood: живость membership-конфига (ADR-IWE-020 §5 — анти-молчаливая-смерть).
         # Проверяет: (1) schema-triggers.yaml читается; (2) fired_event совпадает с triggers AR.234 в реестре.
-        DOGFOOD=$(_REG="$REGISTRY" _CFG="${SCHEMA_TRIGGERS_CONFIG:-$HOME/IWE/.claude/hooks/schema-triggers.yaml}" python3 - <<'PYEOF' 2>/dev/null || echo "FAIL config unreadable"
+        # Cold review 2026-08-19 (Codex, High): this PyYAML consumer was missed
+        # by the initial two-pass `import yaml` grep — a self-test that fails
+        # closed ("FAIL config unreadable") on a yaml-less bare python3 would
+        # falsely report the dogfood check itself as broken, on a machine
+        # where the shared resolver would have found a working interpreter.
+        # No bare-python3 fallback — same rationale as the other sites in
+        # this migration: an unresolved interpreter fails the dogfood check
+        # explicitly, it does not fall through to a bare-python3 retry.
+        DOGFOOD_RESOLVED_PYTHON3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || DOGFOOD_RESOLVED_PYTHON3=""
+        if [ -z "$DOGFOOD_RESOLVED_PYTHON3" ]; then
+            DOGFOOD="FAIL no python3 with PyYAML found"
+        else
+            DOGFOOD=$(_REG="$REGISTRY" _CFG="${SCHEMA_TRIGGERS_CONFIG:-$HOME/IWE/.claude/hooks/schema-triggers.yaml}" "$DOGFOOD_RESOLVED_PYTHON3" - <<'PYEOF' 2>/dev/null || echo "FAIL config unreadable"
 import os, yaml
 with open(os.environ["_CFG"]) as f:
     cfg = yaml.safe_load(f) or {}
@@ -1430,6 +1738,7 @@ if fired not in ar234.get("triggers", []):
 print("PASS")
 PYEOF
 )
+        fi
         if [ "$DOGFOOD" = "PASS" ]; then
             echo "PASS Test 40: dogfood — schema-triggers.yaml жив, fired_event совпадает с AR.234.triggers"
             PASS=$((PASS+1))

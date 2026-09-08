@@ -6,6 +6,7 @@ related: [WP-377, WP-369, DP.SC.049, DP.ROLE.063, MIM.M.030, MIM.M.031]
 version: 1.0.0
 layer: L3
 status: active
+browser_safe: false
 triggers:
   slash: [/org-dev]
   phrases:

@@ -18,7 +18,7 @@ gate: user
 
 0. **Проверь согласие** перед записью — [../appendix/consent-check.md](../appendix/consent-check.md). При `denied`/`null` — НЕ писать трекинг/domain_event, идти на самодекларации.
 
-1. **Обнови трекер** (`docs/Caliber-artifacts-tracker.md`):
+1. **Обнови трекер** (`Lifework/Caliber-artifacts-tracker.md`):
    - Дата сессии
    - C_vis, C_act (из 05a)
    - Статус рекомендации: `proposed` / `remind_monthly` / `dismissed` / `in-progress` / `done`

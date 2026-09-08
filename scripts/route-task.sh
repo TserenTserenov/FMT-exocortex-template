@@ -4,7 +4,7 @@
 # see DP.SC.159, DP.ROLE.059
 #
 # Получает routing-tag из WP Gate или Артефактора → lookup в executor-catalog.yaml →
-# запускает нужный исполнитель (script | haiku | sonnet | opus | mcp-direct).
+# запускает нужный исполнитель (script | haiku | sonnet | opus | mcp-direct | agent | script+judgment).
 #
 # Usage:
 #   route-task.sh --skill <skill-name> [--args "..."]   # strict: no fallback
@@ -18,9 +18,9 @@
 set -euo pipefail
 
 IWE_DIR="${IWE_DIR:-$HOME/IWE}"
+IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE_DIR/FMT-exocortex-template}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog.yaml}"
-VALID_EXECUTORS=("script" "haiku" "sonnet" "opus" "mcp-direct")
 AUDIT_LOG="${IWE_ROUTER_AUDIT:-${IWE_DIR}/${GOV_REPO}/logs/routing-path-distribution.tsv}"
 ERROR_LOG="${IWE_ROUTER_ERRORS:-${IWE_DIR}/${GOV_REPO}/logs/routing-errors.log}"
 JSON_MODE="false"
@@ -61,10 +61,15 @@ require_catalog() {
 # ---------------------------------------------------------------------------
 
 emit_result() {
-    local skill="$1" executor="$2" result="$3" routing_path="$4"
+    local skill="$1" executor="$2" result="$3" routing_path="$4" model="${5:-}"
     if [[ "$JSON_MODE" == "true" ]]; then
-        printf '{"executor":"%s","routing_path":"%s","exec_result":"%s"}\n' \
-            "$executor" "$routing_path" "$result"
+        if [[ -n "$model" ]]; then
+            printf '{"executor":"%s","routing_path":"%s","exec_result":"%s","model":"%s"}\n' \
+                "$executor" "$routing_path" "$result" "$model"
+        else
+            printf '{"executor":"%s","routing_path":"%s","exec_result":"%s"}\n' \
+                "$executor" "$routing_path" "$result"
+        fi
     fi
 }
 
@@ -116,6 +121,8 @@ for entry in cat.get("entries", []):
         print(f"deterministic={r.get('deterministic', 'false')}")
         if "script_path" in r:
             print(f"script_path={r['script_path']}")
+        if "model" in r:
+            print(f"model={r['model']}")
         if "optimization_priority" in r:
             print(f"optimization_priority={r['optimization_priority']}")
         sys.exit(0)
@@ -157,9 +164,11 @@ run_script() {
     local allow_fallback="${4:-true}"
     local routing_path="${5:-$skill_name → script}"
 
-    # Resolve relative path from IWE_DIR
+    # executor-catalog.yaml is generated from template SKILL.md frontmatter,
+    # so relative script_path is relative to the template root, not the
+    # workspace root (issue #634).
     if [[ "$script_path" != /* ]]; then
-        script_path="$IWE_DIR/$script_path"
+        script_path="$IWE_TEMPLATE/$script_path"
     fi
 
     if [[ ! -f "$script_path" ]]; then
@@ -230,6 +239,33 @@ run_mcp_direct() {
     fi
 }
 
+run_agent() {
+    local skill_name="$1"
+    local model="$2"
+    local args="${3:-}"
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=agent model=$model"
+        echo "ROUTE_TO_AGENT skill=$skill_name model=$model args=$args"
+    fi
+}
+
+run_script_judgment() {
+    local skill_name="$1"
+    local args="${2:-}"
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=script+judgment"
+        echo "ROUTE_TO_JUDGMENT skill=$skill_name mode=script+judgment args=$args"
+    fi
+}
+
+fallback_to_sonnet() {
+    local skill_name="$1" args="$2" ts="$3" reason="$4"
+    warn "${reason} Falling back to Sonnet."
+    run_sonnet "$skill_name" "$args"
+    log_audit "$ts" "$skill_name" "sonnet" "OK"
+    emit_result "$skill_name" "sonnet" "OK" "$skill_name → sonnet (fallback)"
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
@@ -252,18 +288,16 @@ dispatch_skill() {
                 log_audit "$ts" "$skill_name" "unknown" "NO_MATCH"
                 exit 3
             fi
-            warn "skill '$skill_name' not in catalog. Falling back to Sonnet."
-            run_sonnet "$skill_name" "$args"
-            log_audit "$ts" "$skill_name" "sonnet" "OK"
-            emit_result "$skill_name" "sonnet" "OK" "$skill_name → sonnet (fallback)"
+            fallback_to_sonnet "$skill_name" "$args" "$ts" "skill '$skill_name' not in catalog."
             return 0
         fi
         die "catalog lookup failed (exit=$lookup_exit)"
     fi
 
-    local executor script_path=""
+    local executor script_path="" model=""
     executor=$(echo "$lookup_result" | grep "^executor=" | cut -d= -f2)
     script_path=$(echo "$lookup_result" | grep "^script_path=" | cut -d= -f2- || true)
+    model=$(echo "$lookup_result" | grep "^model=" | cut -d= -f2- || true)
     routing_path="${routing_path}${executor}"
 
     case "$executor" in
@@ -294,6 +328,29 @@ dispatch_skill() {
             emit_result "$skill_name" "mcp-direct" "OK" "$routing_path"
             return 0
             ;;
+        agent)
+            if [[ -z "$model" ]]; then
+                if [[ "$allow_fallback" == "false" ]]; then
+                    warn "agent executor missing model for skill '$skill_name'."
+                    emit_error "$skill_name" "EXEC_FAILED" "agent executor missing model"
+                    emit_result "$skill_name" "agent" "EXEC_FAILED" "$routing_path"
+                    log_audit "$ts" "$skill_name" "agent" "EXEC_FAILED"
+                    exit 4
+                fi
+                fallback_to_sonnet "$skill_name" "$args" "$ts" "agent executor missing model for skill '$skill_name'."
+                return 0
+            fi
+            run_agent "$skill_name" "$model" "$args"
+            log_audit "$ts" "$skill_name" "agent" "OK"
+            emit_result "$skill_name" "agent" "OK" "$routing_path" "$model"
+            return 0
+            ;;
+        script+judgment)
+            run_script_judgment "$skill_name" "$args"
+            log_audit "$ts" "$skill_name" "script+judgment" "OK"
+            emit_result "$skill_name" "script+judgment" "OK" "$routing_path"
+            return 0
+            ;;
         *)
             if [[ "$allow_fallback" == "false" ]]; then
                 warn "unknown executor '$executor' for skill '$skill_name'."
@@ -302,10 +359,7 @@ dispatch_skill() {
                 log_audit "$ts" "$skill_name" "unknown" "EXEC_FAILED"
                 exit 4
             fi
-            warn "unknown executor '$executor' for skill '$skill_name'. Falling back to Sonnet."
-            run_sonnet "$skill_name" "$args"
-            log_audit "$ts" "$skill_name" "sonnet" "OK"
-            emit_result "$skill_name" "sonnet" "OK" "$skill_name → sonnet (fallback)"
+            fallback_to_sonnet "$skill_name" "$args" "$ts" "unknown executor '$executor' for skill '$skill_name'."
             return 0
             ;;
     esac
@@ -329,7 +383,7 @@ for e in cat["entries"]:
     ex = e["routing"]["executor"]
     by_exec.setdefault(ex, []).append(e)
 
-for ex in ["script", "haiku", "sonnet", "opus", "mcp-direct"]:
+for ex in ["script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"]:
     for e in by_exec.get(ex, []):
         r = e["routing"]
         sp = r.get("script_path", "—")
@@ -345,7 +399,8 @@ validate_catalog() {
     python3 - "$CATALOG" << 'PYEOF'
 import sys, yaml
 
-VALID = {"script", "haiku", "sonnet", "opus", "mcp-direct"}
+VALID = {"script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"}
+VALID_AGENT_MODELS = {"haiku", "sonnet", "opus"}
 errors = []
 
 with open(sys.argv[1]) as f:
@@ -360,6 +415,8 @@ for e in cat["entries"]:
         errors.append(f"{name}: missing deterministic")
     if r.get("executor") == "script" and "script_path" not in r:
         errors.append(f"{name}: script executor missing script_path")
+    if r.get("executor") == "agent" and r.get("model") not in VALID_AGENT_MODELS:
+        errors.append(f"{name}: agent executor requires model: haiku|sonnet|opus")
 
 if errors:
     print("FAIL:")

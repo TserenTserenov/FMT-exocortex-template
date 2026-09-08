@@ -5,6 +5,7 @@ argument-hint: "[описание проблемы]"
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/iwe-bug-report]
   phrases: []
@@ -44,7 +45,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 | Метка | Когда |
 |-------|-------|
 | `bug` | Скилл / протокол / скрипт работает не так, как задумано |
-| `docs` | Неточность или пробел в документации / memory / SKILL.md |
+| `documentation` | Неточность или пробел в документации / memory / SKILL.md |
 | `enhancement` | Улучшение существующего поведения (не новый функционал) |
 | `question` | Поведение непонятно, нужно уточнение |
 
@@ -62,7 +63,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 Запусти:
 ```bash
-cd ~/IWE/FMT-exocortex-template && git log -1 --format="%h %ad" --date=short 2>/dev/null || echo "неизвестно"
+git -C "$HOME/IWE/FMT-exocortex-template" log -1 --format="%h %ad" --date=short 2>/dev/null || echo "неизвестно"
 ```
 
 ## Шаг 4. Проверить gh CLI
@@ -73,7 +74,7 @@ gh auth status 2>&1 | head -3
 ```
 
 Если `gh` не авторизован или не установлен — выведи сообщение:
-> «`gh` CLI не найден или не авторизован. Установи через `brew install gh`, затем `gh auth login`. Issue не создан.»
+> «`gh` CLI не найден или не авторизован. Установи (macOS: `brew install gh`; Linux: `apt install gh` или https://cli.github.com/), затем `gh auth login`. Issue не создан.»
 > Прекрати выполнение.
 
 ## Шаг 5. Создать issue
@@ -83,6 +84,17 @@ gh auth status 2>&1 | head -3
 - `CATEGORY`: метка из шага 1
 - `DATE`: сегодняшняя дата (YYYY-MM-DD)
 - `IWE_VERSION`: из шага 3
+
+Метки в `TserenTserenov/FMT-exocortex-template` — копия чужого репозитория и может
+разойтись с таблицей шага 1 (issue #457: `docs` переименовали в `documentation`,
+`gh issue create --label` в этом случае падает и issue не создаётся вовсе).
+Проверь метку перед использованием:
+```bash
+gh label list --repo TserenTserenov/FMT-exocortex-template --json name -q '.[].name' | grep -qx "CATEGORY"
+```
+Метка найдена → используй `--label "CATEGORY"` ниже как обычно. Не найдена → создай issue
+БЕЗ флага `--label` (не блокируй создание из-за расхождения меток) и допиши в конец
+`## Контекст` строку `- Метка не создана: "CATEGORY" не найдена в репозитории (проверь актуальный список через gh label list)`.
 
 Запусти (подставив реальные значения):
 ```bash

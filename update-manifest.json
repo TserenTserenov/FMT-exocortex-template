@@ -1,1691 +1,2901 @@
 {
-  "version": "0.36.2",
+  "schema_version": 2,
+  "version": "0.39.2",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
-      "path": ".claude/agents/wp-sync-actualizer.md"
+      "path": ".agentigore",
+      "sha256": "40f8b3d924848fac222b26506975f69213d608924104ff0236a7bc26bd43994c"
     },
     {
-      "path": ".claude/capture-config.sh.example"
+      "path": ".claude/agents/wp-sync-actualizer.md",
+      "sha256": "224cdb263231374275c68fe46993d1be2fe2395fb10968e55de97546f828636d"
     },
     {
-      "path": ".claude/config/capture-detectors.sh"
+      "path": ".claude/capture-config.sh.example",
+      "sha256": "8915ae79beeaee8b83d23d804f16a043ca1a4e12868570ab22c524e846c9c48a"
     },
     {
-      "path": ".claude/detectors/README.md"
+      "path": ".claude/config/capture-detectors.sh",
+      "sha256": "57722f1f78369ef496843d2d2187ea7d434a0e6ccee2f40a0b63457d5cbf0efa"
     },
     {
-      "path": ".claude/detectors/detector_decision.sh"
+      "path": ".claude/detectors/README.md",
+      "sha256": "29147a3593aa2d826546fa6745767d2303a05834992c0e25f3677294f3398984"
     },
     {
-      "path": ".claude/detectors/detector_incident.sh"
+      "path": ".claude/detectors/detector_decision.sh",
+      "sha256": "7dbf61a3fec906cb15b74a53cdba2dc94e0b67f153489d0adf8659f0e6d30368"
     },
     {
-      "path": ".claude/detectors/detector_pattern_awareness.sh"
+      "path": ".claude/detectors/detector_incident.sh",
+      "sha256": "7a48ae3eada737d4db4afaa13c3dae050c0c9c07de0bda4ca6346bec486f37d0"
     },
     {
-      "path": ".claude/hooks/agent-trace-recorder.sh"
+      "path": ".claude/detectors/detector_pattern_awareness.sh",
+      "sha256": "c0cb1995d05f7624cc3ec04413fd3237548409afb7fbea098d245230905d390e"
     },
     {
-      "path": ".claude/hooks/agent-trace-uploader.sh"
+      "path": ".claude/hooks/.orphan-allowlist",
+      "sha256": "685bc9115f0ca88ef0979b6349a6beb725940d366cdcdf499cd778908563a701"
     },
     {
-      "path": ".claude/hooks/capture-bus.sh"
+      "path": ".claude/hooks/agent-trace-recorder.sh",
+      "sha256": "6ca087df68f9b14419fca158f9fe6e9941a54c5e25371b73ebbbf7fe23f84a9d"
     },
     {
-      "path": ".claude/hooks/check-trash.sh"
+      "path": ".claude/hooks/agent-trace-uploader.sh",
+      "sha256": "240cebd285ecda22c3c4374c5f564853943f753a670f5e6fef43f6e6d0ccdc8f"
     },
     {
-      "path": ".claude/hooks/close-gate-reminder.sh"
+      "path": ".claude/hooks/capture-bus.sh",
+      "sha256": "54bae311bfe6a014b9a9382f6cee18a30c052dfb6a12c86de3b2c0f8b2611dd3"
     },
     {
-      "path": ".claude/hooks/destructive-guard.sh"
+      "path": ".claude/hooks/check-trash.sh",
+      "sha256": "7378e1f310161a2103ab413c1d39d150c2fb88ef2ff0f4e76d8958e0a50c3921"
     },
     {
-      "path": ".claude/hooks/dry-run-gate.sh"
+      "path": ".claude/hooks/close-gate-reminder.sh",
+      "sha256": "fedd8c93c4783608f25244cd9a4126160f10c2f592c2ab85fb64f1333f0ec549"
     },
     {
-      "path": ".claude/hooks/extensions-gate.sh"
+      "path": ".claude/hooks/destructive-guard.sh",
+      "sha256": "aaab111b500049cd078a86752e790083ff7a464c098eea5ab23cf5f3b4cdd3c5"
     },
     {
-      "path": ".claude/hooks/inject-code-style.sh"
+      "path": ".claude/hooks/destructive-mcp-guard.sh",
+      "sha256": "9012de5deeaae4c6fdbbbbc5c955e5554d5d20f374fb8c1c7fbfeaf2a939b068"
     },
     {
-      "path": ".claude/hooks/inject-communication-style.sh"
+      "path": ".claude/hooks/dry-run-gate.sh",
+      "sha256": "1f3f2d75cd688dceddfc407eafc3f8bec4075beeb5d618fe30ae6e92e6589a10"
     },
     {
-      "path": ".claude/hooks/inject-fault-profile.sh"
+      "path": ".claude/hooks/extensions-gate.sh",
+      "sha256": "7e564cbee9a85835ec26124c5f33035e103572ea79c99f3b8e287884e5f0f6ca"
     },
     {
-      "path": ".claude/hooks/inject-role-prefixes.sh"
+      "path": ".claude/hooks/inject-code-style.sh",
+      "sha256": "085b2d7d9dba02576ece94d92c63c051358ff5e29e205c824f5be5fa51452060"
     },
     {
-      "path": ".claude/hooks/lazy-context-loader.sh"
+      "path": ".claude/hooks/inject-communication-style.sh",
+      "sha256": "5e2df1b36cd1729ab1a362310f4d5c133ad1fe88331d82e72a011271056edf3e"
     },
     {
-      "path": ".claude/hooks/memory-exocortex-sync.sh"
+      "path": ".claude/hooks/inject-fault-profile.sh",
+      "sha256": "e0c1f576c43fac12018a090121ed77ef9b03cbe5ec9ffda65ce7629ce9ba8712"
     },
     {
-      "path": ".claude/hooks/pack-creator-spf-guard.sh"
+      "path": ".claude/hooks/inject-role-prefixes.sh",
+      "sha256": "a7ef0667319e79e3da4b3aa16ca2e8bc3c0065794f0badade37e9c3e52d3e6f1"
     },
     {
-      "path": ".claude/hooks/precompact-checkpoint.sh"
+      "path": ".claude/hooks/lazy-context-loader.sh",
+      "sha256": "03ebaa16a75b08414baeb816b16a0bb895fa2c14262fc2e117c5506754a970b2"
     },
     {
-      "path": ".claude/hooks/protocol-artifact-validate.sh"
+      "path": ".claude/hooks/memory-exocortex-sync.sh",
+      "sha256": "f1b639adc8fab3c92ef96c84f3d17caaa0e00c6190a4c7cd4037f4d235d1df49"
     },
     {
-      "path": ".claude/hooks/protocol-completion-reminder.sh"
+      "path": ".claude/hooks/pack-creator-spf-guard.sh",
+      "sha256": "68be07adff21228a20ba39b7762d66f5619dd6ce3719b4e8ff82b2724d38d32a"
     },
     {
-      "path": ".claude/hooks/protocol-stop-gate.sh"
+      "path": ".claude/hooks/precompact-checkpoint.sh",
+      "sha256": "7d6f9904923f3173387d435e1e4e4f59f30a6ed1cd693e92df4045667facee9c"
     },
     {
-      "path": ".claude/hooks/pull-on-touch.sh"
+      "path": ".claude/hooks/protocol-artifact-validate.sh",
+      "sha256": "64f250446dacc1967e722313f52a063bbb9feb02c79cf5f21d00b3b12fb67f15"
     },
     {
-      "path": ".claude/hooks/residency-gate-init.sh"
+      "path": ".claude/hooks/protocol-completion-reminder.sh",
+      "sha256": "d6f242ac42a13a293a321454a6c9c17181f644ec5eb49ab2886e03fa3838cc99"
     },
     {
-      "path": ".claude/hooks/residency-gate-lazy.sh"
+      "path": ".claude/hooks/protocol-stop-gate.sh",
+      "sha256": "40e9d2b474fe71719fb704cb4d1b2415bc8e52272bcca5519baff64dd38ed9dd"
     },
     {
-      "path": ".claude/hooks/response-clarity-hook.sh"
+      "path": ".claude/hooks/pull-on-touch.sh",
+      "sha256": "ce00afb11193c91e7da9f1c6c3f8f92ac2ec8543aa38b1150c0054ac8ba7dc6c"
     },
     {
-      "path": ".claude/hooks/rule-engine.sh"
+      "path": ".claude/hooks/residency-gate-init.sh",
+      "sha256": "92781333c043afc60d952ab0f2114918e5da8248557e9868a272ac93df97038d"
     },
     {
-      "path": ".claude/hooks/session-end-status.sh"
+      "path": ".claude/hooks/residency-gate-lazy.sh",
+      "sha256": "4e6d6f71150d4fc283bd08ee1af632fe22da385740b5bd10feec83f559e0fb04"
     },
     {
-      "path": ".claude/hooks/wp-gate-reminder.sh"
+      "path": ".claude/hooks/residency-gate-skill-adapter.sh",
+      "sha256": "f1069eba3df5a0cdf9e7a18ae15ecdeb82c4f0f4f5057212e8c25ed89b5f2e80"
     },
     {
-      "path": ".claude/lib/behaviour-report.sh"
+      "path": ".claude/hooks/response-clarity-hook.sh",
+      "sha256": "094c904d9452b9067dfbbd867adf8902ed49c45296661a6aebdfa2690a9431e8"
     },
     {
-      "path": ".claude/lib/capture_selftest.sh"
+      "path": ".claude/hooks/rule-engine.sh",
+      "sha256": "3903cd2bb5eb8dd412cbf0e219cd6b676da2cbe0113765ea6920a43b58e48e83"
     },
     {
-      "path": ".claude/lib/capture_writer.sh"
+      "path": ".claude/hooks/session-end-status.sh",
+      "sha256": "07b157c5d7614939f027aa50080cabe4531aba4ebae8886038f167620daba6b9"
     },
     {
-      "path": ".claude/lib/frontmatter.sh"
+      "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
+      "sha256": "9ced3b69e749eef98bf2ccdc5a666f11064d62eb3b2dd5c20d837ef7e5a453d3"
     },
     {
-      "path": ".claude/lib/iwe-env-bootstrap.sh"
+      "path": ".claude/hooks/wp-gate-reminder.sh",
+      "sha256": "a6dfaee3ebc87432236f63b33a047c52fa1a117b4d44803689cf96ba2559a84d"
     },
     {
-      "path": ".claude/lib/log_formatter.sh"
+      "path": ".claude/lib/behaviour-report.sh",
+      "sha256": "5f63abbcfe69ab6b72d3a28cf91a25d50e63e618b76578e48298db6a3b4283e3"
     },
     {
-      "path": ".claude/lib/resolve_target_repo.sh"
+      "path": ".claude/lib/capture_selftest.sh",
+      "sha256": "48021aed153e0195d589c64a740fcd92f3dd10636f7b599d6d56688a59934f35"
     },
     {
-      "path": ".claude/parity-contract.yaml"
+      "path": ".claude/lib/capture_writer.sh",
+      "sha256": "03ea07a993c104a4108dcbae63d7cb8a671f7c19928b716206d30fa6fb004aff"
     },
     {
-      "path": ".claude/process-pattern-catalog.yaml"
+      "path": ".claude/lib/find-python3.sh",
+      "sha256": "b938fca2780186b9383f3174a6d21b218f3b5f3a50e5d411a38179d584689cdd"
     },
     {
-      "path": ".claude/rules-lazy/blocking-rules-full.md"
+      "path": ".claude/lib/frontmatter.sh",
+      "sha256": "184ab6e9df7c9ea8589a6a960ed91db4491e56944e04022b9b9478bc04cae5a9"
     },
     {
-      "path": ".claude/rules-lazy/drift-guard.md"
+      "path": ".claude/lib/iwe-env-bootstrap.sh",
+      "sha256": "911c64488ac5508b2df448a7aae1367207f6828af26a1bbe876e8744caed52f7"
     },
     {
-      "path": ".claude/rules-lazy/hooks-bypass-gate.md"
+      "path": ".claude/lib/log_formatter.sh",
+      "sha256": "98b0b271e1d12b89f54764dd2ebcccb68ecaa3f5c60359b87bf9c2216873998a"
     },
     {
-      "path": ".claude/rules-lazy/integration-gate.md"
+      "path": ".claude/lib/residency-gate-run.sh",
+      "sha256": "7f562bd647bdb5729d0d5c922970aeeba455a315afd09677ef62bd90ad1abf8a"
     },
     {
-      "path": ".claude/rules-lazy/new-files-guard.md"
+      "path": ".claude/lib/resolve_target_repo.sh",
+      "sha256": "f0e32051430c4f5e1b6e9d3c6abf6b5866787ca9fb921103e0663ce9e37f4377"
     },
     {
-      "path": ".claude/rules-lazy/role-prefixes-full.md"
+      "path": ".claude/parity-contract.yaml",
+      "sha256": "490b6866cc1750a043bb9a62021656f0ee4b1fb768930d0ea8950d3a69703e17"
     },
     {
-      "path": ".claude/rules-lazy/wp-stop-list.md"
+      "path": ".claude/process-pattern-catalog.yaml",
+      "sha256": "eb4d0e15c4dd438efae8a4bb193536384c4816f5e635a3738d1cab13cef5988e"
     },
     {
-      "path": ".claude/rules/distinctions.md"
+      "path": ".claude/rules-lazy/blocking-rules-full.md",
+      "sha256": "136cd2b0a4f9fb888be0b5ec99b443a5f8e6816c5ad24533c411c03fff3ffc69"
     },
     {
-      "path": ".claude/rules/formatting.md"
+      "path": ".claude/rules-lazy/drift-guard.md",
+      "sha256": "8099ecc27c790619169409236c470300ff249f9614828969cb1c7a71b92109da"
     },
     {
-      "path": ".claude/rules/role-prefixes.md"
+      "path": ".claude/rules-lazy/hooks-bypass-gate.md",
+      "sha256": "a9e0c81fc5b5f3097dcb419c2334fcb8a4a4d4a2ad57fdc56341b0718f1bcb46"
     },
     {
-      "path": ".claude/rules/wp-scope.md"
+      "path": ".claude/rules-lazy/integration-gate.md",
+      "sha256": "077cd9815d7e11644180ac78ec39d6495f36e91d04335f6c003fbc8b8eac715b"
     },
     {
-      "path": ".claude/runtime-overlay.yaml"
+      "path": ".claude/rules-lazy/new-files-guard.md",
+      "sha256": "f6f143427bbf4c7d8158e8df38c86010e913a6a3009c221fb50086e3efb46e8a"
     },
     {
-      "path": ".claude/scripts/check-index-health.py"
+      "path": ".claude/rules-lazy/role-prefixes-full.md",
+      "sha256": "971e2f2caf9b4d4a49d1c07fd6a64529d631cde896fbeff526b0a7cb9d5f77a3"
     },
     {
-      "path": ".claude/scripts/generate-rules-registry.py"
+      "path": ".claude/rules-lazy/state-transition-gate.md",
+      "sha256": "fc244080c1a1742eb75a83620a4d69ee627ad01cefc46b08d5750839a47f64f0"
     },
     {
-      "path": ".claude/scripts/load-extensions.sh"
+      "path": ".claude/rules-lazy/wp-stop-list.md",
+      "sha256": "33fa9411f59599ceca457041631f06ba026295e94a8682723157e66dd1dd485f"
     },
     {
-      "path": ".claude/scripts/memory-drift-scan.py"
+      "path": ".claude/rules/distinctions.md",
+      "sha256": "92782bac92674f695a667af1890fbd2c8ba0684163038f63cff46a7ef91e1a77"
     },
     {
-      "path": ".claude/scripts/wp-sync-bundle.sh"
+      "path": ".claude/rules/formatting.md",
+      "sha256": "4c62ecae76ee6e6988ac3137e85370cc51d65fabddf1dac395185d975c62963d"
     },
     {
-      "path": ".claude/settings.json"
+      "path": ".claude/rules/role-prefixes.md",
+      "sha256": "8e9a5220a89ca63a4421b70e2bd612d30b87664efb99c7fa8af6e6ca332ac9cb"
     },
     {
-      "path": ".claude/skills-catalog.yaml"
+      "path": ".claude/rules/wp-scope.md",
+      "sha256": "8727d8c0c447afe12b46a5cfcc08d4cff6af9108721442e04f7e6570eeb266ce"
     },
     {
-      "path": ".claude/skills/SKILL-INDEX.yaml"
+      "path": ".claude/runtime-overlay.yaml",
+      "sha256": "8a7a0cfcd3606ab80d76fbf3aaf8dec71c2079c01070130ad50913e9e1e30b36"
     },
     {
-      "path": ".claude/skills/_template/SKILL.md"
+      "path": ".claude/scripts/check-index-health.py",
+      "sha256": "348db830188a04e76c2ff02ca6f2d52c93072f628290c1ac4f2818c2a264269a"
     },
     {
-      "path": ".claude/skills/agent-fault/SKILL.md"
+      "path": ".claude/scripts/classify-workspace-copy.sh",
+      "sha256": "39e14176892023597366818e5d8afeba763a72403999da362c385e0235245cd5"
     },
     {
-      "path": ".claude/skills/apply-captures/SKILL.md"
+      "path": ".claude/scripts/generate-rules-registry.py",
+      "sha256": "814607296a21ae1ce8a21f2484fce2c3e62be23f481da172fb55f920dfab793a"
     },
     {
-      "path": ".claude/skills/archgate/SKILL.md"
+      "path": ".claude/scripts/load-extensions.sh",
+      "sha256": "1d3bd569180e65544e4aae650e3a4ec8e60aaec07460e8a4819498d39b86125d"
     },
     {
-      "path": ".claude/skills/artifactor/SKILL.md"
+      "path": ".claude/scripts/memory-drift-scan.py",
+      "sha256": "65200a4f0e2f496d59c9206840cdb323eeb3e7e66fdbbc05a0612975af26f33c"
     },
     {
-      "path": ".claude/skills/audit-docs/SKILL.md"
+      "path": ".claude/scripts/settings-merge-apply.sh",
+      "sha256": "30c13a546e7d8178ffa186813fe1f56b88edd11ae74cb5c24c35588bff0984a4"
     },
     {
-      "path": ".claude/skills/audit-installation/SKILL.md"
+      "path": ".claude/scripts/settings-merge-preview.py",
+      "sha256": "1736fa40d7229ad26c5b7a61ba5fdbb5b7b5844f6288a2e927c7f67137281dfb"
     },
     {
-      "path": ".claude/skills/author-mode/SKILL.md"
+      "path": ".claude/scripts/wp-sync-bundle.sh",
+      "sha256": "431bed387ac29e09d5e568de3f308815b3def0d23a8e6d566c0b1df0fee29266"
     },
     {
-      "path": ".claude/skills/bottleneck-pick/SKILL.md"
+      "path": ".claude/settings.json",
+      "sha256": "280fa18d9d5e4188569c1a30e3dfe31e992975e295c9817e438dca3c66ae4b81"
     },
     {
-      "path": ".claude/skills/check-secret/SKILL.md"
+      "path": ".claude/skills-catalog.yaml",
+      "sha256": "5d8752ff4dda433e822e52fad57bdf0121b4f339587ae4a5e9ebb0ce2fc89200"
     },
     {
-      "path": ".claude/skills/check-secret/check.sh"
+      "path": ".claude/skills/SKILL-INDEX.yaml",
+      "sha256": "089a8a8776cfb071bd69c49da387d9b3d185235cffc7b5c18f264d2a75d3ebd1"
     },
     {
-      "path": ".claude/skills/consent/SKILL.md"
+      "path": ".claude/skills/_template/SKILL.md",
+      "sha256": "ee1b2720c2f3c1e99895e29d4bec5ee7732d7bf4fbafa6feaf7587a1505815b8"
     },
     {
-      "path": ".claude/skills/day-close/SKILL.md"
+      "path": ".claude/skills/agent-fault/SKILL.md",
+      "sha256": "96df4d6ab5350568cb82908b64d742f2994fee07b5ec4784d0b287ec47037620"
     },
     {
-      "path": ".claude/skills/day-close/day-close-details.md"
+      "path": ".claude/skills/apply-captures/SKILL.md",
+      "sha256": "865a1f10a0ce6e01965299f34698217dc107b12410a0d39d4f97daf0c963558c"
     },
     {
-      "path": ".claude/skills/day-close/day-close/SKILL.md"
+      "path": ".claude/skills/archgate/SKILL.md",
+      "sha256": "0570143bd9ca62f87b0996ac42b1ece4eba814582c8e05732fe9e609e54333db"
     },
     {
-      "path": ".claude/skills/day-open/SKILL.md"
+      "path": ".claude/skills/artifactor/SKILL.md",
+      "sha256": "33db1a1e5a80190708374597444433e1d7388d9bb9277921ab0f4968536e5e85"
     },
     {
-      "path": ".claude/skills/day-open/day-open-details.md"
+      "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
+      "sha256": "cbaf7ca2d6fa8d7d18a02d1ea45dc52673f7fc1545dcfb8812a2cf7e1c30b718"
     },
     {
-      "path": ".claude/skills/day-open/templates.md"
+      "path": ".claude/skills/audit-docs/SKILL.md",
+      "sha256": "f267893c84acc5bbe9dab9ccb906eecf0a790308b7da314dad51887864c23cc2"
     },
     {
-      "path": ".claude/skills/decompose/SKILL.md"
+      "path": ".claude/skills/audit-installation/SKILL.md",
+      "sha256": "650596be95602ce2398c0ace07ac2332e0235e50dc32ab5b4f5374ac1476eedf"
     },
     {
-      "path": ".claude/skills/diagnose/SKILL.md"
+      "path": ".claude/skills/author-mode/SKILL.md",
+      "sha256": "4dee948e5d20002fa90703fb7b4a426ff9bcc0d35b4a4d6cc2e83f043e8640bf"
     },
     {
-      "path": ".claude/skills/discovery-session/SKILL.md"
+      "path": ".claude/skills/bottleneck-pick/SKILL.md",
+      "sha256": "bce893b0f6f828442f3b609558a419b900d4e28c0fe1e7ac35a2b9e45c1462b0"
     },
     {
-      "path": ".claude/skills/extend/SKILL.md"
+      "path": ".claude/skills/check-secret/SKILL.md",
+      "sha256": "df991b9e5d4a4caf9c8b5432226af330338ffb05d84aebaed54d15583848bc5b"
     },
     {
-      "path": ".claude/skills/fpf/SKILL.md"
+      "path": ".claude/skills/check-secret/check.sh",
+      "sha256": "7c5dace7bf1e9bd8769c87d6115a7a917f837db872bc2069af64562d4744da5c"
     },
     {
-      "path": ".claude/skills/integration-gate/SKILL.md"
+      "path": ".claude/skills/consent/SKILL.md",
+      "sha256": "7bfb6783e785282e7135f2301695cb302c50c6aa119c0095b10959fe07a4c5d0"
     },
     {
-      "path": ".claude/skills/iwe-bug-report/SKILL.md"
+      "path": ".claude/skills/day-close/SKILL.md",
+      "sha256": "760e7c05c4789d3c413efc48437d1f2fbc02e7d58d4254fbbe2540b2398bbd5c"
     },
     {
-      "path": ".claude/skills/iwe-restore/SKILL.md"
+      "path": ".claude/skills/day-close/day-close-details.md",
+      "sha256": "128dc6f26933025c79460e3d2c818b6aeda1233d43c25918221ae4102f30fec4"
     },
     {
-      "path": ".claude/skills/iwe-rules-review/SKILL.md"
+      "path": ".claude/skills/day-close/day-close/SKILL.md",
+      "sha256": "95aa08ce8eec158f2851515a2ea1c949d6466af13958ef327d4b13855c1e5be2"
     },
     {
-      "path": ".claude/skills/iwe-update/SKILL.md"
+      "path": ".claude/skills/day-open/SKILL.md",
+      "sha256": "2ff43129f8c25dd893a58c4c2844105269d097dfc605ad62b5398311aff02838"
     },
     {
-      "path": ".claude/skills/ke/SKILL.md"
+      "path": ".claude/skills/day-open/day-open-details.md",
+      "sha256": "37172dfebeb48f276963e129120aec72f824632346e75ee1abb7d0d55e9e7f89"
     },
     {
-      "path": ".claude/skills/kimi-peer-writer/SKILL.md"
+      "path": ".claude/skills/day-open/templates.md",
+      "sha256": "c91e7acf0bb5106713891079a84076cb8a0782a16de26ada96eabc32e7811154"
     },
     {
-      "path": ".claude/skills/lesson-close/SKILL.md"
+      "path": ".claude/skills/decompose/SKILL.md",
+      "sha256": "f4b103b30c1d9d1ae6999ca089cee9e14b6c2ef4a21f82510bfae96d68188677"
     },
     {
-      "path": ".claude/skills/local-llm/SKILL.md"
+      "path": ".claude/skills/diagnose/SKILL.md",
+      "sha256": "6cd49fb0c6d81f79fdd01350ad19218bbada178e982e9fae3c6cfc3570f3f7ad"
     },
     {
-      "path": ".claude/skills/month-close/SKILL.md"
+      "path": ".claude/skills/discovery-session/SKILL.md",
+      "sha256": "51dc819c4feb38b3f48eb31b447bd6f28ec56d22f1da86898ed023ab1899ae75"
     },
     {
-      "path": ".claude/skills/org-dev/SKILL.md"
+      "path": ".claude/skills/extend/SKILL.md",
+      "sha256": "44f503db81a2d0ef223e5ed40cbbd9595901913adb5120f1c9b5e7e211672cba"
     },
     {
-      "path": ".claude/skills/org-dev/test_skill.sh"
+      "path": ".claude/skills/fpf/SKILL.md",
+      "sha256": "7910297fcbc1ddca07269d2356f208a8ffbd0a931b7613feaf48c566dfa5b017"
     },
     {
-      "path": ".claude/skills/pack-creator/SKILL.md"
+      "path": ".claude/skills/integration-gate/SKILL.md",
+      "sha256": "8100e7475c7f57b0dbced4966f013d16ae29e5970796659eb67d47320004ed95"
     },
     {
-      "path": ".claude/skills/pack-creator/test_guard.sh"
+      "path": ".claude/skills/iwe-bug-report/SKILL.md",
+      "sha256": "9ac44b9799e511dcf70a6502ec003146f7b7357e080d0808560e07e7d0977121"
     },
     {
-      "path": ".claude/skills/pack-new/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/SKILL.md",
+      "sha256": "687501774da17a872917def02798a6c0d326bbcc42d444f730b8592d4b85e50b"
     },
     {
-      "path": ".claude/skills/peer-conversation/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/boundary-guard.sh",
+      "sha256": "d259907b4a6e964f19164aa16ca187e019e039f7bead9b103b42b1ab73995b54"
     },
     {
-      "path": ".claude/skills/personal-guide-render/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-bad-release/ci-receipt.txt",
+      "sha256": "f40aaff58ec84a4c6435e58cc6edc450c58f5e1c7d6ceef37cd4f5f66607e65e"
     },
     {
-      "path": ".claude/skills/personal-guide-render/templates/reflection-template.md"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-bad-release/files/alpha.txt",
+      "sha256": "905954a0933d7bc8b8ae1ed115abc317c8bcb3490c007fbacbd36a61b4a4b50e"
     },
     {
-      "path": ".claude/skills/personal-guide-start/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-bad-release/files/beta.txt",
+      "sha256": "ec513fa72a8d8c074d91b2d3360ce60a561675ea074b6fabe8ee25dd88eed280"
     },
     {
-      "path": ".claude/skills/platform-bottleneck/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-bad-release/manifest.txt",
+      "sha256": "eb5632cc0202628f030785fe41e1850ba991fd6328f608d68db1ca2f31d1c94a"
     },
     {
-      "path": ".claude/skills/residency-gate/__init__.py"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-good-release/ci-receipt.txt",
+      "sha256": "f40aaff58ec84a4c6435e58cc6edc450c58f5e1c7d6ceef37cd4f5f66607e65e"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/__init__.py"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-good-release/files/alpha.txt",
+      "sha256": "905954a0933d7bc8b8ae1ed115abc317c8bcb3490c007fbacbd36a61b4a4b50e"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/consent.py"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-good-release/files/beta.txt",
+      "sha256": "ec513fa72a8d8c074d91b2d3360ce60a561675ea074b6fabe8ee25dd88eed280"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/parser.py"
+      "path": ".claude/skills/iwe-platform-redteam/fixtures/known-good-release/manifest.txt",
+      "sha256": "7e6815431d26f51080b5301e0a260d1c23d893b4055dfbe5aeb4b03ea0c2b45c"
     },
     {
-      "path": ".claude/skills/residency-gate/lib/state.py"
+      "path": ".claude/skills/iwe-platform-redteam/references/adversarial-cases.md",
+      "sha256": "9c7fe1c0ec2a8a52f10806f03ba1526b310b5cb01a787bd478993b6e62898524"
     },
     {
-      "path": ".claude/skills/residency-gate/pre-grant.yaml"
+      "path": ".claude/skills/iwe-platform-redteam/references/agentic-security.md",
+      "sha256": "678ec2c9a2c91c5c52ca6306bdbb7c68f06e1b9f8768d45cfea62a83daace92e"
     },
     {
-      "path": ".claude/skills/residency-gate/residency-gate.py"
+      "path": ".claude/skills/iwe-platform-redteam/references/ci-and-supply-chain.md",
+      "sha256": "b9b8865abb5a6b6d072ed02626b694e28d1f96dbd2421e302c11765bd89a1de9"
     },
     {
-      "path": ".claude/skills/residency-gate/tests/test_parser.py"
+      "path": ".claude/skills/iwe-platform-redteam/references/evidence-and-reporting.md",
+      "sha256": "ac38d11a5ed761da8b069081e03081f7a245a6baee7994eb9350badb6fd175ba"
     },
     {
-      "path": ".claude/skills/residency-gate/tests/test_pre_grant.py"
+      "path": ".claude/skills/iwe-platform-redteam/references/install-and-upgrade-matrix.md",
+      "sha256": "6b51feb1308fe8fab70d0e587a1fda36331377e3b8d99f244336b7f1e2995d5c"
     },
     {
-      "path": ".claude/skills/restore-exocortex/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/references/methodology-sources.md",
+      "sha256": "db7aaff6e0f61fbc84c41a740783442e13ed70f6f6f7bf6095e82de9326774cb"
     },
     {
-      "path": ".claude/skills/run-protocol/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/references/release-and-update.md",
+      "sha256": "8eff3fd1121f351b1cfb2c4b98063463f4869cf13f959e52841ba6f5cce95844"
     },
     {
-      "path": ".claude/skills/setup-wakatime/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/references/runtime-and-integrations.md",
+      "sha256": "8e1497951291f30f116dece0368b254a4deba01da1d0606e8a8df13b5b22a161"
     },
     {
-      "path": ".claude/skills/skill-creator/SKILL.md"
+      "path": ".claude/skills/iwe-platform-redteam/tests/run-calibration.sh",
+      "sha256": "2ec5f5bbf73ca5b3d8a33280108ab5fdbbd5f00a41e4c7d76de4f9f0e474f16d"
     },
     {
-      "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md"
+      "path": ".claude/skills/iwe-restore/SKILL.md",
+      "sha256": "371215ed2ee814bbed382902a271833d1ed5e3a944691a266522911cc614a4e3"
     },
     {
-      "path": ".claude/skills/skill-creator/assets/skill-scaffold-minimal.md"
+      "path": ".claude/skills/iwe-rules-review/SKILL.md",
+      "sha256": "9cdf82d963bedb9f4fb9bab121af6ce2a6e2c462c14a80efa53d61ceac518221"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/batch-fix-skills.py"
+      "path": ".claude/skills/iwe-update/SKILL.md",
+      "sha256": "add0e5142c38f3e840ffa5afd69335318d2392daa22a88663d006c9b83442a16"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/content-audit.sh"
+      "path": ".claude/skills/ke/SKILL.md",
+      "sha256": "6b353eda26ee252c3379fd92413df4bcc654a4530700aa8fb46b011bbb527a9c"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/scaffold-init.sh"
+      "path": ".claude/skills/kimi-peer-writer/SKILL.md",
+      "sha256": "062556dc1fff91780ae31633e12e4c69dd1a584612ad46591128e6443ffe3aa8"
     },
     {
-      "path": ".claude/skills/skill-creator/scripts/verify-skill.sh"
+      "path": ".claude/skills/lesson-close/SKILL.md",
+      "sha256": "350dbc63ad76e3f1fe64a317fc49bcb41ac78620862914fe59c3324f1724031f"
     },
     {
-      "path": ".claude/skills/strategy-session/SKILL.md"
+      "path": ".claude/skills/local-llm/SKILL.md",
+      "sha256": "3c3e64045c404298d0b99bdd489bdb416d11038d39ad6e821636ba8328dae2f6"
     },
     {
-      "path": ".claude/skills/think/SKILL.md"
+      "path": ".claude/skills/month-close/SKILL.md",
+      "sha256": "5df8c865120eba4860ad6b3f0a8cdf8ad1eeaf150128f06547593559202fcba3"
     },
     {
-      "path": ".claude/skills/transcribe/SKILL.md"
+      "path": ".claude/skills/org-dev/SKILL.md",
+      "sha256": "c5090c81d21a87c949ecb521a476658eafedd049ff3abe593405e3ba67782d4d"
     },
     {
-      "path": ".claude/skills/vdv/SKILL.md"
+      "path": ".claude/skills/org-dev/test_skill.sh",
+      "sha256": "da55df9367a47a3623134716d806ff53e7649c0325fd67a52f2fc4a5a60e54df"
     },
     {
-      "path": ".claude/skills/vdv/test_cases.md"
+      "path": ".claude/skills/pack-creator/SKILL.md",
+      "sha256": "debd8a564b128cf23b5a59c7c87e62369ab118b07dc13a2e7bfd0035836eb53a"
     },
     {
-      "path": ".claude/skills/verify-hypotheses/SKILL.md"
+      "path": ".claude/skills/pack-creator/test_guard.sh",
+      "sha256": "443f3d1d0bde2e092305e5ddd06f31cdd9c49f0fe8a7719c5b8fe373cbc673b9"
     },
     {
-      "path": ".claude/skills/verify/SKILL.md"
+      "path": ".claude/skills/pack-new/SKILL.md",
+      "sha256": "b13b8b7e240801b5f445a4c522f5167f5eae62b9db073cd1c44b5c79f4670cff"
     },
     {
-      "path": ".claude/skills/verify/verify-fpf-subsection.md"
+      "path": ".claude/skills/peer-conversation/SKILL.md",
+      "sha256": "b2ecfb9da95c487e13e8d6c6b1925bdd398565840342d6c3c12f0facf74533bc"
     },
     {
-      "path": ".claude/skills/verify/verify-pack-adequacy-subsection.md"
+      "path": ".claude/skills/personal-guide-render/SKILL.md",
+      "sha256": "e11fd71f6daac948c5364591afc565f3a9b5b4adda0a79192152a015c2c55294"
     },
     {
-      "path": ".claude/skills/verify/verify-pedagogy-subsection.md"
+      "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
+      "sha256": "2e18d87006ea2f5fc2379ba8bbb32b3cf59bd33abd9d2b6da70aeec86749c3ad"
     },
     {
-      "path": ".claude/skills/w-reflection/SKILL.md"
+      "path": ".claude/skills/personal-guide-start/SKILL.md",
+      "sha256": "b896e48b709b841a78d94a01490e2572517b50a13c9888282e513c07a4541847"
     },
     {
-      "path": ".claude/skills/week-close-pilot/SKILL.md"
+      "path": ".claude/skills/platform-bottleneck/SKILL.md",
+      "sha256": "3d72607a2781db1fe365ffb5dc92f4c3efc824494aac014c08b70c08be718596"
     },
     {
-      "path": ".claude/skills/week-close/SKILL.md"
+      "path": ".claude/skills/repo-new/SKILL.md",
+      "sha256": "1879b74035387a3f32da455e9ef8ec7523518f25db94878cfd544e323a4ec715"
     },
     {
-      "path": ".claude/skills/week-close/week-close/SKILL.md"
+      "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
+      "sha256": "a6c1687494de1166b92a0fd2cdd9fab51701ba58be77b7ddf91238d46751c76f"
     },
     {
-      "path": ".claude/skills/wp-new/SKILL.md"
+      "path": ".claude/skills/repo-new/assets/repository-skeleton/README.md",
+      "sha256": "6c2d4dc2186bf9d97d4949218fcf13d35e68a7f691c54c14b55518139709d943"
     },
     {
-      "path": ".claude/styles/p05-core.md"
+      "path": ".claude/skills/residency-gate/__init__.py",
+      "sha256": "b4cbf3c22d18b3d501923e18d6d3a300f8fa0c1ff5025976ccda4efc08f2486b"
     },
     {
-      "path": ".claude/styles/s0-core.md"
+      "path": ".claude/skills/residency-gate/lib/__init__.py",
+      "sha256": "9bf8849a642e349752ff05394f729244dd399bfb36ab3df9021f19fa9c0b207f"
     },
     {
-      "path": ".claude/sync-manifest.yaml"
+      "path": ".claude/skills/residency-gate/lib/consent.py",
+      "sha256": "78baa048b36327319a0a95ebff6157a11813bc3f6890359636367e97c9a5b548"
     },
     {
-      "path": ".claude/templates/drr-template.md"
+      "path": ".claude/skills/residency-gate/lib/parser.py",
+      "sha256": "71e2cb45b74dcb906f88622930a54443361c751a59dde13ba45cf64916184cb1"
     },
     {
-      "path": ".githooks/commit-msg"
+      "path": ".claude/skills/residency-gate/lib/state.py",
+      "sha256": "e873f1e865a7075fe4d27261d7e315c297ac363ee0b3971670c57a706759df8c"
     },
     {
-      "path": ".githooks/post-commit"
+      "path": ".claude/skills/residency-gate/pre-grant.yaml",
+      "sha256": "0781b77830593c9aad4fb2801c7a393be78c01a32a62337d9214256432bc77ea"
     },
     {
-      "path": ".githooks/pre-commit"
+      "path": ".claude/skills/residency-gate/residency-gate.py",
+      "sha256": "b5f2dd8484a1c9e0c5a5cf4e53903a0141072cf22ff99e603d319ff2082d1e28"
     },
     {
-      "path": ".github/workflows/cloud-scheduler.yml"
+      "path": ".claude/skills/residency-gate/tests/test_parser.py",
+      "sha256": "03a3b7cbe31ec6c104925273671c6512eade341d3984f86f4bcc249bd458d724"
     },
     {
-      "path": ".gitignore"
+      "path": ".claude/skills/residency-gate/tests/test_pre_grant.py",
+      "sha256": "f09e190f5389f0b58c5978db89ccd233da237c616f99a14d7fd8eb1da9413c6d"
     },
     {
-      "path": ".mcp.json"
+      "path": ".claude/skills/restore-exocortex/SKILL.md",
+      "sha256": "0acf583aac6e89133143f6573826b4118b1eb0b76709731b7f2137f429510fac"
     },
     {
-      "path": ".stignore"
+      "path": ".claude/skills/run-protocol/SKILL.md",
+      "sha256": "a21bd983e7170d9f8aa0dcb911358690072e9c61221d66941a883aa9a41c69a8"
     },
     {
-      "path": "AGENTS.md"
+      "path": ".claude/skills/setup-wakatime/SKILL.md",
+      "sha256": "7b941a2b7090d2ac68de7048d892d13707b96090e15066d2c7dc1b83106ab2e4"
     },
     {
-      "path": "CHANGELOG.md"
+      "path": ".claude/skills/skill-creator/SKILL.md",
+      "sha256": "79d832e4e72309340a529a4f90fa5d6ce3761decb900336a584435de10282741"
     },
     {
-      "path": "CLAUDE.md"
+      "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md",
+      "sha256": "5f18c84abe018fd99a5bbd2ba8231153a53a1d09b6ae56f5b1f1fe7b5210f694"
     },
     {
-      "path": "ONTOLOGY.md"
+      "path": ".claude/skills/skill-creator/assets/skill-scaffold-minimal.md",
+      "sha256": "9011870f63fde09f59cf313b8f21cc7865df713793085f67deb695d104cc9d4a"
     },
     {
-      "path": "REPO-TYPE.md"
+      "path": ".claude/skills/skill-creator/scripts/batch-fix-skills.py",
+      "sha256": "15da4adc8ef3c27ad05c2ba53b1aa80dbee356973680d9a1fac01632d89ec7e8"
     },
     {
-      "path": "aisystant-sync-targets.yaml"
+      "path": ".claude/skills/skill-creator/scripts/content-audit.sh",
+      "sha256": "a67c3ea12f8e47b36bdef058356887f5aea29601c3f33595d0058e9735ce0a8a"
     },
     {
-      "path": "docs/AGENT-FAULT-PROCESS.md"
+      "path": ".claude/skills/skill-creator/scripts/scaffold-init.sh",
+      "sha256": "6997b0b4db9841602eda66d62196cf0979cb9ae51e43507a67ad70cc43b00b69"
     },
     {
-      "path": "docs/AGENT-VENDOR-SETUP.md"
+      "path": ".claude/skills/skill-creator/scripts/verify-skill.sh",
+      "sha256": "8cd3a28578ad22530d9ba905ab65b8475057cb2850afaa13def5375582695d58"
     },
     {
-      "path": "docs/BROWSER-CI-TEMPLATE.md"
+      "path": ".claude/skills/strategy-session/SKILL.md",
+      "sha256": "cc03ca19f46a09a102783433222269b34ebba13fe6164db416951a91f04342fd"
     },
     {
-      "path": "docs/CLOUD-SCHEDULER.md"
+      "path": ".claude/skills/think/SKILL.md",
+      "sha256": "2c98be210a764f8654bcdcd679b7015138c0152a5cd31a354f14433ea4ed78a3"
     },
     {
-      "path": "docs/DATA-POLICY.md"
+      "path": ".claude/skills/transcribe/SKILL.md",
+      "sha256": "75b9fe53a7f95c8d89daf68e8bdc2ea30d3e8dd5adca71afe235cb9b53bfcbe5"
     },
     {
-      "path": "docs/DATA-RESIDENCY.md"
+      "path": ".claude/skills/vdv/SKILL.md",
+      "sha256": "df3b912afef44ebfbe43e821aa070dc4e2001b533cb4820db9fb4c46c9169c42"
     },
     {
-      "path": "docs/IWE-HELP.md"
+      "path": ".claude/skills/vdv/test_cases.md",
+      "sha256": "44543834e5de3faad3b5180b250c545dcad49f7465118e3a60ebb52a6fecadb0"
     },
     {
-      "path": "docs/KIMI-BROWSER-SETUP.md"
+      "path": ".claude/skills/verify-hypotheses/SKILL.md",
+      "sha256": "5c7b1a9216c75833656beaa2393e2987c1e642c8190f4412a9d0505ea3e3b4fa"
     },
     {
-      "path": "docs/KIMI-SETUP.md"
+      "path": ".claude/skills/verify/SKILL.md",
+      "sha256": "98832996078075232e60513f7bb09a07d62c5b1579bfc69c91d669456a02261c"
     },
     {
-      "path": "docs/LEARNING-PATH.md"
+      "path": ".claude/skills/verify/verify-fpf-subsection.md",
+      "sha256": "962c450b881832034e4d81bb3de3e06a6c53aaa99decdf6ea7c2baeff6694e71"
     },
     {
-      "path": "docs/PACK-CREATION.md"
+      "path": ".claude/skills/verify/verify-pack-adequacy-subsection.md",
+      "sha256": "fd105286bcba402aed001d4c13cf93661ed225927d26219fda55e391c321d015"
     },
     {
-      "path": "docs/PLATFORM-COMPAT.md"
+      "path": ".claude/skills/verify/verify-pedagogy-subsection.md",
+      "sha256": "851505f5be6305ea43e4a1efee1489792665b59eedc495ed7332324f2795bf19"
     },
     {
-      "path": "docs/PORTABILITY.md"
+      "path": ".claude/skills/w-reflection/SKILL.md",
+      "sha256": "9f4128ce42f08312bc6fc3b1f7b2158becc5dd5209aca5b5f57185be59bc03b7"
     },
     {
-      "path": "docs/QUICK-START.md"
+      "path": ".claude/skills/week-close-pilot/SKILL.md",
+      "sha256": "f176648de9b24b60d97436797bae3b052f80ed415f661b4c1c87a19966917e65"
     },
     {
-      "path": "docs/RELEASE-PROCESS.md"
+      "path": ".claude/skills/week-close/SKILL.md",
+      "sha256": "c516c1e477299a7151604c039927c4f83d6deec0dcff7f776d058dccf3d37272"
     },
     {
-      "path": "docs/RESIDENCY-GATE-USAGE.md"
+      "path": ".claude/skills/week-close/week-close/SKILL.md",
+      "sha256": "efcda66de3b2a902d5d0d8cac7734c2a6117ac46a113cf9fabca9c81e0e9dd84"
     },
     {
-      "path": "docs/SCRIPT-PROMOTION.md"
+      "path": ".claude/skills/wp-new/SKILL.md",
+      "sha256": "945ae6d1fe0fc674d6882dad9343402a418f0998a0e61b7704d8c2e75cdfe793"
     },
     {
-      "path": "docs/SETUP-GUIDE.md"
+      "path": ".claude/styles/p05-core.md",
+      "sha256": "f4a15383059df6ade9026a99aa83dc7dd61521b15e953ee8c35a570b959717a8"
     },
     {
-      "path": "docs/VERIFY-KNOWLEDGE-MCP.md"
+      "path": ".claude/styles/s0-core.md",
+      "sha256": "2dd9ee45fcbfed74d1614da1723c45e2731b0ac174003449c2f4e0dd2e33af3b"
     },
     {
-      "path": "docs/adr/ADR-001-setup-in-template.md"
+      "path": ".claude/sync-manifest.yaml",
+      "sha256": "d4d1fddfce286cb7db3300b421a1bc0552210dd8e9356aafb7e3b84765a20cc7"
     },
     {
-      "path": "docs/adr/ADR-002-modular-roles.md"
+      "path": ".claude/templates/drr-template.md",
+      "sha256": "54356facf8d596bad78889791927b0d8977d75a836cffbcc184d7611905af673"
     },
     {
-      "path": "docs/adr/ADR-003-hosting-platform.md"
+      "path": ".githooks/commit-msg",
+      "sha256": "f8507693252517c89deb4b963cdd499aa570dbba6663cb62a2ca4db1f8e2f6b9"
     },
     {
-      "path": "docs/agent-coordination-manifest.md"
+      "path": ".githooks/post-commit",
+      "sha256": "bf5be587db3488945025b5e8c7b486996a0b2ae3895f01ab449fdd555fc221ed"
     },
     {
-      "path": "docs/assets/orz-cycle.svg"
+      "path": ".githooks/pre-commit",
+      "sha256": "1097b690e58456f673e180cae712182ce8298e4b7546ad91c42c82116a4c9652"
     },
     {
-      "path": "docs/hindsight-setup.md"
+      "path": ".github/workflows/cloud-scheduler.yml",
+      "sha256": "7bfbe1a561531dea5f2d5539a99971dcbb1167877911a67072ee8330c7e86936"
     },
     {
-      "path": "docs/inter-agent-handoff.md"
+      "path": ".github/workflows/notify-security.yml",
+      "sha256": "c5616d747ad3c08b1a450d415f46545de9bb32987db3901b10d5b9d2095d824d"
     },
     {
-      "path": "docs/maintaining-skills.md"
+      "path": ".github/workflows/notify-update.yml",
+      "sha256": "d38bf9caa7b4eaccf0f86a6c96142d4b191c5919af95746eef57a341d288fa31"
     },
     {
-      "path": "docs/migrations/strategy-v0.27.0.md"
+      "path": ".github/workflows/post-release-audit.yml",
+      "sha256": "c01d2e59b832da6d692780cca4c97b42cf3050af7529f4e100c9f55f67438cb8"
     },
     {
-      "path": "docs/onboarding/architecture-layers.md"
+      "path": ".gitignore",
+      "sha256": "af6d4f4f3b7b4b07faef627856bd77c28ac0a957b42fcb9c8b68ff7f460094d4"
     },
     {
-      "path": "docs/onboarding/iwe-layers.md"
+      "path": ".gitleaks.toml",
+      "sha256": "1d86da22e3faa02a9c9789a8cfe5b000ce7daae9d04e3a99530fec2ca899d57c"
     },
     {
-      "path": "docs/onboarding/onboarding-diagrams.md"
+      "path": ".mcp.json",
+      "sha256": "ecd2f0ef900004f49208fed8f71500ca23876807a0cd3ae3525de306f25df6d8"
     },
     {
-      "path": "docs/onboarding/onboarding-guide.md"
+      "path": ".stignore",
+      "sha256": "13c0512dafbb06fe34b0efb34311874114188121d3c0609d514775b9a5c5398c"
     },
     {
-      "path": "docs/onboarding/onboarding-slides.md"
+      "path": "AGENTS-agent-blocks.md",
+      "sha256": "609c4037e9d70ea4a30c75d83626e48041e3b4746c3a217ba868a83bc6897738"
     },
     {
-      "path": "docs/onboarding/web-connect-guide.md"
+      "path": "AGENTS.md",
+      "sha256": "2c837f98d656019a7db7b9ef7faad05710abfbcb6407c9e3fce389da64bfbed6"
     },
     {
-      "path": "docs/onboarding/web-onboarding.md"
+      "path": "CHANGELOG.md",
+      "sha256": "ee615b766d65bb420db79b055cb1687496b4f1f3447970bd775cbd5a2fc734c0"
     },
     {
-      "path": "docs/principles-vs-skills.md"
+      "path": "CLAUDE.md",
+      "sha256": "7051cbfb4b12e88c196a014967e5bd860ab68bdc04a787acb9f13717aedd57fa"
     },
     {
-      "path": "docs/release-audit-log.md"
+      "path": "ONTOLOGY.md",
+      "sha256": "43e310f7c8f25070c3854fedf66019b05197b8777f7ae226d3a110487c8c822a"
     },
     {
-      "path": "docs/roles-catalog.md"
+      "path": "REPO-TYPE.md",
+      "sha256": "342059ac98920243b55c8985619dfda3c442196e46e7dfdf0ba3dfccfe51401a"
     },
     {
-      "path": "docs/scripts-catalog.md"
+      "path": "aisystant-sync-targets.yaml",
+      "sha256": "a254a6cefa1593a49f31d81ec9741a5a80163c82378340fc5e570a0e26073897"
     },
     {
-      "path": "docs/skills-catalog.md"
+      "path": "docs/AGENT-FAULT-PROCESS.md",
+      "sha256": "0d10a2b3cdd3cdd173bbb0b686d197ff3becf8ea311e587e41985512859d97db"
     },
     {
-      "path": "docs/use-cases/USE-CASES.md"
+      "path": "docs/AGENT-VENDOR-SETUP.md",
+      "sha256": "338fdbf324c5bb42b87218ee8f59baf32eb3ecb6ceb2aa0cd23e17bc7c06ac78"
     },
     {
-      "path": "exocortex/hindsight/docker-compose.yml"
+      "path": "docs/BROWSER-CI-TEMPLATE.md",
+      "sha256": "f263277a5e73aeab8f6065395b1ec4fc4a8b094d4941b3a53fa8a27a5992ace2"
     },
     {
-      "path": "exocortex/hindsight/install-launchd.sh"
+      "path": "docs/CLOUD-SCHEDULER.md",
+      "sha256": "cecf3f96218990b6c48c460b0207c1008472d08be8404929c22bede1c4240bd7"
     },
     {
-      "path": "exocortex/hindsight/start.sh"
+      "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
+      "sha256": "26ccae3560fc8b722e5f110a80267fedc8d5ee83b3f88270355cad39f130c14a"
     },
     {
-      "path": "extensions/README.md"
+      "path": "docs/DATA-POLICY.md",
+      "sha256": "9a6634619daff21faac14f466a66b57e057b305190b8d4e31003dfd8c581e57f"
     },
     {
-      "path": "extensions/agent-inbox/README.md"
+      "path": "docs/DATA-RESIDENCY.md",
+      "sha256": "2345886ab3f357ac16e02c60c5df009cb2c2bd13ffadd28be352f09c6b3989ee"
     },
     {
-      "path": "extensions/agent-inbox/SPEC.md"
+      "path": "docs/IWE-HELP.md",
+      "sha256": "2501fdd9d9932ef9a14f2f2ba37c32f2c06e8d588bc605481aef960ab690824d"
     },
     {
-      "path": "extensions/agent-inbox/scripts/config/pipeline-security-whitelist.yaml"
+      "path": "docs/KIMI-BROWSER-SETUP.md",
+      "sha256": "b5c7876038402d27572c94521c78a1e5983cacefcf5dd087cafc4b311c7e1e5a"
     },
     {
-      "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py"
+      "path": "docs/KIMI-SETUP.md",
+      "sha256": "ea1a75d391ec914719e78b8b555d541ed5ceb3ec0796584ce58d319c4e6f7fd6"
     },
     {
-      "path": "extensions/agent-inbox/templates/_template.md"
+      "path": "docs/LEARNING-PATH.md",
+      "sha256": "45d551ccc33148a0cda1262b23613586afe3fcda9dc9b664e35ed90fb86f6f4b"
     },
     {
-      "path": "extensions/agent-inbox/templates/analyze-section.md"
+      "path": "docs/PACK-CREATION.md",
+      "sha256": "63418eae5d6713abfe367d9ca4cf283852b66ce69baaa567c8898b0cebe0e440"
     },
     {
-      "path": "extensions/agent-inbox/templates/evolution-cron.md"
+      "path": "docs/PLATFORM-COMPAT.md",
+      "sha256": "e6041151feeb249c0ee4cf58f37ae845f2931e48a0a04e409fd1c33e9cd5aea9"
     },
     {
-      "path": "extensions/agent-inbox/templates/scout-daily.md"
+      "path": "docs/PORTABILITY.md",
+      "sha256": "48d7302a1d4124d336574f90f737b48d68d5339bea12032ffb3bdf9a8b10b316"
     },
     {
-      "path": "extensions/agent-inbox/templates/soak-verify.md"
+      "path": "docs/QUICK-START.md",
+      "sha256": "66d8037c86370dd02aef648928fa4a3362429379cf0c7eac1fceffc381b9bae3"
     },
     {
-      "path": "extensions/agentigore.sample"
+      "path": "docs/RELEASE-PROCESS.md",
+      "sha256": "a9cbdaff5d184302e7c83585521432a821134ee7899d8f77ba8c04a37bff0d64"
     },
     {
-      "path": "extensions/day-close.checks.session-orphans.md"
+      "path": "docs/RESIDENCY-GATE-USAGE.md",
+      "sha256": "04c07f24983304e9e9003254682e8a429d5762db9cc6bf6da8b8780c48d2becc"
     },
     {
-      "path": "extensions/day-open.after.session-orphans.md"
+      "path": "docs/SCRIPT-PROMOTION.md",
+      "sha256": "52f3056554fbaae92a7800817c681ac76083038b5b13971426468c5ce46e7922"
     },
     {
-      "path": "extensions/local-llm/ADR-001-local-llm-stack.md"
+      "path": "docs/SETUP-GUIDE.md",
+      "sha256": "0fdcee057931141ba27cd97c81fa013194230e8d0aa6998e52e62b15c0e0e671"
     },
     {
-      "path": "extensions/local-llm/README.md"
+      "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
+      "sha256": "fa4773e98c1f496f3eaa9bb8c3d8666252803197bde7d84626dd4c4600c56e22"
     },
     {
-      "path": "extensions/local-llm/detect-hardware.sh"
+      "path": "docs/adr/ADR-001-setup-in-template.md",
+      "sha256": "60b1e11855d8580d9acf4d3f9a4882b7b26a8b5e55ff53c6d755a74eaadc63ba"
     },
     {
-      "path": "extensions/local-llm/install-local-llm.sh"
+      "path": "docs/adr/ADR-002-modular-roles.md",
+      "sha256": "9f42709cffda4e72ae6d6234d906c7caa81c622f6cbe5044cd6ba8a25cf8c987"
     },
     {
-      "path": "extensions/local-llm/iwe-local-llm.sh"
+      "path": "docs/adr/ADR-003-hosting-platform.md",
+      "sha256": "641a2bc17471a86b1819a05177eaa5e8583ed44bd9ac8d08e879e7d60ec8006a"
     },
     {
-      "path": "extensions/local-llm/model-catalog.yaml"
+      "path": "docs/adr/ADR-004-data-domain-map.md",
+      "sha256": "5604b41db5629720eb09fb6c213c89d774eab2e79c3e3f2347868fa7812540ef"
     },
     {
-      "path": "extensions/local-llm/model-lifecycle.py"
+      "path": "docs/agent-coordination-manifest.md",
+      "sha256": "532c87fa48d758839890d5ccdfef9bfc959e18b95ad48ff633555ca4e10e7f33"
     },
     {
-      "path": "extensions/local-llm/model-monitor.py"
+      "path": "docs/assets/orz-cycle.svg",
+      "sha256": "f12a5ba4cbacffa2d7aa5bfe7148c43273195e8276173de5007c0658efe01b1a"
     },
     {
-      "path": "extensions/protocol-close.after.session-record.md"
+      "path": "docs/critical-files-map.yaml",
+      "sha256": "f01e9dfbc906409a2241793b603031daebd06ae98c7802f9fd227bd274a6152b"
     },
     {
-      "path": "extensions/protocol-close.checks.fault.md"
+      "path": "docs/hindsight-setup.md",
+      "sha256": "db3f6ba15eb8d45871cb772dfef40fa670107445cf4bac80084ae9764a1f2f36"
     },
     {
-      "path": "extensions/protocol-close.checks.md"
+      "path": "docs/inter-agent-handoff.md",
+      "sha256": "a8806c837378ba03ce197d827fbb2be13f15077461c709e0d6b2ced47168600a"
     },
     {
-      "path": "extensions/protocol-open.after.fault.md"
+      "path": "docs/maintaining-skills.md",
+      "sha256": "60882af7bf5876e0e738bcda61045dc209e32efac00a59be96f6b5a677863d64"
     },
     {
-      "path": "guide-kit/.gitignore"
+      "path": "docs/migrations/strategy-v0.27.0.md",
+      "sha256": "505d016f030f44f26777c450937320ba5d0d884c9153388015fac7298aa5452c"
     },
     {
-      "path": "guide-kit/FORMAT.md"
+      "path": "docs/onboarding/architecture-layers.md",
+      "sha256": "192afd4dfa5a2ab33da5cec90c66e01da5f88053ee5ad037c098de7b9b9b26fd"
     },
     {
-      "path": "guide-kit/HOW-IT-WORKS.md"
+      "path": "docs/onboarding/iwe-layers.md",
+      "sha256": "7ae6b208267d301083c0ea6591c19018db31bc98f98eae2defb7b9017d5c45f0"
     },
     {
-      "path": "guide-kit/LICENSE"
+      "path": "docs/onboarding/onboarding-diagrams.md",
+      "sha256": "a5ecabdceae8eea408535a4753f47163a80fdd2ea578f30b081dfba0c9d1f1ef"
     },
     {
-      "path": "guide-kit/README.md"
+      "path": "docs/onboarding/onboarding-guide.md",
+      "sha256": "cef88560d5c8afc182532a7a03d7fbf6aa0b447faca8abd45b70c03a3e994ca5"
     },
     {
-      "path": "guide-kit/demo/README.md"
+      "path": "docs/onboarding/onboarding-slides.md",
+      "sha256": "58985e3d7fd2338b6815c777b834bdeb55bf8826c9fce43efc2d8afbb1a5492e"
     },
     {
-      "path": "guide-kit/demo/cards/CAT.002.A1.json"
+      "path": "docs/onboarding/web-connect-guide.md",
+      "sha256": "5976d4132aaf657331b6207549e15ee40bf40ac50c6f1d532a293f58d4f813e6"
     },
     {
-      "path": "guide-kit/demo/cards/CAT.003.METHOD.001.json"
+      "path": "docs/onboarding/web-onboarding.md",
+      "sha256": "eee5fe90a126eb40c3a6e2d8c928b81748c3a7067716625ffad286f2eb3d1b4b"
     },
     {
-      "path": "guide-kit/demo/curriculum/M-D1.md"
+      "path": "docs/principles-vs-skills.md",
+      "sha256": "15aa82a39166853f2a8350691d54ebc46255dc4d2ab33c7aaa749b66da7953ed"
     },
     {
-      "path": "guide-kit/generator/adapter.py"
+      "path": "docs/release-audit-log.md",
+      "sha256": "b0a41a43e1a0c127008de723f5e3b00372be1d7b5d54f8cf8c1cdabc5bc7e029"
     },
     {
-      "path": "guide-kit/generator/conftest.py"
+      "path": "docs/roles-catalog.md",
+      "sha256": "5fcee4ddcde9d6566038609330b404f9346fdcddd0d996f5c4f71a52fc60ed34"
     },
     {
-      "path": "guide-kit/generator/horizons.py"
+      "path": "docs/scripts-catalog.md",
+      "sha256": "e866b32a63c270103512b06a354a4cb61a238d28390b990e3bf67d7ba2b471df"
     },
     {
-      "path": "guide-kit/generator/llm_backends/__init__.py"
+      "path": "docs/skills-catalog.md",
+      "sha256": "95f6f2036cab1a21c1a710965cd29d8947c80692c526078b185ae363d216d052"
     },
     {
-      "path": "guide-kit/generator/llm_backends/anthropic.py"
+      "path": "docs/use-cases/USE-CASES.md",
+      "sha256": "69859c5b129bafcaa1bd53dc6aae360a95bfa9639e6aa50275608ab2e490ca46"
     },
     {
-      "path": "guide-kit/generator/llm_backends/local.py"
+      "path": "exocortex/hindsight/docker-compose.yml",
+      "sha256": "a7c03f9c4062362cf97dc4562cdefec3914b516ae7a3a142174d71f3a22cc8c6"
     },
     {
-      "path": "guide-kit/generator/llm_backends/openai_compatible.py"
+      "path": "exocortex/hindsight/install-launchd.sh",
+      "sha256": "b538819443a02db6bb914a498a035983e7c44ba36b8cd1889b3ae7e2255d7eb7"
     },
     {
-      "path": "guide-kit/generator/onboarding_ctas.py"
+      "path": "exocortex/hindsight/start.sh",
+      "sha256": "9a8f69ae6a25d1286ef7f7b728d5f74971fc7715ed72cf51b840ed2ae34f1ab0"
     },
     {
-      "path": "guide-kit/generator/personal_export.py"
+      "path": "extensions/README.md",
+      "sha256": "a01398ab546d402096b7ac7e416677811a3a943b05040a763fd5ce9d4630d66d"
     },
     {
-      "path": "guide-kit/generator/planner.py"
+      "path": "extensions/agent-inbox/README.md",
+      "sha256": "25fcc81507dff73c0029a686620b9dc8bf10570e0ad7f3d39d8e978cc85dae89"
     },
     {
-      "path": "guide-kit/generator/platform_knowledge.py"
+      "path": "extensions/agent-inbox/SPEC.md",
+      "sha256": "95e513145db3022bdcc42c868395f2d227f059f048743334128623ffbc7eb65d"
     },
     {
-      "path": "guide-kit/generator/policies/default.yaml"
+      "path": "extensions/agent-inbox/scripts/config/pipeline-security-whitelist.yaml",
+      "sha256": "d9c77d539574864d55431a84568ea0c873f371b769e6c786603749d24848d27e"
     },
     {
-      "path": "guide-kit/generator/prompt.md"
+      "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
+      "sha256": "d736ab9d8b2c7d3c51f1b03a43e230b9ce6b0c11c8e0ec3440add731cbe78fd2"
     },
     {
-      "path": "guide-kit/generator/render_work_section_runner.py"
+      "path": "extensions/agent-inbox/templates/_template.md",
+      "sha256": "d1083b2965a19a14428ca28840912d76c7910373609e6b398b34a280e15efc84"
     },
     {
-      "path": "guide-kit/generator/test_acceptance_backends.py"
+      "path": "extensions/agent-inbox/templates/analyze-section.md",
+      "sha256": "9ce3944ae270f852fa016d8513dd8f653d0b02e42e05d28c366ad09a7802fe09"
     },
     {
-      "path": "guide-kit/generator/test_adapter_work_section.py"
+      "path": "extensions/agent-inbox/templates/evolution-cron.md",
+      "sha256": "db93e0d3d914e365a289edb10e55d7527388be78ee2705c15e55a5f8a53deacc"
     },
     {
-      "path": "guide-kit/generator/test_demo_catalog.py"
+      "path": "extensions/agent-inbox/templates/scout-daily.md",
+      "sha256": "8586e6ebd442f458ba31ca1ed8d15ad77580b013ae21ecd0b73dd373b02c17c7"
     },
     {
-      "path": "guide-kit/generator/test_horizons.py"
+      "path": "extensions/agent-inbox/templates/soak-verify.md",
+      "sha256": "f07a26d53869bba88fcb6fcd7fd9f2b7f097a5b37e4a734238c74587143ea0a8"
     },
     {
-      "path": "guide-kit/generator/test_onboarding_ctas.py"
+      "path": "extensions/agentigore.sample",
+      "sha256": "9bfe3029f8dfe18f8bd74c347c7755cacba53edf14bdb6a893a28836a60b615e"
     },
     {
-      "path": "guide-kit/generator/test_personal_export.py"
+      "path": "extensions/day-close.checks.session-orphans.md",
+      "sha256": "dd1ff9170b7471a29742d747cbdfeaa5752b5d6c4c53a0794364289224782f51"
     },
     {
-      "path": "guide-kit/generator/test_platform_knowledge.py"
+      "path": "extensions/day-open.after.session-orphans.md",
+      "sha256": "36df5255c46647e969b7aa69137bc996790b47619f7a808640e3dd584346b897"
     },
     {
-      "path": "guide-kit/generator/test_work_section.py"
+      "path": "extensions/day-open.checks.md",
+      "sha256": "41fd9c38d4a29c02ee99b7ff5eb849841215dd026711eb50fb1b93bfde57c48d"
     },
     {
-      "path": "guide-kit/generator/test_zero_upload.py"
+      "path": "extensions/local-llm/ADR-001-local-llm-stack.md",
+      "sha256": "70849c5b4ce154361e4745fb8edcfdd585fc93802a2e5e4fd13da4a1e618a243"
     },
     {
-      "path": "guide-kit/generator/work_section.py"
+      "path": "extensions/local-llm/README.md",
+      "sha256": "520d9d529ad202b7ca4c1e3757301cbf0f6c800b39c15dd1b351dddf6c14a28f"
     },
     {
-      "path": "guide-kit/guide-kit.config.yaml.example"
+      "path": "extensions/local-llm/detect-hardware.sh",
+      "sha256": "82b3536025e1b50935868a387d081d6bbe3917f2450d2779fb5f49f8e5eb8da3"
     },
     {
-      "path": "guide-kit/scripts/build-snapshot.py"
+      "path": "extensions/local-llm/install-local-llm.sh",
+      "sha256": "4118de5c13f0ecbf18ae56d93ea0ee008d69b1d62d3c58b7777f45ca134806ea"
     },
     {
-      "path": "guide-kit/scripts/fetch-snapshot.py"
+      "path": "extensions/local-llm/iwe-local-llm.sh",
+      "sha256": "1efb81a90b6b7dcc374cdcaefbb96acac96472660215e89941bfd98c98b6ef73"
     },
     {
-      "path": "guide-kit/scripts/publish-snapshot.sh"
+      "path": "extensions/local-llm/model-catalog.yaml",
+      "sha256": "4143552c5bc45931aea81faca34cae2a0f056b8e097f678a2458aa05ec18e670"
     },
     {
-      "path": "guide-kit/scripts/test_build_snapshot.py"
+      "path": "extensions/local-llm/model-lifecycle.py",
+      "sha256": "c2d4396afbfc32b40563f3afd1f27cfc23051a9a769218e371668299d0b89834"
     },
     {
-      "path": "guide-kit/scripts/test_fetch_snapshot.py"
+      "path": "extensions/local-llm/model-monitor.py",
+      "sha256": "cb3329efabaa4e49c05a71d3c58f708323ab0fa04b48e7bf3840cafbc192e6b7"
     },
     {
-      "path": "guide-kit/scripts/test_publish_snapshot.sh"
+      "path": "extensions/protocol-close.after.session-record.md",
+      "sha256": "1734506683fbc22dec42731ef8cef26e3198e68251a19469cf0ad2a43e032b5c"
     },
     {
-      "path": "guide-kit/scripts/test_snapshot_allowlist.py"
+      "path": "extensions/protocol-close.checks.fault.md",
+      "sha256": "3fc3c938f3d27c5124216e51f99c965ac6667c25e2712a6dccb1d3209c73427e"
     },
     {
-      "path": "guide-kit/structurer/classify.py"
+      "path": "extensions/protocol-close.checks.md",
+      "sha256": "6b55cafe0c2f27c13626003b1c6e40a359d50afd3cb949dbdcb00e3578b7f154"
     },
     {
-      "path": "guide-kit/structurer/extractors.py"
+      "path": "extensions/protocol-open.after.fault.md",
+      "sha256": "0744a46aa45630c5eb451a64fea6570c82379bb7c12350a395efb570a21d4005"
     },
     {
-      "path": "guide-kit/structurer/freshness.py"
+      "path": "extensions/strategy-cycle/README.md",
+      "sha256": "f1830d944b0d0731663790500c49f4b41c359ecc1def4573886731542fbef93d"
     },
     {
-      "path": "guide-kit/structurer/homes.py"
+      "path": "extensions/strategy-cycle/SPEC.md",
+      "sha256": "24df14999e91c3d51c4f2a6556fd6c90e67aa8bc94b17b808bc81a8dfbea8e68"
     },
     {
-      "path": "guide-kit/structurer/media.py"
+      "path": "extensions/strategy-cycle/scripts/test-validate-event.sh",
+      "sha256": "66c5009439715c2103af2c42fad62c9ac749f91c66f88d4ff067f51385b6ac6c"
     },
     {
-      "path": "guide-kit/structurer/quarantine.py"
+      "path": "extensions/strategy-cycle/scripts/validate-event.sh",
+      "sha256": "6a201fdbf5149798f6843d1c1bcce820eb4dc82b695c9044ee33b606fecd0a69"
     },
     {
-      "path": "guide-kit/structurer/residency.py"
+      "path": "generate-manifest.sh",
+      "sha256": "21463b0ddacde3ed8b9df6649e9d0d949c57c6b7c83a849a01cbf00555a835fd"
     },
     {
-      "path": "guide-kit/structurer/sidecar.py"
+      "path": "guide-kit/.gitignore",
+      "sha256": "15ed85cf9b54eb982fc6e54d0177aa1e2516f839fa0de00c19387cf6f196817a"
     },
     {
-      "path": "guide-kit/structurer/signals.py"
+      "path": "guide-kit/FORMAT-topic.yaml.md",
+      "sha256": "ec5fbe07b496fb45c6e5cb6eecaa5fc90d19e89eb00020f3dac82b2e3e090a9d"
     },
     {
-      "path": "guide-kit/structurer/test_classify.py"
+      "path": "guide-kit/FORMAT.md",
+      "sha256": "b2ea719172bf546c84c05e029a6c183fd286c72f1013ba6b0c5a035f4bd36abe"
     },
     {
-      "path": "guide-kit/structurer/test_extractors.py"
+      "path": "guide-kit/HOW-IT-WORKS.md",
+      "sha256": "4e4522eeb95bab13c7069346fd61918bebf95dc0fedf501cc103c080be41b088"
     },
     {
-      "path": "guide-kit/structurer/test_freshness.py"
+      "path": "guide-kit/LICENSE",
+      "sha256": "12015679f89d8df3cb97e156f72f5de85e0c5b35a19a417e6c53c6bd645c4c56"
     },
     {
-      "path": "guide-kit/structurer/test_media.py"
+      "path": "guide-kit/README.md",
+      "sha256": "3f791662ce0e317a4223a5eebfa665e06aaf4ff07df6532e30da66ec27eda6a2"
     },
     {
-      "path": "guide-kit/structurer/test_quarantine.py"
+      "path": "guide-kit/demo/README.md",
+      "sha256": "751216656b1aabc6785db56166bfb573828354c16feb56d0de21bcb52023c2ce"
     },
     {
-      "path": "guide-kit/structurer/test_residency.py"
+      "path": "guide-kit/demo/cards/CAT.002.A1.json",
+      "sha256": "89755b535d5edf567f5c85cb7326333e7c3cdf1029db1c6397c99c4ffb8d1620"
     },
     {
-      "path": "guide-kit/structurer/test_sidecar.py"
+      "path": "guide-kit/demo/cards/CAT.003.METHOD.001.json",
+      "sha256": "ee6945d7330fb511b11e67fd7b5351ff3c1b92d31871725dca899d721f8beb68"
     },
     {
-      "path": "guide-kit/tests/acceptance/stub_llm_server.py"
+      "path": "guide-kit/demo/curriculum/M-D1.md",
+      "sha256": "92c1bcf58361cce3b4a741f6a48855f3d3a8d0bfba5d4e33dbdedf152cba0488"
     },
     {
-      "path": "guide-kit/tests/acceptance/stub_mcp_server.py"
+      "path": "guide-kit/generator/adapter.py",
+      "sha256": "c85ed0369576271aa6e303bed45015ba362526795c782a083e43ab3b4f62fb91"
     },
     {
-      "path": "guide-kit/tests/acceptance/test_p1_clean_machine.sh"
+      "path": "guide-kit/generator/conftest.py",
+      "sha256": "3c3ec36417f30afd960a97af67bf65e3c01825a8c8c28b529239b8a32735dc2c"
     },
     {
-      "path": "memory/MEMORY.md"
+      "path": "guide-kit/generator/decomposer.py",
+      "sha256": "d72884818a55a601448bdea8c6ac31336cd6bf842f589f7ea247cd225b1eeb14"
     },
     {
-      "path": "memory/agent-architecture-framework.md"
+      "path": "guide-kit/generator/f6f10_integration.py",
+      "sha256": "4ccb1e95b247f076296daa1619321d5a3d8b4c57c198ee35f006e13d91ef7595"
     },
     {
-      "path": "memory/agent-vendor-connect-pattern.md"
+      "path": "guide-kit/generator/health_adapter.py",
+      "sha256": "f71fb5c91e03aeafb2c1d8ec62afd013ff08b1f8671059eec3554a5e75368f8e"
     },
     {
-      "path": "memory/checklists.md"
+      "path": "guide-kit/generator/horizons.py",
+      "sha256": "e4c0198b6c163f46f60ef096dc40c5eee7d636d640bf9fc17fb2d6bca4e94f34"
     },
     {
-      "path": "memory/communication-style-base.md"
+      "path": "guide-kit/generator/llm_backends/__init__.py",
+      "sha256": "62a5f9015bdfe3517aaceda520197b30d8990610b68cb27652ac7fd369e9de94"
     },
     {
-      "path": "memory/communication-style-downstream-template.md"
+      "path": "guide-kit/generator/llm_backends/anthropic.py",
+      "sha256": "9a966ca0d4c37f14dc9ade2b8d7e66d7473fb123677d06601d737f91ae7865ac"
     },
     {
-      "path": "memory/communication-style-personal-template.md"
+      "path": "guide-kit/generator/llm_backends/local.py",
+      "sha256": "e1ada4025c499cd5b6f753ff88624ad8520e2b520dee92c3ecead00e464b3665"
     },
     {
-      "path": "memory/day-rhythm-config.yaml"
+      "path": "guide-kit/generator/llm_backends/openai_compatible.py",
+      "sha256": "9b72e53465771ac13a94bee38705e1ec3efe0611798258547170c2c1cfedef2d"
     },
     {
-      "path": "memory/distinctions-warm.md"
+      "path": "guide-kit/generator/onboarding_ctas.py",
+      "sha256": "def598346299763b55dcbed5b84cee2fc1a527119ee1f067ed6d50c189785d54"
     },
     {
-      "path": "memory/dry-run-contract.md"
+      "path": "guide-kit/generator/personal_export.py",
+      "sha256": "38a4890a72bca61b1b8207d6c63fa7dcd760145dbd2ddf0347189cb6f0ab12f0"
     },
     {
-      "path": "memory/feedback_community_communication_style.md"
+      "path": "guide-kit/generator/planner.py",
+      "sha256": "49878fbd0978635ef5f2c2c46d2f08f05b06cbce97e285c16402de9b0e60f5d6"
     },
     {
-      "path": "memory/feedback_response_clarity_for_pilot.md"
+      "path": "guide-kit/generator/platform_knowledge.py",
+      "sha256": "6b68750133a14b7033dcfc8e1a76b8a00ec857ca133dec896a3e66677c9e198e"
     },
     {
-      "path": "memory/fpf-reference.md"
+      "path": "guide-kit/generator/policies/default.yaml",
+      "sha256": "5a3a479903900f6dc4f48b59d6b2ce5b5d1148baeb81fb0084010472431911f9"
     },
     {
-      "path": "memory/fpf-term-map.yaml"
+      "path": "guide-kit/generator/prompt.md",
+      "sha256": "451ee71a48bef00cf2aede12b8e3af4f1c68b629c3bfd5ca269a6202adc99cf7"
     },
     {
-      "path": "memory/hard-distinctions.md"
+      "path": "guide-kit/generator/render_work_section_runner.py",
+      "sha256": "141c62d63b5d42e7e9f298de9b6c1cc4571a69d0fa3d72312e840a7622faf9b3"
     },
     {
-      "path": "memory/hooks-design.md"
+      "path": "guide-kit/generator/research_formalize.py",
+      "sha256": "caa4143d872f4f2d509e95872ca81ed841efb60d333fbce4326bb597c3928683"
     },
     {
-      "path": "memory/memory-lifecycle-spec.md"
+      "path": "guide-kit/generator/scenario_router.py",
+      "sha256": "ab2e8e7ce49fa3decd0b1607c40669f58fca1d948cfb34ae71977e667cb3d085"
     },
     {
-      "path": "memory/navigation.md"
+      "path": "guide-kit/generator/source_finder.py",
+      "sha256": "79bb2b431e575dd168e9b8658733d4a985eea1ad7dd56fb7725e0ae37804a3e8"
     },
     {
-      "path": "memory/protocol-close.md"
+      "path": "guide-kit/generator/test_acceptance_backends.py",
+      "sha256": "7cf680a9da07fbd0febac40b1637879d1b222c1614a2b94b951d859ddc55088e"
     },
     {
-      "path": "memory/protocol-dt-integration.md"
+      "path": "guide-kit/generator/test_adapter_applied_note.py",
+      "sha256": "896548b6f00095234271ca4d56477daa662706a309d8cb0d480fe091f997bbfd"
     },
     {
-      "path": "memory/protocol-month-close.md"
+      "path": "guide-kit/generator/test_adapter_work_section.py",
+      "sha256": "7fb96934fb7e1792cfb054cbb71772d14ab9a98533c36a0a64a66b401bb7f6b4"
     },
     {
-      "path": "memory/protocol-open.md"
+      "path": "guide-kit/generator/test_applied_track.py",
+      "sha256": "c43fcfbae992037f3ab02c744130342ba69fcc1fd2429252ed965d8102e2769b"
     },
     {
-      "path": "memory/protocol-work.md"
+      "path": "guide-kit/generator/test_demo_catalog.py",
+      "sha256": "18d74368c9d5b1fa7b24fda94bd903eac1353c29add156a8aa63b5d5f1e4ccb2"
     },
     {
-      "path": "memory/r-questionnaire.md"
+      "path": "guide-kit/generator/test_horizons.py",
+      "sha256": "b7e3f9bf1c3458160fa2a9b5656ec40152ddb8885254faf10d01fa5ceaa60b07"
     },
     {
-      "path": "memory/reference/agent-core.md"
+      "path": "guide-kit/generator/test_onboarding_ctas.py",
+      "sha256": "0124394406af859321b019156ec4b6bb858a6b57c09f2215a92a8be3bbaacc89"
     },
     {
-      "path": "memory/repo-type-rules.md"
+      "path": "guide-kit/generator/test_personal_export.py",
+      "sha256": "fc747e8334ed9bd8ebd3249a2037a9f8807153e1a5ec9fdde22f707b2dbb481a"
     },
     {
-      "path": "memory/roles-detail.md"
+      "path": "guide-kit/generator/test_platform_knowledge.py",
+      "sha256": "5bda893cd250d1f467e110356b3b4c3285382ddab9f0ed5aa50bb7bfbf956be8"
     },
     {
-      "path": "memory/roles.md"
+      "path": "guide-kit/generator/test_work_section.py",
+      "sha256": "efbccaae8a80e48d6f845a8316640805e1edf2568811a986ce6721195850bdf4"
     },
     {
-      "path": "memory/routing-vocab.md"
+      "path": "guide-kit/generator/test_zero_upload.py",
+      "sha256": "99f624ce39ede8f5fc483f1662b06e778e2b2e3c3db30e6848ab4ad8fc90912e"
     },
     {
-      "path": "memory/sota-prompt-cache.md"
+      "path": "guide-kit/generator/work_section.py",
+      "sha256": "2d5b8558ff2cb95d47353ffd1e57d089f11aefd5d3a5e2acff391173f7731d9a"
     },
     {
-      "path": "memory/sota-reference.md"
+      "path": "guide-kit/guide-kit.config.yaml.example",
+      "sha256": "e61a2b811001cfef2fab18816ba5810b6b636a3519e5e88c3407444b4bb24369"
     },
     {
-      "path": "memory/t-checklist.md"
+      "path": "guide-kit/scripts/build-snapshot.py",
+      "sha256": "c665e28491d1e6eb6897ed41b199d4dd0ebe42adfe80c7f222c7206d3e073490"
     },
     {
-      "path": "memory/templates-dayplan.md"
+      "path": "guide-kit/scripts/fetch-snapshot.py",
+      "sha256": "8bd0e4a70e4ec9f8b35597b1da8c63c165b0fad93aa0a7f78f11dac8d631c0ee"
     },
     {
-      "path": "pack-templates/.github/README.md"
+      "path": "guide-kit/scripts/publish-snapshot.sh",
+      "sha256": "12949a6447fd3d8e90e8fe34c287b102c0d3e8104d54ca8f082dee23dc40ed33"
     },
     {
-      "path": "pack-templates/.github/scripts/check-pack-collisions.sh"
+      "path": "guide-kit/scripts/test_build_snapshot.py",
+      "sha256": "9d3ad0046b13ecabf66cfacb5a9a0ce764afa82a5772464af7d84ad4cfff289b"
     },
     {
-      "path": "pack-templates/.github/workflows/pack-lint.yml"
+      "path": "guide-kit/scripts/test_fetch_snapshot.py",
+      "sha256": "bc6162e6def34e4b1822cc91797293bbfd969a1feeae9e1734b073fd48b80891"
     },
     {
-      "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-constraint-analyst.md"
+      "path": "guide-kit/scripts/test_publish_snapshot.sh",
+      "sha256": "ae0dbb401eda9a338cbd1b3d39a32f6b3ccca25672ddd853e1a7c2d2081de445"
     },
     {
-      "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-dispatcher.md"
+      "path": "guide-kit/scripts/test_snapshot_allowlist.py",
+      "sha256": "5dabe6c0ee607bf9619e100b061cded64245de650ff9466c6bdd15b5535041fc"
     },
     {
-      "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-external-session-adapter.md"
+      "path": "guide-kit/structurer/classify.py",
+      "sha256": "d20652622ba3dda6f4fdbf90c61a3367c4c0971ad97e4f5ae7da7cebc43b95f8"
     },
     {
-      "path": "pack-templates/digital-platform/04-work-products/DP.WP.NNN-stage-dependency-map.md"
+      "path": "guide-kit/structurer/extractors.py",
+      "sha256": "dc07010f924fe031c26733b45de13f3e784be2faea5341c05c1abaccd3708bb1"
     },
     {
-      "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-agent-inbox.md"
+      "path": "guide-kit/structurer/freshness.py",
+      "sha256": "00368e7810a5644c10980487b2d9dc77886728aad9121ce162416bfd4364da32"
     },
     {
-      "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-constraint-analysis.md"
+      "path": "guide-kit/structurer/homes.py",
+      "sha256": "b4ef2870b7e2f0f7341a2a8cfc35a045775fe17a796aa3958136674f1f824669"
     },
     {
-      "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-external-session-request.md"
+      "path": "guide-kit/structurer/media.py",
+      "sha256": "088706bfffa052dffb379108d1a055ffd2a6a3aef2a0cfeb4990f7dfeeee9437"
     },
     {
-      "path": "roles/README.md"
+      "path": "guide-kit/structurer/quarantine.py",
+      "sha256": "b6f420718c186b78a25bed675a77185bf9115be43f85f96befcafbc1ccd4631b"
     },
     {
-      "path": "roles/ROLE-CONTRACT.md"
+      "path": "guide-kit/structurer/residency.py",
+      "sha256": "68fe9205b845c41f778b1c6c2b20f767e8c686f3bb4f459c4c1cbbb57ab18493"
     },
     {
-      "path": "roles/auditor/README.md"
+      "path": "guide-kit/structurer/sidecar.py",
+      "sha256": "4ce33a3b70a5b2d768ee89c8cfc2a480ee1992ecc1423c806b8eec763b59a8ad"
     },
     {
-      "path": "roles/auditor/install.sh"
+      "path": "guide-kit/structurer/signals.py",
+      "sha256": "af47db92f4e1b68e7e61d06a068ee97fef7e8823322f73790ef870cc2a1ee9ad"
     },
     {
-      "path": "roles/auditor/prompts/audit-coverage.md"
+      "path": "guide-kit/structurer/test_classify.py",
+      "sha256": "3d5472ef23c8f6ab3e1279dc9ca1f251add1b4babf82fb35e2d970187db4e181"
     },
     {
-      "path": "roles/auditor/prompts/audit-plan-consistency.md"
+      "path": "guide-kit/structurer/test_extractors.py",
+      "sha256": "d782044ccaaf7ac60164774fe8ece7e68b2d8bd7751442951756ff4a0d68ad32"
     },
     {
-      "path": "roles/auditor/role.yaml"
+      "path": "guide-kit/structurer/test_freshness.py",
+      "sha256": "fe29b92b4c0159f364fde5fb7728603d27c8be5b11270a0d504075c51744d9f9"
     },
     {
-      "path": "roles/extractor/README.md"
+      "path": "guide-kit/structurer/test_media.py",
+      "sha256": "ecac97a3deedf062f20f5b510b3046c54cf535084e3fbdbecb16b445b40244fd"
     },
     {
-      "path": "roles/extractor/config/feedback-log.md"
+      "path": "guide-kit/structurer/test_quarantine.py",
+      "sha256": "61e8b572bbfb9886bb8269ce89317549798bc2bf2d191aa648352f5b8e8bbab3"
     },
     {
-      "path": "roles/extractor/config/routing.md"
+      "path": "guide-kit/structurer/test_residency.py",
+      "sha256": "21bf5786235e81fd009f7d8e3bbaa79c57663d96449a019da9666a2629e5b2a3"
     },
     {
-      "path": "roles/extractor/install.sh"
+      "path": "guide-kit/structurer/test_sidecar.py",
+      "sha256": "76790b46666676129e015f246ec546ed1abaa07fca6397157189f00582a98c11"
     },
     {
-      "path": "roles/extractor/prompts/git-diff-feed.md"
+      "path": "guide-kit/tests/acceptance/stub_llm_server.py",
+      "sha256": "09398946875d12dd7bd0b1434ea3caa06c31fb1d68f0b2676f3651f1299c9edd"
     },
     {
-      "path": "roles/extractor/prompts/inbox-check.md"
+      "path": "guide-kit/tests/acceptance/stub_mcp_server.py",
+      "sha256": "ee66e749efbe4041e7c463058fcf15e10848e13447a308b72fafe6da7e0ef888"
     },
     {
-      "path": "roles/extractor/prompts/knowledge-audit.md"
+      "path": "guide-kit/tests/acceptance/test_p1_clean_machine.sh",
+      "sha256": "e1406f88ea4d22c6fb170dbddd486deb431425a4041d32a60c28891ec6419c76"
     },
     {
-      "path": "roles/extractor/prompts/on-demand.md"
+      "path": "guide-kit/tests/test_decomposer.py",
+      "sha256": "4a093d97f1e79cd46540bc90357c2f51826deaaf96371974efbf492efb425df5"
     },
     {
-      "path": "roles/extractor/prompts/session-close-feed.md"
+      "path": "guide-kit/tests/test_f6f10_smoke.py",
+      "sha256": "a8ef4fa0b67f8bb083601095a09536a867d8c65dc1b2a2142e65499efb458984"
     },
     {
-      "path": "roles/extractor/prompts/session-close.md"
+      "path": "guide-kit/tests/test_planner_area_fallback.py",
+      "sha256": "d5e469080121392ff94da6647f78c85c63b0d851eff0eeb5442c99dd966b7520"
     },
     {
-      "path": "roles/extractor/role.yaml"
+      "path": "memory/MEMORY.md",
+      "sha256": "7016cf161da6ad632371f64ae841a12e0b645595db9db70827adb77a726e6375"
     },
     {
-      "path": "roles/extractor/scripts/extractor.sh"
+      "path": "memory/agent-architecture-framework.md",
+      "sha256": "38fea9159f06418a2b5727964329d6c3e3a00bcd35a1d88b5f57571eeee4b4b2"
     },
     {
-      "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist"
+      "path": "memory/agent-vendor-connect-pattern.md",
+      "sha256": "2c7c51d91ed3be09148fb927c8d52bb5ec75a0186f950f8bc0545bf16096935f"
     },
     {
-      "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service"
+      "path": "memory/checklists.md",
+      "sha256": "8c9e5bfd7befab90fc892f4bf1e638655231ed29bcc4cae6e9fb7277d5e402d1"
     },
     {
-      "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.timer"
+      "path": "memory/communication-style-base.md",
+      "sha256": "9775eda3c479f6149434469f7f925cfabb6925e5b0e410227c0070142f455f4f"
     },
     {
-      "path": "roles/extractor/scripts/wp429-extractor-prefilters.py"
+      "path": "memory/communication-style-downstream-template.md",
+      "sha256": "b1858b936c5a7152d1d2e75b0c3b5dcfa238ab16e4cacf4a46493c1043621959"
     },
     {
-      "path": "roles/role-boundaries.md"
+      "path": "memory/communication-style-personal-template.md",
+      "sha256": "5928f1f7617004b00737e6d505b862d760d63630dfb992980ccf0a20b932a6db"
     },
     {
-      "path": "roles/strategist/README.md"
+      "path": "memory/day-rhythm-config.yaml",
+      "sha256": "90d3bb465ef90b19a14dc17849fedd51473e356a2d67f3df7b339c1e500a41e3"
     },
     {
-      "path": "roles/strategist/install.sh"
+      "path": "memory/distinctions-warm.md",
+      "sha256": "44f99f43925283c276f280c3bce02a56f289281f1b60e55b897d955acbc5e8c2"
     },
     {
-      "path": "roles/strategist/prompts/add-wp.md"
+      "path": "memory/dry-run-contract.md",
+      "sha256": "fc1aa32ffbbd041c9f35c540b261e9c645d47221c9159042367852c99ec0f6ee"
     },
     {
-      "path": "roles/strategist/prompts/check-plan.md"
+      "path": "memory/feedback_community_communication_style.md",
+      "sha256": "f4dc097e77c2e880477f0875ee0622f3892c1940fd5c308bd892c28f0df91ad4"
     },
     {
-      "path": "roles/strategist/prompts/day-close.md"
+      "path": "memory/feedback_response_clarity_for_pilot.md",
+      "sha256": "6d4dc548120e7a7b46f4040c9bff72bad20e07e4f1213da11272e52afee118fb"
     },
     {
-      "path": "roles/strategist/prompts/day-plan.md"
+      "path": "memory/fpf-reference.md",
+      "sha256": "d753b57b1a500861034bdd4a522773979b1a8665135ba679afc02ecaeca9f3f9"
     },
     {
-      "path": "roles/strategist/prompts/evening.md"
+      "path": "memory/fpf-term-map.yaml",
+      "sha256": "437cf0ed811380380e6ac4f9f6242560ea970a1c2ab317c9ded36a52623df600"
     },
     {
-      "path": "roles/strategist/prompts/month-close.md"
+      "path": "memory/hard-distinctions.md",
+      "sha256": "96596d5fa545c03b6f18d0ef6ca79e0f464800785365f57b457497273eaa6634"
     },
     {
-      "path": "roles/strategist/prompts/note-review.md"
+      "path": "memory/hooks-design.md",
+      "sha256": "951872ce350cb40e619a095e2d4de282735d81d5a0370256b380b31eded62986"
     },
     {
-      "path": "roles/strategist/prompts/session-prep.md"
+      "path": "memory/lpf-hypothesis-log.md",
+      "sha256": "058bb2a0adbeee41a5512a572c82f78b24325814e1b3244fd69e10bcd823e8ff"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-monthly.md"
+      "path": "memory/memory-lifecycle-spec.md",
+      "sha256": "68dfa01867f40cce0bf66e7276bbc7c1af96d4657c1659feb5004399d640f60b"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly.md"
+      "path": "memory/navigation.md",
+      "sha256": "46c4321d8a309d0dd4ea56ecac0802d8f14a7040801affb44a58de46245d70c7"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/appendix/consent-check.md"
+      "path": "memory/protocol-close.md",
+      "sha256": "42a408e8c174b3b72b5056cdeb6304002ca4a8bd59d3b35504ee4db271ccd735"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/appendix/dt-guide-prep.md"
+      "path": "memory/protocol-dt-integration.md",
+      "sha256": "edb7b8057234cb185017ac502957731ce113d6d9171ea1349b75fb9f37d11c73"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/jump-handler.md"
+      "path": "memory/protocol-month-close.md",
+      "sha256": "f64ceb9eb79523ae4800727c1e3765317da634ee767680388ca0ef1ff51b3980"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/00-open.md"
+      "path": "memory/protocol-open.md",
+      "sha256": "06b3eb988ce8eb37e2758f08bd1e75a2caa858a15cec63396402546a920dbeab"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/01-review.md"
+      "path": "memory/protocol-work.md",
+      "sha256": "18496c61531af033a1701b8ea9cf3cd46f0777dceac0964aa6ee5122428c87c0"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/02-inbox.md"
+      "path": "memory/r-questionnaire.md",
+      "sha256": "38391245c46cee1b5cef87190bb28aded29d635d4bb8a0a63dee6d273c7b7744"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/03-dissatisfactions.md"
+      "path": "memory/reference/agent-core.md",
+      "sha256": "08e2f1601c52757ea8a266c593563e3e8faedd029a9b6936ebef0994e84322df"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/04-strategy-sync.md"
+      "path": "memory/repo-type-rules.md",
+      "sha256": "87ed9df2a5a75dec0d408019d06f1d0ce87d94dbcfb286bf361153973d9c0bd9"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/05a-measurement.md"
+      "path": "memory/roles-detail.md",
+      "sha256": "7a118106568cf18948d1e4cc451e11f0912248eacb570d41cd100815ac811a74"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/05b-recommendation.md"
+      "path": "memory/roles.md",
+      "sha256": "5a71b49f62edc756de3a52dc6ab707e0945d318f35dd9fe2d94cab703a7754f4"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/05c-tracking.md"
+      "path": "memory/routing-vocab.md",
+      "sha256": "f50ec267c727ea860cbe55ac6edf6f1bdc9335c4426e31710167b6072ced97c7"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md"
+      "path": "memory/sota-prompt-cache.md",
+      "sha256": "b5b9ecc71cbe87fb7c2d85a80e02e4dccc3bc665f46f5e7992bc3e60c656cb6b"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md"
+      "path": "memory/sota-reference.md",
+      "sha256": "e2301014fb9ef1f04e0ad47bb9717977562166c3c69d129ae237fdf819d052f5"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/06c-finalize.md"
+      "path": "memory/t-checklist.md",
+      "sha256": "b67f5f17d6855956294a3f4b457d9d3a39caa5d212d3064d891b69b9d733c1b6"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/07-irregular.md"
+      "path": "memory/templates-dayplan.md",
+      "sha256": "317f5b8d2b2e31782b00e21ab72c55f9fca0eede8165de9e84f855a2f5988e5d"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md"
+      "path": "pack-templates/.github/README.md",
+      "sha256": "4978537e5767bd425d3baddb56b49cb1691d13450a699b20e7b0fb9cee475add"
     },
     {
-      "path": "roles/strategist/prompts/strategy-session.md"
+      "path": "pack-templates/.github/scripts/check-pack-collisions.sh",
+      "sha256": "caf99816ed1bda5cfa21b611c338e482fc9e50523d596dca2e164bdd2ddc4cc4"
     },
     {
-      "path": "roles/strategist/prompts/update-priorities.md"
+      "path": "pack-templates/.github/workflows/pack-lint.yml",
+      "sha256": "a33d295bbd47ca6bc92362d09c90da9a3b283ea4d3a3c6f5a3b9ea6b77ab8272"
     },
     {
-      "path": "roles/strategist/prompts/week-review.md"
+      "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-constraint-analyst.md",
+      "sha256": "26b659973568ce45d4913f000fdcd0a10d130f41ae16adc0b9ef0b19c16530d8"
     },
     {
-      "path": "roles/strategist/role.yaml"
+      "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-dispatcher.md",
+      "sha256": "d902e8a5e51bacf5fbe7490ce03861206a5bd4f38078906e755268bbc66a9f1b"
     },
     {
-      "path": "roles/strategist/scripts/cleanup-processed-notes.py"
+      "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-external-session-adapter.md",
+      "sha256": "9a562120dec1a0d0546456cd3194545724d85a620cae7f3f20571b8e6b563adc"
     },
     {
-      "path": "roles/strategist/scripts/fetch-wakatime.sh"
+      "path": "pack-templates/digital-platform/04-work-products/DP.WP.NNN-stage-dependency-map.md",
+      "sha256": "2317fb34445196210cab849a8a9bba9f0aa01c1252afcba79c220acb230ec48a"
     },
     {
-      "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist"
+      "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-agent-inbox.md",
+      "sha256": "8efdba8b122524a18beb7a99c0079e043cf1e64cb80c716b228e2cdfb2951213"
     },
     {
-      "path": "roles/strategist/scripts/launchd/com.strategist.weekreview.plist"
+      "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-constraint-analysis.md",
+      "sha256": "9dfbb28d28c00b368ce74c2ff9a57450a3e00083aaca57e2dd1daa6bef8520ec"
     },
     {
-      "path": "roles/strategist/scripts/strategist.sh"
+      "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-external-session-request.md",
+      "sha256": "8076866fe2eddc7b4276c3a147d93c02c8792b24f48bbe05a4617248cc85d0f7"
     },
     {
-      "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service"
+      "path": "requirements.txt",
+      "sha256": "43a454364b88c54582a022a8969f2326d84ef892f927d532816c7ab18bdcb184"
     },
     {
-      "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.timer"
+      "path": "roles/README.md",
+      "sha256": "935ab61d966fa3a4e0b8994119e2c54e0ac00791703d9ab611e70f6b163b3a33"
     },
     {
-      "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.service"
+      "path": "roles/ROLE-CONTRACT.md",
+      "sha256": "b24ec541d1a370fce5295f7f1d5055486711c1016495d58160e94f7dc2c58c8b"
     },
     {
-      "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.timer"
+      "path": "roles/auditor/README.md",
+      "sha256": "904bc5a49f00d1783de14e3a498fdd6b21ae4b6ad11d6c59d9ef3c405a231be5"
     },
     {
-      "path": "roles/synchronizer/README.md"
+      "path": "roles/auditor/install.sh",
+      "sha256": "ba07f5d63864e185b64bd307df420a02a10304b4cb36229b57dba6937569d2d3"
     },
     {
-      "path": "roles/synchronizer/config.yaml"
+      "path": "roles/auditor/prompts/audit-coverage.md",
+      "sha256": "f87ec03c27b5e372419aa0675d9296d7adb348ab1dcf3f2f055c6278eb069741"
     },
     {
-      "path": "roles/synchronizer/install.sh"
+      "path": "roles/auditor/prompts/audit-plan-consistency.md",
+      "sha256": "c4438143079b837535fd98582725a77e9a80ebead70b12a0c5f5cf5caa8c84ec"
     },
     {
-      "path": "roles/synchronizer/role.yaml"
+      "path": "roles/auditor/role.yaml",
+      "sha256": "e56f6c5f57e92bbd9e303496208e6dc0f0afe31a77b375b8fc0a10b90665fe7b"
     },
     {
-      "path": "roles/synchronizer/scripts/code-scan.sh"
+      "path": "roles/extractor/README.md",
+      "sha256": "6edc4207a6d0f4aefbaa588b8d26c94614f0411e96306ccdf46c18d5fea7afad"
     },
     {
-      "path": "roles/synchronizer/scripts/collectors.d/README.md"
+      "path": "roles/extractor/config/feedback-log.md",
+      "sha256": "d55e433e904402f1783e042e3bf93767745f9a748fd6559ef8dcb6198b8f8e0a"
     },
     {
-      "path": "roles/synchronizer/scripts/daily-report.sh"
+      "path": "roles/extractor/config/routing.md",
+      "sha256": "2169ec26fd6ab8639b2b00571839698f1347fdde254c8c6cc53bfe8373034b04"
     },
     {
-      "path": "roles/synchronizer/scripts/dt-collect-neon.py"
+      "path": "roles/extractor/install.sh",
+      "sha256": "b151686a7f233b15c5d462b453575d156b66521a554cf5eaaa412f0009fea32f"
     },
     {
-      "path": "roles/synchronizer/scripts/dt-collect.sh"
+      "path": "roles/extractor/prompts/git-diff-feed.md",
+      "sha256": "b51365aedcd3c3fcc726e6077dd68b2241770b230bc72df7caff2dffb4781b89"
     },
     {
-      "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist"
+      "path": "roles/extractor/prompts/inbox-check.md",
+      "sha256": "41992442742bbb44665d175296ada3088b3f0c6131fe2817762565aceb743d47"
     },
     {
-      "path": "roles/synchronizer/scripts/notify.sh"
+      "path": "roles/extractor/prompts/knowledge-audit.md",
+      "sha256": "461175205bc692551c741a7619bbed6aaa7286d354af2080b6ac59db8a9ff12e"
     },
     {
-      "path": "roles/synchronizer/scripts/scheduler.sh"
+      "path": "roles/extractor/prompts/on-demand.md",
+      "sha256": "28e04b10fbb48a183890b83e032a70b33d624a917e941a2317a7f23867298e83"
     },
     {
-      "path": "roles/synchronizer/scripts/sync-files.sh"
+      "path": "roles/extractor/prompts/session-close-feed.md",
+      "sha256": "e3d4517e09b60a99a81f25ea2cc734770d453cd1ba66e825d883744157bf8e28"
     },
     {
-      "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service"
+      "path": "roles/extractor/prompts/session-close.md",
+      "sha256": "5721090b978bb0a5f1273a43c2bac938002d77671932f514d4cc923cc1222dc9"
     },
     {
-      "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.timer"
+      "path": "roles/extractor/role.yaml",
+      "sha256": "36a89cf11dd18e1e80ac30ba9c9e9262d223ed6b9ac5fd399b19e90c06589e4b"
     },
     {
-      "path": "roles/synchronizer/scripts/templates/extractor.sh"
+      "path": "roles/extractor/scripts/connect.sh",
+      "sha256": "8a24dba34d40db361b793bd706187cb74c5ad03f99da2456f1b9ec36806ac6a1"
     },
     {
-      "path": "roles/synchronizer/scripts/templates/strategist.sh"
+      "path": "roles/extractor/scripts/extractor.sh",
+      "sha256": "9b03702993e3250cadc32871d20633d486cc77649444d3dddf12d3d659edf491"
     },
     {
-      "path": "roles/synchronizer/scripts/templates/synchronizer.sh"
+      "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
+      "sha256": "0f698455a221d847c195a22d3207c1ae348c338c86f2f6e1ba7cba8b7b37a45e"
     },
     {
-      "path": "roles/synchronizer/scripts/video-scan.sh"
+      "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service",
+      "sha256": "f99b4c0accd17a2498587226fbb775f6e535ed968e6d5722854e5300bcadce49"
     },
     {
-      "path": "roles/verifier/README.md"
+      "path": "roles/extractor/scripts/systemd/iwe-extractor-inbox-check.timer",
+      "sha256": "4a47c109ab263a44c51fbd5d5f40a4c2c283cb16d954df8d07367544ca85f78e"
     },
     {
-      "path": "roles/verifier/install.sh"
+      "path": "roles/extractor/scripts/wp429-extractor-prefilters.py",
+      "sha256": "9fc2ec3a24618221bdd5793931098d4ce25683449d83287e8a4ae9f85371cd5e"
     },
     {
-      "path": "roles/verifier/prompts/verify-content.md"
+      "path": "roles/lib/scheduler-cron.sh",
+      "sha256": "60fb686703ef17d480cfabb4c9f266b3c8256ddda780e87d0020711f607c6037"
     },
     {
-      "path": "roles/verifier/prompts/verify-pack-entity.md"
+      "path": "roles/role-boundaries.md",
+      "sha256": "7a9a03ac30020dda91657e95621954cc040349b8d71f50aff9d876177cee8495"
     },
     {
-      "path": "roles/verifier/prompts/verify-wp-acceptance.md"
+      "path": "roles/strategist/README.md",
+      "sha256": "e7a13b44f9d0a2bd4af4c19094b201cf5cb804653bb7c01b7ea988e468887329"
     },
     {
-      "path": "roles/verifier/role.yaml"
+      "path": "roles/strategist/install.sh",
+      "sha256": "d95a06571d86f5721030f959938d0cb910e22fc0f7cbe19b033f39b7c6ae2b60"
     },
     {
-      "path": "scripts/active-wp-sweep.sh"
+      "path": "roles/strategist/prompts/add-wp.md",
+      "sha256": "2017ee287b2dc9b688eed9254f83e3e475197068d43477cf8653a5e1b0bfe961"
     },
     {
-      "path": "scripts/add-skill-markers.sh"
+      "path": "roles/strategist/prompts/check-plan.md",
+      "sha256": "9d2f703d4eb631d85c145897168547395b45f763fa60a58579c3a421488ee284"
     },
     {
-      "path": "scripts/agent-heartbeat.sh"
+      "path": "roles/strategist/prompts/day-close.md",
+      "sha256": "eaea3e988571d9a3dd676328fccb61453525df3adcff3928dd56b5a50f934cb8"
     },
     {
-      "path": "scripts/agent-status-report.sh"
+      "path": "roles/strategist/prompts/day-plan.md",
+      "sha256": "d31d486744b069d87b3f964228547d40e12120ab6f3db0f5bf8a3e9885b9d52d"
     },
     {
-      "path": "scripts/agent_fault_remind.py"
+      "path": "roles/strategist/prompts/evening.md",
+      "sha256": "6a1fc15c45583c1b35ba3b865786023c8cb77308a8ba009792190747a5796605"
     },
     {
-      "path": "scripts/agent_fault_remind.sh"
+      "path": "roles/strategist/prompts/month-close.md",
+      "sha256": "a4d8de9d61ec38577f15cbc303e62ac6c266aa40c0aa054e51c4844f1d53768d"
     },
     {
-      "path": "scripts/archive-done-wp.sh"
+      "path": "roles/strategist/prompts/note-review.md",
+      "sha256": "5031dd3ed708521f6f377f8ae47dd4b03150e999ff52b2c07bd141c7df8e37e4"
     },
     {
-      "path": "scripts/artifactor.py"
+      "path": "roles/strategist/prompts/session-prep.md",
+      "sha256": "424ef6e16894d82c61b90c6450d12007beb5863c3a1f6df42148ac286000bd60"
     },
     {
-      "path": "scripts/backup-icloud.sh"
+      "path": "roles/strategist/prompts/strategy-session-monthly.md",
+      "sha256": "eb8e72c35a5b94fae3634597e61a40a27ec90bc1cf64b5fd7e1971dcce877340"
     },
     {
-      "path": "scripts/build-active-wp.py"
+      "path": "roles/strategist/prompts/strategy-session-weekly.md",
+      "sha256": "1b36875dd8e2df730315dd2e4737223bbec07aab44cecbe0296cc14d153a90a1"
     },
     {
-      "path": "scripts/changelog-append.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/appendix/consent-check.md",
+      "sha256": "02980864b01d01ec3e7d4b9db2e8d1307e9b844a71727160d7c9c090c170e62f"
     },
     {
-      "path": "scripts/changelog-flush.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/appendix/dt-guide-prep.md",
+      "sha256": "fb94142583027d0199b9ef4d507d141738665939670ee7085b8f1c4762129dcb"
     },
     {
-      "path": "scripts/check-claude-md-links.py"
+      "path": "roles/strategist/prompts/strategy-session-weekly/jump-handler.md",
+      "sha256": "211da10c9807a71be1319efc84add252115412ecb25b0cd88b2ca57aeebac311"
     },
     {
-      "path": "scripts/check-dirty-repos.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/00-open.md",
+      "sha256": "aef3315be7bf21e9e02fcb4a9a472c020412d24bb13d8eaa63f009be0e0216a7"
     },
     {
-      "path": "scripts/check-manifest-coverage.py"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/01-review.md",
+      "sha256": "dc411c53b7757f8e2d05944de276779bb1747fc03ab6558d5e8c0a30af762d31"
     },
     {
-      "path": "scripts/check-open-sessions.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/02-inbox.md",
+      "sha256": "b23518e24e0ecdbe117f02814f7ae83ff754abe201b42bc33db1ed6fc4235e31"
     },
     {
-      "path": "scripts/check-platform-compat.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/03-dissatisfactions.md",
+      "sha256": "e171f1183bab34f96217e5c70873a249ff76271f5b51c61362397ad10e408c79"
     },
     {
-      "path": "scripts/check-script-collisions.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/04-strategy-sync.md",
+      "sha256": "c038f69525068e872edd430607c07340c1ac1378909d8188cc675675946547c6"
     },
     {
-      "path": "scripts/check-seed-drift.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/05a-measurement.md",
+      "sha256": "f844815388563f3c31e9edb8a02ed9bf1e010cfc131edbc63298bb4ea29e7248"
     },
     {
-      "path": "scripts/check-setup-update-parity.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/05b-recommendation.md",
+      "sha256": "80d014d7d997a00fd22891c13c71697c0b749b8860a45860fd8f4c015f01b1de"
     },
     {
-      "path": "scripts/check-wp-format.py"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/05c-tracking.md",
+      "sha256": "dc37287fb7bb0f53c9dbe5825fcc5f3431f90d4780c6bb938216dc45a4241f18"
     },
     {
-      "path": "scripts/check-wp-transfer-completeness.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
+      "sha256": "fbbc35bc212b4cb8cc4bd865027d555fb7c968f61c280ecc442066ffecaae797"
     },
     {
-      "path": "scripts/claude-peer-adapter.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md",
+      "sha256": "e85d58fea904270c2d29f7857dbd9f17e8b4e06ced8c0ccce9af618d4a196846"
     },
     {
-      "path": "scripts/close-wp.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/06c-finalize.md",
+      "sha256": "18e1c1778cf1bbaa2699a9db1482067c2e78a3ba3aedd9d5721aa9e5a816f24b"
     },
     {
-      "path": "scripts/codex-peer-adapter.sh"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/07-irregular.md",
+      "sha256": "8953afd4b39db32fb0bb7952359dee59a21ac43bf34ea5830f6a07ab63bb095d"
     },
     {
-      "path": "scripts/config/pipeline-security-whitelist.yaml"
+      "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md",
+      "sha256": "18fd3f447bd0d165d8226498bae14732ec6d6f9db5415c4543ce1dc06d6f08fd"
     },
     {
-      "path": "scripts/content-filter-apply.py"
+      "path": "roles/strategist/prompts/strategy-session.md",
+      "sha256": "c2f9b9108bd685bdc01792c33a099a57c6cc50700b4ddb2267c894efe7d0f555"
     },
     {
-      "path": "scripts/content-filter-map.txt"
+      "path": "roles/strategist/prompts/update-priorities.md",
+      "sha256": "6585fa8e3d26e060ec6a6607ba06628c0bb3cfd2038f2f77f5623f9ba317277c"
     },
     {
-      "path": "scripts/copy-to-aisystant.py"
+      "path": "roles/strategist/prompts/week-review.md",
+      "sha256": "a09434082d56b7210db75a155a4098871e7889aba127c7d8735a313b3a34121a"
     },
     {
-      "path": "scripts/coverage-skills.sh"
+      "path": "roles/strategist/role.yaml",
+      "sha256": "f5df97cb0c45743a89345ebcdb2fcdc1a80a9047c0f4410101150039b982af24"
     },
     {
-      "path": "scripts/create-skill.sh"
+      "path": "roles/strategist/scripts/cleanup-processed-notes.py",
+      "sha256": "d8905fabfc9e950cc38465572ee4a3ed67b8288fbcb22a5958d530f073f6584c"
     },
     {
-      "path": "scripts/create-wp.sh"
+      "path": "roles/strategist/scripts/fetch-wakatime.sh",
+      "sha256": "6f0ddd6e7ee4e4ae0abf44234de64b2bd0ea1a688255e3d0729af4df2f183689"
     },
     {
-      "path": "scripts/day-close-lock.sh"
+      "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist",
+      "sha256": "a79e22b95bd917fa194695500ee8ed28f32df180bb56bd62313b776b67970677"
     },
     {
-      "path": "scripts/day-close-prepare.sh"
+      "path": "roles/strategist/scripts/launchd/com.strategist.weekreview.plist",
+      "sha256": "0cb4af08c5f63d01bfcbc07736453383ccb9be35b2e804e0f660eb10424ae637"
     },
     {
-      "path": "scripts/day-close.sh"
+      "path": "roles/strategist/scripts/strategist.sh",
+      "sha256": "ea4f00b8a5c80b93bdccd81e29eb489b33a9d3943460c9a8996f61cb5f2be866"
     },
     {
-      "path": "scripts/day-open-budget-patch.py"
+      "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
+      "sha256": "977321695ba576f19214ccf219f98e6101cd94eae5c0de54fe374ad3738c2577"
     },
     {
-      "path": "scripts/day-open-checks-runner.sh"
+      "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.timer",
+      "sha256": "b724ec2c2d77638613664a1febfde418f55f6ddc89b091fd170d5f7af9e438fc"
     },
     {
-      "path": "scripts/day-open-llm-fill.py"
+      "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.service",
+      "sha256": "f300d3ea098e2bb653e1d3b8ba7c544811a7deaa65ecb51d81d9d55cbf270b49"
     },
     {
-      "path": "scripts/day-open-pipeline.sh"
+      "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.timer",
+      "sha256": "cb0decae15fd9c0d093486c3d3696e2580e73492ec6700efd74742685945ed0e"
     },
     {
-      "path": "scripts/day-open-preflight.sh"
+      "path": "roles/synchronizer/README.md",
+      "sha256": "6b034a8e68f71729ffaa4f967ec85b46cacc99f2c68d4c7cb2684a66ac543b01"
     },
     {
-      "path": "scripts/day-open-scaffold.sh"
+      "path": "roles/synchronizer/config.yaml",
+      "sha256": "ba5fda23809e9bd27418678b97a5bd4f57933f6b3e6c8378281511707ecef7b7"
     },
     {
-      "path": "scripts/day-open-smoke-extended.sh"
+      "path": "roles/synchronizer/install.sh",
+      "sha256": "a2deb61e38527f67f3647d3ba2ecda52a82ec6bab6dd5610197ff1538e3e13b3"
     },
     {
-      "path": "scripts/day-open-smoke.sh"
+      "path": "roles/synchronizer/role.yaml",
+      "sha256": "48f88473112b02a29e814688abace37f8ee971f29a72fe62d49ff26373c1b36e"
     },
     {
-      "path": "scripts/fmt-critical-alert.sh"
+      "path": "roles/synchronizer/scripts/code-scan.sh",
+      "sha256": "f1124e8425b792141a31586452df22eeeadd9befd23b0ec39e609da15b0ac467"
     },
     {
-      "path": "scripts/gate-metrics.sh"
+      "path": "roles/synchronizer/scripts/collectors.d/README.md",
+      "sha256": "83e9fce997e62801bafea8b1d0080d89e7237cf427645c454e0b7b9f4cc5bee3"
     },
     {
-      "path": "scripts/generate-catalogs.py"
+      "path": "roles/synchronizer/scripts/daily-report.sh",
+      "sha256": "5b5bbf735174c0bbe39be5a6d4bcdceb86f2efe3f0f6e7c592de8ba6663aa5da"
     },
     {
-      "path": "scripts/generate-diagnose-skill.py"
+      "path": "roles/synchronizer/scripts/dt-collect-neon.py",
+      "sha256": "eed4e29e622c51c2d10d6b656f3e7385e6b0e60d1518bc745f129d5efc747aaf"
     },
     {
-      "path": "scripts/generate-executor-catalog.py"
+      "path": "roles/synchronizer/scripts/dt-collect.sh",
+      "sha256": "2e40f42a06cb52b2fb4ef0dee67ba4d3eedf61cdaa699fcee94ad1a5f78ad0fb"
     },
     {
-      "path": "scripts/generate-hot-files-list.sh"
+      "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
+      "sha256": "0f555d8af7de37467ac34955e2d58c3f2deb0141b69e2e956e54a15bfdd54293"
     },
     {
-      "path": "scripts/generate-skills-catalog.sh"
+      "path": "roles/synchronizer/scripts/notify.sh",
+      "sha256": "1c2c7c4fcb91d05015dc9254f7b1fa20e28dd54bede263140f46dd1e75643823"
     },
     {
-      "path": "scripts/git-dirty-guard.sh"
+      "path": "roles/synchronizer/scripts/scheduler.sh",
+      "sha256": "083d313b51c89335d48b1fd8f0eaa4ecdb55a248caf76487a2ae93a7e4cff1b0"
     },
     {
-      "path": "scripts/headless-runner.sh"
+      "path": "roles/synchronizer/scripts/sync-files.sh",
+      "sha256": "db846e0c85a64766d6c7187c60e1155cab13327ad62c76df9c6e4393fa9c0f16"
     },
     {
-      "path": "scripts/hindsight_adapter.py"
+      "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service",
+      "sha256": "d80079cce7ea8f26d4d3b8d6490487a526e809f99b9538dc7badae0e2dba8eba"
     },
     {
-      "path": "scripts/hindsight_trigger.py"
+      "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.timer",
+      "sha256": "c82c53025bd93cbf7aece9133ba39f31e753c0830d7f994da80cbe8faf2fdfcf"
     },
     {
-      "path": "scripts/hook-promote.sh"
+      "path": "roles/synchronizer/scripts/templates/extractor.sh",
+      "sha256": "b06348f4b90945d739974f470f92614164a271188513d64c0aa4ddd39e78eacd"
     },
     {
-      "path": "scripts/hot-files.list"
+      "path": "roles/synchronizer/scripts/templates/strategist.sh",
+      "sha256": "c7681bc024c5c49659c97b6049076639d35d37ea169d604261153fa570b2731c"
     },
     {
-      "path": "scripts/iwe-agent-dispatcher.py"
+      "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
+      "sha256": "7bdca449308bed6a6ad064cfb2620eac317458a6d4bb5544708f0d968020aea6"
     },
     {
-      "path": "scripts/iwe-audit.sh"
+      "path": "roles/synchronizer/scripts/video-scan.sh",
+      "sha256": "7ab958a57b69df67f46f8c5a440e638d87884f18f5071166fefc9d731a29eb1c"
     },
     {
-      "path": "scripts/iwe-backup-check.sh"
+      "path": "roles/verifier/README.md",
+      "sha256": "a840de427a312e98fb4536bcef483edfcf92e12caba75a9b8adaaa07e5ef9336"
     },
     {
-      "path": "scripts/iwe-bug-report.sh"
+      "path": "roles/verifier/install.sh",
+      "sha256": "f56addcdb42e48ef25273d1f0d0ea684885c17256002aaf3d016cd9f8d8aeb97"
     },
     {
-      "path": "scripts/iwe-consent.sh"
+      "path": "roles/verifier/prompts/verify-content.md",
+      "sha256": "198d94a0525ebe3a31801c958d2e811faa79a4bae70801805abf2055ae27ceef"
     },
     {
-      "path": "scripts/iwe-drift-helpers/check-arch-version.sh"
+      "path": "roles/verifier/prompts/verify-pack-entity.md",
+      "sha256": "0df28dc09c58629b8a39c6facd7af0d444d1e7e272075909252498b4b6b21e98"
     },
     {
-      "path": "scripts/iwe-drift-helpers/check-status-legend.sh"
+      "path": "roles/verifier/prompts/verify-wp-acceptance.md",
+      "sha256": "2567c4c75df3369a307a1a8376ade661a7cd89689b30a22a67f96eef5f857ed5"
     },
     {
-      "path": "scripts/iwe-drift.sh"
+      "path": "roles/verifier/role.yaml",
+      "sha256": "0f96d891b459426bf9cfb4e06b95287e053fa38bd072d930ef9f887fb562a861"
     },
     {
-      "path": "scripts/iwe-grep-secret.sh"
+      "path": "scripts/active-wp-sweep.sh",
+      "sha256": "cf3618f6b03741dd5de333a80a277c322212d5235c9fbf117588e1cfba92f621"
     },
     {
-      "path": "scripts/iwe-multipath.py"
+      "path": "scripts/add-secret.sh",
+      "sha256": "7c4e1779238ccca30d585fa8bd56c3822908b868645528ce3fe153a3bd6bbdb9"
     },
     {
-      "path": "scripts/iwe-transcribe.sh"
+      "path": "scripts/add-skill-markers.sh",
+      "sha256": "0de7b249f82b176f6020e08f647b29f765fa62838b2db63da634db64f7f8a9ae"
     },
     {
-      "path": "scripts/iwe-w-reflection.sh"
+      "path": "scripts/agent-fault/iwe_checklist_memory.py",
+      "sha256": "783bd2969693df8c2cbd58300624b88df4da95fb94114c974ddfd3649f800b3f"
     },
     {
-      "path": "scripts/ke-classify.sh"
+      "path": "scripts/agent-fault/test_iwe_checklist_memory_m15.py",
+      "sha256": "8d6c3c9d81c93b4da051cd2f6e15089c6b429650c908459d81becf08e4ee425e"
     },
     {
-      "path": "scripts/ke-queue-stats.sh"
+      "path": "scripts/agent-heartbeat.sh",
+      "sha256": "fa5284fb366b0b94400df1697e2173287461156375fb7d82954c56b2367ba1a2"
     },
     {
-      "path": "scripts/kimi-auto-heartbeat.sh"
+      "path": "scripts/agent-status-report.sh",
+      "sha256": "ce660e06bbdf733c6314f42104ad834554e3711e5e8ad044deb68aaa4fc067f5"
     },
     {
-      "path": "scripts/kimi-compaction-watchdog.sh"
+      "path": "scripts/agent_fault_remind.py",
+      "sha256": "87643a721d9d315fefbd49988ced6288cb2bcdf6a62b2e84ce86e063fa8dc02f"
     },
     {
-      "path": "scripts/kimi-peer-adapter.sh"
+      "path": "scripts/agent_fault_remind.sh",
+      "sha256": "a254bc5ae5147d63f6c3974607992a9f7edf8d90a6f4ca4d6b31c7f8369b0f13"
     },
     {
-      "path": "scripts/kimi-session-watchdog.sh"
+      "path": "scripts/archive-cadence-sweep.py",
+      "sha256": "63ee63324b124b43ecd87e365e99b656ae07ffaedffce3042db908c9a745aee1"
     },
     {
-      "path": "scripts/kimi-standalone-preflight.sh"
+      "path": "scripts/archive-done-wp.sh",
+      "sha256": "e9bc5bbfaf04d7e3a611060690679afb8641e301c5ffbae4c75950740aea4fa6"
     },
     {
-      "path": "scripts/kimi-whisper-safe.sh"
+      "path": "scripts/artifactor.py",
+      "sha256": "1f15087c32da05fe1a929c8e1ad078ea3fdee950240facce206a5aee32919dd0"
     },
     {
-      "path": "scripts/lesson-close.sh"
+      "path": "scripts/attestation-build-statement.sh",
+      "sha256": "4fd7d51e25df9f28e481e67bdbe284eee48220ac6a26cf00dfa9669946953acf"
     },
     {
-      "path": "scripts/lib/common.sh"
+      "path": "scripts/attestation-canonical-digest.sh",
+      "sha256": "cd0bca61f82ed3aa59c4f1d8dd8df6835ca5543ac69f3aaaa4e53eb37549a31d"
     },
     {
-      "path": "scripts/llm-proxy-launcher.sh"
+      "path": "scripts/attestation-statement.schema.json",
+      "sha256": "5473f31ff649349b2a6a676e02e6d1bedc9daf0bdcfbd92f48d7a92432c0b34a"
     },
     {
-      "path": "scripts/median-ratio.conf"
+      "path": "scripts/backup-icloud.sh",
+      "sha256": "952484d862c8b6975656d21362d59dd43ce9ea280a20611e6b4fd277d1de7bd4"
     },
     {
-      "path": "scripts/memory-active-wp-update.sh"
+      "path": "scripts/build-active-wp.py",
+      "sha256": "39188448fa00e5d70f1bddd157a5467b7b44c2eea3b15a4b33efca6ef2f23c81"
     },
     {
-      "path": "scripts/memory-bleed.sh"
+      "path": "scripts/changelog-append.sh",
+      "sha256": "53fd0abc41b738a69f9e85607c09918f552fe8eb071404b098706bf7f1514884"
     },
     {
-      "path": "scripts/memory-health.sh"
+      "path": "scripts/changelog-diff-lines.sh",
+      "sha256": "92d55dc631f6c763edfe3be9312ffc5a7ea6540889abddb5c16dda2b802b4d86"
     },
     {
-      "path": "scripts/memory-migrate.sh"
+      "path": "scripts/changelog-flush.sh",
+      "sha256": "853e53618ac0776ba23cbbbdba051a26110004f0b1c4efdac49f4725253e69eb"
     },
     {
-      "path": "scripts/memory-validate.sh"
+      "path": "scripts/check-claude-md-links.py",
+      "sha256": "f3f6fb6080291f4a36d48fed4167a872df8996154f04f8ab22802c388295be04"
     },
     {
-      "path": "scripts/migrate-initial-marker.sh"
+      "path": "scripts/check-critical-files-map.sh",
+      "sha256": "dafd2296b481e9976272258504d05770c49f054591912f4c0046b568f079443e"
     },
     {
-      "path": "scripts/migrate-skills-to-v2.sh"
+      "path": "scripts/check-delivery-route-label.sh",
+      "sha256": "474549abe2bf777ba38c097832a144e77e1295698bd22ee995613ae5512133db"
     },
     {
-      "path": "scripts/migrate-to-runtime-target.sh"
+      "path": "scripts/check-dirty-repos.sh",
+      "sha256": "e4678b0fc4493e569e2ba95d6269619e5771d1e638a79587de2f074af42ade8a"
     },
     {
-      "path": "scripts/pack-ci-install.sh"
+      "path": "scripts/check-manifest-coverage.py",
+      "sha256": "9fe915ccf6fdeaa209b879075650c1052a9f6f3dde4150b0d33b7f02025144ce"
     },
     {
-      "path": "scripts/peer-adapter-filter.py"
+      "path": "scripts/check-open-sessions.sh",
+      "sha256": "89d69907c3bfc2b91099f415207e0dcfc8dddfbe278607f2f09ad78301220c6b"
     },
     {
-      "path": "scripts/pending-phases-sweep.sh"
+      "path": "scripts/check-orphan-hooks.sh",
+      "sha256": "8aab17e230c2c475d1c78c8f08ef3ae967a6f02ce8fbeb789ebd6d8907d3d6ab"
     },
     {
-      "path": "scripts/post-update-check-skills.sh"
+      "path": "scripts/check-platform-compat.sh",
+      "sha256": "61c960813407e0b37df5522935d55d3ae7f12dadc90b26bcdfc53b88545f041e"
     },
     {
-      "path": "scripts/pre-commit-secret-scan.sh"
+      "path": "scripts/check-python-resolver-contract.sh",
+      "sha256": "6a8d56b16da06ec42597a01cba20622e333545840f1827a430ac7741d0ba5861"
     },
     {
-      "path": "scripts/promote-common.sh"
+      "path": "scripts/check-script-collisions.sh",
+      "sha256": "c6642016eb3ee8390bf98a4d733243f17bead221aeb8fcd15ac87c455b8ed593"
     },
     {
-      "path": "scripts/restore-from-exocortex.sh"
+      "path": "scripts/check-seed-drift.sh",
+      "sha256": "a7ef7cbbcf811a91bac1e4931a72c5704e2d5e4eb9933349dc891a4e64567507"
     },
     {
-      "path": "scripts/route-task.sh"
+      "path": "scripts/check-setup-update-parity.sh",
+      "sha256": "244a916e8011e74e759e84dd27fb0332cdcda931ec88d065572021ad2c16d609"
     },
     {
-      "path": "scripts/script-promote.sh"
+      "path": "scripts/check-wp-format.py",
+      "sha256": "dc069113a57be36f81661a2e56ef2ac49142aa86c7a86b6e8acecb5501c70400"
     },
     {
-      "path": "scripts/server-calendar.sh"
+      "path": "scripts/check-wp-transfer-completeness.sh",
+      "sha256": "03b92990085bac34b06b9b31bd3708dcadd94495e60f6d77a1c4147c97fa5d97"
     },
     {
-      "path": "scripts/server-news.sh"
+      "path": "scripts/claude-peer-adapter.sh",
+      "sha256": "f7185cafe9ca62e2c408e2502539811f81ac7b7c22e8bd91d083a19f77d33b8c"
     },
     {
-      "path": "scripts/session-guard.sh"
+      "path": "scripts/close-wp.sh",
+      "sha256": "1708ba2d92f31e0770ceff9847ddfd1012776f28302134704e1fd91caa02ba92"
     },
     {
-      "path": "scripts/settings-promote.sh"
+      "path": "scripts/codex-peer-adapter.sh",
+      "sha256": "dbef2b0357617283119d0b2641e43b3f2b01a9e77d302d7c193e63f823504231"
     },
     {
-      "path": "scripts/setup-extractor-feeders.sh"
+      "path": "scripts/config/pipeline-security-whitelist.yaml",
+      "sha256": "d9c77d539574864d55431a84568ea0c873f371b769e6c786603749d24848d27e"
     },
     {
-      "path": "scripts/skill-promote.sh"
+      "path": "scripts/content-filter-apply.py",
+      "sha256": "f93b545cc65938ae12e49ba0965e68f9cab08b59892a1ed58ab20a62b4645a5a"
     },
     {
-      "path": "scripts/skills-pull.sh"
+      "path": "scripts/content-filter-map.txt",
+      "sha256": "18d4ad729d42435437b6a0338900d4674106f504715f7d5164b498dd08b2a915"
     },
     {
-      "path": "scripts/smoke-clean-env.sh"
+      "path": "scripts/copy-to-aisystant.py",
+      "sha256": "8dfc2169a0c9aeb537ab4699745940fbf3464cb198c265754f38a4212aba3172"
     },
     {
-      "path": "scripts/staging-audit.sh"
+      "path": "scripts/coverage-skills.sh",
+      "sha256": "1dbd8de1ae00bcf9549108dc9291a2b3994d3f1a642bffde68e75041fe16c14c"
     },
     {
-      "path": "scripts/style-check-post-run.sh"
+      "path": "scripts/create-skill.sh",
+      "sha256": "073c0bd106f8caf404330e216e4303429839fed08e0075c97e8d4c98694a06f7"
     },
     {
-      "path": "scripts/style-promote.sh"
+      "path": "scripts/create-wp.sh",
+      "sha256": "c855565180efcd81933c3fcb22fee0d7fbb0ed25060d69b9e2eeafeb5c70c8f5"
     },
     {
-      "path": "scripts/sync-agent-instructions.sh"
+      "path": "scripts/day-close-lock.sh",
+      "sha256": "df0224ec63e5dde75c8dcbd367971f47e19bbe817b611168c1a0e673b1329c77"
     },
     {
-      "path": "scripts/sync-communication-style.py"
+      "path": "scripts/day-close-prepare.sh",
+      "sha256": "f93ff8f21e5af567d790382745134350c602871cf489a443c90f433b84c318bd"
     },
     {
-      "path": "scripts/sync-communication-style.yaml.example"
+      "path": "scripts/day-close.sh",
+      "sha256": "9b73293b523d7d86322e0714f1efdd7d42276a000a754e63c50c8793d65465e8"
     },
     {
-      "path": "scripts/sync-version-badge.sh"
+      "path": "scripts/day-open-bottleneck-patch.sh",
+      "sha256": "9050b6df2664f3683b71be868b2c17a0c85e36ccb64d1d847b09ea7a0934e4d7"
     },
     {
-      "path": "scripts/sync_feedback_to_memory.py"
+      "path": "scripts/day-open-budget-patch.py",
+      "sha256": "648688fcb06a3409b3d54a453cb6164e996a15584c37fffaadabd50890f3f221"
     },
     {
-      "path": "scripts/test-route-task.sh"
+      "path": "scripts/day-open-checks-runner.sh",
+      "sha256": "b16b1357161a0a94ac855541f94cef7016d708a38d69c37af1a157b8ec6d19bf"
     },
     {
-      "path": "scripts/update-derived-snapshot.py"
+      "path": "scripts/day-open-close-error-patch.py",
+      "sha256": "83d32007bd512f80032471eebff89adace920625e689980c0e847271176b13a6"
     },
     {
-      "path": "scripts/validate-fmt-scripts.sh"
+      "path": "scripts/day-open-hooks-runner.sh",
+      "sha256": "cc630fdd33d46be16b11771028277be6b205834833c0ba42bcc78deeee8f584d"
     },
     {
-      "path": "scripts/validate-skill.sh"
+      "path": "scripts/day-open-ledger-render-patch.py",
+      "sha256": "395224010927ec5dd5a2625b6c99f58c27045a5dd6bd7090acc0919c4841b90b"
     },
     {
-      "path": "scripts/verify-context-budget.sh"
+      "path": "scripts/day-open-llm-fill.py",
+      "sha256": "c1c4592e652db242ec2698b157d70e2e649e9ae38b2543b850198d913e048da9"
     },
     {
-      "path": "scripts/verify-manifest.sh"
+      "path": "scripts/day-open-multiplier-backfill-patch.py",
+      "sha256": "98e4c83e08eeea19d3fc8f3b7b9d96400f5a9087add8729620d65d27368b7dc1"
     },
     {
-      "path": "scripts/week-draft-append.sh"
+      "path": "scripts/day-open-pipeline.sh",
+      "sha256": "3b8be616bd947060ea89efbaf2b45def3054f8234e77d0f15547335ebbf9e9c8"
     },
     {
-      "path": "scripts/week-draft-init.sh"
+      "path": "scripts/day-open-preflight.sh",
+      "sha256": "ff38d44cfb2aad74a7b4b675443a630234eb0fe12cbcceacca1ae8ce47f564d1"
     },
     {
-      "path": "scripts/wp-list.py"
+      "path": "scripts/day-open-priorities-patch.py",
+      "sha256": "65b036a83e164a0bbeb9b8cc421c4c00f1646d7284bdc0879ae551fc0338a872"
     },
     {
-      "path": "scripts/wp499-agent-coordination-test.sh"
+      "path": "scripts/day-open-scaffold.sh",
+      "sha256": "c182e63bc254feb79f8c390f29e33e8a751d6f94a947048a80df799ff3d4b582"
     },
     {
-      "path": "sessions/00-index.md"
+      "path": "scripts/day-open-smoke-extended.sh",
+      "sha256": "005d757b280b6f6350fd27ba99e46413ad631673b1d42e0e717417e7d46676bd"
     },
     {
-      "path": "setup.sh"
+      "path": "scripts/day-open-smoke.sh",
+      "sha256": "75e5fabf1ab91b0503dd7dcd653a247f9d99ca5c4b9501a4a4090f4005590c51"
     },
     {
-      "path": "setup/optional/setup-cloud-scheduler.sh"
+      "path": "scripts/day-open-version-check-patch.py",
+      "sha256": "4324e682ec690e2ef565f7c99ba580e5d80556bccb73d36ca39b8ee096a2decf"
     },
     {
-      "path": "setup/optional/setup-local-gateway.sh"
+      "path": "scripts/dry-run-begin.sh",
+      "sha256": "998accf2fa2199069c6af58bc6eade22e14132a841187e07aedde6647c81405a"
     },
     {
-      "path": "setup/validate-template.sh"
+      "path": "scripts/dry-run-complete.sh",
+      "sha256": "e7712eb5c2fc68b6f675c97b626e80e5f5198c195acd2956a9ef0a60170aad23"
     },
     {
-      "path": "shared/rubrics/form-089.yaml"
+      "path": "scripts/external-tracker.py",
+      "sha256": "d248cb83b373ad9e8e71c6af6a42634d8dde25c5a56ba2ef667627109321ad9b"
     },
     {
-      "path": "translation-manifest.yaml"
+      "path": "scripts/fmt-critical-alert.sh",
+      "sha256": "3ef35ba426ef153cb3e689f8aebdfcb4da3c8d336f586355e34d523111f73d44"
     },
     {
-      "path": "translation/en-doc-style.md"
+      "path": "scripts/gate-metrics.sh",
+      "sha256": "508d93213a9d61716cce1a80064893a12ca4d8eb774de008ca54e74aa2eed215"
     },
     {
-      "path": "translation/glossary-v0.1.csv"
+      "path": "scripts/generate-catalogs.py",
+      "sha256": "843e14a9fd76e313d2bed965fbf4dab8cf379abcc848aeade655636daf8b9a8e"
     },
     {
-      "path": "update.sh"
+      "path": "scripts/generate-diagnose-skill.py",
+      "sha256": "508d1da83ba3287d9a43b9d55bb3dbd0ce086a9fad0ce59dbfa051656efcde5e"
     },
     {
-      "path": "scripts/tests/test_create_wp_registry_coherence.sh"
+      "path": "scripts/generate-executor-catalog.py",
+      "sha256": "775b126e54d95531c9abc2f8ac97534ec92cdba312764356431bb149ed2c7145"
     },
     {
-      "path": "scripts/tests/test_capture_bus_detector_timeout.sh"
+      "path": "scripts/generate-hot-files-list.sh",
+      "sha256": "66dbd5a45b7cd1aa975b50e7d8debcef3df15c444c68031490096d2ad9c31b32"
     },
     {
-      "path": "scripts/tests/test_critical_alert_disabled_tracker.sh"
+      "path": "scripts/generate-skills-catalog.sh",
+      "sha256": "8809f5a65e200f683eb80ef35b1054fc859e8dcad0492c195aa1c3d561fd44a0"
     },
     {
-      "path": "scripts/run-regression-tests.sh"
+      "path": "scripts/git-dirty-guard.sh",
+      "sha256": "ff03d395fa0c0526ba0492230a170d96ee6a5757fc7af065bca80ffcddbf4ba4"
     },
     {
-      "path": "scripts/tests/test_create_wp_contract.sh"
+      "path": "scripts/governance-repo-contract.json",
+      "sha256": "c41ac16e71abeab7575f7c75dbb8fff87e8662abb062ca3561a8420835873f26"
     },
     {
-      "path": "scripts/tests/test_capture_bus_contract.sh"
+      "path": "scripts/headless-runner.sh",
+      "sha256": "5a79a6d1fe9735bd7a6675d79aeb31d0fb4112f32a639c434f1e406ac14582ff"
     },
     {
-      "path": "scripts/tests/test_critical_alert_contract.sh"
+      "path": "scripts/hermes-peer-adapter.sh",
+      "sha256": "d91905470bb5cbddfafbc8cf972e1da7dd9f967136e72cc4536ad0861bc0f448"
     },
     {
-      "path": "scripts/tests/validate_manifest_coverage.sh"
+      "path": "scripts/hindsight_adapter.py",
+      "sha256": "fe18ecc43b7fccc220ac36a0eb7a7ceddce25a368fb095b1203a615e450ef78f"
+    },
+    {
+      "path": "scripts/hindsight_trigger.py",
+      "sha256": "16c54653640fbe3a6b3a50839856f68a3c787b26b27e1fa016b7803eec74c3a2"
+    },
+    {
+      "path": "scripts/hook-promote.sh",
+      "sha256": "9279d09adf07d3fe065b71d4292808888c0a6f20c8256d769cfceb0ef9172d4c"
+    },
+    {
+      "path": "scripts/hot-files.list",
+      "sha256": "19780ebdac77af24e345d17a1e9799e5dd3db56c97cd50dd53001860d0e3cfe2"
+    },
+    {
+      "path": "scripts/install-hooks.sh",
+      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+    },
+    {
+      "path": "scripts/iwe-agent-dispatcher.py",
+      "sha256": "d736ab9d8b2c7d3c51f1b03a43e230b9ce6b0c11c8e0ec3440add731cbe78fd2"
+    },
+    {
+      "path": "scripts/iwe-audit.sh",
+      "sha256": "640078ac3d1de22a3abd43efd0cf2ddba518bab473d4a998eab093235bc25802"
+    },
+    {
+      "path": "scripts/iwe-backup-check.sh",
+      "sha256": "cdff90a0c4a4605b9c5254a2e19fe5f8a32bc64c2e53a2f4b2bfba6846a6d453"
+    },
+    {
+      "path": "scripts/iwe-bug-report.sh",
+      "sha256": "b225f50c32bd11a45e608edc93d604bddc9bbb06edda4065720decbf1d1cd7c7"
+    },
+    {
+      "path": "scripts/iwe-consent.sh",
+      "sha256": "f4a914194297eb16fdc17312eb0083c50727967d14cceb8af6dc03659680bb24"
+    },
+    {
+      "path": "scripts/iwe-drift-helpers/check-arch-version.sh",
+      "sha256": "4bbc9dabf4606634fdb96820d826fd1dea3b1537a92df1a17ad9613df99f032f"
+    },
+    {
+      "path": "scripts/iwe-drift-helpers/check-status-legend.sh",
+      "sha256": "4b025b18accb86c1bba5cf6d9284e6ccfe4ca58b32881cb5979b7d49260078f6"
+    },
+    {
+      "path": "scripts/iwe-drift.sh",
+      "sha256": "314d3b4816d82face81014d74d56064253b63d29b8152f0986e6c451ed575a07"
+    },
+    {
+      "path": "scripts/iwe-grep-secret.sh",
+      "sha256": "f2b60883fc53425810907147d0e68a240f6f4fd3f9d26918d5ac6e650895ad12"
+    },
+    {
+      "path": "scripts/iwe-multipath.py",
+      "sha256": "2bc20bf869195220748b1b0961a1219aab328279df5b36d48c092dcdaef6f631"
+    },
+    {
+      "path": "scripts/iwe-transcribe.sh",
+      "sha256": "69ff20801d889a343f46c15b4b78c7c4959cc5a17aac20c180903ccce2945742"
+    },
+    {
+      "path": "scripts/iwe-w-reflection.sh",
+      "sha256": "c6b10e9db575905d67d787b72b3066c495fb6d5cef46e98ce43b7582328cfb20"
+    },
+    {
+      "path": "scripts/ke-classify.sh",
+      "sha256": "bc4787d9121db5045cbadbad5495821adf1283553f04ad44929e91607af574ec"
+    },
+    {
+      "path": "scripts/ke-queue-stats.sh",
+      "sha256": "5428c6cc329add702e5d2ff91ba7af2114a8cd023f9cb5c921a9f6b1720e89df"
+    },
+    {
+      "path": "scripts/kimi-auto-heartbeat.sh",
+      "sha256": "233eef6b4568b9e9b2fcf46162c71a13ee84dccec33500fbcaa1e9de7a41d9b8"
+    },
+    {
+      "path": "scripts/kimi-compaction-watchdog.sh",
+      "sha256": "e4d07c41b6b60e2ea07316e7d8ba9adad82b939d86244556fb7b211ee6acb75a"
+    },
+    {
+      "path": "scripts/kimi-peer-adapter.sh",
+      "sha256": "a31ffe012292419672b2819d0843f002578d881e96da0363e9cab2b7c324a7fd"
+    },
+    {
+      "path": "scripts/kimi-session-watchdog.sh",
+      "sha256": "0be30d1b62a22d10ae4b18bf4b0e78740f7b09d20497df377b3b828dc456eb2b"
+    },
+    {
+      "path": "scripts/kimi-standalone-preflight.sh",
+      "sha256": "624beea81b3ff43347818fe8be2cd9dc923acfeff072a5197bbf140022af12ea"
+    },
+    {
+      "path": "scripts/kimi-whisper-safe.sh",
+      "sha256": "d9f1e1815ac9001efd185d10e5905cec1f3424c3cae77a33a16798cead6d88be"
+    },
+    {
+      "path": "scripts/ledger-append.sh",
+      "sha256": "6a7f4f22ce6281e3b195d4f15930bf96cc92ae873303ae06143528242175c5eb"
+    },
+    {
+      "path": "scripts/lesson-close.sh",
+      "sha256": "202440eae8e614d2f2e8675af63efb0a0b053b5b3832083aec8f6e64f1324023"
+    },
+    {
+      "path": "scripts/lib/common.sh",
+      "sha256": "ac0700709a939e4f0fc8c9bb504c9918e4f0a7d17694d65a7b7682ebb4979bf1"
+    },
+    {
+      "path": "scripts/lib/day-open-hooks.sh",
+      "sha256": "fe64d2c112e40c9695884c3ceb6dac14e1ca41ad1da3bdc561b4fe84987d9964"
+    },
+    {
+      "path": "scripts/lib/find-python3.sh",
+      "sha256": "b938fca2780186b9383f3174a6d21b218f3b5f3a50e5d411a38179d584689cdd"
+    },
+    {
+      "path": "scripts/lib/ledger-path.sh",
+      "sha256": "725d8de49c7c0d04645521ba646ff7ba952e412574e87d2514b3769464fbf48c"
+    },
+    {
+      "path": "scripts/lib/ledger-publish-kick.sh",
+      "sha256": "0e4ebc302e7a8819af2e71c8643887bdc887fb87d06d865d27258c7c5482fece"
+    },
+    {
+      "path": "scripts/lib/ledger_path.py",
+      "sha256": "864b0352e097e767b8ed27001b1750cfb507b191aeff04f9063318e821068bc4"
+    },
+    {
+      "path": "scripts/lib/network-wait.sh",
+      "sha256": "beefa7845cd7d386a0b272bc147a01c0223211cf574dfc95054533461d191ea4"
+    },
+    {
+      "path": "scripts/lib/notification-render.sh",
+      "sha256": "ac1c9e55dd710e4d62d05b2fae19157c012dba0688c178475cf5f047ba909a38"
+    },
+    {
+      "path": "scripts/lib/telegram.sh",
+      "sha256": "4c5c0546b87a7bbe6dbff6af7ca011c561a1c2f5a2e5db4c4fedcd183bc9de3e"
+    },
+    {
+      "path": "scripts/lib/wp_inbox.py",
+      "sha256": "c22ac737ed5a35131f0ed45518f071deaa3c89c0e100a85d8b9114250210ec6d"
+    },
+    {
+      "path": "scripts/llm-proxy-launcher.sh",
+      "sha256": "9c543b3cbd7b12a630f3591b5f6cd5a3ba162686717f814a24291ddaf94b87d9"
+    },
+    {
+      "path": "scripts/median-ratio.conf",
+      "sha256": "ebce772bbb0dc48d04eab3350d45becd4e21b4bec70da85486bfe54134dd960d"
+    },
+    {
+      "path": "scripts/memory-active-wp-update.sh",
+      "sha256": "7b1ad4a22c4b39edd4332905271e7b6dd9770f28ad9513996fc7d341ff7adc51"
+    },
+    {
+      "path": "scripts/memory-bleed.sh",
+      "sha256": "6e17b5d41562ce24326cd4b1556d30c0ef2ae60f5a83e31012f05982ca6a16e8"
+    },
+    {
+      "path": "scripts/memory-health.sh",
+      "sha256": "cf0844f0fff0392081714d2766c0367937ef505992a5e8a56fd55c1c1e6748de"
+    },
+    {
+      "path": "scripts/memory-migrate.sh",
+      "sha256": "b5affc00bda0be96dcfcdc7bf55481c0c68aa9150cd27d7fe22b0e1142dd0305"
+    },
+    {
+      "path": "scripts/memory-validate.sh",
+      "sha256": "b64ca8dc78fa4a4f02a669728cca3b8b2a0c3356d96f52312afcb54c7eb7dd49"
+    },
+    {
+      "path": "scripts/migrate-initial-marker.sh",
+      "sha256": "ead17f08b7aef6c48ad5432de3b60edbfcff1e33ab3a05dfa7bcd3dfc64a84cc"
+    },
+    {
+      "path": "scripts/migrate-skills-to-v2.sh",
+      "sha256": "dbbdf2c62d6af909ecbcd54c8202e4f64c99d1092f100fc465dfa841c65ffdf1"
+    },
+    {
+      "path": "scripts/migrate-to-runtime-target.sh",
+      "sha256": "108012b32f8783027c08e3395c640c9fe55d8ce2907a3766d9578d1996de7ac0"
+    },
+    {
+      "path": "scripts/pack-ci-install.sh",
+      "sha256": "f2f28c26900c065f700dbbc79dfb0b5942e1bafd25d084224bc57b8410645934"
+    },
+    {
+      "path": "scripts/peer-adapter-filter.py",
+      "sha256": "ebbfdae528c71bfb8d41f45bc7851bccc4cb06b57090ffd4ff14aa7eb507da2a"
+    },
+    {
+      "path": "scripts/peer-session-finalize.sh",
+      "sha256": "37d66e672547f34052bb3b2034078e61d89b7d611e1d3134cd04d78483a45722"
+    },
+    {
+      "path": "scripts/pending-phases-sweep.sh",
+      "sha256": "d6b914259b2bf4a6ee1f1a4bcd1c0907e2807cd9924c62c624bf46b2d256bab0"
+    },
+    {
+      "path": "scripts/post-update-check-skills.sh",
+      "sha256": "d417e873da1c1b7a6d9cfc883fb0b8bcf2d60595c1f965f936de9993d0c97ec4"
+    },
+    {
+      "path": "scripts/pre-commit-secret-scan.sh",
+      "sha256": "5e9bfc63e64b095c427508ecfb4b05cc755aa65aedbe87fe7d4880c76229ac91"
+    },
+    {
+      "path": "scripts/promote-common.sh",
+      "sha256": "09f091dc35474ca700060f0bd5a717f3617118d41ead190b3607a4aa0db015ad"
+    },
+    {
+      "path": "scripts/release-receipt.sh",
+      "sha256": "e70fac071cbe4731e21be3363c2fd29a9a4a66e13ef851f94d5c33bb6815dd06"
+    },
+    {
+      "path": "scripts/restore-from-exocortex.sh",
+      "sha256": "0df9545069cbca03fc25013254e0fdfa98c8f8d466bab5d8f8712a34791daa98"
+    },
+    {
+      "path": "scripts/route-task.sh",
+      "sha256": "b1b6c165cf378ced7c5a9b2b69c84b0b70d98ff57c8fd3e81f7c60b05b642b44"
+    },
+    {
+      "path": "scripts/run-regression-tests.sh",
+      "sha256": "39eacd8e71d21816aa3e68eeeed8ec07498465c7d4d6c76fb8b599de599ddc48"
+    },
+    {
+      "path": "scripts/script-promote.sh",
+      "sha256": "1d92da239f78e9225a7a2f651c977ce5956050d52576ebb066429fe336f43da9"
+    },
+    {
+      "path": "scripts/server-calendar.sh",
+      "sha256": "7e2c56557c61a308af111fe5a0a8036ceb388b1235ca9b1a1868eef58b8dd1a8"
+    },
+    {
+      "path": "scripts/server-news.sh",
+      "sha256": "28be1a113884e4f747e43ee659221201456837a49258e645d8342426163f2b1c"
+    },
+    {
+      "path": "scripts/session-guard.sh",
+      "sha256": "f219b0ec7746e12d98f677d4984a2ad02eb573e0c2c5e5b41ca22724f465b3f3"
+    },
+    {
+      "path": "scripts/settings-promote.sh",
+      "sha256": "1ac13a8ed2345257c53f4fb3ce5f37637663bfaf3e321d651087066dc61f0082"
+    },
+    {
+      "path": "scripts/setup-extractor-feeders.sh",
+      "sha256": "6a73a17201951293542388d78cb4c903a5149fd1d78c31eb0e7730253ecf3826"
+    },
+    {
+      "path": "scripts/setup-vscode-auto-mode.sh",
+      "sha256": "7be9a3950bba650181f2134e57d97b29946b8ba50de7b0cf6c0b686d865d76c0"
+    },
+    {
+      "path": "scripts/skill-promote.sh",
+      "sha256": "b3f0a897e18ed6294f23b33dc408794a1594afcc1a08d611f00c408b63c90512"
+    },
+    {
+      "path": "scripts/skills-pull.sh",
+      "sha256": "2d141c61c70e976efcf8ab7cb91150a3eec36243386432b49732c58f0048f03f"
+    },
+    {
+      "path": "scripts/smoke-clean-env.sh",
+      "sha256": "b8bab269eeb332980de4af7c05b84cabb312ef996bf36c841cd77edc48a23a9c"
+    },
+    {
+      "path": "scripts/staging-audit.sh",
+      "sha256": "51234a6e7098f147959d26d3e5a1a57dc48e1506241b9b3f8a3a255498890859"
+    },
+    {
+      "path": "scripts/style-check-post-run.sh",
+      "sha256": "a2cf71882102f4ec8dbbc62dd0274de5fa4b5646f66bc34381b78cc64aae424b"
+    },
+    {
+      "path": "scripts/style-promote.sh",
+      "sha256": "e0151ed43597d20e8d0eac10c7b426d72bcbca033a5f3d22bee3f2f113ea1b69"
+    },
+    {
+      "path": "scripts/sync-agent-instructions.sh",
+      "sha256": "be2e17e318c4e1bea46895eb41f06f5f95df51fe2dd899be202fea9c72f863b8"
+    },
+    {
+      "path": "scripts/sync-communication-style.py",
+      "sha256": "23286c975801e4e345d3ec08728b6a182dde49ceaf69689c0370339246e06d6e"
+    },
+    {
+      "path": "scripts/sync-communication-style.yaml.example",
+      "sha256": "12ac2e3524b329d0bb725f01e2fa52fc73e75edd93a7819ca031ba45b4ec03ed"
+    },
+    {
+      "path": "scripts/sync-version-badge.sh",
+      "sha256": "4b5109d3ca401680eb0f9e84a220e89f52019c6791a3a4031ffd835db3017414"
+    },
+    {
+      "path": "scripts/sync_feedback_to_memory.py",
+      "sha256": "64546c07323752ce6092c0ed1095699cd1738dbe308dc4a6743b2dbdf4eb0d92"
+    },
+    {
+      "path": "scripts/test-route-task.sh",
+      "sha256": "8b42da27ee36905e4b426edfcd1dd9d66e3a70f851d07a8e558e03a38cbe3c94"
+    },
+    {
+      "path": "scripts/test_archive_cadence_sweep.py",
+      "sha256": "a2a648d4243c69a92b2f6cf4ba1ecb4697c585e3c028d682b353b1b0dbd660d0"
+    },
+    {
+      "path": "scripts/test_external_tracker.py",
+      "sha256": "f2ae015d394a447778e1ed75ecfa16d80fe98e1164655b3431940c7e783d206c"
+    },
+    {
+      "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
+      "sha256": "42d937baf40ba1d439f8c49c8b94751381acf679ee0ce67f175c058fa4de9d78"
+    },
+    {
+      "path": "scripts/tests/lib/capture_fixture.sh",
+      "sha256": "edf6eba925d890e2aa52541be8fff27fb48ab11f5c7c69a8a3b1b001408978cd"
+    },
+    {
+      "path": "scripts/tests/lib/seed_strategy_fixture.sh",
+      "sha256": "68354ecd9583fcf1e02f1570c28552fd495f4a5da7bf58c99e43f86a879bf17e"
+    },
+    {
+      "path": "scripts/tests/run-issue-tests.sh",
+      "sha256": "0bda885cf450f89bb2806902f947126be2b7b0e1706d2a03251a1d536c6f52ed"
+    },
+    {
+      "path": "scripts/tests/test_capture_bus_contract.sh",
+      "sha256": "41afdb00139193c82c34626884407018c2c76f5ad1adf6e908a726101c6788ba"
+    },
+    {
+      "path": "scripts/tests/test_capture_bus_detector_timeout.sh",
+      "sha256": "c6b1fd0709577a695cc04b8e544ca7b8b7c9ab6b28ecf7d89d5dd7b8373c0231"
+    },
+    {
+      "path": "scripts/tests/test_check_orphan_hooks.sh",
+      "sha256": "c62cf8b8136587e33ea622e47713d0e3d48417113bab1a6b096b9af68d6b9af3"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_contract.sh",
+      "sha256": "cb8ae42e06dbeb141d8566a9cd808874798cb01f0d8c7395aeee05e270fe83c2"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_hypothesis_relation.sh",
+      "sha256": "2265e5dda20c17e17ea66d2c870fa0f97e3a053f741239fe61beaa785f944a58"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_number_padding.py",
+      "sha256": "fc5c500573c067fb1e6882834d2e0a1d7cd287446f9df5c9b49c1b404362e201"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_registry_coherence.sh",
+      "sha256": "852828b4b741b9922fd0a72b5089214a3ee1663874d7950976ed8115958adb69"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_repeat_and_cwd.sh",
+      "sha256": "926603ebb29d83b7e3db5e0998182e1cc8c8b756820e3b99950d24071cbb093a"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_weekplan_writer.py",
+      "sha256": "126dabff6e7e72c7564e2d0acfdf0449eca9adf06e76010f1175c9b02fe70fc8"
+    },
+    {
+      "path": "scripts/tests/test_critical_alert_contract.sh",
+      "sha256": "ef00075dd25cc016c0d21d4605dcb9444c62493a08f90c44c92b60eb8fec2547"
+    },
+    {
+      "path": "scripts/tests/test_critical_alert_disabled_tracker.sh",
+      "sha256": "ed39762d006f1d98fff599df35cbf42e0bf4ae731fa38885a37268bfaf151bf6"
+    },
+    {
+      "path": "scripts/tests/test_critical_alert_failure_matrix.sh",
+      "sha256": "feadf84f5b558981d267e27c93a5f689457a6e2bfb93b8454730a3472c4f678a"
+    },
+    {
+      "path": "scripts/tests/test_day_close_lock_timezone.sh",
+      "sha256": "0fbbd9493331b7bd4fd9adac592dfd6eed1d3bcd17c13800ec094400e6d4c645"
+    },
+    {
+      "path": "scripts/tests/test_fresh_seed_reproduction.sh",
+      "sha256": "f8459d2cf2c065888d7e80d285a372166c6d88503c89c05a47409234b1171588"
+    },
+    {
+      "path": "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",
+      "sha256": "b9b360036eb38e0ea24b2ab11611a1251555a6d3e1ba72400c7441b8db099e3f"
+    },
+    {
+      "path": "scripts/tests/test_hindsight_docs_contract.sh",
+      "sha256": "042e7689fd88c3eaa1f5d02f9ea46310536972ae5ab6780949edd68a1b793ba6"
+    },
+    {
+      "path": "scripts/tests/test_hook_classification.sh",
+      "sha256": "5cc71a227734d32a5a939b482ae1669c2fc5f3fb0ccc2b874dfb3169f8e2c78a"
+    },
+    {
+      "path": "scripts/tests/test_install_hooks.py",
+      "sha256": "afe084887934053e9208edd7702b9e25e14cf855dc17fc513012aeb0cd83aacd"
+    },
+    {
+      "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
+      "sha256": "2f6bf87b5911bf84c2ae392bf89df55e98f28ffde3a1998c043cdff0e8db2f71"
+    },
+    {
+      "path": "scripts/tests/test_issue_453_calendar_private_visibility.sh",
+      "sha256": "a9866e9c48e44f1728e04e19a9ea9bcfd86943d280927adf1c7ee867a8ede903"
+    },
+    {
+      "path": "scripts/tests/test_issue_455_scaffold_missing_lib_fatal.sh",
+      "sha256": "83e6af367398aefb93c042769f95ee0a471fb47e388c2eda31ddb24d45da6cfb"
+    },
+    {
+      "path": "scripts/tests/test_issue_463_pyyaml_explicit_diagnostics.sh",
+      "sha256": "c059fc7f7b7fc7ce22d555fca8a8dec0a48ff8c0caed0c8de5a18b50a4e9c027"
+    },
+    {
+      "path": "scripts/tests/test_issue_463_setup_reuses_resolved_python3.sh",
+      "sha256": "2f57fc6e6ace9c4bac9c13a7e1e2865b7c26f50f0bf8bc0778a276a266a7ee20"
+    },
+    {
+      "path": "scripts/tests/test_issue_469_settings_merge_hook_identity.py",
+      "sha256": "e9d5384908b54c80d52d95aaba5e4220bbe82d8c86ca4c8a6f748b1d37e42276"
+    },
+    {
+      "path": "scripts/tests/test_issue_471_drift_scan_status_boundary.py",
+      "sha256": "7c04d98dfe74469b43ee725295f3f3aaebfb42f0730356a14f08b4120c5f8587"
+    },
+    {
+      "path": "scripts/tests/test_issue_473_build_active_wp_columns.py",
+      "sha256": "c315bcc73c7ec5ea5a6b97cfd49439978c67507930bebaea0ff061c176e743b3"
+    },
+    {
+      "path": "scripts/tests/test_issue_473_wp_sync_bundle_status.sh",
+      "sha256": "b6cf4944b3902cc9e2063a0159858bb7c681c38714e34870146b932a6d45949e"
+    },
+    {
+      "path": "scripts/tests/test_issue_511_day_close_commit_guard.sh",
+      "sha256": "c5f058979445a3d16d92c8370151101ecfbd145a0ae63c8db8467146701156c8"
+    },
+    {
+      "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
+      "sha256": "df11abbbe08ad4ce2a456bd8cb42ef03039b73fd9697305bec36ebde7c561d7c"
+    },
+    {
+      "path": "scripts/tests/test_issue_536_day_close_backup.sh",
+      "sha256": "512108486010ace38c9de67ce6dbb0568618966f8b09feb9511a51818e0d62cd"
+    },
+    {
+      "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
+      "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
+    },
+    {
+      "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
+      "sha256": "4b44a9bbcb4eb3247e10bea7c133ce8ea0f866421445f6e539c42dc48617ecd6"
+    },
+    {
+      "path": "scripts/tests/test_issues_413_418.py",
+      "sha256": "bec574712bb6c776c2c3b0f571b87b152c33745214fe9dd7788b2a2dbff6fedd"
+    },
+    {
+      "path": "scripts/tests/test_launchd_identity_runtime.sh",
+      "sha256": "a4c14370c1817b6010fb31d35916cd72e028349427f1c14e72a10bfd3144593e"
+    },
+    {
+      "path": "scripts/tests/test_role_runner_update_marker_guard.sh",
+      "sha256": "d5f39a5aa6e485b019a7ad53152a7f9377f7a9d43f45583cd0d599b8273a32dc"
+    },
+    {
+      "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
+      "sha256": "45d241902da232578652c576f3240088936fb165a4ada29917089e802df61edb"
+    },
+    {
+      "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
+      "sha256": "f1fc7a6ad4233f71ec5d259a2ac5473bf62db39df2dc379b586169e09ab197f5"
+    },
+    {
+      "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
+      "sha256": "1a35d1a41fd77d85832d26d0445e275f2b996204c3340593089ab20da23ac54b"
+    },
+    {
+      "path": "scripts/tests/test_update_delivery_ref.sh",
+      "sha256": "aa9177a21c6bf6dd8278f5b5218b2a0e597cd859964252ce92d3d16fadd43b9b"
+    },
+    {
+      "path": "scripts/tests/test_update_deprecated_mirror_guard.sh",
+      "sha256": "7cf9f47166c53d47064fb48d5406f64adacb8296b5782e3563f64796e0a499d5"
+    },
+    {
+      "path": "scripts/tests/test_update_install_path_guard.sh",
+      "sha256": "29886cbdcbc571266e6c710eba97bbddf7bd58078d311696be9afc843358c09b"
+    },
+    {
+      "path": "scripts/tests/test_update_install_path_guard_provenance.sh",
+      "sha256": "d56594acb2e87564bb2f8c2bd22593dc97d65738735166d8713a0cecf8fd1baf"
+    },
+    {
+      "path": "scripts/tests/test_update_settings_merge_drift.sh",
+      "sha256": "0bbff3338ba5176f2bf8d62c8d18de80bdaff7c8dde264ca6c0de7b3e0d34906"
+    },
+    {
+      "path": "scripts/tests/test_upgrade_worktree_cleanup.sh",
+      "sha256": "fffd6c65017455af0cee8af1d05595d773cdc8776738286aa488b0086a972192"
+    },
+    {
+      "path": "scripts/tests/validate_manifest_coverage.sh",
+      "sha256": "8ca218f39bc6357c0ba4399a7de89c5465b2368f8820ba8c0102d00c67ec6007"
+    },
+    {
+      "path": "scripts/update-derived-snapshot.py",
+      "sha256": "0d5e7404bc60b4830de2f096e0b15d08712d6fd4405a3176b3d563f5a25f9252"
+    },
+    {
+      "path": "scripts/validate-fmt-scripts.sh",
+      "sha256": "6f4b86a03150000c5d1d7da7631412ba927f539e605188718e821188cfdb89eb"
+    },
+    {
+      "path": "scripts/validate-hypothesis-priority.sh",
+      "sha256": "4d8209a0abcf6294bd93a13dcc9c74df91b90d865d1c7b9a52a3140fe2289c20"
+    },
+    {
+      "path": "scripts/validate-skill.sh",
+      "sha256": "35c13fa3df643cade27d01f6a15e62ae0002c6adb6e9885545d47e5d8becd815"
+    },
+    {
+      "path": "scripts/validate-staged-artifacts.sh",
+      "sha256": "be628b27788432af3497f918c5e7a2157d0f98914ae02a2e2a6d82c7f78204da"
+    },
+    {
+      "path": "scripts/verify-context-budget.sh",
+      "sha256": "f5d55e0427acabe899428cdaa3b64cbc2a64c8f2c4a402041a66ba48365ea4d2"
+    },
+    {
+      "path": "scripts/verify-manifest.sh",
+      "sha256": "5d2a58223e9c4d52bb0254a781b03c650142d166e900935f6c88b7d610221a97"
+    },
+    {
+      "path": "scripts/week-draft-append.sh",
+      "sha256": "1112d7d98b76427650255e06004934c964b18c1c28a7ceef26c60f043b2801e0"
+    },
+    {
+      "path": "scripts/week-draft-init.sh",
+      "sha256": "45adae54e5bdfb2a98c4c734973dca82b9bd747b2f23e01a998562f16792fed4"
+    },
+    {
+      "path": "scripts/wp-list.py",
+      "sha256": "5814dcdcee11fad443aa1cb48a2518ac43cf0c52fa07f9e2f48d0bb950569b4f"
+    },
+    {
+      "path": "scripts/wp-pool-cascade.sh",
+      "sha256": "d1b82a9f4866ce0d546d493eb6b078026ee0b94450851c628707c23a47973039"
+    },
+    {
+      "path": "scripts/wp499-agent-coordination-test.sh",
+      "sha256": "4a70590ecf6279e8c4fbb33330b36af5a23a320edfaec6f18607cc94dc0d2bf5"
+    },
+    {
+      "path": "seed/strategy/.githooks/pre-commit",
+      "sha256": "6bb072687ea8a23171de1630b1e51e18b87799232932c3628e8ca713c627cd0f"
+    },
+    {
+      "path": "seed/strategy/.githooks/pre-push",
+      "sha256": "d2fc416595518b4bf1d3989308a66090f9c2a984530388114244e5d3b6ca7c5f"
+    },
+    {
+      "path": "seed/strategy/exocortex/agent-fault-profile/.gitignore",
+      "sha256": "68d61a50891b837e5d1385dc78187c0c027e188944e4a37fdeed18849d37dcfb"
+    },
+    {
+      "path": "seed/strategy/scripts/agent_fault_remind.py",
+      "sha256": "c02a86aec937906148873513987a1b3d144b58583b06c9f40633c75fb8be2f3a"
+    },
+    {
+      "path": "seed/strategy/scripts/agent_fault_remind.sh",
+      "sha256": "1d012b3c06b4baba52fd2f3c8f8f870ec3815bad3a02fdbaf904ff9425352796"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-llm-fill.py",
+      "sha256": "21fdc689599ba88fff4215cf590e5baaa0efa1d0f552e7c7e9be311bab7e41cf"
+    },
+    {
+      "path": "seed/strategy/scripts/generate-executor-catalog.py",
+      "sha256": "775b126e54d95531c9abc2f8ac97534ec92cdba312764356431bb149ed2c7145"
+    },
+    {
+      "path": "seed/strategy/scripts/install-hooks.sh",
+      "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+    },
+    {
+      "path": "seed/strategy/scripts/iwe_checklist_memory.py",
+      "sha256": "daa7fe5442175b7eb2fd08798353bb3c58c71e7f84f05881a35dc3183f89160a"
+    },
+    {
+      "path": "seed/strategy/scripts/sync_feedback_to_memory.py",
+      "sha256": "b9042591e77b838f262c81fd0c15d0b362942075bf725022cce9af71aee15697"
+    },
+    {
+      "path": "seed/strategy/scripts/update-derived-snapshot.py",
+      "sha256": "b1c7ca80792acfa1e4b0ae528148ca2cf3ebbff6589ab699ec63b36611a438d8"
+    },
+    {
+      "path": "sessions/00-index.md",
+      "sha256": "462b1b9de70848d56e0f94b09893a09eaa93e4b81666565d6b6d969f42b3d94d"
+    },
+    {
+      "path": "setup.sh",
+      "sha256": "31a75c3d8f7acc21a711ea4c40a037ec9ac3e81a868b8da4f56c95324bc0c0ba"
+    },
+    {
+      "path": "setup/build-runtime.sh",
+      "sha256": "c858557329da9e9b8d1e665ab9f69994b2ebdc1da52cc7e0f014db633f32c83b"
+    },
+    {
+      "path": "setup/install-iwe-paths.sh",
+      "sha256": "523cd10448bbd0a2bf8a5458e26d2d56bacc9c7ab72bb9fc7d1690d3ee7f6aab"
+    },
+    {
+      "path": "setup/optional/setup-cloud-scheduler.sh",
+      "sha256": "b4b721412fffe448d61e0709badacc4210109ce938cb8723fa56b938cf1346ba"
+    },
+    {
+      "path": "setup/optional/setup-local-gateway.sh",
+      "sha256": "89665f7870bdf8b1e400b8eaf311189aebb4ad8014b07ebbabcf7fc0f7611b8a"
+    },
+    {
+      "path": "setup/validate-template.sh",
+      "sha256": "32496926d7a7d32103bcd7c336678346d7008c97e5589e84e8485a066024264b"
+    },
+    {
+      "path": "shared/rubrics/form-089.yaml",
+      "sha256": "56d865e1facca25fd789a85fd0625c4322936c754d9d8883ad5b6729ac7c48ff"
+    },
+    {
+      "path": "translation-manifest.yaml",
+      "sha256": "c14d0fa83eaeb31d18be1fc0121d60faa4c0a61cb9ad475c00408776ab1c8bb0"
+    },
+    {
+      "path": "translation/en-doc-style.md",
+      "sha256": "eb404961303d4d48cefef78ddf543edc6effc03b8f07e25ac30eae36070c39c9"
+    },
+    {
+      "path": "translation/glossary-v0.1.csv",
+      "sha256": "e3fee071150469b7b649a757e0bdd4305f205017014cce77bf7d97d09cbc4dcc"
+    },
+    {
+      "path": "update.sh",
+      "sha256": "60bf249aaf4a965b4d2b85361fc5c6a2a03602b01e682ae32e8f2c8d02a52a52"
     }
   ],
   "excluded_paths": [
-    "AGENTS-agent-blocks.md",
+    ".github/workflows/nightly-template-audit.yml",
     "docs/developer/README.md",
     "docs/developer/card-template.md",
     "docs/developer/code-style.md",
     "docs/developer/developer-guide.md",
+    "docs/developer/external-developer-letter.md",
+    "docs/developer/proposal-process.md",
     "docs/developer/testing-as-spec.md",
     "docs/developer/working-with-claude.md",
     "promotion-status.yaml",
@@ -1701,29 +2911,90 @@
     "scripts/iwe-trace.py",
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/conftest.py",
+    "scripts/tests/lib/extract-update-download-batch.sh",
+    "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
+    "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
-    "scripts/tests/test_create_wp_number_padding.py",
-    "scripts/tests/test_create_wp_weekplan_writer.py",
     "scripts/tests/test_day_close_prepare.py",
+    "scripts/tests/test_day_open_checks_runner_false_positive.sh",
+    "scripts/tests/test_day_open_preflight_calendar_path.sh",
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dry_run_gate.py",
-    "scripts/tests/test_install_hooks.py",
+    "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
+    "scripts/tests/test_issue_529_owner_integrity.sh",
+    "scripts/tests/test_issue_530_staged_self_scan.sh",
+    "scripts/tests/test_issue_531_index_health_status_cell.py",
+    "scripts/tests/test_issue_532_dayplan_strategy_gate.sh",
+    "scripts/tests/test_issue_544_staged_precommit.sh",
+    "scripts/tests/test_issue_545_sessions_root.sh",
+    "scripts/tests/test_issue_549_dryrun_redesign.sh",
+    "scripts/tests/test_issue_555_claude_silent_loss.sh",
+    "scripts/tests/test_issue_581_calendar_single_source.sh",
+    "scripts/tests/test_issue_582_audit_promoted_layout.sh",
+    "scripts/tests/test_issue_583_dayopen_yaml.sh",
+    "scripts/tests/test_issue_584_build_version.sh",
+    "scripts/tests/test_issue_596_weekreport_filename.sh",
+    "scripts/tests/test_issue_633_resolve_governance_branch.sh",
+    "scripts/tests/test_issue_657.sh",
+    "scripts/tests/test_issue_660.sh",
+    "scripts/tests/test_issue_665.sh",
+    "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
+    "scripts/tests/test_mount_readonly_packs.sh",
+    "scripts/tests/test_pending_phases_sweep.sh",
+    "scripts/tests/test_release_receipt.sh",
+    "scripts/tests/test_residency_gate_skill_adapter.py",
+    "scripts/tests/test_session_guard_unknown_flag.sh",
+    "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",
+    "scripts/tests/test_update_download_batch_network_failure_failclosed.sh",
+    "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
+    "scripts/tests/test_update_verify_batch_integrity_hash_mismatch_failclosed.sh",
+    "scripts/tests/test_validate_hypothesis_priority.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/00-writer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/01-peer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/02-writer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/03-peer.md",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/meta.yaml",
-    "sessions/2026-06/2026-06-17-01-kimi-setup/report.md"
+    "setup/detector-fixtures/README.md",
+    "setup/detector-fixtures/detector_07/positive_backtick_slash.md",
+    "setup/detector-regex.sh",
+    "setup/integration-contract-validator.sh",
+    "setup/optional/COVER-IMAGES.md",
+    "setup/optional/README.md",
+    "setup/optional/generate-post-image.py",
+    "setup/optional/pomodoro-alert.plist",
+    "setup/optional/pomodoro-alert.py",
+    "setup/optional/setup-agent-workspace.sh",
+    "setup/optional/setup-calendar.sh",
+    "setup/promote-fixtures/README.md",
+    "setup/promote-fixtures/sample-hook.sh",
+    "setup/promote-fixtures/sample-script.sh",
+    "setup/promote-fixtures/sample-settings.json",
+    "setup/promote-fixtures/sample-skill/SKILL.md",
+    "setup/promote-fixtures/sample-skill/scripts/sample-tool.sh",
+    "setup/release-audit-prompt.md",
+    "setup/smoke-test-fresh-install.sh",
+    "setup/test-attestation-build-statement.sh",
+    "setup/test-attestation-canonical-digest.sh",
+    "setup/test-build-runtime-preserves-live-state.sh",
+    "setup/test-day-open-delivery-closure.sh",
+    "setup/test-delivery-route-label.sh",
+    "setup/test-detectors.sh",
+    "setup/test-update-edge-cases.sh",
+    "setup/test-update-install-path-provenance.sh",
+    "setup/test-update-issue-226.sh",
+    "setup/test-update-release-channel.sh",
+    "setup/test-update-self-overwrite.sh",
+    "setup/test-update-step0-staged-rename.sh",
+    "setup/ux-walkthrough-prompt.md"
   ],
   "deprecated_files": [
+    {
+      "path": "scripts/template-sync.sh",
+      "reason": "removed 2026-07-17 (e9cf822): functionality fully covered by the protected author-side sync pipeline (not shipped to the template). Forks that updated before removal keep an orphaned copy on disk without this entry (issue #486)."
+    },
     {
       "path": "scripts/safe-pull.sh",
       "reason": "zero callers (WP-5 audit), logic folded into scripts/lib/common.sh iwe_safe_pull(), removed in v0.36.2"
@@ -1821,20 +3092,9 @@
       "reason": "session transcripts archived, removed by WP-401 Ф6.1 2026-07-22"
     },
     {
-      "path": "docs/developer/README.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
-    },
-    {
-      "path": "docs/developer/card-template.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
-    },
-    {
-      "path": "docs/developer/developer-guide.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
-    },
-    {
-      "path": "docs/developer/testing-as-spec.md",
-      "reason": "documentation pipeline deprecated, consolidated in memory/, removed by WP-401 Ф6.1 2026-07-23"
+      "path": "scripts/tests/test_session_guard_unknown_flag.sh",
+      "reason": "moved to excluded_paths[] (scripts/tests/ blanket pattern) after being in files[] by oversight — WP-7 Ф92",
+      "excluded_confirmed": true
     }
   ]
 }

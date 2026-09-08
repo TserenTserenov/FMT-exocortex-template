@@ -6,7 +6,7 @@ type: protocol
 horizon: warm
 domains: [reference]
 status: active
-owner: user
+owner: platform
 schema_version: 1
 
 name: "dry-run-contract"
@@ -18,6 +18,19 @@ description: "Операционный файл памяти IWE"
 >
 > **Принцип реализации (вариант F3).** Скиллы НЕ знают про dry-run. Защита через **PreToolUse-хук + sentinel-файл** — внешний механизм, независимый от логики скилла. Это покрывает и автора (inline-скиллы), и пилотов (FMT-делегирование), и кастомные скиллы пилотов.
 
+## State-машина (issue #549 stage 2, 2026-08-31 — надмножество над sentinel)
+
+> **Проблема stage 1 не закрывала:** ветка «sentinel снят, owner-файл остался» была вечным fail-closed без штатного пути разблокировки изнутри (сессия умерла между `rm sentinel` и Stop-хуком, или id не совпал).
+
+**Инварианты (дизайн подтверждён пир-ревью Codex, 2 раунда):**
+
+1. **Единая каноническая запись** — `/tmp/iwe-dry-run-<uid>/gate-<gate_id>.state` (JSON v2: `gate_id`, `owner_session_id`, `owner_pid`/`owner_pgid`/`owner_pid_start`, `state: active|completed`, `created_at`, `completed_at`, `completion_reason`, `owner_token_sha256`). Capability-token хранится только как sha256 — репетиция, читающая state разрешённой read-only командой, получает лишь хэш и не может завершить gate сама (завершение требует preimage; Stop-хук рантайма завершает сам inline — никакого trusted-флага не существует, Codex r2: флаг обходился shell-квотированием аргумента). Sentinel `/tmp/iwe-dry-run.flag` — только маркер активного режима со ссылкой `gate_id` на эту запись; решение гейта принимается по таблице состояний (sentinel×state), не по одному sentinel.
+2. **Эксклюзивность:** одна активная репетиция на установку; вторая попытка — отказ с текущим `gate_id`. Несколько active-state = corruption → fail-closed.
+3. **Атомарные переходы и создание:** только `active→completed`, монотонно, tmp+mv внутри короткого транзакционного замка (`transaction.lock/` через `mkdir`, владелец замка pid+nonce — доказуемо осиротевший замок уносится уникальным именем; освобождение только по своему nonce). Создание — тоже под замком и тоже только через helper (`scripts/dry-run-begin.sh`: скан заново, отказ при активной репетиции, эксклюзивное создание sentinel после state). Завершение делает **команда завершения** (`scripts/dry-run-complete.sh`, capability token), Stop-хук — идемпотентный fallback inline по `gate_id`+`owner_session_id` (весь скан под одним замком, переход только при ровно одном валидном v2 active своей сессии, sentinel только после успешного перехода). Повторное завершение не перетирает metadata.
+4. **Доказуемое сиротство** (вместо вечной блокировки): `owner_pid` мёртв ИЛИ его `lstart` не совпал (pid reuse) **И** ни одного живого процесса с `owner_pgid` → `completed(reason=orphan-sweep)` → allow. Любая неоднозначность (ошибка ps, битый state, неизвестный gate_id, живой pgid) → прежний вечный fail-closed с командой восстановления `dry-run-complete.sh <gate_id> manual-recovery`.
+5. **Известные остатки (приняты осознанно):** (а) если рантайм помещает сам гейт в process group владельца, pgid-скан всегда видит «живых» → вечный fail-closed (безопасное направление); (б) `lstart` — текстовый платформенный формат: живой pid с ДРУГИМ стартом = pid reuse (исходный владелец доказуемо мёртв), а НЕЧИТАЕМЫЙ ps/пустой вывод = «не доказано» → fail-closed; (c) атаки от того же uid вне threat model (защита — 0700 каталог + lstat-проверки от symlink/чужого владельца); (d) PGID reuse даёт только ложный fail-closed; (e) env-оверрайды путей (`IWE_DRY_RUN_DIR`/`IWE_DRY_RUN_SENTINEL`) действуют только при наличии маркера `.iwe-dry-run-test-mode` в override-каталоге — ambient-переменные из конфигурации запуска защиту не отключают.
+6. **Legacy:** owner-*.token старого формата (без state-файла) — прежняя вечная ветка с `rm -f`-восстановлением. `sentinel+completed` — самолечение: stale sentinel снимается после сверки gate_id.
+
 ## Sentinel-механика
 
 ### Файл
@@ -28,9 +41,8 @@ description: "Операционный файл памяти IWE"
 
 - **Имя:** единый файл, не session-bound (v2, WP-7/BUGTRIAGE2, issue #237). `CLAUDE_SESSION_ID` не пробрасывается в окружение субагентов — session-bound имя создавало рассинхрон: главный агент создавал `iwe-dry-run-${SID}.flag` по своему SID, а Stop-hook субагента чистил по своему (пустому/другому) SID, промахиваясь мимо реального файла. Единое имя убирает рассинхрон создания/очистки.
 - **Содержимое:** одна строка JSON: `{"created_at": "<ISO8601>", "session_id": "<id-инициатора>", "initiator": "<skill-name>"}` — session_id хранится только для диагностики, не участвует в поиске/очистке файла.
-- **TTL:** 10 минут от mtime. Хук игнорирует файл с mtime > 10 мин назад (защита от sticky-state при kill -9 / краше CLI).
-- **Очистка:** (а) явная — финал шага в `/audit-installation`; (б) Stop-hook (`protocol-stop-gate.sh` — безусловный `rm -f /tmp/iwe-dry-run.flag`, без привязки к `CLAUDE_SESSION_ID`); (в) TTL — mtime > 10 мин.
-- **Известное ограничение единого файла:** Stop любой параллельной сессии снимет активный dry-run другой сессии. Модель угроз контракта — добросовестный агент/случайный обход, не конкурентная многосессийность вокруг одного smoke-теста (см. §«Не входит в контракт»); TTL и синхронность прогона внутри одного хода инициатора страхуют остаточный риск.
+- **TTL:** 40 минут (2400с) от mtime (issue #460 путь 3, было 10 мин — измеренный `close day` занимает ~26 мин, старый TTL истекал посреди легитимной репетиции). Файл с mtime старше TTL — **fail-CLOSED**: хук блокирует и оставляет sentinel на месте для ручного разбора, больше не удаляет его сам (раньше `rm -f` + allow — тот же класс fail-open, что путь 1/2).
+- **Очистка:** (а) явная — финал шага в `/audit-installation`; (б) TTL-expiry требует ручного `rm -f`, автоматической очистки больше нет. Stop владельца (даже при совпадении `session_id` и capability-token) **больше не удаляет sentinel** (issue #460 путь 6 — тот же `session_id` у родителя и его фонового субагента, поэтому Stop родительского хода мог снести защиту, пока субагент ещё пишет); Stop только подчищает residue-owner-файл текущей сессии, и только когда sentinel уже отсутствует. Чужой Stop по-прежнему не снимает защиту (issue #460 путь 7, регрессия покрыта тестом).
 
 ### Жизненный цикл
 
@@ -47,7 +59,7 @@ description: "Операционный файл памяти IWE"
 
 ### Контракт
 
-При наличии валидного sentinel-файла (единое имя, mtime ≤ 10 мин) хук блокирует **любой tool-call с побочными эффектами** и возвращает exit 2 с диагностикой:
+При наличии валидного sentinel-файла (единое имя, mtime ≤ 40 мин) хук блокирует **любой tool-call с побочными эффектами** и возвращает exit 2 с диагностикой:
 
 ```
 [dry-run-gate] BLOCKED: <tool> on <path/cmd>
@@ -86,6 +98,8 @@ sed -i*
 curl -X (POST|PUT|DELETE|PATCH) | curl --data | curl -d
 psql ... (INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)   # матчится по оригиналу (SQL в кавычках)
 bash|sh|zsh <script>              # indirect execution — block, КРОМЕ whitelist ниже (issue #264)
+python|python3 <script>           # indirect execution — block, КРОМЕ whitelist ниже (issue #460 путь 5)
+python|python3 -c "..."           # inline snippet — вне контракта по threat model (см. ниже), allow
 eval|source|.|xargs               # indirect execution — payload неинспектируем после quote-strip
 
 Whitelist read-only helpers (issue #264) — разрешены под dry-run, т.к. write-путей
@@ -101,6 +115,28 @@ ${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-close-prepare.sh # абсолютный (�
 "$IWE_SCRIPTS/day-close-prepare.sh"                    # реальная документированная форма (день. вызов
                                                         # из day-close/SKILL.md) — маркер __WL_DAY_CLOSE_PREPARE__
 ```
+
+Python-whitelist (issue #460 путь 5, добавлен после того как code review поймал, что
+безусловный block ломает `close day` на первом же шаге):
+
+```
+${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.claude/scripts/memory-drift-scan.py
+${IWE_TEMPLATE:-<HOME_DIR>/IWE/FMT-exocortex-template}/.claude/scripts/check-index-health.py
+```
+
+Обе — read-only диагностика (day-close/SKILL.md шаги 1-2), без write-путей в коде
+(проверено). Маркеры `__WL_PY_MDS__`/`__WL_PY_CIH__`, та же техника точечной
+sed-замены до split, что у `day-close-prepare.sh` выше — `${IWE_TEMPLATE:-...}`
+содержит `{`/`}`, которые иначе рвут путь на сегменты (см. комментарий в коде).
+Паттерн matches **точный** `$HOME`-путь, не wildcard-default — round-2 review
+живьём воспроизвёл, что `[^}]*` пропускал `${IWE_TEMPLATE:-$(cmd)}/...` как
+allow, глотая command substitution маркером раньше, чем шаг 2 успевал его
+сегментировать. `rule-classifier.py` (day-close/SKILL.md шаг «Rule-engine»)
+сознательно НЕ в whitelist — сам SKILL.md документирует, что скрипт вносит правки.
+`{{HOME_DIR}}` в исходнике SKILL.md — шаблонный плейсхолдер репозитория-шаблона
+(setup.sh рендерит только CLAUDE.md, не `.claude/skills/`); ожидается, что
+исполняющий агент подставляет реальный путь при формировании Bash-вызова — тот
+же принцип, что у уже существующего `WL_ABS`/`WL_ABS2` (bash-whitelist).
 
 Абсолютный паттерн захардкожен в `$HOME/IWE`, не glob `*/.claude/...` и не
 `$IWE_ROOT` — иначе подложный `/tmp/.claude/scripts/load-extensions.sh` или
@@ -238,4 +274,5 @@ Subagent после прогона ритуала анализирует transcr
 - **v1 (отвергнут):** dry-run флаг в каждом скилле (вариант A на ArchGate v1). Декларативный контракт, LLM могла пропустить флаг.
 - **v2 (отвергнут):** dry-run флаг в `/run-protocol` (F2 на ArchGate v2). Не покрывает авторские inline-скиллы.
 - **v3 (отвергнут):** sentinel + хук, session-bound имя файла (F3 на ArchGate v3). Покрывал все скиллы независимо от их структуры, но session-bound sentinel не переживал субагентов — issue #237.
-- **v4 (текущий, WP-7/BUGTRIAGE2):** единый sentinel-файл (не session-bound) + разбор Bash-команды на простые сегменты вместо построчного regex. Закрывает 4 дыры, найденные и подтверждённые живым запуском хука: залипание блокировки у субагентов, самоблокирующийся cleanup, subshell-обход, ложные срабатывания на текст в кавычках.
+- **v4 (WP-7/BUGTRIAGE2):** единый sentinel-файл (не session-bound) + разбор Bash-команды на простые сегменты вместо построчного regex. Закрывает 4 дыры, найденные и подтверждённые живым запуском хука: залипание блокировки у субагентов, самоблокирующийся cleanup, subshell-обход, ложные срабатывания на текст в кавычках.
+- **v5 (текущий, issue #460):** живая установка поймала 7 fail-open путей разом — `/audit-installation` реально записал в файл во время репетиции. Fail-closed вместо fail-open на jq-missing (путь 1) и sentinel-missing-with-owner (путь 2); TTL 600с→2400с + fail-closed вместо `rm+allow` на истечении (путь 3); `python`/`python3` добавлены в indirect-execution матчер (путь 5); Stop-хук больше не удаляет живой sentinel вообще, даже свой — только residue owner-файл, когда sentinel уже снят явно (путь 6); путь 7 (чужая сессия) подтверждён уже закрытым, покрыт регресс-тестом.

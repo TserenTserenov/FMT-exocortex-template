@@ -274,6 +274,19 @@ jobs:
           [issue]($EN/issues) describing the change instead.
           EOF
 
+      - name: Cyrillic gate for en-draft
+        id: staging_cyrillic
+        # Publish has the same hard gate, but stopping here prevents an LLM
+        # residual from being committed to the staging branch and poisoning
+        # every later delta run.
+        if: always() && steps.en_draft.outcome == 'success'
+        run: |
+          if git -C ../en-draft grep -nP '[А-Яа-яЁё]' -- .; then
+            echo '::error::Cyrillic remains in en-draft; fix the translation before staging it.'
+            exit 1
+          fi
+          echo 'PASS: en-draft contains no Cyrillic.'
+
       # Tripwire (WP-483 Ф4): the vendored guide-kit/ copy must never reach the
       # EN distribution — the original already lives at iwesys/guide-kit, and a
       # second copy inside iwesys/IWE would be a diverging duplicate. Today this
@@ -372,7 +385,7 @@ jobs:
           fi
 
       - name: Commit and push to en-draft
-        if: always() && steps.en_draft.outcome == 'success'
+        if: always() && steps.en_draft.outcome == 'success' && steps.staging_cyrillic.outcome == 'success'
         env:
           # Committer stays canon-sync[bot] (the entity that operates this
           # pipeline); author becomes the human who made the source change

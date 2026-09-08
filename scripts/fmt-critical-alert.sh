@@ -32,22 +32,14 @@
 
 set -eu
 
-# Repo resolution: IWE_FMT_REPO env → GITHUB_USER env → params.yaml → exit with hint.
-# Не hardcode'им автора шаблона: скрипт работает в forks любого пилота.
-REPO="${IWE_FMT_REPO:-}"
-if [ -z "$REPO" ] && [ -n "${GITHUB_USER:-}" ]; then
-    REPO="${GITHUB_USER}/FMT-exocortex-template"
-fi
-if [ -z "$REPO" ] && [ -f "${IWE_ROOT:-$HOME/IWE}/params.yaml" ]; then
-    GH_USER=$(grep -E "^github_user:" "${IWE_ROOT:-$HOME/IWE}/params.yaml" 2>/dev/null | sed -E 's/^github_user:[[:space:]]*//; s/^"//; s/"$//')
-    [ -n "$GH_USER" ] && REPO="${GH_USER}/FMT-exocortex-template"
-fi
-if [ -z "$REPO" ]; then
-    echo "Error: cannot resolve FMT repo. Set IWE_FMT_REPO or GITHUB_USER env, or add 'github_user: <login>' to params.yaml." >&2
-    exit 2
-fi
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+case "$SCRIPT_PATH" in /*) ;; *) SCRIPT_PATH="$PWD/$SCRIPT_PATH" ;; esac
+SCRIPT_DIR="$(cd "${SCRIPT_PATH%/*}" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
 
 SEND_TG=true
+REPO_ARG=""
 # stale-unattended added (pipeline fix): issues triaged but unfixed for 14+ days were invisible
 # after the 2-day Day Open window. Now they surface here at Week Close.
 LABEL_QUERY="critical,deadline,stale-unattended"
@@ -55,7 +47,7 @@ LABEL_QUERY="critical,deadline,stale-unattended"
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-telegram) SEND_TG=false; shift ;;
-        --repo) REPO="$2"; shift 2 ;;
+        --repo) [ $# -ge 2 ] || { echo "--repo requires OWNER/REPO" >&2; exit 1; }; REPO_ARG="$2"; shift 2 ;;
         --labels) LABEL_QUERY="$2"; shift 2 ;;
         -h|--help)
             grep '^#' "$0" | head -30
@@ -64,6 +56,26 @@ while [ $# -gt 0 ]; do
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
+
+# Repo resolution happens after argument parsing so --repo works even when no
+# ambient config exists. Precedence: CLI → process env → .exocortex.env → params.
+ROOT=$(iwe_resolve_root "${IWE_WORKSPACE:-${IWE_ROOT:-}}") || exit 2
+ENV_FILE="$ROOT/.exocortex.env"
+ENV_REPO=$(iwe_env_get "$ENV_FILE" IWE_FMT_REPO 2>/dev/null || true)
+ENV_GITHUB_USER=$(iwe_env_get "$ENV_FILE" GITHUB_USER 2>/dev/null || true)
+REPO="${REPO_ARG:-${IWE_FMT_REPO:-${ENV_REPO:-}}}"
+GH_USER="${GITHUB_USER:-${ENV_GITHUB_USER:-}}"
+if [ -z "$REPO" ] && [ -n "$GH_USER" ]; then
+    REPO="${GH_USER}/FMT-exocortex-template"
+fi
+if [ -z "$REPO" ] && [ -f "$ROOT/params.yaml" ]; then
+    GH_USER=$(grep -E "^github_user:" "$ROOT/params.yaml" 2>/dev/null | sed -E 's/^github_user:[[:space:]]*//; s/^"//; s/"$//')
+    [ -n "$GH_USER" ] && REPO="${GH_USER}/FMT-exocortex-template"
+fi
+if [ -z "$REPO" ]; then
+    echo "Error: cannot resolve FMT repo. Use --repo, IWE_FMT_REPO/GITHUB_USER, or $ENV_FILE." >&2
+    exit 2
+fi
 
 # Проверка зависимостей
 command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not found" >&2; exit 2; }

@@ -50,17 +50,14 @@ pairs:
     owner_role: agent
     symptom: "Day Open работает не по protocol-open.md"
 
-  # 2. Staging ↔ FMT (валидированные правила должны быть промотированы)
-  - id: staging-validated-to-fmt
-    source: STAGING.md
-    derived: FMT-exocortex-template/
-    relation: reconciliation
-    check: mtime-lag
-    threshold_days: 7
-    critical_days: 21
-    owner_role: human
-    symptom: "Правило `validated` в STAGING.md не промотировано в FMT более 3 недель"
-    notes: "Если у вас нет локального FMT-зеркала — пара бесполезна, удалите."
+  # 2. (issue #404) staging-validated-to-fmt пара удалена отсюда 2026-08-12:
+  #    её source (STAGING.md) — авторская инфраструктура обкатки (CLAUDE.md §8),
+  #    не поставляется пользовательской установкой шаблона. Пара безусловно
+  #    получала status=missing (mtime-lag не различает "источника нет и не
+  #    будет" от "источник реально пропал") на каждой не-авторской установке
+  #    навсегда — не намеренная задержка. Автору, кто ведёт STAGING.md,
+  #    эквивалентный трекинг — через собственный `author_mode` манифест,
+  #    не общий шипящийся файл.
 
   # 3. ARCH-якорь ↔ downstream `derived_from:` (helper из scripts/iwe-drift-helpers/)
   - id: arch-version-drift

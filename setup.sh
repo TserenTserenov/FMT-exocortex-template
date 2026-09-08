@@ -24,6 +24,13 @@ else
     sed_inplace() { sed -i '' "$@"; }
 fi
 
+# sed_escape_replacement STR — escape values used as the replacement side of
+# `sed s|...|STR|`. Without this, &, | or \ in an installation value either
+# expands the match, terminates the expression or changes the following byte.
+sed_escape_replacement() {
+    printf '%s' "$1" | sed -e 's/[\&|]/\\&/g'
+}
+
 # === Parse arguments ===
 for arg in "$@"; do
     case "$arg" in
@@ -108,10 +115,12 @@ if $VALIDATE_ONLY; then
     else
         echo "  ⚠ extensions/ не найдена (опционально)"
     fi
-    if [ -f "$SCRIPT_DIR/params.yaml" ]; then
-        echo "  ✓ params.yaml"
+    # issue #348: в репозитории лежит только образец; рабочий params.yaml создаётся
+    # build-runtime.sh в корне установки и под git-контроль шаблона не попадает.
+    if [ -f "$SCRIPT_DIR/params.yaml.example" ]; then
+        echo "  ✓ params.yaml.example (образец параметров)"
     else
-        echo "  ⚠ params.yaml не найден (опционально)"
+        echo "  ⚠ params.yaml.example не найден (опционально)"
     fi
 
     # Check MCP accessibility
@@ -157,9 +166,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR"
 
 # Verify we're inside the template
-if [ ! -f "$TEMPLATE_DIR/CLAUDE.md" ] || [ ! -d "$TEMPLATE_DIR/memory" ]; then
+if [ ! -f "$TEMPLATE_DIR/CLAUDE.md" ] || [ ! -f "$TEMPLATE_DIR/AGENTS.md" ] || [ ! -d "$TEMPLATE_DIR/memory" ]; then
     echo "ERROR: This script must be run from the root of FMT-exocortex-template."
-    echo "  Expected: $TEMPLATE_DIR/CLAUDE.md and $TEMPLATE_DIR/memory/"
+    echo "  Expected: $TEMPLATE_DIR/CLAUDE.md, $TEMPLATE_DIR/AGENTS.md and $TEMPLATE_DIR/memory/"
     echo ""
     echo "  Steps:"
     echo "    gh repo fork TserenTserenov/FMT-exocortex-template --clone"
@@ -297,17 +306,82 @@ else
 fi
 
 HOME_DIR="$HOME"
+USER_NAME="$(id -un)"
 
 # Compute Claude project slug: /Users/alice/IWE → -Users-alice-IWE
 CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
 
-# Auto-detect governance repo (used in placeholder substitution + .exocortex.env).
-# Стратегия: (1) DS-strategy (default), (2) wildcard DS-*-strategy* (legacy/локальные имена).
-# Если ни один не найден — default DS-strategy (будет создан при первом seed-ритуале).
-GOVERNANCE_REPO=""
-if [ -d "$WORKSPACE_DIR/DS-strategy" ]; then
-    GOVERNANCE_REPO="DS-strategy"
+# === Governance repo contract (WP-560 Ф5-Phase-2) ===
+# Single machine-readable source for the governance repo's default name and
+# the content markers that identify one as "the" governance repo — shared
+# with the server side (aisystant/github-integration-service,
+# src/governance-repo-contract.json). That repo's CI keeps this vendored copy
+# in sync (scheduled + on-push check against the public raw file here); a
+# mismatch there is a signal to update this file, not something this script
+# can detect on its own.
+GOVERNANCE_CONTRACT_FILE="$TEMPLATE_DIR/scripts/governance-repo-contract.json"
+if [ ! -f "$GOVERNANCE_CONTRACT_FILE" ]; then
+    echo "ERROR: governance contract not found: $GOVERNANCE_CONTRACT_FILE" >&2
+    echo "  Run 'git pull' in the template or re-clone, then re-run setup.sh." >&2
+    exit 1
 fi
+if ! GOVERNANCE_CONTRACT_SCHEMA_VERSION=$(jq -r '.schemaVersion // empty' "$GOVERNANCE_CONTRACT_FILE"); then
+    echo "ERROR: governance contract is not valid JSON: $GOVERNANCE_CONTRACT_FILE" >&2
+    exit 1
+fi
+if [ "$GOVERNANCE_CONTRACT_SCHEMA_VERSION" != "1" ]; then
+    echo "ERROR: unsupported governance contract schemaVersion: ${GOVERNANCE_CONTRACT_SCHEMA_VERSION:-<missing>}" >&2
+    exit 1
+fi
+GOVERNANCE_CONTRACT_DEFAULT_REPO=$(jq -r '.defaultRepoName // empty' "$GOVERNANCE_CONTRACT_FILE")
+if [ -z "$GOVERNANCE_CONTRACT_DEFAULT_REPO" ]; then
+    echo "ERROR: governance contract missing defaultRepoName" >&2
+    exit 1
+fi
+GOVERNANCE_MARKERS=()
+_governance_markers_raw=$(jq -r '.requiredMarkers[]? // empty' "$GOVERNANCE_CONTRACT_FILE")
+while IFS= read -r _governance_marker; do
+    [ -n "$_governance_marker" ] && GOVERNANCE_MARKERS+=("$_governance_marker")
+done <<< "$_governance_markers_raw"
+if [ "${#GOVERNANCE_MARKERS[@]}" -eq 0 ]; then
+    echo "ERROR: governance contract has no requiredMarkers" >&2
+    exit 1
+fi
+unset _governance_markers_raw _governance_marker
+
+# Honor an explicit governance repo, then preserve an existing installation's
+# config, then a trusted runtime override; only then auto-detect/default. This
+# makes setup reruns converge on arbitrary safe governance names instead of
+# silently creating a second DS-strategy repository.
+GOVERNANCE_REPO="${GOVERNANCE_REPO:-}"
+if [ -z "$GOVERNANCE_REPO" ] && [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
+    GOVERNANCE_REPO=$(grep '^GOVERNANCE_REPO=' "$WORKSPACE_DIR/.exocortex.env" 2>/dev/null |
+        head -1 | cut -d= -f2-)
+    case "$GOVERNANCE_REPO" in
+        \"*\") GOVERNANCE_REPO="${GOVERNANCE_REPO#\"}"; GOVERNANCE_REPO="${GOVERNANCE_REPO%\"}" ;;
+        \'*\') GOVERNANCE_REPO="${GOVERNANCE_REPO#\'}"; GOVERNANCE_REPO="${GOVERNANCE_REPO%\'}" ;;
+    esac
+fi
+if [ -z "$GOVERNANCE_REPO" ]; then
+    GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-}"
+fi
+case "$GOVERNANCE_REPO" in
+    "" ) ;;
+    .|..|.*|*/*|*[!A-Za-z0-9._-]*)
+        echo "ОШИБКА: GOVERNANCE_REPO должен быть безопасным именем каталога: $GOVERNANCE_REPO" >&2
+        exit 1
+        ;;
+esac
+if [ -z "$GOVERNANCE_REPO" ] && [ -d "$WORKSPACE_DIR/$GOVERNANCE_CONTRACT_DEFAULT_REPO" ]; then
+    GOVERNANCE_REPO="$GOVERNANCE_CONTRACT_DEFAULT_REPO"
+fi
+# Scope note (WP-560 Ф5-Phase-2 review, 02.09): this local name-glob picks the
+# first DS-*strategy* directory it finds and does not consult the contract's
+# ambiguityPolicy (0/1/2+, enforced server-side in governance-repo-resolver.ts
+# against GitHub content markers). The two mechanisms differ in kind — this one
+# checks local directory names, not remote content markers — so the policy
+# isn't mechanically portable here; unifying them is an open follow-up on the
+# WP-560 card, not done in this change.
 if [ -z "$GOVERNANCE_REPO" ]; then
     for d in "$WORKSPACE_DIR"/DS-*; do
         case "${d##*/}" in
@@ -318,7 +392,19 @@ if [ -z "$GOVERNANCE_REPO" ]; then
         esac
     done
 fi
-GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
+GOVERNANCE_REPO="${GOVERNANCE_REPO:-$GOVERNANCE_CONTRACT_DEFAULT_REPO}"
+if [ -L "$WORKSPACE_DIR/$GOVERNANCE_REPO" ]; then
+    echo "ОШИБКА: governance repo не может быть символической ссылкой: $WORKSPACE_DIR/$GOVERNANCE_REPO" >&2
+    exit 1
+fi
+if [ -d "$WORKSPACE_DIR/$GOVERNANCE_REPO" ] && [ -d "$TEMPLATE_DIR" ]; then
+    GOVERNANCE_REAL=$(cd -P "$WORKSPACE_DIR/$GOVERNANCE_REPO" 2>/dev/null && pwd -P) || exit 1
+    TEMPLATE_REAL=$(cd -P "$TEMPLATE_DIR" 2>/dev/null && pwd -P) || exit 1
+    if [ "$GOVERNANCE_REAL" = "$TEMPLATE_REAL" ]; then
+        echo "ОШИБКА: GOVERNANCE_REPO указывает на template repo: $GOVERNANCE_REPO" >&2
+        exit 1
+    fi
+fi
 
 # IWE_TEMPLATE = путь к FMT-репо (где живёт setup.sh).
 IWE_TEMPLATE_PATH="$TEMPLATE_DIR"
@@ -388,6 +474,7 @@ CLAUDE_PROJECT_SLUG="$CLAUDE_PROJECT_SLUG"
 TIMEZONE_HOUR="$TIMEZONE_HOUR"
 TIMEZONE_DESC="$TIMEZONE_DESC"
 HOME_DIR="$HOME_DIR"
+USER_NAME="$USER_NAME"
 GOVERNANCE_REPO="$GOVERNANCE_REPO"
 IWE_TEMPLATE="$IWE_TEMPLATE_PATH"
 IWE_RUNTIME="$IWE_RUNTIME_PATH"
@@ -418,9 +505,28 @@ echo "[1/6] Building generated runtime..."
 if $DRY_RUN; then
     bash "$TEMPLATE_DIR/setup/build-runtime.sh" --dry-run \
         --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /'
+    # PIPESTATUS[0], not `if cmd | sed; then`: without `set -o pipefail` (not
+    # set anywhere in this script — changing that here would affect every
+    # other pipe below, out of scope for this fix) the pipeline's exit status
+    # is sed's, which is always 0. build-runtime.sh's own real failure (e.g.
+    # missing .exocortex.env on a first-ever dry-run before it's been written)
+    # printed an ERROR line right here but setup.sh kept going to a false
+    # "[DRY RUN] No changes made." success (found 03.08, Ф-script-contract-gate
+    # test_fresh_seed_reproduction.sh — a genuinely fresh checkout hits this
+    # exact path, so it's not a hypothetical).
+    build_runtime_rc=${PIPESTATUS[0]}
+    if [ "$build_runtime_rc" -ne 0 ]; then
+        echo "  ERROR: build-runtime.sh --dry-run failed (exit $build_runtime_rc)" >&2
+        exit 1
+    fi
 else
     bash "$TEMPLATE_DIR/setup/build-runtime.sh" \
         --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /'
+    build_runtime_rc=${PIPESTATUS[0]}
+    if [ "$build_runtime_rc" -ne 0 ]; then
+        echo "  ERROR: build-runtime.sh failed (exit $build_runtime_rc)" >&2
+        exit 1
+    fi
 
     # Enable pre-commit hook for platform compatibility checks
     if [ -d "$TEMPLATE_DIR/.githooks" ]; then
@@ -431,31 +537,88 @@ fi
 
 # (Repo rename removed — folder stays as FMT-exocortex-template)
 
-# === 2. Copy CLAUDE.md to workspace root (with substitution) ===
-# FMT/CLAUDE.md остаётся clean upstream (плейсхолдеры). В workspace/CLAUDE.md
-# плейсхолдеры подставляются (single-file substitution, не sed по дереву).
-# .base копии — substituted (для 3-way merge).
-echo "[2/6] Installing CLAUDE.md..."
+# === 2. Copy agent instructions to workspace root (with substitution) ===
+# FMT instruction files stay clean upstream. Workspace copies are substituted;
+# CLAUDE.md additionally keeps a substituted base for its 3-way merge.
+install_workspace_instruction() {
+    local source_name="$1"
+    local destination="$WORKSPACE_DIR/$source_name"
+    local destination_temp=""
+    if [ -L "$destination" ]; then
+        echo "  ERROR: $destination is a symbolic link; refusing instruction install" >&2
+        return 1
+    fi
+    if [ -e "$destination" ] && [ ! -f "$destination" ]; then
+        echo "  ERROR: $destination is not a regular file; refusing instruction install" >&2
+        return 1
+    fi
+    destination_temp=$(mktemp "$WORKSPACE_DIR/.${source_name}.install.XXXXXX") || return 1
+    if ! cp "$TEMPLATE_DIR/$source_name" "$destination_temp"; then
+        rm -f "$destination_temp"
+        return 1
+    fi
+    sed_inplace \
+        -e "s|{{GITHUB_USER}}|$(sed_escape_replacement "$GITHUB_USER")|g" \
+        -e "s|{{WORKSPACE_DIR}}|$(sed_escape_replacement "$WORKSPACE_DIR")|g" \
+        -e "s|{{CLAUDE_PATH}}|$(sed_escape_replacement "$CLAUDE_PATH")|g" \
+        -e "s|{{CLAUDE_PROJECT_SLUG}}|$(sed_escape_replacement "$CLAUDE_PROJECT_SLUG")|g" \
+        -e "s|{{TIMEZONE_HOUR}}|$(sed_escape_replacement "$TIMEZONE_HOUR")|g" \
+        -e "s|{{TIMEZONE_DESC}}|$(sed_escape_replacement "$TIMEZONE_DESC")|g" \
+        -e "s|{{HOME_DIR}}|$(sed_escape_replacement "$HOME_DIR")|g" \
+        -e "s|{{GOVERNANCE_REPO}}|$(sed_escape_replacement "$GOVERNANCE_REPO")|g" \
+        -e "s|{{IWE_TEMPLATE}}|$(sed_escape_replacement "$IWE_TEMPLATE_PATH")|g" \
+        -e "s|{{IWE_RUNTIME}}|$(sed_escape_replacement "$IWE_RUNTIME_PATH")|g" \
+        "$destination_temp" || {
+            rm -f "$destination_temp"
+            return 1
+        }
+    if ! mv -f "$destination_temp" "$destination"; then
+        rm -f "$destination_temp"
+        return 1
+    fi
+}
+
+install_workspace_merge_base() {
+    local source="$WORKSPACE_DIR/CLAUDE.md"
+    local destination="$WORKSPACE_DIR/.claude.md.base"
+    local destination_temp=""
+    if [ -L "$source" ] || [ ! -f "$source" ]; then
+        echo "  ERROR: $source is not a regular instruction file" >&2
+        return 1
+    fi
+    if [ -L "$destination" ]; then
+        echo "  ERROR: $destination is a symbolic link; refusing merge-base install" >&2
+        return 1
+    fi
+    if [ -e "$destination" ] && [ ! -f "$destination" ]; then
+        echo "  ERROR: $destination is not a regular file; refusing merge-base install" >&2
+        return 1
+    fi
+    destination_temp=$(mktemp "$WORKSPACE_DIR/.claude.md.base.install.XXXXXX") || return 1
+    if ! cp "$source" "$destination_temp" || \
+       ! mv -f "$destination_temp" "$destination"; then
+        rm -f "$destination_temp"
+        return 1
+    fi
+}
+
+install_agent_instruction_bundle() {
+    install_workspace_instruction "CLAUDE.md" || return 1
+    install_workspace_instruction "AGENTS.md" || return 1
+    install_workspace_merge_base || return 1
+}
+
+echo "[2/6] Installing CLAUDE.md + AGENTS.md..."
 if $DRY_RUN; then
     echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md (substituted)"
+    echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/AGENTS.md → $WORKSPACE_DIR/AGENTS.md (substituted)"
 else
-    cp "$TEMPLATE_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
-    sed_inplace \
-        -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
-        -e "s|{{WORKSPACE_DIR}}|$WORKSPACE_DIR|g" \
-        -e "s|{{CLAUDE_PATH}}|$CLAUDE_PATH|g" \
-        -e "s|{{CLAUDE_PROJECT_SLUG}}|$CLAUDE_PROJECT_SLUG|g" \
-        -e "s|{{TIMEZONE_HOUR}}|$TIMEZONE_HOUR|g" \
-        -e "s|{{TIMEZONE_DESC}}|$TIMEZONE_DESC|g" \
-        -e "s|{{HOME_DIR}}|$HOME_DIR|g" \
-        -e "s|{{GOVERNANCE_REPO}}|$GOVERNANCE_REPO|g" \
-        -e "s|{{IWE_TEMPLATE}}|$IWE_TEMPLATE_PATH|g" \
-        -e "s|{{IWE_RUNTIME}}|$IWE_RUNTIME_PATH|g" \
-        "$WORKSPACE_DIR/CLAUDE.md"
-    # Save base copies for 3-way merge on future updates (substituted version)
-    cp "$WORKSPACE_DIR/CLAUDE.md" "$WORKSPACE_DIR/.claude.md.base"
-    cp "$WORKSPACE_DIR/CLAUDE.md" "$TEMPLATE_DIR/.claude.md.base"  # legacy compat for update.sh
-    echo "  Copied to $WORKSPACE_DIR/CLAUDE.md (+ merge base, substituted)"
+    # Workspace merge base is substituted. The template repo must never receive
+    # this copy: doing so publishes install paths when update.sh commits the fork.
+    # Any unsafe destination aborts the actual setup path; a helper refusal must
+    # never fall through into a false-success message or poisoned merge base.
+    install_agent_instruction_bundle || exit 1
+    echo "  Copied CLAUDE.md (+ merge base) and AGENTS.md (substituted)"
 fi
 
 # === 3. Copy memory to Claude projects directory ===
@@ -664,35 +827,54 @@ fi
 
 # === 4e. Generate executor-catalog.yaml for task routing (issue #197) ===
 # route-task.sh (DP.ROLE.059, Маршрутизатор) looks this up at
-# ~/IWE/$GOVERNANCE_REPO/scripts/executor-catalog.yaml — without generating it on
-# install, a fresh install has no catalog and route-task.sh always fails ("not found").
-# Non-fatal on error: routing is a convenience feature, not a hard setup prerequisite
-# (PyYAML availability etc. is already checked at consumption time in route-task.sh).
-if $CORE_ONLY; then
-    echo "[4e] executor-catalog.yaml... пропущено (core mode, нет агента для маршрутизации)"
-elif $DRY_RUN; then
-    echo "[DRY RUN] Would generate executor-catalog.yaml (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
+# WP-529 F6 (#463): one visible PyYAML preflight instead of per-script
+# surprises. Warning only — never blocks install: calendar/news/wp-sweep are
+# optional features and every consumer now fails with an explicit dependency
+# error at use time (scripts/lib/find-python3.sh).
+#
+# Evgenii Red Team review 2026-08-19 (defect #2): this used to run the
+# resolver for its exit code only and discard stdout — the executor-catalog
+# generation below then called bare `python3` again, which on the same Apple
+# Silicon machine can be a DIFFERENT interpreter (no yaml) than the one the
+# resolver just found. Keep the resolved path and reuse it everywhere below.
+YAML_PYTHON3=""
+if YAML_PYTHON3=$("$TEMPLATE_DIR/scripts/lib/find-python3.sh" 2>/dev/null); then
+    :
 else
-    echo "[4e] Generating executor-catalog.yaml..."
-    if CATALOG_OUTPUT=$(IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" python3 "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" 2>&1); then
-        echo "$CATALOG_OUTPUT" | sed 's/^/  /'
-    elif echo "$CATALOG_OUTPUT" | grep -q "No module named 'yaml'"; then
-        # Голая Ubuntu/Debian не тащит PyYAML в system python3 (issue найден живым
-        # прогоном WP-5, 2026-07-27) — сырой traceback пугает новичка без подсказки.
-        echo "  ⚠ executor-catalog.yaml не сгенерирован — не хватает библиотеки PyYAML для python3."
-        if [ "$(uname)" = "Linux" ]; then
-            echo "    Установи: sudo apt install python3-yaml (или: pip3 install pyyaml, если pip3 уже стоит)"
-        else
-            echo "    Установи: pip3 install pyyaml"
-        fi
-        echo "    Потом выполни вручную:"
-        echo "    python3 $TEMPLATE_DIR/scripts/generate-executor-catalog.py"
+    YAML_PYTHON3=""
+    echo "  ⚠ Не найден python3 с библиотекой PyYAML — календарь, лента «Мир» и обзор РП будут отключаться с явной ошибкой зависимости."
+    if [ "$(uname)" = "Linux" ]; then
+        echo "    Установи: sudo apt install python3-yaml (или: pip3 install pyyaml)"
     else
-        echo "$CATALOG_OUTPUT" | sed 's/^/  /'
-        echo "  ⚠ executor-catalog.yaml не сгенерирован — запусти вручную:"
-        echo "    python3 $TEMPLATE_DIR/scripts/generate-executor-catalog.py"
+        echo "    Установи: pip3 install pyyaml (python3 из Homebrew уже содержит pip3)"
     fi
 fi
+
+# The catalog belongs inside the governance repo. Do not call this helper until
+# step 6 has either found that repo or copied seed/strategy into place: writing
+# here used to create a non-empty plain directory that step 6 then rejected as
+# a failed prior install (#508.4).
+generate_executor_catalog_for_governance() {
+    if $CORE_ONLY; then
+        echo "[6a] executor-catalog.yaml... пропущено (core mode, нет агента для маршрутизации)"
+    elif $DRY_RUN; then
+        echo "[DRY RUN] Would generate executor-catalog.yaml after governance repo setup (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
+    elif [ -z "$YAML_PYTHON3" ]; then
+        echo "[6a] executor-catalog.yaml... пропущено (нет python3 с PyYAML, см. предупреждение выше)"
+    else
+        echo "[6a] Generating executor-catalog.yaml..."
+        if CATALOG_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" \
+            "$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" \
+            --skills-dir "$WORKSPACE_DIR/.claude/skills" \
+            --output "$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml" 2>&1); then
+            echo "$CATALOG_OUTPUT" | sed 's/^/  /'
+        else
+            echo "$CATALOG_OUTPUT" | sed 's/^/  /'
+            echo "  ⚠ executor-catalog.yaml не сгенерирован — запусти вручную:"
+            echo "    IWE_ROOT=\"$WORKSPACE_DIR\" \"$YAML_PYTHON3\" $TEMPLATE_DIR/scripts/generate-executor-catalog.py --skills-dir \"$WORKSPACE_DIR/.claude/skills\" --output \"$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml\""
+        fi
+    fi
+}
 
 # === 4f. Regenerate hot-files.list for the actual governance repo (issue #294/#291) ===
 # The repo ships hot-files.list pre-baked with the author's GOVERNANCE_REPO name —
@@ -702,7 +884,12 @@ if $DRY_RUN; then
     echo "[DRY RUN] Would regenerate hot-files.list (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
 else
     echo "[4f] Regenerating hot-files.list..."
-    if HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" bash "$TEMPLATE_DIR/scripts/generate-hot-files-list.sh" 2>&1); then
+    # POLICY (2026-08-23, матрица v0.38.7 находка 6, консенсус с codex):
+    # критичные IWE_*-переменные передаются генераторам ЯВНО из переменных
+    # самого setup — унаследованный env другого workspace не должен решать,
+    # куда пишет установка. Живой случай: exported IWE_RUNTIME workspace A
+    # побеждал переданный IWE_ROOT, и hot-files.list уезжал в чужой runtime.
+    if HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_RUNTIME="$IWE_RUNTIME_PATH" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" bash "$TEMPLATE_DIR/scripts/generate-hot-files-list.sh" 2>&1); then
         echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
     else
         echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
@@ -725,6 +912,13 @@ else
     # в env для role install.sh (тот же паттерн что в update.sh:836).
     # Без этого install.sh падает в legacy fallback и видит {{плейсхолдеры}}.
     [ -f "$WORKSPACE_DIR/.iwe-paths" ] && . "$WORKSPACE_DIR/.iwe-paths"
+    # Same isolation policy as step 4f: role install.sh scripts read
+    # IWE_RUNTIME/IWE_WORKSPACE from env — pin them to THIS install's targets
+    # explicitly, so a foreign exported value (or a missing .iwe-paths) can
+    # never redirect a role install into another workspace.
+    export IWE_WORKSPACE="$WORKSPACE_DIR"
+    export IWE_RUNTIME="$IWE_RUNTIME_PATH"
+    export IWE_TEMPLATE="$TEMPLATE_DIR"
 
     MANUAL_ROLES=()
 
@@ -765,22 +959,100 @@ else
 fi
 
 # === 6. Create DS-strategy repo ===
-echo "[6/6] Setting up DS-strategy..."
-MY_STRATEGY_DIR="$WORKSPACE_DIR/DS-strategy"
+echo "[6/6] Setting up $GOVERNANCE_REPO..."
+MY_STRATEGY_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
 
+# WP-560 Ф5-Phase-1: the browser path (create_personal_data_space via
+# github-integration-service, family-catalog.ts) creates the same governance
+# repository under the same canonical name, independently of this script. A user
+# who started in the browser and then installs VS Code used to hit
+# `gh repo create` failing on "already exists" while a second, unrelated local
+# repo got initialised. Adopt the existing remote instead — but only after
+# proving it is ours (owner = GITHUB_USER) and shaped like a governance repo
+# (seed markers). Anything else aborts loudly; nothing is ever pushed over it.
+# GOVERNANCE_MARKERS itself is loaded from the shared contract earlier in this
+# script (WP-560 Ф5-Phase-2) — not redefined here.
+
+remote_governance_repo_exists() {
+    ! $CORE_ONLY && command -v gh >/dev/null 2>&1 \
+        && gh repo view "$GITHUB_USER/$GOVERNANCE_REPO" --json name >/dev/null 2>&1
+}
+
+governance_markers_missing() {
+    local root="$1" m
+    for m in "${GOVERNANCE_MARKERS[@]}"; do
+        [ -e "$root/$m" ] || echo "$m"
+    done
+}
+
+adopt_existing_governance_repo() {
+    local owner_login
+    owner_login=$(gh repo view "$GITHUB_USER/$GOVERNANCE_REPO" --json owner --jq '.owner.login' 2>/dev/null)
+    if [ "$owner_login" != "$GITHUB_USER" ]; then
+        echo "  ERROR: GitHub repo $GITHUB_USER/$GOVERNANCE_REPO resolves to owner '$owner_login', expected '$GITHUB_USER'."
+        echo "  Refusing to adopt a repository that is not yours. Set GOVERNANCE_REPO to another name and re-run."
+        exit 1
+    fi
+    if [ -d "$MY_STRATEGY_DIR" ] && [ -n "$(ls -A "$MY_STRATEGY_DIR" 2>/dev/null)" ]; then
+        echo "  ERROR: $MY_STRATEGY_DIR exists, is not a git repo, and is not empty — cannot clone into it."
+        echo "  Fix: inspect and clean it up (or rename it aside), then re-run setup.sh."
+        exit 1
+    fi
+    if $DRY_RUN; then
+        echo "  [DRY RUN] Remote $GITHUB_USER/$GOVERNANCE_REPO exists → would clone it into $MY_STRATEGY_DIR"
+        echo "  [DRY RUN] Would verify governance markers: ${GOVERNANCE_MARKERS[*]}"
+        generate_executor_catalog_for_governance
+        return
+    fi
+    echo "  Remote $GITHUB_USER/$GOVERNANCE_REPO already exists (created elsewhere, e.g. from the browser) — adopting it."
+    if ! gh repo clone "$GITHUB_USER/$GOVERNANCE_REPO" "$MY_STRATEGY_DIR" -- --quiet 2>/dev/null; then
+        echo "  ERROR: could not clone $GITHUB_USER/$GOVERNANCE_REPO. Check network/access and re-run."
+        exit 1
+    fi
+    local missing
+    missing=$(governance_markers_missing "$MY_STRATEGY_DIR")
+    if ! find "$MY_STRATEGY_DIR" -mindepth 1 -maxdepth 1 ! -name .git -print -quit | grep -q .; then
+        # Empty remote (browser created the repository but nothing landed yet): seed it.
+        echo "  Remote is empty — seeding governance structure into it."
+        cp -r "$STRATEGY_TEMPLATE"/. "$MY_STRATEGY_DIR"/
+        generate_executor_catalog_for_governance
+        (cd "$MY_STRATEGY_DIR" && git add -A && git commit -q -m "Initial exocortex: $GOVERNANCE_REPO governance hub" && git push -q -u origin HEAD) || {
+            echo "  ERROR: seeded $MY_STRATEGY_DIR but could not commit/push. Fix manually: cd $MY_STRATEGY_DIR && git push -u origin HEAD"
+            exit 1
+        }
+    elif [ -n "$missing" ]; then
+        echo "  ERROR: $GITHUB_USER/$GOVERNANCE_REPO exists but does not look like an IWE governance repo — missing:"
+        printf '    - %s\n' $missing
+        echo "  It was left untouched in $MY_STRATEGY_DIR (cloned, nothing pushed)."
+        echo "  Fix: either point GOVERNANCE_REPO at a different name, or bring this repo to the seed structure and re-run."
+        exit 1
+    else
+        echo "  ✓ $GOVERNANCE_REPO adopted: owner and structure verified."
+        generate_executor_catalog_for_governance
+    fi
+    if [ -d "$MY_STRATEGY_DIR/.githooks" ]; then
+        (cd "$MY_STRATEGY_DIR" && git config core.hooksPath .githooks 2>/dev/null) && \
+            echo "  Pre-commit hook enabled (.githooks/)" || true
+    fi
+}
+
 if [ -d "$MY_STRATEGY_DIR/.git" ]; then
-    echo "  DS-strategy already exists as git repo."
+    echo "  $GOVERNANCE_REPO already exists as git repo."
+    generate_executor_catalog_for_governance
+elif [ -d "$STRATEGY_TEMPLATE" ] && remote_governance_repo_exists; then
+    adopt_existing_governance_repo
 elif $DRY_RUN; then
     if [ -d "$STRATEGY_TEMPLATE" ]; then
-        echo "  [DRY RUN] Would create DS-strategy from seed/strategy → $MY_STRATEGY_DIR"
+        echo "  [DRY RUN] Would create $GOVERNANCE_REPO from seed/strategy → $MY_STRATEGY_DIR"
         echo "  [DRY RUN] Would init git repo + initial commit"
         if ! $CORE_ONLY; then
-            echo "  [DRY RUN] Would create GitHub repo: $GITHUB_USER/DS-strategy (private)"
+            echo "  [DRY RUN] Would create GitHub repo: $GITHUB_USER/$GOVERNANCE_REPO (private)"
         fi
     else
-        echo "  [DRY RUN] Would create minimal DS-strategy (seed/strategy not found)"
+        echo "  [DRY RUN] Would create minimal $GOVERNANCE_REPO (seed/strategy not found)"
     fi
+    generate_executor_catalog_for_governance
 else
     if [ -d "$STRATEGY_TEMPLATE" ]; then
         # bug (issue #305): $MY_STRATEGY_DIR can exist as a plain non-git dir on a
@@ -798,10 +1070,11 @@ else
         # Copy my-strategy template into its own repo
         mkdir -p "$MY_STRATEGY_DIR"
         cp -r "$STRATEGY_TEMPLATE"/. "$MY_STRATEGY_DIR"/
+        generate_executor_catalog_for_governance
         cd "$MY_STRATEGY_DIR"
         git init
         git add -A
-        git commit -m "Initial exocortex: DS-strategy governance hub"
+        git commit -m "Initial exocortex: $GOVERNANCE_REPO governance hub"
 
         # Enable secrets-check pre-commit hook (issue #317: install-iwe-paths.sh
         # runs at step [4d], before this repo exists — its auto-enable loop can't
@@ -813,25 +1086,26 @@ else
 
         if ! $CORE_ONLY; then
             # Create GitHub repo (full mode only)
-            gh repo create "$GITHUB_USER/DS-strategy" --private --source=. --push 2>/dev/null || \
-                echo "  GitHub repo DS-strategy already exists or creation skipped."
+            gh repo create "$GITHUB_USER/$GOVERNANCE_REPO" --private --source=. --push 2>/dev/null || \
+                echo "  GitHub repo $GOVERNANCE_REPO already exists or creation skipped."
         else
             echo "  Локальный репозиторий создан. Для публикации на GitHub:"
-            echo "    cd $MY_STRATEGY_DIR && gh repo create $GITHUB_USER/DS-strategy --private --source=. --push"
+            echo "    cd $MY_STRATEGY_DIR && gh repo create $GITHUB_USER/$GOVERNANCE_REPO --private --source=. --push"
         fi
     else
-        echo "  ERROR: seed/strategy/ not found. DS-strategy will be incomplete."
+        echo "  ERROR: seed/strategy/ not found. $GOVERNANCE_REPO will be incomplete."
         echo "  Fix: re-clone the template and run setup.sh again."
         echo "  Creating minimal structure as fallback..."
         mkdir -p "$MY_STRATEGY_DIR"/{current,inbox,archive/wp-contexts,docs,exocortex}
+        generate_executor_catalog_for_governance
         cd "$MY_STRATEGY_DIR"
         git init
         git add -A
-        git commit -m "Initial exocortex: DS-strategy governance hub (minimal)"
+        git commit -m "Initial exocortex: $GOVERNANCE_REPO governance hub (minimal)"
 
         if ! $CORE_ONLY; then
-            gh repo create "$GITHUB_USER/DS-strategy" --private --source=. --push 2>/dev/null || \
-                echo "  GitHub repo DS-strategy already exists or creation skipped."
+            gh repo create "$GITHUB_USER/$GOVERNANCE_REPO" --private --source=. --push 2>/dev/null || \
+                echo "  GitHub repo $GOVERNANCE_REPO already exists or creation skipped."
         fi
     fi
 fi
@@ -861,9 +1135,55 @@ else
         fi
     }
 
-    clone_base_repo "ZP" "TserenTserenov/ZP"
-    clone_base_repo "FPF" "ailev/FPF"
-    clone_base_repo "SPF" "TserenTserenov/SPF"
+    # Declarative list instead of 3 hardcoded calls (WP-526 Ф6). PD-*/MC-*
+    # repo families are NOT added here — they are created on-demand by
+    # WP-527, not at install time (see hint printed at the end of setup).
+    BOOTSTRAP_REPOS=(
+        "ZP:TserenTserenov/ZP"
+        "FPF:ailev/FPF"
+        "SPF:TserenTserenov/SPF"
+    )
+    for entry in "${BOOTSTRAP_REPOS[@]}"; do
+        clone_base_repo "${entry%%:*}" "${entry#*:}"
+    done
+fi
+
+# === 8. Enable Knowledge Extractor feeders (WP-5) ===
+# Onboarding gap found live 03.09: setup.sh never called this script, so a
+# fresh install never got git-diff-feed/inbox-check running at all -- the
+# whole automated capture-to-Pack pipeline (Ф46-Ф52) silently never started
+# for a new user, with nothing in setup's own output to say so.
+echo "[8/8] Enabling Knowledge Extractor feeders..."
+if $CORE_ONLY; then
+    echo "  пропущено (core mode)"
+else
+    EXTRACTOR_MODE="install"
+    $DRY_RUN && EXTRACTOR_MODE="--check"
+    if IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" IWE_RUNTIME="$IWE_RUNTIME_PATH" \
+        bash "$TEMPLATE_DIR/scripts/setup-extractor-feeders.sh" "$EXTRACTOR_MODE"; then
+        :
+    else
+        echo "  ⚠ setup-extractor-feeders.sh завершился с ошибкой — Экстрактор не запустится автоматически"
+        echo "    Повторить вручную: bash $TEMPLATE_DIR/scripts/setup-extractor-feeders.sh"
+    fi
+fi
+
+# === 8b. VS Code default permission mode (WP-406, onboarding VS Code track) ===
+# Without this, every new VS Code window starts the Claude Code extension in
+# Manual (ask before each edit) — a newcomer picking Auto in one window sees
+# it reset in the next, because the extension's own default is Manual.
+if $CORE_ONLY; then
+    :
+else
+    echo "[8b] Настройка VS Code (режим Auto по умолчанию)..."
+    VSCODE_AUTO_MODE_ARG="apply"
+    $DRY_RUN && VSCODE_AUTO_MODE_ARG="--check"
+    if bash "$TEMPLATE_DIR/scripts/setup-vscode-auto-mode.sh" "$VSCODE_AUTO_MODE_ARG"; then
+        :
+    else
+        echo "  ⚠ setup-vscode-auto-mode.sh завершился с ошибкой — Auto-режим не выставлен, VS Code не тронут"
+        echo "    Повторить вручную: bash $TEMPLATE_DIR/scripts/setup-vscode-auto-mode.sh"
+    fi
 fi
 
 # === Done ===
@@ -887,7 +1207,7 @@ else
     echo "  ✓ CLAUDE.md:   $WORKSPACE_DIR/CLAUDE.md"
     echo "  ✓ Memory:      $CLAUDE_MEMORY_DIR/ ($(ls "$CLAUDE_MEMORY_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ') files)"
     echo "  ✓ Symlink:     $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
-    echo "  ✓ DS-strategy: $MY_STRATEGY_DIR/"
+    echo "  ✓ $GOVERNANCE_REPO: $MY_STRATEGY_DIR/"
     echo "  ✓ Template:    $TEMPLATE_DIR/"
     echo ""
 
@@ -910,6 +1230,10 @@ else
     echo ""
     echo "Update from upstream:"
     echo "  cd $TEMPLATE_DIR && bash update.sh"
+    echo ""
+
+    echo "Личные (PD-*) и служебные (MC-*) репозитории (WP-526/WP-527):"
+    echo "  создаются по запросу, не при установке — см. README.md § «5 семей репозиториев»"
     echo ""
 
     # === Post-install validation (WP-265 Ф8) ===

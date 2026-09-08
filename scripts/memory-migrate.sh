@@ -18,8 +18,21 @@
 set -eu
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
+# NOTE: iwe-env-bootstrap.sh reassigns SCRIPT_DIR to its OWN location (via its
+# BASH_SOURCE[0]) as a side effect of being sourced — save ours first so the
+# frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_MEMORY_MIGRATE_DIR="$SCRIPT_DIR"
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+# issue #658: was a private get_field() unaware of the `metadata:`-nested
+# frontmatter dialect (issue #281) — every already-nested scalar field
+# (type/horizon/status/owner/valid_from/...) read back as empty, which made
+# the migration below think the field was missing and propose a filename-
+# guessed flat duplicate on top of the real value. Sourcing the shared
+# reader fixes scalar fields; `domains:` written as a columnar YAML list is
+# a separate, deferred fix (frontmatter.sh itself doesn't parse `- item`
+# lists yet — same pre-existing limitation noted in its own comment).
+source "$_MEMORY_MIGRATE_DIR/../.claude/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 DRY_RUN=0
 ALL=0
@@ -43,11 +56,6 @@ while [ $# -gt 0 ]; do
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
-
-get_field() {
-    local file="$1" field="$2"
-    awk '/^---/{f++} f==1 && /^'"$field"':/{gsub(/^[^:]+: */,""); gsub(/^["'"'"']|["'"'"']$/,""); print; exit}' "$file"
-}
 
 has_frontmatter() {
     head -1 "$1" | grep -q '^---$'

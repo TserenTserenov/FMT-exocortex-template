@@ -84,7 +84,7 @@ rm -rf "$tmp_dir"
 echo "✅ Промотирован: FMT/.claude/hooks/$fname"
 
 CHANGELOG_SCRIPT="$FMT_DIR/scripts/changelog-append.sh"
-if [[ -f "$CHANGELOG_SCRIPT" ]]; then bash "$CHANGELOG_SCRIPT"; fi
+if [[ -f "$CHANGELOG_SCRIPT" ]]; then IWE_TEMPLATE="$FMT_DIR" bash "$CHANGELOG_SCRIPT"; fi
 
 MANIFEST_SCRIPT="$FMT_DIR/generate-manifest.sh"
 if [[ -f "$MANIFEST_SCRIPT" ]]; then

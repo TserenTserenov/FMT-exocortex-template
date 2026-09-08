@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Optional, Callable
 import yaml
 
 from .parser import DataNeed
-from .state import ResidencyState, ConsentStatus
+from .state import ResidencyState, ConsentStatus, ResidencyStateError
 
 
 DEFAULT_PRE_GRANT_FILE = Path(__file__).parent.parent / "pre-grant.yaml"
@@ -123,6 +123,10 @@ class ResidencyGate:
                     self.state.grant_consent(function_id, need_key)
                     continue
                 blocking.append(f"{need.name}: requires consent (use Point B / lazy check)")
+            else:
+                raise ResidencyStateError(
+                    f"consent record '{function_id}/{need_key}' has unknown status: {status!r}"
+                )
 
         return len(blocking) == 0, blocking
 
@@ -157,6 +161,11 @@ class ResidencyGate:
             if on_deny_callback:
                 on_deny_callback(reason)
             return False, f"Revoked: {reason}"
+
+        if status != "not_asked":
+            raise ResidencyStateError(
+                f"consent record '{function_id}/{need_key}' has unknown status: {status!r}"
+            )
 
         return False, "Access not yet consented (status: not_asked)"
 

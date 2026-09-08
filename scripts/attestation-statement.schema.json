@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aisystant/FMT-exocortex-template/scripts/attestation-statement.schema.json",
+  "title": "WP-529 red-team attestation (in-toto Statement)",
+  "description": "Predicate carried inside an in-toto v1 Statement, signed as a DSSE envelope by attestation-sign.sh. See the WP-529 red-team enforcement design record in this project's governance history for the design rationale.",
+  "type": "object",
+  "required": ["_type", "subject", "predicateType", "predicate"],
+  "properties": {
+    "_type": { "const": "https://in-toto.io/Statement/v1" },
+    "subject": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "digest", "annotations"],
+        "properties": {
+          "name": { "type": "string", "description": "owner/repo" },
+          "digest": {
+            "type": "object",
+            "required": ["sha256"],
+            "properties": {
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            },
+            "additionalProperties": false
+          },
+          "annotations": {
+            "type": "object",
+            "required": [
+              "github.repository_id",
+              "git.head_sha",
+              "git.base_sha",
+              "policy.id",
+              "policy.digest.sha256"
+            ],
+            "properties": {
+              "github.repository_id": {
+                "type": "integer",
+                "description": "Numeric GitHub repo ID, not owner/repo — survives renames"
+              },
+              "github.pr_number": { "type": "integer" },
+              "git.head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              "git.base_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              "policy.id": { "type": "string" },
+              "policy.digest.sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "predicateType": {
+      "const": "https://aisystant.io/WP-529/red-team-attestation/v1"
+    },
+    "predicate": {
+      "type": "object",
+      "required": ["verdict", "issued_at", "expires_at"],
+      "properties": {
+        "verdict": { "enum": ["pass", "fail", "conditional"] },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "auditor_decision": {
+          "type": "object",
+          "description": "Informational only — verifier MUST NOT use this to establish signer identity (that comes from the DSSE/Sigstore envelope, not this payload). See DRR §Rationale, Codex turn 1: 'verifier использует allowlist identity, а не доверяет полям auditor.identity* внутри подписанного файла.'",
+          "properties": {
+            "type": { "enum": ["human_review"] },
+            "note": { "type": "string" }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

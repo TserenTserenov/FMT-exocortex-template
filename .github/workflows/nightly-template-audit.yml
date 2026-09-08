@@ -1,0 +1,37 @@
+name: "Ночная проверка шаблона IWE"
+
+on:
+  schedule:
+    # 23:00 Moscow (UTC+3) every day.
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  template-validation:
+    name: Лёгкая проверка шаблона
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Проверить структуру шаблона
+        run: bash setup/validate-template.sh "$PWD"
+      - name: Проверить скрипты шаблона
+        run: bash scripts/validate-fmt-scripts.sh
+      - name: Установить ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Найти критические ошибки Shell
+        run: |
+          failed=0
+          while IFS= read -r -d '' file; do
+            shellcheck -S error "$file" || failed=1
+          done < <(find . -path ./guide-kit -prune -o -name '*.sh' -type f -print0)
+          exit "$failed"
+
+  secret-scan:
+    name: Поиск секретов
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: gitleaks/gitleaks-action@v2

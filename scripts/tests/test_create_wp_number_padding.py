@@ -62,9 +62,8 @@ def test_next_wp_number_padded_in_paths_and_headers(tmp_path):
     assert "# WP-009: Тестовый РП" in content, "заголовок H1 должен быть дополнен нулями"
     assert "wp: 9" in content, "frontmatter wp: остаётся чистым числом, без паддинга"
 
-    archive_stub = strategy / "archive" / "wp-contexts" / "WP-009-testovyj-rp.md"
-    assert archive_stub.is_file(), f"archive stub не найден: {sorted((strategy / 'archive' / 'wp-contexts').iterdir())}"
-    assert "wp: 9" in archive_stub.read_text(encoding="utf-8")
+    archive_dir = strategy / "archive" / "wp-contexts"
+    assert not list(archive_dir.iterdir()), "архив создаётся только при закрытии РП, без pending stub"
 
 
 def test_registry_number_column_stays_bare(tmp_path):

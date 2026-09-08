@@ -1,4 +1,5 @@
 #!/bin/bash
+# claude-hook: false — standalone uploader; запускается one-shot/планировщиком, не событием Claude
 # WP-295 Ф1 шаг 5: agent-trace async uploader.
 # Читает NDJSON-файлы из ~/.claude/logs/agent-trace/, POST'ит каждую строку
 # в event-gateway (с idempotency по external_id). Успешно отправленные строки

@@ -5,6 +5,7 @@ argument-hint: ""
 version: 1.1.0
 layer: L1
 status: active
+browser_safe: false
 triggers:
   slash: [/day-close]
   phrases: []
@@ -20,9 +21,9 @@ routing:
 
 ## БЛОКИРУЮЩЕЕ: пошаговое исполнение
 
-Day Close = протокол. Исполнять ТОЛЬКО пошагово через TodoWrite.
-**Шаг 0 — ПЕРВОЕ действие:** создать список задач прямо сейчас (до любых других действий).
-Каждый шаг алгоритма → отдельная задача (pending → in_progress → completed).
+Day Close = протокол. Блокирующее требование — наблюдаемое свойство: **ни один шаг не пропущен молча**; каждый шаг отмечается ДО перехода к следующему.
+**Шаг 0 — ПЕРВОЕ действие:** зафиксировать список шагов прямо сейчас (до любых других действий) — в TodoWrite, а при его недоступности явной нумерацией в ответе.
+Инструмент по умолчанию — TodoWrite: каждый шаг алгоритма → отдельная задача (pending → in_progress → completed). **TodoWrite недоступен** (штатная ситуация, зависит от сборки клиента) → сообщить пилоту одной строкой, вести шаги явной нумерацией («Шаг X из Y: <название> — выполнен»), факт замены зафиксировать в отчёте закрытия (issues #561, #563).
 Переход к следующему — ТОЛЬКО после отметки текущего. Шаг невозможен → blocked (не пропускать молча).
 
 ## Алгоритм
@@ -64,13 +65,13 @@ Day Close = протокол. Исполнять ТОЛЬКО пошагово �
 
 ### 4б. Memory Drift Scan
 Две независимые проверки (issue #326 — лексическая одна пропускала расхождения статуса без триггерных слов):
-1. **Структурная:** `python3 ${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}/.claude/scripts/memory-drift-scan.py` — сверяет колонку «Статус» MEMORY.md с полем `status` WP-context по номеру РП. Exit 1 → для каждой найденной строки обновить устаревшее.
+1. **Структурная:** `T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/memory-drift-scan.py"` — сверяет колонку «Статус» MEMORY.md с полем `status` WP-context по номеру РП. Exit 1 → для каждой найденной строки обновить устаревшее.
 2. **Лексическая:** Grep MEMORY.md на паттерны «ждёт/блокер/blocked/остановлен» (ловит текстовые блокеры без изменения статуса — отдельный класс, скрипт п.1 их не видит). Для каждого: найти WP-context, проверить статус, обновить устаревшее.
 Анонс при 0 расхождений по обеим проверкам: *«Drift-scan: N паттернов + M структурных, устаревших нет»*.
 <!-- Детали: day-close-details.md § Шаг 4б -->
 
 ### 4в. Index Health Check
-`python3 ${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}/.claude/scripts/check-index-health.py` — для каждого FAIL/WARN: диагностика (дамп vs жанр) → перенести или пометить skip.
+`T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/check-index-health.py"` — для каждого FAIL/WARN: диагностика (дамп vs жанр) → перенести или пометить skip.
 <!-- Детали: day-close-details.md § Шаг 4в -->
 
 ### 4. Lesson Hygiene
@@ -80,7 +81,9 @@ Day Close = протокол. Исполнять ТОЛЬКО пошагово �
 `"$IWE_SCRIPTS/day-close.sh"` — Linear sync, downstream sync (update.sh), backup (memory/ + CLAUDE.md).
 
 ### 6. Мультипликатор IWE
-> Условный шаг: если `params.yaml → multiplier_enabled: false` → пропустить.
+> Условный шаг: если `params.yaml → multiplier_enabled: false` → пропустить и
+> при записи итогов выбрать только ветку `multiplier:off` из шаблона. Не добавлять
+> WakaTime, физическое время, формулу или заглушку «мультипликатор не посчитан».
 
 WakaTime CLI (`~/.wakatime/wakatime-cli --today`) или Neon-fallback → Бюджет ПО ФАКТУ / WakaTime = мультипликатор `N.Nx`. Prerequisite: прочитать `sessions/00-index.md` (grep сегодня) → список peer-сессий с числом ходов. Sanity check: <1.5x при ≥10 peer-сессий → пересчитать.
 <!-- Детали: day-close-details.md § Шаг 6 -->
@@ -93,7 +96,7 @@ WakaTime CLI (`~/.wakatime/wakatime-cli --today`) или Neon-fallback → Бю�
 Пользователь читает черновик → корректирует → одобряет.
 
 ### 9. Запись итогов
-**9a.** **Strategy_day (шаг 0в) → неприменимо, пропустить целиком** (DayPlan не создавался — писать «Итоги дня» некуда, postcondition-grep недостижим по конструкции дня, не FAIL). Итоги стратегического дня идут только в 9b/WeekReport, как обычный день — только факты, плановые строки не копировать (day-close-details.md § strategy_day). Иначе: дописать «Итоги дня» в DayPlan (шаблон: `memory/templates-dayplan.md`). Валидация: «Завтра начать с» непустое + каждый pending РП с конкретным next action. Postcondition: bash-grep по паттерну `Итоги дня|Day summary` (оба языка — issue #234: при `language: english` заголовок DayPlan «Day summary», русский grep всегда FAIL) → `9a OK/FAIL`.
+**9a.** **Strategy_day (шаг 0в) → неприменимо, пропустить целиком** (DayPlan не создавался — писать «Итоги дня» некуда, postcondition-grep недостижим по конструкции дня, не FAIL). Итоги стратегического дня идут только в 9b/WeekReport, как обычный день — только факты, плановые строки не копировать (day-close-details.md § strategy_day). Иначе: дописать «Итоги дня» в DayPlan (шаблон: `memory/templates-dayplan.md`, ветка по `multiplier_enabled`). Валидация: «Завтра начать с» непустое + каждый pending РП с конкретным next action. Postcondition: bash-grep по паттерну `Итоги дня|Day summary` (оба языка — issue #234: при `language: english` заголовок DayPlan «Day summary», русский grep всегда FAIL) → `9a OK/FAIL`.
 
 При архивации DayPlan (шаг 3) — frontmatter `status: active` → `status: closed`:
 ```bash
@@ -112,7 +115,142 @@ TODAY_DAYPLAN="${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan $(d
 `bash .claude/scripts/load-extensions.sh day-close after` → exit 0: `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/day-close.after.md` И `extensions/day-close.after.<suffix>.md`. Симметрично week-close (шаг 9): вызывается ДО финального коммита (10b), чтобы правки расширений попадали в тот же коммит, не оставались незакоммиченным хвостом (issue #320/#322).
 
 ### 10b. Финальный коммит (все затронутые репозитории, не только governance)
-`git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`{{HOME_DIR}}/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное (включая правки шага 10a) → `git add <specific paths>` → commit → push. Переходить к шагу 11 только когда `git status` чист во всех репо.
+`git status --short` по КАЖДОМУ репо, который сессия трогала за день — как минимум workspace root (`{{HOME_DIR}}/IWE/`, там физически лежат `MEMORY.md` и `memory/*.md`, их правят шаги 4б/4) и `${IWE_GOVERNANCE_REPO:-DS-strategy}` (WeekPlan/DayPlan/WP-REGISTRY). Незафиксированное (включая правки шага 10a) стадировать и коммитить только одной fail-closed командой ниже: ненулевой код = СТОП, отдельный `git commit` после него запрещён. Переходить к шагу 11 только когда `git status` чист во всех репо.
+
+<!-- issue-511-guard:start -->
+```bash
+assert_staged_scope_or_stop() {
+  if [ "$#" -lt 2 ]; then
+    echo "STOP: assert_staged_scope_or_stop requires <repo> <path>..." >&2
+    return 74
+  fi
+  local repo="$1"
+  shift
+  # Variable names deliberately avoid zsh special parameters: `path` shadows
+  # PATH (git stops resolving) and `status` is read-only in zsh (#557); the
+  # agent sources these functions in the pilot's login shell, not bash.
+  local staged_status staged_path staged_path_after allowed_path commit_path normalized_path display_path
+  while IFS= read -r -d '' staged_status; do
+    IFS= read -r -d '' staged_path || {
+      echo "STOP: staged index status could not be parsed" >&2
+      return 76
+    }
+    staged_path_after=""
+    case "$staged_status" in
+      R*|C*)
+        IFS= read -r -d '' staged_path_after || {
+          echo "STOP: staged rename/copy status could not be parsed" >&2
+          return 76
+        }
+        ;;
+    esac
+    allowed_path=false
+    for commit_path in "$@"; do
+      normalized_path="${commit_path#./}"
+      if [ "$staged_path" = "$normalized_path" ] || \
+         [ "$staged_path_after" = "$normalized_path" ]; then
+        allowed_path=true
+        break
+      fi
+    done
+    if ! $allowed_path; then
+      display_path="$staged_path"
+      [ -n "$staged_path_after" ] && display_path="$staged_path -> $staged_path_after"
+      echo "STOP: staged path is outside the explicit commit scope: $display_path" >&2
+      return 75
+    fi
+  done < <(git -C "$repo" diff --cached --name-status -z -M)
+}
+
+stage_and_commit_or_stop() {
+  if [ "$#" -lt 3 ]; then
+    echo "STOP: usage: stage_and_commit_or_stop <repo> <message> <path>..." >&2
+    return 63
+  fi
+  local repo="$1" message="$2"
+  shift 2
+  if [ "$#" -eq 0 ]; then
+    echo "STOP: no explicit paths supplied for commit" >&2
+    return 64
+  fi
+
+  local commit_path normalized_path tracked_descendant
+  for commit_path in "$@"; do
+    case "$commit_path" in
+      .|./|-A|--all|-u|--update)
+        echo "STOP: broad git-add path/options are forbidden: $commit_path" >&2
+        return 65
+        ;;
+    esac
+    if [ -d "$repo/$commit_path" ]; then
+      echo "STOP: explicit commit scope requires files, not a directory: $commit_path" >&2
+      return 65
+    fi
+    normalized_path="${commit_path#./}"
+    normalized_path="${normalized_path%/}"
+    tracked_descendant=""
+    while IFS= read -r -d '' tracked_descendant; do
+      break
+    done < <(git -C "$repo" ls-files -z -- "$normalized_path/")
+    if [ -n "$tracked_descendant" ]; then
+      echo "STOP: explicit commit scope resolves to tracked descendants, not one file: $commit_path" >&2
+      return 65
+    fi
+    local path_status=""
+    if ! path_status=$(git -C "$repo" status --porcelain=v1 --untracked-files=all -- "$commit_path"); then
+      echo "STOP: path status could not be inspected: $commit_path" >&2
+      return 66
+    fi
+    if [ -z "$path_status" ]; then
+      echo "STOP: explicit path has no pending or staged change: $commit_path" >&2
+      return 67
+    fi
+  done
+
+  # A shared repository can already contain another agent's staged work.
+  # Refuse it before mutating the index; `git commit -m` commits the whole
+  # index, not only the pathspec later passed to `git add`.
+  assert_staged_scope_or_stop "$repo" "$@" || return $?
+
+  if ! git -C "$repo" add -- "$@"; then
+    echo "STOP: git add failed; commit was not attempted" >&2
+    return 68
+  fi
+  for commit_path in "$@"; do
+    if git -C "$repo" diff --cached --quiet --exit-code -- "$commit_path"; then
+      echo "STOP: explicit path has no staged content: $commit_path" >&2
+      return 69
+    else
+      local path_diff_rc=$?
+      if [ "$path_diff_rc" -ne 1 ]; then
+        echo "STOP: staged content could not be inspected for: $commit_path" >&2
+        return 70
+      fi
+    fi
+  done
+  if git -C "$repo" diff --cached --quiet --exit-code; then
+    echo "STOP: staged diff is empty" >&2
+    return 71
+  else
+    local diff_rc=$?
+    if [ "$diff_rc" -ne 1 ]; then
+      echo "STOP: staged diff could not be inspected" >&2
+      return 72
+    fi
+  fi
+  if ! git -C "$repo" commit -m "$message"; then
+    echo "STOP: git commit failed" >&2
+    return 73
+  fi
+}
+```
+<!-- issue-511-guard:end -->
+
+> **Двойной сторож коммита (#511, дважды воспроизведённый класс «git mv + правка → пустой/устаревший дифф»):** механизм 21.08 доказан — `git mv` уже положил rename в индекс, правка нового пути осталась только в worktree, `git add` старого пути упал, но отдельный commit проигнорировал ошибку и зафиксировал прежний staged rename. Функция выше устраняет именно этот путь: commit недостижим после failed add. Механизм 18.08 по имеющейся фактуре всё ещё не установлен, поэтому issue остаётся открытым.
+> 1. ПЕРЕД commit: функция сначала запрещает staged-пути вне явного списка, затем сама проверяет код `git add`, непустой общий staged diff и непустой staged-контент каждого явно переданного пути (`git diff --cached -- <path>`). `git add -- <явные пути>` после этой проверки не может добавить чужой путь; повторная проверка по именам после add дала бы ложный отказ для rename, который Git переклассифицировал в delete+add после изменения содержимого. Не повторять commit вручную после отказа функции.
+> 1a. **После `git mv` в этом же ходе передавать ТОЛЬКО новый (текущий) путь файла** — старый путь больше не существует на диске, `git add` по нему падает (код 68) и коммит корректно останавливается. Для staged-rename проверка области видимости сверяет обе стороны переименования и принимает новый путь (issue #557, замечание к архивации DayPlan).
+> 2. ПОСЛЕ commit: сверить, что правки реально в HEAD — `git show HEAD --stat` содержит перемещённый файл, и `git diff HEAD -- <файл>` пуст (на диске нет незакоммиченных остатков правок).
+> 3. Любое срабатывание → СТОП + собрать диагностику в отчёт дня: `git status`, `git diff`, `git log -1 --stat`, точная последовательность выполненных команд — и сообщить пилоту. Индекс намеренно не сбрасывать автоматически: там может быть доказательство инцидента или ранее сделанный `git mv`. После диагностики исправить список путей и повторить единую функцию. Это материал для установления корня #511.
 
 ### 10c. Heartbeat для Day Open guard
 Пишется ПОСЛЕ push шага 10b — DayPlan уже реально закоммичен. day-open-pipeline.sh на следующий день читает этот файл как сигнал «Day Close сделан» (fallback — присутствие архивного DayPlan в git, симметрично day-open):
@@ -144,6 +282,7 @@ Sub-agent Haiku R23 (context isolation): передать чеклист + че�
 - [ ] open-sessions.log: строки закрытых сессий удалены
 - [ ] Captures за день применены (все Quick Close → KE пройден)
 - [ ] Синхронизация downstream: `update.sh` выполнен
+- [ ] **Синхронизация рабочих копий (поручение пилота 21.08):** все машины/копии установки ↔ GitHub синхронизированы, за исключением работающих сейчас сессий. Проверка: `git status -sb` в governance-репо (без ahead/behind) + статус sync-скрипта вторичных копий (если настроен, напр. `tsekh1-git-sync.sh --status`). «Deferred из-за живого семафора» — норма для реально работающей сессии; протухший семафор при запушенном отчёте — аномалия: закрыть семафор до завершения Day Close.
 - [ ] Linear sync: статусы соответствуют git. Кол-во active РП в REGISTRY = active issues в Linear
 - [ ] Repo CLAUDE.md: feat-коммиты → новые правила?
 - [ ] DayPlan сегодня → `archive/day-plans/` (старые DayPlan'ы в `current/` тоже) — **DayPlan сегодня N/A на strategy_day** (шаг 0в), старые — архивировать в любом случае
@@ -153,7 +292,7 @@ Sub-agent Haiku R23 (context isolation): передать чеклист + че�
 - [ ] Видео: обработанные помечены (если video.enabled)
 - [ ] Governance: REPOSITORY-REGISTRY, navigation.md, MAP.002
 - [ ] Backup: `day-close.sh` выполнен
-- [ ] **Rule-engine FP-stats** (WP-272 Ф2.5): `[ -f ~/IWE/.claude/scripts/fp-stats.py ] && python3 ~/IWE/.claude/scripts/fp-stats.py --date $(date +%Y-%m-%d) || echo "skip: fp-stats.py требует rule-classifier.py"` → если есть `⚠️ REVISE` → записать в «Завтра начать с»
+- [ ] **Rule-engine FP-stats** (WP-272 Ф2.5): `[ -f ~/IWE/.claude/scripts/fp-stats.py ] && python3 ~/IWE/.claude/scripts/fp-stats.py --date $(date +%Y-%m-%d) || echo "skip: fp-stats.py требует rule-classifier.py"` → если есть `⚠️ REVISE` → **спросить пилота по факту флага** (WP-545 Ф5, 21.08 — заменяет прежний еженедельный R8-вопрос, который спрашивал вслепую по расписанию, не по конкретному сигналу): «правило `<X>` — это ложные срабатывания детектора, или реальный, но неудобный сигнал?» Ответ → в «Завтра начать с» вместе с решением (переформулировать правило / оставить как есть)
 - [ ] Верификация compliance: /verify запускался сегодня?
 - [ ] WakaTime + Мультипликатор: часы / бюджет ПО ФАКТУ (sessions/00-index.md перечислен; ad-hoc оценены по ходам; сверхплановое — по факту); sanity check ≥10 peer-сессий
 - [ ] Итоги дня записаны в DayPlan **(postcondition 9a: grep подтверждён)** — **N/A на strategy_day** (шаг 0в)

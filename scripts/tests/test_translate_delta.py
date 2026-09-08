@@ -50,6 +50,15 @@ def repo(tmp_path):
 MANIFEST = {"categories": {"D": {"files": ["README.md", "docs/"]}}}
 
 
+def test_system_prompt_requires_cyrillic_free_published_output(tmp_path):
+    style = tmp_path / "en-doc-style.md"
+    style.write_text("Use plain English.\n", encoding="utf-8")
+
+    prompt = translate._build_system_prompt(style, glossary={}, manifest={"exclusions": {}})
+
+    assert "must contain no Cyrillic characters" in prompt
+
+
 def _stub_args(repo_root: Path, output_dir: Path, state_file: Path | None) -> translate.argparse.Namespace:
     return translate.argparse.Namespace(
         output_dir=str(output_dir),

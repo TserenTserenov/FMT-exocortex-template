@@ -19,7 +19,8 @@
 # становится самым свежим совпадением и маскирует реальную причину reject'а — ревью нашло это
 # эмпирически (reject от ПОСТОРОННЕГО коммита давал ложное "кто-то закрывает день" на каждый раз).
 #
-# TZ закреплён в UTC: сервер и Mac иначе могут разойтись в вычислении "today" у полуночи.
+# Календарная дата следует системной зоне установки — той же зоне, в которой
+# протокол пишет финальный маркер day-close. Epoch-возраст маркера от зоны не зависит.
 #
 # Двухуровневая защита: сначала быстрый локальный барьер (gateway-lock.py, для двух процессов на
 # ОДНОЙ машине), затем git-маркер (для гонки МЕЖДУ машинами — ровно инцидент 17.07). Первый уровень
@@ -32,7 +33,6 @@
 #   exit 2 — git/gateway-операция не удалась однозначно (сеть/хук/окружение) — ретраить снаружи, не считать "уже закрыто"
 
 set -euo pipefail
-export TZ=UTC
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
@@ -43,6 +43,10 @@ TTL_SECONDS=1800  # та же конвенция, что scripts/session-guard.s
 GATEWAY_LOCK_PY="$REPO_DIR/scripts/lib/gateway-lock.py"
 
 log() { echo "[day-close-lock] $1"; }
+
+calendar_today() {
+  date +%Y-%m-%d
+}
 
 # Единая точка выхода после того, как локальный маркер-коммит уже создан: откатывает его
 # и завершает с нужным кодом — вместо повторения "discard + exit" по трём местам (P2).
@@ -72,7 +76,7 @@ local_barrier() {
 # НЕ локальный HEAD после rebase, см. комментарий в заголовке файла).
 check_today_history() {
   local ref="${1:-HEAD}"
-  local today; today=$(date +%Y-%m-%d)
+  local today; today=$(calendar_today)
   local log_lines
   log_lines=$(git log "$ref" --since="${today} 00:00" --format="%ct %s" 2>/dev/null || true)
 
@@ -143,7 +147,7 @@ acquire() {
 
   local who today branch
   who="${IWE_AGENT:-$(whoami)}@$(hostname -s)"
-  today=$(date +%Y-%m-%d)
+  today=$(calendar_today)
   branch=$(git rev-parse --abbrev-ref HEAD)
   create_start_marker "$who" "$today" || { log "Не удалось создать маркер-коммит — эскалирую"; exit 2; }
 
@@ -169,7 +173,9 @@ acquire() {
   log "Lock acquired на втором заходе: day-close-start: ${today} by ${who}"
 }
 
-case "${1:-}" in
-  acquire) acquire ;;
-  *) echo "Usage: $0 acquire" >&2; exit 2 ;;
-esac
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "${1:-}" in
+    acquire) acquire ;;
+    *) echo "Usage: $0 acquire" >&2; exit 2 ;;
+  esac
+fi

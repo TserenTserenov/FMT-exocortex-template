@@ -983,6 +983,8 @@ PACK-{область}/
 2. При Close → Claude активирует роль Экстрактора (R2) и показывает Extraction Report
 3. Ты одобряешь → сущности записываются в Pack
 
+**Inbox-Check работает без тебя** — headless-запуск по расписанию (каждые 3 часа) не может использовать твой интерактивный вход в Claude Code, ему нужен отдельный долгоживущий токен подписки. Подключается один раз: `cd ~/IWE/FMT-exocortex-template && bash roles/extractor/scripts/connect.sh` (после `roles/extractor/install.sh`, см. [roles/extractor/README.md](../roles/extractor/README.md)). Session-Close, On-Demand и Bulk-Extraction работают в твоей уже открытой сессии — подключения не требуют.
+
 **Где изучить:**
 - Протокол Close (§ 5.1) — когда активируется Экстрактор
 - [DP.ROLE.001](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/02-domain-entities/DP.ROLE.001-platform-roles.md) R2 — полное описание роли
@@ -1005,14 +1007,14 @@ Hybrid search (vector + keyword) по всем Pack-репозиториям и 
 
 > Поиск по руководствам: `knowledge_search("запрос", source_type="guides")`. Отдельный guides-сервер не нужен — Gateway объединяет все источники.
 
-#### digital-twin — цифровой двойник ученика
+#### digital-twin — цифровой двойник участника
 
-Метамодель данных ученика: цели, самооценка, контекст, прогресс.
+Метамодель данных участника: цели, самооценка, контекст, прогресс.
 
 | Инструмент | Что делает | Пример |
 |------------|-----------|--------|
 | `dt_describe_by_path` | Структура метамодели | `dt_describe_by_path("/")` → 4 категории IND.1-4 |
-| `dt_read_digital_twin` | Чтение данных | `dt_read_digital_twin("1_declarative/1_2_goals")` → цели ученика |
+| `dt_read_digital_twin` | Чтение данных | `dt_read_digital_twin("1_declarative/1_2_goals")` → цели участника |
 | `dt_write_digital_twin` | Запись в IND.1 | `dt_write_digital_twin("1_declarative/...", data)` |
 
 > **IND.1 (Declarative)** — единственная записываемая категория. IND.2 (Collected), IND.3 (Derived), IND.4 (Generated) — только чтение.
@@ -1024,7 +1026,7 @@ Hybrid search (vector + keyword) по всем Pack-репозиториям и 
 | Доменный вопрос, паттерн, архитектура | `knowledge_search(query, source_type="pack")` |
 | Конкретный документ по коду (DP.ROLE.001) | `knowledge_get_document("filename")` |
 | Обучение, методология, руководства | `knowledge_search(query, source_type="guides")` |
-| Цели ученика, самооценка | `dt_read_digital_twin("path")` |
+| Цели участника, самооценка | `dt_read_digital_twin("path")` |
 | Перед записью в Pack — проверка дубликатов | `knowledge_search` + `knowledge_get_document` |
 
 ### 6.6. Онтология: граф знаний
@@ -1480,6 +1482,12 @@ Telegram-бот — основная точка входа для T1-T3. Для 
 3. **Массовый приём задач** (из Obsidian, заметок, backlog): создай один РП «Триаж задач из [источник]». Результат = набор WP-файлов в inbox/ с полным контекстом каждой задачи. Потом на стратегической сессии отсортируешь их по неудовлетворённостям.
 
 **Ключевое:** Claude не теряет контекст — он его не записывает, если не сказано куда. Протокол Close (§ 5.1) + WP-файлы решают эту задачу.
+
+#### «Obsidian показывает белый экран при открытии IWE»
+
+**Что происходит.** Obsidian пытается проиндексировать весь `~/IWE`, включая большие технические Markdown-файлы. Например, `FPF/FPF-Spec.md` может занимать много мегабайт, и интерфейс зависает на белом экране.
+
+**Что делать.** Открой в Obsidian только отдельный governance-репозиторий (`DS-strategy`) как vault. Корень `~/IWE` как vault не поддерживается. Для просмотра всего workspace используй VS Code; большие технические репозитории не добавляй в Obsidian-vault через символическую ссылку (symlink).
 
 #### «Pack не используется при работе»
 

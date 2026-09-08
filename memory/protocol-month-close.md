@@ -7,7 +7,7 @@ valid_from: 2026-04-24
 horizon: warm
 domains: [protocol]
 status: active
-owner: user
+owner: platform
 schema_version: 1
 ---
 # Протокол Month Close (ОРЗ-фрактал, 5-й масштаб)

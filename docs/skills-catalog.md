@@ -1,6 +1,6 @@
 # Каталог скиллов IWE
 
-> Автогенерировано `scripts/generate-catalogs.py` · 2026-07-23 · НЕ редактировать вручную.
+> Автогенерировано `scripts/generate-catalogs.py` · 2026-08-10 · НЕ редактировать вручную.
 > Источник: `.claude/skills/*/SKILL.md`. Скилл вызывается командой `/<id>`.
 
 | Скилл | Что делает |
@@ -35,9 +35,9 @@
 | `/org-dev` | Organizational Development Manager (R31): guides the subject from an organizational change request (self/team… |
 | `/pack-creator` | Guide a PACK-X author through the SPF fill cycle 01-11. Calls R28 Diagnostician to select mode (assembly/hybr… |
 | `/pack-new` | Create a new Pack — guided flow through SPF: choose domain, name Pack, scaffold structure, fill roadmap. |
-| `/peer-conversation` | Многотуровый диалог писателя (Claude) с напарником (Kimi) по задаче пилота (DP.SC.154). Ведёт turn-loop, обна… |
-| `/personal-guide-render` | Руководство собирается автоматически на сервере платформы по расписанию; скилл проверяет доставку и объясняет состояние (ручной пересбор — после выхода серверного инструмента) |
-| `/personal-guide-start` | Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in th… |
+| `/peer-conversation` | Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/c… |
+| `/personal-guide-render` | Персональное руководство пилота собирается автоматически на сервере платформы по расписанию. Используй когда… |
+| `/personal-guide-start` | Bootstrap wrapper — creates an empty DS-personal-guide repo under the pilot's account (flat name, no login in… |
 | `/platform-bottleneck` | Скилл IWE — см. тело файла |
 | `/restore-exocortex` | Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-fr… |
 | `/run-protocol` | Step-by-step execution of the OWC protocol with mandatory checkpoint at each step. Prevents skipping steps (i… |
@@ -52,7 +52,7 @@
 | `/w-reflection` | Записать W-рефлексию (мировоззренческий слот RCS) в learning.w_reflections. Используется Диагностом R28 (MIM.… |
 | `/week-close` | Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап,… |
 | `/week-close-pilot` | Run the pilot-facing Week Close protocol with progress review and carry-over. |
-| `/wp-new` | Создание нового рабочего продукта (РП) с записью в 5 мест атомарно. Используй когда появляется новая задача,… |
+| `/wp-new` | Создание нового рабочего продукта (РП) с атомарной записью в 4 локальных места (+ условный пост-шаг во внешни… |
 
 _Всего скиллов: 48_
 

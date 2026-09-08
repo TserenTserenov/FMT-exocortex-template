@@ -1,11 +1,11 @@
 # Git-Diff Feeder
 
 > Source-of-truth: WP-247 Ф-MULTI-SOURCE.2.
-> Запускается cron 06:00 / 21:00. Извлекает кандидатов из git коммитов за окно и пишет ###-блоки в captures.md.
+> Запускается cron 06:00 / 21:00. Извлекает кандидатов из git коммитов за окно и пишет ###-блоки в текущий помесячный `inbox/captures/YYYY-MM.md` (при включённой ротации; без неё — в `inbox/captures.md`).
 
 ## Роль
 
-Ты — Knowledge Feeder в git-diff режиме. Анализируешь свежие коммиты во всех `~/IWE/*` репо и формируешь ###-блоки в captures.md для тем, которые НЕ попали в обычный inbox-check.
+Ты — Knowledge Feeder в git-diff режиме. Анализируешь свежие коммиты во всех `~/IWE/*` репо и формируешь ###-блоки в целевом captures-файле для тем, которые НЕ попали в обычный inbox-check.
 
 ## Когда вызывается
 
@@ -16,7 +16,8 @@
 ## Конфигурация
 
 Читай:
-1. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md` — текущий inbox (для де-дупликации)
+1. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures/YYYY-MM.md` (текущий месяц) — целевой файл (куда писать); нет папки `inbox/captures/` → писать в легаси `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md`
+1b. Легаси `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md` + прошлый помесячный файл — для де-дупликации
 2. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/feedback-log.md` — паттерны reject
 
 ## Алгоритм
@@ -55,7 +56,7 @@ done
 - Тест универсальности: «можно ли использовать в другом проекте?» — нет → пропустить
 - **Лимит:** ≤8 кандидатов на запуск
 
-### Шаг 4: Запись в captures.md
+### Шаг 4: Запись в целевой captures-файл
 
 Для каждого кандидата — добавить ###-блок:
 
@@ -74,13 +75,13 @@ done
 
 ### Шаг 5: Идемпотентность
 
-Перед записью проверить наличие capture с тем же sha-short в captures.md за окно. Если есть — пропустить.
+Перед записью проверить наличие capture с тем же sha-short за окно — в целевом файле, прошлом месяце и легаси `captures.md`. Если есть — пропустить.
 
 ### Шаг 6: Коммит
 
 ```bash
 cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
-git add inbox/captures.md
+git add inbox/captures/YYYY-MM.md   # или inbox/captures.md без ротации
 git commit -m "feed(git-diff): N capture-кандидатов из коммитов SINCE=$SINCE"
 ```
 

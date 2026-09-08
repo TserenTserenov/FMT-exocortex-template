@@ -22,28 +22,14 @@ CONFIG="${1:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
 MAX_ITEMS_PER_TOPIC=3
 MAX_AGE_DAYS=2
 
-# --- Pick a python3 that has PyYAML (NixOS: scheduler env has it, bare shell may not) ---
-# No hardcoded /nix/store hash — those rot on every nixos-rebuild. The old `find | while`
-# form emitted the fallback too (return ran in a pipe subshell), producing a two-line
-# result that broke `$PYTHON3 << EOF`. Process substitution keeps the loop in the current
-# shell, so return exits the function and exactly one line is emitted.
-_find_python3() {
-  local p
-  for p in python3 /usr/bin/python3 /usr/local/bin/python3; do
-    if command -v "$p" >/dev/null 2>&1 && "$p" -c "import yaml" 2>/dev/null; then
-      echo "$p"
-      return 0
-    fi
-  done
-  while read -r p; do
-    if "$p" -c "import yaml" 2>/dev/null; then
-      echo "$p"
-      return 0
-    fi
-  done < <(find /nix/store -maxdepth 3 -name python3 -path "*env*/bin/*" 2>/dev/null)
-  echo "python3"
-}
-PYTHON3=$(_find_python3)
+# --- Pick a python3 that has PyYAML (shared resolver, WP-529 F6 / #463) ---
+# The resolver additionally knows the Homebrew python3 location on stock macOS
+# Apple Silicon and fails loud instead of returning a yaml-less interpreter.
+RESOLVER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
+if ! PYTHON3=$("$RESOLVER"); then
+    echo "**Мир:** ⚠️ PENDING — не найден python3 с библиотекой PyYAML. Установить: pip3 install pyyaml (или sudo apt install python3-yaml); см. requirements.txt"
+    exit 0
+fi
 
 $PYTHON3 << PYEOF
 import sys, json, subprocess, xml.etree.ElementTree as ET

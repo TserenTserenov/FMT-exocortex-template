@@ -25,7 +25,7 @@ description: "Операционный файл памяти IWE"
 |----|------|-----|-------------|-------|----------------|
 | R1 | **Стратег** | — | скилл | `/day-open` `/day-close` `/week-close` `/month-close` `/strategy-session` `/wp-new` `/run-protocol` | План дня/недели, сессия стратегирования, ревью, note-review |
 | R2 | **Экстрактор** | — | скилл | `/ke` `/apply-captures` | KE в Pack, inbox check, ontology sync |
-| R3 | **Консультант** | — | inline | — | Q&A ученика, проверка ДЗ, генерация контента ленты/марафона |
+| R3 | **Консультант** | — | inline | — | Q&A участника, проверка ДЗ, генерация контента ленты/марафона |
 | R4 | **Автор** | FX1 | inline | — | Посты, презентации, питчи, описания |
 | R5 | **Архитектор** | FX5 | скилл + inline | `/archgate` `/think` `/fpf` | ArchGate, ADR, BC-mapping, SOTA-update |
 | R6 | **Кодировщик** | FX5, FX8 | inline + скилл | `/transcribe` `/simplify`* `/claude-api`* `/review`* | Код, рефакторинг, баг-фикс |

@@ -131,7 +131,9 @@ echo "--- 6. LESSON / MEMORY STATS ---"
 for m in $(memory_files); do
   [ -f "$m" ] || continue
   LINES=$(wc -l < "$m" | tr -d ' ')
-  LESSONS=$(grep -c "lessons_" "$m" 2>/dev/null || true)
+  # Lesson files are named lesson-<topic>.md / lessons_<topic>.md — match both
+  # spellings; the old "lessons_" literal never matched and always counted 0 (#559).
+  LESSONS=$(grep -cE "lessons?[-_]" "$m" 2>/dev/null || true)
   echo "MEMORY.md: $LINES lines (flag if >200), $LESSONS lesson references (target ≤8)"
 done
 

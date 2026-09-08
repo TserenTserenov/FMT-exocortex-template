@@ -1,18 +1,14 @@
 ---
 name: feedback_response_clarity_for_pilot
 description: 12 паттернов засорения ответов агентов + 11 правил A1-A11 «писать в режиме читателя» + детектор канала; источник — peer-сессия 2026-06-01-27
-metadata: 
-  node_type: memory
-  type: feedback
-  horizon: warm
-  domains: 
-    - communication
-    - agent-behaviour
-    - pilot-ux
-  status: active
-  valid_from: 2026-06-01
-  owner: user
-  schema_version: 1
+node_type: memory
+type: feedback
+horizon: warm
+domains: [communication, agent-behaviour, pilot-ux]
+status: active
+valid_from: 2026-06-01
+owner: platform
+schema_version: 1
 ---
 
 # Правила «писать для пилота, не для CI-инспектора»
@@ -136,13 +132,11 @@ metadata:
 
 ## Связанные файлы
 
-- [feedback_explanations_no_codes.md](feedback_explanations_no_codes.md) — цифры правил только в скобках, основная фраза = понятное объяснение
-- [feedback_russian_clear.md](feedback_russian_clear.md) — таблица конкретных переводов (smoke-test → прогон работоспособности, rollback → откат, deploy → выкатить и др.); применяется совместно с правилом A2 как источник готовых русских описаний
-- [feedback_response_language_russian.md](feedback_response_language_russian.md) — итоговые сводки только на русском, без английского
+- [communication-style-base.md](communication-style-base.md) — базовый разговорный стиль: русские описания перед кодами, готовые переводы терминов, итоговые сводки на русском (вобрал три прежних файла: explanations_no_codes, russian_clear, response_language_russian — issue #514)
 - [CLAUDE.md §9 «Режим «на пальцах» (S-37)»](../../../IWE/CLAUDE.md) — триггеры, детектор канала, базовое правило режима
 
 ---
 
 ## Источник
 
-Правило сформулировано в peer-сессии 2026-06-01-27 двух агентов (Kimi-писатель, Claude-напарник). Полный журнал и итоговый отчёт — в `{{GOVERNANCE_REPO}}/sessions/2026-06/2026-06-01-27-agent-response-style/report.md` авторского workspace.
+Правило сформулировано в peer-сессии 2026-06-01-27 двух агентов (Kimi-писатель, Claude-напарник). Полный журнал и итоговый отчёт — в репозитории стратегии автора, sessions/2026-06/2026-06-01-27-agent-response-style/report.md (файл памяти не проходит подстановку переменных — буквальный плейсхолдер здесь был дефектом, issue #514).

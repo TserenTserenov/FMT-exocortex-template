@@ -1,11 +1,12 @@
 # Каталог скриптов IWE
 
-> Автогенерировано `scripts/generate-catalogs.py` · 2026-07-23 · НЕ редактировать вручную.
+> Автогенерировано `scripts/generate-catalogs.py` · 2026-08-10 · НЕ редактировать вручную.
 > Источник: `scripts/*.sh`, `.claude/scripts/*.{sh,py}`. Это вспомогательные скрипты (хелперы, утилиты, серверы), не скиллы.
 
 | Скрипт | Путь | Что делает |
 |--------|------|------------|
 | `active-wp-sweep.sh` | `scripts/active-wp-sweep.sh` | heartbeat sweep активных РП |
+| `add-secret.sh` | `scripts/add-secret.sh` | единый способ сохранить любой API-ключ/токен в ~/.secrets/ |
 | `add-skill-markers.sh` | `scripts/add-skill-markers.sh` | inject empty USER-SPACE block into L1 SKILL.md files that lack it. |
 | `agent-heartbeat.sh` | `scripts/agent-heartbeat.sh` | agent-heartbeat.sh |
 | `agent-status-report.sh` | `scripts/agent-status-report.sh` | РП-395 Ф3 fail-safe writer. |
@@ -18,15 +19,18 @@
 | `check-dirty-repos.sh` | `scripts/check-dirty-repos.sh` | Скан всех IWE репо на незакоммиченные изменения |
 | `check-index-health.py` | `.claude/scripts/check-index-health.py` | Детектор раздутых индекс-файлов. |
 | `check-open-sessions.sh` | `scripts/check-open-sessions.sh` | WP-358 Ф10 — детектор незакрытых external-сессий. |
+| `check-orphan-hooks.sh` | `scripts/check-orphan-hooks.sh` | каждый хук в .claude/hooks/ действительно вызывается |
+| `check-platform-compat.sh` | `scripts/check-platform-compat.sh` | enforces docs/PLATFORM-COMPAT.md as a CI gate, |
 | `check-script-collisions.sh` | `scripts/check-script-collisions.sh` | проверить коллизии скриптов между авторской зоной и FMT-шаблоном. |
 | `check-seed-drift.sh` | `scripts/check-seed-drift.sh` | seed/strategy/scripts/ снапшоты не разъехались с scripts/ |
 | `check-setup-update-parity.sh` | `scripts/check-setup-update-parity.sh` | статический анализ парных скриптов |
 | `check-wp-transfer-completeness.sh` | `scripts/check-wp-transfer-completeness.sh` | проверка перед архивацией inbox/WP-N/: |
 | `claude-peer-adapter.sh` | `scripts/claude-peer-adapter.sh` | адаптер Claude для peer-conversation (роль напарника) |
 | `close-wp.sh` | `scripts/close-wp.sh` | Закрытие РП: зачёркивает строку в REGISTRY, дописывает ## Закрытие в archive/wp-contexts/ |
+| `codex-peer-adapter.sh` | `scripts/codex-peer-adapter.sh` | Codex CLI (ChatGPT) adapter for peer-conversation.sh. |
 | `coverage-skills.sh` | `scripts/coverage-skills.sh` | детектор B12a/B12b/B12c/B12d (promotion coverage) |
 | `create-skill.sh` | `scripts/create-skill.sh` | создать scaffold нового скилла IWE (SKILL.md v2) |
-| `create-wp.sh` | `scripts/create-wp.sh` | атомарное создание РП в 4 местах (inbox, REGISTRY, WeekPlan, Linear) |
+| `create-wp.sh` | `scripts/create-wp.sh` | атомарное создание РП в локальных местах (inbox, REGISTRY, WeekPlan); |
 | `day-close-lock.sh` | `scripts/day-close-lock.sh` | git-native cross-machine lock against duplicate Day Close runs (WP-484 Ф2). |
 | `day-close-prepare.sh` | `scripts/day-close-prepare.sh` | one-call data digest for the Day Close protocol (issue #234). |
 | `day-close.sh` | `scripts/day-close.sh` | Автоматические шаги Day Close (backup + reindex + linear sync + sessions) |
@@ -44,6 +48,7 @@
 | `git-dirty-guard.sh` | `scripts/git-dirty-guard.sh` | protects a repo's periodic pull from a dirty working tree. |
 | `guide-kit-sync.sh` | `scripts/guide-kit-sync.sh` | vendor a tagged release of iwesys/guide-kit into the |
 | `headless-runner.sh` | `scripts/headless-runner.sh` | точка входа Headless-адаптера (DP.IWE.011-adapter-headless) |
+| `hermes-peer-adapter.sh` | `scripts/hermes-peer-adapter.sh` | адаптер Hermes для peer-conversation (роль напарника) |
 | `hook-promote.sh` | `scripts/hook-promote.sh` | промоция личного хука в платформенный шаблон IWE |
 | `iwe-audit.sh` | `scripts/iwe-audit.sh` | оркестратор аудита инсталляции IWE |
 | `iwe-backup-check.sh` | `scripts/iwe-backup-check.sh` | Проверка здоровья системы резервного копирования IWE |
@@ -66,6 +71,7 @@
 | `load-extensions.sh` | `.claude/scripts/load-extensions.sh` | unified loader для suffix extensions (R4.4 fix, WP-273 Этап 2). |
 | `memory-active-wp-update.sh` | `scripts/memory-active-wp-update.sh` | обновление секции «Текущие РП» в MEMORY.md |
 | `memory-bleed.sh` | `scripts/memory-bleed.sh` | детектор нарушений memory/ (WP-217 Ф10.2) |
+| `memory-drift-scan.py` | `.claude/scripts/memory-drift-scan.py` | Детектор дрейфа статусов между MEMORY.md и WP-context. |
 | `memory-health.sh` | `scripts/memory-health.sh` | метрики здоровья memory/ (WP-217 Ф10.2) |
 | `memory-migrate.sh` | `scripts/memory-migrate.sh` | добавление отсутствующих frontmatter-полей (WP-217 Ф10.2/Ф10.4) |
 | `memory-validate.sh` | `scripts/memory-validate.sh` | валидация frontmatter memory/*.md (WP-217 Ф10.2) |
@@ -73,12 +79,14 @@
 | `migrate-skills-to-v2.sh` | `scripts/migrate-skills-to-v2.sh` | миграция существующих скиллов под стандарт SKILL.md v2 |
 | `migrate-to-runtime-target.sh` | `scripts/migrate-to-runtime-target.sh` | миграция с dirty FMT (≤0.28.x) на Generated runtime (≥0.29.0). |
 | `pack-ci-install.sh` | `scripts/pack-ci-install.sh` | Устанавливает CI guard (ID collision detector) во все Pack-репо в ~/IWE/ |
+| `peer-session-finalize.sh` | `scripts/peer-session-finalize.sh` | finalize / interrupt для peer-сессий (DP.SC.154) |
 | `pending-phases-sweep.sh` | `scripts/pending-phases-sweep.sh` | обходит активные WP-context файлы и выводит pending фазы |
 | `post-update-check-skills.sh` | `scripts/post-update-check-skills.sh` | post-update detector for SKILL.md routing blocks (WP-350 Ф18) |
 | `pre-commit-secret-scan.sh` | `scripts/pre-commit-secret-scan.sh` | Pre-commit hook: блокирует случайный коммит секретов. |
 | `promote-common.sh` | `scripts/promote-common.sh` | общая библиотека для promote-скриптов |
 | `restore-from-exocortex.sh` | `scripts/restore-from-exocortex.sh` | восстановление памяти IWE из exocortex-бэкапа (closes #125) |
 | `route-task.sh` | `scripts/route-task.sh` | Маршрутизатор задач IWE (DP.ROLE.059) |
+| `run-regression-tests.sh` | `scripts/run-regression-tests.sh` | Run regression tests for bug fixes (#338, #339, #340). |
 | `script-promote.sh` | `scripts/script-promote.sh` | промоция личного скрипта (или всех общих скриптов) в платформенный шаблон IWE |
 | `server-calendar.sh` | `scripts/server-calendar.sh` | кросс-платформенная замена mcp__ext-google-calendar для server-mode |
 | `server-news.sh` | `scripts/server-news.sh` | кросс-платформенная замена WebSearch для server-mode |
@@ -102,6 +110,7 @@
 | `week-draft-append.sh` | `scripts/week-draft-append.sh` | обновить метрики текущего дня в черновике недельного поста. |
 | `week-draft-init.sh` | `scripts/week-draft-init.sh` | создать пустой черновик недельного поста для новой недели. |
 | `wp-sync-bundle.sh` | `.claude/scripts/wp-sync-bundle.sh` | детерминированный bundler контекста РП для sync-фазы WP Gate |
+| `wp499-agent-coordination-test.sh` | `scripts/wp499-agent-coordination-test.sh` | Воспроизводимый координационный тест N агентов IWE (WP-499 Ф7/Ф11, расширен Ф17 п.3-4, |
 
-_Всего скриптов: 97_
+_Всего скриптов: 106_
 

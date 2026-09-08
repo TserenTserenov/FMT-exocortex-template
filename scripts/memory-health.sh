@@ -16,8 +16,17 @@
 set -eu
 
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
+# NOTE: iwe-env-bootstrap.sh reassigns SCRIPT_DIR to its OWN location (via its
+# BASH_SOURCE[0]) as a side effect of being sourced — save ours first so the
+# frontmatter.sh source below still resolves relative to THIS script (issue #229).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_MEMORY_HEALTH_DIR="$SCRIPT_DIR"
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
+# issue #658: was a private get_field() unaware of the `metadata:`-nested
+# frontmatter dialect (issue #281) — memory-validate.sh/memory-bleed.sh
+# already source the shared reader; this closes the gap for the two scripts
+# that still had their own copy.
+source "$_MEMORY_HEALTH_DIR/../.claude/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 HOT_LIMIT=150
 MODE="full"
@@ -34,11 +43,6 @@ while [ $# -gt 0 ]; do
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
     esac
 done
-
-get_field() {
-    local file="$1" field="$2"
-    awk '/^---/{f++} f==1 && /^'"$field"':/{gsub(/^[^:]+: */,""); gsub(/^["'"'"']|["'"'"']$/,""); print; exit}' "$file"
-}
 
 has_frontmatter() {
     head -1 "$1" | grep -q '^---$'

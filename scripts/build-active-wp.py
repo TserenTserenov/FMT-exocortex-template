@@ -42,9 +42,11 @@ OUTPUT = ROOT / "current" / "active-wp.md"
 INBOX_DIR = ROOT / "inbox"
 ARCHIVE_DIR = ROOT / "archive" / "wp-contexts"
 
-# Статусы храним без U+FE0F (emoji variation selector): «↗️» и «↗» — один статус.
+# Статусы храним без U+FE0F (emoji variation selector): "стрелка с VS16" и без него - один статус.
+# ⏹ (снят) и 🔁 (свёрнут в спринт) - issue #473: реестр их уже использует,
+# парсер их не знал, обе строки проваливались в PARSE-WARN как "неизвестный статус".
 ACTIVE_STATUSES = {"🔄", "⏳", "🧪", "🚧", "⏸"}
-CLOSED_STATUSES = {"✅", "📦", "↗", "❌"}
+CLOSED_STATUSES = {"✅", "📦", "↗", "❌", "⏹", "🔁"}
 ALL_STATUSES = ACTIVE_STATUSES | CLOSED_STATUSES
 
 
@@ -53,15 +55,70 @@ def norm_status(token: str) -> str:
 
 # Строка-РП: `| 312 | P2 | **Название** | 🔄 | repo | 8h |`
 # Done-вариант: `| ~~306~~ | ~~P3~~ | ~~Название~~ | ✅ | ~~repo~~ | ~~4h~~ |`
-ROW_RE = re.compile(r"^\|\s*(?:~~)?(?:\*\*)?(\d{1,4})(?:\*\*)?(?:~~)?\s*\|")
+ROW_RE = re.compile(r"^\|\s*(?:~~)?(?:\*\*)?(?:WP-)?(\d{1,4})(?:\*\*)?(?:~~)?\s*\|")
 
 # Имя файла WP в inbox/archive: WP-NNN-... .md или WP-NNN.md или папка WP-NNN/
 WP_NAME_RE = re.compile(r"^WP-(\d{1,4})(?:[-.].*|/)?$")
+
+# issue #473: колонки реестра читались по жёсткой позиции (cols[3] = статус и
+# т.д.), схема таблицы `| # | P | Название | Ст | Репо | Бюджет |`. Реальные
+# реестры расходятся и по числу, и по порядку колонок (одна установка добавила
+# "Ставка" между Репо и Бюджет, другая использует "Статус | Цель | Создан | P"
+# в другом порядке) - жёсткая позиция читала не ту колонку молча. Индекс
+# теперь определяется по имени колонки из строки-заголовка.
+HEADER_RE = re.compile(r"^\|\s*#\s*\|")
+_COLUMN_ALIASES = {
+    "wp": {"#", "№"},
+    "name": {"название"},
+    "status": {"статус", "ст"},
+    "repo": {"репо"},
+    "budget": {"бюджет"},
+    "project": {"p", "п"},
+}
+_REQUIRED_COLUMNS = {"name", "status"}
+
+
+_TABLE_SEPARATOR_RE = re.compile(r"^\|[\s:-]+\|[\s:-]*\|?")
+
+
+def find_header_columns(text: str) -> dict[str, int]:
+    """Индекс {роль: позиция} по строке-заголовку `| # | ... |`. Пустой словарь,
+    если заголовок не найден - вызывающий код обязан явно на это отреагировать,
+    не подставлять позиции по умолчанию.
+
+    Найдено пир-сессией с Codex (ход 3): берём только ПЕРВУЮ строку вида
+    "| # | ... |" в файле, а такая строка теоретически может встретиться и
+    в легенде статусов внутри <details> раньше настоящей шапки таблицы.
+    Кандидат принимается, только если следующая строка - markdown-разделитель
+    (`|---|---|...`), как и положено настоящей шапке таблицы."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not HEADER_RE.match(line):
+            continue
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if not _TABLE_SEPARATOR_RE.match(next_line):
+            continue
+        cells = [c.strip().lower() for c in line.strip("|").split("|")]
+        idx: dict[str, int] = {}
+        for j, cell in enumerate(cells):
+            for role, aliases in _COLUMN_ALIASES.items():
+                if cell in aliases and role not in idx:
+                    idx[role] = j
+        return idx
+    return {}
 
 
 def parse_registry(text: str) -> tuple[list[dict], list[str]]:
     """Разбор реестра. Строка с номером РП никогда не сбрасывается молча:
     непарсибельные попадают в rows (для orphan-детекции) + в problems (PARSE-WARN)."""
+    columns = find_header_columns(text)
+    missing_required = _REQUIRED_COLUMNS - columns.keys()
+    if missing_required:
+        raise ValueError(
+            f"в шапке реестра (строка '| # | ... |') не найдены обязательные колонки: "
+            f"{sorted(missing_required)} - распознаны: {columns}"
+        )
+
     rows: list[dict] = []
     problems: list[str] = []
     for lineno, line in enumerate(text.splitlines(), 1):
@@ -70,42 +127,50 @@ def parse_registry(text: str) -> tuple[list[dict], list[str]]:
             continue
         wp = int(m.group(1))
         cols = [c.strip() for c in line.strip("|").split("|")]
-        if len(cols) < 6:
+        max_needed = max(columns.values())
+        if len(cols) <= max_needed:
             problems.append(
-                f"WP-{wp} (строка {lineno}): колонок < 6 — строка учтена в реестре, "
-                f"но не попадает в active-wp.md."
+                f"WP-{wp} (строка {lineno}): {len(cols)} колонок, ожидалось минимум "
+                f"{max_needed + 1} по шапке реестра - строка учтена, но не попадает в active-wp.md."
             )
-            cols = cols + [""] * (6 - len(cols))
+            cols = cols + [""] * (max_needed + 1 - len(cols))
+
+        def cell(role: str, cols=cols) -> str:
+            i = columns.get(role)
+            return cols[i].strip() if i is not None and i < len(cols) else ""
+
         # Очистка от ~~ и пробелов; берём только первый токен, чтобы
         # принять варианты вида "🔄 Ф4" (статус + пометка фазы).
-        status_raw = cols[3].replace("~~", "").strip()
+        status_raw = cell("status").replace("~~", "").strip()
         token = status_raw.split()[0] if status_raw else ""
         status = norm_status(token)
         if status not in ALL_STATUSES:
             problems.append(
-                f"WP-{wp} (строка {lineno}): неизвестный статус {token!r} — строка учтена "
+                f"WP-{wp} (строка {lineno}): неизвестный статус {token!r} - строка учтена "
                 f"в реестре, но не попадает ни в открытые, ни в закрытые active-wp.md."
             )
         rows.append({
             "wp": wp,
-            "project": cols[1].replace("~~", "").strip(),
-            "name": cols[2].strip(),
+            "project": cell("project").replace("~~", "").strip(),
+            "name": cell("name"),
             "status": status,
             "status_display": token,
-            "repo": cols[4].strip(),
-            "budget": cols[5].strip(),
+            "repo": cell("repo"),
+            "budget": cell("budget"),
             "raw": line,
+            "_status_col": columns.get("status"),
+            # Original cell text (markup intact) for re-rendering exactly the
+            # header's six roles in active-wp.md (#558) — the raw line carries
+            # ALL registry columns and overflowed the 6-column header,
+            # spilling everything right of "Бюджет" outside the table. The
+            # "wp" role falls back to the numeric id when the registry header
+            # names its first column something un-aliased.
+            "_view_cells": {
+                role: (cell(role) or (str(wp) if role == "wp" else ""))
+                for role in ("wp", "project", "name", "repo", "budget")
+            },
         })
     return rows, problems
-
-
-def clean_status_in_row(raw: str, status: str) -> str:
-    """Заменяет содержимое колонки «Ст» на очищенный статус и обрезает лишние колонки."""
-    parts = raw.split("|")
-    if len(parts) >= 6:
-        parts[4] = f" {status} "
-        parts = parts[:7]
-    return "|".join(parts) + "|"
 
 
 def render(rows: list[dict]) -> str:
@@ -123,10 +188,19 @@ def render(rows: list[dict]) -> str:
     def table(items: list[dict]) -> str:
         if not items:
             return "_нет_\n"
+        # Rows are built from exactly the six roles the header declares (#558):
+        # printing the raw registry line spilled every column right of
+        # "Бюджет" (the registry has 10) outside the table as plain text.
+        # find_header_columns() already reads the registry schema dynamically —
+        # a schema change now affects cell PICKING, not the rendered width.
         out = ["| # | P | Название | Ст | Репо | Бюджет |",
                "|---:|---|------------------|:--:|------------------|------:|"]
         for r in items:
-            out.append(clean_status_in_row(r["raw"], r["status_display"]))
+            v = r["_view_cells"]
+            out.append(
+                f"| {v['wp']} | {v['project']} | {v['name']} "
+                f"| {r['status_display']} | {v['repo']} | {v['budget']} |"
+            )
         return "\n".join(out) + "\n"
 
     lines = [
@@ -297,7 +371,11 @@ def main() -> int:
         print(f"build-active-wp: REGISTRY не найден: {REGISTRY}", file=sys.stderr)
         return 2
 
-    rows, parse_problems = parse_registry(REGISTRY.read_text(encoding="utf-8"))
+    try:
+        rows, parse_problems = parse_registry(REGISTRY.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        print(f"build-active-wp: {exc}", file=sys.stderr)
+        return 2
     if not rows:
         print("build-active-wp: ни одной РП-строки не распознано — проверь схему таблицы", file=sys.stderr)
         return 2

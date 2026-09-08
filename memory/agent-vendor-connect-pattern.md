@@ -1,19 +1,16 @@
 ---
 name: agent-vendor-connect-pattern
 description: Паттерн подключения нового агента-вендора к IWE и простой выбор между подключёнными агентами
-metadata: 
-  node_type: memory
-  valid_from: 2026-07-28
-  type: reference
-  horizon: warm
-  domains: 
-    - reference
-    - agent-architecture
-  status: active
-  owner: user
-  schema_version: 1
-  originSessionId: c962bd9f-0f47-43ca-9cb5-f5c3cd8ee516
-  modified: 2026-07-28T12:49:31.166Z
+node_type: memory
+valid_from: 2026-07-28
+type: reference
+horizon: warm
+domains: [reference, agent-architecture]
+status: active
+owner: platform
+schema_version: 1
+originSessionId: c962bd9f-0f47-43ca-9cb5-f5c3cd8ee516
+modified: 2026-07-28T12:49:31.166Z
 ---
 
 # Подключение агента-вендора к IWE

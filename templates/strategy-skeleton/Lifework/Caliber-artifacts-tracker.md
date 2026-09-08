@@ -2,7 +2,7 @@
 type: tracker
 purpose: caliber-artifacts-recommendations
 updated: {{TODAY}}
-review: weekly (Strategy Session, Фаза 2b «Линза калибра»)
+review: monthly (Strategy Session, Фаза 2b «Линза калибра»)
 ---
 
 # Трекер рекомендаций lifework-документов

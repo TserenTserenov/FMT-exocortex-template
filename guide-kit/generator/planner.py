@@ -444,6 +444,46 @@ def _get_recent_element_ids(recent: list[RecentLesson], n: int = 5) -> set[str]:
     return {r.element_id for r in recent[:n]}
 
 
+# Area order used to break ties when falling back to another area — the planner
+# must be deterministic for the same input (same seed → same plan).
+_AREA_KEYS_BY_INDEX = ["knowledge", "tools", "constraints", "environment", "organism"]
+
+
+def _area_has_elements(area: int, stage: int) -> bool:
+    """True if some catalog can serve this area at this stage."""
+    for meta in {**CAT002_ELEMENTS, **CAT003_ELEMENTS}.values():
+        if meta["area"] == area and meta["entry_stage"] <= stage:
+            return True
+    for meta in _load_cat001().values():
+        if meta.get("area") == area and meta.get("entry_stage", 1) <= stage:
+            return True
+    return False
+
+
+def _nearest_servable_area(
+    primary_area: int, stage: int, mastery_by_area: dict[str, int]
+) -> tuple[int | None, str]:
+    """Pick a replacement area when `primary_area` has nothing in any catalog.
+
+    Preference is the same one _choose_area uses when it works normally — the
+    largest remaining gap (4 - depth), so real progress data (including the
+    interim LMS snapshot) still steers the choice. Ties break on the lower area
+    number, so the plan stays reproducible for a given seed.
+
+    Returns (area, reason) or (None, reason) when no area can be served at all —
+    the caller then keeps the empty skeleton, exactly as before this fallback.
+    """
+    servable = [a for a in range(1, 6) if a != primary_area and _area_has_elements(a, stage)]
+    if not servable:
+        return None, "ни одна область не обслуживается каталогом"
+    best = max(
+        servable,
+        key=lambda a: (4 - mastery_by_area.get(_AREA_KEYS_BY_INDEX[a - 1], 0), -a),
+    )
+    depth = mastery_by_area.get(_AREA_KEYS_BY_INDEX[best - 1], 0)
+    return best, f"замена на area={best} (gap={4 - depth}, обслуживается каталогом)"
+
+
 def _choose_element_worldview(
     area: int,
     stage: int,
@@ -633,6 +673,59 @@ def _build_session_goal(element_id: str | None, impact_type: ImpactType, area: i
         return f"Переосмыслить мировоззренческий паттерн в области «{area_name}» (глубина {depth})"
     else:
         return f"Освоить практику в области «{area_name}»: {element_id or 'по каталогу'} (степень {depth})"
+
+
+# ---------------------------------------------------------------------------
+# Applied track (Ф5b): domain_traits → daily applied-mastery mini-section.
+# Model fixed in WP-495 Ф3 (2026-07-18) — two-factor hierarchical choice:
+# primary = the applied program's next unresolved step (one active domain,
+# program order is not skippable); secondary (optional) = link to today's
+# worldview lesson. The applied section never replaces the worldview lesson.
+# ---------------------------------------------------------------------------
+
+def _choose_domain_step(domain_traits: list) -> tuple[str, str, str] | None:
+    """Pick the next unresolved step of the ONE active applied domain.
+
+    "Unresolved" = the first not-yet-measured trait, in list order (the order
+    IS the program sequence — domain_traits is expected pre-sorted by the
+    domain's own scale, e.g. threshold characteristics before growth ones).
+    A domain with no unresolved trait (everything measured or dormant) has no
+    active step today — returns None, not a guess.
+
+    Returns (domain, characteristic, reason) or None if no domain is active.
+    """
+    if not domain_traits:
+        return None
+
+    active_domain = domain_traits[0].domain
+    for trait in domain_traits:
+        if trait.domain != active_domain:
+            continue  # one active domain per day — program order is not skipped across domains
+        if trait.status == "dormant-no-source":
+            continue  # failed the 6-point activation checklist — not offered
+        if trait.status != "measured":
+            return trait.domain, trait.characteristic, (
+                f"прикладной трек «{trait.domain}»: следующий нерешённый шаг «{trait.characteristic}»"
+            )
+
+    return None  # every trait of the active domain is already measured or dormant
+
+
+def _build_applied_section(domain: str, characteristic: str, worldview_area: int) -> dict:
+    """Builds the daily applied-mastery mini-section (Объединение №1, WP-495 Ф3).
+
+    `link_mode` names how the connection to the worldview lesson should be
+    shown, per the decided model: either through the lesson's theme, or as an
+    adjacent related case. The exact choice of framing text is prompt.md's
+    job (LLM stage) — the planner only supplies the deterministic skeleton.
+    """
+    return {
+        "domain": domain,
+        "characteristic": characteristic,
+        "link_mode": "theme_lens",  # shown through the worldview lesson's theme, by default
+        "worldview_area": worldview_area,
+        "note": "мини-секция дополняет мыслительный урок, не заменяет и не продвигает программу автоматически",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -869,6 +962,11 @@ def plan_horizon(ctx: "HorizonContext", seed: int | None = None) -> dict:
 
     mastery_by_area comes from ctx.mastery_by_area.
     recent_history stays [] — the domain_event → RecentLesson conversion is deferred.
+
+    ctx.domain_traits (Ф5b, applied track) has no production adapter yet — no
+    caller populates it from a real source (e.g. characteristics/*.yaml on
+    disk). Only tests set it directly. Wiring a real adapter is a separate,
+    not-yet-scheduled step (pilot decides which domain goes first).
     """
     from horizons import HorizonContext
 
@@ -927,6 +1025,35 @@ def plan_horizon(ctx: "HorizonContext", seed: int | None = None) -> dict:
                     primary_area, stage_code, recent_ids, mastery_gaps, mastery_by_area, []
                 )
 
+    # Cross-area fallback: both catalogs are empty FOR THIS AREA, so no amount of
+    # retrying inside it can help. Without this the planner hands prompt.md an
+    # empty skeleton and the LLM improvises the whole lesson — which is exactly
+    # what happens today for the most common profile there is: the default RCS
+    # bottleneck is M1, _SLOT_TO_AREA maps M1 to area 3 (Ограничения), and area 3
+    # has no CAT.002/003 practices at all, while CAT.001 stays empty whenever
+    # GUIDE_KIT_CURRICULUM_PATH is unset. Pick the nearest area that can actually
+    # be served instead of serving nothing.
+    if element_id is None:
+        fallback_area, fallback_reason = _nearest_servable_area(
+            primary_area, stage_code, mastery_by_area
+        )
+        if fallback_area is not None:
+            element_id, raw_depth, element_reason = _choose_element_mastery(
+                fallback_area, stage_code, recent_ids, mastery_gaps, mastery_by_area, []
+            )
+            impact_type = "mastery"
+            if element_id is None:
+                element_id, raw_depth, element_reason = _choose_element_worldview(
+                    fallback_area, stage_code, recent_ids, worldview_gaps, mastery_by_area, []
+                )
+                impact_type = "worldview"
+            if element_id is not None:
+                element_reason = (
+                    f"area={primary_area} не обслуживается каталогом → {fallback_reason}; "
+                    f"{element_reason}"
+                )
+                primary_area = fallback_area
+
     # Mastery-gate: do not raise the depth without passing the can-do check (P5 fix)
     if element_id:
         target_depth, gate_reason = _mastery_gate(element_id, raw_depth, [])
@@ -971,6 +1098,15 @@ def plan_horizon(ctx: "HorizonContext", seed: int | None = None) -> dict:
         "notes": ctx.day.notes,
     }
 
+    # Applied track (Ф5b): the daily mini-section, alongside the worldview lesson
+    # above — never replacing it. domain_traits absent/empty → section stays
+    # off, same honest-absence principle as the rest of the planner (no guess).
+    domain_step = _choose_domain_step(ctx.domain_traits)
+    applied_section = (
+        _build_applied_section(domain_step[0], domain_step[1], primary_area)
+        if domain_step else None
+    )
+
     decision_log = {
         "bottleneck": bottleneck,
         "primary_area": f"{primary_area} ({AREA_NAMES.get(primary_area, '?')})",
@@ -981,6 +1117,7 @@ def plan_horizon(ctx: "HorizonContext", seed: int | None = None) -> dict:
         "tomatoes": tomatoes,
         "trigger": f"{ctx.trigger.kind}: {ctx.trigger.detail}",
         "rcs_stage": rcs.stage_derived,
+        "applied_track": domain_step[2] if domain_step else "нет активного домена — секция отсутствует",
     }
 
     return {
@@ -991,6 +1128,7 @@ def plan_horizon(ctx: "HorizonContext", seed: int | None = None) -> dict:
             "area": primary_area,
             "target_depth": target_depth,
             "tomatoes": tomatoes,
+            "applied_section": applied_section,
         },
         "horizon_context": {
             "quarter": quarter_block,

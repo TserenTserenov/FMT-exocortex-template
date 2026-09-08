@@ -16,8 +16,21 @@ if [[ ! -f "$FILE" ]]; then
   exit 1
 fi
 
+# WP-529 (continuation, 19.08, peer-session 2026-08-19-29 turn 7): resolved
+# via the shared F6 resolver instead of bare python3 -- same class of defect
+# Evgenii found elsewhere (bare python3 can be a different, yaml-less
+# interpreter than the resolver would find). Explicit exit on resolver
+# failure, same convention as the file-not-found check above -- this closes
+# under `set -e`, but `||` on the assignment itself already neutralizes -e
+# for that one line, so the check below is what actually surfaces the error.
+_RESOLVED_PYTHON3=$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh" 2>/dev/null) || _RESOLVED_PYTHON3=""
+if [ -z "$_RESOLVED_PYTHON3" ]; then
+  echo "ERROR: python3 с библиотекой PyYAML не найден (pip install pyyaml)" >&2
+  exit 1
+fi
+
 # Обновляем frontmatter через Python
-python3 <<PYEOF
+"$_RESOLVED_PYTHON3" <<PYEOF
 import yaml, re, sys
 from datetime import datetime
 

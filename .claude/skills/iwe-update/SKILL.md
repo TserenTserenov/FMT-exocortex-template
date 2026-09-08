@@ -4,6 +4,7 @@ description: "Update IWE with change explanations. Agent calls update.sh, parses
 argument-hint: ""
 user_invocable: true
 version: 1.0.0
+browser_safe: false
 routing:
   executor: haiku
   deterministic: false
@@ -15,6 +16,17 @@ routing:
 > **Триггер:** «обнови IWE», «обновись», `/iwe-update`, или агент предлагает после обнаружения новой версии.
 
 ## Алгоритм
+
+### 0. Extensions `before`
+
+```bash
+bash .claude/scripts/load-extensions.sh iwe-update before
+```
+
+Код `0` → прочитать каждый путь из вывода в алфавитном порядке и выполнить
+инструкции до превью. Код `1` → расширений нет, продолжить. Любой другой код или
+ошибка обязательного шага расширения → обновление не начинать, показать
+настоящую причину ошибки.
 
 ### 1. Превью (--check)
 
@@ -113,6 +125,21 @@ cd "$IWE_TEMPLATE" && bash update.sh --yes 2>&1
 **5d. Рекомендации:**
 На основе кастомизаций пользователя (его extensions/, params.yaml, Pack) — предложить как использовать новые возможности.
 
+**5e. Extensions `checks`:**
+
+```bash
+bash .claude/scripts/load-extensions.sh iwe-update checks
+```
+
+Код `0` → прочитать и выполнить каждый файл до итогового отчёта. Код `1` →
+проверок нет. Любой другой код или провал проверки не откатывает уже применённые
+файлы, но запрещает объявлять обновление полностью успешным: показать
+«обновление применено, пользовательская проверка не прошла», точную причину,
+путь упавшего extension и список уже выполненных `checks`-файлов. Remediation:
+исправить или временно отключить именно этот extension, снова загрузить
+`iwe-update checks` и повторить все проверки; до их успеха состояние называется
+`applied_with_failed_extension_check`, а не успешным обновлением.
+
 ### 6. Отчёт
 
 ```
@@ -125,6 +152,16 @@ cd "$IWE_TEMPLATE" && bash update.sh --yes 2>&1
 
 Перезапустите Claude Code для применения обновлений memory/.
 ```
+
+### 7. Extensions `after`
+
+```bash
+bash .claude/scripts/load-extensions.sh iwe-update after
+```
+
+Код `0` → прочитать и выполнить файлы после отчёта. Код `1` → расширений нет.
+Ошибка `after` не отменяет уже применённое обновление, но обязательно выводится
+отдельным предупреждением с именем расширения и причиной.
 
 ---
 

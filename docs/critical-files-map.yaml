@@ -1,0 +1,221 @@
+# docs/critical-files-map.yaml — WP-529 Ф1: карта критичных путей доставки шаблона.
+#
+# Слой: FMT-exocortex-template (main/тег) → файловая система пользователя,
+# через update-manifest.json + update.sh/setup.sh + CI (Validate Template).
+# Другие слои конвейера — не здесь: авторский ~/IWE → этот репо (WP-491, закрыт);
+# ~/IWE/scripts/ ↔ этот repo/scripts/ (WP-485, в работе).
+#
+# Единица картирования — категория, не отдельный файл (764 файла в git на
+# 2026-08-18, из них 619 доставляются пользователю через files[] манифеста —
+# остальные 145 распределены по 7 другим категориям ниже).
+# Членство файла в категории определяет ЖИВОЙ код generate-manifest.sh — этот
+# реестр ссылается на его блоки (derived_from_block), а не копирует их логику.
+# Копия разошлась бы с кодом тем же классом бага, который сегодня нашли и
+# починили в самом update-manifest.json (пир-сессия 2026-08-18-01).
+#
+# Схема категории:
+#   id                  уникальный kebab-case
+#   route               источник → получатель, человеческим языком
+#   derived_from_block   имя bash-массива в generate-manifest.sh (SoT членства)
+#   channel             clone-once | update-curl | ci-only | none
+#   owner               роль (Pack DP.ROLE.*)
+#   proof_of_delivery   manifest_sha | ci:<job> | none — почему ок
+#
+# Схема special_route (файл внутри категории с нестандартной клиентской
+# семантикой применения — категории мало, нужно точечное уточнение):
+#   path                 путь или glob
+#   category             id категории-владельца
+#   note                 в чём нестандартность
+#   proof_of_delivery    как именно проверяется (может отличаться от категории)
+
+version: 1
+owner_default: DP.ROLE.078  # владелец тира шаблона — см. "owner_note" ниже
+
+owner_note: >
+  На 2026-08-18 owner по умолчанию формален: роль назначена, но не имеет
+  описанных операционных обязанностей (согласовано с codex, пир-сессия
+  2026-08-18-02). Три обязанности, которые сделали бы поле рабочим —
+  approve изменений правил маршрутизации, triage дрейф-инцидентов,
+  ежеквартальный пересмотр proof_of_delivery — не назначены. Это открытый
+  пункт, не ложное покрытие: зафиксирован явно, а не скрыт дефолтным owner.
+
+categories:
+  - id: delivered-default
+    route: "git-дерево main → update-manifest.json files[] → curl в update.sh → файл пользователя"
+    derived_from_block: "(без явного блока — всё, что не попало ни в одно из исключений ниже)"
+    channel: update-curl
+    owner: DP.ROLE.078
+    proof_of_delivery: manifest_sha
+    note: >
+      Основная масса (~570 из 619 файлов). Проверка: per-file SHA-256 в
+      update.sh Step 2 при скачивании + scripts/verify-manifest.sh в CI
+      (job validate, шаг "Check manifest completeness (B2)") — сверяет, что
+      update-manifest.json совпадает с выводом generate-manifest.sh для
+      текущего дерева. Починен в этой же пир-сессии (2026-08-18-01) после
+      15-файлового рассинхрона.
+
+  - id: github-explicit-include
+    route: "git-дерево (.github/workflows/, scripts/tests/) → files[] через явный allow-list → curl в update.sh"
+    derived_from_block: GITHUB_EXPLICIT_INCLUDE, SCRIPT_CONTRACT_EXPLICIT_INCLUDE
+    channel: update-curl
+    owner: DP.ROLE.078
+    proof_of_delivery: manifest_sha
+    note: >
+      Точечное исключение ИЗ общего блэклиста .github/ (issue #325 —
+      cloud-scheduler/notify-security/notify-update/post-release-audit
+      workflows реально используются пользователями) и scripts/tests/
+      (issue найден 03.08 — свой тестовый гейт должен доставляться, иначе
+      следующий релиз тихо теряет собственную проверку).
+
+  - id: github-ci-only-exclude
+    route: "git-дерево (.github/workflows/nightly-template-audit.yml) → остаётся только в репо автора"
+    derived_from_block: GITHUB_CI_ONLY_EXCLUDE
+    channel: ci-only
+    owner: DP.ROLE.078
+    proof_of_delivery: "none — по конструкции, не гэп"
+    note: >
+      Видимо в update-manifest.json как excluded_paths (issue #423 — раньше
+      это было немой пробел, теперь явная классификация с причиной).
+
+  - id: platform-hooks-explicit-include
+    route: "git-дерево seed/strategy platform payload → files[] через узкий allow-list → curl в update.sh → governance repo"
+    derived_from_block: PLATFORM_HOOKS_EXPLICIT_INCLUDE
+    channel: update-curl
+    owner: DP.ROLE.078
+    proof_of_delivery: manifest_sha
+    note: >
+      Точечное исключение из общего seed/ user-space правила для четырёх
+      платформенных файлов: pre-commit, pre-push, install-hooks.sh и
+      update-derived-snapshot.py. update.sh после доставки идемпотентно
+      переносит их в существующий governance repo; остальной seed/ по-прежнему
+      не обновляется (issues #502 и #508.2).
+
+  - id: vcs-tooling-internal
+    route: "инструментарий репозитория — никуда не доставляется, вообще вне контракта поставки"
+    derived_from_block: SKIP_PATTERNS
+    channel: none
+    owner: DP.ROLE.078
+    proof_of_delivery: "none — граница контракта, не гэп"
+    note: >
+      .git/, .github/ (базово), .backups/, .DS_Store, сам
+      generate-manifest.sh/update-manifest.json/update-manifest.local.json,
+      seed/ (кроме PLATFORM_HOOKS_EXPLICIT_INCLUDE), templates/, .gitkeep.
+      Не в files[] и не в excluded_paths[] —
+      молчаливо вне манифеста намеренно (это не B2-пробел: check-manifest-
+      coverage.py и verify-manifest.sh не ожидают эти пути в манифесте).
+
+  - id: setup-install-time-only
+    route: "git clone (первая установка через setup.sh) → НЕ обновляется через update.sh дальше"
+    derived_from_block: "(setup/* без явного include ниже)"
+    channel: clone-once
+    owner: DP.ROLE.078
+    proof_of_delivery: "ci:integration-contract-ubuntu (setup/smoke-test-fresh-install.sh)"
+    note: >
+      Каталог setup/ доставляется целиком один раз через git clone при
+      первой установке; update.sh молча пропускает всё, кроме явных
+      исключений ниже — эти файлы НЕ обновляются повторными update.sh.
+      Проверяется только на fresh-install (не на upgrade) через
+      integration-contract-validator.sh + smoke-test-fresh-install.sh —
+      это ОТДЕЛЬНЫЙ канал от manifest_sha, тот самый разрыв, который
+      naparник (codex) попросил явно назвать в вопросе о границе слоя 3.
+
+  - id: setup-explicit-include
+    route: "git-дерево (setup/build-runtime.sh и др.) → files[] через явный allow-list → curl в update.sh"
+    derived_from_block: SETUP_EXPLICIT_INCLUDE
+    channel: update-curl
+    owner: DP.ROLE.078
+    proof_of_delivery: manifest_sha
+    note: >
+      Точечное исключение ИЗ setup-install-time-only: build-runtime.sh,
+      install-iwe-paths.sh, validate-template.sh, setup-cloud-scheduler.sh,
+      setup-local-gateway.sh — эти ДОЛЖНЫ обновляться и после первой
+      установки (issue #325), в отличие от остального setup/.
+      build-runtime.sh — тот самый скрипт, что реально создаёт params.yaml
+      пользователя (см. special_routes ниже), поэтому его сходство с
+      delivered-default критично, не косметика.
+
+  - id: dev-only-excluded
+    route: "git-дерево → видно в excluded_paths[] манифеста → пользователю не доставляется"
+    derived_from_block: EXCLUDED_PATTERNS, EXCLUDED_EXACT, EXCLUDED_SCRIPTS
+    channel: ci-only
+    owner: DP.ROLE.078
+    proof_of_delivery: "none — по конструкции, видимо в манифесте как причина"
+    note: >
+      scripts/tests/, docs/developer/, sessions/2026-06/, promotion-status.yaml,
+      guide-kit-sync-state.yaml, ~12 dev/CI-only скриптов (см. список в
+      generate-manifest.sh: EXCLUDED_SCRIPTS). Корень: issue #246/#247 — раньше
+      весь scripts/ считался dev-only и 92 нужных файла не доставлялись;
+      теперь default = доставлять, explicit exclude только для
+      действительно не имеющих ссылок из доставляемого.
+
+  - id: user-space-excluded
+    route: "git clone (первая установка) → НЕ обновляется update.sh, пользователь владеет содержимым"
+    derived_from_block: FILES_EXCLUDE_PATTERNS, FILES_EXCLUDE_EXACT
+    channel: clone-once
+    owner: DP.ROLE.078
+    proof_of_delivery: "none — по конструкции: либо чистая мета-репо (README/LICENSE), либо пользовательское пространство"
+    note: >
+      README/LICENSE/CONTRIBUTING и т.п. — мета репозитория, пользователю
+      не нужна повторная синхронизация. params.yaml/params.yaml.example,
+      .claude/settings.local.json, extensions/day-close.after.md,
+      extensions/mcp-user.json — пользовательское пространство, защищено
+      от перезаписи is_protected_user_file() (update.sh) даже если когда-
+      нибудь попадёт в files[]. См. special_routes: params.yaml не
+      создаётся этим каналом напрямую — его пишет setup/build-runtime.sh
+      (категория setup-explicit-include) при первом запуске.
+
+  - id: deprecated-removal
+    route: "update-manifest.json deprecated_files[] (управляется вручную) → update.sh удаляет файл с диска пользователя"
+    derived_from_block: "(deprecated_files — ручной список, не выводится из git-дерева)"
+    channel: update-curl
+    owner: DP.ROLE.078
+    proof_of_delivery: "ci:upgrade-test (scripts/check-manifest-rename-coverage.py, issue #218)"
+    note: >
+      Единственная категория без автоматического вывода из git ls-files —
+      требует ручного решения «этот файл больше не нужен пользователю».
+      upgrade-test job (issue #218) специально гоняет checkout-prev →
+      smoke → checkout-HEAD → validate, чтобы поймать пропущенное удаление.
+
+special_routes:
+  - path: ".githooks/*, scripts/wp-list.py, scripts/check-claude-md-links.py"
+    category: delivered-default
+    note: >
+      curl не сохраняет права доступа — update.sh переустанавливает бит
+      +x явно после копирования (issue #308: git-хук без +x молча не
+      срабатывает, это не косметика).
+    proof_of_delivery: manifest_sha
+
+  - path: "CLAUDE.md"
+    category: delivered-default
+    note: >
+      Не прямая перезапись — трёхстороннее слияние через .claude.md.base
+      (git merge-file), сохраняющее пользовательские §8/§9. Конфликт
+      оставляет маркеры и НЕ считается тихим успехом (issue #226/#254/#336).
+    proof_of_delivery: "manifest_sha + ci:test-update-issue-226.sh (Сценарий A)"
+
+  - path: ".claude/skills/*/SKILL.md"
+    category: delivered-default
+    note: >
+      USER-SPACE блок (между маркерами) извлекается перед перезаписью и
+      возвращается после — как CLAUDE.md, но своя (более лёгкая) механика.
+    proof_of_delivery: manifest_sha
+
+  - path: "params.yaml"
+    category: user-space-excluded
+    note: >
+      НЕ в files[] и никогда не скачивается update.sh. Реальный источник —
+      setup/build-runtime.sh (категория setup-explicit-include) при первом
+      запуске; is_protected_user_file() в update.sh — защита на случай
+      будущего изменения, сейчас не задействована этим путём (файл никогда
+      не встречается в manifest-цикле, чтобы её сработать).
+    proof_of_delivery: "ci:integration-contract-ubuntu (smoke-test-fresh-install.sh проверяет создание файла)"
+
+open_questions:
+  - "owner_default формален (см. owner_note) — нужно решение пилота, кто реально
+    берёт три обязанности, или явно принять формальность как временное состояние."
+  - "setup-install-time-only проверяется только на fresh-install, не на upgrade —
+    файл, сломанный после первой установки, не поймает ни один текущий гейт CI.
+    Job upgrade-test гоняет setup/smoke-test-fresh-install.sh дважды (до и после
+    checkout HEAD), но не сам update.sh — апгрейд через update.sh отдельно
+    покрыт T1-T26/issue #226 в job validate. Ни один из этих путей не
+    перезапускает setup/-скрипты НА УЖЕ УСТАНОВЛЕННОЙ копии. Кандидат для Ф2/Ф3."

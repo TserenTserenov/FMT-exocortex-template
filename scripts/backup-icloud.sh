@@ -38,6 +38,8 @@ tar --exclude='.git' \
     --exclude='__pycache__' \
     --exclude='_backups' \
     --exclude='.DS_Store' \
+    --exclude='.claude/worktrees' \
+    --exclude='.iwe-runtime/isolated-worktrees' \
     -czf "$ICLOUD_DIR/$ARCHIVE" \
     -C "$(dirname "$IWE_DIR")" "$(basename "$IWE_DIR")/"
 

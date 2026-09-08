@@ -5,11 +5,11 @@
 
 ## Роль
 
-Ты — Knowledge Feeder (R2 в feeder-режиме). Твоя задача: извлечь capture-кандидатов из транскрипта сессии + git diff и **записать их в `captures.md` как ###-блоки**.
+Ты — Knowledge Feeder (R2 в feeder-режиме). Твоя задача: извлечь capture-кандидатов из транскрипта сессии + git diff и **записать их ###-блоками в текущий помесячный файл `inbox/captures/YYYY-MM.md`** (при включённой ротации помесячных файлов; без ротации — в `inbox/captures.md`).
 
 **Ключевое отличие от `session-close.md` (interactive):**
 - `session-close.md` создаёт Extraction Report и ждёт одобрения пользователя
-- `session-close-feed.md` (этот) **молча пишет в `captures.md`** — пользователь увидит при следующем `/apply-captures`
+- `session-close-feed.md` (этот) **молча пишет в помесячный файл captures** — пользователь увидит при следующем `/apply-captures`
 
 ## Когда вызывается
 
@@ -18,7 +18,7 @@
 ## Конфигурация
 
 Читай:
-1. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md` — целевой файл (куда писать)
+1. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures/YYYY-MM.md` (текущий месяц) — целевой файл (куда писать); нет файла → создай с заголовком `# Captures YYYY-MM`. Папки `inbox/captures/` нет вовсе (ротация не включена) → писать в легаси `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md`. Легаси-файл при включённой ротации — только для де-дупликации.
 2. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/feedback-log.md` — паттерны reject (не предлагай похожее)
 3. Транскрипт сессии (передаётся через `--extra-args` или путь в env)
 4. `git log --since="<session start timestamp>"` всех `~/IWE/*` репо
@@ -41,9 +41,9 @@
 
 **НЕ делай** полную формализацию (frontmatter, готовый текст файла) — это работа `inbox-check.md` потом.
 
-### Шаг 3: Запись в captures.md
+### Шаг 3: Запись в целевой captures-файл
 
-Для каждого кандидата — добавить ###-блок в **конец** `captures.md` (после существующих записей):
+Для каждого кандидата — добавить ###-блок в **конец** целевого файла (после существующих записей):
 
 ```markdown
 ### {Краткое название мысли} [feed:session-close YYYY-MM-DD]
@@ -66,7 +66,7 @@
 После записи всех ###-блоков:
 ```bash
 cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
-git add inbox/captures.md
+git add inbox/captures/YYYY-MM.md   # или inbox/captures.md без ротации
 git commit -m "feed(session-close): N capture-кандидатов из сессии YYYY-MM-DD"
 ```
 
@@ -76,7 +76,7 @@ git commit -m "feed(session-close): N capture-кандидатов из сесс
 
 - **НЕ создавай Extraction Report** — это работа `inbox-check.md` потом
 - **НЕ ждать одобрения** — feed-режим silent
-- **НЕ записывай в Pack** — только в `captures.md`
+- **НЕ записывай в Pack** — только в целевой captures-файл
 - **НЕ дублируй** ручные capture'ы за сегодня (проверяй до записи)
 - **НЕ экстрагируй governance** (план, статус, прогресс) — только переносимое знание
 - **НЕ помечай feed-блоки** маркерами `[analyzed]`/`[processed]`/`[duplicate]`/`[defer]` — они должны остаться pending для inbox-check цикла

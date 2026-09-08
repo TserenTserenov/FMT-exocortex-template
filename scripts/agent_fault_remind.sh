@@ -1,9 +1,20 @@
-#!/bin/bash
-# routing: helper  skill=day-open  called-by=sonnet
-# see DP.SC.159, DP.ROLE.059
-# WP-316: Agent Fault Profile reminder wrapper
-# Usage: bash scripts/agent_fault_remind.sh [open|close|work]
+#!/usr/bin/env bash
+# Legacy positional protocol delegated to the Python compatibility shim.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_BIN="$(command -v python3 || true)"
+
+if [[ -z "$PYTHON_BIN" ]]; then
+    echo "ERROR: python3 is required for agent-fault" >&2
+    exit 2
+fi
+
+if [[ "${1:-}" == "--stats" ]]; then
+    exec "$PYTHON_BIN" "$SCRIPT_DIR/agent_fault_remind.py" "$@"
+fi
 
 PROTOCOL="${1:-work}"
-cd "$(dirname "$0")/.." || exit 1
-python3 scripts/agent_fault_remind.py --protocol "$PROTOCOL"
+[[ $# -eq 0 ]] || shift
+exec "$PYTHON_BIN" "$SCRIPT_DIR/agent_fault_remind.py" \
+    --protocol "$PROTOCOL" "$@"

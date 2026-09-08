@@ -95,7 +95,7 @@ check_forbidden() {
 }
 
 check_forbidden "readlink -f" 'readlink -f' 'cd "$(dirname "$0")" && pwd'
-check_forbidden "grep -P" 'grep -P' 'grep -E (Extended regex)'
+check_forbidden "grep -P" '(^|[^a-zA-Z])grep -P' 'grep -E (Extended regex)'
 check_forbidden "mktemp -d -t" 'mktemp -d -t' 'mktemp -d (без шаблона)'
 
 if [ "$fail" -eq 0 ]; then

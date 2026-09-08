@@ -13,7 +13,7 @@
    файл: печатает предупреждение в stderr, содержимое файла не меняется.
 
 Тест выполняет python-блок ИЗ РЕАЛЬНОГО create-wp.sh (извлекается по
-heredoc-маркерам между «# --- Шаг 4: WeekPlan ---» и следующим PYEOF),
+семантическому маркеру секции WeekPlan и следующему PYEOF),
 не копию логики — иначе тест проверял бы дубликат, не продакшен-код.
 """
 
@@ -26,10 +26,11 @@ CREATE_WP = Path(__file__).parent.parent / "create-wp.sh"
 
 
 def _extract_weekplan_writer() -> str:
-    """Достаёт python-heredoc шага 4 (WeekPlan writer) из create-wp.sh."""
+    """Достаёт WeekPlan-writer без привязки к порядковому номеру шага."""
     text = CREATE_WP.read_text(encoding="utf-8")
-    marker = "# --- Шаг 4: WeekPlan ---"
-    start = text.index(marker)
+    marker = re.search(r"^# --- Шаг \d+: WeekPlan ---$", text, flags=re.MULTILINE)
+    assert marker, "В create-wp.sh отсутствует секция WeekPlan"
+    start = marker.end()
     heredoc_start = text.index("<<'PYEOF'\n", start) + len("<<'PYEOF'\n")
     heredoc_end = text.index("\nPYEOF", heredoc_start)
     return text[heredoc_start:heredoc_end]

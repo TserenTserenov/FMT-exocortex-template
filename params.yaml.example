@@ -52,6 +52,16 @@ capture_autonomy: propose
 # Пример: "~/IWE/path/to/linear-sync.sh"
 linear_sync_path: ""
 
+# Необязательная проекция локальных РП во внешний трекер. Локальный контекст
+# всегда остаётся источником истины; пустой allowlist запрещает внешние записи.
+external_tracker:
+  adapter: none # none | github_issues
+  failure_policy: preserve_local
+  source_of_truth: iwe
+  github:
+    owner: ""
+    repositories: []
+
 # === Расширения ===
 
 # Директория с пользовательскими расширениями протоколов

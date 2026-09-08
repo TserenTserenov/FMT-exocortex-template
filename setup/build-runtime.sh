@@ -23,6 +23,7 @@
 #   3 — overlay-реестр не найден
 #   4 — отсутствуют source-файлы из реестра
 #   5 — drift detected (только в --diff режиме при найденных расхождениях)
+#   7 — отсутствует обязательное значение runtime-конфигурации
 #
 # WP-273 Этап 2 Ф18. ArchGate v2 → F (Generated runtime).
 
@@ -160,6 +161,12 @@ fi
 env_get() {
     local raw
     raw=$(grep "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    # launchd не передаёт USER/LOGNAME в job, но build выполняется в
+    # интерактивной системе, где Unix login доступен надёжно. Явное значение
+    # из env-файла сохраняет приоритет для нестандартных установок.
+    if [ -z "$raw" ] && [ "$1" = "USER_NAME" ]; then
+        raw=$(id -un 2>/dev/null || true)
+    fi
     case "$raw" in
         \"*\") [ ${#raw} -ge 2 ] && raw="${raw#\"}" && raw="${raw%\"}" ;;
         \'*\') [ ${#raw} -ge 2 ] && raw="${raw#\'}" && raw="${raw%\'}" ;;
@@ -197,10 +204,21 @@ if [ "${#SUBSTITUTED_FILES[@]}" -eq 0 ] && [ "${#COPIED_FILES[@]}" -eq 0 ]; then
     exit 3
 fi
 
+# USER/LOGNAME are absent from launchd's minimal environment. They are rendered
+# during the build from explicit configuration or the current Unix login.
+if [ -z "$(env_get USER_NAME)" ]; then
+    echo "ERROR: cannot determine USER_NAME to render launchd jobs." >&2
+    echo "Set USER_NAME in .exocortex.env or run the build as a Unix user." >&2
+    exit 7
+fi
+
 # === Verify source files exist in FMT ===
 MISSING=()
 for f in "${SUBSTITUTED_FILES[@]}" "${COPIED_FILES[@]}"; do
-    [ -f "$TEMPLATE_DIR/$f" ] || MISSING+=("$f")
+    # issue #348: a user-owned workspace file ships as <name>.example (see
+    # copy_to_workspace_file below) — accept either name here, or this pre-flight
+    # rejects the very layout the fix introduces.
+    [ -f "$TEMPLATE_DIR/$f" ] || [ -f "$TEMPLATE_DIR/$f.example" ] || MISSING+=("$f")
 done
 
 if [ "${#MISSING[@]}" -gt 0 ]; then
@@ -220,10 +238,18 @@ fi
 trap "rm -rf '$BUILD_DIR'" EXIT
 
 # Hash inputs (FMT files + .exocortex.env) for build-stamp
+resolve_overlay_source() {
+    local rel="$1"
+    local src="$TEMPLATE_DIR/$rel"
+    [ -f "$src" ] || src="$TEMPLATE_DIR/$rel.example"
+    [ -f "$src" ] || { echo "ERROR: overlay source missing for $rel" >&2; return 1; }
+    printf '%s\n' "$src"
+}
+
 INPUT_HASH=$(
     {
         for f in "${SUBSTITUTED_FILES[@]}" "${COPIED_FILES[@]}"; do
-            hash_file "$TEMPLATE_DIR/$f"
+            hash_file "$(resolve_overlay_source "$f")"
             echo "$f"
         done
         hash_file "$ENV_FILE"
@@ -231,7 +257,7 @@ INPUT_HASH=$(
     } | hash_file /dev/stdin 2>/dev/null || \
     {
         for f in "${SUBSTITUTED_FILES[@]}" "${COPIED_FILES[@]}"; do
-            hash_file "$TEMPLATE_DIR/$f"
+            hash_file "$(resolve_overlay_source "$f")"
             echo "$f"
         done
         hash_file "$ENV_FILE"
@@ -239,12 +265,13 @@ INPUT_HASH=$(
     } | (command -v shasum >/dev/null && shasum -a 256 || sha256sum) | cut -d' ' -f1
 )
 
-FMT_VERSION=$(grep -m1 '^## \[' "$TEMPLATE_DIR/CHANGELOG.md" | sed 's/.*\[\(.*\)\].*/\1/')
+FMT_VERSION=$(grep '^## \[' "$TEMPLATE_DIR/CHANGELOG.md" | grep -v '^## \[Unreleased\]' | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
 
 # === Apply substitutions ===
 build_substituted_file() {
     local rel="$1"
-    local src="$TEMPLATE_DIR/$rel"
+    local src
+    src=$(resolve_overlay_source "$rel") || return 1
     local dst="$BUILD_DIR/runtime/$rel"
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
@@ -275,8 +302,14 @@ build_substituted_file() {
 
 copy_to_workspace_file() {
     local rel="$1"
-    local src="$TEMPLATE_DIR/$rel"
+    local src
+    src=$(resolve_overlay_source "$rel") || return 1
     local dst="$BUILD_DIR/workspace/$rel"
+    # issue #348: a workspace file that belongs to the user (params.yaml) ships as
+    # <name>.example and is git-ignored under its working name — otherwise the
+    # template repo owns a file it has declared to be the user's, and a fork's pull
+    # puts the upstream defaults back over the user's edits. Destination name is
+    # unchanged; only the source in the template carries the .example suffix.
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
     case "$dst" in *.sh) chmod +x "$dst" ;; esac
@@ -375,8 +408,20 @@ fi
 
 mv "$BUILD_DIR/runtime" "$RUNTIME_DIR"
 
-# Cleanup old runtime
-[ -d "$RUNTIME_OLD" ] && rm -rf "$RUNTIME_OLD"
+# bug-2026-09-02-build-runtime-wipes-live-session-state: .iwe-runtime/ is
+# documented above as build-only (.build-hash, .build-version, roles/), but
+# session-guard.sh and friends also keep LIVE, non-regenerable state directly
+# under it (sessions/, isolate-push-attempts/, close-obligation/ — observed
+# live, not an exhaustive list). A plain "swap + rm -rf the old tree" silently
+# destroyed other agents' open-session markers on 2026-09-02. Carry forward
+# any top-level entry the fresh build did not itself produce, instead of
+# assuming the whole old tree is disposable.
+if [ -d "$RUNTIME_OLD" ]; then
+    while IFS= read -r entry; do
+        [ -e "$RUNTIME_DIR/$entry" ] || mv "$RUNTIME_OLD/$entry" "$RUNTIME_DIR/$entry"
+    done < <(find "$RUNTIME_OLD" -mindepth 1 -maxdepth 1 -exec basename {} \;)
+    rm -rf "$RUNTIME_OLD"
+fi
 
 # Lock освобождается автоматически при exit (FD 9 закрывается)
 
@@ -391,6 +436,13 @@ for f in "${COPIED_FILES[@]}"; do
     elif [ -f "$dst" ] && cmp -s "$src" "$dst"; then
         : # skip — identical
     else
+        # issue #348: seeding a protected user file used to be silent, so a workspace
+        # that had lost its params.yaml (layout migration, interrupted setup) got the
+        # template default back with no trace — indistinguishable from "update.sh
+        # overwrote my settings". Say it out loud when it happens.
+        if is_protected_user_file "$f" && [ ! -f "$dst" ]; then
+            $QUIET || echo "  ⚠ $f отсутствовал в $WORKSPACE_DIR — засеян значениями шаблона. Ваши прежние настройки в нём НЕ восстановлены."
+        fi
         cp "$src" "$dst"
         COPIED_COUNT=$((COPIED_COUNT + 1))
     fi

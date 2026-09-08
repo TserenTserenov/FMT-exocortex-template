@@ -5,6 +5,7 @@ argument-hint: "<запрос или тема>"
 version: 1.0.0
 layer: L1
 status: active
+browser_safe: true
 triggers:
   slash: [/fpf]
   phrases: []

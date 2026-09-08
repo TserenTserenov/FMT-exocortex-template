@@ -10,7 +10,7 @@ gate: auto
 
 | | |
 |---|---|
-| **Вход** | `docs/Caliber-artifacts-tracker.md`, `docs/Dissatisfactions.md`, `Lifework/` |
+| **Вход** | `Lifework/Caliber-artifacts-tracker.md`, `docs/Dissatisfactions.md`, `Lifework/` |
 | **Действие** | AI-вычисления: C_vis, C_act, разрыв, проверка пакета |
 | **Выход** | Измерения + рекомендация для шага 05b |
 
@@ -19,7 +19,7 @@ gate: auto
 > Метод: `PD.METHOD.018` § Механизм рекомендации Стратегом. Различение C_vis vs C_act — `PD.FORM.091 §6.1`.
 > **Согласие:** перед чтением метрик ЦД — сверить согласие, см. [../appendix/consent-check.md](../appendix/consent-check.md). При `denied`/`null` — degraded (калибр на самооценке, без записи).
 
-1. **Прочитать трекер:** `docs/Caliber-artifacts-tracker.md` (если нет — создай из шаблона)
+1. **Прочитать трекер:** `Lifework/Caliber-artifacts-tracker.md` (если нет — создай из шаблона `templates/strategy-skeleton/Lifework/Caliber-artifacts-tracker.md`)
 
 2. **Измерить C_vis:**
    - Max системный уровень в `Dissatisfactions.md` с фильтром «≥2 НЭП на уровне»

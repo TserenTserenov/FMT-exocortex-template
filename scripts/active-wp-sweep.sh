@@ -60,22 +60,12 @@ if ! command -v timeout &>/dev/null; then
     }
 fi
 
-# --- Найти python3 с yaml ---
-_find_python3() {
-  if python3 -c "import yaml" 2>/dev/null; then echo "python3"; return; fi
-  local p
-  for p in \
-    /nix/store/aj1smkrsnv16lbz9g8qancb04b3kv0va-python3-3.12.8-env/bin/python3 \
-    /usr/bin/python3 /usr/local/bin/python3; do
-    [[ -x "$p" ]] && "$p" -c "import yaml" 2>/dev/null && { echo "$p"; return; }
-  done
-  echo ""
-}
-
-PYTHON=$(_find_python3)
-
-if [[ -z "$PYTHON" ]]; then
-  echo "<!-- active-wp-sweep: python3+yaml не найден, sweep пропущен -->"
+# --- Найти python3 с yaml (общий резолвер, WP-529 F6 / #463) ---
+RESOLVER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
+if ! PYTHON=$("$RESOLVER"); then
+  # Sweep degrades to an explicit comment (callers embed stdout into
+  # dashboards); the resolver already printed install hints to stderr.
+  echo "<!-- active-wp-sweep: python3 с PyYAML не найден (pip3 install pyyaml), sweep пропущен -->"
   exit 0
 fi
 

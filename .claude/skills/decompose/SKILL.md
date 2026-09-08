@@ -4,6 +4,7 @@ description: Decompose work into stages with physical artifacts and acceptance c
 version: 1.0.0
 layer: L3
 status: active
+browser_safe: true
 triggers:
   slash: [/decompose]
   phrases: []

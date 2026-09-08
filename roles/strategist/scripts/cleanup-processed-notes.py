@@ -2,8 +2,14 @@
 """
 Deterministic cleanup of processed notes from fleeting-notes.md.
 
-Safety net for Note-Review Step 10: LLM often copies notes to archive
-but forgets to delete from source (tool-use hallucination).
+Pilot decision (2026-07-29): Note-Review classifies and proposes, it never
+decides on the pilot's behalf. As of that date the prompt (note-review.md
+step 4) stops stripping bold after classification — processed notes get
+"**Title** ✅предложено" instead, staying bold and visible every day until
+the pilot removes them himself. This script still exists as a safety net
+for any note that reaches this file without bold at all (pre-2026-07-29
+format, or a future regression) — it must never silently sweep up a note
+the pilot hasn't explicitly closed.
 
 This script runs AFTER note-review and deterministically:
 1. Parses fleeting-notes.md into header + note blocks
@@ -12,9 +18,9 @@ This script runs AFTER note-review and deterministically:
 4. Stages changes for git commit
 
 Keep rules:
-  - **bold** title  → new note, KEEP
+  - **bold** title  → note not yet closed by pilot (new or ✅предложено), KEEP
   - 🔄 in title    → needs review, KEEP
-  - everything else → processed, ARCHIVE
+  - everything else → already stripped of bold by something else, ARCHIVE
 """
 
 import os

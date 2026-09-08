@@ -4,7 +4,7 @@ type: reference
 horizon: warm
 domains: [agent-core]
 status: active
-owner: user
+owner: platform
 schema_version: 1
 name: "Agent Core — элаборация"
 description: "Полные формулировки блоков SYNC-CORE/CLAUDE.md §1-2, свёрнутых при M2-слиме (WP-7 HOTBUDGET-M2). Восстановлено из git-истории (commit fee0f85^) — issue #283."
@@ -15,7 +15,7 @@ description: "Полные формулировки блоков SYNC-CORE/CLAUD
 
 ## Pull-on-Touch (CLAUDE.md §2 п.4) — конфликт-резолюция
 
-`git pull --rebase` при первом **обращении** к репо за сессию (любое — `ls`/`Read`/`find`/`grep`/Edit/commit), один раз на репо, lazy. Применяется ко ВСЕМ git-репо в рабочей директории, не только governance.
+PreToolUse-хук автоматически выполняет `git pull --rebase --autostash` при первом **обращении** к репо за сессию, один раз на репо. Агент не повторяет pull вручную и не меняет рабочий каталог через `cd`; для git-команд используется `git -C <repo>`.
 
 Перед pull — `git status`:
 - **dirty** → stash или пропустить с пометкой «вывод potentially stale»

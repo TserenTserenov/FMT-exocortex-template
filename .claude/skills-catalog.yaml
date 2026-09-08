@@ -2,14 +2,14 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-07-19T06:33:31Z
+generated: 2026-08-27T12:59:44Z
 skills_dir: .claude/skills
 
 skills:
   - id: agent-fault
     name: "agent-fault"
     description: "Регистрация косяка агента в системе учёта WP-316 L1. Без LLM — детерминированный скрипт без WP Gate."
-    version: 0.1.0
+    version: 0.2.0
     layer: L1
     status: active
     triggers:
@@ -21,7 +21,7 @@ skills:
   - id: apply-captures
     name: "apply-captures"
     description: "Разбор extraction-reports со status pending-review — решение R15 (accept/reject/defer) ЖИВЫМ ПИЛОТОМ, запись в Pack, обновление статуса, коммит. Вызывать при Close при наличии N>0 pending-review отчётов."
-    version: 1.1.0
+    version: 1.3.0
     layer: L1
     status: active
     triggers:
@@ -45,13 +45,14 @@ skills:
     depends_on: []
     invoked_by:
     - CLAUDE.md
+    - extend
     - verify
     - bottleneck-pick
     - archgate
     - decompose
   - id: artifactor
     name: "artifactor"
-    description: "Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, routing_tag, resolution_path}. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."
+    description: "Classifies raw pilot request → structured request with routing and an explicit unresolved strategic-basis gate. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."
     version: 1.0.0
     layer: L1
     status: active
@@ -60,11 +61,12 @@ skills:
         - /artifactor
     depends_on: []
     invoked_by:
+    - protocol-open
     - artifactor
   - id: audit-docs
     name: "audit-docs"
     description: "Audit repository documentation: detect drift between code and docs, report coverage by category. Run manually or on triggered drift critical."
-    version: 0.1.0
+    version: 0.2.0
     layer: L3
     status: active
     triggers:
@@ -114,7 +116,7 @@ skills:
     - platform-bottleneck
   - id: check-secret
     name: "check-secret"
-    description: "Check a text fragment for potential secrets (API keys, tokens, passwords) BEFORE sending to chat / committing / publishing. Third protection layer on top of pre-commit hook (B7.7a) and PostToolUse redact (B7.7b). Manual gate — user explicitly calls on potentially sensitive text."
+    description: "Check a text fragment for potential secrets (API keys, tokens, passwords) BEFORE sending to chat / committing / publishing. Second protection layer on top of the pre-commit hook — manual gate, user explicitly calls on potentially sensitive text."
     version: 1.0.0
     layer: L1
     status: active
@@ -135,6 +137,7 @@ skills:
         - /consent
     depends_on: []
     invoked_by:
+    - protocol-dt-integration
     - consent
   - id: day-close
     name: "day-close"
@@ -147,6 +150,7 @@ skills:
         - /day-close
     depends_on: []
     invoked_by:
+    - protocol-close
     - run-protocol
     - extend
     - day-close
@@ -162,6 +166,7 @@ skills:
         - /day-open
     depends_on: []
     invoked_by:
+    - protocol-open
     - CLAUDE.md
     - run-protocol
     - extend
@@ -181,6 +186,7 @@ skills:
         - /decompose
     depends_on: []
     invoked_by:
+    - protocol-open
     - bottleneck-pick
     - decompose
   - id: diagnose
@@ -259,6 +265,18 @@ skills:
     depends_on: []
     invoked_by:
     - iwe-bug-report
+  - id: iwe-platform-redteam
+    name: "iwe-platform-redteam"
+    description: "Product-only Red Team audit of the FMT/IWE platform: source, manifests, setup/update paths, CI and release provenance, agent permissions and memory, hooks, runtime, roles, schedulers, Day Open/Close, and regression claims. Use before merging or publishing a release, after changes to updater/runtime/security behavior, or when verifying a reported platform defect. Excludes real consumer workspaces and personal customizations; use repository-owned code and synthetic disposable fixtures only."
+    version: 1.0.0
+    layer: L1
+    status: experimental
+    triggers:
+      slash:
+        - /iwe-platform-redteam
+    depends_on: []
+    invoked_by:
+    - iwe-platform-redteam
   - id: iwe-restore
     name: "iwe-restore"
     description: "Восстановление памяти агента из exocortex-бэкапа при переезде на новое устройство. Находит DS-strategy/exocortex/, показывает что будет восстановлено, спрашивает подтверждение, копирует memory/ + CLAUDE.md + AGENTS.md, финализирует /audit-installation."
@@ -291,6 +309,7 @@ skills:
       slash: []
     depends_on: []
     invoked_by:
+    - extend
     - iwe-update
   - id: ke
     name: "ke"
@@ -309,7 +328,7 @@ skills:
   - id: kimi-peer-writer
     name: "kimi-peer-writer"
     description: "Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Opening и Closing, turn-loop, эскалации, Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), отложенную финализацию и верификацию."
-    version: 1.2.0
+    version: 1.3.0
     layer: L1
     status: active
     triggers:
@@ -319,7 +338,7 @@ skills:
     invoked_by: []
   - id: lesson-close
     name: "lesson-close"
-    description: "Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в /lesson."
+    description: "Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо DS-personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в /lesson."
     version: 1.0.0
     layer: L1
     status: active
@@ -352,7 +371,10 @@ skills:
         - /month-close
     depends_on: []
     invoked_by:
+    - protocol-month-close
+    - protocol-close
     - CLAUDE.md
+    - extend
     - month-close
   - id: org-dev
     name: "org-dev"
@@ -395,8 +417,8 @@ skills:
     - pack-creator
   - id: peer-conversation
     name: "peer-conversation"
-    description: "Многотуровый диалог писателя (Claude) с напарником (Kimi) по задаче пилота (DP.SC.154). Ведёт turn-loop, обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
-    version: 1.3.0
+    description: "Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/claude-headless) по задаче пилота (DP.SC.154). Ведёт turn-loop (2 участника) или round-loop (3+, WP-509), обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
+    version: 1.5.5
     layer: L1
     status: active
     triggers:
@@ -408,10 +430,10 @@ skills:
     - kimi-peer-writer
   - id: personal-guide-render
     name: "personal-guide-render"
-    description: "Тонкий клиент — собирает персональное руководство пилота через локальный шлюз (mcp__iwe-local-gateway__render_personal_guide). Используй когда пилот просит «пересобери руководство», «обнови мой план», «собери руководство на сегодня»."
-    version: 2.0.0
+    description: "Персональное руководство пилота собирается автоматически на сервере платформы по расписанию. Используй когда пилот просит «пересобери руководство», «обнови мой план», «собери руководство на сегодня» — скилл объясняет текущее состояние и проверяет, что руководство доехало."
+    version: 2.1.0
     layer: L1
-    status: active
+    status: awaiting-server-tool
     triggers:
       slash:
         - /personal-guide-render
@@ -422,12 +444,13 @@ skills:
     - personal-guide-render
   - id: personal-guide-start
     name: "personal-guide-start"
-    description: "Bootstrap wrapper — creates an empty personal-guide repo under the pilot's account (flat name, no login in the name; if not yet created), then calls /personal-guide-render to populate 6 files. Use when pilot first asks 'create my personal guide', 'I want to start a personal development program', 'build me a starter plan'."
-    version: 0.0.0
-    layer: unknown
+    description: "Bootstrap-обёртка — создаёт пустой репо `DS-personal-guide` под аккаунтом пилота (плоское имя, без логина в названии; если ещё нет), затем вызывает /personal-guide-render для наполнения 6 файлами. Используй когда пилот в первый раз просит «создай мне персональное руководство», «хочу начать программу личного развития», «собери мне стартовый план»."
+    version: 1.3.2
+    layer: L1
     status: active
     triggers:
-      slash: []
+      slash:
+        - /personal-guide-start
     depends_on: []
     invoked_by:
     - bottleneck-pick
@@ -445,6 +468,19 @@ skills:
     depends_on: []
     invoked_by:
     - platform-bottleneck
+  - id: repo-new
+    name: "repo-new"
+    description: "Гейт создания любого нового репозитория IWE (экосистемного или личного пространства). Проводит запрос через: классификацию намерения (Pack / SpacePlan / именованный проект / экосистемный DS), проверку имени и класса, разметку данных (типы 2.1-2.6, карантин), объявление писатель/владелец/читатели, решение о публичности, обязательный Decision Gate (по умолчанию — одобрение пилота, для CI — ограниченное делегирование), затем исполнение (создание, регистрация, развёртывание скелета). Используй когда пилот хочет создать новый репозиторий, или спрашивает, куда и как разместить новый вид данных. Не для расширения существующего репозитория (→ Repo-Touch/Residency Gate) и не для Pack-репозиториев (делегируется `/pack-new`)."
+    version: 0.2.0
+    layer: L2
+    status: experimental
+    triggers:
+      slash:
+        - repo-new
+    depends_on: []
+    invoked_by:
+    - personal-guide-start
+    - repo-new
   - id: restore-exocortex
     name: "restore-exocortex"
     description: "Restore IWE memory from an exocortex backup on a new device or after data loss — NL wrapper around restore-from-exocortex.sh."
@@ -467,6 +503,7 @@ skills:
       slash: []
     depends_on: []
     invoked_by:
+    - protocol-month-close
     - CLAUDE.md
     - day-close
     - day-close
@@ -497,7 +534,7 @@ skills:
     - skill-creator
   - id: strategy-session
     name: "strategy-session"
-    description: "Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). День-1+ → weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
+    description: "Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
     version: 1.0.0
     layer: L1
     status: active
@@ -506,6 +543,7 @@ skills:
         - /strategy-session
     depends_on: []
     invoked_by:
+    - extend
     - discovery-session
     - strategy-session
   - id: think
@@ -529,6 +567,7 @@ skills:
         - /transcribe
     depends_on: []
     invoked_by:
+    - protocol-work
     - transcribe
   - id: vdv
     name: "vdv"
@@ -545,6 +584,18 @@ skills:
     invoked_by:
     - vdv
     - skill-creator
+  - id: verify-hypotheses
+    name: "verify-hypotheses"
+    description: "Сверка журнала гипотез (hypotheses-log.md) по запросу вне ритма week-close. Фильтрует записи со статусом «на сверке» и наступившей датой, сверяет критерий фальсификации с доступной фактурой, предлагает вердикт, пилот подтверждает, вердикт пишется новой записью. Вызывать на явную фразу пилота, не автоматически."
+    version: 0.1.0
+    layer: L1
+    status: experimental
+    triggers:
+      slash:
+        - /verify-hypotheses
+    depends_on: []
+    invoked_by:
+    - verify-hypotheses
   - id: verify
     name: "verify"
     description: "Верификация артефакта по эталону из Pack. Загружает роль VR.R.001 (Верификатор) с context isolation — проверяет результат, а не процесс создания."
@@ -556,8 +607,12 @@ skills:
         - /verify
     depends_on: []
     invoked_by:
+    - protocol-work
+    - protocol-close
     - CLAUDE.md
     - run-protocol
+    - verify-hypotheses
+    - extend
     - peer-conversation
     - day-close
     - verify
@@ -601,7 +656,9 @@ skills:
         - /week-close
     depends_on: []
     invoked_by:
+    - protocol-close
     - run-protocol
+    - verify-hypotheses
     - extend
     - week-close-pilot
     - month-close
@@ -609,7 +666,7 @@ skills:
     - week-close
   - id: wp-new
     name: "wp-new"
-    description: "Создание нового рабочего продукта (РП) с записью в 5 мест атомарно. Используй когда появляется новая задача, которой нет в плане недели."
+    description: "Создание нового рабочего продукта (РП) с атомарной записью в 4 локальных места (+ условный пост-шаг во внешний трекер, если подключён). Используй когда появляется новая задача, которой нет в плане недели."
     version: 1.0.0
     layer: L1
     status: active

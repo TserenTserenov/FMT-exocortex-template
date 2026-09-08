@@ -76,6 +76,7 @@ copied_substituted:
 # раньше — из $TEMPLATE_DIR/.exocortex.env, миграция при первом build).
 placeholders:
   - HOME_DIR
+  - USER_NAME
   - WORKSPACE_DIR
   - CLAUDE_PATH
   - CLAUDE_PROJECT_SLUG

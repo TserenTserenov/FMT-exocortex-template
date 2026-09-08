@@ -9,8 +9,21 @@ name: IWE Cloud Scheduler (базовый)
 # Подробности: DP.SC.019 (PACK-digital-platform/08-service-clauses/)
 #
 # Настройка:
-# 1. Создайте GitHub Secret: STRATEGY_REPO_TOKEN (PAT с доступом к DS-strategy)
-# 2. Укажите STRATEGY_REPO в env ниже (ваш DS-strategy репо)
+# 1. Скопируйте этот файл в СВОЙ DS-strategy репозиторий (не форк FMT-exocortex-template — см. docs/CLOUD-SCHEDULER.md)
+# 2. Создайте GitHub Secret: STRATEGY_REPO_TOKEN (PAT с доступом к DS-strategy)
+# 3. Укажите STRATEGY_REPO в Settings → Variables вашего репозитория
+#
+# issue #454: раньше здесь стоял `if: github.repository == 'TserenTserenov/FMT-exocortex-template'`
+# на уровне job — идея была не гонять расписание по случайным форкам шаблона, но
+# условие проверяло ИМЯ АПСТРИМ-РЕПОЗИТОРИЯ, а не факт форка — и поэтому так же
+# ломало и единственный документированный сценарий (шаг 1 выше): в СВОЁМ отдельном
+# DS-strategy репозитории github.repository тоже никогда не равен
+# TserenTserenov/FMT-exocortex-template, так что workflow не запускался НИГДЕ,
+# кроме самого upstream-репозитория шаблона, где STRATEGY_REPO в принципе не
+# настроен. Ниже — не «дополнительная защита от форков», а восстановление
+# единственной проверки, которая и нужна: настроен ли STRATEGY_REPO. Не настроен
+# (обычный форк шаблона, который никто не подключал) → шаг "Skip" ниже печатает
+# причину, не тихо проваливается.
 
 on:
   schedule:
@@ -41,10 +54,9 @@ jobs:
     name: Backup memory → exocortex
     runs-on: ubuntu-latest
     if: >-
-      github.repository == 'TserenTserenov/FMT-exocortex-template' && (
       github.event_name == 'schedule' ||
       github.event.inputs.task == 'all' ||
-      github.event.inputs.task == 'backup' )
+      github.event.inputs.task == 'backup'
     steps:
       - name: Checkout strategy repo
         if: env.STRATEGY_REPO != ''
@@ -108,15 +120,15 @@ jobs:
         run: |
           echo "⚠️ STRATEGY_REPO не настроен. Укажите в Settings → Variables → STRATEGY_REPO"
           echo "Формат: username/repo-name"
+          echo "Если вы видите это в форке FMT-exocortex-template: этот workflow не предназначен для запуска здесь — см. docs/CLOUD-SCHEDULER.md, шаг 1 (скопировать в свой DS-strategy репозиторий)."
 
   health-check:
     name: Health check (ночная автоматика)
     runs-on: ubuntu-latest
     if: >-
-      github.repository == 'TserenTserenov/FMT-exocortex-template' && (
       github.event_name == 'schedule' ||
       github.event.inputs.task == 'all' ||
-      github.event.inputs.task == 'health-check' )
+      github.event.inputs.task == 'health-check'
     steps:
       - name: Checkout strategy repo
         if: env.STRATEGY_REPO != ''
@@ -286,3 +298,4 @@ jobs:
         if: env.STRATEGY_REPO == ''
         run: |
           echo "⚠️ STRATEGY_REPO не настроен. Укажите в Settings → Variables → STRATEGY_REPO"
+          echo "Если вы видите это в форке FMT-exocortex-template: этот workflow не предназначен для запуска здесь — см. docs/CLOUD-SCHEDULER.md, шаг 1 (скопировать в свой DS-strategy репозиторий)."

@@ -42,11 +42,19 @@
 
 **Проверка (в начале алгоритма, до шага 1).** `date +%A` — локале-зависимо (под `ru_RU.UTF-8` вернёт «четверг», не «thursday», и сравнение с англоязычным именем из конфига никогда не совпадёт — тот же баг однажды уже был найден и исправлен в `day-open-scaffold.sh`, здесь используется тот же паттерн: числовой день недели `date +%u` (1=Пн…7=Вс, локале-независимо) + карта имя→число):
 ```bash
-STRATEGY_DAY_NAME=$(python3 -c "
+T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"
+# issue #541 hvost 3 (Evgenii, cold-review 26.08): бывший голый `python3 -c` со
+# сглатыванием stderr тихо возвращал "monday", даже если реальный
+# day-rhythm-config.yaml называет другой день — на хосте без PyYAML это была
+# не ошибка, а неотличимая от штатной работы неверная логика. find-python3.sh
+# сам печатает внятную причину в stderr при неудаче (не глушим её здесь);
+# страховка на monday остаётся — это мягкий guard, не повод падать целиком.
+PY3="$(bash "$T/.claude/lib/find-python3.sh")"
+STRATEGY_DAY_NAME=$([ -n "$PY3" ] && "$PY3" -c "
 import yaml
 d = yaml.safe_load(open('${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml'))
 print((d.get('day_open') or {}).get('strategy_day', 'monday'))
-" 2>/dev/null || echo monday)
+" || echo monday)
 case "$STRATEGY_DAY_NAME" in
   monday)    STRATEGY_DOW=1 ;;
   tuesday)   STRATEGY_DOW=2 ;;
@@ -120,7 +128,8 @@ grep -nE "→ ждёт|ждёт|dep:|блокер|blocked:|остановлен|
 > Правило: [feedback_memory_index_discipline.md](../../../memory/feedback_memory_index_discipline.md)
 
 ```bash
-python3 ${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}/.claude/scripts/check-index-health.py
+T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"
+PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/check-index-health.py"
 ```
 
 Для каждого FAIL/WARN в отчёте:

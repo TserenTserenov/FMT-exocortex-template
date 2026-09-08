@@ -109,7 +109,10 @@ A1_MATCH=$(printf '%s\n' "$RESPONSE" | grep -E '^\s*`?[A-Za-z0-9_/.-]+\.(py|md|t
 # exit 0 / SHA: / status: done — детерминированы. PASS/FAIL ловим только в
 # тест-контексте (рядом тест/smoke/проверка/G-гейт) — иначе ложный позитив
 # на обычное слово («полный FAIL»).
-A10_MATCH=$(printf '%s\n' "$RESPONSE" | grep -E '(\bexit\s+0\b|SHA:\s*[a-f0-9]{7,}|status:\s*(done|success)|\bG[0-9]\s+(PASS|FAIL)\b|(smoke|тест[а-я]*|проверк[а-я]*)\s*:\s*(PASS|FAIL)\b|`(PASS|FAIL)`)' | head -1 || true)
+# NB: no Cyrillic ranges ([а-я]) here — GNU grep under C.UTF-8 (GitHub runner)
+# rejects them with "Invalid collation character" and the hook goes silently
+# blind (found by T16 in CI, 2026-08-04). [^:[:space:]] is locale-independent.
+A10_MATCH=$(printf '%s\n' "$RESPONSE" | grep -E '(\bexit\s+0\b|SHA:\s*[a-f0-9]{7,}|status:\s*(done|success)|\bG[0-9]\s+(PASS|FAIL)\b|(smoke|тест[^:[:space:]]*|проверк[^:[:space:]]*)\s*:\s*(PASS|FAIL)\b|`(PASS|FAIL)`)' | head -1 || true)
 [ -n "$A10_MATCH" ] && log_violation "A10" "bare-english-marker" "$A10_MATCH"
 
 # --- A8: журнал процесса в начале строки ответа ---

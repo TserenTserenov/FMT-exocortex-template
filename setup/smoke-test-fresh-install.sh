@@ -35,6 +35,24 @@ TEST_WS="${SMOKE_WORKSPACE:-/tmp/iwe-smoke-test-$$}"
 # DS-pilot-strategy и пр. Закрывает gap «hardcode виден только при non-default».
 SMOKE_GOVERNANCE_REPO="${SMOKE_GOVERNANCE_REPO:-DS-strategy}"
 
+# E2E sections replace HOME so setup cannot touch the caller's real dotfiles.
+# On macOS CI, PyYAML can live in the original HOME's user-site; changing HOME
+# would otherwise make the already-verified dependency disappear mid-test and
+# create unrelated ResidencyGate/catalog cascades. Preserve only the resolved
+# package directory for the isolated subprocesses.
+SMOKE_PYTHON_RESOLVER="$TEMPLATE_DIR/.claude/lib/find-python3.sh"
+if [ -x "$SMOKE_PYTHON_RESOLVER" ]; then
+    SMOKE_PYTHON=$("$SMOKE_PYTHON_RESOLVER" 2>/dev/null || true)
+    if [ -n "$SMOKE_PYTHON" ]; then
+        SMOKE_PYYAML_SITE=$("$SMOKE_PYTHON" -c \
+            'from pathlib import Path; import yaml; print(Path(yaml.__file__).resolve().parent.parent)' \
+            2>/dev/null || true)
+        if [ -n "$SMOKE_PYYAML_SITE" ]; then
+            export PYTHONPATH="$SMOKE_PYYAML_SITE${PYTHONPATH:+:$PYTHONPATH}"
+        fi
+    fi
+fi
+
 # Cleanup при exit
 cleanup() {
     local rc=$?
@@ -50,6 +68,13 @@ PASS_COUNT=0
 fail() { echo "  ❌ FAIL: $*" >&2; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 pass() { echo "  ✅ PASS: $*"; PASS_COUNT=$((PASS_COUNT + 1)); }
 warn() { echo "  ⚠️  WARN: $*" >&2; }
+
+portable_mode() {
+    # GNU stat accepts -c, while BSD/macOS stat accepts -f. Try the
+    # GNU form first because GNU `stat -f` can emit filesystem output before
+    # rejecting the BSD format argument, contaminating fallback output.
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null
+}
 
 echo "=========================================="
 echo "  Smoke Test: Fresh Install (WP-273 F)"
@@ -69,6 +94,7 @@ CLAUDE_PROJECT_SLUG=smoke-test
 TIMEZONE_HOUR=4
 TIMEZONE_DESC=4:00 UTC
 HOME_DIR=$TEST_WS
+USER_NAME=smoke-test
 GOVERNANCE_REPO=$SMOKE_GOVERNANCE_REPO
 IWE_TEMPLATE=$TEMPLATE_DIR
 IWE_RUNTIME=$TEST_WS/.iwe-runtime
@@ -145,6 +171,7 @@ CLAUDE_PROJECT_SLUG=smoke-test
 TIMEZONE_HOUR=4
 TIMEZONE_DESC=4:00 UTC
 HOME_DIR=$TEST_WS
+USER_NAME=smoke-test
 GOVERNANCE_REPO=DS-pilot-strategy
 IWE_TEMPLATE=$TEMPLATE_DIR
 IWE_RUNTIME=$TEST_WS/.iwe-runtime
@@ -335,6 +362,20 @@ else
     fail "Test 7c: ожидался exit 0 + health в выводе, получено: rc=$EXT_RC3 out=$EXT_OUT3"
 fi
 
+# 7d: missing extensions directory is damaged delivery, not an empty hook.
+BROKEN_LOADER_WS="$TEST_WS/ext-loader-broken"
+mkdir -p "$BROKEN_LOADER_WS/.claude/scripts"
+cp "$LOAD_EXT" "$BROKEN_LOADER_WS/.claude/scripts/"
+EXT_RC4=$(IWE_WORKSPACE="$BROKEN_LOADER_WS" WORKSPACE_DIR="$BROKEN_LOADER_WS" \
+    IWE_ROOT="$BROKEN_LOADER_WS" IWE="$BROKEN_LOADER_WS" \
+    bash "$BROKEN_LOADER_WS/.claude/scripts/load-extensions.sh" archgate checks \
+    >/dev/null 2>&1 && echo 0 || echo $?)
+if [ "$EXT_RC4" = "3" ]; then
+    pass "Test 7d: отсутствующий extensions/ → typed loader error"
+else
+    fail "Test 7d: отсутствующий extensions/ должен вернуть 3, получено $EXT_RC4"
+fi
+
 rm -rf "$EXT_TEST_WS"
 
 # === Test 9: e2e setup.sh delivery — реальный запуск + проверка workspace ===
@@ -345,11 +386,12 @@ echo "[9] e2e setup.sh delivery (SETUP_CI=1 --core)..."
 E2E_WS="/tmp/iwe-smoke-e2e-$$"
 # HOME isolation обязательна — иначе install-iwe-paths.sh перезатрёт реальный $HOME/.iwe-paths
 # автора smoke-test путём /tmp/iwe-smoke-e2e-* (collateral pollution, баг 0.7.x).
-E2E_HOME="$E2E_WS/home"
+E2E_HOME="/tmp/iwe-smoke-e2e-home-$$"
 E2E_MEM="$E2E_HOME/.claude/projects/$(echo "$E2E_WS" | tr '/' '-')/memory"
 mkdir -p "$E2E_WS" "$E2E_HOME"
 E2E_RC=0
 E2E_OUT=$(HOME="$E2E_HOME" SETUP_CI=1 GITHUB_USER=smoke-e2e WORKSPACE_DIR="$E2E_WS" \
+    GOVERNANCE_REPO="$SMOKE_GOVERNANCE_REPO" \
     GIT_AUTHOR_NAME="smoke-e2e" GIT_AUTHOR_EMAIL="smoke@test.local" \
     GIT_COMMITTER_NAME="smoke-e2e" GIT_COMMITTER_EMAIL="smoke@test.local" \
     bash "$TEMPLATE_DIR/setup.sh" --core 2>&1) || E2E_RC=$?
@@ -363,22 +405,139 @@ else
         ".claude/agents" \
         ".claude/skills" \
         ".claude/hooks" \
+        ".claude/lib/find-python3.sh" \
+        ".claude/lib/residency-gate-run.sh" \
         ".claude/rules" \
-        "CLAUDE.md"; do
+        ".claude/rules-lazy/role-prefixes-full.md" \
+        ".claude/rules-lazy/state-transition-gate.md" \
+        "CLAUDE.md" \
+        "AGENTS.md"; do
         if [ -e "$E2E_WS/$f" ]; then
             pass "e2e workspace: $f доставлен"
         else
             fail "e2e workspace: $f ОТСУТСТВУЕТ (delivery gap)"
         fi
     done
+    E2E_STATE_REGISTRY="$E2E_WS/$SMOKE_GOVERNANCE_REPO/docs/state-axes-registry.yaml"
+    if [ ! -e "$E2E_STATE_REGISTRY" ] && \
+       grep -Fq '.claude/rules-lazy/state-transition-gate.md' "$E2E_WS/CLAUDE.md" && \
+       grep -Fq '.claude/rules-lazy/state-transition-gate.md' "$E2E_WS/AGENTS.md" && \
+       grep -Fq "$SMOKE_GOVERNANCE_REPO/docs/state-axes-registry.yaml" "$E2E_WS/AGENTS.md" && \
+       ! grep -Fq 'gate_ready' "$E2E_WS/CLAUDE.md" && \
+       ! grep -Fq '{{GOVERNANCE_REPO}}' "$E2E_WS/AGENTS.md" && \
+       ! grep -Fq '{{GOVERNANCE_REPO}}' "$E2E_WS/.claude/rules-lazy/state-transition-gate.md" && \
+       [ -r "$E2E_WS/.claude/rules-lazy/state-transition-gate.md" ]; then
+        pass "e2e workspace: State-Transition Gate stays lazy without a governance registry"
+    else
+        fail "e2e workspace: State-Transition Gate lazy trigger or fresh-install condition drifted"
+    fi
     # Проверяем memory/*.yaml в claude projects dir
     if [ -f "$E2E_MEM/day-rhythm-config.yaml" ]; then
         pass "e2e memory: day-rhythm-config.yaml доставлен"
     else
         fail "e2e memory: day-rhythm-config.yaml ОТСУТСТВУЕТ в $E2E_MEM"
     fi
+    E2E_GATE_SKILL="$E2E_WS/.claude/skills/smoke-residency-policy"
+    mkdir -p "$E2E_GATE_SKILL"
+    cat > "$E2E_GATE_SKILL/SKILL.md" <<'EOF'
+---
+name: smoke-residency-policy
+---
+
+data_needs:
+  - type: 2.1, flow: inbound, name: smoke-profile, schema_version: 1
+EOF
+    E2E_GATE_RC=0
+    E2E_GATE_OUT=$(printf '%s' \
+        '{"tool_name":"Skill","tool_input":{"skill":"smoke-residency-policy"}}' \
+        | HOME="$E2E_HOME" IWE_WORKSPACE="$E2E_WS" \
+          bash "$E2E_WS/.claude/hooks/residency-gate-skill-adapter.sh" \
+        2>&1) || E2E_GATE_RC=$?
+    if [ "$E2E_GATE_RC" -eq 2 ] && echo "$E2E_GATE_OUT" | grep -q '\[policy_denied\]'; then
+        pass "e2e workspace: installed ResidencyGate blocks declared need as policy_denied"
+    else
+        fail "e2e workspace: installed ResidencyGate outcome rc=$E2E_GATE_RC: $E2E_GATE_OUT"
+    fi
+    E2E_STATE_HOME="$E2E_HOME/.iwe/state"
+    E2E_STATE_FILE="$E2E_STATE_HOME/data-residency.yaml"
+    if [ -f "$E2E_STATE_FILE" ] && [ ! -e "$E2E_HOME/IWE/current/data-residency.yaml" ]; then
+        pass "e2e workspace: ResidencyGate state is local and outside the IWE workspace"
+    else
+        fail "e2e workspace: ResidencyGate state path is not isolated"
+    fi
+    if [ "$(portable_mode "$E2E_STATE_HOME")" = "700" ] && \
+       [ "$(portable_mode "$E2E_STATE_FILE")" = "600" ]; then
+        pass "e2e workspace: ResidencyGate state permissions are private"
+    else
+        fail "e2e workspace: ResidencyGate state permissions are not 0700/0600"
+    fi
+    E2E_ROLE_HOOK="$E2E_WS/.claude/hooks/inject-role-prefixes.sh"
+    E2E_ROLE_ORDINARY=$(printf '%s' \
+        '{"session_id":"fresh-role","prompt":"Обычный вопрос без роли"}' \
+        | CLAUDE_PROJECT_DIR="$E2E_WS" bash "$E2E_ROLE_HOOK")
+    E2E_ROLE_PREFIX=$(printf '%s' \
+        '{"session_id":"fresh-role","prompt":"Навигатор, выбери следующий шаг"}' \
+        | CLAUDE_PROJECT_DIR="$E2E_WS" bash "$E2E_ROLE_HOOK")
+    if [ "$E2E_ROLE_ORDINARY" = "{}" ] && \
+       echo "$E2E_ROLE_PREFIX" | grep -q 'Полный контекст ролей IWE'; then
+        pass "e2e workspace: installed role hook distinguishes ordinary and role-prefixed prompts"
+    else
+        fail "e2e workspace: installed role hook does not honor .prompt classification"
+    fi
 fi
-rm -rf "$E2E_WS" "$E2E_MEM" 2>/dev/null || true
+rm -rf "$E2E_WS" "$E2E_HOME" 2>/dev/null || true
+
+# === Test 9b: setup rerun preserves configured arbitrary governance repo ===
+echo "[9b] setup.sh rerun reuses workspace governance config..."
+RERUN_WS="/tmp/iwe-smoke-rerun-$$"
+RERUN_HOME="$RERUN_WS/home"
+RERUN_GOV="pilot-governance"
+mkdir -p "$RERUN_WS" "$RERUN_HOME"
+RERUN_FIRST_RC=0
+HOME="$RERUN_HOME" SETUP_CI=1 GITHUB_USER=smoke-rerun \
+    WORKSPACE_DIR="$RERUN_WS" GOVERNANCE_REPO="$RERUN_GOV" \
+    GIT_AUTHOR_NAME="smoke-rerun" GIT_AUTHOR_EMAIL="smoke@test.local" \
+    GIT_COMMITTER_NAME="smoke-rerun" GIT_COMMITTER_EMAIL="smoke@test.local" \
+    bash "$TEMPLATE_DIR/setup.sh" --core >/dev/null 2>&1 || RERUN_FIRST_RC=$?
+RERUN_SECOND_RC=0
+env -u GOVERNANCE_REPO -u IWE_GOVERNANCE_REPO \
+    HOME="$RERUN_HOME" SETUP_CI=1 GITHUB_USER=smoke-rerun \
+    WORKSPACE_DIR="$RERUN_WS" \
+    GIT_AUTHOR_NAME="smoke-rerun" GIT_AUTHOR_EMAIL="smoke@test.local" \
+    GIT_COMMITTER_NAME="smoke-rerun" GIT_COMMITTER_EMAIL="smoke@test.local" \
+    bash "$TEMPLATE_DIR/setup.sh" --core >/dev/null 2>&1 || RERUN_SECOND_RC=$?
+if [ "$RERUN_FIRST_RC" -eq 0 ] && [ "$RERUN_SECOND_RC" -eq 0 ] && \
+   [ -d "$RERUN_WS/$RERUN_GOV/.git" ] && \
+   [ ! -e "$RERUN_WS/DS-strategy" ] && \
+   grep -Fq "GOVERNANCE_REPO=\"$RERUN_GOV\"" "$RERUN_WS/.exocortex.env"; then
+    pass "e2e rerun: configured arbitrary governance is preserved without env replay"
+else
+    fail "e2e rerun: rc=$RERUN_FIRST_RC/$RERUN_SECOND_RC or DS-strategy escaped from configured governance"
+fi
+rm -rf "$RERUN_WS" 2>/dev/null || true
+
+# === Test 9c: governance-root symlink is rejected before external writes ===
+echo "[9c] setup.sh rejects governance root symlink..."
+SYMLINK_WS="/tmp/iwe-smoke-symlink-$$"
+SYMLINK_HOME="$SYMLINK_WS/home"
+SYMLINK_OUTSIDE="/tmp/iwe-smoke-symlink-outside-$$"
+mkdir -p "$SYMLINK_WS" "$SYMLINK_HOME" "$SYMLINK_OUTSIDE"
+printf 'sentinel-before\n' > "$SYMLINK_OUTSIDE/sentinel.txt"
+ln -s "$SYMLINK_OUTSIDE" "$SYMLINK_WS/custom-governance"
+SYMLINK_RC=0
+SYMLINK_OUT=$(HOME="$SYMLINK_HOME" SETUP_CI=1 GITHUB_USER=smoke-symlink \
+    WORKSPACE_DIR="$SYMLINK_WS" GOVERNANCE_REPO=custom-governance \
+    bash "$TEMPLATE_DIR/setup.sh" --core 2>&1) || SYMLINK_RC=$?
+SYMLINK_FILE_COUNT=$(find "$SYMLINK_OUTSIDE" -type f | wc -l | tr -d ' ')
+if [ "$SYMLINK_RC" -ne 0 ] && \
+   echo "$SYMLINK_OUT" | grep -q 'не может быть символической ссылкой' && \
+   [ "$(cat "$SYMLINK_OUTSIDE/sentinel.txt")" = "sentinel-before" ] && \
+   [ "$SYMLINK_FILE_COUNT" -eq 1 ]; then
+    pass "e2e symlink: setup fails before writing through governance root"
+else
+    fail "e2e symlink: rc=$SYMLINK_RC external files=$SYMLINK_FILE_COUNT"
+fi
+rm -rf "$SYMLINK_WS" "$SYMLINK_OUTSIDE" 2>/dev/null || true
 
 # === Test 10: setup.sh full mode — step [5/6] Installing roles не падает (WP-315 Ф5) ===
 # Test 9 использует --core → пропускает step 5. Этот тест — полный запуск на macOS
@@ -389,6 +548,7 @@ E2E_HOME10="$E2E_WS10/home"
 mkdir -p "$E2E_WS10" "$E2E_HOME10"
 E2E10_RC=0
 E2E10_OUT=$(HOME="$E2E_HOME10" SETUP_CI=1 GITHUB_USER=smoke-full WORKSPACE_DIR="$E2E_WS10" \
+    GOVERNANCE_REPO="$SMOKE_GOVERNANCE_REPO" \
     GIT_AUTHOR_NAME="smoke-full" GIT_AUTHOR_EMAIL="smoke@test.local" \
     GIT_COMMITTER_NAME="smoke-full" GIT_COMMITTER_EMAIL="smoke@test.local" \
     bash "$TEMPLATE_DIR/setup.sh" 2>&1) || E2E10_RC=$?
@@ -414,6 +574,61 @@ else
         fi
     else
         warn "e2e full mode: LaunchAgents dir не создан (возможно, ни одна auto-role не установлена)"
+    fi
+    E2E_GOV10="$E2E_WS10/$SMOKE_GOVERNANCE_REPO"
+    if [ -d "$E2E_GOV10/.git" ]; then
+        pass "e2e full mode: governance git repository created"
+    else
+        fail "e2e full mode: governance git repository missing"
+    fi
+    if [ "$SMOKE_GOVERNANCE_REPO" != "DS-strategy" ] && \
+       [ -e "$E2E_WS10/DS-strategy" ]; then
+        fail "e2e full mode: custom governance also created an unintended DS-strategy"
+    elif [ "$SMOKE_GOVERNANCE_REPO" != "DS-strategy" ]; then
+        pass "e2e full mode: custom governance creates no default DS-strategy"
+    fi
+    if git -C "$E2E_GOV10" ls-files --error-unmatch -- \
+        scripts/executor-catalog.yaml >/dev/null 2>&1; then
+        pass "e2e full mode: executor catalog is present in the initial governance commit"
+    else
+        fail "e2e full mode: executor catalog is absent or untracked"
+    fi
+    if git -C "$E2E_GOV10" ls-files --error-unmatch -- \
+            scripts/generate-executor-catalog.py >/dev/null 2>&1 \
+        && cmp -s "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" \
+            "$E2E_GOV10/scripts/generate-executor-catalog.py"; then
+        pass "e2e full mode: installed catalog generator matches the template source"
+    else
+        fail "e2e full mode: installed catalog generator is absent, untracked, or drifted"
+    fi
+    if [ -n "${SMOKE_PYTHON:-}" ] && \
+        "$SMOKE_PYTHON" - "$E2E_GOV10/scripts/executor-catalog.yaml" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    catalog = yaml.safe_load(stream)
+assert catalog["reflexes"] == []
+assert catalog["skipped_no_routing"] == len(catalog["skipped"])
+assert all(
+    set(item) == {"name", "skip_reason"}
+    and isinstance(item["name"], str)
+    and isinstance(item["skip_reason"], str)
+    for item in catalog["skipped"]
+)
+PY
+    then
+        pass "e2e full mode: fresh catalog has detailed skips and empty reflexes"
+    else
+        fail "e2e full mode: fresh catalog state schema is incomplete"
+    fi
+    E2E_ROUTE_OUT=$(IWE_EXECUTOR_CATALOG="$E2E_GOV10/scripts/executor-catalog.yaml" \
+        bash "$TEMPLATE_DIR/scripts/route-task.sh" --validate 2>&1) || E2E_ROUTE_RC=$?
+    E2E_ROUTE_RC="${E2E_ROUTE_RC:-0}"
+    if [ "$E2E_ROUTE_RC" -eq 0 ]; then
+        pass "e2e full mode: route-task validates the freshly generated catalog"
+    else
+        fail "e2e full mode: route-task rejects the freshly generated catalog: $E2E_ROUTE_OUT"
     fi
 fi
 rm -rf "$E2E_WS10" "$E2E_HOME10" 2>/dev/null || true

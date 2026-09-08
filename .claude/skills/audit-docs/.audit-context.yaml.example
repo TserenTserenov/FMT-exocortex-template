@@ -1,0 +1,22 @@
+# Copy to <repo>/docs/.audit-context.yaml only after the repository owner
+# approves every category and mapping. The auditor must not invent this model.
+schema_version: 1
+owner_approved: true          # must reflect a real, explicit approval
+approved_by: repository-owner
+approved_at: YYYY-MM-DD
+
+categories:
+  - id: public-api            # unique stable category id
+    source_patterns:          # source artifacts that require documentation
+      - src/api/**/*.py
+    docs_patterns:            # documentation files counted for this category
+      - docs/api/**/*.md
+    file_naming: docs/api/{stem}.md  # mapping from a source file to its docs file
+    drift_days: 7             # optional positive mtime-lag threshold
+
+  - id: operations
+    source_patterns:
+      - scripts/**/*.sh
+    docs_patterns:
+      - docs/operations/**/*.md
+    file_naming: docs/operations/{stem}.md

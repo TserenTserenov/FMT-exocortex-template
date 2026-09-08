@@ -10,7 +10,8 @@
 
 set -uo pipefail
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
 
 # portable_date_offset <days_back> [format] — BSD `date -v` (macOS) vs GNU `date -d` (Linux)
 portable_date_offset() {
@@ -33,7 +34,7 @@ CONFIG="${2:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
 
 # --- Calendar: server-calendar.sh ---
 CALENDAR_STATUS="unknown"
-CALENDAR_OUT=$(bash "$IWE/scripts/server-calendar.sh" "$DATE" "$CONFIG" 2>/dev/null || echo "")
+CALENDAR_OUT=$(bash "$SCRIPT_DIR/server-calendar.sh" "$DATE" "$CONFIG" 2>/dev/null || echo "")
 if [ -n "$CALENDAR_OUT" ]; then
   if echo "$CALENDAR_OUT" | grep -q "PENDING"; then
     CALENDAR_STATUS="pending"

@@ -1,97 +1,90 @@
 #!/usr/bin/env bash
-# Contract test for bug #339: capture-bus.sh must handle detector crash without blocking.
-# Inject crash mid-loop and verify continued execution and degraded (non-zero) status.
+# Contract test for bug #339: capture-bus.sh must survive a crashing detector
+# without blocking the remaining detectors — and record the crash, not hide it.
+#
+# The dispatcher's own contract (capture-bus.sh header, "НИКОГДА не блокирует")
+# is exit 0 always, by design (harness must never see a hook failure). An
+# earlier draft of this test expected a non-zero exit on detector crash — that
+# would have locked in a contract that contradicts the script's own documented
+# behavior. The real safety invariant lives in the JSONL log, not the exit
+# code: a crashed detector must produce a status=detector_error entry with the
+# failure reason, and dispatch must continue to the next detector.
 
 set -euo pipefail
 
+TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-cd "$TMPDIR"
+# shellcheck source=lib/capture_fixture.sh
+source "$TEMPLATE_ROOT/scripts/tests/lib/capture_fixture.sh"
+setup_capture_fixture "$TEMPLATE_ROOT" "$TMPDIR"
 
-# Prepare config with 3 detectors: 1 succeeds, 2 crashes mid-loop
-cat > capture-config.yaml <<'EOF'
-detectors:
-  - name: detector-1-ok
-    path: ./detector-1.sh
-    event_type: capture
-    cost_class: free
-    enabled: true
-  - name: detector-2-crash
-    path: ./detector-2.sh
-    event_type: capture
-    cost_class: free
-    enabled: true
-  - name: detector-3-ok
-    path: ./detector-3.sh
-    event_type: capture
-    cost_class: free
-    enabled: true
+mkdir -p "$TMPDIR/detectors"
+
+cat > "$TMPDIR/detectors/first.sh" <<EOF
+#!/usr/bin/env bash
+: > "$TMPDIR/first.ran"
+EOF
+cat > "$TMPDIR/detectors/crash.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "injected detector crash" >&2
+exit 42
+EOF
+cat > "$TMPDIR/detectors/last.sh" <<EOF
+#!/usr/bin/env bash
+: > "$TMPDIR/last.ran"
+EOF
+chmod +x "$TMPDIR"/detectors/*.sh
+
+cat > "$TMPDIR/.claude/config/capture-detectors.sh" <<'EOF'
+CAPTURE_COST_LEVEL=free
+CAPTURE_DETECTOR_TIMEOUT_SECONDS=2
+DETECTORS=(
+  "first|detectors/first.sh|capture|free|true|PostToolUse"
+  "crash|detectors/crash.sh|capture|free|true|PostToolUse"
+  "last|detectors/last.sh|capture|free|true|PostToolUse"
+)
 EOF
 
-# Detector 1: success
-cat > detector-1.sh <<'EOF'
-#!/bin/bash
-echo "detector-1: OK"
-EOF
-chmod +x detector-1.sh
+INPUT='{"hook_event_name":"PostToolUse","session_id":"contract","tool_name":"Write","cwd":"/tmp","tool_input":{"file_path":"x"}}'
 
-# Detector 2: crash after brief delay (simulate mid-loop failure)
-cat > detector-2.sh <<'EOF'
-#!/bin/bash
-sleep 1
-echo "detector-2: crashing" >&2
-exit 1
-EOF
-chmod +x detector-2.sh
+run_dispatcher() {
+  START=$(date +%s)
+  set +e
+  printf '%s\n' "$INPUT" |
+    bash "$TMPDIR/.claude/hooks/capture-bus.sh" >"$TMPDIR/stdout" 2>"$TMPDIR/stderr"
+  RC=$?
+  set -e
+  ELAPSED=$(( $(date +%s) - START ))
+}
 
-# Detector 3: success
-cat > detector-3.sh <<'EOF'
-#!/bin/bash
-echo "detector-3: OK"
-EOF
-chmod +x detector-3.sh
+run_dispatcher
 
-# Get capture-bus.sh hook
-CAPTURE_BUS="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/.claude/hooks/capture-bus.sh"
-if [ ! -f "$CAPTURE_BUS" ]; then
-  echo "capture-bus.sh not found" >&2
-  exit 1
-fi
+[ "$RC" -eq 0 ] ||
+  { echo "FAIL: dispatcher must remain non-blocking, rc=$RC" >&2; cat "$TMPDIR/stderr" >&2; exit 1; }
+[ "$ELAPSED" -lt 10 ] ||
+  { echo "FAIL: progress invariant violated (${ELAPSED}s)" >&2; exit 1; }
+[ -f "$TMPDIR/first.ran" ] ||
+  { echo "FAIL: first detector did not run" >&2; exit 1; }
+[ -f "$TMPDIR/last.ran" ] ||
+  { echo "FAIL: loop stopped after crash — detector after it never ran" >&2; exit 1; }
+grep -q '"detector":"crash"' "$CAPTURE_LOG_FILE" ||
+  { echo "FAIL: crashed detector absent from log" >&2; exit 1; }
+grep -q '"status":"detector_error"' "$CAPTURE_LOG_FILE" ||
+  { echo "FAIL: degraded state was not recorded" >&2; exit 1; }
+grep -q 'injected detector crash' "$CAPTURE_LOG_FILE" ||
+  { echo "FAIL: crash reason was lost" >&2; exit 1; }
 
-# Run hook with short timeout to force detector 2 crash
-export CAPTURE_DETECTOR_TIMEOUT_SECONDS=10
-export CAPTURE_CONFIG_FILE="./capture-config.yaml"
-export IWE_SCRIPTS="${IWE_SCRIPTS:-$HOME/IWE/scripts}"
+echo "✓ Progress and safety invariants hold (non-blocking, crash recorded, dispatch continued)"
 
-START=$(date +%s)
-EXIT_CODE=0
-bash "$CAPTURE_BUS" 2>&1 | tee capture-output.txt > /dev/null || EXIT_CODE=$?
-END=$(date +%s)
-ELAPSED=$((END - START))
+# Idempotency: two independent PostToolUse events are two independent facts —
+# a second identical hook call must record its own crash, not silently dedupe.
+rm -f "$TMPDIR/first.ran" "$TMPDIR/last.ran"
+run_dispatcher
+[ "$RC" -eq 0 ] || { echo "FAIL: second invocation must also remain non-blocking, rc=$RC" >&2; exit 1; }
+CRASH_COUNT=$(grep -c '"detector":"crash"' "$CAPTURE_LOG_FILE")
+[ "$CRASH_COUNT" -eq 2 ] ||
+  { echo "FAIL: expected 2 recorded crashes after 2 invocations, got $CRASH_COUNT" >&2; exit 1; }
 
-echo "Elapsed: ${ELAPSED}s"
-echo "Exit code: $EXIT_CODE"
-
-# Verify contract:
-# 1. Hook should NOT return success (0) when detector crashes
-# 2. Execution should continue past detector 2 (detector 3 should run)
-# 3. Hook should complete within timeout window (not block)
-
-if [ $EXIT_CODE -eq 0 ]; then
-  echo "FAIL: Hook returned 0 (success) despite detector crash" >&2
-  exit 1
-fi
-
-if ! grep -q "detector-3" capture-output.txt; then
-  echo "FAIL: Hook did not continue past crashed detector" >&2
-  exit 1
-fi
-
-if [ $ELAPSED -gt 30 ]; then
-  echo "FAIL: Hook blocked too long (${ELAPSED}s)" >&2
-  exit 1
-fi
-
-echo "✓ Contract verified: non-zero status, continued execution, no blocking"
-exit 0
+echo "✓ Repeat invocation records its own event, no silent dedup"

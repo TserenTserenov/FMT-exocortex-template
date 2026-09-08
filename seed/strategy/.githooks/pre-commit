@@ -9,4 +9,41 @@ if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
     exit 1
 fi
 
+# === Protocol artifacts (issue #544): staged-semantics validation ===
+# Настоящий pre-commit видит реальный индекс после любой формы git add
+# (слитные `git add && git commit`, маски, -A/-u) — PreToolUse-перехватчик
+# protocol-artifact-validate.sh остаётся ранним слоем быстрой обратной связи,
+# эта граница — корректностная. Читает staged blob, не рабочее дерево.
+HOOK_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+VALIDATOR=""
+VALIDATOR_MODE=""
+if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "${IWE_SCRIPTS}/validate-staged-artifacts.sh" ]; then
+    VALIDATOR="${IWE_SCRIPTS}/validate-staged-artifacts.sh"
+    VALIDATOR_MODE="template"
+elif [ -f "$HOOK_REPO_ROOT/../FMT-exocortex-template/scripts/validate-staged-artifacts.sh" ]; then
+    VALIDATOR="$HOOK_REPO_ROOT/../FMT-exocortex-template/scripts/validate-staged-artifacts.sh"
+    VALIDATOR_MODE="template"
+elif [ -f "$HOOK_REPO_ROOT/scripts/validate-staged-artifacts.sh" ]; then
+    # Деградированный режим: исполняется версия из рабочего дерева, а не из
+    # индекса/шаблона — локальная правка валидатора влияет на саму проверку.
+    VALIDATOR="$HOOK_REPO_ROOT/scripts/validate-staged-artifacts.sh"
+    VALIDATOR_MODE="degraded-repo-local"
+fi
+if [ -z "$VALIDATOR" ]; then
+    # Не блокируем: на свежей установке до первого /iwe-update валидатора может
+    # ещё не быть. Отсутствие границы обязано быть видимым, не тихим.
+    echo "WARN: validate-staged-artifacts.sh не найден — протокольные артефакты коммитятся без staged-проверки (обновите шаблон: /iwe-update)" >&2
+else
+    [ "$VALIDATOR_MODE" = "degraded-repo-local" ] && \
+        echo "WARN: validate-staged-artifacts.sh исполняется из рабочего дерева репо (деградированный режим), а не из шаблона" >&2
+    if ! bash "$VALIDATOR"; then
+        exit 1
+    fi
+fi
+
+hook_dir="$(dirname "$0")"
+if [ -x "$hook_dir/pre-commit-deny-legacy-sessions.sh" ]; then
+    "$hook_dir/pre-commit-deny-legacy-sessions.sh" || exit 1
+fi
+
 exit 0

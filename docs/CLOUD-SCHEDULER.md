@@ -20,7 +20,7 @@ bash setup/optional/setup-cloud-scheduler.sh
 
 ## Ручная настройка
 
-1. Убедитесь, что `.github/workflows/cloud-scheduler.yml` запушен в ваш DS-strategy репо
+1. Убедитесь, что `.github/workflows/cloud-scheduler.yml` запушен в ваш DS-strategy репо — **именно в свой отдельный репозиторий, не в форк FMT-exocortex-template** (issue #454: workflow работает только там, где настроен `STRATEGY_REPO` — форк шаблона его не задаёт по умолчанию и получит объясняющий Skip, а не тихую бездеятельность)
 2. (Опционально) Настройте Telegram:
    ```bash
    gh secret set TELEGRAM_BOT_TOKEN --repo ВАШ_РЕПО --body "ТОКЕН"

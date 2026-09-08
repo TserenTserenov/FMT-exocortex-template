@@ -7,7 +7,7 @@
 #                         (/Users/ подставлен, /opt/homebrew в CLAUDE_PATH, MEMORY заполняется работой).
 #                         Используется setup.sh --validate как делегат структурных чеков.
 #
-# 7 проверок:
+# 8 проверок:
 # 1. Нет автор-специфичного контента                              [pristine + installed]
 # 2. Нет захардкоженных путей /Users/                             [pristine only]
 # 3. Нет захардкоженных путей /opt/homebrew                       [pristine only]
@@ -15,6 +15,7 @@
 # 5. Обязательные файлы существуют                                [pristine + installed]
 # 6. Нет хардкод-путей к FMT/scripts|roles в протоколах (WP-219)  [pristine + installed]
 # 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)   [pristine + installed]
+# 8. Нет устаревших семантических ссылок FPF                     [pristine + staged]
 
 set -euo pipefail
 
@@ -81,6 +82,34 @@ if [ "$MODE" = "staged" ]; then
     fi
 fi
 
+# issue #547: paths the manifest deliberately freezes out of delivery
+# (excluded_paths) never get refreshed on forks — an author-content hit there
+# is permanent and unactionable for a fork owner, so excluding a path from
+# delivery while including it in this scan makes the two rules contradict
+# each other forever. Scope: ONLY check [1/5] (author-content); the other
+# checks below intentionally still see excluded paths — this must not become
+# a general validation bypass.
+EXCLUDED_LIST=$(jq -r '.excluded_paths[]? // empty' "$TEMPLATE_DIR/update-manifest.json" 2>/dev/null || true)
+is_excluded_path() {
+    local rel="$1" ex
+    [ -n "$EXCLUDED_LIST" ] || return 1
+    while IFS= read -r ex; do
+        [ -n "$ex" ] || continue
+        [ "$rel" = "$ex" ] && return 0
+        case "$rel" in "$ex"/*) return 0 ;; esac
+    done <<< "$EXCLUDED_LIST"
+    return 1
+}
+filter_excluded_hits() {
+    # stdin: grep -r output "<abs-path>:<line>:<text>" — drop excluded_paths rows
+    local line abs rel
+    while IFS= read -r line; do
+        abs="${line%%:*}"
+        rel="${abs#"$TEMPLATE_DIR"/}"
+        is_excluded_path "$rel" || printf '%s\n' "$line"
+    done
+}
+
 # 1. Нет автор-специфичного контента
 echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
@@ -100,6 +129,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
             case "$f" in
                 guide-kit/*) continue ;;  # vendored copy is derived-only (WP-483) — checked by its upstream CI
             esac
+            is_excluded_path "$f" && continue  # frozen out of delivery (#547)
             case "$f" in
                 *.md|*.sh|*.py|*.json|*.plist|*.yaml) ;;
                 *) continue ;;
@@ -128,7 +158,8 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                 --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
                 --exclude='translation-manifest.yaml' --exclude-dir='guide-kit' 2>/dev/null \
                 | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' | wc -l | tr -d ' ' || true)
+                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
+                | filter_excluded_hits | wc -l | tr -d ' ' || true)
     fi
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
@@ -142,7 +173,8 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                 --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
                 --exclude='translation-manifest.yaml' --exclude-dir='guide-kit' 2>/dev/null \
                 | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' | head -3 || true
+                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
+                | filter_excluded_hits | head -3 || true
         fi
         CHECK1_FAIL=1
         FAIL=1
@@ -216,13 +248,19 @@ HARDCODE_SCAN_INCLUDES=(--include="*.md" --include="*.sh" --include="*.json" --i
 # files" в своём --help, но фактически сканировал весь репозиторий).
 # Печатает совпадение-count в stdout, построчные hits — в файл $3.
 hardcode_scan_staged() {
-    local pattern="$1" exclude_re="$2" hits_file="$3"
+    # $4 (optional): regex of file PATHS to skip for this scan only — the
+    # $2 exclude_re filters content lines (no filename in them), so per-file
+    # exceptions cannot be expressed there (WP-529 F6).
+    local pattern="$1" exclude_re="$2" hits_file="$3" skip_files_re="${4:-}"
     local f file_hits count=0
     : > "$hits_file"
     while IFS= read -r f; do
         case "$f" in
             */validate-template.sh|validate-template.sh|*/setup.sh|setup.sh|CHANGELOG.md) continue ;;
         esac
+        if [ -n "$skip_files_re" ] && echo "$f" | grep -qE "$skip_files_re"; then
+            continue
+        fi
         case "$f" in
             *.md|*.sh|*.json|*.plist) ;;
             *) continue ;;
@@ -281,7 +319,10 @@ if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — CLAUDE_PATH может быть /opt/homebrew/...)"
 elif [ "$MODE" = "staged" ]; then
     TMPDIR_CHECK3_HITS_FILE="$(mktemp)"
-    count=$(hardcode_scan_staged '/opt/homebrew' 'README\.md|PLATFORM-COMPAT\.md|validate-template\.yml|/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE")
+    # The shipped resolver copies are sanctioned exceptions (WP-529 F6,
+    # #453/#463): their job is enumerating STANDARD system Python locations
+    # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
+    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK3_HITS_FILE" || true
@@ -291,8 +332,12 @@ elif [ "$MODE" = "staged" ]; then
     fi
     rm -f "$TMPDIR_CHECK3_HITS_FILE"
 else
+    # scripts/lib/find-python3.sh: sanctioned exception (WP-529 F6, #453/#463) —
+    # the resolver's whole job is enumerating STANDARD system python locations
+    # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
     count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
+            --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' \
             | grep -v 'PLATFORM-COMPAT.md' \
@@ -303,6 +348,7 @@ else
         echo "FAIL ($count hits)"
         grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
+            --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' \
             | grep -v 'validate-template.yml' \
@@ -415,6 +461,11 @@ else
     for hook in "$HOOKS_DIR"/*.sh; do
         [ -f "$hook" ] || continue
         name=$(basename "$hook")
+        # Каталог исторически содержит не только Claude hooks. Не угадываем по
+        # имени: самостоятельный сервис/CLI/библиотека обязан явно объявить
+        # контракт в собственной шапке. Новый неклассифицированный файл всё
+        # равно даст warning и потребует решения владельца.
+        grep -q '^# claude-hook: false — ' "$hook" && continue
         # Skip known user-deployed hooks (see .claude/skills/setup-wakatime/SKILL.md)
         skip=0
         for ud in "${USER_DEPLOYED_HOOKS[@]}"; do [ "$name" = "$ud" ] && skip=1 && break; done
@@ -428,6 +479,44 @@ else
         fi
     done
     [ "$CHECK7_FAIL" -eq 0 ] && [ "$ORPHAN_WARN" -eq 0 ] && echo "PASS"
+fi
+
+# 8. Устаревшие семантические ссылки FPF (issue #390 follow-up).
+# A.2 и A.2.1 сами по себе действительны для ролей и назначений. Запрещены только
+# две доказанно ложные привязки: удалённая A.6.8 и трактовка слова mastery/
+# «мастерство» как сущности A.2. В installed-режиме пользовательская память может
+# содержать исторические цитаты, поэтому проверка относится только к поставляемому
+# pristine/staged шаблону.
+echo -n "[8/8] Obsolete FPF semantic references... "
+if [ "$MODE" = "installed" ]; then
+    echo "SKIP (installed mode — пользовательская память может содержать исторические цитаты)"
+else
+    FPF_STALE_PATTERN='A\.6\.8|(mastery|мастерство).*A\.2([^0-9.]|$)'
+    FPF_STALE_HITS=""
+    if [ "$MODE" = "staged" ]; then
+        while IFS= read -r f; do
+            case "$f" in
+                memory/*.md|.claude/*.md|.claude/*/*.md|.claude/*/*/*.md|docs/*.md)
+                    hits=$(git -C "$TEMPLATE_DIR" show ":$f" 2>/dev/null \
+                        | grep -niE "$FPF_STALE_PATTERN" \
+                        | sed "s#^#$f:#" || true)
+                    [ -n "$hits" ] && FPF_STALE_HITS="${FPF_STALE_HITS}${FPF_STALE_HITS:+$'\n'}$hits"
+                    ;;
+            esac
+        done <<<"$STAGED_FILES"
+    else
+        FPF_STALE_HITS=$(grep -rniE "$FPF_STALE_PATTERN" \
+            "$TEMPLATE_DIR/memory" "$TEMPLATE_DIR/.claude" "$TEMPLATE_DIR/docs" \
+            --include='*.md' 2>/dev/null || true)
+    fi
+
+    if [ -n "$FPF_STALE_HITS" ]; then
+        echo "FAIL"
+        echo "$FPF_STALE_HITS" | sed 's/^/  /'
+        FAIL=1
+    else
+        echo "PASS"
+    fi
 fi
 
 echo ""
