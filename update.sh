@@ -1773,6 +1773,17 @@ run_sync_canary() {
     local governance_repo
     governance_repo=$(effective_governance_repo) || { echo "  ℹ Canary (реестр РП): SKIP (governance repo не определён)"; return 0; }
 
+    # effective_governance_repo() always returns a name (default DS-strategy)
+    # even when that directory doesn't exist yet — a fresh install before the
+    # pilot's first governance repo is set up. wp-sync-bundle.sh hard-exits 1
+    # in that case ("Governance repo с WP-REGISTRY.md не найден"), which
+    # run_sync_canary would otherwise report as a canary FAILURE rather than
+    # the "not configured yet" SKIP it actually is.
+    if [ ! -f "$WORKSPACE_DIR/$governance_repo/docs/WP-REGISTRY.md" ]; then
+        echo "  ℹ Canary (реестр РП): SKIP ($governance_repo/docs/WP-REGISTRY.md ещё не существует)"
+        return 0
+    fi
+
     local sync_bundle="$WORKSPACE_DIR/$governance_repo/.claude/scripts/wp-sync-bundle.sh"
     if [ ! -x "$sync_bundle" ]; then
         sync_bundle="$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"

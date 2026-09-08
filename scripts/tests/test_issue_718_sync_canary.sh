@@ -88,7 +88,20 @@ eval "$(awk '
 EXIT_CANARY_FAILED=5
 WORKSPACE_DIR="$TMP/rsc-workspace"
 SCRIPT_DIR="$TMP/rsc-template"
-mkdir -p "$WORKSPACE_DIR" "$SCRIPT_DIR"
+mkdir -p "$WORKSPACE_DIR" "$SCRIPT_DIR/.claude/scripts"
+
+# SCRIPT_DIR always ships its own wp-sync-bundle.sh (it's the template
+# install, not a bare directory) — a real one, so this fixture exercises the
+# same "governance repo not set up yet" path a fresh install hits, not the
+# unrelated "script file missing" path a bare empty SCRIPT_DIR would hit
+# instead. That distinction is exactly the gap that hid the bug this test
+# was written for: effective_governance_repo() always resolves a repo NAME
+# (default DS-strategy) even when that directory doesn't exist, so the old
+# run_sync_canary fell through to actually invoking wp-sync-bundle.sh, which
+# hard-exits 1 on a missing WP-REGISTRY.md — reported as a canary FAILURE
+# instead of the "not configured yet" SKIP it actually is.
+cp "$ROOT/.claude/scripts/wp-sync-bundle.sh" "$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"
+chmod +x "$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"
 
 # No governance repo configured at all -> SKIP (exit 0), not FAIL.
 ENV_GOVERNANCE_REPO=""
@@ -100,11 +113,15 @@ else
     fail "run_sync_canary expected SKIP/exit 0 with no governance repo, got exit $rsc_status:\n$rsc_out"
 fi
 
-# Governance repo configured, wp-sync-bundle.sh present but its self-test
-# fails -> run_sync_canary must propagate EXIT_CANARY_FAILED, not mask it.
+# Governance repo configured AND set up (docs/WP-REGISTRY.md exists — this
+# is what distinguishes "configured but its canary genuinely fails" from the
+# "not configured yet" SKIP case above), wp-sync-bundle.sh present but its
+# self-test fails -> run_sync_canary must propagate EXIT_CANARY_FAILED, not
+# mask it.
 # shellcheck disable=SC2034  # read by effective_governance_repo(), eval'd above
 ENV_GOVERNANCE_REPO="gov"
-mkdir -p "$WORKSPACE_DIR/gov/.claude/scripts"
+mkdir -p "$WORKSPACE_DIR/gov/.claude/scripts" "$WORKSPACE_DIR/gov/docs"
+touch "$WORKSPACE_DIR/gov/docs/WP-REGISTRY.md"
 cat >"$WORKSPACE_DIR/gov/.claude/scripts/wp-sync-bundle.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "simulated registry failure"

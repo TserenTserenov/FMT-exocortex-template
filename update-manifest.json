@@ -2693,7 +2693,7 @@
     },
     {
       "path": "scripts/tests/test_issue_718_sync_canary.sh",
-      "sha256": "ca5b130bbb15c62e6bd5fd374bc6a2d7d480855b29614d0f5f9eda0593c94015"
+      "sha256": "79aabff7ed9bf948e16e76e3de86168d62eb4c572fbbc65a3d327ac0ebc0c36c"
     },
     {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "7a31947e400a0993d999b4db2cac61f698f65dd24569bce2801924b7439af964"
+      "sha256": "660b3ee006bdbd7095562232153d50c700f79b7d8a2a157b9c209faab4ece9b0"
     }
   ],
   "excluded_paths": [
