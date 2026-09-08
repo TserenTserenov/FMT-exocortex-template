@@ -2656,8 +2656,19 @@ secret_bypass_self_test() {
   audit_file="$audit_tmp/audit.jsonl"
   audit_link="$audit_tmp/audit-link.jsonl"
   audit_truncated="$audit_tmp/audit-truncated.jsonl"
+  # Portable octal-permission read (docs/PLATFORM-COMPAT.md): `stat -f` is
+  # BSD-only, `stat -c` is GNU-only — same Darwin/else split already used by
+  # destructive-guard.sh's neighbour dry-run-gate.sh for the same field.
+  # Called lazily inside the `&&` chain below (not hoisted above the `if`):
+  # $audit_file does not exist until secret_bypass_audit_append creates it.
+  portable_octal_perm() {
+    case "$(uname -s)" in
+      Darwin) stat -f '%Lp' "$1" 2>/dev/null ;;
+      *)      stat -c '%a' "$1" 2>/dev/null ;;
+    esac
+  }
   if secret_bypass_audit_append "$audit_file" '{"hook":"self-test","decision":"test"}' \
-    && [ "$(stat -f '%Lp' "$audit_file" 2>/dev/null)" = "600" ] \
+    && [ "$(portable_octal_perm "$audit_file")" = "600" ] \
     && grep -q '"decision":"test"' "$audit_file"; then
     printf 'PASS durable_private_audit\n'
   else
