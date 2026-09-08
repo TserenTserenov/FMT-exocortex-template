@@ -23,6 +23,10 @@ EXIT_TAINTED=4   # peer-session 2026-08-21-09: grep-fallback manifest parsing ra
                  # a real operational error (network/conflict/runtime) still
                  # takes priority over this code, it never masks one.
 EXIT_CONFLICT=49
+EXIT_CANARY_FAILED=5   # issue #718: --check's registry-sync canary (see run_sync_canary)
+                       # found the WP-Registry unreadable/unparseable for a real WP —
+                       # a silently lost fix in that path would look identical to a
+                       # healthy one without this check.
 EXIT_GENERAL=1
 GITHUB_API_AUTH_FAILURE=90
 GITHUB_API_INVALID_TOKEN=91
@@ -1756,6 +1760,41 @@ assert_self_unmutated() {
     fi
 }
 
+# run_sync_canary — issue #718: a mechanism that fails open (delivers a
+# plausible-looking result instead of a loud error) can silently lose a fix
+# for weeks before anyone notices, e.g. #717. wp-sync-bundle.sh --self-test
+# already exercises the exact code path every WP Gate sync relies on
+# (registry lookup + status-cell resolution); running it here catches a
+# broken/unreadable registry the same day an update runs, not weeks later.
+# No governance repo configured, or wp-sync-bundle.sh missing — SKIP, not
+# FAIL: those are separate, already-diagnosed conditions elsewhere in
+# update.sh, not a canary regression.
+run_sync_canary() {
+    local governance_repo
+    governance_repo=$(effective_governance_repo) || { echo "  ℹ Canary (реестр РП): SKIP (governance repo не определён)"; return 0; }
+
+    local sync_bundle="$WORKSPACE_DIR/$governance_repo/.claude/scripts/wp-sync-bundle.sh"
+    if [ ! -x "$sync_bundle" ]; then
+        sync_bundle="$SCRIPT_DIR/.claude/scripts/wp-sync-bundle.sh"
+    fi
+    if [ ! -x "$sync_bundle" ]; then
+        echo "  ℹ Canary (реестр РП): SKIP (wp-sync-bundle.sh не найден)"
+        return 0
+    fi
+
+    local canary_output canary_status
+    canary_output=$(IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$governance_repo" \
+        bash "$sync_bundle" --self-test 2>&1)
+    canary_status=$?
+    if [ "$canary_status" -eq 0 ]; then
+        echo "  ✓ Canary (реестр РП): OK"
+        return 0
+    fi
+    echo "  ✗ Canary (реестр РП) FAILED — реестр WP-Registry нечитаем или статус не резолвится:" >&2
+    echo "$canary_output" | sed 's/^/    /' >&2
+    return "$EXIT_CANARY_FAILED"
+}
+
 # exit_clean — the shared exit for every "this run completed with no
 # operational error" path (peer-session 2026-08-21-09, Codex review
 # consensus). Overrides EXIT_OK with EXIT_TAINTED when INTEGRITY_TAINTED is
@@ -3276,6 +3315,9 @@ if $CHECK_ONLY; then
     echo "Режим --check: изменения не применяются."
     echo "Для применения: bash update.sh"
     assert_self_unmutated
+    if ! run_sync_canary; then
+        exit "$EXIT_CANARY_FAILED"
+    fi
     exit_clean
 fi
 

@@ -193,6 +193,7 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     # доставляется, а его обязательный baseline сидел в excluded — на установке
     # строго из манифеста сторож падал rc=2. Ratchet-снимок — часть поставки.
     "scripts/tests/fixtures/python-resolver-baseline.txt"
+    "scripts/tests/test_issue_718_sync_canary.sh"
     "scripts/tests/test_create_wp_registry_coherence.sh"
     "scripts/tests/test_check_orphan_hooks.sh"
     "scripts/tests/test_capture_bus_detector_timeout.sh"

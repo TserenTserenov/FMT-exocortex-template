@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "8a9fb07aa39992a06a896a65f0307eff9bf9c9b6c61493b737f462603903b423"
+      "sha256": "ee8786d5d76ab64486e17e23e955783cbbfbd9122d1668d7445b1d8945a5a220"
     },
     {
       "path": ".claude/settings.json",
@@ -1093,7 +1093,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "0be98cd6b67502bea3ceb1edd91487635538b906ab81c3412c322b58fefacf7b"
+      "sha256": "787854a63d26e4977f7d3863d9d2b4f614ed9829aa67749ab297560bc837deae"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2692,6 +2692,10 @@
       "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
     },
     {
+      "path": "scripts/tests/test_issue_718_sync_canary.sh",
+      "sha256": "ca5b130bbb15c62e6bd5fd374bc6a2d7d480855b29614d0f5f9eda0593c94015"
+    },
+    {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
       "sha256": "4b44a9bbcb4eb3247e10bea7c133ce8ea0f866421445f6e539c42dc48617ecd6"
     },
@@ -2973,7 +2977,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "0c953d6146d07d38dd39bfd1f5e0cb3c5a80d6b23b5c6ee31ff528ba6c38a1d4"
+      "sha256": "7a31947e400a0993d999b4db2cac61f698f65dd24569bce2801924b7439af964"
     }
   ],
   "excluded_paths": [
