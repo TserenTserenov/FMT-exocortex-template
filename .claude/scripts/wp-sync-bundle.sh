@@ -407,7 +407,12 @@ main() {
 
   local input="$1"
 
-  # Self-test mode (diagnostic — see WP-294 Ф7)
+  # Self-test / canary mode (diagnostic — see WP-294 Ф7; extended issue #718:
+  # a canary that only checks file lookup passes even when the registry
+  # itself is unreadable or the WP's status cell can't be resolved — exactly
+  # the class of "plausible result instead of a loud failure" the issue
+  # describes. An explicit WP-N argument makes this usable as an
+  # update.sh --check canary against a known-good WP, not just a diagnostic.)
   if [[ "$input" == "--self-test" ]]; then
     echo "=== WP Sync Bundle Self-Test ==="
     echo "IWE_WORKSPACE: $IWE_WORKSPACE"
@@ -419,9 +424,18 @@ main() {
       echo "REGISTRY_FILE: MISSING"
       exit 1
     fi
-    # Find any real WP from inbox instead of hardcoded number
+
     local test_num=""
-    if [[ -d "$INBOX_DIR" ]]; then
+    if [[ $# -ge 2 && -n "${2:-}" ]]; then
+      test_num=$(normalize_wp_num "$2")
+      if ! echo "$test_num" | grep -qE '^[0-9]+$'; then
+        log_err "Неверный формат canary WP: '$2'. Ожидается WP-N или N."
+        exit 2
+      fi
+    fi
+    # No explicit WP given — find any real one from inbox (diagnostic default,
+    # unchanged from prior behavior).
+    if [[ -z "$test_num" && -d "$INBOX_DIR" ]]; then
       local first_wp
       first_wp=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort | head -1 || true)
       if [[ -n "$first_wp" ]]; then
@@ -435,15 +449,29 @@ main() {
       echo "WP lookup: SKIP (no WP files found in inbox or registry)"
       exit 0
     fi
+
     local test_file
     test_file=$(find_wp_file "$test_num")
     if [[ -n "$test_file" ]]; then
       echo "WP-${test_num} lookup: OK ($test_file)"
-      exit 0
     else
       echo "WP-${test_num} lookup: FAIL"
       exit 1
     fi
+
+    # registry_status() is the part update.sh's silent-drift class of bug
+    # (issue #718) actually cares about — a WP file can exist while the
+    # registry row it's supposed to have is empty, stale, or unparseable.
+    local status
+    status=$(registry_status "$test_num")
+    echo "WP-${test_num} registry_status: $status"
+    case "$status" in
+      _не\ в\ реестре_|_статус\ неизвестен_|_колонка\ статуса\ не\ найдена*|_нет\ файла\ REGISTRY_|_некорректный\ номер\ РП*)
+        echo "Canary FAILED: registry status unresolved for WP-${test_num}: $status" >&2
+        exit 1
+        ;;
+    esac
+    exit 0
   fi
 
   local wp_num

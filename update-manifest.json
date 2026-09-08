@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "8a9fb07aa39992a06a896a65f0307eff9bf9c9b6c61493b737f462603903b423"
+      "sha256": "ee8786d5d76ab64486e17e23e955783cbbfbd9122d1668d7445b1d8945a5a220"
     },
     {
       "path": ".claude/settings.json",
@@ -1093,7 +1093,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "3356ec4df8c503a89da0a7ff8c7b8b5458efde22625b98729f8c58cf575af299"
+      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2692,6 +2692,10 @@
       "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
     },
     {
+      "path": "scripts/tests/test_issue_718_sync_canary.sh",
+      "sha256": "79aabff7ed9bf948e16e76e3de86168d62eb4c572fbbc65a3d327ac0ebc0c36c"
+    },
+    {
       "path": "scripts/tests/test_issue_720_decision_log_sot.sh",
       "sha256": "b38448f83b4ee3a7cefe3cf40eea41e56153f50134fd91f78c28bc2643318686"
     },
@@ -2977,7 +2981,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "0c953d6146d07d38dd39bfd1f5e0cb3c5a80d6b23b5c6ee31ff528ba6c38a1d4"
+      "sha256": "660b3ee006bdbd7095562232153d50c700f79b7d8a2a157b9c209faab4ece9b0"
     }
   ],
   "excluded_paths": [
