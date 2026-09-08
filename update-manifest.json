@@ -1096,14 +1096,6 @@
       "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
     },
     {
-      "path": "generate-manifest.sh",
-      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
-    },
-    {
-      "path": "generate-manifest.sh",
-      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
-    },
-    {
       "path": "guide-kit/.gitignore",
       "sha256": "15ed85cf9b54eb982fc6e54d0177aa1e2516f839fa0de00c19387cf6f196817a"
     },
