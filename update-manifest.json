@@ -1497,7 +1497,7 @@
     },
     {
       "path": "memory/memory-lifecycle-spec.md",
-      "sha256": "ea7135621911771bbb814ce093171fb998851e21876ca13f535023d05d1c58c3"
+      "sha256": "dff4f2312e292b310595688bb2a23a0da2c16250201d54bfebf082472e0f2544"
     },
     {
       "path": "memory/navigation.md",
@@ -2453,7 +2453,7 @@
     },
     {
       "path": "scripts/memory-validate.sh",
-      "sha256": "b64ca8dc78fa4a4f02a669728cca3b8b2a0c3356d96f52312afcb54c7eb7dd49"
+      "sha256": "f8308e3c2a05de11f2c97ab9824ca5d0a70e2a1e3e5296a36d102d950f9cb501"
     },
     {
       "path": "scripts/migrate-initial-marker.sh",
