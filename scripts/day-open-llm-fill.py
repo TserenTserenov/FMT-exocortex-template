@@ -569,6 +569,7 @@ def build_today_plan_prompt(header: str, section_content: str, weekplan: str,
         "6. Не меняй структуру markdown (таблицы, списки, жирный текст).",
         "7. Верни ТОЛЬКО содержимое секции — БЕЗ заголовка секции.",
         "8. Audit-trail для carry-over: после строки '**Carry-over из Day Close вчера:**' воспроизведи ВЕСЬ список из WeekReport ('Не выполнено (carry-over ...)') или вчерашнего DayPlan ('Завтра начать с'). Если какой-то пункт carry-over НЕ попал в таблицу плана — оставь его в самой строке carry-over с пометкой `(отложено: <причина>)` в круглых скобках сразу после пункта. Возможные причины: 'нет WP-ID — ad-hoc задача, не проходит JSON-fact pipeline' / 'условный carry-over \"если бюджет\", дневной бюджет заполнен другими РП' / 'WP в JSON, но статус — done/blocked'. НЕ выкидывай пункт молча — у пилота должен оставаться след. ВАЖНО: пункты с пометкой '(отложено: ...)' живут ТОЛЬКО в строке carry-over (текстовом следе), их часы НЕ входят в Бюджет дня (инвариант 5 остаётся в силе: бюджет = сумма часов JSON-фактов + mandatory_daily_wps).",
+        "9. В переданной секции таблица содержит одну строку-ОБРАЗЕЦ формата: '| 🔴 | С | NNN | **<!-- PENDING -->** | X | pending |'. Это НЕ данные и не РП из JSON — это только показ формата колонок. Эта строка целиком (включая литералы NNN, X, pending) НЕ должна попасть в твой ответ ни в каком виде. Замени её (и добавь остальные) РОВНО N строками, где N = число РП в JSON-фактах (инвариант 2) — по одной строке на каждый РП, реальные номер/название/часы/статус из JSON, без единого NNN/X/<!-- PENDING --> в финальной таблице.",
         "",
         "=== JSON-ФАКТЫ: Активные РП (источник — frontmatter WP-*.md) ===",
         facts_json,
@@ -658,6 +659,25 @@ def fill_chunk(chunk: dict, weekplan: str, active_wps: str, calendar: str,
 
     if not response.strip():
         raise RuntimeError(f"Empty response for section {header}")
+    if is_today_plan:
+        # WP-561 Ф11 (found live 2026-09-09): the example format row (day-open-
+        # scaffold.sh, "| ... | NNN | ... | X | pending |") is only half-marked
+        # as a placeholder -- one cell wrapped in <!-- PENDING -->, the rest
+        # plain literals -- so the LLM sometimes keeps it verbatim alongside
+        # the real per-WP rows instead of dropping it. day-open-checks-runner.sh
+        # already blocks the commit on this (Block DOF check), but that check
+        # only reports "1/22 failed", not why -- print the offending line(s)
+        # here, at the point they were produced, so the answer is in whatever
+        # log captures this script's stderr, without needing to reproduce the run.
+        leftover = [ln for ln in response.splitlines()
+                    if ln.strip().startswith("|")
+                    and re.search(r"\|\s*NNN\s*\||<!-- PENDING -->|\|\s*X\s*\|", ln)]
+        if leftover:
+            print("[WARN] today_plan response still contains the scaffold's "
+                  "example row (NNN/X/PENDING) -- Block DOF check will block "
+                  "the commit. Offending line(s):", file=sys.stderr)
+            for ln in leftover:
+                print(f"[WARN]   {ln}", file=sys.stderr)
     return response
 
 
