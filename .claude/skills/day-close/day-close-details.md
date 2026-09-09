@@ -146,7 +146,8 @@ PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/che
 ## Шаг 6: Мультипликатор IWE — алгоритм
 
 1. **WakaTime** — физическое время за день:
-   - CLI: `~/.wakatime/wakatime-cli --today`
+   - **Дата закрытия ≠ календарная дата вызова** (например, `/day-close` вызван после полуночи для вчерашнего дня) → `--today` НЕ пробовать вообще, сразу Neon-fallback с явной датой в SQL (issue #732: `--today` у `wakatime-cli` возвращает данные за день ВЫЗОВА, не за закрываемый день, и при последней проверке 15.07 флага «дать данные за конкретную дату» у CLI не было — тот же класс бага, что уже чинили для Day Open, WP-299 Ф4 п.3).
+   - Дата закрытия = календарная дата вызова → CLI: `~/.wakatime/wakatime-cli --today`
    - Fallback Neon: `SELECT payload->>'human_readable', payload->>'total_seconds' FROM learning.public.domain_event WHERE event_type='coding_time' AND account_id='{DT_USER_ID}' AND external_id='wakatime:{DT_USER_ID}:{YYYY-MM-DD}'`
    - Если Neon тоже пуст → пометить «pending Neon», пересчитать при следующей сессии
 
