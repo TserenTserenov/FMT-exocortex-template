@@ -53,6 +53,7 @@ frontmatter_translate_keys:
   - title
   - description
   - summary
+  - name
 
 # FILE CATEGORIES
 # Д — Documentation: auto-translate via LLM pipeline + glossary
