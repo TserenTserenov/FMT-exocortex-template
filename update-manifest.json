@@ -2149,7 +2149,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "c855565180efcd81933c3fcb22fee0d7fbb0ed25060d69b9e2eeafeb5c70c8f5"
+      "sha256": "d4f808130d3c424d0de8f1701531bec6ac9914a98f6e41105d2add600b0cee95"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -3025,7 +3025,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "a457e5f7d0ca31562294c63c872122bfbf38dbcb5c102fe08d2b755b4bde9ebf"
+      "sha256": "f35309c750047db28b6eea5d946ca534e803b16f52558b44cfd4ac3c83afef84"
     }
   ],
   "excluded_paths": [

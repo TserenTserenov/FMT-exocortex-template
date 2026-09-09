@@ -200,8 +200,19 @@ if [[ -n "$STATE" && -n "${STATE_AXES:-}" ]]; then
   fi
 fi
 
-# --- Найти следующий номер WP ---
-WP_NUM=$(python3 - "$REGISTRY" <<'PYEOF' 2>/dev/null
+# --- Найти и атомарно зарезервировать следующий номер WP ---
+# issue #743: max(REGISTRY)+1 без резервирования отдаёт один и тот же номер
+# двум параллельным агентам (Claude/Kimi/Codex — штатный режим платформы,
+# см. AGENTS.md § Git Staging), и повторно — любому сокращению активного
+# реестра (архивация, разделение). Тот же класс гонки уже закрыт для номеров
+# пир-сессий (session-dir-reserve.sh, WP-530): маркер-каталог + `mkdir` без
+# -p как единственный атомарный арбитр на POSIX-файловой системе, retry на
+# EEXIST. Маркеры никогда не удаляются при архивации WP — номер не переиздаётся.
+WP_NUMBERS_DIR="$STATE_DIR/wp-numbers"
+mkdir -p "$WP_NUMBERS_DIR"
+
+registry_max() {
+  python3 - "$REGISTRY" <<'PYEOF' 2>/dev/null
 import sys, re
 registry = sys.argv[1]
 max_num = 0
@@ -214,18 +225,43 @@ try:
                 n = int(m.group(1))
                 if n > max_num:
                     max_num = n
-except Exception as e:
-    print(0, file=sys.stderr)
-print(max_num + 1)
+except Exception:
+    pass
+print(max_num)
 PYEOF
-)
+}
 
-if [[ -z "$WP_NUM" || "$WP_NUM" -le 0 ]]; then
-  echo "❌ Не удалось определить следующий номер WP из REGISTRY" >&2
+highest_taken() {
+  local max
+  max=$(registry_max)
+  [[ "$max" =~ ^[0-9]+$ ]] || max=0
+  local d n
+  for d in "$WP_NUMBERS_DIR"/*/; do
+    [[ -d "$d" ]] || continue
+    n="$(basename "$d")"
+    [[ "$n" =~ ^[0-9]+$ ]] || continue
+    if [ "$n" -gt "$max" ]; then max=$n; fi
+  done
+  printf '%s\n' "$max"
+}
+
+WP_NUM=""
+for ((_attempt = 1; _attempt <= 50; _attempt++)); do
+  next=$(( $(highest_taken) + 1 ))
+  # Без -p: EEXIST — сигнал, что номер выиграла другая сессия, повторить со
+  # свежим highest_taken (могла также вырасти сама REGISTRY-часть максимума).
+  if mkdir "$WP_NUMBERS_DIR/$next" 2>/dev/null; then
+    WP_NUM="$next"
+    break
+  fi
+done
+
+if [[ -z "$WP_NUM" ]]; then
+  echo "❌ Не удалось зарезервировать номер WP за 50 попыток" >&2
   exit 1
 fi
 
-echo "📋 Следующий номер WP: $WP_NUM"
+echo "📋 Следующий номер WP: $WP_NUM (зарезервирован: $WP_NUMBERS_DIR/$WP_NUM)"
 
 # issue #338 п.4: без паддинга "WP-9" в листинге сортируется после "WP-10".
 # WP_ID — только для строк с префиксом "WP-" (пути, заголовки); frontmatter
