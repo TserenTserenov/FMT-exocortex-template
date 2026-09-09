@@ -833,11 +833,15 @@
     },
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
-      "sha256": "338fdbf324c5bb42b87218ee8f59baf32eb3ecb6ceb2aa0cd23e17bc7c06ac78"
+      "sha256": "c936a16f645374526601f7f797d09a1c1554fa63db885a2515205659407c2945"
     },
     {
       "path": "docs/BROWSER-CI-TEMPLATE.md",
       "sha256": "f263277a5e73aeab8f6065395b1ec4fc4a8b094d4941b3a53fa8a27a5992ace2"
+    },
+    {
+      "path": "docs/CHATGPT-CODEX-SETUP.md",
+      "sha256": "634a124429b20640a0c95f6a94a0f92985088d06810b0f426b4c150a79d207b8"
     },
     {
       "path": "docs/CLOUD-SCHEDULER.md",
@@ -973,7 +977,7 @@
     },
     {
       "path": "docs/onboarding/web-connect-guide.md",
-      "sha256": "5976d4132aaf657331b6207549e15ee40bf40ac50c6f1d532a293f58d4f813e6"
+      "sha256": "72d6a628e8c05c8159ac2a3c5b8918e92b43709c48c953f15d731bd2c8dcd915"
     },
     {
       "path": "docs/onboarding/web-onboarding.md",
