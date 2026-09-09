@@ -2985,7 +2985,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "134dde54a5afdd58964d31c18a8d6fbc3970447f5224e922d6270e10ac76f1a8"
+      "sha256": "ba3a950fc36569f8df183dc838a3d05999f77be71d31a6fce9c629e9a391e0af"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3025,7 +3025,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "f35309c750047db28b6eea5d946ca534e803b16f52558b44cfd4ac3c83afef84"
+      "sha256": "1442776d1e24f854ae0595cfb0dbff4b150253f7c7b19d53d61f0823fff3f48e"
     }
   ],
   "excluded_paths": [
@@ -3084,6 +3084,7 @@
     "scripts/tests/test_issue_711_conflict_base.sh",
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_729_strategy_day.sh",
+    "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",

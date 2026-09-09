@@ -725,6 +725,18 @@ MCP_TEMPLATE="$TEMPLATE_DIR/.mcp.json"
 MCP_DEST="$WORKSPACE_DIR/.mcp.json"
 MCP_USER_EXT="$WORKSPACE_DIR/extensions/mcp-user.json"
 
+# WP-7 Ф133 (live user report, Ruslan, 2026-09-09): extensions/ was already
+# read here (MCP_USER_EXT above) and by day-open-hooks-runner.sh's step 0,
+# but setup.sh never created it — day-open-hooks.sh's fail-closed contract
+# ("every install ships extensions/") aborted the canonical Day Open
+# pipeline on every fresh install. Empty is sufficient: find_day_open_hook_files
+# only requires the directory to exist, not to be non-empty.
+if $DRY_RUN; then
+    echo "  [DRY RUN] Would create $WORKSPACE_DIR/extensions"
+else
+    mkdir -p "$WORKSPACE_DIR/extensions"
+fi
+
 if $DRY_RUN; then
     _IWE_TIER=$(check_user_tier)
     echo "  [DRY RUN] Would generate $MCP_DEST (tier=$_IWE_TIER)"
