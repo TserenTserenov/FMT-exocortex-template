@@ -3958,6 +3958,18 @@ fi
 
 # (Step 6b removed — repo rename no longer supported, no link migration needed)
 
+# === Step 6b2: Self-heal missing extensions/ (WP-7 Ф133) ===
+# setup.sh never created $WORKSPACE_DIR/extensions/ before this fix (only
+# read from it — MCP_USER below, day-open-hooks-runner.sh step 0), so every
+# install that ran setup.sh before this fix landed and will never re-run
+# setup.sh is stuck without it. day-open-hooks.sh's fail-closed contract
+# ("every install ships extensions/") then aborts the canonical Day Open
+# pipeline on every single run — confirmed live (Ruslan, 2026-09-09).
+# Idempotent no-op once the directory exists, same as any other self-heal.
+if ! $CHECK_ONLY; then
+    mkdir -p "$WORKSPACE_DIR/extensions"
+fi
+
 MCP_TEMPLATE="$SCRIPT_DIR/.mcp.json"
 MCP_WORKSPACE="$WORKSPACE_DIR/.mcp.json"
 MCP_USER="$WORKSPACE_DIR/extensions/mcp-user.json"
