@@ -11,10 +11,10 @@
         <string>dispatch</string>
     </array>
 
-    <!-- Пробуждение в ключевые часы:
+    <!-- Пробуждение в ключевые часы (местное время машины, launchd так и планирует):
          0:00  — week-review (Пн) + code-scan
          3:00  — extractor inbox-check
-         4:00  — strategist morning
+         {{TIMEZONE_HOUR}}:00  — strategist morning
          6:00  — extractor + daily-report
          9:00  — extractor
          12:00 — extractor
