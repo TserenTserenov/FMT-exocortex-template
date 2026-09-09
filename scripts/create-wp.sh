@@ -200,8 +200,24 @@ if [[ -n "$STATE" && -n "${STATE_AXES:-}" ]]; then
   fi
 fi
 
-# --- Найти следующий номер WP ---
-WP_NUM=$(python3 - "$REGISTRY" <<'PYEOF' 2>/dev/null
+# --- Найти и атомарно зарезервировать следующий номер WP ---
+# issue #743: max(REGISTRY)+1 без резервирования отдаёт один и тот же номер
+# двум параллельным агентам (Claude/Kimi/Codex — штатный режим платформы,
+# см. AGENTS.md § Git Staging), и повторно — любому сокращению активного
+# реестра (архивация, разделение). Тот же класс гонки уже закрыт для номеров
+# пир-сессий (session-dir-reserve.sh, WP-530): маркер-каталог + `mkdir` без
+# -p как единственный атомарный арбитр на POSIX-файловой системе, retry на
+# EEXIST. Маркеры никогда не удаляются при архивации WP — номер не переиздаётся.
+WP_NUMBERS_DIR="$STATE_DIR/wp-numbers"
+mkdir -p "$WP_NUMBERS_DIR"
+# Fail fast on a real filesystem problem (permissions, read-only, disk full)
+# instead of burning all 50 retry attempts and reporting a misleading
+# "couldn't reserve after 50 tries" — that message is meant for a genuine
+# reservation race, not a broken filesystem (cold-review finding, PR #746).
+[[ -w "$WP_NUMBERS_DIR" ]] || { echo "❌ Нет прав на запись в $WP_NUMBERS_DIR — резервирование номера невозможно" >&2; exit 1; }
+
+registry_max() {
+  python3 - "$REGISTRY" <<'PYEOF' 2>/dev/null
 import sys, re
 registry = sys.argv[1]
 max_num = 0
@@ -214,18 +230,43 @@ try:
                 n = int(m.group(1))
                 if n > max_num:
                     max_num = n
-except Exception as e:
-    print(0, file=sys.stderr)
-print(max_num + 1)
+except Exception:
+    pass
+print(max_num)
 PYEOF
-)
+}
 
-if [[ -z "$WP_NUM" || "$WP_NUM" -le 0 ]]; then
-  echo "❌ Не удалось определить следующий номер WP из REGISTRY" >&2
+highest_taken() {
+  local max
+  max=$(registry_max)
+  [[ "$max" =~ ^[0-9]+$ ]] || max=0
+  local d n
+  for d in "$WP_NUMBERS_DIR"/*/; do
+    [[ -d "$d" ]] || continue
+    n="$(basename "$d")"
+    [[ "$n" =~ ^[0-9]+$ ]] || continue
+    if [ "$n" -gt "$max" ]; then max=$n; fi
+  done
+  printf '%s\n' "$max"
+}
+
+WP_NUM=""
+for ((_attempt = 1; _attempt <= 50; _attempt++)); do
+  next=$(( $(highest_taken) + 1 ))
+  # Без -p: EEXIST — сигнал, что номер выиграла другая сессия, повторить со
+  # свежим highest_taken (могла также вырасти сама REGISTRY-часть максимума).
+  if mkdir "$WP_NUMBERS_DIR/$next" 2>/dev/null; then
+    WP_NUM="$next"
+    break
+  fi
+done
+
+if [[ -z "$WP_NUM" ]]; then
+  echo "❌ Не удалось зарезервировать номер WP за 50 попыток" >&2
   exit 1
 fi
 
-echo "📋 Следующий номер WP: $WP_NUM"
+echo "📋 Следующий номер WP: $WP_NUM (зарезервирован: $WP_NUMBERS_DIR/$WP_NUM)"
 
 # issue #338 п.4: без паддинга "WP-9" в листинге сортируется после "WP-10".
 # WP_ID — только для строк с префиксом "WP-" (пути, заголовки); frontmatter
@@ -233,9 +274,18 @@ echo "📋 Следующий номер WP: $WP_NUM"
 WP_ID=$(printf '%03d' "$WP_NUM")
 
 # --- Проверка consent ---
+# Отказ здесь — штатный первый круг WP Gate (реальный пользователь ещё не
+# подтвердил создание), не гонка за номером: ничего для WP_NUM не создано,
+# поэтому маркер резервации снимаем перед выходом — иначе повторный запуск
+# после `touch` резервирует СЛЕДУЮЩИЙ номер, а не тот, что пользователь только
+# что подтвердил, и WP Gate никогда не проходит (живой тест поймал это до
+# релиза: touch consent-2 → второй запуск требует consent-3 → бесконечная
+# погоня). Отличие от "не удалось создать WP-N" ниже (rollback_wp_creation):
+# там уже могли быть частичные файловые следы, здесь — гарантированно нет.
 CONSENT_FILE="$STATE_DIR/wp-consent-${WP_NUM}"
 if [[ "$SKIP_CONSENT" -eq 0 ]]; then
   if [[ ! -f "$CONSENT_FILE" ]]; then
+    rmdir "$WP_NUMBERS_DIR/$WP_NUM" 2>/dev/null
     echo "🚫 WP Gate: нет согласия пользователя на создание WP-${WP_NUM}" >&2
     echo "   Создайте consent file и повторите:" >&2
     echo "   touch $CONSENT_FILE" >&2

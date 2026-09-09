@@ -50,9 +50,14 @@ API_BASE="https://api.github.com/repos/$REPO"
 CHECK_ONLY=false
 AUTO_YES=false
 FAST_CHECK=false
-# Stage B opt-ins (WP-7 F71): по умолчанию оба выключены — без флагов конвейер
-# только наблюдает (stage A) и ничего не пишет в пользовательские файлы.
+# Stage B opt-ins (WP-7 F71, поведение settings-merge скорректировано issue
+# #738): по умолчанию (без флагов, интерактивный запуск) оба выключены —
+# конвейер только наблюдает (stage A) и ничего не пишет в пользовательские
+# файлы. --yes включает settings-merge автоматически (см. ниже, после разбора
+# аргументов) — доказанно аддитивное слияние не рискованнее остального,
+# что --yes уже применяет без подтверждения.
 APPLY_SETTINGS_MERGE=false
+NO_SETTINGS_MERGE=false
 REFRESH_STALE=false
 
 # #533: governance compatibility entrypoints are upgraded as one ownership
@@ -98,6 +103,7 @@ for arg in "$@"; do
         --fast)             FAST_CHECK=true ;;
         --yes)              AUTO_YES=true ;;
         --apply-settings-merge) APPLY_SETTINGS_MERGE=true ;;
+        --no-settings-merge)    NO_SETTINGS_MERGE=true ;;
         --refresh-stale)    REFRESH_STALE=true ;;
         --version)          echo "exocortex-update v$VERSION"; exit 0 ;;
         --help|-h)
@@ -106,8 +112,9 @@ for arg in "$@"; do
             echo "Options:"
             echo "  --check     Показать доступные обновления без применения"
             echo "  --fast      С --check: сравнить только версию манифеста (без скачивания 300+ файлов, issue #230)"
-            echo "  --yes       Применить обновления без подтверждения"
-            echo "  --apply-settings-merge  Применить слияние settings.json (бэкап + пост-валидация; без флага — только предпросмотр)"
+            echo "  --yes       Применить обновления без подтверждения (включает settings.json merge, см. --no-settings-merge)"
+            echo "  --apply-settings-merge  Применить слияние settings.json отдельно от --yes (бэкап + пост-валидация; без флага и без --yes — только предпросмотр)"
+            echo "  --no-settings-merge     С --yes: НЕ применять слияние settings.json (оставить только предпросмотр, старое поведение --yes)"
             echo "  --refresh-stale         author_mode: обновить файлы «отстал от шаблона, правок нет» (бэкап; блок при «неизвестно» > 0)"
             echo "  --version   Версия скрипта"
             echo "  --help      Эта справка"
@@ -115,6 +122,24 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# issue #738: --apply-settings-merge оставался opt-in даже под --yes, поэтому
+# автоматический `update.sh --yes` доставлял новые файлы хуков в .claude/hooks/,
+# но не регистрировал их в settings.json — блокирующие защитные хуки
+# (destructive-guard.sh, pull-on-touch.sh) молча оставались выключены.
+# Слияние доказанно только аддитивное (settings-merge-preview.py: union по
+# hooks/permissions, при конфликте побеждает значение пользователя, ничего
+# существующего не перезаписывается и не удаляется) — не более рискованно,
+# чем остальное, что --yes уже применяет без подтверждения. Явный
+# --apply-settings-merge остаётся отдельной ручкой для запуска слияния без
+# остального --yes-конвейера (например, повторный прогон после --check).
+# --no-settings-merge — явный opt-out для тех, кто сознательно держал
+# settings.json под ручным контролем и гонял --yes только ради остального
+# конвейера (Codex, ревью этого фикса, ход 3): сохраняет старое поведение
+# --yes точечно, без отказа от автоприменения остальных обновлений.
+if [ "$AUTO_YES" = "true" ] && [ "$NO_SETTINGS_MERGE" != "true" ]; then
+    APPLY_SETTINGS_MERGE=true
+fi
 
 # === Cross-platform sed -i ===
 if sed --version >/dev/null 2>&1; then
