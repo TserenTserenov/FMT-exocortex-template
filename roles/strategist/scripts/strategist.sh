@@ -319,8 +319,39 @@ acquire_lock() {
 }
 
 # Читаем strategy_day из конфига (L4 Personal)
-RHYTHM_CONFIG="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/day-rhythm-config.yaml"
-STRATEGY_DAY_NAME=$(grep 'strategy_day:' "$RHYTHM_CONFIG" 2>/dev/null | awk '{print $2}' || echo "monday")
+# issue #729: раньше единственным источником был auto-memory Claude Code по
+# литеральному пути "-Users-$(whoami)-IWE" — ломается молча, если workspace
+# не буквально ~/IWE (симлинк или другой путь на Linux/WSL), а fallback на
+# monday ничем не сигнализировал об ошибке. Governance-репо копия — тот же
+# источник, что уже читают day-open-scaffold.sh и server-calendar.sh, и она
+# не зависит от workspace-пути. Функция вынесена отдельно ради регрессионного
+# теста (scripts/tests/test_issue_729_rhythm_config_resolve.sh).
+resolve_rhythm_config() {
+    local ws="$1" iwe_workspace="$2"
+    local rhythm_config="$ws/exocortex/day-rhythm-config.yaml"
+    if [ ! -f "$rhythm_config" ]; then
+        # Fallback: auto-memory Claude Code, путь выводим из РЕАЛЬНОГО workspace
+        # (pwd -P разворачивает симлинки), не из literal "~/IWE".
+        local ws_real
+        ws_real="$(cd "${iwe_workspace:-$HOME/IWE}" 2>/dev/null && pwd -P || true)"
+        if [ -n "$ws_real" ]; then
+            # tr '/_.' '-', не sed 's#/#-#g': Claude Code слугифицирует путь,
+            # заменяя на "-" также "_" и "." (см. memory-exocortex-sync.sh) —
+            # sed-only вариант молча ломался бы для workspace-путей с "." или "_".
+            local ws_slug
+            ws_slug="$(printf '%s' "$ws_real" | tr '/_.' '-')"
+            rhythm_config="$HOME/.claude/projects/${ws_slug}/memory/day-rhythm-config.yaml"
+        fi
+    fi
+    printf '%s\n' "$rhythm_config"
+}
+
+RHYTHM_CONFIG="$(resolve_rhythm_config "$WORKSPACE" "${IWE_WORKSPACE:-}")"
+STRATEGY_DAY_NAME=$(grep 'strategy_day:' "$RHYTHM_CONFIG" 2>/dev/null | awk '{print $2}')
+if [ -z "$STRATEGY_DAY_NAME" ]; then
+    log "WARN: strategy_day not found in $RHYTHM_CONFIG — fallback: monday"
+    STRATEGY_DAY_NAME="monday"
+fi
 # Конвертируем имя дня в номер (1=Mon..7=Sun)
 case "$STRATEGY_DAY_NAME" in
     monday)    STRATEGY_DAY_NUM=1 ;;

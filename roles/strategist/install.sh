@@ -142,6 +142,16 @@ for label in com.strategist.morning com.strategist.weekreview; do
         continue
     fi
     launchctl unload "$TARGET_DIR/$label.plist" 2>/dev/null || true
+    # issue #725: безусловный cp стирал ручную правку пользователя (например,
+    # ограничение Weekday) без предупреждения и бэкапа при каждом update.sh —
+    # backup+warn выбран вместо skip-if-diverged (пир-сессия с Codex,
+    # 2026-09-09): skip навсегда заморозил бы апстрим-фиксы плиста для тех,
+    # кто его один раз отредактировал по несвязанной причине.
+    if [ -f "$TARGET_DIR/$label.plist" ] && ! cmp -s "$TARGET_DIR/$label.plist" "$LAUNCHD_DIR/$label.plist"; then
+        BACKUP="$TARGET_DIR/$label.plist.bak-$(date +%Y%m%dT%H%M%S)"
+        cp "$TARGET_DIR/$label.plist" "$BACKUP"
+        echo "  ⚠ $label.plist отличается от шаблона — старая версия сохранена в $(basename "$BACKUP") перед перезаписью"
+    fi
     cp "$LAUNCHD_DIR/$label.plist" "$TARGET_DIR/"
     if [ -z "${SETUP_CI:-}" ]; then
         launchctl load "$TARGET_DIR/$label.plist"

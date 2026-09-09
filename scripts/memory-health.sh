@@ -148,6 +148,22 @@ echo ""
 if [ $orphans -gt 0 ]; then
     echo "⚠️  $orphans файлов без frontmatter — запустить \`memory-validate.sh\` для деталей"
 fi
+
+# issue #735: memory-validate.sh существовал и работал, но не вызывался ни
+# из одного рабочего пути — только упоминался в тексте этого предупреждения.
+# Fail-soft (WARN, не блок): memory-health.sh сам используется в нескольких
+# местах (day-close, audit-installation), падать из-за отсутствующего/
+# неисполняемого validate-скрипта на чужой установке нельзя.
+_VALIDATE_SCRIPT="$_MEMORY_HEALTH_DIR/memory-validate.sh"
+if [ -x "$_VALIDATE_SCRIPT" ]; then
+    _validate_fails=$(bash "$_VALIDATE_SCRIPT" --quiet --dir "$MEMORY_DIR" 2>/dev/null | grep -c '^FAIL' || true)
+    if [ "$_validate_fails" -gt 0 ]; then
+        echo "❌ memory-validate.sh: $_validate_fails нарушений frontmatter — запустить \`memory-validate.sh\` для деталей"
+    fi
+else
+    echo "⚠️  memory-validate.sh недоступен ($_VALIDATE_SCRIPT) — валидация frontmatter пропущена"
+fi
+
 if [ $hot_lines -gt $HOT_LIMIT ]; then
     echo "❌ HOT-лимит превышен на $((hot_lines - HOT_LIMIT)) строк — перевести файлы в WARM"
 fi
