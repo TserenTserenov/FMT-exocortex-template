@@ -1713,7 +1713,7 @@
     },
     {
       "path": "roles/strategist/README.md",
-      "sha256": "e7a13b44f9d0a2bd4af4c19094b201cf5cb804653bb7c01b7ea988e468887329"
+      "sha256": "eb6b976372513838c3f7dfc8a7d92565b253f61f3392acd89cc27ea04e46c283"
     },
     {
       "path": "roles/strategist/install.sh",
@@ -1865,7 +1865,7 @@
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.timer",
-      "sha256": "b724ec2c2d77638613664a1febfde418f55f6ddc89b091fd170d5f7af9e438fc"
+      "sha256": "262ad3aadd2e292209118373c2b24f5d571f33968f2870c1df66a5ccc92c4073"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.service",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
-      "sha256": "b76fdb7251e00560f230514011e27bd59c237e1af838db9d35707ebc170c7ba4"
+      "sha256": "7173995a3718b160d229dd5767631ecff23917ef170113c029a80c8c7d94986b"
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
@@ -2985,7 +2985,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "6c5de026806d7d7e11aa4c28c78dae620fc904ce97ca2faeffb53e5f934cf220"
+      "sha256": "134dde54a5afdd58964d31c18a8d6fbc3970447f5224e922d6270e10ac76f1a8"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3025,7 +3025,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "657fe5f8ab4af7c127d556249d651021a229b346f745d10238dfa602822c9985"
+      "sha256": "a457e5f7d0ca31562294c63c872122bfbf38dbcb5c102fe08d2b755b4bde9ebf"
     }
   ],
   "excluded_paths": [

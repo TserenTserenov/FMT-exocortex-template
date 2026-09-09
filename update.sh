@@ -3732,7 +3732,7 @@ WORKSPACE_DIR="$DETECTED_WORKSPACE"
 CLAUDE_PATH="$(command -v claude 2>/dev/null || echo 'claude')"
 CLAUDE_PROJECT_SLUG="$(echo "$DETECTED_WORKSPACE" | tr '/' '-')"
 TIMEZONE_HOUR="4"
-TIMEZONE_DESC="4:00 UTC"
+TIMEZONE_DESC="4:00 (местное время)"
 HOME_DIR="$HOME"
 
 # === Knowledge Gateway (T3+) — fill in if using personal Pack index ===

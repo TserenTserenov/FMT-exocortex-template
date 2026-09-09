@@ -277,7 +277,7 @@ if [ -n "${SETUP_CI:-}" ]; then
     WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
     CLAUDE_PATH="${CLAUDE_PATH:-claude}"
     TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
-    TIMEZONE_DESC="${TIMEZONE_DESC:-4:00 UTC}"
+    TIMEZONE_DESC="${TIMEZONE_DESC:-4:00 (местное время)}"
     echo "  [CI] GITHUB_USER=$GITHUB_USER WORKSPACE_DIR=$WORKSPACE_DIR"
 else
     read -p "GitHub username (или Enter для пропуска): " GITHUB_USER
@@ -292,16 +292,16 @@ else
         # Core: используем defaults, не спрашиваем Claude-специфичные параметры
         CLAUDE_PATH="${AI_CLI:-claude}"
         TIMEZONE_HOUR="4"
-        TIMEZONE_DESC="4:00 UTC"
+        TIMEZONE_DESC="4:00 (местное время)"
     else
         read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
         CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
 
-        read -p "Strategist launch hour (UTC, 0-23) [4]: " TIMEZONE_HOUR
+        read -p "Strategist launch hour, местное время машины (0-23) [4]: " TIMEZONE_HOUR
         TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
 
-        read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 UTC]: " TIMEZONE_DESC
-        TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 UTC}"
+        read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 (местное время)]: " TIMEZONE_DESC
+        TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 (местное время)}"
     fi
 fi
 
@@ -417,7 +417,7 @@ if $CORE_ONLY; then
     echo "  Mode:           core (offline)"
 else
     echo "  Claude path:    $CLAUDE_PATH"
-    echo "  Schedule hour:  $TIMEZONE_HOUR (UTC)"
+    echo "  Schedule hour:  $TIMEZONE_HOUR (местное время)"
     echo "  Time desc:      $TIMEZONE_DESC"
 fi
 echo "  Home dir:       $HOME_DIR"
@@ -1222,7 +1222,7 @@ else
         echo "  3. Ask Claude: «Проведём первую стратегическую сессию»"
         echo ""
         echo "Strategist will run automatically:"
-        echo "  - Morning ($TIMEZONE_DESC): strategy (Mon) / day-plan (Tue-Sun)"
+        echo "  - Morning at $TIMEZONE_DESC: strategy (Mon) / day-plan (Tue-Sun)"
         echo "  - Sunday night: week review"
     fi
     echo ""
