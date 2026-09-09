@@ -210,6 +210,11 @@ fi
 # EEXIST. Маркеры никогда не удаляются при архивации WP — номер не переиздаётся.
 WP_NUMBERS_DIR="$STATE_DIR/wp-numbers"
 mkdir -p "$WP_NUMBERS_DIR"
+# Fail fast on a real filesystem problem (permissions, read-only, disk full)
+# instead of burning all 50 retry attempts and reporting a misleading
+# "couldn't reserve after 50 tries" — that message is meant for a genuine
+# reservation race, not a broken filesystem (cold-review finding, PR #746).
+[[ -w "$WP_NUMBERS_DIR" ]] || { echo "❌ Нет прав на запись в $WP_NUMBERS_DIR — резервирование номера невозможно" >&2; exit 1; }
 
 registry_max() {
   python3 - "$REGISTRY" <<'PYEOF' 2>/dev/null
@@ -269,9 +274,18 @@ echo "📋 Следующий номер WP: $WP_NUM (зарезервирова
 WP_ID=$(printf '%03d' "$WP_NUM")
 
 # --- Проверка consent ---
+# Отказ здесь — штатный первый круг WP Gate (реальный пользователь ещё не
+# подтвердил создание), не гонка за номером: ничего для WP_NUM не создано,
+# поэтому маркер резервации снимаем перед выходом — иначе повторный запуск
+# после `touch` резервирует СЛЕДУЮЩИЙ номер, а не тот, что пользователь только
+# что подтвердил, и WP Gate никогда не проходит (живой тест поймал это до
+# релиза: touch consent-2 → второй запуск требует consent-3 → бесконечная
+# погоня). Отличие от "не удалось создать WP-N" ниже (rollback_wp_creation):
+# там уже могли быть частичные файловые следы, здесь — гарантированно нет.
 CONSENT_FILE="$STATE_DIR/wp-consent-${WP_NUM}"
 if [[ "$SKIP_CONSENT" -eq 0 ]]; then
   if [[ ! -f "$CONSENT_FILE" ]]; then
+    rmdir "$WP_NUMBERS_DIR/$WP_NUM" 2>/dev/null
     echo "🚫 WP Gate: нет согласия пользователя на создание WP-${WP_NUM}" >&2
     echo "   Создайте consent file и повторите:" >&2
     echo "   touch $CONSENT_FILE" >&2
