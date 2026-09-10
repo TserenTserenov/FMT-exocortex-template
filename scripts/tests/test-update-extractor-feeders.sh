@@ -25,6 +25,14 @@ eval "$(awk '
 ' "$ROOT/update.sh")"
 declare -F backfill_extractor_feeders >/dev/null
 
+# issue #768: backfill_extractor_feeders() now checks $HOST_GLOBAL_OWNER_CONFLICT
+# (set near the top of update.sh, outside the extracted function body) before
+# doing anything -- default to the no-conflict case here, same as every real
+# invocation on a machine that IS the recorded owner of its own host-global
+# resources. Case 6 below flips this on to check the opposite path.
+HOST_GLOBAL_OWNER_CONFLICT=false
+HOST_GLOBAL_OWNER_CONFLICT_REASON=""
+
 SCRIPT_DIR="$TMP/template"
 WORKSPACE_DIR="$TMP/workspace"
 EFFECTIVE_GOVERNANCE_REPO="DS-strategy"
@@ -130,4 +138,22 @@ if ! grep -Fq 'повторите вручную' <(printf '%s' "$OUT"); then
     exit 1
 fi
 
-echo 'PASS: update.sh backfills the Extractor feeders (install, opt-out, no-CLI, missing script, failure)'
+# 6. issue #768: a foreign/unowned host does not get its launchd schedule
+# touched at all, regardless of everything else being in place.
+write_feeders 0
+rm -f "$TMP/feeders-call"
+HOST_GLOBAL_OWNER_CONFLICT=true
+HOST_GLOBAL_OWNER_CONFLICT_REASON="~/.zshenv points to /some/other/workspace"
+OUT=$(backfill_extractor_feeders)
+HOST_GLOBAL_OWNER_CONFLICT=false
+HOST_GLOBAL_OWNER_CONFLICT_REASON=""
+if [ -e "$TMP/feeders-call" ]; then
+    echo 'host-global owner conflict did not stop the feeders script from running' >&2
+    exit 1
+fi
+if ! grep -Fq 'points to /some/other/workspace' <(printf '%s' "$OUT"); then
+    echo 'host-global owner conflict skip did not explain why' >&2
+    exit 1
+fi
+
+echo 'PASS: update.sh backfills the Extractor feeders (install, opt-out, no-CLI, missing script, failure, foreign workspace)'
