@@ -15,6 +15,15 @@
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
+# --help/-h — до любых side-effects (issue #757): голый exit 0 без этой ветки
+# заставлял --help реально вооружать гейт (INITIATOR="--help"), а HELP-smoke
+# в validate-fmt-scripts.sh считал такой exit 0 доказательством безопасности.
+[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
+    echo "dry-run-begin.sh — эксклюзивное создание dry-run репетиции (issue #549 stage 2)"
+    echo "Использование: dry-run-begin.sh [initiator] [session_id]"
+    exit 0
+}
+
 INITIATOR="${1:-audit-installation}"
 SID="${2:-${CLAUDE_SESSION_ID:-dry-$(date +%s)-$$}}"
 command -v jq >/dev/null 2>&1 || { echo "dry-run-begin: jq required" >&2; exit 2; }

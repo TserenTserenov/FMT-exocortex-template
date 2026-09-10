@@ -68,7 +68,7 @@ validate_dayplan() { # <staged-path> <tmpfile>
       "Итоги вчера|Yesterday"
     )
     for section in "${SECTIONS[@]}"; do
-        grep -qE "$section" "$f" || err "DayPlan $rel: пропущена секция «$section»"
+        grep -qE "$section" "$f" || err "DayPlan $rel: пропущена секция «${section}»"
     done
 
     local headings
@@ -99,6 +99,12 @@ validate_dayplan() { # <staged-path> <tmpfile>
     # пропустить проверку из-за инфраструктурной ошибки, резолвер python3
     # не более надёжен, чем сам YAML.
     local config="$WORKSPACE/memory/day-rhythm-config.yaml"
+    # issue #773 — я предложил свой резолвер, но пока эта сессия шла,
+    # тот же баг независимо закрыла параллельная сессия как issue #764/#765
+    # (PR #769): resolve_find_python3() ниже — уже смёрженная версия,
+    # дополнительно делает mandatory-проверку fail-closed (не WARN-skip,
+    # как предлагал я). Беру их версию, не держу дублирующую реализацию
+    # одного и того же факта (OwnerIntegrity) — см. issue-комментарий #773.
     local py="" py_resolver=""
     py_resolver=$(resolve_find_python3) || py_resolver=""
     if [ -n "$py_resolver" ]; then

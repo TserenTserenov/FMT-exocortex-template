@@ -162,8 +162,14 @@ GATE_LOG="$IWE_ROOT/.claude/logs/gate_log.jsonl"
 mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
 
 # --- Шаг 1: был ли вызов протокольного скилла? ---
+# issue #758: в транскрипте Claude Code tool_use лежит вложенно, в
+# .message.content[], а не на верхнем уровне строки (там type=assistant/
+# user/attachment) — select(.type=="tool_use") на верхнем уровне не
+# совпадал никогда. `[]?` гасит ошибку, если .message/.content отсутствует
+# или не массив, — этого достаточно, широкий `try` не нужен.
 PROTOCOL_SKILL=$(jq -r '
-  select(.type == "tool_use" and .name == "Skill")
+  .message.content[]?
+  | select(.type == "tool_use" and .name == "Skill")
   | .input.skill // empty
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
   | grep -E '^(day-open|day-close|run-protocol|wp-new)$' \
@@ -175,9 +181,10 @@ if [ -z "$PROTOCOL_SKILL" ]; then
   exit 0
 fi
 
-# --- Шаг 2: был ли TodoWrite с ≥3 items? ---
+# --- Шаг 2: был ли TodoWrite с ≥3 items? --- (та же вложенность, что в Шаге 1)
 TODO_MAX=$(jq -r '
-  select(.type == "tool_use" and .name == "TodoWrite")
+  .message.content[]?
+  | select(.type == "tool_use" and .name == "TodoWrite")
   | .input.todos
   | if type == "array" then length else 0 end
 ' "$TRANSCRIPT_PATH" 2>/dev/null \

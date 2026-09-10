@@ -117,7 +117,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "40e9d2b474fe71719fb704cb4d1b2415bc8e52272bcca5519baff64dd38ed9dd"
+      "sha256": "d693fe71908993e9b08f8dce95d30d3917fdd89df9cfd9a68b2cf889a30ba62d"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -733,7 +733,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "c516c1e477299a7151604c039927c4f83d6deec0dcff7f776d058dccf3d37272"
+      "sha256": "db8fa64b97df2b38db10b352dbc03f7c0ee78e57421c72c068a6fba5c0e2a761"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -1505,7 +1505,7 @@
     },
     {
       "path": "memory/memory-lifecycle-spec.md",
-      "sha256": "dff4f2312e292b310595688bb2a23a0da2c16250201d54bfebf082472e0f2544"
+      "sha256": "4c4009df1ab3eced5cdb12b67b5e00789b27dd691ae4941355f794756207de84"
     },
     {
       "path": "memory/navigation.md",
@@ -2233,7 +2233,7 @@
     },
     {
       "path": "scripts/dry-run-begin.sh",
-      "sha256": "998accf2fa2199069c6af58bc6eade22e14132a841187e07aedde6647c81405a"
+      "sha256": "7e8f4bdff52aef84ee54935a41a6fbed213250aa916b19ba48408d57ac0f1e04"
     },
     {
       "path": "scripts/dry-run-complete.sh",
@@ -2557,7 +2557,7 @@
     },
     {
       "path": "scripts/smoke-clean-env.sh",
-      "sha256": "b8bab269eeb332980de4af7c05b84cabb312ef996bf36c841cd77edc48a23a9c"
+      "sha256": "4d062f62e794929bdf86fed7f7d3631050713e6ef794c70cb4d7265ab6a85c00"
     },
     {
       "path": "scripts/staging-audit.sh",
@@ -2821,7 +2821,7 @@
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
-      "sha256": "87f6a07fac9ebf21bf2d410ebe58310073de2d0aca0a4db98f602935331494cd"
+      "sha256": "b04dee30fdc028666a41d0bc3e6a35e2465f60b21c6a478324d92e4dd911cd43"
     },
     {
       "path": "scripts/validate-hypothesis-priority.sh",
@@ -2833,7 +2833,7 @@
     },
     {
       "path": "scripts/validate-staged-artifacts.sh",
-      "sha256": "949b65b9ccb048e22073db6efe720b733dda9897399594c205761a1b4a527df3"
+      "sha256": "9a9ae6740805de29261696756bf6f71f485f8848009b37237f43a1b112af1937"
     },
     {
       "path": "scripts/verify-context-budget.sh",
