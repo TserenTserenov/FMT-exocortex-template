@@ -993,7 +993,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "b0a41a43e1a0c127008de723f5e3b00372be1d7b5d54f8cf8c1cdabc5bc7e029"
+      "sha256": "c3eb6174035a19fb10ecd259e0035fe8b4654462032a9c312ed8ccba443f8713"
     },
     {
       "path": "docs/roles-catalog.md",
@@ -1437,7 +1437,7 @@
     },
     {
       "path": "memory/MEMORY.md",
-      "sha256": "7016cf161da6ad632371f64ae841a12e0b645595db9db70827adb77a726e6375"
+      "sha256": "00d8bfdd7590f16e3d344b06d3f18dcafa2f26929fed443111ea679f50164cb7"
     },
     {
       "path": "memory/agent-architecture-framework.md",
@@ -3120,7 +3120,9 @@
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
     "setup/detector-fixtures/README.md",
+    "setup/detector-fixtures/detector_07/negative_env_fallback.md",
     "setup/detector-fixtures/detector_07/positive_backtick_slash.md",
+    "setup/detector-fixtures/detector_07/positive_quoted_literal.md",
     "setup/detector-regex.sh",
     "setup/integration-contract-validator.sh",
     "setup/optional/COVER-IMAGES.md",
