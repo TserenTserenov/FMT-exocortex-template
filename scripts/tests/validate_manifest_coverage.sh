@@ -9,6 +9,19 @@
 # (found 03.08, running it for real: 6/6 false "not in manifest" errors on
 # files that were plainly present). Now parses the manifest as JSON and checks
 # the actual files[].path contract instead of grepping for a substring.
+#
+# issue #707: this script's contract ("every file under scripts/tests/ must
+# be in the manifest") disagrees with generate-manifest.sh's own SKIP_PATTERNS
+# (most of scripts/tests/ is deliberately excluded — author-only pytest/dev
+# fixtures, opted into delivery per-file via SCRIPT_CONTRACT_EXPLICIT_INCLUDE).
+# It is intentionally NOT wired into .github/workflows/validate-template.yml
+# for that reason -- it would fail on every routine commit that adds an
+# author-only test. scripts/check-manifest-coverage.py is the CI-enforced,
+# contract-respecting check (git-tracked files vs. manifest.files +
+# manifest.excluded_paths); this script is author-only ad-hoc tooling for
+# spot-checking "did I forget to explicit-include a test I meant to ship" --
+# run it by hand, do not add it to CI without first reconciling it with
+# SCRIPT_CONTRACT_EXPLICIT_INCLUDE (it will otherwise fail on every commit).
 
 set -euo pipefail
 
