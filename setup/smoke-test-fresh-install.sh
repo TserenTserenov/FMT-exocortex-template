@@ -35,6 +35,16 @@ TEST_WS="${SMOKE_WORKSPACE:-/tmp/iwe-smoke-test-$$}"
 # DS-pilot-strategy и пр. Закрывает gap «hardcode виден только при non-default».
 SMOKE_GOVERNANCE_REPO="${SMOKE_GOVERNANCE_REPO:-DS-strategy}"
 
+# issue #748 (post-release audit): a hardcoded PATH=/usr/bin:/bin isolates
+# these subprocesses from a personal dev-machine's git wrapper (correct
+# intent), but on NixOS coreutils (dirname, basename, ...) live under
+# /run/current-system/sw/bin, not /usr/bin or /bin — install.sh then died on
+# "dirname: command not found" instead of exercising the fail-fast check it
+# was meant to test. Add the Nix system profile as a known-standard extra
+# location; still excludes any personal ~/.iwe-runtime-style PATH entry.
+SMOKE_CLEAN_PATH="/usr/bin:/bin"
+[ -d /run/current-system/sw/bin ] && SMOKE_CLEAN_PATH="$SMOKE_CLEAN_PATH:/run/current-system/sw/bin"
+
 # E2E sections replace HOME so setup cannot touch the caller's real dotfiles.
 # On macOS CI, PyYAML can live in the original HOME's user-site; changing HOME
 # would otherwise make the already-verified dependency disappear mid-test and
@@ -151,7 +161,7 @@ fi
 echo "[5/6] install.sh fail-fast без env (R5.2 regression)..."
 # Запускаем install.sh с очищенным окружением — IWE_RUNTIME / IWE_WORKSPACE не определены.
 # Должен сработать fail-fast: detect literal {{...}} в plist → exit 2 + понятная ошибка.
-INSTALL_OUT=$(env -i HOME="$TEST_WS" PATH=/usr/bin:/bin \
+INSTALL_OUT=$(env -i HOME="$TEST_WS" PATH="$SMOKE_CLEAN_PATH" \
     bash "$TEMPLATE_DIR/roles/strategist/install.sh" 2>&1 || true)
 INSTALL_RC=$?
 if echo "$INSTALL_OUT" | grep -qE 'содержит незаменённые плейсхолдеры'; then
@@ -310,7 +320,7 @@ echo "[6/7] install.sh с env проходит fail-fast (positive case)..."
 # главное — НЕ упасть на fail-fast check.
 # WP-293: HOME isolation обязателен — install.sh пишет plist в $HOME/Library/LaunchAgents
 # и делает launchctl load. Без env -i HOME=$TEST_WS test перезатрёт реальный launchd автора.
-INSTALL_OK_OUT=$(env -i HOME="$TEST_WS" PATH=/usr/bin:/bin \
+INSTALL_OK_OUT=$(env -i HOME="$TEST_WS" PATH="$SMOKE_CLEAN_PATH" \
     IWE_RUNTIME="$TEST_WS/.iwe-runtime" IWE_WORKSPACE="$TEST_WS" \
     bash "$TEMPLATE_DIR/roles/strategist/install.sh" 2>&1 || true)
 if echo "$INSTALL_OK_OUT" | grep -qE 'содержит незаменённые плейсхолдеры'; then
@@ -390,7 +400,7 @@ E2E_HOME="/tmp/iwe-smoke-e2e-home-$$"
 E2E_MEM="$E2E_HOME/.claude/projects/$(echo "$E2E_WS" | tr '/' '-')/memory"
 mkdir -p "$E2E_WS" "$E2E_HOME"
 E2E_RC=0
-E2E_OUT=$(HOME="$E2E_HOME" SETUP_CI=1 GITHUB_USER=smoke-e2e WORKSPACE_DIR="$E2E_WS" \
+E2E_OUT=$(HOME="$E2E_HOME" PATH="$SMOKE_CLEAN_PATH" SETUP_CI=1 GITHUB_USER=smoke-e2e WORKSPACE_DIR="$E2E_WS" \
     GOVERNANCE_REPO="$SMOKE_GOVERNANCE_REPO" \
     GIT_AUTHOR_NAME="smoke-e2e" GIT_AUTHOR_EMAIL="smoke@test.local" \
     GIT_COMMITTER_NAME="smoke-e2e" GIT_COMMITTER_EMAIL="smoke@test.local" \
@@ -494,14 +504,14 @@ RERUN_HOME="$RERUN_WS/home"
 RERUN_GOV="pilot-governance"
 mkdir -p "$RERUN_WS" "$RERUN_HOME"
 RERUN_FIRST_RC=0
-HOME="$RERUN_HOME" SETUP_CI=1 GITHUB_USER=smoke-rerun \
+HOME="$RERUN_HOME" PATH="$SMOKE_CLEAN_PATH" SETUP_CI=1 GITHUB_USER=smoke-rerun \
     WORKSPACE_DIR="$RERUN_WS" GOVERNANCE_REPO="$RERUN_GOV" \
     GIT_AUTHOR_NAME="smoke-rerun" GIT_AUTHOR_EMAIL="smoke@test.local" \
     GIT_COMMITTER_NAME="smoke-rerun" GIT_COMMITTER_EMAIL="smoke@test.local" \
     bash "$TEMPLATE_DIR/setup.sh" --core >/dev/null 2>&1 || RERUN_FIRST_RC=$?
 RERUN_SECOND_RC=0
 env -u GOVERNANCE_REPO -u IWE_GOVERNANCE_REPO \
-    HOME="$RERUN_HOME" SETUP_CI=1 GITHUB_USER=smoke-rerun \
+    HOME="$RERUN_HOME" PATH="$SMOKE_CLEAN_PATH" SETUP_CI=1 GITHUB_USER=smoke-rerun \
     WORKSPACE_DIR="$RERUN_WS" \
     GIT_AUTHOR_NAME="smoke-rerun" GIT_AUTHOR_EMAIL="smoke@test.local" \
     GIT_COMMITTER_NAME="smoke-rerun" GIT_COMMITTER_EMAIL="smoke@test.local" \
@@ -525,7 +535,7 @@ mkdir -p "$SYMLINK_WS" "$SYMLINK_HOME" "$SYMLINK_OUTSIDE"
 printf 'sentinel-before\n' > "$SYMLINK_OUTSIDE/sentinel.txt"
 ln -s "$SYMLINK_OUTSIDE" "$SYMLINK_WS/custom-governance"
 SYMLINK_RC=0
-SYMLINK_OUT=$(HOME="$SYMLINK_HOME" SETUP_CI=1 GITHUB_USER=smoke-symlink \
+SYMLINK_OUT=$(HOME="$SYMLINK_HOME" PATH="$SMOKE_CLEAN_PATH" SETUP_CI=1 GITHUB_USER=smoke-symlink \
     WORKSPACE_DIR="$SYMLINK_WS" GOVERNANCE_REPO=custom-governance \
     bash "$TEMPLATE_DIR/setup.sh" --core 2>&1) || SYMLINK_RC=$?
 SYMLINK_FILE_COUNT=$(find "$SYMLINK_OUTSIDE" -type f | wc -l | tr -d ' ')
@@ -547,7 +557,7 @@ E2E_WS10="/tmp/iwe-smoke-full-$$"
 E2E_HOME10="$E2E_WS10/home"
 mkdir -p "$E2E_WS10" "$E2E_HOME10"
 E2E10_RC=0
-E2E10_OUT=$(HOME="$E2E_HOME10" SETUP_CI=1 GITHUB_USER=smoke-full WORKSPACE_DIR="$E2E_WS10" \
+E2E10_OUT=$(HOME="$E2E_HOME10" PATH="$SMOKE_CLEAN_PATH" SETUP_CI=1 GITHUB_USER=smoke-full WORKSPACE_DIR="$E2E_WS10" \
     GOVERNANCE_REPO="$SMOKE_GOVERNANCE_REPO" \
     GIT_AUTHOR_NAME="smoke-full" GIT_AUTHOR_EMAIL="smoke@test.local" \
     GIT_COMMITTER_NAME="smoke-full" GIT_COMMITTER_EMAIL="smoke@test.local" \

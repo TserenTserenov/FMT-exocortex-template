@@ -16,6 +16,9 @@
 # Detector #7: prompts_python_coverage — bare DS-strategy в prompts/.py файлах
 # История regex: 0.29.5 базовый, 0.29.14 расширен на backtick+slash паттерн
 # (subagent post-release verify нашёл gap, Євгений нашёл бы на fresh clone).
-export DETECTOR_07_REGEX='`DS-strategy[`/]|/DS-strategy/| DS-strategy[ /]'
+# issue #748 (post-release audit v0.40.0): расширен на голый quoted-литерал
+# ("DS-strategy" / 'DS-strategy', без trailing слэша) — пример-YAML/значение
+# в markdown-промпте, не только путь.
+export DETECTOR_07_REGEX='`DS-strategy[`/]|/DS-strategy/| DS-strategy[ /]|["'"'"']DS-strategy["'"'"']'
 
 # (При добавлении detector_08+ — добавлять здесь как DETECTOR_NN_REGEX)
