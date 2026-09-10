@@ -2813,7 +2813,7 @@
     },
     {
       "path": "scripts/tests/validate_manifest_coverage.sh",
-      "sha256": "8ca218f39bc6357c0ba4399a7de89c5465b2368f8820ba8c0102d00c67ec6007"
+      "sha256": "c997b4e94b29aede85a5db7df1cfbff2b9638e606bb89dc318a45f0767fd4d3d"
     },
     {
       "path": "scripts/update-derived-snapshot.py",
