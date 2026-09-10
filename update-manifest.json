@@ -2529,7 +2529,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "7afdce09da6a3f1ddbe855c0cac659404c8d35231ceedcc1276e3c24afd32019"
+      "sha256": "e239fe9c50a5586330460aad1ce4c12950f5608f51cd96b0fb44aafd275b59fd"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2590,6 +2590,10 @@
     {
       "path": "scripts/test-route-task.sh",
       "sha256": "05c714c8dfe530f1954bcd87fa4b312c15e235c341f8ffd3e12b6aeca00afe9c"
+    },
+    {
+      "path": "scripts/test-session-guard-yaml-task-escaping.sh",
+      "sha256": "36706ca648d1782376db6923c1a37cc74fab2d103089255875bb67c560c0008a"
     },
     {
       "path": "scripts/test_archive_cadence_sweep.py",
