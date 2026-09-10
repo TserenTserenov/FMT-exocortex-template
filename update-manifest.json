@@ -1141,7 +1141,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
+      "sha256": "52e1b8b8ae51fc6cdc92d1e9af6a6626f2fd6b2c1f741613c5e56fcf01c1c6d2"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2477,7 +2477,7 @@
     },
     {
       "path": "scripts/peer-adapter-filter.py",
-      "sha256": "ebbfdae528c71bfb8d41f45bc7851bccc4cb06b57090ffd4ff14aa7eb507da2a"
+      "sha256": "e9019119b7242fcc165cc8e16dad281505639853db824abf2f48227817b0ae75"
     },
     {
       "path": "scripts/peer-session-finalize.sh",
@@ -2746,6 +2746,10 @@
     {
       "path": "scripts/tests/test_issue_720_decision_log_sot.sh",
       "sha256": "b38448f83b4ee3a7cefe3cf40eea41e56153f50134fd91f78c28bc2643318686"
+    },
+    {
+      "path": "scripts/tests/test_issue_728_agentigore_dirslash.sh",
+      "sha256": "8fd41c1964b7668c7cd07a93921314f4398876417c097c8dbc029275fb8f79a0"
     },
     {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
