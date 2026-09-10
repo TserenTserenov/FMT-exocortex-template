@@ -61,7 +61,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "a6d9468071cdd50436125384eb1820d7444a5b33a07688548c34dc193ea45877"
+      "sha256": "df9d2075aaba4ce83c9aeab9f7e5efb1474c4681801e9a47be0e246b51c633b6"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -169,7 +169,7 @@
     },
     {
       "path": ".claude/hooks/sql-pii-guard.sh",
-      "sha256": "f081e4d19a64ccf2de50c979e2df48dfe6c3f7534700bce48174fc955c14a19e"
+      "sha256": "4c567c88d1590531060cd09e19897ef31c91d2c26be3258410d03fc0b95b294d"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
