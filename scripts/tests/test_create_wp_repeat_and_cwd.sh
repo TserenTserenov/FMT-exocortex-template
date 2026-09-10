@@ -27,6 +27,7 @@ run_create() {
       --title "Retry Contract" \
       --budget 1h \
       --priority P4 \
+      --verification-class closed-loop \
       --no-consent-check
   )
 }

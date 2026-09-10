@@ -96,6 +96,7 @@ PATH="$FAKE_BIN:$PATH" bash "$IWE_TEMPLATE/scripts/create-wp.sh" \
   --title "Contract Test WP" \
   --budget "1h" \
   --priority "P4" \
+  --verification-class closed-loop \
   --no-consent-check \
   >"$TMPDIR/create.out" 2>&1
 EXIT_CODE=$?

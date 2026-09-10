@@ -146,7 +146,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
 
 **Шаг 4.** Регистрация в `<governance-repo>/inbox/open-sessions.log` (например DS-strategy): `YYYY-MM-DD HH:MM | WP-N | модель | описание`. Исключения — не регистрировать. [[gate]]
 
-**Шаг 4.5. Артефактор (автоматический).** Если класс ∈ {open-loop, problem-framing} И оценка ≥3h → выполнить `/artifactor` inline (без вопроса пользователю). Этапную карту вставить в WP context file (секция `## Этапы` в конец файла). Если класс trivial/closed-loop ИЛИ оценка <3h → пропустить молча. [[narrative]]
+**Шаг 4.5. Декомпозитор (автоматический).** Если класс ∈ {open-loop, problem-framing} И оценка ≥3h → выполнить `/decompose` inline (без вопроса пользователю). Этапную карту вставить в WP context file (секция `## Этапы` в конец файла). Если класс trivial/closed-loop ИЛИ оценка <3h → пропустить молча. [[narrative]]
 
 **EXTENSION POINT (protocol-open after):** `bash .claude/scripts/load-extensions.sh protocol-open after` — exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить. Exit 1 → пропустить. Поддерживает `extensions/protocol-open.after.md` И `extensions/protocol-open.after.<suffix>.md`. [[gate]]
 

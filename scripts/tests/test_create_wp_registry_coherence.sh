@@ -51,6 +51,7 @@ bash "$IWE_TEMPLATE/scripts/create-wp.sh" \
   --title "$TITLE" \
   --budget "2h" \
   --priority "P3" \
+  --verification-class closed-loop \
   --no-consent-check
 
 # Извлечь WP номер из созданного файла
