@@ -853,7 +853,7 @@
     },
     {
       "path": "docs/DATA-DOMAINS-REGISTRY.yaml",
-      "sha256": "26ccae3560fc8b722e5f110a80267fedc8d5ee83b3f88270355cad39f130c14a"
+      "sha256": "f3682b409066dbfa7eec9e5234d27e1bfedc85dbf0836aa2eb387dbed3cec7ba"
     },
     {
       "path": "docs/DATA-POLICY.md",
@@ -929,7 +929,7 @@
     },
     {
       "path": "docs/adr/ADR-004-data-domain-map.md",
-      "sha256": "5604b41db5629720eb09fb6c213c89d774eab2e79c3e3f2347868fa7812540ef"
+      "sha256": "ca26153bcc4844c0791c26a958b43e14409cb8cd955e779c74f350ac6f02c6e3"
     },
     {
       "path": "docs/agent-coordination-manifest.md",
