@@ -737,7 +737,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "4c57129ed8a2edadeb77a0b787744e206bb5c60885636c3c3e6375e8b6b8c137"
+      "sha256": "e5b1a85320475b16087dbcae251e2ebd83ad405b62f4e992c38ed40674aa4164"
     },
     {
       "path": ".claude/styles/p05-core.md",
@@ -1521,7 +1521,7 @@
     },
     {
       "path": "memory/protocol-open.md",
-      "sha256": "06b3eb988ce8eb37e2758f08bd1e75a2caa858a15cec63396402546a920dbeab"
+      "sha256": "ad95d0af64e8369e5aa102d9d5de93603e9244c30111b3f70f1691b9f45f710d"
     },
     {
       "path": "memory/protocol-work.md",
@@ -1561,7 +1561,7 @@
     },
     {
       "path": "memory/t-checklist.md",
-      "sha256": "b67f5f17d6855956294a3f4b457d9d3a39caa5d212d3064d891b69b9d733c1b6"
+      "sha256": "216361a0b1be8e00ec2c024a0480a7f697126b6d1aa81cb22a5a5724a4fb46f5"
     },
     {
       "path": "memory/templates-dayplan.md",
@@ -2153,7 +2153,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "5c9761acd0426119a06899e80a3444b79995b604a1bc27d0ab29a6e02dabfd8c"
+      "sha256": "4c3d389e0f4bbe70fe86750703d2634d2370fdd9d74d82e0b3f61833aa0b506b"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2629,23 +2629,23 @@
     },
     {
       "path": "scripts/tests/test_create_wp_contract.sh",
-      "sha256": "cb8ae42e06dbeb141d8566a9cd808874798cb01f0d8c7395aeee05e270fe83c2"
+      "sha256": "48664e0ba57486c5a53fea7f92043b3f7626d00801cf8fcfa8568cbc621e5bb9"
     },
     {
       "path": "scripts/tests/test_create_wp_hypothesis_relation.sh",
-      "sha256": "2265e5dda20c17e17ea66d2c870fa0f97e3a053f741239fe61beaa785f944a58"
+      "sha256": "d14398811aedc21cceecbade45d5bfbbd1852ba125a294546af9d670b50be023"
     },
     {
       "path": "scripts/tests/test_create_wp_number_padding.py",
-      "sha256": "fc5c500573c067fb1e6882834d2e0a1d7cd287446f9df5c9b49c1b404362e201"
+      "sha256": "6f035835af033c10993cc9ea46442916ff0a69201bad80021b5bff15e6a635b8"
     },
     {
       "path": "scripts/tests/test_create_wp_registry_coherence.sh",
-      "sha256": "852828b4b741b9922fd0a72b5089214a3ee1663874d7950976ed8115958adb69"
+      "sha256": "b1cb6c0de484ee1362ddd07a76c4d63a6b5155f025fb927dafdf6dadb76c300e"
     },
     {
       "path": "scripts/tests/test_create_wp_repeat_and_cwd.sh",
-      "sha256": "926603ebb29d83b7e3db5e0998182e1cc8c8b756820e3b99950d24071cbb093a"
+      "sha256": "e5a759f588d019868885494923044aff05ef617ac2503685d89d2c8a72f562ba"
     },
     {
       "path": "scripts/tests/test_create_wp_weekplan_writer.py",
@@ -2669,7 +2669,7 @@
     },
     {
       "path": "scripts/tests/test_fresh_seed_reproduction.sh",
-      "sha256": "f8459d2cf2c065888d7e80d285a372166c6d88503c89c05a47409234b1171588"
+      "sha256": "7a7f7716d610e7732369f12add25496431231c092ccfedfd5cedc631b7475eb1"
     },
     {
       "path": "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",
@@ -3061,6 +3061,7 @@
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_copy_to_aisystant.py",
+    "scripts/tests/test_create_wp_verification_class.sh",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",
     "scripts/tests/test_day_open_preflight_calendar_path.sh",

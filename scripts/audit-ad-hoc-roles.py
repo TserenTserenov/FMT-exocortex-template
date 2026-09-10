@@ -101,6 +101,7 @@ def create_pack_gap_wp(role_name, source_sessions, dry_run):
             "--title", title,
             "--budget", "2h",
             "--priority", "P3",
+            "--verification-class", "closed-loop",
             "--slug", slug,
             "--related", "WP-367",
         ],

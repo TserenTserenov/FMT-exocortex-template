@@ -58,6 +58,7 @@ export IWE_GOVERNANCE_REPO="strategy"
     --title "Fresh Seed Smoke" \
     --budget 1h \
     --priority P4 \
+    --verification-class closed-loop \
     --no-consent-check
 ) >"$TMPDIR/create.out" 2>&1 || {
   echo "FAIL: create-wp.sh failed against a freshly copied seed" >&2
@@ -94,7 +95,7 @@ cat > "$LEGACY_STRATEGY/docs/WP-REGISTRY.md" <<'EOF'
 | 7 | **Старый РП** | 🔄 | 2026-07-01: начат |
 EOF
 IWE_GOVERNANCE_REPO=legacy-strategy bash "$TEMPLATE_ROOT/scripts/create-wp.sh" \
-  --title "Legacy Migration Smoke" --budget 1h --priority P4 --no-consent-check \
+  --title "Legacy Migration Smoke" --budget 1h --priority P4 --verification-class closed-loop --no-consent-check \
   >"$TMPDIR/legacy-create.out" 2>&1 || {
     cat "$TMPDIR/legacy-create.out" >&2
     echo "FAIL: create-wp.sh did not migrate a legacy registry" >&2

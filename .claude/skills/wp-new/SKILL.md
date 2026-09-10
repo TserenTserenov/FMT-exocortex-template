@@ -97,6 +97,7 @@ bash "$IWE_SCRIPTS/create-wp.sh" \
   --title "Название РП" \
   --budget 5h \
   --priority P2 \
+  --verification-class open-loop \  # обязателен всегда: trivial|closed-loop|open-loop|problem-framing
   --state "belonging (Оснащённость): пилот без Х → с Х" \  # обязателен при наличии docs/state-axes-registry.yaml
   --hypothesis H-101 \ # для tests/enables/responds
   --hypothesis-relation tests \ # tests|enables|responds|researches|operational
@@ -115,6 +116,7 @@ budget: {Nh}
 created: {YYYY-MM-DD}
 last_session: {YYYY-MM-DD}
 related: []
+verification_class: {trivial|closed-loop|open-loop|problem-framing}
 state_transition: "{ось (Русское имя): из → в}"
 hypothesis: "{H-NNN или —}"
 hypothesis_relation: "{tests|enables|responds|researches|operational}"

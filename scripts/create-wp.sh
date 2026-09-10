@@ -7,10 +7,15 @@
 # see DP.M.010, DP.ROLE.037
 #
 # Использование:
-#   bash create-wp.sh --title "Название" --budget 5h --priority P3 [--slug slug] [--repo "репо"] [--related "WP-150:dependency,WP-167:продукт"]
-#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --state "belonging (Оснащённость): из → в" --hypothesis "H-101 | —:infra|techdebt|order|spinoff" [--hypothesis-relation tests]
-#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --no-consent-check
+#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --verification-class closed-loop [--slug slug] [--repo "репо"] [--related "WP-150:dependency,WP-167:продукт"]
+#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --verification-class open-loop --state "belonging (Оснащённость): из → в" --hypothesis "H-101 | —:infra|techdebt|order|spinoff" [--hypothesis-relation tests]
+#   bash create-wp.sh --title "Название" --budget 5h --priority P3 --verification-class trivial --no-consent-check
 #
+# --verification-class (WP structural-hole fix): REQUIRED, always — trivial|closed-loop|open-loop|problem-framing.
+#   Determines whether the WP needs a staged plan (/decompose): open-loop/problem-framing
+#   with budget ≥3h get an extra checklist item in the generated context file's «Осталось»
+#   section reminding the pilot to run /decompose. Unlike --state/--hypothesis this gate is
+#   NOT conditional on a governance-repo file existing — every WP declares its class.
 # --state (WP-505): target state transition (WP-457 State-Transition Gate).
 #   REQUIRED when <governance>/docs/state-axes-registry.yaml exists (author install);
 #   optional otherwise (typical user install — gate inactive per template contract).
@@ -51,6 +56,7 @@ SLUG=""
 REPO=""
 RELATED=""
 RESULT=""
+VERIFICATION_CLASS=""
 STATE=""
 HYPOTHESIS=""
 HYPOTHESIS_RELATION="unclassified"
@@ -65,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --repo)     REPO="$2";     shift 2 ;;
     --related)  RELATED="$2";  shift 2 ;;
     --result)   RESULT="$2";   shift 2 ;;
+    --verification-class) VERIFICATION_CLASS="$2"; shift 2 ;;
     --state)    STATE="$2";    shift 2 ;;
     --hypothesis) HYPOTHESIS="$2"; shift 2 ;;
     --hypothesis-relation) HYPOTHESIS_RELATION="$2"; shift 2 ;;
@@ -75,9 +82,22 @@ done
 
 # --- Валидация ---
 if [[ -z "$TITLE" || -z "$BUDGET" ]]; then
-  echo "Использование: $0 --title \"Название\" --budget 5h [--priority P3] [--slug slug] [--repo репо] [--related \"WP-NNN:тип\"] [--result R3] [--state \"ось: из → в\"] [--hypothesis H-NNN] [--hypothesis-relation tests]" >&2
+  echo "Использование: $0 --title \"Название\" --budget 5h --verification-class <trivial|closed-loop|open-loop|problem-framing> [--priority P3] [--slug slug] [--repo репо] [--related \"WP-NNN:тип\"] [--result R3] [--state \"ось: из → в\"] [--hypothesis H-NNN] [--hypothesis-relation tests]" >&2
   exit 1
 fi
+
+# --- Verification-Class Gate (structural-hole fix) ---
+# Unlike --state/--hypothesis, this is unconditionally required: every WP
+# declares its verification class regardless of which governance-repo files
+# exist. The class feeds the decompose-reminder checklist item below.
+case "$VERIFICATION_CLASS" in
+  trivial|closed-loop|open-loop|problem-framing) ;;
+  *)
+    echo "❌ --verification-class обязателен: trivial|closed-loop|open-loop|problem-framing" >&2
+    echo "   Передано: ${VERIFICATION_CLASS:-<пусто>}" >&2
+    exit 1
+    ;;
+esac
 
 case "$HYPOTHESIS_RELATION" in
   tests|enables|responds)
@@ -174,6 +194,33 @@ if [[ -f "$HYP_LOG" ]]; then
       done
       ;;
   esac
+fi
+
+# --- Decompose-reminder derivation (structural-hole fix) ---
+# Budget formats seen in the wild: "5h", "2h", "3-4h" (range). For a range we
+# want the upper bound — the more conservative read when deciding whether the
+# WP is big enough to need a staged plan. Plain `sed 's/[^0-9]//g'` (used
+# elsewhere in this script for a different, looser purpose) would mangle
+# "3-4h" into "34"; this instead takes the max of all digit groups found.
+budget_upper_bound_hours() {
+  local budget="$1" n max=0
+  for n in $(grep -oE '[0-9]+' <<<"$budget"); do
+    [[ "$n" -gt "$max" ]] && max="$n"
+  done
+  printf '%s\n' "$max"
+}
+
+# Шаг 4.5 protocol-open.md (/decompose): open-loop/problem-framing + budget
+# ≥3h needs a staged plan. create-wp.sh is deterministic=true and cannot call
+# the (non-deterministic) /decompose skill itself — instead it plants a
+# checklist reminder directly in the generated «Осталось» section, so the
+# nudge survives even when the console output scrolls away.
+DECOMPOSE_CHECKLIST_ITEM=""
+if [[ "$VERIFICATION_CLASS" == "open-loop" || "$VERIFICATION_CLASS" == "problem-framing" ]]; then
+  if [[ "$(budget_upper_bound_hours "$BUDGET")" -ge 3 ]]; then
+    DECOMPOSE_CHECKLIST_ITEM="- [ ] Запустить /decompose — план по этапам (класс проверки требует)
+"
+  fi
 fi
 
 # Registry cell «Ставка»: Russian axis names + hypothesis id (WP-505).
@@ -406,6 +453,7 @@ budget: ${BUDGET}
 created: ${TODAY}
 last_session: ${TODAY}
 related: []
+verification_class: ${VERIFICATION_CLASS}
 ${FM_STAKE}
 activation: on-demand
 ---
@@ -442,7 +490,7 @@ ${RELATED_ROWS}
 **Что узнали:** —
   → memory: не нужно
 **Что дальше:**
-- [ ] Открыть сессию, прочитать задачу, составить план
+${DECOMPOSE_CHECKLIST_ITEM}- [ ] Открыть сессию, прочитать задачу, составить план
 **Следующий шаг:** Открыть сессию — прочитать задачу, составить план
 **Контекст для следующей сессии:** РП только создан, нет контекста
 WPEOF

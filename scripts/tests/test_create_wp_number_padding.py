@@ -34,7 +34,10 @@ def _scaffold_governance_repo(root: Path) -> Path:
 
 
 def _run_create_wp(iwe_root: Path, **extra_args):
-    args = ["--title", "Тестовый РП", "--budget", "3h", "--priority", "P2", "--no-consent-check"]
+    args = [
+        "--title", "Тестовый РП", "--budget", "3h", "--priority", "P2",
+        "--verification-class", "closed-loop", "--no-consent-check",
+    ]
     for k, v in extra_args.items():
         args += [f"--{k}", v]
     env = {"IWE_ROOT": str(iwe_root), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
@@ -87,7 +90,10 @@ def test_consent_file_path_stays_bare_number(tmp_path):
     state_dir.mkdir(parents=True)
     (state_dir / "wp-consent-9").touch()
 
-    args = ["--title", "РП с согласием", "--budget", "2h", "--priority", "P3"]
+    args = [
+        "--title", "РП с согласием", "--budget", "2h", "--priority", "P3",
+        "--verification-class", "closed-loop",
+    ]
     env = {"IWE_ROOT": str(tmp_path), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
     result = subprocess.run(
         ["bash", str(CREATE_WP), *args], capture_output=True, text=True, env=env
