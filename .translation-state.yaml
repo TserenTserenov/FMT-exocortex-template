@@ -1,8 +1,21 @@
 files_translated:
 - README.md
+- docs/AGENT-FAULT-PROCESS.md
+- docs/AGENT-VENDOR-SETUP.md
+- docs/CHATGPT-CODEX-SETUP.md
+- docs/IWE-HELP.md
 - docs/LEARNING-PATH.md
-- docs/RESIDENCY-GATE-USAGE.md
+- docs/QUICK-START.md
+- docs/RELEASE-PROCESS.md
 - docs/SETUP-GUIDE.md
-last_run_utc: '2026-08-24T18:20:02Z'
-last_synced_sha: 8a26f6782317e0ce5b39230515792e0e54d75b94
+- docs/adr/ADR-004-data-domain-map.md
+- docs/developer/external-developer-letter.md
+- docs/developer/proposal-process.md
+- docs/onboarding/web-connect-guide.md
+- docs/onboarding/web-onboarding.md
+- docs/release-audit-log.md
+- docs/skills-catalog.md
+- docs/use-cases/USE-CASES.md
+last_run_utc: '2026-09-10T13:43:45Z'
+last_synced_sha: c3662b37f08da2dd5610ffed960741a9722fa96b
 schema_version: 1

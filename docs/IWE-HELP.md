@@ -1,7 +1,7 @@
 # IWE: Bot Reference
 
 > Quick reference for Intellectual Work Environment (IWE) — for bot search and responses.
-> Full installation: [SETUP-GUIDE.md](SETUP-GUIDE.md)
+> Full installation guide: [SETUP-GUIDE.md](SETUP-GUIDE.md)
 > Not on macOS or not using Claude Code? → **[PORTABILITY.md](PORTABILITY.md)**
 >
 > **Source-of-truth:** Platform Pack entities (available via Gateway `iwe-knowledge`):
@@ -15,15 +15,15 @@
 
 ## What IWE Is
 
-IWE (Intellectual Work Environment) is an intelligent work Environment. It is described through five views (FPF A.7: **Role → Method → Work Product**):
+IWE (Intellectual Work Environment) is an intellectual work Environment. It is described through five views (FPF A.7: **Role → Method → Work Product**):
 
 | View | What | Examples |
 |------|------|---------|
 | **Systems** | Programs with 4D boundaries | Claude Code, Telegram bot, MCP servers, WakaTime, Git, exocortex (files), Neon DB |
-| **Descriptions** | Knowledge loaded into systems | FPF/SPF/ZP, Pack entities, Role prompts, exocortex content |
+| **Descriptions** | Knowledge loaded into systems | FPF/SPF/ZP, Pack entities, Role prompts, exocortex contents |
 | **Roles** | Function, not Performer | Strategist (R1) ← Claude, Extractor (R2), Synchronizer (R8), User ← Human |
-| **Methods** | "How to do it" Procedures | Opening/Work/Closing Protocol, Capture-to-Pack, ArchGate, KE, Note-Review |
-| **Work Products** | What is produced | DS-strategy, Pack documents, DS-projects, digital twin events |
+| **Methods** | "How to do it" procedures | OWC Protocol, Capture-to-Pack, ArchGate, KE, Note-Review |
+| **Work Products** | What gets produced | DS-strategy, Pack documents, DS-projects, digital twin events |
 
 Full architectural model: [LEARNING-PATH.md § 1.2](LEARNING-PATH.md). Source-of-truth: `DP.IWE.001` (via Gateway: `knowledge_search("IWE architecture")`).
 
@@ -32,14 +32,14 @@ Full architectural model: [LEARNING-PATH.md § 1.2](LEARNING-PATH.md). Source-of
 ## Installation Requirements
 
 ### Required
-- macOS, Linux, or Windows (via Git Bash — WSL is not required; not verified on real Windows hardware, see [SETUP-GUIDE.md § Windows](SETUP-GUIDE.md))
+- macOS, Linux, or Windows (via Git Bash — WSL is not required; not verified on real Windows hardware, see [SETUP-GUIDE.md § Windows](SETUP-GUIDE.md#00-windows-without-wsl))
 - Git + GitHub account + GitHub CLI (`gh`)
 - Node.js v18+ and npm
 - Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
-- Anthropic subscription: **Claude Pro** ($20/month) — recommended for getting started. If needed — **Claude Max** (~$100/month) for unlimited message usage.
+- Anthropic subscription: **Claude Pro** ($20/month) — recommended to start. If needed — **Claude Max** (~$100/month) for unlimited message usage.
 
 ### Optional
-- VS Code (recommended) or any other editor with a terminal. Claude Code is a CLI and runs in any terminal (Terminal.app, iTerm2, etc.). VS Code is convenient: editor + terminal + Claude Code extension in one window.
+- VS Code (recommended) or any other editor with a terminal. Claude Code is a CLI tool and works in any terminal (Terminal.app, iTerm2, etc.). VS Code is convenient: editor + terminal + Claude Code extension in one window.
 - Telegram (@aist_me_bot) — for notes
 - WakaTime — work time tracking
 
@@ -47,14 +47,14 @@ Full architectural model: [LEARNING-PATH.md § 1.2](LEARNING-PATH.md). Source-of
 
 ## How to Install IWE
 
-**Installation time: 30–60 minutes** (depends on terminal experience).
+**Installation time: 30–60 minutes** (depends on terminal Experience).
 
-For a detailed step-by-step guide — including how to open a terminal, install all dependencies, and what to do if something goes wrong — see: **[SETUP-GUIDE.md](SETUP-GUIDE.md)**
+Full step-by-step guide (including how to open a terminal, install all dependencies, and what to do when something goes wrong): **[SETUP-GUIDE.md](SETUP-GUIDE.md)**
 
-Installation result:
+Installation results:
 - A fork of the exocortex Template in your GitHub
 - CLAUDE.md and memory/ — configured for you
-- Strategist (AI agent) — on automatic schedule
+- Strategist (AI agent) — running on automatic schedule
 - DS-strategy — private Repository for planning
 
 ---
@@ -69,7 +69,7 @@ MCP (Model Context Protocol) is the Protocol through which Claude Code connects 
 
 > Search guides: `knowledge_search("query", source_type="guides")`.
 
-MCP connects via https://claude.ai/settings/connectors (see SETUP-GUIDE §1.3b). Verify: `/mcp` in Claude Code → servers Connected. Ask "Find documents about principles" — Claude will use `knowledge_search`.
+MCP connects via https://claude.ai/settings/connectors (see SETUP-GUIDE §1.3b). To verify: run `/mcp` in Claude Code → servers show Connected. Ask "Find documents about principles" — Claude will use `knowledge_search`.
 
 ---
 
@@ -79,36 +79,36 @@ MCP connects via https://claude.ai/settings/connectors (see SETUP-GUIDE §1.3b).
 > Full Role Registry: `DP.ROLE.001` (via Gateway: `knowledge_search("agent role registry")`).
 
 ### Strategist (R1)
-Planning and reflection. Every morning (Tue–Sun) generates a day plan from yesterday's commits. Monday — preparation for the weekly Session. Evening (23:00) — processes notes from Telegram.
+Planning and reflection. Every morning (Tue–Sun) it generates a day plan from yesterday's commits. Monday is preparation for the weekly Session. In the evening (23:00) it processes notes from Telegram.
 
-Manual launch (in terminal or VS Code integrated terminal):
+Manual launch (in a terminal or the VS Code integrated terminal):
 ```bash
 bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-plan
 ```
 
 ### Extractor (R2)
-Knowledge extraction into Pack Repositories. 4 scenarios: session-close (on Session close), on-demand (by request), inbox-check (every 3 hours), knowledge-audit (completeness Audit).
+Knowledge extraction into Pack Repositories. Four scenarios: session-close (when closing a Session), on-demand (on request), inbox-check (every 3 hours), knowledge-audit (completeness Audit).
 
 Always proposes, never writes without approval (human-in-the-loop).
 
-Installation (in terminal): `bash ~/IWE/FMT-exocortex-template/roles/extractor/install.sh`
+Installation (in a terminal): `bash ~/IWE/FMT-exocortex-template/roles/extractor/install.sh`
 
 ### Synchronizer (R8)
-Central dispatcher (bash, not AI). Manages the schedule of all Roles, sends Telegram notifications, performs nightly code review.
+Central dispatcher (bash, not AI). Manages the schedule for all Roles, sends Telegram notifications, performs a nightly code review.
 
-Installation (in terminal): `bash ~/IWE/FMT-exocortex-template/roles/synchronizer/install.sh`
+Installation (in a terminal): `bash ~/IWE/FMT-exocortex-template/roles/synchronizer/install.sh`
 
 ---
 
-## Opening/Work/Closing Protocol (Daily Work)
+## OWC Protocol (Daily Work)
 
-Each Session in Claude Code has three stages:
+Every Session in Claude Code has three stages:
 
-**Opening.** You give a task → Claude checks WP Gate (is it in the week plan?). If not — proposes to add it. Declares Role, Method, estimate.
+**Opening.** You give a task → Claude checks WP Gate (is it in the week plan?). If not — it proposes adding it. It announces the Role, Method, and estimate.
 
-**Work.** Claude executes the task. At Work milestones, captures Knowledge: "Capture: [what] → [where]".
+**Work.** Claude executes the task. At Work milestones it captures Knowledge: "Capture: [what] → [where]".
 
-**Closing.** Say "close" → Claude commits, pushes, updates Memory, creates Backup.
+**Closing.** Say "close" → Claude commits, pushes, updates Memory, creates a Backup.
 
 ---
 
@@ -120,9 +120,9 @@ Each Session in Claude Code has three stages:
 | Rules | `CLAUDE.md` | Always (auto-context) |
 | Reference | `memory/*.md` | On request |
 
-MEMORY.md — personal data (current tasks, weekly Work Products). Edited each Session.
-`DS-strategy/docs/WP-REGISTRY.md` — complete Registry of all Work Products from most recent to first (DP.WP.015). Updated on Close when status changes.
-All other memory/*.md files — Platform-space. Updated from upstream via `update.sh`.
+MEMORY.md — personal (current tasks, weekly Work Products). Edited every Session.
+`DS-strategy/docs/WP-REGISTRY.md` — full Registry of all Work Products from most recent to first (DP.WP.015). Updated on Close when status changes.
+All other memory/*.md files — Platform files. Updated from upstream via `update.sh`.
 
 ---
 
@@ -134,6 +134,8 @@ bash update.sh          # update
 bash update.sh --check  # check without applying
 ```
 
+For GitHub requests, the updater first uses a non-empty `GH_TOKEN`, then `GITHUB_TOKEN`, then an authorized `gh`, and only falls back to anonymous `curl` when no explicit authorization is present. An error from an explicit token or `gh` stops the update without falling back to anonymous access; the token value is not passed as a process argument and is not printed in the trace. For token-based requests, `CURL_OPTS` accepts only `--insecure` and numeric timeout/retry parameters; verbose tracing, additional headers, Configuration files, and output files are blocked before the network request; the user's `.curlrc` is disabled for such requests.
+
 Updated: CLAUDE.md, memory/ (except MEMORY.md), Role prompts, Scripts.
 NOT touched: MEMORY.md, DS-strategy/, routing.md, personal settings.
 
@@ -143,25 +145,25 @@ NOT touched: MEMORY.md, DS-strategy/, routing.md, personal settings.
 
 The @aist_me_bot bot accepts notes:
 - `.Note text` (period + text)
-- `.` + reply/forward on a message
+- `.` + reply to or forward of a message
 
-Notes go into `DS-strategy/inbox/fleeting-notes.md`. The Strategist processes them in the evening (Note-Review).
+Notes go to `DS-strategy/inbox/fleeting-notes.md`. The Strategist processes them in the evening (Note-Review).
 
 ---
 
 ## Common Issues
 
-**Claude Code does not start** — check your Anthropic subscription and `claude --version`. You can start with the Pro plan ($20/month). If needed — Max (~$100/month).
+**Claude Code does not start** — check your Anthropic subscription and run `claude --version`. You can start with the Pro plan ($20/month). If needed — Max (~$100/month).
 
-**Strategist does not generate a plan** — macOS: `launchctl list | grep strategist`. Linux: `systemctl --user list-timers | grep strategist`. If missing — `bash roles/strategist/install.sh`.
+**Strategist does not generate a plan** — macOS: `launchctl list | grep strategist`. Linux: `systemctl --user list-timers | grep strategist`. If absent — run `bash roles/strategist/install.sh`.
 
-**MEMORY.md does not load** — check the path: `~/.claude/projects/-Users-<username>-IWE/memory/MEMORY.md`. The directory name equals the workspace path with dashes.
+**MEMORY.md does not load** — check the path: `~/.claude/projects/-Users-<username>-IWE/memory/MEMORY.md`. The directory name equals the workspace path with hyphens.
 
 **DS-strategy not created** — create manually: `mkdir -p ~/IWE/DS-strategy/{current,inbox,docs,archive} && cd ~/IWE/DS-strategy && git init`.
 
-**Notes not arriving from Telegram** — check your subscription in @aist_me_bot. Format: period + text (`.My note`).
+**Notes are not arriving from Telegram** — check your subscription in @aist_me_bot. Format: period + text (`.My note`).
 
-**MCP not working (Claude does not search the knowledge base)** — check the connection: `/mcp` in Claude Code. Servers must be Connected. If missing — add via https://claude.ai/settings/connectors (see SETUP-GUIDE §1.3b).
+**MCP is not working (Claude does not search the knowledge base)** — check the connection: `/mcp` in Claude Code. Servers must show Connected. If they are missing — add them via https://claude.ai/settings/connectors (see SETUP-GUIDE §1.3b).
 
 **How to configure Telegram notifications** — create `~/.config/aist/env`:
 ```bash
@@ -177,17 +179,17 @@ export TELEGRAM_CHAT_ID="your-id"
 |------|---------|
 | IWE | Intellectual Work Environment |
 | Exocortex | IWE Memory Subsystem (CLAUDE.md + MEMORY.md + memory/) |
-| Pack | Domain Knowledge base (source-of-truth for a Domain) |
+| Pack | Domain knowledge base (source-of-truth for a Domain) |
 | DS-strategy | Personal strategic hub (private Repository) |
 | WP Gate | Check: is the task in the week plan? |
-| Opening/Work/Closing | Opening → Work → Closing (three Session stages) |
-| Capture | Fixing Knowledge in the course of work |
+| OWC | Opening → Work → Closing (three Session stages) |
+| Capture | Capturing Knowledge during work |
 | Platform-space | Standard files, updated from upstream |
 | User-space | Personal files, never overwritten |
-| Routing | Knowledge routing table (where to place captures) |
-| Marp | Tool for creating slides from Markdown. Workflow: `.md` → preview (VS Code) → PDF/HTML (`marp --pdf`). Used for sliduments. |
+| Routing | Knowledge routing table (where to put captures) |
+| Marp | Tool for creating slides from Markdown. Workflow: `.md` → preview (VS Code) → PDF/HTML (`marp --pdf`). Used for slide documents. |
 | MCP | Model Context Protocol — Claude Code access to external knowledge bases |
-| iwe-knowledge | Gateway MCP server (`mcp.aisystant.com/mcp`): search across Packs, guides, DS + digital twin |
+| iwe-knowledge | Gateway MCP server (`mcp.aisystant.com/mcp`): search across Pack, guides, DS + digital twin |
 
 ---
 
@@ -195,18 +197,18 @@ export TELEGRAM_CHAT_ID="your-id"
 
 ## Creating a Pack (Domain Knowledge Base)
 
-A Pack is a Repository with formalized Domain Knowledge. It is the source-of-truth: everything Claude needs to know about a Domain lives here.
+A Pack is a Repository with formalized Domain knowledge. It is the source-of-truth: everything Claude needs to know about the Domain lives here.
 
 **When you need a Pack:**
 - You work regularly in one area
-- You want Claude to know the terms and patterns of your Domain
+- You want Claude to know the terms and patterns of your area
 - You are tired of repeating context in every Session
 
 **How to create one:** type `/pack-new` in Claude Code.
 
 The Skill will guide you through: Domain selection → Pack name → structure → content Roadmap.
 
-**After creating a Pack,** fill it using `/ke` (Knowledge Extraction) — capture Knowledge as you work.
+**After creating a Pack,** populate it via `/ke` (Knowledge Extraction) — capture Knowledge as you work.
 
 Details: [PACK-CREATION.md](PACK-CREATION.md)
 
@@ -216,13 +218,13 @@ Details: [PACK-CREATION.md](PACK-CREATION.md)
 
 **In this repo:**
 - [SETUP-GUIDE.md](SETUP-GUIDE.md) — step-by-step installation (from zero to a working IWE)
-- [LEARNING-PATH.md](LEARNING-PATH.md) — full learning path: principles, Protocols, agents, Packs, SOTA
+- [LEARNING-PATH.md](LEARNING-PATH.md) — full learning path: principles, Protocols, agents, Pack, SOTA
 - [PACK-CREATION.md](PACK-CREATION.md) — creating a Pack: Domain, name, structure, content
-- [principles-vs-skills.md](principles-vs-skills.md) — why Skills are not enough: principles and the generative hierarchy
+- [principles-vs-skills.md](principles-vs-skills.md) — why Skills are not enough: principles and generative hierarchy
 
 **In Pack (via Gateway `knowledge_search`):**
 - `DP.IWE.001` — what IWE is, why it exists, 5 architectural views, comparisons (vs exocortex, vs agents, vs second brain)
-- `DP.IWE.002` — Template and installation: prerequisites, cost, Roles, Opening/Work/Closing, FAQ, security
+- `DP.IWE.002` — Template and installation: prerequisites, cost, Roles, OWC, FAQ, security
 - `DP.EXOCORTEX.001` — modular exocortex: 3 layers, template-sync, standard/personal
 - `DP.ARCH.002` — tiers T0-T4 + TM1-TM3 + TA1-TA4 + TD1: what is available at each level
 - `DP.ROLE.001` — full AI Role Registry (21 Roles)
