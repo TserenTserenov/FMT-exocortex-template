@@ -2257,7 +2257,7 @@
     },
     {
       "path": "scripts/generate-executor-catalog.py",
-      "sha256": "775b126e54d95531c9abc2f8ac97534ec92cdba312764356431bb149ed2c7145"
+      "sha256": "a4fd8e441601d9634be147a2e6f4bc120db74f0ecba13081a3be0f94afcf381d"
     },
     {
       "path": "scripts/generate-hot-files-list.sh",
@@ -2537,7 +2537,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "170efdf27b5a7874a87bdaae0c7d70e2de5c6843d4663725a60f884b5059d109"
+      "sha256": "c32fcd060cb5741764fb8783c69604e1b6f51d16464e762e7d7c9eba97464cca"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -2709,7 +2709,7 @@
     },
     {
       "path": "scripts/tests/test_issue_463_setup_reuses_resolved_python3.sh",
-      "sha256": "2f57fc6e6ace9c4bac9c13a7e1e2865b7c26f50f0bf8bc0778a276a266a7ee20"
+      "sha256": "06530443e8a91ad556babff38f43d83e62075cc9c8796a84f470389f40f87604"
     },
     {
       "path": "scripts/tests/test_issue_469_settings_merge_hook_identity.py",
@@ -2925,7 +2925,7 @@
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
-      "sha256": "775b126e54d95531c9abc2f8ac97534ec92cdba312764356431bb149ed2c7145"
+      "sha256": "a4fd8e441601d9634be147a2e6f4bc120db74f0ecba13081a3be0f94afcf381d"
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
@@ -3001,7 +3001,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "672677e388baf0e6d4839fd857dbebb85b053fea7b5f660eaf1be472709532c9"
+      "sha256": "61525569e640828f028f25f419977fb9ba57b5c2d50ebbfa2838352a8f3d50ec"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3033,7 +3033,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "1442776d1e24f854ae0595cfb0dbff4b150253f7c7b19d53d61f0823fff3f48e"
+      "sha256": "e993456531ba11b68f2f0fca0625e9ba20b45d095d96a77f8527cc83ba3890ec"
     }
   ],
   "excluded_paths": [

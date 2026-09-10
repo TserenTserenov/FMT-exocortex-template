@@ -148,10 +148,27 @@ else
     sed_inplace() { sed -i '' "$@"; }
 fi
 
+# issue #755: `A 2>/dev/null | cut ... || B` never ran B on a missing `shasum`
+# (Alpine/busybox and similar minimal images have neither `shasum` nor
+# `perl`) -- `cut`'s own exit code (0, even on empty stdin) is what `||`
+# checked, not shasum's. hash_file() silently returned "" for every file, both
+# sides of every comparison in this script came out equal ("" = ""), and the
+# whole run finished EXIT=0 having verified nothing (754 files reported as
+# "unchanged" on one real report, 100% false). Fail loudly here, once, up
+# front, instead of at each of the dozens of call sites below.
+if ! command -v shasum >/dev/null 2>&1 && ! command -v sha256sum >/dev/null 2>&1; then
+    echo "ОШИБКА: ни shasum, ни sha256sum не найдены — проверка целостности файлов невозможна." >&2
+    echo "  Установите coreutils (sha256sum) или perl (даёт shasum) и повторите." >&2
+    exit "$EXIT_RUNTIME"
+fi
+
 # === Cross-platform hash ===
 hash_file() {
-    shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || \
-    sha256sum "$1" 2>/dev/null | cut -d' ' -f1
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        sha256sum "$1" | cut -d' ' -f1
+    fi
 }
 
 # === Cross-platform Python resolution (issue #402) ===
@@ -607,6 +624,102 @@ RULES_BACKUP_RUN=""
 RULES_SAFE_TO_UPDATE="|"
 UPDATE_INCOMPLETE_MARKER="$SCRIPT_DIR/.update-incomplete"
 UPDATE_TRANSACTION_STARTED=false
+
+# issue #768: a full update.sh run, launched from a disposable copy of the
+# workspace, silently retargeted the REAL ~/Library/LaunchAgents and
+# ~/.zshenv onto the copy — WORKSPACE_DIR correctly points at the copy, but
+# nothing checks whether host-global resources (a real per-user shell rc
+# file, real launchd jobs) already belong to a DIFFERENT, already-configured
+# workspace before rewriting them. Absence of evidence is not evidence of
+# being the primary install — this only detects a conflict with a workspace
+# already on record; a virgin machine still lets the first run claim
+# ownership (peer-session 2026-09-10-09-fmt-issues-triage, Kimi+Codex).
+HOST_GLOBAL_OWNER_CONFLICT=false
+HOST_GLOBAL_OWNER_CONFLICT_REASON=""
+
+canonical_workspace_path() {
+    if [ -d "$1" ]; then
+        (cd "$1" 2>/dev/null && pwd -P)
+    else
+        printf '%s\n' "${1%/}"
+    fi
+}
+
+mark_host_global_conflict() {
+    if [ -n "$HOST_GLOBAL_OWNER_CONFLICT_REASON" ]; then
+        HOST_GLOBAL_OWNER_CONFLICT_REASON="$HOST_GLOBAL_OWNER_CONFLICT_REASON; $1"
+    else
+        HOST_GLOBAL_OWNER_CONFLICT_REASON="$1"
+    fi
+    HOST_GLOBAL_OWNER_CONFLICT=true
+}
+
+detect_host_global_owner_conflict() {
+    local current_root existing_root plist plist_root zsh_roots
+    current_root="$(canonical_workspace_path "$WORKSPACE_DIR")"
+
+    if [ -f "$HOME/.zshenv" ]; then
+        zsh_roots=$(awk '
+          /^# IWE environment \(WP-219, DP.FM.009\):/ { managed=1; next }
+          managed && /^_IWE_ROOT="/ {
+              value=$0
+              sub(/^_IWE_ROOT="/, "", value)
+              sub(/"$/, "", value)
+              print value
+          }
+          managed && /^unset _IWE_ROOT$/ { managed=0 }
+        ' "$HOME/.zshenv")
+
+        while IFS= read -r existing_root; do
+            [ -n "$existing_root" ] || continue
+            if [ "$(canonical_workspace_path "$existing_root")" != "$current_root" ]; then
+                mark_host_global_conflict "~/.zshenv points to $existing_root"
+            fi
+        done <<EOF
+$zsh_roots
+EOF
+    fi
+
+    # Only IWE-owned launchd job names — an unrelated ~/Library/LaunchAgents
+    # entry with a similar prefix from another tool is not this contract.
+    for plist in \
+        "$HOME/Library/LaunchAgents"/com.exocortex.*.plist \
+        "$HOME/Library/LaunchAgents"/com.strategist.*.plist \
+        "$HOME/Library/LaunchAgents"/com.extractor.*.plist
+    do
+        [ -f "$plist" ] || continue
+
+        if [ -x /usr/libexec/PlistBuddy ]; then
+            plist_root=$(/usr/libexec/PlistBuddy \
+                -c 'Print :EnvironmentVariables:IWE_WORKSPACE' \
+                "$plist" 2>/dev/null || true)
+        elif command -v plutil >/dev/null 2>&1; then
+            plist_root=$(plutil -extract EnvironmentVariables.IWE_WORKSPACE raw -o - \
+                "$plist" 2>/dev/null || true)
+        else
+            plist_root=""
+        fi
+
+        if [ -z "$plist_root" ]; then
+            # Neither parser available, or the key isn't there — cannot prove
+            # this plist belongs to the current workspace. Fail closed: treat
+            # as a conflict rather than silently assume ownership.
+            mark_host_global_conflict "$(basename "$plist"): владелец не определён"
+        elif [ "$(canonical_workspace_path "$plist_root")" != "$current_root" ]; then
+            mark_host_global_conflict "$(basename "$plist") points to $plist_root"
+        fi
+    done
+}
+
+if [ "${IWE_ALLOW_FOREIGN_WORKSPACE:-0}" != "1" ]; then
+    detect_host_global_owner_conflict
+fi
+if $HOST_GLOBAL_OWNER_CONFLICT; then
+    echo "⚠ Host-global ресурсы IWE (~/.zshenv, launchd) принадлежат другому или неопределённому workspace:"
+    echo "  $HOST_GLOBAL_OWNER_CONFLICT_REASON"
+    echo "  ~/.zshenv и планировщики задач НЕ будут изменены этим прогоном."
+    echo "  Если это осознанный перенос основной установки: IWE_ALLOW_FOREIGN_WORKSPACE=1 bash update.sh"
+fi
 
 # WP-529 F6 (peer-session 2026-08-19-01, Evgenii post-update defect #5):
 # build-runtime is part of the update transaction. Its failure used to be
@@ -1560,9 +1673,16 @@ run_post_apply_backfills_or_die() {
         return 1
     fi
 
+    local install_paths_args=(
+        --workspace "$WORKSPACE_DIR"
+        --governance "$EFFECTIVE_GOVERNANCE_REPO"
+        --quiet
+    )
+    # issue #768: a foreign/unowned host-global state must not have its real
+    # ~/.zshenv rewritten to point at this WORKSPACE_DIR.
+    $HOST_GLOBAL_OWNER_CONFLICT && install_paths_args+=(--skip-zshenv)
     bash "$SCRIPT_DIR/setup/install-iwe-paths.sh" \
-        --workspace "$WORKSPACE_DIR" --governance "$EFFECTIVE_GOVERNANCE_REPO" \
-        --quiet 2>&1 | sed 's/^/  /'
+        "${install_paths_args[@]}" 2>&1 | sed 's/^/  /'
     local install_paths_status="${PIPESTATUS[0]}"
     if [ "$install_paths_status" -ne 0 ]; then
         echo "  ⚠ install-iwe-paths.sh завершился с ошибкой (exit $install_paths_status). Запустите вручную: bash $SCRIPT_DIR/setup/install-iwe-paths.sh --workspace $WORKSPACE_DIR --governance $EFFECTIVE_GOVERNANCE_REPO"
@@ -1640,6 +1760,13 @@ backfill_extractor_feeders() {
         echo "  ○ Экстрактор: пропущен (IWE_SKIP_EXTRACTOR_FEEDERS=1)."
         return 0
     fi
+    # issue #768: the feeders script schedules a real launchd job under the
+    # current user's real $HOME — a foreign/unowned host-global state must
+    # not have that job's workspace pointer rewritten onto this copy.
+    if $HOST_GLOBAL_OWNER_CONFLICT; then
+        echo "  ○ Экстрактор: host-global расписание не изменено — $HOST_GLOBAL_OWNER_CONFLICT_REASON"
+        return 0
+    fi
     if [ ! -f "$feeders" ]; then
         echo "  ○ Экстрактор: scripts/setup-extractor-feeders.sh не найден, backfill пропущен."
         return 0
@@ -1656,9 +1783,11 @@ backfill_extractor_feeders() {
     # --schedule-only, not install: an update may add the periodic job, but must
     # not redo the install-time decisions (the global git hook template, the
     # init.templateDir pointer, seeding fleeting-notes) on every single run.
-    # IWE_WORKSPACE is deliberately not passed: the feeders script never reads
-    # it, so passing it would only pretend the workspace is configurable here.
+    # IWE_WORKSPACE now passed (issue #768 fix) — the feeders script used to
+    # hardcode $HOME/IWE regardless, which is exactly what let it silently
+    # retarget a real host-global launchd job onto a disposable copy.
     if feeders_output=$(
+        IWE_WORKSPACE="$WORKSPACE_DIR" \
         IWE_GOVERNANCE_REPO="$governance_repo" \
         IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
         bash "$feeders" --schedule-only 2>&1); then
@@ -4067,6 +4196,13 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
 done
 
 if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
+    # issue #768: role installers register real launchd jobs under the
+    # current user's real $HOME — a foreign/unowned host-global state must
+    # not have those jobs reloaded pointing at this copy.
+    if $HOST_GLOBAL_OWNER_CONFLICT; then
+        echo ""
+        echo "  ○ Переустановка launchd-ролей пропущена: $HOST_GLOBAL_OWNER_CONFLICT_REASON"
+    else
     echo ""
     echo "Роли обновлены. Переустановка..."
     # WP-529 Ф94 (peer-session 2026-09-08-32): $HOME/.iwe-paths is a legacy
@@ -4089,6 +4225,7 @@ if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
                 echo "  ○ $(basename "$role_dir"): переустановите вручную"
         fi
     done
+    fi
 fi
 
 # === Step 6d2: Regenerate hot-files.list (issue #294/#291) ===

@@ -390,6 +390,37 @@ assert_invalid_catalog_rejected "nonmapping" $'- item\n'
 assert_invalid_catalog_rejected "missing-reflexes" $'schema_version: "1.0"\n'
 assert_invalid_catalog_rejected "nonlist-reflexes" $'reflexes: {}\n'
 
+# issue #767: a bare-missing-reflexes catalog is correctly rejected above, but
+# the error used to name the problem with no next step. --repair-add-reflexes
+# is the one-shot migration path it now points to -- verify it actually
+# converges the rejected case into an accepted one.
+REPAIR_TARGET="$TEST_ROOT/repair-missing-reflexes.yaml"
+printf 'schema_version: "1.0"\nsome_other_field: kept\n' > "$REPAIR_TARGET"
+REPAIR_OUT=$("$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --repair-add-reflexes "$REPAIR_TARGET" 2>&1)
+REPAIR_STATUS=$?
+if [ "$REPAIR_STATUS" -eq 0 ] && grep -qF 'some_other_field: kept' "$REPAIR_TARGET" \
+    && grep -qF 'reflexes: []' "$REPAIR_TARGET"; then
+    pass "--repair-add-reflexes adds an empty reflexes section, keeps the rest"
+else
+    fail "--repair-add-reflexes did not converge (status=$REPAIR_STATUS): $REPAIR_OUT"
+fi
+REPAIR_RERUN_OUT=$(IWE_ROOT="$CUSTOM_WORKSPACE" IWE_GOVERNANCE_REPO=custom-governance \
+    "$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --skills-dir "$CUSTOM_SKILLS" --output "$REPAIR_TARGET" 2>&1)
+if [ $? -eq 0 ]; then
+    pass "generator no longer rejects a catalog repaired by --repair-add-reflexes"
+else
+    fail "generator still rejects the repaired catalog: $REPAIR_RERUN_OUT"
+fi
+REPAIR_TWICE_OUT=$("$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --repair-add-reflexes "$REPAIR_TARGET" 2>&1)
+if [ $? -ne 0 ]; then
+    pass "--repair-add-reflexes refuses a catalog that already has reflexes"
+else
+    fail "--repair-add-reflexes ran again on an already-repaired catalog: $REPAIR_TWICE_OUT"
+fi
+
 VALIDATE_OUTPUT="$TEST_ROOT/validate-input-only.yaml"
 printf 'reflexes: [\n' > "$VALIDATE_OUTPUT"
 cp "$VALIDATE_OUTPUT" "$VALIDATE_OUTPUT.before"

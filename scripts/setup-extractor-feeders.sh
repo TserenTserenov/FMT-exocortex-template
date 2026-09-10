@@ -18,10 +18,17 @@
 
 set -euo pipefail
 
-IWE_RUNTIME="${IWE_RUNTIME:-$HOME/IWE/.iwe-runtime}"
+# issue #768: this script hardcoded $HOME/IWE everywhere below, ignoring
+# IWE_WORKSPACE entirely -- update.sh's caller comment used to say "the
+# feeders script never reads it" as if that were a fact of nature, when it
+# was really just this script never having been written to read it. A
+# workspace copy running update.sh got its real launchd job silently
+# re-pointed at $HOME/IWE regardless of where it actually lived.
+IWE_WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
+IWE_RUNTIME="${IWE_RUNTIME:-$IWE_WORKSPACE/.iwe-runtime}"
 GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 EXTRACTOR_SH="$IWE_RUNTIME/roles/extractor/scripts/extractor.sh"
-FLEETING="$HOME/IWE/$GOVERNANCE_REPO/inbox/fleeting-notes.md"
+FLEETING="$IWE_WORKSPACE/$GOVERNANCE_REPO/inbox/fleeting-notes.md"
 
 MODE="${1:-install}"
 
@@ -172,7 +179,7 @@ if [ "$PLATFORM" = "Darwin" ]; then
         <key>USER</key><string>${USER:-$(whoami)}</string>
         <key>LOGNAME</key><string>${USER:-$(whoami)}</string>
         <key>IWE_TEMPLATE</key><string>$IWE_TEMPLATE_DIR</string>
-        <key>IWE_WORKSPACE</key><string>$HOME/IWE</string>
+        <key>IWE_WORKSPACE</key><string>$IWE_WORKSPACE</string>
         <key>IWE_GOVERNANCE_REPO</key><string>$GOVERNANCE_REPO</string>
         <key>IWE_RUNTIME</key><string>$IWE_RUNTIME</string>
     </dict>

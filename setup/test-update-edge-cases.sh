@@ -2802,6 +2802,60 @@ else
     fail "T38g: setup corrupted a special-character replacement or its merge base"
 fi
 
+# ============================================================================
+# T39: hash_file() fails loudly with neither shasum nor sha256sum (issue #755)
+# ============================================================================
+echo "--- T39: hash_file() on a system with no hasher at all (issue #755) ---"
+
+# Extracts the real preflight check + hash_file() from update.sh (same
+# awk-by-function-name technique as T24's rule helpers) -- not a re-typed
+# copy, so this breaks the moment the two diverge.
+T39_PREFLIGHT=$(awk '
+/^if ! command -v shasum/{copy=1}
+copy{print}
+copy && /^fi$/{exit}
+' "$TEMPLATE_DIR/update.sh")
+T39_HASH_FILE=$(awk '/^hash_file\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")
+
+if [ -z "$T39_PREFLIGHT" ] || [ -z "$T39_HASH_FILE" ]; then
+    fail "T39: could not extract the hasher preflight or hash_file() from update.sh — code moved?"
+else
+    T39_DIR="$TEST_WS/t39-no-hasher"
+    T39_BIN="$T39_DIR/bin"
+    mkdir -p "$T39_BIN"
+    # A PATH containing only what bash itself needs to run this snippet --
+    # no shasum, no sha256sum, no perl (real /bin already lacks GNU coreutils
+    # sha256sum on macOS; symlinking just the handful of builtins this test
+    # needs keeps the fixture from silently finding a real hasher elsewhere).
+    for tool in bash cut env command printf; do
+        p=$(command -v "$tool" 2>/dev/null) || continue
+        ln -sf "$p" "$T39_BIN/$(basename "$p")"
+    done
+    T39_TARGET="$T39_DIR/some-file.txt"
+    echo "content" > "$T39_TARGET"
+
+    T39_SNIPPET="$T39_DIR/snippet.sh"
+    {
+        echo 'EXIT_RUNTIME=3'
+        printf '%s\n' "$T39_PREFLIGHT"
+        printf '%s\n' "$T39_HASH_FILE"
+        echo 'hash_file "$1"'
+    } > "$T39_SNIPPET"
+
+    T39_STATUS=0
+    T39_OUT=$(env -i PATH="$T39_BIN" HOME="$HOME" bash "$T39_SNIPPET" "$T39_TARGET" 2>&1) || T39_STATUS=$?
+
+    if [ "$T39_STATUS" -eq 3 ] && [ -z "$T39_OUT" ]; then
+        # exit 3 with nothing on stdout is wrong in the OTHER direction: it
+        # would mean the preflight fired but printed nothing to explain why.
+        fail "T39: preflight exited EXIT_RUNTIME but printed no diagnostic"
+    elif [ "$T39_STATUS" -eq 3 ] && printf '%s' "$T39_OUT" | grep -qi "shasum\|sha256sum"; then
+        pass "T39: no hasher on PATH -> loud EXIT_RUNTIME(3) naming the missing tools, not a silent empty hash"
+    else
+        fail "T39: expected EXIT_RUNTIME(3) with a shasum/sha256sum diagnostic, got status=$T39_STATUS: $T39_OUT"
+    fi
+fi
+
 # ============================================================
 # Summary
 # ============================================================
