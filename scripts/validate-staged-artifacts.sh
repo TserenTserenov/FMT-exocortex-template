@@ -25,6 +25,24 @@ GOV_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 ERRORS=()
 
+# find-python3.sh resolver (issue #764): $WORKSPACE/scripts/lib/find-python3.sh
+# never existed on any install — scripts/lib/ lives inside the template, not
+# in the workspace root. Resolve via $IWE_SCRIPTS first (setup.sh's own var),
+# then self-relative to this script's own governance-repo scripts/lib/.
+resolve_find_python3() {
+    local candidate
+    if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/lib/find-python3.sh" ]; then
+        printf '%s\n' "$IWE_SCRIPTS/lib/find-python3.sh"
+        return 0
+    fi
+    candidate="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)/lib/find-python3.sh"
+    if [ -f "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+    return 1
+}
+
 err() { ERRORS+=("$1"); }
 
 # staged_to_tmp <path> — staged blob во временный файл; печатает путь.
@@ -76,17 +94,19 @@ validate_dayplan() { # <staged-path> <tmpfile>
     fi
 
     # Mandatory check — только если сконфигурирован. Конфиг существует, но
-    # не читается (битый YAML) — fail-closed: обязательная граница не вправе
-    # молча пропустить проверку из-за инфраструктурной ошибки. Python без
-    # резолвера/интерпретатора — пропуск с WARN (оценить конфиг нечем).
+    # не читается (битый YAML) ИЛИ python3 не резолвится — оба одинаково
+    # fail-closed (issue #765): обязательная граница не вправе молча
+    # пропустить проверку из-за инфраструктурной ошибки, резолвер python3
+    # не более надёжен, чем сам YAML.
     local config="$WORKSPACE/memory/day-rhythm-config.yaml"
-    local py=""
-    if [ -f "$WORKSPACE/scripts/lib/find-python3.sh" ]; then
-        py=$("$WORKSPACE/scripts/lib/find-python3.sh" 2>/dev/null) || py=""
+    local py="" py_resolver=""
+    py_resolver=$(resolve_find_python3) || py_resolver=""
+    if [ -n "$py_resolver" ]; then
+        py=$("$py_resolver" 2>/dev/null) || py=""
     fi
     if [ -f "$config" ]; then
         if [ -z "$py" ]; then
-            echo "WARN: day-rhythm-config.yaml есть, но python3 не найден — mandatory-проверка DayPlan пропущена" >&2
+            err "DayPlan $rel: day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор) — mandatory-проверка невозможна, fail-closed"
         else
             # Коды: 0 = mandatory сконфигурирован; 1 = валидный конфиг (map)
             # без mandatory; 2 = любая ошибка (нет PyYAML, битый YAML, корень

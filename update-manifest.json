@@ -109,7 +109,7 @@
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
-      "sha256": "64f250446dacc1967e722313f52a063bbb9feb02c79cf5f21d00b3b12fb67f15"
+      "sha256": "009b9363f3950ab97407ae3aa1b14e780fd1f8474ac9ea8529341d72a374439e"
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
@@ -186,6 +186,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",
       "sha256": "604c42d167de4ac40ea2d48b1f97c1dca000357b16000b7567477406876abe82"
+    },
+    {
+      "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
+      "sha256": "6298b52f77be40dca698050a95fee94cca66cf4a9e64f119acde03b18d76f765"
     },
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-unparsed-input.sh",
@@ -1141,7 +1145,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "a943b65dd1ac5c2a1406f80f3ec4c7ca49588ba6c032be64053fe486860f48f9"
+      "sha256": "21d30b236b7fa4bfd3ad931ace08219782037966a142bb61a3fd8a632f8778d6"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2477,7 +2481,7 @@
     },
     {
       "path": "scripts/peer-adapter-filter.py",
-      "sha256": "ebbfdae528c71bfb8d41f45bc7851bccc4cb06b57090ffd4ff14aa7eb507da2a"
+      "sha256": "e9019119b7242fcc165cc8e16dad281505639853db824abf2f48227817b0ae75"
     },
     {
       "path": "scripts/peer-session-finalize.sh",
@@ -2752,6 +2756,10 @@
       "sha256": "b38448f83b4ee3a7cefe3cf40eea41e56153f50134fd91f78c28bc2643318686"
     },
     {
+      "path": "scripts/tests/test_issue_728_agentigore_dirslash.sh",
+      "sha256": "3a109db4e82516d917bcb5835b45d4f589d01d9f40c15db69ac53b535b22b0ba"
+    },
+    {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",
       "sha256": "4b44a9bbcb4eb3247e10bea7c133ce8ea0f866421445f6e539c42dc48617ecd6"
     },
@@ -2825,7 +2833,7 @@
     },
     {
       "path": "scripts/validate-staged-artifacts.sh",
-      "sha256": "be628b27788432af3497f918c5e7a2157d0f98914ae02a2e2a6d82c7f78204da"
+      "sha256": "949b65b9ccb048e22073db6efe720b733dda9897399594c205761a1b4a527df3"
     },
     {
       "path": "scripts/verify-context-budget.sh",
