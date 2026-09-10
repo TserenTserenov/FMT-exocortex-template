@@ -12,6 +12,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+PY3=$("$ROOT/scripts/lib/find-python3.sh")
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
@@ -31,7 +32,7 @@ printf '__pycache__/\n' > "$AGENTIGORE"
 
 RC=0
 SRC_DIR="$SRC" DST_DIR="$DST" AGENTIGORE_FILE="$AGENTIGORE" \
-  python3 "$ROOT/scripts/peer-adapter-filter.py" >"$TMP/out.log" 2>"$TMP/err.log" || RC=$?
+  "$PY3" "$ROOT/scripts/peer-adapter-filter.py" >"$TMP/out.log" 2>"$TMP/err.log" || RC=$?
 
 if [ "$RC" -eq 0 ]; then
   ok "фильтр отработал без ошибки"

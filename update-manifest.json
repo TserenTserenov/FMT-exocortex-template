@@ -1141,7 +1141,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "52e1b8b8ae51fc6cdc92d1e9af6a6626f2fd6b2c1f741613c5e56fcf01c1c6d2"
+      "sha256": "21d30b236b7fa4bfd3ad931ace08219782037966a142bb61a3fd8a632f8778d6"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2749,7 +2749,7 @@
     },
     {
       "path": "scripts/tests/test_issue_728_agentigore_dirslash.sh",
-      "sha256": "8fd41c1964b7668c7cd07a93921314f4398876417c097c8dbc029275fb8f79a0"
+      "sha256": "3a109db4e82516d917bcb5835b45d4f589d01d9f40c15db69ac53b535b22b0ba"
     },
     {
       "path": "scripts/tests/test_issue_calendar_api_error_named.sh",

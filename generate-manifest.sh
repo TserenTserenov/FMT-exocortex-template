@@ -189,6 +189,9 @@ AGENT_FAULT_EXPLICIT_INCLUDE=(
 # real release would have shipped a template without its own test gate and
 # nobody would have noticed until a user hit the bug the gate exists to catch.
 SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
+    # Changes to this array require a `Delivery-Route: github-explicit-include`
+    # commit trailer (docs/critical-files-map.yaml) — enforced by
+    # scripts/check-delivery-route-label.sh in CI.
     # 2026-08-23 (v0.38.7 матрица, находка 4): check-python-resolver-contract.sh
     # доставляется, а его обязательный baseline сидел в excluded — на установке
     # строго из манифеста сторож падал rc=2. Ratchet-снимок — часть поставки.
