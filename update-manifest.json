@@ -3009,7 +3009,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "61525569e640828f028f25f419977fb9ba57b5c2d50ebbfa2838352a8f3d50ec"
+      "sha256": "6f0fa9ba968eb894a50028d18dc4457fbfb0701eb39d09346009fdb3942def8a"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
