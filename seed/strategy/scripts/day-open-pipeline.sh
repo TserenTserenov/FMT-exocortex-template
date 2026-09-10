@@ -19,6 +19,21 @@ IWE="$(cd "$DS_STRATEGY/.." && pwd)"
 # Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
 # a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
 export IWE_ROOT="$IWE"
+# issue #756: session-guard.sh, day-open-scaffold.sh and the other helpers
+# called below live inside the template (FMT-exocortex-template/scripts/),
+# not directly under $IWE/scripts -- that directory does not exist on any
+# install where the template sits as a subdirectory of the workspace (the
+# layout setup.sh itself produces). $IWE_SCRIPTS is written once at
+# install/update time (install-iwe-paths.sh's .iwe-paths, sourced via
+# ~/.zshenv; the systemd unit templates bake it into Environment=) rather
+# than re-derived on every invocation the way $IWE/$DS_STRATEGY are above --
+# an inherited value from a DIFFERENT checkout (e.g. running this exact
+# script from an isolated worktree with the main workspace's env still
+# exported) would silently win over the correct co-located $IWE/scripts
+# fallback. $IWE/scripts stays as that fallback for an install where scripts
+# really were flattened into the workspace root.
+IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE/scripts}"
+export IWE_SCRIPTS
 # Every child process, including the background snapshot refresh below, must
 # resolve the same governance repository as this pipeline. launchd/cron do not
 # inherit the interactive shell setting, so derive it from the script location
@@ -31,7 +46,7 @@ CONFIG="$DS_STRATEGY/exocortex/day-rhythm-config.yaml"
 # Quarantine only provably orphaned semaphores (dead recorded pid). Old
 # semaphores without pid proof are reported and kept for manual review.
 mkdir -p "$IWE/.iwe-runtime"
-bash "$IWE/scripts/session-guard.sh" audit --cleanup-orphans \
+bash "$IWE_SCRIPTS/session-guard.sh" audit --cleanup-orphans \
   >> "$IWE/.iwe-runtime/session-orphan-sweep.log" 2>&1 || true
 
 # ============================================
@@ -361,7 +376,7 @@ fi
 # 1. Pre-flight healthcheck
 # ============================================
 echo "=== 1. Pre-flight ==="
-PREFLIGHT_JSON=$(bash "$IWE/scripts/day-open-preflight.sh" "$DATE" "$CONFIG" 2>/dev/null || echo '{"calendar":"unknown"}')
+PREFLIGHT_JSON=$(bash "$IWE_SCRIPTS/day-open-preflight.sh" "$DATE" "$CONFIG" 2>/dev/null || echo '{"calendar":"unknown"}')
 CALENDAR_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.calendar // "unknown"')
 SCOUT_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.scout // "unknown"')
 TRIAGE_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.triage // "unknown"')
@@ -726,11 +741,11 @@ if [ -z "$WEEKPLAN_PATH" ] || [ ! -f "$WEEKPLAN_PATH" ]; then
 fi
 
 mkdir -p "$IWE/.tmp"
-bash "$IWE/scripts/server-calendar.sh" "$DATE" "$CONFIG" > "$CALENDAR_OUT" 2>/dev/null || true
+bash "$IWE_SCRIPTS/server-calendar.sh" "$DATE" "$CONFIG" > "$CALENDAR_OUT" 2>/dev/null || true
 
 # Generate scaffold to temp file first (for hash guard)
 SCAFFOLD_TEMP="$DAYPLAN_PATH.scaffold.tmp"
-SCAFFOLD_SCRIPT="$IWE/scripts/day-open-scaffold.sh"
+SCAFFOLD_SCRIPT="$IWE_SCRIPTS/day-open-scaffold.sh"
 bash "$SCAFFOLD_SCRIPT" "$DATE" > "$SCAFFOLD_TEMP" || {
   SC=$?
   if [ $SC -eq 2 ]; then
@@ -1005,7 +1020,7 @@ else
 # prevent, just via a path this guard didn't cover. Sync/archive is housekeeping, not
 # required for today's DayPlan content, so a failure here degrades gracefully (skip
 # pull, keep the already-written file) instead of discarding a good render.
-if ! bash "$IWE/scripts/git-dirty-guard.sh" "$DS_STRATEGY"; then
+if ! bash "$IWE_SCRIPTS/git-dirty-guard.sh" "$DS_STRATEGY"; then
   tg_notify "⚠️ Day Open: git-dirty-guard нашёл незакоммиченную работу — pull пропущен, но уже отрендеренный DayPlan сохраняется (не абортим pipeline, WP-484 fix 26.07)"
 else
   # Sync failures are reported out-of-repo only. Appending sync_skipped to the
@@ -1055,10 +1070,10 @@ if [ "$PROBE" != "true" ]; then
   # both note-file calls fail in one run); the slug is fixed by the `open
   # --housekeeping day-open` call above. --owner-pid from the author copy is NOT
   # ported: this parser swallows unknown flags and misparses the PID as positional.
-  bash "$IWE/scripts/session-guard.sh" open --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
-  bash "$IWE/scripts/session-guard.sh" note-file "$DAYPLAN_PATH" --agent "$SG_AGENT" --slug day-open
+  bash "$IWE_SCRIPTS/session-guard.sh" open --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
+  bash "$IWE_SCRIPTS/session-guard.sh" note-file "$DAYPLAN_PATH" --agent "$SG_AGENT" --slug day-open
   for f in "${ARCHIVED_PATHS[@]+"${ARCHIVED_PATHS[@]}"}"; do
-    bash "$IWE/scripts/session-guard.sh" note-file "$ARCHIVE_DIR/$(basename "$f")" --agent "$SG_AGENT" --slug day-open
+    bash "$IWE_SCRIPTS/session-guard.sh" note-file "$ARCHIVE_DIR/$(basename "$f")" --agent "$SG_AGENT" --slug day-open
   done
 fi
 
@@ -1136,7 +1151,7 @@ if [ "$PROBE" != "true" ]; then
   echo "$INPUT_HASH" > "$INPUT_HASH_FILE"
 fi
 
-bash "$IWE/scripts/session-guard.sh" close --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
+bash "$IWE_SCRIPTS/session-guard.sh" close --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
 
 COMMIT_HASH=$(git log -1 --format=%H)
 echo "  Committed: $COMMIT_HASH"
