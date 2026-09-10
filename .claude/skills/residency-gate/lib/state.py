@@ -28,6 +28,7 @@ class ResidencyState:
     BACKUP_DIR_NAME = "migration-backups"
     LEGACY_BACKUP_NAME = "data-residency.yaml.legacy"
     LEGACY_QUARANTINE_NAME = ".data-residency.yaml.legacy.migrating"
+    INIT_MARKER_NAME = ".data-residency.initialized"
 
     def __init__(self, state_file: Optional[str] = None):
         """Initialize state manager.
@@ -76,6 +77,7 @@ class ResidencyState:
                 self._migrate_legacy_state()
             self._ensure_file_exists()
             self._ensure_private_file(self.state_file)
+            self._ensure_init_marker()
 
     @staticmethod
     def _absolute_path(value: str, label: str) -> Path:
@@ -672,9 +674,46 @@ class ResidencyState:
                 os.close(legacy_directory)
 
     def _ensure_file_exists(self) -> None:
-        """Create empty state file if it doesn't exist."""
-        if not self.state_file.exists() and not self.state_file.is_symlink():
-            self._save_state_unlocked({})
+        """Create empty state on first-ever use; fail closed if it vanished later.
+
+        A missing state file is ambiguous by itself: it looks identical whether
+        this location has never been used, or whether a real consent/denial
+        record existed here and was lost (disk corruption, accidental deletion).
+        Silently recreating an empty file would make that data loss look like a
+        fresh install with nothing asked yet (issue #521B). The init marker
+        breaks the ambiguity: its presence proves this location was previously
+        initialized, so a missing state file next to it is an integrity failure,
+        not a first run.
+        """
+        if self.state_file.exists() or self.state_file.is_symlink():
+            return
+        marker = self.state_file.parent / self.INIT_MARKER_NAME
+        if marker.exists() or marker.is_symlink():
+            raise ResidencyStateError(
+                "consent state file is missing but this location was already "
+                f"initialized: {self.state_file}. Refusing to silently treat "
+                "prior consent/denial decisions as never asked — restore it "
+                "from an external/OS-level backup if one exists, or remove "
+                f"the marker at {marker} only if you are certain no consent "
+                "state ever existed here."
+            )
+        self._save_state_unlocked({})
+
+    def _ensure_init_marker(self) -> None:
+        """Backfill or verify the tombstone marking this location as initialized.
+
+        Callers must invoke this only after ``_ensure_private_file(state_file)``
+        has proven the entry is a legitimate regular file (not a symlink,
+        directory, or extra hardlink) — planting the marker before that check
+        would falsely attest "already initialized" for an entry that
+        construction is about to reject, permanently locking out a fresh
+        install once the offending entry is removed.
+        """
+        marker = self.state_file.parent / self.INIT_MARKER_NAME
+        if marker.exists() or marker.is_symlink():
+            self._ensure_private_file(marker)
+            return
+        self._create_exclusive_private_file(marker, b"")
 
     def _load_state_unlocked(self) -> dict:
         """Load current state from yaml."""
