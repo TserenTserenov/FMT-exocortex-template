@@ -94,6 +94,16 @@ def main() -> int:
                 if rel_path == prefix or rel_path.startswith(prefix + os.sep):
                     return True
                 continue
+            # X/ (trailing slash, no other special markers) — gitignore-style
+            # directory name, matched anywhere in the path (issue #728: a
+            # plain fnmatch never matches "__pycache__/" against a file path,
+            # since no file path ends in "/" — this pattern class never
+            # matched anything before this branch existed).
+            if p.endswith("/"):
+                target = p[:-1]
+                if any(fnmatch.fnmatch(part, target) for part in parts[:-1]):
+                    return True
+                continue
             # Plain glob — match relative path or basename
             if fnmatch.fnmatch(rel_path, p):
                 return True
