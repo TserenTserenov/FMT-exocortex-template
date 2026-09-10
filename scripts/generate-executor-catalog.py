@@ -194,9 +194,20 @@ def _read_existing_catalog(output_path: Path) -> dict:
 
     missing = [key for key in PRESERVED_TOP_LEVEL_KEYS if key not in existing]
     if missing:
+        # issue #767: the previous message named the missing section but gave
+        # no next step, so update.sh printed it and stopped without telling
+        # the operator what to actually do. This can legitimately happen on
+        # an install upgrading across the release that introduced "reflexes"
+        # (not necessarily corruption) -- name the concrete fix, matching the
+        # existing repair contract this file already ships (see
+        # --repair-add-reflexes below), which the existing test suite already
+        # asserts must still REJECT a bare missing key rather than silently
+        # backfill it (silent backfill would mask real data loss the same
+        # way as a genuinely truncated file).
         raise ValueError(
             f"existing catalog is missing runtime-owned sections {missing}: {output_path}; "
-            "refusing to overwrite it"
+            "refusing to overwrite it. Fix: "
+            f"python3 {sys.argv[0]} --repair-add-reflexes {output_path}"
         )
     for key in PRESERVED_TOP_LEVEL_KEYS:
         if not isinstance(existing[key], list):
@@ -270,7 +281,46 @@ def _parse_args() -> argparse.Namespace:
         default=workspace / governance_repo / "scripts" / "executor-catalog.yaml",
         help="Catalog output path",
     )
+    parser.add_argument(
+        "--repair-add-reflexes",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "One-shot migration for a catalog written before PRESERVED_TOP_LEVEL_KEYS "
+            "grew the 'reflexes' entry (issue #767): add an empty reflexes: [] to PATH "
+            "in place and exit, without touching any other section. Refuses (nonzero "
+            "exit) if PATH is not valid YAML, is not a mapping, or already has "
+            "'reflexes' -- this is a targeted repair for exactly the missing-key case, "
+            "not a general-purpose catalog fixer."
+        ),
+    )
     return parser.parse_args()
+
+
+def repair_add_reflexes(path: Path) -> None:
+    """Add an empty `reflexes: []` to an existing catalog missing only that key."""
+    try:
+        existing = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise ValueError(f"{path} is not readable/valid YAML: {exc}") from exc
+    if not isinstance(existing, dict):
+        raise ValueError(f"{path} is not a YAML mapping — refusing to guess a repair")
+    if "reflexes" in existing:
+        raise ValueError(f"{path} already has a 'reflexes' section — nothing to repair")
+    existing["reflexes"] = []
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as temporary:
+        yaml.safe_dump(existing, temporary, allow_unicode=True, sort_keys=False)
+        temporary_path = Path(temporary.name)
+    temporary_path.chmod(0o644)
+    temporary_path.replace(path)
 
 
 def _without_generation_time(catalog: dict) -> dict:
@@ -320,6 +370,16 @@ def _write_catalog_if_changed(catalog: dict, output_path: Path) -> bool:
 
 def main():
     args = _parse_args()
+
+    if args.repair_add_reflexes is not None:
+        try:
+            repair_add_reflexes(args.repair_add_reflexes.expanduser())
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print(f"OK: added empty reflexes: [] to {args.repair_add_reflexes}")
+        return
+
     skills_dir = args.skills_dir.expanduser()
     output_path = args.output.expanduser()
 
