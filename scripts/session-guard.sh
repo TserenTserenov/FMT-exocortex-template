@@ -59,6 +59,41 @@ now_date() { date +"%Y-%m-%d"; }
 now_month() { date +"%Y-%m"; }
 fail() { echo "session-guard: $1" >&2; exit "${2:-1}"; }
 
+# yaml_task_line <value> -- render a "task: <value>" YAML line, quoting the
+# value only when PyYAML's own writer decides it needs quoting. session-guard
+# used to write this field with a bare `echo "task: $TASK"`: a value
+# containing a literal ": " (a real one arrived 2026-09-09, "РП170: R15-триаж
+# ...") produced a line no strict YAML parser can read back as a mapping,
+# leaving the semaphore ambiguous to any such reader -- see
+# bug-2026-09-09-git-wrapper-blocked-by-corrupt-semaphore.md. Delegates to
+# PyYAML rather than reimplementing the plain-scalar grammar in bash, and
+# falls back to the old bare form if PyYAML is unavailable -- a missing
+# dependency degrades to previous behaviour instead of failing `open`. Not
+# reused for other semaphore fields (e.g. `housekeeping:`/`slug:`, see the
+# comment at their write site) -- those are matched elsewhere by exact
+# raw-string equality and doubling as filename components, so quoting them
+# would trade this bug for a different one, not just extend the same fix.
+# width=10**7 disables PyYAML's default 80-column wrapping (cold review of
+# this same fix, 2026-09-10): ordinary prose long enough to exceed 80
+# columns -- not an edge case -- was folded onto a continuation line that
+# every raw `grep '^task: ' | cut` reader then silently truncated away,
+# reintroducing the same corruption class by length instead of by ": ".
+# Embedded newlines fold the scalar the same way regardless of width, so
+# they are collapsed to spaces first -- this field is documented as
+# single-line, not free-form multi-line text.
+yaml_task_line() {
+  python3 -c '
+import sys
+value = " ".join(sys.argv[1].splitlines())
+try:
+    import yaml
+except ImportError:
+    print("task: %s" % value)
+    raise SystemExit(0)
+sys.stdout.write(yaml.safe_dump({"task": value}, allow_unicode=True, default_flow_style=False, width=10**7).rstrip("\n"))
+' "$1"
+}
+
 # resolve_orz_sessions_dir -- forward-port from ~/IWE/scripts/session-guard.sh
 # (WP-526 Ф2, 29.08; this FMT copy stays on the reduced/freeze-canonical
 # variant per WP-546, so only this one function is ported, not the file).
@@ -366,6 +401,20 @@ if [ "$CMD" = "open" ]; then
       echo "---"
       echo "agent: $AGENT"
       echo "personality: $PERSONALITY"
+      # NOT run through yaml_task_line, unlike `task:` in the main open path
+      # below: $HOUSEKEEPING is also interpolated straight into a filename
+      # (HK_FILE, above) and matched elsewhere by exact raw-string equality
+      # (select_semaphore, close, note-file, orphan audit all grep
+      # '^slug: ' | cut and compare to the CLI argument verbatim) -- it is a
+      # path-safe slug token by convention, not free-form prose like `task`.
+      # Quoting only this line would not even close the YAML-parseability
+      # gap it shares with `slug:` below (same raw value, same document)
+      # without also quoting `slug:` -- and quoting `slug:` breaks every
+      # exact-match consumer. A colon here already produces an unparseable
+      # document for a strict reader regardless; the real fix is
+      # validating/restricting `--housekeeping` to a path-safe token, a
+      # separate, larger decision than this bug's scope (bug-2026-09-09-
+      # git-wrapper-blocked-by-corrupt-semaphore.md, "Резолюция", 2026-09-10).
       echo "housekeeping: $HOUSEKEEPING"
       # bug-2026-07-10 (Day Close): select_semaphore() only matches on `wp:`/`slug:`
       # lines. Without this, 2+ open housekeeping semaphores are permanently
@@ -487,7 +536,7 @@ if [ "$CMD" = "open" ]; then
     echo "agent: $AGENT"
     echo "personality: $PERSONALITY"
     echo "wp: $WP"
-    echo "task: ${TASK:-}"
+    echo "$(yaml_task_line "${TASK:-}")"
     echo "slug: ${SLUG:-$WP}"
     echo "opened_at: $(now_iso)"
     echo "created_at: $(now_iso)"
