@@ -663,18 +663,40 @@ T11_CHECKS_BLOCK=$(awk '
 /^# --- Ф3 Check 5:/{found=0}
 found' "$HOOK_FILE")
 
+# Check 4 calls resolve_find_python3() (issue #764/#765 fix), defined earlier
+# in the hook outside the Check-3..5 slice above — extract it too, by function
+# boundary, and source it first so the sliced block can call it.
+T11_RESOLVER_BLOCK=$(awk '
+/^resolve_find_python3\(\) \{$/{found=1}
+found{print}
+found && /^}$/{exit}
+' "$HOOK_FILE")
+
 if [ -z "$T11_CHECKS_BLOCK" ]; then
     fail "T11: could not extract Check 3/4 block from protocol-artifact-validate.sh — marker comments moved?"
+elif [ -z "$T11_RESOLVER_BLOCK" ]; then
+    fail "T11: could not extract resolve_find_python3() from protocol-artifact-validate.sh — function moved/renamed?"
 else
+    T11_RESOLVER_FILE="$TEST_WS/t11-resolver.sh"
+    printf '%s\n' "$T11_RESOLVER_BLOCK" > "$T11_RESOLVER_FILE"
+    source "$T11_RESOLVER_FILE"
+
     T11_CHECKS_FILE="$TEST_WS/t11-checks.sh"
     printf '%s\n' "$T11_CHECKS_BLOCK" > "$T11_CHECKS_FILE"
+
+    # resolve_find_python3() is sourced from a temp file above, so its own
+    # self-relative fallback (dirname of its *defining* file) points into
+    # $TEST_WS, not the real template — IWE_SCRIPTS is what makes it resolve
+    # to a real find-python3.sh in these fixtures (issue #764: the fixture
+    # used to place find-python3.sh at $WORKSPACE/scripts/lib/, the exact
+    # path the fixed resolver no longer looks at).
+    export IWE_SCRIPTS="$TEMPLATE_DIR/scripts"
 
     # Case A: default installation (mandatory_daily_wps commented out in the
     # template default), DayPlan uses the real pilot phrasing from issue #328.
     T11_DIR="$TEST_WS/t11-dayplan"
-    mkdir -p "$T11_DIR/memory" "$T11_DIR/current" "$T11_DIR/scripts/lib"
+    mkdir -p "$T11_DIR/memory" "$T11_DIR/current"
     cp "$TEMPLATE_DIR/memory/day-rhythm-config.yaml" "$T11_DIR/memory/day-rhythm-config.yaml"
-    cp "$TEMPLATE_DIR/scripts/lib/find-python3.sh" "$T11_DIR/scripts/lib/find-python3.sh"
     cat > "$T11_DIR/current/DayPlan.md" <<'HEREDOC'
 ## Бюджет
 ~1.25 ч РП всего / 0 ч физической работы. Мультипликатор не считаю.
@@ -695,8 +717,7 @@ HEREDOC
     # section — must still fail. Proves Case A isn't passing because the
     # checks were silently disabled, not because the config was honored.
     T11_DIR_B="$TEST_WS/t11-dayplan-b"
-    mkdir -p "$T11_DIR_B/memory" "$T11_DIR_B/current" "$T11_DIR_B/scripts/lib"
-    cp "$TEMPLATE_DIR/scripts/lib/find-python3.sh" "$T11_DIR_B/scripts/lib/find-python3.sh"
+    mkdir -p "$T11_DIR_B/memory" "$T11_DIR_B/current"
     cat > "$T11_DIR_B/memory/day-rhythm-config.yaml" <<'HEREDOC'
 mandatory_daily_wps:
   - wp: 7
