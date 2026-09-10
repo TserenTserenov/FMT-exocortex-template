@@ -130,6 +130,20 @@ esac
 
 [ -x "$ENGINE" ] || guard_failure "rule engine is missing or not executable"
 
+# rule-engine.sh defaults RULE_REGISTRY to $HOME/IWE/.claude/rules-registry.yaml
+# (its own hardcoded assumption about the workspace path), not to a path
+# relative to itself. On any install where the workspace isn't literally
+# named "IWE" directly under $HOME, that default silently misses the
+# registry this template ships at .claude/rules-registry.yaml (relative to
+# HOOK_DIR) — load_rules_for_event() then returns an empty rule list instead
+# of erroring, and every SQL write fails closed with a misleading "AR.112/
+# AR.113 were not both applied" (issue #753). Point the engine at the
+# template's own shipped copy explicitly, the same path self_test() already
+# uses below, unless the caller already overrode RULE_REGISTRY.
+RULE_REGISTRY="${RULE_REGISTRY:-$HOOK_DIR/../rules-registry.yaml}"
+[ -r "$RULE_REGISTRY" ] || guard_failure "rules registry not found at $RULE_REGISTRY — AR.112/AR.113 cannot be evaluated"
+export RULE_REGISTRY
+
 CTX=$(python3 - "$FILE_PATH" <<'PYEOF'
 import json
 import sys

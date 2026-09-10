@@ -9,6 +9,23 @@ block() {
   exit 2
 }
 
+# Portable timeout (same helper as rule-engine.sh:_safe_timeout — kept local,
+# not sourced, since this hook has no other dependency on rule-engine.sh).
+# Plain `timeout` is a GNU coreutils binary, not part of base macOS: on a
+# clean Mac install (no Homebrew coreutils) it is simply absent, `command not
+# found` exits 127, and the `if !` below treats that identically to a real jq
+# failure — every Bash call gets fail-closed blocked (issue #754).
+_safe_timeout() {
+  local t="$1"; shift
+  if command -v gtimeout &>/dev/null; then
+    gtimeout "$t" "$@"
+  elif command -v timeout &>/dev/null; then
+    timeout "$t" "$@"
+  else
+    perl -e "alarm $t; exec @ARGV" -- "$@"
+  fi
+}
+
 # Read stdin once: a pipe/redirected fd is fully drained by the first jq call,
 # so a second `jq` reading raw stdin always sees EOF and returns empty — this
 # silently zeroed out $CWD on every invocation (found WP-547, 03.09, while
@@ -30,7 +47,7 @@ HOOK_INPUT=$(cat 2>/dev/null || true)
 # above, but nothing bounded how long it could run on a pathological payload
 # either — a hang here would hang the hook, and by the same fail-closed logic
 # as the rest of this block, a hung/killed jq (exit 124) blocks too.
-if ! printf '%s' "$HOOK_INPUT" | timeout 5 jq -e \
+if ! printf '%s' "$HOOK_INPUT" | _safe_timeout 5 jq -e \
   'type == "object" and (.tool_input | type) == "object" and (.tool_input.command | type) == "string" and (.tool_input.command | length) > 0' \
   >/dev/null 2>&1; then
   block "не удалось разобрать вход хука, либо tool_input.command отсутствует/пустой/неверного типа — блокирую как неопределённо опасный запрос."
