@@ -3001,7 +3001,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "ba3a950fc36569f8df183dc838a3d05999f77be71d31a6fce9c629e9a391e0af"
+      "sha256": "8e52298fb4fa373d7f50ea0d4772632c9a84fa4dc1e35930134ecee49abe4dff"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3080,8 +3080,8 @@
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dry_run_gate.py",
-    "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
+    "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
