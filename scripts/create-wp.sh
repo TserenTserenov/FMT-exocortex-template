@@ -147,7 +147,7 @@ PYEOF
   fi
 elif [[ "$SKIP_ARTIFACTOR" -eq 0 ]]; then
   echo "🚫 WP Gate: нет результата Артефактора для нового РП" >&2
-  echo "   Вызови Skill artifactor (или python3 scripts/artifactor.py), сохрани JSON-ответ в файл:" >&2
+  echo "   Вызови Skill artifactor (или его keyword-классификатор напрямую), сохрани JSON-ответ в файл:" >&2
   echo "   --artifactor-result /path/to/artifactor-result.json" >&2
   echo "   Обязателен для любого класса задачи, исключений нет (go-ahead пилота 2026-09-11)." >&2
   echo "   Экстренный обход (не для штатного создания РП): --no-artifactor-check" >&2
