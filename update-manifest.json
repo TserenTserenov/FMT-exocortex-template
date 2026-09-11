@@ -2029,7 +2029,7 @@
     },
     {
       "path": "scripts/artifactor.py",
-      "sha256": "1f15087c32da05fe1a929c8e1ad078ea3fdee950240facce206a5aee32919dd0"
+      "sha256": "7627424bcf4e1a8b84f749873485bbc3d4d1557b89c098547d1100b5d7688429"
     },
     {
       "path": "scripts/attestation-build-statement.sh",
@@ -2481,7 +2481,7 @@
     },
     {
       "path": "scripts/peer-adapter-filter.py",
-      "sha256": "e9019119b7242fcc165cc8e16dad281505639853db824abf2f48227817b0ae75"
+      "sha256": "ebbfdae528c71bfb8d41f45bc7851bccc4cb06b57090ffd4ff14aa7eb507da2a"
     },
     {
       "path": "scripts/peer-session-finalize.sh",
