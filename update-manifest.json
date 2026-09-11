@@ -1693,7 +1693,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "9b03702993e3250cadc32871d20633d486cc77649444d3dddf12d3d659edf491"
+      "sha256": "a27d6fddcee535ea78740987998a98bb375cc372d181f6efe198a808e4dce1f4"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1865,7 +1865,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "8cc51f04a94e34eeb1a8d5ad232b1b68dacfb02a4fa113d8299e8b9a85149f7f"
+      "sha256": "90b9172aaf3981eb35fe6320cc7e8bb75dc01e59b2d542df9896d2baf93724d4"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2553,7 +2553,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "c32fcd060cb5741764fb8783c69604e1b6f51d16464e762e7d7c9eba97464cca"
+      "sha256": "acb4465387debce7857d84a610e41f67ba127ce59bc9f2b3d84f8c63d5541efc"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -3084,6 +3084,7 @@
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
+    "scripts/tests/test_ar293_ai_cli_override.sh",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_create_wp_verification_class.sh",
     "scripts/tests/test_day_close_prepare.py",

@@ -54,16 +54,20 @@ elif [ -x "$HOME/.npm-global/bin/claude" ]; then
 else
     CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime должен был подставить
 fi
-if [ ! -x "$CLAUDE_PATH" ]; then
-    echo "[$(date '+%H:%M:%S')] ERROR: claude CLI не найден (CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$CLAUDE_PATH')." >&2
-    exit 127
-fi
 ENV_FILE="$HOME/.config/aist/env"
 
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+
+# AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
+# иначе override остаётся декоративным, когда claude физически отсутствует, но
+# AI_CLI указывает на реально установленную другую программу.
+if ! command -v "$AI_CLI" >/dev/null 2>&1 && [ ! -x "$AI_CLI" ]; then
+    echo "[$(date '+%H:%M:%S')] ERROR: $AI_CLI CLI не найден (AI_CLI/CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$AI_CLI')." >&2
+    exit 127
+fi
 
 # issue #17: load NOTIFY_SH_PATH from params.yaml if not already set in environment
 if [ -z "${NOTIFY_SH_PATH:-}" ]; then
