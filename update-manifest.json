@@ -361,7 +361,7 @@
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
-      "sha256": "8380ab51fcccff08312098a39553d8a8111cce8482eb52d5bb72a41725a86e62"
+      "sha256": "1a7d8afdc028608e68d4ef5aba71417f169303c1eca86086775665f9a5224c9c"
     },
     {
       "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
