@@ -2029,7 +2029,7 @@
     },
     {
       "path": "scripts/artifactor.py",
-      "sha256": "7627424bcf4e1a8b84f749873485bbc3d4d1557b89c098547d1100b5d7688429"
+      "sha256": "bf08b68fefbfa577e053dd47af437ec52e2caeb8eedb17328f1cf0f2c3a77982"
     },
     {
       "path": "scripts/attestation-build-statement.sh",
