@@ -75,10 +75,10 @@ KEYWORD_MAP = {
     "peer-сессия": ("peer_session", "trivial", None, "Итоговый отчёт пир-сессии"),  # SPECIAL_RESOLUTION: deferred-to-session
     "peer сессия": ("peer_session", "trivial", None, "Итоговый отчёт пир-сессии"),
     # closed-loop
-    "бот упал": ("bot_fix", "closed-loop", "WorkDone", "Исправление бота"),
-    "ошибк бота": ("bot_fix", "closed-loop", "WorkDone", "Исправление бота"),     # matches «ошибка» and «ошибки»
-    "фиксы": ("bug_fix", "closed-loop", "WorkDone", "Исправление дефекта"),
-    "устранить": ("bug_fix", "closed-loop", "WorkDone", "Исправление дефекта"),
+    "бот упал": ("bot_fix", "closed-loop", "WorkDone", "Исправленный бот"),
+    "ошибк бота": ("bot_fix", "closed-loop", "WorkDone", "Исправленный бот"),     # matches «ошибка» and «ошибки»
+    "фиксы": ("bug_fix", "closed-loop", "WorkDone", "Исправленный дефект"),
+    "устранить": ("bug_fix", "closed-loop", "WorkDone", "Исправленный дефект"),
     "доделать рп": ("wp_finish", "closed-loop", "WorkDone", "Завершённая фаза РП"),
     "хвосты рп": ("wp_finish", "closed-loop", "WorkDone", "Завершённая фаза РП"),
     "закрыть рп": ("wp_close", "closed-loop", "WorkDone", "Отчёт о закрытии РП"),
@@ -89,7 +89,7 @@ KEYWORD_MAP = {
     "разбор ke": ("ke_review", "closed-loop", "ChoiceResult", "Решение по кандидатам знаний"),  # R15 accept/reject/defer, не граф claim'ов
     "триаж": ("wp_triage", "closed-loop", "ChoiceResult", "Решение по триажу РП"),
     "реализация плана": ("wp_implement", "closed-loop", "WorkDone", "Реализованный план"),
-    "миграция": ("wp_implement", "closed-loop", "WorkDone", "Миграция"),
+    "миграция": ("wp_implement", "closed-loop", "WorkDone", "Выполненная миграция"),
     "создай pack": ("pack_create", "closed-loop", "Episteme", "Паспорт Pack"),
     "новый pack": ("pack_create", "closed-loop", "Episteme", "Паспорт Pack"),
     "ротация секретов": ("ops_security", "closed-loop", "WorkDone", "Ротированные секреты"),

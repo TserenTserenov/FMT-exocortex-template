@@ -361,7 +361,7 @@
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
-      "sha256": "33db1a1e5a80190708374597444433e1d7388d9bb9277921ab0f4968536e5e85"
+      "sha256": "8380ab51fcccff08312098a39553d8a8111cce8482eb52d5bb72a41725a86e62"
     },
     {
       "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
@@ -741,7 +741,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "e5b1a85320475b16087dbcae251e2ebd83ad405b62f4e992c38ed40674aa4164"
+      "sha256": "5be309491b6e042abf5e0230e0e82f2eb00f105e90003670c79bf14c2f25a4b6"
     },
     {
       "path": ".claude/styles/p05-core.md",
@@ -2029,7 +2029,7 @@
     },
     {
       "path": "scripts/artifactor.py",
-      "sha256": "1f15087c32da05fe1a929c8e1ad078ea3fdee950240facce206a5aee32919dd0"
+      "sha256": "7627424bcf4e1a8b84f749873485bbc3d4d1557b89c098547d1100b5d7688429"
     },
     {
       "path": "scripts/attestation-build-statement.sh",
@@ -2157,7 +2157,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "4c3d389e0f4bbe70fe86750703d2634d2370fdd9d74d82e0b3f61833aa0b506b"
+      "sha256": "b63df0f808a3be1c4ed2e807a5563e8b0364510310c902feff680c964ea909ab"
     },
     {
       "path": "scripts/day-close-lock.sh",
