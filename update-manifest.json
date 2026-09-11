@@ -2052,6 +2052,18 @@
       "sha256": "39188448fa00e5d70f1bddd157a5467b7b44c2eea3b15a4b33efca6ef2f23c81"
     },
     {
+      "path": "scripts/canon-dirty-proposals.sh",
+      "sha256": "4f33b3658380441d0e2dd93697f538206c7ded1ad8fc3d80a08614ed64de4901"
+    },
+    {
+      "path": "scripts/canon-dirty-snapshot.sh",
+      "sha256": "0140a4bfd9887f2d33bdca0643da31be10c9744638761eea6d241d1866702bc1"
+    },
+    {
+      "path": "scripts/canon-reconcile-published.sh",
+      "sha256": "3dc026a0f8dbd2e135f585528f2da21dfddc0922d94c82e7ef2d5e8251bf17b2"
+    },
+    {
       "path": "scripts/changelog-append.sh",
       "sha256": "53fd0abc41b738a69f9e85607c09918f552fe8eb071404b098706bf7f1514884"
     },
