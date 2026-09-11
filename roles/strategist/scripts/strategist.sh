@@ -115,11 +115,19 @@ elif [ -x "$HOME/.npm-global/bin/claude" ]; then
 else
     CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime должен был подставить
 fi
-if [ ! -x "$CLAUDE_PATH" ]; then
-    echo "[$(date '+%H:%M:%S')] ERROR: claude CLI не найден (CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$CLAUDE_PATH')." >&2
+CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
+
+# AI CLI: переопределение через переменные окружения (см. extractor.sh)
+AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
+AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
+
+# AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
+# иначе override остаётся декоративным, когда claude физически отсутствует, но
+# AI_CLI указывает на реально установленную другую программу.
+if ! command -v "$AI_CLI" >/dev/null 2>&1 && [ ! -x "$AI_CLI" ]; then
+    echo "[$(date '+%H:%M:%S')] ERROR: $AI_CLI CLI не найден (AI_CLI/CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$AI_CLI')." >&2
     exit 127
 fi
-CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
 
 # macOS не имеет GNU timeout — используем perl fallback
 if ! command -v timeout &>/dev/null; then
@@ -250,10 +258,20 @@ ${prompt}"
     # дефолт — проверенный mcp__claude_ai_Google_Calendar. Неизвестные имена в
     # whitelist безвредны — просто никогда не совпадут.
     local calendar_mcp="${IWE_CALENDAR_MCP_SERVERS:-mcp__claude_ai_Google_Calendar}"
-    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" \
-        "${model_args[@]}" \
-        --allowedTools "Read,Write,Edit,Glob,Grep,Bash,${calendar_mcp}" \
-        -p "$prompt" \
+    # AR.293: AI_CLI_EXTRA_FLAGS — точка подмены на случай, когда AI_CLI указывает
+    # не на Claude Code (--model/--allowedTools — его флаги, не переносимы как есть).
+    # Дефолт воспроизводит прежнее поведение один в один.
+    local extra_flags
+    if [ -n "${AI_CLI_EXTRA_FLAGS:-}" ]; then
+        # намеренный word-splitting единой override-строки — тот же контракт,
+        # что уже принят в extractor.sh
+        read -ra extra_flags <<< "$AI_CLI_EXTRA_FLAGS"
+    else
+        extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash,${calendar_mcp}")
+    fi
+    timeout "$CLAUDE_TIMEOUT" "$AI_CLI" \
+        "${extra_flags[@]}" \
+        $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1 || rc=$?
 
     if [ $rc -eq 124 ]; then

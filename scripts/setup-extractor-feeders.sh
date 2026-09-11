@@ -58,11 +58,15 @@ if [ ! -x "$EXTRACTOR_SH" ]; then
 fi
 ok "extractor.sh найден"
 
-if ! command -v claude >/dev/null 2>&1; then
-    fail "claude CLI не установлен (https://docs.anthropic.com/en/docs/claude-code)"
+# AR.293: гейт смотрит на эффективную программу (AI_CLI override у
+# extractor.sh), не на литерал claude — иначе override самого вызова
+# остаётся декоративным, расписание не заводится ни при какой настройке.
+AI_CLI="${AI_CLI:-claude}"
+if ! command -v "$AI_CLI" >/dev/null 2>&1; then
+    fail "$AI_CLI CLI не установлен (https://docs.anthropic.com/en/docs/claude-code)"
     exit 1
 fi
-ok "claude CLI: $(command -v claude)"
+ok "$AI_CLI CLI: $(command -v "$AI_CLI")"
 
 PLATFORM=$(uname -s)
 case "$PLATFORM" in
@@ -151,7 +155,7 @@ if [ "$PLATFORM" = "Darwin" ]; then
         # launchd не наследует login-shell PATH (WP-5, найдено 03.09 — job падал
         # exit 127 "claude CLI не найден"), поэтому PATH нужно прописать явно, а
         # не полагаться на окружение launchd по умолчанию (/usr/bin:/bin:/usr/sbin:/sbin).
-        CLAUDE_BIN_DIR="$(dirname "$(command -v claude)")"
+        CLAUDE_BIN_DIR="$(dirname "$(command -v "$AI_CLI")")"
         PLIST_PATH="$CLAUDE_BIN_DIR:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
         IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
         NEW_PLIST_CONTENT=$(cat <<PLIST
