@@ -2057,7 +2057,7 @@
     },
     {
       "path": "scripts/canon-dirty-snapshot.sh",
-      "sha256": "0140a4bfd9887f2d33bdca0643da31be10c9744638761eea6d241d1866702bc1"
+      "sha256": "ab297ff262ef9bed3ce72123a70c4569dd4e32eb9340a53bfd1875fc508837ff"
     },
     {
       "path": "scripts/canon-reconcile-published.sh",

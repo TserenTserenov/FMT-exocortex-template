@@ -18,11 +18,22 @@ git diff --cached --name-only -z > "$SNAP/staged-paths.z"
 : > "$SNAP/manifest.sha256"
 : > "$SNAP/manifest.stat"
 find . -type d -empty -not -path './.git/*' | sort > "$SNAP/empty-dirs.txt"
+# GNU-first (Linux/coreutils), BSD fallback (macOS) -- same order and same
+# rationale as iwe_file_mtime_date() in scripts/lib/common.sh: this pilot's
+# own hosts span both (Mac + tsekh-1 Linux), and the reverse check order has
+# previously broken the Linux branch of stat -f/-c detection.
+portable_stat_line() {  # <path> -- "type perm size mtime", one format picked once per host
+  if stat --version >/dev/null 2>&1; then
+    stat -c '%F %a %s %Y' -- "$1"
+  else
+    stat -f '%HT %Lp %z %m' -- "$1"
+  fi
+}
 record() {  # <path> -- content hash + stat line (+ symlink target) for one path
   if [ -L "$1" ]; then printf '%s %s\n' "$(printf '%s' "$(readlink "$1")" | git hash-object --stdin)" "$1" >> "$SNAP/manifest.sha256"
   else printf '%s %s\n' "$(git hash-object "$1")" "$1" >> "$SNAP/manifest.sha256"; fi
   if [ -L "$1" ]; then printf 'link %s -> %s\n' "$1" "$(readlink "$1")" >> "$SNAP/manifest.stat"
-  else printf '%s %s\n' "$(stat -f '%HT %Lp %z %m' "$1")" "$1" >> "$SNAP/manifest.stat"; fi
+  else printf '%s %s\n' "$(portable_stat_line "$1")" "$1" >> "$SNAP/manifest.stat"; fi
 }
 # every path git reports (modified, staged, untracked) -- copied with metadata
 git status --porcelain -z | while IFS= read -r -d '' entry; do
@@ -48,7 +59,7 @@ while read -r h p; do
     [ "$(readlink "$SNAP/files/$p")" = "$(readlink "$p")" ] || { echo "SYMLINK MISMATCH in snapshot: $p" >&2; bad=1; }
   else
     [ "$(git hash-object "$SNAP/files/$p")" = "$h" ] || { echo "HASH MISMATCH in snapshot: $p" >&2; bad=1; }
-    [ "$(stat -f '%HT %Lp %z' "$SNAP/files/$p")" = "$(stat -f '%HT %Lp %z' "$p")" ] || { echo "STAT MISMATCH in snapshot: $p" >&2; bad=1; }
+    [ "$(portable_stat_line "$SNAP/files/$p" | cut -d' ' -f1-3)" = "$(portable_stat_line "$p" | cut -d' ' -f1-3)" ] || { echo "STAT MISMATCH in snapshot: $p" >&2; bad=1; }
   fi
 done < "$SNAP/manifest.sha256"
 n=$(grep -vc '^DELETED' "$SNAP/manifest.sha256")
