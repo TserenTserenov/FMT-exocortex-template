@@ -741,7 +741,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "e5b1a85320475b16087dbcae251e2ebd83ad405b62f4e992c38ed40674aa4164"
+      "sha256": "5be309491b6e042abf5e0230e0e82f2eb00f105e90003670c79bf14c2f25a4b6"
     },
     {
       "path": ".claude/styles/p05-core.md",
@@ -2157,7 +2157,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "4c3d389e0f4bbe70fe86750703d2634d2370fdd9d74d82e0b3f61833aa0b506b"
+      "sha256": "cc795cc14d4570e626627fcd5cb4b358e540fe6e617678d47022c1d9326e4857"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2481,7 +2481,7 @@
     },
     {
       "path": "scripts/peer-adapter-filter.py",
-      "sha256": "ebbfdae528c71bfb8d41f45bc7851bccc4cb06b57090ffd4ff14aa7eb507da2a"
+      "sha256": "e9019119b7242fcc165cc8e16dad281505639853db824abf2f48227817b0ae75"
     },
     {
       "path": "scripts/peer-session-finalize.sh",
