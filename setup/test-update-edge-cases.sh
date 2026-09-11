@@ -24,7 +24,7 @@
 #   T20: index-health skip suppresses size checks but keeps semantic checks (issue #357)
 #   T21: legacy owner:user protocols migrate once with backup; other user files stay protected (issue #354)
 #   T22: Quick Close requires a runner card only when the runner and graph exist (issue #356)
-#   T23: wp-sync-bundle prefers folder cards and reads structured open phase statuses
+#   T23: wp-sync-bundle handles canonical cards, phase statuses, relation shapes, titles, and linked worktrees
 #   T24-T27: update safety, bootstrap/path contracts, multiplier opt-out, #384/#387/#388
 #   T28: settings.json merge preview never touches inputs, honors merge rules (WP-7 F71)
 #   T29: author_mode skip classifier verdicts on synthetic template history (WP-7 F71)
@@ -1508,6 +1508,7 @@ echo "--- T23: wp-sync-bundle uses the canonical folder card and phase statuses 
 
 T23_ROOT="$TEST_WS/t23-root"
 T23_GOV="$T23_ROOT/governance"
+T23_BUNDLE="${WP_SYNC_BUNDLE_UNDER_TEST:-$TEMPLATE_DIR/.claude/scripts/wp-sync-bundle.sh}"
 mkdir -p "$T23_GOV/docs" "$T23_GOV/inbox/WP-777"
 printf '# registry\n' > "$T23_GOV/docs/WP-REGISTRY.md"
 
@@ -1536,7 +1537,7 @@ phases:
 HEREDOC
 
 T23_OUT=$(IWE_WORKSPACE="$T23_ROOT" IWE_GOVERNANCE_REPO=governance \
-    bash "$TEMPLATE_DIR/.claude/scripts/wp-sync-bundle.sh" WP-777 2>&1)
+    bash "$T23_BUNDLE" WP-777 2>&1)
 T23_RC=$?
 if [ "$T23_RC" -eq 0 ] && \
    [[ "$T23_OUT" == *'Файл: `inbox/WP-777/WP-777.md`'* ]] && \
@@ -1562,7 +1563,7 @@ status: in_progress
 HEREDOC
 
 T23_LEGACY_OUT=$(IWE_WORKSPACE="$T23_ROOT" IWE_GOVERNANCE_REPO=governance \
-    bash "$TEMPLATE_DIR/.claude/scripts/wp-sync-bundle.sh" WP-778 2>&1)
+    bash "$T23_BUNDLE" WP-778 2>&1)
 T23_LEGACY_RC=$?
 if [ "$T23_LEGACY_RC" -eq 0 ] && \
    [[ "$T23_LEGACY_OUT" == *'Открытых фаз: 2'* ]] && \
@@ -1582,12 +1583,219 @@ status: done
 HEREDOC
 
 T23_PREFIX_OUT=$(IWE_WORKSPACE="$T23_ROOT" IWE_GOVERNANCE_REPO=governance \
-    bash "$TEMPLATE_DIR/.claude/scripts/wp-sync-bundle.sh" WP-46 2>&1)
+    bash "$T23_BUNDLE" WP-46 2>&1)
 T23_PREFIX_RC=$?
 if [ "$T23_PREFIX_RC" -eq 1 ] && [[ "$T23_PREFIX_OUT" == *'WP-46: файл не найден'* ]]; then
     pass "T23: a shorter WP ID does not resolve a longer numeric prefix"
 else
     fail "T23: numeric-prefix archive lookup regressed (rc=$T23_PREFIX_RC): $T23_PREFIX_OUT"
+fi
+
+T23_GIT_SOURCE="$T23_ROOT/git-source"
+T23_LINKED_WORKSPACE="$T23_ROOT/linked-workspace"
+T23_LINKED_GOV="$T23_LINKED_WORKSPACE/governance"
+mkdir -p "$T23_GIT_SOURCE/docs" "$T23_GIT_SOURCE/inbox/WP-780" \
+    "$T23_GIT_SOURCE/inbox/WP-78" "$T23_GIT_SOURCE/inbox/WP-784" \
+    "$T23_GIT_SOURCE/inbox/WP-785" \
+    "$T23_GIT_SOURCE/inbox/WP-781" "$T23_GIT_SOURCE/inbox/WP-782" \
+    "$T23_GIT_SOURCE/inbox/WP-783" "$T23_LINKED_WORKSPACE"
+cat > "$T23_GIT_SOURCE/docs/WP-REGISTRY.md" <<'HEREDOC'
+| # | Название | Статус |
+|---|---|---|
+| 780 | Inline current | 🔄 in_progress |
+| 78 | Closed prefix | ✅ done |
+| 781 | Legacy related | ⏳ pending |
+| 782 | Titled related | ⏳ pending |
+| 783 | Block related | ⏳ pending |
+| 784 | Boundary current | 🔄 in_progress |
+| 785 | Inline blocker | 🔄 in_progress |
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-78/WP-78.md" <<'HEREDOC'
+---
+wp: 78
+title: Closed prefix relation
+status: done
+spawned: 2026-09-10
+phases: []
+---
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-780/WP-780.md" <<'HEREDOC'
+---
+wp: 780
+title: Inline current title
+status: in_progress
+spawned: 2026-09-10
+# Inline YAML accepts both canonical WP-N and the numeric legacy form used by
+# existing cards. A following top-level comment is not part of this value.
+related: [WP-781, 782, WP-781, WP-780] # WP-799 is not related.
+# WP-799 belongs to this comment, not to related.
+phases: []
+---
+
+No related references in the body.
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-781/WP-781.md" <<'HEREDOC'
+---
+wp: 781
+name: Legacy related name
+title: Ignored title because name has priority
+status: pending
+spawned: 2026-09-10
+phases: []
+---
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-782/WP-782.md" <<'HEREDOC'
+---
+wp: 782
+title: Titled related name
+status: pending
+spawned: 2026-09-10
+phases: []
+---
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-783/WP-783.md" <<'HEREDOC'
+---
+wp: 783
+title: Block related name
+status: in_progress
+spawned: 2026-09-10
+related: # WP-799 is not related; the indented mapping below is the value.
+  # WP-798 is not related either.
+  depends_on: [WP-781 (uses 5 views)]
+  references: [782]
+phases: []
+---
+
+See WP-5 in the body only.
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-784/WP-784.md" <<'HEREDOC'
+---
+wp: 784
+title: Exact relation boundary
+status: in_progress
+spawned: 2026-09-10
+related: [WP-78]
+---
+
+- [ ] Continue WP-780 only.
+HEREDOC
+cat > "$T23_GIT_SOURCE/inbox/WP-785/WP-785.md" <<'HEREDOC'
+---
+wp: 785
+title: Inline blocker current
+status: in_progress
+spawned: 2026-09-10
+blockers: [WP-781]
+phases: []
+---
+
+No related references in the body.
+HEREDOC
+git -C "$T23_GIT_SOURCE" init -q -b main
+git -C "$T23_GIT_SOURCE" config user.email "test@test"
+git -C "$T23_GIT_SOURCE" config user.name "test"
+git -C "$T23_GIT_SOURCE" add docs/WP-REGISTRY.md \
+    inbox/WP-78/WP-78.md inbox/WP-784/WP-784.md inbox/WP-785/WP-785.md \
+    inbox/WP-780/WP-780.md inbox/WP-781/WP-781.md \
+    inbox/WP-782/WP-782.md inbox/WP-783/WP-783.md
+git -C "$T23_GIT_SOURCE" commit -qm "fixture baseline commit"
+git -C "$T23_GIT_SOURCE" worktree add -q -b t23-linked "$T23_LINKED_GOV" main
+
+T23_INLINE_OUT=$(IWE_WORKSPACE="$T23_LINKED_WORKSPACE" IWE_GOVERNANCE_REPO=governance \
+    WP_SYNC_GIT_DAYS=3650 bash "$T23_BUNDLE" WP-780 2>&1)
+T23_INLINE_RC=$?
+T23_INLINE_781=$(printf '%s\n' "$T23_INLINE_OUT" | grep -c '^### WP-781 (related)$' || true)
+T23_INLINE_782=$(printf '%s\n' "$T23_INLINE_OUT" | grep -c '^### WP-782 (related)$' || true)
+T23_INLINE_799=$(printf '%s\n' "$T23_INLINE_OUT" | grep -c '^### WP-799 ' || true)
+if [ "$T23_INLINE_RC" -eq 0 ] && [ -f "$T23_LINKED_GOV/.git" ] && \
+   [ ! -d "$T23_LINKED_GOV/.git" ] && \
+   [ "$T23_INLINE_781" -eq 1 ] && [ "$T23_INLINE_782" -eq 1 ] && \
+   [ "$T23_INLINE_799" -eq 0 ] && \
+   [[ "$T23_INLINE_OUT" == *'- Название: Inline current title'* ]] && \
+   [[ "$T23_INLINE_OUT" == *'- Название: Legacy related name'* ]] && \
+   [[ "$T23_INLINE_OUT" == *'- Название: Titled related name'* ]] && \
+   [[ "$T23_INLINE_OUT" == *'fixture baseline commit'* ]] && \
+   [[ "$T23_INLINE_OUT" != *'_git недоступен_'* ]]; then
+    pass "T23: inline related, title fallback, dedup/self-filter, and linked-worktree history work together"
+else
+    fail "T23: inline related/title/linked-worktree contract regressed (rc=$T23_INLINE_RC): $T23_INLINE_OUT"
+fi
+
+T23_BLOCK_OUT=$(IWE_WORKSPACE="$T23_LINKED_WORKSPACE" IWE_GOVERNANCE_REPO=governance \
+    WP_SYNC_GIT_DAYS=3650 bash "$T23_BUNDLE" WP-783 2>&1)
+T23_BLOCK_RC=$?
+if [ "$T23_BLOCK_RC" -eq 0 ] && \
+   [[ "$T23_BLOCK_OUT" == *'### WP-781 (depends_on)'* ]] && \
+   [[ "$T23_BLOCK_OUT" == *'### WP-782 (references)'* ]] && \
+   [[ "$T23_BLOCK_OUT" == *'### WP-5 (body_ref)'* ]] && \
+   [[ "$T23_BLOCK_OUT" != *'### WP-798 '* ]] && \
+   [[ "$T23_BLOCK_OUT" != *'### WP-799 '* ]]; then
+    pass "T23: block related keeps typed relations"
+else
+    fail "T23: block related relation types regressed (rc=$T23_BLOCK_RC): $T23_BLOCK_OUT"
+fi
+
+T23_BOUNDARY_OUT=$(IWE_WORKSPACE="$T23_LINKED_WORKSPACE" IWE_GOVERNANCE_REPO=governance \
+    bash "$T23_BUNDLE" WP-784 2>&1)
+T23_BOUNDARY_RC=$?
+if [ "$T23_BOUNDARY_RC" -eq 0 ] && \
+   [[ "$T23_BOUNDARY_OUT" == *'### WP-78 (related)'* ]] && \
+   [[ "$T23_BOUNDARY_OUT" == *'- Кол-во: 0'* ]]; then
+    pass "T23: a WP-780 phase reference does not create drift for closed WP-78"
+else
+    fail "T23: relation ID boundary regressed (rc=$T23_BOUNDARY_RC): $T23_BOUNDARY_OUT"
+fi
+
+if grep -q '^extract_blocker_wps()' "$T23_BUNDLE"; then
+    T23_BLOCKER_OUT=$(IWE_WORKSPACE="$T23_LINKED_WORKSPACE" IWE_GOVERNANCE_REPO=governance \
+        bash "$T23_BUNDLE" WP-785 2>&1)
+    T23_BLOCKER_RC=$?
+    if [ "$T23_BLOCKER_RC" -eq 0 ] && \
+       [[ "$T23_BLOCKER_OUT" == *'### WP-781 (body_ref)'* ]]; then
+        pass "T23: runtime variant reads inline blockers"
+    else
+        fail "T23: inline blocker extraction regressed (rc=$T23_BLOCKER_RC): $T23_BLOCKER_OUT"
+    fi
+fi
+git -C "$T23_GIT_SOURCE" worktree remove "$T23_LINKED_GOV" --force >/dev/null 2>&1
+
+T23_NESTED_WORKSPACE="$T23_GIT_SOURCE/nested-workspace"
+T23_NESTED_GOV="$T23_NESTED_WORKSPACE/governance"
+mkdir -p "$T23_NESTED_GOV/docs" "$T23_NESTED_GOV/inbox/WP-790" \
+    "$T23_NESTED_GOV/inbox/WP-791"
+cat > "$T23_NESTED_GOV/docs/WP-REGISTRY.md" <<'HEREDOC'
+| # | Название | Статус |
+|---|---|---|
+| 790 | Nested current | 🔄 in_progress |
+| 791 | Nested related | ⏳ pending |
+HEREDOC
+cat > "$T23_NESTED_GOV/inbox/WP-790/WP-790.md" <<'HEREDOC'
+---
+wp: 790
+title: Nested current
+status: in_progress
+spawned: 2026-09-10
+related: [WP-791]
+phases: []
+---
+HEREDOC
+cat > "$T23_NESTED_GOV/inbox/WP-791/WP-791.md" <<'HEREDOC'
+---
+wp: 791
+title: Nested related
+status: pending
+spawned: 2026-09-10
+phases: []
+---
+HEREDOC
+T23_NESTED_OUT=$(IWE_WORKSPACE="$T23_NESTED_WORKSPACE" IWE_GOVERNANCE_REPO=governance \
+    bash "$T23_BUNDLE" WP-790 2>&1)
+T23_NESTED_RC=$?
+if [ "$T23_NESTED_RC" -eq 0 ] && \
+   [[ "$T23_NESTED_OUT" == *'_git недоступен_'* ]]; then
+    pass "T23: a plain directory nested in another repository is not treated as its Git root"
+else
+    fail "T23: nested non-root Git directory was accepted (rc=$T23_NESTED_RC): $T23_NESTED_OUT"
 fi
 
 # ============================================================

@@ -329,7 +329,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "ee8786d5d76ab64486e17e23e955783cbbfbd9122d1668d7445b1d8945a5a220"
+      "sha256": "ef9cbb17c9f994899c2bd569cae8001dfa991761398e42f172edac2a1b4ac5a1"
     },
     {
       "path": ".claude/settings.json",
