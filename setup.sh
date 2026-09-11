@@ -365,34 +365,57 @@ fi
 if [ -z "$GOVERNANCE_REPO" ]; then
     GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-}"
 fi
-case "$GOVERNANCE_REPO" in
-    "" ) ;;
-    .|..|.*|*/*|*[!A-Za-z0-9._-]*)
-        echo "ОШИБКА: GOVERNANCE_REPO должен быть безопасным именем каталога: $GOVERNANCE_REPO" >&2
-        exit 1
-        ;;
-esac
-if [ -z "$GOVERNANCE_REPO" ] && [ -d "$WORKSPACE_DIR/$GOVERNANCE_CONTRACT_DEFAULT_REPO" ]; then
-    GOVERNANCE_REPO="$GOVERNANCE_CONTRACT_DEFAULT_REPO"
-fi
-# Scope note (WP-560 Ф5-Phase-2 review, 02.09): this local name-glob picks the
-# first DS-*strategy* directory it finds and does not consult the contract's
-# ambiguityPolicy (0/1/2+, enforced server-side in governance-repo-resolver.ts
-# against GitHub content markers). The two mechanisms differ in kind — this one
-# checks local directory names, not remote content markers — so the policy
-# isn't mechanically portable here; unifying them is an open follow-up on the
-# WP-560 card, not done in this change.
+# Applied both to an explicitly-supplied name (right here) and, again, to
+# whatever the auto-detect loop below resolves — a candidate directory found
+# on disk can itself contain spaces/other unsafe characters (the glob match
+# doesn't restrict that), so re-checking only the explicit-source value would
+# let an unsafe auto-detected name slip through unvalidated.
+validate_governance_repo_name() {
+    case "$1" in
+        "" ) ;;
+        .|..|.*|*/*|*[!A-Za-z0-9._-]*)
+            echo "ОШИБКА: GOVERNANCE_REPO должен быть безопасным именем каталога: $1" >&2
+            exit 1
+            ;;
+    esac
+}
+validate_governance_repo_name "$GOVERNANCE_REPO"
+# Scope note (WP-560 Ф5-Phase-2 review, 02.09; fail-closed added 11.09; the
+# separate GOVERNANCE_CONTRACT_DEFAULT_REPO pre-check folded in the same day,
+# peer-review round 2 — it used to run before this loop and short-circuit it
+# whenever the default-named directory existed, so a second, differently
+# named candidate sitting right next to it was never even looked at): this
+# local name-glob mirrors only the contract's ambiguityPolicy.twoOrMore branch
+# — 2+ matching directories (the default name included: it matches the same
+# `DS-*strategy*` glob, so it is just another candidate here, not a
+# short-circuit) fail closed instead of silently picking one. `zero` stays
+# untouched on purpose: an empty match here falls through to the
+# GOVERNANCE_CONTRACT_DEFAULT_REPO fallback below, which governs local
+# directory names, not the GitHub content markers that ambiguityPolicy.zero
+# governs on the resolver.ts side.
 if [ -z "$GOVERNANCE_REPO" ]; then
+    GOVERNANCE_LOCAL_CANDIDATES=()
     for d in "$WORKSPACE_DIR"/DS-*; do
+        [ -d "$d" ] || continue
         case "${d##*/}" in
-            DS-*strategy*|DS-strategy)
-                GOVERNANCE_REPO="${d##*/}"
-                break
+            DS-*strategy*)  # `DS-strategy` itself already matches this pattern (shellcheck SC2221/SC2222)
+                GOVERNANCE_LOCAL_CANDIDATES+=("${d##*/}")
                 ;;
         esac
     done
+    case "${#GOVERNANCE_LOCAL_CANDIDATES[@]}" in
+        0) ;;
+        1) GOVERNANCE_REPO="${GOVERNANCE_LOCAL_CANDIDATES[0]}" ;;
+        *)
+            echo "ОШИБКА: найдено несколько локальных кандидатов на governance-репо: ${GOVERNANCE_LOCAL_CANDIDATES[*]}." >&2
+            echo "Укажите нужный явно, в кавычках: GOVERNANCE_REPO='<имя>' bash setup.sh ..." >&2
+            exit 1
+            ;;
+    esac
+    unset GOVERNANCE_LOCAL_CANDIDATES
 fi
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-$GOVERNANCE_CONTRACT_DEFAULT_REPO}"
+validate_governance_repo_name "$GOVERNANCE_REPO"
 if [ -L "$WORKSPACE_DIR/$GOVERNANCE_REPO" ]; then
     echo "ОШИБКА: governance repo не может быть символической ссылкой: $WORKSPACE_DIR/$GOVERNANCE_REPO" >&2
     exit 1
