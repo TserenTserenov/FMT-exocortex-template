@@ -2389,7 +2389,7 @@
     },
     {
       "path": "scripts/kimi-peer-adapter.sh",
-      "sha256": "f3667622efc5b83d51d6d7364d95072e804cc470206b7d2c3ff17f9c310f57ef"
+      "sha256": "10332cda79fa9dcdec1b2dbb21503c2a92c66985bc24ec07d7edaf02e865089f"
     },
     {
       "path": "scripts/kimi-session-watchdog.sh",

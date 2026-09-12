@@ -2250,23 +2250,22 @@ if [ -x "$GUARD_BIN" ]; then
   GUARD_ARGS=("$GUARD_BIN" --max-tokens "${KIMI_MAX_TOKENS:-800000}" --)
 fi
 
-# === Kimi CLI style detect ===
+# === Kimi CLI capability gate ===
 # `--quiet` is no longer a reliable legacy marker: current kimi-code retains it
 # as an alias while supporting the modern `--agent-file` API.  The latter is
 # required for the no-tools profile below, so it is the capability probe.
-# Legacy CLI: prompt via stdin, flags --quiet --yolo.  Modern CLI: `-p` plus
-# `--agent-file`, stream-json, and no auto-approved tools.
+# Unsafe legacy invocation is rejected here; no executable `--yolo` fallback
+# remains below this gate.
 KIMI_HELP_FILE="$TMP_ROOT/kimi-help.txt"
 "$KIMI_BIN" --help 9>&- > "$KIMI_HELP_FILE" 2>/dev/null || true
-if grep -q -- '--agent-file' "$KIMI_HELP_FILE"; then
-  KIMI_CLI_STYLE="prompt-arg"
-else
-  KIMI_CLI_STYLE="legacy"
+if ! grep -q -- '--agent-file' "$KIMI_HELP_FILE"; then
+  echo "ERROR: installed Kimi CLI lacks --agent-file; refusing an unsafe legacy peer invocation." >&2
+  echo "  Upgrade Kimi CLI to a version that supports a no-tools agent profile." >&2
+  exit 1
 fi
 
 KIMI_STDERR="$TMP_ROOT/kimi.stderr"
 
-if [ "$KIMI_CLI_STYLE" = "prompt-arg" ]; then
   # Single-argv limit: Linux MAX_ARG_STRLEN is 128KiB per argument; macOS ARG_MAX ~1MiB total.
   PROMPT_BYTES=$(wc -c < "$PROMPT_FILE" | tr -d ' ')
   case "$(uname -s)" in
@@ -2343,11 +2342,6 @@ EOF
     "--output-format" "stream-json"
   )
   kimi_cli_supports '--print' && KIMI_PROMPT_ARGS+=("--print")
-else
-  echo "ERROR: installed Kimi CLI lacks --agent-file; refusing an unsafe legacy peer invocation." >&2
-  echo "  Upgrade Kimi CLI to a version that supports a no-tools agent profile." >&2
-  exit 1
-fi
 
 # OAuth-refresh lock: all Kimi processes on this machine share one token file
 # keyed by server URL (~/.kimi/mcp-oauth/), not by PID/session — Kimi CLI itself
@@ -2408,31 +2402,20 @@ if [ -n "${IWE_PEER_TEST_PRE_EXEC_BARRIER:-}" ]; then
   KIMI_LINEAGE_ARGS+=(--pre-exec-barrier "$IWE_PEER_TEST_PRE_EXEC_BARRIER")
 fi
 
-if [ "$KIMI_CLI_STYLE" = "prompt-arg" ]; then
-  # kimi-code 0.29 gates --agent-file behind the v2 engine, enabled by this
-  # env var.  Set it only for the v2 agent format (peer-session 2026-08-15-05,
-  # Codex review): an experimental flag may change more than the gate, so a
-  # pre-v2 CLI must not receive it.
-  if [ "$KIMI_AGENT_STYLE" = "v2" ]; then
-    export KIMI_CODE_EXPERIMENTAL_FLAG=1
-  fi
-  KIMI_RAW=$(cd "$KIMI_TEXT_ONLY_WORKDIR" && run_with_deadline "$IWE_PEER_TIMEOUT_SECONDS" \
-    "${KIMI_LINEAGE_ARGS[@]}" \
-    "${GUARD_ARGS[@]+"${GUARD_ARGS[@]}"}" "$KIMI_BIN" \
-    "${KIMI_PROMPT_ARGS[@]}" \
-    ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} \
-    ${KIMI_DIR_ARGS[@]+"${KIMI_DIR_ARGS[@]}"} \
-    < /dev/null \
-    2>"$KIMI_STDERR")
-else
-  KIMI_RAW=$(run_with_deadline "$IWE_PEER_TIMEOUT_SECONDS" \
-    "${KIMI_LINEAGE_ARGS[@]}" \
-    "${GUARD_ARGS[@]+"${GUARD_ARGS[@]}"}" "$KIMI_BIN" --quiet --yolo \
-    ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} \
-    ${KIMI_DIR_ARGS[@]+"${KIMI_DIR_ARGS[@]}"} \
-    < "$PROMPT_FILE" \
-    2>"$KIMI_STDERR")
+# kimi-code 0.29 gates --agent-file behind the v2 engine, enabled by this
+# env var. Set it only for the v2 agent format (peer-session 2026-08-15-05,
+# Codex review): an experimental flag may change more than the gate.
+if [ "$KIMI_AGENT_STYLE" = "v2" ]; then
+  export KIMI_CODE_EXPERIMENTAL_FLAG=1
 fi
+KIMI_RAW=$(cd "$KIMI_TEXT_ONLY_WORKDIR" && run_with_deadline "$IWE_PEER_TIMEOUT_SECONDS" \
+  "${KIMI_LINEAGE_ARGS[@]}" \
+  "${GUARD_ARGS[@]+"${GUARD_ARGS[@]}"}" "$KIMI_BIN" \
+  "${KIMI_PROMPT_ARGS[@]}" \
+  ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} \
+  ${KIMI_DIR_ARGS[@]+"${KIMI_DIR_ARGS[@]}"} \
+  < /dev/null \
+  2>"$KIMI_STDERR")
 # $? read directly off the assignment — no pipe inside the command substitution,
 # so it can't be masked by grep's exit code the way PIPESTATUS[0] was after `fi`
 # (verified empirically in peer-session 2026-07-01-31-oauth-refresh-regression).
@@ -2457,8 +2440,7 @@ if [ -s "$SESSION_LOCK_FAILURE" ]; then
   exit 1
 fi
 
-if [ "$KIMI_CLI_STYLE" = "prompt-arg" ]; then
-  # stream-json: keep only assistant text; meta lines (resume hint) drop out naturally.
+# stream-json: keep only assistant text; meta lines (resume hint) drop out naturally.
   # Exit 10 = input WAS JSON but held no assistant text (e.g. CLI retry loop died
   # mid-turn with only meta/tool events) — that is "no answer", not format drift.
   # Unparsable lines are counted and reported, never dropped in silence (WP-524
@@ -2513,10 +2495,7 @@ sys.exit(10 if (saw_json and not text) else 0)
   PARSE_RC=$?
   # Raw pass-through only for genuine format drift (no JSON lines at all) —
   # otherwise raw meta-JSON would leak into the peer transcript (review 24.07).
-  if [ "$PARSE_RC" -ne 10 ] && [ -z "$KIMI_OUTPUT" ] && [ -n "$KIMI_RAW" ]; then
-    KIMI_OUTPUT=$(printf '%s\n' "$KIMI_RAW" | grep -v "^To resume this session:")
-  fi
-else
+if [ "$PARSE_RC" -ne 10 ] && [ -z "$KIMI_OUTPUT" ] && [ -n "$KIMI_RAW" ]; then
   KIMI_OUTPUT=$(printf '%s\n' "$KIMI_RAW" | grep -v "^To resume this session:")
 fi
 
