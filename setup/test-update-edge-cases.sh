@@ -35,6 +35,7 @@
 #   T34: Unicode context caps count characters, not bytes (issue #435)
 #   T35: /extend catalog matches every invoked extension point (issues #436/#508)
 #   T36: extension loader sorts suffixes and preserves no-op/error exit codes (issue #508)
+#   T40: Kimi peer heartbeat stays outside authoritative session admission (WP-484)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -3083,6 +3084,359 @@ else
     else
         fail "T39: expected EXIT_RUNTIME(3) with a shasum/sha256sum diagnostic, got status=$T39_STATUS: $T39_OUT"
     fi
+fi
+
+# ============================================================
+# T40: Kimi peer heartbeat is observational, never a session semaphore (WP-484)
+# ============================================================
+echo "--- T40: Kimi peer heartbeat namespace and watchdog consumer (WP-484) ---"
+
+T40_ROOT="$TEST_WS/t40-kimi-peer-heartbeat"
+T40_IWE="$T40_ROOT/iwe"
+T40_HOME="$T40_ROOT/home"
+T40_ADD_DIR="$T40_ROOT/peer-beacon-session"
+T40_LOCK_DIR="$T40_ROOT/locks"
+T40_BIN="$T40_ROOT/fake-kimi"
+T40_READY="$T40_ROOT/ready"
+T40_RELEASE="$T40_ROOT/release"
+mkdir -p "$T40_HOME" "$T40_ADD_DIR"
+
+cat > "$T40_BIN" <<'EOF'
+#!/bin/bash
+if [ "${1:-}" = "--help" ]; then
+    echo "--agent-file Load an agent definition from a Markdown file"
+    exit 0
+fi
+printf '%s\n' "$$" >> "$T40_READY"
+while [ ! -f "$T40_RELEASE" ]; do sleep 0.05; done
+printf '%s\n' '{"role":"assistant","content":"CONSENSUS: beacon probe complete"}'
+EOF
+chmod +x "$T40_BIN"
+export T40_READY T40_RELEASE
+
+HOME="$T40_HOME" CODEX_SANDBOX='' CODEX_SANDBOX_NETWORK_DISABLED='' \
+    IWE_PEER_PLAIN=1 IWE_ROOT="$T40_IWE" \
+    IWE_PEER_LOCK_DIR="$T40_LOCK_DIR" IWE_PEER_HEARTBEAT_SECONDS=1 \
+    IWE_PEER_TIMEOUT_SECONDS=10 \
+    KIMI_BIN="$T40_BIN" \
+    bash "$TEMPLATE_DIR/scripts/kimi-peer-adapter.sh" --add-dir "$T40_ADD_DIR" \
+    </dev/null >"$T40_ROOT/adapter.out" 2>"$T40_ROOT/adapter.err" &
+T40_ADAPTER_PID=$!
+for _t40_wait in $(seq 1 200); do
+    [ -f "$T40_READY" ] && break
+    sleep 0.05
+done
+
+T40_BEACON="$T40_IWE/.iwe-runtime/peer-heartbeats/kimi-peer-peer-beacon-session.heartbeat"
+mkdir -p "$T40_IWE/.iwe-runtime/sessions"
+T40_OPEN_COUNT=$(find "$T40_IWE/.iwe-runtime/sessions" -name '*.open' 2>/dev/null | wc -l | tr -d ' ')
+if [ -f "$T40_READY" ] && [ -f "$T40_BEACON" ] && [ ! -L "$T40_BEACON" ] && \
+   [ "$T40_OPEN_COUNT" = 0 ] && grep -q '^agent: kimi-peer$' "$T40_BEACON"; then
+    pass "T40a: peer adapter writes visibility beacon outside sessions/*.open"
+else
+    fail "T40a: peer beacon entered admission namespace or was not created: $(find "$T40_IWE/.iwe-runtime" -type f 2>/dev/null | tr '\n' ' ')"
+fi
+
+T40_ID_BEFORE=$(python3 -c 'import os,sys; s=os.lstat(sys.argv[1]); print(f"{s.st_dev}:{s.st_ino}")' "$T40_BEACON" 2>/dev/null)
+T40_SUM_BEFORE=$(head -6 "$T40_BEACON" | cksum 2>/dev/null)
+if HOME="$T40_HOME" CODEX_SANDBOX='' CODEX_SANDBOX_NETWORK_DISABLED='' \
+   IWE_PEER_PLAIN=1 IWE_ROOT="$T40_IWE" \
+   IWE_PEER_LOCK_DIR="$T40_LOCK_DIR" IWE_PEER_HEARTBEAT_SECONDS=1 \
+   IWE_PEER_TIMEOUT_SECONDS=2 \
+   KIMI_BIN="$T40_BIN" \
+   bash "$TEMPLATE_DIR/scripts/kimi-peer-adapter.sh" --add-dir "$T40_ADD_DIR" \
+   </dev/null >"$T40_ROOT/duplicate.out" 2>"$T40_ROOT/duplicate.err"; then
+    T40_DUPLICATE_RC=0
+else
+    T40_DUPLICATE_RC=$?
+fi
+T40_ID_AFTER=$(python3 -c 'import os,sys; s=os.lstat(sys.argv[1]); print(f"{s.st_dev}:{s.st_ino}")' "$T40_BEACON" 2>/dev/null)
+T40_SUM_AFTER=$(head -6 "$T40_BEACON" | cksum 2>/dev/null)
+if [ "$T40_DUPLICATE_RC" -eq 5 ] && [ -n "$T40_ID_BEFORE" ] && \
+   [ "$T40_ID_AFTER" = "$T40_ID_BEFORE" ] && [ "$T40_SUM_AFTER" = "$T40_SUM_BEFORE" ]; then
+    pass "T40b: rejected duplicate cannot replace the live owner's beacon"
+else
+    fail "T40b: duplicate mutated the beacon (rc=$T40_DUPLICATE_RC before=$T40_ID_BEFORE/$T40_SUM_BEFORE after=$T40_ID_AFTER/$T40_SUM_AFTER)"
+fi
+
+touch "$T40_RELEASE"
+if wait "$T40_ADAPTER_PID"; then
+    T40_ADAPTER_RC=0
+else
+    T40_ADAPTER_RC=$?
+fi
+if [ "$T40_ADAPTER_RC" -eq 0 ] && [ ! -e "$T40_BEACON" ] && \
+   [ ! -e "$T40_IWE/.iwe-runtime/sessions/kimi-peer-peer-beacon-session.open" ]; then
+    pass "T40c: normal peer exit removes its beacon without leaving .open"
+else
+    fail "T40c: peer heartbeat cleanup failed (rc=$T40_ADAPTER_RC)"
+fi
+
+T40_JOURNAL="$T40_HOME/.iwe/agent-sessions.jsonl"
+for _t40_wait in $(seq 1 100); do
+    [ -s "$T40_JOURNAL" ] && break
+    sleep 0.05
+done
+if python3 - "$T40_JOURNAL" <<'PY'
+import datetime
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+record = json.loads(path.read_text(encoding="utf-8").splitlines()[-1])
+assert record["agent"] == "kimi"
+assert record["session_id"] == "peer-beacon-session"
+datetime.datetime.fromisoformat(record["start_time"].replace("Z", "+00:00"))
+datetime.datetime.fromisoformat(record["end_time"].replace("Z", "+00:00"))
+PY
+then
+    pass "T40d: successful peer call records a timestamped session journal entry"
+else
+    fail "T40d: successful peer call lost its session journal entry"
+fi
+
+# Start eight adapters on one id without a pre-established winner. Exactly one
+# may enter the fake CLI; the kernel lock must reject the other seven.
+T40_RACE_ADD="$T40_ROOT/peer-race-session"
+T40_RACE_READY="$T40_ROOT/race-ready"
+T40_RACE_RELEASE="$T40_ROOT/race-release"
+mkdir -p "$T40_RACE_ADD" "$T40_ROOT/race-results"
+t40_racer() {
+    local index="$1" rc
+    if HOME="$T40_HOME" CODEX_SANDBOX='' CODEX_SANDBOX_NETWORK_DISABLED='' \
+       IWE_PEER_PLAIN=1 IWE_ROOT="$T40_IWE" \
+       IWE_PEER_LOCK_DIR="$T40_LOCK_DIR" IWE_PEER_HEARTBEAT_SECONDS=1 \
+       IWE_PEER_TIMEOUT_SECONDS=10 T40_READY="$T40_RACE_READY" \
+       T40_RELEASE="$T40_RACE_RELEASE" KIMI_BIN="$T40_BIN" \
+       bash "$TEMPLATE_DIR/scripts/kimi-peer-adapter.sh" --add-dir "$T40_RACE_ADD" \
+       </dev/null >"$T40_ROOT/race-results/$index.out" 2>"$T40_ROOT/race-results/$index.err"; then
+        rc=0
+    else
+        rc=$?
+    fi
+    printf '%s\n' "$rc" > "$T40_ROOT/race-results/$index.rc"
+}
+T40_RACE_PIDS=""
+for _t40_index in $(seq 1 8); do
+    t40_racer "$_t40_index" &
+    T40_RACE_PIDS="$T40_RACE_PIDS $!"
+done
+for _t40_wait in $(seq 1 100); do
+    T40_RACE_DONE=$(find "$T40_ROOT/race-results" -name '*.rc' | wc -l | tr -d ' ')
+    [ "$T40_RACE_DONE" -ge 7 ] && break
+    sleep 0.05
+done
+touch "$T40_RACE_RELEASE"
+for _t40_pid in $T40_RACE_PIDS; do
+    wait "$_t40_pid" || true
+done
+if [ -f "$T40_RACE_READY" ]; then
+    T40_RACE_ENTERED=$(wc -l < "$T40_RACE_READY" | tr -d ' ')
+else
+    T40_RACE_ENTERED=0
+fi
+T40_RACE_OK=$(grep -l '^0$' "$T40_ROOT"/race-results/*.rc 2>/dev/null | wc -l | tr -d ' ')
+T40_RACE_BUSY=$(grep -l '^5$' "$T40_ROOT"/race-results/*.rc 2>/dev/null | wc -l | tr -d ' ')
+if [ "$T40_RACE_ENTERED" -eq 1 ] && [ "$T40_RACE_OK" -eq 1 ] && \
+   [ "$T40_RACE_BUSY" -eq 7 ]; then
+    pass "T40e: concurrent same-id adapters elect exactly one owner"
+else
+    fail "T40e: peer lock split ownership (entered=$T40_RACE_ENTERED ok=$T40_RACE_OK busy=$T40_RACE_BUSY)"
+fi
+
+# SIGKILL skips the adapter's EXIT trap. Its two direct helpers must observe
+# reparenting, release the kernel lock and remove only their own beacon.
+T40_CRASH_ADD="$T40_ROOT/peer-crash-session"
+T40_CRASH_READY="$T40_ROOT/crash-ready"
+T40_CRASH_RELEASE="$T40_ROOT/crash-release"
+T40_CRASH_BEACON="$T40_IWE/.iwe-runtime/peer-heartbeats/kimi-peer-peer-crash-session.heartbeat"
+T40_CRASH_LOCK="$T40_LOCK_DIR/peer-crash-session.pid"
+mkdir -p "$T40_CRASH_ADD"
+HOME="$T40_HOME" CODEX_SANDBOX='' CODEX_SANDBOX_NETWORK_DISABLED='' \
+    IWE_PEER_PLAIN=1 IWE_ROOT="$T40_IWE" \
+    IWE_PEER_LOCK_DIR="$T40_LOCK_DIR" IWE_PEER_HEARTBEAT_SECONDS=1 \
+    IWE_PEER_TIMEOUT_SECONDS=10 T40_READY="$T40_CRASH_READY" \
+    T40_RELEASE="$T40_CRASH_RELEASE" KIMI_BIN="$T40_BIN" \
+    bash "$TEMPLATE_DIR/scripts/kimi-peer-adapter.sh" --add-dir "$T40_CRASH_ADD" \
+    </dev/null >"$T40_ROOT/crash.out" 2>"$T40_ROOT/crash.err" &
+T40_CRASH_PID=$!
+for _t40_wait in $(seq 1 200); do
+    [ -s "$T40_CRASH_READY" ] && [ -f "$T40_CRASH_BEACON" ] && break
+    sleep 0.05
+done
+T40_CRASH_STARTED=0
+if [ -s "$T40_CRASH_READY" ] && [ -f "$T40_CRASH_BEACON" ]; then
+    T40_CRASH_STARTED=1
+fi
+kill -9 "$T40_CRASH_PID" 2>/dev/null || true
+wait "$T40_CRASH_PID" 2>/dev/null || true
+touch "$T40_CRASH_RELEASE"
+for _t40_wait in $(seq 1 100); do
+    [ ! -e "$T40_CRASH_BEACON" ] && [ ! -e "$T40_CRASH_LOCK" ] && break
+    sleep 0.05
+done
+if [ "$T40_CRASH_STARTED" -eq 1 ] && \
+   [ ! -e "$T40_CRASH_BEACON" ] && [ ! -e "$T40_CRASH_LOCK" ]; then
+    pass "T40f: owner SIGKILL cannot leave a live-looking beacon or held lock"
+else
+    fail "T40f: owner SIGKILL setup/cleanup failed (started=$T40_CRASH_STARTED beacon=$(test -e "$T40_CRASH_BEACON" && echo yes || echo no) lock=$(test -e "$T40_CRASH_LOCK" && echo yes || echo no))"
+fi
+
+# TERM must terminate the adapter after cleanup; the old multi-signal cleanup
+# handler returned to normal execution and could print a response after giving
+# up its lock. Release the fake CLI only to let Bash deliver its deferred trap.
+T40_TERM_ADD="$T40_ROOT/peer-term-session"
+T40_TERM_READY="$T40_ROOT/term-ready"
+T40_TERM_RELEASE="$T40_ROOT/term-release"
+T40_TERM_BEACON="$T40_IWE/.iwe-runtime/peer-heartbeats/kimi-peer-peer-term-session.heartbeat"
+mkdir -p "$T40_TERM_ADD"
+HOME="$T40_HOME" CODEX_SANDBOX='' CODEX_SANDBOX_NETWORK_DISABLED='' \
+    IWE_PEER_PLAIN=1 IWE_ROOT="$T40_IWE" \
+    IWE_PEER_LOCK_DIR="$T40_LOCK_DIR" IWE_PEER_HEARTBEAT_SECONDS=1 \
+    IWE_PEER_TIMEOUT_SECONDS=10 T40_READY="$T40_TERM_READY" \
+    T40_RELEASE="$T40_TERM_RELEASE" KIMI_BIN="$T40_BIN" \
+    bash "$TEMPLATE_DIR/scripts/kimi-peer-adapter.sh" --add-dir "$T40_TERM_ADD" \
+    </dev/null >"$T40_ROOT/term.out" 2>"$T40_ROOT/term.err" &
+T40_TERM_PID=$!
+for _t40_wait in $(seq 1 200); do
+    [ -s "$T40_TERM_READY" ] && [ -f "$T40_TERM_BEACON" ] && break
+    sleep 0.05
+done
+kill -TERM "$T40_TERM_PID" 2>/dev/null || true
+touch "$T40_TERM_RELEASE"
+if wait "$T40_TERM_PID"; then
+    T40_TERM_RC=0
+else
+    T40_TERM_RC=$?
+fi
+if [ "$T40_TERM_RC" -eq 143 ] && [ ! -s "$T40_ROOT/term.out" ] && \
+   [ ! -e "$T40_TERM_BEACON" ]; then
+    pass "T40g: TERM exits after exact cleanup and cannot continue the peer call"
+else
+    fail "T40g: TERM did not stop the adapter (rc=$T40_TERM_RC output=$(wc -c < "$T40_ROOT/term.out" | tr -d ' '))"
+fi
+
+mkdir -p "$T40_IWE/.iwe-runtime/peer-heartbeats"
+cat > "$T40_BEACON" <<'EOF'
+opened_at: 2020-01-01T00:00:00Z
+wp: WP-7
+task: bounded consumer probe
+agent: kimi-peer
+heartbeat_at: 2020-01-01T00:00:00Z
+EOF
+T40_WATCHDOG_OUT=$(IWE_ROOT="$T40_IWE" SILENCE_THRESHOLD_S=1 \
+    bash -c 'source "$1"; notify_pilot(){ printf "%s|%s\n" "$1" "$2"; }; scan_once' \
+    t40 "$TEMPLATE_DIR/scripts/kimi-session-watchdog.sh" 2>&1)
+T40_WATCHDOG_RC=$?
+if [ "$T40_WATCHDOG_RC" -eq 0 ] && [[ "$T40_WATCHDOG_OUT" == *"$T40_BEACON|"* ]]; then
+    pass "T40h: watchdog consumes the separate peer-heartbeats namespace"
+else
+    fail "T40h: watchdog ignored the peer heartbeat (rc=$T40_WATCHDOG_RC out=$T40_WATCHDOG_OUT)"
+fi
+
+T40_FRESH_NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+cat > "$T40_BEACON" <<EOF
+opened_at: $T40_FRESH_NOW
+wp: WP-7
+task: fresh consumer probe
+agent: kimi-peer
+heartbeat_at: $T40_FRESH_NOW
+EOF
+T40_FRESH_OUT=$(IWE_ROOT="$T40_IWE" SILENCE_THRESHOLD_S=300 \
+    bash -c 'source "$1"; notify_pilot(){ printf "%s|%s\n" "$1" "$2"; }; scan_once' \
+    t40 "$TEMPLATE_DIR/scripts/kimi-session-watchdog.sh" 2>&1)
+if [ -z "$T40_FRESH_OUT" ]; then
+    pass "T40i: watchdog does not alert on a fresh peer heartbeat"
+else
+    fail "T40i: watchdog falsely reported a fresh heartbeat: $T40_FRESH_OUT"
+fi
+
+if IWE_ROOT="$T40_IWE" CHECK_INTERVAL_S=0 \
+   bash -c 'source "$1"' t40 "$TEMPLATE_DIR/scripts/kimi-session-watchdog.sh" \
+   >"$T40_ROOT/invalid-interval.out" 2>&1; then
+    T40_BAD_INTERVAL_RC=0
+else
+    T40_BAD_INTERVAL_RC=$?
+fi
+if IWE_ROOT="$T40_IWE" SILENCE_THRESHOLD_S=not-a-number \
+   bash -c 'source "$1"' t40 "$TEMPLATE_DIR/scripts/kimi-session-watchdog.sh" \
+   >"$T40_ROOT/invalid-threshold.out" 2>&1; then
+    T40_BAD_THRESHOLD_RC=0
+else
+    T40_BAD_THRESHOLD_RC=$?
+fi
+if [ "$T40_BAD_INTERVAL_RC" -ne 0 ] && [ "$T40_BAD_THRESHOLD_RC" -ne 0 ] && \
+   grep -q 'positive integer' "$T40_ROOT/invalid-interval.out" && \
+   grep -q 'positive integer' "$T40_ROOT/invalid-threshold.out"; then
+    pass "T40j: watchdog rejects zero and non-numeric timing controls"
+else
+    fail "T40j: watchdog accepted an unsafe timing value (interval=$T40_BAD_INTERVAL_RC threshold=$T40_BAD_THRESHOLD_RC)"
+fi
+
+T40_OSA_DIR="$T40_ROOT/fake-osa-bin"
+T40_OSA_CAPTURE="$T40_ROOT/osascript-args.json"
+mkdir -p "$T40_OSA_DIR"
+cat > "$T40_OSA_DIR/osascript" <<'EOF'
+#!/bin/bash
+python3 - "$T40_OSA_CAPTURE" "$@" <<'PY'
+import json
+import pathlib
+import sys
+
+pathlib.Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]), encoding="utf-8")
+PY
+EOF
+chmod +x "$T40_OSA_DIR/osascript"
+export T40_OSA_CAPTURE
+if ! PATH="$T40_OSA_DIR:$PATH" command -v osascript >/dev/null 2>&1; then
+    fail "T40k: fake osascript is not discoverable"
+fi
+cat > "$T40_BEACON" <<'EOF'
+opened_at: 2020-01-01T00:00:00Z
+wp: WP-7
+task: probe"; display dialog "PWN
+agent: kimi-peer
+heartbeat_at: 2020-01-01T00:00:00Z
+EOF
+PATH="$T40_OSA_DIR:$PATH" IWE_ROOT="$T40_IWE" SILENCE_THRESHOLD_S=1 \
+    bash -c 'source "$1"; notify_pilot "$2" 999' \
+    t40 "$TEMPLATE_DIR/scripts/kimi-session-watchdog.sh" "$T40_BEACON"
+if python3 - "$T40_OSA_CAPTURE" <<'PY'
+import json
+import pathlib
+import sys
+
+args = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert len(args) == 2 and args[0] == "-e"
+program = args[1]
+assert 'subtitle "probe\\"; display dialog \\"PWN"' in program
+assert 'subtitle "probe"; display dialog "PWN"' not in program
+PY
+then
+    pass "T40k: watchdog escapes peer labels before AppleScript interpolation"
+else
+    fail "T40k: watchdog exposed an unescaped peer label to AppleScript"
+fi
+
+T40_PYTHON3=$("$TEMPLATE_DIR/scripts/lib/find-python3.sh" 2>/dev/null || true)
+if [ -n "$T40_PYTHON3" ]; then
+    T40_LANG_RESULT=$(printf '%s\n' 'This complete response is deliberately written only in English prose.' | \
+        "$T40_PYTHON3" "$TEMPLATE_DIR/scripts/lib/language-check.py" 2>/dev/null || true)
+else
+    T40_LANG_RESULT=""
+fi
+if [ -n "$T40_PYTHON3" ] && "$T40_PYTHON3" - "$T40_LANG_RESULT" <<'PY'
+import json
+import sys
+
+result = json.loads(sys.argv[1])
+assert result["alert"] is True
+PY
+then
+    pass "T40l: template delivers the peer language-check dependency"
+else
+    fail "T40l: peer language-check dependency is missing or inactive"
 fi
 
 # ============================================================
