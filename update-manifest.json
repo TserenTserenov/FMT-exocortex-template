@@ -104,6 +104,10 @@
       "sha256": "68be07adff21228a20ba39b7762d66f5619dd6ce3719b4e8ff82b2724d38d32a"
     },
     {
+      "path": ".claude/hooks/post-tool-use-scope-track.sh",
+      "sha256": "e6dbccf1464d50b3aba6adccc3dc1d1ac1379bf91b1ae0b933ad7b5b7814cac9"
+    },
+    {
       "path": ".claude/hooks/precompact-checkpoint.sh",
       "sha256": "7d6f9904923f3173387d435e1e4e4f59f30a6ed1cd693e92df4045667facee9c"
     },
@@ -333,7 +337,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "ad0766e994b872150f91fbfaaee0e125189ba33d2757e05fc6e61b7688e8fa5e"
+      "sha256": "98041e309d1633474763ed8ec34d41dd815ae65279c2a1b430a19f7d11cc7600"
     },
     {
       "path": ".claude/skills-catalog.yaml",
@@ -2005,7 +2009,7 @@
     },
     {
       "path": "scripts/agent-heartbeat.sh",
-      "sha256": "fa5284fb366b0b94400df1697e2173287461156375fb7d82954c56b2367ba1a2"
+      "sha256": "4a56c1acc074bf2fa22aae9fe4f6589a0cb0123fb62427782192df436a4a03e1"
     },
     {
       "path": "scripts/agent-status-report.sh",
@@ -2377,7 +2381,7 @@
     },
     {
       "path": "scripts/kimi-auto-heartbeat.sh",
-      "sha256": "233eef6b4568b9e9b2fcf46162c71a13ee84dccec33500fbcaa1e9de7a41d9b8"
+      "sha256": "42c243a29607102ede93416f1df80ab91aa5451daa9b1155b830cdf1a26d9652"
     },
     {
       "path": "scripts/kimi-compaction-watchdog.sh",
@@ -2545,7 +2549,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "e239fe9c50a5586330460aad1ce4c12950f5608f51cd96b0fb44aafd275b59fd"
+      "sha256": "7106f3a9004e9f448c478da0a3e8c75362122046ffdbd60d445bb257ab37bd75"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2701,7 +2705,7 @@
     },
     {
       "path": "scripts/tests/test_hook_classification.sh",
-      "sha256": "5cc71a227734d32a5a939b482ae1669c2fc5f3fb0ccc2b874dfb3169f8e2c78a"
+      "sha256": "0d683edb6c08c8f2358c34daa9121c1d6fc1143704598a84214bf338ff7776df"
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
@@ -2789,7 +2793,7 @@
     },
     {
       "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
-      "sha256": "45d241902da232578652c576f3240088936fb165a4ada29917089e802df61edb"
+      "sha256": "1c30d6e56c915a401385bdc43dfdb348703281c1080458931054c00c3a82dcb7"
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",

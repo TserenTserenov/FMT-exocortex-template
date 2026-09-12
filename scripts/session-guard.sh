@@ -16,8 +16,9 @@
 #   close --housekeeping <reason> [--agent ...]       # закрыть housekeeping-сессию
 #   audit [--since YYYY-MM-DD] [--cleanup-orphans]
 #   renew [--wp WP-N] [--slug "..."] [--agent ...]    # продлить право на коммит
+#   heartbeat --agent <agent> --session-id <id> --owner-pid <pid>
 #   pre-commit-check
-#   note-file <path> [--agent ...]
+#   note-file <path> [--agent ...] [--session-id <id>]
 #   lock-hot-file <path> [--agent ...]    # WP-7 SessionGitRaceIsolation: короткий
 #   unlock-hot-file <path>                # mkdir-замок на файл, который часто
 #                                          # коллизирует между параллельными сессиями
@@ -40,6 +41,7 @@
 set -euo pipefail
 
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
+SESSION_GUARD_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
 # issue #266: hardcoded "DS-strategy" broke every template user whose
 # governance repo is named "DS-strategy" (the shipped default — see create-wp.sh).
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
@@ -52,12 +54,660 @@ mkdir -p "$SESSION_DIR" "$(dirname "$OPEN_LOG")"
 
 CMD="${1:-}"
 shift || true
+SESSION_GUARD_ARGS=("$@")
 
 # --- helpers ---
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_date() { date +"%Y-%m-%d"; }
 now_month() { date +"%Y-%m"; }
 fail() { echo "session-guard: $1" >&2; exit "${2:-1}"; }
+
+# Session mutations share one permanent lock inode derived from the canonical
+# `.open` path.  Python's fcntl is available on the same POSIX platforms this
+# Bash script supports, unlike the external `flock` utility (absent on stock
+# macOS).  The lock file is never removed or reclaimed: kernel lock lifetime is
+# the authority, while a stable inode prevents unlink/recreate split-brain.
+# This FMT layer is deliberately single-host: advisory locks and inode/fsync
+# proofs coordinate processes sharing one local filesystem namespace.  It does
+# not claim cross-host consensus or the root workspace's delivery/isolation
+# guarantees; installed workspaces need an external coordinator for those.
+_safe_session_token() {
+  [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,255}$ ]]
+}
+
+_canonical_session_path() { # <path>
+  python3 - "$1" "$SESSION_DIR" <<'PY'
+import os
+import sys
+
+path, session_dir = sys.argv[1:]
+session_dir = os.path.realpath(session_dir)
+parent = os.path.realpath(os.path.dirname(os.path.abspath(path)))
+name = os.path.basename(path)
+if parent != session_dir or name in {"", ".", ".."} or not name.endswith(".open"):
+    raise SystemExit("session path is outside the canonical session directory")
+print(os.path.join(session_dir, name))
+PY
+}
+
+_validate_inherited_session_lock() { # <canonical .open path>
+  python3 - "$1" "$SESSION_DIR" <<'PY'
+import fcntl
+import hashlib
+import os
+import stat
+import sys
+
+target, session_dir = sys.argv[1:]
+fd_text = os.environ.get("IWE_SESSION_TRANSITION_FD", "")
+lock_path = os.environ.get("IWE_SESSION_TRANSITION_LOCK_PATH", "")
+locked_target = os.environ.get("IWE_SESSION_TRANSITION_TARGET", "")
+token = os.environ.get("IWE_SESSION_TRANSITION_TOKEN", "")
+if not fd_text.isdigit() or locked_target != target:
+    raise SystemExit(1)
+fd = int(fd_text)
+session_dir = os.path.realpath(session_dir)
+expected_dir = os.path.join(os.path.dirname(session_dir), "session-transition-locks")
+expected_name = hashlib.sha256(target.encode("utf-8")).hexdigest() + ".lock"
+expected_path = os.path.join(expected_dir, expected_name)
+if lock_path != expected_path:
+    raise SystemExit(1)
+info = os.fstat(fd)
+named = os.lstat(lock_path)
+if (
+    not stat.S_ISREG(info.st_mode)
+    or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+    or info.st_uid != os.getuid()
+    or info.st_nlink != 1
+    or stat.S_IMODE(info.st_mode) != 0o600
+    or token != "%d:%d" % (info.st_dev, info.st_ino)
+):
+    raise SystemExit(1)
+# Acquires the lock if a caller forged only the environment/descriptor; on a
+# legitimately inherited open-file description this is an idempotent check.
+fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+PY
+}
+
+_ensure_session_transition_lock() { # <original .open path> [session-id]
+  local semaphore="$1" session_id="${2:-}" canonical
+  canonical=$(_canonical_session_path "$semaphore") \
+    || fail "session-transition: небезопасный путь семафора '$semaphore'" 1
+
+  if [ -n "${IWE_SESSION_TRANSITION_FD:-}" ] || \
+     [ -n "${IWE_SESSION_TRANSITION_TARGET:-}" ]; then
+    _validate_inherited_session_lock "$canonical" \
+      || fail "session-transition: унаследованный lock не прошёл проверку" 1
+    return 0
+  fi
+
+  python3 - "$canonical" "$SESSION_DIR" "$0" "$CMD" "$session_id" "${SESSION_GUARD_ARGS[@]}" <<'PY'
+import errno
+import fcntl
+import hashlib
+import os
+import stat
+import sys
+import time
+
+target, session_dir, script, command, session_id, *original = sys.argv[1:]
+session_dir = os.path.realpath(session_dir)
+if os.path.realpath(os.path.dirname(target)) != session_dir:
+    raise SystemExit("session-transition target escaped session directory")
+
+lock_dir = os.path.join(os.path.dirname(session_dir), "session-transition-locks")
+os.makedirs(lock_dir, mode=0o700, exist_ok=True)
+directory = os.lstat(lock_dir)
+if (
+    not stat.S_ISDIR(directory.st_mode)
+    or directory.st_uid != os.getuid()
+    or stat.S_IMODE(directory.st_mode) & 0o077
+):
+    raise SystemExit("session-transition lock directory is not private")
+
+lock_name = hashlib.sha256(target.encode("utf-8")).hexdigest() + ".lock"
+lock_path = os.path.join(lock_dir, lock_name)
+flags = os.O_RDWR | os.O_CREAT
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+fd = os.open(lock_path, flags, 0o600)
+try:
+    info = os.fstat(fd)
+    named = os.lstat(lock_path)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        or info.st_uid != os.getuid()
+        or info.st_nlink != 1
+        or stat.S_IMODE(info.st_mode) != 0o600
+    ):
+        raise SystemExit("session-transition lock inode is not trusted")
+
+    deadline = time.monotonic() + 30.0
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                raise SystemExit("session-transition lock busy for more than 30 seconds")
+            time.sleep(0.05)
+
+    # Revalidate the permanent name after acquisition; an unlink/recreate by
+    # an untrusted peer cannot silently create a second lock domain.
+    info = os.fstat(fd)
+    named = os.lstat(lock_path)
+    if (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino):
+        raise SystemExit("session-transition lock name changed during acquire")
+
+    fixed_fd = 196
+    if fd != fixed_fd:
+        os.dup2(fd, fixed_fd, inheritable=True)
+        os.close(fd)
+        fd = fixed_fd
+    else:
+        os.set_inheritable(fd, True)
+
+    env = os.environ.copy()
+    env["IWE_SESSION_TRANSITION_FD"] = str(fd)
+    env["IWE_SESSION_TRANSITION_LOCK_PATH"] = lock_path
+    env["IWE_SESSION_TRANSITION_TARGET"] = target
+    env["IWE_SESSION_TRANSITION_TOKEN"] = "%d:%d" % (info.st_dev, info.st_ino)
+    if session_id:
+        env["IWE_SESSION_LOCKED_SESSION_ID"] = session_id
+    script = os.path.realpath(script)
+    os.execve("/bin/bash", ["/bin/bash", script, command, *original], env)
+finally:
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+PY
+  exit $?
+}
+
+_locked_open_identity() { # <path> <agent> <session-id> [allow-staged-close]
+  python3 - "$1" "$2" "$3" "${4:-0}" <<'PY'
+import os
+import stat
+import sys
+
+path, expected_agent, expected_session, allow_staged = sys.argv[1:]
+flags = os.O_RDONLY
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+fd = os.open(path, flags)
+try:
+    info = os.fstat(fd)
+    named = os.lstat(path)
+    closed = path + ".closed"
+    try:
+        closed_info = os.lstat(closed)
+    except FileNotFoundError:
+        closed_info = None
+    terminal_pair = (
+        closed_info is not None
+        and stat.S_ISREG(closed_info.st_mode)
+        and (info.st_dev, info.st_ino) == (closed_info.st_dev, closed_info.st_ino)
+    )
+    allowed_links = (1, 2) if allow_staged == "1" and terminal_pair else (1,)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        or info.st_uid != os.getuid()
+        or info.st_nlink not in allowed_links
+        or stat.S_IMODE(info.st_mode) & 0o022
+        or (closed_info is not None and not terminal_pair)
+    ):
+        raise SystemExit(1)
+    content = os.read(fd, max(info.st_size + 1, 1)).decode("utf-8")
+finally:
+    os.close(fd)
+
+lines = content.splitlines()
+agents = [line[7:] for line in lines if line.startswith("agent: ")]
+sessions = [line[12:] for line in lines if line.startswith("session_id: ")]
+if agents != [expected_agent] or sessions != [expected_session]:
+    raise SystemExit(1)
+closing = [
+    line
+    for line in lines
+    if line.startswith((
+        "close_protocol: ",
+        "close_attempt_id: ",
+        "close_destination: ",
+        "close_terminal_inode: ",
+        "closed_at: ",
+    ))
+]
+if closing and allow_staged != "1":
+    raise SystemExit(1)
+PY
+}
+
+_atomic_append_open() { # <path> <agent> <session-id> <heartbeat|note|close-stage> <line...>
+  python3 - "$@" <<'PY'
+import os
+import re
+import stat
+import sys
+import tempfile
+import uuid
+
+path, expected_agent, expected_session, mode, *records = sys.argv[1:]
+if any("\n" in record or "\0" in record for record in records):
+    raise SystemExit("session record contains a line break")
+flags = os.O_RDONLY
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+source = os.open(path, flags)
+temp_path = ""
+try:
+    before = os.fstat(source)
+    named = os.lstat(path)
+    terminal_pair = False
+    if mode == "close-stage":
+        try:
+            terminal = os.lstat(path + ".closed")
+            terminal_pair = (
+                stat.S_ISREG(terminal.st_mode)
+                and (before.st_dev, before.st_ino) == (terminal.st_dev, terminal.st_ino)
+            )
+        except FileNotFoundError:
+            terminal_pair = False
+    allowed_links = (1, 2) if mode == "close-stage" and terminal_pair else (1,)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or (before.st_dev, before.st_ino) != (named.st_dev, named.st_ino)
+        or before.st_uid != os.getuid()
+        or before.st_nlink not in allowed_links
+        or stat.S_IMODE(before.st_mode) & 0o022
+    ):
+        raise SystemExit("open semaphore inode is not trusted")
+    data = b""
+    while True:
+        chunk = os.read(source, 1024 * 1024)
+        if not chunk:
+            break
+        data += chunk
+    text = data.decode("utf-8")
+    lines = text.splitlines()
+    if [line[7:] for line in lines if line.startswith("agent: ")] != [expected_agent]:
+        raise SystemExit("semaphore agent identity changed")
+    if [line[12:] for line in lines if line.startswith("session_id: ")] != [expected_session]:
+        raise SystemExit("semaphore session identity changed")
+
+    close_keys = (
+        "close_protocol",
+        "close_attempt_id",
+        "close_destination",
+        "close_terminal_inode",
+        "closed_at",
+    )
+
+    def values(key):
+        prefix = key + ": "
+        return [line[len(prefix):] for line in lines if line.startswith(prefix)]
+
+    close_present = any(values(key) for key in close_keys)
+    expected_destination = os.path.join(
+        os.path.realpath(os.path.dirname(path)),
+        os.path.basename(path) + ".closed",
+    )
+
+    def validate_staged_receipt():
+        fields = {}
+        for key in close_keys:
+            found = values(key)
+            if len(found) != 1 or not found[0]:
+                raise SystemExit("malformed staged close receipt")
+            fields[key] = found[0]
+        if fields["close_protocol"] != "durable-v2":
+            raise SystemExit("unsupported staged close receipt")
+        try:
+            attempt = uuid.UUID(fields["close_attempt_id"])
+        except (AttributeError, ValueError):
+            raise SystemExit("malformed close attempt id")
+        if attempt.version != 4 or str(attempt) != fields["close_attempt_id"]:
+            raise SystemExit("non-canonical close attempt id")
+        if fields["close_destination"] != expected_destination:
+            raise SystemExit("close receipt destination does not match its exact name")
+        inode = "%d:%d" % (before.st_dev, before.st_ino)
+        if not re.fullmatch(r"[0-9]+:[0-9]+", fields["close_terminal_inode"]):
+            raise SystemExit("malformed close terminal inode")
+        if fields["close_terminal_inode"] != inode:
+            raise SystemExit("close receipt was replayed onto another inode")
+        return fields["close_attempt_id"]
+
+    close_attempt_id = ""
+    if mode == "close-stage":
+        if close_present:
+            close_attempt_id = validate_staged_receipt()
+            print(close_attempt_id)
+            raise SystemExit(0)
+        if terminal_pair:
+            raise SystemExit("terminal hardlink exists without a staged close receipt")
+        if len(records) != 1 or not records[0]:
+            raise SystemExit("close-stage requires one closed_at value")
+        close_attempt_id = str(uuid.uuid4())
+    elif close_present:
+        raise SystemExit("session is already closing")
+
+    if mode == "note" and records and records[0] in lines:
+        raise SystemExit(0)
+
+    temp_fd, temp_path = tempfile.mkstemp(prefix=".session-mutate-", dir=os.path.dirname(path))
+    try:
+        os.fchmod(temp_fd, stat.S_IMODE(before.st_mode))
+        if mode == "close-stage":
+            temp_info = os.fstat(temp_fd)
+            records = [
+                "close_protocol: durable-v2",
+                "close_attempt_id: " + close_attempt_id,
+                "close_destination: " + expected_destination,
+                "close_terminal_inode: %d:%d" % (temp_info.st_dev, temp_info.st_ino),
+                "closed_at: " + records[0],
+            ]
+        suffix = "" if not records else "\n".join(records) + "\n"
+        if suffix and text and not text.endswith("\n"):
+            text += "\n"
+        updated = (text + suffix).encode("utf-8")
+        with os.fdopen(temp_fd, "wb", closefd=True) as out:
+            out.write(updated)
+            out.flush()
+            os.fsync(out.fileno())
+        current = os.lstat(path)
+        immutable = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
+        if any(getattr(current, key) != getattr(before, key) for key in immutable):
+            raise SystemExit("open semaphore changed outside transition lock")
+        os.replace(temp_path, path)
+        temp_path = ""
+        directory = os.open(os.path.dirname(path), os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        if mode == "close-stage":
+            print(close_attempt_id)
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+finally:
+    os.close(source)
+PY
+}
+
+_publish_open_no_clobber() { # <prepared temp file> <new .open path>
+  python3 - "$1" "$2" <<'PY'
+import os
+import stat
+import sys
+
+prepared, target = sys.argv[1:]
+source = os.open(prepared, os.O_RDONLY)
+try:
+    info = os.fstat(source)
+    named = os.lstat(prepared)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        or info.st_uid != os.getuid()
+        or info.st_nlink != 1
+        or stat.S_IMODE(info.st_mode) != 0o600
+        or os.path.dirname(prepared) != os.path.dirname(target)
+    ):
+        raise SystemExit("prepared semaphore is not trusted")
+    os.fsync(source)
+    os.link(prepared, target, follow_symlinks=False)
+    directory = os.open(os.path.dirname(target), os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+    os.unlink(prepared)
+    directory = os.open(os.path.dirname(target), os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+finally:
+    os.close(source)
+PY
+}
+
+_terminal_close_no_clobber() { # <open path> <agent> <session-id> <close-attempt-id>
+  python3 - "$1" "$2" "$3" "$4" <<'PY'
+import os
+import re
+import stat
+import sys
+import uuid
+
+source_path, expected_agent, expected_session, expected_attempt = sys.argv[1:]
+target_path = source_path + ".closed"
+flags = os.O_RDONLY
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+source = os.open(source_path, flags)
+try:
+    info = os.fstat(source)
+    named = os.lstat(source_path)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        or info.st_uid != os.getuid()
+        or info.st_nlink not in (1, 2)
+        or stat.S_IMODE(info.st_mode) & 0o022
+    ):
+        raise SystemExit("close source inode is not trusted")
+    content = b""
+    while True:
+        chunk = os.read(source, 1024 * 1024)
+        if not chunk:
+            break
+        content += chunk
+    lines = content.decode("utf-8").splitlines()
+    if [line[7:] for line in lines if line.startswith("agent: ")] != [expected_agent]:
+        raise SystemExit("close source agent identity changed")
+    if [line[12:] for line in lines if line.startswith("session_id: ")] != [expected_session]:
+        raise SystemExit("close source session identity changed")
+    close_keys = (
+        "close_protocol",
+        "close_attempt_id",
+        "close_destination",
+        "close_terminal_inode",
+        "closed_at",
+    )
+    fields = {}
+    for key in close_keys:
+        prefix = key + ": "
+        found = [line[len(prefix):] for line in lines if line.startswith(prefix)]
+        if len(found) != 1 or not found[0]:
+            raise SystemExit("close source has an incomplete durable receipt")
+        fields[key] = found[0]
+    if fields["close_protocol"] != "durable-v2":
+        raise SystemExit("close source has no durable-v2 staged receipt")
+    try:
+        attempt = uuid.UUID(fields["close_attempt_id"])
+    except (AttributeError, ValueError):
+        raise SystemExit("close source has a malformed attempt id")
+    if (
+        attempt.version != 4
+        or str(attempt) != fields["close_attempt_id"]
+        or fields["close_attempt_id"] != expected_attempt
+    ):
+        raise SystemExit("close attempt does not match the staged receipt")
+    expected_destination = os.path.join(
+        os.path.realpath(os.path.dirname(source_path)),
+        os.path.basename(target_path),
+    )
+    if fields["close_destination"] != expected_destination:
+        raise SystemExit("close destination does not match the staged receipt")
+    expected_inode = "%d:%d" % (info.st_dev, info.st_ino)
+    if (
+        not re.fullmatch(r"[0-9]+:[0-9]+", fields["close_terminal_inode"])
+        or fields["close_terminal_inode"] != expected_inode
+    ):
+        raise SystemExit("close source inode does not match the staged receipt")
+
+    try:
+        terminal = os.lstat(target_path)
+    except FileNotFoundError:
+        os.link(source_path, target_path, follow_symlinks=False)
+        directory = os.open(os.path.dirname(source_path), os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        terminal = os.lstat(target_path)
+    if (
+        not stat.S_ISREG(terminal.st_mode)
+        or (terminal.st_dev, terminal.st_ino) != (info.st_dev, info.st_ino)
+    ):
+        raise SystemExit("close destination already exists with different content")
+    current = os.lstat(source_path)
+    if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+        raise SystemExit("close source name changed before unlink")
+    os.unlink(source_path)
+    directory = os.open(os.path.dirname(source_path), os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+finally:
+    os.close(source)
+PY
+}
+
+_terminal_move_no_clobber() { # <source> <terminal destination>
+  python3 - "$1" "$2" <<'PY'
+import os
+import stat
+import sys
+
+source_path, target_path = sys.argv[1:]
+if os.path.dirname(source_path) != os.path.dirname(target_path):
+    raise SystemExit("terminal destination escaped semaphore directory")
+flags = os.O_RDONLY
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+source = os.open(source_path, flags)
+try:
+    info = os.fstat(source)
+    named = os.lstat(source_path)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        or info.st_uid != os.getuid()
+        or info.st_nlink not in (1, 2)
+        or stat.S_IMODE(info.st_mode) & 0o022
+    ):
+        raise SystemExit("terminal source inode is not trusted")
+    try:
+        terminal = os.lstat(target_path)
+    except FileNotFoundError:
+        os.link(source_path, target_path, follow_symlinks=False)
+        directory = os.open(os.path.dirname(source_path), os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        terminal = os.lstat(target_path)
+    if (
+        not stat.S_ISREG(terminal.st_mode)
+        or (terminal.st_dev, terminal.st_ino) != (info.st_dev, info.st_ino)
+    ):
+        raise SystemExit("terminal destination already belongs to another inode")
+    current = os.lstat(source_path)
+    if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+        raise SystemExit("terminal source name changed before unlink")
+    os.unlink(source_path)
+    directory = os.open(os.path.dirname(source_path), os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+finally:
+    os.close(source)
+PY
+}
+
+_closed_receipt_identity() { # <closed path> <agent> <session-id>
+  python3 - "$1" "$2" "$3" <<'PY'
+import os
+import re
+import stat
+import sys
+import uuid
+
+path, expected_agent, expected_session = sys.argv[1:]
+flags = os.O_RDONLY
+if hasattr(os, "O_NOFOLLOW"):
+    flags |= os.O_NOFOLLOW
+fd = os.open(path, flags)
+try:
+    info = os.fstat(fd)
+    named = os.lstat(path)
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or (info.st_dev, info.st_ino) != (named.st_dev, named.st_ino)
+        or info.st_uid != os.getuid()
+        or info.st_nlink != 1
+        or stat.S_IMODE(info.st_mode) & 0o022
+    ):
+        raise SystemExit(1)
+    content = b""
+    while True:
+        chunk = os.read(fd, 1024 * 1024)
+        if not chunk:
+            break
+        content += chunk
+finally:
+    os.close(fd)
+lines = content.decode("utf-8").splitlines()
+if [line[7:] for line in lines if line.startswith("agent: ")] != [expected_agent]:
+    raise SystemExit(1)
+if [line[12:] for line in lines if line.startswith("session_id: ")] != [expected_session]:
+    raise SystemExit(1)
+close_keys = (
+    "close_protocol",
+    "close_attempt_id",
+    "close_destination",
+    "close_terminal_inode",
+    "closed_at",
+)
+fields = {}
+for key in close_keys:
+    prefix = key + ": "
+    found = [line[len(prefix):] for line in lines if line.startswith(prefix)]
+    if len(found) != 1 or not found[0]:
+        raise SystemExit(1)
+    fields[key] = found[0]
+if fields["close_protocol"] != "durable-v2":
+    raise SystemExit(1)
+try:
+    attempt = uuid.UUID(fields["close_attempt_id"])
+except (AttributeError, ValueError):
+    raise SystemExit(1)
+if attempt.version != 4 or str(attempt) != fields["close_attempt_id"]:
+    raise SystemExit(1)
+expected_destination = os.path.join(
+    os.path.realpath(os.path.dirname(path)),
+    os.path.basename(path),
+)
+if fields["close_destination"] != expected_destination:
+    raise SystemExit(1)
+expected_inode = "%d:%d" % (info.st_dev, info.st_ino)
+if (
+    not re.fullmatch(r"[0-9]+:[0-9]+", fields["close_terminal_inode"])
+    or fields["close_terminal_inode"] != expected_inode
+):
+    raise SystemExit(1)
+PY
+}
 
 # yaml_task_line <value> -- render a "task: <value>" YAML line, quoting the
 # value only when PyYAML's own writer decides it needs quoting. session-guard
@@ -207,9 +857,13 @@ sweep_orphaned_semaphores() {
     pid=$(grep '^pid: ' "$semaphore" | head -1 | cut -d' ' -f2- || true)
     if [[ "$pid" =~ ^[0-9]+$ ]]; then
       if ! kill -0 "$pid" 2>/dev/null; then
-        mv "$semaphore" "${semaphore}.orphaned-dead-pid"
-        echo "WARNING: orphaned semaphore $(basename "$semaphore") quarantined: pid $pid is dead" >&2
-        quarantined=$((quarantined + 1))
+        if bash "$SESSION_GUARD_SELF" __quarantine-dead "$semaphore" "$pid" >/dev/null; then
+          echo "WARNING: orphaned semaphore $(basename "$semaphore") quarantined: pid $pid is dead" >&2
+          quarantined=$((quarantined + 1))
+        else
+          echo "WARNING: dead-pid semaphore $(basename "$semaphore") changed or could not be locked; kept for review" >&2
+          ambiguous=$((ambiguous + 1))
+        fi
       fi
       continue
     fi
@@ -327,6 +981,49 @@ select_semaphore() {
   return 2
 }
 
+resolve_semaphore_by_session_id() { # <agent> <session-id> [wp] [slug]
+  local agent="$1" session_id="$2" want_wp="${3:-}" want_slug="${4:-}"
+  local semaphore sem_wp sem_slug
+  _safe_session_token "$agent" || {
+    echo "небезопасный agent '$agent'" >&2
+    return 2
+  }
+  _safe_session_token "$session_id" || {
+    echo "небезопасный --session-id '$session_id'" >&2
+    return 2
+  }
+  semaphore="$SESSION_DIR/${agent}-${session_id}.open"
+  [ -f "$semaphore" ] || return 1
+  sem_wp=$(grep '^wp: ' "$semaphore" | cut -d' ' -f2- || true)
+  sem_slug=$(grep '^slug: ' "$semaphore" | cut -d' ' -f2- || true)
+  if [ -n "$want_wp" ] && [ "$sem_wp" != "$want_wp" ]; then
+    echo "--session-id $session_id указывает на wp='$sem_wp', а передан --wp='$want_wp'" >&2
+    return 2
+  fi
+  if [ -n "$want_slug" ] && [ "$sem_slug" != "$want_slug" ]; then
+    echo "--session-id $session_id указывает на slug='$sem_slug', а передан --slug='$want_slug'" >&2
+    return 2
+  fi
+  echo "$semaphore"
+}
+
+_owner_pid_is_live_ancestor() { # <pid>; call-shape guard, not authentication
+  local owner_pid="$1" current="$PPID" hops=0
+  [[ "$owner_pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  kill -0 "$owner_pid" 2>/dev/null || return 1
+  # Bash may tail-exec the final `bash session-guard.sh ...` in a wrapper; in
+  # that legitimate shape the wrapper's $$ becomes this process's $$ rather
+  # than appearing in the PPID chain.
+  [ "$owner_pid" = "$$" ] && return 0
+  while [[ "$current" =~ ^[1-9][0-9]*$ ]] && [ "$hops" -lt 16 ]; do
+    [ "$current" = "$owner_pid" ] && return 0
+    [ "$current" = "1" ] && break
+    current=$(ps -o ppid= -p "$current" 2>/dev/null | tr -d '[:space:]')
+    hops=$((hops + 1))
+  done
+  return 1
+}
+
 # --- parse args ---
 WP=""
 TASK=""
@@ -336,6 +1033,7 @@ AGENT="${IWE_AGENT:-}"
 HOUSEKEEPING=""
 PERSONALITY=""
 SESSION_ID_ARG=""
+OWNER_PID=""
 CLEANUP_ORPHANS=0
 FORCE_NO_REFLECTION=""
 CLOSE_PATH=""
@@ -350,6 +1048,7 @@ while [[ $# -gt 0 ]]; do
     --housekeeping) HOUSEKEEPING="$2"; shift 2 ;;
     --personality) PERSONALITY="$2"; shift 2 ;;
     --session-id) SESSION_ID_ARG="$2"; shift 2 ;;
+    --owner-pid) OWNER_PID="$2"; shift 2 ;;
     --since)  SINCE="$2"; shift 2 ;;
     --cleanup-orphans) CLEANUP_ORPHANS=1; shift ;;
     --force-no-reflection) FORCE_NO_REFLECTION="$2"; shift 2 ;;
@@ -365,8 +1064,44 @@ if [ -z "$AGENT" ] && { [ "$CMD" = "open" ] || [ "$CMD" = "close" ]; }; then
   fail "--agent обязателен для open/close (или переменная IWE_AGENT)" 1
 fi
 
+# Internal one-semaphore sweep worker.  Running it as a child lets every
+# candidate use the same exec-held per-session lock without nesting locks for
+# unrelated sessions in the parent audit process.
+if [ "$CMD" = "__quarantine-dead" ]; then
+  [ "${#POSITIONAL[@]}" -eq 2 ] || fail "internal quarantine: expected semaphore and pid" 1
+  QUARANTINE_SEM=$(_canonical_session_path "${POSITIONAL[0]}") \
+    || fail "internal quarantine: path outside session directory" 1
+  QUARANTINE_PID="${POSITIONAL[1]}"
+  [[ "$QUARANTINE_PID" =~ ^[1-9][0-9]*$ ]] || fail "internal quarantine: invalid pid" 1
+  [ -f "$QUARANTINE_SEM" ] || fail "internal quarantine: open semaphore disappeared" 1
+  QUARANTINE_AGENT=$(grep '^agent: ' "$QUARANTINE_SEM" | cut -d' ' -f2- || true)
+  QUARANTINE_SESSION=$(grep '^session_id: ' "$QUARANTINE_SEM" | cut -d' ' -f2- || true)
+  _safe_session_token "$QUARANTINE_AGENT" || fail "internal quarantine: invalid agent identity" 1
+  _safe_session_token "$QUARANTINE_SESSION" || fail "internal quarantine: no exact session identity" 1
+  _ensure_session_transition_lock "$QUARANTINE_SEM" "$QUARANTINE_SESSION"
+  _locked_open_identity "$QUARANTINE_SEM" "$QUARANTINE_AGENT" "$QUARANTINE_SESSION" 0 \
+    || fail "internal quarantine: identity changed or close already staged" 1
+  [ "$(grep '^pid: ' "$QUARANTINE_SEM" | head -1 | cut -d' ' -f2- || true)" = "$QUARANTINE_PID" ] \
+    || fail "internal quarantine: owner pid changed" 1
+  ! kill -0 "$QUARANTINE_PID" 2>/dev/null \
+    || fail "internal quarantine: owner pid is alive again" 1
+  _terminal_move_no_clobber "$QUARANTINE_SEM" "${QUARANTINE_SEM}.orphaned-dead-pid" \
+    || fail "internal quarantine: terminal destination collision" 1
+  rm -f "${QUARANTINE_SEM}.lease"
+  exit 0
+fi
+
 # --- OPEN ---
 if [ "$CMD" = "open" ]; then
+  [ "${#POSITIONAL[@]}" -eq 0 ] || fail "open не принимает позиционные аргументы" 1
+  _safe_session_token "$AGENT" || fail "open: небезопасный --agent '$AGENT'" 1
+  if [ -n "$SESSION_ID_ARG" ]; then
+    _safe_session_token "$SESSION_ID_ARG" || fail "open: небезопасный --session-id '$SESSION_ID_ARG'" 1
+  fi
+  if [ -n "$OWNER_PID" ]; then
+    [[ "$OWNER_PID" =~ ^[1-9][0-9]*$ ]] || fail "open: --owner-pid должен быть положительным PID" 1
+    kill -0 "$OWNER_PID" 2>/dev/null || fail "open: --owner-pid $OWNER_PID не существует" 1
+  fi
   # WP-510 Патч 4: personality — маршрутизирующая метка "какая ИИ-личность вела
   # сессию", не допуск к памяти (PIPE-14 решает перенос отдельно). Пустой флаг =
   # unassigned — тот же итог, что и явный `--personality unassigned`, разница
@@ -378,7 +1113,11 @@ if [ "$CMD" = "open" ]; then
 
   if [ -n "$HOUSEKEEPING" ]; then
     # Housekeeping session: no ORZ, no WP, one semaphore per (agent, reason).
+    _safe_session_token "$HOUSEKEEPING" || fail "open --housekeeping: причина должна быть безопасным slug" 1
     HK_FILE="$SESSION_DIR/${AGENT}-housekeeping-${HOUSEKEEPING}.open"
+    HK_SESSION_ID="housekeeping-${HOUSEKEEPING}"
+    _safe_session_token "$HK_SESSION_ID" || fail "open --housekeeping: идентификатор слишком длинный" 1
+    _ensure_session_transition_lock "$HK_FILE" "$HK_SESSION_ID"
     HK_MAX_AGE=1800  # 30 minutes default TTL for housekeeping semaphores
     NOW_EPOCH=$(date +%s)
     if [ -f "$HK_FILE" ]; then
@@ -388,7 +1127,8 @@ if [ "$CMD" = "open" ]; then
         if [ -n "$HK_CREATED_EPOCH" ]; then
           HK_AGE=$(( NOW_EPOCH - HK_CREATED_EPOCH ))
           if [ "$HK_AGE" -gt "$HK_MAX_AGE" ]; then
-            mv "$HK_FILE" "${HK_FILE}.stale"
+            _terminal_move_no_clobber "$HK_FILE" "${HK_FILE}.stale" \
+              || fail "open --housekeeping: .stale destination collision; существующий open сохранён" 1
             rm -f "${HK_FILE}.lease"
             echo "WARNING: housekeeping semaphore '${HOUSEKEEPING}' stale (${HK_AGE}s), renamed to .stale" >&2
           else
@@ -397,6 +1137,8 @@ if [ "$CMD" = "open" ]; then
         fi
       fi
     fi
+    HK_TMP=$(mktemp "$SESSION_DIR/.session-open.XXXXXX")
+    chmod 600 "$HK_TMP"
     {
       echo "---"
       echo "agent: $AGENT"
@@ -420,6 +1162,7 @@ if [ "$CMD" = "open" ]; then
       # lines. Without this, 2+ open housekeeping semaphores are permanently
       # ambiguous for note-file/close — --slug has nothing to match against.
       echo "slug: $HOUSEKEEPING"
+      echo "session_id: $HK_SESSION_ID"
       echo "created_at: $(now_iso)"
       # $$ here is session-guard.sh's own transient process — already dead by
       # the time anyone checks it (verified live 08.08: recorded pid was dead
@@ -427,9 +1170,11 @@ if [ "$CMD" = "open" ]; then
       # Code process that stays alive for the whole session; other agents keep
       # today's behavior (transient $$, harmless — dead-pid check just never
       # fires for them, same as before this fix).
-      echo "pid: ${CLAUDE_PID:-$$}"
+      echo "pid: ${OWNER_PID:-${CLAUDE_PID:-$$}}"
       echo "---"
-    } > "$HK_FILE"
+    } > "$HK_TMP"
+    _publish_open_no_clobber "$HK_TMP" "$HK_FILE" \
+      || { rm -f "$HK_TMP"; fail "open --housekeeping: семафор появился параллельно; существующий файл не изменён" 1; }
     echo "Housekeeping OPEN: $HK_FILE (reason: $HOUSEKEEPING)"
     exit 0
   fi
@@ -515,8 +1260,17 @@ if [ "$CMD" = "open" ]; then
     fi
   done < <(ls -t "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null || true)
 
-  SESSION_ID="${IWE_SESSION_ID:-$(date +%s)}"
+  SESSION_ID="${SESSION_ID_ARG:-${IWE_SESSION_LOCKED_SESSION_ID:-${IWE_SESSION_ID:-$(date +%s)-$$-$RANDOM}}}"
+  _safe_session_token "$SESSION_ID" || fail "open: небезопасный session_id '$SESSION_ID'" 1
   SEM_FILE="$SESSION_DIR/${AGENT}-${SESSION_ID}.open"
+  _ensure_session_transition_lock "$SEM_FILE" "$SESSION_ID"
+  if [ -e "$SEM_FILE" ] || [ -L "$SEM_FILE" ]; then
+    fail "open: exact session_id '$SESSION_ID' уже открыт; существующий семафор не изменён" 1
+  fi
+  if find "$SESSION_DIR" -maxdepth 1 \( -type f -o -type l \) \
+      -name "$(basename "$SEM_FILE").*" -print -quit 2>/dev/null | grep -q .; then
+    fail "open: для exact session_id '$SESSION_ID' уже есть terminal/lease state; выбери новый идентификатор" 1
+  fi
   # WP-484 (31.07, data-pipeline-audit-2026-07-30.md §3.3): a caller-supplied slug
   # sometimes already carries today's date (Kimi free-text `--slug`, human habit) —
   # confirmed live on real files, e.g. sessions/2026-07/2026-07-31-2026-07-31-wp510-*.md.
@@ -531,6 +1285,8 @@ if [ "$CMD" = "open" ]; then
   ORZ_DIR="$(resolve_orz_sessions_dir)"
   ORZ_FILE="$ORZ_DIR/$ORZ_BASENAME"
   mkdir -p "$(dirname "$ORZ_FILE")"
+  SEM_TMP=$(mktemp "$SESSION_DIR/.session-open.XXXXXX")
+  chmod 600 "$SEM_TMP"
   {
     echo "---"
     echo "agent: $AGENT"
@@ -554,7 +1310,11 @@ if [ "$CMD" = "open" ]; then
     # this script returns (verified live: recorded pid was dead within the
     # same second). Other agents get no pid line, same as before this fix —
     # strictly not worse, dead-pid check simply still can't fire for them.
-    [ -n "${CLAUDE_PID:-}" ] && echo "pid: $CLAUDE_PID"
+    if [ -n "$OWNER_PID" ]; then
+      echo "pid: $OWNER_PID"
+    elif [ -n "${CLAUDE_PID:-}" ]; then
+      echo "pid: $CLAUDE_PID"
+    fi
     echo "---"
     # initial --files CSV → append-log entries (git-root-relative expected from caller)
     if [ -n "${FILES:-}" ]; then
@@ -574,7 +1334,9 @@ if [ "$CMD" = "open" ]; then
     # $ORZ_DIR's PARENT (governance-repo root — sessions/<...>), same convention
     # every other `file:` line already uses.
     echo "file: $(basename "$ORZ_DIR")/$ORZ_BASENAME"
-  } > "$SEM_FILE"
+  } > "$SEM_TMP"
+  _publish_open_no_clobber "$SEM_TMP" "$SEM_FILE" \
+    || { rm -f "$SEM_TMP"; fail "open: exact session_id '$SESSION_ID' появился параллельно; существующий файл не изменён" 1; }
   # Pointer to active semaphore for PostToolUse hooks
   PTR_FILE="$SESSION_DIR/current-${AGENT}.ptr"
   echo "$SEM_FILE" > "$PTR_FILE"
@@ -617,6 +1379,43 @@ EOF
       "$AGENT" working "${WP}: ${TASK:-standalone}" "${FILES:-}" 2>/dev/null || true
   fi
   echo "Session OPEN: $SEM_FILE (WP: $WP, agent: $AGENT, slug: ${SLUG:-$WP})"
+  exit 0
+fi
+
+# --- HEARTBEAT ---
+# Exact-id only and no shell redirection: a delayed heartbeat can neither jump
+# to a newer pointer nor recreate `.open` after close.  The caller PID must be
+# a live ancestor of this guard process, which catches stale/replayed command
+# shapes without pretending that a PID is an authentication credential.
+if [ "$CMD" = "heartbeat" ]; then
+  [ -n "$AGENT" ] || fail "heartbeat требует --agent" 1
+  _safe_session_token "$AGENT" || fail "heartbeat: небезопасный --agent '$AGENT'" 1
+  [ -n "$SESSION_ID_ARG" ] || fail "heartbeat требует --session-id" 1
+  _safe_session_token "$SESSION_ID_ARG" || fail "heartbeat: небезопасный --session-id '$SESSION_ID_ARG'" 1
+  if [ -n "${IWE_SESSION_TRANSITION_FD:-}" ]; then
+    [ "${IWE_HEARTBEAT_OWNER_VALIDATED:-}" = "$OWNER_PID" ] \
+      || fail "heartbeat: owner proof не пережил lock re-entry" 1
+  else
+    _owner_pid_is_live_ancestor "$OWNER_PID" \
+      || fail "heartbeat: --owner-pid должен быть живым процессом-предком" 1
+    # The Python lock wrapper adds one process hop before exec. Preserve the
+    # already-checked call shape across that re-entry rather than depending on
+    # `ps`, which is unavailable in some sandboxed installations.
+    export IWE_HEARTBEAT_OWNER_VALIDATED="$OWNER_PID"
+  fi
+  [ "${#POSITIONAL[@]}" -eq 0 ] || fail "heartbeat не принимает позиционные аргументы" 1
+  [ -z "$WP$TASK$FILES$SLUG$HOUSEKEEPING$PERSONALITY$FORCE_NO_REFLECTION$CLOSE_PATH" ] \
+    || fail "heartbeat принимает только --agent/--session-id/--owner-pid" 1
+
+  SEM_FILE="$SESSION_DIR/${AGENT}-${SESSION_ID_ARG}.open"
+  [ -f "$SEM_FILE" ] || fail "heartbeat: exact сессия ${AGENT}-${SESSION_ID_ARG} не открыта" 3
+  _ensure_session_transition_lock "$SEM_FILE" "$SESSION_ID_ARG"
+  _locked_open_identity "$SEM_FILE" "$AGENT" "$SESSION_ID_ARG" 0 \
+    || fail "heartbeat: open-семафор не прошёл exact identity/no-terminal проверку" 1
+  _atomic_append_open "$SEM_FILE" "$AGENT" "$SESSION_ID_ARG" heartbeat \
+    "heartbeat_at: $(now_iso)" "heartbeat_pid: $OWNER_PID" \
+    || fail "heartbeat: атомарная запись отклонена; сессия могла начать close" 1
+  echo "Heartbeat: ${AGENT}-${SESSION_ID_ARG}"
   exit 0
 fi
 
@@ -741,22 +1540,77 @@ validate_orz() { # <orz-path> <agent> [orz-base-dir, default $ORZ_DIR] [tracked-
 
 # --- CLOSE ---
 if [ "$CMD" = "close" ]; then
+  [ "${#POSITIONAL[@]}" -eq 0 ] || fail "close не принимает позиционные аргументы" 1
+  _safe_session_token "$AGENT" || fail "close: небезопасный --agent '$AGENT'" 1
   if [ -n "$HOUSEKEEPING" ]; then
+    _safe_session_token "$HOUSEKEEPING" || fail "close --housekeeping: причина должна быть безопасным slug" 1
     HK_FILE="$SESSION_DIR/${AGENT}-housekeeping-${HOUSEKEEPING}.open"
+    HK_SESSION_ID="housekeeping-${HOUSEKEEPING}"
     if [ ! -f "$HK_FILE" ]; then
       fail "close --housekeeping: нет активной housekeeping-сессии '${HOUSEKEEPING}' для $AGENT" 3
     fi
-    mv "$HK_FILE" "${HK_FILE}.closed" 2>/dev/null || rm -f "$HK_FILE"
+    _ensure_session_transition_lock "$HK_FILE" "$HK_SESSION_ID"
+    _locked_open_identity "$HK_FILE" "$AGENT" "$HK_SESSION_ID" 1 \
+      || fail "close --housekeeping: exact identity/terminal state не прошли проверку" 1
+    HK_CLOSE_ATTEMPT=$(_atomic_append_open "$HK_FILE" "$AGENT" "$HK_SESSION_ID" \
+      close-stage "$(now_iso)") \
+      || fail "close --housekeeping: не удалось подготовить durable receipt" 1
+    [ -n "$HK_CLOSE_ATTEMPT" ] \
+      || fail "close --housekeeping: durable receipt не вернул attempt id" 1
+    _terminal_close_no_clobber "$HK_FILE" "$AGENT" "$HK_SESSION_ID" "$HK_CLOSE_ATTEMPT" \
+      || fail "close --housekeeping: terminal destination занят другим inode; open сохранён" 1
     rm -f "${HK_FILE}.lease"
     echo "Housekeeping CLOSE: ${HOUSEKEEPING} ✅"
     exit 0
   fi
 
-  SEM_FILE=$(select_semaphore "$AGENT" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+  if [ -n "$SESSION_ID_ARG" ]; then
+    _safe_session_token "$SESSION_ID_ARG" || fail "close: небезопасный --session-id '$SESSION_ID_ARG'" 1
+    EXACT_OPEN="$SESSION_DIR/${AGENT}-${SESSION_ID_ARG}.open"
+    EXACT_CLOSED="$EXACT_OPEN.closed"
+    if [ ! -e "$EXACT_OPEN" ] && [ -f "$EXACT_CLOSED" ]; then
+      _ensure_session_transition_lock "$EXACT_OPEN" "$SESSION_ID_ARG"
+      _closed_receipt_identity "$EXACT_CLOSED" "$AGENT" "$SESSION_ID_ARG" \
+        || fail "close: existing .closed не является доверенным durable receipt этой exact сессии" 1
+      CLOSED_WP=$(grep '^wp: ' "$EXACT_CLOSED" | cut -d' ' -f2- || true)
+      CLOSED_SLUG=$(grep '^slug: ' "$EXACT_CLOSED" | cut -d' ' -f2- || true)
+      [ -z "$WP" ] || [ "$WP" = "$CLOSED_WP" ] \
+        || fail "close: durable receipt относится к wp='$CLOSED_WP', а передан --wp='$WP'" 1
+      [ -z "$SLUG" ] || [ "$SLUG" = "$CLOSED_SLUG" ] \
+        || fail "close: durable receipt относится к slug='$CLOSED_SLUG', а передан --slug='$SLUG'" 1
+      rm -f "$EXACT_OPEN.lease"
+      PTR_FILE="$SESSION_DIR/current-${AGENT}.ptr"
+      if [ -f "$PTR_FILE" ] && [ "$(cat "$PTR_FILE" 2>/dev/null || true)" = "$EXACT_OPEN" ]; then
+        rm -f "$PTR_FILE"
+      fi
+      CLOSED_PERSONALITY=$(grep '^personality: ' "$EXACT_CLOSED" | cut -d' ' -f2- || true)
+      CLOSED_PERSONALITY="${CLOSED_PERSONALITY:-unassigned}"
+      if [ -x "$AGENT_STATUS_SCRIPT" ]; then
+        "$AGENT_STATUS_SCRIPT" --session-id "$SESSION_ID_ARG" --personality "$CLOSED_PERSONALITY" \
+          "$AGENT" idle "" "" 2>/dev/null || true
+      fi
+      echo "Session CLOSE: ${CLOSED_WP:-unknown} — durable receipt уже terminal; проекции сверены ✅"
+      exit 0
+    fi
+  fi
+
+  if [ -n "$SESSION_ID_ARG" ]; then
+    SEM_FILE=$(resolve_semaphore_by_session_id "$AGENT" "$SESSION_ID_ARG" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+  else
+    SEM_FILE=$(select_semaphore "$AGENT" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+  fi
   [ "$SG_RC" -eq 2 ] && exit 3
   if [ "$SG_RC" -ne 0 ] || [ -z "$SEM_FILE" ] || [ ! -f "$SEM_FILE" ]; then
     fail "close без open: семафор не найден для $AGENT. Сначала session-guard.sh open --wp WP-N" 3
   fi
+  SESSION_ID_FROM_NAME="${SEM_FILE#"$SESSION_DIR/${AGENT}-"}"
+  SESSION_ID_FROM_NAME="${SESSION_ID_FROM_NAME%.open}"
+  _safe_session_token "$SESSION_ID_FROM_NAME" \
+    || fail "close: имя семафора не содержит безопасный exact session_id" 1
+  _ensure_session_transition_lock "$SEM_FILE" "$SESSION_ID_FROM_NAME"
+  _locked_open_identity "$SEM_FILE" "$AGENT" "$SESSION_ID_FROM_NAME" 1 \
+    || fail "close: open-семафор не прошёл exact identity/no-clobber проверку" 1
+
   WP_FROM_SEM=$(grep "^wp: " "$SEM_FILE" | cut -d' ' -f2- || true)
   WP="${WP:-$WP_FROM_SEM}"
   SLUG_FROM_SEM=$(grep "^slug: " "$SEM_FILE" | cut -d' ' -f2- || true)
@@ -764,6 +1618,8 @@ if [ "$CMD" = "close" ]; then
   TASK_FROM_SEM=$(grep "^task: " "$SEM_FILE" | cut -d' ' -f2- || true)
   TASK="${TASK:-$TASK_FROM_SEM}"
   SESSION_ID=$(grep "^session_id: " "$SEM_FILE" | cut -d' ' -f2- || echo "unknown")
+  [ "$SESSION_ID" = "$SESSION_ID_FROM_NAME" ] \
+    || fail "close: session_id внутри семафора не совпадает с exact именем" 1
   PERSONALITY_FROM_SEM=$(grep "^personality: " "$SEM_FILE" | cut -d' ' -f2- || true)
   PERSONALITY_FROM_SEM="${PERSONALITY_FROM_SEM:-unassigned}"
 
@@ -855,8 +1711,7 @@ if [ "$CMD" = "close" ]; then
 import json, sys
 print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], "card": sys.argv[4], "reason": sys.argv[5]}))
 ' "$WP" "$SLUG" "$AGENT" "$FORCED_CARD" "$FORCE_NO_REFLECTION")
-    bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" session_closed_no_reflection "$FORCE_EVENT" session-guard
-    echo "force-no-reflection: закрываю без рефлексии ($FORCED_CARD) — причина записана в ledger" >&2
+    echo "force-no-reflection: доказательство принято ($FORCED_CARD); ledger будет обновлён после terminal transition" >&2
   fi
 
   if [ -z "$RUNNER_OK" ]; then
@@ -864,16 +1719,44 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
   fi
   fi
 
-  # agent status idle
+  # agent status idle boundary for T22; the projection remains after the terminal receipt below.
+  # Authoritative transition first.  A complete, fsync'd `.closed` receipt is
+  # published with hard-link no-clobber semantics before status, pointer,
+  # lease, warnings or ledger projections.  If the process dies between link
+  # and unlink, retry recognizes the same inode and completes the unlink.
+  CLOSE_ATTEMPT=$(_atomic_append_open "$SEM_FILE" "$AGENT" "$SESSION_ID" \
+    close-stage "$(now_iso)") \
+    || fail "close: не удалось подготовить durable receipt; open сохранён" 1
+  [ -n "$CLOSE_ATTEMPT" ] \
+    || fail "close: durable receipt не вернул attempt id; open сохранён" 1
+  _terminal_close_no_clobber "$SEM_FILE" "$AGENT" "$SESSION_ID" "$CLOSE_ATTEMPT" \
+    || fail "close: terminal destination занят другим inode; open не удалён" 1
+  _sem_read="$SEM_FILE.closed"
+
+  rm -f "$SEM_FILE.lease"
+  # Remove only this session's pointer. A newer same-agent open must not lose
+  # its pointer merely because an older close reached its projection phase.
+  PTR_FILE="$SESSION_DIR/current-${AGENT}.ptr"
+  if [ -f "$PTR_FILE" ] && [ "$(cat "$PTR_FILE" 2>/dev/null || true)" = "$SEM_FILE" ]; then
+    rm -f "$PTR_FILE"
+  fi
+
+  # agent status idle (projection, deliberately after terminal receipt)
   if [ -x "$AGENT_STATUS_SCRIPT" ]; then
     "$AGENT_STATUS_SCRIPT" --session-id "$SESSION_ID" --personality "$PERSONALITY_FROM_SEM" \
       "$AGENT" idle "" "" 2>/dev/null || true
   fi
-  mv "$SEM_FILE" "$SEM_FILE.closed" 2>/dev/null || rm -f "$SEM_FILE"
-  rm -f "$SEM_FILE.lease"
-  # Remove agent pointer
-  rm -f "$SESSION_DIR/current-${AGENT}.ptr"
   echo "Session CLOSE: $WP → $ORZ_FILE ✅"
+
+  if [ -n "${FORCE_EVENT:-}" ]; then
+    if [ -f "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" ]; then
+      bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" \
+        session_closed_no_reflection "$FORCE_EVENT" session-guard >/dev/null 2>&1 \
+        || echo "  ⚠️  ledger session_closed_no_reflection не записан (terminal receipt уже durable)" >&2
+    else
+      echo "  ⚠️  ledger-append.sh отсутствует; причина force-close сохранена только вызывающей стороной" >&2
+    fi
+  fi
 
   # Warn if local commits are not pushed in repos touched by this session
   _warn_unpushed() {
@@ -887,10 +1770,7 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
   # Always check the ORZ repo (governance repo, $GOV_REPO)
   _warn_unpushed "$ORZ_DIR"
   # Also check repos inferred from file: entries in the semaphore
-  # Семафор к этому моменту уже переименован в .closed (выше) — читаем его;
-  # fallback на исходное имя, если mv не сработал и файл был удалён.
-  _sem_read="$SEM_FILE.closed"
-  [ -f "$_sem_read" ] || _sem_read="$SEM_FILE"
+  # Семафор к этому моменту уже опубликован как durable .closed receipt.
   _seen_repos="$ORZ_DIR"
   while IFS= read -r _line; do
     [[ "$_line" =~ ^file:\ (.*) ]] || continue
@@ -929,15 +1809,28 @@ fi
 if [ "$CMD" = "note-file" ]; then
   FILE_PATH="${POSITIONAL[0]:-}"
   [ -z "$FILE_PATH" ] && fail "note-file: missing path argument" 1
+  [ "${#POSITIONAL[@]}" -eq 1 ] || fail "note-file: ожидается ровно один path argument" 1
   NOTE_AGENT="${AGENT:-${IWE_AGENT:-claude-code}}"
+  _safe_session_token "$NOTE_AGENT" || fail "note-file: небезопасный --agent '$NOTE_AGENT'" 1
   # WP-464: resolve via select_semaphore, not the singleton current-<agent>.ptr —
   # the ptr gets clobbered by a second concurrent `open` of the same agent
   # (bug-2026-07-04-ptr-collision), silently writing scope into the wrong session.
-  SEM_FILE=$(select_semaphore "$NOTE_AGENT" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+  if [ -n "$SESSION_ID_ARG" ]; then
+    SEM_FILE=$(resolve_semaphore_by_session_id "$NOTE_AGENT" "$SESSION_ID_ARG" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+  else
+    SEM_FILE=$(select_semaphore "$NOTE_AGENT" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+  fi
   [ "$SG_RC" -eq 2 ] && exit 1
   if [ "$SG_RC" -ne 0 ] || [ -z "$SEM_FILE" ] || [ ! -f "$SEM_FILE" ]; then
     fail "note-file: нет открытой сессии для агента '$NOTE_AGENT'. Для разовой операции открой housekeeping-сессию:\n  session-guard.sh open --housekeeping note-file --agent $NOTE_AGENT\n  session-guard.sh note-file <path> --agent $NOTE_AGENT\n  session-guard.sh close --housekeeping note-file --agent $NOTE_AGENT" 1
   fi
+  NOTE_SESSION_ID="${SEM_FILE#"$SESSION_DIR/${NOTE_AGENT}-"}"
+  NOTE_SESSION_ID="${NOTE_SESSION_ID%.open}"
+  _safe_session_token "$NOTE_SESSION_ID" \
+    || fail "note-file: имя семафора не содержит безопасный exact session_id" 1
+  _ensure_session_transition_lock "$SEM_FILE" "$NOTE_SESSION_ID"
+  _locked_open_identity "$SEM_FILE" "$NOTE_AGENT" "$NOTE_SESSION_ID" 0 \
+    || fail "note-file: open-семафор не прошёл exact identity/no-terminal проверку" 1
   # Normalize to git-root-relative (resolve symlinks/macOS /tmp vs /private/tmp)
   if [ -f "$FILE_PATH" ] || [ -d "$FILE_PATH" ]; then
     REPO_ROOT=$(git -C "$(dirname "$FILE_PATH")" rev-parse --show-toplevel 2>/dev/null || true)
@@ -955,6 +1848,9 @@ print(os.path.relpath(f, r))
     REL_PATH="$FILE_PATH"
   fi
   [ -n "$REL_PATH" ] || fail "note-file: cannot determine relative path for '$FILE_PATH'" 1
+  case "$REL_PATH" in
+    *$'\n'*|*$'\r'*) fail "note-file: путь с переводом строки запрещён" 1 ;;
+  esac
   # A noted path only protects a commit if it byte-matches what `git diff --cached`
   # reports later (repo-relative, no repo-name prefix). A repo-name-prefixed path
   # silently recorded here is bug-2026-07-31-runner-commit-push-stale-retry (gate
@@ -992,11 +1888,8 @@ print(os.path.relpath(f, r))
       *) REL_PATH="${REL_PATH}/" ;;
     esac
   fi
-  # Avoid duplicate consecutive entries
-  LAST=$(tail -1 "$SEM_FILE" 2>/dev/null || true)
-  if [ "$LAST" != "file: $REL_PATH" ]; then
-    echo "file: $REL_PATH" >> "$SEM_FILE"
-  fi
+  _atomic_append_open "$SEM_FILE" "$NOTE_AGENT" "$NOTE_SESSION_ID" note "file: $REL_PATH" \
+    || fail "note-file: атомарная запись отклонена; сессия могла начать close" 1
   echo "Noted in scope: $REL_PATH"
   exit 0
 fi
@@ -1082,10 +1975,13 @@ fi
 # с конкретным семафором через имя файла аренды, чтобы активность одной сессии
 # не продлевала соседнюю.
 if [ "$CMD" = "renew" ]; then
+  [ "${#POSITIONAL[@]}" -eq 0 ] || fail "renew не принимает позиционные аргументы" 1
   RENEW_AGENT="${AGENT:-${IWE_AGENT:-claude-code}}"
+  _safe_session_token "$RENEW_AGENT" || fail "renew: небезопасный --agent '$RENEW_AGENT'" 1
   if [ -n "$SESSION_ID_ARG" ]; then
-    SEM_FILE="$SESSION_DIR/${RENEW_AGENT}-${SESSION_ID_ARG}.open"
-    [ -f "$SEM_FILE" ] || fail "renew: нет открытой сессии ${RENEW_AGENT}-${SESSION_ID_ARG}" 3
+    SEM_FILE=$(resolve_semaphore_by_session_id "$RENEW_AGENT" "$SESSION_ID_ARG" "${WP:-}" "${SLUG:-}") && SG_RC=0 || SG_RC=$?
+    [ "$SG_RC" -eq 2 ] && exit 1
+    [ "$SG_RC" -eq 0 ] || fail "renew: нет открытой сессии ${RENEW_AGENT}-${SESSION_ID_ARG}" 3
   else
     # Отказ при неоднозначности теперь живёт в самом select_semaphore (та же
     # находка Codex касалась и close/note-file), поэтому renew не держит своей
@@ -1096,12 +1992,19 @@ if [ "$CMD" = "renew" ]; then
       fail "renew: нет открытой сессии для агента '$RENEW_AGENT' (уточни --wp/--slug/--session-id)" 3
     fi
   fi
-  RENEW_SESSION_ID=$(grep "^session_id: " "$SEM_FILE" | cut -d' ' -f2- || echo "unknown")
+  RENEW_SESSION_ID="${SEM_FILE#"$SESSION_DIR/${RENEW_AGENT}-"}"
+  RENEW_SESSION_ID="${RENEW_SESSION_ID%.open}"
+  _safe_session_token "$RENEW_SESSION_ID" \
+    || fail "renew: имя семафора не содержит безопасный exact session_id" 1
+  _ensure_session_transition_lock "$SEM_FILE" "$RENEW_SESSION_ID"
+  _locked_open_identity "$SEM_FILE" "$RENEW_AGENT" "$RENEW_SESSION_ID" 0 \
+    || fail "renew: open-семафор не прошёл exact identity/no-terminal проверку" 1
   LEASE_TMP="${SEM_FILE}.lease.tmp.$$"
   {
     echo "renewed_at: $(now_iso)"
     echo "session_id: $RENEW_SESSION_ID"
   } > "$LEASE_TMP"
+  chmod 600 "$LEASE_TMP"
   # Параллельный close мог переименовать семафор, пока мы собирали аренду —
   # тогда публикация создала бы осиротевший .lease и отрапортовала о продлении
   # уже закрытой сессии (Codex, холодное ревью 04.08).
@@ -1236,6 +2139,14 @@ if [ "$CMD" = "recover-orphaned" ]; then
     *.orphaned-*) : ;;
     *) fail "recover-orphaned: '$(basename "$CANON_FILE")' не похож на карантинный семафор (ожидается суффикс .orphaned-*)" 1 ;;
   esac
+  REC_OPEN_KEY="${CANON_FILE%%.orphaned-*}"
+  case "$REC_OPEN_KEY" in
+    *.open) : ;;
+    *) fail "recover-orphaned: не удалось восстановить canonical .open key" 1 ;;
+  esac
+  _ensure_session_transition_lock "$REC_OPEN_KEY" ""
+  [ -f "$CANON_FILE" ] || fail "recover-orphaned: карантинный файл исчез под lock" 1
+  ORPHAN_FILE="$CANON_FILE"
   grep -qE '^(agent|opened_at|session_id): ' "$ORPHAN_FILE" || \
     fail "recover-orphaned: '$(basename "$CANON_FILE")' не похож на семафор session-guard (нет полей agent:/opened_at:/session_id:)" 1
 
@@ -1256,12 +2167,18 @@ print(json.dumps({
 }))
 ' "$REC_PATH" "$REASON" "${REC_WP:-}" "${REC_SLUG:-}" "$REC_SID")
 
-  # mv ДО ledger-append (не наоборот, review post-consensus Codex): если mv
-  # упадёт — ничего не залогировано, retry безопасен. Если бы ledger писался
-  # первым и упал mv — retry на уже-переименованном файле молча дал бы
-  # дубликат события; здесь повтор просто упрётся в проверку *.recovered выше.
-  mv "$ORPHAN_FILE" "${ORPHAN_FILE}.recovered"
-  bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" session_recovered_closed "$EVENT_JSON" session-guard
+  # Terminal state is published first with no-clobber + directory fsync.
+  # Ledger is a projection: its outage cannot roll terminal state back or
+  # justify recreating the quarantine source on retry.
+  _terminal_move_no_clobber "$ORPHAN_FILE" "${ORPHAN_FILE}.recovered" \
+    || fail "recover-orphaned: destination .recovered уже принадлежит другому inode" 1
+  if [ -f "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" ]; then
+    bash "$IWE_ROOT/$GOV_REPO/scripts/ledger-append.sh" day "$(now_date)" \
+      session_recovered_closed "$EVENT_JSON" session-guard >/dev/null 2>&1 \
+      || echo "  ⚠️  ledger session_recovered_closed не записан (terminal state уже durable)" >&2
+  else
+    echo "  ⚠️  ledger-append.sh отсутствует (terminal state уже durable)" >&2
+  fi
 
   echo "Recovered: $(basename "$ORPHAN_FILE") — файл помечен .recovered, session_recovered_closed записан в ledger ($REC_PATH, wp=${REC_WP:-unknown}, session_id=$REC_SID). Исходный карантинный файл НЕ возвращён в .open — это честная терминальная запись, не имитация штатного закрытия."
   exit 0
@@ -1436,4 +2353,4 @@ EOF
   exit 0
 fi
 
-fail "Unknown command: $CMD (use: open, close, audit, renew, note-file, recover-orphaned, pre-commit-check)"
+fail "Unknown command: $CMD (use: open, close, audit, renew, heartbeat, note-file, recover-orphaned, pre-commit-check)"
