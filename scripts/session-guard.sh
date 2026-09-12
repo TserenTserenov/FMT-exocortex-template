@@ -1719,6 +1719,7 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
   fi
   fi
 
+  # agent status idle boundary for T22; the projection remains after the terminal receipt below.
   # Authoritative transition first.  A complete, fsync'd `.closed` receipt is
   # published with hard-link no-clobber semantics before status, pointer,
   # lease, warnings or ledger projections.  If the process dies between link
