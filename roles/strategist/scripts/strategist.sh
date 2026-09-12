@@ -290,8 +290,20 @@ ${prompt}"
     if git -C "$WORKSPACE" diff --quiet origin/main..HEAD 2>/dev/null; then
         log "No unpushed commits"
     else
-        git -C "$WORKSPACE" pull --rebase >> "$LOG_FILE" 2>&1 && log "Pulled (rebase)" || log "WARN: pull --rebase failed"
-        git -C "$WORKSPACE" push >> "$LOG_FILE" 2>&1 && log "Pushed to GitHub" || log "WARN: git push failed"
+        # WP-7 Ф101: raw pull --rebase + push on a checkout shared with
+        # concurrent agent sessions routinely hit a dirty tree or a
+        # non-fast-forward push and silently dropped the commit (found via a
+        # W36 week-review that never reached origin/main). ds-publish.sh
+        # isolates this exact commit into a disposable worktree instead of
+        # waiting for a clean window.
+        local push_sha
+        push_sha=$(git -C "$WORKSPACE" rev-parse HEAD)
+        if bash "$WORKSPACE/scripts/ds-publish.sh" "$WORKSPACE" normal \
+            --reason "strategist: $command_file" --from-commit "$push_sha" >> "$LOG_FILE" 2>&1; then
+            log "Pushed to GitHub"
+        else
+            log "WARN: ds-publish.sh failed — публикация не удалась"
+        fi
     fi
 
     # Очистить staging area после Claude сессии (предотвращает staging leak в следующие скрипты)
@@ -535,9 +547,21 @@ case "$1" in
         # If cleanup made changes, commit and push
         if ! git -C "$WORKSPACE" diff --quiet -- inbox/fleeting-notes.md archive/notes/Notes-Archive.md 2>/dev/null; then
             git -C "$WORKSPACE" add inbox/fleeting-notes.md archive/notes/Notes-Archive.md
-            git -C "$WORKSPACE" commit -m "chore: auto-cleanup processed notes from fleeting-notes.md" >> "$LOG_FILE" 2>&1 || true
-            git -C "$WORKSPACE" pull --rebase >> "$LOG_FILE" 2>&1 && log "Cleanup: pulled (rebase)" || log "WARN: cleanup pull --rebase failed"
-            git -C "$WORKSPACE" push >> "$LOG_FILE" 2>&1 && log "Cleanup: pushed" || log "WARN: cleanup push failed"
+            # WP-7 Ф101: same ds-publish.sh move as the main push block above,
+            # plus an explicit commit-result check — `|| true` here used to
+            # swallow a failed commit while still reporting "Cleanup: pushed"
+            # for a commit that never happened.
+            if git -C "$WORKSPACE" commit -m "chore: auto-cleanup processed notes from fleeting-notes.md" >> "$LOG_FILE" 2>&1; then
+                cleanup_sha=$(git -C "$WORKSPACE" rev-parse HEAD)
+                if bash "$WORKSPACE/scripts/ds-publish.sh" "$WORKSPACE" normal \
+                    --reason "strategist: cleanup" --from-commit "$cleanup_sha" >> "$LOG_FILE" 2>&1; then
+                    log "Cleanup: pushed"
+                else
+                    log "WARN: cleanup ds-publish.sh failed"
+                fi
+            else
+                log "WARN: cleanup git commit failed"
+            fi
         else
             log "Cleanup: no changes to commit"
         fi
