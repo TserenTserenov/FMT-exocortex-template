@@ -1045,7 +1045,7 @@
     },
     {
       "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
-      "sha256": "d736ab9d8b2c7d3c51f1b03a43e230b9ce6b0c11c8e0ec3440add731cbe78fd2"
+      "sha256": "17f74be39152b10e7eaacf7d49acf297508cf213f6ce31fb73450e6b0994613e"
     },
     {
       "path": "extensions/agent-inbox/templates/_template.md",
@@ -2325,7 +2325,7 @@
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
-      "sha256": "d736ab9d8b2c7d3c51f1b03a43e230b9ce6b0c11c8e0ec3440add731cbe78fd2"
+      "sha256": "17f74be39152b10e7eaacf7d49acf297508cf213f6ce31fb73450e6b0994613e"
     },
     {
       "path": "scripts/iwe-audit.sh",
