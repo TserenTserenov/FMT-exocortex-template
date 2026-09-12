@@ -25,38 +25,152 @@ peer_adapter_check_sandbox_network() {
   fi
 }
 
-# run_with_deadline <seconds> <cmd> [args...]
+# run_with_deadline <seconds> [--pgid-file <path> --lineage-nonce <hex>]
+#                   [--exec-gate-file <path>]
+#                   [--pre-exec-barrier <path>]
+#                   [--pre-setsid-barrier <path>] <cmd> [args...]
 # Runs cmd in its own process group and kills the whole group (TERM then
 # KILL) on timeout, so a supervised CLI can't leave an orphaned child behind
 # a plain `timeout` (WP-516: the previous `perl alarm; exec` signalled only
-# the launcher, not a forked CLI child).
+# the launcher, not a forked CLI child). `--pgid-file` publishes the group id
+# after setsid and before exec so an external lifetime/lock helper can stop the
+# group even after SIGKILL of the top adapter. The barrier options are
+# deterministic test seams for the fork/setsid/exec hand-off boundaries.
 run_with_deadline() {
   local deadline_seconds="$1"
   shift
-  perl -MPOSIX=setsid -e '
+  perl -MPOSIX=setsid,WNOHANG -MFcntl=O_RDONLY,O_WRONLY,O_CREAT,O_EXCL -MIO::Handle -e '
     use strict;
     use warnings;
+    use Errno qw(EPERM ESRCH);
+    use Time::HiRes qw(time);
 
     my $seconds = shift @ARGV;
+    my ($pgid_file, $lineage_nonce, $exec_gate_file, $pre_exec_barrier, $pre_setsid_barrier);
+    while (@ARGV >= 2) {
+      if ($ARGV[0] eq "--pgid-file") {
+        shift @ARGV;
+        $pgid_file = shift @ARGV;
+        next;
+      }
+      if ($ARGV[0] eq "--lineage-nonce") {
+        shift @ARGV;
+        $lineage_nonce = shift @ARGV;
+        next;
+      }
+      if ($ARGV[0] eq "--exec-gate-file") {
+        shift @ARGV;
+        $exec_gate_file = shift @ARGV;
+        next;
+      }
+      if ($ARGV[0] eq "--pre-exec-barrier") {
+        shift @ARGV;
+        $pre_exec_barrier = shift @ARGV;
+        next;
+      }
+      if ($ARGV[0] eq "--pre-setsid-barrier") {
+        shift @ARGV;
+        $pre_setsid_barrier = shift @ARGV;
+        next;
+      }
+      last;
+    }
+    die "ERROR: peer CLI command is empty\n" unless @ARGV;
     my $child = fork();
     die "ERROR: cannot fork peer CLI supervisor: $!\n" unless defined $child;
     if ($child == 0) {
+      if (defined $pre_setsid_barrier) {
+        sysopen(my $ready_out, "$pre_setsid_barrier.ready", O_WRONLY | O_CREAT | O_EXCL, 0600)
+          or die "ERROR: cannot publish pre-setsid barrier: $!\n";
+        print {$ready_out} "$$\n";
+        close $ready_out;
+        select undef, undef, undef, 0.01 until -e "$pre_setsid_barrier.release";
+      }
       setsid() or die "ERROR: cannot isolate peer CLI process group: $!\n";
+      if (defined $pgid_file) {
+        die "ERROR: lineage nonce required with pgid file\n"
+          unless defined $lineage_nonce && $lineage_nonce =~ /\A[0-9a-f]{32}\z/;
+        die "ERROR: setsid did not establish pid=pgid\n" unless getpgrp() == $$;
+        my $pgid_tmp = "$pgid_file.$$.tmp";
+        sysopen(my $pgid_out, $pgid_tmp, O_WRONLY | O_CREAT | O_EXCL, 0600)
+          or die "ERROR: cannot publish peer CLI process group: $!\n";
+        print {$pgid_out} "{\"nonce\":\"$lineage_nonce\",\"pid\":$$,\"pgid\":$$}\n";
+        $pgid_out->sync or die "ERROR: cannot sync peer CLI process-group marker: $!\n";
+        close $pgid_out or die "ERROR: cannot close peer CLI process-group marker: $!\n";
+        rename $pgid_tmp, $pgid_file
+          or die "ERROR: cannot publish peer CLI process-group marker atomically: $!\n";
+      }
+      if (defined $exec_gate_file) {
+        die "ERROR: lineage nonce required with exec gate\n"
+          unless defined $lineage_nonce && $lineage_nonce =~ /\A[0-9a-f]{32}\z/;
+        my $expected_gate = "$lineage_nonce $$\n";
+        my $gate_deadline = time + 10;
+        while (1) {
+          if (sysopen(my $gate_in, $exec_gate_file, O_RDONLY)) {
+            local $/;
+            my $gate = <$gate_in>;
+            close $gate_in;
+            die "ERROR: invalid peer CLI exec gate\n"
+              unless defined $gate && $gate eq $expected_gate;
+            last;
+          }
+          die "ERROR: peer CLI exec gate timed out\n" if time >= $gate_deadline;
+          select undef, undef, undef, 0.01;
+        }
+      }
+      if (defined $pre_exec_barrier) {
+        sysopen(my $ready_out, "$pre_exec_barrier.ready", O_WRONLY | O_CREAT | O_EXCL, 0600)
+          or die "ERROR: cannot publish pre-exec barrier: $!\n";
+        print {$ready_out} "$$\n";
+        close $ready_out;
+        select undef, undef, undef, 0.01 until -e "$pre_exec_barrier.release";
+      }
       exec @ARGV or die "ERROR: cannot exec peer CLI: $!\n";
     }
 
-    my $timed_out = 0;
-    local $SIG{ALRM} = sub {
-      $timed_out = 1;
-      kill "TERM", -$child;
-      select undef, undef, undef, 2;
-      kill "KILL", -$child;
-    };
-    alarm $seconds;
-    waitpid($child, 0);
-    my $status = $?;
-    alarm 0;
-    exit 142 if $timed_out;
+    sub child_group_alive {
+      local $! = 0;
+      return 1 if kill 0, -$child;
+      return 1 if $! == EPERM;
+      return 0 if $! == ESRCH;
+      return 1; # unknown kernel result is not proof that the group is gone
+    }
+
+    sub stop_child_group {
+      my $reaped = 0;
+      kill "TERM", -$child if child_group_alive();
+      for (1 .. 20) {
+        if (!$reaped) {
+          my $done = waitpid($child, WNOHANG);
+          $reaped = 1 if $done == $child;
+        }
+        if (!child_group_alive()) {
+          waitpid($child, 0) unless $reaped;
+          return;
+        }
+        select undef, undef, undef, 0.1;
+      }
+      # A TERM-resistant grandchild keeps the original group observable even
+      # after its leader exits. Re-check immediately before KILL so a vanished
+      # group is never signalled later after that numeric PGID is reused.
+      kill "KILL", -$child if child_group_alive();
+      waitpid($child, 0) unless $reaped;
+    }
+
+    my $deadline = time + $seconds;
+    my $status;
+    while (1) {
+      my $done = waitpid($child, WNOHANG);
+      if ($done == $child) {
+        $status = $?;
+        last;
+      }
+      if (time >= $deadline) {
+        stop_child_group();
+        exit 142;
+      }
+      select undef, undef, undef, 0.05;
+    }
     exit 128 + ($status & 127) if $status & 127;
     exit $status >> 8;
   ' "$deadline_seconds" "$@"
@@ -102,7 +216,7 @@ peer_adapter_check_language() {
   lang_check="$lib_dir/language-check.py"
   python_resolver="$lib_dir/find-python3.sh"
   if [ -f "$lang_check" ] && [ -x "$python_resolver" ]; then
-    resolved_python=$("$python_resolver" 2>/dev/null || true)
+    resolved_python=$("$python_resolver" --stdlib-only 2>/dev/null || true)
   else
     resolved_python=""
   fi

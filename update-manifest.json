@@ -217,7 +217,7 @@
     },
     {
       "path": ".claude/lib/find-python3.sh",
-      "sha256": "b938fca2780186b9383f3174a6d21b218f3b5f3a50e5d411a38179d584689cdd"
+      "sha256": "34ad77a7d721309dee10244843ea900db26954fc953d3dfc529eaa28f6ff25a0"
     },
     {
       "path": ".claude/lib/frontmatter.sh",
@@ -2389,7 +2389,7 @@
     },
     {
       "path": "scripts/kimi-peer-adapter.sh",
-      "sha256": "c91b04fa03d3e15a856c79266f07d1146989b670b584c2e0442781315554da69"
+      "sha256": "f3667622efc5b83d51d6d7364d95072e804cc470206b7d2c3ff17f9c310f57ef"
     },
     {
       "path": "scripts/kimi-session-watchdog.sh",
@@ -2421,7 +2421,7 @@
     },
     {
       "path": "scripts/lib/find-python3.sh",
-      "sha256": "b938fca2780186b9383f3174a6d21b218f3b5f3a50e5d411a38179d584689cdd"
+      "sha256": "34ad77a7d721309dee10244843ea900db26954fc953d3dfc529eaa28f6ff25a0"
     },
     {
       "path": "scripts/lib/language-check.py",
@@ -2449,7 +2449,7 @@
     },
     {
       "path": "scripts/lib/peer-adapter-common.sh",
-      "sha256": "874e916b4914f32b6918ffee44080c30ab7e4cf0f3ced7252e4dd6de6abf6088"
+      "sha256": "65b3a09582fb2bcb61b2c0a8ac7914b21ed5479ed8805ed438978264cb390682"
     },
     {
       "path": "scripts/lib/telegram.sh",
@@ -2981,7 +2981,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/find-python3.sh",
-      "sha256": "0d11e4e5a7e96e8125f2679632dca144c7cdf614221c536947b58d95943d6e13"
+      "sha256": "d0cc830a53adde80c4bff2d3c92c28efa45d8e2e6c67e5a54c48d1774818ca69"
     },
     {
       "path": "seed/strategy/scripts/lib/ledger-path.sh",

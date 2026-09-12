@@ -3,7 +3,10 @@
 # issues #453/#463, Evgenii 18.08).
 #
 # Contract (peer-session 2026-08-19-01, codex В1): standalone executable, not a
-# sourced lib. stdout = path to a python3 whose `import yaml` succeeds, exit 0.
+# sourced lib. By default stdout = path to a python3 whose `import yaml`
+# succeeds, exit 0. `--stdlib-only` keeps the same candidate resolution but
+# requires only the Python standard library; callers that do not import PyYAML
+# must use it rather than acquiring an unrelated optional dependency.
 # No candidate → exit 1 with actionable diagnostics on stderr. Callers use
 # command substitution and MUST check the exit code, failing with an explicit
 # dependency error instead of a misleading domain error ("calendar_ids не
@@ -15,6 +18,14 @@
 # to a yaml-less interpreter.
 set -u
 
+stdlib_only=false
+case "${1:-}" in
+    --stdlib-only) stdlib_only=true; shift ;;
+    "") ;;
+    *) echo "ERROR: unknown find-python3.sh argument: $1" >&2; exit 2 ;;
+esac
+[ "$#" -eq 0 ] || { echo "ERROR: find-python3.sh accepts only --stdlib-only" >&2; exit 2; }
+
 candidates=(
     python3
     /opt/homebrew/bin/python3
@@ -24,7 +35,7 @@ candidates=(
 
 for cand in "${candidates[@]}"; do
     resolved=$(command -v "$cand" 2>/dev/null) || continue
-    if "$resolved" -c "import yaml" >/dev/null 2>&1; then
+    if $stdlib_only || "$resolved" -c "import yaml" >/dev/null 2>&1; then
         printf '%s\n' "$resolved"
         exit 0
     fi
@@ -36,11 +47,16 @@ done
 # that made this branch dead code in server-calendar.sh).
 if [ -d /nix/store ]; then
     while IFS= read -r cand; do
-        if "$cand" -c "import yaml" >/dev/null 2>&1; then
+        if $stdlib_only || "$cand" -c "import yaml" >/dev/null 2>&1; then
             printf '%s\n' "$cand"
             exit 0
         fi
     done < <(find /nix/store -maxdepth 3 -name python3 -path "*env*/bin/*" 2>/dev/null)
+fi
+
+if $stdlib_only; then
+    echo "ERROR: python3 не найден (проверены: PATH, /opt/homebrew, /usr/local, /usr/bin, Nix)." >&2
+    exit 1
 fi
 
 {
