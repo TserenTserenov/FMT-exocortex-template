@@ -2389,11 +2389,11 @@
     },
     {
       "path": "scripts/kimi-peer-adapter.sh",
-      "sha256": "a31ffe012292419672b2819d0843f002578d881e96da0363e9cab2b7c324a7fd"
+      "sha256": "c91b04fa03d3e15a856c79266f07d1146989b670b584c2e0442781315554da69"
     },
     {
       "path": "scripts/kimi-session-watchdog.sh",
-      "sha256": "0be30d1b62a22d10ae4b18bf4b0e78740f7b09d20497df377b3b828dc456eb2b"
+      "sha256": "6045878646195725126759fd976f4a44865a9943788ab3c4542ccf27aa4451f0"
     },
     {
       "path": "scripts/kimi-standalone-preflight.sh",
@@ -2424,6 +2424,10 @@
       "sha256": "b938fca2780186b9383f3174a6d21b218f3b5f3a50e5d411a38179d584689cdd"
     },
     {
+      "path": "scripts/lib/language-check.py",
+      "sha256": "ba445fe2f2f7cb85bdf81c582597871b66f114e2f9022f0f26d86039bade233a"
+    },
+    {
       "path": "scripts/lib/ledger-path.sh",
       "sha256": "725d8de49c7c0d04645521ba646ff7ba952e412574e87d2514b3769464fbf48c"
     },
@@ -2442,6 +2446,10 @@
     {
       "path": "scripts/lib/notification-render.sh",
       "sha256": "ac1c9e55dd710e4d62d05b2fae19157c012dba0688c178475cf5f047ba909a38"
+    },
+    {
+      "path": "scripts/lib/peer-adapter-common.sh",
+      "sha256": "874e916b4914f32b6918ffee44080c30ab7e4cf0f3ced7252e4dd6de6abf6088"
     },
     {
       "path": "scripts/lib/telegram.sh",
