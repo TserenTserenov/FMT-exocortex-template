@@ -3792,12 +3792,12 @@ if [ -f "$ENV_FILE" ]; then
                 DETECTED_GOV="${IWE_GOVERNANCE_REPO:-DS-strategy}"
                 echo "  ⚠ Governance repo не найден в $DETECT_WS — fallback ${IWE_GOVERNANCE_REPO:-DS-strategy}. Проверьте .exocortex.env вручную."
             fi
-            echo "GOVERNANCE_REPO=$DETECTED_GOV" >> "$ENV_FILE"
+            echo "GOVERNANCE_REPO=\"$DETECTED_GOV\"" >> "$ENV_FILE"
             echo "  ✓ Добавлено GOVERNANCE_REPO=$DETECTED_GOV в .exocortex.env (миграция 0.28.5)"
             ENV_GOVERNANCE_REPO="$DETECTED_GOV"
         fi
         if ! grep -q '^IWE_TEMPLATE=' "$ENV_FILE" 2>/dev/null; then
-            echo "IWE_TEMPLATE=$SCRIPT_DIR" >> "$ENV_FILE"
+            echo "IWE_TEMPLATE=\"$SCRIPT_DIR\"" >> "$ENV_FILE"
             echo "  ✓ Добавлено IWE_TEMPLATE=$SCRIPT_DIR в .exocortex.env (миграция 0.28.5)"
             ENV_IWE_TEMPLATE="$SCRIPT_DIR"
         fi
@@ -3807,7 +3807,7 @@ if [ -f "$ENV_FILE" ]; then
         # generated plist could ever carry it — the launchd jobs silently ran
         # without it (strategist.sh:357-366 fell back to the free-form prompt).
         if ! grep -q '^IWE_SCRIPTS=' "$ENV_FILE" 2>/dev/null; then
-            echo "IWE_SCRIPTS=$SCRIPT_DIR/scripts" >> "$ENV_FILE"
+            echo "IWE_SCRIPTS=\"$SCRIPT_DIR/scripts\"" >> "$ENV_FILE"
             echo "  ✓ Добавлено IWE_SCRIPTS=$SCRIPT_DIR/scripts в .exocortex.env (WP-529 Ф94)"
             ENV_IWE_SCRIPTS="$SCRIPT_DIR/scripts"
         fi
@@ -3815,7 +3815,7 @@ if [ -f "$ENV_FILE" ]; then
         # === WP-273 Этап 2: IWE_RUNTIME для Generated runtime architecture (F) ===
         if ! grep -q '^IWE_RUNTIME=' "$ENV_FILE" 2>/dev/null; then
             DETECT_WS_RT="${ENV_WORKSPACE_DIR:-$WORKSPACE_DIR}"
-            echo "IWE_RUNTIME=$DETECT_WS_RT/.iwe-runtime" >> "$ENV_FILE"
+            echo "IWE_RUNTIME=\"$DETECT_WS_RT/.iwe-runtime\"" >> "$ENV_FILE"
             echo "  ✓ Добавлено IWE_RUNTIME=$DETECT_WS_RT/.iwe-runtime (миграция WP-273 → 0.29.0)"
             ENV_IWE_RUNTIME="$DETECT_WS_RT/.iwe-runtime"
         fi
@@ -3841,14 +3841,18 @@ if [ -f "$ENV_FILE" ]; then
         # `UTC: command not found`, rc 127). Чиним только значения, где
         # реально нет пробела в написанном виде разбор строкой (line-parser
         # выше) уже подтвердил валидный KEY — просто дописываем кавычки туда,
-        # где их ещё нет.
+        # где их ещё нет. Список расширен ревью после первого фикса (#786):
+        # GOVERNANCE_REPO/IWE_TEMPLATE/IWE_SCRIPTS/IWE_RUNTIME писались этим
+        # же update.sh без кавычек чуть ниже по файлу (миграции 0.28.5/WP-273/
+        # WP-529) — тот же класс дефекта на путях с пробелом.
         for _key in TIMEZONE_DESC GITHUB_USER WORKSPACE_DIR CLAUDE_PATH \
-                    CLAUDE_PROJECT_SLUG HOME_DIR USER_NAME; do
+                    CLAUDE_PROJECT_SLUG HOME_DIR USER_NAME \
+                    GOVERNANCE_REPO IWE_TEMPLATE IWE_SCRIPTS IWE_RUNTIME; do
             _raw_line=$(grep -E "^${_key}=" "$ENV_FILE" 2>/dev/null | head -1)
             [ -z "$_raw_line" ] && continue
             _raw_value="${_raw_line#*=}"
             case "$_raw_value" in
-                \"*\") continue ;;  # уже в кавычках
+                \"*\"|\'*\') continue ;;  # уже в двойных или одинарных кавычках
                 *[[:space:]]*)
                     _quoted=$(sed_escape_replacement "$_raw_value")
                     sed_inplace "s|^${_key}=.*|${_key}=\"${_quoted}\"|" "$ENV_FILE"
@@ -4174,8 +4178,11 @@ elif [ ! -f "$MCP_WORKSPACE" ] && [ -f "$MCP_TEMPLATE" ]; then
     # No workspace .mcp.json — copy from template.
     # issue #786: голый cp оставлял {{HOME_DIR}} буквально — ext-railway не
     # стартовал. Та же процедура подстановки, что уже применяется к CLAUDE.md.
-    substitute_claude_placeholders "$MCP_TEMPLATE" "$MCP_WORKSPACE"
-    echo "  ✓ .mcp.json создан из шаблона (Gateway)"
+    if substitute_claude_placeholders "$MCP_TEMPLATE" "$MCP_WORKSPACE"; then
+        echo "  ✓ .mcp.json создан из шаблона (Gateway)"
+    else
+        echo "  ✗ не удалось создать $MCP_WORKSPACE из шаблона"
+    fi
 elif [ -f "$MCP_WORKSPACE" ] && ! py_available; then
     # No python3 — check if already migrated, otherwise warn
     if grep -q 'iwe-knowledge' "$MCP_WORKSPACE" 2>/dev/null; then
@@ -4184,6 +4191,21 @@ elif [ -f "$MCP_WORKSPACE" ] && ! py_available; then
         echo "  ⚠ .mcp.json: python3 не найден, автомиграция пропущена."
         echo "    Замените knowledge-mcp/digital-twin-mcp на iwe-knowledge вручную."
         echo "    Образец: $MCP_TEMPLATE"
+    fi
+fi
+
+# issue #786 (гэп, найденный ревью после первого фикса): три ветки выше чинят
+# только «файла ещё нет» или «сервер устарел». Автор issue сообщал о файле,
+# ПОБАЙТНО ИДЕНТИЧНОМ шаблону — python-миграция такой файл не трогает
+# (changed остаётся false, нет устаревших ключей), а без python3 ветка просто
+# предупреждает. {{HOME_DIR}} в уже существующем workspace-файле не лечился
+# ни одним путём. Проверяем и чиним отдельно, независимо от того, что
+# случилось выше.
+if [ -f "$MCP_WORKSPACE" ] && grep -qF '{{HOME_DIR}}' "$MCP_WORKSPACE" 2>/dev/null; then
+    if sed_inplace "s|{{HOME_DIR}}|$(sed_escape_replacement "${ENV_HOME_DIR:-$HOME}")|g" "$MCP_WORKSPACE"; then
+        echo "  ✓ .mcp.json: {{HOME_DIR}} подставлен в уже существующем файле (issue #786)"
+    else
+        echo "  ✗ .mcp.json: не удалось подставить {{HOME_DIR}} в уже существующий файл"
     fi
 fi
 

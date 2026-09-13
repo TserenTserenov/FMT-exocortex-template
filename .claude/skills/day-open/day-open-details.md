@@ -149,7 +149,7 @@ done
 
 ## Шаг 5c: Редактор контента (DP.ROLE.033 / DP.SC.127)
 
-`config: content_editor.enabled` (day-rhythm-config.yaml) — `false` → пропустить.
+`config: content_editor.enabled` (day-rhythm-config.yaml) — `true` → выполнить, иначе (включая отсутствие секции, issue #804) → пропустить.
 1. Читать все `<governance-repo>/drafts/D-NNN-*.md` — frontmatter (`created`, `ttl`, `updated`) + текст.
 2. Читать WeekPlan активной недели — R-таблица (инициативы) + S-таблица (неудовлетворённости).
 3. Оценить каждый черновик: (a) сильная идея — тезис в 1-2 предл.; (b) актуальность — совпадает с ≥1 R или S по тексту; (c) свежесть — `updated`/`created` ≤14 дней и TTL не истёк; (d) полнота — есть вступление + основная часть.
