@@ -42,6 +42,11 @@ video:
   content:
     suggest_posts: true         # Suggest post ideas from transcribed videos
 
+content_editor:
+  enabled: false                # Enable content-editor draft review at Day Open (issue #804:
+                                 # секция отсутствовала в дефолтном конфиге, при отсутствии ключа
+                                 # "не false" читалось как "включено" — тот же паттерн, что news/video)
+
 # mandatory_daily_wps:             # WPs that MUST appear in every DayPlan
 #   - wp: 7                        # WP number (from WeekPlan)
 #     min_minutes: 30

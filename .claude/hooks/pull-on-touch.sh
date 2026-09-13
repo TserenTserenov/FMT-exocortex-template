@@ -93,7 +93,7 @@ msg=""
 [ -n "$warns" ] && msg="${msg}⚠️ ${warns}"
 
 if [ -n "$msg" ]; then
-    printf '%s' "$msg" | python3 -c 'import sys,json; print(json.dumps({"additionalContext": sys.stdin.read()}))'
+    printf '%s' "$msg" | python3 -c 'import sys,json; print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": sys.stdin.read()}}))'
 fi
 
 exit 0

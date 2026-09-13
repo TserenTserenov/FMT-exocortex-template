@@ -3833,6 +3833,30 @@ if [ -f "$ENV_FILE" ]; then
             fi
         fi
 
+        # === Re-quote unquoted values in existing .exocortex.env (issue #781) ===
+        # #223/#316 приучили setup.sh/update.sh писать значения в кавычках, но
+        # ни один путь не чинил уже существующий файл, созданный до фикса —
+        # `TIMEZONE_DESC=4:00 UTC` без кавычек ломает любой `source
+        # .exocortex.env` (bash трактует хвост после пробела как команду,
+        # `UTC: command not found`, rc 127). Чиним только значения, где
+        # реально нет пробела в написанном виде разбор строкой (line-parser
+        # выше) уже подтвердил валидный KEY — просто дописываем кавычки туда,
+        # где их ещё нет.
+        for _key in TIMEZONE_DESC GITHUB_USER WORKSPACE_DIR CLAUDE_PATH \
+                    CLAUDE_PROJECT_SLUG HOME_DIR USER_NAME; do
+            _raw_line=$(grep -E "^${_key}=" "$ENV_FILE" 2>/dev/null | head -1)
+            [ -z "$_raw_line" ] && continue
+            _raw_value="${_raw_line#*=}"
+            case "$_raw_value" in
+                \"*\") continue ;;  # уже в кавычках
+                *[[:space:]]*)
+                    _quoted=$(sed_escape_replacement "$_raw_value")
+                    sed_inplace "s|^${_key}=.*|${_key}=\"${_quoted}\"|" "$ENV_FILE"
+                    echo "  ✓ $_key взят в кавычки в .exocortex.env (issue #781, значение содержало пробел)"
+                    ;;
+            esac
+        done
+
         # === Migrate .exocortex.env from FMT to workspace (WP-273 Этап 2) ===
         # Если .exocortex.env живёт в FMT (legacy ≤0.28.x), копируем в workspace.
         # FMT остаётся read-only. Workspace = source-of-truth user state.
@@ -4147,8 +4171,10 @@ if changed:
     print(msg)
 " "$MCP_WORKSPACE" 2>/dev/null
 elif [ ! -f "$MCP_WORKSPACE" ] && [ -f "$MCP_TEMPLATE" ]; then
-    # No workspace .mcp.json — copy from template
-    cp "$MCP_TEMPLATE" "$MCP_WORKSPACE"
+    # No workspace .mcp.json — copy from template.
+    # issue #786: голый cp оставлял {{HOME_DIR}} буквально — ext-railway не
+    # стартовал. Та же процедура подстановки, что уже применяется к CLAUDE.md.
+    substitute_claude_placeholders "$MCP_TEMPLATE" "$MCP_WORKSPACE"
     echo "  ✓ .mcp.json создан из шаблона (Gateway)"
 elif [ -f "$MCP_WORKSPACE" ] && ! py_available; then
     # No python3 — check if already migrated, otherwise warn

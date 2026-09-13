@@ -818,9 +818,22 @@ else
             fi
             ;;
         *)
-            cp "$MCP_TEMPLATE" "$MCP_DEST"
-            echo "  ✓ $MCP_DEST → iwe-knowledge (браузерный OAuth, tier=$_IWE_TIER)"
-            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=browser" >> "$_MCP_LOG"
+            # issue #786: голый cp копировал .mcp.json мимо процедуры подстановки
+            # плейсхолдеров — {{HOME_DIR}} доезжал буквально, ext-railway не мог
+            # стартовать никогда. install_workspace_instruction — тот же атомарный
+            # copy+sed+move, что уже используют CLAUDE.md/AGENTS.md выше по файлу.
+            if install_workspace_instruction ".mcp.json"; then
+                echo "  ✓ $MCP_DEST → iwe-knowledge (браузерный OAuth, tier=$_IWE_TIER)"
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=browser" >> "$_MCP_LOG"
+            else
+                # Codex review (2026-09-13): раньше success-строки печатались
+                # безусловно даже при провале записи — ложный "успех" после
+                # реального сбоя. Провал теперь идёт в ту же ветку, что и
+                # остальные MCP_AUTH_INCOMPLETE-случаи выше по файлу.
+                echo "  ✗ не удалось записать $MCP_DEST"
+                _MCP_AUTH_INCOMPLETE=true
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=write_error" >> "$_MCP_LOG"
+            fi
             ;;
     esac
 

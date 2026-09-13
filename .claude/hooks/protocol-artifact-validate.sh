@@ -260,9 +260,7 @@ if [ ${#MISSING[@]} -gt 0 ] || [ ${#ERRORS[@]} -gt 0 ]; then
 
   jq -n --arg reason "$MSG" '{"decision": "block", "reason": $reason}'
 else
-  cat <<'EOF'
-{"additionalContext": "✅ DayPlan прошёл валидацию: секции, ## заголовки, непустые блоки, мультипликатор, carry-over."}
-EOF
+  jq -n '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "✅ DayPlan прошёл валидацию: секции, ## заголовки, непустые блоки, мультипликатор, carry-over."}}'
 fi
 
 exit 0
