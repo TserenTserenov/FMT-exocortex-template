@@ -57,7 +57,7 @@
     },
     {
       "path": ".claude/hooks/close-gate-reminder.sh",
-      "sha256": "fedd8c93c4783608f25244cd9a4126160f10c2f592c2ab85fb64f1333f0ec549"
+      "sha256": "c4e03fcec045eb9617207d91f95cd2bec7d3578d960f3f1f057cdb326169ec7a"
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
@@ -93,7 +93,7 @@
     },
     {
       "path": ".claude/hooks/lazy-context-loader.sh",
-      "sha256": "03ebaa16a75b08414baeb816b16a0bb895fa2c14262fc2e117c5506754a970b2"
+      "sha256": "042dea616368e2803f3e26ef7ee6f31ffed21bc0ae49181d84c7e88f3a8a2c76"
     },
     {
       "path": ".claude/hooks/memory-exocortex-sync.sh",
@@ -109,15 +109,15 @@
     },
     {
       "path": ".claude/hooks/precompact-checkpoint.sh",
-      "sha256": "7d6f9904923f3173387d435e1e4e4f59f30a6ed1cd693e92df4045667facee9c"
+      "sha256": "0fa68e1514a5260b5e4d35e46d88b9a8aa0107246a645fbaa66e16d2b86d10bc"
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
-      "sha256": "009b9363f3950ab97407ae3aa1b14e780fd1f8474ac9ea8529341d72a374439e"
+      "sha256": "e0defb9d08d03f4948672cae70dc89221d9b29c517f64c2bbc050e1e7ba4469b"
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
-      "sha256": "d6f242ac42a13a293a321454a6c9c17181f644ec5eb49ab2886e03fa3838cc99"
+      "sha256": "d9b39e26a87287f11a5118280390dce83ac6f6295ea807c41aedf4327e0e9530"
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
-      "sha256": "ce00afb11193c91e7da9f1c6c3f8f92ac2ec8543aa38b1150c0054ac8ba7dc6c"
+      "sha256": "87ae9737685893c4eb3245de467e2ca7b6011d73da1a835f9cc1dbeb198dd759"
     },
     {
       "path": ".claude/hooks/residency-gate-init.sh",
@@ -201,7 +201,7 @@
     },
     {
       "path": ".claude/hooks/wp-gate-reminder.sh",
-      "sha256": "a6dfaee3ebc87432236f63b33a047c52fa1a117b4d44803689cf96ba2559a84d"
+      "sha256": "472bd3979eb3f0b6a3693c467a0e7b0b8396ce46d930cdf3344fe110c1b4a8e4"
     },
     {
       "path": ".claude/lib/behaviour-report.sh",
@@ -413,7 +413,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "2ff43129f8c25dd893a58c4c2844105269d097dfc605ad62b5398311aff02838"
+      "sha256": "6a92b02abbbc9563b1f259b3163deee7b024a633269c7386f134d546bd891fdf"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -1469,7 +1469,7 @@
     },
     {
       "path": "memory/day-rhythm-config.yaml",
-      "sha256": "aeff2de8c59dae0238c1b3c6a678e0cdd97903ebe284aa0041a01513672e2b69"
+      "sha256": "f8a129a835b4f8b1c79abdf20d3a6bbc150213394f6c2a04d91da761022fbe40"
     },
     {
       "path": "memory/distinctions-warm.md",
@@ -3041,7 +3041,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "8e52298fb4fa373d7f50ea0d4772632c9a84fa4dc1e35930134ecee49abe4dff"
+      "sha256": "056a950af10a547a3866937af5cecc58ae4b58f196de2e683c53c3b61c49090b"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3081,7 +3081,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "e993456531ba11b68f2f0fca0625e9ba20b45d095d96a77f8527cc83ba3890ec"
+      "sha256": "c8ae14c0a26df5ce4ed80b06782ac7c3c7eb37492b69a4ecdd05fd48d46d48e7"
     }
   ],
   "excluded_paths": [
