@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "d34afb42f60e5dfedb6bc496c0e2d7b8777edb2496f27a7516d5420d343f9d0b"
+      "sha256": "24a7e692cc9bf3e1f643377294ec68c809253d735c154d167bce229ada814ea5"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -121,7 +121,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "d693fe71908993e9b08f8dce95d30d3917fdd89df9cfd9a68b2cf889a30ba62d"
+      "sha256": "54f8bbeb908d572e53f139066c9cdfd0a9f799aa031689f1f1c727748604f3fa"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
