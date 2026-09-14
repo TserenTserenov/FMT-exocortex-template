@@ -523,15 +523,43 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # инжектируемы вызывающим окружением — тот самый обход, который
     # review-01/review-02 закрыли отказом от env-default в этом whitelist).
     WL_TEMPLATE_ABS="$IWE_ROOT_GUESS/FMT-exocortex-template"
+    # Cold-review finding (Codex, 2026-09-14): a STATIC marker string in a
+    # NORM whitelist is spoofable — an attacker can type the marker text
+    # literally as the command's own bare argument and bypass the gate by
+    # planting a same-named file, since NORM only ever ADDS the marker, it
+    # never proves the marker came from OUR substitution rather than from
+    # the attacker's own input. GATE_NONCE makes the NEW .iwe-paths marker
+    # below unpredictable per invocation (this hook is a fresh process per
+    # PreToolUse call, so the attacker's $CMD is fixed before this nonce
+    # even exists) — scoped ONLY to issue #784/#785's whitelist, not to the
+    # pre-existing static markers (__WL_DAY_CLOSE_PREPARE__ etc. below),
+    # which are a separate, already-shipped finding outside this fix's scope.
+    GATE_NONCE=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+    [ -n "$GATE_NONCE" ] || GATE_NONCE="$$-$(date +%s%N 2>/dev/null || date +%s)"
     NORM=$(printf '%s' "$CMD" | sed -E \
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
         -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
+        -e "s@\"\\\$HOME/\\.iwe-paths\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
+        -e "s@\"\\\$\\{IWE_PATHS_FILE:-\\\$HOME/\\.iwe-paths\\}\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
         -e "s/'[^']*'/ QSTR /g" \
         -e 's/"[^"]*"/ QSTR /g' \
         -e 's@[0-9]?>[[:space:]]*/dev/null@ @g' \
         -e 's@2>&1@ @g')
+    NORM_RC=$?
+    # Codex review (2026-09-14): a broken -e expression makes the WHOLE sed
+    # invocation fail with EMPTY stdout (verified live: any invalid -e in
+    # this pipeline → exit 1, zero bytes out — sed validates the full -e
+    # script upfront, before touching input). $(...) alone doesn't stop the
+    # script (no `set -e` here, only pipefail) — without this check, NORM
+    # would silently become "", SPLIT/the whole Bash-matcher loop below would
+    # never iterate, and every single Bash command would fall through to
+    # "read-only: allow" at the bottom of the file, regardless of content.
+    # Found live while adding the #784/#785 whitelist to this same pipeline.
+    if [ "$NORM_RC" -ne 0 ]; then
+        fail_closed "NORM sed pipeline failed (exit $NORM_RC) — cannot classify command, refusing to allow"
+    fi
 
     # Редирект в реальный файл — проверяем по нормализованной строке целиком
     # (позиционно-независим относительно сегментации ниже, как и раньше).
@@ -640,7 +668,24 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;
-            eval|source|.|xargs)
+            source|.)
+                # issue #784/#785: сорсинг .iwe-paths (плоский KEY=VALUE
+                # файл без побочных эффектов — межвызовое shell-состояние
+                # не живёт между Bash-вызовами агента, поэтому его надо
+                # сорсить в той же команде) блокировался безусловно.
+                # Whitelist — по nonce-маркеру GATE_NONCE (см. NORM выше),
+                # не по статическому тексту: cold-review (Codex) нашёл, что
+                # статический маркер спуфится буквальным вводом атакующего
+                # (`source __WL_СТАТИКА__` + одноимённый файл на диске =
+                # обход гейта). eval/xargs намеренно НЕ включены сюда: общие
+                # индирект-векторы без известного безопасного случая в контракте.
+                shift
+                case "${1:-}" in
+                    "__WL_IWE_PATHS_${GATE_NONCE}__") ;;
+                    *) block "$CMD (indirect execution under dry-run)" ;;
+                esac
+                ;;
+            eval|xargs)
                 block "$CMD (indirect execution under dry-run)"
                 ;;
             python|python3)

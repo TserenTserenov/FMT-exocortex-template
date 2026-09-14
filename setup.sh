@@ -792,11 +792,25 @@ else
             fi
 
             if [ -n "$_ICT_TOKEN" ]; then
-                if jq -n \
-                    --arg token "$_ICT_TOKEN" \
-                    '{"mcpServers":{"iwe-knowledge":{"type":"http","url":"https://mcp.aisystant.com/mcp","headers":{"Authorization":("Bearer " + $token)}}}}' \
-                    > "$MCP_DEST" 2>/dev/null; then
-                    echo "  ✓ $MCP_DEST → iwe-knowledge (аутентифицирован, tier=$_IWE_TIER)"
+                # Найдено ревью после #786/#811: ветка раньше строила .mcp.json
+                # с нуля через `jq -n '{"mcpServers":{"iwe-knowledge":...}}' >
+                # "$MCP_DEST"` — безусловный overwrite стирал ВСЕ остальные
+                # серверы шаблона (ext-railway и любые будущие), не только
+                # плейсхолдер. Теперь сначала копируем и подставляем плейсхолдеры
+                # тем же путём, что T1/T2 (install_workspace_instruction), затем
+                # мёржим аутентифицированный iwe-knowledge поверх остального.
+                _MCP_MERGE_OK=false
+                if install_workspace_instruction ".mcp.json"; then
+                    if jq --arg token "$_ICT_TOKEN" \
+                        '.mcpServers["iwe-knowledge"] = {"type":"http","url":"https://mcp.aisystant.com/mcp","headers":{"Authorization":("Bearer " + $token)}}' \
+                        "$MCP_DEST" > "$MCP_DEST.tmp" 2>/dev/null \
+                        && mv "$MCP_DEST.tmp" "$MCP_DEST"; then
+                        _MCP_MERGE_OK=true
+                    fi
+                    rm -f "$MCP_DEST.tmp"
+                fi
+                if $_MCP_MERGE_OK; then
+                    echo "  ✓ $MCP_DEST → iwe-knowledge (аутентифицирован, tier=$_IWE_TIER), остальные серверы шаблона сохранены"
                     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=ict_token" >> "$_MCP_LOG"
                 else
                     echo "  ✗ jq error generating .mcp.json (check jq is installed)"
