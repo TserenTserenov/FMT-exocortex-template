@@ -6,21 +6,25 @@
 # то должен быть TodoWrite с ≥3 items. Иначе — block.
 # Принцип warn-before-block: action=warn (промоция в block после 2 нед обкатки).
 #
-# Защита от infinite loop: переменная STOP_HOOK_ACTIVE.
+# Защита от infinite loop: поле stop_hook_active во входном JSON (issue #819).
 # Read-only кроме gate_log.jsonl.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# --- Infinite loop guard ---
-if [ "${STOP_HOOK_ACTIVE:-}" = "1" ]; then
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
   echo '{}'
   exit 0
 fi
-export STOP_HOOK_ACTIVE=1
 
-INPUT=$(cat)
-if [ -z "$INPUT" ]; then
+# --- Infinite loop guard (issue #819) ---
+# Claude Code запускает этот хук новым bash-процессом на каждое Stop-событие,
+# поэтому env-переменная не переживает между вызовами — старый guard через
+# STOP_HOOK_ACTIVE был мёртвым кодом с рождения. Claude Code сам передаёт
+# признак повтора в JSON; читаем его оттуда (boolean или строка "true").
+STOP_ACTIVE=$(printf '%s' "$INPUT" | jq -r 'if (.stop_hook_active == true or .stop_hook_active == "true") then "1" else "0" end' 2>/dev/null || echo 0)
+if [ "$STOP_ACTIVE" = "1" ]; then
   echo '{}'
   exit 0
 fi
@@ -216,9 +220,14 @@ if [ -n "$LOG_ENTRY" ]; then
 fi
 
 # --- Шаг 4: action=warn (не block — обкатка 2 нед, WP-229 принцип warn-before-block) ---
+# issue #819: раньше здесь стоял {"decision": "block", ...} — для Stop-события
+# это реальный запрет остановиться, а не предупреждение (расходился с
+# action:"warn" в том же LOG_ENTRY выше). systemMessage без decision — тот же
+# паттерн ненавязчивого уведомления, что уже используют secret-leak-block.sh /
+# secret-file-read-block.sh / secret-mcp-dump-guard.sh.
 if [ "$FIRED" = "1" ]; then
   cat <<EOF
-{"decision": "block", "reason": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но TodoWrite с ≥$THRESHOLD задачами не найден (найдено: $TODO_MAX). Протокол требует таск-лист ДО начала исполнения. Действие: создай TodoWrite с шагами скилла и пройди протокол заново. (gate_log: $GATE_LOG)"}
+{"systemMessage": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но TodoWrite с ≥$THRESHOLD задачами не найден (найдено: $TODO_MAX). Протокол требует таск-лист ДО начала исполнения. Действие: создай TodoWrite с шагами скилла и пройди протокол заново. (gate_log: $GATE_LOG)"}
 EOF
 else
   echo '{}'

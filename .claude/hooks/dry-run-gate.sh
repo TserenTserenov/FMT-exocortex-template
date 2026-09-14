@@ -744,6 +744,16 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;
+            uv|uvx)
+                # issue #821: `uv run <script>` had no matcher branch at all — same
+                # gap as python/python3 (#460 path 5). `uvx` is a distinct binary
+                # (alias for `uv tool run`), same threat, needs its own case arm.
+                shift
+                case "${1:-}" in
+                    --version|-V|--help|help) ;;
+                    *) block "$CMD (indirect execution under dry-run)" ;;
+                esac
+                ;;
         esac
     done <<< "$SPLIT"
 fi
