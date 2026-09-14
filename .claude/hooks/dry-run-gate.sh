@@ -570,6 +570,31 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # Шаг 2: разбить на простые команды.
     SPLIT=$(printf '%s\n' "$NORM" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
 
+    # Live-review finding (Fable, 2026-09-14): whitelist для .iwe-paths матчит
+    # ЛИТЕРАЛЬНЫЙ ТЕКСТ "$HOME/.iwe-paths"/"${IWE_PATHS_FILE:-...}", а не
+    # разрешённое значение — цикл ниже классифицирует каждый сегмент НЕЗАВИСИМО
+    # и не помнит присваиваний из предыдущих сегментов. Живой прогон подтвердил
+    # обход: `HOME=/tmp/evil; . "$HOME/.iwe-paths"` при РЕАЛЬНОМ исполнении
+    # сорсит /tmp/evil/.iwe-paths (bash подставляет переменную в момент
+    # выполнения, уже после этого гейта), но классификатор видит второй сегмент
+    # изолированно и не знает о переопределении в первом. Обнаружено уже после
+    # деплоя — сканируем ВЕСЬ SPLIT заранее на переопределение HOME/
+    # IWE_PATHS_FILE где угодно в команде и отзываем whitelist для всей команды,
+    # если оно есть. round-2 cold-review (Codex, 2026-09-14) нашёл, что первая
+    # версия regex (якорь на начало сегмента, только export) пропускала:
+    # (a) префиксное присваивание НЕ первым словом сегмента (`x=1 HOME=evil cmd`),
+    # (b) readonly/declare/typeset/local/builtin export/command export,
+    # (c) printf -v HOME / read HOME (присваивание через builtin, не `VAR=`).
+    # Регекс ниже покрывает все три класса; кавычные спаны уже схлопнуты в QSTR
+    # к этому шагу (см. sed выше), поэтому "HOME=" внутри пользовательской
+    # строки (напр. python -c "...HOME=...") сюда не протекает.
+    HOME_OR_IWE_PATHS_TAMPERED=0
+    if printf '%s\n' "$SPLIT" | grep -qE \
+        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE)=|(^|[[:space:]])(HOME|IWE_PATHS_FILE)=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE)([[:space:]]|$)' \
+    ; then
+        HOME_OR_IWE_PATHS_TAMPERED=1
+    fi
+
     while IFS= read -r SEG; do
         [ -z "$SEG" ] && continue
         # shellcheck disable=SC2086
@@ -679,9 +704,24 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # (`source __WL_СТАТИКА__` + одноимённый файл на диске =
                 # обход гейта). eval/xargs намеренно НЕ включены сюда: общие
                 # индирект-векторы без известного безопасного случая в контракте.
+                # Live-review finding (Fable): HOME_OR_IWE_PATHS_TAMPERED
+                # (вычислен до этого цикла) отзывает whitelist, если HOME/
+                # IWE_PATHS_FILE переопределены где-то в этой же команде.
+                if [ "$HOME_OR_IWE_PATHS_TAMPERED" = "1" ]; then
+                    block "$CMD (HOME/IWE_PATHS_FILE reassigned earlier in the same command)"
+                fi
                 shift
                 case "${1:-}" in
-                    "__WL_IWE_PATHS_${GATE_NONCE}__") ;;
+                    "__WL_IWE_PATHS_${GATE_NONCE}__")
+                        shift
+                        # round-2 cold-review (Codex): NORM вставляет пробелы
+                        # вокруг маркера при замене — без этой проверки
+                        # `. "$HOME/.iwe-paths"суффикс` (конкатенация без
+                        # пробела в исходной команде) резолвился бы в W0=.
+                        # $1=маркер $2=суффикс и прошёл бы как allow, хотя
+                        # реально сорсит другой файл.
+                        [ $# -gt 0 ] && block "$CMD (unexpected token after .iwe-paths whitelist marker)"
+                        ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;
