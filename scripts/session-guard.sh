@@ -1299,6 +1299,22 @@ if [ "$CMD" = "open" ]; then
     echo "session_id: $SESSION_ID"
     [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
     echo "close_path: ${CLOSE_PATH:-unknown}"
+    # WP-484 (15.09, peer-session 2026-09-15-06, Claude+Kimi; same class as
+    # the harness_session_id/close_path point-patch above, 25.08,
+    # bug-2026-08-25-fmt-session-guard-stale-missing-close-path-fields.md):
+    # this FMT copy has no --isolate concept at all (no gov_repo_dir(), no
+    # CURRENT_REPO_DIR) -- it can only ever mean the plain canonical
+    # checkout, the same $IWE_ROOT/$GOV_REPO formula the root copy's own
+    # legacy-semaphore fallback already computes independently. Without this
+    # line, semaphore_governance_worktree() in the root copy (the only
+    # reader -- this field is not consumed anywhere in this file) finds no
+    # governance_worktree/isolated_worktree/orz_sessions_dir at all and
+    # falls into the strict whole-HEAD ancestry check on `close`, which is a
+    # false negative whenever the canonical checkout has diverged from
+    # origin/main (routine under parallel sessions). session-guard.sh itself
+    # is NOT resynced from root by template-sync.sh (TEMPLATE_OWNED_SCRIPTS,
+    # WP-546) -- this is a deliberate point-patch, not partial resync.
+    echo "governance_worktree: $IWE_ROOT/$GOV_REPO"
     echo "orz_file: $ORZ_BASENAME"
     # WP-484 (08.08, Kimi diagnosis + pilot report): regular sessions never
     # recorded a pid at all, so sweep_orphaned_semaphores()'s dead-pid check —
