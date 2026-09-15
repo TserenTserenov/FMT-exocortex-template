@@ -1,15 +1,36 @@
 """Persistent storage and querying of consent state for data needs."""
 
-import fcntl
 import errno
 import os
 import stat
 import tempfile
+import time
 import yaml
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Dict, Iterator, Optional, Literal
+from typing import Callable, Dict, Iterator, Optional, Literal, Union
 from datetime import datetime
+
+# Windows has no fcntl, cannot open a directory as a descriptor and does not
+# support dir_fd. The descriptor-pinned walks below keep their POSIX form; on
+# Windows the same checks run through paths, re-validated right before use.
+# Creating a symlink there needs a privilege ordinary users lack, which keeps
+# the remaining check-then-use window narrow.
+_IS_WINDOWS = os.name == "nt"
+if _IS_WINDOWS:
+    import msvcrt
+
+    fcntl = None
+else:
+    import fcntl
+
+    msvcrt = None
+
+_WINDOWS_LOCK_TIMEOUT_SECONDS = 30.0
+_WINDOWS_LOCK_POLL_SECONDS = 0.05
+
+# A pinned directory: a descriptor on POSIX, a re-validated path on Windows.
+DirectoryHandle = Union[int, Path]
 
 
 ConsentStatus = Literal["not_asked", "granted", "denied", "revoked"]
@@ -97,6 +118,31 @@ class ResidencyState:
             raise ResidencyStateError(f"cannot inspect {label}: {path}: {error}") from error
 
     @staticmethod
+    def _is_link_like(path: Path) -> bool:
+        """Return whether path is a symlink or, on Windows, a directory junction."""
+        if path.is_symlink():
+            return True
+        is_junction = getattr(os.path, "isjunction", None)
+        return bool(is_junction and is_junction(path))
+
+    @staticmethod
+    def _fchmod(descriptor: int, mode: int) -> None:
+        """Apply owner-only mode where the platform supports it.
+
+        os.fchmod exists on Windows only since Python 3.13 and there it can
+        only toggle the read-only attribute; access is governed by the ACLs
+        of the user profile the state lives in.
+        """
+        if hasattr(os, "fchmod"):
+            os.fchmod(descriptor, mode)
+
+    @staticmethod
+    def _close_directory_handle(handle: Optional[DirectoryHandle]) -> None:
+        """Close a POSIX directory descriptor; Windows path handles need nothing."""
+        if isinstance(handle, int):
+            os.close(handle)
+
+    @staticmethod
     def _is_within(path: Path, parent: Path) -> bool:
         """Return whether path is parent itself or one of its descendants."""
         try:
@@ -140,6 +186,9 @@ class ResidencyState:
             raise ResidencyStateError(
                 "residency state directory must not be the filesystem root"
             )
+        if _IS_WINDOWS:
+            self._ensure_private_directory_windows(directory, root)
+            return
 
         flags = os.O_RDONLY
         if hasattr(os, "O_DIRECTORY"):
@@ -216,6 +265,42 @@ class ResidencyState:
             if descriptor is not None:
                 os.close(descriptor)
 
+    def _ensure_private_directory_windows(self, directory: Path, root: Path) -> None:
+        """Path-based equivalent of the descriptor walk for Windows."""
+        components = directory.relative_to(root).parts
+        current = root
+        try:
+            for index, component in enumerate(components):
+                current = current / component
+                is_target = index == len(components) - 1
+                if self._is_link_like(current):
+                    raise ResidencyStateError(
+                        f"residency state directory must not be a symlink: {current}"
+                    )
+                created = False
+                if not os.path.lexists(current):
+                    try:
+                        os.mkdir(current, 0o700)
+                        created = True
+                    except FileExistsError:
+                        pass
+                    if self._is_link_like(current):
+                        raise ResidencyStateError(
+                            f"residency state directory must not be a symlink: {current}"
+                        )
+                if not current.is_dir():
+                    raise ResidencyStateError(
+                        f"residency state directory is not a directory: {current}"
+                    )
+                if created or is_target:
+                    os.chmod(current, 0o700)
+        except ResidencyStateError:
+            raise
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot secure residency state directory: {directory}: {error}"
+            ) from error
+
     def _ensure_private_file(self, path: Path) -> None:
         """Require a regular state file and enforce owner-only access."""
         self._reject_symlink(path, "residency state file")
@@ -232,7 +317,7 @@ class ResidencyState:
                 raise ResidencyStateError(
                     f"residency state must have exactly one hard link: {path}"
                 )
-            os.fchmod(descriptor, 0o600)
+            self._fchmod(descriptor, 0o600)
         except ResidencyStateError:
             raise
         except OSError as error:
@@ -264,9 +349,8 @@ class ResidencyState:
                 raise ResidencyStateError(
                     f"residency state lock must have exactly one hard link: {self.lock_file}"
                 )
-            os.fchmod(descriptor, 0o600)
-            operation = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
-            fcntl.flock(descriptor, operation)
+            self._fchmod(descriptor, 0o600)
+            self._acquire_lock(descriptor, exclusive=exclusive)
         except ResidencyStateError:
             if descriptor is not None:
                 try:
@@ -288,9 +372,41 @@ class ResidencyState:
         finally:
             assert descriptor is not None
             try:
-                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                self._release_lock(descriptor)
             finally:
                 os.close(descriptor)
+
+    @staticmethod
+    def _acquire_lock(descriptor: int, *, exclusive: bool) -> None:
+        """Take the state lock: flock on POSIX, a bounded msvcrt poll on Windows.
+
+        msvcrt has no shared mode, so on Windows every lock is exclusive: this
+        restricts concurrency more than POSIX, never less.
+        """
+        if not _IS_WINDOWS:
+            fcntl.flock(descriptor, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            return
+        deadline = time.monotonic() + _WINDOWS_LOCK_TIMEOUT_SECONDS
+        while True:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            try:
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                return
+            except OSError as error:
+                if error.errno not in (errno.EACCES, errno.EDEADLK):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(_WINDOWS_LOCK_POLL_SECONDS)
+
+    @staticmethod
+    def _release_lock(descriptor: int) -> None:
+        """Release the lock taken by _acquire_lock."""
+        if not _IS_WINDOWS:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            return
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
 
     def _legacy_state_file(self) -> Path:
         """Resolve the one supported pre-#521B state location."""
@@ -364,9 +480,11 @@ class ResidencyState:
             chunks.append(chunk)
         return b"".join(chunks)
 
-    def _open_legacy_directory(self) -> Optional[int]:
+    def _open_legacy_directory(self) -> Optional[DirectoryHandle]:
         """Pin workspace/current without following a symlink below workspace."""
         assert self._legacy_workspace_root is not None
+        if _IS_WINDOWS:
+            return self._legacy_directory_path_windows()
         directory_flags = os.O_RDONLY
         if hasattr(os, "O_DIRECTORY"):
             directory_flags |= os.O_DIRECTORY
@@ -410,13 +528,40 @@ class ResidencyState:
         finally:
             os.close(root_descriptor)
 
+    def _legacy_directory_path_windows(self) -> Optional[Path]:
+        """Windows variant of _open_legacy_directory: a validated path, not a descriptor."""
+        assert self._legacy_workspace_root is not None
+        current = self._legacy_workspace_root / "current"
+        try:
+            if not self._legacy_workspace_root.exists():
+                return None
+            if self._is_link_like(current):
+                raise ResidencyStateError(
+                    "legacy consent directory must be a real directory inside "
+                    f"the IWE workspace: {current}"
+                )
+            if not os.path.lexists(current):
+                return None
+            if not current.is_dir():
+                raise ResidencyStateError(
+                    f"legacy consent directory is not a directory: {current}"
+                )
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot open IWE workspace for consent migration: "
+                f"{self._legacy_workspace_root}: {error}"
+            ) from error
+        return current
+
     @staticmethod
-    def _entry_exists_at(directory_descriptor: Optional[int], name: str) -> bool:
+    def _entry_exists_at(directory_handle: Optional[DirectoryHandle], name: str) -> bool:
         """Check an entry without following its final symlink."""
-        if directory_descriptor is None:
+        if directory_handle is None:
             return False
         try:
-            os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+            if isinstance(directory_handle, Path):
+                return os.path.lexists(directory_handle / name)
+            os.stat(name, dir_fd=directory_handle, follow_symlinks=False)
             return True
         except FileNotFoundError:
             return False
@@ -425,8 +570,18 @@ class ResidencyState:
                 f"cannot inspect legacy consent entry {name}: {error}"
             ) from error
 
-    def _read_legacy_candidate(self, directory_descriptor: int) -> bytes:
+    def _read_legacy_candidate(self, directory_handle: DirectoryHandle) -> bytes:
         """Read the legacy state through the pinned current directory."""
+        assert self._legacy_file_path is not None
+        if isinstance(directory_handle, Path):
+            candidate = directory_handle / self.STATE_FILE_NAME
+            if self._is_link_like(candidate):
+                raise ResidencyStateError(
+                    f"consent state cannot be read safely: {self._legacy_file_path}: "
+                    "legacy state must not be a symlink"
+                )
+            return self._read_migration_candidate(candidate)
+        directory_descriptor = directory_handle
         flags = os.O_RDONLY
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
@@ -477,6 +632,10 @@ class ResidencyState:
 
     def _fsync_private_directory(self, directory: Path) -> None:
         """Strictly persist a private directory before retiring legacy data."""
+        if _IS_WINDOWS:
+            # A directory cannot be opened or fsynced on Windows; NTFS journals
+            # directory metadata itself, and file contents were fsynced already.
+            return
         flags = os.O_RDONLY
         if hasattr(os, "O_DIRECTORY"):
             flags |= os.O_DIRECTORY
@@ -512,7 +671,7 @@ class ResidencyState:
 
         try:
             with os.fdopen(descriptor, "wb") as output:
-                os.fchmod(output.fileno(), 0o600)
+                self._fchmod(output.fileno(), 0o600)
                 output.write(content)
                 output.flush()
                 os.fsync(output.fileno())
@@ -599,7 +758,10 @@ class ResidencyState:
             # directly in private state storage; a crash never leaves a second
             # consent file inside the workspace. Cross-device layouts stop
             # safely because no atomic rename exists across filesystems.
-            if not quarantine_exists:
+            if not quarantine_exists and _IS_WINDOWS:
+                assert legacy_directory is not None
+                self._quarantine_legacy_windows(legacy, quarantine)
+            elif not quarantine_exists:
                 assert legacy_directory is not None
                 state_directory_flags = os.O_RDONLY
                 if hasattr(os, "O_DIRECTORY"):
@@ -647,31 +809,51 @@ class ResidencyState:
                         f"preserving both files: {legacy}, {quarantine}"
                     )
             finally:
-                if fresh_legacy_directory is not None:
-                    os.close(fresh_legacy_directory)
+                self._close_directory_handle(fresh_legacy_directory)
 
             try:
                 quarantine.unlink()
-                state_directory_flags = os.O_RDONLY
-                if hasattr(os, "O_DIRECTORY"):
-                    state_directory_flags |= os.O_DIRECTORY
-                if hasattr(os, "O_NOFOLLOW"):
-                    state_directory_flags |= os.O_NOFOLLOW
-                state_directory = os.open(
-                    self.state_file.parent, state_directory_flags
-                )
-                try:
-                    self._fsync_descriptor(state_directory, quarantine.parent)
-                finally:
-                    os.close(state_directory)
+                if not _IS_WINDOWS:
+                    state_directory_flags = os.O_RDONLY
+                    if hasattr(os, "O_DIRECTORY"):
+                        state_directory_flags |= os.O_DIRECTORY
+                    if hasattr(os, "O_NOFOLLOW"):
+                        state_directory_flags |= os.O_NOFOLLOW
+                    state_directory = os.open(
+                        self.state_file.parent, state_directory_flags
+                    )
+                    try:
+                        self._fsync_descriptor(state_directory, quarantine.parent)
+                    finally:
+                        os.close(state_directory)
             except OSError as error:
                 raise ResidencyStateError(
                     "local copy is safe but quarantined legacy state could not be retired: "
                     f"{quarantine}: {error}"
                 ) from error
         finally:
-            if legacy_directory is not None:
-                os.close(legacy_directory)
+            self._close_directory_handle(legacy_directory)
+
+    def _quarantine_legacy_windows(self, legacy: Path, quarantine: Path) -> None:
+        """Windows variant of the descriptor-relative quarantine rename."""
+        if self._is_link_like(legacy):
+            raise ResidencyStateError(
+                f"cannot quarantine legacy consent state: {legacy}: "
+                "legacy state must not be a symlink"
+            )
+        try:
+            # os.rename never overwrites on Windows, matching the no-clobber
+            # expectation of the POSIX branch, and is atomic within a volume.
+            os.rename(legacy, quarantine)
+        except OSError as error:
+            if error.errno == errno.EXDEV:
+                raise ResidencyStateError(
+                    "legacy consent state is on a different filesystem; "
+                    "automatic atomic migration is unavailable"
+                ) from error
+            raise ResidencyStateError(
+                f"cannot quarantine legacy consent state: {legacy}: {error}"
+            ) from error
 
     def _ensure_file_exists(self) -> None:
         """Create empty state on first-ever use; fail closed if it vanished later.
@@ -755,7 +937,7 @@ class ResidencyState:
             )
             temp_path = Path(raw_path)
             with os.fdopen(descriptor, "wb") as output:
-                os.fchmod(output.fileno(), 0o600)
+                self._fchmod(output.fileno(), 0o600)
                 output.write(content)
                 output.flush()
                 os.fsync(output.fileno())
