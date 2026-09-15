@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "24a7e692cc9bf3e1f643377294ec68c809253d735c154d167bce229ada814ea5"
+      "sha256": "82a913079269ada31321c035674f40c390819fc95a7332f951b431ccd2e7f481"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -121,7 +121,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "54f8bbeb908d572e53f139066c9cdfd0a9f799aa031689f1f1c727748604f3fa"
+      "sha256": "34ce9612d81c8dd6302c2998a89baa64dd74c3fed9feccb16801c7a28335413b"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -1749,7 +1749,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "5eac6a0d017c9ac0f9b924a8bba550a32c42e12b4d2f55527ff1d6a6f46fd4a0"
+      "sha256": "7efcf494378d893dc9c4babc882030607267fda4f11fc6d71ea16539c2115dfa"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -2237,7 +2237,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "cb5daecc19c2bd2123694312a7c17a8e3b7f0df5418113cad5bf4a5e4c41ef01"
+      "sha256": "ad1043885fb41723fa82919eaddf57d6c00a483e388dd6a4561933b6eb12e090"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2357,7 +2357,7 @@
     },
     {
       "path": "scripts/iwe-drift.sh",
-      "sha256": "314d3b4816d82face81014d74d56064253b63d29b8152f0986e6c451ed575a07"
+      "sha256": "2d9986f85ae031344c4f22ef0215b545e45a2f823b6bf942135da5113a838bcf"
     },
     {
       "path": "scripts/iwe-grep-secret.sh",
@@ -2961,7 +2961,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "82a95634eb0a2270847f2aa4a6cc7215662da0ea501e48e782b1a72f6a63b22b"
+      "sha256": "2ab08ff16ac968d974cb6cdc1bb08af1fcbc8ca33828982d30a417d409234f0a"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
