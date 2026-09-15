@@ -183,6 +183,7 @@ dir_newest_mtime_days_ago() {
 parse_manifest() {
     local manifest="$1"
     awk '
+        /^activity_checks:/ { if (id != "") print_record(); exit }
         /^  - id:/ { if (id != "") print_record(); id = clean($3) }
         /^    source:/ { source = clean($2) }
         /^    derived:/ { derived = clean($2) }
