@@ -144,6 +144,13 @@ complete_dry_run_on_stop() {
   if [ "$(sed -n '2p' "$lock_dir/pid" 2>/dev/null)" = "$nonce" ]; then
     rm -rf "$lock_dir" 2>/dev/null || true
   fi
+  # issue #818: RETURN trap (строка ~98) переживает эту функцию — bash не
+  # скоупит `trap ... RETURN` к функции, где он поставлен, он остаётся
+  # армированным для ЛЮБОГО следующего возврата функции/sourced-скрипта в
+  # этом же процессе. Без явной очистки здесь — обычный Stop без активной
+  # репетиции падает под `set -u`, когда хук позже сорсит bootstrap: trap
+  # срабатывает повторно на уже мёртвых $lock_dir/$nonce.
+  trap - RETURN 2>/dev/null || true
   return 0
 }
 

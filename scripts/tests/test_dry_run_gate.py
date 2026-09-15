@@ -114,6 +114,42 @@ class TestSentinelActive:
             r = _run_hook(cmd)
             assert r.returncode == 0, cmd
 
+    def test_nice_wrapper_blocked(self, sentinel):
+        """issue #825: `nice` was missing from the wrapper-skip list, so
+        `nice rm -f ...` rode past the classifier unclassified. Cold-review
+        (second pass) found the fix only closed the bare `nice cmd` form —
+        `nice -n 19 cmd`/`nice -n19 cmd` (the common real-world form, an
+        adjustment value is normal usage) still bypassed because the
+        argument itself doesn't match any wrapper/VAR= pattern and stops the
+        loop on it. All of nice's argument forms plus the legacy `-N` form
+        must be skipped, not just the bare wrapper word."""
+        for cmd in (
+            "nice rm -f /tmp/iwe-drg-nice-test",
+            "nice -n 19 rm -f /tmp/iwe-drg-nice-test",
+            "nice -n19 rm -f /tmp/iwe-drg-nice-test",
+            "nice --adjustment=19 rm -f /tmp/iwe-drg-nice-test",
+            "nice -19 rm -f /tmp/iwe-drg-nice-test",
+        ):
+            assert _run_hook(cmd).returncode == 2, cmd
+        # read-only under the same wrapper still allowed
+        assert _run_hook("nice -n 19 git status").returncode == 0
+
+    def test_absolute_path_wrapper_and_command_blocked(self, sentinel):
+        """issue #825 part 2: the classifier matched the leading token
+        literally, so an absolute-path invocation of a wrapper (`/usr/bin/nice
+        ...`) or of the real command itself (`/usr/bin/git commit`, `/bin/rm`)
+        matched no case arm and fell through to the default allow at the end
+        of the file. Basename resolution (`${token##*/}`) closes this without
+        touching the WL_ABS*/whitelist literal-path comparisons, which stay
+        deliberately exact-match (review-01/02: glob or env-based resolution
+        there let a decoy path or IWE_ROOT injection through)."""
+        for cmd in (
+            "/usr/bin/nice rm -f /tmp/iwe-drg-nice-test",
+            "/usr/bin/git commit -am x",
+            "/bin/rm -f /tmp/iwe-drg-nice-test",
+        ):
+            assert _run_hook(cmd).returncode == 2, cmd
+
     def test_redirect_and_fs_mutation_blocked(self, sentinel):
         assert _run_hook("echo x > /tmp/iwe-drg-test-f").returncode == 2
         assert _run_hook("rm /tmp/iwe-drg-test-f").returncode == 2
@@ -305,3 +341,38 @@ class TestStopOwnership:
             assert not OWNER.exists(), "sentinel уже снят явно — owner-файл residue, чистится"
         finally:
             OWNER.unlink(missing_ok=True)
+
+    def test_ordinary_stop_survives_leftover_dry_dir(self, tmp_path):
+        """issue #818: `complete_dry_run_on_stop` arms a RETURN trap that
+        references its own locals (lock_dir/nonce) and never clears it. bash
+        does not scope a RETURN trap to the function that set it — it stays
+        armed for the next `source` in the same process. This hook sources
+        iwe-env-bootstrap.sh right after calling this function (line ~167),
+        so an ordinary Stop with a leftover (no active gate) dry-run state
+        directory used to crash with "unbound variable" under `set -u`, even
+        with zero active rehearsal. Reproduces the exact trigger: a real
+        dry_dir that exists (matching test-mode override contract used by
+        dry-run-gate.sh) but no matching active gate-*.state for this
+        session_id — exercises the code past the trap-arming line, not just
+        the earlier no-op return paths."""
+        dry_dir = tmp_path / "dry-dir"
+        dry_dir.mkdir()
+        (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+        # transcript_path must exist and be readable: the hook short-circuits
+        # (exits before sourcing iwe-env-bootstrap.sh, the actual trap
+        # trigger) on a missing/empty path — an empty JSONL file is enough,
+        # only its existence matters for reaching the source line.
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text("", encoding="utf-8")
+        env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "sentinel.flag"))
+        payload = json.dumps({"session_id": "no-active-gate-session", "transcript_path": str(transcript)})
+        result = subprocess.run(
+            ["bash", str(STOP_HOOK)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "unbound variable" not in result.stderr

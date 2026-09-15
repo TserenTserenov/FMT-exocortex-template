@@ -599,16 +599,44 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         [ -z "$SEG" ] && continue
         # shellcheck disable=SC2086
         set -- $SEG
-        # Пропустить VAR=val / command / env / nohup / time / sudo — переход к реальной команде.
+        # Пропустить VAR=val / command / env / nohup / time / sudo / nice — переход
+        # к реальной команде. issue #825, две дыры (обе живьём подтверждены
+        # cold-review): (1) `nice` отсутствовал в списке обёрток — `nice rm -f
+        # ...` проходил непроверенным; (2) сравнение по литеральному слову не
+        # матчило `/usr/bin/nice ...`/абсолютный путь к любой обёртке —
+        # basename (`${1##*/}`) закрывает это без обращения к файловой системе
+        # (не readlink/stat — чистая строковая операция, не открывает тот же
+        # класс обхода, что был закрыт для WL_ABS/WL_ABS2/WL_ABS3 review-01/02:
+        # те сравнивают ВТОРОЙ токен — путь к скрипту-аргументу — для ALLOW,
+        # остаются литеральными; здесь меняется только то, в какой БЛОКИРУЮЩИЙ
+        # рукав попадёт команда).
         while [ $# -gt 0 ]; do
             case "$1" in
                 *=*) shift ;;
-                command|env|nohup|time|sudo) shift ;;
-                *) break ;;
+                *)
+                    case "${1##*/}" in
+                        command|env|nohup|time|sudo) shift ;;
+                        nice)
+                            shift
+                            # nice сам принимает необязательный аргумент
+                            # приоритета — `nice -n 19 cmd`/`nice -n19 cmd`
+                            # (самая частая форма реального вызова) без этого
+                            # блока не матчили ни VAR=, ни список обёрток и
+                            # останавливали цикл на W0=-n, снова проходя
+                            # непроверенными (cold-review нашёл живьём).
+                            case "${1:-}" in
+                                -n) [ $# -ge 2 ] && shift 2 || shift ;;
+                                -n*|--adjustment=*) shift ;;
+                                -[0-9]*) shift ;;
+                            esac
+                            ;;
+                        *) break ;;
+                    esac
+                    ;;
             esac
         done
         [ $# -eq 0 ] && continue
-        W0=$1
+        W0="${1##*/}"
 
         case "$W0" in
             git)
