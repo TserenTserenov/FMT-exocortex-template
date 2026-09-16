@@ -694,6 +694,29 @@ else
     fail "H: no compact-format guard message, output was:"; cat "$TEST_ROOT/out-h.log" >&2
 fi
 
+# WP-529 F26: the no-Python degradation used to announce itself with a single
+# line lost among dozens of others — a user learned that integrity was never
+# checked only from exit code 4, if they looked at it at all. The run above
+# already goes through that exact branch, so assert the framed warning and its
+# consequences here rather than building a second fixture for it.
+if grep -q "ОБНОВЛЕНИЕ БЕЗ ПРОВЕРКИ ЦЕЛОСТНОСТИ" "$TEST_ROOT/out-h.log"; then
+    pass "H: the no-Python degradation is announced with a visible framed banner"
+else
+    fail "H: framed integrity warning missing, output was:"; cat "$TEST_ROOT/out-h.log" >&2
+fi
+
+if grep -q "установите python3" "$TEST_ROOT/out-h.log"; then
+    pass "H: the warning tells the user how to restore full verification"
+else
+    fail "H: the warning does not say how to restore full verification"
+fi
+
+if grep -q "кодом 4" "$TEST_ROOT/out-h.log"; then
+    pass "H: the warning explains that exit code 4 marks an unverified run"
+else
+    fail "H: the warning does not explain the meaning of exit code 4"
+fi
+
 if grep -q "Не удалось разобрать манифест" "$TEST_ROOT/out-h.log"; then
     fail "H: wrong error path — hit the Python-parser failure message, not the fallback guard"
 else

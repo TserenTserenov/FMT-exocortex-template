@@ -44,6 +44,21 @@ BRANCH="main"
 # (author/dev workflow) — a failed release lookup aborts fail-closed (#501),
 # it never falls back to main automatically.
 UPDATE_CHANNEL="${IWE_UPDATE_CHANNEL:-release}"
+# WP-529 F26: an unknown channel used to fall through to the main branch
+# silently — a typo (IWE_UPDATE_CHANNEL=realese) delivered unreleased main to a
+# user who explicitly asked for the pinned release. Fail closed and name the
+# accepted values instead of guessing which one was meant.
+case "$UPDATE_CHANNEL" in
+    release|main) ;;
+    *)
+        echo "✗ Неизвестный канал обновления: IWE_UPDATE_CHANNEL='$UPDATE_CHANNEL'" >&2
+        echo "  Допустимые значения:" >&2
+        echo "    release — последний опубликованный выпуск (по умолчанию)" >&2
+        echo "    main    — движущаяся ветка разработки (только для автора)" >&2
+        echo "  Обновление остановлено: неизвестное значение раньше молча уводило на main." >&2
+        exit "$EXIT_USAGE"
+        ;;
+esac
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 API_BASE="https://api.github.com/repos/$REPO"
 
@@ -2758,7 +2773,21 @@ else
     # every file below counts as unverified (INTEGRITY_TAINTED, not merely
     # "checked composition only" as the old comment claimed).
     INTEGRITY_TAINTED=true
-    echo "⚠ Python недоступен — только состав файлов сверяется, содержимое НЕ проверяется по контрольной сумме." >&2
+    # WP-529 F26: одна строка в общем потоке вывода терялась между десятками
+    # других — пользователь узнавал о работе без проверки целостности только по
+    # коду возврата 4, если вообще на него смотрел. Рамка и явные последствия
+    # делают деградацию заметной в момент, когда она происходит.
+    echo "" >&2
+    echo "┌──────────────────────────────────────────────────────────────────┐" >&2
+    echo "│ ⚠  ОБНОВЛЕНИЕ БЕЗ ПРОВЕРКИ ЦЕЛОСТНОСТИ                           │" >&2
+    echo "└──────────────────────────────────────────────────────────────────┘" >&2
+    echo "  Python недоступен, поэтому контрольные суммы SHA-256 не проверяются." >&2
+    echo "  Сверяется только состав файлов: подменённое или повреждённое" >&2
+    echo "  содержимое в этом режиме обнаружено НЕ будет." >&2
+    echo "  Обновление завершится с кодом $EXIT_TAINTED вместо 0 — это не ошибка," >&2
+    echo "  а отметка, что проверка целостности не выполнялась." >&2
+    echo "  Как вернуть полную проверку: установите python3 и повторите запуск." >&2
+    echo "" >&2
 
     # High 2 fail-closed guard (peer-session 2026-08-21-12, Codex, revised
     # after cold-context review found the first version tautological — the
