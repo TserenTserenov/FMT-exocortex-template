@@ -25,10 +25,20 @@ git clone --quiet --no-hardlinks "$ROOT" "$GOV"
 git -C "$GOV" config user.email test@test
 git -C "$GOV" config user.name test
 
+# The real hook always runs with cwd = repo root (that's how git invokes
+# .githooks/pre-commit) -- pre-commit-secret-scan.sh relies on that (its own
+# `git rev-parse --show-toplevel` and `git diff --cached` both use cwd, no
+# explicit -C anywhere). An earlier version of this test ran the script
+# without cd'ing into $GOV first: it silently scanned whatever repo this
+# test process's own cwd happened to be in instead, made all three checks
+# below pass or fail for the wrong reason, and was only caught because
+# check 3 (the negative control) failed loudly.
+run_scanner() { ( cd "$GOV" && bash scripts/pre-commit-secret-scan.sh ); }
+
 # --- 1. Staging a real edit to secret-bypass-lib.sh must not self-block ---
 printf '\n# issue-810 self-exclusion probe (no secret here)\n' >> "$GOV/.claude/hooks/secret-bypass-lib.sh"
 git -C "$GOV" add .claude/hooks/secret-bypass-lib.sh
-if out=$(bash "$GOV/scripts/pre-commit-secret-scan.sh" 2>&1); then
+if out=$(run_scanner 2>&1); then
     ok "editing secret-bypass-lib.sh does not self-block on its own rule literals"
 else
     echo "$out" >&2
@@ -40,7 +50,7 @@ git -C "$GOV" checkout -q -- .claude/hooks/secret-bypass-lib.sh
 # --- 2. Staging a real edit to secret-bypass-analyzer.py must not self-block ---
 printf '\n# issue-810 self-exclusion probe (no secret here)\n' >> "$GOV/.claude/hooks/secret-bypass-analyzer.py"
 git -C "$GOV" add .claude/hooks/secret-bypass-analyzer.py
-if out=$(bash "$GOV/scripts/pre-commit-secret-scan.sh" 2>&1); then
+if out=$(run_scanner 2>&1); then
     ok "editing secret-bypass-analyzer.py does not self-block on its own rule literals"
 else
     echo "$out" >&2
@@ -58,7 +68,7 @@ git -C "$GOV" checkout -q -- .claude/hooks/secret-bypass-analyzer.py
 PEM_HEADER="-----BEGIN ""RSA PRIVATE KEY""-----"
 printf '%s\nnot a real key, just the header shape\n' "$PEM_HEADER" > "$GOV/probe-secret.txt"
 git -C "$GOV" add probe-secret.txt
-if bash "$GOV/scripts/pre-commit-secret-scan.sh" >"$TMP/c3.out" 2>&1; then
+if run_scanner >"$TMP/c3.out" 2>&1; then
     bad "ordinary staged file with a private-key header bypassed the scanner"
 else
     ok "ordinary staged file with a private-key header still blocked (exclusion is exact-path)"
