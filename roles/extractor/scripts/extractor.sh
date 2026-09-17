@@ -673,10 +673,18 @@ mount_readonly_packs() {
     local isolated_workspace="$2"
     local pack_dir pack_name remote_url snapshot_ref pack_count=0
     EXTRACTOR_PACK_REFS=()
+    EXTRACTOR_PACK_SKIPPED=()
     EXTRACTOR_PACK_VERIFIED_AT=""
     for pack_dir in "$canonical_workspace"/PACK-*; do
         [ -d "$pack_dir" ] || continue
         pack_name=$(basename "$pack_dir")
+        # Frozen Pack has no live remote by design -- skip it instead of
+        # aborting duplicate-check for every other Pack too (WP-7 F156).
+        if [ -f "$pack_dir/.pack-frozen" ]; then
+            log "WARN: $pack_name marked .pack-frozen, skipping mount (not counted toward duplicate-check coverage)"
+            EXTRACTOR_PACK_SKIPPED+=("$pack_name")
+            continue
+        fi
         if ! remote_url=$(git -C "$pack_dir" remote get-url origin 2>/dev/null) || \
            ! (cd "$pack_dir" && git clone -q --no-local --depth 1 --single-branch --no-tags \
                "$remote_url" "$isolated_workspace/$pack_name") >> "$LOG_FILE" 2>&1 || \
@@ -695,6 +703,9 @@ mount_readonly_packs() {
         log "ERROR: no Pack repositories available; duplicate check and analysis were not started"
         return 1
     fi
+    if [ "${#EXTRACTOR_PACK_SKIPPED[@]}" -gt 0 ]; then
+        log "WARN: duplicate-check ran against $pack_count of $((pack_count + ${#EXTRACTOR_PACK_SKIPPED[@]})) Packs; skipped (frozen): ${EXTRACTOR_PACK_SKIPPED[*]}"
+    fi
     EXTRACTOR_PACK_VERIFIED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 }
 
@@ -708,6 +719,9 @@ pack_snapshot_context() {
     for pack_ref in "${EXTRACTOR_PACK_REFS[@]}"; do
         printf -- '- %s\n' "$pack_ref"
     done
+    if [ "${#EXTRACTOR_PACK_SKIPPED[@]}" -gt 0 ]; then
+        printf 'Внимание: следующие Pack помечены как frozen и не участвовали в проверке на дубли: %s\n' "${EXTRACTOR_PACK_SKIPPED[*]}"
+    fi
 }
 
 pending_capture_count() {
