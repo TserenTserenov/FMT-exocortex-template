@@ -41,7 +41,20 @@ def redact_yookassa(match):
         before.endswith("::")
         and re.match(r"(?:\[[^\]\r\n]*\])?(?=\s|$|:)", after) is not None
     )
-    if YOOKASSA_PYTEST_SHAPE_RE.fullmatch(value) and (source_definition or pytest_nodeid):
+    # issue #848: the same pytest-identifier shape also shows up merely
+    # MENTIONING a test's name rather than defining or addressing it -- a
+    # comment referencing it, a `--exclude=`/`=`-style CLI argument, or the
+    # basename of a `test_*.sh`/`test_*.py` file. Recognized the same way as
+    # source_definition/pytest_nodeid above: by syntactic context, not by
+    # relaxing YOOKASSA_PYTEST_SHAPE_RE itself -- the shape bar (five or more
+    # lowercase snake_case segments) stays exactly as strict as before.
+    current_line = before.rsplit("\n", 1)[-1]
+    comment_mention = "#" in current_line
+    cli_argument = re.search(r"=\Z", before) is not None
+    script_filename = re.match(r"\.(?:sh|py)\b", after) is not None
+    if YOOKASSA_PYTEST_SHAPE_RE.fullmatch(value) and (
+        source_definition or pytest_nodeid or comment_mention or cli_argument or script_filename
+    ):
         return value
     return "[REDACTED-YOOKASSA-KEY]"
 
@@ -1810,6 +1823,10 @@ def self_test():
         "123456789:short",
         "def test_alpha_bravo_charlie_delta_echo(self):",
         "tests/test_foo.py::test_alpha_bravo_charlie_delta_echo PASSED",
+        # issue #848: mentioning a test's name outside a def/nodeid context.
+        "# scripts/tests/test_alpha_bravo_charlie_delta_echo.sh",
+        "--exclude=test_alpha_bravo_charlie_delta_echo.sh",
+        "# see test_alpha_bravo_charlie_delta_echo for the fixture",
     )
     for name, value in positives.items():
         ids, count, _details = scan(value)
