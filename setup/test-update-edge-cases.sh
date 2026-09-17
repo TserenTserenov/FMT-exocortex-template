@@ -36,6 +36,11 @@
 #   T35: /extend catalog matches every invoked extension point (issues #436/#508)
 #   T36: extension loader sorts suffixes and preserves no-op/error exit codes (issue #508)
 #   T40: Kimi peer heartbeat stays outside authoritative session admission (WP-484)
+#   T41: sync_workspace_claude_md() accepts a hand-resolved conflict instead of
+#        re-merging it against the stale base forever; a stale pending record
+#        (upstream moved on) is discarded, not silently accepted (issue #846)
+#   T42: memory/*.md stale-repair backs up the workspace copy before
+#        overwriting it, like .claude/rules/* already does (issue #847)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -4232,6 +4237,148 @@ then
     pass "T40u: template delivers the peer language-check dependency"
 else
     fail "T40u: peer language-check dependency is missing or inactive"
+fi
+
+# ============================================================================
+# T41: sync_workspace_claude_md() accepts a hand-resolved conflict instead of
+# re-merging it against the stale base forever; a stale pending record
+# (upstream moved on since) is discarded, not silently accepted (issue #846)
+# ============================================================================
+echo "--- T41: workspace CLAUDE.md conflict-pending sidecar (issue #846) ---"
+
+T41_FN_BLOCK=$(awk '/^sync_workspace_claude_md\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+if [ -z "$T41_FN_BLOCK" ]; then
+    fail "T41: could not extract sync_workspace_claude_md() from update.sh — signature moved?"
+else
+    T41_DIR="$TEST_WS/t41-claude-conflict"
+    mkdir -p "$T41_DIR"
+    T41_FN_FILE="$T41_DIR/fn.sh"
+    printf '%s\n' "$T41_FN_BLOCK" > "$T41_FN_FILE"
+
+    # Stubs for the function's two dependencies — this test targets the
+    # merge/conflict/pending logic, not placeholder substitution or the
+    # (unrelated) silent-loss heuristic.
+    substitute_claude_placeholders() { cp "$1" "$2"; }
+    detect_claude_silent_loss() { echo 0; }
+    # shellcheck source=/dev/null
+    source "$T41_FN_FILE"
+
+    T41_SCRIPT_DIR="$T41_DIR/script"
+    T41_WORKSPACE_DIR="$T41_DIR/workspace"
+    mkdir -p "$T41_SCRIPT_DIR" "$T41_WORKSPACE_DIR" "$T41_DIR/tmp"
+
+    # base + pilot's copy + upstream's next edit disagree on the same line —
+    # a real, unavoidable 3-way conflict.
+    printf 'line one\nORIGINAL\nline three\n' > "$T41_WORKSPACE_DIR/.claude.md.base"
+    printf 'line one\nPILOT-EDIT\nline three\n' > "$T41_WORKSPACE_DIR/CLAUDE.md"
+    printf 'line one\nUPSTREAM-EDIT\nline three\n' > "$T41_SCRIPT_DIR/CLAUDE.md"
+
+    SCRIPT_DIR="$T41_SCRIPT_DIR" WORKSPACE_DIR="$T41_WORKSPACE_DIR" TMPDIR_UPDATE="$T41_DIR/tmp"
+    CLAUDE_CONFLICT_DETECTED=false; CLAUDE_CONFLICT_FILES=(); CLAUDE_SILENT_LOSS_FILES=(); CLAUDE_CONFLICTS=0
+    sync_workspace_claude_md
+
+    if grep -q '^<<<<<<<' "$T41_WORKSPACE_DIR/CLAUDE.md" \
+        && [ -f "$T41_WORKSPACE_DIR/.claude.md.conflict-pending" ] \
+        && grep -q 'UPSTREAM-EDIT' "$T41_WORKSPACE_DIR/.claude.md.conflict-pending"; then
+        pass "T41: first run — real conflict surfaced and recorded as pending"
+    else
+        fail "T41: first run did not produce the expected conflict/pending state"
+    fi
+
+    # The pilot resolves it by hand: keeps their own edit, removes markers.
+    # Upstream CLAUDE.md is unchanged since the conflict.
+    printf 'line one\nPILOT-EDIT\nline three\n' > "$T41_WORKSPACE_DIR/CLAUDE.md"
+    sync_workspace_claude_md
+
+    if ! grep -q '^<<<<<<<' "$T41_WORKSPACE_DIR/CLAUDE.md" \
+        && grep -q 'PILOT-EDIT' "$T41_WORKSPACE_DIR/CLAUDE.md" \
+        && grep -q 'UPSTREAM-EDIT' "$T41_WORKSPACE_DIR/.claude.md.base" \
+        && [ ! -f "$T41_WORKSPACE_DIR/.claude.md.conflict-pending" ]; then
+        pass "T41: hand-resolved file accepted — base advanced without re-merging, file untouched"
+    else
+        fail "T41: hand-resolved file was re-merged instead of accepted"
+    fi
+
+    if compgen -G "$T41_WORKSPACE_DIR/.claude.md.base.bak-*" > /dev/null; then
+        pass "T41: old base backed up before being advanced"
+    else
+        fail "T41: old base was overwritten with no backup"
+    fi
+
+    # --- Scenario 2: upstream moves on again before the pilot resolves. The
+    # stale pending record (recorded against the now-superseded upstream
+    # edit) must not be blindly trusted — a fresh merge decides instead. ---
+    T41_SCRIPT_DIR2="$T41_DIR/script2"
+    T41_WORKSPACE_DIR2="$T41_DIR/workspace2"
+    mkdir -p "$T41_SCRIPT_DIR2" "$T41_WORKSPACE_DIR2" "$T41_DIR/tmp2"
+    printf 'line one\nORIGINAL\nline three\n' > "$T41_WORKSPACE_DIR2/.claude.md.base"
+    printf 'line one\nPILOT-EDIT\nline three\n' > "$T41_WORKSPACE_DIR2/CLAUDE.md"
+    printf 'line one\nUPSTREAM-EDIT\nline three\n' > "$T41_SCRIPT_DIR2/CLAUDE.md"
+
+    SCRIPT_DIR="$T41_SCRIPT_DIR2" WORKSPACE_DIR="$T41_WORKSPACE_DIR2" TMPDIR_UPDATE="$T41_DIR/tmp2"
+    CLAUDE_CONFLICT_DETECTED=false; CLAUDE_CONFLICT_FILES=(); CLAUDE_SILENT_LOSS_FILES=(); CLAUDE_CONFLICTS=0
+    sync_workspace_claude_md   # first conflict — records pending = UPSTREAM-EDIT
+
+    printf 'line one\nPILOT-EDIT\nline three\n' > "$T41_WORKSPACE_DIR2/CLAUDE.md"   # pilot resolves by hand
+    printf 'line one\nUPSTREAM-EDIT-V2\nline three\n' > "$T41_SCRIPT_DIR2/CLAUDE.md"  # but upstream moved on
+
+    T41_OUT2=$(SCRIPT_DIR="$T41_SCRIPT_DIR2" WORKSPACE_DIR="$T41_WORKSPACE_DIR2" TMPDIR_UPDATE="$T41_DIR/tmp2" \
+        sync_workspace_claude_md)
+
+    if ! printf '%s' "$T41_OUT2" | grep -q "принят как разрешённый вручную" \
+        && grep -q '^<<<<<<<' "$T41_WORKSPACE_DIR2/CLAUDE.md"; then
+        pass "T41: stale pending (upstream moved on) is discarded — fresh merge runs instead of blind accept"
+    else
+        fail "T41: stale pending record was blindly accepted despite upstream moving on"
+    fi
+fi
+
+# ============================================================================
+# T42: memory/*.md stale-repair backs up the workspace copy before
+# overwriting it, like .claude/rules/* already does (issue #847)
+# ============================================================================
+echo "--- T42: memory/* stale-repair backup (issue #847) ---"
+
+T42_FN_BLOCK=$(awk '/^backup_memory_file_before_overwrite\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+if [ -z "$T42_FN_BLOCK" ]; then
+    fail "T42: could not extract backup_memory_file_before_overwrite() from update.sh — signature moved?"
+else
+    T42_DIR="$TEST_WS/t42-memory-backup"
+    T42_WORKSPACE_DIR="$T42_DIR/workspace"
+    mkdir -p "$T42_WORKSPACE_DIR/memory"
+    printf '%s\n' "$T42_FN_BLOCK" > "$T42_DIR/fn.sh"
+    # shellcheck source=/dev/null
+    source "$T42_DIR/fn.sh"
+
+    WORKSPACE_DIR="$T42_WORKSPACE_DIR"
+    MEMORY_BACKUP_RUN=""
+    printf 'owner: platform\npilot-local edits here\n' > "$T42_WORKSPACE_DIR/memory/navigation.md"
+    backup_memory_file_before_overwrite "memory/navigation.md" "$T42_WORKSPACE_DIR/memory/navigation.md"
+
+    T42_BACKUP=$(find "$T42_WORKSPACE_DIR/.backups/memory-pre-update" -type f -name navigation.md -print -quit 2>/dev/null || true)
+    if [ -n "$T42_BACKUP" ] && grep -q 'pilot-local edits here' "$T42_BACKUP"; then
+        pass "T42: memory/navigation.md backed up before stale-repair overwrite"
+    else
+        fail "T42: no backup found for memory/navigation.md before overwrite"
+    fi
+
+    # A path outside memory/*.md|.yaml|.yml is a no-op (same guard shape as
+    # backup_rule_before_overwrite() for .claude/rules/*).
+    MEMORY_BACKUP_RUN=""
+    printf 'unrelated' > "$T42_WORKSPACE_DIR/README.md"
+    backup_memory_file_before_overwrite "README.md" "$T42_WORKSPACE_DIR/README.md"
+    if [ -z "$MEMORY_BACKUP_RUN" ]; then
+        pass "T42: non-memory path is a no-op, matching the .claude/rules/*-only scope of the sibling function"
+    else
+        fail "T42: backup_memory_file_before_overwrite acted on a path outside memory/*"
+    fi
+
+    T42_WIRED=$(grep -c 'backup_memory_file_before_overwrite "\$fpath" "\$mem_dst"' "$TEMPLATE_DIR/update.sh")
+    if [ "$T42_WIRED" -ge 1 ]; then
+        pass "T42: repair_pass() actually calls the backup before the stale-repair cp"
+    else
+        fail "T42: backup_memory_file_before_overwrite() exists but repair_pass() never calls it"
+    fi
 fi
 
 # ============================================================
