@@ -147,6 +147,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.40.1] — 2026-09-17
+
 ### Added
 
 - `8f77149` feat(artifactor): добавлен дискриминатор `result_type` (system vs episteme) (#793)
