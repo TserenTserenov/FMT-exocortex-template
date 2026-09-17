@@ -3045,7 +3045,7 @@
     },
     {
       "path": "setup/build-runtime.sh",
-      "sha256": "c858557329da9e9b8d1e665ab9f69994b2ebdc1da52cc7e0f014db633f32c83b"
+      "sha256": "d28e87a10d09ca8ed7c9e9775fabb81689e7a51d33817f4842c064520389919e"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -3081,7 +3081,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "cdd78d22f837b0bb0f20dc2cc82286bbe68661ab2524985bf7bb4991ccbbc9ff"
+      "sha256": "6856fd91b256076e90e1c164a373836498ea5f4d5b6f543e1e4c842d360673b3"
     }
   ],
   "excluded_paths": [
