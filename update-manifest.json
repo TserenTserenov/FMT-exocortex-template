@@ -3306,6 +3306,14 @@
       "path": "scripts/tests/test_session_guard_unknown_flag.sh",
       "reason": "moved to excluded_paths[] (scripts/tests/ blanket pattern) after being in files[] by oversight — WP-7 Ф92",
       "excluded_confirmed": true
+    },
+    {
+      "path": ".claude/skills/lesson-close/SKILL.md",
+      "reason": "removed 2026-09-17 (ffceb51, issue #778): shipped in the general template without its counterpart /lesson (author-only skill). personal-guide-start already distributes both /lesson and /lesson-close together when a pilot starts that flow -- the standalone shipment was redundant."
+    },
+    {
+      "path": "scripts/lesson-close.sh",
+      "reason": "removed 2026-09-17 (ffceb51, issue #778): companion script to the removed lesson-close skill, same reason."
     }
   ]
 }
