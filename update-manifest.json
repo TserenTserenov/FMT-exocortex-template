@@ -149,7 +149,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "2c02530b2c6df105016c02a4bb6fdefe4a4d4dbd424c943b58a85283febf8042"
+      "sha256": "fd5514c07da81142f0da2a57620b99a4d20f90fc7836ca14edd8fad00638afad"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -198,6 +198,10 @@
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
       "sha256": "6298b52f77be40dca698050a95fee94cca66cf4a9e64f119acde03b18d76f765"
+    },
+    {
+      "path": ".claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh",
+      "sha256": "f1c9f00430a7d44571fbc585e386806bd7934db499e976075e25c9ec96531833"
     },
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-unparsed-input.sh",

@@ -1590,11 +1590,36 @@ def analyze_bash(raw):
     command = tool_input.get("command")
     if not isinstance(command, str) or not command.strip():
         fail("invalid Bash hook envelope")
-    shell_scaffold, heredoc_bodies = extract_heredocs(command)
+    # issue #760: parse_heredoc_header() tracks quoting with one flat variable
+    # and does not know that $(...) opens an independent quoting context. A
+    # heredoc declared inside a still-open outer quote (`echo "$(cat <<'EOF'
+    # ... )"`) can therefore produce a bogus declaration and then fail()
+    # looking for a delimiter line that will never appear -- or, downstream,
+    # hand shell_command_variants() a scaffold shlex cannot tokenize. Both
+    # fail() with SystemExit rather than returning an error value. Degrading
+    # to a literal scan of the raw text (same as the heredoc_bodies scan a
+    # few lines below, which already needs no shell model) keeps secret
+    # detection working instead of fail-closed-blocking every tool call whose
+    # command happens to contain this shape -- exactly what the issue asked
+    # for. Confirmed by enumeration (peer-session 2026-09-17-08-wp582, with
+    # Kimi as reviewer) that every fail() reachable from extract_heredocs()
+    # (via parse_heredoc_header()/read_heredoc_word()) and from
+    # shell_tokens() is a grammar-parse failure, never a "secret found"
+    # result -- those come back through scan()'s return value, not an
+    # exception -- so nothing that should stay fail-closed is caught here.
+    try:
+        shell_scaffold, heredoc_bodies = extract_heredocs(command)
+    except SystemExit:
+        shell_scaffold, heredoc_bodies = command, []
     pattern_ids = []
     match_count = 0
     for variant in shell_command_variants(shell_scaffold):
-        variant_ids, variant_count, _details = scan(" ".join(shell_tokens(variant)))
+        try:
+            tokens = shell_tokens(variant)
+        except SystemExit:
+            variant_ids, variant_count, _details = scan(variant)
+        else:
+            variant_ids, variant_count, _details = scan(" ".join(tokens))
         pattern_ids.extend(variant_ids)
         match_count += variant_count
     for body in heredoc_bodies:
@@ -1612,26 +1637,47 @@ def analyze_bash(raw):
     try:
         direct_read, direct_upload, bulk_enumeration = analyze_shell_paths(shell_scaffold)
         shell_model = "complete"
-    except ShellModelUnsupported:
+    except (ShellModelUnsupported, SystemExit):
+        # issue #760 (peer-session 2026-09-17-08-wp582, with Kimi): a
+        # scaffold extract_heredocs() could not fully normalize can be
+        # malformed enough that analyze_shell_paths() itself hits shell_tokens()
+        # and fail()s with SystemExit -- not the friendlier ShellModelUnsupported
+        # ("valid Bash this analyzer does not model") this except used to
+        # assume was the only way in. Same degraded branch either way.
         shell_model = "unsupported"
-        scaffold_tokens = shell_tokens(shell_scaffold)
-        # Conservative token-level answers. value_has_sensitive_path, not
-        # is_sensitive_path: an uploader names the file INSIDE an argument
-        # (curl --data-binary @~/.config/aist/env), and a whole-token compare
-        # missed exactly that - cold review 06.09 showed the upload check was
-        # switched off entirely in this branch, so five characters of extra
-        # grammar (an elif) turned a refusal into a pass.
-        direct_read = any(
-            value_has_sensitive_path(token) for token in scaffold_tokens
-        )
-        # One mechanism covers both questions here: reading and sending name
-        # the same file, and without the shell model there is nothing left to
-        # tell the two apart. The refusal above is what stops both.
-        direct_upload = False
-        bulk_enumeration = any(
-            token in BULK_ENV_DUMP_EXECUTABLES or token == "railway"
-            for token in scaffold_tokens
-        )
+        try:
+            scaffold_tokens = shell_tokens(shell_scaffold)
+        except SystemExit:
+            # Even the token-level fallback below cannot lex this scaffold.
+            # The literal-value scan already ran and needs no shell model at
+            # all (see the comment above it) -- that stays the primary
+            # defense. secret-leak-block.sh already surfaces a visible
+            # "разобрано не полностью" notice whenever shell_model != complete,
+            # so silently answering "unknown" here for the path/upload
+            # heuristic is not a silent degradation for the user.
+            scaffold_tokens = None
+        if scaffold_tokens is None:
+            direct_read = False
+            direct_upload = False
+            bulk_enumeration = False
+        else:
+            # Conservative token-level answers. value_has_sensitive_path, not
+            # is_sensitive_path: an uploader names the file INSIDE an argument
+            # (curl --data-binary @~/.config/aist/env), and a whole-token compare
+            # missed exactly that - cold review 06.09 showed the upload check was
+            # switched off entirely in this branch, so five characters of extra
+            # grammar (an elif) turned a refusal into a pass.
+            direct_read = any(
+                value_has_sensitive_path(token) for token in scaffold_tokens
+            )
+            # One mechanism covers both questions here: reading and sending name
+            # the same file, and without the shell model there is nothing left to
+            # tell the two apart. The refusal above is what stops both.
+            direct_upload = False
+            bulk_enumeration = any(
+                token in BULK_ENV_DUMP_EXECUTABLES or token == "railway"
+                for token in scaffold_tokens
+            )
     return {
         "applicable": True,
         "session_id": session_id,
