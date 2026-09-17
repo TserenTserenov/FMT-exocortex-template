@@ -1002,6 +1002,18 @@ case "$1" in
         # WP-247 Ф-MULTI-SOURCE.2: git-diff feeder (cron 06:00/21:00).
         # Извлекает кандидатов из git log за окно и пишет ###-блоки в captures-inbox.
         # Окно: $2 (по умолчанию "12 hours ago").
+        #
+        # issue #840: this case wrote to the same captures.md as
+        # session-close-feed without taking any lock -- a concurrent
+        # session-close-feed run could lose this run's edits (read-modify-
+        # write race, same class as the one already fixed for session-close-
+        # feed above). Reuses that same lock dir/var: both feeders append to
+        # the identical file, so one shared lock is correct, not two.
+        feed_lock_dir="${IWE_EXTRACTOR_FEED_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-session-close-feed.lock}"
+        if ! acquire_inbox_lock "$feed_lock_dir" "git-diff-feed"; then
+            exit 0
+        fi
+        trap 'release_inbox_lock "$feed_lock_dir" "git-diff-feed"' EXIT
         SINCE="${2:-12 hours ago}"
         log "Running git-diff FEED (since: $SINCE)"
         run_claude "git-diff-feed" "$SINCE"

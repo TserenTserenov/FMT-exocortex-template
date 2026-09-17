@@ -1697,7 +1697,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "3353712ef5cdf0cba7b0c22a8df3bbb60a37343245a1738722ffd3a68ee68bd0"
+      "sha256": "0ca302f1368bc435e5bb20229f7d66265977999ba2542c16bf6e860a3ab8ee73"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1873,7 +1873,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "587b3b571d6abc41dfc9cd235bcbb9dd0ab08a8c31dab605e69abc29b7d1d6f2"
+      "sha256": "c4b362d060b716fa7a481dfd9a083cf837ac765ae81f18b6b30c7f85d9ea5575"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -3111,6 +3111,7 @@
     "scripts/tests/day-open-world-fill-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
+    "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
