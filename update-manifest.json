@@ -2181,7 +2181,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "b63df0f808a3be1c4ed2e807a5563e8b0364510310c902feff680c964ea909ab"
+      "sha256": "1398ca5ad93f04d36e120024b9218cfe0bdb0cd8c1a20c660db899b65a8b73ec"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -3147,6 +3147,7 @@
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_729_strategy_day.sh",
     "scripts/tests/test_issue_810_scan_selfexcl.sh",
+    "scripts/tests/test_issue_851_cyrillic_slug.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
