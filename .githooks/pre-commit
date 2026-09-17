@@ -13,6 +13,21 @@ if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
     exit 1
 fi
 
+# === issue #810: secret corpus scan ===
+# pre-commit-secret-scan.sh shipped since #410 but no hook ever called it --
+# check-secret/SKILL.md claimed an automatic layer that did not exist. The
+# script itself is fail-closed by design (exit 2 when its helpers are
+# missing/broken, exit 1 when it finds a match) -- calling it unconditionally
+# here is enough; no separate policy branch needed.
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOOK_DIR/..")"
+if [ -x "$REPO_ROOT/scripts/pre-commit-secret-scan.sh" ]; then
+    "$REPO_ROOT/scripts/pre-commit-secret-scan.sh" || exit 1
+else
+    echo "SECURITY: pre-commit-secret-scan.sh missing or not executable -- refusing to commit unscanned (fail-closed)." >&2
+    exit 1
+fi
+
 # === CHANGELOG ↔ update-manifest.json version sync ===
 # Корень бага (25 апр): drift на 5 версий между CHANGELOG (0.27.7) и
 # manifest (0.26.1) — update.sh --check отдавал «нет обновлений», пока

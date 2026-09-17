@@ -57,7 +57,7 @@
 
 Файлы/репо → `memory/navigation.md` · Pack-репо → `memory/repo-type-rules.md` · терминология → `memory/hard-distinctions.md` · FPF/SOTA/Роли → `memory/fpf-reference.md`, `memory/sota-reference.md`, `memory/roles.md` · документ/чеклист → `memory/checklists.md`.
 
-Политика: ≤11 файлов; построчно проверяется только distinctions.md (≤150), остальное — суммарным M1/M2-бюджетом (WP-7 NR1.2); lazy-reference без лимита. Горизонты/frontmatter → `memory/memory-lifecycle-spec.md`; temporal metadata → `memory/protocol-work.md §2`.
+Политика: построчно проверяется только distinctions.md (≤150), остальное — суммарным M1/M2-бюджетом (WP-7 NR1.2); lazy-reference без лимита (issue #736: старое «≤11 файлов» не имело кода-исполнителя и разошлось с практикой — архитектура памяти давно перешла на HOT/WARM/COLD с бюджетом по токенам, не по числу файлов, см. `memory/memory-lifecycle-spec.md`). Горизонты/frontmatter → `memory/memory-lifecycle-spec.md`; temporal metadata → `memory/protocol-work.md §2`.
 Рабочая директория: `{{HOME_DIR}}/IWE/`; `memory/` = симлинк на auto-memory.
 
 ## 5. АрхГейт — ОБЯЗАТЕЛЬНАЯ оценка

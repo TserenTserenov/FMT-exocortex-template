@@ -148,8 +148,12 @@
       "sha256": "304caca86a807c7022911bd9091895015717d76aa2d785a4bd2d6e0410495533"
     },
     {
+      "path": ".claude/hooks/secret-bypass-analyzer.py",
+      "sha256": "2c02530b2c6df105016c02a4bb6fdefe4a4d4dbd424c943b58a85283febf8042"
+    },
+    {
       "path": ".claude/hooks/secret-bypass-lib.sh",
-      "sha256": "5e00fb93f8cc28967b2af1a43d49c9acedac4c748bd511cf292a02c392d5a666"
+      "sha256": "a1123577daa3526a5507378dbe32916fe771ab0f3b2d49df0f79076df3d6fcb8"
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
@@ -341,7 +345,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "5d8752ff4dda433e822e52fad57bdf0121b4f339587ae4a5e9ebb0ce2fc89200"
+      "sha256": "4a645b10560a953c7837242b6c7b2394144d5231a056c2b8c99c62abd145dbf9"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -421,7 +425,7 @@
     },
     {
       "path": ".claude/skills/day-open/templates.md",
-      "sha256": "c91e7acf0bb5106713891079a84076cb8a0782a16de26ada96eabc32e7811154"
+      "sha256": "91418eaed0e9f36d152f60cfefd3a5f5800f2a69267317354b8c78b194ab33e8"
     },
     {
       "path": ".claude/skills/decompose/SKILL.md",
@@ -546,10 +550,6 @@
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
       "sha256": "062556dc1fff91780ae31633e12e4c69dd1a584612ad46591128e6443ffe3aa8"
-    },
-    {
-      "path": ".claude/skills/lesson-close/SKILL.md",
-      "sha256": "350dbc63ad76e3f1fe64a317fc49bcb41ac78620862914fe59c3324f1724031f"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -773,7 +773,7 @@
     },
     {
       "path": ".githooks/pre-commit",
-      "sha256": "1097b690e58456f673e180cae712182ce8298e4b7546ad91c42c82116a4c9652"
+      "sha256": "e643f41b2788199495c4d1271e816b4b4fb9539cedd8d1762daa4662a9126cc0"
     },
     {
       "path": ".github/workflows/cloud-scheduler.yml",
@@ -821,7 +821,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "9911196ea6c77c9c3ea0e2e0657b306a0c8a995f7b02750d0ab55c4b81091894"
+      "sha256": "e8f9cb5c4d4e60d232f35b8b2a2f17af71303d8857ce92330ba55caa15d0ce4d"
     },
     {
       "path": "ONTOLOGY.md",
@@ -881,7 +881,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "4721d6476467d5193d8a1e8d34e55264434e205a22a702fc98222add07405ff9"
+      "sha256": "5eff82c8be4c1ec2226a969209059c81d916199f4faa9ba444bb586c7ea39e0f"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -889,7 +889,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "e6041151feeb249c0ee4cf58f37ae845f2931e48a0a04e409fd1c33e9cd5aea9"
+      "sha256": "b4b6e56f27defa45286658ce89606115ec32d0d53a37b0cc7978acb7c7fc7a20"
     },
     {
       "path": "docs/PORTABILITY.md",
@@ -1005,11 +1005,11 @@
     },
     {
       "path": "docs/scripts-catalog.md",
-      "sha256": "e866b32a63c270103512b06a354a4cb61a238d28390b990e3bf67d7ba2b471df"
+      "sha256": "ef563d4b2f947d7b30fbb0a59195668d8e4db0ce5d7f1c3e6d9e318865eda65d"
     },
     {
       "path": "docs/skills-catalog.md",
-      "sha256": "95f6f2036cab1a21c1a710965cd29d8947c80692c526078b185ae363d216d052"
+      "sha256": "9cf28d0f72f967eb1b183e458c8b1214e9b97f8daf218847ccbde16b7244dc0a"
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
@@ -1509,7 +1509,7 @@
     },
     {
       "path": "memory/memory-lifecycle-spec.md",
-      "sha256": "4c4009df1ab3eced5cdb12b67b5e00789b27dd691ae4941355f794756207de84"
+      "sha256": "a57434745fd4703e3b763fd77b79caf812da8759fe052591dc64fa9fbfdbc236"
     },
     {
       "path": "memory/navigation.md",
@@ -1849,7 +1849,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "9e77f63d77eecaf500b5e7d5f07d883c64b6b1199537645af31aa147a1558299"
+      "sha256": "aca8f980654ff9bc9673661959279aa8952bc43a13bdf9c50854fe59217cfeae"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -2420,10 +2420,6 @@
       "sha256": "faab91cc4b183bf81affa0d51e2cdb896ad17521b4893fa192c2e7520cb04b03"
     },
     {
-      "path": "scripts/lesson-close.sh",
-      "sha256": "202440eae8e614d2f2e8675af63efb0a0b053b5b3832083aec8f6e64f1324023"
-    },
-    {
       "path": "scripts/lib/common.sh",
       "sha256": "ac0700709a939e4f0fc8c9bb504c9918e4f0a7d17694d65a7b7682ebb4979bf1"
     },
@@ -2529,11 +2525,11 @@
     },
     {
       "path": "scripts/post-update-check-skills.sh",
-      "sha256": "d417e873da1c1b7a6d9cfc883fb0b8bcf2d60595c1f965f936de9993d0c97ec4"
+      "sha256": "c940d07d206e950c3c2d0615f3100643601a8c082518195167d7b13bf916d27c"
     },
     {
       "path": "scripts/pre-commit-secret-scan.sh",
-      "sha256": "5e9bfc63e64b095c427508ecfb4b05cc755aa65aedbe87fe7d4880c76229ac91"
+      "sha256": "a203b7abc4aad366a46bcec3eb7de80cfccca773bcb1af6d562787c8df4fdec7"
     },
     {
       "path": "scripts/promote-common.sh",
@@ -2901,7 +2897,7 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "6bb072687ea8a23171de1630b1e51e18b87799232932c3628e8ca713c627cd0f"
+      "sha256": "298bf47a24542de9655f84ee5f2d23886670819f711376171ab582e31ee081e3"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
@@ -3146,6 +3142,7 @@
     "scripts/tests/test_issue_711_conflict_base.sh",
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_729_strategy_day.sh",
+    "scripts/tests/test_issue_810_scan_selfexcl.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
