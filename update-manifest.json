@@ -305,7 +305,7 @@
     },
     {
       "path": ".claude/scripts/check-index-health.py",
-      "sha256": "2b12c530f0fa5ee19c349901807e0b9a55fb6ed4c37b7e8ed2d0ed4fe9e91203"
+      "sha256": "c6451c640c691fd258ff0623f0464b90d7ca7da8628aea8542689a58fdbbf51a"
     },
     {
       "path": ".claude/scripts/classify-workspace-copy.sh",
@@ -581,7 +581,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "b2ecfb9da95c487e13e8d6c6b1925bdd398565840342d6c3c12f0facf74533bc"
+      "sha256": "eaebbf23caa3643626fc6f3b8f42341d11a4a48c0d8437915c4e42e9d08349b2"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -1489,7 +1489,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "d753b57b1a500861034bdd4a522773979b1a8665135ba679afc02ecaeca9f3f9"
+      "sha256": "bfa06bae377473dcaa6ac4f38fe300a8cb5c99a6c313ab9c6ced67b0c352aa2b"
     },
     {
       "path": "memory/fpf-term-map.yaml",
@@ -1749,7 +1749,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "7efcf494378d893dc9c4babc882030607267fda4f11fc6d71ea16539c2115dfa"
+      "sha256": "b22a0dc0e6511d69fcbd649aa55b3d2a944c53d64b78f8f8e52e16604652456f"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -2229,7 +2229,7 @@
     },
     {
       "path": "scripts/day-open-preflight.sh",
-      "sha256": "ff38d44cfb2aad74a7b4b675443a630234eb0fe12cbcceacca1ae8ce47f564d1"
+      "sha256": "e3dc9df026c1d0e410292fe15a9e12b6ea7efba234b289c115102774212c3b03"
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
@@ -2577,7 +2577,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "acb4465387debce7857d84a610e41f67ba127ce59bc9f2b3d84f8c63d5541efc"
+      "sha256": "77056be85ae137c72f8dd1b7540cebc88f1faaaab2a169b0f983cb9ddd8ee6ff"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -3041,7 +3041,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "b32856488e10779abec722dfb2875af45c7c7359cadf44a1ca31d8247ef0354f"
+      "sha256": "eda0dd50a8ce7f566c92166040b63e8dc0d4adc0f06b6d91585ace197517bc8f"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3049,7 +3049,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "6f0fa9ba968eb894a50028d18dc4457fbfb0701eb39d09346009fdb3942def8a"
+      "sha256": "84bc0c40351295286f591f21d98c22df713e379bb2612c8b004c39abc38dbab9"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3061,7 +3061,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "e50c0a022390ba07a2d101187cc4881feaf72ee1466f416977a92007e009ee27"
+      "sha256": "1b3030bb20243827930198ecb59f14cba487d3c86ff55709209bac61e21d3f3b"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
