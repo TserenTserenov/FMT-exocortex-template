@@ -439,6 +439,41 @@ author_diverged() {
     return 1
 }
 
+# author_release_regression FPATH PAYLOAD — bug-2026-09-17-tsekh1-release-
+# regression: author_diverged() above only catches commits НЕ ЕЩЁ дошедшие до
+# origin/$BRANCH — if the author's fix is already merged into main, that
+# check reports "no divergence" even though the release channel is about to
+# overwrite the file with an OLDER release snapshot (release_tag can trail
+# main by any number of unreleased commits). Live incident: an author's fix
+# landed on origin/main, update.sh (release channel, default) applied the
+# release payload anyway and silently reverted it — noticed only by manually
+# re-reading the file, not by any warning.
+#
+# The check needs no reference to whichever ref the release payload actually
+# came from: PAYLOAD is already the downloaded release content
+# ($TMPDIR_UPDATE/files/$f), so comparing it directly against origin/$BRANCH
+# HEAD answers the only question that matters — "does applying this payload
+# move the file away from what main already has?". Fires only when the local
+# file already equals origin/$BRANCH HEAD (author_diverged already covers
+# "has local edits") but the payload does not match that same HEAD. Reuses
+# the fetch done by author_diverged() via $_AUTHOR_FETCH_DONE — no extra
+# network round-trip.
+author_release_regression() {
+    local fpath="$1" payload="$2" head_sha local_sha payload_sha
+    [ "$UPDATE_CHANNEL" = "release" ] || return 1
+    is_author_mode || return 1
+    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+    if [ "$_AUTHOR_FETCH_DONE" = false ]; then
+        git -C "$SCRIPT_DIR" fetch --quiet origin "$BRANCH" 2>/dev/null || true
+        _AUTHOR_FETCH_DONE=true
+    fi
+    head_sha=$(git -C "$SCRIPT_DIR" rev-parse "origin/$BRANCH:$fpath" 2>/dev/null) || return 1
+    local_sha=$(git -C "$SCRIPT_DIR" hash-object "$SCRIPT_DIR/$fpath" 2>/dev/null) || return 1
+    [ "$local_sha" = "$head_sha" ] || return 1
+    payload_sha=$(git -C "$SCRIPT_DIR" hash-object "$payload" 2>/dev/null) || return 1
+    [ "$payload_sha" != "$head_sha" ]
+}
+
 # author_mode skip classification (WP-7 F71 stage A, peer-session 2026-08-14-05):
 # tell the author WHY each file was skipped (authored edits vs merely stale vs
 # undecidable) instead of one generic warning per file — Konstantin's live
@@ -3610,6 +3645,11 @@ for f in "${UPDATED_FILES[@]}"; do
     if author_diverged "$f"; then
         echo "  ⚠ $f — author_mode: несмёрженные правки, файл не тронут."
         echo "    Сверь: diff \"$TMPDIR_UPDATE/files/$f\" \"$SCRIPT_DIR/$f\""
+        AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
+        continue
+    elif author_release_regression "$f" "$TMPDIR_UPDATE/files/$f"; then
+        echo "  ⚠ $f — author_mode: локальная копия уже равна main, но release-канал старее (фикс влит, релиза под него ещё не было) — файл не тронут."
+        echo "    Хотите намеренно синхронизироваться с релизом — запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
         AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
         continue
     fi

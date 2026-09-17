@@ -416,11 +416,53 @@ mv "$BUILD_DIR/runtime" "$RUNTIME_DIR"
 # destroyed other agents' open-session markers on 2026-09-02. Carry forward
 # any top-level entry the fresh build did not itself produce, instead of
 # assuming the whole old tree is disposable.
+#
+# bug-2026-09-17-tsekh1-recovery-backups-abort: under `set -eu`, a single
+# failed `mv` (e.g. permission denied on a root-owned entry inherited from an
+# earlier root-privileged operation) used to abort this whole script — losing
+# any not-yet-processed live entries and skipping the `rm -rf` below entirely,
+# leaving `$RUNTIME_OLD` orphaned on disk indefinitely (live incident: a
+# month-old root:root `recovery-backups/` blocked the carry-forward, and
+# `.iwe-runtime.old.<pid>` from that run is still there). Failing one entry
+# must not cost the rest.
+CARRY_FORWARD_FAILURES=0
 if [ -d "$RUNTIME_OLD" ]; then
     while IFS= read -r entry; do
-        [ -e "$RUNTIME_DIR/$entry" ] || mv "$RUNTIME_OLD/$entry" "$RUNTIME_DIR/$entry"
+        [ -e "$RUNTIME_DIR/$entry" ] && continue
+        if ! mv "$RUNTIME_OLD/$entry" "$RUNTIME_DIR/$entry" 2>/dev/null; then
+            echo "  ⚠ не удалось перенести $RUNTIME_OLD/$entry в $RUNTIME_DIR/ (владелец/права?) — оставлен на месте, перенесите вручную (например через sudo)" >&2
+            CARRY_FORWARD_FAILURES=$((CARRY_FORWARD_FAILURES + 1))
+        fi
     done < <(find "$RUNTIME_OLD" -mindepth 1 -maxdepth 1 -exec basename {} \;)
-    rm -rf "$RUNTIME_OLD"
+    if [ "$CARRY_FORWARD_FAILURES" -eq 0 ]; then
+        rm -rf "$RUNTIME_OLD"
+    else
+        echo "  ⚠ $RUNTIME_OLD оставлен на диске — $CARRY_FORWARD_FAILURES запис(ь/и) не перенеслись, живые данные внутри могут быть неполными" >&2
+    fi
+fi
+
+# bug-2026-09-17-tsekh1-recovery-backups-abort (продолжение): leftovers from
+# a PAST crashed run (different pid, e.g. `.iwe-runtime.old.4079200` sitting
+# next to `.iwe-runtime.old.$$` right now) are not this run's responsibility
+# to delete blindly — a directory named "recovery-backups" is presumably
+# there on purpose, and deleting other processes' state without knowing
+# whether they're mid-flight is its own risk. Surface them instead of hiding
+# the debt again: this is the "no owner ever notices" gap the same incident
+# found, closed by visibility rather than by silent auto-delete.
+STALE_OLD_DIRS=""
+for candidate in "${RUNTIME_DIR}".old.*; do
+    [ -d "$candidate" ] || continue
+    [ "$candidate" = "$RUNTIME_OLD" ] && continue
+    STALE_OLD_DIRS="${STALE_OLD_DIRS}${STALE_OLD_DIRS:+, }$candidate"
+done
+# НЕ гейтить $QUIET (в отличие от обычных info-сообщений в этом скрипте):
+# update.sh — единственный регулярный маршрут вызова build-runtime.sh — зовёт
+# его именно с --quiet (issue найден cold-review той же сессии), а это
+# предупреждение существует ровно для того, чтобы не потонуть молча в этом
+# самом вызове.
+if [ -n "$STALE_OLD_DIRS" ]; then
+    echo "  ⚠ найдены зависшие каталоги от прошлых прерванных пересборок: $STALE_OLD_DIRS"
+    echo "    проверьте содержимое и удалите вручную (может требоваться sudo), если оно больше не нужно"
 fi
 
 # Lock освобождается автоматически при exit (FD 9 закрывается)
