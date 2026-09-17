@@ -31,10 +31,7 @@ name: Weekly Release
 
 on:
   schedule:
-    # TEMPORARY test window (revert to '0 20 * * 0' after confirming the
-    # bump fires correctly against a populated [Unreleased] — see CHANGELOG
-    # backfill in this same PR): fires once at 08:35 UTC on 2026-09-17.
-    - cron: '35 8 * * *'
+    - cron: '0 20 * * 0'  # Вс 20:00 UTC
   workflow_dispatch:        # ручной запуск для тестирования
 
 permissions:
