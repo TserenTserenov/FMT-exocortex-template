@@ -54,14 +54,20 @@ GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
 
 IWE_ENV_FILE="$WORKSPACE_DIR/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
+# issue #808: .zshenv is read only by zsh. On Linux/WSL, where bash is the
+# default interactive shell, IWE_* never reached the shell at all — install
+# into .bashrc too so both shells pick up the same workspace. --skip-zshenv
+# (its name predates this fix) already means "another workspace/tool owns
+# this host's shell rc files" at every call site, so it gates both targets.
+BASHRC_FILE="$HOME/.bashrc"
 IWE_ENV_MARKER="# IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам"
 
 if $DRY_RUN; then
     $QUIET || echo "  [DRY RUN] Would write $IWE_ENV_FILE (workspace=$WORKSPACE_DIR, governance=$GOVERNANCE_REPO)"
     if $SKIP_ZSHENV; then
-        $QUIET || echo "  [DRY RUN] Would leave $ZSHENV_FILE unchanged (--skip-zshenv)"
+        $QUIET || echo "  [DRY RUN] Would leave $ZSHENV_FILE and $BASHRC_FILE unchanged (--skip-zshenv)"
     else
-        $QUIET || echo "  [DRY RUN] Would ensure $ZSHENV_FILE sources \$WORKSPACE_DIR/.iwe-paths"
+        $QUIET || echo "  [DRY RUN] Would ensure $ZSHENV_FILE and $BASHRC_FILE source \$WORKSPACE_DIR/.iwe-paths"
     fi
     exit 0
 fi
@@ -98,33 +104,45 @@ fi
 # different, already-configured workspace, per the caller's ownership check)
 # must not be touched — that real, per-user shell rc file is not scoped to
 # $WORKSPACE_DIR the way $IWE_ENV_FILE above is.
-if $SKIP_ZSHENV; then
-    $QUIET || echo "  ○ $ZSHENV_FILE unchanged (--skip-zshenv)"
-else
-    # Replace both the legacy $HOME/.iwe-paths one-liner and any older managed
-    # block. Marker presence alone is not proof that it sources this workspace.
-    if [ -f "$ZSHENV_FILE" ]; then
-        ZSHENV_TMP=$(mktemp)
+# Idempotent: replaces both the legacy $HOME/.iwe-paths one-liner and any
+# older managed block in $1 (marker presence alone is not proof that it
+# sources this workspace), then appends a fresh block if missing.
+install_iwe_env_block() {
+    local rc_file="$1"
+    if [ -f "$rc_file" ]; then
+        local rc_tmp
+        rc_tmp=$(mktemp)
         awk '
           /^# IWE environment \(WP-219, DP.FM.009\):/{skip=1; next}
           skip && /^unset _IWE_ROOT$/{skip=0; next}
           /\[ -f "\$HOME\/\.iwe-paths" \] && source "\$HOME\/\.iwe-paths"/{next}
           !skip{print}
-        ' "$ZSHENV_FILE" > "$ZSHENV_TMP"
-        mv "$ZSHENV_TMP" "$ZSHENV_FILE"
+        ' "$rc_file" > "$rc_tmp"
+        mv "$rc_tmp" "$rc_file"
     fi
-    if ! grep -qF "_IWE_ROOT=\"$WORKSPACE_DIR\"" "$ZSHENV_FILE" 2>/dev/null; then
-        cat >> "$ZSHENV_FILE" <<ZSHENV_EOF
+    if ! grep -qF "_IWE_ROOT=\"$WORKSPACE_DIR\"" "$rc_file" 2>/dev/null; then
+        cat >> "$rc_file" <<RC_EOF
 
 # IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам
 _IWE_ROOT="$WORKSPACE_DIR"
 [ -f "\$_IWE_ROOT/.iwe-paths" ] && source "\$_IWE_ROOT/.iwe-paths"
 unset _IWE_ROOT
-ZSHENV_EOF
-        $QUIET || echo "  ✓ $ZSHENV_FILE → sources \$WORKSPACE_DIR/.iwe-paths"
+RC_EOF
+        $QUIET || echo "  ✓ $rc_file → sources \$WORKSPACE_DIR/.iwe-paths"
     else
-        $QUIET || echo "  ○ $ZSHENV_FILE already sources $WORKSPACE_DIR/.iwe-paths"
+        $QUIET || echo "  ○ $rc_file already sources $WORKSPACE_DIR/.iwe-paths"
     fi
+}
+
+if $SKIP_ZSHENV; then
+    $QUIET || echo "  ○ $ZSHENV_FILE and $BASHRC_FILE unchanged (--skip-zshenv)"
+else
+    install_iwe_env_block "$ZSHENV_FILE"
+    # issue #808: bash (login or not) never reads .zshenv. touch -a creates an
+    # empty .bashrc if none exists yet, same as a fresh shell would on first
+    # write — matches .zshenv's own implicit behavior a few lines above.
+    touch "$BASHRC_FILE"
+    install_iwe_env_block "$BASHRC_FILE"
 fi
 
 # Auto-enable pre-commit hooks for IWE repos that have .githooks/
