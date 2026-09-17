@@ -149,7 +149,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "fd5514c07da81142f0da2a57620b99a4d20f90fc7836ca14edd8fad00638afad"
+      "sha256": "f744c49bf754698ac2d252319bab38e1a7f88eb06509b920f9a1c708c5a0109c"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -825,7 +825,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "e8f9cb5c4d4e60d232f35b8b2a2f17af71303d8857ce92330ba55caa15d0ce4d"
+      "sha256": "5ebc30c328ee52c487505a11c31d855055bfd1c25c1118a9611d58f810377a3b"
     },
     {
       "path": "ONTOLOGY.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "c920f1dc8a269623a6e395f5839f90fb92b64272f70450acf5fe972b39846fc3"
+      "sha256": "9b39c61c4b4d70eb5f9a8a8993fc19be99b246ffdd2e3f45c5746a5192d44a98"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -3081,7 +3081,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "088ee3e7b41996ec9dc662b8d30168cf96cb01bb315601d37b6d76209bed429b"
+      "sha256": "cdd78d22f837b0bb0f20dc2cc82286bbe68661ab2524985bf7bb4991ccbbc9ff"
     }
   ],
   "excluded_paths": [
