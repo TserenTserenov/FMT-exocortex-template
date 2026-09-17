@@ -268,8 +268,21 @@ def fmt_file_line(path: Path, root: Path, findings: dict) -> str:
     return "  " + "  ".join(parts)
 
 
+def _default_workspace() -> Path:
+    """Resolve the workspace root the same way the shell tooling does
+    (iwe-env-bootstrap.sh): explicit env var wins, ~/IWE is only a last
+    resort. Without this, an install at a non-default path is always
+    scanned at the wrong root and Day Close degrades silently (issue #834,
+    same root cause as #638 in memory-drift-scan.py)."""
+    for var in ("IWE_WORKSPACE", "IWE_ROOT", "WORKSPACE_DIR"):
+        value = os.environ.get(var)
+        if value:
+            return Path(value)
+    return Path.home() / "IWE"
+
+
 def main() -> int:
-    root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "IWE"
+    root = Path(sys.argv[1]) if len(sys.argv) > 1 else _default_workspace()
     if not root.is_dir():
         print(f"FAIL: root dir not found: {root}", file=sys.stderr)
         return 2

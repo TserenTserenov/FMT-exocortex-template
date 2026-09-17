@@ -88,8 +88,20 @@ log "2/4 Git-templates для post-commit hook"
 GIT_TEMPLATES="$HOME/.git-templates"
 TEMPLATE_HOOK="$GIT_TEMPLATES/hooks/post-commit"
 
+# issue #809: v1's SCRIPT_DIR-relative `source` only ever resolved correctly
+# inside .git-templates itself — once `git init`/`git clone` copies this hook
+# into ANY new repo's .git/hooks/post-commit (that's the whole point of
+# init.templateDir), SCRIPT_DIR becomes <that-repo>/.git/hooks, and the
+# relative path resolves to a location that never exists. `|| exit 1` then
+# silently killed the hook on every commit in every non-IWE repo on the
+# machine. Marker bumped to v2 so an already-installed v1 hook (present on
+# any machine that ran this script before the fix) gets regenerated the next
+# time setup.sh/update.sh calls this script, instead of the grep below
+# treating a known-broken hook as "already installed".
+HOOK_MARKER="WP-247 Ф-TRIGGER-BASED v2"
+
 if [ "$MODE" = "--check" ]; then
-    if [ -f "$TEMPLATE_HOOK" ] && grep -q "WP-247 Ф-TRIGGER-BASED" "$TEMPLATE_HOOK"; then
+    if [ -f "$TEMPLATE_HOOK" ] && grep -q "$HOOK_MARKER" "$TEMPLATE_HOOK"; then
         ok "post-commit hook в git-templates установлен"
     else
         warn "post-commit hook не установлен — запустите без --check"
@@ -97,31 +109,35 @@ if [ "$MODE" = "--check" ]; then
 elif [ "$MODE" = "--uninstall" ]; then
     if [ -f "$TEMPLATE_HOOK" ]; then
         # Удаляем только наш блок
-        sed -i.bak '/WP-247 Ф-TRIGGER-BASED/,/^fi$/d' "$TEMPLATE_HOOK"
+        sed -i.bak "/$HOOK_MARKER/,/^fi\$/d" "$TEMPLATE_HOOK"
         ok "post-commit hook (наш блок) удалён"
     fi
 else
     mkdir -p "$GIT_TEMPLATES/hooks"
-    if [ ! -f "$TEMPLATE_HOOK" ] || ! grep -q "WP-247 Ф-TRIGGER-BASED" "$TEMPLATE_HOOK"; then
-        cp "$IWE_RUNTIME/scripts/post-commit-template.sh" "$TEMPLATE_HOOK" 2>/dev/null || \
-        cat > "$TEMPLATE_HOOK" <<'HOOK'
+    if [ ! -f "$TEMPLATE_HOOK" ] || ! grep -q "$HOOK_MARKER" "$TEMPLATE_HOOK"; then
+        cat > "$TEMPLATE_HOOK" <<HOOK
 #!/bin/bash
-# post-commit hook — WP-247 Ф-TRIGGER-BASED
+# post-commit hook — $HOOK_MARKER
 # При изменении inbox/captures.md (или его помесячных чанков inbox/captures/YYYY-MM.md) либо fleeting-notes.md → запускает extractor inbox-check
 set -uo pipefail
 
-# Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
-REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
-[[ "$REPO_DIR" != "$IWE_ROOT"* ]] && exit 0
-REPO_NAME=$(basename "$REPO_DIR")
-GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-if [ "$REPO_NAME" = "$GOVERNANCE_REPO" ]; then
-    CHANGED=$(git diff-tree --no-commit-id -r --name-only HEAD 2>/dev/null | grep -E '^inbox/(captures(/[0-9]{4}-[0-9]{2})?|fleeting-notes)\.md$' || true)
-    if [ -n "$CHANGED" ]; then
-        EXTRACTOR_SH="$IWE_ROOT/.iwe-runtime/roles/extractor/scripts/extractor.sh"
-        [ -x "$EXTRACTOR_SH" ] && (nohup "$EXTRACTOR_SH" inbox-check >/dev/null 2>&1 &) 2>/dev/null
+# issue #809: this hook is installed globally and copied into EVERY new repo
+# on this machine, not just IWE ones — baked-in absolute root, checked before
+# touching anything that only exists inside the IWE workspace, so a foreign
+# repo exits immediately instead of failing on a path that was never there.
+IWE_ROOT_BAKED="$IWE_WORKSPACE"
+REPO_DIR=\$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+[[ "\$REPO_DIR" != "\$IWE_ROOT_BAKED"* ]] && exit 0
+
+# Absolute, not \$SCRIPT_DIR-relative (issue #809 — see above).
+source "\$IWE_ROOT_BAKED/.claude/lib/iwe-env-bootstrap.sh" || exit 1
+REPO_NAME=\$(basename "\$REPO_DIR")
+GOVERNANCE_REPO="\${IWE_GOVERNANCE_REPO:-DS-strategy}"
+if [ "\$REPO_NAME" = "\$GOVERNANCE_REPO" ]; then
+    CHANGED=\$(git diff-tree --no-commit-id -r --name-only HEAD 2>/dev/null | grep -E '^inbox/(captures(/[0-9]{4}-[0-9]{2})?|fleeting-notes)\.md\$' || true)
+    if [ -n "\$CHANGED" ]; then
+        EXTRACTOR_SH="\$IWE_ROOT/.iwe-runtime/roles/extractor/scripts/extractor.sh"
+        [ -x "\$EXTRACTOR_SH" ] && (nohup "\$EXTRACTOR_SH" inbox-check >/dev/null 2>&1 &) 2>/dev/null
     fi
 fi
 exit 0

@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.40.0",
+  "version": "0.40.1",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -148,8 +148,12 @@
       "sha256": "304caca86a807c7022911bd9091895015717d76aa2d785a4bd2d6e0410495533"
     },
     {
+      "path": ".claude/hooks/secret-bypass-analyzer.py",
+      "sha256": "f744c49bf754698ac2d252319bab38e1a7f88eb06509b920f9a1c708c5a0109c"
+    },
+    {
       "path": ".claude/hooks/secret-bypass-lib.sh",
-      "sha256": "5e00fb93f8cc28967b2af1a43d49c9acedac4c748bd511cf292a02c392d5a666"
+      "sha256": "a1123577daa3526a5507378dbe32916fe771ab0f3b2d49df0f79076df3d6fcb8"
     },
     {
       "path": ".claude/hooks/secret-file-read-block.sh",
@@ -194,6 +198,10 @@
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
       "sha256": "6298b52f77be40dca698050a95fee94cca66cf4a9e64f119acde03b18d76f765"
+    },
+    {
+      "path": ".claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh",
+      "sha256": "f1c9f00430a7d44571fbc585e386806bd7934db499e976075e25c9ec96531833"
     },
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-unparsed-input.sh",
@@ -305,7 +313,7 @@
     },
     {
       "path": ".claude/scripts/check-index-health.py",
-      "sha256": "2b12c530f0fa5ee19c349901807e0b9a55fb6ed4c37b7e8ed2d0ed4fe9e91203"
+      "sha256": "c6451c640c691fd258ff0623f0464b90d7ca7da8628aea8542689a58fdbbf51a"
     },
     {
       "path": ".claude/scripts/classify-workspace-copy.sh",
@@ -341,7 +349,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "5d8752ff4dda433e822e52fad57bdf0121b4f339587ae4a5e9ebb0ce2fc89200"
+      "sha256": "4a645b10560a953c7837242b6c7b2394144d5231a056c2b8c99c62abd145dbf9"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -421,7 +429,7 @@
     },
     {
       "path": ".claude/skills/day-open/templates.md",
-      "sha256": "c91e7acf0bb5106713891079a84076cb8a0782a16de26ada96eabc32e7811154"
+      "sha256": "91418eaed0e9f36d152f60cfefd3a5f5800f2a69267317354b8c78b194ab33e8"
     },
     {
       "path": ".claude/skills/decompose/SKILL.md",
@@ -548,10 +556,6 @@
       "sha256": "062556dc1fff91780ae31633e12e4c69dd1a584612ad46591128e6443ffe3aa8"
     },
     {
-      "path": ".claude/skills/lesson-close/SKILL.md",
-      "sha256": "350dbc63ad76e3f1fe64a317fc49bcb41ac78620862914fe59c3324f1724031f"
-    },
-    {
       "path": ".claude/skills/local-llm/SKILL.md",
       "sha256": "3c3e64045c404298d0b99bdd489bdb416d11038d39ad6e821636ba8328dae2f6"
     },
@@ -581,7 +585,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "b2ecfb9da95c487e13e8d6c6b1925bdd398565840342d6c3c12f0facf74533bc"
+      "sha256": "eaebbf23caa3643626fc6f3b8f42341d11a4a48c0d8437915c4e42e9d08349b2"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -773,7 +777,7 @@
     },
     {
       "path": ".githooks/pre-commit",
-      "sha256": "1097b690e58456f673e180cae712182ce8298e4b7546ad91c42c82116a4c9652"
+      "sha256": "e643f41b2788199495c4d1271e816b4b4fb9539cedd8d1762daa4662a9126cc0"
     },
     {
       "path": ".github/workflows/cloud-scheduler.yml",
@@ -817,11 +821,11 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ff5b82e2fbb97180fd541228a43fad9023cd05716ea4f14d434b55e8c14b74a5"
+      "sha256": "f8ff4402f184a4568f226b1f04c709a3d4930ca8768732aa45679e16cb37aba2"
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "9911196ea6c77c9c3ea0e2e0657b306a0c8a995f7b02750d0ab55c4b81091894"
+      "sha256": "5ebc30c328ee52c487505a11c31d855055bfd1c25c1118a9611d58f810377a3b"
     },
     {
       "path": "ONTOLOGY.md",
@@ -881,7 +885,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "4721d6476467d5193d8a1e8d34e55264434e205a22a702fc98222add07405ff9"
+      "sha256": "5eff82c8be4c1ec2226a969209059c81d916199f4faa9ba444bb586c7ea39e0f"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -889,7 +893,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "e6041151feeb249c0ee4cf58f37ae845f2931e48a0a04e409fd1c33e9cd5aea9"
+      "sha256": "b4b6e56f27defa45286658ce89606115ec32d0d53a37b0cc7978acb7c7fc7a20"
     },
     {
       "path": "docs/PORTABILITY.md",
@@ -901,7 +905,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "c920f1dc8a269623a6e395f5839f90fb92b64272f70450acf5fe972b39846fc3"
+      "sha256": "9b39c61c4b4d70eb5f9a8a8993fc19be99b246ffdd2e3f45c5746a5192d44a98"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -1005,11 +1009,11 @@
     },
     {
       "path": "docs/scripts-catalog.md",
-      "sha256": "e866b32a63c270103512b06a354a4cb61a238d28390b990e3bf67d7ba2b471df"
+      "sha256": "ef563d4b2f947d7b30fbb0a59195668d8e4db0ce5d7f1c3e6d9e318865eda65d"
     },
     {
       "path": "docs/skills-catalog.md",
-      "sha256": "95f6f2036cab1a21c1a710965cd29d8947c80692c526078b185ae363d216d052"
+      "sha256": "9cf28d0f72f967eb1b183e458c8b1214e9b97f8daf218847ccbde16b7244dc0a"
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
@@ -1509,7 +1513,7 @@
     },
     {
       "path": "memory/memory-lifecycle-spec.md",
-      "sha256": "4c4009df1ab3eced5cdb12b67b5e00789b27dd691ae4941355f794756207de84"
+      "sha256": "a57434745fd4703e3b763fd77b79caf812da8759fe052591dc64fa9fbfdbc236"
     },
     {
       "path": "memory/navigation.md",
@@ -1697,7 +1701,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "675e6ee06a0e53c4fa18051b224dcfb86c7163b0d391ea2fbfc0e92adf1029b4"
+      "sha256": "594a9739e1cde6c04837d3f319f8fe6d14af66927dd68f3404681a074a8bbd04"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1749,7 +1753,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "7efcf494378d893dc9c4babc882030607267fda4f11fc6d71ea16539c2115dfa"
+      "sha256": "b22a0dc0e6511d69fcbd649aa55b3d2a944c53d64b78f8f8e52e16604652456f"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -1849,7 +1853,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "9e77f63d77eecaf500b5e7d5f07d883c64b6b1199537645af31aa147a1558299"
+      "sha256": "aca8f980654ff9bc9673661959279aa8952bc43a13bdf9c50854fe59217cfeae"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -1873,7 +1877,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "587b3b571d6abc41dfc9cd235bcbb9dd0ab08a8c31dab605e69abc29b7d1d6f2"
+      "sha256": "c4b362d060b716fa7a481dfd9a083cf837ac765ae81f18b6b30c7f85d9ea5575"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2229,7 +2233,7 @@
     },
     {
       "path": "scripts/day-open-preflight.sh",
-      "sha256": "ff38d44cfb2aad74a7b4b675443a630234eb0fe12cbcceacca1ae8ce47f564d1"
+      "sha256": "e3dc9df026c1d0e410292fe15a9e12b6ea7efba234b289c115102774212c3b03"
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
@@ -2420,10 +2424,6 @@
       "sha256": "faab91cc4b183bf81affa0d51e2cdb896ad17521b4893fa192c2e7520cb04b03"
     },
     {
-      "path": "scripts/lesson-close.sh",
-      "sha256": "202440eae8e614d2f2e8675af63efb0a0b053b5b3832083aec8f6e64f1324023"
-    },
-    {
       "path": "scripts/lib/common.sh",
       "sha256": "ac0700709a939e4f0fc8c9bb504c9918e4f0a7d17694d65a7b7682ebb4979bf1"
     },
@@ -2529,11 +2529,11 @@
     },
     {
       "path": "scripts/post-update-check-skills.sh",
-      "sha256": "d417e873da1c1b7a6d9cfc883fb0b8bcf2d60595c1f965f936de9993d0c97ec4"
+      "sha256": "c940d07d206e950c3c2d0615f3100643601a8c082518195167d7b13bf916d27c"
     },
     {
       "path": "scripts/pre-commit-secret-scan.sh",
-      "sha256": "5e9bfc63e64b095c427508ecfb4b05cc755aa65aedbe87fe7d4880c76229ac91"
+      "sha256": "a203b7abc4aad366a46bcec3eb7de80cfccca773bcb1af6d562787c8df4fdec7"
     },
     {
       "path": "scripts/promote-common.sh",
@@ -2577,7 +2577,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "acb4465387debce7857d84a610e41f67ba127ce59bc9f2b3d84f8c63d5541efc"
+      "sha256": "77056be85ae137c72f8dd1b7540cebc88f1faaaab2a169b0f983cb9ddd8ee6ff"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -2901,7 +2901,7 @@
     },
     {
       "path": "seed/strategy/.githooks/pre-commit",
-      "sha256": "6bb072687ea8a23171de1630b1e51e18b87799232932c3628e8ca713c627cd0f"
+      "sha256": "298bf47a24542de9655f84ee5f2d23886670819f711376171ab582e31ee081e3"
     },
     {
       "path": "seed/strategy/.githooks/pre-push",
@@ -3041,7 +3041,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "b32856488e10779abec722dfb2875af45c7c7359cadf44a1ca31d8247ef0354f"
+      "sha256": "eda0dd50a8ce7f566c92166040b63e8dc0d4adc0f06b6d91585ace197517bc8f"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3049,7 +3049,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "6f0fa9ba968eb894a50028d18dc4457fbfb0701eb39d09346009fdb3942def8a"
+      "sha256": "84bc0c40351295286f591f21d98c22df713e379bb2612c8b004c39abc38dbab9"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3061,7 +3061,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "e50c0a022390ba07a2d101187cc4881feaf72ee1466f416977a92007e009ee27"
+      "sha256": "1b3030bb20243827930198ecb59f14cba487d3c86ff55709209bac61e21d3f3b"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3081,7 +3081,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "088ee3e7b41996ec9dc662b8d30168cf96cb01bb315601d37b6d76209bed429b"
+      "sha256": "cdd78d22f837b0bb0f20dc2cc82286bbe68661ab2524985bf7bb4991ccbbc9ff"
     }
   ],
   "excluded_paths": [
@@ -3111,6 +3111,7 @@
     "scripts/tests/day-open-world-fill-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
+    "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
@@ -3145,6 +3146,7 @@
     "scripts/tests/test_issue_711_conflict_base.sh",
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_729_strategy_day.sh",
+    "scripts/tests/test_issue_810_scan_selfexcl.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",

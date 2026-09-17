@@ -348,6 +348,45 @@ acquire_lock() {
     add_exit_cleanup "rm -rf \"$lockdir\" 2>/dev/null"
 }
 
+# issue #840: git-diff-feed and session-close-feed (extractor.sh) and this
+# note-review step all read-modify-write the same shared inbox/captures.md.
+# acquire_lock() above only serializes note-review against a second
+# note-review run (own $LOG_DIR/locks) -- it never intersects extractor.sh's
+# separate TMPDIR-based lock, so the two scripts could still race on the
+# same file. Shares that exact lock dir/var so both writers contend for the
+# same resource instead of two disjoint namespaces.
+acquire_captures_write_lock() {
+    local lock_dir="${IWE_EXTRACTOR_FEED_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-session-close-feed.lock}"
+    local waited=0
+    while true; do
+        if mkdir "$lock_dir" 2>/dev/null; then
+            printf '%s\n' "$$" > "$lock_dir/pid"
+            add_exit_cleanup "rm -f '$lock_dir/pid' 2>/dev/null; rmdir '$lock_dir' 2>/dev/null"
+            return 0
+        fi
+        local owner_pid=""
+        [ -f "$lock_dir/pid" ] && owner_pid=$(tr -d '[:space:]' < "$lock_dir/pid")
+        # Mirrors acquire_inbox_lock() (extractor.sh) exactly: only reclaim
+        # when the pid file is present and non-empty. A missing/empty pid
+        # file means another writer's mkdir has landed but its own pid write
+        # has not (a real, if narrow, gap -- see extractor.sh's own mkdir/
+        # printf pair) -- reclaiming there would steal a lock someone else
+        # already holds (TOCTOU), reintroducing the exact race #840 fixes.
+        # Cold-review (same session) caught this asymmetry before deploy.
+        if [ -n "$owner_pid" ] && { ! [[ "$owner_pid" =~ ^[0-9]+$ ]] || ! kill -0 "$owner_pid" 2>/dev/null; }; then
+            rm -f "$lock_dir/pid"
+            rmdir "$lock_dir" 2>/dev/null
+            continue
+        fi
+        if [ "$waited" -ge 30 ]; then
+            log "WARN: captures.md lock unavailable after ${waited}s (pid: ${owner_pid:-mid-acquire}) — proceeding without it"
+            return 1
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+}
+
 # Читаем strategy_day из конфига (L4 Personal)
 # issue #729: раньше единственным источником был auto-memory Claude Code по
 # литеральному пути "-Users-$(whoami)-IWE" — ломается молча, если workspace
@@ -497,6 +536,7 @@ case "$1" in
         BOLD_NEW_BEFORE=$(grep -vc '🔄' <(grep '^\*\*' "$FLEETING" 2>/dev/null) 2>/dev/null || true); BOLD_NEW_BEFORE=${BOLD_NEW_BEFORE:-0}
         log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄)"
 
+        acquire_captures_write_lock || true
         run_claude "note-review" "claude-haiku-4-5-20251001"
 
         # Canary: count bold notes after (needs to be visible for alert at line ~274)

@@ -336,18 +336,6 @@ skills:
         - /peer-writer
     depends_on: []
     invoked_by: []
-  - id: lesson-close
-    name: "lesson-close"
-    description: "Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные времени, длительность), делает commit + push в репо DS-personal-guide. Триггерит замкнутый контур доставки — после push → GitHub webhook → bot oauth_server.py:/webhook/github/workbook → sync_one_user_to_dt → ЦД обновляется в Neon. Используй когда пилот говорит «закрываем», «всё», «закончили», «закрой урок» — или после явного завершения задания в /lesson."
-    version: 1.0.0
-    layer: L1
-    status: active
-    triggers:
-      slash:
-        - /lesson-close
-    depends_on: []
-    invoked_by:
-    - lesson-close
   - id: local-llm
     name: "local-llm"
     description: "Локальный LLM-стек на Mac (Apple Silicon, MLX) под приватность и запасной режим. NL-вход к установке/запуску/переключению моделей + слой суждения для мониторинга новых моделей. Тонкая обёртка над скриптами РП404, не замена."
@@ -439,7 +427,6 @@ skills:
         - /personal-guide-render
     depends_on: []
     invoked_by:
-    - lesson-close
     - personal-guide-start
     - personal-guide-render
   - id: personal-guide-start

@@ -30,6 +30,21 @@ GOV="$WS/${GOVERNANCE_REPO:-DS-strategy}"
 mkdir -p "$GOV/.githooks" "$GOV/current"
 cp "$ROOT/seed/strategy/.githooks/pre-commit" "$GOV/.githooks/pre-commit"
 chmod +x "$GOV/.githooks/pre-commit"
+# issue #810: the seed hook now runs pre-commit-secret-scan.sh (fail-closed)
+# before this test's own artifact validator ever gets a turn -- without a
+# real scanner in this synthetic fixture, every commit below would fail on
+# the new gate for a reason unrelated to what this test actually checks.
+# Resolution order mirrors the hook: $IWE_SCRIPTS (set below) for the
+# scanner script, $repo_root/.claude/hooks/ (the governance-repo checkout
+# itself) for its pattern library.
+cp "$ROOT/scripts/pre-commit-secret-scan.sh" "$WS/FMT-exocortex-template/scripts/"
+chmod +x "$WS/FMT-exocortex-template/scripts/pre-commit-secret-scan.sh"
+mkdir -p "$GOV/.claude/hooks"
+cp "$ROOT/.claude/hooks/secret-bypass-lib.sh" "$GOV/.claude/hooks/secret-bypass-lib.sh"
+# issue #832: the analyzer program moved out of secret-bypass-lib.sh into its
+# own file (secret-bypass-analyzer.py), resolved relative to the library's
+# own directory at call time -- it has to sit right next to the copy above.
+cp "$ROOT/.claude/hooks/secret-bypass-analyzer.py" "$GOV/.claude/hooks/secret-bypass-analyzer.py"
 git -C "$GOV" init -q
 git -C "$GOV" config user.email test@test && git -C "$GOV" config user.name test
 git -C "$GOV" config core.hooksPath .githooks

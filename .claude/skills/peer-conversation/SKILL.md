@@ -71,7 +71,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 **§0в.1 Общий контракт адаптера** (для добавления нового вендора): stdin = полный промпт хода (Bash pipe, не inline `echo` — inline попадает в командную строку и хук B7.7c может ложно заблокировать повторные вызовы); stdout = одна реплика с frontmatter; exit `0` = OK, `1` = general error, `2` = content-filter/PII violation, `3` = PII hard block, `5` = уже идёт сессия (pidfile lock). Для `claude` действует усиленный контракт WP-458: `--add-dir` запрещён, peer получает только минимальную текстовую проекцию в stdin и не имеет файловых или shell-инструментов. Коды 2-5 — не обязательны для нового адаптера, но `0`/`1` обязательны (Шаг 3.1/3р.1 проверяет `exit ≠ 0` как «напарник не ответил»).
 
-Построить для каждого `vendor` в `PEER_VENDORS`: `ADAPTER_PATH[$vendor]="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/<адаптер из таблицы>"` и `PEER_AGENT_ID[$vendor]="<peer_agent из таблицы>"` (bash associative arrays; порядок вызова = порядок `PEER_VENDORS`). Используются везде ниже вместо хардкода `kimi-peer-adapter.sh`/`kimi-headless`.
+Адаптеры лежат в репозитории шаблона (`$IWE_TEMPLATE`), не в личном governance-репо пользователя — governance-репо хранит только стратегические данные пилота и своих скриптов-адаптеров не содержит. Построить для каждого `vendor` в `PEER_VENDORS`: `ADAPTER_PATH[$vendor]="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/<адаптер из таблицы>"` и `PEER_AGENT_ID[$vendor]="<peer_agent из таблицы>"` (bash associative arrays; порядок вызова = порядок `PEER_VENDORS`). Используются везде ниже вместо хардкода `kimi-peer-adapter.sh`/`kimi-headless`. (issue #830)
 
 **§0в.2 Проверка доступности vendor'ов (capability-check, WP-509 Ф5).** После построения `ADAPTER_PATH`, до анонса напарников:
 
@@ -1049,6 +1049,7 @@ cat > "$GUARD_ORZ" <<EOF
 date: $TODAY
 type: peer-session
 wp: <WP-NNN>
+agent: claude-code
 writer: claude-code
 peer: [<PEER_AGENT_ID>, ...]      # список; при PEER_COUNT==1 — один элемент
 duration_h: <(end_time - start_time) в часах, 1 знак>
