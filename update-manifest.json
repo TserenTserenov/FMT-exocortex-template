@@ -1669,7 +1669,7 @@
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
-      "sha256": "b51365aedcd3c3fcc726e6077dd68b2241770b230bc72df7caff2dffb4781b89"
+      "sha256": "e58de616d6d4aaafce1ed2d87fb3462e729e5d1e7f660f77dd6fc527e4d1f5fa"
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "594a9739e1cde6c04837d3f319f8fe6d14af66927dd68f3404681a074a8bbd04"
+      "sha256": "997eb8df16148f70b4ccece7740b4d23719bada2c3ebe4f482474438d85b3f6e"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
