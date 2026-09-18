@@ -354,7 +354,7 @@ extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason> <changed-pa
     local strategy_dir="$1" agent="$2" reason="$3" changed_paths="$4"
     local guard="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh"
     [ -x "$guard" ] || return 1
-    bash "$guard" open --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1 || return 1
+    bash "$guard" open --housekeeping "$reason" --agent "$agent" --canonical-owner "$reason" >> "$LOG_FILE" 2>&1 || return 1
     local rel
     while IFS= read -r rel; do
         [ -n "$rel" ] || continue

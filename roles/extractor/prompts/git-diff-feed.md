@@ -79,11 +79,7 @@ done
 
 ### Шаг 6: Коммит
 
-```bash
-cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
-git add inbox/captures/YYYY-MM.md   # или inbox/captures.md без ротации
-git commit -m "feed(git-diff): N capture-кандидатов из коммитов SINCE=$SINCE"
-```
+Коммит здесь не выполняется — его делает уже обёрнутая `commit_extractor_changes()` в `extractor.sh` ПОСЛЕ этого прогона: у headless-запуска этого промпта нет своего семафора, прямой `git commit` из промпта обходит сессионную обвязку и иногда натыкается на глобальную блокировку `session-guard.sh` из-за чужих просроченных семафоров.
 
 ## Что НЕ делать
 
