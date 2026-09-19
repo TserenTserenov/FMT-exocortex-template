@@ -2969,7 +2969,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "2ab08ff16ac968d974cb6cdc1bb08af1fcbc8ca33828982d30a417d409234f0a"
+      "sha256": "0ff59484281b0f92074c5fec391c5faea25412d189618a58372ed45109f4b3a0"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
