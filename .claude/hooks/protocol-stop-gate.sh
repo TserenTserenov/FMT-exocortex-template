@@ -178,8 +178,12 @@ mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
 # user/attachment) — select(.type=="tool_use") на верхнем уровне не
 # совпадал никогда. `[]?` гасит ошибку, если .message/.content отсутствует
 # или не массив, — этого достаточно, широкий `try` не нужен.
-PROTOCOL_SKILL=$(jq -r '
-  .message.content[]?
+# issue #862 follow-up (Codex r3): транскрипт — JSONL (по одному JSON-объекту
+# на строку/сообщение), поэтому все jq-запросы используют -s и разворачивают
+# массив сообщений через .[].
+PROTOCOL_SKILL=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message.content[]?]
+  | .[]
   | select(.type == "tool_use" and .name == "Skill")
   | .input.skill // empty
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
@@ -196,8 +200,12 @@ fi
 # issue #862: TodoWrite устарел и заменён TaskCreate/TaskUpdate; кроме того,
 # SKILL.md явно разрешает нумерацию шагов в ответах, когда Task-инструменты
 # недоступны. Учитываем все три признака.
-TODO_MAX=$(jq -r '
-  .message.content[]?
+# issue #862 follow-up (Codex r3): транскрипт JSONL, считаем только сообщения
+# ассистента, TaskCreate и TaskUpdate разделяем (обновления одной задачи не
+# должны множиться), TodoWrite берём по максимальному списку.
+TODO_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
   | select(.type == "tool_use" and .name == "TodoWrite")
   | .input.todos
   | if type == "array" then length else 0 end
@@ -205,20 +213,48 @@ TODO_MAX=$(jq -r '
   | sort -n | tail -1)
 TODO_MAX="${TODO_MAX:-0}"
 
-TASK_MAX=$(jq -r '
-  .message.content[]?
-  | select(.type == "tool_use" and (.name == "TaskCreate" or .name == "TaskUpdate"))
-  | (.input.tasks // .input.task_list // .input.items // [])
-  | if type == "array" then length else 0 end
+TASK_CREATE_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
+  | select(.type == "tool_use" and .name == "TaskCreate")
+  | .input
+  | if (.tasks // .task_list // .items) | type == "array" then
+      (.tasks // .task_list // .items) | length
+    elif (.tasks // .task_list // .items) != null then
+      1
+    elif (.name // .title // .description // .status) then
+      1
+    else
+      0
+    end
+' "$TRANSCRIPT_PATH" 2>/dev/null \
+  | awk '{s+=$1} END {print s+0}')
+TASK_CREATE_MAX="${TASK_CREATE_MAX:-0}"
+
+TASK_UPDATE_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
+  | select(.type == "tool_use" and .name == "TaskUpdate")
+  | .input
+  | if (.tasks // .task_list // .items) | type == "array" then
+      (.tasks // .task_list // .items) | length
+    elif (.tasks // .task_list // .items) != null then
+      1
+    elif (.name // .title // .description // .status) then
+      1
+    else
+      0
+    end
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
   | sort -n | tail -1)
-TASK_MAX="${TASK_MAX:-0}"
+TASK_UPDATE_MAX="${TASK_UPDATE_MAX:-0}"
 
 # Явная нумерация шагов в ответах ассистента: "Шаг N из M" / "Step N of M".
 # Берём максимальный общий знаменатель M, потому что ответ может содержать
 # промежуточные шаги без полной формулы.
-STEP_MAX=$(jq -r '
-  .message.content[]?
+STEP_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
   | select(.type == "text" and (.text // "") != "")
   | .text
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
@@ -227,8 +263,14 @@ STEP_MAX=$(jq -r '
   | sort -n | tail -1)
 STEP_MAX="${STEP_MAX:-0}"
 
-LIST_MAX=$(( TODO_MAX > TASK_MAX ? TODO_MAX : TASK_MAX ))
-LIST_MAX=$(( LIST_MAX > STEP_MAX ? LIST_MAX : STEP_MAX ))
+# TodoWrite и TaskCreate — сигналы планирования (список задач); суммируем,
+# потому что отдельные TaskCreate = отдельные шаги, а TodoWrite может быть
+# дополнен TaskCreate. TaskUpdate — обновления, берём max, чтобы обновления
+# одной задачи не размножались. Явная нумерация в тексте — независимый
+# источник; берём max.
+LIST_MAX=$(( TODO_MAX + TASK_CREATE_MAX ))
+if [ "$TASK_UPDATE_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$TASK_UPDATE_MAX"; fi
+if [ "$STEP_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$STEP_MAX"; fi
 
 THRESHOLD=3
 
@@ -239,18 +281,25 @@ if [ "$LIST_MAX" -lt "$THRESHOLD" ]; then
   FIRED=1
 fi
 
+TASK_MAX_SIGNAL="$TASK_CREATE_MAX"
+if [ "$TASK_UPDATE_MAX" -gt "$TASK_MAX_SIGNAL" ]; then TASK_MAX_SIGNAL="$TASK_UPDATE_MAX"; fi
+
 LOG_ENTRY=$(jq -nc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
   --arg skill "$PROTOCOL_SKILL" \
   --arg todo_max "$TODO_MAX" \
-  --arg task_max "$TASK_MAX" \
+  --arg task_max "$TASK_MAX_SIGNAL" \
+  --arg task_create_max "$TASK_CREATE_MAX" \
+  --arg task_update_max "$TASK_UPDATE_MAX" \
   --arg step_max "$STEP_MAX" \
   --arg list_max "$LIST_MAX" \
   --arg threshold "$THRESHOLD" \
   --arg fired "$FIRED" \
   '{ts: $ts, gate: "protocol-stop-gate", session_id: $sid, skill: $skill,
     todo_max: ($todo_max|tonumber), task_max: ($task_max|tonumber),
+    task_create_max: ($task_create_max|tonumber),
+    task_update_max: ($task_update_max|tonumber),
     step_max: ($step_max|tonumber), list_max: ($list_max|tonumber),
     threshold: ($threshold|tonumber), fired: ($fired == "1"), action: "warn"}' 2>/dev/null || true)
 

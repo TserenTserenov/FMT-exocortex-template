@@ -121,7 +121,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "6e4c055791725686df88cd2b1b854c32d27fc61a741f4639461e21f662631160"
+      "sha256": "dcde39291460aa143c0f81d0a04107477790e1e7b6b1aa6cd65d7487cceea278"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -198,6 +198,10 @@
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
       "sha256": "6298b52f77be40dca698050a95fee94cca66cf4a9e64f119acde03b18d76f765"
+    },
+    {
+      "path": ".claude/hooks/tests/test-protocol-stop-gate-task-replacement.sh",
+      "sha256": "1f31158ffc77d822b14d80456d5f336e988e8d34459b2284a73ed0c9bacbad25"
     },
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh",
