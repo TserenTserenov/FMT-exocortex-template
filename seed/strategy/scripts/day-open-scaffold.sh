@@ -627,6 +627,17 @@ render_repo_activity() {
 }
 
 # --- Section: IWE за ночь (светофор) ---
+
+# issue #866: validate that a stat result is a non-negative integer before using
+# it in arithmetic or comparisons. BSD/GNU stat flag differences can produce
+# empty or textual output; empty/invalid values must be treated as unknown.
+_is_nonneg_int() {
+    case "${1:-}" in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
 render_iwe_status() {
   echo "| Подсистема | Статус | Детали |"
   echo "|------------|--------|--------|"
@@ -658,7 +669,60 @@ render_iwe_status() {
         line=$(launchctl list 2>/dev/null | awk -v a="$agent" '$3==a{print}')
         [ -z "$line" ] && { agents_bad="$agents_bad $agent(not loaded)"; continue; }
         status=$(echo "$line" | awk '{print $2}')
-        [ "$status" != "0" ] && [ "$status" != "-" ] && agents_bad="$agents_bad $agent(exit=$status)"
+        if [ "$status" != "0" ] && [ "$status" != "-" ]; then
+          # issue #866: a non-zero exit code may be stale. Show the last log date
+          # and mark the result stale when the expected interval has passed.
+          local log_path="" log_mtime="" status_file="" status_mtime="" status_result="" last_run="" age_days="" stale_threshold=2 status_is_freshest=""
+          case "$agent" in
+            com.strategist.weekreview) stale_threshold=8 ;;
+          esac
+          if command -v plutil &>/dev/null; then
+            log_path=$(plutil -extract StandardOutPath raw "$plist" 2>/dev/null || true)
+          fi
+          log_path="${log_path//\{\{HOME_DIR\}\}/$HOME}"
+          if [ -n "$log_path" ] && [ -f "$log_path" ]; then
+            log_mtime=$(stat -f %m "$log_path" 2>/dev/null) ||
+                log_mtime=$(stat -c %Y "$log_path" 2>/dev/null) ||
+                log_mtime=""
+          fi
+          _is_nonneg_int "$log_mtime" || log_mtime=""
+
+          # issue #866: a manual successful retry updates the per-scenario status
+          # file; use its mtime when it is fresher than the agent's log.
+          case "$agent" in
+            com.strategist.weekreview) status_file="$HOME/logs/strategist/week-review-last-status" ;;
+          esac
+          if [ -n "$status_file" ] && [ -f "$status_file" ]; then
+            status_mtime=$(stat -f %m "$status_file" 2>/dev/null) ||
+                status_mtime=$(stat -c %Y "$status_file" 2>/dev/null) ||
+                status_mtime=""
+            status_result=$(awk -F'\t' 'NR==1 {print $2}' "$status_file" 2>/dev/null || true)
+          fi
+          _is_nonneg_int "$status_mtime" || status_mtime=""
+
+          if [ -n "$status_mtime" ] && [ -n "$log_mtime" ]; then
+            if [ "$status_mtime" -ge "$log_mtime" ]; then
+              log_mtime="$status_mtime"
+              status_is_freshest=true
+            fi
+          elif [ -n "$status_mtime" ]; then
+            # Status file alone is the freshest signal we have (no agent log).
+            log_mtime="$status_mtime"
+            status_is_freshest=true
+          fi
+
+          if [ -n "$log_mtime" ]; then
+            last_run=$(date -r "$log_mtime" '+%Y-%m-%d' 2>/dev/null || date -d "@$log_mtime" '+%Y-%m-%d' 2>/dev/null || true)
+            age_days=$(( ( $(date +%s) - log_mtime ) / 86400 ))
+          fi
+          if [ -n "$age_days" ] && [ "$age_days" -gt "$stale_threshold" ]; then
+            agents_bad="$agents_bad $agent(exit=$status, last $last_run, stale)"
+          elif [ "$status_result" = "SUCCESS" ] && [ "$status_is_freshest" = true ]; then
+            agents_bad="$agents_bad $agent(exit=$status, last ${last_run:-unknown}, recovered)"
+          else
+            agents_bad="$agents_bad $agent(exit=$status, last ${last_run:-unknown})"
+          fi
+        fi
       done
     fi
     if [ "$agents_checked" -eq 0 ]; then
