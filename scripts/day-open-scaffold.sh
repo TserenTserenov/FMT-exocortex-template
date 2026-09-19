@@ -705,7 +705,9 @@ render_iwe_status() {
               status_is_freshest=true
             fi
           elif [ -n "$status_mtime" ]; then
+            # Status file alone is the freshest signal we have (no agent log).
             log_mtime="$status_mtime"
+            status_is_freshest=true
           fi
 
           if [ -n "$log_mtime" ]; then

@@ -338,7 +338,11 @@ run_claude_with_retry() {
         # from earlier scenarios in the shared daily log.
         local log_start_bytes=0
         if [ -f "$LOG_FILE" ]; then
-            log_start_bytes=$(wc -c < "$LOG_FILE")
+            # BSD wc pads with spaces; strip so arithmetic/tail offsets stay sane.
+            log_start_bytes=$(wc -c < "$LOG_FILE" | tr -d '[:space:]')
+            case "$log_start_bytes" in
+                ''|*[!0-9]*) log_start_bytes=0 ;;
+            esac
         fi
         run_claude "$command_file" "$model_override" || rc=$?
 
@@ -351,7 +355,12 @@ run_claude_with_retry() {
             fi
             if printf '%s\n' "$attempt_output" | grep -qiE "(Failed to authenticate|API Error: 403|401 Unauthorized|Request not allowed)"; then
                 local delay_idx=$((attempt - 1))
-                local delay="${delays[$delay_idx]:-${delays[${#delays[@]} - 1]:-300}}"
+                local delay=300
+                if [ "$delay_idx" -lt "${#delays[@]}" ]; then
+                    delay="${delays[$delay_idx]}"
+                elif [ "${#delays[@]}" -gt 0 ]; then
+                    delay="${delays[$((${#delays[@]} - 1))]}"
+                fi
                 log "AUTH_FAILURE scenario: $command_file (attempt $attempt/$max_attempts); retry in ${delay}s"
                 sleep "$delay"
                 attempt=$((attempt + 1))

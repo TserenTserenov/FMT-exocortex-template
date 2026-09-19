@@ -502,6 +502,9 @@ detect_release_rollback() {
     if ! printf '%s' "$release_sha" | grep -qxE '[0-9a-f]{40}'; then
         commit_json=$(github_api_get "$API_BASE/commits/$release_sha" 2>/dev/null) || return 2
         # Prefer JSON parsing; fall back to sed only when Python is unavailable.
+        # Guard the assignment with || return 2: under set -e a bare failing
+        # command-substitution aborts the whole script when this function is
+        # not invoked from an if/|| context (WP-529 review of #863).
         if py_available; then
             release_sha=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
 import json, re, sys
@@ -512,10 +515,11 @@ except json.JSONDecodeError:
 sha = doc.get("sha", "") if isinstance(doc, dict) else ""
 if not re.fullmatch(r"[0-9a-f]{40}", sha):
     raise SystemExit(1)
-print(sha)')
+print(sha)') || return 2
         else
+            # Non-greedy: take the first 40-hex sha field only (head -1).
             release_sha=$(printf '%s\n' "$commit_json" | \
-                sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
+                sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1) || return 2
         fi
         [ -n "$release_sha" ] || return 2
     fi

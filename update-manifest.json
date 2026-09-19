@@ -5,7 +5,7 @@
   "files": [
     {
       "path": ".agentigore",
-      "sha256": "40f8b3d924848fac222b26506975f69213d608924104ff0236a7bc26bd43994c"
+      "sha256": "0d4fc562f87c9ae3788dbdcbce039a2713d90ba53a387cd38ddca3f50a5d9a7e"
     },
     {
       "path": ".claude/agents/wp-sync-actualizer.md",
@@ -117,11 +117,11 @@
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
-      "sha256": "d9b39e26a87287f11a5118280390dce83ac6f6295ea807c41aedf4327e0e9530"
+      "sha256": "09080a32dcb81738ff198cfc899de6fca7efeaa1e56b6e907a3b7049ca6712bb"
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "34ce9612d81c8dd6302c2998a89baa64dd74c3fed9feccb16801c7a28335413b"
+      "sha256": "6e4c055791725686df88cd2b1b854c32d27fc61a741f4639461e21f662631160"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -225,7 +225,7 @@
     },
     {
       "path": ".claude/lib/find-python3.sh",
-      "sha256": "34ad77a7d721309dee10244843ea900db26954fc953d3dfc529eaa28f6ff25a0"
+      "sha256": "0458450073d95b1cfb9452067d4006468aa80fa7c4435415fbf060459d022964"
     },
     {
       "path": ".claude/lib/frontmatter.sh",
@@ -341,7 +341,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "ef9cbb17c9f994899c2bd569cae8001dfa991761398e42f172edac2a1b4ac5a1"
+      "sha256": "ee7fa6dca8af2cfab7afdb2420e168795c876b67863e67a6502440ed38d56a1d"
     },
     {
       "path": ".claude/settings.json",
@@ -585,7 +585,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "eaebbf23caa3643626fc6f3b8f42341d11a4a48c0d8437915c4e42e9d08349b2"
+      "sha256": "bda4b0d4461029ce28126eada72a87234524e8262c778f0e2ed0fd96ed648aa2"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -633,7 +633,7 @@
     },
     {
       "path": ".claude/skills/residency-gate/lib/state.py",
-      "sha256": "5b9b385bf7306d840f2a3dcd1c960140b31f4785d4c2d5d961afacb2136b016c"
+      "sha256": "227d2a6032aebefeb421be017fef2af9893d04b41d75c792c08f3ede63bb0eb6"
     },
     {
       "path": ".claude/skills/residency-gate/pre-grant.yaml",
@@ -1497,7 +1497,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "d753b57b1a500861034bdd4a522773979b1a8665135ba679afc02ecaeca9f3f9"
+      "sha256": "bfa06bae377473dcaa6ac4f38fe300a8cb5c99a6c313ab9c6ced67b0c352aa2b"
     },
     {
       "path": "memory/fpf-term-map.yaml",
@@ -1705,7 +1705,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "997eb8df16148f70b4ccece7740b4d23719bada2c3ebe4f482474438d85b3f6e"
+      "sha256": "7e90bf620c968719071c1a69c7fb80c09f076168ad8959f3622f2f44982ba52b"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1881,7 +1881,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "c4b362d060b716fa7a481dfd9a083cf837ac765ae81f18b6b30c7f85d9ea5575"
+      "sha256": "d6400de834ff112bbb4359cda82e894571bb8d902db8bf7cd371fdd88efe8760"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2193,7 +2193,7 @@
     },
     {
       "path": "scripts/day-close-prepare.sh",
-      "sha256": "f93ff8f21e5af567d790382745134350c602871cf489a443c90f433b84c318bd"
+      "sha256": "712b23afa31a21d8c046c81e148af1f485424feab8a7aa657fd5303821dcffe5"
     },
     {
       "path": "scripts/day-close.sh",
@@ -2245,7 +2245,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "ad1043885fb41723fa82919eaddf57d6c00a483e388dd6a4561933b6eb12e090"
+      "sha256": "a9fe2013f6fdf96ba1ede4f09da0b109c01b3f4e2a3b828f44ca48fd32443fdd"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2437,7 +2437,7 @@
     },
     {
       "path": "scripts/lib/find-python3.sh",
-      "sha256": "34ad77a7d721309dee10244843ea900db26954fc953d3dfc529eaa28f6ff25a0"
+      "sha256": "0458450073d95b1cfb9452067d4006468aa80fa7c4435415fbf060459d022964"
     },
     {
       "path": "scripts/lib/language-check.py",
@@ -2997,7 +2997,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/find-python3.sh",
-      "sha256": "d0cc830a53adde80c4bff2d3c92c28efa45d8e2e6c67e5a54c48d1774818ca69"
+      "sha256": "fc359d237ba4acb9c472abac8c37a942f2f01644d020ea8c8361bd37483aa942"
     },
     {
       "path": "seed/strategy/scripts/lib/ledger-path.sh",
@@ -3045,7 +3045,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "eda0dd50a8ce7f566c92166040b63e8dc0d4adc0f06b6d91585ace197517bc8f"
+      "sha256": "11f477bf64e2a55f98b3da0f82240758a68911b1922d47125dfa363ba2d65da7"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3085,7 +3085,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "6856fd91b256076e90e1c164a373836498ea5f4d5b6f543e1e4c842d360673b3"
+      "sha256": "a29e46ca32e5ef6ea80e1d69b89d56ab9a769d791f4fb75a28326cb6cbf82b08"
     }
   ],
   "excluded_paths": [

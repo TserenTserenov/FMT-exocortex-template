@@ -25,12 +25,17 @@ extract_function() {
 }
 extract_function github_api_get > "$FUNCS"
 extract_function resolve_delivery_ref >> "$FUNCS"
+extract_function detect_release_rollback >> "$FUNCS"
 grep -q '^github_api_get() {' "$FUNCS" || {
     echo "FATAL: github_api_get extraction is empty" >&2
     exit 2
 }
 grep -q '^resolve_delivery_ref() {' "$FUNCS" || {
     echo "FATAL: resolve_delivery_ref extraction is empty" >&2
+    exit 2
+}
+grep -q '^detect_release_rollback() {' "$FUNCS" || {
+    echo "FATAL: detect_release_rollback extraction is empty" >&2
     exit 2
 }
 
@@ -259,7 +264,100 @@ OUT=$(run_case release no no no none "" "" 2>&1)
 echo "$OUT" | grep -q "RAW_BASE=.*/v9.9.9$" && pass "9 no-python release pins immutable tag" || fail "9 no-python tag pin failed: $OUT"
 echo "$OUT" | grep -q "/commits/v9.9.9" && fail "9 no-python path made unnecessary commit GET: $OUT" || pass "9 only latest-release GET used"
 
-[ "$CASE_COUNT" -eq 9 ] || fail "matrix executed $CASE_COUNT cases, expected 9"
+# --- issue #863: detect_release_rollback ---
+CASE_COUNT=$((CASE_COUNT + 1))
+ROLLBACK_REPO=$(mktemp -d)
+(
+    set -euo pipefail
+    git -C "$ROLLBACK_REPO" init -q
+    git -C "$ROLLBACK_REPO" config user.email "test@example.com"
+    git -C "$ROLLBACK_REPO" config user.name "test"
+    echo one > "$ROLLBACK_REPO/f"
+    git -C "$ROLLBACK_REPO" add f
+    git -C "$ROLLBACK_REPO" commit -qm "release"
+    RELEASE_COMMIT=$(git -C "$ROLLBACK_REPO" rev-parse HEAD)
+    echo two >> "$ROLLBACK_REPO/f"
+    git -C "$ROLLBACK_REPO" commit -qam "local ahead"
+    LOCAL_HEAD=$(git -C "$ROLLBACK_REPO" rev-parse HEAD)
+
+    # shellcheck disable=SC1090
+    . "$FUNCS"
+    UPDATE_CHANNEL=release
+    RELEASE_SHA="$RELEASE_COMMIT"
+    SCRIPT_DIR="$ROLLBACK_REPO"
+    PY_BIN=""
+    py_available() { return 1; }
+    github_api_get() { return 1; }
+
+    rc=0
+    detect_release_rollback || rc=$?
+    echo "ROLLBACK_RC=$rc"
+    echo "RELEASE_COMMIT=$RELEASE_COMMIT"
+    echo "LOCAL_HEAD=$LOCAL_HEAD"
+) >"$TRACE_DIR/rollback-out.txt" 2>"$TRACE_DIR/rollback-err.txt" || true
+ROLLBACK_OUT=$(cat "$TRACE_DIR/rollback-out.txt")
+echo "$ROLLBACK_OUT" | grep -q "ROLLBACK_RC=0" && pass "10 rollback detected when local ahead of release" \
+    || fail "10 expected rollback rc=0: out=$ROLLBACK_OUT err=$(cat "$TRACE_DIR/rollback-err.txt")"
+
+CASE_COUNT=$((CASE_COUNT + 1))
+(
+    set -euo pipefail
+    # Same repo: release SHA equals HEAD → no rollback.
+    # shellcheck disable=SC1090
+    . "$FUNCS"
+    UPDATE_CHANNEL=release
+    RELEASE_SHA=$(git -C "$ROLLBACK_REPO" rev-parse HEAD)
+    SCRIPT_DIR="$ROLLBACK_REPO"
+    PY_BIN=""
+    py_available() { return 1; }
+    github_api_get() { return 1; }
+    rc=0
+    detect_release_rollback || rc=$?
+    echo "EQUAL_RC=$rc"
+) >"$TRACE_DIR/equal-out.txt" 2>"$TRACE_DIR/equal-err.txt" || true
+EQUAL_OUT=$(cat "$TRACE_DIR/equal-out.txt")
+echo "$EQUAL_OUT" | grep -q "EQUAL_RC=1" && pass "11 equal HEAD is not a rollback" \
+    || fail "11 expected equal rc=1: out=$EQUAL_OUT err=$(cat "$TRACE_DIR/equal-err.txt")"
+
+CASE_COUNT=$((CASE_COUNT + 1))
+(
+    set -euo pipefail
+    # shellcheck disable=SC1090
+    . "$FUNCS"
+    UPDATE_CHANNEL=main
+    RELEASE_SHA=$(git -C "$ROLLBACK_REPO" rev-parse HEAD~1)
+    SCRIPT_DIR="$ROLLBACK_REPO"
+    rc=0
+    detect_release_rollback || rc=$?
+    echo "MAIN_RC=$rc"
+) >"$TRACE_DIR/main-out.txt" 2>"$TRACE_DIR/main-err.txt" || true
+MAIN_OUT=$(cat "$TRACE_DIR/main-out.txt")
+echo "$MAIN_OUT" | grep -q "MAIN_RC=1" && pass "12 main channel skips rollback detection" \
+    || fail "12 expected main rc=1: out=$MAIN_OUT err=$(cat "$TRACE_DIR/main-err.txt")"
+
+CASE_COUNT=$((CASE_COUNT + 1))
+(
+    set -euo pipefail
+    # Tag-like RELEASE_SHA + bad JSON → uncertain (rc=2), must not abort under set -e.
+    # shellcheck disable=SC1090
+    . "$FUNCS"
+    UPDATE_CHANNEL=release
+    RELEASE_SHA="v9.9.9"
+    SCRIPT_DIR="$ROLLBACK_REPO"
+    PY_BIN=python3
+    py_available() { return 0; }
+    github_api_get() { printf '%s\n' '{"not":"a commit"}'; return 0; }
+    rc=0
+    detect_release_rollback || rc=$?
+    echo "UNCERTAIN_RC=$rc"
+) >"$TRACE_DIR/uncertain-out.txt" 2>"$TRACE_DIR/uncertain-err.txt" || true
+UNCERTAIN_OUT=$(cat "$TRACE_DIR/uncertain-out.txt")
+echo "$UNCERTAIN_OUT" | grep -q "UNCERTAIN_RC=2" && pass "13 unresolved tag returns uncertain (2) without abort" \
+    || fail "13 expected uncertain rc=2: out=$UNCERTAIN_OUT err=$(cat "$TRACE_DIR/uncertain-err.txt")"
+
+rm -rf "$ROLLBACK_REPO"
+
+[ "$CASE_COUNT" -eq 13 ] || fail "matrix executed $CASE_COUNT cases, expected 13"
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL ($CASE_COUNT cases)"
 [ "$FAIL_COUNT" -eq 0 ] && exit 0 || exit 1
