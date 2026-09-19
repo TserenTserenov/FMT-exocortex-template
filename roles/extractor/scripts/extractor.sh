@@ -469,6 +469,57 @@ commit_extractor_changes() {
     target_changes=$(git -C "$strategy_dir" status --porcelain --untracked-files=all -- "${target_paths[@]}")
     if [ -z "$target_changes" ]; then
         log "No new changes to commit in $repo_name"
+        # issue #860: the agent may have already committed inside the prompt.
+        # If HEAD is ahead of origin by extractor-owned commits, publish them
+        # instead of leaving them local.
+        local ahead_count
+        ahead_count=$(git -C "$strategy_dir" rev-list --count "origin/${gov_branch}..HEAD" 2>/dev/null || echo 0)
+        ahead_count=${ahead_count:-0}
+        if [ "$ahead_count" -gt 0 ]; then
+            local latest_local latest_paths
+            latest_local=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null || true)
+            latest_paths=$(git -C "$strategy_dir" diff-tree --no-commit-id --name-only -r "$latest_local" 2>/dev/null || true)
+            if [ -n "$latest_paths" ]; then
+                local p is_extractor_commit=0
+                for p in "${target_paths[@]}"; do
+                    if printf '%s\n' "$latest_paths" | grep -qxF "$p"; then
+                        is_extractor_commit=1
+                        break
+                    fi
+                done
+                if [ "$is_extractor_commit" -eq 1 ]; then
+                    log "Found unpublished extractor commit ($latest_local) already on HEAD"
+                    local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
+                    if [ ! -f "$publish_gate" ]; then
+                        if git -C "$strategy_dir" push origin "$latest_local:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
+                            log "Pushed pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="published"
+                        else
+                            log "WARN: git push failed for pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="failed"
+                            return 1
+                        fi
+                    else
+                        # shellcheck source=/dev/null
+                        . "$publish_gate"
+                        if is_ds_repo_by_origin "$strategy_dir" \
+                            && IWE_WORKSPACE="${IWE_ROOT:-$HOME/IWE}" \
+                               publish_commit "$strategy_dir" "$latest_local" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+                            log "Published pre-existing extractor commit $latest_local via ds-publish.sh"
+                            EXTRACTOR_COMMIT_RESULT="published"
+                        elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
+                            log "Pushed pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="published"
+                        else
+                            log "WARN: publish failed for pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="failed"
+                            return 1
+                        fi
+                    fi
+                    return 0
+                fi
+            fi
+        fi
         EXTRACTOR_COMMIT_RESULT="no_changes"
         return 0
     fi

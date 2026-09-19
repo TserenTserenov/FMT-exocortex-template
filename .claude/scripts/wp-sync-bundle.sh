@@ -560,17 +560,49 @@ main() {
         exit 2
       fi
     fi
-    # No explicit WP given — find any real one from inbox (diagnostic default,
-    # unchanged from prior behavior).
+    # No explicit WP given — find a real, resolvable WP for the canary.
+    # WP-434: canonical folder cards win over legacy flat files; closed WPs
+    # (archived/done) are avoided because the canary should test the active
+    # governance contour, not a stale baseline (issue #861).
     if [[ -z "$test_num" && -d "$INBOX_DIR" ]]; then
       local first_wp
-      first_wp=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort | head -1 || true)
+      first_wp=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-*/WP-*.md" 2>/dev/null | sort | head -1 || true)
       if [[ -n "$first_wp" ]]; then
-        test_num=$(basename "$first_wp" | grep -oE '^WP-[0-9]+' | grep -oE '[0-9]+' || true)
+        test_num=$(basename "$(dirname "$first_wp")" | grep -oE '[0-9]+' || true)
+      fi
+      if [[ -z "$test_num" ]]; then
+        first_wp=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort | head -1 || true)
+        if [[ -n "$first_wp" ]]; then
+          test_num=$(basename "$first_wp" | grep -oE '^WP-[0-9]+' | grep -oE '[0-9]+' || true)
+        fi
       fi
     fi
-    if [[ -z "$test_num" ]]; then
-      test_num=$(grep -oE 'WP-[0-9]+' "$REGISTRY_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+' || true)
+    if [[ -z "$test_num" && -f "$REGISTRY_FILE" ]]; then
+      local reg_num seen=""
+      while IFS= read -r reg_num; do
+        reg_num=$(echo "$reg_num" | grep -oE '[0-9]+' || true)
+        [[ -z "$reg_num" ]] && continue
+        [[ "$seen" == *" ${reg_num} "* ]] && continue
+        seen="${seen} ${reg_num} "
+        local candidate_file candidate_status
+        candidate_file=$(find_wp_file "$reg_num")
+        [[ -z "$candidate_file" ]] && continue
+        candidate_status=$(registry_status "$reg_num")
+        # Prefer active WPs; archived/closed/done are acceptable only as a last
+        # resort (handled below after the loop).
+        if [[ "$candidate_status" == "🔄 in_progress"* || "$candidate_status" == "⏳ pending"* ]]; then
+          test_num="$reg_num"
+          break
+        fi
+      done <<< "$(grep -oE 'WP-[0-9]+' "$REGISTRY_FILE" 2>/dev/null || true)"
+      # Last resort: any resolvable WP, even archived, so the file-lookup part
+      # of the canary still runs on a bare installation.
+      if [[ -z "$test_num" ]]; then
+        reg_num=$(grep -oE 'WP-[0-9]+' "$REGISTRY_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+' || true)
+        if [[ -n "$reg_num" ]] && [[ -n "$(find_wp_file "$reg_num")" ]]; then
+          test_num="$reg_num"
+        fi
+      fi
     fi
     if [[ -z "$test_num" ]]; then
       echo "WP lookup: SKIP (no WP files found in inbox or registry)"

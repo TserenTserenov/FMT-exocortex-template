@@ -9,3 +9,5 @@ scripts/iwe-grep-secret.sh
 .github/workflows/cloud-scheduler.yml
 guide-kit/structurer/test_quarantine.py
 scripts/add-secret.sh
+__pycache__/
+*.pyc

@@ -18,7 +18,7 @@ if [ "$TOOL" = "Read" ] && echo "$FILE_PATH" | grep -q "protocol-"; then
 
 # Срабатываем на вызов протокольных скиллов (Skill tool)
 elif [ "$TOOL" = "Skill" ] && echo "$SKILL_NAME" | grep -qE '^(day-open|day-close|run-protocol|wp-new)$'; then
-  CTX="📝 СКИЛЛ ЗАГРУЖЕН: $SKILL_NAME. ОБЯЗАТЕЛЬНО: (1) Используй TodoWrite — создай таск-лист ВСЕХ шагов скилла ДО начала исполнения. (2) Выполни ВСЕ шаги последовательно, отмечая каждый. (3) После завершения запусти /verify (Haiku R23). НЕ пропускай шаги и верификацию."
+  CTX="📝 СКИЛЛ ЗАГРУЖЕН: $SKILL_NAME. ОБЯЗАТЕЛЬНО: (1) Создай таск-лист ВСЕХ шагов скилла ДО начала исполнения — TodoWrite, TaskCreate/TaskUpdate или явная нумерация шагов в ответах, если Task-инструменты недоступны. (2) Выполни ВСЕ шаги последовательно, отмечая каждый. (3) После завершения запусти /verify (Haiku R23). НЕ пропускай шаги и верификацию."
   jq -n --arg ctx "$CTX" '{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": $ctx}}'
 
 else

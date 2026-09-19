@@ -192,7 +192,10 @@ if [ -z "$PROTOCOL_SKILL" ]; then
   exit 0
 fi
 
-# --- Шаг 2: был ли TodoWrite с ≥3 items? --- (та же вложенность, что в Шаге 1)
+# --- Шаг 2: был ли таск-лист с ≥3 items? --- (та же вложенность, что в Шаге 1)
+# issue #862: TodoWrite устарел и заменён TaskCreate/TaskUpdate; кроме того,
+# SKILL.md явно разрешает нумерацию шагов в ответах, когда Task-инструменты
+# недоступны. Учитываем все три признака.
 TODO_MAX=$(jq -r '
   .message.content[]?
   | select(.type == "tool_use" and .name == "TodoWrite")
@@ -200,14 +203,39 @@ TODO_MAX=$(jq -r '
   | if type == "array" then length else 0 end
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
   | sort -n | tail -1)
-
 TODO_MAX="${TODO_MAX:-0}"
+
+TASK_MAX=$(jq -r '
+  .message.content[]?
+  | select(.type == "tool_use" and (.name == "TaskCreate" or .name == "TaskUpdate"))
+  | (.input.tasks // .input.task_list // .input.items // [])
+  | if type == "array" then length else 0 end
+' "$TRANSCRIPT_PATH" 2>/dev/null \
+  | sort -n | tail -1)
+TASK_MAX="${TASK_MAX:-0}"
+
+# Явная нумерация шагов в ответах ассистента: "Шаг N из M" / "Step N of M".
+# Берём максимальный общий знаменатель M, потому что ответ может содержать
+# промежуточные шаги без полной формулы.
+STEP_MAX=$(jq -r '
+  .message.content[]?
+  | select(.type == "text" and (.text // "") != "")
+  | .text
+' "$TRANSCRIPT_PATH" 2>/dev/null \
+  | grep -oiE '(шаг|step)[[:space:]]+[0-9]+[[:space:]]+(из|of)[[:space:]]+[0-9]+' \
+  | grep -oiE '[0-9]+$' \
+  | sort -n | tail -1)
+STEP_MAX="${STEP_MAX:-0}"
+
+LIST_MAX=$(( TODO_MAX > TASK_MAX ? TODO_MAX : TASK_MAX ))
+LIST_MAX=$(( LIST_MAX > STEP_MAX ? LIST_MAX : STEP_MAX ))
+
 THRESHOLD=3
 
 # --- Шаг 3: логировать событие ---
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FIRED=0
-if [ "$TODO_MAX" -lt "$THRESHOLD" ]; then
+if [ "$LIST_MAX" -lt "$THRESHOLD" ]; then
   FIRED=1
 fi
 
@@ -216,11 +244,15 @@ LOG_ENTRY=$(jq -nc \
   --arg sid "$SESSION_ID" \
   --arg skill "$PROTOCOL_SKILL" \
   --arg todo_max "$TODO_MAX" \
+  --arg task_max "$TASK_MAX" \
+  --arg step_max "$STEP_MAX" \
+  --arg list_max "$LIST_MAX" \
   --arg threshold "$THRESHOLD" \
   --arg fired "$FIRED" \
   '{ts: $ts, gate: "protocol-stop-gate", session_id: $sid, skill: $skill,
-    todo_max: ($todo_max|tonumber), threshold: ($threshold|tonumber),
-    fired: ($fired == "1"), action: "warn"}' 2>/dev/null || true)
+    todo_max: ($todo_max|tonumber), task_max: ($task_max|tonumber),
+    step_max: ($step_max|tonumber), list_max: ($list_max|tonumber),
+    threshold: ($threshold|tonumber), fired: ($fired == "1"), action: "warn"}' 2>/dev/null || true)
 
 if [ -n "$LOG_ENTRY" ]; then
   echo "$LOG_ENTRY" >> "$GATE_LOG" 2>/dev/null || true
@@ -234,7 +266,7 @@ fi
 # secret-file-read-block.sh / secret-mcp-dump-guard.sh.
 if [ "$FIRED" = "1" ]; then
   cat <<EOF
-{"systemMessage": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но TodoWrite с ≥$THRESHOLD задачами не найден (найдено: $TODO_MAX). Протокол требует таск-лист ДО начала исполнения. Действие: создай TodoWrite с шагами скилла и пройди протокол заново. (gate_log: $GATE_LOG)"}
+{"systemMessage": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но признак исполнения по шагам (TodoWrite/Task-инструменты/явная нумерация) с ≥$THRESHOLD задачами не найден (найдено: $LIST_MAX). Протокол требует пошаговый план ДО начала исполнения. Действие: создай TodoWrite/Task-лист с шагами скилла либо явно пронумеруй шаги в ответах, как разрешено SKILL.md, и пройди протокол заново. (gate_log: $GATE_LOG)"}
 EOF
 else
   echo '{}'

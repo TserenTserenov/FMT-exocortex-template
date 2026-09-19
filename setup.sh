@@ -911,11 +911,11 @@ if YAML_PYTHON3=$("$TEMPLATE_DIR/scripts/lib/find-python3.sh" 2>/dev/null); then
     :
 else
     YAML_PYTHON3=""
-    echo "  ⚠ Не найден python3 с библиотекой PyYAML — календарь, лента «Мир» и обзор РП будут отключаться с явной ошибкой зависимости."
+    echo "  ⚠ Не найден python3 >= 3.10 с библиотекой PyYAML — календарь, лента «Мир», обзор РП и core-скрипты (artifactor.py, session-dispatcher-tsekh.py) будут отключаться с явной ошибкой зависимости."
     if [ "$(uname)" = "Linux" ]; then
-        echo "    Установи: sudo apt install python3-yaml (или: pip3 install pyyaml)"
+        echo "    Установи: sudo apt install python3-yaml (или python3.10 + pip3 install pyyaml)"
     else
-        echo "    Установи: pip3 install pyyaml (python3 из Homebrew уже содержит pip3)"
+        echo "    Установи: brew install python3 && pip3 install pyyaml"
     fi
 fi
 
