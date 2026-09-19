@@ -144,32 +144,34 @@ echo "--- 7. WAKATIME ---"
 python3 - "$TODAY" <<'PYEOF'
 import sys, os, re, json, urllib.request, base64, configparser
 target = sys.argv[1]
-api_key = None
-for env_path in [
-    os.path.expanduser("~/.config/aist/env"),
-    os.path.expanduser("~/.iwe/.exocortex.env"),
-    os.path.expanduser("~/.wakatime.env"),
-]:
-    if not os.path.isfile(env_path):
-        continue
-    try:
-        with open(env_path) as f:
-            for line in f:
-                m = re.match(r'WAKATIME_API_KEY\s*=\s*"?([^"\n]+)"?', line)
-                if m:
-                    api_key = m.group(1).strip()
-                    break
-    except Exception:
-        pass
-    if api_key:
-        break
+api_key = os.environ.get("WAKATIME_API_KEY", "").strip() or None
+if not api_key:
+    for env_path in [
+        os.path.expanduser("~/.config/aist/env"),
+        os.path.expanduser("~/.iwe/.exocortex.env"),
+        os.path.expanduser("~/.wakatime.env"),
+    ]:
+        if not os.path.isfile(env_path):
+            continue
+        try:
+            with open(env_path) as f:
+                for line in f:
+                    # Support KEY=value, KEY="value", KEY='value', export KEY=value
+                    m = re.match(r"^(?:export\s+)?WAKATIME_API_KEY\s*=\s*([\"']?)([^\"'\n]+)\1\s*$", line)
+                    if m:
+                        api_key = m.group(2).strip()
+                        break
+        except (OSError, UnicodeError) as exc:
+            print(f"(cannot read {env_path}: {exc})")
+        if api_key:
+            break
 if not api_key and os.path.isfile(os.path.expanduser("~/.wakatime.cfg")):
     try:
         cfg = configparser.ConfigParser()
         cfg.read(os.path.expanduser("~/.wakatime.cfg"))
         api_key = cfg.get("settings", "api_key", fallback=None)
-    except Exception:
-        pass
+    except (OSError, configparser.Error) as exc:
+        print(f"(cannot read ~/.wakatime.cfg: {exc})")
 if not api_key:
     print("(WAKATIME_API_KEY not found — use Neon fallback: domain_event coding_time)")
     sys.exit(0)
@@ -179,15 +181,18 @@ req = urllib.request.Request(url, headers={"Authorization": f"Basic {auth}", "Ac
 try:
     with urllib.request.urlopen(req, timeout=15) as resp:
         body = json.loads(resp.read().decode("utf-8"))
-except Exception as exc:
+except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
     print(f"(WakaTime API error: {exc} — use Neon fallback: domain_event coding_time)")
     sys.exit(0)
 days = body.get("data") if isinstance(body, dict) else None
 if not isinstance(days, list) or not days:
     print("(no WakaTime data for today)")
     sys.exit(0)
-day_entry = next((d for d in days if isinstance(d, dict) and d.get("range", {}).get("date") == target), days[0])
-grand_total = day_entry.get("grand_total") if isinstance(day_entry, dict) else None
+day_entry = next((d for d in days if isinstance(d, dict) and d.get("range", {}).get("date") == target), None)
+if not isinstance(day_entry, dict):
+    print(f"(no WakaTime entry for {target})")
+    sys.exit(0)
+grand_total = day_entry.get("grand_total")
 seconds = grand_total.get("total_seconds") if isinstance(grand_total, dict) else None
 if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
     print("(no positive WakaTime time for today)")

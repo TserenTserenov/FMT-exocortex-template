@@ -652,6 +652,10 @@
       "sha256": "f09e190f5389f0b58c5978db89ccd233da237c616f99a14d7fd8eb1da9413c6d"
     },
     {
+      "path": ".claude/skills/residency-gate/tests/test_state_platform.py",
+      "sha256": "51a3725b1aa8e33f01c74cf42f0ed372aec4d5cb217fb1f4ea8954809ca0d00d"
+    },
+    {
       "path": ".claude/skills/restore-exocortex/SKILL.md",
       "sha256": "0acf583aac6e89133143f6573826b4118b1eb0b76709731b7f2137f429510fac"
     },

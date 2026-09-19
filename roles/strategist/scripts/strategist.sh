@@ -318,6 +318,62 @@ ${prompt}"
     return $rc
 }
 
+# issue #866: retry transient auth failures and leave a recoverable record.
+run_claude_with_retry() {
+    local command_file="$1"
+    local model_override="${2:-${IWE_STRATEGIST_MODEL:-}}"
+    local max_attempts="${3:-3}"
+    shift 3 || shift $#
+    local delays=(60 300)
+    if [ $# -gt 0 ]; then
+        delays=("$@")
+    fi
+    local attempt=1
+    local rc=0
+    local status_file="$LOG_DIR/${command_file}-last-status"
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        rc=0
+        # Capture only the output produced by this attempt, not stale lines
+        # from earlier scenarios in the shared daily log.
+        local log_start_bytes=0
+        if [ -f "$LOG_FILE" ]; then
+            log_start_bytes=$(wc -c < "$LOG_FILE")
+        fi
+        run_claude "$command_file" "$model_override" || rc=$?
+
+        # Transient auth failure: 403/401 in this attempt's CLI output is
+        # recoverable once the VPN/credentials become available.
+        if [ "$rc" -ne 0 ] && [ "$attempt" -lt "$max_attempts" ]; then
+            local attempt_output=""
+            if [ -f "$LOG_FILE" ]; then
+                attempt_output=$(tail -c "+$((log_start_bytes + 1))" "$LOG_FILE" 2>/dev/null || true)
+            fi
+            if printf '%s\n' "$attempt_output" | grep -qiE "(Failed to authenticate|API Error: 403|401 Unauthorized|Request not allowed)"; then
+                local delay_idx=$((attempt - 1))
+                local delay="${delays[$delay_idx]:-${delays[${#delays[@]} - 1]:-300}}"
+                log "AUTH_FAILURE scenario: $command_file (attempt $attempt/$max_attempts); retry in ${delay}s"
+                sleep "$delay"
+                attempt=$((attempt + 1))
+                continue
+            fi
+        fi
+
+        break
+    done
+
+    # Record the final outcome so the morning traffic light can distinguish a
+    # fresh failure from a stale one.
+    if [ "$rc" -eq 0 ]; then
+        printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "SUCCESS" "$rc" > "$status_file"
+    else
+        printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "FAILED" "$rc" > "$status_file"
+        log "RECORDED: $command_file failed with rc=$rc (see $status_file)"
+    fi
+
+    return $rc
+}
+
 # Проверка: уже запускался ли сценарий сегодня
 already_ran_today() {
     local scenario="$1"
@@ -506,7 +562,11 @@ case "$1" in
             exit 0
         fi
         log "Sunday: running week review"
-        run_claude "week-review" "claude-opus-4-7"
+        # issue #866: week-review runs at night when credentials/VPN may be
+        # transiently unavailable. Retry auth failures with backoff and leave a
+        # status file so the morning traffic light can distinguish fresh from
+        # stale failures.
+        run_claude_with_retry "week-review" "claude-opus-4-7" 3 60 300
         # Fallback push for Knowledge Index (week-review creates a post there)
         # KI_REPO may not exist for all users — guard with [ -d ]
         KI_REPO="$HOME/IWE/DS-Knowledge-Index"

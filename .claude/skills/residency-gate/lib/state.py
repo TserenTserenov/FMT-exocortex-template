@@ -1,15 +1,18 @@
 """Persistent storage and querying of consent state for data needs."""
 
-import fcntl
 import errno
 import os
 import stat
 import tempfile
+import time
 import yaml
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Dict, Iterator, Optional, Literal
 from datetime import datetime
+
+if os.name == "posix":
+    import fcntl
 
 
 ConsentStatus = Literal["not_asked", "granted", "denied", "revoked"]
@@ -20,8 +23,12 @@ class ResidencyStateError(RuntimeError):
     """Persistent consent state is unreadable or violates its schema."""
 
 
-class ResidencyState:
-    """Manage local consent state outside the Git-backed IWE workspace."""
+class _BaseResidencyState:
+    """Shared consent-state logic and public API.
+
+    Platform-specific backends implement the storage/locking primitives that
+    ``get_consent``, ``grant_consent`` and the other public methods rely on.
+    """
 
     STATE_FILE_NAME = "data-residency.yaml"
     LOCK_FILE_NAME = ".data-residency.lock"
@@ -29,6 +36,147 @@ class ResidencyState:
     LEGACY_BACKUP_NAME = "data-residency.yaml.legacy"
     LEGACY_QUARANTINE_NAME = ".data-residency.yaml.legacy.migrating"
     INIT_MARKER_NAME = ".data-residency.initialized"
+
+    @staticmethod
+    def _absolute_path(value: str, label: str) -> Path:
+        """Return an expanded absolute path or fail closed."""
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            raise ResidencyStateError(f"{label} must be an absolute path: {value!r}")
+        return path
+
+    @staticmethod
+    def _reject_symlink(path: Path, label: str) -> None:
+        """Reject a symlink at the security boundary instead of following it."""
+        try:
+            if path.is_symlink():
+                raise ResidencyStateError(f"{label} must not be a symlink: {path}")
+        except OSError as error:
+            raise ResidencyStateError(f"cannot inspect {label}: {path}: {error}") from error
+
+    @staticmethod
+    def _is_within(path: Path, parent: Path) -> bool:
+        """Return whether path is parent itself or one of its descendants."""
+        try:
+            path.relative_to(parent)
+            return True
+        except ValueError:
+            return False
+
+    def _legacy_state_file(self) -> Path:
+        """Resolve the one supported pre-#521B state location."""
+        iwe_root_value = (
+            os.environ.get("IWE_WORKSPACE")
+            or os.environ.get("IWE_ROOT")
+            or os.environ.get("IWE")
+            or str(Path.home() / "IWE")
+        )
+        iwe_root = self._absolute_path(iwe_root_value, "IWE workspace")
+        self._legacy_workspace_root = iwe_root.resolve(strict=False)
+        return self._legacy_workspace_root / "current" / self.STATE_FILE_NAME
+
+    @staticmethod
+    def _validated_document(content: bytes, path: Path) -> dict:
+        """Parse enough schema to compare migration candidates safely."""
+        try:
+            doc = yaml.safe_load(content.decode("utf-8")) or {}
+        except (UnicodeError, yaml.YAMLError) as error:
+            raise ResidencyStateError(
+                f"consent state cannot be read safely: {path}: {error}"
+            ) from error
+        if not isinstance(doc, dict):
+            raise ResidencyStateError(f"consent state root must be a mapping: {path}")
+        functions = doc.get("functions", {})
+        if functions is None:
+            functions = {}
+        if not isinstance(functions, dict):
+            raise ResidencyStateError(
+                f"consent state 'functions' must be a mapping: {path}"
+            )
+        return doc
+
+    def get_consent(self, function_id: str, data_need_key: str) -> Dict:
+        """Get current consent status for a specific data need.
+
+        Returns dict with keys:
+        - status: ConsentStatus
+        - granted_at: ISO timestamp or null
+        - denied_reason: string or null
+        """
+        state = self._load_state()
+        func_state = state.get(function_id, {})
+        if not isinstance(func_state, dict):
+            raise ResidencyStateError(f"consent state for '{function_id}' must be a mapping")
+        need_state = func_state.get(data_need_key, {})
+        if not isinstance(need_state, dict):
+            raise ResidencyStateError(
+                f"consent record '{function_id}/{data_need_key}' must be a mapping"
+            )
+        status = need_state.get("status", "not_asked")
+        if status not in VALID_CONSENT_STATUSES:
+            raise ResidencyStateError(
+                f"consent record '{function_id}/{data_need_key}' has unknown status: {status!r}"
+            )
+
+        return {
+            "status": status,
+            "granted_at": need_state.get("granted_at"),
+            "denied_reason": need_state.get("denied_reason"),
+            "revoked_reason": need_state.get("revoked_reason"),
+        }
+
+    def grant_consent(self, function_id: str, data_need_key: str) -> None:
+        """Record user grant for a data need."""
+        def grant(state: dict) -> None:
+            if function_id not in state:
+                state[function_id] = {}
+            state[function_id][data_need_key] = {
+                "status": "granted",
+                "granted_at": datetime.utcnow().isoformat() + "Z",
+            }
+
+        self._mutate_state(grant)
+
+    def deny_consent(self, function_id: str, data_need_key: str, reason: str = "") -> None:
+        """Record user denial for a data need."""
+        def deny(state: dict) -> None:
+            if function_id not in state:
+                state[function_id] = {}
+            state[function_id][data_need_key] = {
+                "status": "denied",
+                "denied_reason": reason,
+                "denied_at": datetime.utcnow().isoformat() + "Z",
+            }
+
+        self._mutate_state(deny)
+
+    def revoke_consent(self, function_id: str, data_need_key: str, reason: str = "") -> None:
+        """User revokes previously granted consent."""
+        def revoke(state: dict) -> None:
+            if function_id not in state:
+                state[function_id] = {}
+            state[function_id][data_need_key] = {
+                "status": "revoked",
+                "revoked_reason": reason,
+                "revoked_at": datetime.utcnow().isoformat() + "Z",
+            }
+
+        self._mutate_state(revoke)
+
+    def list_all_consents(self) -> Dict:
+        """Return all consent records."""
+        return self._load_state()
+
+    def reset_function_consents(self, function_id: str) -> None:
+        """Clear all consent records for a function (for version upgrade/reset)."""
+        def reset(state: dict) -> None:
+            state.pop(function_id, None)
+
+        self._mutate_state(reset)
+
+
+class _PosixResidencyState(_BaseResidencyState):
+    """POSIX backend: paranoid path pinning, fcntl locks, atomic migration."""
 
     def __init__(self, state_file: Optional[str] = None):
         """Initialize state manager.
@@ -78,32 +226,6 @@ class ResidencyState:
             self._ensure_file_exists()
             self._ensure_private_file(self.state_file)
             self._ensure_init_marker()
-
-    @staticmethod
-    def _absolute_path(value: str, label: str) -> Path:
-        """Return an expanded absolute path or fail closed."""
-        path = Path(value).expanduser()
-        if not path.is_absolute():
-            raise ResidencyStateError(f"{label} must be an absolute path: {value!r}")
-        return path
-
-    @staticmethod
-    def _reject_symlink(path: Path, label: str) -> None:
-        """Reject a symlink at the security boundary instead of following it."""
-        try:
-            if path.is_symlink():
-                raise ResidencyStateError(f"{label} must not be a symlink: {path}")
-        except OSError as error:
-            raise ResidencyStateError(f"cannot inspect {label}: {path}: {error}") from error
-
-    @staticmethod
-    def _is_within(path: Path, parent: Path) -> bool:
-        """Return whether path is parent itself or one of its descendants."""
-        try:
-            path.relative_to(parent)
-            return True
-        except ValueError:
-            return False
 
     def _assert_default_location_is_private(self) -> None:
         """Keep default consent state physically outside Git-backed IWE."""
@@ -291,38 +413,6 @@ class ResidencyState:
                 fcntl.flock(descriptor, fcntl.LOCK_UN)
             finally:
                 os.close(descriptor)
-
-    def _legacy_state_file(self) -> Path:
-        """Resolve the one supported pre-#521B state location."""
-        iwe_root_value = (
-            os.environ.get("IWE_WORKSPACE")
-            or os.environ.get("IWE_ROOT")
-            or os.environ.get("IWE")
-            or str(Path.home() / "IWE")
-        )
-        iwe_root = self._absolute_path(iwe_root_value, "IWE workspace")
-        self._legacy_workspace_root = iwe_root.resolve(strict=False)
-        return self._legacy_workspace_root / "current" / self.STATE_FILE_NAME
-
-    @staticmethod
-    def _validated_document(content: bytes, path: Path) -> dict:
-        """Parse enough schema to compare migration candidates safely."""
-        try:
-            doc = yaml.safe_load(content.decode("utf-8")) or {}
-        except (UnicodeError, yaml.YAMLError) as error:
-            raise ResidencyStateError(
-                f"consent state cannot be read safely: {path}: {error}"
-            ) from error
-        if not isinstance(doc, dict):
-            raise ResidencyStateError(f"consent state root must be a mapping: {path}")
-        functions = doc.get("functions", {})
-        if functions is None:
-            functions = {}
-        if not isinstance(functions, dict):
-            raise ResidencyStateError(
-                f"consent state 'functions' must be a mapping: {path}"
-            )
-        return doc
 
     def _read_migration_candidate(self, path: Path) -> bytes:
         """Read a regular non-symlink file as an immutable migration snapshot."""
@@ -790,81 +880,390 @@ class ResidencyState:
             mutation(state)
             self._save_state_unlocked(state)
 
-    def get_consent(self, function_id: str, data_need_key: str) -> Dict:
-        """Get current consent status for a specific data need.
 
-        Returns dict with keys:
-        - status: ConsentStatus
-        - granted_at: ISO timestamp or null
-        - denied_reason: string or null
+class _WindowsResidencyState(_BaseResidencyState):
+    """Windows backend: plain pathlib, msvcrt locks, no dir_fd/O_NOFOLLOW.
+
+    Security posture differs from POSIX (no hardlink/symlink pinning, no
+    owner-only ACL enforcement). Those differences are surfaced as errors where
+    possible, and permissions are applied best-effort.
+    """
+
+    def __init__(self, state_file: Optional[str] = None):
+        """Initialize state manager.
+
+        Args:
+            state_file: Explicit state path for embedding/tests. The default is
+                ``${IWE_STATE_HOME:-$HOME/.iwe/state}/data-residency.yaml``.
         """
-        state = self._load_state()
-        func_state = state.get(function_id, {})
-        if not isinstance(func_state, dict):
-            raise ResidencyStateError(f"consent state for '{function_id}' must be a mapping")
-        need_state = func_state.get(data_need_key, {})
-        if not isinstance(need_state, dict):
-            raise ResidencyStateError(
-                f"consent record '{function_id}/{data_need_key}' must be a mapping"
+        self._uses_default_location = state_file is None
+        self._standard_state_container: Optional[Path] = None
+        if self._uses_default_location:
+            state_home_override = os.environ.get("IWE_STATE_HOME")
+            state_home_value = state_home_override or str(
+                Path.home() / ".iwe" / "state"
             )
-        status = need_state.get("status", "not_asked")
-        if status not in VALID_CONSENT_STATUSES:
-            raise ResidencyStateError(
-                f"consent record '{function_id}/{data_need_key}' has unknown status: {status!r}"
+            raw_state_home = self._absolute_path(state_home_value, "IWE_STATE_HOME")
+            if state_home_override is None:
+                self._reject_symlink(
+                    raw_state_home.parent, "default residency state container"
+                )
+            state_home = raw_state_home.resolve(strict=False)
+            if state_home_override is None:
+                self._standard_state_container = state_home.parent
+            state_file = str(state_home / self.STATE_FILE_NAME)
+        else:
+            explicit_state_file = self._absolute_path(
+                str(state_file), "explicit residency state path"
+            )
+            state_file = str(
+                explicit_state_file.parent.resolve(strict=False)
+                / explicit_state_file.name
             )
 
-        return {
-            "status": status,
-            "granted_at": need_state.get("granted_at"),
-            "denied_reason": need_state.get("denied_reason"),
-            "revoked_reason": need_state.get("revoked_reason"),
-        }
+        self.state_file = Path(state_file)
+        self._legacy_file_path: Optional[Path] = None
+        self._legacy_workspace_root: Optional[Path] = None
+        if self._uses_default_location:
+            self._legacy_file_path = self._legacy_state_file()
+            self._assert_default_location_is_private()
+        if self._standard_state_container is not None:
+            self._ensure_private_directory(self._standard_state_container)
+        self._ensure_private_directory(self.state_file.parent)
+        self.lock_file = self.state_file.parent / self.LOCK_FILE_NAME
+        with self._state_lock(exclusive=True):
+            if self._uses_default_location:
+                self._detect_legacy_state()
+            self._ensure_file_exists()
+            self._ensure_private_file(self.state_file)
+            self._ensure_init_marker()
 
-    def grant_consent(self, function_id: str, data_need_key: str) -> None:
-        """Record user grant for a data need."""
-        def grant(state: dict) -> None:
-            if function_id not in state:
-                state[function_id] = {}
-            state[function_id][data_need_key] = {
-                "status": "granted",
-                "granted_at": datetime.utcnow().isoformat() + "Z",
-            }
+    def _assert_default_location_is_private(self) -> None:
+        """Keep default consent state physically outside Git-backed IWE."""
+        assert self._legacy_file_path is not None
+        state_home = self.state_file.parent
+        resolved_home = state_home.resolve(strict=False)
+        assert self._legacy_workspace_root is not None
+        resolved_workspace = self._legacy_workspace_root
+        resolved_target = self.state_file.resolve(strict=False)
+        resolved_legacy = self._legacy_file_path.resolve(strict=False)
+        if self._is_within(resolved_home, resolved_workspace):
+            raise ResidencyStateError(
+                "IWE_STATE_HOME must be physically outside the IWE workspace: "
+                f"{state_home}"
+            )
+        if resolved_target == resolved_legacy:
+            raise ResidencyStateError(
+                "local and legacy consent paths resolve to the same file: "
+                f"{self.state_file}"
+            )
+        for parent in (resolved_home, *resolved_home.parents):
+            if (parent / ".git").exists():
+                raise ResidencyStateError(
+                    f"IWE_STATE_HOME must be outside a Git repository: {state_home}"
+                )
 
-        self._mutate_state(grant)
+    def _ensure_private_directory(self, directory: Path) -> None:
+        """Create a directory tree and make its leaf private (best-effort)."""
+        directory = self._absolute_path(
+            str(directory), "residency state directory"
+        )
+        root = Path(directory.anchor)
+        if directory == root:
+            raise ResidencyStateError(
+                "residency state directory must not be the filesystem root"
+            )
 
-    def deny_consent(self, function_id: str, data_need_key: str, reason: str = "") -> None:
-        """Record user denial for a data need."""
-        def deny(state: dict) -> None:
-            if function_id not in state:
-                state[function_id] = {}
-            state[function_id][data_need_key] = {
-                "status": "denied",
-                "denied_reason": reason,
-                "denied_at": datetime.utcnow().isoformat() + "Z",
-            }
+        current = directory
+        while current != root:
+            try:
+                if current.is_symlink():
+                    raise ResidencyStateError(
+                        f"residency state directory must not be a symlink: {current}"
+                    )
+            except OSError as error:
+                raise ResidencyStateError(
+                    f"cannot inspect residency state directory: {current}: {error}"
+                ) from error
+            current = current.parent
 
-        self._mutate_state(deny)
+        try:
+            directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot secure residency state directory: {directory}: {error}"
+            ) from error
 
-    def revoke_consent(self, function_id: str, data_need_key: str, reason: str = "") -> None:
-        """User revokes previously granted consent."""
-        def revoke(state: dict) -> None:
-            if function_id not in state:
-                state[function_id] = {}
-            state[function_id][data_need_key] = {
-                "status": "revoked",
-                "revoked_reason": reason,
-                "revoked_at": datetime.utcnow().isoformat() + "Z",
-            }
+        try:
+            os.chmod(directory, 0o700)
+        except OSError:
+            pass
 
-        self._mutate_state(revoke)
+        if not directory.is_dir():
+            raise ResidencyStateError(
+                f"residency state directory is not a directory: {directory}"
+            )
 
-    def list_all_consents(self) -> Dict:
-        """Return all consent records."""
-        return self._load_state()
+    def _ensure_private_file(self, path: Path) -> None:
+        """Require a regular state file and enforce owner-only access."""
+        self._reject_symlink(path, "residency state file")
+        try:
+            if not path.is_file():
+                raise ResidencyStateError(f"residency state is not a regular file: {path}")
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot inspect residency state file: {path}: {error}"
+            ) from error
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
 
-    def reset_function_consents(self, function_id: str) -> None:
-        """Clear all consent records for a function (for version upgrade/reset)."""
-        def reset(state: dict) -> None:
-            state.pop(function_id, None)
+    @contextmanager
+    def _state_lock(self, *, exclusive: bool) -> Iterator[None]:
+        """Serialize read-modify-write consent updates with msvcrt.locking."""
+        del exclusive  # msvcrt.locking only provides exclusive locks.
+        if self._standard_state_container is not None:
+            self._ensure_private_directory(self._standard_state_container)
+        self._ensure_private_directory(self.state_file.parent)
+        self.lock_file.parent.mkdir(parents=True, exist_ok=True)
 
-        self._mutate_state(reset)
+        descriptor: Optional[int] = None
+        try:
+            descriptor = os.open(self.lock_file, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                os.chmod(self.lock_file, 0o600)
+            except OSError:
+                pass
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot lock residency state: {self.lock_file}: {error}"
+            ) from error
+
+        try:
+            import msvcrt
+            lock_size = 1024 * 1024
+            deadline = time.monotonic() + 30.0
+            while True:
+                try:
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_NBLCK, lock_size)
+                    break
+                except OSError as error:
+                    # Retry only on lock contention (EACCES/EDEADLK); other
+                    # errors (descriptor gone, filesystem failure) are permanent.
+                    if getattr(error, "errno", None) not in (
+                        errno.EACCES,
+                        errno.EDEADLK,
+                    ):
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise ResidencyStateError(
+                            f"timeout waiting for residency state lock: {self.lock_file}"
+                        )
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                try:
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, lock_size)
+                except OSError:
+                    pass
+        except ResidencyStateError:
+            raise
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot lock residency state: {self.lock_file}: {error}"
+            ) from error
+        finally:
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+
+    def _detect_legacy_state(self) -> None:
+        """Refuse to start fresh when an un-migrated legacy file still exists.
+
+        Also detects an interrupted POSIX migration that left a quarantine copy
+        behind: the original workspace file may already be renamed away, but the
+        consent decisions are still in the quarantine path.
+        """
+        assert self._legacy_file_path is not None
+        quarantine = self.state_file.parent / self.LEGACY_QUARANTINE_NAME
+        if (
+            self._legacy_file_path.exists()
+            or self._legacy_file_path.is_symlink()
+            or quarantine.exists()
+            or quarantine.is_symlink()
+        ):
+            raise ResidencyStateError(
+                "legacy consent state detected on Windows; automatic migration is unavailable. "
+                f"Move {self._legacy_file_path} to {self.state_file} manually, "
+                "or migrate from a POSIX system."
+            )
+
+    def _create_exclusive_private_file(self, path: Path, content: bytes) -> None:
+        """Create a private file without overwriting a concurrent writer."""
+        try:
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            try:
+                existing = path.read_bytes()
+            except OSError as error:
+                raise ResidencyStateError(
+                    f"cannot read existing private state file: {path}: {error}"
+                ) from error
+            if existing != content:
+                raise ResidencyStateError(
+                    f"migration target appeared with different content: {path}"
+                )
+            return
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot create private state file: {path}: {error}"
+            ) from error
+
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(content)
+                output.flush()
+                os.fsync(output.fileno())
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        except OSError as error:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise ResidencyStateError(
+                f"cannot persist private state file: {path}: {error}"
+            ) from error
+
+    def _ensure_file_exists(self) -> None:
+        """Create empty state on first-ever use; fail closed if it vanished later.
+
+        A missing state file is ambiguous by itself: it looks identical whether
+        this location has never been used, or whether a real consent/denial
+        record existed here and was lost. Silently recreating an empty file
+        would make that data loss look like a fresh install with nothing asked
+        yet. The init marker breaks the ambiguity: its presence proves this
+        location was previously initialized, so a missing state file next to it
+        is an integrity failure, not a first run.
+        """
+        if self.state_file.exists() or self.state_file.is_symlink():
+            return
+        marker = self.state_file.parent / self.INIT_MARKER_NAME
+        if marker.exists() or marker.is_symlink():
+            raise ResidencyStateError(
+                "consent state file is missing but this location was already "
+                f"initialized: {self.state_file}. Refusing to silently treat "
+                "prior consent/denial decisions as never asked — restore it "
+                "from an external/OS-level backup if one exists, or remove "
+                f"the marker at {marker} only if you are certain no consent "
+                "state ever existed here."
+            )
+        self._save_state_unlocked({})
+
+    def _ensure_init_marker(self) -> None:
+        """Backfill or verify the tombstone marking this location as initialized."""
+        marker = self.state_file.parent / self.INIT_MARKER_NAME
+        if marker.exists() or marker.is_symlink():
+            self._ensure_private_file(marker)
+            return
+        self._create_exclusive_private_file(marker, b"")
+
+    def _load_state_unlocked(self) -> dict:
+        """Load current state from yaml."""
+        try:
+            self._ensure_private_file(self.state_file)
+            content = self.state_file.read_bytes()
+            doc = self._validated_document(content, self.state_file)
+        except (OSError, UnicodeError, yaml.YAMLError) as error:
+            raise ResidencyStateError(
+                f"consent state cannot be read safely: {self.state_file}: {error}"
+            ) from error
+        functions = doc.get("functions", {})
+        if functions is None:
+            functions = {}
+        return functions
+
+    def _save_state_unlocked(self, state: dict) -> None:
+        """Save state to yaml file atomically."""
+        doc = {"functions": state}
+        header = "# Data residency consent state\n# Auto-generated\n\n"
+        content = (
+            header
+            + yaml.safe_dump(
+                doc,
+                default_flow_style=False,
+                sort_keys=True,
+                allow_unicode=True,
+            )
+        ).encode("utf-8")
+
+        if self.state_file.exists() or self.state_file.is_symlink():
+            self._ensure_private_file(self.state_file)
+        temp_path: Optional[Path] = None
+        try:
+            descriptor, raw_path = tempfile.mkstemp(
+                prefix=f".{self.STATE_FILE_NAME}.",
+                suffix=".tmp",
+                dir=self.state_file.parent,
+            )
+            temp_path = Path(raw_path)
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(content)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temp_path, self.state_file)
+            temp_path = None
+            self._ensure_private_file(self.state_file)
+        except OSError as error:
+            raise ResidencyStateError(
+                f"cannot save consent state safely: {self.state_file}: {error}"
+            ) from error
+        finally:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+    def _load_state(self) -> dict:
+        """Read one snapshot, rechecking legacy writers before every default read."""
+        with self._state_lock(exclusive=self._uses_default_location):
+            if self._uses_default_location:
+                self._detect_legacy_state()
+            return self._load_state_unlocked()
+
+    def _mutate_state(self, mutation: Callable[[dict], None]) -> None:
+        """Apply one consent mutation without losing a concurrent update."""
+        with self._state_lock(exclusive=True):
+            if self._uses_default_location:
+                self._detect_legacy_state()
+            state = self._load_state_unlocked()
+            mutation(state)
+            self._save_state_unlocked(state)
+
+
+class _UnsupportedResidencyState(_BaseResidencyState):
+    """Backend for platforms with no implemented storage backend."""
+
+    def __init__(self, state_file: Optional[str] = None):
+        """Fail closed: we do not know how to persist consent here."""
+        del state_file
+        raise ResidencyStateError(
+            f"unsupported platform for residency state: {os.name}"
+        )
+
+
+if os.name == "posix":
+    ResidencyState = _PosixResidencyState
+elif os.name == "nt":
+    ResidencyState = _WindowsResidencyState
+else:
+    ResidencyState = _UnsupportedResidencyState

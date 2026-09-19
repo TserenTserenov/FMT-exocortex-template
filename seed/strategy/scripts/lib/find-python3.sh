@@ -34,8 +34,20 @@ candidates=(
     /usr/bin/python3
 )
 
+# issue #864: Python 3.10+ is required for union syntax (`str | None`) used in
+# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early
+# with a clear message instead of a cryptic TypeError at use time.
+MIN_PYTHON_VERSION="3.10"
+python_meets_version() {
+    local py="$1"
+    "$py" -c "import sys; v=sys.version_info; sys.exit(0 if (v.major, v.minor) >= (3, 10) else 1)" >/dev/null 2>&1
+}
+
 for cand in "${candidates[@]}"; do
     resolved=$(command -v "$cand" 2>/dev/null) || continue
+    if ! python_meets_version "$resolved"; then
+        continue
+    fi
     if $stdlib_only || "$resolved" -c "import yaml" >/dev/null 2>&1; then
         printf '%s\n' "$resolved"
         exit 0
@@ -48,6 +60,9 @@ done
 # that made this branch dead code in server-calendar.sh).
 if [ -d /nix/store ]; then
     while IFS= read -r cand; do
+        if ! python_meets_version "$cand"; then
+            continue
+        fi
         if $stdlib_only || "$cand" -c "import yaml" >/dev/null 2>&1; then
             printf '%s\n' "$cand"
             exit 0
@@ -56,15 +71,15 @@ if [ -d /nix/store ]; then
 fi
 
 if $stdlib_only; then
-    echo "ERROR: python3 не найден (проверены: PATH, /opt/homebrew, /usr/local, /usr/bin, Nix)." >&2
+    echo "ERROR: python3 >= ${MIN_PYTHON_VERSION} не найден (проверены: PATH, /opt/homebrew, /usr/local, /usr/bin, Nix)." >&2
     exit 1
 fi
 
 {
-    echo "ERROR: python3 с библиотекой PyYAML не найден (проверены: PATH, /opt/homebrew, /usr/local, /usr/bin, Nix)."
-    echo "PyYAML — заявленная зависимость шаблона (requirements.txt). Установка:"
-    echo "  - macOS (Homebrew): pip3 install pyyaml   (python3 из brew уже содержит pip3)"
-    echo "  - Debian/Ubuntu:    sudo apt install python3-yaml"
-    echo "  - универсально:     pip3 install pyyaml"
+    echo "ERROR: python3 >= ${MIN_PYTHON_VERSION} с библиотекой PyYAML не найден (проверены: PATH, /opt/homebrew, /usr/local, /usr/bin, Nix)."
+    echo "Python 3.10+ требуется для синтаксиса union types (|) в core-скриптах шаблона. PyYAML — заявленная зависимость (requirements.txt). Установка:"
+    echo "  - macOS (Homebrew): brew install python3 && pip3 install pyyaml"
+    echo "  - Debian/Ubuntu:    sudo apt install python3-yaml   (или python3.10 + pip3 install pyyaml)"
+    echo "  - универсально:     установи Python 3.10+, затем pip3 install pyyaml"
 } >&2
 exit 1

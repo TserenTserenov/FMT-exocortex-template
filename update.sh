@@ -62,6 +62,9 @@ esac
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 API_BASE="https://api.github.com/repos/$REPO"
 
+# issue #863: release commit SHA, set by resolve_delivery_ref for rollback detection.
+RELEASE_SHA=""
+
 CHECK_ONLY=false
 AUTO_YES=false
 FAST_CHECK=false
@@ -472,6 +475,67 @@ author_release_regression() {
     [ "$local_sha" = "$head_sha" ] || return 1
     payload_sha=$(git -C "$SCRIPT_DIR" hash-object "$payload" 2>/dev/null) || return 1
     [ "$payload_sha" != "$head_sha" ]
+}
+
+# issue #863: detect when the default release channel would roll back an install
+# that is already newer than the latest published release. Fires in release
+# channel when SCRIPT_DIR is a git repo and local HEAD contains commits that are
+# not present in the release (i.e. the release is strictly behind local).
+#
+# Exit codes:
+#   0 - rollback detected (release is a strict ancestor of local HEAD)
+#   1 - no rollback (release is HEAD, ahead, or unrelated)
+#   2 - cannot determine (network/history missing) -> caller must block --yes
+detect_release_rollback() {
+    [ "$UPDATE_CHANNEL" = "release" ] || return 1
+    [ -n "$RELEASE_SHA" ] || return 1
+    git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+    local local_sha release_sha merge_base commit_json
+    local_sha=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null) || return 1
+    [ -n "$local_sha" ] || return 1
+
+    release_sha="$RELEASE_SHA"
+    # Resolve a tag/branch ref to the actual commit SHA via the delivery API.
+    # A full SHA is already resolved; local resolution is not enough because
+    # the install's `origin` may point to a different fork or the local tag may
+    # differ from the published one.
+    if ! printf '%s' "$release_sha" | grep -qxE '[0-9a-f]{40}'; then
+        commit_json=$(github_api_get "$API_BASE/commits/$release_sha" 2>/dev/null) || return 2
+        # Prefer JSON parsing; fall back to sed only when Python is unavailable.
+        if py_available; then
+            release_sha=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
+import json, re, sys
+try:
+    doc = json.load(sys.stdin)
+except json.JSONDecodeError:
+    raise SystemExit(1)
+sha = doc.get("sha", "") if isinstance(doc, dict) else ""
+if not re.fullmatch(r"[0-9a-f]{40}", sha):
+    raise SystemExit(1)
+print(sha)')
+        else
+            release_sha=$(printf '%s\n' "$commit_json" | \
+                sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
+        fi
+        [ -n "$release_sha" ] || return 2
+    fi
+
+    # Ensure the release commit object is available locally for merge-base.
+    if ! git -C "$SCRIPT_DIR" cat-file -e "$release_sha" 2>/dev/null; then
+        if ! git -C "$SCRIPT_DIR" fetch --quiet origin "$release_sha" 2>/dev/null; then
+            return 2
+        fi
+    fi
+
+    merge_base=$(git -C "$SCRIPT_DIR" merge-base "$local_sha" "$release_sha" 2>/dev/null) || return 2
+    [ -n "$merge_base" ] || return 2
+
+    # Rollback if the release commit is an ancestor of local HEAD but not equal
+    # to it (local has additional commits after the release).
+    if [ "$merge_base" = "$release_sha" ] && [ "$local_sha" != "$release_sha" ]; then
+        return 0
+    fi
+    return 1
 }
 
 # author_mode skip classification (WP-7 F71 stage A, peer-session 2026-08-14-05):
@@ -2227,9 +2291,13 @@ if not re.fullmatch(r"[0-9a-f]{40}", sha):
 print(sha)'); then
                 RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
                 echo "  Канал поставки: релиз $release_tag (снимок ${resolved_ref:0:12})"
+                # issue #863: remember the release commit SHA for rollback detection.
+                RELEASE_SHA="$resolved_ref"
             else
                 RAW_BASE="https://raw.githubusercontent.com/$REPO/$release_tag"
                 echo "  Канал поставки: релиз $release_tag (закреплён по тегу)"
+                # Fallback: tag itself is the best SHA proxy we have.
+                RELEASE_SHA="$release_tag"
             fi
             return 0
         fi
@@ -3531,6 +3599,31 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
     exit_clean
 fi
 
+# issue #863: rollback warning must appear before the file list, not hidden inside it.
+ROLLBACK_DETECTED=false
+ROLLBACK_UNCERTAIN=false
+_rollback_code=1
+if detect_release_rollback; then
+    _rollback_code=0
+else
+    _last_rc=$?
+    if [ "$_last_rc" -eq 2 ]; then
+        _rollback_code=2
+    fi
+fi
+if [ "$_rollback_code" -eq 0 ]; then
+    ROLLBACK_DETECTED=true
+    echo "🔴 ВНИМАНИЕ: локальная установка новее последнего релиза."
+    echo "   Применение обновления release-каналом ОТКАТИТ установку на более старый снимок."
+    echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+    echo ""
+elif [ "$_rollback_code" -eq 2 ]; then
+    ROLLBACK_UNCERTAIN=true
+    echo "⚠️ ВНИМАНИЕ: не удалось проверить историю релиза; автоматическое применение с --yes заблокировано."
+    echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+    echo ""
+fi
+
 if [ ${#NEW_FILES[@]} -gt 0 ]; then
     echo "Новые файлы (${#NEW_FILES[@]}):"
     for i in "${!NEW_FILES[@]}"; do
@@ -3598,7 +3691,35 @@ if $CHECK_ONLY; then
 fi
 
 # === Step 4: Confirmation ===
-if ! $AUTO_YES; then
+if [ "$ROLLBACK_DETECTED" = true ]; then
+    # issue #863: automatic/scheduled runs must not silently roll back a newer install.
+    if $AUTO_YES; then
+        echo "🔴 Остановлено: обнаружен откат на более старый релиз, а --yes запрещает интерактивное подтверждение." >&2
+        echo "   Для явного отката запустите без --yes и введите ROLLBACK на запрос подтверждения." >&2
+        echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh" >&2
+        exit "$EXIT_USAGE"
+    fi
+    echo "🔴 Это ОТКАТ на более старый релиз. Чтобы продолжить, введите ROLLBACK явно."
+    read -p "Применить ОТКАТ? (введите ROLLBACK для подтверждения / anything else для отмены) " -r
+    echo ""
+    if [ "$REPLY" != "ROLLBACK" ]; then
+        echo "Отменено."
+        exit 0
+    fi
+elif [ "$ROLLBACK_UNCERTAIN" = true ]; then
+    # issue #863: history could not be verified; require explicit manual approval.
+    if $AUTO_YES; then
+        echo "🔴 Остановлено: не удалось проверить историю релиза, а --yes запрещает интерактивное подтверждение." >&2
+        echo "   Запустите без --yes и подтвердите обновление вручную, либо используйте IWE_UPDATE_CHANNEL=main." >&2
+        exit "$EXIT_USAGE"
+    fi
+    read -p "Продолжить, несмотря на невозможность проверить откат? (y/n) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Отменено."
+        exit 0
+    fi
+elif ! $AUTO_YES; then
     read -p "Применить обновления? (y/n) " -n 1 -r
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
