@@ -53,8 +53,8 @@ mode=run
 exit 0
 EOF
     cp "$h/bin/claude" "$h/bin/other-cli"
-    printf '#!/usr/bin/env bash\nexit 0\n' > "$h/bin/osascript"
-    cp "$h/bin/osascript" "$h/bin/notify-send"
+    # The runtime's notify() runs $NOTIFY_SH_PATH when set: keeps the test silent on any OS.
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$h/bin/notify-stub"
     chmod +x "$h/bin/"*
     echo "$h"
 }
@@ -64,7 +64,7 @@ run_runtime() {
     local h="$1"
     shift
     env -i HOME="$h" PATH="$h/bin:$BASH_DIR:/usr/bin:/bin:/usr/local/bin" FAKE_DUMP="$h/dump" \
-        IWE_WORKSPACE="$h/IWE" IWE_TEMPLATE="$h/IWE/FMT-exocortex-template" "$@" \
+        IWE_WORKSPACE="$h/IWE" IWE_TEMPLATE="$h/IWE/FMT-exocortex-template" NOTIFY_SH_PATH="$h/bin/notify-stub" "$@" \
         bash "$h/runtime/roles/extractor/scripts/extractor.sh" on-demand > "$h/out.log" 2>&1
 }
 

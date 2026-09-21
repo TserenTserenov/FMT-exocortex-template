@@ -1661,7 +1661,7 @@
     },
     {
       "path": "roles/extractor/README.md",
-      "sha256": "6edc4207a6d0f4aefbaa588b8d26c94614f0411e96306ccdf46c18d5fea7afad"
+      "sha256": "b2104256caf200c8c04901adfdc0ca93b2eac5789e7b006cc95cebc77f5521c0"
     },
     {
       "path": "roles/extractor/config/feedback-log.md",
@@ -1709,7 +1709,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "7e90bf620c968719071c1a69c7fb80c09f076168ad8959f3622f2f44982ba52b"
+      "sha256": "70cf8572a3552a150f5931fd4a98c89669076b80fbb505b4a6a077773036b0cc"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
