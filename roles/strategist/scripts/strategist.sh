@@ -174,6 +174,26 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
+# Publish one commit via scripts/ds-publish.sh. The script is not shipped with
+# the template (issue #884, regression of WP-7 Ф101): when it is absent, say so
+# and keep the commit local instead of failing on a bare "No such file".
+# Returns 0 only when the publisher reported success.
+publish_commit_or_explain() {
+    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4"
+    local publisher="$WORKSPACE/scripts/ds-publish.sh"
+
+    if [ ! -f "$publisher" ]; then
+        log "WARN: scripts/ds-publish.sh не установлен — коммит ${sha:0:12} остался локальным и не опубликован. Опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD"
+        return 1
+    fi
+    if bash "$publisher" "$WORKSPACE" normal --reason "$reason" --from-commit "$sha" >> "$LOG_FILE" 2>&1; then
+        log "$ok_msg"
+        return 0
+    fi
+    log "$fail_msg"
+    return 1
+}
+
 notify() {
     local title="$1"
     local message="$2"
@@ -298,12 +318,10 @@ ${prompt}"
         # waiting for a clean window.
         local push_sha
         push_sha=$(git -C "$WORKSPACE" rev-parse HEAD)
-        if bash "$WORKSPACE/scripts/ds-publish.sh" "$WORKSPACE" normal \
-            --reason "strategist: $command_file" --from-commit "$push_sha" >> "$LOG_FILE" 2>&1; then
-            log "Pushed to GitHub"
-        else
-            log "WARN: ds-publish.sh failed — публикация не удалась"
-        fi
+        # Outcome is logged inside; `|| true` only keeps `set -e` from ending
+        # the run over a publish that already reported its own failure.
+        publish_commit_or_explain "strategist: $command_file" "$push_sha" \
+            "Pushed to GitHub" "WARN: ds-publish.sh failed — публикация не удалась" || true
     fi
 
     # Очистить staging area после Claude сессии (предотвращает staging leak в следующие скрипты)
@@ -662,12 +680,8 @@ case "$1" in
             # for a commit that never happened.
             if git -C "$WORKSPACE" commit -m "chore: auto-cleanup processed notes from fleeting-notes.md" >> "$LOG_FILE" 2>&1; then
                 cleanup_sha=$(git -C "$WORKSPACE" rev-parse HEAD)
-                if bash "$WORKSPACE/scripts/ds-publish.sh" "$WORKSPACE" normal \
-                    --reason "strategist: cleanup" --from-commit "$cleanup_sha" >> "$LOG_FILE" 2>&1; then
-                    log "Cleanup: pushed"
-                else
-                    log "WARN: cleanup ds-publish.sh failed"
-                fi
+                publish_commit_or_explain "strategist: cleanup" "$cleanup_sha" \
+                    "Cleanup: pushed" "WARN: cleanup ds-publish.sh failed" || true
             else
                 log "WARN: cleanup git commit failed"
             fi

@@ -837,7 +837,7 @@
     },
     {
       "path": "ONTOLOGY.md",
-      "sha256": "43e310f7c8f25070c3854fedf66019b05197b8777f7ae226d3a110487c8c822a"
+      "sha256": "42d212e518795025a82dfcc82a92c00b9999f1f12c675bdc0ac4152b8af7935e"
     },
     {
       "path": "REPO-TYPE.md",
@@ -893,7 +893,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "5eff82c8be4c1ec2226a969209059c81d916199f4faa9ba444bb586c7ea39e0f"
+      "sha256": "0f690827b7babf8af69a2a7c53c83858d629b7dd5c9f5cef4473c4610b4eeeec"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -1025,7 +1025,7 @@
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
-      "sha256": "69ec77264dc2b6597ad92508b129048ab005a43271567d29a9b7c19889833507"
+      "sha256": "a8b0fc6c865f980e1b09d286d9206d2b54d0dbb4fcd61b576a3e8e9bd1fba2d8"
     },
     {
       "path": "exocortex/hindsight/docker-compose.yml",
@@ -1453,7 +1453,7 @@
     },
     {
       "path": "memory/MEMORY.md",
-      "sha256": "00d8bfdd7590f16e3d344b06d3f18dcafa2f26929fed443111ea679f50164cb7"
+      "sha256": "016c8105b0b4b177e73a7495c8730878f9d1e17bfaed1ba394f7dac51316c33e"
     },
     {
       "path": "memory/agent-architecture-framework.md",
@@ -1465,7 +1465,7 @@
     },
     {
       "path": "memory/checklists.md",
-      "sha256": "8c9e5bfd7befab90fc892f4bf1e638655231ed29bcc4cae6e9fb7277d5e402d1"
+      "sha256": "8472221c874f4a8c4a62627242047bc599d77cb58e5f04eb1cfa073da43fa658"
     },
     {
       "path": "memory/communication-style-base.md",
@@ -1545,7 +1545,7 @@
     },
     {
       "path": "memory/protocol-work.md",
-      "sha256": "18496c61531af033a1701b8ea9cf3cd46f0777dceac0964aa6ee5122428c87c0"
+      "sha256": "2f773ca710fafafa42dec1ca03e02a0b76b273018e45e2f13879cf010dfd4cf3"
     },
     {
       "path": "memory/r-questionnaire.md",
@@ -1577,7 +1577,7 @@
     },
     {
       "path": "memory/sota-reference.md",
-      "sha256": "389eb94de3c30d0b05b8bac0a6b3b2af81c088a1028ea356e320ed589b33450a"
+      "sha256": "6deeb5d1e6746060aaecfb2f5250c738f04e0e7d8b7e6ae97b729cced93c0551"
     },
     {
       "path": "memory/t-checklist.md",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "d6400de834ff112bbb4359cda82e894571bb8d902db8bf7cd371fdd88efe8760"
+      "sha256": "90d74e526c368c0a6d33b302433c82e5433abe752b7247008603b7d8fe3eb1d8"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -3164,6 +3164,9 @@
     "scripts/tests/test_issue_874_here_string.sh",
     "scripts/tests/test_issue_875_workspace_paths.sh",
     "scripts/tests/test_issue_877_llm_proxy_default.sh",
+    "scripts/tests/test_issue_881_nudge_default.sh",
+    "scripts/tests/test_issue_882_archgate_scale.sh",
+    "scripts/tests/test_issue_884_ds_publish_missing.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
