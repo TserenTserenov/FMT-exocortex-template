@@ -87,7 +87,18 @@ export IWE_GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 export IWE_DS_MY_STRATEGY="${IWE_DS_MY_STRATEGY:-${WORKSPACE_DIR}/${IWE_GOVERNANCE_REPO}}"
 export IWE_TEMPLATE="${IWE_TEMPLATE:-${WORKSPACE_DIR}/FMT-exocortex-template}"
 export IWE_RUNTIME="${IWE_RUNTIME:-${WORKSPACE_DIR}/.iwe-runtime}"
-export IWE_SCRIPTS="${IWE_SCRIPTS:-${WORKSPACE_DIR}/FMT-exocortex-template/scripts}"
+# WP-7 F161 (peer session 2026-09-21-04-wp537-wp7-fmt-decisions-followup,
+# Claude+Codex): a live scripts/ checkout at workspace root is canonical --
+# agents commit fixes there -- while the template's own copy is
+# deliberately trimmed (WP-546) and lags behind. Default to the live one;
+# fall back to the template only for installs that have no live checkout.
+if [ -z "${IWE_SCRIPTS:-}" ]; then
+  if [ -d "${WORKSPACE_DIR}/scripts" ]; then
+    export IWE_SCRIPTS="${WORKSPACE_DIR}/scripts"
+  else
+    export IWE_SCRIPTS="${WORKSPACE_DIR}/FMT-exocortex-template/scripts"
+  fi
+fi
 
 # Export to child processes
 export WORKSPACE_DIR

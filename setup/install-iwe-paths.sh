@@ -80,7 +80,16 @@ cat > "$IWE_ENV_FILE" <<IWEENV_EOF
 export IWE_WORKSPACE="$WORKSPACE_DIR"
 export IWE_ROOT="\$IWE_WORKSPACE"
 export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
-export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
+# WP-7 F161 (peer session 2026-09-21-04-wp537-wp7-fmt-decisions-followup,
+# Claude+Codex): a live scripts/ checkout at workspace root is canonical
+# and ahead of the template's own copy (which is deliberately trimmed,
+# WP-546) -- prefer it when present, fall back to the template only when
+# there is no live checkout to defer to.
+if [ -d "\$IWE_WORKSPACE/scripts" ]; then
+  export IWE_SCRIPTS="\$IWE_WORKSPACE/scripts"
+else
+  export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
+fi
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
 export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"
 export IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO"

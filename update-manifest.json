@@ -237,7 +237,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "911c64488ac5508b2df448a7aae1367207f6828af26a1bbe876e8744caed52f7"
+      "sha256": "d4a1e46b807b72531cf6851714cebbcc692674389e1a358fa7c2b221241beb0e"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -3057,7 +3057,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "84bc0c40351295286f591f21d98c22df713e379bb2612c8b004c39abc38dbab9"
+      "sha256": "e531dbb70a04be60059f5502e1a4cc20641ac99aee5e9fc0d3e20636a8e38b3e"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3117,6 +3117,7 @@
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
+    "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
