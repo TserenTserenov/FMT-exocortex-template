@@ -52,6 +52,21 @@ fi
 WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
 
+# WP-7 F161 (peer session 2026-09-21-04-wp537-wp7-fmt-decisions-followup,
+# Claude+Codex): a live scripts/ checkout at workspace root is canonical
+# and ahead of the template's own copy (which is deliberately trimmed,
+# WP-546) -- prefer it when present, fall back to the template only when
+# there is no live checkout to defer to. Resolved here, once, at install
+# time (not as a runtime if/else in the generated file): .iwe-paths is a
+# flat list of literal export lines, same as every other IWE_* var in it,
+# and T25 (setup/test-update-edge-cases.sh) asserts exactly one
+# `^export IWE_` line per variable.
+if [ -d "$WORKSPACE_DIR/scripts" ]; then
+    IWE_SCRIPTS_TARGET="\$IWE_WORKSPACE/scripts"
+else
+    IWE_SCRIPTS_TARGET="\$IWE_TEMPLATE/scripts"
+fi
+
 IWE_ENV_FILE="$WORKSPACE_DIR/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
 # issue #808: .zshenv is read only by zsh. On Linux/WSL, where bash is the
@@ -80,16 +95,7 @@ cat > "$IWE_ENV_FILE" <<IWEENV_EOF
 export IWE_WORKSPACE="$WORKSPACE_DIR"
 export IWE_ROOT="\$IWE_WORKSPACE"
 export IWE_TEMPLATE="\$IWE_WORKSPACE/FMT-exocortex-template"
-# WP-7 F161 (peer session 2026-09-21-04-wp537-wp7-fmt-decisions-followup,
-# Claude+Codex): a live scripts/ checkout at workspace root is canonical
-# and ahead of the template's own copy (which is deliberately trimmed,
-# WP-546) -- prefer it when present, fall back to the template only when
-# there is no live checkout to defer to.
-if [ -d "\$IWE_WORKSPACE/scripts" ]; then
-  export IWE_SCRIPTS="\$IWE_WORKSPACE/scripts"
-else
-  export IWE_SCRIPTS="\$IWE_TEMPLATE/scripts"
-fi
+export IWE_SCRIPTS="$IWE_SCRIPTS_TARGET"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
 export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"
 export IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO"
