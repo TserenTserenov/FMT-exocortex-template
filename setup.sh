@@ -308,8 +308,27 @@ fi
 HOME_DIR="$HOME"
 USER_NAME="$(id -un)"
 
-# Compute Claude project slug: /Users/alice/IWE → -Users-alice-IWE
-CLAUDE_PROJECT_SLUG="$(echo "$WORKSPACE_DIR" | tr '/' '-')"
+# iwe_claude_project_slug PATH — the directory name Claude Code uses under
+# ~/.claude/projects for PATH: every character that is not an ASCII letter or
+# digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
+# issue #869: three scripts used three different rules ("tr /", "tr /_.",
+# "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
+# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
+# cygpath; the drive-letter case does not matter there, the file system is
+# case-insensitive. Non-ASCII characters follow the ambient locale (sed counts
+# characters in a UTF-8 locale, bytes in the C locale).
+# KEEP IN SYNC with update.sh and scripts/day-close.sh — the same function body;
+# scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
+iwe_claude_project_slug() {
+    local path="$1" native=""
+    if command -v cygpath >/dev/null 2>&1; then
+        native=$(cygpath -w "$path" 2>/dev/null) || native=""
+        [ -n "$native" ] && path="$native"
+    fi
+    printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
+}
+
+CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$WORKSPACE_DIR")"
 
 # === Governance repo contract (WP-560 Ф5-Phase-2) ===
 # Single machine-readable source for the governance repo's default name and
@@ -507,7 +526,11 @@ IWE_RUNTIME="$IWE_RUNTIME_PATH"
 IWE_SCRIPTS="$IWE_TEMPLATE_PATH/scripts"
 
 # === Platform LLM Proxy (optional own API key for unlimited usage) ===
-PLATFORM_LLM_PROXY_URL=https://llm.aisystant.com/v1
+# issue #877: no default address is written. The platform gateway URL used to be
+# recorded here as if it worked, but the endpoint does not answer (HTTP 404 on
+# every path) and nothing else can use it. Set it once a real gateway exists;
+# day-open reads LLM_PROXY_URL first, then this value.
+# PLATFORM_LLM_PROXY_URL=
 # ANTHROPIC_API_KEY=  # Optional: own key for unlimited usage (Direct MCP mode)
 
 ENVEOF
@@ -674,8 +697,31 @@ else
 
     # Create symlink so CLAUDE.md references (memory/protocol-open.md etc.) resolve from workspace root
     if [ ! -e "$WORKSPACE_DIR/memory" ]; then
-        ln -s "$CLAUDE_MEMORY_DIR" "$WORKSPACE_DIR/memory"
-        echo "  Symlink: $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
+        ln -s "$CLAUDE_MEMORY_DIR" "$WORKSPACE_DIR/memory" 2>/dev/null || true
+        # issue #869: on Windows (Git Bash without symlink rights) `ln -s` quietly
+        # makes a plain COPY instead of a link, and the failure only surfaced a
+        # day later as an ambiguous-memory error in update.sh. Check the result.
+        if [ -L "$WORKSPACE_DIR/memory" ]; then
+            echo "  Symlink: $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
+        else
+            echo "  ВНИМАНИЕ: ссылка $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR не создана." >&2
+            # The directory found here can only be the plain copy `ln -s` just made (the
+            # branch is entered only when nothing existed). Leaving it would keep two
+            # independent MEMORY.md copies AND make the next run skip this fix because
+            # "memory already exists" - so set it aside; the real memory in
+            # $CLAUDE_MEMORY_DIR was written above and is not touched.
+            if [ -e "$WORKSPACE_DIR/memory" ]; then
+                MEMORY_COPY_ASIDE="$WORKSPACE_DIR/memory.not-a-link-$(date +%Y%m%d%H%M%S)"
+                if mv "$WORKSPACE_DIR/memory" "$MEMORY_COPY_ASIDE" 2>/dev/null; then
+                    echo "    Копия, которую вместо ссылки сделал ln, перенесена в $MEMORY_COPY_ASIDE (память в $CLAUDE_MEMORY_DIR не тронута)." >&2
+                else
+                    echo "    Копию перенести не удалось: удалите $WORKSPACE_DIR/memory вручную (память в $CLAUDE_MEMORY_DIR не тронута)." >&2
+                fi
+            fi
+            echo "    Без ссылки CLAUDE.md не найдёт memory/ в рабочей папке." >&2
+            echo "    Windows: включите «Режим разработчика» и запустите терминал с MSYS=winsymlinks:nativestrict," >&2
+            echo "    затем повторите установку (или создайте ссылку через mklink /D)." >&2
+        fi
     else
         echo "  WARN: $WORKSPACE_DIR/memory already exists, symlink skipped."
     fi

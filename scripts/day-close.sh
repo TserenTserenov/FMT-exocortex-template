@@ -29,9 +29,29 @@ source "$SCRIPT_DIR/lib/common.sh" || {
 }
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 DS_STRATEGY="$WORKSPACE_DIR/$GOVERNANCE_REPO"
+# iwe_claude_project_slug PATH — the directory name Claude Code uses under
+# ~/.claude/projects for PATH: every character that is not an ASCII letter or
+# digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
+# issue #869: three scripts used three different rules ("tr /", "tr /_.",
+# "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
+# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
+# cygpath; the drive-letter case does not matter there, the file system is
+# case-insensitive. Non-ASCII characters follow the ambient locale (sed counts
+# characters in a UTF-8 locale, bytes in the C locale).
+# KEEP IN SYNC with setup.sh and update.sh — the same function body;
+# scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
+iwe_claude_project_slug() {
+    local path="$1" native=""
+    if command -v cygpath >/dev/null 2>&1; then
+        native=$(cygpath -w "$path" 2>/dev/null) || native=""
+        [ -n "$native" ] && path="$native"
+    fi
+    printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
+}
+
 # Slug derived from WORKSPACE_DIR (not $HOME) so it matches Claude's project key
 # regardless of workspace location. Override via IWE_MEMORY_SRC if needed.
-WORKSPACE_SLUG=$(echo "$WORKSPACE_DIR" | tr '/_ ' '-')
+WORKSPACE_SLUG=$(iwe_claude_project_slug "$WORKSPACE_DIR")
 MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${WORKSPACE_SLUG}/memory}"
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
 # MCP reindex — опциональный компонент (WP-187 iwe-knowledge Gateway заменяет локальный knowledge-mcp).

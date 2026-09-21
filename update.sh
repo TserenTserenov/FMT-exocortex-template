@@ -1989,9 +1989,29 @@ copy_platform_file_preserving_user_space() {
     fi
 }
 
+# iwe_claude_project_slug PATH — the directory name Claude Code uses under
+# ~/.claude/projects for PATH: every character that is not an ASCII letter or
+# digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
+# issue #869: three scripts used three different rules ("tr /", "tr /_.",
+# "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
+# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
+# cygpath; the drive-letter case does not matter there, the file system is
+# case-insensitive. Non-ASCII characters follow the ambient locale (sed counts
+# characters in a UTF-8 locale, bytes in the C locale).
+# KEEP IN SYNC with setup.sh and scripts/day-close.sh — the same function body;
+# scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
+iwe_claude_project_slug() {
+    local path="$1" native=""
+    if command -v cygpath >/dev/null 2>&1; then
+        native=$(cygpath -w "$path" 2>/dev/null) || native=""
+        [ -n "$native" ] && path="$native"
+    fi
+    printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
+}
+
 resolve_workspace_memory_dir() {
     local workspace="$1" physical="" computed slug
-    slug=$(printf '%s' "$workspace" | tr '/_.' '-')
+    slug=$(iwe_claude_project_slug "$workspace")
     computed="$HOME/.claude/projects/$slug/memory"
     if [ -d "$workspace/memory" ]; then
         physical=$(cd -P "$workspace/memory" 2>/dev/null && pwd -P) || return 1
@@ -4153,7 +4173,7 @@ else
 GITHUB_USER="your-username"
 WORKSPACE_DIR="$DETECTED_WORKSPACE"
 CLAUDE_PATH="$(command -v claude 2>/dev/null || echo 'claude')"
-CLAUDE_PROJECT_SLUG="$(echo "$DETECTED_WORKSPACE" | tr '/' '-')"
+CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$DETECTED_WORKSPACE")"
 TIMEZONE_HOUR="4"
 TIMEZONE_DESC="4:00 (местное время)"
 HOME_DIR="$HOME"
