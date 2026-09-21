@@ -36,8 +36,9 @@ DS_STRATEGY="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 # "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
 # Claude Code actually sees ("F:\notes"). On Windows the native path comes from
 # cygpath; the drive-letter case does not matter there, the file system is
-# case-insensitive. Non-ASCII characters follow the ambient locale (sed counts
-# characters in a UTF-8 locale, bytes in the C locale).
+# case-insensitive. A non-ASCII character becomes one dash (python3 counts characters
+# whatever the locale - launchd and cron run with none; the sed fallback does the same
+# only under a UTF-8 locale). Not verified against Claude Code for non-ASCII paths.
 # KEEP IN SYNC with setup.sh and update.sh — the same function body;
 # scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
 iwe_claude_project_slug() {
@@ -45,6 +46,10 @@ iwe_claude_project_slug() {
     if command -v cygpath >/dev/null 2>&1; then
         native=$(cygpath -w "$path" 2>/dev/null) || native=""
         [ -n "$native" ] && path="$native"
+    fi
+    if command -v python3 >/dev/null 2>&1 \
+       && python3 -c 'import os, re, sys; sys.stdout.write(re.sub("[^A-Za-z0-9]", "-", os.fsencode(sys.argv[1]).decode("utf-8", "replace")))' "$path" 2>/dev/null; then
+        return 0
     fi
     printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
 }

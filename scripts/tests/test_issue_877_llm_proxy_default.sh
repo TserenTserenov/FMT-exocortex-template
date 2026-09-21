@@ -49,8 +49,16 @@ resolve() {
     mkdir -p "$ds/scripts/lib" "$iwe"
     cp "$COMMON" "$ds/scripts/lib/common.sh"
     [ -f "$TMP/$name.envfile" ] && cp "$TMP/$name.envfile" "$iwe/.exocortex.env"
-    env -i PATH="$PATH" HOME="$TMP/$name/home" DS_STRATEGY="$ds" IWE="$iwe" "$@" \
-        bash -c '. "$1"; printf "%s" "$LLM_PROXY_URL"' _ "$TMP/resolve.sh" 2>"$TMP/$name.err"
+    # The pipeline defines its own tg_notify() before this block; sourcing lib/common.sh
+    # (which defines a different one) must not replace it. A sentinel stands in for it.
+    env -i PATH="$PATH" HOME="$TMP/$name/home" DS_STRATEGY="$ds" IWE="$iwe" CLOBBER_LOG="$TMP/clobber.log" "$@" \
+        bash -c '
+            tg_notify() { echo SENTINEL_PIPELINE_TG_NOTIFY; }
+            before=$(declare -f tg_notify)
+            . "$1"
+            [ "$(declare -f tg_notify)" = "$before" ] || echo "tg_notify clobbered in case $2" >> "$CLOBBER_LOG"
+            printf "%s" "$LLM_PROXY_URL"
+        ' _ "$TMP/resolve.sh" "$name" 2>"$TMP/$name.err"
 }
 
 expect() {
@@ -88,6 +96,12 @@ expect "explicit LLM_PROXY_URL with '/v1/' suffix is normalised (no /v1/v1)" "ht
     "$(resolve explicitv1 LLM_PROXY_URL=https://host.example/v1/)"
 expect "explicit local URL is untouched" "http://localhost:18765" \
     "$(resolve local LLM_PROXY_URL=http://localhost:18765)"
+
+if [ -s "$TMP/clobber.log" ]; then
+    bad "reading the workspace env file replaced the pipeline's own tg_notify(): $(cat "$TMP/clobber.log")"
+else
+    ok "the pipeline's own tg_notify() survives the resolution block (probe mode keeps suppressing Telegram)"
+fi
 
 # --- extract the real step-2 guard and run it with a fake abort/curl ---
 awk '

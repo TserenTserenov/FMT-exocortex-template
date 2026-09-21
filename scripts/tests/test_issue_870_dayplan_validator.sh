@@ -119,5 +119,19 @@ else
     bad "newest staged plan: wrong predecessor in: $OUT"
 fi
 
+# --- 2d. a non-canonical name ("DayPlan_..." instead of "DayPlan ...") is still compared with
+#         the newest canonical plan, as before the predecessor fix ---
+WS=$(make_repo noncanon)
+write_plan "$WS" 2026-09-17 "$LINE" carry
+{ echo "# DayPlan"; echo "## План на сегодня"; echo "$LINE"; } > "$WS/DS-strategy/current/DayPlan_2026-09-18.md"
+git -C "$WS/DS-strategy" add -- "current/DayPlan_2026-09-18.md"
+OUT=$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
+    | IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO=DS-strategy bash "$HOOK")
+if grep -q 'предыдущий DayPlan: DayPlan 2026-09-17.md' <<<"$OUT"; then
+    ok "non-canonical staged name is compared with the newest canonical plan"
+else
+    bad "non-canonical staged name skipped the carry-over check: $OUT"
+fi
+
 echo "Result: $fail FAIL"
 [ "$fail" -eq 0 ]

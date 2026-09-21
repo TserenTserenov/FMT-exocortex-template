@@ -1996,8 +1996,9 @@ copy_platform_file_preserving_user_space() {
 # "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
 # Claude Code actually sees ("F:\notes"). On Windows the native path comes from
 # cygpath; the drive-letter case does not matter there, the file system is
-# case-insensitive. Non-ASCII characters follow the ambient locale (sed counts
-# characters in a UTF-8 locale, bytes in the C locale).
+# case-insensitive. A non-ASCII character becomes one dash (python3 counts characters
+# whatever the locale - launchd and cron run with none; the sed fallback does the same
+# only under a UTF-8 locale). Not verified against Claude Code for non-ASCII paths.
 # KEEP IN SYNC with setup.sh and scripts/day-close.sh — the same function body;
 # scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
 iwe_claude_project_slug() {
@@ -2006,11 +2007,15 @@ iwe_claude_project_slug() {
         native=$(cygpath -w "$path" 2>/dev/null) || native=""
         [ -n "$native" ] && path="$native"
     fi
+    if command -v python3 >/dev/null 2>&1 \
+       && python3 -c 'import os, re, sys; sys.stdout.write(re.sub("[^A-Za-z0-9]", "-", os.fsencode(sys.argv[1]).decode("utf-8", "replace")))' "$path" 2>/dev/null; then
+        return 0
+    fi
     printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
 }
 
 resolve_workspace_memory_dir() {
-    local workspace="$1" physical="" computed slug
+    local workspace="$1" physical="" computed slug legacy_slug legacy_dir
     slug=$(iwe_claude_project_slug "$workspace")
     computed="$HOME/.claude/projects/$slug/memory"
     if [ -d "$workspace/memory" ]; then
@@ -2019,6 +2024,20 @@ resolve_workspace_memory_dir() {
     if [ -n "$physical" ] && [ -d "$computed" ]; then
         computed=$(cd -P "$computed" 2>/dev/null && pwd -P) || return 1
         if [ "$physical" != "$computed" ]; then
+            # issue #869: installs made before the single slug rule pointed workspace/memory at
+            # a directory named by an older rule ("tr /", "tr /_.", "tr /_ "). For a path with a
+            # space or other punctuation that is not the directory Claude Code uses. The physical
+            # link stays authoritative: accept it with a note instead of stopping the updater.
+            for legacy_slug in "$(printf '%s' "$workspace" | tr '/' '-')" \
+                               "$(printf '%s' "$workspace" | tr '/_.' '-')" \
+                               "$(printf '%s' "$workspace" | tr '/_ ' '-')"; do
+                legacy_dir="$HOME/.claude/projects/$legacy_slug/memory"
+                if [ -d "$legacy_dir" ] && [ "$(cd -P "$legacy_dir" 2>/dev/null && pwd -P)" = "$physical" ]; then
+                    echo "ВНИМАНИЕ: workspace/memory ведёт в $physical (каталог назван по прежнему правилу), а Claude Code читает $computed. Обновление продолжается с физической memory/." >&2
+                    printf '%s\n' "$physical"
+                    return 0
+                fi
+            done
             echo "ОШИБКА: memory target неоднозначен: workspace/memory → $physical, slug target → $computed" >&2
             return 1
         fi

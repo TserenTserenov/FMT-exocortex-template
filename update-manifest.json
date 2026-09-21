@@ -73,7 +73,7 @@
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
-      "sha256": "7e564cbee9a85835ec26124c5f33035e103572ea79c99f3b8e287884e5f0f6ca"
+      "sha256": "481777e30ced5f0daa22ff3e9943188b930526366b8c2055e17ef9e3aceb6578"
     },
     {
       "path": ".claude/hooks/inject-code-style.sh",
@@ -97,7 +97,7 @@
     },
     {
       "path": ".claude/hooks/memory-exocortex-sync.sh",
-      "sha256": "f1b639adc8fab3c92ef96c84f3d17caaa0e00c6190a4c7cd4037f4d235d1df49"
+      "sha256": "112ea22978d9e6a95cba82306e03e919dea591776b403005c336fe6b0566e407"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -113,7 +113,7 @@
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
-      "sha256": "e0defb9d08d03f4948672cae70dc89221d9b29c517f64c2bbc050e1e7ba4469b"
+      "sha256": "8de09eb625eafe5642d6c10cb30346d46ed607b2a8ddfc58291a59d8b5ec1afc"
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
@@ -149,7 +149,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "f744c49bf754698ac2d252319bab38e1a7f88eb06509b920f9a1c708c5a0109c"
+      "sha256": "1ffcd9d99d51100d7606f069f5b5e29cdfe5551b083e00ab316eacb89c68202f"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -345,7 +345,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "ee7fa6dca8af2cfab7afdb2420e168795c876b67863e67a6502440ed38d56a1d"
+      "sha256": "8a64c516f03193cd98d4bca327760ee8d9db18940eed9dbed706de78cf9b411a"
     },
     {
       "path": ".claude/settings.json",
@@ -449,7 +449,7 @@
     },
     {
       "path": ".claude/skills/extend/SKILL.md",
-      "sha256": "44f503db81a2d0ef223e5ed40cbbd9595901913adb5120f1c9b5e7e211672cba"
+      "sha256": "e9ed1f5d47eed96342302de195bee8498d2e0c103484c44c7b4a50911b419ead"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -673,7 +673,7 @@
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
-      "sha256": "79d832e4e72309340a529a4f90fa5d6ce3761decb900336a584435de10282741"
+      "sha256": "6bf17e7ed5bdf185d74338aead2d27fa3a4a211dc6508c6b33b99097b6d32e5f"
     },
     {
       "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md",
@@ -873,7 +873,7 @@
     },
     {
       "path": "docs/DATA-POLICY.md",
-      "sha256": "9a6634619daff21faac14f466a66b57e057b305190b8d4e31003dfd8c581e57f"
+      "sha256": "d9b380fdd0db0c16b01c308b4198327e27f9dcea4273197a6c082a23ba77f56c"
     },
     {
       "path": "docs/DATA-RESIDENCY.md",
@@ -925,7 +925,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "d2bc710b8bfde89b88aadaa9347316a11cf31e9e6f1b1b853a2b55127a4ad921"
+      "sha256": "009b44d31922f769c245d6002431806f7f8e0969ae74a79ee1ff526ffa972b35"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1937,7 +1937,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect.sh",
-      "sha256": "2e40f42a06cb52b2fb4ef0dee67ba4d3eedf61cdaa699fcee94ad1a5f78ad0fb"
+      "sha256": "85110a8e8e46521d093060555e3eb098c5a719321c24bb3b108e2c9fdbc312a7"
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
@@ -2201,7 +2201,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "a7ddfb9d63694001bf7f75997ee10c4edabf2689bbca1ee4d6e6922cfe0b4377"
+      "sha256": "02aa306059f017cfc579cf4d67fc743bda23bbfba6ba1405d4a3a6f92e24822e"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
@@ -2237,7 +2237,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "46fbd1510fd0be6cd07a421298e84e56ef11806a15bfa1d134634a98bc4ed924"
+      "sha256": "cc447a35bbf2faac16d9016805cc87b14deb3fe2ae15584fc07f5db03763ab27"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2961,7 +2961,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "eaf91c76bc563554459ded556c0eeb3f17bd2820c2f753b2adc269de3d80acce"
+      "sha256": "ede2ed1162a3fcdbc95ae3624d969342d2e5467c11aadd8c28ce41e5ce8fde67"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3049,7 +3049,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "11f477bf64e2a55f98b3da0f82240758a68911b1922d47125dfa363ba2d65da7"
+      "sha256": "59bc5b061d9097436b1cc7d93d4303ff2603d2b901060697fa6faf51f1fa8e47"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3089,7 +3089,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "a29e46ca32e5ef6ea80e1d69b89d56ab9a769d791f4fb75a28326cb6cbf82b08"
+      "sha256": "07ef3c833c22bf03aca11deb8f4b16006223342007997f4955be8e8bc39887df"
     }
   ],
   "excluded_paths": [
@@ -3156,6 +3156,13 @@
     "scripts/tests/test_issue_729_strategy_day.sh",
     "scripts/tests/test_issue_810_scan_selfexcl.sh",
     "scripts/tests/test_issue_851_cyrillic_slug.sh",
+    "scripts/tests/test_issue_869_claude_slug.sh",
+    "scripts/tests/test_issue_870_dayplan_validator.sh",
+    "scripts/tests/test_issue_871_registry_prefix.sh",
+    "scripts/tests/test_issue_872_skill_user_space.sh",
+    "scripts/tests/test_issue_874_here_string.sh",
+    "scripts/tests/test_issue_875_workspace_paths.sh",
+    "scripts/tests/test_issue_877_llm_proxy_default.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",

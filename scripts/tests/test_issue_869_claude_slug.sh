@@ -64,6 +64,19 @@ check "${MAC_ROOT}/a/.iwe-workdir/x"       "-Users-a--iwe-workdir-x"
 check "/tmp/my ws/IWE"                     "-tmp-my-ws-IWE"
 check "/srv/IWE.v2"                        "-srv-IWE-v2"
 
+# Non-ASCII characters: one dash per character, whatever the locale. launchd and cron run
+# without one, and setup.sh (interactive) and day-close.sh (scheduled) must agree.
+if command -v python3 >/dev/null 2>&1; then
+    CYR="${MAC_ROOT}/Иван/IWE"
+    want="-Users------IWE"
+    got_c=$(LC_ALL=C iwe_claude_project_slug "$CYR")
+    got_u=$(LC_ALL=en_US.UTF-8 iwe_claude_project_slug "$CYR" 2>/dev/null || true)
+    if [ "$got_c" = "$want" ]; then ok "Cyrillic path under LC_ALL=C: one dash per character ($got_c)"; else bad "Cyrillic path under LC_ALL=C: expected '$want', got '$got_c'"; fi
+    if [ -z "$got_u" ] || [ "$got_u" = "$got_c" ]; then ok "Cyrillic path gives the same slug in a UTF-8 locale"; else bad "locale-dependent slug: C='$got_c' UTF-8='$got_u'"; fi
+else
+    echo "SKIP: python3 missing, locale-independence case"
+fi
+
 # --- 3. Windows: the native path (from cygpath) is what gets slugged ---
 mkdir -p "$TMP/bin"
 printf '%s\n' '#!/bin/sh' 'case "$2" in /f/notes) printf "%s\n" "F:\\notes" ;; *) printf "%s\n" "$2" ;; esac' > "$TMP/bin/cygpath"
@@ -117,6 +130,61 @@ else
     else
         bad "real symlink case regressed: $OUT"
     fi
+    # A dangling link left earlier: `ln -s` fails with "File exists" while [ -L ] still holds.
+    rm -rf "$TMP/ws_dangling" "$TMP/mem_dangling"; mkdir -p "$TMP/ws_dangling" "$TMP/mem_dangling"
+    ln -s "$TMP/nowhere-at-all" "$TMP/ws_dangling/memory"
+    OUT=$(WORKSPACE_DIR="$TMP/ws_dangling" CLAUDE_MEMORY_DIR="$TMP/mem_dangling" bash -c '. "$1"' _ "$TMP/link_block.sh" 2>&1)
+    if grep -q 'не создана' <<<"$OUT" && ! grep -q '^  Symlink:' <<<"$OUT"; then
+        ok "a dangling link is not reported as a successful symlink"
+    else
+        bad "dangling link reported as success: $OUT"
+    fi
+    if grep -q 'ln:' <<<"$OUT"; then ok "the real ln error is shown"; else bad "ln error swallowed: $OUT"; fi
+fi
+
+# --- 5. update.sh: a link named by an older slug rule must not stop the updater ---
+awk '/^resolve_workspace_memory_dir\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }' "$ROOT/update.sh" > "$TMP/resolve_fn.sh"
+if [ ! -s "$TMP/resolve_fn.sh" ]; then
+    bad "could not extract resolve_workspace_memory_dir from update.sh"
+else
+    resolve_mem() {   # $1 = workspace path; HOME is the throwaway one set by the caller
+        bash -c '. "$1"; . "$2"; resolve_workspace_memory_dir "$3"' _ "$TMP/setup.sh.fn" "$TMP/resolve_fn.sh" "$1"
+    }
+    # A) legacy install: workspace path with a space; old setup named the directory by "tr /",
+    #    Claude Code (and the new rule) use the dashed name, which exists as well.
+    H="$TMP/home_legacy"; WSL="$TMP/ws with space/IWE"
+    mkdir -p "$WSL" "$H/.claude/projects"
+    LEGACY_SLUG=$(printf '%s' "$WSL" | tr '/' '-')
+    NEW_SLUG=$(HOME="$H" iwe_claude_project_slug "$WSL")
+    mkdir -p "$H/.claude/projects/$LEGACY_SLUG/memory" "$H/.claude/projects/$NEW_SLUG/memory"
+    ln -s "$H/.claude/projects/$LEGACY_SLUG/memory" "$WSL/memory"
+    OUT=$(HOME="$H" resolve_mem "$WSL" 2>"$TMP/legacy.err"); RC=$?
+    WANT=$(cd -P "$H/.claude/projects/$LEGACY_SLUG/memory" && pwd -P)
+    if [ "$RC" = 0 ] && [ "$OUT" = "$WANT" ] && grep -q 'ВНИМАНИЕ' "$TMP/legacy.err"; then
+        ok "legacy link (older slug rule, path with a space): accepted with a note, updater not stopped"
+    else
+        bad "legacy install broken: rc=$RC out='$OUT' err='$(cat "$TMP/legacy.err")'"
+    fi
+    # B) a genuine conflict (link to a directory no rule produces) still stops with the old message
+    H="$TMP/home_conflict"; WSC="$TMP/ws_conflict/IWE"
+    mkdir -p "$WSC" "$H/.claude/projects" "$TMP/elsewhere/memory"
+    NEW_SLUG=$(HOME="$H" iwe_claude_project_slug "$WSC")
+    mkdir -p "$H/.claude/projects/$NEW_SLUG/memory"
+    ln -s "$TMP/elsewhere/memory" "$WSC/memory"
+    OUT=$(HOME="$H" resolve_mem "$WSC" 2>"$TMP/conflict.err"); RC=$?
+    if [ "$RC" != 0 ] && grep -q 'неоднозначен' "$TMP/conflict.err"; then
+        ok "a genuine conflict still stops with the ambiguity error"
+    else
+        bad "genuine conflict no longer detected: rc=$RC err='$(cat "$TMP/conflict.err")'"
+    fi
+    # C) the consistent case is silent
+    H="$TMP/home_ok"; WSO="$TMP/ws_ok/IWE"
+    mkdir -p "$WSO" "$H/.claude/projects"
+    NEW_SLUG=$(HOME="$H" iwe_claude_project_slug "$WSO")
+    mkdir -p "$H/.claude/projects/$NEW_SLUG/memory"
+    ln -s "$H/.claude/projects/$NEW_SLUG/memory" "$WSO/memory"
+    OUT=$(HOME="$H" resolve_mem "$WSO" 2>"$TMP/ok.err"); RC=$?
+    if [ "$RC" = 0 ] && [ ! -s "$TMP/ok.err" ]; then ok "link named by the current rule: accepted silently"; else bad "consistent case broke: rc=$RC err='$(cat "$TMP/ok.err")'"; fi
 fi
 
 echo "Result: $fail FAIL"

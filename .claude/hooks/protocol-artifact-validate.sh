@@ -191,7 +191,9 @@ fi
 # issue #870: предшественник ЗАСТЕЙДЖЕННОГО плана в отсортированном списке, а не
 # «предпоследний на диске»: при коммите не самого свежего плана он сравнивался бы
 # со своим будущим. Самый старый план предшественника не имеет — сравнивать не с чем.
-PREV_DAYPLAN=$(ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null | sort \
+# Сам застейдженный план добавлен в список: имя вне канона («DayPlan_…», не «DayPlan …»)
+# тоже получает предшественника, как и до этой правки.
+PREV_DAYPLAN=$({ ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null; printf '%s\n' "$DAYPLAN"; } | sort -u \
   | CUR="$DAYPLAN" awk '$0 == ENVIRON["CUR"] { print prev; exit } { prev = $0 }')
 if [ -n "$PREV_DAYPLAN" ] && [ "$PREV_DAYPLAN" != "$DAYPLAN" ]; then
   # Предыдущий DayPlan существует — текущий должен содержать Carry-over

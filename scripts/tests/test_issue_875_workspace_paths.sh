@@ -39,7 +39,7 @@ fi
 # --- 3. class guard: no live path derived from the folder name / user name ---
 # The issue's own search. Comment lines are excluded (explanations of the old
 # defect legitimately quote the pattern); tests are excluded (fixtures).
-HITS=$(cd "$ROOT" && grep -rn --include='*.sh' --include='*.py' -E 'whoami\)-IWE|USER}-IWE|projects/-Users' \
+HITS=$(cd "$ROOT" && grep -rn --include='*.sh' --include='*.py' -E 'whoami\)-IWE|USER}-IWE|projects/-Users|SLUG\}-IWE' \
         roles scripts setup .claude 2>/dev/null \
     | grep -v '/tests/' \
     | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)

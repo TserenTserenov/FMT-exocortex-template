@@ -55,8 +55,10 @@ fi
 # Поэтому slug = tr '/_.' '-', а первичный источник — симлинк (не зависит от слугификации).
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
-HOME_SLUG=$(echo "$HOME" | tr '/_.' '-')
-MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${HOME_SLUG}-IWE/memory}"
+# issue #875: the fallback slug comes from the workspace itself, not from "$HOME" + "-IWE"
+# (an install in a folder not named IWE would otherwise mirror another workspace's memory).
+WORKSPACE_SLUG=$(echo "$WORKSPACE_DIR" | tr '/_.' '-')
+MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${WORKSPACE_SLUG}/memory}"
 EXOCORTEX_DST="$WORKSPACE_DIR/$GOVERNANCE_REPO/exocortex"
 
 # Канонический реальный путь memory/. Приоритет — симлинк $WORKSPACE_DIR/memory

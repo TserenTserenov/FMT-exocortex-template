@@ -293,9 +293,10 @@ CALENDAR_OUT="$IWE/.tmp/calendar-$DATE.txt"
 if [ -z "${LLM_PROXY_URL:-}" ]; then
   _platform_proxy="${PLATFORM_LLM_PROXY_URL:-}"
   if [ -z "$_platform_proxy" ] && [ -f "$DS_STRATEGY/scripts/lib/common.sh" ]; then
+    # Read in a subshell: common.sh defines its own tg_notify(), which would replace
+    # this pipeline's (probe-aware, telegram.sh-based) one for the rest of the run.
     # shellcheck source=lib/common.sh
-    . "$DS_STRATEGY/scripts/lib/common.sh"
-    _platform_proxy=$(iwe_env_get "$IWE/.exocortex.env" PLATFORM_LLM_PROXY_URL 2>/dev/null || true)
+    _platform_proxy=$( . "$DS_STRATEGY/scripts/lib/common.sh" && iwe_env_get "$IWE/.exocortex.env" PLATFORM_LLM_PROXY_URL 2>/dev/null ) || _platform_proxy=""
   fi
   _platform_proxy="${_platform_proxy%/}"
   _platform_proxy="${_platform_proxy%/v1}"
