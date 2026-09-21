@@ -130,25 +130,83 @@ notify_telegram() {
 
 # Загрузка переменных окружения
 load_env() {
+    # An explicit CLAUDE_CODE_OAUTH_TOKEN (launchd plist, shell) beats ENV_FILE too.
+    local explicit_token="${CLAUDE_CODE_OAUTH_TOKEN:-}"
     if [ -f "$ENV_FILE" ]; then
         set -a
         source "$ENV_FILE"
         set +a
     fi
-    # WP-5 Ф46: subscription token saved by scripts/connect.sh lives in its own
-    # 600-mode file (add-secret.sh convention), not in ENV_FILE. An explicit
-    # env var (launchd plist, shell) still wins over the file.
-    local token_file="$HOME/.secrets/claude_code_oauth_token"
-    if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -f "$token_file" ]; then
-        CLAUDE_CODE_OAUTH_TOKEN="$(<"$token_file")"
+    if [ -n "$explicit_token" ]; then
+        CLAUDE_CODE_OAUTH_TOKEN="$explicit_token"
         export CLAUDE_CODE_OAUTH_TOKEN
     fi
+    load_claude_subscription_token
+    prefer_subscription_over_proxy
+}
+
+# WP-5 Ф46: the subscription token lives in its own 600-mode file, not in
+# ENV_FILE. First non-empty source wins; an explicit env var (launchd plist,
+# shell) beats both files:
+#   ~/.secrets/claude_code_oauth_token  raw token, written by scripts/connect.sh
+#   ~/.secrets/claude-subscription      CLAUDE_CODE_OAUTH_TOKEN=<token> (add-secret.sh style)
+# The KEY=value file is parsed for that one key, not sourced: sourcing would run
+# the file as shell and export every other variable it happens to hold.
+load_claude_subscription_token() {
+    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        return 0
+    fi
+    local raw_file="$HOME/.secrets/claude_code_oauth_token"
+    local kv_file="$HOME/.secrets/claude-subscription"
+    local token=""
+    if [ -f "$raw_file" ]; then
+        token="$({ tr -d '[:space:]' <"$raw_file"; } 2>/dev/null || true)"
+    fi
+    if [ -z "$token" ] && [ -f "$kv_file" ]; then
+        # Value = first run of non-space characters after the key (a trailing
+        # `# comment` and CRLF fall away); the last matching line wins; quotes are dropped.
+        token="$({ sed -n -E 's/^(export[[:space:]]+)?CLAUDE_CODE_OAUTH_TOKEN=[[:space:]]*([^[:space:]]*).*/\2/p' "$kv_file" \
+            | tail -n 1 | tr -d "\"'"; } 2>/dev/null || true)"
+    fi
+    if [ -n "$token" ]; then
+        CLAUDE_CODE_OAUTH_TOKEN="$token"
+        export CLAUDE_CODE_OAUTH_TOKEN
+    fi
+}
+
+# A subscription token must reach the vendor API directly. ENV_FILE may carry a
+# proxy (ANTHROPIC_BASE_URL) and load_env sources it AFTER any wrapper already
+# dropped it, so the client sent the token to the proxy: 401 "Invalid or expired
+# token" (tsekh-1, 2026-09-21). That proxy also drops the `tools` array, so it
+# cannot serve headless tool-use at all. Auth policy: a connected subscription
+# wins over proxy/API-key env; IWE_EXTRACTOR_USE_API_ENV=1 opts out for a
+# deliberate custom gateway and then withholds the subscription token from it.
+# A non-Claude AI_CLI keeps its environment but never receives the Claude token
+# (a custom claude binary is declared with CLAUDE_CLI_PATH, not AI_CLI).
+prefer_subscription_over_proxy() {
+    if ! ai_cli_is_claude; then
+        unset CLAUDE_CODE_OAUTH_TOKEN
+        return 0
+    fi
+    if [ "${IWE_EXTRACTOR_USE_API_ENV:-}" = "1" ]; then
+        unset CLAUDE_CODE_OAUTH_TOKEN
+        return 0
+    fi
+    [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || return 0
+    if [ -n "${ANTHROPIC_BASE_URL:-}${ANTHROPIC_API_KEY:-}${ANTHROPIC_AUTH_TOKEN:-}${ANTHROPIC_CUSTOM_HEADERS:-}" ]; then
+        log "Auth: subscription oauth preferred — dropping proxy/API-key env"
+    fi
+    unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_CUSTOM_HEADERS
 }
 
 # AI_CLI may be overridden to a non-Claude CLI (see strategist.sh) — then
 # Claude auth checks and hints are meaningless.
 ai_cli_is_claude() {
-    [ "$AI_CLI" = "$CLAUDE_PATH" ]
+    [ "$AI_CLI" = "$CLAUDE_PATH" ] && return 0
+    # Another spelling of the same binary (`claude` vs /run/current-system/sw/bin/claude)
+    local resolved
+    resolved="$(command -v "$AI_CLI" 2>/dev/null)" || return 1
+    [ "$resolved" = "$CLAUDE_PATH" ] || [ "$resolved" -ef "$CLAUDE_PATH" ]
 }
 
 # WP-5 Ф46: preflight before any headless run. `claude auth status` is the
