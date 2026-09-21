@@ -170,6 +170,19 @@ mark_interval() {
     echo "$NOW" > "$STATE_DIR/$1-last"
 }
 
+# "Every N hours" tasks are gated on the time since the previous dispatch START
+# (mark_interval stores NOW), and the timer fires every N hours too. A dispatch may
+# start a few seconds earlier than the previous one did: 15:00:52 -> 18:00:51 is
+# 10799 s < 10800 and the extractor lost a whole interval (tsekh-1, 21.09.2026).
+# The slack absorbs that jitter; it is far below any interval, so a manual dispatch
+# still holds the next timer tick off.
+INTERVAL_SLACK_SECONDS=300
+
+# interval_reached ELAPSED_SECONDS INTERVAL_SECONDS
+interval_reached() {
+    [ "$1" -ge $(( $2 - INTERVAL_SLACK_SECONDS )) ]
+}
+
 # === Очистка старых маркеров (>7 дней) ===
 
 cleanup_state() {
@@ -291,7 +304,7 @@ dispatch() {
     if (( 10#$HOUR >= 7 && 10#$HOUR <= 23 )); then
         local elapsed
         elapsed=$(last_run_seconds_ago "extractor-inbox-check")
-        if [ "$elapsed" -ge 10800 ]; then
+        if interval_reached "$elapsed" 10800; then
             log "→ extractor inbox-check (${elapsed}s since last)"
             if timeout "$TASK_TIMEOUT_LONG" "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
                 mark_interval "extractor-inbox-check"
