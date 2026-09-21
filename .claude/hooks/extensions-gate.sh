@@ -21,11 +21,207 @@
 #   - issue #311: новая директория .claude/skills/<name>/, которой нет в
 #     update-manifest.json — свой навык, update.sh её не тронет. extend/SKILL.md
 #     документирует ровно этот путь как штатный.
+#   - issue #872: правка платформенного .claude/skills/<name>/SKILL.md, весь
+#     эффект которой лежит ВНУТРИ единственного блока между строками
+#     <!-- USER-SPACE --> и <!-- /USER-SPACE --> (update.sh сохраняет этот блок
+#     при обновлении; scripts/add-skill-markers.sh добавляет его в L1-скиллы).
+#     Решение принимается по ИНВАРИАНТУ результирующего документа, не по
+#     old_string/new_string: считаем содержимое файла ПОСЛЕ вызова и требуем
+#     побайтово те же маркеры, тот же текст до открывающего и после закрывающего
+#     маркера. Исключение относится ТОЛЬКО к обычному существующему файлу с
+#     физическим путём <workspace>/.claude/skills/<имя>/SKILL.md; для любого
+#     другого файла (другие хуки, settings, CLAUDE.md, соседние файлы скилла,
+#     memory/protocol-*) оно ничего не меняет: прежнее решение хука сохраняется
+#     как есть (в частности, хук по-прежнему не закрывает .claude/hooks/*).
+#     Любая ошибка разбора/чтения = блок (fail-closed); нет python3 — исключение
+#     не действует.
+#     Принадлежность скилла к платформенному слою доказана ПОРЯДКОМ веток, а не
+#     маркерами: исключение 3 (#311) раньше выпускает любой скилл, чей каталог
+#     отсутствует в прочитанном манифесте, поэтому сюда доходят только скиллы,
+#     записанные в манифесте. Остаточный риск: проверка содержимого и сама запись
+#     инструментом не атомарны (гонка при подмене файла между ними), а хук не может
+#     передать инструменту проверенный inode — он остаётся guardrail от случайной
+#     правки, а не границей безопасности (см. CLAUDE.md §9, Extensions Gate).
 
 block() {
   printf '{"decision": "block", "reason": "⛔ Extensions Gate: %s"}\n' "$1"
   exit 0
 }
+
+# issue #872: decides whether ONE Edit/Write call changes nothing but the text
+# strictly between the USER-SPACE markers of an existing platform SKILL.md.
+# stdin = the PreToolUse payload; argv = workspace, real path (symlinks resolved), raw path.
+# Prints exactly "ALLOW" or "DENY:<reason>"; any other output (or none) = deny.
+IFS= read -r -d '' USER_SPACE_PY <<'PYEOF' || true
+import json
+import os
+import stat
+import sys
+
+OPEN = b"<!-- USER-SPACE -->"
+CLOSE = b"<!-- /USER-SPACE -->"
+MAX_BYTES = 16 * 1024 * 1024
+WHY_MARKERS = "в файле нет ровно одной корректной пары маркеров USER-SPACE"
+
+
+class Deny(Exception):
+    pass
+
+
+def parse(data):
+    """Split into (prefix, open line, middle, close line, suffix) or raise Deny.
+
+    Well-formed = exactly one line equal to the opening marker, exactly one
+    line equal to the closing marker (a trailing CR of a CRLF file is part of
+    the terminator), no other occurrence of either marker text, opening first.
+    """
+    if data.count(OPEN) != 1 or data.count(CLOSE) != 1:
+        raise Deny(WHY_MARKERS)
+    opens = []
+    closes = []
+    pos = 0
+    size = len(data)
+    while pos < size:
+        nl = data.find(b"\n", pos)
+        end = size if nl < 0 else nl + 1
+        body = data[pos:end]
+        if body.endswith(b"\n"):
+            body = body[:-1]
+        if body.endswith(b"\r"):
+            body = body[:-1]
+        if body == OPEN:
+            opens.append((pos, end))
+        elif body == CLOSE:
+            closes.append((pos, end))
+        pos = end
+    if len(opens) != 1 or len(closes) != 1:
+        raise Deny(WHY_MARKERS)
+    (o_start, o_end), (c_start, c_end) = opens[0], closes[0]
+    if o_end > c_start:
+        raise Deny("маркеры USER-SPACE стоят в неправильном порядке")
+    return (data[:o_start], data[o_start:o_end], data[o_end:c_start],
+            data[c_start:c_end], data[c_end:])
+
+
+def check_path(ws, real, raw):
+    """Only <ws>/.claude/skills/<name>/SKILL.md reached without symlinks/aliases."""
+    if not os.path.isabs(raw):
+        raise Deny("путь файла должен быть абсолютным")
+    if not real.startswith(ws + "/"):
+        raise Deny("файл вне рабочего каталога")
+    parts = real[len(ws) + 1:].split("/")
+    if (len(parts) != 4 or parts[0] != ".claude" or parts[1] != "skills"
+            or parts[2] in ("", ".", "..") or parts[3] != "SKILL.md"):
+        raise Deny("исключение действует только для .claude/skills/имя/SKILL.md")
+    comps = raw.split("/")
+    if comps[-4:] != parts:
+        raise Deny("путь не канонический: симлинк, другой регистр букв или лишние сегменты")
+    head = "/".join(comps[:-4]) or "/"
+    if os.path.realpath(head) != ws:
+        raise Deny("путь не канонический: префикс не совпадает с рабочим каталогом")
+    base = "" if head == "/" else head
+    for i in range(1, 4):
+        if stat.S_ISLNK(os.lstat(base + "/" + "/".join(parts[:i])).st_mode):
+            raise Deny("каталог на пути к SKILL.md является симлинком")
+
+
+def read_original(raw):
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(raw, flags)
+    except OSError:
+        raise Deny("SKILL.md не существует или это симлинк: создание файла через исключение запрещено")
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise Deny("SKILL.md не является обычным файлом")
+        if st.st_nlink != 1:
+            raise Deny("SKILL.md имеет жёсткие ссылки")
+        if st.st_size > MAX_BYTES:
+            raise Deny("SKILL.md слишком большой для проверки")
+        with os.fdopen(fd, "rb", closefd=False) as fh:
+            data = fh.read(MAX_BYTES + 1)
+    finally:
+        os.close(fd)
+    if len(data) > MAX_BYTES:
+        raise Deny("SKILL.md слишком большой для проверки")
+    data.decode("utf-8")  # strict: a non-UTF-8 file is not something the tools round-trip
+    return data
+
+
+def apply_edit(original, search, repl, replace_all):
+    return original.replace(search, repl) if replace_all else original.replace(search, repl, 1)
+
+
+def simulate(payload, original):
+    """Return the candidate resulting documents (all must satisfy the invariant)."""
+    tool = payload.get("tool_name")
+    ti = payload.get("tool_input")
+    if not isinstance(ti, dict):
+        raise Deny("нет tool_input")
+    if tool not in ("Edit", "Write"):
+        raise Deny("исключение действует только для Edit и Write")
+    if tool == "Write":
+        if "old_string" in ti or not isinstance(ti.get("content"), str):
+            raise Deny("некорректный вызов Write")
+        return [ti["content"].encode("utf-8")]
+    if "content" in ti or not isinstance(ti.get("old_string"), str) \
+            or not isinstance(ti.get("new_string"), str):
+        raise Deny("некорректный вызов Edit")
+    replace_all = ti.get("replace_all", False)
+    if not isinstance(replace_all, bool):
+        raise Deny("некорректный replace_all")
+    old = ti["old_string"].encode("utf-8")
+    new = ti["new_string"].encode("utf-8")
+    if not old:
+        raise Deny("пустой old_string")
+    count = original.count(old)
+    if count == 0:
+        raise Deny("old_string не найден в файле")
+    if count > 1 and not replace_all:
+        raise Deny("old_string встречается больше одного раза")
+    results = [apply_edit(original, old, new, replace_all)]
+    # The Edit tool, when deleting text (new_string == ""), also removes the
+    # newline that follows old_string - the pair CR LF in a CRLF file (observed on
+    # the real tool). Judge every reading; all of them must pass.
+    if not new and not old.endswith(b"\n"):
+        for terminator in (b"\n", b"\r\n"):
+            if (old + terminator) in original:
+                results.append(apply_edit(original, old + terminator, new, replace_all))
+    return results
+
+
+def main():
+    ws, real, raw = sys.argv[1], sys.argv[2], sys.argv[3]
+    payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise Deny("payload не объект")
+    tool_input = payload.get("tool_input")
+    # The shell layer read the path through jq and command substitution; the
+    # path judged here must be byte-for-byte the one the tool will open.
+    if not isinstance(tool_input, dict) or tool_input.get("file_path") != raw:
+        raise Deny("путь в вызове не совпадает с проверенным путём")
+    check_path(ws, real, raw)
+    original = read_original(raw)
+    pre, open_line, _block, close_line, post = parse(original)
+    for result in simulate(payload, original):
+        # The invariant on the RESULT: still exactly one well-formed pair, the
+        # marker lines and everything outside them byte-identical. Only the
+        # block between the markers may differ.
+        r_pre, r_open, _r_block, r_close, r_post = parse(result)
+        if (r_pre, r_open, r_close, r_post) != (pre, open_line, close_line, post):
+            raise Deny("правка выходит за пределы блока USER-SPACE или меняет сами маркеры")
+
+
+try:
+    main()
+    out = "ALLOW"
+except Deny as exc:
+    out = "DENY:" + str(exc)
+except Exception:
+    out = "DENY:не удалось разобрать файл или вызов — блокирую"
+sys.stdout.buffer.write(out.encode("utf-8"))
+PYEOF
 
 INPUT=$(cat)
 
@@ -146,6 +342,36 @@ EOF_MF
         block "манифест платформы не читается (битый JSON или пустой список файлов) — принадлежность скилла не доказать, блокирую. Восстанови update-manifest.json (git checkout или update.sh)."
       fi
     fi
+  fi
+
+  # Исключение 4 (issue #872): SKILL.md платформенного скилла, правка целиком
+  # внутри блока USER-SPACE. Форма пути — ровно .claude/skills/<имя>/SKILL.md
+  # (один уровень каталога); всё остальное сюда не попадает и блокируется ниже.
+  SKILL_MD_DIR=""
+  case "$REL_PATH" in
+    .claude/skills/*/SKILL.md)
+      SKILL_MD_DIR="${REL_PATH#.claude/skills/}"
+      SKILL_MD_DIR="${SKILL_MD_DIR%/SKILL.md}"
+      case "$SKILL_MD_DIR" in
+        ""|*/*) SKILL_MD_DIR="" ;;
+      esac
+      ;;
+  esac
+  if [ -n "$SKILL_MD_DIR" ]; then
+    # Разрешение только при явном ALLOW от проверки инварианта; пустой вывод,
+    # падение python или любое иное значение = отказ.
+    US_VERDICT=$(printf '%s' "$INPUT" | python3 -I -c "$USER_SPACE_PY" "$WORKSPACE_DIR" "$REAL_PATH" "$FILE_PATH" 2>/dev/null)
+    if [ "$US_VERDICT" = "ALLOW" ]; then
+      echo '{}'
+      exit 0
+    fi
+    case "$US_VERDICT" in
+      DENY:*) US_WHY="${US_VERDICT#DENY:}" ;;
+      *) US_WHY="проверка блока USER-SPACE не выполнена (нет python3 или сбой)" ;;
+    esac
+    # The reason goes into a hand-built JSON string: drop quotes, backslashes and every control character.
+    US_WHY=$(printf '%s' "$US_WHY" | tr '\n\r' '  ' | tr -d '"\134' | tr -d '[:cntrl:]')
+    block "SKILL.md платформенного скилла принадлежит платформе (L1), update.sh перезаписывает его при обновлении. Свои дополнения вноси ТОЛЬКО между строками <!-- USER-SPACE --> и <!-- /USER-SPACE --> этого же файла: update.sh сохраняет этот блок. Всё остальное в файле, сами маркеры и текст до/после них не трогай. Причина отказа: ${US_WHY}. Каталог extensions/ для скиллов не работает: скиллы не читают extensions/*.md. Нет маркеров в L1-скилле — их добавляет scripts/add-skill-markers.sh или обновление (update.sh). Платформенное изменение → FMT-exocortex-template → update.sh."
   fi
 
   # Блокировать для обычных пользователей
