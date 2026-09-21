@@ -272,6 +272,35 @@ bash setup.sh
 5. Установит автоматический запуск Стратега (launchd на macOS)
 6. Создаст `DS-strategy/` — твой приватный стратегический репозиторий на GitHub
 
+### 1.2b Видимость форка и личные данные
+
+`gh repo fork` создаёт **публичный** форк: GitHub не позволяет сделать форк публичного репозитория приватным. Поэтому:
+
+- каталог `FMT-exocortex-template/` содержит платформенные файлы (методология, скрипты, образцы). Всё, что ты закоммитишь и запушишь оттуда, увидит любой;
+- личное хранится **вне** этого каталога: `memory/` живёт в памяти Claude Code (`~/.claude/projects/<slug>/memory`, в рабочей папке это ссылка на неё), `extensions/` и `params.yaml` — в рабочей папке, стратегия и бэкап памяти — в отдельном приватном репозитории `DS-strategy`;
+- одноимённые каталоги `memory/` и `extensions/` внутри клона шаблона — платформенные образцы, а не твои данные. Не правь их под себя и не пушь в форк личный контекст.
+
+**Нужен приватный репозиторий шаблона?** Форком он быть не может. Сделай приватную копию (duplicate) и держи оригинал как `upstream`:
+
+```bash
+git clone --bare https://github.com/TserenTserenov/FMT-exocortex-template.git
+cd FMT-exocortex-template.git
+gh repo create FMT-exocortex-template --private
+git push --mirror "https://github.com/<твой-логин>/FMT-exocortex-template.git"
+cd .. && rm -rf FMT-exocortex-template.git
+git clone "https://github.com/<твой-логин>/FMT-exocortex-template.git"
+cd FMT-exocortex-template
+git remote add upstream https://github.com/TserenTserenov/FMT-exocortex-template.git
+```
+
+Что известно про приватную копию (выведено чтением кода, полный прогон на приватной копии не делался):
+
+| Часть | Что происходит |
+|-------|----------------|
+| `update.sh` | берёт обновления из зашитого адреса оригинала (`UPSTREAM-CONST`), а не из твоего форка или копии, поэтому смена форка на копию источник обновлений не меняет |
+| `scripts/fmt-critical-alert.sh` | у копии нет «родителя», поэтому скрипт проверит **свой** список issue, а он пуст. Ответ «критичных нет» в этом случае значит «проверять нечего», а не «проблем нет». Задай `IWE_FMT_REPO=TserenTserenov/FMT-exocortex-template` (переменная окружения или строка в `.exocortex.env`), чтобы он смотрел issue оригинала |
+| Подключение каталога шаблона к поиску знаний (MCP) | здесь не проверялось |
+
 ### 1.3 Проверь установку
 
 В терминале:
