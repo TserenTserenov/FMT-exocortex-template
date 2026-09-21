@@ -489,10 +489,15 @@ def parse_heredoc_header(command, start):
             )
         if character == "\n":
             return index + 1, declarations
-        if (
-            command.startswith("<<", index)
-            and not command.startswith("<<<", index)
-        ):
+        if command.startswith("<<<", index):
+            # issue #874: a here-string is not a here-document. Skip the whole
+            # operator; falling through to `index += 1` left the cursor on the
+            # 2nd "<", where "<<" + a non-"<" looked like a here-document start,
+            # took the next word as its delimiter and failed on the missing
+            # terminator, blocking every Bash call that used `<<<`.
+            index += 3
+            continue
+        if command.startswith("<<", index):
             operator_start = index
             index += 2
             strip_tabs = index < len(command) and command[index] == "-"
@@ -2161,6 +2166,34 @@ def self_test():
         if any(is_sensitive_path(fragment) for fragment in fragments) != expected:
             fail(f"path_fragments/is_sensitive_path({path_value!r}) expected {expected}")
 
+    # issue #874: `<<<` (here-string) is not a here-document. The header scan
+    # used to leave its cursor on the 2nd "<" and fail closed with
+    # "unterminated heredoc", which blocked every Bash call that used `<<<`.
+    here_string_cases = (
+        'cat <<< "hello"',
+        'jq . <<< "$json"',
+        "cat <<<'x << y'",
+        'cat <<<"$value"',
+        "cat <<<word",
+        "cat <<< foo <<EOF\nplain body\nEOF\n",
+    )
+    for command in here_string_cases:
+        upload["tool_input"] = {"command": command}
+        try:
+            analyze_bash(json.dumps(upload))
+        except SystemExit:
+            fail("here-string was rejected as a broken heredoc: " + repr(command))
+    # A here-document next to a here-string must still be parsed and its body
+    # still scanned as literal text, so secret detection keeps covering it.
+    body_secret = positives["openai-project"]
+    for command in (
+        "cat <<< x <<EOF\n" + body_secret + "\nEOF\n",
+        "cat <<EOF\n" + body_secret + "\nEOF\n",
+    ):
+        upload["tool_input"] = {"command": command}
+        if not analyze_bash(json.dumps(upload))["pattern_ids"]:
+            fail("heredoc body next to a here-string was not scanned")
+
     print("PASS canonical_pattern_corpus")
     print("PASS structured_output_shape")
     print("PASS direct_sensitive_upload")
@@ -2169,6 +2202,7 @@ def self_test():
     print("PASS path_bypass_normalization")
     print("PASS home_config_dir_coverage")
     print("PASS file_uri_case_insensitive")
+    print("PASS here_string_operator")
 
 
 mode = sys.argv[1]
