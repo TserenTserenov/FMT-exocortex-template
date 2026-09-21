@@ -1,7 +1,6 @@
 files_translated:
-- PRIVACY.md
-- docs/DATA-POLICY.md
-- docs/SETUP-GUIDE.md
-last_run_utc: '2026-09-21T08:23:33Z'
-last_synced_sha: b24879c62d077b41d1ff7c7ca96f88efd6d7818a
+- docs/LEARNING-PATH.md
+- docs/use-cases/USE-CASES.md
+last_run_utc: '2026-09-21T12:00:57Z'
+last_synced_sha: cdaea61d405a2596abd8fa7de5b656261ef49e63
 schema_version: 1
