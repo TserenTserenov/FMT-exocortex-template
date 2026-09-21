@@ -371,7 +371,7 @@ EOF_MF
     esac
     # The reason goes into a hand-built JSON string: drop quotes, backslashes and every control character.
     US_WHY=$(printf '%s' "$US_WHY" | tr '\n\r' '  ' | tr -d '"\134' | tr -d '[:cntrl:]')
-    block "SKILL.md платформенного скилла принадлежит платформе (L1), update.sh перезаписывает его при обновлении. Свои дополнения вноси ТОЛЬКО между строками <!-- USER-SPACE --> и <!-- /USER-SPACE --> этого же файла: update.sh сохраняет этот блок. Всё остальное в файле, сами маркеры и текст до/после них не трогай. Причина отказа: ${US_WHY}. Каталог extensions/ для скиллов не работает: скиллы не читают extensions/*.md. Нет маркеров в L1-скилле — их добавляет scripts/add-skill-markers.sh или обновление (update.sh). Платформенное изменение → FMT-exocortex-template → update.sh."
+    block "SKILL.md платформенного скилла принадлежит платформе (L1), update.sh перезаписывает его при обновлении. Свои дополнения вноси ТОЛЬКО между строками <!-- USER-SPACE --> и <!-- /USER-SPACE --> этого же файла: update.sh сохраняет этот блок. Всё остальное в файле, сами маркеры и текст до/после них не трогай. Причина отказа: ${US_WHY}. Каталог extensions/ помогает только скиллам, которые сами вызывают load-extensions.sh (например day-open, day-close); для остальных, включая fpf, он не читается. Если в этом SKILL.md нет маркеров, исключение не действует: маркеры в платформенный скилл добавляет сопровождающий шаблона (scripts/add-skill-markers.sh в клоне шаблона). Платформенное изменение → FMT-exocortex-template → update.sh."
   fi
 
   # Блокировать для обычных пользователей

@@ -73,7 +73,7 @@
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
-      "sha256": "481777e30ced5f0daa22ff3e9943188b930526366b8c2055e17ef9e3aceb6578"
+      "sha256": "fa97c71981a55159a0beb3fc37394dc8756dfeddcd323d9efaacb3c99bb4b718"
     },
     {
       "path": ".claude/hooks/inject-code-style.sh",
@@ -925,7 +925,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "009b44d31922f769c245d6002431806f7f8e0969ae74a79ee1ff526ffa972b35"
+      "sha256": "d37916482aefc9e914bc32c1ac985af2f865436e2b8ea66bc497e48533606b6d"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
