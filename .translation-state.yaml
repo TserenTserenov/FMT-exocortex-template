@@ -1,5 +1,7 @@
 files_translated:
-- docs/RELEASE-PROCESS.md
-last_run_utc: '2026-09-17T14:47:46Z'
-last_synced_sha: 9c2811a01bd395ae8c4893f9b131ec0cda3a3464
+- PRIVACY.md
+- docs/DATA-POLICY.md
+- docs/SETUP-GUIDE.md
+last_run_utc: '2026-09-21T08:23:33Z'
+last_synced_sha: b24879c62d077b41d1ff7c7ca96f88efd6d7818a
 schema_version: 1

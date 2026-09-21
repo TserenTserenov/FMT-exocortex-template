@@ -2,57 +2,57 @@
 
 > This guide takes you from a clean computer to a working IWE in 30–60 minutes.
 > Compatible with macOS, Linux, and Windows (via Git Bash — WSL is not required) — see notes in each step.
-> Unsure what to change for your platform? → **[PORTABILITY.md](PORTABILITY.md)**
+> Not sure what to change for your platform? → **[PORTABILITY.md](PORTABILITY.md)**
 >
-> **Source-of-truth:** `DP.IWE.002` (Pack). If this file conflicts with the Pack, the Pack takes priority.
+> **Source-of-truth:** `DP.IWE.002` (Pack). If this file conflicts with the Pack, the Pack takes Priority.
 > Via Aisystant MCP: `knowledge_search("IWE installation template")`.
 >
-> **Need a shorter version?** → [QUICK-START.md](QUICK-START.md) (15 minutes, if Git, Node.js, and CLI are already installed). This document covers a full installation from scratch.
+> **Need a shorter version?** → [QUICK-START.md](QUICK-START.md) (15 minutes, if Git, Node.js, and the CLI are already installed). This document covers a full installation from scratch.
 
 ## Where You Are and Where You Are Going
 
-The Platform grants access by tier (`DP.ARCH.002`): from T0 (no account) to T4 (Creation, IWE). You may already be using the bot — that is T1–T3. This guide moves you to **T4**, where a personal workspace with AI agents becomes available.
+The Platform opens access by tier (`DP.ARCH.002`): from T0 (no account) to T4 (Creation, IWE). You may already be using the bot — that is T1–T3. This guide moves you to **T4**, where a personal workspace with AI agents becomes available.
 
-| Tier | What is included | How to access |
-|------|-----------------|---------------|
-| **T1: Start** | Bot @aist_me_bot: knowledge search, marathons | `/start` in Telegram |
+| Tier | What is included | How to get there |
+|------|-----------------|-----------------|
+| **T1: Start** | Bot @aist_me_bot: knowledge base search, marathons | `/start` in Telegram |
 | **T2: Learning** | + Programs, guides, schedule | Subscribe to a program |
-| **T3: Personalization** | + Personal responses, digital twin | `/twin` in the bot |
+| **T3: Personalization** | + Personalized responses, digital twin | `/twin` in the bot |
 | **T4: Creation (IWE)** | + Claude Code, Strategist, Git, personal knowledge bases | **This guide** |
 
-> Everything accumulated at T1–T3 (Digital Twin, Profile, Progress) is preserved. T4 adds new capabilities; it does not replace existing ones.
+> Everything you accumulated at T1–T3 (Digital Twin, Profile, Progress) is preserved. T4 adds new capabilities; it does not replace existing ones.
 
-## What You Will Have When Finished
+## What You Will Get
 
-- **Claude Code** — an AI assistant that knows your goals, tasks, and methodology. Remembers context between Sessions
-- **Strategist** (AI agent) — prepares a day plan each morning; delivers a weekly summary on Sundays
-- **Extractor** (AI agent, later) — extracts knowledge from Sessions into a knowledge base
-- **Synchronizer** (later) — agent scheduling, Telegram notifications
-- **DS-strategy** — your personal strategic hub (private Repository on GitHub)
-- **Personal guide** — an optional Development Trajectory assembled from your goals and context
-- **Notes via Telegram** — write a thought in the bot and it enters the planning system
+- **Claude Code** — an AI assistant that knows your goals, tasks, and methodology. It remembers context between Sessions.
+- **Strategist** (AI agent) — prepares a day plan every morning; delivers a week summary every Sunday.
+- **Extractor** (AI agent, later) — extracts Knowledge from Sessions into the knowledge base.
+- **Synchronizer** (later) — agent scheduling, Telegram notifications.
+- **DS-strategy** — your personal strategic hub (private Repository on GitHub).
+- **Personal guide** — an optional Development Trajectory assembled from your goals and context.
+- **Telegram notes** — write a thought in the bot and it enters the planning system.
 
-### Phase Map
+### Stage Map
 
-| Phase | What | Time | On first installation |
+| Stage | What | Time | On first installation |
 |-------|------|------|-----------------------|
 | **0** | Preparation (Git, Node, Claude Code) | 15–20 min | **required** |
 | **1** | IWE installation | ~5 min | **required** |
 | **2** | First strategic Session | ~30 min | **required** |
-| **2a** | Personal guide | 10–20 min | can be done later |
-| **3** | Notes via Telegram | 5 min | can be done later |
-| **4** | WakaTime (time tracking) | 10 min | can be done later |
-| **5** | Google Calendar | 10 min | can be done later |
-| **6** | Video Integration | 5 min | can be done later |
+| **2a** | Personal guide | 10–20 min | can do later |
+| **3** | Telegram notes | 5 min | can do later |
+| **4** | WakaTime (time tracking) | 10 min | can do later |
+| **5** | Google Calendar | 10 min | can do later |
+| **6** | Video Integration | 5 min | can do later |
 | **7** | Agent Workspace (agent data) | 10 min | when >2 agents |
 
-> **Minimum to start:** Phases 0 → 1 → 2. Everything else can be connected at any time — tell Claude *"set up calendar"* or *"connect video recordings"*.
+> **Minimum to start:** Stages 0 → 1 → 2. Everything else can be connected at any time — tell Claude *"set up calendar"* or *"connect video recordings"*.
 >
-> **Kimi as a second agent:** to work in IWE with Kimi Code in addition to Claude, see [`docs/KIMI-SETUP.md`](KIMI-SETUP.md).
+> **Kimi as a second agent:** if you want to work in IWE with Kimi Code as well as Claude, see [`docs/KIMI-SETUP.md`](KIMI-SETUP.md).
 
 ## How to Open a Terminal
 
-All commands in this guide are run in a **terminal** — a program where you enter text commands.
+All commands in this guide run in a **terminal** — a program where you enter text commands.
 
 **macOS:**
 - Press `Cmd + Space` (Spotlight) → type `Terminal` → press Enter
@@ -60,37 +60,37 @@ All commands in this guide are run in a **terminal** — a program where you ent
 
 **Windows:**
 - Install [Git for Windows](https://git-scm.com/download/win) (default checkboxes are fine)
-- Open **Git Bash** — Start → type `Git Bash` → press Enter. WSL is not required; see [§ 0.0 "Windows: without WSL"](#00-windows-without-wsl) for details
+- Open **Git Bash** — Start → type `Git Bash` → press Enter. WSL is not required; see [§ 0.0 "Windows: without WSL"](#00-windows-without-wsl) for details.
 
 **Linux:**
 - `Ctrl + Alt + T` (in most distributions)
 
-> In the terminal you will see a prompt like `username@computer:~$` — this means it is ready for input. Just type a command and press Enter.
+> In the terminal you will see a prompt like `username@computer:~$`. Just type a command and press Enter.
 
-## Phase 0: Preparation (15–20 min)
+## Stage 0: Preparation (15–20 min)
 
-If Git, Node.js, GitHub CLI, and Claude Code CLI are already installed — skip to [Phase 1](#phase-1-iwe-installation-5-min).
+If Git, Node.js, GitHub CLI, and Claude Code CLI are already installed, skip to [Stage 1](#stage-1-iwe-installation-5-min).
 
-> **⚠ Network restrictions (Russia and similar regions).** Some downloads below (GitHub, npm, Homebrew) may not be directly accessible. Standard workarounds: VPN, system proxy, or `torify <command>` for individual calls — for example `torify curl ...` or `torify git clone ...` (for `npm`/`brew`, `torify` is often insufficient; those tools require their own proxy or package-manager registry settings). If a specific step below fails, check whether this is the cause before diagnosing the error.
+> **⚠ Network restrictions (Russia and similar regions).** Some downloads below (GitHub, npm, Homebrew) may be blocked directly. Standard workarounds: VPN, system proxy, or `torify <command>` for individual calls — for example `torify curl ...` or `torify git clone ...` (for `npm`/`brew`, `torify` is often insufficient; configure the package manager's own proxy or registry instead). If a specific step fails, check for a network block before debugging the error.
 
 ### 0.0 Windows: without WSL
 
-WSL is **not required**. The IWE core consists of ordinary bash scripts (`setup.sh` and others). Bash on Windows is provided by **Git for Windows** — installing WSL just for this is unnecessary.
+WSL **is not required**. The IWE core consists of standard bash scripts (`setup.sh` and others), and bash on Windows comes with **Git for Windows** — there is no need to install WSL just for that.
 
-1. **Git for Windows** — download from [git-scm.com](https://git-scm.com/download/win) and install (default checkboxes are fine). It includes **Git Bash** — a terminal with bash where all commands in this guide work.
-2. **All steps in Phase 0 and Phase 1** (Node.js, GitHub CLI, Claude Code CLI, `setup.sh`) must be run **from Git Bash**, not from PowerShell/cmd — commands using `curl`, `xcode-select`, etc. will not work in PowerShell.
+1. **Git for Windows** — download from [git-scm.com](https://git-scm.com/download/win) and install (default checkboxes are fine). This also installs **Git Bash** — a bash terminal in which all commands in this guide work.
+2. **All steps in Stage 0 and Stage 1** (Node.js, GitHub CLI, Claude Code CLI, `setup.sh`) must be run **from Git Bash**, not from PowerShell/cmd — commands using `curl`, `xcode-select`, etc. do not work in PowerShell.
    - Node.js — installer from [nodejs.org](https://nodejs.org/) (LTS version).
    - GitHub CLI — installer from [cli.github.com](https://cli.github.com/) or `winget install --id GitHub.cli` (can be run from regular PowerShell; installs system-wide).
-   - Claude Code CLI — the same `npm install -g @anthropic-ai/claude-code` command as on macOS/Linux (Git Bash can use `npm` if Node.js is on PATH).
-3. **Automatic Claude Code hooks** (pre/post-commit, etc.) call `.sh` files via the system shell — on Windows this only works if `bash` (from Git for Windows) is in the system `PATH`. The Git for Windows installer usually adds it automatically; if hooks do not fire, run `where bash` in cmd to check.
-4. **Local automation (Strategist/Extractor running unattended)** — Windows does not have `launchd`/`systemd`; the closest equivalent is Windows Task Scheduler (see the example in the [Auto-Wake](#automatic-wake-and-sleep-prevention) section below). The simpler path without local scheduled tasks is the cloud option via GitHub Actions (OS-independent; nothing needs to stay powered on).
-5. **If you still want a full Linux environment** — WSL remains a valid fallback (`wsl --install` in an administrator PowerShell); it is simply no longer a requirement for installing IWE.
+   - Claude Code CLI — the same command `npm install -g @anthropic-ai/claude-code` as on macOS/Linux (Git Bash uses `npm` if Node.js is on the PATH).
+3. **Automatic Claude Code hooks** (pre/post-commit, etc.) call `.sh` files via the system shell — on Windows this works only if `bash` (from Git for Windows) is in the system `PATH`. The Git for Windows installer usually adds it; if hooks do not fire, run `where bash` in cmd to check.
+4. **Local automation (Strategist/Extractor without human involvement)** — Windows has no `launchd`/`systemd`; the closest equivalent is Windows Task Scheduler (see the example in the [Automatic Wake](#automatic-wake-and-sleep-prevention) section below). A simpler path that requires no local scheduled tasks is the cloud option via GitHub Actions (OS-independent; nothing needs to be running continuously).
+5. **If you still want a full Linux environment** — WSL remains a working fallback option (`wsl --install` in an administrator PowerShell); it is simply no longer a required condition for installing IWE.
 
-> **Honest disclaimer.** Neither Git Bash nor WSL as an IWE installation path has been tested live by this team on a real Windows machine (the template CI matrix runs only `ubuntu-latest`/`macos-latest`; there is no Windows runner). If you hit a specific, reproducible failure in Git Bash, open an [issue in FMT-exocortex-template](https://github.com/TserenTserenov/FMT-exocortex-template/issues) — that is more useful than guessing in advance.
+> **Honest caveat.** Neither Git Bash nor WSL as an IWE installation path has been tested live by this team on a real Windows machine (the template's CI matrix runs only `ubuntu-latest`/`macos-latest`; there is no Windows runner). If you hit a specific, reproducible failure in Git Bash, open an [issue in FMT-exocortex-template](https://github.com/TserenTserenov/FMT-exocortex-template/issues) — that is more useful than speculating in advance.
 
 ### 0.1 Homebrew (macOS only)
 
-Homebrew is a package manager for macOS. It is used to install other tools with a single command. If it is already installed, skip this step.
+Homebrew is a package manager for macOS. It lets you install the remaining tools with a single command. Skip this step if Homebrew is already installed.
 
 In the terminal:
 ```bash
@@ -101,11 +101,11 @@ brew --version
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-After installation, Homebrew may ask you to run a command to update PATH — copy and run it.
+After installation, Homebrew may ask you to run a PATH command — copy and run it.
 
 ### 0.2 Git
 
-Git is a version control system. It stores the history of file changes and enables synchronization via GitHub.
+Git is a version control system. It stores the history of file changes and lets you synchronize work through GitHub.
 
 In the terminal:
 ```bash
@@ -121,7 +121,7 @@ xcode-select --install
 
 ### 0.3 Node.js and npm
 
-Node.js is a JavaScript runtime. It is required to install Claude Code CLI. npm is the Node.js package manager and is installed together with Node.js.
+Node.js is a JavaScript runtime. It is required to install the Claude Code CLI. npm is the Node.js package manager and is installed together with Node.js.
 
 In the terminal:
 ```bash
@@ -138,7 +138,7 @@ brew install node
 
 ### 0.4 GitHub CLI and Account
 
-GitHub CLI (`gh`) is a tool for working with GitHub from the terminal. The installer uses it to create repositories and copy the template.
+GitHub CLI (`gh`) is a tool for working with GitHub from the terminal. The installer uses it to create Repositories and copy the Template.
 
 **GitHub account:** if you do not have one, register at [github.com](https://github.com/signup).
 
@@ -151,7 +151,7 @@ gh --version
 # macOS:
 brew install gh
 # Linux:
-# https://cli.github.com/ — see installation instructions
+# https://cli.github.com/ — installation instructions
 ```
 
 Now authorize with GitHub (one time):
@@ -167,25 +167,25 @@ gh auth status
 # Should show: ✓ Logged in to github.com as <username>
 ```
 
-**If you cannot sign in via browser** (`Login with a web browser`) — at the method-selection step, choose `Paste an authentication token` instead. This option does not open a browser; `gh` waits for a ready token:
+**If browser login does not work** (`Login with a web browser`) — at the method selection step, choose `Paste an authentication token` instead. This option does not open a browser; `gh` waits for a ready token:
 
 1. Open `https://github.com/settings/tokens` in a browser.
-2. Create a token: **classic** (`Tokens (classic)` — a separate tab/link; the default page opens on fine-grained), with at minimum `repo` and `workflow` scopes (required so the forked template can push `.github/workflows`). Classic is simpler for this scenario — the required scopes are clear. Do not restrict the token to specific repositories (`setup.sh` creates new ones).
+2. Create a token: **classic** (`Tokens (classic)` — a separate tab/link; the default page opens on fine-grained), with at least `repo` and `workflow` scopes (required so the forked Template can push `.github/workflows`). Classic is simpler for this scenario — it is clear which scopes to grant; do not restrict the token to specific Repositories (`setup.sh` creates new ones).
 3. Copy the token and paste it into the terminal when `gh auth login` prompts for it.
-4. Verify with the same `gh auth status` command.
+4. Verify with the same `gh auth status` command above.
 
 ### 0.5 Claude Code CLI
 
-Claude Code is an AI agent that runs in the terminal (or in VS Code). It reads files, executes commands, and helps with planning and coding.
+Claude Code is an AI agent that runs in the terminal (or in VS Code). It reads files, executes commands, and helps with planning and writing code.
 
-It requires an Anthropic subscription. Start with **Claude Pro** ($20/month). Use **Claude Max** (~$100/month) if you need to work without usage limits.
+An Anthropic subscription is required. Start with **Claude Pro** ($20/month). Use **Claude Max** (~$100/month) if you need to work without limits.
 
 In the terminal:
 ```bash
 # Install
 npm install -g @anthropic-ai/claude-code
 
-# Verify
+# Check
 claude --version
 ```
 
@@ -193,43 +193,43 @@ On first launch, Claude Code will ask you to sign in to your Anthropic account �
 
 ### 0.5b Cost Optimization: Choosing a Model
 
-Claude Code lets you choose a model for each task. Choosing correctly preserves your subscription allowance:
+Claude Code lets you choose a model for each task. Choosing correctly saves your subscription limit:
 
 | Model | Verification class | When to use | Cost |
 |-------|--------------------|-------------|------|
 | **Opus** | open-loop, problem-framing | Architecture, complex code, strategy, multi-system changes | High |
-| **Sonnet** | closed-loop | Routine tasks, single-file edits, writing content | Medium |
-| **Haiku** | trivial | Renaming, updating links, formatting, finding a file, cron agents | Low |
+| **Sonnet** | closed-loop | Standard tasks, single-file edits, writing content | Medium |
+| **Haiku** | trivial | Renaming, updating links, Formatting, finding a file, cron agents | Low |
 
-To switch the model in Claude Code: `/model` → select. For automated tasks (Strategist, Extractor), Haiku is recommended — it saves ~80% of the allowance compared to Opus.
+Switch the model in Claude Code: `/model` → select. Haiku is recommended for automated tasks (Strategist, Extractor) — it saves ~80% of the limit compared to Opus.
 
-> **How this works — two scenarios:**
-> - **Entire Session on a different model:** When opening, Claude determines the verification class. If the task is trivial/closed-loop and the current model is excessive, Claude will say: *"I recommend switching to [Haiku/Sonnet] via `/model`. I cannot switch automatically."* The user switches manually.
-> - **A single task within a Session:** If a trivial task arises mid-session, Claude delegates it to a sub-agent on a cheaper model. The main Session is not interrupted. Delegation is downward only (Opus→Sonnet/Haiku, Sonnet→Haiku). Switching upward requires `/model`.
+> **How it works — two scenarios:**
+> - **Entire Session on a different model:** When a Session opens, Claude determines the verification class. If the task is trivial/closed-loop and the current model is excessive, Claude will say: *"I recommend switching to [Haiku/Sonnet] via `/model`. I cannot switch automatically."* The user switches manually.
+> - **A single task within a Session:** If a trivial task appears mid-Session, Claude delegates it to a sub-agent on a cheaper model. The main Session is not interrupted. Delegation goes only downward (Opus→Sonnet/Haiku, Sonnet→Haiku). Switching upward requires `/model`.
 >
-> **Tip:** On a Claude Pro subscription ($20/month), use Haiku actively for routine work (morning plans, file searches, trivial edits). Use Opus only for architectural decisions and complex code.
+> **Tip:** On a Claude Pro subscription ($20/month), use Haiku actively for routine work (morning plans, file search, trivial edits). Use Opus only for architectural decisions and complex code.
 
 ### 0.6 VS Code (recommended)
 
-VS Code is a code editor with a graphical interface. It is convenient for working with Claude Code: you see all your repositories, files, the terminal, and the AI assistant in one window, and you can switch between project repositories within a single Session. **Without VS Code** you can only work through the terminal — this is possible but less convenient.
+VS Code is a code editor with a graphical interface. It provides a convenient environment for working with Claude Code: you see all your Repos, files, the terminal, and the AI assistant in one window, and you can switch between Repos of different projects within a single Session. **Without VS Code** you work only through the terminal — this is possible but less visual.
 
 - Download and install: [code.visualstudio.com](https://code.visualstudio.com/)
 - Open VS Code → press `Cmd+Shift+X` (macOS) or `Ctrl+Shift+X` (Windows/Linux) → search for "Claude Code" → click Install
 
-If you use Obsidian, open only the governance repository `DS-strategy` as a vault. Opening the IWE root (`~/IWE`) as an Obsidian vault is not supported: large technical Markdown files such as `FPF/FPF-Spec.md` can freeze the indexer and produce a blank screen. Open the entire workspace in VS Code. Do not link technical repositories into the governance vault via symbolic links.
+If you use Obsidian, open only the separate governance Repository `DS-strategy` as a vault. The IWE root (`~/IWE`) is not supported as an Obsidian vault: large technical Markdown files such as `FPF/FPF-Spec.md` can hang the indexer and leave a blank screen. Open the entire workspace in VS Code; do not link technical Repositories into the governance vault via symbolic links.
 
-## Phase 1: IWE Installation (~5 min)
+## Stage 1: IWE Installation (~5 min)
 
 ### 1.1 Create a Working Folder
 
-Create **one folder** on your computer for all repositories — current and future. All repositories will be cloned into it: `FMT-exocortex-template/`, `DS-strategy/`, `PACK-{domain}/`, `DS-{projects}/`, etc. `CLAUDE.md` will also live in the root of this folder. The default is `~/IWE`:
+Create **one folder** on your computer for all Repositories — current and future. All Repositories will be cloned into it: `FMT-exocortex-template/`, `DS-strategy/`, `PACK-{domain}/`, `DS-{projects}/`, and others. `CLAUDE.md` will also live in the root of this folder. The default is `~/IWE`:
 
 ```bash
 mkdir -p ~/IWE
 cd ~/IWE
 ```
 
-> **Important:** The name can be anything, but all repositories must be in one place — Claude Code relies on this structure. We recommend `~/IWE`.
+> **Important:** The name can be anything, but all Repos must be in one place — Claude Code relies on this structure. We recommend `~/IWE`.
 
 ### 1.2 Fork the Template and Run the Installer
 
@@ -247,7 +247,7 @@ cd FMT-exocortex-template
 bash setup.sh
 ```
 
-> **Preview without executing:** `bash setup.sh --dry-run`
+> **Preview without running:** `bash setup.sh --dry-run`
 
 The Script will ask:
 
@@ -256,16 +256,45 @@ The Script will ask:
 | GitHub username | Your GitHub login | `ivan-petrov` |
 | Workspace directory | Working folder | Just press Enter (detected automatically) |
 | Claude CLI path | Path to claude | Just press Enter (detected automatically) |
-| Strategist launch hour (UTC) | Strategist start hour | `4` (= 7:00 MSK, 8:00 Almaty) |
+| Strategist launch hour (UTC) | Hour to launch the Strategist | `4` (= 7:00 MSK, 8:00 Almaty) |
 | Timezone description | Time description | `7:00 MSK` |
 
-The Script runs 6 steps:
-1. Substitutes your details into all files (name, paths, timezone)
+The Script performs 6 steps:
+1. Substitutes your data into all files (name, paths, timezone)
 2. Installs `CLAUDE.md` — rules for Claude Code
 3. Installs `memory/` — working memory for Claude Code
-4. Configures permissions (`.claude/settings.local.json`) and outputs instructions for connecting MCP
+4. Configures permissions (`.claude/settings.local.json`) and prints MCP connection instructions
 5. Sets up automatic Strategist launch (launchd on macOS)
 6. Creates `DS-strategy/` — your private strategic Repository on GitHub
+
+### 1.2b Fork Visibility and Personal Data
+
+`gh repo fork` creates a **public** fork: GitHub does not allow making a fork of a public Repository private. Therefore:
+
+- The `FMT-exocortex-template/` directory contains platform files (methodology, scripts, samples). Everything you commit and push from it will be visible to anyone.
+- Personal data is stored **outside** this directory: `memory/` lives in Claude Code memory (`~/.claude/projects/<slug>/memory`; the working folder contains a symlink to it), `extensions/` and `params.yaml` are in the working folder, and the strategy and memory Backup are in the separate private Repository `DS-strategy`.
+- The `memory/` and `extensions/` directories inside the Template clone are platform samples, not your data. Do not edit them for personal use and do not push personal context into the fork.
+
+**Need a private Template Repository?** It cannot be a fork. Make a private duplicate and keep the original as `upstream`:
+
+```bash
+git clone --bare https://github.com/TserenTserenov/FMT-exocortex-template.git
+cd FMT-exocortex-template.git
+gh repo create FMT-exocortex-template --private
+git push --mirror "https://github.com/<your-login>/FMT-exocortex-template.git"
+cd .. && rm -rf FMT-exocortex-template.git
+git clone "https://github.com/<your-login>/FMT-exocortex-template.git"
+cd FMT-exocortex-template
+git remote add upstream https://github.com/TserenTserenov/FMT-exocortex-template.git
+```
+
+What is known about the private copy (derived from reading the code; a full run on a private copy has not been done):
+
+| Part | What happens |
+|------|-------------|
+| `update.sh` | Fetches updates from the hardcoded original address (`UPSTREAM-CONST`), not from your fork or copy, so switching from a fork to a copy does not change the update source. One exception: in the release channel, the rollback check runs `git fetch origin <release commit>` in your clone; if the copy does not have that commit, auto-apply with `--yes` stops, but interactive mode works. |
+| `scripts/fmt-critical-alert.sh` | A copy has no "parent", so the Script checks **its own** issue list, which is empty. A response of "0 (✅ clean)" in this case means "nothing to check", not "no problems" (if the tracker is disabled, the Script exits with "cannot check"). Set `IWE_FMT_REPO=TserenTserenov/FMT-exocortex-template` (environment variable or a line in `.exocortex.env`) to make it check the original's issues. |
+| Template directory connection to knowledge search (MCP) | Not verified here. |
 
 ### 1.3 Verify the Installation
 
@@ -274,23 +303,23 @@ In the terminal:
 # Should exist
 ls ~/IWE/CLAUDE.md
 
-# Memory files should be present (10+)
+# Should have memory files (10+)
 ls ~/.claude/projects/*/memory/
 
-# Strategic hub should exist
+# Should have the strategic hub
 ls ~/IWE/DS-strategy/
 
-# Strategist should be scheduled (macOS)
+# Strategist should be in the schedule (macOS)
 launchctl list | grep strategist
 ```
 
-If everything is present — verify the MCP connection (1.3b) and proceed to Phase 2. Additional Roles (1.4) can be installed later.
+If everything is present, verify the MCP connection (1.3b) and proceed to Stage 2. Additional Roles (1.4) can be installed later.
 
 ### 1.3b Connect MCP Servers
 
-MCP (Model Context Protocol) gives Claude Code access to the Platform knowledge base and your personal repositories. Through it, Claude can see documents, guides, digital twins, and your own Pack repositories — subject-area knowledge bases you build over time.
+MCP (Model Context Protocol) gives Claude Code access to the Platform knowledge base and your personal Repositories. Through it, Claude can see documents, guides, the digital twin, and your own Pack Repos — Domain knowledge bases you build over time.
 
-> **Why:** Documentation and Pack entities (DP.IWE.001, DP.ARCH.001, etc.) reference the source-of-truth in PACK-digital-platform. After connecting MCP, Claude can find these entities on request and work directly with your personal repositories. Without MCP, entities are only accessible as files on GitHub.
+> **Why:** Documentation and Pack entities (DP.IWE.001, DP.ARCH.001, etc.) reference a source-of-truth in PACK-digital-platform. After connecting MCP, Claude can find these entities on request and work with your personal Repos directly. Without MCP, entities are only accessible as files on GitHub.
 
 > Below is the path for Claude Code (via `claude.ai`). For other agents (Hermes, etc.) see `AGENT-VENDOR-SETUP.md`, Step 6.
 
@@ -300,7 +329,7 @@ MCP (Model Context Protocol) gives Claude Code access to the Platform knowledge 
 2. Add an MCP server (Aisystant MCP): `https://mcp.aisystant.com/mcp`
 3. Restart Claude Code
 
-**How it works:** Claude Code connects to Aisystant MCP via claude.ai connectors. The server aggregates all backends (knowledge, digital-twin) and provides tools (`knowledge_search`, `knowledge_get_document`, `knowledge_feedback`, `dt_read_digital_twin`, etc.).
+**How it works:** Claude Code connects to Aisystant MCP through claude.ai connectors. The server aggregates all backends (knowledge, digital-twin) and provides tools (`knowledge_search`, `knowledge_get_document`, `knowledge_feedback`, `dt_read_digital_twin`, etc.).
 
 #### Verification
 
@@ -312,49 +341,49 @@ Claude should use `knowledge_search("principles")` and return a list of document
 **Diagnostics:**
 
 ```bash
-# Check the entire installation (env, files, extensions, MCP availability)
+# Check the full installation (env, files, extensions, MCP availability)
 bash FMT-exocortex-template/setup.sh --validate
 ```
 
 | Problem | Solution |
-|---------|----------|
-| `/mcp` — no servers listed | Repeat steps 1–3 (claude.ai connectors) |
-| Opened the URL in a browser — "Not found" | This is normal. MCP operates via POST (JSON-RPC), not GET. Check via `/mcp` in Claude Code |
+|---------|---------|
+| `/mcp` — no servers | Repeat steps 1–3 (claude.ai connectors) |
+| Opened the URL in a browser — "Not found" | Normal. MCP works via POST (JSON-RPC), not GET. Check via `/mcp` in Claude Code. |
 | Aisystant MCP — connection error | Check your internet connection |
-| `--validate` shows errors | Follow the hints. Missing keys — fill them in in `.exocortex.env` |
+| `--validate` shows errors | Follow the hints. Fill in missing keys in `.exocortex.env` |
 
 > **Tip:** `setup.sh --validate` checks ALL categories at once: env config, required files, extensions, MCP availability.
 
-### 1.3c Connect Your Repositories to Personal Search (optional)
+### 1.3c Connect Your Repositories to Personal Search (Optional)
 
-Step 1.3b gives Claude access to the Platform knowledge base. Your own repositories (notes, Pack, work projects) are not included in that search by default — they must be connected separately.
+Step 1.3b gives Claude access to the Platform knowledge base. Your own Repositories (notes, Pack, working projects) are not included in that search by default — they need to be connected separately.
 
-**How to connect:** tell the agent "connect my GitHub". It will call the `github_connect` tool and provide a link to install the `aisystant-knowledge` GitHub App. On the GitHub page you select which repositories to expose and click Install — no additional configuration is needed. Only the repositories you explicitly select are indexed.
+**How to connect:** tell the agent "connect my GitHub". It will call the `github_connect` tool and provide a link to install the `aisystant-knowledge` GitHub App. On the GitHub page you select which Repositories to open and click Install — no additional configuration is needed. Only Repositories you explicitly select are indexed.
 
-> **Privacy note:** the content of selected repositories (including private ones) leaves your machine and GitHub and is stored on the Platform server as a search index — this is necessary to enable semantic search rather than simple keyword matching. Do not connect a repository if you are not comfortable with this.
+> **Privacy:** the contents of selected Repositories (including private ones) leave your machine and GitHub and are stored on the Platform server as a search index — this is necessary for semantic search rather than simple keyword matching. Do not connect a Repository if you are not comfortable with this.
 
-After installation, indexing runs automatically: the initial index is usually fast, but may take longer for large repositories. Each subsequent push triggers re-indexing automatically, without involving your local machine.
+After installation, indexing runs automatically: the initial index is usually fast, but large Repositories may take longer. Every subsequent push is reindexed automatically, without any local machine involvement.
 
-### 1.4 Installing Additional Roles (later)
+### 1.4 Installing Additional Roles (Later)
 
-setup.sh installs only the Strategist. The Extractor and Synchronizer are installed separately, once you are comfortable with the basic cycle:
+Setup.sh installs only the Strategist. The Extractor and Synchronizer are installed separately, once you have mastered the basic cycle:
 
 In the terminal:
 ```bash
 cd ~/IWE/FMT-exocortex-template
 
-# Extractor — extracts knowledge from Sessions, checks inbox (every 3 hours)
+# Extractor — extracts knowledge from sessions, checks inbox (every 3 hours)
 bash roles/extractor/install.sh
-# Inbox checking runs unattended (headless) — a one-time subscription sign-in is required:
+# Inbox checking runs without you (headless) — a one-time separate sign-in to the subscription is required:
 bash roles/extractor/scripts/connect.sh
 
 # Synchronizer — central scheduler: agent scheduling, notifications, code-scan
 bash roles/synchronizer/install.sh
 ```
 
-> **Recommendation:** The Extractor and Synchronizer can be installed later, once you are comfortable with the basic cycle with the Strategist. See [roles/extractor/README.md](../roles/extractor/README.md) and [roles/synchronizer/README.md](../roles/synchronizer/README.md).
+> **Recommendation:** The Extractor and Synchronizer can be installed later, once you have mastered the basic cycle with the Strategist. See [roles/extractor/README.md](../roles/extractor/README.md) and [roles/synchronizer/README.md](../roles/synchronizer/README.md).
 
-> **Important:** Installing the Synchronizer replaces the individual Strategist launchd agents with a single scheduler. All Roles will run on a schedule from one central point.
+> **Important:** If you install the Synchronizer, it replaces the individual launchd agents for the Strategist with a single scheduler. All Roles will run on a schedule from one point.
 
 ## Something Is Not Working?
 
@@ -365,11 +394,11 @@ cp ~/IWE/FMT-exocortex-template/CLAUDE.md ~/IWE/CLAUDE.md
 
 **Memory not found:**
 ```bash
-# Determine slug
+# Determine the slug
 echo $HOME/IWE | tr '/' '-'
 # Example output: -Users-ivan-IWE
 
-# Create directory and copy
+# Create the directory and copy files
 mkdir -p ~/.claude/projects/-Users-ivan-IWE/memory
 cp ~/IWE/FMT-exocortex-template/memory/*.md ~/.claude/projects/-Users-ivan-IWE/memory/
 ```
@@ -388,32 +417,32 @@ cd DS-strategy && git init && git add -A && git commit -m "Initial"
 gh repo create $(gh api user -q .login)/DS-strategy --private --source=. --push
 ```
 
-## Restoring on a New Device (from an exocortex Backup)
+## Restoring on a New Device (from an Exocortex Backup)
 
-If IWE is already configured on one device, you do **not** need to initialize memory from scratch on a new one. `day-close.sh --backup` and the `memory-exocortex-sync.sh` hook keep a mirror of memory in `DS-strategy/exocortex/`, and this mirror is pushed to GitHub together with the governance repository. `restore-from-exocortex.sh` restores it.
+If IWE is already configured on one device, a new device does **not** need memory initialized from scratch. `day-close.sh --backup` and the `memory-exocortex-sync.sh` hook keep a mirror of memory in `DS-strategy/exocortex/`, and it is pushed to GitHub together with the governance Repo. `restore-from-exocortex.sh` restores it.
 
 **Steps on the new device:**
 
 ```bash
-# 1. Phase 0 (binaries, gh auth, claude CLI) — as usual
+# 1. Stage 0 (binaries, gh auth, claude CLI) — as usual
 # 2. Working folder + clone the template and governance repo (it carries exocortex/)
 mkdir -p ~/IWE && cd ~/IWE
 gh repo fork TserenTserenov/FMT-exocortex-template --clone
-git clone https://github.com/<your-username>/DS-strategy.git
+git clone https://github.com/<your-login>/DS-strategy.git
 
 # 3. Restore memory from backup (instead of initializing from scratch)
 bash ~/IWE/FMT-exocortex-template/scripts/restore-from-exocortex.sh ~/IWE/DS-strategy
-#    --dry-run  — preview without making changes
+#    --dry-run  — preview without changes
 #    --force    — overwrite an already-populated memory/
 
 # 4. Restart Claude Code → memory is in place
 ```
 
-The Script: copies `exocortex/*.md|*.yaml` → auto-memory (`~/.claude/projects/<slug>-IWE/memory/`), `exocortex/CLAUDE.md` → `~/IWE/CLAUDE.md`, creates a symlink `~/IWE/memory → auto-memory`. Does not touch a non-empty `memory/` without `--force` (protects against accidental overwrite of a working installation).
+The Script: copies `exocortex/*.md|*.yaml` → auto-memory (`~/.claude/projects/<slug>-IWE/memory/`), copies `exocortex/CLAUDE.md` → `~/IWE/CLAUDE.md`, and creates a symlink `~/IWE/memory → auto-memory`. It does not touch a non-empty `memory/` without `--force` (protection against accidentally overwriting a working installation).
 
-## Phase 2: First Strategic Session (~30 min)
+## Stage 2: First Strategic Session (~30 min)
 
-This is the most important step — you will set up your goals and your first plan.
+This is the most important step — you will configure your goals and your first plan.
 
 **Option A — via VS Code (recommended):**
 1. Open VS Code
@@ -428,42 +457,42 @@ claude
 
 Tell Claude:
 
-> **"Let's run the first strategic Session"**
+> **"Let's run the first strategic session"**
 
 Claude will read CLAUDE.md and memory/ and guide you through:
 
 1. **Defining goals** — Who do you want to be in a year? What do you want to learn?
-2. **Dissatisfactions** — What is getting in the way? Where is the gap between current and desired state?
-3. **First WeekPlan** — Concrete tasks for the week with time budgets
-4. **Registration in WP-REGISTRY.md and WeekPlan** — Work Products from the Session appear in the registry and the plan
+2. **Dissatisfactions** — What is in the way? Where is the gap between the current state and the desired one?
+3. **First WeekPlan** — Specific tasks for the week with time budgets
+4. **Registration in WP-REGISTRY.md and WeekPlan** — Work Products from the Session appear in the Registry and the plan
 
 **Result:** populated `DS-strategy/docs/Strategy.md`, `Dissatisfactions.md`, and the first `WeekPlan` in `DS-strategy/current/`.
 
 ### Personal Guide (up to 60 min, experimental and optional)
 
-This step is not required for IWE to function. The safe choice is to skip it until you specifically need a published guide. The `/personal-guide-start` command does not ask clarifying questions: its first action is to create or reuse an external **public** GitHub repository `DS-personal-guide` (`private: false`). Only run it if you intentionally accept this external effect.
+This step is not required for IWE to work. The safe choice is to skip it unless you specifically need a public guide. The `/personal-guide-start` command does not ask clarifying questions: its first action is to create or reuse an external **public** GitHub Repository `DS-personal-guide` (`private: false`). Run it only if you intentionally accept this external effect.
 
-Before running, you need an active "Engineering of Intelligence" subscription, GitHub connected in Aisystant MCP, and the `create_repository` and `github_status` operations available. Populating the six files is handled by the separate `/personal-guide-render` command, which additionally requires Memory.Derived and the `personal_write` operation. If the server-side renderer or these operations are unavailable, the bootstrap will not complete: a public repository may already have been created on GitHub without the six finished files. This should not be treated as a finished personal guide.
+Before running, you need an active "Engineering of Intelligence" subscription, GitHub connected in Aisystant MCP, and the `create_repository` and `github_status` Operations available. Populating the six files is done by a separate command `/personal-guide-render`; it additionally requires Memory.Derived and the `personal_write` Operation. If the server renderer or these Operations are unavailable, the bootstrap will not complete: a public Repository may already have been created on GitHub without the six files ready. This should not be considered a complete personal guide.
 
-If the command itself is not visible, check for `.claude/skills/personal-guide-start/SKILL.md` and restart Claude Code. If the command is visible but the server-side operations are unavailable, do not run it again blindly — first restore the GitHub/Aisystant MCP connection and the renderer.
+If the command itself is not visible, check for `.claude/skills/personal-guide-start/SKILL.md` and restart Claude Code. If the command is visible but server Operations are unavailable, do not run it blindly again — first restore the GitHub/Aisystant MCP connection and the renderer.
 
-## Phase 3: Setting Up Notes via Telegram (5 min, optional)
+## Stage 3: Setting Up Telegram Notes (5 min, optional)
 
 To send thoughts to the planning system directly from Telegram:
 
 1. Find the bot **@aist_me_bot** in Telegram
 2. Press `/start`
-3. Subscribe (if not already subscribed)
+3. Subscribe (if you have not already)
 
 **How to send notes:**
 - Write: `.My thought about architecture` (period + text)
 - Or forward/reply to any message with `.`
 
-The note goes to `DS-strategy/inbox/fleeting-notes.md`. The Strategist will process it in the evening (Note-Review, 23:00) and classify it: task → plan, knowledge → captures, idea → for discussion.
+The note will appear in `DS-strategy/inbox/fleeting-notes.md`. The Strategist will process it in the evening (Note-Review, 23:00) and classify it: task → plan, Knowledge → captures, idea → for discussion.
 
-## Phase 4: WakaTime — Time Tracking (10 min, optional)
+## Stage 4: WakaTime — Time Tracking (10 min, optional)
 
-WakaTime tracks work time automatically: by project, language, and category.
+WakaTime tracks working time automatically: by project, language, and category.
 
 In VS Code or the terminal, launch Claude Code and say:
 
@@ -477,21 +506,21 @@ Claude will guide you through the installation:
 
 After setup: WakaTime data is automatically included in the morning day plan and the weekly report.
 
-> **Privacy:** WakaTime is a SaaS service (wakatime.com, AWS servers, USA). The server receives **metadata** about your work: project names, file names, languages, branches, activity time. File **content** is **not** sent. The CLI is open source ([github.com/wakatime/wakatime-cli](https://github.com/wakatime/wakatime-cli)). The Desktop App is closed source and requests Accessibility permission (sees active windows). If metadata is sensitive — use the self-hosted alternative [Wakapi](https://github.com/muety/wakapi) (wakatime-cli supports a custom `api_url` in `~/.wakatime.cfg`).
+> **Privacy:** WakaTime is a SaaS service (wakatime.com, AWS servers, USA). The server receives **metadata** about your work: project names, file names, languages, branches, active time. File **contents are NOT** sent. The CLI is open source ([github.com/wakatime/wakatime-cli](https://github.com/wakatime/wakatime-cli)). The Desktop App is closed source and requests Accessibility permission (sees active windows). If metadata is sensitive, use the self-hosted alternative [Wakapi](https://github.com/muety/wakapi) (wakatime-cli supports a custom `api_url` in `~/.wakatime.cfg`).
 
-## Phase 5: Google Calendar — Day Events in Day Open (10 min, optional)
+## Stage 5: Google Calendar — Day Events in Day Open (10 min, optional)
 
 Connecting Google Calendar lets you see the day's events directly in the morning plan, create events from Claude Code, and prepare for meetings.
 
 ### What You Get
 
-- **Day Open** will show a table of the day's events plus free time slots for work
+- **Day Open** shows a table of the day's events plus free slots for work
 - **Event creation** — "schedule a call for Wednesday at 11:00" directly from Claude Code
-- **Meeting preparation** — Claude will pull context from related Work Products
+- **Meeting preparation** — Claude pulls in context from related Work Products
 
 ### Setup (~1 min)
 
-From the template root, run one command:
+From the Template root, run one command:
 
 ```bash
 bash setup/optional/setup-calendar.sh
@@ -503,7 +532,7 @@ The Script:
 3. Opens a browser → sign in with your Google account → click "Allow"
 4. Restart Claude Code → verify: **"show my events for today"**
 
-> **⚠ Google may show "This app isn't verified".** This is normal — click "Advanced" → "Go to IWE (unsafe)". This warning will disappear once the app is verified.
+> **⚠ Google may show "This app isn't verified".** This is normal — click "Advanced" → "Go to IWE (unsafe)". This warning will disappear after the app is verified.
 
 ### Multiple Accounts
 
@@ -513,21 +542,21 @@ You can connect multiple Google accounts (work + personal):
 Claude, connect another Google Calendar account
 ```
 
-Each account receives a nickname (`personal`, `work`) for addressing.
+Each account gets a nickname (`personal`, `work`) for addressing.
 
 ### Privacy
 
-Calendar data is processed via the Google Calendar API. OAuth tokens are stored locally. Event content is sent to the Claude API to generate the day plan. Confidential events (`visibility=private`) can be excluded from display.
+Calendar data is processed through the Google Calendar API. OAuth tokens are stored locally. Event contents are sent to the Claude API to generate the day plan. Confidential events (`visibility=private`) can be excluded from display.
 
-## Phase 6: Video Integration — Linking Recordings to Work Products (5 min, optional)
+## Stage 6: Video Integration — Linking Recordings to Work Products (5 min, optional)
 
 If you record meetings (Zoom, Telemost, Google Meet), Claude can scan folders containing recordings and link videos to Work Products.
 
 ### What You Get
 
-- **Day Open** will show new video recordings with Work Product links
+- **Day Open** shows new video recordings with Work Product links
 - **Strategy Session** — a weekly review of all unprocessed videos
-- **Transcription** → automatic captures and post ideas (optional, requires whisper)
+- **Transcription** → automatic captures and post ideas (optional; requires whisper)
 
 ### Setup
 
@@ -548,7 +577,7 @@ video:
 ### Where to Find Folders
 
 | Application | Typical path (macOS) |
-|-------------|---------------------|
+|------------|----------------------|
 | Zoom | `~/Documents/Zoom` |
 | Yandex Telemost | `~/Documents/Telemost` or `~/Video Recordings Telemost` |
 | Google Meet | Recordings in Google Drive (not local) |
@@ -556,12 +585,12 @@ video:
 
 ### Linking to Work Products
 
-The Script links videos to Work Products by file name:
+The Script links videos to Work Products by filename:
 - `WP-73-...mp4` → linked to WP-73
 - `2026-03-14-...mp4` → linked by date (matched against the calendar)
-- Others → offered for manual linking
+- Others → manual linking is suggested
 
-### Transcription (optional)
+### Transcription (Optional)
 
 For automatic transcription, install [whisper](https://github.com/openai/whisper):
 
@@ -577,19 +606,19 @@ video:
     enabled: true
 ```
 
-## Phase 7: Agent Workspace — Separate Storage for Agent Data (10 min, optional)
+## Stage 7: Agent Workspace — Separate Storage for Agent Data (10 min, optional)
 
-### Read Before Deciding
+### Read This Before Deciding
 
 This is a **deliberate choice**, not a required step. Two questions will help you decide:
 
 **1. Do you have autonomous agents?**
 
-If you have just started with IWE and are using only Claude Code in interactive mode — **you do not need this**. All scheduler reports will be stored in `DS-strategy/current/` and `DS-strategy/archive/` — that is sufficient.
+If you have just started with IWE and are using only Claude Code in interactive mode — **you do not need this**. All Scheduler reports will be stored in `DS-strategy/current/` and `DS-strategy/archive/` — that is sufficient.
 
-**2. Are agents generating more than 10 files per week?**
+**2. Do agents generate >10 files per week?**
 
-When the Scheduler, Scout, Extractor, and other agents work daily, they produce dozens of files: scheduler reports, bot QA reports, findings, draft plans. These auto-commits pollute the git history of DS-strategy, which should contain only **human decisions** (plans, approved captures).
+When the Scheduler, Scout, Extractor, and other agents run daily, they produce dozens of files: Scheduler reports, bot QA reports, findings, plan drafts. These auto-commits pollute the git history of DS-strategy, which should contain only **human decisions** (plans, approved captures).
 
 ### What Agent Workspace Provides
 
@@ -597,7 +626,7 @@ When the Scheduler, Scout, Extractor, and other agents work daily, they produce 
 |------------------------|---------------------|
 | Everything in DS-strategy | Machine output is separate |
 | Mixed git history | Clean decision history |
-| 1 repository | 2 repositories |
+| 1 Repository | 2 Repositories |
 | Simpler to start | Scales better |
 
 ### Setup
@@ -606,18 +635,18 @@ When the Scheduler, Scout, Extractor, and other agents work daily, they produce 
 bash setup/optional/setup-agent-workspace.sh
 ```
 
-The Script creates a private GitHub repository `DS-agent-workspace` with a structure for each agent type. After creation, scheduler scripts (`daily-report.sh`, etc.) automatically start writing there — detection is based on the presence of `DS-agent-workspace/.git`.
+The Script creates a private GitHub Repo `DS-agent-workspace` with a structure for each agent type. After creation, Scheduler scripts (`daily-report.sh`, etc.) automatically start writing there — checked by the presence of `DS-agent-workspace/.git`.
 
 ### When to Connect
 
 **Recommended path:**
-1. Start without Agent Workspace (Phases 0–2)
+1. Start without Agent Workspace (Stages 0–2)
 2. Connect the Scheduler (launchd) — reports go to DS-strategy
 3. When auto-commits exceed 5/day → create Agent Workspace
 
 ## Automatic Wake and Sleep Prevention
 
-Agents run on a schedule. If the laptop is asleep, tasks wait until it wakes. Configure automatic wake so that the plan is ready before you get up.
+Agents run on a schedule. If the laptop is asleep, tasks wait until it wakes. Configure automatic wake so the plan is ready before you get up.
 
 **macOS:**
 
@@ -627,23 +656,23 @@ sudo pmset repeat wakeorpoweron MTWRFSU 03:55:00
 
 # IMPORTANT: if the laptop is charging, Optimized Battery Charging may
 # switch the power profile to "battery". On the battery profile,
-# a Mac may sleep even with the cable plugged in. Solution:
-sudo pmset -b sleep 0      # do not sleep on battery profile
+# the Mac sleeps even with the cable connected. Solution:
+sudo pmset -b sleep 0      # do not sleep on the battery profile
 sudo pmset -b standby 0    # do not enter deep standby
 
-# Verify: pmset -g custom (sleep=0 in both profiles)
+# Check: pmset -g custom (sleep=0 in both profiles)
 # Cancel wake: sudo pmset repeat cancel
 # Restore sleep: sudo pmset -b sleep 1 && sudo pmset -b standby 1
 ```
 
-> **How it works:** The Mac wakes at 3:55, the scheduler starts at 4:00, the plan is ready by ~4:20. Scripts automatically keep the Mac awake via `caffeinate -diu` (works on the battery profile too).
+> **How it works:** The Mac wakes at 3:55, the scheduler starts at 4:00, and the plan is ready by ~4:20. Scripts automatically keep the Mac awake via `caffeinate -diu` (works on the battery profile too).
 >
-> **Charge Limit (recommended):** instead of Optimized Battery Charging, enable a fixed limit (System Settings → Battery → Charge Limit → 80%). Protects the battery without unpredictable profile switching.
+> **Charge Limit (recommended):** instead of Optimized Battery Charging, enable a fixed limit (System Settings → Battery → Charge Limit → 80%). This protects the battery without unpredictable profile switching.
 
 **Linux:**
 
 ```bash
-# Wake via rtcwake (one-time, typically in cron)
+# One-time wake via rtcwake (usually placed in cron)
 sudo rtcwake -m no -t $(date -d "tomorrow 03:55" +%s)
 
 # Or systemd timer (permanent schedule)
@@ -673,33 +702,33 @@ After installation, the system runs on its own:
 
 | Time | Agent | What happens | Where the result goes |
 |------|-------|-------------|----------------------|
-| **Morning (Tue–Sun)** | Strategist | Collects yesterday's commits, generates the day plan | `DS-strategy/current/DayPlan YYYY-MM-DD.md` |
-| **Morning (Mon)** | Strategist | Prepares a draft weekly plan + Session agenda | `DS-strategy/current/WeekPlan W{N}.md` |
-| **Every 3 hours** | Extractor* | Checks inbox (notes, captures) → proposes knowledge for Pack | `DS-strategy/inbox/extraction-reports/` |
-| **Evening (23:00)** | Strategist | Note-Review classifies notes from Telegram | Target documents in DS-strategy |
-| **Night (00:00)** | Synchronizer* | Code-scan — review of changes in downstream repositories | `DS-strategy/current/CodeScan YYYY-MM-DD.md` |
+| **Morning (Tue–Sun)** | Strategist | Gathers yesterday's commits, generates day plan | `DS-strategy/current/DayPlan YYYY-MM-DD.md` |
+| **Morning (Mon)** | Strategist | Prepares a weekly plan draft + Session agenda | `DS-strategy/current/WeekPlan W{N}.md` |
+| **Every 3 hours** | Extractor* | Checks inbox (notes, captures) → proposes Knowledge for Pack | `DS-strategy/inbox/extraction-reports/` |
+| **Evening (23:00)** | Strategist | Note-Review classifies Telegram notes | Target documents in DS-strategy |
+| **Night (00:00)** | Synchronizer* | Code-scan — review of changes in downstream Repos | `DS-strategy/current/CodeScan YYYY-MM-DD.md` |
 | **Night (Sun→Mon)** | Strategist | Week Review — weekly summary | `DS-strategy/current/WeekReport W{N} YYYY-MM-DD.md` |
-| **Morning (06:00)** | Synchronizer* | Daily report — summary of overnight tasks | `DS-agent-workspace/scheduler/reports/` (or `DS-strategy/current/` without Agent Workspace) |
+| **Morning (06:00)** | Synchronizer* | Daily report — summary of nightly tasks | `DS-agent-workspace/scheduler/reports/` (or `DS-strategy/current/` without Agent Workspace) |
 
-> *Extractor and Synchronizer only run if installed (Phase 1.4).*
+> *Extractor and Synchronizer run only if installed (Stage 1.4).*
 
-### Manual Trigger (if needed)
+### Manual Run (When Needed)
 
 In the terminal:
 ```bash
 # Day plan right now
 bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-plan
 
-# Strategy Session (interactive)
+# Strategy session (interactive)
 bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh strategy-session
 
 # Note review
 bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh note-review
 
-# Weekly summary
+# Week review
 bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh week-review
 
-# Extractor: extract knowledge from the current Session (assembled runtime copy, not the raw file in FMT)
+# Extractor: extract knowledge from the current session (assembled runtime copy, not the raw file in FMT)
 bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" session-close
 
 # Extractor: check inbox
@@ -709,22 +738,22 @@ bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" inbox-check
 bash ~/IWE/FMT-exocortex-template/roles/synchronizer/scripts/scheduler.sh status
 ```
 
-## Daily Work: Three Stages (Opening–Work–Closing)
+## Daily Work: Three Phases (Opening–Work–Closing)
 
-Each Session in Claude Code passes through three stages:
+Each Session in Claude Code passes through three phases:
 
 ### Opening (automatic)
-You give a task → Claude checks: is this task in the week plan? If not — it proposes adding it (WP Gate). It announces the Role, Method, and estimate.
+You give a task → Claude checks: does this task exist in the week plan? If not, it suggests adding it (WP Gate). It announces the Role, Method, and estimate.
 
 ### Work
-Claude completes the task. At each Work milestone (subtask, pattern, decision) — it captures knowledge: *"Capture: [what] → [where]"*.
+Claude performs the task. At each Work milestone (subtask, pattern, decision) it captures Knowledge: *"Capture: [what] → [where]"*.
 
 ### Closing
-Say **"close"** → Claude commits, pushes, updates memory, and creates a Backup.
+Say **"close it"** → Claude commits, pushes, updates memory, and creates a Backup.
 
 ## Updates
 
-The exocortex template is updated — new protocols, improved prompts, Skills, Scripts, fixes.
+The exocortex Template is updated — new protocols, improved prompts, Skills, scripts, fixes.
 
 In the terminal:
 ```bash
@@ -732,66 +761,66 @@ cd ~/IWE/FMT-exocortex-template
 bash update.sh
 ```
 
-The Script downloads the update Manifest from GitHub, compares it with your files, shows a preview (what is new, what changed), and applies it after your confirmation. Self-update: `update.sh` updates itself on every run.
+The Script downloads the update Manifest from GitHub, compares it with your files, shows a preview (what is new, what changed), and applies after your confirmation. Self-update: `update.sh` updates itself on every run.
 
 **What is updated (platform-space):**
-CLAUDE.md (§1–7), memory/ (protocols, reference files), Role prompts and Scripts, hooks, Skills, setup Scripts. If Role Scripts have changed, launchd agents are automatically reinstalled.
+CLAUDE.md (§1–7), memory/ (protocols, references), Role prompts and scripts, hooks, Skills, setup scripts. If Role scripts have changed, launchd agents are automatically reinstalled.
 
-**What is not touched (user-space):**
+**What is NOT touched (user-space):**
 - CLAUDE.md — 3-way merge: your edits in any section are preserved during updates
-- extensions/ — your protocol extensions
-- params.yaml — your protocol parameters
+- extensions/ — your Protocol extensions
+- params.yaml — your Protocol parameters
 - MEMORY.md — your working memory (Work Products, lessons)
 - DS-strategy/ — plans, strategy, inbox
-- .secrets/, .mcp.json — keys and Integration Configuration
+- .secrets/, .mcp.json — integration keys and Configuration
 - .claude/settings.local.json — personal permissions
 - personal/ — your files
 
 
-> To view available updates without applying them: `bash update.sh --check`
+> Preview available updates without applying: `bash update.sh --check`
 
 ## Security and Privacy
 
 > Full data policy: [DATA-POLICY.md](DATA-POLICY.md) | Canonical description: [DP.D.035](https://github.com/TserenTserenov/PACK-digital-platform/blob/main/pack/digital-platform/01-domain-contract/DP.D.035-data-policy.md)
 
-IWE operates primarily locally. Here is what you need to know about security.
+IWE runs primarily locally. Here is what you need to know about security.
 
 ### What Stays Local
 
-| Component | Where it is stored | Is it sent anywhere |
+| Component | Where it is stored | Is it sent anywhere? |
 |-----------|-------------------|---------------------|
-| CLAUDE.md, memory/ | Local files | No (only into Claude's context during work) |
-| DS-strategy | Private repository on GitHub | Only to GitHub (private) |
+| CLAUDE.md, memory/ | Local files | No (only into Claude's context during a session) |
+| DS-strategy | Private Repo on GitHub | Only to GitHub (private) |
 | Launch agents (Strategist, etc.) | Local bash scripts | No |
-| Git repositories | Local + GitHub | Only to GitHub |
+| Git Repositories | Local + GitHub | Only to GitHub |
 
 ### What Is Sent to External Servers
 
 | Component | Where | What data |
-|-----------|-------|----------|
-| **Claude Code** | Anthropic API (USA) | Prompts, content of files from context. [Privacy Policy](https://www.anthropic.com/privacy) |
-| **WakaTime** (optional) | wakatime.com (USA) | Metadata: project names, file names, languages, branches, activity time. File **content** is **not** sent |
-| **Aisystant MCP** (knowledge base search) | Platform server (mcp.aisystant.com), OpenRouter (query embedding) | The text of the search query. Content of your files is not sent unless you connect your repositories (see §1.3c) |
-| **Aisystant MCP** (if you connected your repositories, §1.3c) | Platform server (mcp.aisystant.com), OpenRouter (content embedding) | Content of connected repositories, including private ones — sent to the server to build personal search |
-| **GitHub** | github.com (USA) | Repository content |
+|-----------|-------|-----------|
+| **Claude Code** | Anthropic API (USA) | Prompts, contents of files in context. [Privacy Policy](https://www.anthropic.com/privacy) |
+| **WakaTime** (opt.) | wakatime.com (USA) | Metadata: project names, file names, languages, active time. File **contents are NOT** sent. |
+| **Aisystant MCP** (knowledge base search) | Platform server (mcp.aisystant.com), OpenRouter (query embedding) | Text of the search query. Your file contents are not sent unless you connect your own Repositories (see §1.3c). |
+| **Aisystant MCP** (if you connected your Repositories, §1.3c) | Platform server (mcp.aisystant.com), OpenRouter (content embedding) | Contents of connected Repositories, including private ones — sent to the server to build a personal search index. |
+| **GitHub** | github.com (USA) | Repository contents |
 
 ### Mac Security Recommendations
 
-Before you begin, verify:
+Before you start, check:
 
 1. **Firewall** — must be enabled: `System Settings → Network → Firewall`
-2. **FileVault** — disk encryption: `System Settings → Privacy & Security → FileVault`
+2. **FileVault** — disk Encryption: `System Settings → Privacy & Security → FileVault`
 3. **SIP** (System Integrity Protection) — do not disable: `csrutil status` in Terminal
-4. **.gitignore** — every repository containing code must exclude `.env`, `*.key`, `*.pem`, `credentials.json`
-5. **Secrets** — store API keys in `.env` (gitignored) or in a password manager. **Never** put them in code
+4. **.gitignore** — every Repo with code should exclude `.env`, `*.key`, `*.pem`, `credentials.json`
+5. **Secrets** — API keys should be stored in `.env` (gitignored) or in a password manager, **never** in code
 
-### What Is Not Recommended
+### What NOT to Install
 
-- Browsers from jurisdictions with mandatory data access (check the Privacy Policy)
+- Browsers from jurisdictions with mandatory data access (check Privacy Policy)
 - Closed-source extensions with broad file system access
 - Electron apps with unclear telemetry — check via `Little Snitch` or `LuLu` (open-source firewall)
 
-### Self-hosted Alternatives
+### Self-Hosted Alternatives
 
 If you work with sensitive data, consider:
 
@@ -805,34 +834,34 @@ If you work with sensitive data, consider:
 **Is an Anthropic subscription required?**
 Yes, Claude Code requires an Anthropic subscription. Start with **Claude Pro** ($20/month). Use **Claude Max** (~$100/month) if needed.
 
-**Will Qwen, Perplexity, ChatGPT (chat), or other chat bots work?**
-No. Chat bots and search assistants (Qwen chat, Perplexity, routerai.ru, standard ChatGPT) **do not work** — they cannot read or write files on your computer or execute terminal commands. The exocortex requires an **agentic AI assistant** — one that works with the file system, runs commands, and preserves context between Sessions.
+**Will Qwen, Perplexity, ChatGPT (chat), or other chatbots work?**
+No. Chatbots and search assistants (Qwen chat, Perplexity, routerai.ru, standard ChatGPT) **do not work** — they cannot read or write files on your computer or execute commands in the terminal. The exocortex requires an **agentic AI assistant** — one that works with the file system, runs commands, and preserves context between Sessions.
 
 **What are the alternatives to Claude Code?**
 
 | Alternative | What it is | Price | Models |
-|-------------|-----------|-------|--------|
-| **Cursor** | IDE with AI (replaces VS Code) | from $20/month | Claude, GPT, custom |
+|---|---|---|---|
+| **Cursor** | IDE with AI (VS Code replacement) | from $20/month | Claude, GPT, custom |
 | **GitHub Copilot** (Agent mode) | VS Code extension | from $10/month | Claude, GPT |
 | **Cline / Roo Code** | VS Code extension (open source) | Free + API key | Any (Claude, GPT, Gemini) |
 | **Aider** | CLI tool (open source) | Free + API key | Any |
 
-> **Note on model choice:** The exocortex requires complex agentic behavior from the model — following multi-step protocols, working with 5–10 files simultaneously, reliable editing. Recommended models: **Claude Opus/Sonnet**, **GPT-4o/o1**, **Gemini 2.5 Pro**. Weaker models (Qwen, Llama, Mistral) may lose context and skip protocol steps — they are fine for general coding but unreliable for managing the exocortex.
+> **Important about the model:** The exocortex requires complex agentic behavior from the model — following multi-step protocols, working with 5–10 files simultaneously, reliable editing. Recommended models: **Claude Opus/Sonnet**, **GPT-4o/o1**, **Gemini 2.5 Pro**. Weaker models (Qwen, Llama, Mistral) may lose context and skip protocol steps — they are fine for regular coding but unreliable for managing the exocortex.
 
 **Does it work on Windows?**
-Yes, via Git Bash (installed with [Git for Windows](https://git-scm.com/download/win)) — WSL is not required; see [§ 0.0 "Windows: without WSL"](#00-windows-without-wsl) for details. WSL remains an option if you need local cron-style automation or a familiar Linux environment — follow the Linux instructions inside WSL in that case (launchd does not work there either; use `systemd`/cron).
+Yes, via Git Bash (installed with [Git for Windows](https://git-scm.com/download/win)) — WSL is not required; see [§ 0.0 "Windows: without WSL"](#00-windows-without-wsl) for details. WSL remains an option if you need local cron-like automation or a familiar Linux Environment — in that case, follow the Linux instructions inside WSL (launchd does not work there either; use `systemd`/cron).
 
 **Can I use it without the Strategist?**
 Yes. The Strategist is automation (morning plans, reviews). Without it, Claude Code + CLAUDE.md + memory/ work fully. You plan manually.
 
 **What is a Pack?**
-A Pack is a subject-area knowledge base. It is created later, once you have accumulated enough captures. The first step is working with `captures.md` via the Extractor.
+A Pack is a Domain knowledge base. It is created later, once you have accumulated enough captures. The first step is working with `captures.md` through the Extractor.
 
-**How do I verify MCP?**
-Type `/mcp` in Claude Code — servers should show Connected. Ask: "Find documents about principles." If it does not work, run `bash FMT-exocortex-template/setup.sh --validate` — it will show exactly what is broken. See step 1.3b for details.
+**How do I check MCP?**
+Type `/mcp` in Claude Code — servers should show Connected. Ask: "Find documents about principles." Not working? Run `bash FMT-exocortex-template/setup.sh --validate` — it shows exactly what is broken. See step 1.3b for details.
 
-**Are my data safe?**
-DS-strategy is a private repository. MEMORY.md is a local file. Nothing is published without your knowledge. For details on what is sent to external servers (Claude API, WakaTime, GitHub) — see the [Security and Privacy](#security-and-privacy) section.
+**Is my data safe?**
+DS-strategy is a private Repo. MEMORY.md is a local file. Nothing is published without your knowledge. For details about what is sent to external servers (Claude API, WakaTime, GitHub), see the [Security and Privacy](#security-and-privacy) section.
 
 **How do I uninstall?**
 ```bash
@@ -859,30 +888,30 @@ rm -rf ~/IWE/DS-strategy
 
 | When | What | How |
 |------|------|-----|
-| After the first week | Run a strategy Session (Monday) | Claude will prompt you |
+| After the first week | Run a strategy session (Mon) | Claude will suggest it |
 | After 2 weeks | Create your first Pack (personal knowledge base) | `claude` → "Help me create my first Pack" |
-| As you grow | Set up the Extractor (automatic knowledge extraction) | See [roles/extractor/README.md](../roles/extractor/README.md) |
-| When ready | Connect the Synchronizer (Telegram notifications) | See [roles/synchronizer/README.md](../roles/synchronizer/README.md) |
+| As you grow | Set up the Extractor (automatic Knowledge extraction) | See [roles/extractor/README.md](../roles/extractor/README.md) |
+| When desired | Connect the Synchronizer (Telegram notifications) | See [roles/synchronizer/README.md](../roles/synchronizer/README.md) |
 
 ## Additional Resources
 
-**In this repository:**
+**In this Repo:**
 
 | Document | Contents |
-|----------|----------|
+|----------|---------|
 | [LEARNING-PATH.md](LEARNING-PATH.md) | Full IWE learning path: principles, protocols, agents, Pack, SOTA |
-| [IWE-HELP.md](IWE-HELP.md) | Quick reference (FAQ, glossary) — the same information the bot knows |
+| [IWE-HELP.md](IWE-HELP.md) | Quick reference (FAQ, glossary) — same as what the bot knows |
 | [principles-vs-skills.md](principles-vs-skills.md) | Why Skills are not enough: principles and the generative hierarchy |
 
 **In Pack (via Aisystant MCP `knowledge_search`):**
 
 | Entity | Contents |
-|--------|----------|
+|--------|---------|
 | `DP.IWE.001` | What IWE is, why it exists, 5 architectural views (systems, descriptions, roles, methods, Work Products), tiers, perimeters |
-| `DP.IWE.002` | Template and installation: prerequisites, cost, roles, Opening–Work–Closing, FAQ, security |
+| `DP.IWE.002` | Template and installation: prerequisites, cost, Roles, Opening–Work–Closing, FAQ, security |
 | `DP.EXOCORTEX.001` | Modular exocortex: 3 layers, template-sync, standard/personal |
 | `DP.ARCH.002` | Tiers T0–T4 + TM1–TM3 + TA1–TA4 + TD1: what is available at each level |
 | `DP.ROLE.001` | Full registry of AI Roles (21 Roles) |
 
 > **Need help?** Ask the bot @aist_me_bot — it searches the Platform knowledge base (Pack).
-> **Technical issue?** Open an issue: [github.com/aisystant/FMT-exocortex-template/issues](https://github.com/TserenTserenov/FMT-exocortex-template/issues)
+> **Technical problem?** Open an issue: [github.com/aisystant/FMT-exocortex-template/issues](https://github.com/TserenTserenov/FMT-exocortex-template/issues)
