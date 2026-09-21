@@ -75,6 +75,7 @@ Pack (предметное) → SPF (корректность) → FPF (перв
 - Pack: читай файлы `PACK-*/pack/` через Glob + Read
 - SPF: читай `SPF/docs/` через Glob + Read
 - FPF: читай `FPF/Readme.md` (обзор) или ищи через Grep по `FPF/`
+- Наборы DPF: рядом со спецификацией автор FPF публикует `FPF/Engineering DPF Suite/` (справочник `ENGINEERING-DPF-SUITE-REFERENCE.md`) и `FPF/Foundational Thinking DPF Suite/` (справочник `FOUNDATIONAL-THINKING-DPF-SUITE-REFERENCE.md`); в `FPF-Spec.md` они не входят. Правила входа — `FPF/USING-FPF.md`: начинай с реальной ситуации, набор выбирай через `FPF/Readme.md` и справочник набора; приём ищется по заголовку `## <ID> - …`, его конец — `### <ID>:End`. Если этих папок нет в локальной копии `FPF/`, копия устарела — обнови её
 
 ### 5. Покажи результат
 
