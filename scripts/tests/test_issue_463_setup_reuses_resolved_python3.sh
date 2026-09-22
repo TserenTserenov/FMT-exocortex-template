@@ -137,6 +137,14 @@ chmod +x "$SNIPPET"
 # to avoid the generator's own "SKILLS_DIR not found" exit(1) keeps both
 # reads and writes inside $TEST_ROOT.
 FAKE_HOME="$TEST_ROOT/home"
+# issue #890 (WP-7 Ф164): script_path now must resolve to a real file
+# (checked against the generator's own location, template-root-relative
+# per #634 -- an isolated sandbox HOME cannot satisfy a relative one).
+# Give the fixture skill a real, absolute dummy script instead.
+SMOKE_FIXTURE_SCRIPT="$FAKE_HOME/IWE/smoke-fixture-dummy.sh"
+mkdir -p "$(dirname "$SMOKE_FIXTURE_SCRIPT")"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SMOKE_FIXTURE_SCRIPT"
+chmod +x "$SMOKE_FIXTURE_SCRIPT"
 mkdir -p "$FAKE_HOME/IWE/.claude/skills/smoke-fixture"
 cat > "$FAKE_HOME/IWE/.claude/skills/smoke-fixture/SKILL.md" <<'SKILLEOF'
 ---
@@ -144,11 +152,12 @@ name: smoke-fixture
 description: minimal fixture skill for test_issue_463_setup_reuses_resolved_python3.sh
 routing:
   executor: script
-  script_path: scripts/smoke-fixture.sh
+  script_path: __SMOKE_FIXTURE_SCRIPT_PLACEHOLDER__
   deterministic: true
 ---
 Fixture only — not a real skill.
 SKILLEOF
+sed -i "s#__SMOKE_FIXTURE_SCRIPT_PLACEHOLDER__#$SMOKE_FIXTURE_SCRIPT#" "$FAKE_HOME/IWE/.claude/skills/smoke-fixture/SKILL.md"
 
 # PATH puts the no-yaml stub first for BOTH the resolver call inside the
 # snippet and any bare `python3` the snippet might call — this is the actual
