@@ -2676,14 +2676,6 @@
       "sha256": "0bda885cf450f89bb2806902f947126be2b7b0e1706d2a03251a1d536c6f52ed"
     },
     {
-      "path": "scripts/tests/session-guard-isolate-minimal-smoke.sh",
-      "sha256": "628c4444943ed794588637aa35bfdd167bd0e5d0a3937c006585b76b082606c6"
-    },
-    {
-      "path": "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
-      "sha256": "42108a0983ef51e278b98f80fcf182d27f68b6f29997ff2f1b78c9d28c7f3c56"
-    },
-    {
       "path": "scripts/tests/test_capture_bus_contract.sh",
       "sha256": "41afdb00139193c82c34626884407018c2c76f5ad1adf6e908a726101c6788ba"
     },
@@ -3000,10 +2992,6 @@
       "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
     },
     {
-      "path": "seed/strategy/scripts/isolate-push.sh",
-      "sha256": "c8d31c3595cafd854bdbc127c92f65e903db359c563c2330c281340f65f4af9a"
-    },
-    {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",
       "sha256": "daa7fe5442175b7eb2fd08798353bb3c58c71e7f84f05881a35dc3183f89160a"
     },
@@ -3140,6 +3128,8 @@
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
+    "scripts/tests/session-guard-isolate-minimal-smoke.sh",
+    "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test_adopt_governance.sh",
