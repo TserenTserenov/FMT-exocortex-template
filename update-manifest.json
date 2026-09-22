@@ -1161,7 +1161,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "6fc2199a7662e4934746c06ad6b63ec23b76289ec426c273efa0ce5cb19689c3"
+      "sha256": "0a10dd98be14ee69901df9c38232985655ed648b549ade17c174c014de8f8811"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2990,6 +2990,10 @@
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
       "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+    },
+    {
+      "path": "seed/strategy/scripts/isolate-push.sh",
+      "sha256": "c8d31c3595cafd854bdbc127c92f65e903db359c563c2330c281340f65f4af9a"
     },
     {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",

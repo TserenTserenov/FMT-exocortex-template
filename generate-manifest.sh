@@ -131,6 +131,8 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/.githooks/pre-commit"
     "seed/strategy/.githooks/pre-push"
     "seed/strategy/scripts/install-hooks.sh"
+    # WP-485 Ф14: portable isolate-push for template users (а∩г)
+    "seed/strategy/scripts/isolate-push.sh"
     # #533: existing installations need the subject-scoped Day Open reader.
     "seed/strategy/scripts/day-open-llm-fill.py"
     "seed/strategy/scripts/update-derived-snapshot.py"
