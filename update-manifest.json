@@ -2585,7 +2585,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "6a5594d453fcdcba10f8204ced20c349f55071e415ee1510f7a38a1a3135a7f2"
+      "sha256": "27f76dee0a9dca34106f6bcbe1e91fbd7e092709d2e7a71847b986dcb06df16a"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2677,7 +2677,11 @@
     },
     {
       "path": "scripts/tests/session-guard-isolate-minimal-smoke.sh",
-      "sha256": "529ce97abb24009005c9bd703712b3fa0ee629b9e6e0b26485dd8288807d0acf"
+      "sha256": "628c4444943ed794588637aa35bfdd167bd0e5d0a3937c006585b76b082606c6"
+    },
+    {
+      "path": "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
+      "sha256": "891d28a572dcb0fd48df6946efb856221b9b020b78e18d17983acb490c0c0dfe"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",

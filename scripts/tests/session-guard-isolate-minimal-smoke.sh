@@ -21,4 +21,7 @@ FORBIDDEN="$(printf '%s%s' 'IWE_GOVERNANCE_REPO:-DS-my-' 'strategy')"
 if grep -F "$FORBIDDEN" "$PUSH" >/dev/null 2>&1; then
   fail "isolate-push still contains personal-repo silent default"
 fi
+grep -q 'freeze-canonical' "$SG" || fail "missing freeze-canonical"
+grep -q 'request-unfreeze-canonical' "$SG" || fail "missing request-unfreeze-canonical"
+grep -q 'FROZEN_CANONICAL_PATHS' "$SG" || fail "missing FROZEN_CANONICAL_PATHS"
 echo "PASS: FMT isolate minimal surface present (syntax + wiring)"
