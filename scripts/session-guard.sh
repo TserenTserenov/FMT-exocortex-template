@@ -6,7 +6,7 @@
 # Mechanical enforcement: git pre-commit hook проверяет наличие активного семафора.
 #
 # Команды:
-#   open --wp WP-N [--task "..."] [--files "a,b"] [--slug "..."] [--agent claude-code|kimi|hermes] [--personality <unassigned|UUID>]
+#   open --wp WP-N [--task "..."] [--files "a,b"] [--slug "..."] [--agent claude-code|kimi|hermes|grok] [--personality <unassigned|UUID>] [--isolate]
 #   open --housekeeping <reason> [--agent ...]        # фоновая housekeeping-сессия без ORZ
 #   close [--wp WP-N] [--slug "..."] [--agent ...]
 #   close ... --force-no-reflection "<причина>"       # закрыть без ответа на рефлексию —
@@ -61,6 +61,29 @@ now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_date() { date +"%Y-%m-%d"; }
 now_month() { date +"%Y-%m"; }
 fail() { echo "session-guard: $1" >&2; exit "${2:-1}"; }
+
+# WP-485 Ф14 (а∩г): thin isolate helpers
+ISOLATE_LOCK_DIR="$IWE_ROOT/.iwe-runtime/isolate-locks"
+ISOLATE_LOCK_TTL_SEC="${IWE_ISOLATE_LOCK_TTL_SEC:-120}"
+_ISOLATE_LOCKS_HELD=()
+_SG_ISOLATE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/session-guard-isolate-lib.sh"
+if [ -f "$_SG_ISOLATE_LIB" ]; then
+  # shellcheck source=lib/session-guard-isolate-lib.sh
+  . "$_SG_ISOLATE_LIB"
+fi
+
+resolve_isolate_push_script() {
+  local candidates=(
+    "$IWE_ROOT/$GOV_REPO/scripts/isolate-push.sh"
+    "$IWE_ROOT/scripts/isolate-push.sh"
+  )
+  local c
+  for c in "${candidates[@]}"; do
+    [ -x "$c" ] && { printf '%s\n' "$c"; return 0; }
+  done
+  return 1
+}
+
 
 # Session mutations share one permanent lock inode derived from the canonical
 # `.open` path.  Python's fcntl is available on the same POSIX platforms this
@@ -1037,6 +1060,10 @@ OWNER_PID=""
 CLEANUP_ORPHANS=0
 FORCE_NO_REFLECTION=""
 CLOSE_PATH=""
+ISOLATE_FLAG=0
+BASE_SHA=""
+ISOLATED_WORKTREE_PATH=""
+ISOLATED_WORKTREE_BRANCH=""
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -1045,6 +1072,8 @@ while [[ $# -gt 0 ]]; do
     --files)  FILES="$2"; shift 2 ;;
     --slug|--topic) SLUG="$2"; shift 2 ;;
     --agent)  AGENT="$2"; shift 2 ;;
+    --isolate) ISOLATE_FLAG=1; shift ;;
+    --base-sha) BASE_SHA="$2"; shift 2 ;;
     --housekeeping) HOUSEKEEPING="$2"; shift 2 ;;
     --personality) PERSONALITY="$2"; shift 2 ;;
     --session-id) SESSION_ID_ARG="$2"; shift 2 ;;
@@ -1285,6 +1314,45 @@ if [ "$CMD" = "open" ]; then
   ORZ_DIR="$(resolve_orz_sessions_dir)"
   ORZ_FILE="$ORZ_DIR/$ORZ_BASENAME"
   mkdir -p "$(dirname "$ORZ_FILE")"
+  # --- WP-485 Ф14: minimal open --isolate (happy-path; full root parity deferred) ---
+  if [ "${ISOLATE_FLAG:-0}" = "1" ]; then
+    type with_isolate_lock >/dev/null 2>&1 || fail "--isolate: session-guard-isolate-lib.sh не подключён" 1
+    [ -z "${BASE_SHA:-}" ] || fail "--isolate: --base-sha в минимальном порте Ф14 ещё не поддержан" 1
+    [ -n "$SLUG" ] && validate_isolate_slug "$SLUG"
+    ISOLATE_BASE_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    [ -n "$ISOLATE_BASE_DIR" ] || fail "--isolate: текущий каталог не git-репозиторий" 1
+    ISOLATE_BASE_ORIGIN="$(git -C "$ISOLATE_BASE_DIR" remote get-url origin 2>/dev/null || printf '%s\n' "no-origin")"
+    case "$ISOLATE_BASE_ORIGIN" in
+      *://*@*)
+        _sch="${ISOLATE_BASE_ORIGIN%%://*}"; _rest="${ISOLATE_BASE_ORIGIN#*://}"
+        ISOLATE_BASE_ORIGIN="${_sch}://${_rest##*@}"
+        ;;
+    esac
+    printf 'session-guard: --isolate: изолирую %q (origin: %q)\n' "$ISOLATE_BASE_DIR" "$ISOLATE_BASE_ORIGIN" >&2
+    SESSION_ID="${IWE_SESSION_ID:-$(date +%s)-$(isolate_entropy_suffix)}"
+    ISOLATE_STORE_DIR="$IWE_ROOT/.iwe-runtime/isolated-worktrees"
+    mkdir -p "$ISOLATE_STORE_DIR"
+    ISOLATED_WORKTREE_PATH="$ISOLATE_STORE_DIR/${AGENT}-${SESSION_ID}"
+    ISOLATED_WORKTREE_BRANCH="session-isolate/${AGENT}-${SESSION_ID}"
+    _fmt_isolate_create() {
+      if [ -d "$ISOLATED_WORKTREE_PATH" ]; then
+        fail "--isolate: worktree уже существует ($ISOLATED_WORKTREE_PATH) без семафора — COLLISION_RETRY" 1
+      fi
+      git -C "$ISOLATE_BASE_DIR" fetch origin main >/dev/null 2>&1 \
+        || fail "--isolate: git fetch origin main не удался" 1
+      git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" origin/main \
+        || fail "--isolate: git worktree add не удался" 1
+      case "$(realpath "$ISOLATED_WORKTREE_PATH" 2>/dev/null || echo "$ISOLATED_WORKTREE_PATH")" in
+        "$(realpath "$ISOLATE_STORE_DIR")"/*) : ;;
+        *)
+          git -C "$ISOLATE_BASE_DIR" worktree remove --force "$ISOLATED_WORKTREE_PATH" 2>/dev/null || rm -rf "$ISOLATED_WORKTREE_PATH"
+          fail "--isolate: worktree вне store — удалён" 1
+          ;;
+      esac
+    }
+    with_isolate_lock "$SESSION_ID" _fmt_isolate_create
+  fi
+
   SEM_TMP=$(mktemp "$SESSION_DIR/.session-open.XXXXXX")
   chmod 600 "$SEM_TMP"
   {
@@ -1299,22 +1367,17 @@ if [ "$CMD" = "open" ]; then
     echo "session_id: $SESSION_ID"
     [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
     echo "close_path: ${CLOSE_PATH:-unknown}"
-    # WP-484 (15.09, peer-session 2026-09-15-06, Claude+Kimi; same class as
-    # the harness_session_id/close_path point-patch above, 25.08,
-    # bug-2026-08-25-fmt-session-guard-stale-missing-close-path-fields.md):
-    # this FMT copy has no --isolate concept at all (no gov_repo_dir(), no
-    # CURRENT_REPO_DIR) -- it can only ever mean the plain canonical
-    # checkout, the same $IWE_ROOT/$GOV_REPO formula the root copy's own
-    # legacy-semaphore fallback already computes independently. Without this
-    # line, semaphore_governance_worktree() in the root copy (the only
-    # reader -- this field is not consumed anywhere in this file) finds no
-    # governance_worktree/isolated_worktree/orz_sessions_dir at all and
-    # falls into the strict whole-HEAD ancestry check on `close`, which is a
-    # false negative whenever the canonical checkout has diverged from
-    # origin/main (routine under parallel sessions). session-guard.sh itself
-    # is NOT resynced from root by template-sync.sh (TEMPLATE_OWNED_SCRIPTS,
-    # WP-546) -- this is a deliberate point-patch, not partial resync.
-    echo "governance_worktree: $IWE_ROOT/$GOV_REPO"
+    # WP-484 point-patch + WP-485 Ф14: without isolate, governance_worktree is
+    # the canonical $IWE_ROOT/$GOV_REPO (helps root readers on close). With
+    # --isolate, fields above already point at the isolated worktree.
+    if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${ISOLATED_WORKTREE_PATH:-}" ]; then
+      echo "governance_worktree: $ISOLATED_WORKTREE_PATH"
+      echo "isolated_worktree: $ISOLATED_WORKTREE_PATH"
+      echo "isolated_branch: $ISOLATED_WORKTREE_BRANCH"
+    else
+      echo "governance_worktree: $IWE_ROOT/$GOV_REPO"
+    fi
+    echo "orz_sessions_dir: $ORZ_DIR"
     echo "orz_file: $ORZ_BASENAME"
     # WP-484 (08.08, Kimi diagnosis + pilot report): regular sessions never
     # recorded a pid at all, so sweep_orphaned_semaphores()'s dead-pid check —
@@ -1395,6 +1458,11 @@ EOF
       "$AGENT" working "${WP}: ${TASK:-standalone}" "${FILES:-}" 2>/dev/null || true
   fi
   echo "Session OPEN: $SEM_FILE (WP: $WP, agent: $AGENT, slug: ${SLUG:-$WP})"
+  if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${ISOLATED_WORKTREE_PATH:-}" ]; then
+    printf '{"worktree_path": "%s", "branch": "%s", "session_id": "%s"}\n' \
+      "$ISOLATED_WORKTREE_PATH" "$ISOLATED_WORKTREE_BRANCH" "$SESSION_ID"
+    echo "⚠️  cd \"$ISOLATED_WORKTREE_PATH\" перед следующим действием -- рабочий каталог не переключается автоматически." >&2
+  fi
   exit 0
 fi
 
@@ -1791,6 +1859,22 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
     || fail "close: не удалось подготовить durable receipt; open сохранён" 1
   [ -n "$CLOSE_ATTEMPT" ] \
     || fail "close: durable receipt не вернул attempt id; open сохранён" 1
+
+  # WP-485 Ф14: happy-path isolate publish (full isolate-push/v2 journal deferred)
+  ISOLATE_WT=$(grep "^isolated_worktree: " "$SEM_FILE" 2>/dev/null | head -1 | cut -d" " -f2- || true)
+  if [ -n "$ISOLATE_WT" ] && [ -d "$ISOLATE_WT" ]; then
+    if PUSH_BIN=$(resolve_isolate_push_script); then
+      echo "session-guard: close: isolate-push через $PUSH_BIN" >&2
+      if ! bash "$PUSH_BIN" "$ISOLATE_WT" main; then
+        echo "⚠️  isolate-push не завершился успешно — worktree оставлен: $ISOLATE_WT" >&2
+      else
+        git -C "$(git -C "$ISOLATE_WT" rev-parse --git-common-dir 2>/dev/null | sed "s|/.git$||;s|/$||" || true)" worktree remove --force "$ISOLATE_WT" 2>/dev/null           || git worktree remove --force "$ISOLATE_WT" 2>/dev/null           || echo "⚠️  не удалось удалить isolate worktree $ISOLATE_WT" >&2
+      fi
+    else
+      echo "⚠️  isolate-push.sh не найден ($GOV_REPO/scripts или $IWE_ROOT/scripts) — worktree оставлен: $ISOLATE_WT" >&2
+    fi
+  fi
+
   _terminal_close_no_clobber "$SEM_FILE" "$AGENT" "$SESSION_ID" "$CLOSE_ATTEMPT" \
     || fail "close: terminal destination занят другим inode; open не удалён" 1
   _sem_read="$SEM_FILE.closed"

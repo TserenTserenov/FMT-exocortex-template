@@ -2340,6 +2340,10 @@
       "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
     },
     {
+      "path": "scripts/isolate-push.sh",
+      "sha256": "d619464de664a31e9dc4732518d9f9d7795e3a1ce38412c7346097314438ee0b"
+    },
+    {
       "path": "scripts/iwe-agent-dispatcher.py",
       "sha256": "17f74be39152b10e7eaacf7d49acf297508cf213f6ce31fb73450e6b0994613e"
     },
@@ -2472,6 +2476,10 @@
       "sha256": "65b3a09582fb2bcb61b2c0a8ac7914b21ed5479ed8805ed438978264cb390682"
     },
     {
+      "path": "scripts/lib/session-guard-isolate-lib.sh",
+      "sha256": "82e1e60a8080976c74de0758d8635c783731e39ab4695bb20f7f794b989dbfd7"
+    },
+    {
       "path": "scripts/lib/telegram.sh",
       "sha256": "4c5c0546b87a7bbe6dbff6af7ca011c561a1c2f5a2e5db4c4fedcd183bc9de3e"
     },
@@ -2577,7 +2585,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "a6e62eb6f9fba0cb872d99232ed6d3841ccb80872f90bb75d79ed7007420349e"
+      "sha256": "278ae2a2827282debbfff88be99d09552dd8b4d500765c19b1ef495a6cb483ee"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2666,6 +2674,10 @@
     {
       "path": "scripts/tests/run-issue-tests.sh",
       "sha256": "0bda885cf450f89bb2806902f947126be2b7b0e1706d2a03251a1d536c6f52ed"
+    },
+    {
+      "path": "scripts/tests/session-guard-isolate-minimal-smoke.sh",
+      "sha256": "529ce97abb24009005c9bd703712b3fa0ee629b9e6e0b26485dd8288807d0acf"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -2982,6 +2994,10 @@
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
       "sha256": "80f856ba356a49b4d2d0635235b9edb8bd725178a687c0fce23af2e8b44184e8"
+    },
+    {
+      "path": "seed/strategy/scripts/isolate-push.sh",
+      "sha256": "d619464de664a31e9dc4732518d9f9d7795e3a1ce38412c7346097314438ee0b"
     },
     {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",
