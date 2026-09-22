@@ -1289,7 +1289,11 @@ if [ "$CMD" = "open" ]; then
     fi
   done < <(ls -t "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null || true)
 
-  SESSION_ID="${SESSION_ID_ARG:-${IWE_SESSION_LOCKED_SESSION_ID:-${IWE_SESSION_ID:-$(date +%s)-$$-$RANDOM}}}"
+  if [ "${ISOLATE_FLAG:-0}" = "1" ] && type isolate_entropy_suffix >/dev/null 2>&1; then
+    SESSION_ID="${SESSION_ID_ARG:-${IWE_SESSION_LOCKED_SESSION_ID:-${IWE_SESSION_ID:-$(date +%s)-$(isolate_entropy_suffix)}}}"
+  else
+    SESSION_ID="${SESSION_ID_ARG:-${IWE_SESSION_LOCKED_SESSION_ID:-${IWE_SESSION_ID:-$(date +%s)-$$-$RANDOM}}}"
+  fi
   _safe_session_token "$SESSION_ID" || fail "open: небезопасный session_id '$SESSION_ID'" 1
   SEM_FILE="$SESSION_DIR/${AGENT}-${SESSION_ID}.open"
   _ensure_session_transition_lock "$SEM_FILE" "$SESSION_ID"
@@ -1329,7 +1333,7 @@ if [ "$CMD" = "open" ]; then
         ;;
     esac
     printf 'session-guard: --isolate: изолирую %q (origin: %q)\n' "$ISOLATE_BASE_DIR" "$ISOLATE_BASE_ORIGIN" >&2
-    SESSION_ID="${IWE_SESSION_ID:-$(date +%s)-$(isolate_entropy_suffix)}"
+    # SESSION_ID already fixed above (before SEM_FILE) — do not reassign
     ISOLATE_STORE_DIR="$IWE_ROOT/.iwe-runtime/isolated-worktrees"
     mkdir -p "$ISOLATE_STORE_DIR"
     ISOLATED_WORKTREE_PATH="$ISOLATE_STORE_DIR/${AGENT}-${SESSION_ID}"
