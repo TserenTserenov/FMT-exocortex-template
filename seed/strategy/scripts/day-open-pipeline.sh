@@ -349,8 +349,14 @@ reap_stale_git_lock() {
 }
 
 # --- Helper: abort with notification + proxy cleanup ---
+# issue #893: a caller (strategist.sh's morning scenario) needs to tell "no
+# gateway configured -- retry with --scaffold-only" apart from every other
+# abort reason without re-deriving LLM_PROXY_URL/PLATFORM_LLM_PROXY_URL
+# itself (that resolution already lives in one place, §2 above, and #894's
+# whole point is not to grow a second copy of it). A distinct exit code is
+# the same contract this file already uses for exit 7/8 below.
 abort() {
-  local reason="$1"
+  local reason="$1" code="${2:-1}"
   echo "❌ $reason"
   tg_notify "🚨 Day Open pipeline aborted: ${reason}"
   if [ "$PROBE" = "true" ]; then
@@ -359,7 +365,7 @@ abort() {
     echo "=== PROBE SUMMARY ==="
     echo "  date=$DATE verdict=🔴 red (abort) reason=\"$reason\" wall_min=$wall_min attention_min=0"
   fi
-  exit 1
+  exit "$code"
 }
 
 # Cleanup proxy on exit
@@ -668,7 +674,9 @@ echo "=== 2. LLM Proxy healthcheck ==="
 # hunting for a key rotation - there is no key problem, there is no gateway.
 if [ -z "$LLM_PROXY_URL" ]; then
   echo "  LLM gateway is not configured: LLM_PROXY_URL and PLATFORM_LLM_PROXY_URL are both empty."
-  abort "LLM gateway is not configured - set LLM_PROXY_URL to your gateway (or PLATFORM_LLM_PROXY_URL). This is not an API-key problem. Use --scaffold-only to build the plan without the LLM fill."
+  # exit 9 = no gateway configured -> caller should retry with --scaffold-only
+  # (issue #893), same contract class as exit 7/8 elsewhere in this file.
+  abort "LLM gateway is not configured - set LLM_PROXY_URL to your gateway (or PLATFORM_LLM_PROXY_URL). This is not an API-key problem. Use --scaffold-only to build the plan without the LLM fill." 9
 fi
 PROXY_HEALTH=$(curl -s "${LLM_PROXY_URL}/v1/health" 2>/dev/null | grep -q "ok" && echo "ok" || echo "fail")
 if [ "$PROXY_HEALTH" != "ok" ]; then

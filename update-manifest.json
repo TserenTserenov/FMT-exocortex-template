@@ -2961,7 +2961,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "ede2ed1162a3fcdbc95ae3624d969342d2e5467c11aadd8c28ce41e5ce8fde67"
+      "sha256": "a9f8548f627880cda29357997ed5caea995f7bfb783b0b36bcd81402dd73b542"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
