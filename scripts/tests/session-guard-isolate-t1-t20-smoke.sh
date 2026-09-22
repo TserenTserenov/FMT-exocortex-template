@@ -159,4 +159,62 @@ else
   pass "T20 isolate-push direct (close blocked by FMT quick-close gate — expected gap)"
 fi
 
+
+# --- T10: --isolate + --canonical-owner ---
+export IWE_SESSION_ID="t10-$(date +%s)-$$"
+set +e
+bash "$SG" open --wp WP-485 --task x --slug t10 --agent "$AGENT" --isolate --canonical-owner "x" >/dev/null 2>"$SANDBOX/t10.err"
+RC=$?
+set -e
+[ "$RC" -ne 0 ] || fail "T10 should reject isolate+canonical-owner"
+grep -Eiq 'взаимоисключ|canonical-owner' "$SANDBOX/t10.err" || { echo "T10 stderr:"; cat "$SANDBOX/t10.err"; fail "T10 wrong error"; }
+pass "T10 isolate+canonical-owner rejected"
+
+# --- T11: --base-sha without --isolate ---
+export IWE_SESSION_ID="t11-$(date +%s)-$$"
+set +e
+bash "$SG" open --wp WP-485 --task x --slug t11 --agent "$AGENT" --base-sha HEAD >/dev/null 2>"$SANDBOX/t11.err"
+RC=$?
+set -e
+[ "$RC" -ne 0 ] || fail "T11 should reject base-sha without isolate"
+grep -q 'base-sha' "$SANDBOX/t11.err" || fail "T11 wrong error"
+pass "T11 base-sha without isolate rejected"
+
+# --- T12: --base-sha pins commit ---
+# Sync local base with origin (T20 may have published ahead), then add a newer tip
+git -C "$REPO_DIR" fetch origin main >/dev/null 2>&1
+git -C "$REPO_DIR" reset --hard origin/main >/dev/null
+SEED_SHA=$(git -C "$REPO_DIR" rev-list --max-parents=0 HEAD)
+echo "newer" > "$REPO_DIR/newer.txt"
+git -C "$REPO_DIR" add newer.txt
+git -C "$REPO_DIR" commit -m "newer" >/dev/null
+git -C "$REPO_DIR" push origin main >/dev/null 2>&1
+git -C "$REPO_DIR" clean -fdx >/dev/null 2>&1
+SID12="t12-$(date +%s)-$$"
+export IWE_SESSION_ID="$SID12"
+OUT12=$(bash "$SG" open --wp WP-485 --task t12 --slug t12-base --agent "$AGENT" --isolate --base-sha "$SEED_SHA" 2>"$SANDBOX/t12.err") || {
+  cat "$SANDBOX/t12.err" >&2
+  fail "T12 open with base-sha failed"
+}
+JSON12=$(echo "$OUT12" | grep worktree_path | tail -1)
+WT12=$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["worktree_path"])' <<<"$JSON12")
+HEAD12=$(git -C "$WT12" rev-parse HEAD)
+[ "$HEAD12" = "$SEED_SHA" ] || fail "T12 expected HEAD=$SEED_SHA got $HEAD12"
+[ ! -f "$WT12/newer.txt" ] || fail "T12 worktree should not contain newer.txt"
+pass "T12 base-sha pins commit"
+
+# cleanup t12 session lightly
+rm -f "$IWE_ROOT/.iwe-runtime/sessions/${AGENT}-${SID12}".open*
+git -C "$REPO_DIR" worktree remove --force "$WT12" 2>/dev/null || true
+git -C "$REPO_DIR" branch -D "session-isolate/${AGENT}-${SID12}" >/dev/null 2>&1 || true
+
+# --- isolate-push requires IWE_GOVERNANCE_REPO (no silent personal default) ---
+set +e
+env -u IWE_GOVERNANCE_REPO bash "$PUSH" /tmp/does-not-matter main >/dev/null 2>"$SANDBOX/push-env.err"
+RC=$?
+set -e
+[ "$RC" -ne 0 ] || fail "isolate-push should fail without IWE_GOVERNANCE_REPO"
+grep -q 'IWE_GOVERNANCE_REPO' "$SANDBOX/push-env.err" || { cat "$SANDBOX/push-env.err"; fail "isolate-push missing env error"; }
+pass "isolate-push requires IWE_GOVERNANCE_REPO"
+
 echo "ALL PASS"

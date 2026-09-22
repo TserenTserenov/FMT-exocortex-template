@@ -2341,7 +2341,7 @@
     },
     {
       "path": "scripts/isolate-push.sh",
-      "sha256": "d619464de664a31e9dc4732518d9f9d7795e3a1ce38412c7346097314438ee0b"
+      "sha256": "c8d31c3595cafd854bdbc127c92f65e903db359c563c2330c281340f65f4af9a"
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
@@ -2585,7 +2585,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "27f76dee0a9dca34106f6bcbe1e91fbd7e092709d2e7a71847b986dcb06df16a"
+      "sha256": "e3c2353824e55c523a69e66903ea9d4644755aef61b1ff67d6a721bc2514cffd"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2681,7 +2681,7 @@
     },
     {
       "path": "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
-      "sha256": "891d28a572dcb0fd48df6946efb856221b9b020b78e18d17983acb490c0c0dfe"
+      "sha256": "42108a0983ef51e278b98f80fcf182d27f68b6f29997ff2f1b78c9d28c7f3c56"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3001,7 +3001,7 @@
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",
-      "sha256": "d619464de664a31e9dc4732518d9f9d7795e3a1ce38412c7346097314438ee0b"
+      "sha256": "c8d31c3595cafd854bdbc127c92f65e903db359c563c2330c281340f65f4af9a"
     },
     {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",

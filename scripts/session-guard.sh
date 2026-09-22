@@ -1158,6 +1158,9 @@ fi
 # --- OPEN ---
 if [ "$CMD" = "open" ]; then
   [ "${#POSITIONAL[@]}" -eq 0 ] || fail "open не принимает позиционные аргументы" 1
+  if [ -n "${BASE_SHA:-}" ] && [ "${ISOLATE_FLAG:-0}" != "1" ]; then
+    fail "--base-sha допустим только вместе с --isolate" 1
+  fi
   _safe_session_token "$AGENT" || fail "open: небезопасный --agent '$AGENT'" 1
   if [ -n "$SESSION_ID_ARG" ]; then
     _safe_session_token "$SESSION_ID_ARG" || fail "open: небезопасный --session-id '$SESSION_ID_ARG'" 1
@@ -1383,10 +1386,13 @@ if [ "$CMD" = "open" ]; then
   if [ "${ISOLATE_FLAG:-0}" = "1" ]; then
     type with_isolate_lock >/dev/null 2>&1 || fail "--isolate: session-guard-isolate-lib.sh не подключён" 1
     [ -z "${CANONICAL_OWNER:-}" ] || fail "--isolate и --canonical-owner взаимоисключающи" 1
-    [ -z "${BASE_SHA:-}" ] || fail "--isolate: --base-sha в этом порте Ф14 ещё не поддержан" 1
     [ -n "$SLUG" ] && validate_isolate_slug "$SLUG"
     ISOLATE_BASE_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     [ -n "$ISOLATE_BASE_DIR" ] || fail "--isolate: текущий каталог не git-репозиторий" 1
+    if [ -n "${BASE_SHA:-}" ]; then
+      git -C "$ISOLATE_BASE_DIR" cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+        || fail "--isolate: --base-sha '$BASE_SHA' не является коммитом в ($ISOLATE_BASE_DIR)" 1
+    fi
     ISOLATE_BASE_ORIGIN="$(git -C "$ISOLATE_BASE_DIR" remote get-url origin 2>/dev/null || printf '%s\n' "no-origin")"
     case "$ISOLATE_BASE_ORIGIN" in
       *://*@*)
@@ -1453,10 +1459,17 @@ if [ "$CMD" = "open" ]; then
         fi
         return 0
       fi
-      git -C "$ISOLATE_BASE_DIR" fetch origin main >/dev/null 2>&1 \
-        || fail "--isolate: git fetch origin main не удался" 1
-      git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" origin/main \
-        || fail "--isolate: git worktree add не удался" 1
+      if [ -z "${BASE_SHA:-}" ]; then
+        git -C "$ISOLATE_BASE_DIR" fetch origin main >/dev/null 2>&1 \
+          || fail "--isolate: git fetch origin main не удался" 1
+        git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" origin/main \
+          || fail "--isolate: git worktree add не удался" 1
+      else
+        # Pin exact commit; still refresh remotes best-effort so origin stays usable for later push
+        git -C "$ISOLATE_BASE_DIR" fetch origin main >/dev/null 2>&1 || true
+        git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "$BASE_SHA" \
+          || fail "--isolate: git worktree add от --base-sha не удался" 1
+      fi
       real=$(realpath "$ISOLATED_WORKTREE_PATH" 2>/dev/null || echo "$ISOLATED_WORKTREE_PATH")
       case "$real" in
         "$ISOLATE_STORE_DIR_REAL"/*) : ;;

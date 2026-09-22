@@ -42,6 +42,9 @@
 
 set -uo pipefail
 
+# WP-485 Ф14: no silent personal governance-repo default anywhere in this script.
+: "${IWE_GOVERNANCE_REPO:?isolate-push: IWE_GOVERNANCE_REPO is required, no silent default}"
+
 MAX_RETRIES=3
 
 retry_cleanup_state() {
