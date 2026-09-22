@@ -4,9 +4,8 @@ description: Set up WakaTime time-tracking for Claude Code and VS Code.
 user_invocable: true
 browser_safe: false
 routing:
-  executor: script
-  deterministic: true
-  script_path: ".claude/skills/setup-wakatime/setup.sh"
+  executor: sonnet
+  deterministic: false
 ---
 
 # Setup WakaTime Time Tracking

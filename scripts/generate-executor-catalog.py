@@ -113,7 +113,14 @@ def process_skill(skill_dir: Path) -> dict:
     }
 
 
-def validate_entry(entry: dict) -> list[str]:
+# issue #890: only an executor that runs no model call can honestly claim
+# determinism — a haiku/sonnet/opus/agent call, or the judgment half of
+# script+judgment, varies run to run by construction. mcp-direct is a
+# deterministic tool invocation, same class as a script.
+EXECUTORS_ALLOWING_DETERMINISTIC_TRUE = {"script", "mcp-direct"}
+
+
+def validate_entry(entry: dict, template_root: Path) -> list[str]:
     errors = []
     r = entry.get("routing", {})
     executor = r.get("executor")
@@ -125,9 +132,27 @@ def validate_entry(entry: dict) -> list[str]:
         errors.append(
             f"{entry['name']}: agent executor requires model: haiku|sonnet|opus"
         )
-    if executor == "script" and "script_path" not in r:
-        # Warning, not error — script_path may be added later
-        pass
+    if executor == "script":
+        script_path = r.get("script_path")
+        if not script_path:
+            errors.append(f"{entry['name']}: executor:script requires routing.script_path")
+        # issue #634 (route-task.sh run_script()): a relative script_path is
+        # resolved against the TEMPLATE root, not wherever --skills-dir
+        # happened to point (it is frequently a workspace install's copy,
+        # e.g. <workspace>/.claude/skills, which has no top-level scripts/
+        # of its own). Checking existence against the wrong root broke
+        # every skill whose script lives outside .claude/skills/<name>/
+        # (agent-fault, consent, transcribe, w-reflection all share one
+        # scripts/ tree) the moment --skills-dir pointed at a workspace.
+        elif not (Path(script_path) if os.path.isabs(script_path) else template_root / script_path).is_file():
+            errors.append(
+                f"{entry['name']}: routing.script_path does not exist: {script_path}"
+            )
+    if r.get("deterministic") is True and executor not in EXECUTORS_ALLOWING_DETERMINISTIC_TRUE:
+        errors.append(
+            f"{entry['name']}: deterministic:true is inconsistent with executor '{executor}' "
+            f"(only {sorted(EXECUTORS_ALLOWING_DETERMINISTIC_TRUE)} run no model call)"
+        )
     return errors
 
 
@@ -135,6 +160,10 @@ def build_catalog(skills_dir: Path) -> dict:
     entries = []
     skipped = []
     all_errors = []
+    # This file's own location, not skills_dir (which --skills-dir can point
+    # at a workspace install of skills/ with no scripts/ tree of its own —
+    # see the comment on the template_root parameter in validate_entry).
+    template_root = Path(__file__).resolve().parent.parent
 
     for skill_dir in sorted(skills_dir.iterdir()):
         if not skill_dir.is_dir():
@@ -145,7 +174,7 @@ def build_catalog(skills_dir: Path) -> dict:
                 {"name": entry["skipped"], "skip_reason": entry["skip_reason"]}
             )
             continue
-        errors = validate_entry(entry)
+        errors = validate_entry(entry, template_root)
         if errors:
             all_errors.extend(errors)
             continue

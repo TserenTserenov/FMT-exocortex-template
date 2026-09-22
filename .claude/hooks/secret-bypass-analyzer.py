@@ -24,7 +24,14 @@ import sys
 # redacted -- the cost of a missed real secret is judged higher than the
 # cost of an unnecessarily redacted test name.
 YOOKASSA_CANDIDATE_RE = re.compile(r"(?:live|test)_[A-Za-z0-9_-]{30,}")
-YOOKASSA_PYTEST_SHAPE_RE = re.compile(r"test_[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*){4,}\Z")
+# issue #896: each segment required a LETTER-first char (`[a-z][a-z0-9]*`),
+# so an issue-number segment like test_issue_463_... (463 starts with a
+# digit) never matched the shape at all -- no context exemption below can
+# rescue a candidate that already failed this fullmatch. The real safety net
+# against an actual key is structural (>=5 underscore-separated segments,
+# checked below), which a random blob or a Stripe/YooKassa-style unbroken
+# token never has, not the per-segment leading character.
+YOOKASSA_PYTEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){4,}\Z")
 
 
 def redact_yookassa(match):
@@ -1818,6 +1825,9 @@ def self_test():
         "bearer": "Bearer " + "Q" * 28,
         "yookassa-dense": "test_" + "9" * 32,
         "yookassa-bare-pytest-shape-no-context": "test_alpha_bravo_charlie_delta_echo",
+        # issue #896: a digit-leading segment (an issue number) must
+        # still redact bare with no protecting context around it.
+        "yookassa-digit-segment-bare-no-context": "test_issue_463_foo_bar_baz_qux_quux",
     }
     negatives = (
         "sk-proj-short",
@@ -1828,6 +1838,10 @@ def self_test():
         "123456789:short",
         "def test_alpha_bravo_charlie_delta_echo(self):",
         "tests/test_foo.py::test_alpha_bravo_charlie_delta_echo PASSED",
+        # issue #896: def-line context must rescue a digit-leading
+        # segment (an issue number) the same way it rescues a
+        # letter-only one.
+        "def test_issue_463_foo_bar_baz(self):",
         # issue #848: mentioning a test's name outside a def/nodeid context.
         "# scripts/tests/test_alpha_bravo_charlie_delta_echo.sh",
         "--exclude=test_alpha_bravo_charlie_delta_echo.sh",

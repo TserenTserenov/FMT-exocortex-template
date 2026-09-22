@@ -791,6 +791,23 @@ else
         cp "$TEMPLATE_DIR/.claude/settings.json" "$WORKSPACE_DIR/.claude/settings.json"
         echo "  ✓ .claude/settings.json"
     fi
+    # issue #891: settings.json above was the only loose top-level .claude/
+    # file this installer ever copied. update-manifest.json declares several
+    # more (rules-registry.yaml among them — AR.112/AR.113, read by
+    # sql-pii-guard.sh on every .sql write) that this loop never delivered,
+    # so a fresh install has them checksummed in the manifest but absent on
+    # disk. Mirror every remaining loose file in the template's .claude/
+    # root instead of naming each one, the same way the subdir loop above
+    # mirrors directories rather than hardcoding a file list.
+    for f in "$TEMPLATE_DIR/.claude/"*; do
+        [ -f "$f" ] || continue
+        name=$(basename "$f")
+        case "$name" in
+            settings.json|settings.local.json) continue ;;  # already handled above
+        esac
+        cp "$f" "$WORKSPACE_DIR/.claude/$name"
+        echo "  ✓ .claude/$name"
+    done
 fi
 
 # Resolves IWE_TIER: env var → ~/.iwe/config.yaml → default T1

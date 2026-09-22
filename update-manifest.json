@@ -145,11 +145,11 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "304caca86a807c7022911bd9091895015717d76aa2d785a4bd2d6e0410495533"
+      "sha256": "ca85e1362cfd8b0210bad6466f6d3623d6636bcf03d7268f42dbe6113444565f"
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "1ffcd9d99d51100d7606f069f5b5e29cdfe5551b083e00ab316eacb89c68202f"
+      "sha256": "adf731c45bc3d17251e86684098fb7cf5ab581072999533bb44d097427628eff"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/rules-lazy/blocking-rules-full.md",
-      "sha256": "136cd2b0a4f9fb888be0b5ec99b443a5f8e6816c5ad24533c411c03fff3ffc69"
+      "sha256": "c0db9a1cc312d009e30050cb905fc356a3d6fac347d9de205e482f398553bf31"
     },
     {
       "path": ".claude/rules-lazy/drift-guard.md",
@@ -593,7 +593,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
-      "sha256": "e11fd71f6daac948c5364591afc565f3a9b5b4adda0a79192152a015c2c55294"
+      "sha256": "7632fae7c9cf64a8a3f7148cc149ff9997a32857b4755d0a076f63a5921b3d25"
     },
     {
       "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
@@ -669,7 +669,7 @@
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
-      "sha256": "7b941a2b7090d2ac68de7048d892d13707b96090e15066d2c7dc1b83106ab2e4"
+      "sha256": "d1ddd0f2b0e13b53bb927018e0154c8e00286db25906f09626d1522be9f5e166"
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
@@ -1677,7 +1677,7 @@
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
-      "sha256": "e58de616d6d4aaafce1ed2d87fb3462e729e5d1e7f660f77dd6fc527e4d1f5fa"
+      "sha256": "6dde134a7e79a1c57940bdcc3ee7305c7e7b8f4509da5f25b7f677b72728e632"
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "90d74e526c368c0a6d33b302433c82e5433abe752b7247008603b7d8fe3eb1d8"
+      "sha256": "73122717f90e650c867fc84500cfbda49ee3765d1edfd9e1999c5dc67218ce7a"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2237,7 +2237,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "cc447a35bbf2faac16d9016805cc87b14deb3fe2ae15584fc07f5db03763ab27"
+      "sha256": "f304cda8a37224a3302a5d1c04b5a885b32d6fb51c15bdd72df4901820cd7850"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2293,7 +2293,7 @@
     },
     {
       "path": "scripts/generate-executor-catalog.py",
-      "sha256": "a4fd8e441601d9634be147a2e6f4bc120db74f0ecba13081a3be0f94afcf381d"
+      "sha256": "cc2223c230fce81c372fe0950e2aae14406271b34c4141a948b6394e1e0c1816"
     },
     {
       "path": "scripts/generate-hot-files-list.sh",
@@ -2557,7 +2557,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "e2e5ce2d1d52663e1bd6862fd7c97747997345c837b780c8fabab57cf22aa9d1"
+      "sha256": "8408b14351c31dd7f08c52f46afec7d39ac7029c017f4b1eb36d757e03dc00ca"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -2637,7 +2637,7 @@
     },
     {
       "path": "scripts/test-route-task.sh",
-      "sha256": "05c714c8dfe530f1954bcd87fa4b312c15e235c341f8ffd3e12b6aeca00afe9c"
+      "sha256": "023cd60b79b989f7f66f985a15c059f171f53e4fe7eabba772f4b7d2183f69e4"
     },
     {
       "path": "scripts/test-session-guard-yaml-task-escaping.sh",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
-      "sha256": "a4fd8e441601d9634be147a2e6f4bc120db74f0ecba13081a3be0f94afcf381d"
+      "sha256": "cc2223c230fce81c372fe0950e2aae14406271b34c4141a948b6394e1e0c1816"
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
@@ -3049,7 +3049,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "59bc5b061d9097436b1cc7d93d4303ff2603d2b901060697fa6faf51f1fa8e47"
+      "sha256": "32e873a6063a9a5870110fc8e8505c0f9b1323ce116824167e1422cee19d2554"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3089,7 +3089,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "07ef3c833c22bf03aca11deb8f4b16006223342007997f4955be8e8bc39887df"
+      "sha256": "727b6750c2e2ac7d60cfc1ee0bac522b47dd0c264c852ba63f683d08654c4810"
     }
   ],
   "excluded_paths": [
@@ -3167,6 +3167,13 @@
     "scripts/tests/test_issue_881_nudge_default.sh",
     "scripts/tests/test_issue_882_archgate_scale.sh",
     "scripts/tests/test_issue_884_ds_publish_missing.sh",
+    "scripts/tests/test_issue_888_pull_on_touch_sync.sh",
+    "scripts/tests/test_issue_890_executor_catalog_invariants.py",
+    "scripts/tests/test_issue_891_loose_claude_files_delivery.sh",
+    "scripts/tests/test_issue_893_scaffold_only_fallback.sh",
+    "scripts/tests/test_issue_895_dangling_classifier_stub.sh",
+    "scripts/tests/test_issue_896_yookassa_digit_segment.sh",
+    "scripts/tests/test_issue_898_truncation_signal.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",

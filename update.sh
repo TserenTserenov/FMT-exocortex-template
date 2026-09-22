@@ -2674,7 +2674,12 @@ for entry in data.get('files', []):
                     fi
                 fi
                 ;;
-            .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*)
+            # issue #891: the .claude/*.yaml|.claude/*.yml|.claude/*.example arm
+            # covers loose top-level .claude/ files (rules-registry.yaml among
+            # them). repair_pass() iterates the WHOLE manifest (every declared
+            # path, not just subdirectories), so a missing/stale loose file needs
+            # the same repair arm as the subdir ones, or it is silently skipped.
+            .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
                 dst="$WORKSPACE_DIR/$fpath"
                 if [ ! -f "$dst" ]; then
                     mkdir -p "$(dirname "$dst")"
@@ -4327,7 +4332,14 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
                 echo "  ✓ $f → workspace"
             fi
             ;;
-        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*)
+        # issue #891: the .claude/*.yaml|.claude/*.yml|.claude/*.example arm
+        # covers loose top-level .claude/ files (rules-registry.yaml among
+        # them -- sql-pii-guard.sh's AR.112/AR.113 source). They were
+        # manifest-checksummed but matched no branch here before, so a fresh
+        # NEW_FILES entry for one silently fell through this loop and never
+        # reached disk. None of them carry a USER-SPACE block, so the same
+        # helper as the subdir arms is enough.
+        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
             src="$SCRIPT_DIR/$f"
             dst="$WORKSPACE_DIR/$f"
             if is_author_mode && [ -f "$dst" ]; then

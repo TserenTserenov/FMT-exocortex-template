@@ -564,9 +564,29 @@ case "$1" in
             elif bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1; then
                 log "Morning: Day Open pipeline OK (scaffold + llm-fill)"
             else
-                log "WARN: Day Open pipeline failed (see lines above in this log) — fallback to free-form day-plan prompt"
-                run_claude "day-plan" "claude-sonnet-4-6"
-                notify_telegram "day-plan"
+                pipeline_rc=$?
+                # issue #893: exit 9 = no gateway configured (day-open-pipeline.sh
+                # §2), a case the pipeline itself already ships an answer for
+                # (--scaffold-only, issue #434) — retry with it instead of
+                # falling all the way to the free-form prompt, which ignores
+                # priorities.yaml and the scaffold (the #877 continuation:
+                # after #885 the message changed from HTTP 401 to "not
+                # configured", but strategist.sh still never used the escape
+                # hatch the pipeline's own error text already pointed at).
+                if [ "$pipeline_rc" -eq 9 ]; then
+                    log "Morning: Day Open pipeline has no gateway configured — retrying with --scaffold-only"
+                    if bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1; then
+                        log "Morning: Day Open pipeline OK (scaffold only, no gateway)"
+                    else
+                        log "WARN: Day Open pipeline --scaffold-only also failed (see lines above in this log) — fallback to free-form day-plan prompt"
+                        run_claude "day-plan" "claude-sonnet-4-6"
+                        notify_telegram "day-plan"
+                    fi
+                else
+                    log "WARN: Day Open pipeline failed (see lines above in this log) — fallback to free-form day-plan prompt"
+                    run_claude "day-plan" "claude-sonnet-4-6"
+                    notify_telegram "day-plan"
+                fi
             fi
         fi
         ;;

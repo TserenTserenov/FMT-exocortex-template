@@ -63,6 +63,16 @@ export IWE_GOVERNANCE_REPO="$FIXTURE_GOV"
 export IWE_EXECUTOR_CATALOG="$FIXTURE_IWE/$FIXTURE_GOV/scripts/executor-catalog.yaml"
 export IWE_ROUTER_AUDIT="$FIXTURE_IWE/$FIXTURE_GOV/logs/routing-path-distribution.tsv"
 export IWE_ROUTER_ERRORS="$FIXTURE_IWE/$FIXTURE_GOV/logs/routing-errors.log"
+# route-task.sh resolves relative script_path against $IWE_TEMPLATE (issue
+# #634: catalog entries are template-root-relative, not workspace-root-
+# relative), not against $IWE_DIR. Left unset here it defaulted to
+# $FIXTURE_IWE/FMT-exocortex-template/, a path this fixture never creates —
+# every dispatch silently hit "script not found" and only produced the
+# expected exit code by coincidence (deterministic:true → EXEC_FAILED exit 2
+# is the same exit code consent-fixture.sh itself returns, T1/T4/T14 never
+# told the two apart). T13 is the one case where "not found" (exit 2) and
+# "found and ran" (exit 0) actually differ, which is what exposed this.
+export IWE_TEMPLATE="$FIXTURE_IWE"
 
 PASS=0
 FAIL=0

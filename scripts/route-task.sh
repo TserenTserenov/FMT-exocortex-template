@@ -24,6 +24,12 @@ CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog
 AUDIT_LOG="${IWE_ROUTER_AUDIT:-${IWE_DIR}/${GOV_REPO}/logs/routing-path-distribution.tsv}"
 ERROR_LOG="${IWE_ROUTER_ERRORS:-${IWE_DIR}/${GOV_REPO}/logs/routing-errors.log}"
 JSON_MODE="false"
+# issue #889: a bare `python3` only sees PATH's own interpreter, which on
+# hosts with a pyenv shim ahead of a real PyYAML-carrying python3 fails the
+# catalog lookup before the executor-substitution check ever runs. Resolve
+# once via the shared F6 resolver (scripts/lib/find-python3.sh, #453/#463)
+# and reuse for every python3 call below — same pattern as day-close.sh.
+RESOLVED_PYTHON3=""
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,11 +48,14 @@ die() {
 warn() { echo "WARN: $*" >&2; }
 
 require_python() {
-    if ! command -v python3 &>/dev/null; then
-        die "python3 not found — required for catalog lookup" 1
-    fi
-    if ! python3 -c "import yaml" &>/dev/null; then
-        die "PyYAML not found — required for catalog lookup (pip install pyyaml)" 1
+    [[ -n "$RESOLVED_PYTHON3" ]] && return 0
+    # Resolved next to this script (same install unit as route-task.sh
+    # itself, day-close.sh precedent) — not via $IWE_TEMPLATE/$IWE_DIR,
+    # which a caller may not have set to where the sibling lib/ actually is.
+    local resolver
+    resolver="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
+    if ! RESOLVED_PYTHON3=$("$resolver" 2>/dev/null); then
+        die "$("$resolver" 2>&1 >/dev/null)" 1
     fi
 }
 
@@ -107,7 +116,7 @@ lookup_skill() {
     local skill_name="$1"
     require_python
     require_catalog
-    python3 - "$CATALOG" "$skill_name" << 'PYEOF'
+    "$RESOLVED_PYTHON3" - "$CATALOG" "$skill_name" << 'PYEOF'
 import sys, yaml
 
 catalog_path, skill_name = sys.argv[1], sys.argv[2]
@@ -221,7 +230,7 @@ run_script() {
         # command substitution. `while read -d ''` — bash3.2-совместимо.
         local ARGS_ARRAY=() shlex_tmp shlex_err
         shlex_tmp=$(mktemp "${TMPDIR:-/tmp}/route-task-args.XXXXXX") || die "mktemp failed"
-        if ! shlex_err=$(python3 -c '
+        if ! shlex_err=$("$RESOLVED_PYTHON3" -c '
 import shlex, sys
 try:
     toks = shlex.split(sys.argv[1])
@@ -421,7 +430,7 @@ dispatch_skill() {
 show_list() {
     require_python
     require_catalog
-    python3 - "$CATALOG" << 'PYEOF'
+    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
 import sys, yaml
 
 with open(sys.argv[1]) as f:
@@ -449,7 +458,7 @@ PYEOF
 validate_catalog() {
     require_python
     require_catalog
-    python3 - "$CATALOG" << 'PYEOF'
+    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
 import sys, yaml
 
 VALID = {"script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"}
@@ -503,6 +512,14 @@ main() {
             *)          die "unknown option: $1" ;;
         esac
     done
+
+    # Resolve python3 here, in the main shell, before any mode below can
+    # reach it through a `$(...)` subshell (dispatch_skill -> lookup_skill,
+    # line ~333) — a subshell inherits the parent's variables at fork time
+    # but can never write RESOLVED_PYTHON3 back, so resolving lazily inside
+    # lookup_skill() left every OTHER caller in the parent shell (run_script's
+    # shlex parser) with an empty $RESOLVED_PYTHON3.
+    [[ "$mode" == "help" ]] || require_python
 
     case "$mode" in
         list)     show_list ;;
