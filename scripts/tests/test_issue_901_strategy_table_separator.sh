@@ -7,7 +7,11 @@
 
 set -euo pipefail
 
-TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
+# Resolve relative to this script's own location, not $HOME/IWE (issue #901
+# regression test: run-issue-tests.sh invokes test_issue_*.sh via a bare
+# `bash "$t"`, no IWE_TEMPLATE export — the $HOME/IWE fallback only worked on
+# a dev machine and broke silently in CI, where the checkout lives elsewhere).
+TEMPLATE_ROOT="${IWE_TEMPLATE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)}"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
