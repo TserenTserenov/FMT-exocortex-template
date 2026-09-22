@@ -3174,6 +3174,7 @@
     "scripts/tests/test_issue_895_dangling_classifier_stub.sh",
     "scripts/tests/test_issue_896_yookassa_digit_segment.sh",
     "scripts/tests/test_issue_898_truncation_signal.sh",
+    "scripts/tests/test_issue_901_strategy_table_separator.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",

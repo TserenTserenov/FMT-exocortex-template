@@ -814,11 +814,21 @@ BUDGET_H=$(echo "$BUDGET" | sed 's/[^0-9]//g')
 if [[ -n "$RESULT" && "${BUDGET_H:-0}" -ge 3 ]]; then
   STRATEGY_FILE="$STRATEGY/docs/Strategy.md"
   python3 - "$STRATEGY_FILE" "$WP_ID" "$REPO" "$RESULT" <<'PYEOF'
+import re
 import sys
 
 strategy_path, wp_id, repo, result = sys.argv[1:5]
 
 section_anchor = "### РП → Результаты"
+# A markdown table separator row (`|---|---|`, `|----|----|`, `| --- | --- |`,
+# `|:---|---:|`, or without outer pipes) — any line made only of `|`, `-`, `:`
+# and whitespace, requiring at least two `|`-separated cells (this table is
+# always 4 columns; a bare single-cell "|---|" does not match, unlike the old
+# literal search issue #901 reported — not a concern here). The old literal
+# "|---|" also missed every width other than exactly three dashes per cell.
+TABLE_SEP_RE = re.compile(
+    r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$", re.MULTILINE
+)
 
 with open(strategy_path, "r", encoding="utf-8") as f:
     content = f.read()
@@ -828,12 +838,19 @@ if section_anchor not in content:
     sys.exit(0)
 
 section_start = content.index(section_anchor)
-table_sep = content.find("|---|", section_start)
-if table_sep == -1:
+next_heading = re.search(r"\n#{2,3} ", content[section_start + len(section_anchor):])
+section_end = (
+    section_start + len(section_anchor) + next_heading.start()
+    if next_heading
+    else len(content)
+)
+
+sep_match = TABLE_SEP_RE.search(content, section_start, section_end)
+if not sep_match:
     print("   ⚠️  Strategy.md: разделитель таблицы не найден в секции — добавить вручную")
     sys.exit(0)
 
-insert_at = content.index("\n", table_sep) + 1
+insert_at = content.index("\n", sep_match.end()) + 1
 repo_cell = repo if repo else "—"
 new_row = "| WP-{} | {} | {} | pending |\n".format(wp_id, repo_cell, result)
 content = content[:insert_at] + new_row + content[insert_at:]
