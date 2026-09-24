@@ -10,6 +10,13 @@
 # network).
 set -uo pipefail
 
+# A bare CI runner has no global git identity configured (unlike a dev
+# machine) -- every `git commit` below needs its own, or it fails with
+# "Author identity unknown" (same class of gap fixed for this repo's own
+# CI ancestry-hardening tests, WP-7 F167, 22.09).
+export GIT_AUTHOR_NAME="test" GIT_AUTHOR_EMAIL="test@example.invalid"
+export GIT_COMMITTER_NAME="test" GIT_COMMITTER_EMAIL="test@example.invalid"
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 SCRIPT="$ROOT/roles/extractor/scripts/extractor.sh"
 
