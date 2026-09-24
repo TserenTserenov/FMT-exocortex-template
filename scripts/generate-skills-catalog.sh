@@ -88,7 +88,10 @@ build_invoked_by() {
     local callers=""
     # Ищем /skill-name в protocol-*.md и CLAUDE.md
     local search_files=""
-    [[ -d "$PROTOCOLS_DIR" ]] && search_files+=" $(find "$PROTOCOLS_DIR" -name "protocol-*.md" 2>/dev/null)"
+    # Trailing slash: PROTOCOLS_DIR is usually memory/, a symlink to auto-memory
+    # (junction on Windows). find does not descend into a symlinked start point
+    # without it (issue #913) — 0 files found instead of 5.
+    [[ -d "$PROTOCOLS_DIR" ]] && search_files+=" $(find "$PROTOCOLS_DIR/" -name "protocol-*.md" 2>/dev/null)"
     [[ -f "${IWE}/CLAUDE.md" ]] && search_files+=" ${IWE}/CLAUDE.md"
     # Ищем в других SKILL.md (depends_on)
     [[ -d "$SKILLS_DIR" ]] && search_files+=" $(find "$SKILLS_DIR" -name "SKILL.md" 2>/dev/null)"

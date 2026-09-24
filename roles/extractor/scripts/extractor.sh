@@ -171,6 +171,16 @@ load_claude_subscription_token() {
     if [ -n "$token" ]; then
         CLAUDE_CODE_OAUTH_TOKEN="$token"
         export CLAUDE_CODE_OAUTH_TOKEN
+    else
+        # issue #909: without this, the only diagnostic a missing token ever
+        # produced was the later "протух или отозван" ERROR (line ~278) after
+        # a failed AI CLI call -- indistinguishable from a token that really
+        # did expire. Interactive runs can still succeed on the CLI's own
+        # separate interactive login, masking the gap; a launchd/headless run
+        # has no such fallback and fails every night silently in this same
+        # generic-looking way. Say plainly, up front, that no connection was
+        # ever made.
+        log "WARN: токен не настроен ($raw_file и $kv_file отсутствуют) — ночные/headless прогоны будут падать. Запустите: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
     fi
 }
 
@@ -780,9 +790,10 @@ cleanup_isolated_inbox_worktree() {
 mount_readonly_packs() {
     local canonical_workspace="$1"
     local isolated_workspace="$2"
-    local pack_dir pack_name remote_url snapshot_ref pack_count=0
+    local pack_dir pack_name remote_url snapshot_ref pack_count=0 pack_toplevel
     EXTRACTOR_PACK_REFS=()
     EXTRACTOR_PACK_SKIPPED=()
+    EXTRACTOR_PACK_SKIPPED_NO_ORIGIN=()
     EXTRACTOR_PACK_VERIFIED_AT=""
     for pack_dir in "$canonical_workspace"/PACK-*; do
         [ -d "$pack_dir" ] || continue
@@ -792,6 +803,25 @@ mount_readonly_packs() {
         if [ -f "$pack_dir/.pack-frozen" ]; then
             log "WARN: $pack_name marked .pack-frozen, skipping mount (not counted toward duplicate-check coverage)"
             EXTRACTOR_PACK_SKIPPED+=("$pack_name")
+            continue
+        fi
+        # A Pack the user deliberately keeps local-only (personal data, not
+        # for remote hosting) is a real git repository with no `origin` --
+        # a different situation from a directory that fails to clone or is
+        # not a git repository at all. `rev-parse --is-inside-work-tree`
+        # alone is not enough to tell those apart (cold-review finding,
+        # 24.09): git looks UP the tree for `.git`, so a Pack directory
+        # with no `.git` of its own -- a broken/incomplete clone, the exact
+        # case the strict branch below exists to hard-abort on -- silently
+        # inherits the WORKSPACE's own git identity (the canonical checkout
+        # itself is a git repo) and would be misclassified as this
+        # intentional local-only case instead. Require the Pack directory
+        # to be the TOP of its own work tree, not merely inside one.
+        pack_toplevel=$(git -C "$pack_dir" rev-parse --show-toplevel 2>/dev/null)
+        if [ -n "$pack_toplevel" ] && [ "$pack_toplevel" = "$(cd "$pack_dir" && pwd -P)" ] && \
+           ! git -C "$pack_dir" remote get-url origin >/dev/null 2>&1; then
+            log "WARN: $pack_name has no origin remote, skipping mount (local-only Pack, not counted toward duplicate-check coverage)"
+            EXTRACTOR_PACK_SKIPPED_NO_ORIGIN+=("$pack_name")
             continue
         fi
         if ! remote_url=$(git -C "$pack_dir" remote get-url origin 2>/dev/null) || \
@@ -812,8 +842,9 @@ mount_readonly_packs() {
         log "ERROR: no Pack repositories available; duplicate check and analysis were not started"
         return 1
     fi
-    if [ "${#EXTRACTOR_PACK_SKIPPED[@]}" -gt 0 ]; then
-        log "WARN: duplicate-check ran against $pack_count of $((pack_count + ${#EXTRACTOR_PACK_SKIPPED[@]})) Packs; skipped (frozen): ${EXTRACTOR_PACK_SKIPPED[*]}"
+    local total_skipped=$((${#EXTRACTOR_PACK_SKIPPED[@]} + ${#EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[@]}))
+    if [ "$total_skipped" -gt 0 ]; then
+        log "WARN: duplicate-check ran against $pack_count of $((pack_count + total_skipped)) Packs; skipped (frozen): ${EXTRACTOR_PACK_SKIPPED[*]:-none}; skipped (no origin): ${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]:-none}"
     fi
     EXTRACTOR_PACK_VERIFIED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 }
@@ -830,6 +861,9 @@ pack_snapshot_context() {
     done
     if [ "${#EXTRACTOR_PACK_SKIPPED[@]}" -gt 0 ]; then
         printf 'Внимание: следующие Pack помечены как frozen и не участвовали в проверке на дубли: %s\n' "${EXTRACTOR_PACK_SKIPPED[*]}"
+    fi
+    if [ "${#EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[@]}" -gt 0 ]; then
+        printf 'Внимание: следующие Pack без origin (локальные) и не участвовали в проверке на дубли — захваты для них defer, не accept: %s\n' "${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]}"
     fi
 }
 

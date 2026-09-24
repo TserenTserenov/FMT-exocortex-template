@@ -57,6 +57,11 @@ budget_spread:
   enabled: true          # Distribute weekly budget of WPs across remaining days
   threshold_h: 4         # Only WPs with weekly budget ≥ this value are spread
   rounding: 0.5          # Round daily_slot to nearest N hours
+  # days_left counts these days, including today (issue #902). Default is
+  # mon..fri -- unchanged from before this key existed. A user whose working
+  # week runs further (e.g. through Saturday/Sunday) lists all of them here
+  # instead of the daily budget being overstated on a hardcoded 5-day week.
+  working_days: [mon, tue, wed, thu, fri]
 
 pomodoro:
   work_minutes: 25

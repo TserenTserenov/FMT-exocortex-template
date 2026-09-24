@@ -103,6 +103,28 @@ def parse(data):
             data[c_start:c_end], data[c_end:])
 
 
+def native_realpath(path):
+    """Same canonical form the shell layer already put `ws`/`real` in:
+    os.path.realpath, separators forced to '/'. On POSIX this is a no-op
+    beyond realpath itself; on native Windows Python os.path.realpath
+    returns backslashes, which must be normalized the same way or every
+    comparison against the shell-supplied `ws` mismatches (issue #912).
+
+    Known residual limitation (cold-review, 24.09, unverified on real
+    Windows): the shell-side real_path() also runs its input through
+    cygpath -m before handing it to python; this call does not -- `head`
+    is derived from `raw` (the tool call's own, un-normalized file_path),
+    not from the already-normalized `ws`/`real`. On native Windows Python
+    this relies on os.path.realpath accepting and correctly resolving a
+    forward-slash path the way cygpath -m would, which os.path generally
+    does but was not exercised on a real Windows host here. If it ever
+    disagrees, the mismatch fails CLOSED (Deny), not open -- worst case is
+    a legitimate Windows USER-SPACE edit wrongly denied, never an
+    unintended allow.
+    """
+    return os.path.realpath(path).replace(os.sep, "/")
+
+
 def check_path(ws, real, raw):
     """Only <ws>/.claude/skills/<name>/SKILL.md reached without symlinks/aliases."""
     if not os.path.isabs(raw):
@@ -113,11 +135,11 @@ def check_path(ws, real, raw):
     if (len(parts) != 4 or parts[0] != ".claude" or parts[1] != "skills"
             or parts[2] in ("", ".", "..") or parts[3] != "SKILL.md"):
         raise Deny("исключение действует только для .claude/skills/имя/SKILL.md")
-    comps = raw.split("/")
+    comps = raw.replace("\\", "/").split("/")
     if comps[-4:] != parts:
         raise Deny("путь не канонический: симлинк, другой регистр букв или лишние сегменты")
     head = "/".join(comps[:-4]) or "/"
-    if os.path.realpath(head) != ws:
+    if native_realpath(head) != ws:
         raise Deny("путь не канонический: префикс не совпадает с рабочим каталогом")
     base = "" if head == "/" else head
     for i in range(1, 4):
@@ -235,10 +257,30 @@ if [ -n "$INPUT" ] && [ -z "$FILE_PATH" ]; then
   block "не удалось извлечь путь файла из вызова (битый payload) — правка не классифицируется, блокирую."
 fi
 
+# Every compared path goes through one normalizer. On Windows (Git Bash),
+# python3 (native Windows build) returns paths as C:\Users\... while the
+# shell's `pwd -P` returns /c/Users/... -- the two never matched, and every
+# file classified as external, i.e. allowed (issue #912). cygpath -m yields
+# C:/Users/... for both spellings on input, and os.sep is replaced with '/'
+# on the python output; POSIX systems have no cygpath and os.sep is already
+# '/', so both helpers are no-ops there.
+native_path() {
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -m -- "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+real_path() {
+  python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]).replace(os.sep, "/"))' \
+    "$(native_path "$1")" 2>/dev/null
+}
+
 # Resolve symlinks: симлинк из своей папки скилла на платформенный файл обязан
 # классифицироваться по ЦЕЛИ, не по имени симлинка. Без резолвера защита молча
 # исчезает — поэтому его отказ = блок, не откат к сырому пути.
-REAL_PATH=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$FILE_PATH" 2>/dev/null)
+REAL_PATH=$(real_path "$FILE_PATH")
 if [ -z "$REAL_PATH" ]; then
   block "python3 недоступен или не смог нормализовать путь — без этого не проверить симлинки, блокирую."
 fi
@@ -248,19 +290,42 @@ fi
 # neither overwrite nor protect. Compare physical roots so symlink and prefix
 # collisions cannot smuggle an internal platform file through this boundary.
 WORKSPACE_DIR="$(cd "$(dirname "$0")/../.." && pwd -P)"
-case "$REAL_PATH" in
-  "$WORKSPACE_DIR"|"$WORKSPACE_DIR"/*) ;;
-  *)
-    echo '{}'
-    exit 0
-    ;;
-esac
-REL_PATH="${REAL_PATH#"$WORKSPACE_DIR"/}"
+WORKSPACE_REAL=$(real_path "$WORKSPACE_DIR")
+if [ -z "$WORKSPACE_REAL" ]; then
+  block "не удалось нормализовать корень рабочего каталога — принадлежность файла не определить, блокирую."
+fi
+
+# memory/ is a symlink (a junction on Windows) to the agent's auto-memory
+# store, which lives outside the workspace by design. Map its physical target
+# back onto memory/ so protocol-*.md reached through the link stays covered
+# by this gate instead of being read as an external, unprotected path.
+MEMORY_REAL=""
+if [ -d "$WORKSPACE_DIR/memory" ]; then
+  MEMORY_REAL=$(real_path "$WORKSPACE_DIR/memory")
+fi
+REL_PATH=""
+if [ -n "$MEMORY_REAL" ]; then
+  case "$REAL_PATH" in
+    "$MEMORY_REAL"/*) REL_PATH="memory/${REAL_PATH#"$MEMORY_REAL"/}" ;;
+  esac
+fi
+if [ -z "$REL_PATH" ]; then
+  case "$REAL_PATH" in
+    "$WORKSPACE_REAL"|"$WORKSPACE_REAL"/*)
+      REL_PATH="${REAL_PATH#"$WORKSPACE_REAL"/}"
+      ;;
+    *)
+      echo '{}'
+      exit 0
+      ;;
+  esac
+fi
 
 # Traversal is rejected for in-workspace targets before ownership
 # classification: «..» could otherwise derive one skill name and write another.
+# Backslash form (\..\ etc.) covers a raw Windows path from the tool call.
 case "$FILE_PATH" in
-  *"/../"*|"../"*|*"/.."|"..")
+  *"/../"*|"../"*|*"/.."|".."|*'\..\'*|'..\'*|*'\..')
     block "путь содержит «..» — не классифицируется, блокирую. Используй прямой путь без переходов вверх."
     ;;
 esac
@@ -360,7 +425,7 @@ EOF_MF
   if [ -n "$SKILL_MD_DIR" ]; then
     # Разрешение только при явном ALLOW от проверки инварианта; пустой вывод,
     # падение python или любое иное значение = отказ.
-    US_VERDICT=$(printf '%s' "$INPUT" | python3 -I -c "$USER_SPACE_PY" "$WORKSPACE_DIR" "$REAL_PATH" "$FILE_PATH" 2>/dev/null)
+    US_VERDICT=$(printf '%s' "$INPUT" | python3 -I -c "$USER_SPACE_PY" "$WORKSPACE_REAL" "$REAL_PATH" "$FILE_PATH" 2>/dev/null)
     if [ "$US_VERDICT" = "ALLOW" ]; then
       echo '{}'
       exit 0

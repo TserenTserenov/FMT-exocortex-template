@@ -57,6 +57,17 @@ _STATUS_EMOJI = (
     "🟢", "🟡", "🔴", "⚫",
 )
 _CELL_LEAD_MARKUP = "*~ \t"
+# Tolerates a trailing explanation inside the same comment, e.g.
+# "<!-- index-health: skip-cells — реестр РП, длинные ячейки закрытия -->"
+# (issue #907 finding 2: the old literal substring check required the
+# comment to contain nothing else, so a marker written with any commentary
+# silently never matched -- no warning, no effect, for as long as nobody
+# happened to re-check it against the raw text). Anchored to the WHOLE
+# line (cold-review finding, 24.09): a wider search window (see
+# _index_health_window below) makes it reachable for prose that merely
+# mentions the marker's syntax as an example -- a real directive in this
+# codebase's own style is always alone on its line.
+_INDEX_HEALTH_RE = re.compile(r"^[ \t]*<!--\s*index-health:\s*(skip-cells|skip)\b[^>]*-->[ \t]*$", re.MULTILINE)
 _STATUS_HEADERS = {"ст", "статус", "status", "state"}
 _WP_NUMBER_HEADERS = {"#", "№", "wp", "рп", "id"}
 
@@ -118,6 +129,45 @@ def _status_cell(cells: list[str], status_column: int | None) -> str | None:
     return None
 
 
+def _index_health_window(text: str) -> str:
+    """Where a skip marker is allowed to live (issue #907 finding 1).
+
+    The original fixed first-512-chars window has nowhere legal for the
+    marker once a file's YAML frontmatter alone exceeds it (an ordinary
+    long `summary` field is enough): before it breaks frontmatter parsing,
+    after it is invisible to the detector. Keep the original window as-is
+    (every placement that already works today keeps working) and add the
+    first ~20 lines right after a closing frontmatter `---`.
+    """
+    window = text[:512]
+    if text.startswith("---\n") or text.startswith("---\r\n"):
+        close = re.search(r"\n---[ \t]*\r?\n", text[3:])
+        if close:
+            body_start = 3 + close.end()
+            extra_lines = text[body_start:].splitlines()[:20]
+            window += "\n" + "\n".join(extra_lines)
+    return window
+
+
+def _index_health_marker(window: str) -> tuple[str | None, str | None]:
+    """Return (marker, warning); marker is 'skip', 'skip-cells' or None.
+
+    issue #907 finding 2: a marker comment that carries a trailing
+    explanation used to defeat the old literal substring check completely
+    -- the exemption silently never took effect, no warning, indistinguishable
+    from "no marker was ever placed". Parse with a regex tolerant of
+    trailing text inside the comment, and warn when the header mentions the
+    key but no known directive parses (typo, renamed value) instead of
+    doing nothing.
+    """
+    match = _INDEX_HEALTH_RE.search(window)
+    if match:
+        return match.group(1), None
+    if "index-health:" in window:
+        return None, "index-health: марка в шапке есть, но директива не распознана (ожидается skip или skip-cells)"
+    return None, None
+
+
 def check_file(path: Path) -> dict:
     out = {
         "size": 0,
@@ -127,6 +177,7 @@ def check_file(path: Path) -> dict:
         "skip": False,
         "skip_cells": False,
         "size_skip": False,
+        "marker_warning": None,
     }
     try:
         text = path.read_text(encoding="utf-8")
@@ -138,12 +189,14 @@ def check_file(path: Path) -> dict:
     # байтам, срабатывает не на том объёме, который считает загрузчик.
     out["size"] = len(text)
 
-    head = text[:512]
+    head = _index_health_window(text)
+    marker, warning = _index_health_marker(head)
+    out["marker_warning"] = warning
     # index-health: skip отключает проверки РАЗДУТИЯ (размер/длина/ячейки),
     # но НЕ семантику done-форматирования — она дешёвая и не зависит от размера.
-    size_skip = "<!-- index-health: skip -->" in head
+    size_skip = marker == "skip"
     out["size_skip"] = size_skip
-    if "<!-- index-health: skip-cells -->" in head:
+    if marker == "skip-cells":
         out["skip_cells"] = True
 
     status_column = None
@@ -288,8 +341,11 @@ def main() -> int:
         return 2
 
     buckets = {"FAIL": [], "WARN": [], "OK": [], "SKIP": []}
+    marker_warnings = []
     for path in sorted(iter_index_files(root)):
         findings = check_file(path)
+        if findings["marker_warning"]:
+            marker_warnings.append((path, findings["marker_warning"]))
         if findings["skip"]:
             buckets["SKIP"].append((path, findings))
             continue
@@ -316,6 +372,11 @@ def main() -> int:
         print(f"\n=== SKIP ({len(buckets['SKIP'])}) ===")
         for path, _ in buckets["SKIP"]:
             print(f"  {path.relative_to(root)}")
+
+    if marker_warnings:
+        print(f"\n=== MARKER WARNINGS ({len(marker_warnings)}) ===")
+        for path, warning in marker_warnings:
+            print(f"  {path.relative_to(root)}: {warning}")
 
     return 1 if (buckets["FAIL"] or buckets["WARN"]) else 0
 

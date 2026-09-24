@@ -70,7 +70,7 @@ bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram
 2. **WeekPlan (ОБЯЗАТЕЛЬНО):** прочитать WeekPlan → ВСЕ in_progress и pending РП → проверить каждый: релевантен сегодня? Есть дата/дедлайн сегодня? Просрочен? → добавить.
    **Экономия контекста (issue #207):** WeekPlan 13+ КБ — для шага 2 и Budget Spread нужна только таблица РП (секция «План на неделю» с колонками # / название / h / статус). Читать её адресно (`Read` на секцию или `grep`/`awk` по таблице), а не весь файл.
    **Budget Spread** (если `budget_spread.enabled: true` в day-rhythm-config.yaml): для каждого РП с бюджетом ≥ `threshold_h`:
-   - `days_left` = оставшиеся рабочие дни пн–пт включая сегодня
+   - `days_left` = оставшиеся рабочие дни из `budget_spread.working_days` (список кодов дня недели: mon/tue/wed/thu/fri/sat/sun), включая сегодня; ключа нет → как раньше, пн–пт (issue #902 — форма недели пользователя зашита в правило не должна была быть, у пользователя с рабочими выходными бюджет дня завышался в полтора раза)
    - `daily_slot` = round(budget_week / days_left, `rounding`)
    - Нет бюджета в WeekPlan → пропустить, добавить в «Требует внимания»
    - РП уже в плане (carry-over) → взять max(carry_over_budget, daily_slot)
