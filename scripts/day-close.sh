@@ -238,6 +238,220 @@ protected_roots = {
 }
 hash_pattern = re.compile(r"[0-9a-f]{64}")
 
+# issue #911: the POSIX implementation below needs fcntl and os.*(dir_fd=...),
+# neither available on Windows Python, and cannot run there at all. This
+# branch is a deliberately smaller Windows counterpart, not a port: consensus
+# from peer review (WP-7 F171, 24.09) was to under-promise rather than fake
+# parity with the POSIX transaction journal (hardlink quarantine, TOCTOU
+# hardening, NFKC+casefold path canonicalization) --
+#   - no deletion of stale files and no carrying their entries forward in the
+#     new manifest (a carried-forward entry can go stale itself between the
+#     hash check and the manifest write, with nothing here to catch it --
+#     the same race a reviewer found in an earlier draft of this branch);
+#   - cooperative locking is the existing precopy marker file, not a second,
+#     Windows-only lock primitive (msvcrt.locking) nothing else honors;
+#   - os.replace() is not atomic on Windows when the destination is held
+#     open by another process; a locked destination is skipped with a
+#     warning, not treated as a fatal error for the whole run.
+# The manifest this branch writes is always a SUBSET of what a POSIX run
+# would produce (only files this run actually copied) -- files it does not
+# mention are simply untracked, never silently deleted, by this branch or by
+# a later POSIX run reading its manifest.
+def is_windows_shell():
+    return os.name == "nt"
+
+
+def main_windows():
+    if not destination_root.is_dir():
+        warn(f"destination root is not a directory: {destination_root}")
+        raise SystemExit(1)
+
+    reserved_stems = {
+        "CON", "PRN", "AUX", "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }
+
+    def reject_unsafe_component(component):
+        if (
+            not component
+            or component in {".", ".."}
+            or component != component.strip()
+            or component.endswith(".")
+            or any(ch in component for ch in '<>:"|?*')
+            or any(ord(ch) < 32 for ch in component)
+        ):
+            raise ValueError(f"unsafe path component for Windows: {component!r}")
+        stem = component.rsplit(".", 1)[0].upper()
+        if stem in reserved_stems:
+            raise ValueError(f"reserved Windows device name: {component!r}")
+
+    def owned_relative_windows(raw):
+        if not isinstance(raw, str) or not raw or "\\" in raw or ":" in raw:
+            raise ValueError(f"unsafe manifest path: {raw!r}")
+        relative = PurePosixPath(raw)
+        if relative.is_absolute():
+            raise ValueError(f"unsafe manifest path: {raw!r}")
+        parts = relative.parts
+        if not parts or any(part in {"", ".", ".."} for part in parts):
+            raise ValueError(f"unsafe manifest path: {raw!r}")
+        for part in parts:
+            reject_unsafe_component(part)
+        head = parts[0]
+        # Cold review, WP-7 F171: an exact-string check here missed a
+        # same-named-but-different-case file (e.g. "Day-Rhythm-Config.yaml"),
+        # which is the SAME filesystem object as the real, protected one on
+        # any case-insensitive filesystem -- Windows always, and this
+        # machine's own APFS by default. protected_alias()/canonical_
+        # component() (defined above, NFKC+casefold) are the same check the
+        # POSIX branch already uses in validate_owned_relative() -- reuse
+        # them instead of a second, weaker one.
+        if head in protected_roots or (len(parts) == 1 and head in protected_files):
+            raise ValueError(f"manifest path is protected: {raw!r}")
+        if protected_alias(parts) is not None:
+            raise ValueError(f"manifest path aliases a protected path: {raw!r}")
+        return relative
+
+    def is_reparse_point(path):
+        try:
+            st = path.lstat()
+        except OSError:
+            return False
+        attrs = getattr(st, "st_file_attributes", 0)
+        return path.is_symlink() or bool(attrs & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+
+    def discover_windows():
+        discovered = {}
+        for directory, subdirectories, filenames in os.walk(source_root, followlinks=False):
+            relative_dir = Path(directory).relative_to(source_root)
+            parts = relative_dir.parts
+            kept = []
+            for name in sorted(subdirectories):
+                child = Path(directory) / name
+                if not parts and name in protected_roots:
+                    continue
+                # Cold review, WP-7 F171: this warning used to only fire for
+                # a reparse point below the top level -- a top-level one
+                # (e.g. memory/ itself symlinked, or an early sibling) hit
+                # the protected_roots branch above and was skipped silently.
+                if is_reparse_point(child):
+                    warn(f"skipped reparse point directory: {child}")
+                    continue
+                kept.append(name)
+            subdirectories[:] = kept
+            for name in sorted(filenames):
+                if Path(name).suffix not in {".md", ".yaml", ".yml"}:
+                    continue
+                if not parts and name in protected_files:
+                    continue
+                path = Path(directory) / name
+                if is_reparse_point(path):
+                    warn(f"skipped reparse point file: {path}")
+                    continue
+                raw = PurePosixPath(*parts, name).as_posix()
+                try:
+                    owned_relative_windows(raw)
+                except ValueError as error:
+                    warn(f"source file skipped ({error}): {raw}")
+                    continue
+                discovered[raw] = path
+        return discovered
+
+    def atomic_write_windows(target, data):
+        temporary = target.with_name(f".{target.name}.tmp-{os.getpid()}")
+        try:
+            # Cold review, WP-7 F171: mkdir() used to sit outside this try,
+            # so a stale non-directory at an intermediate path component
+            # crashed the whole run instead of skipping this one file, same
+            # as the write/replace failures below already handle.
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with open(temporary, "wb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, target)
+            return True
+        except OSError as error:
+            # Not atomic on Windows when the destination is held open by
+            # another process (Codex, WP-7 F171 review) -- degrade to a
+            # skip-with-warning for this one file, not a fatal run.
+            warn(f"could not publish {target.name} (destination busy?): {error}")
+            return False
+        finally:
+            if temporary.exists():
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
+
+    lock_marker = destination_root / lock_path.name
+    if lock_marker.exists():
+        warn(
+            f"lock marker present ({lock_marker.name}) -- another backup may be "
+            "running, or one crashed and left it behind; refusing to start. If no "
+            "backup is actually running, delete this file and retry."
+        )
+        raise SystemExit(1)
+    try:
+        lock_marker.write_text("windows-backup\n", encoding="ascii")
+    except OSError as error:
+        # Cold review, WP-7 F171: write_text() is open+write+close, not
+        # atomic -- a failure partway through (e.g. ENOSPC) can leave a
+        # partial file that then permanently blocks every future run with
+        # no diagnostic pointing at this one. Clean up before exiting.
+        try:
+            lock_marker.unlink()
+        except FileNotFoundError:
+            pass
+        warn(f"could not create lock marker: {error}")
+        raise SystemExit(1)
+
+    try:
+        write_precopy_journal_windows()
+        sources = discover_windows()
+        copied = {}
+        for raw, path in sources.items():
+            try:
+                data = path.read_bytes()
+            except OSError as error:
+                warn(f"source file unreadable, skipped: {raw} ({error})")
+                continue
+            digest = hashlib.sha256(data).hexdigest()
+            target = destination_root.joinpath(*PurePosixPath(raw).parts)
+            if atomic_write_windows(target, data):
+                copied[raw] = digest
+        if params_source is not None and "params.yaml" in active_special_targets:
+            try:
+                atomic_write_windows(destination_root / "params.yaml", params_source.read_bytes())
+            except OSError as error:
+                warn(f"params.yaml not published: {error}")
+        manifest_path.write_bytes(manifest_payload(copied))
+        try:
+            quarantine_path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            # Cold review, WP-7 F171: copying and the manifest write above
+            # already succeeded -- a transient failure on this purely
+            # cosmetic cleanup step must not turn a real success into a
+            # reported "backup failed" by escalating to the outer handler.
+            warn(f"precopy marker left behind (harmless, cleared on next run): {error}")
+        print(f"owned memory files (windows compatibility mode): {len(copied)}", file=sys.stderr)
+    finally:
+        try:
+            lock_marker.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def write_precopy_journal_windows():
+    quarantine_path.write_bytes(b'{"schema_version":1,"state":"precopy"}\n')
+
+
+# Dispatch happens at the bottom of the script, after every function this
+# branch calls (manifest_payload among them) is defined -- see the matching
+# `if is_windows_shell():` right before the POSIX module-level flow starts.
+
 
 class PreflightError(RuntimeError):
     pass
@@ -1244,6 +1458,20 @@ def recover_active_journal(journal):
 
 
 destination_root.mkdir(parents=True, exist_ok=True)
+
+if is_windows_shell():
+    warn(
+        "Windows compatibility mode: no descriptor-bound TOCTOU protection, no "
+        "hardlink quarantine, no POSIX NFKC+casefold path canonicalization; "
+        "stale files are not removed in this mode."
+    )
+    try:
+        main_windows()
+    except (OSError, UnicodeError, ValueError) as error:
+        warn(f"backup failed ({error})")
+        raise SystemExit(1)
+    raise SystemExit(0)
+
 if destination_root.is_symlink():
     raise SystemExit("destination exocortex root must not be a symlink")
 try:

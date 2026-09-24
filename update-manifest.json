@@ -73,7 +73,7 @@
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
-      "sha256": "fa97c71981a55159a0beb3fc37394dc8756dfeddcd323d9efaacb3c99bb4b718"
+      "sha256": "7a0d0d3e36181e9b2192c043a2801e954e8a20b36d907636a854ef2a21ac2138"
     },
     {
       "path": ".claude/hooks/inject-code-style.sh",
@@ -265,7 +265,7 @@
     },
     {
       "path": ".claude/rules-lazy/drift-guard.md",
-      "sha256": "8099ecc27c790619169409236c470300ff249f9614828969cb1c7a71b92109da"
+      "sha256": "a927544a2a0440df32fd4783268b49a9a05bbe0cf0b2be1bb8aa9aa55623f2f9"
     },
     {
       "path": ".claude/rules-lazy/hooks-bypass-gate.md",
@@ -317,7 +317,7 @@
     },
     {
       "path": ".claude/scripts/check-index-health.py",
-      "sha256": "c6451c640c691fd258ff0623f0464b90d7ca7da8628aea8542689a58fdbbf51a"
+      "sha256": "31b9ab6fcb8ea6664831f229cd07554df5de55992b6f9cf28d33f7ff89ee369f"
     },
     {
       "path": ".claude/scripts/classify-workspace-copy.sh",
@@ -429,7 +429,7 @@
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
-      "sha256": "f5d6d93f7d5f6a764b09d0a4f01a01a1c0b32d27eda72953f63066b5fa8bc574"
+      "sha256": "bcbe5c9d92c1a102da41e8de61d25ece9c5f39e29391dd54a0fcba094d43abc1"
     },
     {
       "path": ".claude/skills/day-open/templates.md",
@@ -805,7 +805,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "af6d4f4f3b7b4b07faef627856bd77c28ac0a957b42fcb9c8b68ff7f460094d4"
+      "sha256": "6e5a9e26b583e9d55a4d94f6a958a64a1498e3aa1340350673ffc2769d2fe8ae"
     },
     {
       "path": ".gitleaks.toml",
@@ -1481,7 +1481,7 @@
     },
     {
       "path": "memory/day-rhythm-config.yaml",
-      "sha256": "f8a129a835b4f8b1c79abdf20d3a6bbc150213394f6c2a04d91da761022fbe40"
+      "sha256": "f22d52315dd5ef7ce4a5c1062a3b97a975797de88283016bb72c9b60dcfba1fd"
     },
     {
       "path": "memory/distinctions-warm.md",
@@ -1709,7 +1709,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "70cf8572a3552a150f5931fd4a98c89669076b80fbb505b4a6a077773036b0cc"
+      "sha256": "67cb61bfd450ee0b6e8c55308b04d19170803f48d93af424d4ee0238ec81f881"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2069,7 +2069,7 @@
     },
     {
       "path": "scripts/build-active-wp.py",
-      "sha256": "39188448fa00e5d70f1bddd157a5467b7b44c2eea3b15a4b33efca6ef2f23c81"
+      "sha256": "3f05bee2a8b00ab5afaf117d2276f26464c6cd0ba23688f683b69b697a652c40"
     },
     {
       "path": "scripts/canon-dirty-proposals.sh",
@@ -2201,7 +2201,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "02aa306059f017cfc579cf4d67fc743bda23bbfba6ba1405d4a3a6f92e24822e"
+      "sha256": "fdba93e2ab0ae1f6df056e52ddcca2e20bd144ae4a5c47a0b1fffae8f2748e07"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
@@ -2301,7 +2301,7 @@
     },
     {
       "path": "scripts/generate-skills-catalog.sh",
-      "sha256": "8809f5a65e200f683eb80ef35b1054fc859e8dcad0492c195aa1c3d561fd44a0"
+      "sha256": "df53c1db72bfeb80bf0a89bf624e58cecdfe1d39c37da830781fe844f496b167"
     },
     {
       "path": "scripts/git-dirty-guard.sh",
@@ -3189,6 +3189,14 @@
     "scripts/tests/test_issue_896_yookassa_digit_segment.sh",
     "scripts/tests/test_issue_898_truncation_signal.sh",
     "scripts/tests/test_issue_901_strategy_table_separator.sh",
+    "scripts/tests/test_issue_902_budget_spread_working_days.sh",
+    "scripts/tests/test_issue_905_build_active_wp_hint.sh",
+    "scripts/tests/test_issue_907_index_health_marker_parsing.py",
+    "scripts/tests/test_issue_909_token_not_configured_message.sh",
+    "scripts/tests/test_issue_911_day_close_windows_backup.py",
+    "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
+    "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
+    "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_manifest_coverage_local.py",
