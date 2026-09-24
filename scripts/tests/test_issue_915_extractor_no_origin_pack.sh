@@ -51,8 +51,16 @@ git -C "$CANON/PACK-local" commit -q --allow-empty -m init
 
 # PACK-good: origin points at a local bare repo, so the strict clone branch
 # below can succeed without any network access.
+#
+# The bare repo's HEAD symref is pinned to `main` explicitly (`-b main`),
+# not left to `init.defaultBranch` -- a bare repo whose HEAD points at a
+# branch nothing was ever pushed to (e.g. the CI runner's `master` default,
+# vs. `main` on this dev machine) leaves `git clone` unable to check
+# anything out, and the later `git rev-parse HEAD` in mount_readonly_packs()
+# fails with "ambiguous argument 'HEAD'" -- passed locally, failed in CI
+# (GitHub Actions run on PR #916, 24.09) for exactly this reason.
 BARE="$WORKDIR/PACK-good-bare.git"
-git init -q --bare "$BARE"
+git init -q --bare -b main "$BARE"
 mkdir -p "$CANON/PACK-good"
 git -C "$CANON/PACK-good" init -q
 git -C "$CANON/PACK-good" commit -q --allow-empty -m init
