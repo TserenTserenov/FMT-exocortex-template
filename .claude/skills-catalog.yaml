@@ -2,7 +2,7 @@
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
 #
-generated: 2026-08-27T12:59:44Z
+generated: 2026-09-25T19:57:53Z
 skills_dir: .claude/skills
 
 skills:
@@ -35,8 +35,8 @@ skills:
     - apply-captures
   - id: archgate
     name: "archgate"
-    description: "Оценка архитектурного решения по 7 характеристикам ЭМОГССБ (v3 — профиль без агрегатного балла, conjunctive screening). Используй когда пользователь предлагает архитектурное решение, новый инструмент или системное изменение."
-    version: 1.0.0
+    description: "Оценка архитектурного решения по 7 характеристикам ЭМОГССБ (v3.1 — фильтр допуска, атрибут-сценарии, совет затронутых сторон; профиль без агрегатного балла, conjunctive screening). Используй когда пользователь предлагает архитектурное решение, новый инструмент или системное изменение."
+    version: 1.1.0
     layer: L1
     status: active
     triggers:
@@ -52,8 +52,8 @@ skills:
     - decompose
   - id: artifactor
     name: "artifactor"
-    description: "Classifies raw pilot request → structured request with routing and an explicit unresolved strategic-basis gate. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."
-    version: 1.0.0
+    description: "Classifies raw pilot request → structured JSON {task_type, class, artifact, budget_estimate, confidence, routing_tag, resolution_path, schema_version, result_type, expected_result_kind, result_kind_resolution, hypothesis_relation}. Keyword-fast (<200ms) or Haiku fallback (<60s). Does NOT create WP or call executor."
+    version: 1.1.0
     layer: L1
     status: active
     triggers:
@@ -63,6 +63,7 @@ skills:
     invoked_by:
     - protocol-open
     - artifactor
+    - wp-new
   - id: audit-docs
     name: "audit-docs"
     description: "Audit repository documentation: detect drift between code and docs, report coverage by category. Run manually or on triggered drift critical."
@@ -113,6 +114,7 @@ skills:
     depends_on: []
     invoked_by:
     - bottleneck-pick
+    - repo-new
     - platform-bottleneck
   - id: check-secret
     name: "check-secret"
@@ -191,7 +193,7 @@ skills:
     - decompose
   - id: diagnose
     name: "diagnose"
-    description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 мин. Сохраняет cp-профиль в цифровой двойник (browser) или Neon (VS Code). Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда видишь пустой cp_profile или нового пользователя без данных."
+    description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 мин. Сохраняет cp-профиль в канонический журнал learning.cp_assessments — через MCP-инструмент (browser) или напрямую в Neon (VS Code). Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда видишь пустой cp_profile или нового пользователя без данных."
     version: 5.0.0
     layer: L1
     status: active
@@ -252,6 +254,7 @@ skills:
     depends_on: []
     invoked_by:
     - CLAUDE.md
+    - wp-new
     - integration-gate
   - id: iwe-bug-report
     name: "iwe-bug-report"
@@ -288,6 +291,7 @@ skills:
         - /iwe-restore
     depends_on: []
     invoked_by:
+    - extend
     - iwe-restore
   - id: iwe-rules-review
     name: "iwe-rules-review"
@@ -403,6 +407,7 @@ skills:
     - pack-new
     - skill-creator
     - pack-creator
+    - repo-new
   - id: peer-conversation
     name: "peer-conversation"
     description: "Многотуровый диалог писателя (Claude) с одним или несколькими напарниками (любой набор из kimi/codex/hermes/claude-headless) по задаче пилота (DP.SC.154). Ведёт turn-loop (2 участника) или round-loop (3+, WP-509), обнаруживает CONSENSUS/ESCALATE, после консенсуса — Decision Gate (зафиксировать vs реализовать → ревью → проверить → задеплоить), синтезирует report.md через Agent tool."
@@ -457,7 +462,7 @@ skills:
     - platform-bottleneck
   - id: repo-new
     name: "repo-new"
-    description: "Гейт создания любого нового репозитория IWE (экосистемного или личного пространства). Проводит запрос через: классификацию намерения (Pack / SpacePlan / именованный проект / экосистемный DS), проверку имени и класса, разметку данных (типы 2.1-2.6, карантин), объявление писатель/владелец/читатели, решение о публичности, обязательный Decision Gate (по умолчанию — одобрение пилота, для CI — ограниченное делегирование), затем исполнение (создание, регистрация, развёртывание скелета). Используй когда пилот хочет создать новый репозиторий, или спрашивает, куда и как разместить новый вид данных. Не для расширения существующего репозитория (→ Repo-Touch/Residency Gate) и не для Pack-репозиториев (делегируется `/pack-new`)."
+    description: "Гейт создания любого нового репозитория IWE (экосистемного или личного пространства). Проводит запрос через: классификацию намерения (Pack / SpacePlan / именованный проект / экосистемный DS), проверку имени и класса, разметку данных (типы 2.1-2.4, карантин), объявление писатель/владелец/читатели, решение о публичности, обязательный Decision Gate (по умолчанию — одобрение пилота, для CI — ограниченное делегирование), затем исполнение (создание, регистрация, развёртывание скелета). Используй когда пилот хочет создать новый репозиторий, или спрашивает, куда и как разместить новый вид данных. Не для расширения существующего репозитория (→ Repo-Touch/Residency Gate) и не для Pack-репозиториев (делегируется `/pack-new`)."
     version: 0.2.0
     layer: L2
     status: experimental
@@ -505,20 +510,20 @@ skills:
     triggers:
       slash: []
     depends_on: []
-    invoked_by:
-    - setup-wakatime
+    invoked_by: []
   - id: skill-creator
     name: "skill-creator"
-    description: "|"
+    description: "Create a new IWE skill with proper frontmatter, gates, scaffold and verification. Use when the pilot says: /skill-creator or «создай скилл <name>». The skill enforces WP Gate precondition, Routing Gate, IntegrationGate hard-check, collects parameters in 4 short steps, generates a scaffold SKILL.md from a template, shows a draft, writes files, and reminds about verify-skill.sh."
     version: 0.3.2
     layer: L1
     status: experimental
     triggers:
       slash:
-        - slash:
+        - /skill-creator
     depends_on: []
     invoked_by:
     - skill-creator
+    - repo-new
   - id: strategy-session
     name: "strategy-session"
     description: "Стратегическая сессия — диспетчер. День-0 (нет Strategy.md/WeekPlan) → initial flow (цели, неудовлетворённости, первый WeekPlan). Первая сессия календарного месяца → полный monthly flow (стратегическая сверка + линза калибра). Остальные дни → короткий weekly flow (требует черновик от session-prep). Триггеры — «проведём стратегическую сессию», «первая стратегическая сессия», «strategy session», «давай стратегировать»."
@@ -571,6 +576,7 @@ skills:
     invoked_by:
     - vdv
     - skill-creator
+    - repo-new
   - id: verify-hypotheses
     name: "verify-hypotheses"
     description: "Сверка журнала гипотез (hypotheses-log.md) по запросу вне ритма week-close. Фильтрует записи со статусом «на сверке» и наступившей датой, сверяет критерий фальсификации с доступной фактурой, предлагает вердикт, пилот подтверждает, вердикт пишется новой записью. Вызывать на явную фразу пилота, не автоматически."
@@ -606,7 +612,9 @@ skills:
     - kimi-peer-writer
     - pack-new
     - skill-creator
+    - artifactor
     - pack-creator
+    - repo-new
     - audit-docs
   - id: w-reflection
     name: "w-reflection"
@@ -662,6 +670,7 @@ skills:
         - /wp-new
     depends_on: []
     invoked_by:
+    - artifactor
     - wp-new
     - pack-creator
     - decompose
