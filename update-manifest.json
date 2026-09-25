@@ -393,7 +393,7 @@
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
-      "sha256": "cfb24705ebf731d80dfc545946b97707964beb3948c33dd5f887a14f95c747b9"
+      "sha256": "c956b999a9d0493ac85b112800f237c46d93ce51ddf2497ae081c0395bfcd4e0"
     },
     {
       "path": ".claude/skills/bottleneck-pick/SKILL.md",
@@ -2553,7 +2553,7 @@
     },
     {
       "path": "scripts/promote-common.sh",
-      "sha256": "09f091dc35474ca700060f0bd5a717f3617118d41ead190b3607a4aa0db015ad"
+      "sha256": "53c7410c5875ced8957812e48f2f02185e1a2555991ed8e5857711b13e961d88"
     },
     {
       "path": "scripts/release-receipt.sh",
