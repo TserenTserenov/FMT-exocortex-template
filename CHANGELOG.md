@@ -147,6 +147,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.40.2] — 2026-09-27
+
 
 ### Fixed
 
