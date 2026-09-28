@@ -204,12 +204,11 @@ run_week_review() {  # <STUB_MODE> [keep-logs] -> exit code of the real script o
         bash "$SCRIPT" week-review >/dev/null 2>&1
     echo $?
 }
-E2E_LOG_GLOB="$E2E_HOME/logs/strategist"/*.log
+e2e_log_text() { cat "$E2E_HOME"/logs/strategist/*.log 2>/dev/null; }
 
 git -C "$E2E_WS/DS-strategy" pull -q --ff-only origin main 2>/dev/null || git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main
 rc=$(run_week_review nothing)
-# shellcheck disable=SC2086
-LOG_TEXT=$(cat $E2E_LOG_GLOB 2>/dev/null)
+LOG_TEXT=$(e2e_log_text)
 if [ "$rc" = "70" ] && printf '%s' "$LOG_TEXT" | grep -q 'FAILED scenario: week-review (rc=70)' \
     && ! printf '%s' "$LOG_TEXT" | grep -q 'SUCCESS scenario: week-review' \
     && printf '%s' "$LOG_TEXT" | grep -q 'POSTCONDITION scenario: week-review' \
@@ -226,8 +225,7 @@ git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy
 # must end the loop (exit 0) while still alarming; the first one must keep exit 70 so a retry is possible.
 rc_first=$(run_week_review nothing)
 rc_second=$(run_week_review nothing keep-logs)
-# shellcheck disable=SC2086
-LOG_TEXT=$(cat $E2E_LOG_GLOB 2>/dev/null)
+LOG_TEXT=$(e2e_log_text)
 if [ "$rc_first" = "70" ] && [ "$rc_second" = "0" ] && printf '%s' "$LOG_TEXT" | grep -q 'GAVE UP scenario: week-review after 2 failed runs' \
     && grep -q 'strategist week-review-failed' "$NOTIFY_LOG"; then
     pass "first failed run exits 70 (retry allowed), second the same day gives up with exit 0 and still alarms"
@@ -237,8 +235,7 @@ fi
 
 git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main
 rc=$(run_week_review deliver)
-# shellcheck disable=SC2086
-LOG_TEXT=$(cat $E2E_LOG_GLOB 2>/dev/null)
+LOG_TEXT=$(e2e_log_text)
 if [ "$rc" = "0" ] && printf '%s' "$LOG_TEXT" | grep -q 'SUCCESS scenario: week-review' \
     && grep -qx 'strategist week-review' "$NOTIFY_LOG" && ! grep -q 'failed' "$NOTIFY_LOG"; then
     pass "report delivered to origin/main -> exit 0, SUCCESS logged, normal notification, no alarm"

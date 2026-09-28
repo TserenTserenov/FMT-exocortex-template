@@ -694,10 +694,11 @@ case "$1" in
             # The scheduler reruns every non-zero exit at its next dispatch (about ten a day, 30
             # min of model time each). An undelivered report is usually structural (a refused
             # session, a frozen checkout), so after the second failed run today stop retrying:
-            # the alarms and the FAILED status already tell the owner. RECORDED is written once
+            # the alarms and the FAILED status already tell the owner (exit 0 makes the scheduler
+            # mark the week done, so a rerun after the fix is by hand). RECORDED is written once
             # per dispatch, unlike FAILED, which repeats on every auth retry inside one.
             if [ "$(grep -c 'RECORDED: week-review failed' "$LOG_FILE")" -ge "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
-                log "GAVE UP scenario: week-review after $WEEK_REVIEW_MAX_FAILED_RUNS failed runs today; no more retries until tomorrow"
+                log "GAVE UP scenario: week-review after $WEEK_REVIEW_MAX_FAILED_RUNS failed runs today; exit 0 marks the week done for the scheduler, so rerun it by hand once the cause is fixed"
                 exit 0
             fi
             exit "$week_review_rc"

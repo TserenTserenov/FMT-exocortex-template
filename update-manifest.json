@@ -1861,7 +1861,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "25d602967d2ee4ea8225bec82c894fbbad2232bed2860ffe6c877e5d190303d8"
+      "sha256": "afb7c823ff52e763489eecca06a97c8f2ac50b33a8abc685210e16b6e1f3c130"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "14e9dd4cdb6028d3f272707b8b87aec8b143a5216e5e54579b57d22771818ebd"
+      "sha256": "7bfced3233ace94eaccea048b82f6205d42421e9136d78d44dcd247689481539"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
