@@ -198,6 +198,9 @@ esac
 exit 0
 STUB
 chmod +x "$E2E_TPL/roles/synchronizer/scripts/notify.sh" "$TEST_ROOT/bin/osascript" "$TEST_ROOT/bin/notify-send" "$TEST_ROOT/stub-model.sh"
+# The stubs must shadow the real notifiers, or a test run would pop up real desktop notifications.
+[ "$(PATH="$TEST_ROOT/bin:$PATH" command -v osascript)" = "$TEST_ROOT/bin/osascript" ] \
+    || { echo "the stand-in osascript does not shadow the real one" >&2; exit 2; }
 
 run_week_review() {  # <STUB_MODE> [keep-logs] -> exit code of the real script on stdout; notifications in $NOTIFY_LOG
     [ "${2:-}" = "keep-logs" ] || rm -rf "$E2E_HOME/logs"
