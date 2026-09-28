@@ -216,6 +216,63 @@ notify_telegram() {
     [ -f "$notify_script" ] && "$notify_script" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
 }
 
+# WP-561 Ф25: a scenario that must deliver a document proves it on origin/main, not by the
+# CLI exit code. 28.09: week-review wrote WeekReport/WeekPlan, could not commit (the commit
+# guard refused its session), was logged "SUCCESS", sent the "завершён" message and marked the
+# day done -- the pilot learned of it from the model's own last lines.
+# Proof: origin/main taken before the run is an ancestor of origin/main after it, and the
+# range between them changes the scenario's exact expected path.
+# Known limit: without a run id in the commit this cannot tell THIS run's commit from a
+# foreign one that touches the same file -- the exact path keeps that window narrow.
+DELIVERY_POSTCONDITION_RC=70
+WEEK_REVIEW_MAX_FAILED_RUNS=2
+
+expected_delivery_path() {  # <scenario> -> :(glob) pathspec in the governance repo, empty = none
+    case "$1" in
+        week-review) echo 'current/WeekReport W*' ;;
+    esac
+}
+
+# Bounded: an unattended run must not hang on the network. Assumes a remote named `origin` and
+# a default branch `main` (the publish step below assumes the same); a repo without them gets no
+# baseline and the run is reported as unproven, which is loud rather than silently green.
+fetch_delivery_origin() {
+    timeout 120 git -C "$WORKSPACE" fetch -q origin main 2>>"$LOG_FILE"
+}
+
+delivery_baseline() {  # <scenario> -> origin/main sha before the run; empty = no contract or origin not freshly read
+    [ -n "$(expected_delivery_path "$1")" ] || return 0
+    # A failed fetch must NOT fall back to the old local origin/main: a stale baseline would let
+    # an earlier report commit pass as this run's delivery.
+    fetch_delivery_origin || return 0
+    git -C "$WORKSPACE" rev-parse origin/main 2>/dev/null || true
+}
+
+verify_delivery_postcondition() {  # <scenario> <origin/main sha before the run>; 0 = delivered or none required
+    local scenario="$1" pre_origin="$2" spec post_origin
+    spec=$(expected_delivery_path "$scenario")
+    [ -n "$spec" ] || return 0
+    if [ -z "$pre_origin" ]; then
+        log "POSTCONDITION scenario: $scenario -- origin/main перед запуском прочитать не удалось (нужны remote origin и ветка main, сеть), доставку проверить нельзя"
+        return 1
+    fi
+    if ! fetch_delivery_origin; then
+        log "POSTCONDITION scenario: $scenario -- git fetch не удался (нужны remote origin и ветка main, сеть), доставку проверить нельзя"
+        return 1
+    fi
+    post_origin=$(git -C "$WORKSPACE" rev-parse origin/main 2>/dev/null) || post_origin=""
+    if [ -z "$post_origin" ] || ! git -C "$WORKSPACE" merge-base --is-ancestor "$pre_origin" "$post_origin" 2>/dev/null; then
+        log "POSTCONDITION scenario: $scenario -- origin/main не продолжает состояние до запуска (${pre_origin:0:12} не предок ${post_origin:0:12}): расхождение или force-push"
+        return 1
+    fi
+    # ACMRT: a deletion of the report file is a change, not a delivery.
+    if [ -z "$(git -C "$WORKSPACE" diff --name-only --diff-filter=ACMRT "$pre_origin" "$post_origin" -- ":(glob)$spec")" ]; then
+        log "POSTCONDITION scenario: $scenario -- за запуск на origin/main не появилось созданного или изменённого файла '$spec': отчёт не доставлен"
+        return 1
+    fi
+    return 0
+}
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
@@ -263,6 +320,10 @@ ${prompt}"
 
     cd "$WORKSPACE"
 
+    # WP-561 Ф25: origin/main до запуска модели, точка отсчёта для постусловия доставки.
+    local delivery_pre_origin
+    delivery_pre_origin=$(delivery_baseline "$command_file")
+
     # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
     local model_args=()
@@ -300,12 +361,6 @@ ${prompt}"
         log "WARN: Claude CLI exited with code $rc for scenario: $command_file"
     fi
 
-    if [ $rc -eq 0 ]; then
-        log "SUCCESS scenario: $command_file"
-    else
-        log "FAILED scenario: $command_file (rc=$rc)"
-    fi
-
     # Push changes to GitHub (чтобы бот мог читать через API)
     if git -C "$WORKSPACE" diff --quiet origin/main..HEAD 2>/dev/null; then
         log "No unpushed commits"
@@ -328,6 +383,17 @@ ${prompt}"
     # НЕ трогаем working tree — только unstage orphaned changes
     git -C "$WORKSPACE" reset --quiet 2>/dev/null || true
     log "Cleared staging area after Claude session"
+
+    # WP-561 Ф25: SUCCESS is written only after delivery is proven -- already_ran_today() keys
+    # on it, so an undelivered run must not mark the day done (a manual rerun stays possible).
+    if [ $rc -eq 0 ] && ! verify_delivery_postcondition "$command_file" "$delivery_pre_origin"; then
+        rc=$DELIVERY_POSTCONDITION_RC
+    fi
+    if [ $rc -eq 0 ]; then
+        log "SUCCESS scenario: $command_file"
+    else
+        log "FAILED scenario: $command_file (rc=$rc)"
+    fi
 
     # macOS notification
     local summary
@@ -613,12 +679,28 @@ case "$1" in
         # transiently unavailable. Retry auth failures with backoff and leave a
         # status file so the morning traffic light can distinguish fresh from
         # stale failures.
-        run_claude_with_retry "week-review" "claude-opus-4-7" 3 60 300
+        # WP-561 Ф25: `set -e` would end the script silently on a failed run (no message at
+        # all); keep the code, alarm the pilot, then exit with it.
+        week_review_rc=0
+        run_claude_with_retry "week-review" "claude-opus-4-7" 3 60 300 || week_review_rc=$?
         # Fallback push for Knowledge Index (week-review creates a post there)
         # KI_REPO may not exist for all users — guard with [ -d ]
         KI_REPO="$HOME/IWE/DS-Knowledge-Index"
         if [ -d "$KI_REPO/.git" ] && git -C "$KI_REPO" log --oneline -1 --since="1 hour ago" --grep="week-review" 2>/dev/null | grep -q .; then
             git -C "$KI_REPO" push >> "$LOG_FILE" 2>&1 && log "Pushed Knowledge Index (fallback)" || log "WARN: KI push failed"
+        fi
+        if [ "$week_review_rc" -ne 0 ]; then
+            notify_telegram "week-review-failed" || true  # the alarm must never replace the run's own exit code
+            # The scheduler reruns every non-zero exit at its next dispatch (about ten a day, 30
+            # min of model time each). An undelivered report is usually structural (a refused
+            # session, a frozen checkout), so after the second failed run today stop retrying:
+            # the alarms and the FAILED status already tell the owner. RECORDED is written once
+            # per dispatch, unlike FAILED, which repeats on every auth retry inside one.
+            if [ "$(grep -c 'RECORDED: week-review failed' "$LOG_FILE")" -ge "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
+                log "GAVE UP scenario: week-review after $WEEK_REVIEW_MAX_FAILED_RUNS failed runs today; no more retries until tomorrow"
+                exit 0
+            fi
+            exit "$week_review_rc"
         fi
         notify_telegram "week-review"
         ;;
