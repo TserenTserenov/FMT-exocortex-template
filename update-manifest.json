@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "14b21c2b95de4d820e7b2c348f2c95ca4b8708d09f6300cefec6257a29e6a722"
+      "sha256": "fb337031dd81c5cd65ed2639093beb6f1383d92788d3f9cd337243fd17df130f"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",

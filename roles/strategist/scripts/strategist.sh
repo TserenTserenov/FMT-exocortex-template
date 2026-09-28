@@ -249,7 +249,7 @@ delivery_baseline() {  # <scenario> -> origin/main sha before the run; empty = n
 }
 
 verify_delivery_postcondition() {  # <scenario> <origin/main sha before the run>; 0 = delivered or none required
-    local scenario="$1" pre_origin="$2" spec post_origin
+    local scenario="$1" pre_origin="$2" spec post_origin existing
     spec=$(expected_delivery_path "$scenario")
     [ -n "$spec" ] || return 0
     if [ -z "$pre_origin" ]; then
@@ -268,6 +268,13 @@ verify_delivery_postcondition() {  # <scenario> <origin/main sha before the run>
     # ACMRT: a deletion of the report file is a change, not a delivery.
     if [ -z "$(git -C "$WORKSPACE" diff --name-only --diff-filter=ACMRT "$pre_origin" "$post_origin" -- ":(glob)$spec")" ]; then
         log "POSTCONDITION scenario: $scenario -- за запуск на origin/main не появилось созданного или изменённого файла '$spec': отчёт не доставлен"
+        # The proof is per run, on purpose: a report that was already there is not this run's work
+        # (an empty stub or last week's file would otherwise pass). A rerun after an earlier delivery
+        # still fails here, so name what IS there -- the reader can tell a false alarm at a glance.
+        # diff against the empty tree: the same pathspec semantics as the delivery check above
+        # (ls-tree reads its paths differently and would miss the glob).
+        existing=$(git -C "$WORKSPACE" diff --name-only "$(git -C "$WORKSPACE" hash-object -t tree /dev/null)" "$post_origin" -- ":(glob)$spec" 2>/dev/null | tr '\n' ';')
+        [ -z "$existing" ] || log "POSTCONDITION scenario: $scenario -- на origin/main уже есть, без изменений за этот запуск: ${existing%;}"
         return 1
     fi
     return 0
@@ -316,6 +323,9 @@ close_runner_session() {  # once per open; a failed close is logged and never re
 # behind when they died. A semaphore whose recorded owner pid is still alive belongs to a live run
 # (possibly one that started before midnight) and is left alone; a dead owner's is closed by its own
 # reason (parsed from the file name). A failed close only means the lease will expire.
+# Liveness is `kill -0` only: a pid reused by an unrelated process keeps a leftover alive until the
+# guard's lease expires. Accepted -- since open_runner_session selects its own session by slug, such
+# a leftover no longer gets in the way of the next run.
 close_dead_runner_sessions() {  # <agent> <sessions dir>
     local agent="$1" dir="$2" sem reason pid
     for sem in "$dir/${agent}-housekeeping-"*.open; do
@@ -362,7 +372,11 @@ open_runner_session() {  # <scenario>
     # Without the directory the guard records the scope as the literal path `current` (no trailing
     # slash), which covers no file below it.
     mkdir -p "$WORKSPACE/$scope"
-    if ! runner_guard note-file "$scope" --agent "$agent"; then
+    # --slug: the guard selects a session by agent, and a second live session of this agent (a run
+    # that overlapped midnight, or a leftover whose recorded pid got reused) makes that ambiguous --
+    # the guard then refuses and the run would die with exit 71 before the model (cold review, 28.09).
+    # A housekeeping semaphore stores its reason as the slug, so the reason selects exactly this one.
+    if ! runner_guard note-file "$scope" --agent "$agent" --slug "$reason"; then
         close_runner_session
         return 1
     fi

@@ -129,7 +129,7 @@ else
 fi
 
 PRE=$(pre_origin)
-git -C "$OTHER" pull -q --ff-only origin main 2>/dev/null || git -C "$OTHER" fetch -q origin main && git -C "$OTHER" reset -q --hard origin/main
+git -C "$OTHER" fetch -q origin main && git -C "$OTHER" reset -q --hard origin/main
 push_from_other "current/WeekReport W41 2026-10-05.md"
 PRE=$(pre_origin)
 git -C "$OTHER" rm -q "current/WeekReport W41 2026-10-05.md"
@@ -137,6 +137,18 @@ git -C "$OTHER" -c commit.gpgsign=false commit -q -m "delete the report"
 git -C "$OTHER" push -q origin HEAD:main
 rc=$(run_postcondition week-review "$PRE")
 [ "$rc" = "1" ] && pass "deleting a report file is not a delivery" || fail "a deletion must not satisfy the check, rc=$rc: $(cat "$LOG_FILE")"
+
+# A report that was already on origin/main before the run and did not change is not this run's
+# delivery (per-run proof, on purpose) -- but the log must name it, so a rerun after an earlier
+# delivery reads as a false alarm at a glance rather than as a lost report.
+push_from_other "current/WeekReport W42 2026-10-12.md"
+PRE=$(pre_origin)
+rc=$(run_postcondition week-review "$PRE")
+if [ "$rc" = "1" ] && grep -q 'отчёт не доставлен' "$LOG_FILE" && grep -q 'уже есть, без изменений за этот запуск: .*WeekReport W42 2026-10-12.md' "$LOG_FILE"; then
+    pass "a pre-existing, unchanged report is not this run's delivery, and the log names what is already there"
+else
+    fail "unchanged pre-existing report: rc=$rc log=$(cat "$LOG_FILE")"
+fi
 
 rc=$(run_postcondition week-review "")
 [ "$rc" = "1" ] && grep -q 'перед запуском' "$LOG_FILE" && pass "no baseline sha -> refused, cannot prove delivery" || fail "missing baseline must be refused, rc=$rc"
@@ -212,7 +224,7 @@ run_week_review() {  # <STUB_MODE> [keep-logs] -> exit code of the real script o
 }
 e2e_log_text() { cat "$E2E_HOME"/logs/strategist/*.log 2>/dev/null; }
 
-git -C "$E2E_WS/DS-strategy" pull -q --ff-only origin main 2>/dev/null || git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main
+git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main
 rc=$(run_week_review nothing)
 LOG_TEXT=$(e2e_log_text)
 if [ "$rc" = "70" ] && printf '%s' "$LOG_TEXT" | grep -q 'FAILED scenario: week-review (rc=70)' \
@@ -293,7 +305,9 @@ guard_calls() {
 }
 reset_ws() { git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main; }
 OPEN='guard open --housekeeping week-review-R --agent strategist-week-review --canonical-owner week-review --owner-pid N|'
-NOTE='guard note-file current/ --agent strategist-week-review|'
+# --slug: the run's own reason selects ITS session even when a second live session of the same agent
+# exists (see the real-guard case below).
+NOTE='guard note-file current/ --agent strategist-week-review --slug week-review-R|'
 CLOSE='guard close --housekeeping week-review-R --agent strategist-week-review|'
 
 reset_ws
@@ -346,10 +360,9 @@ rm -f "$STALE_SEM"
 # A leftover whose recorded owner pid is alive belongs to a live run (for instance one that started
 # before midnight, when the per-day lock name changes): it must be left alone.
 reset_ws
-sleep 60 & LIVE_PID=$!
-mkdir -p "$(dirname "$STALE_SEM")"; printf 'agent: strategist-week-review\npid: %s\n' "$LIVE_PID" > "$STALE_SEM"
+# This test's own pid is alive for the whole run: no background process to spawn and reap.
+mkdir -p "$(dirname "$STALE_SEM")"; printf 'agent: strategist-week-review\npid: %s\n' "$$" > "$STALE_SEM"
 rc=$(run_guarded deliver ok); calls=$(guard_calls)
-kill "$LIVE_PID" 2>/dev/null; wait "$LIVE_PID" 2>/dev/null
 [ "$rc" = "0" ] && [ "$calls" = "${OPEN}${NOTE}MODEL|${CLOSE}" ] && [ -e "$STALE_SEM" ] \
     && pass "a semaphore whose owner pid is alive is not touched (its run may still be in the model)" \
     || fail "a live run's session must be left alone: rc=$rc calls=$calls"
@@ -370,6 +383,30 @@ if [ "$rc_first" = "70" ] && [ "$rc_second" = "0" ] && [ "$open_left" = "0" ] \
     pass "template's own guard, two runs in a row: both get a session, none is left open (no wedge after a closed receipt)"
 else
     fail "two runs against the template guard: first=$rc_first second=$rc_second open_left=$open_left log=$(printf '%s' "$LOG_SECOND" | tail -3)"
+fi
+
+# A second LIVE session of the same agent (a run that overlapped midnight, or a leftover whose pid
+# got reused) makes an agent-only selector ambiguous: the real guard answered note-file with
+# "несколько открытых семафоров" and the run died with 71 before the model (cold review, 28.09).
+# The run must select its own session by its reason (slug), deliver, close only its own session and
+# leave the live one alone.
+LIVE_REASON="week-review-2026-09-01-1"
+LIVE_SEM="$E2E_WS/.iwe-runtime/sessions/strategist-week-review-housekeeping-$LIVE_REASON.open"
+real_guard() { ( cd "$E2E_WS/DS-strategy" && IWE_ROOT="$E2E_WS" IWE_GOVERNANCE_REPO=DS-strategy bash "$REPO_ROOT/scripts/session-guard.sh" "$@" ) >/dev/null 2>&1; }
+reset_ws
+if real_guard open --housekeeping "$LIVE_REASON" --agent strategist-week-review --canonical-owner week-review --owner-pid "$$" && [ -e "$LIVE_SEM" ]; then
+    rc=$(run_guarded deliver ok real-guard); LOG_TEXT=$(e2e_log_text)
+    open_left=$(find "$E2E_WS/.iwe-runtime/sessions" -name '*.open' 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$rc" = "0" ] && [ "$open_left" = "1" ] && [ -e "$LIVE_SEM" ] \
+        && printf '%s' "$LOG_TEXT" | grep -q 'SESSION: открыта служебная сессия' \
+        && printf '%s' "$LOG_TEXT" | grep -q 'SUCCESS scenario: week-review'; then
+        pass "template's own guard, a second live session of the same agent: the run still gets its scope (selected by slug), delivers, and leaves the live session alone"
+    else
+        fail "second live session: rc=$rc open_left=$open_left live_kept=$([ -e "$LIVE_SEM" ] && echo yes || echo no) log=$(printf '%s' "$LOG_TEXT" | tail -4)"
+    fi
+    real_guard close --housekeeping "$LIVE_REASON" --agent strategist-week-review
+else
+    fail "could not open the live session fixture with the template guard"
 fi
 
 echo ""
