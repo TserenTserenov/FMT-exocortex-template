@@ -233,11 +233,31 @@ expected_delivery_path() {  # <scenario> -> :(glob) pathspec in the governance r
     esac
 }
 
-# Bounded: an unattended run must not hang on the network. Assumes a remote named `origin` and
-# a default branch `main` (the publish step below assumes the same); a repo without them gets no
-# baseline and the run is reported as unproven, which is loud rather than silently green.
+# Bounded and prompt-free: an unattended run must not hang on the network or on a credential
+# prompt. Assumes a remote named `origin` and a default branch `main` (the publish step below
+# assumes the same); a repo without them gets no baseline and the run is reported as unproven,
+# which is loud rather than silently green.
+# Retries absorb the short outages that hit a job with no rerun (weekly, 00:00): a baseline lost to
+# a blip would turn a delivered report into a false "cannot prove". Worst case per call is about
+# 105 s (3 x 30 s + 5 s + 10 s), and the call runs twice per scenario, before and after the model.
+# It runs inside $(...) (see delivery_baseline), so it writes to the log file directly and never
+# through log(), whose stdout would end up in the captured sha.
+# DELIVERY_GIT_BIN is a test seam for this one fetch: the publisher and the guard keep the real git.
 fetch_delivery_origin() {
-    timeout 120 git -C "$WORKSPACE" fetch -q origin main 2>>"$LOG_FILE"
+    local attempts="${DELIVERY_FETCH_ATTEMPTS:-3}" per_try="${DELIVERY_FETCH_TIMEOUT:-30}" pause="${DELIVERY_FETCH_PAUSE:-5}"
+    local n=1 rc
+    case "$attempts$per_try$pause" in *[!0-9]*) attempts=3; per_try=30; pause=5 ;; esac
+    [ "$attempts" -ge 1 ] || attempts=3
+    [ "$per_try" -ge 1 ] || per_try=30
+    while :; do
+        rc=0
+        GIT_TERMINAL_PROMPT=0 timeout "$per_try" "${DELIVERY_GIT_BIN:-git}" -C "$WORKSPACE" fetch -q origin main 2>>"$LOG_FILE" || rc=$?
+        [ "$rc" -eq 0 ] && return 0
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] GIT-FETCH: попытка $n из $attempts не удалась (код $rc)" >> "$LOG_FILE"
+        [ "$n" -lt "$attempts" ] || return 1
+        sleep $((pause * n))
+        n=$((n + 1))
+    done
 }
 
 delivery_baseline() {  # <scenario> -> origin/main sha before the run; empty = no contract or origin not freshly read
@@ -384,12 +404,29 @@ open_runner_session() {  # <scenario>
     return 0
 }
 
+log_size_bytes() {  # -> size of the daily log in bytes, 0 when there is none
+    local size=0
+    # BSD wc pads with spaces; strip so arithmetic/tail offsets stay sane.
+    [ -f "$LOG_FILE" ] && size=$(wc -c < "$LOG_FILE" | tr -d '[:space:]')
+    case "$size" in ''|*[!0-9]*) size=0 ;; esac
+    echo "$size"
+}
+
+# Byte range of the log that holds exactly the output of the last AI_CLI call. run_claude_with_retry
+# looks for auth failures only there: the rest of an attempt's log also carries the output of git
+# fetch and of the publisher, whose own "401 Unauthorized" would restart a model run that failed
+# for another reason. Empty = no CLI call in the last run_claude (an early exit).
+AI_CLI_OUT_START=""
+AI_CLI_OUT_END=""
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
     # Приоритет: аргумент > env > пустая строка (дефолт Claude CLI).
     local model_override="${2:-${IWE_STRATEGIST_MODEL:-}}"
     local command_path="$PROMPTS_DIR/$command_file.md"
+    AI_CLI_OUT_START=""
+    AI_CLI_OUT_END=""
 
     if [ ! -f "$command_path" ]; then
         log "ERROR: Command file not found: $command_path"
@@ -466,10 +503,12 @@ ${prompt}"
     else
         extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash,${calendar_mcp}")
     fi
+    AI_CLI_OUT_START=$(log_size_bytes)
     timeout "$CLAUDE_TIMEOUT" "$AI_CLI" \
         "${extra_flags[@]}" \
         $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1 || rc=$?
+    AI_CLI_OUT_END=$(log_size_bytes)
 
     if [ $rc -eq 124 ]; then
         log "WARN: Claude CLI timed out after ${CLAUDE_TIMEOUT}s for scenario: $command_file"
@@ -536,24 +575,16 @@ run_claude_with_retry() {
 
     while [ "$attempt" -le "$max_attempts" ]; do
         rc=0
-        # Capture only the output produced by this attempt, not stale lines
-        # from earlier scenarios in the shared daily log.
-        local log_start_bytes=0
-        if [ -f "$LOG_FILE" ]; then
-            # BSD wc pads with spaces; strip so arithmetic/tail offsets stay sane.
-            log_start_bytes=$(wc -c < "$LOG_FILE" | tr -d '[:space:]')
-            case "$log_start_bytes" in
-                ''|*[!0-9]*) log_start_bytes=0 ;;
-            esac
-        fi
         run_claude "$command_file" "$model_override" || rc=$?
 
         # Transient auth failure: 403/401 in this attempt's CLI output is
-        # recoverable once the VPN/credentials become available.
+        # recoverable once the VPN/credentials become available. Only the CLI's own output counts
+        # (AI_CLI_OUT_*), not the fetch/publish lines that share the log.
         if [ "$rc" -ne 0 ] && [ "$attempt" -lt "$max_attempts" ]; then
             local attempt_output=""
-            if [ -f "$LOG_FILE" ]; then
-                attempt_output=$(tail -c "+$((log_start_bytes + 1))" "$LOG_FILE" 2>/dev/null || true)
+            if [ -n "$AI_CLI_OUT_START" ] && [ -n "$AI_CLI_OUT_END" ] && [ -f "$LOG_FILE" ]; then
+                attempt_output=$(tail -c "+$((AI_CLI_OUT_START + 1))" "$LOG_FILE" 2>/dev/null \
+                    | head -c "$((AI_CLI_OUT_END - AI_CLI_OUT_START))" || true)
             fi
             if printf '%s\n' "$attempt_output" | grep -qiE "(Failed to authenticate|API Error: 403|401 Unauthorized|Request not allowed)"; then
                 local delay_idx=$((attempt - 1))

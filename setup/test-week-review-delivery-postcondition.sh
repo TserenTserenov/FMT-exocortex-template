@@ -13,6 +13,10 @@ REPO_ROOT="$(dirname "$SELF_DIR")"
 SCRIPT="$REPO_ROOT/roles/strategist/scripts/strategist.sh"
 TEST_ROOT="${WEEK_REVIEW_POSTCONDITION_TEST_ROOT:-/tmp/iwe-week-review-postcondition-$$}"
 
+# The fetch retries pause between attempts; no test below waits for a real pause (the one case that
+# checks the pause values passes its own).
+export DELIVERY_FETCH_PAUSE=0
+
 FAIL_COUNT=0
 PASS_COUNT=0
 fail() { echo "  ❌ FAIL: $*" >&2; FAIL_COUNT=$((FAIL_COUNT + 1)); }
@@ -178,6 +182,72 @@ rc=$(run_postcondition week-review "$PRE")
 mv "$ORIGIN.gone" "$ORIGIN"
 [ "$rc" = "1" ] && grep -q 'git fetch не удался' "$LOG_FILE" && pass "unreachable origin -> refused, cannot prove delivery" || fail "unreachable origin must be refused, rc=$rc"
 
+echo "=== fetch_delivery_origin: bounded retries ==="
+
+# A stand-in for git, used through DELIVERY_GIT_BIN by fetch_delivery_origin ONLY: the publisher and
+# the guard keep the real git. FETCH_PLAN holds one letter per call: F = fail, T = exit 124 (a
+# timeout), anything else = the real git; calls past the plan use the real git.
+REAL_GIT=$(command -v git)
+FETCH_STATE="$TEST_ROOT/fetch.state"
+cat > "$TEST_ROOT/fetch-git-stub.sh" <<'STUB'
+#!/bin/bash
+n=$(( $(cat "$FETCH_STATE" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$FETCH_STATE"
+read -ra plan <<< "${FETCH_PLAN:-}"
+case "${plan[$((n - 1))]:-.}" in
+    F) echo "fatal: unable to access 'origin': Could not resolve host" >&2; exit 128 ;;
+    T) exit 124 ;;
+    *) exec "$REAL_GIT" "$@" ;;
+esac
+STUB
+chmod +x "$TEST_ROOT/fetch-git-stub.sh"
+export REAL_GIT FETCH_STATE
+
+SLEEP_LOG="$TEST_ROOT/sleep.log"
+PLAN_PAUSE=0
+# run_with_plan <plan> <snippet that uses the cut-out functions>; sleep() is a recorder, log() as above
+run_with_plan() {
+    : > "$LOG_FILE"; : > "$SLEEP_LOG"; rm -f "$FETCH_STATE"
+    FETCH_PLAN="$1" DELIVERY_GIT_BIN="$TEST_ROOT/fetch-git-stub.sh" DELIVERY_FETCH_PAUSE="$PLAN_PAUSE" bash -c "log() { echo \"\$1\" >> \"$LOG_FILE\"; }
+sleep() { echo \"\$1\" >> \"$SLEEP_LOG\"; }
+$FUNCTIONS
+$2" 2>/dev/null
+}
+calls() { cat "$FETCH_STATE" 2>/dev/null || echo 0; }
+ORIGIN_SHA=$(git -C "$ORIGIN" rev-parse main)
+
+BASE=$(run_with_plan "F F ." 'delivery_baseline week-review')
+[ "$BASE" = "$ORIGIN_SHA" ] && [ "$(calls)" = "3" ] \
+    && pass "two failed fetches then a good one -> baseline is exactly the sha (stdout carries nothing else), 3 calls" \
+    || fail "transient fetch failure: base='$BASE' calls=$(calls)"
+
+BASE=$(run_with_plan "T T ." 'delivery_baseline week-review')
+[ "$BASE" = "$ORIGIN_SHA" ] && grep -q 'GIT-FETCH: попытка 1 из 3 не удалась (код 124)' "$LOG_FILE" \
+    && pass "exit 124 from timeout counts as a failed try, not as success" \
+    || fail "a timeout must be retried: base='$BASE' log=$(cat "$LOG_FILE")"
+
+PLAN_PAUSE=5
+BASE=$(run_with_plan "F F F" 'delivery_baseline week-review')
+PLAN_PAUSE=0
+if [ -z "$BASE" ] && [ "$(calls)" = "3" ] && [ "$(tr '\n' ' ' < "$SLEEP_LOG")" = "5 10 " ] \
+    && [ "$(grep -c 'GIT-FETCH: попытка' "$LOG_FILE")" = "3" ]; then
+    pass "all three tries fail -> no baseline; pauses are 5 s then 10 s and none after the last try"
+else
+    fail "exhausted retries: base='$BASE' calls=$(calls) sleeps='$(tr '\n' ' ' < "$SLEEP_LOG")'"
+fi
+
+rc=$(run_with_plan "F F . F F ." 'pre=$(delivery_baseline week-review); verify_delivery_postcondition week-review "$pre"; echo $?' | tail -1)
+if [ "$rc" = "1" ] && [ "$(calls)" = "6" ] && grep -q 'отчёт не доставлен' "$LOG_FILE" && ! grep -q 'git fetch не удался' "$LOG_FILE"; then
+    pass "the retry budget is per call: 3 tries before the model and 3 after it, each recovered"
+else
+    fail "per-call budget: rc=$rc calls=$(calls) log=$(cat "$LOG_FILE")"
+fi
+
+BASE_ZERO=$(run_with_plan "F F ." 'export DELIVERY_FETCH_ATTEMPTS=0; delivery_baseline week-review')
+BASE_TEXT=$(run_with_plan "F F ." 'export DELIVERY_FETCH_TIMEOUT=abc; delivery_baseline week-review')
+[ "$BASE_ZERO" = "$ORIGIN_SHA" ] && [ "$BASE_TEXT" = "$ORIGIN_SHA" ] \
+    && pass "a zero or non-numeric setting falls back to the defaults instead of breaking the loop" \
+    || fail "bad settings must fall back to 3 tries: zero='$BASE_ZERO' text='$BASE_TEXT'"
+
 echo "=== end to end: the real strategist.sh week-review with a stand-in model ==="
 
 # The wiring (run_claude ordering, retry wrapper, `set -e`, the case branch) is the part unit tests
@@ -195,6 +265,7 @@ printf '#!/bin/bash\nexit 0\n' > "$TEST_ROOT/bin/osascript"; cp "$TEST_ROOT/bin/
 cat > "$TEST_ROOT/stub-model.sh" <<'STUB'
 #!/bin/bash
 # Stands in for the model. STUB_MODE: nothing (exit 0, deliver nothing) | deliver | crash
+# | commit-crash (a local report commit, no push, exit 1) | auth403 (the CLI's own auth error, exit 1)
 [ -z "${GUARD_LOG:-}" ] || echo MODEL >> "$GUARD_LOG"
 case "${STUB_MODE:-nothing}" in
     deliver)
@@ -205,10 +276,26 @@ case "${STUB_MODE:-nothing}" in
         echo "report $$ $(date +%s%N)" > "current/WeekReport W39 2026-09-21.md"
         git add -A && git -c commit.gpgsign=false commit -q -m "week report" && git push -q origin HEAD:main
         ;;
+    commit-crash)
+        cd "$STUB_WORKSPACE" || exit 9
+        mkdir -p current
+        echo "report $$ $(date +%s%N)" > "current/WeekReport W39 2026-09-21.md"
+        git add "current/WeekReport W39 2026-09-21.md" && git -c commit.gpgsign=false commit -q -m "week report (local)"
+        exit 1
+        ;;
+    auth403) echo "API Error: 403 Request not allowed"; exit 1 ;;
     crash) exit 1 ;;
 esac
 exit 0
 STUB
+# A no-op sleep that records its argument while STUB_SLEEP_LOG is set (the model's auth retry waits
+# 60 s and 300 s); the real sleep otherwise.
+cat > "$TEST_ROOT/bin/sleep" <<'STUB'
+#!/bin/bash
+if [ -n "${STUB_SLEEP_LOG:-}" ]; then echo "$1" >> "$STUB_SLEEP_LOG"; exit 0; fi
+exec /bin/sleep "$@"
+STUB
+chmod +x "$TEST_ROOT/bin/sleep"
 chmod +x "$E2E_TPL/roles/synchronizer/scripts/notify.sh" "$TEST_ROOT/bin/osascript" "$TEST_ROOT/bin/notify-send" "$TEST_ROOT/stub-model.sh"
 # The stubs must shadow the real notifiers, or a test run would pop up real desktop notifications.
 [ "$(PATH="$TEST_ROOT/bin:$PATH" command -v osascript)" = "$TEST_ROOT/bin/osascript" ] \
@@ -296,9 +383,14 @@ run_guarded() {
     HOME="$E2E_HOME" PATH="$TEST_ROOT/bin:$PATH" IWE_WORKSPACE="$E2E_WS" IWE_GOVERNANCE_REPO=DS-strategy \
         IWE_TEMPLATE="$E2E_TPL" IWE_SCRIPTS="$scripts_dir" AI_CLI="$TEST_ROOT/stub-model.sh" STUB_MODE="$1" \
         STUB_GUARD="$2" GUARD_LOG="$GUARD_LOG" STUB_WORKSPACE="$E2E_WS/DS-strategy" \
+        DELIVERY_GIT_BIN="${E2E_DELIVERY_GIT_BIN:-}" FETCH_PLAN="${E2E_FETCH_PLAN:-}" STUB_SLEEP_LOG="${E2E_SLEEP_LOG:-}" \
         bash "$SCRIPT" week-review >/dev/null 2>&1
     echo $?
 }
+# with_fetch_plan <plan>: the next run_guarded calls use the fetch stand-in until without_fetch_plan
+with_fetch_plan() { E2E_DELIVERY_GIT_BIN="$TEST_ROOT/fetch-git-stub.sh"; E2E_FETCH_PLAN="$1"; rm -f "$FETCH_STATE"; }
+without_fetch_plan() { E2E_DELIVERY_GIT_BIN=""; E2E_FETCH_PLAN=""; }
+model_runs() { grep -c '^MODEL$' "$GUARD_LOG" 2>/dev/null || true; }
 guard_calls() {
     sed -E 's/--owner-pid [0-9]+/--owner-pid N/; s/week-review-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+/week-review-R/g' \
         "$GUARD_LOG" 2>/dev/null | tr '\n' '|'
@@ -407,6 +499,67 @@ if real_guard open --housekeeping "$LIVE_REASON" --agent strategist-week-review 
     real_guard close --housekeeping "$LIVE_REASON" --agent strategist-week-review
 else
     fail "could not open the live session fixture with the template guard"
+fi
+
+echo "=== end to end: fetch failures around the model, and what counts as an auth failure ==="
+
+# The week-review job has no rerun and no second chance at 00:00, so the wrapper must (1) ride out a
+# short git outage on both sides of the model, (2) still run the model when the baseline could not be
+# read (an unprovable delivery is better than no report at all), (3) restart the model only for the
+# CLI's own auth errors, never for a 401 that came from git or from the publisher.
+reset_ws
+with_fetch_plan "F F . F F ."
+rc=$(run_guarded deliver ok); LOG_TEXT=$(e2e_log_text)
+without_fetch_plan
+if [ "$rc" = "0" ] && [ "$(calls)" = "6" ] && [ "$(model_runs)" = "1" ] \
+    && [ "$(printf '%s\n' "$LOG_TEXT" | grep -c 'GIT-FETCH: попытка')" = "4" ] \
+    && printf '%s' "$LOG_TEXT" | grep -q 'SUCCESS scenario: week-review'; then
+    pass "a short git outage before and after the model is ridden out: delivered, proven, exit 0, 4 failed tries logged"
+else
+    fail "transient outage around the model: rc=$rc fetch_calls=$(calls) model_runs=$(model_runs) log=$(printf '%s' "$LOG_TEXT" | tail -4)"
+fi
+
+reset_ws
+with_fetch_plan "F F F F F F"
+rc=$(run_guarded deliver ok); LOG_TEXT=$(e2e_log_text); calls_seen=$(guard_calls)
+without_fetch_plan
+if [ "$rc" = "70" ] && [ "$(model_runs)" = "1" ] && [ "$calls_seen" = "${OPEN}${NOTE}MODEL|${CLOSE}" ] \
+    && printf '%s' "$LOG_TEXT" | grep -q 'перед запуском прочитать не удалось' \
+    && grep -q 'strategist week-review-failed' "$NOTIFY_LOG"; then
+    pass "git is down before the run: the model STILL runs (no report is worse than an unprovable one), the run ends 70 with an alarm"
+else
+    fail "unreadable baseline: rc=$rc model_runs=$(model_runs) calls=$calls_seen notify=$(cat "$NOTIFY_LOG" 2>/dev/null)"
+fi
+
+# A publisher that fails with a 401 of its own, after a model that made a local commit and died.
+# Restarting the model here would burn up to 90 minutes of a one-shot slot for a failure the model
+# did not cause. The stand-in publisher makes no network call.
+FAKE_PUB="$E2E_WS/DS-strategy/scripts/ds-publish.sh"
+mkdir -p "$(dirname "$FAKE_PUB")"
+printf '#!/bin/bash\necho "fatal: unable to access origin: The requested URL returned error: 401 Unauthorized"\nexit 1\n' > "$FAKE_PUB"
+reset_ws
+SLEEPS="$TEST_ROOT/e2e-sleeps.log"; : > "$SLEEPS"; E2E_SLEEP_LOG="$SLEEPS"
+rc=$(run_guarded commit-crash ok); LOG_TEXT=$(e2e_log_text)
+E2E_SLEEP_LOG=""
+rm -f "$FAKE_PUB"; rmdir "$(dirname "$FAKE_PUB")" 2>/dev/null || true
+if [ "$rc" = "1" ] && [ "$(model_runs)" = "1" ] && printf '%s' "$LOG_TEXT" | grep -q '401 Unauthorized' \
+    && ! printf '%s' "$LOG_TEXT" | grep -q 'AUTH_FAILURE' && [ ! -s "$SLEEPS" ]; then
+    pass "a 401 from the publisher after a model failure is not a model auth error: no restart, the model ran once"
+else
+    fail "publisher 401 must not restart the model: rc=$rc model_runs=$(model_runs) sleeps='$(tr '\n' ' ' < "$SLEEPS")' log=$(printf '%s' "$LOG_TEXT" | tail -5)"
+fi
+
+# Positive control for the range: the CLI's OWN auth error still restarts the model (twice, with the
+# 60 s and 300 s waits, which the recorder skips).
+reset_ws
+: > "$SLEEPS"; E2E_SLEEP_LOG="$SLEEPS"
+rc=$(run_guarded auth403 ok); LOG_TEXT=$(e2e_log_text)
+E2E_SLEEP_LOG=""
+if [ "$rc" = "1" ] && [ "$(model_runs)" = "3" ] && [ "$(printf '%s\n' "$LOG_TEXT" | grep -c 'AUTH_FAILURE')" = "2" ] \
+    && grep -qx 60 "$SLEEPS" && grep -qx 300 "$SLEEPS"; then
+    pass "the CLI's own auth error still restarts the model (3 runs, waits 60 s and 300 s), then the run fails with an alarm"
+else
+    fail "CLI auth retry: rc=$rc model_runs=$(model_runs) sleeps='$(tr '\n' ' ' < "$SLEEPS")' log=$(printf '%s' "$LOG_TEXT" | grep -c AUTH_FAILURE)"
 fi
 
 echo ""
