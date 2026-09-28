@@ -1861,7 +1861,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "afb7c823ff52e763489eecca06a97c8f2ac50b33a8abc685210e16b6e1f3c130"
+      "sha256": "87f5c8ca89edfdb3c5f2e513e6dcdd34e8549d5a532c6a353452f93c646a34ca"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "7bfced3233ace94eaccea048b82f6205d42421e9136d78d44dcd247689481539"
+      "sha256": "09ee3492f7d8ed50c2139f490e9507ef5bfad2d53771460a8efc8b4c416cf236"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1969,7 +1969,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "5e1e1bac63ba7cba40eed72e199d7f0d657ca2876ef63c20ffafe8afd08e0eeb"
+      "sha256": "4c6aa74d8cdf18630ffc862cd07200b52868c8406e852749ebb7f6df8853e08e"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",

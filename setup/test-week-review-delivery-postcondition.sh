@@ -183,11 +183,14 @@ printf '#!/bin/bash\nexit 0\n' > "$TEST_ROOT/bin/osascript"; cp "$TEST_ROOT/bin/
 cat > "$TEST_ROOT/stub-model.sh" <<'STUB'
 #!/bin/bash
 # Stands in for the model. STUB_MODE: nothing (exit 0, deliver nothing) | deliver | crash
+[ -z "${GUARD_LOG:-}" ] || echo MODEL >> "$GUARD_LOG"
 case "${STUB_MODE:-nothing}" in
     deliver)
         cd "$STUB_WORKSPACE" || exit 9
         mkdir -p current
-        echo report > "current/WeekReport W39 2026-09-21.md"
+        # unique per run: origin already holds the file after the first delivery, and an identical
+        # rewrite would commit nothing (and so deliver nothing)
+        echo "report $$ $(date +%s%N)" > "current/WeekReport W39 2026-09-21.md"
         git add -A && git -c commit.gpgsign=false commit -q -m "week report" && git push -q origin HEAD:main
         ;;
     crash) exit 1 ;;
@@ -250,6 +253,88 @@ if [ "$rc" = "1" ] && grep -q 'strategist week-review-failed' "$NOTIFY_LOG"; the
 else
     fail "a crashed run must alarm and keep its own exit code: rc=$rc notify=$(cat "$NOTIFY_LOG" 2>/dev/null)"
 fi
+
+echo "=== end to end: the session the wrapper opens for the model ==="
+
+# A stand-in guard records every call, and refuses on demand. The wrapper must call it in a fixed
+# order around the model and must close what it opened exactly once, whatever happens to the model.
+mkdir -p "$TEST_ROOT/guard-bin"
+cat > "$TEST_ROOT/guard-bin/session-guard.sh" <<'STUB'
+#!/bin/bash
+echo "guard $*" >> "$GUARD_LOG"
+case "${STUB_GUARD:-ok}" in
+    open-refuses) [ "$1" = "open" ] && { echo "session-guard: refused (stub)"; exit 1; } ;;
+    note-refuses) [ "$1" = "note-file" ] && { echo "session-guard: refused (stub)"; exit 1; } ;;
+esac
+exit 0
+STUB
+chmod +x "$TEST_ROOT/guard-bin/session-guard.sh"
+GUARD_LOG="$TEST_ROOT/guard.log"
+STALE_SEM="$E2E_WS/.iwe-runtime/sessions/strategist-week-review-housekeeping-week-review.open"
+
+# run_guarded <STUB_MODE> <STUB_GUARD> [with-guard|no-guard] -> exit code; calls in $GUARD_LOG
+run_guarded() {
+    rm -rf "$E2E_HOME/logs"; rm -f "$NOTIFY_LOG" "$GUARD_LOG"
+    local scripts_dir="$TEST_ROOT/guard-bin"
+    [ "${3:-with-guard}" = "with-guard" ] || scripts_dir="$TEST_ROOT/no-guard-here"
+    HOME="$E2E_HOME" PATH="$TEST_ROOT/bin:$PATH" IWE_WORKSPACE="$E2E_WS" IWE_GOVERNANCE_REPO=DS-strategy \
+        IWE_TEMPLATE="$E2E_TPL" IWE_SCRIPTS="$scripts_dir" AI_CLI="$TEST_ROOT/stub-model.sh" STUB_MODE="$1" \
+        STUB_GUARD="$2" GUARD_LOG="$GUARD_LOG" STUB_WORKSPACE="$E2E_WS/DS-strategy" \
+        bash "$SCRIPT" week-review >/dev/null 2>&1
+    echo $?
+}
+guard_calls() { sed -E 's/--owner-pid [0-9]+/--owner-pid N/' "$GUARD_LOG" 2>/dev/null | tr '\n' '|'; }
+reset_ws() { git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main; }
+OPEN='guard open --housekeeping week-review --agent strategist-week-review --canonical-owner week-review --owner-pid N|'
+NOTE='guard note-file current/ --agent strategist-week-review|'
+CLOSE='guard close --housekeeping week-review --agent strategist-week-review|'
+
+reset_ws
+rc=$(run_guarded deliver ok); calls=$(guard_calls); LOG_TEXT=$(e2e_log_text)
+if [ "$rc" = "0" ] && [ "$calls" = "${OPEN}${NOTE}MODEL|${CLOSE}" ] && printf '%s' "$LOG_TEXT" | grep -q 'SESSION: открыта служебная сессия'; then
+    pass "session owned by the script: open (as scheduled runner) -> note-file current/ -> model -> close, exit 0"
+else
+    fail "wrong call order: rc=$rc calls=$calls"
+fi
+
+reset_ws
+rc=$(run_guarded crash ok); calls=$(guard_calls)
+[ "$rc" = "1" ] && [ "$calls" = "${OPEN}${NOTE}MODEL|${CLOSE}" ] \
+    && pass "the model crashes -> the session is still closed, exactly once, and the run keeps its own exit code" \
+    || fail "a crashed model must not leak the session: rc=$rc calls=$calls"
+
+reset_ws
+rc=$(run_guarded deliver open-refuses); calls=$(guard_calls); LOG_TEXT=$(e2e_log_text)
+if [ "$rc" = "71" ] && [ "$calls" = "${OPEN}" ] && printf '%s' "$LOG_TEXT" | grep -q 'FAILED scenario: week-review (rc=71)' \
+    && grep -q 'strategist week-review-failed' "$NOTIFY_LOG"; then
+    pass "a guard that refuses the session -> the model is NOT started, exit 71, alarm sent"
+else
+    fail "a refused open must stop the run before the model: rc=$rc calls=$calls notify=$(cat "$NOTIFY_LOG" 2>/dev/null)"
+fi
+
+reset_ws
+rc=$(run_guarded deliver note-refuses); calls=$(guard_calls)
+[ "$rc" = "71" ] && [ "$calls" = "${OPEN}${NOTE}${CLOSE}" ] \
+    && pass "the scope cannot be declared -> the half-open session is closed and the model is NOT started" \
+    || fail "a refused note-file must roll the session back: rc=$rc calls=$calls"
+
+reset_ws
+rc=$(run_guarded deliver ok no-guard); LOG_TEXT=$(e2e_log_text)
+if [ "$rc" = "0" ] && [ "$(guard_calls)" = "MODEL|" ] && printf '%s' "$LOG_TEXT" | grep -q 'session-guard.sh не найден'; then
+    pass "an install with no guard at all runs as before (WARN in the log, no session)"
+else
+    fail "an install with no guard must still run and deliver, no guard calls: rc=$rc calls=$(guard_calls)"
+fi
+
+reset_ws
+mkdir -p "$(dirname "$STALE_SEM")"; : > "$STALE_SEM"
+rc=$(run_guarded deliver ok); calls=$(guard_calls); LOG_TEXT=$(e2e_log_text)
+if [ "$rc" = "0" ] && [ "$calls" = "${CLOSE}${OPEN}${NOTE}MODEL|${CLOSE}" ] && printf '%s' "$LOG_TEXT" | grep -q 'остаточная сессия'; then
+    pass "a leftover semaphore of a dead run is closed first, then the session opens as usual"
+else
+    fail "leftover handling: rc=$rc calls=$calls"
+fi
+rm -f "$STALE_SEM"
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed"

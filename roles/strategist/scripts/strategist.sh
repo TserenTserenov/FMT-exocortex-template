@@ -273,6 +273,82 @@ verify_delivery_postcondition() {  # <scenario> <origin/main sha before the run>
     return 0
 }
 
+# WP-561 Ф25: a scenario whose result is committed under the session guard gets a session owned by
+# THIS script, opened as a scheduled runner (--canonical-owner: on a frozen checkout only that mode
+# may open a housekeeping session). The guard's scope gate does not look at who commits: a live
+# semaphore covering a path authorises it, so the model needs no session of its own and cannot
+# invent one (28.09: `--wp week-review-w39`). A housekeeping semaphore has no wp and is skipped by
+# the commit barrier: it grants rights, it never blocks anyone.
+SESSION_OPEN_FAILED_RC=71
+RUNNER_SESSION_OPEN=0
+RUNNER_SESSION_CLEANUP_REGISTERED=0
+RUNNER_GUARD=""
+RUNNER_SESSION_AGENT=""
+RUNNER_SESSION_REASON=""
+
+runner_session_scope() {  # <scenario> -> repo-relative path the scenario may commit under; empty = no session
+    case "$1" in
+        week-review) echo 'current/' ;;
+    esac
+}
+
+runner_guard_path() {  # -> path of session-guard.sh; empty when this install has none
+    local guard="${IWE_SCRIPTS:-}/session-guard.sh"
+    [ -f "$guard" ] || guard="${IWE_WORKSPACE:-$HOME/IWE}/scripts/session-guard.sh"
+    if [ -f "$guard" ]; then echo "$guard"; fi
+    return 0
+}
+
+runner_guard() {  # <guard args...>; root and governance repo are explicit: the guard aborts without them
+    ( cd "$WORKSPACE" && IWE_ROOT="${IWE_WORKSPACE:-$HOME/IWE}" IWE_GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}" \
+        bash "$RUNNER_GUARD" "$@" ) >> "$LOG_FILE" 2>&1
+}
+
+close_runner_session() {  # once per open; a failed close is logged and never replaces the run's own exit status
+    [ "$RUNNER_SESSION_OPEN" = 1 ] || return 0
+    RUNNER_SESSION_OPEN=0
+    runner_guard close --housekeeping "$RUNNER_SESSION_REASON" --agent "$RUNNER_SESSION_AGENT" \
+        || log "WARN: служебная сессия $RUNNER_SESSION_AGENT не закрыта (см. строки выше); следующий запуск закроет остаток"
+    return 0
+}
+
+# 0 = session open, or none required, or this install has no guard at all (old behaviour, WARN).
+# 1 = a guard IS installed but did not give the session (refused, or too old to know the mode): the
+# run must not start, it could only burn model time and end in a refused commit.
+open_runner_session() {  # <scenario>
+    local scenario="$1" scope agent stale
+    scope=$(runner_session_scope "$scenario")
+    [ -n "$scope" ] || return 0
+    RUNNER_GUARD=$(runner_guard_path)
+    if [ -z "$RUNNER_GUARD" ]; then
+        log "WARN: session-guard.sh не найден, сценарий $scenario идёт без сессии охраны"
+        return 0
+    fi
+    agent="strategist-$scenario"
+    # A semaphore left by a run that died without cleanup refuses the fixed name. Closing it is safe
+    # only because acquire_lock() is held from before this call until exit and is local to this
+    # host's $HOME: one run of a scenario at a time, so whatever is there is a leftover of a dead run.
+    stale="${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/sessions/${agent}-housekeeping-${scenario}.open"
+    if [ -e "$stale" ]; then
+        log "SESSION: остаточная сессия $agent от прежнего запуска, закрываю"
+        runner_guard close --housekeeping "$scenario" --agent "$agent" || return 1
+    fi
+    runner_guard open --housekeeping "$scenario" --agent "$agent" --canonical-owner "$scenario" --owner-pid "$$" || return 1
+    RUNNER_SESSION_AGENT="$agent"
+    RUNNER_SESSION_REASON="$scenario"
+    RUNNER_SESSION_OPEN=1
+    if [ "$RUNNER_SESSION_CLEANUP_REGISTERED" != 1 ]; then
+        add_exit_cleanup 'close_runner_session'
+        RUNNER_SESSION_CLEANUP_REGISTERED=1
+    fi
+    if ! runner_guard note-file "$scope" --agent "$agent"; then
+        close_runner_session
+        return 1
+    fi
+    log "SESSION: открыта служебная сессия $agent, область $scope"
+    return 0
+}
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
@@ -323,6 +399,11 @@ ${prompt}"
     # WP-561 Ф25: origin/main до запуска модели, точка отсчёта для постусловия доставки.
     local delivery_pre_origin
     delivery_pre_origin=$(delivery_baseline "$command_file")
+
+    if ! open_runner_session "$command_file"; then
+        log "FAILED scenario: $command_file (rc=$SESSION_OPEN_FAILED_RC) -- сессия охраны не открыта (причина в строках выше), модель не запускалась"
+        return "$SESSION_OPEN_FAILED_RC"
+    fi
 
     # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
     local rc=0
@@ -383,6 +464,8 @@ ${prompt}"
     # НЕ трогаем working tree — только unstage orphaned changes
     git -C "$WORKSPACE" reset --quiet 2>/dev/null || true
     log "Cleared staging area after Claude session"
+
+    close_runner_session
 
     # WP-561 Ф25: SUCCESS is written only after delivery is proven -- already_ran_today() keys
     # on it, so an undelivered run must not mark the day done (a manual rerun stays possible).
