@@ -312,11 +312,32 @@ close_runner_session() {  # once per open; a failed close is logged and never re
     return 0
 }
 
+# Hygiene, never a precondition of the new run: close what earlier runs of this scenario left
+# behind when they died. A semaphore whose recorded owner pid is still alive belongs to a live run
+# (possibly one that started before midnight) and is left alone; a dead owner's is closed by its own
+# reason (parsed from the file name). A failed close only means the lease will expire.
+close_dead_runner_sessions() {  # <agent> <sessions dir>
+    local agent="$1" dir="$2" sem reason pid
+    for sem in "$dir/${agent}-housekeeping-"*.open; do
+        [ -e "$sem" ] || continue
+        pid=$(sed -n 's/^pid: //p' "$sem" 2>/dev/null | head -1)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            continue
+        fi
+        reason="${sem##*/}"
+        reason="${reason#"${agent}-housekeeping-"}"
+        reason="${reason%.open}"
+        log "SESSION: остаточная сессия $agent/$reason (владелец не жив), закрываю"
+        runner_guard close --housekeeping "$reason" --agent "$agent" \
+            || log "WARN: остаточную сессию $reason закрыть не удалось, она истечёт по сроку аренды"
+    done
+}
+
 # 0 = session open, or none required, or this install has no guard at all (old behaviour, WARN).
 # 1 = a guard IS installed but did not give the session (refused, or too old to know the mode): the
 # run must not start, it could only burn model time and end in a refused commit.
 open_runner_session() {  # <scenario>
-    local scenario="$1" scope agent stale
+    local scenario="$1" scope agent reason
     scope=$(runner_session_scope "$scenario")
     [ -n "$scope" ] || return 0
     RUNNER_GUARD=$(runner_guard_path)
@@ -325,22 +346,22 @@ open_runner_session() {  # <scenario>
         return 0
     fi
     agent="strategist-$scenario"
-    # A semaphore left by a run that died without cleanup refuses the fixed name. Closing it is safe
-    # only because acquire_lock() is held from before this call until exit and is local to this
-    # host's $HOME: one run of a scenario at a time, so whatever is there is a leftover of a dead run.
-    stale="${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/sessions/${agent}-housekeeping-${scenario}.open"
-    if [ -e "$stale" ]; then
-        log "SESSION: остаточная сессия $agent от прежнего запуска, закрываю"
-        runner_guard close --housekeeping "$scenario" --agent "$agent" || return 1
-    fi
-    runner_guard open --housekeeping "$scenario" --agent "$agent" --canonical-owner "$scenario" --owner-pid "$$" || return 1
+    # The reason names the session file, so it is unique per run: a guard that keeps a closed-session
+    # receipt for a name (older installs) would refuse to reopen the same name, and two runs that
+    # overlap (one started after midnight while another is still in the model) must not collide.
+    reason="$scenario-$DATE-$$"
+    close_dead_runner_sessions "$agent" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime/sessions"
+    runner_guard open --housekeeping "$reason" --agent "$agent" --canonical-owner "$scenario" --owner-pid "$$" || return 1
     RUNNER_SESSION_AGENT="$agent"
-    RUNNER_SESSION_REASON="$scenario"
+    RUNNER_SESSION_REASON="$reason"
     RUNNER_SESSION_OPEN=1
     if [ "$RUNNER_SESSION_CLEANUP_REGISTERED" != 1 ]; then
         add_exit_cleanup 'close_runner_session'
         RUNNER_SESSION_CLEANUP_REGISTERED=1
     fi
+    # Without the directory the guard records the scope as the literal path `current` (no trailing
+    # slash), which covers no file below it.
+    mkdir -p "$WORKSPACE/$scope"
     if ! runner_guard note-file "$scope" --agent "$agent"; then
         close_runner_session
         return 1

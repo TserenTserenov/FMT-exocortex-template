@@ -270,24 +270,28 @@ exit 0
 STUB
 chmod +x "$TEST_ROOT/guard-bin/session-guard.sh"
 GUARD_LOG="$TEST_ROOT/guard.log"
-STALE_SEM="$E2E_WS/.iwe-runtime/sessions/strategist-week-review-housekeeping-week-review.open"
+STALE_SEM="$E2E_WS/.iwe-runtime/sessions/strategist-week-review-housekeeping-week-review-2026-09-01-1.open"
 
 # run_guarded <STUB_MODE> <STUB_GUARD> [with-guard|no-guard] -> exit code; calls in $GUARD_LOG
 run_guarded() {
     rm -rf "$E2E_HOME/logs"; rm -f "$NOTIFY_LOG" "$GUARD_LOG"
     local scripts_dir="$TEST_ROOT/guard-bin"
-    [ "${3:-with-guard}" = "with-guard" ] || scripts_dir="$TEST_ROOT/no-guard-here"
+    [ "${3:-with-guard}" = "no-guard" ] && scripts_dir="$TEST_ROOT/no-guard-here"
+    [ "${3:-with-guard}" = "real-guard" ] && scripts_dir="$REPO_ROOT/scripts"
     HOME="$E2E_HOME" PATH="$TEST_ROOT/bin:$PATH" IWE_WORKSPACE="$E2E_WS" IWE_GOVERNANCE_REPO=DS-strategy \
         IWE_TEMPLATE="$E2E_TPL" IWE_SCRIPTS="$scripts_dir" AI_CLI="$TEST_ROOT/stub-model.sh" STUB_MODE="$1" \
         STUB_GUARD="$2" GUARD_LOG="$GUARD_LOG" STUB_WORKSPACE="$E2E_WS/DS-strategy" \
         bash "$SCRIPT" week-review >/dev/null 2>&1
     echo $?
 }
-guard_calls() { sed -E 's/--owner-pid [0-9]+/--owner-pid N/' "$GUARD_LOG" 2>/dev/null | tr '\n' '|'; }
+guard_calls() {
+    sed -E 's/--owner-pid [0-9]+/--owner-pid N/; s/week-review-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+/week-review-R/g' \
+        "$GUARD_LOG" 2>/dev/null | tr '\n' '|'
+}
 reset_ws() { git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main; }
-OPEN='guard open --housekeeping week-review --agent strategist-week-review --canonical-owner week-review --owner-pid N|'
+OPEN='guard open --housekeeping week-review-R --agent strategist-week-review --canonical-owner week-review --owner-pid N|'
 NOTE='guard note-file current/ --agent strategist-week-review|'
-CLOSE='guard close --housekeeping week-review --agent strategist-week-review|'
+CLOSE='guard close --housekeeping week-review-R --agent strategist-week-review|'
 
 reset_ws
 rc=$(run_guarded deliver ok); calls=$(guard_calls); LOG_TEXT=$(e2e_log_text)
@@ -330,11 +334,40 @@ reset_ws
 mkdir -p "$(dirname "$STALE_SEM")"; : > "$STALE_SEM"
 rc=$(run_guarded deliver ok); calls=$(guard_calls); LOG_TEXT=$(e2e_log_text)
 if [ "$rc" = "0" ] && [ "$calls" = "${CLOSE}${OPEN}${NOTE}MODEL|${CLOSE}" ] && printf '%s' "$LOG_TEXT" | grep -q 'остаточная сессия'; then
-    pass "a leftover semaphore of a dead run is closed first, then the session opens as usual"
+    pass "a leftover semaphore of a dead run (no live owner pid) is closed by its own reason, then the session opens as usual"
 else
     fail "leftover handling: rc=$rc calls=$calls"
 fi
 rm -f "$STALE_SEM"
+
+# A leftover whose recorded owner pid is alive belongs to a live run (for instance one that started
+# before midnight, when the per-day lock name changes): it must be left alone.
+reset_ws
+sleep 60 & LIVE_PID=$!
+mkdir -p "$(dirname "$STALE_SEM")"; printf 'agent: strategist-week-review\npid: %s\n' "$LIVE_PID" > "$STALE_SEM"
+rc=$(run_guarded deliver ok); calls=$(guard_calls)
+kill "$LIVE_PID" 2>/dev/null; wait "$LIVE_PID" 2>/dev/null
+[ "$rc" = "0" ] && [ "$calls" = "${OPEN}${NOTE}MODEL|${CLOSE}" ] && [ -e "$STALE_SEM" ] \
+    && pass "a semaphore whose owner pid is alive is not touched (its run may still be in the model)" \
+    || fail "a live run's session must be left alone: rc=$rc calls=$calls"
+rm -f "$STALE_SEM"
+
+# The template's OWN guard keeps a receipt for every closed housekeeping name and refuses to reopen
+# the same name (found by the cold review: with a fixed name the second run of a template install
+# died with exit 71). Two runs one after another must both get their session.
+rm -rf "$E2E_WS/.iwe-runtime"
+reset_ws
+rc_first=$(run_guarded nothing ok real-guard); LOG_FIRST=$(e2e_log_text)
+reset_ws
+rc_second=$(run_guarded deliver ok real-guard); LOG_SECOND=$(e2e_log_text)
+open_left=$(find "$E2E_WS/.iwe-runtime/sessions" -name '*.open' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$rc_first" = "70" ] && [ "$rc_second" = "0" ] && [ "$open_left" = "0" ] \
+    && printf '%s' "$LOG_FIRST" | grep -q 'SESSION: открыта служебная сессия' \
+    && printf '%s' "$LOG_SECOND" | grep -q 'SESSION: открыта служебная сессия'; then
+    pass "template's own guard, two runs in a row: both get a session, none is left open (no wedge after a closed receipt)"
+else
+    fail "two runs against the template guard: first=$rc_first second=$rc_second open_left=$open_left log=$(printf '%s' "$LOG_SECOND" | tail -3)"
+fi
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed"
