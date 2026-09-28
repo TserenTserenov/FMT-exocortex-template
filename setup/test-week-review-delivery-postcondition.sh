@@ -186,7 +186,8 @@ echo "=== fetch_delivery_origin: bounded retries ==="
 
 # A stand-in for git, used through DELIVERY_GIT_BIN by fetch_delivery_origin ONLY: the publisher and
 # the guard keep the real git. FETCH_PLAN holds one letter per call: F = fail, T = exit 124 (a
-# timeout), anything else = the real git; calls past the plan use the real git.
+# timeout), G = print a line to stdout and then run the real git, anything else = the real git; calls
+# past the plan use the real git.
 REAL_GIT=$(command -v git)
 FETCH_STATE="$TEST_ROOT/fetch.state"
 cat > "$TEST_ROOT/fetch-git-stub.sh" <<'STUB'
@@ -196,6 +197,7 @@ read -ra plan <<< "${FETCH_PLAN:-}"
 case "${plan[$((n - 1))]:-.}" in
     F) echo "fatal: unable to access 'origin': Could not resolve host" >&2; exit 128 ;;
     T) exit 124 ;;
+    G) echo "STDOUT-GARBAGE"; exec "$REAL_GIT" "$@" ;;
     *) exec "$REAL_GIT" "$@" ;;
 esac
 STUB
@@ -247,6 +249,31 @@ BASE_TEXT=$(run_with_plan "F F ." 'export DELIVERY_FETCH_TIMEOUT=abc; delivery_b
 [ "$BASE_ZERO" = "$ORIGIN_SHA" ] && [ "$BASE_TEXT" = "$ORIGIN_SHA" ] \
     && pass "a zero or non-numeric setting falls back to the defaults instead of breaking the loop" \
     || fail "bad settings must fall back to 3 tries: zero='$BASE_ZERO' text='$BASE_TEXT'"
+
+# A leading zero is read by bash as octal: 09 would be an arithmetic error that ends the script, 010
+# would wait 8 s. It must fall back to the default pause (5 s, then 10 s) instead.
+BASE=$(run_with_plan "F F ." 'export DELIVERY_FETCH_PAUSE=09; delivery_baseline week-review')
+[ "$BASE" = "$ORIGIN_SHA" ] && [ "$(tr '\n' ' ' < "$SLEEP_LOG")" = "5 10 " ] \
+    && pass "a leading-zero pause (09) falls back to the default instead of an octal error" \
+    || fail "pause 09: base='$BASE' sleeps='$(tr '\n' ' ' < "$SLEEP_LOG")'"
+
+# Each setting is judged on its own: a bad pause must not throw away a good attempts value.
+BASE=$(run_with_plan "F F F" 'export DELIVERY_FETCH_ATTEMPTS=2 DELIVERY_FETCH_PAUSE=abc; delivery_baseline week-review')
+[ -z "$BASE" ] && [ "$(calls)" = "2" ] && [ "$(tr '\n' ' ' < "$SLEEP_LOG")" = "5 " ] \
+    && pass "settings are checked one by one: attempts=2 is kept while the bad pause falls back to 5 s" \
+    || fail "per-setting fallback: base='$BASE' calls=$(calls) sleeps='$(tr '\n' ' ' < "$SLEEP_LOG")'"
+
+# Zero is the one legitimate zero: a pause of 0 means no waiting (the whole suite runs that way).
+BASE=$(run_with_plan "F F F" 'delivery_baseline week-review')
+[ -z "$BASE" ] && [ "$(calls)" = "3" ] && [ "$(tr '\n' ' ' < "$SLEEP_LOG")" = "0 0 " ] \
+    && pass "a pause of 0 is accepted as no waiting" \
+    || fail "pause 0: base='$BASE' calls=$(calls) sleeps='$(tr '\n' ' ' < "$SLEEP_LOG")'"
+
+# The fetch binary's own stdout must not reach the caller: the baseline is captured with $(...).
+BASE=$(run_with_plan "G" 'delivery_baseline week-review')
+[ "$BASE" = "$ORIGIN_SHA" ] \
+    && pass "the fetch's stdout is discarded: the baseline is exactly the sha" \
+    || fail "fetch stdout leaked into the baseline: '$BASE'"
 
 echo "=== end to end: the real strategist.sh week-review with a stand-in model ==="
 
@@ -384,7 +411,7 @@ run_guarded() {
         IWE_TEMPLATE="$E2E_TPL" IWE_SCRIPTS="$scripts_dir" AI_CLI="$TEST_ROOT/stub-model.sh" STUB_MODE="$1" \
         STUB_GUARD="$2" GUARD_LOG="$GUARD_LOG" STUB_WORKSPACE="$E2E_WS/DS-strategy" \
         DELIVERY_GIT_BIN="${E2E_DELIVERY_GIT_BIN:-}" FETCH_PLAN="${E2E_FETCH_PLAN:-}" STUB_SLEEP_LOG="${E2E_SLEEP_LOG:-}" \
-        bash "$SCRIPT" week-review >/dev/null 2>&1
+        bash "$SCRIPT" week-review >/dev/null 2>"${E2E_STDERR:-/dev/null}"
     echo $?
 }
 # with_fetch_plan <plan>: the next run_guarded calls use the fetch stand-in until without_fetch_plan
@@ -560,6 +587,18 @@ if [ "$rc" = "1" ] && [ "$(model_runs)" = "3" ] && [ "$(printf '%s\n' "$LOG_TEXT
     pass "the CLI's own auth error still restarts the model (3 runs, waits 60 s and 300 s), then the run fails with an alarm"
 else
     fail "CLI auth retry: rc=$rc model_runs=$(model_runs) sleeps='$(tr '\n' ' ' < "$SLEEPS")' log=$(printf '%s' "$LOG_TEXT" | grep -c AUTH_FAILURE)"
+fi
+
+# A model that dies without writing a byte leaves an empty output range. `head -c 0` is an error on
+# BSD/macOS, and its complaint would land in the job's stderr (the launchd log) on every such run.
+reset_ws
+E2E_STDERR="$TEST_ROOT/e2e-stderr.log"; : > "$E2E_STDERR"
+rc=$(run_guarded crash ok)
+STDERR_TEXT=$(cat "$E2E_STDERR"); E2E_STDERR=""
+if [ "$rc" = "1" ] && [ "$(model_runs)" = "1" ] && ! printf '%s' "$STDERR_TEXT" | grep -q 'illegal byte count'; then
+    pass "a model that writes nothing and dies: no restart, and no stray complaint from head in stderr"
+else
+    fail "silent model failure: rc=$rc model_runs=$(model_runs) stderr=$STDERR_TEXT"
 fi
 
 echo ""

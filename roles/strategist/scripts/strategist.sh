@@ -241,17 +241,21 @@ expected_delivery_path() {  # <scenario> -> :(glob) pathspec in the governance r
 # a blip would turn a delivered report into a false "cannot prove". Worst case per call is about
 # 105 s (3 x 30 s + 5 s + 10 s), and the call runs twice per scenario, before and after the model.
 # It runs inside $(...) (see delivery_baseline), so it writes to the log file directly and never
-# through log(), whose stdout would end up in the captured sha.
+# through log(), whose stdout would end up in the captured sha; the fetch's own stdout is discarded.
 # DELIVERY_GIT_BIN is a test seam for this one fetch: the publisher and the guard keep the real git.
+# DELIVERY_FETCH_{ATTEMPTS,TIMEOUT,PAUSE} override the defaults (3, 30 s, 5 s). Each is checked on its
+# own: a bad value falls back to that default and leaves the others alone. Plain decimal digits only,
+# at most four, and no leading zero (bash would read 010 as octal, and 09 as an arithmetic error that
+# ends the script). Zero is valid for the pause only (no waiting; the test suite relies on it).
 fetch_delivery_origin() {
     local attempts="${DELIVERY_FETCH_ATTEMPTS:-3}" per_try="${DELIVERY_FETCH_TIMEOUT:-30}" pause="${DELIVERY_FETCH_PAUSE:-5}"
     local n=1 rc
-    case "$attempts$per_try$pause" in *[!0-9]*) attempts=3; per_try=30; pause=5 ;; esac
-    [ "$attempts" -ge 1 ] || attempts=3
-    [ "$per_try" -ge 1 ] || per_try=30
+    case "$attempts" in ''|0*|*[!0-9]*|?????*) attempts=3 ;; esac
+    case "$per_try" in ''|0*|*[!0-9]*|?????*) per_try=30 ;; esac
+    case "$pause" in ''|0?*|*[!0-9]*|?????*) pause=5 ;; esac
     while :; do
         rc=0
-        GIT_TERMINAL_PROMPT=0 timeout "$per_try" "${DELIVERY_GIT_BIN:-git}" -C "$WORKSPACE" fetch -q origin main 2>>"$LOG_FILE" || rc=$?
+        GIT_TERMINAL_PROMPT=0 timeout "$per_try" "${DELIVERY_GIT_BIN:-git}" -C "$WORKSPACE" fetch -q origin main >/dev/null 2>>"$LOG_FILE" || rc=$?
         [ "$rc" -eq 0 ] && return 0
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] GIT-FETCH: попытка $n из $attempts не удалась (код $rc)" >> "$LOG_FILE"
         [ "$n" -lt "$attempts" ] || return 1
@@ -415,7 +419,8 @@ log_size_bytes() {  # -> size of the daily log in bytes, 0 when there is none
 # Byte range of the log that holds exactly the output of the last AI_CLI call. run_claude_with_retry
 # looks for auth failures only there: the rest of an attempt's log also carries the output of git
 # fetch and of the publisher, whose own "401 Unauthorized" would restart a model run that failed
-# for another reason. Empty = no CLI call in the last run_claude (an early exit).
+# for another reason. Empty = the last run_claude returned before calling the CLI (a refused guard
+# session, exit 71); a missing prompt file ends the script with `exit 1` and never gets this far.
 AI_CLI_OUT_START=""
 AI_CLI_OUT_END=""
 
@@ -582,7 +587,9 @@ run_claude_with_retry() {
         # (AI_CLI_OUT_*), not the fetch/publish lines that share the log.
         if [ "$rc" -ne 0 ] && [ "$attempt" -lt "$max_attempts" ]; then
             local attempt_output=""
-            if [ -n "$AI_CLI_OUT_START" ] && [ -n "$AI_CLI_OUT_END" ] && [ -f "$LOG_FILE" ]; then
+            # A model that wrote nothing leaves an empty range: `head -c 0` is an error on BSD/macOS.
+            if [ -n "$AI_CLI_OUT_START" ] && [ -n "$AI_CLI_OUT_END" ] && [ "$AI_CLI_OUT_END" -gt "$AI_CLI_OUT_START" ] \
+                && [ -f "$LOG_FILE" ]; then
                 attempt_output=$(tail -c "+$((AI_CLI_OUT_START + 1))" "$LOG_FILE" 2>/dev/null \
                     | head -c "$((AI_CLI_OUT_END - AI_CLI_OUT_START))" || true)
             fi
