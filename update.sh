@@ -1665,7 +1665,7 @@ backfill_governance_seed_script() {
     local relative_path="$1"
     local source_path="$SCRIPT_DIR/seed/strategy/$relative_path"
     local target_path="$governance_dir/$relative_path"
-    local git_prefix git_relative_path git_pathspec tracked_paths status_output
+    local git_prefix git_relative_path git_pathspec tracked_paths status_output tracked_status
 
     if [ -L "$governance_dir" ]; then
         echo "  ✗ $relative_path не обновлён: governance repo является symlink." >&2
@@ -1704,7 +1704,9 @@ backfill_governance_seed_script() {
             if ! tracked_paths=$(agent_fault_git "$governance_dir" \
                     ls-files -- "$git_pathspec") || \
                ! status_output=$(agent_fault_git "$governance_dir" \
-                    status --porcelain=v1 --untracked-files=all -- "$git_pathspec"); then
+                    status --porcelain=v1 --untracked-files=all -- "$git_pathspec") || \
+               ! tracked_status=$(agent_fault_git "$governance_dir" \
+                    status --porcelain=v1 --untracked-files=no -- "$git_pathspec"); then
                 echo "  ✗ $relative_path: Git state не прочитан; backfill запрещён." >&2
                 return 1
             fi
@@ -1713,12 +1715,22 @@ backfill_governance_seed_script() {
                 echo "  ✗ $relative_path имеет case-insensitive tracked alias; backfill запрещён." >&2
                 return 1
             fi
-            if [ -n "$status_output" ]; then
-                echo "  ✗ $relative_path содержит локальные изменения/удаление или case alias; сначала разберите Git state." >&2
+            # status_output mixes the tracked file's own state with any
+            # untracked case-variant sibling matched by the icase pathspec;
+            # tracked_status (--untracked-files=no) isolates the former so
+            # each branch below names the actual cause, not a catch-all.
+            if [ -n "$tracked_status" ]; then
+                echo "  ✗ $relative_path содержит локальные изменения/удаление; сначала разберите Git state." >&2
                 return 1
             fi
-            if [ -z "$tracked_paths" ] && [ -e "$target_path" ]; then
-                echo "  ✗ $relative_path существует как пользовательский untracked-файл; автоматическая перезапись запрещена." >&2
+            if [ -n "$status_output" ]; then
+                if [ -n "$tracked_paths" ]; then
+                    echo "  ✗ $relative_path: рядом обнаружен untracked-файл с другим регистром имени (case alias); backfill запрещён." >&2
+                elif [ -e "$target_path" ]; then
+                    echo "  ✗ $relative_path существует как пользовательский untracked-файл; автоматическая перезапись запрещена. Если это платформенный файл, который забыли закоммитить — выполните git add/git commit и повторите обновление." >&2
+                else
+                    echo "  ✗ $relative_path: рядом обнаружен файл с другим регистром имени (untracked case alias); backfill запрещён." >&2
+                fi
                 return 1
             fi
         elif [ -e "$target_path" ]; then
