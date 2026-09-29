@@ -537,6 +537,8 @@ ln -s "$SYMLINK_OUTSIDE" "$SYMLINK_WS/custom-governance"
 SYMLINK_RC=0
 SYMLINK_OUT=$(HOME="$SYMLINK_HOME" PATH="$SMOKE_CLEAN_PATH" SETUP_CI=1 GITHUB_USER=smoke-symlink \
     WORKSPACE_DIR="$SYMLINK_WS" GOVERNANCE_REPO=custom-governance \
+    GIT_AUTHOR_NAME="smoke-symlink" GIT_AUTHOR_EMAIL="smoke@test.local" \
+    GIT_COMMITTER_NAME="smoke-symlink" GIT_COMMITTER_EMAIL="smoke@test.local" \
     bash "$TEMPLATE_DIR/setup.sh" --core 2>&1) || SYMLINK_RC=$?
 SYMLINK_FILE_COUNT=$(find "$SYMLINK_OUTSIDE" -type f | wc -l | tr -d ' ')
 if [ "$SYMLINK_RC" -ne 0 ] && \
