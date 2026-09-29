@@ -829,7 +829,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "dc78c59e92307b92e0accd770dc63fdbf64d7fe73ad80eb0dec56caa6271beb0"
+      "sha256": "3d4818c0c1b303056aff98912cf9156426b7aa2eb0ce45b181afa4d0dd0d8037"
     },
     {
       "path": "CLAUDE.md",
@@ -1709,7 +1709,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "67cb61bfd450ee0b6e8c55308b04d19170803f48d93af424d4ee0238ec81f881"
+      "sha256": "39cf7f040de59874534fb60b52878f5a0aa5ec808c97f71cf0196a58f5cfab6a"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1729,7 +1729,7 @@
     },
     {
       "path": "roles/extractor/tests/test_extractor_pipeline.py",
-      "sha256": "4b6d046d544f7ded4a3940eac336d8c13678a01998e74b7561c17ac992ebc796"
+      "sha256": "d0b28e182eeb7475f63dd0cfa3dda2f5566e31c7ba71bc35e5ff055a56d3829c"
     },
     {
       "path": "roles/lib/scheduler-cron.sh",
