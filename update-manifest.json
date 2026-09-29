@@ -1861,7 +1861,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "aca8f980654ff9bc9673661959279aa8952bc43a13bdf9c50854fe59217cfeae"
+      "sha256": "7a1d109e09e0c11e1d6ef8af6e9b6e63afacc33f7826c313ef7281c2ad310893"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "73122717f90e650c867fc84500cfbda49ee3765d1edfd9e1999c5dc67218ce7a"
+      "sha256": "295c2ca4a73b3f446bf0fdacb6701f0c8fd3575fa64c142fe0b47b5e726b2d33"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1969,7 +1969,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "c7681bc024c5c49659c97b6049076639d35d37ea169d604261153fa570b2731c"
+      "sha256": "4c6aa74d8cdf18630ffc862cd07200b52868c8406e852749ebb7f6df8853e08e"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -3101,7 +3101,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "727b6750c2e2ac7d60cfc1ee0bac522b47dd0c264c852ba63f683d08654c4810"
+      "sha256": "e389bff1797328a2baa5acfd3956a3ebafbf3f7e19ab9cc4b15b16f85f257ad1"
     }
   ],
   "excluded_paths": [
@@ -3251,6 +3251,7 @@
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",
+    "setup/test-week-review-delivery-postcondition.sh",
     "setup/ux-walkthrough-prompt.md"
   ],
   "deprecated_files": [

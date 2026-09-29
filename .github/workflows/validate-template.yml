@@ -152,6 +152,8 @@ jobs:
         run: bash setup/test-attestation-canonical-digest.sh
       - name: Run WP-529 Ф21 attestation statement tests
         run: bash setup/test-attestation-build-statement.sh
+      - name: Run WP-561 Ф25 week-review delivery postcondition tests
+        run: bash setup/test-week-review-delivery-postcondition.sh
 
   integration-contract-macos:
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'
