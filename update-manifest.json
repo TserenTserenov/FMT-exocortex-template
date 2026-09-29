@@ -825,7 +825,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "8fe473a391d1a789b08f2ff85572bddb3054fd32a7aea6c0f1b2e887c4cccc3c"
+      "sha256": "124fdc131adcd27803d3b658b20460626d011068fd0c731e554b6102e1808079"
     },
     {
       "path": "CHANGELOG.md",
@@ -833,7 +833,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "314d319a1d4b99c1b75be031d62514222088186067e0c376ae9eae2cba9f07fe"
+      "sha256": "4fa693a277f9d9752f57a93fba5b99366af5033597c87b874da47ff267548f09"
     },
     {
       "path": "ONTOLOGY.md",
