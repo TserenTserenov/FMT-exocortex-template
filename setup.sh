@@ -206,6 +206,27 @@ check_command() {
 # Git — обязателен всегда
 check_command "git" "Git" "xcode-select --install"
 
+# Git identity — required in every mode: step 6 makes the initial commit of the
+# governance repo (full and --core). Without an identity that commit dies in the
+# middle of the install with git's own "Author identity unknown", after most of
+# the work is done and before the base repos are cloned; a new machine has none
+# until the user sets it (CI never saw this: its smoke passes GIT_AUTHOR_* env).
+# A throwaway empty commit is the only faithful probe: `git var` and `git config`
+# both answer differently from `git commit` in some environments (auto-detected
+# names, useConfigOnly). A dry run makes no commit, so it only warns.
+if command -v git >/dev/null 2>&1; then
+    _ID_PROBE=$(mktemp -d 2>/dev/null || true)
+    if [ -n "$_ID_PROBE" ] && git -C "$_ID_PROBE" init -q >/dev/null 2>&1 \
+            && git -C "$_ID_PROBE" commit -q --allow-empty -m probe >/dev/null 2>&1; then
+        echo "  ✓ Git identity: задана"
+    else
+        echo "  ✗ Git identity: не задана (имя и почта для коммитов)"
+        echo "    Install: git config --global user.name \"Your Name\" && git config --global user.email \"you@example.com\""
+        $DRY_RUN || PREREQ_FAIL=1
+    fi
+    [ -z "$_ID_PROBE" ] || rm -rf "$_ID_PROBE"
+fi
+
 # jq — обязателен всегда: .claude/hooks/dry-run-gate.sh (устанавливается в любом режиме,
 # см. шаг 4b) fail-closed блокирует ВСЕ tool calls без jq, без явного предупреждения (issue #192).
 check_command "jq" "jq" "brew install jq (Linux: apt install jq / dnf install jq)"
