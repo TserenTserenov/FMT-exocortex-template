@@ -111,6 +111,10 @@ Discrepancy found (file ≠ plan, stale content): **report to pilot, do not sile
 
 `{{WORKSPACE_DIR}}/`
 
+## FPF Usage
+
+Работа опирается на FPF/DPF → скилл `/fpf` (шаг 0 читает `FPF/USING-FPF.md` автора и проверяет доступ к полному тексту). Нет полного текста → сказать и оставить зависимый вывод открытым; в ответе — версия копии, номера паттернов, допущения.
+
 ## Status Reporting — Agent Status Registry (РП-395)
 
 **Primary (обязательно):** в начале задачи `agent_status_update(agent=<claude-code|kimi|codex|hermes>, status=working, task=<кратко>, files=[...])`; по завершении — `status=idle`. Статусы: `idle|working|peer-session|blocked`; пилот видит всех через `agent_status_list`. Командный режим (`repo=`) и fail-safe скрипт → `memory/reference/agent-core.md`.
