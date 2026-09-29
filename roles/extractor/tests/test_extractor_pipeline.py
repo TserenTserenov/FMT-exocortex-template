@@ -123,6 +123,22 @@ class ExtractorPipelineTests(unittest.TestCase):
         result = self.shell("pending_capture_count " + " ".join(shlex.quote(str(p)) for p in [legacy, monthly, fleeting]))
         self.assertEqual(result.stdout.strip(), "3")
 
+    def test_status_marks_with_trailing_text_are_not_pending(self):
+        # The model marks duplicates as "[duplicate, см. <report> Кандидат #4]":
+        # a comma (or any non-word char) after the status word must still count
+        # as marked, otherwise the deterministic pre-check reports pending
+        # captures the model correctly finds none of, and inbox-check fails with
+        # "success without a new extraction report" every 3h (2026-09-25..29).
+        monthly = self.write(self.workspace / "inbox/captures/2026-09.md", "\n".join([
+            "### A [duplicate, см. 2026-09-26-inbox-check-4.md Кандидат #4]", "Body",
+            "### B [analyzed 2026-09-12]", "Body",
+            "### C [defer: ждёт РП]", "Body",
+            "### D [processed]", "Body",
+            "### E [analyzedX]", "Body",
+            "### F", "Body", ""]))
+        result = self.shell(f"pending_capture_count {shlex.quote(str(monthly))}")
+        self.assertEqual(result.stdout.strip(), "2")  # E (not a status word) and F
+
     def test_fleeting_only_is_pending(self):
         fleeting = self.write(self.workspace / "inbox/fleeting-notes.md", "### Thought\nBody\n")
         result = self.shell('sources=(); while IFS= read -r src; do sources+=("$src"); done < <(capture_source_files "$WORKSPACE/inbox"); pending_capture_count "${sources[@]}"')

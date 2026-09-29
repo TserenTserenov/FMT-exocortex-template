@@ -880,7 +880,7 @@ pending_capture_count() {
       comment { if (/-->/) comment=0; next }
       /^### / {
         finish()
-        active=($0 !~ /\[(analyzed|processed|duplicate|defer)([[:space:]]|\])/)
+        active=($0 !~ /\[(analyzed|processed|duplicate|defer)([^[:alnum:]_]|$)/)
         next
       }
       /^# |^## / { finish(); next }
