@@ -2053,7 +2053,7 @@
     },
     {
       "path": "scripts/attestation-build-statement.sh",
-      "sha256": "4fd7d51e25df9f28e481e67bdbe284eee48220ac6a26cf00dfa9669946953acf"
+      "sha256": "2ab04bae2a6309fd73c872140679dd6a5f60558df52762a467178b2cb2eafe1c"
     },
     {
       "path": "scripts/attestation-canonical-digest.sh",
@@ -2096,6 +2096,10 @@
       "sha256": "853e53618ac0776ba23cbbbdba051a26110004f0b1c4efdac49f4725253e69eb"
     },
     {
+      "path": "scripts/check-changelog-entry.sh",
+      "sha256": "6eee6be94fa06971be06e887fcb633e955d6371b4ac95f123cd7d536a9cee7a0"
+    },
+    {
       "path": "scripts/check-claude-md-links.py",
       "sha256": "f3f6fb6080291f4a36d48fed4167a872df8996154f04f8ab22802c388295be04"
     },
@@ -2113,7 +2117,7 @@
     },
     {
       "path": "scripts/check-manifest-coverage.py",
-      "sha256": "9fe915ccf6fdeaa209b879075650c1052a9f6f3dde4150b0d33b7f02025144ce"
+      "sha256": "8afcf3341c2c1005320da0385c8bc42573a61d872800d9119b76700eae94a9d7"
     },
     {
       "path": "scripts/check-open-sessions.sh",
@@ -3239,6 +3243,7 @@
     "setup/test-attestation-build-statement.sh",
     "setup/test-attestation-canonical-digest.sh",
     "setup/test-build-runtime-preserves-live-state.sh",
+    "setup/test-check-changelog-entry.sh",
     "setup/test-day-open-delivery-closure.sh",
     "setup/test-delivery-route-label.sh",
     "setup/test-detectors.sh",

@@ -1,0 +1,74 @@
+name: Changelog Gate
+
+# WP-529 (29.09.2026): гейт заметок выпуска. Недельный релиз срабатывает по
+# непустой секции [Unreleased], но никто её не ведёт: между v0.40.1 и main
+# накопилось 28 коммитов при одной записи, а 20.09 релиз молча пропустился.
+# Этот workflow требует, чтобы PR в main добавлял в [Unreleased] пункт со
+# ссылкой на номер PR (логика и сценарии - scripts/check-changelog-entry.sh
+# и setup/test-check-changelog-entry.sh).
+#
+# Исключения:
+#   - PR из веток release/* (недельный релиз переносит записи из
+#     [Unreleased] в версию, новой записи в нём быть не должно);
+#   - метка no-changelog, поставленная участником из NO_CHANGELOG_ALLOWED.
+#     Ограничение: все агенты пилота работают под его учёткой, поэтому
+#     allowlist отсекает только посторонних актёров (боты, чужие аккаунты),
+#     но не агента под учёткой пилота.
+#
+# Статус: совещательный (не входит в required checks защиты main). Сделать
+# обязательным - решение пилота после пары недель наблюдения.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  changelog-entry:
+    runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      NO_CHANGELOG_ALLOWED: "TserenTserenov"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Skip release branches
+        id: release
+        run: |
+          case "$HEAD_REF" in
+            release/*) echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Релизная ветка $HEAD_REF - гейт не применяется." ;;
+            *) echo "skip=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Check no-changelog label
+        id: label
+        if: steps.release.outputs.skip == 'false'
+        run: |
+          ACTOR=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/events" --paginate \
+            --jq '[.[] | select(.event == "labeled" and .label.name == "no-changelog")] | last | .actor.login // ""')
+          if [ -n "$ACTOR" ] && printf ' %s ' "$NO_CHANGELOG_ALLOWED" | grep -q " $ACTOR "; then
+            HAS=$(gh pr view "$PR_NUMBER" --json labels --jq '[.labels[].name] | index("no-changelog") != null')
+            if [ "$HAS" = "true" ]; then
+              echo "exempt=true" >> "$GITHUB_OUTPUT"
+              echo "Метка no-changelog поставлена $ACTOR (в allowlist) - гейт пропущен."
+              exit 0
+            fi
+          fi
+          echo "exempt=false" >> "$GITHUB_OUTPUT"
+          [ -z "$ACTOR" ] || echo "Метка no-changelog от $ACTOR не в allowlist или снята - проверяем запись."
+
+      - name: Require a CHANGELOG entry
+        if: steps.release.outputs.skip == 'false' && steps.label.outputs.exempt == 'false'
+        run: bash scripts/check-changelog-entry.sh "$BASE_SHA" "$HEAD_SHA" "$PR_NUMBER"

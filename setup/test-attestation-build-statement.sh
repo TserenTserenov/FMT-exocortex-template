@@ -123,6 +123,8 @@ assert_rejected() {
 
 assert_rejected "malformed subject-digest (not 64 hex chars)" --subject-digest "not-hex"
 assert_rejected "invalid verdict value" --verdict maybe
+assert_rejected "non-numeric ttl-hours (would reach shell arithmetic)" --ttl-hours "a[\$(touch /tmp/ttl-injection-probe)]"
+assert_rejected "empty ttl-hours" --ttl-hours ""
 
 # --- Case: missing required argument is rejected (bypasses good_call's defaults) ---
 if bash "$BUILD_SCRIPT" --subject-digest "$HEX64" >/dev/null 2>&1; then
