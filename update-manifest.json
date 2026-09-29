@@ -2353,7 +2353,7 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "640078ac3d1de22a3abd43efd0cf2ddba518bab473d4a998eab093235bc25802"
+      "sha256": "c59fe3add2c5f0df6031a1abb53155ca3281ce9c2421f30fd9d4a13374cbdf59"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
@@ -3139,6 +3139,7 @@
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
+    "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test-update-fpf-refresh.sh",
     "scripts/tests/test_adopt_governance.sh",
