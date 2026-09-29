@@ -79,7 +79,7 @@ head_before=$(git -C "$WORKSPACE_DIR/FPF" rev-parse HEAD)
 out=$(refresh_fpf_base_clone)
 [ "$head_before" = "$(git -C "$WORKSPACE_DIR/FPF" rev-parse HEAD)" ] || fail "case 4: HEAD moved on a diverged copy"
 [ -f "$WORKSPACE_DIR/FPF/mine.md" ] || fail "case 4: local commit lost"
-grep -q 'не обновлена' <<<"$out" || fail "case 4: no warning: $out"
+grep -q 'разошлась' <<<"$out" || fail "case 4: no warning: $out"
 
 # 5. No copy installed -> skipped without error.
 rm -rf "$WORKSPACE_DIR/FPF"
@@ -116,7 +116,7 @@ out=$(refresh_fpf_base_clone)
 : > "$GIT_CONFIG_GLOBAL"
 assert_untouched "case 7" "$head_before"
 [ -f "$WORKSPACE_DIR/FPF/mine2.md" ] || fail "case 7: local commit lost"
-grep -q 'не обновлена' <<<"$out" || fail "case 7: no warning: $out"
+grep -q 'разошлась' <<<"$out" || fail "case 7: no warning: $out"
 
 # 8. Shallow clone (what a size-limited install would have) behind upstream by
 #    two commits -> fast-forwarded.
@@ -133,7 +133,7 @@ publish_upstream sixth.md six
 head_before=$(git -C "$WORKSPACE_DIR/FPF" rev-parse HEAD)
 out=$(refresh_fpf_base_clone)
 assert_untouched "case 9" "$head_before"
-grep -q 'не обновлена' <<<"$out" || fail "case 9: no warning: $out"
+grep -q 'нет ветки слежения' <<<"$out" || fail "case 9: no warning: $out"
 
 # 10. Untracked local file that collides with an incoming file -> untouched, kept.
 fresh_copy ""
@@ -143,6 +143,7 @@ echo precious > "$WORKSPACE_DIR/FPF/sixth.md"
 out=$(refresh_fpf_base_clone)
 assert_untouched "case 10" "$head_before"
 grep -q precious "$WORKSPACE_DIR/FPF/sixth.md" || fail "case 10: untracked file overwritten"
+grep -q 'неотслеживаемые' <<<"$out" || fail "case 10: wrong reason reported: $out"
 rm -f "$WORKSPACE_DIR/FPF/sixth.md"
 
 # 11. Staged (not yet committed) edit counts as a local change -> untouched.
@@ -169,4 +170,51 @@ grep -q 'не удалось получить' <<<"$out" || fail "case 12: no wa
 ( set -e; refresh_fpf_base_clone >/dev/null || true; echo survived ) | grep -q survived \
     || fail "case 13: update aborted"
 
-echo "PASS: 13 cases"
+# 14. Clean tree but the copy has its own commit that the server lacks: never
+#     reported as "up to date" (a merge would say exactly that), left untouched.
+fresh_copy ""
+echo mine > "$WORKSPACE_DIR/FPF/ahead.md"
+git -C "$WORKSPACE_DIR/FPF" add ahead.md
+git_q -C "$WORKSPACE_DIR/FPF" commit -m ahead-only
+head_before=$(git -C "$WORKSPACE_DIR/FPF" rev-parse HEAD)
+out=$(refresh_fpf_base_clone)
+assert_untouched "case 14" "$head_before"
+grep -q 'свои коммиты' <<<"$out" || fail "case 14: ahead copy not reported: $out"
+if grep -q 'актуальна' <<<"$out"; then fail "case 14: ahead copy reported as up to date: $out"; fi
+
+# 15. .git is a file (linked worktree, submodule), not a directory: the copy is
+#     still found and fast-forwarded to the server's tip.
+rm -rf "$TMP/mainrepo" "$WORKSPACE_DIR/FPF"
+git_q clone "file://$ORIGIN" "$TMP/mainrepo"
+git_q -C "$TMP/mainrepo" checkout -b holder
+git_q -C "$TMP/mainrepo" branch -f main HEAD~1
+git_q -C "$TMP/mainrepo" worktree add "$WORKSPACE_DIR/FPF" main
+git_q -C "$WORKSPACE_DIR/FPF" branch --set-upstream-to=origin/main main
+[ -f "$WORKSPACE_DIR/FPF/.git" ] || fail "case 15: fixture .git is not a file"
+out=$(refresh_fpf_base_clone)
+tip=$(git --git-dir="$ORIGIN" rev-parse main)
+[ "$(git -C "$WORKSPACE_DIR/FPF" rev-parse HEAD)" = "$tip" ] || fail "case 15: worktree copy not updated: $out"
+grep -q 'обновлена' <<<"$out" || fail "case 15: no report: $out"
+git_q -C "$TMP/mainrepo" worktree remove --force "$WORKSPACE_DIR/FPF"
+
+# 16. A fetch that never returns (dead network, credential helper stuck): the
+#     update gets control back within the limit and says so.
+fresh_copy ""
+git_q -C "$WORKSPACE_DIR/FPF" reset --hard HEAD~1
+mkdir -p "$TMP/shim"
+REAL_GIT=$(command -v git)
+cat > "$TMP/shim/git" <<SHIM
+#!/bin/bash
+for a in "\$@"; do [ "\$a" = fetch ] && exec sleep 30; done
+exec "$REAL_GIT" "\$@"
+SHIM
+chmod +x "$TMP/shim/git"
+head_before=$(git -C "$WORKSPACE_DIR/FPF" rev-parse HEAD)
+started=$(date +%s)
+out=$(PATH="$TMP/shim:$PATH" IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone)
+elapsed=$(( $(date +%s) - started ))
+[ "$elapsed" -lt 12 ] || fail "case 16: took ${elapsed}s, watchdog did not fire"
+grep -q 'не ответил' <<<"$out" || fail "case 16: no timeout message: $out"
+assert_untouched "case 16" "$head_before"
+
+echo "PASS: 16 cases"

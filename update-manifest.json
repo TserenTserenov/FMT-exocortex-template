@@ -453,7 +453,7 @@
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
-      "sha256": "cffe4bf910d7b8ec397978d9bd2a062dd518e6ed1b5dfb6140e87a30668303bd"
+      "sha256": "a70bd2585631b762927a82894b22ff2e0d2f4b6c261b2851aa0fc8c5f8ffb4ce"
     },
     {
       "path": ".claude/skills/integration-gate/SKILL.md",
@@ -829,7 +829,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3d4818c0c1b303056aff98912cf9156426b7aa2eb0ce45b181afa4d0dd0d8037"
+      "sha256": "b5a8f841df5450939af863f29c201d20fbb29cde4cb210cce8496ae6d4a9c7c0"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "b5a8f841df5450939af863f29c201d20fbb29cde4cb210cce8496ae6d4a9c7c0"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "b5a8f841df5450939af863f29c201d20fbb29cde4cb210cce8496ae6d4a9c7c0"
     },
     {
       "path": "CLAUDE.md",
@@ -2353,7 +2361,7 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "c59fe3add2c5f0df6031a1abb53155ca3281ce9c2421f30fd9d4a13374cbdf59"
+      "sha256": "47f2068e24f3bbdd5596c6e4cb43f0f71964fec016fcd93efa63c80e5a0cfa9f"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
@@ -3105,7 +3113,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "59dcdf1c4b06c395b749f2e93480f5bb5e3acf73fe48ccb9523d4307465b661a"
+      "sha256": "7673f1d40c95382e7374c6a88c48840339a9798aedc459084dc48c97b9855a0a"
     }
   ],
   "excluded_paths": [

@@ -1938,17 +1938,19 @@ backfill_extractor_feeders() {
 # WP-5 F57: setup.sh clones ailev/FPF once and nothing refreshed it afterwards,
 # so already-installed machines never received USING-FPF.md (the author's usage
 # instruction) or the newer DPF Suites. Fast-forward only, tracked-clean copies
-# only, never fatal: a modified or diverged copy is reported as possibly stale
-# and left exactly as it was.
+# only, never fatal: a modified, ahead or diverged copy is reported and left
+# exactly as it was.
 refresh_fpf_base_clone() {
     local fpf_dir="$WORKSPACE_DIR/FPF"
-    local before after
+    local before after upstream head_oid fetch_pid waited
+    local fetch_limit="${IWE_FPF_FETCH_TIMEOUT:-90}"
 
     if [ "${IWE_SKIP_FPF_REFRESH:-0}" = "1" ]; then
         echo "  ○ FPF: пропущен (IWE_SKIP_FPF_REFRESH=1)."
         return 0
     fi
-    if [ ! -d "$fpf_dir/.git" ]; then
+    # .git is a file, not a directory, in a linked worktree or a submodule.
+    if [ ! -e "$fpf_dir/.git" ]; then
         echo "  ○ FPF: копия не найдена ($fpf_dir), обновление пропущено."
         return 0
     fi
@@ -1960,31 +1962,66 @@ refresh_fpf_base_clone() {
         echo "  ⚠ FPF: не удалось прочитать состояние копии, обновление пропущено."
         return 0
     fi
-    # An unattended update must never wait for a password or an ssh prompt, and
-    # must not depend on the user's pull.rebase / merge.ff settings: fetch, then
-    # an explicit fast-forward-only merge into the tracked upstream. The
-    # low-speed limits bound a dead network mid-transfer; the prompt/ssh
-    # settings bound the connect phase. `timeout` is optional (absent on macOS).
-    local git_net=(env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true
-        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10')
-    if command -v timeout >/dev/null 2>&1; then
-        git_net=(timeout 90 "${git_net[@]}")
+
+    # An unattended update must never wait for a password, an ssh prompt or a
+    # dead network. macOS has no timeout(1), so the limit is a portable
+    # background-and-poll watchdog. The low-speed limits bound a stalled
+    # transfer, the prompt/ssh settings bound the connect phase.
+    env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true \
+        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' \
+        git -C "$fpf_dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
+        fetch --quiet 2>/dev/null &
+    fetch_pid=$!
+    waited=0
+    while kill -0 "$fetch_pid" 2>/dev/null && [ "$waited" -lt "$fetch_limit" ]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    if kill -0 "$fetch_pid" 2>/dev/null; then
+        pkill -P "$fetch_pid" 2>/dev/null || true
+        kill "$fetch_pid" 2>/dev/null || true
+        wait "$fetch_pid" 2>/dev/null || true
+        echo "  ⚠ FPF: сервер не ответил за ${fetch_limit} с — копия остаётся как была и может быть устаревшей."
+        return 0
     fi
-    if ! "${git_net[@]}" git -C "$fpf_dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
-            fetch --quiet 2>/dev/null; then
+    if ! wait "$fetch_pid"; then
         echo "  ⚠ FPF: не удалось получить обновления (нет сети или доступ отказан) — копия остаётся как была и может быть устаревшей."
         return 0
     fi
-    if ! git -C "$fpf_dir" merge --ff-only --quiet '@{u}' 2>/dev/null; then
-        echo "  ⚠ FPF: копия не обновлена (нет ветки слежения или история разошлась) — она остаётся как была и может быть устаревшей."
+
+    # Classify HEAD against the tracked upstream instead of trusting the exit
+    # code of a merge: "already up to date" is also what a copy that is AHEAD
+    # of the server reports, and an untracked-file collision fails the merge
+    # for a reason that has nothing to do with history.
+    if ! upstream=$(git -C "$fpf_dir" rev-parse --verify --quiet '@{u}' 2>/dev/null); then
+        echo "  ⚠ FPF: у копии нет ветки слежения (отсоединённый HEAD или другая настройка) — не обновляю, копия может быть устаревшей."
         return 0
     fi
-    after=$(git -C "$fpf_dir" rev-parse --short HEAD)
-    if [ "$before" = "$after" ]; then
-        echo "  ✓ FPF: копия уже актуальна ($after)."
-    else
-        echo "  ✓ FPF: копия обновлена $before → $after."
+    if ! head_oid=$(git -C "$fpf_dir" rev-parse HEAD 2>/dev/null); then
+        echo "  ⚠ FPF: не удалось прочитать состояние копии, обновление пропущено."
+        return 0
     fi
+    if [ "$head_oid" = "$upstream" ]; then
+        echo "  ✓ FPF: копия уже актуальна ($before)."
+        return 0
+    fi
+    if git -C "$fpf_dir" merge-base --is-ancestor "$upstream" "$head_oid" 2>/dev/null; then
+        echo "  ⚠ FPF: в копии есть свои коммиты, которых нет на сервере — не трогаю."
+        return 0
+    fi
+    if ! git -C "$fpf_dir" merge-base --is-ancestor "$head_oid" "$upstream" 2>/dev/null; then
+        echo "  ⚠ FPF: история копии разошлась с сервером — не трогаю, копия может быть устаревшей."
+        return 0
+    fi
+    if ! git -C "$fpf_dir" merge --ff-only --quiet "$upstream" 2>/dev/null; then
+        echo "  ⚠ FPF: обновить не удалось (возможно, мешают неотслеживаемые файлы в копии) — копия остаётся как была."
+        return 0
+    fi
+    if ! after=$(git -C "$fpf_dir" rev-parse --short HEAD 2>/dev/null); then
+        echo "  ⚠ FPF: копия обновлена, но новое состояние прочитать не удалось."
+        return 0
+    fi
+    echo "  ✓ FPF: копия обновлена $before → $after."
     return 0
 }
 

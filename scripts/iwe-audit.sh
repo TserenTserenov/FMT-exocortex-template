@@ -728,14 +728,18 @@ echo ""
 
 # WP-5 F57: the author's usage instruction (FPF/USING-FPF.md) reaches an
 # installation only through its FPF copy, which update.sh fast-forwards. A copy
-# that is missing, older than the instruction, or a month stale means agents
+# that is missing, older than the instruction, or behind the server means agents
 # quote FPF from memory. Warning only: the copy is optional infrastructure.
+# Commit age alone proves neither staleness (the author may simply not have
+# published) nor freshness (a copy can be days behind a recent tip), so age is
+# reported as a hint and lag is measured against the last known server state.
 report_fpf_copy_state() {
-    local fpf="$IWE_ROOT/FPF" commit_ts now_ts age_days
+    local fpf="$IWE_ROOT/FPF" commit_ts now_ts age_days behind
 
     echo "### Состояние копии FPF"
     echo ""
-    if [ ! -d "$fpf/.git" ]; then
+    # .git is a file, not a directory, in a linked worktree or a submodule.
+    if [ ! -e "$fpf/.git" ]; then
         echo "⚠️ Копия \`FPF/\` не найдена — скилл \`/fpf\` не сможет читать полный текст. Решение: \`bash update.sh\` или клонировать ailev/FPF в \`FPF/\`."
         UPD_WARN=$((UPD_WARN + 1))
         echo ""
@@ -747,6 +751,11 @@ report_fpf_copy_state() {
         echo "⚠️ В копии FPF нет \`USING-FPF.md\` — копия старее инструкции автора. Решение: \`bash update.sh\` (обновит копию) или \`git -C FPF pull --ff-only\`, если в копии нет своих правок."
         UPD_WARN=$((UPD_WARN + 1))
     fi
+    behind=$(git -C "$fpf" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo "")
+    if [ -n "$behind" ] && [ "$behind" -gt 0 ]; then
+        echo "⚠️ Копия FPF отстаёт от известного состояния сервера на $behind коммит(ов) (по данным последнего получения обновлений). Решение: \`bash update.sh\`."
+        UPD_WARN=$((UPD_WARN + 1))
+    fi
     commit_ts=$(git -C "$fpf" log -1 --format=%ct 2>/dev/null || echo 0)
     now_ts=$(date +%s)
     if [ "${commit_ts:-0}" -le 0 ]; then
@@ -754,10 +763,11 @@ report_fpf_copy_state() {
         UPD_WARN=$((UPD_WARN + 1))
     else
         age_days=$(( (now_ts - commit_ts) / 86400 ))
+        [ "$age_days" -lt 0 ] && age_days=0
         if [ "$age_days" -gt 30 ]; then
-            echo "⚠️ Последний коммит копии FPF старше 30 дней ($age_days дн.) — копия устарела. Решение: \`bash update.sh\`."
+            echo "⚠️ Последний коммит копии FPF старше 30 дней ($age_days дн.) — возможно, копия устарела (или автор давно ничего не публиковал). Решение: \`bash update.sh\`."
             UPD_WARN=$((UPD_WARN + 1))
-        else
+        elif [ -z "$behind" ] || [ "$behind" -eq 0 ]; then
             echo "✅ Копия FPF свежая (последний коммит $age_days дн. назад)"
         fi
     fi
