@@ -1865,6 +1865,10 @@ run_post_apply_backfills_or_die() {
     echo ""
     echo "Knowledge Extractor feeders (upgrade backfill)..."
     backfill_extractor_feeders || true
+
+    echo ""
+    echo "FPF base copy (upgrade refresh)..."
+    refresh_fpf_base_clone || true
 }
 
 # WP-5 F55 (High finding of F54, 03.09): setup.sh got the extractor feeders
@@ -1929,6 +1933,59 @@ backfill_extractor_feeders() {
     printf '%s\n' "$feeders_output" | sed 's/^/  /' >&2
     echo "  ⚠ Экстрактор не запустится автоматически — повторите вручную: bash $feeders" >&2
     return 1
+}
+
+# WP-5 F57: setup.sh clones ailev/FPF once and nothing refreshed it afterwards,
+# so already-installed machines never received USING-FPF.md (the author's usage
+# instruction) or the newer DPF Suites. Fast-forward only, tracked-clean copies
+# only, never fatal: a modified or diverged copy is reported as possibly stale
+# and left exactly as it was.
+refresh_fpf_base_clone() {
+    local fpf_dir="$WORKSPACE_DIR/FPF"
+    local before after
+
+    if [ "${IWE_SKIP_FPF_REFRESH:-0}" = "1" ]; then
+        echo "  ○ FPF: пропущен (IWE_SKIP_FPF_REFRESH=1)."
+        return 0
+    fi
+    if [ ! -d "$fpf_dir/.git" ]; then
+        echo "  ○ FPF: копия не найдена ($fpf_dir), обновление пропущено."
+        return 0
+    fi
+    if [ -n "$(git -C "$fpf_dir" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+        echo "  ⚠ FPF: в копии есть локальные изменения — не обновляю, копия может быть устаревшей."
+        return 0
+    fi
+    if ! before=$(git -C "$fpf_dir" rev-parse --short HEAD 2>/dev/null); then
+        echo "  ⚠ FPF: не удалось прочитать состояние копии, обновление пропущено."
+        return 0
+    fi
+    # An unattended update must never wait for a password or an ssh prompt, and
+    # must not depend on the user's pull.rebase / merge.ff settings: fetch, then
+    # an explicit fast-forward-only merge into the tracked upstream. The
+    # low-speed limits bound a dead network mid-transfer; the prompt/ssh
+    # settings bound the connect phase. `timeout` is optional (absent on macOS).
+    local git_net=(env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true
+        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10')
+    if command -v timeout >/dev/null 2>&1; then
+        git_net=(timeout 90 "${git_net[@]}")
+    fi
+    if ! "${git_net[@]}" git -C "$fpf_dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
+            fetch --quiet 2>/dev/null; then
+        echo "  ⚠ FPF: не удалось получить обновления (нет сети или доступ отказан) — копия остаётся как была и может быть устаревшей."
+        return 0
+    fi
+    if ! git -C "$fpf_dir" merge --ff-only --quiet '@{u}' 2>/dev/null; then
+        echo "  ⚠ FPF: копия не обновлена (нет ветки слежения или история разошлась) — она остаётся как была и может быть устаревшей."
+        return 0
+    fi
+    after=$(git -C "$fpf_dir" rev-parse --short HEAD)
+    if [ "$before" = "$after" ]; then
+        echo "  ✓ FPF: копия уже актуальна ($after)."
+    else
+        echo "  ✓ FPF: копия обновлена $before → $after."
+    fi
+    return 0
 }
 
 record_rule_workspace_state() {
