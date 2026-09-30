@@ -298,6 +298,8 @@ $extra_args"
     if git -C "$strategy_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         if [ "$commit_mode" = "isolated-inbox" ]; then
             verify_inbox_outputs "$strategy_dir" || return 1
+        elif [ "$commit_mode" = "isolated-feed" ]; then
+            verify_feed_outputs "$strategy_dir" || return 1
         fi
         prefilter_changed_reports "$strategy_dir" || return 1
 
@@ -326,6 +328,66 @@ verify_inbox_outputs() {
         log "ERROR: AI CLI returned success without updated input marks; publication blocked"
         return 1
     fi
+}
+
+# Exit contract of the isolated feeders (session-close-feed, git-diff-feed).
+# Runs inside the throwaway worktree, before anything is committed:
+#   - whatever the agent did (its own commits, staged files) is normalised to
+#     plain working-tree changes against the base commit, so the script alone
+#     decides what is committed;
+#   - every changed path must be a captures input file (capture_source_files);
+#   - either nothing changed (no candidates = normal outcome, success without a
+#     commit) or at least one added line carries a "[feed:...]" marker.
+# Requires EXTRACTOR_FEED_BASE_SHA (set by run_feed_isolated).
+verify_feed_outputs() {
+    local strategy_dir="$1" base="${EXTRACTOR_FEED_BASE_SHA:-}"
+    local src entry path p ok violation=0 feed_lines=0 n
+    local allowed=() feed_changed=()
+    if [ -z "$base" ]; then
+        log "ERROR: feed base commit is unknown; publication blocked"
+        return 1
+    fi
+    if ! git -C "$strategy_dir" reset -q --mixed "$base" >> "$LOG_FILE" 2>&1; then
+        log "ERROR: cannot normalise feed worktree against $base; publication blocked"
+        return 1
+    fi
+    while IFS= read -r src; do
+        allowed+=("${src#"$strategy_dir/"}")
+    done < <(capture_source_files "$strategy_dir/inbox")
+    while IFS= read -r -d '' entry; do
+        path="${entry:3}"
+        ok=0
+        for p in "${allowed[@]}"; do
+            if [ "$p" = "$path" ]; then ok=1; break; fi
+        done
+        if [ "$ok" -eq 0 ]; then
+            log "ERROR: feed touched a path outside the captures allowlist: $path"
+            violation=1
+        else
+            feed_changed+=("$path")
+        fi
+    done < <(git -C "$strategy_dir" status --porcelain -z --untracked-files=all)
+    if [ "$violation" -ne 0 ]; then
+        log "ERROR: feed output violates the captures-only contract; publication blocked"
+        return 1
+    fi
+    if [ "${#feed_changed[@]}" -eq 0 ]; then
+        log "Feed no_changes: no capture candidates written"
+        return 0
+    fi
+    for path in "${feed_changed[@]}"; do
+        if git -C "$strategy_dir" cat-file -e "$base:$path" 2>/dev/null; then
+            n=$(git -C "$strategy_dir" diff "$base" -- "$path" | grep -cE '^\+.*\[feed:[^]]+\]' || true)
+        else
+            n=$(grep -cE '\[feed:[^]]+\]' "$strategy_dir/$path" || true)
+        fi
+        feed_lines=$((feed_lines + ${n:-0}))
+    done
+    if [ "$feed_lines" -eq 0 ]; then
+        log "ERROR: feed changed captures without any [feed:...] block; publication blocked"
+        return 1
+    fi
+    log "Feed output verified: $feed_lines [feed:...] block(s) in ${#feed_changed[@]} file(s)"
 }
 
 markdown_fence_awk() {
@@ -485,7 +547,7 @@ commit_extractor_changes() {
             target_paths+=("${source_file#"$strategy_dir/"}")
         done < <(capture_source_files "$strategy_dir/inbox")
     fi
-    if [ -d "$strategy_dir/inbox/extraction-reports" ]; then
+    if [ "$commit_mode" != "isolated-feed" ] && [ -d "$strategy_dir/inbox/extraction-reports" ]; then
         while IFS= read -r -d '' source_file; do
             target_paths+=("${source_file#"$strategy_dir/"}")
         done < <(find "$strategy_dir/inbox/extraction-reports" -maxdepth 1 -type f -name '*.md' -print0)
@@ -499,8 +561,13 @@ commit_extractor_changes() {
         return 0
     fi
     gov_branch=$(resolve_governance_branch "$strategy_dir")
-    if [ "$branch" != "$gov_branch" ] && \
-       { [ "$commit_mode" != "isolated-inbox" ] || [[ "$branch" != extractor/inbox-check-* ]]; }; then
+    # Isolated modes run on their own throwaway branch; every other mode must
+    # be on the governance branch.
+    local isolated_branch_ok=0
+    case "$commit_mode:$branch" in
+        isolated-inbox:extractor/inbox-check-*|isolated-feed:extractor/feed-*) isolated_branch_ok=1 ;;
+    esac
+    if [ "$branch" != "$gov_branch" ] && [ "$isolated_branch_ok" -ne 1 ]; then
         log "SKIP: $repo_name is on branch '$branch', expected '$gov_branch'"
         EXTRACTOR_COMMIT_RESULT="blocked"
         return 0
@@ -626,8 +693,12 @@ commit_extractor_changes() {
         return 1
     fi
 
+    local commit_message="inbox-check: extraction report $DATE"
+    if [ "$commit_mode" = "isolated-feed" ]; then
+        commit_message="feed(${EXTRACTOR_FEED_LABEL:-feed}): capture candidates $DATE"
+    fi
     if ! git -C "$strategy_dir" commit --only \
-        -m "inbox-check: extraction report $DATE" -- \
+        -m "$commit_message" -- \
         "${target_paths[@]}" >> "$LOG_FILE" 2>&1; then
         log "WARN: git commit failed for $repo_name"
         EXTRACTOR_COMMIT_RESULT="failed"
@@ -756,11 +827,20 @@ cleanup_isolated_inbox_worktree() {
     # WARN forever.
     local pack_clone
     for pack_clone in "$isolated_workspace"/PACK-*; do
+        # Feeder workspaces link the real Packs: drop only the link, never
+        # chmod/rm through it.
+        if [ -L "$pack_clone" ]; then
+            rm -f "$pack_clone"
+            continue
+        fi
         [ -d "$pack_clone" ] || continue
         chmod -R u+w "$pack_clone" 2>/dev/null
         rm -rf "$pack_clone"
     done
 
+    # Feeder workspaces hold symlinks to every canonical repository; remove the
+    # links themselves (never their targets).
+    find "$isolated_workspace" -maxdepth 1 -type l -exec rm -f {} + 2>/dev/null || true
     rm -f "$isolated_workspace/$repo_name" \
         "$isolated_workspace/FMT-exocortex-template/roles/extractor/config/routing.md" \
         "$isolated_workspace/FMT-exocortex-template/roles/extractor/prompts/session-close.md"
@@ -944,12 +1024,40 @@ standalone_capture_files() {
                2>/dev/null | sort)
 }
 
+# Shared by the isolated inbox-check and the isolated feeders: a throwaway
+# worktree of origin/<gov_branch> on its own branch extractor/<label>-<id>, plus
+# a synthetic workspace whose <repo_name> entry links to that worktree. The
+# canonical checkout is never touched. Results (globals): ISO_RUN_ROOT,
+# ISO_WORKTREE, ISO_WORKSPACE, ISO_BRANCH. The caller owns lock handling.
+create_isolated_worktree() {  # <canonical_repo> <repo_name> <gov_branch> <label>
+    local canonical_repo="$1" repo_name="$2" gov_branch="$3" label="$4" run_id
+    ISO_RUN_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/iwe-extractor-$label.XXXXXX") || {
+        log "ERROR: cannot create isolated $label directory"
+        return 1
+    }
+    run_id="$(date +%Y%m%d%H%M%S)-$$"
+    ISO_WORKTREE="$ISO_RUN_ROOT/$repo_name"
+    ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
+    ISO_BRANCH="extractor/$label-$run_id"
+
+    if ! git -C "$canonical_repo" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot create isolated $label worktree; run directory preserved: $ISO_RUN_ROOT"
+        return 1
+    fi
+    git -C "$ISO_WORKTREE" branch --set-upstream-to="origin/$gov_branch" "$ISO_BRANCH" >> "$LOG_FILE" 2>&1 || true
+
+    if ! mkdir "$ISO_WORKSPACE" || ! ln -s "$ISO_WORKTREE" "$ISO_WORKSPACE/$repo_name"; then
+        log "WARN: cannot prepare isolated $label workspace; worktree preserved: $ISO_WORKTREE"
+        return 1
+    fi
+}
+
 run_inbox_check_isolated() {
     local canonical_workspace="$WORKSPACE"
     local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
     local canonical_repo="$canonical_workspace/$repo_name"
     local lock_dir="${IWE_EXTRACTOR_INBOX_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-inbox-check.lock}"
-    local run_root worktree isolated_workspace branch_name run_id isolated_template actual_pending gov_branch
+    local run_root worktree isolated_workspace branch_name isolated_template actual_pending gov_branch
 
     case "$repo_name" in
         ""|.*|*/*)
@@ -972,27 +1080,17 @@ run_inbox_check_isolated() {
         return 1
     fi
 
-    run_root=$(mktemp -d "${TMPDIR:-/tmp}/iwe-extractor-inbox-check.XXXXXX") || {
-        log "ERROR: cannot create isolated inbox-check directory"
-        release_inbox_lock "$lock_dir"
-        return 1
-    }
-    run_id="$(date +%Y%m%d%H%M%S)-$$"
-    worktree="$run_root/$repo_name"
-    isolated_workspace="$run_root/workspace"
-    branch_name="extractor/inbox-check-$run_id"
-    isolated_template="${IWE_TEMPLATE:-$canonical_workspace/FMT-exocortex-template}"
-
-    if ! git -C "$canonical_repo" worktree add -b "$branch_name" "$worktree" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
-        log "WARN: cannot create isolated inbox-check worktree; run directory preserved: $run_root"
+    if ! create_isolated_worktree "$canonical_repo" "$repo_name" "$gov_branch" "inbox-check"; then
         release_inbox_lock "$lock_dir"
         return 1
     fi
-    git -C "$worktree" branch --set-upstream-to="origin/$gov_branch" "$branch_name" >> "$LOG_FILE" 2>&1 || true
+    run_root="$ISO_RUN_ROOT"
+    worktree="$ISO_WORKTREE"
+    isolated_workspace="$ISO_WORKSPACE"
+    branch_name="$ISO_BRANCH"
+    isolated_template="${IWE_TEMPLATE:-$canonical_workspace/FMT-exocortex-template}"
 
-    if ! mkdir "$isolated_workspace" || \
-       ! ln -s "$worktree" "$isolated_workspace/$repo_name" || \
-       ! [ -d "$isolated_template" ] || \
+    if ! [ -d "$isolated_template" ] || \
        ! mkdir -p "$isolated_workspace/FMT-exocortex-template/roles/extractor/config" \
            "$isolated_workspace/FMT-exocortex-template/roles/extractor/prompts" || \
        ! cp "$isolated_template/roles/extractor/config/routing.md" \
@@ -1080,6 +1178,85 @@ $(pack_snapshot_context)"
     release_inbox_lock "$lock_dir"
 }
 
+# Isolated feeder (session-close-feed, git-diff-feed): the agent works in a
+# throwaway worktree, never in the canonical governance checkout. The agent
+# only writes capture blocks; this script verifies (verify_feed_outputs),
+# commits and publishes. The caller holds the shared feed lock.
+run_feed_isolated() {  # <prompt-file> <extra-args> <label>
+    local prompt_file="$1" extra_args="${2:-}" label="${3:-feed}"
+    local canonical_workspace="$WORKSPACE"
+    local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+    local canonical_repo="$canonical_workspace/$repo_name"
+    local run_root worktree isolated_workspace branch_name gov_branch repo_dir link_name
+
+    case "$repo_name" in
+        ""|.*|*/*)
+            log "ERROR: unsafe governance repository name for isolated feed: '$repo_name'"
+            return 1
+            ;;
+    esac
+    if ! git -C "$canonical_repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log "ERROR: governance repository is unavailable for isolated feed: $canonical_repo"
+        return 1
+    fi
+    gov_branch=$(resolve_governance_branch "$canonical_repo")
+    if ! git -C "$canonical_repo" fetch origin "$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot refresh origin/$gov_branch; isolated feed was not started"
+        return 1
+    fi
+    if ! create_isolated_worktree "$canonical_repo" "$repo_name" "$gov_branch" "feed"; then
+        return 1
+    fi
+    run_root="$ISO_RUN_ROOT"
+    worktree="$ISO_WORKTREE"
+    isolated_workspace="$ISO_WORKSPACE"
+    branch_name="$ISO_BRANCH"
+
+    # The feeder prompts read git history of every repository, so the synthetic
+    # workspace links all of them (governance repo excluded: it is the worktree).
+    for repo_dir in "$canonical_workspace"/*/; do
+        repo_dir="${repo_dir%/}"
+        link_name="$(basename "$repo_dir")"
+        [ "$link_name" = "$repo_name" ] && continue
+        [ -e "$repo_dir/.git" ] || continue
+        ln -s "$repo_dir" "$isolated_workspace/$link_name" || \
+            log "WARN: cannot link $link_name into isolated feed workspace"
+    done
+
+    local EXTRACTOR_FEED_BASE_SHA EXTRACTOR_FEED_LABEL="$label"
+    EXTRACTOR_FEED_BASE_SHA=$(git -C "$worktree" rev-parse HEAD 2>/dev/null) || {
+        log "WARN: cannot resolve isolated feed base commit; worktree preserved: $worktree"
+        return 1
+    }
+    local feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог): историю читай через git -C <путь> log, проверку -d .git для него не применяй. Не выполняй git add/commit/push: файлы captures только пиши, коммит и публикацию делает скрипт."
+    if [ -n "$extra_args" ]; then
+        feed_context="$extra_args
+
+$feed_context"
+    fi
+
+    local WORKSPACE="$isolated_workspace"
+    local IWE_WORKSPACE="$isolated_workspace"
+    export IWE_WORKSPACE
+    EXTRACTOR_COMMIT_RESULT=""
+    if ! run_claude "$prompt_file" "$feed_context" "isolated-feed"; then
+        log "WARN: isolated $prompt_file failed; worktree preserved for review: $worktree"
+        return 1
+    fi
+
+    case "${EXTRACTOR_COMMIT_RESULT:-}" in
+        published|no_changes)
+            cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
+                "$isolated_workspace" "$repo_name" "$run_root" || true
+            log "Completed process: $prompt_file (${EXTRACTOR_COMMIT_RESULT})"
+            ;;
+        *)
+            log "WARN: isolated $prompt_file did not reach a safe publication state; worktree preserved: $worktree"
+            return 1
+            ;;
+    esac
+}
+
 # Проверка рабочих часов
 is_work_hours() {
     local hour
@@ -1151,7 +1328,7 @@ case "$1" in
         # nothing reported. The trap covers every exit path uniformly.
         trap 'release_inbox_lock "$feed_lock_dir" "session-close-feed"' EXIT
         log "Running session-close FEED (non-interactive, writes to captures inbox)"
-        run_claude "session-close-feed" "${2:-}"
+        run_feed_isolated "session-close-feed" "${2:-}" "session-close"
         notify_telegram "session-close-feed"
         ;;
 
@@ -1173,7 +1350,7 @@ case "$1" in
         trap 'release_inbox_lock "$feed_lock_dir" "git-diff-feed"' EXIT
         SINCE="${2:-12 hours ago}"
         log "Running git-diff FEED (since: $SINCE)"
-        run_claude "git-diff-feed" "$SINCE"
+        run_feed_isolated "git-diff-feed" "$SINCE" "git-diff"
         notify_telegram "git-diff-feed"
         ;;
 

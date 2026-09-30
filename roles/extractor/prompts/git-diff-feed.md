@@ -27,7 +27,7 @@
 ```bash
 SINCE="${1:-12 hours ago}"  # по умолчанию 12h окно
 for repo in {{WORKSPACE_DIR}}/*/; do
-  if [ -d "$repo/.git" ]; then
+  if [ -e "$repo/.git" ]; then
     name=$(basename "$repo")
     cd "$repo" && git log --oneline --since="$SINCE" 2>/dev/null
   fi
@@ -79,7 +79,7 @@ done
 
 ### Шаг 6: Коммит
 
-Коммит здесь не выполняется — его делает уже обёрнутая `commit_extractor_changes()` в `extractor.sh` ПОСЛЕ этого прогона: у headless-запуска этого промпта нет своего семафора, прямой `git commit` из промпта обходит сессионную обвязку и иногда натыкается на глобальную блокировку `session-guard.sh` из-за чужих просроченных семафоров.
+Не коммить и не пушь: ты работаешь в изолированной рабочей копии, `git add`/`git commit`/`git push` не выполняй. Только пиши ###-блоки в целевой captures-файл; `commit_extractor_changes()` в `extractor.sh` проверит (изменён только captures-файл, есть блок `[feed:git-diff ...]`), закоммитит и опубликует ПОСЛЕ прогона. Кандидатов нет — не меняй ничего (это нормальный исход).
 
 ## Что НЕ делать
 

@@ -460,6 +460,153 @@ reports.mkdir()
         self.assertIn("[cross-report]", result.stdout)
         self.assertNotIn("fixture-source-text", result.stdout)
 
+    # --- isolated feeders (session-close-feed / git-diff-feed) -------------------
+
+    FEED_BLOCK = "### Feed candidate [feed:git-diff 2026-09-12]\\n**Тип:** method\\n"
+
+    def feed_fixture(self, agent_body):
+        """Canonical DS-fixture + a second repo; fake CLI = the feeder agent."""
+        self.make_pack()
+        governance, _, remote = self.published_repo("DS-fixture", {
+            "README.md": "fixture\n",
+            "inbox/captures/2026-09.md": "# Captures 2026-09\n",
+        })
+        cli = self.write(self.base / "fake-feed-cli", f"#!{sys.executable}\n" + """from pathlib import Path
+import subprocess
+import sys
+assert Path("PACK-fixture").is_symlink(), "all repositories must be linked into the feed workspace"
+assert Path("DS-fixture").is_symlink()
+assert "Не выполняй git add/commit/push" in sys.argv[-1]
+repo = Path("DS-fixture")
+captures = repo / "inbox/captures/2026-09.md"
+block = "%s"
+""" % self.FEED_BLOCK + agent_body)
+        cli.chmod(0o700)
+        return governance, remote, cli
+
+    def run_feed(self, cli, *, check=True, label="git-diff", prompt="git-diff-feed"):
+        return self.shell(f'run_feed_isolated {prompt} "12 hours ago" {label}', variables={
+            "AI_CLI": str(cli), "AI_CLI_PROMPT_FLAG": "-p", "AI_CLI_EXTRA_FLAGS": "",
+        }, check=check)
+
+    def assert_canonical_untouched(self, governance, head_before):
+        self.assertEqual(self.git(governance, "status", "--porcelain"), "")
+        self.assertEqual(self.git(governance, "rev-parse", "HEAD"), head_before)
+        self.assertEqual(self.git(governance, "branch", "--show-current"), "main")
+
+    def leftover_feed_dirs(self):
+        return list((self.base / "runs").glob("iwe-extractor-feed.*"))
+
+    def test_isolated_feed_publishes_block_and_leaves_canonical_untouched(self):
+        governance, remote, cli = self.feed_fixture('captures.write_text(captures.read_text() + block)\n')
+        head_before = self.git(governance, "rev-parse", "HEAD")
+        commits_before = int(self.git(remote, "rev-list", "--count", "main"))
+        result = self.run_feed(cli)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("[feed:git-diff 2026-09-12]", self.git(remote, "show", "main:inbox/captures/2026-09.md"))
+        self.assertEqual(int(self.git(remote, "rev-list", "--count", "main")), commits_before + 1)
+        self.assertTrue(self.git(remote, "log", "-1", "--format=%s", "main").startswith("feed(git-diff):"))
+        self.assertEqual(self.git(remote, "show", "main:README.md"), "fixture")
+        self.assert_canonical_untouched(governance, head_before)
+        self.assertNotIn("[feed:", (governance / "inbox/captures/2026-09.md").read_text())
+        # Published run: worktree, branch and the whole run directory are gone,
+        # and cleanup never reached through the links into the real repositories.
+        self.assertEqual(self.leftover_feed_dirs(), [])
+        self.assertEqual(self.git(governance, "worktree", "list").count("\n"), 0)
+        self.assertEqual(self.git(governance, "branch", "--list", "extractor/feed-*"), "")
+        self.assertTrue((self.workspace / "PACK-fixture/pack/known.md").exists())
+        self.assertTrue((self.workspace / "PACK-fixture/.git").exists())
+
+    def test_isolated_feed_creates_new_month_file_from_allowlist(self):
+        governance, remote, cli = self.feed_fixture(
+            '(repo / "inbox/captures/2026-10.md").write_text("# Captures 2026-10\\n" + block)\n')
+        head_before = self.git(governance, "rev-parse", "HEAD")
+        self.run_feed(cli)
+        self.assertIn("[feed:git-diff", self.git(remote, "show", "main:inbox/captures/2026-10.md"))
+        self.assert_canonical_untouched(governance, head_before)
+
+    def test_isolated_feed_no_changes_is_success_without_commit(self):
+        governance, remote, cli = self.feed_fixture("pass\n")
+        head_before = self.git(governance, "rev-parse", "HEAD")
+        before = self.git(remote, "rev-parse", "main")
+        result = self.run_feed(cli)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("no_changes", result.stdout)
+        self.assertEqual(self.git(remote, "rev-parse", "main"), before)
+        self.assert_canonical_untouched(governance, head_before)
+        self.assertEqual(self.leftover_feed_dirs(), [])
+
+    def test_isolated_feed_agent_commit_is_normalised_and_republished_by_script(self):
+        # The agent ignores "do not commit": its own commit must not be published
+        # as-is; the script re-derives the change from the working tree.
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block)\n'
+            'subprocess.run(["git", "-C", "DS-fixture", "add", "--", "inbox/captures/2026-09.md"], check=True)\n'
+            'subprocess.run(["git", "-C", "DS-fixture", "commit", "-m", "agent self-commit"], check=True)\n')
+        head_before = self.git(governance, "rev-parse", "HEAD")
+        commits_before = int(self.git(remote, "rev-list", "--count", "main"))
+        self.run_feed(cli)
+        self.assertIn("[feed:git-diff", self.git(remote, "show", "main:inbox/captures/2026-09.md"))
+        self.assertEqual(int(self.git(remote, "rev-list", "--count", "main")), commits_before + 1)
+        self.assertTrue(self.git(remote, "log", "-1", "--format=%s", "main").startswith("feed(git-diff):"))
+        self.assertNotIn("agent self-commit", self.git(remote, "log", "--format=%s", "main"))
+        self.assert_canonical_untouched(governance, head_before)
+
+    def assert_feed_blocked(self, governance, remote, cli, expected_message):
+        head_before = self.git(governance, "rev-parse", "HEAD")
+        before = self.git(remote, "rev-parse", "main")
+        result = self.run_feed(cli, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(expected_message, result.stdout)
+        self.assertNotIn("Completed process:", result.stdout)
+        self.assertEqual(self.git(remote, "rev-parse", "main"), before)
+        self.assert_canonical_untouched(governance, head_before)
+        # Nothing is lost: the worktree is preserved for review.
+        self.assertEqual(len(self.leftover_feed_dirs()), 1)
+        self.assertNotIn("[feed:", (governance / "inbox/captures/2026-09.md").read_text())
+
+    def test_isolated_feed_change_outside_allowlist_blocks_publication(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block)\n'
+            '(repo / "README.md").write_text("agent edited an unrelated file\\n")\n')
+        self.assert_feed_blocked(governance, remote, cli, "outside the captures allowlist: README.md")
+
+    def test_isolated_feed_new_untracked_file_outside_allowlist_blocks_publication(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block)\n'
+            '(repo / "inbox/extraction-reports").mkdir()\n'
+            '(repo / "inbox/extraction-reports/r.md").write_text("report\\n")\n')
+        self.assert_feed_blocked(governance, remote, cli, "outside the captures allowlist: inbox/extraction-reports/r.md")
+
+    def test_isolated_feed_agent_commit_outside_allowlist_blocks_publication(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block)\n'
+            '(repo / "README.md").write_text("committed by the agent\\n")\n'
+            'subprocess.run(["git", "-C", "DS-fixture", "add", "--", "README.md", "inbox/captures/2026-09.md"], check=True)\n'
+            'subprocess.run(["git", "-C", "DS-fixture", "commit", "-m", "agent self-commit"], check=True)\n')
+        self.assert_feed_blocked(governance, remote, cli, "outside the captures allowlist: README.md")
+
+    def test_isolated_feed_changed_captures_without_feed_marker_blocks_publication(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + "### Manual-looking block\\nBody\\n")\n')
+        self.assert_feed_blocked(governance, remote, cli, "without any [feed:...] block")
+
+    def test_isolated_feed_cli_failure_publishes_nothing(self):
+        governance, remote, cli = self.feed_fixture("sys.exit(3)\n")
+        self.assert_feed_blocked(governance, remote, cli, "AI CLI failed")
+
+    def test_feed_subcommands_use_isolated_mode_and_prompts_do_not_self_commit(self):
+        text = RUNNER.read_text()
+        self.assertIn('run_feed_isolated "session-close-feed"', text)
+        self.assertIn('run_feed_isolated "git-diff-feed"', text)
+        self.assertNotIn('run_claude "session-close-feed"', text)
+        self.assertNotIn('run_claude "git-diff-feed"', text)
+        # Both feeders keep the shared lock.
+        self.assertEqual(text.count('trap \'release_inbox_lock "$feed_lock_dir"'), 2)
+        prompts = ROOT / "roles/extractor/prompts"
+        self.assertNotIn("git add inbox", (prompts / "session-close-feed.md").read_text())
+        self.assertNotIn("git commit -m", (prompts / "session-close-feed.md").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

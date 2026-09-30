@@ -63,14 +63,7 @@
 
 ### Шаг 5: Коммит
 
-После записи всех ###-блоков:
-```bash
-cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
-git add inbox/captures/YYYY-MM.md   # или inbox/captures.md без ротации
-git commit -m "feed(session-close): N capture-кандидатов из сессии YYYY-MM-DD"
-```
-
-(extractor.sh сам коммитит после run_claude — этот шаг выполнится автоматически.)
+**Не коммить и не пушь.** Ты работаешь в изолированной рабочей копии: только пиши ###-блоки в целевой captures-файл (`inbox/captures/YYYY-MM.md` или `inbox/captures.md`) и больше ничего не меняй — `git add`/`git commit`/`git push` не выполняй. Скрипт `extractor.sh` сам проверит, что изменён только captures-файл и есть блок `[feed:session-close ...]`, закоммитит и опубликует его. Изменение любого другого файла блокирует публикацию. Кандидатов нет — не меняй ничего (это нормальный исход).
 
 ## Что НЕ делать
 
