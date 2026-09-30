@@ -829,7 +829,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d5b48093d0b18679b04413fcf641ddb49b896c0646a3ad6e87c6e0ef1bafae37"
+      "sha256": "e7404a3d669b9171a20f33c8cbfcf0e3927b00dea7afb5d855dfa61db6218f68"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "e7404a3d669b9171a20f33c8cbfcf0e3927b00dea7afb5d855dfa61db6218f68"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "e7404a3d669b9171a20f33c8cbfcf0e3927b00dea7afb5d855dfa61db6218f68"
     },
     {
       "path": "CLAUDE.md",
