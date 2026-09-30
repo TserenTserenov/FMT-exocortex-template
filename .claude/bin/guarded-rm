@@ -61,21 +61,29 @@ while IFS= read -r line || [ -n "$line" ]; do
   line=${line#"${line%%[![:space:]]*}"}
   line=${line%"${line##*[![:space:]]}"}
   [ -n "$line" ] || continue
+  temp_token=0
   case "$line" in
     /|[A-Za-z]:|[A-Za-z]:/|//*) refuse "корень реестра — корень файловой системы или диска: $line" ;;
-    "{TMP}") root=/tmp ;;
-    "{TMPDIR}") root=${TMPDIR:-}; [ -n "$root" ] || continue ;;
+    "{TMP}") root=/tmp; temp_token=1 ;;
+    "{TMPDIR}") root=${TMPDIR:-}; [ -n "$root" ] || continue; temp_token=1 ;;
     "{WORKSPACE}"/*) root="$WORKSPACE${line#\{WORKSPACE\}}" ;;
     /*|[A-Za-z]:/*) root=$line ;;
     *) refuse "непонятная запись реестра: $line" ;;
   esac
   root=$(canon "$root") || refuse "не нормализуется корень реестра: $line"
-  # Не меньше двух частей пути после нормализации: `/`, `/c`, `c:` — слишком широкие корни.
+  # Корень ФС и корень диска никогда не корень удаления (canon отдаёт для `/` пустую строку).
   case "$root" in
-    */?*/?*) ;;
-    [a-z]:/?*/?*) ;;
-    *) refuse "корень реестра — корень файловой системы или диска: $line → $root" ;;
+    ""|[a-z]:) refuse "корень реестра — корень файловой системы или диска: $line → ${root:-/}" ;;
   esac
+  # Не меньше двух частей пути после нормализации: `/c`, `/home` — слишком широкие корни.
+  # Исключение — сами метки временного каталога: `{TMP}` на Linux это `/tmp`, одна часть по природе.
+  if [ "$temp_token" != 1 ]; then
+    case "$root" in
+      */?*/?*) ;;
+      [a-z]:/?*/?*) ;;
+      *) refuse "корень реестра — корень файловой системы или диска: $line → $root" ;;
+    esac
+  fi
   ROOTS+=("$root")
 done < "$REGISTRY"
 [ "${#ROOTS[@]}" -gt 0 ] || refuse "реестр корней пуст"

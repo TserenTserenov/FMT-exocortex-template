@@ -227,6 +227,35 @@ def main():
         os.remove(os.path.join(w.ws, ".claude", "config", "guarded-rm-roots.txt"))
         code, err = w.run("-rf", mixed(keep))
         check("нет реестра", code == 1 and os.path.exists(keep) and "нет реестра" in err, err)
+
+        # --- {TMP} / {TMPDIR} where /tmp is ONE path component (Linux): a realpath that does not
+        # resolve /tmp to /private/tmp (as macOS does) stands in for it. The check that a registry
+        # root has two components used to refuse the temp-dir tokens themselves. ---
+        if os.name != "nt":
+            stub = tempfile.mkdtemp(prefix="dg-realpath-")
+            with open(os.path.join(stub, "realpath"), "w", newline="\n") as f:
+                f.write('#!/bin/sh\nfor a; do last="$a"; done\nprintf "%s\\n" "$last"\n')
+            os.chmod(os.path.join(stub, "realpath"), 0o755)
+            env = dict(os.environ, PATH=stub + os.pathsep + os.environ["PATH"])
+
+            def run_linux(*args, extra_env=None):
+                proc = subprocess.run(["bash", w.script, *args], capture_output=True, text=True, encoding="utf-8",
+                                      errors="replace", env=dict(env, **(extra_env or {})))
+                return proc.returncode, proc.stderr.strip()
+
+            w.registry("{TMP}\n")
+            inside = tempfile.mkdtemp(prefix="dg-tmp-target-", dir="/tmp")
+            code, err = run_linux("-rf", inside)
+            check("{TMP} = /tmp (одна часть пути): цель внутри удаляется", code == 0 and not os.path.exists(inside), err)
+            code, err = run_linux("-rf", "/etc/dg-guarded-rm-absent-target")
+            check("{TMP} = /tmp: цель вне корня отказ", code == 1 and "вне разрешённых" in err, err)
+            w.registry("{TMPDIR}\n")
+            inside = tempfile.mkdtemp(prefix="dg-tmpdir-target-", dir="/tmp")
+            code, err = run_linux("-rf", inside, extra_env={"TMPDIR": "/tmp"})
+            check("{TMPDIR}=/tmp: цель внутри удаляется", code == 0 and not os.path.exists(inside), err)
+            code, err = run_linux("-rf", "/tmp/dg-guarded-rm-absent-target", extra_env={"TMPDIR": "/"})
+            check("{TMPDIR}=/ — корень ФС в реестре: отказ", code == 1 and "корень файловой системы" in err, err)
+            shutil.rmtree(stub, ignore_errors=True)
     finally:
         w.close()
 

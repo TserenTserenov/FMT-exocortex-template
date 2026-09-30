@@ -207,7 +207,31 @@ SEGMENTER_PL='
       my $char = substr($text, $i, 1);
       if (defined $quote) {
         if ($char eq "\\" && $quote eq "ansi" && $i + 1 < length($text)) {
-          $word .= substr($text, ++$i, 1);
+          # Decode what bash decodes inside dollar-single-quote: the flag -rf can be written -r\x66.
+          my $esc = substr($text, $i + 1, 1);
+          my $tail = substr($text, $i + 1);
+          my %simple = (a => "\a", b => "\b", e => chr(27), E => chr(27), f => "\f", n => "\n", r => "\r", t => "\t", v => chr(11));
+          if ($esc eq "x" && $tail =~ /^x([0-9A-Fa-f]{1,2})/) {
+            $word .= chr(hex $1);
+            $i += length($1) + 1;
+          } elsif ($tail =~ /^([0-7]{1,3})/) {
+            $word .= chr(oct($1) & 255);
+            $i += length($1);
+          } elsif (($esc eq "u" && $tail =~ /^u([0-9A-Fa-f]{1,4})/) || ($esc eq "U" && $tail =~ /^U([0-9A-Fa-f]{1,8})/)) {
+            $word .= chr(hex $1);
+            $i += length($1) + 1;
+          } elsif (exists $simple{$esc}) {
+            $word .= $simple{$esc};
+            $i++;
+          } elsif ($esc eq "c" && $i + 2 < length($text)) {
+            $word .= chr(ord(substr($text, $i + 2, 1)) & 31);
+            $i += 2;
+          } elsif ($esc eq chr(92) || $esc eq chr(39) || $esc eq q{"} || $esc eq q{?}) {
+            $word .= $esc;
+            $i++;
+          } else {
+            $word .= $char;               # an unknown escape keeps its backslash
+          }
         } elsif ($char eq "\\" && $quote eq q{"} && $i + 1 < length($text) && substr($text, $i + 1, 1) =~ /[\$`"\\\n]/) {
           # In double quotes a backslash escapes only $ ` " \ and a newline; in "C:\Git\usr" it stays.
           $word .= substr($text, ++$i, 1);
@@ -220,6 +244,9 @@ SEGMENTER_PL='
         # ANSI-C quoting (dollar + single quote): a backslash escapes the next char.
         $quote = "ansi";
         $i++;
+      } elsif ($char eq q{$} && $i + 1 < length($text) && substr($text, $i + 1, 1) eq q{"}) {
+        # dollar-double-quote (locale translation) is an ordinary double-quoted string: drop the dollar.
+        next;
       } elsif ($char eq q{"} || $char eq chr(39)) {
         $quote = $char;
       } elsif ($char eq "\\" && $i + 1 < length($text)) {
@@ -255,8 +282,7 @@ SEGMENTER_PL='
         $segment .= $char . $next;
         $i++;
       } elsif ($char eq "\\" && $next eq "\n") {
-        # A backslash before a newline joins the lines: `git add \<newline> -A` is one command.
-        $segment .= q{ };
+        # A backslash before a newline joins the lines and both vanish: r-backslash-newline-m is rm.
         $i++;
       } elsif ($char eq "\\" && $i + 1 < $n && $next !~ /[;&|(){}\n`]/) {
         # An escaped character is literal: an escaped quote opens no quote. An escaped separator
@@ -304,6 +330,7 @@ SEGMENTER_PL='
   # Basename of a command word: /bin/rm, /usr/bin/rm, C:\Git\usr\bin\rm.exe all name `rm`.
   sub command_base {
     my ($word) = @_;
+    $word =~ s/[<>].*$//;                # rm>/dev/null names rm
     $word =~ s{^.*[/\\]}{};
     $word =~ s/\.exe$//i;
     return $word;
@@ -414,39 +441,39 @@ SEGMENTER_PL='
       if ($depth < 3 && $tokens[$index] =~ /\s/) {
         push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$index]);
       }
-      if ($depth < 3 && $base =~ /^(?:ba|z|k|da|a)?sh$/) {
-        for (my $j = $index + 1; $j <= $#tokens; $j++) {
-          if ($tokens[$j] =~ /^-[A-Za-z]*c[A-Za-z]*$/ && $j < $#tokens) {
-            push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j + 1]);
-            last;
+      # Candidate command positions: the executable itself and, after a command that is not
+      # known to only print its arguments, every later word (ssh host rm -rf x, docker exec c
+      # sh -c "rm -rf x", strace git push --force). A data command (echo, grep, cat ...) ends
+      # the search, and so does git: its later words are its arguments (git grep -e rm -e -rf).
+      # A parse mistake here errs toward a block, never a pass.
+      my @candidates = ($index);
+      push @candidates, $index + 1 .. $#tokens unless $data{$base} || $base eq "git";
+      for my $cand (@candidates) {
+      my $cbase = command_base($tokens[$cand]);
+      if ($depth < 3) {
+        if ($cbase =~ /^(?:ba|z|k|da|a)?sh$/) {
+          for (my $j = $cand + 1; $j <= $#tokens; $j++) {
+            if ($tokens[$j] =~ /^-[A-Za-z]*c[A-Za-z]*$/ && $j < $#tokens) {
+              push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j + 1]);
+              last;
+            }
+            last unless $tokens[$j] =~ /^-/;
           }
-          last unless $tokens[$j] =~ /^-/;
-        }
-      } elsif ($depth < 3 && $base =~ /^(?:ssh|su)$/) {
-        # `ssh host "rm -rf /x"`: a word with blanks after ssh/su is a command line for the far side.
-        for (my $j = $index + 1; $j <= $#tokens; $j++) {
-          push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j]) if $tokens[$j] =~ /\s/;
-        }
-      } elsif ($depth < 3 && $base eq "eval" && $index < $#tokens) {
-        push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments(join(" ", @tokens[$index + 1 .. $#tokens]));
-      }
-      my @starts = ($index);
-      # After a command that is not known to only print its arguments, a later word that is the
-      # wanted command may be the real one (`ssh host rm -rf x`, `docker exec c git add -A`,
-      # `strace git push --force`): examine it too. A data command (echo, grep, cat ...) ends
-      # the search; a parse mistake here errs toward a block, never toward a pass.
-      unless ($data{$base}) {
-        for (my $j = $index + 1; $j <= $#tokens; $j++) {
-          push @starts, $j if command_base($tokens[$j]) eq $name;
+        } elsif ($cand == $index && $cbase =~ /^(?:ssh|su)$/) {
+          # ssh host "rm -rf /x": a word with blanks after ssh/su is a command line for the far side.
+          for (my $j = $cand + 1; $j <= $#tokens; $j++) {
+            push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j]) if $tokens[$j] =~ /\s/;
+          }
+        } elsif ($cbase eq "eval" && $cand < $#tokens) {
+          push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments(join(" ", @tokens[$cand + 1 .. $#tokens]));
         }
       }
-      for my $start (@starts) {
-      next unless command_base($tokens[$start]) eq $name;
-      my $index = $start;
+      next unless $cbase eq $name;
+      my $start = $cand;
       if (length $subcmd) {
         # Global git options (--no-pager, -C dir, -Cdir, -c k=v, a redirection) sit between
-        # `git` and the subcommand.
-        my $i = $index + 1;
+        # git and the subcommand.
+        my $i = $start + 1;
         while ($i < @tokens) {
           if (is_redirection($tokens[$i], 1)) { $i += 2; }
           elsif (is_redirection($tokens[$i], 0)) { $i++; }
@@ -464,7 +491,7 @@ SEGMENTER_PL='
       my @raw = @tokens[$start .. $#tokens];
       $raw[0] = $name;
       print join(" ", @raw), "\n";
-      my @clean = ($base);
+      my @clean = ($name);
       for (my $k = 1; $k < @raw; $k++) {
         if (is_redirection($raw[$k], 1)) { $k++; next; }
         next if is_redirection($raw[$k], 0);

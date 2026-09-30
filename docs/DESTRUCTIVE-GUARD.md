@@ -31,7 +31,7 @@ Claude Code блокирует команду только при коде вы�
 ## Проверка
 
 ```bash
-python3 .claude/hooks/tests/destructive-guard/hook_cases.py                 # 148 случаев хука
+python3 .claude/hooks/tests/destructive-guard/hook_cases.py                 # 168 случаев хука
 python3 .claude/hooks/tests/destructive-guard/long_cases.py                 # длинные команды (70 КБ)
 python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
 bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
