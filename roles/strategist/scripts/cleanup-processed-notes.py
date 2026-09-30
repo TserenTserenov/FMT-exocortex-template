@@ -33,7 +33,25 @@ from typing import Optional
 GOVERNANCE_REPO = os.environ.get('IWE_GOVERNANCE_REPO', 'DS-strategy')
 # WP-530 Ф72: an isolated run points the script at its throwaway copy of the governance repo.
 _REPO_DIR_OVERRIDE = os.environ.get('IWE_CLEANUP_REPO_DIR')
-WORKSPACE = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else Path.home() / "IWE" / GOVERNANCE_REPO
+_CANON_DIR = Path.home() / "IWE" / GOVERNANCE_REPO
+# IWE_CLEANUP_ISOLATED=1 (set by strategist.sh in an isolated run) forbids the silent fallback to
+# the canonical checkout: the directory must be given and must be a linked git worktree, not the canon.
+_ISOLATED = os.environ.get('IWE_CLEANUP_ISOLATED') == '1'
+if _ISOLATED:
+    _repo = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else None
+    _problem = None
+    if _repo is None:
+        _problem = "IWE_CLEANUP_REPO_DIR is not set"
+    elif not _repo.is_dir():
+        _problem = f"{_repo} is not a directory"
+    elif not (_repo / ".git").is_file():
+        _problem = f"{_repo} is not a linked git worktree (.git is not a file)"
+    elif _repo.resolve() == _CANON_DIR.resolve():
+        _problem = f"{_repo} is the canonical checkout"
+    if _problem:
+        print(f"ERROR: isolated cleanup refused: {_problem}", file=sys.stderr)
+        sys.exit(2)
+WORKSPACE = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else _CANON_DIR
 FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
 

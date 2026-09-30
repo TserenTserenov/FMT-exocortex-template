@@ -92,7 +92,7 @@ EOF
 repo="$1"; sha=""
 while [ $# -gt 0 ]; do [ "$1" = "--from-commit" ] && sha="$2"; shift; done
 echo "$repo" >> "$PUBLOG"
-[ "${FAKE_PUBLISH_FAIL:-0}" = 1 ] && exit 1
+[ "${FAKE_PUBLISH_FAIL:-0}" = 1 ] && exit "${FAKE_PUBLISH_RC:-1}"
 git -C "$repo" push -q origin "$sha:refs/heads/main"
 EOF
     git -C "$CANON" add -A && git -C "$CANON" commit -q -m seed && git -C "$CANON" push -q origin HEAD:main
@@ -133,7 +133,7 @@ canon_untouched() {  # <label>
 run_fn() {
     FN_OUT=$(MUTATOR="$1" SHIM="${2:-}" FUNCS="$FUNCTIONS" WORKSPACE="$CANON" LOG_FILE="$LOG" \
         STRATEGIST_ISOLATED_TMPDIR="$ISO_TMP" PUBLOG="$PUBLOG" IWE_GOVERNANCE_REPO=DS-strategy \
-        FAKE_PUBLISH_FAIL="${FAKE_PUBLISH_FAIL:-0}" ISOLATED_LIST="${ISOLATED_LIST:-}" bash -c '
+        FAKE_PUBLISH_FAIL="${FAKE_PUBLISH_FAIL:-0}" FAKE_PUBLISH_RC="${FAKE_PUBLISH_RC:-1}" ISOLATED_LIST="${ISOLATED_LIST:-}" bash -c '
         [ -z "$SHIM" ] || PATH="$SHIM:$PATH"
         eval "$FUNCS"
         isolated_begin note-review || { echo "begin-failed"; exit 9; }
@@ -190,6 +190,13 @@ make_env
 run_fn 'rm docs/other.md'
 check "deleted outside path: blocked" "rc=72 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
 
+echo "== A4b: an allowed path turned into a symlink blocks =="
+make_env
+run_fn 'rm inbox/fleeting-notes.md; ln -s /etc/hosts inbox/fleeting-notes.md'
+check "symlink on an allowed path: blocked" "rc=72 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "symlink on an allowed path: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+canon_untouched "symlink"
+
 echo "== A5: a model commit is normalised, not trusted =="
 make_env
 run_fn 'echo x > docs/c.md; git add docs/c.md; git commit -q -m "model commit outside"'
@@ -222,9 +229,15 @@ check "git status fails: origin unchanged, copy preserved" "0/1" "$(origin_commi
 echo "== A7: publication failure keeps the copy =="
 make_env
 FAKE_PUBLISH_FAIL=1 run_fn 'echo more >> inbox/fleeting-notes.md'
-check "publisher fails: blocked" "rc=72 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "publisher fails (exit 1): its own status passes through, not 72" "rc=1 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
 check "publisher fails: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
 canon_untouched "publisher fails"
+for code in 70 71; do
+    make_env
+    FAKE_PUBLISH_FAIL=1 FAKE_PUBLISH_RC=$code run_fn 'echo more >> inbox/fleeting-notes.md'
+    check "publisher exits $code: $code goes out unchanged" "rc=$code result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
+    check "publisher exits $code: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+done
 make_env
 rm -f "$CANON/scripts/ds-publish.sh"; git -C "$CANON" commit -q -am "drop publisher"; git -C "$CANON" push -q origin HEAD:main
 BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(canon_head)
@@ -259,11 +272,11 @@ check "scenario without allowlist: begin refuses" "rc=1" "$NOALLOW_OUT"
 # <stub mode> <STRATEGIST_ISOLATED_SCENARIOS> [runner argument, default note-review]; sets RC
 run_runner() {
     RC=0
-    env HOME="$HOME_DIR" IWE_WORKSPACE="$WSROOT" IWE_GOVERNANCE_REPO=DS-strategy IWE_TEMPLATE="$REPO_ROOT" \
+    env HOME="$HOME_DIR" IWE_WORKSPACE="$WSROOT" IWE_GOVERNANCE_REPO=DS-strategy IWE_TEMPLATE="${TEMPLATE_OVERRIDE:-$REPO_ROOT}" \
         AI_CLI="$E/bin/ai-stub" STUB_MODE="$1" STUB_CWD_FILE="$E/stub-cwd" STUB_ARGS_FILE="$E/stub-args" PUBLOG="$PUBLOG" \
         STRATEGIST_ISOLATED_SCENARIOS="$2" STRATEGIST_ISOLATED_TMPDIR="$ISO_TMP" TMPDIR="$TMPD" \
         IWE_EXTRACTOR_FEED_LOCK_DIR="$E/feed.lock" TELEGRAM_BOT_TOKEN= TELEGRAM_CHAT_ID= \
-        FAKE_PUBLISH_FAIL="${FAKE_PUBLISH_FAIL:-0}" PATH="$E/shim:$PATH" \
+        FAKE_PUBLISH_FAIL="${FAKE_PUBLISH_FAIL:-0}" FAKE_PUBLISH_RC="${FAKE_PUBLISH_RC:-1}" PATH="${EXTRA_SHIM:+$EXTRA_SHIM:}$E/shim:$PATH" \
         bash "$SCRIPT" "${3:-note-review}" > "$E/out.txt" 2>&1 || RC=$?
 }
 fleeting_has_plain() { grep -c 'Plain old note' "$1/inbox/fleeting-notes.md"; }
@@ -309,9 +322,15 @@ canon_untouched "CLI failure"
 echo "== B5: isolated note-review, publisher fails =="
 make_env
 FAKE_PUBLISH_FAIL=1 run_runner noop note-review
-check "runner exits 72" "72" "$RC"
+check "publisher exit 1: runner exits with it" "1" "$RC"
 check "origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
 canon_untouched "publisher failure"
+for code in 70 71; do
+    make_env
+    FAKE_PUBLISH_FAIL=1 FAKE_PUBLISH_RC=$code run_runner noop note-review
+    check "publisher exit $code: runner exits $code" "$code" "$RC"
+    check "publisher exit $code: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+done
 
 echo "== B6: flag off keeps the legacy path =="
 make_env
@@ -342,6 +361,72 @@ run_runner noop session-prep morning
 check "morning->session-prep listed: refused inside run_claude, exits 72" "72" "$RC"
 check "morning->session-prep listed: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
 canon_untouched "session-prep listed"
+
+echo "== C1: cleanup script in isolated mode has no silent canon fallback =="
+CLEANUP_PY="$REPO_ROOT/roles/strategist/scripts/cleanup-processed-notes.py"
+run_cleanup() {  # <env assignments...>; sets CRC
+    CRC=0
+    env HOME="$HOME_DIR" IWE_GOVERNANCE_REPO=DS-strategy "$@" python3 "$CLEANUP_PY" > "$E/cleanup.out" 2>&1 || CRC=$?
+}
+canon_has_plain() { grep -c 'Plain old note' "$CANON/inbox/fleeting-notes.md"; }
+make_env
+run_cleanup IWE_CLEANUP_ISOLATED=1
+check "isolated, no IWE_CLEANUP_REPO_DIR: refused (non-zero)" "2" "$CRC"
+check "isolated, no dir: the canon was not touched" "1" "$(canon_has_plain)"
+run_cleanup IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$CANON"
+check "isolated, dir = the canon checkout: refused" "2" "$CRC"
+check "isolated, dir = canon: the canon was not touched" "1" "$(canon_has_plain)"
+git clone -q "$ORIGIN" "$E/other-clone" 2>/dev/null
+run_cleanup IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$E/other-clone"
+check "isolated, dir = an ordinary clone (not a linked worktree): refused" "2" "$CRC"
+run_cleanup IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$E/no-such-dir"
+check "isolated, dir missing: refused" "2" "$CRC"
+git -C "$CANON" worktree add -q -b cleanup-wt "$E/wt" origin/main
+run_cleanup IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$E/wt"
+check "isolated, dir = a linked worktree: runs" "0" "$CRC"
+check "isolated worktree run archived the note in the copy only" "0/1" "$(grep -c 'Plain old note' "$E/wt/inbox/fleeting-notes.md")/$(canon_has_plain)"
+make_env
+run_cleanup
+check "not isolated, no dir: legacy default still edits the canon path" "0/0" "$CRC/$(canon_has_plain)"
+
+echo "== B8: a failing cleanup script blocks the isolated run =="
+make_failing_cleanup_template() {
+    mkdir -p "$E/tmpl/roles/strategist/scripts"
+    ln -s "$REPO_ROOT/roles/strategist/prompts" "$E/tmpl/roles/strategist/prompts"
+    printf 'import sys\nprint("boom", file=sys.stderr)\nsys.exit(2)\n' > "$E/tmpl/roles/strategist/scripts/cleanup-processed-notes.py"
+}
+make_env
+make_failing_cleanup_template
+TEMPLATE_OVERRIDE="$E/tmpl" run_runner noop note-review
+check "cleanup script fails: runner exits 72" "72" "$RC"
+check "cleanup script fails: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+canon_untouched "cleanup failure"
+make_env
+make_failing_cleanup_template
+TEMPLATE_OVERRIDE="$E/tmpl" run_runner noop ""
+check "flag off: the same failing cleanup script is still ignored as before (exit 0)" "0" "$RC"
+
+echo "== B9: errexit is off inside run_claude when called with || : failures must still stop it =="
+make_env
+mkdir -p "$E/shim-py" "$E/shim-sed" "$E/shim-git"
+printf '#!/bin/bash\nexit 1\n' > "$E/shim-py/python3"; chmod +x "$E/shim-py/python3"
+cp "$E/shim-py/python3" "$E/shim-sed/sed"
+EXTRA_SHIM="$E/shim-py" run_runner noop note-review
+check "python3 (date context) fails: runner exits non-zero" "1" "$([ "$RC" -ne 0 ] && echo 1 || echo 0)"
+check "python3 fails: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
+check "python3 fails: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+make_env
+mkdir -p "$E/shim-cd"
+printf '#!/bin/bash\nrm -rf "%s"/iwe-strategist-note-review.*/DS-strategy\nexec /usr/bin/sed "$@"\n' "$ISO_TMP" > "$E/shim-cd/sed"; chmod +x "$E/shim-cd/sed"
+EXTRA_SHIM="$E/shim-cd" run_runner noop note-review
+check "cd into the copy fails: runner exits non-zero" "1" "$([ "$RC" -ne 0 ] && echo 1 || echo 0)"
+check "cd fails: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
+make_env
+mkdir -p "$E/shim-sed"; printf '#!/bin/bash\nexit 1\n' > "$E/shim-sed/sed"; chmod +x "$E/shim-sed/sed"
+EXTRA_SHIM="$E/shim-sed" run_runner noop note-review
+check "sed (prompt read) fails: runner exits non-zero" "1" "$([ "$RC" -ne 0 ] && echo 1 || echo 0)"
+check "sed fails: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
+check "sed fails: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
 
 echo
 echo "Passed: $PASS_COUNT, failed: $FAIL_COUNT"

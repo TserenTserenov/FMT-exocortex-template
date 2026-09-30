@@ -178,6 +178,7 @@ log() {
 # the template (issue #884, regression of WP-7 Ф101): when it is absent, say so
 # and keep the commit local instead of failing on a bare "No such file".
 # Returns 0 only when the publisher reported success.
+PUBLISH_LAST_RC=""
 publish_commit_or_explain() {
     local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4"
     local publisher="$WORKSPACE/scripts/ds-publish.sh"
@@ -186,10 +187,14 @@ publish_commit_or_explain() {
         log "WARN: scripts/ds-publish.sh не установлен — коммит ${sha:0:12} остался локальным и не опубликован. Опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD"
         return 1
     fi
-    if bash "$publisher" "$WORKSPACE" normal --reason "$reason" --from-commit "$sha" >> "$LOG_FILE" 2>&1; then
+    PUBLISH_LAST_RC=""
+    local prc=0
+    bash "$publisher" "$WORKSPACE" normal --reason "$reason" --from-commit "$sha" >> "$LOG_FILE" 2>&1 || prc=$?
+    if [ "$prc" -eq 0 ]; then
         log "$ok_msg"
         return 0
     fi
+    PUBLISH_LAST_RC="$prc"  # WP-530 Ф72: the isolated path passes the publisher's own status on
     log "$fail_msg"
     return 1
 }
@@ -395,7 +400,7 @@ open_runner_session() {  # <scenario>
     fi
     # Without the directory the guard records the scope as the literal path `current` (no trailing
     # slash), which covers no file below it.
-    mkdir -p "$WORKSPACE/$scope"
+    mkdir -p "$WORKSPACE/$scope" || { close_runner_session; return 1; }
     # --slug: the guard selects a session by agent, and a second live session of this agent (a run
     # that overlapped midnight, or a leftover whose recorded pid got reused) makes that ambiguous --
     # the guard then refuses and the run would die with exit 71 before the model (cold review, 28.09).
@@ -491,7 +496,7 @@ isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
         log "ISOLATION: не удалось подготовить рабочее пространство копии; копия сохранена: $ISO_WORKTREE"
         return 1
     fi
-    gov_real=$(cd -P "$canon" && pwd -P)
+    gov_real=$(cd -P "$canon" && pwd -P) || { log "ISOLATION: не удалось определить путь канона; копия сохранена: $ISO_WORKTREE"; return 1; }
     for repo_dir in "$(dirname "$canon")"/*/; do
         repo_dir="${repo_dir%/}"
         link_name="$(basename "$repo_dir")"
@@ -545,6 +550,8 @@ isolated_verify() {
         log "ISOLATION: git status в копии не удался, публикация заблокирована"
         return 1
     fi
+    # Known limit: git-ignored files are invisible to `git status`, so a change to one is neither
+    # checked nor published, and it is deleted together with the copy.
     # After the reset the index equals the base, so status has no rename records; an unexpected
     # record would fail the exact-path comparison below and block (fail closed).
     while IFS= read -r -d '' entry; do
@@ -555,6 +562,9 @@ isolated_verify() {
         done <<< "$allow"
         if [ "$ok" -eq 0 ]; then
             log "ISOLATION: сценарий $ISO_SCENARIO тронул путь вне списка разрешённых: $path"
+            violation=1
+        elif [ -L "$WORKSPACE/$path" ]; then
+            log "ISOLATION: разрешённый путь стал символической ссылкой (пишет за пределы копии): $path"
             violation=1
         else
             ISOLATED_CHANGED+=("$path")
@@ -599,7 +609,9 @@ isolated_finish() {  # <publish reason> <commit message>
             if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась"; then
                 ISOLATED_RESULT="published"
             else
-                rc=$ISOLATION_BLOCKED_RC
+                # The publisher's own status (70/71/...) goes out as is; 72 is only for the
+                # isolation checks themselves (and a publisher that never ran).
+                rc="${PUBLISH_LAST_RC:-$ISOLATION_BLOCKED_RC}"
             fi
         else
             [ "$rc" -ne 0 ] || log "WARN: ISOLATION: git commit в копии не удался"
@@ -667,15 +679,16 @@ run_claude() {
         -e "s|${_o}GOVERNANCE_REPO${_c}|$_gov_repo|g" \
         -e "s|${_o}WORKSPACE_DIR${_c}|$_ws|g" \
         -e "s|${_o}GITHUB_USER${_c}|$_gh_user|g" \
-        "$command_path")
+        "$command_path") || { log "ERROR: не удалось прочитать промпт $command_path (sed)"; return 1; }
 
     # issue #942: calendar_source (params.yaml) = connector | script | none.
     # Without the shared helper (old install) the calendar stays on, as before.
     local calendar_source="connector" _iwe_common="${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh"
     if [ -f "$_iwe_common" ]; then
         # shellcheck source=/dev/null
-        . "$_iwe_common"
-        calendar_source=$(iwe_calendar_source "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml")
+        . "$_iwe_common" || { log "ERROR: не удалось загрузить $_iwe_common"; return 1; }
+        calendar_source=$(iwe_calendar_source "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml") \
+            || { log "ERROR: iwe_calendar_source не отработал"; return 1; }
     fi
     local calendar_note=""
     case "$calendar_source" in
@@ -691,7 +704,7 @@ days = ['Понедельник','Вторник','Среда','Четверг',
 months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
 d = datetime.date.today()
 print(f'{d.day} {months[d.month-1]} {d.year}, {days[d.weekday()]}')
-")
+") || { log "ERROR: не удалось получить дату для контекста (python3)"; return 1; }
     prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). Первый Пн месяца: ${IS_FIRST_MONDAY_OF_MONTH} (посчитано командой date, не выводи это значение сам — issue #616).${calendar_note} ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
 
 ${prompt}"
@@ -700,11 +713,11 @@ ${prompt}"
     log "Command file: $command_path"
     log "Date context: $ru_date_context"
 
-    cd "$WORKSPACE"
+    cd "$WORKSPACE" || { log "ERROR: не удалось перейти в $WORKSPACE"; return 1; }
 
     # WP-561 Ф25: origin/main до запуска модели, точка отсчёта для постусловия доставки.
     local delivery_pre_origin
-    delivery_pre_origin=$(delivery_baseline "$command_file")
+    delivery_pre_origin=$(delivery_baseline "$command_file") || { log "ERROR: не удалось прочитать базу доставки"; return 1; }
 
     if ! open_runner_session "$command_file"; then
         log "FAILED scenario: $command_file (rc=$SESSION_OPEN_FAILED_RC) -- сессия охраны не открыта (причина в строках выше), модель не запускалась"
@@ -734,7 +747,7 @@ ${prompt}"
     if [ -n "${AI_CLI_EXTRA_FLAGS:-}" ]; then
         # намеренный word-splitting единой override-строки — тот же контракт,
         # что уже принят в extractor.sh
-        read -ra extra_flags <<< "$AI_CLI_EXTRA_FLAGS"
+        read -ra extra_flags <<< "$AI_CLI_EXTRA_FLAGS" || { log "ERROR: не удалось разобрать AI_CLI_EXTRA_FLAGS"; return 1; }
     else
         extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash${calendar_mcp:+,$calendar_mcp}")
     fi
@@ -766,7 +779,7 @@ ${prompt}"
         # isolates this exact commit into a disposable worktree instead of
         # waiting for a clean window.
         local push_sha
-        push_sha=$(git -C "$WORKSPACE" rev-parse HEAD)
+        push_sha=$(git -C "$WORKSPACE" rev-parse HEAD) || { log "ERROR: не удалось прочитать HEAD для публикации"; return 1; }
         # Outcome is logged inside; `|| true` only keeps `set -e` from ending
         # the run over a publish that already reported its own failure.
         publish_commit_or_explain "strategist: $command_file" "$push_sha" \
@@ -1178,17 +1191,27 @@ case "$1" in
         log "Running deterministic cleanup..."
         # WP-530 Ф72: in an isolated run the script edits the copy's files, not the canon's.
         cleanup_env=()
-        [ "$ISOLATED_RUN" != 1 ] || cleanup_env=(IWE_CLEANUP_REPO_DIR="$WORKSPACE")
+        [ "$ISOLATED_RUN" != 1 ] || cleanup_env=(IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$WORKSPACE")
+        cleanup_rc=0
         if [ -n "$cleanup_python3" ]; then
-            CLEANUP_OUTPUT=$(env ${cleanup_env[@]+"${cleanup_env[@]}"} "$cleanup_python3" "$cleanup_script" 2>&1) || true
+            if [ "$ISOLATED_RUN" = 1 ]; then
+                # isolated: a failing script must block, not read as "no changes"
+                CLEANUP_OUTPUT=$(env ${cleanup_env[@]+"${cleanup_env[@]}"} "$cleanup_python3" "$cleanup_script" 2>&1) || cleanup_rc=$?
+            else
+                CLEANUP_OUTPUT=$(env ${cleanup_env[@]+"${cleanup_env[@]}"} "$cleanup_python3" "$cleanup_script" 2>&1) || true
+            fi
         else
             CLEANUP_OUTPUT="no python3 interpreter found — skipped"
+            [ "$ISOLATED_RUN" != 1 ] || cleanup_rc=127
         fi
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push
         iso_finish_rc=0
-        if [ "$ISOLATED_RUN" = 1 ]; then
+        if [ "$ISOLATED_RUN" = 1 ] && [ "$cleanup_rc" -ne 0 ]; then
+            log "ISOLATION: cleanup-скрипт завершился с кодом $cleanup_rc, публикации нет, копия сохранена: $ISO_WORKTREE"
+            iso_finish_rc=$ISOLATION_BLOCKED_RC
+        elif [ "$ISOLATED_RUN" = 1 ]; then
             # Verify the allowlist (inbox/fleeting-notes.md, archive/notes/Notes-Archive.md), commit
             # and publish from the copy; the copy is removed only after a publication.
             isolated_finish "strategist: cleanup" "chore: auto-cleanup processed notes from fleeting-notes.md" || iso_finish_rc=$?
