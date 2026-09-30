@@ -9,7 +9,7 @@
     },
     {
       "path": ".claude/agents/wp-sync-actualizer.md",
-      "sha256": "224cdb263231374275c68fe46993d1be2fe2395fb10968e55de97546f828636d"
+      "sha256": "66547a1286cf094579cbc8970bce20e6307fa3cfcfc73a08864f084194b4a120"
     },
     {
       "path": ".claude/bin/guarded-rm",
@@ -364,8 +364,12 @@
       "sha256": "1736fa40d7229ad26c5b7a61ba5fdbb5b7b5844f6288a2e927c7f67137281dfb"
     },
     {
+      "path": ".claude/scripts/wp-phase-digest.sh",
+      "sha256": "dfab3c7620f209e19cd0830e2a7c3ed814727087fdeb3a058c080a882ff333f2"
+    },
+    {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "8a64c516f03193cd98d4bca327760ee8d9db18940eed9dbed706de78cf9b411a"
+      "sha256": "96a6d35a57c1cff65968e7d6444f248cd7bdc30f77ec67769cfe9adad4d7bfa2"
     },
     {
       "path": ".claude/settings.json",
@@ -849,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "40a5886718173db86d7e557804f069228f078b33b70d5fb2fd04cfa3d6ff2a0e"
+      "sha256": "81136dfd2feb0de6be01995b62244e935d39c01ac1432d5b0941d728eed60265"
     },
     {
       "path": "CLAUDE.md",
@@ -2476,6 +2480,10 @@
       "sha256": "0458450073d95b1cfb9452067d4006468aa80fa7c4435415fbf060459d022964"
     },
     {
+      "path": "scripts/lib/git-sync-status.sh",
+      "sha256": "27e1e88bf831b549e302d1fbc4772fe9839ce77d3f3ff7621edd648f08456735"
+    },
+    {
       "path": "scripts/lib/language-check.py",
       "sha256": "ba445fe2f2f7cb85bdf81c582597871b66f114e2f9022f0f26d86039bade233a"
     },
@@ -3163,6 +3171,7 @@
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
+    "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
@@ -3253,6 +3262,7 @@
     "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
     "scripts/tests/test_update_verify_batch_integrity_hash_mismatch_failclosed.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",
+    "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
     "setup/detector-fixtures/README.md",
