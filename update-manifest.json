@@ -849,7 +849,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c4c31c1d6c958fde3bb86b5854c55ff0c6e791d38df720aa55be6c2371a5e4e3"
+      "sha256": "0a03d0426d8415d9c31e17a24d5f3180a0764bc0561bd537ee948306a15526b7"
     },
     {
       "path": "CLAUDE.md",
@@ -1893,7 +1893,7 @@
     },
     {
       "path": "roles/strategist/scripts/cleanup-processed-notes.py",
-      "sha256": "d8905fabfc9e950cc38465572ee4a3ed67b8288fbcb22a5958d530f073f6584c"
+      "sha256": "125658b13edbaf32064f7c2fa7e288d4744df4a9e2ebff9006192c0eaf7c70b1"
     },
     {
       "path": "roles/strategist/scripts/fetch-wakatime.sh",
@@ -1909,7 +1909,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "b446f44a2d1854cff5c67e2d0a478cb9c538daa525e1a3252a60bcc8c976014b"
+      "sha256": "8824db63558788758bb5116c924cb358bc9f9bdfbb5d924f933e1a21c8b57b21"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -3283,6 +3283,7 @@
     "setup/test-ds-publish.sh",
     "setup/test-extractor-subscription-env.sh",
     "setup/test-scheduler-interval-slack.sh",
+    "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-update-channel-enum.sh",
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
