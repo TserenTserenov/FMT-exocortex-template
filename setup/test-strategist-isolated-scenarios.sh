@@ -19,6 +19,9 @@ REPO_ROOT="$(dirname "$SELF_DIR")"
 SCRIPT="${STRATEGIST_SCRIPT_UNDER_TEST:-$REPO_ROOT/roles/strategist/scripts/strategist.sh}"
 TEST_ROOT="$(cd -P "$(mktemp -d "${TMPDIR:-/tmp}/iwe-strategist-isolated-test.XXXXXX")" && pwd -P)"
 
+# repo-owned python programs are resolved through the template's single resolver (WP-529 F6)
+PY3="$(bash "$REPO_ROOT/scripts/lib/find-python3.sh" --stdlib-only)" || { echo "no python3 for the cleanup contract cases" >&2; exit 2; }
+
 FAIL_COUNT=0
 PASS_COUNT=0
 fail() { echo "  ❌ FAIL: $*" >&2; FAIL_COUNT=$((FAIL_COUNT + 1)); }
@@ -100,6 +103,8 @@ EOF
     CANON_HEAD=$(git -C "$CANON" rev-parse HEAD)
     printf '#!/bin/bash\nexit 0\n' > "$E/shim/osascript"; cp "$E/shim/osascript" "$E/shim/notify-send"
     chmod +x "$E/shim/osascript" "$E/shim/notify-send"
+    # the notifier doubles must win over any real desktop notifier on the test PATH
+    check "notifier double takes precedence" "$E/shim/osascript" "$(PATH="$E/shim:$PATH" command -v osascript)"
     # stub model: STUB_MODE picks what it does inside its working directory
     cat > "$E/bin/ai-stub" <<'EOF'
 #!/bin/bash
@@ -366,7 +371,7 @@ echo "== C1: cleanup script in isolated mode has no silent canon fallback =="
 CLEANUP_PY="$REPO_ROOT/roles/strategist/scripts/cleanup-processed-notes.py"
 run_cleanup() {  # <env assignments...>; sets CRC
     CRC=0
-    env HOME="$HOME_DIR" IWE_GOVERNANCE_REPO=DS-strategy "$@" python3 "$CLEANUP_PY" > "$E/cleanup.out" 2>&1 || CRC=$?
+    env HOME="$HOME_DIR" IWE_GOVERNANCE_REPO=DS-strategy "$@" "$PY3" "$CLEANUP_PY" > "$E/cleanup.out" 2>&1 || CRC=$?
 }
 canon_has_plain() { grep -c 'Plain old note' "$CANON/inbox/fleeting-notes.md"; }
 make_env
