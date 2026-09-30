@@ -115,6 +115,67 @@ case "${OSTYPE:-}" in
     ;;
 esac
 
+# fetch_update_manifest URL DEST — download the update manifest (issue #943).
+# curl's stderr used to go to /dev/null, so every failure looked like "check the
+# internet"; a Windows user could not tell a timeout from a write error. Now: up to
+# 3 attempts; each failed attempt prints curl's exit code, the HTTP status and the
+# last stderr line. Only transient failures are retried (network exit codes, HTTP
+# 5xx/429); a 4xx or a certificate error stops at once. After a write failure (curl
+# exit 23, or success with an empty file) the next attempt writes through a shell
+# redirect instead of curl -o: a labelled diagnostic experiment for "the file curl
+# opens itself is blocked", it does not change TLS. The file is moved into place only
+# when complete and JSON-shaped. On failure FETCH_MANIFEST_DIAG holds the last cause.
+FETCH_MANIFEST_DIAG=""
+fetch_update_manifest() {
+    local url="$1" dest="$2"
+    local part="$dest.part" errf="$dest.err"
+    local max_attempts=3 attempt=1 mode="file" rc http err_line transient write_failure
+    while [ "$attempt" -le "$max_attempts" ]; do
+        rc=0; http="n/a"
+        if [ "$mode" = "file" ]; then
+            # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
+            http=$(curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL -w '%{http_code}' -o "$part" "$url" 2>"$errf") || rc=$?
+        else
+            # shellcheck disable=SC2086
+            curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$url" >"$part" 2>"$errf" || rc=$?
+        fi
+        err_line=$(tail -n 1 "$errf" 2>/dev/null | cut -c1-200)
+        if [ "$rc" -eq 0 ] && [ ! -s "$part" ]; then
+            err_line="curl завершился без ошибки, но файл пуст"
+        elif [ "$rc" -eq 0 ] && [ "$(tr -d ' \t\r\n' < "$part" | head -c 1)" != "{" ]; then
+            FETCH_MANIFEST_DIAG="ответ не похож на JSON (прокси или страница входа в сеть?), HTTP $http"
+            echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
+            rm -f "$part" "$errf"
+            return 1
+        elif [ "$rc" -eq 0 ]; then
+            mv -f "$part" "$dest"
+            rm -f "$errf"
+            return 0
+        fi
+        FETCH_MANIFEST_DIAG="curl код $rc, HTTP $http, запись: $mode${err_line:+; $err_line}"
+        echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
+
+        transient=false; write_failure=false
+        case "$rc" in
+            5|6|7|18|28|35|52|55|56) transient=true ;;
+            22) case "$http" in 5??|429) transient=true ;; esac ;;
+            23) write_failure=true ;;
+            0) write_failure=true ;;   # success with an empty file
+        esac
+        if $write_failure && [ "$mode" = "file" ]; then
+            mode="stdout"
+            echo "  … диагностика: повтор с записью через перенаправление вместо curl -o"
+        elif $transient; then
+            sleep "${IWE_FETCH_RETRY_SLEEP:-2}"
+        else
+            break
+        fi
+        attempt=$((attempt + 1))
+    done
+    rm -f "$part" "$errf"
+    return 1
+}
+
 for arg in "$@"; do
     case "$arg" in
         --check|--dry-run)  CHECK_ONLY=true ;;
@@ -1759,6 +1820,20 @@ backfill_executor_catalog_generator() {
     backfill_governance_seed_script "scripts/generate-executor-catalog.py"
 }
 
+# ds-publish.sh (issue #941): strategist.sh publishes its commits through
+# $governance/scripts/ds-publish.sh, which the template never shipped. Delivered only
+# when the governance repo has no such file: an existing one is not ours to replace
+# (an installation may keep its own, larger publisher at the same path).
+backfill_ds_publish() {
+    local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
+    local target_path="$WORKSPACE_DIR/$governance_repo/scripts/ds-publish.sh"
+    if [ -e "$target_path" ] || [ -L "$target_path" ]; then
+        echo "  ✓ scripts/ds-publish.sh уже есть в $governance_repo, не заменяю."
+        return 0
+    fi
+    backfill_governance_seed_script "scripts/ds-publish.sh"
+}
+
 # #533: update is the one reliable point at which an existing private fault
 # profile can be brought onto the current schema and permission contract.  The
 # canonical CLI's no-create observational `stats` command is used here: it
@@ -1857,6 +1932,10 @@ run_post_apply_backfills_or_die() {
         echo "  ОШИБКА: generator executor catalog не обновлён; обновление оставлено незавершённым." >&2
         return 1
     fi
+
+    echo ""
+    echo "Публикатор коммитов ds-publish.sh (upgrade backfill)..."
+    backfill_ds_publish || echo "  ⚠ scripts/ds-publish.sh не доставлен: ночные роли оставят коммиты локальными, пока его нет (issue #941)." >&2
 
     echo ""
     echo "Executor catalog (upgrade backfill)..."
@@ -2179,6 +2258,7 @@ print_extra_write_targets() {
     echo "  • $governance_dir/scripts/update-derived-snapshot.py — обновлятор derived snapshot"
     echo "  • $governance_dir/scripts/generate-executor-catalog.py — генератор каталога исполнителей"
     echo "  • $governance_dir/scripts/executor-catalog.yaml — каталог исполнителей"
+    echo "  • $governance_dir/scripts/ds-publish.sh — публикатор коммитов ночных ролей (кладётся только если файла нет, существующий не трогается)"
     echo "  • $governance_dir/exocortex/agent-fault-profile/ — только миграция/права существующей приватной БД; отсутствующий профиль не создаётся"
     echo "    Symlink-пути блокируют backfill. Отличающиеся installer/hooks сохраняются в .git/hook-backups/ и заменяются."
     echo "    Локально изменённые Day Open reader/snapshot updater/executor-catalog generator блокируют обновление; executor-catalog.yaml — генерируемый файл и заменяется при смысловом расхождении."
@@ -2559,10 +2639,12 @@ echo "[1] Загрузка манифеста..."
 MANIFEST_URL="$RAW_BASE/update-manifest.json"
 MANIFEST="$TMPDIR_UPDATE/manifest.json"
 
-if ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$MANIFEST_URL" -o "$MANIFEST" 2>/dev/null; then
+if ! fetch_update_manifest "$MANIFEST_URL" "$MANIFEST"; then
     echo "ОШИБКА: Не удалось загрузить манифест обновлений."
     echo "  URL: $MANIFEST_URL"
-    echo "  Проверьте подключение к интернету."
+    echo "  Последний отказ: $FETCH_MANIFEST_DIAG"
+    echo "  Проверьте подключение к интернету. Значение кода curl объясняет раздел EXIT CODES в man curl."
+    echo "  Если такая же команда curl вручную работает, а здесь нет, приложите этот вывод к обращению (issue #943)."
     exit 1
 fi
 

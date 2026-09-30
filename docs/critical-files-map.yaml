@@ -89,6 +89,8 @@ categories:
       и #508.2): githooks, install-hooks.sh, subject-scoped Day Open reader
       (#533), и полный граф зависимостей day-open-pipeline.sh/-scaffold.sh —
       обе точки входа плюс всё, что они транзитивно вызывают/source'ят,
+      а также ds-publish.sh — публикатор коммитов ночных ролей (issue #941;
+      update.sh доставляет его только если файла в governance repo нет),
       включая lib/ целиком (issue #693: 8 из 29 файлов seed/strategy/scripts/
       были в этой категории, доставка молчаливо теряла оставшиеся 21). update.sh
       после доставки идемпотентно переносит их в существующий governance repo;

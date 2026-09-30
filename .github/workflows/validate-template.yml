@@ -636,6 +636,16 @@ jobs:
       - name: Run update.sh release-channel test
         run: bash setup/test-update-release-channel.sh
 
+      # Issue #943: manifest download with retries and a diagnostic; stubbed curl.
+      - name: Run update.sh manifest fetch test
+        run: bash setup/test-update-manifest-fetch.sh
+
+      # Issue #941: the strategist's commit publisher shipped in seed/ and delivered by update.sh.
+      - name: Run ds-publish tests
+        run: |
+          bash setup/test-ds-publish.sh
+          bash setup/test-update-ds-publish-delivery.sh
+
       # issue #505 (live user-blocking): update.sh is delivered ONLY by Step 0
       # self-update — Step 5 must skip it (generic cp clobbered the running
       # inode; the placeholder pass baked install paths into its sed

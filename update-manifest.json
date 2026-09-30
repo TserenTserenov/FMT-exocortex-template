@@ -957,7 +957,7 @@
     },
     {
       "path": "docs/critical-files-map.yaml",
-      "sha256": "5549467779b71109b2f2e32dc796cb6dcb48331390c8698f6512266f9078e8a3"
+      "sha256": "e726c233d816af5787bdc1e8740162b9eef571ab7f6d6692ced0a008274c5f3c"
     },
     {
       "path": "docs/hindsight-setup.md",
@@ -1161,7 +1161,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "0a10dd98be14ee69901df9c38232985655ed648b549ade17c174c014de8f8811"
+      "sha256": "c05765ea709dbf4d0e5663b95ffb29a2d18310780bd9d997a53ae9cb6b9e73a6"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2988,6 +2988,10 @@
       "sha256": "bc380db1c7cc5c9c44840bfd1815320dec1f850a4f47264e0510a87cb024f6ef"
     },
     {
+      "path": "seed/strategy/scripts/ds-publish.sh",
+      "sha256": "080dc006807b26872875f536b6367315f7d20fbba8339d7c6677d416e108408f"
+    },
+    {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
       "sha256": "cc2223c230fce81c372fe0950e2aae14406271b34c4141a948b6394e1e0c1816"
     },
@@ -3105,7 +3109,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "7673f1d40c95382e7374c6a88c48840339a9798aedc459084dc48c97b9855a0a"
+      "sha256": "284d2932b9c40195eb8018be27719064b90d91f7d5d762aecbd908ae65b52cbc"
     }
   ],
   "excluded_paths": [
@@ -3251,12 +3255,15 @@
     "setup/test-day-open-delivery-closure.sh",
     "setup/test-delivery-route-label.sh",
     "setup/test-detectors.sh",
+    "setup/test-ds-publish.sh",
     "setup/test-extractor-subscription-env.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-update-channel-enum.sh",
+    "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-manifest-fetch.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",
