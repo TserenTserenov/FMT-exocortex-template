@@ -409,7 +409,7 @@ iwe_calendar_source() {
   local file="${1:-}" value
   [ -f "$file" ] || { echo connector; return 0; }
   value=$(grep -E '^calendar_source:' "$file" 2>/dev/null | head -1 \
-    | sed -E 's/^calendar_source:[[:space:]]*//; s/[[:space:]]*#.*$//; s/^["'"'"']//; s/["'"'"']$//; s/[[:space:]]+$//')
+    | sed -E 's/^calendar_source:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//')
   case "$value" in
     ''|connector) echo connector ;;
     script|none) echo "$value" ;;

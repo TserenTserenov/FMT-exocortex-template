@@ -60,6 +60,7 @@ SERVER_MODE="${IWE_SERVER_MODE:-0}"  # WP-283: 1 = Linux server, Mac-only MCP н
 # --- Pre-flight healthcheck (WP-7 ФDay-Open-Hardening) ---
 PREFLIGHT_JSON=$(bash "$IWE/scripts/day-open-preflight.sh" "$DATE" "$CONFIG" 2>/dev/null || echo '{"calendar":"unknown","scout":"unknown","triage":"unknown"}')
 CALENDAR_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.calendar // "unknown"')
+CALENDAR_SOURCE=$(iwe_calendar_source "$PARAMS_FILE")  # issue #942: connector | script | none
 SCOUT_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.scout // "unknown"')
 TRIAGE_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.triage // "unknown"')
 MEMORY_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.memory // "unknown"')
@@ -332,9 +333,12 @@ except Exception as e:
 "
 }
 
-# Midnight epoch of a YYYY-MM-DD date (BSD date, then GNU date); 0 = unreadable.
+# Epoch of 00:00:00 UTC of a YYYY-MM-DD date (BSD date, then GNU date); 0 = unreadable.
+# UTC, not local time: a local-midnight difference is 23 or 25 hours short/long
+# across a DST change and would round a 4-day-old list down to 3.
 _prio_epoch() {
-  date -j -f "%Y-%m-%d" "$1" +%s 2>/dev/null || date -d "$1" +%s 2>/dev/null || echo 0
+  date -j -u -f "%Y-%m-%d %H:%M:%S" "$1 00:00:00" +%s 2>/dev/null \
+    || date -u -d "$1 00:00:00" +%s 2>/dev/null || echo 0
 }
 
 read_morning_priorities() {
@@ -354,7 +358,7 @@ read_morning_priorities() {
     echo "⚠️ приоритеты не показаны: в priorities.yaml нет даты last_updated — обнови файл"
     return 0
   fi
-  # Both dates go through _prio_epoch, so the difference is whole calendar days.
+  # Both dates go through _prio_epoch: the difference is whole calendar days.
   last_epoch=$(_prio_epoch "$last_updated")
   today_epoch=$(_prio_epoch "$(date +%Y-%m-%d)")
   if [ "$last_epoch" -le 0 ] || [ "$today_epoch" -le 0 ]; then
@@ -389,13 +393,24 @@ read_morning_priorities() {
 }
 
 # The DayPlan "Календарь" section. Omitted when the calendar is switched off
-# (params.yaml calendar_source: none, issue #942): the user does not use it.
+# (params.yaml calendar_source: none, issue #942); for calendar_source: script the
+# instruction names server-calendar.sh only, so an agent filling the plan in another
+# session is not told to try the connector first.
 render_calendar_section() {
   [ "$CALENDAR_PF" = "disabled" ] && return 0
-  cat <<CALENDAR_SECTION
+  cat <<CALENDAR_HEAD
 <details>
 <summary><b>Календарь ($DAY_NUM $MONTH_RU)</b></summary>
 
+CALENDAR_HEAD
+  if [ "$CALENDAR_SOURCE" = "script" ]; then
+    cat <<CALENDAR_SCRIPT
+<!-- PENDING: calendar — источник: только bash \$IWE_SCRIPTS/server-calendar.sh $DATE
+  (params.yaml: calendar_source: script); календарный коннектор не запрашивать.
+  Показать ВСЕ события дня (00:00–23:59 МСК). Формат: таблица + строка свободных блоков ≥1h. -->
+CALENDAR_SCRIPT
+  else
+    cat <<CALENDAR_CONNECTOR
 <!-- PENDING: calendar — единый источник: календарный коннектор (MCP-инструменты
   календаря; имена зависят от установки, имя содержит «calendar» без учёта регистра, напр. mcp__claude_ai_Google_Calendar__* — фактические имена
   взять из списка инструментов текущей сессии). Получить список календарей пилота
@@ -404,6 +419,9 @@ render_calendar_section() {
   Если коннектора нет — фоллбэк: bash \$IWE_SCRIPTS/server-calendar.sh $DATE
   (его «credentials не настроены» — факт о скрипте, не о календаре; issue #581).
   Формат: таблица + строка свободных блоков ≥1h. -->
+CALENDAR_CONNECTOR
+  fi
+  cat <<CALENDAR_TABLE
 
 | Время (МСК) | Событие | Длит. | Связь с РП |
 |-------------|---------|-------|------------|
@@ -413,7 +431,7 @@ render_calendar_section() {
 
 </details>
 
-CALENDAR_SECTION
+CALENDAR_TABLE
 }
 
 # --- Strategy_day guard (Ф6 WP-264) ---

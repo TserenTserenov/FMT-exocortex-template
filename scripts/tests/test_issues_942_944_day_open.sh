@@ -81,6 +81,17 @@ assert_lacks    "date in the future → no list" "$out" "WP-101"
 printf 'last_updated: "%s"\ntoday: []\n' "$(date_offset 0)" > "$PRIO"; out=$(run_reader)
 [ -z "$out" ] && ok "fresh empty list → silent (fallback to yesterday's carry-over)" || fail "fresh empty list (got «${out}»)"
 
+# Day arithmetic must not lose a day across a DST change: 4 calendar days that
+# start BEFORE the clock change are 95 h of local time, still 4 days here.
+# (Europe/Berlin springs forward 2026-03-29, America/New_York 2026-03-08.)
+dst_case() {  # TZ FROM TO
+  local diff
+  diff=$(TZ="$1" bash -c '. "$1"; a=$(_prio_epoch "$2"); b=$(_prio_epoch "$3"); echo $(( (b - a) / 86400 ))' _ "$FUNCS" "$2" "$3")
+  [ "$diff" = 4 ] && ok "DST: $2 → $3 is 4 days in $1" || fail "DST in $1 gives ${diff} days for $2 → $3"
+}
+dst_case Europe/Berlin 2026-03-28 2026-04-01
+dst_case America/New_York 2026-03-07 2026-03-11
+
 # ---------------------------------------------------------------- #942
 echo "== #942 calendar_source"
 COMMON="$ROOT/scripts/lib/common.sh"
@@ -95,6 +106,10 @@ for v in connector script none; do
 done
 printf 'calendar_source: "none"   # no Google here\n' > "$TMP/p.yaml"
 [ "$(src "$TMP/p.yaml")" = none ] && ok "quoted value with a comment → none" || fail "quoted value with a comment"
+printf 'calendar_source: "none"   \n' > "$TMP/p.yaml"
+[ "$(src "$TMP/p.yaml")" = none ] && ok "quoted none with trailing spaces, no comment → none" || fail "quoted none with trailing spaces"
+printf "calendar_source: 'script'  \n" > "$TMP/p.yaml"
+[ "$(src "$TMP/p.yaml")" = script ] && ok "single-quoted script with trailing spaces → script" || fail "single-quoted script"
 printf 'calendar_source: gcal\n' > "$TMP/p.yaml"
 got=$(src "$TMP/p.yaml")
 [ "$got" = connector ] && ok "unknown value → connector" || fail "unknown value → connector (got $got)"
@@ -133,6 +148,11 @@ awk '/^render_calendar_section\(\) \{/,/^}/ {print}' "$ROOT/scripts/day-open-sca
 off=$(CALENDAR_PF=disabled DAY_NUM=30 MONTH_RU=сентября DATE=2026-09-30 bash -c '. "$1"; render_calendar_section' _ "$SECTION")
 on=$(CALENDAR_PF=ok DAY_NUM=30 MONTH_RU=сентября DATE=2026-09-30 bash -c '. "$1"; render_calendar_section' _ "$SECTION")
 [ -z "$off" ] && ok "scaffold: disabled → no Календарь section" || fail "scaffold: disabled → section printed"
+script_mode=$(CALENDAR_PF=ok CALENDAR_SOURCE=script DAY_NUM=30 MONTH_RU=сентября DATE=2026-09-30 bash -c '. "$1"; render_calendar_section' _ "$SECTION")
+assert_contains "scaffold: script mode names server-calendar.sh" "$script_mode" "server-calendar.sh"
+assert_lacks    "scaffold: script mode does not send the agent to the connector" "$script_mode" "календарный коннектор (MCP"
+assert_contains "scaffold: connector mode still names the connector" "$(CALENDAR_PF=ok CALENDAR_SOURCE=connector DAY_NUM=30 MONTH_RU=сентября DATE=2026-09-30 bash -c '. "$1"; render_calendar_section' _ "$SECTION")" "календарный коннектор (MCP"
+
 assert_contains "scaffold: ok → Календарь section present" "$on" "Календарь (30 сентября)"
 
 echo
