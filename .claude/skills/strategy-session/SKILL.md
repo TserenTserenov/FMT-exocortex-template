@@ -31,16 +31,35 @@ gates_rationale: "операционный скилл; WP Gate применим 
 ### Шаг 0. Extensions (before)
 `bash .claude/scripts/load-extensions.sh strategy-session before` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
 
+## Шаг 0.5. Рабочая копия governance-репозитория (БЛОКИРУЮЩЕЕ, до любой записи)
+
+> Канон governance-репозитория (`{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`) может быть под freeze: правило «Канон под freeze» в `{{GOVERNANCE_REPO}}/CLAUDE.md` — любая правка, в том числе сессия масштаба «Неделя», идёт из изолированной копии и публикуется через `ds-publish.sh`. Поэтому ВСЕ пути записи ниже строятся от `$GOV_WT` (рабочая копия), а не от канона.
+
+```bash
+CANON="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}"
+# resolver (если есть в репозитории) иначе git-корень текущего каталога
+if [ -f "$CANON/scripts/lib/governance-repo-path.sh" ]; then
+  . "$CANON/scripts/lib/governance-repo-path.sh"; GOV_WT=$(resolve_active_worktree)
+else
+  GOV_WT=$(git rev-parse --show-toplevel 2>/dev/null)
+fi
+[ -n "$GOV_WT" ] && [ "$(cd "$GOV_WT" && pwd -P)" != "$(cd "$CANON" && pwd -P)" ] && echo "isolated: $GOV_WT" || echo "NOT ISOLATED"
+```
+
+- `isolated: <путь>` -> `GOV_WT` = этот путь; работай в нём.
+- `NOT ISOLATED` -> ничего не записывай. Открой изолированную копию: `bash {{WORKSPACE_DIR}}/scripts/session-guard.sh open --isolate --wp <WP-N или housekeeping по правилам репозитория>`, возьми `worktree_path` из его вывода, сделай `cd` в него и повтори проверку выше. Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши.
+- Публикация в конце сессии: коммит в `$GOV_WT`, затем `bash $GOV_WT/scripts/ds-publish.sh "$GOV_WT" normal --reason "strategy-session"`; в канон не коммить напрямую.
+
 ## Шаг 1. Определить режим
 
 Проверь наличие любого из:
 
-- `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md`
-- `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md`
+- `$GOV_WT/docs/Strategy.md`
+- `$GOV_WT/current/WeekPlan W*.md`
 
 Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца. Записи двух легальных раскладок (issue #608, тот же корень, что #545 в day-open-scaffold.sh): плоские файлы Strategy/Day-сессий (`sessions/YYYY-MM-DD.md`) и подпапка по месяцу для peer-сессий (`sessions/YYYY-MM/`) — искать нужно по обоим адресам, иначе плоская раскладка (дефолт по `memory/routing-vocab.md`) всегда даёт «не найдено» и месячная сверка не срабатывает ни разу:
 ```bash
-SESSIONS_DIR=$(source {{WORKSPACE_DIR}}/scripts/lib/common.sh 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/sessions"
+SESSIONS_DIR=$(source {{WORKSPACE_DIR}}/scripts/lib/common.sh 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="$GOV_WT/sessions"
 grep -rl "strategy-session\|Strategy Session" \
   "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
   "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
@@ -75,7 +94,7 @@ grep -rl "strategy-session\|Strategy Session" \
 - «Чему хочешь научиться?»
 - «Какие 2-3 крупные цели на ближайшие 3-6 месяцев?»
 
-Запиши ответы в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md` по структуре:
+Запиши ответы в `$GOV_WT/docs/Strategy.md` по структуре:
 - Видение (1 год)
 - Цели на горизонт (3-6 месяцев)
 - Принципы (что для меня важно)
@@ -86,7 +105,7 @@ grep -rl "strategy-session\|Strategy Session" \
 - «Что сейчас мешает? Где разрыв между текущим и желаемым?»
 - «Что регулярно раздражает или забирает энергию?»
 
-Запиши в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Dissatisfactions.md` списком: каждая неудовлетворённость = 1-2 строки.
+Запиши в `$GOV_WT/docs/Dissatisfactions.md` списком: каждая неудовлетворённость = 1-2 строки.
 
 ### 2.3. Первый WeekPlan (10 мин)
 
@@ -95,7 +114,7 @@ grep -rl "strategy-session\|Strategy Session" \
 - Бюджет (часы)
 - Артефакт-критерий (что появится по завершении)
 
-Запиши в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W{N}.md` (где N — номер ISO-недели).
+Запиши в `$GOV_WT/current/WeekPlan W{N}.md` (где N — номер ISO-недели).
 
 ### 2.4. Обновление MEMORY.md (2 мин)
 
@@ -123,7 +142,7 @@ grep -rl "strategy-session\|Strategy Session" \
 
 ### 3.1 Обход Backlog (B-005, обязательно)
 
-Прочитай `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Backlog.md`. Для каждой записи `B-NNN` в разделе `## Активные записи`:
+Прочитай `$GOV_WT/docs/Backlog.md`. Для каждой записи `B-NNN` в разделе `## Активные записи`:
 
 - Проверь триггеры открытия (`Триггер открытия:` блок в записи).
 - **Hard-trigger сработал?** (внешнее событие случилось — например, `первый user-deletion request получен`, `legal review запланирован на эту неделю`, `Honcho API timeout ≥48ч`) — поднять для обсуждения в стратегической повестке: «B-NNN активирован, открываем РП?»

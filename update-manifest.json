@@ -721,7 +721,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "cc03ca19f46a09a102783433222269b34ebba13fe6164db416951a91f04342fd"
+      "sha256": "67160d54241daf3d7b8865b028405cd65ed05a965ce2dcc07f4e6dbaba783744"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -849,7 +849,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "98cff691536733a846953372eed4994d418f7ded71e7bdca6c6e11c51a2ded8b"
+      "sha256": "5fb2792820193d6f598d6601c91dc6367eb00c281180fc059793fe5ccc267bc1"
     },
     {
       "path": "CLAUDE.md",
@@ -1877,7 +1877,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "c2f9b9108bd685bdc01792c33a099a57c6cc50700b4ddb2267c894efe7d0f555"
+      "sha256": "1a28c289a0be6dcb734eb9fce3b1806fd479ec581cc2df2dcca84a79448a06cb"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",
@@ -3166,6 +3166,7 @@
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
+    "scripts/tests/strategy-session-isolated-copy-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
