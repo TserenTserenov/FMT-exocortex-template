@@ -354,6 +354,16 @@ verify_feed_outputs() {
     while IFS= read -r src; do
         allowed+=("${src#"$strategy_dir/"}")
     done < <(capture_source_files "$strategy_dir/inbox")
+    local status_file
+    status_file=$(mktemp "${TMPDIR:-/tmp}/iwe-feed-status.XXXXXX") || {
+        log "ERROR: cannot create status buffer; publication blocked"
+        return 1
+    }
+    if ! git -C "$strategy_dir" status --porcelain -z --untracked-files=all > "$status_file" 2>> "$LOG_FILE"; then
+        rm -f "$status_file"
+        log "ERROR: git status failed in feed worktree; publication blocked"
+        return 1
+    fi
     while IFS= read -r -d '' entry; do
         path="${entry:3}"
         ok=0
@@ -366,7 +376,8 @@ verify_feed_outputs() {
         else
             feed_changed+=("$path")
         fi
-    done < <(git -C "$strategy_dir" status --porcelain -z --untracked-files=all)
+    done < "$status_file"
+    rm -f "$status_file"
     if [ "$violation" -ne 0 ]; then
         log "ERROR: feed output violates the captures-only contract; publication blocked"
         return 1
@@ -375,16 +386,24 @@ verify_feed_outputs() {
         log "Feed no_changes: no capture candidates written"
         return 0
     fi
+    local marker_re="\\[feed:${EXTRACTOR_FEED_LABEL:-feed} [0-9]{4}-[0-9]{2}-[0-9]{2}\\]"
+    local deleted
     for path in "${feed_changed[@]}"; do
         if git -C "$strategy_dir" cat-file -e "$base:$path" 2>/dev/null; then
-            n=$(git -C "$strategy_dir" diff "$base" -- "$path" | grep -cE '^\+.*\[feed:[^]]+\]' || true)
+            # Feeders only append: any removed line means accumulated captures were rewritten.
+            deleted=$(git -C "$strategy_dir" diff --numstat "$base" -- "$path" | awk '{d += ($2 == "-" ? 0 : $2)} END {print d + 0}')
+            if [ "$deleted" -ne 0 ]; then
+                log "ERROR: feed removed $deleted line(s) from $path (append-only contract); publication blocked"
+                return 1
+            fi
+            n=$(git -C "$strategy_dir" diff "$base" -- "$path" | grep -E '^\+### .*'"$marker_re" | wc -l | tr -d ' ')
         else
-            n=$(grep -cE '\[feed:[^]]+\]' "$strategy_dir/$path" || true)
+            n=$(grep -E '^### .*'"$marker_re" "$strategy_dir/$path" | wc -l | tr -d ' ')
         fi
         feed_lines=$((feed_lines + ${n:-0}))
     done
     if [ "$feed_lines" -eq 0 ]; then
-        log "ERROR: feed changed captures without any [feed:...] block; publication blocked"
+        log "ERROR: feed changed captures without a heading block '### ... [feed:<mode> YYYY-MM-DD]' for this mode; publication blocked"
         return 1
     fi
     log "Feed output verified: $feed_lines [feed:...] block(s) in ${#feed_changed[@]} file(s)"
@@ -1040,8 +1059,11 @@ create_isolated_worktree() {  # <canonical_repo> <repo_name> <gov_branch> <label
     ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
     ISO_BRANCH="extractor/$label-$run_id"
 
-    if ! git -C "$canonical_repo" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
-        log "WARN: cannot create isolated $label worktree; run directory preserved: $ISO_RUN_ROOT"
+    if ! git -C "$canonical_repo" rev-parse --verify -q "origin/$gov_branch^{commit}" >/dev/null 2>&1 || \
+       ! git -C "$canonical_repo" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot create isolated $label worktree from origin/$gov_branch; empty run directory removed"
+        git -C "$canonical_repo" worktree prune >> "$LOG_FILE" 2>&1 || true
+        rm -rf "$ISO_RUN_ROOT"
         return 1
     fi
     git -C "$ISO_WORKTREE" branch --set-upstream-to="origin/$gov_branch" "$ISO_BRANCH" >> "$LOG_FILE" 2>&1 || true
@@ -1214,9 +1236,15 @@ run_feed_isolated() {  # <prompt-file> <extra-args> <label>
 
     # The feeder prompts read git history of every repository, so the synthetic
     # workspace links all of them (governance repo excluded: it is the worktree).
+    local gov_real repo_real
+    gov_real=$(cd -P "$canonical_repo" && pwd -P)
     for repo_dir in "$canonical_workspace"/*/; do
         repo_dir="${repo_dir%/}"
         link_name="$(basename "$repo_dir")"
+        repo_real=$(cd -P "$repo_dir" 2>/dev/null && pwd -P) || continue
+        # Governance is excluded by identity, not name: an alias symlink to the
+        # same repository would otherwise expose the frozen canon for writing.
+        [ "$repo_real" = "$gov_real" ] && continue
         [ "$link_name" = "$repo_name" ] && continue
         [ -e "$repo_dir/.git" ] || continue
         ln -s "$repo_dir" "$isolated_workspace/$link_name" || \

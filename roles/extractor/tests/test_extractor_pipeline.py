@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -484,9 +485,10 @@ block = "%s"
         cli.chmod(0o700)
         return governance, remote, cli
 
-    def run_feed(self, cli, *, check=True, label="git-diff", prompt="git-diff-feed"):
+    def run_feed(self, cli, *, check=True, label="git-diff", prompt="git-diff-feed", variables=None):
         return self.shell(f'run_feed_isolated {prompt} "12 hours ago" {label}', variables={
             "AI_CLI": str(cli), "AI_CLI_PROMPT_FLAG": "-p", "AI_CLI_EXTRA_FLAGS": "",
+            **(variables or {}),
         }, check=check)
 
     def assert_canonical_untouched(self, governance, head_before):
@@ -552,10 +554,10 @@ block = "%s"
         self.assertNotIn("agent self-commit", self.git(remote, "log", "--format=%s", "main"))
         self.assert_canonical_untouched(governance, head_before)
 
-    def assert_feed_blocked(self, governance, remote, cli, expected_message):
+    def assert_feed_blocked(self, governance, remote, cli, expected_message, variables=None):
         head_before = self.git(governance, "rev-parse", "HEAD")
         before = self.git(remote, "rev-parse", "main")
-        result = self.run_feed(cli, check=False)
+        result = self.run_feed(cli, check=False, variables=variables)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(expected_message, result.stdout)
         self.assertNotIn("Completed process:", result.stdout)
@@ -589,11 +591,64 @@ block = "%s"
     def test_isolated_feed_changed_captures_without_feed_marker_blocks_publication(self):
         governance, remote, cli = self.feed_fixture(
             'captures.write_text(captures.read_text() + "### Manual-looking block\\nBody\\n")\n')
-        self.assert_feed_blocked(governance, remote, cli, "without any [feed:...] block")
+        self.assert_feed_blocked(governance, remote, cli, "for this mode")
 
     def test_isolated_feed_cli_failure_publishes_nothing(self):
         governance, remote, cli = self.feed_fixture("sys.exit(3)\n")
         self.assert_feed_blocked(governance, remote, cli, "AI CLI failed")
+
+    def test_isolated_feed_replacing_captures_with_one_line_is_refused(self):
+        # Accumulated captures must never be rewritten: append-only.
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(block)\n')
+        self.assert_feed_blocked(governance, remote, cli, "append-only contract")
+
+    def test_isolated_feed_git_status_failure_blocks_instead_of_no_changes(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block)\n')
+        real_git = shutil.which("git")
+        stubs = self.base / "stubs"
+        stub = self.write(stubs / "git", f"#!/bin/sh\n"
+            'for a in "$@"; do [ "$a" = status ] && exit 1; done\n'
+            f'exec {real_git} "$@"\n')
+        stub.chmod(0o700)
+        self.assert_feed_blocked(governance, remote, cli, "git status failed in feed worktree",
+                                 variables={"PATH": f"{stubs}:{os.environ['PATH']}"})
+
+    def test_isolated_feed_foreign_mode_marker_is_refused(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block.replace("git-diff", "session-close"))\n')
+        self.assert_feed_blocked(governance, remote, cli, "for this mode")
+
+    def test_isolated_feed_marker_outside_block_heading_is_refused(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + "quoted [feed:git-diff 2026-09-12] in prose\\n")\n')
+        self.assert_feed_blocked(governance, remote, cli, "for this mode")
+
+    def test_isolated_session_close_feed_accepts_its_own_marker(self):
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_text(captures.read_text() + block.replace("git-diff", "session-close"))\n')
+        self.run_feed(cli, label="session-close", prompt="session-close-feed")
+        self.assertIn("[feed:session-close 2026-09-12]", self.git(remote, "show", "main:inbox/captures/2026-09.md"))
+        self.assertTrue(self.git(remote, "log", "-1", "--format=%s", "main").startswith("feed(session-close):"))
+
+    def test_isolated_feed_alias_symlink_to_governance_is_not_linked(self):
+        governance, remote, cli = self.feed_fixture(
+            'assert not Path("DS-alias").exists(), "alias of the frozen canon must not be linked"\n'
+            'captures.write_text(captures.read_text() + block)\n')
+        (self.workspace / "DS-alias").symlink_to(governance)
+        head_before = self.git(governance, "rev-parse", "HEAD")
+        result = self.run_feed(cli)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("[feed:git-diff", self.git(remote, "show", "main:inbox/captures/2026-09.md"))
+        self.assert_canonical_untouched(governance, head_before)
+        self.assertTrue((self.workspace / "DS-alias").is_symlink())
+
+    def test_create_isolated_worktree_failure_removes_run_directory(self):
+        governance, _, _ = self.published_repo("DS-fixture", {"README.md": "x\n"})
+        result = self.shell(f'create_isolated_worktree {shlex.quote(str(governance))} DS-fixture no-such-branch feed', check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.leftover_feed_dirs(), [])
 
     def test_feed_subcommands_use_isolated_mode_and_prompts_do_not_self_commit(self):
         text = RUNNER.read_text()
