@@ -454,6 +454,20 @@ run_claude() {
         -e "s|${_o}GITHUB_USER${_c}|$_gh_user|g" \
         "$command_path")
 
+    # issue #942: calendar_source (params.yaml) = connector | script | none.
+    # Without the shared helper (old install) the calendar stays on, as before.
+    local calendar_source="connector" _iwe_common="${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh"
+    if [ -f "$_iwe_common" ]; then
+        # shellcheck source=/dev/null
+        . "$_iwe_common"
+        calendar_source=$(iwe_calendar_source "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml")
+    fi
+    local calendar_note=""
+    case "$calendar_source" in
+        none) calendar_note=" Календарь отключён (params.yaml: calendar_source: none): шаг про календарь (3a) пропусти, секцию «Календарь» в плане не пиши, календарный коннектор не запрашивай." ;;
+        script) calendar_note=" Календарь берётся только из scripts/server-calendar.sh (params.yaml: calendar_source: script): календарный коннектор не запрашивай." ;;
+    esac
+
     # Inject current date + day of week (prevents LLM calendar arithmetic errors)
     local ru_date_context
     ru_date_context=$(python3 -c "
@@ -463,7 +477,7 @@ months = ['января','февраля','марта','апреля','мая','
 d = datetime.date.today()
 print(f'{d.day} {months[d.month-1]} {d.year}, {days[d.weekday()]}')
 ")
-    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). Первый Пн месяца: ${IS_FIRST_MONDAY_OF_MONTH} (посчитано командой date, не выводи это значение сам — issue #616). ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
+    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). Первый Пн месяца: ${IS_FIRST_MONDAY_OF_MONTH} (посчитано командой date, не выводи это значение сам — issue #616).${calendar_note} ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
 
 ${prompt}"
 
@@ -497,6 +511,7 @@ ${prompt}"
     # дефолт — проверенный mcp__claude_ai_Google_Calendar. Неизвестные имена в
     # whitelist безвредны — просто никогда не совпадут.
     local calendar_mcp="${IWE_CALENDAR_MCP_SERVERS:-mcp__claude_ai_Google_Calendar}"
+    [ "$calendar_source" = "connector" ] || calendar_mcp=""
     # AR.293: AI_CLI_EXTRA_FLAGS — точка подмены на случай, когда AI_CLI указывает
     # не на Claude Code (--model/--allowedTools — его флаги, не переносимы как есть).
     # Дефолт воспроизводит прежнее поведение один в один.
@@ -506,7 +521,7 @@ ${prompt}"
         # что уже принят в extractor.sh
         read -ra extra_flags <<< "$AI_CLI_EXTRA_FLAGS"
     else
-        extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash,${calendar_mcp}")
+        extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash${calendar_mcp:+,$calendar_mcp}")
     fi
     AI_CLI_OUT_START=$(log_size_bytes)
     timeout "$CLAUDE_TIMEOUT" "$AI_CLI" \

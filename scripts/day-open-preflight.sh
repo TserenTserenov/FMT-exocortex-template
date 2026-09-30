@@ -3,9 +3,10 @@
 # see DP.SC.159, DP.ROLE.059
 # day-open-preflight.sh — pre-flight healthcheck для Day Open
 # WP-7 ФDay-Open-Hardening (DOC6 3-состояния: peer-session 2026-07-14-07)
-# Возвращает единый JSON: {"calendar":"ok|fail|pending","scout":"ok|fail|disabled|pending","scout_reason":"...",
+# Возвращает единый JSON: {"calendar":"ok|fail|pending|disabled","scout":"ok|fail|disabled|pending","scout_reason":"...",
 #   "triage":"ok|fail|disabled|pending","triage_reason":"...","memory":"ok|stale|missing"}
-# "disabled" = источник намеренно не настроен на этой машине (Scout/triage репо отсутствуют).
+# "disabled" = источник намеренно не настроен на этой машине (Scout/triage репо отсутствуют;
+#   календарь: params.yaml → calendar_source: none, issue #942).
 # "fail" = источник настроен, но данные не собрались (диагностика нужна).
 
 set -uo pipefail
@@ -33,10 +34,17 @@ GOV_REPO="$(iwe_resolve_governance_repo)"
 CONFIG="${2:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
 
 # --- Calendar: server-calendar.sh ---
+# issue #942: calendar_source: none in params.yaml = the calendar is not used;
+# report "disabled" (like Scout) and do not call the script at all.
 CALENDAR_STATUS="unknown"
-CALENDAR_OUT=$(bash "$SCRIPT_DIR/server-calendar.sh" "$DATE" "$CONFIG" 2>/dev/null || echo "")
-if [ -n "$CALENDAR_OUT" ]; then
-  if echo "$CALENDAR_OUT" | grep -q "PENDING"; then
+CALENDAR_SOURCE=$(iwe_calendar_source "$IWE/params.yaml")
+if [ "$CALENDAR_SOURCE" = "none" ]; then
+  CALENDAR_STATUS="disabled"
+else
+  CALENDAR_OUT=$(bash "$SCRIPT_DIR/server-calendar.sh" "$DATE" "$CONFIG" 2>/dev/null || echo "")
+  if [ -z "$CALENDAR_OUT" ]; then
+    CALENDAR_STATUS="fail"
+  elif echo "$CALENDAR_OUT" | grep -q "PENDING"; then
     CALENDAR_STATUS="pending"
   elif echo "$CALENDAR_OUT" | grep -qE '(\| [0-9]{2}:[0-9]{2} \||✅)'; then
     # "✅" covers successful responses with 0 events (no | HH:MM | rows)
@@ -44,8 +52,6 @@ if [ -n "$CALENDAR_OUT" ]; then
   else
     CALENDAR_STATUS="fail"
   fi
-else
-  CALENDAR_STATUS="fail"
 fi
 
 # --- Scout: check backlog + latest log ---

@@ -331,6 +331,11 @@ except Exception as e:
 "
 }
 
+# Midnight epoch of a YYYY-MM-DD date (BSD date, then GNU date); 0 = unreadable.
+_prio_epoch() {
+  date -j -f "%Y-%m-%d" "$1" +%s 2>/dev/null || date -d "$1" +%s 2>/dev/null || echo 0
+}
+
 read_morning_priorities() {
   local prio_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/priorities.yaml"
 
@@ -338,20 +343,31 @@ read_morning_priorities() {
     return 0
   fi
 
-  # Stale check (>= 3 days)
-  local last_updated stale_warn=""
+  # issue #944: an untrusted list (no/unreadable/far-future date, or older than
+  # PRIORITIES_STALE_DAYS) is not printed: one explanatory line only, so the
+  # DayPlan falls back to yesterday's carry-over. last_updated is the day the
+  # list is FOR (Day Close stores tomorrow's date), so one day ahead is normal.
+  local last_updated last_epoch today_epoch diff_days
   last_updated=$(grep "^last_updated:" "$prio_file" 2>/dev/null | sed 's/last_updated:[[:space:]]*//' | tr -d '"' | head -1)
-  if [ -n "$last_updated" ]; then
-    local today_epoch last_epoch diff_days
-    today_epoch=$(date +%s)
-    last_epoch=$(date -j -f "%Y-%m-%d" "$last_updated" +%s 2>/dev/null \
-      || date -d "$last_updated" +%s 2>/dev/null || echo 0)
-    if [ "$last_epoch" -gt 0 ]; then
-      diff_days=$(( (today_epoch - last_epoch) / 86400 ))
-      if [ "$diff_days" -ge 3 ]; then
-        stale_warn="⚠️ приоритеты устарели: обновлены $last_updated (${diff_days}д назад) — обнови priorities.yaml"
-      fi
-    fi
+  if [ -z "$last_updated" ]; then
+    echo "⚠️ приоритеты не показаны: в priorities.yaml нет даты last_updated — обнови файл"
+    return 0
+  fi
+  # Both dates go through _prio_epoch, so the difference is whole calendar days.
+  last_epoch=$(_prio_epoch "$last_updated")
+  today_epoch=$(_prio_epoch "$(date +%Y-%m-%d)")
+  if [ "$last_epoch" -le 0 ] || [ "$today_epoch" -le 0 ]; then
+    echo "⚠️ приоритеты не показаны: дата last_updated «$last_updated» не читается (нужен формат ГГГГ-ММ-ДД)"
+    return 0
+  fi
+  diff_days=$(( (today_epoch - last_epoch) / 86400 ))
+  if [ "$diff_days" -lt -1 ]; then
+    echo "⚠️ приоритеты не показаны: дата last_updated $last_updated в будущем — проверь priorities.yaml"
+    return 0
+  fi
+  if [ "$diff_days" -gt "${PRIORITIES_STALE_DAYS:-3}" ]; then
+    echo "⚠️ приоритеты устарели: обновлены $last_updated (${diff_days}д назад), список не перенесён — обнови priorities.yaml на Day Close"
+    return 0
   fi
 
   local wps
@@ -368,8 +384,35 @@ read_morning_priorities() {
     return 0
   fi
 
-  [ -n "$stale_warn" ] && echo "$stale_warn"
   echo "$wps"
+}
+
+# The DayPlan "Календарь" section. Omitted when the calendar is switched off
+# (params.yaml calendar_source: none, issue #942): the user does not use it.
+render_calendar_section() {
+  [ "$CALENDAR_PF" = "disabled" ] && return 0
+  cat <<CALENDAR_SECTION
+<details>
+<summary><b>Календарь ($DAY_NUM $MONTH_RU)</b></summary>
+
+<!-- PENDING: calendar — единый источник: календарный коннектор (MCP-инструменты
+  календаря; имена зависят от установки, имя содержит «calendar» без учёта регистра, напр. mcp__claude_ai_Google_Calendar__* — фактические имена
+  взять из списка инструментов текущей сессии). Получить список календарей пилота
+  (свои + подключённые общие), затем события каждого за $DATE (00:00–23:59 МСК).
+  Показать ВСЕ события дня по всем найденным календарям.
+  Если коннектора нет — фоллбэк: bash \$IWE_SCRIPTS/server-calendar.sh $DATE
+  (его «credentials не настроены» — факт о скрипте, не о календаре; issue #581).
+  Формат: таблица + строка свободных блоков ≥1h. -->
+
+| Время (МСК) | Событие | Длит. | Связь с РП |
+|-------------|---------|-------|------------|
+| <!-- PENDING --> | <!-- PENDING --> | — | — |
+
+⏱ Свободных блоков ≥1h: <!-- PENDING -->
+
+</details>
+
+CALENDAR_SECTION
 }
 
 # --- Strategy_day guard (Ф6 WP-264) ---
@@ -1277,13 +1320,15 @@ render_compact_dashboard() {
   echo "**Сегодня (топ-7 по приоритету):** <!-- filled by day-open-llm-fill.py from 'План на сегодня' -->"
   echo ""
 
-  # Дедлайны из календаря (если preflight OK)
+  # Дедлайны из календаря (если preflight OK); отключён (calendar_source: none,
+  # issue #942) — строки нет вовсе, это не незавершённая настройка
   if [[ "$CALENDAR_PF" == "ok" ]]; then
     echo "**Календарь:** доступен — запустить server-calendar.sh для деталей"
-  else
+    echo ""
+  elif [[ "$CALENDAR_PF" != "disabled" ]]; then
     echo "**Календарь:** недоступен (${CALENDAR_PF})"
+    echo ""
   fi
-  echo ""
 
   # Светофор — критические позиции
   echo "**IWE за ночь:**"
@@ -1485,26 +1530,7 @@ $(render_fleeting_notes)
 
 </details>
 
-<details>
-<summary><b>Календарь ($DAY_NUM $MONTH_RU)</b></summary>
-
-<!-- PENDING: calendar — единый источник: календарный коннектор (MCP-инструменты
-  календаря; имена зависят от установки, имя содержит «calendar» без учёта регистра, напр. mcp__claude_ai_Google_Calendar__* — фактические имена
-  взять из списка инструментов текущей сессии). Получить список календарей пилота
-  (свои + подключённые общие), затем события каждого за $DATE (00:00–23:59 МСК).
-  Показать ВСЕ события дня по всем найденным календарям.
-  Если коннектора нет — фоллбэк: bash \$IWE_SCRIPTS/server-calendar.sh $DATE
-  (его «credentials не настроены» — факт о скрипте, не о календаре; issue #581).
-  Формат: таблица + строка свободных блоков ≥1h. -->
-
-| Время (МСК) | Событие | Длит. | Связь с РП |
-|-------------|---------|-------|------------|
-| <!-- PENDING --> | <!-- PENDING --> | — | — |
-
-⏱ Свободных блоков ≥1h: <!-- PENDING -->
-
-</details>
-
+$(render_calendar_section)
 <details>
 <summary><b>Здоровье платформы (QA)</b></summary>
 

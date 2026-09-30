@@ -784,7 +784,11 @@ if [ -z "$WEEKPLAN_PATH" ] || [ ! -f "$WEEKPLAN_PATH" ]; then
 fi
 
 mkdir -p "$IWE/.tmp"
-bash "$IWE_SCRIPTS/server-calendar.sh" "$DATE" "$CONFIG" > "$CALENDAR_OUT" 2>/dev/null || true
+if [ "$CALENDAR_PF" = "disabled" ]; then
+  : > "$CALENDAR_OUT"  # issue #942: calendar_source: none, nothing to fetch
+else
+  bash "$IWE_SCRIPTS/server-calendar.sh" "$DATE" "$CONFIG" > "$CALENDAR_OUT" 2>/dev/null || true
+fi
 
 # Generate scaffold to temp file first (for hash guard)
 SCAFFOLD_TEMP="$DAYPLAN_PATH.scaffold.tmp"

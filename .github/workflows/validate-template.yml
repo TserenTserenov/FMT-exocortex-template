@@ -625,6 +625,10 @@ jobs:
       - name: Run delivered Day Open world checks
         run: bash scripts/tests/day-open-world-fill-smoke.sh
 
+      # Issues #942/#944: calendar_source switch and stale priorities.yaml.
+      - name: Run Day Open calendar switch and stale priorities test
+        run: bash scripts/tests/test_issues_942_944_day_open.sh
+
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
       # last published release by default, moving main only via explicit
       # IWE_UPDATE_CHANNEL=main or as an announced fallback when no release

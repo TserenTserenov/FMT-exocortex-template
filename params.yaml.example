@@ -10,6 +10,12 @@
 # Day Open: проверка видео за предыдущий день
 video_check: true
 
+# Day Open: источник календаря (issue #942)
+#   connector — календарный коннектор claude.ai, затем scripts/server-calendar.sh (по умолчанию, ключ не задан = connector)
+#   script    — только scripts/server-calendar.sh (нужен файл ключей Google)
+#   none      — календарь не используется: без проверки, без секции в DayPlan, коннектор не подключается
+calendar_source: connector
+
 # Day Close: расчёт мультипликатора IWE (требует WakaTime API key)
 multiplier_enabled: true
 

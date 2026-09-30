@@ -78,7 +78,7 @@ Day Close = протокол. Блокирующее требование — н
 Просмотреть «Уроки» в MEMORY.md. Не применялся >1 нед и есть в `lessons_*.md` → удалить. Новый урок → строка в MEMORY.md + `lessons_*.md`. Цель: ≤8 уроков.
 
 ### 5. Автоматические шаги
-`. "${IWE_PATHS_FILE:-$HOME/.iwe-paths}" 2>/dev/null; "$IWE_SCRIPTS/day-close.sh"` — источник переменных явный (issue #688, см. шаг 0б), Linear sync, downstream sync (update.sh), backup (memory/ + CLAUDE.md).
+`. "${IWE_PATHS_FILE:-$HOME/.iwe-paths}" 2>/dev/null; "$IWE_SCRIPTS/day-close.sh"` — источник переменных явный (issue #688, см. шаг 0б), Linear sync, backup (memory/ + CLAUDE.md), reindex, консолидация сессий дня. Обновление платформы (`update.sh`) сюда НЕ входит (issue #945): это сетевая операция со своим ритуалом; о доступном обновлении сообщает таблица состояния IWE при Day Open (`update.sh --check --fast`), применяется отдельно (`/iwe-update`).
 
 ### 6. Мультипликатор IWE
 > Условный шаг: если `params.yaml → multiplier_enabled: false` → пропустить и
@@ -281,7 +281,7 @@ Sub-agent Haiku R23 (context isolation): передать чеклист + че�
 - [ ] DayPlan обновлён (статусы ВСЕХ строк: РП + ad-hoc) — **N/A на strategy_day** (шаг 0в)
 - [ ] open-sessions.log: строки закрытых сессий удалены
 - [ ] Captures за день применены (все Quick Close → KE пройден)
-- [ ] Синхронизация downstream: `update.sh` выполнен
+- [ ] Утренние приоритеты (шаг 7з): `current/priorities.yaml` → `last_updated` = день после закрываемого, ИЛИ в отчёте закрытия явно записано «приоритеты не обновлены (пропущено пилотом)». Ни того ни другого → вернуться к шагу 7з и спросить пилота (issue #944)
 - [ ] **Синхронизация рабочих копий (поручение пилота 21.08):** все машины/копии установки ↔ GitHub синхронизированы, за исключением работающих сейчас сессий. Проверка: `git status -sb` в governance-репо (без ahead/behind) + статус sync-скрипта вторичных копий (если настроен, напр. `tsekh1-git-sync.sh --status`). «Deferred из-за живого семафора» — норма для реально работающей сессии; протухший семафор при запушенном отчёте — аномалия: закрыть семафор до завершения Day Close.
 - [ ] Linear sync: статусы соответствуют git. Кол-во active РП в REGISTRY = active issues в Linear
 - [ ] Repo CLAUDE.md: feat-коммиты → новые правила?
