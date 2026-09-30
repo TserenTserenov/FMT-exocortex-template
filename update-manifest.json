@@ -2989,7 +2989,7 @@
     },
     {
       "path": "seed/strategy/scripts/ds-publish.sh",
-      "sha256": "080dc006807b26872875f536b6367315f7d20fbba8339d7c6677d416e108408f"
+      "sha256": "dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
@@ -3109,7 +3109,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "284d2932b9c40195eb8018be27719064b90d91f7d5d762aecbd908ae65b52cbc"
+      "sha256": "12f90bb6d38fc0e0dd099272cc95d13f24df57d9da44f75f6e1143d4b1552a87"
     }
   ],
   "excluded_paths": [

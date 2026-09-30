@@ -147,6 +147,39 @@ commit_in "$WS" main.txt m "main work" >/dev/null; g "$WS" merge -q --no-ff side
 MERGE=$(g "$WS" rev-parse HEAD); N=$(origin_count); run_pub "$WS" normal --from-commit "$MERGE"
 [ "$RC" -eq 2 ] && [ "$(origin_count)" = "$N" ] && ok "merge commit refused, origin untouched" || fail "merge commit rc=$RC"
 
+echo "== a single-branch clone (remote.origin.fetch narrowed to another branch)"
+new_scene s10
+g "$WS" config remote.origin.fetch "+refs/heads/other:refs/remotes/origin/other"
+g "$WS" update-ref -d refs/remotes/origin/main
+SHA=$(commit_in "$WS" a.txt one "role: single-branch")
+run_pub "$WS" normal --from-commit "$SHA"
+[ "$RC" -eq 0 ] && [ "$(origin_log)" = "role: single-branch|base|" ] && ok "published although refs/remotes/origin/main does not exist" || fail "single-branch (rc=$RC): $(cat "$TMP/err.txt")"
+[ -z "$(g "$WS" for-each-ref refs/ds-publish)" ] && ok "the private fetch ref is removed" || fail "private ref left behind"
+
+echo "== a stale origin/<branch> tracking ref must not fake 'already published'"
+new_scene s11
+SHA=$(commit_in "$WS" a.txt one "role: stale")
+g "$WS" push -q origin HEAD:main 2>/dev/null                         # published under this SHA ...
+g "$OTHER" pull -q origin main 2>/dev/null; g "$OTHER" reset -q --hard HEAD~1; g "$OTHER" push -q --force origin HEAD:main 2>/dev/null   # ... then origin was rewritten without it
+run_pub "$WS" normal --from-commit "$SHA"
+[ "$RC" -eq 0 ] && [ "$(origin_log)" = "role: stale|base|" ] && ok "re-published after origin was rewritten (the stale tracking ref was not trusted)" || fail "stale tracking ref (rc=$RC, log=$(origin_log))"
+
+echo "== a cherry-pick that fails for a reason other than a conflict is NOT success"
+new_scene s12
+SHA=$(commit_in "$WS" a.txt one "role: tech")
+mkdir -p "$TMP/shim2"
+cat > "$TMP/shim2/git" <<EOF
+#!/bin/sh
+case " \$* " in *" cherry-pick "*) echo "fatal: Unable to create index.lock: File exists" >&2; exit 1 ;; esac
+exec "$REAL_GIT" "\$@"
+EOF
+chmod +x "$TMP/shim2/git"
+BEFORE=$(origin_log)
+( cd "$TMP" && PATH="$TMP/shim2:$PATH" bash "$PUB" "$WS" normal --from-commit "$SHA" ) > "$TMP/out.txt" 2> "$TMP/err.txt"; RC=$?
+[ "$RC" -eq 1 ] && ok "exit 1, not a false success" || fail "technical failure gave exit $RC"
+[ "$(origin_log)" = "$BEFORE" ] && ok "origin unchanged" || fail "origin changed"
+grep -q "other than a conflict" "$TMP/err.txt" && ok "the reason is stated" || fail "no reason: $(cat "$TMP/err.txt")"
+
 echo "== the strategist call shape from the template"
 new_scene s9
 SHA=$(commit_in "$WS" a.txt one "strategist: day plan")

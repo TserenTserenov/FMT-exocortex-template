@@ -69,12 +69,16 @@ BRANCH="${BRANCH:-main}"
 
 echo "ds-publish: ${SHA:0:12} -> origin/$BRANCH${REASON:+ ($REASON)}"
 
-WORK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/ds-publish.XXXXXX") || die "cannot create a temp directory"
+WORK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/ds-publish.XXXXXX" 2>/dev/null || mktemp -d) || die "cannot create a temp directory"
 WORKTREE="$WORK_ROOT/wt"
+# origin's tip is fetched into a private ref, not into refs/remotes/origin/<branch>: a
+# single-branch clone (or any narrowed remote.origin.fetch) never updates the latter.
+TIP_REF="refs/ds-publish/$$"
 
 cleanup_worktree() {
   git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
   git -C "$REPO" worktree prune >/dev/null 2>&1 || true
+  git -C "$REPO" update-ref -d "$TIP_REF" >/dev/null 2>&1 || true
   rm -rf "$WORK_ROOT"
 }
 trap cleanup_worktree EXIT
@@ -87,32 +91,39 @@ if [ -z "$(git -C "$REPO" config user.email 2>/dev/null)" ]; then
 fi
 
 already_published() {
-  git -C "$REPO" merge-base --is-ancestor "$SHA" "origin/$BRANCH" 2>/dev/null && return 0
+  git -C "$REPO" merge-base --is-ancestor "$SHA" "$TIP" 2>/dev/null && return 0
   # `git cherry` marks an equivalent patch already upstream with "-".
   git -C "$REPO" rev-parse --verify --quiet "$SHA^" >/dev/null || return 1
-  git -C "$REPO" cherry "origin/$BRANCH" "$SHA" "$SHA^" 2>/dev/null | grep -q '^-'
+  git -C "$REPO" cherry "$TIP" "$SHA" "$SHA^" 2>/dev/null | grep -q '^-'
 }
 
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-  git -C "$REPO" fetch --quiet origin "$BRANCH" 2>"$WORK_ROOT/fetch.err" \
+  git -C "$REPO" fetch --quiet origin "+refs/heads/$BRANCH:$TIP_REF" 2>"$WORK_ROOT/fetch.err" \
     || die "fetch origin/$BRANCH failed: $(tail -n 1 "$WORK_ROOT/fetch.err")"
+  TIP=$(git -C "$REPO" rev-parse --verify --quiet "$TIP_REF^{commit}") || die "origin/$BRANCH not found after fetch"
 
   if already_published; then
     echo "ds-publish: already on origin/$BRANCH, nothing to do"
     exit 0
   fi
 
-  git -C "$REPO" worktree add --detach --quiet "$WORKTREE" "origin/$BRANCH" 2>"$WORK_ROOT/wt.err" \
+  git -C "$REPO" worktree add --detach --quiet "$WORKTREE" "$TIP" 2>"$WORK_ROOT/wt.err" \
     || die "cannot create a temp worktree: $(tail -n 1 "$WORK_ROOT/wt.err")"
 
   if ! git -C "$WORKTREE" cherry-pick "$SHA" >"$WORK_ROOT/pick.out" 2>&1; then
-    if git -C "$WORKTREE" diff --cached --quiet && [ -z "$(git -C "$WORKTREE" diff --name-only --diff-filter=U)" ]; then
+    # Three different failures share this branch; only a PROVEN empty result may report success.
+    picking=$(git -C "$WORKTREE" rev-parse --verify --quiet CHERRY_PICK_HEAD || true)
+    conflicts=$(git -C "$WORKTREE" diff --name-only --diff-filter=U)
+    if [ -n "$conflicts" ]; then
+      git -C "$WORKTREE" cherry-pick --abort >/dev/null 2>&1 || true
+      die "conflict replaying ${SHA:0:12} on origin/$BRANCH; the commit stays local. $(tail -n 1 "$WORK_ROOT/pick.out")" 3
+    fi
+    if [ -n "$picking" ] && git -C "$WORKTREE" diff --cached --quiet && [ "$(git -C "$WORKTREE" rev-parse HEAD)" = "$TIP" ]; then
       echo "ds-publish: the commit changes nothing on top of origin/$BRANCH, nothing to do"
       exit 0
     fi
-    git -C "$WORKTREE" cherry-pick --abort >/dev/null 2>&1 || true
-    die "conflict replaying ${SHA:0:12} on origin/$BRANCH; the commit stays local. $(tail -n 1 "$WORK_ROOT/pick.out")" 3
+    die "cherry-pick of ${SHA:0:12} failed for a reason other than a conflict; the commit stays local. $(tail -n 1 "$WORK_ROOT/pick.out")"
   fi
 
   if git -C "$WORKTREE" push --quiet origin "HEAD:refs/heads/$BRANCH" 2>"$WORK_ROOT/push.err"; then

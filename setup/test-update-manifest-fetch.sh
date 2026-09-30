@@ -123,6 +123,25 @@ rm -f "$TMP/case/manifest.json"
 run_case "empty ok"
 [ "$RC" -eq 0 ] && [ "$(sed -n 2p "$TMP/log")" = "call 2 mode=stdout" ] && ok "empty file → redirect attempt" || fail "empty file (rc=$RC, $(sed -n 2p "$TMP/log"))"
 
+echo "== the redirect experiment cannot see the HTTP status: a 22 there is retried, not given up"
+rm -f "$TMP/case/manifest.json"
+run_case "rc23 rc22 ok"
+[ "$RC" -eq 0 ] && [ "$CALLS" -eq 3 ] && valid_json_in "$DEST" && ok "23, then a 22 in redirect mode, then success" || fail "rc23 rc22 ok (rc=$RC calls=$CALLS)"
+
+echo "== a failed move into place is reported, not hidden"
+mkdir -p "$TMP/mvfail"
+cat > "$TMP/bin/mv" <<'MVSTUB'
+#!/bin/sh
+echo "mv: cannot move: Permission denied" >&2
+exit 1
+MVSTUB
+chmod +x "$TMP/bin/mv"
+run_case "ok" "$TMP/mvfail"
+rm -f "$TMP/bin/mv"
+[ "$RC" -ne 0 ] && ok "returns a failure" || fail "a failed mv counted as success"
+case "$DIAG" in *"не записан"*) ok "the diagnostic says the manifest was not written" ;; *) fail "diag: $DIAG" ;; esac
+[ ! -e "$TMP/mvfail/manifest.json" ] && ok "no half-written manifest" || fail "manifest exists after a failed move"
+
 echo "== a path with spaces"
 rm -f "$TMP/with space/manifest.json"
 run_case "ok" "$TMP/with space"

@@ -148,7 +148,12 @@ fetch_update_manifest() {
             rm -f "$part" "$errf"
             return 1
         elif [ "$rc" -eq 0 ]; then
-            mv -f "$part" "$dest"
+            if ! mv -f "$part" "$dest" 2>"$errf"; then
+                FETCH_MANIFEST_DIAG="манифест скачан, но не записан на место: $(tail -n 1 "$errf" | cut -c1-200)"
+                echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
+                rm -f "$part" "$errf"
+                return 1
+            fi
             rm -f "$errf"
             return 0
         fi
@@ -158,7 +163,9 @@ fetch_update_manifest() {
         transient=false; write_failure=false
         case "$rc" in
             5|6|7|18|28|35|52|55|56) transient=true ;;
-            22) case "$http" in 5??|429) transient=true ;; esac ;;
+            # The redirect mode cannot report the HTTP status ("n/a"): a 22 there may be a 503
+            # as well as a 404, so it is retried once more rather than given up.
+            22) case "$http" in 5??|429|n/a) transient=true ;; esac ;;
             23) write_failure=true ;;
             0) write_failure=true ;;   # success with an empty file
         esac
