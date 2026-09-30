@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-09-30T10:30:49Z'
-last_synced_sha: 53046460fea62ea3d67c6b8baddfdf5afefec2f4
+files_translated:
+- docs/DESTRUCTIVE-GUARD.md
+last_run_utc: '2026-09-30T10:45:35Z'
+last_synced_sha: ff5afa1b63b50a0d1fa3fbe509482b6f2f980b10
 schema_version: 1
