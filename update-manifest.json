@@ -433,11 +433,11 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "03d5467543065220642d6fe03838015a48b5ca4cf4945c4b6c5000f9d48f4609"
+      "sha256": "0f0dbce379ab4ab24daba3149690b72651f4758eb765bfa824d89aa472b5ce54"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
-      "sha256": "3e83f5a48f1455dfebabbeb35211e4e74169baf532ff8bfbd71eca07010557ea"
+      "sha256": "26c6ff95ba03a7c8492ed92f2797ae615411210e08bdba803b40c2ab23c969d4"
     },
     {
       "path": ".claude/skills/day-close/day-close/SKILL.md",
@@ -849,7 +849,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9ad5d579349b367a30041c685c12c524fb6034a0b13bc56305684de477f75784"
+      "sha256": "8647f13f016120eada029d3f5ed32b4b889907a8b48a239b25859a31975ab8df"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "8647f13f016120eada029d3f5ed32b4b889907a8b48a239b25859a31975ab8df"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "8647f13f016120eada029d3f5ed32b4b889907a8b48a239b25859a31975ab8df"
     },
     {
       "path": "CLAUDE.md",
@@ -981,7 +989,7 @@
     },
     {
       "path": "docs/critical-files-map.yaml",
-      "sha256": "5549467779b71109b2f2e32dc796cb6dcb48331390c8698f6512266f9078e8a3"
+      "sha256": "e726c233d816af5787bdc1e8740162b9eef571ab7f6d6692ced0a008274c5f3c"
     },
     {
       "path": "docs/hindsight-setup.md",
@@ -1185,7 +1193,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "0a10dd98be14ee69901df9c38232985655ed648b549ade17c174c014de8f8811"
+      "sha256": "c05765ea709dbf4d0e5663b95ffb29a2d18310780bd9d997a53ae9cb6b9e73a6"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1785,7 +1793,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "b22a0dc0e6511d69fcbd649aa55b3d2a944c53d64b78f8f8e52e16604652456f"
+      "sha256": "8619428208c158bfd43156370b2bd34599f7885cdd46e9a449fca1f500460137"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -1909,7 +1917,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "295c2ca4a73b3f446bf0fdacb6701f0c8fd3575fa64c142fe0b47b5e726b2d33"
+      "sha256": "b446f44a2d1854cff5c67e2d0a478cb9c538daa525e1a3252a60bcc8c976014b"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2265,11 +2273,11 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "f304cda8a37224a3302a5d1c04b5a885b32d6fb51c15bdd72df4901820cd7850"
+      "sha256": "98e22b6f6f7b2fceb9675371f16c57b49024712b47d790939f0896f4fae79b01"
     },
     {
       "path": "scripts/day-open-preflight.sh",
-      "sha256": "e3dc9df026c1d0e410292fe15a9e12b6ea7efba234b289c115102774212c3b03"
+      "sha256": "fc89f990405a442504a8b53226310fb0c4e7613728385667244d45cb87a2a0e9"
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
@@ -2277,7 +2285,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "a9fe2013f6fdf96ba1ede4f09da0b109c01b3f4e2a3b828f44ca48fd32443fdd"
+      "sha256": "08fc02bb80e5b36b0b873383750eaaa3ec74f3cd279d6c5eef3b7e1c423254b5"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2465,7 +2473,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "ac0700709a939e4f0fc8c9bb504c9918e4f0a7d17694d65a7b7682ebb4979bf1"
+      "sha256": "aeb3361337b9c6781b8102fa737080a34bc75e003f8ac1c5ce354b2911fecf56"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -2997,7 +3005,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "a9f8548f627880cda29357997ed5caea995f7bfb783b0b36bcd81402dd73b542"
+      "sha256": "d561a3d289a3b52a241a12bf9b0843de0b0a7db439decf7b76ae8e2308d25c36"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3005,11 +3013,15 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "0ff59484281b0f92074c5fec391c5faea25412d189618a58372ed45109f4b3a0"
+      "sha256": "451e458f87a8592a08940fcdf92881aa1aabe3dd760f98d11b9046013aaf2821"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
       "sha256": "bc380db1c7cc5c9c44840bfd1815320dec1f850a4f47264e0510a87cb024f6ef"
+    },
+    {
+      "path": "seed/strategy/scripts/ds-publish.sh",
+      "sha256": "dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
@@ -3033,7 +3045,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "ac0700709a939e4f0fc8c9bb504c9918e4f0a7d17694d65a7b7682ebb4979bf1"
+      "sha256": "aeb3361337b9c6781b8102fa737080a34bc75e003f8ac1c5ce354b2911fecf56"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3129,7 +3141,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "b96d58fc6ee3de98aa62a82fce19ff9a12cbafde207f2f56c53c9726e9941bc4"
+      "sha256": "3436d597f9afc55761318a1341e89625602171f3b266c0c07e816f4a10354a1e"
     }
   ],
   "excluded_paths": [
@@ -3230,6 +3242,7 @@
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
+    "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_pending_phases_sweep.sh",
@@ -3274,12 +3287,15 @@
     "setup/test-day-open-delivery-closure.sh",
     "setup/test-delivery-route-label.sh",
     "setup/test-detectors.sh",
+    "setup/test-ds-publish.sh",
     "setup/test-extractor-subscription-env.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-update-channel-enum.sh",
+    "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-manifest-fetch.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",
