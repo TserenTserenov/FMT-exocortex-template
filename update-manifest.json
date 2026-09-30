@@ -849,7 +849,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8647f13f016120eada029d3f5ed32b4b889907a8b48a239b25859a31975ab8df"
+      "sha256": "cb3ebe3938795a5d6301e41935e00cb4eb78112e8d5ed8704459108919c487c1"
     },
     {
       "path": "CLAUDE.md",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
-      "sha256": "6dde134a7e79a1c57940bdcc3ee7305c7e7b8f4509da5f25b7f677b72728e632"
+      "sha256": "72a6f0c3da38c509b72125109ef26b6772fe141146a89ddba0441631cddfdb0f"
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
@@ -1717,7 +1717,7 @@
     },
     {
       "path": "roles/extractor/prompts/session-close-feed.md",
-      "sha256": "e3d4517e09b60a99a81f25ea2cc734770d453cd1ba66e825d883744157bf8e28"
+      "sha256": "758455847fdfd1509f5bc26f6f3e0ec66e92ab435eda92022fd95dd0c4a5109d"
     },
     {
       "path": "roles/extractor/prompts/session-close.md",
@@ -1733,7 +1733,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "39cf7f040de59874534fb60b52878f5a0aa5ec808c97f71cf0196a58f5cfab6a"
+      "sha256": "8558f722737524a7c77a617a970ad19e34f1e03e39226fbd647dba218fb4ecd6"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1753,7 +1753,7 @@
     },
     {
       "path": "roles/extractor/tests/test_extractor_pipeline.py",
-      "sha256": "d0b28e182eeb7475f63dd0cfa3dda2f5566e31c7ba71bc35e5ff055a56d3829c"
+      "sha256": "6dbd21322398b0857d4df5b9e001aae5eeb5e2eb12654ef1adce20011dce6340"
     },
     {
       "path": "roles/lib/scheduler-cron.sh",
