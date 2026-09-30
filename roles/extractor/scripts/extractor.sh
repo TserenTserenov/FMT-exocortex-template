@@ -887,7 +887,21 @@ cleanup_isolated_inbox_worktree() {
     fi
 
     if ! git -C "$canonical_repo" branch -d "$branch_name" >> "$LOG_FILE" 2>&1; then
-        log "WARN: published inbox-check branch was preserved for review: $branch_name"
+        # Publication carries the commit to origin as a cherry-pick (new SHA), so
+        # `branch -d` never sees the branch as merged. Drop it only when every
+        # commit on it has a patch-equivalent on its upstream; otherwise keep it.
+        local upstream
+        upstream=$(git -C "$canonical_repo" rev-parse --abbrev-ref "${branch_name}@{upstream}" 2>/dev/null) || upstream=""
+        if [ -n "$upstream" ]; then
+            timeout 20 git -C "$canonical_repo" fetch -q "${upstream%%/*}" "${upstream#*/}" >> "$LOG_FILE" 2>&1 || true
+        fi
+        if [ -n "$upstream" ] \
+           && ! git -C "$canonical_repo" cherry "$upstream" "$branch_name" 2>/dev/null | grep -q '^+' \
+           && git -C "$canonical_repo" branch -D "$branch_name" >> "$LOG_FILE" 2>&1; then
+            log "Deleted isolated-run branch (all commits patch-equivalent on $upstream): $branch_name"
+        else
+            log "WARN: isolated-run branch was preserved for review: $branch_name"
+        fi
     fi
 
     # Read-only Pack clones (see mount_readonly_packs()) are chmod a-w
