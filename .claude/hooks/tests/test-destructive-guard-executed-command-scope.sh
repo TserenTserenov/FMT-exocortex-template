@@ -120,8 +120,17 @@ EOF'
 expect "уборка своего временного файла (rm -f без -r) не блокируется" pass \
 'rm -f /Users/.../IWE/DS-strategy/tmp-prompt.txt'
 
-expect "rm -rf в /tmp остаётся штатной уборкой" pass \
+# issue #940: a temporary path anywhere in the call text no longer excuses a recursive forced
+# rm (the target depends on variables, cd and links known only at run time). The same removal
+# goes through .claude/bin/guarded-rm, which checks the real path when it runs.
+expect "rm -rf в /tmp блокируется: удаление идёт через guarded-rm (issue #940)" block \
 'rm -rf /tmp/wp-sync-bundle-512'
+
+expect "путь /tmp в соседней команде не освобождает rm -rf (issue #940)" block \
+'rm -rf /important; ls /tmp/'
+
+expect "guarded-rm с теми же ключами проходит (issue #940)" pass \
+'.claude/bin/guarded-rm -rf /tmp/wp-sync-bundle-512'
 
 # === git staging: the real forms are still refused ===
 expect "git add . блокируется" block \

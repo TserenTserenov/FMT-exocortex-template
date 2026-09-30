@@ -2874,12 +2874,12 @@ for entry in data.get('files', []):
             # them). repair_pass() iterates the WHOLE manifest (every declared
             # path, not just subdirectories), so a missing/stale loose file needs
             # the same repair arm as the subdir ones, or it is silently skipped.
-            .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
+            .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/bin/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
                 dst="$WORKSPACE_DIR/$fpath"
                 if [ ! -f "$dst" ]; then
                     mkdir -p "$(dirname "$dst")"
                     if copy_platform_file_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" "$fpath"; then
-                        case "$fpath" in *.sh) chmod +x "$dst" ;; esac
+                        case "$fpath" in *.sh|.claude/bin/*) chmod +x "$dst" ;; esac
                         echo "  ⟲ $fpath → workspace (repair)"
                         REPAIRED=$((REPAIRED + 1))
                     fi
@@ -2887,7 +2887,7 @@ for entry in data.get('files', []):
                     report_author_skip "$fpath" "$dst"
                 elif [ -r "$dst" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$dst")" ]; then
                     if copy_platform_file_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" "$fpath"; then
-                        case "$fpath" in *.sh) chmod +x "$dst" ;; esac
+                        case "$fpath" in *.sh|.claude/bin/*) chmod +x "$dst" ;; esac
                         echo "  ⟲ $fpath → workspace (stale repair)"
                         REPAIRED=$((REPAIRED + 1))
                     fi
@@ -4534,7 +4534,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         # NEW_FILES entry for one silently fell through this loop and never
         # reached disk. None of them carry a USER-SPACE block, so the same
         # helper as the subdir arms is enough.
-        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
+        .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/bin/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
             src="$SCRIPT_DIR/$f"
             dst="$WORKSPACE_DIR/$f"
             if is_author_mode && [ -f "$dst" ]; then
@@ -4543,6 +4543,8 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
             fi
             mkdir -p "$(dirname "$dst")"
             if copy_platform_file_preserving_user_space "$src" "$dst" "$f"; then
+                # .claude/bin holds extension-less executables (guarded-rm, issue #940)
+                case "$f" in .claude/bin/*) chmod +x "$dst" ;; esac
                 echo "  ✓ $f → workspace"
             fi
             ;;

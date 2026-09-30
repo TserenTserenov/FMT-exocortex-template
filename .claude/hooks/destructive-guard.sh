@@ -1,13 +1,52 @@
 #!/usr/bin/env bash
 # PreToolUse:Bash guard — blocks irreversible operations: git (staging, history,
-# push/reset/clean), filesystem (rm -rf outside temp paths), prod DB (psql
-# DROP/TRUNCATE/DELETE without WHERE), GitHub repo deletion. Exit 2 = block.
+# push/reset/clean), filesystem (recursive forced rm — only through
+# .claude/bin/guarded-rm), prod DB (psql DROP/TRUNCATE/DELETE without WHERE),
+# GitHub repo deletion. Exit 2 = block.
 set -euo pipefail
 
 block() {
   echo "BLOCKED: $1" >&2
   exit 2
 }
+
+# Outcomes of this hook: 0 = allowed, 2 = forbidden OR the check itself failed.
+# Claude Code treats only exit code 2 as a block, so any other non-zero exit (a
+# missing perl or jq, a command failing under `set -e`) would let the call through.
+# Every unexpected exit is turned into a block instead (issue #940).
+fail_check() {
+  block "ошибка проверки destructive-guard ($1) — команда не пропущена. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+}
+on_exit() {
+  local rc=$?
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+    fail_check "неожиданный выход, код $rc"
+  fi
+}
+trap on_exit EXIT
+
+# matches TEXT <grep options and pattern...> — 0 = match, 1 = no match. A grep or printf that
+# FAILS (exit code 2 or more: a broken binary, a bad pattern) is a failed check and blocks;
+# inside `if cmd | grep -q ...` it used to read as "no match" and let the call through.
+# `grep -c` reads all its input, so an early exit of grep cannot raise SIGPIPE in printf.
+matches() {
+  local text=$1 feed=0 found=0
+  shift
+  { printf '%s\n' "$text" | grep -c "$@" >/dev/null; feed=${PIPESTATUS[0]} found=${PIPESTATUS[1]}; } || true
+  [ "$feed" -eq 0 ] || fail_check "printf, код $feed"
+  case "$found" in
+    0|1) return "$found" ;;
+    *) fail_check "grep, код $found" ;;
+  esac
+}
+
+# Bypass: только из реального шелла пилота (тот же контракт, что secret-leak-block.sh —
+# хук читает свой процессный env, не текст команды, агент не может выставить это сам себе).
+# Строгое сравнение с "1" (не -n) — та же несогласованность в secret-leak-block.sh
+# (там -n) допустима для существующего кода, но не стоит копировать её в новый
+# (пир-ревью Codex, WP-544 Ф1, 20.08): -n пропустил бы CC_ALLOW_DESTRUCTIVE_INPUT=0 как bypass.
+# Первым делом, до разбора входа: обход пилота должен работать и при сломанном jq.
+[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && exit 0
 
 # Portable timeout (same helper as rule-engine.sh:_safe_timeout — kept local,
 # not sourced, since this hook has no other dependency on rule-engine.sh).
@@ -63,6 +102,7 @@ CMD=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command') || block "jq от
 CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/dev/null || true)
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 WORKSPACE_ROOT="$(cd "$HOOK_DIR/../.." && pwd -P)"
+GUARDED_RM="$WORKSPACE_ROOT/.claude/bin/guarded-rm"
 
 # --- what this hook is allowed to look at (WP-545, 06.09) -------------------
 #
@@ -129,29 +169,26 @@ else
   CMD_EXEC="${CMD_EXEC#OK}"
 fi
 
-# Bypass: только из реального шелла пилота (тот же контракт, что secret-leak-block.sh —
-# хук читает свой процессный env, не текст команды, агент не может выставить это сам себе).
-# Строгое сравнение с "1" (не -n) — та же несогласованность в secret-leak-block.sh
-# (там -n) допустима для существующего кода, но не стоит копировать её в новый
-# (пир-ревью Codex, WP-544 Ф1, 20.08): -n пропустил бы CC_ALLOW_DESTRUCTIVE_INPUT=0 как bypass.
-[ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ] && exit 0
-
 # #362: a top-level `cd` persists between Bash calls in Claude Code. Strip
 # quoted spans before detecting command segments; `(cd ... && ...)` remains
 # allowed because the opening parenthesis is not a top-level separator.
-if printf '%s' "$CMD_EXEC" | perl -e '
+CD_RC=0
+printf '%s' "$CMD_EXEC" | perl -e '
   my $s = do { local $/; <STDIN> };
   $s =~ s/'"'"'[^'"'"']*'"'"'/ Q /g;
   $s =~ s/"(?:\\.|[^"\\])*"/ Q /g;
   exit($s =~ /(?:^|[;&|\n]\s*)cd\s+/ ? 0 : 1);
-'; then
-  block "верхнеуровневый cd запрещён: используй git -C <path>, абсолютный путь или (cd <path> && ...)."
-fi
+' || CD_RC=$?
+case "$CD_RC" in
+  0) block "верхнеуровневый cd запрещён: используй git -C <path>, абсолютный путь или (cd <path> && ...)." ;;
+  1) ;;
+  *) fail_check "perl, проверка cd, код $CD_RC" ;;
+esac
 
 if [ -n "$CWD" ]; then
   CWD_PHYSICAL=$(cd "$CWD" 2>/dev/null && pwd -P || printf '%s' "$CWD")
   if [ "$CWD_PHYSICAL" != "$WORKSPACE_ROOT" ] && \
-     echo "$CMD_EXEC" | grep -qE "(^|[[:space:]\"'])(\\.claude/|scripts/|memory/)"; then
+     matches "$CMD_EXEC" -E "(^|[[:space:]\"'])(\\.claude/|scripts/|memory/)"; then
     block "root-relative path вызван из cwd=$CWD_PHYSICAL; используй абсолютный путь от $WORKSPACE_ROOT."
   fi
 fi
@@ -169,13 +206,20 @@ SEGMENTER_PL='
     for (my $i = 0; $i < length($text); $i++) {
       my $char = substr($text, $i, 1);
       if (defined $quote) {
-        if ($char eq "\\" && $quote eq q{"} && $i + 1 < length($text)) {
+        if ($char eq "\\" && $quote eq "ansi" && $i + 1 < length($text)) {
           $word .= substr($text, ++$i, 1);
-        } elsif ($char eq $quote) {
+        } elsif ($char eq "\\" && $quote eq q{"} && $i + 1 < length($text) && substr($text, $i + 1, 1) =~ /[\$`"\\\n]/) {
+          # In double quotes a backslash escapes only $ ` " \ and a newline; in "C:\Git\usr" it stays.
+          $word .= substr($text, ++$i, 1);
+        } elsif ($char eq ($quote eq "ansi" ? chr(39) : $quote)) {
           undef $quote;
         } else {
           $word .= $char;
         }
+      } elsif ($char eq q{$} && $i + 1 < length($text) && substr($text, $i + 1, 1) eq chr(39)) {
+        # ANSI-C quoting (dollar + single quote): a backslash escapes the next char.
+        $quote = "ansi";
+        $i++;
       } elsif ($char eq q{"} || $char eq chr(39)) {
         $quote = $char;
       } elsif ($char eq "\\" && $i + 1 < length($text)) {
@@ -194,25 +238,53 @@ SEGMENTER_PL='
   sub segments {
     my ($text) = @_;
     my (@out, $segment, $quote) = ((), q{}, undef);
-    for (my $i = 0; $i < length($text); $i++) {
+    my $n = length($text);
+    my $escaped_at = -1;
+    for (my $i = 0; $i < $n; $i++) {
       my $char = substr($text, $i, 1);
+      my $next = $i + 1 < $n ? substr($text, $i + 1, 1) : q{};
       if (defined $quote) {
         $segment .= $char;
-        if ($char eq "\\" && $quote eq q{"} && $i + 1 < length($text)) {
+        if ($char eq "\\" && ($quote eq q{"} || $quote eq "ansi") && $i + 1 < $n) {
           $segment .= substr($text, ++$i, 1);
-        } elsif ($char eq $quote) {
+        } elsif ($char eq ($quote eq "ansi" ? chr(39) : $quote)) {
           undef $quote;
         }
+      } elsif ($char eq q{$} && $next eq chr(39)) {
+        $quote = "ansi";
+        $segment .= $char . $next;
+        $i++;
+      } elsif ($char eq "\\" && $next eq "\n") {
+        # A backslash before a newline joins the lines: `git add \<newline> -A` is one command.
+        $segment .= q{ };
+        $i++;
+      } elsif ($char eq "\\" && $i + 1 < $n && $next !~ /[;&|(){}\n`]/) {
+        # An escaped character is literal: an escaped quote opens no quote. An escaped separator
+        # still splits (conservative: the next iteration sees it as the separator it looks like).
+        $segment .= $char . $next;
+        $escaped_at = length $segment;
+        $i++;
       } elsif ($char eq q{"} || $char eq chr(39)) {
         $quote = $char;
         $segment .= $char;
+      } elsif ($char eq q{#} && $escaped_at != length($segment) && ($segment eq q{} || $segment =~ /[ \t]$/)) {
+        # A comment runs to the end of the line; an apostrophe in it must not open a quote
+        # that swallows the next lines (and a command hidden behind them).
+        my $end = index($text, "\n", $i);
+        $i = ($end < 0 ? $n : $end) - 1;
+      } elsif ($char eq chr(123) && $next eq chr(125)) {
+        # `{}` — the placeholder of `find -exec` / `xargs -I {}`, not a brace group.
+        $segment .= $char . $next;
+        $i++;
       } elsif ($char eq q{&} && length($segment) && substr($segment, -1, 1) eq q{>}) {
         # `>&` fd-dup (`2>&1`, `>&2`) — part of the CURRENT command redirect,
         # not a separator (WP-544, 04.09: without this, a lone command ending
         # in `2>&1` was mis-split into two).
         $segment .= $char;
-      } elsif ($char eq q{&} && $i + 1 < length($text) && substr($text, $i + 1, 1) eq q{>}) {
+      } elsif ($char eq q{&} && $next eq q{>}) {
         $segment .= $char;
+      } elsif ($char eq q{|} && length($segment) && substr($segment, -1, 1) eq q{>}) {
+        $segment .= $char;                       # `>|` noclobber redirect
       } elsif ($char =~ /[;&|(){}\n]/ || $char eq q{`}) {
         # A newline ends a command exactly like `;` does. Without it, every
         # later line of a multi-line call was glued onto the first command
@@ -220,12 +292,26 @@ SEGMENTER_PL='
         # was read as `git add .` (WP-545).
         push @out, $segment;
         $segment = q{};
+        $escaped_at = -1;
       } else {
         $segment .= $char;
       }
     }
     push @out, $segment;
     return @out;
+  }
+
+  # Basename of a command word: /bin/rm, /usr/bin/rm, C:\Git\usr\bin\rm.exe all name `rm`.
+  sub command_base {
+    my ($word) = @_;
+    $word =~ s{^.*[/\\]}{};
+    $word =~ s/\.exe$//i;
+    return $word;
+  }
+
+  sub is_redirection {
+    my ($word, $alone) = @_;
+    return $alone ? ($word =~ /^(?:\d*|&)(?:>>?|<<?|>&|<&|>\|)$/) : ($word =~ /^(?:\d*|&)(?:>>?|<<?|>&|<&|>\|)./);
   }
 
   sub command_indices {
@@ -243,20 +329,24 @@ SEGMENTER_PL='
     my %option_with_argument = (
       sudo    => qr/^(?:-u|-g|-h|-p|-C|-r|-t|--user|--group|--host|--prompt|--close-from|--role|--type)$/,
       doas    => qr/^(?:-u|-C)$/,
-      env     => qr/^(?:-u|--unset|-C|--chdir|-S|--split-string)$/,
+      env     => qr/^(?:-u|--unset|-C|--chdir)$/,
       timeout => qr/^(?:-s|-k|--signal|--kill-after)$/,
       nice    => qr/^(?:-n|--adjustment)$/,
       ionice  => qr/^(?:-c|-n|-p|-P|-u)$/,
       stdbuf  => qr/^(?:-i|-o|-e|--input|--output|--error)$/,
-      xargs   => qr/^(?:-n|-P|-I|-i|-L|-s|-E|-d|-a|--max-args|--max-procs|--replace|--max-lines|--max-chars|--eof|--delimiter|--arg-file)$/,
+      time    => qr/^(?:-o|-f|--output|--format)$/,
+      xargs   => qr/^(?:-n|-P|-I|-L|-s|-E|-d|-a|--max-args|--max-procs|--max-chars|--delimiter|--arg-file)$/,
     );
+    my %keyword = map { $_ => 1 } qw(! then do else elif if while until);
     my (@tokens) = @_;
     my @indices;
     my $i = 0;
     while ($i < @tokens) {
-      if ($tokens[$i] =~ /^[A-Za-z_][A-Za-z0-9_]*=/) { $i++; next; }
-      my $name = $tokens[$i];
-      $name =~ s/^.*\///;
+      if ($tokens[$i] =~ /^[A-Za-z_][A-Za-z0-9_]*=/ || $keyword{$tokens[$i]}) { $i++; next; }
+      # A redirection in front of the command (`> log cmd`, `2>&1 cmd`) is not the command.
+      if (is_redirection($tokens[$i], 1)) { $i += 2; next; }
+      if (is_redirection($tokens[$i], 0)) { $i++; next; }
+      my $name = command_base($tokens[$i]);
       last unless $name =~ /^(?:command|builtin|exec|env|nohup|time|sudo|doas|timeout|nice|ionice|stdbuf|setsid|xargs)$/;
       my $pattern = $option_with_argument{$name};
       $i++;
@@ -270,7 +360,7 @@ SEGMENTER_PL='
     }
     return () unless $i < @tokens;
     push @indices, $i;
-    if ($tokens[$i] eq "find") {
+    if (command_base($tokens[$i]) eq "find") {
       for (my $j = $i + 1; $j < $#tokens; $j++) {
         push @indices, $j + 1 if $tokens[$j] =~ /^-(?:exec|execdir)$/;
       }
@@ -309,29 +399,81 @@ SEGMENTER_PL='
   }
   my $name = $ENV{"NAME"};
   my $subcmd = $ENV{"SUBCMD"};
-  for my $segment (@found) {
+  my %data = map { $_ => 1 } qw(echo printf : true false test [ which type man help grep egrep fgrep rg cat ls head tail wc sort uniq cut);
+  my %global_option_with_argument = map { $_ => 1 } qw(-C -c --git-dir --work-tree --namespace --super-prefix --config-env);
+  # A string handed to a shell (`bash -c "..."`, `eval "..."`) is commands too; it goes back
+  # into the queue, a few levels deep.
+  my @queue = map { [$_, 0] } @found;
+  while (my $item = shift @queue) {
+    my ($segment, $depth) = @$item;
     my @tokens = words($segment);
     next unless @tokens;
     for my $index (command_indices(@tokens)) {
-      next unless $index <= $#tokens && $tokens[$index] eq $name;
-      my $start = $index;
-      if (length $subcmd) {
-        my $i = $index + 1;
-        while ($i < @tokens) {
-          if ($tokens[$i] =~ /^-C$/ || $tokens[$i] =~ /^--(?:git-dir|work-tree)$/ || $tokens[$i] =~ /^-c$/) {
-            $i += 2;
-          } elsif ($tokens[$i] =~ /^--(?:git-dir|work-tree)=/ || $tokens[$i] =~ /^-c/) {
-            $i++;
-          } else {
+      next unless $index <= $#tokens;
+      my $base = command_base($tokens[$index]);
+      if ($depth < 3 && $tokens[$index] =~ /\s/) {
+        push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$index]);
+      }
+      if ($depth < 3 && $base =~ /^(?:ba|z|k|da|a)?sh$/) {
+        for (my $j = $index + 1; $j <= $#tokens; $j++) {
+          if ($tokens[$j] =~ /^-[A-Za-z]*c[A-Za-z]*$/ && $j < $#tokens) {
+            push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j + 1]);
             last;
           }
+          last unless $tokens[$j] =~ /^-/;
+        }
+      } elsif ($depth < 3 && $base =~ /^(?:ssh|su)$/) {
+        # `ssh host "rm -rf /x"`: a word with blanks after ssh/su is a command line for the far side.
+        for (my $j = $index + 1; $j <= $#tokens; $j++) {
+          push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j]) if $tokens[$j] =~ /\s/;
+        }
+      } elsif ($depth < 3 && $base eq "eval" && $index < $#tokens) {
+        push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments(join(" ", @tokens[$index + 1 .. $#tokens]));
+      }
+      my @starts = ($index);
+      # After a command that is not known to only print its arguments, a later word that is the
+      # wanted command may be the real one (`ssh host rm -rf x`, `docker exec c git add -A`,
+      # `strace git push --force`): examine it too. A data command (echo, grep, cat ...) ends
+      # the search; a parse mistake here errs toward a block, never toward a pass.
+      unless ($data{$base}) {
+        for (my $j = $index + 1; $j <= $#tokens; $j++) {
+          push @starts, $j if command_base($tokens[$j]) eq $name;
+        }
+      }
+      for my $start (@starts) {
+      next unless command_base($tokens[$start]) eq $name;
+      my $index = $start;
+      if (length $subcmd) {
+        # Global git options (--no-pager, -C dir, -Cdir, -c k=v, a redirection) sit between
+        # `git` and the subcommand.
+        my $i = $index + 1;
+        while ($i < @tokens) {
+          if (is_redirection($tokens[$i], 1)) { $i += 2; }
+          elsif (is_redirection($tokens[$i], 0)) { $i++; }
+          elsif ($tokens[$i] =~ /^-/) { $i += $global_option_with_argument{$tokens[$i]} ? 2 : 1; }
+          else { last; }
         }
         next unless $i < @tokens && $tokens[$i] eq $subcmd;
       }
       # Print and keep scanning — one call can chain several invocations of
       # the same command (`git push origin main && git push origin +:refs/x`),
-      # and every check below reads all of them, one per line.
-      print join(" ", @tokens[$start .. $#tokens]), "\n";
+      # and every check below reads all of them, one per line. The command word is printed
+      # as its basename, so `/usr/bin/git reset` reads like `git reset` downstream. A second
+      # line without redirections is printed when they change the text (`git add -A>/dev/null`
+      # reads as `-A`); the raw line stays, because a quoted ">" looks like a redirection.
+      my @raw = @tokens[$start .. $#tokens];
+      $raw[0] = $name;
+      print join(" ", @raw), "\n";
+      my @clean = ($base);
+      for (my $k = 1; $k < @raw; $k++) {
+        if (is_redirection($raw[$k], 1)) { $k++; next; }
+        next if is_redirection($raw[$k], 0);
+        my $word = $raw[$k];
+        $word =~ s/\d*[<>].*$// if $word =~ /^-/;
+        push @clean, $word;
+      }
+      print join(" ", @clean), "\n" if join(" ", @clean) ne join(" ", @raw);
+      }
     }
   }
 '
@@ -366,7 +508,7 @@ is_git_subcmd() {
 PUSH_SEGMENT=$(git_segment push)
 if [ -n "$PUSH_SEGMENT" ]; then
   PUSH_FORCE_SCAN=$(echo "$PUSH_SEGMENT" | sed -E 's/--force-with-lease(=[^[:space:]]*)?//g')
-  if echo "$PUSH_FORCE_SCAN" | grep -qE -- '(^|[[:space:]])(--force([[:space:]]|=|$)|-[a-zA-Z]*f[a-zA-Z]*([[:space:]]|$))'; then
+  if matches "$PUSH_FORCE_SCAN" -E -- '(^|[[:space:]])(--force([[:space:]]|=|$)|-[a-zA-Z]*f[a-zA-Z]*([[:space:]]|$))'; then
     block "git push --force запрещён. Используй --force-with-lease или согласуй с владельцем (CLAUDE.md §2)."
   fi
 
@@ -385,10 +527,10 @@ if [ -n "$PUSH_SEGMENT" ]; then
   # obfuscation (REF=":main"; git push origin $REF) is not caught — the hook
   # only sees literal command text, the same limit already documented for the
   # neighbouring secret hooks (Д6.3).
-  if echo "$PUSH_SEGMENT" | grep -qE -- '(^|[[:space:]])(--de[a-zA-Z]*([[:space:]]|=|$)|-[a-zA-Z]*d[a-zA-Z]*([[:space:]]|$))'; then
+  if matches "$PUSH_SEGMENT" -E -- '(^|[[:space:]])(--de[a-zA-Z]*([[:space:]]|=|$)|-[a-zA-Z]*d[a-zA-Z]*([[:space:]]|$))'; then
     block "git push --delete запрещён — удаление удалённой ветки/тега необратимо. Согласуй с владельцем (CLAUDE.md §2)."
   fi
-  if echo "$PUSH_SEGMENT" | grep -qE -- '(^|[[:space:]])\+?:[^[:space:]]+'; then
+  if matches "$PUSH_SEGMENT" -E -- '(^|[[:space:]])\+?:[^[:space:]]+'; then
     block "git push с refspec-удалением (:<ref> или +:<ref>) запрещён — удаление удалённой ветки/тега необратимо. Согласуй с владельцем (CLAUDE.md §2)."
   fi
 
@@ -399,7 +541,7 @@ if [ -n "$PUSH_SEGMENT" ]; then
   # to cover while already here. `--mi`/`--mir`/... also match — confirmed
   # live that `--mir` executes as `--mirror` (no other push option starts
   # with "mi").
-  if echo "$PUSH_SEGMENT" | grep -qE -- '(^|[[:space:]])--mi[a-zA-Z]*([[:space:]]|=|$)'; then
+  if matches "$PUSH_SEGMENT" -E -- '(^|[[:space:]])--mi[a-zA-Z]*([[:space:]]|=|$)'; then
     block "git push --mirror запрещён — синхронизирует remote с локальными ссылками, удаляя отсутствующие локально ветки/теги. Согласуй с владельцем (CLAUDE.md §2)."
   fi
 fi
@@ -447,9 +589,12 @@ reset_is_non_destructive() {
 # on its own, not concatenated.
 RESET_SEGMENT=$(git_segment reset)
 if [ -n "$RESET_SEGMENT" ]; then
+  # With a cd anywhere in the call, reset_is_non_destructive would inspect the wrong
+  # repository (the hook's cwd, not the one the reset runs in), so the exception is off.
+  RESET_CD=$(shell_invocations cd)
   while IFS= read -r one_reset; do
     [ -n "$one_reset" ] || continue
-    if echo "$one_reset" | grep -qE -- '(^|[[:space:]])--hard([[:space:]]|$)' && ! reset_is_non_destructive "$one_reset"; then
+    if matches "$one_reset" -E -- '(^|[[:space:]])--hard([[:space:]]|$)' && { [ -n "$RESET_CD" ] || ! reset_is_non_destructive "$one_reset"; }; then
       block "git reset --hard запрещён (теряет незакоммиченное). Используй git stash."
     fi
   done <<< "$RESET_SEGMENT"
@@ -457,7 +602,7 @@ fi
 
 # git clean with delete flags (-f/-d/-x)
 CLEAN_SEGMENT=$(git_segment clean)
-if [ -n "$CLEAN_SEGMENT" ] && echo "$CLEAN_SEGMENT" | grep -qE -- '(^|[[:space:]])-[a-zA-Z]*[dfx]'; then
+if [ -n "$CLEAN_SEGMENT" ] && matches "$CLEAN_SEGMENT" -E -- '(^|[[:space:]])-[a-zA-Z]*[dfx]'; then
   block "git clean -fdx запрещён (удаляет неотслеживаемые файлы). Согласуй с владельцем."
 fi
 
@@ -469,10 +614,10 @@ fi
 # расхождение версий хука между личной установкой и этим шаблоном.)
 ADD_SEGMENT=$(git_segment add)
 if [ -n "$ADD_SEGMENT" ]; then
-  if echo "$ADD_SEGMENT" | grep -qE -- '(^|[[:space:]])(-A|--all|-u|--update)([[:space:]]|$)'; then
+  if matches "$ADD_SEGMENT" -E -- '(^|[[:space:]])(-A|--all|-u|--update)([[:space:]]|$)'; then
     block "git add -A/--all/-u/--update запрещён — подхватывает файлы других агентов (CLAUDE.md §Git Staging). Стейдж конкретные пути: git add <path>."
   fi
-  if echo "$ADD_SEGMENT" | grep -qE -- '(^|[[:space:]])\.([[:space:]]|$)'; then
+  if matches "$ADD_SEGMENT" -E -- '(^|[[:space:]])\.([[:space:]]|$)'; then
     block "git add . запрещён — подхватывает файлы других агентов (CLAUDE.md §Git Staging). Стейдж конкретные пути: git add <path>."
   fi
 fi
@@ -517,7 +662,7 @@ stash_pop_apply_is_safe() {
   git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
   local status
   status=$(git -C "$repo" stash show --name-status -- "$ref" 2>/dev/null) || return 1
-  ! echo "$status" | grep -qE '^D[[:space:]]'
+  ! matches "$status" -E '^D[[:space:]]'
 }
 
 # Same one-line-per-invocation reasoning as the reset check above — each
@@ -532,53 +677,61 @@ if [ -n "$STASH_SEGMENT" ]; then
   done <<< "$STASH_SEGMENT"
 fi
 
-# rm с одновременным recursive (-r/-R/--recursive) и force (-f/--force) — но
-# только когда оба флага принадлежат ОДНОМУ вызову rm. Три отдельных grep по
-# всему тексту вызова давали ложный отказ на записи документа: `rm -f
-# "$PROMPT_FILE"` (уборка временного файла) давал слово rm и флаг -f, а
-# несвязанный `--add-dir` другой команды прочитывался как «рекурсивно»
-# (живой случай 06.09, тот же класс, что зафиксирован 04.09 в
-# bug-2026-09-04-destructive-guard-rm-rf-false-positive-cross-command.md).
+# rm с одновременным recursive (-r/-R/--recursive) и force (-f/--force), в любом сочетании
+# флагов (слитных или раздельных), включая /bin/rm, /usr/bin/rm, \rm, find -exec rm, xargs rm,
+# обёртки sudo/env/time и строки для sh -c/eval, запрещён БЕЗ исключений (issue #940).
+# Удалять — через .claude/bin/guarded-rm: он при выполнении, когда оболочка уже раскрыла
+# переменные и шаблоны, вычисляет настоящий путь каждой цели и удаляет только внутри корней
+# из .claude/config/guarded-rm-roots.txt.
 #
-# Исключение (временные пути) намеренно осталось широким — оно смотрит и на
-# сам вызов, и на весь текст: сужение срабатывания убирает ложные ОТКАЗЫ,
-# сужение исключения добавило бы новые (`S=/tmp/x; rm -rf "$S/y"` — путь
-# виден только в присваивании выше).
+# Прежнее исключение «/tmp/, /scratchpad/ или .claude/worktrees/ где угодно в тексте вызова»
+# освобождало и удаление вне временных каталогов: `rm -rf /important; ls /tmp/` и
+# `echo /tmp/ > /dev/null && rm -rf "$HOME/project/data"` проходили. Сузить исключение по
+# тексту нельзя: цель удаления зависит от переменных, cd, ссылок и подстановок, известных
+# только при выполнении, поэтому проверка перенесена с текста на выполнение.
+#
+# Признаки флагов только для коротких кластеров (-rf, -vrf) и --recursive/--force с их
+# сокращениями GNU (--rec, --for): в `--verbose` или `--preserve-root` буква r/f — не флаг.
+RM_RECURSIVE_RE='(^|[[:space:]])(-[A-Za-z]*[rR][A-Za-z]*|--r[a-z]*)([[:space:]]|$)'
+RM_FORCE_RE='(^|[[:space:]])(-[A-Za-z]*f[A-Za-z]*|--f[a-z]*)([[:space:]]|$)'
+
+# git rm с -r и -f: -f теряет незакоммиченные правки удаляемых файлов (`git rm -r --cached`
+# без -f остаётся разрешённым).
+GIT_RM_INVOCATIONS=$(git_segment rm)
+if [ -n "$GIT_RM_INVOCATIONS" ]; then
+  while IFS= read -r one_git_rm; do
+    [ -n "$one_git_rm" ] || continue
+    if matches "$one_git_rm" -E -- "$RM_RECURSIVE_RE" && matches "$one_git_rm" -E -- "$RM_FORCE_RE"; then
+      block "git rm с -r и -f запрещён — -f теряет незакоммиченные правки. Убери -f или согласуй с владельцем."
+    fi
+  done <<< "$GIT_RM_INVOCATIONS"
+fi
+
 RM_INVOCATIONS=$(shell_invocations rm)
 if [ -n "$RM_INVOCATIONS" ]; then
   while IFS= read -r one_rm; do
     [ -n "$one_rm" ] || continue
-    if ! echo "$one_rm" | grep -qE -- '(^|[[:space:]])(-[^[:space:]]*[rR][^[:space:]]*|--recursive)([[:space:]]|$)'; then
-      continue
+    if matches "$one_rm" -E -- "$RM_RECURSIVE_RE" && matches "$one_rm" -E -- "$RM_FORCE_RE"; then
+      block "rm с -r и -f запрещён — удаление необратимо. Удаляй той же командой через $GUARDED_RM (те же ключи и цели): он при выполнении проверит настоящие пути и удалит только внутри временных каталогов из реестра $WORKSPACE_ROOT/.claude/config/guarded-rm-roots.txt. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
     fi
-    if ! echo "$one_rm" | grep -qE -- '(^|[[:space:]])(-[^[:space:]]*f[^[:space:]]*|--force)([[:space:]]|$)'; then
-      continue
-    fi
-    if echo "$one_rm" | grep -qE '(/tmp/|/scratchpad/|\.claude/worktrees/)'; then
-      continue
-    fi
-    if echo "$CMD_EXEC" | grep -qE '(/tmp/|/scratchpad/|\.claude/worktrees/)'; then
-      continue
-    fi
-    block "rm -r -f (в любом сочетании флагов) вне /tmp, scratchpad или worktree запрещён — удаление необратимо. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
   done <<< "$RM_INVOCATIONS"
 fi
 
 # psql: DROP/TRUNCATE — необратимая потеря структуры/данных.
-if echo "$CMD_EXEC" | grep -qiE '\bpsql\b' && echo "$CMD_EXEC" | grep -qiE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
+if matches "$CMD_EXEC" -iE '\bpsql\b' && matches "$CMD_EXEC" -iE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
   block "DROP/TRUNCATE через psql запрещён — необратимая потеря данных. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # psql: DELETE FROM без WHERE в том же операторе (эвристика: сегмент до ближайшего
 # ';' или конца строки — не защищает от WHERE в другом statement той же команды).
-if echo "$CMD_EXEC" | grep -qiE '\bpsql\b' \
-  && echo "$CMD_EXEC" | grep -qiE 'DELETE[[:space:]]+FROM' \
-  && ! echo "$CMD_EXEC" | grep -qiE 'DELETE[[:space:]]+FROM[^;]*[[:space:]]WHERE([[:space:]]|$)'; then
+if matches "$CMD_EXEC" -iE '\bpsql\b' \
+  && matches "$CMD_EXEC" -iE 'DELETE[[:space:]]+FROM' \
+  && ! matches "$CMD_EXEC" -iE 'DELETE[[:space:]]+FROM[^;]*[[:space:]]WHERE([[:space:]]|$)'; then
   block "DELETE FROM без WHERE через psql запрещён — удалит всю таблицу. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # удаление репозитория на GitHub — необратимо.
-if echo "$CMD_EXEC" | grep -qE '\bgh[[:space:]]+repo[[:space:]]+delete\b'; then
+if matches "$CMD_EXEC" -E '\bgh[[:space:]]+repo[[:space:]]+delete\b'; then
   block "gh repo delete запрещён — необратимо. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
@@ -589,8 +742,8 @@ fi
 # без -w/--allow-write, тот случай остаётся обычным interactive-approve.
 # Тот же residual, что у push --delete выше: whole-command grep, не
 # git_segment-изолированный per-invocation — variable-obfuscation не ловит.
-if echo "$CMD_EXEC" | grep -qE '\bgh[[:space:]]+repo[[:space:]]+deploy-key[[:space:]]+add\b' \
-  && echo "$CMD_EXEC" | grep -qE -- '(^|[[:space:]"'"'"'])(-w|--allow-write)([[:space:]"'"'"'=]|$)'; then
+if matches "$CMD_EXEC" -E '\bgh[[:space:]]+repo[[:space:]]+deploy-key[[:space:]]+add\b' \
+  && matches "$CMD_EXEC" -E -- '(^|[[:space:]"'"'"'])(-w|--allow-write)([[:space:]"'"'"'=]|$)'; then
   block "gh repo deploy-key add с -w/--allow-write запрещён — добавляет ключ с правом записи в репозиторий (необратимое расширение доступа). Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
