@@ -302,13 +302,14 @@ $extra_args"
         elif [ "$commit_mode" = "isolated-feed" ]; then
             verify_feed_outputs "$strategy_dir" || return 1
         elif [ "$commit_mode" = "isolated-audit" ]; then
+            # Read-only contract: a clean tree is the only success and there is
+            # nothing to commit or publish (the report stays in the log).
             verify_audit_outputs "$strategy_dir" || return 1
+            EXTRACTOR_COMMIT_RESULT="no_changes"
+            notify "KE: $command_file" "Процесс завершён"
+            return 0
         fi
-        # The audit report is not an inbox-check report (no capture sources,
-        # no Pack refs): the inbox-check pre-filters do not apply to it.
-        if [ "$commit_mode" != "isolated-audit" ]; then
-            prefilter_changed_reports "$strategy_dir" || return 1
-        fi
+        prefilter_changed_reports "$strategy_dir" || return 1
 
         if ! commit_extractor_changes "$strategy_dir" "$_gov_repo" "$commit_mode"; then
             return 1
@@ -421,19 +422,16 @@ verify_feed_outputs() {
     log "Feed output verified: $feed_lines [feed:...] block(s) in ${#feed_changed[@]} file(s)"
 }
 
-# Exit contract of the isolated knowledge audit (audit, audit-scheduled).
-# Runs inside the throwaway worktree, before anything is committed:
+# Exit contract of the isolated knowledge audit (audit, audit-scheduled):
+# governance is READ-ONLY for it (the prompt only prints a report; fixes need
+# approval). Runs inside the throwaway worktree:
 #   - agent commits/staged files are normalised to plain working-tree changes
 #     against the base commit (EXTRACTOR_FEED_BASE_SHA, set by run_feed_isolated);
-#   - the ONLY allowed change is a NEW non-empty report
-#     inbox/extraction-reports/YYYY-MM-DD-knowledge-audit*.md; captures (the
-#     audit consumes none, so no input marks may change), existing reports and
-#     every other path are a violation;
-#   - no new report = failure (a silent success would hide a lost audit).
+#   - `git status` must then be EMPTY: any new/changed/deleted path is a
+#     violation and blocks; a failing `git status` blocks too (never "clean").
 verify_audit_outputs() {
     local strategy_dir="$1" base="${EXTRACTOR_FEED_BASE_SHA:-}"
-    local entry path code violation=0 new_reports=0 status_file
-    local report_re='^inbox/extraction-reports/[0-9]{4}-[0-9]{2}-[0-9]{2}-knowledge-audit[A-Za-z0-9._-]*\.md$'
+    local entry violation=0 status_file
     if [ -z "$base" ]; then
         log "ERROR: audit base commit is unknown; publication blocked"
         return 1
@@ -452,30 +450,15 @@ verify_audit_outputs() {
         return 1
     fi
     while IFS= read -r -d '' entry; do
-        code="${entry:0:2}"
-        path="${entry:3}"
-        if [ "$code" = "??" ] && [[ "$path" =~ $report_re ]]; then
-            if [ -s "$strategy_dir/$path" ]; then
-                new_reports=$((new_reports + 1))
-            else
-                log "ERROR: audit report is empty: $path"
-                violation=1
-            fi
-        else
-            log "ERROR: audit touched a path outside the new-report allowlist: $path"
-            violation=1
-        fi
+        log "ERROR: audit changed governance (read-only contract): ${entry:3}"
+        violation=1
     done < "$status_file"
     rm -f "$status_file"
     if [ "$violation" -ne 0 ]; then
-        log "ERROR: audit output violates the report-only contract; publication blocked"
+        log "ERROR: audit output violates the read-only contract; publication blocked"
         return 1
     fi
-    if [ "$new_reports" -eq 0 ]; then
-        log "ERROR: AI CLI returned success without a new audit report; publication blocked"
-        return 1
-    fi
-    log "Audit output verified: $new_reports new report(s)"
+    log "Audit output verified: governance tree is clean, nothing to publish"
 }
 
 markdown_fence_awk() {
@@ -630,8 +613,7 @@ commit_extractor_changes() {
                 return 1
             fi
         done
-    elif [ "$commit_mode" != "isolated-audit" ]; then
-        # The audit consumes no captures: its only publishable paths are reports.
+    else
         while IFS= read -r source_file; do
             target_paths+=("${source_file#"$strategy_dir/"}")
         done < <(capture_source_files "$strategy_dir/inbox")
@@ -654,7 +636,7 @@ commit_extractor_changes() {
     # be on the governance branch.
     local isolated_branch_ok=0
     case "$commit_mode:$branch" in
-        isolated-inbox:extractor/inbox-check-*|isolated-feed:extractor/feed-*|isolated-audit:extractor/audit-*) isolated_branch_ok=1 ;;
+        isolated-inbox:extractor/inbox-check-*|isolated-feed:extractor/feed-*) isolated_branch_ok=1 ;;
     esac
     if [ "$branch" != "$gov_branch" ] && [ "$isolated_branch_ok" -ne 1 ]; then
         log "SKIP: $repo_name is on branch '$branch', expected '$gov_branch'"
@@ -783,9 +765,6 @@ commit_extractor_changes() {
     fi
 
     local commit_message="inbox-check: extraction report $DATE"
-    if [ "$commit_mode" = "isolated-audit" ]; then
-        commit_message="audit: knowledge audit report $DATE"
-    fi
     if [ "$commit_mode" = "isolated-feed" ]; then
         commit_message="feed(${EXTRACTOR_FEED_LABEL:-feed}): capture candidates $DATE"
     fi
@@ -1278,8 +1257,8 @@ $(pack_snapshot_context)"
 # only writes capture blocks; this script verifies (verify_feed_outputs),
 # commits and publishes. The caller holds the shared feed lock.
 # Also hosts the isolated knowledge audit (mode "isolated-audit", label "audit"):
-# same worktree/workspace/normalisation machinery, different exit contract
-# (verify_audit_outputs) and a different agent notice.
+# same worktree/workspace/normalisation machinery, but a read-only exit
+# contract (verify_audit_outputs: clean tree = success, no commit/publication).
 run_feed_isolated() {  # <prompt-file> <extra-args> <label> [mode]
     local prompt_file="$1" extra_args="${2:-}" label="${3:-feed}" commit_mode="${4:-isolated-feed}"
     local canonical_workspace="$WORKSPACE"
@@ -1337,7 +1316,7 @@ run_feed_isolated() {  # <prompt-file> <extra-args> <label> [mode]
     }
     local feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог): историю читай через git -C <путь> log, проверку -d .git для него не применяй. Не выполняй git add/commit/push: файлы captures только пиши, коммит и публикацию делает скрипт."
     if [ "$commit_mode" = "isolated-audit" ]; then
-        feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог). Запуск headless, вопросов пользователю нет. Не выполняй git add/commit/push и не правь Pack'и и другие файлы: единственный результат — новый файл отчёта аудита $repo_name/inbox/extraction-reports/$DATE-knowledge-audit*.md (для одного Pack'а — с суффиксом -<имя Pack'а>); коммит и публикацию делает скрипт."
+        feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог). Запуск headless, вопросов пользователю нет. Не выполняй git add/commit/push и не правь Pack'и и другие файлы: аудит только читает: отчёт выведи в ответ, файлы не создавай и не меняй."
     fi
     if [ -n "$extra_args" ]; then
         feed_context="$extra_args

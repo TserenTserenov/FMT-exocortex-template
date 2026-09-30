@@ -668,9 +668,7 @@ block = "%s"
         self.assertNotIn("git add inbox", (prompts / "session-close-feed.md").read_text())
         self.assertNotIn("git commit -m", (prompts / "session-close-feed.md").read_text())
 
-    # --- isolated knowledge audit (audit / audit-scheduled) ---------------------
-
-    AUDIT_REPORT = "inbox/extraction-reports/2026-09-12-knowledge-audit-PACK-fixture.md"
+    # --- isolated knowledge audit (audit / audit-scheduled): read-only contract --
 
     def audit_fixture(self, agent_body):
         """Canonical DS-fixture + a Pack; fake CLI = the audit agent."""
@@ -679,7 +677,6 @@ block = "%s"
             "README.md": "fixture\n",
             "inbox/captures/2026-09.md": "# Captures 2026-09\n### Pending [feed:git-diff 2026-09-01]\n",
             "inbox/extraction-reports/2026-09-01-inbox-check.md": "old report\n",
-            "inbox/extraction-reports/2026-09-01-knowledge-audit.md": "old audit\n",
         })
         cli = self.write(self.base / "fake-audit-cli", f"#!{sys.executable}\n" + """from pathlib import Path
 import subprocess
@@ -688,10 +685,10 @@ assert Path("PACK-fixture").is_symlink(), "Packs must be readable in the audit w
 assert Path("DS-fixture").is_symlink()
 assert "Scope: только Pack 'PACK-fixture'" in sys.argv[-1]
 assert "Не выполняй git add/commit/push" in sys.argv[-1]
-assert "knowledge-audit" in sys.argv[-1]
+assert "аудит только читает" in sys.argv[-1]
 repo = Path("DS-fixture")
-report = repo / "%s"
-""" % self.AUDIT_REPORT + agent_body)
+print("Knowledge Audit Report (printed, not written)")
+""" + agent_body)
         cli.chmod(0o700)
         return governance, remote, cli
 
@@ -705,23 +702,16 @@ report = repo / "%s"
     def leftover_audit_dirs(self):
         return list((self.base / "runs").glob("iwe-extractor-audit.*"))
 
-    WRITE_REPORT = 'report.write_text("# Knowledge Audit Report\\nScope: PACK-fixture\\n")\n'
-
-    def test_isolated_audit_publishes_report_and_leaves_canonical_untouched(self):
-        governance, remote, cli = self.audit_fixture(self.WRITE_REPORT)
+    def test_isolated_audit_clean_tree_is_success_without_commit(self):
+        governance, remote, cli = self.audit_fixture("pass\n")
         head_before = self.git(governance, "rev-parse", "HEAD")
-        commits_before = int(self.git(remote, "rev-list", "--count", "main"))
+        before = self.git(remote, "rev-parse", "main")
         result = self.run_audit(cli)
         self.assertEqual(result.returncode, 0)
-        # Exact text: the inbox-check pre-filters must not append a section to an audit report.
-        self.assertEqual(self.git(remote, "show", "main:" + self.AUDIT_REPORT),
-                         "# Knowledge Audit Report\nScope: PACK-fixture")
-        self.assertEqual(int(self.git(remote, "rev-list", "--count", "main")), commits_before + 1)
-        self.assertTrue(self.git(remote, "log", "-1", "--format=%s", "main").startswith("audit:"))
-        self.assertEqual(self.git(remote, "show", "main:README.md"), "fixture")
-        self.assertEqual(self.git(remote, "show", "main:inbox/extraction-reports/2026-09-01-inbox-check.md"), "old report")
+        self.assertIn("governance tree is clean", result.stdout)
+        self.assertIn("Completed process: knowledge-audit (no_changes)", result.stdout)
+        self.assertEqual(self.git(remote, "rev-parse", "main"), before)
         self.assert_canonical_untouched(governance, head_before)
-        self.assertFalse((governance / self.AUDIT_REPORT).exists())
         self.assertEqual(self.leftover_audit_dirs(), [])
         self.assertEqual(self.git(governance, "worktree", "list").count("\n"), 0)
         self.assertEqual(self.git(governance, "branch", "--list", "extractor/audit-*"), "")
@@ -740,72 +730,40 @@ report = repo / "%s"
         # Nothing is lost: the worktree is preserved for review.
         self.assertEqual(len(self.leftover_audit_dirs()), 1)
 
-    def test_isolated_audit_without_report_is_failure(self):
-        governance, remote, cli = self.audit_fixture("pass\n")
-        self.assert_audit_blocked(governance, remote, cli, "without a new audit report")
-
-    def test_isolated_audit_empty_report_is_failure(self):
-        governance, remote, cli = self.audit_fixture('report.write_text("")\n')
-        self.assert_audit_blocked(governance, remote, cli, "audit report is empty")
-
-    def test_isolated_audit_capture_marks_change_blocks_publication(self):
-        # The audit consumes no captures: touching input marks is a violation.
+    def test_isolated_audit_new_file_blocks_publication(self):
+        # Even a well-meant report file is a change: the audit is read-only.
         governance, remote, cli = self.audit_fixture(
-            self.WRITE_REPORT +
+            '(repo / "inbox/extraction-reports").mkdir(exist_ok=True)\n'
+            '(repo / "inbox/extraction-reports/2026-09-12-knowledge-audit.md").write_text("report\\n")\n')
+        self.assert_audit_blocked(governance, remote, cli, "read-only contract): inbox/extraction-reports/2026-09-12-knowledge-audit.md")
+
+    def test_isolated_audit_changed_captures_blocks_publication(self):
+        governance, remote, cli = self.audit_fixture(
             '(repo / "inbox/captures/2026-09.md").write_text("# Captures 2026-09\\n### Pending [analyzed 2026-09-12]\\n")\n')
-        self.assert_audit_blocked(governance, remote, cli, "outside the new-report allowlist: inbox/captures/2026-09.md")
+        self.assert_audit_blocked(governance, remote, cli, "read-only contract): inbox/captures/2026-09.md")
 
-    def test_isolated_audit_change_outside_allowlist_blocks_publication(self):
-        governance, remote, cli = self.audit_fixture(
-            self.WRITE_REPORT + '(repo / "README.md").write_text("agent edited an unrelated file\\n")\n')
-        self.assert_audit_blocked(governance, remote, cli, "outside the new-report allowlist: README.md")
+    def test_isolated_audit_changed_readme_blocks_publication(self):
+        governance, remote, cli = self.audit_fixture('(repo / "README.md").write_text("edited\\n")\n')
+        self.assert_audit_blocked(governance, remote, cli, "read-only contract): README.md")
 
-    def test_isolated_audit_rewriting_existing_report_blocks_publication(self):
-        governance, remote, cli = self.audit_fixture(
-            self.WRITE_REPORT +
-            '(repo / "inbox/extraction-reports/2026-09-01-inbox-check.md").write_text("rewritten\\n")\n')
-        self.assert_audit_blocked(governance, remote, cli, "outside the new-report allowlist: inbox/extraction-reports/2026-09-01-inbox-check.md")
+    def test_isolated_audit_deleted_file_blocks_publication(self):
+        governance, remote, cli = self.audit_fixture('(repo / "README.md").unlink()\n')
+        self.assert_audit_blocked(governance, remote, cli, "read-only contract): README.md")
 
-    def test_isolated_audit_rewriting_existing_audit_report_blocks_publication(self):
-        # A name that matches the allowlist is still refused when the file already exists.
+    def test_isolated_audit_agent_self_commit_is_normalised_and_blocks(self):
+        # The agent commits despite the ban: reset --mixed exposes the change, nothing is published.
         governance, remote, cli = self.audit_fixture(
-            self.WRITE_REPORT +
-            '(repo / "inbox/extraction-reports/2026-09-01-knowledge-audit.md").write_text("rewritten\\n")\n')
-        self.assert_audit_blocked(governance, remote, cli, "outside the new-report allowlist: inbox/extraction-reports/2026-09-01-knowledge-audit.md")
-
-    def test_isolated_audit_report_with_foreign_name_blocks_publication(self):
-        governance, remote, cli = self.audit_fixture(
-            'Path("DS-fixture/inbox/extraction-reports/2026-09-12-inbox-check.md").write_text("fake inbox report\\n")\n')
-        self.assert_audit_blocked(governance, remote, cli, "outside the new-report allowlist: inbox/extraction-reports/2026-09-12-inbox-check.md")
-
-    def test_isolated_audit_agent_commit_outside_allowlist_blocks_publication(self):
-        # The agent ignores "do not commit": normalisation exposes the foreign path.
-        governance, remote, cli = self.audit_fixture(
-            self.WRITE_REPORT +
             '(repo / "README.md").write_text("committed by the agent\\n")\n'
-            'subprocess.run(["git", "-C", "DS-fixture", "add", "--", "README.md", "%s"], check=True)\n'
-            'subprocess.run(["git", "-C", "DS-fixture", "commit", "-m", "agent self-commit"], check=True)\n' % self.AUDIT_REPORT)
-        self.assert_audit_blocked(governance, remote, cli, "outside the new-report allowlist: README.md")
-
-    def test_isolated_audit_agent_commit_is_normalised_and_republished_by_script(self):
-        governance, remote, cli = self.audit_fixture(
-            self.WRITE_REPORT +
-            'subprocess.run(["git", "-C", "DS-fixture", "add", "--", "%s"], check=True)\n'
-            'subprocess.run(["git", "-C", "DS-fixture", "commit", "-m", "agent self-commit"], check=True)\n' % self.AUDIT_REPORT)
-        head_before = self.git(governance, "rev-parse", "HEAD")
-        commits_before = int(self.git(remote, "rev-list", "--count", "main"))
-        self.run_audit(cli)
-        self.assertEqual(int(self.git(remote, "rev-list", "--count", "main")), commits_before + 1)
-        self.assertNotIn("agent self-commit", self.git(remote, "log", "--format=%s", "main"))
-        self.assertTrue(self.git(remote, "log", "-1", "--format=%s", "main").startswith("audit:"))
-        self.assert_canonical_untouched(governance, head_before)
+            'subprocess.run(["git", "-C", "DS-fixture", "add", "--", "README.md"], check=True)\n'
+            'subprocess.run(["git", "-C", "DS-fixture", "commit", "-m", "agent self-commit"], check=True)\n')
+        self.assert_audit_blocked(governance, remote, cli, "read-only contract): README.md")
 
     def test_isolated_audit_cli_failure_publishes_nothing(self):
         governance, remote, cli = self.audit_fixture("sys.exit(3)\n")
         self.assert_audit_blocked(governance, remote, cli, "AI CLI failed")
 
-    def test_isolated_audit_git_status_failure_blocks_instead_of_no_report(self):
-        governance, remote, cli = self.audit_fixture(self.WRITE_REPORT)
+    def test_isolated_audit_git_status_failure_blocks_instead_of_clean(self):
+        governance, remote, cli = self.audit_fixture("pass\n")
         real_git = shutil.which("git")
         stubs = self.base / "stubs"
         stub = self.write(stubs / "git", f"#!/bin/sh\n"
@@ -820,6 +778,7 @@ report = repo / "%s"
         self.assertEqual(text.count('run_feed_isolated "knowledge-audit"'), 2)
         self.assertNotIn('run_claude "knowledge-audit"', text)
         self.assertIn('"audit-scheduled")', text)
+        self.assertIn("audit-scheduled requires a Pack name", text)
 
 
 if __name__ == "__main__":
