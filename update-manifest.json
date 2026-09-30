@@ -849,7 +849,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "555d9fcde655754d13bb225ca709e3693a9c2f01e5bda3f38324bd820f8ffcab"
+      "sha256": "40a5886718173db86d7e557804f069228f078b33b70d5fb2fd04cfa3d6ff2a0e"
     },
     {
       "path": "CLAUDE.md",
@@ -2105,7 +2105,7 @@
     },
     {
       "path": "scripts/canon-reconcile-published.sh",
-      "sha256": "3dc026a0f8dbd2e135f585528f2da21dfddc0922d94c82e7ef2d5e8251bf17b2"
+      "sha256": "7d9737046a62328cd23a5252ea0f18a8753d8a6b95d7bc8107c52fa097cf6486"
     },
     {
       "path": "scripts/changelog-append.sh",
@@ -3158,6 +3158,8 @@
     "scripts/iwe-catalog-list.py",
     "scripts/iwe-trace.py",
     "scripts/session-dispatcher-tsekh.py",
+    "scripts/tests/ancestry-hardening-lib.sh",
+    "scripts/tests/canon-reconcile-published-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
