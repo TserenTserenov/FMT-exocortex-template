@@ -6,7 +6,7 @@
 - **HUB (личные планы):** $GOV_WT/current/
 - **Документы стратегии:** $GOV_WT/docs/ (Strategy.md, Dissatisfactions.md, Session Agenda.md)
 - **Inbox:** $GOV_WT/inbox/
-- **`$GOV_WT`:** рабочая (изолированная) копия governance-репозитория; определяется по шагу 0.5 скилла strategy-session (`.claude/skills/strategy-session/SKILL.md`), все записи строить от неё, не от канона `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`; публикация через `ds-publish.sh`
+- **`$GOV_WT`:** рабочая (изолированная) копия governance-репозитория; определяется по шагу 0 скилла strategy-session (`.claude/skills/strategy-session/SKILL.md`), все записи строить от неё, не от канона `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`; публикация через `ds-publish.sh`, только в режиме isolated (в режиме legacy без session-guard — штатным способом установки); перед каждым блоком записи `: "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1`
 - **SPOKE (планы репо):** {{WORKSPACE_DIR}}/*/WORKPLAN.md
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
@@ -21,7 +21,7 @@
 
 #### 0. Если первая сессия месяца — прочитать архив прошлого месяца (БЛОКИРУЮЩЕЕ)
 
-- Проверь: сегодня — первая Strategy Session в текущем месяце? (Признак: дата сессии ≤7 числа месяца И в `{{GOVERNANCE_REPO}}/sessions/` нет записи Strategy Session с этого месяца)
+- Проверь: сегодня — первая Strategy Session в текущем месяце? (Признак: дата сессии ≤7 числа месяца И в журнале сессий (`iwe_sessions_dir`, при его отсутствии `$GOV_WT/sessions`; ищи и `sessions/YYYY-MM-*.md`, и `sessions/YYYY-MM/`) нет записи Strategy Session с этого месяца)
 - Если да:
   1. Найди последний `$GOV_WT/archive/MonthClose YYYY-MM.md` (за прошлый месяц)
   2. Прочитай ОБЯЗАТЕЛЬНО ДО шага 1: мультипликатор, фаза, калибр, ревизия проектов, инсайты решений, R-вопросник, carry-over

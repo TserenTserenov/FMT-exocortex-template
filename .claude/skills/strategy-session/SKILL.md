@@ -28,27 +28,50 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Algorithm
 
-### Шаг 0. Extensions (before)
-`bash .claude/scripts/load-extensions.sh strategy-session before` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
+### Шаг 0. Рабочая копия governance-репозитория (БЛОКИРУЮЩЕЕ, ДО расширений и любой записи)
 
-## Шаг 0.5. Рабочая копия governance-репозитория (БЛОКИРУЮЩЕЕ, до любой записи)
-
-> Канон governance-репозитория (`{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`) может быть под freeze: правило «Канон под freeze» в `{{GOVERNANCE_REPO}}/CLAUDE.md` — любая правка, в том числе сессия масштаба «Неделя», идёт из изолированной копии и публикуется через `ds-publish.sh`. Поэтому ВСЕ пути записи ниже строятся от `$GOV_WT` (рабочая копия), а не от канона.
+> Если в установке есть `session-guard.sh` (канон под freeze), правка идёт только из изолированной копии и публикуется через `ds-publish.sh` (правило «Канон под freeze» в `{{GOVERNANCE_REPO}}/CLAUDE.md`). Если session-guard в установке нет, заморозки нет: работай как раньше в найденной рабочей копии и сохраняй штатным способом. Это две явные ветки ниже, не молчаливый пропуск. ВСЕ пути записи строятся от `GOV_WT`, не от канона.
 
 ```bash
 CANON="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}"
-# resolver (если есть в репозитории) иначе git-корень текущего каталога
-if [ -f "$CANON/scripts/lib/governance-repo-path.sh" ]; then
-  . "$CANON/scripts/lib/governance-repo-path.sh"; GOV_WT=$(resolve_active_worktree)
+GUARD="${IWE_SCRIPTS:-}/session-guard.sh"
+[ -f "$GUARD" ] || GUARD="{{WORKSPACE_DIR}}/scripts/session-guard.sh"
+[ -f "$GUARD" ] || GUARD="$CANON/scripts/session-guard.sh"
+[ -f "$GUARD" ] && GUARD_MODE=required || GUARD_MODE=absent
+CANON_C=$(cd -- "$CANON" 2>/dev/null && pwd -P) || { echo "ERROR: канон $CANON недоступен" >&2; exit 1; }
+CANON_COMMON=$(git -C "$CANON_C" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+  || { echo "ERROR: $CANON_C не git-репозиторий" >&2; exit 1; }
+if [ -f "$CANON_C/scripts/lib/governance-repo-path.sh" ]; then
+  CAND=$(. "$CANON_C/scripts/lib/governance-repo-path.sh" && resolve_active_worktree) \
+    || { echo "ERROR: resolve_active_worktree завершился с ошибкой" >&2; exit 1; }
 else
-  GOV_WT=$(git rev-parse --show-toplevel 2>/dev/null)
+  CAND=$(git rev-parse --show-toplevel 2>/dev/null) || CAND=""
 fi
-[ -n "$GOV_WT" ] && [ "$(cd "$GOV_WT" && pwd -P)" != "$(cd "$CANON" && pwd -P)" ] && echo "isolated: $GOV_WT" || echo "NOT ISOLATED"
+CAND_C=""; CAND_COMMON=""
+if [ -n "$CAND" ]; then
+  CAND_C=$(cd -- "$CAND" 2>/dev/null && pwd -P) || { echo "ERROR: не удалось нормализовать путь $CAND" >&2; exit 1; }
+  CAND_COMMON=$(git -C "$CAND_C" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || CAND_COMMON=""
+fi
+# кандидат годится, только если его общий git-каталог совпадает с каноном (тот же governance-репозиторий)
+if [ -n "$CAND_C" ] && [ "$CAND_COMMON" = "$CANON_COMMON" ]; then GOV_WT="$CAND_C"; else GOV_WT=""; fi
+if [ "$GUARD_MODE" = required ]; then
+  if [ -z "$GOV_WT" ] || [ "$GOV_WT" = "$CANON_C" ]; then
+    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: bash \"$GUARD\" open --isolate --wp <WP-N>, затем cd в worktree_path и повтори шаг" >&2; exit 2
+  fi
+  echo "GOV_WT=$GOV_WT mode=isolated"
+else
+  [ -n "$GOV_WT" ] || GOV_WT="$CANON_C"
+  echo "GOV_WT=$GOV_WT mode=legacy (session-guard не найден: заморозки нет, работа как раньше)"
+fi
 ```
 
-- `isolated: <путь>` -> `GOV_WT` = этот путь; работай в нём.
-- `NOT ISOLATED` -> ничего не записывай. Открой изолированную копию: `bash {{WORKSPACE_DIR}}/scripts/session-guard.sh open --isolate --wp <WP-N или housekeeping по правилам репозитория>`, возьми `worktree_path` из его вывода, сделай `cd` в него и повтори проверку выше. Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши.
-- Публикация в конце сессии: коммит в `$GOV_WT`, затем `bash $GOV_WT/scripts/ds-publish.sh "$GOV_WT" normal --reason "strategy-session"`; в канон не коммить напрямую.
+- Код выхода 0 -> **запиши абсолютный путь `GOV_WT` в свой ответ пользователю** (контекст сессии): независимые вызовы Bash не разделяют переменные, а `cd` в подоболочке каталог не меняет.
+- Код выхода 2 (`NOT ISOLATED`) -> ничего не записывай. Выполни `session-guard.sh open --isolate ...`, возьми `worktree_path` из его вывода, `cd` в него и повтори блок. Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши. Код 1 -> ошибка резолвера или путей: покажи сообщение и остановись.
+- КАЖДЫЙ последующий блок записи начинается с явного задания и проверки: `GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1`.
+- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем `bash "$GOV_WT/scripts/ds-publish.sh" "$GOV_WT" normal --reason "strategy-session"`, в канон не коммить. `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
+
+### Шаг 0.1. Extensions (before)
+`GOV_WT="<записанный путь>" bash .claude/scripts/load-extensions.sh strategy-session before` -> Exit 0: Read каждый файл, выполнить; расширения работают с этим корнем `GOV_WT`. Exit 1: пропустить.
 
 ## Шаг 1. Определить режим
 
@@ -59,12 +82,13 @@ fi
 
 Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца. Записи двух легальных раскладок (issue #608, тот же корень, что #545 в day-open-scaffold.sh): плоские файлы Strategy/Day-сессий (`sessions/YYYY-MM-DD.md`) и подпапка по месяцу для peer-сессий (`sessions/YYYY-MM/`) — искать нужно по обоим адресам, иначе плоская раскладка (дефолт по `memory/routing-vocab.md`) всегда даёт «не найдено» и месячная сверка не срабатывает ни разу:
 ```bash
-SESSIONS_DIR=$(source {{WORKSPACE_DIR}}/scripts/lib/common.sh 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="$GOV_WT/sessions"
+GOV_WT="<записанный путь>"; : "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1
+SESSIONS_DIR=$(source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="$GOV_WT/sessions"
 grep -rl "strategy-session\|Strategy Session" \
   "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
   "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
 ```
-Пусто → первая сессия месяца.
+Первая сессия месяца = дата сессии ≤7 числа месяца И поиск выше пуст. Журнал сессий берётся из `iwe_sessions_dir` (общий журнал вне копии), при его отсутствии из `$GOV_WT/sessions`.
 
 > **Найдено платформенным аудитом 17.08.2026:** до этого исправления диспетчер знал только про initial/weekly — monthly-вариант (`strategy-session-monthly.md`) был реализован, но ничем не вызывался, кроме редкой ручной эскалации из weekly-stop-gate. Результат — шаги, привязанные только к monthly (стратегическая сверка, линза калибра/lifework-пакет, разбор inbox), фактически никогда не запускались ни у одного пользователя. Этот шаг — фикс маршрутизации, не новая функциональность.
 >
