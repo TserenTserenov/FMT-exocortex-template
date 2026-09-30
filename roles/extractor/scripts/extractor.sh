@@ -391,7 +391,12 @@ verify_feed_outputs() {
     for path in "${feed_changed[@]}"; do
         if git -C "$strategy_dir" cat-file -e "$base:$path" 2>/dev/null; then
             # Feeders only append: any removed line means accumulated captures were rewritten.
-            deleted=$(git -C "$strategy_dir" diff --numstat "$base" -- "$path" | awk '{d += ($2 == "-" ? 0 : $2)} END {print d + 0}')
+            # numstat prints "-" for a binary change: it cannot be proven append-only, refuse it.
+            deleted=$(git -C "$strategy_dir" diff --numstat "$base" -- "$path" | awk '$1 == "-" || $2 == "-" {b = 1} {d += $2} END {print (b ? "binary" : d + 0)}')
+            if [ "$deleted" = "binary" ]; then
+                log "ERROR: feed made a binary change to $path (append-only contract); publication blocked"
+                return 1
+            fi
             if [ "$deleted" -ne 0 ]; then
                 log "ERROR: feed removed $deleted line(s) from $path (append-only contract); publication blocked"
                 return 1

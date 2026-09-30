@@ -603,6 +603,12 @@ block = "%s"
             'captures.write_text(block)\n')
         self.assert_feed_blocked(governance, remote, cli, "append-only contract")
 
+    def test_isolated_feed_binary_change_to_captures_is_refused(self):
+        # numstat reports "-" for binary content; it must not count as zero deletions.
+        governance, remote, cli = self.feed_fixture(
+            'captures.write_bytes(captures.read_bytes() + b"\\x00\\x01" + block.encode())\n')
+        self.assert_feed_blocked(governance, remote, cli, "binary change")
+
     def test_isolated_feed_git_status_failure_blocks_instead_of_no_changes(self):
         governance, remote, cli = self.feed_fixture(
             'captures.write_text(captures.read_text() + block)\n')
