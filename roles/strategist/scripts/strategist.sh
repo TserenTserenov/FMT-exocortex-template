@@ -408,6 +408,214 @@ open_runner_session() {  # <scenario>
     return 0
 }
 
+# WP-530 Ф72: isolated scenario runs. A scheduled scenario used to write straight into the shared
+# (frozen) governance checkout; the isolated mode runs it in a throwaway git worktree of origin/main,
+# so the canonical checkout is only read. The model and the deterministic steps write into the copy;
+# this script then checks that only the scenario's allowlisted paths changed, commits and publishes
+# from the copy (publish_commit_or_explain), and removes the copy only after a publication. On any
+# failure the copy is kept for review and the canonical checkout stays untouched.
+# Off by default: STRATEGIST_ISOLATED_SCENARIOS is a comma/space list of scenarios (empty = none), so
+# nothing changes until the pilot lists a scenario. Only scenarios with an allowlist can be listed
+# (today: note-review); listing any other one is refused, never silently run un-isolated.
+# Known limit: the model keeps Write/Bash tools and the caller's environment, so the copy isolates
+# the runner's paths; it is not a sandbox against a model that writes to absolute canon paths.
+ISOLATION_BLOCKED_RC=72
+ISOLATED_RUN=0
+ISOLATED_PROMPT_WORKSPACE=""
+ISOLATED_RESULT=""
+ISOLATED_CHANGED=()
+ISO_SCENARIO=""
+ISO_CANON_REPO=""
+ISO_RUN_ROOT=""
+ISO_WORKTREE=""
+ISO_WORKSPACE=""
+ISO_BRANCH=""
+ISO_BASE_SHA=""
+
+isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
+    local list=",${STRATEGIST_ISOLATED_SCENARIOS:-},"
+    list="${list// /,}"
+    case "$list" in *",$1,"*) return 0 ;; esac
+    return 1
+}
+
+isolated_allowlist() {  # <scenario> -> repo-relative paths the scenario may change, one per line; empty = none
+    case "$1" in
+        note-review) printf '%s\n' 'inbox/fleeting-notes.md' 'archive/notes/Notes-Archive.md' ;;
+    esac
+}
+
+# Sets ISO_* and repoints WORKSPACE at the copy. The prompt workspace is a synthetic directory whose
+# <governance repo> entry links to the copy (other repositories are linked for reading history).
+isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
+    local scenario="$1" canon="$WORKSPACE" repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+    local run_id repo_dir link_name gov_real repo_real
+    if [ -z "$(isolated_allowlist "$scenario")" ]; then
+        log "ISOLATION: для сценария $scenario не задан список разрешённых путей — изолированный запуск невозможен, сценарий не запущен"
+        return 1
+    fi
+    case "$repo_name" in
+        ""|.*|*/*) log "ISOLATION: небезопасное имя governance-репозитория '$repo_name', сценарий $scenario не запущен"; return 1 ;;
+    esac
+    if ! git -C "$canon" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log "ISOLATION: governance-репозиторий недоступен: $canon, сценарий $scenario не запущен"
+        return 1
+    fi
+    if ! fetch_delivery_origin; then
+        log "ISOLATION: git fetch origin main не удался, свежую копию взять нельзя, сценарий $scenario не запущен"
+        return 1
+    fi
+    if ! git -C "$canon" rev-parse --verify -q "origin/main^{commit}" >/dev/null 2>&1; then
+        log "ISOLATION: нет origin/main в $canon, сценарий $scenario не запущен"
+        return 1
+    fi
+    ISO_RUN_ROOT=$(mktemp -d "${STRATEGIST_ISOLATED_TMPDIR:-${TMPDIR:-/tmp}}/iwe-strategist-$scenario.XXXXXX") || {
+        log "ISOLATION: не удалось создать каталог изолированного запуска"
+        return 1
+    }
+    run_id="$(date +%Y%m%d%H%M%S)-$$"
+    ISO_WORKTREE="$ISO_RUN_ROOT/$repo_name"
+    ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
+    ISO_BRANCH="strategist/$scenario-$run_id"
+    if ! git -C "$canon" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" origin/main >> "$LOG_FILE" 2>&1; then
+        log "ISOLATION: не удалось создать рабочую копию от origin/main, пустой каталог запуска удалён"
+        git -C "$canon" worktree prune >> "$LOG_FILE" 2>&1 || true
+        rm -rf "$ISO_RUN_ROOT"
+        return 1
+    fi
+    if ! ISO_BASE_SHA=$(git -C "$ISO_WORKTREE" rev-parse HEAD 2>/dev/null) || [ -z "$ISO_BASE_SHA" ]; then
+        log "ISOLATION: не удалось определить базовый коммит копии; копия сохранена: $ISO_WORKTREE"
+        return 1
+    fi
+    if ! mkdir "$ISO_WORKSPACE" || ! ln -s "$ISO_WORKTREE" "$ISO_WORKSPACE/$repo_name"; then
+        log "ISOLATION: не удалось подготовить рабочее пространство копии; копия сохранена: $ISO_WORKTREE"
+        return 1
+    fi
+    gov_real=$(cd -P "$canon" && pwd -P)
+    for repo_dir in "$(dirname "$canon")"/*/; do
+        repo_dir="${repo_dir%/}"
+        link_name="$(basename "$repo_dir")"
+        repo_real=$(cd -P "$repo_dir" 2>/dev/null && pwd -P) || continue
+        # governance is excluded by identity (an alias symlink would expose the frozen canon for writing)
+        [ "$repo_real" = "$gov_real" ] && continue
+        [ "$link_name" = "$repo_name" ] && continue
+        [ -e "$repo_dir/.git" ] || continue
+        ln -s "$repo_dir" "$ISO_WORKSPACE/$link_name" 2>/dev/null || true
+    done
+    ISO_SCENARIO="$scenario"
+    ISO_CANON_REPO="$canon"
+    ISOLATED_RESULT=""
+    WORKSPACE="$ISO_WORKTREE"
+    ISOLATED_PROMPT_WORKSPACE="$ISO_WORKSPACE"
+    ISOLATED_RUN=1
+    log "ISOLATION: сценарий $scenario идёт в копии $ISO_WORKTREE (ветка $ISO_BRANCH, база ${ISO_BASE_SHA:0:12}), канон $canon только читается"
+    return 0
+}
+
+# Normalises whatever the model did (own commits, staged files) into plain working-tree changes
+# against the base commit, then requires every changed path to be on the scenario's allowlist.
+# 0 = allowed (ISOLATED_CHANGED holds the changed paths, possibly none); 1 = blocked.
+isolated_verify() {
+    local allow entry path p ok violation=0 status_file head_branch
+    ISOLATED_CHANGED=()
+    if [ "$ISOLATED_RUN" != 1 ] || [ -z "$ISO_BASE_SHA" ]; then
+        log "ISOLATION: нет базового коммита копии, публикация заблокирована"
+        return 1
+    fi
+    allow=$(isolated_allowlist "$ISO_SCENARIO")
+    if [ -z "$allow" ]; then
+        log "ISOLATION: для сценария $ISO_SCENARIO нет списка разрешённых путей, публикация заблокирована"
+        return 1
+    fi
+    head_branch=$(git -C "$WORKSPACE" symbolic-ref --short -q HEAD 2>/dev/null) || head_branch=""
+    if [ "$head_branch" != "$ISO_BRANCH" ]; then
+        log "ISOLATION: копия сошла с ветки $ISO_BRANCH (сейчас '${head_branch:-detached}'), публикация заблокирована"
+        return 1
+    fi
+    if ! git -C "$WORKSPACE" reset -q --mixed "$ISO_BASE_SHA" >> "$LOG_FILE" 2>&1; then
+        log "ISOLATION: не удалось привести копию к базе $ISO_BASE_SHA, публикация заблокирована"
+        return 1
+    fi
+    status_file=$(mktemp "${TMPDIR:-/tmp}/iwe-strategist-status.XXXXXX") || {
+        log "ISOLATION: не удалось создать буфер статуса, публикация заблокирована"
+        return 1
+    }
+    if ! git -C "$WORKSPACE" status --porcelain -z --untracked-files=all > "$status_file" 2>> "$LOG_FILE"; then
+        rm -f "$status_file"
+        log "ISOLATION: git status в копии не удался, публикация заблокирована"
+        return 1
+    fi
+    # After the reset the index equals the base, so status has no rename records; an unexpected
+    # record would fail the exact-path comparison below and block (fail closed).
+    while IFS= read -r -d '' entry; do
+        path="${entry:3}"
+        ok=0
+        while IFS= read -r p; do
+            if [ "$p" = "$path" ]; then ok=1; break; fi
+        done <<< "$allow"
+        if [ "$ok" -eq 0 ]; then
+            log "ISOLATION: сценарий $ISO_SCENARIO тронул путь вне списка разрешённых: $path"
+            violation=1
+        else
+            ISOLATED_CHANGED+=("$path")
+        fi
+    done < "$status_file"
+    rm -f "$status_file"
+    if [ "$violation" -ne 0 ]; then
+        log "ISOLATION: результат нарушает контракт «только разрешённые пути», публикация заблокирована"
+        return 1
+    fi
+    return 0
+}
+
+isolated_cleanup() {  # only after a publication (or nothing to publish); a failure keeps the copy
+    if ! git -C "$ISO_CANON_REPO" worktree remove "$ISO_WORKTREE" >> "$LOG_FILE" 2>&1; then
+        log "WARN: ISOLATION: копия сохранена после сбоя очистки: $ISO_WORKTREE"
+        return 1
+    fi
+    git -C "$ISO_CANON_REPO" branch -D "$ISO_BRANCH" >> "$LOG_FILE" 2>&1 \
+        || log "WARN: ISOLATION: ветка $ISO_BRANCH сохранена для проверки"
+    find "$ISO_WORKSPACE" -maxdepth 1 -type l -exec rm -f {} + 2>/dev/null || true
+    rmdir "$ISO_WORKSPACE" 2>/dev/null || log "WARN: ISOLATION: не удалось убрать $ISO_WORKSPACE"
+    rmdir "$ISO_RUN_ROOT" 2>/dev/null || log "WARN: ISOLATION: не удалось убрать $ISO_RUN_ROOT"
+    return 0
+}
+
+# Verify, commit the allowlisted changes, publish from the copy. Result in ISOLATED_RESULT:
+# published | no_changes | blocked. 0 only for published/no_changes; the copy is removed only then.
+isolated_finish() {  # <publish reason> <commit message>
+    local reason="$1" msg="$2" path sha="" rc=0
+    ISOLATED_RESULT="blocked"
+    if ! isolated_verify; then
+        rc=$ISOLATION_BLOCKED_RC
+    elif [ "${#ISOLATED_CHANGED[@]}" -eq 0 ]; then
+        ISOLATED_RESULT="no_changes"
+    else
+        for path in "${ISOLATED_CHANGED[@]}"; do
+            git -C "$WORKSPACE" add -- "$path" >> "$LOG_FILE" 2>&1 || rc=$ISOLATION_BLOCKED_RC
+        done
+        if [ "$rc" -eq 0 ] && git -C "$WORKSPACE" commit -q -m "$msg" >> "$LOG_FILE" 2>&1 \
+            && sha=$(git -C "$WORKSPACE" rev-parse HEAD 2>/dev/null) && [ -n "$sha" ]; then
+            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась"; then
+                ISOLATED_RESULT="published"
+            else
+                rc=$ISOLATION_BLOCKED_RC
+            fi
+        else
+            [ "$rc" -ne 0 ] || log "WARN: ISOLATION: git commit в копии не удался"
+            rc=$ISOLATION_BLOCKED_RC
+        fi
+    fi
+    case "$ISOLATED_RESULT" in
+        published|no_changes) isolated_cleanup || true ;;
+        *) log "ISOLATION: публикации не было, копия сохранена для проверки: $ISO_WORKTREE" ;;
+    esac
+    WORKSPACE="$ISO_CANON_REPO"
+    ISOLATED_PROMPT_WORKSPACE=""
+    ISOLATED_RUN=0
+    return "$rc"
+}
+
 log_size_bytes() {  # -> size of the daily log in bytes, 0 when there is none
     local size=0
     # BSD wc pads with spaces; strip so arithmetic/tail offsets stay sane.
@@ -438,6 +646,13 @@ run_claude() {
         exit 1
     fi
 
+    # WP-530 Ф72: a scenario listed for isolation must arrive here through isolated_begin; a listed
+    # one without an isolated setup is refused, never run against the shared checkout.
+    if isolation_enabled "$command_file" && [ "$ISOLATED_RUN" != 1 ]; then
+        log "ISOLATION: сценарий $command_file указан в STRATEGIST_ISOLATED_SCENARIOS, но изолированного запуска для него нет — не запускаю (rc=$ISOLATION_BLOCKED_RC)"
+        return "$ISOLATION_BLOCKED_RC"
+    fi
+
     # Читаем содержимое команды.
     # WP-273 0.29.6 R6.1**: build-runtime подменял плейсхолдеры в этих sed-выражениях
     # → runner становился сломан после build (искал значение в промпте вместо плейсхолдера).
@@ -445,7 +660,7 @@ run_claude() {
     # не находит цельный паттерн и не трогает.
     local prompt
     local _gov_repo="${IWE_GOVERNANCE_REPO:-DS-strategy}"
-    local _ws="${IWE_WORKSPACE:-$HOME/IWE}"
+    local _ws="${ISOLATED_PROMPT_WORKSPACE:-${IWE_WORKSPACE:-$HOME/IWE}}"  # WP-530 Ф72: the copy's workspace in an isolated run
     local _gh_user="${GITHUB_USER:-your-username}"
     local _o='{''{' _c='}''}'  # escape: build-runtime ищет цельный двойно-фигурный токен с UPPER_NAME внутри, поэтому конкатенация одиночных скобок его не матчит
     prompt=$(sed \
@@ -537,7 +752,11 @@ ${prompt}"
     fi
 
     # Push changes to GitHub (чтобы бот мог читать через API)
-    if git -C "$WORKSPACE" diff --quiet origin/main..HEAD 2>/dev/null; then
+    if [ "$ISOLATED_RUN" = 1 ]; then
+        # WP-530 Ф72: nothing the model committed is published unverified; the runner checks the
+        # allowlist and publishes from the copy (isolated_finish).
+        log "Isolated run: публикацию делает isolated_finish после проверки списка путей"
+    elif git -C "$WORKSPACE" diff --quiet origin/main..HEAD 2>/dev/null; then
         log "No unpushed commits"
     else
         # WP-7 Ф101: raw pull --rebase + push on a checkout shared with
@@ -753,6 +972,12 @@ case "$STRATEGY_DAY_NAME" in
     *)         STRATEGY_DAY_NUM=1 ;;  # fallback: monday
 esac
 
+# WP-530 Ф72: only scenarios with an isolated setup may be listed in STRATEGIST_ISOLATED_SCENARIOS.
+if isolation_enabled "${1:-}" && [ -z "$(isolated_allowlist "$1")" ]; then
+    log "ISOLATION: сценарий $1 указан в STRATEGIST_ISOLATED_SCENARIOS, но списка разрешённых путей для него нет — изолированный запуск не поддержан, сценарий не запущен (rc=$ISOLATION_BLOCKED_RC)"
+    exit "$ISOLATION_BLOCKED_RC"
+fi
+
 # Определяем какой сценарий запускать
 case "$1" in
     "morning")
@@ -889,6 +1114,10 @@ case "$1" in
     "note-review")
         acquire_lock "note-review"
         log "Evening: running note review"
+        # WP-530 Ф72: opt-in isolation (STRATEGIST_ISOLATED_SCENARIOS); off = the legacy path below.
+        if isolation_enabled "note-review"; then
+            isolated_begin "note-review" || { log "FAILED scenario: note-review (rc=$ISOLATION_BLOCKED_RC) -- изолированная копия не создана, канон не тронут"; exit "$ISOLATION_BLOCKED_RC"; }
+        fi
         # Canary: count bold notes before (exclude 🔄 — deferred ideas stay bold by design)
         # NB: `grep -c` при exit 1 (no matches) печатает "0" до `||`, так что `|| echo 0`
         # давал двухстрочный "0\n0" и ломал арифметику. Используем `|| true` + fallback.
@@ -898,7 +1127,16 @@ case "$1" in
         log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄)"
 
         acquire_captures_write_lock || true
-        run_claude "note-review" "claude-haiku-4-5-20251001"
+        if [ "$ISOLATED_RUN" = 1 ]; then
+            note_review_rc=0
+            run_claude "note-review" "claude-haiku-4-5-20251001" || note_review_rc=$?
+            if [ "$note_review_rc" -ne 0 ]; then
+                log "ISOLATION: сбой запуска модели (rc=$note_review_rc), публикации нет, копия сохранена: $ISO_WORKTREE"
+                exit "$note_review_rc"
+            fi
+        else
+            run_claude "note-review" "claude-haiku-4-5-20251001"
+        fi
 
         # Canary: count bold notes after (needs to be visible for alert at line ~274)
         BOLD_AFTER=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || true); BOLD_AFTER=${BOLD_AFTER:-0}
@@ -938,15 +1176,24 @@ case "$1" in
         done
         unset _cleanup_python_candidate
         log "Running deterministic cleanup..."
+        # WP-530 Ф72: in an isolated run the script edits the copy's files, not the canon's.
+        cleanup_env=()
+        [ "$ISOLATED_RUN" != 1 ] || cleanup_env=(IWE_CLEANUP_REPO_DIR="$WORKSPACE")
         if [ -n "$cleanup_python3" ]; then
-            CLEANUP_OUTPUT=$("$cleanup_python3" "$cleanup_script" 2>&1) || true
+            CLEANUP_OUTPUT=$(env ${cleanup_env[@]+"${cleanup_env[@]}"} "$cleanup_python3" "$cleanup_script" 2>&1) || true
         else
             CLEANUP_OUTPUT="no python3 interpreter found — skipped"
         fi
         log "Cleanup: $CLEANUP_OUTPUT"
 
         # If cleanup made changes, commit and push
-        if ! git -C "$WORKSPACE" diff --quiet -- inbox/fleeting-notes.md archive/notes/Notes-Archive.md 2>/dev/null; then
+        iso_finish_rc=0
+        if [ "$ISOLATED_RUN" = 1 ]; then
+            # Verify the allowlist (inbox/fleeting-notes.md, archive/notes/Notes-Archive.md), commit
+            # and publish from the copy; the copy is removed only after a publication.
+            isolated_finish "strategist: cleanup" "chore: auto-cleanup processed notes from fleeting-notes.md" || iso_finish_rc=$?
+            log "Cleanup (isolated): $ISOLATED_RESULT"
+        elif ! git -C "$WORKSPACE" diff --quiet -- inbox/fleeting-notes.md archive/notes/Notes-Archive.md 2>/dev/null; then
             git -C "$WORKSPACE" add inbox/fleeting-notes.md archive/notes/Notes-Archive.md
             # WP-7 Ф101: same ds-publish.sh move as the main push block above,
             # plus an explicit commit-result check — `|| true` here used to
@@ -976,6 +1223,7 @@ case "$1" in
             fi
         fi
 
+        [ "$iso_finish_rc" -eq 0 ] || { log "FAILED scenario: note-review (rc=$iso_finish_rc) -- изолированный результат не опубликован"; exit "$iso_finish_rc"; }
         notify_telegram "note-review"
         ;;
     "day-close")

@@ -154,6 +154,8 @@ jobs:
         run: bash setup/test-attestation-build-statement.sh
       - name: Run WP-561 Ф25 week-review delivery postcondition tests
         run: bash setup/test-week-review-delivery-postcondition.sh
+      - name: Run WP-530 Ф72 strategist isolated scenario tests
+        run: bash setup/test-strategist-isolated-scenarios.sh
       - name: Run WP-529 changelog gate tests
         run: bash setup/test-check-changelog-entry.sh
 

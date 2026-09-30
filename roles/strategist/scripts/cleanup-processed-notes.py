@@ -31,7 +31,9 @@ from pathlib import Path
 from typing import Optional
 
 GOVERNANCE_REPO = os.environ.get('IWE_GOVERNANCE_REPO', 'DS-strategy')
-WORKSPACE = Path.home() / "IWE" / GOVERNANCE_REPO
+# WP-530 Ф72: an isolated run points the script at its throwaway copy of the governance repo.
+_REPO_DIR_OVERRIDE = os.environ.get('IWE_CLEANUP_REPO_DIR')
+WORKSPACE = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else Path.home() / "IWE" / GOVERNANCE_REPO
 FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
 
