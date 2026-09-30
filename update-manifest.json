@@ -849,7 +849,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0a03d0426d8415d9c31e17a24d5f3180a0764bc0561bd537ee948306a15526b7"
+      "sha256": "680045c4b5860225195988093daf232cb467678c57d5a33839291c7b8c68b658"
     },
     {
       "path": "CLAUDE.md",
@@ -1909,7 +1909,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "8824db63558788758bb5116c924cb358bc9f9bdfbb5d924f933e1a21c8b57b21"
+      "sha256": "73eac324dcc288f95657f76d4670585ed8d5f25bc13599d3b18a48b36c713dcd"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",

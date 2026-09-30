@@ -444,6 +444,21 @@ isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
     return 1
 }
 
+# An allowlist is exact repo-relative paths, so a scenario gets one only where its prompt fixes every
+# path it writes (checked against roles/strategist/prompts/, WP-530 Ф72 steps V-D). Scenarios left
+# out, and why -- each is refused with rc=72 when listed, never run un-isolated:
+#   day-plan     the primary morning path is scripts/day-open-pipeline.sh (its own commit/push and state
+#                files, not run_claude); the run_claude prompt builds its paths from $IWE_WORKSPACE (the
+#                canon) and commits/pushes itself, so a copy would not catch its writes.
+#   evening      the prompt says only "update the day plan" (which file is not stated).
+#   day-close    deprecated prompt: WeekPlan W*.md (dynamic name), MEMORY.md and exocortex/ backup
+#                copies of a directory glob (outside the repo or a dynamic file list).
+#   session-prep archives files under dynamic names (WeekPlan/WeekReport/DayPlan W{N}/dates, WP-*.md,
+#                extraction reports, captures), edits docs/Strategy.md and MEMORY.md.
+#   week-review  WeekReport/WeekPlan names carry W{N} and the date; it also writes the Knowledge Index
+#                repo and MEMORY.md (outside the copy); and its delivery proof (codes 70/71, the
+#                guard session opened on the checkout) runs inside run_claude, before an isolated
+#                finish could publish -- it would report 70 on every isolated run.
 isolated_allowlist() {  # <scenario> -> repo-relative paths the scenario may change, one per line; empty = none
     case "$1" in
         note-review) printf '%s\n' 'inbox/fleeting-notes.md' 'archive/notes/Notes-Archive.md' ;;
@@ -999,6 +1014,14 @@ case "$1" in
             SCENARIO="session-prep"
         else
             SCENARIO="day-plan"
+        fi
+
+        # WP-530 Ф72: `morning` itself is not a listed name, but the scenario it resolves to is. The
+        # day-plan branch is served by day-open-pipeline.sh (no run_claude, no isolation), so a listed
+        # day-plan must stop here, before the pipeline writes into the shared checkout.
+        if isolation_enabled "$SCENARIO" && [ -z "$(isolated_allowlist "$SCENARIO")" ]; then
+            log "ISOLATION: morning выбрал сценарий $SCENARIO, он указан в STRATEGIST_ISOLATED_SCENARIOS, но изолированного запуска для него нет — не запускаю (rc=$ISOLATION_BLOCKED_RC)"
+            exit "$ISOLATION_BLOCKED_RC"
         fi
 
         # Защита от повторного запуска (RunAtLoad + CalendarInterval race condition)

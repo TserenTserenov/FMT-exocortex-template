@@ -367,6 +367,70 @@ check "morning->session-prep listed: refused inside run_claude, exits 72" "72" "
 check "morning->session-prep listed: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
 canon_untouched "session-prep listed"
 
+echo "== B7b: the other scenarios have no allowlist (WP-530 Ф72 V-D): each is refused, none runs un-isolated =="
+for scn in day-plan day-close evening strategy-session; do
+    make_env
+    run_runner noop "$scn" "$scn"
+    check "$scn listed: runner exits 72" "72" "$RC"
+    check "$scn listed: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
+    check "$scn listed: refused up front for the missing allowlist (not only later inside run_claude)" "1" "$(grep -c "ISOLATION: сценарий $scn указан в STRATEGIST_ISOLATED_SCENARIOS, но списка разрешённых путей" "$HOME_DIR/logs/strategist/"*.log | awk '{print ($1 > 0)}')"
+    canon_untouched "$scn listed"
+done
+
+# morning on a non-strategy day resolves to day-plan and, with the canonical pipeline present, would
+# run day-open-pipeline.sh (no run_claude): a listed day-plan must stop before the pipeline writes
+make_pipeline_env() {
+    make_env
+    printf 'strategy_day: %s\n' "$(date -d 'tomorrow' +%A 2>/dev/null || date -v+1d +%A)" | tr '[:upper:]' '[:lower:]' > "$CANON/exocortex/day-rhythm-config.yaml"
+    printf '#!/bin/bash\ntouch "%s"\nexit 0\n' "$E/pipeline-ran" > "$CANON/scripts/day-open-pipeline.sh"
+    git -C "$CANON" add -A && git -C "$CANON" commit -q -m "pipeline double" && git -C "$CANON" push -q origin HEAD:main
+    BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(canon_head)
+}
+ran() { [ -e "$1" ] && echo 1 || echo 0; }
+make_pipeline_env
+run_runner noop "" morning
+check "control, flag off: morning runs the canonical pipeline (fixture reaches it)" "0/1" "$RC/$(ran "$E/pipeline-ran")"
+make_pipeline_env
+run_runner noop note-review morning
+check "control, unrelated listing (note-review): the pipeline still runs" "0/1" "$RC/$(ran "$E/pipeline-ran")"
+make_pipeline_env
+run_runner noop day-plan morning
+check "morning->day-plan listed: refused up front, exits 72" "72" "$RC"
+check "morning->day-plan listed: the pipeline never ran" "0" "$(ran "$E/pipeline-ran")"
+check "morning->day-plan listed: the model never ran" "0" "$(ran "$E/stub-cwd")"
+canon_untouched "morning->day-plan listed"
+
+echo "== B7c: week-review keeps its own contract: listed = refused before the guard session, flag off = codes 70/71 =="
+# a session-guard double at the runner's fallback location ($IWE_WORKSPACE/scripts/session-guard.sh)
+make_week_review_env() {
+    make_env
+    mkdir -p "$WSROOT/scripts"
+    cat > "$WSROOT/scripts/session-guard.sh" <<'EOF'
+#!/bin/bash
+echo "$*" >> "$GUARD_LOG"
+[ "$1" = open ] && exit "${GUARD_OPEN_RC:-0}"
+exit 0
+EOF
+    export GUARD_LOG="$E/guard.log"
+}
+make_week_review_env
+run_runner noop week-review week-review
+check "week-review listed: runner exits 72" "72" "$RC"
+check "week-review listed: refused up front for the missing allowlist" "1" "$(grep -c "ISOLATION: сценарий week-review указан в STRATEGIST_ISOLATED_SCENARIOS, но списка разрешённых путей" "$HOME_DIR/logs/strategist/"*.log | awk '{print ($1 > 0)}')"
+check "week-review listed: no guard session was opened" "0" "$(ran "$GUARD_LOG")"
+check "week-review listed: the model never ran" "0" "$(ran "$E/stub-cwd")"
+canon_untouched "week-review listed"
+make_week_review_env
+run_runner noop "" week-review
+check "flag off: nothing delivered, the delivery proof still reports 70" "70" "$RC"
+check "flag off: the guard session was opened and closed by the runner" "1/1" "$(grep -c '^open --housekeeping' "$GUARD_LOG")/$(grep -c '^close --housekeeping' "$GUARD_LOG")"
+check "flag off: the model ran in the canon (legacy path)" "$CANON" "$(cat "$E/stub-cwd")"
+check "flag off: no isolated copy was created" "0" "$(ls "$ISO_TMP" | wc -l | tr -d ' ')"
+make_week_review_env
+GUARD_OPEN_RC=1 run_runner noop "" week-review
+check "flag off, guard refuses the session: exit 71, the model never ran" "71/0" "$RC/$(ran "$E/stub-cwd")"
+unset GUARD_LOG
+
 echo "== C1: cleanup script in isolated mode has no silent canon fallback =="
 CLEANUP_PY="$REPO_ROOT/roles/strategist/scripts/cleanup-processed-notes.py"
 run_cleanup() {  # <env assignments...>; sets CRC
