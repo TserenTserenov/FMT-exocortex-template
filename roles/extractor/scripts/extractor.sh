@@ -5,6 +5,7 @@
 # Использование:
 #   extractor.sh inbox-check     # headless: обработка inbox (launchd)
 #   extractor.sh audit           # headless: аудит Pack'ов
+#   extractor.sh audit-scheduled <pack>  # headless: аудит одного Pack'а (месячная ротация)
 #   extractor.sh session-close   # convenience wrapper
 #   extractor.sh on-demand       # convenience wrapper
 
@@ -300,8 +301,14 @@ $extra_args"
             verify_inbox_outputs "$strategy_dir" || return 1
         elif [ "$commit_mode" = "isolated-feed" ]; then
             verify_feed_outputs "$strategy_dir" || return 1
+        elif [ "$commit_mode" = "isolated-audit" ]; then
+            verify_audit_outputs "$strategy_dir" || return 1
         fi
-        prefilter_changed_reports "$strategy_dir" || return 1
+        # The audit report is not an inbox-check report (no capture sources,
+        # no Pack refs): the inbox-check pre-filters do not apply to it.
+        if [ "$commit_mode" != "isolated-audit" ]; then
+            prefilter_changed_reports "$strategy_dir" || return 1
+        fi
 
         if ! commit_extractor_changes "$strategy_dir" "$_gov_repo" "$commit_mode"; then
             return 1
@@ -412,6 +419,63 @@ verify_feed_outputs() {
         return 1
     fi
     log "Feed output verified: $feed_lines [feed:...] block(s) in ${#feed_changed[@]} file(s)"
+}
+
+# Exit contract of the isolated knowledge audit (audit, audit-scheduled).
+# Runs inside the throwaway worktree, before anything is committed:
+#   - agent commits/staged files are normalised to plain working-tree changes
+#     against the base commit (EXTRACTOR_FEED_BASE_SHA, set by run_feed_isolated);
+#   - the ONLY allowed change is a NEW non-empty report
+#     inbox/extraction-reports/YYYY-MM-DD-knowledge-audit*.md; captures (the
+#     audit consumes none, so no input marks may change), existing reports and
+#     every other path are a violation;
+#   - no new report = failure (a silent success would hide a lost audit).
+verify_audit_outputs() {
+    local strategy_dir="$1" base="${EXTRACTOR_FEED_BASE_SHA:-}"
+    local entry path code violation=0 new_reports=0 status_file
+    local report_re='^inbox/extraction-reports/[0-9]{4}-[0-9]{2}-[0-9]{2}-knowledge-audit[A-Za-z0-9._-]*\.md$'
+    if [ -z "$base" ]; then
+        log "ERROR: audit base commit is unknown; publication blocked"
+        return 1
+    fi
+    if ! git -C "$strategy_dir" reset -q --mixed "$base" >> "$LOG_FILE" 2>&1; then
+        log "ERROR: cannot normalise audit worktree against $base; publication blocked"
+        return 1
+    fi
+    status_file=$(mktemp "${TMPDIR:-/tmp}/iwe-audit-status.XXXXXX") || {
+        log "ERROR: cannot create status buffer; publication blocked"
+        return 1
+    }
+    if ! git -C "$strategy_dir" status --porcelain -z --untracked-files=all > "$status_file" 2>> "$LOG_FILE"; then
+        rm -f "$status_file"
+        log "ERROR: git status failed in audit worktree; publication blocked"
+        return 1
+    fi
+    while IFS= read -r -d '' entry; do
+        code="${entry:0:2}"
+        path="${entry:3}"
+        if [ "$code" = "??" ] && [[ "$path" =~ $report_re ]]; then
+            if [ -s "$strategy_dir/$path" ]; then
+                new_reports=$((new_reports + 1))
+            else
+                log "ERROR: audit report is empty: $path"
+                violation=1
+            fi
+        else
+            log "ERROR: audit touched a path outside the new-report allowlist: $path"
+            violation=1
+        fi
+    done < "$status_file"
+    rm -f "$status_file"
+    if [ "$violation" -ne 0 ]; then
+        log "ERROR: audit output violates the report-only contract; publication blocked"
+        return 1
+    fi
+    if [ "$new_reports" -eq 0 ]; then
+        log "ERROR: AI CLI returned success without a new audit report; publication blocked"
+        return 1
+    fi
+    log "Audit output verified: $new_reports new report(s)"
 }
 
 markdown_fence_awk() {
@@ -566,7 +630,8 @@ commit_extractor_changes() {
                 return 1
             fi
         done
-    else
+    elif [ "$commit_mode" != "isolated-audit" ]; then
+        # The audit consumes no captures: its only publishable paths are reports.
         while IFS= read -r source_file; do
             target_paths+=("${source_file#"$strategy_dir/"}")
         done < <(capture_source_files "$strategy_dir/inbox")
@@ -589,7 +654,7 @@ commit_extractor_changes() {
     # be on the governance branch.
     local isolated_branch_ok=0
     case "$commit_mode:$branch" in
-        isolated-inbox:extractor/inbox-check-*|isolated-feed:extractor/feed-*) isolated_branch_ok=1 ;;
+        isolated-inbox:extractor/inbox-check-*|isolated-feed:extractor/feed-*|isolated-audit:extractor/audit-*) isolated_branch_ok=1 ;;
     esac
     if [ "$branch" != "$gov_branch" ] && [ "$isolated_branch_ok" -ne 1 ]; then
         log "SKIP: $repo_name is on branch '$branch', expected '$gov_branch'"
@@ -718,6 +783,9 @@ commit_extractor_changes() {
     fi
 
     local commit_message="inbox-check: extraction report $DATE"
+    if [ "$commit_mode" = "isolated-audit" ]; then
+        commit_message="audit: knowledge audit report $DATE"
+    fi
     if [ "$commit_mode" = "isolated-feed" ]; then
         commit_message="feed(${EXTRACTOR_FEED_LABEL:-feed}): capture candidates $DATE"
     fi
@@ -1209,8 +1277,11 @@ $(pack_snapshot_context)"
 # throwaway worktree, never in the canonical governance checkout. The agent
 # only writes capture blocks; this script verifies (verify_feed_outputs),
 # commits and publishes. The caller holds the shared feed lock.
-run_feed_isolated() {  # <prompt-file> <extra-args> <label>
-    local prompt_file="$1" extra_args="${2:-}" label="${3:-feed}"
+# Also hosts the isolated knowledge audit (mode "isolated-audit", label "audit"):
+# same worktree/workspace/normalisation machinery, different exit contract
+# (verify_audit_outputs) and a different agent notice.
+run_feed_isolated() {  # <prompt-file> <extra-args> <label> [mode]
+    local prompt_file="$1" extra_args="${2:-}" label="${3:-feed}" commit_mode="${4:-isolated-feed}"
     local canonical_workspace="$WORKSPACE"
     local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
     local canonical_repo="$canonical_workspace/$repo_name"
@@ -1226,12 +1297,15 @@ run_feed_isolated() {  # <prompt-file> <extra-args> <label>
         log "ERROR: governance repository is unavailable for isolated feed: $canonical_repo"
         return 1
     fi
+    # Branch/directory prefix (extractor/<prefix>-*) is what commit_extractor_changes allows.
+    local worktree_label="feed"
+    [ "$commit_mode" = "isolated-audit" ] && worktree_label="audit"
     gov_branch=$(resolve_governance_branch "$canonical_repo")
     if ! git -C "$canonical_repo" fetch origin "$gov_branch" >> "$LOG_FILE" 2>&1; then
         log "WARN: cannot refresh origin/$gov_branch; isolated feed was not started"
         return 1
     fi
-    if ! create_isolated_worktree "$canonical_repo" "$repo_name" "$gov_branch" "feed"; then
+    if ! create_isolated_worktree "$canonical_repo" "$repo_name" "$gov_branch" "$worktree_label"; then
         return 1
     fi
     run_root="$ISO_RUN_ROOT"
@@ -1262,6 +1336,9 @@ run_feed_isolated() {  # <prompt-file> <extra-args> <label>
         return 1
     }
     local feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог): историю читай через git -C <путь> log, проверку -d .git для него не применяй. Не выполняй git add/commit/push: файлы captures только пиши, коммит и публикацию делает скрипт."
+    if [ "$commit_mode" = "isolated-audit" ]; then
+        feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог). Запуск headless, вопросов пользователю нет. Не выполняй git add/commit/push и не правь Pack'и и другие файлы: единственный результат — новый файл отчёта аудита $repo_name/inbox/extraction-reports/$DATE-knowledge-audit*.md (для одного Pack'а — с суффиксом -<имя Pack'а>); коммит и публикацию делает скрипт."
+    fi
     if [ -n "$extra_args" ]; then
         feed_context="$extra_args
 
@@ -1272,7 +1349,7 @@ $feed_context"
     local IWE_WORKSPACE="$isolated_workspace"
     export IWE_WORKSPACE
     EXTRACTOR_COMMIT_RESULT=""
-    if ! run_claude "$prompt_file" "$feed_context" "isolated-feed"; then
+    if ! run_claude "$prompt_file" "$feed_context" "$commit_mode"; then
         log "WARN: isolated $prompt_file failed; worktree preserved for review: $worktree"
         return 1
     fi
@@ -1326,7 +1403,27 @@ case "$1" in
 
     "audit")
         log "Running knowledge audit"
-        run_claude "knowledge-audit" ""
+        run_feed_isolated "knowledge-audit" "" "audit" "isolated-audit"
+        notify_telegram "audit"
+        ;;
+
+    "audit-scheduled")
+        # Monthly rotation (knowledge-audit-watchdog.sh): one Pack per run, headless.
+        # Governance writes are isolated (report-only worktree). The Pack itself is
+        # only READ by the prompt (fixes need approval, none is possible headless);
+        # Pack repositories are linked live into the workspace, not isolated.
+        case "${2:-}" in
+            ""|.*|*/*)
+                log "ERROR: audit-scheduled requires a Pack name (\$2), got '${2:-}'"
+                exit 1
+                ;;
+        esac
+        if [ ! -d "$WORKSPACE/$2" ]; then
+            log "ERROR: audit-scheduled: Pack not found: $WORKSPACE/$2"
+            exit 1
+        fi
+        log "Running scheduled knowledge audit: $2"
+        run_feed_isolated "knowledge-audit" "Scope: только Pack '$2' (headless, ротация — DP.SC.061). Не спрашивай пользователя, не проверяй другие Pack'и." "audit" "isolated-audit"
         notify_telegram "audit"
         ;;
 
@@ -1400,6 +1497,7 @@ case "$1" in
         echo "Processes:"
         echo "  inbox-check    Headless: обработка pending captures (launchd, 3h)"
         echo "  audit          Аудит Pack'ов"
+        echo "  audit-scheduled <pack>  Аудит одного Pack'а (месячная ротация)"
         echo "  session-close  Экстракция при закрытии сессии"
         echo "  on-demand      Экстракция по запросу"
         exit 1
