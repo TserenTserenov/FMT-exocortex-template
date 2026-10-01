@@ -14,7 +14,9 @@
 # it, inside a disposable workspace, under `env -i` with a throwaway HOME and stubs for
 # claude/gh/curl in front of PATH (no network). The copy is taken from the working tree on
 # purpose (not `git archive HEAD`): the test must see uncommitted edits and must work from an
-# extracted archive without .git.
+# extracted archive without .git. Every date is taken from the real clock (no date literals):
+# the normal run of case H archives any DayPlan that is not today's, and the fixtures hold for
+# any weekday, including the strategy day and the Sunday Week Close window.
 #
 # Cases (probe = `--probe --scaffold-only`: real preflight + scaffold, no commit, no Telegram):
 #   A  non-standard governance name from the environment (a sibling DS-strategy must not exist,
@@ -49,10 +51,12 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/iwe-issue-974.XXXXXX")
 TMP=$(cd "$TMP" && pwd -P)
 trap 'rm -rf "$TMP"' EXIT
-# Nothing below may read or write the real home or the real temp dir.
+# Nothing below may read or write the real home or the real temp dir, and the fixture
+# repositories must not pick up a caller's repository (a git hook exports GIT_DIR and friends).
 export HOME="$TMP/home"
 export TMPDIR="$TMP/tmp"
 export GIT_CONFIG_NOSYSTEM=1
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX
 mkdir -p "$HOME" "$TMPDIR"
 
 for tool in jq git tar python3; do
@@ -60,8 +64,33 @@ for tool in jq git tar python3; do
 done
 REAL_PYTHON3=$(command -v python3)
 
-DATE=2026-10-01   # a Thursday: not the default strategy day (monday), so the scaffold runs
-YESTERDAY=2026-09-30
+# Dates come from the real clock, never from literals. A normal (non-probe) run archives every
+# DayPlan that is not today's (step 4.6), so case H must run on the real "today" with the real
+# "yesterday" in the governance history; the other cases use the same date.
+date_shift() { # <YYYY-MM-DD> <+N|-N days> -> YYYY-MM-DD (BSD date, then GNU date)
+    date -j -v"${2}"d -f "%Y-%m-%d" "$1" "+%Y-%m-%d" 2>/dev/null || date -d "$1 ${2} days" "+%Y-%m-%d"
+}
+date_field() { # <YYYY-MM-DD> <strftime format> (BSD date, then GNU date)
+    date -j -f "%Y-%m-%d" "$1" "$2" 2>/dev/null || date -d "$1" "$2"
+}
+weekday_name() { # <1-7, monday = 1> -> the lower-case English name day-rhythm-config.yaml uses
+    case "$1" in
+        1) echo monday ;; 2) echo tuesday ;; 3) echo wednesday ;; 4) echo thursday ;;
+        5) echo friday ;; 6) echo saturday ;; *) echo sunday ;;
+    esac
+}
+seconds_to_midnight() {
+    echo $((86400 - 10#$(date +%H) * 3600 - 10#$(date +%M) * 60 - 10#$(date +%S)))
+}
+# The whole run has to stay inside one calendar day (see above): do not start just before midnight.
+if [ "$(seconds_to_midnight)" -lt 240 ]; then
+    sleep $(($(seconds_to_midnight) + 2))
+fi
+DATE=$(date +%Y-%m-%d)
+YESTERDAY=$(date_shift "$DATE" -1)
+DOW=$(date_field "$DATE" +%u)                                        # 1 = monday ... 7 = sunday
+WEEK_NUM=$((10#$(date_field "$DATE" +%V)))
+WEEK_MONDAY=$(date_shift "$DATE" "-$((DOW - 1))")
 
 # Offline stubs; the Telegram variant answers like the Bot API and records what was sent.
 STUBS="$TMP/stubs"
@@ -156,23 +185,33 @@ build_workspace() { # <workspace> <governance name> <with-seed-scripts: yes|no> 
 # the week, the memory file, yesterday's DayPlan archived and committed yesterday, a local bare
 # repository as origin. No .githooks on purpose: the seed's pre-commit validator rejects a
 # DayPlan built without the model (no budget line, no multiplier), a separate matter from the
-# layout under test.
+# layout under test. Weekday-proof for any real "today":
+#  - strategy_day is set three days ahead, so neither today nor yesterday is a strategy day
+#    (the Day Close guard of step 1.1 then looks for yesterday's archived DayPlan);
+#  - on a Sunday the Week Close guard (step 1.1b, after 23:00 Cyprus time) finds the WeekReport.
 build_working_governance() { # <dir> <bare remote dir>
-    local dir="$1" remote="$2"
+    local dir="$1" remote="$2" week_plan="WeekPlan W${WEEK_NUM} ${WEEK_MONDAY}.md"
+    local -a committed
     copy_seed "$dir" --exclude=./scripts --exclude=./.githooks
-    mkdir -p "$dir/logs" "$dir/archive/day-plans"
+    mkdir -p "$dir/logs" "$dir/archive/day-plans" "$dir/exocortex"
     rm -f "$dir/current/WeekPlan W1.md"
-    printf '# WeekPlan W40\n' > "$dir/current/WeekPlan W40 2026-09-28.md"
+    printf '# WeekPlan W%s\n' "$WEEK_NUM" > "$dir/current/$week_plan"
     printf 'active\n' > "$dir/current/active-wp.md"
     printf '# DayPlan %s\n' "$YESTERDAY" > "$dir/archive/day-plans/DayPlan $YESTERDAY.md"
+    printf 'day_open:\n  strategy_day: %s\n' "$(weekday_name $(((DOW + 2) % 7 + 1)))" \
+        > "$dir/exocortex/day-rhythm-config.yaml"
+    committed=("archive/day-plans/DayPlan $YESTERDAY.md" current/active-wp.md "current/$week_plan")
+    if [ "$DOW" -eq 7 ]; then
+        printf '# WeekReport W%s\n' "$WEEK_NUM" > "$dir/current/WeekReport W${WEEK_NUM} ${WEEK_MONDAY}.md"
+        committed+=("current/WeekReport W${WEEK_NUM} ${WEEK_MONDAY}.md")
+    fi
     git init -q --bare "$remote" 2>/dev/null
     git -C "$dir" init -q 2>/dev/null
     git -C "$dir" symbolic-ref HEAD refs/heads/main
     git -C "$dir" remote add origin "$remote"
     git -C "$dir" config user.name fixture
     git -C "$dir" config user.email fixture@example.invalid
-    git -C "$dir" add -- "archive/day-plans/DayPlan $YESTERDAY.md" current/active-wp.md \
-        "current/WeekPlan W40 2026-09-28.md"
+    git -C "$dir" add -- "${committed[@]}"
     GIT_AUTHOR_DATE="${YESTERDAY}T12:00:00" GIT_COMMITTER_DATE="${YESTERDAY}T12:00:00" \
         git -C "$dir" commit -q -m "fixture: yesterday closed" 2>/dev/null
     git -C "$dir" push -q -u origin main 2>/dev/null
@@ -184,6 +223,8 @@ build_working_governance() { # <dir> <bare remote dir>
 #   plain     no flags, a normal run
 # Mirrors what the strategist job provides: IWE_SCRIPTS pointing into the template. Later
 # VAR=value pairs override the defaults (an empty IWE_SCRIPTS= counts as unset for the script).
+# DAY_OPEN_FORCE_STRATEGY_DAY=1: whatever the weekday, the scaffold builds the plan (it skips a
+# strategy day, monday by default, which is not what any case here is about).
 run_pipeline() {
     local mode="$1" ws="$2" script="$3" out="$4"
     local -a args
@@ -194,7 +235,7 @@ run_pipeline() {
         *)        args=(--date "$DATE") ;;
     esac
     env -i HOME="$HOME" PATH="$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
-        DAY_OPEN_LOCK_FILE="$ws/day-open.lock" \
+        DAY_OPEN_LOCK_FILE="$ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
         IWE_SCRIPTS="$ws/FMT-exocortex-template/scripts" \
         "$@" "$BASH" "$script" "${args[@]}" > "$out" 2>&1
 }
@@ -466,10 +507,12 @@ if [ "$(git -C "$H/remote.git" log -1 --format=%s main 2>/dev/null)" = "feat(day
 else
     bad "H: в origin нет коммита с планом дня: $(git -C "$H/remote.git" log -1 --format=%s main 2>&1 | head -1)"
 fi
-if has "$H/call2.txt" "memory=ok"; then
-    ok "H: preflight видит память (current/active-wp.md) в DS-strategy"
+# "missing" is the symptom (the file is looked up in the template); ok and stale both prove it
+# was found in the governance repository (stale = older than a week by the clock the run sees).
+if has "$H/call2.txt" "memory=ok" || has "$H/call2.txt" "memory=stale"; then
+    ok "H: preflight находит память (current/active-wp.md) в DS-strategy, а не memory=missing"
 else
-    bad "H: preflight не видит память в DS-strategy: $(grep -F 'calendar=' "$H/call2.txt" | head -1)"
+    bad "H: preflight не находит память в DS-strategy: $(grep -F 'calendar=' "$H/call2.txt" | head -1)"
 fi
 if has "$H/call2.txt" "Day Close for $YESTERDAY found (archived DayPlan present)" \
    && ! has "$H/call2.txt" "No commits for $YESTERDAY"; then
@@ -489,9 +532,10 @@ expect_template_untouched "H" "$H/ws" "$H/before.txt"
 echo "== S: ни одной ссылки \$DS_STRATEGY/scripts/ в исполняемых строках обеих копий конвейера"
 for pipeline in "$ROOT/scripts/day-open-pipeline.sh" "$ROOT/seed/strategy/scripts/day-open-pipeline.sh"; do
     # The cases above notice a wrong executable path only where its failure is loud; many call
-    # sites sit behind `|| true` or run in the background, so the spelling itself is checked.
+    # sites sit behind `|| true` or run in the background, so the spelling itself is checked:
+    # $DS_STRATEGY/scripts/, ${DS_STRATEGY}/scripts/ and "$DS_STRATEGY"/scripts/.
     # shellcheck disable=SC2016  # regex literal: $ must stay literal
-    refs=$(grep -E '\$\{?DS_STRATEGY\}?/scripts/' "$pipeline" | grep -vc '^[[:space:]]*#' || true)
+    refs=$(grep -E '\$\{?DS_STRATEGY\}?"?/scripts/' "$pipeline" | grep -vc '^[[:space:]]*#' || true)
     if [ "$refs" = 0 ]; then
         ok "S: ${pipeline#"$ROOT"/} — ссылок на \$DS_STRATEGY/scripts/ нет"
     else
