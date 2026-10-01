@@ -74,7 +74,7 @@ export IWE_GOVERNANCE_REPO="strategy"
   exit 1
 }
 
-WP_FILE=$(find "$TMPDIR/strategy/inbox" -type f -path '*/WP-*/WP-*.md' | head -1)
+WP_FILE=$(find "$TMPDIR/strategy/inbox" -type f -path '*/WP-*/WP-*.md' | sed -n 1p)
 [ -n "$WP_FILE" ] ||
   { echo "FAIL: fresh seed produced no first WP" >&2; exit 1; }
 

@@ -2725,15 +2725,15 @@
     },
     {
       "path": "scripts/tests/test_create_wp_artifactor_gate.sh",
-      "sha256": "2cccf5463f1f01806a2232bad325154bb7392c023292e5616716c6b66f87a0dd"
+      "sha256": "3ad0f619d2fd986752de245d8c7ba57a928653fca3ac7e94dfbf148de846183a"
     },
     {
       "path": "scripts/tests/test_create_wp_contract.sh",
-      "sha256": "b9db0e67ad19a88a15d7af87791e73c13274910991dbfc7397550295de80ab3b"
+      "sha256": "fdf9a5280e6ac0560feccd6a390f9442c20f14337af249088211d8f9c81c5c2e"
     },
     {
       "path": "scripts/tests/test_create_wp_hypothesis_relation.sh",
-      "sha256": "9d702d7f7a25f17327d460cd66fddb28e7402116870f245413e1f48a1e61e315"
+      "sha256": "80022d7ec7e7b54dfa46e9ee5d81388e86fc0fb1bf12fd01ef16af32893248b5"
     },
     {
       "path": "scripts/tests/test_create_wp_number_padding.py",
@@ -2741,7 +2741,7 @@
     },
     {
       "path": "scripts/tests/test_create_wp_registry_coherence.sh",
-      "sha256": "58faaa0d14478cf7024e1129cd9e51f2f7da34f45edfb974f21d1d504010a36a"
+      "sha256": "2caf0c48598e73d27ac3f2d94a2c136f07865945e375b768667871d26d2c51cf"
     },
     {
       "path": "scripts/tests/test_create_wp_repeat_and_cwd.sh",
@@ -2749,7 +2749,7 @@
     },
     {
       "path": "scripts/tests/test_create_wp_verification_class.sh",
-      "sha256": "d0003c1473669253d63bd3962d01595185463c65496a99c26fb13e9c48a473bd"
+      "sha256": "008f342f28b06209ee9aae14b838539446c9c4931b1474c95e6a948ec4b9eec9"
     },
     {
       "path": "scripts/tests/test_create_wp_weekplan_writer.py",
@@ -2773,7 +2773,7 @@
     },
     {
       "path": "scripts/tests/test_fresh_seed_reproduction.sh",
-      "sha256": "5e8560e0ce8c35a2dbc2a0ca99d92fecdc93001775e04cd2541075696a3d6e65"
+      "sha256": "7de7a50a5e8d091aba7160ed7a1cff0e61675d4bf9d96de38a5138594fd5ade6"
     },
     {
       "path": "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",

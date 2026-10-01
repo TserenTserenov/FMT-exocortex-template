@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Contract test for bug #338: create-wp.sh must guarantee atomic registry coherence.
-# Inject a deterministic fault on the WeekPlan write (step 3/5) and verify full
-# rollback (inbox + archive stub + REGISTRY + WeekPlan all back to pre-run state),
-# not a partial WP left behind.
+# Inject a deterministic fault right AFTER the WeekPlan write (step 3/5: the writer
+# has already put its row into the file, then fails) and verify full rollback
+# (inbox + archive stub + REGISTRY + WeekPlan all back to pre-run state), not a
+# partial WP left behind.
 #
 # The test proves its own premises (issue #956): since 2026-09-11 the Artifactor
 # Gate refuses a call without --artifactor-result/--no-artifactor-check with exit
@@ -11,7 +12,8 @@
 # changed. Now the call passes the gate (--no-artifactor-check), the fault shim
 # records the working tree at the moment of injection, and the test asserts
 #   (a) the injection point was reached (shim and create-wp.sh failure messages),
-#   (b) steps 1-2 had already written their traces (so a rollback has work to do),
+#   (b) steps 1-3 had already written their traces (REGISTRY row, inbox folder and
+#       the WeekPlan row, so a rollback of each has work to do),
 #   (c) everything is byte-identical to the pre-run state afterwards.
 #
 # Earlier version used `chmod 444` on WeekPlan — non-deterministic (root/ACLs can
@@ -20,6 +22,8 @@
 # regardless (found 03.08, running this for real produced a false "Exit code: 0").
 # This version shadows `python3` on PATH so only the WeekPlan-writing invocation
 # fails, with a distinctive exit code — deterministic regardless of permissions.
+# The shim lets the real writer run first and fails afterwards: failing BEFORE the
+# write would leave the WeekPlan untouched and make its rollback check vacuous.
 
 set -euo pipefail
 
@@ -62,12 +66,13 @@ case "$PWD" in
     ;;
 esac
 
-WEEKPLAN=$(find current -maxdepth 1 -name "WeekPlan*.md" | head -1)
+WEEKPLAN=$(find current -maxdepth 1 -name "WeekPlan*.md" | sed -n 1p)
 
 # Fault injection: a python3 shim that fails ONLY when invoked with the
-# WeekPlan path as an argument (create-wp.sh step 3/5), passes through to the
-# real interpreter for every other call (the REGISTRY step uses a plain heredoc,
-# but the WP number lookup and slug transliteration also shell out to python3).
+# WeekPlan path as an argument (create-wp.sh step 3/5) — after running the real
+# writer —, passes through to the real interpreter for every other call (the
+# REGISTRY step uses a plain heredoc, but the WP number lookup and slug
+# transliteration also shell out to python3).
 # `[[ == */"$WEEKPLAN" ]]`, not a `case` pattern: real WeekPlan filenames
 # contain spaces (this repo's own convention — "WeekPlan W31 ....md"), and an
 # unquoted case pattern splits on that space into two tokens, a syntax error
@@ -78,16 +83,18 @@ WEEKPLAN=$(find current -maxdepth 1 -name "WeekPlan*.md" | head -1)
 REAL_PYTHON3=$(command -v python3)
 FAKE_BIN="$TMPDIR/fake-bin"
 mkdir -p "$FAKE_BIN"
-# At the moment of injection the shim also records what steps 1-2 had already
-# written (REGISTRY row, inbox folder): proof that the later rollback has
-# something to undo, so "everything is back to the initial state" cannot be
-# satisfied by a run that never wrote anything.
+# At the moment of injection the shim also records what steps 1-3 had already
+# written (REGISTRY row, inbox folder, WeekPlan row): proof that the later
+# rollback has something to undo, so "everything is back to the initial state"
+# cannot be satisfied by a run that never wrote anything.
 cat > "$FAKE_BIN/python3" <<EOF
 #!/usr/bin/env bash
 for arg in "\$@"; do
   if [[ "\$arg" == */"$WEEKPLAN" ]]; then
+    "$REAL_PYTHON3" "\$@" || exit 74
     echo "injected WeekPlan writer failure" >&2
     cp "$TMPDIR/strategy/docs/WP-REGISTRY.md" "$TMPDIR/registry.at-injection"
+    cp "$TMPDIR/strategy/$WEEKPLAN" "$TMPDIR/weekplan.at-injection"
     (cd "$TMPDIR/strategy" && find inbox -mindepth 1 | sort) > "$TMPDIR/inbox.at-injection"
     exit 73
   fi
@@ -144,11 +151,13 @@ grep -q "WeekPlan write FAILED" "$TMPDIR/create.out" ||
 grep -q "Откат:" "$TMPDIR/create.out" ||
   { echo "FAIL: create-wp.sh did not announce the rollback" >&2; exit 1; }
 
-# (b) Steps 1-2 had written their traces by the time the fault fired.
-[ -f "$TMPDIR/registry.at-injection" ] && [ -f "$TMPDIR/inbox.at-injection" ] ||
+# (b) Steps 1-3 had written their traces by the time the fault fired.
+[ -f "$TMPDIR/registry.at-injection" ] && [ -f "$TMPDIR/weekplan.at-injection" ] && [ -f "$TMPDIR/inbox.at-injection" ] ||
   { echo "FAIL: no working-tree record from the injection point" >&2; exit 1; }
 cmp -s "$TMPDIR/registry.at-injection" "$INITIAL_REGISTRY_SNAPSHOT" &&
   { echo "FAIL: REGISTRY was unchanged at injection time — the rollback check below would be vacuous" >&2; exit 1; }
+cmp -s "$TMPDIR/weekplan.at-injection" "$INITIAL_WEEKPLAN_SNAPSHOT" &&
+  { echo "FAIL: WeekPlan was unchanged at injection time — the rollback check below would be vacuous" >&2; exit 1; }
 [ "$(cat "$TMPDIR/inbox.at-injection")" = "$INITIAL_INBOX" ] &&
   { echo "FAIL: inbox/ was unchanged at injection time — the rollback check below would be vacuous" >&2; exit 1; }
 

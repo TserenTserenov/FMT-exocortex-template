@@ -66,7 +66,7 @@ expect_refused() {
   else
     fail "$label: expected exit 1, got $RC; output: $OUT"
   fi
-  if printf '%s\n' "$OUT" | grep -qF -- "$fragment"; then
+  if grep -qF -- "$fragment" <<<"$OUT"; then
     pass "$label: names the reason ($fragment)"
   else
     fail "$label: message fragment '$fragment' missing; output: $OUT"
@@ -89,7 +89,7 @@ expect_created() {
   else
     fail "$label: expected exit 0, got $RC; output: $OUT"
   fi
-  WP_FILE=$(find "$CASE_ROOT/strategy/inbox" -type f -name 'WP-*.md' | head -1)
+  WP_FILE=$(find "$CASE_ROOT/strategy/inbox" -type f -name 'WP-*.md' | sed -n 1p)
   if [ -n "$WP_FILE" ] && grep -qxF "title: \"$title\"" "$WP_FILE"; then
     pass "$label: context file carries title \"$title\""
   else

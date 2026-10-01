@@ -22,7 +22,7 @@ bash "$TEMPLATE_ROOT/scripts/create-wp.sh" \
   --title "Проверка связи РП" --budget 1h --priority P4 --verification-class closed-loop --no-consent-check --no-artifactor-check \
   --hypothesis H-101 --hypothesis-relation tests >"$TMPDIR/create.out"
 
-WP_FILE=$(find "$TMPDIR/strategy/inbox" -type f -name 'WP-*.md' | head -1)
+WP_FILE=$(find "$TMPDIR/strategy/inbox" -type f -name 'WP-*.md' | sed -n 1p)
 grep -q '^hypothesis: "H-101"$' "$WP_FILE"
 grep -q '^hypothesis_relation: "tests"$' "$WP_FILE"
 

@@ -89,7 +89,7 @@ echo "✓ inbox/$WP_ID/$WP_ID.md"
 # паддинг только в путях/заголовках. WeekPlan-строка не содержит пути, поэтому
 # "WP-001" в ней в принципе не появляется — нашёл grep'ая за $WP_ID вхолостую,
 # пока эта фикстура наконец не заработала целиком (03.08).
-WEEKPLAN=$(ls -1 current/WeekPlan*.md | head -1)
+WEEKPLAN=$(ls -1 current/WeekPlan*.md | sed -n 1p)
 [ -n "$WEEKPLAN" ] || { echo "FAIL: no WeekPlan found"; exit 1; }
 grep -q "$TITLE" "$WEEKPLAN" || { echo "FAIL: $WP_ID (title: $TITLE) not in WeekPlan"; exit 1; }
 echo "✓ WeekPlan ($WEEKPLAN)"

@@ -78,7 +78,7 @@ rc=$?
 set -e
 [ "$rc" -ne 0 ] ||
   { echo "FAIL: create-wp.sh accepted a call without --verification-class" >&2; exit 1; }
-echo "$out" | grep -q -- "--verification-class обязателен" ||
+grep -q -- "--verification-class обязателен" <<<"$out" ||
   { echo "FAIL: rejection message does not name the missing flag" >&2; echo "$out" >&2; exit 1; }
 after=$(find "$TMPDIR/strategy/inbox" -maxdepth 1 -type d -name 'WP-*' | wc -l | tr -d ' ')
 [ "$after" -eq "$before" ] ||
@@ -93,9 +93,9 @@ rc=$?
 set -e
 [ "$rc" -ne 0 ] ||
   { echo "FAIL: create-wp.sh accepted an unknown --verification-class value" >&2; exit 1; }
-echo "$out" | grep -q -- "--verification-class обязателен" ||
+grep -q -- "--verification-class обязателен" <<<"$out" ||
   { echo "FAIL: unknown class refused for the wrong reason (expected the verification-class gate)" >&2; echo "$out" >&2; exit 1; }
-echo "$out" | grep -q -- "Передано: openloop" ||
+grep -q -- "Передано: openloop" <<<"$out" ||
   { echo "FAIL: rejection message does not echo the rejected value" >&2; echo "$out" >&2; exit 1; }
 after=$(find "$TMPDIR/strategy/inbox" -maxdepth 1 -type d -name 'WP-*' | wc -l | tr -d ' ')
 [ "$after" -eq "$before" ] ||
