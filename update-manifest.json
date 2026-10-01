@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5f5735149f9f1f70fb54361f4615410aaba349a2fc3384f06b1b6f7fdfede1ee"
+      "sha256": "9d413405d33cfac02c8425fc5740f85b991d8a4f1e99ab9149572944ff7dadf3"
     },
     {
       "path": "CLAUDE.md",
@@ -3113,7 +3113,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "3a0f4917669898f7473b99f815d7c7c29883b45288afff9f4012e82ddc6c10c0"
+      "sha256": "2e838010755c73134f348d20c08c38844efec58dcc12d9082ce29b943ea2dd12"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "f77b402bce43e2168ccbe004519e41f12b842d1af9ea673fdacfb745d0ffbf4d"
+      "sha256": "73c514fe2e68b93fe0b6d928116208ce43437924d25b7717867618ad1fd7dbf0"
     }
   ],
   "excluded_paths": [
