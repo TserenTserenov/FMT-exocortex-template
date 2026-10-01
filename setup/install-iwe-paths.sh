@@ -115,11 +115,19 @@ fi
 # an IWE_SCRIPTS switch used to pass without a word. Remember the previous value
 # to announce a change after the write. The file keeps literals ($IWE_WORKSPACE,
 # $IWE_TEMPLATE); compare and show them resolved, so an absolute path to the
-# same directory is not reported as a change.
+# same directory is not reported as a change. Only the leading reference is
+# replaced, by concatenation: in a ${v//pat/rep} replacement bash 5.2+ treats
+# '&' as the matched text (patsub_replacement), which would mangle a workspace
+# path that contains one.
 resolve_paths_literal() {
     local value="$1"
-    value="${value//\$IWE_WORKSPACE/$WORKSPACE_DIR}"
-    value="${value//\$IWE_TEMPLATE/$WORKSPACE_DIR/FMT-exocortex-template}"
+    # shellcheck disable=SC2016 # literal "$IWE_*" references, exactly as written in .iwe-paths
+    case "$value" in
+        '$IWE_WORKSPACE' | '$IWE_WORKSPACE'/*)
+            value="$WORKSPACE_DIR${value#\$IWE_WORKSPACE}" ;;
+        '$IWE_TEMPLATE' | '$IWE_TEMPLATE'/*)
+            value="$WORKSPACE_DIR/FMT-exocortex-template${value#\$IWE_TEMPLATE}" ;;
+    esac
     printf '%s' "$value"
 }
 OLD_IWE_SCRIPTS=""

@@ -14,7 +14,8 @@
 # Both now accept the workspace scripts/ only when it holds a REGULAR
 # (non-symlink) session-guard.sh; otherwise IWE_SCRIPTS stays on the template's
 # scripts/. Five layouts run through BOTH writers. A regenerated .iwe-paths
-# also announces an IWE_SCRIPTS change even under --quiet.
+# also announces an IWE_SCRIPTS change even under --quiet, with the paths
+# resolved intact for a workspace whose path holds a space and '&'.
 #
 # Known limit (not asserted): the marker proves "this is a live checkout", not
 # that its file set is complete -- a partial live scripts/ still shadows the
@@ -149,6 +150,23 @@ WS_B=$(make_ws same-dir)
 layout_no_scripts "$WS_B"
 printf 'export IWE_SCRIPTS="%s"\n' "$WS_B/FMT-exocortex-template/scripts" > "$WS_B/.iwe-paths"
 check "тот же каталог другой записью: вывод пуст" "" "$(run_installer "$WS_B")"
+
+echo "--- workspace path with a space and '&' (bash 5.2+ patsub_replacement) ---"
+# From bash 5.2 an '&' in the replacement of ${v//pat/rep} stands for the matched
+# text. Resolving "$IWE_WORKSPACE" against such a path used to distort it: a false
+# "old -> new" for the same directory and a mangled path in a real change.
+WS_C=$(make_ws "ws a&b")
+layout_live_copy "$WS_C"
+check "путь с пробелом и «&»: install-iwe-paths.sh -> scripts/ рабочей копии" \
+    "$WS_C/scripts" "$(iwe_scripts_from_installer "$WS_C")"
+check "путь с пробелом и «&»: iwe-env-bootstrap.sh  -> scripts/ рабочей копии" \
+    "$WS_C/scripts" "$(iwe_scripts_from_bootstrap "$WS_C")"
+printf 'export IWE_SCRIPTS="%s"\n' "$WS_C/scripts" > "$WS_C/.iwe-paths"
+check "путь с «&», тот же каталог другой записью: вывод пуст" "" "$(run_installer "$WS_C")"
+rm "$WS_C/scripts/session-guard.sh"
+out=$(run_installer "$WS_C")
+check_contains "путь с «&»: смена показана без искажения пути" \
+    "$out" "IWE_SCRIPTS: $WS_C/scripts → $WS_C/FMT-exocortex-template/scripts"
 
 if [ "$fail" -gt 0 ]; then
     echo "FAIL: $fail проверок упало"
