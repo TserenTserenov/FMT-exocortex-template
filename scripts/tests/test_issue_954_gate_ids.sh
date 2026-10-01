@@ -245,7 +245,7 @@ check_field() {  # <description> <blocked|open> <card text>
   expect_gate "$1" "$ws" 44 "$2"
 }
 
-echo "--- the value is a YAML scalar: a quoted one is taken whole, only a comment may follow its closing quote ---"
+echo "--- the value is a single-line plain or quoted scalar (a subset of YAML): a quoted one is taken whole, only a comment may follow its closing quote ---"
 check_field "bare value -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: unclassified\n---\n# card\n'
 check_field "double-quoted value (what create-wp.sh writes) -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: "unclassified"\n---\n# card\n'
 check_field "single-quoted value -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: \'unclassified\'\n---\n# card\n'
@@ -260,18 +260,44 @@ check_field "a stray closing quote is not stripped on its own (unclassified\") -
 check_field "text after the closing quote that is not a comment -> opens" open $'---\nwp: 44\nhypothesis_relation: "unclassified"x\n---\n# card\n'
 check_field "a value that only starts with the word -> opens" open $'---\nwp: 44\nhypothesis_relation: unclassified-ish\n---\n# card\n'
 check_field "a chosen value + trailing comment -> opens" open $'---\nwp: 44\nhypothesis_relation: tests  # chosen\n---\n# card\n'
+# What the subset does NOT do is written in the comment of card_is_unclassified; pinned here so that
+# the comment keeps telling the truth.
+check_field "documented limit: an escape sequence is not decoded (\"unclassifi\\u0065d\" stays literal) -> opens" open $'---\nwp: 44\nhypothesis_relation: "unclassifi\\u0065d"\n---\n# card\n'
+check_field "documented limit: a multi-line plain scalar is judged by its first line (unclassified + a continuation line) -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: unclassified\n  example\n---\n# card\n'
 
-echo "--- where the field is looked for: a first line --- makes a frontmatter, and only the frontmatter is read ---"
+echo "--- where the field is looked for: the first NON-EMPTY line --- makes a frontmatter, and only the frontmatter is read ---"
 check_field "frontmatter says operational, a YAML example in the body says unclassified -> opens" open $'---\nwp: 44\nhypothesis_relation: operational\n---\n# card\n\nExample:\n\n```yaml\nhypothesis_relation: unclassified\n```\n'
 check_field "frontmatter says tests, a second --- block in the body says unclassified -> opens" open $'---\nwp: 44\nhypothesis_relation: "tests"\n---\n# card\n\n---\nhypothesis_relation: unclassified\n---\n'
 check_field "no such field in the frontmatter, an example in the body -> opens (an absent field is not blocked)" open $'---\nwp: 44\nstatus: pending\n---\n# card\n\nhypothesis_relation: unclassified\n'
 check_field "a UTF-8 BOM before the first --- does not hide the frontmatter (operational + an example in the body) -> opens" open $'\xEF\xBB\xBF---\nwp: 44\nhypothesis_relation: operational\n---\n# card\n\nhypothesis_relation: unclassified\n'
 check_field "a UTF-8 BOM before the first --- (the frontmatter says unclassified) -> blocked" blocked $'\xEF\xBB\xBF---\nwp: 44\nhypothesis_relation: "unclassified"\n---\n# card\n'
-echo "--- no --- on the first line: no frontmatter, the whole file is read, any line counts (what the gate always did) ---"
-check_field "a heading, then a --- block with the field: the delimiter is not on the first line -> blocked" blocked $'# Карточка\n---\nhypothesis_relation: unclassified\n---\n'
-check_field "a heading, then an example line -> blocked" blocked $'# Карточка\nПример:\nhypothesis_relation: unclassified\n'
+check_field "a blank first line, a frontmatter that says independent, a fenced example with unclassified in the body -> opens" open $'\n---\nhypothesis_relation: independent\n---\nПример:\n```yaml\nhypothesis_relation: unclassified\n```\n'
+check_field "blank lines before the frontmatter (the frontmatter says tests, a bare example line below it) -> opens" open $'\n\n  \n---\nhypothesis_relation: tests\n---\nhypothesis_relation: unclassified\n'
+check_field "blank lines before the frontmatter (the frontmatter says unclassified) -> blocked" blocked $'\n\n---\nhypothesis_relation: "unclassified"\n---\n# card\n'
+check_field "CRLF: a blank first line, then a frontmatter that says unclassified -> blocked" blocked $'\r\n---\r\nhypothesis_relation: unclassified\r\n---\r\n'
+check_field "CRLF: a blank first line, a frontmatter that says operational, an example below -> opens" open $'\r\n---\r\nhypothesis_relation: operational\r\n---\r\nhypothesis_relation: unclassified\r\n'
+check_field "a BOM, a blank line, then the frontmatter that says unclassified -> blocked" blocked $'\xEF\xBB\xBF\n---\nhypothesis_relation: unclassified\n---\n'
+
+echo "--- no frontmatter: only the initial block of key: value lines is read, never the rest of the document ---"
 check_field "a file of one line, the field only (the WP-518 fixture) -> blocked" blocked $'hypothesis_relation: "unclassified"\n'
-check_field "no frontmatter, a chosen value -> opens" open $'# Карточка\nhypothesis_relation: tests\n'
+check_field "the same line without the final newline -> blocked" blocked 'hypothesis_relation: "unclassified"'
+check_field "key: value lines, the field among them -> blocked" blocked $'wp: 44\nstatus: pending\nhypothesis_relation: unclassified\nbudget: 3h\n'
+check_field "blank lines, then key: value lines with the field -> blocked" blocked $'\n\nwp: 44\nhypothesis_relation: unclassified\n'
+check_field "a BOM, then key: value lines with the field -> blocked" blocked $'\xEF\xBB\xBFwp: 44\nhypothesis_relation: unclassified\n'
+check_field "CRLF key: value lines with the field -> blocked" blocked $'wp: 44\r\nhypothesis_relation: unclassified\r\n'
+check_field "no space after the colon (hypothesis_relation:\"unclassified\", what the old gate also recognised) -> blocked" blocked $'hypothesis_relation:"unclassified"\n'
+check_field "key: value lines with a chosen value -> opens" open $'wp: 44\nhypothesis_relation: tests\n'
+check_field "a quoted # belongs to the value here too -> opens" open $'wp: 44\nhypothesis_relation: "unclassified # example"\n'
+check_field "the field after a Markdown heading -> opens" open $'# Карточка\nhypothesis_relation: unclassified\n'
+check_field "a heading, then a --- block with the field: the delimiter is not the first line, the block is body -> opens" open $'# Карточка\n---\nhypothesis_relation: unclassified\n---\n'
+check_field "a heading, a prose line, then the field -> opens" open $'# Карточка\nПример:\nhypothesis_relation: unclassified\n'
+check_field "the field after a blank line -> opens" open $'wp: 44\n\nhypothesis_relation: unclassified\n'
+check_field "the field after a prose line -> opens" open $'Описание карточки\nhypothesis_relation: unclassified\n'
+check_field "key: value lines, then a heading, then the field -> opens" open $'wp: 44\n# Title\nhypothesis_relation: unclassified\n'
+check_field "the field only inside a backtick fence below key: value lines -> opens" open $'wp: 44\n```yaml\nhypothesis_relation: unclassified\n```\n'
+check_field "the field only inside a tilde fence below a heading -> opens" open $'# Card\n\n~~~yaml\nhypothesis_relation: unclassified\n~~~\n'
+check_field "a file that starts with a fence -> opens" open $'```yaml\nhypothesis_relation: unclassified\n```\n'
+check_field "a --- line that is not the first line, the field below it -> opens" open $'wp: 44\n---\nhypothesis_relation: unclassified\n'
 check_field "an empty card file -> opens (nothing to read is not a block, and not a crash under set -u)" open ''
 
 echo
