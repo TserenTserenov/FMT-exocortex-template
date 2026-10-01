@@ -171,7 +171,8 @@ simulate_one_transfer() {
         cp "$UPSTREAM/update-manifest.json" "\$o"
     else
         local src="$UPSTREAM/\$rel"
-        [ -f "\$src" ] && cp "\$src" "\$o" || return 22
+        # Like real curl -sS -f: the cause goes to stderr (issue #980 reads its last line).
+        [ -f "\$src" ] && cp "\$src" "\$o" || { echo "curl: (22) The requested URL returned error: 404" >&2; return 22; }
     fi
 }
 
@@ -547,6 +548,62 @@ if [ "$(sha256sum "$SCRIPT_DIR/update-manifest.json" | cut -d' ' -f1)" = "$MANIF
 else
     fail "E: local manifest changed despite the aborted run"
 fi
+
+# issue #980: the failed transfer used to be silent (curl's stderr went to /dev/null).
+# Now the batch call's exit code and the last line of its stderr are shown.
+if grep -q "curl код [0-9][0-9]*; curl: (22) The requested URL returned error: 404" "$TEST_ROOT/out-e.log"; then
+    pass "E: a failed batch download shows curl's exit code and its last stderr line"
+else
+    fail "E: the failed batch download left no curl diagnostic in the output"
+fi
+
+echo "--- Scenario E2: the sequential fallback names the file and curl's cause (#980) ---"
+set +e
+CURL_SHIM_PARALLEL_SUPPORTED=0 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e2.log" 2>&1
+RC_E2=$?
+set -e
+if [ "$RC_E2" -eq 2 ]; then
+    pass "E2: the sequential path also aborts with EXIT_NETWORK(2) on a failed fetch"
+else
+    fail "E2: expected exit 2, got $RC_E2"
+fi
+if grep -q "memory/never-fetched.md: curl код 22; curl: (22) The requested URL returned error: 404" "$TEST_ROOT/out-e2.log"; then
+    pass "E2: the failed file is named together with curl's exit code and stderr line"
+else
+    fail "E2: the sequential failure left no per-file curl diagnostic"
+fi
+
+# A dead network must not print one line per manifest entry: the first 5 failures of a
+# call are shown, the rest are counted. Seven failing files, two passes (first + retry).
+echo "--- Scenario E3: sequential diagnostics are capped at 5 per call (#980) ---"
+# e3_extra_entries add|remove — six more manifest entries that the shim cannot serve.
+e3_extra_entries() {
+    python3 - "$UPSTREAM/update-manifest.json" "$1" <<'PY'
+import json
+import sys
+path, mode = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+extra = [f"memory/never-fetched-{number}.md" for number in range(1, 7)]
+manifest["files"] = [entry for entry in manifest["files"] if entry["path"] not in extra]
+if mode == "add":
+    manifest["files"] += [{"path": name, "sha256": "0" * 64} for name in extra]
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+}
+e3_extra_entries add
+set +e
+CURL_SHIM_PARALLEL_SUPPORTED=0 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e3.log" 2>&1
+set -e
+E3_SHOWN=$(grep -c "curl код 22" "$TEST_ROOT/out-e3.log" || true)
+E3_COUNTED=$(grep -c "ещё 2 сбоев загрузки не показано" "$TEST_ROOT/out-e3.log" || true)
+if [ "$E3_SHOWN" -eq 10 ] && [ "$E3_COUNTED" -eq 2 ]; then
+    pass "E3: 5 diagnostics per call are shown and the other 2 are counted (first pass and retry)"
+else
+    fail "E3: expected 10 shown diagnostics and 2 counter lines, got $E3_SHOWN and $E3_COUNTED"
+fi
+e3_extra_entries remove
 
 # ------------------------------------------------------------------
 # Scenario F/G (WP-546 Ф5, peer-session 2026-08-21-12): assert that

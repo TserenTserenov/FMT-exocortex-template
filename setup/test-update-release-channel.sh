@@ -128,7 +128,16 @@ run_case() {
             if [ "${1:-}" = "api" ]; then
                 local endpoint="" argument
                 for argument in "$@"; do
-                    case "$argument" in /repos/*) endpoint="$argument" ;; esac
+                    case "$argument" in
+                        # Git Bash (MSYS) rewrites an argument that starts with "/" into a
+                        # Windows path ("C:/Program Files/Git/repos/..."), and gh then
+                        # rejects the endpoint (issue #980): fail like it does.
+                        /*)
+                            echo "CALL gh:invalid API endpoint, leading slash: $argument" >&2
+                            return 1
+                            ;;
+                        repos/*) endpoint="$argument" ;;
+                    esac
                 done
                 echo "CALL gh:$endpoint:GH_DEBUG=${GH_DEBUG:-}:DEBUG=${DEBUG:-}:PROMPT=${GH_PROMPT_DISABLED:-}" >&2
                 [ "$FAIL_MODE" = "gh-api" ] && return 1
@@ -171,6 +180,17 @@ CASE_COUNT=$((CASE_COUNT + 1))
 DEBUG_SECRET="hostile_debug_secret_538"
 OUT=$(run_case release yes yes yes none "" "" "$DEBUG_SECRET" 2>&1)
 echo "$OUT" | grep -q "CALL gh:.*/releases/latest" && pass "3 authenticated gh is third" || fail "3 gh route missing: $OUT"
+# #980: the endpoint reaches gh as "repos/..." (no leading slash), so Git Bash has nothing to rewrite.
+if echo "$OUT" | grep -q "CALL gh:repos/owner/tmpl/releases/latest:"; then
+    pass "3 gh endpoint has no leading slash"
+else
+    fail "3 gh endpoint is not a bare repos/... path: $OUT"
+fi
+if echo "$OUT" | grep -q "RAW_BASE=.*/$TAG_SHA$"; then
+    pass "3 gh route pins the release commit"
+else
+    fail "3 gh route did not pin the release: $OUT"
+fi
 echo "$OUT" | grep -q "CALL curl:" && fail "3 curl used despite authenticated gh: $OUT" || pass "3 no curl fallback"
 echo "$OUT" | grep -q "GH_DEBUG=:DEBUG=:PROMPT=1" && pass "3 gh debug and prompts are neutralized" || fail "3 unsafe gh environment: $OUT"
 echo "$OUT" | grep -Fq "$DEBUG_SECRET" && fail "3 hostile gh debug value leaked: $OUT" || pass "3 hostile gh debug value absent"
@@ -263,6 +283,48 @@ CASE_COUNT=$((CASE_COUNT + 1))
 OUT=$(run_case release no no no none "" "" 2>&1)
 echo "$OUT" | grep -q "RAW_BASE=.*/v9.9.9$" && pass "9 no-python release pins immutable tag" || fail "9 no-python tag pin failed: $OUT"
 echo "$OUT" | grep -q "/commits/v9.9.9" && fail "9 no-python path made unnecessary commit GET: $OUT" || pass "9 only latest-release GET used"
+
+# --- issue #980: no other `gh api` call may pass an endpoint with a leading slash ---
+# Git Bash (MSYS) rewrites such an argument into a Windows path before gh sees it.
+# The matrix above only exercises github_api_get(); this static scan covers every
+# `gh api` call site in update.sh, and its detector is checked on samples first so
+# that a scan that finds nothing cannot pass by being blind.
+gh_api_leading_slash_hits() {
+    grep -nE 'gh api[^#]*[[:space:]]"?/[A-Za-z]|^[[:space:]]*endpoint="/' "$1" || true
+}
+CASE_COUNT=$((CASE_COUNT + 1))
+SLASH_SAMPLE="$TRACE_DIR/gh-api-sample.txt"
+# shellcheck disable=SC2016  # the samples are literal source text, not expansions
+printf '%s\n' 'endpoint="/${api_url#https://api.github.com/}"' > "$SLASH_SAMPLE"
+if [ -n "$(gh_api_leading_slash_hits "$SLASH_SAMPLE")" ]; then
+    pass "9b detector flags the old endpoint assignment"
+else
+    fail "9b detector missed the old endpoint assignment"
+fi
+printf '%s\n' 'gh api --method GET "/repos/owner/repo/releases/latest"' > "$SLASH_SAMPLE"
+if [ -n "$(gh_api_leading_slash_hits "$SLASH_SAMPLE")" ]; then
+    pass "9b detector flags a literal /repos argument"
+else
+    fail "9b detector missed a literal /repos argument"
+fi
+# shellcheck disable=SC2016
+printf '%s\n' 'endpoint="${api_url#https://api.github.com/}"' 'gh api --method GET "$endpoint"' 'gh api user' > "$SLASH_SAMPLE"
+if [ -z "$(gh_api_leading_slash_hits "$SLASH_SAMPLE")" ]; then
+    pass "9b detector accepts bare endpoints"
+else
+    fail "9b detector rejected bare endpoints"
+fi
+if grep -q 'gh api' "$UPDATE_SH"; then
+    pass "9b update.sh still calls gh api (scan is not vacuous)"
+else
+    fail "9b update.sh has no gh api call: the scan checks nothing"
+fi
+SLASH_HITS=$(gh_api_leading_slash_hits "$UPDATE_SH")
+if [ -z "$SLASH_HITS" ]; then
+    pass "9b no gh api call in update.sh passes a leading-slash endpoint"
+else
+    fail "9b leading-slash gh api endpoint in update.sh: $SLASH_HITS"
+fi
 
 # --- issue #863: detect_release_rollback ---
 CASE_COUNT=$((CASE_COUNT + 1))
@@ -357,7 +419,7 @@ echo "$UNCERTAIN_OUT" | grep -q "UNCERTAIN_RC=2" && pass "13 unresolved tag retu
 
 rm -rf "$ROLLBACK_REPO"
 
-[ "$CASE_COUNT" -eq 13 ] || fail "matrix executed $CASE_COUNT cases, expected 13"
+[ "$CASE_COUNT" -eq 14 ] || fail "matrix executed $CASE_COUNT cases, expected 14"
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL ($CASE_COUNT cases)"
 [ "$FAIL_COUNT" -eq 0 ] && exit 0 || exit 1
