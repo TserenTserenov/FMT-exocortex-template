@@ -68,6 +68,9 @@ make_env() {
     git init -q --bare -b main "$ORIGIN"
     git clone -q "$ORIGIN" "$CANON" 2>/dev/null
     mkdir -p "$CANON/inbox" "$CANON/archive/notes" "$CANON/docs" "$CANON/scripts" "$CANON/exocortex"
+    # The stamp of the plain old note is one that extract_note_date() of the cleanup script cannot parse, so its
+    # "younger than 24 h" guard never applies and the note is archived on every day of the year (the former stamp
+    # "1 янв, 10:00" was read as a time of the current year and protected the note on 1 and 2 January)
     cat > "$CANON/inbox/fleeting-notes.md" <<'EOF'
 ---
 title: Fleeting
@@ -88,7 +91,7 @@ title: Fleeting
 ---
 
 Plain old note
-<sub>1 янв, 10:00</sub>
+<sub>10.09.2026, 10:00</sub>
 EOF
     printf '# Archive\n' > "$CANON/archive/notes/Notes-Archive.md"
     printf 'other\n' > "$CANON/docs/other.md"

@@ -1084,14 +1084,25 @@ render_fleeting_notes() {
   local notes_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/fleeting-notes.md"
 
   # One decision with the safety net (cleanup-processed-notes.py should_keep) and the canary (strategist.sh
-  # count_new_bold_notes): a note awaits the pilot when its FIRST line (the line after a --- rule) carries the mark
-  # "✅предложено" anywhere, with or without bold, or when a line is a bold title alone (**Title**, the legacy
-  # rule), or a bold title followed by the mark. A first line that is a quote, a heading, a timestamp, a
-  # struck-through note (~~) or a list item is no note title. The body of a note is never scanned.
+  # count_new_bold_notes): the mark "✅предложено" counts in the FIRST line of a note (the line after a --- rule),
+  # with or without bold, wherever it stands in that line. A first line that is a quote, a heading, a timestamp, a
+  # struck-through note (~~) or a list item is no note title. A bold title alone on a line (**Title**), or followed
+  # by the mark, is taken wherever it stands (the legacy rule): a bold line inside a note body is listed, and counted
+  # by the canary, too; the safety net looks at the first line only. The printed title has the mark and 🔄 cut out;
+  # a title without them stays as typed, and a line with nothing but the mark keeps it so that the row has a name.
   # awk, not grep -i / tolower: Cyrillic case folding depends on the locale, so the mark is spelled out in
   # (п|П) pairs; the no-break space is spelled in octal because [[:space:]] does not cover it in every locale.
   local new_notes
   new_notes=$(awk '
+    # the title without the mark and without 🔄; as typed when it has neither, whole when nothing else is left
+    function clean(t,   c) {
+      c = t
+      gsub("[[:space:]]*" mark, "", c)
+      gsub(/[[:space:]]*🔄/, "", c)
+      if (c == t) return t
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", c)
+      return (c == "") ? t : c
+    }
     BEGIN {
       mark = "✅([[:space:]]|\302\240)*(п|П)(р|Р)(е|Е)(д|Д)(л|Л)(о|О)(ж|Ж)(е|Е)(н|Н)(о|О)"
       bold = "^[*][*][^*]+[*][*][[:space:]]*(" mark ".*)?$"
@@ -1123,7 +1134,7 @@ render_fleeting_notes() {
           }
         }
       }
-      if (title != "") print title
+      if (title != "") print clean(title)
     }
   ' "$notes_file" 2>/dev/null)
 

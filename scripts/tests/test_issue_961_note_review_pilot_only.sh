@@ -217,32 +217,32 @@ cat > "$SB/scan-fleeting.md" <<'EOF'
 ---
 
 **Новая заметка**
-<sub>1 янв, 10:00</sub>
+<sub>10.09.2026, 10:00</sub>
 
 ---
 
 **Предложенная заметка** ✅предложено
-<sub>1 янв, 10:05</sub>
+<sub>10.09.2026, 10:05</sub>
 
 ---
 
 **Шумовая заметка** ✅предложено (шум)
-<sub>1 янв, 10:10</sub>
+<sub>10.09.2026, 10:10</sub>
 
 ---
 
 **Отложенная заметка** 🔄
-<sub>1 янв, 10:15</sub>
+<sub>10.09.2026, 10:15</sub>
 
 ---
 
 Обычная заметка
-<sub>1 янв, 10:20</sub>
+<sub>10.09.2026, 10:20</sub>
 
 ---
 
 ~~Зачёркнутая заметка~~
-<sub>1 янв, 10:25</sub>
+<sub>10.09.2026, 10:25</sub>
 
 ---
 EOF
@@ -388,6 +388,16 @@ for stale in '29-30.07.2026' '(пилот, 30.07.2026)' 'Пилот (2026-07-29)
     'pilot decision 2026-07-29/30' 'Pilot decision (2026-07-29)' 'Since the pilot decision of'; do
     absent_in_texts "no '$stale' in the shipped texts and script comments" "$stale"
 done
+
+echo "== G4: the scanner comment says what the scanner does with a bold line inside a note body =="
+# the mark is looked for in the first line of a block only, but the legacy rule "a bold title alone on a line" takes such a
+# line wherever it stands (a plain title with **Важно** in its body: the safety net does not keep it, the canary counts it
+# as new, the scanner lists it); a comment that said "the body is never scanned" was wrong
+for scaffold in "scripts/day-open-scaffold.sh" "seed/strategy/scripts/day-open-scaffold.sh"; do
+    check "$scaffold: no claim that the body of a note is never scanned" "0" "$(count_fixed 'The body of a note is never scanned' "$ROOT/$scaffold")"
+    check "$scaffold: the comment says a bold title alone on a line is taken wherever it stands" "1" "$(count_fixed 'is taken wherever it stands' "$ROOT/$scaffold")"
+done
+
 # ==== LAYER H: one answer in three places ====
 echo "== H: the safety net, the canary and the Day Open scanner answer the same on one table of note titles =="
 # The mark of a proposed note is recognised by three independent rules: should_keep() of the cleanup script (Python),
@@ -398,7 +408,9 @@ echo "== H: the safety net, the canary and the Day Open scanner answer the same 
 # list item) or the pilot struck the note through. Every row is the first line of a one-note box; the expectation is
 # "kept by the safety net / counted as NEW by the canary / listed for the pilot by the scanner". A note nobody touched
 # is new and listed; a deferred 🔄 note is kept and not listed (the strategy session handles it); a bold line with
-# other text and no mark is the old legacy case (counted new by the canary, not listed by the scanner).
+# other text and no mark is the old legacy case (counted new by the canary, not listed by the scanner). The title the
+# scanner prints is cleaned of the mark and of 🔄 (T09, T28, T38); a title without them stays as typed (T01, T37), and
+# a line with nothing but the mark keeps it (T36) so that the row still has a name.
 NB=$'\302\240'
 H_ROWS=(
     'T01|1/1/1|**New note**'
@@ -437,6 +449,8 @@ H_ROWS=(
     'T34|1/1/0|**Other** ✔️предложено'
     'T35|1/1/0|**English** ✅proposed'
     'T36|1/0/1|**✅предложено**'
+    'T37|1/1/1|**Обычное название  с двумя пробелами и (скобками)**'
+    'T38|1/0/1|**Both 🔄** ✅предложено'
 )
 # the box layout is the real one: header, rule, title line, timestamp line (the bot format, which the safety net
 # cannot date, so the 24-hour guard stays out of the way on every day of the year), rule
@@ -475,8 +489,8 @@ done
     done
 } > "$SB/h-all-box.md"
 H_LISTED_TITLES="$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$SB/h-all-box.md" | sed -E 's/^\| \[«(.*)»\]\(.*$/\1/' | tr '\n' '|')"
-check "one box with every row: the pilot sees each waiting note once, with a clean title" \
-    "New note|Proposed|Spaced|Capital|Shout|Mixed|Tail|Tail|Inside ✅предложено|Two|Bare proposed|Bare space|Bare capital|Bare paren|Bare colon|Bare mid|Заметка про слово|Both 🔄|Nbsp|Bare nbsp|Twice|Bare|✅предложено|" "$H_LISTED_TITLES"
+check "one box with every row: the pilot sees each waiting note once, its title without the mark and without 🔄 (a title without them as typed)" \
+    "New note|Proposed|Spaced|Capital|Shout|Mixed|Tail|Tail|Inside|Two|Bare proposed|Bare space|Bare capital|Bare paren|Bare colon|Bare mid|Заметка про слово|Both|Nbsp|Bare nbsp|Twice|Bare|✅предложено|Обычное название  с двумя пробелами и (скобками)|Both|" "$H_LISTED_TITLES"
 # ==== END LAYERS ====
 
 echo
