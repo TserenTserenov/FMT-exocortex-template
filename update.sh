@@ -2729,6 +2729,11 @@ if [ "$STEP0_RC" -ne 0 ]; then
     # issues #955/#980: "could not check" is not "checked, up to date". The failure used
     # to fall through to the "актуален" line below, with curl's cause thrown away.
     echo "  ⚠ не удалось проверить update.sh: $(curl_failure_note "$STEP0_RC" "$STEP0_ERR")"
+elif [ ! -s "$REMOTE_UPDATE" ]; then
+    # curl exit 0 with an empty body (a proxy or a login page that returns nothing) is a
+    # failed check as well: the empty file differs from the local one, so it used to pass
+    # for a newer update.sh and a normal run replaced the updater with a 0-byte file.
+    echo "  ⚠ не удалось проверить update.sh: пустой ответ"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
