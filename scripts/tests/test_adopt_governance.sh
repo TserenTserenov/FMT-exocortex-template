@@ -12,11 +12,16 @@
 #      `gh repo view|create|clone`) and the preview names both outcomes;
 #   2. dry run, remote absent → the same preview, line for line (discriminating
 #      control: the output must not depend on the remote);
-#   3. adopt_existing_governance_repo itself, extracted from setup.sh and run for
-#      real against the fake gh: foreign owner → refused before any clone; our
-#      owner → cloned and the structure markers verified;
-#   4. the structure markers checked after a real clone are the seed's own
-#      files, so a clone of a foreign/non-governance repo cannot pass.
+#   3. the REAL step-6 block of setup.sh, run in real mode (DRY_RUN=false) against
+#      the fake gh, together with the real contract loader that builds
+#      GOVERNANCE_MARKERS:
+#        remote ours      → gh repo clone, structure verified, no gh repo create;
+#        remote absent    → gh repo create, no gh repo clone;
+#        foreign owner    → refused before any clone or create;
+#        ours, no markers → refused, listing the missing markers of the real array;
+#   4. GOVERNANCE_MARKERS is the contract's requiredMarkers list and the seed ships
+#      every one of them, so a clone of a foreign/non-governance repo cannot pass
+#      and a freshly seeded repo is not rejected.
 #
 # Bash 3.2 compatible. Usage: bash scripts/tests/test_adopt_governance.sh
 
@@ -35,8 +40,9 @@ mkdir -p "$TEMPLATE_COPY" "$WORKSPACE" "$FAKE_BIN" "$TMP/home"
 tar -C "$TEMPLATE_ROOT" --exclude='./.git' -cf - . | tar -C "$TEMPLATE_COPY" -xf -
 
 # Fake gh: FAKE_GH_REMOTE_EXISTS=1 → `repo view` succeeds and reports FAKE_GH_OWNER;
-# `repo clone` materialises a governance-shaped clone (the seed's marker files);
-# every invocation is logged so the test can prove what ran and what never did.
+# `repo clone` materialises a clone holding the files in FAKE_GH_MARKERS (copied from
+# the seed) plus FAKE_GH_EXTRA_FILE; `repo create` succeeds. Every invocation is
+# logged so the test can prove what ran and what never did.
 cat > "$FAKE_BIN/gh" <<'SH'
 #!/bin/sh
 printf '%s\n' "gh $*" >>"$FAKE_GH_LOG"
@@ -55,7 +61,9 @@ case "$1 $2" in
       mkdir -p "$4/$(dirname "$m")"
       cp "$FAKE_GH_SEED_DIR/$m" "$4/$m"
     done
+    if [ -n "${FAKE_GH_EXTRA_FILE:-}" ]; then printf 'unrelated\n' > "$4/$FAKE_GH_EXTRA_FILE"; fi
     exit 0 ;;
+  "repo create") exit 0 ;;
   *) exit 97 ;;
 esac
 SH
@@ -125,48 +133,94 @@ check "step-6 preview is identical whether or not the remote exists" "step-6 pre
   cmp -s "$TMP/preview-remote-exists.txt" "$TMP/preview-remote-absent.txt"
 check "step-6 preview is not empty" "step-6 section missing from the dry-run output" [ -s "$TMP/preview-remote-absent.txt" ]
 
-echo "=== 3. adopt_existing_governance_repo (extracted from setup.sh, run for real against the fake gh) ==="
-MARKERS=$(jq -r '.requiredMarkers[]' "$TEMPLATE_ROOT/scripts/governance-repo-contract.json" | tr '\n' ' ')
-extract_fn() { sed -n "/^$1() {/,/^}/p" "$TEMPLATE_COPY/setup.sh"; }
-check "adopt_existing_governance_repo found in setup.sh" "function not found in setup.sh — extraction pattern is stale" \
-  test -n "$(extract_fn adopt_existing_governance_repo)"
-check "governance_markers_missing found in setup.sh" "function not found in setup.sh — extraction pattern is stale" \
-  test -n "$(extract_fn governance_markers_missing)"
+echo "=== 3. Step 6 of the real setup.sh in real mode, against the fake gh ==="
+# The harness is assembled from the real script: the contract loader (builds
+# GOVERNANCE_MARKERS) and the whole step-6 block. Only generate_executor_catalog_for_governance,
+# which is defined in another section and not under test, is stubbed.
+check "contract loader found in setup.sh" "contract loader not found in setup.sh — extraction pattern is stale" \
+  test -n "$(sed -n '/^GOVERNANCE_CONTRACT_FILE=/,/^unset _governance_markers_raw/p' "$TEMPLATE_COPY/setup.sh")"
+check "step-6 block found in setup.sh" "step-6 block not found in setup.sh — extraction pattern is stale" \
+  test -n "$(sed -n '/^# === 6\./,/^# === 7\./p' "$TEMPLATE_COPY/setup.sh")"
 
-run_adopt() { # $1 = owner reported by gh → prints the exit code; output in $TMP/adopt.log
-  local adopt_dir="$TMP/adopt-$1/DS-strategy"   # one clone target per owner: runs never share state
+# run_step6 <case> <remote exists 0/1> <owner> <clone shape: governance|stray>
+# → prints the exit code; output in $TMP/step6-<case>.log, workspace in $TMP/step6-<case>
+run_step6() {
+  local name="$1" exists="$2" owner="$3" shape="$4"
+  local ws="$TMP/step6-$name"
+  mkdir -p "$ws"
   : >"$GH_LOG"
   {
     echo 'set -e'
-    echo 'GITHUB_USER=contract-test; GOVERNANCE_REPO=DS-strategy; DRY_RUN=false; CORE_ONLY=false'
-    echo "MY_STRATEGY_DIR='$adopt_dir'; STRATEGY_TEMPLATE='$TEMPLATE_ROOT/seed/strategy'"
-    echo "GOVERNANCE_MARKERS=($MARKERS)"
+    echo "TEMPLATE_DIR='$TEMPLATE_COPY'; WORKSPACE_DIR='$ws'"
+    echo 'GITHUB_USER=contract-test; GOVERNANCE_REPO=DS-strategy; DRY_RUN=false; CORE_ONLY=false; GOVERNANCE_REPO_PUSH_FAILED=false'
+    sed -n '/^GOVERNANCE_CONTRACT_FILE=/,/^unset _governance_markers_raw/p' "$TEMPLATE_COPY/setup.sh"
+    # The single-quoted lines below are harness text: they expand inside the harness.
+    # shellcheck disable=SC2016
+    echo 'echo "[harness] GOVERNANCE_MARKERS=${GOVERNANCE_MARKERS[*]}"'
+    if [ "$shape" = "stray" ]; then
+      echo 'export FAKE_GH_MARKERS=""; export FAKE_GH_EXTRA_FILE=README.md'
+    else
+      # shellcheck disable=SC2016
+      echo 'export FAKE_GH_MARKERS="${GOVERNANCE_MARKERS[*]}"'
+    fi
     echo 'generate_executor_catalog_for_governance() { :; }'
-    extract_fn governance_markers_missing
-    extract_fn adopt_existing_governance_repo
-    echo 'adopt_existing_governance_repo'
-  } >"$TMP/adopt-harness.sh"
-  env HOME="$TMP/home" PATH="$FAKE_BIN:$PATH" FAKE_GH_LOG="$GH_LOG" FAKE_GH_REMOTE_EXISTS=1 FAKE_GH_OWNER="$1" \
-      FAKE_GH_SEED_DIR="$TEMPLATE_ROOT/seed/strategy" FAKE_GH_MARKERS="$MARKERS" \
-      bash "$TMP/adopt-harness.sh" >"$TMP/adopt.log" 2>&1
+    sed -n '/^# === 6\./,/^# === 7\./p' "$TEMPLATE_COPY/setup.sh"
+  } >"$TMP/step6-$name.sh"
+  env HOME="$TMP/home" PATH="$FAKE_BIN:$PATH" FAKE_GH_LOG="$GH_LOG" FAKE_GH_REMOTE_EXISTS="$exists" FAKE_GH_OWNER="$owner" \
+      FAKE_GH_SEED_DIR="$TEMPLATE_ROOT/seed/strategy" \
+      GIT_AUTHOR_NAME=contract GIT_AUTHOR_EMAIL=contract@example.invalid \
+      GIT_COMMITTER_NAME=contract GIT_COMMITTER_EMAIL=contract@example.invalid \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+      bash "$TMP/step6-$name.sh" >"$TMP/step6-$name.log" 2>&1
   echo $?
 }
 
-rc=$(run_adopt someone-else)
-check "foreign owner refused (exit $rc)" "accepted a repo owned by someone-else" [ "$rc" != "0" ]
-check "refusal names the owner mismatch" "no owner-mismatch message; output: $(cat "$TMP/adopt.log")" \
-  grep -qF "Refusing to adopt a repository that is not yours" "$TMP/adopt.log"
-check_not "nothing cloned" "cloned a foreign repo" grep -qE "^gh repo clone" "$GH_LOG"
-
-rc=$(run_adopt contract-test)
-check "our own repository is adopted" "exit $rc; $(tail -5 "$TMP/adopt.log")" [ "$rc" = "0" ]
+echo "--- remote exists and is ours → adopted (clone), never created ---"
+rc=$(run_step6 ours 1 contract-test governance)
+check "step 6 succeeds (exit $rc)" "exit $rc; $(tail -5 "$TMP/step6-ours.log")" [ "$rc" = "0" ]
 check "our repository is cloned" "no gh repo clone of our repository; log: $(cat "$GH_LOG")" \
   grep -qE "^gh repo clone contract-test/DS-strategy " "$GH_LOG"
-check "owner and structure verified" "adoption not confirmed; output: $(cat "$TMP/adopt.log")" \
-  grep -qF "adopted: owner and structure verified" "$TMP/adopt.log"
+check_not "no gh repo create for an existing repository" "gh repo create ran although the repository exists" \
+  grep -qE "^gh repo create" "$GH_LOG"
+check "owner and structure verified" "adoption not confirmed; output: $(cat "$TMP/step6-ours.log")" \
+  grep -qF "adopted: owner and structure verified" "$TMP/step6-ours.log"
 
-echo "=== 4. Seed really ships the markers the adoption check relies on ==="
-for m in REPO-TYPE.md docs/WP-REGISTRY.md; do
+echo "--- remote absent → created (gh repo create), nothing cloned ---"
+rc=$(run_step6 absent 0 contract-test governance)
+check "step 6 succeeds (exit $rc)" "exit $rc; $(tail -5 "$TMP/step6-absent.log")" [ "$rc" = "0" ]
+check "gh repo create is called for the new repository" "no gh repo create; log: $(cat "$GH_LOG")" \
+  grep -qE "^gh repo create contract-test/DS-strategy " "$GH_LOG"
+check_not "no gh repo clone when the remote is absent" "gh repo clone ran although the remote is absent" \
+  grep -qE "^gh repo clone" "$GH_LOG"
+check "the local governance repo is initialised" "no local git repo in the workspace" \
+  test -d "$TMP/step6-absent/DS-strategy/.git"
+
+echo "--- foreign owner → refused before any clone or create ---"
+rc=$(run_step6 foreign 1 someone-else governance)
+check "foreign owner refused (exit $rc)" "accepted a repo owned by someone-else" [ "$rc" != "0" ]
+check "refusal names the owner mismatch" "no owner-mismatch message; output: $(cat "$TMP/step6-foreign.log")" \
+  grep -qF "Refusing to adopt a repository that is not yours" "$TMP/step6-foreign.log"
+check_not "nothing cloned or created" "a foreign repo was cloned or a new one created: $(grep '^gh repo' "$GH_LOG")" \
+  grep -qE "^gh repo (clone|create)" "$GH_LOG"
+
+echo "--- ours, but the clone has none of the markers → refused, missing markers listed ---"
+rc=$(run_step6 stray 1 contract-test stray)
+check "a clone without markers is refused (exit $rc)" "a clone without governance markers was adopted" [ "$rc" != "0" ]
+check "refusal says it is not a governance repo" "no 'does not look like' message; output: $(cat "$TMP/step6-stray.log")" \
+  grep -qF "does not look like an IWE governance repo" "$TMP/step6-stray.log"
+check_not "nothing is reported as adopted" "a clone without markers was reported as adopted" \
+  grep -qF "adopted: owner and structure verified" "$TMP/step6-stray.log"
+REAL_MARKERS=$(sed -n 's/^\[harness\] GOVERNANCE_MARKERS=//p' "$TMP/step6-stray.log")
+for m in $REAL_MARKERS; do
+  check "missing marker $m is listed" "marker $m of the real array is not listed as missing" \
+    grep -qF -- "    - $m" "$TMP/step6-stray.log"
+done
+
+echo "=== 4. GOVERNANCE_MARKERS is the contract's list and the seed ships every marker ==="
+CONTRACT_MARKERS=$(jq -r '.requiredMarkers[]' "$TEMPLATE_ROOT/scripts/governance-repo-contract.json" | tr '\n' ' ')
+check "the real loader yields the contract's requiredMarkers" "loader gave '$REAL_MARKERS', contract says '$CONTRACT_MARKERS'" \
+  [ "$REAL_MARKERS " = "$CONTRACT_MARKERS" ]
+for m in $REAL_MARKERS; do
   [ -e "$TEMPLATE_ROOT/seed/strategy/$m" ] && pass "seed/strategy/$m present" || fail "seed/strategy/$m missing — adoption would reject a freshly seeded repo"
 done
 
