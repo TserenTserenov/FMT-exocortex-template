@@ -566,16 +566,16 @@ d2_hint_of() {
 }
 # d2_check_save_hint LOG TEXT BEFORE LABEL — the offered command, run as printed, must keep the
 # current copy (BEFORE) next to MEM_DST and then make MEM_DST the template's file. Run a second
-# time (the pilot repeats it, e.g. after the next release) it must not overwrite that copy: the
-# name carries a time stamp, so the first copy — the only one that holds the pilot's edits —
-# survives next to the second one.
+# time (the pilot repeats it, e.g. after the next release, or twice in a row) it must not
+# overwrite that copy: the name carries a date and $RANDOM, so the first copy — the only one that
+# holds the pilot's edits — survives next to the second one even when both runs fall into the same
+# second. RANDOM is seeded differently in the two runs, which keeps the check deterministic.
 d2_check_save_hint() {
     local hint backup count=0 original_kept=0
     hint=$(d2_hint_of "$1" "$2")
     rm -f "$MEM_DST".before-update*
-    bash -c "$hint" > /dev/null 2>&1 || true
-    sleep 1   # the time stamp in the name has a resolution of one second
-    bash -c "$hint" > /dev/null 2>&1 || true
+    bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
+    bash -c "RANDOM=22; $hint" > /dev/null 2>&1 || true
     for backup in "$MEM_DST".before-update-*; do
         [ -f "$backup" ] || continue
         count=$((count + 1))
@@ -584,9 +584,9 @@ d2_check_save_hint() {
         fi
     done
     if [ "$count" -eq 2 ] && [ "$original_kept" -eq 1 ] && cmp -s "$MEM_DST" "$SCRIPT_DIR/memory/dummy-memo.md"; then
-        pass "$4: the offered command saves the copy under a time-stamped name and a second run keeps both copies"
+        pass "$4: the offered command saves the copy under a unique name and a second run keeps both copies"
     else
-        fail "$4: the offered command ('${hint:-<none>}') left $count time-stamped copies (original kept: $original_kept); two were expected, one with the original"
+        fail "$4: the offered command ('${hint:-<none>}') left $count saved copies (original kept: $original_kept); two were expected, one with the original"
     fi
     rm -f "$MEM_DST".before-update*
 }

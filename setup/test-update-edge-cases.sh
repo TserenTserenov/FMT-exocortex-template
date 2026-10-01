@@ -43,8 +43,9 @@
 #        overwriting it, like .claude/rules/* already does (issue #847)
 #   T43: Step 6 (the main apply path) backs up a modified platform memory file
 #        before replacing it and names the replaced files (issue #967)
-#   T44: the author_mode "stale" hint saves the copy under a time-stamped name, so
-#        running it twice keeps both copies (cold review of #967)
+#   T44: the author_mode "stale" hint runs on exactly the printed paths (a space, quotes,
+#        $(...), backticks and a backslash in them) and two runs keep two copies
+#   T45: the same for the owner:user drift hint (cold review of #967)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -4501,24 +4502,58 @@ else
 fi
 
 # ============================================================================
-# T44: the author_mode "stale" hint saves the copy under a time-stamped name
-# (cold review of #967)
+# T44/T45: the cp command that the drift reports offer for a copy that equals a committed
+# version runs on exactly the printed paths and keeps every earlier copy (cold review of #967)
 # ============================================================================
-echo "--- T44: author_mode stale hint never overwrites an earlier copy ---"
+# A bare cp loses the copy when the verdict misleads (an edit committed into the clone looks like
+# an older version too). The printed command is run by the user's shell, so a path with a double
+# quote breaks it, and a literal $(...) in a path would be executed; and a saved copy with a fixed
+# (or per-second) name is overwritten by a second run of the same command, leaving only the
+# already refreshed copy. The real functions and the real classifier run on a throwaway template
+# clone; the printed command runs twice in a shell.
 
-# report_author_skip() offers `cp <template file> <workspace copy>` for a copy that equals an
-# older template version. A bare cp loses the copy when the verdict misleads (an edit committed
-# into the clone looks like an older version too); a fixed backup name would be overwritten by
-# the second run of the same hint, leaving only the already refreshed copy. The real function
-# and the real classifier run on a throwaway template clone; the printed command runs twice.
+# check_saving_hint LABEL HINT COPY ORIGINAL TEMPLATE_TEXT EXPANDED_DIR — HINT is a command line
+# update.sh printed for the user to run. It runs twice, back to back (RANDOM seeded differently:
+# two runs inside one second). The copy must end up as TEMPLATE_TEXT at exactly COPY; two saved
+# copies must sit next to it, one holding ORIGINAL; and the shell must have interpreted nothing
+# in the paths: EXPANDED_DIR, the directory a shell would have used after running the
+# $(printf EXPANDED) of the path, must not exist.
+check_saving_hint() {
+    local label="$1" hint="$2" copy="$3" original="$4" template_text="$5" expanded_dir="$6"
+    local saved count=0 original_kept=0
+    bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
+    bash -c "RANDOM=22; $hint" > /dev/null 2>&1 || true
+    for saved in "$copy".before-update-*; do
+        [ -f "$saved" ] || continue
+        count=$((count + 1))
+        if [ "$(cat "$saved")" = "$original" ]; then
+            original_kept=1
+        fi
+    done
+    if [ "$count" -eq 2 ] && [ "$original_kept" -eq 1 ] && [ "$(cat "$copy" 2>/dev/null)" = "$template_text" ] \
+        && [ ! -e "$expanded_dir" ]; then
+        pass "$label: the printed command refreshes exactly the printed path, interprets nothing in it, and two runs keep two copies"
+    else
+        fail "$label: the printed command ('$hint') left $count saved copies (original kept: $original_kept), the copy now holds '$(cat "$copy" 2>/dev/null)', an expanded directory exists: $([ -e "$expanded_dir" ] && echo yes || echo no)"
+    fi
+}
+
+echo "--- T44: author_mode stale hint: odd paths, two runs keep two copies ---"
 T44_FN=$(awk '/^report_author_skip\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+# The command builder is a helper of the report; it is extracted when update.sh has it (the report
+# fails by itself if it calls a helper that is gone).
+T44_HELPER=$(awk '/^saving_cp_command\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
 if [ -z "$T44_FN" ]; then
     fail "T44: could not extract report_author_skip() from update.sh — signature moved?"
 else
     T44_DIR="$TEST_WS/t44-author-hint"
-    T44_TEMPLATE="$T44_DIR/template"
-    T44_COPY="$T44_DIR/workspace copy.md"   # a space in the path: the hint must quote it
-    mkdir -p "$T44_TEMPLATE/memory" "$T44_TEMPLATE/.claude/scripts"
+    # One path with a space, double quotes, a $(...) substitution, backticks and a backslash.
+    # shellcheck disable=SC2016  # literal characters, nothing is meant to expand
+    T44_ODD='odd "q" $(printf EXPANDED) `b` back\slash'
+    T44_TEMPLATE="$T44_DIR/template $T44_ODD"
+    T44_COPY="$T44_DIR/copy $T44_ODD/workspace copy.md"
+    T44_EXPANDED="$T44_DIR/copy odd \"q\" EXPANDED \`b\` back\\slash"
+    mkdir -p "$T44_TEMPLATE/memory" "$T44_TEMPLATE/.claude/scripts" "$(dirname "$T44_COPY")"
     cp "$TEMPLATE_DIR/.claude/scripts/classify-workspace-copy.sh" "$T44_TEMPLATE/.claude/scripts/classify-workspace-copy.sh"
     chmod +x "$T44_TEMPLATE/.claude/scripts/classify-workspace-copy.sh"
     git -C "$T44_TEMPLATE" init -q
@@ -4534,6 +4569,7 @@ else
 
     T44_OUT=$(
         set +u
+        eval "$T44_HELPER"
         eval "$T44_FN"
         SCRIPT_DIR="$T44_TEMPLATE"
         # Exported: the eval'd update.sh function reads and counts them.
@@ -4544,25 +4580,81 @@ else
     )
     if grep -qF -- 'Обновить: ' <<<"$T44_OUT"; then
         T44_HINT="${T44_OUT#*Обновить: }"
-        bash -c "$T44_HINT" > /dev/null 2>&1 || true
-        sleep 1   # the time stamp in the copy's name has a resolution of one second
-        bash -c "$T44_HINT" > /dev/null 2>&1 || true
-        t44_count=0
-        t44_original_kept=0
-        for t44_backup in "$T44_COPY".before-update-*; do
-            [ -f "$t44_backup" ] || continue
-            t44_count=$((t44_count + 1))
-            if [ "$(cat "$t44_backup")" = "template v1" ]; then
-                t44_original_kept=1
-            fi
-        done
-        if [ "$t44_count" -eq 2 ] && [ "$t44_original_kept" -eq 1 ] && [ "$(cat "$T44_COPY")" = "template v2" ]; then
-            pass "T44: the hint saves the copy under a time-stamped name; a second run keeps both copies"
-        else
-            fail "T44: the hint left $t44_count time-stamped copies (original kept: $t44_original_kept), copy now '$(cat "$T44_COPY")'; expected 2 copies, the original among them, and the template text"
-        fi
+        check_saving_hint "T44" "$T44_HINT" "$T44_COPY" "template v1" "template v2" "$T44_EXPANDED"
     else
         fail "T44: report_author_skip() printed no 'Обновить:' hint for a stale copy: '${T44_OUT:-<empty>}'"
+    fi
+fi
+
+echo "--- T45: owner:user drift hint: odd paths, two runs keep two copies ---"
+T45_FUNCS=""
+T45_MISSING=""
+for t45_fn in hash_file is_migrated_platform_memory_path report_owner_user_memory_drift; do
+    t45_src=$(awk -v fn="$t45_fn" '$0 ~ "^" fn "\\(\\) \\{" {copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")
+    if [ -z "$t45_src" ]; then
+        T45_MISSING="$T45_MISSING $t45_fn"
+    fi
+    T45_FUNCS="$T45_FUNCS
+$t45_src"
+done
+# The command builder, when update.sh has it (see T44).
+T45_FUNCS="$T45_FUNCS
+$(awk '/^saving_cp_command\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")"
+if [ -n "$T45_MISSING" ]; then
+    fail "T45: could not extract from update.sh:$T45_MISSING"
+else
+    T45_DIR="$TEST_WS/t45-owner-hint"
+    # shellcheck disable=SC2016
+    T45_ODD='odd "q" $(printf EXPANDED) `b` back\slash'
+    T45_TEMPLATE="$T45_DIR/template $T45_ODD"
+    T45_MEMORY="$T45_DIR/memory $T45_ODD"
+    T45_EXPANDED="$T45_DIR/memory odd \"q\" EXPANDED \`b\` back\\slash"
+    # The memory file's own name has the odd characters too (no backslash: git reads one in a pathspec as an escape).
+    # shellcheck disable=SC2016
+    T45_NAME='odd "q" $(printf EXPANDED) `b`.md'
+    T45_FPATH="memory/$T45_NAME"
+    T45_MANIFEST="$T45_DIR/manifest.json"
+    mkdir -p "$T45_TEMPLATE/memory" "$T45_TEMPLATE/.claude/scripts" "$T45_MEMORY"
+    cp "$TEMPLATE_DIR/.claude/scripts/classify-workspace-copy.sh" "$T45_TEMPLATE/.claude/scripts/classify-workspace-copy.sh"
+    git -C "$T45_TEMPLATE" init -q
+    git -C "$T45_TEMPLATE" config user.email "test@test"
+    git -C "$T45_TEMPLATE" config user.name "test"
+    printf -- '---\nowner: user\n---\ntemplate v1\n' > "$T45_TEMPLATE/$T45_FPATH"
+    git -C "$T45_TEMPLATE" add -- "$T45_FPATH"
+    git -C "$T45_TEMPLATE" commit -q -m "v1"
+    printf -- '---\nowner: user\n---\ntemplate v2\n' > "$T45_TEMPLATE/$T45_FPATH"
+    git -C "$T45_TEMPLATE" add -- "$T45_FPATH"
+    git -C "$T45_TEMPLATE" commit -q -m "v2"
+    printf -- '---\nowner: user\n---\ntemplate v1\n' > "$T45_MEMORY/$T45_NAME"   # equals the committed v1: verdict "stale"
+    python3 - "$T45_MANIFEST" "$T45_FPATH" <<'PY'
+import json
+import sys
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump({"files": [{"path": sys.argv[2]}]}, handle)
+PY
+
+    T45_OUT=$(
+        set +u
+        # shellcheck source=/dev/null
+        source "$TEMPLATE_DIR/.claude/lib/frontmatter.sh"
+        eval "$T45_FUNCS"
+        # shellcheck disable=SC2329  # called by the eval'd update.sh function
+        py_available() { return 0; }
+        # shellcheck disable=SC2034
+        PY_BIN=python3
+        SCRIPT_DIR="$T45_TEMPLATE"
+        # shellcheck disable=SC2034  # read by the eval'd update.sh function
+        CLAUDE_MEMORY_DIR="$T45_MEMORY"
+        # shellcheck disable=SC2034
+        MANIFEST="$T45_MANIFEST"
+        report_owner_user_memory_drift
+    )
+    T45_LINE=$(grep -F -- 'Обновить с сохранением копии: ' <<<"$T45_OUT" || true)
+    if [ -n "$T45_LINE" ]; then
+        T45_HINT="${T45_LINE#*Обновить с сохранением копии: }"
+        check_saving_hint "T45" "$T45_HINT" "$T45_MEMORY/$T45_NAME" "$(cat "$T45_MEMORY/$T45_NAME")" "$(cat "$T45_TEMPLATE/$T45_FPATH")" "$T45_EXPANDED"
+    else
+        fail "T45: report_owner_user_memory_drift() printed no saving hint for a stale copy: '${T45_OUT:-<empty>}'"
     fi
 fi
 
