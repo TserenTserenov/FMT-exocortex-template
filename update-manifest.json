@@ -453,11 +453,11 @@
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
-      "sha256": "bcbe5c9d92c1a102da41e8de61d25ece9c5f39e29391dd54a0fcba094d43abc1"
+      "sha256": "da38dea4d1820f55b7b7ce4080de6e1e651b94cf3467e9b80407b005eaa46758"
     },
     {
       "path": ".claude/skills/day-open/templates.md",
-      "sha256": "91418eaed0e9f36d152f60cfefd3a5f5800f2a69267317354b8c78b194ab33e8"
+      "sha256": "1b76c7bb2dff53d484b01f37c98d3f3d0e7bb7c457b83cd1460c8fea577157cc"
     },
     {
       "path": ".claude/skills/decompose/SKILL.md",
@@ -909,7 +909,7 @@
     },
     {
       "path": "docs/IWE-HELP.md",
-      "sha256": "2501fdd9d9932ef9a14f2f2ba37c32f2c06e8d588bc605481aef960ab690824d"
+      "sha256": "541231e5cd111f529ed3b87e3737913bc1a6f210a31c7004f98d16977927e416"
     },
     {
       "path": "docs/KIMI-BROWSER-SETUP.md",
@@ -921,7 +921,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "0f690827b7babf8af69a2a7c53c83858d629b7dd5c9f5cef4473c4610b4eeeec"
+      "sha256": "222b5c012296ddfd709022fb165d249801cef0a9ec903503dc54124042ca3500"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -953,7 +953,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "d37916482aefc9e914bc32c1ac985af2f865436e2b8ea66bc497e48533606b6d"
+      "sha256": "cf2a882d2006de3b1c42da2574a84b136a728cb01d5313bf9dc82061829d6249"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1613,7 +1613,7 @@
     },
     {
       "path": "memory/templates-dayplan.md",
-      "sha256": "317f5b8d2b2e31782b00e21ab72c55f9fca0eede8165de9e84f855a2f5988e5d"
+      "sha256": "cfa0028763b47441754f472e7081adc7fab1c4308cfde7112c1ee1993ce9d7c9"
     },
     {
       "path": "pack-templates/.github/README.md",
@@ -1661,7 +1661,7 @@
     },
     {
       "path": "roles/README.md",
-      "sha256": "3a2850e75c0f3c2f672d650eb8796114661fc013893e2c8fd777d52a12351b40"
+      "sha256": "86349ac7fa2c3ff1cbed8df676feb3000746bcfffe98d93576f2b74f15eb978e"
     },
     {
       "path": "roles/ROLE-CONTRACT.md",
@@ -1789,7 +1789,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "ad47adcb22fcfc490bd7921a6f69f8636d3cf758fea060939b1cc5686ae831d2"
+      "sha256": "c6a188e09627c40540b2a617526a04600ca8ade32ccf3909c01aba5d24b5fa77"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -1801,11 +1801,11 @@
     },
     {
       "path": "roles/strategist/prompts/note-review.md",
-      "sha256": "a9b659c1673ae4f2590d31f974fe688fac1d059b45bc9683713b16f6765192e5"
+      "sha256": "028a419cf7deb505d42dcd3d52eb077c1e78873a5a8d73eb839eb64d0d058b48"
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "424ef6e16894d82c61b90c6450d12007beb5863c3a1f6df42148ac286000bd60"
+      "sha256": "e9d03b989f3bf65e0d5faa5e5ac187099c5a7e561c3ac27b8d294a1e3e0618ba"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -1877,11 +1877,11 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md",
-      "sha256": "18fd3f447bd0d165d8226498bae14732ec6d6f9db5415c4543ce1dc06d6f08fd"
+      "sha256": "68039549796074f3fcc3b359fadd718fab1136f0615825cb8243c3964c869b52"
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "e94ff7b63613e1060c5e3dc94738626f7b9d2896252a513674c6f66a9ee9a098"
+      "sha256": "13286a40f19b95d5f18bfe1a386d8b2db4ce1b56de10ecd4133f5ebec3d26756"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",
@@ -1933,11 +1933,11 @@
     },
     {
       "path": "roles/synchronizer/README.md",
-      "sha256": "84eb57399262f7569bd929811646ed37563b162164370002917f294633b801d5"
+      "sha256": "af4c68304e6262df6d80cd2ad21fb58c65a705d5e5b5d66018dd1111418f38af"
     },
     {
       "path": "roles/synchronizer/config.yaml",
-      "sha256": "a009351521146fa03913d7581012a667f9392b559ea107c0863948ba69b0bc78"
+      "sha256": "5c799359a9e28a0a617f8a6edba4c1f4d6efd1c649c64436c7d2371ec2367095"
     },
     {
       "path": "roles/synchronizer/install.sh",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# test_issue_961_note_review_pilot_only.sh - regression for issue #961: Note-Review against the pilot
-# decision of 2026-07-29/30. Note-Review only classifies and PROPOSES: it never strips bold, never
+# test_issue_961_note_review_pilot_only.sh - regression for issue #961: Note-Review against the template
+# owner's decision of July 2026. Note-Review only classifies and PROPOSES: it never strips bold, never
 # archives or deletes a note on its own, and the scheduler never starts it. A processed note is marked
 # "**Title** ✅предложено", stays bold and visible until the pilot closes it (a command, or by
 # striking it through).
@@ -13,7 +13,10 @@
 #   C. Day Open scanner: the REAL render_fleeting_notes of scripts/ and of the seed snapshot lists a
 #      "✅предложено" note as awaiting the pilot;
 #   D. the Telegram text of a finished Note-Review no longer claims the inbox was cleaned;
-#   E. daily-report.sh no longer reports a missing note-review marker as a failure.
+#   E. daily-report.sh no longer reports a missing note-review marker as a failure;
+#   G. the Day Open instructions, the user guides and the other prompts no longer describe the old flow
+#      (a nightly review, a note that leaves the box after Note-Review) and do not attribute the decision
+#      to a pilot on a date.
 # The canary of strategist.sh is covered end to end in setup/test-strategist-isolated-scenarios.sh (B10).
 
 # SC2016: the single-quoted strings are literal prompt fragments (with backticks) and stub-script bodies
@@ -62,16 +65,23 @@ echo "== A2: the prompt no longer archives or deletes on its own =="
 check "the old mandatory 'archive processed notes' step is gone" "0" "$(count_fixed '#### 10. Архивировать обработанные заметки' "$PROMPT")"
 check "the old 'delete from fleeting-notes.md' step is gone" "0" "$(count_fixed 'Шаг 10b. Удалить из fleeting-notes.md' "$PROMPT")"
 check "the old 'Step 10 is mandatory' block is gone" "0" "$(count_fixed 'Шаг 10 ОБЯЗАТЕЛЕН' "$PROMPT")"
-check "step 10 never edits the box beyond the proposed mark" "1" "$(count_fixed '`fleeting-notes.md` НЕ редактируется этим шагом, кроме простановки `✅предложено` в шаге 4 выше.' "$PROMPT")"
+check "step 10 never edits the box beyond the proposed mark and the notes the pilot struck through" "1" "$(count_fixed '`fleeting-notes.md` НЕ редактируется этим шагом, кроме простановки `✅предложено` в шаге 4 выше и удаления заметок, которые пилот сам зачеркнул' "$PROMPT")"
+check "the 'do not touch the box' rule names the same exception" "1" "$(count_fixed 'кроме пометок шага 4 и удаления заметок, которые пилот сам зачеркнул' "$PROMPT")"
 check_at_least "every archive record format carries the pilot decision (step 10 and the manual cleanup)" 2 "$(count_fixed '**Разбор:** YYYY-MM-DD — **Решение пилота:**' "$PROMPT")"
 check "principle: a note leaves the box only with the pilot decision recorded" "1" "$(count_fixed '**Каждый разбор — запись решения:**' "$PROMPT")"
-check "manual cleanup is the only way to remove a note" "1" "$(count_fixed 'Это единственный путь физического удаления из `fleeting-notes.md`' "$PROMPT")"
+check "manual cleanup is the main way to remove a note, with step 10 and the safety net named as the exceptions" "1" "$(count_fixed 'Это основной путь физического удаления из `fleeting-notes.md` (кроме шага 10' "$PROMPT")"
+check "no claim of an 'only way' to remove a note is left (step 10 and the safety net remove too)" "0" "$(count_fixed 'единственный путь физического удаления' "$PROMPT")"
+check "the legend names the safety net as the only writer of a plain note's archive record" "1" "$(count_fixed 'только скриптом-страховкой, запись «auto-cleanup»' "$PROMPT")"
 
 echo "== A3: pilot-only contract: no automatic and no headless run =="
 check "the precondition says automatic runs are off" "1" "$(count_fixed 'Автоматические запуски отключены' "$PROMPT")"
 check "the old 'runs every evening automatically' sentence is gone" "0" "$(count_fixed 'Процесс запускается вечером (~23:00) автоматически' "$PROMPT")"
-check "headless mode is forbidden" "1" "$(count_fixed 'Headless-режим запрещён' "$PROMPT")"
+check "a run from strategist.sh (no chat) only marks and proposes: the precondition says so" "1" "$(count_fixed 'идёт без чата и только ставит пометки `✅предложено` и пишет предложения (шаги 1-9 и 11)' "$PROMPT")"
+check "a run without a chat archives and deletes nothing: step 9 says so" "1" "$(count_fixed 'ничего не архивирует и не удаляет' "$PROMPT")"
+check "step 10 is skipped when there is no chat" "1" "$(count_fixed 'Из `strategist.sh` (без чата) этот шаг пропускается.' "$PROMPT")"
+check "the old blanket ban that contradicted the terminal run is gone" "0" "$(count_fixed 'без живого пилота сценарий не выполняется вовсе' "$PROMPT")"
 check "the old 'headless: do not wait for approval' block is gone" "0" "$(count_fixed '**Headless-режим:** НЕ ждать одобрения' "$PROMPT")"
+check "the scenario is no longer called 'daily'" "0" "$(count_fixed 'Ежедневный разбор заметок' "$PROMPT")"
 
 echo "== A4: the box legend and the Day Plan prompt follow the decision =="
 check "seed legend: the proposed mark is described" "1" "$([ "$(count_fixed '✅предложено' "$SEED_LEGEND")" -ge 1 ] && echo 1 || echo 0)"
@@ -253,6 +263,43 @@ check "the dry run succeeds" "0" "$DR_RC"
 check "everything that must run did run: the traffic light is green (a missing note-review marker is no failure)" "1" "$(printf '%s\n' "$DR_OUT" | grep -cF '🟢')"
 check "no note-review complaint in the remarks" "0" "$(printf '%s\n' "$DR_OUT" | grep -c 'note-review')"
 check "no 'Разбор заметок' row that could show a failed run" "0" "$(printf '%s\n' "$DR_OUT" | grep -cF 'Разбор заметок')"
+# ==== LAYER G: the other texts ====
+echo "== G1: the Day Open instructions no longer say that a processed note leaves the box =="
+for f in ".claude/skills/day-open/day-open-details.md" ".claude/skills/day-open/templates.md" "memory/templates-dayplan.md"; do
+    for stale in 'проверить по git log (`note-review`)' 'проверить git log `note-review`' 'исчезает из fleeting-notes.md' \
+        'Все заметки обработаны (коммит HASH' 'Источник: Note-Review (вчера)'; do
+        check "$f: no '$stale'" "0" "$(count_fixed "$stale" "$ROOT/$f")"
+    done
+    check_at_least "$f: the condition is 'no notes waiting for the pilot's decision'" 1 "$(count_fixed 'ждущих решения пилота' "$ROOT/$f")"
+done
+check "day-open-details: a note marked ✅предложено is carried over to the next Day Plan" "1" "$(count_fixed 'такую заметку переносить в секцию «Разбор заметок» снова' "$ROOT/.claude/skills/day-open/day-open-details.md")"
+
+echo "== G2: no guide, seed file or prompt promises an automatic evening review =="
+absent_in_texts() {  # <description> <fixed string>: no file under docs/, seed/, roles/, .claude/, memory/ contains it
+    check "$1" "0" "$(grep -rlF -- "$2" "$ROOT/docs" "$ROOT/seed" "$ROOT/roles" "$ROOT/.claude" "$ROOT/memory" 2>/dev/null | wc -l | tr -d ' ')"
+}
+absent_in_texts "SETUP-GUIDE: the note is not 'reviewed in the evening' by the Strategist" 'Стратег разберёт её вечером'
+absent_in_texts "SETUP-GUIDE: no 'Вечер (23:00)' row in the table of automatic jobs" '**Вечер (23:00)**'
+absent_in_texts "IWE-HELP: no 'Вечером (23:00) — разбор заметок'" 'Вечером (23:00) — разбор заметок'
+absent_in_texts "IWE-HELP: no 'Стратег разбирает вечером'" 'Стратег разбирает вечером'
+absent_in_texts "LEARNING-PATH: note-review is not one of the nightly automations" '(sync-agent, note-review, reindex)'
+absent_in_texts "LEARNING-PATH: the note lifecycle does not hand the review to the Strategist role" 'Note-Review (Стратег или вручную)'
+absent_in_texts "LEARNING-PATH: noise is not struck through by the agent" '~~зачёркнуто~~ → архив'
+absent_in_texts "seed draft list: not updated by a daily Note-Review" 'Note-Review (ежедневно)'
+absent_in_texts "roles/README: the Strategist has no evening job" 'launchd (утро, вечер, неделя)'
+absent_in_texts "session-prep: no 'daily triage' of Note-Review" 'ежедневного triage Note-Review'
+absent_in_texts "strategy-session: no ambiguous 'clean the processed'" 'Очисти обработанные из'
+absent_in_texts "strategy-session steps: no ambiguous 'clean the processed'" '**Очисти** обработанные из'
+for f in "roles/strategist/prompts/strategy-session.md" "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md"; do
+    check "$f: only notes the pilot already decided on are cleaned" "1" "$(count_fixed 'по которым пилот уже принял решение' "$ROOT/$f")"
+done
+check "synchronizer README: a manual run from the terminal is described honestly" "1" "$(count_fixed 'Запуск `strategist.sh note-review` из терминала идёт без чата' "$ROOT/roles/synchronizer/README.md")"
+check "synchronizer README: no promise that the manual run does the whole review" "0" "$(count_fixed 'вручную (`strategist.sh note-review`) или в секции' "$ROOT/roles/synchronizer/README.md")"
+
+echo "== G3: the decision is not attributed to a pilot on a date =="
+for stale in '29-30.07.2026' '(пилот, 30.07.2026)' 'Пилот (2026-07-29)' '(пилот, 2026-07-29)'; do
+    absent_in_texts "no '$stale' in the shipped texts" "$stale"
+done
 # ==== END LAYERS ====
 
 echo
