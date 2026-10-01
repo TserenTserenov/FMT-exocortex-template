@@ -79,6 +79,7 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
    bash "${IWE_WORKSPACE:-$HOME/IWE}/.claude/scripts/wp-sync-bundle.sh" WP-N > /tmp/wp-sync-bundle-$$.md
    ```
    Exit 0 → читать вывод. Exit 1 → РП не найден → перейти к Ритуалу с пометкой «контекст не найден». Exit 2 → ошибка парсинга → перейти к Ритуалу, поднять stderr в «Требует внимания».
+   Exit 4 → не найдена библиотека wp-num.sh: ошибка установки, не «РП не найден»; сообщить пилоту и обновить шаблон.
 
    **Шаг 3b — Override (опционально).** `bash .claude/scripts/load-extensions.sh protocol-open sync` — exit 0 → `Read` файлы (alphabetic), они переопределяют дефолтное поведение шага 3c. Exit 1 → дефолт.
 

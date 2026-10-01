@@ -82,6 +82,143 @@ if [ -f "$_SG_ISOLATE_LIB" ]; then
   # shellcheck source=lib/session-guard-isolate-lib.sh
   . "$_SG_ISOLATE_LIB"
 fi
+# issue #954: shared reader of WP numbers; the hypothesis gate in `open` finds the card by
+# the normalised number. The same lookup block as in the other consumers, but OPTIONAL here
+# (_WPN_OPTIONAL=1): a session must still open on an installation without the library, the
+# gate then warns and checks only the exact card names (see wp_card_candidates).
+_WPN_ROOT_UP=".."
+_WPN_OPTIONAL=1
+# >>> wp-num locate
+# Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
+# resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
+# fixtures. Candidates, in order: lib/ next to the file, <root>/scripts/lib, the template
+# clone next to a delivered workspace (<root>/FMT-exocortex-template), the explicit
+# IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
+# just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
+# The library is mandatory: not finding it is an installation error, not "WP not found",
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# A consumer that must keep working without the library (session-guard: its hypothesis gate
+# warns and checks the exact card names, it never blocks a session over a missing library)
+# sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
+_wpn_src="${BASH_SOURCE[0]}"
+_wpn_hops=0
+while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
+  _wpn_link="$(readlink "$_wpn_src")"
+  case "$_wpn_link" in
+    /*) _wpn_src="$_wpn_link" ;;
+    *) _wpn_src="$(dirname "$_wpn_src")/$_wpn_link" ;;
+  esac
+  _wpn_hops=$((_wpn_hops + 1))
+done
+_wpn_dir="$(cd -P "$(dirname "$_wpn_src")" && pwd)"
+_wpn_root="$(cd -P "$_wpn_dir/$_WPN_ROOT_UP" && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
+                 "$_wpn_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [ -r "$_wpn_cand" ]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [ -z "$WP_NUM_LIB" ] && [ -z "${_WPN_OPTIONAL:-}" ]; then
+  echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
+  exit 4
+fi
+if [ -n "$WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$WP_NUM_LIB"
+fi
+# <<< wp-num locate
+
+# Every path where the card of `--wp <id>` may be written, one per line: the id as typed
+# (inbox/<id>/<id>.md and inbox/<id>.md -- what the hypothesis gate always read) and, when
+# the id is a WP number and the shared reader is loaded, the folder card in both spellings
+# (WP-044/, legacy WP-44/) and every flat card of the number, with or without a slug
+# (WP-044.md, WP-44-task.md: wp_num_flat_cards, the lookup wp-list.py and the bundle use).
+# Without the reader only the typed paths are listed. Notes are not listed.
+wp_card_candidates() {
+  local inbox="$1" id="$2" n pad
+  printf '%s\n' "$inbox/$id/$id.md" "$inbox/$id.md"
+  if type wp_num_normalize >/dev/null 2>&1 && n=$(wp_num_normalize "$id"); then
+    pad=$(printf '%03d' "$n")
+    printf '%s\n' "$inbox/WP-$pad/WP-$pad.md" "$inbox/WP-$n/WP-$n.md"
+    wp_num_flat_cards "$inbox" "$id" || true
+  fi
+}
+
+# Succeeds when the top-level `hypothesis_relation` of the card is `unclassified`.
+#
+# Where the field is looked for: one rule, decided by the first NON-EMPTY line of the file
+# (leading blank lines, a UTF-8 BOM and CRLF are ignored).
+#   * It is `---`: the card has a frontmatter, up to the next `---` line, and only the first
+#     such field in it counts. The body is never read, so a YAML example in it (a fenced block
+#     included) is not the card's field.
+#   * It is anything else: the card has no frontmatter, and only its initial block of metadata
+#     is read, the run of `key: value` lines at the top of the file, up to the first blank line,
+#     Markdown heading, fence or any other line; any `hypothesis_relation` in that block counts.
+#     This keeps the one-line fixtures of the WP-518 test (and cards that are bare `key: value`
+#     lines) working without reading the rest of the document: a field after a heading, after
+#     a blank line or inside a ``` / ~~~ fence is an example, not metadata.
+#
+# What the value is: a SUBSET of YAML, on purpose. Supported: single-line plain and quoted
+# values. Not supported: escape sequences and multi-line scalars. A quoted value is taken whole
+# (a `#` inside the quotes belongs to it, so "unclassified # example" is not `unclassified`) and
+# only whitespace and a `# comment` may follow the closing quote; a plain value ends at a ` #`
+# comment. No quote is stripped on its own: an unterminated "unclassified is not `unclassified`
+# either. Where this differs from a YAML parser: an escape is read literally ("unclassifi\x65d"
+# is not `unclassified`, although YAML decodes it to that), and a plain `unclassified` continued
+# on the next line is judged by its first line only (so it still blocks, although YAML reads
+# the two lines as one value).
+card_is_unclassified() {
+  local bom
+  bom=$'\xEF\xBB\xBF'
+  awk -v bom="$bom" -v sq="'" -v dq='"' '
+    function scalar(text,   q, i, n, c, out, closed, tail) {
+      sub(/^[[:space:]]+/, "", text)
+      sub(/[[:space:]]+$/, "", text)
+      q = substr(text, 1, 1)
+      if (q == dq || q == sq) {
+        n = length(text); out = ""; closed = 0
+        for (i = 2; i <= n; i++) {
+          c = substr(text, i, 1)
+          if (q == dq && c == "\\") { out = out substr(text, i, 2); i++; continue }
+          if (c == q) {
+            if (q == sq && substr(text, i + 1, 1) == sq) { out = out sq; i++; continue }
+            closed = 1
+            break
+          }
+          out = out c
+        }
+        if (closed) {
+          tail = substr(text, i + 1)
+          if (tail == "" || tail ~ /^[[:space:]]+#/) return out
+        }
+        return text
+      }
+      sub(/[[:space:]]+#.*$/, "", text)
+      return text
+    }
+    NR == 1 && index($0, bom) == 1 { $0 = substr($0, length(bom) + 1) }
+    state == "" {
+      if ($0 ~ /^[[:space:]]*$/) next
+      first = $0
+      sub(/[[:space:]]+$/, "", first)
+      if (first == "---") { state = "frontmatter"; next }
+      state = "head"
+    }
+    state == "frontmatter" && /^---[[:space:]]*$/ { exit }
+    state == "head" && $0 !~ /^[A-Za-z_][A-Za-z0-9_-]*:/ { exit }
+    /^hypothesis_relation:/ {
+      v = $0
+      sub(/^hypothesis_relation:/, "", v)
+      if (scalar(v) == "unclassified") found = 1
+      if (found || state == "frontmatter") exit
+    }
+    END { exit found ? 0 : 1 }
+  ' "$1" 2>/dev/null
+}
 
 # Prints frozen checkout cwd sits in, or empty. FMT has no gov_repo_dir();
 # check git toplevel only (sufficient for open freeze + tests).
@@ -1257,11 +1394,29 @@ if [ "$CMD" = "open" ]; then
   # Отсутствующее поле намеренно не блокируется: это карточка, созданная до
   # введения контракта, и массовое дообогащение исторических РП не является
   # безопасным побочным эффектом открытия одной сессии.
-  WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP/$WP.md"
-  if [ ! -f "$WP_CARD" ]; then
-    WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP.md"
+  # issue #954: --wp 44, 044, WP-44 and WP-044 name one card (folder WP-044/), so every
+  # place the card can be written is checked and ANY of them still marked unclassified
+  # blocks the open (see wp_card_candidates). A note that merely carries `wp: N` is not a card.
+  # The field is read by card_is_unclassified (where it is looked for -- the frontmatter, or
+  # the initial block of metadata of a card without one -- and which values it understands
+  # are described there), not grepped from the whole file: a trailing `# comment` does not
+  # hide it and an example in the body does not fake it. A session is never refused for the
+  # lack of the shared reader (the gate degrades instead), but checking less than it promises
+  # must not be silent: one warning, and the exact card names are still checked. `open`
+  # re-executes itself under the transition lock (_ensure_session_transition_lock), which runs
+  # this gate a second time: warn on the first pass only.
+  if ! type wp_num_normalize >/dev/null 2>&1 \
+     && [ -z "${IWE_SESSION_TRANSITION_FD:-}" ] && [ -z "${IWE_SESSION_TRANSITION_TARGET:-}" ]; then
+    echo "session-guard: wp-num.sh не найдена: гейт гипотезы проверяет только точные имена карточек" >&2
   fi
-  if [ -f "$WP_CARD" ] && grep -qE "^hypothesis_relation:[[:space:]]*['\"]?unclassified['\"]?[[:space:]]*$" "$WP_CARD"; then
+  WP_CARD=""
+  while IFS= read -r _sg_card; do
+    if [ -f "$_sg_card" ] && card_is_unclassified "$_sg_card"; then
+      WP_CARD="$_sg_card"
+      break
+    fi
+  done < <(wp_card_candidates "$IWE_ROOT/$GOV_REPO/inbox" "$WP")
+  if [ -n "$WP_CARD" ]; then
     fail "РП $WP не классифицирована по гипотезе. До открытия выберите tests, enables, responds, researches или operational в $WP_CARD" 1
   fi
 

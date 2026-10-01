@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # wp-phase-digest.sh — детерминированный дайджест состояния фаз карточки РП
 # Контракт: вход WP-N (или N) → stdout `status=...` + `phase_digest=...` +
-#           `phase_count=...`, exit 0/1
+#           `phase_count=...`, exit 0/1/4 (4: не найден scripts/lib/wp-num.sh —
+#           ошибка установки, а не «РП не найден»; см. wp-sync-bundle.sh)
 #
 # Зачем: пир-сессия WP-561 2026-09-03-19 (Kimi+Codex) — snapshot-механизм
 # "handoff_snapshot" (при close агент записывает {ref, observed_status,
@@ -21,6 +22,52 @@
 
 set -euo pipefail
 
+_WPN_ROOT_UP="../.."
+_WPN_OPTIONAL=""
+# >>> wp-num locate
+# Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
+# resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
+# fixtures. Candidates, in order: lib/ next to the file, <root>/scripts/lib, the template
+# clone next to a delivered workspace (<root>/FMT-exocortex-template), the explicit
+# IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
+# just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
+# The library is mandatory: not finding it is an installation error, not "WP not found",
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# A consumer that must keep working without the library (session-guard: its hypothesis gate
+# warns and checks the exact card names, it never blocks a session over a missing library)
+# sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
+_wpn_src="${BASH_SOURCE[0]}"
+_wpn_hops=0
+while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
+  _wpn_link="$(readlink "$_wpn_src")"
+  case "$_wpn_link" in
+    /*) _wpn_src="$_wpn_link" ;;
+    *) _wpn_src="$(dirname "$_wpn_src")/$_wpn_link" ;;
+  esac
+  _wpn_hops=$((_wpn_hops + 1))
+done
+_wpn_dir="$(cd -P "$(dirname "$_wpn_src")" && pwd)"
+_wpn_root="$(cd -P "$_wpn_dir/$_WPN_ROOT_UP" && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
+                 "$_wpn_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [ -r "$_wpn_cand" ]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [ -z "$WP_NUM_LIB" ] && [ -z "${_WPN_OPTIONAL:-}" ]; then
+  echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
+  exit 4
+fi
+if [ -n "$WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$WP_NUM_LIB"
+fi
+# <<< wp-num locate
+
 IWE_WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-governance}"
 # Portability (template install): same fallback as wp-sync-bundle.sh -- any
@@ -36,22 +83,12 @@ ARCHIVE_DIR="$STRATEGY_DIR/archive/wp-contexts"
 
 log_err() { echo "[ERROR] $*" >&2; }
 
-# Тот же поиск, что find_wp_file() в wp-sync-bundle.sh (WP-434: папочная
-# конвенция первична) — сознательно не source'им весь wp-sync-bundle.sh
-# (он объявляет main() и запускает себя), копия одной функции безопаснее.
+# Тот же поиск, что find_wp_file() в wp-sync-bundle.sh (WP-434: папочная конвенция
+# первична): оба зовут wp_num_find_card — один парсер на обоих концах снимка. Раньше
+# здесь жила урезанная копия функции, и поиск расходился (#954): без нулей в имени
+# папки, без плоских файлов со slug. Всегда возвращает 0 (set -e у вызывающих).
 find_wp_file() {
-  local num="$1"
-  local found=""
-  if [[ -d "$INBOX_DIR" ]]; then
-    found=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    [[ -z "$found" ]] && found=$(grep -rl "^wp: ${num}$" "$INBOX_DIR" 2>/dev/null | head -1 || true)
-    [[ -z "$found" ]] && found=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}.md" 2>/dev/null | head -1 || true)
-  fi
-  if [[ -z "$found" && -d "$ARCHIVE_DIR" ]]; then
-    found=$(find "$ARCHIVE_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    [[ -z "$found" ]] && found=$(grep -rl "^wp: ${num}$" "$ARCHIVE_DIR" 2>/dev/null | head -1 || true)
-  fi
-  echo "$found"
+  wp_num_find_card "$INBOX_DIR" "$ARCHIVE_DIR" "$1" || true
 }
 
 extract_fm_field() {

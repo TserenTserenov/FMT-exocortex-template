@@ -9,9 +9,14 @@
 
 set -euo pipefail
 
-TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
+# Template root comes from this file's own location, never from $HOME (CI checks
+# the repository out elsewhere); HOME and TMPDIR stay inside the test's temp dir.
+TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
+export TMPDIR
+export HOME="$TMPDIR/home"
+mkdir -p "$HOME"
 
 cp -R "$TEMPLATE_ROOT/seed/strategy" "$TMPDIR/strategy"
 mkdir -p "$TMPDIR/unrelated/cwd"
@@ -20,6 +25,8 @@ export IWE_TEMPLATE="$TEMPLATE_ROOT"
 export IWE_ROOT="$TMPDIR"
 export IWE_GOVERNANCE_REPO="strategy"
 
+# --no-artifactor-check: the Artifactor Gate is covered by
+# test_create_wp_artifactor_gate.sh; this test is about repeat calls and cwd.
 run_create() {
   (
     cd "$TMPDIR/unrelated/cwd"
@@ -28,7 +35,8 @@ run_create() {
       --budget 1h \
       --priority P4 \
       --verification-class closed-loop \
-      --no-consent-check
+      --no-consent-check \
+      --no-artifactor-check
   )
 }
 

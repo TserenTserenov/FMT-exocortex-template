@@ -20,6 +20,52 @@
 
 set -uo pipefail
 
+_WPN_ROOT_UP=".."
+_WPN_OPTIONAL=""
+# >>> wp-num locate
+# Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
+# resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
+# fixtures. Candidates, in order: lib/ next to the file, <root>/scripts/lib, the template
+# clone next to a delivered workspace (<root>/FMT-exocortex-template), the explicit
+# IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
+# just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
+# The library is mandatory: not finding it is an installation error, not "WP not found",
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# A consumer that must keep working without the library (session-guard: its hypothesis gate
+# warns and checks the exact card names, it never blocks a session over a missing library)
+# sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
+_wpn_src="${BASH_SOURCE[0]}"
+_wpn_hops=0
+while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
+  _wpn_link="$(readlink "$_wpn_src")"
+  case "$_wpn_link" in
+    /*) _wpn_src="$_wpn_link" ;;
+    *) _wpn_src="$(dirname "$_wpn_src")/$_wpn_link" ;;
+  esac
+  _wpn_hops=$((_wpn_hops + 1))
+done
+_wpn_dir="$(cd -P "$(dirname "$_wpn_src")" && pwd)"
+_wpn_root="$(cd -P "$_wpn_dir/$_WPN_ROOT_UP" && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
+                 "$_wpn_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [ -r "$_wpn_cand" ]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [ -z "$WP_NUM_LIB" ] && [ -z "${_WPN_OPTIONAL:-}" ]; then
+  echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
+  exit 4
+fi
+if [ -n "$WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$WP_NUM_LIB"
+fi
+# <<< wp-num locate
+
 MODE="${1:-}"
 if [[ -z "$MODE" ]]; then
   echo "Использование: $0 <WP_NUM|--all> [--dry-run] [IWE_ROOT]" >&2
@@ -39,15 +85,11 @@ done
 IWE="${IWE_ROOT_ARG:-${IWE_ROOT:-$HOME/IWE}}"
 INBOX="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox"
 
-check_one() {
-  local wp_num="$1"
-  local wp_dir="$INBOX/WP-${wp_num}"
-  local wp_file="$wp_dir/WP-${wp_num}.md"
-
-  if [[ ! -f "$wp_file" ]]; then
-    echo "WP-${wp_num}: ❌ $wp_file не найден — пропуск"
-    return
-  fi
+# Inspect one card: <card file> = <inbox>/WP-<N>/WP-<N>.md, the folder is its directory.
+check_card() {
+  local wp_file="$1"
+  local wp_dir
+  wp_dir=$(dirname "$wp_file")
 
   python3 - "$wp_file" "$wp_dir" "$DRY_RUN" <<'PYEOF'
 import sys, re, os, datetime
@@ -109,6 +151,20 @@ if orphans:
 PYEOF
 }
 
+# Inspect the card of the WP given as typed (44, 044, WP-044). issue #954: the folder is
+# WP-044/ (create-wp.sh) or the older WP-44/; the path that exists is used, and the old
+# "<N> не найден — пропуск" no longer fires for a card that is simply spelled with zeros.
+check_one() {
+  local wp_num="$1" wp_file padded
+  wp_file=$(wp_num_card_path "$INBOX" "$wp_num" || true)
+  if [[ -z "$wp_file" ]]; then
+    padded=$(wp_num_padded "$wp_num" || echo "$wp_num")
+    echo "WP-${wp_num}: ❌ $INBOX/WP-${padded}/WP-${padded}.md не найден — пропуск"
+    return
+  fi
+  check_card "$wp_file"
+}
+
 if [[ "$MODE" == "--all" ]]; then
   total=0
   warned=0
@@ -118,7 +174,12 @@ if [[ "$MODE" == "--all" ]]; then
     num="${name#WP-}"
     [[ "$num" =~ ^[0-9]+$ ]] || continue
     total=$((total + 1))
-    out=$(check_one "$num")
+    # Each folder is checked through its own card: WP-47/ and WP-047/ side by side are two folders.
+    if [[ -f "${dir}${name}.md" ]]; then
+      out=$(check_card "${dir}${name}.md")
+    else
+      out="WP-${num}: ❌ ${dir}${name}.md не найден — пропуск"
+    fi
     echo "$out"
     if echo "$out" | grep -q "warn\|❌"; then
       warned=$((warned + 1))
