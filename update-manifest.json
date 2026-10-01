@@ -2709,7 +2709,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "0bda885cf450f89bb2806902f947126be2b7b0e1706d2a03251a1d536c6f52ed"
+      "sha256": "859a617282747107562f27202ba7fdb67a7da207685bef3a433f1565817cb28b"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -2725,23 +2725,23 @@
     },
     {
       "path": "scripts/tests/test_create_wp_contract.sh",
-      "sha256": "48664e0ba57486c5a53fea7f92043b3f7626d00801cf8fcfa8568cbc621e5bb9"
+      "sha256": "b9db0e67ad19a88a15d7af87791e73c13274910991dbfc7397550295de80ab3b"
     },
     {
       "path": "scripts/tests/test_create_wp_hypothesis_relation.sh",
-      "sha256": "d14398811aedc21cceecbade45d5bfbbd1852ba125a294546af9d670b50be023"
+      "sha256": "9d702d7f7a25f17327d460cd66fddb28e7402116870f245413e1f48a1e61e315"
     },
     {
       "path": "scripts/tests/test_create_wp_number_padding.py",
-      "sha256": "6f035835af033c10993cc9ea46442916ff0a69201bad80021b5bff15e6a635b8"
+      "sha256": "09fa01a3a3c2a35e98f013c085a9c8b1e05cbe0adaf5ed7be7fcdc5d525fb4c4"
     },
     {
       "path": "scripts/tests/test_create_wp_registry_coherence.sh",
-      "sha256": "b1cb6c0de484ee1362ddd07a76c4d63a6b5155f025fb927dafdf6dadb76c300e"
+      "sha256": "58faaa0d14478cf7024e1129cd9e51f2f7da34f45edfb974f21d1d504010a36a"
     },
     {
       "path": "scripts/tests/test_create_wp_repeat_and_cwd.sh",
-      "sha256": "e5a759f588d019868885494923044aff05ef617ac2503685d89d2c8a72f562ba"
+      "sha256": "a3de898c189ba9954bd41ac67222e727b8f6624f43b626fcbda8a4ec87ed5815"
     },
     {
       "path": "scripts/tests/test_create_wp_weekplan_writer.py",
@@ -2765,7 +2765,7 @@
     },
     {
       "path": "scripts/tests/test_fresh_seed_reproduction.sh",
-      "sha256": "7a7f7716d610e7732369f12add25496431231c092ccfedfd5cedc631b7475eb1"
+      "sha256": "5e8560e0ce8c35a2dbc2a0ca99d92fecdc93001775e04cd2541075696a3d6e65"
     },
     {
       "path": "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",
@@ -3187,6 +3187,7 @@
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_ar293_ai_cli_override.sh",
     "scripts/tests/test_copy_to_aisystant.py",
+    "scripts/tests/test_create_wp_artifactor_gate.sh",
     "scripts/tests/test_create_wp_verification_class.sh",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",
