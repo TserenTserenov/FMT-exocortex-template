@@ -553,6 +553,13 @@ registry_status() {
   elif LC_ALL=C grep -qF '⏸' <<<"$status_cell"; then resolved="⏸ paused"
   elif LC_ALL=C grep -qF '⏹' <<<"$status_cell"; then resolved="⏹ снят"
   elif LC_ALL=C grep -qF '🔁' <<<"$status_cell"; then resolved="🔁 свёрнут в спринт"
+  # issue #964: "↗️ merged в другой РП" is in the registry legend the template ships
+  # (seed/strategy/docs/WP-REGISTRY.md) and is a terminal status like ✅ and 📦, yet the
+  # resolver did not know it. Matched by its base character, like ⏸ above (the ️ variation
+  # selector is optional in registries). Last on purpose: it never outranks a status
+  # emoji that sits in the same cell. "frozen" is deliberately NOT here: the platform's
+  # status vocabulary is the pilot's decision.
+  elif LC_ALL=C grep -qF '↗' <<<"$status_cell"; then resolved="↗️ merged"
   fi
   if [[ -n "$resolved" ]]; then
     echo "$resolved"
@@ -674,6 +681,59 @@ extract_structured_open_phases() {
   ' "$file" 2>/dev/null
 }
 
+# True when registry_status() answered with one of its "could not resolve" markers
+# (no such row, status cell outside the vocabulary, no status column, no registry file,
+# malformed number) instead of a real status.
+registry_status_unresolved() {
+  case "$1" in
+    _не\ в\ реестре_|_статус\ неизвестен_|_колонка\ статуса\ не\ найдена*|_нет\ файла\ REGISTRY_|_некорректный\ номер\ РП*) return 0 ;;
+  esac
+  return 1
+}
+
+# Numbers of the inbox cards in the order the canary tries them: folder cards (WP-434)
+# first, then flat legacy files, each group in sort order.
+canary_card_numbers() {
+  local card
+  while IFS= read -r card; do
+    basename "$(dirname "$card")" | grep -oE '[0-9]+' | head -1 || true
+  done < <(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-*/WP-*.md" 2>/dev/null | sort)
+  while IFS= read -r card; do
+    basename "$card" | grep -oE '^WP-[0-9]+' | grep -oE '[0-9]+' | head -1 || true
+  done < <(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort)
+}
+
+# Choose the card the canary checks (issue #964). It used to be the first inbox card in
+# sort order whatever its status; a status outside the platform vocabulary (a user's own
+# "❄️ frozen") then failed `update.sh --check` with exit 5 although the reader was fine.
+# Now: the first card whose registry status the resolver recognises. When no card has a
+# recognised status the FIRST card is chosen, so the canary still fails loudly on it
+# (#717/#718: a reader that resolves nothing must not pass). Sets CANARY_PICK (the card's
+# number, "" when inbox holds no cards) and, when other cards were passed over,
+# CANARY_SKIPPED_COUNT / CANARY_SKIPPED_LIST (the first three, with their status).
+pick_canary_wp() {
+  local num status first=""
+  CANARY_PICK=""
+  CANARY_SKIPPED_COUNT=0
+  CANARY_SKIPPED_LIST=""
+  while IFS= read -r num; do
+    [[ -n "$num" ]] || continue
+    [[ -n "$first" ]] || first="$num"
+    status=$(registry_status "$num" 2>/dev/null || true)
+    if ! registry_status_unresolved "$status"; then
+      CANARY_PICK="$num"
+      return 0
+    fi
+    CANARY_SKIPPED_COUNT=$((CANARY_SKIPPED_COUNT + 1))
+    if [[ "$CANARY_SKIPPED_COUNT" -le 3 ]]; then
+      CANARY_SKIPPED_LIST="${CANARY_SKIPPED_LIST:+${CANARY_SKIPPED_LIST}, }WP-${num} ${status}"
+    fi
+  done < <(canary_card_numbers)
+  CANARY_PICK="$first"
+  CANARY_SKIPPED_COUNT=0
+  CANARY_SKIPPED_LIST=""
+}
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -728,18 +788,13 @@ main() {
     # No explicit WP given — find a real, resolvable WP for the canary.
     # WP-434: canonical folder cards win over legacy flat files; closed WPs
     # (archived/done) are avoided because the canary should test the active
-    # governance contour, not a stale baseline (issue #861).
+    # governance contour, not a stale baseline (issue #861). The card is the first one
+    # whose registry status the resolver recognises (issue #964, see pick_canary_wp).
     if [[ -z "$test_num" && -d "$INBOX_DIR" ]]; then
-      local first_wp
-      first_wp=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-*/WP-*.md" 2>/dev/null | sort | head -1 || true)
-      if [[ -n "$first_wp" ]]; then
-        test_num=$(basename "$(dirname "$first_wp")" | grep -oE '[0-9]+' || true)
-      fi
-      if [[ -z "$test_num" ]]; then
-        first_wp=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort | head -1 || true)
-        if [[ -n "$first_wp" ]]; then
-          test_num=$(basename "$first_wp" | grep -oE '^WP-[0-9]+' | grep -oE '[0-9]+' || true)
-        fi
+      pick_canary_wp
+      test_num="$CANARY_PICK"
+      if [[ "$CANARY_SKIPPED_COUNT" -gt 0 ]]; then
+        echo "Canary: пропущено карточек без распознанного статуса: ${CANARY_SKIPPED_COUNT} (${CANARY_SKIPPED_LIST}); проверяется WP-${test_num}"
       fi
     fi
     if [[ -z "$test_num" && -f "$REGISTRY_FILE" ]]; then
@@ -789,12 +844,10 @@ main() {
     local status
     status=$(registry_status "$test_num")
     echo "WP-${test_num} registry_status: $status"
-    case "$status" in
-      _не\ в\ реестре_|_статус\ неизвестен_|_колонка\ статуса\ не\ найдена*|_нет\ файла\ REGISTRY_|_некорректный\ номер\ РП*)
-        echo "Canary FAILED: registry status unresolved for WP-${test_num}: $status" >&2
-        exit 1
-        ;;
-    esac
+    if registry_status_unresolved "$status"; then
+      echo "Canary FAILED: registry status unresolved for WP-${test_num}: $status" >&2
+      exit 1
+    fi
     exit 0
   fi
 
@@ -1057,7 +1110,9 @@ main() {
 
         # Drift: related is closed, but open phase references it
         local is_closed=0
-        if echo "$reg_status" | grep -qiE '✅|done|closed|~~'; then
+        # "↗️ merged" (issue #964) is as terminal as ✅: before the resolver knew ↗️ a
+        # struck-through merged row came back as "~~done~~ (зачёркнут)" and matched here.
+        if echo "$reg_status" | grep -qiE '✅|done|closed|merged|~~'; then
           is_closed=1
         fi
         if echo "$rstatus" | grep -qiE '^(closed|done|complete)$'; then

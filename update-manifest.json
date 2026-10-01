@@ -369,7 +369,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "3561f1ff35b5ceca198ab09916476d1d5ec43f007df3442e70ed2b2388e7bcb5"
+      "sha256": "03baa02fcb74c5f3207e0c7a8520369b1790af8f9296786776f3ad4813b40dd1"
     },
     {
       "path": ".claude/settings.json",
@@ -3252,6 +3252,7 @@
     "scripts/tests/test_issue_954_gate_ids.sh",
     "scripts/tests/test_issue_954_wp_list_keys.py",
     "scripts/tests/test_issue_954_wp_number_forms.sh",
+    "scripts/tests/test_issue_964_canary_status.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
