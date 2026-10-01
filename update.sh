@@ -618,6 +618,57 @@ manifest_version() {
     grep '"version"' "$1" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//'
 }
 
+# manifest_sha256_of MANIFEST PATH — the sha256 MANIFEST lists for PATH (one reader for the
+# upstream manifest in the install-path guard and for the installed one in
+# claude_template_copy_is_pristine). Prints nothing and returns 1 when there is no such entry,
+# the entries disagree or the manifest cannot be read.
+manifest_sha256_of() {
+    local manifest="$1" want="$2"
+    if py_available; then
+        "$PY_BIN" - "$manifest" "$want" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as f:
+        data = json.load(f)
+except Exception:
+    sys.exit(1)
+matches = [e.get('sha256') for e in data.get('files', []) if e.get('path') == sys.argv[2]]
+uniq = set(m for m in matches if m)
+if len(uniq) != 1:
+    sys.exit(1)
+print(uniq.pop())
+PYEOF
+        return $?
+    fi
+    # Shell-фоллбек (нет python3/python): не общий JSON-парсер — опирается
+    # на фиксированный layout нашего же generate-manifest.sh
+    # (json.dump(indent=2), "path" непосредственно перед "sha256" в одном
+    # объекте, один ключ на строку). Если формат манифеста когда-нибудь
+    # разъедется с этим предположением — E2E-тест на no-python окружение
+    # это поймает (WP-529 Ф16, В3 codex).
+    awk -v want="$want" '
+        /"path"[[:space:]]*:/ {
+            line = $0
+            sub(/^[^"]*"path"[[:space:]]*:[[:space:]]*"/, "", line)
+            sub(/".*$/, "", line)
+            cur_path = line
+            next
+        }
+        /"sha256"[[:space:]]*:/ && cur_path == want {
+            line = $0
+            sub(/^[^"]*"sha256"[[:space:]]*:[[:space:]]*"/, "", line)
+            sub(/".*$/, "", line)
+            if (found && line != found_val) { ambiguous = 1 }
+            found = 1
+            found_val = line
+        }
+        END {
+            if (found && !ambiguous) { print found_val; exit 0 }
+            exit 1
+        }
+    ' "$manifest"
+}
+
 # version_compare A B — compare two plain X.Y.Z versions numerically. Prints -1, 0 or 1 (A is
 # older than, equal to, newer than B) and returns 0; returns 2 and prints nothing when either
 # argument is not digits-only X.Y.Z (at most 9 digits per part, so the arithmetic cannot
@@ -3155,14 +3206,18 @@ sync_workspace_claude_md() {
                 fi
             else
                 WS_CONFLICTS=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/ws-claude-merged.md" 2>/dev/null || true); WS_CONFLICTS=${WS_CONFLICTS:-0}
-                cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
-                CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
-                if [ "$WS_CONFLICTS" -gt 0 ]; then
+                if [ "$WS_CONFLICTS" -eq 0 ]; then
+                    # Non-zero without a single marker is not a conflict: git did not merge.
+                    # Its (empty) output must not replace the pilot's file.
+                    claude_merge_failed "$WS_CURRENT" "$WS_NEW"
+                else
+                    cp "$TMPDIR_UPDATE/ws-claude-merged.md" "$WS_CURRENT"
+                    CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + WS_CONFLICTS))
                     # issue #226: don't abort here — a CLAUDE.md conflict is an isolated
                     # artifact, not a reason to skip the rest of the delivery (memory/hooks/
                     # skills propagation, repair-pass, commit). Warn now, fail at the end.
-                    # issue #711: do NOT advance $WS_BASE here (unlike the no-conflict
-                    # branch below) — advancing it made the next run's `diff -q
+                    # issue #711: do NOT advance $WS_BASE here (unlike the clean-merge
+                    # branch above) — advancing it made the next run's `diff -q
                     # "$WORKSPACE_DIR/.claude.md.base" "$WS_NEW"` gate at the top of this
                     # function succeed even though $WS_CURRENT still had unresolved
                     # <<<<<<< markers, so update.sh reported "Всё актуально" on a corrupt
@@ -3176,9 +3231,6 @@ sync_workspace_claude_md() {
                     echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
                     CLAUDE_CONFLICT_DETECTED=true
                     CLAUDE_CONFLICT_FILES+=("$WS_CURRENT")
-                else
-                    cp "$WS_NEW" "$WS_BASE"
-                    echo "  ✓ $WS_CURRENT обновлён (3-way merge)"
                 fi
             fi
         elif [ ! -f "$WS_CURRENT" ]; then
@@ -3225,15 +3277,46 @@ sync_workspace_claude_md() {
 # never updated, .update-incomplete forever). That workspace base is the
 # substituted template copy as of the last successful sync: when FILE,
 # substituted exactly as sync_workspace_claude_md() does, matches it byte for
-# byte, the template copy holds no local edits and a 3-way merge would return
-# the upstream file unchanged. Deliberately not a hash check against the
-# installed update-manifest.json: Step 6e replaces it even on a run that ends
-# in EXIT_CONFLICT, so such a check could never heal an install already stuck.
+# byte, a 3-way merge of the copy would return the upstream file unchanged.
 claude_template_copy_matches_workspace_base() {
     local substituted="$TMPDIR_UPDATE/claude-template-substituted.md"
     [ -f "$WORKSPACE_DIR/.claude.md.base" ] || return 1
     substitute_claude_placeholders "$1" "$substituted" || return 1
+    # An empty copy equal to an empty base is not "unedited", it is a broken pair.
+    [ -s "$substituted" ] || return 1
     cmp -s "$substituted" "$WORKSPACE_DIR/.claude.md.base"
+}
+
+# claude_template_copy_is_pristine FILE — the other half of the B1 test. The
+# workspace base alone does not prove FILE was never edited: the #541 refusal
+# leaves an edited copy in place, sync_workspace_claude_md() then advances the
+# base to that edited copy, and on the next run "copy == base" holds for it too
+# (found by the round-16 peer review). So FILE must also be, byte for byte,
+#   - the file the installed update-manifest.json lists: the release this
+#     install last updated to (Step 6e replaces the manifest only after Step 5,
+#     so it is still the old one here), or
+#   - the file committed at the clone's HEAD: an install that never took a
+#     CLAUDE.md update, the stuck state this fix heals (update.sh commits
+#     nothing, so on its own this holds only until the first update).
+# A copy edited and then committed by hand passes the second test; its text stays in the history.
+claude_template_copy_is_pristine() {
+    local copy="$1" delivered committed
+    delivered=$(manifest_sha256_of "$SCRIPT_DIR/update-manifest.json" "CLAUDE.md" 2>/dev/null) || delivered=""
+    if [ -n "$delivered" ] && [ "$(hash_file "$copy")" = "$delivered" ]; then
+        return 0
+    fi
+    command -v git >/dev/null 2>&1 || return 1
+    committed=$(git -C "$SCRIPT_DIR" rev-parse --verify -q "HEAD:CLAUDE.md" 2>/dev/null) || return 1
+    [ "$(git -C "$SCRIPT_DIR" hash-object -- "$copy" 2>/dev/null)" = "$committed" ]
+}
+
+# claude_merge_failed FILE NEW — `git merge-file` failed without a conflict to show (no
+# markers in its output): there is no merge result, so FILE is left exactly as it is, the
+# merge base is not advanced and the run ends in EXIT_CONFLICT with a pointer to git.
+claude_merge_failed() {
+    CLAUDE_MERGE_FAILED_FILES+=("$1")
+    echo "  ⚠ $1 НЕ тронут — git merge-file не выдал слияния (git не работает?)."
+    echo "    Проверьте: git --version. Сверить вручную: diff \"$1\" \"$2\""
 }
 
 # issue #541 cold-review (P2, DP.SC.172): the CLAUDE.md conflict/missing-base
@@ -3241,7 +3324,8 @@ claude_template_copy_matches_workspace_base() {
 # below, plus the pre-existing final gate at the end of the script) — third
 # repetition, extract instead of copy-pasting a fourth time.
 claude_conflict_gate() {
-    if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
+    if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ] \
+        || [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
         echo "  ⚠ Workspace-копия CLAUDE.md требует ручной сверки (см. предупреждения выше)."
         exit "$EXIT_CONFLICT"
     fi
@@ -3273,6 +3357,11 @@ CLAUDE_BASE_MISSING_FILES=()
 # reported separately (detect_claude_silent_loss above), so the summary
 # points at the right cause instead of "no base file" or "look for markers".
 CLAUDE_SILENT_LOSS_FILES=()
+# WP-7 F193 (round-16 cold review): a FOURTH class — git itself failed. `git merge-file`
+# exited non-zero without a single conflict marker and without a merge result (a macOS
+# whose Command Line Tools went missing prints an xcrun error and exits 1 for every git
+# command). The empty output used to be copied over CLAUDE.md as a "clean" merge.
+CLAUDE_MERGE_FAILED_FILES=()
 
 # WP-546 (peer-session 2026-08-20-11, WP-546 Ф2 consensus with Codex): the
 # manifest loop used to run one `curl` per file, sequentially — 632 files at
@@ -4263,13 +4352,14 @@ for f in "${UPDATED_FILES[@]}"; do
                     echo "  ~ $f (3-way merge, $CONFLICT_COUNT конфликтов — разрешите вручную)"
                     echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
                 else
-                    # git merge-file returned non-zero but no conflict markers — treat as success
-                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
-                    cp "$NEW_FILE" "$BASE_FILE"
-                    echo "  ~ $f (3-way merge)"
+                    # Non-zero without a single marker is not a conflict: git did not merge.
+                    # This branch used to "treat it as success" and copy the (empty) output
+                    # over the file.
+                    claude_merge_failed "$CURRENT_FILE" "$NEW_FILE"
                 fi
             fi
-        elif [ ! -f "$BASE_FILE" ] && claude_template_copy_matches_workspace_base "$CURRENT_FILE"; then
+        elif [ ! -f "$BASE_FILE" ] && claude_template_copy_matches_workspace_base "$CURRENT_FILE" \
+            && claude_template_copy_is_pristine "$CURRENT_FILE"; then
             # B1: nothing to merge in an unedited template copy, upstream goes in
             # as is. No base is written here (setup.sh: the template repo never
             # receives one); sync_workspace_claude_md() in Step 6 merges the
@@ -4305,6 +4395,9 @@ for f in "${UPDATED_FILES[@]}"; do
                 CLAUDE_BASE_MISSING_FILES+=("$CURRENT_FILE")
                 echo "  ⚠ $f НЕ тронут — базовый файл для слияния отсутствовал."
                 echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
+                if [ -f "${WORKSPACE_DIR:-}/.claude.md.base" ]; then
+                    echo "    База в рабочей папке есть, но копия в каталоге шаблона не совпадает ни с файлом прошлого обновления (update-manifest.json), ни с закоммиченным в клоне: похоже, её правили вручную."
+                fi
             fi
         fi
     elif [[ "$f" == .claude/skills/*/SKILL.md ]]; then
@@ -5124,51 +5217,9 @@ validate_no_install_values_in_applied_additions() {
     # Детерминированно в обоих окружениях (peer-review Codex, 2026-08-24-07):
     # python-путь и shell-фоллбек дают одинаковый результат на одном манифесте
     # — P0 не остаётся воспроизводимым только в окружениях без python3/python.
+    # Upstream manifest of this run; the reader itself is manifest_sha256_of (top level).
     manifest_sha256_for_path() {
-        local want="$1"
-        if py_available; then
-            "$PY_BIN" - "$MANIFEST" "$want" <<'PYEOF'
-import json, sys
-try:
-    with open(sys.argv[1], encoding='utf-8') as f:
-        data = json.load(f)
-except Exception:
-    sys.exit(1)
-matches = [e.get('sha256') for e in data.get('files', []) if e.get('path') == sys.argv[2]]
-uniq = set(m for m in matches if m)
-if len(uniq) != 1:
-    sys.exit(1)
-print(uniq.pop())
-PYEOF
-            return $?
-        fi
-        # Shell-фоллбек (нет python3/python): не общий JSON-парсер — опирается
-        # на фиксированный layout нашего же generate-manifest.sh
-        # (json.dump(indent=2), "path" непосредственно перед "sha256" в одном
-        # объекте, один ключ на строку). Если формат манифеста когда-нибудь
-        # разъедется с этим предположением — E2E-тест на no-python окружение
-        # это поймает (WP-529 Ф16, В3 codex).
-        awk -v want="$want" '
-            /"path"[[:space:]]*:/ {
-                line = $0
-                sub(/^[^"]*"path"[[:space:]]*:[[:space:]]*"/, "", line)
-                sub(/".*$/, "", line)
-                cur_path = line
-                next
-            }
-            /"sha256"[[:space:]]*:/ && cur_path == want {
-                line = $0
-                sub(/^[^"]*"sha256"[[:space:]]*:[[:space:]]*"/, "", line)
-                sub(/".*$/, "", line)
-                if (found && line != found_val) { ambiguous = 1 }
-                found = 1
-                found_val = line
-            }
-            END {
-                if (found && !ambiguous) { print found_val; exit 0 }
-                exit 1
-            }
-        ' "$MANIFEST"
+        manifest_sha256_of "$MANIFEST" "$1"
     }
 
     for fpath in "${APPLIED_PATHS[@]}"; do
@@ -5311,7 +5362,16 @@ if [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
     echo "  Пропавшие строки — в предупреждениях выше. Сверьте вручную и закоммитьте отдельно."
 fi
 
-if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ]; then
+# WP-7 F193: git failed, no merge was made (see claude_merge_failed).
+if [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
+    echo ""
+    echo "⚠ CLAUDE.md не тронут (git не выдал слияния) в:"
+    for cf in "${CLAUDE_MERGE_FAILED_FILES[@]}"; do echo "  - $cf"; done
+    echo "  Проверьте, что git работает (git --version), и перезапустите update.sh: файл не менялся, повтор безопасен."
+fi
+
+if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ] \
+    || [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
     exit "$EXIT_CONFLICT"
 fi
 

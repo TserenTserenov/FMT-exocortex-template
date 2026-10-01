@@ -12,7 +12,7 @@
 # Runs the REAL update.sh --yes (channel main) against disposable installs and a
 # stubbed GitHub: curl serves a local upstream tree, gh is never authenticated,
 # launchctl/osascript/claude and friends only log their calls. No network, no
-# writes outside $TMPDIR. The workspace copy of CLAUDE.md and its merge base are
+# writes outside $TMPDIR (a mktemp stand-in sees to macOS ignoring $TMPDIR). The workspace copy of CLAUDE.md and its merge base are
 # written by setup.sh's own install functions, so the setup.sh -> update.sh
 # contract (both substitute placeholders the same way) is what gets exercised.
 #
@@ -27,6 +27,15 @@
 #   6 the pilot edited a line upstream also changed: conflict markers, exit 49
 #   7 author_mode with an unpromoted edit of the template copy: the author guard
 #     still runs first, the file stays untouched
+#   8 an edited template copy is not replaced on the run AFTER a refusal either:
+#     the refusal advances the workspace base to the edited copy, so "copy == base"
+#     alone would arm the shortcut (found by the round-16 peer review)
+#   9 the second update on a healed install: the copy is no longer the committed
+#     one, the installed manifest vouches for it
+#  10 a broken git (macOS after an update: "xcrun: error", exit 1 for everything) must not
+#     empty the workspace copy: git merge-file failed without a conflict, so no merge result
+#  11 the same in the old layout, for the template copy
+#  12 an empty template copy equal to an empty base is not "unedited"
 #
 # Usage: bash scripts/tests/test_issue_541_workspace_base.sh
 #        KEEP=1 ... keeps the temporary tree for inspection.
@@ -39,6 +48,7 @@ FIXTURE_SHA="3333333333333333333333333333333333333333"
 B1_LINE="обновлён (копия в каталоге шаблона не правилась)"
 REFUSAL_LINE="CLAUDE.md НЕ тронут — базовый файл для слияния отсутствовал"
 PILOT_LINE="- Pilot rule: this line must survive every update."
+EDIT_LINE="Local edit made in the template copy."
 
 # Explicit template: a bare mktemp on macOS ignores $TMPDIR, this test must stay inside it.
 TEST_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/iwe-claude-md-workspace-base.XXXXXX")
@@ -149,7 +159,28 @@ for stub in launchctl osascript claude crontab systemctl open caffeinate; do
     # shellcheck disable=SC2016  # $* and $STUB_LOG belong to the stub, expanded when it runs
     printf '#!/bin/bash\necho "%s $*" >> "$STUB_LOG"\nexit 0\n' "$stub" > "$SHIM_DIR/$stub"
 done
+# macOS mktemp -d without a template ignores $TMPDIR and writes into the user's real temp
+# directory; give it one. Any other call goes to the real mktemp untouched.
+cat > "$SHIM_DIR/mktemp" <<'SHIM'
+#!/bin/bash
+if [ "$#" -eq 1 ] && [ "$1" = "-d" ]; then exec /usr/bin/mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX"; fi
+exec /usr/bin/mktemp "$@"
+SHIM
 chmod +x "$SHIM_DIR"/*
+# A git that does not work, as on a macOS whose Command Line Tools went missing after an update.
+BROKEN_GIT_DIR="$TEST_ROOT/broken-git"
+mkdir -p "$BROKEN_GIT_DIR"
+cat > "$BROKEN_GIT_DIR/git" <<'SHIM'
+#!/bin/bash
+echo "xcrun: error: invalid active developer path (/Library/Developer/CommandLineTools), missing xcrun at: /Library/Developer/CommandLineTools/usr/bin/xcrun" >&2
+exit 1
+SHIM
+chmod +x "$BROKEN_GIT_DIR/git"
+# The stand-in must shadow the real notifier, or an update run would pop a desktop notification.
+[ "$(PATH="$SHIM_DIR:$PATH" command -v osascript)" = "$SHIM_DIR/osascript" ] || {
+    echo "FATAL: the stand-in osascript does not shadow the real one" >&2
+    exit 2
+}
 
 # --- fixture content ---
 write_claude_v1() {
@@ -197,6 +228,12 @@ Staging notes from the platform.
 
 Authored section placeholder.
 EOF
+}
+# upstream_to_v3 — upstream's next release: only the platform rule line changes.
+upstream_to_v3() {
+    sed 's/^Platform rule A: version two\.$/Platform rule A: version three./' "$UP/CLAUDE.md" > "$UP/CLAUDE.md.tmp" &&
+        mv "$UP/CLAUDE.md.tmp" "$UP/CLAUDE.md" &&
+        write_manifest "$UP" "0.40.3"
 }
 
 # write_manifest DIR VERSION — schema v2 update-manifest.json for DIR's CLAUDE.md and update.sh
@@ -332,10 +369,11 @@ build_case() {
 
 # run_update — the real update.sh --yes on channel main, under the same bash that
 # runs this test (so /bin/bash on macOS checks bash 3.2); sets RUN_RC and RUN_LOG.
+# EXTRA_PATH=<dir> run_update puts <dir> in front of the stubs (a broken git).
 run_update() {
     RUN_N=$((RUN_N + 1))
     RUN_LOG="$CASE_DIR/run-$RUN_N.log"
-    env -i PATH="$SHIM_DIR:$PATH" HOME="$CASE_DIR/home" TMPDIR="$CASE_DIR/tmp" \
+    env -i PATH="${EXTRA_PATH:+$EXTRA_PATH:}$SHIM_DIR:$PATH" HOME="$CASE_DIR/home" TMPDIR="$CASE_DIR/tmp" \
         LANG="${LANG:-C}" USER="${USER:-tester}" TERM=dumb \
         GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com \
         GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com \
@@ -466,6 +504,82 @@ check "7 the author guard reports the skip" log_has "CLAUDE.md — author_mode: 
 check "7 the shortcut does not run" log_lacks "$B1_LINE"
 check "7 the template copy with the author's edit is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
 check "7 no merge base in the template repo" absent "$SD/.claude.md.base"
+
+echo "=== case 8: the refusal must not arm the shortcut for an edited template copy ==="
+build_case laundered modern
+# No pilot edit in the workspace copy: it and its base are the v1 template, as setup.sh leaves them.
+install_workspace_copy
+printf '%s\n' "$EDIT_LINE" >> "$SD/CLAUDE.md"
+cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+run_update
+check "8 run 1: exit 49" rc_is 49
+check "8 run 1: the edited template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+check "8 run 1: the refusal says the copy looks edited by hand" log_has "похоже, её правили вручную"
+run_update
+check "8 run 2: exit 49 again" rc_is 49
+check "8 run 2: the edited template copy is still untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+check "8 run 2: the edit is still in the template copy" has_line "$SD/CLAUDE.md" "$EDIT_LINE"
+check "8 run 2: the edit is still in the workspace copy" has_line "$WS/CLAUDE.md" "$EDIT_LINE"
+check "8 run 2: upstream is not taken as is" log_lacks "$B1_LINE"
+check "8 run 2: no merge base in the template repo" absent "$SD/.claude.md.base"
+
+echo "=== case 9: the second update on a healed install ==="
+build_case steady modern
+run_update
+check "9 first update: exit 0" rc_is 0
+check "9 first update: the shortcut ran" log_has "$B1_LINE"
+# The first update is not committed (update.sh commits nothing): the copy is now upstream's v2,
+# the clone's HEAD still holds v1. Upstream moves on to v3.
+upstream_to_v3
+expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
+check "9 the copy is no longer the committed one" lacks_text "$SD/CLAUDE.md" "version one"
+run_update
+check "9 second update: exit 0" rc_is 0
+check "9 second update: no marker" absent "$SD/.update-incomplete"
+check "9 second update: the shortcut ran, not the refusal" log_has "$B1_LINE"
+check "9 second update: the template copy is upstream's v3" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
+check "9 second update: the workspace copy is merged with the pilot line kept" same "$WS/CLAUDE.md" "$CASE_DIR/expected-ws.md"
+
+echo "=== case 10: a broken git must not empty the workspace copy ==="
+build_case brokengit modern
+cp "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+cp "$WS/.claude.md.base" "$CASE_DIR/ws-base-before.md"
+EXTRA_PATH="$BROKEN_GIT_DIR" run_update
+check "10 broken git: exit 49" rc_is 49
+check "10 broken git: the workspace copy is byte for byte what it was" same "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+check "10 broken git: the workspace copy is not empty" test -s "$WS/CLAUDE.md"
+check "10 broken git: the workspace base does not advance" same "$WS/.claude.md.base" "$CASE_DIR/ws-base-before.md"
+check "10 broken git: the failure is reported as a git failure" log_has "git merge-file не выдал слияния"
+check "10 broken git: the summary points at git" log_has "Проверьте, что git работает"
+check "10 broken git: the marker stays" test -f "$SD/.update-incomplete"
+expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
+run_update
+check "10 git repaired: exit 0" rc_is 0
+check "10 git repaired: the marker is removed" absent "$SD/.update-incomplete"
+check "10 git repaired: the workspace copy is merged with the pilot line kept" same "$WS/CLAUDE.md" "$CASE_DIR/expected-ws.md"
+
+echo "=== case 11: a broken git must not empty the template copy either (old layout) ==="
+build_case brokenlegacy legacy
+cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+cp "$SD/.claude.md.base" "$CASE_DIR/template-base-before.md"
+EXTRA_PATH="$BROKEN_GIT_DIR" run_update
+check "11 broken git: exit 49" rc_is 49
+check "11 broken git: the template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+check "11 broken git: the template copy is not empty" test -s "$SD/CLAUDE.md"
+check "11 broken git: the template base does not advance" same "$SD/.claude.md.base" "$CASE_DIR/template-base-before.md"
+check "11 broken git: the failure is reported as a git failure" log_has "git merge-file не выдал слияния"
+
+echo "=== case 12: an empty template copy equal to an empty base is not unedited ==="
+build_case emptypair modern
+: > "$SD/CLAUDE.md"
+git -C "$SD" add CLAUDE.md
+git -C "$SD" -c user.name=test -c user.email=test@example.com commit -q -m "empty CLAUDE.md"
+: > "$WS/.claude.md.base"
+cp "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+run_update
+check "12 exit 49" rc_is 49
+check "12 the shortcut does not run" log_lacks "$B1_LINE"
+check "12 the workspace copy is untouched" same "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
 
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"
