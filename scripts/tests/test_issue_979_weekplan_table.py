@@ -91,6 +91,13 @@ def _weekplan(tmp_path: Path, body: str) -> Path:
     return path
 
 
+def _first_row_below(weekplan: Path, header_fragment: str) -> str:
+    """First data row of the table whose header line contains header_fragment."""
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    header = next(i for i, ln in enumerate(lines) if header_fragment in ln)
+    return lines[header + 2]
+
+
 def test_row_goes_to_plan_table_not_day_summary(tmp_path):
     weekplan = _weekplan(tmp_path, DAY_SUMMARY + PLAN_SECTION)
 
@@ -168,6 +175,130 @@ def test_plan_section_wins_over_another_candidate(tmp_path):
     assert result.returncode == 0, result.stderr
     head, tail = weekplan.read_text(encoding="utf-8").split("План на неделю W40")
     assert "Новый РП" in tail and "Новый РП" not in head
+
+
+def test_first_of_two_plan_sections_wins(tmp_path):
+    second = PLAN_SECTION.replace("W40", "W41").replace("**Старый**", "**Следующий**")
+    weekplan = _weekplan(tmp_path, PLAN_SECTION + "\n" + second)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("План на неделю W41")
+    assert NEW_ROW in head and "Новый РП" not in tail
+
+
+def test_plan_section_with_a_subheading_and_a_second_table(tmp_path):
+    # W18 form: «План» sits in the <summary>, a ### sub-heading stands above the table
+    # and another block holds a second РП/Статус table (column «Связанные РП»).
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open>\n<summary><b>План на неделю W18</b></summary>\n\n"
+        "### ТОС недели W18 + запрос недели\n\n"
+        "| 🚦 | # | РП | h | Статус | Дедлайн | Репо |\n"
+        "|----|---|----|---|--------|---------|------|\n"
+        "| 🟡 | 7 | **Основной** | 2 | pending | — | — |\n"
+        "\n</details>\n\n"
+        "<details><summary><b>Стратегическая сверка</b></summary>\n\n"
+        "| ID | Результат | Бюджет | Статус | P | Связанные РП |\n"
+        "|----|-----------|--------|--------|---|--------------|\n"
+        "| R1 | ... | ... | ... | P3 | WP-7 |\n"
+        "\n</details>\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    assert _first_row_below(weekplan, "| Дедлайн | Репо |") == (
+        "| 🟡 | 16 | **Новый РП** — [описание] | 3 | pending | — | — |"
+    )
+    assert _first_row_below(weekplan, "Связанные РП") == "| R1 | ... | ... | ... | P3 | WP-7 |"
+
+
+def test_plan_section_with_several_subsection_tables_takes_the_first(tmp_path):
+    # W09 form: one «План на неделю» section with a РП/Статус table per ### sub-section,
+    # followed by a day block that says «План» but is a facts section («ИТОГИ»).
+    weekplan = _weekplan(
+        tmp_path,
+        "## План на неделю W09\n\n"
+        "### Главные дела недели\n\n"
+        "| # | РП | Бюджет | Статус | Дедлайн | Репо |\n"
+        "|---|----|--------|--------|---------|------|\n"
+        "| 3 | **Главное** | 4h | pending | — | — |\n\n"
+        "### Остальные РП\n\n"
+        "| # | РП | Бюджет | Статус | Репо |\n"
+        "|---|----|--------|--------|------|\n"
+        "| 4 | **Прочее** | 1h | pending | — |\n\n"
+        "## План на понедельник (16 фев) — ИТОГИ\n\n" + DAY_SUMMARY_TABLE,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Бюджет | Статус | Дедлайн | Репо |") == (
+        "| 16 | **Новый РП** — [описание] | — | pending | — | — |"
+    )
+    assert _first_row_below(weekplan, "| Бюджет | Статус | Репо |") == "| 4 | **Прочее** | 1h | pending | — |"
+    assert _first_row_below(weekplan, "Что сделано") == "| #5 | вчера | done |"
+
+
+def test_facts_section_nested_under_a_heading_stays_excluded(tmp_path):
+    # «Итоги» above, «Закрытые РП» below it: the facts verdict belongs to the whole chain.
+    weekplan = _weekplan(
+        tmp_path,
+        "## Итоги дня 2026-09-29\n\n### Закрытые РП\n\n" + DAY_SUMMARY_TABLE
+        + "\n## Задачи недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("## Задачи недели")
+    assert "Новый РП" not in head
+    assert NEW_ROW in tail
+
+
+@pytest.mark.parametrize(
+    "title, is_facts",
+    [
+        ("Итоги дня 2026-09-29", True),
+        ("Итоги недели", True),
+        ("Итог дня", True),
+        ("Сводка недели", True),
+        ("Summary", True),
+        ("Итоговая таблица недели (плановые РП)", False),
+        ("Итого за неделю", False),
+        ("Сводный список РП", False),
+    ],
+)
+def test_only_facts_titles_exclude_a_table(tmp_path, title, is_facts):
+    weekplan = _weekplan(tmp_path, f"## {title}\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert ("добавлена" in result.stdout) is (not is_facts), result.stdout + result.stderr
+
+
+def test_headings_before_a_details_block_do_not_apply_inside_it(tmp_path):
+    # W23 form: a flat «## Итоги» section, then independent <details> blocks.
+    weekplan = _weekplan(tmp_path, "## Итоги W23\n\nтекст\n\n" + PLAN_SECTION)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert NEW_ROW in weekplan.read_text(encoding="utf-8")
+
+
+def test_headings_inside_a_details_block_do_not_leak_out_of_it(tmp_path):
+    notes = "<details><summary>Заметки</summary>\n\n### Итоги прошлой недели\n\nтекст\n\n</details>\n\n"
+    weekplan = _weekplan(tmp_path, notes + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
 
 
 def test_two_candidates_without_a_plan_section_are_ambiguous(tmp_path):
