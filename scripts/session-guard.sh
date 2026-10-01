@@ -82,6 +82,26 @@ if [ -f "$_SG_ISOLATE_LIB" ]; then
   # shellcheck source=lib/session-guard-isolate-lib.sh
   . "$_SG_ISOLATE_LIB"
 fi
+# issue #954: shared reader of WP numbers; the hypothesis gate in `open` finds the card by
+# the normalised number. Optional like the lib above (functions only, nothing runs on load).
+_SG_WP_NUM_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/wp-num.sh"
+if [ -f "$_SG_WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$_SG_WP_NUM_LIB"
+fi
+
+# Every path where the card of `--wp <id>` may be written, one per line: the id as typed
+# (inbox/<id>/<id>.md and inbox/<id>.md -- what the hypothesis gate always read) and, when
+# the id is a WP number, the folder and the flat card in both spellings (WP-044, legacy
+# WP-44). Without the shared reader only the typed paths are listed. Notes are not listed.
+wp_card_candidates() {
+  local inbox="$1" id="$2" n pad
+  printf '%s\n' "$inbox/$id/$id.md" "$inbox/$id.md"
+  if type wp_num_normalize >/dev/null 2>&1 && n=$(wp_num_normalize "$id"); then
+    pad=$(printf '%03d' "$n")
+    printf '%s\n' "$inbox/WP-$pad/WP-$pad.md" "$inbox/WP-$n/WP-$n.md" "$inbox/WP-$pad.md" "$inbox/WP-$n.md"
+  fi
+}
 
 # Prints frozen checkout cwd sits in, or empty. FMT has no gov_repo_dir();
 # check git toplevel only (sufficient for open freeze + tests).
@@ -1257,11 +1277,17 @@ if [ "$CMD" = "open" ]; then
   # Отсутствующее поле намеренно не блокируется: это карточка, созданная до
   # введения контракта, и массовое дообогащение исторических РП не является
   # безопасным побочным эффектом открытия одной сессии.
-  WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP/$WP.md"
-  if [ ! -f "$WP_CARD" ]; then
-    WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP.md"
-  fi
-  if [ -f "$WP_CARD" ] && grep -qE "^hypothesis_relation:[[:space:]]*['\"]?unclassified['\"]?[[:space:]]*$" "$WP_CARD"; then
+  # issue #954: --wp 44, 044, WP-44 and WP-044 name one card (folder WP-044/), so every
+  # place the card can be written is checked and ANY of them still marked unclassified
+  # blocks the open (see wp_card_candidates). A note that merely carries `wp: N` is not a card.
+  WP_CARD=""
+  while IFS= read -r _sg_card; do
+    if [ -f "$_sg_card" ] && grep -qE "^hypothesis_relation:[[:space:]]*['\"]?unclassified['\"]?[[:space:]]*$" "$_sg_card"; then
+      WP_CARD="$_sg_card"
+      break
+    fi
+  done < <(wp_card_candidates "$IWE_ROOT/$GOV_REPO/inbox" "$WP")
+  if [ -n "$WP_CARD" ]; then
     fail "РП $WP не классифицирована по гипотезе. До открытия выберите tests, enables, responds, researches или operational в $WP_CARD" 1
   fi
 
