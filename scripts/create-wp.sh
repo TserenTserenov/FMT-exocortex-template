@@ -780,34 +780,59 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # and the new row landed there. So every table gets its chain of ancestors — the
 # <summary> of each enclosing <details> plus the markdown headings in scope — and the
 # writer skips a table when ANY ancestor is a facts section («Итоги», «Сводка», «Summary»:
-# WeekPlan = plan, WeekReport = facts), prefers a table with a «План» ancestor, falls back
-# to the only remaining candidate and otherwise refuses to guess. A <details> block is a
-# section of its own: headings from before it do not apply inside, headings met inside it
-# are dropped when it closes. Fenced code blocks (``` or ~~~) are not markup: nothing inside
-# one is a heading, a tag or a table. A table is a candidate only when its header has the
-# exact cell «РП» and a cell starting with the word «Статус» («Статус (на 3 июля)» counts):
-# «Связанные РП» (the «Стратегическая сверка» table) is not a plan and would receive a
-# nameless row.
+# WeekPlan = plan, WeekReport = facts), prefers the table whose «План» ancestor is the nearest
+# one (its own section beats a plan title that only a general heading above it carries; the
+# first one on a tie), falls back to the only remaining candidate and otherwise refuses to
+# guess. A <details> block is a section of its own: headings from before it do not apply
+# inside, headings met inside it are dropped when it closes. A <summary> may span several
+# lines; one that is never closed swallows its block, so no table inside it is a candidate.
+# Fenced code blocks (``` or ~~~) and indented ones (4+ columns, a tab counts to 4) are not
+# markup: nothing inside a fence is a heading, a tag or a table, and an indented table is an
+# example. A table is a candidate only when its header has the exact cell «РП» and a cell
+# starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
+# plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
+# and would receive a nameless row.
 # Separator rows are matched by pattern, not by the literal `|---` (same as #901).
 TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
-TAG_RE = re.compile(r"</details>|<details\b|<summary[^>]*>(.*?)</summary>", re.IGNORECASE)
+TAG_RE = re.compile(r"</details>|<details\b|<summary\b[^>]*>|</summary>", re.IGNORECASE)
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 # Whole words only: «Итоговая таблица недели (плановые РП)» is a plan, not a facts section.
 FACTS_RE = re.compile(r"\b(?:Итог(?:и|ов)?|Сводк[аиу]|Summary)\b", re.IGNORECASE)
-PLAN_RE = re.compile(r"План|\bPlan\b", re.IGNORECASE)
+# The word must START with «План»/«Plan»: «Внеплановые РП» is not a plan section.
+PLAN_RE = re.compile(r"\b(?:План|Plan)", re.IGNORECASE)
 
 
 def strip_tags(text):
-    return re.sub(r"<[^>]+>", "", text).strip()
+    return " ".join(re.sub(r"<[^>]+>", "", text).split())
 
 
 def table_cells(row):
     return [c.strip() for c in row.strip().strip("|").split("|")]
 
 
+def column_key(cell):
+    """Column name without its qualifier: «Статус (на 3 июля)» and «Статус W13» are «Статус»."""
+    return "Статус" if re.match(r"Статус\b", cell) else cell
+
+
 def is_plan_header(cells):
-    return "РП" in cells and any(re.match(r"Статус\b", c) for c in cells)
+    keys = [column_key(c) for c in cells]
+    return "РП" in keys and "Статус" in keys
+
+
+def is_indented_code(text):
+    """Leading whitespace of 4+ columns (a tab counts to the next multiple of 4): indented code."""
+    expanded = text.expandtabs(4)
+    return len(expanded) - len(expanded.lstrip(" ")) >= 4
+
+
+def plan_distance(ancestors):
+    """Ancestors below the nearest «План» one: 0 = the table's own section, None = no «План» above."""
+    for below, title in enumerate(reversed(ancestors)):
+        if PLAN_RE.search(title):
+            return below
+    return None
 
 
 def next_fence(fence, text):
@@ -831,35 +856,58 @@ def next_fence(fence, text):
 candidates = []  # (header line, insert position, ancestor titles)
 headings = []  # (level, title) of the markdown headings in scope
 blocks = []  # per open <details>: [summary title, headings outside it (rebound, never mutated)]
+summary = None  # text pieces of a <summary> that is still open; its lines are not markup
 fence = None  # (marker, length) while inside a fenced code block
 for i, line in enumerate(lines):
     in_code = fence is not None
     fence = next_fence(fence, line.rstrip("\r\n"))
     if in_code or fence:
         continue
+    inside_summary = summary is not None
+    position = 0
     for tag in TAG_RE.finditer(line):
-        text = tag.group(0).lower()
-        if text == "</details>":
+        if summary is not None:
+            summary.append(line[position:tag.start()])
+        position = tag.end()
+        kind = tag.group(0).lower()
+        if kind == "</summary>":
+            if summary is not None:
+                blocks[-1][0] = strip_tags(" ".join(summary))
+                summary = None
+        elif kind == "</details>":
+            summary = None  # a <summary> that was never closed ends with its block
             if blocks:
                 headings = blocks.pop()[1]
-        elif text.startswith("<details"):
+        elif kind.startswith("<details"):
             blocks.append(["", headings])
             headings = []
         elif blocks:
-            blocks[-1][0] = strip_tags(tag.group(1))
+            summary = []
+    if summary is not None:
+        summary.append(line[position:])
+    if inside_summary:
+        continue  # the lines of a <summary> title are text, not headings or tables
     # A table row such as `# | Статус | РП` looks like a heading but is not one.
     heading = None if "|" in line else HEADING_RE.match(line)
     if heading:
         level = len(heading.group(1))
         headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
     if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
+        header = lines[i - 1]
         ancestors = [b[0] for b in blocks] + [h[1] for h in headings]
-        if is_plan_header(table_cells(lines[i - 1])) and not any(FACTS_RE.search(t) for t in ancestors):
-            candidates.append((lines[i - 1], i + 1, ancestors))
+        if (
+            is_plan_header(table_cells(header))
+            and not is_indented_code(header)
+            and not is_indented_code(line)
+            and not any(FACTS_RE.search(t) for t in ancestors)
+        ):
+            candidates.append((header, i + 1, ancestors))
 
-plan_titled = [c for c in candidates if any(PLAN_RE.search(t) for t in c[2])]
-if plan_titled:
-    chosen = plan_titled[0]
+# The table whose «План» ancestor is the nearest wins; equal distance keeps document order.
+ranked = [(plan_distance(c[2]), n) for n, c in enumerate(candidates)]
+ranked = [r for r in ranked if r[0] is not None]
+if ranked:
+    chosen = candidates[min(ranked)[1]]
 elif len(candidates) == 1:
     chosen = candidates[0]
 else:
@@ -886,8 +934,9 @@ else:
     }
     row_cells = ["—"] * len(header_cols)
     for idx, name in enumerate(header_cols):
-        if name in values_by_name:
-            row_cells[idx] = values_by_name[name]
+        key = column_key(name)  # the same normalization the header detection used
+        if key in values_by_name:
+            row_cells[idx] = values_by_name[key]
     new_row = "| " + " | ".join(row_cells) + " |\n"
     lines.insert(insert_at, new_row)
     with open(weekplan_path, "w", encoding="utf-8") as f:
