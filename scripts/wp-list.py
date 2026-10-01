@@ -36,6 +36,18 @@ ALL_FIELDS = ["wp", "title", "status", "status_raw", "registry_done", "created",
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 FIELD_RE = re.compile(r"^(\w+):\s*(.*)$")
 
+# First cell of a struck-through registry row, whatever the number looks like there:
+# ~~9~~, ~~009~~, ~~WP-009~~, ~~wp-9~~, ~~**WP-9**~~, ~~13★~~ (issue #954).
+STRUCK_ROW_RE = re.compile(r"^\|\s*(?:\*\*)?~~\s*(?:\*\*)?(?:WP-|wp-)?0*(\d+)")
+
+
+def wp_key(raw):
+    """Canonical key of a WP number: the integer, as a string. "009" and "9" are one WP
+    (issue #954: create-wp.sh names the card folder WP-009 while the registry cell says 9,
+    009 or WP-009). The key is for lookups and de-duplication only — a card's file name
+    and the `wp` column keep their own digits."""
+    return str(int(raw))
+
 
 def _clean_value(raw):
     """Strip surrounding quotes, or — only for unquoted values — a trailing
@@ -79,6 +91,11 @@ def discover_cards(root):
     archive/wp-contexts/ (WP-434). Dedups: a folder wins over a flat file
     for the same number if both exist (folder is the current convention).
 
+    The number is compared as an integer (issue #954), so WP-9/ and WP-009/ are one WP:
+    the zero-padded folder (what create-wp.sh writes) wins over the unpadded legacy
+    one, and either wins over a flat file. The yielded number keeps the digits of the
+    winning card's own name ("009"); only the dedup key is normalised.
+
     Known exception, not specially handled: a handful of pre-WP-434 archive
     entries carry BOTH a flat file (the real closed-out card) and a folder
     stub with `results_in:` pointing at that flat file (a since-abandoned
@@ -88,29 +105,39 @@ def discover_cards(root):
     case for a single-digit number of legacy rows."""
     if not root.is_dir():
         return
-    found = {}
+    best = {}  # key -> (rank, digits as spelled in the card's name, path); lower rank wins
+
+    def offer(digits, path, is_folder):
+        key = wp_key(digits)
+        if not is_folder:
+            rank = 2
+        else:
+            rank = 0 if digits == f"{int(key):03d}" else 1
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, digits, path)
+
     for entry in sorted(root.iterdir()):
         if entry.is_dir():
             m = re.match(r"^WP-(\d+)$", entry.name)
             if not m:
                 continue
-            num = m.group(1)
-            nested = entry / f"WP-{num}.md"
+            digits = m.group(1)
+            nested = entry / f"WP-{digits}.md"
             if nested.is_file():
-                found[num] = nested
+                offer(digits, nested, True)
         elif entry.is_file() and entry.suffix == ".md":
             m = re.match(r"^WP-(\d+)(?:-.*)?\.md$", entry.name)
             if m:
-                num = m.group(1)
-                found.setdefault(num, entry)
-    for num, path in found.items():
-        yield num, path
+                offer(m.group(1), entry, False)
+    for _rank, digits, path in best.values():
+        yield digits, path
 
 
 def registry_done_status(registry_path):
-    """Return {wp_num: True} for every WP struck through (~~N~~) in
+    """Return {wp_key: True} for every WP struck through (~~N~~) in
     WP-REGISTRY.md — the one field REGISTRY is the actual source of truth
-    for (see module docstring)."""
+    for (see module docstring). Keys are wp_key() integers, so a row written
+    ~~9~~, ~~009~~ or ~~WP-009~~ marks the same WP (issue #954)."""
     done = {}
     if not registry_path.is_file():
         return done
@@ -119,16 +146,16 @@ def registry_done_status(registry_path):
     except (OSError, UnicodeDecodeError):
         return done
     for line in text.splitlines():
-        m = re.match(r"^\|\s*~~0*(\d+)~~", line)
+        m = STRUCK_ROW_RE.match(line)
         if m:
-            done[m.group(1)] = True
+            done[wp_key(m.group(1))] = True
     return done
 
 
 def build_row(num, card_path, registry_done):
     fm = parse_frontmatter(card_path)
     status_raw = fm.get("status", "")
-    is_registry_done = bool(registry_done.get(num))
+    is_registry_done = bool(registry_done.get(wp_key(num)))
     status = "done" if (is_registry_done and status_raw != "done") else status_raw
     return {
         "wp": num,
@@ -186,10 +213,13 @@ def main():
             # inbox wins over archive on collision (shouldn't happen — same
             # WP shouldn't be both active and archived — but archive wins if
             # it does, since archival is the more recent state transition).
-            if num not in seen or root.name == "wp-contexts":
-                seen[num] = build_row(num, card_path, registry_done)
+            # The collision key is the integer: WP-9 in one place and WP-009 in
+            # the other is the same WP (issue #954).
+            key = wp_key(num)
+            if key not in seen or root.name == "wp-contexts":
+                seen[key] = build_row(num, card_path, registry_done)
 
-    rows = [seen[num] for num in sorted(seen, key=int)]
+    rows = [seen[key] for key in sorted(seen, key=int)]
     rows = [{k: row[k] for k in fields} for row in rows]
 
     if args.format == "json":

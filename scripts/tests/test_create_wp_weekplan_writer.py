@@ -97,7 +97,8 @@ def test_column_order_independent(tmp_path):
     weekplan.write_text(
         "# WeekPlan W31\n\n"
         "**Бюджет:** 40h\n\n"
-        "# | Статус | РП | h\n"
+        # С ведущей `|`: строка `# | Статус | РП | h` без неё — ATX-заголовок, не заголовок таблицы.
+        "| # | Статус | РП | h |\n"
         "|---|---|---|---|\n",
         encoding="utf-8",
     )

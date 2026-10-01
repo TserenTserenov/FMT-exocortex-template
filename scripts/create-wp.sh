@@ -622,17 +622,25 @@ fi
 echo "2/5 WP-REGISTRY.md..."
 
 if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" "$STAKE_CELL" "$WP_ID" <<'PYEOF'
+import re
 import sys
 registry_path, wp_num, priority, title, repo, budget, gov_repo, stake, wp_id = sys.argv[1:10]
 
 with open(registry_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
 
-# Найти строку-разделитель после заголовка таблицы (|---|---|...)
+# Markdown table separator row: `|---|---|`, `| --- | --- |`, `|:---|---:|`, or without
+# outer pipes — a line made only of `|`, `-`, `:` and whitespace with at least two cells.
+# Same pattern as the Strategy.md writer below (issue #901); the literal `|---` lookup
+# this replaces missed every spaced separator, and the missing table failed the whole
+# creation with a rollback (issue #979).
+TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
+
+# Find the separator row under the header row (`| # | ...`)
 insert_at = None
 header_line = None
 for i, line in enumerate(lines):
-    if line.strip().startswith("|---") and i > 0 and lines[i-1].strip().startswith("| #"):
+    if TABLE_SEP_RE.match(line.rstrip("\r\n")) and i > 0 and lines[i-1].strip().startswith("| #"):
         insert_at = i + 1
         header_line = lines[i-1]
         break
@@ -766,18 +774,355 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # table header is "🚦 | # | РП | h | Источник | P | Статус | Результат"). Locate the table by
 # its actual header instead, same name-based technique as the REGISTRY writer, so
 # column order/extra columns don't silently corrupt the row.
-header_line = None
-insert_at = None
-for i, line in enumerate(lines):
-    if line.strip().startswith("|---") and i > 0 and "РП" in lines[i - 1] and "Статус" in lines[i - 1]:
-        header_line = lines[i - 1]
-        insert_at = i + 1
-        break
+#
+# issue #979: the first РП/Статус table is not necessarily the plan. After a day close
+# the WeekPlan may start with an «Итоги дня» block holding `| РП | Что сделано | Статус |`
+# and the new row landed there. So every table gets its chain of ancestors — the
+# <summary> of each enclosing <details> plus the markdown headings in scope — and the
+# writer skips a table when ANY ancestor is a facts section («Итоги», «Сводка», «Summary»:
+# WeekPlan = plan, WeekReport = facts), prefers the table whose «План» ancestor is the nearest
+# one (its own section beats a plan title that only a general heading above it carries; the
+# first one on a tie), falls back to the only remaining candidate and otherwise refuses to
+# guess. A <details> block is a section of its own: headings from before it do not apply
+# inside, headings met inside it are dropped when it closes. A <summary> may span several
+# lines and belongs to the block that opened it: one that is never closed swallows its block
+# (nested blocks included), so no table inside it is a candidate, and a nested <details> or
+# <summary> cannot take the open state over. The first <summary> names the block; a second one
+# in the same block makes the name untrustworthy, and every table of that block, those above
+# the second <summary> included, is left to the pilot. Code is decided BEFORE anything else
+# (the stage table below): nothing inside a fenced block (``` or ~~~), an indented one (4+
+# columns beyond the list item it sits in, a tab counts to 4) or an inline code span is a
+# comment or a tag, and nothing inside a fenced or an indented block is a heading or a table.
+# An indented line is code only after a blank line, a heading, a closing fence or another code
+# line (it cannot interrupt a paragraph, an HTML block or a list item), and a nested list is
+# not code. Only an unindented heading is trusted as a section title. A heading with anything
+# in front of its hashes (indentation, a list marker, a quote mark) sits in a container whose
+# end the line-based reading cannot tell for sure (lazy continuation, tabs, numbering), so it
+# changes no section, neither pushes nor pops: it opens an AMBIGUITY ZONE, and no table after
+# it, up to the next unindented heading, is a candidate. A heading is told from a table row by
+# its shape, not by a pipe in its text: `#`..`######` and a space make an ATX heading (it wins
+# over a table row in CommonMark and GFM), so `### Итоги | факт` is the heading «Итоги | факт»
+# and `# | РП | Статус` is a heading, not a table header. A quote (`>` after up to three
+# spaces) is a container of its own: its tags change nothing outside it. The content of an HTML
+# comment (`<!--` .. `-->`, one line or many) is not read at all: no heading, tag, table or zone
+# comes out of it, and what is left of a line around a comment (`| РП | <!-- x --> |`) is read as
+# the line it is; an unclosed comment swallows the rest of the file. Code comes before comments:
+# a `<!--` in fenced, indented or inline code is text and opens nothing. The rows are written
+# into the file as it is.
+# A table is a candidate only when its header has the exact cell «РП» and a cell
+# starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
+# plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
+# and would receive a nameless row.
+# Separator rows are matched by pattern, not by the literal `|---` (same as #901).
+#
+# STAGE ORDER. The document is read in five stages and an earlier stage takes its lines first: a
+# later stage reads only what the earlier ones leave, and no stage hands the next one a line an
+# earlier stage has taken (a comment never opens in a line of code, a line inside a comment is no
+# code, fence, tag or heading, a heading line is no table row). Two stages that decide on the same
+# lines in two places can disagree, so stages 1 and 2 are ONE pass (`read_layout`) with one mask.
+#
+#   stage | takes                                | what it leaves to the later stages
+#   ------+--------------------------------------+---------------------------------------------
+#     1   | code: fenced (``` ~~~), indented (4+ | nothing of such a line: no comment, tag,
+#         | columns beyond the list item, a tab  | heading or table row comes out of it (`deep`
+#         | counts to 4), inline `code spans`    | marks the lines that can be no table row)
+#         | (a span is looked for on one line)   |
+#     2   | HTML comments, `<!--` .. `-->`       | the text around a comment on its line; a
+#         |                                      | line with nothing left is blank
+#     3   | tags <details>, <summary>            | the block stack and the titles; the lines of
+#         |                                      | an open <summary> title are text
+#     4   | ATX headings                         | the headings in scope; one in a container
+#         |                                      | opens the ambiguity zone instead
+#     5   | table rows: separator and header     | the candidates
+#
+# Stages 1 and 2 are `read_layout`, stage 3 is `scan_tags`, stages 4 and 5 are the loop below.
+TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
+TAG_RE = re.compile(r"</details>|<details\b|<summary\b[^>]*>|</summary>", re.IGNORECASE)
+HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
+FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
+LIST_ITEM_RE = re.compile(r"^( *)(?:[-*+]|\d{1,9}[.)])( +|$)")
+QUOTE_RE = re.compile(r"^ {0,3}>")
+# A heading with something in front of the hashes: indentation, quote marks, list markers.
+LOOSE_HEADING_RE = re.compile(r"^[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*#{1,6}[ \t]+\S")
+# Whole words only: «Итоговая таблица недели (плановые РП)» is a plan, not a facts section.
+FACTS_RE = re.compile(r"\b(?:Итог(?:и|ов)?|Сводк[аиу]|Summary)\b", re.IGNORECASE)
+# The word must START with «План»/«Plan»: «Внеплановые РП» is not a plan section.
+PLAN_RE = re.compile(r"\b(?:План|Plan)", re.IGNORECASE)
+
+
+def strip_tags(text):
+    return " ".join(re.sub(r"<[^>]+>", "", text).split())
+
+
+def table_cells(row):
+    return [c.strip() for c in row.strip().strip("|").split("|")]
+
+
+def column_key(cell):
+    """Column name without its qualifier: «Статус (на 3 июля)» and «Статус W13» are «Статус»."""
+    return "Статус" if re.match(r"Статус\b", cell) else cell
+
+
+def is_plan_header(cells):
+    keys = [column_key(c) for c in cells]
+    return "РП" in keys and "Статус" in keys
+
+
+def plan_distance(ancestors):
+    """Ancestors below the nearest «План» one: 0 = the table's own section, None = no «План» above."""
+    for below, title in enumerate(reversed(ancestors)):
+        if PLAN_RE.search(title):
+            return below
+    return None
+
+
+def next_fence(fence, text):
+    """Fence tracker after one line: (marker, length) inside a fenced code block, else None."""
+    found = FENCE_RE.match(text)
+    if fence:
+        # Only a fence of the same kind, at least as long and without an info string closes it.
+        closes = (
+            found
+            and found.group(1)[0] == fence[0]
+            and len(found.group(1)) >= fence[1]
+            and not found.group(2).strip()
+        )
+        return None if closes else fence
+    # An info string with a backtick means inline code, not a fence (CommonMark).
+    if found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
+        return (found.group(1)[0], len(found.group(1)))
+    return None
+
+
+def heading_of(line):
+    # An ATX heading wins over a table row (CommonMark, GFM): `### Итоги | факт` is a heading
+    # whatever its text holds, and so is `# | РП | Статус`, which therefore is no table header.
+    # A row of a table starts with a pipe or does not look like this at all.
+    return HEADING_RE.match(line)
+
+
+def mask_code_spans(text):
+    """The text with every inline code span, backticks included, blanked out; same length."""
+    masked = []
+    i = 0
+    while i < len(text):
+        if text[i] != "`":
+            masked.append(text[i])
+            i += 1
+            continue
+        run = re.match(r"`+", text[i:]).group()
+        closing = re.search(r"(?<!`)" + re.escape(run) + r"(?!`)", text[i + len(run):])
+        if closing:  # a span ends at as many backticks as it began with
+            end = i + len(run) + closing.end()
+            masked.append(" " * (end - i))
+            i = end
+        else:  # no closing run: the backticks are plain text
+            masked.append(run)
+            i += len(run)
+    return "".join(masked)
+
+
+def comment_start(text, pos):
+    """Index of the first `<!--` at or after pos that is not inside an inline code span, else -1."""
+    found = mask_code_spans(text[pos:]).find("<!--")
+    return pos + found if found >= 0 else -1
+
+
+def strip_comments(text, in_comment, block):
+    """Stage 2 on one line: (what is left of it, still inside a comment, the open comment began a line).
+
+    A comment opens at `<!--` and closes at the next `-->`, on the same line or on a later one; a
+    line with nothing left is blank. A comment that starts a line is an HTML block: its closing line
+    goes with it, whatever follows the `-->`. A `<!--` inside an inline code span is text.
+    """
+    visible, pos = [], 0
+    while pos < len(text):
+        if in_comment:
+            end = text.find("-->", pos)
+            if end < 0:
+                break
+            pos, in_comment = (len(text) if block else end + 3), False
+        else:
+            start = comment_start(text, pos)
+            if start < 0:
+                visible.append(text[pos:])
+                break
+            visible.append(text[pos:start])
+            block = not "".join(visible).strip()
+            pos, in_comment = start + 4, True
+    return "".join(visible), in_comment, block
+
+
+def read_line(text, items, code_ok):
+    """Stage 1 on one line that is not fenced code: (is_code, deep, base, items, code_ok).
+
+    The first three are the facts about the line, the last two the state after it. is_code: a line of
+    an indented code block (4+ columns beyond the list item it sits in, a tab counts to 4); it starts
+    only after a blank line, a heading, a closing fence or another code line, as right after any other
+    line it continues that line's block. deep: indented that far whatever block it belongs to, so never
+    a table row. base: the column where the markup of the line starts, i.e. the content offset of its
+    container (of the item it opens, for a list item line); a quote or a tag is looked for after it,
+    not after the margin. items: content offsets of the open list items, outermost first.
+    """
+    text = text.expandtabs(4)
+    if not text.strip():
+        return False, False, 0, items, True
+    indent = len(text) - len(text.lstrip(" "))
+    items = [offset for offset in items if offset <= indent]
+    container = items[-1] if items else 0
+    deep = indent - container >= 4
+    item = LIST_ITEM_RE.match(text)
+    if item and not deep:
+        return False, False, item.end(), items + [item.end()], heading_of(text[item.end():]) is not None
+    if deep and code_ok:
+        return True, True, 0, items, True
+    return False, deep, container, items, heading_of(text[container:]) is not None
+
+
+def read_layout(lines):
+    """Stages 1 and 2 in ONE pass: (view, is_code, deep, base), one entry per line.
+
+    view: the lines as markdown reads them, whatever sits inside an HTML comment gone. The code mask
+    (is_code, deep, base) is made from the same pass and the same state, so that code and comments
+    cannot disagree: a line the code stage takes (fenced, or a line of an indented code block) is
+    never looked at for a comment, a `<!--` in it is text, and a line inside a comment is neither
+    code nor a fence. Same number of lines, so an index means the same line before and after.
+    """
+    view, is_code, deep, base = [], [], [], []
+    fence = None  # (marker, length) while inside a fenced code block
+    in_comment = False
+    block = False  # the open comment started its line: the line it closes on is hidden whole
+    items, code_ok = [], True
+    for line in lines:
+        text = line.rstrip("\r\n")
+        seen = None  # what stage 1 leaves of the line to the later stages
+        if not in_comment:
+            was_open = fence is not None
+            fence = next_fence(fence, text)
+            if was_open or fence:  # fenced code
+                view.append(line)
+                is_code.append(True)
+                deep.append(False)
+                base.append(0)
+                code_ok = was_open and not fence  # only the closing fence line frees the next one
+                continue
+            if read_line(text, items, code_ok)[0]:  # indented code: its `<!--` is text
+                seen = text
+        if seen is None:
+            seen, in_comment, block = strip_comments(text, in_comment, block)
+        code, is_deep, offset, items, code_ok = read_line(seen, items, code_ok)
+        view.append(seen)
+        is_code.append(code)
+        deep.append(is_deep)
+        base.append(offset)
+    return view, is_code, deep, base
+
+
+class Block:
+    """An open <details>: the title of its <summary> and what the writer needs to scope headings."""
+
+    def __init__(self, outer_headings):
+        self.title = ""
+        self.outer_headings = outer_headings  # headings in scope before it opened (rebound, never mutated)
+        self.pieces = None  # text of the <summary> being read, None while none is open
+        self.summaries = 0  # <summary> tags met in this block; a second one makes its name untrustworthy
+
+
+def collect_title(blocks, text):
+    """Add text to the innermost <summary> that is still open."""
+    for block in reversed(blocks):
+        if block.pieces is not None:
+            block.pieces.append(text)
+            return
+
+
+def scan_tags(line, blocks, headings):
+    """Apply the <details>/<summary> tags of one line to the block stack; return the headings in scope.
+
+    A tag inside an inline code span is text: stage 1 (code) comes before stage 3 (tags).
+    """
+    position = 0
+    for tag in TAG_RE.finditer(mask_code_spans(line)):
+        collect_title(blocks, line[position:tag.start()])
+        position = tag.end()
+        kind = tag.group(0).lower()
+        top = blocks[-1] if blocks else None
+        if kind == "</summary>":
+            if top and top.pieces is not None:  # only the block that opened it can close it
+                if top.summaries == 1:  # the first <summary> names the block, a later one never renames it
+                    top.title = strip_tags(" ".join(top.pieces))
+                top.pieces = None
+        elif kind == "</details>":
+            if top:
+                headings = blocks.pop().outer_headings  # an unclosed <summary> ends with its block
+        elif kind.startswith("<details"):
+            blocks.append(Block(headings))
+            headings = []
+        elif top:
+            top.summaries += 1
+            if top.pieces is None:  # a repeated tag inside an open title keeps the text read so far
+                top.pieces = []
+    collect_title(blocks, line[position:])
+    return headings
+
+
+view, is_code, deep, base = read_layout(lines)  # stages 1 and 2; `lines` stays as it is, the row goes into it
+candidates = []  # (header line, insert position, ancestor titles, open blocks)
+headings = []  # (level, title) of the markdown headings in scope
+blocks = []  # the open <details> blocks, outermost first
+zone = False  # a heading we cannot place was met and no unindented heading has closed its zone yet
+for i, line in enumerate(view):
+    if is_code[i]:
+        continue
+    text = line.expandtabs(4)[base[i]:]  # the line without the indentation of its container
+    in_summary = any(b.pieces is not None for b in blocks)  # the line starts inside a <summary> title
+    if not in_summary and not line.startswith("#") and LOOSE_HEADING_RE.match(line):
+        zone = True  # a heading in a list item, in a quote or indented: it changes no section, see above
+    if QUOTE_RE.match(text):
+        continue  # a quote is a container of its own: its tags leave the sections outside alone
+    headings = scan_tags(text, blocks, headings)
+    if in_summary:
+        continue  # the lines of a <summary> title are text, not headings or tables
+    heading = heading_of(line) if line.startswith("#") else None  # only an unindented heading is trusted
+    if heading:
+        level = len(heading.group(1))
+        headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
+        zone = False
+    if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
+        header = view[i - 1]
+        ancestors = [b.title for b in blocks] + [h[1] for h in headings]
+        if (
+            not zone
+            and heading_of(header) is None  # a heading is no table header, a pipe in its text or not
+            and is_plan_header(table_cells(header))
+            and not deep[i - 1]
+            and not deep[i]
+            and not any(FACTS_RE.search(t) for t in ancestors)
+        ):
+            candidates.append((header, i + 1, ancestors, list(blocks)))
+
+# A block with a second <summary> is not told by its name: its tables, those above the second
+# <summary> included, are left to the pilot.
+candidates = [c for c in candidates if all(b.summaries < 2 for b in c[3])]
+# The table whose «План» ancestor is the nearest wins; equal distance keeps document order.
+ranked = [(plan_distance(c[2]), n) for n, c in enumerate(candidates)]
+ranked = [r for r in ranked if r[0] is not None]
+if ranked:
+    chosen = candidates[min(ranked)[1]]
+elif len(candidates) == 1:
+    chosen = candidates[0]
+else:
+    chosen = None
+header_line, insert_at = (chosen[0], chosen[1]) if chosen else (None, None)
 
 if insert_at is None:
-    print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус) не найдена — добавить вручную", file=sys.stderr)
+    if candidates:
+        titles = ", ".join("«{}»".format(" › ".join(t for t in c[2] if t) or "без заголовка") for c in candidates)
+        print("   ⚠️  WeekPlan: несколько таблиц РП/Статус, ни одна не названа «План» ({}) — не выбираю наугад, добавить вручную".format(titles), file=sys.stderr)
+    else:
+        print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус вне блоков «Итоги») не найдена — добавить вручную", file=sys.stderr)
 else:
-    header_cols = [c.strip() for c in header_line.strip().strip("|").split("|")]
+    header_cols = table_cells(header_line)
     values_by_name = {
         "🚦": flag,
         "#": wp_num,
@@ -790,9 +1135,12 @@ else:
     }
     row_cells = ["—"] * len(header_cols)
     for idx, name in enumerate(header_cols):
-        if name in values_by_name:
-            row_cells[idx] = values_by_name[name]
-    new_row = "| " + " | ".join(row_cells) + " |\n"
+        key = column_key(name)  # the same normalization the header detection used
+        if key in values_by_name:
+            row_cells[idx] = values_by_name[key]
+    # The new row keeps the indentation of the table (a table inside a list item stays one).
+    indent = re.match(r"[ \t]*", lines[insert_at - 1]).group()
+    new_row = indent + "| " + " | ".join(row_cells) + " |\n"
     lines.insert(insert_at, new_row)
     with open(weekplan_path, "w", encoding="utf-8") as f:
         f.writelines(lines)

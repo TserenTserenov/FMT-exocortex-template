@@ -1,14 +1,63 @@
 #!/usr/bin/env bash
 # wp-sync-bundle.sh — детерминированный bundler контекста РП для sync-фазы WP Gate
-# Контракт: вход WP-N или N → stdout markdown bundle, exit 0/1/2/3
+# Контракт: вход WP-N или N → stdout markdown bundle, exit 0/1/2/3/4
 #   Первые машинные строки stdout: GIT_SYNC_STATUS / GIT_SYNC_DETAIL /
 #   [GIT_SYNC_OVERRIDE] / CARD_SOURCE (worktree | origin-pinned oid=<40hex>
 #   behind=N ahead=M | worktree-forced). WP-561 Ф24: при STALE/DIVERGED и
 #   свежем remote-tracking ref карточки читаются со снимка origin (exit 0).
+#   exit 4: не найден scripts/lib/wp-num.sh — ошибка установки, а не «РП не найден»
+#   (exit 1); проверяется первым, до чтения конфигурации и реестра. Тот же код 4
+#   отдаёт сверка handoff_snapshot, когда его не нашёл wp-phase-digest.sh.
 # see WP-294
 # Compatible: bash 3.2+
 
 set -euo pipefail
+
+_WPN_ROOT_UP="../.."
+_WPN_OPTIONAL=""
+# >>> wp-num locate
+# Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
+# resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
+# fixtures. Candidates, in order: lib/ next to the file, <root>/scripts/lib, the template
+# clone next to a delivered workspace (<root>/FMT-exocortex-template), the explicit
+# IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
+# just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
+# The library is mandatory: not finding it is an installation error, not "WP not found",
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# A consumer that must keep working without the library (session-guard: its hypothesis gate
+# warns and checks the exact card names, it never blocks a session over a missing library)
+# sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
+_wpn_src="${BASH_SOURCE[0]}"
+_wpn_hops=0
+while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
+  _wpn_link="$(readlink "$_wpn_src")"
+  case "$_wpn_link" in
+    /*) _wpn_src="$_wpn_link" ;;
+    *) _wpn_src="$(dirname "$_wpn_src")/$_wpn_link" ;;
+  esac
+  _wpn_hops=$((_wpn_hops + 1))
+done
+_wpn_dir="$(cd -P "$(dirname "$_wpn_src")" && pwd)"
+_wpn_root="$(cd -P "$_wpn_dir/$_WPN_ROOT_UP" && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
+                 "$_wpn_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [ -r "$_wpn_cand" ]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [ -z "$WP_NUM_LIB" ] && [ -z "${_WPN_OPTIONAL:-}" ]; then
+  echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
+  exit 4
+fi
+if [ -n "$WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$WP_NUM_LIB"
+fi
+# <<< wp-num locate
 
 # ---------------------------------------------------------------------------
 # Config (with resilience fallback — see WP-294)
@@ -129,11 +178,6 @@ card_relpath() {
   fi
 }
 
-normalize_wp_num() {
-  local arg="$1"
-  echo "${arg#WP-}" | tr -d ' '
-}
-
 wp_path_label() {
   local filepath="$1"
   case "$filepath" in
@@ -189,53 +233,13 @@ cleanup_tmp() {
   return 0
 }
 
+# Path of the WP's card ("" when there is none). The lookup itself lives in
+# scripts/lib/wp-num.sh (issue #954): canonical folder cards in either spelling
+# (WP-044/ and the older WP-44/, inbox then archive, WP-434/#267) before the last-resort
+# `wp:` grep, which cannot tell a card from a note carrying the same field. The path
+# that exists is returned as found. Always returns 0: callers run under `set -e`.
 find_wp_file() {
-  local num="$1"
-  local found=""
-
-  if [[ -d "$INBOX_DIR" ]]; then
-    # WP-434: a canonical folder card wins over stale flat duplicates.
-    found=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    if [[ -z "$found" ]]; then
-      found=$(grep -rl "^wp: ${num}$" "$INBOX_DIR" 2>/dev/null | head -1 || true)
-    fi
-    if [[ -z "$found" ]]; then
-      found=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}.md" 2>/dev/null | head -1 || true)
-    fi
-    if [[ -z "$found" ]]; then
-      local candidates
-      candidates=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}-*.md" 2>/dev/null | sort | head -5 || true)
-      if [[ -n "$candidates" ]]; then
-        while IFS= read -r cand; do
-          if [[ -f "$cand" ]] && grep -q "^wp: ${num}$" "$cand" 2>/dev/null; then
-            found="$cand"
-            break
-          fi
-        done <<< "$candidates"
-        if [[ -z "$found" ]]; then
-          # Pick shortest filename
-          found=$(echo "$candidates" | awk '{print length, $0}' | sort -n | head -1 | cut -d' ' -f2-)
-        fi
-      fi
-    fi
-  fi
-
-  if [[ -z "$found" && -d "$ARCHIVE_DIR" ]]; then
-    # WP-434: same canonical-folder-first priority as the inbox branch above
-    # (issue #267 — archive previously had no folder-card preference at all).
-    found=$(find "$ARCHIVE_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    if [[ -z "$found" ]]; then
-      found=$(grep -rl "^wp: ${num}$" "$ARCHIVE_DIR" 2>/dev/null | head -1 || true)
-    fi
-    if [[ -z "$found" ]]; then
-      # A numeric prefix is not an ID boundary: `WP-46*.md` also matches
-      # `WP-469-*.md`. Only the exact flat filename or a hyphenated slug is
-      # a valid legacy archive candidate for this WP.
-      found=$(find "$ARCHIVE_DIR" -maxdepth 1 \( -name "WP-${num}.md" -o -name "WP-${num}-*.md" \) 2>/dev/null | sort | head -1 || true)
-    fi
-  fi
-
-  echo "$found"
+  wp_num_find_card "$INBOX_DIR" "$ARCHIVE_DIR" "$1" || true
 }
 
 extract_fm_field() {
@@ -486,20 +490,41 @@ registry_status_column() {
 }
 
 registry_status() {
-  local num="$1"
+  local num="$1" prev="" malformed="_некорректный номер РП: ${1}_"
   # Найдено пир-сессией с Codex (ход 3): единственный вызывающий (строка ~514)
   # сейчас всегда передаёт голое число (та же инвариантность проверяется
   # соседним `grep -cE '^[0-9]+$'` на строке ~608), но публичная функция не
   # обязана полагаться на дисциплину вызывающего — "WP-47" тихо не находился бы.
-  num="${num#WP-}"
-  num="${num#wp-}"
-  if [[ ! "$num" =~ ^[0-9]{1,4}$ ]]; then
-    echo "_некорректный номер РП: ${1}_"
-    return
-  fi
+  #
+  # issue #954: the number is read by the SAME rules as wp_num_normalize (scripts/lib/wp-num.sh),
+  # which this function must not call (the #473/#713/#871 tests cut it out by name and run it
+  # alone), so the rules are repeated here step for step and test_issue_954_wp_number_forms.sh
+  # compares the two on a table of inputs: at most 64 characters in all (a prefix counts),
+  # surrounding spaces and ~~ / ** wrappers peeled, a WP- prefix in any case, digits only, at most
+  # 9 of them after the leading zeros. It used to take 1-4 digits and only "WP-" / "wp-", so
+  # "00044" -- and "wP-044" -- came back as "некорректный номер" and failed the canary although
+  # the library, the card lookup and close-wp.sh all read them as 44.
+  [[ "${#num}" -le 64 ]] || { echo "$malformed"; return; }
+  num="${num#"${num%%[![:space:]]*}"}"
+  num="${num%"${num##*[![:space:]]}"}"
+  while [[ "$num" != "$prev" ]]; do
+    prev="$num"
+    case "$num" in
+      '~~'*'~~') num="${num#'~~'}"; num="${num%'~~'}" ;;
+      '**'*'**') num="${num#'**'}"; num="${num%'**'}" ;;
+    esac
+  done
+  case "$num" in
+    [Ww][Pp]-*) num="${num#???}" ;;
+  esac
+  [[ "$num" =~ ^[0-9]+$ ]] || { echo "$malformed"; return; }
   # issue #715: ведущие нули (WP-038) не совпадали с голым "38" в реестре —
-  # нормализуем ДО построения regex поиска строки. `10#` держит базу 10
-  # явно (иначе bash читает "038" как некорректный восьмеричный литерал).
+  # нормализуем ДО построения regex поиска строки. Нули снимаются текстом, не арифметикой:
+  # `10#` держит базу 10 (иначе bash читает "038" как некорректный восьмеричный литерал),
+  # но длинная строка цифр переполнила бы 64-битное целое молча.
+  num="${num#"${num%%[!0]*}"}"
+  [[ -n "$num" ]] || num=0
+  [[ "${#num}" -le 9 ]] || { echo "$malformed"; return; }
   num=$((10#$num))
   if [[ ! -f "$REGISTRY_FILE" ]]; then
     echo "_нет файла REGISTRY_"
@@ -520,7 +545,14 @@ registry_status() {
   # руками. Без `(WP-|wp-)?` такая строка молча давала «не в реестре», неотличимое
   # от настоящего отсутствия. Префикс допустим только сразу перед числом, поэтому
   # "WP-1170" по-прежнему не совпадает с 117.
-  local regex="^\|[[:space:]]*(~~)?(\*\*)?(WP-|wp-)?${num}(\*\*)?(~~)?[^0-9|]*[[:space:]]*\|"
+  # issue #954: та же ячейка пишется и с ведущими нулями ("| WP-044 |", как называет
+  # папку карточки create-wp.sh) — `0*` между префиксом и числом. Запрос уже
+  # нормализован выше (44), так что "440" и "0440" по-прежнему не совпадают с 44:
+  # после числа цифра запрещена `[^0-9|]*`. Тот же шаблон отдаёт
+  # wp_num_registry_cell_regex (scripts/lib/wp-num.sh) для close-wp.sh; функция
+  # намеренно не зовёт библиотеку — тесты #473/#713/#871 вырезают её по имени и
+  # прогоняют отдельно от остального файла.
+  local regex="^\|[[:space:]]*(~~)?(\*\*)?(WP-|wp-)?0*${num}(\*\*)?(~~)?[^0-9|]*[[:space:]]*\|"
   local match_count
   match_count=$(grep -cE "$regex" "$REGISTRY_FILE" 2>/dev/null || true)
   match_count=${match_count:-0}
@@ -561,6 +593,13 @@ registry_status() {
   elif LC_ALL=C grep -qF '⏸' <<<"$status_cell"; then resolved="⏸ paused"
   elif LC_ALL=C grep -qF '⏹' <<<"$status_cell"; then resolved="⏹ снят"
   elif LC_ALL=C grep -qF '🔁' <<<"$status_cell"; then resolved="🔁 свёрнут в спринт"
+  # issue #964: "↗️ merged в другой РП" is in the registry legend the template ships
+  # (seed/strategy/docs/WP-REGISTRY.md) and is a terminal status like ✅ and 📦, yet the
+  # resolver did not know it. Matched by its base character, like ⏸ above (the ️ variation
+  # selector is optional in registries). Last on purpose: it never outranks a status
+  # emoji that sits in the same cell. "frozen" is deliberately NOT here: the platform's
+  # status vocabulary is the pilot's decision.
+  elif LC_ALL=C grep -qF '↗' <<<"$status_cell"; then resolved="↗️ merged"
   fi
   if [[ -n "$resolved" ]]; then
     echo "$resolved"
@@ -682,6 +721,60 @@ extract_structured_open_phases() {
   ' "$file" 2>/dev/null
 }
 
+# True when registry_status() answered with one of its "could not resolve" markers
+# (no such row, status cell outside the vocabulary, no status column, no registry file,
+# malformed number) instead of a real status.
+registry_status_unresolved() {
+  case "$1" in
+    _не\ в\ реестре_|_статус\ неизвестен_|_колонка\ статуса\ не\ найдена*|_нет\ файла\ REGISTRY_|_некорректный\ номер\ РП*) return 0 ;;
+  esac
+  return 1
+}
+
+# Numbers of the inbox cards in the order the canary tries them: folder cards (WP-434)
+# first, then flat legacy files, each group in sort order.
+canary_card_numbers() {
+  local card
+  while IFS= read -r card; do
+    basename "$(dirname "$card")" | grep -oE '[0-9]+' | head -1 || true
+  done < <(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-*/WP-*.md" 2>/dev/null | sort)
+  while IFS= read -r card; do
+    basename "$card" | grep -oE '^WP-[0-9]+' | grep -oE '[0-9]+' | head -1 || true
+  done < <(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort)
+}
+
+# Choose the card the canary checks (issue #964). The first inbox card used to be taken
+# whatever its status, so a user's own "❄️ frozen" failed `update.sh --check` (exit 5).
+# Only a card whose registry row IS found but whose status is unknown ("_статус неизвестен_")
+# is passed over. Any other answer ends the search on that card: a recognised status, or a
+# "cannot resolve" answer -- above all "_не в реестре_" -- on which the canary then fails
+# as before: skipping such cards would blind it to a row format the reader cannot parse
+# (#717/#718; #954 A was caught exactly so). Every card unknown: the FIRST one is chosen
+# and refused. Sets CANARY_PICK ("" when inbox holds no cards) and, for cards passed over
+# before the pick, CANARY_SKIPPED_COUNT / CANARY_SKIPPED_LIST (first three, with status).
+pick_canary_wp() {
+  local num status first=""
+  CANARY_PICK=""
+  CANARY_SKIPPED_COUNT=0
+  CANARY_SKIPPED_LIST=""
+  while IFS= read -r num; do
+    [[ -n "$num" ]] || continue
+    [[ -n "$first" ]] || first="$num"
+    status=$(registry_status "$num" 2>/dev/null || true)
+    if [[ "$status" != "_статус неизвестен_" ]]; then
+      CANARY_PICK="$num"
+      return 0
+    fi
+    CANARY_SKIPPED_COUNT=$((CANARY_SKIPPED_COUNT + 1))
+    if [[ "$CANARY_SKIPPED_COUNT" -le 3 ]]; then
+      CANARY_SKIPPED_LIST="${CANARY_SKIPPED_LIST:+${CANARY_SKIPPED_LIST}, }WP-${num} ${status}"
+    fi
+  done < <(canary_card_numbers)
+  CANARY_PICK="$first"
+  CANARY_SKIPPED_COUNT=0
+  CANARY_SKIPPED_LIST=""
+}
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -727,8 +820,9 @@ main() {
 
     local test_num=""
     if [[ $# -ge 2 && -n "${2:-}" ]]; then
-      test_num=$(normalize_wp_num "$2")
-      if ! echo "$test_num" | grep -qE '^[0-9]+$'; then
+      # The one reader of WP numbers (issue #954); a refusal is handled here, because under
+      # `set -e` a failing assignment would end the script without a word.
+      if ! test_num=$(wp_num_normalize "$2"); then
         log_err "Неверный формат canary WP: '$2'. Ожидается WP-N или N."
         exit 2
       fi
@@ -736,18 +830,15 @@ main() {
     # No explicit WP given — find a real, resolvable WP for the canary.
     # WP-434: canonical folder cards win over legacy flat files; closed WPs
     # (archived/done) are avoided because the canary should test the active
-    # governance contour, not a stale baseline (issue #861).
+    # governance contour, not a stale baseline (issue #861). The card is the first one that
+    # is not passed over: only a card whose registry row exists but whose status is unknown
+    # (a user's own "❄️") is skipped; any other unresolved answer stops the search and
+    # fails the canary (issue #964, see pick_canary_wp).
     if [[ -z "$test_num" && -d "$INBOX_DIR" ]]; then
-      local first_wp
-      first_wp=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-*/WP-*.md" 2>/dev/null | sort | head -1 || true)
-      if [[ -n "$first_wp" ]]; then
-        test_num=$(basename "$(dirname "$first_wp")" | grep -oE '[0-9]+' || true)
-      fi
-      if [[ -z "$test_num" ]]; then
-        first_wp=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort | head -1 || true)
-        if [[ -n "$first_wp" ]]; then
-          test_num=$(basename "$first_wp" | grep -oE '^WP-[0-9]+' | grep -oE '[0-9]+' || true)
-        fi
+      pick_canary_wp
+      test_num="$CANARY_PICK"
+      if [[ "$CANARY_SKIPPED_COUNT" -gt 0 ]]; then
+        echo "Canary: пропущено карточек без распознанного статуса: ${CANARY_SKIPPED_COUNT} (${CANARY_SKIPPED_LIST}); проверяется WP-${test_num}"
       fi
     fi
     if [[ -z "$test_num" && -f "$REGISTRY_FILE" ]]; then
@@ -797,19 +888,18 @@ main() {
     local status
     status=$(registry_status "$test_num")
     echo "WP-${test_num} registry_status: $status"
-    case "$status" in
-      _не\ в\ реестре_|_статус\ неизвестен_|_колонка\ статуса\ не\ найдена*|_нет\ файла\ REGISTRY_|_некорректный\ номер\ РП*)
-        echo "Canary FAILED: registry status unresolved for WP-${test_num}: $status" >&2
-        exit 1
-        ;;
-    esac
+    if registry_status_unresolved "$status"; then
+      echo "Canary FAILED: registry status unresolved for WP-${test_num}: $status" >&2
+      exit 1
+    fi
     exit 0
   fi
 
+  # The one reader of WP numbers (issue #954): 44, 044, WP-44, WP-044, wp-044 and WP-00044
+  # all mean 44 and give one bundle. A refusal is handled here, because under `set -e` a
+  # failing assignment would end the script without a word.
   local wp_num
-  wp_num=$(normalize_wp_num "$input")
-
-  if ! echo "$wp_num" | grep -qE '^[0-9]+$'; then
+  if ! wp_num=$(wp_num_normalize "$input"); then
     log_err "Неверный формат: '$input'. Ожидается WP-N или N."
     exit 1
   fi
@@ -949,12 +1039,14 @@ main() {
   local related_from_body
   related_from_body=$(grep_body_wps "$wp_file")
 
-  # Merge, deduplicate, exclude self, limit to 30
+  # Merge, deduplicate, exclude self, limit to 30. Self is excluded by NUMBER (issue #954):
+  # the card says "WP-044" in its heading while the caller typed 44 (or the other way
+  # round), and a string compare listed the WP as related to itself.
   local all_related
   all_related=$(
     { echo "$related_from_fm"; echo "$related_from_blockers"; echo "$related_from_body"; } \
     | grep -E '^[0-9]+$' \
-    | grep -v "^${wp_num}$" \
+    | awk -v self="$wp_num" '$0 + 0 != self + 0' \
     | sort -nu \
     | head -30 \
     || true
@@ -1065,7 +1157,9 @@ main() {
 
         # Drift: related is closed, but open phase references it
         local is_closed=0
-        if echo "$reg_status" | grep -qiE '✅|done|closed|~~'; then
+        # "↗️ merged" (issue #964) is as terminal as ✅: before the resolver knew ↗️ a
+        # struck-through merged row came back as "~~done~~ (зачёркнут)" and matched here.
+        if echo "$reg_status" | grep -qiE '✅|done|closed|merged|~~'; then
           is_closed=1
         fi
         if echo "$rstatus" | grep -qiE '^(closed|done|complete)$'; then
@@ -1110,16 +1204,60 @@ main() {
           snap_line=$(printf '%s\n' "$handoff_snapshot" | grep "^WP-${rnum}|" || true)
           if [[ -n "$snap_line" ]]; then
             local snap_status snap_digest current_digest_out current_status current_digest
+            local digest_rc=0 digest_template digest_line digest_missing
             snap_status=$(echo "$snap_line" | cut -d'|' -f2)
             snap_digest=$(echo "$snap_line" | cut -d'|' -f3)
+            # issue #954: the helper's exit code is decided here, not swallowed. It used to be
+            # hidden (`|| true`, stderr to /dev/null) and the `grep` on its empty output then
+            # ended the bundle with a bare exit 1 under `set -e` -- for exit 4 (no wp-num.sh:
+            # an installation error) that is "РП не найден" to memory/protocol-open.md. Now 4
+            # stays 4 with the helper's own message; any other failure still ends the bundle
+            # with exit 1, as it always did, but says what failed. IWE_TEMPLATE points the
+            # helper at the library THIS bundle loaded (what update.sh passes for the canary),
+            # so a helper reached through a link into another tree finds it too.
+            digest_template="${IWE_TEMPLATE:-${WP_NUM_LIB%/scripts/lib/wp-num.sh}}"
             if [[ -n "$ORIGIN_WS" ]]; then
-              current_digest_out=$(IWE_WORKSPACE="$ORIGIN_WS" IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$PHASE_DIGEST_SCRIPT" "$rnum" 2>/dev/null || true)
+              current_digest_out=$(IWE_WORKSPACE="$ORIGIN_WS" IWE_GOVERNANCE_REPO="$GOV_REPO" IWE_TEMPLATE="$digest_template" bash "$PHASE_DIGEST_SCRIPT" "$rnum" 2>&1) || digest_rc=$?
             else
-              current_digest_out=$(IWE_GOVERNANCE_REPO="$GOV_REPO" bash "$PHASE_DIGEST_SCRIPT" "$rnum" 2>/dev/null || true)
+              current_digest_out=$(IWE_GOVERNANCE_REPO="$GOV_REPO" IWE_TEMPLATE="$digest_template" bash "$PHASE_DIGEST_SCRIPT" "$rnum" 2>&1) || digest_rc=$?
             fi
-            current_status=$(echo "$current_digest_out" | grep '^status=' | sed 's/^status=//')
-            current_digest=$(echo "$current_digest_out" | grep '^phase_digest=' | sed 's/^phase_digest=//')
-            if [[ -n "$current_digest" ]] && { [[ "$current_status" != "$snap_status" ]] || [[ "$current_digest" != "$snap_digest" ]]; }; then
+            if [[ "$digest_rc" -ne 0 ]]; then
+              printf '%s\n' "$current_digest_out" >&2
+              log_sync "$wp_num" "FAIL" "phase_digest_exit=${digest_rc} card_source=${CARD_SOURCE}"
+              cleanup_tmp
+              if [[ "$digest_rc" -eq 4 ]]; then
+                log_err "wp-phase-digest.sh (WP-${rnum}) завершился с кодом 4: не найдена библиотека wp-num.sh — ошибка установки, это не «РП не найден». Обновите шаблон: bash update.sh"
+                exit 4
+              fi
+              log_err "wp-phase-digest.sh (WP-${rnum}) завершился с кодом ${digest_rc}: сверка снимка зависимостей невозможна, bundle прерван (exit 1)"
+              exit 1
+            fi
+            # The helper's contract: on exit 0 it prints a status= and a phase_digest= line, neither
+            # ever empty (it writes "unknown" / "nodigest" for none). An answer without either is not
+            # "nothing to compare": the comparison would be skipped in silence and the bundle would
+            # stand for "no drift" with nothing checked. It is a broken helper: exit 1, what a
+            # missing line always ended the bundle with on main, but now with a message. A read
+            # loop parses the answer, not grep: grep on a missing line ends the script under
+            # `set -e` + pipefail without a word.
+            current_status=""
+            current_digest=""
+            while IFS= read -r digest_line; do
+              case "$digest_line" in
+                status=*) [[ -n "$current_status" ]] || current_status="${digest_line#status=}" ;;
+                phase_digest=*) [[ -n "$current_digest" ]] || current_digest="${digest_line#phase_digest=}" ;;
+              esac
+            done <<< "$current_digest_out"
+            if [[ -z "$current_status" || -z "$current_digest" ]]; then
+              digest_missing=""
+              [[ -n "$current_status" ]] || digest_missing="status="
+              [[ -n "$current_digest" ]] || digest_missing="${digest_missing:+${digest_missing}, }phase_digest="
+              [[ -z "$current_digest_out" ]] || printf '%s\n' "$current_digest_out" >&2
+              log_sync "$wp_num" "FAIL" "phase_digest_contract missing=${digest_missing} card_source=${CARD_SOURCE}"
+              cleanup_tmp
+              log_err "wp-phase-digest.sh (WP-${rnum}) завершился с кодом 0, но не выдал ${digest_missing}: нарушен контракт helper, сверка снимка зависимостей невозможна, bundle прерван (exit 1)"
+              exit 1
+            fi
+            if [[ "$current_status" != "$snap_status" ]] || [[ "$current_digest" != "$snap_digest" ]]; then
               echo "DRIFT: stale_handoff — снимок WP-${rnum} на момент прошлого close (status=${snap_status}, digest=${snap_digest}) разошёлся с текущим (status=${current_status}, digest=${current_digest}); план \"what_next\" стоит перепроверить" >> "$drift_file"
             fi
           fi

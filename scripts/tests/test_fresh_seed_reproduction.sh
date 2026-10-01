@@ -21,12 +21,17 @@
 
 set -euo pipefail
 
-TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
+# Template root comes from this file's own location, never from $HOME (CI checks
+# the repository out elsewhere); HOME and TMPDIR stay inside the test's temp dir.
+TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # --- Part 1: seed/strategy + create-wp.sh ---
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
+export TMPDIR
+export HOME="$TMPDIR/home"
+mkdir -p "$HOME"
 
 [ -d "$TEMPLATE_ROOT/seed/strategy" ] ||
   { echo "FAIL: seed/strategy missing from template" >&2; exit 1; }
@@ -52,6 +57,8 @@ export IWE_TEMPLATE="$TEMPLATE_ROOT"
 export IWE_ROOT="$TMPDIR"
 export IWE_GOVERNANCE_REPO="strategy"
 
+# --no-artifactor-check: the Artifactor Gate is covered by
+# test_create_wp_artifactor_gate.sh; this part checks that a fresh seed is usable.
 (
   cd "$TMPDIR"
   bash "$TEMPLATE_ROOT/scripts/create-wp.sh" \
@@ -59,14 +66,15 @@ export IWE_GOVERNANCE_REPO="strategy"
     --budget 1h \
     --priority P4 \
     --verification-class closed-loop \
-    --no-consent-check
+    --no-consent-check \
+    --no-artifactor-check
 ) >"$TMPDIR/create.out" 2>&1 || {
   echo "FAIL: create-wp.sh failed against a freshly copied seed" >&2
   cat "$TMPDIR/create.out" >&2
   exit 1
 }
 
-WP_FILE=$(find "$TMPDIR/strategy/inbox" -type f -path '*/WP-*/WP-*.md' | head -1)
+WP_FILE=$(find "$TMPDIR/strategy/inbox" -type f -path '*/WP-*/WP-*.md' | sed -n 1p)
 [ -n "$WP_FILE" ] ||
   { echo "FAIL: fresh seed produced no first WP" >&2; exit 1; }
 
@@ -95,7 +103,7 @@ cat > "$LEGACY_STRATEGY/docs/WP-REGISTRY.md" <<'EOF'
 | 7 | **Старый РП** | 🔄 | 2026-07-01: начат |
 EOF
 IWE_GOVERNANCE_REPO=legacy-strategy bash "$TEMPLATE_ROOT/scripts/create-wp.sh" \
-  --title "Legacy Migration Smoke" --budget 1h --priority P4 --verification-class closed-loop --no-consent-check \
+  --title "Legacy Migration Smoke" --budget 1h --priority P4 --verification-class closed-loop --no-consent-check --no-artifactor-check \
   >"$TMPDIR/legacy-create.out" 2>&1 || {
     cat "$TMPDIR/legacy-create.out" >&2
     echo "FAIL: create-wp.sh did not migrate a legacy registry" >&2
