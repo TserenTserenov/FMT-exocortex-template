@@ -209,6 +209,7 @@ f=$(block_of publish)
 if [ -n "$f" ]; then
   new_copy() {  # NAME -> COPY: a session-isolate copy of origin/main, as session-guard.sh --isolate makes it
     COPY="$C2/isolated-worktrees/$1"
+    git -C "$CANON" fetch -q origin main 2>/dev/null
     git -C "$CANON" worktree add -q -b "session-isolate/$1" "$COPY" origin/main 2>/dev/null
   }
   commit_in_copy() {  # FILE MESSAGE -> one commit in $COPY that adds the message as a line of FILE
@@ -237,6 +238,30 @@ if [ -n "$f" ]; then
   only_main && check "publication: only main on origin" ok || check "publication: only main on origin" bad
   [ ! -e "$C2/canon-publisher-ran" ] && check "publication, fresh install: the copy's own publisher wins over the canon's file" ok \
     || check "publication, fresh install: the copy's own publisher wins over the canon's file" bad
+
+  # C3: the publisher carries one commit per call, so the block publishes every commit of the copy that
+  # origin/main lacks, oldest first; a repeated run changes nothing; a copy with nothing new says so.
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null 2>&1 || { echo "SKIP: $sh not found, the publication block is not run in it"; continue; }
+    new_copy "claude-two-$sh"
+    commit_in_copy "current/WeekPlan W44.md" "strategy-session: week plan, $sh"
+    commit_in_copy "inbox/fleeting-notes.md" "strategy-session: inbox, $sh"
+    if [ "$sh" = zsh ]; then publish_copy zsh -f; else publish_copy; fi
+    [ "$RC" -eq 0 ] && [ "$(git --git-dir="$ORIGIN" log -2 --reverse --format=%s main | tr '\n' '|')" = "strategy-session: week plan, $sh|strategy-session: inbox, $sh|" ] && only_main \
+      && check "publication ($sh), two commits in the copy: both on origin/main, oldest first" ok \
+      || { detail "rc=$RC out=$OUT"; check "publication ($sh), two commits in the copy: both on origin/main, oldest first" bad; }
+  done
+  before=$(git --git-dir="$ORIGIN" rev-parse main)
+  publish_copy
+  [ "$RC" -eq 0 ] && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
+    && check "publication, repeated: exit 0, origin/main unchanged" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, repeated: exit 0, origin/main unchanged" bad; }
+  new_copy "claude-nothing"
+  publish_copy
+  [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q 'Публиковать нечего' && ! printf '%s' "$OUT" | grep -q 'published as' \
+    && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
+    && check "publication, nothing new in the copy: exit 0, one line says so, no claim of a publication" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, nothing new in the copy: exit 0, one line says so, no claim of a publication" bad; }
 
   # C1 compat: update.sh never replaces an existing scripts/ds-publish.sh, so an install may keep one that
   # does not know --branch and answers it with usage, exit 1: its own one with a fixed target branch (made
