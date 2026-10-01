@@ -789,9 +789,10 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # (nested blocks included), so no table inside it is a candidate, and a nested <details> or
 # <summary> cannot take the open state over. The first <summary> names the block; a second one
 # in the same block makes the name untrustworthy, and every table of that block, those above
-# the second <summary> included, is left to the pilot. Code is decided BEFORE any tag, heading
-# or table is looked at: nothing inside a fenced block (``` or ~~~) or an indented one (4+
-# columns beyond the list item it sits in, a tab counts to 4) is a heading, a tag or a table.
+# the second <summary> included, is left to the pilot. Code is decided BEFORE anything else
+# (the stage table below): nothing inside a fenced block (``` or ~~~), an indented one (4+
+# columns beyond the list item it sits in, a tab counts to 4) or an inline code span is a
+# comment or a tag, and nothing inside a fenced or an indented block is a heading or a table.
 # An indented line is code only after a blank line, a heading, a closing fence or another code
 # line (it cannot interrupt a paragraph, an HTML block or a list item), and a nested list is
 # not code. Only an unindented heading is trusted as a section title. A heading with anything
@@ -805,13 +806,36 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # spaces) is a container of its own: its tags change nothing outside it. The content of an HTML
 # comment (`<!--` .. `-->`, one line or many) is not read at all: no heading, tag, table or zone
 # comes out of it, and what is left of a line around a comment (`| РП | <!-- x --> |`) is read as
-# the line it is; an unclosed comment swallows the rest of the file. Fenced and inline code are
-# not scanned for comments. The rows are written into the file as it is.
+# the line it is; an unclosed comment swallows the rest of the file. Code comes before comments:
+# a `<!--` in fenced, indented or inline code is text and opens nothing. The rows are written
+# into the file as it is.
 # A table is a candidate only when its header has the exact cell «РП» and a cell
 # starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
 # plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
 # and would receive a nameless row.
 # Separator rows are matched by pattern, not by the literal `|---` (same as #901).
+#
+# STAGE ORDER. The document is read in five stages and an earlier stage takes its lines first: a
+# later stage reads only what the earlier ones leave, and no stage hands the next one a line an
+# earlier stage has taken (a comment never opens in a line of code, a line inside a comment is no
+# code, fence, tag or heading, a heading line is no table row). Two stages that decide on the same
+# lines in two places can disagree, so stages 1 and 2 are ONE pass (`read_layout`) with one mask.
+#
+#   stage | takes                                | what it leaves to the later stages
+#   ------+--------------------------------------+---------------------------------------------
+#     1   | code: fenced (``` ~~~), indented (4+ | nothing of such a line: no comment, tag,
+#         | columns beyond the list item, a tab  | heading or table row comes out of it (`deep`
+#         | counts to 4), inline `code spans`    | marks the lines that can be no table row)
+#         | (a span is looked for on one line)   |
+#     2   | HTML comments, `<!--` .. `-->`       | the text around a comment on its line; a
+#         |                                      | line with nothing left is blank
+#     3   | tags <details>, <summary>            | the block stack and the titles; the lines of
+#         |                                      | an open <summary> title are text
+#     4   | ATX headings                         | the headings in scope; one in a container
+#         |                                      | opens the ambiguity zone instead
+#     5   | table rows: separator and header     | the candidates
+#
+# Stages 1 and 2 are `read_layout`, stage 3 is `scan_tags`, stages 4 and 5 are the loop below.
 TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
 TAG_RE = re.compile(r"</details>|<details\b|<summary\b[^>]*>|</summary>", re.IGNORECASE)
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
@@ -877,106 +901,121 @@ def heading_of(line):
     return HEADING_RE.match(line)
 
 
+def mask_code_spans(text):
+    """The text with every inline code span, backticks included, blanked out; same length."""
+    masked = []
+    i = 0
+    while i < len(text):
+        if text[i] != "`":
+            masked.append(text[i])
+            i += 1
+            continue
+        run = re.match(r"`+", text[i:]).group()
+        closing = re.search(r"(?<!`)" + re.escape(run) + r"(?!`)", text[i + len(run):])
+        if closing:  # a span ends at as many backticks as it began with
+            end = i + len(run) + closing.end()
+            masked.append(" " * (end - i))
+            i = end
+        else:  # no closing run: the backticks are plain text
+            masked.append(run)
+            i += len(run)
+    return "".join(masked)
+
+
 def comment_start(text, pos):
     """Index of the first `<!--` at or after pos that is not inside an inline code span, else -1."""
-    i = pos
-    while i < len(text):
-        if text.startswith("<!--", i):
-            return i
-        if text[i] == "`":
-            run = re.match(r"`+", text[i:]).group()
-            closing = re.search(r"(?<!`)" + re.escape(run) + r"(?!`)", text[i + len(run):])
-            i += len(run) + (closing.end() if closing else 0)  # a span ends at as many backticks
-        else:
-            i += 1
-    return -1
+    found = mask_code_spans(text[pos:]).find("<!--")
+    return pos + found if found >= 0 else -1
 
 
-def hide_comments(lines):
-    """The lines as markdown reads them: whatever sits inside an HTML comment is gone.
+def strip_comments(text, in_comment, block):
+    """Stage 2 on one line: (what is left of it, still inside a comment, the open comment began a line).
 
-    A comment opens at `<!--` and closes at the next `-->`, on the same line or on a later one;
-    what is left of a line is its visible text, and a line with nothing left is blank. A comment
-    that starts a line is an HTML block: its closing line goes with it, whatever follows the
-    `-->`. Fenced code and inline code are not scanned: a `<!--` there is text. Same number of
-    lines, so an index means the same line before and after.
+    A comment opens at `<!--` and closes at the next `-->`, on the same line or on a later one; a
+    line with nothing left is blank. A comment that starts a line is an HTML block: its closing line
+    goes with it, whatever follows the `-->`. A `<!--` inside an inline code span is text.
     """
-    view = []
+    visible, pos = [], 0
+    while pos < len(text):
+        if in_comment:
+            end = text.find("-->", pos)
+            if end < 0:
+                break
+            pos, in_comment = (len(text) if block else end + 3), False
+        else:
+            start = comment_start(text, pos)
+            if start < 0:
+                visible.append(text[pos:])
+                break
+            visible.append(text[pos:start])
+            block = not "".join(visible).strip()
+            pos, in_comment = start + 4, True
+    return "".join(visible), in_comment, block
+
+
+def read_line(text, items, code_ok):
+    """Stage 1 on one line that is not fenced code: (is_code, deep, base, items, code_ok).
+
+    The first three are the facts about the line, the last two the state after it. is_code: a line of
+    an indented code block (4+ columns beyond the list item it sits in, a tab counts to 4); it starts
+    only after a blank line, a heading, a closing fence or another code line, as right after any other
+    line it continues that line's block. deep: indented that far whatever block it belongs to, so never
+    a table row. base: the column where the markup of the line starts, i.e. the content offset of its
+    container (of the item it opens, for a list item line); a quote or a tag is looked for after it,
+    not after the margin. items: content offsets of the open list items, outermost first.
+    """
+    text = text.expandtabs(4)
+    if not text.strip():
+        return False, False, 0, items, True
+    indent = len(text) - len(text.lstrip(" "))
+    items = [offset for offset in items if offset <= indent]
+    container = items[-1] if items else 0
+    deep = indent - container >= 4
+    item = LIST_ITEM_RE.match(text)
+    if item and not deep:
+        return False, False, item.end(), items + [item.end()], heading_of(text[item.end():]) is not None
+    if deep and code_ok:
+        return True, True, 0, items, True
+    return False, deep, container, items, heading_of(text[container:]) is not None
+
+
+def read_layout(lines):
+    """Stages 1 and 2 in ONE pass: (view, is_code, deep, base), one entry per line.
+
+    view: the lines as markdown reads them, whatever sits inside an HTML comment gone. The code mask
+    (is_code, deep, base) is made from the same pass and the same state, so that code and comments
+    cannot disagree: a line the code stage takes (fenced, or a line of an indented code block) is
+    never looked at for a comment, a `<!--` in it is text, and a line inside a comment is neither
+    code nor a fence. Same number of lines, so an index means the same line before and after.
+    """
+    view, is_code, deep, base = [], [], [], []
     fence = None  # (marker, length) while inside a fenced code block
     in_comment = False
     block = False  # the open comment started its line: the line it closes on is hidden whole
+    items, code_ok = [], True
     for line in lines:
         text = line.rstrip("\r\n")
+        seen = None  # what stage 1 leaves of the line to the later stages
         if not in_comment:
             was_open = fence is not None
             fence = next_fence(fence, text)
-            if was_open or fence:
+            if was_open or fence:  # fenced code
                 view.append(line)
+                is_code.append(True)
+                deep.append(False)
+                base.append(0)
+                code_ok = was_open and not fence  # only the closing fence line frees the next one
                 continue
-        visible, pos = [], 0
-        while pos < len(text):
-            if in_comment:
-                end = text.find("-->", pos)
-                if end < 0:
-                    break
-                pos, in_comment = (len(text) if block else end + 3), False
-            else:
-                start = comment_start(text, pos)
-                if start < 0:
-                    visible.append(text[pos:])
-                    break
-                visible.append(text[pos:start])
-                block = not "".join(visible).strip()
-                pos, in_comment = start + 4, True
-        view.append("".join(visible))
-    return view
-
-
-def classify(lines):
-    """Per line: (is_code, deep, base).
-
-    is_code: fenced code or a line of an indented code block; nothing in it is a tag, a heading
-    or a table. deep: indented 4+ columns beyond its container (the content of the list item it
-    sits in), so never a table row, whatever block it belongs to. base: the column where the
-    markup of the line starts, i.e. the content offset of its container (of the item it opens,
-    for a list item line); a quote or a tag is looked for after it, not after the margin.
-    Indented code starts only after a blank line, a heading, a closing fence or another code
-    line; right after any other line it continues that line's block.
-    """
-    is_code = [False] * len(lines)
-    deep = [False] * len(lines)
-    base = [0] * len(lines)
-    fence = None  # (marker, length) while inside a fenced code block
-    items = []  # content offsets of the open list items, outermost first
-    code_ok = True  # an indented line may open or continue a code block here
-    for i, line in enumerate(lines):
-        text = line.rstrip("\r\n")
-        was_open = fence is not None
-        fence = next_fence(fence, text)
-        if was_open or fence:
-            is_code[i] = True
-            code_ok = was_open and not fence  # only the closing fence line frees the next one
-            continue
-        text = text.expandtabs(4)
-        if not text.strip():
-            code_ok = True
-            continue
-        indent = len(text) - len(text.lstrip(" "))
-        while items and indent < items[-1]:
-            items.pop()
-        container = items[-1] if items else 0
-        deep[i] = indent - container >= 4
-        item = LIST_ITEM_RE.match(text)
-        if item and not deep[i]:
-            items.append(item.end())
-            base[i] = item.end()
-        elif deep[i] and code_ok:
-            is_code[i] = True
-            continue
-        else:
-            base[i] = container
-        code_ok = heading_of(text[base[i]:]) is not None
-    return is_code, deep, base
+            if read_line(text, items, code_ok)[0]:  # indented code: its `<!--` is text
+                seen = text
+        if seen is None:
+            seen, in_comment, block = strip_comments(text, in_comment, block)
+        code, is_deep, offset, items, code_ok = read_line(seen, items, code_ok)
+        view.append(seen)
+        is_code.append(code)
+        deep.append(is_deep)
+        base.append(offset)
+    return view, is_code, deep, base
 
 
 class Block:
@@ -998,9 +1037,12 @@ def collect_title(blocks, text):
 
 
 def scan_tags(line, blocks, headings):
-    """Apply the <details>/<summary> tags of one line to the block stack; return the headings in scope."""
+    """Apply the <details>/<summary> tags of one line to the block stack; return the headings in scope.
+
+    A tag inside an inline code span is text: stage 1 (code) comes before stage 3 (tags).
+    """
     position = 0
-    for tag in TAG_RE.finditer(line):
+    for tag in TAG_RE.finditer(mask_code_spans(line)):
         collect_title(blocks, line[position:tag.start()])
         position = tag.end()
         kind = tag.group(0).lower()
@@ -1024,8 +1066,7 @@ def scan_tags(line, blocks, headings):
     return headings
 
 
-view = hide_comments(lines)  # what is read below; `lines` stays as it is, the row goes into it
-is_code, deep, base = classify(view)
+view, is_code, deep, base = read_layout(lines)  # stages 1 and 2; `lines` stays as it is, the row goes into it
 candidates = []  # (header line, insert position, ancestor titles, open blocks)
 headings = []  # (level, title) of the markdown headings in scope
 blocks = []  # the open <details> blocks, outermost first

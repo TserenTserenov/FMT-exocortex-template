@@ -16,10 +16,14 @@ refuses to guess (warning, nothing written). A `<summary>` may span several
 lines and belongs to the block that opened it: one that is never closed swallows
 its block, and a nested `<details>` cannot take the open state over; a second
 `<summary>` in one block makes its name untrustworthy and leaves all its tables
-to the pilot. Code is decided before any tag, heading or table is looked at:
-fenced and indented (4+ columns beyond the list item, a tab counts to 4) code
-blocks are not markup; an indented line is code only after a blank line, a
-heading, a closing fence or another code line, and an indented list is not code.
+to the pilot. The document is read in five stages and an earlier one takes its
+lines first: code, then HTML comments, then tags, then headings, then table rows
+(one pair of tests per pair of stages: the earlier stage takes the line, and a
+control where it does not). Code comes before everything: fenced and indented
+(4+ columns beyond the list item, a tab counts to 4) code blocks are not markup,
+and a `<!--` in them, like one in an inline code span, opens no comment; an
+indented line is code only after a blank line, a heading, a closing fence or
+another code line, and an indented list is not code.
 Only an unindented heading is a section title. A heading with anything in front
 of its hashes (indentation, a list marker, a quote mark) sits in a container whose
 end a line-based reading cannot tell for sure (lazy continuation, tabs, numbering):
@@ -29,8 +33,8 @@ not by a pipe in its text: `### Итоги | факт` is a heading, and `# | Р
 is a heading, not a table header (an ATX heading wins over a table row in CommonMark
 and GFM). The content of an HTML comment (`<!--` .. `-->`, one line or many) is not
 read at all: no heading, tag, table or zone comes out of it (a comment around a
-table cell leaves the row a row, an unclosed one swallows the rest of the file,
-fenced and inline code are not scanned for comments). A quote is a container of
+table cell leaves the row a row, an unclosed one swallows the rest of the file).
+A tag in an inline code span is text. A quote is a container of
 its own: its tags change nothing outside it. A table is a candidate only when its
 header has the exact cell «РП» and a cell starting with the word «Статус» («Статус
 (на 3 июля)» counts and is filled with «pending» like the plain column, «Связанные
@@ -926,6 +930,21 @@ def test_code_may_follow_a_heading_inside_a_nested_list_item(tmp_path):
     assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
 
 
+def test_code_may_follow_a_heading_on_a_list_item_line(tmp_path):
+    # «- ## Раздел» is a heading line of its own, whose item content starts after the marker: four
+    # more columns right below it are code (the same example tag as above would otherwise name a block).
+    weekplan = _weekplan(
+        tmp_path,
+        "- ## Раздел\n      <details><summary>Итоги</summary>\n\n## План недели\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
 def test_a_nested_facts_heading_does_not_reach_the_next_plan_section(tmp_path):
     items, pad = _nested_list("-", "-")
     weekplan = _weekplan(
@@ -1399,6 +1418,248 @@ def test_comments_in_a_crlf_weekplan_are_hidden_too(tmp_path):
     lines = weekplan.read_bytes().decode("utf-8").split("\n")
     row = next(i for i, ln in enumerate(lines) if "**Новый РП**" in ln)
     assert lines[row + 1].startswith("| Плановый"), "the row went into the plan table"
+
+
+# --- the order of the stages: code, comments, tags, headings, table rows --------------------------------------
+# An earlier stage takes its lines first and a later one reads only what is left (the table is in the comment
+# of create-wp.sh above the stages). Every pair of stages has a test in which the earlier stage takes the line
+# and a control in which it does not, so the outcome tells which stage got the line. Two tables tell where the
+# row went: «A» is the one with the row «Первая», «B» the one with the row «Вторая».
+
+ROW_A = "| Первая | pending |"
+ROW_B = "| Вторая | pending |"
+TABLE_A = f"| РП | Статус |\n| --- | --- |\n{ROW_A}\n"
+TABLE_B = f"| РП | Статус |\n| --- | --- |\n{ROW_B}\n"
+
+
+def _landing(tmp_path, body):
+    """Where the row went: «A», «B», or «none» when the writer refused and left the file alone."""
+    weekplan = _weekplan(tmp_path, body)
+    original = weekplan.read_text(encoding="utf-8").splitlines()
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    added = [i for i, ln in enumerate(lines) if "**Новый РП**" in ln]
+    if not added:
+        assert lines == original and "добавить вручную" in result.stderr
+        return "none"
+    assert len(added) == 1 and lines[: added[0]] + lines[added[0] + 1 :] == original, "one row, nothing else"
+    return {ROW_A: "A", ROW_B: "B"}[lines[added[0] + 1].strip()]  # a table in a list item is indented
+
+
+CODE_FORMS = ["fenced", "tilde-fenced", "indented", "tab", "list-item", "inline"]
+BLOCK_FORMS = CODE_FORMS[:-1]  # the forms a block of several lines can take
+
+
+def _as_code(form, text):
+    """The lines of text as the code stage takes them; «list-item» is four columns beyond «- Пункт»."""
+    lines = text.rstrip("\n").split("\n")
+    if form == "inline":
+        return "Пример: `" + " ".join(lines) + "`\n"
+    if form in ("fenced", "tilde-fenced"):
+        fence = "```" if form == "fenced" else "~~~"
+        return fence + "\n" + "\n".join(lines) + "\n" + fence + "\n"
+    prefix = {"indented": "    ", "tab": "\t", "list-item": "      "}[form]
+    code = "".join(prefix + ln + "\n" for ln in lines)
+    return "- Пункт\n\n" + code if form == "list-item" else code
+
+
+def _plan_block(example):
+    """A «Резерв» block, then the plan block holding the example: tags read from it reshape the plan block."""
+    return (
+        "<details><summary>Резерв</summary>\n\n" + TABLE_A + "\n</details>\n\n"
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n" + example + "\n\n" + TABLE_B
+        + "\n</details>\n"
+    )
+
+
+COMMENT_BODY = "<!-- пояснение -->"
+CODE_THEN_COMMENT = "## План\n\n{opener}\n\n## Итоги\n\n" + COMMENT_BODY + "\n\n" + TABLE_A + "\n## План\n\n" + TABLE_B
+
+
+@pytest.mark.parametrize("form", CODE_FORMS)
+def test_stage_code_takes_the_line_before_comments(tmp_path, form):
+    # The reviewer's input: `<!--` in a code block is text. Read as a comment it swallowed «## Итоги» up to
+    # the `-->` of the next comment, both tables got the ancestor «План» and the first one, facts, won.
+    body = CODE_THEN_COMMENT.replace("{opener}", _as_code(form, "<!--").rstrip("\n"))
+    assert _landing(tmp_path, body) == "B"
+
+
+@pytest.mark.parametrize(
+    "opener",
+    ["<!--", "   <!--", "Текст\n    <!--", "- Пункт\n\n    <!--", "- Пункт\n\n\t<!--"],
+    ids=["column-zero", "three-spaces", "right-after-a-paragraph", "two-beyond-a-list-item", "tab-in-a-list-item"],
+)
+def test_stage_comments_read_what_code_leaves(tmp_path, opener):
+    # Control: the same `<!--` is no code (a margin of three, a paragraph that goes on, a list item that
+    # holds the line) and opens the comment that hides «## Итоги»: the first table is then as good as the second.
+    assert _landing(tmp_path, CODE_THEN_COMMENT.replace("{opener}", opener)) == "A"
+
+
+def test_indented_code_may_follow_a_comment_line(tmp_path):
+    # An HTML block ends on the line of its `-->`: the next indented line is code again.
+    body = CODE_THEN_COMMENT.replace("{opener}", COMMENT_BODY + "\n    <!--")
+    assert _landing(tmp_path, body) == "B"
+
+
+TAG_EXAMPLES = ["<details><summary>Итоги</summary>", "</details>"]
+
+
+@pytest.mark.parametrize("example", TAG_EXAMPLES, ids=["opening-tag", "closing-tag"])
+@pytest.mark.parametrize("form", CODE_FORMS)
+def test_stage_code_takes_the_line_before_tags(tmp_path, form, example):
+    # Read as markup the opening tag names a block «Итоги» (the plan table is then facts) and the closing
+    # one ends the plan block early (the plan table loses its «План» title): the row left the plan block.
+    assert _landing(tmp_path, _plan_block(_as_code(form, example).rstrip("\n"))) == "B"
+
+
+@pytest.mark.parametrize("example, expected", [(TAG_EXAMPLES[0], "A"), (TAG_EXAMPLES[1], "none")], ids=["opening-tag", "closing-tag"])
+def test_stage_tags_read_what_code_leaves(tmp_path, example, expected):
+    # Control: the same tag on a line of its own is markup.
+    assert _landing(tmp_path, _plan_block(example)) == expected
+
+
+@pytest.mark.parametrize("form", BLOCK_FORMS)
+def test_stage_code_takes_the_line_before_headings(tmp_path, form):
+    assert _landing(tmp_path, "## План\n\n" + _as_code(form, "## Итоги") + "\n" + TABLE_A) == "A"
+
+
+def test_stage_headings_read_what_code_leaves(tmp_path):
+    # Control: the heading of the same text, not in code, makes the table below it facts.
+    assert _landing(tmp_path, "## План\n\n## Итоги\n\n" + TABLE_A) == "none"
+
+
+@pytest.mark.parametrize("form", BLOCK_FORMS)
+def test_stage_code_takes_the_line_before_table_rows(tmp_path, form):
+    assert _landing(tmp_path, "## План\n\n" + _as_code(form, TABLE_A) + "\n" + TABLE_B) == "B"
+
+
+def test_stage_table_rows_read_what_code_leaves(tmp_path):
+    # Control: the table that is no code is the first of two under the same «План»: it wins the tie.
+    assert _landing(tmp_path, "## План\n\n" + TABLE_A + "\n" + TABLE_B) == "A"
+
+
+COMMENT_FORMS = {
+    "one-line": "<!-- {} -->",
+    "own-lines": "<!--\n{}\n-->",
+    "starts-mid-line": "Заметка <!--\n{}\n-->",
+    "text-after-the-end": "<!--\n{}\n--> хвост",
+}
+
+
+@pytest.mark.parametrize("example", TAG_EXAMPLES, ids=["opening-tag", "closing-tag"])
+@pytest.mark.parametrize("form", COMMENT_FORMS)
+def test_stage_comments_take_the_line_before_tags(tmp_path, form, example):
+    assert _landing(tmp_path, _plan_block(COMMENT_FORMS[form].replace("{}", example))) == "B"
+
+
+@pytest.mark.parametrize("example, expected", [(TAG_EXAMPLES[0], "A"), (TAG_EXAMPLES[1], "none")], ids=["opening-tag", "closing-tag"])
+def test_stage_tags_read_what_comments_leave(tmp_path, example, expected):
+    # Control: without the comment marks the tag is markup. A comment around the tag on the same line
+    # leaves the rest of the line alone: «Заметка <!-- x --> <details>...» opens the block.
+    assert _landing(tmp_path, _plan_block(example)) == expected
+    assert _landing(tmp_path, _plan_block("Заметка <!-- x --> " + example)) == expected
+
+
+@pytest.mark.parametrize("form", COMMENT_FORMS)
+def test_stage_comments_take_the_line_before_headings(tmp_path, form):
+    assert _landing(tmp_path, "## План\n\n" + COMMENT_FORMS[form].replace("{}", "## Итоги") + "\n\n" + TABLE_A) == "A"
+
+
+def test_stage_headings_read_what_comments_leave(tmp_path):
+    # Control: a heading with a comment after it on the same line is the heading.
+    assert _landing(tmp_path, "## План\n\n## Итоги <!-- x -->\n\n" + TABLE_A) == "none"
+
+
+@pytest.mark.parametrize("form", ["own-lines", "starts-mid-line"])
+def test_stage_comments_take_the_line_before_table_rows(tmp_path, form):
+    body = "## План\n\n" + COMMENT_FORMS[form].replace("{}", TABLE_A.rstrip("\n")) + "\n\n" + TABLE_B
+    assert _landing(tmp_path, body) == "B"
+
+
+def test_stage_table_rows_read_what_comments_leave(tmp_path):
+    # Control: a comment above the table takes nothing of it: the first of two tables under «План» wins.
+    assert _landing(tmp_path, "## План\n\n<!-- x -->\n\n" + TABLE_A + "\n" + TABLE_B) == "A"
+
+
+def test_a_fence_marker_left_of_a_comment_is_text_not_code(tmp_path):
+    # What follows the `-->` is text, not the start of a code block: the stages see one mask. The code
+    # stage used to take the marker for a fence of its own, after the comment stage had skipped it.
+    assert _landing(tmp_path, "## План\n\nтекст <!--\n--> ```\n\n" + TABLE_A) == "A"
+
+
+@pytest.mark.parametrize("example", TAG_EXAMPLES, ids=["opening-tag", "closing-tag"])
+def test_a_code_span_ends_at_a_run_of_the_same_length(tmp_path, example):
+    # One span of two backticks holds a lone backtick and the tag: it ends at the next run of exactly two.
+    assert _landing(tmp_path, _plan_block("Пример: ``a `x " + example + " ``")) == "B"
+
+
+@pytest.mark.parametrize(
+    "example, expected", [(TAG_EXAMPLES[0], "A"), (TAG_EXAMPLES[1], "none")], ids=["opening-tag", "closing-tag"]
+)
+def test_a_lone_backtick_protects_no_tag(tmp_path, example, expected):
+    # A backtick with no closing one on its line is plain text: it opens no code span.
+    assert _landing(tmp_path, _plan_block("Одиночная ` кавычка " + example)) == expected
+
+
+def test_a_lone_backtick_protects_no_comment(tmp_path):
+    body = "## План\n\nОдиночная ` кавычка <!--\n## Итоги\n-->\n\n" + TABLE_A
+    assert _landing(tmp_path, body) == "A"
+
+
+@pytest.mark.parametrize(
+    "summary",
+    ["<summary>`План на неделю W40`</summary>", "<summary>`План на неделю W40`\n</summary>"],
+    ids=["one-line", "title-then-closing-line"],
+)
+def test_a_title_in_a_code_span_is_still_the_title(tmp_path, summary):
+    # A code span only keeps the tags in it from being read: its text is part of the title.
+    spare = "<details><summary>Резерв</summary>\n\n" + TABLE_A + "\n</details>\n\n"
+    plan = "<details open>\n" + summary + "\n\n" + TABLE_B + "\n</details>\n"
+    assert _landing(tmp_path, spare + plan) == "B"
+
+
+SUMMARY_TITLE = "<details open>\n<summary>План недели{}\n</summary>\n\n"
+
+
+def test_stage_tags_take_the_title_lines_before_headings(tmp_path):
+    # The lines of a <summary> title are text: the title is «План недели ## Резерв», its table is as near to
+    # «План» as the table of the plain «План на неделю» section, and the first one wins.
+    body = SUMMARY_TITLE.replace("{}", "\n## Резерв") + TABLE_A + "\n</details>\n\n## План на неделю\n\n" + TABLE_B
+    assert _landing(tmp_path, body) == "A"
+
+
+def test_stage_headings_read_what_tags_leave(tmp_path):
+    # Control: the same line after the title is a heading, one step between the table and «План».
+    body = SUMMARY_TITLE.replace("{}", "") + "## Резерв\n\n" + TABLE_A + "\n</details>\n\n## План на неделю\n\n" + TABLE_B
+    assert _landing(tmp_path, body) == "B"
+
+
+def _hash_row_table(container, hashed):
+    """A table whose header is `# | РП | Статус |` (a heading) when hashed, a header row when not."""
+    mark = "# " if hashed else ""
+    if container == "list":
+        return f"- Пункт\n  {mark}| РП | Статус |\n  | --- | --- |\n  {ROW_A}\n"
+    if container == "quote":
+        return f"> {mark}| РП | Статус |\n> | --- | --- |\n> | Цитата | pending |\n\n" + TABLE_A
+    return f"{mark}| РП | Статус |\n| --- | --- |\n{ROW_A}\n"
+
+
+@pytest.mark.parametrize("container", ["plain", "list", "quote"])
+def test_stage_headings_take_the_line_before_table_rows(tmp_path, container):
+    # `# | РП | Статус |` is a heading, not a header row: the table below it is no candidate (in a list item
+    # or in a quote the heading opens a zone that covers the tables up to the next unindented heading).
+    assert _landing(tmp_path, "## План\n\n" + _hash_row_table(container, True) + "\n## План\n\n" + TABLE_B) == "B"
+
+
+@pytest.mark.parametrize("container", ["plain", "list", "quote"])
+def test_stage_table_rows_read_what_headings_leave(tmp_path, container):
+    # Control: without the hash the table is a candidate, the first of two under «План» (in a quote
+    # the table after it, the quoted one is no candidate).
+    body = "## План\n\n" + _hash_row_table(container, False) + "\n## План\n\n" + TABLE_B
+    assert _landing(tmp_path, body) == "A"
 
 
 @pytest.mark.parametrize(
