@@ -1789,7 +1789,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "8619428208c158bfd43156370b2bd34599f7885cdd46e9a449fca1f500460137"
+      "sha256": "ad47adcb22fcfc490bd7921a6f69f8636d3cf758fea060939b1cc5686ae831d2"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -1801,7 +1801,7 @@
     },
     {
       "path": "roles/strategist/prompts/note-review.md",
-      "sha256": "86e4a69544fd12ad37b99279b0438efb08d7a6f767a9511d17ca54aef871ac78"
+      "sha256": "a9b659c1673ae4f2590d31f974fe688fac1d059b45bc9683713b16f6765192e5"
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
@@ -3246,6 +3246,7 @@
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
     "scripts/tests/test_issue_959_cleanup_parse_notes.py",
+    "scripts/tests/test_issue_961_note_review_pilot_only.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
