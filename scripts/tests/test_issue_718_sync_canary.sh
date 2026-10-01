@@ -163,7 +163,7 @@ ENV_GOVERNANCE_REPO="gov"
 
 rsc_out=$(run_sync_canary 2>&1)
 rsc_status=$?
-if [ "$rsc_status" -eq 0 ] && echo "$rsc_out" | grep -q "Canary (реестр РП): OK"; then
+if [ "$rsc_status" -eq 0 ] && grep -q -- "Canary (реестр РП): OK" <<<"$rsc_out"; then
     pass "run_sync_canary passes with the bundle and digest copied into the governance repo (library only in the template)"
 else
     fail "run_sync_canary with a governance-repo copy of the bundle expected exit 0 and OK, got exit $rsc_status:\n$rsc_out"
@@ -175,7 +175,7 @@ rm -f "$H1_WS/gov/.claude/scripts/wp-sync-bundle.sh" "$H1_WS/gov/.claude/scripts
 cp "$ROOT/.claude/scripts/wp-sync-bundle.sh" "$ROOT/.claude/scripts/wp-phase-digest.sh" "$H1_TEMPLATE/.claude/scripts/"
 rsc_out=$(run_sync_canary 2>&1)
 rsc_status=$?
-if [ "$rsc_status" -eq 0 ] && echo "$rsc_out" | grep -q "Canary (реестр РП): OK"; then
+if [ "$rsc_status" -eq 0 ] && grep -q -- "Canary (реестр РП): OK" <<<"$rsc_out"; then
     pass "run_sync_canary passes with the template's own bundle when the governance repo has no copy"
 else
     fail "run_sync_canary with the template's own bundle expected exit 0 and OK, got exit $rsc_status:\n$rsc_out"

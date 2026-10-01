@@ -98,14 +98,14 @@ if [ "$have_lib" = 1 ]; then
 
   re=$(wp_num_registry_cell_regex 44)
   for cell in "44" "044" "WP-44" "WP-044" "wp-044" "~~WP-044~~" "**WP-044**" "44★"; do
-    if printf '| %s | x |\n' "$cell" | grep -Eq "^\\|[[:space:]]*${re}[[:space:]]*\\|"; then
+    if grep -Eq -- "^\\|[[:space:]]*${re}[[:space:]]*\\|" <<<"| $cell | x |"; then
       ok "cell regex (ERE) matches [$cell] for 44"
     else
       bad "cell regex (ERE) must match [$cell] for 44"
     fi
   done
   for cell in "440" "0440" "4" "144" "WP-0440" "~~440~~"; do
-    if printf '| %s | x |\n' "$cell" | grep -Eq "^\\|[[:space:]]*${re}[[:space:]]*\\|"; then
+    if grep -Eq -- "^\\|[[:space:]]*${re}[[:space:]]*\\|" <<<"| $cell | x |"; then
       bad "cell regex (ERE) must NOT match [$cell] for 44"
     else
       ok "cell regex (ERE) rejects [$cell] for 44"
