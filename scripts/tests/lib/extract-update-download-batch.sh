@@ -12,6 +12,8 @@
 # Usage:
 #   extract_update_hash_file <path-to-update.sh>            > hash_file.sh
 #   extract_update_download_batch <path-to-update.sh>       > download_batch.sh
+#                         (also emits curl_failure_note(), the helper download_batch()
+#                          calls to describe a failed curl call — issue #980)
 #   extract_update_verify_batch_integrity <path-to-update.sh> > verify_batch_integrity.sh
 #   extract_update_retry_and_classify <path-to-update.sh>   > retry_and_classify.sh
 extract_update_hash_file() {
@@ -22,7 +24,19 @@ extract_update_hash_file() {
     ' "$1"
 }
 
+# download_batch() reports a failed curl call through curl_failure_note(); a test that
+# sources only download_batch() would hit "command not found" on every failure path
+# and silently exercise a broken diagnostic, so both functions are extracted together.
+extract_update_curl_failure_note() {
+    awk '
+        /^curl_failure_note\(\) \{$/ { found=1 }
+        found { print }
+        found && /^\}$/ { exit }
+    ' "$1"
+}
+
 extract_update_download_batch() {
+    extract_update_curl_failure_note "$1"
     awk '
         /^download_batch\(\) \{$/ { found=1 }
         found { print }

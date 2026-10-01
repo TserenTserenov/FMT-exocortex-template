@@ -941,7 +941,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "9b39c61c4b4d70eb5f9a8a8993fc19be99b246ffdd2e3f45c5746a5192d44a98"
+      "sha256": "d0d222dc69314685340e2eb21c3bc0c034a1c33436a2ec684f8d2807ded4b8c6"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -3141,7 +3141,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "3436d597f9afc55761318a1341e89625602171f3b266c0c07e816f4a10354a1e"
+      "sha256": "78c40475f4d8de1d327cbb715c03e3fb0b6a9d02dbaf613fc27dc3d9b5105f06"
     }
   ],
   "excluded_paths": [

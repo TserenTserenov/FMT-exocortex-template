@@ -115,6 +115,20 @@ case "${OSTYPE:-}" in
     ;;
 esac
 
+# curl_failure_note RC ERRFILE — the cause of a failed curl call, as one line: its exit code
+# plus the last line of its stderr (issue #980). `2>/dev/null` used to hide the cause, so
+# every failure read as "check your internet" even when the network was fine and the write
+# to a temp path failed. Callers send curl's stderr to ERRFILE (curl -sS keeps the error
+# message and drops the progress meter) and print this note only when the call failed.
+curl_failure_note() {
+    local rc="$1" errf="$2" err_line=""
+    if [ -s "$errf" ]; then
+        # tr -d '\r': a native Windows curl ends its stderr lines with CRLF.
+        err_line=$(tail -n 1 "$errf" | tr -d '\r' | cut -c1-200)
+    fi
+    printf 'curl код %s%s' "$rc" "${err_line:+; $err_line}"
+}
+
 # fetch_update_manifest URL DEST — download the update manifest (issue #943).
 # curl's stderr used to go to /dev/null, so every failure looked like "check the
 # internet"; a Windows user could not tell a timeout from a write error. Now: up to
@@ -461,8 +475,22 @@ migrate_platform_memory() {
 # issue #375: owner:user protects the deployed copy from overwrite, but protection
 # must not make upstream drift invisible. Scan the whole manifest on every real
 # update/repair pass, not only NEW_FILES/UPDATED_FILES from this invocation.
+#
+# issues #965/#967: say WHY a copy differs, using the shipped classifier. Its verdict is only
+# as strong as the clone's git history (the versions committed for this path), so the texts
+# promise no more than that:
+#   stale    - the copy equals a version committed in the clone. That can be an older release,
+#              but also the pilot's own edit committed into the clone (a fork with local
+#              commits, #963), so the text says so and the offered command saves the current
+#              copy next to it before the cp.
+#   authored - the copy equals no committed version: the pilot's edits, or a release that
+#              update.sh already applied to the clone (it never commits what it applies).
+#   anything else, including a missing classifier, keeps the generic text.
+# The classifier is called directly, not through report_author_skip(): that one counts and
+# queues files for --refresh-stale.
 report_owner_user_memory_drift() {
     local fpath deployed drift_count=0
+    local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh" classify_out verdict
     [ -d "$CLAUDE_MEMORY_DIR" ] && [ -f "$MANIFEST" ] && py_available || return 0
     while IFS= read -r fpath; do
         [ -n "$fpath" ] || continue
@@ -471,8 +499,26 @@ report_owner_user_memory_drift() {
         [ -f "$SCRIPT_DIR/$fpath" ] && [ -r "$deployed" ] || continue
         [ "$(get_field "$deployed" owner)" = "user" ] || continue
         if [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$deployed")" ]; then
-            echo "  ⚠ $fpath — owner: user, НЕ обновлён, но шаблонная версия отличается."
-            echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+            verdict=""
+            if [ -f "$classifier" ]; then
+                # </dev/null: this loop reads its paths from stdin; nothing else may take them.
+                classify_out=$(bash "$classifier" "$SCRIPT_DIR" "$fpath" "$deployed" </dev/null 2>/dev/null || true)
+                verdict="${classify_out%% *}"
+            fi
+            case "$verdict" in
+                stale)
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
+                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    ;;
+                authored)
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)."
+                    echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    ;;
+                *)
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён, но шаблонная версия отличается."
+                    echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    ;;
+            esac
             drift_count=$((drift_count + 1))
         fi
     done < <($PY_BIN - "$MANIFEST" <<'PY' 2>/dev/null
@@ -545,15 +591,66 @@ author_release_regression() {
     [ "$payload_sha" != "$head_sha" ]
 }
 
+# manifest_version FILE — the first "version" value of an update-manifest.json (empty when
+# there is none). One reader for every place that needs it: the upstream manifest (Step 1),
+# the installed one for --check --fast, and the installed one when histories cannot be
+# ordered by git (rollback_by_version, #963).
+manifest_version() {
+    grep '"version"' "$1" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//'
+}
+
+# version_compare A B — compare two plain X.Y.Z versions numerically. Prints -1, 0 or 1 (A is
+# older than, equal to, newer than B) and returns 0; returns 2 and prints nothing when either
+# argument is not digits-only X.Y.Z (at most 9 digits per part, so the arithmetic cannot
+# overflow). "0.9.0" is older than "0.10.0": a string comparison says the opposite.
+version_compare() {
+    local a="$1" b="$2" part_a part_b re='^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$'
+    [[ $a =~ $re ]] && [[ $b =~ $re ]] || return 2
+    while [ -n "$a" ]; do
+        part_a=${a%%.*}
+        part_b=${b%%.*}
+        # 10#: a part such as "08" is the decimal 8, not an invalid octal literal.
+        if [ $((10#$part_a)) -lt $((10#$part_b)) ]; then echo -1; return 0; fi
+        if [ $((10#$part_a)) -gt $((10#$part_b)) ]; then echo 1; return 0; fi
+        case "$a" in
+            *.*) a=${a#*.}; b=${b#*.} ;;
+            *) a="" ;;
+        esac
+    done
+    echo 0
+}
+
+# rollback_by_version — issue #963: when the installed copy and the release share no commit
+# (a fork whose history was rewritten, e.g. a different root commit), git merge-base cannot
+# order them; order them by manifest version instead: the installed update-manifest.json
+# against UPSTREAM_VERSION (set in Step 1, before the rollback check runs).
+# Exit codes (the same contract as detect_release_rollback):
+#   0 - the release is strictly older than the installed version: a rollback
+#   1 - the release is newer or equal (equal versions do not prove a rollback)
+#   2 - cannot tell: a shallow clone (a real ancestor may be cut off), no installed manifest,
+#       or a version that is not plain X.Y.Z
+rollback_by_version() {
+    local installed cmp
+    # A shallow clone reports "no common ancestor" also for histories that do share one.
+    [ "$(git -C "$SCRIPT_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "false" ] || return 2
+    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 2
+    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
+    cmp=$(version_compare "${UPSTREAM_VERSION:-}" "$installed") || return 2
+    [ "$cmp" = "-1" ]
+}
+
 # issue #863: detect when the default release channel would roll back an install
 # that is already newer than the latest published release. Fires in release
 # channel when SCRIPT_DIR is a git repo and local HEAD contains commits that are
-# not present in the release (i.e. the release is strictly behind local).
+# not present in the release (i.e. the release is strictly behind local). When the
+# two histories share no commit at all (#963) the versions in the manifests decide.
 #
 # Exit codes:
-#   0 - rollback detected (release is a strict ancestor of local HEAD)
-#   1 - no rollback (release is HEAD, ahead, or unrelated)
-#   2 - cannot determine (network/history missing) -> caller must block --yes
+#   0 - rollback detected: the release is a strict ancestor of local HEAD, or (no common
+#       ancestor) its manifest version is older than the installed one
+#   1 - no rollback (release is HEAD, ahead, or, with no common ancestor, not older by version)
+#   2 - cannot determine (network/history missing, unreadable versions, a shallow clone with
+#       no visible common ancestor) -> caller must block --yes
 detect_release_rollback() {
     [ "$UPDATE_CHANNEL" = "release" ] || return 1
     [ -n "$RELEASE_SHA" ] || return 1
@@ -568,7 +665,7 @@ detect_release_rollback() {
     # the install's `origin` may point to a different fork or the local tag may
     # differ from the published one.
     if ! printf '%s' "$release_sha" | grep -qxE '[0-9a-f]{40}'; then
-        commit_json=$(github_api_get "$API_BASE/commits/$release_sha" 2>/dev/null) || return 2
+        commit_json=$(github_api_get "$API_BASE/commits/$release_sha") || return 2
         # Prefer JSON parsing; fall back to sed only when Python is unavailable.
         # Guard the assignment with || return 2: under set -e a bare failing
         # command-substitution aborts the whole script when this function is
@@ -599,7 +696,14 @@ print(sha)') || return 2
         fi
     fi
 
-    merge_base=$(git -C "$SCRIPT_DIR" merge-base "$local_sha" "$release_sha" 2>/dev/null) || return 2
+    # git merge-base: 0 = found, 1 = no common ancestor, anything else (128...) = an error.
+    local merge_base_rc=0
+    merge_base=$(git -C "$SCRIPT_DIR" merge-base "$local_sha" "$release_sha" 2>/dev/null) || merge_base_rc=$?
+    case "$merge_base_rc" in
+        0) ;;
+        1) rollback_by_version; return $? ;;
+        *) return 2 ;;
+    esac
     [ -n "$merge_base" ] || return 2
 
     # Rollback if the release commit is an ancestor of local HEAD but not equal
@@ -2467,7 +2571,10 @@ github_api_get() {
     if command -v gh >/dev/null 2>&1 && \
        GH_DEBUG='' DEBUG='' GH_PROMPT_DISABLED=1 \
            gh auth status --hostname github.com >/dev/null 2>&1; then
-        endpoint="/${api_url#https://api.github.com/}"
+        # No leading slash (issue #980): Git Bash (MSYS) rewrites an argument that starts
+        # with "/" into a Windows path ("C:/Program Files/Git/repos/...") before gh sees
+        # it, and gh rejects that endpoint. gh accepts "repos/..." everywhere.
+        endpoint="${api_url#https://api.github.com/}"
         if ! GH_DEBUG='' DEBUG='' GH_PROMPT_DISABLED=1 \
              gh api --hostname github.com --method GET "$endpoint"; then
             echo "ОШИБКА: authenticated GitHub API request via gh failed; fallback disabled." >&2
@@ -2614,31 +2721,43 @@ echo "[0] Проверка update.sh..."
 # Capture hash before any network activity — used for --check integrity guard below (fix #205)
 SELF_HASH_BEFORE=$(hash_file "$SCRIPT_DIR/update.sh")
 REMOTE_UPDATE="$TMPDIR_UPDATE/update.sh.new"
-if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_UPDATE" 2>/dev/null; then
+STEP0_ERR="$TMPDIR_UPDATE/update.sh.err"
+STEP0_RC=0
+# shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
+curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update.sh" -o "$REMOTE_UPDATE" 2>"$STEP0_ERR" || STEP0_RC=$?
+if [ "$STEP0_RC" -ne 0 ]; then
+    # issues #955/#980: "could not check" is not "checked, up to date". The failure used
+    # to fall through to the "актуален" line below, with curl's cause thrown away.
+    echo "  ⚠ не удалось проверить update.sh: $(curl_failure_note "$STEP0_RC" "$STEP0_ERR")"
+elif [ ! -s "$REMOTE_UPDATE" ]; then
+    # curl exit 0 with an empty body (a proxy or a login page that returns nothing) is a
+    # failed check as well: the empty file differs from the local one, so it used to pass
+    # for a newer update.sh and a normal run replaced the updater with a 0-byte file.
+    echo "  ⚠ не удалось проверить update.sh: пустой ответ"
+else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
-    if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
-        if $CHECK_ONLY; then
-            # In --check mode: report available update without touching the file
-            echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
-        else
-            echo "  Найдена новая версия update.sh — обновляю..."
-            # issue #505 class (residual, found in the same sweep): replace
-            # the RUNNING script via sibling tmp + mv — rename swaps the
-            # directory entry and this process keeps its old inode; a plain cp
-            # truncates the very file bash is executing. Historically survived
-            # only because the few remaining commands sat in bash's read
-            # buffer.
-            _boot_staged="$SCRIPT_DIR/.update.sh.staged.$$"
-            cp "$REMOTE_UPDATE" "$_boot_staged"
-            chmod +x "$_boot_staged"
-            mv -f "$_boot_staged" "$SCRIPT_DIR/update.sh"
-            echo "  Перезапуск..."
-            exec bash "$SCRIPT_DIR/update.sh" "$@"
-        fi
+    if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+        echo "  update.sh актуален."
+    elif $CHECK_ONLY; then
+        # In --check mode: report available update without touching the file
+        echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
+    else
+        echo "  Найдена новая версия update.sh — обновляю..."
+        # issue #505 class (residual, found in the same sweep): replace
+        # the RUNNING script via sibling tmp + mv — rename swaps the
+        # directory entry and this process keeps its old inode; a plain cp
+        # truncates the very file bash is executing. Historically survived
+        # only because the few remaining commands sat in bash's read
+        # buffer.
+        _boot_staged="$SCRIPT_DIR/.update.sh.staged.$$"
+        cp "$REMOTE_UPDATE" "$_boot_staged"
+        chmod +x "$_boot_staged"
+        mv -f "$_boot_staged" "$SCRIPT_DIR/update.sh"
+        echo "  Перезапуск..."
+        exec bash "$SCRIPT_DIR/update.sh" "$@"
     fi
 fi
-echo "  update.sh актуален."
 echo ""
 
 # === Step 1: Fetch manifest ===
@@ -2683,7 +2802,7 @@ PY
 fi
 
 # Parse version from manifest
-UPSTREAM_VERSION=$(grep '"version"' "$MANIFEST" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+UPSTREAM_VERSION=$(manifest_version "$MANIFEST")
 echo "  Версия upstream: $UPSTREAM_VERSION"
 echo ""
 
@@ -2700,7 +2819,7 @@ echo ""
 if $CHECK_ONLY && $FAST_CHECK; then
     LOCAL_MANIFEST="$SCRIPT_DIR/update-manifest.json"
     LOCAL_VERSION=""
-    [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(grep '"version"' "$LOCAL_MANIFEST" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+    [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(manifest_version "$LOCAL_MANIFEST")
 
     if py_available && [ -f "$LOCAL_MANIFEST" ]; then
         # issue #402: paths passed via argv, not interpolated into the -c string —
@@ -3459,27 +3578,33 @@ download_batch() {
     [ $# -eq 0 ] && return 0
     local p dst
     if $USE_PARALLEL_DOWNLOAD; then
-        local cfg
+        local cfg batch_err batch_rc=0
         # Under $TMPDIR_UPDATE, not a bare mktemp (cold-context review,
         # peer-session 2026-08-21-09): cleanup_update()'s EXIT trap removes
         # $TMPDIR_UPDATE wholesale, so a signal or crash between this mktemp
         # and the `rm -f "$cfg"` below no longer leaks a temp file — the old
         # bare mktemp location was outside that trap's reach.
         cfg=$(mktemp "$TMPDIR_UPDATE/curl-batch.XXXXXX")
+        batch_err="$cfg.err"
         for p in "$@"; do
             dst="$TMPDIR_UPDATE/files/$p"
             mkdir -p "$(dirname "$dst")"
             printf 'url = "%s/%s"\noutput = "%s"\n' "$RAW_BASE" "$p" "$dst" >> "$cfg"
         done
         # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
-        # `|| true`: a batch failing outright (e.g. every URL in it
+        # `|| batch_rc=$?`: a batch failing outright (e.g. every URL in it
         # unreachable) must not trip `set -e` and abort the whole update —
         # the per-file presence check right after this call is what
         # actually decides success per file, same as the old code's
         # per-file `if curl ...` (Ф2 peer-session review; all found live
         # testing this exact function).
-        curl $CURL_BASE_OPTS $_CURL_SSL_OPT -f --remove-on-error --parallel --parallel-max 8 -K "$cfg" 2>/dev/null || true
-        rm -f "$cfg"
+        # -sS (not the default progress meter): stderr goes to a file whose last
+        # line names the cause, shown below only when the batch failed (#980).
+        curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sS -f --remove-on-error --parallel --parallel-max 8 -K "$cfg" 2>"$batch_err" || batch_rc=$?
+        if [ "$batch_rc" -ne 0 ]; then
+            echo "  ⚠ пакетная загрузка: $(curl_failure_note "$batch_rc" "$batch_err")" >&2
+        fi
+        rm -f "$cfg" "$batch_err"
     else
         # Sequential fallback (peer-session 2026-08-21-09): one curl call
         # per file, same CURL_BASE_OPTS/-f as the parallel path. No
@@ -3495,18 +3620,31 @@ download_batch() {
         # file mid-transfer, or clobber it after "a.part" already landed.
         # mktemp in the same destination directory makes the temp name
         # unpredictable and immune to any manifest content.
+        #
+        # A failed call names its file and curl's cause (#980); the first 5 per
+        # call are shown, the rest are counted, so a dead network cannot flood
+        # the output with one line per manifest entry.
+        local dst_tmp seq_err="$TMPDIR_UPDATE/curl-single.err" seq_rc failed=0
         for p in "$@"; do
             dst="$TMPDIR_UPDATE/files/$p"
             mkdir -p "$(dirname "$dst")"
-            local dst_tmp
             dst_tmp=$(mktemp "$dst.XXXXXX")
             # shellcheck disable=SC2086
-            if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -f -o "$dst_tmp" "$RAW_BASE/$p" 2>/dev/null; then
+            if curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sS -f -o "$dst_tmp" "$RAW_BASE/$p" 2>"$seq_err"; then
                 mv "$dst_tmp" "$dst"
             else
+                seq_rc=$?
                 rm -f "$dst_tmp"
+                failed=$((failed + 1))
+                if [ "$failed" -le 5 ]; then
+                    echo "  ⚠ $p: $(curl_failure_note "$seq_rc" "$seq_err")" >&2
+                fi
             fi
         done
+        if [ "$failed" -gt 5 ]; then
+            echo "  ⚠ ещё $((failed - 5)) сбоев загрузки не показано (первые 5 выше)" >&2
+        fi
+        rm -f "$seq_err"
     fi
 }
 
@@ -4444,6 +4582,7 @@ sync_workspace_claude_md
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     MEM_UPDATED=0
+    MEM_REPLACED=()
     for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         case "$f" in
             memory/*.md|memory/*.yaml|memory/*.yml)
@@ -4467,6 +4606,14 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
                         # эта ветка тоже слепо копировала SCRIPT_DIR поверх live-копии.
                         report_author_skip "$f" "$dst"
                     else
+                        # issue #967: a platform memory file the pilot has edited (e.g.
+                        # memory/navigation.md holds per-installation notes) used to be
+                        # replaced here by a bare cp, with no backup, exactly like the
+                        # repair pass did before #847. Save the previous version first.
+                        if [ -f "$dst" ] && [ "$(hash_file "$SCRIPT_DIR/$f")" != "$(hash_file "$dst")" ]; then
+                            backup_memory_file_before_overwrite "$f" "$dst"
+                            MEM_REPLACED+=("$f")
+                        fi
                         cp "$SCRIPT_DIR/$f" "$dst"
                         MEM_UPDATED=$((MEM_UPDATED + 1))
                     fi
@@ -4476,6 +4623,13 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     done
     if [ "$MEM_UPDATED" -gt 0 ]; then
         echo "  ✓ $MEM_UPDATED memory-файлов обновлено в $CLAUDE_MEMORY_DIR"
+    fi
+    if [ "${#MEM_REPLACED[@]}" -gt 0 ]; then
+        MEM_REPLACED_LIST=""
+        for f in ${MEM_REPLACED[@]+"${MEM_REPLACED[@]}"}; do
+            MEM_REPLACED_LIST="${MEM_REPLACED_LIST:+$MEM_REPLACED_LIST, }$f"
+        done
+        echo "  ⚠ Заменено файлов памяти платформы: ${#MEM_REPLACED[@]} ($MEM_REPLACED_LIST); прежние версии сохранены в $MEMORY_BACKUP_RUN"
     fi
     echo "  ✓ memory/MEMORY.md — не тронут"
 fi

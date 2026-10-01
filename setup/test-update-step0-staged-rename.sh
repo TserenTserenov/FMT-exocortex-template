@@ -11,12 +11,22 @@
 # update.sh, Step 0 must stage+rename it, re-exec, and the run must complete
 # cleanly.
 #
+# Two --check scenarios run first, on the same fixture (issue #955 / #980):
+#   - the fetch is served a different update.sh: Step 0 must say a new version
+#     exists and must NOT also claim "update.sh актуален", and --check must leave
+#     the local file byte-identical;
+#   - the fetch fails (curl exit 23, a write error): Step 0 must say it could not
+#     check, show curl's cause, and must NOT claim "актуален";
+#   - the fetch succeeds (curl exit 0) but the body is empty (a proxy or a login page that
+#     returns nothing): that is a failed check too, not a "newer" update.sh — --check must not
+#     announce a new version and a normal run must not replace update.sh with a 0-byte file.
+#
 # Usage: bash setup/test-update-step0-staged-rename.sh
 
 set -uo pipefail
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 UPDATE_SH_REAL="$(dirname "$SELF_DIR")/update.sh"
-TEST_ROOT="/tmp/iwe-step0-rename-test-$$"
+TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iwe-step0-rename-test.XXXXXX")"
 FAKE_HOME="$TEST_ROOT/fake-home"
 
 FAIL_COUNT=0
@@ -126,10 +136,135 @@ if [ -n "\$cfgfile" ]; then
     exit "\$had_error"
 fi
 [ -z "\$url" ] && exit 22
+# SHIM_FAIL_UPDATE_SH_RC: the Step 0 fetch of update.sh fails like a native Windows
+# curl that cannot write to a POSIX temp path (issue #980).
+if [ -n "\${SHIM_FAIL_UPDATE_SH_RC:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    echo "curl: (\$SHIM_FAIL_UPDATE_SH_RC) client returned ERROR on write of 16384 bytes" >&2
+    exit "\$SHIM_FAIL_UPDATE_SH_RC"
+fi
+# SHIM_EMPTY_UPDATE_SH: the Step 0 fetch "succeeds" with an empty body (exit 0).
+if [ -n "\${SHIM_EMPTY_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && : > "\$out"
+    exit 0
+fi
 [ -z "\$out" ] && exit 0
 serve "\$url" "\$out"
 SHIMEOF
 chmod +x "$SHIM_DIR/curl"
+
+# --- --check with a newer update.sh upstream (issue #955) -----------------------
+# Before the fix Step 0 printed the warning and then, unconditionally,
+# "update.sh актуален." right under it.
+echo "--- --check: a newer update.sh is reported once, as a warning ---"
+cp "$SCRIPT_DIR/update.sh" "$TEST_ROOT/update.sh.before"
+set +e
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-new.log" 2>&1
+set -e
+if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-new.log"; then
+  pass "--check reports that a new update.sh is available"
+else
+  fail "--check did not report the new update.sh; tail: $(tail -3 "$TEST_ROOT/check-new.log" | tr '\n' ' ')"
+fi
+if grep -q "update.sh актуален" "$TEST_ROOT/check-new.log"; then
+  fail "--check says 'update.sh актуален' although a newer update.sh exists (#955)"
+else
+  pass "--check does not claim update.sh is up to date"
+fi
+if cmp -s "$SCRIPT_DIR/update.sh" "$TEST_ROOT/update.sh.before"; then
+  pass "--check left the local update.sh byte-identical"
+else
+  fail "--check changed the local update.sh"
+fi
+
+# --- --check when the Step 0 download fails (issues #955 / #980) -----------------
+# Before the fix curl's stderr went to /dev/null and the failure fell through to
+# the same "актуален" line: "could not check" was reported as "checked, current".
+echo "--- --check: a failed update.sh download is not reported as up to date ---"
+set +e
+SHIM_FAIL_UPDATE_SH_RC=23 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-fail.log" 2>&1
+set -e
+if grep -q "не удалось проверить update.sh" "$TEST_ROOT/check-fail.log"; then
+  pass "a failed Step 0 download is reported as a failed check"
+else
+  fail "a failed Step 0 download was not reported; tail: $(tail -3 "$TEST_ROOT/check-fail.log" | tr '\n' ' ')"
+fi
+if grep -q "не удалось проверить update.sh.*curl код 23" "$TEST_ROOT/check-fail.log" && \
+   grep -q "client returned ERROR on write" "$TEST_ROOT/check-fail.log"; then
+  pass "the report carries curl's exit code and its last stderr line"
+else
+  fail "curl's cause is missing from the report: $(grep -n 'update.sh' "$TEST_ROOT/check-fail.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "update.sh актуален" "$TEST_ROOT/check-fail.log"; then
+  fail "a failed download was reported as 'update.sh актуален' (#955/#980)"
+else
+  pass "a failed download is not reported as up to date"
+fi
+if cmp -s "$SCRIPT_DIR/update.sh" "$TEST_ROOT/update.sh.before"; then
+  pass "a failed download left the local update.sh untouched"
+else
+  fail "a failed download changed the local update.sh"
+fi
+
+# --- Step 0 gets an EMPTY answer with curl exit 0 (cold review of #955 / #980) ----
+# An empty file differs from the local update.sh, so it used to count as a newer one:
+# --check announced "Новая версия update.sh доступна", and a normal run replaced update.sh
+# with a 0-byte file and re-executed it (exit 0, nothing done, every later run empty too).
+echo "--- --check: an empty update.sh answer is a failed check, not a new version ---"
+set +e
+SHIM_EMPTY_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-empty.log" 2>&1
+set -e
+if grep -q "не удалось проверить update.sh: пустой ответ" "$TEST_ROOT/check-empty.log"; then
+  pass "--check reports an empty answer as a failed check"
+else
+  fail "--check did not report the empty answer; update.sh lines: $(grep -n 'update.sh' "$TEST_ROOT/check-empty.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-empty.log"; then
+  fail "--check announced a new update.sh although the answer was empty"
+else
+  pass "--check does not announce a new version for an empty answer"
+fi
+if grep -q "update.sh актуален" "$TEST_ROOT/check-empty.log"; then
+  fail "an empty answer was reported as 'update.sh актуален'"
+else
+  pass "an empty answer is not reported as up to date"
+fi
+if cmp -s "$SCRIPT_DIR/update.sh" "$TEST_ROOT/update.sh.before"; then
+  pass "--check left the local update.sh untouched"
+else
+  fail "--check changed the local update.sh after an empty answer"
+fi
+
+# A normal run, on a copy of the install (the run below replaces the real one on purpose).
+echo "--- normal run: an empty update.sh answer must not replace update.sh ---"
+cp -R "$TEST_ROOT/repo" "$TEST_ROOT/repo-empty"
+EMPTY_UPDATE_SH="$TEST_ROOT/repo-empty/FMT-exocortex-template/update.sh"
+set +e
+SHIM_EMPTY_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$EMPTY_UPDATE_SH" --yes > "$TEST_ROOT/out-empty.log" 2>&1
+set -e
+if [ -s "$EMPTY_UPDATE_SH" ] && cmp -s "$EMPTY_UPDATE_SH" "$TEST_ROOT/update.sh.before"; then
+  pass "the local update.sh is neither replaced nor emptied by an empty answer"
+else
+  fail "update.sh is $(wc -c < "$EMPTY_UPDATE_SH" | tr -d ' ') bytes after an empty answer; it must stay as it was"
+fi
+if grep -q "не удалось проверить update.sh: пустой ответ" "$TEST_ROOT/out-empty.log"; then
+  pass "the run says that the update.sh check failed"
+else
+  fail "the run did not report the empty answer; head: $(head -12 "$TEST_ROOT/out-empty.log" | tr '\n' ' ')"
+fi
+if grep -q "Перезапуск" "$TEST_ROOT/out-empty.log"; then
+  fail "update.sh re-executed itself after an empty answer"
+else
+  pass "no re-exec after an empty answer"
+fi
+if grep -q "Загрузка манифеста" "$TEST_ROOT/out-empty.log"; then
+  pass "the run goes on with the update after the failed self-check"
+else
+  fail "the run stopped after the failed self-check; head: $(head -12 "$TEST_ROOT/out-empty.log" | tr '\n' ' ')"
+fi
 
 # --- Run the REAL update.sh: Step 0 must replace+re-exec itself ---------------
 echo "--- full run: Step 0 self-update replaces the running script ---"

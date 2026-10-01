@@ -171,7 +171,8 @@ simulate_one_transfer() {
         cp "$UPSTREAM/update-manifest.json" "\$o"
     else
         local src="$UPSTREAM/\$rel"
-        [ -f "\$src" ] && cp "\$src" "\$o" || return 22
+        # Like real curl -sS -f: the cause goes to stderr (issue #980 reads its last line).
+        [ -f "\$src" ] && cp "\$src" "\$o" || { echo "curl: (22) The requested URL returned error: 404" >&2; return 22; }
     fi
 }
 
@@ -488,6 +489,195 @@ if grep -q "owner: user, НЕ обновлён, но шаблонная верс
 else
     fail "D: owner:user drift remained silent outside the changed-files list"
 fi
+# The install above has no classifier script: the report must stay generic (verdict unknown)
+# and must not claim to know where the copy came from.
+if grep -qE "совпадает с версией из git-истории|не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d.log"; then
+    fail "D: a verdict was claimed although the install has no classifier"
+else
+    pass "D: without the classifier the report claims no verdict (unknown)"
+fi
+
+# ------------------------------------------------------------------
+# Scenario D2 (#965/#967): with the shipped classifier the drift report says WHY a copy
+# differs — a copy equal to a committed version of the file, one equal to none, or an
+# undecidable history — instead of one generic line for all three. The classifier compares
+# the copy only with the versions COMMITTED in the template clone, so the report promises
+# no more than that (the cases below, D3 and D4, pin the two ways the verdicts can mislead).
+# ------------------------------------------------------------------
+echo "--- Scenario D2: owner:user drift verdicts — committed version / no committed version / unknown (#965 #967) ---"
+D2_COMMITTED_TEXT='совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они'
+D2_UNCOMMITTED_TEXT='не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)'
+cp "$UPSTREAM/memory/dummy-memo.md" "$TEST_ROOT/memo-upstream.txt"
+mkdir -p "$SCRIPT_DIR/.claude/scripts"
+cp "$SELF_DIR/../.claude/scripts/classify-workspace-copy.sh" "$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh"
+# A second owner:user file that no commit of the template ever touched: verdict unknown.
+printf '# Untracked memo\n' > "$UPSTREAM/memory/untracked-memo.md"
+cp "$UPSTREAM/memory/untracked-memo.md" "$SCRIPT_DIR/memory/untracked-memo.md"
+printf -- '---\nowner: user\n---\nPilot copy of the untracked memo\n' > "$(dirname "$MEM_DST")/untracked-memo.md"
+d2_untracked_entry() {
+    python3 - "$UPSTREAM/update-manifest.json" "$UPSTREAM" "$1" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+manifest_path, root, mode = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+name = "memory/untracked-memo.md"
+manifest["files"] = [entry for entry in manifest["files"] if entry["path"] != name]
+if mode == "add":
+    manifest["files"].append({"path": name, "sha256": hashlib.sha256((pathlib.Path(root) / name).read_bytes()).hexdigest()})
+with open(manifest_path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+}
+# d2_memo_sha — the manifest entry of memory/dummy-memo.md follows the upstream file again.
+d2_memo_sha() {
+    python3 - "$UPSTREAM/update-manifest.json" "$UPSTREAM" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+manifest_path, root = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+for entry in manifest["files"]:
+    if entry["path"] == "memory/dummy-memo.md":
+        entry["sha256"] = hashlib.sha256((pathlib.Path(root) / entry["path"]).read_bytes()).hexdigest()
+with open(manifest_path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+}
+# d2_run_update LOG — the real update.sh --yes; its exit code is not the point here.
+d2_run_update() {
+    PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/$1" 2>&1 || true
+}
+# d2_commit_memo SOURCE MESSAGE — the clone's memory/dummy-memo.md becomes SOURCE, committed.
+d2_commit_memo() {
+    cp "$1" "$SCRIPT_DIR/memory/dummy-memo.md"
+    git -C "$SCRIPT_DIR" add memory/dummy-memo.md
+    git -C "$SCRIPT_DIR" commit -q -m "$2"
+}
+# d2_hint_of LOG TEXT — the command printed on the line after the report line that carries TEXT.
+d2_hint_of() {
+    local line
+    line=$(grep -A1 -F "$2" "$TEST_ROOT/$1" | tail -1)
+    printf '%s\n' "${line#*: }"
+}
+# d2_check_save_hint LOG TEXT BEFORE LABEL — the offered command, run as printed, must keep the
+# current copy (BEFORE) in MEM_DST.before-update and then make MEM_DST the template's file.
+d2_check_save_hint() {
+    local hint
+    hint=$(d2_hint_of "$1" "$2")
+    rm -f "$MEM_DST.before-update"
+    bash -c "$hint" > /dev/null 2>&1 || true
+    if [ -f "$MEM_DST.before-update" ] && [ "$(cat "$MEM_DST.before-update")" = "$3" ] \
+        && cmp -s "$MEM_DST" "$SCRIPT_DIR/memory/dummy-memo.md"; then
+        pass "$4: the offered command saves the current copy to .before-update, then refreshes it"
+    else
+        fail "$4: the offered command ('${hint:-<none>}') did not save the current copy before replacing it"
+    fi
+    rm -f "$MEM_DST.before-update"
+}
+d2_untracked_entry add
+
+d2_run_update out-d-authored.log
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_UNCOMMITTED_TEXT" "$TEST_ROOT/out-d-authored.log" && \
+   grep -q 'Сверьте: diff' "$TEST_ROOT/out-d-authored.log"; then
+    pass "D2: a copy that equals no committed version is reported with both possible causes, and a diff command"
+else
+    fail "D2: no verdict for the copy that equals no committed version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-authored.log"; then
+    fail "D2: the report still blames the pilot's edits without naming the other cause"
+else
+    pass "D2: the report no longer says 'probably your edits' on its own"
+fi
+if grep -q "memory/untracked-memo.md — owner: user, НЕ обновлён, но шаблонная версия отличается" "$TEST_ROOT/out-d-authored.log"; then
+    pass "D2: an undecidable history (verdict unknown) keeps the generic text"
+else
+    fail "D2: the unknown verdict did not keep the generic text: $(grep -n 'untracked-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "owner:user memory drift: 2 файл" "$TEST_ROOT/out-d-authored.log"; then
+    pass "D2: the drift summary still counts every differing file"
+else
+    fail "D2: the drift summary lost its count"
+fi
+
+# The deployed copy equals an OLDER version from the template history.
+printf -- '---\nowner: user\n---\nOlder template text of the memo\n' > "$TEST_ROOT/memo-older.txt"
+d2_commit_memo "$TEST_ROOT/memo-older.txt" "history: an older memo"
+d2_commit_memo "$TEST_ROOT/memo-upstream.txt" "history: memo back to the upstream text"
+cp "$TEST_ROOT/memo-older.txt" "$MEM_DST"
+
+d2_run_update out-d-stale.log
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$TEST_ROOT/out-d-stale.log"; then
+    pass "D2: a copy that equals a committed version is reported as such, with the pilot's-own-commit caveat"
+else
+    fail "D2: no verdict for the copy that equals an older committed version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-stale.log" | head -3 | tr '\n' ' ')"
+fi
+d2_check_save_hint out-d-stale.log "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$(cat "$TEST_ROOT/memo-older.txt")" "D2"
+if grep -q "не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d-stale.log"; then
+    fail "D2: a copy that equals a committed version was reported as equal to none"
+else
+    pass "D2: a copy that equals a committed version is not reported as equal to none"
+fi
+
+# ------------------------------------------------------------------
+# Scenario D3: the same verdict, but the committed version IS the pilot's own edit — a fork
+# with local commits (#963) keeps it in the clone's history. "Equals a committed version"
+# proves nothing about who wrote it, so the report must not promise "no edits found", and the
+# command it offers must save the copy before it replaces it.
+# ------------------------------------------------------------------
+echo "--- Scenario D3: a committed version can be the pilot's own edit (cold review of #965/#967) ---"
+printf -- '---\nowner: user\n---\nPilot notes committed into the clone\n' > "$TEST_ROOT/memo-pilot.txt"
+d2_commit_memo "$TEST_ROOT/memo-pilot.txt" "pilot: my notes in the memo"
+d2_commit_memo "$TEST_ROOT/memo-upstream.txt" "history: memo back to the upstream text"
+cp "$TEST_ROOT/memo-pilot.txt" "$MEM_DST"
+
+d2_run_update out-d-committed.log
+if grep -q "ваших правок не найдено" "$TEST_ROOT/out-d-committed.log"; then
+    fail "D3: the report promises 'no edits found' for a copy that is the pilot's own committed edit"
+else
+    pass "D3: the report does not promise 'no edits found'"
+fi
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$TEST_ROOT/out-d-committed.log"; then
+    pass "D3: the report says the match may be the pilot's own committed edit"
+else
+    fail "D3: the pilot's-own-commit caveat is missing: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-committed.log" | head -3 | tr '\n' ' ')"
+fi
+d2_check_save_hint out-d-committed.log "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$(cat "$TEST_ROOT/memo-pilot.txt")" "D3"
+
+# ------------------------------------------------------------------
+# Scenario D4: the copy equals no committed version, yet the pilot edited nothing. update.sh
+# applies a release to the clone WITHOUT committing it, so after the pilot copied release one
+# into the memory directory (the cp the report suggests) and release two arrived, the copy
+# is release one — which exists in no commit of the clone.
+# ------------------------------------------------------------------
+echo "--- Scenario D4: an applied earlier release is not blamed on the pilot (cold review of #965/#967) ---"
+printf -- '---\nowner: user\n---\nRelease one text of the memo\n' > "$MEM_DST"
+printf -- '---\nowner: user\n---\nRelease two text of the memo\n' > "$UPSTREAM/memory/dummy-memo.md"
+cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
+d2_memo_sha
+
+d2_run_update out-d-release.log
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_UNCOMMITTED_TEXT" "$TEST_ROOT/out-d-release.log"; then
+    pass "D4: the report names an already applied earlier release as a possible cause"
+else
+    fail "D4: the earlier-release cause is missing: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-release.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-release.log"; then
+    fail "D4: the report says 'probably your edits' for an unedited copy of an earlier release"
+else
+    pass "D4: the report does not say 'probably your edits'"
+fi
+# Back to the state the next scenarios expect: the clone and the upstream carry the committed text.
+cp "$TEST_ROOT/memo-upstream.txt" "$UPSTREAM/memory/dummy-memo.md"
+cp "$TEST_ROOT/memo-upstream.txt" "$SCRIPT_DIR/memory/dummy-memo.md"
+d2_memo_sha
+
+d2_untracked_entry remove
+rm -f "$UPSTREAM/memory/untracked-memo.md" "$SCRIPT_DIR/memory/untracked-memo.md" "$(dirname "$MEM_DST")/untracked-memo.md"
 
 # ------------------------------------------------------------------
 # Scenario E: a genuine change (memo v2 → v3) lands alongside a manifest
@@ -547,6 +737,62 @@ if [ "$(sha256sum "$SCRIPT_DIR/update-manifest.json" | cut -d' ' -f1)" = "$MANIF
 else
     fail "E: local manifest changed despite the aborted run"
 fi
+
+# issue #980: the failed transfer used to be silent (curl's stderr went to /dev/null).
+# Now the batch call's exit code and the last line of its stderr are shown.
+if grep -q "curl код [0-9][0-9]*; curl: (22) The requested URL returned error: 404" "$TEST_ROOT/out-e.log"; then
+    pass "E: a failed batch download shows curl's exit code and its last stderr line"
+else
+    fail "E: the failed batch download left no curl diagnostic in the output"
+fi
+
+echo "--- Scenario E2: the sequential fallback names the file and curl's cause (#980) ---"
+set +e
+CURL_SHIM_PARALLEL_SUPPORTED=0 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e2.log" 2>&1
+RC_E2=$?
+set -e
+if [ "$RC_E2" -eq 2 ]; then
+    pass "E2: the sequential path also aborts with EXIT_NETWORK(2) on a failed fetch"
+else
+    fail "E2: expected exit 2, got $RC_E2"
+fi
+if grep -q "memory/never-fetched.md: curl код 22; curl: (22) The requested URL returned error: 404" "$TEST_ROOT/out-e2.log"; then
+    pass "E2: the failed file is named together with curl's exit code and stderr line"
+else
+    fail "E2: the sequential failure left no per-file curl diagnostic"
+fi
+
+# A dead network must not print one line per manifest entry: the first 5 failures of a
+# call are shown, the rest are counted. Seven failing files, two passes (first + retry).
+echo "--- Scenario E3: sequential diagnostics are capped at 5 per call (#980) ---"
+# e3_extra_entries add|remove — six more manifest entries that the shim cannot serve.
+e3_extra_entries() {
+    python3 - "$UPSTREAM/update-manifest.json" "$1" <<'PY'
+import json
+import sys
+path, mode = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+extra = [f"memory/never-fetched-{number}.md" for number in range(1, 7)]
+manifest["files"] = [entry for entry in manifest["files"] if entry["path"] not in extra]
+if mode == "add":
+    manifest["files"] += [{"path": name, "sha256": "0" * 64} for name in extra]
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+}
+e3_extra_entries add
+set +e
+CURL_SHIM_PARALLEL_SUPPORTED=0 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e3.log" 2>&1
+set -e
+E3_SHOWN=$(grep -c "curl код 22" "$TEST_ROOT/out-e3.log" || true)
+E3_COUNTED=$(grep -c "ещё 2 сбоев загрузки не показано" "$TEST_ROOT/out-e3.log" || true)
+if [ "$E3_SHOWN" -eq 10 ] && [ "$E3_COUNTED" -eq 2 ]; then
+    pass "E3: 5 diagnostics per call are shown and the other 2 are counted (first pass and retry)"
+else
+    fail "E3: expected 10 shown diagnostics and 2 counter lines, got $E3_SHOWN and $E3_COUNTED"
+fi
+e3_extra_entries remove
 
 # ------------------------------------------------------------------
 # Scenario F/G (WP-546 Ф5, peer-session 2026-08-21-12): assert that
@@ -647,6 +893,57 @@ if grep -q "последовательно" "$TEST_ROOT/out-g.log" && ! grep -q 
     pass "G: the printed message matches the sequential path"
 else
     fail "G: expected the sequential-mode message, output was:"; cat "$TEST_ROOT/out-g.log" >&2
+fi
+
+# ------------------------------------------------------------------
+# Scenario I (#967): Step 6 used to replace a changed platform memory file with a bare
+# cp — a pilot's edit to e.g. memory/navigation.md vanished with no backup and no word.
+# Now the previous version is saved first and the replaced files are named.
+# ------------------------------------------------------------------
+echo "--- Scenario I: Step 6 backs up a modified platform memory file (#967) ---"
+printf '# Dummy memo v6\n' > "$UPSTREAM/memory/dummy-memo.md"
+python3 - "$UPSTREAM/update-manifest.json" "$UPSTREAM" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+manifest_path, root = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+for entry in manifest["files"]:
+    if entry["path"] == "memory/dummy-memo.md":
+        entry["sha256"] = hashlib.sha256((pathlib.Path(root) / entry["path"]).read_bytes()).hexdigest()
+with open(manifest_path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+printf -- '---\nowner: platform\n---\n# Dummy memo v5\nPilot edit: notes about this installation\n' > "$MEM_DST"
+set +e
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-i.log" 2>&1
+RC_I=$?
+set -e
+if [ "$RC_I" -eq 0 ]; then
+    pass "I: update.sh exits 0 when it replaces a platform memory file"
+else
+    fail "I: expected exit 0, got $RC_I; tail: $(tail -3 "$TEST_ROOT/out-i.log" | tr '\n' ' ')"
+fi
+I_BACKUP=$(grep -rl 'Pilot edit: notes about this installation' "$WORKSPACE_DIR/.backups/memory-pre-update" 2>/dev/null | head -1 || true)
+if [ -n "$I_BACKUP" ] && [ "$(basename "$I_BACKUP")" = "dummy-memo.md" ]; then
+    pass "I: the pilot's version is saved under .backups/memory-pre-update/ before Step 6 replaces it"
+else
+    fail "I: no backup of the pilot's memory edit (found: ${I_BACKUP:-none})"
+fi
+if cmp -s "$MEM_DST" "$UPSTREAM/memory/dummy-memo.md"; then
+    pass "I: the memory file now carries the release version"
+else
+    fail "I: the memory file was not replaced with the release version"
+fi
+I_SUMMARY=$(grep -F 'Заменено файлов памяти платформы' "$TEST_ROOT/out-i.log" || true)
+if grep -qF -- 'Заменено файлов памяти платформы: 1' <<<"$I_SUMMARY" && \
+   grep -qF -- 'memory/dummy-memo.md' <<<"$I_SUMMARY" && \
+   grep -qF -- "$WORKSPACE_DIR/.backups/memory-pre-update" <<<"$I_SUMMARY"; then
+    pass "I: the run names the replaced file and where the previous version went"
+else
+    fail "I: no replaced-files summary with the backup directory: '${I_SUMMARY:-<none>}'"
 fi
 
 # ------------------------------------------------------------------
