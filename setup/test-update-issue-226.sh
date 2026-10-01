@@ -491,7 +491,7 @@ else
 fi
 # The install above has no classifier script: the report must stay generic (verdict unknown)
 # and must not claim to know where the copy came from.
-if grep -qE "совпадает с версией из git-истории|не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d.log"; then
+if grep -qE "совпадает с версией в истории текущей ветки|не совпадает ни с одной версией в истории текущей ветки" "$TEST_ROOT/out-d.log"; then
     fail "D: a verdict was claimed although the install has no classifier"
 else
     pass "D: without the classifier the report claims no verdict (unknown)"
@@ -505,8 +505,8 @@ fi
 # no more than that (the cases below, D3 and D4, pin the two ways the verdicts can mislead).
 # ------------------------------------------------------------------
 echo "--- Scenario D2: owner:user drift verdicts — committed version / no committed version / unknown (#965 #967) ---"
-D2_COMMITTED_TEXT='совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они'
-D2_UNCOMMITTED_TEXT='не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)'
+D2_COMMITTED_TEXT='совпадает с версией в истории текущей ветки клона шаблона; если вы коммитили свои правки в клон, это могут быть и они'
+D2_UNCOMMITTED_TEXT='не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)'
 cp "$UPSTREAM/memory/dummy-memo.md" "$TEST_ROOT/memo-upstream.txt"
 mkdir -p "$SCRIPT_DIR/.claude/scripts"
 cp "$SELF_DIR/../.claude/scripts/classify-workspace-copy.sh" "$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh"
@@ -628,7 +628,7 @@ else
     fail "D2: no verdict for the copy that equals an older committed version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-stale.log" | head -3 | tr '\n' ' ')"
 fi
 d2_check_save_hint out-d-stale.log "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$(cat "$TEST_ROOT/memo-older.txt")" "D2"
-if grep -q "не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d-stale.log"; then
+if grep -q "не совпадает ни с одной версией в истории текущей ветки" "$TEST_ROOT/out-d-stale.log"; then
     fail "D2: a copy that equals a committed version was reported as equal to none"
 else
     pass "D2: a copy that equals a committed version is not reported as equal to none"
