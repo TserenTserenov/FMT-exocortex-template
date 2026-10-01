@@ -783,11 +783,16 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # WeekPlan = plan, WeekReport = facts), prefers a table with a «План» ancestor, falls back
 # to the only remaining candidate and otherwise refuses to guess. A <details> block is a
 # section of its own: headings from before it do not apply inside, headings met inside it
-# are dropped when it closes.
+# are dropped when it closes. Fenced code blocks (``` or ~~~) are not markup: nothing inside
+# one is a heading, a tag or a table. A table is a candidate only when its header has the
+# exact cell «РП» and a cell starting with the word «Статус» («Статус (на 3 июля)» counts):
+# «Связанные РП» (the «Стратегическая сверка» table) is not a plan and would receive a
+# nameless row.
 # Separator rows are matched by pattern, not by the literal `|---` (same as #901).
 TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
 TAG_RE = re.compile(r"</details>|<details\b|<summary[^>]*>(.*?)</summary>", re.IGNORECASE)
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
+FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 # Whole words only: «Итоговая таблица недели (плановые РП)» is a plan, not a facts section.
 FACTS_RE = re.compile(r"\b(?:Итог(?:и|ов)?|Сводк[аиу]|Summary)\b", re.IGNORECASE)
 PLAN_RE = re.compile(r"План|\bPlan\b", re.IGNORECASE)
@@ -797,10 +802,41 @@ def strip_tags(text):
     return re.sub(r"<[^>]+>", "", text).strip()
 
 
+def table_cells(row):
+    return [c.strip() for c in row.strip().strip("|").split("|")]
+
+
+def is_plan_header(cells):
+    return "РП" in cells and any(re.match(r"Статус\b", c) for c in cells)
+
+
+def next_fence(fence, text):
+    """Fence tracker after one line: (marker, length) inside a fenced code block, else None."""
+    found = FENCE_RE.match(text)
+    if fence:
+        # Only a fence of the same kind, at least as long and without an info string closes it.
+        closes = (
+            found
+            and found.group(1)[0] == fence[0]
+            and len(found.group(1)) >= fence[1]
+            and not found.group(2).strip()
+        )
+        return None if closes else fence
+    # An info string with a backtick means inline code, not a fence (CommonMark).
+    if found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
+        return (found.group(1)[0], len(found.group(1)))
+    return None
+
+
 candidates = []  # (header line, insert position, ancestor titles)
 headings = []  # (level, title) of the markdown headings in scope
 blocks = []  # per open <details>: [summary title, headings outside it (rebound, never mutated)]
+fence = None  # (marker, length) while inside a fenced code block
 for i, line in enumerate(lines):
+    in_code = fence is not None
+    fence = next_fence(fence, line.rstrip("\r\n"))
+    if in_code or fence:
+        continue
     for tag in TAG_RE.finditer(line):
         text = tag.group(0).lower()
         if text == "</details>":
@@ -816,9 +852,9 @@ for i, line in enumerate(lines):
     if heading:
         level = len(heading.group(1))
         headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
-    if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")) and "РП" in lines[i - 1] and "Статус" in lines[i - 1]:
+    if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
         ancestors = [b[0] for b in blocks] + [h[1] for h in headings]
-        if not any(FACTS_RE.search(t) for t in ancestors):
+        if is_plan_header(table_cells(lines[i - 1])) and not any(FACTS_RE.search(t) for t in ancestors):
             candidates.append((lines[i - 1], i + 1, ancestors))
 
 plan_titled = [c for c in candidates if any(PLAN_RE.search(t) for t in c[2])]
@@ -837,7 +873,7 @@ if insert_at is None:
     else:
         print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус вне блоков «Итоги») не найдена — добавить вручную", file=sys.stderr)
 else:
-    header_cols = [c.strip() for c in header_line.strip().strip("|").split("|")]
+    header_cols = table_cells(header_line)
     values_by_name = {
         "🚦": flag,
         "#": wp_num,

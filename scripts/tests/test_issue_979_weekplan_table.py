@@ -6,10 +6,14 @@ table of the WeekPlan, not into the first table that merely has «РП» and
 After a day close a WeekPlan may start with an «Итоги дня» block holding
 `| РП | Что сделано | Статус |`; the old writer took that table, so the rows of
 new WPs landed in the summary of the past day, with dashes in every column the
-summary does not share with the plan. The writer now remembers the nearest
-`<summary>` / markdown heading above each table, skips tables under
-«Итог / Сводк / Summary», prefers a section titled «План», falls back to the only
-remaining candidate and otherwise refuses to guess (warning, nothing written).
+summary does not share with the plan. The writer now gives every table the chain
+of its ancestors (the `<summary>` of each enclosing `<details>` plus the markdown
+headings in scope), skips a table when any ancestor is a facts section
+(«Итоги / Сводка / Summary», whole words), prefers a table with a «План»
+ancestor, falls back to the only remaining candidate and otherwise refuses to
+guess (warning, nothing written). Fenced code blocks are not markup, and a table
+is a candidate only when its header has the exact cell «РП» and a cell starting
+with the word «Статус» («Статус (на 3 июля)» counts, «Связанные РП» does not).
 
 The same fix replaces the literal `|---` separator lookup in the WeekPlan and
 REGISTRY writers (`| --- |` made the REGISTRY step fail and roll the whole WP
@@ -83,6 +87,13 @@ PLAN_SECTION = (
     + "\n</details>\n"
 )
 SPARE_TABLE = "| # | РП | Статус |\n|---|----|--------|\n| 1 | **Запас** | pending |\n"
+# The «Стратегическая сверка» table of the day-open template: «РП» only as part of «Связанные РП».
+SVERKA_TABLE = (
+    "| ID | Результат | Бюджет | Статус | P | Связанные РП |\n"
+    "|----|-----------|--------|--------|---|--------------|\n"
+    "| R1 | ... | ... | ... | P3 | WP-7 |\n"
+)
+SVERKA_ROW = "| R1 | ... | ... | ... | P3 | WP-7 |"
 
 
 def _weekplan(tmp_path: Path, body: str) -> Path:
@@ -199,11 +210,7 @@ def test_plan_section_with_a_subheading_and_a_second_table(tmp_path):
         "|----|---|----|---|--------|---------|------|\n"
         "| 🟡 | 7 | **Основной** | 2 | pending | — | — |\n"
         "\n</details>\n\n"
-        "<details><summary><b>Стратегическая сверка</b></summary>\n\n"
-        "| ID | Результат | Бюджет | Статус | P | Связанные РП |\n"
-        "|----|-----------|--------|--------|---|--------------|\n"
-        "| R1 | ... | ... | ... | P3 | WP-7 |\n"
-        "\n</details>\n",
+        "<details><summary><b>Стратегическая сверка</b></summary>\n\n" + SVERKA_TABLE + "\n</details>\n",
     )
 
     result = _add_to_weekplan(weekplan)
@@ -213,7 +220,7 @@ def test_plan_section_with_a_subheading_and_a_second_table(tmp_path):
     assert _first_row_below(weekplan, "| Дедлайн | Репо |") == (
         "| 🟡 | 16 | **Новый РП** — [описание] | 3 | pending | — | — |"
     )
-    assert _first_row_below(weekplan, "Связанные РП") == "| R1 | ... | ... | ... | P3 | WP-7 |"
+    assert _first_row_below(weekplan, "Связанные РП") == SVERKA_ROW
 
 
 def test_plan_section_with_several_subsection_tables_takes_the_first(tmp_path):
@@ -299,6 +306,139 @@ def test_headings_inside_a_details_block_do_not_leak_out_of_it(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "добавлена" in result.stdout
+
+
+def test_code_fence_inside_the_plan_block_is_not_markup(tmp_path):
+    # A shell comment «# Итоги дня…» inside a fenced block is code, not a heading. Taken for
+    # one, it made the plan block a facts section and left only the «Связанные РП» table as
+    # a candidate, which then received a nameless row.
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open><summary><b>План на неделю W40</b></summary>\n\n"
+        "```bash\n# Итоги дня: запустить закрытие\necho done\n```\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+        + "\n</details>\n\n"
+        "<details><summary>Стратегическая сверка</summary>\n\n" + SVERKA_TABLE + "\n</details>\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "Связанные РП") == SVERKA_ROW
+
+
+@pytest.mark.parametrize(
+    "opening, inner, closing",
+    [
+        ("```", "~~~", "```"),
+        ("~~~", "```", "~~~"),
+        ("````", "```", "````"),
+        ("```python", "# комментарий", "```"),
+        ("```", "```text", "```"),
+    ],
+    ids=[
+        "tildes-inside-backticks",
+        "backticks-inside-tildes",
+        "shorter-inside-longer",
+        "info-string",
+        "info-string-line-inside",
+    ],
+)
+def test_a_table_inside_a_fenced_block_is_not_a_candidate(tmp_path, opening, inner, closing):
+    # The example table sits in the same «План» section as the real one and comes first: it
+    # must stay hidden until a fence of the same kind and at least the same length closes.
+    example = f"{opening}\n{inner}\n| РП | Статус |\n|----|--------|\n| 1 | пример |\n{closing}\n"
+    weekplan = _weekplan(
+        tmp_path, "## План недели\n\n" + example + "\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "| РП | Статус |") == "| 1 | пример |"
+
+
+def test_triple_backticks_inside_a_line_do_not_open_a_fence(tmp_path):
+    weekplan = _weekplan(
+        tmp_path, "```код``` в тексте\n\n## План недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert NEW_ROW in weekplan.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "| ID | Результат | Бюджет | Статус | P | Связанные РП |",
+        "| # | РП-связки | Статус |",
+        "| # | Название | Статус РП |",
+        "| # | Название | Статус |",
+        "| # | РП | Бюджет |",
+        "| # | РП | Текущий Статус |",
+        "| # | РП | Статусы |",
+    ],
+    ids=[
+        "related-rp-column",
+        "rp-with-suffix",
+        "rp-only-inside-another-cell",
+        "no-rp-column",
+        "no-status-column",
+        "status-not-leading",
+        "status-longer-word",
+    ],
+)
+def test_header_needs_an_exact_rp_cell_and_a_status_cell(tmp_path, header):
+    separator = "|" + "---|" * (header.count("|") - 1) + "\n"
+    weekplan = _weekplan(tmp_path, header + "\n" + separator + "| 1 | x | y |\n")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize(
+    "header, separator",
+    [
+        ("|  РП  |  Статус  |", "|------|----------|"),
+        ("РП | Статус", "--- | ---"),
+        ("| # | РП | Статус |", "|---|----|--------|"),
+        # Real plans: the status column often carries a qualifier.
+        ("| # | РП | Бюджет | Статус (на 3 июля) | Репо |", "|---|----|--------|---------------------|------|"),
+        ("| # | РП | Статус на конец дня |", "|---|----|---------------------|"),
+        ("| # | РП | Статус W13 |", "|---|----|------------|"),
+    ],
+    ids=["padded", "no-outer-pipes", "plain", "status-with-date", "status-end-of-day", "status-with-week"],
+)
+def test_header_cells_match_after_trimming(tmp_path, header, separator):
+    weekplan = _weekplan(tmp_path, header + "\n" + separator + "\n| 1 | x | y |\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    assert "Новый РП" in weekplan.read_text(encoding="utf-8")
+
+
+def test_a_table_with_a_related_rp_column_is_no_competitor(tmp_path):
+    weekplan = _weekplan(
+        tmp_path,
+        "## Задачи недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n## Сверка\n\n" + SVERKA_TABLE,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "Связанные РП") == SVERKA_ROW
 
 
 def test_two_candidates_without_a_plan_section_are_ambiguous(tmp_path):
