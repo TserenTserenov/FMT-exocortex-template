@@ -23,6 +23,7 @@ ADDITIONAL_ISSUE_TESTS=(
     "scripts/tests/test_create_wp_registry_coherence.sh"
     "scripts/tests/test_create_wp_repeat_and_cwd.sh"
     "scripts/tests/test_create_wp_verification_class.sh"
+    "scripts/tests/test_fresh_seed_reproduction.sh"
     "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh"
     "scripts/tests/test_hindsight_docs_contract.sh"
     "scripts/tests/test_hook_classification.sh"

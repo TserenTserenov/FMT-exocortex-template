@@ -2709,7 +2709,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "859a617282747107562f27202ba7fdb67a7da207685bef3a433f1565817cb28b"
+      "sha256": "1948065257faef4c0e351f770bacc257c7ce3cb17c4b5275a3c0fad8009970b7"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3101,7 +3101,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "0c3e2801398b4e5889026b244a8853caa38065044d2cfa7e08416c4fa9457e75"
+      "sha256": "3a0f4917669898f7473b99f815d7c7c29883b45288afff9f4012e82ddc6c10c0"
     },
     {
       "path": "setup/build-runtime.sh",
