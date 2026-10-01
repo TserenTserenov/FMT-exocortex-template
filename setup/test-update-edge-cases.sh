@@ -4465,14 +4465,14 @@ else
         fail "T43: navigation.md was not replaced with the release version"
     fi
     T43_SUMMARY=$(printf '%s\n' "$T43_OUT" | grep -F 'Заменено файлов памяти платформы' || true)
-    if printf '%s\n' "$T43_SUMMARY" | grep -qF 'Заменено файлов памяти платформы: 1' \
-        && printf '%s\n' "$T43_SUMMARY" | grep -qF 'memory/navigation.md' \
-        && printf '%s\n' "$T43_SUMMARY" | grep -qF "$T43_WORKSPACE/.backups/memory-pre-update"; then
+    if grep -qF -- 'Заменено файлов памяти платформы: 1' <<<"$T43_SUMMARY" \
+        && grep -qF -- 'memory/navigation.md' <<<"$T43_SUMMARY" \
+        && grep -qF -- "$T43_WORKSPACE/.backups/memory-pre-update" <<<"$T43_SUMMARY"; then
         pass "T43: the summary names the replaced file, their number and the backup directory"
     else
         fail "T43: replaced-files summary is missing or wrong: '${T43_SUMMARY:-<none>}'"
     fi
-    if printf '%s\n' "$T43_SUMMARY" | grep -qE 'brand-new|same\.md|user-owned'; then
+    if grep -qE -- 'brand-new|same\.md|user-owned' <<<"$T43_SUMMARY"; then
         fail "T43: the summary lists a file that was not replaced: $T43_SUMMARY"
     else
         pass "T43: new, identical and pilot-owned files are not in the summary"
@@ -4491,7 +4491,7 @@ else
 
     # A second pass finds nothing that differs: nothing to back up, nothing to report.
     T43_OUT2=$(t43_run_step6 "" "memory/navigation.md memory/same.md")
-    if printf '%s\n' "$T43_OUT2" | grep -qF 'Заменено файлов памяти платформы'; then
+    if grep -qF -- 'Заменено файлов памяти платформы' <<<"$T43_OUT2"; then
         fail "T43: a pass that replaces nothing still prints the replaced-files summary"
     else
         pass "T43: no summary when no file is replaced"

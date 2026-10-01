@@ -188,12 +188,12 @@ DEBUG_SECRET="hostile_debug_secret_538"
 OUT=$(run_case release yes yes yes none "" "" "$DEBUG_SECRET" 2>&1)
 echo "$OUT" | grep -q "CALL gh:.*/releases/latest" && pass "3 authenticated gh is third" || fail "3 gh route missing: $OUT"
 # #980: the endpoint reaches gh as "repos/..." (no leading slash), so Git Bash has nothing to rewrite.
-if echo "$OUT" | grep -q "CALL gh:repos/owner/tmpl/releases/latest:"; then
+if grep -q -- "CALL gh:repos/owner/tmpl/releases/latest:" <<<"$OUT"; then
     pass "3 gh endpoint has no leading slash"
 else
     fail "3 gh endpoint is not a bare repos/... path: $OUT"
 fi
-if echo "$OUT" | grep -q "RAW_BASE=.*/$TAG_SHA$"; then
+if grep -q -- "RAW_BASE=.*/$TAG_SHA$" <<<"$OUT"; then
     pass "3 gh route pins the release commit"
 else
     fail "3 gh route did not pin the release: $OUT"

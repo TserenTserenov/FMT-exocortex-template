@@ -491,7 +491,7 @@ else
 fi
 # The install above has no classifier script: the report must stay generic (verdict unknown)
 # and must not claim to know where the copy came from.
-if grep -q "совпадает с версией из git-истории" "$TEST_ROOT/out-d.log" || grep -q "не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d.log"; then
+if grep -qE "совпадает с версией из git-истории|не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d.log"; then
     fail "D: a verdict was claimed although the install has no classifier"
 else
     pass "D: without the classifier the report claims no verdict (unknown)"
@@ -938,9 +938,9 @@ else
     fail "I: the memory file was not replaced with the release version"
 fi
 I_SUMMARY=$(grep -F 'Заменено файлов памяти платформы' "$TEST_ROOT/out-i.log" || true)
-if printf '%s\n' "$I_SUMMARY" | grep -qF 'Заменено файлов памяти платформы: 1' && \
-   printf '%s\n' "$I_SUMMARY" | grep -qF 'memory/dummy-memo.md' && \
-   printf '%s\n' "$I_SUMMARY" | grep -qF "$WORKSPACE_DIR/.backups/memory-pre-update"; then
+if grep -qF -- 'Заменено файлов памяти платформы: 1' <<<"$I_SUMMARY" && \
+   grep -qF -- 'memory/dummy-memo.md' <<<"$I_SUMMARY" && \
+   grep -qF -- "$WORKSPACE_DIR/.backups/memory-pre-update" <<<"$I_SUMMARY"; then
     pass "I: the run names the replaced file and where the previous version went"
 else
     fail "I: no replaced-files summary with the backup directory: '${I_SUMMARY:-<none>}'"
