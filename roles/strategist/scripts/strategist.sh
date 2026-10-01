@@ -179,10 +179,12 @@ log() {
 # $WORKSPACE/scripts/ds-publish.sh, then <fallback repo>/scripts/ds-publish.sh. A target branch goes
 # only to a publisher that knows --branch: update.sh never replaces an existing scripts/ds-publish.sh
 # (an installation's own publisher, or a seed copy delivered before --branch existed), and such a
-# publisher answers an unknown --branch with usage, exit 1. So the first candidate whose text names
-# --branch gets it; when none does, the first existing one runs without it, as before --branch
-# existed, and the log says what to replace if it refuses. Known limit: a text match, so a publisher
-# that names --branch without supporting it still gets the flag.
+# publisher answers an unknown --branch with usage, exit 1. "Knows" is judged by the file's text (a
+# heuristic): an argument-parsing branch for the option, a line that starts with a case pattern such
+# as --branch), -b|--branch) or --branch=*). A comment, a usage text or `git status --branch` does not
+# count. A miss (a wrapper that hands "$@" on) is safe, the publisher runs as before --branch existed;
+# a false hit is not, hence the narrow match. The publication block of the strategy-session skill uses
+# the same expression. When no candidate knows --branch, the first existing one runs without it.
 PUBLISHER=""
 PUBLISHER_BRANCH_ARG=""
 pick_publisher() {  # <target branch, empty = the publisher's default> <fallback repo, empty = none>
@@ -193,15 +195,12 @@ pick_publisher() {  # <target branch, empty = the publisher's default> <fallback
         [ -f "$candidate" ] || continue
         [ -n "$PUBLISHER" ] || PUBLISHER="$candidate"
         [ -n "$target_branch" ] || return 0
-        if grep -qF -e '--branch' "$candidate"; then
+        if grep -qE -e '^[[:space:]]*[(]?([^|)#[:space:]]+[[:space:]]*[|][[:space:]]*)*"?--branch(=[^|)[:space:]]*)?"?[[:space:]]*[|)]' "$candidate"; then
             PUBLISHER="$candidate"
             PUBLISHER_BRANCH_ARG="$target_branch"
             return 0
         fi
     done
-    if [ -n "$PUBLISHER" ] && [ -n "$target_branch" ]; then
-        log "WARN: публикатор $PUBLISHER не знает --branch (старая копия шаблона или собственный публикатор установки) — вызываю его без --branch, как раньше. Если он откажет, замените scripts/ds-publish.sh в репозитории управления версией шаблона seed/strategy/scripts/ds-publish.sh"
-    fi
     return 0
 }
 
@@ -216,10 +215,12 @@ pick_publisher() {  # <target branch, empty = the publisher's default> <fallback
 # none: update.sh puts the publisher into the canon's working tree without a commit
 # (backfill_ds_publish), so a copy made from origin/main of an upgraded install lacks it.
 # The publisher still publishes $WORKSPACE. Which publisher runs, and whether it gets
-# --branch: pick_publisher.
+# --branch: pick_publisher. A publisher that had to run without the wanted --branch gets the
+# replacement advice only in the refusal message: a successful run logs nothing extra.
 PUBLISH_LAST_RC=""
 publish_commit_or_explain() {
     local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4" target_branch="${5:-}" fallback_repo="${6:-}"
+    local prc=0 advice=""
 
     PUBLISH_LAST_RC=""
     pick_publisher "$target_branch" "$fallback_repo"
@@ -227,7 +228,6 @@ publish_commit_or_explain() {
         log "WARN: scripts/ds-publish.sh не установлен${fallback_repo:+ (нет ни в копии, ни в $fallback_repo)} — коммит ${sha:0:12} остался локальным и не опубликован. Запустите update.sh: он доставляет публикатор в репозиторий управления. Или опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD${target_branch:+:$target_branch}"
         return 1
     fi
-    local prc=0
     set -- "$WORKSPACE" normal --reason "$reason" --from-commit "$sha"
     [ -z "$PUBLISHER_BRANCH_ARG" ] || set -- "$@" --branch "$PUBLISHER_BRANCH_ARG"
     bash "$PUBLISHER" "$@" >> "$LOG_FILE" 2>&1 || prc=$?
@@ -236,7 +236,10 @@ publish_commit_or_explain() {
         return 0
     fi
     PUBLISH_LAST_RC="$prc"  # WP-530 Ф72: the isolated path passes the publisher's own status on
-    log "$fail_msg"
+    if [ -n "$target_branch" ] && [ -z "$PUBLISHER_BRANCH_ARG" ]; then
+        advice=" (публикатор $PUBLISHER вызван без --branch $target_branch: по тексту файла он не знает --branch — старая копия шаблона или собственный публикатор установки; если отказ из-за этого, замените scripts/ds-publish.sh в репозитории управления версией шаблона seed/strategy/scripts/ds-publish.sh)"
+    fi
+    log "$fail_msg$advice"
     return 1
 }
 

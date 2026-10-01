@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "739fbf069ed4ae6046fd4b6ac253c480b4f2c116bd48741bfb2c91c2a1d0801f"
+      "sha256": "e1707e7251f955bf3e96ca8c453c7ce91b240f8fda812cbcd0dc497b1591863d"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1881,7 +1881,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "27a9005bfba434810a1c1fe7ab5dfdc53e55b3bccca0c35a008ce5077f8f3362"
+      "sha256": "330affe88e15ddfe7e7f9c21044ec752c1cecda52405de84747da52b58053b7e"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "7c28ed70e2afddacc24c1093b9bf57dba9c13f2a113a5b9328c505978bc43ec4"
+      "sha256": "1dae05ae839dc99de0d82395e4dc33759b56bd99b6754fdba2301c86781de521"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",

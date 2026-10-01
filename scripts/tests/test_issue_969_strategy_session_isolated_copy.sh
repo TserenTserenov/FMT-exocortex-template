@@ -284,27 +284,89 @@ EOF
       && check "publication ($sh), git rev-list fails: exit 1 with the reason, not 'nothing to publish'" ok \
       || { detail "rc=$RC out=$OUT"; check "publication ($sh), git rev-list fails: exit 1 with the reason, not 'nothing to publish'" bad; }
   done
+  # Uncommitted changes are not published: the block says so in one line, its exit code stays the same.
+  new_copy "claude-uncommitted"; printf 'draft\n' >> "$COPY/docs/Strategy.md"
+  publish_copy
+  [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q 'ВНИМАНИЕ: в копии есть незакоммиченные изменения, они не опубликованы' \
+    && printf '%s' "$OUT" | grep -q 'Публиковать нечего' && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
+    && check "publication, uncommitted changes and no commit: one warning line, 'nothing to publish', exit 0" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, uncommitted changes and no commit: one warning line, 'nothing to publish', exit 0" bad; }
+  # The block stops on the first refusal: the first of two commits conflicts with origin (exit 3 of the
+  # publisher), the second one is not sent. Both copies are made before a racer lands the conflicting files.
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null 2>&1 || continue
+    new_copy "claude-stop-$sh"
+    commit_in_copy "docs/race-$sh.md" "strategy-session: first, conflicts ($sh)"
+    commit_in_copy "docs/after-$sh.md" "strategy-session: second, not sent ($sh)"
+  done
+  RACER="$C2/racer"; git clone -q "$ORIGIN" "$RACER" 2>/dev/null
+  printf 'theirs\n' > "$RACER/docs/race-bash.md"; printf 'theirs\n' > "$RACER/docs/race-zsh.md"
+  git -C "$RACER" add docs && git -C "$RACER" commit -q -m "racer" && git -C "$RACER" push -q origin HEAD:main
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null 2>&1 || { echo "SKIP: $sh not found, the publication block is not run in it"; continue; }
+    COPY="$C2/isolated-worktrees/claude-stop-$sh"; before=$(git --git-dir="$ORIGIN" rev-parse main)
+    if [ "$sh" = zsh ]; then publish_copy zsh -f; else publish_copy; fi
+    [ "$RC" -eq 3 ] && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] && ! git --git-dir="$ORIGIN" cat-file -e "main:docs/after-$sh.md" 2>/dev/null \
+      && check "publication ($sh), the first of two commits is refused: the block stops with its code (3), the second is not sent" ok \
+      || { detail "rc=$RC out=$OUT"; check "publication ($sh), the first of two commits is refused: the block stops with its code (3), the second is not sent" bad; }
+  done
 
   # C1 compat: update.sh never replaces an existing scripts/ds-publish.sh, so an install may keep one that
   # does not know --branch and answers it with usage, exit 1: its own one with a fixed target branch (made
   # here from the seed copy delivered before --branch existed: main always, the same strict argument
   # parser) or that seed copy itself (the fixture, byte for byte). --branch goes only to one that knows it,
-  # judged by the file's text (a heuristic).
+  # judged by the file's text (a heuristic): an argument-parsing branch for it, not the word. The own one
+  # names --branch in a comment, in git status / git log calls and in its usage text, and parses none.
   OLD_PUB="$TEMPLATE_ROOT/scripts/tests/fixtures/ds-publish-637a526.sh"
   OWN_PUB="$C2/own-ds-publish.sh"
-  # shellcheck disable=SC2016  # the literal publisher line ${BRANCH:-main}, not an expansion
-  sed 's/^BRANCH="\${BRANCH:-main}"$/BRANCH="main"  # this installation always publishes to main/' "$OLD_PUB" > "$OWN_PUB"
-  [ -f "$OLD_PUB" ] && ! grep -qF -e '--branch' "$OLD_PUB" "$OWN_PUB" && grep -q '^BRANCH="main"  # this installation' "$OWN_PUB" \
-    && check "compat fixtures: the old seed copy and the own publisher (main always) do not know --branch" ok \
-    || check "compat fixtures: the old seed copy and the own publisher (main always) do not know --branch" bad
+  # shellcheck disable=SC2016  # literal publisher lines (${BRANCH:-main}, ${SHA:0:12}), not expansions
+  sed -e 's/^BRANCH="\${BRANCH:-main}"$/BRANCH="main"  # this installation always publishes to main/' \
+      -e '2a\
+# no --branch support: this installation always publishes to main' \
+      -e 's/^echo "ds-publish: \${SHA:0:12}/git -C "$REPO" status --porcelain --branch >\/dev\/null 2>\&1; git -C "$REPO" log --branches -1 >\/dev\/null 2>\&1; &/' \
+      -e 's/\[--from-commit SHA\]" >&2$/[--from-commit SHA] [--branch NAME]" >\&2/' \
+      "$OLD_PUB" > "$OWN_PUB"
+  [ -f "$OLD_PUB" ] && ! grep -qF -e '--branch' "$OLD_PUB" && grep -q '^BRANCH="main"  # this installation' "$OWN_PUB" \
+    && [ "$(grep -c -e '--branch' "$OWN_PUB")" -ge 3 ] \
+    && check "compat fixtures: the old seed copy never names --branch, the own publisher (main always) names it without parsing it" ok \
+    || check "compat fixtures: the old seed copy never names --branch, the own publisher (main always) names it without parsing it" bad
+  # The block's knows_branch on one-line publishers, in bash and zsh, and the same expression as pick_publisher.
+  KB_FN=$(grep -m1 '^knows_branch() {' "$BLOCKS/$f")
+  KB_DIR="$C2/knows-branch"; mkdir -p "$KB_DIR"
+  kb_line() { printf '#!/bin/bash\n%s\n' "$2" > "$KB_DIR/$1.sh"; }
+  # shellcheck disable=SC2016  # publisher lines written as text, not expanded here
+  {
+    kb_line yes-plain '    --branch) TARGET_BRANCH="$2"; shift 2 ;;'
+    kb_line yes-alt-first '    -b|--branch) TARGET_BRANCH="$2"; shift 2 ;;'
+    kb_line yes-alt-last '    --branch|-b) TARGET_BRANCH="$2"; shift 2 ;;'
+    kb_line yes-equals '    --branch=*) TARGET_BRANCH="${1#--branch=}"; shift ;;'
+    kb_line no-comment '# no --branch support: this publisher always publishes to main'
+    kb_line no-status '    git -C "$REPO" status --porcelain --branch >/dev/null 2>&1'
+    kb_line no-log '    git -C "$REPO" log --branches -1 >/dev/null 2>&1'
+    kb_line no-usage '    echo "usage: ds-publish.sh <repo-dir> <priority> [--from-commit SHA] [--branch NAME]" >&2'
+  }
+  kb_expected="yes-plain=yes yes-alt-first=yes yes-alt-last=yes yes-equals=yes no-comment=no no-status=no no-log=no no-usage=no "
+  # shellcheck disable=SC2016  # the script runs in the child shell
+  kb_script='eval "$KB_FN"; for n in yes-plain yes-alt-first yes-alt-last yes-equals no-comment no-status no-log no-usage; do if knows_branch "$KB_DIR/$n.sh"; then printf "%s=yes " "$n"; else printf "%s=no " "$n"; fi; done'
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null 2>&1 || { echo "SKIP: $sh not found, knows_branch is not run in it"; continue; }
+    if [ "$sh" = zsh ]; then kb_got=$(KB_FN="$KB_FN" KB_DIR="$KB_DIR" zsh -f -c "$kb_script" 2>&1); else kb_got=$(KB_FN="$KB_FN" KB_DIR="$KB_DIR" bash -c "$kb_script" 2>&1); fi
+    [ "$kb_got" = "$kb_expected" ] && check "knows_branch ($sh): parse branches count, a comment / git status --branch / git log --branches / usage text do not" ok \
+      || { detail "got: $kb_got"; check "knows_branch ($sh): parse branches count, a comment / git status --branch / git log --branches / usage text do not" bad; }
+  done
+  kb_ere_skill=$(printf '%s\n' "$KB_FN" | sed -n "s/.*grep -qE -e '\([^']*\)'.*/\1/p")
+  kb_ere_runner=$(sed -n "/^pick_publisher() {/,/^}/s/.*grep -qE -e '\([^']*\)'.*/\1/p" "$TEMPLATE_ROOT/roles/strategist/scripts/strategist.sh")
+  [ -n "$kb_ere_skill" ] && [ "$kb_ere_skill" = "$kb_ere_runner" ] \
+    && check "knows_branch: the skill and pick_publisher in strategist.sh use the same expression" ok \
+    || { detail "skill: $kb_ere_skill | strategist.sh: $kb_ere_runner"; check "knows_branch: the skill and pick_publisher in strategist.sh use the same expression" bad; }
   publisher_on_origin "$OWN_PUB"
   for sh in bash zsh; do
     command -v "$sh" >/dev/null 2>&1 || { echo "SKIP: $sh not found, the publication block is not run in it"; continue; }
     new_copy "claude-own-$sh"; commit_in_copy "current/WeekPlan W42.md" "strategy-session: own publisher, $sh"
     if [ "$sh" = zsh ]; then publish_copy zsh -f; else publish_copy; fi
     [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: own publisher, $sh" ] && only_main && ! printf '%s' "$OUT" | grep -q 'usage:' \
-      && check "publication ($sh), own publisher without --branch (main always): called without it, origin/main got the commit" ok \
-      || { detail "rc=$RC out=$OUT"; check "publication ($sh), own publisher without --branch (main always): called without it, origin/main got the commit" bad; }
+      && check "publication ($sh), own publisher naming --branch without a parse branch (main always): called without it, origin/main got the commit" ok \
+      || { detail "rc=$RC out=$OUT"; check "publication ($sh), own publisher naming --branch without a parse branch (main always): called without it, origin/main got the commit" bad; }
   done
   publisher_on_origin "$OLD_PUB"
   cp "$PUB" "$CANON/scripts/ds-publish.sh"   # the current version in the canon's working tree only
@@ -329,6 +391,14 @@ EOF
   [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: next week plan" ] \
     && check "publication, upgraded install: the canon's publisher publishes the copy's commit" ok \
     || { detail "rc=$RC out=$OUT"; check "publication, upgraded install: the canon's publisher publishes the copy's commit" bad; }
+  # The copy has no publisher and the canon's does not know --branch (the installation's own, untracked):
+  # the canon's still runs, called without --branch.
+  cp "$OWN_PUB" "$CANON/scripts/ds-publish.sh"
+  new_copy "claude-own-canon-only"; commit_in_copy "current/WeekPlan W46.md" "strategy-session: own publisher in the canon only"
+  publish_copy
+  [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: own publisher in the canon only" ] && ! printf '%s' "$OUT" | grep -q 'usage:' \
+    && check "publication, no publisher in the copy, the canon's without --branch: the canon's runs without it and publishes" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, no publisher in the copy, the canon's without --branch: the canon's runs without it and publishes" bad; }
 
   # No publisher anywhere: a non-zero exit that names update.sh, nothing published
   rm "$CANON/scripts/ds-publish.sh"
