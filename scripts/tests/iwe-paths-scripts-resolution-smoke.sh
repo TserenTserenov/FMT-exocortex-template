@@ -9,6 +9,12 @@
 # `scripts/` checkout agents actually commit fixes into. Every interactive
 # shell (and any agent launched from one) then worked off the stale copy.
 # Both now prefer the live workspace scripts/ when it exists.
+#
+# Issue #957: "exists" means a live checkout, recognised by a REGULAR
+# (non-symlink) session-guard.sh inside it; a bare directory does not count.
+# The fixture below therefore builds the live scripts/ with that marker (an empty
+# directory used to pass here and pinned the defect). The marker rule itself is
+# covered layout by layout in test_issue_957_iwe_scripts_marker.sh.
 set -uo pipefail
 
 INSTALL_SCRIPT="${INSTALL_IWE_PATHS_SCRIPT:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template/setup/install-iwe-paths.sh}"
@@ -33,7 +39,11 @@ check() {
 make_workspace() {  # <path> <with-live-scripts: yes|no>
   local ws="$1" with_live="$2"
   mkdir -p "$ws/FMT-exocortex-template/scripts"
-  [ "$with_live" = "yes" ] && mkdir -p "$ws/scripts"
+  if [ "$with_live" = "yes" ]; then
+    mkdir -p "$ws/scripts"
+    # The marker of a live checkout (#957): a regular session-guard.sh.
+    printf '#!/bin/bash\n' > "$ws/scripts/session-guard.sh"
+  fi
 }
 
 # --- install-iwe-paths.sh: generated .iwe-paths must resolve IWE_SCRIPTS

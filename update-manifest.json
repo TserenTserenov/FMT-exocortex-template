@@ -257,7 +257,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "d4a1e46b807b72531cf6851714cebbcc692674389e1a358fa7c2b221241beb0e"
+      "sha256": "7c07900eda58963500bf01af7a454cf0806499d1bb243981f6770ffa4496ad4a"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "adc2171079da0e5250acdf12f81a05592262c0d3c0bf43ddfd773bdcd656b303"
+      "sha256": "82aaeba74cf28e34be96d1065f0c789fab1e4ff0bf3047b286a874074caa11f1"
     },
     {
       "path": "CLAUDE.md",
@@ -941,7 +941,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "9b39c61c4b4d70eb5f9a8a8993fc19be99b246ffdd2e3f45c5746a5192d44a98"
+      "sha256": "d0d222dc69314685340e2eb21c3bc0c034a1c33436a2ec684f8d2807ded4b8c6"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -3121,7 +3121,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "f2151e2a744cd3cc3694c1a95180b5682b94093f948129f9e1b8b16213d38075"
+      "sha256": "06136873a0a83f56bb0a6b0e34b10f9486c283a77c7295f58b7db9d7e1b86a50"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "771fd91241bfa84633fcf5cc84490736031fbf9c06f5479fadeedaf88e23443e"
+      "sha256": "f77b402bce43e2168ccbe004519e41f12b842d1af9ea673fdacfb745d0ffbf4d"
     }
   ],
   "excluded_paths": [
@@ -3260,7 +3260,9 @@
     "scripts/tests/test_issue_954_locate.sh",
     "scripts/tests/test_issue_954_wp_list_keys.py",
     "scripts/tests/test_issue_954_wp_number_forms.sh",
+    "scripts/tests/test_issue_957_iwe_scripts_marker.sh",
     "scripts/tests/test_issue_964_canary_status.sh",
+    "scripts/tests/test_issue_966_sessions_root.sh",
     "scripts/tests/test_issue_973_transcribe_model_default.sh",
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",
