@@ -85,6 +85,48 @@ else
   bad "--wp WP-X must still be blocked (rc=$rc): $out"
 fi
 
+put() {  # <workspace> <path under inbox> <wp: field or ""> <hypothesis_relation or "">
+  local f="$1/$GOV/inbox/$2"
+  mkdir -p "$(dirname "$f")"
+  {
+    printf -- '---\n'
+    [ -z "$3" ] || printf 'wp: %s\n' "$3"
+    [ -z "$4" ] || printf 'hypothesis_relation: "%s"\n' "$4"
+    printf -- '---\n# file\n'
+  } > "$f"
+}
+
+expect_gate() {  # <description> <workspace> <wp as typed> <blocked|open>
+  local out rc
+  out=$(open_session "$2" "$3"); rc=$?
+  if [ "$4" = blocked ]; then
+    if [ "$rc" -ne 0 ] && [[ "$out" == *"не классифицирована по гипотезе"* ]]; then ok "$1"; else bad "$1: must be blocked by the gate (rc=$rc): $out"; fi
+  else
+    if [ "$rc" -eq 0 ] && [ -f "$2/.iwe-runtime/sessions/kimi-gate-ids.open" ]; then ok "$1"; else bad "$1: must open (rc=$rc): $out"; fi
+  fi
+}
+
+echo "--- the card is judged by its own file: a note that merely carries 'wp: 46' neither hides it nor blocks ---"
+for form in WP-046 46 046 WP-46; do
+  ws=$(new_ws)
+  put "$ws" "WP-046.md" "" unclassified            # the card: no wp: field, so the grep fallback cannot see it
+  put "$ws" "h-notes.md" 46 ""                      # a note about the same WP
+  expect_gate "--wp $form: flat unclassified card + a note with 'wp: 46' -> blocked" "$ws" "$form" blocked
+done
+for form in WP-046 46; do
+  ws=$(new_ws)
+  put "$ws" "h-notes.md" 46 unclassified            # no card at all; the note even carries the field
+  expect_gate "--wp $form: only a note (never a card) -> opens" "$ws" "$form" open
+done
+
+echo "--- every place the card is written counts: any unclassified candidate blocks ---"
+for form in WP-044 44; do
+  ws=$(new_ws)
+  put "$ws" "WP-044/WP-044.md" 44 tests             # classified folder card ...
+  put "$ws" "WP-044.md" 44 unclassified             # ... and a stale flat duplicate that is not
+  expect_gate "--wp $form: classified folder card + unclassified flat duplicate -> blocked" "$ws" "$form" blocked
+done
+
 echo
 if [ "$FAILS" -eq 0 ]; then
   echo "✅ test_issue_954_gate_ids: $PASSES checks passed"
