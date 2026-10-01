@@ -20,14 +20,15 @@ to the pilot. Code is decided before any tag, heading or table is looked at:
 fenced and indented (4+ columns beyond the list item, a tab counts to 4) code
 blocks are not markup; an indented line is code only after a blank line, a
 heading, a closing fence or another code line, and an indented list is not code.
-Markup is looked for after the indentation of its container (a heading inside a
-nested list item is a heading), a heading inside a list item belongs to that item
-only (the sections around the list never see it, and it is gone when the item
-ends), and a quote is a container of its own: its tags change nothing outside it.
-A table is a candidate only
-when its header has the exact cell «РП» and a cell starting with the word
-«Статус» («Статус (на 3 июля)» counts and is filled with «pending» like the plain
-column, «Связанные РП» does not); the new row keeps the indentation of its table.
+Only an unindented heading is a section title. A heading with anything in front
+of its hashes (indentation, a list marker, a quote mark) sits in a container whose
+end a line-based reading cannot tell for sure (lazy continuation, tabs, numbering):
+it changes no section and opens an ambiguity zone, in which no table is picked up
+to the next unindented heading. A quote is a container of its own: its tags change
+nothing outside it. A table is a candidate only when its header has the exact cell
+«РП» and a cell starting with the word «Статус» («Статус (на 3 июля)» counts and is
+filled with «pending» like the plain column, «Связанные РП» does not); the new row
+keeps the indentation of its table.
 
 The same fix replaces the literal `|---` separator lookup in the WeekPlan and
 REGISTRY writers (`| --- |` made the REGISTRY step fail and roll the whole WP
@@ -820,12 +821,9 @@ NESTED_LISTS = pytest.mark.parametrize(
 )
 
 
-@NESTED_LISTS
-def test_a_facts_heading_in_a_nested_list_still_excludes_its_table(tmp_path, outer, nested):
-    # The reviewer's input. Markup is looked for after the indentation of its container: the
-    # heading sits at the content of the inner item, so it is a heading, and its table is facts.
-    items, pad = _nested_list(outer, nested)
-    weekplan = _weekplan(tmp_path, items + f"{pad}## Итоги\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n")
+def _assert_refused(tmp_path, body):
+    """The writer must say «добавить вручную» and leave a WeekPlan made of `body` alone."""
+    weekplan = _weekplan(tmp_path, body)
     original = weekplan.read_text(encoding="utf-8")
 
     result = _add_to_weekplan(weekplan)
@@ -836,73 +834,93 @@ def test_a_facts_heading_in_a_nested_list_still_excludes_its_table(tmp_path, out
     assert weekplan.read_text(encoding="utf-8") == original
 
 
-@NESTED_LISTS
-def test_a_plan_table_in_a_nested_list_is_still_chosen(tmp_path, outer, nested):
-    # The «План» heading of the nested list is what makes this table win over the spare one.
-    items, pad = _nested_list(outer, nested)
-    weekplan = _weekplan(
-        tmp_path,
-        "## Резерв\n\n" + SPARE_TABLE + "\n" + items + f"{pad}## План\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n",
-    )
-
-    result = _add_to_weekplan(weekplan)
-
-    assert result.returncode == 0, result.stderr
+def _row_below(weekplan, separator):
     lines = weekplan.read_text(encoding="utf-8").splitlines()
-    assert lines[lines.index(f"{pad}| --- | --- |") + 1] == f"{pad}| **Новый РП** — [описание] | pending |"
-    assert _first_row_below(weekplan, "| # | РП | Статус |") == "| 1 | **Запас** | pending |"
+    return lines[lines.index(separator) + 1]
+
+
+@NESTED_LISTS
+def test_a_facts_heading_in_a_nested_list_still_excludes_its_table(tmp_path, outer, nested):
+    # A heading inside a list item opens an ambiguity zone: the tables after it, its own included,
+    # are not picked until an unindented heading closes the zone.
+    items, pad = _nested_list(outer, nested)
+    _assert_refused(tmp_path, items + f"{pad}## Итоги\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n")
+
+
+@NESTED_LISTS
+def test_a_plan_table_under_a_heading_in_a_list_is_left_to_the_pilot(tmp_path, outer, nested):
+    # Even a «План» heading does not make the table of its list item a candidate: whether the
+    # list item still reaches the table cannot be told from lines alone (it chose this table
+    # before the zone, and went wrong on lazy continuations, tabs and numbering).
+    items, pad = _nested_list(outer, nested)
+    _assert_refused(tmp_path, items + f"{pad}## План\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n")
 
 
 def test_a_heading_on_the_line_of_a_list_item_is_a_heading(tmp_path):
-    weekplan = _weekplan(tmp_path, "- ## Итоги\n\n  | РП | Статус |\n  | --- | --- |\n")
-    original = weekplan.read_text(encoding="utf-8")
-
-    result = _add_to_weekplan(weekplan)
-
-    assert result.returncode == 0, result.stderr
-    assert "добавить вручную" in result.stderr
-    assert weekplan.read_text(encoding="utf-8") == original
+    _assert_refused(tmp_path, "- ## Итоги\n\n  | РП | Статус |\n  | --- | --- |\n")
 
 
 def test_a_heading_in_a_tab_indented_nested_list_is_a_heading(tmp_path):
-    weekplan = _weekplan(
-        tmp_path, "- Раздел\n\t- Вложенный раздел\n\t\t## Итоги\n\n\t\t| РП | Статус |\n\t\t| --- | --- |\n"
+    _assert_refused(tmp_path, "- Раздел\n\t- Вложенный раздел\n\t\t## Итоги\n\n\t\t| РП | Статус |\n\t\t| --- | --- |\n")
+
+
+@pytest.mark.parametrize(
+    "item, content",
+    [("- ## Итоги\n", "  "), ("1. ## Итоги\n", "   ")],
+    ids=["bullet", "numbered"],
+)
+def test_a_lazy_continuation_does_not_end_the_zone_of_a_list_heading(tmp_path, item, content):
+    # The reviewer's input: «продолжение» is a lazy continuation of the paragraph in the same list
+    # item, but a line-based reading closes the item there, and the table below used to be picked
+    # with no ancestor at all (the row went into «Итоги»).
+    _assert_refused(
+        tmp_path, f"{item}\n{content}Текст\nпродолжение\n\n{content}| РП | Статус |\n{content}| --- | --- |\n"
     )
-    original = weekplan.read_text(encoding="utf-8")
 
-    result = _add_to_weekplan(weekplan)
 
-    assert result.returncode == 0, result.stderr
-    assert "добавить вручную" in result.stderr
-    assert weekplan.read_text(encoding="utf-8") == original
+@pytest.mark.parametrize(
+    "item",
+    ["- Раздел\n  ## Итоги\n", "- ## Итоги\n"],
+    ids=["heading-in-the-item", "heading-on-the-item-line"],
+)
+def test_a_table_right_after_a_list_with_a_heading_is_left_to_the_pilot(tmp_path, item):
+    # No unindented heading between the list and the table: the zone is still open.
+    _assert_refused(tmp_path, item + "\n| РП | Статус |\n| --- | --- |\n")
+
+
+def test_the_zone_of_a_list_heading_covers_the_next_items(tmp_path):
+    _assert_refused(tmp_path, "- Первый\n  ## Итоги\n\n- Второй\n\n  | РП | Статус |\n  | --- | --- |\n")
+
+
+def test_two_headings_in_a_list_item_leave_its_tables_to_the_pilot(tmp_path):
+    _assert_refused(tmp_path, "- Раздел\n  ## Итоги\n  ## План\n\n  | РП | Статус |\n  | --- | --- |\n")
+
+
+def test_a_heading_of_a_list_item_leaves_the_items_nested_in_it_too(tmp_path):
+    _assert_refused(tmp_path, "- Раздел\n  ## Итоги\n\n  - Вложенный\n\n    | РП | Статус |\n    | --- | --- |\n")
 
 
 def test_code_in_a_nested_list_item_is_still_code(tmp_path):
     # Four columns beyond the content of the inner item: an indented code block.
     items, pad = _nested_list("-", "-")
-    weekplan = _weekplan(tmp_path, items + f"\n{pad}    | РП | Статус |\n{pad}    | --- | --- |\n")
-    original = weekplan.read_text(encoding="utf-8")
-
-    result = _add_to_weekplan(weekplan)
-
-    assert result.returncode == 0, result.stderr
-    assert "добавить вручную" in result.stderr
-    assert weekplan.read_text(encoding="utf-8") == original
+    _assert_refused(tmp_path, items + f"\n{pad}    | РП | Статус |\n{pad}    | --- | --- |\n")
 
 
 def test_code_may_follow_a_heading_inside_a_nested_list_item(tmp_path):
-    # Right after the heading (no blank line) four more columns are code, tag or not.
+    # Right after the heading (no blank line) four more columns are code, tag or not. Taken for a
+    # real tag, the example would open a block named «Итоги» that never closes, and the plan
+    # table below the unindented heading would be refused as facts.
     items, pad = _nested_list("-", "-")
     weekplan = _weekplan(
         tmp_path,
-        items + f"{pad}## План\n{pad}    <details><summary>Итоги</summary>\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n",
+        items + f"{pad}## План\n{pad}    <details><summary>Итоги</summary>\n\n## План недели\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
     )
 
     result = _add_to_weekplan(weekplan)
 
     assert result.returncode == 0, result.stderr
-    lines = weekplan.read_text(encoding="utf-8").splitlines()
-    assert lines[lines.index(f"{pad}| --- | --- |") + 1] == f"{pad}| **Новый РП** — [описание] | pending |"
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
 
 
 def test_a_nested_facts_heading_does_not_reach_the_next_plan_section(tmp_path):
@@ -923,21 +941,13 @@ def test_a_nested_facts_heading_does_not_reach_the_next_plan_section(tmp_path):
 
 @pytest.mark.parametrize("nested_heading", ["#", "##"], ids=["higher-level", "same-level"])
 def test_a_heading_in_a_list_item_does_not_replace_the_outer_facts_section(tmp_path, nested_heading):
-    # The reviewer's input. The «План» heading belongs to the list item: it used to take the
-    # place of the outer «Итоги», and the row went into the facts table after the list.
+    # The «План» heading of the list item used to take the place of the outer «Итоги», and the
+    # row went into the facts table after the list. It changes no section now.
     items, pad = _nested_list("-", "-")
-    weekplan = _weekplan(
+    _assert_refused(
         tmp_path,
         "## Итоги\n\n" + items + f"{pad}{nested_heading} План\n\n### Выполнено\n\n| РП | Статус |\n| --- | --- |\n",
     )
-    original = weekplan.read_text(encoding="utf-8")
-
-    result = _add_to_weekplan(weekplan)
-
-    assert result.returncode == 0, result.stderr
-    assert "добавить вручную" in result.stderr
-    assert "добавлена" not in result.stdout
-    assert weekplan.read_text(encoding="utf-8") == original
 
 
 def test_a_facts_heading_in_a_list_item_does_not_exclude_the_outer_plan_table(tmp_path):
@@ -950,56 +960,83 @@ def test_a_facts_heading_in_a_list_item_does_not_exclude_the_outer_plan_table(tm
     result = _add_to_weekplan(weekplan)
 
     assert result.returncode == 0, result.stderr
-    lines = weekplan.read_text(encoding="utf-8").splitlines()
-    assert lines[lines.index("| --- | --- |") + 1] == "| **Новый РП** — [описание] | pending |"
+    assert _row_below(weekplan, "| --- | --- |") == "| **Новый РП** — [описание] | pending |"
+
+
+@pytest.mark.parametrize("opener", ["- ## Итоги\n", "> ## Итоги\n"], ids=["list", "quote"])
+@pytest.mark.parametrize("closer", ["#", "##", "###", "####"])
+def test_an_unindented_heading_of_any_level_closes_the_zone(tmp_path, opener, closer):
+    weekplan = _weekplan(
+        tmp_path, f"{opener}\n{closer} План\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+@pytest.mark.parametrize("indent", [" ", "  ", "   "], ids=["one-space", "two-spaces", "three-spaces"])
+def test_an_indented_heading_opens_a_zone(tmp_path, indent):
+    # An indented heading cannot be told from one inside a list item whose end the reading missed.
+    _assert_refused(tmp_path, f"{indent}## Итоги\n\n| РП | Статус |\n| --- | --- |\n")
+
+
+@pytest.mark.parametrize("indent", [" ", "  ", "   ", "\t"], ids=["one-space", "two-spaces", "three-spaces", "tab"])
+def test_an_indented_heading_closes_no_zone(tmp_path, indent):
+    _assert_refused(tmp_path, f"- ## Итоги\n\n{indent}## План\n\n| РП | Статус |\n| --- | --- |\n")
+
+
+def test_an_indented_heading_after_a_lazy_continuation_rewrites_no_section(tmp_path):
+    # «  ## План» belongs to the list item, which the line-based reading closed at «продолжение».
+    # Taken for an unindented heading it replaced the outer «Итоги», the zone ended, and the row
+    # went into the facts table under «### Выполнено».
+    _assert_refused(
+        tmp_path,
+        "## Итоги\n\n- ## Раздел\nпродолжение\n  ## План\n\n### Выполнено\n\n| РП | Статус |\n| --- | --- |\n",
+    )
 
 
 @pytest.mark.parametrize(
-    "item",
-    ["- Раздел\n  ## Итоги\n", "- ## Итоги\n"],
-    ids=["heading-in-the-item", "heading-on-the-item-line"],
+    "code",
+    ["~~~\n  - ## Итоги\n~~~\n", "\n    ## Итоги\n"],
+    ids=["fenced", "indented"],
 )
-def test_a_heading_in_a_list_item_is_gone_when_the_list_ends(tmp_path, item):
-    weekplan = _weekplan(tmp_path, item + "\n| РП | Статус |\n| --- | --- |\n")
+def test_heading_like_text_in_code_opens_no_zone(tmp_path, code):
+    weekplan = _weekplan(tmp_path, code + "\n| РП | Статус |\n| --- | --- |\n")
 
     result = _add_to_weekplan(weekplan)
 
     assert result.returncode == 0, result.stderr
-    lines = weekplan.read_text(encoding="utf-8").splitlines()
-    assert lines[lines.index("| --- | --- |") + 1] == "| **Новый РП** — [описание] | pending |"
+    assert _row_below(weekplan, "| --- | --- |") == "| **Новый РП** — [описание] | pending |"
 
 
-def test_a_heading_in_one_list_item_does_not_reach_its_sibling(tmp_path):
-    weekplan = _weekplan(tmp_path, "- Первый\n  ## Итоги\n\n- Второй\n\n  | РП | Статус |\n  | --- | --- |\n")
-
-    result = _add_to_weekplan(weekplan)
-
-    assert result.returncode == 0, result.stderr
-    lines = weekplan.read_text(encoding="utf-8").splitlines()
-    assert lines[lines.index("  | --- | --- |") + 1] == "  | **Новый РП** — [описание] | pending |"
-
-
-def test_a_heading_of_a_list_item_applies_to_the_items_nested_in_it(tmp_path):
+def test_heading_like_text_in_a_summary_title_opens_no_zone(tmp_path):
+    # The lines of a <summary> title are text, not markup.
     weekplan = _weekplan(
-        tmp_path, "- Раздел\n  ## Итоги\n\n  - Вложенный\n\n    | РП | Статус |\n    | --- | --- |\n"
+        tmp_path,
+        "<details open>\n<summary>\n- ## Заметки\n</summary>\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+        + "\n</details>\n",
     )
-    original = weekplan.read_text(encoding="utf-8")
 
     result = _add_to_weekplan(weekplan)
 
     assert result.returncode == 0, result.stderr
-    assert "добавить вручную" in result.stderr
-    assert weekplan.read_text(encoding="utf-8") == original
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
 
 
-def test_headings_of_one_list_item_replace_each_other_by_level(tmp_path):
-    weekplan = _weekplan(tmp_path, "- Раздел\n  ## Итоги\n  ## План\n\n  | РП | Статус |\n  | --- | --- |\n")
+def test_an_indented_table_header_that_starts_with_a_hash_is_no_heading(tmp_path):
+    weekplan = _weekplan(tmp_path, "  # | РП | Статус\n  --- | --- | ---\n  1 | x | y\n")
 
     result = _add_to_weekplan(weekplan)
 
     assert result.returncode == 0, result.stderr
-    lines = weekplan.read_text(encoding="utf-8").splitlines()
-    assert lines[lines.index("  | --- | --- |") + 1] == "  | **Новый РП** — [описание] | pending |"
+    assert _row_below(weekplan, "  --- | --- | ---") == "  | 16 | **Новый РП** — [описание] | pending |"
+
+
+@pytest.mark.parametrize("quote", [">", " >", "   >", "> >"], ids=["flush", "one-space", "three-spaces", "nested"])
+def test_a_heading_in_a_quote_leaves_the_tables_after_it_to_the_pilot(tmp_path, quote):
+    _assert_refused(tmp_path, f"{quote} ## Итоги\n\n| РП | Статус |\n| --- | --- |\n")
 
 
 @pytest.mark.parametrize("quote", [">", " >", "   >"], ids=["flush", "one-space", "three-spaces"])
@@ -1053,6 +1090,18 @@ def test_a_quote_inside_a_list_item_is_a_quote(tmp_path):
     weekplan = _weekplan(
         tmp_path,
         items + f"{pad}> <details><summary>Итоги</summary>\n\n## План недели\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_quote_on_the_line_of_a_list_item_is_a_quote(tmp_path):
+    weekplan = _weekplan(
+        tmp_path,
+        "- > <details><summary>Итоги</summary>\n\n## План недели\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
     )
 
     result = _add_to_weekplan(weekplan)
