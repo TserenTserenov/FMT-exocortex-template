@@ -3109,7 +3109,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "f8a50bffd855120c356f1cb991c07459971fa59223ef12cab78fde0ca6423d64"
+      "sha256": "d552ccc3a7a5e60b9acb729307cb6920450eb972deb0ad32b15ce14d1c4a02b3"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3246,6 +3246,7 @@
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
     "scripts/tests/test_issue_957_iwe_scripts_marker.sh",
+    "scripts/tests/test_issue_966_sessions_root.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",

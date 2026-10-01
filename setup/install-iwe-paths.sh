@@ -75,6 +75,22 @@ else
     IWE_SCRIPTS_TARGET="\$IWE_TEMPLATE/scripts"
 fi
 
+# Issue #966: MC-sessions is created on demand, not by setup.sh (pilot decision
+# 18.08, ADR-004). resolve_orz_sessions_dir (scripts/session-guard.sh) reads an
+# EXPLICIT IWE_SESSIONS_ROOT as a deliberate choice and refuses without any
+# fallback, so naming a directory that was never created made `session-guard.sh
+# open` fail on every installation that has not adopted MC-sessions. Name it only
+# while it exists; otherwise write an EMPTY value: the resolver tests
+# `[ -n "${IWE_SESSIONS_ROOT:-}" ]` (so empty == unset and its legacy fallback with
+# a WARN stays reachable) and the file keeps exactly eight `export IWE_` lines
+# (T25). A directory that exists but is not a git repository still gets the path:
+# the resolver's loud refusal is the intended signal of a broken migration (ADR-004).
+if [ -d "$WORKSPACE_DIR/MC-sessions" ]; then
+    IWE_SESSIONS_ROOT_TARGET="\$IWE_WORKSPACE/MC-sessions"
+else
+    IWE_SESSIONS_ROOT_TARGET=""
+fi
+
 IWE_ENV_FILE="$WORKSPACE_DIR/.iwe-paths"
 ZSHENV_FILE="$HOME/.zshenv"
 # issue #808: .zshenv is read only by zsh. On Linux/WSL, where bash is the
@@ -123,7 +139,7 @@ export IWE_SCRIPTS="$IWE_SCRIPTS_TARGET"
 export IWE_ROLES="\$IWE_TEMPLATE/roles"
 export IWE_RUNTIME="\$IWE_WORKSPACE/.iwe-runtime"
 export IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO"
-export IWE_SESSIONS_ROOT="\$IWE_WORKSPACE/MC-sessions"
+export IWE_SESSIONS_ROOT="$IWE_SESSIONS_ROOT_TARGET"
 IWEENV_EOF
 
 $QUIET || echo "  ✓ $IWE_ENV_FILE written (workspace=$WORKSPACE_DIR)"
