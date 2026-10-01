@@ -365,11 +365,11 @@
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
-      "sha256": "75f4074e2d4877efdacce92b58af4f7240cad1903d4fa5f951d200ce077e8df5"
+      "sha256": "b4d7c53775f74485788fd52cb0487ab677d99be427f98b471215b346cebab635"
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "403753dc6eb06131c7dd2898a5ad0c67f2d8e6ba368221d23e7b9ff61f8ef744"
+      "sha256": "66df16606fcb94e92183c9b44ae4c5d33e661518a36a9e6a56e9db58ef4ee405"
     },
     {
       "path": ".claude/settings.json",
@@ -1569,7 +1569,7 @@
     },
     {
       "path": "memory/protocol-open.md",
-      "sha256": "ad95d0af64e8369e5aa102d9d5de93603e9244c30111b3f70f1691b9f45f710d"
+      "sha256": "cc24bbf125646f850a95aaa06984b640da45133ebb29b9af17d395841beccd62"
     },
     {
       "path": "memory/protocol-work.md",
@@ -2073,7 +2073,7 @@
     },
     {
       "path": "scripts/archive-done-wp.sh",
-      "sha256": "ca6f03d9f7f642cb116ce7a1db85421dbee4ffae3b1e6a200352a141f681fef5"
+      "sha256": "070ef25ece923b43784571c1d5dd6c86c0b4c6cbb03720c1901c0432c84e7c67"
     },
     {
       "path": "scripts/artifactor.py",
@@ -2181,7 +2181,7 @@
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
-      "sha256": "614b7837851036c8a485b40fadfbc18932b81f0d513586701449838c09676d3f"
+      "sha256": "da74e608383ca43832cbe7e8dcf41a3121d699ad5f10c1587c26867e2f77c431"
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "9e69c1e82ebe7b3c3e912b093f1f7428530da805d8c68aa3204afcc970672bb9"
+      "sha256": "94d1b0ee3db5204c638d59a920ca7797a525e96372c644f20383be041206b831"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -3250,6 +3250,7 @@
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
     "scripts/tests/test_issue_954_gate_ids.sh",
+    "scripts/tests/test_issue_954_locate.sh",
     "scripts/tests/test_issue_954_wp_list_keys.py",
     "scripts/tests/test_issue_954_wp_number_forms.sh",
     "scripts/tests/test_issue_964_canary_status.sh",

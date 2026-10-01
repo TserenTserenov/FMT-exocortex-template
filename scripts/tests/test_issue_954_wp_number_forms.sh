@@ -207,6 +207,25 @@ else
   bad "registry_status could not be loaded from $BUNDLE"
 fi
 
+# The bundle's registry_status writes the row regex inline (its older tests cut the function out
+# and run it alone), the library hands the same cell pattern to close-wp.sh: two copies of one
+# rule. Both must answer the same for every spelling of the cell, so that a drift turns red.
+if declare -F registry_status >/dev/null && [ "$have_lib" = 1 ]; then
+  EQ_REGISTRY="$TMP/registry-equiv.md"
+  eq_re=$(wp_num_registry_cell_regex 44)
+  for pair in "44|yes" "044|yes" "WP-044|yes" "~~44~~|yes" "  44  |yes" "440|no" "0440|no" "|no"; do
+    cell="${pair%|*}"
+    want="${pair##*|}"
+    printf '%s\n' '| # | Название | Статус |' '|---|----------|--------|' "| $cell | Demo | 🔄 |" > "$EQ_REGISTRY"
+    REGISTRY_FILE="$EQ_REGISTRY"
+    if [ "$(registry_status 44 2>/dev/null)" = "_не в реестре_" ]; then bundle_says=no; else bundle_says=yes; fi
+    if grep -Eq -- "^\\|[[:space:]]*${eq_re}[[:space:]]*\\|" <<<"| $cell | Demo | 🔄 |"; then lib_says=yes; else lib_says=no; fi
+    expect_eq "registry cell [$cell] for 44: the bundle's regex and the library's agree (bundle=$bundle_says)" "$lib_says" "$bundle_says"
+    expect_eq "registry cell [$cell] for 44: both say $want" "$want" "$bundle_says"
+  done
+  REGISTRY_FILE="$TMP/registry-forms.md"
+fi
+
 # ---------------------------------------------------------------------------
 echo "--- #954 B: find_wp_file returns the card, not the first file that says 'wp: N' ---"
 WS=$(new_ws)
@@ -535,8 +554,17 @@ done
 if [ -d "$ws5/$GOV/inbox/WP-044" ]; then ok "no library: nothing was moved or changed"; else bad "no library: the card folder was touched"; fi
 
 # ---------------------------------------------------------------------------
-echo "--- the same python driver: wp-list.py is covered by test_issue_954_wp_list_keys.py ---"
-if [ -f "$WPLIST" ]; then ok "wp-list.py present (keys are checked by the pytest file)"; else bad "wp-list.py missing"; fi
+echo "--- wp-list.py on the padded-folder fixture (the full key rules are in test_issue_954_wp_list_keys.py) ---"
+WS=$(new_ws)
+printf '%s\n' '| # | Название | Статус |' '|---|----------|--------|' '| ~~WP-044~~ | ~~Demo~~ | 🔄 |' '| 45 | Open | 🔄 |' > "$WS/$GOV/docs/WP-REGISTRY.md"
+card "$WS/$GOV/inbox/WP-044/WP-044.md" 44 in_progress
+card "$WS/$GOV/inbox/WP-045/WP-045.md" 45 in_progress
+PY=$(command -v python3)
+out=$("$PY" "$WPLIST" --list-cards --source inbox --fields wp,registry_done --format tsv --governance-repo "$GOV" --iwe-root "$WS" 2>&1); rc=$?
+expect_eq "wp-list.py runs on the fixture" 0 "$rc"
+expect_eq "wp-list.py: the struck '~~WP-044~~' row marks the padded card done, the open row does not" "wp	registry_done
+044	true
+045	false" "$out"
 
 echo
 if [ "$FAILS" -eq 0 ]; then

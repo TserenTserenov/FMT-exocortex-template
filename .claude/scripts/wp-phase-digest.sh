@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # wp-phase-digest.sh — детерминированный дайджест состояния фаз карточки РП
 # Контракт: вход WP-N (или N) → stdout `status=...` + `phase_digest=...` +
-#           `phase_count=...`, exit 0/1
+#           `phase_count=...`, exit 0/1/4 (4: не найден scripts/lib/wp-num.sh —
+#           ошибка установки, а не «РП не найден»; см. wp-sync-bundle.sh)
 #
 # Зачем: пир-сессия WP-561 2026-09-03-19 (Kimi+Codex) — snapshot-механизм
 # "handoff_snapshot" (при close агент записывает {ref, observed_status,
@@ -21,6 +22,46 @@
 
 set -euo pipefail
 
+_WPN_ROOT_UP="../.."
+# >>> wp-num locate
+# Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
+# resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
+# fixtures. Candidates, in order: lib/ next to the file, <root>/scripts/lib, the template
+# clone next to a delivered workspace (<root>/FMT-exocortex-template), the explicit
+# IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
+# just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
+# The library is mandatory: not finding it is an installation error, not "WP not found",
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+_wpn_src="${BASH_SOURCE[0]}"
+_wpn_hops=0
+while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
+  _wpn_link="$(readlink "$_wpn_src")"
+  case "$_wpn_link" in
+    /*) _wpn_src="$_wpn_link" ;;
+    *) _wpn_src="$(dirname "$_wpn_src")/$_wpn_link" ;;
+  esac
+  _wpn_hops=$((_wpn_hops + 1))
+done
+_wpn_dir="$(cd -P "$(dirname "$_wpn_src")" && pwd)"
+_wpn_root="$(cd -P "$_wpn_dir/$_WPN_ROOT_UP" && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
+                 "$_wpn_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [ -r "$_wpn_cand" ]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [ -z "$WP_NUM_LIB" ]; then
+  echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
+  exit 4
+fi
+# shellcheck source=/dev/null
+. "$WP_NUM_LIB"
+# <<< wp-num locate
+
 IWE_WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-governance}"
 # Portability (template install): same fallback as wp-sync-bundle.sh -- any
@@ -35,27 +76,6 @@ INBOX_DIR="$STRATEGY_DIR/inbox"
 ARCHIVE_DIR="$STRATEGY_DIR/archive/wp-contexts"
 
 log_err() { echo "[ERROR] $*" >&2; }
-
-# Shared reader of WP numbers (issue #954), located from THIS file's own location and
-# never from IWE_WORKSPACE (callers point that at a fixture or an origin snapshot, which
-# carries no scripts). Same candidates, same order as in wp-sync-bundle.sh: <root>/scripts/lib,
-# the template clone next to a delivered workspace .claude/scripts, then IWE_TEMPLATE.
-_wpn_code_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-WP_NUM_LIB=""
-for _wpn_cand in "$_wpn_code_root/scripts/lib/wp-num.sh" \
-                 "$_wpn_code_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
-                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
-  if [[ -r "$_wpn_cand" ]]; then
-    WP_NUM_LIB="$_wpn_cand"
-    break
-  fi
-done
-if [[ -z "$WP_NUM_LIB" ]]; then
-  echo "[ERROR] wp-num.sh не найден: нужен scripts/lib/wp-num.sh (искал в ${_wpn_code_root}/scripts/lib, ${_wpn_code_root}/FMT-exocortex-template/scripts/lib и \${IWE_TEMPLATE}/scripts/lib). Обновите шаблон: bash update.sh" >&2
-  exit 1
-fi
-# shellcheck source=/dev/null
-source "$WP_NUM_LIB"
 
 # Тот же поиск, что find_wp_file() в wp-sync-bundle.sh (WP-434: папочная конвенция
 # первична): оба зовут wp_num_find_card — один парсер на обоих концах снимка. Раньше

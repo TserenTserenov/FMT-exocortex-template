@@ -1,14 +1,56 @@
 #!/usr/bin/env bash
 # wp-sync-bundle.sh — детерминированный bundler контекста РП для sync-фазы WP Gate
-# Контракт: вход WP-N или N → stdout markdown bundle, exit 0/1/2/3
+# Контракт: вход WP-N или N → stdout markdown bundle, exit 0/1/2/3/4
 #   Первые машинные строки stdout: GIT_SYNC_STATUS / GIT_SYNC_DETAIL /
 #   [GIT_SYNC_OVERRIDE] / CARD_SOURCE (worktree | origin-pinned oid=<40hex>
 #   behind=N ahead=M | worktree-forced). WP-561 Ф24: при STALE/DIVERGED и
 #   свежем remote-tracking ref карточки читаются со снимка origin (exit 0).
+#   exit 4: не найден scripts/lib/wp-num.sh — ошибка установки, а не «РП не найден»
+#   (exit 1); проверяется первым, до чтения конфигурации и реестра.
 # see WP-294
 # Compatible: bash 3.2+
 
 set -euo pipefail
+
+_WPN_ROOT_UP="../.."
+# >>> wp-num locate
+# Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
+# resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
+# fixtures. Candidates, in order: lib/ next to the file, <root>/scripts/lib, the template
+# clone next to a delivered workspace (<root>/FMT-exocortex-template), the explicit
+# IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
+# just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
+# The library is mandatory: not finding it is an installation error, not "WP not found",
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+_wpn_src="${BASH_SOURCE[0]}"
+_wpn_hops=0
+while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
+  _wpn_link="$(readlink "$_wpn_src")"
+  case "$_wpn_link" in
+    /*) _wpn_src="$_wpn_link" ;;
+    *) _wpn_src="$(dirname "$_wpn_src")/$_wpn_link" ;;
+  esac
+  _wpn_hops=$((_wpn_hops + 1))
+done
+_wpn_dir="$(cd -P "$(dirname "$_wpn_src")" && pwd)"
+_wpn_root="$(cd -P "$_wpn_dir/$_WPN_ROOT_UP" && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
+                 "$_wpn_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [ -r "$_wpn_cand" ]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [ -z "$WP_NUM_LIB" ]; then
+  echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
+  exit 4
+fi
+# shellcheck source=/dev/null
+. "$WP_NUM_LIB"
+# <<< wp-num locate
 
 # ---------------------------------------------------------------------------
 # Config (with resilience fallback — see WP-294)
@@ -84,31 +126,6 @@ if [[ -r "$GIT_SYNC_LIB" ]]; then
   # shellcheck source=/dev/null
   source "$GIT_SYNC_LIB"
 fi
-
-# Shared reader of WP numbers (issue #954): the one place that knows the spellings
-# 44 / 044 / WP-044 / ~~WP-044~~ and the two card-folder names (WP-044/, legacy WP-44/).
-# Mandatory, unlike the sync lib above: without it every lookup would silently go back to
-# guessing the number's shape. Located from THIS file's own location and never from
-# IWE_WORKSPACE / STRATEGY_DIR, which callers point at fixtures and origin snapshots
-# (see above). Candidates, in order: <root>/scripts/lib (repository checkout, or a
-# workspace that carries its own scripts/), the template clone next to a delivered
-# workspace .claude/scripts, the explicit IWE_TEMPLATE.
-_wpn_code_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-WP_NUM_LIB=""
-for _wpn_cand in "$_wpn_code_root/scripts/lib/wp-num.sh" \
-                 "$_wpn_code_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
-                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
-  if [[ -r "$_wpn_cand" ]]; then
-    WP_NUM_LIB="$_wpn_cand"
-    break
-  fi
-done
-if [[ -z "$WP_NUM_LIB" ]]; then
-  echo "[ERROR] wp-num.sh не найден: нужен scripts/lib/wp-num.sh (искал в ${_wpn_code_root}/scripts/lib, ${_wpn_code_root}/FMT-exocortex-template/scripts/lib и \${IWE_TEMPLATE}/scripts/lib). Обновите шаблон: bash update.sh" >&2
-  exit 1
-fi
-# shellcheck source=/dev/null
-source "$WP_NUM_LIB"
 
 # ---------------------------------------------------------------------------
 # Audit log
@@ -789,8 +806,10 @@ main() {
     # No explicit WP given — find a real, resolvable WP for the canary.
     # WP-434: canonical folder cards win over legacy flat files; closed WPs
     # (archived/done) are avoided because the canary should test the active
-    # governance contour, not a stale baseline (issue #861). The card is the first one
-    # whose registry status the resolver recognises (issue #964, see pick_canary_wp).
+    # governance contour, not a stale baseline (issue #861). The card is the first one that
+    # is not passed over: only a card whose registry row exists but whose status is unknown
+    # (a user's own "❄️") is skipped; any other unresolved answer stops the search and
+    # fails the canary (issue #964, see pick_canary_wp).
     if [[ -z "$test_num" && -d "$INBOX_DIR" ]]; then
       pick_canary_wp
       test_num="$CANARY_PICK"
