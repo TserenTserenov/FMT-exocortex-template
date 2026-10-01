@@ -18,6 +18,9 @@
 INPUT=$(cat)
 TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+# Git Bash hands the Read tool a Windows path (C:\x\IWE\memory\protocol-open.md): match
+# and name it with forward slashes, or dirname/basename see a single path component.
+FILE_PATH=${FILE_PATH//\\//}
 SKILL_NAME=$(echo "$INPUT" | jq -r '.tool_input.skill // empty')
 SKILL_ARGS=$(echo "$INPUT" | jq -r '.tool_input.args // empty')
 
@@ -44,23 +47,33 @@ find_params_file() {
   return 0
 }
 
-# Succeeds unless verify_quick_close is an explicit `false`: case-insensitive,
-# quotes, spaces and a trailing " # comment" tolerated. No file or key = enabled.
+# Succeeds unless verify_quick_close is an explicit `false` (`no`, `off` are not):
+# case-insensitive, quotes, spaces and a trailing " # comment" tolerated, a UTF-8 BOM
+# on the first line ignored, the last of duplicate keys wins (as in YAML). No file or
+# key = enabled. The whole chain runs byte-wise (LC_ALL=C): in a UTF-8 locale a stray
+# non-UTF-8 byte in params.yaml makes sed fail ("illegal byte sequence") or grep report
+# "binary file matches", and the key would silently read as absent.
 verify_enabled() {
   local file value
   file=$(find_params_file)
   [ -n "$file" ] || return 0
-  value=$(grep -E '^verify_quick_close:' "$file" 2>/dev/null | head -1 \
-    | sed -E 's/^verify_quick_close:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//' \
-    | tr '[:upper:]' '[:lower:]')
+  value=$(
+    export LC_ALL=C
+    bom=$(printf '\357\273\277')
+    sed "1s/^$bom//" "$file" 2>/dev/null \
+      | grep -E '^verify_quick_close:' | tail -1 \
+      | sed -E 's/^verify_quick_close:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//' \
+      | tr '[:upper:]' '[:lower:]'
+  )
   [ "$value" != "false" ]
 }
 
-# Closing kind of a run-protocol call, from its args "[open|close] [day|session]"
-# or day-close / week-close (.claude/skills/run-protocol/SKILL.md) or month-close
-# (not in that table, but this hook always reminded R23 for it): prints
-# quick | day | week | month, nothing when the call is not a closing. Only the
-# leading words count: a free-form task text may mention "close" without being one.
+# Closing kind of a run-protocol call, from its args (.claude/skills/run-protocol/SKILL.md):
+# `close` or `close session` = quick, `close day|week|month` = that closing, and
+# day-close / week-close / month-close (month-close is not in the skill's table, but
+# this hook always reminded R23 for it). Prints quick | day | week | month, nothing
+# when the call is not a closing: any other second word means a free-form task text
+# that merely starts with "close" ("close the PR for issue 5").
 run_protocol_close_kind() {
   local first second
   read -r first second _ <<< "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
@@ -70,8 +83,10 @@ run_protocol_close_kind() {
     month-close) echo month ;;
     close)
       case "$second" in
+        '' | session) echo quick ;;
         day) echo day ;;
-        *) echo quick ;;
+        week) echo week ;;
+        month) echo month ;;
       esac
       ;;
   esac

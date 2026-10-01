@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
-      "sha256": "92171c0a343a4f5a0cd21c7579cd0eb320b2cb99493b33e56fe00576284c0b4e"
+      "sha256": "71b431920a87c6ee4f7bcfe07c15f26afe1cb85ec6cb9e6a6af58078c304dcd4"
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",

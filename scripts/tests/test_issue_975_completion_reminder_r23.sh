@@ -19,7 +19,15 @@
 #   * day-open, wp-new, protocol-open and the other protocol-*.md carry no R23 text;
 #   * the text names the real mechanism (sub-agent Haiku, closing checklist),
 #     never the /verify skill (which checks an artifact against a Pack standard);
-#   * only memory/protocol-*.md is matched, not hooks like protocol-stop-gate.sh.
+#   * only memory/protocol-*.md is matched, not hooks like protocol-stop-gate.sh;
+#     a Windows path with backslashes (Git Bash) is matched like a POSIX one;
+#   * run-protocol args name a closing only as `close` / `close session` (Quick),
+#     `close day|week|month`, `day-close` / `week-close` / `month-close`: a task text
+#     that merely starts with the word "close" is not a closing;
+#   * the key is read byte-wise (any locale, stray non-UTF-8 bytes), a UTF-8 BOM on
+#     the first line is ignored, the last of duplicate keys wins (as in YAML);
+#   * the run-protocol skill itself no longer demands a verification on every
+#     protocol (section D).
 #
 # No network, no real $HOME: every hook run gets a temporary HOME/TMPDIR.
 set -uo pipefail
@@ -43,8 +51,16 @@ command -v jq >/dev/null 2>&1 || { echo "FAIL: jq is required (the hook parses s
 WS="$TMP/ws"
 GOV="$WS/my-governance"
 SUB="$GOV/sessions/deep"
-ELSEWHERE="$TMP/elsewhere"
-mkdir -p "$SUB" "$ELSEWHERE"
+# EMPTY_WS: IWE_WORKSPACE for every "no params.yaml means enabled" assertion. Without it
+# the hook climbs up from the project dir, and on macOS mktemp ignores TMPDIR, so a
+# foreign params.yaml in one of the 4 directories above $TMP would flip the result.
+EMPTY_WS="$TMP/empty-ws"
+# ELSEWHERE sits 4 directories below $TMP/e1, so a climb of at most 4 levels from it
+# never leaves $TMP: "nothing found" is then a property of the fixture, not of the machine.
+ELSEWHERE="$TMP/e1/e2/e3/e4/elsewhere"
+FOREIGN="$TMP/foreign-cwd"
+mkdir -p "$SUB" "$ELSEWHERE" "$EMPTY_WS" "$FOREIGN"
+[ ! -e "$EMPTY_WS/params.yaml" ] || { echo "FAIL: fixture broken: $EMPTY_WS/params.yaml exists"; exit 1; }
 
 # params <dir> <text with \n / \r escapes> : (re)write <dir>/params.yaml
 params() { mkdir -p "$1"; printf '%b' "$2" > "$1/params.yaml"; }
@@ -60,17 +76,22 @@ read_json() { jq -nc --arg p "$1" '{tool_name:"Read",tool_input:{file_path:$p}}'
 # run_hook <project_dir|""> <workspace|""> <cwd> <json> [hook-file]
 # Sets HOOK_OUT (stdout) and HOOK_RC. Inherited CLAUDE_PROJECT_DIR / IWE_WORKSPACE
 # are always dropped: they would turn the test into a function of the machine.
+# HOOK_LOCALE, when set, becomes LC_ALL of the hook (the byte-wise reading cases).
+HOOK_LOCALE=""
 run_hook() {
     local proj="$1" ws="$2" cwd="$3" json="$4" hook="${5:-$HOOK}"
     local -a envs=("HOME=$TMP/home" "TMPDIR=$TMP/tmp")
     [ -n "$proj" ] && envs+=("CLAUDE_PROJECT_DIR=$proj")
     [ -n "$ws" ] && envs+=("IWE_WORKSPACE=$ws")
+    [ -n "$HOOK_LOCALE" ] && envs+=("LC_ALL=$HOOK_LOCALE")
     HOOK_OUT=$(cd "$cwd" && printf '%s' "$json" \
         | env -u CLAUDE_PROJECT_DIR -u IWE_WORKSPACE "${envs[@]}" /bin/bash "$hook" 2>"$TMP/stderr")
     HOOK_RC=$?
 }
 # default: project dir = workspace root = cwd
 run_ws() { run_hook "$WS" "" "$WS" "$1"; }
+# "no params.yaml": IWE_WORKSPACE names an empty directory, so nothing is climbed
+run_noparams() { run_hook "$WS" "$EMPTY_WS" "$WS" "$1"; }
 
 ctx() { printf '%s' "$HOOK_OUT" | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null; }
 
@@ -116,8 +137,7 @@ PROTO_CLOSE="$WS/memory/protocol-close.md"
 params "$WS" 'verify_quick_close: false\n'
 run_ws "$(skill_json day-open)"
 expect_steps_without_r23 "day-open + key false: steps demanded, no R23/verify"
-no_params "$WS"
-run_ws "$(skill_json day-open)"
+run_noparams "$(skill_json day-open)"
 expect_steps_without_r23 "day-open + no params.yaml: no R23/verify"
 params "$WS" 'verify_quick_close: true\n'
 run_ws "$(skill_json day-open)"
@@ -159,6 +179,12 @@ run_ws "$(skill_json run-protocol 'open session')"
 expect_steps_without_r23 "run-protocol 'open session': no R23"
 run_ws "$(skill_json run-protocol 'fix the close button styling')"
 expect_steps_without_r23 "run-protocol with a task text mentioning close: not a closing"
+run_ws "$(skill_json run-protocol 'close the PR for issue 5')"
+expect_steps_without_r23 "run-protocol 'close the PR for issue 5': a task text starting with close is not a closing"
+run_ws "$(skill_json run-protocol 'close foo')"
+expect_steps_without_r23 "run-protocol 'close foo': an unknown second word is not a closing"
+run_ws "$(skill_json run-protocol '  Close   Session ')"
+expect_r23 "run-protocol '  Close   Session ': case and spacing do not matter"
 
 params "$WS" 'verify_quick_close: false\n'
 run_ws "$(skill_json run-protocol close)"
@@ -173,10 +199,13 @@ run_ws "$(skill_json run-protocol week-close)"
 expect_r23 "run-protocol week-close + key false: Week Close has its own R23 step, key is Quick Close only"
 run_ws "$(skill_json run-protocol month-close)"
 expect_r23 "run-protocol month-close + key false: Month Close keeps R23 (not a Quick Close)"
+run_ws "$(skill_json run-protocol 'close week')"
+expect_r23 "run-protocol 'close week' + key false: Week Close ignores the key"
+run_ws "$(skill_json run-protocol 'close month')"
+expect_r23 "run-protocol 'close month' + key false: Month Close ignores the key"
 
 # default is ON: no file, or a file without the key
-no_params "$WS"
-run_ws "$(skill_json run-protocol close)"
+run_noparams "$(skill_json run-protocol close)"
 expect_r23 "run-protocol close + no params.yaml: default enabled"
 params "$WS" 'author_mode: false\n'
 run_ws "$(skill_json run-protocol close)"
@@ -192,11 +221,10 @@ expect_steps_without_r23 "Read protocol-close.md + key false: no R23"
 params "$WS" 'author_mode: false\n'
 run_ws "$(read_json "$PROTO_CLOSE")"
 expect_r23 "Read protocol-close.md + no key: R23 (default enabled)"
-no_params "$WS"
-run_ws "$(read_json "$PROTO_CLOSE")"
+run_noparams "$(read_json "$PROTO_CLOSE")"
 expect_r23 "Read protocol-close.md + no params.yaml: R23"
 # Month Close always carried R23 on reading its protocol; the Quick Close key does not apply.
-run_ws "$(read_json "$WS/memory/protocol-month-close.md")"
+run_noparams "$(read_json "$WS/memory/protocol-month-close.md")"
 expect_r23 "Read protocol-month-close.md + no params.yaml: R23 stays"
 params "$WS" 'verify_quick_close: false\n'
 run_ws "$(read_json "$WS/memory/protocol-month-close.md")"
@@ -218,6 +246,25 @@ run_ws "$(read_json "$WS/README.md")"
 expect_silent "unrelated Read: hook silent"
 run_ws 'not json at all'
 expect_silent "malformed stdin: hook still answers {} and exits 0"
+
+# ---- Windows paths: Git Bash hands the Read tool a path with backslashes ----
+run_ws "$(read_json 'C:\x\IWE\memory\protocol-month-close.md')"
+expect_r23 "Windows path (backslashes) to memory/protocol-month-close.md: matched, R23"
+if [[ $(ctx) == *"ПРОТОКОЛ ЗАГРУЖЕН: protocol-month-close."* ]]; then
+    ok "Windows path: the protocol is named by its file, not by the whole path"
+else
+    bad "Windows path: wrong protocol name — context: $(ctx)"
+fi
+run_ws "$(read_json 'C:\x\IWE\memory\protocol-open.md')"
+expect_steps_without_r23 "Windows path to memory/protocol-open.md: matched, no R23"
+run_ws "$(read_json 'C:\x\IWE\.claude\hooks\protocol-stop-gate.sh')"
+expect_silent "Windows path to hooks/protocol-stop-gate.sh: hook silent"
+run_ws "$(read_json 'C:\x\IWE\docs\protocol-overview.md')"
+expect_silent "Windows path outside memory/: hook silent"
+params "$WS" 'verify_quick_close: false\n'
+run_ws "$(read_json 'C:\x\IWE\memory\protocol-close.md')"
+expect_steps_without_r23 "Windows path to memory/protocol-close.md + key false: Quick Close silenced"
+params "$WS" 'verify_quick_close: true\n'
 
 # ============================ B. how the key is written ============================
 # Quick Close is the probe (run-protocol close): R23 present = key NOT off, absent = key off.
@@ -244,6 +291,30 @@ probe_on 'only a literal false switches it off (no = still on)' 'verify_quick_cl
 probe_on 'empty value' 'verify_quick_close:\n'
 probe_on 'another key sharing the prefix' 'verify_quick_close_extra: false\n'
 probe_on 'false glued to a comment sign is not YAML false' 'verify_quick_close: false#x\n'
+probe_on 'off is not false either (the docs allow a literal false only)' 'verify_quick_close: off\n'
+
+# Duplicate keys: the last one wins, as in YAML.
+probe_off 'duplicate key, the last one is false' 'verify_quick_close: true\nverify_quick_close: false\n'
+probe_on 'duplicate key, the last one is true' 'verify_quick_close: false\nverify_quick_close: true\n'
+
+# A UTF-8 BOM (Windows editors) before the first key must not hide it.
+BOM=$(printf '\357\273\277')
+probe_off 'UTF-8 BOM before the key on the first line' "${BOM}verify_quick_close: false\\n"
+probe_off 'UTF-8 BOM and CRLF line endings' "${BOM}verify_quick_close: false\\r\\n"
+probe_off 'UTF-8 BOM on the first line, the key on the second' "${BOM}# settings\\nverify_quick_close: false\\n"
+
+# Byte-wise reading: a stray non-UTF-8 byte (a Latin-1 comment) must not hide the key
+# when the hook runs in a UTF-8 locale (sed: illegal byte sequence; grep: binary file).
+UTF8_LOCALE=$(locale -a 2>/dev/null | grep -ixE 'en_US\.utf-?8|C\.utf-?8' | head -1)
+if [ -n "$UTF8_LOCALE" ]; then
+    HOOK_LOCALE="$UTF8_LOCALE"
+    probe_off "Latin-1 byte in the comment of the key line (LC_ALL=$UTF8_LOCALE)" 'verify_quick_close: false # caf\351\n'
+    probe_off "Latin-1 byte on a line before the key (LC_ALL=$UTF8_LOCALE)" '# caf\351 note\nverify_quick_close: false\n'
+    probe_on "Latin-1 byte, key true (LC_ALL=$UTF8_LOCALE)" 'verify_quick_close: true # caf\351\n'
+    HOOK_LOCALE=""
+else
+    echo "SKIP: no UTF-8 locale installed, byte-wise reading not exercised"
+fi
 
 # ============================ C. where params.yaml is looked up ============================
 # Session started in a governance repository: the key lives in the workspace root.
@@ -296,6 +367,15 @@ cp "$HOOK" "$WS2/.claude/hooks/protocol-completion-reminder.sh"
 params "$WS2" 'verify_quick_close: false\n'
 run_hook "" "" "$WS2/somewhere/else" "$(skill_json run-protocol close)" "$WS2/.claude/hooks/protocol-completion-reminder.sh"
 expect_steps_without_r23 "CLAUDE_PROJECT_DIR unset: workspace derived from the hook location (false)"
+# ... and the cwd of the call plays no part: a non-empty cwd OUTSIDE the workspace, with a
+# params.yaml of its own that says the opposite, must not be consulted (nor climbed from).
+params "$FOREIGN" 'verify_quick_close: true\n'
+run_hook "" "" "$FOREIGN" "$(skill_json run-protocol close)" "$WS2/.claude/hooks/protocol-completion-reminder.sh"
+expect_steps_without_r23 "no CLAUDE_PROJECT_DIR, no IWE_WORKSPACE, cwd outside the workspace (true there): the hook location wins (false)"
+params "$WS2" 'verify_quick_close: true\n'
+params "$FOREIGN" 'verify_quick_close: false\n'
+run_hook "" "" "$FOREIGN" "$(skill_json run-protocol close)" "$WS2/.claude/hooks/protocol-completion-reminder.sh"
+expect_r23 "same, the other way round: hook location says true, the foreign cwd says false"
 
 # ============================ D. the run-protocol skill text ============================
 # The skill is loaded together with this reminder, so it must not demand a verification
