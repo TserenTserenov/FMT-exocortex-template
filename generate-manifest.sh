@@ -220,6 +220,10 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     "scripts/tests/test_critical_alert_failure_matrix.sh"
     "scripts/tests/test_create_wp_repeat_and_cwd.sh"
     "scripts/tests/test_create_wp_hypothesis_relation.sh"
+    # issue #956: run-issue-tests.sh (delivered) names both in ADDITIONAL_ISSUE_TESTS,
+    # and a registered test file that is missing fails the runner on an installed copy.
+    "scripts/tests/test_create_wp_verification_class.sh"
+    "scripts/tests/test_create_wp_artifactor_gate.sh"
     "scripts/tests/test_day_close_lock_timezone.sh"
     "scripts/tests/test_fresh_seed_reproduction.sh"
     "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh"

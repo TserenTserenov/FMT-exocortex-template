@@ -755,6 +755,7 @@ jobs:
           python3 -m pytest -q \
             scripts/tests/test_issue_*.py \
             scripts/tests/test_create_wp_number_padding.py \
+            scripts/tests/test_create_wp_weekplan_writer.py \
             scripts/tests/test_install_hooks.py \
             scripts/tests/test_skill_promote.py \
             scripts/tests/test_residency_gate_skill_adapter.py
