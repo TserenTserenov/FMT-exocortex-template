@@ -2760,6 +2760,12 @@ elif [ "$(head -c 2 "$REMOTE_UPDATE")" != "#!" ]; then
     # proxy. update.sh starts with a "#!" line (any interpreter path, /bin/bash or
     # /usr/bin/env bash alike); anything else must not replace the running updater.
     echo "  ⚠ не удалось проверить update.sh: ответ не похож на скрипт"
+elif ! bash -n "$REMOTE_UPDATE" 2>/dev/null; then
+    # "#!" alone proves nothing about integrity: a script cut off in the middle (an incomplete
+    # body served as a finished HTTP 200) starts with it too. A syntax check is the one test
+    # that needs no reference hash, which Step 0 does not have yet (the manifest comes later),
+    # and it runs with the same `bash` that the replacement is re-executed with.
+    echo "  ⚠ не удалось проверить update.sh: ответ не похож на рабочий скрипт"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
