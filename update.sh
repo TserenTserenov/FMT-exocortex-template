@@ -559,15 +559,66 @@ author_release_regression() {
     [ "$payload_sha" != "$head_sha" ]
 }
 
+# manifest_version FILE — the first "version" value of an update-manifest.json (empty when
+# there is none). One reader for every place that needs it: the upstream manifest (Step 1),
+# the installed one for --check --fast, and the installed one when histories cannot be
+# ordered by git (rollback_by_version, #963).
+manifest_version() {
+    grep '"version"' "$1" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//'
+}
+
+# version_compare A B — compare two plain X.Y.Z versions numerically. Prints -1, 0 or 1 (A is
+# older than, equal to, newer than B) and returns 0; returns 2 and prints nothing when either
+# argument is not digits-only X.Y.Z (at most 9 digits per part, so the arithmetic cannot
+# overflow). "0.9.0" is older than "0.10.0": a string comparison says the opposite.
+version_compare() {
+    local a="$1" b="$2" part_a part_b re='^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$'
+    [[ $a =~ $re ]] && [[ $b =~ $re ]] || return 2
+    while [ -n "$a" ]; do
+        part_a=${a%%.*}
+        part_b=${b%%.*}
+        # 10#: a part such as "08" is the decimal 8, not an invalid octal literal.
+        if [ $((10#$part_a)) -lt $((10#$part_b)) ]; then echo -1; return 0; fi
+        if [ $((10#$part_a)) -gt $((10#$part_b)) ]; then echo 1; return 0; fi
+        case "$a" in
+            *.*) a=${a#*.}; b=${b#*.} ;;
+            *) a="" ;;
+        esac
+    done
+    echo 0
+}
+
+# rollback_by_version — issue #963: when the installed copy and the release share no commit
+# (a fork whose history was rewritten, e.g. a different root commit), git merge-base cannot
+# order them; order them by manifest version instead: the installed update-manifest.json
+# against UPSTREAM_VERSION (set in Step 1, before the rollback check runs).
+# Exit codes (the same contract as detect_release_rollback):
+#   0 - the release is strictly older than the installed version: a rollback
+#   1 - the release is newer or equal (equal versions do not prove a rollback)
+#   2 - cannot tell: a shallow clone (a real ancestor may be cut off), no installed manifest,
+#       or a version that is not plain X.Y.Z
+rollback_by_version() {
+    local installed cmp
+    # A shallow clone reports "no common ancestor" also for histories that do share one.
+    [ "$(git -C "$SCRIPT_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "false" ] || return 2
+    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 2
+    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
+    cmp=$(version_compare "${UPSTREAM_VERSION:-}" "$installed") || return 2
+    [ "$cmp" = "-1" ]
+}
+
 # issue #863: detect when the default release channel would roll back an install
 # that is already newer than the latest published release. Fires in release
 # channel when SCRIPT_DIR is a git repo and local HEAD contains commits that are
-# not present in the release (i.e. the release is strictly behind local).
+# not present in the release (i.e. the release is strictly behind local). When the
+# two histories share no commit at all (#963) the versions in the manifests decide.
 #
 # Exit codes:
-#   0 - rollback detected (release is a strict ancestor of local HEAD)
-#   1 - no rollback (release is HEAD, ahead, or unrelated)
-#   2 - cannot determine (network/history missing) -> caller must block --yes
+#   0 - rollback detected: the release is a strict ancestor of local HEAD, or (no common
+#       ancestor) its manifest version is older than the installed one
+#   1 - no rollback (release is HEAD, ahead, or, with no common ancestor, not older by version)
+#   2 - cannot determine (network/history missing, unreadable versions, a shallow clone with
+#       no visible common ancestor) -> caller must block --yes
 detect_release_rollback() {
     [ "$UPDATE_CHANNEL" = "release" ] || return 1
     [ -n "$RELEASE_SHA" ] || return 1
@@ -582,7 +633,7 @@ detect_release_rollback() {
     # the install's `origin` may point to a different fork or the local tag may
     # differ from the published one.
     if ! printf '%s' "$release_sha" | grep -qxE '[0-9a-f]{40}'; then
-        commit_json=$(github_api_get "$API_BASE/commits/$release_sha" 2>/dev/null) || return 2
+        commit_json=$(github_api_get "$API_BASE/commits/$release_sha") || return 2
         # Prefer JSON parsing; fall back to sed only when Python is unavailable.
         # Guard the assignment with || return 2: under set -e a bare failing
         # command-substitution aborts the whole script when this function is
@@ -613,7 +664,14 @@ print(sha)') || return 2
         fi
     fi
 
-    merge_base=$(git -C "$SCRIPT_DIR" merge-base "$local_sha" "$release_sha" 2>/dev/null) || return 2
+    # git merge-base: 0 = found, 1 = no common ancestor, anything else (128...) = an error.
+    local merge_base_rc=0
+    merge_base=$(git -C "$SCRIPT_DIR" merge-base "$local_sha" "$release_sha" 2>/dev/null) || merge_base_rc=$?
+    case "$merge_base_rc" in
+        0) ;;
+        1) rollback_by_version; return $? ;;
+        *) return 2 ;;
+    esac
     [ -n "$merge_base" ] || return 2
 
     # Rollback if the release commit is an ancestor of local HEAD but not equal
@@ -2707,7 +2765,7 @@ PY
 fi
 
 # Parse version from manifest
-UPSTREAM_VERSION=$(grep '"version"' "$MANIFEST" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+UPSTREAM_VERSION=$(manifest_version "$MANIFEST")
 echo "  Версия upstream: $UPSTREAM_VERSION"
 echo ""
 
@@ -2724,7 +2782,7 @@ echo ""
 if $CHECK_ONLY && $FAST_CHECK; then
     LOCAL_MANIFEST="$SCRIPT_DIR/update-manifest.json"
     LOCAL_VERSION=""
-    [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(grep '"version"' "$LOCAL_MANIFEST" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+    [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(manifest_version "$LOCAL_MANIFEST")
 
     if py_available && [ -f "$LOCAL_MANIFEST" ]; then
         # issue #402: paths passed via argv, not interpolated into the -c string —
