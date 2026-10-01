@@ -187,8 +187,8 @@ from pathlib import Path
 import sys
 
 text = Path(sys.argv[1]).read_text(encoding="utf-8")
-# week-review and morning only: note-review has no scheduled run since the pilot decision
-# of 2026-07-29/30 (#961); the dedicated check is scripts/tests/test_issue_961_*.sh
+# week-review and morning only: note-review has no scheduled run since the template owner's
+# decision of July 2026 (#961); the dedicated check is scripts/tests/test_issue_961_*.sh
 assert text.count('if run_strategist_scenario "') == 2
 assert 'run_strategist_scenario "note-review"' not in text
 assert text.count('timeout "$TASK_TIMEOUT_LONG" "$STRATEGIST_SH"') == 1

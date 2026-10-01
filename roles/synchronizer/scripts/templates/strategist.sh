@@ -131,7 +131,8 @@ build_message() {
             ;;
 
         "note-review")
-            printf "<b>📝 Note-Review завершён</b>\n\nЗаметки классифицированы, предложения записаны в целевые документы. Заметки остаются в inbox до решения пилота."
+            # The notifier cannot see what the model did, so the text claims nothing about written proposals
+            printf "<b>📝 Note-Review завершён</b>\n\nЗаметки остаются в inbox, пока вы не примете по ним решение."
             ;;
 
         *)

@@ -2,25 +2,29 @@
 """
 Deterministic cleanup of processed notes from fleeting-notes.md.
 
-Pilot decision (2026-07-29): Note-Review classifies and proposes, it never
-decides on the pilot's behalf. As of that date the prompt (note-review.md
-step 4) stops stripping bold after classification — processed notes get
+Template owner's decision (July 2026): Note-Review classifies and proposes, it
+never decides on the pilot's behalf. The prompt (note-review.md step 4)
+therefore no longer strips bold after classification — processed notes get
 "**Title** ✅предложено" instead, staying bold and visible every day until
 the pilot removes them himself. This script still exists as a safety net
-for any note that reaches this file without bold at all (pre-2026-07-29
-format, or a future regression) — it must never silently sweep up a note
-the pilot hasn't explicitly closed.
+for any note that reaches this file without bold at all (an older format, or
+a model that dropped the bold) — it must never silently sweep up a note the
+pilot hasn't explicitly closed, so a note that carries the ✅предложено mark
+is kept even when its bold is gone.
 
 This script runs AFTER note-review and deterministically:
 1. Parses fleeting-notes.md into header + note blocks
-2. Archives non-bold, non-🔄 blocks to Notes-Archive.md
+2. Archives non-bold, non-🔄, non-✅предложено blocks to Notes-Archive.md
 3. Removes them from fleeting-notes.md
 4. Stages changes for git commit
 
 Keep rules:
-  - **bold** title  → note not yet closed by pilot (new or ✅предложено), KEEP
-  - 🔄 in title    → needs review, KEEP
-  - everything else → already stripped of bold by something else, ARCHIVE
+  - **bold** title        → note not yet closed by pilot (new or ✅предложено), KEEP
+  - 🔄 in title           → needs review, KEEP
+  - ✅предложено in title → proposal written, the decision is the pilot's, KEEP
+                            (any case, a space after ✅ allowed; not when the
+                            pilot struck the note through with ~~)
+  - everything else       → already stripped of bold by something else, ARCHIVE
 """
 
 import os
@@ -54,6 +58,10 @@ if _ISOLATED:
 WORKSPACE = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else _CANON_DIR
 FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
+
+# The mark Note-Review puts on a proposed note. A model does not copy it letter for letter:
+# "✅ предложено" and "✅Предложено" occur, and the bold may be dropped (#961).
+PROPOSED_MARK_RE = re.compile(r"✅\s*предложено", re.IGNORECASE)
 
 
 def parse_notes(content: str) -> tuple[str, list[str]]:
@@ -128,6 +136,10 @@ def should_keep(block: str) -> bool:
         return True
     # 🔄 marker = needs review
     if "🔄" in first_line:
+        return True
+    # ✅предложено = a proposal is written and the decision is the pilot's, even if the bold is gone;
+    # a note the pilot struck through (~~) is closed whatever else its line says
+    if PROPOSED_MARK_RE.search(first_line) and not first_line.startswith("~~"):
         return True
     # Protection: don't archive notes younger than 24h.
     # Catch-up note-review may strip bold without real processing (bug 21 Mar 2026).

@@ -1897,7 +1897,7 @@
     },
     {
       "path": "roles/strategist/scripts/cleanup-processed-notes.py",
-      "sha256": "3757261664c74469b3ff6a59338e49ef29df443e4a752885729615db7333b5cb"
+      "sha256": "201c8740749ae2bf122998197f95fa52e96af24d834a368c316609b92d5b7cfa"
     },
     {
       "path": "roles/strategist/scripts/fetch-wakatime.sh",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "8776f7b02f17fe942eefdd09eda5c12b26ed7d8c7b4db18637c93c0f6a6729e3"
+      "sha256": "3e07ac06abad3a3ace49eb86c85be1be31536ca97b65b1a5a78101c5e5377e35"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1957,7 +1957,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/daily-report.sh",
-      "sha256": "5586d329542362ba5eaefd43a997e6e7afd86ecac459e9e34ba22865ea88b16f"
+      "sha256": "6b854a11b22466cdc3bd79d5d75e71ffdb47f7747ec8884876c5d391a47fa616"
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect-neon.py",
@@ -1977,7 +1977,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "1d3964f591145fc586fa2b370caf70fd0ad5bb28e4ed3b5302d2d8860da8d910"
+      "sha256": "78f592816c4682ba90f4fc11c00c9dd32bc550a905b3db993282551e87acd118"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -1997,7 +1997,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "541c4568e31a12cc9e2d0d01dfcae44a407c8f568a26978808d8260642ef24e8"
+      "sha256": "210458a5367ad0d5cb088dbd8a5f9c6320682a7629da2abff1874ae2cb1cd12a"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -2857,7 +2857,7 @@
     },
     {
       "path": "scripts/tests/test_launchd_identity_runtime.sh",
-      "sha256": "a0eebdb3bb79d8cbe90245ca891499cac659aeb73061e0665c78e32f7625eba9"
+      "sha256": "6bd0d6ac517b0088a783fd7e866051872de53a05bc3ab717c8b55e5b234bf6e5"
     },
     {
       "path": "scripts/tests/test_role_runner_update_marker_guard.sh",

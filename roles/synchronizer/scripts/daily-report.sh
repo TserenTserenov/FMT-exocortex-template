@@ -169,7 +169,7 @@ agent: Синхронизатор
     fi
 
     # The note-review row and its traffic-light check are gone: the scheduler no longer runs
-    # note-review (pilot decision 2026-07-29/30, #961), so a missing marker is not a failure.
+    # note-review (template owner's decision, July 2026), so a missing marker is not a failure.
 
     # 3. Week-review (Пн)
     if [ "$DOW" = "1" ]; then

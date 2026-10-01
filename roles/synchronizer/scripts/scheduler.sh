@@ -233,11 +233,12 @@ dispatch() {
         ran=1
     fi
 
-    # --- Стратег: note-review — no scheduled runs (pilot decision 2026-07-29/30, #961) ---
-    # Notes are reviewed ONLY by the pilot, in the Day Open "Разбор заметок" section. The nightly
-    # run kept stripping bold and archiving notes without a pilot decision, so BOTH scheduler
-    # paths are gone: the evening run (22:00+) and the morning catch-up for "yesterday".
-    # A manual `strategist.sh note-review` in a live session with the pilot is still allowed.
+    # --- Стратег: note-review — no scheduled runs (template owner's decision, July 2026) ---
+    # Notes are reviewed ONLY by hand, in a live session with the pilot (e.g. the Day Open
+    # "Разбор заметок" section). The nightly run kept stripping bold and archiving notes without
+    # a pilot decision, so BOTH scheduler paths are gone: the evening run (22:00+) and the
+    # morning catch-up for "yesterday". A manual `strategist.sh note-review` from a terminal
+    # still works, but it has no chat: it only marks notes and writes proposals, it never archives.
 
     # --- Синхронизатор: code-scan (ежедневно) ---
     if ! ran_today "synchronizer-code-scan"; then

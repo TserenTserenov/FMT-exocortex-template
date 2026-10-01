@@ -892,12 +892,17 @@ already_ran_today() {
 }
 
 # Note-Review canary (#961): number of NEW notes in fleeting-notes.md, i.e. bold titles that carry
-# neither 🔄 (deferred) nor ✅предложено (proposal already written). Since the pilot decision of
-# 2026-07-29 a processed note stays bold and gets the ✅предложено mark instead of losing its bold,
-# so a healthy run lowers THIS count, not the plain bold count. Prints 0 for a missing file.
+# neither 🔄 (deferred) nor ✅предложено (proposal already written). Since the template owner's
+# decision of July 2026 a processed note stays bold and gets the ✅предложено mark instead of losing
+# its bold, so a healthy run lowers THIS count, not the plain bold count. The mark is matched the way
+# a model types it: with a space after ✅ and with a capital. The case variants are spelled out
+# instead of using grep -i, because folding Cyrillic case depends on the locale of the runner
+# (cleanup-processed-notes.py matches the same variants case-insensitively).
+# Prints 0 for a missing file.
+PROPOSED_MARK_ERE='✅[[:space:]]*(предложено|Предложено|ПРЕДЛОЖЕНО)'
 count_new_bold_notes() {  # <fleeting-notes.md>
     local count
-    count=$(grep '^\*\*' "$1" 2>/dev/null | grep -vc -e '🔄' -e '✅предложено' || true)
+    count=$(grep '^\*\*' "$1" 2>/dev/null | grep -vcE -e '🔄' -e "$PROPOSED_MARK_ERE" || true)
     echo "${count:-0}"
 }
 
@@ -1199,7 +1204,7 @@ case "$1" in
         ) || true
 
         # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net: only notes the pilot closed
-        # by hand — bold removed or struck through; ✅предложено notes are bold and are never swept up)
+        # by hand — bold removed or struck through; ✅предложено notes are never swept up, bold or not)
         # cleanup-processed-notes.py has no placeholders, so it is read-only
         # data from FMT (same rule as notify.sh above) and build-runtime does
         # not deliver it next to this runtime copy of strategist.sh — resolving
@@ -1298,7 +1303,7 @@ case "$1" in
         echo ""
         echo "Scenarios:"
         echo "  morning           - 4:00 EET daily (session-prep on Mon, day-plan others)"
-        echo "  note-review       - manual only, with the pilot present (classify fleeting notes and propose; no auto-archive)"
+        echo "  note-review       - manual only: marks notes ✅предложено and writes proposals; the archive needs a live session with the pilot"
         echo "  week-review       - Sunday 19:00 EET review for club"
         echo "  session-prep      - Manual session prep (headless preparation)"
         echo "  strategy-session  - Manual strategy session (interactive with user)"

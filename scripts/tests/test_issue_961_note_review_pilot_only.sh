@@ -89,7 +89,7 @@ check "seed legend: no 'reviewed every day at 23:00' promise" "0" "$(count_fixed
 check "seed legend: the box is reviewed by the pilot only" "1" "$(count_fixed 'Разбирает только пилот' "$SEED_LEGEND")"
 check "day-plan prompt: no claim that Note-Review marks and archives notes at 23:00" "0" "$(count_fixed 'это делает Note-Review в 23:00' "$DAYPLAN_PROMPT")"
 
-echo "== A5: the cleanup safety net never sweeps up a proposed note =="
+echo "== A5: the cleanup safety net never sweeps up a proposed note, bold or not =="
 PY3="$(bash "$ROOT/scripts/lib/find-python3.sh" --stdlib-only)" || { echo "no python3 for the cleanup case" >&2; exit 2; }
 mkdir -p "$SB/clean/inbox" "$SB/clean/archive/notes" "$SB/clean-home"
 cat > "$SB/clean/inbox/fleeting-notes.md" <<'EOF'
@@ -118,11 +118,34 @@ title: Fleeting
 ~~Note D closed by the pilot~~
 
 ---
+
+Note E proposed, the model dropped the bold ✅предложено
+
+---
+
+Note F proposed, typed with a space ✅ предложено
+
+---
+
+Note G proposed, typed with a capital ✅Предложено
+
+---
+
+Note H plain, no mark at all
+
+---
+
+~~Note I struck through by the pilot~~ ✅предложено
+
+---
 EOF
 CLEAN_OUT="$(env HOME="$SB/clean-home" IWE_CLEANUP_REPO_DIR="$SB/clean" "$PY3" "$CLEANUP_PY" 2>&1)"
-check "cleanup run: 1 archived (the one the pilot struck through), 3 kept" "Cleaned: 1 archived, 3 kept" "$CLEAN_OUT"
+check "cleanup run: 3 archived (D, H, I: closed by the pilot or never marked), 6 kept" "Cleaned: 3 archived, 6 kept" "$CLEAN_OUT"
 check "cleanup: the proposed notes and the new note stay in the box" "3" "$(grep -c '^\*\*Note' "$SB/clean/inbox/fleeting-notes.md")"
+check "cleanup: a proposed note without bold stays in the box, typed with a space or with a capital too" "3" "$(grep -cE '^Note [EFG] ' "$SB/clean/inbox/fleeting-notes.md")"
 check "cleanup: the struck-through note went to the archive" "1" "$(count_fixed 'Note D closed by the pilot' "$SB/clean/archive/notes/Notes-Archive.md")"
+check "cleanup control: a plain note without any mark is still archived" "1" "$(count_fixed 'Note H plain, no mark at all' "$SB/clean/archive/notes/Notes-Archive.md")"
+check "cleanup: a note the pilot struck through is archived even though the mark is still on its line" "1" "$(count_fixed 'Note I struck through by the pilot' "$SB/clean/archive/notes/Notes-Archive.md")"
 
 # ==== LAYER B: the scheduler never starts note-review ====
 echo "== B: scheduler.sh dispatch =="
@@ -248,7 +271,9 @@ TG_MSG="$(env -i HOME="$SB/tg-home" PATH="$PATH" IWE_WORKSPACE="$SB/tg" IWE_GOVE
     bash -c 'source "$1"; build_message note-review' _ "$ROOT/roles/synchronizer/scripts/templates/strategist.sh" 2>&1)"
 check "the message exists (the fixture Day Plan was found)" "1" "$(printf '%s\n' "$TG_MSG" | grep -cF 'Note-Review завершён')"
 check "the message does not claim the inbox was cleaned" "0" "$(printf '%s\n' "$TG_MSG" | grep -cF 'inbox почищен')"
-check "the message says the decision stays with the pilot" "1" "$(printf '%s\n' "$TG_MSG" | grep -cF 'до решения пилота')"
+# the notifier cannot tell whether the model wrote anything, so it must not say that proposals were written
+check "the message does not claim the proposals were written (a refused or failed model run sends it too)" "0" "$(printf '%s\n' "$TG_MSG" | grep -cF 'предложения записаны')"
+check "the message says the notes wait for the pilot's decision" "1" "$(printf '%s\n' "$TG_MSG" | grep -cF 'пока вы не примете по ним решение')"
 
 # ==== LAYER E: the scheduler report ====
 echo "== E: daily-report.sh at 23:00 =="
@@ -263,6 +288,52 @@ check "the dry run succeeds" "0" "$DR_RC"
 check "everything that must run did run: the traffic light is green (a missing note-review marker is no failure)" "1" "$(printf '%s\n' "$DR_OUT" | grep -cF '🟢')"
 check "no note-review complaint in the remarks" "0" "$(printf '%s\n' "$DR_OUT" | grep -c 'note-review')"
 check "no 'Разбор заметок' row that could show a failed run" "0" "$(printf '%s\n' "$DR_OUT" | grep -cF 'Разбор заметок')"
+# ==== LAYER F: the canary ====
+echo "== F: the canary counts as NEW only the notes nobody has dealt with (count_new_bold_notes) =="
+cat > "$SB/canary-fleeting.md" <<'EOF'
+# Fleeting Notes
+
+---
+
+**New note**
+
+---
+
+**Proposed note** ✅предложено
+
+---
+
+**Spaced note** ✅ предложено
+
+---
+
+**Capitalised note** ✅Предложено
+
+---
+
+**Shouting noise note** ✅ПРЕДЛОЖЕНО (шум)
+
+---
+
+**Deferred note** 🔄
+
+---
+
+Plain note, the model dropped the bold ✅предложено
+
+---
+
+~~Struck note~~
+EOF
+# the function and the pattern it uses are cut out of the runner by name, as setup/test-strategist-isolated-scenarios.sh does
+CANARY_CODE="$(sed -n '/^PROPOSED_MARK_ERE=/p;/^count_new_bold_notes() {/,/^}/p' "$ROOT/roles/strategist/scripts/strategist.sh")"
+[ -n "$CANARY_CODE" ] || fail "count_new_bold_notes is missing in strategist.sh"
+canary_count() {  # <fleeting notes file>
+    bash -c "$CANARY_CODE"$'\n''count_new_bold_notes "$1"' _ "$1"
+}
+check "only the untouched note counts as new: marked notes (with a space, with capitals), a deferred one, a plain one and a struck one do not" "1" "$(canary_count "$SB/canary-fleeting.md")"
+check "a missing box counts as zero" "0" "$(canary_count "$SB/no-such-box.md")"
+
 # ==== LAYER G: the other texts ====
 echo "== G1: the Day Open instructions no longer say that a processed note leaves the box =="
 for f in ".claude/skills/day-open/day-open-details.md" ".claude/skills/day-open/templates.md" "memory/templates-dayplan.md"; do
@@ -297,8 +368,9 @@ check "synchronizer README: a manual run from the terminal is described honestly
 check "synchronizer README: no promise that the manual run does the whole review" "0" "$(count_fixed 'вручную (`strategist.sh note-review`) или в секции' "$ROOT/roles/synchronizer/README.md")"
 
 echo "== G3: the decision is not attributed to a pilot on a date =="
-for stale in '29-30.07.2026' '(пилот, 30.07.2026)' 'Пилот (2026-07-29)' '(пилот, 2026-07-29)'; do
-    absent_in_texts "no '$stale' in the shipped texts" "$stale"
+for stale in '29-30.07.2026' '(пилот, 30.07.2026)' 'Пилот (2026-07-29)' '(пилот, 2026-07-29)' \
+    'pilot decision 2026-07-29/30' 'Pilot decision (2026-07-29)' 'Since the pilot decision of'; do
+    absent_in_texts "no '$stale' in the shipped texts and script comments" "$stale"
 done
 # ==== END LAYERS ====
 

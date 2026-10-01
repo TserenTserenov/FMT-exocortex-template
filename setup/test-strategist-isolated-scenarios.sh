@@ -122,6 +122,10 @@ case "${STUB_MODE:-noop}" in
     commit-inside) echo x >> inbox/fleeting-notes.md; git add inbox/fleeting-notes.md; git commit -q -m "model commit" ;;
     # a healthy Note-Review (#961): the new note is marked, its bold stays
     mark-proposed) sed 's/^\*\*Bold new note\*\*$/**Bold new note** ✅предложено/' inbox/fleeting-notes.md > "$TMPDIR/fleeting.marked" && cat "$TMPDIR/fleeting.marked" > inbox/fleeting-notes.md ;;
+    # the same mark typed with a space and a capital (a model does not copy the prompt letter for letter)
+    mark-variant) sed 's/^\*\*Bold new note\*\*$/**Bold new note** ✅ Предложено/' inbox/fleeting-notes.md > "$TMPDIR/fleeting.marked" && cat "$TMPDIR/fleeting.marked" > inbox/fleeting-notes.md ;;
+    # a model that marks the note but drops its bold: the safety net must not sweep it up
+    mark-nobold) sed 's/^\*\*Bold new note\*\*$/Bold new note ✅предложено/' inbox/fleeting-notes.md > "$TMPDIR/fleeting.marked" && cat "$TMPDIR/fleeting.marked" > inbox/fleeting-notes.md ;;
     fail) exit 3 ;;
 esac
 exit 0
@@ -505,11 +509,12 @@ check "sed (prompt read) fails: runner exits non-zero" "1" "$([ "$RC" -ne 0 ] &&
 check "sed fails: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
 check "sed fails: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
 
-echo "== B10: the canary understands ✅предложено (#961): a healthy run is silent, a run that processed nothing still alarms =="
-# The canary used to expect the plain bold count to drop. Since the pilot decision of 2026-07-29 a processed note
-# keeps its bold and gets the ✅предложено mark, so every healthy run looked like a failed one and sent a false alarm.
-# The model double either marks the new note (healthy) or does nothing; a recording curl double stands for the
-# Telegram API, so an alert is observable. The legacy and the isolated path share the canary code: both are run.
+echo "== B10: the canary and the safety net understand ✅предложено (#961): a healthy run is silent, a run that processed nothing still alarms =="
+# The canary used to expect the plain bold count to drop. Since the template owner's decision of July 2026 a processed
+# note keeps its bold and gets the ✅предложено mark, so every healthy run looked like a failed one and sent a false
+# alarm. The model double marks the new note exactly as the prompt says, with a space and a capital, or with the mark
+# but without bold (all healthy), or does nothing (the control); a recording curl double stands for the Telegram API,
+# so an alert is observable. The legacy and the isolated path share the canary code: both are run.
 log_count() { cat "$HOME_DIR"/logs/strategist/*.log 2>/dev/null | grep -c -- "$1" || true; }
 alert_count() { if [ -f "$E/curl.log" ]; then grep -c 'Note-Review canary' "$E/curl.log" || true; else echo 0; fi; }
 published_count() { git -C "$ORIGIN" show main:inbox/fleeting-notes.md | grep -c -- "$1" || true; }
@@ -522,14 +527,21 @@ make_canary_env() {
 }
 for scenario_flag in "" "note-review"; do
     mode_label="flag off"; [ -z "$scenario_flag" ] || mode_label="isolated"
-    make_canary_env
-    run_runner mark-proposed "$scenario_flag" note-review
-    check "$mode_label, healthy run (the new note gets ✅предложено): runner exits 0" "0" "$RC"
-    check "$mode_label, healthy run: the canary logged no warning" "0" "$(log_count 'WARN: Note-Review')"
-    check "$mode_label, healthy run: no canary alert was sent" "0" "$(alert_count)"
-    check "$mode_label, healthy run: the marked note is published bold, nothing archived on its own" "1" "$(published_count '^\*\*Bold new note\*\* ✅предложено$')"
-    check "$mode_label, healthy run: the earlier proposed note is still in the box" "1" "$(published_count '^\*\*Already proposed note\*\* ✅предложено$')"
-    check "$mode_label, healthy run: the plain old note was archived by the safety net, as before" "0" "$(published_count 'Plain old note')"
+    for model_mode in mark-proposed mark-variant mark-nobold; do
+        case "$model_mode" in
+            mark-proposed) marked_line='^\*\*Bold new note\*\* ✅предложено$' ;;
+            mark-variant)  marked_line='^\*\*Bold new note\*\* ✅ Предложено$' ;;
+            *)             marked_line='^Bold new note ✅предложено$' ;;
+        esac
+        make_canary_env
+        run_runner "$model_mode" "$scenario_flag" note-review
+        check "$mode_label, healthy run ($model_mode): runner exits 0" "0" "$RC"
+        check "$mode_label, healthy run ($model_mode): the canary logged no warning" "0" "$(log_count 'WARN: Note-Review')"
+        check "$mode_label, healthy run ($model_mode): no canary alert was sent" "0" "$(alert_count)"
+        check "$mode_label, healthy run ($model_mode): the marked note is published and nothing is archived on its own" "1" "$(published_count "$marked_line")"
+        check "$mode_label, healthy run ($model_mode): the earlier proposed note is still in the box" "1" "$(published_count '^\*\*Already proposed note\*\* ✅предложено$')"
+        check "$mode_label, healthy run ($model_mode): the plain old note was archived by the safety net, as before" "0" "$(published_count 'Plain old note')"
+    done
     make_canary_env
     run_runner noop "$scenario_flag" note-review
     check "$mode_label, control, the model processed nothing: runner exits 0" "0" "$RC"
