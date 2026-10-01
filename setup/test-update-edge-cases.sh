@@ -2685,13 +2685,15 @@ IWE_GOVERNANCE_REPO=""
 print_extra_write_targets
 EOF
 T37_OUT=$(bash "$T37_RUNNER" 2>&1)
-if printf '%s\n' "$T37_OUT" | grep -Fq "$T37_WS/legacy-governance/scripts/install-hooks.sh" && \
-   printf '%s\n' "$T37_OUT" | grep -Fq "$T37_WS/legacy-governance/.githooks/pre-commit" && \
-   printf '%s\n' "$T37_OUT" | grep -Fq "$T37_WS/legacy-governance/scripts/update-derived-snapshot.py" && \
-   printf '%s\n' "$T37_OUT" | grep -Fq "$T37_WS/legacy-governance/scripts/executor-catalog.yaml" && \
-   printf '%s\n' "$T37_OUT" | grep -Fq "$T37_WS/.iwe-paths" && \
-   printf '%s\n' "$T37_OUT" | grep -Fq '/.zshenv' && \
-   printf '%s\n' "$T37_OUT" | grep -Fq 'local core.hooksPath'; then
+# Here-strings, not `printf | grep -q`: with pipefail, grep -q leaving after an early match makes
+# printf die of SIGPIPE once the preview outgrows the pipe buffer, and the check fails at random.
+if grep -Fq -- "$T37_WS/legacy-governance/scripts/install-hooks.sh" <<<"$T37_OUT" && \
+   grep -Fq -- "$T37_WS/legacy-governance/.githooks/pre-commit" <<<"$T37_OUT" && \
+   grep -Fq -- "$T37_WS/legacy-governance/scripts/update-derived-snapshot.py" <<<"$T37_OUT" && \
+   grep -Fq -- "$T37_WS/legacy-governance/scripts/executor-catalog.yaml" <<<"$T37_OUT" && \
+   grep -Fq -- "$T37_WS/.iwe-paths" <<<"$T37_OUT" && \
+   grep -Fq -- '/.zshenv' <<<"$T37_OUT" && \
+   grep -Fq -- 'local core.hooksPath' <<<"$T37_OUT"; then
     pass "T37: preview resolves legacy config and lists every governance backfill target"
 else
     fail "T37: preview omits or mis-resolves governance backfill targets: $T37_OUT"
