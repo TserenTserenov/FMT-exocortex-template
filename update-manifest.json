@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "e75d09d1665e7a2cb9245a3fc38097d06c26526b4b6b383cfe0b634cd8b8215d"
+      "sha256": "739fbf069ed4ae6046fd4b6ac253c480b4f2c116bd48741bfb2c91c2a1d0801f"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1881,7 +1881,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "64881ab4f8018a01b88e5d5cb323f5e8235b039a80fd14d000cd4d43d7c292c0"
+      "sha256": "27a9005bfba434810a1c1fe7ab5dfdc53e55b3bccca0c35a008ce5077f8f3362"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",

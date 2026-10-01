@@ -4,7 +4,8 @@
 # WP-7 C1/C2: every command of the skill passes the destructive-guard hook (a top-level cd is
 # blocked there), the rewritten blocks still do their job, and the publication command publishes
 # from a session-isolate copy to origin/main with real publishers (C1 compat: --branch only to a
-# publisher that knows it; C3: every commit of the copy, oldest first).
+# publisher that knows it, judged by the file's text (a heuristic); C3: every commit of the copy,
+# oldest first; a failed git rev-list is an error, not "nothing to publish").
 # scripts/tests/run-issue-tests.sh picks up test_issue_*.sh by existence, with no registration, so an
 # install without this dev-only (undelivered) file is not reported as missing it.
 set -uo pipefail
@@ -265,11 +266,30 @@ if [ -n "$f" ]; then
     && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
     && check "publication, nothing new in the copy: exit 0, one line says so, no claim of a publication" ok \
     || { detail "rc=$RC out=$OUT"; check "publication, nothing new in the copy: exit 0, one line says so, no claim of a publication" bad; }
+  # A failing git rev-list is an error, not "nothing to publish": an empty list from a failed command must
+  # not read as success. The git double fails rev-list only and runs the real git for every other call.
+  SHIM="$C2/shim-revlist"; REAL_GIT=$(command -v git); mkdir -p "$SHIM"
+  cat > "$SHIM/git" <<EOF
+#!/bin/sh
+for a in "\$@"; do [ "\$a" = rev-list ] && { echo "fatal: rev-list failed (test double)" >&2; exit 1; }; done
+exec "$REAL_GIT" "\$@"
+EOF
+  chmod +x "$SHIM/git"
+  new_copy "claude-revlist-fails"; commit_in_copy "current/WeekPlan W45.md" "strategy-session: rev-list fails"
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null 2>&1 || { echo "SKIP: $sh not found, the publication block is not run in it"; continue; }
+    if [ "$sh" = zsh ]; then publish_copy env "PATH=$SHIM:$PATH" zsh -f; else publish_copy env "PATH=$SHIM:$PATH" bash; fi
+    [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q 'не удалось получить список коммитов' && ! printf '%s' "$OUT" | grep -q 'Публиковать нечего' \
+      && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
+      && check "publication ($sh), git rev-list fails: exit 1 with the reason, not 'nothing to publish'" ok \
+      || { detail "rc=$RC out=$OUT"; check "publication ($sh), git rev-list fails: exit 1 with the reason, not 'nothing to publish'" bad; }
+  done
 
   # C1 compat: update.sh never replaces an existing scripts/ds-publish.sh, so an install may keep one that
   # does not know --branch and answers it with usage, exit 1: its own one with a fixed target branch (made
   # here from the seed copy delivered before --branch existed: main always, the same strict argument
-  # parser) or that seed copy itself (the fixture, byte for byte). --branch goes only to one that knows it.
+  # parser) or that seed copy itself (the fixture, byte for byte). --branch goes only to one that knows it,
+  # judged by the file's text (a heuristic).
   OLD_PUB="$TEMPLATE_ROOT/scripts/tests/fixtures/ds-publish-637a526.sh"
   OWN_PUB="$C2/own-ds-publish.sh"
   # shellcheck disable=SC2016  # the literal publisher line ${BRANCH:-main}, not an expansion
