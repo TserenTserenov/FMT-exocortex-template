@@ -711,6 +711,14 @@ run_claude() {
         script) calendar_note=" Календарь берётся только из scripts/server-calendar.sh (params.yaml: calendar_source: script): календарный коннектор не запрашивай." ;;
     esac
 
+    # #961: note-review started from this script has no chat with the pilot. One line says so, the way the
+    # calendar sentence above is added, so that skipping step 10 (the archive) does not rest on the model's guess.
+    # A live session (the Day Open mini-review, a request in a chat) never passes here and gets no such line.
+    local mode_line=""
+    case "$command_file" in
+        note-review) mode_line=$'\n'"РЕЖИМ: запуск из скрипта без чата; шаг 10 и архив не выполнять, только пометки и предложения" ;;
+    esac
+
     # Inject current date + day of week (prevents LLM calendar arithmetic errors)
     local ru_date_context
     ru_date_context=$(python3 -c "
@@ -720,7 +728,7 @@ months = ['января','февраля','марта','апреля','мая','
 d = datetime.date.today()
 print(f'{d.day} {months[d.month-1]} {d.year}, {days[d.weekday()]}')
 ") || { log "ERROR: не удалось получить дату для контекста (python3)"; return 1; }
-    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). Первый Пн месяца: ${IS_FIRST_MONDAY_OF_MONTH} (посчитано командой date, не выводи это значение сам — issue #616).${calendar_note} ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
+    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). Первый Пн месяца: ${IS_FIRST_MONDAY_OF_MONTH} (посчитано командой date, не выводи это значение сам — issue #616).${calendar_note} ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.${mode_line}
 
 ${prompt}"
 
@@ -895,11 +903,12 @@ already_ran_today() {
 # neither 🔄 (deferred) nor ✅предложено (proposal already written). Since the template owner's
 # decision of July 2026 a processed note stays bold and gets the ✅предложено mark instead of losing
 # its bold, so a healthy run lowers THIS count, not the plain bold count. The mark is matched the way
-# a model types it: with a space after ✅ and with a capital. The case variants are spelled out
-# instead of using grep -i, because folding Cyrillic case depends on the locale of the runner
-# (cleanup-processed-notes.py matches the same variants case-insensitively).
-# Prints 0 for a missing file.
-PROPOSED_MARK_ERE='✅[[:space:]]*(предложено|Предложено|ПРЕДЛОЖЕНО)'
+# a model types it: spaces after ✅ (a no-break one too) and any mix of capitals. The letters are
+# spelled out in (п|П) pairs instead of using grep -i, because folding Cyrillic case depends on the
+# locale of the runner. The same mark means "waiting for the pilot" in cleanup-processed-notes.py
+# (re.IGNORECASE) and in the Day Open scanner (day-open-scaffold.sh, the same pairs); the line is one
+# line on purpose, the test harness cuts it out by name. Prints 0 for a missing file.
+PROPOSED_MARK_ERE='✅([[:space:]]|'$'\302\240'')*(п|П)(р|Р)(е|Е)(д|Д)(л|Л)(о|О)(ж|Ж)(е|Е)(н|Н)(о|О)'
 count_new_bold_notes() {  # <fleeting-notes.md>
     local count
     count=$(grep '^\*\*' "$1" 2>/dev/null | grep -vcE -e '🔄' -e "$PROPOSED_MARK_ERE" || true)

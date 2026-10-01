@@ -453,11 +453,11 @@
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
-      "sha256": "da38dea4d1820f55b7b7ce4080de6e1e651b94cf3467e9b80407b005eaa46758"
+      "sha256": "8817fdd65c9808f8c7beedf1ed242b774ea092c940188385508ce102261dc12c"
     },
     {
       "path": ".claude/skills/day-open/templates.md",
-      "sha256": "1b76c7bb2dff53d484b01f37c98d3f3d0e7bb7c457b83cd1460c8fea577157cc"
+      "sha256": "408322233362931d5b9a41be96363951419cab9d46e0f841a0753b758f3d351b"
     },
     {
       "path": ".claude/skills/decompose/SKILL.md",
@@ -909,7 +909,7 @@
     },
     {
       "path": "docs/IWE-HELP.md",
-      "sha256": "541231e5cd111f529ed3b87e3737913bc1a6f210a31c7004f98d16977927e416"
+      "sha256": "c73ccc6e6ea83177ff9e11aca7eb393a1901b8430565c18cdafad2aa382d3b96"
     },
     {
       "path": "docs/KIMI-BROWSER-SETUP.md",
@@ -921,7 +921,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "222b5c012296ddfd709022fb165d249801cef0a9ec903503dc54124042ca3500"
+      "sha256": "343c8d19889547029cb7c16b04c9900f80f8e029e993a003491638fea1613427"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -953,7 +953,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "cf2a882d2006de3b1c42da2574a84b136a728cb01d5313bf9dc82061829d6249"
+      "sha256": "8b45035b76af19c1b4dad36a8ce7f5e7d0e9cffb1e45a2b39119af230a457c67"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1613,7 +1613,7 @@
     },
     {
       "path": "memory/templates-dayplan.md",
-      "sha256": "cfa0028763b47441754f472e7081adc7fab1c4308cfde7112c1ee1993ce9d7c9"
+      "sha256": "97f8896cd644d4dbfeb223b87f6b14b7a198877c2123844a3ae35c32b2359fbb"
     },
     {
       "path": "pack-templates/.github/README.md",
@@ -1801,7 +1801,7 @@
     },
     {
       "path": "roles/strategist/prompts/note-review.md",
-      "sha256": "028a419cf7deb505d42dcd3d52eb077c1e78873a5a8d73eb839eb64d0d058b48"
+      "sha256": "9c11418e6eb4ebb0aad00f448468c987240b8ccaee27058339cd340807bff384"
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
@@ -1897,7 +1897,7 @@
     },
     {
       "path": "roles/strategist/scripts/cleanup-processed-notes.py",
-      "sha256": "201c8740749ae2bf122998197f95fa52e96af24d834a368c316609b92d5b7cfa"
+      "sha256": "77a2784755d3fcb4491c5262a218a2542d041ee081845123b39d597d40cb887a"
     },
     {
       "path": "roles/strategist/scripts/fetch-wakatime.sh",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "3e07ac06abad3a3ace49eb86c85be1be31536ca97b65b1a5a78101c5e5377e35"
+      "sha256": "760741c9b51efc9bd8089ddd9f93aa46acd4fb97d317bc49b2244c2e0a321d9c"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1933,7 +1933,7 @@
     },
     {
       "path": "roles/synchronizer/README.md",
-      "sha256": "af4c68304e6262df6d80cd2ad21fb58c65a705d5e5b5d66018dd1111418f38af"
+      "sha256": "c95575277cecfac8f75e092c684bbf631bea5d1630568bef2359cd3b929199b8"
     },
     {
       "path": "roles/synchronizer/config.yaml",
@@ -2281,7 +2281,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "0e9f40638119cdf77c858a8e037d57a6b484f0b71fb08f5a4f6882cd156ec566"
+      "sha256": "dac4e6ea521a8492bf474af0437ef9303f02c46341340041e06fd9c34c24d069"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3013,7 +3013,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "dd0bbc52b695717585d610603899c5420da8dae0964aa1ab5362357c62b2e4ca"
+      "sha256": "3be5bf8be26793c2be5b2c73ab46540bc3ae2c1c815de0d4d03e493e453f88ba"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",

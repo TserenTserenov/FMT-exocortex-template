@@ -1074,27 +1074,57 @@ render_scout() {
 
 # --- Section: Разбор заметок (fleeting-notes) ---
 # Парсит inbox/fleeting-notes.md на наличие заметок, ждущих решения пилота: строки **Title**
-# (новые), **Title** ✅предложено и Title ✅предложено (агент записал предложение, решение за
-# пилотом; модель могла уронить жирный, #961).
+# (новые) и заметки с пометкой ✅предложено в первой строке (агент записал предложение, решение
+# за пилотом; модель могла уронить жирный или дописать хвост, #961). Отложенные 🔄 не считаются.
 # Если пусто → "нет заметок" без маркера PENDING → LLM секцию не трогает.
 # Если есть → строки таблицы с реальными заголовками и PENDING на Тип/Предложение.
 # Bold **text** в GitHub не создаёт якорей — ссылки без #якорь.
 render_fleeting_notes() {
   local notes_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/fleeting-notes.md"
 
-  # The mark of a proposed note, spelled the way a model types it: with a space after the check mark and with a
-  # capital. Spelled out instead of grep -i because Cyrillic case folding depends on the locale. The same rule as
-  # the canary (strategist.sh count_new_bold_notes) and the safety net (cleanup-processed-notes.py should_keep).
-  local mark='✅[[:space:]]*(предложено|Предложено|ПРЕДЛОЖЕНО)'
-  local bold_note="^\*\*[^*]+\*\*[[:space:]]*(${mark}.*)?\$"
-  # A marked note without bold: the mark closes the line (a "(...)" tail such as "(шум)" is allowed); the line is
-  # not a quote, a struck-through note (~~), a timestamp (<sub>), a heading or a list item
-  local plain_note="^[^*~<>#[:space:]-].*${mark}([[:space:]]*\(.*\))?[[:space:]]*\$"
-
-  # Extract titles of notes awaiting the pilot: **Title**, **Title** <mark>[ (шум)], Title <mark>[ (шум)]
+  # One decision with the safety net (cleanup-processed-notes.py should_keep) and the canary (strategist.sh
+  # count_new_bold_notes): a note awaits the pilot when its FIRST line (the line after a --- rule) carries the mark
+  # "✅предложено" anywhere, with or without bold, or when a line is a bold title alone (**Title**, the legacy
+  # rule), or a bold title followed by the mark. A first line that is a quote, a heading, a timestamp, a
+  # struck-through note (~~) or a list item is no note title. The body of a note is never scanned.
+  # awk, not grep -i / tolower: Cyrillic case folding depends on the locale, so the mark is spelled out in
+  # (п|П) pairs; the no-break space is spelled in octal because [[:space:]] does not cover it in every locale.
   local new_notes
-  new_notes=$(grep -E -e "$bold_note" -e "$plain_note" "$notes_file" 2>/dev/null \
-    | sed -E -e 's/^\*\*//' -e "s/\*\*[[:space:]]*(${mark}.*)?\$//" -e "s/[[:space:]]*${mark}([[:space:]]*\(.*\))?[[:space:]]*\$//")
+  new_notes=$(awk '
+    BEGIN {
+      mark = "✅([[:space:]]|\302\240)*(п|П)(р|Р)(е|Е)(д|Д)(л|Л)(о|О)(ж|Ж)(е|Е)(н|Н)(о|О)"
+      bold = "^[*][*][^*]+[*][*][[:space:]]*(" mark ".*)?$"
+      no_title = "^([>#<]|~~|[-+*][[:space:]]|[0-9]+[.)][[:space:]])"
+      first = 1
+    }
+    { sub(/\r$/, "") }
+    /^---[[:space:]]*$/ { first = 1; next }
+    /^[[:space:]]*$/ { next }
+    {
+      starts_block = first
+      first = 0
+      title = ""
+      if ($0 ~ bold) {
+        title = $0
+        sub(/^[*][*]/, "", title)
+        sub("[*][*][[:space:]]*(" mark ".*)?$", "", title)
+      } else if (starts_block) {
+        line = $0
+        sub(/^[[:space:]]+/, "", line)
+        if (line ~ mark && line !~ no_title) {
+          title = line
+          sub(mark ".*$", "", title)
+          gsub(/[*][*]/, "", title)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", title)
+          if (title == "") {
+            title = line
+            gsub(/[*][*]/, "", title)
+          }
+        }
+      }
+      if (title != "") print title
+    }
+  ' "$notes_file" 2>/dev/null)
 
   if [ -z "$new_notes" ]; then
     printf '| нет заметок | — | — | ✅ |\n'
@@ -1551,7 +1581,7 @@ ${DAY_CLOSE_CARRY_OVER:-нет (Day Close не найден)}
 <details>
 <summary><b>Разбор заметок</b></summary>
 
-<!-- Источник: inbox/fleeting-notes.md. Строки **Title** = непрочитанные, **Title** ✅предложено = предложение записано, ждёт решения пилота. Ссылки без якоря — bold не создаёт GitHub-якорей. -->
+<!-- Источник: inbox/fleeting-notes.md. В списке заметки, ждущие решения пилота: жирные (**Title**, ещё не разобраны) и с пометкой ✅предложено (предложение записано, решение за пилотом; жирный мог пропасть). Отложенные 🔄 не считаются. Ссылки без якоря — bold не создаёт GitHub-якорей. -->
 
 | Заметка | Тип | Предложение | ✅ |
 |---------|-----|-------------|---|

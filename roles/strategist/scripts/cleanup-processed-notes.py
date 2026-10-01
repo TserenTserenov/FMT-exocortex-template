@@ -18,12 +18,16 @@ This script runs AFTER note-review and deterministically:
 3. Removes them from fleeting-notes.md
 4. Stages changes for git commit
 
-Keep rules:
+Keep rules (they look at the FIRST line of a note block, its title):
   - **bold** title        → note not yet closed by pilot (new or ✅предложено), KEEP
   - 🔄 in title           → needs review, KEEP
   - ✅предложено in title → proposal written, the decision is the pilot's, KEEP
-                            (any case, a space after ✅ allowed; not when the
-                            pilot struck the note through with ~~)
+                            (any mix of case, a space after ✅ allowed, anywhere in
+                            the line, with or without bold). The same rule is
+                            applied by the canary in strategist.sh and by the Day
+                            Open scanner; a first line that is a quote, a heading,
+                            a timestamp, a list item or a note the pilot struck
+                            through (~~) is no note title and carries no mark
   - everything else       → already stripped of bold by something else, ARCHIVE
 """
 
@@ -60,8 +64,12 @@ FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
 
 # The mark Note-Review puts on a proposed note. A model does not copy it letter for letter:
-# "✅ предложено" and "✅Предложено" occur, and the bold may be dropped (#961).
+# "✅ предложено", "✅Предложено" and "✅пРедложено" occur, the bold may be dropped and a tail may follow (#961).
 PROPOSED_MARK_RE = re.compile(r"✅\s*предложено", re.IGNORECASE)
+# A first line that is not the title of a note: a quote, a heading, a timestamp, a note the pilot struck through,
+# a bulleted or numbered list item. The mark on such a line says nothing about a note (day-open-scaffold.sh and the
+# canary in strategist.sh draw the same line).
+NOT_A_TITLE_RE = re.compile(r"^(?:[>#<]|~~|[-+*]\s|\d+[.)]\s)")
 
 
 def parse_notes(content: str) -> tuple[str, list[str]]:
@@ -138,8 +146,8 @@ def should_keep(block: str) -> bool:
     if "🔄" in first_line:
         return True
     # ✅предложено = a proposal is written and the decision is the pilot's, even if the bold is gone;
-    # a note the pilot struck through (~~) is closed whatever else its line says
-    if PROPOSED_MARK_RE.search(first_line) and not first_line.startswith("~~"):
+    # a line that is no note title (a quote, a struck-through note, a list item...) is not a marked note
+    if PROPOSED_MARK_RE.search(first_line) and not NOT_A_TITLE_RE.match(first_line):
         return True
     # Protection: don't archive notes younger than 24h.
     # Catch-up note-review may strip bold without real processing (bug 21 Mar 2026).

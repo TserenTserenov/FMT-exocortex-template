@@ -80,7 +80,7 @@ check "the precondition says automatic runs are off" "1" "$(count_fixed 'Авт�
 check "the old 'runs every evening automatically' sentence is gone" "0" "$(count_fixed 'Процесс запускается вечером (~23:00) автоматически' "$PROMPT")"
 check "a run from strategist.sh (no chat) only marks and proposes: the precondition says so" "1" "$(count_fixed 'идёт без чата и только ставит пометки `✅предложено` и пишет предложения (шаги 1-9 и 11)' "$PROMPT")"
 check "a run without a chat archives and deletes nothing: step 9 says so" "1" "$(count_fixed 'ничего не архивирует и не удаляет' "$PROMPT")"
-check "step 10 is skipped when there is no chat" "1" "$(count_fixed 'Из `strategist.sh` (без чата) этот шаг пропускается.' "$PROMPT")"
+check "step 10 is skipped when there is no chat: the prompt names the mode line the runner adds" "1" "$(count_fixed 'раннер добавляет в начало промпта строку «РЕЖИМ: запуск из скрипта без чата' "$PROMPT")"
 check "the old blanket ban that contradicted the terminal run is gone" "0" "$(count_fixed 'без живого пилота сценарий не выполняется вовсе' "$PROMPT")"
 check "the old 'headless: do not wait for approval' block is gone" "0" "$(count_fixed '**Headless-режим:** НЕ ждать одобрения' "$PROMPT")"
 check "the scenario is no longer called 'daily'" "0" "$(count_fixed 'Ежедневный разбор заметок' "$PROMPT")"
@@ -313,6 +313,10 @@ cat > "$SB/canary-fleeting.md" <<'EOF'
 
 ---
 
+**Mixed case note** ✅пРедложено
+
+---
+
 **Shouting noise note** ✅ПРЕДЛОЖЕНО (шум)
 
 ---
@@ -333,7 +337,7 @@ CANARY_CODE="$(sed -n '/^PROPOSED_MARK_ERE=/p;/^count_new_bold_notes() {/,/^}/p'
 canary_count() {  # <fleeting notes file>
     bash -c "$CANARY_CODE"$'\n''count_new_bold_notes "$1"' _ "$1"
 }
-check "only the untouched note counts as new: marked notes (with a space, with capitals), a deferred one, a plain one and a struck one do not" "1" "$(canary_count "$SB/canary-fleeting.md")"
+check "only the untouched note counts as new: marked notes (with a space, with capitals, in any mix of case), a deferred one, a plain one and a struck one do not" "1" "$(canary_count "$SB/canary-fleeting.md")"
 check "a missing box counts as zero" "0" "$(canary_count "$SB/no-such-box.md")"
 
 # ==== LAYER G: the other texts ====
@@ -344,8 +348,10 @@ for f in ".claude/skills/day-open/day-open-details.md" ".claude/skills/day-open/
         check "$f: no '$stale'" "0" "$(count_fixed "$stale" "$ROOT/$f")"
     done
     check_at_least "$f: the condition is 'no notes waiting for the pilot's decision'" 1 "$(count_fixed 'ждущих решения пилота' "$ROOT/$f")"
+    check_at_least "$f: what waits is a bold note OR a note marked ✅предложено; a deferred 🔄 note does not count (the scanner does not list it)" 1 "$(count_fixed 'отложенные `🔄` не считаются' "$ROOT/$f")"
 done
 check "day-open-details: a note marked ✅предложено is carried over to the next Day Plan" "1" "$(count_fixed 'такую заметку переносить в секцию «Разбор заметок» снова' "$ROOT/.claude/skills/day-open/day-open-details.md")"
+check "day-open-details: the categorisation points at the prompt that is shipped" "1" "$(count_fixed 'Полная справка → `roles/strategist/prompts/note-review.md`' "$ROOT/.claude/skills/day-open/day-open-details.md")"
 
 echo "== G2: no guide, seed file or prompt promises an automatic evening review =="
 absent_in_texts() {  # <description> <fixed string>: no file under docs/, seed/, roles/, .claude/, memory/ contains it
@@ -366,6 +372,14 @@ absent_in_texts "strategy-session steps: no ambiguous 'clean the processed'" '**
 for f in "roles/strategist/prompts/strategy-session.md" "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md"; do
     check "$f: only notes the pilot already decided on are cleaned" "1" "$(count_fixed 'по которым пилот уже принял решение' "$ROOT/$f")"
 done
+echo "== G2b: every text that sends the user to a manual review names a route that exists =="
+absent_in_texts "no text points at a memory file that is not shipped" 'feedback_note_review_routing'
+absent_in_texts "no text says 'ask in a chat' without naming a route" 'когда вы просите об этом в чате'
+absent_in_texts "no text says 'ask the Strategist in a chat' without naming a route" 'попросите Стратега разобрать их в чате'
+for f in docs/SETUP-GUIDE.md docs/IWE-HELP.md docs/LEARNING-PATH.md; do
+    check_at_least "$f: the manual review names the terminal command" 1 "$(count_fixed 'strategist.sh note-review' "$ROOT/$f")"
+done
+check "SETUP-GUIDE: the chat route names the instruction file that is shipped" "1" "$(count_fixed 'по инструкции `roles/strategist/prompts/note-review.md`' "$ROOT/docs/SETUP-GUIDE.md")"
 check "synchronizer README: a manual run from the terminal is described honestly" "1" "$(count_fixed 'Запуск `strategist.sh note-review` из терминала идёт без чата' "$ROOT/roles/synchronizer/README.md")"
 check "synchronizer README: no promise that the manual run does the whole review" "0" "$(count_fixed 'вручную (`strategist.sh note-review`) или в секции' "$ROOT/roles/synchronizer/README.md")"
 
@@ -377,51 +391,92 @@ done
 # ==== LAYER H: one answer in three places ====
 echo "== H: the safety net, the canary and the Day Open scanner answer the same on one table of note titles =="
 # The mark of a proposed note is recognised by three independent rules: should_keep() of the cleanup script (Python),
-# count_new_bold_notes() of the runner (grep) and render_fleeting_notes() of the Day Open scaffold (grep and sed).
-# A model types the mark with a space after the check mark, with a capital, and sometimes drops the bold. Every row is
-# the first line of a note; the expectation is "kept by the safety net / counted as NEW by the canary / listed for the
-# pilot by the scanner". Whatever the spelling, a marked note is kept, not new, listed exactly once; a note the pilot
-# struck through, a plain note and a deferred one (the scanner leaves those to the strategy session) are not listed.
-H_TITLES=(
-    '**New note**'
-    '**Proposed** ✅предложено'
-    '**Spaced** ✅ предложено'
-    '**Capital** ✅Предложено'
-    '**Shouting noise** ✅ПРЕДЛОЖЕНО (шум)'
-    'Bare proposed ✅предложено'
-    'Bare spaced ✅ предложено'
-    'Bare capital ✅Предложено'
-    '~~Struck~~ ✅предложено'
-    'Plain note'
-    '**Deferred** 🔄'
+# count_new_bold_notes() of the runner (grep) and render_fleeting_notes() of the Day Open scaffold (awk). A model does
+# not copy the mark letter for letter: a space after the check mark (also a no-break one), any mix of capitals, a tail
+# such as ": задача" or "(шум)", sometimes no bold. The decision the three share: the mark in the FIRST line of a note
+# makes it "waiting for the pilot's decision", unless that line is no note title (a quote, a heading, a timestamp, a
+# list item) or the pilot struck the note through. Every row is the first line of a one-note box; the expectation is
+# "kept by the safety net / counted as NEW by the canary / listed for the pilot by the scanner". A note nobody touched
+# is new and listed; a deferred 🔄 note is kept and not listed (the strategy session handles it); a bold line with
+# other text and no mark is the old legacy case (counted new by the canary, not listed by the scanner).
+NB=$'\302\240'
+H_ROWS=(
+    'T01|1/1/1|**New note**'
+    'T02|1/0/1|**Proposed** ✅предложено'
+    'T03|1/0/1|**Spaced** ✅ предложено'
+    'T04|1/0/1|**Capital** ✅Предложено'
+    'T05|1/0/1|**Shout** ✅ПРЕДЛОЖЕНО (шум)'
+    'T06|1/0/1|**Mixed** ✅пРедложено'
+    'T07|1/0/1|**Tail** ✅предложено: задача, НЭП'
+    'T08|1/0/1|**Tail** ✅предложено (шум: Реализовано: РП #54)'
+    'T09|1/0/1|**Inside ✅предложено**'
+    'T10|1/0/1|**Two**  ✅  предложено'
+    'T11|1/0/1|Bare proposed ✅предложено'
+    'T12|1/0/1|Bare space ✅ предложено'
+    'T13|1/0/1|Bare capital ✅Предложено'
+    'T14|1/0/1|Bare paren ✅предложено (шум)'
+    'T15|1/0/1|Bare colon ✅предложено: задача'
+    'T16|1/0/1|Bare mid ✅предложено в середине строки'
+    'T17|1/0/1|Заметка про слово ✅предложено в тексте'
+    'T18|0/0/0|> quoted ✅предложено'
+    'T19|0/0/0|~~Struck~~ ✅предложено'
+    'T20|0/0/0|~~Struck~~'
+    'T21|0/0/0|- item ✅предложено'
+    'T22|0/0/0|* item ✅предложено'
+    'T23|0/0/0|1. numbered ✅предложено'
+    'T24|0/0/0|# Heading ✅предложено'
+    'T25|0/0/0|<sub>10.09.2026, 15:32</sub> ✅предложено'
+    'T26|0/0/0|Plain note'
+    'T27|1/0/0|**Deferred** 🔄'
+    'T28|1/0/1|**Both** 🔄 ✅предложено'
+    'T29|1/0/0|Plain 🔄'
+    "T30|1/0/1|**Nbsp** ✅${NB}предложено"
+    "T31|1/0/1|Bare nbsp ✅${NB}предложено"
+    'T32|1/0/1|**Twice** ✅предложено ✅предложено'
+    'T33|1/0/1|Bare ✅предложено (шум) хвост'
+    'T34|1/1/0|**Other** ✔️предложено'
+    'T35|1/1/0|**English** ✅proposed'
+    'T36|1/0/1|**✅предложено**'
 )
-H_EXPECTED=( 1/1/1 1/0/1 1/0/1 1/0/1 1/0/1 1/0/1 1/0/1 1/0/1 0/0/0 0/0/0 1/0/0 )
-H_KEPT="$(printf '%s\n' "${H_TITLES[@]}" | env HOME="$SB/clean-home" IWE_CLEANUP_REPO_DIR="$SB/clean" "$PY3" -c '
+# the box layout is the real one: header, rule, title line, timestamp line (the bot format, which the safety net
+# cannot date, so the 24-hour guard stays out of the way on every day of the year), rule
+h_index=0
+for h_row in "${H_ROWS[@]}"; do
+    h_index=$((h_index + 1))
+    IFS='|' read -r h_id h_expected h_title <<< "$h_row"
+    printf '# Fleeting Notes\n\n---\n\n%s\n<sub>10.09.2026, 15:32</sub>\n\n---\n' "$h_title" > "$SB/h-box-$(printf '%02d' "$h_index").md"
+done
+H_KEPT="$(env HOME="$SB/clean-home" IWE_CLEANUP_REPO_DIR="$SB/clean" "$PY3" -c '
 import importlib.util
 import sys
 spec = importlib.util.spec_from_file_location("cleanup_under_test", sys.argv[1])
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
-for line in sys.stdin.read().splitlines():
-    print(int(module.should_keep(line)))
-' "$CLEANUP_PY")"
+for path in sys.argv[2:]:
+    with open(path, encoding="utf-8") as box:
+        header, blocks = module.parse_notes(box.read())
+    print(int(module.should_keep(blocks[0])) if blocks else -1)
+' "$CLEANUP_PY" "$SB"/h-box-*.md)"
 h_index=0
-for h_title in "${H_TITLES[@]}"; do
-    # the real box layout: the title line, then the timestamp line
-    printf '# Fleeting Notes\n\n---\n\n%s\n<sub>1 янв, 10:00</sub>\n\n---\n' "$h_title" > "$SB/h-box.md"
-    h_answer="$(printf '%s' "$H_KEPT" | sed -n "$((h_index + 1))p")/$(canary_count "$SB/h-box.md")/$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$SB/h-box.md" | grep -c '^| \[«')"
-    check "kept/new/listed for '$h_title'" "${H_EXPECTED[$h_index]}" "$h_answer"
-    h_seed_listed="$(run_scanner "$ROOT/seed/strategy/scripts/day-open-scaffold.sh" "$SB/h-box.md" | grep -c '^| \[«')"
-    check "the seed copy of the scanner agrees for '$h_title'" "${h_answer##*/}" "$h_seed_listed"
+for h_row in "${H_ROWS[@]}"; do
     h_index=$((h_index + 1))
+    IFS='|' read -r h_id h_expected h_title <<< "$h_row"
+    h_file="$SB/h-box-$(printf '%02d' "$h_index").md"
+    h_answer="$(printf '%s\n' "$H_KEPT" | sed -n "${h_index}p")/$(canary_count "$h_file")/$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$h_file" | grep -c '^| \[«')"
+    check "$h_id kept/new/listed for '$h_title'" "$h_expected" "$h_answer"
+    check "$h_id the seed copy of the scanner agrees" "${h_answer##*/}" "$(run_scanner "$ROOT/seed/strategy/scripts/day-open-scaffold.sh" "$h_file" | grep -c '^| \[«')"
 done
+# one box with every row: each waiting note once, in file order, with a clean title (the mark is not part of it)
 {
     printf '# Fleeting Notes\n\n---\n'
-    for h_title in "${H_TITLES[@]}"; do printf '\n%s\n<sub>1 янв, 10:00</sub>\n\n---\n' "$h_title"; done
+    for h_row in "${H_ROWS[@]}"; do
+        IFS='|' read -r h_id h_expected h_title <<< "$h_row"
+        printf '\n%s\n<sub>10.09.2026, 15:32</sub>\n\n---\n' "$h_title"
+    done
 } > "$SB/h-all-box.md"
 H_LISTED_TITLES="$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$SB/h-all-box.md" | sed -E 's/^\| \[«(.*)»\]\(.*$/\1/' | tr '\n' '|')"
-check "one box with every row: the pilot sees each waiting note once, with a clean title (the mark is not part of it)" \
-    "New note|Proposed|Spaced|Capital|Shouting noise|Bare proposed|Bare spaced|Bare capital|" "$H_LISTED_TITLES"
+check "one box with every row: the pilot sees each waiting note once, with a clean title" \
+    "New note|Proposed|Spaced|Capital|Shout|Mixed|Tail|Tail|Inside ✅предложено|Two|Bare proposed|Bare space|Bare capital|Bare paren|Bare colon|Bare mid|Заметка про слово|Both 🔄|Nbsp|Bare nbsp|Twice|Bare|✅предложено|" "$H_LISTED_TITLES"
 # ==== END LAYERS ====
 
 echo

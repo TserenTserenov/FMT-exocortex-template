@@ -308,6 +308,11 @@ check "cleanup left the already proposed note (bold + ✅предложено) o
 check "cleanup script edited the copy: canon still holds the plain note" "1" "$(fleeting_has_plain "$CANON")"
 check "prompt points the model at the copy's workspace" "1" "$(grep -c 'iwe-strategist-note-review.*/workspace/DS-strategy/inbox/' "$E/stub-args" | awk '{print ($1 > 0)}')"
 check "prompt never mentions the canonical path" "0" "$(grep -c "$CANON" "$E/stub-args")"
+# a run from the script has no chat: the model is TOLD so (#961), it does not have to guess that step 10 is off.
+# The runner adds the mode as a line of its own; the prompt file quotes the same sentence inside a longer line, so the
+# whole line is compared (grep -x): one hit = the runner's line, the quote does not count
+MODE_LINE='РЕЖИМ: запуск из скрипта без чата; шаг 10 и архив не выполнять, только пометки и предложения'
+check "the model is told this is a run without a chat (isolated)" "1" "$(grep -c -x -F "$MODE_LINE" "$E/stub-args")"
 canon_untouched "isolated happy path"
 check "copy removed after publication" "0" "$(iso_copies)"
 
@@ -357,6 +362,7 @@ check "legacy: the cleanup commit is made in the canon" "1" "$([ "$(canon_head)"
 check "legacy: the publisher got the canon path" "$CANON" "$(head -1 "$PUBLOG")"
 check "legacy: origin got one commit with the two files" "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_commits)|$(origin_paths)"
 check "legacy: the model ran in the canon" "$CANON" "$(cat "$E/stub-cwd")"
+check "legacy: the model is told this is a run without a chat" "1" "$(grep -c -x -F "$MODE_LINE" "$E/stub-args")"
 make_env
 run_runner outside-file ""
 check "legacy: an outside file is NOT blocked (behaviour unchanged)" "0" "$RC"
@@ -436,6 +442,7 @@ run_runner noop "" week-review
 check "flag off: nothing delivered, the delivery proof still reports 70" "70" "$RC"
 check "flag off: the guard session was opened and closed by the runner" "1/1" "$(grep -c '^open --housekeeping' "$GUARD_LOG")/$(grep -c '^close --housekeeping' "$GUARD_LOG")"
 check "flag off: the model ran in the canon (legacy path)" "$CANON" "$(cat "$E/stub-cwd")"
+check "control: another scenario (week-review) does not get the no-chat line" "0" "$(grep -c -F 'РЕЖИМ: запуск из скрипта без чата' "$E/stub-args")"
 check "flag off: no isolated copy was created" "0" "$(ls "$ISO_TMP" | wc -l | tr -d ' ')"
 make_week_review_env
 GUARD_OPEN_RC=1 run_runner noop "" week-review
