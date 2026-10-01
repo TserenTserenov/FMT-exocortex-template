@@ -794,11 +794,12 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # columns beyond the list item it sits in, a tab counts to 4) is a heading, a tag or a table.
 # An indented line is code only after a blank line, a heading, a closing fence or another code
 # line (it cannot interrupt a paragraph, an HTML block or a list item), and a nested list is
-# not code. Markup is looked for after the indentation of its container (the content of the
-# list item), so a heading inside a nested list item is a heading; it belongs to that item:
-# the sections around the list never see it and it is gone when the item ends, while the
-# items nested in it inherit it. A quote (`>` after up to three spaces) is a container of its
-# own: its tags and headings change nothing outside it.
+# not code. Only an unindented heading is trusted as a section title. A heading with anything
+# in front of its hashes (indentation, a list marker, a quote mark) sits in a container whose
+# end the line-based reading cannot tell for sure (lazy continuation, tabs, numbering), so it
+# changes no section, neither pushes nor pops: it opens an AMBIGUITY ZONE, and no table after
+# it, up to the next unindented heading, is a candidate. A quote (`>` after up to three
+# spaces) is a container of its own: its tags change nothing outside it.
 # A table is a candidate only when its header has the exact cell «РП» and a cell
 # starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
 # plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
@@ -810,6 +811,8 @@ HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 LIST_ITEM_RE = re.compile(r"^( *)(?:[-*+]|\d{1,9}[.)])( +|$)")
 QUOTE_RE = re.compile(r"^ {0,3}>")
+# A heading with something in front of the hashes: indentation, quote marks, list markers.
+LOOSE_HEADING_RE = re.compile(r"^[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*#{1,6}[ \t]+\S")
 # Whole words only: «Итоговая таблица недели (плановые РП)» is a plan, not a facts section.
 FACTS_RE = re.compile(r"\b(?:Итог(?:и|ов)?|Сводк[аиу]|Summary)\b", re.IGNORECASE)
 # The word must START with «План»/«Plan»: «Внеплановые РП» is not a plan section.
@@ -866,24 +869,21 @@ def heading_of(line):
 
 
 def classify(lines):
-    """Per line: (is_code, deep, base, scope).
+    """Per line: (is_code, deep, base).
 
     is_code: fenced code or a line of an indented code block; nothing in it is a tag, a heading
     or a table. deep: indented 4+ columns beyond its container (the content of the list item it
     sits in), so never a table row, whatever block it belongs to. base: the column where the
     markup of the line starts, i.e. the content offset of its container (of the item it opens,
-    for a list item line); a heading, a quote or a tag is looked for after it, not after the
-    margin. scope: the open list items the line belongs to, outermost first (the item a list
-    item line opens included), each named by the number of the line that opened it. Indented
-    code starts only after a blank line, a heading, a closing fence or another code line; right
-    after any other line it continues that line's block.
+    for a list item line); a quote or a tag is looked for after it, not after the margin.
+    Indented code starts only after a blank line, a heading, a closing fence or another code
+    line; right after any other line it continues that line's block.
     """
     is_code = [False] * len(lines)
     deep = [False] * len(lines)
     base = [0] * len(lines)
-    scope = [()] * len(lines)
     fence = None  # (marker, length) while inside a fenced code block
-    items = []  # (content offset, number of the opening line) of the open list items, outermost first
+    items = []  # content offsets of the open list items, outermost first
     code_ok = True  # an indented line may open or continue a code block here
     for i, line in enumerate(lines):
         text = line.rstrip("\r\n")
@@ -898,22 +898,21 @@ def classify(lines):
             code_ok = True
             continue
         indent = len(text) - len(text.lstrip(" "))
-        while items and indent < items[-1][0]:
+        while items and indent < items[-1]:
             items.pop()
-        container = items[-1][0] if items else 0
+        container = items[-1] if items else 0
         deep[i] = indent - container >= 4
         item = LIST_ITEM_RE.match(text)
         if item and not deep[i]:
-            items.append((item.end(), i))
+            items.append(item.end())
             base[i] = item.end()
         elif deep[i] and code_ok:
             is_code[i] = True
             continue
         else:
             base[i] = container
-        scope[i] = tuple(opened for _, opened in items)
         code_ok = heading_of(text[base[i]:]) is not None
-    return is_code, deep, base, scope
+    return is_code, deep, base
 
 
 class Block:
@@ -961,37 +960,34 @@ def scan_tags(line, blocks, headings):
     return headings
 
 
-is_code, deep, base, scope = classify(lines)
+is_code, deep, base = classify(lines)
 candidates = []  # (header line, insert position, ancestor titles, open blocks)
-headings = []  # (level, title) of the markdown headings in scope outside any list item
-item_headings = {}  # scope of a list item -> (level, title) of the headings met inside it
+headings = []  # (level, title) of the markdown headings in scope
 blocks = []  # the open <details> blocks, outermost first
+zone = False  # a heading we cannot place was met and no unindented heading has closed its zone yet
 for i, line in enumerate(lines):
     if is_code[i]:
         continue
     text = line.expandtabs(4)[base[i]:]  # the line without the indentation of its container
-    if QUOTE_RE.match(text):
-        continue  # a quote is a container of its own: its tags and headings leave the sections outside alone
     in_summary = any(b.pieces is not None for b in blocks)  # the line starts inside a <summary> title
+    if not in_summary and "|" not in line and not line.startswith("#") and LOOSE_HEADING_RE.match(line):
+        zone = True  # a heading in a list item, in a quote or indented: it changes no section, see above
+    if QUOTE_RE.match(text):
+        continue  # a quote is a container of its own: its tags leave the sections outside alone
     headings = scan_tags(text, blocks, headings)
     if in_summary:
         continue  # the lines of a <summary> title are text, not headings or tables
-    heading = heading_of(text)
+    heading = heading_of(line) if line.startswith("#") else None  # only an unindented heading is trusted
     if heading:
         level = len(heading.group(1))
-        entry = (level, strip_tags(heading.group(2)))
-        if scope[i]:
-            # A heading inside a list item belongs to that item: it never touches the sections
-            # around the list and is gone when the item ends.
-            item_headings[scope[i]] = [h for h in item_headings.get(scope[i], []) if h[0] < level] + [entry]
-        else:
-            headings = [h for h in headings if h[0] < level] + [entry]
+        headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
+        zone = False
     if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
         header = lines[i - 1]
-        in_items = [h[1] for k in range(1, len(scope[i]) + 1) for h in item_headings.get(scope[i][:k], [])]
-        ancestors = [b.title for b in blocks] + [h[1] for h in headings] + in_items
+        ancestors = [b.title for b in blocks] + [h[1] for h in headings]
         if (
-            is_plan_header(table_cells(header))
+            not zone
+            and is_plan_header(table_cells(header))
             and not deep[i - 1]
             and not deep[i]
             and not any(FACTS_RE.search(t) for t in ancestors)
