@@ -4512,17 +4512,24 @@ fi
 # already refreshed copy. The real functions and the real classifier run on a throwaway template
 # clone; the printed command runs twice in a shell.
 
+# A `date` that always prints the same value: the runs of a printed command must not depend on the
+# clock or on a shell's random numbers for the name of the copy they save.
+T44_FIXED_DATE_DIR="$TEST_WS/fixed-date"
+mkdir -p "$T44_FIXED_DATE_DIR"
+printf '#!/bin/bash\necho 20260101000000\n' > "$T44_FIXED_DATE_DIR/date"
+chmod +x "$T44_FIXED_DATE_DIR/date"
+
 # check_saving_hint LABEL HINT COPY ORIGINAL TEMPLATE_TEXT EXPANDED_DIR — HINT is a command line
-# update.sh printed for the user to run. It runs twice, back to back (RANDOM seeded differently:
-# two runs inside one second). The copy must end up as TEMPLATE_TEXT at exactly COPY; two saved
-# copies must sit next to it, one holding ORIGINAL; and the shell must have interpreted nothing
-# in the paths: EXPANDED_DIR, the directory a shell would have used after running the
-# $(printf EXPANDED) of the path, must not exist.
+# update.sh printed for the user to run. It runs twice, back to back, under IDENTICAL conditions:
+# the same RANDOM seed and a date that never changes (the same second, the same random number).
+# The copy must end up as TEMPLATE_TEXT at exactly COPY; two saved copies must sit next to it, one
+# holding ORIGINAL; and the shell must have interpreted nothing in the paths: EXPANDED_DIR, the
+# directory a shell would have used after running the $(printf EXPANDED) of the path, must not exist.
 check_saving_hint() {
     local label="$1" hint="$2" copy="$3" original="$4" template_text="$5" expanded_dir="$6"
     local saved count=0 original_kept=0
-    bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
-    bash -c "RANDOM=22; $hint" > /dev/null 2>&1 || true
+    PATH="$T44_FIXED_DATE_DIR:$PATH" bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
+    PATH="$T44_FIXED_DATE_DIR:$PATH" bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
     for saved in "$copy".before-update-*; do
         [ -f "$saved" ] || continue
         count=$((count + 1))
@@ -4532,7 +4539,7 @@ check_saving_hint() {
     done
     if [ "$count" -eq 2 ] && [ "$original_kept" -eq 1 ] && [ "$(cat "$copy" 2>/dev/null)" = "$template_text" ] \
         && [ ! -e "$expanded_dir" ]; then
-        pass "$label: the printed command refreshes exactly the printed path, interprets nothing in it, and two runs keep two copies"
+        pass "$label: the printed command refreshes exactly the printed path, interprets nothing in it, and two identical runs keep two copies"
     else
         fail "$label: the printed command ('$hint') left $count saved copies (original kept: $original_kept), the copy now holds '$(cat "$copy" 2>/dev/null)', an expanded directory exists: $([ -e "$expanded_dir" ] && echo yes || echo no)"
     fi

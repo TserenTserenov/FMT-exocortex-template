@@ -564,18 +564,24 @@ d2_hint_of() {
     line=$(grep -A1 -F "$2" "$TEST_ROOT/$1" | tail -1)
     printf '%s\n' "${line#*: }"
 }
+# A `date` that always prints the same value: the name of the saved copy must not depend on the
+# clock or on a shell's random numbers (the two runs below get the same date and the same seed).
+D2_FIXED_DATE_DIR="$TEST_ROOT/fixed-date"
+mkdir -p "$D2_FIXED_DATE_DIR"
+printf '#!/bin/bash\necho 20260101000000\n' > "$D2_FIXED_DATE_DIR/date"
+chmod +x "$D2_FIXED_DATE_DIR/date"
 # d2_check_save_hint LOG TEXT BEFORE LABEL — the offered command, run as printed, must keep the
 # current copy (BEFORE) next to MEM_DST and then make MEM_DST the template's file. Run a second
 # time (the pilot repeats it, e.g. after the next release, or twice in a row) it must not
-# overwrite that copy: the name carries a date and $RANDOM, so the first copy — the only one that
-# holds the pilot's edits — survives next to the second one even when both runs fall into the same
-# second. RANDOM is seeded differently in the two runs, which keeps the check deterministic.
+# overwrite that copy: the first copy — the only one that holds the pilot's edits — survives next
+# to the second one, even when both runs happen under identical conditions (the same second, the
+# same RANDOM seed).
 d2_check_save_hint() {
     local hint backup count=0 original_kept=0
     hint=$(d2_hint_of "$1" "$2")
     rm -f "$MEM_DST".before-update*
-    bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
-    bash -c "RANDOM=22; $hint" > /dev/null 2>&1 || true
+    PATH="$D2_FIXED_DATE_DIR:$PATH" bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
+    PATH="$D2_FIXED_DATE_DIR:$PATH" bash -c "RANDOM=11; $hint" > /dev/null 2>&1 || true
     for backup in "$MEM_DST".before-update-*; do
         [ -f "$backup" ] || continue
         count=$((count + 1))
