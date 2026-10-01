@@ -1,4 +1,7 @@
-files_translated: []
-last_run_utc: '2026-10-01T17:51:54Z'
-last_synced_sha: 3968ebb1a4ee0331aa6a142fa3311fba4c692886
+files_translated:
+- docs/IWE-HELP.md
+- docs/LEARNING-PATH.md
+- docs/SETUP-GUIDE.md
+last_run_utc: '2026-10-01T18:15:24Z'
+last_synced_sha: 637a5260f0a4e3560fa9f1e2654c276fe6cbdf3b
 schema_version: 1
