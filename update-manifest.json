@@ -2269,7 +2269,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "98e22b6f6f7b2fceb9675371f16c57b49024712b47d790939f0896f4fae79b01"
+      "sha256": "9ee7186933aea9f82e7a8d9ea86f4aff8c82bf8f02a599d18d8b61916ad7fefd"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2697,7 +2697,7 @@
     },
     {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
-      "sha256": "3864213c1c80728abd4de6715e408d325405565b9d4bd75251f8091dd1e34aa1"
+      "sha256": "04369eb480cc81ff199ae692fd7ce92dacd22f4748c66c03891e16daa287b4bf"
     },
     {
       "path": "scripts/tests/lib/capture_fixture.sh",
@@ -2825,7 +2825,7 @@
     },
     {
       "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
-      "sha256": "df11abbbe08ad4ce2a456bd8cb42ef03039b73fd9697305bec36ebde7c561d7c"
+      "sha256": "e4ce96455f67a2e8bb37ca144d01cd95f438cb1e13d4adc0f201c6d8ac705a46"
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",
@@ -3005,7 +3005,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "d561a3d289a3b52a241a12bf9b0843de0b0a7db439decf7b76ae8e2308d25c36"
+      "sha256": "1a9c5bb57d043c7dd318d5801baeaff45d8fcba8332012205db2312d5bcdd6d6"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3245,6 +3245,7 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",

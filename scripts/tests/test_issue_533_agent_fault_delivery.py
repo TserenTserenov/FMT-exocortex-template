@@ -655,7 +655,7 @@ def test_update_backfills_the_governance_reader_that_day_open_executes(
         ROOT / "scripts" / "day-open-pipeline.sh",
         SEED / "scripts" / "day-open-pipeline.sh",
     ):
-        assert '"$DS_STRATEGY/scripts/day-open-llm-fill.py"' in pipeline.read_text(
+        assert '"$SCRIPT_HOME/day-open-llm-fill.py"' in pipeline.read_text(
             encoding="utf-8"
         )
 

@@ -26,8 +26,8 @@ scripts/create-wp.sh	TRACKER_OUTPUT=$(python3 "$TRACKER_ADAPTER" create --contex
 scripts/create-wp.sh	python3 "$BUILD_ACTIVE_WP" \
 scripts/day-close-lock.sh	python3 "$GATEWAY_LOCK_PY" acquire "day-close-lock" "$TTL_SECONDS" >/dev/null 2>&1 || rc=$?
 scripts/day-close-prepare.sh	python3 "$IH" 2>&1 | head -60
-scripts/day-open-pipeline.sh	(python3 "$DS_STRATEGY/scripts/update-derived-snapshot.py" --if-stale-days 10 \
-scripts/day-open-pipeline.sh	python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
+scripts/day-open-pipeline.sh	(python3 "$SCRIPT_HOME/update-derived-snapshot.py" --if-stale-days 10 \
+scripts/day-open-pipeline.sh	python3 "$SCRIPT_HOME/day-open-budget-patch.py" \
 scripts/hermes-peer-adapter.sh	_LANG_RESULT=$(printf '%s' "$RESPONSE" | python3 "$_LANG_CHECK" 2>/dev/null || true)
 scripts/kimi-peer-adapter.sh	if python3 "$SCRIPT_DIR/content-filter-apply.py" "$CONTENT_FILTER_MAP" \
 scripts/kimi-peer-adapter.sh	python3 "$SCRIPT_DIR/peer-adapter-filter.py"
