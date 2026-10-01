@@ -3218,6 +3218,24 @@ sync_workspace_claude_md() {
     fi
 }
 
+# claude_template_copy_matches_workspace_base FILE — B1 (WP-7 F193): setup.sh
+# (since v0.38.10) keeps the CLAUDE.md merge base only in the workspace root,
+# never in the template repo, so Step 5 found no $SCRIPT_DIR/.claude.md.base on
+# such installs and kept the #541 refusal on every run (exit 49, CLAUDE.md
+# never updated, .update-incomplete forever). That workspace base is the
+# substituted template copy as of the last successful sync: when FILE,
+# substituted exactly as sync_workspace_claude_md() does, matches it byte for
+# byte, the template copy holds no local edits and a 3-way merge would return
+# the upstream file unchanged. Deliberately not a hash check against the
+# installed update-manifest.json: Step 6e replaces it even on a run that ends
+# in EXIT_CONFLICT, so such a check could never heal an install already stuck.
+claude_template_copy_matches_workspace_base() {
+    local substituted="$TMPDIR_UPDATE/claude-template-substituted.md"
+    [ -f "$WORKSPACE_DIR/.claude.md.base" ] || return 1
+    substitute_claude_placeholders "$1" "$substituted" || return 1
+    cmp -s "$substituted" "$WORKSPACE_DIR/.claude.md.base"
+}
+
 # issue #541 cold-review (P2, DP.SC.172): the CLAUDE.md conflict/missing-base
 # check-then-exit-49 idiom now has 3 call sites (the two new early-exit gates
 # below, plus the pre-existing final gate at the end of the script) — third
@@ -4251,6 +4269,13 @@ for f in "${UPDATED_FILES[@]}"; do
                     echo "  ~ $f (3-way merge)"
                 fi
             fi
+        elif [ ! -f "$BASE_FILE" ] && claude_template_copy_matches_workspace_base "$CURRENT_FILE"; then
+            # B1: nothing to merge in an unedited template copy, upstream goes in
+            # as is. No base is written here (setup.sh: the template repo never
+            # receives one); sync_workspace_claude_md() in Step 6 merges the
+            # workspace copy against the workspace base, keeping the pilot's edits.
+            cp "$NEW_FILE" "$CURRENT_FILE"
+            echo "  ~ $f обновлён (копия в каталоге шаблона не правилась)"
         else
             # issue #336: no base file (first migration or lost .claude.md.base) — a
             # blind `cp $NEW_FILE $CURRENT_FILE` silently discarded any pilot edit to
