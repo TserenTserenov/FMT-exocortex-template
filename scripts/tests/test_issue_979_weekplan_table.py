@@ -24,8 +24,10 @@ Only an unindented heading is a section title. A heading with anything in front
 of its hashes (indentation, a list marker, a quote mark) sits in a container whose
 end a line-based reading cannot tell for sure (lazy continuation, tabs, numbering):
 it changes no section and opens an ambiguity zone, in which no table is picked up
-to the next unindented heading. A quote is a container of its own: its tags change
-nothing outside it. A table is a candidate only when its header has the exact cell
+to the next unindented heading. A heading is told from a table row by its shape,
+not by a pipe in its text: `### Итоги | факт` is a heading, and `# | РП | Статус`
+is a heading, not a table header (an ATX heading wins over a table row in CommonMark
+and GFM). A quote is a container of its own: its tags change nothing outside it. A table is a candidate only when its header has the exact cell
 «РП» and a cell starting with the word «Статус» («Статус (на 3 июля)» counts and is
 filled with «pending» like the plain column, «Связанные РП» does not); the new row
 keeps the indentation of its table.
@@ -188,18 +190,15 @@ def test_plan_table_after_a_closed_summary_block_is_the_only_candidate(tmp_path)
     assert "Новый РП" not in out.split("</details>")[0]
 
 
-def test_header_row_starting_with_hash_is_not_a_section_title(tmp_path):
-    # `# | ...` reads like a markdown heading, but it is a table header row: its
-    # «Итог» column must not make the writer treat the table as a facts section.
-    weekplan = _weekplan(
+@pytest.mark.parametrize("last_cell", ["Итог недели", "Результат"], ids=["facts-word", "neutral"])
+def test_a_header_row_that_starts_with_a_hash_is_a_heading_not_a_table(tmp_path, last_cell):
+    # `# | ...` is an ATX heading in CommonMark and GFM, whatever its text holds (an ATX heading
+    # wins over a table row), so what follows it is no table. It used to be read as a table
+    # header because of the pipe; a header with a leading pipe, `| # | РП | ...`, is a table.
+    _assert_refused(
         tmp_path,
-        "# | РП | Статус | Итог недели\n|---|----|--------|------------|\n| 7 | **Старый** | pending | — |\n",
+        f"# | РП | Статус | {last_cell}\n|---|----|--------|------------|\n| 7 | **Старый** | pending | — |\n",
     )
-
-    result = _add_to_weekplan(weekplan)
-
-    assert result.returncode == 0, result.stderr
-    assert "добавлена" in result.stdout
 
 
 def test_plan_section_wins_over_another_candidate(tmp_path):
@@ -1025,13 +1024,74 @@ def test_heading_like_text_in_a_summary_title_opens_no_zone(tmp_path):
     assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
 
 
-def test_an_indented_table_header_that_starts_with_a_hash_is_no_heading(tmp_path):
-    weekplan = _weekplan(tmp_path, "  # | РП | Статус\n  --- | --- | ---\n  1 | x | y\n")
+def test_an_indented_header_row_that_starts_with_a_hash_is_a_heading(tmp_path):
+    # An ATX heading with up to three spaces in front, so no table header, and an indented
+    # heading opens a zone.
+    _assert_refused(tmp_path, "  # | РП | Статус\n  --- | --- | ---\n  1 | x | y\n")
+
+
+@pytest.mark.parametrize("indent", [" ", "  ", "   "], ids=["one-space", "two-spaces", "three-spaces"])
+def test_an_indented_heading_with_a_pipe_opens_a_zone(tmp_path, indent):
+    # The reviewer's input. The pipe in the text made the line a «table row», so the zone was
+    # never opened and the row went into the table under «### Итоги | факт».
+    _assert_refused(tmp_path, f"## План\n\n{indent}### Итоги | факт\n\n| РП | Статус |\n| --- | --- |\n")
+
+
+@pytest.mark.parametrize("title", ["Итоги | факт", "факт | Итоги", "|Итоги|"], ids=["before", "after", "between"])
+def test_an_unindented_heading_with_a_pipe_excludes_the_table_under_it(tmp_path, title):
+    # The whole text of the heading is read, a pipe cuts nothing off.
+    _assert_refused(tmp_path, f"## План\n\n### {title}\n\n| РП | Статус |\n| --- | --- |\n")
+
+
+@pytest.mark.parametrize("title", ["План | неделя W40", "неделя W40 | План"], ids=["before", "after"])
+def test_a_plan_heading_with_a_pipe_still_names_the_plan(tmp_path, title):
+    weekplan = _weekplan(
+        tmp_path,
+        "## Резерв\n\n" + SPARE_TABLE + f"\n## {title}\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
 
     result = _add_to_weekplan(weekplan)
 
     assert result.returncode == 0, result.stderr
-    assert _row_below(weekplan, "  --- | --- | ---") == "  | 16 | **Новый РП** — [описание] | pending |"
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "| # | РП | Статус |") == "| 1 | **Запас** | pending |"
+
+
+def test_an_unindented_heading_with_a_pipe_changes_the_sections(tmp_path):
+    # It replaces the same-level «Итоги», so the table after it is no longer facts.
+    weekplan = _weekplan(tmp_path, "## Итоги\n\n## Заметки | недели\n\n| РП | Статус |\n| --- | --- |\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _row_below(weekplan, "| --- | --- |") == "| **Новый РП** — [описание] | pending |"
+
+
+@pytest.mark.parametrize(
+    "opener",
+    ["> ## Итоги | факт\n", "- ## Итоги | факт\n", "- Раздел\n  - Вложенный\n    ### Итоги | факт\n"],
+    ids=["quote", "list-item", "nested-list"],
+)
+def test_a_heading_with_a_pipe_in_a_container_opens_a_zone(tmp_path, opener):
+    _assert_refused(tmp_path, f"## План\n\n{opener}\n| РП | Статус |\n| --- | --- |\n")
+
+
+def test_an_unindented_heading_with_a_pipe_closes_a_zone(tmp_path):
+    weekplan = _weekplan(tmp_path, "- ## Итоги\n\n## План | неделя\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_table_header_with_a_leading_pipe_and_a_hash_cell_is_still_a_table(tmp_path):
+    weekplan = _weekplan(tmp_path, "| # | РП | Статус |\n| --- | --- | --- |\n| 1 | x | y |\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _row_below(weekplan, "| --- | --- | --- |") == "| 16 | **Новый РП** — [описание] | pending |"
 
 
 @pytest.mark.parametrize("quote", [">", " >", "   >", "> >"], ids=["flush", "one-space", "three-spaces", "nested"])
