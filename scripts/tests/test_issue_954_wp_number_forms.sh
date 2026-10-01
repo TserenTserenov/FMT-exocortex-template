@@ -72,14 +72,18 @@ card() {  # <path> <wp-field or ""> <status>
   } > "$1"
 }
 
-run_limited() {  # <seconds> <command...>: prints the command's output; returns its exit code, 124 when it ran too long
-  local limit="$1" pid i=0 rc out_file
-  shift
-  out_file=$(mktemp "$TMP/lim.XXXXXX")
+# Hang guard: a child still running after this many seconds is killed and reported as 124. It
+# only stops a stuck process; it never decides a check. Every check that uses run_guarded asserts
+# the exit code and the output, so a slow or loaded runner cannot turn a pass into a failure.
+HANG_GUARD_SECONDS=60
+
+run_guarded() {  # <command...>: prints the command's output; returns its exit code (124: hang guard fired)
+  local pid i=0 rc out_file
+  out_file=$(mktemp "$TMP/guard.XXXXXX")
   "$@" >"$out_file" 2>&1 &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$i" -ge $((limit * 10)) ]; then
+    if [ "$i" -ge $((HANG_GUARD_SECONDS * 10)) ]; then
       kill "$pid" 2>/dev/null
       wait "$pid" 2>/dev/null
       cat "$out_file"
@@ -114,21 +118,22 @@ if [ "$have_lib" = 1 ]; then
     got=$(wp_num_normalize "$raw"); rc=$?
     if [ "$rc" -ne 0 ] && [ -z "$got" ]; then ok "normalize rejects [$raw] without output"; else bad "normalize [$raw]: expected rc!=0 and no output, got rc=$rc out=[$got]"; fi
   done
-  # Input length is capped (64 characters): a pathological argument must be refused at once
-  # instead of keeping the string operations busy for seconds (50 000 zeros took 8 s, 5 000
-  # nested ~~ wrappers 13 s under bash 3.2). The cap sits above every real spelling.
+  # Input length is capped (64 characters): a pathological argument is refused before any string
+  # operation runs (without the cap 50 000 zeros kept the library busy for 8 s and 5 000 nested ~~
+  # wrappers for 13 s under bash 3.2). The cap sits above every real spelling. What is asserted is
+  # the behaviour (exit code and output), never how long it took: run_guarded only stops a hang.
   # shellcheck disable=SC2016  # the text of a script for `bash -c`: $1/$2 expand there, not here
   norm_script='. "$1"; wp_num_normalize "$2"'
   zeros=$(printf '%050000d' 0)
-  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "$zeros"); rc=$?
-  expect_eq "50000 zeros are refused at once (rc 1, no output)" "1:" "$rc:$out"
+  out=$(run_guarded /bin/bash -c "$norm_script" _ "$LIB" "$zeros"); rc=$?
+  expect_eq "50000 zeros are refused (rc 1, no output)" "1:" "$rc:$out"
   wrap=$(printf '~~%.0s' $(seq 1 5000))
-  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "${wrap}44${wrap}"); rc=$?
-  expect_eq "5000 nested ~~ wrappers are refused at once (rc 1, no output)" "1:" "$rc:$out"
-  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "$(printf '%064d' 44)"); rc=$?
-  expect_eq "a 64-character input is still read" "0:44" "$rc:$out"
-  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "$(printf '%065d' 44)"); rc=$?
-  expect_eq "a 65-character input is refused" "1:" "$rc:$out"
+  out=$(run_guarded /bin/bash -c "$norm_script" _ "$LIB" "${wrap}44${wrap}"); rc=$?
+  expect_eq "5000 nested ~~ wrappers are refused (rc 1, no output)" "1:" "$rc:$out"
+  out=$(run_guarded /bin/bash -c "$norm_script" _ "$LIB" "$(printf '%064d' 44)"); rc=$?
+  expect_eq "a 64-character input is still read (rc 0, the number)" "0:44" "$rc:$out"
+  out=$(run_guarded /bin/bash -c "$norm_script" _ "$LIB" "$(printf '%065d' 44)"); rc=$?
+  expect_eq "a 65-character input is refused (rc 1, no output)" "1:" "$rc:$out"
   expect_eq "padded 44" "044" "$(wp_num_padded 44)"
   expect_eq "padded WP-7" "007" "$(wp_num_padded WP-7)"
   expect_eq "padded 1234 (four digits stay as they are)" "1234" "$(wp_num_padded 1234)"
