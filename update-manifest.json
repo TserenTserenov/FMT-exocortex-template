@@ -193,7 +193,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "314649e7ab3c7ca2bf68ee3c84d839fdc1f649c3a672e3230330ebacf3978bc7"
+      "sha256": "5bd94ae3d3d7b2a1caef5689a84936ff7d89bdb9e0ab4b0a80fdbdccc95074ad"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "1b334a49eedf16bbeee7ac65509c42220a5522d56070e88fd42ce8cd5fc70ae3"
+      "sha256": "de20aac07a5bd968624dbe4af18db1bdbd57ae2541fb18652e6aa59388192d5a"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5f5735149f9f1f70fb54361f4615410aaba349a2fc3384f06b1b6f7fdfede1ee"
+      "sha256": "a0a00ed1d38573048252197d694768ef8c245868487f5f9067382e87613f602c"
     },
     {
       "path": "CLAUDE.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "0a9f2a51b2619795815971306f1242266182bc0afa2f84106f37788f3908a06d"
+      "sha256": "73649bbb03b91089a898f20c30b843b4e529e00a775a244e600ce4690c7d9a1e"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -1881,7 +1881,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "13286a40f19b95d5f18bfe1a386d8b2db4ce1b56de10ecd4133f5ebec3d26756"
+      "sha256": "d77df957a4b5fc7630384e63cadd3d60cbf037ff373ebb729ea2d3281f30cb37"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "760741c9b51efc9bd8089ddd9f93aa46acd4fb97d317bc49b2244c2e0a321d9c"
+      "sha256": "ad175c43fdb9dfa9bfde7b303fecd59fa84634ba77be03c841e206b2ec1ee0b2"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2713,7 +2713,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "1948065257faef4c0e351f770bacc257c7ce3cb17c4b5275a3c0fad8009970b7"
+      "sha256": "0884ff798074750d3dd7e20a37b148c32c7411eeb5175a2e27c8efc0681caa94"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3033,7 +3033,7 @@
     },
     {
       "path": "seed/strategy/scripts/ds-publish.sh",
-      "sha256": "dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
+      "sha256": "13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
