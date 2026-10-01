@@ -297,6 +297,49 @@ params "$WS2" 'verify_quick_close: false\n'
 run_hook "" "" "$WS2/somewhere/else" "$(skill_json run-protocol close)" "$WS2/.claude/hooks/protocol-completion-reminder.sh"
 expect_steps_without_r23 "CLAUDE_PROJECT_DIR unset: workspace derived from the hook location (false)"
 
+# ============================ D. the run-protocol skill text ============================
+# The skill is loaded together with this reminder, so it must not demand a verification
+# step on every protocol (open included) or name the /verify skill while the hook says
+# otherwise: the check is a Haiku sub-agent (R23), closings only, Quick Close by the key.
+SKILL_MD="$ROOT/.claude/skills/run-protocol/SKILL.md"
+section() { awk -v n="$1" '$0 ~ "^## " n {f=1; next} /^## /{f=0} f' "$SKILL_MD"; }
+STEP2=$(section 'Шаг 2')
+STEP4=$(section 'Шаг 4')
+
+if grep -q '/verify' "$SKILL_MD"; then
+    bad "run-protocol skill still names the /verify skill"
+else
+    ok "run-protocol skill: the /verify skill is not named (the closing check is a Haiku sub-agent)"
+fi
+if grep -q 'Последняя задача ВСЕГДА' "$SKILL_MD"; then
+    bad "run-protocol skill still ends every protocol with an unconditional verification task"
+else
+    ok "run-protocol skill: no unconditional 'last task is always the verification'"
+fi
+if [[ $STEP2 == *"только для close-протоколов"* ]]; then
+    ok "run-protocol skill step 2: the verification task is for close protocols only"
+else
+    bad "run-protocol skill step 2 does not restrict the verification task to close protocols"
+fi
+missing=""
+for token in 'Quick Close' 'Day Close' 'Week Close' 'Month Close' 'verify_quick_close'; do
+    [[ $STEP4 == *"$token"* ]] || missing="$missing [$token]"
+done
+if [ -z "$missing" ]; then
+    ok "run-protocol skill step 4: closings only, Quick Close by verify_quick_close, the other closings ignore it"
+else
+    bad "run-protocol skill step 4 lacks:$missing"
+fi
+missing=""
+for token in 'sub-agent Haiku' 'R23' 'чеклист'; do
+    [[ $STEP4 == *"$token"* ]] || missing="$missing [$token]"
+done
+if [ -z "$missing" ]; then
+    ok "run-protocol skill step 4: names the Haiku sub-agent (R23) checking the closing checklist"
+else
+    bad "run-protocol skill step 4 does not name the real mechanism, lacks:$missing"
+fi
+
 echo "---"
 echo "issue #975: passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
