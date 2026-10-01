@@ -27,10 +27,14 @@ it changes no section and opens an ambiguity zone, in which no table is picked u
 to the next unindented heading. A heading is told from a table row by its shape,
 not by a pipe in its text: `### Итоги | факт` is a heading, and `# | РП | Статус`
 is a heading, not a table header (an ATX heading wins over a table row in CommonMark
-and GFM). A quote is a container of its own: its tags change nothing outside it. A table is a candidate only when its header has the exact cell
-«РП» and a cell starting with the word «Статус» («Статус (на 3 июля)» counts and is
-filled with «pending» like the plain column, «Связанные РП» does not); the new row
-keeps the indentation of its table.
+and GFM). The content of an HTML comment (`<!--` .. `-->`, one line or many) is not
+read at all: no heading, tag, table or zone comes out of it (a comment around a
+table cell leaves the row a row, an unclosed one swallows the rest of the file,
+fenced and inline code are not scanned for comments). A quote is a container of
+its own: its tags change nothing outside it. A table is a candidate only when its
+header has the exact cell «РП» and a cell starting with the word «Статус» («Статус
+(на 3 июля)» counts and is filled with «pending» like the plain column, «Связанные
+РП» does not); the new row keeps the indentation of its table.
 
 The same fix replaces the literal `|---` separator lookup in the WeekPlan and
 REGISTRY writers (`| --- |` made the REGISTRY step fail and roll the whole WP
@@ -1179,6 +1183,275 @@ def test_a_table_in_a_quote_is_not_a_candidate(tmp_path):
     assert result.returncode == 0, result.stderr
     assert quoted in weekplan.read_text(encoding="utf-8"), "the quoted table must stay untouched"
     assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+DAY_OPEN_TEMPLATES = ROOT / ".claude" / "skills" / "day-open" / "templates.md"
+PLAN_TABLE_SEPARATOR = "|----|---|-----|---|----------|---|--------|-----------|"
+
+
+def _day_open_weekplan_template() -> str:
+    """The WeekPlan template of the day-open skill: the first fenced block after its heading."""
+    lines = DAY_OPEN_TEMPLATES.read_text(encoding="utf-8").splitlines()
+    heading = next(i for i, ln in enumerate(lines) if ln.startswith("## Шаблон WeekPlan"))
+    opening = next(i for i in range(heading, len(lines)) if lines[i].startswith("```"))
+    closing = next(i for i in range(opening + 1, len(lines)) if lines[i].startswith("```"))
+    return "\n".join(lines[opening + 1:closing]) + "\n"
+
+
+def test_a_heading_in_an_html_comment_changes_no_section(tmp_path):
+    # The reviewer's input. «## План» inside the comment replaced «## Итоги», both tables were
+    # at the same distance from «План», and the first one, the facts table, got the row.
+    old_facts = "| РП | Статус |\n| --- | --- |\n| Старый итог | done |\n"
+    plan = "| РП | Статус |\n| --- | --- |\n| Плановый | pending |\n"
+    weekplan = _weekplan(
+        tmp_path, "## Итоги\n\n<!--\n## План\n-->\n\n" + old_facts + "\n## План\n\n" + plan
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    out = weekplan.read_text(encoding="utf-8")
+    assert old_facts in out, "the facts table must stay untouched"
+    # the file is as it was, plus the one row: the comment lines stay where they are
+    expected = original.replace("| Плановый | pending |", "| **Новый РП** — [описание] | pending |\n| Плановый | pending |")
+    assert out == expected
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "<!--\n## Итоги\n-->",
+        "Заметка <!--\n## Итоги\n-->",
+        "<!--\n\n## Итоги\n\n-->",
+        "<!-- ## Итоги\nещё строка -->",
+        "<!--\n## Итоги\n--> хвост",
+    ],
+    ids=["own-lines", "starts-mid-line", "blank-lines-inside", "heading-on-the-first-line", "text-after-the-end"],
+)
+def test_a_facts_heading_in_a_comment_does_not_make_a_section(tmp_path, comment):
+    # Before the comment was read, «## Итоги» in it replaced «## План» and the plan table was facts.
+    weekplan = _weekplan(
+        tmp_path, f"## План\n\n{comment}\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_table_inside_a_comment_is_no_candidate(tmp_path):
+    # Both tables sit under the same «План»: the commented one comes first and used to win.
+    commented = "<!--\n| РП | Статус |\n| --- | --- |\n| Старый | done |\n-->\n"
+    weekplan = _weekplan(
+        tmp_path, "## План\n\n" + commented + "\n| РП | Статус |\n| --- | --- |\n| Плановый | pending |\n"
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    out = weekplan.read_text(encoding="utf-8")
+    assert commented in out, "the commented table must stay untouched"
+    assert "| Старый | done |\n-->\n\n| РП | Статус |\n| --- | --- |\n| **Новый РП**" in out
+
+
+@pytest.mark.parametrize(
+    "comment",
+    ["<!-- </details> -->", "<!--\n</details>\n-->"],
+    ids=["one-line", "own-lines"],
+)
+def test_a_closing_tag_in_a_comment_does_not_close_the_block(tmp_path, comment):
+    spare = "<details><summary>Резерв</summary>\n\n" + SPARE_TABLE + "\n</details>\n\n"
+    plan = (
+        f"<details open>\n<summary><b>План на неделю W40</b></summary>\n{comment}\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n"
+    )
+    weekplan = _weekplan(tmp_path, spare + plan)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_an_opening_tag_in_a_comment_opens_no_block(tmp_path):
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n"
+        "<!-- <details><summary>Итоги</summary> -->\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_an_unclosed_comment_swallows_the_rest_of_the_file(tmp_path):
+    _assert_refused(tmp_path, "<!-- незакрытый\n\n## План\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+
+@pytest.mark.parametrize(
+    "header, separator, expected",
+    [
+        ("| РП | Статус | <!-- note --> |", "|---|---|---|", "| **Новый РП** — [описание] | pending | — |"),
+        ("| РП | <!-- a | b --> | Статус |", "|---|---|---|", "| **Новый РП** — [описание] | — | pending |"),
+        ("| <!-- # --> РП | Статус |", "|---|---|", "| **Новый РП** — [описание] | pending |"),
+    ],
+    ids=["comment-in-a-cell", "pipe-in-the-comment", "comment-before-a-name"],
+)
+def test_a_comment_inside_a_table_row_leaves_a_table_row(tmp_path, header, separator, expected):
+    weekplan = _weekplan(tmp_path, f"{header}\n{separator}\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    assert _row_below(weekplan, separator) == expected
+
+
+def test_a_comment_between_the_header_and_the_separator_makes_no_table(tmp_path):
+    # An HTML block between them: not a table in GFM either.
+    _assert_refused(tmp_path, "## План\n\n| РП | Статус |\n<!-- c -->\n| --- | --- |\n| 1 | x |\n")
+
+
+def test_a_comment_that_starts_a_line_is_hidden_with_its_closing_line(tmp_path):
+    # An HTML block ends on the line with the `-->`, and what follows it there is part of it.
+    _assert_refused(tmp_path, "## План\n\n<!-- c\n--> | РП | Статус |\n| --- | --- |\n| 1 | x |\n")
+
+
+def test_what_follows_an_inline_comment_is_read(tmp_path):
+    weekplan = _weekplan(tmp_path, "## План\n\nтекст <!-- c\n--> | РП | Статус |\n| --- | --- |\n| 1 | x |\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _row_below(weekplan, "| --- | --- |") == "| **Новый РП** — [описание] | pending |"
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "```html\n<!--\n```\n",
+        "~~~\n<!-- ## Итоги\n~~~\n",
+        "Маркер `<!--` открывает комментарий.\n",
+        "Маркер ``<!-- и `код` ``.\n",
+    ],
+    ids=["fenced", "tilde-fenced", "inline-code", "double-backticks"],
+)
+def test_a_comment_start_in_code_is_text(tmp_path, code):
+    weekplan = _weekplan(tmp_path, f"## План\n\n{code}\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_fence_in_a_comment_opens_no_code_block(tmp_path):
+    # The comment is not scanned for markup, fences included: the table below it is no code.
+    weekplan = _weekplan(
+        tmp_path, "## План\n\n<!--\n```\n-->\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_comment_in_a_list_item_hides_its_tags(tmp_path):
+    weekplan = _weekplan(
+        tmp_path,
+        "- <!--\n  <details><summary>Итоги</summary>\n  -->\n\n## План недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_comment_in_a_quote_opens_no_zone(tmp_path):
+    # The quoted heading used to open a zone and the table after it was left to the pilot.
+    weekplan = _weekplan(
+        tmp_path, "> <!--\n> ## Заметки\n> -->\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_comments_in_a_crlf_weekplan_are_hidden_too(tmp_path):
+    weekplan = tmp_path / "WeekPlan W40.md"
+    body = (
+        "# WeekPlan W40\n\n## Итоги\n\n<!--\n## План\n-->\n\n| РП | Статус |\n| --- | --- |\n| Старый итог | done |\n\n"
+        "## План\n\n| РП | Статус |\n| --- | --- |\n| Плановый | pending |\n"
+    )
+    weekplan.write_bytes(body.replace("\n", "\r\n").encode("utf-8"))
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    lines = weekplan.read_bytes().decode("utf-8").split("\n")
+    row = next(i for i, ln in enumerate(lines) if "**Новый РП**" in ln)
+    assert lines[row + 1].startswith("| Плановый"), "the row went into the plan table"
+
+
+@pytest.mark.parametrize(
+    "where", ["above", "glued-above", "below", "between-separator-and-row"],
+    ids=["above", "glued-above", "below", "between-separator-and-row"],
+)
+def test_pending_markers_do_not_break_the_seed_template(tmp_path, where):
+    seed = SEED_WEEKPLAN.read_text(encoding="utf-8").splitlines()
+    header = next(i for i, ln in enumerate(seed) if ln.startswith("| 🚦"))
+    marker = "<!-- PENDING: week_context -->"
+    if where == "above":
+        seed[header:header] = [marker, ""]
+    elif where == "glued-above":
+        seed.insert(header, marker)
+    elif where == "below":
+        seed += ["", marker]
+    else:
+        seed.insert(header + 2, marker)
+    weekplan = tmp_path / "WeekPlan W1.md"
+    weekplan.write_text("\n".join(seed) + "\n", encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan, num="1", title="Первый РП", priority="P1", budget="2h")
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index(PLAN_TABLE_SEPARATOR) + 1] == (
+        "| 🔴 | 1 | **Первый РП** — [описание] | 2 | — | P1 | pending | [заполнить] |"
+    )
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [None, "<!-- PENDING: week_context -->", "<!-- PENDING: bottleneck-week\nвторая строка маркера -->"],
+    ids=["as-shipped", "one-line-marker", "two-line-marker"],
+)
+def test_the_day_open_weekplan_template_gets_the_row_in_its_plan_table(tmp_path, marker):
+    template = _day_open_weekplan_template()
+    if marker:
+        # markers of the day-open scaffold in front of the plan table and between the blocks
+        template = template.replace("| 🚦 | # | РП | h | Источник |", marker + "\n\n| 🚦 | # | РП | h | Источник |", 1)
+        template = template.replace("</details>\n<details>", "</details>\n" + marker + "\n<details>")
+    weekplan = tmp_path / "WeekPlan W40.md"
+    weekplan.write_text(template, encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index(PLAN_TABLE_SEPARATOR) + 1] == NEW_ROW
+    # nothing else of the template changed: the file is the template plus the one row
+    assert len(lines) == len(template.splitlines()) + 1
 
 
 def test_unplanned_section_is_not_the_plan(tmp_path):

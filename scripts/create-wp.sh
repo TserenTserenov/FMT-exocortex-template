@@ -802,7 +802,11 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # its shape, not by a pipe in its text: `#`..`######` and a space make an ATX heading (it wins
 # over a table row in CommonMark and GFM), so `### Итоги | факт` is the heading «Итоги | факт»
 # and `# | РП | Статус` is a heading, not a table header. A quote (`>` after up to three
-# spaces) is a container of its own: its tags change nothing outside it.
+# spaces) is a container of its own: its tags change nothing outside it. The content of an HTML
+# comment (`<!--` .. `-->`, one line or many) is not read at all: no heading, tag, table or zone
+# comes out of it, and what is left of a line around a comment (`| РП | <!-- x --> |`) is read as
+# the line it is; an unclosed comment swallows the rest of the file. Fenced and inline code are
+# not scanned for comments. The rows are written into the file as it is.
 # A table is a candidate only when its header has the exact cell «РП» and a cell
 # starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
 # plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
@@ -871,6 +875,61 @@ def heading_of(line):
     # whatever its text holds, and so is `# | РП | Статус`, which therefore is no table header.
     # A row of a table starts with a pipe or does not look like this at all.
     return HEADING_RE.match(line)
+
+
+def comment_start(text, pos):
+    """Index of the first `<!--` at or after pos that is not inside an inline code span, else -1."""
+    i = pos
+    while i < len(text):
+        if text.startswith("<!--", i):
+            return i
+        if text[i] == "`":
+            run = re.match(r"`+", text[i:]).group()
+            closing = re.search(r"(?<!`)" + re.escape(run) + r"(?!`)", text[i + len(run):])
+            i += len(run) + (closing.end() if closing else 0)  # a span ends at as many backticks
+        else:
+            i += 1
+    return -1
+
+
+def hide_comments(lines):
+    """The lines as markdown reads them: whatever sits inside an HTML comment is gone.
+
+    A comment opens at `<!--` and closes at the next `-->`, on the same line or on a later one;
+    what is left of a line is its visible text, and a line with nothing left is blank. A comment
+    that starts a line is an HTML block: its closing line goes with it, whatever follows the
+    `-->`. Fenced code and inline code are not scanned: a `<!--` there is text. Same number of
+    lines, so an index means the same line before and after.
+    """
+    view = []
+    fence = None  # (marker, length) while inside a fenced code block
+    in_comment = False
+    block = False  # the open comment started its line: the line it closes on is hidden whole
+    for line in lines:
+        text = line.rstrip("\r\n")
+        if not in_comment:
+            was_open = fence is not None
+            fence = next_fence(fence, text)
+            if was_open or fence:
+                view.append(line)
+                continue
+        visible, pos = [], 0
+        while pos < len(text):
+            if in_comment:
+                end = text.find("-->", pos)
+                if end < 0:
+                    break
+                pos, in_comment = (len(text) if block else end + 3), False
+            else:
+                start = comment_start(text, pos)
+                if start < 0:
+                    visible.append(text[pos:])
+                    break
+                visible.append(text[pos:start])
+                block = not "".join(visible).strip()
+                pos, in_comment = start + 4, True
+        view.append("".join(visible))
+    return view
 
 
 def classify(lines):
@@ -965,12 +1024,13 @@ def scan_tags(line, blocks, headings):
     return headings
 
 
-is_code, deep, base = classify(lines)
+view = hide_comments(lines)  # what is read below; `lines` stays as it is, the row goes into it
+is_code, deep, base = classify(view)
 candidates = []  # (header line, insert position, ancestor titles, open blocks)
 headings = []  # (level, title) of the markdown headings in scope
 blocks = []  # the open <details> blocks, outermost first
 zone = False  # a heading we cannot place was met and no unindented heading has closed its zone yet
-for i, line in enumerate(lines):
+for i, line in enumerate(view):
     if is_code[i]:
         continue
     text = line.expandtabs(4)[base[i]:]  # the line without the indentation of its container
@@ -988,7 +1048,7 @@ for i, line in enumerate(lines):
         headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
         zone = False
     if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
-        header = lines[i - 1]
+        header = view[i - 1]
         ancestors = [b.title for b in blocks] + [h[1] for h in headings]
         if (
             not zone
