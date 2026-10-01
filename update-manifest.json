@@ -369,7 +369,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "03baa02fcb74c5f3207e0c7a8520369b1790af8f9296786776f3ad4813b40dd1"
+      "sha256": "316e729aedd3527c7d29eed644dde4e303470947b8c3cbd413e58e042c7fee6e"
     },
     {
       "path": ".claude/settings.json",

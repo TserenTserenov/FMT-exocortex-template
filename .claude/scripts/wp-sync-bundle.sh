@@ -703,14 +703,15 @@ canary_card_numbers() {
   done < <(find "$INBOX_DIR" -maxdepth 1 -name "WP-*.md" 2>/dev/null | sort)
 }
 
-# Choose the card the canary checks (issue #964). It used to be the first inbox card in
-# sort order whatever its status; a status outside the platform vocabulary (a user's own
-# "❄️ frozen") then failed `update.sh --check` with exit 5 although the reader was fine.
-# Now: the first card whose registry status the resolver recognises. When no card has a
-# recognised status the FIRST card is chosen, so the canary still fails loudly on it
-# (#717/#718: a reader that resolves nothing must not pass). Sets CANARY_PICK (the card's
-# number, "" when inbox holds no cards) and, when other cards were passed over,
-# CANARY_SKIPPED_COUNT / CANARY_SKIPPED_LIST (the first three, with their status).
+# Choose the card the canary checks (issue #964). The first inbox card used to be taken
+# whatever its status, so a user's own "❄️ frozen" failed `update.sh --check` (exit 5).
+# Only a card whose registry row IS found but whose status is unknown ("_статус неизвестен_")
+# is passed over. Any other answer ends the search on that card: a recognised status, or a
+# "cannot resolve" answer -- above all "_не в реестре_" -- on which the canary then fails
+# as before: skipping such cards would blind it to a row format the reader cannot parse
+# (#717/#718; #954 A was caught exactly so). Every card unknown: the FIRST one is chosen
+# and refused. Sets CANARY_PICK ("" when inbox holds no cards) and, for cards passed over
+# before the pick, CANARY_SKIPPED_COUNT / CANARY_SKIPPED_LIST (first three, with status).
 pick_canary_wp() {
   local num status first=""
   CANARY_PICK=""
@@ -720,7 +721,7 @@ pick_canary_wp() {
     [[ -n "$num" ]] || continue
     [[ -n "$first" ]] || first="$num"
     status=$(registry_status "$num" 2>/dev/null || true)
-    if ! registry_status_unresolved "$status"; then
+    if [[ "$status" != "_статус неизвестен_" ]]; then
       CANARY_PICK="$num"
       return 0
     fi

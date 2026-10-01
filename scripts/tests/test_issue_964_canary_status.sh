@@ -3,10 +3,13 @@
 # `update.sh --check`) took the FIRST inbox card in sort order and failed with exit 5 when
 # that card's registry status was outside the platform vocabulary (a user's own "❄️ frozen"):
 # a fact about the data, not proof that the reader is broken, yet it blocked the update.
-# The canary now takes the first card whose status the resolver recognises. When no card
-# has a recognised status it still refuses, on the first card (#717/#718: a reader that
-# resolves nothing must stay loud). "↗️ merged" (the template legend) is recognised too.
-# Frozen is NOT added to the platform vocabulary: that is the pilot's decision.
+# The canary now walks the cards in sort order and passes over ONLY a card whose registry row
+# is found but whose status is outside the vocabulary. A card with no registry row (or any
+# other "cannot resolve" answer) is NOT passed over: the search stops on it and the canary
+# fails as before -- that is the signal "the registry is not read" (#954 A was caught exactly
+# so) and #717/#718 depend on it. When every card has an unknown status the first one is
+# refused. "↗️ merged" (the template legend) is recognised too. Frozen is NOT added to the
+# platform vocabulary: that is the pilot's decision.
 #
 # Synthetic fixtures under a temporary HOME/TMPDIR; every failure is collected and reported.
 set -uo pipefail
@@ -83,6 +86,38 @@ out=$(selftest "$WS" 13); rc=$?
 expect_eq "an explicitly requested WP is still checked strictly (❄️ -> exit 1)" 1 "$rc"
 expect_has "the explicit request names the unresolved status" "Canary FAILED: registry status unresolved for WP-13" "$out"
 
+echo "--- (1b) several cards with an unknown status in a row are all passed over ---"
+WS=$(new_ws)
+registry "$WS" "13|❄️ frozen" "20|🧊 on ice" "44|🔄 in_progress"
+card "$WS" 13
+card "$WS" 20
+card "$WS" 44
+out=$(selftest "$WS"); rc=$?
+expect_eq "two unknown-status cards first, a working WP third: exit code" 0 "$rc"
+expect_has "the third card is the one checked" "WP-044 registry_status: 🔄 in_progress" "$out"
+expect_has "both skipped cards are reported" "WP-013 _статус неизвестен_, WP-020 _статус неизвестен_" "$out"
+
+echo "--- (1c) a card with NO registry row is not passed over: the canary fails on it, as before ---"
+WS=$(new_ws)
+registry "$WS" "44|🔄 in_progress"
+card "$WS" 13
+card "$WS" 44
+out=$(selftest "$WS"); rc=$?
+expect_eq "first card has no registry row, a working WP follows: exit code" 1 "$rc"
+expect_has "the failure names the card that is missing from the registry" "Canary FAILED: registry status unresolved for WP-013: _не в реестре_" "$out"
+expect_lacks "the working card behind it is not what gets checked" "WP-044 registry_status" "$out"
+
+WS=$(new_ws)
+registry "$WS" "13|❄️ frozen" "44|🔄 in_progress"
+card "$WS" 13
+card "$WS" 20
+card "$WS" 44
+out=$(selftest "$WS"); rc=$?
+expect_eq "❄️ first, then a card with no registry row, then a working WP: exit code" 1 "$rc"
+expect_has "the search stops on the card with no registry row" "Canary FAILED: registry status unresolved for WP-020: _не в реестре_" "$out"
+expect_has "the ❄️ card passed over before it is still reported" "WP-013 _статус неизвестен_" "$out"
+expect_lacks "the working card behind the stop is not what gets checked" "WP-044 registry_status" "$out"
+
 echo "--- (2) when no card has a recognised status the canary still refuses ---"
 WS=$(new_ws)
 registry "$WS" "13|❄️ frozen" "44|🧊 on ice"
@@ -91,6 +126,16 @@ card "$WS" 44
 out=$(selftest "$WS"); rc=$?
 expect_eq "every card with an unknown status: exit code" 1 "$rc"
 expect_has "the refusal names the first card and its status" "Canary FAILED: registry status unresolved for WP-013: _статус неизвестен_" "$out"
+
+WS=$(new_ws)
+registry "$WS" "13|❄️ frozen" "20|🧊 on ice" "44|💤 sleeping"
+card "$WS" 13
+card "$WS" 20
+card "$WS" 44
+out=$(selftest "$WS"); rc=$?
+expect_eq "three cards, all with an unknown status: exit code" 1 "$rc"
+expect_has "the refusal is on the first card" "Canary FAILED: registry status unresolved for WP-013: _статус неизвестен_" "$out"
+expect_lacks "nothing was recognised, so no card is announced as skipped" "пропущ" "$out"
 
 WS=$(new_ws)
 registry "$WS" "99|🔄 in_progress"
