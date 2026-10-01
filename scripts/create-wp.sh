@@ -622,17 +622,25 @@ fi
 echo "2/5 WP-REGISTRY.md..."
 
 if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" "$STAKE_CELL" "$WP_ID" <<'PYEOF'
+import re
 import sys
 registry_path, wp_num, priority, title, repo, budget, gov_repo, stake, wp_id = sys.argv[1:10]
 
 with open(registry_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
 
-# Найти строку-разделитель после заголовка таблицы (|---|---|...)
+# Markdown table separator row: `|---|---|`, `| --- | --- |`, `|:---|---:|`, or without
+# outer pipes — a line made only of `|`, `-`, `:` and whitespace with at least two cells.
+# Same pattern as the Strategy.md writer below (issue #901); the literal `|---` lookup
+# this replaces missed every spaced separator, and the missing table failed the whole
+# creation with a rollback (issue #979).
+TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
+
+# Find the separator row under the header row (`| # | ...`)
 insert_at = None
 header_line = None
 for i, line in enumerate(lines):
-    if line.strip().startswith("|---") and i > 0 and lines[i-1].strip().startswith("| #"):
+    if TABLE_SEP_RE.match(line.rstrip("\r\n")) and i > 0 and lines[i-1].strip().startswith("| #"):
         insert_at = i + 1
         header_line = lines[i-1]
         break
@@ -766,16 +774,68 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # table header is "🚦 | # | РП | h | Источник | P | Статус | Результат"). Locate the table by
 # its actual header instead, same name-based technique as the REGISTRY writer, so
 # column order/extra columns don't silently corrupt the row.
-header_line = None
-insert_at = None
+#
+# issue #979: the first РП/Статус table is not necessarily the plan. After a day close
+# the WeekPlan may start with an «Итоги дня» block holding `| РП | Что сделано | Статус |`
+# and the new row landed there. So every table gets its chain of ancestors — the
+# <summary> of each enclosing <details> plus the markdown headings in scope — and the
+# writer skips a table when ANY ancestor is a facts section («Итоги», «Сводка», «Summary»:
+# WeekPlan = plan, WeekReport = facts), prefers a table with a «План» ancestor, falls back
+# to the only remaining candidate and otherwise refuses to guess. A <details> block is a
+# section of its own: headings from before it do not apply inside, headings met inside it
+# are dropped when it closes.
+# Separator rows are matched by pattern, not by the literal `|---` (same as #901).
+TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
+TAG_RE = re.compile(r"</details>|<details\b|<summary[^>]*>(.*?)</summary>", re.IGNORECASE)
+HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
+# Whole words only: «Итоговая таблица недели (плановые РП)» is a plan, not a facts section.
+FACTS_RE = re.compile(r"\b(?:Итог(?:и|ов)?|Сводк[аиу]|Summary)\b", re.IGNORECASE)
+PLAN_RE = re.compile(r"План|\bPlan\b", re.IGNORECASE)
+
+
+def strip_tags(text):
+    return re.sub(r"<[^>]+>", "", text).strip()
+
+
+candidates = []  # (header line, insert position, ancestor titles)
+headings = []  # (level, title) of the markdown headings in scope
+blocks = []  # per open <details>: [summary title, headings outside it (rebound, never mutated)]
 for i, line in enumerate(lines):
-    if line.strip().startswith("|---") and i > 0 and "РП" in lines[i - 1] and "Статус" in lines[i - 1]:
-        header_line = lines[i - 1]
-        insert_at = i + 1
-        break
+    for tag in TAG_RE.finditer(line):
+        text = tag.group(0).lower()
+        if text == "</details>":
+            if blocks:
+                headings = blocks.pop()[1]
+        elif text.startswith("<details"):
+            blocks.append(["", headings])
+            headings = []
+        elif blocks:
+            blocks[-1][0] = strip_tags(tag.group(1))
+    # A table row such as `# | Статус | РП` looks like a heading but is not one.
+    heading = None if "|" in line else HEADING_RE.match(line)
+    if heading:
+        level = len(heading.group(1))
+        headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
+    if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")) and "РП" in lines[i - 1] and "Статус" in lines[i - 1]:
+        ancestors = [b[0] for b in blocks] + [h[1] for h in headings]
+        if not any(FACTS_RE.search(t) for t in ancestors):
+            candidates.append((lines[i - 1], i + 1, ancestors))
+
+plan_titled = [c for c in candidates if any(PLAN_RE.search(t) for t in c[2])]
+if plan_titled:
+    chosen = plan_titled[0]
+elif len(candidates) == 1:
+    chosen = candidates[0]
+else:
+    chosen = None
+header_line, insert_at = (chosen[0], chosen[1]) if chosen else (None, None)
 
 if insert_at is None:
-    print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус) не найдена — добавить вручную", file=sys.stderr)
+    if candidates:
+        titles = ", ".join("«{}»".format(" › ".join(t for t in c[2] if t) or "без заголовка") for c in candidates)
+        print("   ⚠️  WeekPlan: несколько таблиц РП/Статус, ни одна не названа «План» ({}) — не выбираю наугад, добавить вручную".format(titles), file=sys.stderr)
+    else:
+        print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус вне блоков «Итоги») не найдена — добавить вручную", file=sys.stderr)
 else:
     header_cols = [c.strip() for c in header_line.strip().strip("|").split("|")]
     values_by_name = {

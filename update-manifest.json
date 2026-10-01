@@ -1189,7 +1189,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "c05765ea709dbf4d0e5663b95ffb29a2d18310780bd9d997a53ae9cb6b9e73a6"
+      "sha256": "15c61b0c78c1a5e42dd9416859563f36561e18a21c5e67123729bbf7600963c4"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2221,7 +2221,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "2cb6978c00f745d4eef7fe4d9b291aee7cacb2780fa45011022644648721eff2"
+      "sha256": "706e8cd5e7ba90c03cdea5bc6918b6597e303e731bbd393e81b79f8fa1a93c01"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2709,7 +2709,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "0bda885cf450f89bb2806902f947126be2b7b0e1706d2a03251a1d536c6f52ed"
+      "sha256": "1948065257faef4c0e351f770bacc257c7ce3cb17c4b5275a3c0fad8009970b7"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -2724,24 +2724,32 @@
       "sha256": "c62cf8b8136587e33ea622e47713d0e3d48417113bab1a6b096b9af68d6b9af3"
     },
     {
+      "path": "scripts/tests/test_create_wp_artifactor_gate.sh",
+      "sha256": "3ad0f619d2fd986752de245d8c7ba57a928653fca3ac7e94dfbf148de846183a"
+    },
+    {
       "path": "scripts/tests/test_create_wp_contract.sh",
-      "sha256": "48664e0ba57486c5a53fea7f92043b3f7626d00801cf8fcfa8568cbc621e5bb9"
+      "sha256": "fdf9a5280e6ac0560feccd6a390f9442c20f14337af249088211d8f9c81c5c2e"
     },
     {
       "path": "scripts/tests/test_create_wp_hypothesis_relation.sh",
-      "sha256": "d14398811aedc21cceecbade45d5bfbbd1852ba125a294546af9d670b50be023"
+      "sha256": "80022d7ec7e7b54dfa46e9ee5d81388e86fc0fb1bf12fd01ef16af32893248b5"
     },
     {
       "path": "scripts/tests/test_create_wp_number_padding.py",
-      "sha256": "6f035835af033c10993cc9ea46442916ff0a69201bad80021b5bff15e6a635b8"
+      "sha256": "09fa01a3a3c2a35e98f013c085a9c8b1e05cbe0adaf5ed7be7fcdc5d525fb4c4"
     },
     {
       "path": "scripts/tests/test_create_wp_registry_coherence.sh",
-      "sha256": "b1cb6c0de484ee1362ddd07a76c4d63a6b5155f025fb927dafdf6dadb76c300e"
+      "sha256": "2caf0c48598e73d27ac3f2d94a2c136f07865945e375b768667871d26d2c51cf"
     },
     {
       "path": "scripts/tests/test_create_wp_repeat_and_cwd.sh",
-      "sha256": "e5a759f588d019868885494923044aff05ef617ac2503685d89d2c8a72f562ba"
+      "sha256": "a3de898c189ba9954bd41ac67222e727b8f6624f43b626fcbda8a4ec87ed5815"
+    },
+    {
+      "path": "scripts/tests/test_create_wp_verification_class.sh",
+      "sha256": "008f342f28b06209ee9aae14b838539446c9c4931b1474c95e6a948ec4b9eec9"
     },
     {
       "path": "scripts/tests/test_create_wp_weekplan_writer.py",
@@ -2765,7 +2773,7 @@
     },
     {
       "path": "scripts/tests/test_fresh_seed_reproduction.sh",
-      "sha256": "7a7f7716d610e7732369f12add25496431231c092ccfedfd5cedc631b7475eb1"
+      "sha256": "7de7a50a5e8d091aba7160ed7a1cff0e61675d4bf9d96de38a5138594fd5ade6"
     },
     {
       "path": "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",
@@ -3101,7 +3109,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "0c3e2801398b4e5889026b244a8853caa38065044d2cfa7e08416c4fa9457e75"
+      "sha256": "3a0f4917669898f7473b99f815d7c7c29883b45288afff9f4012e82ddc6c10c0"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3187,7 +3195,6 @@
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_ar293_ai_cli_override.sh",
     "scripts/tests/test_copy_to_aisystant.py",
-    "scripts/tests/test_create_wp_verification_class.sh",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",
     "scripts/tests/test_day_open_preflight_calendar_path.sh",
@@ -3245,6 +3252,7 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_979_weekplan_table.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
