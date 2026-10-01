@@ -198,15 +198,35 @@ out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
 expect_eq "digest exit 7 -> bundle exit 1" 1 "$rc"
 expect_has "the bundle says which exit code the helper gave" "завершился с кодом 7" "$out"
 
-echo "--- a helper that succeeds drives the comparison; one that says nothing means nothing to compare ---"
-stub_digest "$STUBT" 0 "status=done" "stub: noise on stderr is not output"
-out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
-expect_eq "digest exit 0 with only a status line -> bundle exit 0 (no digest, nothing to compare)" 0 "$rc"
-expect_lacks "no drift is invented from a half answer" "stale_handoff" "$out"
+echo "--- the helper's contract: exit 0 means a status= AND a phase_digest= line; an answer without them is a broken helper, not 'no drift' ---"
+# What the helper prints on exit 0 is compared with the snapshot (status in_progress, digest 0123456789ab).
 stub_digest "$STUBT" 0 "" ""
 out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
-expect_eq "digest exit 0 with no output -> bundle exit 0" 0 "$rc"
-expect_lacks "no drift is invented from an empty answer" "stale_handoff" "$out"
+expect_eq "digest exit 0 with no output -> bundle exit 1 (nothing was compared)" 1 "$rc"
+expect_has "the message names the broken contract and both missing lines" "завершился с кодом 0, но не выдал status=, phase_digest=" "$out"
+expect_has "the message says it is a helper contract violation" "нарушен контракт helper" "$out"
+expect_lacks "no 'no drift' is reported for a comparison that did not happen" "Drift-сигналы" "$out"
+stub_digest "$STUBT" 0 "status=done" "stub: noise on stderr is not output"
+out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
+expect_eq "digest exit 0 with only a status line -> bundle exit 1" 1 "$rc"
+expect_has "the message names the missing phase_digest line" "не выдал phase_digest=:" "$out"
+expect_has "the helper's own stderr reaches the user" "stub: noise on stderr is not output" "$out"
+stub_digest "$STUBT" 0 "phase_digest=deadbeef0000" ""
+out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
+expect_eq "digest exit 0 with only a phase_digest line -> bundle exit 1" 1 "$rc"
+expect_has "the message names the missing status line" "не выдал status=:" "$out"
+stub_digest "$STUBT" 0 $'status=\nphase_digest=0123456789ab' ""
+out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
+expect_eq "digest exit 0 with an empty status= value -> bundle exit 1" 1 "$rc"
+echo "--- a complete answer drives the comparison ---"
+stub_digest "$STUBT" 0 $'status=in_progress\nphase_digest=0123456789ab\nphase_count=1' "stub: noise on stderr is not output"
+out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
+expect_eq "digest = the snapshot -> bundle exit 0" 0 "$rc"
+expect_lacks "digest = the snapshot -> no drift" "stale_handoff" "$out"
+stub_digest "$STUBT" 0 $'status=done\nphase_digest=0123456789ab\nphase_count=1' ""
+out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
+expect_eq "another status than the snapshot -> bundle exit 0" 0 "$rc"
+expect_has "another status than the snapshot -> the drift is reported" "DRIFT: stale_handoff" "$out"
 install_code "$STUBT" yes   # the real helper again
 out=$(run_bundle "$STUBT" "$HWS" 44); rc=$?
 expect_eq "the real helper: bundle exit 0" 0 "$rc"

@@ -218,14 +218,30 @@ else
   bad "registry_status could not be loaded from $BUNDLE"
 fi
 
+# The bundle's registry_status repeats the library's number rules (it must not call the library:
+# its older tests cut it out by name and run it alone). Two copies of one contract: for every
+# input they must both accept or both refuse, and an accepted input must reach the same
+# registry row. A drift -- the case of the prefix, the length that counts the prefix, the
+# significant digits, spaces and wrappers -- turns this red.
 if declare -F registry_status >/dev/null && [ "$have_lib" = 1 ]; then
-  for raw in 44 044 0044 00044 000000044 999999999 1234567890 0 000 "$(printf '%064d' 44)" "$(printf '%065d' 44)" "$(printf '%064d' 0)" "$(printf '%065d' 0)"; do
+  n_total=$(printf '%064d' 44)          # 64 characters, ends in 44
+  for raw in 44 044 0044 00044 000000044 999999999 1234567890 0 000 "" \
+             "$n_total" "$(printf '%065d' 44)" "$(printf '%064d' 0)" "$(printf '%065d' 0)" \
+             WP-044 wp-044 wP-044 Wp-044 WP-00044 WP- wp- "WP-WP-44" "WP-44-slug" 13\* -5 1.5 "4 4" \
+             " 44 " "~~44~~" "**WP-044**" "~~**wP-044**~~" "~~44" \
+             "WP-$(printf '%059d' 44)" "WP-$(printf '%060d' 44)" "WP-$(printf '%062d' 44)" "WP-$(printf '%064d' 44)" \
+             "wP-$(printf '%059d' 44)" "wP-$(printf '%060d' 44)"; do
     if wp_num_normalize "$raw" >/dev/null 2>&1; then lib_says=accepts; else lib_says=refuses; fi
-    case "$(registry_status "$raw" 2>/dev/null)" in
+    got=$(registry_status "$raw" 2>/dev/null)
+    case "$got" in
       "_некорректный номер РП"*) bundle_says=refuses ;;
       *) bundle_says=accepts ;;
     esac
-    expect_eq "digits [${raw:0:12}...] (${#raw} characters): the bundle's registry_status and the library agree" "$lib_says" "$bundle_says"
+    label="[${raw:0:14}] (${#raw} characters)"
+    expect_eq "input $label: the bundle's registry_status and the library agree (library $lib_says)" "$lib_says" "$bundle_says"
+    if [ "$lib_says" = accepts ]; then
+      expect_eq "input $label: registry_status reaches the row of the library's number" "$(registry_status "$(wp_num_normalize "$raw")" 2>/dev/null)" "$got"
+    fi
   done
 fi
 
