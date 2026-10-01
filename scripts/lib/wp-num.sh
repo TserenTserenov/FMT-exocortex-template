@@ -19,6 +19,7 @@
 #   p=$(wp_num_padded 44)                    # -> 044
 #   re=$(wp_num_registry_cell_regex 44)      # regex of the registry "#" cell (ERE and Python re)
 #   f=$(wp_num_card_path "$inbox" 44)        # -> $inbox/WP-044/WP-044.md  (the path that exists)
+#   wp_num_flat_cards "$archive" 44          # -> flat WP-044*.md / WP-44*.md files, one per line
 #   f=$(wp_num_find_card "$inbox" "$archive" 44)   # whole card lookup, see below
 #
 # Every function returns 1 (and prints nothing) when it cannot answer; callers running
@@ -108,13 +109,16 @@ _wp_num_grep_card() {
   printf '%s\n' "$found"
 }
 
-# _wp_num_flat_cards <dir> <n> -> flat legacy files WP-<N>.md and WP-<N>-<slug>.md in <dir>,
-# either spelling, sorted. The hyphen is the ID boundary: WP-46-*.md never matches WP-469-*.
-_wp_num_flat_cards() {
-  local dir="$1" spelling
+# wp_num_flat_cards <dir> <raw> -> flat legacy files WP-<N>.md and WP-<N>-<slug>.md in <dir>
+# (the zero-padded spelling first in sort order), one per line. The hyphen is the ID
+# boundary: WP-46-*.md never matches WP-469-*. Used for contexts and cards written flat
+# (close-wp.sh writes archive/wp-contexts/WP-044-<slug>.md).
+wp_num_flat_cards() {
+  local dir="${1-}" n spelling
+  n=$(wp_num_normalize "${2-}") || return 1
   while IFS= read -r spelling; do
     find "$dir" -maxdepth 1 \( -name "WP-${spelling}.md" -o -name "WP-${spelling}-*.md" \) 2>/dev/null
-  done < <(_wp_num_spellings "$2") | sort -u
+  done < <(_wp_num_spellings "$n") | sort -u
 }
 
 # _wp_num_inbox_flat <dir> <n> -> a flat legacy card in inbox: the exact WP-<N>.md first;
@@ -161,7 +165,7 @@ wp_num_find_card() {
   fi
   if [ -z "$found" ] && [ -d "$archive" ]; then
     found=$(wp_num_card_path "$archive" "$n" || true)
-    [ -n "$found" ] || found=$(_wp_num_flat_cards "$archive" "$n" | head -1 || true)
+    [ -n "$found" ] || found=$(wp_num_flat_cards "$archive" "$n" | head -1 || true)
   fi
   if [ -z "$found" ] && [ -d "$inbox" ]; then
     found=$(_wp_num_grep_card "$inbox" "$n" || true)

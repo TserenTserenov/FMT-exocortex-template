@@ -995,12 +995,14 @@ main() {
   local related_from_body
   related_from_body=$(grep_body_wps "$wp_file")
 
-  # Merge, deduplicate, exclude self, limit to 30
+  # Merge, deduplicate, exclude self, limit to 30. Self is excluded by NUMBER (issue #954):
+  # the card says "WP-044" in its heading while the caller typed 44 (or the other way
+  # round), and a string compare listed the WP as related to itself.
   local all_related
   all_related=$(
     { echo "$related_from_fm"; echo "$related_from_blockers"; echo "$related_from_body"; } \
     | grep -E '^[0-9]+$' \
-    | grep -v "^${wp_num}$" \
+    | awk -v self="$wp_num" '$0 + 0 != self + 0' \
     | sort -nu \
     | head -30 \
     || true

@@ -165,7 +165,9 @@ print("context")
 PYEOF2
 )
 CANONICAL_CONTEXT_FILE="$ARCHIVE_DIR/WP-${WP_ID}-${SLUG}.md"
-LEGACY_CONTEXT_FILE=$(find "$ARCHIVE_DIR" -maxdepth 1 -type f -name "WP-${WP_NUM}-*.md" -print 2>/dev/null | sort | head -1)
+# An older context written under another title (or with the number spelled differently,
+# WP-044-old-title.md vs WP-44-old-title.md) is appended to, not shadowed by a second file (#954).
+LEGACY_CONTEXT_FILE=$(wp_num_flat_cards "$ARCHIVE_DIR" "$WP_NUM" | head -1)
 if [[ -f "$CANONICAL_CONTEXT_FILE" ]]; then
   CONTEXT_FILE="$CANONICAL_CONTEXT_FILE"
 elif [[ -n "$LEGACY_CONTEXT_FILE" ]]; then
@@ -246,11 +248,11 @@ fi
 # --- Шаг 3: обновить статус в inbox/WP-NNN*.md ---
 echo "3/3 Обновляю inbox/WP-${WP_ID}..."
 
-CANONICAL_INBOX_FILE="$STRATEGY/inbox/WP-${WP_ID}/WP-${WP_ID}.md"
-if [[ -f "$CANONICAL_INBOX_FILE" ]]; then
-  INBOX_FILE="$CANONICAL_INBOX_FILE"
-else
-  INBOX_FILE=$(find "$STRATEGY/inbox" -maxdepth 2 -type f \( -name "WP-${WP_NUM}.md" -o -name "WP-${WP_NUM}-*.md" \) -print 2>/dev/null | sort | head -1)
+# The folder card in either spelling (WP-044/ is canonical, WP-44/ legacy), else a flat legacy
+# card WP-044-<slug>.md / WP-44.md in inbox (#954: the flat spelling with zeros was not found).
+INBOX_FILE=$(wp_num_card_path "$STRATEGY/inbox" "$WP_NUM" || true)
+if [[ -z "$INBOX_FILE" ]]; then
+  INBOX_FILE=$(wp_num_flat_cards "$STRATEGY/inbox" "$WP_NUM" | head -1)
 fi
 
 if [[ -n "$INBOX_FILE" ]]; then

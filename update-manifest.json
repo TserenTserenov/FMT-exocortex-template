@@ -369,7 +369,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "316e729aedd3527c7d29eed644dde4e303470947b8c3cbd413e58e042c7fee6e"
+      "sha256": "403753dc6eb06131c7dd2898a5ad0c67f2d8e6ba368221d23e7b9ff61f8ef744"
     },
     {
       "path": ".claude/settings.json",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "6abe9646456385102a7600b506f0e236a78b0e2fac49c313ec50591b5886f5c8"
+      "sha256": "9e69c1e82ebe7b3c3e912b093f1f7428530da805d8c68aa3204afcc970672bb9"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -2521,7 +2521,7 @@
     },
     {
       "path": "scripts/lib/wp-num.sh",
-      "sha256": "9ce0d0fc37b5962492a5313e0d8edf9b302261e7a5832e362e0f2592f346f558"
+      "sha256": "f242ab37462388bf4ce87fd580d0fbda01624087b25c455ce3d0198939021179"
     },
     {
       "path": "scripts/lib/wp_inbox.py",

@@ -286,6 +286,22 @@ expect_eq "bundle WP-70 (legacy card in inbox, stub in archive) exits 0" 0 "$rc"
 expect_has "bundle WP-70 reads the live inbox card, not the archive stub" "Файл: \`inbox/WP-070-legacy.md\`" "$out"
 expect_has "bundle WP-70 shows the live card's status" "Status: in_progress" "$out"
 
+# a WP mentioned in its own body is not related to itself, whichever way the number is spelled
+for pair in "44:WP-044" "044:WP-44" "WP-044:WP-044" "44:WP-44"; do
+  typed="${pair%%:*}"
+  spelled="${pair#*:}"
+  WS=$(new_ws)
+  issue_registry "$WS/$GOV/docs/WP-REGISTRY.md" "44"
+  mkdir -p "$WS/$GOV/inbox/WP-044"
+  printf -- '---\nwp: 44\nstatus: in_progress\n---\n# WP-044\n\nSee %s and WP-45.\n' "$spelled" > "$WS/$GOV/inbox/WP-044/WP-044.md"
+  card "$WS/$GOV/inbox/WP-045/WP-045.md" 45 in_progress
+  out=$(IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$BUNDLE" "$typed" 2>&1); rc=$?
+  expect_eq "bundle $typed ($spelled in its own body) exits 0" 0 "$rc"
+  expect_has "bundle $typed ($spelled in its own body): the other WP is listed as related" "### WP-45 (" "$out"
+  expect_lacks "bundle $typed ($spelled in its own body): not related to itself (as WP-044)" "### WP-044 (" "$out"
+  expect_lacks "bundle $typed ($spelled in its own body): not related to itself (as WP-44)" "### WP-44 (" "$out"
+done
+
 # ---------------------------------------------------------------------------
 echo "--- #954 C: close-wp.sh strikes the row whatever the cell looks like ---"
 for arg in 44 WP-044 wp-044; do
@@ -318,6 +334,36 @@ EOF
 card "$WS/$GOV/inbox/WP-044/WP-044.md" 44 in_progress
 IWE_ROOT="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$CLOSE" --wp 44 --summary "closed by the test" >/dev/null 2>&1
 expect_has "close-wp: the canonical bare-number row is still struck" "| ~~44~~ |" "$(sed -n '3p' "$WS/$GOV/docs/WP-REGISTRY.md")"
+
+echo "--- #954 L2: close-wp.sh finds the older context and the flat card spelled with zeros ---"
+for arg in 44 044; do
+  # a context written earlier under another title: closing again must append to it, not create a second one
+  WS=$(new_ws)
+  cat > "$WS/$GOV/docs/WP-REGISTRY.md" <<'EOF'
+| # | Приоритет | Название | Статус | Репо | Бюджет | Неделя |
+|---|-----------|---------|--------|------|--------|--------|
+| WP-044 | P2 | **Demo WP** | 🔄 in_progress | DS-strategy | 3h | W38 |
+EOF
+  card "$WS/$GOV/inbox/WP-044/WP-044.md" 44 in_progress
+  card "$WS/$GOV/archive/wp-contexts/WP-044-old-title.md" 44 "done"
+  out=$(IWE_ROOT="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$CLOSE" --wp "$arg" --summary "second closure" 2>&1); rc=$?
+  expect_eq "close-wp --wp $arg (older context WP-044-old-title.md) exits 0" 0 "$rc"
+  expect_eq "close-wp --wp $arg: no second context is created beside the older one" "WP-044-old-title.md" "$(ls "$WS/$GOV/archive/wp-contexts")"
+  expect_has "close-wp --wp $arg: the closure is appended to the older context" "**Итог:** second closure" "$(cat "$WS/$GOV/archive/wp-contexts/WP-044-old-title.md")"
+
+  # a flat legacy card in inbox (no folder): its status must still be set to done
+  WS=$(new_ws)
+  cat > "$WS/$GOV/docs/WP-REGISTRY.md" <<'EOF'
+| # | Приоритет | Название | Статус | Репо | Бюджет | Неделя |
+|---|-----------|---------|--------|------|--------|--------|
+| WP-044 | P2 | **Demo WP** | 🔄 in_progress | DS-strategy | 3h | W38 |
+EOF
+  card "$WS/$GOV/inbox/WP-044-flat.md" 44 in_progress
+  out=$(IWE_ROOT="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$CLOSE" --wp "$arg" --summary "flat closure" 2>&1); rc=$?
+  expect_eq "close-wp --wp $arg (flat card WP-044-flat.md) exits 0" 0 "$rc"
+  expect_has "close-wp --wp $arg: the flat card is marked done" "status: done" "$(cat "$WS/$GOV/inbox/WP-044-flat.md")"
+  expect_lacks "close-wp --wp $arg: no 'update by hand' warning for the flat card" "обновить вручную" "$out"
+done
 
 # ---------------------------------------------------------------------------
 echo "--- #954 D: archive-done-wp.sh moves the padded folder and reports failures honestly ---"
