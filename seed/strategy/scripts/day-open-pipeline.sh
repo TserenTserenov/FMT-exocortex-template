@@ -132,7 +132,7 @@ if [ -f "$SCRIPT_HOME/../update-manifest.json" ]; then
     elif [ -n "${IWE_ROOT:-}" ]; then ROOT_SOURCE="IWE_ROOT"
     else ROOT_SOURCE="расположение скрипта (или WORKSPACE_DIR из .exocortex.env)"
     fi
-    early_abort "Governance-репозиторий не найден: $DS_STRATEGY. Корень $IWE взят из: $ROOT_SOURCE — проверьте, что он верный и не устарел, и что в нём есть каталог $GOV_REPO (имя задаёт IWE_GOVERNANCE_REPO, по умолчанию DS-strategy)"
+    early_abort "Governance-репозиторий не найден: $DS_STRATEGY. Корень $IWE взят из: $ROOT_SOURCE — проверьте, что он верный и не устарел, и что в нём есть каталог $GOV_REPO (имя задаёт переменная IWE_GOVERNANCE_REPO; без неё берётся имя репозитория управления по умолчанию)"
   fi
   SCRIPTS_FALLBACK="$SCRIPT_HOME"
 else
