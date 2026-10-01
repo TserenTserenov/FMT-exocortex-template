@@ -13,11 +13,15 @@ headings in scope), skips a table when any ancestor is a facts section
 ancestor is the nearest one (the word must start with «План»/«Plan»; the first
 table on a tie), falls back to the only remaining candidate and otherwise
 refuses to guess (warning, nothing written). A `<summary>` may span several
-lines, and one that is never closed swallows its block. Fenced and indented
-(4+ columns, a tab counts to 4) code blocks are not markup. A table is a
-candidate only when its header has the exact cell «РП» and a cell starting with
-the word «Статус» («Статус (на 3 июля)» counts and is filled with «pending» like
-the plain column, «Связанные РП» does not).
+lines and belongs to the block that opened it: one that is never closed swallows
+its block, and a nested `<details>` cannot take the open state over. Code is
+decided before any tag, heading or table is looked at: fenced and indented
+(4+ columns beyond the list item, a tab counts to 4) code blocks are not markup;
+an indented line is code only after a blank line, a heading, a closing fence or
+another code line, and an indented list is not code. A table is a candidate only
+when its header has the exact cell «РП» and a cell starting with the word
+«Статус» («Статус (на 3 июля)» counts and is filled with «pending» like the plain
+column, «Связанные РП» does not); the new row keeps the indentation of its table.
 
 The same fix replaces the literal `|---` separator lookup in the WeekPlan and
 REGISTRY writers (`| --- |` made the REGISTRY step fail and roll the whole WP
@@ -471,6 +475,67 @@ def test_summary_outside_details_is_plain_text(tmp_path, stray):
 
 
 @pytest.mark.parametrize(
+    "body",
+    [
+        # the reviewer's input: the inner block closes, the table sits in the outer one
+        "<details>\n<summary>Итоги дня\n<details><summary>Резерв</summary>\n</details>\n"
+        "| РП | Статус |\n|---|---|\n</details>\n",
+        # the table sits in the inner block, under a closed «Резерв» summary
+        "<details>\n<summary>План недели\n<details><summary>Резерв</summary>\n\n" + SPARE_TABLE
+        + "\n</details>\n</details>\n",
+        # the inner <summary> is not closed either
+        "<details>\n<summary>План недели\n<details>\n<summary>Резерв\n\n" + SPARE_TABLE
+        + "\n</details>\n</details>\n",
+    ],
+    ids=["table-in-the-outer-block", "table-in-the-inner-block", "inner-summary-unclosed-too"],
+)
+def test_a_nested_block_does_not_close_an_open_summary(tmp_path, body):
+    # The open <summary> state belongs to the block that opened it: the inner block's own
+    # <summary> used to overwrite it, the outer block stayed without a title and its table
+    # became the only candidate.
+    weekplan = _weekplan(tmp_path, body)
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize("summary_first", [True, False], ids=["summary-first", "summary-last"])
+def test_a_summary_block_nested_in_the_plan_block_stays_excluded(tmp_path, summary_first):
+    # Proper nesting «План → Итоги»: the day summary is excluded, the plan table is written.
+    inner = "<details>\n<summary>Итоги дня 2026-09-29</summary>\n\n" + DAY_SUMMARY_TABLE + "\n</details>\n"
+    plan_table = PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    content = inner + "\n" + plan_table if summary_first else plan_table + "\n" + inner
+    weekplan = _weekplan(
+        tmp_path, "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n" + content + "\n</details>\n"
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "Что сделано") == "| #5 | вчера | done |"
+
+
+def test_an_unclosed_inner_summary_leaves_the_outer_plan_usable(tmp_path):
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+        + "\n<details>\n<summary>Итоги дня\n\n" + DAY_SUMMARY_TABLE + "\n</details>\n</details>\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "Что сделано") == "| #5 | вчера | done |"
+
+
+@pytest.mark.parametrize(
     "header_indent, separator_indent",
     [("    ", "    "), ("\t", "\t"), ("      ", "      "), ("  \t", "  \t"), ("    ", ""), ("", "    ")],
     ids=["four-spaces", "tab", "six-spaces", "spaces-then-tab", "only-header", "only-separator"],
@@ -515,7 +580,156 @@ def test_a_table_indented_by_three_spaces_is_still_a_table(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "добавлена" in result.stdout
-    assert "Новый РП" in weekplan.read_text(encoding="utf-8")
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    # the row keeps the indentation of its table
+    assert lines[lines.index("   |----|--------|") + 1] == "   | **Новый РП** — [описание] | pending |"
+
+
+CODEX_PLAN = "## План\n| РП | Статус |\n|---|---|\n"
+
+
+@pytest.mark.parametrize(
+    "indent", ["    ", "\t", "      ", "  \t"], ids=["four-spaces", "tab", "six-spaces", "spaces-then-tab"]
+)
+def test_a_tag_line_in_indented_code_is_not_markup(tmp_path, indent):
+    # The reviewer's input. Tags used to be handled before the indentation was looked at: the
+    # example opened a block named «Итоги» and the real plan table below it was refused as facts.
+    example = f"{indent}<details><summary>Итоги</summary>\n"
+    weekplan = _weekplan(tmp_path, example + CODEX_PLAN)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index("|---|---|") + 1] == "| **Новый РП** — [описание] | pending |"
+    assert example in weekplan.read_text(encoding="utf-8"), "the example must stay untouched"
+
+
+@pytest.mark.parametrize(
+    "example",
+    ["<details><summary>Итоги</summary>", "<summary>Итоги</summary>", "</details>"],
+    ids=["details-with-summary", "summary", "closing-details"],
+)
+@pytest.mark.parametrize("indent", ["    ", "\t"], ids=["four-spaces", "tab"])
+def test_example_tags_in_indented_code_do_not_reshape_the_plan_block(tmp_path, indent, example):
+    # Taken for markup the example renames the plan block «Итоги» (the row went to «Резерв»)
+    # or closes it early (the plan table lost its «План» title and the choice was refused).
+    spare = "<details><summary>Резерв</summary>\n\n" + SPARE_TABLE + "\n</details>\n\n"
+    plan = (
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n"
+        f"{indent}{example}\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n"
+    )
+    weekplan = _weekplan(tmp_path, spare + plan)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("План на неделю W40")
+    assert NEW_ROW in tail and "Новый РП" not in head
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "## План недели\n    <details><summary>Итоги</summary>\n",
+        "\n    Пример разметки:\n    <details><summary>Итоги</summary>\n## План недели\n",
+        "```text\nпример\n```\n    <details><summary>Итоги</summary>\n## План недели\n",
+        "\n    - <details><summary>Итоги</summary>\n## План недели\n",
+    ],
+    ids=["right-after-a-heading", "after-another-code-line", "right-after-a-closing-fence", "list-marker-in-code"],
+)
+def test_where_indented_code_starts_and_continues(tmp_path, prefix):
+    # Code opens after a blank line, a heading or a closing fence, goes on over the next
+    # indented line, and a bullet in it is no list item.
+    weekplan = _weekplan(tmp_path, prefix + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_an_indented_tag_under_an_html_line_is_still_a_tag(tmp_path):
+    # `<summary>` indented under `<details>` with no blank line between belongs to the same HTML
+    # block: it is markup, and the plan block keeps its title (the spare table has none).
+    spare = "<details><summary>Резерв</summary>\n\n" + SPARE_TABLE + "\n</details>\n\n"
+    plan = (
+        "<details open>\n    <summary><b>План на неделю W40</b></summary>\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n"
+    )
+    weekplan = _weekplan(tmp_path, spare + plan)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "| # | РП | Статус |") == "| 1 | **Запас** | pending |"
+
+
+@pytest.mark.parametrize(
+    "marker, indent",
+    [("-", "    "), ("1.", "    "), ("-", "\t")],
+    ids=["bullet-four-spaces", "numbered-four-spaces", "bullet-tab"],
+)
+def test_a_table_inside_a_list_item_is_a_table_and_its_row_keeps_the_indentation(tmp_path, marker, indent):
+    # Four columns from the margin are only two beyond the content of «- Задачи:»: not code.
+    table = "".join(indent + ln + "\n" for ln in ["| РП | Статус |", "|----|--------|", "| 1 | x |"])
+    weekplan = _weekplan(tmp_path, f"## План недели\n\n{marker} Задачи:\n\n{table}")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index(indent + "|----|--------|") + 1] == indent + "| **Новый РП** — [описание] | pending |"
+
+
+def test_code_inside_a_list_item_is_still_code(tmp_path):
+    # Eight columns are six beyond the content of «- Задачи:»: an indented code block.
+    weekplan = _weekplan(
+        tmp_path,
+        "## План недели\n\n- Задачи:\n\n        | РП | Статус |\n        |----|--------|\n        | 1 | x |\n",
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_a_list_ends_with_the_next_unindented_line(tmp_path):
+    # After «- Пункт» and an unindented paragraph the list is over: four columns from the margin
+    # are code again, not two beyond a list item.
+    example = "    | РП | Статус |\n    |----|--------|\n    | 1 | пример |\n"
+    weekplan = _weekplan(
+        tmp_path,
+        "## План недели\n\n- Пункт\n\nОбычный абзац.\n\n" + example + "\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert example in weekplan.read_text(encoding="utf-8"), "the example must stay untouched"
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_an_indented_tag_inside_a_list_item_is_real_markup(tmp_path):
+    # Two columns beyond the content of «- Пункт» is no code: the tag opens a block named «Итоги»
+    # that is never closed, so the plan table below it is not a safe pick.
+    weekplan = _weekplan(
+        tmp_path,
+        "- Пункт\n\n    <details><summary>Итоги</summary>\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
 
 
 def test_unplanned_section_is_not_the_plan(tmp_path):
