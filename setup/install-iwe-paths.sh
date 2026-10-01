@@ -159,6 +159,7 @@ if [ -n "$OLD_IWE_SCRIPTS" ]; then
         # Deliberately not gated by --quiet: this is the case --quiet callers must see.
         echo "  ⚠ IWE_SCRIPTS: $OLD_SCRIPTS_RESOLVED → $NEW_SCRIPTS_RESOLVED"
         echo "    Рабочая scripts/ берётся, только если в ней обычный (не симлинк) session-guard.sh; иначе — scripts/ шаблона. Проверьте, что путь ожидаемый."
+        echo "    Новое значение подхватят только новые оболочки и Claude Code после перезапуска."
     fi
 fi
 

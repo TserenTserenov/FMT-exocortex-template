@@ -137,6 +137,8 @@ rm "$WS_A/scripts/session-guard.sh"
 out=$(run_installer "$WS_A")
 check_contains "маркер пропал: «старое → новое» напечатано при --quiet" \
     "$out" "IWE_SCRIPTS: $WS_A/scripts → $TEMPLATE_SCRIPTS"
+check_contains "маркер пропал: сказано, что значение подхватят только новые оболочки" \
+    "$out" "подхватят только новые оболочки и Claude Code после перезапуска"
 check "маркер пропал: .iwe-paths указывает на шаблон" \
     "$TEMPLATE_SCRIPTS" "$(iwe_scripts_after_sourcing "$WS_A/.iwe-paths")"
 
