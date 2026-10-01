@@ -482,7 +482,9 @@ migrate_platform_memory() {
 #   stale    - the copy equals a version committed in the clone. That can be an older release,
 #              but also the pilot's own edit committed into the clone (a fork with local
 #              commits, #963), so the text says so and the offered command saves the current
-#              copy next to it before the cp.
+#              copy next to it before the cp. The saved copy's name carries a time stamp (the
+#              user's shell expands the $(date ...) when the command runs): with a fixed name a
+#              second run would replace the only copy of the pilot's edits with the refreshed file.
 #   authored - the copy equals no committed version: the pilot's edits, or a release that
 #              update.sh already applied to the clone (it never commits what it applies).
 #   anything else, including a missing classifier, keeps the generic text.
@@ -508,7 +510,7 @@ report_owner_user_memory_drift() {
             case "$verdict" in
                 stale)
                     echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
-                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update-\$(date +%Y%m%d%H%M%S)\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
                     ;;
                 authored)
                     echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)."
@@ -751,7 +753,9 @@ report_author_skip() {
             # Byte-identical to the template — not a real skip, no warning needed.
             ;;
         stale)
-            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: cp \"$SCRIPT_DIR/$fpath\" \"$dst\""
+            # The same saving, time-stamped command as in report_owner_user_memory_drift(): a bare cp
+            # loses the copy when the verdict misleads, and a fixed backup name is overwritten by a rerun.
+            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: cp -p \"$dst\" \"$dst.before-update-\$(date +%Y%m%d%H%M%S)\" && cp \"$SCRIPT_DIR/$fpath\" \"$dst\""
             AUTHOR_SKIP_STALE=$((AUTHOR_SKIP_STALE + 1))
             AUTHOR_STALE_PAIRS+=("$fpath|$dst")
             ;;
