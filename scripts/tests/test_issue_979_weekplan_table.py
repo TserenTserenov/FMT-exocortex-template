@@ -9,11 +9,15 @@ new WPs landed in the summary of the past day, with dashes in every column the
 summary does not share with the plan. The writer now gives every table the chain
 of its ancestors (the `<summary>` of each enclosing `<details>` plus the markdown
 headings in scope), skips a table when any ancestor is a facts section
-(«Итоги / Сводка / Summary», whole words), prefers a table with a «План»
-ancestor, falls back to the only remaining candidate and otherwise refuses to
-guess (warning, nothing written). Fenced code blocks are not markup, and a table
-is a candidate only when its header has the exact cell «РП» and a cell starting
-with the word «Статус» («Статус (на 3 июля)» counts, «Связанные РП» does not).
+(«Итоги / Сводка / Summary», whole words), prefers the table whose «План»
+ancestor is the nearest one (the word must start with «План»/«Plan»; the first
+table on a tie), falls back to the only remaining candidate and otherwise
+refuses to guess (warning, nothing written). A `<summary>` may span several
+lines, and one that is never closed swallows its block. Fenced and indented
+(4+ columns, a tab counts to 4) code blocks are not markup. A table is a
+candidate only when its header has the exact cell «РП» and a cell starting with
+the word «Статус» («Статус (на 3 июля)» counts and is filled with «pending» like
+the plain column, «Связанные РП» does not).
 
 The same fix replaces the literal `|---` separator lookup in the WeekPlan and
 REGISTRY writers (`| --- |` made the REGISTRY step fail and roll the whole WP
@@ -96,9 +100,9 @@ SVERKA_TABLE = (
 SVERKA_ROW = "| R1 | ... | ... | ... | P3 | WP-7 |"
 
 
-def _weekplan(tmp_path: Path, body: str) -> Path:
+def _weekplan(tmp_path: Path, body: str, title: str = "WeekPlan W40") -> Path:
     path = tmp_path / "WeekPlan W40.md"
-    path.write_text("# WeekPlan W40\n\n" + body, encoding="utf-8")
+    path.write_text(f"# {title}\n\n" + body, encoding="utf-8")
     return path
 
 
@@ -107,6 +111,16 @@ def _first_row_below(weekplan: Path, header_fragment: str) -> str:
     lines = weekplan.read_text(encoding="utf-8").splitlines()
     header = next(i for i, ln in enumerate(lines) if header_fragment in ln)
     return lines[header + 2]
+
+
+def _cells(row: str) -> list:
+    return [c.strip() for c in row.strip().strip("|").split("|")]
+
+
+def _new_row_by_column(weekplan: Path, header: str, separator: str) -> dict:
+    """The row written under this header/separator pair, keyed by the header's column names."""
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    return dict(zip(_cells(header), _cells(lines[lines.index(separator) + 1])))
 
 
 def test_row_goes_to_plan_table_not_day_summary(tmp_path):
@@ -372,6 +386,217 @@ def test_triple_backticks_inside_a_line_do_not_open_a_fence(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "summary",
+    [
+        "<summary>\nИтоги дня\n</summary>",
+        "<summary>Итоги дня\n</summary>",
+        "<summary>\nИтоги дня</summary>",
+        "<summary><b>Итоги\nдня 2026-09-29</b></summary>",
+    ],
+    ids=["tags-on-own-lines", "close-on-its-own-line", "open-on-its-own-line", "title-broken-in-two"],
+)
+def test_summary_over_several_lines_still_marks_a_facts_section(tmp_path, summary):
+    # The summary used to be searched inside ONE line: the block stayed without a title and
+    # its day-summary table became the only candidate.
+    weekplan = _weekplan(tmp_path, f"<details>\n{summary}\n\n" + DAY_SUMMARY_TABLE + "\n</details>\n")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_plan_title_over_several_lines_counts_as_plan(tmp_path):
+    spare = "<details><summary>Резерв</summary>\n\n" + SPARE_TABLE + "\n</details>\n\n"
+    plan = (
+        "<details open>\n<summary>\n<b>План на неделю W40</b>\n</summary>\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n"
+    )
+    weekplan = _weekplan(tmp_path, spare + plan)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("План на неделю W40")
+    assert NEW_ROW in tail and "Новый РП" not in head
+
+
+def test_unclosed_summary_leaves_no_candidate_in_its_block(tmp_path):
+    # A typo in the closing tag: the title never ends, so nothing in the block can be trusted.
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open>\n<summary>План на неделю W40\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+        + "\n</details>\n",
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_damage_of_an_unclosed_summary_ends_with_its_block(tmp_path):
+    # The broken block is skipped, the plain table after its </details> is the only candidate.
+    weekplan = _weekplan(
+        tmp_path,
+        "<details>\n<summary>Итоги дня\n\n" + DAY_SUMMARY_TABLE + "\n</details>\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("</details>")
+    assert NEW_ROW in tail and "Новый РП" not in head
+    assert DAY_SUMMARY_TABLE in head
+
+
+@pytest.mark.parametrize(
+    "stray", ["<summary>Итоги дня</summary>", "<summary>Итоги дня"], ids=["closed", "unclosed"]
+)
+def test_summary_outside_details_is_plain_text(tmp_path, stray):
+    # No <details> around it: not a section title, and an unclosed one swallows nothing.
+    weekplan = _weekplan(tmp_path, stray + "\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert NEW_ROW in weekplan.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "header_indent, separator_indent",
+    [("    ", "    "), ("\t", "\t"), ("      ", "      "), ("  \t", "  \t"), ("    ", ""), ("", "    ")],
+    ids=["four-spaces", "tab", "six-spaces", "spaces-then-tab", "only-header", "only-separator"],
+)
+def test_an_indented_table_is_code_not_a_candidate(tmp_path, header_indent, separator_indent):
+    # An example table, indented like a code block, sits above the real one in the same
+    # «План» section; the row used to land inside the example, without its indentation.
+    example = (
+        f"{header_indent}| РП | Статус |\n{separator_indent}|----|--------|\n{header_indent}| 1 | пример |\n"
+    )
+    weekplan = _weekplan(
+        tmp_path, "## План недели\n\n" + example + "\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    out = weekplan.read_text(encoding="utf-8")
+    assert example in out, "the example must stay untouched"
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_only_an_indented_table_leaves_nothing_to_write_into(tmp_path):
+    weekplan = _weekplan(
+        tmp_path, "## План недели\n\n    | РП | Статус |\n    |----|--------|\n    | 1 | пример |\n"
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_a_table_indented_by_three_spaces_is_still_a_table(tmp_path):
+    # Up to three spaces of indentation keep a table a table; only four make it code.
+    weekplan = _weekplan(tmp_path, "## План недели\n\n   | РП | Статус |\n   |----|--------|\n   | 1 | x |\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    assert "Новый РП" in weekplan.read_text(encoding="utf-8")
+
+
+def test_unplanned_section_is_not_the_plan(tmp_path):
+    # «Внеплановые» contains «план» as a substring, not as a word.
+    weekplan = _weekplan(
+        tmp_path,
+        "## Внеплановые РП\n\n" + SPARE_TABLE + "\n## План недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("## План недели")
+    assert NEW_ROW in tail and "Новый РП" not in head
+
+
+@pytest.mark.parametrize(
+    "title, is_plan",
+    [
+        ("План недели W40", True),
+        ("План на неделю", True),
+        ("Плановые РП", True),
+        ("Недельный план", True),
+        ("Plan", True),
+        ("Week Plan", True),
+        ("Внеплановые РП", False),
+        ("Неплановые задачи", False),
+        ("Floorplan", False),
+    ],
+)
+def test_plan_word_starts_a_word(tmp_path, title, is_plan):
+    # Two candidates: a «План» title decides, without one there is nothing to prefer.
+    other = SPARE_TABLE.replace("Запас", "Другой")
+    weekplan = _weekplan(tmp_path, f"## {title}\n\n{SPARE_TABLE}\n## Резерв\n\n{other}")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    if is_plan:
+        assert "добавлена" in result.stdout
+        assert _first_row_below(weekplan, "| # | РП | Статус |") == "| 16 | **Новый РП** — [описание] | pending |"
+    else:
+        assert "добавить вручную" in result.stderr
+        assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_plan_section_beats_a_document_title_that_says_plan(tmp_path):
+    # «# План недели W40» makes every table below a plan table; the table whose OWN section
+    # is the plan must still win over «Резерв», which only inherits the word.
+    weekplan = _weekplan(
+        tmp_path,
+        "## Резерв\n\n" + SPARE_TABLE + "\n## План недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+        title="План недели W40",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("## План недели")
+    assert NEW_ROW in tail and "Новый РП" not in head
+
+
+def test_nearest_plan_ancestor_wins_inside_one_block(tmp_path):
+    # Both tables sit under the summary «План на неделю»; the second also has a «План» heading
+    # of its own, which is nearer, while «Резерв» only inherits the summary.
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n"
+        "### Резерв\n\n" + SPARE_TABLE + "\n### План на понедельник\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+        + "\n</details>\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("### План на понедельник")
+    assert NEW_ROW in tail and "Новый РП" not in head
+
+
+@pytest.mark.parametrize(
     "header",
     [
         "| ID | Результат | Бюджет | Статус | P | Связанные РП |",
@@ -425,7 +650,37 @@ def test_header_cells_match_after_trimming(tmp_path, header, separator):
 
     assert result.returncode == 0, result.stderr
     assert "добавлена" in result.stdout
-    assert "Новый РП" in weekplan.read_text(encoding="utf-8")
+    # The row must carry the VALUES, not just exist: the plan name and «pending» in the status column.
+    row = _new_row_by_column(weekplan, header, separator)
+    assert row["РП"] == "**Новый РП** — [описание]"
+    assert next(value for name, value in row.items() if name.startswith("Статус")) == "pending"
+
+
+@pytest.mark.parametrize(
+    "header, expected",
+    [
+        ("| РП | Статус (на 3 июля) |", "| **Новый РП** — [описание] | pending |"),
+        ("| # | РП | Бюджет | Статус W13 | Репо |", "| 16 | **Новый РП** — [описание] | — | pending | — |"),
+        ("| РП | Статус | Статус (на 3 июля) |", "| **Новый РП** — [описание] | pending | pending |"),
+        (
+            "| 🚦 | # | РП | h | Источник | P | Статус на конец дня | Результат |",
+            "| 🟡 | 16 | **Новый РП** — [описание] | 3 | — | P2 | pending | [заполнить] |",
+        ),
+    ],
+    ids=["status-with-date", "status-with-week", "two-status-columns", "full-plan-header"],
+)
+def test_a_status_column_with_a_qualifier_is_filled_like_a_plain_one(tmp_path, header, expected):
+    # Detection and filling share one column-name normalization: a header the detector
+    # accepts must not get a dash in its status column.
+    separator = "|" + "---|" * (header.count("|") - 1)
+    weekplan = _weekplan(tmp_path, header + "\n" + separator + "\n")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index(separator) + 1] == expected
 
 
 def test_a_table_with_a_related_rp_column_is_no_competitor(tmp_path):

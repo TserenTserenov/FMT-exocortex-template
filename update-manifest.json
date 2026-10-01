@@ -2221,7 +2221,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "2e7d3e679ee260ec4293235484d7a0e940717a9f266d423c6d6bd4936b210c7b"
+      "sha256": "7758b766fe5f037da1506fe4dba94727b1026cecc45f1c912a94409a136ea57b"
     },
     {
       "path": "scripts/day-close-lock.sh",
