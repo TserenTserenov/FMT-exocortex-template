@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
-      "sha256": "09080a32dcb81738ff198cfc899de6fca7efeaa1e56b6e907a3b7049ca6712bb"
+      "sha256": "066466e0d0f865773f35b24602a0e8a06d3c562f876f25ed96c0c9396610aed1"
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
@@ -689,7 +689,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "a21bd983e7170d9f8aa0dcb911358690072e9c61221d66941a883aa9a41c69a8"
+      "sha256": "5b6fcc899277cf2a5e774fca87278c636864f3a7fd583621ff7e24d7c9c5a1cb"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -733,7 +733,7 @@
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
-      "sha256": "75b9fe53a7f95c8d89daf68e8bdc2ea30d3e8dd5adca71afe235cb9b53bfcbe5"
+      "sha256": "48f4a9639071fc2e0bcb24ce5162c02a5551982914a12a0e895f48d8956a4fd3"
     },
     {
       "path": ".claude/skills/vdv/SKILL.md",
@@ -1573,7 +1573,7 @@
     },
     {
       "path": "memory/protocol-work.md",
-      "sha256": "2f773ca710fafafa42dec1ca03e02a0b76b273018e45e2f13879cf010dfd4cf3"
+      "sha256": "f64b62764aea7ac7260ea92e9296cfdad0c79cb914d373df8364641e697edb65"
     },
     {
       "path": "memory/r-questionnaire.md",
@@ -2417,7 +2417,7 @@
     },
     {
       "path": "scripts/iwe-transcribe.sh",
-      "sha256": "69ff20801d889a343f46c15b4b78c7c4959cc5a17aac20c180903ccce2945742"
+      "sha256": "40d4c46c515352eaa65f2c981e5320647e6f3836a7987e8ff22cc1bcd4b01084"
     },
     {
       "path": "scripts/iwe-w-reflection.sh",
@@ -3245,7 +3245,9 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_973_transcribe_model_default.sh",
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
+    "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
