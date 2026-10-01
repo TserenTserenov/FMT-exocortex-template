@@ -477,14 +477,18 @@ migrate_platform_memory() {
 # update/repair pass, not only NEW_FILES/UPDATED_FILES from this invocation.
 #
 # issues #965/#967: say WHY a copy differs, using the shipped classifier. Its verdict is only
-# as strong as the clone's git history (the versions committed for this path), so the texts
-# promise no more than that:
-#   stale    - the copy equals a version committed in the clone. That can be an older release,
-#              but also the pilot's own edit committed into the clone (a fork with local
-#              commits, #963), so the text says so and the offered command saves the current
-#              copy next to it before the cp.
-#   authored - the copy equals no committed version: the pilot's edits, or a release that
-#              update.sh already applied to the clone (it never commits what it applies).
+# as strong as the history of the clone's CURRENT branch (git rev-list HEAD for this path; a
+# version that exists only on another branch is not seen), so the texts promise no more:
+#   stale    - the copy equals a version in the history of the current branch. That can be an
+#              older release, but also the pilot's own edit committed into the clone (a fork
+#              with local commits, #963), so the text says so and the offered command saves the
+#              current copy next to it before the cp. The saved copy's name carries a time stamp
+#              (the user's shell expands the $(date ...) when the command runs): with a fixed
+#              name a second run would replace the only copy of the pilot's edits with the
+#              refreshed file.
+#   authored - the copy equals no version in that history: the pilot's edits, a release that
+#              update.sh already applied to the clone (it never commits what it applies), or a
+#              version that lives only on another branch.
 #   anything else, including a missing classifier, keeps the generic text.
 # The classifier is called directly, not through report_author_skip(): that one counts and
 # queues files for --refresh-stale.
@@ -507,11 +511,11 @@ report_owner_user_memory_drift() {
             fi
             case "$verdict" in
                 stale)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
-                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией в истории текущей ветки клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
+                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update-\$(date +%Y%m%d%H%M%S)\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
                     ;;
                 authored)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)."
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)."
                     echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
                     ;;
                 *)
@@ -751,7 +755,9 @@ report_author_skip() {
             # Byte-identical to the template — not a real skip, no warning needed.
             ;;
         stale)
-            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: cp \"$SCRIPT_DIR/$fpath\" \"$dst\""
+            # The same saving, time-stamped command as in report_owner_user_memory_drift(): a bare cp
+            # loses the copy when the verdict misleads, and a fixed backup name is overwritten by a rerun.
+            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: cp -p \"$dst\" \"$dst.before-update-\$(date +%Y%m%d%H%M%S)\" && cp \"$SCRIPT_DIR/$fpath\" \"$dst\""
             AUTHOR_SKIP_STALE=$((AUTHOR_SKIP_STALE + 1))
             AUTHOR_STALE_PAIRS+=("$fpath|$dst")
             ;;
@@ -2734,6 +2740,11 @@ elif [ ! -s "$REMOTE_UPDATE" ]; then
     # failed check as well: the empty file differs from the local one, so it used to pass
     # for a newer update.sh and a normal run replaced the updater with a 0-byte file.
     echo "  ⚠ не удалось проверить update.sh: пустой ответ"
+elif [ "$(head -c 2 "$REMOTE_UPDATE")" != "#!" ]; then
+    # Same for an answer that is no script: HTTP 200 with the HTML of a Wi-Fi login page or a
+    # proxy. update.sh starts with a "#!" line (any interpreter path, /bin/bash or
+    # /usr/bin/env bash alike); anything else must not replace the running updater.
+    echo "  ⚠ не удалось проверить update.sh: ответ не похож на скрипт"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")

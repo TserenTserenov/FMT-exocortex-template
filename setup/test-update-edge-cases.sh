@@ -43,6 +43,8 @@
 #        overwriting it, like .claude/rules/* already does (issue #847)
 #   T43: Step 6 (the main apply path) backs up a modified platform memory file
 #        before replacing it and names the replaced files (issue #967)
+#   T44: the author_mode "stale" hint saves the copy under a time-stamped name, so
+#        running it twice keeps both copies (cold review of #967)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -4495,6 +4497,72 @@ else
         fail "T43: a pass that replaces nothing still prints the replaced-files summary"
     else
         pass "T43: no summary when no file is replaced"
+    fi
+fi
+
+# ============================================================================
+# T44: the author_mode "stale" hint saves the copy under a time-stamped name
+# (cold review of #967)
+# ============================================================================
+echo "--- T44: author_mode stale hint never overwrites an earlier copy ---"
+
+# report_author_skip() offers `cp <template file> <workspace copy>` for a copy that equals an
+# older template version. A bare cp loses the copy when the verdict misleads (an edit committed
+# into the clone looks like an older version too); a fixed backup name would be overwritten by
+# the second run of the same hint, leaving only the already refreshed copy. The real function
+# and the real classifier run on a throwaway template clone; the printed command runs twice.
+T44_FN=$(awk '/^report_author_skip\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+if [ -z "$T44_FN" ]; then
+    fail "T44: could not extract report_author_skip() from update.sh — signature moved?"
+else
+    T44_DIR="$TEST_WS/t44-author-hint"
+    T44_TEMPLATE="$T44_DIR/template"
+    T44_COPY="$T44_DIR/workspace copy.md"   # a space in the path: the hint must quote it
+    mkdir -p "$T44_TEMPLATE/memory" "$T44_TEMPLATE/.claude/scripts"
+    cp "$TEMPLATE_DIR/.claude/scripts/classify-workspace-copy.sh" "$T44_TEMPLATE/.claude/scripts/classify-workspace-copy.sh"
+    chmod +x "$T44_TEMPLATE/.claude/scripts/classify-workspace-copy.sh"
+    git -C "$T44_TEMPLATE" init -q
+    git -C "$T44_TEMPLATE" config user.email "test@test"
+    git -C "$T44_TEMPLATE" config user.name "test"
+    printf 'template v1\n' > "$T44_TEMPLATE/memory/x.md"
+    git -C "$T44_TEMPLATE" add memory/x.md
+    git -C "$T44_TEMPLATE" commit -q -m "v1"
+    printf 'template v2\n' > "$T44_TEMPLATE/memory/x.md"
+    git -C "$T44_TEMPLATE" add memory/x.md
+    git -C "$T44_TEMPLATE" commit -q -m "v2"
+    printf 'template v1\n' > "$T44_COPY"   # equals the committed v1: verdict "stale"
+
+    T44_OUT=$(
+        set +u
+        eval "$T44_FN"
+        SCRIPT_DIR="$T44_TEMPLATE"
+        # Exported: the eval'd update.sh function reads and counts them.
+        export CLASSIFIER_DEGRADED_WARNED=false AUTHOR_SKIP_AUTHORED=0 AUTHOR_SKIP_STALE=0 AUTHOR_SKIP_UNKNOWN=0
+        # shellcheck disable=SC2034
+        AUTHOR_STALE_PAIRS=()
+        report_author_skip memory/x.md "$T44_COPY"
+    )
+    if grep -qF -- 'Обновить: ' <<<"$T44_OUT"; then
+        T44_HINT="${T44_OUT#*Обновить: }"
+        bash -c "$T44_HINT" > /dev/null 2>&1 || true
+        sleep 1   # the time stamp in the copy's name has a resolution of one second
+        bash -c "$T44_HINT" > /dev/null 2>&1 || true
+        t44_count=0
+        t44_original_kept=0
+        for t44_backup in "$T44_COPY".before-update-*; do
+            [ -f "$t44_backup" ] || continue
+            t44_count=$((t44_count + 1))
+            if [ "$(cat "$t44_backup")" = "template v1" ]; then
+                t44_original_kept=1
+            fi
+        done
+        if [ "$t44_count" -eq 2 ] && [ "$t44_original_kept" -eq 1 ] && [ "$(cat "$T44_COPY")" = "template v2" ]; then
+            pass "T44: the hint saves the copy under a time-stamped name; a second run keeps both copies"
+        else
+            fail "T44: the hint left $t44_count time-stamped copies (original kept: $t44_original_kept), copy now '$(cat "$T44_COPY")'; expected 2 copies, the original among them, and the template text"
+        fi
+    else
+        fail "T44: report_author_skip() printed no 'Обновить:' hint for a stale copy: '${T44_OUT:-<empty>}'"
     fi
 fi
 
