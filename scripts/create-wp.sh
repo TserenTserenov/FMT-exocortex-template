@@ -798,7 +798,10 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # in front of its hashes (indentation, a list marker, a quote mark) sits in a container whose
 # end the line-based reading cannot tell for sure (lazy continuation, tabs, numbering), so it
 # changes no section, neither pushes nor pops: it opens an AMBIGUITY ZONE, and no table after
-# it, up to the next unindented heading, is a candidate. A quote (`>` after up to three
+# it, up to the next unindented heading, is a candidate. A heading is told from a table row by
+# its shape, not by a pipe in its text: `#`..`######` and a space make an ATX heading (it wins
+# over a table row in CommonMark and GFM), so `### Итоги | факт` is the heading «Итоги | факт»
+# and `# | РП | Статус` is a heading, not a table header. A quote (`>` after up to three
 # spaces) is a container of its own: its tags change nothing outside it.
 # A table is a candidate only when its header has the exact cell «РП» and a cell
 # starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
@@ -864,8 +867,10 @@ def next_fence(fence, text):
 
 
 def heading_of(line):
-    # A table row such as `# | Статус | РП` looks like a heading but is not one.
-    return None if "|" in line else HEADING_RE.match(line)
+    # An ATX heading wins over a table row (CommonMark, GFM): `### Итоги | факт` is a heading
+    # whatever its text holds, and so is `# | РП | Статус`, which therefore is no table header.
+    # A row of a table starts with a pipe or does not look like this at all.
+    return HEADING_RE.match(line)
 
 
 def classify(lines):
@@ -970,7 +975,7 @@ for i, line in enumerate(lines):
         continue
     text = line.expandtabs(4)[base[i]:]  # the line without the indentation of its container
     in_summary = any(b.pieces is not None for b in blocks)  # the line starts inside a <summary> title
-    if not in_summary and "|" not in line and not line.startswith("#") and LOOSE_HEADING_RE.match(line):
+    if not in_summary and not line.startswith("#") and LOOSE_HEADING_RE.match(line):
         zone = True  # a heading in a list item, in a quote or indented: it changes no section, see above
     if QUOTE_RE.match(text):
         continue  # a quote is a container of its own: its tags leave the sections outside alone
@@ -987,6 +992,7 @@ for i, line in enumerate(lines):
         ancestors = [b.title for b in blocks] + [h[1] for h in headings]
         if (
             not zone
+            and heading_of(header) is None  # a heading is no table header, a pipe in its text or not
             and is_plan_header(table_cells(header))
             and not deep[i - 1]
             and not deep[i]
