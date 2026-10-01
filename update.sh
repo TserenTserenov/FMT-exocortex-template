@@ -3315,7 +3315,7 @@ claude_template_copy_is_pristine() {
 # merge base is not advanced and the run ends in EXIT_CONFLICT with a pointer to git.
 claude_merge_failed() {
     CLAUDE_MERGE_FAILED_FILES+=("$1")
-    echo "  ⚠ $1 НЕ тронут — git merge-file не выдал слияния (git не работает?)."
+    echo "  ⚠ $1 НЕ тронут — git merge-file не выдал слияния (git не работает или файл нечитаем?)."
     echo "    Проверьте: git --version. Сверить вручную: diff \"$1\" \"$2\""
 }
 
