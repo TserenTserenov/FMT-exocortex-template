@@ -14,11 +14,15 @@ ancestor is the nearest one (the word must start with «План»/«Plan»; the
 table on a tie), falls back to the only remaining candidate and otherwise
 refuses to guess (warning, nothing written). A `<summary>` may span several
 lines and belongs to the block that opened it: one that is never closed swallows
-its block, and a nested `<details>` cannot take the open state over. Code is
-decided before any tag, heading or table is looked at: fenced and indented
-(4+ columns beyond the list item, a tab counts to 4) code blocks are not markup;
-an indented line is code only after a blank line, a heading, a closing fence or
-another code line, and an indented list is not code. A table is a candidate only
+its block, and a nested `<details>` cannot take the open state over; a second
+`<summary>` in one block makes its name untrustworthy and leaves all its tables
+to the pilot. Code is decided before any tag, heading or table is looked at:
+fenced and indented (4+ columns beyond the list item, a tab counts to 4) code
+blocks are not markup; an indented line is code only after a blank line, a
+heading, a closing fence or another code line, and an indented list is not code.
+Markup is looked for after the indentation of its container (a heading inside a
+nested list item is a heading), and a quote is a container of its own: its tags
+change nothing outside it. A table is a candidate only
 when its header has the exact cell «РП» and a cell starting with the word
 «Статус» («Статус (на 3 июля)» counts and is filled with «pending» like the plain
 column, «Связанные РП» does not); the new row keeps the indentation of its table.
@@ -536,6 +540,75 @@ def test_an_unclosed_inner_summary_leaves_the_outer_plan_usable(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "summaries",
+    [
+        "<summary>Итоги</summary>\n<summary>План</summary>",
+        "<summary>Итоги\n<summary>План</summary>",
+        "<summary>План</summary>\n<summary>Итоги</summary>",
+        "<summary>План недели</summary>\n<summary>Заметки</summary>",
+        "<summary>План недели</summary><summary>План недели</summary>",
+    ],
+    ids=["facts-then-plan", "first-not-closed", "plan-then-facts", "plan-then-notes", "same-line"],
+)
+def test_a_second_summary_in_one_block_leaves_its_tables_to_the_pilot(tmp_path, summaries):
+    # The second <summary> used to rename the block («Итоги» became «План» and the row went to
+    # the table). Which of the two names is true cannot be told, so nothing in the block is picked.
+    weekplan = _weekplan(tmp_path, f"<details>\n{summaries}\n\n| РП | Статус |\n| --- | --- |\n</details>\n")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_tables_above_the_second_summary_are_left_out_too(tmp_path):
+    weekplan = _weekplan(
+        tmp_path,
+        "<details>\n<summary>План недели</summary>\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW
+        + "\n<summary>Заметки</summary>\n</details>\n",
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_an_ambiguous_block_does_not_hide_the_plan_block_elsewhere(tmp_path):
+    # The first block would be «План недели» by its last <summary> and win as the first plan.
+    ambiguous = (
+        "<details>\n<summary>Резерв</summary>\n<summary>План недели</summary>\n\n" + SPARE_TABLE + "\n</details>\n\n"
+    )
+    weekplan = _weekplan(tmp_path, ambiguous + PLAN_SECTION)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    head, tail = weekplan.read_text(encoding="utf-8").split("План на неделю W40")
+    assert NEW_ROW in tail and "Новый РП" not in head
+
+
+def test_an_ambiguous_inner_block_does_not_taint_the_outer_one(tmp_path):
+    inner = "<details>\n<summary>Резерв</summary>\n<summary>Ещё</summary>\n\n" + SPARE_TABLE + "\n</details>\n"
+    weekplan = _weekplan(
+        tmp_path,
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n" + inner + "\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    assert _first_row_below(weekplan, "| # | РП | Статус |") == "| 1 | **Запас** | pending |"
+
+
+@pytest.mark.parametrize(
     "header_indent, separator_indent",
     [("    ", "    "), ("\t", "\t"), ("      ", "      "), ("  \t", "  \t"), ("    ", ""), ("", "    ")],
     ids=["four-spaces", "tab", "six-spaces", "spaces-then-tab", "only-header", "only-separator"],
@@ -730,6 +803,190 @@ def test_an_indented_tag_inside_a_list_item_is_real_markup(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "добавить вручную" in result.stderr
     assert weekplan.read_text(encoding="utf-8") == original
+
+
+def _nested_list(outer, nested):
+    """Two nested list items and the indentation of the content of the inner one."""
+    pad = " " * (len(outer) + 1)
+    return f"{outer} Раздел\n{pad}{nested} Вложенный раздел\n", pad + " " * (len(nested) + 1)
+
+
+NESTED_LISTS = pytest.mark.parametrize(
+    "outer, nested",
+    [("-", "-"), ("*", "+"), ("1.", "1."), ("-", "1.")],
+    ids=["bullets", "other-bullets", "numbers", "bullet-then-number"],
+)
+
+
+@NESTED_LISTS
+def test_a_facts_heading_in_a_nested_list_still_excludes_its_table(tmp_path, outer, nested):
+    # The reviewer's input. Markup is looked for after the indentation of its container: the
+    # heading sits at the content of the inner item, so it is a heading, and its table is facts.
+    items, pad = _nested_list(outer, nested)
+    weekplan = _weekplan(tmp_path, items + f"{pad}## Итоги\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert "добавлена" not in result.stdout
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+@NESTED_LISTS
+def test_a_plan_table_in_a_nested_list_is_still_chosen(tmp_path, outer, nested):
+    # The «План» heading of the nested list is what makes this table win over the spare one.
+    items, pad = _nested_list(outer, nested)
+    weekplan = _weekplan(
+        tmp_path,
+        "## Резерв\n\n" + SPARE_TABLE + "\n" + items + f"{pad}## План\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index(f"{pad}| --- | --- |") + 1] == f"{pad}| **Новый РП** — [описание] | pending |"
+    assert _first_row_below(weekplan, "| # | РП | Статус |") == "| 1 | **Запас** | pending |"
+
+
+def test_a_heading_on_the_line_of_a_list_item_is_a_heading(tmp_path):
+    weekplan = _weekplan(tmp_path, "- ## Итоги\n\n  | РП | Статус |\n  | --- | --- |\n")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_a_heading_in_a_tab_indented_nested_list_is_a_heading(tmp_path):
+    weekplan = _weekplan(
+        tmp_path, "- Раздел\n\t- Вложенный раздел\n\t\t## Итоги\n\n\t\t| РП | Статус |\n\t\t| --- | --- |\n"
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_code_in_a_nested_list_item_is_still_code(tmp_path):
+    # Four columns beyond the content of the inner item: an indented code block.
+    items, pad = _nested_list("-", "-")
+    weekplan = _weekplan(tmp_path, items + f"\n{pad}    | РП | Статус |\n{pad}    | --- | --- |\n")
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_code_may_follow_a_heading_inside_a_nested_list_item(tmp_path):
+    # Right after the heading (no blank line) four more columns are code, tag or not.
+    items, pad = _nested_list("-", "-")
+    weekplan = _weekplan(
+        tmp_path,
+        items + f"{pad}## План\n{pad}    <details><summary>Итоги</summary>\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n",
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index(f"{pad}| --- | --- |") + 1] == f"{pad}| **Новый РП** — [описание] | pending |"
+
+
+def test_a_nested_facts_heading_does_not_reach_the_next_plan_section(tmp_path):
+    items, pad = _nested_list("-", "-")
+    weekplan = _weekplan(
+        tmp_path,
+        items + f"{pad}## Итоги\n\n{pad}| РП | Статус |\n{pad}| --- | --- |\n\n## План недели\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+    nested_table = f"{pad}| РП | Статус |\n{pad}| --- | --- |\n\n## План недели"
+    assert nested_table in weekplan.read_text(encoding="utf-8"), "the nested table must stay untouched"
+
+
+@pytest.mark.parametrize("quote", [">", " >", "   >"], ids=["flush", "one-space", "three-spaces"])
+def test_a_block_opened_in_a_quote_does_not_reach_the_sections_outside(tmp_path, quote):
+    # The reviewer's input. The quote is a container of its own: its <details> used to stay open
+    # and the «Итоги» in its summary made the plan table below it facts.
+    weekplan = _weekplan(
+        tmp_path, f"{quote} <details><summary>Итоги</summary>\n\n## План\n| РП | Статус |\n|---|---|\n"
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавлена" in result.stdout
+    lines = weekplan.read_text(encoding="utf-8").splitlines()
+    assert lines[lines.index("|---|---|") + 1] == "| **Новый РП** — [описание] | pending |"
+
+
+def test_four_spaces_before_the_marker_make_no_quote(tmp_path):
+    # Right after text, four spaces continue that line: no quote, so the tag is real markup, the
+    # block named «Итоги» stays open and the plan table inside it is not a safe pick.
+    weekplan = _weekplan(
+        tmp_path, "Текст\n    > <details><summary>Итоги</summary>\n\n## План\n| РП | Статус |\n|---|---|\n"
+    )
+    original = weekplan.read_text(encoding="utf-8")
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert "добавить вручную" in result.stderr
+    assert weekplan.read_text(encoding="utf-8") == original
+
+
+def test_a_closing_tag_in_a_quote_does_not_close_the_block_around_it(tmp_path):
+    spare = "<details><summary>Резерв</summary>\n\n" + SPARE_TABLE + "\n</details>\n\n"
+    plan = (
+        "<details open>\n<summary><b>План на неделю W40</b></summary>\n\n> </details>\n\n"
+        + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW + "\n</details>\n"
+    )
+    weekplan = _weekplan(tmp_path, spare + plan)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_quote_inside_a_list_item_is_a_quote(tmp_path):
+    # Four columns from the margin, none beyond the content of the inner item: a quote.
+    items, pad = _nested_list("-", "-")
+    weekplan = _weekplan(
+        tmp_path,
+        items + f"{pad}> <details><summary>Итоги</summary>\n\n## План недели\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW,
+    )
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
+
+
+def test_a_table_in_a_quote_is_not_a_candidate(tmp_path):
+    quoted = "> | РП | Статус |\n> | --- | --- |\n> | 1 | x |\n"
+    weekplan = _weekplan(tmp_path, quoted + "\n## План недели\n\n" + PLAN_HEADER + PLAN_SEPARATOR + OLD_ROW)
+
+    result = _add_to_weekplan(weekplan)
+
+    assert result.returncode == 0, result.stderr
+    assert quoted in weekplan.read_text(encoding="utf-8"), "the quoted table must stay untouched"
+    assert _first_row_below(weekplan, "| Источник | P | Статус |") == NEW_ROW
 
 
 def test_unplanned_section_is_not_the_plan(tmp_path):

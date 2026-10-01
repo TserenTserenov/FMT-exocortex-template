@@ -787,12 +787,17 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # inside, headings met inside it are dropped when it closes. A <summary> may span several
 # lines and belongs to the block that opened it: one that is never closed swallows its block
 # (nested blocks included), so no table inside it is a candidate, and a nested <details> or
-# <summary> cannot take the open state over. Code is decided BEFORE any tag, heading or table
-# is looked at: nothing inside a fenced block (``` or ~~~) or an indented one (4+ columns
-# beyond the list item it sits in, a tab counts to 4) is a heading, a tag or a table. An
-# indented line is code only after a blank line, a heading, a closing fence or another code
+# <summary> cannot take the open state over. The first <summary> names the block; a second one
+# in the same block makes the name untrustworthy, and every table of that block, those above
+# the second <summary> included, is left to the pilot. Code is decided BEFORE any tag, heading
+# or table is looked at: nothing inside a fenced block (``` or ~~~) or an indented one (4+
+# columns beyond the list item it sits in, a tab counts to 4) is a heading, a tag or a table.
+# An indented line is code only after a blank line, a heading, a closing fence or another code
 # line (it cannot interrupt a paragraph, an HTML block or a list item), and a nested list is
-# not code. A table is a candidate only when its header has the exact cell «РП» and a cell
+# not code. Markup is looked for after the indentation of its container (the content of the
+# list item), so a heading inside a nested list item is a heading. A quote (`>` after up to
+# three spaces) is a container of its own: its tags and headings change nothing outside it.
+# A table is a candidate only when its header has the exact cell «РП» and a cell
 # starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
 # plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
 # and would receive a nameless row.
@@ -802,6 +807,7 @@ TAG_RE = re.compile(r"</details>|<details\b|<summary\b[^>]*>|</summary>", re.IGN
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*)$")
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})(.*)$")
 LIST_ITEM_RE = re.compile(r"^( *)(?:[-*+]|\d{1,9}[.)])( +|$)")
+QUOTE_RE = re.compile(r"^ {0,3}>")
 # Whole words only: «Итоговая таблица недели (плановые РП)» is a plan, not a facts section.
 FACTS_RE = re.compile(r"\b(?:Итог(?:и|ов)?|Сводк[аиу]|Summary)\b", re.IGNORECASE)
 # The word must START with «План»/«Plan»: «Внеплановые РП» is not a plan section.
@@ -858,15 +864,19 @@ def heading_of(line):
 
 
 def classify(lines):
-    """Per line: (is_code, deep).
+    """Per line: (is_code, deep, base).
 
     is_code: fenced code or a line of an indented code block; nothing in it is a tag, a heading
-    or a table. deep: indented 4+ columns beyond its list item, so never a table row, whatever
-    block it belongs to. Indented code starts only after a blank line, a heading, a closing
-    fence or another code line; right after any other line it continues that line's block.
+    or a table. deep: indented 4+ columns beyond its container (the content of the list item it
+    sits in), so never a table row, whatever block it belongs to. base: the column where the
+    markup of the line starts, i.e. the content offset of its container (of the item it opens,
+    for a list item line); a heading, a quote or a tag is looked for after it, not after the
+    margin. Indented code starts only after a blank line, a heading, a closing fence or another
+    code line; right after any other line it continues that line's block.
     """
     is_code = [False] * len(lines)
     deep = [False] * len(lines)
+    base = [0] * len(lines)
     fence = None  # (marker, length) while inside a fenced code block
     items = []  # content offsets of the open list items, outermost first
     code_ok = True  # an indented line may open or continue a code block here
@@ -885,23 +895,36 @@ def classify(lines):
         indent = len(text) - len(text.lstrip(" "))
         while items and indent < items[-1]:
             items.pop()
-        deep[i] = indent - (items[-1] if items else 0) >= 4
+        container = items[-1] if items else 0
+        deep[i] = indent - container >= 4
         item = LIST_ITEM_RE.match(text)
         if item and not deep[i]:
             items.append(item.end())
-            code_ok = False
+            base[i] = item.end()
         elif deep[i] and code_ok:
             is_code[i] = True
+            continue
         else:
-            code_ok = heading_of(text) is not None
-    return is_code, deep
+            base[i] = container
+        code_ok = heading_of(text[base[i]:]) is not None
+    return is_code, deep, base
+
+
+class Block:
+    """An open <details>: the title of its <summary> and what the writer needs to scope headings."""
+
+    def __init__(self, outer_headings):
+        self.title = ""
+        self.outer_headings = outer_headings  # headings in scope before it opened (rebound, never mutated)
+        self.pieces = None  # text of the <summary> being read, None while none is open
+        self.summaries = 0  # <summary> tags met in this block; a second one makes its name untrustworthy
 
 
 def collect_title(blocks, text):
     """Add text to the innermost <summary> that is still open."""
     for block in reversed(blocks):
-        if block[2] is not None:
-            block[2].append(text)
+        if block.pieces is not None:
+            block.pieces.append(text)
             return
 
 
@@ -912,50 +935,58 @@ def scan_tags(line, blocks, headings):
         collect_title(blocks, line[position:tag.start()])
         position = tag.end()
         kind = tag.group(0).lower()
+        top = blocks[-1] if blocks else None
         if kind == "</summary>":
-            if blocks and blocks[-1][2] is not None:  # only the block that opened it can close it
-                blocks[-1][0] = strip_tags(" ".join(blocks[-1][2]))
-                blocks[-1][2] = None
+            if top and top.pieces is not None:  # only the block that opened it can close it
+                if top.summaries == 1:  # the first <summary> names the block, a later one never renames it
+                    top.title = strip_tags(" ".join(top.pieces))
+                top.pieces = None
         elif kind == "</details>":
-            if blocks:
-                headings = blocks.pop()[1]  # an unclosed <summary> ends with its block
+            if top:
+                headings = blocks.pop().outer_headings  # an unclosed <summary> ends with its block
         elif kind.startswith("<details"):
-            blocks.append(["", headings, None])
+            blocks.append(Block(headings))
             headings = []
-        elif blocks:
-            blocks[-1][2] = []
+        elif top:
+            top.summaries += 1
+            if top.pieces is None:  # a repeated tag inside an open title keeps the text read so far
+                top.pieces = []
     collect_title(blocks, line[position:])
     return headings
 
 
-is_code, deep = classify(lines)
-candidates = []  # (header line, insert position, ancestor titles)
+is_code, deep, base = classify(lines)
+candidates = []  # (header line, insert position, ancestor titles, open blocks)
 headings = []  # (level, title) of the markdown headings in scope
-# per open <details>: [summary title, headings outside it (rebound, never mutated), text pieces
-# of the <summary> it opened while that is still open, else None]
-blocks = []
+blocks = []  # the open <details> blocks, outermost first
 for i, line in enumerate(lines):
     if is_code[i]:
         continue
-    in_summary = any(b[2] is not None for b in blocks)  # the line starts inside a <summary> title
-    headings = scan_tags(line, blocks, headings)
+    text = line.expandtabs(4)[base[i]:]  # the line without the indentation of its container
+    if QUOTE_RE.match(text):
+        continue  # a quote is a container of its own: its tags and headings leave the sections outside alone
+    in_summary = any(b.pieces is not None for b in blocks)  # the line starts inside a <summary> title
+    headings = scan_tags(text, blocks, headings)
     if in_summary:
         continue  # the lines of a <summary> title are text, not headings or tables
-    heading = heading_of(line)
+    heading = heading_of(text)
     if heading:
         level = len(heading.group(1))
         headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
     if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
         header = lines[i - 1]
-        ancestors = [b[0] for b in blocks] + [h[1] for h in headings]
+        ancestors = [b.title for b in blocks] + [h[1] for h in headings]
         if (
             is_plan_header(table_cells(header))
             and not deep[i - 1]
             and not deep[i]
             and not any(FACTS_RE.search(t) for t in ancestors)
         ):
-            candidates.append((header, i + 1, ancestors))
+            candidates.append((header, i + 1, ancestors, list(blocks)))
 
+# A block with a second <summary> is not told by its name: its tables, those above the second
+# <summary> included, are left to the pilot.
+candidates = [c for c in candidates if all(b.summaries < 2 for b in c[3])]
 # The table whose «План» ancestor is the nearest wins; equal distance keeps document order.
 ranked = [(plan_distance(c[2]), n) for n, c in enumerate(candidates)]
 ranked = [r for r in ranked if r[0] is not None]
