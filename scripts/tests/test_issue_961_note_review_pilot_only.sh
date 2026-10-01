@@ -5,11 +5,16 @@
 # "**Title** ✅предложено", stays bold and visible until the pilot closes it (a command, or by
 # striking it through).
 #
-# Layer (no network, no real HOME):
+# Layers (no network, no real HOME; every runner and notifier is a double):
 #   A. text contract: roles/strategist/prompts/note-review.md, day-plan.md, the seed box legend,
-#      and the cleanup script's safety net (a proposed note is never swept up).
-# The scheduler, the Day Open scanner, the Telegram text and the scheduler report (layers B-E) arrive
-# with the behaviour change that makes them true.
+#      and the cleanup script's safety net (a proposed note is never swept up);
+#   B. roles/synchronizer/scripts/scheduler.sh: the REAL dispatch, run in a sandbox with a fake clock
+#      and recording stub runners, never starts note-review (neither the evening run nor the catch-up);
+#   C. Day Open scanner: the REAL render_fleeting_notes of scripts/ and of the seed snapshot lists a
+#      "✅предложено" note as awaiting the pilot;
+#   D. the Telegram text of a finished Note-Review no longer claims the inbox was cleaned;
+#   E. daily-report.sh no longer reports a missing note-review marker as a failure.
+# The canary of strategist.sh is covered end to end in setup/test-strategist-isolated-scenarios.sh (B10).
 
 # SC2016: the single-quoted strings are literal prompt fragments (with backticks) and stub-script bodies
 # that must stay unexpanded.
@@ -109,6 +114,145 @@ check "cleanup run: 1 archived (the one the pilot struck through), 3 kept" "Clea
 check "cleanup: the proposed notes and the new note stay in the box" "3" "$(grep -c '^\*\*Note' "$SB/clean/inbox/fleeting-notes.md")"
 check "cleanup: the struck-through note went to the archive" "1" "$(count_fixed 'Note D closed by the pilot' "$SB/clean/archive/notes/Notes-Archive.md")"
 
+# ==== LAYER B: the scheduler never starts note-review ====
+echo "== B: scheduler.sh dispatch =="
+# A fake clock (date shim for +%H and +%u only) and recording stub runners next to a COPY of scheduler.sh,
+# so the real script resolves its helpers (code-scan, daily-report) and runners from the sandbox.
+REAL_DATE="$(command -v date)"
+cat > "$SB/shim/date" <<EOF
+#!/bin/bash
+case "\$1" in
+    +%H) printf '%s\n' "\${FAKE_HOUR:-12}" ;;
+    +%u) printf '%s\n' "\${FAKE_DOW:-3}" ;;
+    *) exec "$REAL_DATE" "\$@" ;;
+esac
+EOF
+for tool in caffeinate systemd-inhibit; do
+    printf '#!/bin/bash\nexit 0\n' > "$SB/shim/$tool"
+done
+# macOS only: the dispatch reads the AC sleep setting, and under pipefail an empty answer would abort it
+printf '#!/bin/bash\nprintf "AC Power:\\n sleep 0\\nBattery Power:\\n sleep 1\\n"\n' > "$SB/shim/pmset"
+chmod +x "$SB/shim/"*
+
+mkdir -p "$SB/sched/scripts" "$SB/runtime/roles/strategist/scripts" "$SB/runtime/roles/extractor/scripts"
+cp "$ROOT/roles/synchronizer/scripts/scheduler.sh" "$SB/sched/scripts/scheduler.sh"
+for stub in code-scan.sh dt-collect.sh daily-report.sh; do
+    printf '#!/bin/bash\nexit 0\n' > "$SB/sched/scripts/$stub"
+done
+printf '#!/bin/bash\nprintf "strategist %%s\\n" "$*" >> "$CALLS_LOG"\nexit 0\n' > "$SB/runtime/roles/strategist/scripts/strategist.sh"
+printf '#!/bin/bash\nprintf "extractor %%s\\n" "$*" >> "$CALLS_LOG"\nexit 0\n' > "$SB/runtime/roles/extractor/scripts/extractor.sh"
+chmod +x "$SB/sched/scripts/"*.sh "$SB/runtime/roles/strategist/scripts/strategist.sh" "$SB/runtime/roles/extractor/scripts/extractor.sh"
+
+RUN_N=0
+run_scheduler() {  # <fake hour> <fake day of week>; sets SCHED_RC, SCHED_HOME; recorded runner calls -> $SB/calls.log
+    RUN_N=$((RUN_N + 1))
+    SCHED_HOME="$SB/sched-home-$RUN_N"
+    mkdir -p "$SCHED_HOME"
+    : > "$SB/calls.log"
+    SCHED_RC=0
+    env -i HOME="$SCHED_HOME" PATH="$SB/shim:$PATH" TMPDIR="$SB/tmp" IWE_TEMPLATE="$ROOT" IWE_RUNTIME="$SB/runtime" \
+        IWE_WORKSPACE="$SB/ws" CALLS_LOG="$SB/calls.log" FAKE_HOUR="$1" FAKE_DOW="$2" \
+        bash "$SB/sched/scripts/scheduler.sh" dispatch > "$SB/sched.out" 2>&1 || SCHED_RC=$?
+}
+state_markers() {  # <name fragment> -> number of scheduler state markers whose name contains it
+    find "$SCHED_HOME/.local/state/exocortex" -name "*$1*" 2>/dev/null | wc -l | tr -d ' '
+}
+
+echo "-- 23:00 on a Monday: the evening slot of the old nightly run (week-review is the control) --"
+run_scheduler 23 1
+check "dispatch completed" "0/1" "$SCHED_RC/$(count_fixed 'dispatch completed' "$SB/sched.out")"
+check "control: the stub strategist runner is wired in (week-review ran)" "1" "$(count_fixed 'strategist week-review' "$SB/calls.log")"
+check "note-review was NOT started in the evening" "0" "$(count_fixed 'note-review' "$SB/calls.log")"
+check "no note-review state marker was written" "0" "$(state_markers note-review)"
+
+echo "-- 09:00 on a Wednesday: the morning catch-up of the old nightly run (morning is the control) --"
+run_scheduler 9 3
+check "dispatch completed" "0/1" "$SCHED_RC/$(count_fixed 'dispatch completed' "$SB/sched.out")"
+check "control: the stub strategist runner is wired in (morning ran)" "1" "$(count_fixed 'strategist morning' "$SB/calls.log")"
+check "note-review was NOT started as a catch-up for yesterday" "0" "$(count_fixed 'note-review' "$SB/calls.log")"
+check "no note-review state marker (yesterday or today) was written" "0" "$(state_markers note-review)"
+
+# ==== LAYER C: the Day Open scanner ====
+echo "== C: Day Open scanner (render_fleeting_notes) =="
+cat > "$SB/scan-fleeting.md" <<'EOF'
+# Fleeting Notes
+
+> legend with a **bold** word and ✅предложено
+
+---
+
+**Новая заметка**
+<sub>1 янв, 10:00</sub>
+
+---
+
+**Предложенная заметка** ✅предложено
+<sub>1 янв, 10:05</sub>
+
+---
+
+**Шумовая заметка** ✅предложено (шум)
+<sub>1 янв, 10:10</sub>
+
+---
+
+**Отложенная заметка** 🔄
+<sub>1 янв, 10:15</sub>
+
+---
+
+Обычная заметка
+<sub>1 янв, 10:20</sub>
+
+---
+
+~~Зачёркнутая заметка~~
+<sub>1 янв, 10:25</sub>
+
+---
+EOF
+run_scanner() {  # <scaffold script> <fleeting notes file> -> the rendered table rows
+    local fn
+    fn="$(sed -n '/^render_fleeting_notes() {/,/^}/p' "$1")"
+    [ -n "$fn" ] || { echo "render_fleeting_notes is missing in $1"; return 0; }
+    mkdir -p "$SB/iwe/DS-strategy/inbox"
+    cp "$2" "$SB/iwe/DS-strategy/inbox/fleeting-notes.md"
+    IWE="$SB/iwe" IWE_GOVERNANCE_REPO=DS-strategy bash -c "$fn"$'\n''render_fleeting_notes'
+}
+for scaffold in "scripts/day-open-scaffold.sh" "seed/strategy/scripts/day-open-scaffold.sh"; do
+    ROWS="$(run_scanner "$ROOT/$scaffold" "$SB/scan-fleeting.md")"
+    check "$scaffold: three notes await the pilot (new, proposed, proposed noise)" "3" "$(printf '%s\n' "$ROWS" | grep -c '^| \[«')"
+    check "$scaffold: the new note is listed" "1" "$(printf '%s\n' "$ROWS" | grep -cF '[«Новая заметка»]')"
+    check "$scaffold: the proposed note is listed with its clean title" "1" "$(printf '%s\n' "$ROWS" | grep -cF '[«Предложенная заметка»]')"
+    check "$scaffold: the proposed noise is listed without the mark in its title" "1" "$(printf '%s\n' "$ROWS" | grep -cF '[«Шумовая заметка»]')"
+    check "$scaffold: deferred, plain and struck-through notes are not listed" "0" "$(printf '%s\n' "$ROWS" | grep -cE 'Отложенная|Обычная|Зачёркнутая')"
+done
+printf '# Fleeting Notes\n\n> legend\n\n---\n\nОбычная заметка\n\n---\n' > "$SB/scan-empty.md"
+check "no note awaits the pilot: the empty row, no PENDING marker" "| нет заметок | — | — | ✅ |" "$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$SB/scan-empty.md")"
+
+# ==== LAYER D: the Telegram text ====
+echo "== D: the Note-Review Telegram message =="
+mkdir -p "$SB/tg/DS-strategy/current"
+printf '# DayPlan\n' > "$SB/tg/DS-strategy/current/DayPlan $("$REAL_DATE" +%Y-%m-%d).md"
+TG_MSG="$(env -i HOME="$SB/tg-home" PATH="$PATH" IWE_WORKSPACE="$SB/tg" IWE_GOVERNANCE_REPO=DS-strategy \
+    bash -c 'source "$1"; build_message note-review' _ "$ROOT/roles/synchronizer/scripts/templates/strategist.sh" 2>&1)"
+check "the message exists (the fixture Day Plan was found)" "1" "$(printf '%s\n' "$TG_MSG" | grep -cF 'Note-Review завершён')"
+check "the message does not claim the inbox was cleaned" "0" "$(printf '%s\n' "$TG_MSG" | grep -cF 'inbox почищен')"
+check "the message says the decision stays with the pilot" "1" "$(printf '%s\n' "$TG_MSG" | grep -cF 'до решения пилота')"
+
+# ==== LAYER E: the scheduler report ====
+echo "== E: daily-report.sh at 23:00 =="
+mkdir -p "$SB/dr-home/.local/state/exocortex"
+TODAY="$("$REAL_DATE" +%Y-%m-%d)"
+echo "00:00:01" > "$SB/dr-home/.local/state/exocortex/synchronizer-code-scan-$TODAY"
+echo "04:00:01" > "$SB/dr-home/.local/state/exocortex/strategist-morning-$TODAY"
+DR_RC=0
+DR_OUT="$(env -i HOME="$SB/dr-home" PATH="$SB/shim:$PATH" TMPDIR="$SB/tmp" IWE_WORKSPACE="$SB/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    FAKE_HOUR=23 FAKE_DOW=3 bash "$ROOT/roles/synchronizer/scripts/daily-report.sh" --dry-run 2>&1)" || DR_RC=$?
+check "the dry run succeeds" "0" "$DR_RC"
+check "everything that must run did run: the traffic light is green (a missing note-review marker is no failure)" "1" "$(printf '%s\n' "$DR_OUT" | grep -cF '🟢')"
+check "no note-review complaint in the remarks" "0" "$(printf '%s\n' "$DR_OUT" | grep -c 'note-review')"
+check "no 'Разбор заметок' row that could show a failed run" "0" "$(printf '%s\n' "$DR_OUT" | grep -cF 'Разбор заметок')"
 # ==== END LAYERS ====
 
 echo

@@ -10,10 +10,8 @@ schedules:
         type: daily
         hour: "{{TIMEZONE_HOUR}}"     # Mon=session-prep, Tue-Sun=day-plan
         window: "4-21"                # После 22:00 бесполезен
-      note-review:
-        type: daily
-        hour: 23
-        window: "22-23"
+      # note-review has no scheduled run (pilot decision 2026-07-29/30, #961): notes are reviewed
+      # only by the pilot, by hand or in the Day Open "Разбор заметок" section.
       week-review:
         type: weekly
         day: 1                        # Monday

@@ -1661,7 +1661,7 @@
     },
     {
       "path": "roles/README.md",
-      "sha256": "935ab61d966fa3a4e0b8994119e2c54e0ac00791703d9ab611e70f6b163b3a33"
+      "sha256": "3a2850e75c0f3c2f672d650eb8796114661fc013893e2c8fd777d52a12351b40"
     },
     {
       "path": "roles/ROLE-CONTRACT.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "73eac324dcc288f95657f76d4670585ed8d5f25bc13599d3b18a48b36c713dcd"
+      "sha256": "8776f7b02f17fe942eefdd09eda5c12b26ed7d8c7b4db18637c93c0f6a6729e3"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1933,11 +1933,11 @@
     },
     {
       "path": "roles/synchronizer/README.md",
-      "sha256": "6b034a8e68f71729ffaa4f967ec85b46cacc99f2c68d4c7cb2684a66ac543b01"
+      "sha256": "84eb57399262f7569bd929811646ed37563b162164370002917f294633b801d5"
     },
     {
       "path": "roles/synchronizer/config.yaml",
-      "sha256": "ba5fda23809e9bd27418678b97a5bd4f57933f6b3e6c8378281511707ecef7b7"
+      "sha256": "a009351521146fa03913d7581012a667f9392b559ea107c0863948ba69b0bc78"
     },
     {
       "path": "roles/synchronizer/install.sh",
@@ -1957,7 +1957,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/daily-report.sh",
-      "sha256": "5b5bbf735174c0bbe39be5a6d4bcdceb86f2efe3f0f6e7c592de8ba6663aa5da"
+      "sha256": "5586d329542362ba5eaefd43a997e6e7afd86ecac459e9e34ba22865ea88b16f"
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect-neon.py",
@@ -1969,7 +1969,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
-      "sha256": "7173995a3718b160d229dd5767631ecff23917ef170113c029a80c8c7d94986b"
+      "sha256": "eda45a64bd0dd34b86cac17377a4d74000a78ff113eb22e07bdedb645e501860"
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
@@ -1977,7 +1977,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "7f1af13656fa99a6cc8468fc79f1e4b99319af01aee897fa47848c41afefd33f"
+      "sha256": "1d3964f591145fc586fa2b370caf70fd0ad5bb28e4ed3b5302d2d8860da8d910"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -1997,7 +1997,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "4c6aa74d8cdf18630ffc862cd07200b52868c8406e852749ebb7f6df8853e08e"
+      "sha256": "541c4568e31a12cc9e2d0d01dfcae44a407c8f568a26978808d8260642ef24e8"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -2281,7 +2281,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "08fc02bb80e5b36b0b873383750eaaa3ec74f3cd279d6c5eef3b7e1c423254b5"
+      "sha256": "11731e6226138290af0b4890e095a411628807f18d72f826606489395d2b8edf"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2857,7 +2857,7 @@
     },
     {
       "path": "scripts/tests/test_launchd_identity_runtime.sh",
-      "sha256": "433e3a77becb80cc5f9b296a387180777a0cc722d2d9a9611bf30eab7b139509"
+      "sha256": "a0eebdb3bb79d8cbe90245ca891499cac659aeb73061e0665c78e32f7625eba9"
     },
     {
       "path": "scripts/tests/test_role_runner_update_marker_guard.sh",
@@ -3013,7 +3013,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "451e458f87a8592a08940fcdf92881aa1aabe3dd760f98d11b9046013aaf2821"
+      "sha256": "a2d7a88571783af1e5ba6879e05dfbe4240f577a46c680c6cea99899c5bbc92c"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",

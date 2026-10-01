@@ -21,7 +21,7 @@
          15:00 — extractor
          18:00 — extractor
          21:00 — extractor
-         23:00 — strategist note-review
+         23:00 — catch-up tick only (note-review has no scheduled run, #961)
     -->
     <key>StartCalendarInterval</key>
     <array>

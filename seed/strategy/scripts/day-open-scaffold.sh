@@ -1074,17 +1074,18 @@ render_scout() {
 }
 
 # --- Section: Разбор заметок (fleeting-notes) ---
-# Парсит inbox/fleeting-notes.md на наличие непрочитанных заметок (строки **Title**).
+# Парсит inbox/fleeting-notes.md на наличие заметок, ждущих решения пилота: строки **Title**
+# (новые) и **Title** ✅предложено (агент записал предложение, решение за пилотом, #961).
 # Если пусто → "нет заметок" без маркера PENDING → LLM секцию не трогает.
 # Если есть → строки таблицы с реальными заголовками и PENDING на Тип/Предложение.
 # Bold **text** в GitHub не создаёт якорей — ссылки без #якорь.
 render_fleeting_notes() {
   local notes_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/fleeting-notes.md"
 
-  # Extract titles of new unprocessed notes (lines matching **Title**)
+  # Extract titles of notes awaiting the pilot: **Title**, **Title** ✅предложено, **Title** ✅предложено (шум)
   local new_notes
-  new_notes=$(grep -E '^\*\*[^*]+\*\*[[:space:]]*$' "$notes_file" 2>/dev/null \
-    | sed 's/^\*\*//; s/\*\*[[:space:]]*$//')
+  new_notes=$(grep -E '^\*\*[^*]+\*\*[[:space:]]*(✅предложено.*)?$' "$notes_file" 2>/dev/null \
+    | sed -E 's/^\*\*//; s/\*\*[[:space:]]*(✅предложено.*)?$//')
 
   if [ -z "$new_notes" ]; then
     printf '| нет заметок | — | — | ✅ |\n'
@@ -1541,7 +1542,7 @@ ${DAY_CLOSE_CARRY_OVER:-нет (Day Close не найден)}
 <details>
 <summary><b>Разбор заметок</b></summary>
 
-<!-- Источник: inbox/fleeting-notes.md. Строки **Title** = непрочитанные. Ссылки без якоря — bold не создаёт GitHub-якорей. -->
+<!-- Источник: inbox/fleeting-notes.md. Строки **Title** = непрочитанные, **Title** ✅предложено = предложение записано, ждёт решения пилота. Ссылки без якоря — bold не создаёт GitHub-якорей. -->
 
 | Заметка | Тип | Предложение | ✅ |
 |---------|-----|-------------|---|

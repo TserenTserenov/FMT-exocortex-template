@@ -83,6 +83,10 @@ title: Fleeting
 
 ---
 
+**Already proposed note** ✅предложено
+
+---
+
 Plain old note
 <sub>1 янв, 10:00</sub>
 EOF
@@ -116,6 +120,8 @@ case "${STUB_MODE:-noop}" in
     outside-edit) echo x >> docs/other.md ;;
     commit-outside) echo x > docs/committed-outside.md; git add docs/committed-outside.md; git commit -q -m "model commit" ;;
     commit-inside) echo x >> inbox/fleeting-notes.md; git add inbox/fleeting-notes.md; git commit -q -m "model commit" ;;
+    # a healthy Note-Review (#961): the new note is marked, its bold stays
+    mark-proposed) sed 's/^\*\*Bold new note\*\*$/**Bold new note** ✅предложено/' inbox/fleeting-notes.md > "$TMPDIR/fleeting.marked" && cat "$TMPDIR/fleeting.marked" > inbox/fleeting-notes.md ;;
     fail) exit 3 ;;
 esac
 exit 0
@@ -294,6 +300,7 @@ check "model ran in the copy, not in the canon" "1" "$(grep -c 'iwe-strategist-n
 check "origin got exactly one commit" "1" "$(origin_commits)"
 check "the commit touches exactly the two allowlisted files" "archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_paths)"
 check "cleanup archived the plain note on origin" "0" "$(git -C "$ORIGIN" show main:inbox/fleeting-notes.md | grep -c 'Plain old note')"
+check "cleanup left the already proposed note (bold + ✅предложено) on origin, it is not the script's to archive" "1" "$(git -C "$ORIGIN" show main:inbox/fleeting-notes.md | grep -c 'Already proposed note')"
 check "cleanup script edited the copy: canon still holds the plain note" "1" "$(fleeting_has_plain "$CANON")"
 check "prompt points the model at the copy's workspace" "1" "$(grep -c 'iwe-strategist-note-review.*/workspace/DS-strategy/inbox/' "$E/stub-args" | awk '{print ($1 > 0)}')"
 check "prompt never mentions the canonical path" "0" "$(grep -c "$CANON" "$E/stub-args")"
@@ -454,6 +461,7 @@ git -C "$CANON" worktree add -q -b cleanup-wt "$E/wt" origin/main
 run_cleanup IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$E/wt"
 check "isolated, dir = a linked worktree: runs" "0" "$CRC"
 check "isolated worktree run archived the note in the copy only" "0/1" "$(grep -c 'Plain old note' "$E/wt/inbox/fleeting-notes.md")/$(canon_has_plain)"
+check "isolated worktree run kept the proposed note in the copy" "1" "$(grep -c 'Already proposed note' "$E/wt/inbox/fleeting-notes.md")"
 make_env
 run_cleanup
 check "not isolated, no dir: legacy default still edits the canon path" "0/0" "$CRC/$(canon_has_plain)"
@@ -496,6 +504,38 @@ EXTRA_SHIM="$E/shim-sed" run_runner noop note-review
 check "sed (prompt read) fails: runner exits non-zero" "1" "$([ "$RC" -ne 0 ] && echo 1 || echo 0)"
 check "sed fails: the model never ran" "0" "$([ -e "$E/stub-cwd" ] && echo 1 || echo 0)"
 check "sed fails: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+
+echo "== B10: the canary understands ✅предложено (#961): a healthy run is silent, a run that processed nothing still alarms =="
+# The canary used to expect the plain bold count to drop. Since the pilot decision of 2026-07-29 a processed note
+# keeps its bold and gets the ✅предложено mark, so every healthy run looked like a failed one and sent a false alarm.
+# The model double either marks the new note (healthy) or does nothing; a recording curl double stands for the
+# Telegram API, so an alert is observable. The legacy and the isolated path share the canary code: both are run.
+log_count() { cat "$HOME_DIR"/logs/strategist/*.log 2>/dev/null | grep -c -- "$1" || true; }
+alert_count() { if [ -f "$E/curl.log" ]; then grep -c 'Note-Review canary' "$E/curl.log" || true; else echo 0; fi; }
+published_count() { git -C "$ORIGIN" show main:inbox/fleeting-notes.md | grep -c -- "$1" || true; }
+make_canary_env() {
+    make_env
+    mkdir -p "$HOME_DIR/.config/aist"
+    printf 'TELEGRAM_BOT_TOKEN=canary-test\nTELEGRAM_CHAT_ID=1\n' > "$HOME_DIR/.config/aist/env"
+    printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s"\nexit 0\n' "$E/curl.log" > "$E/shim/curl"
+    chmod +x "$E/shim/curl"
+}
+for scenario_flag in "" "note-review"; do
+    mode_label="flag off"; [ -z "$scenario_flag" ] || mode_label="isolated"
+    make_canary_env
+    run_runner mark-proposed "$scenario_flag" note-review
+    check "$mode_label, healthy run (the new note gets ✅предложено): runner exits 0" "0" "$RC"
+    check "$mode_label, healthy run: the canary logged no warning" "0" "$(log_count 'WARN: Note-Review')"
+    check "$mode_label, healthy run: no canary alert was sent" "0" "$(alert_count)"
+    check "$mode_label, healthy run: the marked note is published bold, nothing archived on its own" "1" "$(published_count '^\*\*Bold new note\*\* ✅предложено$')"
+    check "$mode_label, healthy run: the earlier proposed note is still in the box" "1" "$(published_count '^\*\*Already proposed note\*\* ✅предложено$')"
+    check "$mode_label, healthy run: the plain old note was archived by the safety net, as before" "0" "$(published_count 'Plain old note')"
+    make_canary_env
+    run_runner noop "$scenario_flag" note-review
+    check "$mode_label, control, the model processed nothing: runner exits 0" "0" "$RC"
+    check "$mode_label, control: the canary logged its warning" "1" "$(log_count 'WARN: Note-Review')"
+    check "$mode_label, control: the canary alert was sent (the recording double is wired in)" "1" "$(alert_count)"
+done
 
 echo
 echo "Passed: $PASS_COUNT, failed: $FAIL_COUNT"

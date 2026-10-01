@@ -891,6 +891,16 @@ already_ran_today() {
     [ -f "$LOG_FILE" ] && grep -q "SUCCESS scenario: $scenario" "$LOG_FILE"
 }
 
+# Note-Review canary (#961): number of NEW notes in fleeting-notes.md, i.e. bold titles that carry
+# neither 🔄 (deferred) nor ✅предложено (proposal already written). Since the pilot decision of
+# 2026-07-29 a processed note stays bold and gets the ✅предложено mark instead of losing its bold,
+# so a healthy run lowers THIS count, not the plain bold count. Prints 0 for a missing file.
+count_new_bold_notes() {  # <fleeting-notes.md>
+    local count
+    count=$(grep '^\*\*' "$1" 2>/dev/null | grep -vc -e '🔄' -e '✅предложено' || true)
+    echo "${count:-0}"
+}
+
 # File-based lock to prevent concurrent execution (RunAtLoad + CalendarInterval race)
 # mkdir — атомарная операция на POSIX, исключает TOCTOU race condition
 LOCK_DIR="$LOG_DIR/locks"
@@ -1149,18 +1159,19 @@ case "$1" in
         ;;
     "note-review")
         acquire_lock "note-review"
-        log "Evening: running note review"
+        log "Manual: running note review"
         # WP-530 Ф72: opt-in isolation (STRATEGIST_ISOLATED_SCENARIOS); off = the legacy path below.
         if isolation_enabled "note-review"; then
             isolated_begin "note-review" || { log "FAILED scenario: note-review (rc=$ISOLATION_BLOCKED_RC) -- изолированная копия не создана, канон не тронут"; exit "$ISOLATION_BLOCKED_RC"; }
         fi
-        # Canary: count bold notes before (exclude 🔄 — deferred ideas stay bold by design)
+        # Canary: count bold notes before. "New" = bold without 🔄 (deferred ideas stay bold by design)
+        # and without ✅предложено (already proposed; stays bold until the pilot closes it, #961).
         # NB: `grep -c` при exit 1 (no matches) печатает "0" до `||`, так что `|| echo 0`
         # давал двухстрочный "0\n0" и ломал арифметику. Используем `|| true` + fallback.
         FLEETING="$WORKSPACE/inbox/fleeting-notes.md"
         BOLD_BEFORE=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || true); BOLD_BEFORE=${BOLD_BEFORE:-0}
-        BOLD_NEW_BEFORE=$(grep -vc '🔄' <(grep '^\*\*' "$FLEETING" 2>/dev/null) 2>/dev/null || true); BOLD_NEW_BEFORE=${BOLD_NEW_BEFORE:-0}
-        log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄)"
+        BOLD_NEW_BEFORE=$(count_new_bold_notes "$FLEETING")
+        log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄 or ✅предложено)"
 
         acquire_captures_write_lock || true
         if [ "$ISOLATED_RUN" = 1 ]; then
@@ -1174,20 +1185,21 @@ case "$1" in
             run_claude "note-review" "claude-haiku-4-5-20251001"
         fi
 
-        # Canary: count bold notes after (needs to be visible for alert at line ~274)
+        # Canary: count bold notes after (needs to be visible for the alert further below)
         BOLD_AFTER=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || true); BOLD_AFTER=${BOLD_AFTER:-0}
-        BOLD_NEW_AFTER=$(grep -vc '🔄' <(grep '^\*\*' "$FLEETING" 2>/dev/null) 2>/dev/null || true); BOLD_NEW_AFTER=${BOLD_NEW_AFTER:-0}
+        BOLD_NEW_AFTER=$(count_new_bold_notes "$FLEETING")
         # Non-blocking diagnostic (isolated from set -e to protect cleanup below)
         (
             log "Canary: $BOLD_AFTER bold total ($BOLD_NEW_AFTER new)"
             NON_BOLD=$(grep -c '^[^*#>-]' "$FLEETING" 2>/dev/null || true); NON_BOLD=${NON_BOLD:-0}
             log "Non-bold content lines: $NON_BOLD"
             if [ "$BOLD_NEW_AFTER" -ge "$BOLD_NEW_BEFORE" ] && [ "$BOLD_NEW_BEFORE" -gt 0 ]; then
-                log "WARN: Note-Review Step 10 may have failed — new bold notes did not decrease ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER)"
+                log "WARN: Note-Review did not mark new notes ✅предложено — new bold notes did not decrease ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER)"
             fi
         ) || true
 
-        # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
+        # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net: only notes the pilot closed
+        # by hand — bold removed or struck through; ✅предложено notes are bold and are never swept up)
         # cleanup-processed-notes.py has no placeholders, so it is read-only
         # data from FMT (same rule as notify.sh above) and build-runtime does
         # not deliver it next to this runtime copy of strategist.sh — resolving
@@ -1256,12 +1268,12 @@ case "$1" in
             log "Cleanup: no changes to commit"
         fi
 
-        # Alert if LLM failed AND cleanup was needed (only for NEW bold, not deferred 🔄)
+        # Alert if the LLM did not process the new notes (only NEW bold: not deferred 🔄, not already ✅предложено)
         if [ "$BOLD_NEW_AFTER" -ge "$BOLD_NEW_BEFORE" ] && [ "$BOLD_NEW_BEFORE" -gt 0 ]; then
             ENV_FILE="$HOME/.config/aist/env"
             if [ -f "$ENV_FILE" ]; then
                 set -a; source "$ENV_FILE"; set +a
-                ALERT_TEXT="⚠️ <b>Note-Review canary</b>: Step 10 не сработал ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER new bold). Deterministic cleanup applied."
+                ALERT_TEXT="⚠️ <b>Note-Review canary</b>: разбор не пометил новые заметки ✅предложено ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER новых жирных). Заметки остаются в inbox до решения пилота."
                 ALERT_JSON=$(printf '%s' "$ALERT_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
                 curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
                     -H "Content-Type: application/json" \
@@ -1286,7 +1298,7 @@ case "$1" in
         echo ""
         echo "Scenarios:"
         echo "  morning           - 4:00 EET daily (session-prep on Mon, day-plan others)"
-        echo "  note-review       - 23:00 EET daily (review fleeting notes + clean inbox)"
+        echo "  note-review       - manual only, with the pilot present (classify fleeting notes and propose; no auto-archive)"
         echo "  week-review       - Sunday 19:00 EET review for club"
         echo "  session-prep      - Manual session prep (headless preparation)"
         echo "  strategy-session  - Manual strategy session (interactive with user)"
