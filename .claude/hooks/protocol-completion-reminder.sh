@@ -48,19 +48,23 @@ find_params_file() {
 }
 
 # Succeeds unless verify_quick_close is an explicit `false` (`no`, `off` are not):
-# case-insensitive, quotes, spaces and a trailing " # comment" tolerated, a UTF-8 BOM
-# on the first line ignored, the last of duplicate keys wins (as in YAML). No file or
-# key = enabled. The whole chain runs byte-wise (LC_ALL=C): in a UTF-8 locale a stray
-# non-UTF-8 byte in params.yaml makes sed fail ("illegal byte sequence") or grep report
-# "binary file matches", and the key would silently read as absent.
+# case-insensitive, quotes, spaces and a trailing " # comment" tolerated, a BOM on the
+# first line ignored (UTF-8, UTF-16 LE/BE), the last of duplicate keys wins (as in YAML).
+# No file or key = enabled. The input is normalised before the key is looked for, so the
+# answer does not depend on incidental properties of the file: NUL bytes are dropped (a
+# stray one, or the second byte of every character of a UTF-16 file; with them grep takes
+# the file for binary data and prints no line, and the key would silently read as absent),
+# and the whole chain runs byte-wise (LC_ALL=C): in a UTF-8 locale a stray non-UTF-8 byte
+# makes sed fail ("illegal byte sequence") the same way.
 verify_enabled() {
   local file value
   file=$(find_params_file)
   [ -n "$file" ] || return 0
   value=$(
     export LC_ALL=C
-    bom=$(printf '\357\273\277')
-    sed "1s/^$bom//" "$file" 2>/dev/null \
+    boms="$(printf '\357\273\277')|$(printf '\377\376')|$(printf '\376\377')"
+    tr -d '\000' 2>/dev/null < "$file" \
+      | sed -E "1s/^($boms)//" \
       | grep -E '^verify_quick_close:' | tail -1 \
       | sed -E 's/^verify_quick_close:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//' \
       | tr '[:upper:]' '[:lower:]'
@@ -68,22 +72,34 @@ verify_enabled() {
   [ "$value" != "false" ]
 }
 
+# "session." -> "session": trailing . , ; : ! ? is sentence punctuation, not part of the
+# word. A word made of punctuation only is returned as it is (it stays an unknown word).
+trim_punct() {
+  local w="$1" punct='[.,;:!?]'
+  while [[ $w == *$punct ]]; do w=${w%?}; done
+  [ -n "$w" ] || w="$1"
+  printf '%s' "$w"
+}
+
 # Closing kind of a run-protocol call, from its args (.claude/skills/run-protocol/SKILL.md):
-# `close` or `close session` = quick, `close day|week|month` = that closing, and
-# day-close / week-close / month-close (month-close is not in the skill's table, but
-# this hook always reminded R23 for it). Prints quick | day | week | month, nothing
-# when the call is not a closing: any other second word means a free-form task text
-# that merely starts with "close" ("close the PR for issue 5").
+# `close`, `close session` or `close sessions` = quick, `close day|week|month` = that
+# closing, and day-close / week-close / month-close (month-close is not in the skill's
+# table, but this hook always reminded R23 for it); trailing punctuation of the first two
+# words is ignored ("close session."). Prints quick | day | week | month, nothing when the
+# call is not a closing: any other second word means a free-form task text that merely
+# starts with "close" ("close the PR for issue 5", "close day-open").
 run_protocol_close_kind() {
   local first second
   read -r first second _ <<< "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  first=$(trim_punct "$first")
+  second=$(trim_punct "$second")
   case "$first" in
     day-close) echo day ;;
     week-close) echo week ;;
     month-close) echo month ;;
     close)
       case "$second" in
-        '' | session) echo quick ;;
+        '' | session | sessions) echo quick ;;
         day) echo day ;;
         week) echo week ;;
         month) echo month ;;

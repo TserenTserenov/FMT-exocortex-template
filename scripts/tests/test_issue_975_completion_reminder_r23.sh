@@ -185,6 +185,30 @@ run_ws "$(skill_json run-protocol 'close foo')"
 expect_steps_without_r23 "run-protocol 'close foo': an unknown second word is not a closing"
 run_ws "$(skill_json run-protocol '  Close   Session ')"
 expect_r23 "run-protocol '  Close   Session ': case and spacing do not matter"
+# Sentence punctuation after the word of the closing is not part of it; "sessions" is Quick Close too.
+for p in '.' ',' ';' ':' '!' '?' '?!' '...'; do
+    run_ws "$(skill_json run-protocol "close session$p")"
+    expect_r23 "run-protocol 'close session$p' + key true: trailing punctuation does not hide the closing"
+done
+run_ws "$(skill_json run-protocol 'close.')"
+expect_r23 "run-protocol 'close.' + key true: punctuation after the first word too"
+run_ws "$(skill_json run-protocol 'close sessions')"
+expect_r23 "run-protocol 'close sessions' + key true: the plural counts as Quick Close"
+run_ws "$(skill_json run-protocol 'Close Sessions!')"
+expect_r23 "run-protocol 'Close Sessions!' + key true: plural, case and punctuation"
+# ... and none of that turns a task text into a closing.
+run_ws "$(skill_json run-protocol 'close day-open')"
+expect_steps_without_r23 "run-protocol 'close day-open': a hyphenated second word is not 'day'"
+run_ws "$(skill_json run-protocol 'close the PR for issue 5.')"
+expect_steps_without_r23 "run-protocol 'close the PR for issue 5.': still a task text"
+run_ws "$(skill_json run-protocol 'close foo.')"
+expect_steps_without_r23 "run-protocol 'close foo.': an unknown second word stays unknown"
+run_ws "$(skill_json run-protocol 'close sessionx')"
+expect_steps_without_r23 "run-protocol 'close sessionx': only 'session' and 'sessions' are Quick Close"
+run_ws "$(skill_json run-protocol 'close ...')"
+expect_steps_without_r23 "run-protocol 'close ...': a second word of punctuation only is not an empty one"
+run_ws "$(skill_json run-protocol '? close')"
+expect_steps_without_r23 "run-protocol '? close': punctuation as the first word is no closing"
 
 params "$WS" 'verify_quick_close: false\n'
 run_ws "$(skill_json run-protocol close)"
@@ -203,6 +227,18 @@ run_ws "$(skill_json run-protocol 'close week')"
 expect_r23 "run-protocol 'close week' + key false: Week Close ignores the key"
 run_ws "$(skill_json run-protocol 'close month')"
 expect_r23 "run-protocol 'close month' + key false: Month Close ignores the key"
+run_ws "$(skill_json run-protocol 'close session.')"
+expect_steps_without_r23 "run-protocol 'close session.' + key false: still Quick Close, silenced"
+run_ws "$(skill_json run-protocol 'close sessions')"
+expect_steps_without_r23 "run-protocol 'close sessions' + key false: Quick Close, silenced"
+run_ws "$(skill_json run-protocol 'close day.')"
+expect_r23 "run-protocol 'close day.' + key false: Day Close with punctuation ignores the key"
+run_ws "$(skill_json run-protocol 'day-close!')"
+expect_r23 "run-protocol 'day-close!' + key false: Day Close with punctuation ignores the key"
+run_ws "$(skill_json run-protocol 'close week;')"
+expect_r23 "run-protocol 'close week;' + key false: Week Close with punctuation ignores the key"
+run_ws "$(skill_json run-protocol 'Month-Close?')"
+expect_r23 "run-protocol 'Month-Close?' + key false: Month Close with punctuation ignores the key"
 
 # default is ON: no file, or a file without the key
 run_noparams "$(skill_json run-protocol close)"
@@ -314,6 +350,38 @@ if [ -n "$UTF8_LOCALE" ]; then
     HOOK_LOCALE=""
 else
     echo "SKIP: no UTF-8 locale installed, byte-wise reading not exercised"
+fi
+
+# NUL bytes, a stray one or a whole UTF-16 file: grep takes such input for binary data and
+# prints no line, so the key used to read as absent and the reminder stayed on whatever the
+# file said. The result must not depend on whether the file happens to contain a NUL.
+probe_off 'a NUL byte on a line of its own' 'verify_quick_close: false\n# junk\000\n'
+probe_off 'a NUL byte on the key line' 'verify_quick_close: false \000# comment\n'
+probe_off 'a NUL byte before the key line' 'a\000b\nverify_quick_close: false\n'
+probe_on 'a NUL byte, key true' 'verify_quick_close: true\n# junk\000\n'
+probe_on 'a NUL byte, no key' '# junk\000\nauthor_mode: false\n'
+# UTF-16 as Windows Notepad writes "Unicode": a BOM, then two bytes per character.
+utf16() { # <iconv target> <BOM as %b escapes, may be empty> <text as %b escapes>
+    { printf '%b' "$2"; printf '%b' "$3" | iconv -f UTF-8 -t "$1"; } > "$WS/params.yaml"
+}
+if command -v iconv >/dev/null 2>&1; then
+    utf16 UTF-16LE '\377\376' 'verify_quick_close: false\r\n'
+    run_ws "$(skill_json run-protocol close)"
+    expect_steps_without_r23 "key off: UTF-16LE file with a BOM, CRLF"
+    utf16 UTF-16BE '\376\377' 'verify_quick_close: false\n'
+    run_ws "$(skill_json run-protocol close)"
+    expect_steps_without_r23 "key off: UTF-16BE file with a BOM, key on the first line"
+    utf16 UTF-16BE '\376\377' '# settings\nverify_quick_close: false\n'
+    run_ws "$(skill_json run-protocol close)"
+    expect_steps_without_r23 "key off: UTF-16BE file with a BOM, key on the second line"
+    utf16 UTF-16LE '' 'verify_quick_close: "false"  # weekly\n'
+    run_ws "$(skill_json run-protocol close)"
+    expect_steps_without_r23 "key off: UTF-16LE file without a BOM, quoted value and a comment"
+    utf16 UTF-16LE '\377\376' 'verify_quick_close: true\n'
+    run_ws "$(skill_json run-protocol close)"
+    expect_r23 "key stays on: UTF-16LE file with the key true"
+else
+    echo "SKIP: no iconv, UTF-16 files not exercised"
 fi
 
 # ============================ C. where params.yaml is looked up ============================
