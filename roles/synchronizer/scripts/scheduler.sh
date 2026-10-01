@@ -238,7 +238,8 @@ dispatch() {
     # "Разбор заметок" section). The nightly run kept stripping bold and archiving notes without
     # a pilot decision, so BOTH scheduler paths are gone: the evening run (22:00+) and the
     # morning catch-up for "yesterday". A manual `strategist.sh note-review` from a terminal
-    # still works, but it has no chat: it only marks notes and writes proposals, it never archives.
+    # still works, but it has no chat: it only marks notes and writes proposals, the model archives
+    # nothing (only the cleanup safety net may archive a note whose bold the pilot already removed).
 
     # --- Синхронизатор: code-scan (ежедневно) ---
     if ! ran_today "synchronizer-code-scan"; then
