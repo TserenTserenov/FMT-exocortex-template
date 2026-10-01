@@ -2521,7 +2521,7 @@
     },
     {
       "path": "scripts/lib/wp-num.sh",
-      "sha256": "e252ba332090008c4c1adbdf703c174d4d76f0749c813d95b1e5b02aca675dbc"
+      "sha256": "9ce0d0fc37b5962492a5313e0d8edf9b302261e7a5832e362e0f2592f346f558"
     },
     {
       "path": "scripts/lib/wp_inbox.py",

@@ -26,10 +26,12 @@
 
 # wp_num_normalize <raw> -> bare decimal integer on stdout.
 # Accepts 44, 044, WP-44, WP-044, wp-044, ~~WP-044~~, **WP-044** (surrounding spaces ok).
-# Rejects empty input, non-numbers, trailing junk (13*, WP-44-slug) and more than nine
-# significant digits.
+# Rejects empty input, non-numbers, trailing junk (13*, WP-44-slug), more than nine
+# significant digits and input longer than 64 characters (no real spelling comes close;
+# without the cap a pathological argument kept the string operations below busy for seconds).
 wp_num_normalize() {
   local raw="${1-}" prev="" digits
+  [ "${#raw}" -le 64 ] || return 1
   raw="${raw#"${raw%%[![:space:]]*}"}"
   raw="${raw%"${raw##*[![:space:]]}"}"
   # Peel registry-cell decoration: ~~...~~ and **...** in any nesting.
@@ -142,26 +144,30 @@ _wp_num_inbox_flat() {
 
 # wp_num_find_card <inbox_dir> <archive_dir> <raw> -> path of the WP's card file.
 # Order (the first hit wins; either directory may be missing):
-#   1. folder card WP-<N>/WP-<N>.md in inbox, then in archive          (canonical, WP-434)
-#   2. inbox: a file whose frontmatter says `wp: <N>`, then a flat WP-<N>.md / WP-<N>-<slug>.md
-#   3. archive: a file whose frontmatter says `wp: <N>`, then a flat WP-<N>.md / WP-<N>-<slug>.md
-# Canonical paths go first on purpose: the `wp:` grep returns the first file that carries the
-# field -- often a note about the WP, not its card (#954).
+#   1. inbox: folder card WP-<N>/WP-<N>.md (zero-padded, then legacy unpadded), then a flat
+#      WP-<N>.md / WP-<N>-<slug>.md in either spelling
+#   2. archive: folder card, then a flat WP-<N>.md / WP-<N>-<slug>.md
+#   3. last resort, inbox then archive: a file whose frontmatter says `wp: <N>`
+# Inbox is the live contour and always outranks the archive (a legacy card still in inbox
+# beats an archive stub of the same WP). The `wp:` grep goes last on purpose: it returns the
+# first file that carries the field -- often a note about the WP, not its card (#954).
 wp_num_find_card() {
   local inbox="${1-}" archive="${2-}" n found=""
   n=$(wp_num_normalize "${3-}") || return 1
 
-  [ -d "$inbox" ] && found=$(wp_num_card_path "$inbox" "$n" || true)
-  if [ -z "$found" ] && [ -d "$archive" ]; then
-    found=$(wp_num_card_path "$archive" "$n" || true)
-  fi
-  if [ -z "$found" ] && [ -d "$inbox" ]; then
-    found=$(_wp_num_grep_card "$inbox" "$n" || true)
+  if [ -d "$inbox" ]; then
+    found=$(wp_num_card_path "$inbox" "$n" || true)
     [ -n "$found" ] || found=$(_wp_num_inbox_flat "$inbox" "$n" || true)
   fi
   if [ -z "$found" ] && [ -d "$archive" ]; then
-    found=$(_wp_num_grep_card "$archive" "$n" || true)
+    found=$(wp_num_card_path "$archive" "$n" || true)
     [ -n "$found" ] || found=$(_wp_num_flat_cards "$archive" "$n" | head -1 || true)
+  fi
+  if [ -z "$found" ] && [ -d "$inbox" ]; then
+    found=$(_wp_num_grep_card "$inbox" "$n" || true)
+  fi
+  if [ -z "$found" ] && [ -d "$archive" ]; then
+    found=$(_wp_num_grep_card "$archive" "$n" || true)
   fi
 
   [ -n "$found" ] || return 1

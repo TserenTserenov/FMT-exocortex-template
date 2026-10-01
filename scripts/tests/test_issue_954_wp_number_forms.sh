@@ -72,6 +72,28 @@ card() {  # <path> <wp-field or ""> <status>
   } > "$1"
 }
 
+run_limited() {  # <seconds> <command...>: prints the command's output; returns its exit code, 124 when it ran too long
+  local limit="$1" pid i=0 rc out_file
+  shift
+  out_file=$(mktemp "$TMP/lim.XXXXXX")
+  "$@" >"$out_file" 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$i" -ge $((limit * 10)) ]; then
+      kill "$pid" 2>/dev/null
+      wait "$pid" 2>/dev/null
+      cat "$out_file"
+      return 124
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  wait "$pid"
+  rc=$?
+  cat "$out_file"
+  return "$rc"
+}
+
 if [ -r "$LIB" ]; then
   # shellcheck source=/dev/null
   . "$LIB"
@@ -92,6 +114,21 @@ if [ "$have_lib" = 1 ]; then
     got=$(wp_num_normalize "$raw"); rc=$?
     if [ "$rc" -ne 0 ] && [ -z "$got" ]; then ok "normalize rejects [$raw] without output"; else bad "normalize [$raw]: expected rc!=0 and no output, got rc=$rc out=[$got]"; fi
   done
+  # Input length is capped (64 characters): a pathological argument must be refused at once
+  # instead of keeping the string operations busy for seconds (50 000 zeros took 8 s, 5 000
+  # nested ~~ wrappers 13 s under bash 3.2). The cap sits above every real spelling.
+  # shellcheck disable=SC2016  # the text of a script for `bash -c`: $1/$2 expand there, not here
+  norm_script='. "$1"; wp_num_normalize "$2"'
+  zeros=$(printf '%050000d' 0)
+  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "$zeros"); rc=$?
+  expect_eq "50000 zeros are refused at once (rc 1, no output)" "1:" "$rc:$out"
+  wrap=$(printf '~~%.0s' $(seq 1 5000))
+  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "${wrap}44${wrap}"); rc=$?
+  expect_eq "5000 nested ~~ wrappers are refused at once (rc 1, no output)" "1:" "$rc:$out"
+  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "$(printf '%064d' 44)"); rc=$?
+  expect_eq "a 64-character input is still read" "0:44" "$rc:$out"
+  out=$(run_limited 3 /bin/bash -c "$norm_script" _ "$LIB" "$(printf '%065d' 44)"); rc=$?
+  expect_eq "a 65-character input is refused" "1:" "$rc:$out"
   expect_eq "padded 44" "044" "$(wp_num_padded 44)"
   expect_eq "padded WP-7" "007" "$(wp_num_padded WP-7)"
   expect_eq "padded 1234 (four digits stay as they are)" "1234" "$(wp_num_padded 1234)"
@@ -181,8 +218,10 @@ card "$IN/WP-046/WP-046.md" "" in_progress           # a card without the `wp:` 
 card "$IN/b-notes.md" 46 notes
 card "$IN/WP-45/WP-45.md" 45 in_progress             # older, unpadded folder
 card "$IN/WP-070-flat-slug.md" 70 in_progress
+card "$AR/WP-070/WP-070.md" 70 pending               # a stub of the same WP in the archive
 card "$AR/WP-050/WP-050.md" 50 "done"
 card "$AR/WP-060-closed-slug.md" 60 "done"           # what close-wp.sh writes
+card "$IN/c-notes.md" 60 notes                       # a note about it in inbox
 card "$AR/WP-469-unrelated.md" 469 "done"
 # shellcheck disable=SC2034  # read by the find_wp_file() taken from the bundle below
 INBOX_DIR="$IN"
@@ -197,11 +236,11 @@ if declare -F find_wp_file >/dev/null; then
   for q in 45 045; do
     expect_eq "find_wp_file $q -> the real unpadded folder card" "$IN/WP-45/WP-45.md" "$(find_wp_file "$q")"
   done
-  expect_eq "find_wp_file 70 -> flat slug card" "$IN/WP-070-flat-slug.md" "$(find_wp_file 70)"
+  expect_eq "find_wp_file 70 -> the live flat card in inbox, not the archive stub (inbox goes first)" "$IN/WP-070-flat-slug.md" "$(find_wp_file 70)"
   for q in 50 050; do
     expect_eq "find_wp_file $q -> archive folder card" "$AR/WP-050/WP-050.md" "$(find_wp_file "$q")"
   done
-  expect_eq "find_wp_file 60 -> flat archive context (padded name)" "$AR/WP-060-closed-slug.md" "$(find_wp_file 60)"
+  expect_eq "find_wp_file 60 -> flat archive context, not a note in inbox (the wp: grep goes last)" "$AR/WP-060-closed-slug.md" "$(find_wp_file 60)"
   expect_eq "find_wp_file 469 -> its own archive file" "$AR/WP-469-unrelated.md" "$(find_wp_file 469)"
   expect_eq "find_wp_file 47 -> nothing (46/469 prefixes are not IDs)" "" "$(find_wp_file 47)"
   expect_eq "find_wp_file 440 -> nothing" "" "$(find_wp_file 440)"
@@ -236,6 +275,16 @@ for q in 46 046 WP-046; do
   expect_eq "bundle $q exits 0" 0 "$rc"
   expect_has "bundle $q reads the padded card" "Файл: \`inbox/WP-046/WP-046.md\`" "$out"
 done
+
+# inbox is the live contour: an active legacy card there outranks a stub of the same WP in the archive
+WS=$(new_ws)
+issue_registry "$WS/$GOV/docs/WP-REGISTRY.md" "70"
+card "$WS/$GOV/inbox/WP-070-legacy.md" 70 in_progress
+card "$WS/$GOV/archive/wp-contexts/WP-070/WP-070.md" 70 pending
+out=$(IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$BUNDLE" WP-70 2>&1); rc=$?
+expect_eq "bundle WP-70 (legacy card in inbox, stub in archive) exits 0" 0 "$rc"
+expect_has "bundle WP-70 reads the live inbox card, not the archive stub" "Файл: \`inbox/WP-070-legacy.md\`" "$out"
+expect_has "bundle WP-70 shows the live card's status" "Status: in_progress" "$out"
 
 # ---------------------------------------------------------------------------
 echo "--- #954 C: close-wp.sh strikes the row whatever the cell looks like ---"
