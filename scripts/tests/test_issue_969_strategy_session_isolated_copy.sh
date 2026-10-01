@@ -1,9 +1,12 @@
 #!/bin/bash
-# strategy-session-isolated-copy-smoke.sh -- regression guard (WP-530 F72 wave 4).
+# test_issue_969_strategy_session_isolated_copy.sh -- regression guard for #969 (WP-530 F72 wave 4).
 # Text checks on SKILL.md + a behavioural run of the Step 0 block on a synthetic repo.
 # WP-7 C1/C2: every command of the skill passes the destructive-guard hook (a top-level cd is
 # blocked there), the rewritten blocks still do their job, and the publication command publishes
-# from a session-isolate copy to origin/main with the real seed publisher.
+# from a session-isolate copy to origin/main with real publishers (C1 compat: --branch only to a
+# publisher that knows it; C3: every commit of the copy, oldest first).
+# scripts/tests/run-issue-tests.sh picks up test_issue_*.sh by existence, with no registration, so an
+# install without this dev-only (undelivered) file is not reported as missing it.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL="${STRATEGY_SKILL_UNDER_TEST:-$SCRIPT_DIR/../../.claude/skills/strategy-session/SKILL.md}"

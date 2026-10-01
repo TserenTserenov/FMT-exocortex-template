@@ -477,8 +477,9 @@ ISO_WORKTREE=""
 ISO_WORKSPACE=""
 ISO_BRANCH=""
 ISO_BASE_SHA=""
-# The copy is created from origin/$ISO_BASE_BRANCH (fetch_delivery_origin refreshes the same branch)
-# and its result is published back to it: the copy's own branch ($ISO_BRANCH) exists only locally.
+# The copy is created from origin/$ISO_BASE_BRANCH and its result is published back to it: the copy's
+# own branch ($ISO_BRANCH) exists only locally. The value must match the branch fetch_delivery_origin
+# refreshes (main, fixed there); change them together.
 ISO_BASE_BRANCH="main"
 
 isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS

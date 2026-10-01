@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "cc87c752197dccad00862d4e72a677b26909dfadbc5e2be182fb24d05859fc1f"
+      "sha256": "7c28ed70e2afddacc24c1093b9bf57dba9c13f2a113a5b9328c505978bc43ec4"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2713,7 +2713,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "0884ff798074750d3dd7e20a37b148c32c7411eeb5175a2e27c8efc0681caa94"
+      "sha256": "1948065257faef4c0e351f770bacc257c7ce3cb17c4b5275a3c0fad8009970b7"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3190,7 +3190,6 @@
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
-    "scripts/tests/strategy-session-isolated-copy-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
@@ -3266,6 +3265,7 @@
     "scripts/tests/test_issue_961_note_review_pilot_only.sh",
     "scripts/tests/test_issue_964_canary_status.sh",
     "scripts/tests/test_issue_966_sessions_root.sh",
+    "scripts/tests/test_issue_969_strategy_session_isolated_copy.sh",
     "scripts/tests/test_issue_973_transcribe_model_default.sh",
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",

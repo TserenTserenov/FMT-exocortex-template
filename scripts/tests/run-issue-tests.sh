@@ -17,7 +17,6 @@ shopt -s nullglob
 fail=0
 ran=0
 ADDITIONAL_ISSUE_TESTS=(
-    "scripts/tests/strategy-session-isolated-copy-smoke.sh"
     "scripts/tests/test_create_wp_artifactor_gate.sh"
     "scripts/tests/test_create_wp_contract.sh"
     "scripts/tests/test_create_wp_hypothesis_relation.sh"
