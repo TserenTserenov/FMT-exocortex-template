@@ -127,6 +127,140 @@ for form in WP-044 44; do
   expect_gate "--wp $form: classified folder card + unclassified flat duplicate -> blocked" "$ws" "$form" blocked
 done
 
+echo "--- a flat card with a slug (WP-044-task.md) is a card: the library and wp-list.py read it, so does the gate ---"
+for form in WP-044 44 044 WP-44 wp-044; do
+  ws=$(new_ws)
+  put "$ws" "WP-044-task.md" "" unclassified        # the only card of the WP, flat, with a slug
+  expect_gate "--wp $form: the only card is flat with a slug and unclassified -> blocked" "$ws" "$form" blocked
+done
+ws=$(new_ws)
+put "$ws" "WP-044-task.md" "" tests
+expect_gate "--wp 44: the same flat card with a slug, classified -> opens" "$ws" 44 open
+ws=$(new_ws)
+put "$ws" "WP-44-old-slug.md" "" unclassified       # the older, unpadded spelling with a slug
+expect_gate "--wp 44: an unpadded flat card with a slug (WP-44-old-slug.md), unclassified -> blocked" "$ws" 44 blocked
+ws=$(new_ws)
+put "$ws" "WP-440-other.md" "" unclassified         # the neighbour 440 is not WP 44
+put "$ws" "WP-0440.md" "" unclassified
+expect_gate "--wp 44: unclassified cards of 440 and 0440 are other WPs -> opens" "$ws" 44 open
+
+# ---------------------------------------------------------------------------
+# The shared reader is found the way the other consumers find it: from the real file's location
+# (symlinks followed), the sibling template clone, IWE_TEMPLATE. A copy of the guard without
+# lib/wp-num.sh next to it used to load nothing and fall back to the exact names silently.
+WARN="wp-num.sh не найдена: гейт гипотезы проверяет только точные имена карточек"
+
+open_with() {  # <guard script> <workspace> <wp as typed> [VAR=value ...]: open --wp with any copy of the guard
+  local guard="$1" ws="$2" wp="$3"
+  shift 3
+  env IWE_ROOT="$ws" IWE_GOVERNANCE_REPO="$GOV" "$@" bash "$guard" open --wp "$wp" --agent kimi \
+    --slug gate-ids --session-id gate-ids --owner-pid "$$" --close-path peer-session 2>&1
+}
+
+expect_gate_with() {  # <description> <blocked|open> <guard> <workspace> <wp as typed> [VAR=value ...]; keeps the output in LAST_OUT
+  local desc="$1" want="$2" guard="$3" ws="$4" wp="$5" rc
+  shift 5
+  LAST_OUT=$(open_with "$guard" "$ws" "$wp" "$@"); rc=$?
+  if [ "$want" = blocked ]; then
+    if [ "$rc" -ne 0 ] && [[ "$LAST_OUT" == *"не классифицирована по гипотезе"* ]]; then ok "$desc"; else bad "$desc: must be blocked by the gate (rc=$rc): $LAST_OUT"; fi
+  else
+    if [ "$rc" -eq 0 ] && [ -f "$ws/.iwe-runtime/sessions/kimi-gate-ids.open" ]; then ok "$desc"; else bad "$desc: must open (rc=$rc): $LAST_OUT"; fi
+  fi
+}
+
+expect_warnings() {  # <description> <expected count of the missing-library warning in LAST_OUT>
+  local n
+  n=$(grep -c -F -- "$WARN" <<<"$LAST_OUT")
+  if [ "$n" = "$2" ]; then ok "$1"; else bad "$1: expected $2 warning line(s), got $n: $LAST_OUT"; fi
+}
+
+echo "--- a copy of the guard with no lib/wp-num.sh next to it finds the library through IWE_TEMPLATE ---"
+TEMPLATE="$TMP/template"
+mkdir -p "$TEMPLATE/scripts/lib" "$TMP/copy/scripts"
+cp "$ROOT/scripts/lib/wp-num.sh" "$TEMPLATE/scripts/lib/wp-num.sh"
+COPY_GUARD="$TMP/copy/scripts/session-guard.sh"
+cp "$GUARD" "$COPY_GUARD"
+for form in 44 wp-044 WP-044; do
+  ws=$(new_ws)
+  put "$ws" "WP-044/WP-044.md" 44 unclassified     # the canonical card: only the library can reach it from "44"
+  expect_gate_with "copy + IWE_TEMPLATE, --wp $form: canonical unclassified card -> blocked" blocked "$COPY_GUARD" "$ws" "$form" IWE_TEMPLATE="$TEMPLATE"
+  expect_warnings "copy + IWE_TEMPLATE, --wp $form: no missing-library warning" 0
+done
+
+card_ws() {  # <relation>: a fresh workspace holding the canonical card of WP-044 with that relation; prints its path
+  local d
+  d=$(new_ws)
+  put "$d" "WP-044/WP-044.md" 44 "$1"
+  printf '%s\n' "$d"
+}
+
+echo "--- a symlink to the guard: the library is looked for next to the REAL file, then in the usual places ---"
+mkdir -p "$TMP/lnk"
+ln -s "$GUARD" "$TMP/lnk/guard-a.sh"                # the real file has lib/wp-num.sh next to it
+ln -s guard-a.sh "$TMP/lnk/guard-b.sh"             # a second hop, relative
+ln -s "$COPY_GUARD" "$TMP/lnk/guard-c.sh"          # the real file has no library next to it ...
+for link in guard-a.sh guard-b.sh; do
+  ws=$(card_ws unclassified)
+  expect_gate_with "symlink $link (real file with its library), --wp 44: blocked" blocked "$TMP/lnk/$link" "$ws" 44
+  expect_warnings "symlink $link: no missing-library warning" 0
+done
+ws=$(card_ws unclassified)
+expect_gate_with "symlink to a copy with no library + IWE_TEMPLATE, --wp 44: blocked" blocked "$TMP/lnk/guard-c.sh" "$ws" 44 IWE_TEMPLATE="$TEMPLATE"
+expect_warnings "symlink to a copy + IWE_TEMPLATE: no missing-library warning" 0
+
+echo "--- the template clone next to the workspace is found without any variable ---"
+SIBLING="$TMP/sibling-ws"
+mkdir -p "$SIBLING/scripts" "$SIBLING/FMT-exocortex-template/scripts/lib"
+cp "$GUARD" "$SIBLING/scripts/session-guard.sh"
+cp "$ROOT/scripts/lib/wp-num.sh" "$SIBLING/FMT-exocortex-template/scripts/lib/wp-num.sh"
+ws=$(card_ws unclassified)
+expect_gate_with "workspace copy + sibling FMT-exocortex-template, --wp 44: blocked" blocked "$SIBLING/scripts/session-guard.sh" "$ws" 44
+ln -s "$SIBLING/scripts/session-guard.sh" "$TMP/lnk/guard-d.sh"
+ws=$(card_ws unclassified)
+expect_gate_with "symlink to that workspace copy (its sibling clone is found from the real file), --wp 44: blocked" blocked "$TMP/lnk/guard-d.sh" "$ws" 44
+
+echo "--- no library anywhere: the session still opens on the exact names, and the gate says it checks less ---"
+mkdir -p "$TMP/empty-template"
+ws=$(card_ws unclassified)
+expect_gate_with "no library, --wp 44: the card is reachable only through the number -> opens" open "$COPY_GUARD" "$ws" 44
+expect_warnings "no library, --wp 44: the warning is printed once" 1
+ws=$(card_ws unclassified)
+expect_gate_with "IWE_TEMPLATE without the library, --wp 44: opens" open "$COPY_GUARD" "$ws" 44 IWE_TEMPLATE="$TMP/empty-template"
+expect_warnings "IWE_TEMPLATE without the library: the warning is printed once" 1
+ws=$(card_ws unclassified)
+expect_gate_with "no library, --wp WP-044: the exact name still blocks" blocked "$COPY_GUARD" "$ws" WP-044
+expect_warnings "no library, --wp WP-044: the warning is printed once" 1
+ws=$(card_ws tests)
+expect_gate_with "library present (the guard in the repository), classified card -> opens" open "$GUARD" "$ws" 44
+expect_warnings "library present: no warning" 0
+
+# ---------------------------------------------------------------------------
+# The field is read from the card's own frontmatter: grep over the whole file let a trailing
+# comment hide `unclassified` and let a YAML example in the body fake it.
+check_field() {  # <description> <blocked|open> <card text>
+  local ws
+  ws=$(new_ws)
+  mkdir -p "$ws/$GOV/inbox/WP-044"
+  printf '%s' "$3" > "$ws/$GOV/inbox/WP-044/WP-044.md"
+  expect_gate "$1" "$ws" 44 "$2"
+}
+
+echo "--- the value: quotes and a trailing comment are not part of it ---"
+check_field "bare value -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: unclassified\n---\n# card\n'
+check_field "double-quoted value (what create-wp.sh writes) -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: "unclassified"\n---\n# card\n'
+check_field "single-quoted value -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: \'unclassified\'\n---\n# card\n'
+check_field "bare value + trailing comment -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: unclassified # выбрать позже\n---\n# card\n'
+check_field "quoted value + trailing comment -> blocked" blocked $'---\nwp: 44\nhypothesis_relation: "unclassified"   # pick later\n---\n# card\n'
+check_field "CRLF line endings -> blocked" blocked $'---\r\nwp: 44\r\nhypothesis_relation: "unclassified"\r\n---\r\n# card\r\n'
+check_field "a value that only starts with the word -> opens" open $'---\nwp: 44\nhypothesis_relation: unclassified-ish\n---\n# card\n'
+check_field "a chosen value + trailing comment -> opens" open $'---\nwp: 44\nhypothesis_relation: tests  # chosen\n---\n# card\n'
+
+echo "--- only the first frontmatter counts: the body is not read ---"
+check_field "frontmatter says operational, a YAML example in the body says unclassified -> opens" open $'---\nwp: 44\nhypothesis_relation: operational\n---\n# card\n\nExample:\n\n```yaml\nhypothesis_relation: unclassified\n```\n'
+check_field "frontmatter says tests, a second --- block in the body says unclassified -> opens" open $'---\nwp: 44\nhypothesis_relation: "tests"\n---\n# card\n\n---\nhypothesis_relation: unclassified\n---\n'
+check_field "no such field in the frontmatter, an example in the body -> opens (an absent field is not blocked)" open $'---\nwp: 44\nstatus: pending\n---\n# card\n\nhypothesis_relation: unclassified\n'
+check_field "a file with no frontmatter at all is read whole, as before -> blocked" blocked $'hypothesis_relation: "unclassified"\n'
+
 echo
 if [ "$FAILS" -eq 0 ]; then
   echo "✅ test_issue_954_gate_ids: $PASSES checks passed"

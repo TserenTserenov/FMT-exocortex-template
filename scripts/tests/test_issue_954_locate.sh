@@ -6,9 +6,10 @@
 #   * Not finding the library is an installation error, not "WP not found": exit 4 (memory/
 #     protocol-open.md reads exit 1 as "РП не найден"), and the message names the searched
 #     places, with the VALUE of IWE_TEMPLATE (or "не задана"), not the literal "${IWE_TEMPLATE}".
-#   * The text between the "wp-num locate" markers is identical in all five files; the
-#     per-file differences, _WPN_ROOT_UP and _WPN_OPTIONAL (the library is mandatory in all
-#     five: empty), sit above the block, and _WPN_ROOT_UP must match the file's depth.
+#   * The text between the "wp-num locate" markers is identical in all five files and in
+#     scripts/session-guard.sh (which keeps working without the library: _WPN_OPTIONAL=1); the
+#     per-file differences, _WPN_ROOT_UP and _WPN_OPTIONAL, sit above the block, and
+#     _WPN_ROOT_UP must match the file's depth.
 #   * A script started through a symlink (absolute, relative, chained) finds the library from
 #     the real file's location.
 #   * wp-sync-bundle.sh does not swallow the exit code of the wp-phase-digest.sh it calls: 4 (no
@@ -27,7 +28,7 @@ unset IWE_ROOT IWE_WORKSPACE IWE_GOVERNANCE_REPO IWE_TEMPLATE IWE_SCRIPTS STRATE
 GOV=DS-strategy
 LIB="$ROOT/scripts/lib/wp-num.sh"
 CONSUMERS=".claude/scripts/wp-sync-bundle.sh .claude/scripts/wp-phase-digest.sh scripts/close-wp.sh scripts/archive-done-wp.sh scripts/check-wp-transfer-completeness.sh"
-BLOCK_USERS="$CONSUMERS"
+BLOCK_USERS="$CONSUMERS scripts/session-guard.sh"   # session-guard.sh has the same block, optional there
 PASSES=0
 FAILS=0
 ok()  { echo "  ✅ PASS: $*"; PASSES=$((PASSES + 1)); }
@@ -74,7 +75,7 @@ run_env() {  # <extra env assignments...> -- <command...>: the command in a clea
   env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" ${envs[@]+"${envs[@]}"} "$@"
 }
 
-echo "--- the lookup block is identical in the five scripts (the markers are the contract) ---"
+echo "--- the lookup block is identical in the five scripts and in session-guard.sh (the markers are the contract) ---"
 ref=$(block_of "$ROOT/.claude/scripts/wp-sync-bundle.sh")
 if [ -n "$ref" ]; then ok "the reference block exists in wp-sync-bundle.sh"; else bad "wp-sync-bundle.sh has no wp-num locate block"; fi
 for f in $BLOCK_USERS; do
