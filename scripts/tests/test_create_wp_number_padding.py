@@ -33,19 +33,35 @@ def _scaffold_governance_repo(root: Path) -> Path:
     return strategy
 
 
+def _isolated_env(iwe_root: Path) -> dict:
+    """Environment for create-wp.sh: HOME and TMPDIR confined to the test's tmp dir."""
+    home = iwe_root / "home"
+    tmp = iwe_root / "tmp"
+    home.mkdir(exist_ok=True)
+    tmp.mkdir(exist_ok=True)
+    return {
+        "IWE_ROOT": str(iwe_root),
+        "HOME": str(home),
+        "TMPDIR": str(tmp),
+        "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+    }
+
+
 def _run_create_wp(iwe_root: Path, **extra_args):
+    # --no-artifactor-check: the Artifactor Gate refuses before anything else and is
+    # covered by test_create_wp_artifactor_gate.sh; this file is about numbering.
     args = [
         "--title", "Тестовый РП", "--budget", "3h", "--priority", "P2",
         "--verification-class", "closed-loop", "--no-consent-check",
+        "--no-artifactor-check",
     ]
     for k, v in extra_args.items():
         args += [f"--{k}", v]
-    env = {"IWE_ROOT": str(iwe_root), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
     return subprocess.run(
         ["bash", str(CREATE_WP), *args],
         capture_output=True,
         text=True,
-        env=env,
+        env=_isolated_env(iwe_root),
     )
 
 
@@ -92,11 +108,10 @@ def test_consent_file_path_stays_bare_number(tmp_path):
 
     args = [
         "--title", "РП с согласием", "--budget", "2h", "--priority", "P3",
-        "--verification-class", "closed-loop",
+        "--verification-class", "closed-loop", "--no-artifactor-check",
     ]
-    env = {"IWE_ROOT": str(tmp_path), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
     result = subprocess.run(
-        ["bash", str(CREATE_WP), *args], capture_output=True, text=True, env=env
+        ["bash", str(CREATE_WP), *args], capture_output=True, text=True, env=_isolated_env(tmp_path)
     )
 
     assert result.returncode == 0, result.stderr

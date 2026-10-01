@@ -137,4 +137,48 @@ else
     fail "run_sync_canary expected exit $EXIT_CANARY_FAILED on a failing canary, got exit $rsc_status:\n$rsc_out"
 fi
 
+# --- Part 3: a copy of the bundle kept in the governance repo (issue #954 review, H1) ---
+# run_sync_canary prefers $WORKSPACE_DIR/<governance>/.claude/scripts/wp-sync-bundle.sh. Such a
+# copy has no scripts/lib next to it: the shared WP-number library (wp-num.sh) lives in the
+# template clone ($SCRIPT_DIR), so update.sh has to say where the template is (IWE_TEMPLATE).
+# Without it the canary ended with "wp-num.sh не найден" and EXIT_CANARY_FAILED although
+# nothing was wrong with the registry. IWE_TEMPLATE is cleared here on purpose: the value
+# must come from run_sync_canary itself, not from the caller's environment.
+unset IWE_TEMPLATE
+H1_WS="$TMP/h1-workspace"
+H1_TEMPLATE="$TMP/h1-template"
+mkdir -p "$H1_WS/gov/.claude/scripts" "$H1_WS/gov/docs" "$H1_WS/gov/inbox/WP-044" \
+    "$H1_TEMPLATE/scripts/lib" "$H1_TEMPLATE/.claude/scripts"
+cp "$ROOT/.claude/scripts/wp-sync-bundle.sh" "$ROOT/.claude/scripts/wp-phase-digest.sh" "$H1_WS/gov/.claude/scripts/"
+cp "$ROOT/scripts/lib/wp-num.sh" "$H1_TEMPLATE/scripts/lib/"
+printf '%s\n' \
+    '| # | Название | Статус | Приоритет |' \
+    '|---|----------|--------|-----------|' \
+    '| WP-044 | Копия в governance | 🔄 | P1 |' >"$H1_WS/gov/docs/WP-REGISTRY.md"
+printf '%s\n' '---' 'name: "Копия в governance"' 'status: in_progress' '---' >"$H1_WS/gov/inbox/WP-044/WP-044.md"
+WORKSPACE_DIR="$H1_WS"
+SCRIPT_DIR="$H1_TEMPLATE"
+# shellcheck disable=SC2034  # read by effective_governance_repo(), eval'd above
+ENV_GOVERNANCE_REPO="gov"
+
+rsc_out=$(run_sync_canary 2>&1)
+rsc_status=$?
+if [ "$rsc_status" -eq 0 ] && grep -q -- "Canary (реестр РП): OK" <<<"$rsc_out"; then
+    pass "run_sync_canary passes with the bundle and digest copied into the governance repo (library only in the template)"
+else
+    fail "run_sync_canary with a governance-repo copy of the bundle expected exit 0 and OK, got exit $rsc_status:\n$rsc_out"
+fi
+
+# Without a copy in the governance repo the template's own bundle runs; its library is found
+# next to it, so that case never needed IWE_TEMPLATE (guard: it must keep working).
+rm -f "$H1_WS/gov/.claude/scripts/wp-sync-bundle.sh" "$H1_WS/gov/.claude/scripts/wp-phase-digest.sh"
+cp "$ROOT/.claude/scripts/wp-sync-bundle.sh" "$ROOT/.claude/scripts/wp-phase-digest.sh" "$H1_TEMPLATE/.claude/scripts/"
+rsc_out=$(run_sync_canary 2>&1)
+rsc_status=$?
+if [ "$rsc_status" -eq 0 ] && grep -q -- "Canary (реестр РП): OK" <<<"$rsc_out"; then
+    pass "run_sync_canary passes with the template's own bundle when the governance repo has no copy"
+else
+    fail "run_sync_canary with the template's own bundle expected exit 0 and OK, got exit $rsc_status:\n$rsc_out"
+fi
+
 echo "✅ test_issue_718_sync_canary: $pass_count checks passed"
