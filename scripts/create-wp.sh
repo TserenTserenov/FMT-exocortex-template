@@ -795,8 +795,10 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # An indented line is code only after a blank line, a heading, a closing fence or another code
 # line (it cannot interrupt a paragraph, an HTML block or a list item), and a nested list is
 # not code. Markup is looked for after the indentation of its container (the content of the
-# list item), so a heading inside a nested list item is a heading. A quote (`>` after up to
-# three spaces) is a container of its own: its tags and headings change nothing outside it.
+# list item), so a heading inside a nested list item is a heading; it belongs to that item:
+# the sections around the list never see it and it is gone when the item ends, while the
+# items nested in it inherit it. A quote (`>` after up to three spaces) is a container of its
+# own: its tags and headings change nothing outside it.
 # A table is a candidate only when its header has the exact cell «РП» and a cell
 # starting with the word «Статус» («Статус (на 3 июля)» counts, and gets «pending» like the
 # plain «Статус» column): «Связанные РП» (the «Стратегическая сверка» table) is not a plan
@@ -864,21 +866,24 @@ def heading_of(line):
 
 
 def classify(lines):
-    """Per line: (is_code, deep, base).
+    """Per line: (is_code, deep, base, scope).
 
     is_code: fenced code or a line of an indented code block; nothing in it is a tag, a heading
     or a table. deep: indented 4+ columns beyond its container (the content of the list item it
     sits in), so never a table row, whatever block it belongs to. base: the column where the
     markup of the line starts, i.e. the content offset of its container (of the item it opens,
     for a list item line); a heading, a quote or a tag is looked for after it, not after the
-    margin. Indented code starts only after a blank line, a heading, a closing fence or another
-    code line; right after any other line it continues that line's block.
+    margin. scope: the open list items the line belongs to, outermost first (the item a list
+    item line opens included), each named by the number of the line that opened it. Indented
+    code starts only after a blank line, a heading, a closing fence or another code line; right
+    after any other line it continues that line's block.
     """
     is_code = [False] * len(lines)
     deep = [False] * len(lines)
     base = [0] * len(lines)
+    scope = [()] * len(lines)
     fence = None  # (marker, length) while inside a fenced code block
-    items = []  # content offsets of the open list items, outermost first
+    items = []  # (content offset, number of the opening line) of the open list items, outermost first
     code_ok = True  # an indented line may open or continue a code block here
     for i, line in enumerate(lines):
         text = line.rstrip("\r\n")
@@ -893,21 +898,22 @@ def classify(lines):
             code_ok = True
             continue
         indent = len(text) - len(text.lstrip(" "))
-        while items and indent < items[-1]:
+        while items and indent < items[-1][0]:
             items.pop()
-        container = items[-1] if items else 0
+        container = items[-1][0] if items else 0
         deep[i] = indent - container >= 4
         item = LIST_ITEM_RE.match(text)
         if item and not deep[i]:
-            items.append(item.end())
+            items.append((item.end(), i))
             base[i] = item.end()
         elif deep[i] and code_ok:
             is_code[i] = True
             continue
         else:
             base[i] = container
+        scope[i] = tuple(opened for _, opened in items)
         code_ok = heading_of(text[base[i]:]) is not None
-    return is_code, deep, base
+    return is_code, deep, base, scope
 
 
 class Block:
@@ -955,9 +961,10 @@ def scan_tags(line, blocks, headings):
     return headings
 
 
-is_code, deep, base = classify(lines)
+is_code, deep, base, scope = classify(lines)
 candidates = []  # (header line, insert position, ancestor titles, open blocks)
-headings = []  # (level, title) of the markdown headings in scope
+headings = []  # (level, title) of the markdown headings in scope outside any list item
+item_headings = {}  # scope of a list item -> (level, title) of the headings met inside it
 blocks = []  # the open <details> blocks, outermost first
 for i, line in enumerate(lines):
     if is_code[i]:
@@ -972,10 +979,17 @@ for i, line in enumerate(lines):
     heading = heading_of(text)
     if heading:
         level = len(heading.group(1))
-        headings = [h for h in headings if h[0] < level] + [(level, strip_tags(heading.group(2)))]
+        entry = (level, strip_tags(heading.group(2)))
+        if scope[i]:
+            # A heading inside a list item belongs to that item: it never touches the sections
+            # around the list and is gone when the item ends.
+            item_headings[scope[i]] = [h for h in item_headings.get(scope[i], []) if h[0] < level] + [entry]
+        else:
+            headings = [h for h in headings if h[0] < level] + [entry]
     if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")):
         header = lines[i - 1]
-        ancestors = [b.title for b in blocks] + [h[1] for h in headings]
+        in_items = [h[1] for k in range(1, len(scope[i]) + 1) for h in item_headings.get(scope[i][:k], [])]
+        ancestors = [b.title for b in blocks] + [h[1] for h in headings] + in_items
         if (
             is_plan_header(table_cells(header))
             and not deep[i - 1]
