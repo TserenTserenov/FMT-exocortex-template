@@ -146,8 +146,10 @@ hook_rc() {  # FILE -> exit code of the hook for the file's text sent as one Bas
     | HOME="$C2/home" bash "$HOOK" >/dev/null 2>"$C2/hook.err"
   echo $?
 }
-run_block() {  # FILE -> runs it from an unrelated directory; sets OUT and RC
-  OUT=$(cd "$C2/foreign" && IWE_SCRIPTS="$C2/none" bash "$1" 2>&1); RC=$?
+run_block() {  # FILE [interpreter words, default: bash] -> runs it from an unrelated directory; sets OUT and RC
+  local file="$1"; shift
+  [ "$#" -gt 0 ] || set -- bash
+  OUT=$(cd "$C2/foreign" && IWE_SCRIPTS="$C2/none" "$@" "$file" 2>&1); RC=$?
 }
 
 # C2.1: every command passes the hook; the controls keep this from passing with a disabled hook
@@ -202,46 +204,89 @@ if [ -n "$f" ]; then
     || { detail "rc=$RC out=$OUT"; check "the session search finds this month's session file" bad; }
 fi
 
-# C1: the publication block, from the session-isolate copy, with the seed publisher, origin has only main.
-# Fresh install: the publisher is committed, so the copy has its own; the canon's file must not run.
+# C1: the publication block, from a session-isolate copy, with real publishers, origin has only main.
 f=$(block_of publish)
 if [ -n "$f" ]; then
+  new_copy() {  # NAME -> COPY: a session-isolate copy of origin/main, as session-guard.sh --isolate makes it
+    COPY="$C2/isolated-worktrees/$1"
+    git -C "$CANON" worktree add -q -b "session-isolate/$1" "$COPY" origin/main 2>/dev/null
+  }
+  commit_in_copy() {  # FILE MESSAGE -> one commit in $COPY that adds the message as a line of FILE
+    mkdir -p "$(dirname "$COPY/$1")"; printf '%s\n' "$2" >> "$COPY/$1"
+    git -C "$COPY" add "$1" && git -C "$COPY" commit -q -m "$2"
+  }
+  publish_copy() {  # [interpreter words] -> the publication block run against $COPY; sets OUT and RC
+    sed "s#$WT_REAL#$(cd -P "$COPY" && pwd -P)#g" "$BLOCKS/$f" > "$C2/publish-copy.sh"
+    run_block "$C2/publish-copy.sh" "$@"
+  }
+  origin_top() { git --git-dir="$ORIGIN" log -1 --format=%s main; }
+  only_main() { [ "$(git --git-dir="$ORIGIN" for-each-ref --format='%(refname:short)' refs/heads)" = main ]; }
+  publisher_on_origin() {  # FILE -> the canon commits it as scripts/ds-publish.sh, so every new copy carries it
+    git -C "$CANON" checkout -q -- scripts/ds-publish.sh 2>/dev/null
+    git -C "$CANON" pull -q --ff-only origin main 2>/dev/null
+    cp "$1" "$CANON/scripts/ds-publish.sh"
+    git -C "$CANON" commit -q -am "publisher: $(basename "$1")" && git -C "$CANON" push -q origin HEAD:main
+  }
+
+  # Fresh install: the publisher is committed, so the copy has its own; the canon's file must not run.
   printf '#!/bin/bash\ntouch "%s"\nexit 1\n' "$C2/canon-publisher-ran" > "$CANON/scripts/ds-publish.sh"
-  mkdir -p "$WT/current"; printf 'plan\n' > "$WT/current/WeekPlan W40.md"
-  git -C "$WT" add "current/WeekPlan W40.md" && git -C "$WT" commit -q -m "strategy-session: week plan"
-  run_block "$BLOCKS/$f"
-  [ "$RC" -eq 0 ] && [ "$(git --git-dir="$ORIGIN" log -1 --format=%s main)" = "strategy-session: week plan" ] && check "publication: origin/main got the copy's commit" ok \
+  COPY="$WT"; commit_in_copy "current/WeekPlan W40.md" "strategy-session: week plan"
+  publish_copy
+  [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: week plan" ] && check "publication: origin/main got the copy's commit" ok \
     || { detail "rc=$RC out=$OUT"; check "publication: origin/main got the copy's commit" bad; }
-  [ "$(git --git-dir="$ORIGIN" for-each-ref --format='%(refname:short)' refs/heads)" = main ] && check "publication: only main on origin" ok \
-    || check "publication: only main on origin" bad
+  only_main && check "publication: only main on origin" ok || check "publication: only main on origin" bad
   [ ! -e "$C2/canon-publisher-ran" ] && check "publication, fresh install: the copy's own publisher wins over the canon's file" ok \
     || check "publication, fresh install: the copy's own publisher wins over the canon's file" bad
 
+  # C1 compat: update.sh never replaces an existing scripts/ds-publish.sh, so an install may keep one that
+  # does not know --branch and answers it with usage, exit 1: its own one with a fixed target branch (made
+  # here from the seed copy delivered before --branch existed: main always, the same strict argument
+  # parser) or that seed copy itself (the fixture, byte for byte). --branch goes only to one that knows it.
+  OLD_PUB="$TEMPLATE_ROOT/scripts/tests/fixtures/ds-publish-637a526.sh"
+  OWN_PUB="$C2/own-ds-publish.sh"
+  # shellcheck disable=SC2016  # the literal publisher line ${BRANCH:-main}, not an expansion
+  sed 's/^BRANCH="\${BRANCH:-main}"$/BRANCH="main"  # this installation always publishes to main/' "$OLD_PUB" > "$OWN_PUB"
+  [ -f "$OLD_PUB" ] && ! grep -qF -e '--branch' "$OLD_PUB" "$OWN_PUB" && grep -q '^BRANCH="main"  # this installation' "$OWN_PUB" \
+    && check "compat fixtures: the old seed copy and the own publisher (main always) do not know --branch" ok \
+    || check "compat fixtures: the old seed copy and the own publisher (main always) do not know --branch" bad
+  publisher_on_origin "$OWN_PUB"
+  for sh in bash zsh; do
+    command -v "$sh" >/dev/null 2>&1 || { echo "SKIP: $sh not found, the publication block is not run in it"; continue; }
+    new_copy "claude-own-$sh"; commit_in_copy "current/WeekPlan W42.md" "strategy-session: own publisher, $sh"
+    if [ "$sh" = zsh ]; then publish_copy zsh -f; else publish_copy; fi
+    [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: own publisher, $sh" ] && only_main && ! printf '%s' "$OUT" | grep -q 'usage:' \
+      && check "publication ($sh), own publisher without --branch (main always): called without it, origin/main got the commit" ok \
+      || { detail "rc=$RC out=$OUT"; check "publication ($sh), own publisher without --branch (main always): called without it, origin/main got the commit" bad; }
+  done
+  publisher_on_origin "$OLD_PUB"
+  cp "$PUB" "$CANON/scripts/ds-publish.sh"   # the current version in the canon's working tree only
+  new_copy "claude-oldcopy"; commit_in_copy "current/WeekPlan W43.md" "strategy-session: old copy, current canon"
+  publish_copy
+  [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: old copy, current canon" ] && only_main \
+    && check "publication, the copy's publisher without --branch, the canon's with it: the canon's publishes" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, the copy's publisher without --branch, the canon's with it: the canon's publishes" bad; }
+  git -C "$CANON" checkout -q -- scripts/ds-publish.sh
+
   # Upgraded install: origin/main has no publisher, the canon holds it untracked (update.sh copies it in
   # without a commit), so a copy made from origin/main has none: the canon's file publishes the copy.
-  git -C "$CANON" pull -q --ff-only origin main 2>/dev/null   # the canon is behind the publication above
+  git -C "$CANON" pull -q --ff-only origin main 2>/dev/null   # the canon is behind the publications above
   git -C "$CANON" rm -q -f scripts/ds-publish.sh && git -C "$CANON" commit -q -m "no publisher on origin" && git -C "$CANON" push -q origin HEAD:main
   mkdir -p "$CANON/scripts" && cp "$PUB" "$CANON/scripts/ds-publish.sh"   # git rm took the emptied folder away
   [ -f "$CANON/scripts/ds-publish.sh" ] && [ -z "$(git -C "$CANON" ls-files scripts/ds-publish.sh)" ] \
     && check "upgraded fixture: the canon has the publisher untracked" ok || check "upgraded fixture: the canon has the publisher untracked" bad
-  WT2="$C2/isolated-worktrees/claude-s2"
-  git -C "$CANON" worktree add -q -b session-isolate/claude-s2 "$WT2" origin/main 2>/dev/null
-  WT2_REAL=$(cd -P "$WT2" && pwd -P)
-  sed "s#$WT_REAL#$WT2_REAL#g" "$BLOCKS/$f" > "$C2/publish-upgraded.sh"
-  [ -e "$WT2/scripts/ds-publish.sh" ] && check "upgraded fixture: the copy has no publisher" bad || check "upgraded fixture: the copy has no publisher" ok
-  mkdir -p "$WT2/current"; printf 'plan\n' > "$WT2/current/WeekPlan W41.md"
-  git -C "$WT2" add "current/WeekPlan W41.md" && git -C "$WT2" commit -q -m "strategy-session: next week plan"
-  run_block "$C2/publish-upgraded.sh"
-  [ "$RC" -eq 0 ] && [ "$(git --git-dir="$ORIGIN" log -1 --format=%s main)" = "strategy-session: next week plan" ] \
+  new_copy "claude-s2"
+  [ -e "$COPY/scripts/ds-publish.sh" ] && check "upgraded fixture: the copy has no publisher" bad || check "upgraded fixture: the copy has no publisher" ok
+  commit_in_copy "current/WeekPlan W41.md" "strategy-session: next week plan"
+  publish_copy
+  [ "$RC" -eq 0 ] && [ "$(origin_top)" = "strategy-session: next week plan" ] \
     && check "publication, upgraded install: the canon's publisher publishes the copy's commit" ok \
     || { detail "rc=$RC out=$OUT"; check "publication, upgraded install: the canon's publisher publishes the copy's commit" bad; }
 
   # No publisher anywhere: a non-zero exit that names update.sh, nothing published
   rm "$CANON/scripts/ds-publish.sh"
-  printf 'more\n' >> "$WT2/current/WeekPlan W41.md"
-  git -C "$WT2" commit -q -am "strategy-session: not published"
+  commit_in_copy "current/WeekPlan W41.md" "strategy-session: not published"
   before=$(git --git-dir="$ORIGIN" rev-parse main)
-  run_block "$C2/publish-upgraded.sh"
+  publish_copy
   [ "$RC" -ne 0 ] && printf '%s' "$OUT" | grep -q 'update.sh' && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
     && check "publication, no publisher anywhere: non-zero exit, update.sh named, nothing published" ok \
     || { detail "rc=$RC out=$OUT"; check "publication, no publisher anywhere: non-zero exit, update.sh named, nothing published" bad; }

@@ -83,12 +83,15 @@ fi
   <команды записи>
   )
   ```
-- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем публикация из копии, в канон не коммить. Ветка назначения `main` задаётся явно: `session-guard.sh open --isolate` создаёт копию от `origin/main` на её собственной ветке `session-isolate/<agent>-<session>`, которой на сервере нет. Публикатор берётся из копии, а если его там нет — из канона: `update.sh` кладёт `scripts/ds-publish.sh` в канон без коммита, и копия от `origin/main` его не содержит. Нет нигде -> ненулевой код и сообщение: запусти `update.sh`.
+- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем публикация из копии, в канон не коммить. Ветка назначения `main` задаётся явно (`--branch main`): `session-guard.sh open --isolate` создаёт копию от `origin/main` на её собственной ветке `session-isolate/<agent>-<session>`, которой на сервере нет. `--branch` получает только публикатор, который его знает: `update.sh` не заменяет уже лежащий `scripts/ds-publish.sh` (собственный публикатор установки или старая копия шаблона), и такой публикатор вызывается без `--branch`, как раньше. Публикатор берётся из копии; из канона — если в копии его нет (`update.sh` кладёт `scripts/ds-publish.sh` в канон без коммита, и копия от `origin/main` его не содержит) или если в копии он не знает `--branch`, а в каноне знает. Нет нигде -> ненулевой код и сообщение: запусти `update.sh`. Публикатор без `--branch` отказал -> предложи пилоту заменить `scripts/ds-publish.sh` в репозитории управления версией шаблона `seed/strategy/scripts/ds-publish.sh`.
   ```bash
   GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"
-  PUB="$GOV_WT/scripts/ds-publish.sh"; [ -f "$PUB" ] || PUB="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/ds-publish.sh"
+  PUB="$GOV_WT/scripts/ds-publish.sh"; CANON_PUB="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/ds-publish.sh"
+  if ! grep -qF -e '--branch' "$PUB" 2>/dev/null && grep -qF -e '--branch' "$CANON_PUB" 2>/dev/null; then PUB="$CANON_PUB"; fi
+  [ -f "$PUB" ] || PUB="$CANON_PUB"
   [ -f "$PUB" ] || { echo "ERROR: публикатор ds-publish.sh не найден ни в копии, ни в каноне. Запусти update.sh (он доставляет публикатор) и повтори публикацию; коммит остаётся в копии $GOV_WT" >&2; exit 1; }
-  bash "$PUB" "$GOV_WT" normal --reason "strategy-session" --branch main
+  if grep -qF -e '--branch' "$PUB"; then bash "$PUB" "$GOV_WT" normal --reason "strategy-session" --branch main
+  else bash "$PUB" "$GOV_WT" normal --reason "strategy-session"; fi
   ```
   `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
 

@@ -174,6 +174,37 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
+# Picks the publisher for publish_commit_or_explain: sets PUBLISHER (empty = none installed) and
+# PUBLISHER_BRANCH_ARG (the value for --branch, empty = call without it). Candidates, in order:
+# $WORKSPACE/scripts/ds-publish.sh, then <fallback repo>/scripts/ds-publish.sh. A target branch goes
+# only to a publisher that knows --branch: update.sh never replaces an existing scripts/ds-publish.sh
+# (an installation's own publisher, or a seed copy delivered before --branch existed), and such a
+# publisher answers an unknown --branch with usage, exit 1. So the first candidate whose text names
+# --branch gets it; when none does, the first existing one runs without it, as before --branch
+# existed, and the log says what to replace if it refuses. Known limit: a text match, so a publisher
+# that names --branch without supporting it still gets the flag.
+PUBLISHER=""
+PUBLISHER_BRANCH_ARG=""
+pick_publisher() {  # <target branch, empty = the publisher's default> <fallback repo, empty = none>
+    local target_branch="$1" fallback_repo="$2" candidate
+    PUBLISHER=""
+    PUBLISHER_BRANCH_ARG=""
+    for candidate in "$WORKSPACE/scripts/ds-publish.sh" "${fallback_repo:+$fallback_repo/scripts/ds-publish.sh}"; do
+        [ -f "$candidate" ] || continue
+        [ -n "$PUBLISHER" ] || PUBLISHER="$candidate"
+        [ -n "$target_branch" ] || return 0
+        if grep -qF -e '--branch' "$candidate"; then
+            PUBLISHER="$candidate"
+            PUBLISHER_BRANCH_ARG="$target_branch"
+            return 0
+        fi
+    done
+    if [ -n "$PUBLISHER" ] && [ -n "$target_branch" ]; then
+        log "WARN: публикатор $PUBLISHER не знает --branch (старая копия шаблона или собственный публикатор установки) — вызываю его без --branch, как раньше. Если он откажет, замените scripts/ds-publish.sh в репозитории управления версией шаблона seed/strategy/scripts/ds-publish.sh"
+    fi
+    return 0
+}
+
 # Publish one commit via scripts/ds-publish.sh. The script is not shipped with
 # the template (issue #884, regression of WP-7 Ф101): when it is absent, say so
 # and keep the commit local instead of failing on a bare "No such file".
@@ -184,24 +215,22 @@ log() {
 # The optional 6th argument is a repo whose scripts/ds-publish.sh runs when $WORKSPACE has
 # none: update.sh puts the publisher into the canon's working tree without a commit
 # (backfill_ds_publish), so a copy made from origin/main of an upgraded install lacks it.
-# The publisher still publishes $WORKSPACE.
+# The publisher still publishes $WORKSPACE. Which publisher runs, and whether it gets
+# --branch: pick_publisher.
 PUBLISH_LAST_RC=""
 publish_commit_or_explain() {
     local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4" target_branch="${5:-}" fallback_repo="${6:-}"
-    local publisher="$WORKSPACE/scripts/ds-publish.sh"
 
     PUBLISH_LAST_RC=""
-    if [ ! -f "$publisher" ] && [ -n "$fallback_repo" ] && [ -f "$fallback_repo/scripts/ds-publish.sh" ]; then
-        publisher="$fallback_repo/scripts/ds-publish.sh"
-    fi
-    if [ ! -f "$publisher" ]; then
+    pick_publisher "$target_branch" "$fallback_repo"
+    if [ -z "$PUBLISHER" ]; then
         log "WARN: scripts/ds-publish.sh не установлен${fallback_repo:+ (нет ни в копии, ни в $fallback_repo)} — коммит ${sha:0:12} остался локальным и не опубликован. Запустите update.sh: он доставляет публикатор в репозиторий управления. Или опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD${target_branch:+:$target_branch}"
         return 1
     fi
     local prc=0
     set -- "$WORKSPACE" normal --reason "$reason" --from-commit "$sha"
-    [ -z "$target_branch" ] || set -- "$@" --branch "$target_branch"
-    bash "$publisher" "$@" >> "$LOG_FILE" 2>&1 || prc=$?
+    [ -z "$PUBLISHER_BRANCH_ARG" ] || set -- "$@" --branch "$PUBLISHER_BRANCH_ARG"
+    bash "$PUBLISHER" "$@" >> "$LOG_FILE" 2>&1 || prc=$?
     if [ "$prc" -eq 0 ]; then
         log "$ok_msg"
         return 0

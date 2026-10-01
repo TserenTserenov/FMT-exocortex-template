@@ -27,6 +27,7 @@ run_publish() {
         set -e
         WORKSPACE="$1"; LOG_FILE="$2"; SHA="$3"
         '"$(sed -n '/^log() {/,/^}/p' "$SCRIPT")"'
+        '"$(sed -n '/^pick_publisher() {/,/^}/p' "$SCRIPT")"'
         '"$(sed -n '/^publish_commit_or_explain() {/,/^}/p' "$SCRIPT")"'
         rc=0
         publish_commit_or_explain "strategist: test" "$SHA" "OK-MSG" "FAIL-MSG" >/dev/null || rc=$?
