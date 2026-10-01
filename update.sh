@@ -476,13 +476,18 @@ migrate_platform_memory() {
 # must not make upstream drift invisible. Scan the whole manifest on every real
 # update/repair pass, not only NEW_FILES/UPDATED_FILES from this invocation.
 #
-# issues #965/#967: say WHY a copy differs, using the shipped classifier (verdict from the
-# template's git history): "stale" = it equals an older template version, so the pilot
-# changed nothing and the cp below is safe; "authored" = it matches no known template
-# version, so it probably holds the pilot's edits ("probably": the history only proves
-# that no template version matches, not who edited the copy); anything else, including a
-# missing classifier, keeps the generic text. The classifier is called directly, not through
-# report_author_skip(): that one counts and queues files for --refresh-stale.
+# issues #965/#967: say WHY a copy differs, using the shipped classifier. Its verdict is only
+# as strong as the clone's git history (the versions committed for this path), so the texts
+# promise no more than that:
+#   stale    - the copy equals a version committed in the clone. That can be an older release,
+#              but also the pilot's own edit committed into the clone (a fork with local
+#              commits, #963), so the text says so and the offered command saves the current
+#              copy next to it before the cp.
+#   authored - the copy equals no committed version: the pilot's edits, or a release that
+#              update.sh already applied to the clone (it never commits what it applies).
+#   anything else, including a missing classifier, keeps the generic text.
+# The classifier is called directly, not through report_author_skip(): that one counts and
+# queues files for --refresh-stale.
 report_owner_user_memory_drift() {
     local fpath deployed drift_count=0
     local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh" classify_out verdict
@@ -502,11 +507,11 @@ report_owner_user_memory_drift() {
             fi
             case "$verdict" in
                 stale)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: отстал от шаблона, ваших правок не найдено."
-                    echo "    Обновить: cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
+                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
                     ;;
                 authored)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: отличается от всех известных версий шаблона (вероятно, ваши правки)."
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)."
                     echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
                     ;;
                 *)

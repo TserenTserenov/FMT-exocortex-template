@@ -490,8 +490,8 @@ else
     fail "D: owner:user drift remained silent outside the changed-files list"
 fi
 # The install above has no classifier script: the report must stay generic (verdict unknown)
-# and must not claim to know who changed the copy.
-if grep -q "отстал от шаблона" "$TEST_ROOT/out-d.log" || grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d.log"; then
+# and must not claim to know where the copy came from.
+if grep -q "совпадает с версией из git-истории" "$TEST_ROOT/out-d.log" || grep -q "не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d.log"; then
     fail "D: a verdict was claimed although the install has no classifier"
 else
     pass "D: without the classifier the report claims no verdict (unknown)"
@@ -499,10 +499,15 @@ fi
 
 # ------------------------------------------------------------------
 # Scenario D2 (#965/#967): with the shipped classifier the drift report says WHY a copy
-# differs — authored (matches no known template version), stale (matches an older one),
-# unknown (the history cannot tell) — instead of one generic line for all three.
+# differs — a copy equal to a committed version of the file, one equal to none, or an
+# undecidable history — instead of one generic line for all three. The classifier compares
+# the copy only with the versions COMMITTED in the template clone, so the report promises
+# no more than that (the cases below, D3 and D4, pin the two ways the verdicts can mislead).
 # ------------------------------------------------------------------
-echo "--- Scenario D2: owner:user drift verdicts — authored / stale / unknown (#965 #967) ---"
+echo "--- Scenario D2: owner:user drift verdicts — committed version / no committed version / unknown (#965 #967) ---"
+D2_COMMITTED_TEXT='совпадает с версией из git-истории клона шаблона; если вы коммитили свои правки в клон, это могут быть и они'
+D2_UNCOMMITTED_TEXT='не совпадает ни с одной закоммиченной в клоне версией (ваши правки или уже применённый прошлый релиз)'
+cp "$UPSTREAM/memory/dummy-memo.md" "$TEST_ROOT/memo-upstream.txt"
 mkdir -p "$SCRIPT_DIR/.claude/scripts"
 cp "$SELF_DIR/../.claude/scripts/classify-workspace-copy.sh" "$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh"
 # A second owner:user file that no commit of the template ever touched: verdict unknown.
@@ -526,14 +531,67 @@ with open(manifest_path, "w", encoding="utf-8") as handle:
     json.dump(manifest, handle)
 PY
 }
+# d2_memo_sha — the manifest entry of memory/dummy-memo.md follows the upstream file again.
+d2_memo_sha() {
+    python3 - "$UPSTREAM/update-manifest.json" "$UPSTREAM" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+manifest_path, root = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+for entry in manifest["files"]:
+    if entry["path"] == "memory/dummy-memo.md":
+        entry["sha256"] = hashlib.sha256((pathlib.Path(root) / entry["path"]).read_bytes()).hexdigest()
+with open(manifest_path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+}
+# d2_run_update LOG — the real update.sh --yes; its exit code is not the point here.
+d2_run_update() {
+    PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/$1" 2>&1 || true
+}
+# d2_commit_memo SOURCE MESSAGE — the clone's memory/dummy-memo.md becomes SOURCE, committed.
+d2_commit_memo() {
+    cp "$1" "$SCRIPT_DIR/memory/dummy-memo.md"
+    git -C "$SCRIPT_DIR" add memory/dummy-memo.md
+    git -C "$SCRIPT_DIR" commit -q -m "$2"
+}
+# d2_hint_of LOG TEXT — the command printed on the line after the report line that carries TEXT.
+d2_hint_of() {
+    local line
+    line=$(grep -A1 -F "$2" "$TEST_ROOT/$1" | tail -1)
+    printf '%s\n' "${line#*: }"
+}
+# d2_check_save_hint LOG TEXT BEFORE LABEL — the offered command, run as printed, must keep the
+# current copy (BEFORE) in MEM_DST.before-update and then make MEM_DST the template's file.
+d2_check_save_hint() {
+    local hint
+    hint=$(d2_hint_of "$1" "$2")
+    rm -f "$MEM_DST.before-update"
+    bash -c "$hint" > /dev/null 2>&1 || true
+    if [ -f "$MEM_DST.before-update" ] && [ "$(cat "$MEM_DST.before-update")" = "$3" ] \
+        && cmp -s "$MEM_DST" "$SCRIPT_DIR/memory/dummy-memo.md"; then
+        pass "$4: the offered command saves the current copy to .before-update, then refreshes it"
+    else
+        fail "$4: the offered command ('${hint:-<none>}') did not save the current copy before replacing it"
+    fi
+    rm -f "$MEM_DST.before-update"
+}
 d2_untracked_entry add
 
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d-authored.log" 2>&1 || true
-if grep -q "memory/dummy-memo.md — owner: user, НЕ обновлён: отличается от всех известных версий шаблона (вероятно, ваши правки)" "$TEST_ROOT/out-d-authored.log" && \
+d2_run_update out-d-authored.log
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_UNCOMMITTED_TEXT" "$TEST_ROOT/out-d-authored.log" && \
    grep -q 'Сверьте: diff' "$TEST_ROOT/out-d-authored.log"; then
-    pass "D2: a copy that matches no template version is reported as probably the pilot's own edit, with a diff command"
+    pass "D2: a copy that equals no committed version is reported with both possible causes, and a diff command"
 else
-    fail "D2: no authored verdict for the diverged copy: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
+    fail "D2: no verdict for the copy that equals no committed version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-authored.log"; then
+    fail "D2: the report still blames the pilot's edits without naming the other cause"
+else
+    pass "D2: the report no longer says 'probably your edits' on its own"
 fi
 if grep -q "memory/untracked-memo.md — owner: user, НЕ обновлён, но шаблонная версия отличается" "$TEST_ROOT/out-d-authored.log"; then
     pass "D2: an undecidable history (verdict unknown) keeps the generic text"
@@ -546,27 +604,77 @@ else
     fail "D2: the drift summary lost its count"
 fi
 
-# The deployed copy equals an OLDER version from the template history: no pilot edit.
-printf -- '---\nowner: user\n---\nOlder template text of the memo\n' > "$SCRIPT_DIR/memory/dummy-memo.md"
-git -C "$SCRIPT_DIR" add memory/dummy-memo.md
-git -C "$SCRIPT_DIR" commit -q -m "history: an older memo"
-cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
-git -C "$SCRIPT_DIR" add memory/dummy-memo.md
-git -C "$SCRIPT_DIR" commit -q -m "history: memo back to the upstream text"
-printf -- '---\nowner: user\n---\nOlder template text of the memo\n' > "$MEM_DST"
+# The deployed copy equals an OLDER version from the template history.
+printf -- '---\nowner: user\n---\nOlder template text of the memo\n' > "$TEST_ROOT/memo-older.txt"
+d2_commit_memo "$TEST_ROOT/memo-older.txt" "history: an older memo"
+d2_commit_memo "$TEST_ROOT/memo-upstream.txt" "history: memo back to the upstream text"
+cp "$TEST_ROOT/memo-older.txt" "$MEM_DST"
 
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d-stale.log" 2>&1 || true
-if grep -q "memory/dummy-memo.md — owner: user, НЕ обновлён: отстал от шаблона, ваших правок не найдено" "$TEST_ROOT/out-d-stale.log" && \
-   grep -q 'Обновить: cp "' "$TEST_ROOT/out-d-stale.log"; then
-    pass "D2: a copy that matches an older template version is reported as stale, with a cp command"
+d2_run_update out-d-stale.log
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$TEST_ROOT/out-d-stale.log"; then
+    pass "D2: a copy that equals a committed version is reported as such, with the pilot's-own-commit caveat"
 else
-    fail "D2: no stale verdict for the copy that equals an older version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-stale.log" | head -3 | tr '\n' ' ')"
+    fail "D2: no verdict for the copy that equals an older committed version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-stale.log" | head -3 | tr '\n' ' ')"
 fi
-if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-stale.log"; then
-    fail "D2: a stale copy was reported as the pilot's own edit"
+d2_check_save_hint out-d-stale.log "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$(cat "$TEST_ROOT/memo-older.txt")" "D2"
+if grep -q "не совпадает ни с одной закоммиченной" "$TEST_ROOT/out-d-stale.log"; then
+    fail "D2: a copy that equals a committed version was reported as equal to none"
 else
-    pass "D2: a stale copy is not reported as the pilot's own edit"
+    pass "D2: a copy that equals a committed version is not reported as equal to none"
 fi
+
+# ------------------------------------------------------------------
+# Scenario D3: the same verdict, but the committed version IS the pilot's own edit — a fork
+# with local commits (#963) keeps it in the clone's history. "Equals a committed version"
+# proves nothing about who wrote it, so the report must not promise "no edits found", and the
+# command it offers must save the copy before it replaces it.
+# ------------------------------------------------------------------
+echo "--- Scenario D3: a committed version can be the pilot's own edit (cold review of #965/#967) ---"
+printf -- '---\nowner: user\n---\nPilot notes committed into the clone\n' > "$TEST_ROOT/memo-pilot.txt"
+d2_commit_memo "$TEST_ROOT/memo-pilot.txt" "pilot: my notes in the memo"
+d2_commit_memo "$TEST_ROOT/memo-upstream.txt" "history: memo back to the upstream text"
+cp "$TEST_ROOT/memo-pilot.txt" "$MEM_DST"
+
+d2_run_update out-d-committed.log
+if grep -q "ваших правок не найдено" "$TEST_ROOT/out-d-committed.log"; then
+    fail "D3: the report promises 'no edits found' for a copy that is the pilot's own committed edit"
+else
+    pass "D3: the report does not promise 'no edits found'"
+fi
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$TEST_ROOT/out-d-committed.log"; then
+    pass "D3: the report says the match may be the pilot's own committed edit"
+else
+    fail "D3: the pilot's-own-commit caveat is missing: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-committed.log" | head -3 | tr '\n' ' ')"
+fi
+d2_check_save_hint out-d-committed.log "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_COMMITTED_TEXT" "$(cat "$TEST_ROOT/memo-pilot.txt")" "D3"
+
+# ------------------------------------------------------------------
+# Scenario D4: the copy equals no committed version, yet the pilot edited nothing. update.sh
+# applies a release to the clone WITHOUT committing it, so after the pilot copied release one
+# into the memory directory (the cp the report suggests) and release two arrived, the copy
+# is release one — which exists in no commit of the clone.
+# ------------------------------------------------------------------
+echo "--- Scenario D4: an applied earlier release is not blamed on the pilot (cold review of #965/#967) ---"
+printf -- '---\nowner: user\n---\nRelease one text of the memo\n' > "$MEM_DST"
+printf -- '---\nowner: user\n---\nRelease two text of the memo\n' > "$UPSTREAM/memory/dummy-memo.md"
+cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
+d2_memo_sha
+
+d2_run_update out-d-release.log
+if grep -qF "memory/dummy-memo.md — owner: user, НЕ обновлён: $D2_UNCOMMITTED_TEXT" "$TEST_ROOT/out-d-release.log"; then
+    pass "D4: the report names an already applied earlier release as a possible cause"
+else
+    fail "D4: the earlier-release cause is missing: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-release.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-release.log"; then
+    fail "D4: the report says 'probably your edits' for an unedited copy of an earlier release"
+else
+    pass "D4: the report does not say 'probably your edits'"
+fi
+# Back to the state the next scenarios expect: the clone and the upstream carry the committed text.
+cp "$TEST_ROOT/memo-upstream.txt" "$UPSTREAM/memory/dummy-memo.md"
+cp "$TEST_ROOT/memo-upstream.txt" "$SCRIPT_DIR/memory/dummy-memo.md"
+d2_memo_sha
 
 d2_untracked_entry remove
 rm -f "$UPSTREAM/memory/untracked-memo.md" "$SCRIPT_DIR/memory/untracked-memo.md" "$(dirname "$MEM_DST")/untracked-memo.md"
