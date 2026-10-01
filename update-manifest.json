@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
-      "sha256": "09080a32dcb81738ff198cfc899de6fca7efeaa1e56b6e907a3b7049ca6712bb"
+      "sha256": "92171c0a343a4f5a0cd21c7579cd0eb320b2cb99493b33e56fe00576284c0b4e"
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
@@ -3245,6 +3245,7 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
