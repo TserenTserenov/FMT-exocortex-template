@@ -733,7 +733,7 @@
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
-      "sha256": "ab5c505b32fdd2503ce0b72e22493322430d3656fa76a827c0e91003ada9aa68"
+      "sha256": "48f4a9639071fc2e0bcb24ce5162c02a5551982914a12a0e895f48d8956a4fd3"
     },
     {
       "path": ".claude/skills/vdv/SKILL.md",
@@ -1573,7 +1573,7 @@
     },
     {
       "path": "memory/protocol-work.md",
-      "sha256": "132bf3df2508612746266d169f660767334cced458b38e6bf69a81c1e8a0ff46"
+      "sha256": "f64b62764aea7ac7260ea92e9296cfdad0c79cb914d373df8364641e697edb65"
     },
     {
       "path": "memory/r-questionnaire.md",
@@ -2417,7 +2417,7 @@
     },
     {
       "path": "scripts/iwe-transcribe.sh",
-      "sha256": "c2052d9ca60a701a0d1ccf82d635710b5eca20f06f8363ad06661bc61197f4fa"
+      "sha256": "40d4c46c515352eaa65f2c981e5320647e6f3836a7987e8ff22cc1bcd4b01084"
     },
     {
       "path": "scripts/iwe-w-reflection.sh",
