@@ -1897,7 +1897,7 @@
     },
     {
       "path": "roles/strategist/scripts/cleanup-processed-notes.py",
-      "sha256": "125658b13edbaf32064f7c2fa7e288d4744df4a9e2ebff9006192c0eaf7c70b1"
+      "sha256": "3757261664c74469b3ff6a59338e49ef29df443e4a752885729615db7333b5cb"
     },
     {
       "path": "roles/strategist/scripts/fetch-wakatime.sh",
@@ -3245,6 +3245,7 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_959_cleanup_parse_notes.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",

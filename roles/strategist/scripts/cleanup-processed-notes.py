@@ -61,25 +61,31 @@ def parse_notes(content: str) -> tuple[str, list[str]]:
 
     Header = everything up to and including the first `---` after the
     blockquote section. Note blocks are separated by `---`.
+
+    YAML frontmatter exists only when `---` is the very first line of the
+    file; its closing `---` is then skipped and the header ends at the next
+    one. Without frontmatter the header ends at the first `---`. A file with
+    no header-closing `---` has no note blocks (the whole file is header), so
+    nothing is archived and the file is never emptied (#959).
     """
     lines = content.split("\n")
 
-    # Find end of header: skip frontmatter, title, blockquote, then first ---
-    in_frontmatter = False
-    past_frontmatter = False
-    header_end = 0
+    # Find end of header: the header-closing `---`; frontmatter fences are not it
+    has_frontmatter = lines[0].strip() == "---"
+    rules_to_skip = 2 if has_frontmatter else 0
+    header_end = None
 
     for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped == "---" and not past_frontmatter:
-            if not in_frontmatter:
-                in_frontmatter = True
-            else:
-                past_frontmatter = True
+        if line.strip() != "---":
             continue
-        if past_frontmatter and stripped == "---":
-            header_end = i + 1
-            break
+        if rules_to_skip:
+            rules_to_skip -= 1
+            continue
+        header_end = i + 1
+        break
+
+    if header_end is None:
+        return content, []
 
     header = "\n".join(lines[:header_end])
     rest = "\n".join(lines[header_end:]).strip()
@@ -173,6 +179,8 @@ def main():
     if archive_content and not archive_content.endswith("\n"):
         archive_content += "\n"
     archive_content += archive_section.rstrip() + "\n"
+    # Installations assembled before archive/notes/ existed do not have the directory (#959)
+    ARCHIVE.parent.mkdir(parents=True, exist_ok=True)
     ARCHIVE.write_text(archive_content, encoding="utf-8")
 
     # Rewrite fleeting-notes.md with only kept blocks
