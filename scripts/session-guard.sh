@@ -148,32 +148,63 @@ wp_card_candidates() {
   fi
 }
 
-# Value of the top-level `hypothesis_relation` field of a card, read from the FIRST frontmatter
-# only (between the first two `---` lines): a quoted value loses its quotes, a trailing
-# `# comment` is not part of it. Prints an empty line when the field is absent. The body is
-# never read: a YAML example in it is not the card's field. A file with no `---` line at all
-# has no frontmatter to speak of and is read whole, as the gate always did (the WP-518 test
-# fixtures are such one-line files).
-card_hypothesis_relation() {
-  local value legacy=0
-  grep -q '^---[[:space:]]*$' "$1" 2>/dev/null || legacy=1
-  value=$(awk -v legacy="$legacy" '
-    BEGIN { fm = legacy }
-    /^---[[:space:]]*$/ { fm++; if (fm == 2) exit; next }
-    fm != 1 { next }
-    /^hypothesis_relation:/ {
-      sub(/^hypothesis_relation:[[:space:]]*/, "")
-      sub(/[[:space:]]+#.*$/, "")
-      sub(/[[:space:]]+$/, "")
-      print
-      exit
+# Succeeds when the top-level `hypothesis_relation` of the card is `unclassified`.
+#
+# Where the field is looked for -- one explicit rule. A card whose FIRST line is `---` (a UTF-8
+# BOM and CRLF are ignored) has a frontmatter, up to the next `---` line, and only the first
+# such field in it counts: the body is never read, so a YAML example in it is not the card's
+# field. A file whose first line is not `---` has no frontmatter, and the field is looked for in
+# the whole file, any line counts: that is what the gate always did, kept for such cards and for
+# the one-line WP-518 test fixtures. (A heading above a `---` block does not make it a
+# frontmatter.)
+#
+# What the value is: a YAML scalar. A quoted one is taken whole -- a `#` inside the quotes belongs
+# to it, so "unclassified # example" is not `unclassified` -- and only whitespace and a `# comment`
+# may follow the closing quote; a plain one ends at a ` #` comment. No quote is stripped on its
+# own: an unterminated "unclassified is not `unclassified` either.
+card_is_unclassified() {
+  local first="" bom mode=whole
+  bom=$'\xEF\xBB\xBF'
+  { IFS= read -r first < "$1"; } 2>/dev/null || true
+  first="${first#"$bom"}"
+  first="${first%"${first##*[![:space:]]}"}"
+  if [ "$first" = "---" ]; then mode=frontmatter; fi
+  awk -v mode="$mode" -v sq="'" -v dq='"' '
+    function scalar(text,   q, i, n, c, out, closed, tail) {
+      sub(/^[[:space:]]+/, "", text)
+      sub(/[[:space:]]+$/, "", text)
+      q = substr(text, 1, 1)
+      if (q == dq || q == sq) {
+        n = length(text); out = ""; closed = 0
+        for (i = 2; i <= n; i++) {
+          c = substr(text, i, 1)
+          if (q == dq && c == "\\") { out = out substr(text, i, 2); i++; continue }
+          if (c == q) {
+            if (q == sq && substr(text, i + 1, 1) == sq) { out = out sq; i++; continue }
+            closed = 1
+            break
+          }
+          out = out c
+        }
+        if (closed) {
+          tail = substr(text, i + 1)
+          if (tail == "" || tail ~ /^[[:space:]]+#/) return out
+        }
+        return text
+      }
+      sub(/[[:space:]]+#.*$/, "", text)
+      return text
     }
-  ' "$1" 2>/dev/null || true)
-  value="${value#\"}"
-  value="${value%\"}"
-  value="${value#\'}"
-  value="${value%\'}"
-  printf '%s\n' "$value"
+    mode == "frontmatter" && NR == 1 { next }
+    mode == "frontmatter" && /^---[[:space:]]*$/ { exit }
+    /^hypothesis_relation:/ {
+      v = $0
+      sub(/^hypothesis_relation:/, "", v)
+      if (scalar(v) == "unclassified") found = 1
+      if (found || mode == "frontmatter") exit
+    }
+    END { exit found ? 0 : 1 }
+  ' "$1" 2>/dev/null
 }
 
 # Prints frozen checkout cwd sits in, or empty. FMT has no gov_repo_dir();
@@ -1353,20 +1384,20 @@ if [ "$CMD" = "open" ]; then
   # issue #954: --wp 44, 044, WP-44 and WP-044 name one card (folder WP-044/), so every
   # place the card can be written is checked and ANY of them still marked unclassified
   # blocks the open (see wp_card_candidates). A note that merely carries `wp: N` is not a card.
-  # The field is read from the card's own frontmatter (card_hypothesis_relation), not grepped
-  # from the whole file: a trailing `# comment` does not hide it and an example in the body
-  # does not fake it. A session is never refused for the lack of the shared reader (the gate
-  # degrades instead), but checking less than it promises must not be silent: one warning, and
-  # the exact card names are still checked. `open` re-executes itself under the transition
-  # lock (_ensure_session_transition_lock), which runs this gate a second time: warn on the
-  # first pass only.
+  # The field is read by card_is_unclassified (the frontmatter rule and the YAML value rules
+  # are described there), not grepped from the whole file: a trailing `# comment` does not
+  # hide it and an example in the body does not fake it. A session is never refused for the
+  # lack of the shared reader (the gate degrades instead), but checking less than it promises
+  # must not be silent: one warning, and the exact card names are still checked. `open`
+  # re-executes itself under the transition lock (_ensure_session_transition_lock), which runs
+  # this gate a second time: warn on the first pass only.
   if ! type wp_num_normalize >/dev/null 2>&1 \
      && [ -z "${IWE_SESSION_TRANSITION_FD:-}" ] && [ -z "${IWE_SESSION_TRANSITION_TARGET:-}" ]; then
     echo "session-guard: wp-num.sh не найдена: гейт гипотезы проверяет только точные имена карточек" >&2
   fi
   WP_CARD=""
   while IFS= read -r _sg_card; do
-    if [ -f "$_sg_card" ] && [ "$(card_hypothesis_relation "$_sg_card")" = "unclassified" ]; then
+    if [ -f "$_sg_card" ] && card_is_unclassified "$_sg_card"; then
       WP_CARD="$_sg_card"
       break
     fi
