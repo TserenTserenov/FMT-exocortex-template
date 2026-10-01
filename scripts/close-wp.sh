@@ -17,6 +17,28 @@ STRATEGY="$IWE/$GOV_REPO"
 REGISTRY="$STRATEGY/docs/WP-REGISTRY.md"
 ARCHIVE_DIR="$STRATEGY/archive/wp-contexts"
 
+# Shared reader of WP numbers (issue #954). Located from THIS file's own location, never
+# from IWE_ROOT / the governance repo (callers point those at fixtures). Candidates, in
+# order: lib/ next to this script, the template clone next to a workspace scripts/ dir
+# that carries no lib/, the explicit IWE_TEMPLATE.
+_wpn_code_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_wpn_code_root="$(cd "$_wpn_code_dir/.." && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_code_dir/lib/wp-num.sh" \
+                 "$_wpn_code_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [[ -r "$_wpn_cand" ]]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [[ -z "$WP_NUM_LIB" ]]; then
+  echo "❌ wp-num.sh не найден: нужен scripts/lib/wp-num.sh (искал в ${_wpn_code_dir}/lib, ${_wpn_code_root}/FMT-exocortex-template/scripts/lib и \${IWE_TEMPLATE}/scripts/lib). Обновите шаблон: bash update.sh" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$WP_NUM_LIB"
+
 WP_NUM=""
 SUMMARY=""
 REASON=""
@@ -38,38 +60,32 @@ fi
 # Public files use the canonical three-digit ID (WP-009), while the registry
 # stores the bare number (9).  Normalise the CLI once so closing a freshly
 # created card does not create a second WP-9 archive or miss WP-009.md.
-if ! WP_NUM=$(python3 - "$WP_NUM" <<'PY'
-import re
-import sys
-
-raw = sys.argv[1]
-match = re.fullmatch(r"(?:WP-)?(\d+)", raw)
-if not match:
-    raise SystemExit(1)
-print(int(match.group(1)))
-PY
-); then
+# The reader is shared with the other WP scripts (issue #954): 9, 009, WP-9, WP-009, wp-009.
+if ! WP_NUM=$(wp_num_normalize "$WP_NUM"); then
   echo "Некорректный номер РП: используйте число или WP-N" >&2
   exit 1
 fi
-WP_ID=$(printf '%03d' "$WP_NUM")
+WP_ID=$(wp_num_padded "$WP_NUM")
+# The registry's "#" cell as it may be written: 9, 009, WP-009, ~~WP-009~~ (not 90 or 0090).
+CELL_RE=$(wp_num_registry_cell_regex "$WP_NUM")
 
 TODAY=$(date +%Y-%m-%d)
 
 # --- Шаг 1: зачеркнуть строку в REGISTRY ---
 echo "1/3 Обновляю REGISTRY..."
 
-python3 - "$REGISTRY" "$WP_NUM" <<'PYEOF'
+python3 - "$REGISTRY" "$WP_NUM" "$CELL_RE" <<'PYEOF'
 import sys, re
-registry_path, wp_num = sys.argv[1], sys.argv[2]
+registry_path, wp_num, cell_re = sys.argv[1], sys.argv[2], sys.argv[3]
 
 with open(registry_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
 
 changed = False
 for i, line in enumerate(lines):
-    # Ищем строку с данным номером WP (активную — без ~~NNN~~)
-    m = re.match(r"^(\|\s*)(\*\*)?(" + re.escape(wp_num) + r")(\*\*)?(\s*\|)", line)
+    # Ищем строку с данным номером WP (активную — без ~~NNN~~). Ячейка "#" может быть
+    # 9, 009, WP-009, 13★ — шаблон общий с wp-sync-bundle.sh (#954), 90/0090 не совпадают.
+    m = re.match(r"^(\|\s*)(" + cell_re + r")(\s*\|)", line)
     pipe_pos = line.find("|", 1)
     if m and (pipe_pos == -1 or "~~" not in line[:pipe_pos]):
         # Зачеркнуть все поля: | N | P | Название | ... |
@@ -128,13 +144,14 @@ echo "2/3 Создаю archive/wp-contexts..."
 mkdir -p "$ARCHIVE_DIR"
 
 # Определить slug из REGISTRY
-SLUG=$(python3 - "$REGISTRY" "$WP_NUM" <<'PYEOF2'
+SLUG=$(python3 - "$REGISTRY" "$WP_NUM" "$CELL_RE" <<'PYEOF2'
 import sys, re
-registry_path, wp_num = sys.argv[1], sys.argv[2]
+registry_path, wp_num, cell_re = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(registry_path, "r", encoding="utf-8") as f:
     for line in f:
-        # Ищем строку с этим WP (теперь уже зачёркнутую)
-        if re.search(r"~~" + re.escape(wp_num) + r"~~", line):
+        # Ищем строку с этим WP (теперь уже зачёркнутую): ~~9~~, ~~WP-009~~ (#954)
+        row = re.match(r"^\|\s*(" + cell_re + r")\s*\|", line)
+        if row and "~~" in row.group(1):
             # Извлечь название из колонки имени (3-я колонка)
             parts = line.split("|")
             if len(parts) >= 4:

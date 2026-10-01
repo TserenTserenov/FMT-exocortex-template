@@ -85,6 +85,31 @@ if [[ -r "$GIT_SYNC_LIB" ]]; then
   source "$GIT_SYNC_LIB"
 fi
 
+# Shared reader of WP numbers (issue #954): the one place that knows the spellings
+# 44 / 044 / WP-044 / ~~WP-044~~ and the two card-folder names (WP-044/, legacy WP-44/).
+# Mandatory, unlike the sync lib above: without it every lookup would silently go back to
+# guessing the number's shape. Located from THIS file's own location and never from
+# IWE_WORKSPACE / STRATEGY_DIR, which callers point at fixtures and origin snapshots
+# (see above). Candidates, in order: <root>/scripts/lib (repository checkout, or a
+# workspace that carries its own scripts/), the template clone next to a delivered
+# workspace .claude/scripts, the explicit IWE_TEMPLATE.
+_wpn_code_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_code_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_code_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [[ -r "$_wpn_cand" ]]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [[ -z "$WP_NUM_LIB" ]]; then
+  echo "[ERROR] wp-num.sh не найден: нужен scripts/lib/wp-num.sh (искал в ${_wpn_code_root}/scripts/lib, ${_wpn_code_root}/FMT-exocortex-template/scripts/lib и \${IWE_TEMPLATE}/scripts/lib). Обновите шаблон: bash update.sh" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$WP_NUM_LIB"
+
 # ---------------------------------------------------------------------------
 # Audit log
 # ---------------------------------------------------------------------------
@@ -189,53 +214,13 @@ cleanup_tmp() {
   return 0
 }
 
+# Path of the WP's card ("" when there is none). The lookup itself lives in
+# scripts/lib/wp-num.sh (issue #954): canonical folder cards in either spelling
+# (WP-044/ and the older WP-44/, inbox then archive, WP-434/#267) before the last-resort
+# `wp:` grep, which cannot tell a card from a note carrying the same field. The path
+# that exists is returned as found. Always returns 0: callers run under `set -e`.
 find_wp_file() {
-  local num="$1"
-  local found=""
-
-  if [[ -d "$INBOX_DIR" ]]; then
-    # WP-434: a canonical folder card wins over stale flat duplicates.
-    found=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    if [[ -z "$found" ]]; then
-      found=$(grep -rl "^wp: ${num}$" "$INBOX_DIR" 2>/dev/null | head -1 || true)
-    fi
-    if [[ -z "$found" ]]; then
-      found=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}.md" 2>/dev/null | head -1 || true)
-    fi
-    if [[ -z "$found" ]]; then
-      local candidates
-      candidates=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}-*.md" 2>/dev/null | sort | head -5 || true)
-      if [[ -n "$candidates" ]]; then
-        while IFS= read -r cand; do
-          if [[ -f "$cand" ]] && grep -q "^wp: ${num}$" "$cand" 2>/dev/null; then
-            found="$cand"
-            break
-          fi
-        done <<< "$candidates"
-        if [[ -z "$found" ]]; then
-          # Pick shortest filename
-          found=$(echo "$candidates" | awk '{print length, $0}' | sort -n | head -1 | cut -d' ' -f2-)
-        fi
-      fi
-    fi
-  fi
-
-  if [[ -z "$found" && -d "$ARCHIVE_DIR" ]]; then
-    # WP-434: same canonical-folder-first priority as the inbox branch above
-    # (issue #267 — archive previously had no folder-card preference at all).
-    found=$(find "$ARCHIVE_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    if [[ -z "$found" ]]; then
-      found=$(grep -rl "^wp: ${num}$" "$ARCHIVE_DIR" 2>/dev/null | head -1 || true)
-    fi
-    if [[ -z "$found" ]]; then
-      # A numeric prefix is not an ID boundary: `WP-46*.md` also matches
-      # `WP-469-*.md`. Only the exact flat filename or a hyphenated slug is
-      # a valid legacy archive candidate for this WP.
-      found=$(find "$ARCHIVE_DIR" -maxdepth 1 \( -name "WP-${num}.md" -o -name "WP-${num}-*.md" \) 2>/dev/null | sort | head -1 || true)
-    fi
-  fi
-
-  echo "$found"
+  wp_num_find_card "$INBOX_DIR" "$ARCHIVE_DIR" "$1" || true
 }
 
 extract_fm_field() {
@@ -520,7 +505,14 @@ registry_status() {
   # руками. Без `(WP-|wp-)?` такая строка молча давала «не в реестре», неотличимое
   # от настоящего отсутствия. Префикс допустим только сразу перед числом, поэтому
   # "WP-1170" по-прежнему не совпадает с 117.
-  local regex="^\|[[:space:]]*(~~)?(\*\*)?(WP-|wp-)?${num}(\*\*)?(~~)?[^0-9|]*[[:space:]]*\|"
+  # issue #954: та же ячейка пишется и с ведущими нулями ("| WP-044 |", как называет
+  # папку карточки create-wp.sh) — `0*` между префиксом и числом. Запрос уже
+  # нормализован выше (44), так что "440" и "0440" по-прежнему не совпадают с 44:
+  # после числа цифра запрещена `[^0-9|]*`. Тот же шаблон отдаёт
+  # wp_num_registry_cell_regex (scripts/lib/wp-num.sh) для close-wp.sh; функция
+  # намеренно не зовёт библиотеку — тесты #473/#713/#871 вырезают её по имени и
+  # прогоняют отдельно от остального файла.
+  local regex="^\|[[:space:]]*(~~)?(\*\*)?(WP-|wp-)?0*${num}(\*\*)?(~~)?[^0-9|]*[[:space:]]*\|"
   local match_count
   match_count=$(grep -cE "$regex" "$REGISTRY_FILE" 2>/dev/null || true)
   match_count=${match_count:-0}

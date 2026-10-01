@@ -36,22 +36,33 @@ ARCHIVE_DIR="$STRATEGY_DIR/archive/wp-contexts"
 
 log_err() { echo "[ERROR] $*" >&2; }
 
-# Тот же поиск, что find_wp_file() в wp-sync-bundle.sh (WP-434: папочная
-# конвенция первична) — сознательно не source'им весь wp-sync-bundle.sh
-# (он объявляет main() и запускает себя), копия одной функции безопаснее.
+# Shared reader of WP numbers (issue #954), located from THIS file's own location and
+# never from IWE_WORKSPACE (callers point that at a fixture or an origin snapshot, which
+# carries no scripts). Same candidates, same order as in wp-sync-bundle.sh: <root>/scripts/lib,
+# the template clone next to a delivered workspace .claude/scripts, then IWE_TEMPLATE.
+_wpn_code_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_code_root/scripts/lib/wp-num.sh" \
+                 "$_wpn_code_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [[ -r "$_wpn_cand" ]]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [[ -z "$WP_NUM_LIB" ]]; then
+  echo "[ERROR] wp-num.sh не найден: нужен scripts/lib/wp-num.sh (искал в ${_wpn_code_root}/scripts/lib, ${_wpn_code_root}/FMT-exocortex-template/scripts/lib и \${IWE_TEMPLATE}/scripts/lib). Обновите шаблон: bash update.sh" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$WP_NUM_LIB"
+
+# Тот же поиск, что find_wp_file() в wp-sync-bundle.sh (WP-434: папочная конвенция
+# первична): оба зовут wp_num_find_card — один парсер на обоих концах снимка. Раньше
+# здесь жила урезанная копия функции, и поиск расходился (#954): без нулей в имени
+# папки, без плоских файлов со slug. Всегда возвращает 0 (set -e у вызывающих).
 find_wp_file() {
-  local num="$1"
-  local found=""
-  if [[ -d "$INBOX_DIR" ]]; then
-    found=$(find "$INBOX_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    [[ -z "$found" ]] && found=$(grep -rl "^wp: ${num}$" "$INBOX_DIR" 2>/dev/null | head -1 || true)
-    [[ -z "$found" ]] && found=$(find "$INBOX_DIR" -maxdepth 1 -name "WP-${num}.md" 2>/dev/null | head -1 || true)
-  fi
-  if [[ -z "$found" && -d "$ARCHIVE_DIR" ]]; then
-    found=$(find "$ARCHIVE_DIR" -maxdepth 2 -path "*/WP-${num}/WP-${num}.md" 2>/dev/null | head -1 || true)
-    [[ -z "$found" ]] && found=$(grep -rl "^wp: ${num}$" "$ARCHIVE_DIR" 2>/dev/null | head -1 || true)
-  fi
-  echo "$found"
+  wp_num_find_card "$INBOX_DIR" "$ARCHIVE_DIR" "$1" || true
 }
 
 extract_fm_field() {

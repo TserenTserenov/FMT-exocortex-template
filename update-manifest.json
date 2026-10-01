@@ -365,11 +365,11 @@
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
-      "sha256": "dfab3c7620f209e19cd0830e2a7c3ed814727087fdeb3a058c080a882ff333f2"
+      "sha256": "75f4074e2d4877efdacce92b58af4f7240cad1903d4fa5f951d200ce077e8df5"
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "96a6d35a57c1cff65968e7d6444f248cd7bdc30f77ec67769cfe9adad4d7bfa2"
+      "sha256": "3561f1ff35b5ceca198ab09916476d1d5ec43f007df3442e70ed2b2388e7bcb5"
     },
     {
       "path": ".claude/settings.json",
@@ -2073,7 +2073,7 @@
     },
     {
       "path": "scripts/archive-done-wp.sh",
-      "sha256": "e9bc5bbfaf04d7e3a611060690679afb8641e301c5ffbae4c75950740aea4fa6"
+      "sha256": "ca6f03d9f7f642cb116ce7a1db85421dbee4ffae3b1e6a200352a141f681fef5"
     },
     {
       "path": "scripts/artifactor.py",
@@ -2181,7 +2181,7 @@
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
-      "sha256": "03b92990085bac34b06b9b31bd3708dcadd94495e60f6d77a1c4147c97fa5d97"
+      "sha256": "614b7837851036c8a485b40fadfbc18932b81f0d513586701449838c09676d3f"
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "1708ba2d92f31e0770ceff9847ddfd1012776f28302134704e1fd91caa02ba92"
+      "sha256": "6abe9646456385102a7600b506f0e236a78b0e2fac49c313ec50591b5886f5c8"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -2518,6 +2518,10 @@
     {
       "path": "scripts/lib/telegram.sh",
       "sha256": "4c5c0546b87a7bbe6dbff6af7ca011c561a1c2f5a2e5db4c4fedcd183bc9de3e"
+    },
+    {
+      "path": "scripts/lib/wp-num.sh",
+      "sha256": "e252ba332090008c4c1adbdf703c174d4d76f0749c813d95b1e5b02aca675dbc"
     },
     {
       "path": "scripts/lib/wp_inbox.py",
@@ -2941,7 +2945,7 @@
     },
     {
       "path": "scripts/wp-list.py",
-      "sha256": "5814dcdcee11fad443aa1cb48a2518ac43cf0c52fa07f9e2f48d0bb950569b4f"
+      "sha256": "e18f6155f3dc2c5f4f652b63a26458bb413366cafc28032c17b5233216900f6e"
     },
     {
       "path": "scripts/wp-pool-cascade.sh",
@@ -3245,6 +3249,8 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_954_wp_list_keys.py",
+    "scripts/tests/test_issue_954_wp_number_forms.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",

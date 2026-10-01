@@ -20,6 +20,28 @@
 
 set -uo pipefail
 
+# Shared reader of WP numbers (issue #954). Located from THIS file's own location, never
+# from IWE_ROOT / the governance repo (callers point those at fixtures). Candidates, in
+# order: lib/ next to this script, the template clone next to a workspace scripts/ dir
+# that carries no lib/, the explicit IWE_TEMPLATE.
+_wpn_code_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_wpn_code_root="$(cd "$_wpn_code_dir/.." && pwd)"
+WP_NUM_LIB=""
+for _wpn_cand in "$_wpn_code_dir/lib/wp-num.sh" \
+                 "$_wpn_code_root/FMT-exocortex-template/scripts/lib/wp-num.sh" \
+                 ${IWE_TEMPLATE:+"$IWE_TEMPLATE/scripts/lib/wp-num.sh"}; do
+  if [[ -r "$_wpn_cand" ]]; then
+    WP_NUM_LIB="$_wpn_cand"
+    break
+  fi
+done
+if [[ -z "$WP_NUM_LIB" ]]; then
+  echo "❌ wp-num.sh не найден: нужен scripts/lib/wp-num.sh (искал в ${_wpn_code_dir}/lib, ${_wpn_code_root}/FMT-exocortex-template/scripts/lib и \${IWE_TEMPLATE}/scripts/lib). Обновите шаблон: bash update.sh" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$WP_NUM_LIB"
+
 MODE="${1:-}"
 if [[ -z "$MODE" ]]; then
   echo "Использование: $0 <WP_NUM|--all> [--dry-run] [IWE_ROOT]" >&2
@@ -39,15 +61,11 @@ done
 IWE="${IWE_ROOT_ARG:-${IWE_ROOT:-$HOME/IWE}}"
 INBOX="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox"
 
-check_one() {
-  local wp_num="$1"
-  local wp_dir="$INBOX/WP-${wp_num}"
-  local wp_file="$wp_dir/WP-${wp_num}.md"
-
-  if [[ ! -f "$wp_file" ]]; then
-    echo "WP-${wp_num}: ❌ $wp_file не найден — пропуск"
-    return
-  fi
+# Inspect one card: <card file> = <inbox>/WP-<N>/WP-<N>.md, the folder is its directory.
+check_card() {
+  local wp_file="$1"
+  local wp_dir
+  wp_dir=$(dirname "$wp_file")
 
   python3 - "$wp_file" "$wp_dir" "$DRY_RUN" <<'PYEOF'
 import sys, re, os, datetime
@@ -109,6 +127,20 @@ if orphans:
 PYEOF
 }
 
+# Inspect the card of the WP given as typed (44, 044, WP-044). issue #954: the folder is
+# WP-044/ (create-wp.sh) or the older WP-44/; the path that exists is used, and the old
+# "<N> не найден — пропуск" no longer fires for a card that is simply spelled with zeros.
+check_one() {
+  local wp_num="$1" wp_file padded
+  wp_file=$(wp_num_card_path "$INBOX" "$wp_num" || true)
+  if [[ -z "$wp_file" ]]; then
+    padded=$(wp_num_padded "$wp_num" || echo "$wp_num")
+    echo "WP-${wp_num}: ❌ $INBOX/WP-${padded}/WP-${padded}.md не найден — пропуск"
+    return
+  fi
+  check_card "$wp_file"
+}
+
 if [[ "$MODE" == "--all" ]]; then
   total=0
   warned=0
@@ -118,7 +150,12 @@ if [[ "$MODE" == "--all" ]]; then
     num="${name#WP-}"
     [[ "$num" =~ ^[0-9]+$ ]] || continue
     total=$((total + 1))
-    out=$(check_one "$num")
+    # Each folder is checked through its own card: WP-47/ and WP-047/ side by side are two folders.
+    if [[ -f "${dir}${name}.md" ]]; then
+      out=$(check_card "${dir}${name}.md")
+    else
+      out="WP-${num}: ❌ ${dir}${name}.md не найден — пропуск"
+    fi
     echo "$out"
     if echo "$out" | grep -q "warn\|❌"; then
       warned=$((warned + 1))
