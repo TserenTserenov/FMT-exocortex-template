@@ -55,6 +55,9 @@
 #   T47: the record of installed memory versions (.memory-deployed.tsv): a broken-off run and a
 #        copy several releases behind, an unusable record, setup.sh's first record, author_mode
 #        in Step 6 and the repair pass (review of #965/#967)
+#   T48: the record before Step 5 (a run broken off before Step 6), atomic writes of the record and
+#        of memory copies, unreadable or linked record, every file left as it was in the summary
+#        (review-12 of #965/#967)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -4471,7 +4474,7 @@ else
 
     T43_NAV_LINE=$(grep -F -- 'memory/navigation.md — НЕ обновлён: ' <<<"$T43_OUT" || true)
     if grep -q 'Pilot notes about this installation' "$T43_MEMORY/navigation.md" \
-        && grep -qF -- 'Принять версию шаблона (ваши правки пропадут, копия останется): ' <<<"$T43_NAV_LINE"; then
+        && grep -qF -- 'Если ваших правок там нет, примите версию шаблона (прежняя копия останется рядом): ' <<<"$T43_NAV_LINE"; then
         pass "T43: the pilot's edited navigation.md is kept, with one line and a ready command"
     else
         fail "T43: the edited navigation.md was replaced or reported without a command: '${T43_NAV_LINE:-<no line>}'"
@@ -4667,8 +4670,8 @@ else
         fail "T45: the stale copy on an odd path was not refreshed with a backup: $(printf '%s' "$T45_OUT" | tr '\n' ' ')"
     fi
     T45_LINE=$(grep -F -- "$T45_FPATH — НЕ обновлён: " <<<"$T45_OUT" || true)
-    if grep -qF -- 'Принять версию шаблона (ваши правки пропадут, копия останется): ' <<<"$T45_LINE"; then
-        T45_HINT="${T45_LINE#*копия останется): }"
+    if grep -qF -- 'Если ваших правок там нет, примите версию шаблона (прежняя копия останется рядом): ' <<<"$T45_LINE"; then
+        T45_HINT="${T45_LINE#*прежняя копия останется рядом): }"
         check_saving_hint "T45" "$T45_HINT" "$T45_MEMORY/$T45_NAME" "$(cat "$T45_MEMORY/$T45_NAME")" "$(cat "$T45_TEMPLATE/$T45_FPATH")" "$T45_EXPANDED"
     else
         fail "T45: apply_memory_policy() printed no saving command for a kept copy: '${T45_OUT:-<empty>}'"
@@ -4688,7 +4691,8 @@ T46_FUNCS=$(update_sh_functions hash_file is_personal_config is_author_mode repo
     saving_cp_command backup_memory_file_before_overwrite sync_workspace_agents repair_pass \
     is_migrated_platform_memory_path migrate_platform_memory report_owner_user_memory_drift \
     record_memory_old_hash memory_old_hash apply_memory_policy report_memory_policy_summary \
-    memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy is_user_owned_memory report_author_user_memory report_author_skip_summary apply_refresh_stale)
+    memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy is_user_owned_memory report_author_user_memory report_author_skip_summary apply_refresh_stale \
+    remember_untouched_memory_before_apply)
 T46_STEP6=$(awk '
     /^# Copy memory files to Claude projects directory$/ { armed=1; next }
     armed && /^if \[ -d "\$CLAUDE_MEMORY_DIR" \]; then$/ { found=1 }
@@ -4884,7 +4888,7 @@ t46_kept_ok=true
 for t46_name in user-edited platform-edited protocol-work; do
     t46_line=$(grep -F -- "memory/$t46_name.md — НЕ обновлён: " <<<"$T46A_OUT" || true)
     if ! grep -q "Pilot line in $t46_name" "$T46A_MEM/$t46_name.md" || [ -n "$(t46_backup "$t46_name.md")" ] \
-        || ! grep -qF -- '. Сверьте: diff ' <<<"$t46_line" || ! grep -qF -- 'Принять версию шаблона (ваши правки пропадут, копия останется): ' <<<"$t46_line"; then
+        || ! grep -qF -- '. Сам он не обновится. Сверьте: diff ' <<<"$t46_line" || ! grep -qF -- 'Если ваших правок там нет, примите версию шаблона (прежняя копия останется рядом): ' <<<"$t46_line"; then
         t46_kept_ok=false
         fail "T46: edited $t46_name.md was replaced, backed up, or got no one-line reason with a command: '${t46_line:-<no line>}'"
     fi
@@ -4986,7 +4990,7 @@ else
     fail "T46: the stuck copy was not refreshed through history (status $T46_RC): $(grep -F 'stuck' <<<"$T46_OUT" | tr '\n' ' ')"
 fi
 if grep -q 'The pilot rewrote this file' "$T46B_MEM/authored.md" \
-    && grep -qF -- 'memory/authored.md — НЕ обновлён: не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз). Сверьте: diff ' <<<"$T46_OUT"; then
+    && grep -qF -- 'memory/authored.md — НЕ обновлён: не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз). Сам он не обновится. Сверьте: diff ' <<<"$T46_OUT"; then
     pass "T46: an owner: platform copy that matches no committed version is kept, naming both possible causes"
 else
     fail "T46: the authored owner: platform copy was replaced or reported wrongly: $(grep -F 'authored' <<<"$T46_OUT" | tr '\n' ' ')"
@@ -5011,7 +5015,7 @@ t46c_repair() {
 t46_run t46c_repair
 if [ "$T46_RC" -eq 0 ] && grep -q 'stuck-platform release two' "$T46C_MEM/stuck-platform.md" \
     && grep -q 'stuck-user release two' "$T46C_MEM/stuck-user.md" && [ ! -d "$T46C_DIR/workspace/.backups" ] \
-    && grep -qF -- 'memory/stuck-platform.md — НЕ обновлён: не удалось проверить, менялся ли файл (клон шаблона сделан с --depth, его истории нет). Сверьте: diff ' <<<"$T46_OUT"; then
+    && grep -qF -- 'memory/stuck-platform.md — НЕ обновлён: не удалось проверить, менялся ли файл (клон шаблона сделан с --depth, его истории нет). Сам он не обновится. Сверьте: diff ' <<<"$T46_OUT"; then
     pass "T46: in a --depth 1 clone a stuck copy is kept — owner: platform too — with the reason and a command"
 else
     fail "T46: the shallow clone's stuck copy was replaced or not reported (status $T46_RC): $(grep -F 'stuck' <<<"$T46_OUT" | tr '\n' ' ')"
@@ -5321,6 +5325,178 @@ if [ "$T46_RC" -eq 0 ] && [ ! -e "$T47S_DRY_WS/.memory-deployed.tsv" ] && [ ! -e
     pass "T47: setup.sh --dry-run writes no record"
 else
     fail "T47: setup.sh --dry-run wrote memory or its record, or failed (status $T46_RC): $(printf '%s' "$T46_OUT" | tr '\n' ' ')"
+fi
+
+# ============================================================================
+# T48: the record before Step 5 and the safety of every write (review-12 of #965/#967: С1, М1-М3).
+# A copy equal to the version this run replaces gets its record line BEFORE Step 5, so a run broken
+# off between Step 5 and Step 6 cannot leave it unprovable; the record and the memory copies are
+# replaced by rename, never rewritten in place; a record that cannot be read, or is a link, is not
+# written; every file left as it was is listed in the closing summary.
+# ============================================================================
+echo "--- T48: record before Step 5, atomic writes, unusable record, closing summary (review-12 of #965/#967) ---"
+
+# t48_inode FILE — the inode number: a rename gives the path a new one, an in-place write does not.
+# shellcheck disable=SC2012  # ls -i is the portable inode reader (stat differs between BSD and GNU)
+t48_inode() { ls -i "$1" | awk '{print $1}'; }
+T48_ROOT=false
+[ "$(id -u)" -eq 0 ] && T48_ROOT=true   # root ignores file modes: the mode-based checks say so and stand aside
+
+# --- 48a: the record before Step 5. Untouched copies (owner: user and owner: platform) get the version
+# this run is about to replace; the edited copy, MEMORY.md and the personal config get nothing; author_mode
+# records nothing.
+T48A_DIR="$TEST_WS/t48-a"
+T48A_TEMPLATE="$T48A_DIR/template"
+T48A_WS="$T48A_DIR/workspace"
+T48A_MEM="$T48A_DIR/memory"
+t46_template "$T48A_TEMPLATE"
+mkdir -p "$T48A_MEM" "$T48A_WS"
+t46_doc user "user copy release one" > "$T48A_TEMPLATE/memory/user-copy.md"
+t46_doc platform "platform copy release one" > "$T48A_TEMPLATE/memory/platform-copy.md"
+t46_doc platform "edited copy release one" > "$T48A_TEMPLATE/memory/edited-copy.md"
+printf '# Index\n' > "$T48A_TEMPLATE/memory/MEMORY.md"
+printf 'calendar_ids: []\n' > "$T48A_TEMPLATE/memory/day-rhythm-config.yaml"
+cp "$T48A_TEMPLATE/memory/"* "$T48A_MEM/"
+echo "Pilot line in edited-copy" >> "$T48A_MEM/edited-copy.md"
+# shellcheck disable=SC2329  # invoked through t46_run
+t48a_before_apply() {
+    t46_prepare "$T48A_TEMPLATE" "$T48A_WS" "$T48A_MEM" "$T48A_DIR/manifest.json"
+    # shellcheck disable=SC2034
+    UPDATED_FILES=(memory/user-copy.md memory/platform-copy.md memory/edited-copy.md memory/MEMORY.md memory/day-rhythm-config.yaml)
+    for t48_f in "${UPDATED_FILES[@]}"; do
+        record_memory_old_hash "$t48_f" "$(hash_file "$SCRIPT_DIR/$t48_f")"
+    done
+    remember_untouched_memory_before_apply
+}
+t46_run t48a_before_apply
+T48A_RECORD="$T48A_WS/.memory-deployed.tsv"
+if [ "$T46_RC" -eq 0 ] \
+    && grep -qxF -- "$(t47_line memory/user-copy.md "$T48A_TEMPLATE/memory/user-copy.md")" "$T48A_RECORD" 2>/dev/null \
+    && grep -qxF -- "$(t47_line memory/platform-copy.md "$T48A_TEMPLATE/memory/platform-copy.md")" "$T48A_RECORD" 2>/dev/null \
+    && ! grep -qE 'edited-copy|MEMORY\.md|day-rhythm' "$T48A_RECORD" 2>/dev/null; then
+    pass "T48: before Step 5 untouched copies get their record line — owner: user and owner: platform; edited copy, MEMORY.md, personal config none"
+else
+    fail "T48: the record before Step 5 is wrong (status $T46_RC): '$(tr '\n' '|' < "$T48A_RECORD" 2>/dev/null)' $(printf '%s' "$T46_OUT" | tr '\n' ' ')"
+fi
+rm -f "$T48A_RECORD"
+printf 'author_mode: true\n' > "$T48A_WS/params.yaml"
+t46_run t48a_before_apply
+if [ "$T46_RC" -eq 0 ] && [ ! -e "$T48A_RECORD" ]; then
+    pass "T48: author_mode writes no record before Step 5"
+else
+    fail "T48: author_mode wrote a record before Step 5 (status $T46_RC)"
+fi
+
+# The functions below are update.sh's own; each check runs them in a subshell under set -e.
+T48_FUNCS=$(update_sh_functions hash_file memory_record_put memory_record_get remember_memory_deployed replace_memory_copy)
+T48_H1=$(printf one | shasum -a 256 | cut -d' ' -f1)
+T48_H2=$(printf two | shasum -a 256 | cut -d' ' -f1)
+T48_DIR="$TEST_WS/t48-units"
+mkdir -p "$T48_DIR"
+
+# --- 48b: the record is replaced by rename: a read-only record still takes the new line, and the path
+# gets a new inode (an in-place `cat >` fails on it, or keeps the inode).
+T48B_REC="$T48_DIR/readonly-record.tsv"
+printf 'memory/a.md\t%s\nmemory/b.md\t%s\n' "$T48_H1" "$T48_H2" > "$T48B_REC"
+chmod 444 "$T48B_REC"
+T48B_INODE=$(t48_inode "$T48B_REC")
+T48B_RC=0
+( set -e; eval "$T48_FUNCS"; memory_record_put "$T48B_REC" memory/c.md "$T48_H1" ) || T48B_RC=$?
+if [ "$T48B_RC" -eq 0 ] && grep -qxF -- "$(printf 'memory/c.md\t%s' "$T48_H1")" "$T48B_REC" \
+    && grep -qxF -- "$(printf 'memory/a.md\t%s' "$T48_H1")" "$T48B_REC" \
+    && [ "$(t48_inode "$T48B_REC")" != "$T48B_INODE" ]; then
+    pass "T48: the record is rewritten by rename — a read-only record still takes the line, under a new inode"
+else
+    fail "T48: the record was written in place or not at all (rc $T48B_RC, inode $T48B_INODE -> $(t48_inode "$T48B_REC")): $(tr '\n' '|' < "$T48B_REC")"
+fi
+rm -f "$T48B_REC"
+
+# --- 48c: a memory copy is replaced by rename too, keeping its mode: no moment shows it cut short.
+printf 'release two\n' > "$T48_DIR/src.md"
+printf 'release one\n' > "$T48_DIR/dst.md"
+chmod 640 "$T48_DIR/dst.md"
+T48C_INODE=$(t48_inode "$T48_DIR/dst.md")
+T48C_RC=0
+( set -e; eval "$T48_FUNCS"; replace_memory_copy "$T48_DIR/src.md" "$T48_DIR/dst.md" ) || T48C_RC=$?
+# shellcheck disable=SC2012  # the mode string of one known file
+T48C_MODE=$(ls -l "$T48_DIR/dst.md" | cut -c1-10)
+if [ "$T48C_RC" -eq 0 ] && cmp -s "$T48_DIR/src.md" "$T48_DIR/dst.md" \
+    && [ "$(t48_inode "$T48_DIR/dst.md")" != "$T48C_INODE" ] && [ "$T48C_MODE" = "-rw-r-----" ] \
+    && [ -z "$(find "$T48_DIR" -name 'dst.md.update-*')" ]; then
+    pass "T48: a memory copy is replaced by rename (new inode), keeps its mode and leaves no temporary file"
+else
+    fail "T48: the memory copy was rewritten in place or lost its mode (rc $T48C_RC, mode $T48C_MODE, inode $T48C_INODE -> $(t48_inode "$T48_DIR/dst.md"))"
+fi
+
+# --- 48d: a record that cannot be read, or that is a link, is not written: other files keep proof (a).
+T48D_REC="$T48_DIR/unreadable-record.tsv"
+for t48_n in 1 2 3 4 5 6; do printf 'memory/f%s.md\t%s\n' "$t48_n" "$T48_H1"; done > "$T48D_REC"
+if $T48_ROOT; then
+    echo "  (T48: unreadable-record check skipped — root reads any file)"
+else
+    chmod 000 "$T48D_REC"
+    T48D_RC=0
+    ( set -e; eval "$T48_FUNCS"; memory_record_put "$T48D_REC" memory/new.md "$T48_H2" ) || T48D_RC=$?
+    chmod 600 "$T48D_REC"
+    if [ "$T48D_RC" -ne 0 ] && [ "$(wc -l < "$T48D_REC" | tr -d ' ')" = "6" ] && ! grep -q 'memory/new.md' "$T48D_REC"; then
+        pass "T48: an unreadable record is not rewritten — its six lines survive"
+    else
+        fail "T48: an unreadable record was rewritten (rc $T48D_RC): $(wc -l < "$T48D_REC" | tr -d ' ') line(s) left"
+    fi
+fi
+printf 'memory/x.md\t%s\n' "$T48_H1" > "$T48_DIR/elsewhere.tsv"
+ln -s "$T48_DIR/elsewhere.tsv" "$T48_DIR/linked-record.tsv"
+T48D_OUT=$(
+    exec 2>&1
+    eval "$T48_FUNCS"
+    # shellcheck disable=SC2034  # read by the eval'd update.sh functions
+    MEMORY_DEPLOYED_RECORD="$T48_DIR/linked-record.tsv"
+    # shellcheck disable=SC2034
+    MEMORY_RECORD_WARNED=false
+    remember_memory_deployed memory/y.md "$T48_H2"
+    remember_memory_deployed memory/z.md "$T48_H2"
+) || true
+if [ -L "$T48_DIR/linked-record.tsv" ] && [ "$(cat "$T48_DIR/elsewhere.tsv")" = "$(printf 'memory/x.md\t%s' "$T48_H1")" ] \
+    && [ "$(t46_count 'не удалось записать' "$T48D_OUT")" = "1" ]; then
+    pass "T48: a record that is a link is left as it is, with one warning for the run"
+else
+    fail "T48: a linked record was replaced or written through, or warned $(t46_count 'не удалось записать' "$T48D_OUT") times"
+fi
+
+# --- 48e: every file left as it was is in the closing summary, whatever the reason; the summary does not
+# promise a command where there is none.
+if $T48_ROOT; then
+    echo "  (T48: closing-summary check skipped — root ignores the modes it needs)"
+else
+    T48E_DIR="$TEST_WS/t48-e"
+    T48E_TEMPLATE="$T48E_DIR/template"
+    T48E_MEM="$T48E_DIR/memory"
+    t46_template "$T48E_TEMPLATE"
+    mkdir -p "$T48E_TEMPLATE/memory/sub" "$T48E_MEM/sub" "$T48E_DIR/workspace"
+    t46_doc platform "new file" > "$T48E_TEMPLATE/memory/sub/new.md"
+    t46_doc platform "template file nobody can read" > "$T48E_TEMPLATE/memory/unreadable.md"
+    t46_doc platform "the copy" > "$T48E_MEM/unreadable.md"
+    chmod 555 "$T48E_MEM/sub"
+    chmod 000 "$T48E_TEMPLATE/memory/unreadable.md"
+    # shellcheck disable=SC2329  # invoked through t46_run
+    t48e_policy() {
+        t46_prepare "$T48E_TEMPLATE" "$T48E_DIR/workspace" "$T48E_MEM" "$T48E_DIR/manifest.json"
+        apply_memory_policy memory/sub/new.md "$T48E_MEM/sub/new.md" || true
+        apply_memory_policy memory/unreadable.md "$T48E_MEM/unreadable.md" || true
+        report_memory_policy_summary
+    }
+    t46_run t48e_policy
+    chmod 755 "$T48E_MEM/sub"
+    chmod 644 "$T48E_TEMPLATE/memory/unreadable.md"
+    T48E_SUMMARY=$(grep -F -- 'Не обновлено файлов памяти' <<<"$T46_OUT" || true)
+    if [ "$T46_RC" -eq 0 ] && grep -qF -- 'Не обновлено файлов памяти: 2 (memory/sub/new.md, memory/unreadable.md)' <<<"$T48E_SUMMARY" \
+        && grep -qF -- 'почему и что сделать — в строке каждого файла выше' <<<"$T48E_SUMMARY" \
+        && grep -qF -- 'memory/sub/new.md — НЕ доставлен: ' <<<"$T46_OUT" \
+        && grep -qF -- 'memory/unreadable.md — НЕ обновлён: не удалось прочитать шаблонный файл' <<<"$T46_OUT"; then
+        pass "T48: a copy that could not be delivered and an unreadable template file are in the closing summary"
+    else
+        fail "T48: the closing summary misses a file left as it was (status $T46_RC): $(printf '%s' "$T46_OUT" | tr '\n' ' ')"
+    fi
 fi
 
 # ============================================================

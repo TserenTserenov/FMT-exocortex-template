@@ -368,8 +368,8 @@ hash_file() {
 # memory_record_put FILE KEY HASH — the record of installed memory versions
 # ($WORKSPACE_DIR/.memory-deployed.tsv, one "key<TAB>sha256" line per file): afterwards its line for
 # KEY says HASH. update.sh reads it to tell a memory copy nobody changed from an edited one (issues
-# #965/#967). Written through a temporary file and mv; returns non-zero, without a word, when it
-# cannot write.
+# #965/#967). Written through a temporary file and mv; a record that is a link, no regular file or
+# unreadable is left as it is; returns non-zero, without a word, when it does not write.
 # KEEP IN SYNC with update.sh — the same function body; setup/test-update-edge-cases.sh (T47) fails
 # when the copies diverge.
 memory_record_put() {
@@ -377,18 +377,18 @@ memory_record_put() {
     tab=$(printf '\t')
     case "$hash" in *[!0-9a-f]*|'') return 1 ;; esac
     [ "${#hash}" -eq 64 ] || return 1
-    if [ -e "$file" ] && [ ! -f "$file" ]; then
+    if [ -L "$file" ] || { [ -e "$file" ] && { [ ! -f "$file" ] || [ ! -r "$file" ]; }; }; then
         return 1
     fi
     tmp=$(mktemp "$file.XXXXXX" 2>/dev/null) || return 1
-    if [ -r "$file" ]; then
+    if [ -f "$file" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             case "$line" in *"$tab"*) ;; *) continue ;; esac
             value="${line##*"$tab"}"
             case "$value" in *[!0-9a-f]*|'') continue ;; esac
             [ "${#value}" -eq 64 ] || continue
             [ "${line%"$tab"*}" = "$key" ] || printf '%s\n' "$line"
-        done < "$file" > "$tmp"
+        done < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
     fi
     if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" && mv -f "$tmp" "$file"; then
         return 0
