@@ -2740,6 +2740,11 @@ elif [ ! -s "$REMOTE_UPDATE" ]; then
     # failed check as well: the empty file differs from the local one, so it used to pass
     # for a newer update.sh and a normal run replaced the updater with a 0-byte file.
     echo "  ⚠ не удалось проверить update.sh: пустой ответ"
+elif [ "$(head -c 2 "$REMOTE_UPDATE")" != "#!" ]; then
+    # Same for an answer that is no script: HTTP 200 with the HTML of a Wi-Fi login page or a
+    # proxy. update.sh starts with a "#!" line (any interpreter path, /bin/bash or
+    # /usr/bin/env bash alike); anything else must not replace the running updater.
+    echo "  ⚠ не удалось проверить update.sh: ответ не похож на скрипт"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")

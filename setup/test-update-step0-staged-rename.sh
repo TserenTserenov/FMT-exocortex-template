@@ -17,9 +17,11 @@
 #     the local file byte-identical;
 #   - the fetch fails (curl exit 23, a write error): Step 0 must say it could not
 #     check, show curl's cause, and must NOT claim "актуален";
-#   - the fetch succeeds (curl exit 0) but the body is empty (a proxy or a login page that
-#     returns nothing): that is a failed check too, not a "newer" update.sh — --check must not
-#     announce a new version and a normal run must not replace update.sh with a 0-byte file.
+#   - the fetch succeeds (curl exit 0) but the answer is no script: an empty body, or a page
+#     of HTML (a proxy or a Wi-Fi login page answering HTTP 200). That is a failed check too,
+#     not a "newer" update.sh — --check must not announce a new version and a normal run must
+#     not replace update.sh with it; a real script that starts with "#!/usr/bin/env bash" is
+#     still accepted (control).
 #
 # Usage: bash setup/test-update-step0-staged-rename.sh
 
@@ -147,6 +149,17 @@ if [ -n "\${SHIM_EMPTY_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
     [ -n "\$out" ] && : > "\$out"
     exit 0
 fi
+# SHIM_HTML_UPDATE_SH: the fetch "succeeds" with a page that is no script (HTTP 200 from a
+# Wi-Fi login page or a proxy).
+if [ -n "\${SHIM_HTML_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && printf '<html><body>captive portal login</body></html>\n' > "\$out"
+    exit 0
+fi
+# SHIM_ENV_SHEBANG_UPDATE_SH: a real, different script whose first line is "#!/usr/bin/env bash".
+if [ -n "\${SHIM_ENV_SHEBANG_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && { echo '#!/usr/bin/env bash'; tail -n +2 "$UPSTREAM/update.sh"; } > "\$out"
+    exit 0
+fi
 [ -z "\$out" ] && exit 0
 serve "\$url" "\$out"
 SHIMEOF
@@ -207,63 +220,101 @@ else
   fail "a failed download changed the local update.sh"
 fi
 
-# --- Step 0 gets an EMPTY answer with curl exit 0 (cold review of #955 / #980) ----
-# An empty file differs from the local update.sh, so it used to count as a newer one:
-# --check announced "Новая версия update.sh доступна", and a normal run replaced update.sh
-# with a 0-byte file and re-executed it (exit 0, nothing done, every later run empty too).
-echo "--- --check: an empty update.sh answer is a failed check, not a new version ---"
-set +e
-SHIM_EMPTY_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
-    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-empty.log" 2>&1
-set -e
-if grep -q "не удалось проверить update.sh: пустой ответ" "$TEST_ROOT/check-empty.log"; then
-  pass "--check reports an empty answer as a failed check"
-else
-  fail "--check did not report the empty answer; update.sh lines: $(grep -n 'update.sh' "$TEST_ROOT/check-empty.log" | head -3 | tr '\n' ' ')"
-fi
-if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-empty.log"; then
-  fail "--check announced a new update.sh although the answer was empty"
-else
-  pass "--check does not announce a new version for an empty answer"
-fi
-if grep -q "update.sh актуален" "$TEST_ROOT/check-empty.log"; then
-  fail "an empty answer was reported as 'update.sh актуален'"
-else
-  pass "an empty answer is not reported as up to date"
-fi
-if cmp -s "$SCRIPT_DIR/update.sh" "$TEST_ROOT/update.sh.before"; then
-  pass "--check left the local update.sh untouched"
-else
-  fail "--check changed the local update.sh after an empty answer"
-fi
+# --- Step 0 gets an answer that is no script (cold review of #955 / #980) ---------
+# curl exit 0 is no proof of an update.sh: a proxy or a login page can answer 200 with nothing
+# or with a page of HTML. Either differs from the local file, so it used to count as a newer
+# update.sh: --check announced "Новая версия update.sh доступна", and a normal run replaced
+# update.sh with it and re-executed it (a 0-byte file: exit 0 and nothing done; an HTML page:
+# a syntax error, exit 2), every later run broken too. A script starts with "#!".
 
-# A normal run, on a copy of the install (the run below replaces the real one on purpose).
-echo "--- normal run: an empty update.sh answer must not replace update.sh ---"
-cp -R "$TEST_ROOT/repo" "$TEST_ROOT/repo-empty"
-EMPTY_UPDATE_SH="$TEST_ROOT/repo-empty/FMT-exocortex-template/update.sh"
+# step0_check_case LABEL SHIM_VAR REASON — --check while the update.sh fetch answers badly (the
+# shim mode SHIM_VAR=1): a failed check with REASON, no "new version", no "up to date", and the
+# local file untouched.
+step0_check_case() {
+    local label="$1" shim_var="$2" reason="$3" log="$TEST_ROOT/check-$1.log"
+    echo "--- --check: a $label update.sh answer is a failed check, not a new version ---"
+    set +e
+    env "$shim_var=1" PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+        bash "$SCRIPT_DIR/update.sh" --check > "$log" 2>&1
+    set -e
+    if grep -qF -- "не удалось проверить update.sh: $reason" "$log"; then
+      pass "--check reports a $label answer as a failed check ($reason)"
+    else
+      fail "--check did not report the $label answer; update.sh lines: $(grep -n 'update.sh' "$log" | head -3 | tr '\n' ' ')"
+    fi
+    if grep -q "Новая версия update.sh доступна" "$log"; then
+      fail "--check announced a new update.sh although the answer was a $label one"
+    else
+      pass "--check does not announce a new version for a $label answer"
+    fi
+    if grep -q "update.sh актуален" "$log"; then
+      fail "a $label answer was reported as 'update.sh актуален'"
+    else
+      pass "a $label answer is not reported as up to date"
+    fi
+    if cmp -s "$SCRIPT_DIR/update.sh" "$TEST_ROOT/update.sh.before"; then
+      pass "--check left the local update.sh untouched after a $label answer"
+    else
+      fail "--check changed the local update.sh after a $label answer"
+    fi
+}
+
+# step0_run_case LABEL SHIM_VAR REASON — a normal run, on a copy of the install (the run below
+# replaces the real one on purpose): update.sh is neither replaced nor emptied, the run says
+# why the check failed, does not re-exec, and goes on with the update.
+step0_run_case() {
+    local label="$1" shim_var="$2" reason="$3"
+    local copy="$TEST_ROOT/repo-$1" log="$TEST_ROOT/out-$1.log" copy_update_sh
+    echo "--- normal run: a $label update.sh answer must not replace update.sh ---"
+    cp -R "$TEST_ROOT/repo" "$copy"
+    copy_update_sh="$copy/FMT-exocortex-template/update.sh"
+    set +e
+    env "$shim_var=1" PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+        bash "$copy_update_sh" --yes > "$log" 2>&1
+    set -e
+    if [ -s "$copy_update_sh" ] && cmp -s "$copy_update_sh" "$TEST_ROOT/update.sh.before"; then
+      pass "the local update.sh is neither replaced nor emptied by a $label answer"
+    else
+      fail "update.sh is $(wc -c < "$copy_update_sh" | tr -d ' ') bytes after a $label answer; it must stay as it was"
+    fi
+    if grep -qF -- "не удалось проверить update.sh: $reason" "$log"; then
+      pass "the run says that the update.sh check failed ($reason)"
+    else
+      fail "the run did not report the $label answer; head: $(head -12 "$log" | tr '\n' ' ')"
+    fi
+    if grep -q "Перезапуск" "$log"; then
+      fail "update.sh re-executed itself after a $label answer"
+    else
+      pass "no re-exec after a $label answer"
+    fi
+    if grep -q "Загрузка манифеста" "$log"; then
+      pass "the run goes on with the update after the failed self-check ($label answer)"
+    else
+      fail "the run stopped after the failed self-check ($label answer); head: $(head -12 "$log" | tr '\n' ' ')"
+    fi
+}
+
+step0_check_case empty SHIM_EMPTY_UPDATE_SH "пустой ответ"
+step0_run_case empty SHIM_EMPTY_UPDATE_SH "пустой ответ"
+step0_check_case html SHIM_HTML_UPDATE_SH "ответ не похож на скрипт"
+step0_run_case html SHIM_HTML_UPDATE_SH "ответ не похож на скрипт"
+
+# Control: the check refuses what is no script, not what merely starts differently — a real
+# update.sh whose first line is "#!/usr/bin/env bash" is still a newer update.sh.
+echo "--- control: a script with an env shebang is still accepted as a newer update.sh ---"
 set +e
-SHIM_EMPTY_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
-    bash "$EMPTY_UPDATE_SH" --yes > "$TEST_ROOT/out-empty.log" 2>&1
+SHIM_ENV_SHEBANG_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-envshebang.log" 2>&1
 set -e
-if [ -s "$EMPTY_UPDATE_SH" ] && cmp -s "$EMPTY_UPDATE_SH" "$TEST_ROOT/update.sh.before"; then
-  pass "the local update.sh is neither replaced nor emptied by an empty answer"
+if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-envshebang.log"; then
+  pass "a script that starts with #!/usr/bin/env bash is reported as a newer update.sh"
 else
-  fail "update.sh is $(wc -c < "$EMPTY_UPDATE_SH" | tr -d ' ') bytes after an empty answer; it must stay as it was"
+  fail "a script with an env shebang was not reported as newer; update.sh lines: $(grep -n 'update.sh' "$TEST_ROOT/check-envshebang.log" | head -3 | tr '\n' ' ')"
 fi
-if grep -q "не удалось проверить update.sh: пустой ответ" "$TEST_ROOT/out-empty.log"; then
-  pass "the run says that the update.sh check failed"
+if grep -q "не удалось проверить update.sh" "$TEST_ROOT/check-envshebang.log"; then
+  fail "a script with an env shebang was refused as 'not a script'"
 else
-  fail "the run did not report the empty answer; head: $(head -12 "$TEST_ROOT/out-empty.log" | tr '\n' ' ')"
-fi
-if grep -q "Перезапуск" "$TEST_ROOT/out-empty.log"; then
-  fail "update.sh re-executed itself after an empty answer"
-else
-  pass "no re-exec after an empty answer"
-fi
-if grep -q "Загрузка манифеста" "$TEST_ROOT/out-empty.log"; then
-  pass "the run goes on with the update after the failed self-check"
-else
-  fail "the run stopped after the failed self-check; head: $(head -12 "$TEST_ROOT/out-empty.log" | tr '\n' ' ')"
+  pass "a script with an env shebang is not refused"
 fi
 
 # --- Run the REAL update.sh: Step 0 must replace+re-exec itself ---------------
