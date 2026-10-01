@@ -82,6 +82,13 @@ if [ -f "$_SG_ISOLATE_LIB" ]; then
   # shellcheck source=lib/session-guard-isolate-lib.sh
   . "$_SG_ISOLATE_LIB"
 fi
+# issue #954: shared reader of WP numbers; the hypothesis gate in `open` finds the card by
+# the normalised number. Optional like the lib above (functions only, nothing runs on load).
+_SG_WP_NUM_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/wp-num.sh"
+if [ -f "$_SG_WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$_SG_WP_NUM_LIB"
+fi
 
 # Prints frozen checkout cwd sits in, or empty. FMT has no gov_repo_dir();
 # check git toplevel only (sufficient for open freeze + tests).
@@ -1257,9 +1264,17 @@ if [ "$CMD" = "open" ]; then
   # Отсутствующее поле намеренно не блокируется: это карточка, созданная до
   # введения контракта, и массовое дообогащение исторических РП не является
   # безопасным побочным эффектом открытия одной сессии.
-  WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP/$WP.md"
-  if [ ! -f "$WP_CARD" ]; then
-    WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP.md"
+  # issue #954: --wp 44, 044, WP-44 and WP-044 name one card (folder WP-044/), but the id
+  # used to be looked up as typed, so only the spelling equal to the folder name was gated.
+  # The card is now found by the normalised number; an id that is not a number (or a
+  # checkout without the shared reader) keeps the exact-id lookup.
+  WP_CARD=""
+  if type wp_num_find_card >/dev/null 2>&1; then
+    WP_CARD=$(wp_num_find_card "$IWE_ROOT/$GOV_REPO/inbox" "" "$WP" 2>/dev/null || true)
+  fi
+  if [ -z "$WP_CARD" ]; then
+    WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP/$WP.md"
+    [ -f "$WP_CARD" ] || WP_CARD="$IWE_ROOT/$GOV_REPO/inbox/$WP.md"
   fi
   if [ -f "$WP_CARD" ] && grep -qE "^hypothesis_relation:[[:space:]]*['\"]?unclassified['\"]?[[:space:]]*$" "$WP_CARD"; then
     fail "РП $WP не классифицирована по гипотезе. До открытия выберите tests, enables, responds, researches или operational в $WP_CARD" 1
