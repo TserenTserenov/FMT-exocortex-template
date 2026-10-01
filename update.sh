@@ -475,17 +475,17 @@ migrate_platform_memory() {
 # saving_cp_command SOURCE TARGET — the command line the reports offer for refreshing TARGET
 # from SOURCE: first save TARGET next to itself, then replace it. The user's shell runs it, so
 # each path goes through printf %q: the shell receives exactly these paths whatever they hold
-# (spaces, quotes, $, backticks, backslashes) and expands nothing inside them. Only the tail of
-# the saved copy's name stays live for the user's shell: a date plus $RANDOM (empty in a shell
-# that has none), so two runs, even within one second, keep both copies instead of the second
-# replacing the only copy of the user's edits with the refreshed file (issue #967).
+# (spaces, quotes, $, backticks, backslashes) and expands nothing inside them. The saved copy's
+# name comes from mktemp (TARGET.before-update-XXXXXX), which creates the file under a name no
+# other run has, atomically: two runs, even within one second and with the same random seed, can
+# never write into one copy, so the second run cannot replace the only copy of the user's edits
+# with the refreshed file (issue #967). Only "$bak" is left for the user's shell to expand.
 saving_cp_command() {
     local source_q target_q
-    # shellcheck disable=SC2016  # meant for the user's shell: it expands this when the command runs
-    local stamp='$(date +%Y%m%d%H%M%S)-$RANDOM'
     printf -v source_q '%q' "$1"
     printf -v target_q '%q' "$2"
-    printf 'cp -p %s %s.before-update-%s && cp %s %s' "$target_q" "$target_q" "$stamp" "$source_q" "$target_q"
+    # shellcheck disable=SC2016  # "$bak" is meant for the user's shell, which runs this command
+    printf 'bak=$(mktemp %s.before-update-XXXXXX) && cp -p %s "$bak" && cp %s %s' "$target_q" "$target_q" "$source_q" "$target_q"
 }
 
 # issue #375: owner:user protects the deployed copy from overwrite, but protection
@@ -499,7 +499,7 @@ saving_cp_command() {
 #              older release, but also the pilot's own edit committed into the clone (a fork
 #              with local commits, #963), so the text says so and the offered command saves the
 #              current copy next to it before the cp (see saving_cp_command: every path is
-#              escaped, and the saved copy's name is unique per run, so a second run cannot
+#              escaped, and the saved copy's name comes from mktemp, so a second run cannot
 #              replace the only copy of the pilot's edits with the refreshed file).
 #   authored - the copy equals no version in that history: the pilot's edits, a release that
 #              update.sh already applied to the clone (it never commits what it applies), or a
