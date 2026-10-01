@@ -13,9 +13,12 @@
 #   - .claude/lib/iwe-env-bootstrap.sh  (fallback when IWE_SCRIPTS is not set)
 # Both now accept the workspace scripts/ only when it holds a REGULAR
 # (non-symlink) session-guard.sh; otherwise IWE_SCRIPTS stays on the template's
-# scripts/. Five layouts run through BOTH writers. A regenerated .iwe-paths
-# also announces an IWE_SCRIPTS change even under --quiet, with the paths
-# resolved intact for a workspace whose path holds a space and '&'.
+# scripts/. Seven layouts run through BOTH writers. The marker is judged on the
+# file itself: a scripts/ that is a symlink to a directory holding a real
+# session-guard.sh still counts as a live checkout, a dangling one does not.
+# A regenerated .iwe-paths also announces an IWE_SCRIPTS change even under
+# --quiet, with the paths resolved intact for a workspace whose path holds a
+# space and '&'.
 #
 # Known limit (not asserted): the marker proves "this is a live checkout", not
 # that its file set is complete -- a partial live scripts/ still shadows the
@@ -87,6 +90,14 @@ layout_personal_name_clash() { # personal script named like a template one, no s
     mkdir -p "$1/scripts"
     stub_script "$1/scripts/day-open-preflight.sh"
 }
+layout_scripts_dir_symlink() { # scripts/ itself is a symlink to a directory with a real session-guard.sh
+    mkdir -p "$1/live-scripts"
+    stub_script "$1/live-scripts/session-guard.sh"
+    ln -s live-scripts "$1/scripts"
+}
+layout_scripts_dangling_symlink() { # scripts/ is a symlink to a directory that does not exist
+    ln -s no-such-dir "$1/scripts"
+}
 
 # "$BASH" is the interpreter running this test, so `/bin/bash test.sh` exercises
 # both writers on bash 3.2 end to end (a bare `bash` could resolve to bash 5).
@@ -119,12 +130,14 @@ run_layout() { # <name> <layout function> <expected: workspace|template>
     check "$name: iwe-env-bootstrap.sh  -> scripts/ of the $want" "$expected" "$(iwe_scripts_from_bootstrap "$ws")"
 }
 
-echo "--- five layouts, both writers of IWE_SCRIPTS ---"
+echo "--- seven layouts, both writers of IWE_SCRIPTS ---"
 run_layout audit-logs-only layout_audit_logs_only template
 run_layout hybrid-symlinks layout_hybrid_symlinks template
 run_layout live-copy layout_live_copy workspace
 run_layout no-scripts layout_no_scripts template
 run_layout personal-name-clash layout_personal_name_clash template
+run_layout scripts-dir-symlink layout_scripts_dir_symlink workspace
+run_layout scripts-dangling-symlink layout_scripts_dangling_symlink template
 
 echo "--- regeneration announces an IWE_SCRIPTS change even under --quiet ---"
 WS_A=$(make_ws announce)
