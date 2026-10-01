@@ -27,17 +27,24 @@ pass() { echo "  ✅ PASS: $*"; PASS_COUNT=$((PASS_COUNT + 1)); }
 
 [ -f "$PIPELINE" ] || { echo "FATAL: $PIPELINE not found" >&2; exit 2; }
 
-# --- 1. Closure of $DS_STRATEGY/scripts/ references in the pipeline ----------
+# --- 1. Closure of $SCRIPT_HOME/ references in the pipeline -------------------
 # Dynamic extraction (codex amendment: no hand-kept list): every literal
-# $DS_STRATEGY/scripts/<path> the pipeline mentions, in any call form (direct,
-# bash -c, heredoc) — the literal is what delivery must satisfy.
+# $SCRIPT_HOME/<path> the pipeline mentions, in any call form (direct, bash -c,
+# heredoc) — the literal is what delivery must satisfy. $SCRIPT_HOME is the
+# scripts/ directory the pipeline runs from (it used to be spelled
+# $DS_STRATEGY/scripts/ until issue #974: the template copy is not inside the
+# governance repo), so each reference maps to scripts/<path> of the template.
+# A parent-relative reference ($SCRIPT_HOME/.., e.g. the template-root marker
+# $SCRIPT_HOME/../update-manifest.json) is not a file delivered under scripts/
+# — skipped.
 echo "=== 1. Pipeline references resolve inside the delivery root ==="
-STRATEGY_REFS=$(grep -o '\$DS_STRATEGY/scripts/[a-zA-Z0-9._/-]*' "$PIPELINE" | sed 's|^\$DS_STRATEGY/||' | sort -u)
+# shellcheck disable=SC2016  # regex/sed literals: the $ must stay literal
+STRATEGY_REFS=$(grep -o '\$SCRIPT_HOME/[a-zA-Z0-9._/-]*' "$PIPELINE" | grep -v '^\$SCRIPT_HOME/\.\.' | sed 's|^\$SCRIPT_HOME/|scripts/|' | sort -u)
 # An empty extraction means the regex no longer matches the pipeline (variable
 # renamed, quoting changed) — every section below would loop zero times and the
 # test would pass while checking nothing (cold review 2026-08-21-17, High).
 if [ -z "$STRATEGY_REFS" ]; then
-  fail "no \$DS_STRATEGY/scripts/ references extracted from pipeline — extraction regex broken"
+  fail "no \$SCRIPT_HOME/ references extracted from pipeline — extraction regex broken"
 fi
 for rel in $STRATEGY_REFS; do
   f="$REPO_ROOT/$rel"

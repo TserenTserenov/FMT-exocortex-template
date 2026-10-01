@@ -13,8 +13,36 @@
 
 set -uo pipefail
 
-DS_STRATEGY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IWE="$(cd "$DS_STRATEGY/.." && pwd)"
+# SCRIPT_HOME is the directory this copy runs from. Executables and libraries
+# are always taken from here; DATA (WeekPlan, current/, inbox/, logs/ ...) lives
+# in the governance repository, $DS_STRATEGY.
+SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# issue #974: strategist.sh runs the copy inside the template checkout
+# (<workspace>/FMT-exocortex-template/scripts/), a SIBLING of the governance
+# repo, so deriving the repo from this file's location made the template look
+# like the governance repo. The template ships update-manifest.json at its root
+# and a governance repo never does: for a template copy the workspace root and
+# the governance repo come from the environment (lib/common.sh, as in
+# day-open-preflight.sh); a copy promoted into the governance repo itself keeps
+# deriving both from its location, which also beats a stale inherited environment.
+if [ -f "$SCRIPT_HOME/../update-manifest.json" ]; then
+  # shellcheck source=/dev/null
+  . "$SCRIPT_HOME/lib/common.sh" || {
+    echo "FATAL: lib/common.sh не найден рядом с $0 — копия шаблона неполная, обновите шаблон" >&2
+    exit 1
+  }
+  IWE="$(iwe_resolve_root)" || exit 1
+  GOV_REPO="$(iwe_resolve_governance_repo)"
+  DS_STRATEGY="$IWE/$GOV_REPO"
+else
+  DS_STRATEGY="$(cd "$SCRIPT_HOME/.." && pwd)"
+  IWE="$(cd "$DS_STRATEGY/.." && pwd)"
+  GOV_REPO="$(basename "$DS_STRATEGY")"
+fi
+if [ ! -d "$DS_STRATEGY" ]; then
+  echo "❌ Governance-репозиторий не найден: $DS_STRATEGY — задайте IWE_GOVERNANCE_REPO (имя его каталога в $IWE)" >&2
+  exit 1
+fi
 # Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
 # a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
 export IWE_ROOT="$IWE"
@@ -35,12 +63,12 @@ IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE/scripts}"
 export IWE_SCRIPTS
 # Every child process, including the background snapshot refresh below, must
 # resolve the same governance repository as this pipeline. launchd/cron do not
-# inherit the interactive shell setting, so derive it from the script location
-# before the first child process starts.
-export IWE_GOVERNANCE_REPO="$(basename "$DS_STRATEGY")"
+# inherit the interactive shell setting, so export the one resolved above before
+# the first child process starts.
+export IWE_GOVERNANCE_REPO="$GOV_REPO"
 CONFIG="$DS_STRATEGY/exocortex/day-rhythm-config.yaml"
 # shellcheck source=lib/ledger-path.sh
-. "$DS_STRATEGY/scripts/lib/ledger-path.sh"
+. "$SCRIPT_HOME/lib/ledger-path.sh"
 
 # Quarantine only provably orphaned semaphores (dead recorded pid). Old
 # semaphores without pid proof are reported and kept for manual review.
@@ -63,7 +91,7 @@ bash "$IWE_SCRIPTS/session-guard.sh" audit --cleanup-orphans \
 # before this block instead of moving the block back down.
 # ============================================
 echo "=== 1.5. Snapshot refresh (opportunistic) ==="
-(python3 "$DS_STRATEGY/scripts/update-derived-snapshot.py" --if-stale-days 10 \
+(python3 "$SCRIPT_HOME/update-derived-snapshot.py" --if-stale-days 10 \
   >> "$DS_STRATEGY/logs/personal-guide-update.log" 2>&1 || true) &
 SNAPSHOT_PID=$!
 echo "  snapshot refresh pid=$SNAPSHOT_PID (background, non-blocking)"
@@ -102,7 +130,7 @@ PROBE_START_S=$SECONDS
 # notification-render.sh — this promotion carries the transport fix only, not
 # a gated call site.
 # shellcheck source=lib/telegram.sh
-. "$DS_STRATEGY/scripts/lib/telegram.sh"
+. "$SCRIPT_HOME/lib/telegram.sh"
 
 tg_notify() {
   local msg="$1"
@@ -235,7 +263,9 @@ fi
 tg_notify "🌅 Day Open pipeline started for $DATE"
 
 # --- Lock file (prevent concurrent runs) ---
-LOCK_FILE="/tmp/day-open-pipeline.lock"
+# DAY_OPEN_LOCK_FILE exists so tests can keep the lock inside a throwaway dir
+# instead of the machine-wide /tmp path a real run holds.
+LOCK_FILE="${DAY_OPEN_LOCK_FILE:-/tmp/day-open-pipeline.lock}"
 if [ -f "$LOCK_FILE" ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
   if kill -0 "$LOCK_PID" 2>/dev/null; then
@@ -291,11 +321,11 @@ CALENDAR_OUT="$IWE/.tmp/calendar-$DATE.txt"
 # value carries a "/v1" suffix, while every call below appends its own "/v1/...".
 if [ -z "${LLM_PROXY_URL:-}" ]; then
   _platform_proxy="${PLATFORM_LLM_PROXY_URL:-}"
-  if [ -z "$_platform_proxy" ] && [ -f "$DS_STRATEGY/scripts/lib/common.sh" ]; then
+  if [ -z "$_platform_proxy" ] && [ -f "$SCRIPT_HOME/lib/common.sh" ]; then
     # Read in a subshell: common.sh defines its own tg_notify(), which would replace
     # this pipeline's (probe-aware, telegram.sh-based) one for the rest of the run.
     # shellcheck source=lib/common.sh
-    _platform_proxy=$( . "$DS_STRATEGY/scripts/lib/common.sh" && iwe_env_get "$IWE/.exocortex.env" PLATFORM_LLM_PROXY_URL 2>/dev/null ) || _platform_proxy=""
+    _platform_proxy=$( . "$SCRIPT_HOME/lib/common.sh" && iwe_env_get "$IWE/.exocortex.env" PLATFORM_LLM_PROXY_URL 2>/dev/null ) || _platform_proxy=""
   fi
   _platform_proxy="${_platform_proxy%/}"
   _platform_proxy="${_platform_proxy%/v1}"
@@ -398,7 +428,7 @@ trap cleanup EXIT
 # DS_STRATEGY state, so letting its failure through as a soft warning risks
 # committing whatever it left behind (Codex review, 2026-08-28).
 echo "=== 0. Extension graph: before ==="
-BEFORE_HOOK_OUT=$(bash "$DS_STRATEGY/scripts/day-open-hooks-runner.sh" before 2>&1)
+BEFORE_HOOK_OUT=$(bash "$SCRIPT_HOME/day-open-hooks-runner.sh" before 2>&1)
 BEFORE_HOOK_EXIT=$?
 echo "$BEFORE_HOOK_OUT"
 if [ $BEFORE_HOOK_EXIT -ne 0 ]; then
@@ -619,7 +649,7 @@ if [ -d "$DS_STRATEGY/.githooks" ] && [ -n "$(ls -A "$DS_STRATEGY/.githooks" 2>/
   CURRENT_HOOKS_PATH=$(git -C "$DS_STRATEGY" config core.hooksPath 2>/dev/null || echo "")
   if [ "$CURRENT_HOOKS_PATH" != ".githooks" ]; then
     echo "=== 1.2. Git hooks: core.hooksPath='$CURRENT_HOOKS_PATH' (expected .githooks) — self-healing ==="
-    if bash "$DS_STRATEGY/scripts/install-hooks.sh" "$DS_STRATEGY" >/dev/null 2>&1; then
+    if bash "$SCRIPT_HOME/install-hooks.sh" "$DS_STRATEGY" >/dev/null 2>&1; then
       echo "  Fixed: core.hooksPath=.githooks (force-push guard now active)"
       tg_notify "⚠️ Day Open: core.hooksPath на $DS_STRATEGY был не .githooks — pre-push force-push guard молчал. Автоматически починил (install-hooks.sh)."
     else
@@ -692,7 +722,7 @@ if [ "$PROXY_HEALTH" != "ok" ]; then
       echo "  Health check failed but port $PROXY_PORT is already held — not spawning a second proxy, just waiting."
     else
       echo "  Proxy not running. Starting via launcher (loads OPENROUTER_API_KEY from secrets)..."
-      bash "$DS_STRATEGY/scripts/llm-proxy-launcher.sh" "$PROXY_PORT" &
+      bash "$SCRIPT_HOME/llm-proxy-launcher.sh" "$PROXY_PORT" &
       PROXY_PID=$!
     fi
   else
@@ -888,7 +918,7 @@ if [ -z "$_RESOLVED_PYTHON3" ]; then
   echo "[ERROR] no python3 with PyYAML found (checked PATH and the resolver's standard candidate list, see scripts/lib/find-python3.sh)" > "$FILL_ERR_TMP"
   FILL_EXIT=1
 else
-  "$_RESOLVED_PYTHON3" "$DS_STRATEGY/scripts/day-open-llm-fill.py" \
+  "$_RESOLVED_PYTHON3" "$SCRIPT_HOME/day-open-llm-fill.py" \
     --scaffold "$DAYPLAN_PATH" \
     --weekplan "$WEEKPLAN_PATH" \
     --wp-registry "$WP_REGISTRY" \
@@ -931,7 +961,7 @@ fi
 # marker with unmarked prose. Running last makes this script the authoritative source.
 # ============================================
 echo "=== 4.2. Bottleneck patch ==="
-bash "$DS_STRATEGY/scripts/day-open-bottleneck-patch.sh" "$DAYPLAN_PATH" 2>&1 || true
+bash "$SCRIPT_HOME/day-open-bottleneck-patch.sh" "$DAYPLAN_PATH" 2>&1 || true
 
 
 # Shared resolver for the deterministic patch steps below (4.3, 4.55-4.57).
@@ -952,7 +982,7 @@ _PATCH_PY=$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh" 
 # own docstring for the graceful-degradation design.
 # ============================================
 echo "=== 4.3. Ledger render ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-ledger-render-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-ledger-render-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --date "$DATE" 2>&1 || true
 
@@ -960,7 +990,7 @@ echo "=== 4.3. Ledger render ==="
 # 4.5. Budget patch (deterministic: sum h column, no LLM hallucination)
 # ============================================
 echo "=== 4.5. Budget patch ==="
-python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
+python3 "$SCRIPT_HOME/day-open-budget-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
 
@@ -974,7 +1004,7 @@ python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
 # bare python3 — see _PATCH_PY above.
 # ============================================
 echo "=== 4.55. Priorities patch ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-priorities-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-priorities-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
 
@@ -985,7 +1015,7 @@ echo "=== 4.55. Priorities patch ==="
 # without a night cycle) — no-op then. Same non-blocking pattern as 4.55.
 # ============================================
 echo "=== 4.56. Close-error patch ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-close-error-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-close-error-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --error "${IWE_CLOSE_ERROR:-}" 2>&1 || true
 
@@ -1000,7 +1030,7 @@ echo "=== 4.56. Close-error patch ==="
 echo "=== 4.57. Version-check patch ==="
 if git -C "$DS_STRATEGY" remote get-url origin >/dev/null 2>&1 \
    && git -C "$DS_STRATEGY" rev-parse --verify --quiet origin/main >/dev/null 2>&1; then
-  "$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-version-check-patch.py" \
+  "$_PATCH_PY" "$SCRIPT_HOME/day-open-version-check-patch.py" \
     --dayplan "$DAYPLAN_PATH" \
     --repo "$DS_STRATEGY" 2>&1 || true
 else
@@ -1016,11 +1046,11 @@ fi
 # patches above — never blocks Open, never fabricates a value.
 # ============================================
 echo "=== 4.59. Multiplier backfill patch ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-multiplier-backfill-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-multiplier-backfill-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --ledger-root "$DS_STRATEGY/machine/ledger/day" \
   --date "$DATE" \
-  --ledger-append "$DS_STRATEGY/scripts/ledger-append.sh" 2>&1 || true
+  --ledger-append "$SCRIPT_HOME/ledger-append.sh" 2>&1 || true
 
 # ============================================
 # 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Ф2)
@@ -1133,7 +1163,7 @@ fi
 # orphans.md) sees the final content, and Checks below validates whatever
 # it left behind.
 echo "=== 4.8. Extension graph: after ==="
-AFTER_HOOK_OUT=$(bash "$DS_STRATEGY/scripts/day-open-hooks-runner.sh" after 2>&1)
+AFTER_HOOK_OUT=$(bash "$SCRIPT_HOME/day-open-hooks-runner.sh" after 2>&1)
 AFTER_HOOK_EXIT=$?
 echo "$AFTER_HOOK_OUT"
 if [ $AFTER_HOOK_EXIT -ne 0 ]; then
@@ -1145,7 +1175,7 @@ fi
 # 5. Checks
 # ============================================
 echo "=== 5. Checks ==="
-CHECKS_OUT=$(bash "$DS_STRATEGY/scripts/day-open-checks-runner.sh" "$DAYPLAN_PATH" 2>&1)
+CHECKS_OUT=$(bash "$SCRIPT_HOME/day-open-checks-runner.sh" "$DAYPLAN_PATH" 2>&1)
 CHECKS_EXIT=$?
 echo "$CHECKS_OUT"
 
