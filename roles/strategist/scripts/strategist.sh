@@ -181,16 +181,23 @@ log() {
 # The optional 5th argument names the branch on origin to publish to; empty = the
 # publisher's default (the branch checked out in $WORKSPACE). An isolated copy sits on
 # a local-only branch, so isolated_finish names the branch the copy was created from.
+# The optional 6th argument is a repo whose scripts/ds-publish.sh runs when $WORKSPACE has
+# none: update.sh puts the publisher into the canon's working tree without a commit
+# (backfill_ds_publish), so a copy made from origin/main of an upgraded install lacks it.
+# The publisher still publishes $WORKSPACE.
 PUBLISH_LAST_RC=""
 publish_commit_or_explain() {
-    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4" target_branch="${5:-}"
+    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4" target_branch="${5:-}" fallback_repo="${6:-}"
     local publisher="$WORKSPACE/scripts/ds-publish.sh"
 
+    PUBLISH_LAST_RC=""
+    if [ ! -f "$publisher" ] && [ -n "$fallback_repo" ] && [ -f "$fallback_repo/scripts/ds-publish.sh" ]; then
+        publisher="$fallback_repo/scripts/ds-publish.sh"
+    fi
     if [ ! -f "$publisher" ]; then
-        log "WARN: scripts/ds-publish.sh не установлен — коммит ${sha:0:12} остался локальным и не опубликован. Опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD${target_branch:+:$target_branch}"
+        log "WARN: scripts/ds-publish.sh не установлен${fallback_repo:+ (нет ни в копии, ни в $fallback_repo)} — коммит ${sha:0:12} остался локальным и не опубликован. Запустите update.sh: он доставляет публикатор в репозиторий управления. Или опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD${target_branch:+:$target_branch}"
         return 1
     fi
-    PUBLISH_LAST_RC=""
     local prc=0
     set -- "$WORKSPACE" normal --reason "$reason" --from-commit "$sha"
     [ -z "$target_branch" ] || set -- "$@" --branch "$target_branch"
@@ -629,7 +636,7 @@ isolated_finish() {  # <publish reason> <commit message>
         done
         if [ "$rc" -eq 0 ] && git -C "$WORKSPACE" commit -q -m "$msg" >> "$LOG_FILE" 2>&1 \
             && sha=$(git -C "$WORKSPACE" rev-parse HEAD 2>/dev/null) && [ -n "$sha" ]; then
-            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась" "$ISO_BASE_BRANCH"; then
+            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась" "$ISO_BASE_BRANCH" "$ISO_CANON_REPO"; then
                 ISOLATED_RESULT="published"
             else
                 # The publisher's own status (70/71/...) goes out as is; 72 is only for the

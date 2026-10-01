@@ -21,7 +21,7 @@ has 'ds-publish.sh' && check "ds-publish" ok || check "ds-publish" bad
 has 'GUARD_MODE=absent' && has 'mode=legacy' && check "explicit no-session-guard branch" ok || check "explicit no-session-guard branch" bad
 has ': "${GOV_WT:?}"' && has 'cd -- "$GOV_WT" || exit 1' && check "GOV_WT re-check in write blocks" ok || check "GOV_WT re-check in write blocks" bad
 has '--git-common-dir' && check "common-dir membership check" ok || check "common-dir membership check" bad
-has 'bash "$GOV_WT/scripts/ds-publish.sh" "$GOV_WT"' && has 'source "{{WORKSPACE_DIR}}/scripts/lib/common.sh"' && check "quoted paths" ok || check "quoted paths" bad
+has 'PUB="$GOV_WT/scripts/ds-publish.sh"' && has 'bash "$PUB" "$GOV_WT" normal' && has 'source "{{WORKSPACE_DIR}}/scripts/lib/common.sh"' && check "quoted paths" ok || check "quoted paths" bad
 # extensions come after the working-copy step
 o1=$(grep -n '^### Шаг 0\. Рабочая копия' "$SKILL" | head -1 | cut -d: -f1)
 o2=$(grep -n 'load-extensions.sh strategy-session before' "$SKILL" | head -1 | cut -d: -f1)
@@ -202,9 +202,11 @@ if [ -n "$f" ]; then
     || { detail "rc=$RC out=$OUT"; check "the session search finds this month's session file" bad; }
 fi
 
-# C1: the publication block, from the session-isolate copy, with the seed publisher, origin has only main
+# C1: the publication block, from the session-isolate copy, with the seed publisher, origin has only main.
+# Fresh install: the publisher is committed, so the copy has its own; the canon's file must not run.
 f=$(block_of publish)
 if [ -n "$f" ]; then
+  printf '#!/bin/bash\ntouch "%s"\nexit 1\n' "$C2/canon-publisher-ran" > "$CANON/scripts/ds-publish.sh"
   mkdir -p "$WT/current"; printf 'plan\n' > "$WT/current/WeekPlan W40.md"
   git -C "$WT" add "current/WeekPlan W40.md" && git -C "$WT" commit -q -m "strategy-session: week plan"
   run_block "$BLOCKS/$f"
@@ -212,6 +214,37 @@ if [ -n "$f" ]; then
     || { detail "rc=$RC out=$OUT"; check "publication: origin/main got the copy's commit" bad; }
   [ "$(git --git-dir="$ORIGIN" for-each-ref --format='%(refname:short)' refs/heads)" = main ] && check "publication: only main on origin" ok \
     || check "publication: only main on origin" bad
+  [ ! -e "$C2/canon-publisher-ran" ] && check "publication, fresh install: the copy's own publisher wins over the canon's file" ok \
+    || check "publication, fresh install: the copy's own publisher wins over the canon's file" bad
+
+  # Upgraded install: origin/main has no publisher, the canon holds it untracked (update.sh copies it in
+  # without a commit), so a copy made from origin/main has none: the canon's file publishes the copy.
+  git -C "$CANON" pull -q --ff-only origin main 2>/dev/null   # the canon is behind the publication above
+  git -C "$CANON" rm -q -f scripts/ds-publish.sh && git -C "$CANON" commit -q -m "no publisher on origin" && git -C "$CANON" push -q origin HEAD:main
+  mkdir -p "$CANON/scripts" && cp "$PUB" "$CANON/scripts/ds-publish.sh"   # git rm took the emptied folder away
+  [ -f "$CANON/scripts/ds-publish.sh" ] && [ -z "$(git -C "$CANON" ls-files scripts/ds-publish.sh)" ] \
+    && check "upgraded fixture: the canon has the publisher untracked" ok || check "upgraded fixture: the canon has the publisher untracked" bad
+  WT2="$C2/isolated-worktrees/claude-s2"
+  git -C "$CANON" worktree add -q -b session-isolate/claude-s2 "$WT2" origin/main 2>/dev/null
+  WT2_REAL=$(cd -P "$WT2" && pwd -P)
+  sed "s#$WT_REAL#$WT2_REAL#g" "$BLOCKS/$f" > "$C2/publish-upgraded.sh"
+  [ -e "$WT2/scripts/ds-publish.sh" ] && check "upgraded fixture: the copy has no publisher" bad || check "upgraded fixture: the copy has no publisher" ok
+  mkdir -p "$WT2/current"; printf 'plan\n' > "$WT2/current/WeekPlan W41.md"
+  git -C "$WT2" add "current/WeekPlan W41.md" && git -C "$WT2" commit -q -m "strategy-session: next week plan"
+  run_block "$C2/publish-upgraded.sh"
+  [ "$RC" -eq 0 ] && [ "$(git --git-dir="$ORIGIN" log -1 --format=%s main)" = "strategy-session: next week plan" ] \
+    && check "publication, upgraded install: the canon's publisher publishes the copy's commit" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, upgraded install: the canon's publisher publishes the copy's commit" bad; }
+
+  # No publisher anywhere: a non-zero exit that names update.sh, nothing published
+  rm "$CANON/scripts/ds-publish.sh"
+  printf 'more\n' >> "$WT2/current/WeekPlan W41.md"
+  git -C "$WT2" commit -q -am "strategy-session: not published"
+  before=$(git --git-dir="$ORIGIN" rev-parse main)
+  run_block "$C2/publish-upgraded.sh"
+  [ "$RC" -ne 0 ] && printf '%s' "$OUT" | grep -q 'update.sh' && [ "$(git --git-dir="$ORIGIN" rev-parse main)" = "$before" ] \
+    && check "publication, no publisher anywhere: non-zero exit, update.sh named, nothing published" ok \
+    || { detail "rc=$RC out=$OUT"; check "publication, no publisher anywhere: non-zero exit, update.sh named, nothing published" bad; }
 fi
 
 [ "$FAILURES" -eq 0 ] && { echo "ALL PASS"; exit 0; } || { echo "$FAILURES FAILED"; exit 1; }

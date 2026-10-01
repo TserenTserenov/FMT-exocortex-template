@@ -298,7 +298,42 @@ make_env
 rm -f "$CANON/scripts/ds-publish.sh"; git -C "$CANON" commit -q -am "drop publisher"; git -C "$CANON" push -q origin HEAD:main
 BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(canon_head)
 run_fn 'echo more >> inbox/fleeting-notes.md'
-check "publisher missing in the copy: blocked, copy preserved" "rc=72 result=blocked/1" "$(printf '%s' "$FN_OUT" | tail -1)/$(iso_copies)"
+check "publisher missing in the copy and the canon: blocked, copy preserved" "rc=72 result=blocked/1" "$(printf '%s' "$FN_OUT" | tail -1)/$(iso_copies)"
+check "publisher missing everywhere: the log says to run update.sh" "1" "$(printf '%s\n' "$FN_OUT" | grep -c 'не установлен.*Запустите update.sh')"
+check "publisher missing everywhere: nothing published" "0" "$(origin_commits)"
+
+# An install upgraded by update.sh: origin/main has no publisher, the canon holds it as an untracked
+# file (backfill_ds_publish copies it in without a commit), so a copy made from origin/main has none.
+make_upgraded_env() {
+    make_env
+    git -C "$CANON" rm -q scripts/ds-publish.sh && git -C "$CANON" commit -q -m "no publisher on origin" && git -C "$CANON" push -q origin HEAD:main
+    # git rm took the emptied scripts/ away; update.sh creates the folder the same way
+    mkdir -p "$CANON/scripts" && cp "$REAL_PUBLISHER" "$CANON/scripts/ds-publish.sh" && chmod +x "$CANON/scripts/ds-publish.sh"
+    BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(canon_head)
+    check "upgraded fixture: origin/main has no publisher, the canon has it untracked" "|?? scripts/ds-publish.sh" \
+        "$(git -C "$ORIGIN" ls-tree --name-only main scripts/ds-publish.sh)|$(canon_status_files)"
+}
+canon_status_files() { git -C "$CANON" status --porcelain --untracked-files=all; }   # an untracked folder shows its files
+canon_keeps_untracked_publisher() {  # <label>: the canon is untouched apart from the untracked publisher
+    check "$1: canon HEAD unchanged" "$CANON_HEAD" "$(canon_head)"
+    check "$1: canon working tree holds only the untracked publisher" "?? scripts/ds-publish.sh" "$(canon_status_files)"
+}
+
+echo "== A7u: upgraded install, the publisher only in the canon (untracked): the copy publishes with it =="
+make_upgraded_env
+run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
+check "upgraded install: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "upgraded install: origin/main got the runner's commit, only main on origin" "1|chore: test cleanup|main" \
+    "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)|$(origin_branches)"
+check "upgraded install: copy removed after publication" "0" "$(iso_copies)"
+canon_keeps_untracked_publisher "upgraded install"
+
+echo "== A7c: control, fresh install: the copy's own (committed) publisher wins over the canon's file =="
+make_env
+printf '#!/bin/bash\ntouch "%s"\nexit 1\n' "$E/canon-publisher-ran" > "$CANON/scripts/ds-publish.sh"
+run_fn 'echo more >> inbox/fleeting-notes.md'
+check "copy wins: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "copy wins: the canon's file never ran" "0" "$([ -e "$E/canon-publisher-ran" ] && echo 1 || echo 0)"
 
 echo "== A7b: commit failure blocks =="
 make_env
@@ -369,6 +404,15 @@ check "seed publisher: copy removed, no strategist/* branch left" "0|" "$(iso_co
 check "seed publisher: the log shows the publication to origin/main" "1" \
     "$(grep -c 'ds-publish: .* -> origin/main (strategist: cleanup)' "$HOME_DIR/logs/strategist/"*.log | awk '{print ($1 > 0)}')"
 canon_untouched "seed publisher end to end"
+
+echo "== B1u: upgraded install end to end: note-review in the copy, the publisher from the canon =="
+make_upgraded_env
+run_runner noop note-review
+check "upgraded install: runner exits 0" "0" "$RC"
+check "upgraded install: origin/main got one commit with the two allowlisted files, only main on origin" \
+    "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md|main" "$(origin_commits)|$(origin_paths)|$(origin_branches)"
+check "upgraded install: copy removed" "0" "$(iso_copies)"
+canon_keeps_untracked_publisher "upgraded install end to end"
 
 echo "== B2: isolated note-review, model writes outside the allowlist =="
 make_env
