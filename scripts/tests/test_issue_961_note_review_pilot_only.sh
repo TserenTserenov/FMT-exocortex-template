@@ -8,8 +8,9 @@
 # Layers (no network, no real HOME; every runner and notifier is a double):
 #   A. text contract: roles/strategist/prompts/note-review.md, day-plan.md, the seed box legend,
 #      and the cleanup script's safety net (a proposed note is never swept up);
-#   B. roles/synchronizer/scripts/scheduler.sh: the REAL dispatch, run in a sandbox with a fake clock
-#      and recording stub runners, never starts note-review (neither the evening run nor the catch-up);
+#   B. roles/synchronizer/scripts/scheduler.sh: the REAL dispatch, run in a sandbox with a fake clock, a fake
+#      platform name (Darwin and Linux, the two sleep-inhibitor branches) and recording stub runners, never
+#      starts note-review (neither the evening run nor the catch-up) and ends with exit code 0 on both platforms;
 #   C. Day Open scanner: the REAL render_fleeting_notes of scripts/ and of the seed snapshot lists a
 #      "✅предложено" note as awaiting the pilot;
 #   D. the Telegram text of a finished Note-Review no longer claims the inbox was cleaned;
@@ -151,9 +152,13 @@ check "cleanup: a note the pilot struck through is archived even though the mark
 
 # ==== LAYER B: the scheduler never starts note-review ====
 echo "== B: scheduler.sh dispatch =="
-# A fake clock (date shim for +%H and +%u only) and recording stub runners next to a COPY of scheduler.sh,
-# so the real script resolves its helpers (code-scan, daily-report) and runners from the sandbox.
+# A fake clock (date shim for +%H and +%u only), a fake platform name (uname shim) and recording stub runners next to a
+# COPY of scheduler.sh, so the real script resolves its helpers (code-scan, daily-report) and runners from the sandbox.
+# scheduler.sh keeps the machine awake differently per platform: `caffeinate` on Darwin, a background
+# `systemd-inhibit ... sleep infinity` that an EXIT trap kills anywhere else. Every case runs under both platform names,
+# so a Mac exercises the Linux branch and a Linux runner the Darwin one.
 REAL_DATE="$(command -v date)"
+REAL_UNAME="$(command -v uname)"
 cat > "$SB/shim/date" <<EOF
 #!/bin/bash
 case "\$1" in
@@ -162,11 +167,36 @@ case "\$1" in
     *) exec "$REAL_DATE" "\$@" ;;
 esac
 EOF
-for tool in caffeinate systemd-inhibit; do
-    printf '#!/bin/bash\nexit 0\n' > "$SB/shim/$tool"
+cat > "$SB/shim/uname" <<EOF
+#!/bin/bash
+[ -n "\${FAKE_UNAME:-}" ] || exec "$REAL_UNAME" "\$@"
+case "\${1:-}" in
+    ""|-s) printf 'uname %s\n' "\$FAKE_UNAME" >> "\${PLATFORM_LOG:-/dev/null}"; printf '%s\n' "\$FAKE_UNAME" ;;
+    *) exec "$REAL_UNAME" "\$@" ;;
+esac
+EOF
+printf '#!/bin/bash\nexit 0\n' > "$SB/shim/caffeinate"
+# The Linux inhibitor. The real systemd-inhibit skips its own --options and runs the wrapped command in its place; the
+# stub does the same, so the PID that scheduler.sh keeps in $! is a live process and the EXIT trap (kill $_INHIBIT_PID)
+# succeeds. A stub that returned at once left the trap a dead PID: kill exited 1 and so did the whole dispatch on Linux
+# ("dispatch completed" printed, exit code 1). BSD sleep (macOS) does not accept "infinity", a long number stands for it.
+cat > "$SB/shim/systemd-inhibit" <<'EOF'
+#!/bin/bash
+while [ $# -gt 0 ]; do
+    case "$1" in --*) shift ;; *) break ;; esac
 done
-# macOS only: the dispatch reads the AC sleep setting, and under pipefail an empty answer would abort it
-printf '#!/bin/bash\nprintf "AC Power:\\n sleep 0\\nBattery Power:\\n sleep 1\\n"\n' > "$SB/shim/pmset"
+[ $# -gt 0 ] || exit 0
+if [ "$1" = sleep ] && [ "${2:-}" = infinity ]; then set -- sleep 600; fi
+exec "$@"
+EOF
+# macOS only: the dispatch reads the AC sleep setting, and under pipefail an empty answer would abort it. The call is
+# recorded: it happens in the foreground and on the Darwin branch only, which makes it the control that the branch ran
+# (the inhibitors themselves run in the background and may be killed before they write anything)
+cat > "$SB/shim/pmset" <<'EOF'
+#!/bin/bash
+printf 'pmset %s\n' "$*" >> "$PLATFORM_LOG"
+printf 'AC Power:\n sleep 0\nBattery Power:\n sleep 1\n'
+EOF
 chmod +x "$SB/shim/"*
 
 mkdir -p "$SB/sched/scripts" "$SB/runtime/roles/strategist/scripts" "$SB/runtime/roles/extractor/scripts"
@@ -179,33 +209,44 @@ printf '#!/bin/bash\nprintf "extractor %%s\\n" "$*" >> "$CALLS_LOG"\nexit 0\n' >
 chmod +x "$SB/sched/scripts/"*.sh "$SB/runtime/roles/strategist/scripts/strategist.sh" "$SB/runtime/roles/extractor/scripts/extractor.sh"
 
 RUN_N=0
-run_scheduler() {  # <fake hour> <fake day of week>; sets SCHED_RC, SCHED_HOME; recorded runner calls -> $SB/calls.log
+run_scheduler() {  # <fake hour> <fake day of week> <platform name>; sets SCHED_RC, SCHED_HOME; runner calls -> $SB/calls.log
     RUN_N=$((RUN_N + 1))
     SCHED_HOME="$SB/sched-home-$RUN_N"
     mkdir -p "$SCHED_HOME"
     : > "$SB/calls.log"
+    : > "$SB/platform.log"
     SCHED_RC=0
     env -i HOME="$SCHED_HOME" PATH="$SB/shim:$PATH" TMPDIR="$SB/tmp" IWE_TEMPLATE="$ROOT" IWE_RUNTIME="$SB/runtime" \
-        IWE_WORKSPACE="$SB/ws" CALLS_LOG="$SB/calls.log" FAKE_HOUR="$1" FAKE_DOW="$2" \
+        IWE_WORKSPACE="$SB/ws" CALLS_LOG="$SB/calls.log" PLATFORM_LOG="$SB/platform.log" \
+        FAKE_HOUR="$1" FAKE_DOW="$2" FAKE_UNAME="$3" \
         bash "$SB/sched/scripts/scheduler.sh" dispatch > "$SB/sched.out" 2>&1 || SCHED_RC=$?
 }
 state_markers() {  # <name fragment> -> number of scheduler state markers whose name contains it
     find "$SCHED_HOME/.local/state/exocortex" -name "*$1*" 2>/dev/null | wc -l | tr -d ' '
 }
 
-echo "-- 23:00 on a Monday: the evening slot of the old nightly run (week-review is the control) --"
-run_scheduler 23 1
-check "dispatch completed" "0/1" "$SCHED_RC/$(count_fixed 'dispatch completed' "$SB/sched.out")"
-check "control: the stub strategist runner is wired in (week-review ran)" "1" "$(count_fixed 'strategist week-review' "$SB/calls.log")"
-check "note-review was NOT started in the evening" "0" "$(count_fixed 'note-review' "$SB/calls.log")"
-check "no note-review state marker was written" "0" "$(state_markers note-review)"
+for B_PLATFORM in Darwin Linux; do
+    B_EXPECT_PMSET=1
+    [ "$B_PLATFORM" = Linux ] && B_EXPECT_PMSET=0
 
-echo "-- 09:00 on a Wednesday: the morning catch-up of the old nightly run (morning is the control) --"
-run_scheduler 9 3
-check "dispatch completed" "0/1" "$SCHED_RC/$(count_fixed 'dispatch completed' "$SB/sched.out")"
-check "control: the stub strategist runner is wired in (morning ran)" "1" "$(count_fixed 'strategist morning' "$SB/calls.log")"
-check "note-review was NOT started as a catch-up for yesterday" "0" "$(count_fixed 'note-review' "$SB/calls.log")"
-check "no note-review state marker (yesterday or today) was written" "0" "$(state_markers note-review)"
+    echo "-- $B_PLATFORM, 23:00 on a Monday: the evening slot of the old nightly run (week-review is the control) --"
+    run_scheduler 23 1 "$B_PLATFORM"
+    check "$B_PLATFORM: dispatch completed" "0/1" "$SCHED_RC/$(count_fixed 'dispatch completed' "$SB/sched.out")"
+    check_at_least "$B_PLATFORM: control: scheduler.sh asked for the platform and got $B_PLATFORM" 1 "$(count_fixed "uname $B_PLATFORM" "$SB/platform.log")"
+    check "$B_PLATFORM: control: the AC sleep setting is read (pmset) on Darwin and only there" "$B_EXPECT_PMSET" "$(count_fixed 'pmset' "$SB/platform.log")"
+    check "$B_PLATFORM: control: the stub strategist runner is wired in (week-review ran)" "1" "$(count_fixed 'strategist week-review' "$SB/calls.log")"
+    check "$B_PLATFORM: note-review was NOT started in the evening" "0" "$(count_fixed 'note-review' "$SB/calls.log")"
+    check "$B_PLATFORM: no note-review state marker was written" "0" "$(state_markers note-review)"
+
+    echo "-- $B_PLATFORM, 09:00 on a Wednesday: the morning catch-up of the old nightly run (morning is the control) --"
+    run_scheduler 9 3 "$B_PLATFORM"
+    check "$B_PLATFORM: dispatch completed" "0/1" "$SCHED_RC/$(count_fixed 'dispatch completed' "$SB/sched.out")"
+    check_at_least "$B_PLATFORM: control: scheduler.sh asked for the platform and got $B_PLATFORM" 1 "$(count_fixed "uname $B_PLATFORM" "$SB/platform.log")"
+    check "$B_PLATFORM: control: the AC sleep setting is read (pmset) on Darwin and only there" "$B_EXPECT_PMSET" "$(count_fixed 'pmset' "$SB/platform.log")"
+    check "$B_PLATFORM: control: the stub strategist runner is wired in (morning ran)" "1" "$(count_fixed 'strategist morning' "$SB/calls.log")"
+    check "$B_PLATFORM: note-review was NOT started as a catch-up for yesterday" "0" "$(count_fixed 'note-review' "$SB/calls.log")"
+    check "$B_PLATFORM: no note-review state marker (yesterday or today) was written" "0" "$(state_markers note-review)"
+done
 
 # ==== LAYER C: the Day Open scanner ====
 echo "== C: Day Open scanner (render_fleeting_notes) =="
