@@ -907,20 +907,37 @@ already_ran_today() {
 # D16 (#983, #981): the morning Day Open never falls back to the free-form day-plan prompt -- it
 # ignores priorities.yaml and the scaffold and invents the plan (an "unavailable" calendar,
 # mandatory items nobody configured, half the commits). A failed Day Open is logged with its reason
-# and alarmed by one day-open-failed message a day; the plan is then built in a live session.
-# Structural failures end the day (GAVE UP + exit 0, the scheduler marks the day). Any other pipeline
-# code is passed out for the scheduler to retry. Attempts are counted when they START: the
-# scheduler's timeout kills this script before it could record an end. The explicit
-# `strategist.sh day-plan` below still runs the prompt by hand.
+# and alarmed by one delivered day-open-failed message a day; the plan is then built in a live
+# session. Structural failures end the day (GAVE UP + exit 0, the scheduler marks the day). A
+# deferral (exit 7) is no failure: no alarm, not an attempt, exit 7. Any other pipeline code is
+# passed out for the scheduler to retry. Attempts are counted when they START: the scheduler's
+# timeout kills this script before it could record an end. The explicit `strategist.sh day-plan`
+# below still runs the prompt by hand.
 DAY_OPEN_MAX_ATTEMPTS=3
 DAY_OPEN_ATTEMPT_MARK="RECORDED: day-open attempt"
+DAY_OPEN_DEFERRED_MARK="RECORDED: day-open deferred"
 DAY_OPEN_OK_MARK="Morning: Day Open pipeline OK"
 DAY_OPEN_ALARM_MARK="ALARM: day-open-failed"
+# What notify.sh prints into the same log once the Bot API accepted the message (send_telegram):
+# only a delivered alarm counts, a failed send is retried by the next attempt.
+DAY_OPEN_ALARM_SENT_MARK="Telegram notification sent: strategist/day-open-failed"
+# The pipeline's own contract (day-open-pipeline.sh, steps 1 and 1.1/1.1b): 7 = deferred, not done
+# (yesterday is not closed yet, the triage report is still being published, the week is closing).
+DAY_OPEN_DEFERRED_RC=7
+# The scheduler reads exit 2 as "lock held, another run is in progress" (scheduler.sh
+# run_strategist_scenario); a pipeline that failed with 2 is passed out as this code instead.
+DAY_OPEN_RC2_SUBSTITUTE=73
 DAY_OPEN_ATTEMPT=0
 
-day_open_alarm() {  # <reason code> <reason text> [exit code]; at most one message a day (by today's log)
-    if grep -qF "$DAY_OPEN_ALARM_MARK" "$LOG_FILE" 2>/dev/null; then
-        log "Day Open: тревога сегодня уже отправлена, повторно не шлю ($2)"
+count_in_log() {  # <literal text> -> number of today's log lines that contain it, 0 without a log
+    local n
+    n=$(grep -cF -- "$1" "$LOG_FILE" 2>/dev/null || true)
+    echo "${n:-0}"
+}
+
+day_open_alarm() {  # <reason code> <reason text> [exit code]; at most one delivered message a day
+    if grep -qF "$DAY_OPEN_ALARM_SENT_MARK" "$LOG_FILE" 2>/dev/null; then
+        log "Day Open: тревога сегодня уже доставлена, повторно не шлю ($2)"
         return 0
     fi
     log "$DAY_OPEN_ALARM_MARK ($2)"
@@ -936,25 +953,34 @@ day_open_give_up() {  # <reason code> <reason text> [exit code]; no more morning
 
 day_open_start_attempt() {  # gives up instead when DAY_OPEN_MAX_ATTEMPTS attempts already started today
     local started
-    started=$(grep -cF "$DAY_OPEN_ATTEMPT_MARK" "$LOG_FILE" 2>/dev/null || true)
-    started="${started:-0}"
+    # A deferred run started an attempt too, but it is no failure and does not count.
+    started=$(( $(count_in_log "$DAY_OPEN_ATTEMPT_MARK") - $(count_in_log "$DAY_OPEN_DEFERRED_MARK") ))
     # A plan built earlier today is no failure: a later run (RunAtLoad after a reboot) reaches the
     # pipeline, whose own dedup answers "already committed".
     if [ "$started" -ge "$DAY_OPEN_MAX_ATTEMPTS" ] && ! grep -qF "$DAY_OPEN_OK_MARK" "$LOG_FILE" 2>/dev/null; then
         day_open_give_up attempts-exhausted "за сегодня начато попыток: $started, ни одна не собрала план (ошибка или прерывание по тайм-ауту)"
     fi
     DAY_OPEN_ATTEMPT=$((started + 1))
-    log "$DAY_OPEN_ATTEMPT_MARK $DAY_OPEN_ATTEMPT (предел $DAY_OPEN_MAX_ATTEMPTS за день)"
+    log "$DAY_OPEN_ATTEMPT_MARK $DAY_OPEN_ATTEMPT (предел $DAY_OPEN_MAX_ATTEMPTS за день, отсрочки не считаются)"
+}
+
+day_open_deferred() {  # the pipeline deferred the day (exit 7) and reported it itself; exits 7, the scheduler retries later
+    log "$DAY_OPEN_DEFERRED_MARK: конвейер отложил Открытие дня (код 7: вчерашний день ещё не закрыт, отчёт triage ещё готовится или закрывается неделя). Это не сбой: тревоги нет, попытка не засчитана, повтор при следующем запуске планировщика"
+    exit "$DAY_OPEN_DEFERRED_RC"
 }
 
 day_open_transient_failure() {  # <pipeline exit code>; exits with it (the scheduler retries) or gives up on the last attempt
-    local rc="$1"
+    local rc="$1" out_rc="$1" note=""
     if [ "$DAY_OPEN_ATTEMPT" -ge "$DAY_OPEN_MAX_ATTEMPTS" ]; then
         day_open_give_up attempts-exhausted "попытка $DAY_OPEN_ATTEMPT из $DAY_OPEN_MAX_ATTEMPTS тоже не удалась: конвейер завершился с кодом $rc" "$rc"
     fi
     day_open_alarm pipeline-failed "конвейер Открытия дня завершился с кодом $rc, попытка $DAY_OPEN_ATTEMPT из $DAY_OPEN_MAX_ATTEMPTS" "$rc"
-    log "FAILED scenario: day-plan (rc=$rc) -- план дня не собран, выхожу с кодом конвейера, планировщик повторит"
-    exit "$rc"
+    if [ "$rc" -eq 2 ]; then
+        out_rc=$DAY_OPEN_RC2_SUBSTITUTE
+        note=" (код конвейера 2 передаю как $out_rc: планировщик читает 2 как «другой запуск ещё идёт»)"
+    fi
+    log "FAILED scenario: day-plan (rc=$rc) -- план дня не собран, выхожу с кодом $out_rc$note, повтор при следующем запуске планировщика"
+    exit "$out_rc"
 }
 
 # Note-Review canary (#961): number of NEW notes in fleeting-notes.md, i.e. bold titles that carry
@@ -1146,6 +1172,8 @@ case "$1" in
             bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
             if [ "$pipeline_rc" -eq 0 ]; then
                 log "$DAY_OPEN_OK_MARK (scaffold + llm-fill)"
+            elif [ "$pipeline_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
+                day_open_deferred
             elif [ "$pipeline_rc" -eq 9 ]; then
                 # issue #893: exit 9 = no gateway configured (day-open-pipeline.sh
                 # §2), a case the pipeline itself already ships an answer for
@@ -1156,6 +1184,8 @@ case "$1" in
                 bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
                 if [ "$scaffold_rc" -eq 0 ]; then
                     log "$DAY_OPEN_OK_MARK (scaffold only, no gateway)"
+                elif [ "$scaffold_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
+                    day_open_deferred
                 else
                     day_open_give_up scaffold-only-failed "шлюз модели не настроен (код 9), повтор с --scaffold-only тоже не прошёл: код $scaffold_rc (причина в строках выше)" "$scaffold_rc"
                 fi

@@ -95,7 +95,7 @@ extract_function() {  # <name> -> the function, from its header line to the firs
     awk -v head="$1() {" 'index($0, head) == 1 { on = 1 } on { print } on && /^}/ { exit }' "$STRATEGIST"
 }
 HELPERS="$(grep -E '^DAY_OPEN_[A-Z_]+=' "$STRATEGIST")
-$(for fn in day_open_alarm day_open_give_up day_open_start_attempt day_open_transient_failure; do extract_function "$fn"; done)"
+$(for fn in count_in_log day_open_alarm day_open_give_up day_open_start_attempt day_open_deferred day_open_transient_failure; do extract_function "$fn"; done)"
 if ! printf '%s\n' "$HELPERS" | grep -q '^day_open_transient_failure() {'; then
     fail_test "could not cut the D16 helpers out of strategist.sh — names changed, update this test"
     echo "Result: $fail FAIL"
