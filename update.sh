@@ -2317,9 +2317,12 @@ run_sync_canary() {
         return 0
     fi
 
+    # IWE_TEMPLATE: a copy of the bundle kept in the governance repo has no scripts/lib next
+    # to it, and the shared WP-number library (wp-num.sh, issue #954) lives in the template
+    # clone -- tell the bundle where it is instead of failing the canary on a missing file.
     local canary_output canary_status
     canary_output=$(IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$governance_repo" \
-        bash "$sync_bundle" --self-test 2>&1)
+        IWE_TEMPLATE="$SCRIPT_DIR" bash "$sync_bundle" --self-test 2>&1)
     canary_status=$?
     if [ "$canary_status" -eq 0 ]; then
         echo "  ✓ Canary (реестр РП): OK"

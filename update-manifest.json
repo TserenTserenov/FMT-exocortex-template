@@ -2841,7 +2841,7 @@
     },
     {
       "path": "scripts/tests/test_issue_718_sync_canary.sh",
-      "sha256": "79aabff7ed9bf948e16e76e3de86168d62eb4c572fbbc65a3d327ac0ebc0c36c"
+      "sha256": "e81c67cad1f1727e830453e30c4aa21c8c0e9adf3a27424d8b7df942429b56df"
     },
     {
       "path": "scripts/tests/test_issue_720_decision_log_sot.sh",
@@ -3145,7 +3145,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "3436d597f9afc55761318a1341e89625602171f3b266c0c07e816f4a10354a1e"
+      "sha256": "771fd91241bfa84633fcf5cc84490736031fbf9c06f5479fadeedaf88e23443e"
     }
   ],
   "excluded_paths": [
