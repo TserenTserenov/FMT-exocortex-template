@@ -484,7 +484,7 @@ Pilot-owned content that intentionally differs.
 EOF
 
 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d.log" 2>&1 || true
-if grep -qF "memory/dummy-memo.md — НЕ обновлён: не удалось проверить, менялся ли файл (нет классификатора). Принять версию шаблона: " "$TEST_ROOT/out-d.log" && \
+if grep -qF "memory/dummy-memo.md — НЕ обновлён: не удалось проверить, менялся ли файл (нет классификатора истории). Сверьте: diff " "$TEST_ROOT/out-d.log" && \
    grep -q 'Pilot-owned content that intentionally differs' "$MEM_DST"; then
     pass "D: a differing copy nothing proves untouched is kept, with the reason and a ready command, on an unchanged run"
 else
@@ -507,7 +507,7 @@ fi
 # can mislead).
 # ------------------------------------------------------------------
 echo "--- Scenario D2: memory policy by the clone's history — committed version / no committed version / unknown (#965 #967) ---"
-D2_COMMITTED_TEXT='обновлён (не менялся: равен версии из истории клона шаблона; если это ваша правка, закоммиченная в клон, она в прежней версии)'
+D2_COMMITTED_TEXT='обновлён (не менялся: равен версии из истории клона шаблона; если в клоне шаблона была ваша правка, она в прежней версии)'
 D2_UNCOMMITTED_TEXT='не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)'
 cp "$UPSTREAM/memory/dummy-memo.md" "$TEST_ROOT/memo-upstream.txt"
 mkdir -p "$SCRIPT_DIR/.claude/scripts"
@@ -560,12 +560,12 @@ d2_commit_memo() {
     git -C "$SCRIPT_DIR" add memory/dummy-memo.md
     git -C "$SCRIPT_DIR" commit -q -m "$2"
 }
-# d2_hint_of LOG TEXT — the command at the end of the line that carries TEXT: the reason and the
-# command to accept the template version are one line ("… Принять версию шаблона: <command>").
+# d2_hint_of LOG TEXT — the command at the end of the line that carries TEXT: the reason, the diff
+# and the command to accept the template version are one line ("… копия останется): <command>").
 d2_hint_of() {
     local line
     line=$(grep -F "$2" "$TEST_ROOT/$1" | head -1)
-    printf '%s\n' "${line#*Принять версию шаблона: }"
+    printf '%s\n' "${line#*копия останется): }"
 }
 # A `date` that always prints the same value: the name of the saved copy must not depend on the
 # clock or on a shell's random numbers (the two runs below get the same date and the same seed).
@@ -602,7 +602,7 @@ d2_check_save_hint() {
 d2_untracked_entry add
 
 d2_run_update out-d-authored.log
-if grep -qF "memory/dummy-memo.md — НЕ обновлён: $D2_UNCOMMITTED_TEXT. Принять версию шаблона: " "$TEST_ROOT/out-d-authored.log" && \
+if grep -qF "memory/dummy-memo.md — НЕ обновлён: $D2_UNCOMMITTED_TEXT. Сверьте: diff " "$TEST_ROOT/out-d-authored.log" && \
    grep -q 'Pilot-owned content that intentionally differs' "$MEM_DST"; then
     pass "D2: a copy that equals no committed version is kept, named with both possible causes and a ready command"
 else
@@ -613,7 +613,7 @@ if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-authored.
 else
     pass "D2: the report no longer says 'probably your edits' on its own"
 fi
-if grep -qF "memory/untracked-memo.md — НЕ обновлён: не удалось проверить, менялся ли файл (no-history). Принять версию шаблона: " "$TEST_ROOT/out-d-authored.log"; then
+if grep -qF "memory/untracked-memo.md — НЕ обновлён: не удалось проверить, менялся ли файл (в истории клона шаблона нет этого файла). Сверьте: diff " "$TEST_ROOT/out-d-authored.log"; then
     pass "D2: an undecidable history (verdict unknown) keeps the copy and says it cannot be checked"
 else
     fail "D2: the unknown verdict did not keep the copy with its reason: $(grep -n 'untracked-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
@@ -681,23 +681,29 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Scenario D4: the copy equals no committed version, yet the pilot edited nothing. update.sh
-# applies a release to the clone WITHOUT committing it, so after the pilot copied release one
-# into the memory directory (the cp the report suggests) and release two arrived, the copy
-# is release one — which exists in no commit of the clone.
+# Scenario D4 (review С2, #965): the copy is an earlier release that update.sh itself put in place.
+# update.sh never commits what it applies, so no commit of the clone knows that release, and the
+# history check alone would keep such a copy forever (this scenario used to pin exactly that). The
+# record of installed versions, written by the run that found the copy equal to the template,
+# proves it untouched, so the next release reaches it.
 # ------------------------------------------------------------------
-echo "--- Scenario D4: an applied earlier release is not blamed on the pilot (cold review of #965/#967) ---"
-printf -- '---\nowner: user\n---\nRelease one text of the memo\n' > "$MEM_DST"
+echo "--- Scenario D4: an earlier release update.sh installed is refreshed by the record (#965, review С2) ---"
+printf -- '---\nowner: user\n---\nRelease one text of the memo\n' > "$UPSTREAM/memory/dummy-memo.md"
+cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
+cp "$UPSTREAM/memory/dummy-memo.md" "$MEM_DST"
+d2_memo_sha
+d2_run_update out-d-release-one.log
+# Release two lands in the clone; the memory copy stays on release one.
 printf -- '---\nowner: user\n---\nRelease two text of the memo\n' > "$UPSTREAM/memory/dummy-memo.md"
 cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
 d2_memo_sha
 
 d2_run_update out-d-release.log
-if grep -qF "memory/dummy-memo.md — НЕ обновлён: $D2_UNCOMMITTED_TEXT" "$TEST_ROOT/out-d-release.log" && \
-   grep -q 'Release one text of the memo' "$MEM_DST"; then
-    pass "D4: the copy is kept and the line names an already applied earlier release as a possible cause"
+if grep -qF "memory/dummy-memo.md → memory/ — обновлён (не менялся: равен версии, установленной в прошлый раз" "$TEST_ROOT/out-d-release.log" && \
+   cmp -s "$MEM_DST" "$SCRIPT_DIR/memory/dummy-memo.md"; then
+    pass "D4: an earlier release update.sh installed, unknown to the clone's history, is refreshed by the record"
 else
-    fail "D4: the earlier-release cause is missing: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-release.log" | head -3 | tr '\n' ' ')"
+    fail "D4: the copy of an earlier installed release stays old: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-release.log" | head -3 | tr '\n' ' ')"
 fi
 if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-release.log"; then
     fail "D4: the report says 'probably your edits' for an unedited copy of an earlier release"
@@ -955,10 +961,10 @@ else
     fail "I: the edited memory file was replaced or backed up for a replacement"
 fi
 I_LINE=$(grep -F 'memory/dummy-memo.md — НЕ обновлён: ' "$TEST_ROOT/out-i.log" | head -1 || true)
-if grep -qF 'Принять версию шаблона: ' <<<"$I_LINE" && \
+if grep -qF '. Сверьте: diff ' <<<"$I_LINE" && grep -qF 'Принять версию шаблона (ваши правки пропадут, копия останется): ' <<<"$I_LINE" && \
    ! grep -qF 'Заменено файлов памяти' "$TEST_ROOT/out-i.log" && \
    grep -F 'Не обновлено файлов памяти' "$TEST_ROOT/out-i.log" | grep -qF ': 1 (memory/dummy-memo.md)'; then
-    pass "I: one line gives the reason and a ready command; the summary counts the kept file and replaces none"
+    pass "I: one line gives the reason, a diff and then the command; the summary counts the kept file and replaces none"
 else
     fail "I: no kept-file line with a command, or a wrong summary: '${I_LINE:-<none>}'"
 fi
@@ -990,7 +996,7 @@ if [ "$RC_J" -eq 0 ] && cmp -s "$MEM_DST" "$UPSTREAM/memory/dummy-memo.md" && [ 
 else
     fail "J: the untouched owner: user copy did not follow the release (rc=$RC_J, backup: ${J_BACKUP:-none}): $(grep -n 'dummy-memo' "$TEST_ROOT/out-j.log" | head -3 | tr '\n' ' ')"
 fi
-if grep -qF 'memory/dummy-memo.md → memory/ — обновлён (не менялся: равен прошлой версии шаблона)' "$TEST_ROOT/out-j.log" && \
+if grep -qF 'memory/dummy-memo.md → memory/ — обновлён (не менялся: равен прошлой версии шаблона; если в клоне шаблона была ваша правка, она в прежней версии)' "$TEST_ROOT/out-j.log" && \
    grep -F 'Заменено файлов памяти: 1 (memory/dummy-memo.md)' "$TEST_ROOT/out-j.log" | grep -qF "$WORKSPACE_DIR/.backups/memory-pre-update"; then
     pass "J: the line names the proof, the closing summary names the file and the backup directory"
 else
@@ -1008,6 +1014,84 @@ if [ "$RC_J2" -eq 0 ] && [ "$J_MEMORY_STATE" = "$(cksum < "$MEM_DST")" ] && \
     pass "J: a second run of the same release changes nothing and backs up nothing"
 else
     fail "J: the repeated run changed the memory copy or its backups (rc=$RC_J2): $(grep -nE 'dummy-memo|Заменено' "$TEST_ROOT/out-j2.log" | head -3 | tr '\n' ' ')"
+fi
+
+# ------------------------------------------------------------------
+# Scenario K (review С1): a run stops with code 49 between Step 5 and Step 6 (conflict markers left
+# in the workspace CLAUDE.md): the clone carries the new release, the memory copy does not, and the
+# hashes this run took in Step 2 are gone with its temporary directory. The next run must still
+# refresh the untouched copy - the record of installed versions proves it - and must keep an edited
+# one, its record line unchanged.
+# ------------------------------------------------------------------
+echo "--- Scenario K: a broken-off run (code 49 before Step 6), then the next run (review С1) ---"
+# k_break TEXT LOG — release TEXT reaches the clone, and the run stops with code 49 before Step 6
+# (markers left over in the workspace CLAUDE.md); the markers are resolved afterwards.
+k_break() {
+    printf -- '---\nowner: user\n---\n%s\n' "$1" > "$UPSTREAM/memory/dummy-memo.md"
+    d2_memo_sha
+    printf '<<<<<<< left over from an earlier run\n' >> "$WORKSPACE_DIR/CLAUDE.md"
+    set +e
+    PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/$2" 2>&1
+    K_RC=$?
+    set -e
+    sed_inplace '/^<<<<<<< left over from an earlier run$/d' "$WORKSPACE_DIR/CLAUDE.md"
+}
+# k_record_line — the record's line for the memo, if any.
+k_record_line() { grep -F 'memory/dummy-memo.md' "$WORKSPACE_DIR/.memory-deployed.tsv" 2>/dev/null || true; }
+K_BEFORE=$(cat "$MEM_DST")
+k_break "Release eight text of the memo" out-k-broken.log
+if [ "$K_RC" -eq 49 ] && [ "$(cat "$MEM_DST")" = "$K_BEFORE" ] && grep -q 'Release eight' "$SCRIPT_DIR/memory/dummy-memo.md"; then
+    pass "K: the run stops with code 49 after the clone took the release and before the memory copy did"
+else
+    fail "K: the broken-off run did not stop between Step 5 and Step 6 (rc=$K_RC)"
+fi
+d2_run_update out-k.log
+if grep -qF 'memory/dummy-memo.md → memory/ — обновлён (не менялся: равен версии, установленной в прошлый раз' "$TEST_ROOT/out-k.log" && \
+   cmp -s "$MEM_DST" "$UPSTREAM/memory/dummy-memo.md"; then
+    pass "K: the next run refreshes the untouched copy the broken-off run left behind"
+else
+    fail "K: the copy left behind by the broken-off run stays old: $(grep -n 'dummy-memo' "$TEST_ROOT/out-k.log" | head -3 | tr '\n' ' ')"
+fi
+printf 'Pilot line written after the update\n' >> "$MEM_DST"
+K_EDITED=$(cat "$MEM_DST")
+K_RECORD_LINE=$(k_record_line)
+k_break "Release nine text of the memo" out-k2-broken.log
+d2_run_update out-k2.log
+if [ "$(cat "$MEM_DST")" = "$K_EDITED" ] && grep -qF 'memory/dummy-memo.md — НЕ обновлён: ' "$TEST_ROOT/out-k2.log" && \
+   [ -n "$K_RECORD_LINE" ] && [ "$(k_record_line)" = "$K_RECORD_LINE" ]; then
+    pass "K: an edited copy stays through a broken-off run, its record line still naming the version installed before"
+else
+    fail "K: the edited copy or its record line changed after a broken-off run: $(grep -n 'dummy-memo' "$TEST_ROOT/out-k2.log" | head -3 | tr '\n' ' ')"
+fi
+
+# ------------------------------------------------------------------
+# Scenario L (review С2): an installation from before the record. The copy equals the clone's file,
+# which update.sh brought (no commit knows it); the first run finds them equal and starts the
+# record. Later the copy falls two releases behind - a broken-off run, then one more release - and
+# neither the clone's history nor this run's replaced version can prove it untouched; the record can.
+# ------------------------------------------------------------------
+echo "--- Scenario L: an installed copy two releases behind, its record started by a later run (review С2) ---"
+rm -f "$WORKSPACE_DIR/.memory-deployed.tsv"
+printf -- '---\nowner: user\n---\nRelease ten text of the memo\n' > "$UPSTREAM/memory/dummy-memo.md"
+cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
+cp "$UPSTREAM/memory/dummy-memo.md" "$MEM_DST"
+d2_memo_sha
+d2_run_update out-l1.log
+L_TEN_LINE=$(printf 'memory/dummy-memo.md\t%s' "$(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$MEM_DST")")
+if [ "$(k_record_line)" = "$L_TEN_LINE" ]; then
+    pass "L: a run that finds the copy equal to the template starts its record line"
+else
+    fail "L: no record line after a run that found the copy equal to the template: '$(k_record_line)'"
+fi
+k_break "Release eleven text of the memo" out-l2-broken.log
+printf -- '---\nowner: user\n---\nRelease twelve text of the memo\n' > "$UPSTREAM/memory/dummy-memo.md"
+d2_memo_sha
+d2_run_update out-l3.log
+if grep -qF 'memory/dummy-memo.md → memory/ — обновлён (не менялся: равен версии, установленной в прошлый раз' "$TEST_ROOT/out-l3.log" && \
+   cmp -s "$MEM_DST" "$UPSTREAM/memory/dummy-memo.md"; then
+    pass "L: a copy two releases behind, unknown to the clone's history, is refreshed by the record"
+else
+    fail "L: the copy two releases behind stays old: $(grep -n 'dummy-memo' "$TEST_ROOT/out-l3.log" | head -3 | tr '\n' ' ')"
 fi
 
 # ------------------------------------------------------------------

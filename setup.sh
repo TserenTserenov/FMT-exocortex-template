@@ -354,6 +354,49 @@ iwe_claude_project_slug() {
     printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
 }
 
+# hash_file FILE — the file's sha256, as update.sh computes it.
+# KEEP IN SYNC with update.sh — the same function body; setup/test-update-edge-cases.sh (T47) fails
+# when the copies diverge.
+hash_file() {
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        sha256sum "$1" | cut -d' ' -f1
+    fi
+}
+
+# memory_record_put FILE KEY HASH — the record of installed memory versions
+# ($WORKSPACE_DIR/.memory-deployed.tsv, one "key<TAB>sha256" line per file): afterwards its line for
+# KEY says HASH. update.sh reads it to tell a memory copy nobody changed from an edited one (issues
+# #965/#967). Written through a temporary file and mv; returns non-zero, without a word, when it
+# cannot write.
+# KEEP IN SYNC with update.sh — the same function body; setup/test-update-edge-cases.sh (T47) fails
+# when the copies diverge.
+memory_record_put() {
+    local file="$1" key="$2" hash="$3" tmp line value tab
+    tab=$(printf '\t')
+    case "$hash" in *[!0-9a-f]*|'') return 1 ;; esac
+    [ "${#hash}" -eq 64 ] || return 1
+    if [ -e "$file" ] && [ ! -f "$file" ]; then
+        return 1
+    fi
+    tmp=$(mktemp "$file.XXXXXX" 2>/dev/null) || return 1
+    if [ -r "$file" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in *"$tab"*) ;; *) continue ;; esac
+            value="${line##*"$tab"}"
+            case "$value" in *[!0-9a-f]*|'') continue ;; esac
+            [ "${#value}" -eq 64 ] || continue
+            [ "${line%"$tab"*}" = "$key" ] || printf '%s\n' "$line"
+        done < "$file" > "$tmp"
+    fi
+    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" && mv -f "$tmp" "$file"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
 CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$WORKSPACE_DIR")"
 
 # === Governance repo contract (WP-560 Ф5-Phase-2) ===
@@ -719,6 +762,17 @@ else
         [ -f "$f" ] && cp "$f" "$CLAUDE_MEMORY_DIR/"
     done
     echo "  Copied to $CLAUDE_MEMORY_DIR"
+    # issues #965/#967: record what was installed, so update.sh can later prove a copy nobody
+    # changed untouched and refresh it. A record that cannot be written only costs that proof.
+    MEMORY_RECORD_FAILED=false
+    for f in "$TEMPLATE_DIR/memory/"*.md "$TEMPLATE_DIR/memory/"*.yaml "$TEMPLATE_DIR/memory/"*.yml; do
+        [ -f "$f" ] || continue
+        memory_record_put "$WORKSPACE_DIR/.memory-deployed.tsv" "memory/$(basename "$f")" \
+            "$(hash_file "$CLAUDE_MEMORY_DIR/$(basename "$f")")" || MEMORY_RECORD_FAILED=true
+    done
+    if $MEMORY_RECORD_FAILED; then
+        echo "  ВНИМАНИЕ: не удалось записать $WORKSPACE_DIR/.memory-deployed.tsv; update.sh будет отличать нетронутые файлы памяти от изменённых по другим признакам." >&2
+    fi
 
     # Create symlink so CLAUDE.md references (memory/protocol-open.md etc.) resolve from workspace root
     if [ ! -e "$WORKSPACE_DIR/memory" ]; then
