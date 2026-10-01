@@ -257,7 +257,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "d4a1e46b807b72531cf6851714cebbcc692674389e1a358fa7c2b221241beb0e"
+      "sha256": "7c07900eda58963500bf01af7a454cf0806499d1bb243981f6770ffa4496ad4a"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -3109,7 +3109,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "f2151e2a744cd3cc3694c1a95180b5682b94093f948129f9e1b8b16213d38075"
+      "sha256": "06136873a0a83f56bb0a6b0e34b10f9486c283a77c7295f58b7db9d7e1b86a50"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3245,6 +3245,8 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_957_iwe_scripts_marker.sh",
+    "scripts/tests/test_issue_966_sessions_root.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
