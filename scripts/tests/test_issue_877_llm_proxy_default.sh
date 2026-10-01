@@ -42,7 +42,8 @@ if [ ! -s "$TMP/resolve.sh" ] || ! grep -q 'LLM_PROXY_URL=' "$TMP/resolve.sh"; t
 fi
 
 # resolve <case-name> [VAR=value ...] : run the block in a clean shell, print the result.
-# DS_STRATEGY/IWE point at a throwaway tree that carries the real lib/common.sh.
+# DS_STRATEGY/IWE point at a throwaway tree; SCRIPT_HOME is its scripts/ dir, which
+# carries the real lib/common.sh (the pipeline reads it from where it runs, issue #974).
 resolve() {
     local name="$1"; shift
     local ds="$TMP/$name/ds" iwe="$TMP/$name/iwe"
@@ -51,7 +52,7 @@ resolve() {
     [ -f "$TMP/$name.envfile" ] && cp "$TMP/$name.envfile" "$iwe/.exocortex.env"
     # The pipeline defines its own tg_notify() before this block; sourcing lib/common.sh
     # (which defines a different one) must not replace it. A sentinel stands in for it.
-    env -i PATH="$PATH" HOME="$TMP/$name/home" DS_STRATEGY="$ds" IWE="$iwe" CLOBBER_LOG="$TMP/clobber.log" "$@" \
+    env -i PATH="$PATH" HOME="$TMP/$name/home" DS_STRATEGY="$ds" SCRIPT_HOME="$ds/scripts" IWE="$iwe" CLOBBER_LOG="$TMP/clobber.log" "$@" \
         bash -c '
             tg_notify() { echo SENTINEL_PIPELINE_TG_NOTIFY; }
             before=$(declare -f tg_notify)

@@ -14,60 +14,12 @@
 
 set -uo pipefail
 
-DS_STRATEGY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IWE="$(cd "$DS_STRATEGY/.." && pwd)"
-# Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
-# a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
-export IWE_ROOT="$IWE"
-# issue #756: session-guard.sh, day-open-scaffold.sh and the other helpers
-# called below live inside the template (FMT-exocortex-template/scripts/),
-# not directly under $IWE/scripts -- that directory does not exist on any
-# install where the template sits as a subdirectory of the workspace (the
-# layout setup.sh itself produces). $IWE_SCRIPTS is written once at
-# install/update time (install-iwe-paths.sh's .iwe-paths, sourced via
-# ~/.zshenv; the systemd unit templates bake it into Environment=) rather
-# than re-derived on every invocation the way $IWE/$DS_STRATEGY are above --
-# an inherited value from a DIFFERENT checkout (e.g. running this exact
-# script from an isolated worktree with the main workspace's env still
-# exported) would silently win over the correct co-located $IWE/scripts
-# fallback. $IWE/scripts stays as that fallback for an install where scripts
-# really were flattened into the workspace root.
-IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE/scripts}"
-export IWE_SCRIPTS
-# Every child process, including the background snapshot refresh below, must
-# resolve the same governance repository as this pipeline. launchd/cron do not
-# inherit the interactive shell setting, so derive it from the script location
-# before the first child process starts.
-export IWE_GOVERNANCE_REPO="$(basename "$DS_STRATEGY")"
-CONFIG="$DS_STRATEGY/exocortex/day-rhythm-config.yaml"
-# shellcheck source=lib/ledger-path.sh
-. "$DS_STRATEGY/scripts/lib/ledger-path.sh"
-
-# Quarantine only provably orphaned semaphores (dead recorded pid). Old
-# semaphores without pid proof are reported and kept for manual review.
-mkdir -p "$IWE/.iwe-runtime"
-bash "$IWE_SCRIPTS/session-guard.sh" audit --cleanup-orphans \
-  >> "$IWE/.iwe-runtime/session-orphan-sweep.log" 2>&1 || true
-
-# ============================================
-# 1.5. Opportunistic derived_snapshot refresh (WP-425 Level 2a)
-# Runs update-derived-snapshot.py --if-stale-days=10 in background.
-# Non-blocking: Day Open continues even if the refresh fails.
-#
-# Above every early-exit branch on purpose (WP-5 VDV correction, 2026-07-09):
-# it serves guide freshness, not today's plan, so it must fire on every
-# invocation regardless of how Day Open itself resolves. `--if-stale-days`
-# is the only throttle — don't move it back below an early-exit.
-# Runs before secrets are sourced further down — fine today, since
-# update-derived-snapshot.py authenticates via the claude CLI session, not
-# via any of AIST_ENV/ANTHROPIC_ENV. If it ever needs those, source secrets
-# before this block instead of moving the block back down.
-# ============================================
-echo "=== 1.5. Snapshot refresh (opportunistic) ==="
-(python3 "$DS_STRATEGY/scripts/update-derived-snapshot.py" --if-stale-days 10 \
-  >> "$DS_STRATEGY/logs/personal-guide-update.log" 2>&1 || true) &
-SNAPSHOT_PID=$!
-echo "  snapshot refresh pid=$SNAPSHOT_PID (background, non-blocking)"
+# SCRIPT_HOME is the directory this copy runs from. Day Open's own helpers (patch
+# scripts, hook/check runners, lib/) are taken from here; the tools shared with the
+# strategist job (session-guard, preflight, scaffold, server-calendar,
+# git-dirty-guard) come from $IWE_SCRIPTS. DATA (WeekPlan, current/, inbox/, logs/
+# ...) lives in the governance repository, $DS_STRATEGY.
+SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- CLI args ---
 FORCE=false
@@ -94,6 +46,32 @@ done
 DATE="${DATE:-$(date +%Y-%m-%d)}"
 PROBE_START_S=$SECONDS
 
+# --- Secrets (must load before the first tg_notify call of a normal run — WP-5 Ubuntu-audit
+# П2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
+# pipeline-started notifications, so those two silently no-op'd every run) ---
+source_env_if_present() {
+  [ -f "$1" ] || return 0
+  set -a
+  source "$1"
+  set +a
+}
+load_secrets() {
+  source_env_if_present "$HOME/.config/aist/env"
+  source_env_if_present "$HOME/IWE/.secrets/anthropic_key.env"  # Anthropic API key for llm-proxy (WP-356)
+  # WP-484 Ф50b named this file as the readable ANTHROPIC_API_KEY source for the
+  # remote-gateway fallback below (line ~534) but never sourced it -- the fallback
+  # chain silently resolved to empty and the authorized probe 401'd (found live
+  # 2026-08-05 running --probe ahead of a scheduled test run).
+  source_env_if_present "$HOME/.iwe/.proxy-env"
+  # WP-484 F64 (06.08): TELEGRAM_* live in ~/.secrets/tg-bots (canonical source per
+  # lib/telegram.sh) — none of the three files above carry them on tsekh-1, so every
+  # tg_notify on the server (incl. the "День открыт" digest and all aborts) was a
+  # silent no-op since the migration. Same fix as day-open-pipeline-watchdog.sh.
+  source_env_if_present "$HOME/.secrets/tg-bots"
+  TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+  TG_CHAT="${TELEGRAM_CHAT_ID:-}"
+}
+
 # --- Helper: send TG notification, transport unified onto lib/telegram.sh ---
 # MUST be defined before first call (regression fix 2026-06-29). WP-538 Ф3:
 # was a raw curl POST duplicating http_code/ok:true checking that
@@ -102,9 +80,6 @@ PROBE_START_S=$SECONDS
 # only in the author's personal governance repo so far, not this template's
 # notification-render.sh — this promotion carries the transport fix only, not
 # a gated call site.
-# shellcheck source=lib/telegram.sh
-. "$DS_STRATEGY/scripts/lib/telegram.sh"
-
 tg_notify() {
   local msg="$1"
   if [ "$PROBE" = "true" ]; then
@@ -117,6 +92,111 @@ tg_notify() {
   fi
   telegram_send "$msg" || { echo "  [tg delivery FAILED] $msg" | head -2; return 1; }
 }
+
+# A refusal while the workspace is being resolved (below) happens before the normal path
+# loads the secrets and the Telegram transport (after the snapshot refresh child below has
+# started with the plain environment), so load them here and report the way abort() does:
+# a failed night run must not be silent (issue #974). The exit code is unchanged.
+early_abort() {
+  local reason="$1"
+  echo "❌ $reason" >&2
+  if [ -f "$SCRIPT_HOME/lib/telegram.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$SCRIPT_HOME/lib/telegram.sh"
+    load_secrets
+    tg_notify "🚨 Day Open pipeline aborted: ${reason}" || true
+  fi
+  exit 1
+}
+
+# issue #974: strategist.sh runs the copy inside the template checkout
+# (<workspace>/FMT-exocortex-template/scripts/), a SIBLING of the governance
+# repo, so deriving the repo from this file's location made the template look
+# like the governance repo. The template ships update-manifest.json at its root
+# and a governance repo never does: for a template copy the workspace root and
+# the governance repo come from the environment (lib/common.sh, as in
+# day-open-preflight.sh); a copy promoted into the governance repo itself keeps
+# deriving both from its location, which also beats a stale inherited environment.
+if [ -f "$SCRIPT_HOME/../update-manifest.json" ]; then
+  [ -f "$SCRIPT_HOME/lib/common.sh" ] \
+    || early_abort "lib/common.sh не найден рядом с $0 — копия шаблона неполная, обновите шаблон"
+  # Subshells: common.sh defines its own tg_notify(), which would replace the one above.
+  # shellcheck source=/dev/null
+  IWE="$( . "$SCRIPT_HOME/lib/common.sh" && iwe_resolve_root 2>&1 )" \
+    || early_abort "Не определён корень рабочего пространства: $IWE"
+  # shellcheck source=/dev/null
+  GOV_REPO="$( . "$SCRIPT_HOME/lib/common.sh" && iwe_resolve_governance_repo )"
+  DS_STRATEGY="$IWE/$GOV_REPO"
+  if [ ! -d "$DS_STRATEGY" ]; then
+    if [ -n "${IWE_WORKSPACE:-}" ]; then ROOT_SOURCE="IWE_WORKSPACE"
+    elif [ -n "${IWE_ROOT:-}" ]; then ROOT_SOURCE="IWE_ROOT"
+    else ROOT_SOURCE="расположение скрипта (или WORKSPACE_DIR из .exocortex.env)"
+    fi
+    early_abort "Governance-репозиторий не найден: $DS_STRATEGY. Корень $IWE взят из: $ROOT_SOURCE — проверьте, что он верный и не устарел, и что в нём есть каталог $GOV_REPO (имя задаёт переменная IWE_GOVERNANCE_REPO; без неё берётся имя репозитория управления по умолчанию)"
+  fi
+  SCRIPTS_FALLBACK="$SCRIPT_HOME"
+else
+  DS_STRATEGY="$(cd "$SCRIPT_HOME/.." && pwd)"
+  IWE="$(cd "$DS_STRATEGY/.." && pwd)"
+  GOV_REPO="$(basename "$DS_STRATEGY")"
+  SCRIPTS_FALLBACK="$IWE/scripts"
+fi
+# Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
+# a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
+export IWE_ROOT="$IWE"
+# issue #756: session-guard.sh, day-open-scaffold.sh and the other shared helpers
+# called below live inside the template (FMT-exocortex-template/scripts/), not
+# directly under $IWE/scripts -- that directory does not exist on any install
+# where the template sits as a subdirectory of the workspace (the layout
+# setup.sh itself produces). $IWE_SCRIPTS is written once at install/update time
+# (install-iwe-paths.sh's .iwe-paths, sourced via ~/.zshenv; the systemd unit
+# templates bake it into Environment=) rather than re-resolved on every
+# invocation -- an inherited value from a DIFFERENT checkout (e.g. running this
+# exact script from an isolated worktree with the main workspace's env still
+# exported) would silently win over the co-located fallback. The fallback is the
+# directory this copy runs from for a template copy (issue #974: there is no
+# <workspace>/scripts on that layout) and $IWE/scripts for a promoted copy, for
+# an install where scripts really were flattened into the workspace root.
+IWE_SCRIPTS="${IWE_SCRIPTS:-$SCRIPTS_FALLBACK}"
+export IWE_SCRIPTS
+# Every child process, including the background snapshot refresh below, must
+# resolve the same governance repository as this pipeline. launchd/cron do not
+# inherit the interactive shell setting, so export the one resolved above before
+# the first child process starts.
+export IWE_GOVERNANCE_REPO="$GOV_REPO"
+CONFIG="$DS_STRATEGY/exocortex/day-rhythm-config.yaml"
+# shellcheck source=lib/ledger-path.sh
+. "$SCRIPT_HOME/lib/ledger-path.sh"
+
+# Quarantine only provably orphaned semaphores (dead recorded pid). Old
+# semaphores without pid proof are reported and kept for manual review.
+mkdir -p "$IWE/.iwe-runtime"
+bash "$IWE_SCRIPTS/session-guard.sh" audit --cleanup-orphans \
+  >> "$IWE/.iwe-runtime/session-orphan-sweep.log" 2>&1 || true
+
+# ============================================
+# 1.5. Opportunistic derived_snapshot refresh (WP-425 Level 2a)
+# Runs update-derived-snapshot.py --if-stale-days=10 in background.
+# Non-blocking: Day Open continues even if the refresh fails.
+#
+# Above every early-exit branch on purpose (WP-5 VDV correction, 2026-07-09):
+# it serves guide freshness, not today's plan, so it must fire on every
+# invocation regardless of how Day Open itself resolves. `--if-stale-days`
+# is the only throttle — don't move it back below an early-exit.
+# Runs before secrets are sourced further down — fine today, since
+# update-derived-snapshot.py authenticates via the claude CLI session, not
+# via any of AIST_ENV/ANTHROPIC_ENV. If it ever needs those, source secrets
+# before this block instead of moving the block back down.
+# ============================================
+echo "=== 1.5. Snapshot refresh (opportunistic) ==="
+(python3 "$SCRIPT_HOME/update-derived-snapshot.py" --if-stale-days 10 \
+  >> "$DS_STRATEGY/logs/personal-guide-update.log" 2>&1 || true) &
+SNAPSHOT_PID=$!
+echo "  snapshot refresh pid=$SNAPSHOT_PID (background, non-blocking)"
+
+# Telegram transport behind tg_notify() (defined near the top of this file).
+# shellcheck source=lib/telegram.sh
+. "$SCRIPT_HOME/lib/telegram.sh"
 
 # --- Helper: portable single-field read from a Y-m-d date string ---
 # BSD `date -j` (macOS) vs GNU `date -d` (Linux/tsekh-1) -- third use of this
@@ -173,30 +253,9 @@ raise SystemExit(1)
   return 1
 }
 
-# --- Secrets (must load before the first tg_notify call below — WP-5 Ubuntu-audit
-# П2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
-# pipeline-started notifications, so those two silently no-op'd every run) ---
-source_env_if_present() {
-  [ -f "$1" ] || return 0
-  set -a
-  source "$1"
-  set +a
-}
-source_env_if_present "$HOME/.config/aist/env"
-source_env_if_present "$HOME/IWE/.secrets/anthropic_key.env"  # Anthropic API key for llm-proxy (WP-356)
-# WP-484 Ф50b named this file as the readable ANTHROPIC_API_KEY source for the
-# remote-gateway fallback below (line ~534) but never sourced it -- the fallback
-# chain silently resolved to empty and the authorized probe 401'd (found live
-# 2026-08-05 running --probe ahead of a scheduled test run).
-source_env_if_present "$HOME/.iwe/.proxy-env"
-# WP-484 F64 (06.08): TELEGRAM_* live in ~/.secrets/tg-bots (canonical source per
-# lib/telegram.sh) — none of the three files above carry them on tsekh-1, so every
-# tg_notify on the server (incl. the "День открыт" digest and all aborts) was a
-# silent no-op since the migration. Same fix as day-open-pipeline-watchdog.sh.
-source_env_if_present "$HOME/.secrets/tg-bots"
-
-TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-TG_CHAT="${TELEGRAM_CHAT_ID:-}"
+# --- Secrets: loaded here, after the snapshot refresh child was started with the
+# plain environment (see 1.5 above) and before the first tg_notify call ---
+load_secrets
 
 # --- Guard: already committed today (D2 dedup) ---
 # Checks by file presence in git history, not commit message prefix —
@@ -236,7 +295,9 @@ fi
 tg_notify "🌅 Day Open pipeline started for $DATE"
 
 # --- Lock file (prevent concurrent runs) ---
-LOCK_FILE="/tmp/day-open-pipeline.lock"
+# DAY_OPEN_LOCK_FILE exists so tests can keep the lock inside a throwaway dir
+# instead of the machine-wide /tmp path a real run holds.
+LOCK_FILE="${DAY_OPEN_LOCK_FILE:-/tmp/day-open-pipeline.lock}"
 if [ -f "$LOCK_FILE" ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
   if kill -0 "$LOCK_PID" 2>/dev/null; then
@@ -292,11 +353,11 @@ CALENDAR_OUT="$IWE/.tmp/calendar-$DATE.txt"
 # value carries a "/v1" suffix, while every call below appends its own "/v1/...".
 if [ -z "${LLM_PROXY_URL:-}" ]; then
   _platform_proxy="${PLATFORM_LLM_PROXY_URL:-}"
-  if [ -z "$_platform_proxy" ] && [ -f "$DS_STRATEGY/scripts/lib/common.sh" ]; then
+  if [ -z "$_platform_proxy" ] && [ -f "$SCRIPT_HOME/lib/common.sh" ]; then
     # Read in a subshell: common.sh defines its own tg_notify(), which would replace
     # this pipeline's (probe-aware, telegram.sh-based) one for the rest of the run.
     # shellcheck source=lib/common.sh
-    _platform_proxy=$( . "$DS_STRATEGY/scripts/lib/common.sh" && iwe_env_get "$IWE/.exocortex.env" PLATFORM_LLM_PROXY_URL 2>/dev/null ) || _platform_proxy=""
+    _platform_proxy=$( . "$SCRIPT_HOME/lib/common.sh" && iwe_env_get "$IWE/.exocortex.env" PLATFORM_LLM_PROXY_URL 2>/dev/null ) || _platform_proxy=""
   fi
   _platform_proxy="${_platform_proxy%/}"
   _platform_proxy="${_platform_proxy%/v1}"
@@ -399,7 +460,7 @@ trap cleanup EXIT
 # DS_STRATEGY state, so letting its failure through as a soft warning risks
 # committing whatever it left behind (Codex review, 2026-08-28).
 echo "=== 0. Extension graph: before ==="
-BEFORE_HOOK_OUT=$(bash "$DS_STRATEGY/scripts/day-open-hooks-runner.sh" before 2>&1)
+BEFORE_HOOK_OUT=$(bash "$SCRIPT_HOME/day-open-hooks-runner.sh" before 2>&1)
 BEFORE_HOOK_EXIT=$?
 echo "$BEFORE_HOOK_OUT"
 if [ $BEFORE_HOOK_EXIT -ne 0 ]; then
@@ -620,7 +681,7 @@ if [ -d "$DS_STRATEGY/.githooks" ] && [ -n "$(ls -A "$DS_STRATEGY/.githooks" 2>/
   CURRENT_HOOKS_PATH=$(git -C "$DS_STRATEGY" config core.hooksPath 2>/dev/null || echo "")
   if [ "$CURRENT_HOOKS_PATH" != ".githooks" ]; then
     echo "=== 1.2. Git hooks: core.hooksPath='$CURRENT_HOOKS_PATH' (expected .githooks) — self-healing ==="
-    if bash "$DS_STRATEGY/scripts/install-hooks.sh" "$DS_STRATEGY" >/dev/null 2>&1; then
+    if bash "$SCRIPT_HOME/install-hooks.sh" "$DS_STRATEGY" >/dev/null 2>&1; then
       echo "  Fixed: core.hooksPath=.githooks (force-push guard now active)"
       tg_notify "⚠️ Day Open: core.hooksPath на $DS_STRATEGY был не .githooks — pre-push force-push guard молчал. Автоматически починил (install-hooks.sh)."
     else
@@ -693,7 +754,7 @@ if [ "$PROXY_HEALTH" != "ok" ]; then
       echo "  Health check failed but port $PROXY_PORT is already held — not spawning a second proxy, just waiting."
     else
       echo "  Proxy not running. Starting via launcher (loads OPENROUTER_API_KEY from secrets)..."
-      bash "$DS_STRATEGY/scripts/llm-proxy-launcher.sh" "$PROXY_PORT" &
+      bash "$SCRIPT_HOME/llm-proxy-launcher.sh" "$PROXY_PORT" &
       PROXY_PID=$!
     fi
   else
@@ -889,7 +950,7 @@ if [ -z "$_RESOLVED_PYTHON3" ]; then
   echo "[ERROR] no python3 with PyYAML found (checked PATH and the resolver's standard candidate list, see scripts/lib/find-python3.sh)" > "$FILL_ERR_TMP"
   FILL_EXIT=1
 else
-  "$_RESOLVED_PYTHON3" "$DS_STRATEGY/scripts/day-open-llm-fill.py" \
+  "$_RESOLVED_PYTHON3" "$SCRIPT_HOME/day-open-llm-fill.py" \
     --scaffold "$DAYPLAN_PATH" \
     --weekplan "$WEEKPLAN_PATH" \
     --wp-registry "$WP_REGISTRY" \
@@ -932,7 +993,7 @@ fi
 # marker with unmarked prose. Running last makes this script the authoritative source.
 # ============================================
 echo "=== 4.2. Bottleneck patch ==="
-bash "$DS_STRATEGY/scripts/day-open-bottleneck-patch.sh" "$DAYPLAN_PATH" 2>&1 || true
+bash "$SCRIPT_HOME/day-open-bottleneck-patch.sh" "$DAYPLAN_PATH" 2>&1 || true
 
 
 # Shared resolver for the deterministic patch steps below (4.3, 4.55-4.57).
@@ -953,7 +1014,7 @@ _PATCH_PY=$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh" 
 # own docstring for the graceful-degradation design.
 # ============================================
 echo "=== 4.3. Ledger render ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-ledger-render-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-ledger-render-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --date "$DATE" 2>&1 || true
 
@@ -961,7 +1022,7 @@ echo "=== 4.3. Ledger render ==="
 # 4.5. Budget patch (deterministic: sum h column, no LLM hallucination)
 # ============================================
 echo "=== 4.5. Budget patch ==="
-python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
+python3 "$SCRIPT_HOME/day-open-budget-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
 
@@ -975,7 +1036,7 @@ python3 "$DS_STRATEGY/scripts/day-open-budget-patch.py" \
 # bare python3 — see _PATCH_PY above.
 # ============================================
 echo "=== 4.55. Priorities patch ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-priorities-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-priorities-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --priorities "$DS_STRATEGY/current/priorities.yaml" 2>&1 || true
 
@@ -986,7 +1047,7 @@ echo "=== 4.55. Priorities patch ==="
 # without a night cycle) — no-op then. Same non-blocking pattern as 4.55.
 # ============================================
 echo "=== 4.56. Close-error patch ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-close-error-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-close-error-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --error "${IWE_CLOSE_ERROR:-}" 2>&1 || true
 
@@ -1001,7 +1062,7 @@ echo "=== 4.56. Close-error patch ==="
 echo "=== 4.57. Version-check patch ==="
 if git -C "$DS_STRATEGY" remote get-url origin >/dev/null 2>&1 \
    && git -C "$DS_STRATEGY" rev-parse --verify --quiet origin/main >/dev/null 2>&1; then
-  "$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-version-check-patch.py" \
+  "$_PATCH_PY" "$SCRIPT_HOME/day-open-version-check-patch.py" \
     --dayplan "$DAYPLAN_PATH" \
     --repo "$DS_STRATEGY" 2>&1 || true
 else
@@ -1017,11 +1078,11 @@ fi
 # patches above — never blocks Open, never fabricates a value.
 # ============================================
 echo "=== 4.59. Multiplier backfill patch ==="
-"$_PATCH_PY" "$DS_STRATEGY/scripts/day-open-multiplier-backfill-patch.py" \
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-multiplier-backfill-patch.py" \
   --dayplan "$DAYPLAN_PATH" \
   --ledger-root "$DS_STRATEGY/machine/ledger/day" \
   --date "$DATE" \
-  --ledger-append "$DS_STRATEGY/scripts/ledger-append.sh" 2>&1 || true
+  --ledger-append "$SCRIPT_HOME/ledger-append.sh" 2>&1 || true
 
 # ============================================
 # 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Ф2)
@@ -1134,7 +1195,7 @@ fi
 # orphans.md) sees the final content, and Checks below validates whatever
 # it left behind.
 echo "=== 4.8. Extension graph: after ==="
-AFTER_HOOK_OUT=$(bash "$DS_STRATEGY/scripts/day-open-hooks-runner.sh" after 2>&1)
+AFTER_HOOK_OUT=$(bash "$SCRIPT_HOME/day-open-hooks-runner.sh" after 2>&1)
 AFTER_HOOK_EXIT=$?
 echo "$AFTER_HOOK_OUT"
 if [ $AFTER_HOOK_EXIT -ne 0 ]; then
@@ -1146,7 +1207,7 @@ fi
 # 5. Checks
 # ============================================
 echo "=== 5. Checks ==="
-CHECKS_OUT=$(bash "$DS_STRATEGY/scripts/day-open-checks-runner.sh" "$DAYPLAN_PATH" 2>&1)
+CHECKS_OUT=$(bash "$SCRIPT_HOME/day-open-checks-runner.sh" "$DAYPLAN_PATH" 2>&1)
 CHECKS_EXIT=$?
 echo "$CHECKS_OUT"
 

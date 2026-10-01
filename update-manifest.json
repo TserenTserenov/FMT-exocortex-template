@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
-      "sha256": "09080a32dcb81738ff198cfc899de6fca7efeaa1e56b6e907a3b7049ca6712bb"
+      "sha256": "066466e0d0f865773f35b24602a0e8a06d3c562f876f25ed96c0c9396610aed1"
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
@@ -257,7 +257,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "d4a1e46b807b72531cf6851714cebbcc692674389e1a358fa7c2b221241beb0e"
+      "sha256": "7c07900eda58963500bf01af7a454cf0806499d1bb243981f6770ffa4496ad4a"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -689,7 +689,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "a21bd983e7170d9f8aa0dcb911358690072e9c61221d66941a883aa9a41c69a8"
+      "sha256": "5b6fcc899277cf2a5e774fca87278c636864f3a7fd583621ff7e24d7c9c5a1cb"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -733,7 +733,7 @@
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
-      "sha256": "75b9fe53a7f95c8d89daf68e8bdc2ea30d3e8dd5adca71afe235cb9b53bfcbe5"
+      "sha256": "48f4a9639071fc2e0bcb24ce5162c02a5551982914a12a0e895f48d8956a4fd3"
     },
     {
       "path": ".claude/skills/vdv/SKILL.md",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4263928dcb477a1a064cc19ab92baad463de1493fd000a0384c40054aa54dabf"
+      "sha256": "5f5735149f9f1f70fb54361f4615410aaba349a2fc3384f06b1b6f7fdfede1ee"
     },
     {
       "path": "CLAUDE.md",
@@ -941,7 +941,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "9b39c61c4b4d70eb5f9a8a8993fc19be99b246ffdd2e3f45c5746a5192d44a98"
+      "sha256": "d0d222dc69314685340e2eb21c3bc0c034a1c33436a2ec684f8d2807ded4b8c6"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -1573,7 +1573,7 @@
     },
     {
       "path": "memory/protocol-work.md",
-      "sha256": "2f773ca710fafafa42dec1ca03e02a0b76b273018e45e2f13879cf010dfd4cf3"
+      "sha256": "f64b62764aea7ac7260ea92e9296cfdad0c79cb914d373df8364641e697edb65"
     },
     {
       "path": "memory/r-questionnaire.md",
@@ -2269,7 +2269,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "98e22b6f6f7b2fceb9675371f16c57b49024712b47d790939f0896f4fae79b01"
+      "sha256": "51178654a311864b80ed38ab650de0718ac5de6c16b2573ffcf378712bad6dce"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2417,7 +2417,7 @@
     },
     {
       "path": "scripts/iwe-transcribe.sh",
-      "sha256": "69ff20801d889a343f46c15b4b78c7c4959cc5a17aac20c180903ccce2945742"
+      "sha256": "40d4c46c515352eaa65f2c981e5320647e6f3836a7987e8ff22cc1bcd4b01084"
     },
     {
       "path": "scripts/iwe-w-reflection.sh",
@@ -2701,7 +2701,7 @@
     },
     {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
-      "sha256": "3864213c1c80728abd4de6715e408d325405565b9d4bd75251f8091dd1e34aa1"
+      "sha256": "04369eb480cc81ff199ae692fd7ce92dacd22f4748c66c03891e16daa287b4bf"
     },
     {
       "path": "scripts/tests/lib/capture_fixture.sh",
@@ -2837,7 +2837,7 @@
     },
     {
       "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
-      "sha256": "df11abbbe08ad4ce2a456bd8cb42ef03039b73fd9697305bec36ebde7c561d7c"
+      "sha256": "e4ce96455f67a2e8bb37ca144d01cd95f438cb1e13d4adc0f201c6d8ac705a46"
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",
@@ -3017,7 +3017,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "d561a3d289a3b52a241a12bf9b0843de0b0a7db439decf7b76ae8e2308d25c36"
+      "sha256": "f70d8dd456392e1387c40c3577c2b6bf0461c3d92618b05b65a35d9acde5294c"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3121,7 +3121,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "f2151e2a744cd3cc3694c1a95180b5682b94093f948129f9e1b8b16213d38075"
+      "sha256": "06136873a0a83f56bb0a6b0e34b10f9486c283a77c7295f58b7db9d7e1b86a50"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "771fd91241bfa84633fcf5cc84490736031fbf9c06f5479fadeedaf88e23443e"
+      "sha256": "f77b402bce43e2168ccbe004519e41f12b842d1af9ea673fdacfb745d0ffbf4d"
     }
   ],
   "excluded_paths": [
@@ -3260,9 +3260,14 @@
     "scripts/tests/test_issue_954_locate.sh",
     "scripts/tests/test_issue_954_wp_list_keys.py",
     "scripts/tests/test_issue_954_wp_number_forms.sh",
+    "scripts/tests/test_issue_957_iwe_scripts_marker.sh",
     "scripts/tests/test_issue_959_cleanup_parse_notes.py",
     "scripts/tests/test_issue_961_note_review_pilot_only.sh",
     "scripts/tests/test_issue_964_canary_status.sh",
+    "scripts/tests/test_issue_966_sessions_root.sh",
+    "scripts/tests/test_issue_973_transcribe_model_default.sh",
+    "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
+    "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_979_weekplan_table.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",

@@ -218,7 +218,7 @@ description: "Протокол ОРЗ — пошаговые инструкци�
 ## 2b. Видео → Captures и Контент (С4+С5) · [[narrative]]
 
 > **Триггер:** Команда «транскрибируй видео» / `/transcribe <file>` или авто при `video.auto_transcribe.enabled: true` и длительности > `min_duration_minutes`.
-> **Зависимость:** скилл `/transcribe` (MLX Whisper, Apple Silicon). Модели: `~/.local/share/mlx-whisper/mlx_models/`.
+> **Зависимость:** скилл `/transcribe` (MLX Whisper, Apple Silicon). Модель: `IWE_WHISPER_MODEL`, иначе локальный каталог `~/.local/share/mlx-whisper/mlx_models/large-v3` (если в нём лежит модель, есть `config.json`), иначе репозиторий Hugging Face `mlx-community/whisper-large-v3-mlx`.
 
 ### С4: Транскрипция → Captures
 

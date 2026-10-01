@@ -92,8 +92,13 @@ export IWE_RUNTIME="${IWE_RUNTIME:-${WORKSPACE_DIR}/.iwe-runtime}"
 # agents commit fixes there -- while the template's own copy is
 # deliberately trimmed (WP-546) and lags behind. Default to the live one;
 # fall back to the template only for installs that have no live checkout.
+# Issue #957: "a live checkout" is a REGULAR (non-symlink) session-guard.sh in
+# workspace scripts/, not just an existing directory -- a scripts/ holding only
+# a README and audit logs, or personal scripts plus symlinks into the template,
+# must not hide the platform scripts. The marker proves "live checkout", not a
+# complete file set. Keep in sync with setup/install-iwe-paths.sh (same rule).
 if [ -z "${IWE_SCRIPTS:-}" ]; then
-  if [ -d "${WORKSPACE_DIR}/scripts" ]; then
+  if [ -f "${WORKSPACE_DIR}/scripts/session-guard.sh" ] && [ ! -L "${WORKSPACE_DIR}/scripts/session-guard.sh" ]; then
     export IWE_SCRIPTS="${WORKSPACE_DIR}/scripts"
   else
     export IWE_SCRIPTS="${WORKSPACE_DIR}/FMT-exocortex-template/scripts"
