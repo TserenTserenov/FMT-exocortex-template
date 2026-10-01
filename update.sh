@@ -423,52 +423,54 @@ is_author_mode() {
     grep -qE '^author_mode:[[:space:]]*true' "$params_file"
 }
 
-# issues #354/#384: these files are platform-maintained, but older template releases
-# shipped them as owner:user. Keep the migration allowlist exact: personal style,
-# author distinctions, FPF snapshots and other real user memory stay protected.
-is_migrated_platform_memory_path() {
-    case "$1" in
-        memory/protocol-open.md|memory/protocol-work.md|memory/protocol-close.md|memory/protocol-month-close.md|\
-        memory/agent-architecture-framework.md|memory/agent-vendor-connect-pattern.md|memory/checklists.md|\
-        memory/dry-run-contract.md|memory/feedback_response_clarity_for_pilot.md|memory/hooks-design.md|\
-        memory/navigation.md|memory/reference/agent-core.md|memory/repo-type-rules.md|\
-        memory/r-questionnaire.md|memory/t-checklist.md|memory/templates-dayplan.md) return 0 ;;
-        *) return 1 ;;
-    esac
+# === Memory policy (issues #965/#967) ===
+# One rule decides every memory/* file the manifest ships, in Step 6 and in repair_pass() alike:
+# a deployed copy the pilot has not changed is refreshed from the template after a backup; a
+# changed copy, or one whose history cannot be checked, is left alone with one line that says
+# why and a ready command to accept the template version. The owner: marker in the copy no
+# longer decides: an untouched owner:user file used to stay behind release after release (#965),
+# and an edited owner:platform one used to be replaced (#967). The one-time owner:user ->
+# owner:platform migration of the platform files old releases shipped as owner:user (#354/#384)
+# is the same rule, not a second overwrite path: an untouched copy is replaced (its marker changes
+# with the file), an edited one stays (navigation.md keeps the installation's addresses).
+# MEMORY.md, personal configs and author_mode never reach the rule: the callers keep their own
+# branches for them.
+#
+# "Not changed" is proven by either of:
+#   1. OLD_HASH: the hash the file had in the template clone before this run replaced it - the
+#      version update.sh really installed last time - equals the deployed copy. Step 2 records
+#      it (record_memory_old_hash); only Step 6 has it, the repair pass replaced nothing to
+#      compare with.
+#   2. The shipped classifier says uptodate or stale: the copy equals a version in the history of
+#      the clone's current branch. That can also be the pilot's own edit committed into the
+#      clone (#963): an accepted residual risk, covered by the backup taken before every
+#      replacement, which the line and the closing summary name.
+# Any other verdict (authored, unknown, no classifier) keeps the copy.
+MEMORY_POLICY_SEEN=""   # paths decided in this run, each followed by a newline
+MEMORY_REPLACED=()      # replaced in this run (report_memory_policy_summary)
+MEMORY_KEPT=()          # kept because they differ and nothing proves them untouched
+
+# record_memory_old_hash FPATH HASH — Step 2: FPATH's hash in the template clone before this run
+# replaces it, as a "path<TAB>hash" line in MEMORY_OLD_HASHES (bash 3.2 has no associative
+# arrays). A failed write costs the file only its first proof: the clone's history still decides.
+record_memory_old_hash() {
+    [ -n "${MEMORY_OLD_HASHES:-}" ] || return 0
+    printf '%s\t%s\n' "$1" "$2" >> "$MEMORY_OLD_HASHES" \
+        || echo "  ⚠ $1 — не удалось запомнить прежнюю версию шаблона; решит история клона" >&2
 }
 
-# One-time owner:user -> owner:platform migration. The owner marker in the deployed
-# copy is the idempotency marker: after a successful copy this branch is no longer
-# eligible. Preserve the user's previous version before replacing it, and fail closed
-# if the backup cannot be written. author_mode stays protected because its live memory
-# copy can be the author's unpublished source.
-migrate_platform_memory() {
-    local fpath="$1" target="$2" source backup
-    source="$SCRIPT_DIR/$fpath"
-
-    is_migrated_platform_memory_path "$fpath" || return 1
-    [ -f "$source" ] && [ -f "$target" ] || return 1
-    [ "$(get_field "$source" owner)" = "platform" ] || return 1
-    [ "$(get_field "$target" owner)" = "user" ] || return 1
-
-    if is_author_mode; then
-        echo "  ⚠ $fpath — author_mode: legacy owner:user copy not migrated. Сверь: diff \"$source\" \"$target\""
-        return 1
-    fi
-
-    backup="$WORKSPACE_DIR/.backups/protocol-owner-migration/${fpath#memory/}"
-    if [ ! -f "$backup" ]; then
-        mkdir -p "$(dirname "$backup")"
-        if ! cp -p "$target" "$backup"; then
-            echo "  ⚠ $fpath — миграция пропущена: не удалось сохранить $backup" >&2
-            return 1
+# memory_old_hash FPATH — the hash record_memory_old_hash() kept for FPATH, or nothing. The hash
+# follows the last tab of its line, so a tab inside a path cannot shift it.
+memory_old_hash() {
+    local line tab
+    tab=$(printf '\t')
+    [ -n "${MEMORY_OLD_HASHES:-}" ] && [ -f "$MEMORY_OLD_HASHES" ] || return 0
+    while IFS= read -r line; do
+        if [ "${line%"$tab"*}" = "$1" ]; then
+            printf '%s\n' "${line##*"$tab"}"
+            return 0
         fi
-    fi
-    if ! cp "$source" "$target"; then
-        echo "  ⚠ $fpath — миграция пропущена: не удалось обновить рабочую копию" >&2
-        return 1
-    fi
-    echo "  ⟲ $fpath → memory/ (owner:user → platform; прежняя версия: $backup)"
+    done < "$MEMORY_OLD_HASHES"
     return 0
 }
 
@@ -488,69 +490,85 @@ saving_cp_command() {
     printf 'bak=$(mktemp %s.before-update-XXXXXX) && cp -p %s "$bak" && cp %s %s' "$target_q" "$target_q" "$source_q" "$target_q"
 }
 
-# issue #375: owner:user protects the deployed copy from overwrite, but protection
-# must not make upstream drift invisible. Scan the whole manifest on every real
-# update/repair pass, not only NEW_FILES/UPDATED_FILES from this invocation.
-#
-# issues #965/#967: say WHY a copy differs, using the shipped classifier. Its verdict is only
-# as strong as the history of the clone's CURRENT branch (git rev-list HEAD for this path; a
-# version that exists only on another branch is not seen), so the texts promise no more:
-#   stale    - the copy equals a version in the history of the current branch. That can be an
-#              older release, but also the pilot's own edit committed into the clone (a fork
-#              with local commits, #963), so the text says so and the offered command saves the
-#              current copy next to it before the cp (see saving_cp_command: every path is
-#              escaped, and the saved copy's name comes from mktemp, so a second run cannot
-#              replace the only copy of the pilot's edits with the refreshed file).
-#   authored - the copy equals no version in that history: the pilot's edits, a release that
-#              update.sh already applied to the clone (it never commits what it applies), or a
-#              version that lives only on another branch.
-#   anything else, including a missing classifier, keeps the generic text.
-# The classifier is called directly, not through report_author_skip(): that one counts and
-# queues files for --refresh-stale.
-report_owner_user_memory_drift() {
-    local fpath deployed drift_count=0
-    local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh" classify_out verdict
-    [ -d "$CLAUDE_MEMORY_DIR" ] && [ -f "$MANIFEST" ] && py_available || return 0
-    while IFS= read -r fpath; do
-        [ -n "$fpath" ] || continue
-        is_migrated_platform_memory_path "$fpath" && continue
-        deployed="$CLAUDE_MEMORY_DIR/${fpath#memory/}"
-        [ -f "$SCRIPT_DIR/$fpath" ] && [ -r "$deployed" ] || continue
-        [ "$(get_field "$deployed" owner)" = "user" ] || continue
-        if [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$deployed")" ]; then
-            verdict=""
-            if [ -f "$classifier" ]; then
-                # </dev/null: this loop reads its paths from stdin; nothing else may take them.
-                classify_out=$(bash "$classifier" "$SCRIPT_DIR" "$fpath" "$deployed" </dev/null 2>/dev/null || true)
-                verdict="${classify_out%% *}"
-            fi
-            case "$verdict" in
-                stale)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией в истории текущей ветки клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
-                    echo "    Обновить с сохранением копии: $(saving_cp_command "$SCRIPT_DIR/$fpath" "$deployed")"
-                    ;;
-                authored)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)."
-                    echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
-                    ;;
-                *)
-                    echo "  ⚠ $fpath — owner: user, НЕ обновлён, но шаблонная версия отличается."
-                    echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
-                    ;;
-            esac
-            drift_count=$((drift_count + 1))
+# apply_memory_policy FPATH DST [OLD_HASH] — the memory policy above for one file: DST is the
+# deployed copy of template file FPATH, OLD_HASH its first proof when the caller has one. A
+# missing DST is copied, an identical one left alone. Returns 0 when DST was written, 1 otherwise
+# (identical, kept, backup or copy failed, or already decided in this run: Step 6 and the repair
+# pass after it walk the same paths, and a file gets one decision and one line per run).
+# The classifier's verdict is only as strong as the history of the clone's CURRENT branch (git
+# rev-list HEAD for this path), so the lines promise no more: "authored" names both causes it
+# can have - the pilot's edits, or a release update.sh applied without committing it.
+apply_memory_policy() {
+    local fpath="$1" mem_dst="$2" old_hash="${3:-}" src dst_hash proof="" keep_reason=""
+    local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh" classify_out="" verdict reason
+    local nl='
+'
+    src="$SCRIPT_DIR/$fpath"
+    case "$nl$MEMORY_POLICY_SEEN" in *"$nl$fpath$nl"*) return 1 ;; esac
+    MEMORY_POLICY_SEEN="$MEMORY_POLICY_SEEN$fpath$nl"
+
+    if [ ! -f "$mem_dst" ]; then
+        if mkdir -p "$(dirname "$mem_dst")" && cp "$src" "$mem_dst"; then
+            echo "  ⟲ $fpath → memory/ (файла не было, скопирован)"
+            return 0
         fi
-    done < <($PY_BIN - "$MANIFEST" <<'PY' 2>/dev/null
-import json
-import sys
-with open(sys.argv[1], encoding="utf-8") as handle:
-    for entry in json.load(handle).get("files", []):
-        path = entry.get("path", "")
-        if path.startswith("memory/"):
-            print(path)
-PY
-    )
-    [ "$drift_count" -eq 0 ] || echo "  ⚠ owner:user memory drift: $drift_count файл(ов), автоматическая перезапись отключена"
+        echo "  ⚠ $fpath — не удалось скопировать в $mem_dst" >&2
+        return 1
+    fi
+    dst_hash=$(hash_file "$mem_dst")
+    [ "$dst_hash" = "$(hash_file "$src")" ] && return 1
+
+    if [ -n "$old_hash" ] && [ "$old_hash" = "$dst_hash" ]; then
+        proof="равен прошлой версии шаблона"
+    else
+        if [ -f "$classifier" ]; then
+            # </dev/null: repair_pass() feeds its loop from stdin; nothing else may take it.
+            classify_out=$(bash "$classifier" "$SCRIPT_DIR" "$fpath" "$mem_dst" </dev/null 2>/dev/null || true)
+        fi
+        verdict="${classify_out%% *}"
+        reason="${classify_out#* }"
+        case "$verdict" in
+            uptodate|stale)
+                proof="равен версии из истории клона шаблона; если это ваша правка, закоммиченная в клон, она в прежней версии" ;;
+            authored)
+                keep_reason="не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)" ;;
+            *)
+                [ -f "$classifier" ] || reason="нет классификатора"
+                keep_reason="не удалось проверить, менялся ли файл (${reason:-нет вердикта})" ;;
+        esac
+    fi
+
+    if [ -z "$proof" ]; then
+        echo "  ⚠ $fpath — НЕ обновлён: $keep_reason. Принять версию шаблона: $(saving_cp_command "$src" "$mem_dst")"
+        MEMORY_KEPT+=("$fpath")
+        return 1
+    fi
+    if ! backup_memory_file_before_overwrite "$fpath" "$mem_dst"; then
+        echo "  ⚠ $fpath — НЕ обновлён: не удалось сохранить прежнюю версию (${MEMORY_BACKUP_FILE:-путь не определён}), замена отменена"
+        return 1
+    fi
+    if ! cp "$src" "$mem_dst"; then
+        echo "  ⚠ $fpath — НЕ обновлён: копирование не удалось; прежняя версия: $MEMORY_BACKUP_FILE" >&2
+        return 1
+    fi
+    echo "  ⟲ $fpath → memory/ — обновлён (не менялся: $proof); прежняя версия: $MEMORY_BACKUP_FILE"
+    MEMORY_REPLACED+=("$fpath")
+    return 0
+}
+
+# report_memory_policy_summary — the closing lines of the memory pass: every file this run
+# replaced with the backup directory, and every file it kept. repair_pass() prints them: it runs
+# after Step 6 on every path that writes memory, so the lists are complete there.
+report_memory_policy_summary() {
+    local f replaced="" kept=""
+    for f in ${MEMORY_REPLACED[@]+"${MEMORY_REPLACED[@]}"}; do replaced="${replaced:+$replaced, }$f"; done
+    for f in ${MEMORY_KEPT[@]+"${MEMORY_KEPT[@]}"}; do kept="${kept:+$kept, }$f"; done
+    if [ -n "$replaced" ]; then
+        echo "  ⚠ Заменено файлов памяти: ${#MEMORY_REPLACED[@]} ($replaced); прежние версии сохранены в $MEMORY_BACKUP_RUN"
+    fi
+    if [ -n "$kept" ]; then
+        echo "  ⚠ Не обновлено файлов памяти с вашими (или непроверяемыми) правками: ${#MEMORY_KEPT[@]} ($kept); принять версию шаблона — командой из строки файла выше"
+    fi
     return 0
 }
 
@@ -770,8 +788,8 @@ report_author_skip() {
             # Byte-identical to the template — not a real skip, no warning needed.
             ;;
         stale)
-            # The same saving command as in report_owner_user_memory_drift(): a bare cp loses the copy
-            # when the verdict misleads, and a fixed backup name is overwritten by a rerun.
+            # The same saving command as apply_memory_policy() offers for a kept copy: a bare cp loses
+            # the copy when the verdict misleads, and a fixed backup name is overwritten by a rerun.
             echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: $(saving_cp_command "$SCRIPT_DIR/$fpath" "$dst")"
             AUTHOR_SKIP_STALE=$((AUTHOR_SKIP_STALE + 1))
             AUTHOR_STALE_PAIRS+=("$fpath|$dst")
@@ -2266,20 +2284,22 @@ backup_rule_before_overwrite() {
 # issue #847: memory/* stale-repair (see repair_pass() below) used to overwrite
 # a workspace-local memory file with the template's version whenever hashes
 # differed, with no backup — unlike .claude/rules/* above, which already has
-# this via backup_rule_before_overwrite(). memory/* files are owner:platform
-# by convention but some (e.g. navigation.md) are filled in per-installation,
-# so the same safety net applies here under its own backup dir.
+# this via backup_rule_before_overwrite(). apply_memory_policy() now replaces only
+# a copy it proved untouched, and saves it here first under its own backup dir.
+# MEMORY_BACKUP_FILE names the saved copy; it is set before the attempt, so a
+# warning can name it too. Returns non-zero when the copy could not be saved
+# (mkdir and cp say why on stderr): the caller must then leave DST alone. The
+# function used to end with an echo, so a failed cp read as success (#967 review).
 backup_memory_file_before_overwrite() {
-    local fpath="$1" dst="$2" backup
+    local fpath="$1" dst="$2"
+    MEMORY_BACKUP_FILE=""
     case "$fpath" in memory/*.md|memory/*.yaml|memory/*.yml) ;; *) return 0 ;; esac
     [ -f "$dst" ] || return 0
     if [ -z "$MEMORY_BACKUP_RUN" ]; then
         MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
     fi
-    backup="$MEMORY_BACKUP_RUN/${fpath#memory/}"
-    mkdir -p "$(dirname "$backup")"
-    cp "$dst" "$backup"
-    echo "  ↳ backup: $dst → $backup"
+    MEMORY_BACKUP_FILE="$MEMORY_BACKUP_RUN/${fpath#memory/}"
+    mkdir -p "$(dirname "$MEMORY_BACKUP_FILE")" && cp "$dst" "$MEMORY_BACKUP_FILE"
 }
 
 copy_platform_file_preserving_user_space() {
@@ -2711,6 +2731,9 @@ print(sha)'); then
 
 # === Temp directory ===
 TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; echo "/tmp/exocortex-update-$$"; })
+# issues #965/#967: Step 2 records here the version of each changed memory file that this run
+# is about to replace (record_memory_old_hash); Step 6 reads it (apply_memory_policy, proof 1).
+MEMORY_OLD_HASHES="$TMPDIR_UPDATE/memory-old-hashes.tsv"
 cleanup_update() {
     local status=$?
     rm -rf "$TMPDIR_UPDATE"
@@ -2956,13 +2979,17 @@ repair_pass() {
     # reader in ordinary temporary files: its diagnostics stay visible and the
     # repair pass remains available on the oldest supported shell.
     local repair_paths repair_errors
+    # Every return below closes the memory pass with its summary: Step 6, before this pass,
+    # may already have replaced or kept memory files in this run.
     repair_paths=$(mktemp "${TMPDIR:-/tmp}/iwe-repair-paths.XXXXXX") || {
         echo "  ⚠ repair_pass: не удалось создать временный список" >&2
+        report_memory_policy_summary
         return 0
     }
     repair_errors=$(mktemp "${TMPDIR:-/tmp}/iwe-repair-errors.XXXXXX") || {
         rm -f "$repair_paths"
         echo "  ⚠ repair_pass: не удалось создать файл диагностики" >&2
+        report_memory_policy_summary
         return 0
     }
 
@@ -2976,7 +3003,7 @@ for entry in data.get('files', []):
 " "$MANIFEST" > "$repair_paths" 2> "$repair_errors"; then
             sed 's/^/  ⚠ repair_pass: /' "$repair_errors" >&2
             rm -f "$repair_paths" "$repair_errors"
-            report_owner_user_memory_drift
+            report_memory_policy_summary
             return 0
         fi
     else
@@ -3000,25 +3027,17 @@ for entry in data.get('files', []):
                     rel="${fpath#memory/}"
                     mem_dst="$CLAUDE_MEMORY_DIR/$rel"
                     mkdir -p "$(dirname "$mem_dst")"
-                    if [ ! -f "$mem_dst" ]; then
-                        cp "$SCRIPT_DIR/$fpath" "$mem_dst"
-                        echo "  ⟲ $fpath → memory/ (repair)"
-                        REPAIRED=$((REPAIRED + 1))
-                    elif [ -r "$mem_dst" ] && [ "$(get_field "$mem_dst" owner)" = "user" ]; then
-                        if migrate_platform_memory "$fpath" "$mem_dst"; then
-                            REPAIRED=$((REPAIRED + 1))
-                        fi
-                    elif is_personal_config "$fname"; then
+                    if [ -f "$mem_dst" ] && is_personal_config "$fname"; then
                         : # личный L4-конфиг без frontmatter (day-rhythm-config.yaml) — НЕ stale-repair
-                    elif is_author_mode; then
+                    elif [ -f "$mem_dst" ] && is_author_mode; then
                         # issue #238: та же дыра, что уже закрыта для .claude/*-веток ниже —
                         # автор мог доработать live-копию memory-файла напрямую, stale-repair
                         # молча затирал бы её версией из SCRIPT_DIR.
                         echo "  ⚠ $fpath — author_mode: memory/ рабочая копия не тронута. Сверь: diff \"$SCRIPT_DIR/$fpath\" \"$mem_dst\""
-                    elif [ -r "$mem_dst" ] && [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$mem_dst")" ]; then
-                        backup_memory_file_before_overwrite "$fpath" "$mem_dst"
-                        cp "$SCRIPT_DIR/$fpath" "$mem_dst"
-                        echo "  ⟲ $fpath → memory/ (stale repair, прежняя версия сохранена в .backups/memory-pre-update/)"
+                    elif apply_memory_policy "$fpath" "$mem_dst"; then
+                        # issues #965/#967: a missing copy is restored, an untouched stale one
+                        # refreshed after a backup, an edited one kept (apply_memory_policy).
+                        # No OLD_HASH here: the repair pass replaced nothing in its own run.
                         REPAIRED=$((REPAIRED + 1))
                     fi
                 fi
@@ -3069,7 +3088,7 @@ for entry in data.get('files', []):
     if [ "$REPAIRED" -gt 0 ]; then
         echo "  ✓ $REPAIRED runtime-файлов восстановлено"
     fi
-    report_owner_user_memory_drift
+    report_memory_policy_summary
     # An explicit success: as a function (unlike the old inline block), this is
     # a plain top-level command at the call site, and its own exit status
     # (not exempted by the && short-circuit rule that saved the old inline code)
@@ -3797,6 +3816,11 @@ for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
             DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$REMOTE_FILE" 2>/dev/null | grep -c '^[<>]' || true); DIFF_COUNT=${DIFF_COUNT:-?}
             UPDATED_FILES+=("$fpath")
             UPDATED_LINES+=("$DIFF_COUNT")
+            # issues #965/#967: the version update.sh installed last time, before Step 5 replaces
+            # it — Step 6 tells an untouched memory copy from an edited one by it.
+            case "$fpath" in
+                memory/*.md|memory/*.yaml|memory/*.yml) record_memory_old_hash "$fpath" "$LOCAL_HASH" ;;
+            esac
         else
             UNCHANGED=$((UNCHANGED + 1))
         fi
@@ -4617,7 +4641,6 @@ sync_workspace_claude_md
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     MEM_UPDATED=0
-    MEM_REPLACED=()
     for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         case "$f" in
             memory/*.md|memory/*.yaml|memory/*.yml)
@@ -4627,29 +4650,17 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
                 dst="$CLAUDE_MEMORY_DIR/${f#memory/}"
                 mkdir -p "$(dirname "$dst")"
                 if [ "$fname" != "MEMORY.md" ]; then
-                    # issue #229: same owner:user guard as repair_pass() — this loop runs on
-                    # every update.sh call (not just repair), so it's the more common path
-                    # that was clobbering user-owned memory files.
-                    if [ -f "$dst" ] && [ "$(get_field "$dst" owner)" = "user" ]; then
-                        if migrate_platform_memory "$f" "$dst"; then
-                            MEM_UPDATED=$((MEM_UPDATED + 1))
-                        fi
-                    elif is_personal_config "$fname" && [ -f "$dst" ]; then
+                    if is_personal_config "$fname" && [ -f "$dst" ]; then
                         echo "  ✓ $fname — личный L4-конфиг, не перезаписан"
                     elif is_author_mode && [ -f "$dst" ]; then
                         # issue #238: тот же класс, что уже закрыт для .claude/*-веток —
                         # эта ветка тоже слепо копировала SCRIPT_DIR поверх live-копии.
                         report_author_skip "$f" "$dst"
-                    else
-                        # issue #967: a platform memory file the pilot has edited (e.g.
-                        # memory/navigation.md holds per-installation notes) used to be
-                        # replaced here by a bare cp, with no backup, exactly like the
-                        # repair pass did before #847. Save the previous version first.
-                        if [ -f "$dst" ] && [ "$(hash_file "$SCRIPT_DIR/$f")" != "$(hash_file "$dst")" ]; then
-                            backup_memory_file_before_overwrite "$f" "$dst"
-                            MEM_REPLACED+=("$f")
-                        fi
-                        cp "$SCRIPT_DIR/$f" "$dst"
+                    elif apply_memory_policy "$f" "$dst" "$(memory_old_hash "$f")"; then
+                        # issues #965/#967: whatever its owner: marker, a copy equal to the
+                        # version installed last time (or to one in the clone's history) is
+                        # refreshed after a backup; an edited one is kept with a command.
+                        # The replaced and kept files are summed up at the end of repair_pass().
                         MEM_UPDATED=$((MEM_UPDATED + 1))
                     fi
                 fi
@@ -4658,13 +4669,6 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     done
     if [ "$MEM_UPDATED" -gt 0 ]; then
         echo "  ✓ $MEM_UPDATED memory-файлов обновлено в $CLAUDE_MEMORY_DIR"
-    fi
-    if [ "${#MEM_REPLACED[@]}" -gt 0 ]; then
-        MEM_REPLACED_LIST=""
-        for f in ${MEM_REPLACED[@]+"${MEM_REPLACED[@]}"}; do
-            MEM_REPLACED_LIST="${MEM_REPLACED_LIST:+$MEM_REPLACED_LIST, }$f"
-        done
-        echo "  ⚠ Заменено файлов памяти платформы: ${#MEM_REPLACED[@]} ($MEM_REPLACED_LIST); прежние версии сохранены в $MEMORY_BACKUP_RUN"
     fi
     echo "  ✓ memory/MEMORY.md — не тронут"
 fi
