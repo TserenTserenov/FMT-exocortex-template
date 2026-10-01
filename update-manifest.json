@@ -365,11 +365,11 @@
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
-      "sha256": "b4d7c53775f74485788fd52cb0487ab677d99be427f98b471215b346cebab635"
+      "sha256": "4ca0b55f46a549a517f353bd9a51c2a56ccc38a75323902985d58c6dd24b50db"
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "66df16606fcb94e92183c9b44ae4c5d33e661518a36a9e6a56e9db58ef4ee405"
+      "sha256": "1a77bf4e6dbadccffb242631fad0e21065845a81816cedc78091b37afefb8a2f"
     },
     {
       "path": ".claude/settings.json",
@@ -2073,7 +2073,7 @@
     },
     {
       "path": "scripts/archive-done-wp.sh",
-      "sha256": "070ef25ece923b43784571c1d5dd6c86c0b4c6cbb03720c1901c0432c84e7c67"
+      "sha256": "e716b720ae7634438c2e8224e8d4b5f9a566cf89767884ea1e444a8d8739226b"
     },
     {
       "path": "scripts/artifactor.py",
@@ -2181,7 +2181,7 @@
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
-      "sha256": "da74e608383ca43832cbe7e8dcf41a3121d699ad5f10c1587c26867e2f77c431"
+      "sha256": "ee37ce41697ee0976cdf9c180c41319e804c5d2dc33c7ef6c4fafe87bd8d17c0"
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "94d1b0ee3db5204c638d59a920ca7797a525e96372c644f20383be041206b831"
+      "sha256": "acce6094dc0bee78f4f7abdb9d3b125ffd836ed9311922ca0f3cf99e539dcfb7"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -2625,7 +2625,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "ce93e488060888358701a6a31a485bb183c89c834e6045a83c8a220b184bbb61"
+      "sha256": "90a8da322eb0e6b80a758852a61e02c5a2ff33e78613a17877a14c4a916ee4c7"
     },
     {
       "path": "scripts/settings-promote.sh",

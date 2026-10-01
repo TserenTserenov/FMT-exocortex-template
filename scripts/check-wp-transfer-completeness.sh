@@ -21,6 +21,7 @@
 set -uo pipefail
 
 _WPN_ROOT_UP=".."
+_WPN_OPTIONAL=""
 # >>> wp-num locate
 # Find scripts/lib/wp-num.sh (issue #954) from THIS file's own location with symlinks
 # resolved, never from IWE_WORKSPACE / IWE_ROOT / STRATEGY_DIR: callers point those at
@@ -30,6 +31,9 @@ _WPN_ROOT_UP=".."
 # just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
 # The library is mandatory: not finding it is an installation error, not "WP not found",
 # hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# A consumer that must keep working without the library (session-guard: its hypothesis gate
+# warns and checks the exact card names, it never blocks a session over a missing library)
+# sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
 _wpn_src="${BASH_SOURCE[0]}"
 _wpn_hops=0
 while [ -L "$_wpn_src" ] && [ "$_wpn_hops" -lt 40 ]; do
@@ -52,12 +56,14 @@ for _wpn_cand in "$_wpn_dir/lib/wp-num.sh" \
     break
   fi
 done
-if [ -z "$WP_NUM_LIB" ]; then
+if [ -z "$WP_NUM_LIB" ] && [ -z "${_WPN_OPTIONAL:-}" ]; then
   echo "❌ wp-num.sh не найден (ошибка установки, это не «РП не найден»): нужен scripts/lib/wp-num.sh. Искал: ${_wpn_dir}/lib, ${_wpn_root}/scripts/lib, ${_wpn_root}/FMT-exocortex-template/scripts/lib, IWE_TEMPLATE=${IWE_TEMPLATE:-не задана}. Обновите шаблон: bash update.sh" >&2
   exit 4
 fi
-# shellcheck source=/dev/null
-. "$WP_NUM_LIB"
+if [ -n "$WP_NUM_LIB" ]; then
+  # shellcheck source=/dev/null
+  . "$WP_NUM_LIB"
+fi
 # <<< wp-num locate
 
 MODE="${1:-}"
