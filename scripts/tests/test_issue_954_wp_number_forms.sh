@@ -208,8 +208,25 @@ if declare -F registry_status >/dev/null; then
   expect_eq "registry_status 440 keeps its own row" "📦 archived" "$(registry_status 440 2>/dev/null)"
   expect_eq "registry_status 450 finds '| 0450 |'" "⏸ paused" "$(registry_status 450 2>/dev/null)"
   expect_eq "registry_status 4 does not match 44/440" "_не в реестре_" "$(registry_status 4 2>/dev/null)"
+  # The digit range is the library's (up to 64 characters, at most 9 significant digits), not
+  # 1-4 digits: "00044" is 44 to the library, the card lookup and close-wp.sh, and used to come
+  # back from here as "некорректный номер" -- a false failure of the update.sh canary.
+  expect_eq "registry_status 00044 (five characters, zeros) finds '| WP-044 |'" "🔄 in_progress" "$(registry_status 00044 2>/dev/null)"
+  expect_eq "registry_status WP-00044 finds '| WP-044 |'" "🔄 in_progress" "$(registry_status WP-00044 2>/dev/null)"
+  expect_eq "registry_status of 64 digits (zeros and 44) finds '| WP-044 |'" "🔄 in_progress" "$(registry_status "$(printf '%064d' 44)" 2>/dev/null)"
 else
   bad "registry_status could not be loaded from $BUNDLE"
+fi
+
+if declare -F registry_status >/dev/null && [ "$have_lib" = 1 ]; then
+  for raw in 44 044 0044 00044 000000044 999999999 1234567890 0 000 "$(printf '%064d' 44)" "$(printf '%065d' 44)" "$(printf '%064d' 0)" "$(printf '%065d' 0)"; do
+    if wp_num_normalize "$raw" >/dev/null 2>&1; then lib_says=accepts; else lib_says=refuses; fi
+    case "$(registry_status "$raw" 2>/dev/null)" in
+      "_некорректный номер РП"*) bundle_says=refuses ;;
+      *) bundle_says=accepts ;;
+    esac
+    expect_eq "digits [${raw:0:12}...] (${#raw} characters): the bundle's registry_status and the library agree" "$lib_says" "$bundle_says"
+  done
 fi
 
 # The bundle's registry_status writes the row regex inline (its older tests cut the function out
@@ -324,6 +341,34 @@ for pair in "44:WP-044" "044:WP-44" "WP-044:WP-044" "44:WP-44"; do
   expect_has "bundle $typed ($spelled in its own body): the other WP is listed as related" "### WP-45 (" "$out"
   expect_lacks "bundle $typed ($spelled in its own body): not related to itself (as WP-044)" "### WP-044 (" "$out"
   expect_lacks "bundle $typed ($spelled in its own body): not related to itself (as WP-44)" "### WP-44 (" "$out"
+done
+
+# The bundle used to strip only "WP-" (a lower-case "wp-044" was refused; "WP-00044" went on as
+# "00044" and the registry reader called it malformed) and kept its own 1-4 digit rule. The
+# input is now read by the library's wp_num_normalize, on the plain run and on --self-test alike:
+# every spelling of 44 gives the same bundle and the same canary.
+echo "--- #954 bundle input: one reader (wp_num_normalize) for the plain run and for --self-test ---"
+WS=$(new_ws)
+issue_registry "$WS/$GOV/docs/WP-REGISTRY.md" "44"
+card "$WS/$GOV/inbox/WP-044/WP-044.md" 44 in_progress
+for q in 44 044 WP-44 WP-044 wp-44 wp-044 WP-00044 00044 " WP-044 "; do
+  out=$(IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$BUNDLE" "$q" 2>&1); rc=$?
+  expect_eq "bundle [$q] exits 0" 0 "$rc"
+  expect_has "bundle [$q] is the bundle of WP 44" "# WP Sync Bundle для WP-44" "$out"
+  expect_has "bundle [$q] reads the padded card" "Файл: \`inbox/WP-044/WP-044.md\`" "$out"
+  out=$(IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$BUNDLE" --self-test "$q" 2>&1); rc=$?
+  expect_eq "--self-test [$q] exits 0" 0 "$rc"
+  expect_has "--self-test [$q] resolves the registry row" "registry_status: 🔄 in_progress" "$out"
+  expect_lacks "--self-test [$q]: the number is not called malformed" "некорректный номер" "$out"
+done
+# a refusal says why (under `set -e` a failing normaliser must not end the script in silence)
+for q in abc "WP-" 44x "$(printf '%065d' 44)"; do
+  out=$(IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$BUNDLE" "$q" 2>&1); rc=$?
+  expect_eq "bundle [${q:0:12}] is refused with exit 1" 1 "$rc"
+  expect_has "bundle [${q:0:12}]: the refusal says why" "Неверный формат" "$out"
+  out=$(IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO="$GOV" bash "$BUNDLE" --self-test "$q" 2>&1); rc=$?
+  expect_eq "--self-test [${q:0:12}] is refused with exit 2" 2 "$rc"
+  expect_has "--self-test [${q:0:12}]: the refusal says why" "Неверный формат canary WP" "$out"
 done
 
 # ---------------------------------------------------------------------------
