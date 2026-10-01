@@ -921,6 +921,15 @@ DAY_OPEN_ALARM_MARK="ALARM: day-open-failed"
 # What notify.sh prints into the same log once the Bot API accepted the message (send_telegram):
 # only a delivered alarm counts, a failed send is retried by the next attempt.
 DAY_OPEN_ALARM_SENT_MARK="Telegram notification sent: strategist/day-open-failed"
+# ...and what it prints when Telegram is not configured: there is nothing to deliver then, the reason
+# stays in this log. A send that fails on the transport (no network: curl exits non-zero under notify.sh's
+# `set -e`) prints nothing at all, so "owed" cannot be read from a failure line; it is "not delivered, and
+# not unconfigured".
+DAY_OPEN_ALARM_UNCONFIGURED_MARK="SKIP: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set"
+DAY_OPEN_ALARM_MAX_ATTEMPTS=3
+# A run that gave up on the plan while the alarm is still owed exits with this code, so the scheduler
+# comes back and the alarm goes out again; the day is not marked done meanwhile.
+DAY_OPEN_ALARM_RETRY_RC=74
 # The pipeline's own contract (day-open-pipeline.sh, steps 1 and 1.1/1.1b): 7 = deferred, not done
 # (yesterday is not closed yet, the triage report is still being published, the week is closing).
 DAY_OPEN_DEFERRED_RC=7
@@ -945,8 +954,22 @@ day_open_alarm() {  # <reason code> <reason text> [exit code]; at most one deliv
     DAY_OPEN_FAILED_REASON="$1" DAY_OPEN_FAILED_RC="${3:-}" notify_telegram "day-open-failed"
 }
 
-day_open_give_up() {  # <reason code> <reason text> [exit code]; no more morning runs today, no false SUCCESS
+day_open_alarm_owed() {  # 0 = the alarm is not delivered, Telegram is configured and attempts are left
+    grep -qF "$DAY_OPEN_ALARM_SENT_MARK" "$LOG_FILE" 2>/dev/null && return 1
+    grep -qF "$DAY_OPEN_ALARM_UNCONFIGURED_MARK" "$LOG_FILE" 2>/dev/null && return 1
+    [ "$(count_in_log "$DAY_OPEN_ALARM_MARK")" -lt "$DAY_OPEN_ALARM_MAX_ATTEMPTS" ]
+}
+
+# No more morning runs today and no false SUCCESS -- once the alarm is out: a give-up with an owed alarm
+# leaves the day open (exit DAY_OPEN_ALARM_RETRY_RC, no GAVE UP line) so the next scheduler run sends it
+# again and nothing else (the pipeline is not run again: a structural failure gives up right away, an
+# exhausted one is recognised by the attempts already counted).
+day_open_give_up() {  # <reason code> <reason text> [exit code]
     day_open_alarm "$@"
+    if day_open_alarm_owed; then
+        log "Day Open: тревога не доставлена (Telegram отказал), повтор доставки при следующем запуске планировщика, код $DAY_OPEN_ALARM_RETRY_RC ($2)"
+        exit "$DAY_OPEN_ALARM_RETRY_RC"
+    fi
     log "GAVE UP scenario: day-plan ($2)"
     exit 0
 }

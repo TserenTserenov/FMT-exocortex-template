@@ -8,7 +8,9 @@
 # day-open-failed message a day; only a DELIVERED message counts, a failed send is retried by the
 # next attempt. A structural failure (the pipeline is not delivered; no model gateway and the
 # --scaffold-only retry failed too) ends the day: "GAVE UP scenario: day-plan (...)", exit 0, and
-# already_ran_today() skips later launchd runs. A deferral (pipeline exit 7: yesterday is not
+# already_ran_today() skips later launchd runs -- but only once the alarm is out: while a configured
+# Telegram refuses it, the run exits 74 without GAVE UP and the scheduler sends it again (three
+# sends a day at most; with no Telegram configured there is nothing to wait for). A deferral (pipeline exit 7: yesterday is not
 # closed yet) is no failure: no alarm, not an attempt, exit 7. Any other pipeline code is passed
 # out so the scheduler retries (2 as 73: the scheduler reads 2 as "lock held"); attempts are
 # counted when they START (the scheduler's timeout kills the run before it can record an end), at
@@ -351,6 +353,47 @@ case "$text" in
     *"$HEADER"*) ok "11: сообщение собрано, в него попадает только числовой код" ;;
     *) bad "11: сообщения с нецифровым кодом нет: «${text}»" ;;
 esac
+
+# ---------------------------------------------------------------- 12
+echo "== 12: структурный отказ, Telegram отказал: день не закрывается, тревога уходит со следующим запуском"
+new_case
+touch "$NET_DOWN_FILE"
+rc1=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
+check "12: первый запуск: код 74, день не закрыт (GAVE UP нет), сообщений нет" \
+    "74|0|0" "$rc1|$(log_count 'GAVE UP')|$(messages)"
+check "12: в журнале тревога и просьба повторить доставку" "1/1" \
+    "$(log_count 'ALARM: day-open-failed')/$(log_count 'повтор доставки при следующем запуске планировщика')"
+rm -f "$NET_DOWN_FILE"
+rc2=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
+check "12: второй запуск (сеть есть): тревога доставлена, день закрыт: выход 0" "0|1|1" \
+    "$rc2|$(messages)|$(log_count 'GAVE UP scenario: day-plan (')"
+check_has "12: доставлено именно сообщение «План дня не собран»" "$(message_texts)" "$HEADER"
+rc3=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
+check "12: третий запуск пропущен, второго сообщения нет" "0/1" "$rc3/$(messages)"
+check "12: модель так и не запускалась" "0" "$(model_runs)"
+
+# ---------------------------------------------------------------- 13
+echo "== 13: Telegram отказывает всё время: три отправки, потом отказ на день без бесконечных повторов"
+new_case
+touch "$NET_DOWN_FILE"
+rcs=""
+for n in 1 2 3; do
+    rcs="$rcs$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts") "
+done
+check "13: две попытки с кодом 74, третья сдаётся с кодом 0" "74 74 0 " "$rcs"
+check "13: три попытки отправки, GAVE UP ровно один, сообщений нет" "3/1/0" \
+    "$(log_count 'ALARM: day-open-failed')/$(log_count 'GAVE UP scenario: day-plan (')/$(messages)"
+rc4=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
+check "13: четвёртый запуск пропущен без новой попытки" "0/3" "$rc4/$(log_count 'ALARM: day-open-failed')"
+
+# ---------------------------------------------------------------- 14
+echo "== 14: Telegram не настроен: ждать нечего, отказ на день сразу, код 0"
+new_case
+rm -f "$TEST_HOME/.config/aist/env"
+rc=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
+check "14: выход 0 и GAVE UP сразу" "0/1" "$rc/$(log_count 'GAVE UP scenario: day-plan (')"
+check "14: тревога в журнале есть, отправки нет" "1/0" "$(log_count 'ALARM: day-open-failed')/$(messages)"
+check "14: без повтора доставки" "0" "$(log_count 'повтор доставки при следующем запуске планировщика')"
 
 echo
 if [ "$fail" -eq 0 ]; then
