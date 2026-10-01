@@ -8,7 +8,20 @@
 set -euo pipefail
 
 VENV="$HOME/.local/share/mlx-whisper/.venv-whisper"
-MODEL="$HOME/.local/share/mlx-whisper/mlx_models/large-v3"
+# Model, first match wins: $IWE_WHISPER_MODEL (path or Hugging Face repo id);
+# the local directory, when it exists; else the Hugging Face repo id, which
+# mlx_whisper downloads into the HF cache on first use. A path that does not
+# exist must never be passed on: mlx_whisper reads it as a repo id and fails
+# with HFValidationError (issue #973).
+LOCAL_MODEL="$HOME/.local/share/mlx-whisper/mlx_models/large-v3"
+HF_MODEL="mlx-community/whisper-large-v3-mlx"
+if [[ -n "${IWE_WHISPER_MODEL:-}" ]]; then
+  MODEL="$IWE_WHISPER_MODEL"
+elif [[ -d "$LOCAL_MODEL" ]]; then
+  MODEL="$LOCAL_MODEL"
+else
+  MODEL="$HF_MODEL"
+fi
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: iwe-transcribe.sh <audio-file>" >&2

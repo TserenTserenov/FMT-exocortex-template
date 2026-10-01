@@ -733,7 +733,7 @@
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
-      "sha256": "75b9fe53a7f95c8d89daf68e8bdc2ea30d3e8dd5adca71afe235cb9b53bfcbe5"
+      "sha256": "ab5c505b32fdd2503ce0b72e22493322430d3656fa76a827c0e91003ada9aa68"
     },
     {
       "path": ".claude/skills/vdv/SKILL.md",
@@ -1573,7 +1573,7 @@
     },
     {
       "path": "memory/protocol-work.md",
-      "sha256": "2f773ca710fafafa42dec1ca03e02a0b76b273018e45e2f13879cf010dfd4cf3"
+      "sha256": "132bf3df2508612746266d169f660767334cced458b38e6bf69a81c1e8a0ff46"
     },
     {
       "path": "memory/r-questionnaire.md",
@@ -2417,7 +2417,7 @@
     },
     {
       "path": "scripts/iwe-transcribe.sh",
-      "sha256": "69ff20801d889a343f46c15b4b78c7c4959cc5a17aac20c180903ccce2945742"
+      "sha256": "c2052d9ca60a701a0d1ccf82d635710b5eca20f06f8363ad06661bc61197f4fa"
     },
     {
       "path": "scripts/iwe-w-reflection.sh",
@@ -3245,6 +3245,7 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_973_transcribe_model_default.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
