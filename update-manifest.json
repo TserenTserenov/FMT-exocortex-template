@@ -2221,7 +2221,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "2cb6978c00f745d4eef7fe4d9b291aee7cacb2780fa45011022644648721eff2"
+      "sha256": "3e0b46fafb26f844c136cf7d62daa0aaaa02a3b3f133db01e6fd4df303ba1b60"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -3246,6 +3246,7 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_979_weekplan_table.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",

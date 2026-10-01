@@ -622,17 +622,25 @@ fi
 echo "2/5 WP-REGISTRY.md..."
 
 if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" "$STAKE_CELL" "$WP_ID" <<'PYEOF'
+import re
 import sys
 registry_path, wp_num, priority, title, repo, budget, gov_repo, stake, wp_id = sys.argv[1:10]
 
 with open(registry_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
 
-# Найти строку-разделитель после заголовка таблицы (|---|---|...)
+# Markdown table separator row: `|---|---|`, `| --- | --- |`, `|:---|---:|`, or without
+# outer pipes — a line made only of `|`, `-`, `:` and whitespace with at least two cells.
+# Same pattern as the Strategy.md writer below (issue #901); the literal `|---` lookup
+# this replaces missed every spaced separator, and the missing table failed the whole
+# creation with a rollback (issue #979).
+TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
+
+# Find the separator row under the header row (`| # | ...`)
 insert_at = None
 header_line = None
 for i, line in enumerate(lines):
-    if line.strip().startswith("|---") and i > 0 and lines[i-1].strip().startswith("| #"):
+    if TABLE_SEP_RE.match(line.rstrip("\r\n")) and i > 0 and lines[i-1].strip().startswith("| #"):
         insert_at = i + 1
         header_line = lines[i-1]
         break
@@ -766,16 +774,49 @@ with open(weekplan_path, "r", encoding="utf-8") as f:
 # table header is "🚦 | # | РП | h | Источник | P | Статус | Результат"). Locate the table by
 # its actual header instead, same name-based technique as the REGISTRY writer, so
 # column order/extra columns don't silently corrupt the row.
-header_line = None
-insert_at = None
+#
+# issue #979: the first РП/Статус table is not necessarily the plan. After a day close
+# the WeekPlan may start with an «Итоги дня» block holding `| РП | Что сделано | Статус |`
+# and the new row landed there. So the writer remembers the nearest <summary> / markdown
+# heading above every table, skips tables under «Итог / Сводк / Summary» (facts, not
+# intents: WeekPlan = plan, WeekReport = facts), prefers a section titled «План», falls
+# back to the only remaining candidate and otherwise refuses to guess.
+# Separator rows are matched by pattern, not by the literal `|---` (same as #901).
+TABLE_SEP_RE = re.compile(r"^[ \t]*\|?[ \t:-]*-[ \t:-]*(?:\|[ \t:-]*-[ \t:-]*)+\|?[ \t]*$")
+SUMMARY_RE = re.compile(r"<summary[^>]*>(.*?)</summary>", re.IGNORECASE)
+HEADING_RE = re.compile(r"^ {0,3}#{1,6}[ \t]+(.*)$")
+FACTS_RE = re.compile(r"Итог|Сводк|Summary", re.IGNORECASE)
+PLAN_RE = re.compile(r"План|\bPlan\b", re.IGNORECASE)
+
+candidates = []  # (header line, insert position, section title)
+section = ""
 for i, line in enumerate(lines):
-    if line.strip().startswith("|---") and i > 0 and "РП" in lines[i - 1] and "Статус" in lines[i - 1]:
-        header_line = lines[i - 1]
-        insert_at = i + 1
-        break
+    summary = SUMMARY_RE.search(line)
+    # A table row such as `# | Статус | РП` looks like a heading but is not one.
+    heading = None if "|" in line else HEADING_RE.match(line)
+    if summary or heading:
+        section = re.sub(r"<[^>]+>", "", (summary or heading).group(1)).strip()
+    elif "</details>" in line:
+        section = ""
+    if i > 0 and TABLE_SEP_RE.match(line.rstrip("\r\n")) and "РП" in lines[i - 1] and "Статус" in lines[i - 1]:
+        if not FACTS_RE.search(section):
+            candidates.append((lines[i - 1], i + 1, section))
+
+plan_titled = [c for c in candidates if PLAN_RE.search(c[2])]
+if plan_titled:
+    chosen = plan_titled[0]
+elif len(candidates) == 1:
+    chosen = candidates[0]
+else:
+    chosen = None
+header_line, insert_at = (chosen[0], chosen[1]) if chosen else (None, None)
 
 if insert_at is None:
-    print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус) не найдена — добавить вручную", file=sys.stderr)
+    if candidates:
+        titles = ", ".join("«{}»".format(c[2] or "без заголовка") for c in candidates)
+        print("   ⚠️  WeekPlan: несколько таблиц РП/Статус, ни одна не названа «План» ({}) — не выбираю наугад, добавить вручную".format(titles), file=sys.stderr)
+    else:
+        print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус вне блоков «Итоги») не найдена — добавить вручную", file=sys.stderr)
 else:
     header_cols = [c.strip() for c in header_line.strip().strip("|").split("|")]
     values_by_name = {
