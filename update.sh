@@ -472,6 +472,22 @@ migrate_platform_memory() {
     return 0
 }
 
+# saving_cp_command SOURCE TARGET — the command line the reports offer for refreshing TARGET
+# from SOURCE: first save TARGET next to itself, then replace it. The user's shell runs it, so
+# each path goes through printf %q: the shell receives exactly these paths whatever they hold
+# (spaces, quotes, $, backticks, backslashes) and expands nothing inside them. Only the tail of
+# the saved copy's name stays live for the user's shell: a date plus $RANDOM (empty in a shell
+# that has none), so two runs, even within one second, keep both copies instead of the second
+# replacing the only copy of the user's edits with the refreshed file (issue #967).
+saving_cp_command() {
+    local source_q target_q
+    # shellcheck disable=SC2016  # meant for the user's shell: it expands this when the command runs
+    local stamp='$(date +%Y%m%d%H%M%S)-$RANDOM'
+    printf -v source_q '%q' "$1"
+    printf -v target_q '%q' "$2"
+    printf 'cp -p %s %s.before-update-%s && cp %s %s' "$target_q" "$target_q" "$stamp" "$source_q" "$target_q"
+}
+
 # issue #375: owner:user protects the deployed copy from overwrite, but protection
 # must not make upstream drift invisible. Scan the whole manifest on every real
 # update/repair pass, not only NEW_FILES/UPDATED_FILES from this invocation.
@@ -482,10 +498,9 @@ migrate_platform_memory() {
 #   stale    - the copy equals a version in the history of the current branch. That can be an
 #              older release, but also the pilot's own edit committed into the clone (a fork
 #              with local commits, #963), so the text says so and the offered command saves the
-#              current copy next to it before the cp. The saved copy's name carries a time stamp
-#              (the user's shell expands the $(date ...) when the command runs): with a fixed
-#              name a second run would replace the only copy of the pilot's edits with the
-#              refreshed file.
+#              current copy next to it before the cp (see saving_cp_command: every path is
+#              escaped, and the saved copy's name is unique per run, so a second run cannot
+#              replace the only copy of the pilot's edits with the refreshed file).
 #   authored - the copy equals no version in that history: the pilot's edits, a release that
 #              update.sh already applied to the clone (it never commits what it applies), or a
 #              version that lives only on another branch.
@@ -512,7 +527,7 @@ report_owner_user_memory_drift() {
             case "$verdict" in
                 stale)
                     echo "  ⚠ $fpath — owner: user, НЕ обновлён: совпадает с версией в истории текущей ветки клона шаблона; если вы коммитили свои правки в клон, это могут быть и они."
-                    echo "    Обновить с сохранением копии: cp -p \"$deployed\" \"$deployed.before-update-\$(date +%Y%m%d%H%M%S)\" && cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    echo "    Обновить с сохранением копии: $(saving_cp_command "$SCRIPT_DIR/$fpath" "$deployed")"
                     ;;
                 authored)
                     echo "  ⚠ $fpath — owner: user, НЕ обновлён: не совпадает ни с одной версией в истории текущей ветки клона (ваши правки или уже применённый прошлый релиз)."
@@ -755,9 +770,9 @@ report_author_skip() {
             # Byte-identical to the template — not a real skip, no warning needed.
             ;;
         stale)
-            # The same saving, time-stamped command as in report_owner_user_memory_drift(): a bare cp
-            # loses the copy when the verdict misleads, and a fixed backup name is overwritten by a rerun.
-            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: cp -p \"$dst\" \"$dst.before-update-\$(date +%Y%m%d%H%M%S)\" && cp \"$SCRIPT_DIR/$fpath\" \"$dst\""
+            # The same saving command as in report_owner_user_memory_drift(): a bare cp loses the copy
+            # when the verdict misleads, and a fixed backup name is overwritten by a rerun.
+            echo "  ⚠ $fpath — author_mode: отстал от шаблона, авторских правок нет. Обновить: $(saving_cp_command "$SCRIPT_DIR/$fpath" "$dst")"
             AUTHOR_SKIP_STALE=$((AUTHOR_SKIP_STALE + 1))
             AUTHOR_STALE_PAIRS+=("$fpath|$dst")
             ;;
@@ -2745,6 +2760,12 @@ elif [ "$(head -c 2 "$REMOTE_UPDATE")" != "#!" ]; then
     # proxy. update.sh starts with a "#!" line (any interpreter path, /bin/bash or
     # /usr/bin/env bash alike); anything else must not replace the running updater.
     echo "  ⚠ не удалось проверить update.sh: ответ не похож на скрипт"
+elif ! bash -n "$REMOTE_UPDATE" 2>/dev/null; then
+    # "#!" alone proves nothing about integrity: a script cut off in the middle (an incomplete
+    # body served as a finished HTTP 200) starts with it too. A syntax check is the one test
+    # that needs no reference hash, which Step 0 does not have yet (the manifest comes later),
+    # and it runs with the same `bash` that the replacement is re-executed with.
+    echo "  ⚠ не удалось проверить update.sh: ответ не похож на рабочий скрипт"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")

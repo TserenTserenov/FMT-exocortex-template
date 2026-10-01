@@ -17,11 +17,12 @@
 #     the local file byte-identical;
 #   - the fetch fails (curl exit 23, a write error): Step 0 must say it could not
 #     check, show curl's cause, and must NOT claim "актуален";
-#   - the fetch succeeds (curl exit 0) but the answer is no script: an empty body, or a page
-#     of HTML (a proxy or a Wi-Fi login page answering HTTP 200). That is a failed check too,
-#     not a "newer" update.sh — --check must not announce a new version and a normal run must
-#     not replace update.sh with it; a real script that starts with "#!/usr/bin/env bash" is
-#     still accepted (control).
+#   - the fetch succeeds (curl exit 0) but the answer is no working script: an empty body, a
+#     page of HTML (a proxy or a Wi-Fi login page answering HTTP 200), or a script cut off in
+#     the middle (it starts with "#!" but bash -n rejects it). That is a failed check too, not a
+#     "newer" update.sh — --check must not announce a new version and a normal run must not
+#     replace update.sh with it; a real script, also one that starts with
+#     "#!/usr/bin/env bash", is still accepted (controls).
 #
 # Usage: bash setup/test-update-step0-staged-rename.sh
 
@@ -155,6 +156,12 @@ if [ -n "\${SHIM_HTML_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
     [ -n "\$out" ] && printf '<html><body>captive portal login</body></html>\n' > "\$out"
     exit 0
 fi
+# SHIM_TRUNCATED_UPDATE_SH: a script cut off in the middle (HTTP 200 for an incomplete body): it
+# starts with "#!" but is not valid shell.
+if [ -n "\${SHIM_TRUNCATED_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && printf '#!/bin/bash\nif true; then\n' > "\$out"
+    exit 0
+fi
 # SHIM_ENV_SHEBANG_UPDATE_SH: a real, different script whose first line is "#!/usr/bin/env bash".
 if [ -n "\${SHIM_ENV_SHEBANG_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
     [ -n "\$out" ] && { echo '#!/usr/bin/env bash'; tail -n +2 "$UPSTREAM/update.sh"; } > "\$out"
@@ -225,7 +232,8 @@ fi
 # or with a page of HTML. Either differs from the local file, so it used to count as a newer
 # update.sh: --check announced "Новая версия update.sh доступна", and a normal run replaced
 # update.sh with it and re-executed it (a 0-byte file: exit 0 and nothing done; an HTML page:
-# a syntax error, exit 2), every later run broken too. A script starts with "#!".
+# a syntax error, exit 2), every later run broken too. A script starts with "#!" and passes
+# bash -n (a script cut off in the middle starts with "#!" as well).
 
 # step0_check_case LABEL SHIM_VAR REASON — --check while the update.sh fetch answers badly (the
 # shim mode SHIM_VAR=1): a failed check with REASON, no "new version", no "up to date", and the
@@ -298,6 +306,9 @@ step0_check_case empty SHIM_EMPTY_UPDATE_SH "пустой ответ"
 step0_run_case empty SHIM_EMPTY_UPDATE_SH "пустой ответ"
 step0_check_case html SHIM_HTML_UPDATE_SH "ответ не похож на скрипт"
 step0_run_case html SHIM_HTML_UPDATE_SH "ответ не похож на скрипт"
+# "#!" alone proves nothing about integrity: a script cut off in the middle starts with it too.
+step0_check_case truncated SHIM_TRUNCATED_UPDATE_SH "ответ не похож на рабочий скрипт"
+step0_run_case truncated SHIM_TRUNCATED_UPDATE_SH "ответ не похож на рабочий скрипт"
 
 # Control: the check refuses what is no script, not what merely starts differently — a real
 # update.sh whose first line is "#!/usr/bin/env bash" is still a newer update.sh.
