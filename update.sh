@@ -475,8 +475,17 @@ migrate_platform_memory() {
 # issue #375: owner:user protects the deployed copy from overwrite, but protection
 # must not make upstream drift invisible. Scan the whole manifest on every real
 # update/repair pass, not only NEW_FILES/UPDATED_FILES from this invocation.
+#
+# issues #965/#967: say WHY a copy differs, using the shipped classifier (verdict from the
+# template's git history): "stale" = it equals an older template version, so the pilot
+# changed nothing and the cp below is safe; "authored" = it matches no known template
+# version, so it probably holds the pilot's edits ("probably": the history only proves
+# that no template version matches, not who edited the copy); anything else, including a
+# missing classifier, keeps the generic text. The classifier is called directly, not through
+# report_author_skip(): that one counts and queues files for --refresh-stale.
 report_owner_user_memory_drift() {
     local fpath deployed drift_count=0
+    local classifier="$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh" classify_out verdict
     [ -d "$CLAUDE_MEMORY_DIR" ] && [ -f "$MANIFEST" ] && py_available || return 0
     while IFS= read -r fpath; do
         [ -n "$fpath" ] || continue
@@ -485,8 +494,26 @@ report_owner_user_memory_drift() {
         [ -f "$SCRIPT_DIR/$fpath" ] && [ -r "$deployed" ] || continue
         [ "$(get_field "$deployed" owner)" = "user" ] || continue
         if [ "$(hash_file "$SCRIPT_DIR/$fpath")" != "$(hash_file "$deployed")" ]; then
-            echo "  ⚠ $fpath — owner: user, НЕ обновлён, но шаблонная версия отличается."
-            echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+            verdict=""
+            if [ -f "$classifier" ]; then
+                # </dev/null: this loop reads its paths from stdin; nothing else may take them.
+                classify_out=$(bash "$classifier" "$SCRIPT_DIR" "$fpath" "$deployed" </dev/null 2>/dev/null || true)
+                verdict="${classify_out%% *}"
+            fi
+            case "$verdict" in
+                stale)
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: отстал от шаблона, ваших правок не найдено."
+                    echo "    Обновить: cp \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    ;;
+                authored)
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён: отличается от всех известных версий шаблона (вероятно, ваши правки)."
+                    echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    ;;
+                *)
+                    echo "  ⚠ $fpath — owner: user, НЕ обновлён, но шаблонная версия отличается."
+                    echo "    Сверьте: diff \"$SCRIPT_DIR/$fpath\" \"$deployed\""
+                    ;;
+            esac
             drift_count=$((drift_count + 1))
         fi
     done < <($PY_BIN - "$MANIFEST" <<'PY' 2>/dev/null
@@ -4545,6 +4572,7 @@ sync_workspace_claude_md
 # Copy memory files to Claude projects directory
 if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     MEM_UPDATED=0
+    MEM_REPLACED=()
     for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
         case "$f" in
             memory/*.md|memory/*.yaml|memory/*.yml)
@@ -4568,6 +4596,14 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
                         # эта ветка тоже слепо копировала SCRIPT_DIR поверх live-копии.
                         report_author_skip "$f" "$dst"
                     else
+                        # issue #967: a platform memory file the pilot has edited (e.g.
+                        # memory/navigation.md holds per-installation notes) used to be
+                        # replaced here by a bare cp, with no backup, exactly like the
+                        # repair pass did before #847. Save the previous version first.
+                        if [ -f "$dst" ] && [ "$(hash_file "$SCRIPT_DIR/$f")" != "$(hash_file "$dst")" ]; then
+                            backup_memory_file_before_overwrite "$f" "$dst"
+                            MEM_REPLACED+=("$f")
+                        fi
                         cp "$SCRIPT_DIR/$f" "$dst"
                         MEM_UPDATED=$((MEM_UPDATED + 1))
                     fi
@@ -4577,6 +4613,13 @@ if [ -d "$CLAUDE_MEMORY_DIR" ]; then
     done
     if [ "$MEM_UPDATED" -gt 0 ]; then
         echo "  ✓ $MEM_UPDATED memory-файлов обновлено в $CLAUDE_MEMORY_DIR"
+    fi
+    if [ "${#MEM_REPLACED[@]}" -gt 0 ]; then
+        MEM_REPLACED_LIST=""
+        for f in ${MEM_REPLACED[@]+"${MEM_REPLACED[@]}"}; do
+            MEM_REPLACED_LIST="${MEM_REPLACED_LIST:+$MEM_REPLACED_LIST, }$f"
+        done
+        echo "  ⚠ Заменено файлов памяти платформы: ${#MEM_REPLACED[@]} ($MEM_REPLACED_LIST); прежние версии сохранены в $MEMORY_BACKUP_RUN"
     fi
     echo "  ✓ memory/MEMORY.md — не тронут"
 fi

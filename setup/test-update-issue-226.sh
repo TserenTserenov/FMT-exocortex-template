@@ -489,6 +489,87 @@ if grep -q "owner: user, НЕ обновлён, но шаблонная верс
 else
     fail "D: owner:user drift remained silent outside the changed-files list"
 fi
+# The install above has no classifier script: the report must stay generic (verdict unknown)
+# and must not claim to know who changed the copy.
+if grep -q "отстал от шаблона" "$TEST_ROOT/out-d.log" || grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d.log"; then
+    fail "D: a verdict was claimed although the install has no classifier"
+else
+    pass "D: without the classifier the report claims no verdict (unknown)"
+fi
+
+# ------------------------------------------------------------------
+# Scenario D2 (#965/#967): with the shipped classifier the drift report says WHY a copy
+# differs — authored (matches no known template version), stale (matches an older one),
+# unknown (the history cannot tell) — instead of one generic line for all three.
+# ------------------------------------------------------------------
+echo "--- Scenario D2: owner:user drift verdicts — authored / stale / unknown (#965 #967) ---"
+mkdir -p "$SCRIPT_DIR/.claude/scripts"
+cp "$SELF_DIR/../.claude/scripts/classify-workspace-copy.sh" "$SCRIPT_DIR/.claude/scripts/classify-workspace-copy.sh"
+# A second owner:user file that no commit of the template ever touched: verdict unknown.
+printf '# Untracked memo\n' > "$UPSTREAM/memory/untracked-memo.md"
+cp "$UPSTREAM/memory/untracked-memo.md" "$SCRIPT_DIR/memory/untracked-memo.md"
+printf -- '---\nowner: user\n---\nPilot copy of the untracked memo\n' > "$(dirname "$MEM_DST")/untracked-memo.md"
+d2_untracked_entry() {
+    python3 - "$UPSTREAM/update-manifest.json" "$UPSTREAM" "$1" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+manifest_path, root, mode = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+name = "memory/untracked-memo.md"
+manifest["files"] = [entry for entry in manifest["files"] if entry["path"] != name]
+if mode == "add":
+    manifest["files"].append({"path": name, "sha256": hashlib.sha256((pathlib.Path(root) / name).read_bytes()).hexdigest()})
+with open(manifest_path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+}
+d2_untracked_entry add
+
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d-authored.log" 2>&1 || true
+if grep -q "memory/dummy-memo.md — owner: user, НЕ обновлён: отличается от всех известных версий шаблона (вероятно, ваши правки)" "$TEST_ROOT/out-d-authored.log" && \
+   grep -q 'Сверьте: diff' "$TEST_ROOT/out-d-authored.log"; then
+    pass "D2: a copy that matches no template version is reported as probably the pilot's own edit, with a diff command"
+else
+    fail "D2: no authored verdict for the diverged copy: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "memory/untracked-memo.md — owner: user, НЕ обновлён, но шаблонная версия отличается" "$TEST_ROOT/out-d-authored.log"; then
+    pass "D2: an undecidable history (verdict unknown) keeps the generic text"
+else
+    fail "D2: the unknown verdict did not keep the generic text: $(grep -n 'untracked-memo' "$TEST_ROOT/out-d-authored.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "owner:user memory drift: 2 файл" "$TEST_ROOT/out-d-authored.log"; then
+    pass "D2: the drift summary still counts every differing file"
+else
+    fail "D2: the drift summary lost its count"
+fi
+
+# The deployed copy equals an OLDER version from the template history: no pilot edit.
+printf -- '---\nowner: user\n---\nOlder template text of the memo\n' > "$SCRIPT_DIR/memory/dummy-memo.md"
+git -C "$SCRIPT_DIR" add memory/dummy-memo.md
+git -C "$SCRIPT_DIR" commit -q -m "history: an older memo"
+cp "$UPSTREAM/memory/dummy-memo.md" "$SCRIPT_DIR/memory/dummy-memo.md"
+git -C "$SCRIPT_DIR" add memory/dummy-memo.md
+git -C "$SCRIPT_DIR" commit -q -m "history: memo back to the upstream text"
+printf -- '---\nowner: user\n---\nOlder template text of the memo\n' > "$MEM_DST"
+
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-d-stale.log" 2>&1 || true
+if grep -q "memory/dummy-memo.md — owner: user, НЕ обновлён: отстал от шаблона, ваших правок не найдено" "$TEST_ROOT/out-d-stale.log" && \
+   grep -q 'Обновить: cp "' "$TEST_ROOT/out-d-stale.log"; then
+    pass "D2: a copy that matches an older template version is reported as stale, with a cp command"
+else
+    fail "D2: no stale verdict for the copy that equals an older version: $(grep -n 'dummy-memo' "$TEST_ROOT/out-d-stale.log" | head -3 | tr '\n' ' ')"
+fi
+if grep -q "вероятно, ваши правки" "$TEST_ROOT/out-d-stale.log"; then
+    fail "D2: a stale copy was reported as the pilot's own edit"
+else
+    pass "D2: a stale copy is not reported as the pilot's own edit"
+fi
+
+d2_untracked_entry remove
+rm -f "$UPSTREAM/memory/untracked-memo.md" "$SCRIPT_DIR/memory/untracked-memo.md" "$(dirname "$MEM_DST")/untracked-memo.md"
 
 # ------------------------------------------------------------------
 # Scenario E: a genuine change (memo v2 → v3) lands alongside a manifest
@@ -704,6 +785,57 @@ if grep -q "последовательно" "$TEST_ROOT/out-g.log" && ! grep -q 
     pass "G: the printed message matches the sequential path"
 else
     fail "G: expected the sequential-mode message, output was:"; cat "$TEST_ROOT/out-g.log" >&2
+fi
+
+# ------------------------------------------------------------------
+# Scenario I (#967): Step 6 used to replace a changed platform memory file with a bare
+# cp — a pilot's edit to e.g. memory/navigation.md vanished with no backup and no word.
+# Now the previous version is saved first and the replaced files are named.
+# ------------------------------------------------------------------
+echo "--- Scenario I: Step 6 backs up a modified platform memory file (#967) ---"
+printf '# Dummy memo v6\n' > "$UPSTREAM/memory/dummy-memo.md"
+python3 - "$UPSTREAM/update-manifest.json" "$UPSTREAM" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+manifest_path, root = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+for entry in manifest["files"]:
+    if entry["path"] == "memory/dummy-memo.md":
+        entry["sha256"] = hashlib.sha256((pathlib.Path(root) / entry["path"]).read_bytes()).hexdigest()
+with open(manifest_path, "w", encoding="utf-8") as handle:
+    json.dump(manifest, handle)
+PY
+printf -- '---\nowner: platform\n---\n# Dummy memo v5\nPilot edit: notes about this installation\n' > "$MEM_DST"
+set +e
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-i.log" 2>&1
+RC_I=$?
+set -e
+if [ "$RC_I" -eq 0 ]; then
+    pass "I: update.sh exits 0 when it replaces a platform memory file"
+else
+    fail "I: expected exit 0, got $RC_I; tail: $(tail -3 "$TEST_ROOT/out-i.log" | tr '\n' ' ')"
+fi
+I_BACKUP=$(grep -rl 'Pilot edit: notes about this installation' "$WORKSPACE_DIR/.backups/memory-pre-update" 2>/dev/null | head -1 || true)
+if [ -n "$I_BACKUP" ] && [ "$(basename "$I_BACKUP")" = "dummy-memo.md" ]; then
+    pass "I: the pilot's version is saved under .backups/memory-pre-update/ before Step 6 replaces it"
+else
+    fail "I: no backup of the pilot's memory edit (found: ${I_BACKUP:-none})"
+fi
+if cmp -s "$MEM_DST" "$UPSTREAM/memory/dummy-memo.md"; then
+    pass "I: the memory file now carries the release version"
+else
+    fail "I: the memory file was not replaced with the release version"
+fi
+I_SUMMARY=$(grep -F 'Заменено файлов памяти платформы' "$TEST_ROOT/out-i.log" || true)
+if printf '%s\n' "$I_SUMMARY" | grep -qF 'Заменено файлов памяти платформы: 1' && \
+   printf '%s\n' "$I_SUMMARY" | grep -qF 'memory/dummy-memo.md' && \
+   printf '%s\n' "$I_SUMMARY" | grep -qF "$WORKSPACE_DIR/.backups/memory-pre-update"; then
+    pass "I: the run names the replaced file and where the previous version went"
+else
+    fail "I: no replaced-files summary with the backup directory: '${I_SUMMARY:-<none>}'"
 fi
 
 # ------------------------------------------------------------------

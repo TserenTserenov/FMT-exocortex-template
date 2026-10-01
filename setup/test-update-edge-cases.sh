@@ -41,6 +41,8 @@
 #        (upstream moved on) is discarded, not silently accepted (issue #846)
 #   T42: memory/*.md stale-repair backs up the workspace copy before
 #        overwriting it, like .claude/rules/* already does (issue #847)
+#   T43: Step 6 (the main apply path) backs up a modified platform memory file
+#        before replacing it and names the replaced files (issue #967)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -4378,6 +4380,121 @@ else
         pass "T42: repair_pass() actually calls the backup before the stale-repair cp"
     else
         fail "T42: backup_memory_file_before_overwrite() exists but repair_pass() never calls it"
+    fi
+fi
+
+# ============================================================================
+# T43: Step 6 (the main apply path) backs up a modified platform memory file
+# before replacing it, and names the replaced files (issue #967)
+# ============================================================================
+echo "--- T43: Step 6 memory/* replacement is backed up and reported (issue #967) ---"
+
+# T42 covers the repair pass. Step 6 replaced a changed memory/*.md with a bare `cp`:
+# a pilot's edit to a platform-owned file (memory/navigation.md holds per-installation
+# notes) vanished with every release that touched the file, with no backup and no word.
+# The Step 6 loop is inline code, not a function: it is extracted by the comment above
+# it and the closing `fi` of its outer `if`, and run for real on a fixture.
+T43_BLOCK=$(awk '
+    /^# Copy memory files to Claude projects directory$/ { armed=1; next }
+    armed && /^if \[ -d "\$CLAUDE_MEMORY_DIR" \]; then$/ { found=1 }
+    found { print }
+    found && /^fi$/ { exit }
+' "$TEMPLATE_DIR/update.sh")
+T43_FUNCS=""
+T43_MISSING=""
+for t43_fn in hash_file is_author_mode is_migrated_platform_memory_path migrate_platform_memory is_personal_config backup_memory_file_before_overwrite; do
+    t43_src=$(awk -v fn="$t43_fn" '$0 ~ "^" fn "\\(\\) \\{" {copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")
+    if [ -z "$t43_src" ]; then
+        T43_MISSING="$T43_MISSING $t43_fn"
+    fi
+    T43_FUNCS="$T43_FUNCS
+$t43_src"
+done
+if [ -z "$T43_BLOCK" ] || [ -n "$T43_MISSING" ]; then
+    fail "T43: could not extract the Step 6 memory loop or helpers from update.sh (block empty: $([ -z "$T43_BLOCK" ] && echo yes || echo no), missing functions:${T43_MISSING:- none})"
+else
+    T43_DIR="$TEST_WS/t43-step6-memory"
+    T43_TEMPLATE="$T43_DIR/template"
+    T43_WORKSPACE="$T43_DIR/workspace"
+    T43_MEMORY="$T43_DIR/claude-memory"
+    mkdir -p "$T43_TEMPLATE/memory" "$T43_WORKSPACE" "$T43_MEMORY"
+
+    # The release: a changed navigation.md, a file that is new here, one that is identical
+    # to the pilot's copy, and one the pilot owns.
+    printf -- '---\nowner: platform\n---\nTemplate v2 navigation\n' > "$T43_TEMPLATE/memory/navigation.md"
+    printf -- '---\nowner: platform\n---\nBrand new platform file\n' > "$T43_TEMPLATE/memory/brand-new.md"
+    printf -- '---\nowner: platform\n---\nSame text on both sides\n' > "$T43_TEMPLATE/memory/same.md"
+    printf -- '---\nowner: platform\n---\nTemplate text for a pilot-owned file\n' > "$T43_TEMPLATE/memory/user-owned.md"
+    # The pilot's deployed copies.
+    printf -- '---\nowner: platform\n---\nTemplate v1 navigation\nPilot notes about this installation\n' > "$T43_MEMORY/navigation.md"
+    cp "$T43_TEMPLATE/memory/same.md" "$T43_MEMORY/same.md"
+    printf -- '---\nowner: user\n---\nPilot-owned text\n' > "$T43_MEMORY/user-owned.md"
+
+    # t43_run_step6 "NEW FILES" "UPDATED FILES" — the extracted loop, in a subshell (it is
+    # update.sh code and runs without -u); prints what the loop printed.
+    t43_run_step6() {
+        local new_list="$1" updated_list="$2"
+        (
+            set +u
+            # shellcheck source=/dev/null
+            source "$TEMPLATE_DIR/.claude/lib/frontmatter.sh"
+            eval "$T43_FUNCS"
+            SCRIPT_DIR="$T43_TEMPLATE"
+            WORKSPACE_DIR="$T43_WORKSPACE"
+            # shellcheck disable=SC2034  # read by the eval'd update.sh code
+            CLAUDE_MEMORY_DIR="$T43_MEMORY"
+            MEMORY_BACKUP_RUN=""
+            # shellcheck disable=SC2034,SC2206  # word splitting of a list of plain paths is intended
+            NEW_FILES=($new_list)
+            # shellcheck disable=SC2034,SC2206
+            UPDATED_FILES=($updated_list)
+            eval "$T43_BLOCK"
+        ) 2>&1
+    }
+    T43_OUT=$(t43_run_step6 "memory/brand-new.md" "memory/navigation.md memory/same.md memory/user-owned.md")
+
+    T43_BACKUP=$(find "$T43_WORKSPACE/.backups/memory-pre-update" -type f -name navigation.md -print -quit 2>/dev/null || true)
+    if [ -n "$T43_BACKUP" ] && grep -q 'Pilot notes about this installation' "$T43_BACKUP"; then
+        pass "T43: the pilot's navigation.md is backed up before Step 6 replaces it"
+    else
+        fail "T43: no backup holding the pilot's edit of navigation.md (found: ${T43_BACKUP:-none})"
+    fi
+    if cmp -s "$T43_MEMORY/navigation.md" "$T43_TEMPLATE/memory/navigation.md"; then
+        pass "T43: navigation.md is replaced with the release version"
+    else
+        fail "T43: navigation.md was not replaced with the release version"
+    fi
+    T43_SUMMARY=$(printf '%s\n' "$T43_OUT" | grep -F 'Заменено файлов памяти платформы' || true)
+    if printf '%s\n' "$T43_SUMMARY" | grep -qF 'Заменено файлов памяти платформы: 1' \
+        && printf '%s\n' "$T43_SUMMARY" | grep -qF 'memory/navigation.md' \
+        && printf '%s\n' "$T43_SUMMARY" | grep -qF "$T43_WORKSPACE/.backups/memory-pre-update"; then
+        pass "T43: the summary names the replaced file, their number and the backup directory"
+    else
+        fail "T43: replaced-files summary is missing or wrong: '${T43_SUMMARY:-<none>}'"
+    fi
+    if printf '%s\n' "$T43_SUMMARY" | grep -qE 'brand-new|same\.md|user-owned'; then
+        fail "T43: the summary lists a file that was not replaced: $T43_SUMMARY"
+    else
+        pass "T43: new, identical and pilot-owned files are not in the summary"
+    fi
+    if [ -f "$T43_MEMORY/brand-new.md" ] \
+        && [ -z "$(find "$T43_WORKSPACE/.backups/memory-pre-update" -type f \( -name brand-new.md -o -name same.md -o -name user-owned.md \) -print 2>/dev/null)" ]; then
+        pass "T43: a new file is copied, and nothing is backed up for new or identical files"
+    else
+        fail "T43: new file missing, or an unnecessary backup exists for a new/identical file"
+    fi
+    if grep -q 'Pilot-owned text' "$T43_MEMORY/user-owned.md"; then
+        pass "T43: a pilot-owned (owner: user) file is still left alone"
+    else
+        fail "T43: the owner: user guard no longer protects the file"
+    fi
+
+    # A second pass finds nothing that differs: nothing to back up, nothing to report.
+    T43_OUT2=$(t43_run_step6 "" "memory/navigation.md memory/same.md")
+    if printf '%s\n' "$T43_OUT2" | grep -qF 'Заменено файлов памяти платформы'; then
+        fail "T43: a pass that replaces nothing still prints the replaced-files summary"
+    else
+        pass "T43: no summary when no file is replaced"
     fi
 fi
 
