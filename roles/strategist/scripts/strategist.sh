@@ -927,6 +927,10 @@ DAY_OPEN_ALARM_SENT_MARK="Telegram notification sent: strategist/day-open-failed
 # not unconfigured".
 DAY_OPEN_ALARM_UNCONFIGURED_MARK="SKIP: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set"
 DAY_OPEN_ALARM_MAX_ATTEMPTS=3
+# Left in today's log by a give-up whose alarm is still owed: "<mark><reason code>|<exit code>|<reason text>".
+# The next run finishes that give-up from this record (day_open_resume_pending_give_up) and does not run the
+# pipeline again.
+DAY_OPEN_GIVEUP_PENDING_MARK="RECORDED: day-open give-up pending|"
 # A run that gave up on the plan while the alarm is still owed exits with this code, so the scheduler
 # comes back and the alarm goes out again; the day is not marked done meanwhile.
 DAY_OPEN_ALARM_RETRY_RC=74
@@ -961,17 +965,30 @@ day_open_alarm_owed() {  # 0 = the alarm is not delivered, Telegram is configure
 }
 
 # No more morning runs today and no false SUCCESS -- once the alarm is out: a give-up with an owed alarm
-# leaves the day open (exit DAY_OPEN_ALARM_RETRY_RC, no GAVE UP line) so the next scheduler run sends it
-# again and nothing else (the pipeline is not run again: a structural failure gives up right away, an
-# exhausted one is recognised by the attempts already counted).
+# leaves the day open (exit DAY_OPEN_ALARM_RETRY_RC, no GAVE UP line) and records what it gave up on, so
+# the next scheduler run sends the alarm again and nothing else: day_open_resume_pending_give_up reads the
+# record before the pipeline is looked at. That also bounds the sends: every one comes from a give-up or
+# from a transient failure of attempts 1 and 2, and the owed test stops at DAY_OPEN_ALARM_MAX_ATTEMPTS.
 day_open_give_up() {  # <reason code> <reason text> [exit code]
     day_open_alarm "$@"
     if day_open_alarm_owed; then
-        log "Day Open: тревога не доставлена (Telegram отказал), повтор доставки при следующем запуске планировщика, код $DAY_OPEN_ALARM_RETRY_RC ($2)"
+        log "$DAY_OPEN_GIVEUP_PENDING_MARK$1|${3:-}|$2"
+        log "Day Open: тревога не доставлена, повтор доставки при следующем запуске планировщика без нового запуска конвейера, код $DAY_OPEN_ALARM_RETRY_RC ($2)"
         exit "$DAY_OPEN_ALARM_RETRY_RC"
     fi
     log "GAVE UP scenario: day-plan ($2)"
     exit 0
+}
+
+day_open_resume_pending_give_up() {  # finishes a give-up whose alarm is still owed; returns when there is none
+    local rec code rc
+    rec=$(grep -F "$DAY_OPEN_GIVEUP_PENDING_MARK" "$LOG_FILE" 2>/dev/null | tail -1) || true
+    [ -n "$rec" ] || return 0
+    rec=${rec#*"$DAY_OPEN_GIVEUP_PENDING_MARK"}
+    code=${rec%%|*}
+    rec=${rec#*|}
+    rc=${rec%%|*}
+    day_open_give_up "$code" "${rec#*|}" "$rc"
 }
 
 day_open_start_attempt() {  # gives up instead when DAY_OPEN_MAX_ATTEMPTS attempts already started today
@@ -1161,6 +1178,7 @@ case "$1" in
             log "SKIP: $SCENARIO already completed today"
             exit 0
         fi
+        day_open_resume_pending_give_up
 
         if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
             log "Strategy day ($STRATEGY_DAY_NAME): running session prep"

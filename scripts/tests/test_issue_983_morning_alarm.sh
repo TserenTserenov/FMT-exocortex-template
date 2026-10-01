@@ -10,7 +10,8 @@
 # --scaffold-only retry failed too) ends the day: "GAVE UP scenario: day-plan (...)", exit 0, and
 # already_ran_today() skips later launchd runs -- but only once the alarm is out: while a configured
 # Telegram refuses it, the run exits 74 without GAVE UP and the scheduler sends it again (three
-# sends a day at most; with no Telegram configured there is nothing to wait for). A deferral (pipeline exit 7: yesterday is not
+# sends a day at most; with no Telegram configured there is nothing to wait for). What the run gave
+# up on is kept in the day's log, so the next run sends the alarm again WITHOUT starting the pipeline. A deferral (pipeline exit 7: yesterday is not
 # closed yet) is no failure: no alarm, not an attempt, exit 7. Any other pipeline code is passed
 # out so the scheduler retries (2 as 73: the scheduler reads 2 as "lock held"); attempts are
 # counted when they START (the scheduler's timeout kills the run before it can record an end), at
@@ -371,6 +372,22 @@ check_has "12: доставлено именно сообщение «План �
 rc3=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
 check "12: третий запуск пропущен, второго сообщения нет" "0/1" "$rc3/$(messages)"
 check "12: модель так и не запускалась" "0" "$(model_runs)"
+
+# ---------------------------------------------------------------- 12b
+echo "== 12б: шлюза нет, повтор --scaffold-only упал, Telegram отказал: доставка повторяется без нового запуска конвейера"
+new_case
+touch "$NET_DOWN_FILE"
+rc1=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
+check "12б: первый запуск: код 74, день не закрыт, конвейер вызван дважды (как есть и с --scaffold-only)" \
+    "74|0|2" "$rc1|$(log_count 'GAVE UP')|$(count_lines "$PIPE_LOG")"
+check "12б: в журнале запись об отложенном отказе с причиной и кодом 4" "1" \
+    "$(log_count 'RECORDED: day-open give-up pending|scaffold-only-failed|4|')"
+rm -f "$NET_DOWN_FILE"
+rc2=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
+check "12б: второй запуск: выход 0, тревога доставлена, день закрыт, конвейер НЕ вызывался снова" "0|1|1|2" \
+    "$rc2|$(messages)|$(log_count 'GAVE UP scenario: day-plan (')|$(count_lines "$PIPE_LOG")"
+check_has "12б: в сообщении код 4 из записи" "$(message_texts)" "(код 4)"
+check "12б: начата одна попытка, повторная доставка её не тратила" "1" "$(log_count 'RECORDED: day-open attempt')"
 
 # ---------------------------------------------------------------- 13
 echo "== 13: Telegram отказывает всё время: три отправки, потом отказ на день без бесконечных повторов"
