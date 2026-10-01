@@ -13,10 +13,101 @@
 
 set -uo pipefail
 
-# SCRIPT_HOME is the directory this copy runs from. Executables and libraries
-# are always taken from here; DATA (WeekPlan, current/, inbox/, logs/ ...) lives
-# in the governance repository, $DS_STRATEGY.
+# SCRIPT_HOME is the directory this copy runs from. Day Open's own helpers (patch
+# scripts, hook/check runners, lib/) are taken from here; the tools shared with the
+# strategist job (session-guard, preflight, scaffold, server-calendar,
+# git-dirty-guard) come from $IWE_SCRIPTS. DATA (WeekPlan, current/, inbox/, logs/
+# ...) lives in the governance repository, $DS_STRATEGY.
 SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- CLI args ---
+FORCE=false
+PROBE=false
+SCAFFOLD_ONLY=false
+DATE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force|-f)      FORCE=true; shift ;;
+    # --probe (WP-484, test stand): dry-run — real preflight+scaffold+LLM-fill+checks,
+    # writes to a "(probe)" suffixed file (never the real DayPlan), skips commit/push/
+    # archive-move/TG. Implies --force (guards are about real-file state, irrelevant here).
+    --probe)         PROBE=true; FORCE=true; shift ;;
+    # --scaffold-only (issue #434): the deterministic skeleton (step 3) needs
+    # no LLM Proxy at all — only step 4 (LLM Fill) does. Before this flag,
+    # an unreachable/unprovisioned proxy made step 2's healthcheck abort the
+    # whole run, so an install without a proxy could never get even the
+    # skeleton. Skips steps 2 and 4; still runs 1, 3, 4.2-4.6, 5, 6.
+    --scaffold-only) SCAFFOLD_ONLY=true; shift ;;
+    --date|-d)       DATE="$2"; shift 2 ;;
+    *)               DATE="$1"; shift ;;
+  esac
+done
+DATE="${DATE:-$(date +%Y-%m-%d)}"
+PROBE_START_S=$SECONDS
+
+# --- Secrets (must load before the first tg_notify call of a normal run — WP-5 Ubuntu-audit
+# П2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
+# pipeline-started notifications, so those two silently no-op'd every run) ---
+source_env_if_present() {
+  [ -f "$1" ] || return 0
+  set -a
+  source "$1"
+  set +a
+}
+load_secrets() {
+  source_env_if_present "$HOME/.config/aist/env"
+  source_env_if_present "$HOME/IWE/.secrets/anthropic_key.env"  # Anthropic API key for llm-proxy (WP-356)
+  # WP-484 Ф50b named this file as the readable ANTHROPIC_API_KEY source for the
+  # remote-gateway fallback below (line ~534) but never sourced it -- the fallback
+  # chain silently resolved to empty and the authorized probe 401'd (found live
+  # 2026-08-05 running --probe ahead of a scheduled test run).
+  source_env_if_present "$HOME/.iwe/.proxy-env"
+  # WP-484 F64 (06.08): TELEGRAM_* live in ~/.secrets/tg-bots (canonical source per
+  # lib/telegram.sh) — none of the three files above carry them on tsekh-1, so every
+  # tg_notify on the server (incl. the "День открыт" digest and all aborts) was a
+  # silent no-op since the migration. Same fix as day-open-pipeline-watchdog.sh.
+  source_env_if_present "$HOME/.secrets/tg-bots"
+  TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+  TG_CHAT="${TELEGRAM_CHAT_ID:-}"
+}
+
+# --- Helper: send TG notification, transport unified onto lib/telegram.sh ---
+# MUST be defined before first call (regression fix 2026-06-29). WP-538 Ф3:
+# was a raw curl POST duplicating http_code/ok:true checking that
+# scripts/lib/telegram.sh already does, with 3x retry instead of one shot.
+# Template note: the admission-gate rate limiter (telegram_send_gated) lives
+# only in the author's personal governance repo so far, not this template's
+# notification-render.sh — this promotion carries the transport fix only, not
+# a gated call site.
+tg_notify() {
+  local msg="$1"
+  if [ "$PROBE" = "true" ]; then
+    echo "  [probe: TG suppressed] $msg" | head -1
+    return 0
+  fi
+  if [ -z "${TG_TOKEN:-}" ] || [ -z "${TG_CHAT:-}" ]; then
+    echo "  [no tg credentials] $msg" | head -1
+    return 1
+  fi
+  telegram_send "$msg" || { echo "  [tg delivery FAILED] $msg" | head -2; return 1; }
+}
+
+# A refusal while the workspace is being resolved (below) happens before the normal path
+# loads the secrets and the Telegram transport (after the snapshot refresh child below has
+# started with the plain environment), so load them here and report the way abort() does:
+# a failed night run must not be silent (issue #974). The exit code is unchanged.
+early_abort() {
+  local reason="$1"
+  echo "❌ $reason" >&2
+  if [ -f "$SCRIPT_HOME/lib/telegram.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$SCRIPT_HOME/lib/telegram.sh"
+    load_secrets
+    tg_notify "🚨 Day Open pipeline aborted: ${reason}" || true
+  fi
+  exit 1
+}
+
 # issue #974: strategist.sh runs the copy inside the template checkout
 # (<workspace>/FMT-exocortex-template/scripts/), a SIBLING of the governance
 # repo, so deriving the repo from this file's location made the template look
@@ -26,40 +117,46 @@ SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # day-open-preflight.sh); a copy promoted into the governance repo itself keeps
 # deriving both from its location, which also beats a stale inherited environment.
 if [ -f "$SCRIPT_HOME/../update-manifest.json" ]; then
+  [ -f "$SCRIPT_HOME/lib/common.sh" ] \
+    || early_abort "lib/common.sh не найден рядом с $0 — копия шаблона неполная, обновите шаблон"
+  # Subshells: common.sh defines its own tg_notify(), which would replace the one above.
   # shellcheck source=/dev/null
-  . "$SCRIPT_HOME/lib/common.sh" || {
-    echo "FATAL: lib/common.sh не найден рядом с $0 — копия шаблона неполная, обновите шаблон" >&2
-    exit 1
-  }
-  IWE="$(iwe_resolve_root)" || exit 1
-  GOV_REPO="$(iwe_resolve_governance_repo)"
+  IWE="$( . "$SCRIPT_HOME/lib/common.sh" && iwe_resolve_root 2>&1 )" \
+    || early_abort "Не определён корень рабочего пространства: $IWE"
+  # shellcheck source=/dev/null
+  GOV_REPO="$( . "$SCRIPT_HOME/lib/common.sh" && iwe_resolve_governance_repo )"
   DS_STRATEGY="$IWE/$GOV_REPO"
+  if [ ! -d "$DS_STRATEGY" ]; then
+    if [ -n "${IWE_WORKSPACE:-}" ]; then ROOT_SOURCE="IWE_WORKSPACE"
+    elif [ -n "${IWE_ROOT:-}" ]; then ROOT_SOURCE="IWE_ROOT"
+    else ROOT_SOURCE="расположение скрипта (или WORKSPACE_DIR из .exocortex.env)"
+    fi
+    early_abort "Governance-репозиторий не найден: $DS_STRATEGY. Корень $IWE взят из: $ROOT_SOURCE — проверьте, что он верный и не устарел, и что в нём есть каталог $GOV_REPO (имя задаёт IWE_GOVERNANCE_REPO, по умолчанию DS-strategy)"
+  fi
+  SCRIPTS_FALLBACK="$SCRIPT_HOME"
 else
   DS_STRATEGY="$(cd "$SCRIPT_HOME/.." && pwd)"
   IWE="$(cd "$DS_STRATEGY/.." && pwd)"
   GOV_REPO="$(basename "$DS_STRATEGY")"
-fi
-if [ ! -d "$DS_STRATEGY" ]; then
-  echo "❌ Governance-репозиторий не найден: $DS_STRATEGY — задайте IWE_GOVERNANCE_REPO (имя его каталога в $IWE)" >&2
-  exit 1
+  SCRIPTS_FALLBACK="$IWE/scripts"
 fi
 # Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
 # a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
 export IWE_ROOT="$IWE"
-# issue #756: session-guard.sh, day-open-scaffold.sh and the other helpers
-# called below live inside the template (FMT-exocortex-template/scripts/),
-# not directly under $IWE/scripts -- that directory does not exist on any
-# install where the template sits as a subdirectory of the workspace (the
-# layout setup.sh itself produces). $IWE_SCRIPTS is written once at
-# install/update time (install-iwe-paths.sh's .iwe-paths, sourced via
-# ~/.zshenv; the systemd unit templates bake it into Environment=) rather
-# than re-derived on every invocation the way $IWE/$DS_STRATEGY are above --
-# an inherited value from a DIFFERENT checkout (e.g. running this exact
-# script from an isolated worktree with the main workspace's env still
-# exported) would silently win over the correct co-located $IWE/scripts
-# fallback. $IWE/scripts stays as that fallback for an install where scripts
-# really were flattened into the workspace root.
-IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE/scripts}"
+# issue #756: session-guard.sh, day-open-scaffold.sh and the other shared helpers
+# called below live inside the template (FMT-exocortex-template/scripts/), not
+# directly under $IWE/scripts -- that directory does not exist on any install
+# where the template sits as a subdirectory of the workspace (the layout
+# setup.sh itself produces). $IWE_SCRIPTS is written once at install/update time
+# (install-iwe-paths.sh's .iwe-paths, sourced via ~/.zshenv; the systemd unit
+# templates bake it into Environment=) rather than re-resolved on every
+# invocation -- an inherited value from a DIFFERENT checkout (e.g. running this
+# exact script from an isolated worktree with the main workspace's env still
+# exported) would silently win over the co-located fallback. The fallback is the
+# directory this copy runs from for a template copy (issue #974: there is no
+# <workspace>/scripts on that layout) and $IWE/scripts for a promoted copy, for
+# an install where scripts really were flattened into the workspace root.
+IWE_SCRIPTS="${IWE_SCRIPTS:-$SCRIPTS_FALLBACK}"
 export IWE_SCRIPTS
 # Every child process, including the background snapshot refresh below, must
 # resolve the same governance repository as this pipeline. launchd/cron do not
@@ -96,54 +193,9 @@ echo "=== 1.5. Snapshot refresh (opportunistic) ==="
 SNAPSHOT_PID=$!
 echo "  snapshot refresh pid=$SNAPSHOT_PID (background, non-blocking)"
 
-# --- CLI args ---
-FORCE=false
-PROBE=false
-SCAFFOLD_ONLY=false
-DATE=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --force|-f)      FORCE=true; shift ;;
-    # --probe (WP-484, test stand): dry-run — real preflight+scaffold+LLM-fill+checks,
-    # writes to a "(probe)" suffixed file (never the real DayPlan), skips commit/push/
-    # archive-move/TG. Implies --force (guards are about real-file state, irrelevant here).
-    --probe)         PROBE=true; FORCE=true; shift ;;
-    # --scaffold-only (issue #434): the deterministic skeleton (step 3) needs
-    # no LLM Proxy at all — only step 4 (LLM Fill) does. Before this flag,
-    # an unreachable/unprovisioned proxy made step 2's healthcheck abort the
-    # whole run, so an install without a proxy could never get even the
-    # skeleton. Skips steps 2 and 4; still runs 1, 3, 4.2-4.6, 5, 6.
-    --scaffold-only) SCAFFOLD_ONLY=true; shift ;;
-    --date|-d)       DATE="$2"; shift 2 ;;
-    *)               DATE="$1"; shift ;;
-  esac
-done
-DATE="${DATE:-$(date +%Y-%m-%d)}"
-PROBE_START_S=$SECONDS
-
-# --- Helper: send TG notification, transport unified onto lib/telegram.sh ---
-# MUST be defined before first call (regression fix 2026-06-29). WP-538 Ф3:
-# was a raw curl POST duplicating http_code/ok:true checking that
-# scripts/lib/telegram.sh already does, with 3x retry instead of one shot.
-# Template note: the admission-gate rate limiter (telegram_send_gated) lives
-# only in the author's personal governance repo so far, not this template's
-# notification-render.sh — this promotion carries the transport fix only, not
-# a gated call site.
+# Telegram transport behind tg_notify() (defined near the top of this file).
 # shellcheck source=lib/telegram.sh
 . "$SCRIPT_HOME/lib/telegram.sh"
-
-tg_notify() {
-  local msg="$1"
-  if [ "$PROBE" = "true" ]; then
-    echo "  [probe: TG suppressed] $msg" | head -1
-    return 0
-  fi
-  if [ -z "${TG_TOKEN:-}" ] || [ -z "${TG_CHAT:-}" ]; then
-    echo "  [no tg credentials] $msg" | head -1
-    return 1
-  fi
-  telegram_send "$msg" || { echo "  [tg delivery FAILED] $msg" | head -2; return 1; }
-}
 
 # --- Helper: portable single-field read from a Y-m-d date string ---
 # BSD `date -j` (macOS) vs GNU `date -d` (Linux/tsekh-1) -- third use of this
@@ -200,30 +252,9 @@ raise SystemExit(1)
   return 1
 }
 
-# --- Secrets (must load before the first tg_notify call below — WP-5 Ubuntu-audit
-# П2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
-# pipeline-started notifications, so those two silently no-op'd every run) ---
-source_env_if_present() {
-  [ -f "$1" ] || return 0
-  set -a
-  source "$1"
-  set +a
-}
-source_env_if_present "$HOME/.config/aist/env"
-source_env_if_present "$HOME/IWE/.secrets/anthropic_key.env"  # Anthropic API key for llm-proxy (WP-356)
-# WP-484 Ф50b named this file as the readable ANTHROPIC_API_KEY source for the
-# remote-gateway fallback below (line ~534) but never sourced it -- the fallback
-# chain silently resolved to empty and the authorized probe 401'd (found live
-# 2026-08-05 running --probe ahead of a scheduled test run).
-source_env_if_present "$HOME/.iwe/.proxy-env"
-# WP-484 F64 (06.08): TELEGRAM_* live in ~/.secrets/tg-bots (canonical source per
-# lib/telegram.sh) — none of the three files above carry them on tsekh-1, so every
-# tg_notify on the server (incl. the "День открыт" digest and all aborts) was a
-# silent no-op since the migration. Same fix as day-open-pipeline-watchdog.sh.
-source_env_if_present "$HOME/.secrets/tg-bots"
-
-TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-TG_CHAT="${TELEGRAM_CHAT_ID:-}"
+# --- Secrets: loaded here, after the snapshot refresh child was started with the
+# plain environment (see 1.5 above) and before the first tg_notify call ---
+load_secrets
 
 # --- Guard: already committed today (D2 dedup) ---
 # Checks by file presence in git history, not commit message prefix —

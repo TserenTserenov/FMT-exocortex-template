@@ -61,7 +61,7 @@ for rel in $STRATEGY_REFS; do
       ;;
   esac
   # Seed mirror: the pipeline itself ships in seed for fresh installs, so every
-  # $DS_STRATEGY-relative dependency must ship there too (2026-08-20-42, theme 4:
+  # $SCRIPT_HOME-relative dependency must ship there too (2026-08-20-42, theme 4:
   # update path and seed are two separate delivery axes).
   if [ -f "$SEED_SCRIPTS/$rel" ] || [ -f "$SEED_SCRIPTS/${rel#scripts/}" ]; then
     pass "seed mirror: $rel"
@@ -115,9 +115,9 @@ for rel in $STRATEGY_REFS; do
   esac
 done
 
-# --- 2b. Pipeline-own dependencies invisible to $DS_STRATEGY extraction -------
+# --- 2b. Pipeline-own dependencies invisible to $SCRIPT_HOME extraction -------
 # find-python3.sh is sourced via $(dirname BASH_SOURCE)/lib/ — not a
-# $DS_STRATEGY literal, so section 1 never sees it; without this check its
+# $SCRIPT_HOME literal, so section 1 never sees it; without this check its
 # deletion would go unnoticed (RESOLVED_PY silently falls back to python3).
 echo "=== 2b. Resolver delivery (BASH_SOURCE-relative dependency) ==="
 if [ -f "$REPO_ROOT/scripts/lib/find-python3.sh" ] && [ -x "$REPO_ROOT/scripts/lib/find-python3.sh" ]; then
