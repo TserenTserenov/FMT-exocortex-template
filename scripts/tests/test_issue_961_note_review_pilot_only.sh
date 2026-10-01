@@ -16,7 +16,9 @@
 #   E. daily-report.sh no longer reports a missing note-review marker as a failure;
 #   G. the Day Open instructions, the user guides and the other prompts no longer describe the old flow
 #      (a nightly review, a note that leaves the box after Note-Review) and do not attribute the decision
-#      to a pilot on a date.
+#      to a pilot on a date;
+#   F. the canary function of strategist.sh on its own, H. one table of note titles on which the safety net,
+#      the canary and the Day Open scanner must give the same answer.
 # The canary of strategist.sh is covered end to end in setup/test-strategist-isolated-scenarios.sh (B10).
 
 # SC2016: the single-quoted strings are literal prompt fragments (with backticks) and stub-script bodies
@@ -372,6 +374,54 @@ for stale in '29-30.07.2026' '(пилот, 30.07.2026)' 'Пилот (2026-07-29)
     'pilot decision 2026-07-29/30' 'Pilot decision (2026-07-29)' 'Since the pilot decision of'; do
     absent_in_texts "no '$stale' in the shipped texts and script comments" "$stale"
 done
+# ==== LAYER H: one answer in three places ====
+echo "== H: the safety net, the canary and the Day Open scanner answer the same on one table of note titles =="
+# The mark of a proposed note is recognised by three independent rules: should_keep() of the cleanup script (Python),
+# count_new_bold_notes() of the runner (grep) and render_fleeting_notes() of the Day Open scaffold (grep and sed).
+# A model types the mark with a space after the check mark, with a capital, and sometimes drops the bold. Every row is
+# the first line of a note; the expectation is "kept by the safety net / counted as NEW by the canary / listed for the
+# pilot by the scanner". Whatever the spelling, a marked note is kept, not new, listed exactly once; a note the pilot
+# struck through, a plain note and a deferred one (the scanner leaves those to the strategy session) are not listed.
+H_TITLES=(
+    '**New note**'
+    '**Proposed** ✅предложено'
+    '**Spaced** ✅ предложено'
+    '**Capital** ✅Предложено'
+    '**Shouting noise** ✅ПРЕДЛОЖЕНО (шум)'
+    'Bare proposed ✅предложено'
+    'Bare spaced ✅ предложено'
+    'Bare capital ✅Предложено'
+    '~~Struck~~ ✅предложено'
+    'Plain note'
+    '**Deferred** 🔄'
+)
+H_EXPECTED=( 1/1/1 1/0/1 1/0/1 1/0/1 1/0/1 1/0/1 1/0/1 1/0/1 0/0/0 0/0/0 1/0/0 )
+H_KEPT="$(printf '%s\n' "${H_TITLES[@]}" | env HOME="$SB/clean-home" IWE_CLEANUP_REPO_DIR="$SB/clean" "$PY3" -c '
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location("cleanup_under_test", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+for line in sys.stdin.read().splitlines():
+    print(int(module.should_keep(line)))
+' "$CLEANUP_PY")"
+h_index=0
+for h_title in "${H_TITLES[@]}"; do
+    # the real box layout: the title line, then the timestamp line
+    printf '# Fleeting Notes\n\n---\n\n%s\n<sub>1 янв, 10:00</sub>\n\n---\n' "$h_title" > "$SB/h-box.md"
+    h_answer="$(printf '%s' "$H_KEPT" | sed -n "$((h_index + 1))p")/$(canary_count "$SB/h-box.md")/$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$SB/h-box.md" | grep -c '^| \[«')"
+    check "kept/new/listed for '$h_title'" "${H_EXPECTED[$h_index]}" "$h_answer"
+    h_seed_listed="$(run_scanner "$ROOT/seed/strategy/scripts/day-open-scaffold.sh" "$SB/h-box.md" | grep -c '^| \[«')"
+    check "the seed copy of the scanner agrees for '$h_title'" "${h_answer##*/}" "$h_seed_listed"
+    h_index=$((h_index + 1))
+done
+{
+    printf '# Fleeting Notes\n\n---\n'
+    for h_title in "${H_TITLES[@]}"; do printf '\n%s\n<sub>1 янв, 10:00</sub>\n\n---\n' "$h_title"; done
+} > "$SB/h-all-box.md"
+H_LISTED_TITLES="$(run_scanner "$ROOT/scripts/day-open-scaffold.sh" "$SB/h-all-box.md" | sed -E 's/^\| \[«(.*)»\]\(.*$/\1/' | tr '\n' '|')"
+check "one box with every row: the pilot sees each waiting note once, with a clean title (the mark is not part of it)" \
+    "New note|Proposed|Spaced|Capital|Shouting noise|Bare proposed|Bare spaced|Bare capital|" "$H_LISTED_TITLES"
 # ==== END LAYERS ====
 
 echo

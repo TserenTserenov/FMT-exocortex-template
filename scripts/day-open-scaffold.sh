@@ -1074,17 +1074,27 @@ render_scout() {
 
 # --- Section: Разбор заметок (fleeting-notes) ---
 # Парсит inbox/fleeting-notes.md на наличие заметок, ждущих решения пилота: строки **Title**
-# (новые) и **Title** ✅предложено (агент записал предложение, решение за пилотом, #961).
+# (новые), **Title** ✅предложено и Title ✅предложено (агент записал предложение, решение за
+# пилотом; модель могла уронить жирный, #961).
 # Если пусто → "нет заметок" без маркера PENDING → LLM секцию не трогает.
 # Если есть → строки таблицы с реальными заголовками и PENDING на Тип/Предложение.
 # Bold **text** в GitHub не создаёт якорей — ссылки без #якорь.
 render_fleeting_notes() {
   local notes_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/fleeting-notes.md"
 
-  # Extract titles of notes awaiting the pilot: **Title**, **Title** ✅предложено, **Title** ✅предложено (шум)
+  # The mark of a proposed note, spelled the way a model types it: with a space after the check mark and with a
+  # capital. Spelled out instead of grep -i because Cyrillic case folding depends on the locale. The same rule as
+  # the canary (strategist.sh count_new_bold_notes) and the safety net (cleanup-processed-notes.py should_keep).
+  local mark='✅[[:space:]]*(предложено|Предложено|ПРЕДЛОЖЕНО)'
+  local bold_note="^\*\*[^*]+\*\*[[:space:]]*(${mark}.*)?\$"
+  # A marked note without bold: the mark closes the line (a "(...)" tail such as "(шум)" is allowed); the line is
+  # not a quote, a struck-through note (~~), a timestamp (<sub>), a heading or a list item
+  local plain_note="^[^*~<>#[:space:]-].*${mark}([[:space:]]*\(.*\))?[[:space:]]*\$"
+
+  # Extract titles of notes awaiting the pilot: **Title**, **Title** <mark>[ (шум)], Title <mark>[ (шум)]
   local new_notes
-  new_notes=$(grep -E '^\*\*[^*]+\*\*[[:space:]]*(✅предложено.*)?$' "$notes_file" 2>/dev/null \
-    | sed -E 's/^\*\*//; s/\*\*[[:space:]]*(✅предложено.*)?$//')
+  new_notes=$(grep -E -e "$bold_note" -e "$plain_note" "$notes_file" 2>/dev/null \
+    | sed -E -e 's/^\*\*//' -e "s/\*\*[[:space:]]*(${mark}.*)?\$//" -e "s/[[:space:]]*${mark}([[:space:]]*\(.*\))?[[:space:]]*\$//")
 
   if [ -z "$new_notes" ]; then
     printf '| нет заметок | — | — | ✅ |\n'
