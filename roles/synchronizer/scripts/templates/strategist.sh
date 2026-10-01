@@ -83,6 +83,35 @@ get_github_link() {
     fi
 }
 
+# D16 (#983, #981): the morning Day Open built no plan and the strategist no longer replaces it with
+# the free-form prompt. Static like week-review-failed: there is no file to look up. strategist.sh
+# passes a reason code in DAY_OPEN_FAILED_REASON and the exit code in DAY_OPEN_FAILED_RC; only digits
+# of the code reach the HTML message.
+build_day_open_failed_message() {
+    local rc="${DAY_OPEN_FAILED_RC:-}" reason
+    local advice="Откройте день в сессии Claude Code командой «открывай». Подробности - в журнале стратега за сегодня (logs/strategist/$DATE.log в домашнем каталоге)."
+    case "$rc" in ''|*[!0-9]*) rc="" ;; esac
+    case "${DAY_OPEN_FAILED_REASON:-}" in
+        not-delivered)
+            reason="Конвейер Открытия дня (scripts/day-open-pipeline.sh) не установлен на этой машине."
+            advice="Запустите update.sh, чтобы его установить. План на сегодня соберите в сессии Claude Code командой «открывай»."
+            ;;
+        scaffold-only-failed)
+            reason="Шлюз модели не настроен, а сборка каркаса плана без модели тоже не дошла до конца${rc:+ (код $rc)}."
+            ;;
+        pipeline-failed)
+            reason="Конвейер Открытия дня завершился с ошибкой${rc:+ (код $rc)}. Планировщик повторит попытку позже; если план нужен сейчас, не ждите."
+            ;;
+        attempts-exhausted)
+            reason="Попытки собрать план за сегодня исчерпаны (ошибка или прерывание по тайм-ауту${rc:+, последний код $rc}), автоматических повторов сегодня больше не будет."
+            ;;
+        *)
+            reason="Конвейер Открытия дня не собрал план${rc:+ (код $rc)}."
+            ;;
+    esac
+    printf "<b>🔴 План дня не собран</b>\n\n%s\n\n%s" "$reason" "$advice"
+}
+
 build_message() {
     local scenario="$1"
     local file
@@ -91,6 +120,10 @@ build_message() {
     # model wrote nothing, so this message is static and skips the file lookup below.
     if [ "$scenario" = "week-review-failed" ]; then
         printf "<b>🔴 Week-Review не доведён до сервера</b>\n\nОтчёт недели не подтверждён на origin/main (запуск не начался, модель упала или отчёт не доставлен), последующие сценарии могут остаться без итогов недели. Причина - в логе стратега за сегодня, строки POSTCONDITION или FAILED."
+        return
+    fi
+    if [ "$scenario" = "day-open-failed" ]; then
+        build_day_open_failed_message
         return
     fi
 

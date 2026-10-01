@@ -447,9 +447,10 @@ isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
 # An allowlist is exact repo-relative paths, so a scenario gets one only where its prompt fixes every
 # path it writes (checked against roles/strategist/prompts/, WP-530 Ф72 steps V-D). Scenarios left
 # out, and why -- each is refused with rc=72 when listed, never run un-isolated:
-#   day-plan     the primary morning path is scripts/day-open-pipeline.sh (its own commit/push and state
-#                files, not run_claude); the run_claude prompt builds its paths from $IWE_WORKSPACE (the
-#                canon) and commits/pushes itself, so a copy would not catch its writes.
+#   day-plan     the morning path is only scripts/day-open-pipeline.sh (its own commit/push and state
+#                files, not run_claude); the run_claude prompt (manual `strategist.sh day-plan` only)
+#                builds its paths from $IWE_WORKSPACE (the canon) and commits/pushes itself, so a copy
+#                would not catch its writes.
 #   evening      the prompt says only "update the day plan" (which file is not stated).
 #   day-close    deprecated prompt: WeekPlan W*.md (dynamic name), MEMORY.md and exocortex/ backup
 #                copies of a directory glob (outside the repo or a dynamic file list).
@@ -894,9 +895,66 @@ run_claude_with_retry() {
 }
 
 # Проверка: уже запускался ли сценарий сегодня
+# Done for today = it succeeded, or it gave up for the day with "GAVE UP scenario: <name> (<reason>)"
+# (the morning Day Open below), so a launchd RunAtLoad/CalendarInterval rerun does not start it again.
+# week-review's own "GAVE UP scenario: week-review after ..." line does not match on purpose: after
+# that alarm the owner reruns week-review by hand the same day.
 already_ran_today() {
     local scenario="$1"
-    [ -f "$LOG_FILE" ] && grep -q "SUCCESS scenario: $scenario" "$LOG_FILE"
+    [ -f "$LOG_FILE" ] && grep -qF -e "SUCCESS scenario: $scenario" -e "GAVE UP scenario: $scenario (" "$LOG_FILE"
+}
+
+# D16 (#983, #981): the morning Day Open never falls back to the free-form day-plan prompt -- it
+# ignores priorities.yaml and the scaffold and invents the plan (an "unavailable" calendar,
+# mandatory items nobody configured, half the commits). A failed Day Open is logged with its reason
+# and alarmed by one day-open-failed message a day; the plan is then built in a live session.
+# Structural failures end the day (GAVE UP + exit 0, the scheduler marks the day). Any other pipeline
+# code is passed out for the scheduler to retry. Attempts are counted when they START: the
+# scheduler's timeout kills this script before it could record an end. The explicit
+# `strategist.sh day-plan` below still runs the prompt by hand.
+DAY_OPEN_MAX_ATTEMPTS=3
+DAY_OPEN_ATTEMPT_MARK="RECORDED: day-open attempt"
+DAY_OPEN_OK_MARK="Morning: Day Open pipeline OK"
+DAY_OPEN_ALARM_MARK="ALARM: day-open-failed"
+DAY_OPEN_ATTEMPT=0
+
+day_open_alarm() {  # <reason code> <reason text> [exit code]; at most one message a day (by today's log)
+    if grep -qF "$DAY_OPEN_ALARM_MARK" "$LOG_FILE" 2>/dev/null; then
+        log "Day Open: тревога сегодня уже отправлена, повторно не шлю ($2)"
+        return 0
+    fi
+    log "$DAY_OPEN_ALARM_MARK ($2)"
+    # The template turns the code into the message text (roles/synchronizer/scripts/templates/strategist.sh).
+    DAY_OPEN_FAILED_REASON="$1" DAY_OPEN_FAILED_RC="${3:-}" notify_telegram "day-open-failed"
+}
+
+day_open_give_up() {  # <reason code> <reason text> [exit code]; no more morning runs today, no false SUCCESS
+    day_open_alarm "$@"
+    log "GAVE UP scenario: day-plan ($2)"
+    exit 0
+}
+
+day_open_start_attempt() {  # gives up instead when DAY_OPEN_MAX_ATTEMPTS attempts already started today
+    local started
+    started=$(grep -cF "$DAY_OPEN_ATTEMPT_MARK" "$LOG_FILE" 2>/dev/null || true)
+    started="${started:-0}"
+    # A plan built earlier today is no failure: a later run (RunAtLoad after a reboot) reaches the
+    # pipeline, whose own dedup answers "already committed".
+    if [ "$started" -ge "$DAY_OPEN_MAX_ATTEMPTS" ] && ! grep -qF "$DAY_OPEN_OK_MARK" "$LOG_FILE" 2>/dev/null; then
+        day_open_give_up attempts-exhausted "за сегодня начато попыток: $started, ни одна не собрала план (ошибка или прерывание по тайм-ауту)"
+    fi
+    DAY_OPEN_ATTEMPT=$((started + 1))
+    log "$DAY_OPEN_ATTEMPT_MARK $DAY_OPEN_ATTEMPT (предел $DAY_OPEN_MAX_ATTEMPTS за день)"
+}
+
+day_open_transient_failure() {  # <pipeline exit code>; exits with it (the scheduler retries) or gives up on the last attempt
+    local rc="$1"
+    if [ "$DAY_OPEN_ATTEMPT" -ge "$DAY_OPEN_MAX_ATTEMPTS" ]; then
+        day_open_give_up attempts-exhausted "попытка $DAY_OPEN_ATTEMPT из $DAY_OPEN_MAX_ATTEMPTS тоже не удалась: конвейер завершился с кодом $rc" "$rc"
+    fi
+    day_open_alarm pipeline-failed "конвейер Открытия дня завершился с кодом $rc, попытка $DAY_OPEN_ATTEMPT из $DAY_OPEN_MAX_ATTEMPTS" "$rc"
+    log "FAILED scenario: day-plan (rc=$rc) -- план дня не собран, выхожу с кодом конвейера, планировщик повторит"
+    exit "$rc"
 }
 
 # Note-Review canary (#961): number of NEW notes in fleeting-notes.md, i.e. bold titles that carry
@@ -1061,16 +1119,16 @@ case "$1" in
             notify_telegram "session-prep"
         else
             # Canonical Day Open pipeline: deterministic scaffold (reads priorities.yaml,
-            # enforces ТВС section order, runs server-news.sh for «Мир»). The free-form
-            # prompt is fallback ONLY — it ignores priorities.yaml and the scaffold, which
-            # was the root cause of the 2026-06-21 structure/priority drift.
+            # enforces ТВС section order, runs server-news.sh for «Мир»). It is the only
+            # morning path: a failure alarms instead of a free-form plan (D16, see
+            # day_open_give_up() above).
             log "Morning: running canonical Day Open pipeline"
             # $IWE_SCRIPTS first (matches the interactive day-open skill's own
             # resolution order), $WORKSPACE/scripts/ as legacy fallback for
             # installs that still deliver a workspace-root copy. #598: this
             # function used to read $WORKSPACE only, so $IWE_SCRIPTS-only
-            # installs fell back to free-form silently, every morning, with
-            # no escalation (found live: 37 consecutive days, 88 runs).
+            # installs fell back to the free-form prompt silently, every morning,
+            # with no escalation (found live: 37 consecutive days, 88 runs).
             DAY_OPEN_PIPELINE="${IWE_SCRIPTS:-}/day-open-pipeline.sh"
             if [ -z "${IWE_SCRIPTS:-}" ] || [ ! -f "$DAY_OPEN_PIPELINE" ]; then
                 DAY_OPEN_PIPELINE="$WORKSPACE/scripts/day-open-pipeline.sh"
@@ -1080,35 +1138,29 @@ case "$1" in
                 # delivered at all (Evgenii defects #2/#3, 18.08) — say so
                 # instead of a generic "unavailable/failed". The delivery
                 # graph itself is WP-529 F7 scope, no silent bridge here.
-                log "WARN: Day Open pipeline not found at \$IWE_SCRIPTS or $WORKSPACE/scripts — canonical pipeline is not delivered on this install (WP-529 F7); fallback to free-form day-plan prompt"
-                run_claude "day-plan" "claude-sonnet-4-6"
-                notify_telegram "day-plan"
-            elif bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1; then
-                log "Morning: Day Open pipeline OK (scaffold + llm-fill)"
-            else
-                pipeline_rc=$?
+                log "WARN: Day Open pipeline not found at \$IWE_SCRIPTS or $WORKSPACE/scripts — canonical pipeline is not delivered on this install (WP-529 F7)"
+                day_open_give_up not-delivered "конвейер Открытия дня не доставлен: day-open-pipeline.sh нет ни в \$IWE_SCRIPTS, ни в $WORKSPACE/scripts"
+            fi
+            day_open_start_attempt
+            pipeline_rc=0
+            bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
+            if [ "$pipeline_rc" -eq 0 ]; then
+                log "$DAY_OPEN_OK_MARK (scaffold + llm-fill)"
+            elif [ "$pipeline_rc" -eq 9 ]; then
                 # issue #893: exit 9 = no gateway configured (day-open-pipeline.sh
                 # §2), a case the pipeline itself already ships an answer for
-                # (--scaffold-only, issue #434) — retry with it instead of
-                # falling all the way to the free-form prompt, which ignores
-                # priorities.yaml and the scaffold (the #877 continuation:
-                # after #885 the message changed from HTTP 401 to "not
-                # configured", but strategist.sh still never used the escape
-                # hatch the pipeline's own error text already pointed at).
-                if [ "$pipeline_rc" -eq 9 ]; then
-                    log "Morning: Day Open pipeline has no gateway configured — retrying with --scaffold-only"
-                    if bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1; then
-                        log "Morning: Day Open pipeline OK (scaffold only, no gateway)"
-                    else
-                        log "WARN: Day Open pipeline --scaffold-only also failed (see lines above in this log) — fallback to free-form day-plan prompt"
-                        run_claude "day-plan" "claude-sonnet-4-6"
-                        notify_telegram "day-plan"
-                    fi
+                # (--scaffold-only, issue #434). The retry's own code is kept
+                # right away: it is what the alarm reports.
+                log "Morning: Day Open pipeline has no gateway configured — retrying with --scaffold-only"
+                scaffold_rc=0
+                bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
+                if [ "$scaffold_rc" -eq 0 ]; then
+                    log "$DAY_OPEN_OK_MARK (scaffold only, no gateway)"
                 else
-                    log "WARN: Day Open pipeline failed (see lines above in this log) — fallback to free-form day-plan prompt"
-                    run_claude "day-plan" "claude-sonnet-4-6"
-                    notify_telegram "day-plan"
+                    day_open_give_up scaffold-only-failed "шлюз модели не настроен (код 9), повтор с --scaffold-only тоже не прошёл: код $scaffold_rc (причина в строках выше)" "$scaffold_rc"
                 fi
+            else
+                day_open_transient_failure "$pipeline_rc"
             fi
         fi
         ;;

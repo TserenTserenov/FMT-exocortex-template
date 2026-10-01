@@ -276,8 +276,8 @@ expect_scaffold_in_governance() { # <label> <workspace> <governance> <output> <r
     else
         ok "$label: шаг 1.2 не трогает чужой репозиторий"
     fi
-    # The strategist falls back to the free-form prompt on any non-zero exit, so the whole
-    # probe run (every later step is started from the directory the copy runs from) must end green.
+    # The strategist treats any non-zero exit as a failed Day Open (no plan, an alarm), so the
+    # whole probe run (every later step is started from the directory the copy runs from) must end green.
     if [ "$rc" -eq 0 ] && has "$out" "verdict=🟢 green"; then
         ok "$label: прогон дошёл до конца, код возврата 0, вердикт green"
     else
