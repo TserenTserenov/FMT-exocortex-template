@@ -178,18 +178,23 @@ log() {
 # the template (issue #884, regression of WP-7 Ф101): when it is absent, say so
 # and keep the commit local instead of failing on a bare "No such file".
 # Returns 0 only when the publisher reported success.
+# The optional 5th argument names the branch on origin to publish to; empty = the
+# publisher's default (the branch checked out in $WORKSPACE). An isolated copy sits on
+# a local-only branch, so isolated_finish names the branch the copy was created from.
 PUBLISH_LAST_RC=""
 publish_commit_or_explain() {
-    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4"
+    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4" target_branch="${5:-}"
     local publisher="$WORKSPACE/scripts/ds-publish.sh"
 
     if [ ! -f "$publisher" ]; then
-        log "WARN: scripts/ds-publish.sh не установлен — коммит ${sha:0:12} остался локальным и не опубликован. Опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD"
+        log "WARN: scripts/ds-publish.sh не установлен — коммит ${sha:0:12} остался локальным и не опубликован. Опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD${target_branch:+:$target_branch}"
         return 1
     fi
     PUBLISH_LAST_RC=""
     local prc=0
-    bash "$publisher" "$WORKSPACE" normal --reason "$reason" --from-commit "$sha" >> "$LOG_FILE" 2>&1 || prc=$?
+    set -- "$WORKSPACE" normal --reason "$reason" --from-commit "$sha"
+    [ -z "$target_branch" ] || set -- "$@" --branch "$target_branch"
+    bash "$publisher" "$@" >> "$LOG_FILE" 2>&1 || prc=$?
     if [ "$prc" -eq 0 ]; then
         log "$ok_msg"
         return 0
@@ -436,6 +441,9 @@ ISO_WORKTREE=""
 ISO_WORKSPACE=""
 ISO_BRANCH=""
 ISO_BASE_SHA=""
+# The copy is created from origin/$ISO_BASE_BRANCH (fetch_delivery_origin refreshes the same branch)
+# and its result is published back to it: the copy's own branch ($ISO_BRANCH) exists only locally.
+ISO_BASE_BRANCH="main"
 
 isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
     local list=",${STRATEGIST_ISOLATED_SCENARIOS:-},"
@@ -485,8 +493,8 @@ isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
         log "ISOLATION: git fetch origin main не удался, свежую копию взять нельзя, сценарий $scenario не запущен"
         return 1
     fi
-    if ! git -C "$canon" rev-parse --verify -q "origin/main^{commit}" >/dev/null 2>&1; then
-        log "ISOLATION: нет origin/main в $canon, сценарий $scenario не запущен"
+    if ! git -C "$canon" rev-parse --verify -q "origin/$ISO_BASE_BRANCH^{commit}" >/dev/null 2>&1; then
+        log "ISOLATION: нет origin/$ISO_BASE_BRANCH в $canon, сценарий $scenario не запущен"
         return 1
     fi
     ISO_RUN_ROOT=$(mktemp -d "${STRATEGIST_ISOLATED_TMPDIR:-${TMPDIR:-/tmp}}/iwe-strategist-$scenario.XXXXXX") || {
@@ -497,8 +505,8 @@ isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
     ISO_WORKTREE="$ISO_RUN_ROOT/$repo_name"
     ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
     ISO_BRANCH="strategist/$scenario-$run_id"
-    if ! git -C "$canon" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" origin/main >> "$LOG_FILE" 2>&1; then
-        log "ISOLATION: не удалось создать рабочую копию от origin/main, пустой каталог запуска удалён"
+    if ! git -C "$canon" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$ISO_BASE_BRANCH" >> "$LOG_FILE" 2>&1; then
+        log "ISOLATION: не удалось создать рабочую копию от origin/$ISO_BASE_BRANCH, пустой каталог запуска удалён"
         git -C "$canon" worktree prune >> "$LOG_FILE" 2>&1 || true
         rm -rf "$ISO_RUN_ROOT"
         return 1
@@ -621,7 +629,7 @@ isolated_finish() {  # <publish reason> <commit message>
         done
         if [ "$rc" -eq 0 ] && git -C "$WORKSPACE" commit -q -m "$msg" >> "$LOG_FILE" 2>&1 \
             && sha=$(git -C "$WORKSPACE" rev-parse HEAD 2>/dev/null) && [ -n "$sha" ]; then
-            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась"; then
+            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась" "$ISO_BASE_BRANCH"; then
                 ISOLATED_RESULT="published"
             else
                 # The publisher's own status (70/71/...) goes out as is; 72 is only for the

@@ -55,8 +55,12 @@ $(extract_block '^fetch_delivery_origin() {' '^}')
 $(extract_until '^ISOLATION_BLOCKED_RC=' '^log_size_bytes')"
 
 # ---------------------------------------------------------------------------------------------
-# fixture: bare origin, canonical checkout <home>/IWE/DS-strategy, fake publisher tracked in the repo
+# fixture: bare origin, canonical checkout <home>/IWE/DS-strategy, publisher tracked in the repo
 # ---------------------------------------------------------------------------------------------
+# C1 (WP-7): every publication goes through the REAL seed publisher. A double that pushed straight to
+# main hid that the real one published to the copy's own branch, which origin does not have.
+REAL_PUBLISHER="$REPO_ROOT/seed/strategy/scripts/ds-publish.sh"
+[ -f "$REAL_PUBLISHER" ] || { echo "no seed publisher at $REAL_PUBLISHER" >&2; exit 2; }
 CASE_N=0
 make_env() {
     CASE_N=$((CASE_N + 1))
@@ -96,14 +100,15 @@ EOF
     printf '# Archive\n' > "$CANON/archive/notes/Notes-Archive.md"
     printf 'other\n' > "$CANON/docs/other.md"
     printf 'strategy_day: %s\n' "$(date +%A | tr '[:upper:]' '[:lower:]')" > "$CANON/exocortex/day-rhythm-config.yaml"
-    cat > "$CANON/scripts/ds-publish.sh" <<'EOF'
+    # Records the call, then runs the real seed publisher. Only a case that injects a publisher
+    # failure (FAKE_PUBLISH_FAIL=1, the runner's handling of the exit code is under test, not the
+    # publication) gets the double's exit code instead.
+    cat > "$CANON/scripts/ds-publish.sh" <<EOF
 #!/bin/bash
-# test double of the publisher: args <repo> normal --reason R --from-commit SHA
-repo="$1"; sha=""
-while [ $# -gt 0 ]; do [ "$1" = "--from-commit" ] && sha="$2"; shift; done
-echo "$repo" >> "$PUBLOG"
-[ "${FAKE_PUBLISH_FAIL:-0}" = 1 ] && exit "${FAKE_PUBLISH_RC:-1}"
-git -C "$repo" push -q origin "$sha:refs/heads/main"
+echo "\$1" >> "\$PUBLOG"
+printf '%s\n' "\$*" >> "\$PUBLOG.args"
+[ "\${FAKE_PUBLISH_FAIL:-0}" = 1 ] && exit "\${FAKE_PUBLISH_RC:-1}"
+exec bash "$REAL_PUBLISHER" "\$@"
 EOF
     git -C "$CANON" add -A && git -C "$CANON" commit -q -m seed && git -C "$CANON" push -q origin HEAD:main
     BASE=$(git -C "$ORIGIN" rev-parse main)
@@ -138,6 +143,15 @@ EOF
 
 origin_commits() { git -C "$ORIGIN" rev-list --count "$BASE..main"; }
 origin_paths() { git -C "$ORIGIN" diff --name-only "$BASE" main | sort | tr '\n' ' ' | sed 's/ $//'; }
+origin_branches() { git -C "$ORIGIN" for-each-ref --format='%(refname:short)' refs/heads | tr '\n' ' ' | sed 's/ $//'; }
+# The exact file users get, without the recording wrapper (C1 regression cases).
+install_seed_publisher() {
+    cp "$REAL_PUBLISHER" "$CANON/scripts/ds-publish.sh"
+    git -C "$CANON" commit -q -am "seed publisher" && git -C "$CANON" push -q origin HEAD:main
+    BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(git -C "$CANON" rev-parse HEAD)
+    check "the governance repo carries the seed publisher byte for byte" "same" \
+        "$(git -C "$ORIGIN" show main:scripts/ds-publish.sh | cmp -s - "$REAL_PUBLISHER" && echo same || echo differs)"
+}
 canon_head() { git -C "$CANON" rev-parse HEAD; }
 canon_status() { git -C "$CANON" status --porcelain; }
 iso_copies() { ls -d "$ISO_TMP"/iwe-strategist-note-review.*/DS-strategy 2>/dev/null | wc -l | tr -d ' '; }
@@ -180,9 +194,33 @@ check "allowed change: rc 0 and published" "rc=0 result=published" "$(printf '%s
 check "allowed change: origin got exactly one commit" "1" "$(origin_commits)"
 check "allowed change: commit touches exactly the allowlisted paths" "archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_paths)"
 check "allowed change: publisher was called from the copy, not the canon" "1" "$(grep -c 'iwe-strategist-note-review' "$PUBLOG")"
+check "allowed change: the copy publishes to the branch it was created from (--branch main)" "1" "$(grep -c -- ' --branch main$' "$PUBLOG.args")"
+check "allowed change: no branch named after the copy on origin" "main" "$(origin_branches)"
 check "allowed change: copy removed after publication" "0" "$(iso_copies)"
 check "allowed change: copy branch removed" "" "$(git -C "$CANON" branch --list 'strategist/*')"
 canon_untouched "allowed change"
+
+echo "== A2r: the seed publisher itself (no wrapper) publishes from the copy to origin/main (C1) =="
+make_env
+install_seed_publisher
+run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
+check "seed publisher: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "seed publisher: origin/main got exactly one commit, the runner's" "1|chore: test cleanup" "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)"
+check "seed publisher: only main on origin" "main" "$(origin_branches)"
+check "seed publisher: copy and its branch removed" "0|" "$(iso_copies)|$(git -C "$CANON" branch --list 'strategist/*')"
+canon_untouched "seed publisher"
+
+echo "== A2c: seed publisher, origin moved with a conflicting change: 3 passes through, the result stays in the copy =="
+make_env
+install_seed_publisher
+# the racer lands its own last line in the same file on origin/main after the copy was made
+run_fn "echo mine >> inbox/fleeting-notes.md; git clone -q '$ORIGIN' '$E/racer' 2>/dev/null && echo theirs >> '$E/racer/inbox/fleeting-notes.md' && git -C '$E/racer' commit -q -am racer && git -C '$E/racer' push -q origin HEAD:main"
+check "conflict: the publisher's 3 goes out, nothing published" "rc=3 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "conflict: origin/main holds only the racer's commit" "1|racer" "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)"
+check "conflict: only main on origin" "main" "$(origin_branches)"
+check "conflict: copy preserved, the runner's commit stays on its local branch" "1|chore: test cleanup" \
+    "$(iso_copies)|$(git -C "$CANON" for-each-ref --format='%(subject)' 'refs/heads/strategist/*')"
+canon_untouched "conflict"
 
 echo "== A3: nothing changed =="
 make_env
@@ -319,6 +357,19 @@ check "the model is told this is a run without a chat (isolated)" "1" "$(grep -c
 canon_untouched "isolated happy path"
 check "copy removed after publication" "0" "$(iso_copies)"
 
+echo "== B1r: isolated note-review end to end with the seed publisher itself, origin has only main (C1) =="
+make_env
+install_seed_publisher
+run_runner noop note-review
+check "seed publisher: runner exits 0" "0" "$RC"
+check "seed publisher: origin/main got exactly one commit with the two allowlisted files" \
+    "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_commits)|$(origin_paths)"
+check "seed publisher: only main on origin" "main" "$(origin_branches)"
+check "seed publisher: copy removed, no strategist/* branch left" "0|" "$(iso_copies)|$(git -C "$CANON" branch --list 'strategist/*')"
+check "seed publisher: the log shows the publication to origin/main" "1" \
+    "$(grep -c 'ds-publish: .* -> origin/main (strategist: cleanup)' "$HOME_DIR/logs/strategist/"*.log | awk '{print ($1 > 0)}')"
+canon_untouched "seed publisher end to end"
+
 echo "== B2: isolated note-review, model writes outside the allowlist =="
 make_env
 run_runner outside-file note-review
@@ -363,6 +414,7 @@ check "runner exits 0" "0" "$RC"
 check "no isolated copy was created" "0" "$(ls "$ISO_TMP" | wc -l | tr -d ' ')"
 check "legacy: the cleanup commit is made in the canon" "1" "$([ "$(canon_head)" != "$CANON_HEAD" ] && echo 1 || echo 0)"
 check "legacy: the publisher got the canon path" "$CANON" "$(head -1 "$PUBLOG")"
+check "legacy: no --branch, the publisher keeps its default (the canon's own branch)" "0" "$(grep -c -- '--branch' "$PUBLOG.args")"
 check "legacy: origin got one commit with the two files" "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_commits)|$(origin_paths)"
 check "legacy: the model ran in the canon" "$CANON" "$(cat "$E/stub-cwd")"
 check "legacy: the model is told this is a run without a chat" "1" "$(grep -c -x -F "$MODE_LINE" "$E/stub-args")"

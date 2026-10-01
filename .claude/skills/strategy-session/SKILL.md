@@ -68,7 +68,7 @@ fi
 - Код выхода 0 -> **запиши абсолютный путь `GOV_WT` в свой ответ пользователю** (контекст сессии): независимые вызовы Bash не разделяют переменные, а `cd` в подоболочке каталог не меняет.
 - Код выхода 2 (`NOT ISOLATED`) -> ничего не записывай. Выполни `session-guard.sh open --isolate ...`, возьми `worktree_path` из его вывода, `cd` в него и повтори блок. Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши. Код 1 -> ошибка резолвера или путей: покажи сообщение и остановись.
 - КАЖДЫЙ последующий блок записи начинается с явного задания и проверки: `GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1`.
-- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем `bash "$GOV_WT/scripts/ds-publish.sh" "$GOV_WT" normal --reason "strategy-session"`, в канон не коммить. `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
+- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем `bash "$GOV_WT/scripts/ds-publish.sh" "$GOV_WT" normal --reason "strategy-session" --branch main`, в канон не коммить. Ветка назначения `main` задаётся явно: `session-guard.sh open --isolate` создаёт копию от `origin/main` на её собственной ветке `session-isolate/<agent>-<session>`, которой на сервере нет. `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
 
 ### Шаг 0.1. Extensions (before)
 `GOV_WT="<записанный путь>" bash .claude/scripts/load-extensions.sh strategy-session before` -> Exit 0: Read каждый файл, выполнить; расширения работают с этим корнем `GOV_WT`. Exit 1: пропустить.
