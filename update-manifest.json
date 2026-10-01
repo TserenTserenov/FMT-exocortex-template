@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5f5735149f9f1f70fb54361f4615410aaba349a2fc3384f06b1b6f7fdfede1ee"
+      "sha256": "31f90bcb6c4b81c75c00773042e5759144d8b5e19cb199379ffbc2ea0d0f3e17"
     },
     {
       "path": "CLAUDE.md",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "f77b402bce43e2168ccbe004519e41f12b842d1af9ea673fdacfb745d0ffbf4d"
+      "sha256": "fed7ebb6f110102868debbbed1d147368a62eaa3f5d6e2aecc204334fee7a2ec"
     }
   ],
   "excluded_paths": [
@@ -3212,6 +3212,7 @@
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
     "scripts/tests/test_issue_532_dayplan_strategy_gate.sh",
+    "scripts/tests/test_issue_541_workspace_base.sh",
     "scripts/tests/test_issue_544_staged_precommit.sh",
     "scripts/tests/test_issue_545_sessions_root.sh",
     "scripts/tests/test_issue_549_dryrun_redesign.sh",
