@@ -46,8 +46,11 @@
 #  19 a FIFO standing where the record belongs does not hang the update (red team of the 0.41.1 candidate)
 #  20 a symlink in place of the record vouches for nothing, even when the file it points to holds the copy's hash
 #  21 a record far bigger than four hashes vouches for nothing
-#  22 junk lines in the record are not carried into the new one
+#  22 a record with junk in it is ignored and rewritten clean
 #  23 a directory standing at the record's path is left alone and the update goes on
+#  24 hex lines of a wrong length are not carried into the new record, a well-formed foreign one is
+#  25 a NUL byte in the record is not dropped on the way in: it does not vouch for an edited copy
+#  26 a record saved with CRLF line ends is replaced by a clean one
 #
 # Usage: bash scripts/tests/test_issue_541_workspace_base.sh
 #        KEEP=1 ... keeps the temporary tree for inspection.
@@ -761,7 +764,7 @@ check "19 run 1: finished in time" test "$RUN_RC" -ne 124
 check "19 run 1: exit 0" rc_is 0
 check "19 run 1: the shortcut ran" log_has "$B1_LINE"
 check "19 run 1: the template copy is upstream's v2" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
-check "19 run 1: the record is a regular file now" regular_file "$WS/.claude.md.delivered"
+check "19 run 1: a regular file stands where the FIFO was" regular_file "$WS/.claude.md.delivered"
 check "19 run 1: it holds the delivered copy" regular_has_line "$WS/.claude.md.delivered" "$(sha256_of "$UP/CLAUDE.md")"
 
 echo "=== case 20: a symlink in place of the record vouches for nothing ==="
@@ -783,13 +786,14 @@ echo "=== case 21: a record far bigger than four hashes vouches for nothing ==="
 build_case hugerecord modern
 printf '%s\n' "$EDIT_LINE" >> "$SD/CLAUDE.md"
 cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
-{ sha256_of "$SD/CLAUDE.md"; head -c 3000 /dev/zero | tr '\0' 'x'; echo; } > "$WS/.claude.md.delivered"
+# well-formed lines only (hash, then thirty more): the size is what is wrong with it, not the format
+{ sha256_of "$SD/CLAUDE.md"; for _ in $(seq 1 30); do printf 'b%.0s' $(seq 1 64); echo; done; } > "$WS/.claude.md.delivered"
 run_update
 check "21 exit 49 (the refusal)" rc_is 49
 check "21 upstream is not taken as is" log_lacks "$B1_LINE"
 check "21 the edited template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
 
-echo "=== case 22: junk lines in the record are not carried into the new one ==="
+echo "=== case 22: a record with junk in it is ignored and rewritten clean ==="
 build_case junkrecord modern
 printf '%s\n' "not a hash" "$(printf 'a%.0s' $(seq 1 64))" "" "NOT-A-HASH-BUT-64-CHARACTERS-LONG-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" > "$WS/.claude.md.delivered"
 run_update
@@ -797,7 +801,8 @@ check "22 exit 0" rc_is 0
 check "22 the shortcut ran" log_has "$B1_LINE"
 check "22 every line of the record is a sha256" only_hashes "$WS/.claude.md.delivered"
 check "22 at most four lines" test "$(wc -l < "$WS/.claude.md.delivered" | tr -d ' ')" -le 4
-check "22 the well-formed earlier line is kept" regular_has_line "$WS/.claude.md.delivered" "$(printf 'a%.0s' $(seq 1 64))"
+check "22 the junk text is gone" lacks_text "$WS/.claude.md.delivered" "NOT-A-HASH"
+check "22 so is the earlier well-formed line (the whole record was ignored)" lacks_text "$WS/.claude.md.delivered" "$(printf 'a%.0s' $(seq 1 64))"
 check "22 the delivered copy is on record" regular_has_line "$WS/.claude.md.delivered" "$(sha256_of "$UP/CLAUDE.md")"
 
 echo "=== case 23: a directory standing at the record's path is left alone ==="
@@ -810,6 +815,36 @@ check "23 the shortcut ran" log_has "$B1_LINE"
 check "23 the template copy is upstream's v2" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
 check "23 the directory is still there" test -d "$WS/.claude.md.delivered"
 check "23 and nothing was moved into it" test -z "$(ls -A "$WS/.claude.md.delivered")"
+
+echo "=== case 24: hex lines of a wrong length are not carried, a well-formed foreign one is ==="
+build_case shortlines modern
+printf '%s\n' "abc" "$(printf 'a%.0s' $(seq 1 64))" > "$WS/.claude.md.delivered"
+run_update
+check "24 exit 0" rc_is 0
+check "24 every line of the record is a sha256" only_hashes "$WS/.claude.md.delivered"
+check "24 the short line is gone" lacks_text "$WS/.claude.md.delivered" "abc"
+check "24 the well-formed earlier line is kept" regular_has_line "$WS/.claude.md.delivered" "$(printf 'a%.0s' $(seq 1 64))"
+check "24 the delivered copy is on record" regular_has_line "$WS/.claude.md.delivered" "$(sha256_of "$UP/CLAUDE.md")"
+
+echo "=== case 25: a NUL byte in the record is not dropped on the way in ==="
+# The shell drops NUL when it reads command output: "<hash><NUL>" would become a valid line and vouch for an edited copy.
+build_case nulrecord modern
+printf '%s\n' "$EDIT_LINE" >> "$SD/CLAUDE.md"
+cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+printf '%s\000\n' "$(sha256_of "$SD/CLAUDE.md")" > "$WS/.claude.md.delivered"
+run_update
+check "25 exit 49 (the refusal)" rc_is 49
+check "25 upstream is not taken as is" log_lacks "$B1_LINE"
+check "25 the edited template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+
+echo "=== case 26: a record saved with CRLF line ends is replaced by a clean one ==="
+build_case crlfrecord modern
+printf '%s\r\n' "$(sha256_of "$SD/CLAUDE.md")" > "$WS/.claude.md.delivered"
+run_update
+check "26 exit 0" rc_is 0
+check "26 the shortcut ran" log_has "$B1_LINE"
+check "26 every line of the record is a sha256" only_hashes "$WS/.claude.md.delivered"
+check "26 the delivered copy is on record" regular_has_line "$WS/.claude.md.delivered" "$(sha256_of "$UP/CLAUDE.md")"
 
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"

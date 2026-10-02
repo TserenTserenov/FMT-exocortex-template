@@ -3292,18 +3292,22 @@ claude_template_copy_is_replaceable() {
     claude_template_copy_is_pristine "$1"
 }
 
-# claude_record_usable FILE — the delivered record is trusted only as a small regular file. A symlink (to an
-# endless source, or to a file kept elsewhere), a FIFO, a directory or a huge file would hang the read, flood it
-# or vouch with text nobody here wrote, so it counts as absent: the other two tests still apply and the next
-# replacement writes a fresh record in its place (red team round 32: a FIFO in its place hung update.sh). A plain
-# file can not be told apart from one this script wrote: whoever can write the workspace can edit the copy too.
+# claude_record_usable FILE — the delivered record is trusted only when it looks exactly like what
+# claude_record_delivered writes: a small regular file (not a symlink, FIFO or directory) made of lowercase hex
+# digits and newlines. Anything else would hang the read (an endless source), flood it, vouch with text nobody
+# here wrote or be bent by the shell on the way in (NUL bytes are dropped, a CR sticks to the line), so it counts
+# as absent: the other two tests still apply and the next replacement writes a fresh record in its place (red
+# team round 32: a FIFO in its place hung update.sh). A well-formed file can not be told apart from one this
+# script wrote: whoever can write the workspace can edit the copy too.
 claude_record_usable() {
-    local size
+    local size stray
     [ -f "$1" ] && [ ! -L "$1" ] || return 1
     size=$(wc -c < "$1" 2>/dev/null) || return 1
     size=${size//[[:space:]]/}
     case "$size" in '' | *[!0-9]*) return 1 ;; esac
-    [ "$size" -le 1024 ]
+    [ "$size" -le 1024 ] || return 1
+    stray=$(LC_ALL=C tr -d '0-9a-f\n' < "$1" 2>/dev/null | wc -c) || return 1
+    [ "${stray//[[:space:]]/}" = 0 ]
 }
 
 # claude_template_copy_is_pristine FILE — proof that FILE was never edited. Equality with the
@@ -3358,8 +3362,8 @@ claude_template_copy_is_pristine() {
 # effort: no failure here stops the update, and without the record the other two tests still apply. Not
 # promised: two update.sh at once (the script has no lock anywhere), an editor saving the template copy
 # while update.sh runs, a kill in the middle of cp itself (a half-written copy matches nothing and is refused).
-# The earlier lines are carried over only from a record claude_record_usable accepts and only when each is a
-# sha256; whatever else stands there (a symlink, a FIFO, junk lines) is replaced, a directory is left alone.
+# The earlier lines are carried over only from a record claude_record_usable accepts; whatever else stands there
+# (a symlink, a FIFO, junk, CRLF text) is replaced, a directory is left alone.
 claude_record_delivered() {
     [ -n "${WORKSPACE_DIR:-}" ] && [ -d "$WORKSPACE_DIR" ] || return 0
     local record="$WORKSPACE_DIR/.claude.md.delivered" tmp hash hashes="" kept="" line
@@ -3370,10 +3374,9 @@ claude_record_delivered() {
     [ -z "$hash" ] || hashes="$hashes$hash"$'\n'
     [ -n "$hashes" ] || return 0
     if claude_record_usable "$record"; then
-        # earlier lines that are a sha256 each and that this run does not write again; anything else is dropped
+        # earlier lines (a sha256 each, and not one this run writes again); a hex line of another length is dropped
         while IFS= read -r line || [ -n "$line" ]; do
             [ "${#line}" -eq 64 ] || continue
-            case "$line" in *[!0-9a-f]*) continue ;; esac
             case $'\n'"$hashes" in *$'\n'"$line"$'\n'*) continue ;; esac
             kept="$kept$line"$'\n'
         done < <(head -c 1024 -- "$record" 2>/dev/null)
