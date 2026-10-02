@@ -825,7 +825,7 @@
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "a41d66e67a1f2f10af479bcd5d166f69cd9da7f87c6cf1960d6937e2e063f12f"
+      "sha256": "f0eaab8dce6beb99e8c14b2f1da0d3cfc7fce9e57dcb8d27c2529d642ca701ef"
     },
     {
       "path": ".gitignore",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d8c3d555e0e380bb8a3d6f7200437d15a57f2e9f608e746ec0d24f2a83ff055f"
+      "sha256": "78991e232a493556a699b6fc15b4b86217789d0638ed6de3fc86d08f146f1291"
     },
     {
       "path": "CLAUDE.md",
