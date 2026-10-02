@@ -708,6 +708,20 @@ log_size_bytes() {  # -> size of the daily log in bytes, 0 when there is none
 AI_CLI_OUT_START=""
 AI_CLI_OUT_END=""
 
+# Issue #1006: the shared helper ships with the template ($IWE_TEMPLATE/scripts/lib); the workspace
+# has no scripts/lib on a typical install, so looking only there left calendar_source at "connector"
+# for every scenario. Template first, then its default place, then the workspace.
+find_common_sh() {
+    local _ws="${IWE_WORKSPACE:-$HOME/IWE}" _base
+    for _base in "${IWE_TEMPLATE:-}" "$_ws/FMT-exocortex-template" "$_ws"; do
+        if [ -n "$_base" ] && [ -f "$_base/scripts/lib/common.sh" ]; then
+            printf '%s\n' "$_base/scripts/lib/common.sh"
+            return 0
+        fi
+    done
+    return 1
+}
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
@@ -747,8 +761,9 @@ run_claude() {
 
     # issue #942: calendar_source (params.yaml) = connector | script | none.
     # Without the shared helper (old install) the calendar stays on, as before.
-    local calendar_source="connector" _iwe_common="${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh"
-    if [ -f "$_iwe_common" ]; then
+    local calendar_source="connector" _iwe_common
+    _iwe_common=$(find_common_sh) || _iwe_common=""
+    if [ -n "$_iwe_common" ]; then
         # shellcheck source=/dev/null
         . "$_iwe_common" || { log "ERROR: не удалось загрузить $_iwe_common"; return 1; }
         calendar_source=$(iwe_calendar_source "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml") \

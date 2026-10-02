@@ -777,7 +777,7 @@ Skill(
 Для каждого репо в списке изменённых файлов:
 
 ```bash
-cd <repo path>
+(cd <repo path>
 git status --short
 # pathspec после `--`: commit ТОЛЬКО свои файлы. Bare `git commit` сметает
 # чужое pre-staged из общего индекса (mis-attribution, см. 2026-06-20-39).
@@ -788,6 +788,7 @@ Refs: peer-session <SESSION_ID>
 Review iters: <REVIEW_ITER>
 Verify: PASS" -- <те же specific files>
 git push
+)
 ```
 
 Записать commit SHA для каждого репо в переменную `DEPLOY_SHAS` (map: repo → sha).
@@ -1082,7 +1083,7 @@ EOF
 **4.5.1 Commit + push:**
 
 ```bash
-cd "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+(cd "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 # pathspec после `--`: commit ТОЛЬКО файлы сессии, не подметаем чужое
 # pre-staged из общего индекса (mis-attribution, см. 2026-06-20-39).
 # $GUARD_ORZ (Шаг 4.5.0) — тот же путь, что "$TODAY-$SESSION_SLUG.md" (Шаг 4.4),
@@ -1091,6 +1092,7 @@ PATHS=("sessions/$MONTH/$DAY/$SESSION_ID/" "sessions/00-index.md" "$GUARD_ORZ")
 git add "${PATHS[@]}"
 git commit -m "feat(peer): $SESSION_ID — <задача кратко>" -- "${PATHS[@]}"
 git push
+)
 ```
 
 **4.5.2 Session-guard close** (best-effort, ПОСЛЕ успешного push — закрывать семафор раньше нельзя, иначе Scope gate на 4.5.1 не найдёт активного семафора):

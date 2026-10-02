@@ -253,7 +253,7 @@ fi
 ### 11. Закоммитить governance-репо
 
 ```bash
-cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
+(cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
 git status --short
 # НЕ git add -A/git add ./git add -u — AGENTS.md CRITICAL (может захватить работу других агентов)
 # Стейджить ТОЛЬКО файлы, изменённые в шагах 1-10 (в массив для pathspec):
@@ -263,6 +263,7 @@ git diff --cached --name-only  # проверить scope — только week-
 # pathspec после `--`: commit ТОЛЬКО свои файлы, не подметаем чужой индекс
 git commit -m "week-close: W{N} итоги q:{score}" -- "${WC_FILES[@]}"
 git push
+)
 ```
 
 ### 12. Верификация (Haiku R23)

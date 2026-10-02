@@ -35,9 +35,10 @@ realized_by:
 Если отсутствуют — сообщить пользователю и предложить команды:
 
 ```bash
-cd ~/IWE
+(cd ~/IWE
 gh repo clone TserenTserenov/SPF SPF -- --depth=1   # если нет SPF/
 gh repo clone ailev/FPF FPF -- --depth=1             # если нет FPF/
+)
 ```
 
 Если репо есть — зафиксировать путь к `SPF/pack-template/` для шага 4.
@@ -336,7 +337,7 @@ distinction: {X} vs {Y}
 
 Затем инициализировать репо и установить CI guard:
 ```bash
-cd ~/IWE/PACK-{slug}
+(cd ~/IWE/PACK-{slug}
 git init
 
 # Установить CI guard (ID collision detector)
@@ -347,13 +348,14 @@ fi
 
 git add -A
 git commit -m "feat: initial scaffold PACK-{slug} (SPF/pack-template) + CI guard R4"
+)
 ```
 
 CI guard — GitHub Action, который при каждом push/PR проверяет уникальность ID (DP.M.NNN, AR.NNN и т.д.) и блокирует слияние при коллизии.
 
 Опционально — создать на GitHub:
 ```bash
-gh repo create {GITHUB_USER}/PACK-{slug} --private --source=. --push
+gh repo create {GITHUB_USER}/PACK-{slug} --private --source="$HOME/IWE/PACK-{slug}" --push
 ```
 
 ---

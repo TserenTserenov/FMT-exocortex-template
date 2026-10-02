@@ -172,7 +172,7 @@ HOT-лимит превышен → понизить horizon в frontmatter ну
 ### 11. Коммит ${IWE_GOVERNANCE_REPO:-DS-strategy}
 
 ```bash
-cd ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}
+(cd ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}
 # НЕ `git add -A`: в общем клоне (multi-agent) сметает чужое pre-staged → mis-attribution
 # (см. sessions/2026-06/2026-06-20-39-*). Перечисли артефакты month-close ЯВНО:
 MONTH_FILES=(
@@ -183,6 +183,7 @@ MONTH_FILES=(
 )
 git add "${MONTH_FILES[@]}"
 git commit -m "month-close: close YYYY-MM" -- "${MONTH_FILES[@]}"
+)
 ```
 
 Push при явном триггере «заливай».

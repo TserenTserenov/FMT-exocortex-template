@@ -321,7 +321,7 @@ echo "[6/7] install.sh с env проходит fail-fast (positive case)..."
 # WP-293: HOME isolation обязателен — install.sh пишет plist в $HOME/Library/LaunchAgents
 # и делает launchctl load. Без env -i HOME=$TEST_WS test перезатрёт реальный launchd автора.
 INSTALL_OK_OUT=$(env -i HOME="$TEST_WS" PATH="$SMOKE_CLEAN_PATH" \
-    IWE_RUNTIME="$TEST_WS/.iwe-runtime" IWE_WORKSPACE="$TEST_WS" \
+    IWE_RUNTIME="$TEST_WS/.iwe-runtime" IWE_WORKSPACE="$TEST_WS" SETUP_CI=1 \
     bash "$TEMPLATE_DIR/roles/strategist/install.sh" 2>&1 || true)
 if echo "$INSTALL_OK_OUT" | grep -qE 'содержит незаменённые плейсхолдеры'; then
     fail "install.sh даёт fail-fast С env (не должен): $INSTALL_OK_OUT"

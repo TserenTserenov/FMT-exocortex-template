@@ -86,6 +86,29 @@ DATE=$(date +%Y-%m-%d)
 HOUR=$(date +%H)
 LOG_FILE="$LOG_DIR/$DATE.log"
 
+# Issue #1006: macOS (no coreutils) and launchd have no timeout(1); a bare `timeout 20 git fetch`
+# was "command not found" and the fetch was silently skipped. Same perl polyfill as
+# scripts/active-wp-sweep.sh and strategist.sh.
+if ! command -v timeout >/dev/null 2>&1; then
+    timeout() {
+        local duration="$1"; shift
+        perl -e '
+            use POSIX ":sys_wait_h";
+            my $timeout = shift @ARGV;
+            my $pid = fork();
+            if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
+            eval {
+                local $SIG{ALRM} = sub { kill "TERM", $pid; die "timeout\n"; };
+                alarm $timeout;
+                waitpid($pid, 0);
+                alarm 0;
+            };
+            if ($@ && $@ eq "timeout\n") { waitpid($pid, WNOHANG); exit 124; }
+            exit ($? >> 8);
+        ' "$duration" "$@"
+    }
+fi
+
 log() {
     # `|| true`: a transient failure writing $LOG_FILE (seen live: macOS
     # "Operation not permitted" on a handful of runs, cause unconfirmed) must

@@ -458,7 +458,7 @@ Claude в этом вызове не запускает smoke-тесты: он �
 Для каждого репо в списке изменённых файлов:
 
 ```bash
-cd <repo path>
+(cd <repo path>
 git status --short
 # pathspec после `--`: commit ТОЛЬКО свои файлы. Bare `git commit` сметает
 # чужое pre-staged из общего индекса (mis-attribution, см. 2026-06-20-39).
@@ -469,6 +469,7 @@ Refs: peer-session <SESSION_ID>
 Review iters: <REVIEW_ITER>
 Verify: PASS" -- <те же specific files>
 git push
+)
 ```
 
 Записать commit SHA для каждого репо в `DEPLOY_SHAS` (map: repo → sha).
@@ -854,7 +855,7 @@ wp: <WP-NNN или unknown>
 ### 4.5 Commit + push
 
 ```bash
-cd "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+(cd "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
 # Pre-commit guard
 test ! -f "$SESSION_DIR/report-draft.md" \
@@ -880,6 +881,7 @@ gh pr create --title "feat(peer): $SESSION_ID" \
   --body "Peer-сессия DP.SC.154. Kimi (writer) + Claude (peer)." \
   --base main --auto-merge 2>/dev/null \
   || echo "WARN: gh pr create failed — merge manually or check gh auth"
+)
 ```
 
 Показать пилоту: «Сессия завершена. Отчёт: `sessions/$MONTH/$DAY/$SESSION_ID/report.md`»

@@ -128,7 +128,12 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 
   if [[ "$IN_PATTERNS" -eq 1 && "$line" =~ ^regex:[[:space:]]*(.+) ]]; then
     regex="${BASH_REMATCH[1]}"
-    regex="${regex#\"}"; regex="${regex%\"}"
+    # Single quotes are the YAML-valid way to write a backslash regex (issue #1006): "\." is an
+    # invalid escape in a double-quoted scalar and a strict YAML parser rejects the file.
+    case "$regex" in
+      \'*\') regex="${regex#\'}"; regex="${regex%\'}" ;;
+      *) regex="${regex#\"}"; regex="${regex%\"}" ;;
+    esac
     echo "$regex" > "$TMPDIR/patterns/$CURRENT_PATTERN/regex"
     continue
   fi

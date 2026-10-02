@@ -33,7 +33,7 @@ bash .claude/scripts/load-extensions.sh iwe-update before
 Запустить update.sh в режиме превью:
 
 ```bash
-cd "$IWE_TEMPLATE" && bash update.sh --check 2>&1
+(cd "$IWE_TEMPLATE" && bash update.sh --check 2>&1)
 ```
 
 Из вывода извлечь:
@@ -98,7 +98,7 @@ ls extensions/*.md 2>/dev/null
 Если пользователь одобрил (или `--yes`):
 
 ```bash
-cd "$IWE_TEMPLATE" && bash update.sh --yes 2>&1
+(cd "$IWE_TEMPLATE" && bash update.sh --yes 2>&1)
 ```
 
 Из вывода извлечь результат:

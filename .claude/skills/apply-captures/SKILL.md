@@ -298,11 +298,12 @@ R15 выбирает вариант:
 
 **CLI-эквивалент** (для batch/автоматизации):
 ```bash
-cd ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}
+(cd ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}
 OPENROUTER_API_KEY="sk-or-v1-..." WP429_DB_ID=3 WP429_TABLE=concept_graph.concepts \
   python3 inbox/WP-429/f2-poc/detector.py --check-candidate \
     --name "<имя кандидата>" \
     --text "<текст кандидата>"
+)
 ```
 
 ### Шаг 5. Запись в Pack и коммит

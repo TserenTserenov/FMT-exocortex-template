@@ -18,7 +18,7 @@ pairs:
     patterns:
       - id: "iwe-paths"
         description: "Упоминание .iwe-paths (source или install)"
-        regex: "\.iwe-paths"
+        regex: '\.iwe-paths'
         required_in_both: true
 
       - id: "memory-files"
@@ -28,12 +28,12 @@ pairs:
 
       - id: "build-runtime-invoke"
         description: "Вызов build-runtime.sh (сухой или реальный)"
-        regex: "build-runtime\.sh"
+        regex: 'build-runtime\.sh'
         required_in_both: true
 
       - id: "placeholder-check"
         description: "Проверка или подстановка {{PLACEHOLDER}}"
-        regex: "\{\{"
+        regex: '\{\{'
         required_in_both: false
 
       - id: "cross-platform-sed"

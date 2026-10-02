@@ -51,9 +51,9 @@ else
 RUNNER="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/process-runner.py"
 GRAPH="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/processes/quick-close.yaml"
 if [ -f "$RUNNER" ] && [ -f "$GRAPH" ]; then
-  cd "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}" && \
+  (cd "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}" && \
     python3 scripts/process-runner.py start quick-close --slug <slug сессии> \
-      --input '{"agent":"<agent>","wp":"<WP-N сессии или null, если сессия без своего РП>","slug":"<slug>","session_file":"<путь или null>","repos":["<repo1>", ...]}'
+      --input '{"agent":"<agent>","wp":"<WP-N сессии или null, если сессия без своего РП>","slug":"<slug>","session_file":"<путь или null>","repos":["<repo1>", ...]}')
 else
   echo "Quick Close: раннер не поставляется этой инсталляцией; выполнить шаги протокола вручную"
 fi
