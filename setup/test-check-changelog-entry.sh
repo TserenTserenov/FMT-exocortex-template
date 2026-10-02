@@ -178,6 +178,43 @@ check_extractor "bad base fails closed" 1 "" "ERROR: git diff failed" deadbeef
 
 rm "$TMP/CHANGELOG.md"
 check_extractor "missing CHANGELOG fails closed" 1 "" "ERROR: CHANGELOG.md is missing" "$ORDINARY"
+
+# Run the actual warning-only workflow block with the CHANGELOG absent. The
+# security notifier fails closed; this advisory job must instead report that
+# its check was not performed, without claiming PASS or silently saying SKIP.
+WARNING_RUN="$(python3 - "$HERE/.github/workflows/validate-template.yml" <<'PY'
+import pathlib
+import sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+marker = "      - name: Warn on unlabeled security-like CHANGELOG entries\n        run: |\n"
+start = source.find(marker)
+if start < 0:
+    sys.exit("warning workflow step not found")
+block = []
+for line in source[start + len(marker):].splitlines():
+    if line.startswith("          "):
+        block.append(line[10:])
+    elif not line.strip():
+        block.append("")
+    else:
+        break
+script = "\n".join(block)
+script = script.replace("${{ github.event_name }}", "push")
+script = script.replace("${{ github.event.before }}", "deadbeef")
+script = script.replace("${{ github.event.pull_request.base.sha }}", "deadbeef")
+print(script)
+PY
+)"
+warning_out="$(cd "$TMP" && bash --noprofile --norc -e -o pipefail -c "$WARNING_RUN" 2>&1)"; warning_rc=$?
+if [[ "$warning_rc" -eq 0 && "$warning_out" == *"::warning file=CHANGELOG.md::"* &&
+      "$warning_out" == *"проверка меток не выполнена"* && "$warning_out" != *"PASS:"* &&
+      "$warning_out" != *"SKIP:"* ]]; then
+    echo "ok   [warning-only workflow reports missing CHANGELOG]"
+else
+    echo "FAIL [warning-only workflow missing CHANGELOG]: rc=$warning_rc out=$warning_out"
+    fail=1
+fi
 git -C "$TMP" restore CHANGELOG.md
 
 mkdir "$TMP/fixture-bin"

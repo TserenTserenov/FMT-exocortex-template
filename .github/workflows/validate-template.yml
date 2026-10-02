@@ -67,7 +67,7 @@ jobs:
       - name: Warn on unlabeled security-like CHANGELOG entries
         run: |
           if [ ! -f CHANGELOG.md ]; then
-            echo "SKIP: CHANGELOG.md не найден"
+            echo "::warning file=CHANGELOG.md::CHANGELOG.md отсутствует; проверка меток не выполнена."
             exit 0
           fi
 
