@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f80276aec397262dd2f888da1f2d0795982904095c072387832ee2b4e0f4dd32"
+      "sha256": "cb6c58944dff93fecff0a5152a2fdb3df76ea23e6274249d952d69de88699860"
     },
     {
       "path": "CLAUDE.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "73b9345be800de205b6529aa3ac051387481a4badfbcd7ffb6446536be4875cf"
+      "sha256": "fe74a3d875447fb714e728941217c830cd128409332fd6d6ce181c2ed2516bbc"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2269,7 +2269,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "a126e981523713907d60557a3e938c7bb63b24704d4923717621d63fea2fdbea"
+      "sha256": "d31a5fdda626bdeb3d6f267572e19a4dbf21dbcaae84e5df70d53fa3677fdff8"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -3017,7 +3017,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "7ec4bb8aa175829cf3c1c20d294871ceb257fb18101ab005073e8e6842c32239"
+      "sha256": "ace8fde4ce89b8ab02797c09ebe518b6904ae7315d8b69d779781037930e2a4f"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",

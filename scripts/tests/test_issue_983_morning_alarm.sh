@@ -122,10 +122,12 @@ cat > "$SCRIPTS/day-open-pipeline.sh" <<'EOF'
 echo "pipeline ${1:-plain}" >> "$PIPE_LOG"
 # what strategist.sh told this run about retries after a deferral (case 16): "none" when it did not
 echo "${DAY_OPEN_QUIET_RETRY:-none}" >> "$PIPE_LOG.quiet"
-# what the real tg_notify logs about a deferral notice: PIPE_NOTICE=delivered / failed (case 16)
+# what the real tg_notify logs about a deferral notice: PIPE_NOTICE=delivered / failed; spoof is a delivered ALARM
+# whose text quotes the delivered-deferral line (case 16)
 case "${PIPE_NOTICE:-}" in
     delivered) echo "  [tg delivered] ⏸ Day Open 2026-10-02 отложен: stub" ;;
     failed) echo "  [tg delivery FAILED] ⏸ Day Open 2026-10-02 отложен: stub" ;;
+    spoof) echo "  [tg delivered] 🚨 Day Open pipeline aborted: [tg delivered] ⏸ Day Open 2026-10-02 отложен: stub" ;;
 esac
 if [ "${PIPE_MODE:-}" = killparent ]; then
     kill -KILL "$PPID"
@@ -445,7 +447,7 @@ check "15: в журнале сказано, что больше не шлём" 
 echo "== 16: повторы после доставленной отсрочки идут тихо: «запущен» и «отложен» уходят один раз"
 # The pipeline defers while yesterday is not closed, and the scheduler comes back at every tick (up to seven a
 # day). Red team of the 0.41.1 candidate: each tick started the pipeline and sent its "started" and "deferred"
-# notices again, 13-15 messages a day where v0.41.0 sent two. Once a deferral notice has been DELIVERED (the pipeline's
+# notices again, up to 14 messages a day where v0.41.0 sent two. Once a deferral notice has been DELIVERED (the pipeline's
 # tg_notify logs "[tg delivered] ⏸ ..."), strategist.sh tells the pipeline to keep those two notices back
 # (DAY_OPEN_QUIET_RETRY=1); until then the retries try again (red team, round 38: a lost first send must not
 # silence the rest of the day).
@@ -466,6 +468,18 @@ for n in 1 2; do
     run_strategist morning PIPE_RC=7 > /dev/null
 done
 check "16: сообщений об отсрочке не было (Telegram не настроен): флага нет" "none none" "$(quiet_flags)"
+new_case
+for n in 1 2; do
+    run_strategist morning PIPE_RC=7 PIPE_NOTICE=spoof > /dev/null
+done
+check "16: доставленная тревога с цитатой строки об отсрочке внутри тишину не включает" "none none" "$(quiet_flags)"
+new_case
+# the day's log is its own file: a deferral notice delivered YESTERDAY says nothing about today
+yesterday=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d yesterday +%Y-%m-%d)
+mkdir -p "$TEST_HOME/logs/strategist"
+printf '[%s 12:00:00] earlier day\n  [tg delivered] ⏸ Day Open %s отложен: вчера\n' "$yesterday" "$yesterday" > "$TEST_HOME/logs/strategist/$yesterday.log"
+run_strategist morning PIPE_RC=7 > /dev/null
+check "16: доставленная вчера отсрочка на сегодня не влияет (журнал свой на каждый день)" "none" "$(quiet_flags)"
 new_case
 for n in 1 2; do
     run_strategist morning PIPE_RC=5 > /dev/null
@@ -541,8 +555,21 @@ case "$out" in
     *"[tg delivery FAILED]"*"rc=1"*) ok "16: недоставленное сообщение строки о доставке не оставляет, код 1" ;;
     *) bad "16: у недоставленного сообщения нет строки об отказе: «$out»" ;;
 esac
-check "16: метку доставки strategist.sh и конвейер называют одинаково" "1" \
-    "$(grep -c 'DAY_OPEN_DEFERRAL_DELIVERED_MARK="\[tg delivered\] ⏸ "' "$STRATEGIST")"
+# the line pattern strategist.sh uses fits the line the real tg_notify writes for a delivered deferral notice and fits no
+# other line (an alarm that quotes it; round 39)
+mark_re=$(sed -n "s/^DAY_OPEN_DEFERRAL_DELIVERED_LINE='\(.*\)'\$/\1/p" "$STRATEGIST")
+out=$(notice_raw "" '⏸ Day Open 2026-10-02 отложен: тест')
+if [ -n "$mark_re" ] && printf '%s\n' "$out" | grep -q -- "$mark_re"; then
+    ok "16: шаблон строки доставки из strategist.sh подходит к строке настоящего tg_notify"
+else
+    bad "16: шаблон «$mark_re» из strategist.sh не подходит к строке tg_notify: «$out»"
+fi
+out=$(notice_raw "" '🚨 Day Open pipeline aborted: [tg delivered] ⏸ Day Open 2026-10-02 отложен: тест')
+if [ -n "$mark_re" ] && printf '%s\n' "$out" | grep -q -- "$mark_re"; then
+    bad "16: шаблон строки доставки подошёл к тревоге с цитатой внутри: «$out»"
+else
+    ok "16: шаблон строки доставки не подходит к тревоге, цитирующей строку об отсрочке"
+fi
 
 echo
 if [ "$fail" -eq 0 ]; then
