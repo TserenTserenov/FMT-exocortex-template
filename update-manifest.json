@@ -449,7 +449,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "6a92b02abbbc9563b1f259b3163deee7b024a633269c7386f134d546bd891fdf"
+      "sha256": "d74f4a4fae63e730637031982adfa951e393dd2b5ff97d3f0cd8a346cb91e382"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -773,7 +773,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "db8fa64b97df2b38db10b352dbc03f7c0ee78e57421c72c068a6fba5c0e2a761"
+      "sha256": "28852639dbbc975a9bc5add07c8670d630c8b470d37d832fa0ec10376c9e33d4"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
