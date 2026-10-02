@@ -817,7 +817,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "c5616d747ad3c08b1a450d415f46545de9bb32987db3901b10d5b9d2095d824d"
+      "sha256": "6468a1e11d6fa0d20e7c322f5e5d21f2696f3503685af16914a91d56119607e4"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -825,7 +825,7 @@
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "c01d2e59b832da6d692780cca4c97b42cf3050af7529f4e100c9f55f67438cb8"
+      "sha256": "cdbea512afc6a39796b5681da8a216e617f57eb2ba7aed51912679e34ec36538"
     },
     {
       "path": ".gitignore",
@@ -1037,7 +1037,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "c3eb6174035a19fb10ecd259e0035fe8b4654462032a9c312ed8ccba443f8713"
+      "sha256": "c5d90717d9d90d9f357077bcf765e9e97ed63ca562dadecf8383611575760b4c"
     },
     {
       "path": "docs/roles-catalog.md",
