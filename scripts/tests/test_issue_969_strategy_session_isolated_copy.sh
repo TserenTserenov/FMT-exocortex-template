@@ -279,7 +279,16 @@ if [ -n "$f" ]; then
     || { detail "rc=$RC out=$OUT"; check "publication, nothing new in the copy: exit 0, one line says so, no claim of a publication" bad; }
   # A failing git rev-list is an error, not "nothing to publish": an empty list from a failed command must
   # not read as success. The git double fails rev-list only and runs the real git for every other call.
-  SHIM="$C2/shim-revlist"; REAL_GIT=$(command -v git); mkdir -p "$SHIM"
+  # A git wrapper earlier on PATH would find this shim when it looks for the real git,
+  # causing wrapper -> shim recursion. Resolve the native binary before adding the shim.
+  REAL_GIT=""
+  while IFS= read -r candidate; do
+    case "$(file -b -L "$candidate" 2>/dev/null)" in
+      *"ELF "*|*"Mach-O "*) REAL_GIT="$candidate"; break ;;
+    esac
+  done < <(type -ap git)
+  [ -n "$REAL_GIT" ] || { echo "FAIL: native git binary not found on PATH"; exit 1; }
+  SHIM="$C2/shim-revlist"; mkdir -p "$SHIM"
   cat > "$SHIM/git" <<EOF
 #!/bin/sh
 for a in "\$@"; do [ "\$a" = rev-list ] && { echo "fatal: rev-list failed (test double)" >&2; exit 1; }; done
