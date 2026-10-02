@@ -861,15 +861,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fb7d8552c1d8dcebb11c65291095e2e783cabe9006c6a3597dddcd9e60683290"
+      "sha256": "31c3a95d854030a90eecb6028b28436842f8fff28151035e33a6f5f60090f6fe"
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fb7d8552c1d8dcebb11c65291095e2e783cabe9006c6a3597dddcd9e60683290"
+      "sha256": "31c3a95d854030a90eecb6028b28436842f8fff28151035e33a6f5f60090f6fe"
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fb7d8552c1d8dcebb11c65291095e2e783cabe9006c6a3597dddcd9e60683290"
+      "sha256": "31c3a95d854030a90eecb6028b28436842f8fff28151035e33a6f5f60090f6fe"
     },
     {
       "path": "CLAUDE.md",
@@ -1945,7 +1945,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "1fec8c38737916741c61a514665cc5856f5d190ebc7cbf4025800a01cc95e59f"
+      "sha256": "8811d93eb673e2a621df273b01cc02ff09ce8f6ba3607fff9b2208d943ada655"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2305,15 +2305,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "48c2d31cf24ec5adb2a8033824dc08d9fb8487f4575039bf63472b641c34f1b0"
-    },
-    {
-      "path": "scripts/day-open-pipeline.sh",
-      "sha256": "48c2d31cf24ec5adb2a8033824dc08d9fb8487f4575039bf63472b641c34f1b0"
-    },
-    {
-      "path": "scripts/day-open-pipeline.sh",
-      "sha256": "48c2d31cf24ec5adb2a8033824dc08d9fb8487f4575039bf63472b641c34f1b0"
+      "sha256": "a284ceffebe23d5805201674d2068edcfb1782e67f9c8aef63d79a75850042df"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -3097,15 +3089,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "784cc7fcd1f6951562421ff260b43bc5827a8138c80c78f520b5c66c9efb3989"
-    },
-    {
-      "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "784cc7fcd1f6951562421ff260b43bc5827a8138c80c78f520b5c66c9efb3989"
-    },
-    {
-      "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "784cc7fcd1f6951562421ff260b43bc5827a8138c80c78f520b5c66c9efb3989"
+      "sha256": "bcfde379d8877c65feecbb281cda6ce46e4478018722118f9547eb0277a696ff"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
