@@ -861,7 +861,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6402cce7d04150d2886bd1a5c6b9d0fc9b7ca62b295f53d1dcfb97d9b1a4b187"
+      "sha256": "d07313d9875e6a91d17f2739974676297bed74bd105185563153603d534dad3d"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "d07313d9875e6a91d17f2739974676297bed74bd105185563153603d534dad3d"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "d07313d9875e6a91d17f2739974676297bed74bd105185563153603d534dad3d"
     },
     {
       "path": "CLAUDE.md",
@@ -1937,7 +1945,15 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "f22f40d7b561deaeaa761e503d12329fa327dfd6f179989c4e424bb56dd1f49f"
+      "sha256": "0d0b2484414abc5aae9ce96cee79019da19b1637f830cc702a8f53ec4a30f38f"
+    },
+    {
+      "path": "roles/strategist/scripts/strategist.sh",
+      "sha256": "0d0b2484414abc5aae9ce96cee79019da19b1637f830cc702a8f53ec4a30f38f"
+    },
+    {
+      "path": "roles/strategist/scripts/strategist.sh",
+      "sha256": "0d0b2484414abc5aae9ce96cee79019da19b1637f830cc702a8f53ec4a30f38f"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2297,7 +2313,15 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "735f7e240c7aa2756036bfbdd41c779a2a80af8244f862e4ce6c95d02e9c309a"
+      "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
+    },
+    {
+      "path": "scripts/day-open-pipeline.sh",
+      "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
+    },
+    {
+      "path": "scripts/day-open-pipeline.sh",
+      "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
     },
     {
       "path": "scripts/day-open-preflight.sh",
