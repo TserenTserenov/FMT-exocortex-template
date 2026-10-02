@@ -54,12 +54,23 @@ wtreal=$(cd "$TMP/wt" && pwd -P)
 # no guard: legacy, canon and worktree both OK, unrelated repo falls back to canon
 out=$(run "$ROOT/GOV"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && check "no guard, canon -> legacy ok" ok || check "no guard, canon -> legacy ok" bad
 out=$(run "$TMP/other"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q "GOV_WT=.*/GOV mode=legacy" && check "no guard, foreign repo -> canon, not foreign" ok || check "no guard, foreign repo -> canon, not foreign" bad
-# guard present
+# guard present, but the canon has no origin (an install without GitHub): `open --isolate` without --base-sha fetches
+# origin main for its base and there is nowhere to publish -> legacy, as before 0.41.0 (audit of v0.41.0: the skill used to stop here with NOT ISOLATED)
 : > "$ROOT/scripts/session-guard.sh"
+out=$(run "$ROOT/GOV"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && echo "$out" | grep -q 'нет origin' && check "guard, canon without origin -> legacy" ok || check "guard, canon without origin -> legacy" bad
+out=$(run "$TMP/wt"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && check "guard, worktree without origin -> legacy" ok || check "guard, worktree without origin -> legacy" bad
+# guard present and the canon has an origin (a connected install): isolation is required
+git -C "$ROOT/GOV" remote add origin "$TMP/origin.git"
 out=$(run "$ROOT/GOV"); rc=$?; [ $rc -eq 2 ] && echo "$out" | grep -q 'NOT ISOLATED' && check "guard, canon -> exit 2" ok || check "guard, canon -> exit 2" bad
 out=$(run "$TMP/other"); rc=$?; [ $rc -eq 2 ] && check "guard, foreign repo -> exit 2 (not accepted as worktree)" ok || check "guard, foreign repo -> exit 2 (not accepted as worktree)" bad
 out=$(run "$TMP"); rc=$?; [ $rc -eq 2 ] && check "guard, non-git cwd -> exit 2" ok || check "guard, non-git cwd -> exit 2" bad
 out=$(run "$TMP/wt"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -qF "GOV_WT=$wtreal mode=isolated" && check "guard, worktree -> isolated" ok || check "guard, worktree -> isolated" bad
+# the freeze switched off by an empty IWE_FROZEN_CANONICAL_PATH (the way session-guard.sh reads it) -> legacy even with an origin
+out=$(cd "$ROOT/GOV" && IWE_FROZEN_CANONICAL_PATH="" IWE_SCRIPTS="$ROOT/none" bash "$TMP/run.sh" 2>&1); rc=$?
+[ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && echo "$out" | grep -q 'заморозка выключена' && check "guard, empty IWE_FROZEN_CANONICAL_PATH -> legacy" ok || check "guard, empty IWE_FROZEN_CANONICAL_PATH -> legacy" bad
+# a non-empty value does not switch isolation off
+out=$(cd "$ROOT/GOV" && IWE_FROZEN_CANONICAL_PATH="$ROOT/GOV" IWE_SCRIPTS="$ROOT/none" bash "$TMP/run.sh" 2>&1); rc=$?
+[ $rc -eq 2 ] && echo "$out" | grep -q 'NOT ISOLATED' && check "guard, non-empty IWE_FROZEN_CANONICAL_PATH keeps isolation" ok || check "guard, non-empty IWE_FROZEN_CANONICAL_PATH keeps isolation" bad
 mv "$ROOT/GOV" "$ROOT/GOV.gone"
 out=$(run "$TMP/other"); rc=$?; [ $rc -eq 1 ] && check "missing canon -> exit 1" ok || check "missing canon -> exit 1" bad
 
