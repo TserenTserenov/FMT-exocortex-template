@@ -825,7 +825,7 @@
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "3b1ce2b172d40acc30acb357e1726a472556448d2d31880177a11bae918defd6"
+      "sha256": "a41d66e67a1f2f10af479bcd5d166f69cd9da7f87c6cf1960d6937e2e063f12f"
     },
     {
       "path": ".gitignore",
@@ -941,7 +941,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "d0d222dc69314685340e2eb21c3bc0c034a1c33436a2ec684f8d2807ded4b8c6"
+      "sha256": "d7f35a4cb8a1f71bfbecae54a1ea58bdd5e4aa5ac7e06fdeba3c98ae9396ee9a"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
