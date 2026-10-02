@@ -35,11 +35,13 @@ if [ -z "${WORKSPACE_DIR:-}" ]; then
     # going up two levels lands inside FMT, not in the real workspace root.
     _IWE_BOOTSTRAP_CANDIDATE="$(cd "$_IWE_BOOTSTRAP_DIR/../.." && pwd)"
     # The template folder name is not an invariant (issue #933: a clone named
-    # e.g. "myexocortex"). A directory that holds no .exocortex.env while its
-    # parent does is the template inside a workspace, whatever it is called:
-    # .exocortex.env lives in the workspace root, never in the template.
+    # e.g. "myexocortex"). The template is recognised by its own marker
+    # (update-manifest.json) AND by sitting inside a workspace (.exocortex.env
+    # in the parent, none inside it). Either alone is too broad: a partial
+    # layout must not lift WORKSPACE_DIR to an unrelated parent.
     if [[ "$(basename "$_IWE_BOOTSTRAP_CANDIDATE")" == "FMT-exocortex-template" ]] \
-       || { [ ! -f "$_IWE_BOOTSTRAP_CANDIDATE/.exocortex.env" ] \
+       || { [ -f "$_IWE_BOOTSTRAP_CANDIDATE/update-manifest.json" ] \
+            && [ ! -f "$_IWE_BOOTSTRAP_CANDIDATE/.exocortex.env" ] \
             && [ -f "$_IWE_BOOTSTRAP_CANDIDATE/../.exocortex.env" ]; }; then
       WORKSPACE_DIR="$(cd "$_IWE_BOOTSTRAP_CANDIDATE/.." && pwd)"
     else

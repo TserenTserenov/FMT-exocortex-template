@@ -20,9 +20,12 @@ command -v python3 >/dev/null 2>&1 || { echo "SKIP: python3 not found"; exit 0; 
 FX="$TMP/fx"
 mkdir -p "$FX/setup" "$FX/scripts"
 echo x > "$FX/scripts/a.sh"
-printf '%s\n' '{"version":"1.0.0","description":"Платформенный манифест","files":[{"path":"scripts/a.sh"}],"excluded_paths":[],"deprecated_files":[]}' \
+printf '%s\n' '{"version":"1.0.0","description":"Платформенный манифест","files":[{"path":"scripts/a.sh"}],"excluded_paths":[],"deprecated_files":[{"path":"roles/strategist/prompts/day-plan.md","reason":"перенесён в скилл"}]}' \
     > "$FX/update-manifest.json"
 printf '%s\n' '## [1.0.0] - 2026-01-01' > "$FX/CHANGELOG.md"
+# Detector 10 fixture: runner still calls a prompt the manifest marks deprecated.
+mkdir -p "$FX/roles/strategist/scripts"
+printf '%s\n' 'run_claude "day-plan"' > "$FX/roles/strategist/scripts/strategist.sh"
 
 # 1. check-manifest-coverage.py: success path under a cp1251 console.
 out=$(printf 'scripts/a.sh\n' | PYTHONIOENCODING=cp1251 \
@@ -42,4 +45,12 @@ grep -q '\[1/11\] manifest_paths' <<<"$out" || fail "detector 1 did not run: $ou
 grep -A1 '\[1/11\] manifest_paths' <<<"$out" | grep -q 'PASS' \
     || fail "detector 1 did not PASS: $out"
 
-echo "PASS: issue 927 (2 checks)"
+# Detectors 9 and 10 must really run (not silently SKIP / swallow the error):
+grep -A1 '\[9/11\] manifest_version' <<<"$out" | grep -q 'PASS (v1.0.0)' \
+    || fail "detector 9 did not PASS (SKIP or crash?): $out"
+grep -A1 '\[10/11\] deprecated_runner_usage' <<<"$out" | grep -q 'SKIP' \
+    && fail "detector 10 was skipped: $out"
+grep -q 'CONFLICT: roles/strategist/prompts/day-plan.md' <<<"$out" \
+    || fail "detector 10 did not read the manifest (expected CONFLICT): $out"
+
+echo "PASS: issue 927 (2 checks, detectors 1/9/10 asserted)"

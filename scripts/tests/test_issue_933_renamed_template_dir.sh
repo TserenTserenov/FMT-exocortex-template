@@ -17,6 +17,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 resolve() {
     local name="$1" ws="$TMP/ws-$1"
     mkdir -p "$ws/$name/.claude/lib" "$ws/$name/scripts"
+    : > "$ws/$name/update-manifest.json"   # template marker
     cp "$BOOT" "$ws/$name/.claude/lib/iwe-env-bootstrap.sh"
     printf 'IWE_TEMPLATE=%s/%s\n' "$ws" "$name" > "$ws/.exocortex.env"
     # Fresh shell, WORKSPACE_DIR and IWE_* deliberately not exported (agent-run
@@ -46,4 +47,14 @@ got="$(env -u WORKSPACE_DIR -u IWE_ROOT -u IWE_TEMPLATE -u IWE_SCRIPTS -u IWE_WO
     bash -c '. "$1/.claude/lib/iwe-env-bootstrap.sh" && printf "%s" "$WORKSPACE_DIR"' _ "$live" 2>&1)"
 [ "$got" = "$(cd "$live" && pwd -P)" ] || fail "live root: WORKSPACE_DIR='$got'"
 
-echo "PASS: issue 933 bootstrap (3 checks)"
+# 4. Incomplete layout: no update-manifest.json (not a template) but the parent
+#    has .exocortex.env -> the root must NOT be lifted to the foreign parent.
+part="$TMP/partial"
+mkdir -p "$part/sub/.claude/lib"
+cp "$BOOT" "$part/sub/.claude/lib/iwe-env-bootstrap.sh"
+: > "$part/.exocortex.env"
+got="$(env -u WORKSPACE_DIR -u IWE_ROOT -u IWE_TEMPLATE -u IWE_SCRIPTS -u IWE_WORKSPACE \
+    bash -c '. "$1/.claude/lib/iwe-env-bootstrap.sh" && printf "%s" "$WORKSPACE_DIR"' _ "$part/sub" 2>&1)"
+[ "$got" = "$(cd "$part/sub" && pwd -P)" ] || fail "partial layout: root lifted to '$got'"
+
+echo "PASS: issue 933 bootstrap (4 checks)"
