@@ -2226,6 +2226,23 @@ backfill_executor_catalog_generator() {
 backfill_ds_publish() {
     local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
     local target_path="$WORKSPACE_DIR/$governance_repo/scripts/ds-publish.sh"
+    # Issue #1003: a copy that THIS template shipped earlier (sha256 on the list) is
+    # not user content: it is replaced even though it lies untracked in the governance
+    # repo (the generic backfill refuses untracked files). Any other file stays.
+    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
+    local source_path="$SCRIPT_DIR/seed/strategy/scripts/ds-publish.sh" target_hash
+    if [ -f "$target_path" ] && [ ! -L "$target_path" ] && [ ! -L "$(dirname "$target_path")" ] \
+       && [ -f "$source_path" ] && [ ! -L "$source_path" ]; then
+        target_hash=$(hash_file "$target_path" 2>/dev/null) || target_hash=""
+        case " $known_old_publishers " in
+            *" $target_hash "*)
+                if [ -n "$target_hash" ]; then
+                    atomic_copy_executable "$source_path" "$target_path" || return 1
+                    echo "  ⟳ scripts/ds-publish.sh: прежняя копия шаблона заменена на текущую в $governance_repo."
+                    return 0
+                fi ;;
+        esac
+    fi
     if [ -e "$target_path" ] || [ -L "$target_path" ]; then
         echo "  ✓ scripts/ds-publish.sh уже есть в $governance_repo, не заменяю."
         return 0
