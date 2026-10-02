@@ -57,8 +57,8 @@
 
 Файлы/репо → `memory/navigation.md` · Pack-репо → `memory/repo-type-rules.md` · терминология → `memory/hard-distinctions.md` · FPF/SOTA/Роли → `memory/fpf-reference.md`, `memory/sota-reference.md`, `memory/roles.md` · документ/чеклист → `memory/checklists.md`.
 
-Политика: ≤11 файлов; построчно проверяется только distinctions.md (≤150), остальное — суммарным M1/M2-бюджетом (WP-7 NR1.2); lazy-reference без лимита. Горизонты/frontmatter → `memory/memory-lifecycle-spec.md`; temporal metadata → `memory/protocol-work.md §2`.
-Рабочая директория: `/home/lokplvl/IWE/`; `memory/` = симлинк на auto-memory.
+Политика: построчно проверяется только distinctions.md (≤150), остальное — суммарным M1/M2-бюджетом (WP-7 NR1.2); lazy-reference без лимита (issue #736: старое «≤11 файлов» не имело кода-исполнителя и разошлось с практикой — архитектура памяти давно перешла на HOT/WARM/COLD с бюджетом по токенам, не по числу файлов, см. `memory/memory-lifecycle-spec.md`). Горизонты/frontmatter → `memory/memory-lifecycle-spec.md`; temporal metadata → `memory/protocol-work.md §2`.
+Рабочая директория: `{{WORKSPACE_DIR}}/`; `memory/` = симлинк на auto-memory.
 
 ## 5. АрхГейт — ОБЯЗАТЕЛЬНАЯ оценка
 
@@ -117,6 +117,8 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
    - описание крайних случаев и результатов проверок (Evidence)
    - суть изменений и анализ влияния на смежные системы
 
+**После `git mv` в этом же ходе — сверять содержимое, не только имя (issue #511).** Список имён из `--name-only` может выглядеть верным, а диф — пустым (rename без правок) или устаревшим (правки Edit'ом ушли не в тот путь). Если этим ходом был `git mv` любого из коммитуемых файлов: перед `git commit` прогнать `git diff --cached <новый_путь>` и убедиться, что нужные правки внутри; коммитить только новый путь после `git mv`, не старый; отдельно проверить код возврата `git add` перед переходом к `git commit`.
+
 ## Artifact Naming
 
 **Do not invent artifact names.** Names for sections, documents, RPs, and deliverables must come from the plan/task you received. If the task is silent on a name — report "need clarification on name" instead of making one up.
@@ -128,6 +130,10 @@ Discrepancy found (file ≠ plan, stale content): **report to pilot, do not sile
 ## Working Directory
 
 `{{WORKSPACE_DIR}}/`
+
+## FPF Usage
+
+Работа опирается на FPF/DPF → скилл `/fpf` (шаг 0 читает инструкцию автора (файл USING-FPF.md в копии FPF) и проверяет полный текст). Нет полного текста → сказать об этом пользователю и не делать вывод, который от него зависит; в ответе — версия копии, номера паттернов, допущения.
 
 ## Status Reporting — Agent Status Registry (РП-395)
 

@@ -4,19 +4,22 @@ name: Weekly Release
 # если секция [Unreleased] непустая — бампает patch-версию в
 # update-manifest.json и открывает PR с этим бампом.
 #
-# WP-529 (31.08.2026): main с 27.08 требует обязательное ревью от code
-# owner'а на каждый мердж (защита ветки, часть слоя принуждения red-team
-# гейта) — прямой `git push origin main` от бота больше физически не
-# проходит (`GH006: Protected branch update failed`). Раньше здесь же был
-# прямой push + явный dispatch validate-template.yml/release.yml (нужен
-# был из-за anti-recursion policy: коммит от github-actions[bot] через
-# стандартный GITHUB_TOKEN не каскадирует в push-триггеры сам по себе) —
-# убрано вместе с прямым push. Теперь job останавливается на открытии PR;
-# CODEOWNERS назначается автоматически, а как только пилот вручную
-# смерджит PR — обычный merge-коммит от GitHub (не от GITHUB_TOKEN
-# Actions-рана) штатно триггерит push-подписки validate-template.yml, а
-# та в свою очередь — release.yml (workflow_run) без какого-либо ручного
-# dispatch: та же цепочка, что и для любого другого мерджа в main.
+# WP-529 (31.08.2026): прямой `git push origin main` от бота не проходит
+# (`GH006: Protected branch update failed`, main защищён), поэтому job
+# открывает PR с бампом, а не пушит в main.
+#
+# WP-529 Ф-релиз (29.09.2026, проверено через API): main требует только
+# статус `release-receipt` (enforce_admins, 0 approvals, code owner не
+# нужен). PR, открытый через GITHUB_TOKEN, получает pull_request-запуски в
+# состоянии `action_required` (правило GitHub для PR от GITHUB_TOKEN) —
+# `release-receipt` не выполняется, слияние остаётся BLOCKED. Оба прошлых
+# релиза держались на ручном «Approve and run» пилота (#843: запуски
+# стартовали через 17 минут после создания). Поэтому после открытия PR
+# шаг «Validate the release branch» явно запускает validate-template.yml
+# через workflow_dispatch (документированное исключение из anti-recursion
+# для GITHUB_TOKEN) — check run встаёт на head-коммит PR, слияние
+# становится доступным без ручного одобрения. release.yml от такого
+# запуска не срабатывает: он слушает только ветку main.
 #
 # WP-7 Ф62 (10.08.2026): исходная причина вообще звать validate перед
 # релизом — раньше бамп версии никак не тестировался перед тем, как
@@ -37,6 +40,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write    # dispatch validate-template.yml on the release branch
+  issues: write     # signal a skipped release (see last step)
 
 jobs:
   weekly-bump:
@@ -112,10 +117,9 @@ jobs:
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Open release PR
-        # main требует ревью code owner'а (branch protection, WP-529) —
-        # смердженный PR даёт обычный push-коммит, который штатно
-        # запускает validate-template.yml → release.yml, тот же путь, что
-        # и любой другой мердж. Явный dispatch здесь больше не нужен.
+        # Смердженный PR даёт обычный push-коммит, который штатно запускает
+        # validate-template.yml → release.yml. До слияния проверки на PR
+        # запускает следующий шаг (см. шапку файла).
         if: steps.check.outputs.has_content == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -125,3 +129,42 @@ jobs:
             --body "Еженедельный автобамп версии. Мердж запускает обычный релизный конвейер (validate → release) через штатный push-триггер." \
             --base main \
             --head "${{ steps.commit.outputs.branch }}"
+
+      - name: Validate the release branch
+        # PR от GITHUB_TOKEN получает pull_request-запуски в action_required,
+        # release-receipt не выполняется. workflow_dispatch — документированное
+        # исключение: check run встаёт на head-коммит release-ветки.
+        if: steps.check.outputs.has_content == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run validate-template.yml --ref "${{ steps.commit.outputs.branch }}"
+
+      - name: Signal a skipped release
+        # 20.09.2026: [Unreleased] был пуст при 10 коммитах с прошлого тега —
+        # workflow молча ничего не выпустил. Пустой [Unreleased] при заметном
+        # числе коммитов — это пропущенные заметки, а не «нечего выпускать».
+        if: steps.check.outputs.has_content == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MIN_COMMITS: "5"
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          if [ -z "$LAST_TAG" ]; then
+            echo "Нет тегов v* — сигнал не нужен."
+            exit 0
+          fi
+          COUNT=$(git rev-list --count "$LAST_TAG"..HEAD)
+          if [ "$COUNT" -lt "$MIN_COMMITS" ]; then
+            echo "С $LAST_TAG всего $COUNT коммитов (< $MIN_COMMITS) — сигнал не нужен."
+            exit 0
+          fi
+          OPEN=$(gh issue list --label release-skipped --state open --json number --jq 'length')
+          if [ "$OPEN" -gt 0 ]; then
+            echo "Открытое обращение release-skipped уже есть — дубль не создаём."
+            exit 0
+          fi
+          gh label create release-skipped --description "Weekly release skipped: empty [Unreleased]" --color B60205 2>/dev/null || true
+          gh issue create --label release-skipped \
+            --title "Недельный релиз пропущен: $COUNT коммитов с $LAST_TAG, [Unreleased] пуст" \
+            --body "Weekly Release запустился, но секция [Unreleased] в CHANGELOG.md пуста, хотя с $LAST_TAG накопилось $COUNT коммитов. Выпуск не создан. Допишите заметки в [Unreleased] (или запустите scripts/changelog-append.sh) и перезапустите workflow Weekly Release вручную."

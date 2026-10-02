@@ -48,6 +48,14 @@ Verdict выносит subagent в роли Аудитора, читая отч�
 Найти и запустить `iwe-audit.sh` через fallback-цепочку (author-mode → workspace, user-mode → `$IWE_SCRIPTS` из `~/.iwe-paths`):
 
 ```bash
+# issue #688: a non-interactive top-level Bash call doesn't go through
+# .bashrc/.zshenv (interactive-shell guard) or BASH_ENV (read before the
+# harness can set it) — $IWE_SCRIPTS is unset here on plenty of real
+# installs even though ~/.iwe-paths exists and is correct. Source it
+# directly, in this same shell, before reading the variable — `.` doesn't
+# depend on interactive/BASH_ENV machinery at all.
+IWE_PATHS="${IWE_PATHS_FILE:-$HOME/.iwe-paths}"
+[ -r "$IWE_PATHS" ] && . "$IWE_PATHS"
 if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/iwe-audit.sh" ]; then
     # $IWE_SCRIPTS first (#566): the hardcoded workspace copy, when it exists at
     # all, is a stale leftover — the installer points IWE_SCRIPTS at the template.
@@ -55,7 +63,7 @@ if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/iwe-audit.sh" ]; then
 elif [ -f "$HOME/IWE/scripts/iwe-audit.sh" ]; then
     AUDIT_SCRIPT="$HOME/IWE/scripts/iwe-audit.sh"
 else
-    echo "iwe-audit.sh не найден. Если \$IWE_SCRIPTS не выставлен — выполни 'source \$HOME/.iwe-paths' (или перезапусти shell), затем повтори. Если файла .iwe-paths нет — запусти setup.sh из FMT-шаблона."
+    echo "iwe-audit.sh не найден. \$IWE_PATHS ($IWE_PATHS) не даёт рабочий \$IWE_SCRIPTS — проверь, что файл существует и содержит export IWE_SCRIPTS=... (запусти setup.sh из FMT-шаблона, если файла нет)."
     exit 1
 fi
 bash "$AUDIT_SCRIPT" $([ "${ARGUMENTS:-}" = "--critical" ] && echo "--critical")

@@ -42,3 +42,13 @@ __pycache__/
 # WP-529 Ф3: release-receipt.sh output — generated per-run in CI (uploaded as
 # an artifact, not committed) and by any local dry-run of the script.
 /release-receipt.json
+
+# issue #906: the platform creates runtime state under .iwe-runtime/ as it
+# works (session-transition-locks/, hot-file-locks/, sessions/, and whatever
+# comes next) but the template shipped no ignore rule for that root at all --
+# every new runtime subdirectory was a fresh, unignored `git status` surprise
+# for every user. Ignore the whole root, carve out the two paths that live
+# there on purpose (hot-files.list, roles/).
+/.iwe-runtime/*
+!/.iwe-runtime/hot-files.list
+!/.iwe-runtime/roles/

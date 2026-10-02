@@ -24,7 +24,8 @@ import sys, json
 file, label = sys.argv[1], sys.argv[2]
 with open(file) as f:
     content = f.read()
-print(json.dumps({'additionalContext': '[Lazy-load: ' + label + ']\n' + content}))
+ctx = '[Lazy-load: ' + label + ']\n' + content
+print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': ctx}}))
 " "$file" "$label"
 }
 

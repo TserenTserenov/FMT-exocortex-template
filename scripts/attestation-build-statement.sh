@@ -59,14 +59,28 @@ check_hex head-sha "$HEAD_SHA" 40
 check_hex base-sha "$BASE_SHA" 40
 check_hex policy-digest "$POLICY_DIGEST" 64
 
+# TTL_HOURS goes into shell arithmetic below: accept digits only, otherwise a
+# crafted value would be evaluated as an arithmetic expression.
+case "$TTL_HOURS" in
+  ''|*[!0-9]*) echo "ERROR: --ttl-hours must be a non-negative integer, got '$TTL_HOURS'" >&2; exit 3 ;;
+esac
+
 case "$VERDICT" in
   pass|fail|conditional) ;;
   *) echo "ERROR: --verdict must be pass, fail, or conditional, got '$VERDICT'" >&2; exit 3 ;;
 esac
 
-ISSUED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-EXPIRES_AT="$(date -u -v+"${TTL_HOURS}"H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
-  || date -u -d "+${TTL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)"
+# One clock read for both timestamps: two separate `date` calls straddling a
+# second boundary made expires_at - issued_at differ from the TTL by 1s
+# (flaky macOS CI run, 29.09.2026).
+NOW_EPOCH="$(date -u +%s)"
+# epoch_to_iso <epoch> - portable across BSD date (macOS) and GNU date.
+epoch_to_iso() {
+  date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ
+}
+ISSUED_AT="$(epoch_to_iso "$NOW_EPOCH")"
+EXPIRES_AT="$(epoch_to_iso $(( NOW_EPOCH + TTL_HOURS * 3600 )))"
 
 STATEMENT="$(jq -n \
   --arg subject_digest "$SUBJECT_DIGEST" \

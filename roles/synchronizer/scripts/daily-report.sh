@@ -99,11 +99,6 @@ compute_traffic_light() {
         issues+="push failed (Mac оффлайн?); "
     fi
 
-    if (( 10#$HOUR >= 23 )) && ! check_ran "strategist-note-review" &>/dev/null; then
-        if [ "$color" = "GREEN" ]; then color="YELLOW"; fi
-        issues+="note-review не запустился; "
-    fi
-
     if [ "$DOW" = "1" ] && ! check_ran_week "strategist-week-review" &>/dev/null; then
         if [ "$color" = "GREEN" ]; then color="YELLOW"; fi
         issues+="week-review не запустился (Пн!); "
@@ -173,38 +168,29 @@ agent: Синхронизатор
 | 2 | Стратег утренний | **❌** | — |"
     fi
 
-    # 3. Note-review (после 22:00)
-    if (( 10#$HOUR >= 22 )); then
-        local nr_time
-        if nr_time=$(check_ran "strategist-note-review"); then
-            report+="
-| 3 | Разбор заметок | **✅** | $nr_time |"
-        else
-            report+="
-| 3 | Разбор заметок | **❌** | — |"
-        fi
-    fi
+    # The note-review row and its traffic-light check are gone: the scheduler no longer runs
+    # note-review (template owner's decision, July 2026), so a missing marker is not a failure.
 
-    # 4. Week-review (Пн)
+    # 3. Week-review (Пн)
     if [ "$DOW" = "1" ]; then
         local wr_time
         if wr_time=$(check_ran_week "strategist-week-review"); then
             report+="
-| 4 | Обзор недели | **✅** | $wr_time |"
+| 3 | Обзор недели | **✅** | $wr_time |"
         else
             report+="
-| 4 | Обзор недели | **❌** | — |"
+| 3 | Обзор недели | **❌** | — |"
         fi
     fi
 
-    # 5. Экстрактор inbox-check
+    # 4. Экстрактор inbox-check
     local ic_detail
     if ic_detail=$(check_interval "extractor-inbox-check"); then
         report+="
-| 5 | Проверка входящих | **✅** | $ic_detail |"
+| 4 | Проверка входящих | **✅** | $ic_detail |"
     else
         report+="
-| 5 | Проверка входящих | **❌** | — |"
+| 4 | Проверка входящих | **❌** | — |"
     fi
 
     report+="

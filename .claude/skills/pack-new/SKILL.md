@@ -410,8 +410,8 @@ gh repo create {GITHUB_USER}/PACK-{slug} --private --source=. --push
   /ke — захват знания в Pack в процессе работы
   /fpf — проверить корректность сущностей по FPF A.*
   /verify pack — baseline-оценка адекватности по 11 координатам
-      E.4.DPF.DA (ожидаемо CONDITIONAL для свежего скаффолда:
-      часть координат partial/missing(seed-expected) — это норма).
+      E.4.DPF.DA (ожидаемо `seedOnly` для свежего скаффолда:
+      часть координат честно ниже порога — это норма для заготовки).
       Обязательный прогон — в /pack-creator Шаг 4.
   SPF/process/03-distinctions-work.md — детальный процесс для Ф1
   SPF/process/08-failure-modes-extraction.md — процесс для Ф5

@@ -15,7 +15,7 @@
    - Зачёркивать: номер, проект, репо, бюджет. **Не зачёркивать:** название (`~~` уже на нём), статус ✅.
    - Автопроверка: `python3 scripts/check-wp-format.py docs/WP-REGISTRY.md`
    - Массовое исправление: `bash scripts/fix-strikethrough.sh`
-3. `python3 scripts/build-active-wp.py` (перегенерация `current/active-wp.md`).
+3. Перегенерация `current/active-wp.md` — скрипт живёт внутри `FMT-exocortex-template/scripts/build-active-wp.py` (в governance-репо копии нет, issue #905); запускать оттуда или через `scripts/create-wp.sh`'ный двухместный резолвер (сначала `${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/`, затем `FMT-exocortex-template/scripts/`).
 4. `git add` всех трёх файлов + commit.
 
 **Exemption-tag `[no-registry-touch]`** — легитимный escape hatch для случаев:

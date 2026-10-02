@@ -285,7 +285,7 @@ if [ ! -f "$SENTINEL" ]; then
                 echo "[dry-run-gate] BLOCKED: dry-run sentinel missing while state gate_id=$gate_id is still active"
                 echo "Reason: owner alive or orphanhood not proven — fail-closed per contract"
                 printf 'Recovery (pilot terminal only, after confirming no dry-run is actually active):\n  bash %q %s manual-recovery\n' \
-                    "$HOME/IWE/FMT-exocortex-template/scripts/dry-run-complete.sh" "$gate_id"
+                    "$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/dry-run-complete.sh" "$gate_id"
             } >&2
             exit 2
         fi
@@ -510,22 +510,56 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # (подтверждено code review: без этого фикс путь 5 блокирует день. close на
     # первом же шаге — читай-только скрипты, а не место реального write).
     #
-    # Точный `$HOME`-путь в паттерне, НЕ wildcard: `[^}]*` вместо конкретного
+    # Точный путь в паттерне, НЕ wildcard: `[^}]*` вместо конкретного
     # default-значения разрешал бы `${IWE_TEMPLATE:-$(cmd)}/...` — command
     # substitution внутри default оказывался бы проглочен маркером ДО того, как
     # шаг 2 успевает его сегментировать и опознать (round-2 review, живое
     # воспроизведение: `${IWE_TEMPLATE:-$(touch /tmp/PWNED)}/...` проходил как
     # allow). Тот же урок, что уже применён к `WL_ABS`/`WL_ABS2` ниже (review-01
     # High/review-02 H1) — whitelist только по точной строке, не по glob.
-    WL_TEMPLATE_ABS="$HOME/IWE/FMT-exocortex-template"
+    # issue #694: якорь — $IWE_ROOT_GUESS (путь самого хука, вычислен строкой
+    # ~27 из BASH_SOURCE), не $HOME/IWE — тот же приём, что уже используется
+    # для GATE_LOG выше. Не env-переменная (IWE_WORKSPACE/IWE_TEMPLATE
+    # инжектируемы вызывающим окружением — тот самый обход, который
+    # review-01/review-02 закрыли отказом от env-default в этом whitelist).
+    WL_TEMPLATE_ABS="$IWE_ROOT_GUESS/FMT-exocortex-template"
+    # Cold-review finding (Codex, 2026-09-14): a STATIC marker string in a
+    # NORM whitelist is spoofable — an attacker can type the marker text
+    # literally as the command's own bare argument and bypass the gate by
+    # planting a same-named file, since NORM only ever ADDS the marker, it
+    # never proves the marker came from OUR substitution rather than from
+    # the attacker's own input. GATE_NONCE makes the NEW .iwe-paths marker
+    # below unpredictable per invocation (this hook is a fresh process per
+    # PreToolUse call, so the attacker's $CMD is fixed before this nonce
+    # even exists) — scoped ONLY to issue #784/#785's whitelist, not to the
+    # pre-existing static markers (__WL_DAY_CLOSE_PREPARE__ etc. below),
+    # which are a separate, already-shipped finding outside this fix's scope.
+    GATE_NONCE=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+    [ -n "$GATE_NONCE" ] || GATE_NONCE="$$-$(date +%s%N 2>/dev/null || date +%s)"
     NORM=$(printf '%s' "$CMD" | sed -E \
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
+        -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
+        -e "s@\"\\\$HOME/\\.iwe-paths\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
+        -e "s@\"\\\$\\{IWE_PATHS_FILE:-\\\$HOME/\\.iwe-paths\\}\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
         -e "s/'[^']*'/ QSTR /g" \
         -e 's/"[^"]*"/ QSTR /g' \
         -e 's@[0-9]?>[[:space:]]*/dev/null@ @g' \
         -e 's@2>&1@ @g')
+    NORM_RC=$?
+    # Codex review (2026-09-14): a broken -e expression makes the WHOLE sed
+    # invocation fail with EMPTY stdout (verified live: any invalid -e in
+    # this pipeline → exit 1, zero bytes out — sed validates the full -e
+    # script upfront, before touching input). $(...) alone doesn't stop the
+    # script (no `set -e` here, only pipefail) — without this check, NORM
+    # would silently become "", SPLIT/the whole Bash-matcher loop below would
+    # never iterate, and every single Bash command would fall through to
+    # "read-only: allow" at the bottom of the file, regardless of content.
+    # Found live while adding the #784/#785 whitelist to this same pipeline.
+    if [ "$NORM_RC" -ne 0 ]; then
+        fail_closed "NORM sed pipeline failed (exit $NORM_RC) — cannot classify command, refusing to allow"
+    fi
 
     # Редирект в реальный файл — проверяем по нормализованной строке целиком
     # (позиционно-независим относительно сегментации ниже, как и раньше).
@@ -536,20 +570,73 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # Шаг 2: разбить на простые команды.
     SPLIT=$(printf '%s\n' "$NORM" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
 
+    # Live-review finding (Fable, 2026-09-14): whitelist для .iwe-paths матчит
+    # ЛИТЕРАЛЬНЫЙ ТЕКСТ "$HOME/.iwe-paths"/"${IWE_PATHS_FILE:-...}", а не
+    # разрешённое значение — цикл ниже классифицирует каждый сегмент НЕЗАВИСИМО
+    # и не помнит присваиваний из предыдущих сегментов. Живой прогон подтвердил
+    # обход: `HOME=/tmp/evil; . "$HOME/.iwe-paths"` при РЕАЛЬНОМ исполнении
+    # сорсит /tmp/evil/.iwe-paths (bash подставляет переменную в момент
+    # выполнения, уже после этого гейта), но классификатор видит второй сегмент
+    # изолированно и не знает о переопределении в первом. Обнаружено уже после
+    # деплоя — сканируем ВЕСЬ SPLIT заранее на переопределение HOME/
+    # IWE_PATHS_FILE где угодно в команде и отзываем whitelist для всей команды,
+    # если оно есть. round-2 cold-review (Codex, 2026-09-14) нашёл, что первая
+    # версия regex (якорь на начало сегмента, только export) пропускала:
+    # (a) префиксное присваивание НЕ первым словом сегмента (`x=1 HOME=evil cmd`),
+    # (b) readonly/declare/typeset/local/builtin export/command export,
+    # (c) printf -v HOME / read HOME (присваивание через builtin, не `VAR=`).
+    # Регекс ниже покрывает все три класса; кавычные спаны уже схлопнуты в QSTR
+    # к этому шагу (см. sed выше), поэтому "HOME=" внутри пользовательской
+    # строки (напр. python -c "...HOME=...") сюда не протекает.
+    HOME_OR_IWE_PATHS_TAMPERED=0
+    if printf '%s\n' "$SPLIT" | grep -qE \
+        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE)=|(^|[[:space:]])(HOME|IWE_PATHS_FILE)=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE)([[:space:]]|$)' \
+    ; then
+        HOME_OR_IWE_PATHS_TAMPERED=1
+    fi
+
     while IFS= read -r SEG; do
         [ -z "$SEG" ] && continue
         # shellcheck disable=SC2086
         set -- $SEG
-        # Пропустить VAR=val / command / env / nohup / time / sudo — переход к реальной команде.
+        # Пропустить VAR=val / command / env / nohup / time / sudo / nice — переход
+        # к реальной команде. issue #825, две дыры (обе живьём подтверждены
+        # cold-review): (1) `nice` отсутствовал в списке обёрток — `nice rm -f
+        # ...` проходил непроверенным; (2) сравнение по литеральному слову не
+        # матчило `/usr/bin/nice ...`/абсолютный путь к любой обёртке —
+        # basename (`${1##*/}`) закрывает это без обращения к файловой системе
+        # (не readlink/stat — чистая строковая операция, не открывает тот же
+        # класс обхода, что был закрыт для WL_ABS/WL_ABS2/WL_ABS3 review-01/02:
+        # те сравнивают ВТОРОЙ токен — путь к скрипту-аргументу — для ALLOW,
+        # остаются литеральными; здесь меняется только то, в какой БЛОКИРУЮЩИЙ
+        # рукав попадёт команда).
         while [ $# -gt 0 ]; do
             case "$1" in
                 *=*) shift ;;
-                command|env|nohup|time|sudo) shift ;;
-                *) break ;;
+                *)
+                    case "${1##*/}" in
+                        command|env|nohup|time|sudo) shift ;;
+                        nice)
+                            shift
+                            # nice сам принимает необязательный аргумент
+                            # приоритета — `nice -n 19 cmd`/`nice -n19 cmd`
+                            # (самая частая форма реального вызова) без этого
+                            # блока не матчили ни VAR=, ни список обёрток и
+                            # останавливали цикл на W0=-n, снова проходя
+                            # непроверенными (cold-review нашёл живьём).
+                            case "${1:-}" in
+                                -n) [ $# -ge 2 ] && shift 2 || shift ;;
+                                -n*|--adjustment=*) shift ;;
+                                -[0-9]*) shift ;;
+                            esac
+                            ;;
+                        *) break ;;
+                    esac
+                    ;;
             esac
         done
         [ $# -eq 0 ] && continue
-        W0=$1
+        W0="${1##*/}"
 
         case "$W0" in
             git)
@@ -607,29 +694,66 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # payload инспектируем по коду скрипта (write-путей нет).
                 # Список синхронизирован с memory/dry-run-contract.md §Bash matchers;
                 # добавление = правка контракта + этого case + code review.
-                # Абсолютный путь привязан к $HOME/IWE и захардкожен (review-01 High,
-                # review-02 H1): glob */.claude/... пропускал /tmp-подделку, а
-                # ${IWE_ROOT:-...} открывал тот же обход через env-инъекцию.
+                # Абсолютный путь захардкожен по точной строке, не по glob
+                # (review-01 High, review-02 H1): glob */.claude/... пропускал
+                # /tmp-подделку, а ${IWE_ROOT:-...}/${IWE_WORKSPACE:-...} открывал
+                # тот же обход через env-инъекцию (вызывающее окружение может
+                # подставить произвольный env перед Bash-вызовом). Якорь —
+                # $IWE_ROOT_GUESS (issue #694): путь самого хука через
+                # BASH_SOURCE (строка ~27), нестандартный WORKSPACE_DIR
+                # резолвится сам, инъекция через env невозможна.
                 shift
-                WL_ABS="$HOME/IWE/.claude/scripts/load-extensions.sh"
+                WL_ABS="$IWE_ROOT_GUESS/.claude/scripts/load-extensions.sh"
                 # Реальный deployed путь — вложенный клон, не workspace-root
                 # (scripts/ не копируется в $WORKSPACE_DIR, в отличие от .claude/;
                 # см. IWE_SCRIPTS default в .claude/lib/iwe-env-bootstrap.sh:86).
-                WL_ABS2="$HOME/IWE/FMT-exocortex-template/scripts/day-close-prepare.sh"
+                WL_ABS2="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/day-close-prepare.sh"
                 # issue #549 stage 2: штатное завершение репетиции — переход
                 # active→completed через helper (rm sentinel внутри него идёт
                 # уже после completed, поэтому сам он безопасен под гейтом;
                 # его внутренний `rm -f "$SENTINEL"` покрыт cleanup-исключением
                 # ветки rm выше).
-                WL_ABS3="$HOME/IWE/FMT-exocortex-template/scripts/dry-run-complete.sh"
+                WL_ABS3="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/dry-run-complete.sh"
                 case "${1:-}" in
                     .claude/scripts/load-extensions.sh|"$WL_ABS") ;;
                     scripts/day-close-prepare.sh|"$WL_ABS2"|__WL_DAY_CLOSE_PREPARE__) ;;
-                    scripts/dry-run-complete.sh|"$WL_ABS3") ;;
+                    scripts/dry-run-complete.sh|"$WL_ABS3"|__WL_DRY_RUN_COMPLETE__) ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;
-            eval|source|.|xargs)
+            source|.)
+                # issue #784/#785: сорсинг .iwe-paths (плоский KEY=VALUE
+                # файл без побочных эффектов — межвызовое shell-состояние
+                # не живёт между Bash-вызовами агента, поэтому его надо
+                # сорсить в той же команде) блокировался безусловно.
+                # Whitelist — по nonce-маркеру GATE_NONCE (см. NORM выше),
+                # не по статическому тексту: cold-review (Codex) нашёл, что
+                # статический маркер спуфится буквальным вводом атакующего
+                # (`source __WL_СТАТИКА__` + одноимённый файл на диске =
+                # обход гейта). eval/xargs намеренно НЕ включены сюда: общие
+                # индирект-векторы без известного безопасного случая в контракте.
+                # Live-review finding (Fable): HOME_OR_IWE_PATHS_TAMPERED
+                # (вычислен до этого цикла) отзывает whitelist, если HOME/
+                # IWE_PATHS_FILE переопределены где-то в этой же команде.
+                if [ "$HOME_OR_IWE_PATHS_TAMPERED" = "1" ]; then
+                    block "$CMD (HOME/IWE_PATHS_FILE reassigned earlier in the same command)"
+                fi
+                shift
+                case "${1:-}" in
+                    "__WL_IWE_PATHS_${GATE_NONCE}__")
+                        shift
+                        # round-2 cold-review (Codex): NORM вставляет пробелы
+                        # вокруг маркера при замене — без этой проверки
+                        # `. "$HOME/.iwe-paths"суффикс` (конкатенация без
+                        # пробела в исходной команде) резолвился бы в W0=.
+                        # $1=маркер $2=суффикс и прошёл бы как allow, хотя
+                        # реально сорсит другой файл.
+                        [ $# -gt 0 ] && block "$CMD (unexpected token after .iwe-paths whitelist marker)"
+                        ;;
+                    *) block "$CMD (indirect execution under dry-run)" ;;
+                esac
+                ;;
+            eval|xargs)
                 block "$CMD (indirect execution under dry-run)"
                 ;;
             python|python3)
@@ -645,6 +769,16 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     # read-only inline snippets doesn't remove protection that existed.
                     -c) ;;
                     __WL_PY_MDS__|__WL_PY_CIH__) ;;
+                    *) block "$CMD (indirect execution under dry-run)" ;;
+                esac
+                ;;
+            uv|uvx)
+                # issue #821: `uv run <script>` had no matcher branch at all — same
+                # gap as python/python3 (#460 path 5). `uvx` is a distinct binary
+                # (alias for `uv tool run`), same threat, needs its own case arm.
+                shift
+                case "${1:-}" in
+                    --version|-V|--help|help) ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;

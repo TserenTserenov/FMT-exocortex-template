@@ -60,7 +60,7 @@ FMT-exocortex-template/              DS-strategy/ (отдельный репо)
 
 ## Расписание (launchd, macOS)
 
-| Время (UTC) | День | Сценарий | Plist |
+| Время (местное время машины) | День | Сценарий | Plist |
 |-------------|------|----------|-------|
 | {{TIMEZONE_HOUR}}:00 | Понедельник | `session-prep` (headless) | `com.strategist.morning` |
 | {{TIMEZONE_HOUR}}:00 | Вт-Вс | `day-plan` | `com.strategist.morning` |

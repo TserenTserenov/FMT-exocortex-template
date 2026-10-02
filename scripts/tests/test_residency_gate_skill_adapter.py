@@ -529,6 +529,31 @@ def test_default_state_home_is_local_private_and_outside_iwe(monkeypatch, tmp_pa
     assert stat.S_IMODE(state_home.stat().st_mode) == 0o700
     assert stat.S_IMODE(target.stat().st_mode) == 0o600
     assert stat.S_IMODE((state_home / ".data-residency.lock").stat().st_mode) == 0o600
+    marker = state_home / ResidencyState.INIT_MARKER_NAME
+    assert stat.S_IMODE(marker.stat().st_mode) == 0o600
+
+
+def test_state_file_removed_after_marker_present_fails_closed(monkeypatch, tmp_path):
+    """A state file that vanishes after this location was initialized must
+    fail loudly (issue #521B) — not be recreated empty and read back as
+    "user was never asked", which would mask real data loss as a fresh
+    install."""
+    home = tmp_path / "vanished-state-home"
+    state_home, _ = _configure_state_paths(monkeypatch, home)
+
+    first = ResidencyState()
+    first.grant_consent("vanished-test", "2.1_inbound_profile")
+    marker = state_home / ResidencyState.INIT_MARKER_NAME
+    assert marker.exists()
+    first.state_file.unlink()
+
+    with pytest.raises(
+        ResidencyStateError,
+        match="already initialized",
+    ):
+        ResidencyState()
+
+    assert not first.state_file.exists()
 
 
 def test_default_state_container_symlink_is_rejected(monkeypatch, tmp_path):
@@ -589,6 +614,11 @@ def test_existing_default_private_tree_permissions_are_repaired(
     assert stat.S_IMODE(state_home.stat().st_mode) == 0o700
     assert stat.S_IMODE(state.state_file.stat().st_mode) == 0o600
     assert stat.S_IMODE(state.lock_file.stat().st_mode) == 0o600
+    # Upgrade path: an install from before the init marker existed (issue
+    # #521B) must self-heal by backfilling the marker, not fail closed —
+    # only a state file that vanishes AFTER the marker exists is a defect.
+    marker = state_home / ResidencyState.INIT_MARKER_NAME
+    assert stat.S_IMODE(marker.stat().st_mode) == 0o600
 
 
 def test_state_home_override_wins_and_legacy_root_is_independent(
@@ -943,6 +973,30 @@ def test_hardlinked_state_is_rejected_without_touching_peer(monkeypatch, tmp_pat
     assert stat.S_IMODE(peer.stat().st_mode) == mode_before
 
 
+def test_rejected_state_file_does_not_plant_init_marker(monkeypatch, tmp_path):
+    """A construction attempt that fails validation (e.g. a symlinked state
+    file) must not leave the init marker behind — otherwise removing the
+    offending entry and retrying a genuine fresh install would falsely hit
+    the "already initialized" fail-closed path added for issue #521B."""
+    home = tmp_path / "rejected-then-fresh-home"
+    state_home, _ = _configure_state_paths(monkeypatch, home)
+    state_home.mkdir(parents=True)
+    target = state_home / ResidencyState.STATE_FILE_NAME
+    outside = tmp_path / "outside-state-target.yaml"
+    outside.write_bytes(_consent_document())
+    target.symlink_to(outside)
+
+    with pytest.raises(ResidencyStateError, match="must not be a symlink"):
+        ResidencyState()
+
+    marker = state_home / ResidencyState.INIT_MARKER_NAME
+    assert not marker.exists()
+
+    target.unlink()
+    state = ResidencyState()
+    assert state.get_consent("fresh-after-rejection", "2.1_inbound_profile")["status"] == "not_asked"
+
+
 def test_hardlinked_lock_is_rejected_before_fchmod(monkeypatch, tmp_path):
     home = tmp_path / "hardlinked-lock-home"
     state_home, _ = _configure_state_paths(monkeypatch, home)
@@ -1161,7 +1215,23 @@ def test_explicit_state_path_never_reads_or_retires_legacy(monkeypatch, tmp_path
 
     assert state.list_all_consents() == {}
     assert explicit.is_file()
+    # Explicit paths (embedding/tests) get the same fresh-vs-vanished marker
+    # as the default location — the "was this ever initialized" ambiguity
+    # applies to a long-lived embedder using a fixed path too (issue #521B).
+    assert (explicit.parent / ResidencyState.INIT_MARKER_NAME).is_file()
     assert legacy.read_bytes() == corrupt
+
+
+def test_explicit_state_path_removed_after_marker_present_fails_closed(
+    monkeypatch, tmp_path
+):
+    explicit = tmp_path / "embedded-state" / "data-residency.yaml"
+    first = ResidencyState(str(explicit))
+    first.grant_consent("explicit-vanished-test", "2.1_inbound_profile")
+    explicit.unlink()
+
+    with pytest.raises(ResidencyStateError, match="already initialized"):
+        ResidencyState(str(explicit))
 
 
 def test_policy_denied_outcome_has_adapter_parity(fake_home, temp_skill):

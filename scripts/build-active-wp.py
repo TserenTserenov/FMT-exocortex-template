@@ -42,6 +42,33 @@ OUTPUT = ROOT / "current" / "active-wp.md"
 INBOX_DIR = ROOT / "inbox"
 ARCHIVE_DIR = ROOT / "archive" / "wp-contexts"
 
+
+def _script_invocation_hint() -> str:
+    """How to tell a user to re-run this script (issue #905).
+
+    The script's OWN location is not ROOT (see the comment above): on a
+    stock install it stays inside FMT-exocortex-template/scripts/, ROOT is
+    a separate governance repo that never receives a copy. A hardcoded
+    "python3 scripts/build-active-wp.py" printed a path that only resolves
+    from ROOT and nowhere else -- exit code 0, message ignored, active-wp.md
+    silently stale. Report the actual runtime location instead, the same
+    two-place FMT-exocortex-template/governance-repo resolution
+    create-wp.sh already uses (scripts/create-wp.sh:872-875), just inverted:
+    that one searches for the script from a known root, this one searches
+    for a known root from the script.
+    """
+    self_path = Path(__file__).resolve()
+    for root in (ROOT, IWE_ROOT / "FMT-exocortex-template"):
+        try:
+            # Both sides must go through the same symlink resolution (e.g.
+            # macOS /var -> /private/var) or an unresolved root never
+            # prefix-matches a resolved self_path.
+            resolved_root = root.resolve()
+            return f"python3 {(Path(root.name) / self_path.relative_to(resolved_root)).as_posix()}"
+        except (ValueError, OSError):
+            continue
+    return f"python3 {self_path}"
+
 # Статусы храним без U+FE0F (emoji variation selector): "стрелка с VS16" и без него - один статус.
 # ⏹ (снят) и 🔁 (свёрнут в спринт) - issue #473: реестр их уже использует,
 # парсер их не знал, обе строки проваливались в PARSE-WARN как "неизвестный статус".
@@ -210,7 +237,7 @@ def render(rows: list[dict]) -> str:
         "# Активные РП — вид на WP-REGISTRY",
         "",
         f"> Открытые ({len(active)}) сверху, закрытые ({len(closed)}) ниже. Обе секции по убыванию номера.",
-        "> Source-of-truth — `docs/WP-REGISTRY.md`. Регенерация: `python3 scripts/build-active-wp.py`.",
+        f"> Source-of-truth — `docs/WP-REGISTRY.md`. Регенерация: `{_script_invocation_hint()}`.",
         "",
         "<details>",
         "<summary><b>Обозначения статусов (Ст)</b></summary>",
@@ -411,7 +438,7 @@ def main() -> int:
     if check_mode:
         if new_content != current:
             print(f"build-active-wp: {OUTPUT.relative_to(ROOT)} расходится с REGISTRY.", file=sys.stderr)
-            print("Пересобрать: python3 scripts/build-active-wp.py", file=sys.stderr)
+            print(f"Пересобрать: {_script_invocation_hint()}", file=sys.stderr)
             return 1
         return 0
 

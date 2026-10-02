@@ -28,24 +28,101 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## Algorithm
 
-### Шаг 0. Extensions (before)
-`bash .claude/scripts/load-extensions.sh strategy-session before` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
+### Шаг 0. Рабочая копия governance-репозитория (БЛОКИРУЮЩЕЕ, ДО расширений и любой записи)
+
+> Если в установке есть `session-guard.sh` (канон под freeze), правка идёт только из изолированной копии и публикуется через `ds-publish.sh` (правило «Канон под freeze» в `{{GOVERNANCE_REPO}}/CLAUDE.md`). Если session-guard в установке нет, заморозки нет: работай как раньше в найденной рабочей копии и сохраняй штатным способом. Это две явные ветки ниже, не молчаливый пропуск. ВСЕ пути записи строятся от `GOV_WT`, не от канона.
+
+```bash
+CANON="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}"
+GUARD="${IWE_SCRIPTS:-}/session-guard.sh"
+[ -f "$GUARD" ] || GUARD="{{WORKSPACE_DIR}}/scripts/session-guard.sh"
+[ -f "$GUARD" ] || GUARD="$CANON/scripts/session-guard.sh"
+[ -f "$GUARD" ] && GUARD_MODE=required || GUARD_MODE=absent
+CANON_C=$(cd -- "$CANON" 2>/dev/null && pwd -P) || { echo "ERROR: канон $CANON недоступен" >&2; exit 1; }
+CANON_COMMON=$(git -C "$CANON_C" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+  || { echo "ERROR: $CANON_C не git-репозиторий" >&2; exit 1; }
+if [ -f "$CANON_C/scripts/lib/governance-repo-path.sh" ]; then
+  CAND=$(. "$CANON_C/scripts/lib/governance-repo-path.sh" && resolve_active_worktree) \
+    || { echo "ERROR: resolve_active_worktree завершился с ошибкой" >&2; exit 1; }
+else
+  CAND=$(git rev-parse --show-toplevel 2>/dev/null) || CAND=""
+fi
+CAND_C=""; CAND_COMMON=""
+if [ -n "$CAND" ]; then
+  CAND_C=$(cd -- "$CAND" 2>/dev/null && pwd -P) || { echo "ERROR: не удалось нормализовать путь $CAND" >&2; exit 1; }
+  CAND_COMMON=$(git -C "$CAND_C" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || CAND_COMMON=""
+fi
+# кандидат годится, только если его общий git-каталог совпадает с каноном (тот же governance-репозиторий)
+if [ -n "$CAND_C" ] && [ "$CAND_COMMON" = "$CANON_COMMON" ]; then GOV_WT="$CAND_C"; else GOV_WT=""; fi
+if [ "$GUARD_MODE" = required ]; then
+  if [ -z "$GOV_WT" ] || [ "$GOV_WT" = "$CANON_C" ]; then
+    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: (cd -- \"$CANON_C\" && bash \"$GUARD\" open --isolate --wp <WP-N>), затем повтори этот шаг внутри копии: (cd -- \"<worktree_path>\" || exit 1; <блок шага 0>)" >&2; exit 2
+  fi
+  echo "GOV_WT=$GOV_WT mode=isolated"
+else
+  [ -n "$GOV_WT" ] || GOV_WT="$CANON_C"
+  echo "GOV_WT=$GOV_WT mode=legacy (session-guard не найден: заморозки нет, работа как раньше)"
+fi
+```
+
+- Код выхода 0 -> **запиши абсолютный путь `GOV_WT` в свой ответ пользователю** (контекст сессии): независимые вызовы Bash не разделяют переменные, а `cd` в подоболочке каталог не меняет.
+- Код выхода 2 (`NOT ISOLATED`) -> ничего не записывай. Открой копию из канона, возьми `worktree_path` из вывода `open --isolate` и повтори блок шага 0 внутри копии; `<CANON_C>` и `<GUARD>` — пути из сообщения `NOT ISOLATED`. Переход в каталог — только в подоболочке `( … )`: верхнеуровневый `cd` хук `destructive-guard.sh` блокирует.
+  ```bash
+  (cd -- "<CANON_C>" && bash "<GUARD>" open --isolate --wp <WP-N>)
+  ```
+  ```bash
+  (cd -- "<worktree_path>" || exit 1
+  <блок шага 0 без изменений>
+  )
+  ```
+  Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши. Код 1 -> ошибка резолвера или путей: покажи сообщение и остановись.
+- КАЖДЫЙ последующий блок записи начинается с явного задания и проверки `GOV_WT` и выполняется в подоболочке внутри копии (git — `git -C "$GOV_WT" …`, файлы — абсолютные пути от `$GOV_WT`):
+  ```bash
+  GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"
+  (cd -- "$GOV_WT" || exit 1
+  <команды записи>
+  )
+  ```
+- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем публикация из копии, в канон не коммить. Ветка назначения `main` задаётся явно (`--branch main`): `session-guard.sh open --isolate` создаёт копию от `origin/main` на её собственной ветке `session-isolate/<agent>-<session>`, которой на сервере нет. `--branch` получает только публикатор, который его знает: `update.sh` не заменяет уже лежащий `scripts/ds-publish.sh` (собственный публикатор установки или старая копия шаблона), и такой публикатор вызывается без `--branch`, как раньше. Знает или нет, функция `knows_branch` судит по тексту файла (эвристика): ветка разбора аргумента `--branch)` (также `-b|--branch)`, `--branch=*)`) в начале строки; комментарий, текст usage или `git status --branch` не в счёт. Ложный пропуск (обёртка, передающая `"$@"`) безопасен: публикатор вызывается как раньше; ложное срабатывание — нет, поэтому признак узкий. Публикатор берётся из копии; из канона — если в копии его нет (`update.sh` кладёт `scripts/ds-publish.sh` в канон без коммита, и копия от `origin/main` его не содержит) или если в копии он не знает `--branch`, а в каноне знает. Нет нигде -> ненулевой код и сообщение: запусти `update.sh`. Публикатор без `--branch` отказал -> предложи пилоту заменить `scripts/ds-publish.sh` в репозитории управления версией шаблона `seed/strategy/scripts/ds-publish.sh`. Публикатор переносит один коммит за вызов, поэтому блок публикует по очереди все коммиты копии, которых нет на `origin/main`, от старого к новому, и останавливается на первом отказе; уже опубликованный коммит публикатор пропускает, повтор блока безвреден. Коммит-слияние публикатор не переносит (код 2): блок остановится на первом таком коммите, так что «все коммиты» — это обычные коммиты. Незакоммиченные изменения в копии не публикуются: блок предупредит одной строкой «ВНИМАНИЕ…», код выхода от этого не меняется. Коммитов нет -> одна строка «Публиковать нечего», без сообщения о публикации; список коммитов не получен (ошибка git) -> код 1 и сообщение, не «Публиковать нечего».
+  ```bash
+  GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"
+  knows_branch() { grep -qE -e '^[[:space:]]*[(]?([^|)#[:space:]]+[[:space:]]*[|][[:space:]]*)*"?--branch(=[^|)[:space:]]*)?"?[[:space:]]*[|)]' "$1" 2>/dev/null; }
+  PUB="$GOV_WT/scripts/ds-publish.sh"; CANON_PUB="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/ds-publish.sh"
+  if ! knows_branch "$PUB" && knows_branch "$CANON_PUB"; then PUB="$CANON_PUB"; fi
+  [ -f "$PUB" ] || PUB="$CANON_PUB"
+  [ -f "$PUB" ] || { echo "ERROR: публикатор ds-publish.sh не найден ни в копии, ни в каноне. Запусти update.sh (он доставляет публикатор) и повтори публикацию; коммиты остаются в копии $GOV_WT" >&2; exit 1; }
+  git -C "$GOV_WT" rev-parse -q --verify origin/main >/dev/null || { echo "ERROR: в копии $GOV_WT нет origin/main, публикацию не с чем сравнить" >&2; exit 1; }
+  COMMITS=$(git -C "$GOV_WT" rev-list --reverse origin/main..HEAD) || { echo "ERROR: не удалось получить список коммитов копии $GOV_WT" >&2; exit 1; }
+  [ -z "$(git -C "$GOV_WT" status --porcelain)" ] || echo "ВНИМАНИЕ: в копии есть незакоммиченные изменения, они не опубликованы: закоммитьте их" >&2
+  [ -n "$COMMITS" ] || { echo "Публиковать нечего: в копии нет коммитов, которых нет на origin/main"; exit 0; }
+  for c in $(printf '%s\n' "$COMMITS"); do
+    if knows_branch "$PUB"; then bash "$PUB" "$GOV_WT" normal --reason "strategy-session" --from-commit "$c" --branch main || exit $?
+    else bash "$PUB" "$GOV_WT" normal --reason "strategy-session" --from-commit "$c" || exit $?; fi
+  done
+  ```
+  `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
+
+### Шаг 0.1. Extensions (before)
+`GOV_WT="<записанный путь>" bash .claude/scripts/load-extensions.sh strategy-session before` -> Exit 0: Read каждый файл, выполнить; расширения работают с этим корнем `GOV_WT`. Exit 1: пропустить.
 
 ## Шаг 1. Определить режим
 
 Проверь наличие любого из:
 
-- `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md`
-- `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W*.md`
+- `$GOV_WT/docs/Strategy.md`
+- `$GOV_WT/current/WeekPlan W*.md`
 
 Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца. Записи двух легальных раскладок (issue #608, тот же корень, что #545 в day-open-scaffold.sh): плоские файлы Strategy/Day-сессий (`sessions/YYYY-MM-DD.md`) и подпапка по месяцу для peer-сессий (`sessions/YYYY-MM/`) — искать нужно по обоим адресам, иначе плоская раскладка (дефолт по `memory/routing-vocab.md`) всегда даёт «не найдено» и месячная сверка не срабатывает ни разу:
 ```bash
-SESSIONS_DIR=$(source {{WORKSPACE_DIR}}/scripts/lib/common.sh 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/sessions"
+GOV_WT="<записанный путь>"; : "${GOV_WT:?}"
+(cd -- "$GOV_WT" || exit 1
+SESSIONS_DIR=$(source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="$GOV_WT/sessions"
 grep -rl "strategy-session\|Strategy Session" \
   "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
   "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
+)
 ```
-Пусто → первая сессия месяца.
+Первая сессия месяца = дата сессии ≤7 числа месяца И поиск выше пуст. Журнал сессий берётся из `iwe_sessions_dir` (общий журнал вне копии), при его отсутствии из `$GOV_WT/sessions`.
 
 > **Найдено платформенным аудитом 17.08.2026:** до этого исправления диспетчер знал только про initial/weekly — monthly-вариант (`strategy-session-monthly.md`) был реализован, но ничем не вызывался, кроме редкой ручной эскалации из weekly-stop-gate. Результат — шаги, привязанные только к monthly (стратегическая сверка, линза калибра/lifework-пакет, разбор inbox), фактически никогда не запускались ни у одного пользователя. Этот шаг — фикс маршрутизации, не новая функциональность.
 >
@@ -75,7 +152,7 @@ grep -rl "strategy-session\|Strategy Session" \
 - «Чему хочешь научиться?»
 - «Какие 2-3 крупные цели на ближайшие 3-6 месяцев?»
 
-Запиши ответы в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Strategy.md` по структуре:
+Запиши ответы в `$GOV_WT/docs/Strategy.md` по структуре:
 - Видение (1 год)
 - Цели на горизонт (3-6 месяцев)
 - Принципы (что для меня важно)
@@ -86,7 +163,7 @@ grep -rl "strategy-session\|Strategy Session" \
 - «Что сейчас мешает? Где разрыв между текущим и желаемым?»
 - «Что регулярно раздражает или забирает энергию?»
 
-Запиши в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Dissatisfactions.md` списком: каждая неудовлетворённость = 1-2 строки.
+Запиши в `$GOV_WT/docs/Dissatisfactions.md` списком: каждая неудовлетворённость = 1-2 строки.
 
 ### 2.3. Первый WeekPlan (10 мин)
 
@@ -95,7 +172,7 @@ grep -rl "strategy-session\|Strategy Session" \
 - Бюджет (часы)
 - Артефакт-критерий (что появится по завершении)
 
-Запиши в `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/WeekPlan W{N}.md` (где N — номер ISO-недели).
+Запиши в `$GOV_WT/current/WeekPlan W{N}.md` (где N — номер ISO-недели).
 
 ### 2.4. Обновление MEMORY.md (2 мин)
 
@@ -123,7 +200,7 @@ grep -rl "strategy-session\|Strategy Session" \
 
 ### 3.1 Обход Backlog (B-005, обязательно)
 
-Прочитай `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/Backlog.md`. Для каждой записи `B-NNN` в разделе `## Активные записи`:
+Прочитай `$GOV_WT/docs/Backlog.md`. Для каждой записи `B-NNN` в разделе `## Активные записи`:
 
 - Проверь триггеры открытия (`Триггер открытия:` блок в записи).
 - **Hard-trigger сработал?** (внешнее событие случилось — например, `первый user-deletion request получен`, `legal review запланирован на эту неделю`, `Honcho API timeout ≥48ч`) — поднять для обсуждения в стратегической повестке: «B-NNN активирован, открываем РП?»

@@ -6,21 +6,25 @@
 # то должен быть TodoWrite с ≥3 items. Иначе — block.
 # Принцип warn-before-block: action=warn (промоция в block после 2 нед обкатки).
 #
-# Защита от infinite loop: переменная STOP_HOOK_ACTIVE.
+# Защита от infinite loop: поле stop_hook_active во входном JSON (issue #819).
 # Read-only кроме gate_log.jsonl.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# --- Infinite loop guard ---
-if [ "${STOP_HOOK_ACTIVE:-}" = "1" ]; then
+INPUT=$(cat)
+if [ -z "$INPUT" ]; then
   echo '{}'
   exit 0
 fi
-export STOP_HOOK_ACTIVE=1
 
-INPUT=$(cat)
-if [ -z "$INPUT" ]; then
+# --- Infinite loop guard (issue #819) ---
+# Claude Code запускает этот хук новым bash-процессом на каждое Stop-событие,
+# поэтому env-переменная не переживает между вызовами — старый guard через
+# STOP_HOOK_ACTIVE был мёртвым кодом с рождения. Claude Code сам передаёт
+# признак повтора в JSON; читаем его оттуда (boolean или строка "true").
+STOP_ACTIVE=$(printf '%s' "$INPUT" | jq -r 'if (.stop_hook_active == true or .stop_hook_active == "true") then "1" else "0" end' 2>/dev/null || echo 0)
+if [ "$STOP_ACTIVE" = "1" ]; then
   echo '{}'
   exit 0
 fi
@@ -140,6 +144,13 @@ complete_dry_run_on_stop() {
   if [ "$(sed -n '2p' "$lock_dir/pid" 2>/dev/null)" = "$nonce" ]; then
     rm -rf "$lock_dir" 2>/dev/null || true
   fi
+  # issue #818: RETURN trap (строка ~98) переживает эту функцию — bash не
+  # скоупит `trap ... RETURN` к функции, где он поставлен, он остаётся
+  # армированным для ЛЮБОГО следующего возврата функции/sourced-скрипта в
+  # этом же процессе. Без явной очистки здесь — обычный Stop без активной
+  # репетиции падает под `set -u`, когда хук позже сорсит bootstrap: trap
+  # срабатывает повторно на уже мёртвых $lock_dir/$nonce.
+  trap - RETURN 2>/dev/null || true
   return 0
 }
 
@@ -162,8 +173,18 @@ GATE_LOG="$IWE_ROOT/.claude/logs/gate_log.jsonl"
 mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
 
 # --- Шаг 1: был ли вызов протокольного скилла? ---
-PROTOCOL_SKILL=$(jq -r '
-  select(.type == "tool_use" and .name == "Skill")
+# issue #758: в транскрипте Claude Code tool_use лежит вложенно, в
+# .message.content[], а не на верхнем уровне строки (там type=assistant/
+# user/attachment) — select(.type=="tool_use") на верхнем уровне не
+# совпадал никогда. `[]?` гасит ошибку, если .message/.content отсутствует
+# или не массив, — этого достаточно, широкий `try` не нужен.
+# issue #862 follow-up (Codex r3): транскрипт — JSONL (по одному JSON-объекту
+# на строку/сообщение), поэтому все jq-запросы используют -s и разворачивают
+# массив сообщений через .[].
+PROTOCOL_SKILL=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message.content[]?]
+  | .[]
+  | select(.type == "tool_use" and .name == "Skill")
   | .input.skill // empty
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
   | grep -E '^(day-open|day-close|run-protocol|wp-new)$' \
@@ -175,43 +196,126 @@ if [ -z "$PROTOCOL_SKILL" ]; then
   exit 0
 fi
 
-# --- Шаг 2: был ли TodoWrite с ≥3 items? ---
-TODO_MAX=$(jq -r '
-  select(.type == "tool_use" and .name == "TodoWrite")
+# --- Шаг 2: был ли таск-лист с ≥3 items? --- (та же вложенность, что в Шаге 1)
+# issue #862: TodoWrite устарел и заменён TaskCreate/TaskUpdate; кроме того,
+# SKILL.md явно разрешает нумерацию шагов в ответах, когда Task-инструменты
+# недоступны. Учитываем все три признака.
+# issue #862 follow-up (Codex r3): транскрипт JSONL, считаем только сообщения
+# ассистента, TaskCreate и TaskUpdate разделяем (обновления одной задачи не
+# должны множиться), TodoWrite берём по максимальному списку.
+TODO_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
+  | select(.type == "tool_use" and .name == "TodoWrite")
   | .input.todos
   | if type == "array" then length else 0 end
 ' "$TRANSCRIPT_PATH" 2>/dev/null \
   | sort -n | tail -1)
-
 TODO_MAX="${TODO_MAX:-0}"
+
+TASK_CREATE_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
+  | select(.type == "tool_use" and .name == "TaskCreate")
+  | .input
+  | if (.tasks // .task_list // .items) | type == "array" then
+      (.tasks // .task_list // .items) | length
+    elif (.tasks // .task_list // .items) != null then
+      1
+    elif (.name // .title // .description // .status) then
+      1
+    else
+      0
+    end
+' "$TRANSCRIPT_PATH" 2>/dev/null \
+  | awk '{s+=$1} END {print s+0}')
+TASK_CREATE_MAX="${TASK_CREATE_MAX:-0}"
+
+TASK_UPDATE_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
+  | select(.type == "tool_use" and .name == "TaskUpdate")
+  | .input
+  | if (.tasks // .task_list // .items) | type == "array" then
+      (.tasks // .task_list // .items) | length
+    elif (.tasks // .task_list // .items) != null then
+      1
+    elif (.name // .title // .description // .status) then
+      1
+    else
+      0
+    end
+' "$TRANSCRIPT_PATH" 2>/dev/null \
+  | sort -n | tail -1)
+TASK_UPDATE_MAX="${TASK_UPDATE_MAX:-0}"
+
+# Явная нумерация шагов в ответах ассистента: "Шаг N из M" / "Step N of M".
+# Берём максимальный общий знаменатель M, потому что ответ может содержать
+# промежуточные шаги без полной формулы.
+STEP_MAX=$(jq -s -r '
+  [.[] | select((.message.role // "assistant") == "assistant") | .message]
+  | .[] | .content[]?
+  | select(.type == "text" and (.text // "") != "")
+  | .text
+' "$TRANSCRIPT_PATH" 2>/dev/null \
+  | grep -oiE '(шаг|step)[[:space:]]+[0-9]+[[:space:]]+(из|of)[[:space:]]+[0-9]+' \
+  | grep -oiE '[0-9]+$' \
+  | sort -n | tail -1)
+STEP_MAX="${STEP_MAX:-0}"
+
+# TodoWrite и TaskCreate — сигналы планирования (список задач); суммируем,
+# потому что отдельные TaskCreate = отдельные шаги, а TodoWrite может быть
+# дополнен TaskCreate. TaskUpdate — обновления, берём max, чтобы обновления
+# одной задачи не размножались. Явная нумерация в тексте — независимый
+# источник; берём max.
+LIST_MAX=$(( TODO_MAX + TASK_CREATE_MAX ))
+if [ "$TASK_UPDATE_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$TASK_UPDATE_MAX"; fi
+if [ "$STEP_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$STEP_MAX"; fi
+
 THRESHOLD=3
 
 # --- Шаг 3: логировать событие ---
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FIRED=0
-if [ "$TODO_MAX" -lt "$THRESHOLD" ]; then
+if [ "$LIST_MAX" -lt "$THRESHOLD" ]; then
   FIRED=1
 fi
+
+TASK_MAX_SIGNAL="$TASK_CREATE_MAX"
+if [ "$TASK_UPDATE_MAX" -gt "$TASK_MAX_SIGNAL" ]; then TASK_MAX_SIGNAL="$TASK_UPDATE_MAX"; fi
 
 LOG_ENTRY=$(jq -nc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
   --arg skill "$PROTOCOL_SKILL" \
   --arg todo_max "$TODO_MAX" \
+  --arg task_max "$TASK_MAX_SIGNAL" \
+  --arg task_create_max "$TASK_CREATE_MAX" \
+  --arg task_update_max "$TASK_UPDATE_MAX" \
+  --arg step_max "$STEP_MAX" \
+  --arg list_max "$LIST_MAX" \
   --arg threshold "$THRESHOLD" \
   --arg fired "$FIRED" \
   '{ts: $ts, gate: "protocol-stop-gate", session_id: $sid, skill: $skill,
-    todo_max: ($todo_max|tonumber), threshold: ($threshold|tonumber),
-    fired: ($fired == "1"), action: "warn"}' 2>/dev/null || true)
+    todo_max: ($todo_max|tonumber), task_max: ($task_max|tonumber),
+    task_create_max: ($task_create_max|tonumber),
+    task_update_max: ($task_update_max|tonumber),
+    step_max: ($step_max|tonumber), list_max: ($list_max|tonumber),
+    threshold: ($threshold|tonumber), fired: ($fired == "1"), action: "warn"}' 2>/dev/null || true)
 
 if [ -n "$LOG_ENTRY" ]; then
   echo "$LOG_ENTRY" >> "$GATE_LOG" 2>/dev/null || true
 fi
 
 # --- Шаг 4: action=warn (не block — обкатка 2 нед, WP-229 принцип warn-before-block) ---
+# issue #819: раньше здесь стоял {"decision": "block", ...} — для Stop-события
+# это реальный запрет остановиться, а не предупреждение (расходился с
+# action:"warn" в том же LOG_ENTRY выше). systemMessage без decision — тот же
+# паттерн ненавязчивого уведомления, что уже используют secret-leak-block.sh /
+# secret-file-read-block.sh / secret-mcp-dump-guard.sh.
 if [ "$FIRED" = "1" ]; then
   cat <<EOF
-{"decision": "block", "reason": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но TodoWrite с ≥$THRESHOLD задачами не найден (найдено: $TODO_MAX). Протокол требует таск-лист ДО начала исполнения. Действие: создай TodoWrite с шагами скилла и пройди протокол заново. (gate_log: $GATE_LOG)"}
+{"systemMessage": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но признак исполнения по шагам (TodoWrite/Task-инструменты/явная нумерация) с ≥$THRESHOLD задачами не найден (найдено: $LIST_MAX). Протокол требует пошаговый план ДО начала исполнения. Действие: создай TodoWrite/Task-лист с шагами скилла либо явно пронумеруй шаги в ответах, как разрешено SKILL.md, и пройди протокол заново. (gate_log: $GATE_LOG)"}
 EOF
 else
   echo '{}'

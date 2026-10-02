@@ -38,6 +38,8 @@ substituted:
   - roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
   - roles/extractor/scripts/systemd/iwe-extractor-inbox-check.timer
   - roles/extractor/scripts/extractor.sh
+  # Runtime dependency of extractor.sh; included in the same build hash.
+  - roles/extractor/scripts/wp429-extractor-prefilters.py
   - roles/extractor/config/routing.md
 
   # Synchronizer (фоновая синхронизация, scheduler)
@@ -83,9 +85,15 @@ placeholders:
   - TIMEZONE_HOUR
   - TIMEZONE_DESC
   - GITHUB_USER
-  - GOVERNANCE_REPO
+  - GOVERNANCE_REPO   # launchd env var is named IWE_GOVERNANCE_REPO — same
+                      # value, deliberately different key name, not a separate
+                      # placeholder (peer-session 2026-09-08-32)
   - IWE_TEMPLATE      # путь к FMT (read-only upstream)
   - IWE_RUNTIME       # путь к $WORKSPACE_DIR/.iwe-runtime/ (writable substituted)
+  - IWE_SCRIPTS       # $IWE_TEMPLATE/scripts — shared scripts read-only from FMT
+                      # (peer-session 2026-09-08-32: missing here meant no
+                      # generated plist could ever carry it, so the launchd
+                      # jobs silently ran without it — issue found via Evgenii)
 
 # === Runtime layout (что появляется в $WORKSPACE_DIR/ после build-runtime.sh) ===
 #

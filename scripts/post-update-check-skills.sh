@@ -14,7 +14,7 @@ EXIT_CODE=0
 
 echo "=== Post-update SKILL.md routing check ==="
 
-for skill in consent w-reflection check-secret transcribe lesson-close; do
+for skill in consent w-reflection check-secret transcribe; do
     skill_file="$SKILLS_DIR/$skill/SKILL.md"
     if [[ ! -f "$skill_file" ]]; then
         echo "❌ MISSING: $skill_file"

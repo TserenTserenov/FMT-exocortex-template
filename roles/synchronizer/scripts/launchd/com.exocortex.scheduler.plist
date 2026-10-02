@@ -11,17 +11,17 @@
         <string>dispatch</string>
     </array>
 
-    <!-- Пробуждение в ключевые часы:
+    <!-- Пробуждение в ключевые часы (местное время машины, launchd так и планирует):
          0:00  — week-review (Пн) + code-scan
          3:00  — extractor inbox-check
-         4:00  — strategist morning
+         {{TIMEZONE_HOUR}}:00  — strategist morning
          6:00  — extractor + daily-report
          9:00  — extractor
          12:00 — extractor
          15:00 — extractor
          18:00 — extractor
          21:00 — extractor
-         23:00 — strategist note-review
+         23:00 — catch-up tick only (note-review has no scheduled run, #961)
     -->
     <key>StartCalendarInterval</key>
     <array>
@@ -59,6 +59,10 @@
         <string>{{WORKSPACE_DIR}}</string>
         <key>IWE_RUNTIME</key>
         <string>{{IWE_RUNTIME}}</string>
+        <key>IWE_SCRIPTS</key>
+        <string>{{IWE_SCRIPTS}}</string>
+        <key>IWE_GOVERNANCE_REPO</key>
+        <string>{{GOVERNANCE_REPO}}</string>
     </dict>
 
     <key>RunAtLoad</key>

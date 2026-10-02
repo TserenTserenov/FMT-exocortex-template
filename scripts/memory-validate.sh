@@ -158,6 +158,25 @@ validate_file() {
         errs="$errs\n  ⚠️  schema_version=$schema_ver (текущая=1, нужна миграция через memory-migrate.sh)"
     fi
 
+    # Проверка 9 (issue #736, дизайн-сессия с Codex): type=lesson без review_at
+    # или без обобщения на будущее поведение — это хроника одного инцидента,
+    # не системный урок. Останавливаем запись такого файла в момент создания,
+    # не полагаясь на последующую уборку (spec §3 инварианты).
+    if [ "$type_val" = "lesson" ]; then
+        review_at=$(get_field "$file" "review_at")
+        if [ -z "$review_at" ]; then
+            errs="$errs\n  ❌ type=lesson но поле review_at отсутствует (spec §3)"
+            errors=$((errors + 1))
+        elif ! echo "$review_at" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            errs="$errs\n  ❌ review_at='$review_at' не соответствует формату YYYY-MM-DD"
+            errors=$((errors + 1))
+        fi
+        if ! grep -qE '\*\*(Как применять|How to apply):\*\*' "$file"; then
+            errs="$errs\n  ❌ type=lesson но в тексте нет маркера **Как применять:** / **How to apply:** (spec §3)"
+            errors=$((errors + 1))
+        fi
+    fi
+
     if [ $errors -eq 0 ]; then
         [ $QUIET -eq 0 ] && printf "OK   %s\n" "$file"
         return 0

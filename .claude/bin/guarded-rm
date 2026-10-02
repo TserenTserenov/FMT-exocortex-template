@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# guarded-rm — rm, который удаляет только внутри разрешённых корней (issue #940).
+#
+# Хук destructive-guard блокирует обычный `rm` с признаками рекурсии и принудительности;
+# вместо него агент вызывает этот скрипт с теми же аргументами. Скрипт при выполнении,
+# когда оболочка уже раскрыла переменные и шаблоны имён, вычисляет канонический путь
+# каждой цели (ссылки и `..` раскрыты, формы Windows `C:/…`, `/c/…`, `/tmp/…` сведены
+# к одной) и сверяет его с реестром корней по границе компонента. Удаляет, только если
+# ВСЕ цели лежат внутри корней; сам корень, путь вне корней, пустая цель, сбой реестра
+# или нормализации — отказ без удаления. Затем один вызов настоящего rm с исходными
+# аргументами (канонический путь — только для проверки).
+#
+# Реестр: <IWE>/.claude/config/guarded-rm-roots.txt — данные, не shell.
+# Строгий режим: любая непредусмотренная ошибка — выход до удаления (рецензия Codex, круг 1:
+# сбой sed при чтении реестра не останавливал удаление).
+set -euo pipefail
+
+refuse() {
+  echo "guarded-rm: отказ, ничего не удалено — $1" >&2
+  exit 1
+}
+trap 'echo "guarded-rm: отказ, ничего не удалено — внутренняя ошибка (строка $LINENO)" >&2' ERR
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || refuse "не найден каталог скрипта"
+WORKSPACE=$(cd "$SELF_DIR/../.." 2>/dev/null && pwd -P) || refuse "не найден корень рабочего пространства"
+REGISTRY="$WORKSPACE/.claude/config/guarded-rm-roots.txt"
+[ -r "$REGISTRY" ] || refuse "нет реестра корней $REGISTRY"
+
+WINDOWS=0
+command -v cygpath >/dev/null 2>&1 && WINDOWS=1
+
+# Канонический путь: ссылки и `..` раскрыты; на Windows — смешанная форма C:/…, нижний регистр.
+canon() {
+  local path=$1 out
+  if realpath -m -- / >/dev/null 2>&1; then
+    out=$(realpath -m -- "$path") || return 1
+  else
+    out=$(perl -MCwd=realpath -MFile::Basename -e '
+      my $p = $ARGV[0];
+      my $r = realpath($p);
+      if (!defined $r) {
+        my $d = realpath(dirname($p));
+        exit 1 unless defined $d;
+        $r = "$d/" . basename($p);
+      }
+      print $r;
+    ' -- "$path") || return 1
+  fi
+  if [ "$WINDOWS" = 1 ]; then
+    out=$(cygpath -m -- "$out") || return 1
+    out=$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]') || return 1
+  fi
+  [ -n "$out" ] || return 1
+  printf '%s' "${out%/}"
+}
+
+ROOTS=()
+while IFS= read -r line || [ -n "$line" ]; do
+  line=${line%%#*}
+  # Обрезка пробелов средствами оболочки — без внешних программ.
+  line=${line#"${line%%[![:space:]]*}"}
+  line=${line%"${line##*[![:space:]]}"}
+  [ -n "$line" ] || continue
+  temp_token=0
+  case "$line" in
+    /|[A-Za-z]:|[A-Za-z]:/|//*) refuse "корень реестра — корень файловой системы или диска: $line" ;;
+    "{TMP}") root=/tmp; temp_token=1 ;;
+    "{TMPDIR}") root=${TMPDIR:-}; [ -n "$root" ] || continue; temp_token=1 ;;
+    "{WORKSPACE}"/*) root="$WORKSPACE${line#\{WORKSPACE\}}" ;;
+    /*|[A-Za-z]:/*) root=$line ;;
+    *) refuse "непонятная запись реестра: $line" ;;
+  esac
+  root=$(canon "$root") || refuse "не нормализуется корень реестра: $line"
+  # Корень ФС и корень диска никогда не корень удаления (canon отдаёт для `/` пустую строку).
+  case "$root" in
+    ""|[a-z]:) refuse "корень реестра — корень файловой системы или диска: $line → ${root:-/}" ;;
+  esac
+  # Не меньше двух частей пути после нормализации: `/c`, `/home` — слишком широкие корни.
+  # Исключение — сами метки временного каталога: `{TMP}` на Linux это `/tmp`, одна часть по природе.
+  if [ "$temp_token" != 1 ]; then
+    case "$root" in
+      */?*/?*) ;;
+      [a-z]:/?*/?*) ;;
+      *) refuse "корень реестра — корень файловой системы или диска: $line → $root" ;;
+    esac
+  fi
+  ROOTS+=("$root")
+done < "$REGISTRY"
+[ "${#ROOTS[@]}" -gt 0 ] || refuse "реестр корней пуст"
+
+inside_root() {
+  local path=$1 root
+  for root in "${ROOTS[@]}"; do
+    case "$path" in
+      "$root"/*) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+options=1
+targets=0
+for arg in "$@"; do
+  if [ "$options" = 1 ]; then
+    case "$arg" in
+      --) options=0; continue ;;
+      --no-preserve-root) refuse "--no-preserve-root" ;;
+      -?*) continue ;;
+    esac
+  fi
+  [ -n "$arg" ] || refuse "пустая цель (пустая переменная?)"
+  path=$(canon "$arg") || refuse "не нормализуется путь: $arg"
+  for root in "${ROOTS[@]}"; do
+    [ "$path" != "$root" ] || refuse "цель — сам разрешённый корень: $arg"
+  done
+  inside_root "$path" || refuse "вне разрешённых корней: $arg → $path (реестр: $REGISTRY)"
+  targets=$((targets + 1))
+done
+
+REAL_RM=/usr/bin/rm
+[ -x "$REAL_RM" ] || REAL_RM=/bin/rm
+[ -x "$REAL_RM" ] || refuse "не найден rm"
+exec "$REAL_RM" "$@"

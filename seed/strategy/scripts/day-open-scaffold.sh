@@ -44,7 +44,7 @@ IWE="$(iwe_resolve_root)"
 IWE_ROOT="$IWE"
 export IWE_ROOT IWE
 DATE="${1:-$(date +%Y-%m-%d)}"
-CONFIG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config.yaml"
+CONFIG="$IWE/memory/day-rhythm-config.yaml"
 PARAMS_FILE="$IWE/params.yaml"
 MULTIPLIER_ENABLED="true"
 if [ -f "$PARAMS_FILE" ] && grep -qE '^multiplier_enabled:[[:space:]]*false([[:space:]]*(#.*)?)?$' "$PARAMS_FILE"; then
@@ -60,6 +60,7 @@ SERVER_MODE="${IWE_SERVER_MODE:-0}"  # WP-283: 1 = Linux server, Mac-only MCP н
 # --- Pre-flight healthcheck (WP-7 ФDay-Open-Hardening) ---
 PREFLIGHT_JSON=$(bash "$IWE/scripts/day-open-preflight.sh" "$DATE" "$CONFIG" 2>/dev/null || echo '{"calendar":"unknown","scout":"unknown","triage":"unknown"}')
 CALENDAR_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.calendar // "unknown"')
+CALENDAR_SOURCE=$(iwe_calendar_source "$PARAMS_FILE")  # issue #942: connector | script | none
 SCOUT_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.scout // "unknown"')
 TRIAGE_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.triage // "unknown"')
 MEMORY_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.memory // "unknown"')
@@ -332,6 +333,14 @@ except Exception as e:
 "
 }
 
+# Epoch of 00:00:00 UTC of a YYYY-MM-DD date (BSD date, then GNU date); 0 = unreadable.
+# UTC, not local time: a local-midnight difference is 23 or 25 hours short/long
+# across a DST change and would round a 4-day-old list down to 3.
+_prio_epoch() {
+  date -j -u -f "%Y-%m-%d %H:%M:%S" "$1 00:00:00" +%s 2>/dev/null \
+    || date -u -d "$1 00:00:00" +%s 2>/dev/null || echo 0
+}
+
 read_morning_priorities() {
   local prio_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/priorities.yaml"
 
@@ -339,20 +348,31 @@ read_morning_priorities() {
     return 0
   fi
 
-  # Stale check (>= 3 days)
-  local last_updated stale_warn=""
+  # issue #944: an untrusted list (no/unreadable/far-future date, or older than
+  # PRIORITIES_STALE_DAYS) is not printed: one explanatory line only, so the
+  # DayPlan falls back to yesterday's carry-over. last_updated is the day the
+  # list is FOR (Day Close stores tomorrow's date), so one day ahead is normal.
+  local last_updated last_epoch today_epoch diff_days
   last_updated=$(grep "^last_updated:" "$prio_file" 2>/dev/null | sed 's/last_updated:[[:space:]]*//' | tr -d '"' | head -1)
-  if [ -n "$last_updated" ]; then
-    local today_epoch last_epoch diff_days
-    today_epoch=$(date +%s)
-    last_epoch=$(date -j -f "%Y-%m-%d" "$last_updated" +%s 2>/dev/null \
-      || date -d "$last_updated" +%s 2>/dev/null || echo 0)
-    if [ "$last_epoch" -gt 0 ]; then
-      diff_days=$(( (today_epoch - last_epoch) / 86400 ))
-      if [ "$diff_days" -ge 3 ]; then
-        stale_warn="⚠️ приоритеты устарели: обновлены $last_updated (${diff_days}д назад) — обнови priorities.yaml"
-      fi
-    fi
+  if [ -z "$last_updated" ]; then
+    echo "⚠️ приоритеты не показаны: в priorities.yaml нет даты last_updated — обнови файл"
+    return 0
+  fi
+  # Both dates go through _prio_epoch: the difference is whole calendar days.
+  last_epoch=$(_prio_epoch "$last_updated")
+  today_epoch=$(_prio_epoch "$(date +%Y-%m-%d)")
+  if [ "$last_epoch" -le 0 ] || [ "$today_epoch" -le 0 ]; then
+    echo "⚠️ приоритеты не показаны: дата last_updated «$last_updated» не читается (нужен формат ГГГГ-ММ-ДД)"
+    return 0
+  fi
+  diff_days=$(( (today_epoch - last_epoch) / 86400 ))
+  if [ "$diff_days" -lt -1 ]; then
+    echo "⚠️ приоритеты не показаны: дата last_updated $last_updated в будущем — проверь priorities.yaml"
+    return 0
+  fi
+  if [ "$diff_days" -gt "${PRIORITIES_STALE_DAYS:-3}" ]; then
+    echo "⚠️ приоритеты устарели: обновлены $last_updated (${diff_days}д назад), список не перенесён — обнови priorities.yaml на Day Close"
+    return 0
   fi
 
   local wps
@@ -369,8 +389,49 @@ read_morning_priorities() {
     return 0
   fi
 
-  [ -n "$stale_warn" ] && echo "$stale_warn"
   echo "$wps"
+}
+
+# The DayPlan "Календарь" section. Omitted when the calendar is switched off
+# (params.yaml calendar_source: none, issue #942); for calendar_source: script the
+# instruction names server-calendar.sh only, so an agent filling the plan in another
+# session is not told to try the connector first.
+render_calendar_section() {
+  [ "$CALENDAR_PF" = "disabled" ] && return 0
+  cat <<CALENDAR_HEAD
+<details>
+<summary><b>Календарь ($DAY_NUM $MONTH_RU)</b></summary>
+
+CALENDAR_HEAD
+  if [ "$CALENDAR_SOURCE" = "script" ]; then
+    cat <<CALENDAR_SCRIPT
+<!-- PENDING: calendar — источник: только bash \$IWE_SCRIPTS/server-calendar.sh $DATE
+  (params.yaml: calendar_source: script); календарный коннектор не запрашивать.
+  Показать ВСЕ события дня (00:00–23:59 МСК). Формат: таблица + строка свободных блоков ≥1h. -->
+CALENDAR_SCRIPT
+  else
+    cat <<CALENDAR_CONNECTOR
+<!-- PENDING: calendar — единый источник: календарный коннектор (MCP-инструменты
+  календаря; имена зависят от установки, имя содержит «calendar» без учёта регистра, напр. mcp__claude_ai_Google_Calendar__* — фактические имена
+  взять из списка инструментов текущей сессии). Получить список календарей пилота
+  (свои + подключённые общие), затем события каждого за $DATE (00:00–23:59 МСК).
+  Показать ВСЕ события дня по всем найденным календарям.
+  Если коннектора нет — фоллбэк: bash \$IWE_SCRIPTS/server-calendar.sh $DATE
+  (его «credentials не настроены» — факт о скрипте, не о календаре; issue #581).
+  Формат: таблица + строка свободных блоков ≥1h. -->
+CALENDAR_CONNECTOR
+  fi
+  cat <<CALENDAR_TABLE
+
+| Время (МСК) | Событие | Длит. | Связь с РП |
+|-------------|---------|-------|------------|
+| <!-- PENDING --> | <!-- PENDING --> | — | — |
+
+⏱ Свободных блоков ≥1h: <!-- PENDING -->
+
+</details>
+
+CALENDAR_TABLE
 }
 
 # --- Strategy_day guard (Ф6 WP-264) ---
@@ -627,6 +688,17 @@ render_repo_activity() {
 }
 
 # --- Section: IWE за ночь (светофор) ---
+
+# issue #866: validate that a stat result is a non-negative integer before using
+# it in arithmetic or comparisons. BSD/GNU stat flag differences can produce
+# empty or textual output; empty/invalid values must be treated as unknown.
+_is_nonneg_int() {
+    case "${1:-}" in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
 render_iwe_status() {
   echo "| Подсистема | Статус | Детали |"
   echo "|------------|--------|--------|"
@@ -658,7 +730,60 @@ render_iwe_status() {
         line=$(launchctl list 2>/dev/null | awk -v a="$agent" '$3==a{print}')
         [ -z "$line" ] && { agents_bad="$agents_bad $agent(not loaded)"; continue; }
         status=$(echo "$line" | awk '{print $2}')
-        [ "$status" != "0" ] && [ "$status" != "-" ] && agents_bad="$agents_bad $agent(exit=$status)"
+        if [ "$status" != "0" ] && [ "$status" != "-" ]; then
+          # issue #866: a non-zero exit code may be stale. Show the last log date
+          # and mark the result stale when the expected interval has passed.
+          local log_path="" log_mtime="" status_file="" status_mtime="" status_result="" last_run="" age_days="" stale_threshold=2 status_is_freshest=""
+          case "$agent" in
+            com.strategist.weekreview) stale_threshold=8 ;;
+          esac
+          if command -v plutil &>/dev/null; then
+            log_path=$(plutil -extract StandardOutPath raw "$plist" 2>/dev/null || true)
+          fi
+          log_path="${log_path//\{\{HOME_DIR\}\}/$HOME}"
+          if [ -n "$log_path" ] && [ -f "$log_path" ]; then
+            log_mtime=$(stat -f %m "$log_path" 2>/dev/null) ||
+                log_mtime=$(stat -c %Y "$log_path" 2>/dev/null) ||
+                log_mtime=""
+          fi
+          _is_nonneg_int "$log_mtime" || log_mtime=""
+
+          # issue #866: a manual successful retry updates the per-scenario status
+          # file; use its mtime when it is fresher than the agent's log.
+          case "$agent" in
+            com.strategist.weekreview) status_file="$HOME/logs/strategist/week-review-last-status" ;;
+          esac
+          if [ -n "$status_file" ] && [ -f "$status_file" ]; then
+            status_mtime=$(stat -f %m "$status_file" 2>/dev/null) ||
+                status_mtime=$(stat -c %Y "$status_file" 2>/dev/null) ||
+                status_mtime=""
+            status_result=$(awk -F'\t' 'NR==1 {print $2}' "$status_file" 2>/dev/null || true)
+          fi
+          _is_nonneg_int "$status_mtime" || status_mtime=""
+
+          if [ -n "$status_mtime" ] && [ -n "$log_mtime" ]; then
+            if [ "$status_mtime" -ge "$log_mtime" ]; then
+              log_mtime="$status_mtime"
+              status_is_freshest=true
+            fi
+          elif [ -n "$status_mtime" ]; then
+            # Status file alone is the freshest signal we have (no agent log).
+            log_mtime="$status_mtime"
+            status_is_freshest=true
+          fi
+
+          if [ -n "$log_mtime" ]; then
+            last_run=$(date -r "$log_mtime" '+%Y-%m-%d' 2>/dev/null || date -d "@$log_mtime" '+%Y-%m-%d' 2>/dev/null || true)
+            age_days=$(( ( $(date +%s) - log_mtime ) / 86400 ))
+          fi
+          if [ -n "$age_days" ] && [ "$age_days" -gt "$stale_threshold" ]; then
+            agents_bad="$agents_bad $agent(exit=$status, last $last_run, stale)"
+          elif [ "$status_result" = "SUCCESS" ] && [ "$status_is_freshest" = true ]; then
+            agents_bad="$agents_bad $agent(exit=$status, last ${last_run:-unknown}, recovered)"
+          else
+            agents_bad="$agents_bad $agent(exit=$status, last ${last_run:-unknown})"
+          fi
+        fi
       done
     fi
     if [ "$agents_checked" -eq 0 ]; then
@@ -949,17 +1074,69 @@ render_scout() {
 }
 
 # --- Section: Разбор заметок (fleeting-notes) ---
-# Парсит inbox/fleeting-notes.md на наличие непрочитанных заметок (строки **Title**).
+# Парсит inbox/fleeting-notes.md на наличие заметок, ждущих решения пилота: строки **Title**
+# (новые) и заметки с пометкой ✅предложено в первой строке (агент записал предложение, решение
+# за пилотом; модель могла уронить жирный или дописать хвост, #961). Отложенные 🔄 не считаются.
 # Если пусто → "нет заметок" без маркера PENDING → LLM секцию не трогает.
 # Если есть → строки таблицы с реальными заголовками и PENDING на Тип/Предложение.
 # Bold **text** в GitHub не создаёт якорей — ссылки без #якорь.
 render_fleeting_notes() {
   local notes_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/fleeting-notes.md"
 
-  # Extract titles of new unprocessed notes (lines matching **Title**)
+  # One decision with the safety net (cleanup-processed-notes.py should_keep) and the canary (strategist.sh
+  # count_new_bold_notes): the mark "✅предложено" counts in the FIRST line of a note (the line after a --- rule),
+  # with or without bold, wherever it stands in that line. A first line that is a quote, a heading, a timestamp, a
+  # struck-through note (~~) or a list item is no note title. A bold title alone on a line (**Title**), or followed
+  # by the mark, is taken wherever it stands (the legacy rule): a bold line inside a note body is listed, and counted
+  # by the canary, too; the safety net looks at the first line only. The printed title has the mark and 🔄 cut out;
+  # a title without them stays as typed, and a line with nothing but the mark keeps it so that the row has a name.
+  # awk, not grep -i / tolower: Cyrillic case folding depends on the locale, so the mark is spelled out in
+  # (п|П) pairs; the no-break space is spelled in octal because [[:space:]] does not cover it in every locale.
   local new_notes
-  new_notes=$(grep -E '^\*\*[^*]+\*\*[[:space:]]*$' "$notes_file" 2>/dev/null \
-    | sed 's/^\*\*//; s/\*\*[[:space:]]*$//')
+  new_notes=$(awk '
+    # the title without the mark and without 🔄; as typed when it has neither, whole when nothing else is left
+    function clean(t,   c) {
+      c = t
+      gsub("[[:space:]]*" mark, "", c)
+      gsub(/[[:space:]]*🔄/, "", c)
+      if (c == t) return t
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", c)
+      return (c == "") ? t : c
+    }
+    BEGIN {
+      mark = "✅([[:space:]]|\302\240)*(п|П)(р|Р)(е|Е)(д|Д)(л|Л)(о|О)(ж|Ж)(е|Е)(н|Н)(о|О)"
+      bold = "^[*][*][^*]+[*][*][[:space:]]*(" mark ".*)?$"
+      no_title = "^([>#<]|~~|[-+*][[:space:]]|[0-9]+[.)][[:space:]])"
+      first = 1
+    }
+    { sub(/\r$/, "") }
+    /^---[[:space:]]*$/ { first = 1; next }
+    /^[[:space:]]*$/ { next }
+    {
+      starts_block = first
+      first = 0
+      title = ""
+      if ($0 ~ bold) {
+        title = $0
+        sub(/^[*][*]/, "", title)
+        sub("[*][*][[:space:]]*(" mark ".*)?$", "", title)
+      } else if (starts_block) {
+        line = $0
+        sub(/^[[:space:]]+/, "", line)
+        if (line ~ mark && line !~ no_title) {
+          title = line
+          sub(mark ".*$", "", title)
+          gsub(/[*][*]/, "", title)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", title)
+          if (title == "") {
+            title = line
+            gsub(/[*][*]/, "", title)
+          }
+        }
+      }
+      if (title != "") print clean(title)
+    }
+  ' "$notes_file" 2>/dev/null)
 
   if [ -z "$new_notes" ]; then
     printf '| нет заметок | — | — | ✅ |\n'
@@ -1214,13 +1391,15 @@ render_compact_dashboard() {
   echo "**Сегодня (топ-7 по приоритету):** <!-- filled by day-open-llm-fill.py from 'План на сегодня' -->"
   echo ""
 
-  # Дедлайны из календаря (если preflight OK)
+  # Дедлайны из календаря (если preflight OK); отключён (calendar_source: none,
+  # issue #942) — строки нет вовсе, это не незавершённая настройка
   if [[ "$CALENDAR_PF" == "ok" ]]; then
     echo "**Календарь:** доступен — запустить server-calendar.sh для деталей"
-  else
+    echo ""
+  elif [[ "$CALENDAR_PF" != "disabled" ]]; then
     echo "**Календарь:** недоступен (${CALENDAR_PF})"
+    echo ""
   fi
-  echo ""
 
   # Светофор — критические позиции
   echo "**IWE за ночь:**"
@@ -1260,10 +1439,16 @@ render_compact_dashboard() {
 # The template's full collection has a status column but does not define an "черновик"
 # value, while the priority table is the explicit current-work list. "Где остановился"
 # is the pilot's own progress — we never fabricate it (see feedback_no_invented_personal_history).
+# Sets globals SELF_DEV_BLOCK (details-section body) and SELF_DEV_TABLE_THEME
+# (short table-row cell, issue #636) from the same source in one pass. A plain
+# `echo`-per-line function called via `SELF_DEV_BLOCK=$(render_self_dev)` would
+# run in a subshell, discarding any other global it tries to set — so this
+# builds SELF_DEV_BLOCK as a string instead of relying on captured stdout.
 render_self_dev() {
   local draft_list="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/drafts/draft-list.md"
   if [ ! -f "$draft_list" ]; then
-    echo "**Активный черновик:** нет данных (drafts/draft-list.md не найден)"
+    SELF_DEV_TABLE_THEME="тема не задана — обсудить с пилотом (drafts/draft-list.md не найден)"
+    SELF_DEV_BLOCK="**Активный черновик:** нет данных (drafts/draft-list.md не найден)"
     return
   fi
   # Take the first data row from the template-defined "Приоритетные" table.
@@ -1282,21 +1467,33 @@ render_self_dev() {
       exit
     }' "$draft_list")
   if [ -z "$row" ]; then
-    echo "**Активный черновик:** нет активных черновиков (приоритетные пусты или все завершены)"
+    SELF_DEV_TABLE_THEME="тема не задана — обсудить с пилотом (нет активных черновиков)"
+    SELF_DEV_BLOCK="**Активный черновик:** нет активных черновиков (приоритетные пусты или все завершены)"
     return
   fi
   local dnum path
   dnum=$(echo "$row" | grep -oE 'D-[0-9]+' | head -1)
   path=$(echo "$row" | grep -oE '\([^)]*D-[0-9][^)]*\.md\)' | head -1 | tr -d '()' | sed 's#^\./#drafts/#')
+  SELF_DEV_TABLE_THEME="$dnum"
+  local draft_line
   if [ -n "$path" ]; then
-    echo "**Активный черновик:** [$dnum]($path)"
+    draft_line="**Активный черновик:** [$dnum]($path)"
   else
-    echo "**Активный черновик:** $dnum (ссылка не распознана в draft-list.md)"
+    draft_line="**Активный черновик:** $dnum (ссылка не распознана в draft-list.md)"
   fi
-  echo "**Где остановился:** открой файл черновика — прогресс ведёт пилот."
-  echo "**Сегодня:** 60-90 мин на редактирование / структурирование."
+  SELF_DEV_BLOCK="$draft_line
+**Где остановился:** открой файл черновика — прогресс ведёт пилот.
+**Сегодня:** 60-90 мин на редактирование / структурирование."
 }
-SELF_DEV_BLOCK=$(render_self_dev)
+# issue #636: table-row theme (SELF_DEV_TABLE_THEME) is deterministic, same
+# source as the details block — a scaffold with no real draft used to leave a
+# bare [тема] placeholder that the LLM filled in on its own, and the invented
+# topic then carried over via Day Close carry-over for weeks
+# (feedback_no_invented_personal_history). Called directly, not via `$(...)`,
+# so both globals land in this shell rather than a discarded subshell.
+SELF_DEV_TABLE_THEME=""
+SELF_DEV_BLOCK=""
+render_self_dev
 
 # --- Pre-compute sweep list (single call, reused below) ---
 # SWEEP_WP_FULL: raw active-wp-sweep.sh output, kept only as input to SWEEP_WP_LIST below.
@@ -1379,7 +1576,7 @@ ${MANDATORY_DAILY_WPS:-  (не задано — day-rhythm-config.yaml не со
 
 | 🚦 | ТВС | # | РП | h | Статус |
 |----|-----|---|-----|---|--------|
-| ⚫ | В | N | **Саморазвитие** — [тема] | 1-2 | pending |
+| ⚫ | В | N | **Саморазвитие** — $SELF_DEV_TABLE_THEME | 1-2 | pending |
 | 🔴 | С | NNN | **<!-- PENDING -->** | X | pending |
 
 > ТВС: **В** = Важное (развитие / критичное для R1-R6) · **Т** = Текущее (плановая работа) · **С** = Срочное (угроза конвейеру, дублируется в шапке 🚨)
@@ -1396,7 +1593,7 @@ ${DAY_CLOSE_CARRY_OVER:-нет (Day Close не найден)}
 <details>
 <summary><b>Разбор заметок</b></summary>
 
-<!-- Источник: inbox/fleeting-notes.md. Строки **Title** = непрочитанные. Ссылки без якоря — bold не создаёт GitHub-якорей. -->
+<!-- Источник: inbox/fleeting-notes.md. В списке заметки, ждущие решения пилота: жирные (**Title**, ещё не разобраны) и с пометкой ✅предложено (предложение записано, решение за пилотом; жирный мог пропасть). Отложенные 🔄 не считаются. Ссылки без якоря — bold не создаёт GitHub-якорей. -->
 
 | Заметка | Тип | Предложение | ✅ |
 |---------|-----|-------------|---|
@@ -1404,26 +1601,7 @@ $(render_fleeting_notes)
 
 </details>
 
-<details>
-<summary><b>Календарь ($DAY_NUM $MONTH_RU)</b></summary>
-
-<!-- PENDING: calendar — единый источник: календарный коннектор (MCP-инструменты
-  календаря; имена зависят от установки, имя содержит «calendar» без учёта регистра, напр. mcp__claude_ai_Google_Calendar__* — фактические имена
-  взять из списка инструментов текущей сессии). Получить список календарей пилота
-  (свои + подключённые общие), затем события каждого за $DATE (00:00–23:59 МСК).
-  Показать ВСЕ события дня по всем найденным календарям.
-  Если коннектора нет — фоллбэк: bash \$IWE_SCRIPTS/server-calendar.sh $DATE
-  (его «credentials не настроены» — факт о скрипте, не о календаре; issue #581).
-  Формат: таблица + строка свободных блоков ≥1h. -->
-
-| Время (МСК) | Событие | Длит. | Связь с РП |
-|-------------|---------|-------|------------|
-| <!-- PENDING --> | <!-- PENDING --> | — | — |
-
-⏱ Свободных блоков ≥1h: <!-- PENDING -->
-
-</details>
-
+$(render_calendar_section)
 <details>
 <summary><b>Здоровье платформы (QA)</b></summary>
 

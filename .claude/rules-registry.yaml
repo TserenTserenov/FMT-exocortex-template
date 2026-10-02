@@ -1,0 +1,41 @@
+schema_version: '1.0'
+generated_at: auto
+source: PACK-agent-rules/rules/
+rule_count: 2
+rules:
+- id: AR.112
+  name: BYPASSRLS → явный WHERE (defense-in-depth)
+  type: behavioural
+  priority: 9
+  status: active
+  triggers:
+  - sql_file_write
+  - Neon DB role creation
+  - RLS policy creation
+  - SQL query touching PII tables
+  applies_when: 'true'
+  exceptions: []
+  hook: rule-engine.sh::check_bypassrls_explicit_where
+  pre_conditions: []
+  post_conditions: []
+  conflicts_with: []
+  depends_on: []
+  superseded_by: null
+  source_file: PACK-agent-rules/rules/AR.112-bypassrls-explicit-where.md
+- id: AR.113
+  name: Двухступенчатая схема opt-in для PII
+  type: behavioural
+  priority: 9
+  status: active
+  triggers:
+  - sql_file_write
+  applies_when: SQL-файл создаёт таблицу или добавляет колонку с прямым либо косвенным
+    PII-идентификатором
+  exceptions: []
+  hook: rule-engine.sh::check_pii_consent_two_tier
+  pre_conditions: []
+  post_conditions: []
+  conflicts_with: []
+  depends_on: []
+  superseded_by: null
+  source_file: PACK-agent-rules/rules/AR.113-pii-consent-two-tier.md

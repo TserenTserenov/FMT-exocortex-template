@@ -26,8 +26,32 @@ log_decision() {
     >> "$LOG_FILE" 2>/dev/null || true
 }
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty' 2>/dev/null)
+input=$(cat 2>/dev/null || true)
+
+# Fail-closed on a malformed/schema-invalid envelope (WP-544 Д22, peer session
+# 2026-09-08-25-wp544-continue-f7, Codex). The old `jq -r '.tool_name //
+# empty'` turned any jq parse error or wrong-typed field into an empty
+# string, which then missed every `mcp__*` case below and fell through to
+# `exit 0` — the same fail-open destructive-guard.sh had. The deny output
+# below is a literal JSON string, not built with jq, so an absent/broken jq
+# still denies instead of silently passing.
+#
+# No `timeout` wrapper here on purpose (unlike destructive-guard.sh):
+# `timeout cmd` execs `cmd` directly, which does not consult bash's function
+# table — an exported bash function used to simulate "jq absent" for a test
+# is invisible to it, and it always finds the real jq on this script's own
+# hardened PATH (line 15) instead. destructive-guard.sh has a second,
+# unwrapped jq call downstream that still catches that case and keeps it
+# testable; this hook's single combined call has no such second call, so
+# wrapping it would make "jq missing" permanently unverifiable by test
+# (confirmed live, cold review WP-544 Д22, 08.09) for a payload class (MCP
+# tool-call metadata) much smaller than the Bash-guard's command strings —
+# not worth trading away test coverage for.
+if ! tool_name=$(printf '%s' "$input" | jq -er '.tool_name | select(type == "string" and length > 0)' 2>/dev/null); then
+  log_decision "deny-malformed-input" ""
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Не удалось разобрать вход хука или tool_name отсутствует/пустой/неверного типа — блокирую как неопределённо опасный MCP-вызов."}}'
+  exit 0
+fi
 
 case "$tool_name" in mcp__*) ;; *) exit 0 ;; esac
 

@@ -12,7 +12,7 @@ DAYPLAN_FILE="$_IWE/{{GOVERNANCE_REPO}}/current/DayPlan $DATE.md"
 
 # Если файла нет — создать через scaffold (если доступен)
 if [ ! -f "$DAYPLAN_FILE" ]; then
-  _SCAFFOLD="$_IWE/scripts/day-open-scaffold.sh"
+  _SCAFFOLD="${IWE_SCRIPTS:-$_IWE/FMT-exocortex-template/scripts}/day-open-scaffold.sh"
   if [ -f "$_SCAFFOLD" ]; then
     bash "$_SCAFFOLD" "$DATE" > "$DAYPLAN_FILE"
     SCAFFOLD_EXIT=$?
@@ -22,7 +22,7 @@ if [ ! -f "$DAYPLAN_FILE" ]; then
       exit 0
     fi
   else
-    echo "WARN: day-open-scaffold.sh not found at $_IWE/scripts/ — создаю минимальный DayPlan, PENDING-маркеры заполнит LLM"
+    echo "WARN: day-open-scaffold.sh not found at $_SCAFFOLD — создаю минимальный DayPlan, PENDING-маркеры заполнит LLM"
     cat > "$DAYPLAN_FILE" <<FRONTMATTER
 ---
 type: daily-plan
@@ -56,6 +56,7 @@ fi
 3. **Carry-over** — цитата секции «Завтра начать с» из `archive/day-plans/DayPlan {вчера}.md`. Если первый день — «нет».
 
 3a. **Календарь** (issue #581 — единый источник: календарный коннектор):
+   - Если в системном контексте сказано «Календарь отключён» — пропусти шаг целиком (issue #942); если «только из server-calendar.sh» — коннектор не запрашивай, сразу второй пункт.
    - Если в этой сессии доступны инструменты календарного коннектора (имя содержит «calendar» без учёта регистра, напр. `mcp__claude_ai_Google_Calendar__* — фактические имена из списка инструментов): получить список календарей (свои + подключённые общие), затем события каждого за сегодня (00:00–23:59 МСК). Показать ВСЕ события: таблица «Время | Событие | Длит. | Связь с РП» + строка свободных блоков ≥1h (в рамках 09:00–22:00).
    - Коннектора нет — фоллбэк: `bash $IWE_SCRIPTS/server-calendar.sh $DATE` (есть свой файл ключей у установки). Его ответ «Google credentials не настроены» — факт об отсутствии файла ключей у СКРИПТА, не о календаре: в этом случае секция «Календарь недоступен (ни коннектор, ни файл ключей)», а не пустые таблицы.
 
@@ -68,30 +69,30 @@ fi
    - N.N = мультипликатор как одно число `~2.75x` (НЕ диапазон `~2.5-3x` — hook fail)
    - НЕ писать "aggregate" перед "РП" (hook regex ищет `~Xh РП`)
 
-5. **Mandatory check** — проверить наличие в плане: WP-7 (техдолг бота, ≥30 мин) + ≥1 контентный РП.
+5. **Mandatory check** — проверить наличие в плане: каждый РП из `day-rhythm-config.yaml → mandatory_daily_wps` (если список пуст или файла нет — пропустить) + ≥1 контентный РП.
 
 5a. **Здоровье платформы (валидация формата)** — секция `<details><summary>Здоровье ...</summary>` ОБЯЗАНА содержать markdown-таблицу с **числовыми ячейками** ИЛИ явный текст «нет данных». Hook regex: `\| *[0-9]|нет данных`. Например:
    ```markdown
    | Метрика | Значение |
    |---------|----------|
-   | Triage 7d | 0 |
-   | Open Issues | 0 |
+   | Triage 7d | <реальное число> |
+   | Open Issues | <реальное число или «не проверено»> |
    ```
    Светофор-таблица (`| Scheduler | 🟢 | ...`) **не проходит** валидацию (после pipe идёт буква, не цифра).
 
 6. **Inbox Triage** (если нужно):
    - Прочитать `{{GOVERNANCE_REPO}}/inbox/fleeting-notes.md` — есть ли **жирные** заметки?
    - Если есть — классифицировать по 7 категориям (НЭП / Задача / Знание / Черновик / Личные / Шум).
-   - НЕ помечать заметки и НЕ архивировать (это делает Note-Review в 23:00).
+   - НЕ помечать заметки и НЕ архивировать (разбор заметок — только по команде пилота, сценарий Note-Review; автозапуска по расписанию нет, решение владельца шаблона, июль 2026).
 
 ### Шаг 7 — сохранение и коммит
 
 ```bash
-cd "${IWE_WORKSPACE:-$HOME/IWE}/{{GOVERNANCE_REPO}}"
-git add current/DayPlan*.md
-git commit -m "day-plan: $DATE автономный полный (strategist morning)"
-git pull --rebase  # на случай если Mac тоже что-то закоммитил
-git push
+REPO_DIR="${IWE_WORKSPACE:-$HOME/IWE}/{{GOVERNANCE_REPO}}"
+git -C "$REPO_DIR" add current/DayPlan*.md
+git -C "$REPO_DIR" commit -m "day-plan: $DATE автономный полный (strategist morning)"
+git -C "$REPO_DIR" pull --rebase  # на случай если Mac тоже что-то закоммитил
+git -C "$REPO_DIR" push
 ```
 
 ## АВТОНОМНЫЙ РЕЖИМ (БЛОКИРУЮЩЕЕ)
@@ -109,13 +110,14 @@ git push
 - MEMORY: `~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/`
 - Skill: `{{WORKSPACE_DIR}}/.claude/skills/day-open/SKILL.md`
 - Templates: `~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/templates-dayplan.md`
-- Scaffold: `{{WORKSPACE_DIR}}/scripts/day-open-scaffold.sh`
+- Scaffold: `{{WORKSPACE_DIR}}/FMT-exocortex-template/scripts/day-open-scaffold.sh` (резолвится через `$IWE_SCRIPTS`)
 - Extensions: `{{WORKSPACE_DIR}}/extensions/day-open.before.md`, `.after.md`, `.checks.md`
 
 ## Если что-то отсутствует
 
 - Файлы или репо нет → log warning, продолжай с тем что есть. НЕ падай.
-- Calendar: на сервере его нет (Mac-only). Секцию пометь «Календарь недоступен на сервере».
+- Calendar: не ставь ложный диагноз «Mac-only». Сначала пробуй доступный серверный скрипт / MCP / fallback-путь; если проверить нельзя — пиши «календарь не проверен», а не «недоступен».
+- GitHub Issues: ложный ноль хуже, чем «не проверено». Считай реально через `gh issue list` / GitHub API; если проверить нельзя — пиши «не проверено», а не `0`.
 - Видео: если scaffold нашёл 0 файлов — секция «нет новых видео сегодня».
 
 Результат: DayPlan в `current/` с заполненными PENDING-секциями, закоммичен и запушен.

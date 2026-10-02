@@ -118,7 +118,7 @@ Co-Authored-By: <Имя агента> <noreply@домен-вендора>
 
 ## Шаг 6. Подключение к Aisystant MCP (не-Claude агенты)
 
-> Claude Code подключается к базе знаний Aisystant через `claude.ai` connectors (`docs/SETUP-GUIDE.md`, шаг 1.3b) — у него отдельная браузерная страница настройки. Остальные агенты (Hermes и т.п.) подключаются иначе: напрямую через свой собственный MCP-клиент, без `claude.ai`. Этот шаг — про них.
+> Claude Code подключается к базе знаний Aisystant через `claude.ai` connectors (`docs/SETUP-GUIDE.md`, шаг 1.3b) — у него отдельная браузерная страница настройки. Остальные агенты (Hermes и т.п.) подключаются иначе: напрямую через свой собственный MCP-клиент, без `claude.ai`. Этот шаг — про них. Готовые пошаговые промты для ChatGPT (в том числе рабочий Business/Enterprise-аккаунт) и для локального Codex — в `docs/CHATGPT-CODEX-SETUP.md`.
 
 ### 6.1. Проверить MCP-конфиг
 
@@ -238,5 +238,6 @@ codex doctor
 - `AGENTS.md` — общие правила для всех агентов.
 - `setup/optional/setup-local-gateway.sh` — установка самого шлюза (клон, сборка, запуск демона).
 - `docs/KIMI-SETUP.md` — специфика подключения Kimi Code (детальный пример шага 5).
+- `docs/CHATGPT-CODEX-SETUP.md` — готовые промты для подключения ChatGPT и Codex к Aisystant MCP (шаг 6).
 - `docs/inter-agent-handoff.md` — передача контекста между агентами без общего шлюза.
 - `memory/agent-vendor-connect-pattern.md` — краткая техническая карточка того же паттерна (справочный формат для памяти агента, не пошаговая инструкция для человека).

@@ -1,0 +1,81 @@
+name: Release Watchdog
+
+# WP-529 (29.09.2026): сторож застрявшего релизного PR. weekly-release.yml
+# открывает PR release/vX, дальше нужен один человеческий шаг - слияние. PR
+# из 27.09 провисел два дня: автоназначение reviewer не сработало как сигнал.
+# Этот workflow ежедневно ищет открытые PR из веток release/* старше
+# STALE_HOURS и заводит по одному обращению (issue) на PR+head-коммит -
+# GitHub присылает пилоту уведомление. Он не часть создания релиза: падение
+# сторожа не влияет на выпуск, а выпуск не зависит от сторожа.
+#
+# Канал в бота (Telegram) - отдельный шаг ниже, он выключен, пока в
+# переменной репозитория PILOT_NOTICE_ENDPOINT не задан адрес. Сторона бота
+# (эндпоинт для одного получателя-пилота, не для подписчиков) пока не
+# создана: DS-IT-systems для агента read-only.
+
+on:
+  schedule:
+    - cron: '30 4 * * *'  # 07:30 MSK
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STALE_HOURS: "12"
+    steps:
+      - name: Close notices for PRs that are no longer open
+        run: |
+          gh issue list --label release-pr-waiting --state open --json number,title \
+            --jq '.[] | "\(.number)\t\(.title)"' | while IFS=$'\t' read -r ISSUE TITLE; do
+            PR=$(printf '%s' "$TITLE" | sed -n 's/.*PR #\([0-9][0-9]*\).*/\1/p')
+            [ -n "$PR" ] || continue
+            STATE=$(gh pr view "$PR" --json state --jq .state 2>/dev/null || echo UNKNOWN)
+            if [ "$STATE" = "MERGED" ] || [ "$STATE" = "CLOSED" ]; then
+              gh issue close "$ISSUE" --comment "PR #$PR: $STATE - обращение закрыто автоматически."
+            fi
+          done
+
+      - name: Notify about stale release PRs
+        id: notify
+        run: |
+          gh label create release-pr-waiting --description "Release PR is waiting for the pilot" --color FBCA04 2>/dev/null || true
+          NOW=$(date -u +%s)
+          FOUND=""
+          while IFS=$'\t' read -r PR SHA CREATED URL; do
+            AGE_H=$(( (NOW - $(date -u -d "$CREATED" +%s)) / 3600 ))
+            [ "$AGE_H" -ge "$STALE_HOURS" ] || continue
+            KEY="PR #$PR @${SHA:0:7}"
+            EXISTING=$(gh issue list --label release-pr-waiting --state all --limit 200 --json title \
+              --jq "[.[] | select(.title | contains(\"$KEY\"))] | length")
+            if [ "$EXISTING" -eq 0 ]; then
+              gh issue create --label release-pr-waiting \
+                --title "Релизный $KEY ждёт слияния уже ${AGE_H} ч" \
+                --body "Открытый релизный PR: $URL (коммит ${SHA:0:7}, возраст ${AGE_H} ч). Проверьте статус release-receipt и сливайте, если он зелёный. Обращение закроется само после слияния или закрытия PR."
+            fi
+            FOUND="${FOUND}${PR} "
+          done < <(gh pr list --state open --json number,headRefName,headRefOid,createdAt,url \
+            --jq '.[] | select(.headRefName | startswith("release/")) | "\(.number)\t\(.headRefOid)\t\(.createdAt)\t\(.url)"')
+          echo "found=${FOUND}" >> "$GITHUB_OUTPUT"
+
+      - name: Send notice to the pilot channel (optional, fail-open)
+        # Выключено, пока PILOT_NOTICE_ENDPOINT не задан. Получатель - только
+        # пилот; не использовать /api/template-update (он для подписчиков).
+        if: steps.notify.outputs.found != '' && vars.PILOT_NOTICE_ENDPOINT != ''
+        continue-on-error: true
+        env:
+          ENDPOINT: ${{ vars.PILOT_NOTICE_ENDPOINT }}
+          WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
+          PRS: ${{ steps.notify.outputs.found }}
+        run: |
+          curl -sS --max-time 10 -X POST "$ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
+            -d "{\"recipient\":\"pilot\",\"kind\":\"release-pr-waiting\",\"prs\":\"$PRS\"}"

@@ -183,6 +183,11 @@ bash scripts/verify-skill.sh <name>       # 33-point structural check
 
 Both commands must pass before the skill is considered created.
 
+Tell the user where the new skill lives and that nothing preserves it (issue #873): a
+project-local skill under `.claude/skills/<name>/` is usually outside git and outside the
+`day-close.sh` backup, and `update.sh` neither erases nor carries it over. Until the template
+owner picks a backup model, suggest keeping a copy in a git repository the user controls.
+
 For skills with `interaction: multi-step`: run `/vdv audit` on the Algorithm section.
 Not a gate — does not block creation — but catches steps with missing Input/Output linkage
 before the skill is used in practice.

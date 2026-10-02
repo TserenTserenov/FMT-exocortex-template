@@ -27,7 +27,7 @@
 ```bash
 SINCE="${1:-12 hours ago}"  # по умолчанию 12h окно
 for repo in {{WORKSPACE_DIR}}/*/; do
-  if [ -d "$repo/.git" ]; then
+  if [ -e "$repo/.git" ]; then
     name=$(basename "$repo")
     cd "$repo" && git log --oneline --since="$SINCE" 2>/dev/null
   fi
@@ -54,7 +54,7 @@ done
 - Прочитать `git show <sha>` — diff + message
 - Идентифицировать тип: distinction / method / sota / failure-mode / rule
 - Тест универсальности: «можно ли использовать в другом проекте?» — нет → пропустить
-- **Лимит:** ≤8 кандидатов на запуск
+- **Лимит:** ≤8 кандидатов на запуск. Содержательных коммитов больше 8 (issue #898: насыщенный день, следующий запуск смотрит уже новое окно — обрезанное безвозвратно теряется) → взять первые 8 по важности (`feat`/`fix` впереди `docs`/`refactor`), а в финальном отчёте (Шаг 6) обязательно указать `TRUNCATED: K of M substantive commits captured` — это единственный сигнал о том, что был обрезан день, не только пустой отчёт «Captured: 8»
 
 ### Шаг 4: Запись в целевой captures-файл
 
@@ -79,11 +79,7 @@ done
 
 ### Шаг 6: Коммит
 
-```bash
-cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
-git add inbox/captures/YYYY-MM.md   # или inbox/captures.md без ротации
-git commit -m "feed(git-diff): N capture-кандидатов из коммитов SINCE=$SINCE"
-```
+Не коммить и не пушь: ты работаешь в изолированной рабочей копии, `git add`/`git commit`/`git push` не выполняй. Только пиши ###-блоки в целевой captures-файл; `commit_extractor_changes()` в `extractor.sh` проверит (изменён только captures-файл, есть блок `[feed:git-diff ...]`), закоммитит и опубликует ПОСЛЕ прогона. Кандидатов нет — не меняй ничего (это нормальный исход).
 
 ## Что НЕ делать
 
@@ -102,4 +98,7 @@ Repos scanned: N
 Substantive commits: M
 Captured: K кандидатов
 Types: distinction=A, method=B, sota=C, fm=D
+TRUNCATED: K of M substantive commits captured
 ```
+
+Строка `TRUNCATED` — только когда M > K из-за лимита ≤8 (Шаг 3), т.е. остаток дня не попал в очередь ни сейчас, ни в следующий запуск (issue #898). K = M (лимит не задет) → строку не писать вовсе, не писать `TRUNCATED: 8 of 8` — присутствие строки само по себе и есть сигнал обрезки, а не число внутри неё.

@@ -276,14 +276,23 @@ hardcode_scan_staged() {
     echo "$count"
 }
 
-# 2. Нет захардкоженных /Users/ путей [pristine + staged; skip только installed]
-# В installed-режиме setup.sh легитимно подставил $WORKSPACE_DIR → /Users/<user>/...
-echo -n "[2/5] Hardcoded /Users/ paths... "
+# 2. Нет захардкоженных /Users/ или C:\Users\ путей [pristine + staged; skip
+# только installed]. В installed-режиме setup.sh легитимно подставил
+# $WORKSPACE_DIR → /Users/<user>/... (issue #835: раньше матчился только
+# POSIX-стиль macOS — нативный Windows-путь вида C:\Users\<user>\... через
+# этот барьер проходил незамеченным).
+HARDCODE_USER_PATH_RE='/Users/\|C:\\Users\\'
+# Third alternative excludes placeholder instructional text (QUICK-START.md
+# telling a Windows user to type their own name) — same intent as the
+# existing "# ... e.g." exclusion for POSIX comments, just not restricted to
+# `#`-comments since this one lives in markdown prose, not a script comment.
+HARDCODE_USER_PATH_EXCLUDE_RE='/Users/\.\.\./|C:\\Users\\\.\.\.|# .*(/Users/|C:\\Users\\|e\.g\.)|C:\\Users\\(твоё-имя|<[^>]+>)'
+echo -n "[2/5] Hardcoded /Users/ or C:\\Users\\ paths... "
 if [ "$MODE" = "installed" ]; then
-    echo "SKIP (installed mode — /Users/ подставлен setup'ом)"
+    echo "SKIP (installed mode — путь подставлен setup'ом)"
 elif [ "$MODE" = "staged" ]; then
     TMPDIR_CHECK2_HITS_FILE="$(mktemp)"
-    count=$(hardcode_scan_staged '/Users/' '/Users/\.\.\./|# .*(/Users/|e\.g\.)' "$TMPDIR_CHECK2_HITS_FILE")
+    count=$(hardcode_scan_staged "$HARDCODE_USER_PATH_RE" "$HARDCODE_USER_PATH_EXCLUDE_RE" "$TMPDIR_CHECK2_HITS_FILE")
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK2_HITS_FILE" || true
@@ -293,19 +302,17 @@ elif [ "$MODE" = "staged" ]; then
     fi
     rm -f "$TMPDIR_CHECK2_HITS_FILE"
 else
-    count=$(grep -rn '/Users/' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
+    count=$(grep -rn "$HARDCODE_USER_PATH_RE" "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
-            | grep -v '/Users/\.\.\./' \
-            | grep -v '# .*\(/Users/\|e\.g\.\)' \
+            | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" \
             | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
-        grep -rn '/Users/' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
+        grep -rn "$HARDCODE_USER_PATH_RE" "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
-            | grep -v '/Users/\.\.\./' \
-            | grep -v '# .*\(/Users/\|e\.g\.\)' | head -3 || true
+            | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" | head -3 || true
         FAIL=1
     else
         echo "PASS"
@@ -322,7 +329,13 @@ elif [ "$MODE" = "staged" ]; then
     # The shipped resolver copies are sanctioned exceptions (WP-529 F6,
     # #453/#463): their job is enumerating STANDARD system Python locations
     # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
+    # secret-bypass-lib.sh (WP-544 Д28) is the same class: it resolves
+    # jq/python3 across the standard FHS locations on macOS (both Intel
+    # /usr/local/bin and Apple Silicon /opt/homebrew/bin) and Linux (/usr/bin,
+    # /bin), falling back to PATH-based `command -v` only for non-standard
+    # layouts (NixOS) — an absolute-path-first resolver by design, not a
+    # hardcoded personal path.
+    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^\.claude/hooks/secret-bypass-lib\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK3_HITS_FILE" || true
@@ -338,6 +351,7 @@ else
     count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
+            --exclude='secret-bypass-lib.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' \
             | grep -v 'PLATFORM-COMPAT.md' \
@@ -349,6 +363,7 @@ else
         grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
+            --exclude='secret-bypass-lib.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
             | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' \
             | grep -v 'validate-template.yml' \

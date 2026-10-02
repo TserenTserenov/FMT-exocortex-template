@@ -17,12 +17,12 @@ on:
   # not within minutes of a push nobody's about to release from unreviewed.
   schedule:
     - cron: '0 2 * * *'  # 05:00 МСК
-  # WP-7 Ф62 (10.08.2026): weekly-release.yml коммитит version-bump через
-  # default GITHUB_TOKEN — по anti-recursion policy GitHub такой push НЕ
-  # триггерит push-based workflow сам по себе, поэтому weekly явно зовёт этот
-  # workflow через workflow_dispatch. release.yml подписан на его завершение
-  # (workflow_run) и берёт SHA из самого события — без этого входа CI на
-  # bot-коммите вообще не запускался бы, и релиз шёл бы непроверенным.
+  # WP-529 (29.09.2026): weekly-release.yml открывает PR с бампом версии через
+  # default GITHUB_TOKEN; pull_request-запуски такого PR стоят в
+  # action_required (правило GitHub), поэтому weekly явно зовёт этот workflow
+  # через workflow_dispatch на release-ветке — так статус `release-receipt`
+  # появляется на head-коммите PR. release.yml слушает завершение этого
+  # workflow только на ветке main, запуск на release-ветке тег не создаёт.
   workflow_dispatch:
 
 jobs:
@@ -152,6 +152,12 @@ jobs:
         run: bash setup/test-attestation-canonical-digest.sh
       - name: Run WP-529 Ф21 attestation statement tests
         run: bash setup/test-attestation-build-statement.sh
+      - name: Run WP-561 Ф25 week-review delivery postcondition tests
+        run: bash setup/test-week-review-delivery-postcondition.sh
+      - name: Run WP-530 Ф72 strategist isolated scenario tests
+        run: bash setup/test-strategist-isolated-scenarios.sh
+      - name: Run WP-529 changelog gate tests
+        run: bash setup/test-check-changelog-entry.sh
 
   integration-contract-macos:
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'
@@ -612,12 +618,45 @@ jobs:
       - name: Run Day Open delivery-closure acceptance test
         run: bash setup/test-day-open-delivery-closure.sh
 
+      - name: Run session guard and delivered ledger contract test
+        run: bash scripts/tests/test_session_guard_hypothesis_gate.sh
+
+      - name: Run delivered Day Open today-plan checks
+        run: bash scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh
+
+      - name: Run delivered Day Open world checks
+        run: bash scripts/tests/day-open-world-fill-smoke.sh
+
+      # Issues #942/#944: calendar_source switch and stale priorities.yaml.
+      - name: Run Day Open calendar switch and stale priorities test
+        run: bash scripts/tests/test_issues_942_944_day_open.sh
+      # Issue #940: the Bash guard and its guarded-rm wrapper. Commands are passed to the hook
+      # as data; nothing is executed.
+      - name: Run destructive-guard tests
+        run: |
+          python3 .claude/hooks/tests/destructive-guard/hook_cases.py
+          python3 .claude/hooks/tests/destructive-guard/long_cases.py
+          python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
+          bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
+          bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
+          bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
+
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
       # last published release by default, moving main only via explicit
       # IWE_UPDATE_CHANNEL=main or as an announced fallback when no release
       # exists. Stubbed-curl cases over the real resolve_delivery_ref().
       - name: Run update.sh release-channel test
         run: bash setup/test-update-release-channel.sh
+
+      # Issue #943: manifest download with retries and a diagnostic; stubbed curl.
+      - name: Run update.sh manifest fetch test
+        run: bash setup/test-update-manifest-fetch.sh
+
+      # Issue #941: the strategist's commit publisher shipped in seed/ and delivered by update.sh.
+      - name: Run ds-publish tests
+        run: |
+          bash setup/test-ds-publish.sh
+          bash setup/test-update-ds-publish-delivery.sh
 
       # issue #505 (live user-blocking): update.sh is delivered ONLY by Step 0
       # self-update — Step 5 must skip it (generic cp clobbered the running
@@ -644,6 +683,12 @@ jobs:
       # only additions made by the current updater run are publication blockers.
       - name: Test staged install-path guard
         run: bash scripts/tests/test_update_install_path_guard.sh
+
+      # WP-5 F55: the Extractor feeders step existed only in setup.sh, so every
+      # already-configured machine kept updating without the capture pipeline
+      # ever being scheduled. Guards the wiring plus install/opt-out/no-CLI paths.
+      - name: Test Extractor feeders backfill in update.sh
+        run: bash scripts/tests/test-update-extractor-feeders.sh
 
       # WP-529 Ф3: release-receipt.sh (the release-receipt job below) must
       # fail closed — success/skipped on every mandatory check to publish,
@@ -709,6 +754,8 @@ jobs:
           python3 -m pytest --version >/dev/null 2>&1 || python3 -m pip install --user pytest
           python3 -m pytest -q \
             scripts/tests/test_issue_*.py \
+            scripts/tests/test_create_wp_number_padding.py \
+            scripts/tests/test_create_wp_weekplan_writer.py \
             scripts/tests/test_install_hooks.py \
             scripts/tests/test_skill_promote.py \
             scripts/tests/test_residency_gate_skill_adapter.py

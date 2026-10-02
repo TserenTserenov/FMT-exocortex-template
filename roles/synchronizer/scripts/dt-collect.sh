@@ -30,7 +30,10 @@ portable_date_offset() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-WORKSPACE="$HOME/IWE"
+# issue #875: the workspace comes from the environment, not from a folder name
+# guessed under $HOME - an install outside ~/IWE otherwise reads another
+# workspace's data without a single error.
+WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 GOVERNANCE_DIR="${GOVERNANCE_DIR:-$WORKSPACE/DS-strategy}"
 LOG_DIR="$HOME/logs/synchronizer"
 DATE=$(date +%Y-%m-%d)
@@ -299,7 +302,10 @@ collect_wp() {
     # Формат строки: | <NNN> | <P> | <Название> | <Ст> | <Репо> | <Бюджет> |
     # Статусы: ✅ done · 🔄 in_progress · ⏳ pending · 📦 archived · ↗️ merged · 🧪 testing
     local REGISTRY_FILE="$GOVERNANCE_DIR/docs/WP-REGISTRY.md"
-    local MEMORY_FILE="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/MEMORY.md"
+    # issue #875: was "$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/...", which
+    # assumes the folder is literally named IWE and read a foreign workspace's
+    # memory otherwise. memory/ inside the workspace is the symlink to the real one.
+    local MEMORY_FILE="$WORKSPACE/memory/MEMORY.md"
 
     python3 -c "
 import json, os

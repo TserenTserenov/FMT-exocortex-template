@@ -20,8 +20,8 @@ routing:
 - Отложенная запись (сложное знание) — добавление в `inbox/captures/<YYYY-MM>.md` (маршрут по дате события; правило → Шаг 3) для агента-экстрактора. Легаси-файл `inbox/captures.md` новыми записями не пополняется (ротация WP-526, 29.08.2026) — читается как архив.
 
 **Этот скилл НЕ делает:**
-- Не разбирает `extraction-reports/*.md` (pending-review кандидатов от агента R2). Это делает `/apply-captures` (в разработке, Ф3 WP-247).
-- Не пишет Pack-сущности (файлы DP.*, PD.*, MIM.*). Это делает `/apply-captures` (в разработке) после решения R15. Альтернативно R15 может писать в Pack напрямую через Edit — `/apply-captures` не единственный путь.
+- Не разбирает `extraction-reports/*.md` (pending-review кандидатов от агента R2). Это делает `/apply-captures`.
+- Не пишет Pack-сущности (файлы DP.*, PD.*, MIM.*). Это делает `/apply-captures` после решения R15. Альтернативно R15 может писать в Pack напрямую через Edit — `/apply-captures` не единственный путь.
 - Не запускает агента-экстрактора R2 (работает через launchd каждые 3h в рабочие часы, запуск `extractor.sh inbox-check`).
 
 **Три инструмента знания (разграничение):**
@@ -30,7 +30,7 @@ routing:
 |------------|------|-------|-------|
 | `/ke` (этот скилл) | R14 Заказчик / R1 Стратег | Рубеж сессии, inline | Правило в CLAUDE.md / запись в `inbox/captures/<YYYY-MM>.md` |
 | `extractor.sh inbox-check` (агент R2) | R2 Экстрактор (ИИ, launchd 3h, work hours) | Автоматически | `extraction-reports/*.md` со `status: pending-review` |
-| `/apply-captures` (в разработке, Ф3 WP-247) | R15 Валидатор | Close при N>0 pending-review | Pack-сущности + коммит + обновление status |
+| `/apply-captures` | R15 Валидатор | Close при N>0 pending-review | Pack-сущности + коммит + обновление status |
 
 Детальная ВДВ-карта цикла: `<governance-repo>/inbox/WP-247-ke-pipeline-vdv.md`
 

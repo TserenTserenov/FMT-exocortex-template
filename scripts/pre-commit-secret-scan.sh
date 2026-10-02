@@ -40,7 +40,18 @@ if ! command -v secret_pattern_process >/dev/null 2>&1 \
   exit 2
 fi
 
-if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --unified=0 -- .); then
+# issue #810/#832: the canonical pattern library and its extracted analyzer
+# necessarily contain the literal patterns they detect (a PEM header regex,
+# self-test corpus fixtures for classes like yookassa) -- scanning them for
+# "secrets" means the scanner trips on its own rule literals, the same class
+# of self-reference already excluded for check-platform-compat.sh below in
+# .githooks/pre-commit. Narrow, path-exact exclusion, not a general bypass;
+# a real secret pasted into either file by mistake still isn't the scanner's
+# job to catch (an unrelated content-review concern, same as for any file
+# whose entire purpose is to hold example/pattern text).
+if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --unified=0 -- . \
+    ':(exclude).claude/hooks/secret-bypass-lib.sh' \
+    ':(exclude).claude/hooks/secret-bypass-analyzer.py'); then
   printf 'Pre-commit secret scan unavailable: staged diff could not be read.\n' >&2
   exit 2
 fi

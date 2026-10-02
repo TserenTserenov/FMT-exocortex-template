@@ -25,6 +25,16 @@ CATALOG.md, TOC.md, MAPSTRATEGIC.md, Projects.md, *-registry.md, *-index.md,
     OK: всё под порогами.
     Размер сам по себе — слабый маркер: реестр 300 РП × 100 ch = 30KB.
 
+    MEMORY.md — отдельные пороги: FAIL на пределе загрузчика контекста
+    (~24.4 KiB символов), WARN — запас до него (issue #677: живой индекс
+    памяти обрезается загрузчиком раньше, чем срабатывают общие пороги).
+
+Обход дерева следует symlink'ам (issue #677: `memory/` на типовой установке —
+symlink на auto-memory) с защитой от циклов. Каталог, где лежит живой
+MEMORY.md, считается хранилищем памяти — заметки вида *-index.md/*-catalog.md
+внутри него не считаются реестрами (иначе это новый класс ложных срабатываний
+после включения symlink'ов).
+
 Пропуск файлов через комментарий в начале файла:
     <!-- index-health: skip --> — не сканировать
     <!-- index-health: skip-cells --> — не проверять ячейки таблиц
@@ -32,6 +42,7 @@ CATALOG.md, TOC.md, MAPSTRATEGIC.md, Projects.md, *-registry.md, *-index.md,
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -46,6 +57,17 @@ _STATUS_EMOJI = (
     "🟢", "🟡", "🔴", "⚫",
 )
 _CELL_LEAD_MARKUP = "*~ \t"
+# Tolerates a trailing explanation inside the same comment, e.g.
+# "<!-- index-health: skip-cells — реестр РП, длинные ячейки закрытия -->"
+# (issue #907 finding 2: the old literal substring check required the
+# comment to contain nothing else, so a marker written with any commentary
+# silently never matched -- no warning, no effect, for as long as nobody
+# happened to re-check it against the raw text). Anchored to the WHOLE
+# line (cold-review finding, 24.09): a wider search window (see
+# _index_health_window below) makes it reachable for prose that merely
+# mentions the marker's syntax as an example -- a real directive in this
+# codebase's own style is always alone on its line.
+_INDEX_HEALTH_RE = re.compile(r"^[ \t]*<!--\s*index-health:\s*(skip-cells|skip)\b[^>]*-->[ \t]*$", re.MULTILINE)
 _STATUS_HEADERS = {"ст", "статус", "status", "state"}
 _WP_NUMBER_HEADERS = {"#", "№", "wp", "рп", "id"}
 
@@ -74,6 +96,13 @@ CELL_FAIL = 400
 # Размер сам по себе — слабый маркер: реестр из 300 РП × 100 chars = 30KB, норма.
 # Настоящие маркеры — длинные строки/ячейки.
 
+# MEMORY.md — отдельные пороги (issue #677): SIZE_WARN/FAIL выше предела
+# загрузчика контекста, поэтому для живого индекса памяти он недостижим по
+# конструкции — файл раньше обрежется загрузчиком, чем сработает этот порог.
+# FAIL = сам предел загрузчика (~24.4 KiB символов), WARN = запас до него.
+MEMORY_SIZE_FAIL = 24986
+MEMORY_SIZE_WARN = int(MEMORY_SIZE_FAIL * 0.85)
+
 
 def _plain_table_cell(cell: str) -> str:
     return cell.strip("*~` \t").rstrip(".").casefold()
@@ -100,29 +129,74 @@ def _status_cell(cells: list[str], status_column: int | None) -> str | None:
     return None
 
 
+def _index_health_window(text: str) -> str:
+    """Where a skip marker is allowed to live (issue #907 finding 1).
+
+    The original fixed first-512-chars window has nowhere legal for the
+    marker once a file's YAML frontmatter alone exceeds it (an ordinary
+    long `summary` field is enough): before it breaks frontmatter parsing,
+    after it is invisible to the detector. Keep the original window as-is
+    (every placement that already works today keeps working) and add the
+    first ~20 lines right after a closing frontmatter `---`.
+    """
+    window = text[:512]
+    if text.startswith("---\n") or text.startswith("---\r\n"):
+        close = re.search(r"\n---[ \t]*\r?\n", text[3:])
+        if close:
+            body_start = 3 + close.end()
+            extra_lines = text[body_start:].splitlines()[:20]
+            window += "\n" + "\n".join(extra_lines)
+    return window
+
+
+def _index_health_marker(window: str) -> tuple[str | None, str | None]:
+    """Return (marker, warning); marker is 'skip', 'skip-cells' or None.
+
+    issue #907 finding 2: a marker comment that carries a trailing
+    explanation used to defeat the old literal substring check completely
+    -- the exemption silently never took effect, no warning, indistinguishable
+    from "no marker was ever placed". Parse with a regex tolerant of
+    trailing text inside the comment, and warn when the header mentions the
+    key but no known directive parses (typo, renamed value) instead of
+    doing nothing.
+    """
+    match = _INDEX_HEALTH_RE.search(window)
+    if match:
+        return match.group(1), None
+    if "index-health:" in window:
+        return None, "index-health: марка в шапке есть, но директива не распознана (ожидается skip или skip-cells)"
+    return None, None
+
+
 def check_file(path: Path) -> dict:
-    size = path.stat().st_size
     out = {
-        "size": size,
+        "size": 0,
         "long_lines": [],      # list of (lineno, char_len)
         "long_cells": [],      # list of (lineno, cell_idx, char_len)
         "done_no_strike": [],  # list of (lineno, wp_number) — ✅ без зачёркивания
         "skip": False,
         "skip_cells": False,
         "size_skip": False,
+        "marker_warning": None,
     }
     try:
         text = path.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
         out["skip"] = True
         return out
+    # Символы, не байты (issue #677) — докстринг обещает char count, а
+    # кириллица в UTF-8 весит вдвое больше символа: порог, сверенный по
+    # байтам, срабатывает не на том объёме, который считает загрузчик.
+    out["size"] = len(text)
 
-    head = text[:512]
+    head = _index_health_window(text)
+    marker, warning = _index_health_marker(head)
+    out["marker_warning"] = warning
     # index-health: skip отключает проверки РАЗДУТИЯ (размер/длина/ячейки),
     # но НЕ семантику done-форматирования — она дешёвая и не зависит от размера.
-    size_skip = "<!-- index-health: skip -->" in head
+    size_skip = marker == "skip"
     out["size_skip"] = size_skip
-    if "<!-- index-health: skip-cells -->" in head:
+    if marker == "skip-cells":
         out["skip_cells"] = True
 
     status_column = None
@@ -162,29 +236,73 @@ def check_file(path: Path) -> dict:
     return out
 
 
-def classify(findings: dict) -> str:
+def classify(findings: dict, size_warn: int = SIZE_WARN, size_fail: int = SIZE_FAIL) -> str:
+    # Defaults keep the pre-#677 single-arg call signature working for
+    # existing external callers (setup/test-update-edge-cases.sh T20) that
+    # never needed MEMORY.md's separate thresholds — main() below still
+    # passes them explicitly for that one filename.
     size = 0 if findings["size_skip"] else findings["size"]
     max_line = max((n for _, n in findings["long_lines"]), default=0)
     max_cell = max((n for _, _, n in findings["long_cells"]), default=0)
-    if size > SIZE_FAIL or max_line > LINE_FAIL or max_cell > CELL_FAIL:
+    if size > size_fail or max_line > LINE_FAIL or max_cell > CELL_FAIL:
         return "FAIL"
-    if size > SIZE_WARN or max_line > LINE_WARN or max_cell > CELL_WARN \
+    if size > size_warn or max_line > LINE_WARN or max_cell > CELL_WARN \
             or findings["done_no_strike"]:
         return "WARN"
     return "OK"
 
 
+def _walk_dirs(root: Path):
+    """os.walk with followlinks, guarded against symlink cycles.
+
+    rglob() does not descend into symlinked directories at all (issue #677) —
+    live indexes under `memory/` (a symlink to auto-memory on a standard
+    install) never reach the scanner. followlinks=True fixes that, at the
+    cost of needing an explicit cycle guard: a symlink loop would otherwise
+    walk forever.
+    """
+    visited_real_dirs: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+        real_dir = os.path.realpath(dirpath)
+        if real_dir in visited_real_dirs:
+            dirnames[:] = []
+            continue
+        visited_real_dirs.add(real_dir)
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        yield Path(dirpath), filenames
+
+
+def _find_memory_dirs(root: Path) -> set[Path]:
+    """Directories containing a live MEMORY.md — the memory store itself.
+
+    Notes inside it named like a registry (`*-index.md`, `*-catalog.md`) are
+    ordinary memory notes, not maintained indexes (issue #677) — flagging
+    them once symlinks are followed would be a new false-positive class.
+    """
+    return {
+        dirpath
+        for dirpath, filenames in _walk_dirs(root)
+        if "MEMORY.md" in filenames
+    }
+
+
 def iter_index_files(root: Path):
-    for path in root.rglob("*.md"):
-        if any(p in SKIP_DIRS for p in path.parts):
-            continue
-        if path.name in NAME_PATTERNS:
-            yield path
-            continue
-        for pat in GLOB_PATTERNS:
-            if path.match(pat):
+    memory_dirs = _find_memory_dirs(root)
+    for dirpath, filenames in _walk_dirs(root):
+        in_memory_dir = dirpath in memory_dirs
+        for filename in filenames:
+            if not filename.endswith(".md"):
+                continue
+            path = dirpath / filename
+            if filename in NAME_PATTERNS:
                 yield path
-                break
+                continue
+            if in_memory_dir:
+                continue
+            for pat in GLOB_PATTERNS:
+                if path.match(pat):
+                    yield path
+                    break
 
 
 def fmt_file_line(path: Path, root: Path, findings: dict) -> str:
@@ -203,19 +321,39 @@ def fmt_file_line(path: Path, root: Path, findings: dict) -> str:
     return "  " + "  ".join(parts)
 
 
+def _default_workspace() -> Path:
+    """Resolve the workspace root the same way the shell tooling does
+    (iwe-env-bootstrap.sh): explicit env var wins, ~/IWE is only a last
+    resort. Without this, an install at a non-default path is always
+    scanned at the wrong root and Day Close degrades silently (issue #834,
+    same root cause as #638 in memory-drift-scan.py)."""
+    for var in ("IWE_WORKSPACE", "IWE_ROOT", "WORKSPACE_DIR"):
+        value = os.environ.get(var)
+        if value:
+            return Path(value)
+    return Path.home() / "IWE"
+
+
 def main() -> int:
-    root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "IWE"
+    root = Path(sys.argv[1]) if len(sys.argv) > 1 else _default_workspace()
     if not root.is_dir():
         print(f"FAIL: root dir not found: {root}", file=sys.stderr)
         return 2
 
     buckets = {"FAIL": [], "WARN": [], "OK": [], "SKIP": []}
+    marker_warnings = []
     for path in sorted(iter_index_files(root)):
         findings = check_file(path)
+        if findings["marker_warning"]:
+            marker_warnings.append((path, findings["marker_warning"]))
         if findings["skip"]:
             buckets["SKIP"].append((path, findings))
             continue
-        buckets[classify(findings)].append((path, findings))
+        if path.name == "MEMORY.md":
+            size_warn, size_fail = MEMORY_SIZE_WARN, MEMORY_SIZE_FAIL
+        else:
+            size_warn, size_fail = SIZE_WARN, SIZE_FAIL
+        buckets[classify(findings, size_warn, size_fail)].append((path, findings))
 
     total = sum(len(v) for v in buckets.values())
     print(f"Index health scan — root: {root}")
@@ -234,6 +372,11 @@ def main() -> int:
         print(f"\n=== SKIP ({len(buckets['SKIP'])}) ===")
         for path, _ in buckets["SKIP"]:
             print(f"  {path.relative_to(root)}")
+
+    if marker_warnings:
+        print(f"\n=== MARKER WARNINGS ({len(marker_warnings)}) ===")
+        for path, warning in marker_warnings:
+            print(f"  {path.relative_to(root)}: {warning}")
 
     return 1 if (buckets["FAIL"] or buckets["WARN"]) else 0
 

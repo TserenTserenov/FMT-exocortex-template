@@ -113,7 +113,14 @@ def process_skill(skill_dir: Path) -> dict:
     }
 
 
-def validate_entry(entry: dict) -> list[str]:
+# issue #890: only an executor that runs no model call can honestly claim
+# determinism — a haiku/sonnet/opus/agent call, or the judgment half of
+# script+judgment, varies run to run by construction. mcp-direct is a
+# deterministic tool invocation, same class as a script.
+EXECUTORS_ALLOWING_DETERMINISTIC_TRUE = {"script", "mcp-direct"}
+
+
+def validate_entry(entry: dict, template_root: Path) -> list[str]:
     errors = []
     r = entry.get("routing", {})
     executor = r.get("executor")
@@ -125,9 +132,27 @@ def validate_entry(entry: dict) -> list[str]:
         errors.append(
             f"{entry['name']}: agent executor requires model: haiku|sonnet|opus"
         )
-    if executor == "script" and "script_path" not in r:
-        # Warning, not error — script_path may be added later
-        pass
+    if executor == "script":
+        script_path = r.get("script_path")
+        if not script_path:
+            errors.append(f"{entry['name']}: executor:script requires routing.script_path")
+        # issue #634 (route-task.sh run_script()): a relative script_path is
+        # resolved against the TEMPLATE root, not wherever --skills-dir
+        # happened to point (it is frequently a workspace install's copy,
+        # e.g. <workspace>/.claude/skills, which has no top-level scripts/
+        # of its own). Checking existence against the wrong root broke
+        # every skill whose script lives outside .claude/skills/<name>/
+        # (agent-fault, consent, transcribe, w-reflection all share one
+        # scripts/ tree) the moment --skills-dir pointed at a workspace.
+        elif not (Path(script_path) if os.path.isabs(script_path) else template_root / script_path).is_file():
+            errors.append(
+                f"{entry['name']}: routing.script_path does not exist: {script_path}"
+            )
+    if r.get("deterministic") is True and executor not in EXECUTORS_ALLOWING_DETERMINISTIC_TRUE:
+        errors.append(
+            f"{entry['name']}: deterministic:true is inconsistent with executor '{executor}' "
+            f"(only {sorted(EXECUTORS_ALLOWING_DETERMINISTIC_TRUE)} run no model call)"
+        )
     return errors
 
 
@@ -135,6 +160,10 @@ def build_catalog(skills_dir: Path) -> dict:
     entries = []
     skipped = []
     all_errors = []
+    # This file's own location, not skills_dir (which --skills-dir can point
+    # at a workspace install of skills/ with no scripts/ tree of its own —
+    # see the comment on the template_root parameter in validate_entry).
+    template_root = Path(__file__).resolve().parent.parent
 
     for skill_dir in sorted(skills_dir.iterdir()):
         if not skill_dir.is_dir():
@@ -145,7 +174,7 @@ def build_catalog(skills_dir: Path) -> dict:
                 {"name": entry["skipped"], "skip_reason": entry["skip_reason"]}
             )
             continue
-        errors = validate_entry(entry)
+        errors = validate_entry(entry, template_root)
         if errors:
             all_errors.extend(errors)
             continue
@@ -194,9 +223,20 @@ def _read_existing_catalog(output_path: Path) -> dict:
 
     missing = [key for key in PRESERVED_TOP_LEVEL_KEYS if key not in existing]
     if missing:
+        # issue #767: the previous message named the missing section but gave
+        # no next step, so update.sh printed it and stopped without telling
+        # the operator what to actually do. This can legitimately happen on
+        # an install upgrading across the release that introduced "reflexes"
+        # (not necessarily corruption) -- name the concrete fix, matching the
+        # existing repair contract this file already ships (see
+        # --repair-add-reflexes below), which the existing test suite already
+        # asserts must still REJECT a bare missing key rather than silently
+        # backfill it (silent backfill would mask real data loss the same
+        # way as a genuinely truncated file).
         raise ValueError(
             f"existing catalog is missing runtime-owned sections {missing}: {output_path}; "
-            "refusing to overwrite it"
+            "refusing to overwrite it. Fix: "
+            f"python3 {sys.argv[0]} --repair-add-reflexes {output_path}"
         )
     for key in PRESERVED_TOP_LEVEL_KEYS:
         if not isinstance(existing[key], list):
@@ -270,7 +310,46 @@ def _parse_args() -> argparse.Namespace:
         default=workspace / governance_repo / "scripts" / "executor-catalog.yaml",
         help="Catalog output path",
     )
+    parser.add_argument(
+        "--repair-add-reflexes",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "One-shot migration for a catalog written before PRESERVED_TOP_LEVEL_KEYS "
+            "grew the 'reflexes' entry (issue #767): add an empty reflexes: [] to PATH "
+            "in place and exit, without touching any other section. Refuses (nonzero "
+            "exit) if PATH is not valid YAML, is not a mapping, or already has "
+            "'reflexes' -- this is a targeted repair for exactly the missing-key case, "
+            "not a general-purpose catalog fixer."
+        ),
+    )
     return parser.parse_args()
+
+
+def repair_add_reflexes(path: Path) -> None:
+    """Add an empty `reflexes: []` to an existing catalog missing only that key."""
+    try:
+        existing = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise ValueError(f"{path} is not readable/valid YAML: {exc}") from exc
+    if not isinstance(existing, dict):
+        raise ValueError(f"{path} is not a YAML mapping — refusing to guess a repair")
+    if "reflexes" in existing:
+        raise ValueError(f"{path} already has a 'reflexes' section — nothing to repair")
+    existing["reflexes"] = []
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as temporary:
+        yaml.safe_dump(existing, temporary, allow_unicode=True, sort_keys=False)
+        temporary_path = Path(temporary.name)
+    temporary_path.chmod(0o644)
+    temporary_path.replace(path)
 
 
 def _without_generation_time(catalog: dict) -> dict:
@@ -320,6 +399,16 @@ def _write_catalog_if_changed(catalog: dict, output_path: Path) -> bool:
 
 def main():
     args = _parse_args()
+
+    if args.repair_add_reflexes is not None:
+        try:
+            repair_add_reflexes(args.repair_add_reflexes.expanduser())
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print(f"OK: added empty reflexes: [] to {args.repair_add_reflexes}")
+        return
+
     skills_dir = args.skills_dir.expanduser()
     output_path = args.output.expanduser()
 

@@ -3,9 +3,10 @@
 
 ## Контекст
 
-- **HUB (личные планы):** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/current/
-- **Документы стратегии:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/docs/ (Strategy.md, Dissatisfactions.md, Session Agenda.md)
-- **Inbox:** {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/
+- **HUB (личные планы):** $GOV_WT/current/
+- **Документы стратегии:** $GOV_WT/docs/ (Strategy.md, Dissatisfactions.md, Session Agenda.md)
+- **Inbox:** $GOV_WT/inbox/
+- **`$GOV_WT`:** рабочая (изолированная) копия governance-репозитория; определяется по шагу 0 скилла strategy-session (`.claude/skills/strategy-session/SKILL.md`), все записи строить от неё, не от канона `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`; публикация через `ds-publish.sh` блоком публикации шага 0 скилла (все коммиты копии, которых нет на `origin/main`, по очереди; `--branch main` — только публикатору, который его знает по тексту файла (эвристика: ветка разбора аргумента `--branch)`)), только в режиме isolated (в режиме legacy без session-guard — штатным способом установки); каждый блок записи — по шагу 0 скилла: `GOV_WT="<путь>"; : "${GOV_WT:?}"`, затем команды в подоболочке `(cd -- "$GOV_WT" || exit 1` … `)`, без верхнеуровневого `cd` (его блокирует хук `destructive-guard.sh`)
 - **SPOKE (планы репо):** {{WORKSPACE_DIR}}/*/WORKPLAN.md
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
@@ -20,11 +21,11 @@
 
 #### 0. Если первая сессия месяца — прочитать архив прошлого месяца (БЛОКИРУЮЩЕЕ)
 
-- Проверь: сегодня — первая Strategy Session в текущем месяце? (Признак: дата сессии ≤7 числа месяца И в `{{GOVERNANCE_REPO}}/sessions/` нет записи Strategy Session с этого месяца)
+- Проверь: сегодня — первая Strategy Session в текущем месяце? (Признак: дата сессии ≤7 числа месяца И в журнале сессий (`iwe_sessions_dir`, при его отсутствии `$GOV_WT/sessions`; ищи и `sessions/YYYY-MM-*.md`, и `sessions/YYYY-MM/`) нет записи Strategy Session с этого месяца)
 - Если да:
-  1. Найди последний `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/archive/MonthClose YYYY-MM.md` (за прошлый месяц)
+  1. Найди последний `$GOV_WT/archive/MonthClose YYYY-MM.md` (за прошлый месяц)
   2. Прочитай ОБЯЗАТЕЛЬНО ДО шага 1: мультипликатор, фаза, калибр, ревизия проектов, инсайты решений, R-вопросник, carry-over
-  3. Прочитай `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/archive/multiplier-trend.md` (если есть) для динамики
+  3. Прочитай `$GOV_WT/archive/multiplier-trend.md` (если есть) для динамики
   4. Используй эти данные как контекст при стратегической сверке (шаг 5) и формировании плана (шаг 6)
 - Если нет (вторая+ сессия месяца) — пропусти, переходи к шагу 1
 
@@ -64,9 +65,9 @@
 
 > Реализует Фазу 2b метода `PD.METHOD.008` (стратегирование). Алгоритм рекомендации Стратегом — `PD.METHOD.018` § Механизм рекомендации Стратегом. Различение C_vis vs C_act — `PD.FORM.091 §6.1`.
 
-1. **Прочитай трекер:** `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/Lifework/Caliber-artifacts-tracker.md` (если файла нет — создай из шаблона `{{WORKSPACE_DIR}}/FMT-exocortex-template/templates/strategy-skeleton/Lifework/Caliber-artifacts-tracker.md`)
+1. **Прочитай трекер:** `$GOV_WT/Lifework/Caliber-artifacts-tracker.md` (если файла нет — создай из шаблона `{{WORKSPACE_DIR}}/FMT-exocortex-template/templates/strategy-skeleton/Lifework/Caliber-artifacts-tracker.md`)
 2. **Измерь C_vis:** max системный уровень в `Dissatisfactions.md` с фильтром «≥2 НЭП на уровне» (одиночный НЭП на высоком уровне = сигнал, не калибр видения)
-3. **Измерь C_act:** max уровень охвата (`PD.FORM.090`) с lifework-документом, действующим ≥6 мес. Читай из `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/Lifework/` (там живут личные документы). Если папки нет или пуста — C_act=0, рекомендуй создать Личный устав (уровень 1) первым, взяв шаблон из `PACK-personal/.../lifework-templates/lifework-self-charter-template.md`
+3. **Измерь C_act:** max уровень охвата (`PD.FORM.090`) с lifework-документом, действующим ≥6 мес. Читай из `$GOV_WT/Lifework/` (там живут личные документы). Если папки нет или пуста — C_act=0, рекомендуй создать Личный устав (уровень 1) первым, взяв шаблон из `PACK-personal/.../lifework-templates/lifework-self-charter-template.md`
 4. **Объяви разрыв:** «C_vis=N, C_act=M, зона роста = [M+1..N]»
 5. **Проверь минимально полный пакет уровня C_act** (`PD.FORM.090 §6`): все ли инварианты уровней 1..C_act присутствуют? Поломки внизу → рекомендация «догнать вниз», STOP здесь (приоритет, поломка наверху = обрыв снизу)
 6. **Двойной gate для подъёма:** активируй рекомендацию уровня C_act+1 ТОЛЬКО если: (а) пакет C_act полный + действует ≥6 мес; (б) ступень мастерства ≥3 (`PD.FORM.080`). Иначе фокус на текущем уровне, не предлагать рост
@@ -100,7 +101,7 @@
 - Обнови WORKPLAN.md в целевых репо (обратная синхронизация)
 - **ОБЯЗАТЕЛЬНО:** Обнови MEMORY.md → секция «РП текущей недели» (актуальный список РП + статусы)
 - **ОБЯЗАТЕЛЬНО:** Если добавлена работа, не отражённая в Strategy.md → обнови Strategy.md (приоритеты месяца, фазы, Q1 результаты)
-- **ОБЯЗАТЕЛЬНО:** Очисти обработанные из fleeting-notes.md и inbox/
+- **ОБЯЗАТЕЛЬНО:** Очисти из fleeting-notes.md заметки, по которым пилот уже принял решение (помеченные `✅предложено` без решения не трогай; процедура — «Очистка заметок» в `note-review.md`), и обработанные файлы из inbox/
 - **ОБЯЗАТЕЛЬНО:** Обратная синхронизация MAPSTRATEGIC.md — если элемент из MAPSTRATEGIC взят в работу (создан РП) → обнови статус фазы в `<repo>/MAPSTRATEGIC.md` (пометь как in-progress, добавь ссылку на РП). Если фаза завершена (РП done) → пометь как done.
 - Закоммить изменения в {{GOVERNANCE_REPO}} и затронутых репо
 

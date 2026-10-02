@@ -137,6 +137,14 @@ chmod +x "$SNIPPET"
 # to avoid the generator's own "SKILLS_DIR not found" exit(1) keeps both
 # reads and writes inside $TEST_ROOT.
 FAKE_HOME="$TEST_ROOT/home"
+# issue #890 (WP-7 Ф164): script_path now must resolve to a real file
+# (checked against the generator's own location, template-root-relative
+# per #634 -- an isolated sandbox HOME cannot satisfy a relative one).
+# Give the fixture skill a real, absolute dummy script instead.
+SMOKE_FIXTURE_SCRIPT="$FAKE_HOME/IWE/smoke-fixture-dummy.sh"
+mkdir -p "$(dirname "$SMOKE_FIXTURE_SCRIPT")"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SMOKE_FIXTURE_SCRIPT"
+chmod +x "$SMOKE_FIXTURE_SCRIPT"
 mkdir -p "$FAKE_HOME/IWE/.claude/skills/smoke-fixture"
 cat > "$FAKE_HOME/IWE/.claude/skills/smoke-fixture/SKILL.md" <<'SKILLEOF'
 ---
@@ -144,11 +152,12 @@ name: smoke-fixture
 description: minimal fixture skill for test_issue_463_setup_reuses_resolved_python3.sh
 routing:
   executor: script
-  script_path: scripts/smoke-fixture.sh
+  script_path: __SMOKE_FIXTURE_SCRIPT_PLACEHOLDER__
   deterministic: true
 ---
 Fixture only — not a real skill.
 SKILLEOF
+sed -i "s#__SMOKE_FIXTURE_SCRIPT_PLACEHOLDER__#$SMOKE_FIXTURE_SCRIPT#" "$FAKE_HOME/IWE/.claude/skills/smoke-fixture/SKILL.md"
 
 # PATH puts the no-yaml stub first for BOTH the resolver call inside the
 # snippet and any bare `python3` the snippet might call — this is the actual
@@ -389,6 +398,37 @@ assert_invalid_catalog_rejected "yaml" $'reflexes: [\n'
 assert_invalid_catalog_rejected "nonmapping" $'- item\n'
 assert_invalid_catalog_rejected "missing-reflexes" $'schema_version: "1.0"\n'
 assert_invalid_catalog_rejected "nonlist-reflexes" $'reflexes: {}\n'
+
+# issue #767: a bare-missing-reflexes catalog is correctly rejected above, but
+# the error used to name the problem with no next step. --repair-add-reflexes
+# is the one-shot migration path it now points to -- verify it actually
+# converges the rejected case into an accepted one.
+REPAIR_TARGET="$TEST_ROOT/repair-missing-reflexes.yaml"
+printf 'schema_version: "1.0"\nsome_other_field: kept\n' > "$REPAIR_TARGET"
+REPAIR_OUT=$("$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --repair-add-reflexes "$REPAIR_TARGET" 2>&1)
+REPAIR_STATUS=$?
+if [ "$REPAIR_STATUS" -eq 0 ] && grep -qF 'some_other_field: kept' "$REPAIR_TARGET" \
+    && grep -qF 'reflexes: []' "$REPAIR_TARGET"; then
+    pass "--repair-add-reflexes adds an empty reflexes section, keeps the rest"
+else
+    fail "--repair-add-reflexes did not converge (status=$REPAIR_STATUS): $REPAIR_OUT"
+fi
+REPAIR_RERUN_OUT=$(IWE_ROOT="$CUSTOM_WORKSPACE" IWE_GOVERNANCE_REPO=custom-governance \
+    "$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --skills-dir "$CUSTOM_SKILLS" --output "$REPAIR_TARGET" 2>&1)
+if [ $? -eq 0 ]; then
+    pass "generator no longer rejects a catalog repaired by --repair-add-reflexes"
+else
+    fail "generator still rejects the repaired catalog: $REPAIR_RERUN_OUT"
+fi
+REPAIR_TWICE_OUT=$("$RESOLVED" "$ROOT/scripts/generate-executor-catalog.py" \
+    --repair-add-reflexes "$REPAIR_TARGET" 2>&1)
+if [ $? -ne 0 ]; then
+    pass "--repair-add-reflexes refuses a catalog that already has reflexes"
+else
+    fail "--repair-add-reflexes ran again on an already-repaired catalog: $REPAIR_TWICE_OUT"
+fi
 
 VALIDATE_OUTPUT="$TEST_ROOT/validate-input-only.yaml"
 printf 'reflexes: [\n' > "$VALIDATE_OUTPUT"

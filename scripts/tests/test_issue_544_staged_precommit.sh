@@ -30,6 +30,21 @@ GOV="$WS/${GOVERNANCE_REPO:-DS-strategy}"
 mkdir -p "$GOV/.githooks" "$GOV/current"
 cp "$ROOT/seed/strategy/.githooks/pre-commit" "$GOV/.githooks/pre-commit"
 chmod +x "$GOV/.githooks/pre-commit"
+# issue #810: the seed hook now runs pre-commit-secret-scan.sh (fail-closed)
+# before this test's own artifact validator ever gets a turn -- without a
+# real scanner in this synthetic fixture, every commit below would fail on
+# the new gate for a reason unrelated to what this test actually checks.
+# Resolution order mirrors the hook: $IWE_SCRIPTS (set below) for the
+# scanner script, $repo_root/.claude/hooks/ (the governance-repo checkout
+# itself) for its pattern library.
+cp "$ROOT/scripts/pre-commit-secret-scan.sh" "$WS/FMT-exocortex-template/scripts/"
+chmod +x "$WS/FMT-exocortex-template/scripts/pre-commit-secret-scan.sh"
+mkdir -p "$GOV/.claude/hooks"
+cp "$ROOT/.claude/hooks/secret-bypass-lib.sh" "$GOV/.claude/hooks/secret-bypass-lib.sh"
+# issue #832: the analyzer program moved out of secret-bypass-lib.sh into its
+# own file (secret-bypass-analyzer.py), resolved relative to the library's
+# own directory at call time -- it has to sit right next to the copy above.
+cp "$ROOT/.claude/hooks/secret-bypass-analyzer.py" "$GOV/.claude/hooks/secret-bypass-analyzer.py"
 git -C "$GOV" init -q
 git -C "$GOV" config user.email test@test && git -C "$GOV" config user.name test
 git -C "$GOV" config core.hooksPath .githooks
@@ -154,8 +169,14 @@ git -C "$GOV" reset -q
 rm -f "$GOV/current/WeekPlan W99.md"
 
 # --- 7. Mandatory fail-closed: конфиг существует, но не читается ---
-mkdir -p "$WS/scripts/lib" "$WS/memory"
-cp "$ROOT/scripts/lib/find-python3.sh" "$WS/scripts/lib/"
+# find-python3.sh резолвится рядом со скриптом-потребителем (issue #764:
+# $WORKSPACE/scripts/lib/ никогда не существует ни на одной установке).
+# Кейс 7 упражняет резолвер через IWE_SCRIPTS (задан на строке 39, указывает
+# сюда же); кейсы 9-12 (после unset на строке 174+) упражняют тот же путь
+# через self-relative fallback — оба совпадают в этой фикстуре с одним и тем
+# же каталогом, поэтому обе ветки resolve_find_python3() покрыты.
+mkdir -p "$WS/FMT-exocortex-template/scripts/lib" "$WS/memory"
+cp "$ROOT/scripts/lib/find-python3.sh" "$WS/FMT-exocortex-template/scripts/lib/"
 printf 'mandatory_daily_wps: [сломано\n  без закрывающей скобки\n' > "$WS/memory/day-rhythm-config.yaml"
 valid_dayplan "$GOV/current/DayPlan 2026-08-31.md"
 if (cd "$GOV" && git add "current/DayPlan 2026-08-31.md" && git commit -qm "broken-config") >"$TMP/c7.err" 2>&1; then
@@ -217,17 +238,38 @@ printf 'mandatory_daily_wps: []
 FAKEPY="$WS/fake-python3"
 printf '#!/bin/sh\nexit 126\n' > "$FAKEPY"; chmod +x "$FAKEPY"
 # Подменяем резолвер: он должен вернуть путь к падающему интерпретатору.
-mv "$WS/scripts/lib/find-python3.sh" "$WS/scripts/lib/find-python3.sh.away"
-printf '#!/bin/sh\necho "%s"\n' "$FAKEPY" > "$WS/scripts/lib/find-python3.sh"; chmod +x "$WS/scripts/lib/find-python3.sh"
+mv "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh" "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh.away"
+printf '#!/bin/sh\necho "%s"\n' "$FAKEPY" > "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh"; chmod +x "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh"
 valid_dayplan "$GOV/current/DayPlan 2026-09-02.md"
 if (cd "$GOV" && git add "current/DayPlan 2026-09-02.md" && git commit -qm "weird-rc") >"$TMP/c11.err" 2>&1; then
     bad "нестандартный rc интерпретатора (126) блокирует коммит (fail-closed)"
 else
     ok "нестандартный rc интерпретатора (126) блокирует коммит (fail-closed)"
 fi
-mv "$WS/scripts/lib/find-python3.sh.away" "$WS/scripts/lib/find-python3.sh"
+mv "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh.away" "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh"
 git -C "$GOV" reset -q
 rm -f "$GOV/current/DayPlan 2026-09-02.md" "$WS/memory/day-rhythm-config.yaml" "$FAKEPY"
+
+# --- 12. Резолвер find-python3.sh отсутствует целиком — fail-closed, не WARN
+# (issue #764/#765: старый код искал резолвер по $WORKSPACE/scripts/lib/,
+# такого пути нет ни на одной установке — python3 никогда не резолвился, и
+# конфиг существующий, но не читаемый только из-за этого, тихо пропускался
+# как «mandatory не сконфигурирован»). ---
+mkdir -p "$WS/memory"
+printf 'mandatory_daily_wps: []\n' > "$WS/memory/day-rhythm-config.yaml"
+mv "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh" "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh.away"
+valid_dayplan "$GOV/current/DayPlan 2026-09-03.md"
+if (cd "$GOV" && git add "current/DayPlan 2026-09-03.md" && git commit -qm "no-resolver") >"$TMP/c12.err" 2>&1; then
+    bad "резолвер find-python3.sh отсутствует → блокирует коммит (fail-closed, не тихий пропуск)"
+else
+    ok "резолвер find-python3.sh отсутствует → блокирует коммит (fail-closed, не тихий пропуск)"
+fi
+grep -qF 'python3 не резолвится' "$TMP/c12.err" \
+    && ok "fail-closed без резолвера называет причину" \
+    || bad "fail-closed без резолвера называет причину"
+mv "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh.away" "$WS/FMT-exocortex-template/scripts/lib/find-python3.sh"
+git -C "$GOV" reset -q
+rm -f "$GOV/current/DayPlan 2026-09-03.md" "$WS/memory/day-rhythm-config.yaml"
 
 if [ "$fail" -gt 0 ]; then
     echo "FAIL: $fail проверок упало"

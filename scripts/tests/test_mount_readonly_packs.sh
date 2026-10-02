@@ -53,8 +53,19 @@ git -C "$WORKSPACE/PACK-test" config user.name "Pack mount regression"
 echo "original content" > "$WORKSPACE/PACK-test/00-pack-manifest.md"
 git -C "$WORKSPACE/PACK-test" add 00-pack-manifest.md
 git -C "$WORKSPACE/PACK-test" commit -q -m init
+git init -q --bare -b main "$TMP/PACK-test.git"
+git -C "$WORKSPACE/PACK-test" remote add origin "$TMP/PACK-test.git"
+git -C "$WORKSPACE/PACK-test" push -q origin main
 
 mount_readonly_packs "$WORKSPACE" "$ISOLATED"
+
+if [ "$(git -C "$ISOLATED/PACK-test" rev-parse HEAD)" = \
+     "$(git -C "$TMP/PACK-test.git" rev-parse main)" ]; then
+    echo "PASS: mounted Pack uses the published commit"
+else
+    echo "FAIL: mounted Pack revision differs from the published commit"
+    FAIL=1
+fi
 
 if [ -f "$ISOLATED/PACK-test/00-pack-manifest.md" ]; then
     echo "PASS: Pack content is readable in the isolated mount"

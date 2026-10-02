@@ -34,6 +34,24 @@ GOV_REPO="${IWE_GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 WORKSPACE="${IWE_WORKSPACE:-${IWE_ROOT:-$HOME/IWE}}"
 GOV_PATH="$WORKSPACE/$GOV_REPO"
 
+# find-python3.sh resolver (issue #764): $WORKSPACE/scripts/lib/find-python3.sh
+# never existed on any install. The manifest delivers find-python3.sh as this
+# hook's own sibling (.claude/lib/find-python3.sh), so resolve relative to
+# this hook's own location first; $IWE_SCRIPTS is an explicit override.
+resolve_find_python3() {
+    local candidate
+    if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/lib/find-python3.sh" ]; then
+        printf '%s\n' "$IWE_SCRIPTS/lib/find-python3.sh"
+        return 0
+    fi
+    candidate="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || true)/lib/find-python3.sh"
+    if [ -f "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+    return 1
+}
+
 # R4.5 fix (WP-273): trigger ТОЛЬКО по staged files, НЕ по тексту команды.
 # Старая логика грепала TOOL_INPUT на «DayPlan|day-close» — false positive
 # на любой коммит файла `day-close/SKILL.md` или сообщения с «day-close».
@@ -110,7 +128,9 @@ fi
 # чего — принуждение к числу даёт фиктивное '~1.0x', которое через месяц читается
 # как измерение. Явная текстовая оговорка ("мультипликатор не считаю"/"не
 # настроен") — такое же честное состояние поля, как и само число.
-if ! grep -qE "~[0-9]+\.?[0-9]*x" "$DAYPLAN" && ! grep -qiE "мультипликатор.*(не считаю|не наст)" "$DAYPLAN"; then
+# issue #870: дробная часть — точка ИЛИ запятая (русский Day Open пишет «~1,2x»).
+# Число только проверяется на формат (grep), в вычислениях не участвует.
+if ! grep -qE "~[0-9]+[.,]?[0-9]*x" "$DAYPLAN" && ! grep -qiE "мультипликатор.*(не считаю|не наст)" "$DAYPLAN"; then
   ERRORS+=("Мультипликатор не найден — нужен формат '~N.Nx' в строке бюджета, либо явная оговорка 'мультипликатор не считаю'")
 fi
 
@@ -127,13 +147,34 @@ if [ -f "$DAY_RHYTHM_CONFIG" ]; then
   # other sites in this migration (peer-session 2026-08-19-29, codex turn 1).
   # No bare-python3 fallback: the resolver's own first candidate is already
   # bare `python3` from PATH.
-  _RESOLVED_PYTHON3=$("$WORKSPACE/scripts/lib/find-python3.sh" 2>/dev/null) || _RESOLVED_PYTHON3=""
-  if [ -n "$_RESOLVED_PYTHON3" ] && "$_RESOLVED_PYTHON3" -c "
-import yaml, sys
-d = yaml.safe_load(open(sys.argv[1])) or {}
+  _RESOLVER=$(resolve_find_python3) || _RESOLVER=""
+  _RESOLVED_PYTHON3=""
+  [ -n "$_RESOLVER" ] && _RESOLVED_PYTHON3=$("$_RESOLVER" 2>/dev/null) || true
+  if [ -z "$_RESOLVED_PYTHON3" ]; then
+    # issue #765: резолвер python3 не менее надёжен, чем сам YAML — та же
+    # fail-closed граница, что применяется ниже к битому/нечитаемому конфигу.
+    ERRORS+=("day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор) — mandatory-проверка невозможна, fail-closed")
+  else
+    # Коды: 0 = mandatory сконфигурирован; 1 = валидный конфиг без mandatory;
+    # 2+ = битый/нечитаемый YAML — fail-closed (тот же контракт, что sibling
+    # validate-staged-artifacts.sh).
+    _MANDATORY_RC=0
+    "$_RESOLVED_PYTHON3" -c "
+import sys
+try:
+    import yaml
+    d = yaml.safe_load(open(sys.argv[1]))
+except Exception:
+    sys.exit(2)
+if not isinstance(d, dict):
+    sys.exit(2)
 sys.exit(0 if d.get('mandatory_daily_wps') else 1)
-" "$DAY_RHYTHM_CONFIG" 2>/dev/null; then
-    MANDATORY_WPS_CONFIGURED=true
+" "$DAY_RHYTHM_CONFIG" 2>/dev/null || _MANDATORY_RC=$?
+    case "$_MANDATORY_RC" in
+      0) MANDATORY_WPS_CONFIGURED=true ;;
+      1) : ;; # валидный конфиг без mandatory — проверка не требуется
+      *) ERRORS+=("day-rhythm-config.yaml существует, но не читается (нет PyYAML / битый или пустой YAML / корень не map / интерпретатор упал rc=$_MANDATORY_RC) — mandatory-проверка невозможна, fail-closed") ;;
+    esac
   fi
 fi
 if [ "$MANDATORY_WPS_CONFIGURED" = "true" ] && ! grep -qi "mandatory" "$DAYPLAN"; then
@@ -142,12 +183,18 @@ fi
 
 # issue #328: русская 'ч' — стандартный формат formatting.md, латинская 'h' — старый
 # формат, оставлена для обратной совместимости с уже существующими артефактами.
-if ! grep -qE "~[0-9]+\.?[0-9]* ?[hч] РП" "$DAYPLAN"; then
+if ! grep -qE "~[0-9]+[.,]?[0-9]* ?[hч] РП" "$DAYPLAN"; then
   ERRORS+=("Бюджет дня не в формате '~Xч РП / ~Yч физ' (латинская 'h' тоже принимается)")
 fi
 
 # --- Ф3 Check 5: Carry-over цитата (если есть предыдущий DayPlan) ---
-PREV_DAYPLAN=$(ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null | sort | tail -2 | head -1)
+# issue #870: предшественник ЗАСТЕЙДЖЕННОГО плана в отсортированном списке, а не
+# «предпоследний на диске»: при коммите не самого свежего плана он сравнивался бы
+# со своим будущим. Самый старый план предшественника не имеет — сравнивать не с чем.
+# Сам застейдженный план добавлен в список: имя вне канона («DayPlan_…», не «DayPlan …»)
+# тоже получает предшественника, как и до этой правки.
+PREV_DAYPLAN=$({ ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null; printf '%s\n' "$DAYPLAN"; } | sort -u \
+  | CUR="$DAYPLAN" awk '$0 == ENVIRON["CUR"] { print prev; exit } { prev = $0 }')
 if [ -n "$PREV_DAYPLAN" ] && [ "$PREV_DAYPLAN" != "$DAYPLAN" ]; then
   # Предыдущий DayPlan существует — текущий должен содержать Carry-over
   if ! grep -qiE 'carry.over|carry_over' "$DAYPLAN"; then
@@ -221,9 +268,7 @@ if [ ${#MISSING[@]} -gt 0 ] || [ ${#ERRORS[@]} -gt 0 ]; then
 
   jq -n --arg reason "$MSG" '{"decision": "block", "reason": $reason}'
 else
-  cat <<'EOF'
-{"additionalContext": "✅ DayPlan прошёл валидацию: секции, ## заголовки, непустые блоки, мультипликатор, carry-over."}
-EOF
+  jq -n '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "✅ DayPlan прошёл валидацию: секции, ## заголовки, непустые блоки, мультипликатор, carry-over."}}'
 fi
 
 exit 0

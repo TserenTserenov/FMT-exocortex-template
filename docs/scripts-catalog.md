@@ -66,7 +66,6 @@
 | `kimi-session-watchdog.sh` | `scripts/kimi-session-watchdog.sh` | kimi-session-watchdog.sh |
 | `kimi-standalone-preflight.sh` | `scripts/kimi-standalone-preflight.sh` | kimi-standalone-preflight.sh |
 | `kimi-whisper-safe.sh` | `scripts/kimi-whisper-safe.sh` | безопасная обёртка для whisper с защитой от |
-| `lesson-close.sh` | `scripts/lesson-close.sh` | закрыть занятие в дневном файле (lesson/<date>.md) |
 | `llm-proxy-launcher.sh` | `scripts/llm-proxy-launcher.sh` | обёртка для запуска llm-proxy.py с OpenRouter secrets (WP-366 Ф4.A) |
 | `load-extensions.sh` | `.claude/scripts/load-extensions.sh` | unified loader для suffix extensions (R4.4 fix, WP-273 Этап 2). |
 | `memory-active-wp-update.sh` | `scripts/memory-active-wp-update.sh` | обновление секции «Текущие РП» в MEMORY.md |

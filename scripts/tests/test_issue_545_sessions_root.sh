@@ -165,7 +165,11 @@ cp "$ROOT/.claude/lib/iwe-env-bootstrap.sh" "$WSS/FMT-exocortex-template/.claude
 # monday. Фикстура обязана ставить strategy_day на заведомо НЕ сегодняшний
 # будний день, иначе тест падает каждый понедельник (поймано 31.08).
 STRAT_DAY=$(date -v+1d +%A 2>/dev/null | tr 'A-Z' 'a-z' || date -d "tomorrow" +%A | tr 'A-Z' 'a-z')
-printf 'day_open:\n  strategy_day: %s\n' "$STRAT_DAY" > "$WSS/DS-strategy/exocortex/day-rhythm-config.yaml"
+# The scaffold reads $IWE/memory/day-rhythm-config.yaml (CONFIG in day-open-scaffold.sh). The
+# fixture used to write it under DS-strategy/exocortex/, where nothing reads it, so on a Monday the
+# built-in default (monday) applied, the scaffold exited 2 and both checks below failed.
+mkdir -p "$WSS/memory"
+printf 'day_open:\n  strategy_day: %s\n' "$STRAT_DAY" > "$WSS/memory/day-rhythm-config.yaml"
 printf '## 1. Открытые вопросы\n\n- КАНАРЕЙКА_ПЕРЕНОС: доделать X\n\n## 2. Прочее\n' \
     > "$WSS/MC-sessions/$YMONTH/${YESTERDAY}-demo-day-close/report.md"
 env -u IWE_ROOT -u IWE_TEMPLATE -u IWE_GOVERNANCE_REPO -u IWE_DS_MY_STRATEGY \

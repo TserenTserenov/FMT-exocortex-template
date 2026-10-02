@@ -9,6 +9,29 @@ if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
     exit 1
 fi
 
+# === issue #810: secret corpus scan ===
+# pre-commit-secret-scan.sh shipped since #410 but no hook here ever called
+# it -- check-secret/SKILL.md claimed an automatic layer that did not exist.
+# Same fallback cascade as the validator below (template copy preferred over
+# the repo-local one, which is degraded because a local edit of the scanner
+# then affects the check on itself). The script is fail-closed by design
+# (exit 2 when its own helpers are missing/broken, exit 1 on a match) -- a
+# missing/non-executable scanner is refused here too, not silently skipped.
+HOOK_REPO_ROOT_SCAN=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+SECRET_SCANNER=""
+if [ -n "${IWE_SCRIPTS:-}" ] && [ -x "${IWE_SCRIPTS}/pre-commit-secret-scan.sh" ]; then
+    SECRET_SCANNER="${IWE_SCRIPTS}/pre-commit-secret-scan.sh"
+elif [ -x "$HOOK_REPO_ROOT_SCAN/../FMT-exocortex-template/scripts/pre-commit-secret-scan.sh" ]; then
+    SECRET_SCANNER="$HOOK_REPO_ROOT_SCAN/../FMT-exocortex-template/scripts/pre-commit-secret-scan.sh"
+elif [ -x "$HOOK_REPO_ROOT_SCAN/scripts/pre-commit-secret-scan.sh" ]; then
+    SECRET_SCANNER="$HOOK_REPO_ROOT_SCAN/scripts/pre-commit-secret-scan.sh"
+fi
+if [ -z "$SECRET_SCANNER" ]; then
+    echo "SECURITY: pre-commit-secret-scan.sh not found (checked \$IWE_SCRIPTS, sibling FMT-exocortex-template, repo-local scripts/) -- refusing to commit unscanned (fail-closed)." >&2
+    exit 1
+fi
+"$SECRET_SCANNER" || exit 1
+
 # === Protocol artifacts (issue #544): staged-semantics validation ===
 # Настоящий pre-commit видит реальный индекс после любой формы git add
 # (слитные `git add && git commit`, маски, -A/-u) — PreToolUse-перехватчик

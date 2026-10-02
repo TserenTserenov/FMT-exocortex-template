@@ -29,7 +29,6 @@
 | `/iwe-update` | Update IWE with change explanations. Agent calls update.sh, parses CHANGELOG, explains what changed, helps ad… |
 | `/ke` | Knowledge Extraction — captures and routes knowledge at work boundaries. Use when you discover a pattern, mak… |
 | `/kimi-peer-writer` | Peer-сессия DP.SC.154 где Kimi = писатель, Claude = напарник. Запускается простой фразой. Включает ОРЗ Openin… |
-| `/lesson-close` | Закрыть занятие, открытое скиллом /lesson. Финализирует lesson/YYYY-MM-DD.md (frontmatter status, метаданные… |
 | `/local-llm` | Локальный LLM-стек на Mac (Apple Silicon, MLX) под приватность и запасной режим. NL-вход к установке/запуску/… |
 | `/month-close` | Протокол закрытия месяца (Month Close). Стадия 7 каскада ВДВ v9 (PD.METHOD.008). Запускается в первый Пн меся… |
 | `/org-dev` | Organizational Development Manager (R31): guides the subject from an organizational change request (self/team… |

@@ -6,10 +6,15 @@
 set -euo pipefail
 
 # Fixture: временный repо-скелет
+# Template root comes from this file's own location, never from $HOME (CI checks
+# the repository out elsewhere); HOME and TMPDIR stay inside the test's temp dir.
+TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
+export TMPDIR
+export HOME="$TMPDIR/home"
+mkdir -p "$HOME"
 
-TEMPLATE_ROOT="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 cp -R "$TEMPLATE_ROOT/seed/strategy" "$TMPDIR/strategy"
 
 # seed/ is a one-time bootstrap template, correctly excluded from update.sh's
@@ -46,12 +51,16 @@ case "$PWD" in
 esac
 
 # Запустить create-wp.sh
+# --no-artifactor-check: the Artifactor Gate is covered by
+# test_create_wp_artifactor_gate.sh; this test is about the five write targets.
 TITLE="Тестовый РП"
 bash "$IWE_TEMPLATE/scripts/create-wp.sh" \
   --title "$TITLE" \
   --budget "2h" \
   --priority "P3" \
-  --no-consent-check
+  --verification-class closed-loop \
+  --no-consent-check \
+  --no-artifactor-check
 
 # Извлечь WP номер из созданного файла
 WP_NUM=""
@@ -80,7 +89,7 @@ echo "✓ inbox/$WP_ID/$WP_ID.md"
 # паддинг только в путях/заголовках. WeekPlan-строка не содержит пути, поэтому
 # "WP-001" в ней в принципе не появляется — нашёл grep'ая за $WP_ID вхолостую,
 # пока эта фикстура наконец не заработала целиком (03.08).
-WEEKPLAN=$(ls -1 current/WeekPlan*.md | head -1)
+WEEKPLAN=$(ls -1 current/WeekPlan*.md | sed -n 1p)
 [ -n "$WEEKPLAN" ] || { echo "FAIL: no WeekPlan found"; exit 1; }
 grep -q "$TITLE" "$WEEKPLAN" || { echo "FAIL: $WP_ID (title: $TITLE) not in WeekPlan"; exit 1; }
 echo "✓ WeekPlan ($WEEKPLAN)"
@@ -96,8 +105,10 @@ grep -q "$WP_ID" "docs/WP-REGISTRY.md" || { echo "FAIL: $WP_ID not in WP-REGISTR
 echo "✓ WP-REGISTRY.md"
 
 # 5. build-active-wp.py доступен (проверка пути)
-BUILD_SCRIPT="${IWE_SCRIPTS:-$HOME/IWE/scripts}/build-active-wp.py"
-[ -f "$BUILD_SCRIPT" ] || { echo "WARN: build-active-wp.py not found at $BUILD_SCRIPT"; }
+# Resolved from the template root, not $HOME/IWE/scripts: that author layout does
+# not exist in CI, and a WARN-only check could never fail.
+BUILD_SCRIPT="$TEMPLATE_ROOT/scripts/build-active-wp.py"
+[ -f "$BUILD_SCRIPT" ] || { echo "FAIL: build-active-wp.py not found at $BUILD_SCRIPT"; exit 1; }
 echo "✓ build-active-wp.py path verified"
 
 echo ""

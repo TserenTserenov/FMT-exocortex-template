@@ -12,6 +12,11 @@
 # Использование (как hook): event-specific обёртки делают source этого файла и вызывают
 # dispatch_event. Прямой запуск тоже доступен — для тестов.
 #
+# CLI exit codes: dispatch/list-rules/session-summary/session-clear/test — 0.
+# check-trace-satisfaction|list-gates|mark-gate — 3 (NOT_IMPLEMENTED, issue #678:
+# protocol-close.md ссылается на них, механика ещё не реализована). Неизвестная
+# подкоманда — 1 (usage).
+#
 # REGISTRY: ~/IWE/.claude/rules-registry.yaml (генерируется из PACK-agent-rules/)
 
 set -uo pipefail
@@ -372,7 +377,19 @@ _classify_integration_phase() {
     # Субагент-классификатор фазы IntegrationGate (AR.013).
     # Принимает JSON-контекст как $1; возвращает JSON через integration-gate-classifier.py.
     local classifier="$HOME/IWE/.claude/scripts/integration-gate-classifier.py"
-    [ ! -f "$classifier" ] && echo '{"phase":"unknown","skip_detected":false,"reason":"classifier script missing","missing":[]}' && return
+    if [ ! -f "$classifier" ]; then
+        # issue #895: this file was read as "almost-working machinery" — the
+        # dangling dependency degraded silently (phase:unknown) with nothing
+        # marking it as expected. Per #310 the machine classifier for AR.013
+        # is intentionally not built yet (the gate itself is "🧠 cognitive:
+        # no machine detector", rule-engine.sh is claude-hook:false, a
+        # library for future event wrappers) -- this is a known stub, not a
+        # broken install. State that once per invocation instead of staying
+        # quiet; still degrades the same way (phase:unknown).
+        echo "rule-engine.sh: integration-gate-classifier.py is not shipped (known stub, see #310/#895) — IntegrationGate phase classification degrades to 'unknown'" >&2
+        echo '{"phase":"unknown","skip_detected":false,"reason":"classifier script missing (known stub, #310/#895)","missing":[]}'
+        return
+    fi
     local ctx_arg="${1:-{}}"
     _IG_CTX="$ctx_arg" python3 "$classifier" 2>/dev/null || echo '{"phase":"unknown","skip_detected":false,"reason":"classifier error","missing":[]}'
 }
@@ -1750,6 +1767,18 @@ PYEOF
         echo ""
         echo "=== Results: $PASS PASS / $FAIL FAIL (total $((PASS+FAIL))) ==="
         [ "$FAIL" -eq 0 ] && exit 0 || exit 1
+        ;;
+    check-trace-satisfaction|list-gates|mark-gate)
+        # issue #678: memory/protocol-close.md ссылается на эти три
+        # подкоманды (Quick/Week/Month Close, gate-трассировка WP-481 Ф5.1),
+        # но механика никогда не была реализована. Раньше это падало в
+        # безымянную ветку *) ниже с generic usage — на практике неотличимо
+        # от опечатки в имени подкоманды и не сообщает, что именно не
+        # работает. Явная ветка с понятным сообщением вместо тихой догадки:
+        # проверка гейтов реально не произошла, это не «прошла с exit 1».
+        echo "NOT_IMPLEMENTED: '$1' (rule-engine.sh) — gate-трассировка (WP-481 Ф5.1) описана в protocol-close.md, но не реализована (issue #678)." >&2
+        echo "Гейты этой секции НЕ проверены автоматически — Close-протокол должен считать этот шаг непройденным, не пропущенным." >&2
+        exit 3
         ;;
     *)
         echo "Usage: rule-engine.sh {dispatch|list-rules|test|session-summary|session-clear}"

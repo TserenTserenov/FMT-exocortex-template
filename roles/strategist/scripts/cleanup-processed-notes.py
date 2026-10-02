@@ -2,25 +2,33 @@
 """
 Deterministic cleanup of processed notes from fleeting-notes.md.
 
-Pilot decision (2026-07-29): Note-Review classifies and proposes, it never
-decides on the pilot's behalf. As of that date the prompt (note-review.md
-step 4) stops stripping bold after classification — processed notes get
+Template owner's decision (July 2026): Note-Review classifies and proposes, it
+never decides on the pilot's behalf. The prompt (note-review.md step 4)
+therefore no longer strips bold after classification — processed notes get
 "**Title** ✅предложено" instead, staying bold and visible every day until
 the pilot removes them himself. This script still exists as a safety net
-for any note that reaches this file without bold at all (pre-2026-07-29
-format, or a future regression) — it must never silently sweep up a note
-the pilot hasn't explicitly closed.
+for any note that reaches this file without bold at all (an older format, or
+a model that dropped the bold) — it must never silently sweep up a note the
+pilot hasn't explicitly closed, so a note that carries the ✅предложено mark
+is kept even when its bold is gone.
 
 This script runs AFTER note-review and deterministically:
 1. Parses fleeting-notes.md into header + note blocks
-2. Archives non-bold, non-🔄 blocks to Notes-Archive.md
+2. Archives non-bold, non-🔄, non-✅предложено blocks to Notes-Archive.md
 3. Removes them from fleeting-notes.md
 4. Stages changes for git commit
 
-Keep rules:
-  - **bold** title  → note not yet closed by pilot (new or ✅предложено), KEEP
-  - 🔄 in title    → needs review, KEEP
-  - everything else → already stripped of bold by something else, ARCHIVE
+Keep rules (they look at the FIRST line of a note block, its title):
+  - **bold** title        → note not yet closed by pilot (new or ✅предложено), KEEP
+  - 🔄 in title           → needs review, KEEP
+  - ✅предложено in title → proposal written, the decision is the pilot's, KEEP
+                            (any mix of case, a space after ✅ allowed, anywhere in
+                            the line, with or without bold). The same rule is
+                            applied by the canary in strategist.sh and by the Day
+                            Open scanner; a first line that is a quote, a heading,
+                            a timestamp, a list item or a note the pilot struck
+                            through (~~) is no note title and carries no mark
+  - everything else       → already stripped of bold by something else, ARCHIVE
 """
 
 import os
@@ -31,9 +39,37 @@ from pathlib import Path
 from typing import Optional
 
 GOVERNANCE_REPO = os.environ.get('IWE_GOVERNANCE_REPO', 'DS-strategy')
-WORKSPACE = Path.home() / "IWE" / GOVERNANCE_REPO
+# WP-530 Ф72: an isolated run points the script at its throwaway copy of the governance repo.
+_REPO_DIR_OVERRIDE = os.environ.get('IWE_CLEANUP_REPO_DIR')
+_CANON_DIR = Path.home() / "IWE" / GOVERNANCE_REPO
+# IWE_CLEANUP_ISOLATED=1 (set by strategist.sh in an isolated run) forbids the silent fallback to
+# the canonical checkout: the directory must be given and must be a linked git worktree, not the canon.
+_ISOLATED = os.environ.get('IWE_CLEANUP_ISOLATED') == '1'
+if _ISOLATED:
+    _repo = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else None
+    _problem = None
+    if _repo is None:
+        _problem = "IWE_CLEANUP_REPO_DIR is not set"
+    elif not _repo.is_dir():
+        _problem = f"{_repo} is not a directory"
+    elif not (_repo / ".git").is_file():
+        _problem = f"{_repo} is not a linked git worktree (.git is not a file)"
+    elif _repo.resolve() == _CANON_DIR.resolve():
+        _problem = f"{_repo} is the canonical checkout"
+    if _problem:
+        print(f"ERROR: isolated cleanup refused: {_problem}", file=sys.stderr)
+        sys.exit(2)
+WORKSPACE = Path(_REPO_DIR_OVERRIDE) if _REPO_DIR_OVERRIDE else _CANON_DIR
 FLEETING = WORKSPACE / "inbox" / "fleeting-notes.md"
 ARCHIVE = WORKSPACE / "archive" / "notes" / "Notes-Archive.md"
+
+# The mark Note-Review puts on a proposed note. A model does not copy it letter for letter:
+# "✅ предложено", "✅Предложено" and "✅пРедложено" occur, the bold may be dropped and a tail may follow (#961).
+PROPOSED_MARK_RE = re.compile(r"✅\s*предложено", re.IGNORECASE)
+# A first line that is not the title of a note: a quote, a heading, a timestamp, a note the pilot struck through,
+# a bulleted or numbered list item. The mark on such a line says nothing about a note (day-open-scaffold.sh and the
+# canary in strategist.sh draw the same line).
+NOT_A_TITLE_RE = re.compile(r"^(?:[>#<]|~~|[-+*]\s|\d+[.)]\s)")
 
 
 def parse_notes(content: str) -> tuple[str, list[str]]:
@@ -41,25 +77,31 @@ def parse_notes(content: str) -> tuple[str, list[str]]:
 
     Header = everything up to and including the first `---` after the
     blockquote section. Note blocks are separated by `---`.
+
+    YAML frontmatter exists only when `---` is the very first line of the
+    file; its closing `---` is then skipped and the header ends at the next
+    one. Without frontmatter the header ends at the first `---`. A file with
+    no header-closing `---` has no note blocks (the whole file is header), so
+    nothing is archived and the file is never emptied (#959).
     """
     lines = content.split("\n")
 
-    # Find end of header: skip frontmatter, title, blockquote, then first ---
-    in_frontmatter = False
-    past_frontmatter = False
-    header_end = 0
+    # Find end of header: the header-closing `---`; frontmatter fences are not it
+    has_frontmatter = lines[0].strip() == "---"
+    rules_to_skip = 2 if has_frontmatter else 0
+    header_end = None
 
     for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped == "---" and not past_frontmatter:
-            if not in_frontmatter:
-                in_frontmatter = True
-            else:
-                past_frontmatter = True
+        if line.strip() != "---":
             continue
-        if past_frontmatter and stripped == "---":
-            header_end = i + 1
-            break
+        if rules_to_skip:
+            rules_to_skip -= 1
+            continue
+        header_end = i + 1
+        break
+
+    if header_end is None:
+        return content, []
 
     header = "\n".join(lines[:header_end])
     rest = "\n".join(lines[header_end:]).strip()
@@ -102,6 +144,10 @@ def should_keep(block: str) -> bool:
         return True
     # 🔄 marker = needs review
     if "🔄" in first_line:
+        return True
+    # ✅предложено = a proposal is written and the decision is the pilot's, even if the bold is gone;
+    # a line that is no note title (a quote, a struck-through note, a list item...) is not a marked note
+    if PROPOSED_MARK_RE.search(first_line) and not NOT_A_TITLE_RE.match(first_line):
         return True
     # Protection: don't archive notes younger than 24h.
     # Catch-up note-review may strip bold without real processing (bug 21 Mar 2026).
@@ -153,6 +199,8 @@ def main():
     if archive_content and not archive_content.endswith("\n"):
         archive_content += "\n"
     archive_content += archive_section.rstrip() + "\n"
+    # Installations assembled before archive/notes/ existed do not have the directory (#959)
+    ARCHIVE.parent.mkdir(parents=True, exist_ok=True)
     ARCHIVE.write_text(archive_content, encoding="utf-8")
 
     # Rewrite fleeting-notes.md with only kept blocks

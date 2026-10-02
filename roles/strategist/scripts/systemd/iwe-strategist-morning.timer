@@ -1,5 +1,5 @@
 [Unit]
-Description=IWE Strategist — morning run в {{TIMEZONE_HOUR}}:00 UTC
+Description=IWE Strategist — morning run в {{TIMEZONE_HOUR}}:00 (местное время)
 
 [Timer]
 OnCalendar=*-*-* {{TIMEZONE_HOUR}}:00:00

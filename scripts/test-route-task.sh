@@ -34,7 +34,7 @@ chmod +x "$FIXTURE_IWE/scripts/consent-fixture.sh" "$FIXTURE_IWE/scripts/agent-f
 cat > "$FIXTURE_IWE/$FIXTURE_GOV/scripts/executor-catalog.yaml" <<'YAML'
 schema_version: '1.0'
 generated_at: '2026-08-24T00:00:00Z'
-total_entries: 3
+total_entries: 4
 entries:
   - name: consent
     routing:
@@ -46,6 +46,11 @@ entries:
       executor: script
       script_path: scripts/intentionally-missing.sh
       deterministic: true
+  - name: connect-guide-flex
+    routing:
+      executor: script
+      script_path: scripts/intentionally-missing.sh
+      deterministic: false
   - name: agent-fault
     routing:
       executor: script
@@ -58,6 +63,16 @@ export IWE_GOVERNANCE_REPO="$FIXTURE_GOV"
 export IWE_EXECUTOR_CATALOG="$FIXTURE_IWE/$FIXTURE_GOV/scripts/executor-catalog.yaml"
 export IWE_ROUTER_AUDIT="$FIXTURE_IWE/$FIXTURE_GOV/logs/routing-path-distribution.tsv"
 export IWE_ROUTER_ERRORS="$FIXTURE_IWE/$FIXTURE_GOV/logs/routing-errors.log"
+# route-task.sh resolves relative script_path against $IWE_TEMPLATE (issue
+# #634: catalog entries are template-root-relative, not workspace-root-
+# relative), not against $IWE_DIR. Left unset here it defaulted to
+# $FIXTURE_IWE/FMT-exocortex-template/, a path this fixture never creates —
+# every dispatch silently hit "script not found" and only produced the
+# expected exit code by coincidence (deterministic:true → EXEC_FAILED exit 2
+# is the same exit code consent-fixture.sh itself returns, T1/T4/T14 never
+# told the two apart). T13 is the one case where "not found" (exit 2) and
+# "found and ran" (exit 0) actually differ, which is what exposed this.
+export IWE_TEMPLATE="$FIXTURE_IWE"
 
 PASS=0
 FAIL=0
@@ -92,8 +107,16 @@ run_test "T3: --tag unknown_skill (flex → fallback Sonnet, exit 0)" 0 --tag un
 # 4. Missing script — strict (--skill)
 run_test "T4: --skill connect-guide (missing script → exit 2)" 2 --skill connect-guide
 
-# 5. Missing script — flex (--tag)
-run_test "T5: --tag connect-guide (missing script → fallback Haiku, exit 0)" 0 --tag connect-guide
+# 5. Missing script, non-deterministic — flex (--tag)
+run_test "T5: --tag connect-guide-flex (missing script, deterministic:false → fallback Haiku, exit 0)" 0 --tag connect-guide-flex
+
+# 5b. Missing script, deterministic:true — flex (--tag). issue #679: the
+# catalog's deterministic flag must block LLM fallback regardless of which
+# CLI flag invoked the router, not only under --skill (which already forced
+# allow_fallback=false before this fix existed and so never exercised the
+# bug — a f-string bug printed Python's True/False instead of true/false,
+# so the bash-side comparison never matched a real YAML boolean).
+run_test "T5b: --tag connect-guide (missing script, deterministic:true → EXEC_FAILED, exit 2)" 2 --tag connect-guide
 
 # 6. Empty tag
 run_test "T6: --tag '' (empty → unknown → fallback Sonnet, exit 0)" 0 --tag ""

@@ -399,3 +399,22 @@ iwe_safe_pull() {
     echo "iwe_safe_pull: rebase complete, ${#orig_pids[@]} local patch(es) verified preserved"
   )
 }
+
+# iwe_calendar_source [PARAMS_FILE] — where Day Open takes the calendar from
+# (issue #942): connector (default: calendar connector, then server-calendar.sh),
+# script (server-calendar.sh only), none (the calendar is not used at all).
+# A missing key or file means connector, so existing installs keep working; an
+# unknown value warns on stderr and also means connector.
+iwe_calendar_source() {
+  local file="${1:-}" value
+  [ -f "$file" ] || { echo connector; return 0; }
+  value=$(grep -E '^calendar_source:' "$file" 2>/dev/null | head -1 \
+    | sed -E 's/^calendar_source:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//')
+  case "$value" in
+    ''|connector) echo connector ;;
+    script|none) echo "$value" ;;
+    *)
+      echo "WARN: params.yaml: calendar_source «$value» неизвестно (connector|script|none), использую connector" >&2
+      echo connector ;;
+  esac
+}

@@ -40,7 +40,7 @@ description: "Операционный файл памяти IWE"
 | SOTA.003 | Open API Specs | SOTA (зрелые) | Проектирование MCP, API-контракты между системами |
 | SOTA.004 | GraphRAG + KG | SOTA | Проектирование retrieval, typed `related:`, MCP tools |
 | SOTA.005 | AI-Native Org Design | SOTA (emerging) | Организация агентов, distribution of responsibility |
-| SOTA.006 | Agentic Development | SOTA (defining) | Архитектура multi-agent, оркестрация, IPO-паттерн. **Amdahl Law:** multi-agent оправдан ТОЛЬКО при (1) context isolation, (2) parallelism gain, (3) tool specialization. Иначе coordination cost > benefit. Start single-agent. (Anthropic 2026, Левенчук). **Coordination Cost Check** (АрхГейт Шаг 2b): применять на обоих масштабах ОРЗ — День (агенты дневного цикла) и Сессия (sub-agents задачи). |
+| SOTA.006 | Agentic Development | SOTA (defining) | Архитектура multi-agent, оркестрация, IPO-паттерн. **Amdahl Law:** multi-agent оправдан ТОЛЬКО при (1) context isolation, (2) parallelism gain, (3) tool specialization. Иначе coordination cost > benefit. Start single-agent. (Anthropic 2026, Левенчук). **Coordination Cost Check** (АрхГейт Шаг 2b): применять на тех масштабах ОРЗ, где работают агенты — День (агенты дневного цикла) и Сессия (sub-agents задачи). |
 | SOTA.007 | AI-Accelerated Ontology | SOTA (breakthrough) | KE pipeline, ontology generation, validation |
 | SOTA.008 | Real-Time Knowledge Capture | SOTA (консенсус) | Протокол Work, capture-to-pack, рубежи |
 | SOTA.009 | Knowledge-Based Digital Twins | Emerging | DDT архитектура, Pack + данные + агенты |
@@ -63,7 +63,7 @@ description: "Операционный файл памяти IWE"
 
 ## Операционные правила (derived from SOTA)
 
-1. **Архитектурное решение** → проверь 6 характеристик ЭМОГСС (эвол., масштаб., обуч., генерат., скорость, современность)
+1. **Архитектурное решение** → проверь 7 характеристик ЭМОГССБ (эвол., масштаб., обуч., генерат., скорость, современность, безопасность)
 2. **Новый Pack** → BC (SOTA.001), Layer 0/1/2 (RAPTOR), summary обязателен (Chunking)
 3. **Новый агент** → определи BC, IPO, контракты (SOTA.006), контекст (SOTA.002). **Coordination Cost Check:** (1) context isolation — агенту нужен отдельный контекст? (2) parallelism gain — задачи параллелизуемы? (3) tool specialization — агенту нужны свои инструменты? Все три «нет» → не создавать отдельного агента
 4. **Интеграция систем** → coupling model: knowledge/distance/volatility (SOTA.011)

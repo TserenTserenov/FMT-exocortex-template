@@ -42,7 +42,7 @@
 
 **Проверка (в начале алгоритма, до шага 1).** `date +%A` — локале-зависимо (под `ru_RU.UTF-8` вернёт «четверг», не «thursday», и сравнение с англоязычным именем из конфига никогда не совпадёт — тот же баг однажды уже был найден и исправлен в `day-open-scaffold.sh`, здесь используется тот же паттерн: числовой день недели `date +%u` (1=Пн…7=Вс, локале-независимо) + карта имя→число):
 ```bash
-T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"
+T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 # issue #541 hvost 3 (Evgenii, cold-review 26.08): бывший голый `python3 -c` со
 # сглатыванием stderr тихо возвращал "monday", даже если реальный
 # day-rhythm-config.yaml называет другой день — на хосте без PyYAML это была
@@ -79,9 +79,9 @@ fi
 ## Шаг 1: Сбор данных
 
 ```bash
-for repo in $(ls {{HOME_DIR}}/IWE/); do
-  if [ -d {{HOME_DIR}}/IWE/$repo/.git ]; then
-    commits=$(git -C {{HOME_DIR}}/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null \
+for repo in $(ls $HOME/IWE/); do
+  if [ -d $HOME/IWE/$repo/.git ]; then
+    commits=$(git -C $HOME/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null \
       | grep -vE "^(docs|chore|ci|style|perf|test)(\\(|:| )" \
       | grep -vE "memory/|\.claude/rules/|template-sync|backup|reindex" \
       || true)
@@ -108,7 +108,7 @@ done
 
 ```bash
 grep -nE "→ ждёт|ждёт|dep:|блокер|blocked:|остановлен|ждёт согласования" \
-  {{HOME_DIR}}/.claude/projects/*/memory/MEMORY.md 2>/dev/null
+  $HOME/.claude/projects/*/memory/MEMORY.md 2>/dev/null
 ```
 
 Для каждого найденного паттерна:
@@ -128,7 +128,7 @@ grep -nE "→ ждёт|ждёт|dep:|блокер|blocked:|остановлен|
 > Правило: [feedback_memory_index_discipline.md](../../../memory/feedback_memory_index_discipline.md)
 
 ```bash
-T="${IWE_TEMPLATE:-{{HOME_DIR}}/IWE/FMT-exocortex-template}"
+T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/check-index-health.py"
 ```
 
@@ -146,7 +146,8 @@ PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/che
 ## Шаг 6: Мультипликатор IWE — алгоритм
 
 1. **WakaTime** — физическое время за день:
-   - CLI: `~/.wakatime/wakatime-cli --today`
+   - **Дата закрытия ≠ календарная дата вызова** (например, `/day-close` вызван после полуночи для вчерашнего дня) → `--today` НЕ пробовать вообще, сразу Neon-fallback с явной датой в SQL (issue #732: `--today` у `wakatime-cli` возвращает данные за день ВЫЗОВА, не за закрываемый день, и при последней проверке 15.07 флага «дать данные за конкретную дату» у CLI не было — тот же класс бага, что уже чинили для Day Open, WP-299 Ф4 п.3).
+   - Дата закрытия = календарная дата вызова → CLI: `~/.wakatime/wakatime-cli --today`
    - Fallback Neon: `SELECT payload->>'human_readable', payload->>'total_seconds' FROM learning.public.domain_event WHERE event_type='coding_time' AND account_id='{DT_USER_ID}' AND external_id='wakatime:{DT_USER_ID}:{YYYY-MM-DD}'`
    - Если Neon тоже пуст → пометить «pending Neon», пересчитать при следующей сессии
 
@@ -202,8 +203,8 @@ PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/che
     - WP-NNN
     - WP-MMM
   ```
-  где `last_updated` = завтрашняя дата (`date -v+1d +%Y-%m-%d 2>/dev/null || date -d "tomorrow" +%Y-%m-%d`).
-- Если пилот пропускает → оставить файл без изменений (Day Open покажет stale-предупреждение, если он устарел ≥3 дня).
+  где `last_updated` = день ПОСЛЕ закрываемого дня (день, на который выставлены приоритеты). При закрытии «сегодня» это завтра; при ретроспективном закрытии дня N (задним числом, в день N+1) это N+1, а не завтрашняя дата: `date -v+1d -j -f %Y-%m-%d "$CLOSE_DATE" +%Y-%m-%d 2>/dev/null || date -d "$CLOSE_DATE + 1 day" +%Y-%m-%d`. Пустой список пишется как `today: []`, не `null`.
+- Если пилот пропускает → файл НЕ менять, но в отчёте закрытия явно записать строку «приоритеты не обновлены (пропущено пилотом)» (issue #944: молчаливый пропуск незаметен, ровно так файл замерзал). Day Open не переносит устаревший список в DayPlan: при возрасте больше 3 дней (переопределяется `PRIORITIES_STALE_DAYS`) он покажет одну строку «приоритеты устарели» и возьмёт вчерашний перенос.
 - Добавить файл в список изменений для коммита на финальном шаге (если перезаписывался).
 
 ---

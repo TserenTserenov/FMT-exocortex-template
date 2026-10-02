@@ -56,4 +56,74 @@ ROLE_ORDINARY_OUT=$(printf '%s' '{"session_id":"issue-525","prompt":"Обычн�
   exit 1
 }
 
-echo "PASS: hook classification and UserPromptSubmit role-prefix contracts hold"
+# Project-relative settings execute the hook snapshot stored in a linked
+# worktree. Verify that this snapshot consumes no stdin before it trampolines
+# to the primary worktree's current hook, and that exact session scope lands
+# only in the canonical runtime semaphore.
+python3 - "$ROOT/.claude/settings.json" <<'PY'
+import json
+import sys
+
+settings = json.load(open(sys.argv[1], encoding="utf-8"))
+matches = [
+    entry
+    for entry in settings["hooks"]["PostToolUse"]
+    if any(
+        hook.get("command") == "$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-use-scope-track.sh"
+        for hook in entry.get("hooks", [])
+    )
+]
+assert len(matches) == 1
+assert matches[0].get("matcher") == "Write|Edit|MultiEdit|NotebookEdit"
+PY
+
+PRIMARY="$TMP/primary"
+LINKED="$TMP/linked"
+mkdir -p "$PRIMARY/.claude/hooks" "$PRIMARY/scripts" "$PRIMARY/DS-strategy/inbox/WP-001"
+git -C "$PRIMARY" init -q
+git -C "$PRIMARY" config user.name "Hook Test"
+git -C "$PRIMARY" config user.email "hook@example.invalid"
+cp "$ROOT/.claude/hooks/post-tool-use-scope-track.sh" "$PRIMARY/.claude/hooks/"
+cp "$ROOT/scripts/session-guard.sh" "$PRIMARY/scripts/"
+chmod +x "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" "$PRIMARY/scripts/session-guard.sh"
+printf '%s\n' 'hypothesis_relation: "tests"' > "$PRIMARY/DS-strategy/inbox/WP-001/WP-001.md"
+printf '%s\n' seed > "$PRIMARY/edited.txt"
+git -C "$PRIMARY" add -- .claude/hooks/post-tool-use-scope-track.sh scripts/session-guard.sh \
+  DS-strategy/inbox/WP-001/WP-001.md edited.txt
+git -C "$PRIMARY" commit -qm "test: seed primary hook"
+git -C "$PRIMARY" worktree add -q -b linked "$LINKED"
+
+CLAUDE_CODE_SESSION_ID="hook-harness" IWE_ROOT="$PRIMARY" IWE_GOVERNANCE_REPO="DS-strategy" \
+  bash "$PRIMARY/scripts/session-guard.sh" open --wp WP-001 --slug hook-test \
+    --agent claude-code --session-id hook-session --owner-pid "$$" --close-path peer-session >/dev/null
+
+mv "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" \
+  "$PRIMARY/.claude/hooks/post-tool-use-scope-track.real.sh"
+cat > "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh" <<'WRAPPER'
+#!/bin/bash
+printf '%s\n' canonical >> "$HOOK_TRACE_FILE"
+exec /bin/bash "$(dirname "${BASH_SOURCE[0]}")/post-tool-use-scope-track.real.sh"
+WRAPPER
+chmod +x "$PRIMARY/.claude/hooks/post-tool-use-scope-track.sh"
+printf '%s\n' changed > "$LINKED/edited.txt"
+HOOK_INPUT=$(python3 - "$LINKED/edited.txt" <<'PY'
+import json
+import sys
+print(json.dumps({
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Edit",
+    "session_id": "hook-harness",
+    "tool_input": {"file_path": sys.argv[1]},
+}))
+PY
+)
+HOOK_TRACE_FILE="$TMP/hook-trace" CLAUDE_PROJECT_DIR="$LINKED" \
+  IWE_GOVERNANCE_REPO="DS-strategy" \
+  bash "$LINKED/.claude/hooks/post-tool-use-scope-track.sh" <<<"$HOOK_INPUT"
+
+grep -qxF canonical "$TMP/hook-trace" \
+  || { echo "FAIL: linked hook snapshot did not trampoline to primary" >&2; exit 1; }
+grep -qxF 'file: edited.txt' "$PRIMARY/.iwe-runtime/sessions/claude-code-hook-session.open" \
+  || { echo "FAIL: canonical hook did not exact-note the edited file" >&2; exit 1; }
+
+echo "PASS: hook classification, role-prefix and canonical trampoline contracts hold"

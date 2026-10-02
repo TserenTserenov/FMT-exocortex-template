@@ -226,6 +226,46 @@ jobs:
                   print(f"stripped Cyrillic anchors: {path}")
           PYEOF
 
+      - name: Normalize Cyrillic subsection letters (§2б → §2b)
+        # Pack/DP references use a trailing Cyrillic letter as a subsection
+        # label (`DP.ARCH.002 §2б`, meaning "part b of section 2") in plain
+        # prose, not inside a link — the anchor-stripper above only touches
+        # markdown link syntax, so this pattern reaches en-draft untouched
+        # and trips the hard Cyrillic gate below (issue #752/#749; root
+        # cause tracked in WP-7). Translit only the single trailing letter
+        # right after "§<digits>", not general prose — a blanket scrub would
+        # risk mangling text the LLM translator was supposed to handle.
+        if: always() && steps.en_draft.outcome == 'success'
+        run: |
+          python3 - <<'PYEOF'
+          import pathlib
+          import re
+
+          # Full alphabet, not just the letters seen in issue #752 — a
+          # partial table closes today's report but not the class (cold
+          # review flagged this: the codebase already has a "§3р" elsewhere,
+          # letter outside the first 10).
+          TRANSLIT = {
+              "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e",
+              "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k",
+              "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+              "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "c",
+              "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
+              "э": "e", "ю": "yu", "я": "ya",
+          }
+          subsection = re.compile(r"(§\d+)([" + "".join(TRANSLIT) + r"])\b")
+
+          def fix(match):
+              return match.group(1) + TRANSLIT[match.group(2)]
+
+          for path in pathlib.Path("../en-draft").rglob("*.md"):
+              content = path.read_text(encoding="utf-8")
+              cleaned = subsection.sub(fix, content)
+              if cleaned != content:
+                  path.write_text(cleaned, encoding="utf-8")
+                  print(f"normalized subsection letters: {path}")
+          PYEOF
+
       - name: Write EN-side community files to en-draft
         # Feedback lives on iwesys/IWE itself (pilot decision 2026-07-10):
         # Issues and Discussions are enabled on the EN repo, no references

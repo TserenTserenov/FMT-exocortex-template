@@ -25,13 +25,6 @@ elif command -v systemd-inhibit &>/dev/null; then
     trap 'kill $_INHIBIT_PID 2>/dev/null' EXIT
 fi
 
-# Cross-platform date offset: portable_date_offset <days_back> <format>
-portable_date_offset() {
-    local days="$1"
-    local fmt="${2:-%Y-%m-%d}"
-    date -v-${days}d +"$fmt" 2>/dev/null || date -d "$days days ago" +"$fmt" 2>/dev/null
-}
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SYNC_DIR="$(dirname "$SCRIPT_DIR")"
 STATE_DIR="$HOME/.local/state/exocortex"
@@ -170,6 +163,19 @@ mark_interval() {
     echo "$NOW" > "$STATE_DIR/$1-last"
 }
 
+# "Every N hours" tasks are gated on the time since the previous dispatch START
+# (mark_interval stores NOW), and the timer fires every N hours too. A dispatch may
+# start a few seconds earlier than the previous one did: 15:00:52 -> 18:00:51 is
+# 10799 s < 10800 and the extractor lost a whole interval (tsekh-1, 21.09.2026).
+# The slack absorbs that jitter; it is far below any interval, so a manual dispatch
+# still holds the next timer tick off.
+INTERVAL_SLACK_SECONDS=300
+
+# interval_reached ELAPSED_SECONDS INTERVAL_SECONDS
+interval_reached() {
+    [ "$1" -ge $(( $2 - INTERVAL_SLACK_SECONDS )) ]
+}
+
 # === Очистка старых маркеров (>7 дней) ===
 
 cleanup_state() {
@@ -227,24 +233,13 @@ dispatch() {
         ran=1
     fi
 
-    # --- Стратег: note-review (22:00+) ---
-    if (( 10#$HOUR >= 22 )) && ! ran_today "strategist-note-review"; then
-        log "→ strategist note-review (catch-up: hour=$HOUR)"
-        if run_strategist_scenario "note-review"; then
-            mark_done "strategist-note-review"
-        fi
-        ran=1
-    elif (( 10#$HOUR < 12 )); then
-        local yesterday
-        yesterday=$(portable_date_offset 1)
-        if [ -n "$yesterday" ] && [ ! -f "$STATE_DIR/strategist-note-review-$yesterday" ]; then
-            log "→ strategist note-review (catch-up for yesterday $yesterday)"
-            if run_strategist_scenario "note-review"; then
-                echo "$(date '+%H:%M:%S') catch-up" > "$STATE_DIR/strategist-note-review-$yesterday"
-            fi
-            ran=1
-        fi
-    fi
+    # --- Стратег: note-review — no scheduled runs (template owner's decision, July 2026) ---
+    # Notes are reviewed ONLY by hand, in a live session with the pilot (e.g. the Day Open
+    # "Разбор заметок" section). The nightly run kept stripping bold and archiving notes without
+    # a pilot decision, so BOTH scheduler paths are gone: the evening run (22:00+) and the
+    # morning catch-up for "yesterday". A manual `strategist.sh note-review` from a terminal
+    # still works, but it has no chat: it only marks notes and writes proposals, the model archives
+    # nothing (only the cleanup safety net may archive a note whose bold the pilot already removed).
 
     # --- Синхронизатор: code-scan (ежедневно) ---
     if ! ran_today "synchronizer-code-scan"; then
@@ -291,7 +286,7 @@ dispatch() {
     if (( 10#$HOUR >= 7 && 10#$HOUR <= 23 )); then
         local elapsed
         elapsed=$(last_run_seconds_ago "extractor-inbox-check")
-        if [ "$elapsed" -ge 10800 ]; then
+        if interval_reached "$elapsed" 10800; then
             log "→ extractor inbox-check (${elapsed}s since last)"
             if timeout "$TASK_TIMEOUT_LONG" "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
                 mark_interval "extractor-inbox-check"

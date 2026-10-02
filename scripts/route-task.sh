@@ -24,6 +24,12 @@ CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog
 AUDIT_LOG="${IWE_ROUTER_AUDIT:-${IWE_DIR}/${GOV_REPO}/logs/routing-path-distribution.tsv}"
 ERROR_LOG="${IWE_ROUTER_ERRORS:-${IWE_DIR}/${GOV_REPO}/logs/routing-errors.log}"
 JSON_MODE="false"
+# issue #889: a bare `python3` only sees PATH's own interpreter, which on
+# hosts with a pyenv shim ahead of a real PyYAML-carrying python3 fails the
+# catalog lookup before the executor-substitution check ever runs. Resolve
+# once via the shared F6 resolver (scripts/lib/find-python3.sh, #453/#463)
+# and reuse for every python3 call below — same pattern as day-close.sh.
+RESOLVED_PYTHON3=""
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,11 +48,14 @@ die() {
 warn() { echo "WARN: $*" >&2; }
 
 require_python() {
-    if ! command -v python3 &>/dev/null; then
-        die "python3 not found — required for catalog lookup" 1
-    fi
-    if ! python3 -c "import yaml" &>/dev/null; then
-        die "PyYAML not found — required for catalog lookup (pip install pyyaml)" 1
+    [[ -n "$RESOLVED_PYTHON3" ]] && return 0
+    # Resolved next to this script (same install unit as route-task.sh
+    # itself, day-close.sh precedent) — not via $IWE_TEMPLATE/$IWE_DIR,
+    # which a caller may not have set to where the sibling lib/ actually is.
+    local resolver
+    resolver="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
+    if ! RESOLVED_PYTHON3=$("$resolver" 2>/dev/null); then
+        die "$("$resolver" 2>&1 >/dev/null)" 1
     fi
 }
 
@@ -107,7 +116,7 @@ lookup_skill() {
     local skill_name="$1"
     require_python
     require_catalog
-    python3 - "$CATALOG" "$skill_name" << 'PYEOF'
+    "$RESOLVED_PYTHON3" - "$CATALOG" "$skill_name" << 'PYEOF'
 import sys, yaml
 
 catalog_path, skill_name = sys.argv[1], sys.argv[2]
@@ -118,7 +127,13 @@ for entry in cat.get("entries", []):
     if entry["name"] == skill_name:
         r = entry["routing"]
         print(f"executor={r['executor']}")
-        print(f"deterministic={r.get('deterministic', 'false')}")
+        # YAML `true`/`false` parse as Python bool — an f-string prints
+        # "True"/"False" (capitalized), which the bash-side comparison
+        # `[[ "$deterministic" == "true" ]]` (issue #679 deterministic-gate)
+        # never matches. Every real entry in executor-catalog.yaml writes
+        # the plain YAML boolean, not a quoted string, so this silently
+        # disabled the gate for 100% of deterministic:true entries.
+        print(f"deterministic={'true' if r.get('deterministic') else 'false'}")
         if "script_path" in r:
             print(f"script_path={r['script_path']}")
         if "model" in r:
@@ -199,7 +214,44 @@ run_script() {
     fi
     local script_exit=0
     if [[ -n "$args" ]]; then
-        read -r -a ARGS_ARRAY <<< "$args"
+        # issue #679: `read -r -a` splits только по IFS — не понимает кавычки
+        # внутри $args, поэтому `--fault "текст с пробелами"` рассыпался на 4
+        # элемента массива вместо 2. Первая попытка фикса (`eval`) отклонена
+        # на ревью: исполняет ЛЮБОЙ shell-синтаксис в $args ($(...), `` ` ``,
+        # ;, &&), а $args может прийти из agent-fault SKILL.md, где --fault —
+        # свободный текст описания косяка агента, не фиксированный литерал.
+        # Вторая попытка (shlex.split + newline-delimited + mapfile) тоже
+        # отклонена: mapfile — bash4+, системный /bin/bash на macOS без
+        # Homebrew — 3.2; и newline-разделитель ломает токен с буквальным
+        # переносом строки внутри (многоабзацное --fault-описание).
+        # NUL — единственный байт, которого не бывает ни в одном bash-токене
+        # и который shlex-токен тоже не может содержать, поэтому безопасен
+        # как разделитель; временный файл (не $()) — NUL не переживает
+        # command substitution. `while read -d ''` — bash3.2-совместимо.
+        local ARGS_ARRAY=() shlex_tmp shlex_err
+        shlex_tmp=$(mktemp "${TMPDIR:-/tmp}/route-task-args.XXXXXX") || die "mktemp failed"
+        if ! shlex_err=$("$RESOLVED_PYTHON3" -c '
+import shlex, sys
+try:
+    toks = shlex.split(sys.argv[1])
+except ValueError as exc:
+    print(f"unbalanced quotes: {exc}", file=sys.stderr)
+    sys.exit(1)
+with open(sys.argv[2], "wb") as f:
+    for tok in toks:
+        f.write(tok.encode())
+        f.write(b"\0")
+' "$args" "$shlex_tmp" 2>&1); then
+            rm -f "$shlex_tmp"
+            warn "failed to parse args for $skill_name: $shlex_err"
+            emit_error "$skill_name" "EXEC_FAILED" "args parse error: $shlex_err"
+            emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+            return 1
+        fi
+        while IFS= read -r -d '' tok; do
+            ARGS_ARRAY+=("$tok")
+        done < "$shlex_tmp"
+        rm -f "$shlex_tmp"
         "$interpreter" "$script_path" "${ARGS_ARRAY[@]}" || script_exit=$?
     else
         "$interpreter" "$script_path" || script_exit=$?
@@ -294,11 +346,21 @@ dispatch_skill() {
         die "catalog lookup failed (exit=$lookup_exit)"
     fi
 
-    local executor script_path="" model=""
+    local executor script_path="" model="" deterministic=""
     executor=$(echo "$lookup_result" | grep "^executor=" | cut -d= -f2)
     script_path=$(echo "$lookup_result" | grep "^script_path=" | cut -d= -f2- || true)
     model=$(echo "$lookup_result" | grep "^model=" | cut -d= -f2- || true)
+    deterministic=$(echo "$lookup_result" | grep "^deterministic=" | cut -d= -f2- || true)
     routing_path="${routing_path}${executor}"
+
+    # issue #679: deterministic:true в каталоге раньше ничего не решал — LLM-
+    # фоллбек при ненайденном скрипте зависел только от того, каким флагом
+    # вызвали роутер (--skill/--tag), не от контракта самого skill-а. Запись,
+    # обещающая "без LLM", могла тихо получить LLM-подмену, если её позвали
+    # через --tag. Каталог теперь важнее выбора вызывающего.
+    if [[ "$deterministic" == "true" ]]; then
+        allow_fallback="false"
+    fi
 
     case "$executor" in
         script)
@@ -368,7 +430,7 @@ dispatch_skill() {
 show_list() {
     require_python
     require_catalog
-    python3 - "$CATALOG" << 'PYEOF'
+    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
 import sys, yaml
 
 with open(sys.argv[1]) as f:
@@ -396,7 +458,7 @@ PYEOF
 validate_catalog() {
     require_python
     require_catalog
-    python3 - "$CATALOG" << 'PYEOF'
+    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
 import sys, yaml
 
 VALID = {"script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"}
@@ -450,6 +512,14 @@ main() {
             *)          die "unknown option: $1" ;;
         esac
     done
+
+    # Resolve python3 here, in the main shell, before any mode below can
+    # reach it through a `$(...)` subshell (dispatch_skill -> lookup_skill,
+    # line ~333) — a subshell inherits the parent's variables at fork time
+    # but can never write RESOLVED_PYTHON3 back, so resolving lazily inside
+    # lookup_skill() left every OTHER caller in the parent shell (run_script's
+    # shlex parser) with an empty $RESOLVED_PYTHON3.
+    [[ "$mode" == "help" ]] || require_python
 
     case "$mode" in
         list)     show_list ;;

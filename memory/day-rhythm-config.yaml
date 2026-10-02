@@ -42,6 +42,11 @@ video:
   content:
     suggest_posts: true         # Suggest post ideas from transcribed videos
 
+content_editor:
+  enabled: false                # Enable content-editor draft review at Day Open (issue #804:
+                                 # секция отсутствовала в дефолтном конфиге, при отсутствии ключа
+                                 # "не false" читалось как "включено" — тот же паттерн, что news/video)
+
 # mandatory_daily_wps:             # WPs that MUST appear in every DayPlan
 #   - wp: 7                        # WP number (from WeekPlan)
 #     min_minutes: 30
@@ -52,6 +57,11 @@ budget_spread:
   enabled: true          # Distribute weekly budget of WPs across remaining days
   threshold_h: 4         # Only WPs with weekly budget ≥ this value are spread
   rounding: 0.5          # Round daily_slot to nearest N hours
+  # days_left counts these days, including today (issue #902). Default is
+  # mon..fri -- unchanged from before this key existed. A user whose working
+  # week runs further (e.g. through Saturday/Sunday) lists all of them here
+  # instead of the daily budget being overstated on a hardcoded 5-day week.
+  working_days: [mon, tue, wed, thu, fri]
 
 pomodoro:
   work_minutes: 25
@@ -59,3 +69,12 @@ pomodoro:
   long_break_minutes: 15
   sessions_before_long_break: 4
   session_alert_minutes: 50     # Remind to take a break after this many minutes
+
+# issue #720: memory/protocol-work.md § 2a Decision Capture references this
+# key for its Nudge check but the key never shipped in the default config —
+# the nudge silently never fires. Default below is a starting point, not a
+# calibrated value (weights from protocol-work.md: decision_approve=1,
+# decision_reject/redirect=3, decision_architectural/strategic=5) — revisit
+# after observing real daily decision-weight sums.
+cognitive_budget:
+  daily_decision_points: 15

@@ -86,6 +86,14 @@ get_github_link() {
 build_message() {
     local scenario="$1"
     local file
+
+    # WP-561 Ф25: a failed week-review must alarm even when no WeekPlan file is found or the
+    # model wrote nothing, so this message is static and skips the file lookup below.
+    if [ "$scenario" = "week-review-failed" ]; then
+        printf "<b>🔴 Week-Review не доведён до сервера</b>\n\nОтчёт недели не подтверждён на origin/main (запуск не начался, модель упала или отчёт не доставлен), последующие сценарии могут остаться без итогов недели. Причина - в логе стратега за сегодня, строки POSTCONDITION или FAILED."
+        return
+    fi
+
     file=$(find_strategy_file "$scenario")
 
     if [ -z "$file" ] || [ ! -f "$file" ]; then
@@ -123,7 +131,8 @@ build_message() {
             ;;
 
         "note-review")
-            printf "<b>📝 Note-Review завершён</b>\n\nЗаметки обработаны, inbox почищен."
+            # The notifier cannot see what the model did, so the text claims nothing about written proposals
+            printf "<b>📝 Note-Review завершён</b>\n\nЗаметки остаются в inbox, пока вы не примете по ним решение."
             ;;
 
         *)

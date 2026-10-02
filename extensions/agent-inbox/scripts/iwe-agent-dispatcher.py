@@ -1014,6 +1014,71 @@ def write_result(repo_dir: Path, task_id: str, fm: dict,
     return result_path
 
 
+def _collect_extra_task_files(repo_dir: Path, exclude: set[Path]) -> list[Path]:
+    """Safety-net (WP-564 Ф3): подбирает markdown-артефакты, которые агент создал
+    сам внутри inbox/agent/tasks/ через свой Write, но не закоммитил.
+
+    Живой прогон Ф2 (12.09.2026) показал: агент реально создаёт N файлов-шагов
+    (per headless-adapter.md таблица A), но post-invoke `git reset --hard
+    origin/<branch>` не трогает untracked-файлы, а финальный commit_and_push()
+    стейджит только [task_path, result_path] — файлы шагов остаются untracked
+    и теряются. Фильтрация по id/task_id из frontmatter не работает: внешний
+    task-файл использует поле `id`, а файлы-шаги, которые пишет сам агент,
+    заводят собственное поле `task_id` со значением ШАГА, а не задачи —
+    совпадения не бывает никогда (пир-сессия 2026-09-12-10-wp564-dispatcher-fix).
+
+    Вместо этого — directory-scope: process_task() вызывается строго
+    последовательно (main() — plain for-loop) под общим `acquire_lock()`,
+    поэтому любой untracked/modified .md в inbox/agent/tasks/ на момент
+    финального коммита принадлежит текущему прогону.
+
+    Известный остаточный риск (не устранён этим фиксом): untracked .md,
+    оставшиеся от прерванного предыдущего прогона в этой же tasks_dir, будут
+    подхвачены вместе с артефактами текущего — это проблема мусора в рабочей
+    директории, не проблема параллелизма.
+
+    Осознанно вне охвата: только `.md`-файлы под inbox/agent/tasks/. Не-md
+    артефакты (например, лог-файл, который агент завёл в живом прогоне Ф2)
+    safety-net не подхватывает — это принятое ограничение, не баг.
+    """
+    tasks_dir = repo_dir / "inbox" / "agent" / "tasks"
+    # -z: git не квотирует путь в кавычки/octal-escape для пробелов и non-ASCII
+    # (кириллица) — обычный --porcelain это делает, и построчный парсинг
+    # молча терял такие файлы (найдено ревью этой же пир-сессии). В -z формате
+    # rename/copy — это второе NUL-поле (ORIG_PATH) СЛЕДОМ за записью, не
+    # часть текста самой записи, поэтому спецкейс " -> " больше не нужен.
+    cp = run(["git", "status", "--porcelain", "-z", "--untracked-files=all", "--", str(tasks_dir)],
+             cwd=repo_dir, check=True)
+
+    collected: list[Path] = []
+    tokens = cp.stdout.split("\0")
+    i = 0
+    while i < len(tokens):
+        record = tokens[i]
+        i += 1
+        if len(record) < 4:
+            continue
+        status, rel = record[:2], record[3:]
+        if "R" in status:  # copy-detection выключен (нет --find-copies) — "C" сюда не приходит
+            i += 1  # ORIG_PATH — отдельное NUL-поле, нас интересует только новый путь
+        if "D" in status:  # удаления — не наша забота
+            continue
+        # Без .resolve(): repo_dir уже абсолютный (см. вызов в process_task), а
+        # commit_and_push() сам делает f.relative_to(repo_dir) без резолва
+        # симлинков (iwe-agent-dispatcher.py:467) — резолвить здесь и не резолвить
+        # там значило бы сравнивать разные представления одного пути (найдено
+        # ревью /verify этой же пир-сессии).
+        candidate = repo_dir / rel
+        if candidate.suffix.lower() != ".md" or candidate in exclude:
+            continue
+        try:
+            candidate.relative_to(tasks_dir)
+        except ValueError:
+            continue
+        collected.append(candidate)
+    return collected
+
+
 # === Главный цикл ===
 
 def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
@@ -1143,9 +1208,24 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
         "completed_at": finished_at.isoformat(),
         "verdict": domain_verdict or ("PASS" if ok else "UNKNOWN"),
     })
+
+    # WP-564 Ф3: подобрать то, что агент создал сам через Write и не закоммитил
+    # (см. docstring _collect_extra_task_files).
+    try:
+        extra_files = _collect_extra_task_files(repo_dir, exclude={task_path, result_path})
+    except Exception as e:
+        # Не даём новому шагу уронить уже готовый completed/failed-коммит —
+        # откатываемся к поведению до Ф3 (только task_path+result_path), но
+        # громко, не молча (найдено /verify этой же пир-сессии).
+        log(f"safety-net: git status упал, extra_files пропущены: {e}", "WARN")
+        extra_files = []
+    # Лог всегда, не только при extra_files>0 — иначе "агент ничего не оставил"
+    # неотличимо от "safety-net не отработал/упал" (риск найден Kimi, ход 4).
+    log(f"safety-net: extra_files={len(extra_files)} в inbox/agent/tasks/", "DEBUG")
+
     commit_and_push(repo_dir,
         f"dispatch(WP-324): {task_id} → {'completed' if ok else 'failed'}",
-        [task_path, result_path])
+        [task_path, result_path, *extra_files])
 
     return True
 

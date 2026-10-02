@@ -94,6 +94,8 @@ esac
 # absent for N days" classification from ledger history alone, same
 # no-mutable-counter principle as day-open-r23-series-patch.py's R23 series.
 case "$KIND" in
+  # WP-561: the delivered session guard emits this on peer/bypass close.
+  session_closed_direct) ;;
   facts_digest|pilot_answer|wp_status_change|blocked_question|close_day_done|open_day_done|close_week_done|open_week_done|session_closed|session_reflection|conversational_close_done|deferred_work_done|pending|day_rollup|wp_drift_found|pool_candidate_selected|pool_tiebreak_resolved|pool_execution_finished|reflection|week_summary|night_cycle_complete|night_cycle_verified|session_recovered_closed|sync_skipped|close_ticket_issued|close_ticket_consumed|close_obligation|session_closed_no_reflection|multiplier_backfill_attempt) ;;
   *) echo "ERROR: invalid kind '$KIND'" >&2; exit 1 ;;
 esac
@@ -304,6 +306,26 @@ if any(not isinstance(existing, dict) for existing in doc["events"]):
     print("ERROR: existing ledger contains a non-mapping event", file=sys.stderr)
     sys.exit(1)
 
+# A resumed terminal transition may retry its projection after publication.
+# Deduplicate that durable attempt under the writer lock; older callers without
+# an attempt id remain append-only, and distinct sessions keep distinct events.
+close_attempt_id = data.get("close_attempt_id") if isinstance(data, dict) else None
+session_id = data.get("session_id") if isinstance(data, dict) else None
+if (
+    "$KIND" == "session_closed_direct"
+    and isinstance(close_attempt_id, str) and close_attempt_id
+    and isinstance(session_id, str) and session_id
+):
+    if any(
+        existing.get("kind") == "session_closed_direct"
+        and isinstance(existing.get("data"), dict)
+        and existing["data"].get("session_id") == session_id
+        and existing["data"].get("close_attempt_id") == close_attempt_id
+        for existing in doc["events"]
+    ):
+        print("SKIP: session_closed_direct for this close attempt already exists")
+        sys.exit(2)
+
 # --dedup-by-kind (28.07): re-check for an existing event of this kind INSIDE the
 # flock we already hold — closes the race a caller-side check-then-append left open
 # (two near-simultaneous callers could both see "not there yet" outside the lock).
@@ -343,7 +365,7 @@ PYEOF
   rm -f "$DATA_TMP"
 
   if [ $PY_EXIT -eq 2 ]; then
-    # --dedup-by-kind skip — no OUT_TMP was created, nothing to rename or clean up
+    # Duplicate skip — no OUT_TMP was created, nothing to rename or clean up.
     return 0
   fi
 
