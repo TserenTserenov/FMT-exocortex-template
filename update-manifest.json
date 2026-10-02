@@ -2313,6 +2313,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
+<<<<<<< HEAD
       "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
     },
     {
@@ -2322,6 +2323,9 @@
     {
       "path": "scripts/day-open-pipeline.sh",
       "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
+=======
+      "sha256": "29ac1203fcd37019a52e16fedcf580de4552c8c57fa6d2b8d995f2ff2a127cbc"
+>>>>>>> 0b8e4b91 (fix(day-open-pipeline): тихий повтор узнаёт сообщение по началу, а не по фразе внутри (красная команда, раунд 37))
     },
     {
       "path": "scripts/day-open-preflight.sh",
