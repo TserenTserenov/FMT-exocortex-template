@@ -5463,6 +5463,19 @@ else
     fail "T48: a linked record was replaced or written through, or warned $(t46_count 'не удалось записать' "$T48D_OUT") times"
 fi
 
+# --- 48f: a link is no proof when READ either (red team of the 0.41.1 candidate). memory_record_put never writes
+# through one, but memory_record_get followed it: a link to a file somebody else filled with the hash of an edited
+# copy made that copy count as untouched, and the update replaced it.
+printf 'memory/x.md\t%s\n' "$T48_H1" > "$T48_DIR/proof-elsewhere.tsv"
+ln -s "$T48_DIR/proof-elsewhere.tsv" "$T48_DIR/proof-link.tsv"
+T48F_PLAIN=$( eval "$T48_FUNCS"; memory_record_get "$T48_DIR/proof-elsewhere.tsv" memory/x.md )
+T48F_LINK=$( eval "$T48_FUNCS"; memory_record_get "$T48_DIR/proof-link.tsv" memory/x.md )
+if [ "$T48F_PLAIN" = "$T48_H1" ] && [ -z "$T48F_LINK" ]; then
+    pass "T48: a record that is a link proves nothing when it is read (the same file read directly does)"
+else
+    fail "T48: a link was read as proof (direct read '$T48F_PLAIN', through the link '$T48F_LINK')"
+fi
+
 # --- 48e: every file left as it was is in the closing summary, whatever the reason; the summary does not
 # promise a command where there is none.
 if $T48_ROOT; then

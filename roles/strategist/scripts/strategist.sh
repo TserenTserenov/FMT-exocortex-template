@@ -1001,6 +1001,13 @@ day_open_alarm() {  # <reason code> <reason text> [exit code]; at most one deliv
         log "Day Open: тревога сегодня уже доставлена, повторно не шлю ($2)"
         return 0
     fi
+    # The limit is checked BEFORE a send starts: a run killed inside the send leaves its ALARM line (and a
+    # pending give-up) behind, and the next run must not start one more send past the limit (red team of the
+    # 0.41.1 candidate: killed runs kept the count from ever stopping the sends).
+    if [ "$(count_in_log "$DAY_OPEN_ALARM_MARK")" -ge "$DAY_OPEN_ALARM_MAX_ATTEMPTS" ]; then
+        log "Day Open: тревога уже начата $DAY_OPEN_ALARM_MAX_ATTEMPTS раза за сегодня, больше не шлю ($2)"
+        return 0
+    fi
     log "$DAY_OPEN_ALARM_MARK ($2)"
     # The template turns the code into the message text (roles/synchronizer/scripts/templates/strategist.sh).
     DAY_OPEN_FAILED_REASON="$1" DAY_OPEN_FAILED_RC="${3:-}" notify_telegram "day-open-failed"

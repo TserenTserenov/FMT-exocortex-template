@@ -412,6 +412,27 @@ check "14: выход 0 и GAVE UP сразу" "0/1" "$rc/$(log_count 'GAVE UP s
 check "14: тревога в журнале есть, отправки нет" "1/0" "$(log_count 'ALARM: day-open-failed')/$(messages)"
 check "14: без повтора доставки" "0" "$(log_count 'повтор доставки при следующем запуске планировщика')"
 
+# ---------------------------------------------------------------- 15
+echo "== 15: тревога убита снаружи на третьей отправке: следующий запуск не начинает четвёртую"
+# A run killed inside the send (the scheduler's timeout while the Bot API hangs) leaves its ALARM line and the
+# pending give-up behind. The count of STARTED sends must stop the next run before it contacts Telegram: red team
+# of the 0.41.1 candidate found the limit checked only after the send.
+new_case
+touch "$NET_DOWN_FILE"
+for n in 1 2; do
+    run_strategist morning IWE_SCRIPTS="$TMP/no-scripts" > /dev/null
+done
+LOGF=$(ls "$TEST_HOME"/logs/strategist/2*.log | head -1)
+# what the killed third run left: its ALARM line and nothing else
+printf '[%s] ALARM: day-open-failed (конвейер Открытия дня не доставлен, запуск убит внутри отправки)\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$LOGF"
+rm -f "$NET_DOWN_FILE"   # the Bot API answers now: a fourth send would be delivered
+rc=$(run_strategist morning IWE_SCRIPTS="$TMP/no-scripts")
+check "15: выход 0 (отказ на день)" "0" "$rc"
+check "15: начатых тревог по-прежнему три" "3" "$(log_count 'ALARM: day-open-failed')"
+check "15: Telegram не получил сообщений" "0" "$(messages)"
+check "15: GAVE UP ровно один" "1" "$(log_count 'GAVE UP scenario: day-plan (')"
+check "15: в журнале сказано, что больше не шлём" "1" "$(log_count 'больше не шлю')"
+
 echo
 if [ "$fail" -eq 0 ]; then
     echo "PASS: issue #983 — утреннее Открытие дня без свободного промпта, с тревогой и пределом попыток"

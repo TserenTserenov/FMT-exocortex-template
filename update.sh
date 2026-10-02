@@ -496,13 +496,15 @@ memory_record_put() {
     return 1
 }
 
-# memory_record_get FILE KEY — the sha256 that FILE keeps for KEY, or nothing: no FILE, an
-# unreadable or malformed one, no line for KEY. The hash follows the last tab of its line, so a
-# tab inside a path cannot shift it. Reading never fails the caller.
+# memory_record_get FILE KEY — the sha256 that FILE keeps for KEY, or nothing: no FILE, a symbolic
+# link (memory_record_put never writes through one, and a link to a file somebody else filled
+# would "prove" a pilot's edit untouched: red team of the 0.41.1 candidate), an unreadable or
+# malformed one, no line for KEY. The hash follows the last tab of its line, so a tab inside a path
+# cannot shift it. Reading never fails the caller.
 memory_record_get() {
     local file="$1" key="$2" line value tab found=""
     tab=$(printf '\t')
-    [ -f "$file" ] && [ -r "$file" ] || return 0
+    [ ! -L "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 0
     while IFS= read -r line || [ -n "$line" ]; do
         case "$line" in *"$tab"*) ;; *) continue ;; esac
         [ "${line%"$tab"*}" = "$key" ] || continue
