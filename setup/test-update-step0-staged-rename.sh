@@ -165,10 +165,10 @@ if [ -n "\${SHIM_TRUNCATED_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; t
     [ -n "\$out" ] && printf '#!/bin/bash\nif true; then\n' > "\$out"
     exit 0
 fi
-# SHIM_STUB_UPDATE_SH (issue #1004): a syntactically WHOLE stub, a shebang and comments only: it
-# passes the emptiness, "#!" and bash -n checks, but is no complete update.sh.
+# SHIM_STUB_UPDATE_SH (issue #1004): a syntactically WHOLE stub that kept the integrity header of
+# this generation but lost the tail (shebang and comments only): it passes the emptiness, "#!" and bash -n checks, but is no complete update.sh.
 if [ -n "\${SHIM_STUB_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
-    [ -n "\$out" ] && printf '#!/bin/bash\n# truncated answer, only comments\n' > "\$out"
+    [ -n "\$out" ] && printf '#!/bin/bash\n%s\n# truncated answer, header kept, tail lost\n' '# update-sh-integrity: end-marker-required' > "\$out"
     exit 0
 fi
 # SHIM_ENV_SHEBANG_UPDATE_SH: a real, different script whose first line is "#!/usr/bin/env bash".
@@ -176,20 +176,24 @@ if [ -n "\${SHIM_ENV_SHEBANG_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ];
     [ -n "\$out" ] && { echo '#!/usr/bin/env bash'; tail -n +2 "$UPSTREAM/update.sh"; } > "\$out"
     exit 0
 fi
-# #1004 release-aware marker check. SHIM_MANIFEST_VERSION rewrites the version the manifest reports.
-# SHIM_OLD_RELEASE_UPDATE_SH: update.sh of a release without the end marker (whole, no marker line).
-# SHIM_MIDMARKER_UPDATE_SH: the marker line is present but in the middle, content follows it.
-if [ -n "\${SHIM_MANIFEST_VERSION:-}" ] && [ "\${url##*/}" = "update-manifest.json" ] && [ -n "\$out" ]; then
-    cp "$UPSTREAM/update-manifest.json" "\$out"
-    sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"\$SHIM_MANIFEST_VERSION\"/" "\$out"; rm -f "\$out.bak"
-    exit 0
+# #1004 integrity-tag cases (no manifest, no version involved).
+# SHIM_OLD_RELEASE_UPDATE_SH: update.sh of a release without the integrity tag and the end marker.
+# SHIM_NOMARKER_UPDATE_SH: the tag is there, the end marker line is gone (tail lost).
+# SHIM_MIDMARKER_UPDATE_SH: tag and marker present, but the marker is in the middle, content follows.
+# SHIM_FAIL_MANIFEST: the manifest cannot be fetched (Step 0 must not care).
+if [ -n "\${SHIM_FAIL_MANIFEST:-}" ] && [ "\${url##*/}" = "update-manifest.json" ]; then
+    exit 22
 fi
 if [ -n "\${SHIM_OLD_RELEASE_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
-    [ -n "\$out" ] && { grep -vxF '# --- end of update.sh ---' "$UPSTREAM/update.sh"; echo '# old release'; } > "\$out"
+    [ -n "\$out" ] && { grep -vxF -e '# --- end of update.sh ---' -e '# update-sh-integrity: end-marker-required' "$UPSTREAM/update.sh"; echo '# old release'; } > "\$out"
+    exit 0
+fi
+if [ -n "\${SHIM_NOMARKER_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && { grep -vxF '# --- end of update.sh ---' "$UPSTREAM/update.sh"; echo '# cut here'; } > "\$out"
     exit 0
 fi
 if [ -n "\${SHIM_MIDMARKER_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
-    [ -n "\$out" ] && printf '#!/bin/bash\n# --- end of update.sh ---\necho cut-off tail\n' > "\$out"
+    [ -n "\$out" ] && printf '#!/bin/bash\n# update-sh-integrity: end-marker-required\n# --- end of update.sh ---\necho cut-off tail\n' > "\$out"
     exit 0
 fi
 [ -z "\$out" ] && exit 0
@@ -343,27 +347,33 @@ step0_run_case stub SHIM_STUB_UPDATE_SH "ответ неполон"
 step0_check_case midmarker SHIM_MIDMARKER_UPDATE_SH "ответ неполон"
 step0_run_case midmarker SHIM_MIDMARKER_UPDATE_SH "ответ неполон"
 
-# Compatibility (#1004): update.sh of a release older than the one that introduced the marker has
-# no marker line; a rollback or pin to it must still replace the updater.
-echo "--- control: an old release without the end marker is still accepted ---"
+# Tag present, end marker lost (header kept, tail cut off): refused.
+step0_check_case nomarker SHIM_NOMARKER_UPDATE_SH "ответ неполон"
+step0_run_case nomarker SHIM_NOMARKER_UPDATE_SH "ответ неполон"
+
+# Compatibility (#1004): update.sh of a release older than the integrity tag has neither tag nor
+# marker; a rollback or pin to it must still replace the updater.
+echo "--- control: an old release without the integrity tag is still accepted ---"
 set +e
-SHIM_MANIFEST_VERSION=0.40.2 SHIM_OLD_RELEASE_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+SHIM_OLD_RELEASE_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
     bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-oldrel.log" 2>&1
 set -e
 if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-oldrel.log" && ! grep -q "не удалось проверить update.sh" "$TEST_ROOT/check-oldrel.log"; then
-  pass "an update.sh without the marker from release 0.40.2 is accepted"
+  pass "an update.sh without tag and marker (older release) is accepted"
 else
   fail "old-release update.sh refused; lines: $(grep -n 'update.sh' "$TEST_ROOT/check-oldrel.log" | head -3 | tr '\n' ' ')"
 fi
-# The same bytes under a marker-bearing release number are refused.
+# Step 0 never touches the network for anything but update.sh itself: a manifest outage changes
+# nothing about the verdict on a whole new update.sh.
+echo "--- control: a manifest fetch failure does not affect Step 0 ---"
 set +e
-SHIM_MANIFEST_VERSION=0.41.1 SHIM_OLD_RELEASE_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
-    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-newrel.log" 2>&1
+SHIM_FAIL_MANIFEST=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-nomanifest.log" 2>&1
 set -e
-if grep -q "ответ неполон" "$TEST_ROOT/check-newrel.log"; then
-  pass "an update.sh without the marker from release 0.41.1 is refused"
+if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-nomanifest.log" && ! grep -qE "не удалось проверить update.sh" "$TEST_ROOT/check-nomanifest.log"; then
+  pass "a whole new update.sh is accepted while the manifest cannot be fetched"
 else
-  fail "marker-less update.sh accepted for release 0.41.1; lines: $(grep -n 'update.sh' "$TEST_ROOT/check-newrel.log" | head -3 | tr '\n' ' ')"
+  fail "manifest outage changed Step 0; lines: $(grep -n 'update.sh' "$TEST_ROOT/check-nomanifest.log" | head -3 | tr '\n' ' ')"
 fi
 
 # Control: the check refuses what is no script, not what merely starts differently — a real

@@ -1,4 +1,5 @@
 #!/bin/bash
+# update-sh-integrity: end-marker-required
 # Exocortex Update — загрузка обновлений платформы из FMT-exocortex-template
 #
 # Использование:
@@ -3047,39 +3048,19 @@ if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
     echo ""
 fi
 
-# version_at_least A B — 0 when the numeric x.y.z prefix of A is >= that of B (a suffix such as
-# "-test" is ignored); non-zero also when A has no x.y.z prefix.
-version_at_least() {
-    local a b
-    a=$(printf '%s' "$1" | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
-    b=$(printf '%s' "$2" | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
-    [ -n "$a" ] && [ -n "$b" ] || return 1
-    awk -v a="$a" -v b="$b" 'BEGIN {
-        n = split(a, x, "."); split(b, y, ".")
-        for (i = 1; i <= n; i++) { if (x[i] + 0 > y[i] + 0) exit 0; if (x[i] + 0 < y[i] + 0) exit 1 }
-        exit 0 }'
-}
-
-# step0_release_check FILE — 0 when the downloaded update.sh FILE may replace the running one.
-# The release it belongs to is read from the manifest served next to it; a release at or above
-# UPDATE_SH_MARKER_MIN_VERSION must end with UPDATE_SH_END_MARKER (last non-empty line). Sets
-# STEP0_REJECT_REASON on refusal.
-UPDATE_SH_MARKER_MIN_VERSION="0.41.1"
-step0_release_check() {
-    local file="$1" manifest="$TMPDIR_UPDATE/step0-manifest.json" release_version last_line
+# step0_integrity_check FILE — 0 when the downloaded update.sh FILE may replace the running one.
+# No manifest, no network, no version parsing (#1004): the file says about itself whether it must
+# end with the marker. An update.sh of this generation carries UPDATE_SH_INTEGRITY_TAG on its own
+# line in the first 40 lines; such a file must END with UPDATE_SH_END_MARKER (last non-empty
+# line), so a copy that kept its header but lost its tail, or has the marker in the middle, is
+# refused. A file without the tag belongs to an older release (rollback, pin): the checks done
+# before this function (non-empty, "#!", bash -n) are all it gets. Sets STEP0_REJECT_REASON.
+UPDATE_SH_INTEGRITY_TAG="# update-sh-integrity: end-marker-required"
+UPDATE_SH_END_MARKER="# --- end of update.sh ---"
+step0_integrity_check() {
+    local file="$1" last_line
     STEP0_REJECT_REASON=""
-    # shellcheck disable=SC2086
-    if ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update-manifest.json" -o "$manifest" 2>/dev/null \
-       || [ ! -s "$manifest" ]; then
-        STEP0_REJECT_REASON="версия выпуска не определена (манифест не загружен), update.sh не заменён"
-        return 1
-    fi
-    release_version=$(manifest_version "$manifest")
-    if [ -z "$release_version" ] || ! version_at_least "$release_version" "0.0.0"; then
-        STEP0_REJECT_REASON="версия выпуска не определена (манифест без версии), update.sh не заменён"
-        return 1
-    fi
-    version_at_least "$release_version" "$UPDATE_SH_MARKER_MIN_VERSION" || return 0
+    head -n 40 "$file" | grep -qxF "$UPDATE_SH_INTEGRITY_TAG" || return 0
     last_line=$(awk 'NF {l = $0} END {print l}' "$file")
     if [ "$last_line" != "$UPDATE_SH_END_MARKER" ]; then
         STEP0_REJECT_REASON="ответ неполон (последняя строка не конечный маркер)"
@@ -3094,7 +3075,6 @@ step0_release_check() {
 # then pinned the delivery to the release snapshot — so the local update.sh
 # ping-ponged between the main and release versions on every run, and Step 5
 # always saw update.sh as "updated" (see part 2 at the apply loop).
-UPDATE_SH_END_MARKER="# --- end of update.sh ---"
 resolve_delivery_ref
 echo "[0] Проверка update.sh..."
 # Capture hash before any network activity — used for --check integrity guard below (fix #205)
@@ -3124,11 +3104,11 @@ elif ! bash -n "$REMOTE_UPDATE" 2>/dev/null; then
     # that needs no reference hash, which Step 0 does not have yet (the manifest comes later),
     # and it runs with the same `bash` that the replacement is re-executed with.
     echo "  ⚠ не удалось проверить update.sh: ответ не похож на рабочий скрипт"
-elif ! step0_release_check "$REMOTE_UPDATE"; then
+elif ! step0_integrity_check "$REMOTE_UPDATE"; then
     # Issue #1004: a syntactically whole stub (a shebang and comments) passes `bash -n` and
-    # used to replace the updater, which then "succeeded" doing nothing. update.sh of a release
-    # that carries the end marker must END with it (its last non-empty line); a release older
-    # than UPDATE_SH_MARKER_MIN_VERSION (rollback, pin) has no marker and keeps the checks above.
+    # used to replace the updater, which then "succeeded" doing nothing. An update.sh that carries
+    # UPDATE_SH_INTEGRITY_TAG must END with the marker; one without the tag is an older release
+    # (rollback, pin) and keeps the checks above.
     echo "  ⚠ не удалось проверить update.sh: $STEP0_REJECT_REASON"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
