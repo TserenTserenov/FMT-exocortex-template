@@ -162,6 +162,12 @@ if [ -n "\${SHIM_TRUNCATED_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; t
     [ -n "\$out" ] && printf '#!/bin/bash\nif true; then\n' > "\$out"
     exit 0
 fi
+# SHIM_STUB_UPDATE_SH (issue #1004): a syntactically WHOLE stub, a shebang and comments only: it
+# passes the emptiness, "#!" and bash -n checks, but is no complete update.sh.
+if [ -n "\${SHIM_STUB_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && printf '#!/bin/bash\n# truncated answer, only comments\n' > "\$out"
+    exit 0
+fi
 # SHIM_ENV_SHEBANG_UPDATE_SH: a real, different script whose first line is "#!/usr/bin/env bash".
 if [ -n "\${SHIM_ENV_SHEBANG_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
     [ -n "\$out" ] && { echo '#!/usr/bin/env bash'; tail -n +2 "$UPSTREAM/update.sh"; } > "\$out"
@@ -309,6 +315,10 @@ step0_run_case html SHIM_HTML_UPDATE_SH "ответ не похож на скр�
 # "#!" alone proves nothing about integrity: a script cut off in the middle starts with it too.
 step0_check_case truncated SHIM_TRUNCATED_UPDATE_SH "ответ не похож на рабочий скрипт"
 step0_run_case truncated SHIM_TRUNCATED_UPDATE_SH "ответ не похож на рабочий скрипт"
+
+# Issue #1004: a stub that is syntactically whole (shebang + comments) is refused as incomplete.
+step0_check_case stub SHIM_STUB_UPDATE_SH "ответ неполон"
+step0_run_case stub SHIM_STUB_UPDATE_SH "ответ неполон"
 
 # Control: the check refuses what is no script, not what merely starts differently — a real
 # update.sh whose first line is "#!/usr/bin/env bash" is still a newer update.sh.

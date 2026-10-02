@@ -3040,6 +3040,7 @@ fi
 # then pinned the delivery to the release snapshot — so the local update.sh
 # ping-ponged between the main and release versions on every run, and Step 5
 # always saw update.sh as "updated" (see part 2 at the apply loop).
+UPDATE_SH_END_MARKER="# --- end of update.sh ---"
 resolve_delivery_ref
 echo "[0] Проверка update.sh..."
 # Capture hash before any network activity — used for --check integrity guard below (fix #205)
@@ -3069,6 +3070,11 @@ elif ! bash -n "$REMOTE_UPDATE" 2>/dev/null; then
     # that needs no reference hash, which Step 0 does not have yet (the manifest comes later),
     # and it runs with the same `bash` that the replacement is re-executed with.
     echo "  ⚠ не удалось проверить update.sh: ответ не похож на рабочий скрипт"
+elif ! grep -qxF "$UPDATE_SH_END_MARKER" "$REMOTE_UPDATE"; then
+    # Issue #1004: a syntactically whole stub (a shebang and comments) passes `bash -n` and
+    # used to replace the updater, which then "succeeded" doing nothing. A complete update.sh
+    # ends with the marker line; one without it is a truncated or foreign answer.
+    echo "  ⚠ не удалось проверить update.sh: ответ неполон (нет конечного маркера)"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
@@ -3497,7 +3503,13 @@ sync_workspace_claude_md() {
             # pilot's file untouched and surface it the same way an unresolved merge
             # conflict is surfaced, instead of guessing.
             WS_USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$WS_CURRENT")
-            if [ -n "$WS_USER_SECTION" ]; then
+            if [ -n "$WS_USER_SECTION" ] && ! WS_BACKUP_DIR=$(claude_backup_before_replace "$WS_CURRENT"); then
+                # #1004: no backup, no replacement.
+                CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
+                echo "  ⚠ $WS_CURRENT НЕ тронут — не удалось сделать резервную копию перед заменой."
+                echo "    Сверьте свои правки вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
+            elif [ -n "$WS_USER_SECTION" ]; then
+                echo "  ⚠ $WS_CURRENT: правки вне блока USER-SPACE будут заменены версией шаблона; резервная копия: $WS_BACKUP_DIR"
                 cp "$WS_NEW" "$WS_CURRENT"
                 sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
                 echo "" >> "$WS_CURRENT"
@@ -3518,6 +3530,20 @@ sync_workspace_claude_md() {
         fi
         CLAUDE_UPDATED=true
     fi
+}
+
+# claude_backup_before_replace FILE — issue #1004: the no-base USER-SPACE branch replaces FILE with
+# the template version and keeps only the marked block; everything the pilot wrote outside it
+# (§8/§9 have no markers in the real format) is gone. Copy FILE into
+# $WORKSPACE_DIR/.backups/claude-md-pre-update/<run>/ first and print where it went; non-zero
+# (and nothing printed) when the copy failed: the caller must then leave FILE untouched.
+claude_backup_before_replace() {
+    local src="$1" dir
+    dir="${WORKSPACE_DIR:-$SCRIPT_DIR}/.backups/claude-md-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    [ -L "${WORKSPACE_DIR:-$SCRIPT_DIR}/.backups" ] && return 1
+    mkdir -p "$dir" || return 1
+    cp -p "$src" "$dir/$(basename "$(dirname "$src")")-$(basename "$src")" || return 1
+    printf '%s\n' "$dir"
 }
 
 # claude_template_copy_is_replaceable FILE — B1 (WP-7 F193): setup.sh (since v0.38.10) keeps the
@@ -4708,7 +4734,12 @@ for f in "${UPDATED_FILES[@]}"; do
             # is no safe 3-way merge — leave the pilot's file untouched and surface it
             # the same way an unresolved merge conflict is surfaced, instead of guessing.
             USER_SECTION=$(sed -n '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/p' "$CURRENT_FILE")
-            if [ -n "$USER_SECTION" ]; then
+            if [ -n "$USER_SECTION" ] && ! CLAUDE_BACKUP_DIR=$(claude_backup_before_replace "$CURRENT_FILE"); then
+                # #1004: no backup, no replacement.
+                CLAUDE_BASE_MISSING_FILES+=("$CURRENT_FILE")
+                echo "  ⚠ $f НЕ тронут — не удалось сделать резервную копию перед заменой."
+            elif [ -n "$USER_SECTION" ]; then
+                echo "  ⚠ $f: правки вне блока USER-SPACE будут заменены версией шаблона; резервная копия: $CLAUDE_BACKUP_DIR"
                 cp "$NEW_FILE" "$CURRENT_FILE"
                 sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CURRENT_FILE"
                 echo "" >> "$CURRENT_FILE"
@@ -5697,3 +5728,5 @@ fi
 
 finish_update_transaction
 exit_clean
+
+# --- end of update.sh ---
