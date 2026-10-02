@@ -24,7 +24,8 @@ CHECKS_RUNNER_OUT=""
 CHECKS_RUNNER_RC=0
 run_checks() {
   local dayplan="$1"
-  if CHECKS_RUNNER_OUT=$(IWE_ROOT="$ROOT" bash "$ROOT/scripts/day-open-checks-runner.sh" "$dayplan" 2>&1); then
+  if CHECKS_RUNNER_OUT=$(IWE_ROOT="$ROOT" IWE_TEMPLATE="$ROOT" \
+      bash "$ROOT/scripts/day-open-checks-runner.sh" "$dayplan" 2>&1); then
     CHECKS_RUNNER_RC=0
   else
     CHECKS_RUNNER_RC=$?

@@ -32,31 +32,36 @@ export CFG="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/exocortex/day-rhythm-config
 export HOME
 export IWE
 
-# Same convention as .claude/scripts/load-extensions.sh: single file
-# `day-open.checks.md` or split files `day-open.checks.*.md` (issue #466 —
-# the old hardcoded single path made the split convention invisible here).
-CHECKS_FILES=$(find_day_open_hook_files "$EXT_DIR" "checks")
-FIND_STATUS=$?
-
-# extensions/ is deliberately empty until the user adds a customization
-# (extensions/README.md: "update.sh never touches this dir") — setup.sh does
-# not seed it, so a fresh install has no $EXT_DIR/day-open.checks*.md at all.
-# The template still ships its own universal-invariant default (WP-529 Ф7);
-# fall back to it ONLY when the workspace copy has nothing, so a pilot who
-# has customized their own extensions/day-open.checks.md keeps using theirs
-# unchanged (issue #635).
-if [ "$FIND_STATUS" -ne 0 ] || [ -z "$CHECKS_FILES" ]; then
-  TEMPLATE_EXT_DIR="$IWE_TEMPLATE/extensions"
-  CHECKS_FILES=$(find_day_open_hook_files "$TEMPLATE_EXT_DIR" "checks")
-  FIND_STATUS=$?
-  if [ "$FIND_STATUS" -eq 0 ] && [ -n "$CHECKS_FILES" ]; then
-    echo "  ℹ️  $EXT_DIR has no day-open.checks*.md — using template default from $TEMPLATE_EXT_DIR"
-  fi
+# Universal checks belong to the template; user checks are additional. The old
+# fallback let any custom split file (including an agent-only file) replace the
+# baseline, so a truncated DayPlan could pass with zero universal checks.
+# Discover each set separately and run the baseline last, so it validates the
+# final DayPlan even if a custom bash block changed it. No user file is copied,
+# changed, or ignored (issue #635's preserve requirement).
+TEMPLATE_EXT_DIR="$IWE_TEMPLATE/extensions"
+BASELINE_FILES=$(find_day_open_hook_files "$TEMPLATE_EXT_DIR" "checks")
+BASELINE_STATUS=$?
+if [ "$BASELINE_STATUS" -ne 0 ] || [ -z "$BASELINE_FILES" ]; then
+  echo "❌ day-open-checks-runner: no template day-open.checks*.md found in $TEMPLATE_EXT_DIR — universal checks unavailable. Commit BLOCKED."
+  exit 1
+fi
+USER_FILES=$(find_day_open_hook_files "$EXT_DIR" "checks")
+USER_STATUS=$?
+if [ "$USER_STATUS" -ne 0 ]; then
+  echo "❌ day-open-checks-runner: could not enumerate $EXT_DIR — user checks may be missing. Commit BLOCKED."
+  exit 1
 fi
 
-if [ "$FIND_STATUS" -ne 0 ] || [ -z "$CHECKS_FILES" ]; then
-  echo "❌ day-open-checks-runner: no day-open.checks*.md found in $EXT_DIR or $IWE_TEMPLATE/extensions — nothing to check"
-  exit 1
+CHECKS_FILES="$BASELINE_FILES"
+if [ "$(cd "$TEMPLATE_EXT_DIR" && pwd -P)" = "$(cd "$EXT_DIR" && pwd -P)" ]; then
+  # A self-contained checkout may use one directory as both template and
+  # workspace. The discovery sets then contain the same files: run each once.
+  echo "  ℹ️  Template and workspace checks share $EXT_DIR — running each file once"
+elif [ -n "$USER_FILES" ]; then
+  CHECKS_FILES=$(printf '%s\n%s' "$USER_FILES" "$BASELINE_FILES")
+  echo "  ℹ️  Running user checks from $EXT_DIR, then template checks from $TEMPLATE_EXT_DIR"
+else
+  echo "  ℹ️  $EXT_DIR has no day-open.checks*.md — using template checks from $TEMPLATE_EXT_DIR"
 fi
 
 # Not `run_day_open_hook_files ... || { ... }` — see scripts/day-open-hooks-runner.sh
@@ -67,6 +72,10 @@ run_day_open_hook_files "$CHECKS_FILES"
 RUN_STATUS=$?
 if [ "$RUN_STATUS" -ne 0 ]; then
   echo "❌ day-open-checks-runner: could not track check results (mktemp failure). Commit BLOCKED."
+  exit 1
+fi
+if [ "$DAYOPEN_HOOK_BLOCKS_RUN" -eq 0 ]; then
+  echo "❌ day-open-checks-runner: no executable bash checks ran. Commit BLOCKED."
   exit 1
 fi
 

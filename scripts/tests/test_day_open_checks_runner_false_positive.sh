@@ -1,38 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# issue #466: day-open-checks-runner.sh reported "all checks passed" without
-# ever executing a check block, in two independent ways:
-#   1. When extensions/day-open.checks.md was missing, awk's stdout was
-#      empty, the `while read -d ''` loop body never ran, and the error
-#      counter stayed at 0 — indistinguishable from "every check passed".
-#   2. The check-file path was hardcoded to a single filename, so a file
-#      following the documented multi-file convention (e.g.
-#      day-open.checks.moi.md, same pattern load-extensions.sh supports)
-#      was invisible to the runner and produced the same false "all checks
-#      passed".
+# issue #466: an absent checks file or an ignored split file must not produce
+# a false "all checks passed". WP-529 F11 adds the template's universal checks
+# first, then any user split files, so a fresh install always runs real checks.
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 mkdir -p "$TMP/extensions" "$TMP/DS-strategy/current"
-echo "test dayplan" > "$TMP/DS-strategy/current/DayPlan 2026-08-18.md"
+cat > "$TMP/DS-strategy/current/DayPlan 2026-08-18.md" <<'EOF'
+# DayPlan 2026-08-18
+
+## Требует внимания
+
+- Нет срочных сигналов.
+
+EOF
 
 run_runner() {
-  IWE_ROOT="$TMP" IWE_GOVERNANCE_REPO="DS-strategy" \
+  IWE_ROOT="$TMP" IWE_TEMPLATE="$ROOT" IWE_GOVERNANCE_REPO="DS-strategy" \
     bash "$ROOT/scripts/day-open-checks-runner.sh" 2>&1
 }
 
-# --- Case 1: no checks file at all — must fail, not silently pass ---
+# --- Case 1: no user checks file — the template baseline still runs ---
 OUT=$(run_runner) && STATUS=0 || STATUS=$?
-if [ "$STATUS" -eq 0 ]; then
-  echo "FAIL (expected, unpatched): runner reported success with no checks file present"
-  echo "$OUT"
-  exit 1
-fi
-if ! echo "$OUT" | grep -q "nothing to check"; then
-  echo "FAIL: expected a 'nothing to check' diagnostic, got:"
+if [ "$STATUS" -ne 0 ] || ! echo "$OUT" | grep -q "all 3 check(s) passed"; then
+  echo "FAIL: template checks did not run without a user file"
   echo "$OUT"
   exit 1
 fi
@@ -58,8 +53,8 @@ if ! echo "$OUT" | grep -q "split file check ran"; then
   echo "$OUT"
   exit 1
 fi
-if ! echo "$OUT" | grep -q "all 1 check(s) passed"; then
-  echo "FAIL: expected exactly 1 check to have run, got:"
+if ! echo "$OUT" | grep -q "all 4 check(s) passed"; then
+  echo "FAIL: expected three template checks and one user check, got:"
   echo "$OUT"
   exit 1
 fi
@@ -80,10 +75,10 @@ if [ "$STATUS" -eq 0 ]; then
   echo "$OUT"
   exit 1
 fi
-if ! echo "$OUT" | grep -q "1/1 block(s) failed"; then
-  echo "FAIL: expected a 1/1 failure count, got:"
+if ! echo "$OUT" | grep -q "1/4 block(s) failed"; then
+  echo "FAIL: expected one failed user check among four blocks, got:"
   echo "$OUT"
   exit 1
 fi
 
-echo "PASS: day-open-checks-runner.sh fails honestly on missing checks, picks up split-file convention, and still catches real failures"
+echo "PASS: day-open-checks-runner.sh runs template and user checks together and catches real failures"

@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "78991e232a493556a699b6fc15b4b86217789d0638ed6de3fc86d08f146f1291"
+      "sha256": "c4a54178c6298ab8c3a2dfcf33e98e4118678e6a98729e1afa02a036b9406d77"
     },
     {
       "path": "CLAUDE.md",
@@ -2245,7 +2245,7 @@
     },
     {
       "path": "scripts/day-open-checks-runner.sh",
-      "sha256": "b16b1357161a0a94ac855541f94cef7016d708a38d69c37af1a157b8ec6d19bf"
+      "sha256": "718821b37c8e66da3578fae3bbc044ad61e50807628c6e8127e6021af7ac2240"
     },
     {
       "path": "scripts/day-open-close-error-patch.py",
@@ -2993,7 +2993,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-checks-runner.sh",
-      "sha256": "dc4fdb2f7f8e1b057315cac5643f53fc61375166dc3a0cb4486867ae5f6216e9"
+      "sha256": "160875cc50b15615dbfa3a43ab4f93abbe5342a11f55f8a8a6bc9dafc6a598de"
     },
     {
       "path": "seed/strategy/scripts/day-open-close-error-patch.py",

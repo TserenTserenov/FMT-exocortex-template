@@ -578,6 +578,100 @@ else
   fail "missing extensions/ directory was silently treated as 'no hooks'"
 fi
 
+# 5j. Universal template checks still run when the user adds a split or
+# agent-only checks file. A one-line plan failed with no customization but
+# used to pass with either file; also prove that a user's bash block executes.
+echo "=== 5j. Template checks plus user checks ==="
+CHECKS_RUNNER="$REPO_ROOT/scripts/day-open-checks-runner.sh"
+CHECKS_PLAN="$HOOKS_WORK/DayPlan 2026-10-02.md"
+CUSTOM_CHECK="$HOOKS_WORK/extensions/day-open.checks.mine.md"
+printf '# DayPlan 2026-10-02\n' > "$CHECKS_PLAN"
+
+CHECKS_OUT=$(IWE_ROOT="$HOOKS_WORK" IWE_TEMPLATE="$REPO_ROOT" \
+  bash "$CHECKS_RUNNER" "$CHECKS_PLAN" 2>&1)
+CHECKS_STATUS=$?
+if [ "$CHECKS_STATUS" -ne 0 ] && echo "$CHECKS_OUT" | grep -q 'подозрительно короткий'; then
+  pass "bad DayPlan is blocked by template checks with no user file"
+else
+  fail "bad DayPlan passed without a user file: $CHECKS_OUT"
+fi
+
+cat > "$CUSTOM_CHECK" <<EOF
+\`\`\`bash
+echo ran > "$MARKER"
+\`\`\`
+EOF
+CHECKS_OUT=$(IWE_ROOT="$HOOKS_WORK" IWE_TEMPLATE="$REPO_ROOT" \
+  bash "$CHECKS_RUNNER" "$CHECKS_PLAN" 2>&1)
+CHECKS_STATUS=$?
+if [ "$CHECKS_STATUS" -ne 0 ] && echo "$CHECKS_OUT" | grep -q 'подозрительно короткий' \
+    && [ "$(cat "$MARKER" 2>/dev/null)" = ran ]; then
+  pass "bad DayPlan stays blocked and the user split check runs"
+else
+  fail "user split check bypassed template checks or did not run: $CHECKS_OUT"
+fi
+
+cat > "$CHECKS_PLAN" <<'EOF'
+# DayPlan 2026-10-02
+
+## Требует внимания
+
+- Нет срочных сигналов.
+
+EOF
+rm -f "$MARKER"
+CHECKS_OUT=$(IWE_ROOT="$HOOKS_WORK" IWE_TEMPLATE="$REPO_ROOT" \
+  bash "$CHECKS_RUNNER" "$CHECKS_PLAN" 2>&1)
+CHECKS_STATUS=$?
+if [ "$CHECKS_STATUS" -eq 0 ] && [ "$(cat "$MARKER" 2>/dev/null)" = ran ] \
+    && echo "$CHECKS_OUT" | grep -q 'all 4 check(s) passed'; then
+  pass "valid DayPlan passes three template checks plus the user split check"
+else
+  fail "valid DayPlan or user split check failed: $CHECKS_OUT"
+fi
+
+# An unpacked/self-contained checkout can designate its own root as both
+# workspace and template. Discovery then returns the same files twice.
+CHECKS_OUT=$(IWE_ROOT="$REPO_ROOT" IWE_TEMPLATE="$REPO_ROOT" \
+  bash "$CHECKS_RUNNER" "$CHECKS_PLAN" 2>&1)
+CHECKS_STATUS=$?
+if [ "$CHECKS_STATUS" -eq 0 ] && echo "$CHECKS_OUT" | grep -q 'all 3 check(s) passed'; then
+  pass "shared template/workspace directory runs each check only once"
+else
+  fail "shared template/workspace directory duplicated checks: $CHECKS_OUT"
+fi
+
+cat > "$CUSTOM_CHECK" <<'EOF'
+```bash
+printf 'broken\n' > "$FILE"
+```
+EOF
+CHECKS_OUT=$(IWE_ROOT="$HOOKS_WORK" IWE_TEMPLATE="$REPO_ROOT" \
+  bash "$CHECKS_RUNNER" "$CHECKS_PLAN" 2>&1)
+CHECKS_STATUS=$?
+if [ "$CHECKS_STATUS" -ne 0 ] && [ "$(cat "$CHECKS_PLAN")" = broken ] \
+    && echo "$CHECKS_OUT" | grep -q 'нет ни одного'; then
+  pass "template checks block a DayPlan damaged by a user check"
+else
+  fail "user check damaged the DayPlan after template validation: $CHECKS_OUT"
+fi
+
+printf '# DayPlan 2026-10-02\n' > "$CHECKS_PLAN"
+cat > "$CUSTOM_CHECK" <<'EOF'
+<!-- executor: agent -->
+Manual check for a later interactive session.
+EOF
+CHECKS_OUT=$(IWE_ROOT="$HOOKS_WORK" IWE_TEMPLATE="$REPO_ROOT" \
+  bash "$CHECKS_RUNNER" "$CHECKS_PLAN" 2>&1)
+CHECKS_STATUS=$?
+if [ "$CHECKS_STATUS" -ne 0 ] && echo "$CHECKS_OUT" | grep -q 'подозрительно короткий' \
+    && ! echo "$CHECKS_OUT" | grep -q 'all 0 check(s) passed'; then
+  pass "agent-only user file cannot replace the template checks"
+else
+  fail "agent-only user file bypassed template checks: $CHECKS_OUT"
+fi
+rm -f "$CHECKS_PLAN" "$CUSTOM_CHECK" "$MARKER"
+
 rm -rf "$HOOKS_WORK"
 trap - EXIT
 
