@@ -829,6 +829,10 @@ render_iwe_status() {
     fi
   elif [ "${SCOUT_PF:-unknown}" = "disabled" ]; then
     echo "| Scout | ⚪ | не установлен на этой машине |"
+  elif [ ! -d "$IWE/DS-autonomous-agents" ] && [ ! -d "$IWE/DS-agent-workspace/scout" ]; then
+    # issue #920: preflight unavailable AND no Scout directory anywhere — nothing
+    # can be broken, so this is "not installed" (⚪), not "could not check" (🟡).
+    echo "| Scout | ⚪ | не установлен на этой машине |"
   else
     echo "| Scout | 🟡 | статус Scout не определён (preflight unavailable) |"
   fi
@@ -841,6 +845,9 @@ render_iwe_status() {
   local triage_file="$IWE/DS-agent-workspace/scheduler/feedback-triage/$DATE.md"
   local watchdog_log="$HOME/logs/synchronizer/feedback-watchdog-$DATE.log"
   local feedback_triage_log="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/logs/feedback-triage.log"
+  # issue #919: the log the scheduler really writes (roles/synchronizer/scripts/scheduler.sh
+  # LOG_FILE) — the three names above are never produced on a real install.
+  local scheduler_log="$HOME/logs/synchronizer/scheduler-$DATE.log"
   local last_watchdog_log
   last_watchdog_log=$(ls -t "$HOME/logs/synchronizer/feedback-watchdog-"*.log 2>/dev/null | head -1 || echo "")
   local last_feedback_triage_log
@@ -869,7 +876,7 @@ render_iwe_status() {
     in_grace_window=true
   fi
 
-  if [ -f "$triage_file" ] || [ -f "$watchdog_log" ] || [ -f "$feedback_triage_log" ]; then
+  if [ -f "$triage_file" ] || [ -f "$watchdog_log" ] || [ -f "$feedback_triage_log" ] || [ -f "$scheduler_log" ]; then
     # Mode B-1: отчёт/лог за сегодня есть → норм
     echo "| Scheduler/триаж | 🟢 | отчёт/лог за $DATE присутствует (Mode B норм) |"
   elif [ "$scheduler_state" = "not_deployed" ]; then
@@ -971,7 +978,7 @@ auto_generated: true
 
 - $launcher_hint: ни один юнит планировщика не зарегистрирован и не активен
 - Признаки прошлого разворачивания на этой машине есть — иначе строка была бы ⚪ «не развёрнут», а этот файл не создавался бы (issue #347)
-- Последний лог \`~/logs/synchronizer/feedback-watchdog-*.log\` старше 24ч (или отсутствует)
+- Последний лог \`~/logs/synchronizer/scheduler-*.log\` старше 24ч (или отсутствует)
 - Mode A классификация (см. peer-сессия 2026-05-30-07 §Gap 3)
 
 ## Action items
@@ -1314,6 +1321,15 @@ render_yesterday() {
   local dc_committed
   dc_committed=$(cd "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" && git log --since="$YDAY 00:00:00" -i \
     --grep="day-close.*$YDAY" --format=%H 2>/dev/null | head -1)
+  # issue #929: same criterion as the pipeline race guard and extract_day_close_carry_over —
+  # yesterday's archived DayPlan with the close sections. The commit-message wording is
+  # not specified by the day-close protocol, so the grep above is only a secondary signal.
+  if [ -z "$dc_committed" ]; then
+    local yday_plan="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan ${YDAY}.md"
+    if [ -f "$yday_plan" ] && grep -qE '<summary><b>Итоги дня</b></summary>|^### Завтра начать с' "$yday_plan"; then
+      dc_committed="archived-plan"
+    fi
+  fi
   if [ -n "$dc_committed" ]; then
     echo "**Коммиты:** $total в $repos репо | **РП закрыто:** <!-- PENDING: count из Day Close отчёта за $YDAY -->"
   else
