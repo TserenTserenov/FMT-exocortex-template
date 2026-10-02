@@ -1242,7 +1242,9 @@ except FileNotFoundError:
 if not stat.S_ISREG(before.st_mode):
     print(json.dumps(["non-regular", before.st_dev, before.st_ino, before.st_mode]))
     raise SystemExit(0)
-flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+# O_BINARY exists on Windows only: without it the descriptor is in text mode (\r\n translation, Ctrl-Z ends
+# the file) and the hash below would not be the hash of the actual bytes.
+flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
 descriptor = os.open(path, flags)
 try:
     opened = os.fstat(descriptor)
@@ -1250,9 +1252,10 @@ try:
         before.st_dev, before.st_ino, before.st_mode, before.st_size,
         before.st_mtime_ns, before.st_ctime_ns,
     )
-    # On Windows lstat reads the directory entry and fstat the open handle, and the two disagree on
-    # st_ctime_ns for a file written moments ago (issue #989). The lstat taken after the read below,
-    # compared with the one above, covers the same swap there, so the cross-API check is POSIX only.
+    # Since CPython 3.12 on Windows lstat() reports the creation time as st_ctime and fstat() the metadata
+    # change time, so the two disagree for any file modified after it was created (issue #989): the
+    # cross-API comparison is POSIX only. The lstat taken after the read below, compared with the one above,
+    # still catches a swap that is in place by then.
     if os.name != "nt" and (
         opened.st_dev, opened.st_ino, opened.st_mode, opened.st_size,
         opened.st_mtime_ns, opened.st_ctime_ns,
