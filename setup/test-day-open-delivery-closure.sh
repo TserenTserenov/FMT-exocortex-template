@@ -321,6 +321,30 @@ EOF
 fi
 rm -rf "$CONTENT_CLEANUP_FIXTURE"
 
+# --- 2g. Fresh setup has no priorities.yaml yet -----------------------------
+# The priorities patch is non-blocking, but a missing optional input must leave
+# a visible fallback finding in the DayPlan rather than a swallowed traceback.
+echo "=== 2g. Missing priorities on a fresh install ==="
+PRIORITIES_FIXTURE=$(mktemp -d)
+cat > "$PRIORITIES_FIXTURE/DayPlan.md" <<'EOF'
+<details>
+<summary><b>Требует внимания</b></summary>
+</details>
+EOF
+# Reuse the interpreter selected by the shared resolver in section 2d.
+PRIORITIES_OUTPUT=$("$SNAPSHOT_PY" "$REPO_ROOT/scripts/day-open-priorities-patch.py" \
+  --dayplan "$PRIORITIES_FIXTURE/DayPlan.md" \
+  --priorities "$PRIORITIES_FIXTURE/priorities.yaml" 2>&1)
+PRIORITIES_STATUS=$?
+if [ "$PRIORITIES_STATUS" -eq 0 ] \
+    && grep -q 'phys_hours не задан в priorities.yaml' "$PRIORITIES_FIXTURE/DayPlan.md" \
+    && ! echo "$PRIORITIES_OUTPUT" | grep -q 'Traceback'; then
+  pass "missing priorities.yaml records a fallback finding without a traceback"
+else
+  fail "missing priorities.yaml did not record a clean fallback: $PRIORITIES_OUTPUT"
+fi
+rm -rf "$PRIORITIES_FIXTURE"
+
 # --- 3. Entry points run from a foreign cwd with a clean PYTHONPATH -----------
 echo "=== 3. Foreign-cwd smoke (clean PYTHONPATH) ==="
 RESOLVED_PY=""

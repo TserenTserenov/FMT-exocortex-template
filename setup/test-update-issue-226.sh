@@ -62,6 +62,14 @@ cat > "$UPSTREAM/memory/dummy-memo.md" <<'EOF'
 # Dummy memo v2
 EOF
 
+mkdir -p "$UPSTREAM/extensions"
+cat > "$UPSTREAM/extensions/day-open.checks.md" <<'EOF'
+# Template Day Open checks
+```bash
+test -f "$FILE"
+```
+EOF
+
 python3 -c "
 import hashlib
 import json
@@ -79,6 +87,7 @@ manifest = {
         entry('AGENTS.md'),
         entry('.claude/hooks/dummy-hook.sh'),
         entry('memory/dummy-memo.md'),
+        entry('extensions/day-open.checks.md'),
     ],
     'deprecated_files': [],
 }
@@ -109,6 +118,16 @@ WORKSPACE_DIR="$TEST_ROOT/repo"
 cat > "$WORKSPACE_DIR/.exocortex.env" <<'EOF'
 GOVERNANCE_REPO="pilot-governance"
 EOF
+
+# Existing installations can have their own Day Open hooks and checks. The
+# updater must deliver its default into the template without touching these.
+mkdir -p "$WORKSPACE_DIR/extensions" "$TEST_ROOT/user-extensions-before"
+for hook in before checks after; do
+    printf '# Pilot-owned Day Open %s\n```bash\nprintf "user-%s\\n"\n```\n' \
+        "$hook" "$hook" > "$WORKSPACE_DIR/extensions/day-open.$hook.md"
+    cp "$WORKSPACE_DIR/extensions/day-open.$hook.md" \
+        "$TEST_ROOT/user-extensions-before/day-open.$hook.md"
+done
 
 # Workspace CLAUDE.md: user edited the SAME line the upstream also changed → real conflict
 cat > "$WORKSPACE_DIR/CLAUDE.md" <<'EOF'
@@ -311,6 +330,20 @@ if [ -f "$SCRIPT_DIR/.update-incomplete" ] && grep -q 'Обновление за
 else
     fail "A: conflict did not preserve/report incomplete update state"
 fi
+
+if cmp -s "$UPSTREAM/extensions/day-open.checks.md" "$SCRIPT_DIR/extensions/day-open.checks.md"; then
+    pass "A: default Day Open checks delivered into template"
+else
+    fail "A: default Day Open checks missing from updated template"
+fi
+for hook in before checks after; do
+    if cmp -s "$TEST_ROOT/user-extensions-before/day-open.$hook.md" \
+        "$WORKSPACE_DIR/extensions/day-open.$hook.md"; then
+        pass "A: existing user day-open.$hook.md preserved byte-for-byte"
+    else
+        fail "A: existing user day-open.$hook.md changed during update"
+    fi
+done
 
 # ------------------------------------------------------------------
 # Scenario B: SCRIPT_DIR already at upstream version (TOTAL_CHANGES=0),

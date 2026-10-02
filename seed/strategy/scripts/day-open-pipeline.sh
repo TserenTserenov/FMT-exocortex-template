@@ -968,16 +968,17 @@ cat "$FILL_ERR_TMP" >&2
 if [ "$FILL_EXIT" -eq 2 ]; then
   echo "  Partial fill — some sections remain PENDING."
   FILL_WARNS=$(grep '\[WARN\]' "$FILL_ERR_TMP" | head -5 || true)
-  tg_notify "⚠️ DayPlan $DATE partially filled — some PENDING sections remain. Checks will block commit until fixed.
+  tg_notify "⚠️ DayPlan $DATE partially filled — some PENDING sections remain. Scaffold saved; Day Open will retry.
 $FILL_WARNS"
-  # Continue to checks (they will fail, but user gets full diagnostics)
+  rm -f "$FILL_ERR_TMP"
+  exit 1
 elif [ "$FILL_EXIT" -ne 0 ]; then
   echo "  LLM fill failed — leaving scaffold for manual completion."
   FILL_ERRS=$(grep -E '\[WARN\]|\[ERROR\]' "$FILL_ERR_TMP" | head -5 || true)
   tg_notify "❌ LLM fill failed for $DATE (exit $FILL_EXIT) — scaffold saved, needs manual completion.
 $FILL_ERRS"
   rm -f "$FILL_ERR_TMP"
-  exit 0
+  exit 1
 fi
 rm -f "$FILL_ERR_TMP"
 echo "  LLM Fill OK"

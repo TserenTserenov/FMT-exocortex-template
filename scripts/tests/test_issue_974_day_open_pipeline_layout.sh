@@ -36,6 +36,8 @@
 #   H  issue #983 as reported: nothing but IWE_SCRIPTS in the environment, no model gateway,
 #      the strategist's two calls (the pipeline as is, then --scaffold-only), a governance repo
 #      with history; everything the pipeline reads or writes belongs to the governance repo
+#   I  a gateway that passes both probes but whose fill fails hard or leaves PENDING sections:
+#      the real pipeline preserves the scaffold, returns failure, and cannot push a false plan
 #   S  static guard on both copies of the pipeline: no executable path built from $DS_STRATEGY
 set -uo pipefail
 
@@ -527,6 +529,86 @@ else
     bad "H: журнал personal-guide-update.log не в DS-strategy/logs: $(grep -F 'personal-guide-update.log' "$H/call2.txt" | head -1)"
 fi
 expect_template_untouched "H" "$H/ws" "$H/before.txt"
+
+# ---------------------------------------------------------------- case I
+echo "== I: ошибка LLM Fill не превращается в успешное Открытие дня"
+STUBS_LLM="$TMP/stubs-llm"
+mkdir -p "$STUBS_LLM"
+cat > "$STUBS_LLM/curl" <<'EOF'
+#!/bin/sh
+# The pipeline checks health and authorization before starting the real fill stage.
+case " $* " in
+    *'/v1/health'*) printf '{"status":"ok"}\n' ;;
+    *'/v1/messages'*) printf 200 ;;
+    *) echo "unexpected curl call: $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$STUBS_LLM/curl"
+for fill_rc in 1 2; do
+    I="$TMP/i-$fill_rc"
+    build_skeleton "$I/ws"
+    build_working_governance "$I/ws/DS-strategy" "$I/remote.git"
+    # Fake only the model fill boundary; every other stage is the delivered pipeline.
+    cat > "$I/ws/FMT-exocortex-template/scripts/day-open-llm-fill.py" <<'EOF'
+import os
+import sys
+
+print("[WARN] fake LLM left PENDING" if os.environ["FAKE_LLM_FILL_RC"] == "2"
+      else "[ERROR] fake LLM failed", file=sys.stderr)
+sys.exit(int(os.environ["FAKE_LLM_FILL_RC"]))
+EOF
+    run_pipeline plain "$I/ws" "$I/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$I/out.txt" \
+        PATH="$STUBS_LLM:$STUBS:$PATH" LLM_PROXY_URL=https://fake.invalid \
+        FAKE_LLM_FILL_RC="$fill_rc"
+    rc=$?
+    plan="$I/ws/DS-strategy/current/DayPlan $DATE.md"
+    if [ "$rc" -eq 1 ] && has "$I/out.txt" "=== 4. LLM Fill ===" \
+       && has "$I/ws/DS-strategy/machine/logs/day-open-$DATE.log" "exit=$fill_rc"; then
+        ok "I/$fill_rc: ошибка заполнения дошла через реальный конвейер до кода 1"
+    else
+        bad "I/$fill_rc: ожидали ошибку заполнения и код 1, получили rc=$rc: $(tail -4 "$I/out.txt" | tr '\n' ' ')"
+    fi
+    if [ -f "$plan" ] && has "$plan" "PENDING"; then
+        ok "I/$fill_rc: незавершённый скелет сохранён для повтора"
+    else
+        bad "I/$fill_rc: скелет с PENDING не сохранён"
+    fi
+    if [ "$(git -C "$I/remote.git" rev-parse main 2>/dev/null)" = \
+         "$(git -C "$I/ws/DS-strategy" rev-parse HEAD 2>/dev/null)" ] \
+       && ! git -C "$I/ws/DS-strategy" ls-files --error-unmatch "current/DayPlan $DATE.md" >/dev/null 2>&1; then
+        ok "I/$fill_rc: незавершённый план не закоммичен и не отправлен"
+    else
+        bad "I/$fill_rc: незавершённый план попал в историю"
+    fi
+done
+# The actual morning runner must see the pipeline failure, alarm/retry it, and never
+# write its success marker. Use the partial branch because it used to continue to
+# weak default checks and could publish a plan with PENDING content.
+I="$TMP/i-2"
+cat > "$STUBS_LLM/caffeinate" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+cat > "$STUBS_LLM/systemd-inhibit" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+chmod +x "$STUBS_LLM/caffeinate" "$STUBS_LLM/systemd-inhibit"
+env -i HOME="$HOME" PATH="$STUBS_LLM:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
+    IWE_WORKSPACE="$I/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_TEMPLATE="$I/ws/FMT-exocortex-template" \
+    IWE_SCRIPTS="$I/ws/FMT-exocortex-template/scripts" \
+    DAY_OPEN_LOCK_FILE="$I/ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
+    LLM_PROXY_URL=https://fake.invalid FAKE_LLM_FILL_RC=2 \
+    "$BASH" "$I/ws/FMT-exocortex-template/roles/strategist/scripts/strategist.sh" morning \
+    > "$I/strategist.txt" 2>&1
+rc=$?
+if [ "$rc" -eq 1 ] && has "$I/strategist.txt" "FAILED scenario: day-plan (rc=1)" \
+   && ! has "$I/strategist.txt" "Morning: Day Open pipeline OK"; then
+    ok "I/2: утренний сценарий получает ошибку и не ставит ложную отметку готовности"
+else
+    bad "I/2: утренний сценарий скрывает ошибку или ставит отметку готовности (rc=$rc): $(tail -5 "$I/strategist.txt" | tr '\n' ' ')"
+fi
 
 # ---------------------------------------------------------------- guard S
 echo "== S: ни одной ссылки \$DS_STRATEGY/scripts/ в исполняемых строках обеих копий конвейера"

@@ -32,7 +32,12 @@ def parse_args():
 
 
 def load_priorities(path):
-    text = Path(path).read_text(encoding="utf-8")
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # A fresh setup has no current/priorities.yaml yet. The pipeline must
+        # still record the phys_hours fallback in «Требует внимания».
+        return {}
     if _YAML_AVAILABLE:
         return _yaml.safe_load(text) or {}
     # PyYAML unavailable: only the two keys this script reads, same fallback
