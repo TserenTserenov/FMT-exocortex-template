@@ -18,7 +18,7 @@ for fn in substitute_claude_placeholders detect_claude_silent_loss claude_backup
   eval "$(awk -v sig="$fn() {" '$0 == sig {c=1} c {print} c && /^}$/ {exit}' "$ROOT/update.sh")"
   [ "$fn" = claude_backup_before_replace ] || declare -F "$fn" >/dev/null || { echo "FATAL: cannot extract $fn" >&2; exit 2; }
 done
-sed_inplace() { sed -i.bak "$@" 2>/dev/null && rm -f "${@: -1}.bak"; }
+sed_inplace() { local target="${*: -1}"; sed -i.bak "$@" 2>/dev/null && rm -f "${target}.bak"; }
 
 setup_case() {
   WORKSPACE_DIR="$TMP/$1/ws"; SCRIPT_DIR="$TMP/$1/tpl"; TMPDIR_UPDATE="$TMP/$1/tmp"
