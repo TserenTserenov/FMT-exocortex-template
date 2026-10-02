@@ -229,4 +229,63 @@ check_extractor "initial-push read failure fails closed" 1 "" "ERROR: CHANGELOG.
 check_extractor "diff parsing failure fails closed" 1 "" "ERROR: CHANGELOG diff parsing failed" \
     "$ORDINARY" "$TMP/fixture-bin:$PATH"
 
+# The advisory workflow must distinguish grep's ordinary no-match (1) from
+# a tool failure (>1) in both keyword and prefix checks.
+CVE_BASE="$(git -C "$TMP" rev-parse HEAD)"
+sed -i.bak '/- \[security\] security change (#42)/a\
+- [behavior] CVE-2026-9999 is fixed (#42)
+' "$TMP/CHANGELOG.md"
+rm "$TMP/CHANGELOG.md.bak"
+git -C "$TMP" commit -q -am cve
+WARNING_RUN_CVE="${WARNING_RUN//deadbeef/$CVE_BASE}"
+mkdir "$TMP/scripts"
+ln -s "$DIFF_CHECK" "$TMP/scripts/changelog-diff-lines.sh"
+REAL_GREP="$(command -v grep)"
+mkdir "$TMP/grep-bin"
+cat > "$TMP/grep-bin/grep" <<'GREP'
+#!/bin/sh
+if [ "$FAIL_GREP_MODE" = first ] || [ "$1" != -qiE ]; then
+    echo "fixture grep failure" >&2
+    exit 7
+fi
+exec "$REAL_GREP" "$@"
+GREP
+chmod +x "$TMP/grep-bin/grep"
+
+check_warning_grep() {
+    local name="$1" mode="$2" want_text="$3" want_pass="$4" path="$PATH"
+    local out rc pass_ok=0
+    [[ "$mode" == healthy ]] || path="$TMP/grep-bin:$PATH"
+    out="$(cd "$TMP" && PATH="$path" IWE_TEMPLATE="$TMP" FAIL_GREP_MODE="$mode" REAL_GREP="$REAL_GREP" \
+        bash --noprofile --norc -e -o pipefail -c "$WARNING_RUN_CVE" 2>&1)"
+    rc=$?
+    if [[ "$want_pass" == yes && "$out" == *"PASS: проверка завершена"* ]]; then
+        pass_ok=1
+    elif [[ "$want_pass" == no && "$out" != *"PASS:"* ]]; then
+        pass_ok=1
+    fi
+    if [[ "$rc" -eq 0 && "$out" == *"$want_text"* && "$pass_ok" -eq 1 ]]; then
+        echo "ok   [$name]"
+    else
+        echo "FAIL [$name]: rc=$rc, out=$out"
+        fail=1
+    fi
+}
+
+check_warning_grep "healthy CVE line gets missing-label warning" healthy "возможно security-пункт без метки" yes
+check_warning_grep "keyword grep failure reports unchecked warning" first "Поиск security-ключевых слов завершился с кодом 7; проверка меток не выполнена" no
+check_warning_grep "prefix grep failure reports unchecked warning" second "Поиск метки [security] завершился с кодом 7; проверка меток не выполнена" no
+
+git -C "$TMP" checkout -q "$ORDINARY" 2>/dev/null
+WARNING_RUN_ORDINARY="${WARNING_RUN//deadbeef/$BASE}"
+ordinary_out="$(cd "$TMP" && IWE_TEMPLATE="$TMP" bash --noprofile --norc -e -o pipefail \
+    -c "$WARNING_RUN_ORDINARY" 2>&1)"; ordinary_rc=$?
+if [[ "$ordinary_rc" -eq 0 && "$ordinary_out" == *"PASS: проверка завершена"* &&
+      "$ordinary_out" != *"::warning"* ]]; then
+    echo "ok   [ordinary line keeps advisory check green]"
+else
+    echo "FAIL [ordinary advisory line]: rc=$ordinary_rc out=$ordinary_out"
+    fail=1
+fi
+
 exit "$fail"

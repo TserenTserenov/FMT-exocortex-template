@@ -105,7 +105,21 @@ jobs:
             # "[migration] fix: ... CVE-2026-9999 in [security]-adjacent
             # helper" молча проходит без предупреждения (найдено code review
             # 13.08, verify-подагент).
-            if echo "$line" | grep -qiE "$PATTERN" && ! echo "$line" | grep -q '^- \[security\] '; then
+            keyword_rc=0
+            grep -qiE "$PATTERN" <<< "$line" || keyword_rc=$?
+            if [ "$keyword_rc" -gt 1 ]; then
+              echo "::warning file=CHANGELOG.md::Поиск security-ключевых слов завершился с кодом $keyword_rc; проверка меток не выполнена."
+              exit 0
+            fi
+            [ "$keyword_rc" -eq 1 ] && continue
+
+            label_rc=0
+            grep -q '^- \[security\] ' <<< "$line" || label_rc=$?
+            if [ "$label_rc" -gt 1 ]; then
+              echo "::warning file=CHANGELOG.md::Поиск метки [security] завершился с кодом $label_rc; проверка меток не выполнена."
+              exit 0
+            fi
+            if [ "$label_rc" -eq 1 ]; then
               echo "::warning file=CHANGELOG.md::возможно security-пункт без метки [security]: $line"
             fi
           done <<< "$NEW_LINES"
