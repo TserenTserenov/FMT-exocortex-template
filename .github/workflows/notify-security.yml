@@ -61,7 +61,7 @@ jobs:
           # The bot deduplicates a broadcast by (subscriber, version label). The top CHANGELOG header is "[Unreleased]"
           # almost always, so the first urgent notice used that key up and every later one was skipped silently.
           # A label per pushed commit keeps each notice deliverable; a re-run of the same push still deduplicates.
-          VERSION="security ${GITHUB_SHA::7}"
+          VERSION="security ${GITHUB_SHA::12}"
           MESSAGE="🔒 СРОЧНО — обнаружены security-изменения:
           $SECURITY_LINES"
 
