@@ -14,7 +14,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-command -v python3 >/dev/null 2>&1 || { echo "SKIP: python3 not found"; exit 0; }
+# Interpreter via the repo resolver (python-resolver contract), not bare python3.
+PY="$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only 2>/dev/null)" \
+    || { echo "SKIP: python3 not found"; exit 0; }
 
 # --- fixture: tiny tree with a manifest that contains Cyrillic text ---------
 FX="$TMP/fx"
@@ -29,7 +31,7 @@ printf '%s\n' 'run_claude "day-plan"' > "$FX/roles/strategist/scripts/strategist
 
 # 1. check-manifest-coverage.py: success path under a cp1251 console.
 out=$(printf 'scripts/a.sh\n' | PYTHONIOENCODING=cp1251 \
-    python3 "$ROOT/scripts/check-manifest-coverage.py" "$FX/update-manifest.json" 2>&1)
+    "$PY" "$ROOT/scripts/check-manifest-coverage.py" "$FX/update-manifest.json" 2>&1)
 rc=$?
 [ "$rc" -eq 0 ] || fail "check-manifest-coverage exit $rc under cp1251 console: $out"
 grep -q 'manifest-coverage' <<<"$out" || fail "no success report: $out"
