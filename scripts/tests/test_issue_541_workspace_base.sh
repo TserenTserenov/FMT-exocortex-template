@@ -41,6 +41,7 @@
 #  14 the record of the copy update.sh wrote never vouches for a copy edited after that
 #  15 the copy was replaced but the run stopped before the manifest was: the record vouches for it
 #  16 a failed copy of the new file stops the run (no false "updated")
+#  17 the proof for the copy in place survives a copy that fails (the record keeps the previous hash)
 #
 # Usage: bash scripts/tests/test_issue_541_workspace_base.sh
 #        KEEP=1 ... keeps the temporary tree for inspection.
@@ -669,6 +670,33 @@ else
     check "16 the run does not report success" test "$RUN_RC" -ne 0
     check "16 no false 'updated' line" log_lacks "$B1_LINE"
     check "16 the workspace copy is untouched" same "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+fi
+
+echo "=== case 17: the proof for the copy in place survives a copy that fails ==="
+# After an interrupted delivery the record vouches for v2. The next release adds v3 to the record BEFORE its
+# copy; when that copy fails, v2 still sits in the template repo and the retry must accept it (found by the
+# round-25 peer review: one line overwritten before a failing cp lost the proof for the old copy).
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  SKIP: running as root, a read-only file does not stop cp"
+else
+    build_case failedcopy modern
+    cp "$SD/update-manifest.json" "$CASE_DIR/manifest-installed.json"
+    run_update
+    check "17 run 1: exit 0" rc_is 0
+    cp "$CASE_DIR/manifest-installed.json" "$SD/update-manifest.json"
+    upstream_to_v3
+    chmod a-w "$SD/CLAUDE.md"
+    run_update
+    chmod u+w "$SD/CLAUDE.md"
+    check "17 run 2: the failed copy stops the run" test "$RUN_RC" -ne 0
+    check "17 run 2: the copy in place is still v2" lacks_text "$SD/CLAUDE.md" "version three"
+    check "17 run 2: the record keeps both hashes" test "$(wc -l < "$WS/.claude.md.delivered" | tr -d ' ')" -eq 2
+    expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
+    run_update
+    check "17 run 3: exit 0" rc_is 0
+    check "17 run 3: the shortcut ran, not the refusal" log_has "$B1_LINE"
+    check "17 run 3: the template copy is upstream's v3" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
+    check "17 run 3: the workspace copy is merged with the pilot line kept" same "$WS/CLAUDE.md" "$CASE_DIR/expected-ws.md"
 fi
 
 echo

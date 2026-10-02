@@ -3313,8 +3313,8 @@ claude_template_copy_is_pristine() {
     if [ -n "$delivered" ] && [ "$(hash_file "$copy")" = "$delivered" ]; then
         return 0
     fi
-    recorded=$(head -n 1 "${WORKSPACE_DIR:-/nonexistent}/.claude.md.delivered" 2>/dev/null) || recorded=""
-    if [ -n "$recorded" ] && [ "$(hash_file "$copy")" = "$recorded" ]; then
+    recorded=$(hash_file "$copy" 2>/dev/null) || recorded=""
+    if [ -n "$recorded" ] && grep -qxF -- "$recorded" "${WORKSPACE_DIR:-/nonexistent}/.claude.md.delivered" 2>/dev/null; then
         return 0
     fi
     command -v git >/dev/null 2>&1 || return 1
@@ -3325,11 +3325,24 @@ claude_template_copy_is_pristine() {
 # claude_record_delivered FILE — remember the sha256 of the CLAUDE.md update.sh is about to write into
 # the template repo (the B1 shortcut below; FILE is the upstream source, not the destination, so an edit
 # saved in the meantime cannot become "delivered"), next to the workspace merge base: the template repo
-# never receives either. Only the shortcut calls this, so an edited copy never matches it. Best effort:
-# without the record the other two tests still apply.
+# never receives either. The file keeps the last few hashes, the new one is ADDED before the copy and the
+# old ones stay: if the copy then fails or the run is interrupted, the copy that is still in place is
+# vouched for by the previous line, and a copy that was written is vouched for by the new one (found by
+# the round-25 peer review: a single line overwritten before a failing cp lost the proof for the old
+# copy). Only the shortcut calls this, so an edited copy never matches. Atomic and best effort: without
+# the record the other two tests still apply.
 claude_record_delivered() {
     [ -n "${WORKSPACE_DIR:-}" ] && [ -d "$WORKSPACE_DIR" ] || return 0
-    hash_file "$1" > "$WORKSPACE_DIR/.claude.md.delivered" 2>/dev/null || true
+    local record="$WORKSPACE_DIR/.claude.md.delivered" tmp hash
+    hash=$(hash_file "$1" 2>/dev/null) || return 0
+    [ -n "$hash" ] || return 0
+    tmp="$record.tmp.$$"
+    if { grep -vxF -- "$hash" "$record" 2>/dev/null || true; printf '%s\n' "$hash"; } | tail -n 4 > "$tmp" 2>/dev/null; then
+        mv -f "$tmp" "$record" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+    else
+        rm -f "$tmp" 2>/dev/null
+    fi
+    return 0
 }
 
 # claude_merge_failed FILE NEW — `git merge-file` failed without a conflict to show (no
