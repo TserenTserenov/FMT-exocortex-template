@@ -964,6 +964,9 @@ already_ran_today() {
 DAY_OPEN_MAX_ATTEMPTS=3
 DAY_OPEN_ATTEMPT_MARK="RECORDED: day-open attempt"
 DAY_OPEN_DEFERRED_MARK="RECORDED: day-open deferred"
+# What the pipeline's tg_notify logs once the Bot API accepted a deferral notice (day-open-pipeline.sh): the
+# retries of the day keep its "started" and "deferred" notices back only after this line.
+DAY_OPEN_DEFERRAL_DELIVERED_MARK="[tg delivered] ⏸ "
 DAY_OPEN_OK_MARK="Morning: Day Open pipeline OK"
 DAY_OPEN_ALARM_MARK="ALARM: day-open-failed"
 # What notify.sh prints into the same log once the Bot API accepted the message (send_telegram):
@@ -1264,13 +1267,14 @@ case "$1" in
                 day_open_give_up not-delivered "конвейер Открытия дня не доставлен: day-open-pipeline.sh нет ни в \$IWE_SCRIPTS, ни в $WORKSPACE/scripts"
             fi
             day_open_start_attempt
-            # A retry after a deferral today: the pipeline defers while yesterday is not closed and the scheduler
-            # comes back at every tick (up to seven a day), so its "started" and "deferred" notices would go out
-            # again each time (red team of the 0.41.1 candidate: 13-15 messages a day, 2-3 in v0.41.0). The first
-            # run reports; the retries keep those two back (day-open-pipeline.sh tg_notify). The result and the
-            # pipeline's own alarms are not touched.
+            # A retry after a deferral that was ANNOUNCED today: the pipeline defers while yesterday is not closed and
+            # the scheduler comes back at every tick (up to seven a day), so its "started" and "deferred" notices would
+            # go out again each time (red team of the 0.41.1 candidate: 13-15 messages a day, 2-3 in v0.41.0). Once a
+            # deferral notice has been delivered (the pipeline logs "[tg delivered] ⏸ ..."), the retries keep those two
+            # notices back (day-open-pipeline.sh tg_notify); while it has not (no network, a refused send), they try
+            # again. The result and the pipeline's own alarms are not touched.
             retry_quiet=""
-            if [ "$(count_in_log "$DAY_OPEN_DEFERRED_MARK")" -gt 0 ]; then
+            if grep -qF "$DAY_OPEN_DEFERRAL_DELIVERED_MARK" "$LOG_FILE" 2>/dev/null; then
                 retry_quiet=1
             fi
             pipeline_rc=0

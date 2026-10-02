@@ -122,6 +122,11 @@ cat > "$SCRIPTS/day-open-pipeline.sh" <<'EOF'
 echo "pipeline ${1:-plain}" >> "$PIPE_LOG"
 # what strategist.sh told this run about retries after a deferral (case 16): "none" when it did not
 echo "${DAY_OPEN_QUIET_RETRY:-none}" >> "$PIPE_LOG.quiet"
+# what the real tg_notify logs about a deferral notice: PIPE_NOTICE=delivered / failed (case 16)
+case "${PIPE_NOTICE:-}" in
+    delivered) echo "  [tg delivered] ⏸ Day Open 2026-10-02 отложен: stub" ;;
+    failed) echo "  [tg delivery FAILED] ⏸ Day Open 2026-10-02 отложен: stub" ;;
+esac
 if [ "${PIPE_MODE:-}" = killparent ]; then
     kill -KILL "$PPID"
     exit 0
@@ -437,18 +442,30 @@ check "15: GAVE UP ровно один" "1" "$(log_count 'GAVE UP scenario: day-
 check "15: в журнале сказано, что больше не шлём" "1" "$(log_count 'больше не шлю')"
 
 # ---------------------------------------------------------------- 16
-echo "== 16: повторы после отсрочки идут тихо: «запущен» и «отложен» уходят один раз, с первым запуском"
+echo "== 16: повторы после доставленной отсрочки идут тихо: «запущен» и «отложен» уходят один раз"
 # The pipeline defers while yesterday is not closed, and the scheduler comes back at every tick (up to seven a
 # day). Red team of the 0.41.1 candidate: each tick started the pipeline and sent its "started" and "deferred"
-# notices again, 13-15 messages a day where v0.41.0 sent two. strategist.sh now tells the pipeline when the day's
-# log already holds a deferral (DAY_OPEN_QUIET_RETRY=1); the pipeline's tg_notify keeps those two notices back.
+# notices again, 13-15 messages a day where v0.41.0 sent two. Once a deferral notice has been DELIVERED (the pipeline's
+# tg_notify logs "[tg delivered] ⏸ ..."), strategist.sh tells the pipeline to keep those two notices back
+# (DAY_OPEN_QUIET_RETRY=1); until then the retries try again (red team, round 38: a lost first send must not
+# silence the rest of the day).
 quiet_flags() { tr '\n' ' ' < "$PIPE_LOG.quiet" 2>/dev/null | sed 's/ $//'; }
 new_case
 for n in 1 2 3; do
-    run_strategist morning PIPE_RC=7 > /dev/null
+    run_strategist morning PIPE_RC=7 PIPE_NOTICE=delivered > /dev/null
 done
 run_strategist morning PIPE_RC=0 > /dev/null
-check "16: первый запуск без флага, три повтора после отсрочки с флагом (и тот, что построил план)" "none 1 1 1" "$(quiet_flags)"
+check "16: первый запуск без флага, повторы после доставленной отсрочки с флагом (и тот, что построил план)" "none 1 1 1" "$(quiet_flags)"
+new_case
+run_strategist morning PIPE_RC=7 PIPE_NOTICE=failed > /dev/null
+run_strategist morning PIPE_RC=7 PIPE_NOTICE=delivered > /dev/null
+run_strategist morning PIPE_RC=7 PIPE_NOTICE=delivered > /dev/null
+check "16: первое сообщение об отсрочке не дошло: следующий запуск говорит снова, молчат только после доставки" "none none 1" "$(quiet_flags)"
+new_case
+for n in 1 2; do
+    run_strategist morning PIPE_RC=7 > /dev/null
+done
+check "16: сообщений об отсрочке не было (Telegram не настроен): флага нет" "none none" "$(quiet_flags)"
 new_case
 for n in 1 2; do
     run_strategist morning PIPE_RC=5 > /dev/null
@@ -456,7 +473,7 @@ done
 check "16: переходный сбой не отсрочка: повторы громкие, флага нет" "none none" "$(quiet_flags)"
 new_case
 for n in 1 2; do
-    run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=7 > /dev/null
+    run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=7 PIPE_NOTICE=delivered > /dev/null
 done
 check "16: шлюза нет, отсрочка при --scaffold-only: повтор тихий в обоих вызовах конвейера" "none none 1 1" "$(quiet_flags)"
 
@@ -468,14 +485,18 @@ awk '/^tg_notify\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }' "$PIPELIN
 # the variable ($MSG, the digest built at run time) turns into the bare date and is dropped.
 grep -o 'tg_notify "[^"]*"' "$PIPELINE" | sed -e 's/^tg_notify "//' -e 's/"$//' \
     | sed -E 's/\$\{?[A-Za-z_][A-Za-z_0-9]*\}?/2026-10-02/g' | grep -vx '2026-10-02' > "$TMP/notices.txt"
-notice() { # <quiet flag: 1 or empty> <message> -> sent | kept back | other: <output>
-    local out
-    out=$(env -i PATH="$PATH" QUIET="$1" MSG="$2" "$BASH" -c '
+notice_raw() { # <quiet flag: 1 or empty> <message> [fail] -> what tg_notify prints, then its exit code
+    env -i PATH="$PATH" QUIET="$1" MSG="$2" SENDFAIL="${3:-}" "$BASH" -c '
         PROBE=false; TG_TOKEN=t; TG_CHAT=c
         if [ -n "$QUIET" ]; then export DAY_OPEN_QUIET_RETRY="$QUIET"; fi
-        telegram_send() { echo SENT; }
+        if [ -n "$SENDFAIL" ]; then telegram_send() { return 1; }; else telegram_send() { echo SENT; }; fi
         . "$1"
-        tg_notify "$MSG"' _ "$TMP/tg_notify.sh" 2>&1)
+        tg_notify "$MSG"
+        echo "rc=$?"' _ "$TMP/tg_notify.sh" 2>&1
+}
+notice() { # <quiet flag: 1 or empty> <message> -> sent | kept back | other: <output>
+    local out
+    out=$(notice_raw "$1" "$2")
     case "$out" in
         *SENT*) echo "sent" ;;
         *"TG suppressed"*) echo "kept back" ;;
@@ -508,6 +529,20 @@ check "16: сводка с фразой «Day Open pipeline started for» вну
     "$(notice 1 '📅 День открыт 2026-10-02: в плане строка Day Open pipeline started for 2026-10-02')"
 check "16: тревога с текстом отсрочки в причине с флагом уходит" "sent" \
     "$(notice 1 '🚨 Day Open pipeline aborted: в журнале Day Open 2026-10-02 отложен: неделя 2026-W40 ещё закрывается')"
+# The line strategist.sh waits for before it goes quiet (round 38) comes from the real tg_notify, and only on a delivery.
+out=$(notice_raw "" '⏸ Day Open 2026-10-02 отложен: тест')
+case "$out" in
+    *"[tg delivered] ⏸ Day Open 2026-10-02 отложен"*"rc=0"*) ok "16: доставленное сообщение об отсрочке оставляет в журнале строку «[tg delivered] ⏸»" ;;
+    *) bad "16: нет строки «[tg delivered] ⏸» после доставленного сообщения: «$out»" ;;
+esac
+out=$(notice_raw "" '⏸ Day Open 2026-10-02 отложен: тест' fail)
+case "$out" in
+    *"[tg delivered]"*) bad "16: недоставленное сообщение отмечено доставленным: «$out»" ;;
+    *"[tg delivery FAILED]"*"rc=1"*) ok "16: недоставленное сообщение строки о доставке не оставляет, код 1" ;;
+    *) bad "16: у недоставленного сообщения нет строки об отказе: «$out»" ;;
+esac
+check "16: метку доставки strategist.sh и конвейер называют одинаково" "1" \
+    "$(grep -c 'DAY_OPEN_DEFERRAL_DELIVERED_MARK="\[tg delivered\] ⏸ "' "$STRATEGIST")"
 
 echo
 if [ "$fail" -eq 0 ]; then

@@ -85,11 +85,11 @@ tg_notify() {
     echo "  [probe: TG suppressed] $msg" | head -1
     return 0
   fi
-  # A scheduler retry after a deferral earlier today (strategist.sh sets DAY_OPEN_QUIET_RETRY=1): the "started"
-  # and "deferred" notices went out with the first run, and the scheduler comes back up to seven times a day,
-  # so repeating them sent up to fifteen messages a day. The digest and every alarm still go out: the patterns
-  # match the START of the message (its emoji and fixed words), not a phrase somewhere inside a digest or an
-  # alarm reason (red team, round 37).
+  # A scheduler retry after a deferral whose notice was DELIVERED earlier today (strategist.sh sets
+  # DAY_OPEN_QUIET_RETRY=1 from the "[tg delivered]" line below): the "started" and "deferred" notices went out with
+  # the first run, and the scheduler comes back up to seven times a day, so repeating them sent up to fifteen
+  # messages a day. The digest and every alarm still go out: the patterns match the START of the message (its emoji
+  # and fixed words), not a phrase somewhere inside a digest or an alarm reason (red team, round 37).
   if [ "${DAY_OPEN_QUIET_RETRY:-}" = "1" ]; then
     case "$msg" in
       "🌅 Day Open pipeline started for "*|"⏸ Day Open "*" отложен: "*)
@@ -103,6 +103,10 @@ tg_notify() {
     return 1
   fi
   telegram_send "$msg" || { echo "  [tg delivery FAILED] $msg" | head -2; return 1; }
+  # What strategist.sh reads: only a delivered deferral notice lets the day's retries keep quiet (red team, round 38:
+  # after a failed first send the retries must try again, not stay silent all day).
+  echo "  [tg delivered] $msg" | head -1
+  return 0
 }
 
 # A refusal while the workspace is being resolved (below) happens before the normal path
