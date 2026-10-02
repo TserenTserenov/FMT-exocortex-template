@@ -48,8 +48,11 @@ printf '#!/bin/bash\necho "hook v2"\n' > "$UPSTREAM/.claude/hooks/dummy-hook.sh"
 
 # The marked update.sh — what upstream "published" (differs from the running
 # copy by a trailing comment, same behaviour otherwise).
-cp "$UPDATE_SH_REAL" "$UPSTREAM/update.sh"
-printf '\n# step0-staged-rename-marker issue-505-residual\n' >> "$UPSTREAM/update.sh"
+# The end marker must stay the LAST line (#1004), so the comment goes in before it.
+END_MARKER='# --- end of update.sh ---'
+sed '$d' "$UPDATE_SH_REAL" > "$UPSTREAM/update.sh"
+printf '\n# step0-staged-rename-marker issue-505-residual\n%s\n' "$END_MARKER" >> "$UPSTREAM/update.sh"
+tail -n 1 "$UPDATE_SH_REAL" | grep -qxF "$END_MARKER" || { echo "FATAL: update.sh does not end with the marker" >&2; exit 2; }
 
 python3 - "$UPSTREAM" <<'PYEOF'
 import hashlib, json, sys
@@ -171,6 +174,22 @@ fi
 # SHIM_ENV_SHEBANG_UPDATE_SH: a real, different script whose first line is "#!/usr/bin/env bash".
 if [ -n "\${SHIM_ENV_SHEBANG_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
     [ -n "\$out" ] && { echo '#!/usr/bin/env bash'; tail -n +2 "$UPSTREAM/update.sh"; } > "\$out"
+    exit 0
+fi
+# #1004 release-aware marker check. SHIM_MANIFEST_VERSION rewrites the version the manifest reports.
+# SHIM_OLD_RELEASE_UPDATE_SH: update.sh of a release without the end marker (whole, no marker line).
+# SHIM_MIDMARKER_UPDATE_SH: the marker line is present but in the middle, content follows it.
+if [ -n "\${SHIM_MANIFEST_VERSION:-}" ] && [ "\${url##*/}" = "update-manifest.json" ] && [ -n "\$out" ]; then
+    cp "$UPSTREAM/update-manifest.json" "\$out"
+    sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"\$SHIM_MANIFEST_VERSION\"/" "\$out"; rm -f "\$out.bak"
+    exit 0
+fi
+if [ -n "\${SHIM_OLD_RELEASE_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && { grep -vxF '# --- end of update.sh ---' "$UPSTREAM/update.sh"; echo '# old release'; } > "\$out"
+    exit 0
+fi
+if [ -n "\${SHIM_MIDMARKER_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && printf '#!/bin/bash\n# --- end of update.sh ---\necho cut-off tail\n' > "\$out"
     exit 0
 fi
 [ -z "\$out" ] && exit 0
@@ -319,6 +338,33 @@ step0_run_case truncated SHIM_TRUNCATED_UPDATE_SH "ответ не похож н
 # Issue #1004: a stub that is syntactically whole (shebang + comments) is refused as incomplete.
 step0_check_case stub SHIM_STUB_UPDATE_SH "ответ неполон"
 step0_run_case stub SHIM_STUB_UPDATE_SH "ответ неполон"
+
+# Marker in the middle of the file, tail after it: not the last line, refused (#1004).
+step0_check_case midmarker SHIM_MIDMARKER_UPDATE_SH "ответ неполон"
+step0_run_case midmarker SHIM_MIDMARKER_UPDATE_SH "ответ неполон"
+
+# Compatibility (#1004): update.sh of a release older than the one that introduced the marker has
+# no marker line; a rollback or pin to it must still replace the updater.
+echo "--- control: an old release without the end marker is still accepted ---"
+set +e
+SHIM_MANIFEST_VERSION=0.40.2 SHIM_OLD_RELEASE_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-oldrel.log" 2>&1
+set -e
+if grep -q "Новая версия update.sh доступна" "$TEST_ROOT/check-oldrel.log" && ! grep -q "не удалось проверить update.sh" "$TEST_ROOT/check-oldrel.log"; then
+  pass "an update.sh without the marker from release 0.40.2 is accepted"
+else
+  fail "old-release update.sh refused; lines: $(grep -n 'update.sh' "$TEST_ROOT/check-oldrel.log" | head -3 | tr '\n' ' ')"
+fi
+# The same bytes under a marker-bearing release number are refused.
+set +e
+SHIM_MANIFEST_VERSION=0.41.1 SHIM_OLD_RELEASE_UPDATE_SH=1 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+    bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/check-newrel.log" 2>&1
+set -e
+if grep -q "ответ неполон" "$TEST_ROOT/check-newrel.log"; then
+  pass "an update.sh without the marker from release 0.41.1 is refused"
+else
+  fail "marker-less update.sh accepted for release 0.41.1; lines: $(grep -n 'update.sh' "$TEST_ROOT/check-newrel.log" | head -3 | tr '\n' ' ')"
+fi
 
 # Control: the check refuses what is no script, not what merely starts differently — a real
 # update.sh whose first line is "#!/usr/bin/env bash" is still a newer update.sh.

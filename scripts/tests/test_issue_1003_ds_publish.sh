@@ -44,6 +44,12 @@ if [ "$RC" -eq 0 ] && cmp -s "$PUB" "$WS/DS-test/scripts/ds-publish.sh" && [ -x 
 else
   fail "earlier copy not replaced (rc=$RC): $OUT"
 fi
+BK=$(find "$WS/.backups/ds-publish-pre-update" -type f -name ds-publish.sh 2>/dev/null | head -1)
+if [ -n "$BK" ] && cmp -s "$OLD" "$BK" && printf '%s' "$OUT" | grep -q 'backup'; then
+  ok "the replaced copy was saved under .backups/ds-publish-pre-update/ and the path printed"
+else
+  fail "no backup of the replaced copy (out: $OUT)"
+fi
 new_gov foreign
 printf '#!/bin/sh\n# my own publisher\n' > "$WS/DS-test/scripts/ds-publish.sh"
 run_backfill "$WS"
@@ -88,6 +94,25 @@ BEFORE=$(git --git-dir="$ORIGIN" rev-parse main)
 OUT=$(cd "$TMP" && bash "$PUB" "$A" normal --from-commit "$SHA2" 2>&1); RC=$?
 AFTER=$(git --git-dir="$ORIGIN" rev-parse main)
 if [ "$RC" -eq 0 ] && [ "$BEFORE" = "$AFTER" ]; then ok "no extra commit pushed"; else fail "rc=$RC before=$BEFORE after=$AFTER: $OUT"; fi
+
+echo "== (2c) two independent commits converging on the same content are not 'already published'"
+printf 'conv\n' > "$A/conv.txt"; g "$A" add conv.txt; g "$A" commit -q -m conv-local
+SHA3=$(g "$A" rev-parse HEAD)
+g "$B" pull -q --rebase origin main >/dev/null 2>&1
+printf 'conv\n' > "$B/conv.txt"; printf 'extra\n' > "$B/extra.txt"; g "$B" add conv.txt extra.txt; g "$B" commit -q -m conv-other; g "$B" push -q origin main 2>/dev/null
+OUT=$(cd "$TMP" && bash "$PUB" "$A" normal --from-commit "$SHA3" 2>&1); RC=$?
+if [ "$RC" -eq 0 ] && ! printf '%s' "$OUT" | grep -q 'already on origin'; then
+  ok "not claimed as an already published patch (rc=0, outcome: $(printf '%s' "$OUT" | tail -1))"
+else
+  fail "converging commits reported as already published or failed (rc=$RC): $OUT"
+fi
+
+echo "== (2d) a commit that changes no tree is a successful no-op"
+g "$A" commit -q --allow-empty -m empty-commit
+SHA4=$(g "$A" rev-parse HEAD)
+BEFORE=$(git --git-dir="$ORIGIN" rev-parse main)
+OUT=$(cd "$TMP" && bash "$PUB" "$A" normal --from-commit "$SHA4" 2>&1); RC=$?
+if [ "$RC" -eq 0 ] && [ "$BEFORE" = "$(git --git-dir="$ORIGIN" rev-parse main)" ]; then ok "rc=0, origin untouched"; else fail "rc=$RC: $OUT"; fi
 
 echo
 if [ "$FAILS" -eq 0 ]; then echo "PASS: #1003"; else echo "FAILED: $FAILS check(s)"; exit 1; fi

@@ -2237,6 +2237,14 @@ backfill_ds_publish() {
         case " $known_old_publishers " in
             *" $target_hash "*)
                 if [ -n "$target_hash" ]; then
+                    # The file is usually untracked (git has no copy): keep one before replacing.
+                    local backup_dir="$WORKSPACE_DIR/.backups/ds-publish-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+                    if [ -L "$WORKSPACE_DIR/.backups" ] || ! mkdir -p "$backup_dir" \
+                       || ! cp -p "$target_path" "$backup_dir/ds-publish.sh"; then
+                        echo "  ✗ scripts/ds-publish.sh: не удалось сделать резервную копию, прежняя копия остаётся." >&2
+                        return 1
+                    fi
+                    echo "  ↳ backup: $target_path → $backup_dir/ds-publish.sh"
                     atomic_copy_executable "$source_path" "$target_path" || return 1
                     echo "  ⟳ scripts/ds-publish.sh: прежняя копия шаблона заменена на текущую в $governance_repo."
                     return 0
@@ -3039,6 +3047,47 @@ if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
     echo ""
 fi
 
+# version_at_least A B — 0 when the numeric x.y.z prefix of A is >= that of B (a suffix such as
+# "-test" is ignored); non-zero also when A has no x.y.z prefix.
+version_at_least() {
+    local a b
+    a=$(printf '%s' "$1" | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+    b=$(printf '%s' "$2" | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+    [ -n "$a" ] && [ -n "$b" ] || return 1
+    awk -v a="$a" -v b="$b" 'BEGIN {
+        n = split(a, x, "."); split(b, y, ".")
+        for (i = 1; i <= n; i++) { if (x[i] + 0 > y[i] + 0) exit 0; if (x[i] + 0 < y[i] + 0) exit 1 }
+        exit 0 }'
+}
+
+# step0_release_check FILE — 0 when the downloaded update.sh FILE may replace the running one.
+# The release it belongs to is read from the manifest served next to it; a release at or above
+# UPDATE_SH_MARKER_MIN_VERSION must end with UPDATE_SH_END_MARKER (last non-empty line). Sets
+# STEP0_REJECT_REASON on refusal.
+UPDATE_SH_MARKER_MIN_VERSION="0.41.1"
+step0_release_check() {
+    local file="$1" manifest="$TMPDIR_UPDATE/step0-manifest.json" release_version last_line
+    STEP0_REJECT_REASON=""
+    # shellcheck disable=SC2086
+    if ! curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update-manifest.json" -o "$manifest" 2>/dev/null \
+       || [ ! -s "$manifest" ]; then
+        STEP0_REJECT_REASON="версия выпуска не определена (манифест не загружен), update.sh не заменён"
+        return 1
+    fi
+    release_version=$(manifest_version "$manifest")
+    if [ -z "$release_version" ] || ! version_at_least "$release_version" "0.0.0"; then
+        STEP0_REJECT_REASON="версия выпуска не определена (манифест без версии), update.sh не заменён"
+        return 1
+    fi
+    version_at_least "$release_version" "$UPDATE_SH_MARKER_MIN_VERSION" || return 0
+    last_line=$(awk 'NF {l = $0} END {print l}' "$file")
+    if [ "$last_line" != "$UPDATE_SH_END_MARKER" ]; then
+        STEP0_REJECT_REASON="ответ неполон (последняя строка не конечный маркер)"
+        return 1
+    fi
+    return 0
+}
+
 # === Step 0: Self-update (bootstrap) ===
 # issue #505 root, part 1: the channel must be resolved BEFORE self-update.
 # Step 0 used to fetch update.sh from the DEFAULT moving main while Step 1
@@ -3075,11 +3124,12 @@ elif ! bash -n "$REMOTE_UPDATE" 2>/dev/null; then
     # that needs no reference hash, which Step 0 does not have yet (the manifest comes later),
     # and it runs with the same `bash` that the replacement is re-executed with.
     echo "  ⚠ не удалось проверить update.sh: ответ не похож на рабочий скрипт"
-elif ! grep -qxF "$UPDATE_SH_END_MARKER" "$REMOTE_UPDATE"; then
+elif ! step0_release_check "$REMOTE_UPDATE"; then
     # Issue #1004: a syntactically whole stub (a shebang and comments) passes `bash -n` and
-    # used to replace the updater, which then "succeeded" doing nothing. A complete update.sh
-    # ends with the marker line; one without it is a truncated or foreign answer.
-    echo "  ⚠ не удалось проверить update.sh: ответ неполон (нет конечного маркера)"
+    # used to replace the updater, which then "succeeded" doing nothing. update.sh of a release
+    # that carries the end marker must END with it (its last non-empty line); a release older
+    # than UPDATE_SH_MARKER_MIN_VERSION (rollback, pin) has no marker and keeps the checks above.
+    echo "  ⚠ не удалось проверить update.sh: $STEP0_REJECT_REASON"
 else
     LOCAL_HASH=$(hash_file "$SCRIPT_DIR/update.sh")
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
@@ -3521,7 +3571,7 @@ sync_workspace_claude_md() {
                 cp "$WS_NEW" "$WS_CURRENT"
                 sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$WS_CURRENT"
                 echo "" >> "$WS_CURRENT"
-                echo "$WS_USER_SECTION" >> "$WS_CURRENT"
+                printf '%s\n' "$WS_USER_SECTION" >> "$WS_CURRENT"
                 cp "$WS_NEW" "$WS_BASE"
                 echo "  ✓ $WS_CURRENT обновлён (USER-SPACE сохранён, базовый файл создан)"
             else
@@ -4754,7 +4804,7 @@ for f in "${UPDATED_FILES[@]}"; do
                 cp "$NEW_FILE" "$CURRENT_FILE"
                 sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CURRENT_FILE"
                 echo "" >> "$CURRENT_FILE"
-                echo "$USER_SECTION" >> "$CURRENT_FILE"
+                printf '%s\n' "$USER_SECTION" >> "$CURRENT_FILE"
                 cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
                 echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
             else

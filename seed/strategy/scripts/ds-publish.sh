@@ -22,8 +22,8 @@
 #   - target branch = --branch NAME when given; otherwise the branch currently checked out in
 #     <repo-dir> (origin/HEAD, then main, when HEAD is detached); a target that origin does
 #     not have is a fetch failure (exit 1), never a new branch on origin;
-#   - a commit already on origin (same SHA, or every path it touches identical on the tip: proven
-#     by the tree, not by an equivalent patch in history) is a successful no-op;
+#   - a commit already on origin (an ancestor of the tip, or an equivalent patch whose paths are
+#     still identical on the tip: a reverted patch does not count) is a successful no-op;
 #   - if origin moved between fetch and push, the commit is replayed on the new tip
 #     (up to 3 attempts); never a force push;
 #   - your working tree, index and HEAD are never modified.
@@ -113,16 +113,20 @@ fi
 
 already_published() {
   git -C "$REPO" merge-base --is-ancestor "$SHA" "$TIP" 2>/dev/null && return 0
-  # Delivery is proven by the TREE, not by an equivalent patch somewhere in history (a
-  # patch that was later reverted on origin would read as published): every path the
-  # commit touches must be identical (mode and blob) on origin's tip.
   git -C "$REPO" rev-parse --verify --quiet "$SHA^" >/dev/null || return 1
-  local path seen=0
+  # Not an ancestor: published only when an EQUIVALENT patch is on origin (`git cherry` marks it
+  # with "-") AND the tree still carries it: every path the commit touches is identical (mode and
+  # blob) on the tip. The patch alone is not enough: it may have been reverted on origin since;
+  # the tree alone is not enough either: two independent commits can converge on the same content.
+  local path seen=0 paths_match=1
   while IFS= read -r -d '' path; do
     seen=1
-    [ "$(git -C "$REPO" ls-tree -r "$SHA" -- "$path" 2>/dev/null)" = "$(git -C "$REPO" ls-tree -r "$TIP" -- "$path" 2>/dev/null)" ] || return 1
+    [ "$(git -C "$REPO" ls-tree -r "$SHA" -- "$path" 2>/dev/null)" = "$(git -C "$REPO" ls-tree -r "$TIP" -- "$path" 2>/dev/null)" ] || { paths_match=0; break; }
   done < <(git -C "$REPO" diff-tree -r -z --no-renames --no-commit-id --name-only "$SHA^" "$SHA")
-  [ "$seen" -eq 1 ]
+  # A commit that changes no tree has nothing to deliver.
+  [ "$seen" -eq 0 ] && return 0
+  [ "$paths_match" -eq 1 ] || return 1
+  git -C "$REPO" cherry "$TIP" "$SHA" "$SHA^" 2>/dev/null | grep -q '^-'
 }
 
 attempt=1

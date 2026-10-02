@@ -47,5 +47,12 @@ else
   fail "file replaced without a backup"
 fi
 
+echo "== the USER-SPACE block is restored with printf, not echo"
+if grep -nE 'echo "\$(WS_)?USER_SECTION"' "$ROOT/update.sh" >/dev/null; then
+  fail "echo of a user block left: $(grep -nE 'echo "\$(WS_)?USER_SECTION"' "$ROOT/update.sh" | head -1)"
+else
+  pass "no echo of USER_SECTION / WS_USER_SECTION"
+fi
+
 echo
 if [ "$fails" -eq 0 ]; then echo "PASS: #1004 CLAUDE.md backup"; else echo "FAILED: $fails check(s)"; exit 1; fi

@@ -48,8 +48,10 @@ printf '# Template CLAUDE.md\n\nSame content both sides.\n' > "$UPSTREAM/CLAUDE.
 printf '#!/bin/bash\necho "hook v2"\n' > "$UPSTREAM/.claude/hooks/dummy-hook.sh"
 
 # The marked update.sh the manifest will bind — differs from the running copy.
-cp "$UPDATE_SH_REAL" "$UPSTREAM/update.sh"
+# The comment goes in BEFORE the end marker: update.sh must still end with it (#1004).
+sed '$d' "$UPDATE_SH_REAL" > "$UPSTREAM/update.sh"
 printf '\n# self-overwrite-regression-marker issue-505\n' >> "$UPSTREAM/update.sh"
+tail -n 1 "$UPDATE_SH_REAL" >> "$UPSTREAM/update.sh"
 
 python3 - "$UPSTREAM" <<'PYEOF'
 import hashlib, json, sys

@@ -40,6 +40,14 @@ elif command -v perl >/dev/null 2>&1; then
   rc_slow=$(bash -c '. "$1"; timeout 1 sleep 5; echo $?' _ "$TMP/timeout_fn.sh")
   rc_ok=$(bash -c '. "$1"; timeout 5 true; echo $?' _ "$TMP/timeout_fn.sh")
   { [ "$rc_slow" = 124 ] && [ "$rc_ok" = 0 ]; } && pass "fallback times out (124) and passes a fast command (0)" || fail "fallback rc slow=$rc_slow ok=$rc_ok"
+  # 124 only on a real timeout: a child killed by a signal reports 128+signal, a plain exit keeps its code
+  rc_sig=$(bash -c '. "$1"; timeout 5 sh -c "kill -9 \$\$"; echo $?' _ "$TMP/timeout_fn.sh")
+  rc_7=$(bash -c '. "$1"; timeout 5 sh -c "exit 7"; echo $?' _ "$TMP/timeout_fn.sh")
+  { [ "$rc_sig" = 137 ] && [ "$rc_7" = 7 ]; } && pass "signalled child -> 137, exit 7 -> 7 (not 124 or 0)" || fail "rc signalled=$rc_sig exit7=$rc_7"
+  # a child that ignores TERM is still stopped and reaped
+  start=$(date +%s)
+  rc_term=$(bash -c '. "$1"; timeout 1 sh -c "trap \"\" TERM; while :; do :; done"; echo $?' _ "$TMP/timeout_fn.sh")
+  [ "$rc_term" = 124 ] && [ $(( $(date +%s) - start )) -lt 6 ] && pass "a TERM-ignoring child is killed, 124" || fail "TERM-ignoring child: rc=$rc_term"
 else
   echo "  skip: no perl"
 fi
