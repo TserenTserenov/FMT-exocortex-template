@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "cf94018e80cd9e8d009608eb3f6182b6be17562edfcbda72444c75df026e25a0"
+      "sha256": "539f099e23efae7f65c10941265e0e3537c85b0dbff597ae34adc5944e9e8653"
     },
     {
       "path": "CLAUDE.md",
@@ -1769,7 +1769,7 @@
     },
     {
       "path": "roles/strategist/README.md",
-      "sha256": "eb6b976372513838c3f7dfc8a7d92565b253f61f3392acd89cc27ea04e46c283"
+      "sha256": "b4d7fb04437f5a5fb6fd5d576d4a47197742094b20b70c635d972762bf075a0a"
     },
     {
       "path": "roles/strategist/install.sh",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "1dae05ae839dc99de0d82395e4dc33759b56bd99b6754fdba2301c86781de521"
+      "sha256": "92b42b546b93ea9717dd90955e807af695b1fa4dcf31ed1cd4eecba2f33305a1"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1997,7 +1997,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "210458a5367ad0d5cb088dbd8a5f9c6320682a7629da2abff1874ae2cb1cd12a"
+      "sha256": "9230568c2ed6578b6d400cb6d6b36be3c76f575bf70f1eb7b4c20c5b1d8bb9f2"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -3271,6 +3271,7 @@
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_979_weekplan_table.py",
+    "scripts/tests/test_issue_983_morning_alarm.sh",
     "scripts/tests/test_issue_989_snapshot_cross_api.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
