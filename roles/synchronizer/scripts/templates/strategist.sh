@@ -31,37 +31,49 @@ escape_html() {
     python3 -c 'import sys, html; sys.stdout.write(html.escape(sys.stdin.read()))'
 }
 
+# Plan table -> Telegram list (#982). Columns are found by the header row, not by
+# position: DayPlan is `🚦 | ТВС | # | РП | h | Статус`, WeekPlan is
+# `🚦 | # | РП | h | Статус | ...`, an older WeekPlan has no 🚦 at all. The icon is the
+# done/in-progress marker from Статус, else the traffic light from 🚦, else ⬜.
+# No `#` before the number: Telegram turns `#WP-17` into the hashtag `#WP`.
 table_to_list() {
     local file="$1"
     local section="$2"
-    # dayplan: 🚦 | ТВС | # | РП | h | Статус (2 leading columns vs weekplan)
-    # weekplan (default): # | РП | Бюджет | Статус | Дедлайн | Репо
-    local format="${3:-weekplan}"
 
     sed -n -E "/^## ${section}|<summary>.*${section}/,/^---|^<\/details>/p" "$file" \
         | grep '^|' \
-        | tail -n +3 \
-        | while IFS='|' read -r _ f1 f2 f3 f4 f5 f6 _rest; do
-            local num rp hours status
-            if [ "$format" = "dayplan" ]; then
-                num="$f3"; rp="$f4"; hours="$f5"; status="$f6"
-            else
-                num="$f1"; rp="$f2"; hours="$f3"; status="$f4"
-            fi
-            num=$(echo "$num" | xargs)
-            rp=$(echo "$rp" | xargs | sed 's/\*\*//g')
-            hours=$(echo "$hours" | xargs | sed 's/\*\*//g')
-            status=$(echo "$status" | xargs)
-
-            local icon="⬜"
-            case "$status" in
-                *done*|*"✅"*) icon="✅" ;;
-                *in_progress*|*in.progress*) icon="🔄" ;;
-                *pending*) icon="⬜" ;;
-            esac
-
-            printf "%s #%s %s (%s)\n" "$icon" "$num" "$rp" "$hours"
-        done
+        | awk -F'|' '
+            function trim(x) { gsub(/^[ \t]+|[ \t]+$/, "", x); return x }
+            function strip(x) { gsub(/\*\*/, "", x); return trim(x) }
+            NR == 1 {
+                for (i = 2; i < NF; i++) {
+                    h = trim($i)
+                    if (h == "🚦") ci = i
+                    else if (h == "#") ni = i
+                    else if (h == "РП") ri = i
+                    else if (h == "h" || h == "Бюджет") hi = i
+                    else if (h == "Статус") si = i
+                }
+                next
+            }
+            NR == 2 { next }
+            ri == "" { next }
+            {
+                light = ci ? trim($ci) : ""
+                num = ni ? trim($ni) : ""
+                rp = strip($ri)
+                hours = hi ? strip($hi) : ""
+                status = si ? trim($si) : ""
+                icon = "⬜"
+                if (light != "" && light != "—" && light != "-") icon = light
+                if (status ~ /done|✅/) icon = "✅"
+                else if (status ~ /in_progress|in.progress/) icon = "🔄"
+                out = icon
+                if (num != "" && num != "—" && num != "-") out = out " " num
+                out = out " " rp
+                if (hours != "") out = out " (" hours ")"
+                print out
+            }'
 }
 
 get_github_link() {
@@ -145,7 +157,7 @@ build_message() {
             local title
             title=$(grep '^# ' "$file" | head -1 | sed 's/^# //' | escape_html)
             local plan_items
-            plan_items=$(table_to_list "$file" "План на сегодня" "dayplan" | escape_html)
+            plan_items=$(table_to_list "$file" "План на сегодня" | escape_html)
 
             printf "<b>📋 %s</b>\n\n" "$title"
             printf "<b>План:</b>\n%s" "$plan_items"
