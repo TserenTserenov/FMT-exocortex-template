@@ -2117,7 +2117,7 @@
     },
     {
       "path": "scripts/changelog-diff-lines.sh",
-      "sha256": "7b35ec54d511bc0ee479f453bd968974d5ada581c169a76be328520d77dd6e9b"
+      "sha256": "5e6cd91d4e3b1b86724c0ddf88e8a6034a5f8abce26cd888c76893d9f053210c"
     },
     {
       "path": "scripts/changelog-flush.sh",

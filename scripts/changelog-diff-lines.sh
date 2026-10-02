@@ -3,7 +3,7 @@
 # changelog-diff-lines.sh — извлекает добавленные строки CHANGELOG.md за
 # диапазон коммитов, с опциональным фильтром по бирке [security].
 #
-# Единая логика для .github/workflows/notify-update.yml (push) и
+# Единая логика для .github/workflows/notify-security.yml (push) и
 # validate-template.yml (push + pull_request) — WP-7 Ф62 п.4. Выделена из
 # трёх независимых копий, найденных code review 13.08.2026 (DP.SC.172 P2:
 # третье повторение → функция); там же найден баг дублирования — голый
