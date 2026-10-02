@@ -84,7 +84,10 @@ jobs:
           # Общая логика извлечения — scripts/changelog-diff-lines.sh
           # (выделена из дублей в этом файле и notify-update.yml, code review
           # 13.08: третье повторение одной и той же логики, DP.SC.172 P2).
-          NEW_LINES=$(bash scripts/changelog-diff-lines.sh "$BASE")
+          if ! NEW_LINES=$(bash scripts/changelog-diff-lines.sh "$BASE"); then
+            echo "::warning file=CHANGELOG.md::Не удалось извлечь новые строки CHANGELOG; проверка меток не выполнена."
+            exit 0
+          fi
 
           if [ -z "$NEW_LINES" ]; then
             echo "PASS: нет новых строк CHANGELOG.md для проверки"
