@@ -36,6 +36,11 @@
 #     empty the workspace copy: git merge-file failed without a conflict, so no merge result
 #  11 the same in the old layout, for the template copy
 #  12 an empty template copy equal to an empty base is not "unedited"
+#  13 the heal run ends in a workspace conflict, the pilot resolves it, the next release changes
+#     CLAUDE.md again: the template copy still follows (post-release audit of v0.41.0)
+#  14 the record of the copy update.sh wrote never vouches for a copy edited after that
+#  15 the copy was replaced but the run stopped before the manifest was: the record vouches for it
+#  16 a failed copy of the new file stops the run (no false "updated")
 #
 # Usage: bash scripts/tests/test_issue_541_workspace_base.sh
 #        KEEP=1 ... keeps the temporary tree for inspection.
@@ -580,6 +585,91 @@ run_update
 check "12 exit 49" rc_is 49
 check "12 the shortcut does not run" log_lacks "$B1_LINE"
 check "12 the workspace copy is untouched" same "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+
+echo "=== case 13: the heal run ends in a workspace conflict, the pilot resolves it, the next release changes CLAUDE.md again ==="
+# Found by the post-release audit of v0.41.0: the shortcut also demanded "template copy == workspace base",
+# but an unresolved conflict keeps the base on the old release while the copy has moved on, so the next
+# release met the #541 refusal forever (the manifest is replaced by run 1: Step 6e also runs after a conflict).
+build_case afterconflict modern
+sed_inplace 's/^Platform rule A: version one\.$/Platform rule A: pilot override./' "$WS/CLAUDE.md"
+run_update
+check "13 run 1: exit 49 (the workspace conflict)" rc_is 49
+check "13 run 1: the shortcut ran" log_has "$B1_LINE"
+check "13 run 1: the template copy took upstream's v2" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
+check "13 run 1: conflict markers in the workspace copy" grep -q '^<<<<<<<' "$WS/CLAUDE.md"
+check "13 run 1: the delivered copy is on record" test -s "$WS/.claude.md.delivered"
+# The pilot resolves the conflict by hand: upstream's v2 plus the own section-9 line. Then v3 is released.
+expected_workspace_copy "$CASE_DIR/resolved-v2.md" yes && cp "$CASE_DIR/resolved-v2.md" "$WS/CLAUDE.md"
+upstream_to_v3
+run_update
+check "13 run 2: the shortcut ran, not the refusal" log_has "$B1_LINE"
+check "13 run 2: no refusal" log_lacks "$REFUSAL_LINE"
+check "13 run 2: the template copy is upstream's v3" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
+# The workspace base stayed on v1 until the first resolution was seen, so v2 against v3 conflicts once more, by design.
+check "13 run 2: exit 49 (a real conflict to resolve, not a refusal)" rc_is 49
+check "13 run 2: conflict markers in the workspace copy" grep -q '^<<<<<<<' "$WS/CLAUDE.md"
+expected_workspace_copy "$CASE_DIR/resolved-v3.md" yes && cp "$CASE_DIR/resolved-v3.md" "$WS/CLAUDE.md"
+expected_workspace_copy "$CASE_DIR/expected-base.md" no
+run_update
+check "13 run 3: exit 0" rc_is 0
+check "13 run 3: no marker" absent "$SD/.update-incomplete"
+check "13 run 3: the workspace copy is the resolved one" same "$WS/CLAUDE.md" "$CASE_DIR/resolved-v3.md"
+check "13 run 3: the workspace base advanced to v3" same "$WS/.claude.md.base" "$CASE_DIR/expected-base.md"
+tree_digest "$WS" > "$CASE_DIR/digest-3.txt"
+run_update
+check "13 run 4: exit 0" rc_is 0
+check "13 run 4: nothing changed" same <(tree_digest "$WS") "$CASE_DIR/digest-3.txt"
+
+echo "=== case 14: the record never vouches for a template copy edited after update.sh wrote it ==="
+build_case editedafterrecord modern
+sed_inplace 's/^Platform rule A: version one\.$/Platform rule A: pilot override./' "$WS/CLAUDE.md"
+run_update
+check "14 run 1: exit 49 (the workspace conflict)" rc_is 49
+check "14 run 1: the delivered copy is on record" test -s "$WS/.claude.md.delivered"
+printf '%s\n' "$EDIT_LINE" >> "$SD/CLAUDE.md"
+cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+upstream_to_v3
+run_update
+check "14 run 2: exit 49" rc_is 49
+check "14 run 2: the refusal, not the shortcut" log_has "$REFUSAL_LINE"
+check "14 run 2: upstream is not taken as is" log_lacks "$B1_LINE"
+check "14 run 2: the edited template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+check "14 run 2: the edit is still there" has_line "$SD/CLAUDE.md" "$EDIT_LINE"
+
+echo "=== case 15: a run that replaced the copy but stopped before the manifest was replaced, then the next release ==="
+# Step 5 replaces the template copy, the manifest follows only at the end (Step 6e): a later failure or an
+# interrupt leaves the copy on the new release and the installed manifest on the old one, and update.sh
+# commits nothing in the clone. The record of what update.sh wrote vouches for the copy. The state is
+# simulated: the old manifest is put back after a complete run.
+build_case interrupted modern
+cp "$SD/update-manifest.json" "$CASE_DIR/manifest-installed.json"
+run_update
+check "15 run 1: exit 0" rc_is 0
+check "15 run 1: the shortcut ran" log_has "$B1_LINE"
+check "15 run 1: the delivered copy is on record" test -s "$WS/.claude.md.delivered"
+cp "$CASE_DIR/manifest-installed.json" "$SD/update-manifest.json"
+upstream_to_v3
+expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
+run_update
+check "15 run 2: exit 0" rc_is 0
+check "15 run 2: the shortcut ran, not the refusal" log_has "$B1_LINE"
+check "15 run 2: the template copy is upstream's v3" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
+check "15 run 2: the workspace copy is merged with the pilot line kept" same "$WS/CLAUDE.md" "$CASE_DIR/expected-ws.md"
+
+echo "=== case 16: a failed copy stops the run, it is not reported as an update ==="
+# cp as the left side of && would be exempt from set -e (found by the round-24 peer review).
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  SKIP: running as root, a read-only file does not stop cp"
+else
+    build_case unwritable modern
+    chmod a-w "$SD/CLAUDE.md"
+    cp "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+    run_update
+    chmod u+w "$SD/CLAUDE.md"
+    check "16 the run does not report success" test "$RUN_RC" -ne 0
+    check "16 no false 'updated' line" log_lacks "$B1_LINE"
+    check "16 the workspace copy is untouched" same "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
+fi
 
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"
