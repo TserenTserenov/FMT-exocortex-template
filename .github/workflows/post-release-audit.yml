@@ -17,9 +17,11 @@ name: Post-Release Adversarial Audit
 # → находит классы регрессий, которые detectors не ловят.
 #
 # Одно напоминание на версию: уже существующее обращение с тем же заголовком (открытое ИЛИ закрытое) шаг
-# не пересоздаёт. Пока ловился только открытый issue, закрытие обращения после аудита приводило к тому, что
-# следующий push update-manifest.json при той же версии x.y.0 (она остаётся до очередного бампа) создавал его
-# заново: после закрытия #748 появился #783 для v0.40.0, и он висел открытым.
+# не пересоздаёт; ищет по метке `release-audit` и точному заголовку среди всех страниц списка (снятая метка или
+# переименованное обращение допускают повторное создание). Пока ловился только открытый issue, закрытие
+# обращения после аудита приводило к тому, что следующий push update-manifest.json при той же версии x.y.0
+# (она остаётся до очередного бампа) создавал его заново: после закрытия #748 появился #783 для v0.40.0, и он
+# висел открытым.
 #
 # Уведомление автору: только сам issue (GitHub пришлёт письмо и push). Раньше после создания issue шаг слал
 # напоминание в `/api/template-update` бота. Это тот же вход, что и рассылка о выпуске подписчикам: служебное
@@ -111,9 +113,11 @@ jobs:
 
             После добавления detector'а — закрыть issue.`;
 
-            // One reminder per version: a CLOSED issue with the same title counts too. Looking at open issues
-            // only re-created it on the next update-manifest.json push after the audit issue had been closed.
-            const { data: issues } = await github.rest.issues.listForRepo({
+            // One reminder per version: a CLOSED issue with the same title counts too, and every page of the
+            // label's issues is read (newest first; a manual run for an old version can need page 2 and later).
+            // Looking at open issues only re-created it on the next update-manifest.json push after the audit
+            // issue had been closed.
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'all',
