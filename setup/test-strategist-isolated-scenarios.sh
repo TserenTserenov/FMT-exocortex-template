@@ -50,13 +50,18 @@ extract_until() {  # <start regex> <stop regex, exclusive>
 TIMEOUT_SHIM='command -v timeout >/dev/null 2>&1 || timeout() { shift; "$@"; }'
 FUNCTIONS="$TIMEOUT_SHIM
 $(extract_block '^log() {' '^}')
+$(extract_block '^pick_publisher() {' '^}')
 $(extract_block '^publish_commit_or_explain() {' '^}')
 $(extract_block '^fetch_delivery_origin() {' '^}')
 $(extract_until '^ISOLATION_BLOCKED_RC=' '^log_size_bytes')"
 
 # ---------------------------------------------------------------------------------------------
-# fixture: bare origin, canonical checkout <home>/IWE/DS-strategy, fake publisher tracked in the repo
+# fixture: bare origin, canonical checkout <home>/IWE/DS-strategy, publisher tracked in the repo
 # ---------------------------------------------------------------------------------------------
+# C1 (WP-7): every publication goes through the REAL seed publisher. A double that pushed straight to
+# main hid that the real one published to the copy's own branch, which origin does not have.
+REAL_PUBLISHER="$REPO_ROOT/seed/strategy/scripts/ds-publish.sh"
+[ -f "$REAL_PUBLISHER" ] || { echo "no seed publisher at $REAL_PUBLISHER" >&2; exit 2; }
 CASE_N=0
 make_env() {
     CASE_N=$((CASE_N + 1))
@@ -96,14 +101,25 @@ EOF
     printf '# Archive\n' > "$CANON/archive/notes/Notes-Archive.md"
     printf 'other\n' > "$CANON/docs/other.md"
     printf 'strategy_day: %s\n' "$(date +%A | tr '[:upper:]' '[:lower:]')" > "$CANON/exocortex/day-rhythm-config.yaml"
-    cat > "$CANON/scripts/ds-publish.sh" <<'EOF'
+    # Records the call and the --branch value it got, then runs the real seed publisher. Only a case
+    # that injects a publisher failure (FAKE_PUBLISH_FAIL=1, the runner's handling of the exit code is
+    # under test, not the publication) gets the double's exit code instead. The --branch value is read
+    # by an argument-parsing branch, which is also what tells the runner that this publisher knows
+    # --branch (pick_publisher, C1 compat): a mere mention of the option in the text does not count.
+    cat > "$CANON/scripts/ds-publish.sh" <<EOF
 #!/bin/bash
-# test double of the publisher: args <repo> normal --reason R --from-commit SHA
-repo="$1"; sha=""
-while [ $# -gt 0 ]; do [ "$1" = "--from-commit" ] && sha="$2"; shift; done
-echo "$repo" >> "$PUBLOG"
-[ "${FAKE_PUBLISH_FAIL:-0}" = 1 ] && exit "${FAKE_PUBLISH_RC:-1}"
-git -C "$repo" push -q origin "$sha:refs/heads/main"
+# a recording wrapper around the real seed publisher
+echo "\$1" >> "\$PUBLOG"
+printf '%s\n' "\$*" >> "\$PUBLOG.args"
+prev=""
+for a in "\$@"; do
+    case "\$prev" in
+        --branch) printf '%s\n' "\$a" >> "\$PUBLOG.branch" ;;
+    esac
+    prev="\$a"
+done
+[ "\${FAKE_PUBLISH_FAIL:-0}" = 1 ] && exit "\${FAKE_PUBLISH_RC:-1}"
+exec bash "$REAL_PUBLISHER" "\$@"
 EOF
     git -C "$CANON" add -A && git -C "$CANON" commit -q -m seed && git -C "$CANON" push -q origin HEAD:main
     BASE=$(git -C "$ORIGIN" rev-parse main)
@@ -138,6 +154,35 @@ EOF
 
 origin_commits() { git -C "$ORIGIN" rev-list --count "$BASE..main"; }
 origin_paths() { git -C "$ORIGIN" diff --name-only "$BASE" main | sort | tr '\n' ' ' | sed 's/ $//'; }
+origin_branches() { git -C "$ORIGIN" for-each-ref --format='%(refname:short)' refs/heads | tr '\n' ' ' | sed 's/ $//'; }
+# A real publisher in place of the recording wrapper, committed on origin/main, so the canon and every
+# copy carry it: the file users get (C1 regression cases) or one an older install keeps (C1 compat).
+install_publisher() {  # <publisher file>
+    cp "$1" "$CANON/scripts/ds-publish.sh"
+    git -C "$CANON" commit -q -am "publisher $(basename "$1")" && git -C "$CANON" push -q origin HEAD:main
+    BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(git -C "$CANON" rev-parse HEAD)
+    check "the governance repo carries $(basename "$1") byte for byte" "same" \
+        "$(git -C "$ORIGIN" show main:scripts/ds-publish.sh | cmp -s - "$1" && echo same || echo differs)"
+}
+# C1 compat (WP-7): update.sh never replaces an existing scripts/ds-publish.sh, so an install may keep a
+# publisher that does not know --branch and answers it with usage, exit 1: the seed copy delivered
+# before --branch existed (the fixture is that file byte for byte) or the installation's own one with a
+# fixed target branch (made here from the same file: main always, the same strict argument parser).
+# The own one also NAMES --branch without parsing it (a comment, git status --branch, git log --branches
+# and a usage text): knowing --branch means an argument-parsing branch for it, not the word in the text.
+OLD_SEED_PUBLISHER="$REPO_ROOT/scripts/tests/fixtures/ds-publish-637a526.sh"
+OWN_PUBLISHER="$TEST_ROOT/own-ds-publish.sh"
+[ -f "$OLD_SEED_PUBLISHER" ] || { echo "no fixture $OLD_SEED_PUBLISHER" >&2; exit 2; }
+# shellcheck disable=SC2016  # literal publisher lines (${BRANCH:-main}, ${SHA:0:12}), not expansions
+sed -e 's/^BRANCH="\${BRANCH:-main}"$/BRANCH="main"  # this installation always publishes to main/' \
+    -e '2a\
+# no --branch support: this installation always publishes to main' \
+    -e 's/^echo "ds-publish: \${SHA:0:12}/git -C "$REPO" status --porcelain --branch >\/dev\/null 2>\&1; git -C "$REPO" log --branches -1 >\/dev\/null 2>\&1; &/' \
+    -e 's/\[--from-commit SHA\]" >&2$/[--from-commit SHA] [--branch NAME]" >\&2/' \
+    "$OLD_SEED_PUBLISHER" > "$OWN_PUBLISHER"
+check "fixtures: the old seed copy does not mention --branch at all" "0" "$(grep -c -e '--branch' "$OLD_SEED_PUBLISHER")"
+check "fixtures: the own publisher always targets main and names --branch in a comment, git status, git log and the usage text" \
+    "1|1|1|1|1" "$(grep -c '^BRANCH="main"  # this installation' "$OWN_PUBLISHER")|$(grep -c '^# no --branch support' "$OWN_PUBLISHER")|$(grep -c 'status --porcelain --branch' "$OWN_PUBLISHER")|$(grep -c 'log --branches' "$OWN_PUBLISHER")|$(grep -c 'SHA\] \[--branch NAME\]' "$OWN_PUBLISHER")"
 canon_head() { git -C "$CANON" rev-parse HEAD; }
 canon_status() { git -C "$CANON" status --porcelain; }
 iso_copies() { ls -d "$ISO_TMP"/iwe-strategist-note-review.*/DS-strategy 2>/dev/null | wc -l | tr -d ' '; }
@@ -173,6 +218,34 @@ FLAG_OUT=$(FUNCS="$FUNCTIONS" bash -c '
     done')
 check "flag parsing: empty=off, listed (comma/space)=on, near-miss names=off" "011100" "$FLAG_OUT"
 
+echo "== A1b: a publisher knows --branch when its text has an argument-parsing branch for it, not the word alone (C1 compat) =="
+# Each workspace holds a publisher of one line; pick_publisher is asked for --branch main.
+KB_DIR="$TEST_ROOT/knows-branch"
+knows_branch_case() {  # <name> <the publisher's one line>
+    mkdir -p "$KB_DIR/$1/scripts"
+    printf '#!/bin/bash\n%s\n' "$2" > "$KB_DIR/$1/scripts/ds-publish.sh"
+}
+# shellcheck disable=SC2016  # publisher lines written as text, not expanded here
+{
+    knows_branch_case yes-plain '    --branch) TARGET_BRANCH="$2"; shift 2 ;;'
+    knows_branch_case yes-alt-first '    -b|--branch) TARGET_BRANCH="$2"; shift 2 ;;'
+    knows_branch_case yes-alt-last '    --branch|-b) TARGET_BRANCH="$2"; shift 2 ;;'
+    knows_branch_case yes-equals '    --branch=*) TARGET_BRANCH="${1#--branch=}"; shift ;;'
+    knows_branch_case no-comment '# no --branch support: this publisher always publishes to main'
+    knows_branch_case no-status '    git -C "$REPO" status --porcelain --branch >/dev/null 2>&1'
+    knows_branch_case no-log '    git -C "$REPO" log --branches -1 >/dev/null 2>&1'
+    knows_branch_case no-usage '    echo "usage: ds-publish.sh <repo-dir> <priority> [--from-commit SHA] [--branch NAME]" >&2'
+}
+kb_run() {  # <case names...> -> name=<branch passed or none> for each, as pick_publisher decides
+    FUNCS="$FUNCTIONS" KB_DIR="$KB_DIR" LOG_FILE="$TEST_ROOT/knows-branch.log" bash -c '
+        eval "$FUNCS"
+        for n in "$@"; do WORKSPACE="$KB_DIR/$n"; pick_publisher main ""; printf "%s=%s " "$n" "${PUBLISHER_BRANCH_ARG:-none}"; done' _ "$@"
+}
+check "knows --branch: --branch), -b|--branch), --branch|-b) and --branch=*) get --branch main" \
+    "yes-plain=main yes-alt-first=main yes-alt-last=main yes-equals=main " "$(kb_run yes-plain yes-alt-first yes-alt-last yes-equals)"
+check "knows --branch: a comment, git status --branch, git log --branches and a usage text do not" \
+    "no-comment=none no-status=none no-log=none no-usage=none " "$(kb_run no-comment no-status no-log no-usage)"
+
 echo "== A2: allowed change is published from the copy =="
 make_env
 run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
@@ -180,9 +253,34 @@ check "allowed change: rc 0 and published" "rc=0 result=published" "$(printf '%s
 check "allowed change: origin got exactly one commit" "1" "$(origin_commits)"
 check "allowed change: commit touches exactly the allowlisted paths" "archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_paths)"
 check "allowed change: publisher was called from the copy, not the canon" "1" "$(grep -c 'iwe-strategist-note-review' "$PUBLOG")"
+check "allowed change: the copy publishes to the branch it was created from (--branch main)" "1" "$(grep -c -- ' --branch main$' "$PUBLOG.args")"
+check "allowed change: the wrapper's --branch parse branch read main" "main" "$(cat "$PUBLOG.branch" 2>/dev/null)"
+check "allowed change: no branch named after the copy on origin" "main" "$(origin_branches)"
 check "allowed change: copy removed after publication" "0" "$(iso_copies)"
 check "allowed change: copy branch removed" "" "$(git -C "$CANON" branch --list 'strategist/*')"
 canon_untouched "allowed change"
+
+echo "== A2r: the seed publisher itself (no wrapper) publishes from the copy to origin/main (C1) =="
+make_env
+install_publisher "$REAL_PUBLISHER"
+run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
+check "seed publisher: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "seed publisher: origin/main got exactly one commit, the runner's" "1|chore: test cleanup" "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)"
+check "seed publisher: only main on origin" "main" "$(origin_branches)"
+check "seed publisher: copy and its branch removed" "0|" "$(iso_copies)|$(git -C "$CANON" branch --list 'strategist/*')"
+canon_untouched "seed publisher"
+
+echo "== A2c: seed publisher, origin moved with a conflicting change: 3 passes through, the result stays in the copy =="
+make_env
+install_publisher "$REAL_PUBLISHER"
+# the racer lands its own last line in the same file on origin/main after the copy was made
+run_fn "echo mine >> inbox/fleeting-notes.md; git clone -q '$ORIGIN' '$E/racer' 2>/dev/null && echo theirs >> '$E/racer/inbox/fleeting-notes.md' && git -C '$E/racer' commit -q -am racer && git -C '$E/racer' push -q origin HEAD:main"
+check "conflict: the publisher's 3 goes out, nothing published" "rc=3 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "conflict: origin/main holds only the racer's commit" "1|racer" "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)"
+check "conflict: only main on origin" "main" "$(origin_branches)"
+check "conflict: copy preserved, the runner's commit stays on its local branch" "1|chore: test cleanup" \
+    "$(iso_copies)|$(git -C "$CANON" for-each-ref --format='%(subject)' 'refs/heads/strategist/*')"
+canon_untouched "conflict"
 
 echo "== A3: nothing changed =="
 make_env
@@ -260,7 +358,82 @@ make_env
 rm -f "$CANON/scripts/ds-publish.sh"; git -C "$CANON" commit -q -am "drop publisher"; git -C "$CANON" push -q origin HEAD:main
 BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(canon_head)
 run_fn 'echo more >> inbox/fleeting-notes.md'
-check "publisher missing in the copy: blocked, copy preserved" "rc=72 result=blocked/1" "$(printf '%s' "$FN_OUT" | tail -1)/$(iso_copies)"
+check "publisher missing in the copy and the canon: blocked, copy preserved" "rc=72 result=blocked/1" "$(printf '%s' "$FN_OUT" | tail -1)/$(iso_copies)"
+check "publisher missing everywhere: the log says to run update.sh" "1" "$(printf '%s\n' "$FN_OUT" | grep -c 'не установлен.*Запустите update.sh')"
+check "publisher missing everywhere: nothing published" "0" "$(origin_commits)"
+
+# An install upgraded by update.sh: origin/main has no publisher, the canon holds it as an untracked
+# file (backfill_ds_publish copies it in without a commit), so a copy made from origin/main has none.
+make_upgraded_env() {
+    make_env
+    git -C "$CANON" rm -q scripts/ds-publish.sh && git -C "$CANON" commit -q -m "no publisher on origin" && git -C "$CANON" push -q origin HEAD:main
+    # git rm took the emptied scripts/ away; update.sh creates the folder the same way
+    mkdir -p "$CANON/scripts" && cp "$REAL_PUBLISHER" "$CANON/scripts/ds-publish.sh" && chmod +x "$CANON/scripts/ds-publish.sh"
+    BASE=$(git -C "$ORIGIN" rev-parse main); CANON_HEAD=$(canon_head)
+    check "upgraded fixture: origin/main has no publisher, the canon has it untracked" "|?? scripts/ds-publish.sh" \
+        "$(git -C "$ORIGIN" ls-tree --name-only main scripts/ds-publish.sh)|$(canon_status_files)"
+}
+canon_status_files() { git -C "$CANON" status --porcelain --untracked-files=all; }   # an untracked folder shows its files
+canon_keeps_untracked_publisher() {  # <label>: the canon is untouched apart from the untracked publisher
+    check "$1: canon HEAD unchanged" "$CANON_HEAD" "$(canon_head)"
+    check "$1: canon working tree holds only the untracked publisher" "?? scripts/ds-publish.sh" "$(canon_status_files)"
+}
+
+echo "== A7u: upgraded install, the publisher only in the canon (untracked): the copy publishes with it =="
+make_upgraded_env
+run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
+check "upgraded install: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "upgraded install: origin/main got the runner's commit, only main on origin" "1|chore: test cleanup|main" \
+    "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)|$(origin_branches)"
+check "upgraded install: copy removed after publication" "0" "$(iso_copies)"
+canon_keeps_untracked_publisher "upgraded install"
+
+echo "== A7c: control, fresh install: the copy's own (committed) publisher wins over the canon's file =="
+make_env
+printf '#!/bin/bash\ntouch "%s"\nexit 1\n' "$E/canon-publisher-ran" > "$CANON/scripts/ds-publish.sh"
+run_fn 'echo more >> inbox/fleeting-notes.md'
+check "copy wins: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "copy wins: the canon's file never ran" "0" "$([ -e "$E/canon-publisher-ran" ] && echo 1 || echo 0)"
+
+publisher_usage_lines() { grep -c 'usage: ds-publish.sh' "$LOG"; }   # an unknown argument, such as --branch, prints it
+no_branch_warnings() { grep -c 'не знает --branch.*seed/strategy/scripts/ds-publish.sh' "$LOG"; }
+
+echo "== A7o: the installation's own publisher names --branch but has no parse branch for it (main always): called without it, it publishes (C1 compat) =="
+make_env
+install_publisher "$OWN_PUBLISHER"
+run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
+check "own publisher: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "own publisher: origin/main got the runner's commit, only main on origin" "1|chore: test cleanup|main" \
+    "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)|$(origin_branches)"
+check "own publisher: --branch was not passed (no usage line)" "0" "$(publisher_usage_lines)"
+check "own publisher: a successful publication leaves no replacement advice in the log" "0" "$(grep -c 'не знает --branch' "$LOG")"
+check "own publisher: copy removed" "0" "$(iso_copies)"
+canon_untouched "own publisher"
+
+echo "== A7m: the copy holds the old seed copy (no --branch), the canon the current one: the canon's publishes with --branch main =="
+make_env
+install_publisher "$OLD_SEED_PUBLISHER"
+cp "$REAL_PUBLISHER" "$CANON/scripts/ds-publish.sh"   # replaced in the canon's working tree only, as the warning advises
+run_fn 'echo more >> inbox/fleeting-notes.md; echo arch >> archive/notes/Notes-Archive.md'
+check "old copy, current canon: rc 0 and published" "rc=0 result=published" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "old copy, current canon: origin/main got the runner's commit, only main on origin" "1|chore: test cleanup|main" \
+    "$(origin_commits)|$(git -C "$ORIGIN" log -1 --format=%s main)|$(origin_branches)"
+check "old copy, current canon: the canon's publisher published to origin/main, no warning" "1|0" \
+    "$(grep -c 'ds-publish: .* -> origin/main (strategist: cleanup)' "$LOG")|$(grep -c 'не знает --branch' "$LOG")"
+check "old copy, current canon: canon HEAD unchanged, only its publisher file differs" "$CANON_HEAD| M scripts/ds-publish.sh" \
+    "$(canon_head)|$(canon_status)"
+
+echo "== A7x: no publisher knows --branch (the old seed copy everywhere): called without it, its refusal goes out, the log says what to replace =="
+make_env
+install_publisher "$OLD_SEED_PUBLISHER"
+run_fn 'echo more >> inbox/fleeting-notes.md'
+check "old seed everywhere: the publisher's own status (1) goes out, nothing published" "rc=1 result=blocked" "$(printf '%s' "$FN_OUT" | tail -1)"
+check "old seed everywhere: called without --branch, it tried the copy's own branch (no usage line)" "1|0" \
+    "$(grep -c 'fetch origin/strategist/note-review-.* failed' "$LOG")|$(publisher_usage_lines)"
+check "old seed everywhere: the refusal message says to replace scripts/ds-publish.sh with the template's version" "1" "$(no_branch_warnings)"
+check "old seed everywhere: the advice is part of the refusal line" "1" "$(grep -c 'isolated publish failed.*не знает --branch' "$LOG")"
+check "old seed everywhere: origin unchanged, copy preserved" "0/1" "$(origin_commits)/$(iso_copies)"
+canon_untouched "old seed everywhere"
 
 echo "== A7b: commit failure blocks =="
 make_env
@@ -319,6 +492,40 @@ check "the model is told this is a run without a chat (isolated)" "1" "$(grep -c
 canon_untouched "isolated happy path"
 check "copy removed after publication" "0" "$(iso_copies)"
 
+echo "== B1r: isolated note-review end to end with the seed publisher itself, origin has only main (C1) =="
+make_env
+install_publisher "$REAL_PUBLISHER"
+run_runner noop note-review
+check "seed publisher: runner exits 0" "0" "$RC"
+check "seed publisher: origin/main got exactly one commit with the two allowlisted files" \
+    "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_commits)|$(origin_paths)"
+check "seed publisher: only main on origin" "main" "$(origin_branches)"
+check "seed publisher: copy removed, no strategist/* branch left" "0|" "$(iso_copies)|$(git -C "$CANON" branch --list 'strategist/*')"
+check "seed publisher: the log shows the publication to origin/main" "1" \
+    "$(grep -c 'ds-publish: .* -> origin/main (strategist: cleanup)' "$HOME_DIR/logs/strategist/"*.log | awk '{print ($1 > 0)}')"
+canon_untouched "seed publisher end to end"
+
+echo "== B1u: upgraded install end to end: note-review in the copy, the publisher from the canon =="
+make_upgraded_env
+run_runner noop note-review
+check "upgraded install: runner exits 0" "0" "$RC"
+check "upgraded install: origin/main got one commit with the two allowlisted files, only main on origin" \
+    "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md|main" "$(origin_commits)|$(origin_paths)|$(origin_branches)"
+check "upgraded install: copy removed" "0" "$(iso_copies)"
+canon_keeps_untracked_publisher "upgraded install end to end"
+
+echo "== B1o: end to end with the installation's own publisher that names --branch without parsing it (main always): the runner publishes (C1 compat) =="
+make_env
+install_publisher "$OWN_PUBLISHER"
+run_runner noop note-review
+check "own publisher end to end: runner exits 0" "0" "$RC"
+check "own publisher end to end: origin/main got one commit with the two allowlisted files, only main on origin" \
+    "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md|main" "$(origin_commits)|$(origin_paths)|$(origin_branches)"
+check "own publisher end to end: --branch was not passed, no replacement advice on success" "0|0" \
+    "$(cat "$HOME_DIR/logs/strategist/"*.log | grep -c 'usage: ds-publish.sh')|$(cat "$HOME_DIR/logs/strategist/"*.log | grep -c 'не знает --branch')"
+check "own publisher end to end: copy removed" "0" "$(iso_copies)"
+canon_untouched "own publisher end to end"
+
 echo "== B2: isolated note-review, model writes outside the allowlist =="
 make_env
 run_runner outside-file note-review
@@ -363,6 +570,7 @@ check "runner exits 0" "0" "$RC"
 check "no isolated copy was created" "0" "$(ls "$ISO_TMP" | wc -l | tr -d ' ')"
 check "legacy: the cleanup commit is made in the canon" "1" "$([ "$(canon_head)" != "$CANON_HEAD" ] && echo 1 || echo 0)"
 check "legacy: the publisher got the canon path" "$CANON" "$(head -1 "$PUBLOG")"
+check "legacy: no --branch, the publisher keeps its default (the canon's own branch)" "0" "$(grep -c -- '--branch' "$PUBLOG.args")"
 check "legacy: origin got one commit with the two files" "1|archive/notes/Notes-Archive.md inbox/fleeting-notes.md" "$(origin_commits)|$(origin_paths)"
 check "legacy: the model ran in the canon" "$CANON" "$(cat "$E/stub-cwd")"
 check "legacy: the model is told this is a run without a chat" "1" "$(grep -c -x -F "$MODE_LINE" "$E/stub-args")"

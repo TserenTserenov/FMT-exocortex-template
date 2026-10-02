@@ -56,7 +56,7 @@ fi
 if [ -n "$CAND_C" ] && [ "$CAND_COMMON" = "$CANON_COMMON" ]; then GOV_WT="$CAND_C"; else GOV_WT=""; fi
 if [ "$GUARD_MODE" = required ]; then
   if [ -z "$GOV_WT" ] || [ "$GOV_WT" = "$CANON_C" ]; then
-    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: bash \"$GUARD\" open --isolate --wp <WP-N>, затем cd в worktree_path и повтори шаг" >&2; exit 2
+    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: (cd -- \"$CANON_C\" && bash \"$GUARD\" open --isolate --wp <WP-N>), затем повтори этот шаг внутри копии: (cd -- \"<worktree_path>\" || exit 1; <блок шага 0>)" >&2; exit 2
   fi
   echo "GOV_WT=$GOV_WT mode=isolated"
 else
@@ -66,9 +66,41 @@ fi
 ```
 
 - Код выхода 0 -> **запиши абсолютный путь `GOV_WT` в свой ответ пользователю** (контекст сессии): независимые вызовы Bash не разделяют переменные, а `cd` в подоболочке каталог не меняет.
-- Код выхода 2 (`NOT ISOLATED`) -> ничего не записывай. Выполни `session-guard.sh open --isolate ...`, возьми `worktree_path` из его вывода, `cd` в него и повтори блок. Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши. Код 1 -> ошибка резолвера или путей: покажи сообщение и остановись.
-- КАЖДЫЙ последующий блок записи начинается с явного задания и проверки: `GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1`.
-- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем `bash "$GOV_WT/scripts/ds-publish.sh" "$GOV_WT" normal --reason "strategy-session"`, в канон не коммить. `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
+- Код выхода 2 (`NOT ISOLATED`) -> ничего не записывай. Открой копию из канона, возьми `worktree_path` из вывода `open --isolate` и повтори блок шага 0 внутри копии; `<CANON_C>` и `<GUARD>` — пути из сообщения `NOT ISOLATED`. Переход в каталог — только в подоболочке `( … )`: верхнеуровневый `cd` хук `destructive-guard.sh` блокирует.
+  ```bash
+  (cd -- "<CANON_C>" && bash "<GUARD>" open --isolate --wp <WP-N>)
+  ```
+  ```bash
+  (cd -- "<worktree_path>" || exit 1
+  <блок шага 0 без изменений>
+  )
+  ```
+  Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши. Код 1 -> ошибка резолвера или путей: покажи сообщение и остановись.
+- КАЖДЫЙ последующий блок записи начинается с явного задания и проверки `GOV_WT` и выполняется в подоболочке внутри копии (git — `git -C "$GOV_WT" …`, файлы — абсолютные пути от `$GOV_WT`):
+  ```bash
+  GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"
+  (cd -- "$GOV_WT" || exit 1
+  <команды записи>
+  )
+  ```
+- Публикация в конце: `mode=isolated` -> коммит в `GOV_WT`, затем публикация из копии, в канон не коммить. Ветка назначения `main` задаётся явно (`--branch main`): `session-guard.sh open --isolate` создаёт копию от `origin/main` на её собственной ветке `session-isolate/<agent>-<session>`, которой на сервере нет. `--branch` получает только публикатор, который его знает: `update.sh` не заменяет уже лежащий `scripts/ds-publish.sh` (собственный публикатор установки или старая копия шаблона), и такой публикатор вызывается без `--branch`, как раньше. Знает или нет, функция `knows_branch` судит по тексту файла (эвристика): ветка разбора аргумента `--branch)` (также `-b|--branch)`, `--branch=*)`) в начале строки; комментарий, текст usage или `git status --branch` не в счёт. Ложный пропуск (обёртка, передающая `"$@"`) безопасен: публикатор вызывается как раньше; ложное срабатывание — нет, поэтому признак узкий. Публикатор берётся из копии; из канона — если в копии его нет (`update.sh` кладёт `scripts/ds-publish.sh` в канон без коммита, и копия от `origin/main` его не содержит) или если в копии он не знает `--branch`, а в каноне знает. Нет нигде -> ненулевой код и сообщение: запусти `update.sh`. Публикатор без `--branch` отказал -> предложи пилоту заменить `scripts/ds-publish.sh` в репозитории управления версией шаблона `seed/strategy/scripts/ds-publish.sh`. Публикатор переносит один коммит за вызов, поэтому блок публикует по очереди все коммиты копии, которых нет на `origin/main`, от старого к новому, и останавливается на первом отказе; уже опубликованный коммит публикатор пропускает, повтор блока безвреден. Коммит-слияние публикатор не переносит (код 2): блок остановится на первом таком коммите, так что «все коммиты» — это обычные коммиты. Незакоммиченные изменения в копии не публикуются: блок предупредит одной строкой «ВНИМАНИЕ…», код выхода от этого не меняется. Коммитов нет -> одна строка «Публиковать нечего», без сообщения о публикации; список коммитов не получен (ошибка git) -> код 1 и сообщение, не «Публиковать нечего».
+  ```bash
+  GOV_WT="<записанный абсолютный путь>"; : "${GOV_WT:?}"
+  knows_branch() { grep -qE -e '^[[:space:]]*[(]?([^|)#[:space:]]+[[:space:]]*[|][[:space:]]*)*"?--branch(=[^|)[:space:]]*)?"?[[:space:]]*[|)]' "$1" 2>/dev/null; }
+  PUB="$GOV_WT/scripts/ds-publish.sh"; CANON_PUB="{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/scripts/ds-publish.sh"
+  if ! knows_branch "$PUB" && knows_branch "$CANON_PUB"; then PUB="$CANON_PUB"; fi
+  [ -f "$PUB" ] || PUB="$CANON_PUB"
+  [ -f "$PUB" ] || { echo "ERROR: публикатор ds-publish.sh не найден ни в копии, ни в каноне. Запусти update.sh (он доставляет публикатор) и повтори публикацию; коммиты остаются в копии $GOV_WT" >&2; exit 1; }
+  git -C "$GOV_WT" rev-parse -q --verify origin/main >/dev/null || { echo "ERROR: в копии $GOV_WT нет origin/main, публикацию не с чем сравнить" >&2; exit 1; }
+  COMMITS=$(git -C "$GOV_WT" rev-list --reverse origin/main..HEAD) || { echo "ERROR: не удалось получить список коммитов копии $GOV_WT" >&2; exit 1; }
+  [ -z "$(git -C "$GOV_WT" status --porcelain)" ] || echo "ВНИМАНИЕ: в копии есть незакоммиченные изменения, они не опубликованы: закоммитьте их" >&2
+  [ -n "$COMMITS" ] || { echo "Публиковать нечего: в копии нет коммитов, которых нет на origin/main"; exit 0; }
+  for c in $(printf '%s\n' "$COMMITS"); do
+    if knows_branch "$PUB"; then bash "$PUB" "$GOV_WT" normal --reason "strategy-session" --from-commit "$c" --branch main || exit $?
+    else bash "$PUB" "$GOV_WT" normal --reason "strategy-session" --from-commit "$c" || exit $?; fi
+  done
+  ```
+  `mode=legacy` -> сохраняй штатным способом установки (коммит и push своими средствами); `ds-publish.sh` используй, только если он есть.
 
 ### Шаг 0.1. Extensions (before)
 `GOV_WT="<записанный путь>" bash .claude/scripts/load-extensions.sh strategy-session before` -> Exit 0: Read каждый файл, выполнить; расширения работают с этим корнем `GOV_WT`. Exit 1: пропустить.
@@ -82,11 +114,13 @@ fi
 
 Если хотя бы один есть — проверь ВТОРЫМ шагом, первая ли это Strategy Session календарного месяца. Записи двух легальных раскладок (issue #608, тот же корень, что #545 в day-open-scaffold.sh): плоские файлы Strategy/Day-сессий (`sessions/YYYY-MM-DD.md`) и подпапка по месяцу для peer-сессий (`sessions/YYYY-MM/`) — искать нужно по обоим адресам, иначе плоская раскладка (дефолт по `memory/routing-vocab.md`) всегда даёт «не найдено» и месячная сверка не срабатывает ни разу:
 ```bash
-GOV_WT="<записанный путь>"; : "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1
+GOV_WT="<записанный путь>"; : "${GOV_WT:?}"
+(cd -- "$GOV_WT" || exit 1
 SESSIONS_DIR=$(source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="$GOV_WT/sessions"
 grep -rl "strategy-session\|Strategy Session" \
   "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
   "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
+)
 ```
 Первая сессия месяца = дата сессии ≤7 числа месяца И поиск выше пуст. Журнал сессий берётся из `iwe_sessions_dir` (общий журнал вне копии), при его отсутствии из `$GOV_WT/sessions`.
 

@@ -174,28 +174,72 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
+# Picks the publisher for publish_commit_or_explain: sets PUBLISHER (empty = none installed) and
+# PUBLISHER_BRANCH_ARG (the value for --branch, empty = call without it). Candidates, in order:
+# $WORKSPACE/scripts/ds-publish.sh, then <fallback repo>/scripts/ds-publish.sh. A target branch goes
+# only to a publisher that knows --branch: update.sh never replaces an existing scripts/ds-publish.sh
+# (an installation's own publisher, or a seed copy delivered before --branch existed), and such a
+# publisher answers an unknown --branch with usage, exit 1. "Knows" is judged by the file's text (a
+# heuristic): an argument-parsing branch for the option, a line that starts with a case pattern such
+# as --branch), -b|--branch) or --branch=*). A comment, a usage text or `git status --branch` does not
+# count. A miss (a wrapper that hands "$@" on) is safe, the publisher runs as before --branch existed;
+# a false hit is not, hence the narrow match. The publication block of the strategy-session skill uses
+# the same expression. When no candidate knows --branch, the first existing one runs without it.
+PUBLISHER=""
+PUBLISHER_BRANCH_ARG=""
+pick_publisher() {  # <target branch, empty = the publisher's default> <fallback repo, empty = none>
+    local target_branch="$1" fallback_repo="$2" candidate
+    PUBLISHER=""
+    PUBLISHER_BRANCH_ARG=""
+    for candidate in "$WORKSPACE/scripts/ds-publish.sh" "${fallback_repo:+$fallback_repo/scripts/ds-publish.sh}"; do
+        [ -f "$candidate" ] || continue
+        [ -n "$PUBLISHER" ] || PUBLISHER="$candidate"
+        [ -n "$target_branch" ] || return 0
+        if grep -qE -e '^[[:space:]]*[(]?([^|)#[:space:]]+[[:space:]]*[|][[:space:]]*)*"?--branch(=[^|)[:space:]]*)?"?[[:space:]]*[|)]' "$candidate"; then
+            PUBLISHER="$candidate"
+            PUBLISHER_BRANCH_ARG="$target_branch"
+            return 0
+        fi
+    done
+    return 0
+}
+
 # Publish one commit via scripts/ds-publish.sh. The script is not shipped with
 # the template (issue #884, regression of WP-7 Ф101): when it is absent, say so
 # and keep the commit local instead of failing on a bare "No such file".
 # Returns 0 only when the publisher reported success.
+# The optional 5th argument names the branch on origin to publish to; empty = the
+# publisher's default (the branch checked out in $WORKSPACE). An isolated copy sits on
+# a local-only branch, so isolated_finish names the branch the copy was created from.
+# The optional 6th argument is a repo whose scripts/ds-publish.sh runs when $WORKSPACE has
+# none: update.sh puts the publisher into the canon's working tree without a commit
+# (backfill_ds_publish), so a copy made from origin/main of an upgraded install lacks it.
+# The publisher still publishes $WORKSPACE. Which publisher runs, and whether it gets
+# --branch: pick_publisher. A publisher that had to run without the wanted --branch gets the
+# replacement advice only in the refusal message: a successful run logs nothing extra.
 PUBLISH_LAST_RC=""
 publish_commit_or_explain() {
-    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4"
-    local publisher="$WORKSPACE/scripts/ds-publish.sh"
+    local reason="$1" sha="$2" ok_msg="$3" fail_msg="$4" target_branch="${5:-}" fallback_repo="${6:-}"
+    local prc=0 advice=""
 
-    if [ ! -f "$publisher" ]; then
-        log "WARN: scripts/ds-publish.sh не установлен — коммит ${sha:0:12} остался локальным и не опубликован. Опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD"
+    PUBLISH_LAST_RC=""
+    pick_publisher "$target_branch" "$fallback_repo"
+    if [ -z "$PUBLISHER" ]; then
+        log "WARN: scripts/ds-publish.sh не установлен${fallback_repo:+ (нет ни в копии, ни в $fallback_repo)} — коммит ${sha:0:12} остался локальным и не опубликован. Запустите update.sh: он доставляет публикатор в репозиторий управления. Или опубликуйте вручную: git -C \"$WORKSPACE\" push origin HEAD${target_branch:+:$target_branch}"
         return 1
     fi
-    PUBLISH_LAST_RC=""
-    local prc=0
-    bash "$publisher" "$WORKSPACE" normal --reason "$reason" --from-commit "$sha" >> "$LOG_FILE" 2>&1 || prc=$?
+    set -- "$WORKSPACE" normal --reason "$reason" --from-commit "$sha"
+    [ -z "$PUBLISHER_BRANCH_ARG" ] || set -- "$@" --branch "$PUBLISHER_BRANCH_ARG"
+    bash "$PUBLISHER" "$@" >> "$LOG_FILE" 2>&1 || prc=$?
     if [ "$prc" -eq 0 ]; then
         log "$ok_msg"
         return 0
     fi
     PUBLISH_LAST_RC="$prc"  # WP-530 Ф72: the isolated path passes the publisher's own status on
-    log "$fail_msg"
+    if [ -n "$target_branch" ] && [ -z "$PUBLISHER_BRANCH_ARG" ]; then
+        advice=" (публикатор $PUBLISHER вызван без --branch $target_branch: по тексту файла он не знает --branch — старая копия шаблона или собственный публикатор установки; если отказ из-за этого, замените scripts/ds-publish.sh в репозитории управления версией шаблона seed/strategy/scripts/ds-publish.sh)"
+    fi
+    log "$fail_msg$advice"
     return 1
 }
 
@@ -436,6 +480,10 @@ ISO_WORKTREE=""
 ISO_WORKSPACE=""
 ISO_BRANCH=""
 ISO_BASE_SHA=""
+# The copy is created from origin/$ISO_BASE_BRANCH and its result is published back to it: the copy's
+# own branch ($ISO_BRANCH) exists only locally. The value must match the branch fetch_delivery_origin
+# refreshes (main, fixed there); change them together.
+ISO_BASE_BRANCH="main"
 
 isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
     local list=",${STRATEGIST_ISOLATED_SCENARIOS:-},"
@@ -485,8 +533,8 @@ isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
         log "ISOLATION: git fetch origin main не удался, свежую копию взять нельзя, сценарий $scenario не запущен"
         return 1
     fi
-    if ! git -C "$canon" rev-parse --verify -q "origin/main^{commit}" >/dev/null 2>&1; then
-        log "ISOLATION: нет origin/main в $canon, сценарий $scenario не запущен"
+    if ! git -C "$canon" rev-parse --verify -q "origin/$ISO_BASE_BRANCH^{commit}" >/dev/null 2>&1; then
+        log "ISOLATION: нет origin/$ISO_BASE_BRANCH в $canon, сценарий $scenario не запущен"
         return 1
     fi
     ISO_RUN_ROOT=$(mktemp -d "${STRATEGIST_ISOLATED_TMPDIR:-${TMPDIR:-/tmp}}/iwe-strategist-$scenario.XXXXXX") || {
@@ -497,8 +545,8 @@ isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
     ISO_WORKTREE="$ISO_RUN_ROOT/$repo_name"
     ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
     ISO_BRANCH="strategist/$scenario-$run_id"
-    if ! git -C "$canon" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" origin/main >> "$LOG_FILE" 2>&1; then
-        log "ISOLATION: не удалось создать рабочую копию от origin/main, пустой каталог запуска удалён"
+    if ! git -C "$canon" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$ISO_BASE_BRANCH" >> "$LOG_FILE" 2>&1; then
+        log "ISOLATION: не удалось создать рабочую копию от origin/$ISO_BASE_BRANCH, пустой каталог запуска удалён"
         git -C "$canon" worktree prune >> "$LOG_FILE" 2>&1 || true
         rm -rf "$ISO_RUN_ROOT"
         return 1
@@ -621,7 +669,7 @@ isolated_finish() {  # <publish reason> <commit message>
         done
         if [ "$rc" -eq 0 ] && git -C "$WORKSPACE" commit -q -m "$msg" >> "$LOG_FILE" 2>&1 \
             && sha=$(git -C "$WORKSPACE" rev-parse HEAD 2>/dev/null) && [ -n "$sha" ]; then
-            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась"; then
+            if publish_commit_or_explain "$reason" "$sha" "Isolated: pushed ${sha:0:12}" "WARN: isolated publish failed — публикация не удалась" "$ISO_BASE_BRANCH" "$ISO_CANON_REPO"; then
                 ISOLATED_RESULT="published"
             else
                 # The publisher's own status (70/71/...) goes out as is; 72 is only for the

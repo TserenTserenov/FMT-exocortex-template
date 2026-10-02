@@ -6,7 +6,7 @@
 - **HUB (личные планы):** $GOV_WT/current/
 - **Документы стратегии:** $GOV_WT/docs/ (Strategy.md, Dissatisfactions.md, Session Agenda.md)
 - **Inbox:** $GOV_WT/inbox/
-- **`$GOV_WT`:** рабочая (изолированная) копия governance-репозитория; определяется по шагу 0 скилла strategy-session (`.claude/skills/strategy-session/SKILL.md`), все записи строить от неё, не от канона `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`; публикация через `ds-publish.sh`, только в режиме isolated (в режиме legacy без session-guard — штатным способом установки); перед каждым блоком записи `: "${GOV_WT:?}"; cd -- "$GOV_WT" || exit 1`
+- **`$GOV_WT`:** рабочая (изолированная) копия governance-репозитория; определяется по шагу 0 скилла strategy-session (`.claude/skills/strategy-session/SKILL.md`), все записи строить от неё, не от канона `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}`; публикация через `ds-publish.sh` блоком публикации шага 0 скилла (все коммиты копии, которых нет на `origin/main`, по очереди; `--branch main` — только публикатору, который его знает по тексту файла (эвристика: ветка разбора аргумента `--branch)`)), только в режиме isolated (в режиме legacy без session-guard — штатным способом установки); каждый блок записи — по шагу 0 скилла: `GOV_WT="<путь>"; : "${GOV_WT:?}"`, затем команды в подоболочке `(cd -- "$GOV_WT" || exit 1` … `)`, без верхнеуровневого `cd` (его блокирует хук `destructive-guard.sh`)
 - **SPOKE (планы репо):** {{WORKSPACE_DIR}}/*/WORKPLAN.md
 - **MEMORY:** ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/memory/MEMORY.md
 
