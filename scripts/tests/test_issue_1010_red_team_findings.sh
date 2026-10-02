@@ -50,7 +50,7 @@ else
 fi
 
 echo "== F14 GNU-first stat"
-bad=$(git -C "$ROOT" grep -nE 'stat -f %m [^|]*\|\| *stat -c %Y' -- '*.sh' 2>/dev/null || true)
+bad=$(git -C "$ROOT" grep -nE 'stat -f %m [^|]*\|\| *stat -c %Y' -- '*.sh' ':!scripts/tests/test_issue_1010_red_team_findings.sh' 2>/dev/null || true)
 [ -z "$bad" ] && pass "no BSD-first 'stat -f %m || stat -c %Y' left" || fail "BSD-first stat: $(printf '%s' "$bad" | head -2 | tr '\n' ' ')"
 eval "$(awk '$0 == "stat_mtime() {" {c=1} c {print} c && /^}$/ {exit}' "$ROOT/scripts/iwe-backup-check.sh")"
 # A GNU-like stat: `-f` is "file system status" (succeeds, several lines), `-c %Y` is the mtime.

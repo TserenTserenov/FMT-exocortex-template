@@ -63,9 +63,13 @@ git clone -q "$ORIGIN" "$B" 2>/dev/null
 printf 'feature\n' > "$A/f.txt"; g "$A" add f.txt; g "$A" commit -q -m feature
 SHA=$(g "$A" rev-parse HEAD)
 # elsewhere, an equivalent patch lands on origin, then somebody reverts it
+# A different committer date: same tree, parent, author and second would give the SAME sha, and
+# the "equivalent patch" would then be the commit itself (an ancestor), not an equivalent one.
+export GIT_COMMITTER_DATE="2001-01-01T00:00:00Z"
 g "$B" cherry-pick "$SHA" >/dev/null 2>&1 || { g "$B" fetch -q "$A" main 2>/dev/null; g "$B" cherry-pick "$SHA" >/dev/null 2>&1; }
 if [ ! -f "$B/f.txt" ]; then printf 'feature\n' > "$B/f.txt"; g "$B" add f.txt; g "$B" commit -q -m feature-equiv; fi
 g "$B" revert --no-edit HEAD >/dev/null 2>&1
+unset GIT_COMMITTER_DATE
 g "$B" push -q origin main 2>/dev/null
 if git --git-dir="$ORIGIN" cat-file -e main:f.txt 2>/dev/null; then fail "fixture: f.txt still on origin"; fi
 OUT=$(cd "$TMP" && bash "$PUB" "$A" normal --from-commit "$SHA" 2>&1); RC=$?

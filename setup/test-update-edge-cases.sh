@@ -640,6 +640,10 @@ HEREDOC
 Upstream replaced this section entirely.
 HEREDOC
 
+    # #1004: the USER-SPACE branch backs the old file up first, through a helper that lives
+    # outside the extracted block.
+    eval "$(awk '$0 == "claude_backup_before_replace() {" {c=1} c {print} c && /^}$/ {exit}' "$TEMPLATE_DIR/update.sh")"
+    WORKSPACE_DIR="$T10_DIR"
     WS_CURRENT="$T10_CURRENT_B" WS_NEW="$T10_NEW_B" WS_BASE="$T10_DIR/ws-base.md" \
         CLAUDE_BASE_MISSING_FILES=()
     source "$T10_STEP6_FILE"

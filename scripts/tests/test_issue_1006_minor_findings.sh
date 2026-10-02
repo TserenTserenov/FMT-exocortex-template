@@ -61,8 +61,8 @@ grep -q '_iwe_common="${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh"' "$ROOT
 echo "== 5 SETUP_CI keeps the scheduler untouched"
 grep -q 'SETUP_CI=1' "$ROOT/setup/smoke-test-fresh-install.sh" && pass "smoke test passes SETUP_CI=1" || fail "smoke test never sets SETUP_CI"
 if [ "$(uname -s)" = Linux ]; then
-  H="$TMP/home"; W="$TMP/work"; B="$TMP/bin"
-  mkdir -p "$H" "$W/.iwe-runtime/roles/extractor/scripts" "$W/DS-strategy/inbox" "$B"
+  GOV=gov-repo; H="$TMP/home"; W="$TMP/work"; B="$TMP/bin"
+  mkdir -p "$H" "$W/.iwe-runtime/roles/extractor/scripts" "$W/$GOV/inbox" "$B"
   printf '#!/bin/sh\nexit 0\n' > "$W/.iwe-runtime/roles/extractor/scripts/extractor.sh"; chmod +x "$W/.iwe-runtime/roles/extractor/scripts/extractor.sh"
   printf '#!/bin/sh\nexit 0\n' > "$B/claude"
   printf '#!/bin/sh\necho "$0 $*" >> "%s/sched-calls.log"\nexit 0\n' "$TMP" > "$B/systemctl"
