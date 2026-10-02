@@ -16,6 +16,11 @@ name: Post-Release Adversarial Audit
 # Цель: создать reminder с adversarial-промптом → автор прогоняет в Claude session
 # → находит классы регрессий, которые detectors не ловят.
 #
+# Одно напоминание на версию: уже существующее обращение с тем же заголовком (открытое ИЛИ закрытое) шаг
+# не пересоздаёт. Пока ловился только открытый issue, закрытие обращения после аудита приводило к тому, что
+# следующий push update-manifest.json при той же версии x.y.0 (она остаётся до очередного бампа) создавал его
+# заново: после закрытия #748 появился #783 для v0.40.0, и он висел открытым.
+#
 # Уведомление автору: только сам issue (GitHub пришлёт письмо и push). Раньше после создания issue шаг слал
 # напоминание в `/api/template-update` бота. Это тот же вход, что и рассылка о выпуске подписчикам: служебное
 # «Нужна независимая проверка (red team)» ушло всем подписчикам обновлений (35 человек при 0.41.0) под заголовком
@@ -106,15 +111,18 @@ jobs:
 
             После добавления detector'а — закрыть issue.`;
 
+            // One reminder per version: a CLOSED issue with the same title counts too. Looking at open issues
+            // only re-created it on the next update-manifest.json push after the audit issue had been closed.
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              state: 'open',
-              labels: 'release-audit'
+              state: 'all',
+              labels: 'release-audit',
+              per_page: 100
             });
             const existing = issues.find(i => i.title === title);
             if (existing) {
-              console.log(`Issue already exists: #${existing.number}`);
+              console.log(`Issue already exists: #${existing.number} (${existing.state})`);
               core.setOutput('created', 'false');
               core.setOutput('number', existing.number);
               core.setOutput('url', existing.html_url);
