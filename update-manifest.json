@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.40.2",
+  "version": "0.41.0",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "e1707e7251f955bf3e96ca8c453c7ce91b240f8fda812cbcd0dc497b1591863d"
+      "sha256": "be35ff3897ab6cb20d6b9a006f655829daa491e44ed73bdd768f13c85a5c9442"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -817,7 +817,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "c5616d747ad3c08b1a450d415f46545de9bb32987db3901b10d5b9d2095d824d"
+      "sha256": "6468a1e11d6fa0d20e7c322f5e5d21f2696f3503685af16914a91d56119607e4"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -825,7 +825,7 @@
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "c01d2e59b832da6d692780cca4c97b42cf3050af7529f4e100c9f55f67438cb8"
+      "sha256": "3b1ce2b172d40acc30acb357e1726a472556448d2d31880177a11bae918defd6"
     },
     {
       "path": ".gitignore",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "291e56ea534178d7bf25b453fe5408d41aaabd3ea2c8e746165a7ce7b03d83a6"
+      "sha256": "cf94018e80cd9e8d009608eb3f6182b6be17562edfcbda72444c75df026e25a0"
     },
     {
       "path": "CLAUDE.md",
@@ -1037,7 +1037,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "c3eb6174035a19fb10ecd259e0035fe8b4654462032a9c312ed8ccba443f8713"
+      "sha256": "c5d90717d9d90d9f357077bcf765e9e97ed63ca562dadecf8383611575760b4c"
     },
     {
       "path": "docs/roles-catalog.md",
@@ -1609,7 +1609,7 @@
     },
     {
       "path": "memory/t-checklist.md",
-      "sha256": "216361a0b1be8e00ec2c024a0480a7f697126b6d1aa81cb22a5a5724a4fb46f5"
+      "sha256": "7f423fddf2eccab668642785255176751401d4cbc3074c3713b191479053fab1"
     },
     {
       "path": "memory/templates-dayplan.md",
@@ -3153,7 +3153,15 @@
     },
     {
       "path": "update.sh",
-      "sha256": "eb81364d3ad0818395184c52136fe04d29fba494999f14b01579d1c9a8e21dd0"
+      "sha256": "55ae15ac8a2cc570c1d3132ca4c24ed5198b7ee22922a05b913d1789ae1f7d21"
+    },
+    {
+      "path": "update.sh",
+      "sha256": "55ae15ac8a2cc570c1d3132ca4c24ed5198b7ee22922a05b913d1789ae1f7d21"
+    },
+    {
+      "path": "update.sh",
+      "sha256": "55ae15ac8a2cc570c1d3132ca4c24ed5198b7ee22922a05b913d1789ae1f7d21"
     }
   ],
   "excluded_paths": [
@@ -3271,6 +3279,7 @@
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_979_weekplan_table.py",
+    "scripts/tests/test_issue_989_snapshot_cross_api.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
