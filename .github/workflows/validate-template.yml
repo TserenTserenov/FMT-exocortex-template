@@ -25,6 +25,11 @@ on:
   # workflow только на ветке main, запуск на release-ветке тег не создаёт.
   workflow_dispatch:
 
+# #1010 F16: every job only reads the repository and uploads artifacts; a token with the
+# default (broad) scope is not needed.
+permissions:
+  contents: read
+
 jobs:
   # Defense-in-depth для случая --no-verify в pre-commit + прямого push.
   # Отдельный job, чтобы шёл независимо от validate/shellcheck (не зависит от их успеха).

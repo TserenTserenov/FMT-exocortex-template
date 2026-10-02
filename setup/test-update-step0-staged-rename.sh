@@ -340,8 +340,11 @@ fi
 
 # --- Run the REAL update.sh: Step 0 must replace+re-exec itself ---------------
 echo "--- full run: Step 0 self-update replaces the running script ---"
+# TMPDIR points at a private directory so that a temp directory orphaned by the re-exec (#1010 F17:
+# exec skips the EXIT trap) is visible afterwards.
+mkdir -p "$TEST_ROOT/step0-tmp"
 set +e
-PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
+TMPDIR="$TEST_ROOT/step0-tmp" PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
     bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out.log" 2>&1
 RC=$?
 set -e
@@ -375,6 +378,12 @@ if compgen -G "$SCRIPT_DIR/.update.sh.staged.*" > /dev/null; then
   fail "staged tmp file(s) left behind: $(ls "$SCRIPT_DIR"/.update.sh.staged.* 2>/dev/null | tr '\n' ' ')"
 else
   pass "no staged tmp files left behind"
+fi
+
+if [ -z "$(ls -A "$TEST_ROOT/step0-tmp" 2>/dev/null)" ]; then
+  pass "no temp directory left behind by the Step 0 re-exec"
+else
+  fail "Step 0 re-exec left temp files behind: $(ls -A "$TEST_ROOT/step0-tmp" | tr '\n' ' ')"
 fi
 
 echo

@@ -1527,7 +1527,12 @@ else
         echo "  validate-режим setup.sh проверит: env-конфиг, обязательные файлы,"
         echo "  extensions, доступность MCP, структурные инварианты."
         echo ""
-        read -p "Запустить проверку сейчас? (y/n) " -n 1 -r || true
+        # #1010 F11: no question without a person to answer it (SETUP_CI or no terminal on stdin):
+        # `read` on an open stdin with no TTY waits forever.
+        REPLY=""
+        if [ -z "${SETUP_CI:-}" ] && [ -t 0 ]; then
+            read -p "Запустить проверку сейчас? (y/n) " -n 1 -r || true
+        fi
         echo ""
         if [[ ${REPLY:-} =~ ^[Yy]$ ]]; then
             echo ""

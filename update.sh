@@ -2590,6 +2590,11 @@ copy_platform_file_preserving_user_space() {
                     return 1
                 fi
                 ;;
+            .claude/skills/*/SKILL.md)
+                # #1010 F3: the regular update path keeps the USER-SPACE block of a skill spec
+                # (Step 5, SKILL.md branch); the repair/stale-repair path did not and dropped it.
+                user_section=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$dst" 2>/dev/null || true)
+                ;;
         esac
         backup_rule_before_overwrite "$fpath" "$dst"
     fi
@@ -3096,6 +3101,9 @@ else
         chmod +x "$_boot_staged"
         mv -f "$_boot_staged" "$SCRIPT_DIR/update.sh"
         echo "  Перезапуск..."
+        # #1010 F17: exec replaces the process, so the EXIT trap never runs and the temp
+        # directory (update.sh.new, update.sh.err) would stay behind: remove it first.
+        rm -rf "$TMPDIR_UPDATE"
         exec bash "$SCRIPT_DIR/update.sh" "$@"
     fi
 fi
@@ -4400,9 +4408,11 @@ if [ "$TOTAL_CHANGES" -eq 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
         if ! run_post_apply_backfills_or_die; then
             exit "$EXIT_RUNTIME"
         fi
+        # #1010 F7: the conflict gate exits BEFORE the marker is cleared: an unresolved CLAUDE.md
+        # conflict (exit 49) must leave .update-incomplete in place.
+        claude_conflict_gate
         finish_update_transaction
         report_settings_merge_drift
-        claude_conflict_gate
     fi
     exit 0
 fi
@@ -4460,7 +4470,6 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         # the preview used to clear a live .update-incomplete from a previous
         # failed run without repair or build-runtime, disarming the contract
         # this marker now carries (runtime freshness + role-runner guard).
-        finish_update_transaction
         # issue #541 hvost 2 (#540): a stale workspace CLAUDE.md caught by
         # sync_workspace_claude_md above must not be reported as "Всё актуально" —
         # that was exactly the false success Evgenii's retry test found. Same
@@ -4468,7 +4477,9 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         # else, since sync_workspace_claude_md (like repair_pass) never ran
         # under --check and the tracking vars would otherwise still be at
         # their initial empty/false state here regardless.
+        # #1010 F7: the gate first, so a conflict exit keeps the marker.
         claude_conflict_gate
+        finish_update_transaction
     fi
     # Флаги stage B осмысленны и когда обновлений нет: workspace-копии могли
     # отстать от уже актуального шаблона (repair_pass выше их классифицировал).

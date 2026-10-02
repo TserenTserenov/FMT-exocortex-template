@@ -36,7 +36,7 @@ TTL_MIN=90
 
 # Проверить TTL — если cache свежий, не запускаться (если не --force)
 if [ "$FORCE" = "false" ] && [ -f "$CACHE_FILE" ]; then
-  cache_ts=$(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)
+  cache_ts=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0)
   now_ts=$(date +%s)
   age_min=$(( (now_ts - cache_ts) / 60 ))
   if [ "$age_min" -lt "$TTL_MIN" ]; then

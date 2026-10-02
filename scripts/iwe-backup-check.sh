@@ -109,12 +109,13 @@ warn()  { printf "⚠️  %s\n" "$*"; }
 crit()  { printf "❌ %s\n" "$*"; }
 info()  { printf "ℹ️  %s\n" "$*"; }
 
-# macOS stat: -f %m (mtime epoch). Linux: -c %Y.
+# GNU stat: -c %Y (mtime epoch) is tried FIRST: GNU `stat -f` means "file system status" and
+# succeeds with several lines of output (#1010 F14). BSD/macOS stat rejects -c and falls to -f %m.
 stat_mtime() {
-    if stat -f %m "$1" >/dev/null 2>&1; then
-        stat -f %m "$1"
-    else
+    if stat -c %Y "$1" >/dev/null 2>&1; then
         stat -c %Y "$1"
+    else
+        stat -f %m "$1"
     fi
 }
 

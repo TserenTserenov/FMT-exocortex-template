@@ -742,8 +742,8 @@ render_iwe_status() {
           fi
           log_path="${log_path//\{\{HOME_DIR\}\}/$HOME}"
           if [ -n "$log_path" ] && [ -f "$log_path" ]; then
-            log_mtime=$(stat -f %m "$log_path" 2>/dev/null) ||
-                log_mtime=$(stat -c %Y "$log_path" 2>/dev/null) ||
+            log_mtime=$(stat -c %Y "$log_path" 2>/dev/null) ||
+                log_mtime=$(stat -f %m "$log_path" 2>/dev/null) ||
                 log_mtime=""
           fi
           _is_nonneg_int "$log_mtime" || log_mtime=""
@@ -754,8 +754,8 @@ render_iwe_status() {
             com.strategist.weekreview) status_file="$HOME/logs/strategist/week-review-last-status" ;;
           esac
           if [ -n "$status_file" ] && [ -f "$status_file" ]; then
-            status_mtime=$(stat -f %m "$status_file" 2>/dev/null) ||
-                status_mtime=$(stat -c %Y "$status_file" 2>/dev/null) ||
+            status_mtime=$(stat -c %Y "$status_file" 2>/dev/null) ||
+                status_mtime=$(stat -f %m "$status_file" 2>/dev/null) ||
                 status_mtime=""
             status_result=$(awk -F'\t' 'NR==1 {print $2}' "$status_file" 2>/dev/null || true)
           fi
@@ -901,7 +901,7 @@ render_iwe_status() {
       last_log_file="$last_watchdog_log"
     fi
     if [ -n "$last_log_file" ]; then
-      last_log_age_days=$(( ( $(date +%s) - $(stat -f %m "$last_log_file" 2>/dev/null || stat -c %Y "$last_log_file" 2>/dev/null || echo 0) ) / 86400 ))
+      last_log_age_days=$(( ( $(date +%s) - $(stat -c %Y "$last_log_file" 2>/dev/null || stat -f %m "$last_log_file" 2>/dev/null || echo 0) ) / 86400 ))
     fi
     if [ "$last_log_age_days" -le 1 ] || [ "$last_log_age_days" -eq -1 ]; then
       echo "| Scheduler/триаж | 🟢 | Mode B: feedback-triage зарегистрирован, последний лог присутствует (нет жалоб = тишина) |"
@@ -920,9 +920,9 @@ render_iwe_status() {
     # Mode A: cron не запущен (нет юнита в launchctl) + нет свежих логов
     local last_log_age_days="∞"
     if [ -n "$last_feedback_triage_log" ]; then
-      last_log_age_days=$(( ( $(date +%s) - $(stat -f %m "$last_feedback_triage_log" 2>/dev/null || stat -c %Y "$last_feedback_triage_log" 2>/dev/null || echo 0) ) / 86400 ))
+      last_log_age_days=$(( ( $(date +%s) - $(stat -c %Y "$last_feedback_triage_log" 2>/dev/null || stat -f %m "$last_feedback_triage_log" 2>/dev/null || echo 0) ) / 86400 ))
     elif [ -n "$last_watchdog_log" ]; then
-      last_log_age_days=$(( ( $(date +%s) - $(stat -f %m "$last_watchdog_log" 2>/dev/null || stat -c %Y "$last_watchdog_log" 2>/dev/null || echo 0) ) / 86400 ))
+      last_log_age_days=$(( ( $(date +%s) - $(stat -c %Y "$last_watchdog_log" 2>/dev/null || stat -f %m "$last_watchdog_log" 2>/dev/null || echo 0) ) / 86400 ))
     fi
     # issue #347: строка светофора не называла способ подавления — пользователь узнавал
     # о маркере, только читая исходник этого скрипта.

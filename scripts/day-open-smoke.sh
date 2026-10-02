@@ -40,7 +40,7 @@ scheduler_pulse() {
   local pulse_file="$DS_STRATEGY/current/.scheduler-last-run"
   if [ -f "$pulse_file" ]; then
     local last_ts
-    last_ts=$(stat -f %m "$pulse_file" 2>/dev/null || stat -c %Y "$pulse_file" 2>/dev/null || echo 0)
+    last_ts=$(stat -c %Y "$pulse_file" 2>/dev/null || stat -f %m "$pulse_file" 2>/dev/null || echo 0)
     local now_ts age_hours
     now_ts=$(date +%s)
     age_hours=$(( (now_ts - last_ts) / 3600 ))

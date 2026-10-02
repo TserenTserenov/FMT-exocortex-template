@@ -127,7 +127,7 @@ find_videos() {
         # macOS-совместимый вывод (без GNU -printf)
         while IFS= read -r -d '' file; do
             local mtime
-            mtime=$(stat -f %m "$file" 2>/dev/null || stat -c %Y "$file" 2>/dev/null || echo 0)
+            mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null || echo 0)
             echo "$mtime $file"
         done < <(find "${find_args[@]}" -print0 2>/dev/null)
     done | sort -rn | cut -d' ' -f2-
@@ -246,7 +246,7 @@ scan() {
         local has_tr="нет"
         has_transcript "$video_path" && has_tr="да"
         local age_days
-        age_days=$(( ($(date +%s) - $(stat -f %m "$video_path" 2>/dev/null || stat -c %Y "$video_path" 2>/dev/null || echo 0)) / 86400 ))
+        age_days=$(( ($(date +%s) - $(stat -c %Y "$video_path" 2>/dev/null || stat -f %m "$video_path" 2>/dev/null || echo 0)) / 86400 ))
 
         # Подсчёт
         if [ "$wp_match" = "unmatched" ]; then
