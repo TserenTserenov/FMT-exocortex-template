@@ -2269,7 +2269,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "5544c502258f8e9bbae5731dffafeb2e0d37b25aa5820eac6b7caf218fb1a930"
+      "sha256": "29ac1203fcd37019a52e16fedcf580de4552c8c57fa6d2b8d995f2ff2a127cbc"
     },
     {
       "path": "scripts/day-open-preflight.sh",

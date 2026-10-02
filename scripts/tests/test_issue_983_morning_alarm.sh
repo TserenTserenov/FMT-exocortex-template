@@ -502,6 +502,12 @@ else
 fi
 # the digest is built at run time ($MSG): it is no "started" or "deferred" notice
 check "16: сводка дня (текст собирается при запуске) с флагом уходит" "sent" "$(notice 1 '📅 День открыт 2026-10-02: план собран')"
+# The two phrases inside a digest or an alarm reason do not make them a "started" or "deferred" notice (round 37):
+# the filter looks at the start of the message, not at a phrase somewhere in it.
+check "16: сводка с фразой «Day Open pipeline started for» внутри с флагом уходит" "sent" \
+    "$(notice 1 '📅 День открыт 2026-10-02: в плане строка Day Open pipeline started for 2026-10-02')"
+check "16: тревога с текстом отсрочки в причине с флагом уходит" "sent" \
+    "$(notice 1 '🚨 Day Open pipeline aborted: в журнале Day Open 2026-10-02 отложен: неделя 2026-W40 ещё закрывается')"
 
 echo
 if [ "$fail" -eq 0 ]; then

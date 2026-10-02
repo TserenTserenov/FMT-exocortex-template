@@ -87,10 +87,12 @@ tg_notify() {
   fi
   # A scheduler retry after a deferral earlier today (strategist.sh sets DAY_OPEN_QUIET_RETRY=1): the "started"
   # and "deferred" notices went out with the first run, and the scheduler comes back up to seven times a day,
-  # so repeating them sent up to fifteen messages a day. The digest and every alarm still go out.
+  # so repeating them sent up to fifteen messages a day. The digest and every alarm still go out: the patterns
+  # match the START of the message (its emoji and fixed words), not a phrase somewhere inside a digest or an
+  # alarm reason (red team, round 37).
   if [ "${DAY_OPEN_QUIET_RETRY:-}" = "1" ]; then
     case "$msg" in
-      *"Day Open pipeline started for "*|*"Day Open "*" отложен: "*)
+      "🌅 Day Open pipeline started for "*|"⏸ Day Open "*" отложен: "*)
         echo "  [retry after a deferral: TG suppressed] $msg" | head -1
         return 0
         ;;
