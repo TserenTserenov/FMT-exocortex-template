@@ -192,6 +192,11 @@ if [ -n "\${SHIM_NOMARKER_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; th
     [ -n "\$out" ] && { grep -vxF '# --- end of update.sh ---' "$UPSTREAM/update.sh"; echo '# cut here'; } > "\$out"
     exit 0
 fi
+# SHIM_TINY_UPDATE_SH: no tag, a shebang and two comments (a truncated answer that lost its header).
+if [ -n "\${SHIM_TINY_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    [ -n "\$out" ] && printf '#!/bin/bash\n# partial\n# answer\n' > "\$out"
+    exit 0
+fi
 if [ -n "\${SHIM_MIDMARKER_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
     [ -n "\$out" ] && printf '#!/bin/bash\n# update-sh-integrity: end-marker-required\n# --- end of update.sh ---\necho cut-off tail\n' > "\$out"
     exit 0
@@ -346,6 +351,10 @@ step0_run_case stub SHIM_STUB_UPDATE_SH "ответ неполон"
 # Marker in the middle of the file, tail after it: not the last line, refused (#1004).
 step0_check_case midmarker SHIM_MIDMARKER_UPDATE_SH "ответ неполон"
 step0_run_case midmarker SHIM_MIDMARKER_UPDATE_SH "ответ неполон"
+
+# No tag and far too short for a real update.sh: refused as incomplete.
+step0_check_case tiny SHIM_TINY_UPDATE_SH "ответ неполон"
+step0_run_case tiny SHIM_TINY_UPDATE_SH "ответ неполон"
 
 # Tag present, end marker lost (header kept, tail cut off): refused.
 step0_check_case nomarker SHIM_NOMARKER_UPDATE_SH "ответ неполон"

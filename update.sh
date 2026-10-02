@@ -3054,14 +3054,24 @@ fi
 # line in the first 40 lines; such a file must END with UPDATE_SH_END_MARKER (last non-empty
 # line), so a copy that kept its header but lost its tail, or has the marker in the middle, is
 # refused. A file without the tag belongs to an older release (rollback, pin): the checks done
-# before this function (non-empty, "#!", bash -n) are all it gets. Sets STEP0_REJECT_REASON.
+# before this function (non-empty, "#!", bash -n) plus a minimum length of UPDATE_SH_MIN_LINES. Sets STEP0_REJECT_REASON.
 UPDATE_SH_INTEGRITY_TAG="# update-sh-integrity: end-marker-required"
 UPDATE_SH_END_MARKER="# --- end of update.sh ---"
+UPDATE_SH_MIN_LINES=100
 step0_integrity_check() {
     local file="$1" last_line
     STEP0_REJECT_REASON=""
-    head -n 40 "$file" | grep -qxF "$UPDATE_SH_INTEGRITY_TAG" || return 0
-    last_line=$(awk 'NF {l = $0} END {print l}' "$file")
+    # Trailing blanks and CR (a CRLF copy) do not change what a line says.
+    if ! head -n 40 "$file" | sed 's/[[:space:]]*$//' | grep -qxF "$UPDATE_SH_INTEGRITY_TAG"; then
+        # An older release has no tag; a real one is thousands of lines, so a few comment lines
+        # after a shebang are a truncated answer, not an old updater.
+        if [ "$(wc -l < "$file" | tr -d ' ')" -lt "$UPDATE_SH_MIN_LINES" ]; then
+            STEP0_REJECT_REASON="ответ неполон (слишком короткий файл)"
+            return 1
+        fi
+        return 0
+    fi
+    last_line=$(awk '{ sub(/[[:space:]]+$/, "") } NF { l = $0 } END { print l }' "$file")
     if [ "$last_line" != "$UPDATE_SH_END_MARKER" ]; then
         STEP0_REJECT_REASON="ответ неполон (последняя строка не конечный маркер)"
         return 1
