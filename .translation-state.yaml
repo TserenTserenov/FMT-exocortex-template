@@ -1,7 +1,5 @@
 files_translated:
-- docs/IWE-HELP.md
-- docs/LEARNING-PATH.md
-- docs/SETUP-GUIDE.md
-last_run_utc: '2026-10-01T18:15:24Z'
-last_synced_sha: 637a5260f0a4e3560fa9f1e2654c276fe6cbdf3b
+- docs/DESTRUCTIVE-GUARD.md
+last_run_utc: '2026-10-02T06:44:53Z'
+last_synced_sha: a6250f45c6575c5e11dc3f2cd90444e071057fd4
 schema_version: 1
