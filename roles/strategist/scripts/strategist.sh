@@ -1264,8 +1264,17 @@ case "$1" in
                 day_open_give_up not-delivered "конвейер Открытия дня не доставлен: day-open-pipeline.sh нет ни в \$IWE_SCRIPTS, ни в $WORKSPACE/scripts"
             fi
             day_open_start_attempt
+            # A retry after a deferral today: the pipeline defers while yesterday is not closed and the scheduler
+            # comes back at every tick (up to seven a day), so its "started" and "deferred" notices would go out
+            # again each time (red team of the 0.41.1 candidate: 13-15 messages a day, 2-3 in v0.41.0). The first
+            # run reports; the retries keep those two back (day-open-pipeline.sh tg_notify). The result and the
+            # pipeline's own alarms are not touched.
+            retry_quiet=""
+            if [ "$(count_in_log "$DAY_OPEN_DEFERRED_MARK")" -gt 0 ]; then
+                retry_quiet=1
+            fi
             pipeline_rc=0
-            bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
+            DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
             if [ "$pipeline_rc" -eq 0 ]; then
                 log "$DAY_OPEN_OK_MARK (scaffold + llm-fill)"
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
@@ -1277,7 +1286,7 @@ case "$1" in
                 # right away: it is what the alarm reports.
                 log "Morning: Day Open pipeline has no gateway configured — retrying with --scaffold-only"
                 scaffold_rc=0
-                bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
+                DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
                 if [ "$scaffold_rc" -eq 0 ]; then
                     log "$DAY_OPEN_OK_MARK (scaffold only, no gateway)"
                 elif [ "$scaffold_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then

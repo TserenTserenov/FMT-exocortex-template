@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "539f099e23efae7f65c10941265e0e3537c85b0dbff597ae34adc5944e9e8653"
+      "sha256": "ad6b961942694901fabbf45a2220651824f23f82bb49d211d53a833d162458e2"
     },
     {
       "path": "CLAUDE.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "85f46c2875b456da2c664bd28b5f5c54c78ad765637a13f36d7e06cb98590fdd"
+      "sha256": "57e5b581ce03010468895f4b2e8007dbda5e82137514806930bc0527444b3ceb"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2269,7 +2269,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "51178654a311864b80ed38ab650de0718ac5de6c16b2573ffcf378712bad6dce"
+      "sha256": "5544c502258f8e9bbae5731dffafeb2e0d37b25aa5820eac6b7caf218fb1a930"
     },
     {
       "path": "scripts/day-open-preflight.sh",

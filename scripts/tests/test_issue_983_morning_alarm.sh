@@ -12,7 +12,8 @@
 # Telegram refuses it, the run exits 74 without GAVE UP and the scheduler sends it again (three
 # sends a day at most; with no Telegram configured there is nothing to wait for). What the run gave
 # up on is kept in the day's log, so the next run sends the alarm again WITHOUT starting the pipeline. A deferral (pipeline exit 7: yesterday is not
-# closed yet) is no failure: no alarm, not an attempt, exit 7. Any other pipeline code is passed
+# closed yet) is no failure: no alarm, not an attempt, exit 7; the scheduler's retries that day keep the
+# pipeline's own "started" and "deferred" notices back (DAY_OPEN_QUIET_RETRY, case 16). Any other pipeline code is passed
 # out so the scheduler retries (2 as 73: the scheduler reads 2 as "lock held"); attempts are
 # counted when they START (the scheduler's timeout kills the run before it can record an end), at
 # most three a day. The explicit `strategist.sh day-plan` keeps running the prompt by hand.
@@ -119,6 +120,8 @@ mkdir -p "$SCRIPTS" "$TMP/no-scripts"
 cat > "$SCRIPTS/day-open-pipeline.sh" <<'EOF'
 #!/bin/bash
 echo "pipeline ${1:-plain}" >> "$PIPE_LOG"
+# what strategist.sh told this run about retries after a deferral (case 16): "none" when it did not
+echo "${DAY_OPEN_QUIET_RETRY:-none}" >> "$PIPE_LOG.quiet"
 if [ "${PIPE_MODE:-}" = killparent ]; then
     kill -KILL "$PPID"
     exit 0
@@ -432,6 +435,73 @@ check "15: начатых тревог по-прежнему три" "3" "$(log_
 check "15: Telegram не получил сообщений" "0" "$(messages)"
 check "15: GAVE UP ровно один" "1" "$(log_count 'GAVE UP scenario: day-plan (')"
 check "15: в журнале сказано, что больше не шлём" "1" "$(log_count 'больше не шлю')"
+
+# ---------------------------------------------------------------- 16
+echo "== 16: повторы после отсрочки идут тихо: «запущен» и «отложен» уходят один раз, с первым запуском"
+# The pipeline defers while yesterday is not closed, and the scheduler comes back at every tick (up to seven a
+# day). Red team of the 0.41.1 candidate: each tick started the pipeline and sent its "started" and "deferred"
+# notices again, 13-15 messages a day where v0.41.0 sent two. strategist.sh now tells the pipeline when the day's
+# log already holds a deferral (DAY_OPEN_QUIET_RETRY=1); the pipeline's tg_notify keeps those two notices back.
+quiet_flags() { tr '\n' ' ' < "$PIPE_LOG.quiet" 2>/dev/null | sed 's/ $//'; }
+new_case
+for n in 1 2 3; do
+    run_strategist morning PIPE_RC=7 > /dev/null
+done
+run_strategist morning PIPE_RC=0 > /dev/null
+check "16: первый запуск без флага, три повтора после отсрочки с флагом (и тот, что построил план)" "none 1 1 1" "$(quiet_flags)"
+new_case
+for n in 1 2; do
+    run_strategist morning PIPE_RC=5 > /dev/null
+done
+check "16: переходный сбой не отсрочка: повторы громкие, флага нет" "none none" "$(quiet_flags)"
+new_case
+for n in 1 2; do
+    run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=7 > /dev/null
+done
+check "16: шлюза нет, отсрочка при --scaffold-only: повтор тихий в обоих вызовах конвейера" "none none 1 1" "$(quiet_flags)"
+
+# The pipeline's own tg_notify, extracted from the real script: with the flag only the "started" notice and the
+# four "deferred" notices are kept back; the digest and every abort or warning still go out.
+PIPELINE="$ROOT/scripts/day-open-pipeline.sh"
+awk '/^tg_notify\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }' "$PIPELINE" > "$TMP/tg_notify.sh"
+# every `tg_notify "<text>"` call with a literal text; a variable in it becomes a date. The one call that passes only
+# the variable ($MSG, the digest built at run time) turns into the bare date and is dropped.
+grep -o 'tg_notify "[^"]*"' "$PIPELINE" | sed -e 's/^tg_notify "//' -e 's/"$//' \
+    | sed -E 's/\$\{?[A-Za-z_][A-Za-z_0-9]*\}?/2026-10-02/g' | grep -vx '2026-10-02' > "$TMP/notices.txt"
+notice() { # <quiet flag: 1 or empty> <message> -> sent | kept back | other: <output>
+    local out
+    out=$(env -i PATH="$PATH" QUIET="$1" MSG="$2" "$BASH" -c '
+        PROBE=false; TG_TOKEN=t; TG_CHAT=c
+        if [ -n "$QUIET" ]; then export DAY_OPEN_QUIET_RETRY="$QUIET"; fi
+        telegram_send() { echo SENT; }
+        . "$1"
+        tg_notify "$MSG"' _ "$TMP/tg_notify.sh" 2>&1)
+    case "$out" in
+        *SENT*) echo "sent" ;;
+        *"TG suppressed"*) echo "kept back" ;;
+        *) echo "other: $out" ;;
+    esac
+}
+if [ ! -s "$TMP/tg_notify.sh" ] || [ ! -s "$TMP/notices.txt" ]; then
+    bad "16: tg_notify или его вызовы не найдены в day-open-pipeline.sh (разметка изменилась?)"
+else
+    started=0; deferred=0; other=0; quiet_wrong=""; loud_wrong=""
+    while IFS= read -r msg; do
+        case "$msg" in
+            "🌅 "*) started=$((started + 1)); want_quiet="kept back" ;;
+            "⏸ "*) deferred=$((deferred + 1)); want_quiet="kept back" ;;
+            *) other=$((other + 1)); want_quiet="sent" ;;
+        esac
+        [ "$(notice 1 "$msg")" = "$want_quiet" ] || quiet_wrong="$quiet_wrong [$msg]"
+        [ "$(notice "" "$msg")" = "sent" ] || loud_wrong="$loud_wrong [$msg]"
+    done < "$TMP/notices.txt"
+    check "16: в конвейере одно сообщение «запущен» и четыре «отложен»" "1/4" "$started/$deferred"
+    check "16: с флагом молчат ровно «запущен» и «отложен», остальные уходят (сводка дня, тревоги, предупреждения)" "" "$quiet_wrong"
+    check "16: без флага уходят все сообщения конвейера" "" "$loud_wrong"
+    [ "$other" -gt 5 ] && ok "16: проверено $other прочих сообщений конвейера" || bad "16: прочих сообщений слишком мало ($other): разбор вызовов сломан?"
+fi
+# the digest is built at run time ($MSG): it is no "started" or "deferred" notice
+check "16: сводка дня (текст собирается при запуске) с флагом уходит" "sent" "$(notice 1 '📅 День открыт 2026-10-02: план собран')"
 
 echo
 if [ "$fail" -eq 0 ]; then
