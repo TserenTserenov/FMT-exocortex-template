@@ -15,6 +15,13 @@ name: Post-Release Adversarial Audit
 #
 # Цель: создать reminder с adversarial-промптом → автор прогоняет в Claude session
 # → находит классы регрессий, которые detectors не ловят.
+#
+# Уведомление автору: только сам issue (GitHub пришлёт письмо и push). Раньше после создания issue шаг слал
+# напоминание в `/api/template-update` бота. Это тот же вход, что и рассылка о выпуске подписчикам: служебное
+# «Нужна независимая проверка (red team)» ушло всем подписчикам обновлений (35 человек при 0.41.0) под заголовком
+# «Обновление шаблона IWE» и с подписью «1 коммит(ов) за последние 24ч» (число зашито в шаге). Адресной отправки
+# только автору у бота нет: пока она не появится, шаг не возвращать. Когда появится, подключить её по образцу
+# release-watchdog.yml (необязательный шаг через vars.PILOT_NOTICE_ENDPOINT, получатель только пилот).
 
 on:
   push:
@@ -124,48 +131,3 @@ jobs:
               core.setOutput('number', data.number);
               core.setOutput('url', data.html_url);
             }
-
-      - name: Notify pilot via bot (new issue only)
-        if: steps.issue.outputs.created == 'true'
-        env:
-          BOT_WEBHOOK_URL: ${{ secrets.BOT_WEBHOOK_URL }}
-          TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
-          VERSION: ${{ steps.ver.outputs.version }}
-          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
-          ISSUE_URL: ${{ steps.issue.outputs.url }}
-        run: |
-          # Same channel-detection rule as notify-security.yml (issue #547/#454):
-          # gate on whether the channel is CONFIGURED, not on repo name — a
-          # fork with no author secrets must skip silently, a half-configured
-          # channel (exactly one secret set) must fail loudly, not skip.
-          if [ -z "${BOT_WEBHOOK_URL}" ] && [ -z "${TEMPLATE_WEBHOOK_SECRET}" ]; then
-            echo "Skip: канал уведомлений не настроен (форк без секретов автора)."
-            exit 0
-          fi
-          if [ -z "${BOT_WEBHOOK_URL}" ] || [ -z "${TEMPLATE_WEBHOOK_SECRET}" ]; then
-            echo "ERROR: настроен только один из двух секретов канала — это полунастроенное состояние, не skip." >&2
-            exit 1
-          fi
-          MESSAGE="🔴 Нужна независимая проверка (red team) для выпуска v${VERSION}.
-          Задача: ${ISSUE_URL}
-
-          Открой новый чат и скажи: «прогони red team проверку из задачи #${ISSUE_NUMBER} в FMT-exocortex-template»."
-
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BOT_WEBHOOK_URL}/api/template-update" \
-            -H "Content-Type: application/json" \
-            -H "X-Webhook-Secret: ${TEMPLATE_WEBHOOK_SECRET}" \
-            -d "$(jq -n \
-              --arg version "$VERSION" \
-              --arg changelog "$MESSAGE" \
-              --arg commit_count "1" \
-              '{version: $version, changelog: $changelog, commit_count: ($commit_count | tonumber)}')")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "Audit reminder notification sent: $BODY"
-          else
-            echo "Audit reminder notification failed (HTTP $HTTP_CODE): $BODY"
-            exit 1
-          fi
