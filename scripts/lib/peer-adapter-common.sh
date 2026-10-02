@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # shellcheck shell=bash
 # peer-adapter-common.sh — shared preamble helpers for <vendor>-peer-adapter.sh
 # (DP.SC.154, §0в.1 contract). Sourced, not executed: declares functions only,

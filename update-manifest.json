@@ -3195,6 +3195,7 @@
     "scripts/tests/test-setup-git-identity-precheck.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test-update-fpf-refresh.sh",
+    "scripts/tests/test-yookassa-test-name-mentions.sh",
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_ar293_ai_cli_override.sh",
