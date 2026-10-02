@@ -9,19 +9,14 @@
 # worktree on top of the fresh branch tip, and pushes from there.
 #
 # Usage:
-#   ds-publish.sh <repo-dir> <priority> [--reason TEXT] [--from-commit SHA] [--branch NAME]
+#   ds-publish.sh <repo-dir> <priority> [--reason TEXT] [--from-commit SHA]
 #     <priority>      normal | high (kept for the callers' contract; not used to reorder anything)
 #     --reason TEXT   shown in the output only
 #     --from-commit   the single commit to publish (default: HEAD of <repo-dir>)
-#     --branch NAME   the branch on origin to publish to (default: see Behaviour). An isolated
-#                     copy (a worktree on a local-only branch such as strategist/<scenario>-<id>
-#                     or session-isolate/<agent>-<session>) passes the branch it was created
-#                     from: origin has no branch named after the copy.
 #
 # Behaviour:
-#   - target branch = --branch NAME when given; otherwise the branch currently checked out in
-#     <repo-dir> (origin/HEAD, then main, when HEAD is detached); a target that origin does
-#     not have is a fetch failure (exit 1), never a new branch on origin;
+#   - target branch = the branch currently checked out in <repo-dir> (origin/HEAD, then
+#     main, when HEAD is detached);
 #   - a commit already on origin (same SHA or an equivalent patch) is a successful no-op;
 #   - if origin moved between fetch and push, the commit is replayed on the new tip
 #     (up to 3 attempts); never a force push;
@@ -41,30 +36,19 @@ MAX_ATTEMPTS=3
 die() { echo "ds-publish: $1" >&2; exit "${2:-1}"; }
 
 usage() {
-  echo "usage: ds-publish.sh <repo-dir> <priority: normal|high> [--reason TEXT] [--from-commit SHA] [--branch NAME]" >&2
+  echo "usage: ds-publish.sh <repo-dir> <priority: normal|high> [--reason TEXT] [--from-commit SHA]" >&2
   exit 1
-}
-
-# A --branch value must be a plain branch name: what git accepts under refs/heads/ (no blanks,
-# "..", "~^:?*[\", "@{" and the like) and not starting with "-", which would read as an option.
-is_branch_name() {
-  case "$1" in ""|-*) return 1 ;; esac
-  git check-ref-format "refs/heads/$1" 2>/dev/null
 }
 
 [ "$#" -ge 2 ] || usage
 REPO="$1"; PRIORITY="$2"; shift 2
 case "$PRIORITY" in normal|high) ;; *) usage ;; esac
 
-REASON=""; FROM_COMMIT=""; TARGET_BRANCH=""
+REASON=""; FROM_COMMIT=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --reason)      [ "$#" -ge 2 ] || usage; REASON="$2"; shift 2 ;;
     --from-commit) [ "$#" -ge 2 ] || usage; FROM_COMMIT="$2"; shift 2 ;;
-    --branch)
-      [ "$#" -ge 2 ] || usage
-      is_branch_name "$2" || { echo "ds-publish: --branch: not a branch name: '$2'" >&2; usage; }
-      TARGET_BRANCH="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -79,13 +63,9 @@ if [ "$(git -C "$REPO" rev-list --parents -n 1 "$SHA" | wc -w | tr -d ' ')" -gt 
   die "$SHA is a merge commit; only single commits are published" 2
 fi
 
-if [ -n "$TARGET_BRANCH" ]; then
-  BRANCH="$TARGET_BRANCH"
-else
-  BRANCH=$(git -C "$REPO" symbolic-ref --quiet --short HEAD 2>/dev/null \
-    || git -C "$REPO" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
-  BRANCH="${BRANCH:-main}"
-fi
+BRANCH=$(git -C "$REPO" symbolic-ref --quiet --short HEAD 2>/dev/null \
+  || git -C "$REPO" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+BRANCH="${BRANCH:-main}"
 
 echo "ds-publish: ${SHA:0:12} -> origin/$BRANCH${REASON:+ ($REASON)}"
 
