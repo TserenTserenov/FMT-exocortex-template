@@ -1,8 +1,9 @@
 name: Weekly Release
 
 # Еженедельно (Вс 20:00 UTC = Пн 00:00 MSK+1) проверяет CHANGELOG.md:
-# если секция [Unreleased] непустая — бампает patch-версию в
-# update-manifest.json и открывает PR с этим бампом.
+# если секция [Unreleased] непустая — по расписанию бампает patch-версию
+# в update-manifest.json и открывает PR. Ручной запуск позволяет явно
+# выбрать patch или minor; тип выпуска не выводится из сообщений коммитов.
 #
 # WP-529 (31.08.2026): прямой `git push origin main` от бота не проходит
 # (`GH006: Protected branch update failed`, main защищён), поэтому job
@@ -35,7 +36,14 @@ name: Weekly Release
 on:
   schedule:
     - cron: '0 20 * * 0'  # Вс 20:00 UTC
-  workflow_dispatch:        # ручной запуск для тестирования
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Тип выпуска: patch для исправлений, minor для новой функции'
+        required: true
+        type: choice
+        options: [patch, minor]
+        default: patch
 
 permissions:
   contents: write
@@ -65,16 +73,24 @@ jobs:
             echo "[Unreleased] содержит изменения — бампаем версию."
           fi
 
-      - name: Bump patch version in manifest
+      - name: Bump selected version in manifest
         if: steps.check.outputs.has_content == 'true'
         id: bump
+        env:
+          RELEASE_TYPE: ${{ github.event.inputs.release_type || 'patch' }}
         run: |
           CURRENT=$(grep -m1 '"version"' update-manifest.json \
             | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
-          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-          MINOR=$(echo "$CURRENT" | cut -d. -f2)
-          PATCH=$(echo "$CURRENT" | cut -d. -f3)
-          NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+          if [[ ! "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid manifest version: $CURRENT" >&2
+            exit 1
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case "$RELEASE_TYPE" in
+            patch) NEW="$MAJOR.$MINOR.$((10#$PATCH + 1))" ;;
+            minor) NEW="$MAJOR.$((10#$MINOR + 1)).0" ;;
+            *) echo "Unsupported release_type: $RELEASE_TYPE" >&2; exit 1 ;;
+          esac
           python3 - "$NEW" <<'EOF'
           import json, sys
           with open('update-manifest.json', encoding='utf-8') as f:
@@ -85,7 +101,7 @@ jobs:
               f.write('\n')
           EOF
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
-          echo "Version bumped: $CURRENT -> $NEW"
+          echo "Version bumped ($RELEASE_TYPE): $CURRENT -> $NEW"
 
       - name: Flush Unreleased section to new version
         if: steps.check.outputs.has_content == 'true'
