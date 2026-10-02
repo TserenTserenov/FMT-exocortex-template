@@ -1199,7 +1199,10 @@ try:
         before.st_dev, before.st_ino, before.st_mode, before.st_size,
         before.st_mtime_ns, before.st_ctime_ns,
     )
-    if (
+    # On Windows lstat reads the directory entry and fstat the open handle, and the two disagree on
+    # st_ctime_ns for a file written moments ago (issue #989). The lstat taken after the read below,
+    # compared with the one above, covers the same swap there, so the cross-API check is POSIX only.
+    if os.name != "nt" and (
         opened.st_dev, opened.st_ino, opened.st_mode, opened.st_size,
         opened.st_mtime_ns, opened.st_ctime_ns,
     ) != identity:
