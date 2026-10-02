@@ -861,15 +861,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d07313d9875e6a91d17f2739974676297bed74bd105185563153603d534dad3d"
+      "sha256": "fb7d8552c1d8dcebb11c65291095e2e783cabe9006c6a3597dddcd9e60683290"
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d07313d9875e6a91d17f2739974676297bed74bd105185563153603d534dad3d"
+      "sha256": "fb7d8552c1d8dcebb11c65291095e2e783cabe9006c6a3597dddcd9e60683290"
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d07313d9875e6a91d17f2739974676297bed74bd105185563153603d534dad3d"
+      "sha256": "fb7d8552c1d8dcebb11c65291095e2e783cabe9006c6a3597dddcd9e60683290"
     },
     {
       "path": "CLAUDE.md",
@@ -1945,15 +1945,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "0d0b2484414abc5aae9ce96cee79019da19b1637f830cc702a8f53ec4a30f38f"
-    },
-    {
-      "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "0d0b2484414abc5aae9ce96cee79019da19b1637f830cc702a8f53ec4a30f38f"
-    },
-    {
-      "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "0d0b2484414abc5aae9ce96cee79019da19b1637f830cc702a8f53ec4a30f38f"
+      "sha256": "1fec8c38737916741c61a514665cc5856f5d190ebc7cbf4025800a01cc95e59f"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2313,19 +2305,15 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-<<<<<<< HEAD
-      "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
+      "sha256": "48c2d31cf24ec5adb2a8033824dc08d9fb8487f4575039bf63472b641c34f1b0"
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
+      "sha256": "48c2d31cf24ec5adb2a8033824dc08d9fb8487f4575039bf63472b641c34f1b0"
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "f96f0d9b2081601202436b71e83d1a85c32eb1453dac724e484d3953e0a51872"
-=======
-      "sha256": "29ac1203fcd37019a52e16fedcf580de4552c8c57fa6d2b8d995f2ff2a127cbc"
->>>>>>> 0b8e4b91 (fix(day-open-pipeline): тихий повтор узнаёт сообщение по началу, а не по фразе внутри (красная команда, раунд 37))
+      "sha256": "48c2d31cf24ec5adb2a8033824dc08d9fb8487f4575039bf63472b641c34f1b0"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -3109,7 +3097,15 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "3041070c90ccf7996e0afc681eafd1699b1292abb31600175e33b0e22e781102"
+      "sha256": "784cc7fcd1f6951562421ff260b43bc5827a8138c80c78f520b5c66c9efb3989"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-pipeline.sh",
+      "sha256": "784cc7fcd1f6951562421ff260b43bc5827a8138c80c78f520b5c66c9efb3989"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-pipeline.sh",
+      "sha256": "784cc7fcd1f6951562421ff260b43bc5827a8138c80c78f520b5c66c9efb3989"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
