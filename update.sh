@@ -2439,6 +2439,7 @@ print_extra_write_targets() {
     echo "  • $CLAUDE_MEMORY_DIR — рабочие копии memory-файлов"
     echo "  • $WORKSPACE_DIR/.iwe-runtime/ — пересобирается целиком из шаблона"
     echo "  • $WORKSPACE_DIR/.exocortex.env, $SCRIPT_DIR/.claude.md.base, $SCRIPT_DIR/update-manifest.json"
+    echo "  • $WORKSPACE_DIR/.claude.md.base и $WORKSPACE_DIR/.claude.md.delivered — база слияния CLAUDE.md и запись хешей доставленной копии"
     echo "  • $WORKSPACE_DIR/.iwe-paths и $HOME/.zshenv — пересоздаваемое окружение путей"
     echo "  • local core.hooksPath в git-репозиториях с .githooks под $WORKSPACE_DIR"
     echo "  • $governance_dir/scripts/install-hooks.sh — установщик platform hooks"
@@ -3306,7 +3307,8 @@ claude_record_usable() {
     size=${size//[[:space:]]/}
     case "$size" in '' | *[!0-9]*) return 1 ;; esac
     [ "$size" -le 1024 ] || return 1
-    stray=$(LC_ALL=C tr -d '0-9a-f\n' < "$1" 2>/dev/null | wc -c) || return 1
+    # pipefail inside the substitution: a failing tr must not be hidden by the wc after it (update.sh runs without pipefail)
+    stray=$(set -o pipefail; LC_ALL=C tr -d '0-9a-f\n' < "$1" 2>/dev/null | wc -c) || return 1
     [ "${stray//[[:space:]]/}" = 0 ]
 }
 
@@ -4448,7 +4450,7 @@ for f in "${UPDATED_FILES[@]}"; do
             # side of && a failure would not stop the run under set -e and "обновлён" would be a lie.
             claude_record_delivered "$NEW_FILE"
             cp "$NEW_FILE" "$CURRENT_FILE"
-            echo "  ~ $f обновлён (копия в каталоге шаблона не правилась)"
+            echo "  ~ $f обновлён (копия в каталоге шаблона совпадает с доставленной ранее или с закоммиченной в клоне; ваша правка, закоммиченная в клоне, остаётся в его истории git)"
         else
             # issue #336: no base file (first migration or lost .claude.md.base) — a
             # blind `cp $NEW_FILE $CURRENT_FILE` silently discarded any pilot edit to

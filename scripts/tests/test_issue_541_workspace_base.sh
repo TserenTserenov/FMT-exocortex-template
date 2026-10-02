@@ -51,6 +51,9 @@
 #  24 hex lines of a wrong length are not carried into the new record, a well-formed foreign one is
 #  25 a NUL byte in the record is not dropped on the way in: it does not vouch for an edited copy
 #  26 a record saved with CRLF line ends is replaced by a clean one
+#  27 a failing filter (tr) in the record check means "not usable", it is not hidden by the wc after it
+#  28 an edit of the template copy that the pilot COMMITTED in the clone is replaced by the release, the edit stays in
+#     the clone's history (a bounded limitation named by the red team of the 0.41.1 candidate, now pinned and told)
 #
 # Usage: bash scripts/tests/test_issue_541_workspace_base.sh
 #        KEEP=1 ... keeps the temporary tree for inspection.
@@ -60,7 +63,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 UPDATE_SH="$ROOT/update.sh"
 SETUP_SH="$ROOT/setup.sh"
 FIXTURE_SHA="3333333333333333333333333333333333333333"
-B1_LINE="обновлён (копия в каталоге шаблона не правилась)"
+B1_LINE="обновлён (копия в каталоге шаблона совпадает с доставленной ранее или с закоммиченной в клоне"
 REFUSAL_LINE="CLAUDE.md НЕ тронут — базовый файл для слияния отсутствовал"
 PILOT_LINE="- Pilot rule: this line must survive every update."
 EDIT_LINE="Local edit made in the template copy."
@@ -845,6 +848,40 @@ check "26 exit 0" rc_is 0
 check "26 the shortcut ran" log_has "$B1_LINE"
 check "26 every line of the record is a sha256" only_hashes "$WS/.claude.md.delivered"
 check "26 the delivered copy is on record" regular_has_line "$WS/.claude.md.delivered" "$(sha256_of "$UP/CLAUDE.md")"
+
+echo "=== case 27: a failing filter in the record check means the record is not usable ==="
+# update.sh runs without pipefail: in `tr ... | wc -c` a failed tr would show up as "no stray bytes" and the NUL-ridden
+# record of case 25 would pass (round 34 peer review). A stub tr fails only for the filter of the record check.
+build_case trfails modern
+printf '%s\n' "$EDIT_LINE" >> "$SD/CLAUDE.md"
+cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+printf '%s\000\n' "$(sha256_of "$SD/CLAUDE.md")" > "$WS/.claude.md.delivered"
+mkdir -p "$CASE_DIR/trfail"
+{
+    echo '#!/bin/bash'
+    echo 'for a in "$@"; do case "$a" in *0-9a-f*) exit 1 ;; esac; done'
+    echo "exec \"$(command -v tr)\" \"\$@\""
+} > "$CASE_DIR/trfail/tr"
+chmod +x "$CASE_DIR/trfail/tr"
+EXTRA_PATH="$CASE_DIR/trfail" run_update
+check "27 exit 49 (the refusal)" rc_is 49
+check "27 upstream is not taken as is" log_lacks "$B1_LINE"
+check "27 the edited template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+
+echo "=== case 28: an edit committed in the clone is replaced by the release, the commit stays ==="
+# The "committed in the clone" test cannot tell such an edit from the delivered file (it is what heals installs that
+# never took a CLAUDE.md update). Bounded and told: the message names it, HEAD keeps the pilot's text, and an
+# edit that is not committed is still refused (cases 3, 14, 20, 21).
+build_case committededit modern
+printf '%s\n' "$EDIT_LINE" >> "$SD/CLAUDE.md"
+git -C "$SD" add CLAUDE.md
+git -C "$SD" -c user.name=test -c user.email=test@example.com commit -q -m "pilot edit of the template copy"
+run_update
+check "28 exit 0" rc_is 0
+check "28 the shortcut ran" log_has "$B1_LINE"
+check "28 the message tells the edit stays in the clone's history" log_has "остаётся в его истории git"
+check "28 the template copy is upstream's v2" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
+check "28 the pilot's commit is untouched: HEAD still holds the edit" test -n "$(git -C "$SD" show HEAD:CLAUDE.md | grep -xF -- "$EDIT_LINE")"
 
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"
