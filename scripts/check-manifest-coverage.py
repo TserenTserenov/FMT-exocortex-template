@@ -160,7 +160,22 @@ def _parse_excluded_paths(raw: object) -> list[str]:
     return result
 
 
+def _force_utf8_streams() -> None:
+    """Emit the report as UTF-8 whatever the console code page is.
+
+    On Windows (cp1251/cp866 consoles) printing the status emoji raises
+    UnicodeEncodeError -- on the success path, which turned a passed check
+    into a blocked commit (issue #927). reconfigure() exists on text streams
+    from Python 3.7; skip silently where a stream lacks it (e.g. replaced).
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 def main() -> None:
+    _force_utf8_streams()
     if len(sys.argv) < 2:
         print("Usage: git ls-files | python3 check-manifest-coverage.py <manifest.json>",
               file=sys.stderr)

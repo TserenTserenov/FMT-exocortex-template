@@ -66,7 +66,7 @@ log "[1/11] manifest_paths — пути из update-manifest.json в дерев�
 if [ -f update-manifest.json ] && command -v python3 >/dev/null 2>&1; then
     MISSING=$(python3 -c "
 import json, os
-with open('update-manifest.json') as f:
+with open('update-manifest.json', encoding='utf-8') as f:
     data = json.load(f)
 for entry in data.get('files', []):
     p = entry.get('path') if isinstance(entry, dict) else entry
@@ -316,7 +316,7 @@ log ""
 # === Detector 9: manifest version matches CHANGELOG ===
 log "[9/11] manifest_version — update-manifest.json version == CHANGELOG.md version..."
 if [ -f update-manifest.json ] && [ -f CHANGELOG.md ] && command -v python3 >/dev/null 2>&1; then
-    MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('update-manifest.json')).get('version',''))" 2>/dev/null || echo "")
+    MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('update-manifest.json', encoding='utf-8')).get('version',''))" 2>/dev/null || echo "")
     CHANGELOG_VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | sed 's/^## \[//;s/\]$//' 2>/dev/null || echo "")
     if [ -z "$MANIFEST_VERSION" ] || [ -z "$CHANGELOG_VERSION" ]; then
         log "  ⊘ SKIP (не удалось прочитать версии)"
@@ -345,7 +345,7 @@ if [ -f update-manifest.json ] && [ -f "$RUNNER" ] && command -v python3 >/dev/n
     DEPRECATED_PROMPTS=$(python3 -c "
 import json, sys
 try:
-    m = json.load(open('update-manifest.json'))
+    m = json.load(open('update-manifest.json', encoding='utf-8'))
     paths = [e['path'] for e in m.get('deprecated_files', []) if '/strategist/prompts/' in e.get('path', '')]
     print('\n'.join(paths))
 except Exception:

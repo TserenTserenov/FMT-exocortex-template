@@ -2456,7 +2456,16 @@ refresh_fpf_base_clone() {
         waited=$((waited + 1))
     done
     if kill -0 "$fetch_pid" 2>/dev/null; then
-        pkill -P "$fetch_pid" 2>/dev/null || true
+        # Git Bash on Windows ships no pkill (issue #1005): the git child
+        # (ssh / remote helper) would outlive the timeout. There, kill the
+        # whole native process tree with taskkill; $IWE_PROC_DIR is only a
+        # seam for tests (MSYS exposes the Windows pid at /proc/<pid>/winpid).
+        if command -v pkill >/dev/null 2>&1; then
+            pkill -P "$fetch_pid" 2>/dev/null || true
+        elif command -v taskkill >/dev/null 2>&1 \
+             && [ -r "${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid" ]; then
+            taskkill //F //T //PID "$(cat "${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid")" >/dev/null 2>&1 || true
+        fi
         kill "$fetch_pid" 2>/dev/null || true
         wait "$fetch_pid" 2>/dev/null || true
         echo "  ⚠ FPF: сервер не ответил за ${fetch_limit} с — копия остаётся как была и может быть устаревшей."

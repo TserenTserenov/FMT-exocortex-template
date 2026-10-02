@@ -254,19 +254,35 @@ import subprocess
 import sys
 
 seconds = int(sys.argv[1])
-process = subprocess.Popen(sys.argv[2:], start_new_session=True)
-handled_signals = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+# Windows has no os.killpg / signal.SIGHUP / start_new_session (issue #1005):
+# there the child is stopped directly (terminate/kill) instead of its group.
+HAS_PGROUP = hasattr(os, "killpg")
+popen_kwargs = {"start_new_session": True} if HAS_PGROUP else {}
+process = subprocess.Popen(sys.argv[2:], **popen_kwargs)
+handled_signals = tuple(
+    getattr(signal, name)
+    for name in ("SIGTERM", "SIGINT", "SIGHUP")
+    if hasattr(signal, name)
+)
+
+def signal_child(hard):
+    if HAS_PGROUP:
+        os.killpg(process.pid, signal.SIGKILL if hard else signal.SIGTERM)
+    elif hard:
+        process.kill()
+    else:
+        process.terminate()
 
 def stop_process_group():
     try:
-        os.killpg(process.pid, signal.SIGTERM)
+        signal_child(False)
     except OSError:
         pass
     try:
         process.wait(timeout=1)
     except subprocess.TimeoutExpired:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            signal_child(True)
         except OSError:
             pass
         process.wait()

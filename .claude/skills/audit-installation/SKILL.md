@@ -54,8 +54,16 @@ Verdict выносит subagent в роли Аудитора, читая отч�
 # installs even though ~/.iwe-paths exists and is correct. Source it
 # directly, in this same shell, before reading the variable — `.` doesn't
 # depend on interactive/BASH_ENV machinery at all.
-IWE_PATHS="${IWE_PATHS_FILE:-$HOME/.iwe-paths}"
-[ -r "$IWE_PATHS" ] && . "$IWE_PATHS"
+# issue #932: the installer writes <workspace>/.iwe-paths (install-iwe-paths.sh);
+# $HOME/.iwe-paths is the legacy location, tried last.
+IWE_PATHS="${IWE_PATHS_FILE:-}"
+if [ -z "$IWE_PATHS" ]; then
+    for _c in "${IWE_WORKSPACE:-}/.iwe-paths" "${WORKSPACE_DIR:-}/.iwe-paths" \
+              "$PWD/.iwe-paths" "$HOME/IWE/.iwe-paths" "$HOME/.iwe-paths"; do
+        [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }
+    done
+fi
+[ -n "$IWE_PATHS" ] && [ -r "$IWE_PATHS" ] && . "$IWE_PATHS"
 if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/iwe-audit.sh" ]; then
     # $IWE_SCRIPTS first (#566): the hardcoded workspace copy, when it exists at
     # all, is a stale leftover — the installer points IWE_SCRIPTS at the template.
@@ -85,7 +93,9 @@ bash "$AUDIT_SCRIPT" $([ "${ARGUMENTS:-}" = "--critical" ] && echo "--critical")
 | `mcp__claude_ai_IWE__knowledge_search` | `query: "test"`, `limit: 1` | бесплатный | ✅ если ответ <15s |
 | `mcp__claude_ai_IWE__github_status` | (без параметров) | бесплатный | ✅ если ответ |
 | `mcp__claude_ai_IWE__personal_search` | `query: "ping"`, `limit: 1` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
-| `mcp__claude_ai_IWE__dt_read_digital_twin` | `path: "1_declarative"` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
+| `mcp__claude_ai_IWE__dt_read_digital_twin` | `path: "/"` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
+
+Двойник проверяется по корню `/`, а не по разделу: незаполненная категория метамодели (например `1_declarative`) отвечает `Path not found`, и исправная установка получала ложный ❌ (#932).
 
 **Подписочное гейтование (DP.SC.112).** `personal_*` и `dt_*` требуют активной БР в `subscription_grants`. Без подписки — это **не сбой инсталляции**, а ожидаемый отказ. Помечать как ⏸️ subscription_required, не ❌. Coverage считать только по доступным для пользователя tool'ам.
 
