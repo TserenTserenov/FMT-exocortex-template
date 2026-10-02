@@ -54,8 +54,8 @@ wtreal=$(cd "$TMP/wt" && pwd -P)
 # no guard: legacy, canon and worktree both OK, unrelated repo falls back to canon
 out=$(run "$ROOT/GOV"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && check "no guard, canon -> legacy ok" ok || check "no guard, canon -> legacy ok" bad
 out=$(run "$TMP/other"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q "GOV_WT=.*/GOV mode=legacy" && check "no guard, foreign repo -> canon, not foreign" ok || check "no guard, foreign repo -> canon, not foreign" bad
-# guard present, but the canon has no origin (an install without GitHub): `open --isolate` fetches origin main for its
-# base and there is nowhere to publish -> legacy, as before 0.41.0 (audit of v0.41.0: the skill used to stop here with NOT ISOLATED)
+# guard present, but the canon has no origin (an install without GitHub): `open --isolate` without --base-sha fetches
+# origin main for its base and there is nowhere to publish -> legacy, as before 0.41.0 (audit of v0.41.0: the skill used to stop here with NOT ISOLATED)
 : > "$ROOT/scripts/session-guard.sh"
 out=$(run "$ROOT/GOV"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && echo "$out" | grep -q 'нет origin' && check "guard, canon without origin -> legacy" ok || check "guard, canon without origin -> legacy" bad
 out=$(run "$TMP/wt"); rc=$?; [ $rc -eq 0 ] && echo "$out" | grep -q 'mode=legacy' && check "guard, worktree without origin -> legacy" ok || check "guard, worktree without origin -> legacy" bad
