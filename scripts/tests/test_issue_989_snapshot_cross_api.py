@@ -2,7 +2,8 @@
 
 Since CPython 3.12 on Windows os.lstat() reports the creation time as st_ctime (Modules/posixmodule.c, win32_xstat)
 while os.fstat() reports the metadata change time (Python/fileutils.c, _Py_attribute_data_to_stat), so the two
-disagree for every file that was modified after it was created. The snapshot then failed with "target identity
+can disagree for a file that was modified after it was created (checked in the CPython 3.12, 3.13 and 3.14
+sources). The snapshot then failed with "target identity
 changed before snapshot" and update.sh ended with exit 3 and a stuck .update-incomplete marker. The cross-API
 comparison is now POSIX only; the lstat taken after the read, compared with the one before it, still catches a
 file that was swapped and is still swapped by then. The descriptor is opened with O_BINARY where that flag exists:
@@ -11,8 +12,8 @@ the hash of the actual bytes.
 
 update.sh embeds the Python in a bash function, so the test cuts the snippet out of the function and runs it
 under a harness. The harness builds fstat from lstat of the same file (so the two agree on every host), adds the
-requested ctime skew, pretends to be a given platform (os.name), changes the file between the two lstat calls, and
-fakes os.O_BINARY to record the flags the snippet passes to os.open. None of that needs Windows; the last test runs
+requested ctime skew, pretends to be a given platform (os.name), imitates a metadata change between the two lstat
+calls, and fakes os.O_BINARY to record the flags the snippet passes to os.open. None of that needs Windows; the last test runs
 the unpatched snippet and is skipped everywhere else.
 """
 import hashlib

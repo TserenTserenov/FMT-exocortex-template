@@ -1253,7 +1253,7 @@ try:
         before.st_mtime_ns, before.st_ctime_ns,
     )
     # Since CPython 3.12 on Windows lstat() reports the creation time as st_ctime and fstat() the metadata
-    # change time, so the two disagree for any file modified after it was created (issue #989): the
+    # change time, so the two can disagree for a file modified after it was created (issue #989): the
     # cross-API comparison is POSIX only. The lstat taken after the read below, compared with the one above,
     # still catches a swap that is in place by then.
     if os.name != "nt" and (
