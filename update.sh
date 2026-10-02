@@ -3322,25 +3322,30 @@ claude_template_copy_is_pristine() {
     [ "$(git -C "$SCRIPT_DIR" hash-object -- "$copy" 2>/dev/null)" = "$committed" ]
 }
 
-# claude_record_delivered FILE — remember the sha256 of the CLAUDE.md update.sh is about to write into
-# the template repo (the B1 shortcut below; FILE is the upstream source, not the destination, so an edit
-# saved in the meantime cannot become "delivered"), next to the workspace merge base: the template repo
-# never receives either. The file keeps the last few hashes, the new one is ADDED before the copy and the
-# old ones stay: if the copy then fails or the run is interrupted, the copy that is still in place is
-# vouched for by the previous line, and a copy that was written is vouched for by the new one (found by
-# the round-25 peer review: a single line overwritten before a failing cp lost the proof for the old
-# copy). Only the shortcut calls this, so an edited copy never matches. Atomic and best effort: without
-# the record the other two tests still apply.
+# claude_record_delivered FILE... — remember the sha256 of every FILE given: the copy about to be replaced
+# (the shortcut has just proved it unedited) and then the upstream CLAUDE.md update.sh is about to write
+# into the template repo (hashed from the SOURCE, so an edit saved in the meantime cannot become
+# "delivered"). The record lives next to the workspace merge base: the template repo never receives
+# either. The new hashes are ADDED before the copy and the file keeps the last four lines: if the copy
+# then fails or the run is interrupted, the copy still in place is vouched for by its own line, which every
+# attempt writes again (a line that only the first attempt wrote would be pushed out by four failed ones),
+# and a copy that was written is vouched for by the new one (round-25 and round-26 peer reviews). Only the
+# shortcut calls this, so an edited copy never matches. Atomic (temp file, mv) and best effort: no failure
+# here stops the update, and without the record the other two tests still apply. Two update.sh running at
+# once are not supported (the script has no lock anywhere).
 claude_record_delivered() {
     [ -n "${WORKSPACE_DIR:-}" ] && [ -d "$WORKSPACE_DIR" ] || return 0
-    local record="$WORKSPACE_DIR/.claude.md.delivered" tmp hash
-    hash=$(hash_file "$1" 2>/dev/null) || return 0
-    [ -n "$hash" ] || return 0
+    local record="$WORKSPACE_DIR/.claude.md.delivered" tmp file hash hashes=""
+    for file in "$@"; do
+        hash=$(hash_file "$file" 2>/dev/null) || continue
+        [ -n "$hash" ] && hashes="$hashes$hash"$'\n'
+    done
+    [ -n "$hashes" ] || return 0
     tmp="$record.tmp.$$"
-    if { grep -vxF -- "$hash" "$record" 2>/dev/null || true; printf '%s\n' "$hash"; } | tail -n 4 > "$tmp" 2>/dev/null; then
-        mv -f "$tmp" "$record" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+    if { { grep -vxF -f <(printf '%s' "$hashes") "$record" 2>/dev/null || true; }; printf '%s' "$hashes"; } | tail -n 4 > "$tmp" 2>/dev/null; then
+        mv -f "$tmp" "$record" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
     else
-        rm -f "$tmp" 2>/dev/null
+        rm -f "$tmp" 2>/dev/null || true
     fi
     return 0
 }
@@ -4401,7 +4406,7 @@ for f in "${UPDATED_FILES[@]}"; do
             # The record first, from the source: nothing can change what it hashes, and an interrupt
             # after the copy finds the record already in place. cp stays a plain statement: as the left
             # side of && a failure would not stop the run under set -e and "обновлён" would be a lie.
-            claude_record_delivered "$NEW_FILE"
+            claude_record_delivered "$CURRENT_FILE" "$NEW_FILE"
             cp "$NEW_FILE" "$CURRENT_FILE"
             echo "  ~ $f обновлён (копия в каталоге шаблона не правилась)"
         else

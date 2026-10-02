@@ -42,6 +42,7 @@
 #  15 the copy was replaced but the run stopped before the manifest was: the record vouches for it
 #  16 a failed copy of the new file stops the run (no false "updated")
 #  17 the proof for the copy in place survives a copy that fails (the record keeps the previous hash)
+#  18 several failed deliveries in a row do not push the proof for the copy in place out of the record
 #
 # Usage: bash scripts/tests/test_issue_541_workspace_base.sh
 #        KEEP=1 ... keeps the temporary tree for inspection.
@@ -86,6 +87,7 @@ check() {
 }
 absent() { [ ! -e "$1" ]; }
 same() { cmp -s "$1" "$2"; }
+sha256_of() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$1"; }
 has_line() { grep -qxF -- "$2" "$1"; }
 lacks_text() { ! grep -qF -- "$2" "$1"; }
 log_has() { grep -qF -- "$1" "$RUN_LOG"; }
@@ -690,13 +692,41 @@ else
     chmod u+w "$SD/CLAUDE.md"
     check "17 run 2: the failed copy stops the run" test "$RUN_RC" -ne 0
     check "17 run 2: the copy in place is still v2" lacks_text "$SD/CLAUDE.md" "version three"
-    check "17 run 2: the record keeps both hashes" test "$(wc -l < "$WS/.claude.md.delivered" | tr -d ' ')" -eq 2
+    check "17 run 2: the record vouches for the copy in place (v2)" grep -qxF "$(sha256_of "$SD/CLAUDE.md")" "$WS/.claude.md.delivered"
+    check "17 run 2: the record already holds the new file (v3)" grep -qxF "$(sha256_of "$UP/CLAUDE.md")" "$WS/.claude.md.delivered"
     expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
     run_update
     check "17 run 3: exit 0" rc_is 0
     check "17 run 3: the shortcut ran, not the refusal" log_has "$B1_LINE"
     check "17 run 3: the template copy is upstream's v3" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
     check "17 run 3: the workspace copy is merged with the pilot line kept" same "$WS/CLAUDE.md" "$CASE_DIR/expected-ws.md"
+fi
+
+echo "=== case 18: several failed deliveries in a row do not lose the proof for the copy in place ==="
+# The record keeps four lines; a copy proved only by the first attempt's line would be pushed out by four failed
+# deliveries (found by the round-26 peer review), so every attempt records the copy it is about to replace too.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "  SKIP: running as root, a read-only file does not stop cp"
+else
+    build_case manyfailures modern
+    cp "$SD/update-manifest.json" "$CASE_DIR/manifest-installed.json"
+    run_update
+    check "18 run 1: exit 0" rc_is 0
+    cp "$CASE_DIR/manifest-installed.json" "$SD/update-manifest.json"
+    for word in three four five six; do
+        sed "s/^Platform rule A: version [a-z]*\.$/Platform rule A: version $word./" "$UP/CLAUDE.md" > "$UP/CLAUDE.md.tmp" &&
+            mv "$UP/CLAUDE.md.tmp" "$UP/CLAUDE.md" && write_manifest "$UP" "0.40.9"
+        chmod a-w "$SD/CLAUDE.md"
+        run_update
+        chmod u+w "$SD/CLAUDE.md"
+        check "18 failed delivery '$word': the run stops" test "$RUN_RC" -ne 0
+    done
+    check "18 the copy in place is still v2" lacks_text "$SD/CLAUDE.md" "version six"
+    expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
+    run_update
+    check "18 retry: exit 0" rc_is 0
+    check "18 retry: the shortcut ran, not the refusal" log_has "$B1_LINE"
+    check "18 retry: the template copy is upstream's latest" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
 fi
 
 echo
