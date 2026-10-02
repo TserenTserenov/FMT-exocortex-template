@@ -3154,14 +3154,6 @@
     {
       "path": "update.sh",
       "sha256": "55ae15ac8a2cc570c1d3132ca4c24ed5198b7ee22922a05b913d1789ae1f7d21"
-    },
-    {
-      "path": "update.sh",
-      "sha256": "55ae15ac8a2cc570c1d3132ca4c24ed5198b7ee22922a05b913d1789ae1f7d21"
-    },
-    {
-      "path": "update.sh",
-      "sha256": "55ae15ac8a2cc570c1d3132ca4c24ed5198b7ee22922a05b913d1789ae1f7d21"
     }
   ],
   "excluded_paths": [
