@@ -14,7 +14,8 @@ Groups: (1) commands with the expected exit code (0 allowed, 2 blocked) and, for
 marker in the message; (2) `git reset --hard` in a clean repository, and after a cd;
 (3) fail-closed: a broken jq, perl, grep or sed, an unexpected exit under set -e and a failing
 printf inside the matcher all block instead of letting the call through; (4) the pilot's bypass
-CC_ALLOW_DESTRUCTIVE_INPUT=1 works even with a broken jq.
+CC_ALLOW_DESTRUCTIVE_INPUT=1 works even with a broken jq; (5) docs/DESTRUCTIVE-GUARD.md names
+every listed pass-through the hook really has and says the bypass covers the whole process.
 Commands are passed to the hook as data, nothing is executed.
 """
 import json
@@ -288,6 +289,23 @@ def main():
     env = dict(os.environ, CC_ALLOW_DESTRUCTIVE_INPUT="0")
     code, err = run(hook, "rm -rf /important", env=env)
     check(code == 2, f"CC_ALLOW_DESTRUCTIVE_INPUT=0 is not a bypass -> {code}")
+
+    # --- the guide tells the truth (WP-7): a pass-through below that the hook really has is named
+    # under «Вне гарантии»; the bypass is described as covering the whole process, not one command ---
+    doc_path = pathlib.Path(hook).resolve().parents[2] / "docs" / "DESTRUCTIVE-GUARD.md"
+    if doc_path.is_file():
+        doc = doc_path.read_text(encoding="utf-8")
+        for command, named in (("rm -r ./data", "`rm -r`"), ("rm -R data/", "`rm -R`"),
+                               ("rm --recursive data", "`rm --recursive`"),
+                               ("git submodule foreach 'rm -rf build'", "`git submodule foreach")):
+            code, err = run(hook, command)
+            check(code != 0 or named in doc, f"{command!r} -> {code}: a pass-through the guide names as {named}")
+        env = dict(os.environ, CC_ALLOW_DESTRUCTIVE_INPUT="1")
+        code, err = run(hook, "git push --force origin main", env=env)
+        check(code == 0 and "не разовый" in doc and "всей сессии агента" in doc,
+              f"bypass -> {code}: the guide says it covers the whole process, not one command")
+    else:
+        print(f"skipped the guide checks: {doc_path} is not next to this hook")
 
     print("\n".join(lines))
     print(f"result: {len(lines) - failed} of {len(lines)} as expected")

@@ -193,7 +193,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "314649e7ab3c7ca2bf68ee3c84d839fdc1f649c3a672e3230330ebacf3978bc7"
+      "sha256": "5bd94ae3d3d7b2a1caef5689a84936ff7d89bdb9e0ab4b0a80fdbdccc95074ad"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "1b334a49eedf16bbeee7ac65509c42220a5522d56070e88fd42ce8cd5fc70ae3"
+      "sha256": "e1707e7251f955bf3e96ca8c453c7ce91b240f8fda812cbcd0dc497b1591863d"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "558a5e20f7ba6d239eeaf4fcf99b8795fea550635d5a678b67076cda0daabb95"
+      "sha256": "5ba990a57130c2ba09bbd076c09e378150aa349faceedf75acd58eca9ba24557"
     },
     {
       "path": "CLAUDE.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "0a9f2a51b2619795815971306f1242266182bc0afa2f84106f37788f3908a06d"
+      "sha256": "73649bbb03b91089a898f20c30b843b4e529e00a775a244e600ce4690c7d9a1e"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -1881,7 +1881,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "13286a40f19b95d5f18bfe1a386d8b2db4ce1b56de10ecd4133f5ebec3d26756"
+      "sha256": "330affe88e15ddfe7e7f9c21044ec752c1cecda52405de84747da52b58053b7e"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "760741c9b51efc9bd8089ddd9f93aa46acd4fb97d317bc49b2244c2e0a321d9c"
+      "sha256": "1dae05ae839dc99de0d82395e4dc33759b56bd99b6754fdba2301c86781de521"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -3033,7 +3033,7 @@
     },
     {
       "path": "seed/strategy/scripts/ds-publish.sh",
-      "sha256": "dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
+      "sha256": "13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e"
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
@@ -3183,13 +3183,13 @@
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
+    "scripts/tests/fixtures/ds-publish-637a526.sh",
     "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
-    "scripts/tests/strategy-session-isolated-copy-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
@@ -3266,6 +3266,7 @@
     "scripts/tests/test_issue_961_note_review_pilot_only.sh",
     "scripts/tests/test_issue_964_canary_status.sh",
     "scripts/tests/test_issue_966_sessions_root.sh",
+    "scripts/tests/test_issue_969_strategy_session_isolated_copy.sh",
     "scripts/tests/test_issue_973_transcribe_model_default.sh",
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",

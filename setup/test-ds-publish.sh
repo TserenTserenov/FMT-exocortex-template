@@ -186,5 +186,80 @@ SHA=$(commit_in "$WS" a.txt one "strategist: day plan")
 ( cd "$TMP" && bash "$PUB" "$WS" normal --reason "strategist morning" --from-commit "$SHA" ) >/dev/null 2>&1
 [ "$(origin_log)" = "strategist: day plan|base|" ] && ok "strategist.sh's exact argument shape publishes" || fail "strategist call shape: $(origin_log)"
 
+# Isolated copies (C1, WP-7): strategist.sh (isolated scenarios) and session-guard.sh --isolate create a
+# worktree of origin/main on a branch that exists only locally (strategist/<scenario>-<run id>,
+# session-isolate/<agent>-<session>). Their callers name the copy's base branch with --branch.
+origin_branches() { git --git-dir="$ORIGIN" for-each-ref --format='%(refname:short)' refs/heads | tr '\n' ' ' | sed 's/ $//'; }
+iso_copy() {  # LABEL BRANCH FILE CONTENT → WT (worktree of origin/main on the local-only BRANCH), ISO_SHA (its commit)
+  WT="$(dirname "$WS")/iso $1"
+  g "$WS" fetch -q origin 2>/dev/null
+  g "$WS" worktree add -q -b "$2" "$WT" origin/main 2>/dev/null
+  ISO_SHA=$(commit_in "$WT" "$3" "$4" "isolated: $1")
+}
+
+for kind in "strategist/note-review-20261001223000-4242" "session-isolate/claude-s1"; do
+  echo "== isolated copy on $kind: --branch main publishes to origin/main"
+  new_scene "s13-${kind%%/*}"
+  iso_copy c "$kind" c.txt c
+  N=$(origin_count)
+  run_pub "$WT" normal --reason "strategist: cleanup" --from-commit "$ISO_SHA" --branch main
+  [ "$RC" -eq 0 ] && ok "exit 0" || fail "exit $RC: $(cat "$TMP/err.txt")"
+  [ "$(origin_count)" = "$((N + 1))" ] && [ "$(git --git-dir="$ORIGIN" log -1 --format=%s main)" = "isolated: c" ] \
+    && ok "origin/main got the copy's commit" || fail "origin log: $(origin_log)"
+  [ "$(origin_branches)" = main ] && ok "no branch named after the copy appeared on origin" || fail "origin branches: $(origin_branches)"
+  [ "$(g "$WT" symbolic-ref --short HEAD)" = "$kind" ] && [ "$(g "$WT" rev-parse HEAD)" = "$ISO_SHA" ] \
+    && ok "the copy keeps its named branch and HEAD" || fail "the copy's branch or HEAD changed"
+  [ "$(temp_worktrees)" = 2 ] && ok "no temp worktree left (the checkout and the copy only)" || fail "worktrees: $(g "$WS" worktree list)"
+  run_pub "$WT" normal --reason "again" --from-commit "$ISO_SHA" --branch main
+  [ "$RC" -eq 0 ] && [ "$(origin_count)" = "$((N + 1))" ] && grep -q "already on origin/main" "$TMP/out.txt" \
+    && ok "a repeated publication is a no-op (exit 0, no second commit)" || fail "repeat: rc=$RC n=$(origin_count) out=$(cat "$TMP/out.txt")"
+done
+
+echo "== isolated copy, conflict on --branch main: exit 3, the commit stays local, origin untouched"
+new_scene s14
+iso_copy f "session-isolate/claude-s2" base.txt mine
+g "$OTHER" pull -q origin main 2>/dev/null; commit_in "$OTHER" base.txt theirs "someone else" >/dev/null; g "$OTHER" push -q origin HEAD:main 2>/dev/null
+BEFORE=$(origin_log); run_pub "$WT" normal --from-commit "$ISO_SHA" --branch main
+[ "$RC" -eq 3 ] && ok "exit 3" || fail "exit $RC: $(cat "$TMP/err.txt")"
+[ "$(origin_log)" = "$BEFORE" ] && [ "$(origin_branches)" = main ] && ok "origin unchanged" || fail "origin changed: $(origin_log) / $(origin_branches)"
+[ "$(g "$WT" rev-parse HEAD)" = "$ISO_SHA" ] && [ "$(g "$WT" symbolic-ref --short HEAD)" = "session-isolate/claude-s2" ] \
+  && ok "the commit stays local on the copy's branch" || fail "the copy lost its commit or branch"
+[ "$(temp_worktrees)" = 2 ] && ok "no temp worktree left" || fail "temp worktree left"
+
+echo "== default unchanged: without --branch an isolated copy targets its own branch, absent on origin"
+new_scene s15
+iso_copy d "strategist/note-review-1" d.txt d
+BEFORE=$(origin_log); run_pub "$WT" normal --from-commit "$ISO_SHA"
+[ "$RC" -eq 1 ] && [ "$(origin_log)" = "$BEFORE" ] && [ "$(origin_branches)" = main ] \
+  && ok "exit 1, origin untouched, no branch created" || fail "rc=$RC origin=$(origin_log) branches=$(origin_branches)"
+grep -q "origin/strategist/note-review-1" "$TMP/err.txt" && ok "the error names the branch it tried" || fail "error: $(cat "$TMP/err.txt")"
+
+echo "== the old call shape from a detached copy still publishes (origin/HEAD, then main)"
+new_scene s16
+WT="$(dirname "$WS")/iso detached"
+g "$WS" worktree add -q --detach "$WT" origin/main 2>/dev/null
+ISO_SHA=$(commit_in "$WT" e.txt e "isolated: detached")
+run_pub "$WT" normal --reason "strategist: cleanup" --from-commit "$ISO_SHA"
+[ "$RC" -eq 0 ] && [ "$(git --git-dir="$ORIGIN" log -1 --format=%s main)" = "isolated: detached" ] \
+  && ok "detached HEAD without --branch publishes to main" || fail "detached: rc=$RC $(cat "$TMP/err.txt")"
+
+echo "== --branch takes a branch name only: garbage gives usage (exit 1) before any fetch or push"
+new_scene s17
+SHA=$(commit_in "$WS" a.txt one "role: x")
+for bad in "" "-main" "ma in" "main..x" "ma:in" "ma~in" "refs/heads/../x"; do
+  run_pub "$WS" normal --from-commit "$SHA" --branch "$bad"
+  if [ "$RC" -eq 1 ] && grep -q -- '--branch NAME' "$TMP/err.txt" && ! grep -qE ' (fetch|push) ' "$TMP/git-calls.log"; then
+    ok "--branch '$bad' refused with usage"
+  else
+    fail "--branch '$bad': rc=$RC err=$(cat "$TMP/err.txt")"
+  fi
+done
+run_pub "$WS" normal --from-commit "$SHA" --branch
+[ "$RC" -eq 1 ] && grep -q -- '--branch NAME' "$TMP/err.txt" && ok "--branch without a value refused with usage" || fail "no value: rc=$RC err=$(cat "$TMP/err.txt")"
+[ "$(origin_log)" = "base|" ] && ok "origin untouched by the refused calls" || fail "origin log: $(origin_log)"
+run_pub "$WS" normal --from-commit "$SHA" --branch no-such-branch
+[ "$RC" -eq 1 ] && [ "$(origin_branches)" = main ] && grep -q "fetch origin/no-such-branch failed" "$TMP/err.txt" \
+  && ok "a valid name absent on origin: exit 1, nothing created on origin" || fail "absent branch: rc=$RC err=$(cat "$TMP/err.txt") branches=$(origin_branches)"
+
 echo
 if [ "$FAILS" -eq 0 ]; then echo "PASS: ds-publish (#941)"; else echo "FAILED: $FAILS check(s)"; exit 1; fi
