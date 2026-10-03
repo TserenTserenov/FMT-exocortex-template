@@ -2592,7 +2592,7 @@ backfill_extractor_feeders() {
 # exactly as it was.
 refresh_fpf_base_clone() {
     local fpf_dir="$WORKSPACE_DIR/FPF"
-    local before after upstream head_oid fetch_pid waited
+    local before after upstream head_oid fetch_pid waited winpid winpid_file
     local fetch_limit="${IWE_FPF_FETCH_TIMEOUT:-90}"
 
     if [ "${IWE_SKIP_FPF_REFRESH:-0}" = "1" ]; then
@@ -2620,7 +2620,7 @@ refresh_fpf_base_clone() {
     env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true \
         GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' \
         git -C "$fpf_dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
-        fetch --quiet 2>/dev/null &
+        fetch --quiet >/dev/null 2>&1 &
     fetch_pid=$!
     waited=0
     while kill -0 "$fetch_pid" 2>/dev/null && [ "$waited" -lt "$fetch_limit" ]; do
@@ -2628,16 +2628,32 @@ refresh_fpf_base_clone() {
         waited=$((waited + 1))
     done
     if kill -0 "$fetch_pid" 2>/dev/null; then
-        # Git Bash on Windows ships no pkill (issue #1005): the git child
-        # (ssh / remote helper) would outlive the timeout. There, kill the
-        # whole native process tree with taskkill; $IWE_PROC_DIR is only a
-        # seam for tests (MSYS exposes the Windows pid at /proc/<pid>/winpid).
-        if command -v pkill >/dev/null 2>&1; then
-            pkill -P "$fetch_pid" 2>/dev/null || true
-        elif command -v taskkill >/dev/null 2>&1 \
-             && [ -r "${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid" ]; then
-            taskkill //F //T //PID "$(cat "${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid")" >/dev/null 2>&1 || true
-        fi
+        # Prefer the native tree kill on Git Bash even when an optional pkill
+        # is installed: pkill -P cannot see every native git helper. The proc
+        # override is a test seam; MSYS exposes the Windows pid at /proc.
+        case "${OSTYPE:-}" in
+            msys*|cygwin*|mingw*)
+                winpid_file="${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid"
+                winpid=""
+                [ -r "$winpid_file" ] && winpid=$(cat "$winpid_file" 2>/dev/null) || true
+                case "$winpid" in
+                    ''|*[!0-9]*)
+                        echo "  ⚠ FPF: Windows PID git недоступен; проверьте, не остались ли дочерние процессы." >&2
+                        ;;
+                    *)
+                        if ! command -v taskkill >/dev/null 2>&1 \
+                           || ! taskkill //F //T //PID "$winpid" >/dev/null 2>&1; then
+                            echo "  ⚠ FPF: не удалось остановить дерево git через taskkill; проверьте дочерние процессы." >&2
+                        fi
+                        ;;
+                esac
+                ;;
+            *)
+                if command -v pkill >/dev/null 2>&1; then
+                    pkill -P "$fetch_pid" 2>/dev/null || true
+                fi
+                ;;
+        esac
         kill "$fetch_pid" 2>/dev/null || true
         wait "$fetch_pid" 2>/dev/null || true
         echo "  ⚠ FPF: сервер не ответил за ${fetch_limit} с — копия остаётся как была и может быть устаревшей."

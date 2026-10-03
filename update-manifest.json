@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f0fd2fa0ceadc8b5dc7a03ddb8acece6466d5241c34616e4dd71461c53bf963e"
+      "sha256": "18000f3ce22016771b6c85c8572259857926cd1f9ef3af273c069f1da298c9c0"
     },
     {
       "path": "CLAUDE.md",
@@ -2481,7 +2481,7 @@
     },
     {
       "path": "scripts/lib/git-sync-status.sh",
-      "sha256": "4e5ad77b79742ca60d1ed246e50634b7dc1a3911cc5ebdecc87bbfcbf0f6ae4f"
+      "sha256": "ac1502902e5f37628ddf55dade1153c2b76071dd754057d029ba42587b55ae15"
     },
     {
       "path": "scripts/lib/language-check.py",
@@ -3161,7 +3161,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "5036b3ae0f01f99d48d5f02ebb3a76d740aa0c087cda07590f034be5bebbb3a4"
+      "sha256": "2ae6ae7286959ea88f0fbbe4d2164a79196c901e48078174c26bbd45f58efbe2"
     }
   ],
   "excluded_paths": [

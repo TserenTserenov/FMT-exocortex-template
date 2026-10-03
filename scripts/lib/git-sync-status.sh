@@ -140,6 +140,11 @@ check_git_sync_status() {
     GIT_SYNC_DETAIL="reason=timeout_${timeout_seconds}s"
     return 0
   fi
+  if [ "$ls_remote_status" -eq 125 ]; then
+    GIT_SYNC_STATUS="fetch_failed"
+    GIT_SYNC_DETAIL="reason=timeout_supervision_failed"
+    return 0
+  fi
   if [ "$ls_remote_status" -ne 0 ]; then
     GIT_SYNC_STATUS="fetch_failed"
     GIT_SYNC_DETAIL="reason=ls_remote_exit_$ls_remote_status"
@@ -227,10 +232,9 @@ check_git_sync_status() {
   return 0
 }
 
-# Self-contained portable deadline — extracted verbatim from
-# git-dirty-guard.sh:99-158 (run_with_timeout), not re-derived, so both
-# gates share one hard-deadline implementation. Do not diverge; fix upstream
-# in git-dirty-guard.sh and re-sync here if the mechanism needs to change.
+# Self-contained deadline for the read-only Sync Gate remote query. A timeout
+# is reported only after the process tree is stopped; incomplete cleanup has
+# a distinct exit status so callers never mistake it for a handled timeout.
 _git_sync_run_with_timeout() {
   local seconds="$1"
   shift
@@ -254,10 +258,21 @@ import subprocess
 import sys
 
 seconds = int(sys.argv[1])
-# Windows has no os.killpg / signal.SIGHUP / start_new_session (issue #1005):
-# there the child is stopped directly (terminate/kill) instead of its group.
+IS_WINDOWS = os.name == "nt"
 HAS_PGROUP = hasattr(os, "killpg")
 popen_kwargs = {"start_new_session": True} if HAS_PGROUP else {}
+# Resolve the native system tool before launching git. A same-named program
+# in the working directory or PATH must not replace process-tree cleanup.
+TASKKILL = None
+if IS_WINDOWS:
+    system_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+    if system_root:
+        candidate = os.path.join(system_root, "System32", "taskkill.exe")
+        if os.path.isfile(candidate):
+            TASKKILL = candidate
+    if not TASKKILL:
+        raise SystemExit(125)
+
 process = subprocess.Popen(sys.argv[2:], **popen_kwargs)
 handled_signals = tuple(
     getattr(signal, name)
@@ -265,33 +280,55 @@ handled_signals = tuple(
     if hasattr(signal, name)
 )
 
-def signal_child(hard):
-    if HAS_PGROUP:
-        os.killpg(process.pid, signal.SIGKILL if hard else signal.SIGTERM)
-    elif hard:
-        process.kill()
-    else:
-        process.terminate()
+def stop_process_tree():
+    if IS_WINDOWS:
+        try:
+            result = subprocess.run(
+                [TASKKILL, "/F", "/T", "/PID", str(process.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                check=False,
+            )
+            if result.returncode == 0:
+                process.wait(timeout=2)
+                return True
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        # A direct kill is only a fallback. It cannot prove that native git
+        # helpers exited, so the wrapper returns 125 even if the root exits.
+        try:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=2)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return False
 
-def stop_process_group():
     try:
-        signal_child(False)
+        if HAS_PGROUP:
+            os.killpg(process.pid, signal.SIGTERM)
+        else:
+            process.terminate()
     except OSError:
         pass
     try:
         process.wait(timeout=1)
     except subprocess.TimeoutExpired:
         try:
-            signal_child(True)
+            if HAS_PGROUP:
+                os.killpg(process.pid, signal.SIGKILL)
+            else:
+                process.kill()
         except OSError:
             pass
         process.wait()
+    return True
 
 def forward_signal(signum, _frame):
     for handled in handled_signals:
         signal.signal(handled, signal.SIG_IGN)
-    stop_process_group()
-    raise SystemExit(128 + signum)
+    raise SystemExit(128 + signum if stop_process_tree() else 125)
 
 for handled in handled_signals:
     signal.signal(handled, forward_signal)
@@ -299,8 +336,7 @@ for handled in handled_signals:
 try:
     returncode = process.wait(timeout=seconds)
 except subprocess.TimeoutExpired:
-    stop_process_group()
-    raise SystemExit(124)
+    raise SystemExit(124 if stop_process_tree() else 125)
 
 raise SystemExit(returncode if returncode >= 0 else 128 - returncode)
 ' "$seconds" "$@"

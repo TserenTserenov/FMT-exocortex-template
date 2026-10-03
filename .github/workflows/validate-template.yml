@@ -195,9 +195,9 @@ jobs:
       - name: Run WP-529 changelog gate tests
         run: bash setup/test-check-changelog-entry.sh
 
-  # #1030: exercise the exact three-process lock publication barrier under
-  # Git for Windows Bash with native Windows Python. POSIX signal probes stay
-  # in the ordinary Linux/macOS issue-test run.
+  # #1030/#1005: exercise lock publication and both timeout process trees
+  # under Git for Windows Bash with native Windows Python. POSIX signal probes
+  # stay in the ordinary Linux/macOS issue-test run.
   issue-1030-windows:
     runs-on: windows-latest
     timeout-minutes: 10
@@ -221,6 +221,15 @@ jobs:
           printf '%s\n' '#!/usr/bin/env bash' 'exec python "$@"' > "$shim_dir/python3"
           chmod +x "$shim_dir/python3"
           PATH="$shim_dir:$PATH" bash scripts/tests/test_issue_657.sh --barrier-only
+      - name: Run #1005 Sync Gate and FPF timeout trees on native Windows
+        run: |
+          python -c 'import os; assert os.name == "nt", os.name'
+          shim_dir=$(mktemp -d)
+          trap 'rm -rf "$shim_dir"' EXIT
+          printf '%s\n' '#!/usr/bin/env bash' 'exec python "$@"' > "$shim_dir/python3"
+          chmod +x "$shim_dir/python3"
+          PATH="$shim_dir:$PATH" bash scripts/tests/test_issue_1005_sync_gate_no_posix_signals.sh --native-windows
+          PATH="$shim_dir:$PATH" bash scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh --native-windows
 
   integration-contract-macos:
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'

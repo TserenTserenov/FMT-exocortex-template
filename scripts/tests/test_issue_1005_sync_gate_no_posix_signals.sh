@@ -2,10 +2,8 @@
 # Issue #1005 (Sync Gate part): the portable deadline wrapper in
 # scripts/lib/git-sync-status.sh used signal.SIGHUP and os.killpg, which do not
 # exist on Windows, so the wrapper crashed and Sync Gate was always
-# "undetermined". Real Windows is not available here: it is simulated by a
-# sitecustomize.py (put on PYTHONPATH) that removes signal.SIGHUP, os.killpg
-# and signal.SIGKILL before the wrapper runs -- exactly the attributes missing
-# from the Windows builds of those modules.
+# "undetermined". The default mode simulates missing POSIX attributes with
+# sitecustomize.py; --native-windows checks a real Git Bash process tree.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -13,6 +11,181 @@ LIB="$ROOT/scripts/lib/git-sync-status.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+if [ "${1:-}" = "--native-windows" ]; then
+    case "$(uname -s)" in MINGW*|MSYS*) ;; *) fail "native mode requires Git Bash on Windows" ;; esac
+    python -c 'import os; assert os.name == "nt", os.name' || fail "native Windows Python required"
+    export GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1
+    : > "$GIT_CONFIG_GLOBAL"
+    git init -q --bare "$TMP/origin.git" || fail "cannot create local origin"
+    git clone -q "$TMP/origin.git" "$TMP/repo" || fail "cannot clone local origin"
+    git -C "$TMP/repo" checkout -q -b main || fail "cannot create main"
+    git -C "$TMP/repo" config user.name test
+    git -C "$TMP/repo" config user.email test@example.invalid
+    echo initial > "$TMP/repo/seed.md"
+    git -C "$TMP/repo" add seed.md
+    git -C "$TMP/repo" commit -q -m initial || fail "cannot commit fixture"
+    git -C "$TMP/repo" push -q origin main || fail "cannot push fixture"
+
+    # The real Sync Gate must also pass a quick local-origin query through
+    # native Python, not only the timeout branch.
+    . "$LIB"
+    check_git_sync_status "$TMP/repo" main 5
+    [ "$GIT_SYNC_STATUS" = OK ] && [ "$GIT_SYNC_BEHIND" = 0 ] \
+        || fail "native Windows local origin classified as $GIT_SYNC_STATUS: $GIT_SYNC_DETAIL"
+
+    cat > "$TMP/native-tree-root.py" <<'PY'
+import json
+import os
+import subprocess
+import sys
+import time
+
+record, repo = sys.argv[1:]
+
+def publish(pids):
+    with open(record + ".tmp", "w", encoding="ascii") as stream:
+        json.dump(pids, stream)
+    os.replace(record + ".tmp", record)
+
+pids = {"root": os.getpid()}
+publish(pids)
+git = subprocess.Popen(
+    ["git", "-C", repo, "-c", "alias.hang=!sleep 30", "hang"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+pids["git"] = git.pid
+publish(pids)
+leaf = subprocess.Popen(
+    [sys.executable, "-c", "import time; time.sleep(30)"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+pids["leaf"] = leaf.pid
+publish(pids)
+time.sleep(30)
+PY
+    cat > "$TMP/native-tree-check.py" <<'PY'
+import ctypes
+import json
+import os
+import subprocess
+import sys
+import time
+from ctypes import wintypes
+
+kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+kernel.OpenProcess.restype = wintypes.HANDLE
+kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+kernel.WaitForSingleObject.restype = wintypes.DWORD
+kernel.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+kernel.GetProcessId.argtypes = (wintypes.HANDLE,)
+kernel.GetProcessId.restype = wintypes.DWORD
+WAIT_OBJECT_0 = 0
+ACCESS = 0x00100000 | 0x0001  # SYNCHRONIZE | PROCESS_TERMINATE
+system_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+if not system_root:
+    raise RuntimeError("Windows system directory unavailable")
+TASKKILL = os.path.join(system_root, "System32", "taskkill.exe")
+
+def capture_tree(record, handles):
+    deadline = time.monotonic() + 5
+    while True:
+        if os.path.exists(record):
+            with open(record, encoding="ascii") as stream:
+                pids = json.load(stream)
+            for name, pid in pids.items():
+                if name not in handles:
+                    handle = kernel.OpenProcess(ACCESS, False, pid)
+                    if not handle:
+                        raise OSError(ctypes.get_last_error(), f"OpenProcess({name}={pid})")
+                    handles[name] = handle
+            if set(handles) == {"root", "git", "leaf"}:
+                return
+        if time.monotonic() > deadline:
+            raise AssertionError(f"tree fixture did not publish all PIDs in {record}")
+        time.sleep(0.05)
+
+def stopped(handle, timeout_ms=0):
+    return kernel.WaitForSingleObject(handle, timeout_ms) == WAIT_OBJECT_0
+
+def kill_tree(pid):
+    try:
+        subprocess.run(
+            [TASKKILL, "/F", "/T", "/PID", str(pid)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=5, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+def cleanup(handles):
+    for handle in handles.values():
+        try:
+            if not stopped(handle):
+                kill_tree(kernel.GetProcessId(handle))
+                if not stopped(handle):
+                    kernel.TerminateProcess(handle, 1)
+        finally:
+            kernel.CloseHandle(handle)
+
+root_script, repo, record, sync_lib = sys.argv[1:]
+
+# Red control: direct termination of the root (the prior Windows behavior)
+# leaves at least one native child running. Handles are kept open to avoid
+# PID reuse and are always cleaned up, including when an assertion fails.
+control = subprocess.Popen([sys.executable, root_script, record + ".control", repo])
+control_handles = {}
+try:
+    capture_tree(record + ".control", control_handles)
+    control.terminate()
+    control.wait(timeout=3)
+    assert not stopped(control_handles["git"]) and not stopped(control_handles["leaf"]), \
+        "red control did not expose both orphaned native descendants"
+finally:
+    if control.poll() is None:
+        kill_tree(control.pid)
+    cleanup(control_handles)
+    if control.poll() is None:
+        control.kill()
+        control.wait(timeout=3)
+
+environment = os.environ.copy()
+environment.update({"SYNC_LIB": sync_lib, "ROOT_SCRIPT": root_script,
+                    "PID_RECORD": record + ".green", "FIXTURE_REPO": repo})
+wrapper = subprocess.Popen(
+    ["bash", "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 python "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
+    env=environment,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+green_handles = {}
+try:
+    capture_tree(record + ".green", green_handles)
+    stdout, stderr = wrapper.communicate(timeout=16)
+    assert wrapper.returncode == 124, f"timeout rc={wrapper.returncode}; out={stdout}; err={stderr}"
+    for name, handle in green_handles.items():
+        assert stopped(handle, 3000), f"timed-out {name} process survived"
+finally:
+    if wrapper.poll() is None:
+        kill_tree(wrapper.pid)
+    cleanup(green_handles)
+    if wrapper.poll() is None:
+        wrapper.kill()
+        wrapper.communicate(timeout=3)
+print("PASS: native Windows Sync Gate local origin and red/green process-tree timeout")
+PY
+    python "$(cygpath -w "$TMP/native-tree-check.py")" \
+        "$(cygpath -w "$TMP/native-tree-root.py")" \
+        "$(cygpath -w "$TMP/repo")" \
+        "$(cygpath -w "$TMP/tree-record")" \
+        "$LIB" || fail "native Windows process-tree timeout test failed"
+    exit 0
+fi
 
 mkdir -p "$TMP/winsim"
 cat > "$TMP/winsim/sitecustomize.py" <<'PY'
