@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e80b8971a179fc168662f84b4a4d47f808456d92e118dfa10a48fb1c4694cf5b"
+      "sha256": "7f01b55eec79d00f836552cda79b4c2903c8c860d9fe464d6a9c404d79bbe0dd"
     },
     {
       "path": "CLAUDE.md",
@@ -2625,7 +2625,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "1a77a33ae1dbdaa39ef23fa803a402b7aede70d8dac07b42bb5bd106c8e55959"
+      "sha256": "ede99b95e9013d3d508ee197b1c4fe0981c7371e2f2145ade3d42d55e61aa3df"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2797,7 +2797,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
-      "sha256": "672997d18715efcc286ff09b8c478dd30636d2fc41dabd15ebdc376cac49f7b7"
+      "sha256": "80338b4704b0d42eb8653bd36f4942574f75288db787c44616e6ebda3610abdd"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",

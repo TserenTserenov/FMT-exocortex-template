@@ -23,7 +23,7 @@ printf 'WP-529 offline fixture\n' > "$CANON/inbox/WP-529/WP-529.md"
 git -C "$CANON" init -q -b main
 git -C "$CANON" -c user.name=test -c user.email=offline@test.invalid add inbox/WP-529/WP-529.md
 git -C "$CANON" -c user.name=test -c user.email=offline@test.invalid commit -q -m seed
-git -C "$CANON" remote add origin https://127.0.0.1:9/offline/DS-strategy.git
+git -C "$CANON" remote add origin 'https://SENTINEL_USERINFO_CREDENTIAL@127.0.0.1:9/offline/DS-strategy.git?access_token=SENTINEL_QUERY_CREDENTIAL'
 git -C "$WORKSPACE/MC-sessions" init -q -b main
 git -C "$WORKSPACE/MC-sessions" -c user.name=test -c user.email=offline@test.invalid commit -q --allow-empty -m seed
 BASE_SHA=$(git -C "$CANON" rev-parse HEAD)
@@ -74,6 +74,10 @@ FETCH_OUTPUT=$(run_in_canon bash "$GUARD" open --isolate --wp WP-529 --task offl
 FETCH_CODE=$?
 set -e
 HINT=$(printf '%s\n' "$FETCH_OUTPUT" | sed -n 's/^session-guard: Офлайн после проверки ревизии: //p')
+[ "${FETCH_OUTPUT#*SENTINEL_USERINFO_CREDENTIAL}" = "$FETCH_OUTPUT" ] && [ "${FETCH_OUTPUT#*SENTINEL_QUERY_CREDENTIAL}" = "$FETCH_OUTPUT" ] || {
+  echo 'FAIL: remote credential appeared in guard diagnostics' >&2
+  exit 1
+}
 [ "$FETCH_CODE" -ne 0 ] && printf '%s\n' "$FETCH_OUTPUT" | grep -q 'origin/main недоступен: нет соединения' && [ -n "$HINT" ] || {
   printf 'FAIL: unavailable origin had no classified cause and executable hint: %s\n' "$FETCH_OUTPUT" >&2
   exit 1
@@ -83,6 +87,10 @@ HINT=$(printf '%s\n' "$FETCH_OUTPUT" | sed -n 's/^session-guard: Офлайн п
 
 OPEN_OUTPUT=$(run_in_canon bash -c "$HINT" 2>&1) || {
   printf 'FAIL: printed offline command failed: %s\n' "$OPEN_OUTPUT" >&2
+  exit 1
+}
+[ "${OPEN_OUTPUT#*SENTINEL_USERINFO_CREDENTIAL}" = "$OPEN_OUTPUT" ] && [ "${OPEN_OUTPUT#*SENTINEL_QUERY_CREDENTIAL}" = "$OPEN_OUTPUT" ] || {
+  echo 'FAIL: remote credential appeared in offline open output' >&2
   exit 1
 }
 WORKTREE=$(printf '%s\n' "$OPEN_OUTPUT" | python3 -c 'import json,sys; print(next((json.loads(s)["worktree_path"] for s in sys.stdin if s.startswith("{")), ""))')
@@ -104,3 +112,58 @@ printf '%s\n' "$STEP0_COPY" | grep -qF "GOV_WT=$WORKTREE mode=isolated" || {
   exit 1
 }
 echo 'PASS: installed strategy-session opens a pinned copy offline without touching canonical contents'
+
+# A partial clone may know an old commit while its blob is still promised by
+# origin. Pinning that commit must reject locally before Git creates a branch
+# or tries its implicit promisor fetch.
+PARTIAL_SOURCE="$FIXTURE/partial-source"
+PARTIAL_CANON="$WORKSPACE/DS-partial"
+mkdir -p "$PARTIAL_SOURCE/inbox/WP-529"
+git -C "$PARTIAL_SOURCE" init -q -b main
+printf 'partial fixture\n' > "$PARTIAL_SOURCE/inbox/WP-529/WP-529.md"
+printf 'old\n' > "$PARTIAL_SOURCE/data.txt"
+git -C "$PARTIAL_SOURCE" -c user.name=test -c user.email=offline@test.invalid add inbox/WP-529/WP-529.md data.txt
+git -C "$PARTIAL_SOURCE" -c user.name=test -c user.email=offline@test.invalid commit -q -m old
+OLD_SHA=$(git -C "$PARTIAL_SOURCE" rev-parse HEAD)
+printf 'new\n' > "$PARTIAL_SOURCE/data.txt"
+git -C "$PARTIAL_SOURCE" -c user.name=test -c user.email=offline@test.invalid commit -qam new
+git -C "$PARTIAL_SOURCE" config uploadpack.allowFilter true
+git clone -q --filter=blob:none "file://$PARTIAL_SOURCE" "$PARTIAL_CANON"
+MISSING=$(GIT_NO_LAZY_FETCH=1 git -C "$PARTIAL_CANON" rev-list --objects --missing=print "$OLD_SHA")
+printf '%s\n' "$MISSING" | grep -q '^?' || { echo 'FAIL: partial fixture has no missing object' >&2; exit 1; }
+git -C "$PARTIAL_CANON" remote set-url origin file:///nonexistent/wp529-1032-offline-remote
+PARTIAL_HEAD=$(git -C "$PARTIAL_CANON" rev-parse HEAD)
+PARTIAL_STATUS=$(git -C "$PARTIAL_CANON" status --porcelain)
+PARTIAL_TRACE="$FIXTURE/partial.trace"
+PARTIAL_SESSION="offline-partial-$$"
+set +e
+PARTIAL_OUTPUT=$(
+  cd "$PARTIAL_CANON" || exit 1
+  export IWE_ROOT="$WORKSPACE" IWE_SCRIPTS="$WORKSPACE/scripts" IWE_GOVERNANCE_REPO=DS-partial
+  export IWE_FROZEN_CANONICAL_PATH="$PARTIAL_CANON" IWE_SESSIONS_ROOT="$WORKSPACE/MC-sessions"
+  export IWE_AGENT=codex IWE_SESSION_ID="$PARTIAL_SESSION" GIT_TRACE="$PARTIAL_TRACE"
+  bash "$GUARD" open --isolate --wp WP-529 --task offline-partial --slug offline-partial --agent codex --base-sha "$OLD_SHA" 2>&1
+)
+PARTIAL_CODE=$?
+set -e
+[ "$PARTIAL_CODE" -ne 0 ] && printf '%s\n' "$PARTIAL_OUTPUT" | grep -q 'неполон локально' || {
+  printf 'FAIL: incomplete local commit had no clear refusal: %s\n' "$PARTIAL_OUTPUT" >&2
+  exit 1
+}
+[ "$(git -C "$PARTIAL_CANON" rev-parse HEAD)" = "$PARTIAL_HEAD" ] && [ "$(git -C "$PARTIAL_CANON" status --porcelain)" = "$PARTIAL_STATUS" ] || {
+  echo 'FAIL: partial canonical checkout changed' >&2
+  exit 1
+}
+! git -C "$PARTIAL_CANON" show-ref --verify --quiet "refs/heads/session-isolate/codex-$PARTIAL_SESSION" || {
+  echo 'FAIL: partial refusal left an isolated branch' >&2
+  exit 1
+}
+[ ! -e "$WORKSPACE/.iwe-runtime/isolated-worktrees/codex-$PARTIAL_SESSION" ] || {
+  echo 'FAIL: partial refusal left a worktree' >&2
+  exit 1
+}
+! grep -q 'git-upload-pack' "$PARTIAL_TRACE" || {
+  echo 'FAIL: partial refusal queried promisor origin' >&2
+  exit 1
+}
+echo 'PASS: incomplete partial clone refuses offline pin before worktree or remote access'

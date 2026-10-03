@@ -1545,17 +1545,20 @@ if [ "$CMD" = "open" ]; then
     ISOLATE_BASE_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     [ -n "$ISOLATE_BASE_DIR" ] || fail "--isolate: текущий каталог не git-репозиторий" 1
     if [ -n "${BASE_SHA:-}" ]; then
-      git -C "$ISOLATE_BASE_DIR" cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+      GIT_NO_LAZY_FETCH=1 git -C "$ISOLATE_BASE_DIR" cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
         || fail "--isolate: --base-sha '$BASE_SHA' не является коммитом в ($ISOLATE_BASE_DIR)" 1
+      # A partial clone can have the commit but not its blobs. worktree add
+      # otherwise fetches them implicitly from the promisor remote. Probe all
+      # reachable objects without lazy fetch before creating a branch.
+      if ! ISOLATE_LOCAL_OBJECTS=$(GIT_NO_LAZY_FETCH=1 git -C "$ISOLATE_BASE_DIR" rev-list --objects --missing=print "$BASE_SHA" 2>/dev/null); then
+        fail "--isolate: не удалось проверить локальные объекты --base-sha '$BASE_SHA'; канон не изменён" 1
+      fi
+      if printf '%s\n' "$ISOLATE_LOCAL_OBJECTS" | grep -q '^?'; then
+        fail "--isolate: --base-sha '$BASE_SHA' неполон локально (отсутствуют объекты partial clone); подключись к origin и догрузи объекты либо выбери полный локальный коммит. Канон не изменён" 1
+      fi
     fi
-    ISOLATE_BASE_ORIGIN="$(git -C "$ISOLATE_BASE_DIR" remote get-url origin 2>/dev/null || printf '%s\n' "no-origin")"
-    case "$ISOLATE_BASE_ORIGIN" in
-      *://*@*)
-        _sch="${ISOLATE_BASE_ORIGIN%%://*}"; _rest="${ISOLATE_BASE_ORIGIN#*://}"
-        ISOLATE_BASE_ORIGIN="${_sch}://${_rest##*@}"
-        ;;
-    esac
-    printf 'session-guard: --isolate: изолирую %q (origin: %q)\n' "$ISOLATE_BASE_DIR" "$ISOLATE_BASE_ORIGIN" >&2
+    # A remote URL can carry credentials in userinfo, path, query or fragment.
+    printf 'session-guard: --isolate: изолирую %q (remote: origin)\n' "$ISOLATE_BASE_DIR" >&2
     ISOLATE_STORE_DIR="$IWE_ROOT/.iwe-runtime/isolated-worktrees"
     mkdir -p "$ISOLATE_STORE_DIR"
     ISOLATE_STORE_DIR_REAL="$(realpath "$ISOLATE_STORE_DIR")"
@@ -1645,7 +1648,7 @@ if [ "$CMD" = "open" ]; then
           || fail "--isolate: git worktree add не удался" 1
       else
         # An explicit local commit is the offline path: no remote query here.
-        git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "$BASE_SHA" \
+        GIT_NO_LAZY_FETCH=1 git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "$BASE_SHA" \
           || fail "--isolate: git worktree add от --base-sha не удался" 1
       fi
       real=$(realpath "$ISOLATED_WORKTREE_PATH" 2>/dev/null || echo "$ISOLATED_WORKTREE_PATH")
