@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "cd0625711ad6a4af68759f9878e2c6e6db9664d571931044e590eb19bc27eec4"
+      "sha256": "529909cbcd9d82ad0a7b9ec8b5ab4c6fb02c397e4e30865332a9f045db635f7e"
     },
     {
       "path": "CLAUDE.md",
@@ -2281,7 +2281,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "0387f48ade1aa4a28a2bd60909b47bed1b1f62e5a846796d8dfc695bb472b630"
+      "sha256": "f7d256d6c7a31c4f60caf0739a425de64d53144deb1d3ca3a63a6175ad92b116"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3025,7 +3025,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "4aa5cfc3b50a8221a33540c85b6469ce86faa423414f69ba0c8cbe9d1f74479e"
+      "sha256": "340655b55260268ac3bc58e128ecf1939a1d210d946d451fd62f8bcef8822c0e"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3277,6 +3277,7 @@
     "scripts/tests/test_issue_989_snapshot_cross_api.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
+    "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",
