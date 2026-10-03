@@ -905,6 +905,30 @@ ${prompt}"
     return $rc
 }
 
+# Publish only owner-generated status. The private temporary file is renamed
+# into place, so a killed writer never exposes a partial counter (#1067).
+publish_week_review_status() {
+    local status_file="$1" outcome="$2" rc="$3" failed_runs="$4" status_tmp
+    if [ -e "$status_file" ] || [ -L "$status_file" ]; then
+        if [ ! -f "$status_file" ] || [ -L "$status_file" ]; then
+            log "ERROR: week-review status changed type: $status_file"
+            return 77
+        fi
+    fi
+    status_tmp=$(umask 077; mktemp "$LOG_DIR/.week-review-last-status.XXXXXX") || {
+        log "ERROR: cannot create week-review status record"
+        return 77
+    }
+    if ! printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" \
+        "$outcome" "$rc" "$failed_runs" > "$status_tmp" ||
+        ! mv "$status_tmp" "$status_file" ||
+        [ ! -f "$status_file" ] || [ -L "$status_file" ]; then
+        rm -f "$status_tmp"
+        log "ERROR: cannot publish week-review status record"
+        return 77
+    fi
+}
+
 # issue #866: retry transient auth failures and leave a recoverable record.
 run_claude_with_retry() {
     local command_file="$1"
@@ -920,7 +944,6 @@ run_claude_with_retry() {
     local status_file="$LOG_DIR/${command_file}-last-status"
     local week_review_failed_runs=0
     local stamped_at prior_outcome prior_rc prior_count extra
-    local status_tmp
 
     # The model's stdout is written to LOG_FILE. Count only outcomes published
     # by this process, never RECORDED/GAVE UP text found in that shared log.
@@ -930,19 +953,34 @@ run_claude_with_retry() {
             log "ERROR: week-review status is not a regular complete record: $status_file"
             return 77
         fi
-        if [ -n "$extra" ] || ! [[ "$prior_rc" =~ ^[0-9]+$ ]] ||
+        if [ -n "$extra" ] || ! [[ "$stamped_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]][0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] ||
+            ! [[ "$prior_rc" =~ ^[0-9]+$ ]] ||
             { [ "$prior_outcome" != SUCCESS ] && [ "$prior_outcome" != FAILED ]; }; then
             log "ERROR: malformed week-review status: $status_file"
             return 77
         fi
+        case "$prior_outcome:$prior_count" in
+            SUCCESS:|SUCCESS:0|FAILED:|FAILED:1|FAILED:2) ;;
+            *) log "ERROR: invalid week-review outcome/count: $status_file"; return 77 ;;
+        esac
         if [ "${stamped_at%% *}" = "$(date '+%Y-%m-%d')" ] && [ "$prior_outcome" = FAILED ]; then
-            # A three-field record is from the previous release: one real failed run.
-            prior_count=${prior_count:-1}
-            case "$prior_count" in
-                1|2) week_review_failed_runs=$prior_count ;;
-                *) log "ERROR: invalid week-review failed-run count: $status_file"; return 77 ;;
-            esac
+            # The previous release did not record whether this was failure #1
+            # or #2. Treat today's three-field FAILED as exhausted: automatic
+            # replay might otherwise become a third model call after upgrade.
+            prior_count=${prior_count:-2}
+            week_review_failed_runs=$prior_count
         fi
+    fi
+
+    if [ "$command_file" = week-review ]; then
+        # Reserve the attempt before invoking the model. If the final status
+        # write fails or this shell dies, count=2 still stops a third automatic
+        # run. A manual retry is allowed and success resets the count to zero.
+        if [ "$week_review_failed_runs" -lt "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
+            week_review_failed_runs=$((week_review_failed_runs + 1))
+        fi
+        publish_week_review_status "$status_file" FAILED 77 "$week_review_failed_runs" || return 77
+        WEEK_REVIEW_FAILED_RUNS=$week_review_failed_runs
     fi
 
     while [ "$attempt" -le "$max_attempts" ]; do
@@ -982,30 +1020,10 @@ run_claude_with_retry() {
     # fresh failure from a stale one.
     if [ "$command_file" = week-review ]; then
         if [ "$rc" -eq 0 ]; then
-            week_review_failed_runs=0
-        elif [ "$week_review_failed_runs" -lt "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
-            week_review_failed_runs=$((week_review_failed_runs + 1))
+            publish_week_review_status "$status_file" SUCCESS 0 0 || return 77
+        else
+            publish_week_review_status "$status_file" FAILED "$rc" "$week_review_failed_runs" || return 77
         fi
-        # A private temporary regular file plus rename prevents partial state
-        # and symlink writes. The scenario lock serializes owner writers.
-        if [ -e "$status_file" ] || [ -L "$status_file" ]; then
-            if [ ! -f "$status_file" ] || [ -L "$status_file" ]; then
-                log "ERROR: week-review status changed type: $status_file"
-                return 77
-            fi
-        fi
-        status_tmp=$(umask 077; mktemp "$LOG_DIR/.week-review-last-status.XXXXXX") || {
-            log "ERROR: cannot create week-review status record"
-            return 77
-        }
-        if ! printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" \
-            "$( [ "$rc" -eq 0 ] && echo SUCCESS || echo FAILED )" "$rc" "$week_review_failed_runs" > "$status_tmp" ||
-            ! mv "$status_tmp" "$status_file"; then
-            rm -f "$status_tmp"
-            log "ERROR: cannot publish week-review status record"
-            return 77
-        fi
-        WEEK_REVIEW_FAILED_RUNS=$week_review_failed_runs
     elif [ "$rc" -eq 0 ]; then
         printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "SUCCESS" "$rc" > "$status_file"
     else

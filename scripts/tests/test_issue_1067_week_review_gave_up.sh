@@ -64,6 +64,35 @@ if [ "$TEST_MODEL_MODE" = deliver ]; then
     git push -q origin HEAD:main || exit 1
 fi
 STUB
+cat > "$BIN/mv" <<'STUB'
+#!/usr/bin/env bash
+last_arg=""
+for arg in "$@"; do last_arg="$arg"; done
+if [ "$last_arg" = "$HOME/logs/strategist/week-review-last-status" ] &&
+    [ -n "${TEST_STATUS_MV_CALLS:-}" ]; then
+    calls=0
+    [ ! -f "$TEST_STATUS_MV_CALLS" ] || calls=$(cat "$TEST_STATUS_MV_CALLS")
+    calls=$((calls + 1))
+    printf '%s\n' "$calls" > "$TEST_STATUS_MV_CALLS"
+    if [ "$calls" -eq "${TEST_STATUS_MV_FAIL_AT:-0}" ]; then exit 1; fi
+fi
+exec /bin/mv "$@"
+STUB
+cat > "$BIN/mktemp" <<'STUB'
+#!/usr/bin/env bash
+case "${1:-}" in
+    "$HOME/logs/strategist/.week-review-last-status."*)
+        if [ -n "${TEST_STATUS_MKTEMP_CALLS:-}" ]; then
+            calls=0
+            [ ! -f "$TEST_STATUS_MKTEMP_CALLS" ] || calls=$(cat "$TEST_STATUS_MKTEMP_CALLS")
+            calls=$((calls + 1))
+            printf '%s\n' "$calls" > "$TEST_STATUS_MKTEMP_CALLS"
+            if [ "$calls" -ge "${TEST_STATUS_MKTEMP_FAIL_AT:-999999}" ]; then exit 1; fi
+        fi
+        ;;
+esac
+exec /usr/bin/mktemp "$@"
+STUB
 chmod +x "$BIN"/* "$TMP/iwe-scripts/session-guard.sh" "$TPL/roles/synchronizer/scripts/notify.sh"
 # The real macOS notifier must never run in this fixture.
 [ "$(PATH="$BIN:$PATH" command -v osascript)" = "$BIN/osascript" ] || {
@@ -202,5 +231,62 @@ for bad_state in symlink malformed; do
     check "$bad_state state does not call model" '[ ! -e "$TEST_MODEL_CALLS" ]'
 done
 check 'symlink target was not overwritten' '[ "$(cat "$TMP/status-sentinel")" = sentinel ]'
+
+# The second attempt is reserved before the model starts. Losing the final
+# atomic rename must leave count=2, so a later dispatch cannot run model #3.
+HOME="$TMP/mv-failure-home" TEST_MODEL_MODE=nothing
+TEST_MODEL_CALLS="$TMP/mv-failure-model-calls"
+TEST_STATUS_MV_CALLS="$TMP/status-mv-calls" TEST_STATUS_MV_FAIL_AT=4
+export TEST_STATUS_MV_CALLS TEST_STATUS_MV_FAIL_AT
+mkdir -p "$HOME/.local/state/exocortex"
+touch "$HOME/.local/state/exocortex/synchronizer-code-scan-$DAY"
+run_strategist || :
+run_scheduler || :
+run_scheduler || :
+mv_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
+check 'failed final rename cannot trigger model run three' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 2 ]'
+check 'final rename refusal was injected' '[ "$(cat "$TMP/status-mv-calls")" -eq 4 ]'
+check 'failed final rename leaves reserved cap' 'awk -F "\t" "NR==1 {exit !(\$2 == \"FAILED\" && \$4 == 2)}" "$HOME/logs/strategist/week-review-last-status"'
+check 'failed final rename leaves weekly marker absent' '[ ! -e "$mv_week_done" ]'
+unset TEST_STATUS_MV_FAIL_AT TEST_STATUS_MV_CALLS
+TEST_MODEL_MODE=deliver
+run_strategist || :
+run_scheduler || :
+check 'manual recovery remains available after rename failure' '[ -f "$mv_week_done" ]'
+
+# A failed reservation cannot start the next model call; retrying the
+# scheduler while the filesystem still refuses mktemp only repeats preflight.
+HOME="$TMP/mktemp-failure-home" TEST_MODEL_MODE=nothing
+TEST_MODEL_CALLS="$TMP/mktemp-failure-model-calls"
+TEST_STATUS_MKTEMP_CALLS="$TMP/status-mktemp-calls" TEST_STATUS_MKTEMP_FAIL_AT=3
+export TEST_STATUS_MKTEMP_CALLS TEST_STATUS_MKTEMP_FAIL_AT
+mkdir -p "$HOME/.local/state/exocortex"
+touch "$HOME/.local/state/exocortex/synchronizer-code-scan-$DAY"
+run_strategist || :
+run_scheduler || :
+run_scheduler || :
+mktemp_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
+check 'failed reservation never starts second model' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 1 ]'
+check 'reservation refusal persisted across dispatches' '[ "$(cat "$TMP/status-mktemp-calls")" -eq 4 ]'
+check 'failed reservation never sets weekly done' '[ ! -e "$mktemp_week_done" ]'
+unset TEST_STATUS_MKTEMP_FAIL_AT TEST_STATUS_MKTEMP_CALLS
+run_scheduler || :
+check 'after storage recovery second real attempt is possible' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 2 ]'
+
+# A v0.41.2 three-field FAILED record cannot distinguish one failed attempt
+# from two. An update in the middle of the day must not schedule a third.
+HOME="$TMP/legacy-status-home" TEST_MODEL_MODE=nothing
+TEST_MODEL_CALLS="$TMP/legacy-status-model-calls"
+mkdir -p "$HOME/logs/strategist" "$HOME/.local/state/exocortex"
+printf '%s 00:00:00\tFAILED\t70\n' "$DAY" > "$HOME/logs/strategist/week-review-last-status"
+touch "$HOME/.local/state/exocortex/synchronizer-code-scan-$DAY"
+run_scheduler || :
+legacy_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
+check 'legacy failed status pauses automatic replay' '[ ! -e "$TEST_MODEL_CALLS" ]'
+check 'legacy failed status never sets weekly done' '[ ! -e "$legacy_week_done" ]'
+legacy_manual_rc=0
+run_strategist || legacy_manual_rc=$?
+check 'legacy status still allows manual retry' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 1 ]'
+check 'failed manual retry after legacy cap returns 76' '[ "$legacy_manual_rc" -eq 76 ]'
 
 if [ "$failures" -eq 0 ]; then echo PASS; else echo "FAILED: $failures"; exit 1; fi

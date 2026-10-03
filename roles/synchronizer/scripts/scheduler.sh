@@ -168,7 +168,7 @@ week_review_exhausted_today() {
     IFS=$'\t' read -r stamped_at outcome rc failed_runs extra < "$status_file" || return 1
     [ -z "$extra" ] && [ "${stamped_at%% *}" = "$DATE" ] &&
         [ "$outcome" = FAILED ] && [[ "$rc" =~ ^[0-9]+$ ]] &&
-        [ "$failed_runs" = 2 ]
+        { [ "$failed_runs" = 2 ] || [ -z "$failed_runs" ]; }
 }
 
 # A manual retry can succeed after the cap. The next scheduler dispatch then

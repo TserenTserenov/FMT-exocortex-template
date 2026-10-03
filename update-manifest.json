@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "02fddf1a8642858d8efe3a145499e2b3541cdd802138ff05a2bb407d657cfd08"
+      "sha256": "7c2e1c90138afd2fbd0b0c6b0b4f968ca71d81ef0decc323aa83f3a3fdfde4df"
     },
     {
       "path": "CLAUDE.md",
@@ -1917,7 +1917,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "e02447a6ad8a997991e30870efe0947a79b34e34ce4ec153061f8d7b45e37753"
+      "sha256": "360cb9882854a073c3e8c8bdfd722b9e2ab796160cde4975dcb836aeebdedb90"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1981,7 +1981,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "d1d5b5e35c99187ba50bbb4ddc6c3d7dd45bc8d7dbbb597d3f0130ea91962477"
+      "sha256": "cc393b294052c6996c4dcfd7539b1b75760cde0fd0457e7938f3950452eac6f4"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
