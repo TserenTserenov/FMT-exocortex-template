@@ -94,8 +94,8 @@ try:
     os.replace(record + ".tmp", record)
 except BaseException:
     # The fault case overrides SystemRoot to break the production taskkill;
-    # test cleanup still needs the real Windows directory.
-    system_root = os.environ.get("WINDIR") or os.environ.get("SystemRoot")
+    # test cleanup uses the system directory captured before that override.
+    system_root = os.environ.get("TEST_REAL_SYSTEM_ROOT")
     taskkill = os.path.join(system_root, "System32", "taskkill.exe") if system_root else None
     for child in reversed(children):
         if child.poll() is None:
@@ -136,6 +136,7 @@ ACCESS = 0x00100000 | 0x0001  # SYNCHRONIZE | PROCESS_TERMINATE
 system_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
 if not system_root:
     raise RuntimeError("Windows system directory unavailable")
+os.environ["TEST_REAL_SYSTEM_ROOT"] = system_root
 TASKKILL = os.path.join(system_root, "System32", "taskkill.exe")
 
 def capture_tree(record, handles, owner):
