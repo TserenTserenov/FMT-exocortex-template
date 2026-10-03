@@ -23,28 +23,46 @@ iwe_systemd_user_bus_ok() {
 # per entry, running COMMAND on that schedule. Only the two calendar forms
 # this template's timer files actually use are handled — a general systemd
 # calendar-spec parser is unwarranted for 3 known unit files:
-#   "*-*-* HH:MM:SS"       -> "MM HH * * *"
-#   "<Dow> *-*-* HH:MM:SS" -> "MM HH * * <cron-dow>"
-# A timer with no OnCalendar (interval-based, e.g. OnUnitActiveSec) yields no
-# lines — callers with that shape supply their own literal cron schedule.
+#   "*-*-* H:MM:SS" or "*-*-* HH:MM:SS"       -> "MM HH * * *"
+#   "<Dow> *-*-* H:MM:SS" or "HH:MM:SS"       -> "MM HH * * <cron-dow>"
+# Interval-based timers have no OnCalendar; callers with that shape supply
+# their own literal cron schedule rather than asking this parser to guess.
 iwe_timer_to_cron_lines() {
   local timer_file="$1" cmd="$2"
-  local spec dow_num hh mm
-  while IFS= read -r spec; do
-    if [[ "$spec" =~ ^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\ \*-\*-\*\ ([0-9]{2}):([0-9]{2}):00$ ]]; then
+  local line spec dow_num hh mm hour minute cron_line
+  local cron_lines=()
+  [ -f "$timer_file" ] || { echo "ERROR: timer не найден: $timer_file" >&2; return 1; }
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in OnCalendar=*) spec=${line#OnCalendar=} ;; *) continue ;; esac
+    if [[ "$spec" =~ ^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\ \*-\*-\*\ ([0-9]{1,2}):([0-9]{2}):00$ ]]; then
       case "${BASH_REMATCH[1]}" in
         Sun) dow_num=0 ;; Mon) dow_num=1 ;; Tue) dow_num=2 ;; Wed) dow_num=3 ;;
         Thu) dow_num=4 ;; Fri) dow_num=5 ;; Sat) dow_num=6 ;;
       esac
       hh="${BASH_REMATCH[2]}"; mm="${BASH_REMATCH[3]}"
-      printf '%s %s * * %s %s\n' "$((10#$mm))" "$((10#$hh))" "$dow_num" "$cmd"
-    elif [[ "$spec" =~ ^\*-\*-\*\ ([0-9]{2}):([0-9]{2}):00$ ]]; then
+      hour=$((10#$hh)); minute=$((10#$mm))
+      [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || {
+        echo "ERROR: недопустимое OnCalendar='$spec' в $timer_file" >&2; return 1;
+      }
+      printf -v cron_line '%s %s * * %s %s' "$minute" "$hour" "$dow_num" "$cmd"
+      cron_lines+=("$cron_line")
+    elif [[ "$spec" =~ ^\*-\*-\*\ ([0-9]{1,2}):([0-9]{2}):00$ ]]; then
       hh="${BASH_REMATCH[1]}"; mm="${BASH_REMATCH[2]}"
-      printf '%s %s * * *  %s\n' "$((10#$mm))" "$((10#$hh))" "$cmd"
+      hour=$((10#$hh)); minute=$((10#$mm))
+      [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || {
+        echo "ERROR: недопустимое OnCalendar='$spec' в $timer_file" >&2; return 1;
+      }
+      printf -v cron_line '%s %s * * *  %s' "$minute" "$hour" "$cmd"
+      cron_lines+=("$cron_line")
     else
-      echo "  WARN: iwe_timer_to_cron_lines не понял OnCalendar='$spec' в $timer_file, эта отметка пропущена" >&2
+      echo "ERROR: iwe_timer_to_cron_lines не понял OnCalendar='$spec' в $timer_file" >&2
+      return 1
     fi
-  done < <(grep '^OnCalendar=' "$timer_file" | sed 's/^OnCalendar=//')
+  done < "$timer_file"
+  [ "${#cron_lines[@]}" -gt 0 ] || {
+    echo "ERROR: нет OnCalendar в $timer_file" >&2; return 1;
+  }
+  printf '%s\n' "${cron_lines[@]}"
 }
 
 # iwe_cron_env_prefix — env-var assignments to prepend to a cron command line.
@@ -77,10 +95,29 @@ iwe_install_cron_fallback() {
   fi
 
   local sentinel="$1"; shift
+  [ "$#" -gt 0 ] || { echo "ERROR: пустое cron-расписание для $sentinel" >&2; return 1; }
+  local line
+  for line in "$@"; do
+    [ -n "$line" ] || { echo "ERROR: пустая cron-строка для $sentinel" >&2; return 1; }
+  done
   local begin="# BEGIN IWE-$sentinel (cron fallback, issue #454)"
   local end="# END IWE-$sentinel"
-  local kept
-  kept="$(crontab -l 2>/dev/null | awk -v b="$begin" -v e="$end" '
+  local current kept
+  if ! current=$(crontab -l 2>&1); then
+    case "$current" in
+      *'no crontab for '*) current="" ;;
+      *) echo "ERROR: не удалось прочитать crontab; расписание не изменено" >&2; return 1 ;;
+    esac
+  fi
+  if ! printf '%s\n' "$current" | awk -v b="$begin" -v e="$end" '
+    $0==b { if (inside || seen) bad=1; inside=1; seen++; next }
+    $0==e { if (!inside) bad=1; inside=0; next }
+    END { if (inside || bad) exit 1 }
+  '; then
+    echo "ERROR: повреждён или продублирован cron-блок $sentinel; расписание не изменено" >&2
+    return 1
+  fi
+  kept="$(printf '%s\n' "$current" | awk -v b="$begin" -v e="$end" '
     $0==b {skip=1; next} $0==e {skip=0; next} skip!=1 {print}
   ')"
   {

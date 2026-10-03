@@ -618,6 +618,11 @@ jobs:
       - name: Run update.sh edge-case regression tests (T1-T26)
         run: bash setup/test-update-edge-cases.sh
 
+      # issue #1039: a Linux role update may refresh only the schedule owned by
+      # this installation; disabled timers and foreign cron blocks stay intact.
+      - name: Run Linux scheduler update ownership test
+        run: bash setup/test-update-linux-scheduler.sh
+
       # issue #226: тест лежал в репо с 6 июля, ни разу не был подключён к CI —
       # найдено 2026-08-10 при аудите конвейера доставки (WP-7 Ф62). E2E smoke на
       # 3 фиксах реального инцидента (конфликт CLAUDE.md при merge, repair-pass

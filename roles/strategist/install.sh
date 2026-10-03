@@ -41,8 +41,9 @@ for plist_check in "$LAUNCHD_DIR/com.strategist.morning.plist" "$LAUNCHD_DIR/com
     fi
 done
 
-# Skip on non-macOS or headless CI without launchctl
-if ! command -v launchctl >/dev/null 2>&1; then
+# Linux must take the systemd/cron path even if a launchctl binary happens to
+# be present on PATH (for example in a shared tooling image).
+if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; then
     if [[ "$(uname -s)" == "Linux" ]]; then
         if [ -n "${SETUP_CI:-}" ]; then
             echo "  ⊠ SETUP_CI: systemd activation skipped for $ROLE_NAME"
@@ -74,20 +75,22 @@ if ! command -v launchctl >/dev/null 2>&1; then
         if ! iwe_systemd_user_bus_ok; then
             echo "  ⚠ systemd --user недоступен (нет пользовательской сессионной шины — типично для WSL2/контейнера/сервера без активного логина)"
             echo "  Installing $ROLE_NAME via cron fallback (issue #454)..."
-            # WP-529 Ф9 (Evgenii 20.08): mapfile is bash4-only — this branch is
-            # exactly the one macOS (stock /bin/bash 3.2, no systemd) takes,
-            # so the previous line silently crashed the cron-fallback install
-            # on the platform it exists to serve.
-            cron_lines=()
-            while IFS= read -r cron_line; do
-                cron_lines+=("$cron_line")
-            done < <(
-                iwe_timer_to_cron_lines "$SYSTEMD_SRC/iwe-strategist-morning.timer" \
-                    "$(iwe_cron_env_prefix) $SCRIPT_TARGET morning >> $HOME/logs/strategist/cron-morning.log 2>&1"
-                iwe_timer_to_cron_lines "$SYSTEMD_SRC/iwe-strategist-weekreview.timer" \
-                    "$(iwe_cron_env_prefix) $SCRIPT_TARGET week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1"
-            )
-            iwe_install_cron_fallback "strategist" "${cron_lines[@]}"
+            # Command substitution preserves each conversion's exit status;
+            # process substitution used here before #1039 hid parser failures
+            # and could install only one of the two required jobs.
+            if ! morning_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-strategist-morning.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPT_TARGET morning >> $HOME/logs/strategist/cron-morning.log 2>&1"); then
+                echo "ERROR: утреннее cron-расписание не собрано; crontab не изменён" >&2
+                exit 2
+            fi
+            if ! week_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-strategist-weekreview.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPT_TARGET week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1"); then
+                echo "ERROR: недельное cron-расписание не собрано; crontab не изменён" >&2
+                exit 2
+            fi
+            iwe_install_cron_fallback "strategist" "$morning_lines" "$week_lines"
             echo "  ✓ Installed via crontab. Verify: crontab -l | grep strategist.sh"
             echo "  ✓ Logs: ~/logs/strategist/"
             exit 0
@@ -103,10 +106,26 @@ if ! command -v launchctl >/dev/null 2>&1; then
         # это отличает «выключено» от «ещё не установлено»). Безусловный re-enable
         # при каждом апдейте роли отменял бы выбор пользователя молча.
         for unit in iwe-strategist-morning iwe-strategist-weekreview; do
-            if [ "$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)" = "disabled" ]; then
-                echo "  ⊘ $unit.timer — disabled by user, пропускаю (systemctl --user enable --now $unit.timer, чтобы включить обратно)"
+            # A mask may be a symlink to /dev/null; never copy through it or
+            # reactivate a timer the user deliberately stopped.
+            if [ -L "$SYSTEMD_USER_DIR/$unit.service" ] || [ -L "$SYSTEMD_USER_DIR/$unit.timer" ]; then
+                echo "  ⊘ $unit.timer — unit is a symlink, пропускаю"
                 continue
             fi
+            case "$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)" in
+                disabled|masked|masked-runtime)
+                    echo "  ⊘ $unit.timer — disabled or masked by user, пропускаю (systemctl --user enable --now $unit.timer, чтобы включить обратно)"
+                    continue
+                    ;;
+            esac
+            for unit_file in "$unit.service" "$unit.timer"; do
+                if [ -f "$SYSTEMD_USER_DIR/$unit_file" ] &&
+                   ! cmp -s "$SYSTEMD_USER_DIR/$unit_file" "$SYSTEMD_SRC/$unit_file"; then
+                    backup="$SYSTEMD_USER_DIR/$unit_file.bak-$(date +%Y%m%dT%H%M%S)"
+                    cp -p "$SYSTEMD_USER_DIR/$unit_file" "$backup"
+                    echo "  ⚠ $unit_file отличается от шаблона — старая версия сохранена в $(basename "$backup")"
+                fi
+            done
             cp "$SYSTEMD_SRC/$unit.service" "$SYSTEMD_SRC/$unit.timer" "$SYSTEMD_USER_DIR/"
             systemctl --user daemon-reload
             systemctl --user enable --now "$unit.timer"

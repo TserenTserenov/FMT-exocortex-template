@@ -5497,17 +5497,243 @@ fi
 # потом install.sh каждой роли (чтение из свежего runtime).
 run_build_runtime_or_die
 
+# Linux scheduler ownership is checked immediately before touching the user's
+# systemd units or crontab. A secondary workspace must never claim the primary
+# installation's schedule, and a missing schedule is not proof of ownership.
+linux_systemd_strategist_owned() {
+    local unit root count current_root service timer expected_command
+    current_root="$(canonical_workspace_path "$WORKSPACE_DIR")"
+    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+        service="$HOME/.config/systemd/user/$unit.service"
+        timer="$HOME/.config/systemd/user/$unit.timer"
+        [ -f "$service" ] && [ -f "$timer" ] || return 1
+        [ ! -L "$service" ] && [ ! -L "$timer" ] || return 1
+        [ ! -e "$service.d" ] && [ ! -e "$timer.d" ] || return 1
+        ! grep -q '^EnvironmentFile=' "$service" || return 1
+        count=$(grep -c '^Environment=IWE_WORKSPACE=' "$service" || true)
+        [ "$count" -eq 1 ] || return 1
+        root=$(sed -n 's/^Environment=IWE_WORKSPACE=//p' "$service")
+        [ "$(canonical_workspace_path "$root")" = "$current_root" ] || return 1
+        count=$(grep -c '^Unit=' "$timer" || true)
+        [ "$count" -eq 1 ] && grep -Fxq "Unit=$unit.service" "$timer" || return 1
+        expected_command="$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/strategist.sh"
+        count=$(grep -c '^ExecStart=' "$service" || true)
+        [ "$count" -eq 1 ] || return 1
+        case "$unit" in
+            iwe-strategist-morning) grep -Fxq "ExecStart=$expected_command morning" "$service" || return 1 ;;
+            iwe-strategist-weekreview) grep -Fxq "ExecStart=$expected_command week-review" "$service" || return 1 ;;
+        esac
+    done
+}
+
+linux_cron_strategist_owned() {
+    local cron_text expected_prefix expected_command begin end line
+    local minute hour day month weekday command
+    local inside=false begins=0 ends=0 morning=0 weekreview=0
+    command -v crontab >/dev/null 2>&1 || return 1
+    cron_text=$(crontab -l 2>/dev/null) || return 1
+    [ -f "$SCRIPT_DIR/roles/lib/scheduler-cron.sh" ] || return 1
+    # This helper defines the exact prefix written by the role installer.
+    # A partially edited block is left untouched for manual reconciliation.
+    . "$SCRIPT_DIR/roles/lib/scheduler-cron.sh"
+    expected_prefix=$(IWE_TEMPLATE="$SCRIPT_DIR" \
+        IWE_WORKSPACE="$WORKSPACE_DIR" \
+        IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+        IWE_GOVERNANCE_REPO="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
+        iwe_cron_env_prefix)
+    expected_command="$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/strategist.sh"
+    begin='# BEGIN IWE-strategist (cron fallback, issue #454)'
+    end='# END IWE-strategist'
+    while IFS= read -r line; do
+        case "$line" in
+            "$begin")
+                if $inside || [ "$begins" -ne 0 ]; then return 1; fi
+                inside=true
+                begins=$((begins + 1))
+                ;;
+            "$end")
+                if ! $inside; then return 1; fi
+                inside=false
+                ends=$((ends + 1))
+                ;;
+            *)
+                if $inside; then
+                    case "$line" in *'#'*|'') return 1 ;; esac
+                    read -r minute hour day month weekday command <<EOF
+$line
+EOF
+                    [ -n "$command" ] || return 1
+                    case "$command" in
+                        "$expected_prefix $expected_command morning >> $HOME/logs/strategist/cron-morning.log 2>&1")
+                            morning=$((morning + 1)) ;;
+                        "$expected_prefix $expected_command week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1")
+                            weekreview=$((weekreview + 1)) ;;
+                        *) return 1 ;;
+                    esac
+                else
+                    case "$line" in
+                        \#*|'') ;;
+                        *strategist.sh*) return 1 ;;
+                    esac
+                fi
+                ;;
+        esac
+    done <<EOF
+$cron_text
+EOF
+    ! $inside && [ "$begins" -eq 1 ] && [ "$ends" -eq 1 ] &&
+        [ "$morning" -eq 1 ] && [ "$weekreview" -eq 1 ]
+}
+
+reinstall_linux_strategist() {
+    local systemd_dir="$HOME/.config/systemd/user" cron_text="" systemd_found=false cron_found=false
+    local role_dir="$SCRIPT_DIR/roles/strategist" unit state active_units=()
+    local cron_backup_dir cron_backup
+
+    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+        if [ -e "$systemd_dir/$unit.service" ] || [ -L "$systemd_dir/$unit.service" ] ||
+           [ -e "$systemd_dir/$unit.timer" ] || [ -L "$systemd_dir/$unit.timer" ]; then
+            systemd_found=true
+        fi
+    done
+    if ! command -v crontab >/dev/null 2>&1; then
+        echo "  ○ Linux-расписание Стратега не изменено: crontab недоступен, отсутствие второго расписания не подтверждено"
+        return 0
+    fi
+    if ! cron_text=$(crontab -l 2>&1); then
+        case "$cron_text" in
+            *'no crontab for '*) cron_text="" ;;
+            *)
+                echo "  ○ Linux-расписание Стратега не изменено: не удалось прочитать crontab"
+                return 0
+                ;;
+        esac
+    fi
+    if printf '%s\n' "$cron_text" | grep -Eq '^# (BEGIN|END) IWE-strategist( |$)|^[[:space:]]*[^#[:space:]].*strategist\.sh'; then
+        cron_found=true
+    fi
+
+    if $HOST_GLOBAL_OWNER_CONFLICT; then
+        echo "  ○ Linux-расписание Стратега не изменено: $HOST_GLOBAL_OWNER_CONFLICT_REASON"
+        return 0
+    fi
+    if $systemd_found && $cron_found; then
+        echo "  ○ Linux-расписание Стратега не изменено: найдены и systemd, и cron; выберите один вручную"
+        return 0
+    fi
+    if $systemd_found; then
+        if ! command -v systemctl >/dev/null 2>&1 ||
+           ! systemctl --user list-timers --no-legend >/dev/null 2>&1; then
+            echo "  ○ Linux-расписание Стратега не изменено: нет пользовательской шины systemd; переход на cron требует ручного решения"
+            return 0
+        fi
+        if ! linux_systemd_strategist_owned; then
+            echo "  ○ Linux-расписание Стратега не изменено: владелец systemd units не подтверждён"
+            return 0
+        fi
+        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+            state=$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)
+            case "$state" in
+                disabled|masked|masked-runtime) continue ;;
+                enabled) ;;
+                *)
+                    echo "  ○ Linux-расписание Стратега не изменено: неизвестное состояние $unit.timer ($state)"
+                    return 0
+                    ;;
+            esac
+            if [ "$(systemctl --user is-active "$unit.timer" 2>/dev/null || true)" != active ]; then
+                echo "  ○ Linux-расписание Стратега не изменено: $unit.timer включён, но остановлен; запуск требует ручного решения"
+                return 0
+            fi
+            active_units+=("$unit.timer")
+        done
+        if [ "${#active_units[@]}" -eq 0 ]; then
+            echo "  ○ Linux-расписание Стратега отключено пользователем; автоматическая переустановка пропущена"
+            return 0
+        fi
+    elif $cron_found; then
+        if command -v systemctl >/dev/null 2>&1 &&
+           systemctl --user list-timers --no-legend >/dev/null 2>&1; then
+            echo "  ○ Linux-расписание Стратега не изменено: cron установлен при доступном systemd; переход требует ручного решения"
+            return 0
+        fi
+        if ! linux_cron_strategist_owned; then
+            echo "  ○ Linux-расписание Стратега не изменено: владелец cron-блока не подтверждён или задание отключено"
+            return 0
+        fi
+        cron_backup_dir="$HOME/.local/state/iwe/cron-backups"
+        mkdir -p -m 700 "$cron_backup_dir"
+        chmod 700 "$cron_backup_dir"
+        if ! cron_backup=$(mktemp "$cron_backup_dir/strategist.XXXXXXXX"); then
+            echo "  ⚠ Стратег: не удалось создать резервную копию crontab" >&2
+            return 1
+        fi
+        chmod 600 "$cron_backup"
+        if ! crontab -l > "$cron_backup"; then
+            rm -f "$cron_backup"
+            echo "  ⚠ Стратег: не удалось сохранить crontab перед обновлением" >&2
+            return 1
+        fi
+        echo "  • Предыдущее расписание cron сохранено: $cron_backup"
+    else
+        echo "  ○ Linux-расписание Стратега не найдено; автоматическая установка без доказательства владения пропущена"
+        return 0
+    fi
+
+    if ! IWE_WORKSPACE="$WORKSPACE_DIR" \
+         IWE_TEMPLATE="$SCRIPT_DIR" \
+         IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
+         IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+         IWE_GOVERNANCE_REPO="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
+         bash "$role_dir/install.sh"; then
+        echo "  ⚠ Стратег: переустановка расписания не завершена; проверьте её вручную"
+        return 1
+    fi
+    if $systemd_found; then
+        for unit in "${active_units[@]}"; do
+            if ! systemctl --user restart "$unit"; then
+                echo "  ⚠ $unit: новое время не применено; перезапустите таймер вручную"
+                return 1
+            fi
+        done
+    fi
+    echo "  ✓ Стратег: Linux-расписание обновлено"
+}
+
+print_optional_linux_role_instruction() {
+    local role="$1" display="$2"
+    printf '  ○ %s: если расписание установлено вручную, обновите его: ' "$display"
+    printf 'IWE_WORKSPACE=%q IWE_TEMPLATE=%q IWE_RUNTIME=%q IWE_SCRIPTS=%q IWE_GOVERNANCE_REPO=%q bash %q\n' \
+        "$WORKSPACE_DIR" "$SCRIPT_DIR" "$WORKSPACE_DIR/.iwe-runtime" \
+        "$SCRIPT_DIR/scripts" "${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
+        "$SCRIPT_DIR/roles/$role/install.sh"
+}
+
 # Reinstall roles if changed (ПОСЛЕ build-runtime — install читает из свежего .iwe-runtime/)
 ROLES_CHANGED=false
+STRATEGIST_CHANGED=false
+SYNCHRONIZER_CHANGED=false
+EXTRACTOR_CHANGED=false
 for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
     case "$f" in roles/*)
         ROLES_CHANGED=true
-        break
+        ;;
+    esac
+    case "$f" in roles/strategist/*|roles/lib/*)
+        STRATEGIST_CHANGED=true
+        ;;
+    esac
+    case "$f" in roles/synchronizer/*|roles/lib/*)
+        SYNCHRONIZER_CHANGED=true
+        ;;
+    esac
+    case "$f" in roles/extractor/*|roles/lib/*)
+        EXTRACTOR_CHANGED=true
         ;;
     esac
 done
 
-if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
+if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/null 2>&1; then
     # issue #768: role installers register real launchd jobs under the
     # current user's real $HOME — a foreign/unowned host-global state must
     # not have those jobs reloaded pointing at this copy.
@@ -5537,6 +5763,22 @@ if $ROLES_CHANGED && command -v launchctl >/dev/null 2>&1; then
                 echo "  ○ $(basename "$role_dir"): переустановите вручную"
         fi
     done
+    fi
+fi
+
+if [ "$(uname -s)" = Linux ] && ! $CHECK_ONLY && [ -z "${SETUP_CI:-}" ]; then
+    if $STRATEGIST_CHANGED; then
+        echo ""
+        echo "Роли обновлены. Проверка Linux-расписания..."
+        reinstall_linux_strategist
+    fi
+    # These roles have auto:false. Updating their files must not silently
+    # activate an optional scheduler that the user installed only by choice.
+    if $SYNCHRONIZER_CHANGED; then
+        print_optional_linux_role_instruction synchronizer Синхронизатор
+    fi
+    if $EXTRACTOR_CHANGED; then
+        print_optional_linux_role_instruction extractor Экстрактор
     fi
 fi
 

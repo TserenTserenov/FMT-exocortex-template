@@ -47,8 +47,8 @@ if [ -d "$SCRIPTS_DIR_RUNTIME" ]; then
     chmod +x "$SCRIPTS_DIR_RUNTIME/templates/"*.sh 2>/dev/null || true
 fi
 
-# Skip on non-macOS or headless CI without launchctl
-if ! command -v launchctl >/dev/null 2>&1; then
+# Linux uses systemd/cron even if a launchctl binary is present on PATH.
+if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; then
     if [[ "$(uname -s)" == "Linux" ]]; then
         if [ -n "${SETUP_CI:-}" ]; then
             echo "  ⊠ SETUP_CI: systemd activation skipped for $ROLE_NAME"
@@ -83,16 +83,13 @@ if ! command -v launchctl >/dev/null 2>&1; then
         if ! iwe_systemd_user_bus_ok; then
             echo "  ⚠ systemd --user недоступен (нет пользовательской сессионной шины — типично для WSL2/контейнера/сервера без активного логина)"
             echo "  Installing $ROLE_NAME via cron fallback (issue #454)..."
-            # WP-529 Ф9 (Evgenii 20.08): mapfile is bash4-only — this branch is
-            # exactly the one macOS (stock /bin/bash 3.2, no systemd) takes,
-            # so the previous line silently crashed the cron-fallback install
-            # on the platform it exists to serve.
-            cron_lines=()
-            while IFS= read -r cron_line; do
-                cron_lines+=("$cron_line")
-            done < <(iwe_timer_to_cron_lines "$SYSTEMD_SRC/iwe-exocortex-scheduler.timer" \
-                "$(iwe_cron_env_prefix) $SCRIPTS_DIR_RUNTIME/scheduler.sh dispatch >> $HOME/logs/synchronizer/cron-scheduler.log 2>&1")
-            iwe_install_cron_fallback "synchronizer" "${cron_lines[@]}"
+            if ! cron_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-exocortex-scheduler.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPTS_DIR_RUNTIME/scheduler.sh dispatch >> $HOME/logs/synchronizer/cron-scheduler.log 2>&1"); then
+                echo "ERROR: cron-расписание Синхронизатора не собрано; crontab не изменён" >&2
+                exit 2
+            fi
+            iwe_install_cron_fallback "synchronizer" "$cron_lines"
             echo "  ✓ Installed via crontab. Verify: crontab -l | grep scheduler.sh"
             echo "  ✓ Logs: ~/logs/synchronizer/cron-scheduler.log"
             exit 0

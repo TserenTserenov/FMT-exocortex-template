@@ -1761,7 +1761,7 @@
     },
     {
       "path": "roles/lib/scheduler-cron.sh",
-      "sha256": "60fb686703ef17d480cfabb4c9f266b3c8256ddda780e87d0020711f607c6037"
+      "sha256": "66cc781144c2ffe931024d081c3b229d6316654d17ada429262944bad4148f0c"
     },
     {
       "path": "roles/role-boundaries.md",
@@ -1773,7 +1773,7 @@
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "ad8def2736fcbcba78a8f4313f9eac9f0d65387011c2e37b7a3d908351953842"
+      "sha256": "ee03b558d41d5a0aebcdd081e2f21b690f1e4fadeec7483ac549e6c400a05e80"
     },
     {
       "path": "roles/strategist/prompts/add-wp.md",
@@ -1941,7 +1941,7 @@
     },
     {
       "path": "roles/synchronizer/install.sh",
-      "sha256": "a2deb61e38527f67f3647d3ba2ecda52a82ec6bab6dd5610197ff1538e3e13b3"
+      "sha256": "5810596d0d989a996a9b2e4e4d8413da78e90fd83df9304c21192ff4efb71ab2"
     },
     {
       "path": "roles/synchronizer/role.yaml",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "fc6eefd122ff2cb9d688d9e24bba3bfa528b5722c66c9686e233b5005566f0af"
+      "sha256": "b5bdbb82cbc7190135f110df434972e4e0c750d7060d5ea028194f0cb61fef16"
     }
   ],
   "excluded_paths": [
@@ -3347,6 +3347,7 @@
     "setup/test-update-edge-cases.sh",
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
