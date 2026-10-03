@@ -160,7 +160,9 @@ for label in com.strategist.morning com.strategist.weekreview; do
         echo "  ⊘ $label — disabled by user (найден $label.plist.disabled), пропускаю"
         continue
     fi
-    launchctl unload "$TARGET_DIR/$label.plist" 2>/dev/null || true
+    if [ -z "${SETUP_CI:-}" ]; then
+        launchctl unload "$TARGET_DIR/$label.plist" 2>/dev/null || true
+    fi
     # issue #725: безусловный cp стирал ручную правку пользователя (например,
     # ограничение Weekday) без предупреждения и бэкапа при каждом update.sh —
     # backup+warn выбран вместо skip-if-diverged (пир-сессия с Codex,

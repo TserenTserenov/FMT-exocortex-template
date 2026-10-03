@@ -120,8 +120,10 @@ fi
 
 mkdir -p "$(dirname "$PLIST_DST")"
 
-# Выгружаем старый агент (если есть)
-launchctl unload "$PLIST_DST" 2>/dev/null || true
+# SETUP_CI installs files only: unloading a host agent is still a global write.
+if [ -z "${SETUP_CI:-}" ]; then
+    launchctl unload "$PLIST_DST" 2>/dev/null || true
+fi
 
 # Копируем plist
 cp "$PLIST_SRC" "$PLIST_DST"

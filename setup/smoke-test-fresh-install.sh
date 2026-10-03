@@ -45,6 +45,39 @@ SMOKE_GOVERNANCE_REPO="${SMOKE_GOVERNANCE_REPO:-DS-strategy}"
 SMOKE_CLEAN_PATH="/usr/bin:/bin"
 [ -d /run/current-system/sw/bin ] && SMOKE_CLEAN_PATH="$SMOKE_CLEAN_PATH:/run/current-system/sw/bin"
 
+# boundary-guard.sh owns a private deny prefix for service-manager calls. Keep
+# it first when this smoke deliberately resets PATH (including its env -i
+# subprocesses); otherwise the smoke could reach the host manager directly.
+if [ -n "${IWE_REDTEAM_SERVICE_BIN:-}" ]; then
+    case "$IWE_REDTEAM_SERVICE_BIN" in
+        "${IWE_REDTEAM_FIXTURE_ROOT:-}/.iwe-redteam-service-bin."*) ;;
+        *) echo "ERROR: invalid Red Team service-manager deny prefix" >&2; exit 1 ;;
+    esac
+    [ -d "$IWE_REDTEAM_SERVICE_BIN" ] || {
+        echo "ERROR: Red Team service-manager deny prefix missing" >&2
+        exit 1
+    }
+    # The smoke normally chooses a sibling /tmp directory. Under the guard,
+    # keep all generated installation files inside the declared fixture.
+    TEST_WS="$IWE_REDTEAM_FIXTURE_ROOT/smoke-$$"
+    SMOKE_CLEAN_PATH="$IWE_REDTEAM_SERVICE_BIN:$SMOKE_CLEAN_PATH"
+    for manager in launchctl systemctl crontab; do
+        resolved=$(PATH="$SMOKE_CLEAN_PATH" command -v "$manager" 2>/dev/null || true)
+        case "$resolved" in
+            ""|"$IWE_REDTEAM_SERVICE_BIN/$manager") ;;
+            *) echo "ERROR: smoke PATH bypasses the $manager deny shim" >&2; exit 1 ;;
+        esac
+    done
+fi
+
+# Calibration probes this exact PATH construction without running setup. A
+# nonzero status prevents a path-only probe from being mistaken for smoke PASS.
+if [ "${SMOKE_GUARD_PATH_PROBE:-}" = "1" ]; then
+    printf 'SMOKE_GUARDED_PATH=%s\n' "$SMOKE_CLEAN_PATH"
+    printf 'SMOKE_GUARDED_WORKSPACE=%s\n' "$TEST_WS"
+    exit 77
+fi
+
 # E2E sections replace HOME so setup cannot touch the caller's real dotfiles.
 # On macOS CI, PyYAML can live in the original HOME's user-site; changing HOME
 # would otherwise make the already-verified dependency disappear mid-test and

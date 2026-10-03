@@ -124,11 +124,13 @@ fi
 
 mkdir -p "$(dirname "$PLIST_DST")"
 
-# Выгружаем старые агенты
-launchctl unload "$PLIST_DST" 2>/dev/null || true
-# Выгружаем также legacy Стратег-агенты (если были)
-launchctl unload "$HOME/Library/LaunchAgents/com.strategist.morning.plist" 2>/dev/null || true
-launchctl unload "$HOME/Library/LaunchAgents/com.strategist.weekreview.plist" 2>/dev/null || true
+# SETUP_CI installs files only: unloading a host agent is still a global write.
+if [ -z "${SETUP_CI:-}" ]; then
+    # Выгружаем старые агенты и legacy Стратег-агенты (если были)
+    launchctl unload "$PLIST_DST" 2>/dev/null || true
+    launchctl unload "$HOME/Library/LaunchAgents/com.strategist.morning.plist" 2>/dev/null || true
+    launchctl unload "$HOME/Library/LaunchAgents/com.strategist.weekreview.plist" 2>/dev/null || true
+fi
 
 # Создаём директории состояния
 mkdir -p "$HOME/.local/state/exocortex"

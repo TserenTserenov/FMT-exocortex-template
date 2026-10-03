@@ -115,7 +115,168 @@ if [ "$leak" = "clean" ]; then
 else
   bad "guard leaked IWE_ROOT into the command (got: '$leak')"
 fi
+ci_mode=$(IWE_REDTEAM_FIXTURE_ROOT="$tmp_ok" bash "$GUARD" -- sh -c 'printf "%s" "$SETUP_CI"' 2>/dev/null)
+if [ "$ci_mode" = "1" ]; then
+  pass "guard forces SETUP_CI=1 inside the disposable fixture"
+else
+  bad "guard did not prevent service activation through SETUP_CI (got: '$ci_mode')"
+fi
+IWE_REDTEAM_FIXTURE_ROOT="$tmp_ok" bash "$GUARD" -- sh -c 'exit 42' 2>/dev/null
+child_rc=$?
+if [ "$child_rc" -eq 42 ]; then
+  pass "guard preserves an ordinary child failure without service calls"
+else
+  bad "guard changed an ordinary child failure (got: $child_rc, want: 42)"
+fi
 rm -rf "$tmp_ok"
+
+# --- guard: service managers are denied, even when a child swallows failure ---
+# The caller's PATH contains only test stubs for these names. A regression can
+# reach the external-hit marker but can never reach a real host manager.
+service_run=$(mk) || { bad "mktemp -d failed"; exit 1; }
+service_abs=$(cd "$service_run" && pwd -P)
+mkdir -p "$service_run/external-bin"
+for manager in launchctl systemctl crontab; do
+  # shellcheck disable=SC2016 # Variables expand in the test stub.
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'printf "%s\n" "$0" >> "$HOME/external-hit"' \
+    'exit 97' > "$service_run/external-bin/$manager"
+  chmod 700 "$service_run/external-bin/$manager"
+done
+service_path="$service_run/external-bin:$PATH"
+for manager in launchctl systemctl crontab; do
+  PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+    bash "$GUARD" -- "$manager" test > "$service_run/$manager.out" 2>&1
+  rc=$?
+  if [ "$rc" -eq 3 ] && grep -q 'boundary-guard: BLOCKED' "$service_run/$manager.out" &&
+     grep -q "^$manager$" "$service_run"/.iwe-redteam-service-bin.*/blocked-calls &&
+     [ ! -e "$service_run/external-hit" ]; then
+    pass "guard denies direct $manager without reaching caller stub"
+  else
+    bad "guard direct $manager escaped or used wrong status (rc=$rc)"
+  fi
+done
+
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c \
+    'launchctl unload "$HOME/test.plist" >/dev/null 2>&1 || true; printf child-ok' \
+  > "$service_run/swallowed.out" 2> "$service_run/swallowed.err"
+rc=$?
+if [ "$rc" -eq 3 ] && [ "$(cat "$service_run/swallowed.out")" = "child-ok" ] &&
+   grep -q 'boundary-guard: BLOCKED' "$service_run/swallowed.err" &&
+   [ ! -e "$service_run/external-hit" ]; then
+  pass "guard reports a swallowed nested launchctl call"
+else
+  bad "guard lost a swallowed nested launchctl call (rc=$rc)"
+fi
+
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c \
+    'env -i PATH="$PATH" HOME="$HOME" sh -c "systemctl --user list-timers >/dev/null 2>&1 || true; crontab -l >/dev/null 2>&1 || true"; printf child-ok' \
+  > "$service_run/env-i.out" 2> "$service_run/env-i.err"
+rc=$?
+if [ "$rc" -eq 3 ] && [ "$(cat "$service_run/env-i.out")" = "child-ok" ] &&
+   grep -q 'boundary-guard: BLOCKED' "$service_run/env-i.err" &&
+   [ ! -e "$service_run/external-hit" ]; then
+  pass "guard keeps deny shims through nested env -i with PATH propagation"
+else
+  bad "guard lost service calls through nested env -i (rc=$rc)"
+fi
+
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c \
+    'launchctl unload "$HOME/test.plist" >/dev/null 2>&1 || true; rm -f "$IWE_REDTEAM_SERVICE_BIN/blocked-calls"; printf child-ok' \
+  > "$service_run/removed-record.out" 2> "$service_run/removed-record.err"
+rc=$?
+if [ "$rc" -eq 3 ] && [ "$(cat "$service_run/removed-record.out")" = "child-ok" ] &&
+   grep -q 'audit protection disappeared' "$service_run/removed-record.err" &&
+   [ ! -e "$service_run/external-hit" ]; then
+  pass "guard fails closed when a child removes a used audit record"
+else
+  bad "guard allowed a child to hide a call by removing its audit record (rc=$rc)"
+fi
+
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c 'rm -rf "$IWE_REDTEAM_SERVICE_BIN"; printf child-ok' \
+  > "$service_run/removed-bin.out" 2> "$service_run/removed-bin.err"
+rc=$?
+if [ "$rc" -eq 3 ] && [ "$(cat "$service_run/removed-bin.out")" = "child-ok" ] &&
+   grep -q 'audit protection disappeared' "$service_run/removed-bin.err" &&
+   [ ! -e "$service_run/external-hit" ]; then
+  pass "guard fails closed when a child removes the deny directory"
+else
+  bad "guard allowed a child to remove the deny directory (rc=$rc)"
+fi
+
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c 'rm -f "$IWE_REDTEAM_SERVICE_BIN/launchctl"; printf child-ok' \
+  > "$service_run/removed-shim.out" 2> "$service_run/removed-shim.err"
+rc=$?
+if [ "$rc" -eq 3 ] && [ "$(cat "$service_run/removed-shim.out")" = "child-ok" ] &&
+   grep -q 'deny shim disappeared' "$service_run/removed-shim.err" &&
+   [ ! -e "$service_run/external-hit" ]; then
+  pass "guard fails closed when a child removes a deny shim"
+else
+  bad "guard allowed a child to remove a deny shim (rc=$rc)"
+fi
+
+# The three macOS role installers previously unloaded jobs even with SETUP_CI.
+# Use a fake uname and synthetic plists, then require file delivery with zero
+# service calls. The guard's launchctl shim would expose any missed unload.
+printf '%s\n' '#!/bin/sh' 'printf "Darwin\n"' > "$service_run/external-bin/uname"
+chmod 700 "$service_run/external-bin/uname"
+repo_root=$(cd "$SKILL_DIR/../../.." && pwd -P)
+for role in strategist synchronizer extractor; do
+  mkdir -p "$service_run/runtime/roles/$role/scripts/launchd"
+done
+for label in com.strategist.morning com.strategist.weekreview; do
+  printf '<plist>synthetic</plist>\n' > "$service_run/runtime/roles/strategist/scripts/launchd/$label.plist"
+done
+printf '<plist>synthetic</plist>\n' > "$service_run/runtime/roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist"
+printf '<plist>synthetic</plist>\n' > "$service_run/runtime/roles/extractor/scripts/launchd/com.extractor.inbox-check.plist"
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c \
+    'export IWE_RUNTIME="$HOME/runtime" SETUP_CI=1; for script in "$@"; do bash "$script" || exit; done' \
+    _ "$repo_root/roles/strategist/install.sh" \
+      "$repo_root/roles/synchronizer/install.sh" \
+      "$repo_root/roles/extractor/install.sh" \
+  > "$service_run/installers.out" 2>&1
+rc=$?
+if [ "$rc" -eq 0 ] && [ ! -e "$service_run/external-hit" ] &&
+   [ -f "$service_abs/Library/LaunchAgents/com.strategist.morning.plist" ] &&
+   [ -f "$service_abs/Library/LaunchAgents/com.strategist.weekreview.plist" ] &&
+   [ -f "$service_abs/Library/LaunchAgents/com.exocortex.scheduler.plist" ] &&
+   [ -f "$service_abs/Library/LaunchAgents/com.extractor.inbox-check.plist" ]; then
+  pass "SETUP_CI installs all role plists without unloading host jobs"
+else
+  bad "SETUP_CI role installation called a service manager or missed a plist (rc=$rc)"
+fi
+
+# The smoke script used to replace PATH with /usr/bin:/bin. Probe its actual
+# early PATH calculation without executing setup or any service-manager call.
+PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
+  bash "$GUARD" -- bash -c \
+    'SMOKE_GUARD_PATH_PROBE=1 bash "$1"' \
+    _ "$repo_root/setup/smoke-test-fresh-install.sh" \
+  > "$service_run/smoke-path.out" 2> "$service_run/smoke-path.err"
+rc=$?
+smoke_path=$(sed -n 's/^SMOKE_GUARDED_PATH=//p' "$service_run/smoke-path.out")
+smoke_ws=$(sed -n 's/^SMOKE_GUARDED_WORKSPACE=//p' "$service_run/smoke-path.out")
+shim_prefix=${smoke_path%%:*}
+case "$smoke_path" in
+  "$service_abs"/.iwe-redteam-service-bin.*:*) guarded_smoke_path=1 ;;
+  *) guarded_smoke_path=0 ;;
+esac
+if [ "$rc" -eq 77 ] && [ "$guarded_smoke_path" -eq 1 ] &&
+   [ "${smoke_ws#"$service_abs"/}" != "$smoke_ws" ] &&
+   [ -x "$shim_prefix/launchctl" ] && [ -x "$shim_prefix/systemctl" ] &&
+   [ -x "$shim_prefix/crontab" ] && [ ! -e "$service_run/external-hit" ]; then
+  pass "smoke clean PATH keeps guard-owned deny shims first"
+else
+  bad "smoke clean PATH bypassed or lost deny shims (rc=$rc, path=$smoke_path)"
+fi
+rm -rf "$service_run"
 
 # --- integrity contract: known-good -> GO -------------------------------------
 good_run=$(mk) || { bad "mktemp -d failed"; exit 1; }

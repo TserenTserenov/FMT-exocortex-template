@@ -489,11 +489,11 @@
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/SKILL.md",
-      "sha256": "9657d4d243b033494aaed698e18f7f756f748d93619834fecb4476cac6e26cde"
+      "sha256": "6cd78013319472eaa1cd1b336e91e20e526bd8c9b07e7931049195e196e83bfa"
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/boundary-guard.sh",
-      "sha256": "d259907b4a6e964f19164aa16ca187e019e039f7bead9b103b42b1ab73995b54"
+      "sha256": "631909d9d83f2667d86838572cc6c75897a0cf944e3dda11aa174958d1a645e0"
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/fixtures/known-bad-release/ci-receipt.txt",
@@ -561,7 +561,7 @@
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/tests/run-calibration.sh",
-      "sha256": "2ec5f5bbf73ca5b3d8a33280108ab5fdbbd5f00a41e4c7d76de4f9f0e474f16d"
+      "sha256": "6e44d809ce04f6ea88f23791fc76ea306bba5281e989a098283d0b0e6e3c7167"
     },
     {
       "path": ".claude/skills/iwe-restore/SKILL.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ee910370c76a6173d396e71c8b4d242d4a43f53301351850a1a430056ce3b7fb"
+      "sha256": "16fa2c0637722ea8f4d3e15b053ed2c24e38b11da23af3b3bc7f2ec0eecae22e"
     },
     {
       "path": "CLAUDE.md",
@@ -1705,7 +1705,7 @@
     },
     {
       "path": "roles/extractor/install.sh",
-      "sha256": "b151686a7f233b15c5d462b453575d156b66521a554cf5eaaa412f0009fea32f"
+      "sha256": "f451dabef0e7e91052f8cfa5b838593679ee92271d2a38312c2e9cd137bfd3e3"
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
@@ -1777,7 +1777,7 @@
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "ee03b558d41d5a0aebcdd081e2f21b690f1e4fadeec7483ac549e6c400a05e80"
+      "sha256": "89703e2a74676187436be67e780e4ee6c457c0d340e2bc079c10042c4dbddd37"
     },
     {
       "path": "roles/strategist/prompts/add-wp.md",
@@ -1945,7 +1945,7 @@
     },
     {
       "path": "roles/synchronizer/install.sh",
-      "sha256": "5810596d0d989a996a9b2e4e4d8413da78e90fd83df9304c21192ff4efb71ab2"
+      "sha256": "2acb5ad0431e281a616e11b601ab8de397fe7dc277b811cfbd3df3a27be57fc2"
     },
     {
       "path": "roles/synchronizer/role.yaml",
