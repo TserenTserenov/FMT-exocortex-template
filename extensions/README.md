@@ -194,7 +194,7 @@ cp my-extension-pack/extensions/* ~/IWE/extensions/
 |---------|-----|---------|
 | без префикса | Платформенные (зарезервированы) | `iwe-knowledge` (Gateway, агрегирует knowledge + digital-twin) |
 | `ext-*` | Вендорские | `ext-google-calendar`, `ext-linear`, `ext-slack` |
-| `<ваш префикс>-*` | Ваши MCP | `tseren-notes`, `tseren-obsidian` |
+| `<ваш префикс>-*` | Ваши MCP | `<ваш-префикс>-notes`, `<ваш-префикс>-obsidian` |
 
 Используйте свой уникальный префикс (например username) — это предотвращает конфликты при обновлениях.
 

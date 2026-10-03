@@ -100,13 +100,33 @@ is_excluded_path() {
     done <<< "$EXCLUDED_LIST"
     return 1
 }
+is_author_context_exception() {
+    # Existing workflow-only context: one host access control and three
+    # historical/test comments. Match the whole line, never the whole file.
+    case "$1:$2" in
+        '.github/workflows/changelog-gate.yml:      NO_CHANGELOG_ALLOWED: "TserenTserenov"'|\
+        '.github/workflows/translate-sync.yml:# TserenTserenov; it was never one of the aisystant repos slated for a'|\
+        '.github/workflows/release-watchdog.yml:# создана: DS-IT-systems для агента read-only.'|\
+        '.github/workflows/validate-template.yml:      # Имитируем pristine user: DS-strategy вместо DS-my-strategy, DayPlan с минимальным шаблоном.') return 0 ;;
+    esac
+    return 1
+}
+filter_staged_author_hits() {
+    local rel="$1" entry
+    while IFS= read -r entry; do
+        is_author_context_exception "$rel" "${entry#*:}" || printf '%s\n' "$entry"
+    done
+}
 filter_excluded_hits() {
-    # stdin: grep -r output "<abs-path>:<line>:<text>" — drop excluded_paths rows
-    local line abs rel
+    # stdin: grep -r output "<abs-path>:<line>:<text>" — drop excluded_paths
+    # and exact workflow-context exceptions, retaining every other .yml hit.
+    local line abs rel numbered
     while IFS= read -r line; do
         abs="${line%%:*}"
         rel="${abs#"$TEMPLATE_DIR"/}"
-        is_excluded_path "$rel" || printf '%s\n' "$line"
+        is_excluded_path "$rel" && continue
+        numbered="${line#"$abs":}"
+        is_author_context_exception "$rel" "${numbered#*:}" || printf '%s\n' "$line"
     done
 }
 
@@ -131,7 +151,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
             esac
             is_excluded_path "$f" && continue  # frozen out of delivery (#547)
             case "$f" in
-                *.md|*.sh|*.py|*.json|*.plist|*.yaml) ;;
+                *.md|*.sh|*.py|*.json|*.plist|*.yaml|*.yml) ;;
                 *) continue ;;
             esac
             case "$(basename "$f")" in
@@ -145,7 +165,8 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
             file_hits=$(cd "$TEMPLATE_DIR" && git show ":$f" 2>/dev/null \
                 | grep -in "$pattern" | grep -v 'github.com/' | grep -v 'docs/adr/' \
                 | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' || true)
+                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
+                | filter_staged_author_hits "$f" || true)
             if [ -n "$file_hits" ]; then
                 count=$((count + $(echo "$file_hits" | wc -l | tr -d ' ')))
                 hits="${hits}${f}:"$'\n'"${file_hits}"$'\n'
@@ -153,7 +174,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
         done <<< "$STAGED_FILES"
     else
         count=$(grep -rin "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" \
+                --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
                 --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
                 --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
                 --exclude='translation-manifest.yaml' --exclude-dir='guide-kit' 2>/dev/null \
@@ -168,7 +189,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
             echo "$hits" | head -3 || true
         else
             grep -rin "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                --include="*.py" --include="*.json" --include="*.plist" \
+                --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
                 --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
                 --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
                 --exclude='translation-manifest.yaml' --exclude-dir='guide-kit' 2>/dev/null \
@@ -223,7 +244,7 @@ if [ "$MODE" = "staged" ] && [ "$(cd "$TEMPLATE_DIR" && git status --porcelain 2
     UNSTAGED_WARN=0
     for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-IT-systems"; do
         warn_count=$(grep -rin "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                     --include="*.py" --include="*.yaml" \
+                     --include="*.py" --include="*.yaml" --include="*.yml" \
                      --exclude='validate-template.sh' --exclude='CHANGELOG.md' 2>/dev/null \
                      | grep -v 'github.com/' | wc -l | tr -d ' ' || true)
         if [ "$warn_count" -gt 0 ]; then

@@ -524,6 +524,15 @@ if [ "$RERUN_FIRST_RC" -eq 0 ] && [ "$RERUN_SECOND_RC" -eq 0 ] && \
 else
     fail "e2e rerun: rc=$RERUN_FIRST_RC/$RERUN_SECOND_RC or DS-strategy escaped from configured governance"
 fi
+RERUN_NAV="$RERUN_HOME/.claude/projects/$(echo "$RERUN_WS" | tr '/' '-')/memory/navigation.md"
+if [ -f "$RERUN_NAV" ] && \
+   grep -Fq '{{GOVERNANCE_REPO}}/docs/Strategy.md' "$RERUN_NAV" && \
+   grep -Fq '.exocortex.env' "$RERUN_NAV" && \
+   ! grep -Fq 'DS-strategy/' "$RERUN_NAV"; then
+    pass "e2e rerun: installed navigation keeps the explained governance marker, not the default path"
+else
+    fail "e2e rerun: installed navigation is missing, lacks the marker, or still names the default path"
+fi
 rm -rf "$RERUN_WS" 2>/dev/null || true
 
 # === Test 9c: governance-root symlink is rejected before external writes ===

@@ -11,7 +11,7 @@
 | `since` | datetime | 2026-04-28T11:37:00+03:00 |
 | `metrics` | list | [throughput, error_rate, lag] |
 | `notify_via` | str | `gmail` / `telegram` |
-| `recipient` | str | aisystant@gmail.com |
+| `recipient` | str | `pilot@example.invalid` (пример; укажите адрес получателя) |
 
 ## Промпт
 
