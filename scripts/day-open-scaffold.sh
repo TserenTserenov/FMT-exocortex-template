@@ -875,9 +875,33 @@ render_iwe_status() {
     in_grace_window=true
   fi
 
-  if [ -f "$triage_file" ] || [ -f "$watchdog_log" ] || [ -f "$feedback_triage_log" ] || [ -f "$scheduler_log" ]; then
-    # Mode B-1: отчёт/лог за сегодня есть → норм
-    echo "| Scheduler/триаж | 🟢 | отчёт/лог за $DATE присутствует (Mode B норм) |"
+  # issue #1060: scheduler.sh creates this log before dispatch and writes WARN/ALARM
+  # on failed tasks, then still writes "dispatch completed". A concurrent healthy
+  # strategist run is logged as SKIP, which is neutral but not proof of success.
+  local scheduler_log_health=absent
+  if [ -f "$scheduler_log" ]; then
+    if grep -Eq '(^|[[:space:]])(WARN|ALARM|ERROR|FATAL):' "$scheduler_log"; then
+      scheduler_log_health=failed
+    elif grep -Eq '(^|[[:space:]])SKIP:' "$scheduler_log"; then
+      scheduler_log_health=deferred
+    elif [ -s "$scheduler_log" ] &&
+         grep -Eq '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\] \[scheduler\] dispatch started ' "$scheduler_log" &&
+         grep -Eq '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\] \[scheduler\] dispatch completed$' "$scheduler_log"; then
+      scheduler_log_health=completed
+    else
+      scheduler_log_health=unverified
+    fi
+  fi
+
+  if [ "$scheduler_log_health" = failed ]; then
+    echo "| Scheduler/триаж | 🔴 | журнал планировщика за $DATE содержит ошибку — проверить $scheduler_log |"
+  elif [ "$scheduler_log_health" = deferred ]; then
+    echo "| Scheduler/триаж | 🟡 | запуск за $DATE отложен из-за параллельной работы; проверить завершение другого запуска — $scheduler_log |"
+  elif [ -f "$triage_file" ] || [ -f "$watchdog_log" ] || [ -f "$feedback_triage_log" ] || [ "$scheduler_log_health" = completed ]; then
+    # Mode B-1: отчёт либо подтверждённый чистый запуск за сегодня есть.
+    echo "| Scheduler/триаж | 🟢 | отчёт или чистый запуск за $DATE подтверждён (Mode B норм) |"
+  elif [ "$scheduler_log_health" = unverified ]; then
+    echo "| Scheduler/триаж | 🟡 | журнал планировщика за $DATE есть, но чистый завершённый запуск не подтверждён — проверить $scheduler_log |"
   elif [ "$scheduler_state" = "not_deployed" ]; then
     # issue #347: планировщик здесь никогда не разворачивали — нет ни юнита, ни
     # crontab-записи, ни единого лога за всю историю. Это не авария, а не-установка:
