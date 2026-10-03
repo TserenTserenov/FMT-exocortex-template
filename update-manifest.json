@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "53412261ce99868e31d501348f8742a7a8557074ad80b53bd14ad21798b58286"
+      "sha256": "a4b2372cd8543a22b7934f23a245179bd0178192b796e5a997b4be0bd2e80510"
     },
     {
       "path": "CLAUDE.md",
@@ -3215,6 +3215,7 @@
     "scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh",
     "scripts/tests/test_issue_1006_minor_findings.sh",
     "scripts/tests/test_issue_1010_red_team_findings.sh",
+    "scripts/tests/test_issue_1036_migration_source.sh",
     "scripts/tests/test_issue_1038_python_env.py",
     "scripts/tests/test_issue_1038_validator.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
