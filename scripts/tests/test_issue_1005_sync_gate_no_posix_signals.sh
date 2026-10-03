@@ -71,16 +71,18 @@ import subprocess
 import sys
 import time
 
-record, repo = sys.argv[1:]
+record, _repo = sys.argv[1:]
 
 children = []
 try:
-    git = subprocess.Popen(
-        ["git", "-C", repo, "-c", "alias.hang=!sleep 30", "hang"],
+    # Native Python children keep the tree fixture free of Git's shell alias.
+    # The real-Git path is checked above with the local origin query.
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    children.append(git)
+    children.append(child)
     leaf = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(30)"],
         stdout=subprocess.DEVNULL,
@@ -90,7 +92,7 @@ try:
     # Publish one complete record. Replacing a record held open by the reader
     # fails on Windows and can leave the fixture's child processes behind.
     with open(record + ".tmp", "w", encoding="ascii") as stream:
-        json.dump({"root": os.getpid(), "git": git.pid, "leaf": leaf.pid}, stream)
+        json.dump({"root": os.getpid(), "child": child.pid, "leaf": leaf.pid}, stream)
     os.replace(record + ".tmp", record)
 except BaseException:
     # The fault case overrides SystemRoot to break the production taskkill;
@@ -151,7 +153,7 @@ def capture_tree(record, handles, owner):
                     if not handle:
                         raise OSError(ctypes.get_last_error(), f"OpenProcess({name}={pid})")
                     handles[name] = handle
-            if set(handles) == {"root", "git", "leaf"}:
+            if set(handles) == {"root", "child", "leaf"}:
                 return
         if owner.poll() is not None:
             raise AssertionError(f"tree fixture exited with {owner.returncode} before publishing all PIDs in {record}")
@@ -195,7 +197,7 @@ try:
     capture_tree(record + ".control", control_handles, control)
     control.terminate()
     control.wait(timeout=3)
-    assert not stopped(control_handles["git"]) and not stopped(control_handles["leaf"]), \
+    assert not stopped(control_handles["child"]) and not stopped(control_handles["leaf"]), \
         "red control did not expose both orphaned native descendants"
 finally:
     if control.poll() is None:
@@ -268,7 +270,7 @@ try:
     assert fault.returncode == 125, \
         f"failed taskkill returned {fault.returncode}, expected 125; out={stdout}; err={stderr}"
     assert stopped(fault_handles["root"], 3000), "fallback did not stop direct root"
-    assert not stopped(fault_handles["git"]) or not stopped(fault_handles["leaf"]), \
+    assert not stopped(fault_handles["child"]) or not stopped(fault_handles["leaf"]), \
         "fault injection did not expose a surviving descendant"
 finally:
     if fault.poll() is None:
