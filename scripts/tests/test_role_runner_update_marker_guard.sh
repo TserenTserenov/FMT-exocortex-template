@@ -102,8 +102,9 @@ SH
 chmod +x "$TMP/template/roles/synchronizer/scripts/notify.sh"
 
 run_dispatch() {
+    local tool_path="${1:-$TMP/bin:/usr/bin:/bin}"
     HOME="$TMP/home" IWE_TEMPLATE="$TMP/template" IWE_WORKSPACE="$TMP/ws" \
-        IWE_RUNTIME="$TMP/runtime" PATH="$TMP/bin:/usr/bin:/bin" \
+        IWE_RUNTIME="$TMP/runtime" PATH="$tool_path" \
         bash "$ROOT/roles/synchronizer/scripts/scheduler.sh" dispatch > "$TMP/dispatch.out" 2>&1 || {
             cat "$TMP/dispatch.out"
             return 1
@@ -194,6 +195,47 @@ run_dispatch
 if [ ! -f "$STATE_DIR/strategist-morning-update-alert-$DATE_FIXED" ] || \
    [ -e "$STATE_DIR/strategist-morning-$DATE_FIXED" ]; then
     echo "❌ FAIL: next dispatch did not retry notification after timeout"
+    exit 1
+fi
+
+echo "--- macOS fallback must stop a notifier's non-exec child ---"
+mkdir -p "$TMP/fallback-bin"
+for tool in awk bash dirname find grep mkdir perl sed tee tr; do
+    ln -s "$(command -v "$tool")" "$TMP/fallback-bin/$tool"
+done
+for tool in date uname systemd-inhibit; do
+    ln -s "$TMP/bin/$tool" "$TMP/fallback-bin/$tool"
+done
+if PATH="$TMP/fallback-bin" command -v timeout >/dev/null 2>&1; then
+    echo "❌ FAIL: fallback test unexpectedly found GNU timeout"
+    exit 1
+fi
+rm "$STATE_DIR/strategist-morning-update-alert-$DATE_FIXED"
+cat > "$TMP/template/roles/synchronizer/scripts/notify.sh" <<'SH'
+#!/bin/sh
+/bin/sleep 18
+printf 'completed-too-late\n' >> "$IWE_WORKSPACE/late-notifier"
+SH
+chmod +x "$TMP/template/roles/synchronizer/scripts/notify.sh"
+started=$SECONDS
+run_dispatch "$TMP/fallback-bin"
+elapsed=$((SECONDS - started))
+if [ "$elapsed" -ge 18 ] || \
+   [ -e "$TMP/ws/late-notifier" ] || \
+   [ -e "$STATE_DIR/strategist-morning-$DATE_FIXED" ] || \
+   [ -e "$STATE_DIR/strategist-morning-update-alert-$DATE_FIXED" ]; then
+    echo "❌ FAIL: fallback left notifier child running or blocked dispatch (elapsed=${elapsed}s)"
+    exit 1
+fi
+cat > "$TMP/template/roles/synchronizer/scripts/notify.sh" <<'SH'
+#!/bin/sh
+echo 'Telegram notification sent: strategist/day-open-failed'
+SH
+chmod +x "$TMP/template/roles/synchronizer/scripts/notify.sh"
+run_dispatch "$TMP/fallback-bin"
+if [ ! -f "$STATE_DIR/strategist-morning-update-alert-$DATE_FIXED" ] || \
+   [ -e "$STATE_DIR/strategist-morning-$DATE_FIXED" ]; then
+    echo "❌ FAIL: fallback did not retry notification after child timeout"
     exit 1
 fi
 

@@ -91,14 +91,24 @@ if ! command -v timeout &>/dev/null; then
             use POSIX ":sys_wait_h";
             my $timeout = shift @ARGV;
             my $pid = fork();
-            if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
+            defined($pid) or die "fork failed: $!";
+            if ($pid == 0) {
+                POSIX::setpgid(0, 0) == 0 or die "setpgid failed: $!";
+                exec @ARGV; die "exec failed: $!";
+            }
             eval {
                 local $SIG{ALRM} = sub { die "alarm" };
                 alarm($timeout);
                 waitpid($pid, 0);
                 alarm(0);
             };
-            if ($@ =~ /alarm/) { kill("TERM", $pid); sleep(1); kill("KILL", $pid); waitpid($pid, WNOHANG); exit(124); }
+            if ($@ =~ /alarm/) {
+                kill("TERM", -$pid);
+                sleep(1);
+                kill("KILL", -$pid);
+                waitpid($pid, WNOHANG);
+                exit(124);
+            }
             exit($? >> 8);
         ' "$duration" "$@"
     }
@@ -160,9 +170,9 @@ notify_incomplete_morning_update() {
         log "WARN: Day Open update-incomplete notification unavailable; will retry next dispatch"
         return 1
     fi
-    # Bound the whole notifier below TASK_TIMEOUT_SHORT (300s). notify.sh also
-    # bounds curl itself, so the macOS timeout fallback cannot leave a child
-    # network request holding this command substitution open.
+    # Bound the whole notifier below TASK_TIMEOUT_SHORT (300s). The macOS
+    # fallback kills its process group, including children that inherited the
+    # command substitution's stdout; notify.sh also bounds curl itself.
     output=$(DAY_OPEN_FAILED_REASON=update-incomplete DAY_OPEN_FAILED_RC=75 \
         timeout 15 "$NOTIFY_SH" strategist day-open-failed 2>&1) || notify_rc=$?
     if [ "$notify_rc" -eq 0 ] && printf '%s\n' "$output" | grep -qxF \
