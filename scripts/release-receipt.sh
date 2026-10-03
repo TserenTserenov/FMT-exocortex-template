@@ -9,7 +9,7 @@
 # for two days, one accidental green run, proved that "we run this check
 # somewhere" says nothing about whether THIS commit passed it).
 #
-# publishable=true requires both Windows jobs to report success. Other
+# publishable=true requires all three Windows jobs to report success. Other
 # mandatory checks may be intentionally skipped for this trigger (e.g. macOS
 # integration on push). Failure/cancelled/unknown, or a skipped Windows job,
 # produces false. The script exits 1 so branch protection can require this
@@ -48,6 +48,7 @@ CHECK_NAMES=(
   shellcheck
   platform-compat
   validate
+  guarded-rm-windows
   upgrade-test
   guide-kit-drift
   windows-session-guard
@@ -60,6 +61,7 @@ CHECK_ENV_VARS=(
   RESULT_SHELLCHECK
   RESULT_PLATFORM_COMPAT
   RESULT_VALIDATE
+  RESULT_GUARDED_RM_WINDOWS
   RESULT_UPGRADE_TEST
   RESULT_GUIDE_KIT_DRIFT
   RESULT_WINDOWS_SESSION_GUARD
@@ -76,8 +78,9 @@ for i in "${!CHECK_NAMES[@]}"; do
   case "$result" in
     success) ;;
     skipped)
-      # Both Windows jobs run on every trigger; skipped bypasses their proof.
-      if [ "$name" = issue-1030-windows ] || [ "$name" = windows-session-guard ]; then
+      # These Windows jobs run on every trigger; skipped bypasses their proof.
+      if [ "$name" = issue-1030-windows ] || [ "$name" = guarded-rm-windows ] ||
+         [ "$name" = windows-session-guard ]; then
         PUBLISHABLE=false
         FAILED_NAMES+=("$name:$result")
       fi

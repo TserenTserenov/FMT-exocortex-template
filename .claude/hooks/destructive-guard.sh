@@ -119,8 +119,8 @@ GUARDED_RM="$WORKSPACE_ROOT/.claude/bin/guarded-rm"
 #     as a command separator, so it landed inside the `git add` segment.
 #
 # So the text scanned is narrowed twice, before any check runs: heredoc bodies
-# are removed (they are data being written, not commands being run), and a
-# newline separates commands the same way `;` does.
+# sent to data commands are removed, while bodies sent to literal shell/SQL
+# interpreters remain; a newline separates commands the same way `;` does.
 CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # Read via stdin, not $ENV{CMD_SCAN}: a command text passed through the
   # process environment is subject to the same execve ARG_MAX as argv (found
@@ -130,7 +130,246 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   my $text = do { local $/; <STDIN> };
   my @lines = split(/\n/, $text, -1);
   my (@out, @pending);
-  for my $line (@lines) {
+  sub continued_header {
+    my ($line, $initial_quote) = @_;
+    my ($slashes) = $line =~ /(\\+)$/;
+    return 0 unless defined $slashes && length($slashes) % 2;
+    my $quote = $initial_quote;
+    for (my $i = 0; $i < length($line); $i++) {
+      my $char = substr($line, $i, 1);
+      if (defined $quote) {
+        if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
+        undef $quote if $char eq $quote;
+      } elsif ($char eq "\\" && $i + 1 < length($line)) {
+        $i++;
+      } elsif ($char eq chr(39) || $char eq q{"}) {
+        $quote = $char;
+      }
+    }
+    return !defined $quote || $quote eq q{"};
+  }
+
+  sub is_data_command {
+    my ($first, $next) = @_;
+    return 1 if lc($first) =~ /^(?:cat|echo|printf|test|\[|type|which|python[0-9.]*|perl|jq|sed|awk|grep|rg|tee|head|tail|wc|sort|uniq|cut|ls)$/;
+    return 1 if lc($first) eq q{command} && ($next // q{}) =~ /^-[vV]$/;
+    return 0;
+  }
+
+  sub heredoc_recipient {
+    my ($fragment) = @_;
+    my @words = grep { length } split(/\s+/, $fragment);
+    # Data commands may mention an interpreter as a filename or argument.
+    # Their heredoc is still data; aliases/functions changing the command
+    # meaning are dynamic and outside this static check.
+    my $first = $words[0] // q{};
+    $first =~ s/<<-?.*$//;
+    $first =~ s/^[!({]+//;
+    $first =~ s{^.*[/\\]}{};
+    $first =~ s/[;)}]+$//;
+    $first =~ s/^[\x27"]+|[\x27"]+$//g;
+    $first =~ s/\.exe$//i;
+    return 0 if is_data_command($first, $words[1]);
+    # A wrapper or remote shell may carry the interpreter. For other commands,
+    # scanning later words errs toward keeping data, not discarding runnable code.
+    for my $word (@words) {
+      $word =~ s/<<-?.*$//;
+      $word =~ s/^[!({]+//;
+      $word =~ s{^.*[/\\]}{};
+      $word =~ s/[;)}]+$//;
+      $word =~ s/^[\x27"]+|[\x27"]+$//g;
+      $word =~ s/\.exe$//i;
+      return 1 if lc($word) =~ /^(?:(?:ba|z|k|da)?sh|ssh|psql|mysql|sqlite3)$/;
+    }
+    return 0;
+  }
+
+  sub data_command_before_heredoc {
+    my ($fragment) = @_;
+    $fragment =~ s/^\s+//;
+    # Assignments and output redirects can precede a command, including one
+    # placed to the right of the heredoc operator.
+    while ($fragment =~ s/^(?:[A-Za-z_][A-Za-z0-9_]*=\S+|\d*(?:>>|<>|<&|>&|>\||>|<)\s*\S+)\s*//) {}
+    $fragment =~ s/^\s*(?:(?:if|then|else|do)\b\s*)+//;
+    my @words = grep { length } split(/\s+/, $fragment);
+    while (@words) {
+      if (lc($words[0]) eq q{env}) {
+        shift @words;
+        shift @words while @words && $words[0] =~ /^[A-Za-z_][A-Za-z0-9_]*=/;
+      } elsif (lc($words[0]) eq q{sudo}) {
+        shift @words;
+        while (@words && $words[0] =~ /^-/) {
+          my $option = shift @words;
+          shift @words if @words && $option =~ /^(?:-u|--user)$/;
+        }
+      } else { last; }
+    }
+    my $first = $words[0] // q{};
+    $first =~ s/^[!({]+//;
+    $first =~ s{^.*[/\\]}{};
+    $first =~ s/[;)}]+$//;
+    $first =~ s/^[\x27"]+|[\x27"]+$//g;
+    $first =~ s/\.exe$//i;
+    return is_data_command($first, $words[1]);
+  }
+
+  sub right_command_stages {
+    my ($tail) = @_;
+    my @stages;
+    my $stage = q{};
+    my $quote;
+    for (my $i = 0; $i < length($tail); $i++) {
+      my $char = substr($tail, $i, 1);
+      my $next = substr($tail, $i + 1, 1);
+      my $prev = $i ? substr($tail, $i - 1, 1) : q{};
+      if (defined $quote) {
+        $stage .= $char;
+        if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($tail)) {
+          $stage .= $next; $i++; next;
+        }
+        undef $quote if $char eq $quote;
+        next;
+      }
+      if ($char eq "\\" && $i + 1 < length($tail)) { $stage .= $char . $next; $i++; next; }
+      if ($char eq chr(39) || $char eq q{"}) { $quote = $char; $stage .= $char; next; }
+      last if $char eq q{;};
+      if ($char eq q{|} && $prev ne q{>}) {
+        last if $next eq q{|};
+        push @stages, $stage;
+        $stage = q{};
+        $i++ if $next eq q{&}; # |& forwards both streams into the next stage.
+        next;
+      }
+      last if $char eq q{&} && $prev !~ /[<>]/ && $next ne q{>};
+      $stage .= $char;
+    }
+    push @stages, $stage;
+    return @stages;
+  }
+
+  sub compound_end {
+    my ($fragment) = @_;
+    return q{fi} if $fragment =~ /^\s*if\b/;
+    return q{done} if $fragment =~ /^\s*(?:for|while|until|select)\b/;
+    return q{esac} if $fragment =~ /^\s*case\b/;
+    return q{};
+  }
+
+  sub compound_recipient {
+    my ($source, $end) = @_;
+    # Loop lists and case labels are data. Scan command fragments in the
+    # construct, conservatively including every possible branch.
+    if ($end eq q{done} && $source =~ /^\s*(?:for|select)\b/) {
+      $source =~ s/^.*?(?:;|\n)\s*do\b//s;
+    } elsif ($end eq q{esac}) {
+      $source =~ s/^\s*case\b.*?\bin\b//s;
+      $source =~ s/(?:^|;;|;&|;;&)\s*[^)\n]*\)/;/g;
+    }
+    for my $fragment (split(/[;\n]/, $source)) {
+      $fragment =~ s/^\s*(?:(?:if|then|elif|else|do|while|until)\b\s*)+//;
+      return 1 if heredoc_recipient($fragment);
+    }
+    return 0;
+  }
+
+  sub line_heredocs {
+    my ($line, $initial_quote, $initial_depth, $prior_group_source, $compound_frames) = @_;
+    my (@specs, $start, $group_depth, $closed_prior_group, $last_heredoc_end);
+    my $quote = $initial_quote;
+    $start = 0;
+    $group_depth = $initial_depth;
+    $closed_prior_group = 0;
+    $last_heredoc_end = -1;
+    for (my $i = 0; $i < length($line); $i++) {
+      my $char = substr($line, $i, 1);
+      if (defined $quote) {
+        if ($quote ne chr(39) && $char eq "\\" && $i + 1 < length($line)) { $i++; next; }
+        undef $quote if $char eq $quote;
+        next;
+      }
+      if ($char eq "\\" && $i + 1 < length($line)) { $i++; next; }
+      if ($char eq chr(39) || $char eq q{"}) { $quote = $char; next; }
+      if ($char eq "(" || $char eq "{") { $group_depth++; next; }
+      if ($char eq ")" || $char eq "}") {
+        $group_depth-- if $group_depth;
+        $closed_prior_group = 1 if $initial_depth && !$group_depth;
+        next;
+      }
+      my $prev = $i ? substr($line, $i - 1, 1) : q{};
+      my $next = substr($line, $i + 1, 1);
+      # These are redirection operators, not shell command separators.
+      next if ($char eq q{&} && ($prev =~ /[<>|]/ || $next eq q{>}))
+           || ($char eq q{|} && $prev eq q{>});
+      if (!$group_depth && $char =~ /[;&|]/) {
+        my $fragment = substr($line, $start, $i - $start);
+        if ($start >= $last_heredoc_end) {
+          my $end = compound_end($fragment);
+          if (length $end) { push @$compound_frames, { source => q{}, line_start => $start, end => $end }; }
+          elsif ($fragment =~ /^\s*(fi|done|esac)\b/ && @$compound_frames && $compound_frames->[-1]{end} eq $1) {
+            pop @$compound_frames;
+          }
+        }
+        $start = $i + 1;
+        if ($char eq q{|} && $next eq q{&}) { $start++; $i++; }
+        $closed_prior_group = 0;
+        next;
+      }
+      next unless substr($line, $i, 2) eq "<<";
+      next if substr($line, $i, 3) eq "<<<";
+      my $tail = substr($line, $i);
+      next unless $tail =~ /^<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/;
+      my $match_length = length($&);
+      my ($indent, $delim) = ($1 eq q{-}, defined $3 ? $3 : $4);
+      my $recipient = substr($line, $start, $i - $start);
+      my $prefix_is_data = data_command_before_heredoc($recipient);
+      my @right_stages = right_command_stages(substr($line, $i + $match_length));
+      my $right_recipient = $right_stages[0];
+      if ($recipient =~ /^\s*0?\s*$/) {
+        # A redirect may precede its command: `<<EOF bash`, `0<<EOF psql`.
+        # Only an empty/FD prefix is commandless; `cat <<EOF bash` still feeds
+        # cat, with bash merely an argument. Stop at the next shell separator.
+        $recipient = $right_recipient;
+      }
+      my $compound_end = $recipient =~ /^\s*(fi|done|esac)\s*$/ ? $1 : q{};
+      my $frame;
+      if (length $compound_end && @$compound_frames && $compound_frames->[-1]{end} eq $compound_end) {
+        # A redirect on fi/done/esac belongs to the entire compound command.
+        $frame = pop @$compound_frames;
+        $recipient = $frame->{source} . substr($line, $frame->{line_start}, $i - $frame->{line_start});
+      }
+      $recipient = $prior_group_source . $recipient if $closed_prior_group;
+      # Keep any body addressed to a literal interpreter, regardless of the
+      # heredoc FD. It may be read through /dev/fd/N or a later FD chain;
+      # `bash 2<<EOF` can therefore be rejected conservatively.
+      my $keep = $frame ? compound_recipient($recipient, $frame->{end}) : heredoc_recipient($recipient);
+      $keep ||= heredoc_recipient($right_recipient) unless $prefix_is_data;
+      # A data command can forward the body over a pipe to a literal shell or
+      # SQL client. A later `;`/`&&` command does not receive that body.
+      for my $stage (@right_stages[1 .. $#right_stages]) {
+        $keep ||= heredoc_recipient($stage);
+      }
+      push @specs, { indent => $indent, delim => $delim, keep => $keep };
+      $last_heredoc_end = $i + $match_length;
+      $i += $match_length - 1;
+    }
+    if (!$group_depth && $start >= $last_heredoc_end) {
+      my $fragment = substr($line, $start);
+      my $end = compound_end($fragment);
+      if (length $end) { push @$compound_frames, { source => q{}, line_start => $start, end => $end }; }
+      elsif ($fragment =~ /^\s*(fi|done|esac)\b/ && @$compound_frames && $compound_frames->[-1]{end} eq $1) {
+        pop @$compound_frames;
+      }
+    }
+    for my $frame (@$compound_frames) {
+      $frame->{source} .= substr($line, $frame->{line_start}) . "\n";
+      $frame->{line_start} = 0;
+    }
+    return (\@specs, $quote, $group_depth);
+  }
+
+  my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
+  for (my $line_no = 0; $line_no < @lines; $line_no++) {
+    my $line = $lines[$line_no];
     if (@pending) {
       my $body = $pending[0];
       my $probe = $line;
@@ -139,23 +378,16 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       push @out, $line if $body->{keep};
       next;
     }
+    while ($line_no + 1 < @lines && continued_header($line, $header_quote)) {
+      $line =~ s/\\$//;
+      $line .= $lines[++$line_no];
+    }
     push @out, $line;
-    # A body fed to something that EXECUTES it stays in the scanned text; a
-    # body written to a file or fed to a non-shell interpreter is content.
-    # Cold review 06.09 broke the first version of this test twice: it was
-    # anchored to the start of a line and to a bare name, so `/bin/bash <<EOF`
-    # and `ssh host bash <<EOF` slipped through, and `psql <<SQL ... DROP
-    # TABLE ... SQL` - executable SQL by any measure - was dropped as data.
-    # Matching a basename anywhere on the line covers all three; the cost of
-    # a false keep is a stricter scan, the cost of a false drop is a bypass.
-    my $keep = 0;
-    for my $word (split(/\s+/, $line)) {
-      $word =~ s/^.*\///;
-      $keep = 1 if $word =~ /^(?:ba|z|k|da)?sh$|^ssh$|^psql$|^mysql$|^sqlite3$/;
-    }
-    while ($line =~ /<<(-?)\s*(?!<)(?:([\x27"])([A-Za-z_][A-Za-z0-9_]*)\2|([A-Za-z_][A-Za-z0-9_]*))/g) {
-      push @pending, { indent => ($1 eq q{-}), delim => (defined $3 ? $3 : $4), keep => $keep };
-    }
+    my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames);
+    push @pending, @$specs;
+    $header_quote = $after_quote;
+    $group_source = $after_depth ? $group_source . $line . "\n" : q{};
+    $header_group_depth = $after_depth;
   }
   # An unterminated body means this was not a heredoc at all (an arithmetic
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
@@ -177,7 +409,7 @@ printf '%s' "$CMD_EXEC" | perl -e '
   my $s = do { local $/; <STDIN> };
   $s =~ s/'"'"'[^'"'"']*'"'"'/ Q /g;
   $s =~ s/"(?:\\.|[^"\\])*"/ Q /g;
-  exit($s =~ /(?:^|[;&|\n]\s*)cd\s+/ ? 0 : 1);
+  exit($s =~ /(?:^\s*|[;&|\n]\s*)cd\s+/ ? 0 : 1);
 ' || CD_RC=$?
 case "$CD_RC" in
   0) block "верхнеуровневый cd запрещён: используй git -C <path>, абсолютный путь или (cd <path> && ...)." ;;
@@ -328,12 +560,61 @@ SEGMENTER_PL='
   }
 
   # Basename of a command word: /bin/rm, /usr/bin/rm, C:\Git\usr\bin\rm.exe all name `rm`.
+  # macOS and Windows can resolve /BIN/RM or GIT to the same executable; normalise
+  # every command name, including data commands such as ECHO, before classification.
   sub command_base {
     my ($word) = @_;
     $word =~ s/[<>].*$//;                # rm>/dev/null names rm
     $word =~ s{^.*[/\\]}{};
     $word =~ s/\.exe$//i;
-    return $word;
+    return lc($word);
+  }
+
+  sub git_clean_would_delete {
+    my @options = @_;
+    # clean.requireForce=false makes even bare `git clean` destructive. Only an
+    # effective dry-run proves that the invocation cannot remove files.
+    my $dry_run = 0;
+    for (my $i = 0; $i < @options; $i++) {
+      my $token = $options[$i];
+      last if $token eq "--";
+      my ($long, $value) = split(/=/, $token, 2);
+      if (length($long) >= 3 && index("--exclude", $long) == 0) {
+        $i++ unless defined $value;
+        next;
+      }
+      if (length($long) >= 4 && index("--dry-run", $long) == 0) { $dry_run = 1; next; }
+      if (length($long) >= 5 && index("--no-dry-run", $long) == 0) { $dry_run = 0; next; }
+      next unless $token =~ /^-[A-Za-z]/;
+      my $flags = substr($token, 1);
+      for (my $j = 0; $j < length($flags); $j++) {
+        my $flag = substr($flags, $j, 1);
+        # -e, also at the end of -fde, consumes the next token. In -fen the
+        # attached n is its pattern, not a dry-run flag.
+        if ($flag eq "e") { $i++ if $j == length($flags) - 1; last; }
+        $dry_run = 1 if $flag eq "n";
+      }
+    }
+    return !$dry_run;
+  }
+
+  sub rm_has_recursive_force {
+    my @args = @_;
+    my ($recursive, $force) = (0, 0);
+    for my $token (@args) {
+      last if $token eq "--";
+      $token =~ s/\d*[<>].*$// if $token =~ /^-/;
+      if ($token =~ /^-([A-Za-z]+)$/) {
+        my $flags = $1;
+        $recursive = 1 if $flags =~ /[rR]/;
+        $force = 1 if $flags =~ /f/;
+      } elsif ($token =~ /^(--[A-Za-z]+)$/) {
+        my $option = lc($1);
+        $recursive = 1 if length($option) >= 3 && index("--recursive", $option) == 0;
+        $force = 1 if length($option) >= 3 && index("--force", $option) == 0;
+      }
+    }
+    return $recursive && $force;
   }
 
   sub is_redirection {
@@ -454,9 +735,12 @@ SEGMENTER_PL='
         if ($cbase =~ /^(?:ba|z|k|da|a)?sh$/) {
           for (my $j = $cand + 1; $j <= $#tokens; $j++) {
             if ($tokens[$j] =~ /^-[A-Za-z]*c[A-Za-z]*$/ && $j < $#tokens) {
-              push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j + 1]);
+              my $script = $j + 1;
+              $script++ if $tokens[$script] eq "--" && $script < $#tokens;
+              push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$script]);
               last;
             }
+            if ($tokens[$j] =~ /^-[oO]$/ && $j < $#tokens) { $j++; next; }
             last unless $tokens[$j] =~ /^-/;
           }
         } elsif ($cand == $index && $cbase =~ /^(?:ssh|su)$/) {
@@ -481,7 +765,12 @@ SEGMENTER_PL='
           else { last; }
         }
         next unless $i < @tokens && $tokens[$i] eq $subcmd;
+        # Keep only dangerous clean calls. The original token boundaries are
+        # still available here, before printing merges quoted arguments.
+        next if $name eq "git" && $subcmd eq "clean" && !git_clean_would_delete(@tokens[$i + 1 .. $#tokens]);
+        next if $name eq "git" && $subcmd eq "rm" && !rm_has_recursive_force(@tokens[$i + 1 .. $#tokens]);
       }
+      next if $name eq "rm" && !rm_has_recursive_force(@tokens[$cand + 1 .. $#tokens]);
       # Print and keep scanning — one call can chain several invocations of
       # the same command (`git push origin main && git push origin +:refs/x`),
       # and every check below reads all of them, one per line. The command word is printed
@@ -627,10 +916,12 @@ if [ -n "$RESET_SEGMENT" ]; then
   done <<< "$RESET_SEGMENT"
 fi
 
-# git clean with delete flags (-f/-d/-x)
+# git_segment clean returns only calls with delete flags and no effective
+# dry-run. Its parser knows that `-e` consumes the next argument, unlike a
+# regex over the flattened command text.
 CLEAN_SEGMENT=$(git_segment clean)
-if [ -n "$CLEAN_SEGMENT" ] && matches "$CLEAN_SEGMENT" -E -- '(^|[[:space:]])-[a-zA-Z]*[dfx]'; then
-  block "git clean -fdx запрещён (удаляет неотслеживаемые файлы). Согласуй с владельцем."
+if [ -n "$CLEAN_SEGMENT" ]; then
+  block "git clean с удалением запрещён (удаляет неотслеживаемые файлы). Согласуй с владельцем."
 fi
 
 # git add -A/--all/-u/--update/bare-dot (I7, WP-458: AR.216 жил только в rule-engine.sh
@@ -706,7 +997,9 @@ fi
 
 # rm с одновременным recursive (-r/-R/--recursive) и force (-f/--force), в любом сочетании
 # флагов (слитных или раздельных), включая /bin/rm, /usr/bin/rm, \rm, find -exec rm, xargs rm,
-# обёртки sudo/env/time и строки для sh -c/eval, запрещён БЕЗ исключений (issue #940).
+# обёртки sudo/env/time и строки для sh -c/eval, распознаётся и блокируется (issue #940).
+# Код через stdin оболочки и подстановки внутри кавычек или некавыченного heredoc
+# остаются за границей текстового анализа; см. docs/DESTRUCTIVE-GUARD.md (#1002).
 # Удалять — через .claude/bin/guarded-rm: он при выполнении, когда оболочка уже раскрыла
 # переменные и шаблоны, вычисляет настоящий путь каждой цели и удаляет только внутри корней
 # из .claude/config/guarded-rm-roots.txt.
@@ -717,44 +1010,33 @@ fi
 # тексту нельзя: цель удаления зависит от переменных, cd, ссылок и подстановок, известных
 # только при выполнении, поэтому проверка перенесена с текста на выполнение.
 #
-# Признаки флагов только для коротких кластеров (-rf, -vrf) и --recursive/--force с их
-# сокращениями GNU (--rec, --for): в `--verbose` или `--preserve-root` буква r/f — не флаг.
-RM_RECURSIVE_RE='(^|[[:space:]])(-[A-Za-z]*[rR][A-Za-z]*|--r[a-z]*)([[:space:]]|$)'
-RM_FORCE_RE='(^|[[:space:]])(-[A-Za-z]*f[A-Za-z]*|--f[a-z]*)([[:space:]]|$)'
+# Ключи проверяются по исходным токенам: `--` в имени цели не является
+# разделителем ключей. Короткие кластеры (-rf, -vrf) и сокращения GNU
+# --recursive/--force признаются; --verbose/--preserve-root — нет.
 
 # git rm с -r и -f: -f теряет незакоммиченные правки удаляемых файлов (`git rm -r --cached`
 # без -f остаётся разрешённым).
 GIT_RM_INVOCATIONS=$(git_segment rm)
 if [ -n "$GIT_RM_INVOCATIONS" ]; then
-  while IFS= read -r one_git_rm; do
-    [ -n "$one_git_rm" ] || continue
-    if matches "$one_git_rm" -E -- "$RM_RECURSIVE_RE" && matches "$one_git_rm" -E -- "$RM_FORCE_RE"; then
-      block "git rm с -r и -f запрещён — -f теряет незакоммиченные правки. Убери -f или согласуй с владельцем."
-    fi
-  done <<< "$GIT_RM_INVOCATIONS"
+  block "git rm с -r и -f запрещён — -f теряет незакоммиченные правки. Убери -f или согласуй с владельцем."
 fi
 
 RM_INVOCATIONS=$(shell_invocations rm)
 if [ -n "$RM_INVOCATIONS" ]; then
-  while IFS= read -r one_rm; do
-    [ -n "$one_rm" ] || continue
-    if matches "$one_rm" -E -- "$RM_RECURSIVE_RE" && matches "$one_rm" -E -- "$RM_FORCE_RE"; then
-      block "rm с -r и -f запрещён — удаление необратимо. Удаляй той же командой через $GUARDED_RM (те же ключи и цели): он при выполнении проверит настоящие пути и удалит только внутри временных каталогов из реестра $WORKSPACE_ROOT/.claude/config/guarded-rm-roots.txt. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
-    fi
-  done <<< "$RM_INVOCATIONS"
+  block "rm с -r и -f запрещён — удаление необратимо. Удаляй той же командой через $GUARDED_RM (те же ключи и цели): он при выполнении проверит настоящие пути и удалит только внутри временных каталогов из реестра $WORKSPACE_ROOT/.claude/config/guarded-rm-roots.txt. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
-# psql: DROP/TRUNCATE — необратимая потеря структуры/данных.
-if matches "$CMD_EXEC" -iE '\bpsql\b' && matches "$CMD_EXEC" -iE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
-  block "DROP/TRUNCATE через psql запрещён — необратимая потеря данных. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+# SQL-клиенты: DROP/TRUNCATE — необратимая потеря структуры/данных.
+if matches "$CMD_EXEC" -iE '\b(psql|mysql|sqlite3)\b' && matches "$CMD_EXEC" -iE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
+  block "DROP/TRUNCATE через SQL-клиент запрещён — необратимая потеря данных. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
-# psql: DELETE FROM без WHERE в том же операторе (эвристика: сегмент до ближайшего
+# SQL-клиенты: DELETE FROM без WHERE в том же операторе (эвристика: сегмент до ближайшего
 # ';' или конца строки — не защищает от WHERE в другом statement той же команды).
-if matches "$CMD_EXEC" -iE '\bpsql\b' \
+if matches "$CMD_EXEC" -iE '\b(psql|mysql|sqlite3)\b' \
   && matches "$CMD_EXEC" -iE 'DELETE[[:space:]]+FROM' \
   && ! matches "$CMD_EXEC" -iE 'DELETE[[:space:]]+FROM[^;]*[[:space:]]WHERE([[:space:]]|$)'; then
-  block "DELETE FROM без WHERE через psql запрещён — удалит всю таблицу. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+  block "DELETE FROM без WHERE через SQL-клиент запрещён — удалит всю таблицу. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # удаление репозитория на GitHub — необратимо.

@@ -14,6 +14,10 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE = sys.argv[1] if len(sys.argv) > 1 else os.path.normpath(os.path.join(HERE, "..", "..", "..", "bin", "guarded-rm"))
+BASH = os.environ.get("GRM_BASH")
+if os.name == "nt" and not BASH:
+    sys.exit("GRM_BASH must point to Git Bash when using native Windows Python")
+BASH = BASH or "bash"
 
 
 def posix(path):
@@ -56,9 +60,9 @@ class Workspace:
 
     def run(self, *args, shell=None, cwd=None):
         if shell:
-            cmd = ["bash", "-c", shell]
+            cmd = [BASH, "-c", shell]
         else:
-            cmd = ["bash", self.script, *args]
+            cmd = [BASH, posix(self.script), *args]
         env = dict(os.environ, GRM=posix(self.script))
         proc = subprocess.run(
             cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, cwd=cwd
@@ -117,6 +121,32 @@ def main():
             code, err = w.run("-rf", mixed(up).upper())
             check("другой регистр пути на Windows", code == 0 and not os.path.exists(up), err)
 
+            def short_path(path):
+                return subprocess.run(
+                    [BASH, "-c", 'cygpath -m -s -- "$1"', "cygpath", posix(path)],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace"
+                )
+
+            short_ws = short_path(w.ws)
+            has_alias = short_ws.returncode == 0 and short_ws.stdout.strip().lower() != mixed(w.ws).lower()
+            check("Windows runner предоставляет короткое имя 8.3", has_alias, short_ws.stderr.strip())
+            if has_alias:
+                alias_root = short_ws.stdout.strip() + "/.claude/worktrees"
+                alias_target = w.make(w.ws, ".claude", "worktrees", "short-alias")
+                code, err = w.run("-rf", alias_root + "/short-alias")
+                check("короткий путь 8.3 внутри разрешённого корня", code == 0 and not os.path.exists(alias_target), err)
+
+                code, err = w.run("-rf", alias_root + "/absent-short-alias")
+                check("несуществующая цель после короткого предка", code == 0, err)
+
+                short_outside = short_path(w.outside)
+                outside_alias = w.make(w.outside, "short-outside")
+                outside_name = short_outside.stdout.strip() + "/short-outside"
+                code, err = w.run("-rf", outside_name)
+                check("короткий путь 8.3 вне разрешённых корней",
+                      short_outside.returncode == 0 and code == 1 and os.path.exists(outside_alias)
+                      and "вне разрешённых" in err, err or short_outside.stderr.strip())
+
         code, err = w.run("-rf")
         check("без целей — ничего не делает", code == 0, err)
 
@@ -171,7 +201,7 @@ def main():
         check("относительная цель вне корней (текущий каталог)", code == 1, err)
 
         link = os.path.join(w.allowed, "link")
-        subprocess.run(["bash", "-c", f'ln -s "{posix(w.outside)}" "{posix(link)}"'], capture_output=True)
+        subprocess.run([BASH, "-c", f'ln -s "{posix(w.outside)}" "{posix(link)}"'], capture_output=True)
         if os.path.islink(link):
             code, err = w.run("-rf", mixed(link))
             check("ссылка внутри корня на каталог снаружи", code == 1 and os.path.exists(o), err)
@@ -191,14 +221,14 @@ def main():
                 check("сама junction наружу (Windows)", code == 1 and os.path.exists(o), err)
                 subprocess.run(["cmd", "/c", "rmdir", junction], capture_output=True)
             else:
-                results.append("пропуск: mklink /J не создал junction — случай не проверен")
+                check("Windows junction доступна для проверки", False, "mklink /J не создал junction")
 
         # --- сбой внешних программ: отказ, ничего не удалено (рецензия Codex, круг 1) ---
         def faulty(tool, fail_from=1):
             """Подделка tool: с вызова номер fail_from выходит с кодом 3, до того — настоящий tool."""
             fake = tempfile.mkdtemp(prefix="grm-fake-")
             counter = posix(os.path.join(fake, "count"))
-            real_tool = subprocess.run(["bash", "-c", f"command -v {tool}"], capture_output=True, text=True).stdout.strip()
+            real_tool = subprocess.run([BASH, "-c", f"command -v {tool}"], capture_output=True, text=True).stdout.strip()
             with open(os.path.join(fake, tool), "w", newline="\n") as f:
                 f.write(f'#!/bin/sh\nn=$(cat "{counter}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "{counter}"\n'
                         f'if [ "$n" -ge {fail_from} ]; then exit 3; fi\nexec "{real_tool}" "$@"\n')
@@ -206,7 +236,7 @@ def main():
             return fake
 
         def run_with(fake, victim):
-            return subprocess.run(["bash", "-c", f'PATH="{posix(fake)}:$PATH"; bash "{posix(w.script)}" -rf "{posix(victim)}"'],
+            return subprocess.run([BASH, "-c", f'PATH="{posix(fake)}:$PATH"; bash "{posix(w.script)}" -rf "{posix(victim)}"'],
                                   capture_output=True, text=True, encoding="utf-8", errors="replace")
 
         tools = ("cygpath", "tr", "dirname") if os.name == "nt" else ("dirname",)
@@ -257,7 +287,7 @@ def main():
             env = dict(os.environ, PATH=stub + os.pathsep + os.environ["PATH"])
 
             def run_linux(*args, extra_env=None):
-                proc = subprocess.run(["bash", w.script, *args], capture_output=True, text=True, encoding="utf-8",
+                proc = subprocess.run([BASH, w.script, *args], capture_output=True, text=True, encoding="utf-8",
                                       errors="replace", env=dict(env, **(extra_env or {})))
                 return proc.returncode, proc.stderr.strip()
 

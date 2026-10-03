@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # WP-529 Ф3: release-receipt.sh must be fail-closed — publishable=true only
 # when every mandatory check reports success or an allowed skip (the macOS
-# integration job on a push event). Both Windows jobs must report success.
+# integration job on a push event). All three Windows jobs must report success.
 # Any failure, cancelled run, or an unset RESULT_* var (the receipt job
 # never even wired that job's result in) must produce publishable=false and
 # a non-zero exit, not silently pass.
@@ -20,6 +20,7 @@ ALL_SUCCESS_ENV=(
   RESULT_SHELLCHECK=success
   RESULT_PLATFORM_COMPAT=success
   RESULT_VALIDATE=success
+  RESULT_GUARDED_RM_WINDOWS=success
   RESULT_UPGRADE_TEST=success
   RESULT_GUIDE_KIT_DRIFT=success
   RESULT_WINDOWS_SESSION_GUARD=success
@@ -35,8 +36,8 @@ fi
   echo "FAIL: all-success scenario did not produce publishable=true"
   exit 1
 }
-[ "$(jq '.checks | length' "$OUT1")" = "10" ] || {
-  echo "FAIL: all-success receipt does not list all 10 mandatory checks"
+[ "$(jq '.checks | length' "$OUT1")" = "11" ] || {
+  echo "FAIL: all-success receipt does not list all 11 mandatory checks"
   exit 1
 }
 [ "$(jq -r '.sha' "$OUT1")" = "$(git -C "$ROOT" rev-parse HEAD)" ] || {
@@ -60,33 +61,29 @@ fi
   exit 1
 }
 
-# A red Windows barrier must make this commit unpublishable, even if every
-# older check passed. It is a required result, not a best-effort side job.
-OUT_WINDOWS="$TMP/receipt-windows-fail.json"
-if RELEASE_RECEIPT_OUT="$OUT_WINDOWS" env "${ALL_SUCCESS_ENV[@]}" RESULT_ISSUE_1030_WINDOWS=failure bash "$SCRIPT"; then
-  echo "FAIL: Windows barrier failure did not block the receipt"
-  exit 1
-fi
-[ "$(jq -r '.checks[] | select(.name=="issue-1030-windows") | .result' "$OUT_WINDOWS")" = "failure" ] || {
-  echo "FAIL: receipt does not record issue-1030-windows:failure"
-  exit 1
+# Each Windows job is mandatory even when the other passes. A skipped job has
+# not checked its invariant and must block publication too.
+check_windows_gate() {
+  local name=$1 result_var=$2 output result
+  for result in failure skipped; do
+    output="$TMP/receipt-$name-$result.json"
+    if RELEASE_RECEIPT_OUT="$output" env "${ALL_SUCCESS_ENV[@]}" "$result_var=$result" bash "$SCRIPT"; then
+      echo "FAIL: $name:$result did not block the receipt"
+      exit 1
+    fi
+    [ "$(jq -r '.publishable' "$output")" = "false" ] || {
+      echo "FAIL: $name:$result did not produce publishable=false"
+      exit 1
+    }
+    [ "$(jq -r --arg name "$name" '.checks[] | select(.name==$name) | .result' "$output")" = "$result" ] || {
+      echo "FAIL: receipt does not record $name:$result"
+      exit 1
+    }
+  done
 }
-
-# A skipped Windows job has not checked the lock. It must block publication
-# even though another optional platform job may legitimately be skipped.
-OUT_WINDOWS_SKIPPED="$TMP/receipt-windows-skipped.json"
-if RELEASE_RECEIPT_OUT="$OUT_WINDOWS_SKIPPED" env "${ALL_SUCCESS_ENV[@]}" RESULT_ISSUE_1030_WINDOWS=skipped bash "$SCRIPT"; then
-  echo "FAIL: skipped Windows barrier did not block the receipt"
-  exit 1
-fi
-[ "$(jq -r '.publishable' "$OUT_WINDOWS_SKIPPED")" = "false" ] || {
-  echo "FAIL: skipped Windows barrier did not produce publishable=false"
-  exit 1
-}
-[ "$(jq -r '.checks[] | select(.name=="issue-1030-windows") | .result' "$OUT_WINDOWS_SKIPPED")" = "skipped" ] || {
-  echo "FAIL: receipt does not record issue-1030-windows:skipped"
-  exit 1
-}
+check_windows_gate issue-1030-windows RESULT_ISSUE_1030_WINDOWS
+check_windows_gate guarded-rm-windows RESULT_GUARDED_RM_WINDOWS
+check_windows_gate windows-session-guard RESULT_WINDOWS_SESSION_GUARD
 
 # Scenario 3: a cancelled run must fail closed too, not just a literal "failure".
 OUT3="$TMP/receipt-cancelled.json"

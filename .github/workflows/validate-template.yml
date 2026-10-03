@@ -878,6 +878,26 @@ jobs:
             echo "PASS: All placeholders are valid"
           fi
 
+  # The Ubuntu guard suite cannot enter guarded-rm's cygpath branch or its
+  # Windows-only path, junction, and command-failure cases.
+  guarded-rm-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run guarded-rm Windows cases
+        shell: bash
+        run: |
+          export PYTHONIOENCODING=utf-8
+          python -c 'import os, sys; sys.exit(0 if os.name == "nt" else "native Windows Python required")'
+          command -v cygpath
+          GRM_BASH="$(cygpath -w "$BASH")"
+          export GRM_BASH
+          python -c 'import os, subprocess; subprocess.run([os.environ["GRM_BASH"], "-c", "command -v cygpath"], check=True)'
+          python .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
+
   # WP-529 Ф3: single fail-closed receipt for this commit, built from the
   # results of THIS workflow run (needs.<job>.result — same trigger, same
   # SHA), not from querying job status elsewhere. `if: always()` so a
@@ -897,6 +917,7 @@ jobs:
       - shellcheck
       - platform-compat
       - validate
+      - guarded-rm-windows
       - upgrade-test
       - guide-kit-drift
       - windows-session-guard
@@ -915,6 +936,7 @@ jobs:
           RESULT_SHELLCHECK: ${{ needs.shellcheck.result }}
           RESULT_PLATFORM_COMPAT: ${{ needs.platform-compat.result }}
           RESULT_VALIDATE: ${{ needs.validate.result }}
+          RESULT_GUARDED_RM_WINDOWS: ${{ needs.guarded-rm-windows.result }}
           RESULT_UPGRADE_TEST: ${{ needs.upgrade-test.result }}
           RESULT_GUIDE_KIT_DRIFT: ${{ needs.guide-kit-drift.result }}
           RESULT_WINDOWS_SESSION_GUARD: ${{ needs.windows-session-guard.result }}

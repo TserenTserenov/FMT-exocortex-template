@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "f9814f1e3a542b26e4f15cc1c046797b8787137dc26ec89440f762ab55e09009"
+      "sha256": "649036905dd0d36db509078301b34d0dcbe620bc2baad4c4f853e20842753d46"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "cfdcba033f7f058201088bb1870d81043a80926856fa4a2da6476ca75946bdbf"
+      "sha256": "ac9c09367773379a1b7d7ed0864a22ddf3d0a13cae708d002a9071a43660d249"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -189,11 +189,11 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
-      "sha256": "d06ead44dbb5fc9414db32d82af45130d54fd03aa225582abfba6b0dbdbabb2b"
+      "sha256": "c890efa1f922682770910d9307dbba63ee2e0c239c3fbd774405e8c994d4026d"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "5bd94ae3d3d7b2a1caef5689a84936ff7d89bdb9e0ab4b0a80fdbdccc95074ad"
+      "sha256": "e9b48361f2be4e4515e6992b1aae7fac110a47b0d796e8643ff3c04f720bda5c"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "71ecd43933681e16bc23e13dc0c2e6ed934c8d7b88002376dc85b80705584148"
+      "sha256": "5c5ebd1f2178a17db2bc26d559a1625a3f2de4acc4bdf9e0559cc3eeb9ee9159"
     },
     {
       "path": "CLAUDE.md",
@@ -909,7 +909,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "73649bbb03b91089a898f20c30b843b4e529e00a775a244e600ce4690c7d9a1e"
+      "sha256": "e1f7aa6d3c87c35b7df7709c83421bc4c265318aafbdc3da7a60bd7b8d284e0b"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -2601,7 +2601,7 @@
     },
     {
       "path": "scripts/release-receipt.sh",
-      "sha256": "62a34b2181e7110c56aa55a20e9c2171ac8266f776838d57e0ce4be024975f90"
+      "sha256": "867598ce6ab8565af5c5820270082ffaa336a7ad739eca67c67537fe66adcb52"
     },
     {
       "path": "scripts/restore-from-exocortex.sh",

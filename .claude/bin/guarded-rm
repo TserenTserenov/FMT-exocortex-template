@@ -29,7 +29,28 @@ REGISTRY="$WORKSPACE/.claude/config/guarded-rm-roots.txt"
 WINDOWS=0
 command -v cygpath >/dev/null 2>&1 && WINDOWS=1
 
-# Канонический путь: ссылки и `..` раскрыты; на Windows — смешанная форма C:/…, нижний регистр.
+# cygpath -m сохраняет короткие 8.3-имена (RUNNER~1), даже если тот же корень
+# реестра записан длинным именем. Раскрываем их у существующего предка; суффикс
+# несуществующей цели оставляем, чтобы `rm -rf` сохранял обычную семантику.
+windows_long_path() {
+  local path=$1 parent name suffix='' long
+  parent=$(cygpath -u -- "$path") || return 1
+  while [ ! -e "$parent" ] && [ ! -L "$parent" ]; do
+    case "$parent" in
+      */?*)
+        name=${parent##*/}
+        parent=${parent%/*}
+        [ -n "$parent" ] || parent=/
+        suffix="/$name$suffix"
+        ;;
+      *) return 1 ;;
+    esac
+  done
+  long=$(cygpath -m -l -- "$parent") || return 1
+  printf '%s%s' "${long%/}" "$suffix"
+}
+
+# Канонический путь: ссылки и `..` раскрыты; на Windows — длинная форма C:/…, нижний регистр.
 canon() {
   local path=$1 out
   if realpath -m -- / >/dev/null 2>&1; then
@@ -47,7 +68,7 @@ canon() {
     ' -- "$path") || return 1
   fi
   if [ "$WINDOWS" = 1 ]; then
-    out=$(cygpath -m -- "$out") || return 1
+    out=$(windows_long_path "$out") || return 1
     out=$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]') || return 1
   fi
   [ -n "$out" ] || return 1
