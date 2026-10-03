@@ -21,7 +21,10 @@ import urllib.request
 # Config from environment
 # ---------------------------------------------------------------------------
 GITHUB_PAT     = os.environ.get("GITHUB_SESSION_PAT", "")
-GITHUB_REPO    = os.environ.get("GITHUB_SESSION_REPO", "${GITHUB_OWNER:-owner}/${IWE_GOVERNANCE_REPO:-DS-strategy}")
+GITHUB_REPO    = os.environ.get("GITHUB_SESSION_REPO") or (
+    f"{os.environ.get('GITHUB_OWNER') or 'owner'}/"
+    f"{os.environ.get('IWE_GOVERNANCE_REPO') or 'DS-strategy'}"
+)
 # WP-358 Ф10.7: per-bot routing. Dispatcher выбирает токен на основе target_bot из meta.
 # TG_BOT_TOKEN_PROD — токен @aist_me_bot (по умолчанию)
 # TG_BOT_TOKEN_PILOT — токен @aist_pilot_bot

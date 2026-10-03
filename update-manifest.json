@@ -2921,7 +2921,7 @@
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
-      "sha256": "b04dee30fdc028666a41d0bc3e6a35e2465f60b21c6a478324d92e4dd911cd43"
+      "sha256": "13d5f80874bd4e47fdf9ebf267d4e98f8f20d66597255dacfb52e18211a3afa1"
     },
     {
       "path": "scripts/validate-hypothesis-priority.sh",
@@ -3215,6 +3215,8 @@
     "scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh",
     "scripts/tests/test_issue_1006_minor_findings.sh",
     "scripts/tests/test_issue_1010_red_team_findings.sh",
+    "scripts/tests/test_issue_1038_python_env.py",
+    "scripts/tests/test_issue_1038_validator.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",

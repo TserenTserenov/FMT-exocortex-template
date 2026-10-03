@@ -4,17 +4,20 @@ Generate helper-scripts-catalog.yaml from # routing: headers in shell scripts.
 Covers scripts that are NOT skills (no SKILL.md) — helpers, utilities, servers, migrations.
 see DP.SC.159, DP.ROLE.059
 """
-import re, yaml
+import os
+import re
+import yaml
 from pathlib import Path
 from datetime import datetime, timezone
 
 IWE = Path.home() / "IWE"
+GOVERNANCE_REPO = os.environ.get("IWE_GOVERNANCE_REPO") or "DS-strategy"
 SEARCH_DIRS = [
     IWE / "scripts",
     IWE / "FMT-exocortex-template" / "scripts",
-    IWE / "${IWE_GOVERNANCE_REPO:-DS-strategy}" / "scripts",
+    IWE / GOVERNANCE_REPO / "scripts",
 ]
-OUTPUT = IWE / "${IWE_GOVERNANCE_REPO:-DS-strategy}" / "scripts" / "helper-scripts-catalog.yaml"
+OUTPUT = IWE / GOVERNANCE_REPO / "scripts" / "helper-scripts-catalog.yaml"
 
 ROUTING_RE = re.compile(r"^# routing:\s+(.+)$", re.MULTILINE)
 DESC_RE    = re.compile(r"^#\s+[\w\-\.]+\.sh\s+[—-]\s+(.+)$", re.MULTILINE)
@@ -64,7 +67,7 @@ catalog = {
     "schema_version": 1,
     "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "source": "# routing: headers in *.sh files",
-    "generator": "${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/generate-helper-catalog.py",
+    "generator": f"{GOVERNANCE_REPO}/scripts/generate-helper-catalog.py",
     "wp": "WP-350",
     "summary": {k: len(v) for k, v in sorted(by_type.items())},
     "total": len(entries),

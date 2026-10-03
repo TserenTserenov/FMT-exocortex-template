@@ -26,7 +26,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
-DS_MY_STRATEGY = Path.home() / "IWE" / "${IWE_GOVERNANCE_REPO:-DS-strategy}"
+GOVERNANCE_REPO = os.environ.get("IWE_GOVERNANCE_REPO") or "DS-strategy"
+DS_MY_STRATEGY = Path.home() / "IWE" / GOVERNANCE_REPO
 SESSIONS_DIR = DS_MY_STRATEGY / "sessions"
 INBOX_DIR = DS_MY_STRATEGY / "inbox"
 CREATE_WP_SCRIPT = Path.home() / "IWE" / "FMT-exocortex-template" / "scripts" / "create-wp.sh"

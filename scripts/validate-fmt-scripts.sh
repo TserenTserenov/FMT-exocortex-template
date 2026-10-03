@@ -80,6 +80,8 @@ if [[ "$MODE" != "settings-json" ]]; then
         #   - ${IWE_GOVERNANCE_REPO:-DS-strategy}  (bash default)
         #   - ${IWE_GOVERNANCE_REPO:?...}          (bash required)
         #   - os.environ.get("GOVERNANCE_REPO", "DS-strategy")  (python fallback)
+        #   - os.environ.get("IWE_GOVERNANCE_REPO") or "DS-strategy"
+        #     (python fallback for unset AND empty values, issue #1038)
         #   - GOV_REPO_TMPL="DS-strategy"          (template identity literal)
         #   - VAR="DS-strategy" \                  (env override в команде, line cont)
         #   - cmd || echo "DS-strategy"            (bare fallback после ||, issue #275)
@@ -134,6 +136,12 @@ if [[ "$MODE" != "settings-json" ]]; then
                     line_content="${bl#*:}"
                     occurrences=$(grep -o "$AUTHOR_GOV_REPO" <<<"$line_content" | wc -l | tr -d ' ')
                     if [[ "$occurrences" -eq 1 ]]; then
+                        # Python's `or` matches shell `${VAR:-default}` for both
+                        # an unset and an empty variable. Require one literal on
+                        # the line so an unrelated hardcode cannot hide next to it.
+                        if echo "$bl" | grep -qE "os\\.environ\\.get\\([\"']IWE_GOVERNANCE_REPO[\"']\\)[[:space:]]+or[[:space:]]+[\"']${AUTHOR_GOV_REPO}[\"']"; then
+                            continue
+                        fi
                         if echo "$bl" | grep -qE "\\|\\|[[:space:]]*echo[[:space:]]+\"$AUTHOR_GOV_REPO\"[[:space:]]*\\)?[[:space:]]*\$"; then
                             continue
                         fi
