@@ -31,6 +31,20 @@ permissions:
   contents: read
 
 jobs:
+  # Issue #1032: prove the early refusal on actual Git Bash and native Python.
+  windows-session-guard:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Reject native Windows session before canonical writes
+        run: bash scripts/tests/test_issue_1032_windows_fail_closed.sh
+
   # Defense-in-depth для случая --no-verify в pre-commit + прямого push.
   # Отдельный job, чтобы шёл независимо от validate/shellcheck (не зависит от их успеха).
   release-sync:
@@ -876,6 +890,7 @@ jobs:
       - validate
       - upgrade-test
       - guide-kit-drift
+      - windows-session-guard
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -893,6 +908,7 @@ jobs:
           RESULT_VALIDATE: ${{ needs.validate.result }}
           RESULT_UPGRADE_TEST: ${{ needs.upgrade-test.result }}
           RESULT_GUIDE_KIT_DRIFT: ${{ needs.guide-kit-drift.result }}
+          RESULT_WINDOWS_SESSION_GUARD: ${{ needs.windows-session-guard.result }}
         run: bash scripts/release-receipt.sh
       - name: Upload release receipt
         if: always()

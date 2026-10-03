@@ -43,6 +43,16 @@
 
 set -euo pipefail
 
+# The transition lock below uses Unix fcntl, inode ownership and /bin/bash.
+# Git Bash with native Windows Python cannot uphold that contract. Refuse every
+# command before creating the session directory or touching the canonical repo.
+case "$(uname -s)" in
+  MINGW*|MSYS*)
+    echo 'session-guard: Git Bash на Windows с нативным Python не поддерживается: Unix-блокировка fcntl недоступна. Запустите рабочую сессию в WSL2.' >&2
+    exit 1
+    ;;
+esac
+
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
 SESSION_GUARD_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
 # issue #266: hardcoded "DS-strategy" broke every template user whose

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # WP-529 Ф3: release-receipt.sh must be fail-closed — publishable=true only
 # when every mandatory check reports success or an allowed skip (the macOS
-# integration job on a push event). The Windows lock check must report success.
+# integration job on a push event). Both Windows jobs must report success.
 # Any failure, cancelled run, or an unset RESULT_* var (the receipt job
 # never even wired that job's result in) must produce publishable=false and
 # a non-zero exit, not silently pass.
@@ -22,6 +22,7 @@ ALL_SUCCESS_ENV=(
   RESULT_VALIDATE=success
   RESULT_UPGRADE_TEST=success
   RESULT_GUIDE_KIT_DRIFT=success
+  RESULT_WINDOWS_SESSION_GUARD=success
 )
 
 # Scenario 1: every mandatory check success/skipped -> publishable, exit 0.
@@ -34,8 +35,8 @@ fi
   echo "FAIL: all-success scenario did not produce publishable=true"
   exit 1
 }
-[ "$(jq '.checks | length' "$OUT1")" = "9" ] || {
-  echo "FAIL: all-success receipt does not list all 9 mandatory checks"
+[ "$(jq '.checks | length' "$OUT1")" = "10" ] || {
+  echo "FAIL: all-success receipt does not list all 10 mandatory checks"
   exit 1
 }
 [ "$(jq -r '.sha' "$OUT1")" = "$(git -C "$ROOT" rev-parse HEAD)" ] || {
@@ -133,4 +134,20 @@ fi
   exit 1
 }
 
-echo "PASS: release-receipt.sh is fail-closed across all-pass/failure/skipped-Windows/cancelled/unset/empty-string scenarios"
+# Issue #1032: this job runs on every trigger. A skipped or failed native
+# Windows test cannot count as publishable, nor may the receipt omit the job.
+for result in failure skipped unknown; do
+  out="$TMP/receipt-windows-$result.json"
+  if RELEASE_RECEIPT_OUT="$out" env "${ALL_SUCCESS_ENV[@]}" \
+    RESULT_WINDOWS_SESSION_GUARD="$result" bash "$SCRIPT"; then
+    echo "FAIL: windows-session-guard:$result was publishable" >&2
+    exit 1
+  fi
+  [ "$(jq -r '.publishable' "$out")" = false ] && \
+  [ "$(jq -r '.checks[] | select(.name=="windows-session-guard") | .result' "$out")" = "$result" ] || {
+    echo "FAIL: windows-session-guard:$result was not recorded as blocking" >&2
+    exit 1
+  }
+done
+
+echo "PASS: release receipt fails closed for Windows failure, skipped and unknown results"
