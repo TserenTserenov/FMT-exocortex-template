@@ -104,6 +104,10 @@ build_day_open_failed_message() {
     local advice="Откройте день в сессии Claude Code командой «открывай». Подробности - в журнале стратега за сегодня (logs/strategist/$DATE.log в домашнем каталоге)."
     case "$rc" in ''|*[!0-9]*) rc="" ;; esac
     case "${DAY_OPEN_FAILED_REASON:-}" in
+        update-incomplete)
+            reason="Обновление шаблона не завершено: оставлен маркер .update-incomplete. Автоматическое Открытие дня отложено${rc:+ (код $rc)}."
+            advice="Завершите или восстановите update.sh; после снятия маркера планировщик повторит попытку. Если план нужен сейчас, откройте день в сессии Claude Code командой «открывай»."
+            ;;
         not-delivered)
             reason="Конвейер Открытия дня (scripts/day-open-pipeline.sh) не установлен на этой машине."
             advice="Запустите update.sh, чтобы его установить. План на сегодня соберите в сессии Claude Code командой «открывай»."

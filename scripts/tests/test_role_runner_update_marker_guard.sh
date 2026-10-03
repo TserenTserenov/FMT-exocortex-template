@@ -87,6 +87,19 @@ cat > "$TMP/bin/systemd-inhibit" <<'SH'
 exec /bin/sleep 120
 SH
 chmod +x "$TMP/bin/date" "$TMP/bin/uname" "$TMP/bin/systemd-inhibit"
+mkdir -p "$TMP/template/roles/synchronizer/scripts"
+cat > "$TMP/template/roles/synchronizer/scripts/notify.sh" <<'SH'
+#!/bin/sh
+printf '%s %s %s %s\n' "$1" "$2" "$DAY_OPEN_FAILED_REASON" "$DAY_OPEN_FAILED_RC" \
+    >> "$IWE_WORKSPACE/notify-attempts"
+if [ "$(wc -l < "$IWE_WORKSPACE/notify-attempts")" -eq 1 ]; then
+    # Real notify.sh also exits 0 when Telegram rejects the request.
+    echo 'Telegram send FAILED: strategist/day-open-failed'
+    exit 0
+fi
+echo 'Telegram notification sent: strategist/day-open-failed'
+SH
+chmod +x "$TMP/template/roles/synchronizer/scripts/notify.sh"
 
 run_dispatch() {
     HOME="$TMP/home" IWE_TEMPLATE="$TMP/template" IWE_WORKSPACE="$TMP/ws" \
@@ -98,17 +111,37 @@ run_dispatch() {
 }
 
 run_dispatch
+if [ -e "$STATE_DIR/strategist-morning-update-alert-$DATE_FIXED" ]; then
+    echo "❌ FAIL: rejected notification was marked as delivered"
+    exit 1
+fi
+run_dispatch
 run_dispatch
 if [ -e "$STATE_DIR/strategist-morning-$DATE_FIXED" ]; then
     echo "❌ FAIL: scheduler marked Day Open done while update marker exists"
     exit 1
 fi
-if [ "$(grep -cF '→ strategist morning' "$SCHEDULER_LOG")" -ne 2 ]; then
+if [ "$(grep -cF '→ strategist morning' "$SCHEDULER_LOG")" -ne 3 ]; then
     echo "❌ FAIL: scheduler did not retry blocked morning on the next dispatch"
     exit 1
 fi
 if ! grep -qF 'ALARM: strategist morning deferred' "$SCHEDULER_LOG"; then
     echo "❌ FAIL: scheduler did not record a visible update-blocked alarm"
+    exit 1
+fi
+if [ ! -f "$TMP/ws/notify-attempts" ] || \
+   [ "$(wc -l < "$TMP/ws/notify-attempts")" -ne 2 ] || \
+   [ "$(tail -1 "$TMP/ws/notify-attempts")" != 'strategist day-open-failed update-incomplete 75' ] || \
+   [ ! -f "$STATE_DIR/strategist-morning-update-alert-$DATE_FIXED" ]; then
+    echo "❌ FAIL: rejected notification was not retried and accepted notification not deduplicated"
+    exit 1
+fi
+
+MESSAGE=$(HOME="$TMP/home" DAY_OPEN_FAILED_REASON=update-incomplete DAY_OPEN_FAILED_RC=75 \
+    bash -c 'source "$1"; build_message day-open-failed' _ \
+    "$ROOT/roles/synchronizer/scripts/templates/strategist.sh")
+if ! printf '%s\n' "$MESSAGE" | grep -qF 'Обновление шаблона не завершено'; then
+    echo "❌ FAIL: delivered notification does not explain the incomplete update"
     exit 1
 fi
 
@@ -126,4 +159,4 @@ if [ ! -f "$STATE_DIR/strategist-morning-$DATE_FIXED" ] || \
     echo "❌ FAIL: recovered morning did not run exactly once and mark completion"
     exit 1
 fi
-echo "✅ PASS: scheduler alarms, keeps retry open, then completes once after recovery"
+echo "✅ PASS: scheduler retries failed notice, deduplicates delivery, and completes after recovery"
