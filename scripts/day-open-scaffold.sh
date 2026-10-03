@@ -698,6 +698,51 @@ _is_nonneg_int() {
     esac
 }
 
+# A file created by launchd or by the producer's first write is not proof that
+# the scheduled work finished. Each producer has its own completion marker.
+triage_report_health() {
+  local file="$1" day="$2"
+  [ -f "$file" ] || { echo absent; return; }
+  if head -1 "$file" | grep -Eq '^(WARN|ALARM|ERROR|FATAL|SKIP):'; then
+    echo failed
+  elif grep -Fxq "## Отчёт QA: неудовлетворённые ответы ($day)" "$file" &&
+       grep -Eq '^- Сегодня: [0-9]+' "$file" &&
+       grep -Eq '^- Вопросов за сутки: [0-9]+' "$file" &&
+       grep -Eq '^- Всего вопросов: [0-9]+' "$file" &&
+       grep -Eq '^- Неудовлетворённых \(🔍\): [0-9]+' "$file"; then
+    echo completed
+  else
+    echo unverified
+  fi
+}
+
+watchdog_log_health() {
+  local file="$1" day="$2"
+  [ -f "$file" ] || { echo absent; return; }
+  if grep -Eq '(^|[[:space:]])(WARN|ALARM|ERROR|FATAL|SKIP):' "$file"; then
+    echo failed
+  elif grep -Eq "^\\[$day [0-9]{2}:[0-9]{2}:[0-9]{2}\\] \\[feedback-watchdog\\] (OK:|done:)" "$file"; then
+    echo completed
+  else
+    echo unverified
+  fi
+}
+
+triage_stdout_health() {
+  local file="$1" day="$2" todays_lines
+  [ -f "$file" ] || { echo absent; return; }
+  todays_lines=$(awk -v prefix="[$day " 'index($0, prefix) == 1' "$file")
+  # A nonempty rolling log containing only older runs says nothing about today.
+  [ -n "$todays_lines" ] || { [ -s "$file" ] && echo absent || echo unverified; return; }
+  if printf '%s\n' "$todays_lines" | grep -Eq '(^|[[:space:]])(WARN|ALARM|ERROR|FATAL|SKIP):'; then
+    echo failed
+  elif printf '%s\n' "$todays_lines" | grep -Eq '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\] \[unsatisfied-report\] done: total=[0-9]+'; then
+    echo completed
+  else
+    echo unverified
+  fi
+}
+
 render_iwe_status() {
   echo "| Подсистема | Статус | Детали |"
   echo "|------------|--------|--------|"
@@ -885,23 +930,35 @@ render_iwe_status() {
     elif grep -Eq '(^|[[:space:]])SKIP:' "$scheduler_log"; then
       scheduler_log_health=deferred
     elif [ -s "$scheduler_log" ] &&
-         grep -Eq '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\] \[scheduler\] dispatch started ' "$scheduler_log" &&
-         grep -Eq '^\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\] \[scheduler\] dispatch completed$' "$scheduler_log"; then
+         grep -Eq "^\\[$DATE [0-9]{2}:[0-9]{2}:[0-9]{2}\\] \\[scheduler\\] dispatch started " "$scheduler_log" &&
+         grep -Eq "^\\[$DATE [0-9]{2}:[0-9]{2}:[0-9]{2}\\] \\[scheduler\\] dispatch completed$" "$scheduler_log"; then
       scheduler_log_health=completed
     else
       scheduler_log_health=unverified
     fi
   fi
 
+  local triage_report_health watchdog_health triage_stdout_health
+  triage_report_health=$(triage_report_health "$triage_file" "$DATE")
+  watchdog_health=$(watchdog_log_health "$watchdog_log" "$DATE")
+  triage_stdout_health=$(triage_stdout_health "$feedback_triage_log" "$DATE")
+
   if [ "$scheduler_log_health" = failed ]; then
     echo "| Scheduler/триаж | 🔴 | журнал планировщика за $DATE содержит ошибку — проверить $scheduler_log |"
+  elif [ "$triage_report_health" = failed ] || [ "$watchdog_health" = failed ] || [ "$triage_stdout_health" = failed ]; then
+    echo "| Scheduler/триаж | 🔴 | журнал или отчёт триажа за $DATE содержит ошибку — проверить $triage_file, $watchdog_log, $feedback_triage_log |"
   elif [ "$scheduler_log_health" = deferred ]; then
     echo "| Scheduler/триаж | 🟡 | запуск за $DATE отложен из-за параллельной работы; проверить завершение другого запуска — $scheduler_log |"
-  elif [ -f "$triage_file" ] || [ -f "$watchdog_log" ] || [ -f "$feedback_triage_log" ] || [ "$scheduler_log_health" = completed ]; then
-    # Mode B-1: отчёт либо подтверждённый чистый запуск за сегодня есть.
-    echo "| Scheduler/триаж | 🟢 | отчёт или чистый запуск за $DATE подтверждён (Mode B норм) |"
+  elif [ "$triage_report_health" = unverified ] || [ "$watchdog_health" = unverified ] ||
+       [ "$triage_stdout_health" = unverified ]; then
+    echo "| Scheduler/триаж | 🟡 | файл за $DATE есть, но успешное завершение триажа не подтверждено — проверить $triage_file, $watchdog_log, $feedback_triage_log |"
   elif [ "$scheduler_log_health" = unverified ]; then
     echo "| Scheduler/триаж | 🟡 | журнал планировщика за $DATE есть, но чистый завершённый запуск не подтверждён — проверить $scheduler_log |"
+  elif [ "$scheduler_log_health" = completed ] || [ "$triage_report_health" = completed ] ||
+       [ "$watchdog_health" = completed ] || [ "$triage_stdout_health" = completed ]; then
+    # Mode B-1: at least one producer finished cleanly and no present producer
+    # is failed, deferred or unverified.
+    echo "| Scheduler/триаж | 🟢 | отчёт или чистый запуск за $DATE подтверждён (Mode B норм) |"
   elif [ "$scheduler_state" = "not_deployed" ]; then
     # issue #347: планировщик здесь никогда не разворачивали — нет ни юнита, ни
     # crontab-записи, ни единого лога за всю историю. Это не авария, а не-установка:
@@ -915,7 +972,7 @@ render_iwe_status() {
     # Mode C: юнит загружен, но cron ещё не сработал (до 06:30)
     echo "| Scheduler/триаж | 🟡 | Mode C: юнит загружен, ожидание cron (06:00) — grace window до 06:30 |"
   elif [ "$has_launchd_unit" = "true" ] && { [ -n "$last_watchdog_log" ] || [ -n "$last_feedback_triage_log" ]; }; then
-    # Mode B-2: юнит зарегистрирован, есть свежий лог < 2 дней → норм (тишина = нет жалоб)
+    # Mode B-2: a historical log proves deployment, not today's completion.
     local last_log_age_days=-1
     local last_log_file=""
     if [ -n "$last_feedback_triage_log" ]; then
@@ -927,7 +984,7 @@ render_iwe_status() {
       last_log_age_days=$(( ( $(date +%s) - $(stat -c %Y "$last_log_file" 2>/dev/null || stat -f %m "$last_log_file" 2>/dev/null || echo 0) ) / 86400 ))
     fi
     if [ "$last_log_age_days" -le 1 ] || [ "$last_log_age_days" -eq -1 ]; then
-      echo "| Scheduler/триаж | 🟢 | Mode B: feedback-triage зарегистрирован, последний лог присутствует (нет жалоб = тишина) |"
+      echo "| Scheduler/триаж | 🟡 | Mode B: feedback-triage зарегистрирован, но за $DATE нет подтверждённого завершения; последний лог $last_log_file |"
     else
       echo "| Scheduler/триаж | 🟡 | Mode B: feedback-triage зарегистрирован, но лог не обновлялся ${last_log_age_days}д — возможно cron skipped |"
     fi
