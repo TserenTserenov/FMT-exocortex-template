@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-# Issue #1005 (update.sh part): refresh_fpf_base_clone killed the timed-out git
-# fetch with `pkill -P`, which Git Bash on Windows does not have -- the git
-# child could outlive the timeout. Fixed: without pkill the process tree is
-# killed with taskkill (Windows pid from /proc/<pid>/winpid).
-# The local control simulates MSYS with both pkill and taskkill present. The
-# Windows branch must choose taskkill because pkill -P cannot be trusted to
-# terminate native descendants. A separate mode runs the real tree on Windows.
+# Issue #1005 (update.sh part): Git Bash $! can identify a Bash shim whose
+# native Git helper is no longer its Windows child. A taskkill /T of that PID
+# reports success while the helper survives. The FPF fetch must use the same
+# bounded native process-tree supervisor as the read-only Sync Gate.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$ROOT"
 TMP="$(mktemp -d)"
 cleanup() {
-    if [ -n "${REAL_TASKKILL:-}" ] && [ -n "${PYTHON3:-}" ] \
-       && [ -f "$TMP/check-native-child.py" ]; then
+    if [ -n "${PYTHON3:-}" ] && [ -f "$TMP/check-native-child.py" ]; then
         for pidfile in "$TMP"/native-*.pid; do
             [ -f "$pidfile" ] || continue
             "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" \
@@ -34,8 +31,7 @@ declare -F refresh_fpf_base_clone >/dev/null || fail "refresh_fpf_base_clone not
 export GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1
 : > "$GIT_CONFIG_GLOBAL"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-# Prefer a real git binary over a wrapper script (a wrapper that calls `git`
-# through PATH would recurse into the shim below).
+# Prefer a real git binary over a wrapper script in the local fixture.
 REAL_GIT=""
 while IFS= read -r cand; do
     if [ "$(head -c 4 "$cand" 2>/dev/null | od -An -c | tr -d ' ')" = '177ELF' ]; then
@@ -44,7 +40,7 @@ while IFS= read -r cand; do
 done < <(type -ap git)
 [ -n "$REAL_GIT" ] || REAL_GIT="$(command -v git)"
 
-WORKSPACE_DIR="$TMP/workspace"
+WORKSPACE_DIR="$TMP/work space"
 mkdir -p "$WORKSPACE_DIR/FPF"
 "$REAL_GIT" -C "$WORKSPACE_DIR/FPF" -c init.defaultBranch=main init -q
 echo one > "$WORKSPACE_DIR/FPF/Readme.md"
@@ -55,8 +51,8 @@ if [ "${1:-}" = "--native-windows" ]; then
     case "$(uname -s)" in MINGW*|MSYS*) ;; *) fail "native mode requires Git Bash on Windows" ;; esac
     PYTHON3=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || fail "Python 3 is unavailable"
     "$PYTHON3" -c 'import os; assert os.name == "nt", os.name' || fail "native Windows Python required"
-    REAL_TASKKILL=$(command -v taskkill) || fail "taskkill is unavailable"
-    export REAL_GIT REAL_TASKKILL PYTHON3
+    NATIVE_PYTHON=$("$PYTHON3" -c 'import sys; print(sys.executable)') || fail "native Python path unavailable"
+    export GIT_ALLOW_PROTOCOL=ext
 
     cat > "$TMP/native-child.py" <<'PY'
 import os
@@ -153,111 +149,110 @@ finally:
     kernel.CloseHandle(handle)
 PY
 
-    NATIVE_TOOLS="$TMP/native-tools"
-    mkdir -p "$NATIVE_TOOLS"
-    cat > "$NATIVE_TOOLS/git" <<'SHIM'
-#!/usr/bin/env bash
-for arg in "$@"; do
-    if [ "$arg" = fetch ]; then
-        printf 'shell_pid=%s shell_winpid=%s\n' "$$" "$(cat "/proc/$$/winpid" 2>/dev/null)" > "$TEST_SHIM_PIDFILE"
-        "$PYTHON3" "$TEST_CHILD_SCRIPT" "$TEST_CHILD_PIDFILE" >/dev/null 2>&1 &
-        wait "$!"
-        exit $?
-    fi
-done
-exec "$REAL_GIT" "$@"
-SHIM
-    cat > "$NATIVE_TOOLS/taskkill" <<'SHIM'
-#!/usr/bin/env bash
-if [ "$TEST_TASKKILL_MODE" = noop ]; then
-    exit 0
-fi
-printf 'args=%s\n' "$*" > "$TEST_TASKKILL_LOG"
-"$REAL_TASKKILL" "$@" > "$TEST_TASKKILL_OUT" 2>&1
-rc=$?
-printf 'rc=%s\n' "$rc" >> "$TEST_TASKKILL_LOG"
-exit "$rc"
-SHIM
-    chmod +x "$NATIVE_TOOLS/git" "$NATIVE_TOOLS/taskkill"
-    export TEST_CHILD_SCRIPT="$(cygpath -w "$TMP/native-child.py")"
+    cat > "$TMP/native-red-control.py" <<'PY'
+import os
+import subprocess
+import sys
+import time
+
+git_exe, repo, record = sys.argv[1:]
+error_file = record + ".git-error"
+error_stream = open(error_file, "w+", encoding="utf-8")
+process = subprocess.Popen(
+    [git_exe, "-C", repo, "fetch", "--quiet"],
+    stdout=subprocess.DEVNULL, stderr=error_stream,
+)
+try:
+    deadline = time.monotonic() + 5
+    while not os.path.exists(record):
+        if process.poll() is not None:
+            error_stream.seek(0)
+            raise AssertionError(
+                f"git fetch exited before remote helper started: {process.returncode}; "
+                f"stderr={error_stream.read()}"
+            )
+        if time.monotonic() >= deadline:
+            raise AssertionError("remote helper did not publish its PID")
+        time.sleep(0.05)
+    process.terminate()  # Prior Windows behavior: only the direct git root.
+    process.wait(timeout=3)
+finally:
+    if process.poll() is None:
+        process.kill()
+        process.wait(timeout=3)
+    error_stream.close()
+PY
+
+    remote_ext_arg() {
+        local value="$1"
+        value="${value//%/%%}"
+        value="${value// /% }"
+        printf '%s' "$value"
+    }
 
     run_native_case() {
-        local mode="$1" pidfile="$TMP/native-$1.pid" output start elapsed
-        export TEST_TASKKILL_MODE="$mode"
-        export TEST_CHILD_PIDFILE="$(cygpath -w "$pidfile")"
-        export TEST_SHIM_PIDFILE="$TMP/shim-$mode.pid"
-        export TEST_TASKKILL_LOG="$TMP/taskkill-$mode.log"
-        export TEST_TASKKILL_OUT="$TMP/taskkill-$mode.out"
-        start=$(date +%s)
-        output=$(PATH="$NATIVE_TOOLS:$PATH" IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone 2>&1)
-        elapsed=$(( $(date +%s) - start ))
-        [ "$elapsed" -lt 12 ] || fail "$mode: watchdog took ${elapsed}s: $output"
-        grep -q 'не ответил' <<<"$output" || fail "$mode: no timeout message: $output"
-        [ -f "$pidfile" ] || fail "$mode: native child did not start: $output"
-        if [ "$mode" = noop ]; then
-            sleep 1
+        local mode="$1" pidfile="$TMP/native-$1.pid" url output start elapsed
+        local python_arg script_arg record_arg
+        python_arg=$(remote_ext_arg "$(cygpath -m "$NATIVE_PYTHON")")
+        script_arg=$(remote_ext_arg "$(cygpath -m "$TMP/native-child.py")")
+        record_arg=$(remote_ext_arg "$(cygpath -m "$pidfile")")
+        url="ext::$python_arg $script_arg $record_arg"
+        "$REAL_GIT" -C "$WORKSPACE_DIR/FPF" remote remove origin >/dev/null 2>&1 || true
+        "$REAL_GIT" -C "$WORKSPACE_DIR/FPF" remote add origin "$url" || fail "$mode: cannot configure local ext remote"
+        if [ "$mode" = red ]; then
+            "$PYTHON3" "$(cygpath -w "$TMP/native-red-control.py")" \
+                "$(cygpath -w "$REAL_GIT")" "$(cygpath -w "$WORKSPACE_DIR/FPF")" "$(cygpath -w "$pidfile")" \
+                || fail "red control: direct git termination did not start the remote helper"
             "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" alive-clean \
-                || fail "red control: missing tree kill did not leave a live native child"
+                || fail "red control: direct git termination did not leave the native helper alive"
         else
+            start=$(date +%s)
+            output=$(IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone 2>&1)
+            elapsed=$(( $(date +%s) - start ))
+            [ "$elapsed" -lt 15 ] || fail "green: fetch timeout took ${elapsed}s: $output"
+            grep -q 'не ответил' <<<"$output" || fail "green: no timeout message: $output"
+            [ -f "$pidfile" ] || fail "green: remote helper did not start: $output"
             "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" dead \
-                || fail "green control: native child survived; output=$output; child=$(cat "$pidfile"); shim=$(cat "$TEST_SHIM_PIDFILE" 2>/dev/null); taskkill=$(cat "$TEST_TASKKILL_LOG" 2>/dev/null); taskkill_out=$(cat "$TEST_TASKKILL_OUT" 2>/dev/null)"
+                || fail "green: native Git helper survived; output=$output; helper=$(cat "$pidfile")"
         fi
         rm -f "$pidfile"
     }
 
-    run_native_case noop
-    run_native_case real
-    echo "PASS: issue 1005 update.sh timeout kills a real Windows child; no-op control detects leak"
+    run_native_case red
+    run_native_case green
+    echo "PASS: issue 1005 FPF native Windows red/green real-Git remote-helper timeout"
     exit 0
 fi
 
-# Minimal PATH with explicit pkill and taskkill probes.
+# Local POSIX smoke: a fetch that never returns must be bounded by the shared
+# supervisor. The native Windows mode above checks the real descendant tree.
 TOOLS="$TMP/tools"
-PROC="$TMP/proc"
-mkdir -p "$TOOLS" "$PROC"
-# Mirror the tools of the current PATH (the real git may be a wrapper script
-# that needs arbitrary helpers).
-IFS=: read -r -a path_dirs <<<"$PATH"
-for d in "${path_dirs[@]}"; do
-    [ -d "$d" ] || continue
-    for f in "$d"/*; do
-        n="$(basename "$f")"
-        [ -x "$f" ] && [ ! -e "$TOOLS/$n" ] && ln -s "$f" "$TOOLS/$n"
-    done
-done
-# Replace (never write through) the mirrored symlinks.
-rm -f "$TOOLS/git" "$TOOLS/taskkill" "$TOOLS/pkill"
-
-# git shim: a fetch that never returns; publishes a fake Windows pid first.
+mkdir -p "$TOOLS"
 cat > "$TOOLS/git" <<SHIM
 #!/bin/bash
 for a in "\$@"; do
-    if [ "\$a" = fetch ]; then
-        mkdir -p "$PROC/\$\$"
-        echo 4242 > "$PROC/\$\$/winpid"
-        exec sleep 30
-    fi
+    [ "\$a" = fetch ] && exec sleep 30
 done
 exec "$REAL_GIT" "\$@"
 SHIM
-cat > "$TOOLS/taskkill" <<STUB
-#!/bin/bash
-echo "\$*" >> "$TMP/taskkill.args"
-STUB
-cat > "$TOOLS/pkill" <<STUB
-#!/bin/bash
-echo "\$*" >> "$TMP/pkill.args"
-STUB
-chmod +x "$TOOLS/git" "$TOOLS/taskkill" "$TOOLS/pkill"
+chmod +x "$TOOLS/git"
 
 started=$(date +%s)
-out=$(OSTYPE=msys PATH="$TOOLS" IWE_PROC_DIR="$PROC" IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone 2>&1)
+out=$(PATH="$TOOLS:$PATH" IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone 2>&1)
 elapsed=$(( $(date +%s) - started ))
-[ "$elapsed" -lt 12 ] || fail "watchdog did not fire (${elapsed}s): $out"
+[ "$elapsed" -lt 12 ] || fail "POSIX timeout took ${elapsed}s: $out"
 grep -q 'не ответил' <<<"$out" || fail "no timeout message: $out"
-[ -f "$TMP/taskkill.args" ] || fail "taskkill was not used for MSYS (native child tree left running)"
-[ ! -f "$TMP/pkill.args" ] || fail "MSYS incorrectly used pkill -P despite taskkill being available"
-grep -q '4242' "$TMP/taskkill.args" || fail "taskkill got no Windows pid: $(cat "$TMP/taskkill.args")"
-grep -q '//T' "$TMP/taskkill.args" || fail "taskkill not asked for the process tree: $(cat "$TMP/taskkill.args")"
 
-echo "PASS: issue 1005 update.sh fetch timeout prefers taskkill on MSYS (5 checks)"
+# A supervisor that cannot prove cleanup must get a distinct warning. The
+# temporary library replaces only the timeout helper for this classification
+# probe; the native Windows branch above exercises the real process tree.
+mkdir -p "$TMP/failing-controller/scripts/lib"
+printf '%s\n' '_git_sync_run_with_timeout() { return 125; }' \
+    > "$TMP/failing-controller/scripts/lib/git-sync-status.sh"
+out=$(SCRIPT_DIR="$TMP/failing-controller" IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone 2>&1)
+grep -q 'остановка дерева git не подтверждена' <<<"$out" \
+    || fail "supervision failure lost its distinct warning: $out"
+out=$(IWE_FPF_FETCH_TIMEOUT=0 refresh_fpf_base_clone 2>&1)
+grep -q 'некорректный лимит' <<<"$out" || fail "zero timeout was not rejected: $out"
+
+echo "PASS: issue 1005 FPF local bounded timeout, supervision failure, zero limit"

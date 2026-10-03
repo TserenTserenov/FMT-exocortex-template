@@ -41,6 +41,29 @@ if [ "${1:-}" = "--native-windows" ]; then
     [ "$GIT_SYNC_STATUS" = OK ] && [ "$GIT_SYNC_BEHIND" = 0 ] \
         || fail "native Windows local origin classified as $GIT_SYNC_STATUS: $GIT_SYNC_DETAIL"
 
+    # A missing system taskkill must fail before spawning git. A separate
+    # classifier probe checks that exit 125 cannot be reported as a normal
+    # handled timeout when the supervisor cannot prove cleanup.
+    cat > "$TMP/preflight-child.py" <<'PY'
+from pathlib import Path
+import sys
+Path(sys.argv[1]).write_text("started", encoding="ascii")
+PY
+    missing_system_root="$(cygpath -w "$TMP/missing-system-root")"
+    preflight_marker="$TMP/preflight-child-started"
+    SystemRoot="$missing_system_root" _git_sync_run_with_timeout 3 \
+        "$NATIVE_PYTHON" "$(cygpath -w "$TMP/preflight-child.py")" "$(cygpath -w "$preflight_marker")" \
+        >/dev/null 2>&1
+    preflight_status=$?
+    [ "$preflight_status" -eq 125 ] || fail "missing taskkill preflight returned $preflight_status, expected 125"
+    [ ! -e "$preflight_marker" ] || fail "missing taskkill preflight launched a child"
+    (
+        _git_sync_run_with_timeout() { return 125; }
+        check_git_sync_status "$TMP/repo" main 5
+        [ "$GIT_SYNC_STATUS" = fetch_failed ] && [ "$GIT_SYNC_DETAIL" = reason=timeout_supervision_failed ] \
+            || fail "supervisor failure misclassified as $GIT_SYNC_STATUS: $GIT_SYNC_DETAIL"
+    )
+
     cat > "$TMP/native-tree-root.py" <<'PY'
 import json
 import os

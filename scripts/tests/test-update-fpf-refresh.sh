@@ -5,6 +5,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
+SCRIPT_DIR="$ROOT"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
