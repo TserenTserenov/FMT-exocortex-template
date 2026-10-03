@@ -1,4 +1,6 @@
-files_translated: []
-last_run_utc: '2026-10-03T13:59:17Z'
-last_synced_sha: 9a9ea9c67cdcbbf38fe9a89ef179935af11b5f4f
+files_translated:
+- README.md
+- docs/SETUP-GUIDE.md
+last_run_utc: '2026-10-03T14:40:30Z'
+last_synced_sha: 4492edbd72a4a7fed6068087bdf6463dcf2993c3
 schema_version: 1
