@@ -36,6 +36,8 @@
 #   H  issue #983 as reported: nothing but IWE_SCRIPTS in the environment, no model gateway,
 #      the strategist's two calls (the pipeline as is, then --scaffold-only), a governance repo
 #      with history; everything the pipeline reads or writes belongs to the governance repo
+#   I  a gateway that passes both probes but whose fill fails hard or leaves PENDING sections:
+#      the real pipeline preserves the scaffold, returns failure, and cannot push a false plan
 #   S  static guard on both copies of the pipeline: no executable path built from $DS_STRATEGY
 set -uo pipefail
 
@@ -116,8 +118,12 @@ while [ $# -gt 0 ]; do
 done
 printf '%s\n' "$url" > "$CURL_LOG_DIR/call-$$.url"
 printf '%s' "$body" > "$CURL_LOG_DIR/call-$$.json"
-[ -n "$out" ] && printf '{"ok":true}' > "$out"
-printf 200
+if [ -n "$out" ]; then
+    printf '{"ok":true}' > "$out"
+    printf 200
+else
+    printf '{"ok":true}'
+fi
 EOF
 cat > "$STUBS_TG/python3" <<'EOF'
 #!/bin/sh
@@ -276,12 +282,12 @@ expect_scaffold_in_governance() { # <label> <workspace> <governance> <output> <r
     else
         ok "$label: шаг 1.2 не трогает чужой репозиторий"
     fi
-    # The strategist treats any non-zero exit as a failed Day Open (no plan, an alarm), so the
-    # whole probe run (every later step is started from the directory the copy runs from) must end green.
-    if [ "$rc" -eq 0 ] && has "$out" "verdict=🟢 green"; then
-        ok "$label: прогон дошёл до конца, код возврата 0, вердикт green"
+    # A scaffold is incomplete even when all structural checks pass.
+    if [ "$rc" -eq 10 ] && has "$out" "verdict=🟡 incomplete (scaffold)" \
+       && ! has "$out" "День открыт"; then
+        ok "$label: каркас дошёл до проверок, но не выдал готовый DayPlan"
     else
-        bad "$label: прогон не завершился успешно (rc=$rc): $(grep -F 'PROBE SUMMARY' -A1 "$out" | tail -1)"
+        bad "$label: каркас получил ложную готовность (rc=$rc): $(grep -F 'PROBE SUMMARY' -A1 "$out" | tail -1)"
     fi
 }
 
@@ -298,13 +304,16 @@ expect_template_untouched() { # <label> <workspace> <before snapshot>
 # What the curl stand-in recorded: how many messages, and their decoded text.
 tg_calls() { # <record dir>
     local n=0 f
-    for f in "$1"/*.url; do [ -f "$f" ] && n=$((n + 1)); done
+    for f in "$1"/*.url; do
+        [ -f "$f" ] && grep -qF 'api.telegram.org/' "$f" && n=$((n + 1))
+    done
     echo "$n"
 }
 tg_text() { # <record dir>
     local f
     for f in "$1"/*.json; do
-        [ -f "$f" ] && PYTHONIOENCODING=utf-8 python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["text"])' "$f"
+        [ -f "$f" ] && grep -qF 'api.telegram.org/' "${f%.json}.url" && \
+            PYTHONIOENCODING=utf-8 python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["text"])' "$f"
     done
 }
 
@@ -483,8 +492,10 @@ H="$TMP/h"; SCRIPT_H="$H/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh"
 build_skeleton "$H/ws"
 build_working_governance "$H/ws/DS-strategy" "$H/remote.git"
 snapshot_tree "$H/ws/FMT-exocortex-template" "$H/before.txt"
+remote_before=$(git -C "$H/remote.git" rev-parse main)
 run_pipeline plain "$H/ws" "$SCRIPT_H" "$H/call1.txt"
 rc1=$?
+governance_before=$(git -C "$H/ws/DS-strategy" status --porcelain --untracked-files=all)
 run_pipeline scaffold "$H/ws" "$SCRIPT_H" "$H/call2.txt"
 rc2=$?
 if [ "$rc1" -eq 9 ] && has "$H/call1.txt" "LLM gateway is not configured"; then
@@ -492,20 +503,45 @@ if [ "$rc1" -eq 9 ] && has "$H/call1.txt" "LLM gateway is not configured"; then
 else
     bad "H: первый вызов: rc=$rc1, ожидалось 9 и «LLM gateway is not configured»: $(tail -2 "$H/call1.txt" | tr '\n' ' ')"
 fi
-if has "$H/call2.txt" "Scaffold OK: $H/ws/DS-strategy/current/DayPlan $DATE.md" && ! has "$H/call2.txt" "WeekPlan not found"; then
-    ok "H: повтор с --scaffold-only проходит Scaffold, план дня создан в DS-strategy"
+draft="$H/ws/.tmp/day-open-scaffold/DayPlan $DATE.md"
+if has "$H/call2.txt" "Scaffold OK: $draft" && ! has "$H/call2.txt" "WeekPlan not found"; then
+    ok "H: повтор с --scaffold-only проходит Scaffold, черновик создан вне DS-strategy"
 else
     bad "H: повтор не прошёл Scaffold (rc=$rc2): $(grep -F 'WeekPlan not found' "$H/call2.txt" | head -1)"
 fi
-if [ "$rc2" -eq 0 ] && [ -f "$H/ws/DS-strategy/current/DayPlan $DATE.md" ]; then
-    ok "H: повтор завершился успешно (rc=0), файл плана лежит в DS-strategy"
+if [ "$rc2" -eq 10 ] && [ -f "$draft" ] \
+   && has "$draft" "<!-- day-open-status: scaffold -->" \
+   && has "$draft" "день не открыт" \
+   && ! [ -e "$H/ws/DS-strategy/current/DayPlan $DATE.md" ] \
+   && ! has "$H/call2.txt" "День открыт"; then
+    ok "H: неполный каркас отмечен в артефакте, полный DayPlan не создан"
 else
-    bad "H: повтор: rc=$rc2, файл плана в DS-strategy: $([ -f "$H/ws/DS-strategy/current/DayPlan $DATE.md" ] && echo есть || echo нет)"
+    bad "H: каркас выдан как готовый или затронул текущий DayPlan (rc=$rc2)"
 fi
-if [ "$(git -C "$H/remote.git" log -1 --format=%s main 2>/dev/null)" = "feat(dayplan): $DATE — auto Day Open (WP-356) [allow:current]" ]; then
-    ok "H: коммит с планом дня отправлен в origin governance-репозитория"
+if [ "$(git -C "$H/remote.git" rev-parse main)" = "$remote_before" ] \
+   && ! git -C "$H/ws/DS-strategy" ls-files --error-unmatch "current/DayPlan $DATE.md" >/dev/null 2>&1 \
+   && ! has "$H/call2.txt" "git-dirty-guard нашёл незакоммиченную работу"; then
+    ok "H: PENDING не закоммичен, не отправлен и не вызвал dirty-guard"
 else
-    bad "H: в origin нет коммита с планом дня: $(git -C "$H/remote.git" log -1 --format=%s main 2>&1 | head -1)"
+    bad "H: незавершённый каркас попал в историю или вызвал dirty-guard"
+fi
+governance_after=$(git -C "$H/ws/DS-strategy" status --porcelain --untracked-files=all)
+if [ "$governance_after" = "$governance_before" ] \
+   && has "$H/call2.txt" "Multiplier backfill patch — SKIPPED (scaffold-only)"; then
+    ok "H: каркас не меняет governance-дерево и не запускает дозапись ledger/WakaTime"
+else
+    bad "H: каркас изменил governance-дерево или запустил backfill"
+fi
+printf '\nПравка пользователя не теряется.\n' >> "$draft"
+draft_hash=$(shasum -a 256 "$draft" | awk '{print $1}')
+run_pipeline scaffold "$H/ws" "$SCRIPT_H" "$H/call3.txt"
+rc3=$?
+if [ "$rc3" -eq 10 ] && [ "$(shasum -a 256 "$draft" | awk '{print $1}')" = "$draft_hash" ] \
+   && has "$H/call3.txt" "preserving it unchanged" \
+   && [ ! -e "$H/ws/day-open.lock" ]; then
+    ok "H: повторный scaffold сохраняет правку пользователя побайтно"
+else
+    bad "H: повторный scaffold затёр правку пользователя (rc=$rc3)"
 fi
 # "missing" is the symptom (the file is looked up in the template); ok and stale both prove it
 # was found in the governance repository (stale = older than a week by the clock the run sees).
@@ -527,6 +563,381 @@ else
     bad "H: журнал personal-guide-update.log не в DS-strategy/logs: $(grep -F 'personal-guide-update.log' "$H/call2.txt" | head -1)"
 fi
 expect_template_untouched "H" "$H/ws" "$H/before.txt"
+
+# ---------------------------------------------------------------- case I
+echo "== I: ошибка LLM Fill не превращается в успешное Открытие дня"
+STUBS_LLM="$TMP/stubs-llm"
+mkdir -p "$STUBS_LLM"
+cat > "$STUBS_LLM/curl" <<'EOF'
+#!/bin/sh
+# The pipeline checks health and authorization before starting the real fill stage.
+case " $* " in
+    *'/v1/health'*) printf '{"status":"ok"}\n' ;;
+    *'/v1/messages'*) printf 200 ;;
+    *) echo "unexpected curl call: $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$STUBS_LLM/curl"
+for fill_rc in 1 2; do
+    I="$TMP/i-$fill_rc"
+    build_skeleton "$I/ws"
+    build_working_governance "$I/ws/DS-strategy" "$I/remote.git"
+    # Fake only the model fill boundary; every other stage is the delivered pipeline.
+    cat > "$I/ws/FMT-exocortex-template/scripts/day-open-llm-fill.py" <<'EOF'
+import os
+import sys
+
+print("[WARN] fake LLM left PENDING" if os.environ["FAKE_LLM_FILL_RC"] == "2"
+      else "[ERROR] fake LLM failed", file=sys.stderr)
+sys.exit(int(os.environ["FAKE_LLM_FILL_RC"]))
+EOF
+    run_pipeline plain "$I/ws" "$I/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$I/out.txt" \
+        PATH="$STUBS_LLM:$STUBS:$PATH" LLM_PROXY_URL=https://fake.invalid \
+        FAKE_LLM_FILL_RC="$fill_rc"
+    rc=$?
+    plan="$I/ws/DS-strategy/current/DayPlan $DATE.md"
+    if [ "$rc" -eq 1 ] && has "$I/out.txt" "=== 4. LLM Fill ===" \
+       && has "$I/ws/DS-strategy/machine/logs/day-open-$DATE.log" "exit=$fill_rc"; then
+        ok "I/$fill_rc: ошибка заполнения дошла через реальный конвейер до кода 1"
+    else
+        bad "I/$fill_rc: ожидали ошибку заполнения и код 1, получили rc=$rc: $(tail -4 "$I/out.txt" | tr '\n' ' ')"
+    fi
+    if [ -f "$plan" ] && has "$plan" "PENDING"; then
+        ok "I/$fill_rc: незавершённый скелет сохранён для повтора"
+    else
+        bad "I/$fill_rc: скелет с PENDING не сохранён"
+    fi
+    if [ "$(git -C "$I/remote.git" rev-parse main 2>/dev/null)" = \
+         "$(git -C "$I/ws/DS-strategy" rev-parse HEAD 2>/dev/null)" ] \
+       && ! git -C "$I/ws/DS-strategy" ls-files --error-unmatch "current/DayPlan $DATE.md" >/dev/null 2>&1; then
+        ok "I/$fill_rc: незавершённый план не закоммичен и не отправлен"
+    else
+        bad "I/$fill_rc: незавершённый план попал в историю"
+    fi
+done
+# The actual morning runner must see the pipeline failure, alarm/retry it, and never
+# write its success marker. Use the partial branch because it used to continue to
+# weak default checks and could publish a plan with PENDING content.
+I="$TMP/i-2"
+cat > "$STUBS_LLM/caffeinate" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+cat > "$STUBS_LLM/systemd-inhibit" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+chmod +x "$STUBS_LLM/caffeinate" "$STUBS_LLM/systemd-inhibit"
+env -i HOME="$HOME" PATH="$STUBS_LLM:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
+    IWE_WORKSPACE="$I/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_TEMPLATE="$I/ws/FMT-exocortex-template" \
+    IWE_SCRIPTS="$I/ws/FMT-exocortex-template/scripts" \
+    DAY_OPEN_LOCK_FILE="$I/ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
+    LLM_PROXY_URL=https://fake.invalid FAKE_LLM_FILL_RC=2 \
+    "$BASH" "$I/ws/FMT-exocortex-template/roles/strategist/scripts/strategist.sh" morning \
+    > "$I/strategist.txt" 2>&1
+rc=$?
+if [ "$rc" -eq 1 ] && has "$I/strategist.txt" "FAILED scenario: day-plan (rc=1)" \
+   && ! has "$I/strategist.txt" "Morning: Day Open pipeline OK"; then
+    ok "I/2: утренний сценарий получает ошибку и не ставит ложную отметку готовности"
+else
+    bad "I/2: утренний сценарий скрывает ошибку или ставит отметку готовности (rc=$rc): $(tail -5 "$I/strategist.txt" | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------- case J
+echo "== J: локальный каркас, существующий DayPlan, пользовательские hooks и последующее полное заполнение"
+J="$TMP/j"
+build_skeleton "$J/ws"
+build_working_governance "$J/ws/DS-strategy" "$J/remote.git"
+mkdir -p "$J/ws/extensions"
+cat > "$J/ws/extensions/day-open.before.fixture.md" <<'EOF'
+```bash
+mkdir -p "$IWE/.tmp"
+touch "$IWE/.tmp/before-hook-ran"
+```
+EOF
+cat > "$J/ws/extensions/day-open.after.fixture.md" <<'EOF'
+```bash
+printf '\nAFTER_HOOK_RAN\n' >> "$IWE/DS-strategy/current/DayPlan $(date +%Y-%m-%d).md"
+```
+EOF
+cat > "$J/ws/extensions/day-open.checks.fixture.md" <<'EOF'
+```bash
+if grep -q '<!-- PENDING' "$FILE"; then
+  echo 'PENDING remains in draft'
+  exit 1
+fi
+grep -q 'AFTER_HOOK_RAN' "$FILE"
+```
+EOF
+complete="$J/ws/DS-strategy/current/DayPlan $DATE.md"
+printf '# Готовый пользовательский план %s\n\nРучная правка.\n' "$DATE" > "$complete"
+complete_hash=$(shasum -a 256 "$complete" | awk '{print $1}')
+run_pipeline scaffold "$J/ws" "$J/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$J/scaffold.txt"
+rc=$?
+draft="$J/ws/.tmp/day-open-scaffold/DayPlan $DATE.md"
+if [ "$rc" -eq 10 ] && [ -f "$draft" ] \
+   && [ "$(shasum -a 256 "$complete" | awk '{print $1}')" = "$complete_hash" ] \
+   && [ -e "$J/ws/.tmp/before-hook-ran" ] \
+   && ! has "$complete" "AFTER_HOOK_RAN" \
+   && has "$J/scaffold.txt" "PENDING remains in draft"; then
+    ok "J: каркас сохранил готовый DayPlan, after hook отложен, пользовательская проверка увидела PENDING"
+else
+    bad "J: каркас тронул готовый DayPlan или выдал ложный статус (rc=$rc)"
+fi
+printf '\nРучная заметка в черновике.\n' >> "$draft"
+draft_hash=$(shasum -a 256 "$draft" | awk '{print $1}')
+rm "$J/ws/.tmp/before-hook-ran"
+# The completed manual plan is kept above; remove it only inside this disposable
+# fixture to exercise a normal full Day Open from the same clean governance data.
+rm "$complete"
+cat > "$J/ws/FMT-exocortex-template/scripts/day-open-llm-fill.py" <<'EOF'
+import re
+import sys
+from pathlib import Path
+
+args = sys.argv
+scaffold = Path(args[args.index('--scaffold') + 1])
+out = Path(args[args.index('--out') + 1])
+text = re.sub(r'<!-- PENDING[^>]*-->', 'заполнено', scaffold.read_text())
+out.write_text(text)
+print('[OK] fake complete fill')
+EOF
+run_pipeline plain "$J/ws" "$J/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$J/full.txt" \
+    PATH="$STUBS_LLM:$STUBS:$PATH" LLM_PROXY_URL=https://fake.invalid
+rc=$?
+if [ "$rc" -eq 0 ] && [ -f "$complete" ] \
+   && ! has "$complete" "<!-- day-open-status: scaffold -->" \
+   && ! has "$complete" "<!-- PENDING" \
+   && has "$complete" "AFTER_HOOK_RAN" \
+   && [ -e "$J/ws/.tmp/before-hook-ran" ] \
+   && [ "$(shasum -a 256 "$draft" | awk '{print $1}')" = "$draft_hash" ] \
+   && git -C "$J/remote.git" cat-file -e "main:current/DayPlan $DATE.md" \
+   && ! has "$J/full.txt" "git-dirty-guard нашёл незакоммиченную работу"; then
+    ok "J: полное заполнение создаёт готовый DayPlan, запускает hooks, сохраняет правки черновика и публикует план"
+else
+    bad "J: переход каркас → полный план нарушен (rc=$rc): $(tail -8 "$J/full.txt" | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------- case K
+echo "== K: ошибка маркировки не публикует неполный каркас; повтор восстанавливается"
+K="$TMP/k"
+build_skeleton "$K/ws"
+build_working_governance "$K/ws/DS-strategy" "$K/remote.git"
+mkdir -p "$K/fail-awk"
+cat > "$K/fail-awk/awk" <<'EOF'
+#!/bin/sh
+case "$*" in
+    *'day-open-status: scaffold'*) exit 63 ;;
+esac
+exec "$REAL_AWK" "$@"
+EOF
+chmod +x "$K/fail-awk/awk"
+run_pipeline scaffold "$K/ws" "$K/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$K/failure.txt" \
+    PATH="$K/fail-awk:$STUBS:$PATH" REAL_AWK="$(command -v awk)"
+rc=$?
+draft="$K/ws/.tmp/day-open-scaffold/DayPlan $DATE.md"
+if [ "$rc" -eq 1 ] && [ ! -e "$draft" ] \
+   && has "$K/failure.txt" "Could not mark incomplete scaffold"; then
+    ok "K: при ошибке маркировки финальный путь отсутствует"
+else
+    bad "K: после ошибки остался немаркированный черновик (rc=$rc)"
+fi
+run_pipeline scaffold "$K/ws" "$K/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$K/retry.txt"
+rc=$?
+if [ "$rc" -eq 10 ] && has "$draft" "<!-- day-open-status: scaffold -->" \
+   && has "$draft" "день не открыт"; then
+    ok "K: повтор создал явно неполный черновик"
+else
+    bad "K: повтор после ошибки маркировки не создал правильный черновик (rc=$rc)"
+fi
+
+# ---------------------------------------------------------------- case L
+echo "== L: реальный morning + pipeline без шлюза шлют одну итоговую тревогу"
+L="$TMP/l"
+build_skeleton "$L/ws"
+build_working_governance "$L/ws/DS-strategy" "$L/remote.git"
+L_HOME="$L/home"
+mkdir -p "$L_HOME/.config/aist" "$L/tg"
+printf 'TELEGRAM_BOT_TOKEN=fake-token-974\nTELEGRAM_CHAT_ID=974\n' > "$L_HOME/.config/aist/env"
+env -i HOME="$L_HOME" PATH="$STUBS_TG:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
+    REAL_PYTHON3="$REAL_PYTHON3" CURL_LOG_DIR="$L/tg" \
+    IWE_WORKSPACE="$L/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_TEMPLATE="$L/ws/FMT-exocortex-template" \
+    IWE_SCRIPTS="$L/ws/FMT-exocortex-template/scripts" \
+    DAY_OPEN_LOCK_FILE="$L/ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
+    "$BASH" "$L/ws/FMT-exocortex-template/roles/strategist/scripts/strategist.sh" morning \
+    > "$L/morning.txt" 2>&1
+rc=$?
+draft="$L/ws/.tmp/day-open-scaffold/DayPlan $DATE.md"
+messages=$(tg_text "$L/tg")
+if [ "$rc" -eq 0 ] && [ -f "$draft" ] \
+   && [ "$(tg_calls "$L/tg")" -eq 1 ] \
+   && [[ "$messages" == *"План дня не собран"* ]] \
+   && [[ "$messages" != *"Day Open pipeline started"* ]] \
+   && [[ "$messages" != *"Day Open pipeline aborted"* ]]; then
+    ok "L: первый утренний запуск передал ровно одну итоговую тревогу без промежуточного шума"
+else
+    bad "L: неверные уведомления реального утреннего запуска (rc=$rc, число=$(tg_calls "$L/tg")): $(tail -8 "$L/morning.txt" | tr '\n' ' ')"
+fi
+env -i HOME="$L_HOME" PATH="$STUBS_TG:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
+    REAL_PYTHON3="$REAL_PYTHON3" CURL_LOG_DIR="$L/tg" \
+    IWE_WORKSPACE="$L/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_TEMPLATE="$L/ws/FMT-exocortex-template" \
+    IWE_SCRIPTS="$L/ws/FMT-exocortex-template/scripts" \
+    DAY_OPEN_LOCK_FILE="$L/ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
+    "$BASH" "$L/ws/FMT-exocortex-template/roles/strategist/scripts/strategist.sh" morning \
+    > "$L/morning-repeat.txt" 2>&1
+repeat_rc=$?
+if [ "$repeat_rc" -eq 0 ] && [ "$(tg_calls "$L/tg")" -eq 1 ]; then
+    ok "L: следующий штатный запуск не дублирует тревогу"
+else
+    bad "L: следующий запуск продублировал тревогу (rc=$repeat_rc, число=$(tg_calls "$L/tg"))"
+fi
+run_notifying plain "$L/ws" "$L/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" \
+    "$L/standalone.txt" "$L/standalone-tg" IWE_GOVERNANCE_REPO=DS-strategy
+standalone_rc=$?
+standalone_messages=$(tg_text "$L/standalone-tg")
+if [ "$standalone_rc" -eq 9 ] && [ "$(tg_calls "$L/standalone-tg")" -eq 2 ] \
+   && [[ "$standalone_messages" == *"Day Open pipeline started"* ]] \
+   && [[ "$standalone_messages" == *"Day Open pipeline aborted"* ]]; then
+    ok "L: прямой вызов конвейера сохранил прежние уведомления"
+else
+    bad "L: прямой вызов конвейера потерял уведомления (rc=$standalone_rc, число=$(tg_calls "$L/standalone-tg"))"
+fi
+
+# ---------------------------------------------------------------- case M
+echo "== M: Mode A в локальном каркасе виден, но не пишет инцидент в governance"
+M="$TMP/m"
+build_skeleton "$M/ws"
+build_working_governance "$M/ws/DS-strategy" "$M/remote.git"
+M_HOME="$M/home"
+mkdir -p "$M_HOME/Library/LaunchAgents" "$M/stubs"
+printf 'previously installed\n' > "$M_HOME/Library/LaunchAgents/com.exocortex.scheduler.plist"
+for launcher in launchctl systemctl; do
+    printf '#!/bin/sh\nexit 0\n' > "$M/stubs/$launcher"
+done
+printf '#!/bin/sh\nexit 1\n' > "$M/stubs/crontab"
+chmod +x "$M/stubs"/*
+incident="$M/ws/DS-strategy/inbox/INCIDENT-scheduler-cron-not-fired-$DATE.md"
+run_pipeline scaffold "$M/ws" "$M/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" "$M/scaffold.txt" \
+    HOME="$M_HOME" PATH="$M/stubs:$STUBS:$PATH"
+rc=$?
+draft="$M/ws/.tmp/day-open-scaffold/DayPlan $DATE.md"
+if [ "$rc" -eq 10 ] && [ -f "$draft" ] && [ ! -e "$incident" ] \
+   && has "$draft" "**Mode A**" \
+   && has "$draft" "Локальный черновик не создаёт инцидент в governance"; then
+    ok "M: красный Mode A и оговорка видны в черновике, инцидент не создан"
+else
+    bad "M: каркас Mode A потерял сигнал или записал инцидент (rc=$rc)"
+fi
+env -i HOME="$M_HOME" PATH="$M/stubs:$STUBS:$PATH" TMPDIR="$TMPDIR" \
+    IWE_ROOT="$M/ws" IWE_SCRIPTS="$M/ws/FMT-exocortex-template/scripts" \
+    IWE_GOVERNANCE_REPO=DS-strategy \
+    "$BASH" "$M/ws/FMT-exocortex-template/scripts/day-open-scaffold.sh" "$DATE" \
+    > "$M/standalone-scaffold.txt" 2>&1
+if [ -f "$incident" ]; then
+    ok "M: обычный прямой scaffold по-прежнему создаёт Mode A инцидент"
+else
+    bad "M: обычный scaffold потерял создание инцидента"
+fi
+
+# ---------------------------------------------------------------- case N
+echo "== N: успешный morning сохраняет независимую защитную тревогу об отказе install-hooks"
+N="$TMP/n"
+build_skeleton "$N/ws"
+build_working_governance "$N/ws/DS-strategy" "$N/remote.git"
+N_HOME="$N/home"
+mkdir -p "$N_HOME/.config/aist" "$N/tg" "$N/stubs" "$N/ws/DS-strategy/.githooks"
+printf 'TELEGRAM_BOT_TOKEN=fake-token-974\nTELEGRAM_CHAT_ID=974\n' > "$N_HOME/.config/aist/env"
+printf '#!/bin/sh\nexit 0\n' > "$N/ws/DS-strategy/.githooks/pre-commit"
+chmod +x "$N/ws/DS-strategy/.githooks/pre-commit"
+git -C "$N/ws/DS-strategy" add -- .githooks/pre-commit
+git -C "$N/ws/DS-strategy" -c core.hooksPath=/dev/null commit -q -m 'fixture: hooks present'
+git -C "$N/ws/DS-strategy" push -q origin main
+git -C "$N/ws/DS-strategy" config core.hooksPath /dev/null
+printf '#!/bin/sh\nexit 1\n' > "$N/ws/FMT-exocortex-template/scripts/install-hooks.sh"
+chmod +x "$N/ws/FMT-exocortex-template/scripts/install-hooks.sh"
+cp "$J/ws/FMT-exocortex-template/scripts/day-open-llm-fill.py" \
+   "$N/ws/FMT-exocortex-template/scripts/day-open-llm-fill.py"
+cat > "$N/stubs/curl" <<'EOF'
+#!/bin/sh
+case " $* " in
+    *'api.telegram.org/'*) exec "$TG_CURL_STUB" "$@" ;;
+    *'/v1/health'*) printf '{"status":"ok"}\n' ;;
+    *'/v1/messages'*) printf 200 ;;
+    *) echo "unexpected curl call: $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$N/stubs/curl"
+env -i HOME="$N_HOME" PATH="$N/stubs:$STUBS_TG:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
+    REAL_PYTHON3="$REAL_PYTHON3" TG_CURL_STUB="$STUBS_TG/curl" CURL_LOG_DIR="$N/tg" \
+    IWE_WORKSPACE="$N/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_TEMPLATE="$N/ws/FMT-exocortex-template" \
+    IWE_SCRIPTS="$N/ws/FMT-exocortex-template/scripts" \
+    DAY_OPEN_LOCK_FILE="$N/ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
+    LLM_PROXY_URL=https://fake.invalid \
+    "$BASH" "$N/ws/FMT-exocortex-template/roles/strategist/scripts/strategist.sh" morning \
+    > "$N/morning.txt" 2>&1
+rc=$?
+messages=$(tg_text "$N/tg")
+if [ "$rc" -eq 0 ] && [ "$(tg_calls "$N/tg")" -ge 2 ] \
+   && [[ "$messages" == *"force-push guard не активен"* ]] \
+   && [[ "$messages" == *"День открыт"* ]] \
+   && ! has "$N/morning.txt" "ALARM: day-open-failed"; then
+    ok "N: Day Open успешен, защитная тревога доставлена отдельно от дайджеста"
+else
+    bad "N: успешный утренний запуск скрыл защитную тревогу (rc=$rc, число=$(tg_calls "$N/tg")): $(tail -8 "$N/morning.txt" | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------- case O
+echo "== O: фатальный сбой авторизации шлюза шлёт одну тревогу от morning; прямой вызов сохраняет подробности"
+O="$TMP/o"
+build_skeleton "$O/ws"
+build_working_governance "$O/ws/DS-strategy" "$O/remote.git"
+O_HOME="$O/home"
+mkdir -p "$O_HOME/.config/aist" "$O/tg" "$O/stubs"
+printf 'TELEGRAM_BOT_TOKEN=fake-token-974\nTELEGRAM_CHAT_ID=974\n' > "$O_HOME/.config/aist/env"
+cat > "$O/stubs/curl" <<'EOF'
+#!/bin/sh
+case " $* " in
+    *'api.telegram.org/'*) exec "$TG_CURL_STUB" "$@" ;;
+    *'/v1/health'*) printf '{"status":"ok"}\n' ;;
+    *'/v1/messages'*) printf 401 ;;
+    *) echo "unexpected curl call: $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$O/stubs/curl"
+env -i HOME="$O_HOME" PATH="$O/stubs:$STUBS_TG:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTWRITEBYTECODE=1 \
+    REAL_PYTHON3="$REAL_PYTHON3" TG_CURL_STUB="$STUBS_TG/curl" CURL_LOG_DIR="$O/tg" \
+    IWE_WORKSPACE="$O/ws" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_TEMPLATE="$O/ws/FMT-exocortex-template" \
+    IWE_SCRIPTS="$O/ws/FMT-exocortex-template/scripts" \
+    DAY_OPEN_LOCK_FILE="$O/ws/day-open.lock" DAY_OPEN_FORCE_STRATEGY_DAY=1 \
+    LLM_PROXY_URL=https://fake.invalid \
+    "$BASH" "$O/ws/FMT-exocortex-template/roles/strategist/scripts/strategist.sh" morning \
+    > "$O/morning.txt" 2>&1
+rc=$?
+messages=$(tg_text "$O/tg")
+if [ "$rc" -eq 1 ] && [ "$(tg_calls "$O/tg")" -eq 1 ] \
+   && [[ "$messages" == *"План дня не собран"* ]] \
+   && [[ "$messages" != *"remote LLM proxy"* ]]; then
+    ok "O: morning при фатальном сбое отправил одну итоговую тревогу"
+else
+    bad "O: morning продублировал фатальную тревогу (rc=$rc, число=$(tg_calls "$O/tg"))"
+fi
+run_notifying plain "$O/ws" "$O/ws/FMT-exocortex-template/scripts/day-open-pipeline.sh" \
+    "$O/standalone.txt" "$O/standalone-tg" HOME="$O_HOME" \
+    PATH="$O/stubs:$STUBS_TG:$STUBS:$PATH" TG_CURL_STUB="$STUBS_TG/curl" \
+    IWE_GOVERNANCE_REPO=DS-strategy LLM_PROXY_URL=https://fake.invalid
+standalone_rc=$?
+standalone_messages=$(tg_text "$O/standalone-tg")
+if [ "$standalone_rc" -eq 1 ] && [[ "$standalone_messages" == *"remote LLM proxy"* ]] \
+   && [[ "$standalone_messages" == *"HTTP 401"* ]]; then
+    ok "O: прямой вызов сохранил подробную тревогу об авторизации шлюза"
+else
+    bad "O: прямой вызов потерял подробности аварии (rc=$standalone_rc, число=$(tg_calls "$O/standalone-tg"))"
+fi
 
 # ---------------------------------------------------------------- guard S
 echo "== S: ни одной ссылки \$DS_STRATEGY/scripts/ в исполняемых строках обеих копий конвейера"

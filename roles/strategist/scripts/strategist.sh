@@ -989,6 +989,8 @@ DAY_OPEN_ALARM_RETRY_RC=74
 # The pipeline's own contract (day-open-pipeline.sh, steps 1 and 1.1/1.1b): 7 = deferred, not done
 # (yesterday is not closed yet, the triage report is still being published, the week is closing).
 DAY_OPEN_DEFERRED_RC=7
+# A saved scaffold is useful local work, but never a completed Day Open.
+DAY_OPEN_SCAFFOLD_RC=10
 # The scheduler reads exit 2 as "lock held, another run is in progress" (scheduler.sh
 # run_strategist_scenario); a pipeline that failed with 2 is passed out as this code instead.
 DAY_OPEN_RC2_SUBSTITUTE=73
@@ -1280,7 +1282,7 @@ case "$1" in
                 retry_quiet=1
             fi
             pipeline_rc=0
-            DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
+            DAY_OPEN_NOTIFICATION_OWNER=strategist DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
             if [ "$pipeline_rc" -eq 0 ]; then
                 log "$DAY_OPEN_OK_MARK (scaffold + llm-fill)"
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
@@ -1292,9 +1294,10 @@ case "$1" in
                 # right away: it is what the alarm reports.
                 log "Morning: Day Open pipeline has no gateway configured — retrying with --scaffold-only"
                 scaffold_rc=0
-                DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
-                if [ "$scaffold_rc" -eq 0 ]; then
-                    log "$DAY_OPEN_OK_MARK (scaffold only, no gateway)"
+                DAY_OPEN_NOTIFICATION_OWNER=strategist DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
+                if [ "$scaffold_rc" -eq "$DAY_OPEN_SCAFFOLD_RC" ]; then
+                    scaffold_path="${IWE_WORKSPACE:-$HOME/IWE}/.tmp/day-open-scaffold/DayPlan $(date +%Y-%m-%d).md"
+                    day_open_give_up scaffold-incomplete "шлюз модели не настроен; неполный каркас сохранён: $scaffold_path. День не открыт; правки черновика не переносятся автоматически в полный план" "$scaffold_rc"
                 elif [ "$scaffold_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
                     day_open_deferred
                 else

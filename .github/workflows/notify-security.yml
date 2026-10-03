@@ -21,7 +21,10 @@ jobs:
       - name: Extract newly added security lines
         id: extract
         run: |
-          NEW_LINES=$(bash scripts/changelog-diff-lines.sh "${{ github.event.before }}" --security-only)
+          if ! NEW_LINES=$(bash scripts/changelog-diff-lines.sh "${{ github.event.before }}" --security-only); then
+            echo "::error file=CHANGELOG.md::Не удалось извлечь security-строки; срочное уведомление не отправлено."
+            exit 1
+          fi
 
           if [ -z "$NEW_LINES" ]; then
             echo "has_security=false" >> "$GITHUB_OUTPUT"

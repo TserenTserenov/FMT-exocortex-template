@@ -36,7 +36,8 @@ while [[ $# -gt 0 ]]; do
     # no LLM Proxy at all — only step 4 (LLM Fill) does. Before this flag,
     # an unreachable/unprovisioned proxy made step 2's healthcheck abort the
     # whole run, so an install without a proxy could never get even the
-    # skeleton. Skips steps 2 and 4; still runs 1, 3, 4.2-4.6, 5, 6.
+    # skeleton. The incomplete draft stays outside the governance repo and
+    # returns 10: it is never published as an opened day (issue #983).
     --scaffold-only) SCAFFOLD_ONLY=true; shift ;;
     --date|-d)       DATE="$2"; shift 2 ;;
     *)               DATE="$1"; shift ;;
@@ -83,6 +84,14 @@ tg_notify() {
   local msg="$1"
   if [ "$PROBE" = "true" ]; then
     echo "  [probe: TG suppressed] $msg" | head -1
+    return 0
+  fi
+  # The unattended strategist owns failure reporting and retries. Intermediate
+  # pipeline notices would otherwise precede its one actionable alarm, while a
+  # successful digest or an intentional deferral still needs direct delivery.
+  if [ "${DAY_OPEN_NOTIFICATION_OWNER:-}" = "strategist" ] \
+     && [ "${2:-}" != "terminal" ] && [ "${2:-}" != "protective" ]; then
+    echo "  [strategist: intermediate TG notice deferred to owner]"
     return 0
   fi
   # A scheduler retry after a deferral whose notice was DELIVERED earlier today (strategist.sh sets
@@ -288,7 +297,7 @@ if [ "$FORCE" != "true" ]; then
   ALREADY_COMMITTED=$(git log HEAD origin/main --since="$DATE 00:00:00" --until="$DATE 23:59:59" --name-only --format="" -- "$DAYPLAN_FILE" 2>/dev/null | grep -c "DayPlan $DATE" || true)
   if [ "${ALREADY_COMMITTED:-0}" -gt 0 ]; then
     echo "  DayPlan already committed today ($DATE, this machine or the other) — nothing to do."
-    tg_notify "📋 DayPlan $DATE already committed today. Use --force to regenerate."
+    tg_notify "📋 DayPlan $DATE already committed today. Use --force to regenerate." terminal
     # Record success heartbeat here too: the other machine did the work, but
     # day-open-pipeline-watchdog.sh only checks THIS machine's heartbeat file.
     # Without this, every day the two machines settle this D2 race the "losing"
@@ -339,6 +348,12 @@ if [ "$PROBE" = "true" ]; then
   DAYPLAN_NAME="DayPlan $DATE (probe).md"
 fi
 DAYPLAN_PATH="$CURRENT_DIR/$DAYPLAN_NAME"
+if [ "$SCAFFOLD_ONLY" = "true" ] && [ "$PROBE" != "true" ]; then
+  # Keep an incomplete draft separate from the canonical plan. A later full
+  # run can write current/DayPlan without overwriting edits to this draft or
+  # making git-dirty-guard mistake the draft for governance work.
+  DAYPLAN_PATH="$IWE/.tmp/day-open-scaffold/$DAYPLAN_NAME"
+fi
 # WP-484 27.07: старый формат "WeekPlan W{N} {дата}.md" сменился на
 # "WeekPlan {год}-W{N} {дата} (night-cycle).md" (week-open-orchestrator.sh) — жёсткий
 # glob "WeekPlan W*.md" переставал матчить ЛЮБОЙ реальный файл сразу как только старый
@@ -464,6 +479,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+if [ "$SCAFFOLD_ONLY" = "true" ] && [ "$PROBE" != "true" ] && [ -e "$DAYPLAN_PATH" ]; then
+  echo "  Incomplete scaffold already exists; preserving it unchanged: $DAYPLAN_PATH"
+  echo "  Edits in this draft are not copied automatically into a fully filled DayPlan."
+  exit 10
+fi
+
 # ============================================
 # 0. Extension graph — "before" hooks (WP-529 Ф11)
 # ============================================
@@ -506,7 +527,7 @@ if [ "$SCOUT_PF" = "fail" ]; then abort "Scout preflight failed"; fi
 # an intentionally absent subsystem remains an allowed degraded configuration.
 if [ "$TRIAGE_PF" = "pending" ]; then
   echo "  Triage report for $DATE is pending — deferring Day Open for the next scheduler tick."
-  tg_notify "⏸ Day Open $DATE отложен: отчёт feedback-triage ещё готовится. Повторится автоматически до 06:30."
+  tg_notify "⏸ Day Open $DATE отложен: отчёт feedback-triage ещё готовится. Повторится автоматически до 06:30." terminal
   exit 7
 fi
 if [ "$TRIAGE_PF" != "ok" ] && [ "$TRIAGE_PF" != "disabled" ]; then
@@ -598,7 +619,7 @@ if [ "$FORCE" != "true" ]; then
       fi
       if [ -z "$DC_DONE" ] && [ -n "$YDAY_COMMITS" ]; then
         echo "  Day Close for $YDAY (strategy_day) not done yet (no facts_digest in ledger) — deferring Day Open (will regenerate after close)."
-        tg_notify "⏸ Day Open $DATE отложен: Day Close за $YDAY (день стратегирования) ещё не сделан. Пересоберётся после закрытия (или запусти с --force)."
+        tg_notify "⏸ Day Open $DATE отложен: Day Close за $YDAY (день стратегирования) ещё не сделан. Пересоберётся после закрытия (или запусти с --force)." terminal
         # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7 tells the scheduler to
         # retry on the next window tick instead of burning the daily marker.
         exit 7
@@ -613,7 +634,7 @@ if [ "$FORCE" != "true" ]; then
       DC_DONE=$(cd "$DS_STRATEGY" && git log HEAD origin/main --format="" --name-only -- "$YDAY_DAYPLAN" 2>/dev/null | head -1)
       if [ -z "$DC_DONE" ] && [ -n "$YDAY_COMMITS" ]; then
         echo "  Day Close for $YDAY not done yet (no archived DayPlan) — deferring Day Open (will regenerate after close)."
-        tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)."
+        tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)." terminal
         # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
         exit 7
       fi
@@ -675,7 +696,7 @@ if [ "$FORCE" != "true" ] && [ "${TARGET_DOW:-0}" = "7" ] && [ "$((10#$CURRENT_H
   WEEK_CLOSED=$(cd "$DS_STRATEGY" && git log HEAD origin/main --format="" --name-only -- "$WEEK_REPORT_REL" 2>/dev/null | head -1)
   if [ -z "$WEEK_CLOSED" ]; then
     echo "  Week $TARGET_WEEK not closed yet (no '$WEEK_REPORT_REL' in HEAD/origin) -- deferring Day Open"
-    tg_notify "⏸ Day Open $DATE отложен: неделя $TARGET_WEEK ещё закрывается (после 23:00 вс). Пересоберётся автоматически после завершения цикла."
+    tg_notify "⏸ Day Open $DATE отложен: неделя $TARGET_WEEK ещё закрывается (после 23:00 вс). Пересоберётся автоматически после завершения цикла." terminal
     # Same contract as §1.1: deferred ≠ done -- exit 7 tells the scheduler to
     # retry on the next window tick instead of burning the daily marker.
     exit 7
@@ -699,10 +720,10 @@ if [ -d "$DS_STRATEGY/.githooks" ] && [ -n "$(ls -A "$DS_STRATEGY/.githooks" 2>/
     echo "=== 1.2. Git hooks: core.hooksPath='$CURRENT_HOOKS_PATH' (expected .githooks) — self-healing ==="
     if bash "$SCRIPT_HOME/install-hooks.sh" "$DS_STRATEGY" >/dev/null 2>&1; then
       echo "  Fixed: core.hooksPath=.githooks (force-push guard now active)"
-      tg_notify "⚠️ Day Open: core.hooksPath на $DS_STRATEGY был не .githooks — pre-push force-push guard молчал. Автоматически починил (install-hooks.sh)."
+      tg_notify "⚠️ Day Open: core.hooksPath на $DS_STRATEGY был не .githooks — pre-push force-push guard молчал. Автоматически починил (install-hooks.sh)." protective
     else
       echo "  WARN: install-hooks.sh failed — hooks still inactive, needs manual attention"
-      tg_notify "🚨 Day Open: core.hooksPath на $DS_STRATEGY сломан, автопочинка (install-hooks.sh) тоже упала — force-push guard не активен, нужна ручная проверка."
+      tg_notify "🚨 Day Open: core.hooksPath на $DS_STRATEGY сломан, автопочинка (install-hooks.sh) тоже упала — force-push guard не активен, нужна ручная проверка." protective
     fi
   fi
 fi
@@ -869,14 +890,19 @@ else
 fi
 
 # Generate scaffold to temp file first (for hash guard)
+mkdir -p "$(dirname "$DAYPLAN_PATH")"
 SCAFFOLD_TEMP="$DAYPLAN_PATH.scaffold.tmp"
 SCAFFOLD_SCRIPT="$IWE_SCRIPTS/day-open-scaffold.sh"
-bash "$SCAFFOLD_SCRIPT" "$DATE" > "$SCAFFOLD_TEMP" || {
+SCAFFOLD_READ_ONLY=0
+if [ "$SCAFFOLD_ONLY" = "true" ] || [ "$PROBE" = "true" ]; then
+  SCAFFOLD_READ_ONLY=1
+fi
+DAY_OPEN_SCAFFOLD_READ_ONLY="$SCAFFOLD_READ_ONLY" bash "$SCAFFOLD_SCRIPT" "$DATE" > "$SCAFFOLD_TEMP" || {
   SC=$?
   if [ $SC -eq 2 ]; then
     echo "  Strategy day — no DayPlan generated."
     rm -f "$SCAFFOLD_TEMP"
-    tg_notify "📋 Strategy day — Day Open skipped."
+    tg_notify "📋 Strategy day — Day Open skipped." terminal
     exit 0
   fi
   # Diagnostics for bug-2026-07-10 repro (день, когда scaffold "не найден" без явной причины)
@@ -900,7 +926,7 @@ if [ "$FORCE" != "true" ] && [ -f "$INPUT_HASH_FILE" ]; then
   if [ "$PREV_HASH" = "$INPUT_HASH" ]; then
     echo "  Input hash unchanged — DayPlan already generated for this data set. Skipping."
     rm -f "$SCAFFOLD_TEMP"
-    tg_notify "📋 DayPlan $DATE already up-to-date (input hash unchanged). Skipping LLM Fill."
+    tg_notify "📋 DayPlan $DATE already up-to-date (input hash unchanged). Skipping LLM Fill." terminal
     exit 0
   fi
 fi
@@ -910,8 +936,30 @@ fi
 # each rerun then skipped with "already generated" while nothing was published).
 # Same bug class as the probe-hash leak fixed 28.07.
 
-# Move scaffold to target
-mv "$SCAFFOLD_TEMP" "$DAYPLAN_PATH"
+if [ "$SCAFFOLD_ONLY" = "true" ]; then
+  # Build the caveat before publishing the draft. A failed formatter must
+  # never leave an unmarked PENDING file that a repeat preserves as complete.
+  CAVEAT_TMP="$SCAFFOLD_TEMP.caveat"
+  awk '
+    !inserted && /^# / {
+      print
+      print ""
+      print "<!-- day-open-status: scaffold -->"
+      print "> ⚠️ **Каркас плана: день не открыт.** Шлюз модели не настроен; разделы `PENDING` не заполнены. Правки в этом черновике не переносятся автоматически в готовый DayPlan."
+      inserted=1
+      next
+    }
+    { print }
+    END { if (!inserted) exit 1 }
+  ' "$SCAFFOLD_TEMP" > "$CAVEAT_TMP" || {
+    rm -f "$CAVEAT_TMP"
+    abort "Could not mark incomplete scaffold: $DAYPLAN_PATH"
+  }
+  mv "$CAVEAT_TMP" "$DAYPLAN_PATH" || abort "Could not save incomplete scaffold: $DAYPLAN_PATH"
+  rm -f "$SCAFFOLD_TEMP"
+else
+  mv "$SCAFFOLD_TEMP" "$DAYPLAN_PATH"
+fi
 echo "  Scaffold OK: $DAYPLAN_PATH"
 
 # ============================================
@@ -984,16 +1032,17 @@ cat "$FILL_ERR_TMP" >&2
 if [ "$FILL_EXIT" -eq 2 ]; then
   echo "  Partial fill — some sections remain PENDING."
   FILL_WARNS=$(grep '\[WARN\]' "$FILL_ERR_TMP" | head -5 || true)
-  tg_notify "⚠️ DayPlan $DATE partially filled — some PENDING sections remain. Checks will block commit until fixed.
+  tg_notify "⚠️ DayPlan $DATE partially filled — some PENDING sections remain. Scaffold saved; Day Open will retry.
 $FILL_WARNS"
-  # Continue to checks (they will fail, but user gets full diagnostics)
+  rm -f "$FILL_ERR_TMP"
+  exit 1
 elif [ "$FILL_EXIT" -ne 0 ]; then
   echo "  LLM fill failed — leaving scaffold for manual completion."
   FILL_ERRS=$(grep -E '\[WARN\]|\[ERROR\]' "$FILL_ERR_TMP" | head -5 || true)
   tg_notify "❌ LLM fill failed for $DATE (exit $FILL_EXIT) — scaffold saved, needs manual completion.
 $FILL_ERRS"
   rm -f "$FILL_ERR_TMP"
-  exit 0
+  exit 1
 fi
 rm -f "$FILL_ERR_TMP"
 echo "  LLM Fill OK"
@@ -1093,12 +1142,18 @@ fi
 # WakaTime HTTP API once synced. Same non-blocking-finding pattern as the
 # patches above — never blocks Open, never fabricates a value.
 # ============================================
-echo "=== 4.59. Multiplier backfill patch ==="
-"$_PATCH_PY" "$SCRIPT_HOME/day-open-multiplier-backfill-patch.py" \
-  --dayplan "$DAYPLAN_PATH" \
-  --ledger-root "$DS_STRATEGY/machine/ledger/day" \
-  --date "$DATE" \
-  --ledger-append "$SCRIPT_HOME/ledger-append.sh" 2>&1 || true
+if [ "$SCAFFOLD_ONLY" = "true" ]; then
+  # Backfill can call WakaTime and append to the tracked governance ledger.
+  # A local, incomplete draft must not trigger either side effect.
+  echo "=== 4.59. Multiplier backfill patch — SKIPPED (scaffold-only) ==="
+else
+  echo "=== 4.59. Multiplier backfill patch ==="
+  "$_PATCH_PY" "$SCRIPT_HOME/day-open-multiplier-backfill-patch.py" \
+    --dayplan "$DAYPLAN_PATH" \
+    --ledger-root "$DS_STRATEGY/machine/ledger/day" \
+    --date "$DATE" \
+    --ledger-append "$SCRIPT_HOME/ledger-append.sh" 2>&1 || true
+fi
 
 # ============================================
 # 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Ф2)
@@ -1121,14 +1176,14 @@ ARCHIVED_PATHS=()
 # the session-guard scope gate then correctly blocked the open.
 ARCHIVE_TARGETS=()
 
-if [ "$PROBE" = "true" ]; then
+if [ "$PROBE" = "true" ] || [ "$SCAFFOLD_ONLY" = "true" ]; then
   # WP-484 27.07 (found by independent review of the --probe stand itself): this whole
   # block used to run unconditionally BEFORE the PROBE check below, which only wrapped
   # the archive-move loop. git-dirty-guard.sh can self-heal a stale mirror via
   # `git reset --hard origin/<branch>` — a real, destructive operation on the production
   # checkout — and the plain `git pull --rebase` below it is a real mutation too. A
   # "dry run" that can silently `reset --hard` or rebase the real repo isn't a dry run.
-  echo "  [probe] git-dirty-guard/pull/archive-move all skipped — no git state touched"
+  echo "  [draft/probe] git-dirty-guard/pull/archive-move all skipped — no git state touched"
 else
 # Sync with remote to avoid non-fast-forward push (race with other agents)
 # WP-484 (2026-07-19): route through git-dirty-guard.sh first — a bare pull --rebase
@@ -1146,14 +1201,14 @@ else
 # required for today's DayPlan content, so a failure here degrades gracefully (skip
 # pull, keep the already-written file) instead of discarding a good render.
 if ! bash "$IWE_SCRIPTS/git-dirty-guard.sh" "$DS_STRATEGY"; then
-  tg_notify "⚠️ Day Open: git-dirty-guard нашёл незакоммиченную работу — pull пропущен, но уже отрендеренный DayPlan сохраняется (не абортим pipeline, WP-484 fix 26.07)"
+  tg_notify "⚠️ Day Open: git-dirty-guard нашёл незакоммиченную работу — pull пропущен, но уже отрендеренный DayPlan сохраняется (не абортим pipeline, WP-484 fix 26.07)" protective
 else
   # Sync failures are reported out-of-repo only. Appending sync_skipped to the
   # tracked ledger here would make the next git-dirty-guard invocation reject the
   # pipeline's own diagnostic write and turn a transient failure into a permanent
   # dirty-tree loop. The periodic sync service owns persistent failure counters.
   git pull --rebase || {
-    tg_notify "⚠️ Day Open: git pull --rebase failed — continuing without pull (WP-484 fix 26.07)"
+    tg_notify "⚠️ Day Open: git pull --rebase failed — continuing without pull (WP-484 fix 26.07)" protective
   }
 fi
 
@@ -1189,7 +1244,7 @@ fi
 # loudly on 2+ candidates — "claude-code" would collide with a live interactive
 # session open on the same machine at the same time.
 SG_AGENT="day-open-pipeline"
-if [ "$PROBE" != "true" ]; then
+if [ "$PROBE" != "true" ] && [ "$SCAFFOLD_ONLY" != "true" ]; then
   # WP-484 F91: explicit --slug keeps note-file resolution unambiguous when the
   # agent has 2+ open semaphores (a stale housekeeping semaphore used to make
   # both note-file calls fail in one run); the slug is fixed by the `open
@@ -1211,12 +1266,16 @@ fi
 # orphans.md) sees the final content, and Checks below validates whatever
 # it left behind.
 echo "=== 4.8. Extension graph: after ==="
-AFTER_HOOK_OUT=$(bash "$SCRIPT_HOME/day-open-hooks-runner.sh" after 2>&1)
-AFTER_HOOK_EXIT=$?
-echo "$AFTER_HOOK_OUT"
-if [ $AFTER_HOOK_EXIT -ne 0 ]; then
-  tg_notify "❌ Day Open aborted: an 'after' extension hook failed for $DATE. See output above."
-  abort "after-hook failed — see output above"
+if [ "$SCAFFOLD_ONLY" = "true" ]; then
+  echo "  deferred: after hooks need a fully filled DayPlan"
+else
+  AFTER_HOOK_OUT=$(bash "$SCRIPT_HOME/day-open-hooks-runner.sh" after 2>&1)
+  AFTER_HOOK_EXIT=$?
+  echo "$AFTER_HOOK_OUT"
+  if [ $AFTER_HOOK_EXIT -ne 0 ]; then
+    tg_notify "❌ Day Open aborted: an 'after' extension hook failed for $DATE. See output above."
+    abort "after-hook failed — see output above"
+  fi
 fi
 
 # ============================================
@@ -1226,6 +1285,20 @@ echo "=== 5. Checks ==="
 CHECKS_OUT=$(bash "$SCRIPT_HOME/day-open-checks-runner.sh" "$DAYPLAN_PATH" 2>&1)
 CHECKS_EXIT=$?
 echo "$CHECKS_OUT"
+
+if [ "$SCAFFOLD_ONLY" = "true" ]; then
+  if [ "$CHECKS_EXIT" -ne 0 ]; then
+    echo "  Draft checks found problems; the incomplete scaffold remains local."
+  fi
+  echo "  Incomplete scaffold saved locally: $DAYPLAN_PATH"
+  echo "  Edits in this draft are not copied automatically into a fully filled DayPlan."
+  echo "  Day Open is incomplete; no commit, push, digest or success heartbeat."
+  if [ "$PROBE" = "true" ]; then
+    echo "=== PROBE SUMMARY ==="
+    echo "  date=$DATE verdict=🟡 incomplete (scaffold) checks_exit=$CHECKS_EXIT"
+  fi
+  exit 10
+fi
 
 if [ $CHECKS_EXIT -ne 0 ]; then
   tg_notify "❌ DayPlan checks failed for $DATE. Commit blocked. Fix and retry."
@@ -1309,7 +1382,7 @@ if [ -f "$GATE_STATUS_FILE" ]; then
   fi
 fi
 
-tg_notify "$MSG"
+tg_notify "$MSG" terminal
 
 if [ "$PROBE" = "true" ]; then
   echo "  [probe] real heartbeat not touched (watchdog reads only real runs)"

@@ -237,12 +237,23 @@ rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
 check "2: повторный запуск: выход 0 и конвейер больше не вызывается" "0/2" "$rc/$(count_lines "$PIPE_LOG")"
 
 # ---------------------------------------------------------------- 3
-echo "== 3: шлюза нет (код 9), повтор --scaffold-only прошёл — план есть, тревоги нет"
+echo "== 3: шлюза нет (код 9), сохранён неполный каркас — честная тревога"
 new_case
-rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=0)
+rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=10 PROXY_SHARED_SECRET=fixture-secret-must-not-appear)
 check "3: код выхода" "0" "$rc"
-check "3: каркас без модели собран" "1" "$(log_count 'Morning: Day Open pipeline OK (scaffold only, no gateway)')"
-check "3: модель не запускалась, сообщений нет" "0/0" "$(model_runs)/$(messages)"
+check "3: каркас не отмечен как успешный Day Open" "0" "$(log_count 'Morning: Day Open pipeline OK')"
+check "3: одна тревога, модель не запускалась" "1/0" "$(messages)/$(model_runs)"
+check_has "3: тревога называет локальный черновик" "$(message_texts)" ".tmp/day-open-scaffold/DayPlan"
+check_has "3: тревога объясняет перенос правок" "$(message_texts)" "не переносятся автоматически"
+if ! message_texts | grep -q 'fixture-secret-must-not-appear'; then
+    ok "3: секрет шлюза не попал в тревогу"
+else
+    bad "3: секрет шлюза попал в тревогу"
+fi
+rc2=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=10)
+rc3=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=10)
+check "3: повторные запуски не собирают каркас и не шлют тревогу снова" \
+    "0/0/2/1" "$rc2/$rc3/$(count_lines "$PIPE_LOG")/$(messages)"
 
 # ---------------------------------------------------------------- 4
 echo "== 4: переходный отказ (код 5): код наружу, повтор планировщиком, одна тревога, отказ после 3-й попытки"
@@ -349,7 +360,7 @@ message() { # <reason> <code> -> the message the real template builds
     ( HOME="$TMP/msg-home" IWE_WORKSPACE="$TMP/msg-ws" DAY_OPEN_FAILED_REASON="$1" DAY_OPEN_FAILED_RC="$2" \
         bash -c '. "$1" && build_message day-open-failed' _ "$MESSAGE_TEMPLATE" ) 2>/dev/null
 }
-for reason in not-delivered scaffold-only-failed pipeline-failed attempts-exhausted unknown-reason; do
+for reason in not-delivered scaffold-only-failed scaffold-incomplete pipeline-failed attempts-exhausted unknown-reason; do
     text=$(message "$reason" 4)
     case "$text" in
         *"$HEADER"*"«открывай»"*) ok "11: $reason — заголовок и что делать (сессия, «открывай»)" ;;

@@ -99,6 +99,12 @@ build_day_open_failed_message() {
         scaffold-only-failed)
             reason="Шлюз модели не настроен, а сборка каркаса плана без модели тоже не дошла до конца${rc:+ (код $rc)}."
             ;;
+        scaffold-incomplete)
+            local draft_path="${IWE_WORKSPACE:-$HOME/IWE}/.tmp/day-open-scaffold/DayPlan $DATE.md"
+            draft_path=$(printf '%s' "$draft_path" | escape_html)
+            reason="Шлюз модели не настроен. Неполный каркас сохранён локально: <code>$draft_path</code>. День не открыт${rc:+ (код $rc)}."
+            advice="Правки в черновике не переносятся автоматически в полный план. Настройте шлюз модели или откройте день в сессии Claude Code командой «открывай»."
+            ;;
         pipeline-failed)
             reason="Конвейер Открытия дня завершился с ошибкой${rc:+ (код $rc)}. Если включён планировщик Синхронизатора, он повторит попытку позже; если план нужен сейчас, не ждите."
             ;;

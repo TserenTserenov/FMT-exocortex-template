@@ -947,6 +947,8 @@ render_iwe_status() {
     local incident_file="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/INCIDENT-scheduler-cron-not-fired-$DATE.md"
     if [ -f "$incident_suppress" ]; then
       echo "  (инцидент подавлен: $incident_suppress — удалите файл, чтобы возобновить авто-создание)"
+    elif [ "${DAY_OPEN_SCAFFOLD_READ_ONLY:-0}" = "1" ]; then
+      echo "> ⚠️ Mode A: планировщик не работает. Локальный черновик не создаёт инцидент в governance: \`$incident_file\`. Проверьте планировщик перед Открытием дня."
     elif [ ! -f "$incident_file" ]; then
       mkdir -p "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox"
       cat > "$incident_file" <<INCEOF

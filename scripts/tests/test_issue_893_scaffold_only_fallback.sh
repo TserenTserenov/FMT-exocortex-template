@@ -112,29 +112,32 @@ run_block() {  # -> exit code of the block
         run_claude() { printf "run_claude %s\n" "$*" >> "'"$TMP"'/calls.txt"; }
         notify_telegram() { printf "notify_telegram %s\n" "$*" >> "'"$TMP"'/calls.txt"; }
         '"$HELPERS"'
+        day_open_alarm_owed() { return 1; }
         '"$(cat "$BLOCK_FILE")"'
     ' _ "$(dirname "$pipeline_script")" "$workspace" "$TMP/log.txt"
 }
 
-# --- 1. Pipeline exits 9 (no gateway), --scaffold-only retry succeeds:
-# scaffold runs, free-form day-plan is never invoked.
+# --- 1. Pipeline exits 9 (no gateway), --scaffold-only saves an incomplete
+# draft: the strategist alarms and never reports a completed day.
 cat > "$TMP/pipeline1.sh" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = "--scaffold-only" ]; then exit 0; fi
+if [ "${1:-}" = "--scaffold-only" ]; then exit 10; fi
 exit 9
 SH
 chmod +x "$TMP/pipeline1.sh"
 mv "$TMP/pipeline1.sh" "$TMP/day-open-pipeline.sh"
 run_block "$TMP/day-open-pipeline.sh" "$TMP/ws1"
-if grep -q 'scaffold only, no gateway' "$TMP/log.txt" 2>/dev/null; then
-    pass "exit 9 + scaffold-only succeeds: logs the no-gateway scaffold success"
+if grep -q 'GAVE UP scenario: day-plan (.*неполный каркас' "$TMP/log.txt" 2>/dev/null \
+   && ! grep -q 'Day Open pipeline OK' "$TMP/log.txt" 2>/dev/null; then
+    pass "exit 9 + scaffold-only returns 10: incomplete draft is alarmed, not marked ready"
 else
-    fail_test "exit 9 + scaffold-only succeeds: missing success log: $(cat "$TMP/log.txt" 2>/dev/null)"
+    fail_test "exit 9 + scaffold-only returns 10: wrong status: $(cat "$TMP/log.txt" 2>/dev/null)"
 fi
-if [ -s "$TMP/calls.txt" ]; then
-    fail_test "exit 9 + scaffold-only succeeds: free-form day-plan was still called: $(cat "$TMP/calls.txt")"
+if grep -q 'run_claude' "$TMP/calls.txt" 2>/dev/null \
+   || ! grep -q 'notify_telegram day-open-failed' "$TMP/calls.txt" 2>/dev/null; then
+    fail_test "exit 9 + scaffold-only returns 10: missing alarm or free-form day-plan ran: $(cat "$TMP/calls.txt")"
 else
-    pass "exit 9 + scaffold-only succeeds: free-form day-plan prompt was NOT called"
+    pass "exit 9 + scaffold-only returns 10: alarm sent, free-form day-plan prompt NOT called"
 fi
 rm -f "$TMP/day-open-pipeline.sh"
 
