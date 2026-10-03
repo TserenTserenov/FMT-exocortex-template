@@ -115,6 +115,9 @@ for arg in "$@"; do
   done
   inside_root "$path" || refuse "вне разрешённых корней: $arg → $path (реестр: $REGISTRY)"
   targets=$((targets + 1))
+  # BSD rm stops parsing options at the first operand. A later -name is a
+  # filename, so every subsequent argument must pass the same path check.
+  options=0
 done
 
 REAL_RM=/usr/bin/rm

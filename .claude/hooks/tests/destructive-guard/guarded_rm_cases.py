@@ -54,13 +54,15 @@ class Workspace:
             f.write("x")
         return path
 
-    def run(self, *args, shell=None):
+    def run(self, *args, shell=None, cwd=None):
         if shell:
             cmd = ["bash", "-c", shell]
         else:
             cmd = ["bash", self.script, *args]
         env = dict(os.environ, GRM=posix(self.script))
-        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, cwd=cwd
+        )
         return proc.returncode, proc.stderr.strip()
 
     def close(self):
@@ -126,6 +128,22 @@ def main():
         keep = w.make(w.allowed, "keep")
         code, err = w.run("-rf", mixed(keep), mixed(o))
         check("одна цель внутри, одна вне — не удалено ничего", code == 1 and os.path.exists(keep) and os.path.exists(o), err)
+
+        # BSD rm treats a dash-prefixed argument after the first target as a
+        # filename. The guard must validate it even though it looks like an option.
+        before_dash = w.make(w.allowed, "before-dash")
+        sentinel = os.path.join(w.outside, "-outside-sentinel")
+        sentinel_bytes = b"outside-root-sentinel\x00"
+        with open(sentinel, "wb") as f:
+            f.write(sentinel_bytes)
+        code, err = w.run("-rf", mixed(before_dash), os.path.basename(sentinel), cwd=w.outside)
+        sentinel_unchanged = False
+        if os.path.isfile(sentinel):
+            with open(sentinel, "rb") as f:
+                sentinel_unchanged = f.read() == sentinel_bytes
+        check("цель с дефисом после первой цели — отказ до rm",
+              code == 1 and os.path.exists(before_dash) and sentinel_unchanged
+              and "вне разрешённых" in err, err)
 
         code, err = w.run("-rf", mixed(w.allowed))
         check("сам корень", code == 1 and os.path.exists(w.allowed) and "сам разрешённый корень" in err, err)

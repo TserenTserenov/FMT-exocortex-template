@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "1afd678dd19cce8985fa18c6fb5bc17236881079fc821d0b35194e5b8f6f5535"
+      "sha256": "f9814f1e3a542b26e4f15cc1c046797b8787137dc26ec89440f762ab55e09009"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
-      "sha256": "79d15bc99949f7f16dde820d958e9344cc6f8d15c316b40565c6bad51b9c7cdf"
+      "sha256": "d06ead44dbb5fc9414db32d82af45130d54fd03aa225582abfba6b0dbdbabb2b"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
