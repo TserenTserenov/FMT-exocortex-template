@@ -145,6 +145,13 @@ for manager in launchctl systemctl crontab; do
   chmod 700 "$service_run/external-bin/$manager"
 done
 service_path="$service_run/external-bin:$PATH"
+if [ "$(PATH="$service_path" command -v launchctl)" != "$service_run/external-bin/launchctl" ] ||
+   [ "$(PATH="$service_path" command -v systemctl)" != "$service_run/external-bin/systemctl" ] ||
+   [ "$(PATH="$service_path" command -v crontab)" != "$service_run/external-bin/crontab" ]; then
+  bad "test PATH does not resolve all service managers to disposable stubs"
+  rm -rf "$service_run"
+  exit 1
+fi
 for manager in launchctl systemctl crontab; do
   PATH="$service_path" IWE_REDTEAM_FIXTURE_ROOT="$service_run" \
     bash "$GUARD" -- "$manager" test > "$service_run/$manager.out" 2>&1

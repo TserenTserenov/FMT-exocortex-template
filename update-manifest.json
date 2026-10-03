@@ -561,7 +561,7 @@
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/tests/run-calibration.sh",
-      "sha256": "6e44d809ce04f6ea88f23791fc76ea306bba5281e989a098283d0b0e6e3c7167"
+      "sha256": "06ad9760e13b21e431a360e7a47d36615a9df9db3c34cbd4943777c261c651a3"
     },
     {
       "path": ".claude/skills/iwe-restore/SKILL.md",
