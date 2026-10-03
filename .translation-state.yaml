@@ -1,5 +1,5 @@
 files_translated:
-- docs/RELEASE-PROCESS.md
-last_run_utc: '2026-10-03T21:41:31Z'
-last_synced_sha: 17e4caf1e5d253f1c780898df90e74e207691e3c
+- docs/release-audit-log.md
+last_run_utc: '2026-10-03T22:09:26Z'
+last_synced_sha: 2a2913335a0b5578e30486d394ab833702722590
 schema_version: 1
