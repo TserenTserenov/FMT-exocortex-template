@@ -54,6 +54,11 @@ if [ "$TEST_MODEL_MODE" = deliver ]; then
 fi
 STUB
 chmod +x "$BIN"/* "$TMP/iwe-scripts/session-guard.sh" "$TPL/roles/synchronizer/scripts/notify.sh"
+# The real macOS notifier must never run in this fixture.
+[ "$(PATH="$BIN:$PATH" command -v osascript)" = "$BIN/osascript" ] || {
+    echo 'fixture notifier stub is not first on PATH' >&2
+    exit 2
+}
 
 git init -q --bare -b main "$TMP/origin.git"
 git clone -q "$TMP/origin.git" "$WS/DS-strategy" 2>/dev/null
