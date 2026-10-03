@@ -6,7 +6,7 @@ description: |
   The skill enforces WP Gate precondition, Routing Gate, IntegrationGate hard-check,
   collects parameters in 4 short steps, generates a scaffold SKILL.md from a template,
   shows a draft, writes files, and reminds about verify-skill.sh.
-version: 0.3.2
+version: 0.4.0
 status: experimental
 browser_safe: false
 layer: L1
@@ -90,7 +90,7 @@ Check whether `<target_path>/SKILL.md` already exists.
   [ ] отмена → ничего не менять
 ```
 
-Collect the pilot's choices. Apply changes directly to the existing `SKILL.md` via Edit.
+Collect the pilot's choices. A requested description must contain at least 10 words; if shorter, explain the validation requirement and ask for an expanded wording before editing. Apply agreed changes directly to the existing `SKILL.md` via Edit.
 
 Skip Steps 3–6 **unless** the pilot selected "bundled resource" or any change that expands the skill's scope or gates — in that case, run **Step 3 (IntegrationGate)** before applying.
 
@@ -120,6 +120,8 @@ Stop until the gate is satisfied or explicitly bypassed by pilot words.
 Имя скилла (hyphen-case): <name>
 Краткое описание — что делает и когда использовать:
 ```
+
+The description must contain at least 10 words; count the YAML value, not surrounding metadata.
 
 **4b. Agents and interaction axes**
 
@@ -177,11 +179,32 @@ Undo works only before next commit or within 15 minutes.
 Write files to target path. Then regenerate the catalog and run verify:
 
 ```bash
-bash scripts/generate-skills-catalog.sh   # register in skills-catalog.yaml
-bash scripts/verify-skill.sh <name>       # 33-point structural check
+# Run from the workspace root. Set these two paths from the routing decision;
+# creator_dir is the directory containing THIS instruction, not the new skill.
+skills_dir=.claude/skills
+creator_dir=.claude/skills/skill-creator
+workspace="$PWD"
+template_root="${IWE_TEMPLATE:-$workspace/FMT-exocortex-template}"
+if [ -f "$workspace/update-manifest.json" ] && [ -f "$workspace/scripts/generate-skills-catalog.sh" ]; then
+  template_root="${IWE_TEMPLATE:-$workspace}"
+fi
+catalog_script="$workspace/scripts/generate-skills-catalog.sh"
+if [ ! -f "$catalog_script" ]; then
+  catalog_script="$template_root/scripts/generate-skills-catalog.sh"
+fi
+catalog_output="$(dirname "$skills_dir")/skills-catalog.yaml"
+if ! IWE_WORKSPACE="$workspace" bash "$catalog_script" \
+  --skills-dir "$skills_dir" --output "$catalog_output"; then
+  echo "Catalog generation failed; verification was not run." >&2
+  exit 1
+fi
+IWE_WORKSPACE="$workspace" IWE_TEMPLATE="$template_root" \
+  bash "$creator_dir/scripts/verify-skill.sh" <name> "$skills_dir"
 ```
 
-Both commands must pass before the skill is considered created.
+Both commands must pass before the skill is considered created. For Kimi targets set `skills_dir=.kimi/skills`; if this instruction is installed there too, set `creator_dir=.kimi/skills/skill-creator`. If either tool is absent, stop with the missing path rather than claiming verification.
+
+The verifier uses the shared workspace `scripts/lib/find-python3.sh` and the declared PyYAML and markdown-it-py dependencies in `requirements.txt`. Metadata must be the first complete YAML block; duplicate keys, invalid types, and empty required values fail. Required Markdown sections must be real headings outside code examples. Bundled resources are checked in `scripts/`, `assets/`, and `references/`.
 
 Tell the user where the new skill lives and that nothing preserves it (issue #873): a
 project-local skill under `.claude/skills/<name>/` is usually outside git and outside the
@@ -196,7 +219,8 @@ before the skill is used in practice.
 
 - `assets/skill-scaffold-minimal.md` — scaffold for single-step skills without external gates
 - `assets/skill-scaffold-full.md` — scaffold for multi-step skills with Preconditions and Bundled resources
-- `scripts/verify-skill.sh` — validates frontmatter, gates fields, bundled resource existence, L1 location
+- `scripts/verify-skill.sh` — CLI wrapper using the shared Python resolver
+- `scripts/verify-skill.py` — validates YAML metadata, gates, real sections, bundled resources, templates and platform-specific L1 location
 
 ## Known schema gaps
 
@@ -209,7 +233,6 @@ Until standardized: leave these fields as-is in existing skills; do not remove d
 
 ## Known tool gaps
 
-- **`verify-skill.sh` L1 location check for `.kimi/skills/`**: `check_l1_location` only checks `FMT-exocortex-template/.claude/skills/`. For skills placed at `.kimi/skills/` (platform:kimi), the L1 location check is skipped when `layer: L2`, or produces a spurious FAIL when `layer: L1`. Until verify-skill.sh is extended with a `--platform kimi` flag, use `layer: L2` for `.kimi/skills/` test skills, and document any intentional L1 Kimi skills separately.
 - **`content-audit.sh` coverage (Ф9)**: audit script checks 5 structural criteria (gates_rationale, Algorithm section, step headings ≥3, step content ≥2 lines, When-to-use section). 7 YELLOW skills (single C3 issue) are simple alias/mode skills without numbered step headings. This is structural noise, not content error — these skills are functionally correct. See `scripts/content-audit.sh` for full output.
 
 ## Anti-patterns
@@ -228,10 +251,10 @@ Until standardized: leave these fields as-is in existing skills; do not remove d
 After creation, run:
 
 ```bash
-bash scripts/verify-skill.sh <skill-name>
+bash .claude/skills/skill-creator/scripts/verify-skill.sh <skill-name> .claude/skills
 ```
 
-Expected result: PASS with checks for: valid YAML frontmatter, non-empty description, recognized triggers, `gates_required`/`gates_enforced` fields with valid enum values, bundled resource files exist, scaffold templates valid, L1 skills present in FMT.
+Expected result: PASS with checks for: valid YAML frontmatter, description of at least 10 words, recognized non-empty triggers, `gates_required`/`gates_enforced` fields with valid enum values, bundled resource files exist, scaffold templates valid, L1 skills present in FMT.
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->

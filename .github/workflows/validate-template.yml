@@ -823,7 +823,7 @@ jobs:
       # «тест есть, CI о нём не знает»).
       - name: Run issue-regression python tests (pytest, WP-529 Ф6)
         run: |
-          python3 -m pytest --version >/dev/null 2>&1 || python3 -m pip install --user pytest
+          python3 -c "import pytest, markdown_it" >/dev/null 2>&1 || python3 -m pip install --user pytest markdown-it-py
           python3 -m pytest -q \
             scripts/tests/test_issue_*.py \
             scripts/tests/test_day_close_prepare.py \

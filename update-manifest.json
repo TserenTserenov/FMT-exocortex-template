@@ -377,7 +377,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "5560d30ededf2ac1952de7147159848f7475e8a8d73bbf10a494dae41fa27c59"
+      "sha256": "09ca01b783b8a6a57e71dbd1b4bf55cc3a4f531d14900c15086c4cd5bc311ec7"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -697,7 +697,7 @@
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
-      "sha256": "6bf17e7ed5bdf185d74338aead2d27fa3a4a211dc6508c6b33b99097b6d32e5f"
+      "sha256": "8ada56fc87e9e1358dd335c04ee07928d8143bc5873f299d898e1b8a7851b191"
     },
     {
       "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md",
@@ -720,8 +720,12 @@
       "sha256": "6997b0b4db9841602eda66d62196cf0979cb9ae51e43507a67ad70cc43b00b69"
     },
     {
+      "path": ".claude/skills/skill-creator/scripts/verify-skill.py",
+      "sha256": "cbb56549295dff77e79c5b5c8e47e67744dbedd25c518a4b0d355124b09117c0"
+    },
+    {
       "path": ".claude/skills/skill-creator/scripts/verify-skill.sh",
-      "sha256": "8cd3a28578ad22530d9ba905ab65b8475057cb2850afaa13def5375582695d58"
+      "sha256": "13a0a084f86a6139a2b11248d0d1d14e641207c1047ca13c65b5137b9439bec5"
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
@@ -853,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f0fd2fa0ceadc8b5dc7a03ddb8acece6466d5241c34616e4dd71461c53bf963e"
+      "sha256": "5db58dcc71dc327a9ccd0a88643c3c02eb89a618accef7879dffc5b7980ef211"
     },
     {
       "path": "CLAUDE.md",
@@ -1657,7 +1661,7 @@
     },
     {
       "path": "requirements.txt",
-      "sha256": "43a454364b88c54582a022a8969f2326d84ef892f927d532816c7ab18bdcb184"
+      "sha256": "ddcb603e43c135b305e78153a41f8a13fd3841fdc86475c01f9eca802ede6dfb"
     },
     {
       "path": "roles/README.md",
@@ -3299,6 +3303,7 @@
     "scripts/tests/test_issue_989_snapshot_cross_api.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
+    "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",

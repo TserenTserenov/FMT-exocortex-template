@@ -8,3 +8,6 @@ pytest>=9.0
 
 # Опционально — только для extensions/local-llm/:
 # ruamel.yaml>=0.18
+
+# Skill verification parses CommonMark structure, including HTML and code blocks.
+markdown-it-py>=3.0
