@@ -20,7 +20,8 @@ if [ "${1:-}" = "--native-windows" ]; then
     case "$(uname -s)" in MINGW*|MSYS*) ;; *) fail "native mode requires Git Bash on Windows" ;; esac
     NATIVE_PYTHON=$("$PYTHON3" -c 'import os, sys; assert os.name == "nt", os.name; print(sys.executable)') \
         || fail "native Windows Python required"
-    export NATIVE_PYTHON
+    TEST_GIT_BASH=$(cygpath -w "$(command -v bash)") || fail "Git Bash executable is unavailable"
+    export NATIVE_PYTHON TEST_GIT_BASH
     export GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1
     : > "$GIT_CONFIG_GLOBAL"
     git init -q --bare "$TMP/origin.git" || fail "cannot create local origin"
@@ -165,7 +166,7 @@ environment = os.environ.copy()
 environment.update({"SYNC_LIB": sync_lib, "ROOT_SCRIPT": root_script,
                     "PID_RECORD": record + ".green", "FIXTURE_REPO": repo})
 wrapper = subprocess.Popen(
-    ["bash", "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 "$NATIVE_PYTHON" "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
+    [os.environ["TEST_GIT_BASH"], "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 "$NATIVE_PYTHON" "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
     env=environment,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
