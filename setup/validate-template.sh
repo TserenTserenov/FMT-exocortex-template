@@ -103,7 +103,9 @@ is_excluded_path() {
 is_author_context_exception() {
     # Existing workflow-only context: one host access control and three
     # historical/test comments. Match the whole line, never the whole file.
-    case "$1:$2" in
+    local line="$2"
+    line="${line%$'\r'}"  # grep preserves a final CR in Windows line endings.
+    case "$1:$line" in
         '.github/workflows/changelog-gate.yml:      NO_CHANGELOG_ALLOWED: "TserenTserenov"'|\
         '.github/workflows/translate-sync.yml:# TserenTserenov; it was never one of the aisystant repos slated for a'|\
         '.github/workflows/release-watchdog.yml:# создана: DS-IT-systems для агента read-only.'|\
@@ -112,21 +114,37 @@ is_author_context_exception() {
     return 1
 }
 filter_staged_author_hits() {
-    local rel="$1" entry
+    local rel="$1" entry key seen=$'\n'
     while IFS= read -r entry; do
-        is_author_context_exception "$rel" "${entry#*:}" || printf '%s\n' "$entry"
+        if is_author_context_exception "$rel" "${entry#*:}"; then
+            key="$rel:${entry#*:}"
+            key="${key%$'\r'}"
+            case "$seen" in
+                *$'\n'"$key"$'\n'*) ;;
+                *) seen="${seen}${key}"$'\n'; continue ;;
+            esac
+        fi
+        printf '%s\n' "$entry"
     done
 }
 filter_excluded_hits() {
     # stdin: grep -r output "<abs-path>:<line>:<text>" — drop excluded_paths
     # and exact workflow-context exceptions, retaining every other .yml hit.
-    local line abs rel numbered
+    local line abs rel numbered key seen=$'\n'
     while IFS= read -r line; do
         abs="${line%%:*}"
         rel="${abs#"$TEMPLATE_DIR"/}"
         is_excluded_path "$rel" && continue
         numbered="${line#"$abs":}"
-        is_author_context_exception "$rel" "${numbered#*:}" || printf '%s\n' "$line"
+        if is_author_context_exception "$rel" "${numbered#*:}"; then
+            key="$rel:${numbered#*:}"
+            key="${key%$'\r'}"
+            case "$seen" in
+                *$'\n'"$key"$'\n'*) ;;
+                *) seen="${seen}${key}"$'\n'; continue ;;
+            esac
+        fi
+        printf '%s\n' "$line"
     done
 }
 

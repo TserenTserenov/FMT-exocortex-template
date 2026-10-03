@@ -3145,7 +3145,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "3ce15a4659dfde56dbbe273701d765a4e66f5afe34be0401e9291318b113c6c0"
+      "sha256": "f22e829a26d10f097cb0340beb547e4b68110c8291d1c4bec33f0eabf7a73477"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
