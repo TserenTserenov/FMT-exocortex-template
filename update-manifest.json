@@ -1981,7 +1981,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "941ba75fee141714645778b4f6c99aed03d273e2f25818ef7b0025bb3cb98b79"
+      "sha256": "688840d2246a48ebfdbdb6c5a645821515bfd6ad0b07232ba79a2ea6a74b000a"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",

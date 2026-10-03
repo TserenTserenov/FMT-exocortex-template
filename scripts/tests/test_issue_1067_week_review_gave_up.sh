@@ -58,7 +58,7 @@ esac
 if [ "$TEST_MODEL_MODE" = deliver ]; then
     cd "$TEST_WORKSPACE" || exit 1
     mkdir -p current
-    printf 'delivered %s\n' "$(wc -l < "$TEST_MODEL_CALLS")" > 'current/WeekReport W40 2026-09-28.md'
+    printf 'delivered %s %s\n' "$TEST_MODEL_CALLS" "$(wc -l < "$TEST_MODEL_CALLS")" > 'current/WeekReport W40 2026-09-28.md'
     git add 'current/WeekReport W40 2026-09-28.md'
     git -c commit.gpgsign=false commit -qm 'week-review delivery' || exit 1
     git push -q origin HEAD:main || exit 1
@@ -276,6 +276,26 @@ ambiguous_row=$(scheduler_row)
 check 'unknown outcome does not show green DayPlan' 'case "$ambiguous_row" in *"🟡"*) true ;; *) false ;; esac'
 ambiguous_installed_row=$(installed_scheduler_row)
 check 'unknown outcome does not show green installed DayPlan' 'case "$ambiguous_installed_row" in *"🟡"*) true ;; *) false ;; esac'
+unset TEST_STATUS_MV_FAIL_AT TEST_STATUS_MV_CALLS
+
+# When the uncertain outcome occurs inside scheduler dispatch, its own alarm
+# must describe the pause accurately rather than promising another model run.
+HOME="$TMP/scheduled-success-rename-failure-home" TEST_MODEL_MODE=deliver
+TEST_MODEL_CALLS="$TMP/scheduled-success-rename-failure-model-calls"
+TEST_STATUS_MV_CALLS="$TMP/scheduled-success-status-mv-calls" TEST_STATUS_MV_FAIL_AT=2
+export TEST_STATUS_MV_CALLS TEST_STATUS_MV_FAIL_AT
+mkdir -p "$HOME/.local/state/exocortex"
+touch "$HOME/.local/state/exocortex/synchronizer-code-scan-$DAY"
+run_scheduler || :
+run_scheduler || :
+scheduled_log="$HOME/logs/synchronizer/scheduler-$DAY.log"
+scheduled_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
+check 'scheduled unknown outcome does not replay model' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 1 ]'
+check 'scheduled unknown outcome does not set weekly done' '[ ! -e "$scheduled_week_done" ]'
+check 'scheduler names uncertain pause' 'grep -q "ALARM: strategist week-review automatic retry paused (rc=77" "$scheduled_log"'
+check 'scheduler does not promise retry after uncertain delivery' '! grep -q "rc=77; will retry next dispatch" "$scheduled_log"'
+scheduled_row=$(scheduler_row)
+check 'scheduled uncertain outcome is red in DayPlan' 'case "$scheduled_row" in *"🔴"*) true ;; *) false ;; esac'
 unset TEST_STATUS_MV_FAIL_AT TEST_STATUS_MV_CALLS
 
 # A failed reservation cannot start the next model call; retrying the

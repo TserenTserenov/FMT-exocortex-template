@@ -142,6 +142,13 @@ run_strategist_scenario() {
         76)
             log "ALARM: strategist $scenario exhausted today's automatic attempts (rc=76; manual retry remains available)"
             ;;
+        77)
+            if [ "$scenario" = week-review ] && week_review_exhausted_today; then
+                log "ALARM: strategist week-review automatic retry paused (rc=77; delivery outcome uncertain or attempts exhausted; inspect status before manual retry)"
+            else
+                log "WARN: strategist $scenario failed (rc=77; next dispatch will recheck status)"
+            fi
+            ;;
         *)
             log "WARN: strategist $scenario failed (rc=$rc; will retry next dispatch)"
             ;;
