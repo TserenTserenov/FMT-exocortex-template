@@ -73,27 +73,43 @@ import time
 
 record, repo = sys.argv[1:]
 
-def publish(pids):
+children = []
+try:
+    git = subprocess.Popen(
+        ["git", "-C", repo, "-c", "alias.hang=!sleep 30", "hang"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    children.append(git)
+    leaf = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    children.append(leaf)
+    # Publish one complete record. Replacing a record held open by the reader
+    # fails on Windows and can leave the fixture's child processes behind.
     with open(record + ".tmp", "w", encoding="ascii") as stream:
-        json.dump(pids, stream)
+        json.dump({"root": os.getpid(), "git": git.pid, "leaf": leaf.pid}, stream)
     os.replace(record + ".tmp", record)
-
-pids = {"root": os.getpid()}
-publish(pids)
-git = subprocess.Popen(
-    ["git", "-C", repo, "-c", "alias.hang=!sleep 30", "hang"],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-pids["git"] = git.pid
-publish(pids)
-leaf = subprocess.Popen(
-    [sys.executable, "-c", "import time; time.sleep(30)"],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-pids["leaf"] = leaf.pid
-publish(pids)
+except BaseException:
+    # The fault case overrides SystemRoot to break the production taskkill;
+    # test cleanup still needs the real Windows directory.
+    system_root = os.environ.get("WINDIR") or os.environ.get("SystemRoot")
+    taskkill = os.path.join(system_root, "System32", "taskkill.exe") if system_root else None
+    for child in reversed(children):
+        if child.poll() is None:
+            try:
+                if taskkill:
+                    subprocess.run([taskkill, "/F", "/T", "/PID", str(child.pid)],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   timeout=5, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=3)
+    raise
 time.sleep(30)
 PY
     cat > "$TMP/native-tree-check.py" <<'PY'
@@ -160,8 +176,10 @@ def cleanup(handles):
         try:
             if not stopped(handle):
                 kill_tree(kernel.GetProcessId(handle))
-                if not stopped(handle):
+                if not stopped(handle, 3000):
                     kernel.TerminateProcess(handle, 1)
+                if not stopped(handle, 3000):
+                    raise AssertionError(f"test process {kernel.GetProcessId(handle)} survived cleanup")
         finally:
             kernel.CloseHandle(handle)
 
