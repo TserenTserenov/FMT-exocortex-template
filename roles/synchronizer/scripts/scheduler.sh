@@ -160,8 +160,11 @@ notify_incomplete_morning_update() {
         log "WARN: Day Open update-incomplete notification unavailable; will retry next dispatch"
         return 1
     fi
+    # Bound the whole notifier below TASK_TIMEOUT_SHORT (300s). notify.sh also
+    # bounds curl itself, so the macOS timeout fallback cannot leave a child
+    # network request holding this command substitution open.
     output=$(DAY_OPEN_FAILED_REASON=update-incomplete DAY_OPEN_FAILED_RC=75 \
-        "$NOTIFY_SH" strategist day-open-failed 2>&1) || notify_rc=$?
+        timeout 15 "$NOTIFY_SH" strategist day-open-failed 2>&1) || notify_rc=$?
     if [ "$notify_rc" -eq 0 ] && printf '%s\n' "$output" | grep -qxF \
         'Telegram notification sent: strategist/day-open-failed'; then
         if mark_done "$notice"; then

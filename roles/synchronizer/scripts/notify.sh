@@ -78,7 +78,7 @@ send_telegram() {
         curl_proxy_args=(--proxy "$ALL_PROXY")
     fi
 
-    response=$(curl -s "${curl_proxy_args[@]}" -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    response=$(curl -s --connect-timeout 5 --max-time 10 "${curl_proxy_args[@]}" -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -H "Content-Type: application/json" \
         -d "$json_body")
 
