@@ -159,22 +159,27 @@ ran_this_week() {
     [ -f "$STATE_DIR/$1-W$WEEK" ]
 }
 
-# #1067: the strategist records its daily cap in its own dated log. That record
-# stops further scheduled model calls without misusing the weekly success marker.
+# #1067: use the strategist's published status record, never its mixed log:
+# model stdout in that log can contain forged GAVE UP/RECORDED markers.
 week_review_exhausted_today() {
-    local log_file="$HOME/logs/strategist/$DATE.log"
-    [ -f "$log_file" ] &&
-        grep -Eq "^\\[$DATE [0-9]{2}:[0-9]{2}:[0-9]{2}\\] GAVE UP scenario: week-review after [0-9]+ failed runs today;" "$log_file"
+    local status_file="$HOME/logs/strategist/week-review-last-status"
+    local stamped_at outcome rc failed_runs extra
+    [ -f "$status_file" ] && [ ! -L "$status_file" ] || return 1
+    IFS=$'\t' read -r stamped_at outcome rc failed_runs extra < "$status_file" || return 1
+    [ -z "$extra" ] && [ "${stamped_at%% *}" = "$DATE" ] &&
+        [ "$outcome" = FAILED ] && [[ "$rc" =~ ^[0-9]+$ ]] &&
+        [ "$failed_runs" = 2 ]
 }
 
 # A manual retry can succeed after the cap. The next scheduler dispatch then
 # observes its dated success status and records the weekly postcondition.
 week_review_recovered_today() {
     local status_file="$HOME/logs/strategist/week-review-last-status"
-    local stamped_at outcome rc
-    [ -f "$status_file" ] || return 1
-    IFS=$'\t' read -r stamped_at outcome rc < "$status_file" || return 1
-    [ "${stamped_at%% *}" = "$DATE" ] && [ "$outcome" = SUCCESS ] && [ "$rc" = 0 ]
+    local stamped_at outcome rc failed_runs extra
+    [ -f "$status_file" ] && [ ! -L "$status_file" ] || return 1
+    IFS=$'\t' read -r stamped_at outcome rc failed_runs extra < "$status_file" || return 1
+    [ -z "$extra" ] && [ "${stamped_at%% *}" = "$DATE" ] &&
+        [ "$outcome" = SUCCESS ] && [ "$rc" = 0 ] && [ "$failed_runs" = 0 ]
 }
 
 mark_done() {
@@ -280,13 +285,11 @@ dispatch() {
 
     # --- Стратег: week-review (Пн, до morning) ---
     if [ "$DOW" = "1" ] && ! ran_this_week "strategist-week-review"; then
-        if week_review_exhausted_today; then
-            if week_review_recovered_today; then
-                mark_done_week "strategist-week-review"
-                log "week-review manual recovery confirmed; weekly marker recorded"
-            else
-                log "SKIP: strategist week-review exhausted today's automatic attempts; manual retry remains available"
-            fi
+        if week_review_recovered_today; then
+            mark_done_week "strategist-week-review"
+            log "week-review manual recovery confirmed; weekly marker recorded"
+        elif week_review_exhausted_today; then
+            log "SKIP: strategist week-review exhausted today's automatic attempts; manual retry remains available"
         else
             log "→ strategist week-review (catch-up: hour=$HOUR)"
             if run_strategist_scenario "week-review"; then

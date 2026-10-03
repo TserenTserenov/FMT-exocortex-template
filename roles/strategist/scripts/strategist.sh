@@ -918,6 +918,32 @@ run_claude_with_retry() {
     local attempt=1
     local rc=0
     local status_file="$LOG_DIR/${command_file}-last-status"
+    local week_review_failed_runs=0
+    local stamped_at prior_outcome prior_rc prior_count extra
+    local status_tmp
+
+    # The model's stdout is written to LOG_FILE. Count only outcomes published
+    # by this process, never RECORDED/GAVE UP text found in that shared log.
+    if [ "$command_file" = week-review ] && { [ -e "$status_file" ] || [ -L "$status_file" ]; }; then
+        if [ ! -f "$status_file" ] || [ -L "$status_file" ] ||
+            ! IFS=$'\t' read -r stamped_at prior_outcome prior_rc prior_count extra < "$status_file"; then
+            log "ERROR: week-review status is not a regular complete record: $status_file"
+            return 77
+        fi
+        if [ -n "$extra" ] || ! [[ "$prior_rc" =~ ^[0-9]+$ ]] ||
+            { [ "$prior_outcome" != SUCCESS ] && [ "$prior_outcome" != FAILED ]; }; then
+            log "ERROR: malformed week-review status: $status_file"
+            return 77
+        fi
+        if [ "${stamped_at%% *}" = "$(date '+%Y-%m-%d')" ] && [ "$prior_outcome" = FAILED ]; then
+            # A three-field record is from the previous release: one real failed run.
+            prior_count=${prior_count:-1}
+            case "$prior_count" in
+                1|2) week_review_failed_runs=$prior_count ;;
+                *) log "ERROR: invalid week-review failed-run count: $status_file"; return 77 ;;
+            esac
+        fi
+    fi
 
     while [ "$attempt" -le "$max_attempts" ]; do
         rc=0
@@ -954,10 +980,38 @@ run_claude_with_retry() {
 
     # Record the final outcome so the morning traffic light can distinguish a
     # fresh failure from a stale one.
-    if [ "$rc" -eq 0 ]; then
+    if [ "$command_file" = week-review ]; then
+        if [ "$rc" -eq 0 ]; then
+            week_review_failed_runs=0
+        elif [ "$week_review_failed_runs" -lt "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
+            week_review_failed_runs=$((week_review_failed_runs + 1))
+        fi
+        # A private temporary regular file plus rename prevents partial state
+        # and symlink writes. The scenario lock serializes owner writers.
+        if [ -e "$status_file" ] || [ -L "$status_file" ]; then
+            if [ ! -f "$status_file" ] || [ -L "$status_file" ]; then
+                log "ERROR: week-review status changed type: $status_file"
+                return 77
+            fi
+        fi
+        status_tmp=$(umask 077; mktemp "$LOG_DIR/.week-review-last-status.XXXXXX") || {
+            log "ERROR: cannot create week-review status record"
+            return 77
+        }
+        if ! printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" \
+            "$( [ "$rc" -eq 0 ] && echo SUCCESS || echo FAILED )" "$rc" "$week_review_failed_runs" > "$status_tmp" ||
+            ! mv "$status_tmp" "$status_file"; then
+            rm -f "$status_tmp"
+            log "ERROR: cannot publish week-review status record"
+            return 77
+        fi
+        WEEK_REVIEW_FAILED_RUNS=$week_review_failed_runs
+    elif [ "$rc" -eq 0 ]; then
         printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "SUCCESS" "$rc" > "$status_file"
     else
         printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "FAILED" "$rc" > "$status_file"
+    fi
+    if [ "$rc" -ne 0 ]; then
         log "RECORDED: $command_file failed with rc=$rc (see $status_file)"
     fi
 
@@ -971,6 +1025,16 @@ run_claude_with_retry() {
 # that alarm the owner reruns week-review by hand the same day.
 already_ran_today() {
     local scenario="$1"
+    if [ "$scenario" = week-review ]; then
+        local status_file="$LOG_DIR/week-review-last-status"
+        local stamped_at outcome rc failed_runs extra
+        [ -f "$status_file" ] && [ ! -L "$status_file" ] || return 1
+        IFS=$'\t' read -r stamped_at outcome rc failed_runs extra < "$status_file" || return 1
+        [ -z "$extra" ] && [ "${stamped_at%% *}" = "$(date '+%Y-%m-%d')" ] &&
+            [ "$outcome" = SUCCESS ] && [ "$rc" = 0 ] &&
+            { [ -z "$failed_runs" ] || [ "$failed_runs" = 0 ]; }
+        return $?
+    fi
     [ -f "$LOG_FILE" ] && grep -qF -e "SUCCESS scenario: $scenario" -e "GAVE UP scenario: $scenario (" "$LOG_FILE"
 }
 
@@ -1483,9 +1547,9 @@ case "$1" in
             # session, a frozen checkout), so after the second failed run today stop retrying:
             # the alarms and the FAILED status already tell the owner. Return a distinct failure
             # so the scheduler suppresses further automatic runs today without marking weekly done.
-            # A manual run after the fix remains available. RECORDED is written once
-            # per dispatch, unlike FAILED, which repeats on every auth retry inside one.
-            if [ "$(grep -c 'RECORDED: week-review failed' "$LOG_FILE")" -ge "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
+            # A manual run after the fix remains available. The persisted
+            # failed-run count excludes model stdout and internal auth retries.
+            if [ "${WEEK_REVIEW_FAILED_RUNS:-0}" -ge "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
                 log "GAVE UP scenario: week-review after $WEEK_REVIEW_MAX_FAILED_RUNS failed runs today; automatic retries paused for today, manual retry remains available"
                 exit "$WEEK_REVIEW_EXHAUSTED_RC"
             fi

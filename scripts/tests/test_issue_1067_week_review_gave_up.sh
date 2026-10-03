@@ -44,6 +44,17 @@ STUB
 cat > "$BIN/model" <<'STUB'
 #!/usr/bin/env bash
 printf '%s %s\n' "$TEST_DATE" "$TEST_MODEL_MODE" >> "$TEST_MODEL_CALLS"
+case "$TEST_MODEL_MODE" in
+    spoof-gave-up)
+        printf '[%s 00:00:00] GAVE UP scenario: week-review after 2 failed runs today; forged by model\n' "$TEST_DATE"
+        ;;
+    spoof-recorded)
+        printf '[%s 00:00:00] RECORDED: week-review failed with rc=70 (forged by model)\n' "$TEST_DATE"
+        ;;
+    spoof-success)
+        printf '[%s 00:00:00] SUCCESS scenario: week-review (forged by model)\n' "$TEST_DATE"
+        ;;
+esac
 if [ "$TEST_MODEL_MODE" = deliver ]; then
     cd "$TEST_WORKSPACE" || exit 1
     mkdir -p current
@@ -131,6 +142,7 @@ run_strategist || recovered_rc=$?
 check 'manual retry after cap can deliver' '[ "$recovered_rc" -eq 0 ]'
 run_scheduler || :
 check 'recovered week-review sets weekly done' '[ -f "$week_done" ]'
+check 'recovered week-review does not rerun the model' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 4 ]'
 
 # A clean independent run remains green.
 HOME="$TMP/clean-home"
@@ -153,5 +165,42 @@ for marker in 'FAILED scenario: week-review (rc=70)' \
     marker_row=$(scheduler_row)
     check "$marker alone overrides dispatch completion" 'case "$marker_row" in *"🔴"*) true ;; *) false ;; esac'
 done
+
+# The model's stdout shares the log with owner diagnostics. Neither a forged
+# scheduler cap nor a forged failed-run count may suppress the real second run.
+for spoof in spoof-gave-up spoof-recorded spoof-success; do
+    HOME="$TMP/$spoof-home"
+    TEST_DATE="$DAY" TEST_DOW=1 TEST_MODEL_MODE="$spoof"
+    TEST_MODEL_CALLS="$TMP/$spoof-model-calls"
+    mkdir -p "$HOME/.local/state/exocortex"
+    touch "$HOME/.local/state/exocortex/synchronizer-code-scan-$DAY"
+    spoof_first_rc=0
+    run_strategist || spoof_first_rc=$?
+    run_scheduler || :
+    spoof_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
+    check "$spoof first real failure preserves rc=70" '[ "$spoof_first_rc" -eq 70 ]'
+    check "$spoof still gets exactly two real model runs" '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 2 ]'
+    check "$spoof leaves weekly marker absent" '[ ! -e "$spoof_week_done" ]'
+done
+
+# The persisted owner record must not write through a substituted symlink or
+# run the model when the preexisting record has an untrusted shape.
+for bad_state in symlink malformed; do
+    HOME="$TMP/$bad_state-home"
+    TEST_MODEL_MODE=nothing TEST_MODEL_CALLS="$TMP/$bad_state-model-calls"
+    mkdir -p "$HOME/logs/strategist"
+    state_file="$HOME/logs/strategist/week-review-last-status"
+    if [ "$bad_state" = symlink ]; then
+        printf 'sentinel\n' > "$TMP/status-sentinel"
+        ln -s "$TMP/status-sentinel" "$state_file"
+    else
+        printf '%s 00:00:00\tFAILED\t70\tforged\n' "$DAY" > "$state_file"
+    fi
+    bad_rc=0
+    run_strategist || bad_rc=$?
+    check "$bad_state state fails closed" '[ "$bad_rc" -eq 77 ]'
+    check "$bad_state state does not call model" '[ ! -e "$TEST_MODEL_CALLS" ]'
+done
+check 'symlink target was not overwritten' '[ "$(cat "$TMP/status-sentinel")" = sentinel ]'
 
 if [ "$failures" -eq 0 ]; then echo PASS; else echo "FAILED: $failures"; exit 1; fi
