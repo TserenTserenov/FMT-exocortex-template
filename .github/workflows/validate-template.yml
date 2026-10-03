@@ -812,6 +812,12 @@ jobs:
       - name: Test read-only Pack mount is filesystem-enforced
         run: bash scripts/tests/test_mount_readonly_packs.sh
 
+      # #1072: a disposable audit must reject service-manager calls even when
+      # a nested installer swallows their status or removes the audit record.
+      # The calibration uses only private PATH stubs, never host services.
+      - name: Calibrate disposable Red Team boundary (#1072)
+        run: bash .claude/skills/iwe-platform-redteam/tests/run-calibration.sh
+
       # WP-529 Ф6 (находки Евгения 18.08): PyYAML — заявленная зависимость
       # (requirements.txt, #463), но CI её не гарантировал, а вся семья
       # scripts/tests/test_issue_*.sh лежала в репо не подключённой — тот же
