@@ -100,6 +100,7 @@ PY
 import ctypes
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -185,20 +186,23 @@ finally:
         control.kill()
         control.wait(timeout=3)
 
-environment = os.environ.copy()
-environment.update({"SYNC_LIB": sync_lib, "ROOT_SCRIPT": root_script,
-                    "PID_RECORD": record + ".green", "FIXTURE_REPO": repo})
-wrapper = subprocess.Popen(
-    [os.environ["TEST_GIT_BASH"], "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 "$NATIVE_PYTHON" "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
-    env=environment,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True,
-)
-green_handles = {}
-try:
+def launch_wrapper(pid_record, overrides=None):
+    environment = os.environ.copy()
+    environment.update({"SYNC_LIB": sync_lib, "ROOT_SCRIPT": root_script,
+                        "PID_RECORD": pid_record, "FIXTURE_REPO": repo})
+    if overrides:
+        environment.update(overrides)
+    return subprocess.Popen(
+        [os.environ["TEST_GIT_BASH"], "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 "$NATIVE_PYTHON" "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+def capture_wrapper_tree(pid_record, handles, wrapper):
     try:
-        capture_tree(record + ".green", green_handles, wrapper)
+        capture_tree(pid_record, handles, wrapper)
     except Exception as error:
         if wrapper.poll() is None:
             kill_tree(wrapper.pid)
@@ -209,6 +213,11 @@ try:
         raise AssertionError(
             f"{error}; wrapper rc={wrapper.returncode}; out={stdout}; err={stderr}"
         ) from error
+
+wrapper = launch_wrapper(record + ".green")
+green_handles = {}
+try:
+    capture_wrapper_tree(record + ".green", green_handles, wrapper)
     stdout, stderr = wrapper.communicate(timeout=16)
     assert wrapper.returncode == 124, f"timeout rc={wrapper.returncode}; out={stdout}; err={stderr}"
     for name, handle in green_handles.items():
@@ -220,7 +229,36 @@ finally:
     if wrapper.poll() is None:
         wrapper.kill()
         wrapper.communicate(timeout=3)
-print("PASS: native Windows Sync Gate local origin and red/green process-tree timeout")
+
+# A taskkill binary that exists but fails after the child starts must not be
+# reported as a handled timeout. Copying a real system executable makes the
+# failure deterministic without replacing the production taskkill or PATH.
+fake_root = os.path.join(os.path.dirname(record), "failed-taskkill-root")
+os.makedirs(os.path.join(fake_root, "System32"), exist_ok=True)
+fake_taskkill = os.path.join(fake_root, "System32", "taskkill.exe")
+shutil.copyfile(os.path.join(system_root, "System32", "where.exe"), fake_taskkill)
+probe = subprocess.run([fake_taskkill, "/F", "/T", "/PID", "0"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=5, check=False)
+assert probe.returncode != 0, "fault taskkill executable unexpectedly succeeded"
+fault = launch_wrapper(record + ".fault", {"SystemRoot": fake_root})
+fault_handles = {}
+try:
+    capture_wrapper_tree(record + ".fault", fault_handles, fault)
+    stdout, stderr = fault.communicate(timeout=19)
+    assert fault.returncode == 125, \
+        f"failed taskkill returned {fault.returncode}, expected 125; out={stdout}; err={stderr}"
+    assert stopped(fault_handles["root"], 3000), "fallback did not stop direct root"
+    assert not stopped(fault_handles["git"]) or not stopped(fault_handles["leaf"]), \
+        "fault injection did not expose a surviving descendant"
+finally:
+    if fault.poll() is None:
+        kill_tree(fault.pid)
+    cleanup(fault_handles)
+    if fault.poll() is None:
+        fault.kill()
+        fault.communicate(timeout=3)
+print("PASS: native Windows Sync Gate red/green tree and both taskkill failure paths")
 PY
     "$PYTHON3" "$(cygpath -w "$TMP/native-tree-check.py")" \
         "$(cygpath -w "$TMP/native-tree-root.py")" \
