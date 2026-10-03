@@ -51,7 +51,8 @@ routing:
 | Параметр | Default | Описание |
 |----------|---------|----------|
 | `--target` | обязательный | `WP-NNN` (зонтичный РП), `weekplan` (текущая неделя), `pilot:<account_id>` (учебный конвейер пилота), `b2:aisystant` (вся экосистема — требует `--layer=platform`), `c2:platform` (только техника — требует `--layer=platform`), project-name, repo-path |
-| `--layer` | intra | `intra` = внутри одной системы (constraint = фаза / РП / блок). `platform` = между подсистемами C2 (constraint = подсистема / handover / роль B3). Опора: `memory/project_iwe_systems_map.md` |
+| `--layer` | intra | `intra` = внутри одной системы (constraint = фаза / РП / блок). `platform` = между подсистемами C2 (constraint = подсистема / handover / роль B3). Требуется пользовательская карта систем. |
+| `--systems-map` | `memory/project_iwe_systems_map.md` в установленном рабочем пространстве | Путь к пользовательской карте для `--layer=platform`; можно указать абсолютный путь к закрытому каталогу. Карта не доставляется публичным шаблоном. |
 | `--horizon` | all | day, week, month, wave-1, wave-2, quarter, next-stage |
 | `--depth` | 2 | 1 = Five Steps only; 2 = + EC для конфликтующих кандидатов; 3 = + Coupling-analysis SOTA.011 для top-3 handovers (только при `--layer=platform`) |
 | `--scope` | direct+related | direct = только target; direct+related = + связанные РП из frontmatter; full = + reachable через граф связей ≤2 hops |
@@ -63,8 +64,8 @@ routing:
 | `WP-NNN` | `${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-NNN-*.md` + связанные РП + git за 7d | governance |
 | `weekplan` | `${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekPlan W{N}.md` + active-wp.md + DP.SC поверх активных РП | governance |
 | `pilot:<id>` | `learning.activity_log` + `learning.cp_assessments` + `learning.bh_metrics` (Neon) | платформа (учебный конвейер) |
-| `b2:aisystant` | `03-our-systems-map.md` (S2R) + `DP.MAP.002` + `project_iwe_systems_map.md` + cross-system SC | governance + Pack |
-| `c2:platform` | `DP.MAP.002` (12 подсистем) + 15 новых Q2 из `project_iwe_systems_map.md` | Pack + memory |
+| `b2:aisystant` | `03-our-systems-map.md` (S2R) + `DP.MAP.002` + пользовательская карта из `--systems-map` + cross-system SC | governance + Pack + пользовательский файл |
+| `c2:platform` | `DP.MAP.002` (12 подсистем) + новые Q2 из пользовательской карты | Pack + пользовательский файл |
 
 ### Error cases
 
@@ -73,6 +74,7 @@ routing:
 | target не найден | «Не нашёл `<target>`. Проверь номер или путь.» → СТОП |
 | target = done-РП | «`<target>` уже закрыт. Укажи активный РП.» → СТОП |
 | target пустой (нет структуры) | «Нет структуры для анализа в `<target>`.» → СТОП |
+| `--layer=platform`, карта отсутствует, пуста или не читается | Запустить `scripts/check-platform-systems-map.sh`, показать его точную диагностику и СТОП до System Card и выводов. Пользователь создаёт собственную карту либо указывает `--systems-map <путь>`. |
 | Данные устарели (>7 дней без git-активности) | Добавить ⚠️ к signal-scan, не останавливаться |
 | EC не сходится (пустые assumptions) | Fallback к Five Steps, отметить в output |
 | Все кандидаты не agent-actionable | «Все кандидаты не agent-actionable. Нужна другая точка входа.» |
@@ -88,10 +90,11 @@ routing:
 **Вход:** target-ref + `--layer` от пользователя.
 
 **Действие:**
+0. Для `--layer=platform` **до анализа** вызвать из корня установленного рабочего пространства `bash scripts/check-platform-systems-map.sh` или, если задан параметр, `bash scripts/check-platform-systems-map.sh --map "<путь из --systems-map>"`. Код 2: вывести диагностику и СТОП; отсутствие карты нельзя заменять догадкой или только `DP.MAP.002`. Скрипт печатает проверенный путь — далее читать именно этот пользовательский файл. Для `--layer=intra` эта проверка не нужна.
 1. Классифицировать тип системы-конвейера по `--target` × `--layer`:
    - **Учебный конвейер пилота** — `--target pilot:<id>` (FORM.089 RCS, источник: Neon `learning.*`)
    - **Конвейер работ (intra)** — `--target WP-NNN | weekplan | project | repo-path`, `--layer=intra`. Структура = направления A-И / фазы Ф1-ФN / блоки внутри одного РП
-   - **Платформенный (cross-system)** — `--target b2:aisystant | c2:platform | WP-NNN-зонтичный`, `--layer=platform`. Структура = подсистемы C2 (≈27 шт) + handovers + роли B3. ⚠️ Validation: при `--layer=platform` обязательно загрузить карту систем (`memory/project_iwe_systems_map.md` + `DP.MAP.002`)
+   - **Платформенный (cross-system)** — `--target b2:aisystant | c2:platform | WP-NNN-зонтичный`, `--layer=platform`. Структура = подсистемы C2 + handovers + роли B3. ⚠️ Validation: обязательно загрузить проверенную пользовательскую карту и `DP.MAP.002`; число подсистем брать из карты, не из шаблона.
    - **Когортный конвейер** — `--target cohort:<id> | wave-N`
 2. Собрать контекст по типу:
    ```bash
@@ -102,7 +105,7 @@ routing:
 
    # platform
    ls PACK-digital-platform/.../08-service-clauses/   # cross-system SC
-   cat memory/project_iwe_systems_map.md              # карта 27 подсистем
+   cat "<проверенный_путь_карты>"                       # путь вывел check-platform-systems-map.sh
    git log --oneline --since="7 days ago" --all       # активность по подсистемам
    ```
 3. Зафиксировать свежесть данных. Если ≥7 дней без активности — ⚠️. При `--layer=platform`: проверить свежесть `DP.MAP.002` (стейл >30 дней → ⚠️).

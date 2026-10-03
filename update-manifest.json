@@ -421,7 +421,7 @@
     },
     {
       "path": ".claude/skills/bottleneck-pick/SKILL.md",
-      "sha256": "bce893b0f6f828442f3b609558a419b900d4e28c0fe1e7ac35a2b9e45c1462b0"
+      "sha256": "d25390eaeddf2adb0b90a4093d080d029acea8b9080ea0de6b64a53aff29005c"
     },
     {
       "path": ".claude/skills/check-secret/SKILL.md",
@@ -629,7 +629,7 @@
     },
     {
       "path": ".claude/skills/platform-bottleneck/SKILL.md",
-      "sha256": "3d72607a2781db1fe365ffb5dc92f4c3efc824494aac014c08b70c08be718596"
+      "sha256": "64437e4de375cfa8aa7dd76c80ec3bf7ef8b09345918a39625422e36f14c3b50"
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
@@ -857,7 +857,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2c126d38259a45d0915e0350a186ba1513ff5889f3f93ae72bf727002b086464"
+      "sha256": "653660c56435a6f2edadcde2860b67af1e5b3ec03c7c2b1b33b078070e37f2fd"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "653660c56435a6f2edadcde2860b67af1e5b3ec03c7c2b1b33b078070e37f2fd"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "653660c56435a6f2edadcde2860b67af1e5b3ec03c7c2b1b33b078070e37f2fd"
     },
     {
       "path": "CLAUDE.md",
@@ -2164,6 +2172,10 @@
       "sha256": "61c960813407e0b37df5522935d55d3ae7f12dadc90b26bcdfc53b88545f041e"
     },
     {
+      "path": "scripts/check-platform-systems-map.sh",
+      "sha256": "7342f3512c2e46f047651b20a7dfda84575717131f613b7d2d6f1d29d6e87b8b"
+    },
+    {
       "path": "scripts/check-python-resolver-contract.sh",
       "sha256": "6a8d56b16da06ec42597a01cba20622e333545840f1827a430ac7741d0ba5861"
     },
@@ -3232,6 +3244,7 @@
     "scripts/tests/test_issue_1037_filemode.sh",
     "scripts/tests/test_issue_1038_python_env.py",
     "scripts/tests/test_issue_1038_validator.sh",
+    "scripts/tests/test_issue_1061_platform_bottleneck_map.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",

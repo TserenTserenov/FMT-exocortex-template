@@ -34,23 +34,27 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ### Шаг 1. Разобрать аргументы
 
-Извлечь `--horizon` и `--subsystem` из аргументов вызова.
+Извлечь `--horizon`, `--subsystem` и необязательный `--systems-map <путь>` из аргументов вызова. Путь к карте — пользовательские данные, не часть публичного шаблона.
 
-### Шаг 2. Делегировать в /bottleneck-pick
+### Шаг 2. Проверить карту систем
+
+До делегирования выполнить из корня установленного рабочего пространства `bash scripts/check-platform-systems-map.sh`; если задан `--systems-map`, выполнить `bash scripts/check-platform-systems-map.sh --map "<путь>"`. Код выхода 2: передать пользователю диагностику скрипта и **остановиться**, не строить анализ по неполной карте. Успешный вызов печатает проверенный путь; передать именно его в следующий шаг как один аргумент.
+
+### Шаг 3. Делегировать в /bottleneck-pick
 
 Без `--subsystem`:
 
 ```
-/bottleneck-pick --target c2:platform --layer platform [--horizon <h>]
+/bottleneck-pick --target c2:platform --layer platform --systems-map "<проверенный_путь>" [--horizon <h>]
 ```
 
 С `--subsystem`:
 
 ```
-/bottleneck-pick --target c2:platform --layer platform --subsystem <s> [--horizon <h>]
+/bottleneck-pick --target c2:platform --layer platform --subsystem <s> --systems-map "<проверенный_путь>" [--horizon <h>]
 ```
 
-### Шаг 3. Вернуть результат
+### Шаг 4. Вернуть результат
 
 Результат `/bottleneck-pick` передаётся пилоту без изменений.
 
