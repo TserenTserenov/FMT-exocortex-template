@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8b6f4a6568b4d63e818a0d9a09c4f5717a17b2e155ed67ba66c48b859c1743f4"
+      "sha256": "594445356d95485c086b82493d15931b3b91e6885ac7a332d6af18971d28499e"
     },
     {
       "path": "CLAUDE.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "66a32ba92192cf76f3dd46c8a78359e9369e7e87b0d171c016f102bcdc7e63dc"
+      "sha256": "eee036519c44860f5ab77936399ef9d2bd341d9080b5be1d1f070aae5cb3b5fe"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1973,11 +1973,11 @@
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
-      "sha256": "1c2c7c4fcb91d05015dc9254f7b1fa20e28dd54bede263140f46dd1e75643823"
+      "sha256": "3e10c056592b6c5ecdaeeb428f179ce6cce8945b849020f14fa4e7f5b60a2337"
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "da5e626076d35ba263e3e4c66ed94a9b2b0735442d54ea48d793e4e7bce800a4"
+      "sha256": "ed8b8b060fb066c7bfcb9c557a98b5ca1831ce8abc5db4562f6eaf92f87b4621"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -1997,7 +1997,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "299a08b5110d75145a99171b2b6ae89d43abc057e5596f1418820447612214a8"
+      "sha256": "971e3b1c7e25436511deb92c82e972f5b33982832fe585fcf7424a7563b69d47"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -2873,7 +2873,7 @@
     },
     {
       "path": "scripts/tests/test_role_runner_update_marker_guard.sh",
-      "sha256": "d5f39a5aa6e485b019a7ad53152a7f9377f7a9d43f45583cd0d599b8273a32dc"
+      "sha256": "6cc2682f2894ec2659c79e24a0f6bd16fd8efcf83d304d5236c0fde9e9241281"
     },
     {
       "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
