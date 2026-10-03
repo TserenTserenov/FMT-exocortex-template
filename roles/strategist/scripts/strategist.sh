@@ -955,15 +955,21 @@ run_claude_with_retry() {
         fi
         if [ -n "$extra" ] || ! [[ "$stamped_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]][0-9]{2}:[0-9]{2}:[0-9]{2}$ ]] ||
             ! [[ "$prior_rc" =~ ^[0-9]+$ ]] ||
-            { [ "$prior_outcome" != SUCCESS ] && [ "$prior_outcome" != FAILED ]; }; then
+            { [ "$prior_outcome" != SUCCESS ] && [ "$prior_outcome" != FAILED ] &&
+                [ "$prior_outcome" != UNKNOWN ]; }; then
             log "ERROR: malformed week-review status: $status_file"
             return 77
         fi
         case "$prior_outcome:$prior_count" in
-            SUCCESS:|SUCCESS:0|FAILED:|FAILED:1|FAILED:2) ;;
+            SUCCESS:|SUCCESS:0|FAILED:|FAILED:1|FAILED:2|UNKNOWN:1|UNKNOWN:2) ;;
             *) log "ERROR: invalid week-review outcome/count: $status_file"; return 77 ;;
         esac
-        if [ "${stamped_at%% *}" = "$(date '+%Y-%m-%d')" ] && [ "$prior_outcome" = FAILED ]; then
+        if [ "$prior_outcome" = UNKNOWN ] && [ "$prior_rc" != 77 ]; then
+            log "ERROR: invalid uncertain week-review status: $status_file"
+            return 77
+        fi
+        if [ "${stamped_at%% *}" = "$(date '+%Y-%m-%d')" ] &&
+            { [ "$prior_outcome" = FAILED ] || [ "$prior_outcome" = UNKNOWN ]; }; then
             # The previous release did not record whether this was failure #1
             # or #2. Treat today's three-field FAILED as exhausted: automatic
             # replay might otherwise become a third model call after upgrade.
@@ -973,13 +979,14 @@ run_claude_with_retry() {
     fi
 
     if [ "$command_file" = week-review ]; then
-        # Reserve the attempt before invoking the model. If the final status
-        # write fails or this shell dies, count=2 still stops a third automatic
-        # run. A manual retry is allowed and success resets the count to zero.
+        # Reserve the attempt before invoking the model. UNKNOWN pauses every
+        # automatic replay if this shell dies or final status publication fails:
+        # the report may already have reached origin, even on attempt one.
+        # A manual retry is allowed and success resets the count to zero.
         if [ "$week_review_failed_runs" -lt "$WEEK_REVIEW_MAX_FAILED_RUNS" ]; then
             week_review_failed_runs=$((week_review_failed_runs + 1))
         fi
-        publish_week_review_status "$status_file" FAILED 77 "$week_review_failed_runs" || return 77
+        publish_week_review_status "$status_file" UNKNOWN 77 "$week_review_failed_runs" || return 77
         WEEK_REVIEW_FAILED_RUNS=$week_review_failed_runs
     fi
 

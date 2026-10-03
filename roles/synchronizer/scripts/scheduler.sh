@@ -160,15 +160,18 @@ ran_this_week() {
 }
 
 # #1067: use the strategist's published status record, never its mixed log:
-# model stdout in that log can contain forged GAVE UP/RECORDED markers.
+# model stdout in that log can contain forged GAVE UP/RECORDED markers. UNKNOWN
+# means a run may have delivered before its final status write failed; pause.
 week_review_exhausted_today() {
     local status_file="$HOME/logs/strategist/week-review-last-status"
     local stamped_at outcome rc failed_runs extra
     [ -f "$status_file" ] && [ ! -L "$status_file" ] || return 1
     IFS=$'\t' read -r stamped_at outcome rc failed_runs extra < "$status_file" || return 1
     [ -z "$extra" ] && [ "${stamped_at%% *}" = "$DATE" ] &&
-        [ "$outcome" = FAILED ] && [[ "$rc" =~ ^[0-9]+$ ]] &&
-        { [ "$failed_runs" = 2 ] || [ -z "$failed_runs" ]; }
+        { { [ "$outcome" = FAILED ] && [[ "$rc" =~ ^[0-9]+$ ]] &&
+            { [ "$failed_runs" = 2 ] || [ -z "$failed_runs" ]; }; } ||
+          { [ "$outcome" = UNKNOWN ] && [ "$rc" = 77 ] &&
+            { [ "$failed_runs" = 1 ] || [ "$failed_runs" = 2 ]; }; }; }
 }
 
 # A manual retry can succeed after the cap. The next scheduler dispatch then
@@ -289,7 +292,7 @@ dispatch() {
             mark_done_week "strategist-week-review"
             log "week-review manual recovery confirmed; weekly marker recorded"
         elif week_review_exhausted_today; then
-            log "SKIP: strategist week-review exhausted today's automatic attempts; manual retry remains available"
+            log "SKIP: strategist week-review automatic retry paused (attempts exhausted or delivery outcome uncertain); inspect status before manual retry"
         else
             log "→ strategist week-review (catch-up: hour=$HOUR)"
             if run_strategist_scenario "week-review"; then

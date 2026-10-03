@@ -246,13 +246,37 @@ run_scheduler || :
 mv_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
 check 'failed final rename cannot trigger model run three' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 2 ]'
 check 'final rename refusal was injected' '[ "$(cat "$TMP/status-mv-calls")" -eq 4 ]'
-check 'failed final rename leaves reserved cap' 'awk -F "\t" "NR==1 {exit !(\$2 == \"FAILED\" && \$4 == 2)}" "$HOME/logs/strategist/week-review-last-status"'
+check 'failed final rename leaves uncertain reserved cap' 'awk -F "\t" "NR==1 {exit !(\$2 == \"UNKNOWN\" && \$3 == 77 && \$4 == 2)}" "$HOME/logs/strategist/week-review-last-status"'
 check 'failed final rename leaves weekly marker absent' '[ ! -e "$mv_week_done" ]'
 unset TEST_STATUS_MV_FAIL_AT TEST_STATUS_MV_CALLS
 TEST_MODEL_MODE=deliver
 run_strategist || :
 run_scheduler || :
 check 'manual recovery remains available after rename failure' '[ -f "$mv_week_done" ]'
+
+# A delivered report followed by a failed final SUCCESS rename is ambiguous.
+# The scheduler must not deliver it again automatically even though count=1.
+HOME="$TMP/success-rename-failure-home" TEST_MODEL_MODE=deliver
+TEST_MODEL_CALLS="$TMP/success-rename-failure-model-calls"
+TEST_STATUS_MV_CALLS="$TMP/success-status-mv-calls" TEST_STATUS_MV_FAIL_AT=2
+export TEST_STATUS_MV_CALLS TEST_STATUS_MV_FAIL_AT
+mkdir -p "$HOME/.local/state/exocortex"
+touch "$HOME/.local/state/exocortex/synchronizer-code-scan-$DAY"
+ambiguous_rc=0
+run_strategist || ambiguous_rc=$?
+run_scheduler || :
+run_scheduler || :
+ambiguous_week_done="$HOME/.local/state/exocortex/strategist-week-review-W$TEST_WEEK"
+check 'delivered but unrecorded success returns failure' '[ "$ambiguous_rc" -eq 77 ]'
+check 'final success rename refusal was injected' '[ "$(cat "$TMP/success-status-mv-calls")" -eq 2 ]'
+check 'unknown outcome cannot replay delivered report' '[ "$(wc -l < "$TEST_MODEL_CALLS")" -eq 1 ]'
+check 'unknown outcome does not set weekly done' '[ ! -e "$ambiguous_week_done" ]'
+check 'unknown outcome is persisted for manual reconciliation' 'awk -F "\t" "NR==1 {exit !(\$2 == \"UNKNOWN\" && \$3 == 77 && \$4 == 1)}" "$HOME/logs/strategist/week-review-last-status"'
+ambiguous_row=$(scheduler_row)
+check 'unknown outcome does not show green DayPlan' 'case "$ambiguous_row" in *"🟡"*) true ;; *) false ;; esac'
+ambiguous_installed_row=$(installed_scheduler_row)
+check 'unknown outcome does not show green installed DayPlan' 'case "$ambiguous_installed_row" in *"🟡"*) true ;; *) false ;; esac'
+unset TEST_STATUS_MV_FAIL_AT TEST_STATUS_MV_CALLS
 
 # A failed reservation cannot start the next model call; retrying the
 # scheduler while the filesystem still refuses mktemp only repeats preflight.
