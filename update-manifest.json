@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bea5a79e156c81d7d373761f0f797079fe4b7360d692accb6d2be83bb2a4ea5a"
+      "sha256": "cd0625711ad6a4af68759f9878e2c6e6db9664d571931044e590eb19bc27eec4"
     },
     {
       "path": "CLAUDE.md",
@@ -1997,7 +1997,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "dbde0b28018d96113fdff3e75d099d194a18326e86ef6b2a428200fbca9f1980"
+      "sha256": "299a08b5110d75145a99171b2b6ae89d43abc057e5596f1418820447612214a8"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -2633,7 +2633,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "77056be85ae137c72f8dd1b7540cebc88f1faaaab2a169b0f983cb9ddd8ee6ff"
+      "sha256": "80fec4dd8be10b22c61f24ac3970dd0093d70511660e2544f5841dafdd080405"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -3271,7 +3271,9 @@
     "scripts/tests/test_issue_974_day_open_pipeline_layout.sh",
     "scripts/tests/test_issue_975_completion_reminder_r23.sh",
     "scripts/tests/test_issue_979_weekplan_table.py",
+    "scripts/tests/test_issue_982_telegram_plan_list.sh",
     "scripts/tests/test_issue_983_morning_alarm.sh",
+    "scripts/tests/test_issue_984_feeder_plist_iwe_scripts.sh",
     "scripts/tests/test_issue_989_snapshot_cross_api.py",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
