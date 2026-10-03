@@ -9,18 +9,13 @@ name: Weekly Release
 # (`GH006: Protected branch update failed`, main защищён), поэтому job
 # открывает PR с бампом, а не пушит в main.
 #
-# WP-529 Ф-релиз (29.09.2026, проверено через API): main требует только
-# статус `release-receipt` (enforce_admins, 0 approvals, code owner не
-# нужен). PR, открытый через GITHUB_TOKEN, получает pull_request-запуски в
-# состоянии `action_required` (правило GitHub для PR от GITHUB_TOKEN) —
-# `release-receipt` не выполняется, слияние остаётся BLOCKED. Оба прошлых
-# релиза держались на ручном «Approve and run» пилота (#843: запуски
-# стартовали через 17 минут после создания). Поэтому после открытия PR
-# шаг «Validate the release branch» явно запускает validate-template.yml
-# через workflow_dispatch (документированное исключение из anti-recursion
-# для GITHUB_TOKEN) — check run встаёт на head-коммит PR, слияние
-# становится доступным без ручного одобрения. release.yml от такого
-# запуска не срабатывает: он слушает только ветку main.
+# WP-529 Ф-релиз: main требует `release-receipt`. PR, открытый через
+# GITHUB_TOKEN, создаёт pull_request-запуски с ожиданием одобрения. Запуск
+# validate-template.yml через workflow_dispatch возможен, но его jobs не
+# удовлетворяют обязательную проверку PR даже на том же head-коммите.
+# Владелец с правом записи одобряет PR workflows, затем ждёт успешного
+# pull_request Validate Template с release-receipt для проверяемого PR-коммита.
+# После слияния обычный push в main запускает проверку и release.yml.
 #
 # WP-7 Ф62 (10.08.2026): исходная причина вообще звать validate перед
 # релизом — раньше бамп версии никак не тестировался перед тем, как
@@ -31,7 +26,8 @@ name: Weekly Release
 # Причина автоматизации в целом: раньше версия бампалась только вручную —
 # паузы между выпусками доходили до 2-3 недель, хотя коммиты в
 # [Unreleased] шли почти ежедневно (см. docs/RELEASE-PROCESS.md). Теперь
-# ручной шаг — только мердж уже готового PR, не сборка бампа с нуля.
+# ручные шаги — допуск PR workflows, проверка и слияние готового PR,
+# а не сборка бампа с нуля.
 
 on:
   schedule:
@@ -48,7 +44,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write    # dispatch validate-template.yml on the release branch
   issues: write     # signal a skipped release (see last step)
 
 jobs:
@@ -134,27 +129,17 @@ jobs:
 
       - name: Open release PR
         # Смердженный PR даёт обычный push-коммит, который штатно запускает
-        # validate-template.yml → release.yml. До слияния проверки на PR
-        # запускает следующий шаг (см. шапку файла).
+        # validate-template.yml → release.yml. До слияния владелец одобряет
+        # pull_request workflows и проверяет release-receipt (см. шапку).
         if: steps.check.outputs.has_content == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh pr create \
             --title "chore(release): weekly auto-bump to v${{ steps.bump.outputs.version }}" \
-            --body "Еженедельный автобамп версии. Мердж запускает обычный релизный конвейер (validate → release) через штатный push-триггер." \
+            --body "Еженедельный автобамп версии. Для PR от GITHUB_TOKEN владелец одобряет запуск workflows (Approve workflows to run), затем проверяет успешный pull_request Validate Template и release-receipt на актуальном PR-коммите. Только после этого слияние запускает обычный релизный конвейер (validate → release) через push в main." \
             --base main \
             --head "${{ steps.commit.outputs.branch }}"
-
-      - name: Validate the release branch
-        # PR от GITHUB_TOKEN получает pull_request-запуски в action_required,
-        # release-receipt не выполняется. workflow_dispatch — документированное
-        # исключение: check run встаёт на head-коммит release-ветки.
-        if: steps.check.outputs.has_content == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run validate-template.yml --ref "${{ steps.commit.outputs.branch }}"
 
       - name: Signal a skipped release
         # 20.09.2026: [Unreleased] был пуст при 10 коммитах с прошлого тега —

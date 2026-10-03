@@ -17,12 +17,11 @@ on:
   # not within minutes of a push nobody's about to release from unreviewed.
   schedule:
     - cron: '0 2 * * *'  # 05:00 МСК
-  # WP-529 (29.09.2026): weekly-release.yml открывает PR с бампом версии через
-  # default GITHUB_TOKEN; pull_request-запуски такого PR стоят в
-  # action_required (правило GitHub), поэтому weekly явно зовёт этот workflow
-  # через workflow_dispatch на release-ветке — так статус `release-receipt`
-  # появляется на head-коммите PR. release.yml слушает завершение этого
-  # workflow только на ветке main, запуск на release-ветке тег не создаёт.
+  # WP-529: weekly-release.yml открывает PR через GITHUB_TOKEN; его
+  # pull_request-запуски ждут одобрения владельца с правом записи.
+  # workflow_dispatch оставлен для ручной диагностики, но его jobs не
+  # удовлетворяют обязательный release-receipt PR даже на том же head.
+  # release.yml слушает завершение проверки только на ветке main.
   workflow_dispatch:
 
 # #1010 F16: every job only reads the repository and uploads artifacts; a token with the
