@@ -2592,7 +2592,7 @@ backfill_extractor_feeders() {
 # exactly as it was.
 refresh_fpf_base_clone() {
     local fpf_dir="$WORKSPACE_DIR/FPF"
-    local before after upstream head_oid fetch_pid waited
+    local before after upstream head_oid fetch_status
     local fetch_limit="${IWE_FPF_FETCH_TIMEOUT:-90}"
 
     if [ "${IWE_SKIP_FPF_REFRESH:-0}" = "1" ]; then
@@ -2613,40 +2613,47 @@ refresh_fpf_base_clone() {
         return 0
     fi
 
-    # An unattended update must never wait for a password, an ssh prompt or a
-    # dead network. macOS has no timeout(1), so the limit is a portable
-    # background-and-poll watchdog. The low-speed limits bound a stalled
-    # transfer, the prompt/ssh settings bound the connect phase.
-    env GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true \
+    # The Sync Gate timeout wrapper launches git under one process-tree
+    # supervisor and gives Windows a native PID. Git Bash's $! /proc winpid
+    # can refer to a Bash shim whose native children are no longer in its
+    # Windows ancestry; taskkill /T then reports success while fetch survives.
+    case "$fetch_limit" in
+        0|*[!0-9]*)
+            echo "  ⚠ FPF: некорректный лимит IWE_FPF_FETCH_TIMEOUT — обновление копии пропущено."
+            return 0
+            ;;
+    esac
+    if [ ! -r "$SCRIPT_DIR/scripts/lib/git-sync-status.sh" ]; then
+        echo "  ⚠ FPF: контроллер таймаута недоступен — обновление копии пропущено."
+        return 0
+    fi
+    # shellcheck source=scripts/lib/git-sync-status.sh
+    . "$SCRIPT_DIR/scripts/lib/git-sync-status.sh"
+    fetch_status=0
+    if GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true \
         GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' \
+        _git_sync_run_with_timeout "$fetch_limit" \
         git -C "$fpf_dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
-        fetch --quiet 2>/dev/null &
-    fetch_pid=$!
-    waited=0
-    while kill -0 "$fetch_pid" 2>/dev/null && [ "$waited" -lt "$fetch_limit" ]; do
-        sleep 1
-        waited=$((waited + 1))
-    done
-    if kill -0 "$fetch_pid" 2>/dev/null; then
-        # Git Bash on Windows ships no pkill (issue #1005): the git child
-        # (ssh / remote helper) would outlive the timeout. There, kill the
-        # whole native process tree with taskkill; $IWE_PROC_DIR is only a
-        # seam for tests (MSYS exposes the Windows pid at /proc/<pid>/winpid).
-        if command -v pkill >/dev/null 2>&1; then
-            pkill -P "$fetch_pid" 2>/dev/null || true
-        elif command -v taskkill >/dev/null 2>&1 \
-             && [ -r "${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid" ]; then
-            taskkill //F //T //PID "$(cat "${IWE_PROC_DIR:-/proc}/$fetch_pid/winpid")" >/dev/null 2>&1 || true
-        fi
-        kill "$fetch_pid" 2>/dev/null || true
-        wait "$fetch_pid" 2>/dev/null || true
-        echo "  ⚠ FPF: сервер не ответил за ${fetch_limit} с — копия остаётся как была и может быть устаревшей."
-        return 0
+        fetch --quiet >/dev/null 2>&1; then
+        :
+    else
+        fetch_status=$?
     fi
-    if ! wait "$fetch_pid"; then
-        echo "  ⚠ FPF: не удалось получить обновления (нет сети или доступ отказан) — копия остаётся как была и может быть устаревшей."
-        return 0
-    fi
+    case "$fetch_status" in
+        0) ;;
+        124)
+            echo "  ⚠ FPF: сервер не ответил за ${fetch_limit} с — копия остаётся как была и может быть устаревшей."
+            return 0
+            ;;
+        125)
+            echo "  ⚠ FPF: остановка дерева git не подтверждена; проверьте дочерние процессы. Копия может быть устаревшей."
+            return 0
+            ;;
+        *)
+            echo "  ⚠ FPF: не удалось получить обновления (ошибка Git или контроллера таймаута) — копия остаётся как была и может быть устаревшей."
+            return 0
+            ;;
+    esac
 
     # Classify HEAD against the tracked upstream instead of trusting the exit
     # code of a merge: "already up to date" is also what a copy that is AHEAD
