@@ -9,11 +9,12 @@
 # for two days, one accidental green run, proved that "we run this check
 # somewhere" says nothing about whether THIS commit passed it).
 #
-# publishable=true requires every mandatory check to be success or skipped
-# (skipped = intentionally not run for this trigger, e.g. the macOS
-# integration job on a push event — see validate-template.yml condition on
-# integration-contract-macos). Any failure/cancelled/unknown → false, and
-# the script exits 1 so a future required_status_check can gate on this one
+# publishable=true requires the Windows lock check to report success; other
+# mandatory checks may be success or intentionally skipped for this trigger
+# (e.g. the macOS integration job on a push event — see validate-template.yml
+# condition on integration-contract-macos). Failure/cancelled/unknown and a
+# skipped issue-1030-windows check produce false. The script then exits 1 so
+# a future required_status_check can gate on this one
 # job instead of enumerating every individual job (Ф2 acceptance criterion,
 # still deferred by pilot decision as of 18.08).
 #
@@ -46,6 +47,7 @@ CHECK_NAMES=(
   release-sync
   integration-contract-ubuntu
   integration-contract-macos
+  issue-1030-windows
   shellcheck
   platform-compat
   validate
@@ -56,6 +58,7 @@ CHECK_ENV_VARS=(
   RESULT_RELEASE_SYNC
   RESULT_INTEGRATION_CONTRACT_UBUNTU
   RESULT_INTEGRATION_CONTRACT_MACOS
+  RESULT_ISSUE_1030_WINDOWS
   RESULT_SHELLCHECK
   RESULT_PLATFORM_COMPAT
   RESULT_VALIDATE
@@ -72,7 +75,13 @@ for i in "${!CHECK_NAMES[@]}"; do
   var="${CHECK_ENV_VARS[$i]}"
   result="${!var:-unknown}"
   case "$result" in
-    success | skipped) ;;
+    success) ;;
+    skipped)
+      if [ "$name" = "issue-1030-windows" ]; then
+        PUBLISHABLE=false
+        FAILED_NAMES+=("$name:$result")
+      fi
+      ;;
     *)
       PUBLISHABLE=false
       FAILED_NAMES+=("$name:$result")
@@ -97,6 +106,6 @@ if [ "$PUBLISHABLE" = "true" ]; then
   echo "PASS: publishable=true — $SHA"
 else
   echo "FAIL: publishable=false — $SHA"
-  echo "  Обязательные проверки без success/skipped: ${FAILED_NAMES[*]}"
+  echo "  Обязательные проверки с недопустимым результатом: ${FAILED_NAMES[*]}"
   exit 1
 fi

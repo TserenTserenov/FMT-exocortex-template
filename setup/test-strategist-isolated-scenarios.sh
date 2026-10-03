@@ -708,7 +708,10 @@ check "flag off: the same failing cleanup script is still ignored as before (exi
 echo "== B9: errexit is off inside run_claude when called with || : failures must still stop it =="
 make_env
 mkdir -p "$E/shim-py" "$E/shim-sed" "$E/shim-git"
-printf '#!/bin/bash\nexit 1\n' > "$E/shim-py/python3"; chmod +x "$E/shim-py/python3"
+# Lock publication uses python3 - before run_claude. Let that call reach the
+# real interpreter so this case still exercises the intended date-context
+# failure after the isolated copy exists.
+printf '#!/bin/bash\nif [ "${1:-}" = "-" ]; then exec %q "$@"; fi\nexit 1\n' "$PY3" > "$E/shim-py/python3"; chmod +x "$E/shim-py/python3"
 cp "$E/shim-py/python3" "$E/shim-sed/sed"
 EXTRA_SHIM="$E/shim-py" run_runner noop note-review
 check "python3 (date context) fails: runner exits non-zero" "1" "$([ "$RC" -ne 0 ] && echo 1 || echo 0)"

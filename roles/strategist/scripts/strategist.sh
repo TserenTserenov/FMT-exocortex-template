@@ -5,8 +5,8 @@
 set -e
 
 # issue #657: this script needs more than one independent EXIT cleanup (kill
-# the sleep inhibitor below; remove acquire_lock()'s concurrency lock
-# directory further down) — plain `trap ... EXIT` only keeps the LAST
+# the sleep inhibitor below; release acquire_lock()'s owner links
+# further down) — plain `trap ... EXIT` only keeps the LAST
 # handler registered for a signal, so the second one silently replaced the
 # first on every ordinary run, not just on kill -9/orphaning as first
 # suspected. Register cleanups here instead of calling `trap` directly.
@@ -20,6 +20,11 @@ run_exit_cleanups() {
         eval "$cmd" 2>/dev/null || true
     done
 }
+# Bash may keep running after SIGINT while a foreground child returns; turn
+# interruption into an exit so the composed EXIT cleanup releases this run's
+# links and the scheduler can retry instead of inheriting an occupied lock.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 trap run_exit_cleanups EXIT
 
 # Sleep inhibitor for the WHOLE script lifetime (issue #553: direct launchd
@@ -1112,28 +1117,156 @@ count_new_bold_notes() {  # <fleeting-notes.md>
     echo "${count:-0}"
 }
 
-# File-based lock to prevent concurrent execution (RunAtLoad + CalendarInterval race)
-# mkdir — атомарная операция на POSIX, исключает TOCTOU race condition
+# File-based lock to prevent concurrent execution (RunAtLoad + CalendarInterval race).
+# A complete owner record is published by one atomic hard link. A contender
+# never removes a live or unpublished lock: the old mkdir/pid protocol exposed
+# an empty pid file, then stale-lock reclaim deleted a live owner's directory
+# (#1030). The short acquisition gate serializes recovery of dead new owners.
 LOCK_DIR="$LOG_DIR/locks"
 mkdir -p "$LOCK_DIR"
 
+STRATEGIST_LOCK_OWNER=""
+STRATEGIST_LOCK_MAIN=""
+STRATEGIST_LOCK_LEGACY=""
+STRATEGIST_LOCK_GATE=""
+
+release_lock() {
+    local path
+    for path in "$STRATEGIST_LOCK_LEGACY" "$STRATEGIST_LOCK_MAIN"; do
+        if [ -n "$path" ] && [ -n "$STRATEGIST_LOCK_OWNER" ] && [ ! -L "$path" ] && [ "$path" -ef "$STRATEGIST_LOCK_OWNER" ]; then
+            rm -f -- "$path" || log "WARN: failed to release own lock: $path"
+        fi
+    done
+    if [ -n "$STRATEGIST_LOCK_OWNER" ]; then
+        rm -f -- "$STRATEGIST_LOCK_OWNER" || log "WARN: failed to remove lock owner record: $STRATEGIST_LOCK_OWNER"
+    fi
+    if [ -n "$STRATEGIST_LOCK_GATE" ]; then
+        rmdir "$STRATEGIST_LOCK_GATE" || log "WARN: failed to release lock acquisition gate: $STRATEGIST_LOCK_GATE"
+    fi
+}
+
+inspect_lock() {  # <scenario> <path>; under the acquisition gate
+    local scenario="$1" path="$2" owner_ref="$2" pid=""
+    if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+        return 0
+    fi
+    if [ -L "$path" ]; then
+        log "ERROR: $scenario lock path is a symlink ($path); inspect it manually"
+        exit 1
+    elif [ -d "$path" ]; then
+        # A running pre-#1030 strategist uses this dated directory. Its pid
+        # may still be in the mkdir -> write window. Old contenders do not
+        # honor our acquisition gate, so never reclaim their directory.
+        owner_ref="$path/pid"
+    elif [ ! -f "$path" ]; then
+        log "ERROR: $scenario lock has an unexpected type ($path); inspect it manually"
+        exit 1
+    fi
+    pid=$(head -n 1 "$owner_ref" 2>/dev/null || true)
+    if [ -z "$pid" ] && [ -d "$path" ]; then
+        log "ERROR: $scenario legacy lock has no published owner ($path); check for an old running strategist before manual removal"
+        exit 1
+    fi
+    if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+        log "ERROR: $scenario lock has an unreadable owner ($path); inspect it manually"
+        exit 1
+    fi
+    if kill -0 "$pid" 2>/dev/null; then
+        log "SKIP: $scenario already running (PID $pid)"
+        exit 2
+    fi
+    if [ -d "$path" ]; then
+        log "ERROR: $scenario has a stale legacy lock ($path, PID $pid); verify the old owner is stopped, then remove that directory manually"
+        exit 1
+    fi
+    # Only new runners use this gate. The recorded owner is dead, so exactly
+    # one contender may remove this stale hard link before publishing its own.
+    rm -f -- "$path" || { log "ERROR: failed to remove stale lock for $scenario: $path"; exit 1; }
+    log "WARN: recovered stale lock for $scenario (PID $pid): $path"
+}
+
+publish_lock_link() {  # <complete-owner-record> <fixed-lock-path>
+    # Unlike `ln source target`, os.link never treats an existing directory
+    # (or a symlink to one) as a destination in which to create a third file.
+    # It fails with EEXIST instead. Python is already required by strategist.
+    python3 - "$1" "$2" <<'PY'
+import os
+import sys
+
+try:
+    os.link(sys.argv[1], sys.argv[2])
+except OSError:
+    sys.exit(1)
+PY
+}
+
+lock_conflict() {  # <scenario> <path>; publication failed while gate held
+    local scenario="$1" path="$2"
+    if [ -e "$path" ] || [ -L "$path" ]; then
+        inspect_lock "$scenario" "$path"
+        log "ERROR: lock path changed during publication for $scenario: $path"
+    else
+        log "ERROR: cannot publish lock for $scenario at $path (hard links unavailable or permission denied)"
+    fi
+    exit 1
+}
+
 acquire_lock() {
     local scenario="$1"
-    local lockdir="$LOCK_DIR/${scenario}.${DATE}.lck"
-    if ! mkdir "$lockdir" 2>/dev/null; then
-        local pid
-        pid=$(cat "$lockdir/pid" 2>/dev/null)
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            log "SKIP: $scenario already running (PID $pid)"
-            exit 2  # non-zero → scheduler won't mark_done
-        else
-            log "WARN: removing stale lock (PID $pid no longer exists): $lockdir"
-            rm -rf "$lockdir"
-            mkdir "$lockdir" || { log "ERROR: failed to acquire lock for $scenario"; exit 1; }
-        fi
+    local owner main="$LOCK_DIR/${scenario}.lock" legacy="$LOCK_DIR/${scenario}.${DATE}.lck"
+    local gate="$LOCK_DIR/.${scenario}.acquire" attempt gate_signal=""
+    if ! command -v python3 >/dev/null 2>&1; then
+        log "ERROR: python3 is required to publish a lock for $scenario"
+        exit 1
     fi
-    echo $$ > "$lockdir/pid" || { rm -rf "$lockdir"; log "ERROR: failed to write PID for $scenario"; exit 1; }
-    add_exit_cleanup "rm -rf \"$lockdir\" 2>/dev/null"
+    add_exit_cleanup 'release_lock'
+    # Bash can run a signal trap after mkdir returns but before the next
+    # assignment. Defer INT/TERM until the gate has a recorded owner; never
+    # let EXIT cleanup infer ownership from a path that another run may own.
+    trap 'gate_signal=130' INT
+    trap 'gate_signal=143' TERM
+    for ((attempt = 0; attempt < 250; attempt++)); do
+        if mkdir "$gate" 2>/dev/null; then
+            STRATEGIST_LOCK_GATE="$gate"
+            [ -z "$gate_signal" ] || exit "$gate_signal"
+            break
+        fi
+        [ -z "$gate_signal" ] || exit "$gate_signal"
+        sleep 0.02
+    done
+    [ -z "$gate_signal" ] || exit "$gate_signal"
+    if [ -z "$STRATEGIST_LOCK_GATE" ]; then
+        log "ERROR: acquisition gate unavailable for $scenario ($gate); inspect the gate before manual removal"
+        exit 1
+    fi
+    inspect_lock "$scenario" "$main"
+    inspect_lock "$scenario" "$legacy"
+    owner=$(mktemp "$LOCK_DIR/.${scenario}.owner.XXXXXX") || { log "ERROR: failed to create lock owner record for $scenario"; exit 1; }
+    STRATEGIST_LOCK_OWNER="$owner"
+    if ! printf '%s\n' "$$" > "$owner"; then
+        log "ERROR: failed to write lock owner record for $scenario"
+        exit 1
+    fi
+    if ! publish_lock_link "$owner" "$main"; then
+        lock_conflict "$scenario" "$main"
+    fi
+    STRATEGIST_LOCK_MAIN="$main"
+    # A dated link fences pre-#1030 strategist processes during an update.
+    # The undated link above keeps a run crossing midnight mutually exclusive.
+    if ! publish_lock_link "$owner" "$legacy"; then
+        lock_conflict "$scenario" "$legacy"
+    fi
+    STRATEGIST_LOCK_LEGACY="$legacy"
+    # Clear ownership before unlinking the shared path: after rmdir succeeds,
+    # another contender may create a new gate before our EXIT trap runs.
+    STRATEGIST_LOCK_GATE=""
+    if ! rmdir "$gate"; then
+        log "ERROR: failed to release acquisition gate for $scenario: $gate"
+        exit 1
+    fi
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    [ -z "$gate_signal" ] || exit "$gate_signal"
 }
 
 # issue #840: git-diff-feed and session-close-feed (extractor.sh) and this
