@@ -877,6 +877,61 @@ PYEOF
     ' "$manifest"
 }
 
+# issue #1037: a fork with core.fileMode=false records new executables as
+# 100644 after plain git add, even when the working copy has +x. Print exact
+# repair commands for manifest files without staging the user's fork.
+report_executable_index_mismatches() {
+    local source="${1:-applied}" repo_prefix file mode unmerged index_entries reported=0
+    local -a candidates=()
+    command -v git >/dev/null 2>&1 || return 0
+    [ "$(git -C "$SCRIPT_DIR" config --bool core.fileMode 2>/dev/null)" = false ] || return 0
+    repo_prefix=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
+    [ -z "$repo_prefix" ] || return 0
+
+    if [ "$source" = manifest ]; then
+        [ -f "${MANIFEST_PARSED:-}" ] || return 0
+        while IFS='|' read -r file _; do
+            candidates+=("$file")
+        done < "$MANIFEST_PARSED"
+    else
+        candidates=("${APPLIED_PATHS[@]}")
+    fi
+
+    for file in "${candidates[@]}"; do
+        case "$file" in
+            *.sh|.githooks/*|.claude/bin/*|scripts/wp-list.py|scripts/check-claude-md-links.py) ;;
+            *) continue ;;
+        esac
+        [ -f "$SCRIPT_DIR/$file" ] && [ -x "$SCRIPT_DIR/$file" ] || continue
+        if ! unmerged=$(git -C "$SCRIPT_DIR" ls-files -u -- ":(top,literal)$file" 2>/dev/null); then
+            printf '  ⚠ %s: не удалось проверить индекс Git; команды не предлагаются.\n' "$file"
+            continue
+        fi
+        if [ -n "$unmerged" ]; then
+            printf '  ⚠ %s: в индексе неразрешённый конфликт; сначала разрешите его вручную. Команды добавления файла не предлагаются.\n' "$file"
+            continue
+        fi
+        if ! index_entries=$(git -C "$SCRIPT_DIR" ls-files --stage -- ":(top,literal)$file" 2>/dev/null); then
+            printf '  ⚠ %s: не удалось проверить режим в индексе Git; команды не предлагаются.\n' "$file"
+            continue
+        fi
+        mode=$(printf '%s\n' "$index_entries" | awk '$3 == 0 { print $1; exit }')
+        [ "$mode" = 100755 ] && continue
+        if [ "$reported" -eq 0 ]; then
+            echo "  ⚠ Git этого форка игнорирует права файла (core.fileMode=false)."
+            echo "    Для следующих исполняемых файлов шаблона нужен режим 100755 в индексе:"
+            reported=1
+        fi
+        printf '    %s (сейчас: %s)\n' "$file" "${mode:-ещё не добавлен}"
+        if [ -z "$mode" ]; then
+            printf '    git -C %q add -- %q\n' "$SCRIPT_DIR" ":(top,literal)$file"
+        fi
+        printf '    git -C %q update-index --chmod=+x -- %q\n' "$SCRIPT_DIR" "$file"
+    done
+    [ "$reported" -eq 0 ] || echo "    Выполните команды после проверки файлов; порядок важен. Затем проверьте: git ls-files --stage."
+    return 0
+}
+
 # version_compare A B — compare two plain X.Y.Z versions numerically. Prints -1, 0 or 1 (A is
 # older than, equal to, newer than B) and returns 0; returns 2 and prints nothing when either
 # argument is not digits-only X.Y.Z (at most 9 digits per part, so the arithmetic cannot
@@ -4525,6 +4580,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
     # отстать от уже актуального шаблона (repair_pass выше их классифицировал).
     apply_settings_merge_if_requested
     report_author_skip_summary
+    report_executable_index_mismatches manifest
     echo "✓ Всё актуально. Обновлений нет. ($UNCHANGED файлов проверено)"
     exit_clean
 fi
@@ -4683,7 +4739,7 @@ for f in "${NEW_FILES[@]}"; do
     # metadata survives), so the +x bit must be reapplied explicitly here.
     # issue #308: .githooks/* is not cosmetic (git silently skips a non-executable
     # hook); wp-list.py/check-claude-md-links.py are git-tracked 755 upstream.
-    case "$f" in *.sh|.githooks/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
+    case "$f" in *.sh|.githooks/*|.claude/bin/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
     echo "  + $f"
     APPLIED=$((APPLIED + 1))
 done
@@ -4836,7 +4892,7 @@ for f in "${UPDATED_FILES[@]}"; do
     else
         cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
         # issue #308: same +x reapply as the NEW_FILES loop above (curl fetch drops file mode).
-        case "$f" in *.sh|.githooks/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
+        case "$f" in *.sh|.githooks/*|.claude/bin/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
         echo "  ~ $f"
     fi
     APPLIED=$((APPLIED + 1))
@@ -5684,9 +5740,11 @@ if ! validate_no_install_values_in_applied_additions; then
     echo "  ОШИБКА: обновление остановлено, чтобы не оставить install paths в шаблоне." >&2
     exit 1
 fi
+
 if [ "${#APPLIED_PATHS[@]}" -gt 0 ]; then
     echo "  ✓ Установочные пути не попали в применённые строки."
     echo "  ℹ Изменения оставлены незакоммиченными: проверьте их и синхронизируйте форк через git."
+    report_executable_index_mismatches manifest
 else
     echo "  Нет изменений шаблона для проверки."
 fi

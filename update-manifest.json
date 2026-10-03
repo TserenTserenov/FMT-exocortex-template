@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "15fbaf4fd0e39ac341787e73e0351d7cb4c6d9dcd234a59c5ef8450a0d77870c"
+      "sha256": "457b9da80f7ac41feb2ded02e2bf15a27cc307cd6881a1288f843a3619cef061"
     },
     {
       "path": "CLAUDE.md",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "70f8e39fdfb299cf745526e5290d2b8a4b616c0615df2dfbf293c7f856847ced"
+      "sha256": "f61878ad1fd1611d8aa1a9a870d0685c688ed1354ec0b4efb535b98c62d2ecb9"
     }
   ],
   "excluded_paths": [
@@ -3216,6 +3216,7 @@
     "scripts/tests/test_issue_1006_minor_findings.sh",
     "scripts/tests/test_issue_1010_red_team_findings.sh",
     "scripts/tests/test_issue_1036_migration_source.sh",
+    "scripts/tests/test_issue_1037_filemode.sh",
     "scripts/tests/test_issue_1038_python_env.py",
     "scripts/tests/test_issue_1038_validator.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
