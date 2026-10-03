@@ -11,10 +11,11 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP="$(mktemp -d)"
 cleanup() {
-    if [ -n "${REAL_TASKKILL:-}" ] && [ -f "$TMP/check-native-child.py" ]; then
+    if [ -n "${REAL_TASKKILL:-}" ] && [ -n "${PYTHON3:-}" ] \
+       && [ -f "$TMP/check-native-child.py" ]; then
         for pidfile in "$TMP"/native-*.pid; do
             [ -f "$pidfile" ] || continue
-            python "$(cygpath -w "$TMP/check-native-child.py")" \
+            "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" \
                 "$(cygpath -w "$pidfile")" cleanup >/dev/null 2>&1 || true
         done
     fi
@@ -52,9 +53,10 @@ echo one > "$WORKSPACE_DIR/FPF/Readme.md"
 
 if [ "${1:-}" = "--native-windows" ]; then
     case "$(uname -s)" in MINGW*|MSYS*) ;; *) fail "native mode requires Git Bash on Windows" ;; esac
-    python -c 'import os; assert os.name == "nt", os.name' || fail "native Windows Python required"
+    PYTHON3=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || fail "Python 3 is unavailable"
+    "$PYTHON3" -c 'import os; assert os.name == "nt", os.name' || fail "native Windows Python required"
     REAL_TASKKILL=$(command -v taskkill) || fail "taskkill is unavailable"
-    export REAL_GIT REAL_TASKKILL
+    export REAL_GIT REAL_TASKKILL PYTHON3
 
     cat > "$TMP/native-child.py" <<'PY'
 import os
@@ -157,7 +159,7 @@ PY
 #!/usr/bin/env bash
 for arg in "$@"; do
     if [ "$arg" = fetch ]; then
-        python "$TEST_CHILD_SCRIPT" "$TEST_CHILD_PIDFILE" >/dev/null 2>&1 &
+        "$PYTHON3" "$TEST_CHILD_SCRIPT" "$TEST_CHILD_PIDFILE" >/dev/null 2>&1 &
         wait "$!"
         exit $?
     fi
@@ -186,10 +188,10 @@ SHIM
         [ -f "$pidfile" ] || fail "$mode: native child did not start: $output"
         if [ "$mode" = noop ]; then
             sleep 1
-            python "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" alive-clean \
+            "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" alive-clean \
                 || fail "red control: missing tree kill did not leave a live native child"
         else
-            python "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" dead \
+            "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" dead \
                 || fail "green control: timed-out native child survived taskkill"
         fi
         rm -f "$pidfile"

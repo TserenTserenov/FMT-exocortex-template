@@ -8,13 +8,19 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LIB="$ROOT/scripts/lib/git-sync-status.sh"
+PYTHON3=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || {
+    echo "FAIL: Python 3 is unavailable" >&2
+    exit 1
+}
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 if [ "${1:-}" = "--native-windows" ]; then
     case "$(uname -s)" in MINGW*|MSYS*) ;; *) fail "native mode requires Git Bash on Windows" ;; esac
-    python -c 'import os; assert os.name == "nt", os.name' || fail "native Windows Python required"
+    NATIVE_PYTHON=$("$PYTHON3" -c 'import os, sys; assert os.name == "nt", os.name; print(sys.executable)') \
+        || fail "native Windows Python required"
+    export NATIVE_PYTHON
     export GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1
     : > "$GIT_CONFIG_GLOBAL"
     git init -q --bare "$TMP/origin.git" || fail "cannot create local origin"
@@ -91,7 +97,7 @@ if not system_root:
     raise RuntimeError("Windows system directory unavailable")
 TASKKILL = os.path.join(system_root, "System32", "taskkill.exe")
 
-def capture_tree(record, handles):
+def capture_tree(record, handles, owner):
     deadline = time.monotonic() + 5
     while True:
         if os.path.exists(record):
@@ -105,6 +111,8 @@ def capture_tree(record, handles):
                     handles[name] = handle
             if set(handles) == {"root", "git", "leaf"}:
                 return
+        if owner.poll() is not None:
+            raise AssertionError(f"tree fixture exited with {owner.returncode} before publishing all PIDs in {record}")
         if time.monotonic() > deadline:
             raise AssertionError(f"tree fixture did not publish all PIDs in {record}")
         time.sleep(0.05)
@@ -140,7 +148,7 @@ root_script, repo, record, sync_lib = sys.argv[1:]
 control = subprocess.Popen([sys.executable, root_script, record + ".control", repo])
 control_handles = {}
 try:
-    capture_tree(record + ".control", control_handles)
+    capture_tree(record + ".control", control_handles, control)
     control.terminate()
     control.wait(timeout=3)
     assert not stopped(control_handles["git"]) and not stopped(control_handles["leaf"]), \
@@ -157,7 +165,7 @@ environment = os.environ.copy()
 environment.update({"SYNC_LIB": sync_lib, "ROOT_SCRIPT": root_script,
                     "PID_RECORD": record + ".green", "FIXTURE_REPO": repo})
 wrapper = subprocess.Popen(
-    ["bash", "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 python "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
+    ["bash", "-c", '. "$(cygpath -u "$SYNC_LIB")"; _git_sync_run_with_timeout 7 "$NATIVE_PYTHON" "$ROOT_SCRIPT" "$PID_RECORD" "$FIXTURE_REPO"'],
     env=environment,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
@@ -165,7 +173,18 @@ wrapper = subprocess.Popen(
 )
 green_handles = {}
 try:
-    capture_tree(record + ".green", green_handles)
+    try:
+        capture_tree(record + ".green", green_handles, wrapper)
+    except Exception as error:
+        if wrapper.poll() is None:
+            kill_tree(wrapper.pid)
+        try:
+            stdout, stderr = wrapper.communicate(timeout=3)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", "wrapper pipe remained open after taskkill"
+        raise AssertionError(
+            f"{error}; wrapper rc={wrapper.returncode}; out={stdout}; err={stderr}"
+        ) from error
     stdout, stderr = wrapper.communicate(timeout=16)
     assert wrapper.returncode == 124, f"timeout rc={wrapper.returncode}; out={stdout}; err={stderr}"
     for name, handle in green_handles.items():
@@ -179,7 +198,7 @@ finally:
         wrapper.communicate(timeout=3)
 print("PASS: native Windows Sync Gate local origin and red/green process-tree timeout")
 PY
-    python "$(cygpath -w "$TMP/native-tree-check.py")" \
+    "$PYTHON3" "$(cygpath -w "$TMP/native-tree-check.py")" \
         "$(cygpath -w "$TMP/native-tree-root.py")" \
         "$(cygpath -w "$TMP/repo")" \
         "$(cygpath -w "$TMP/tree-record")" \
@@ -198,7 +217,7 @@ for _mod, _name in ((signal, "SIGHUP"), (signal, "SIGKILL"), (os, "killpg")):
 PY
 
 # Self-check of the simulation: the attributes really are gone.
-PYTHONPATH="$TMP/winsim" python3 -c 'import os, signal, sys; sys.exit(0 if not (hasattr(os, "killpg") or hasattr(signal, "SIGHUP")) else 1)' \
+PYTHONPATH="$TMP/winsim" "$PYTHON3" -c 'import os, signal, sys; sys.exit(0 if not (hasattr(os, "killpg") or hasattr(signal, "SIGHUP")) else 1)' \
     || fail "Windows simulation is not effective"
 
 # shellcheck source=../lib/git-sync-status.sh
