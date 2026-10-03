@@ -79,14 +79,15 @@ fi
 # WP-529 F6 (Evgenii post-update defect #1, 18.08): update.sh reinstalls
 # auto-roles while .update-incomplete is still present (the transaction closes
 # at the very end), and launchctl load fires RunAtLoad right away — a mutating
-# agent run started mid-update at 22:38. Skip every scenario while an update
-# is open; the next scheduled run picks it up. Template root is resolved as
+# agent run started mid-update at 22:38. Defer every scenario with a temporary
+# failure so the scheduler does not mark it done (#1029). The next scheduled
+# run picks it up. Template root is resolved as
 # $IWE_TEMPLATE first, then ${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template
 # (NOT identical to the PROMPTS_DIR fallback below, which hardcodes $HOME/IWE).
 UPDATE_MARKER="${IWE_TEMPLATE:-${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template}/.update-incomplete"
 if [ -f "$UPDATE_MARKER" ]; then
-    echo "[$(date '+%H:%M:%S')] SKIP: template update in progress ($UPDATE_MARKER present) — no mutating run during update" >&2
-    exit 0
+    echo "[$(date '+%H:%M:%S')] BLOCKED: template update incomplete ($UPDATE_MARKER present) — no mutating run; finish or repair update.sh, then retry" >&2
+    exit 75
 fi
 
 # PROMPTS_DIR резолв: $IWE_TEMPLATE (Generated runtime) → $HOME/IWE/FMT-exocortex-template (default) → relative (legacy fallback)

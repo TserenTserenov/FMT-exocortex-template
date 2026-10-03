@@ -123,6 +123,9 @@ run_strategist_scenario() {
         2)
             log "SKIP: strategist $scenario already running (lock held; will retry next dispatch)"
             ;;
+        75)
+            log "ALARM: strategist $scenario deferred: template update incomplete (rc=75; finish or repair update.sh; will retry next dispatch)"
+            ;;
         *)
             log "WARN: strategist $scenario failed (rc=$rc; will retry next dispatch)"
             ;;

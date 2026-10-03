@@ -3,8 +3,9 @@
 # defect #1, 18.08): update.sh reinstalls auto-roles while .update-incomplete
 # is still present (the transaction closes at the very end), and RunAtLoad in
 # the strategist plists fires the agent right at launchctl load — a mutating
-# run started mid-update at 22:38. The runner must skip cleanly while the
-# marker exists, and must NOT short-circuit when it does not.
+# run started mid-update at 22:38. Issue #1029: a successful skip made the
+# scheduler mark Day Open done. The runner must defer without mutation, and
+# the scheduler must retry after the marker disappears.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP=$(mktemp -d)
@@ -20,13 +21,13 @@ OUT=$(HOME="$TMP/home" IWE_TEMPLATE="$TMP/template" IWE_WORKSPACE="$TMP/ws" \
 RC=$?
 set -e
 
-if [ "$RC" -ne 0 ]; then
-    echo "❌ FAIL: expected clean skip (exit 0), got $RC"
+if [ "$RC" -ne 75 ]; then
+    echo "❌ FAIL: expected temporary failure (exit 75), got $RC"
     echo "$OUT"
     exit 1
 fi
-if ! echo "$OUT" | grep -q "update in progress"; then
-    echo "❌ FAIL: skip message about update in progress not printed"
+if ! echo "$OUT" | grep -q "template update incomplete"; then
+    echo "❌ FAIL: actionable update-incomplete message not printed"
     echo "$OUT"
     exit 1
 fi
@@ -34,7 +35,7 @@ if [ -d "$TMP/home/logs/strategist" ]; then
     echo "❌ FAIL: log/lock dirs created — runner went past the guard"
     exit 1
 fi
-echo "✅ PASS: strategist.sh skips cleanly while .update-incomplete is present"
+echo "✅ PASS: strategist.sh defers without mutation while .update-incomplete is present"
 
 echo "--- without marker: guard must NOT short-circuit the runner ---"
 rm "$TMP/template/.update-incomplete"
@@ -47,9 +48,82 @@ set -e
 # Without claude CLI in PATH the runner proceeds past the guard and fails
 # later (exit 127 at the CLAUDE_PATH check, or otherwise non-zero). A clean
 # exit 0 with the update-skip message would mean the guard fires spuriously.
-if [ "$RC2" -eq 0 ] && echo "$OUT2" | grep -q "update in progress"; then
+if [ "$RC2" -eq 0 ] && echo "$OUT2" | grep -q "template update incomplete"; then
     echo "❌ FAIL: guard fired without a marker"
     echo "$OUT2"
     exit 1
 fi
 echo "✅ PASS: without the marker the guard does not short-circuit (rc=$RC2)"
+
+echo "--- scheduler: blocked morning must remain retryable ---"
+DATE_FIXED=2026-10-06
+STATE_DIR="$TMP/home/.local/state/exocortex"
+SCHEDULER_LOG="$TMP/home/logs/synchronizer/scheduler-$DATE_FIXED.log"
+RUNNER="$TMP/runtime/roles/strategist/scripts/strategist.sh"
+mkdir -p "$TMP/bin" "$TMP/template/roles/strategist" "$(dirname "$RUNNER")" "$STATE_DIR" "$TMP/ws"
+cp "$ROOT/roles/strategist/role.yaml" "$TMP/template/roles/strategist/role.yaml"
+cp "$ROOT/roles/strategist/scripts/strategist.sh" "$RUNNER"
+chmod +x "$RUNNER"
+touch "$TMP/template/.update-incomplete" "$STATE_DIR/synchronizer-code-scan-$DATE_FIXED" \
+      "$STATE_DIR/synchronizer-daily-report-$DATE_FIXED" "$STATE_DIR/pmset-check-$DATE_FIXED"
+printf '1000000\n' > "$STATE_DIR/extractor-inbox-check-last"
+cat > "$TMP/bin/date" <<'SH'
+#!/bin/sh
+case "${1:-}" in
+    +%H) echo 08 ;;
+    +%u) echo 2 ;;
+    +%Y-%m-%d) echo 2026-10-06 ;;
+    +%V) echo 41 ;;
+    +%s) echo 1000000 ;;
+    *) /bin/date "$@" ;;
+esac
+SH
+cat > "$TMP/bin/uname" <<'SH'
+#!/bin/sh
+echo FixtureOS
+SH
+cat > "$TMP/bin/systemd-inhibit" <<'SH'
+#!/bin/sh
+exec /bin/sleep 120
+SH
+chmod +x "$TMP/bin/date" "$TMP/bin/uname" "$TMP/bin/systemd-inhibit"
+
+run_dispatch() {
+    HOME="$TMP/home" IWE_TEMPLATE="$TMP/template" IWE_WORKSPACE="$TMP/ws" \
+        IWE_RUNTIME="$TMP/runtime" PATH="$TMP/bin:/usr/bin:/bin" \
+        bash "$ROOT/roles/synchronizer/scripts/scheduler.sh" dispatch > "$TMP/dispatch.out" 2>&1 || {
+            cat "$TMP/dispatch.out"
+            return 1
+        }
+}
+
+run_dispatch
+run_dispatch
+if [ -e "$STATE_DIR/strategist-morning-$DATE_FIXED" ]; then
+    echo "❌ FAIL: scheduler marked Day Open done while update marker exists"
+    exit 1
+fi
+if [ "$(grep -cF '→ strategist morning' "$SCHEDULER_LOG")" -ne 2 ]; then
+    echo "❌ FAIL: scheduler did not retry blocked morning on the next dispatch"
+    exit 1
+fi
+if ! grep -qF 'ALARM: strategist morning deferred' "$SCHEDULER_LOG"; then
+    echo "❌ FAIL: scheduler did not record a visible update-blocked alarm"
+    exit 1
+fi
+
+rm "$TMP/template/.update-incomplete"
+cat > "$RUNNER" <<'SH'
+#!/bin/sh
+printf '%s\n' "$1" >> "$IWE_WORKSPACE/day-open-attempts"
+exit 0
+SH
+chmod +x "$RUNNER"
+run_dispatch
+run_dispatch
+if [ ! -f "$STATE_DIR/strategist-morning-$DATE_FIXED" ] || \
+   [ "$(cat "$TMP/ws/day-open-attempts")" != morning ]; then
+    echo "❌ FAIL: recovered morning did not run exactly once and mark completion"
+    exit 1
+fi
+echo "✅ PASS: scheduler alarms, keeps retry open, then completes once after recovery"
