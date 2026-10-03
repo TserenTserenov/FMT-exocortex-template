@@ -12,16 +12,20 @@ git -C "$fixture" init -q
 git -C "$fixture" config user.name test
 git -C "$fixture" config user.email test@example.invalid
 git -C "$fixture" config core.fileMode false
+mkdir -p "$fixture/scripts" "$fixture/.claude/bin"
 printf 'baseline\n' > "$fixture/README.md"
-git -C "$fixture" add -- README.md
+printf '#!/bin/sh\nexit 0\n' > "$fixture/scripts/removed.sh"
+chmod +x "$fixture/scripts/removed.sh"
+git -C "$fixture" add -- README.md scripts/removed.sh
 git -C "$fixture" commit -qm baseline
 
-mkdir -p "$fixture/scripts" "$fixture/.claude/bin"
 printf '#!/bin/sh\nexit 0\n' > "$fixture/scripts/new-tool.sh"
 printf '#!/bin/sh\nexit 0\n' > "$fixture/.claude/bin/guarded-rm"
 chmod +x "$fixture/scripts/new-tool.sh" "$fixture/.claude/bin/guarded-rm"
 
-source <(sed -n '/^report_executable_index_mismatches() {/,/^}/p' "$repo_root/update.sh")
+helper_source="$fixture/report-executable-index-mismatches.sh"
+sed -n '/^report_executable_index_mismatches() {/,/^}/p' "$repo_root/update.sh" > "$helper_source"
+source "$helper_source"
 declare -F report_executable_index_mismatches >/dev/null
 
 SCRIPT_DIR=$fixture
@@ -64,6 +68,15 @@ conflict_add=$(printf 'git -C %q add -- %q' "$fixture" ':(top,literal)scripts/co
 [[ "$output" == *'scripts/conflicted.sh: в индексе неразрешённый конфликт'* ]]
 [[ "$output" != *"$conflict_add"* ]]
 test -n "$(git -C "$fixture" ls-files -u -- scripts/conflicted.sh)"
+
+# A staged deletion is intentional user state, not a new file to re-add.
+git -C "$fixture" rm -q --cached -- scripts/removed.sh
+APPLIED_PATHS+=(scripts/removed.sh)
+output=$(report_executable_index_mismatches)
+removed_add=$(printf 'git -C %q add -- %q' "$fixture" ':(top,literal)scripts/removed.sh')
+[[ "$output" == *'scripts/removed.sh: удаление уже подготовлено в Git'* ]]
+[[ "$output" != *"$removed_add"* ]]
+test -f "$fixture/scripts/removed.sh"
 
 echo 'PASS: exact executable-bit commands are reported without staging user files'
 

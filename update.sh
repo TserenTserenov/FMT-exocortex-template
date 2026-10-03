@@ -881,7 +881,7 @@ PYEOF
 # 100644 after plain git add, even when the working copy has +x. Print exact
 # repair commands for manifest files without staging the user's fork.
 report_executable_index_mismatches() {
-    local source="${1:-applied}" repo_prefix file mode unmerged index_entries reported=0
+    local source="${1:-applied}" repo_prefix file mode unmerged index_entries staged_delete reported=0
     local -a candidates=()
     command -v git >/dev/null 2>&1 || return 0
     [ "$(git -C "$SCRIPT_DIR" config --bool core.fileMode 2>/dev/null)" = false ] || return 0
@@ -917,6 +917,16 @@ report_executable_index_mismatches() {
         fi
         mode=$(printf '%s\n' "$index_entries" | awk '$3 == 0 { print $1; exit }')
         [ "$mode" = 100755 ] && continue
+        if [ -z "$mode" ]; then
+            if ! staged_delete=$(git -C "$SCRIPT_DIR" diff --cached --diff-filter=D --name-only -- ":(top,literal)$file" 2>/dev/null); then
+                printf '  ⚠ %s: не удалось проверить подготовленное удаление; команды не предлагаются.\n' "$file"
+                continue
+            fi
+            if [ -n "$staged_delete" ]; then
+                printf '  ⚠ %s: удаление уже подготовлено в Git; команда добавления файла не предлагается.\n' "$file"
+                continue
+            fi
+        fi
         if [ "$reported" -eq 0 ]; then
             echo "  ⚠ Git этого форка игнорирует права файла (core.fileMode=false)."
             echo "    Для следующих исполняемых файлов шаблона нужен режим 100755 в индексе:"
