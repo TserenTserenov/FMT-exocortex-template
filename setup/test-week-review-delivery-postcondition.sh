@@ -353,14 +353,15 @@ grep -q 'FAILED' "$E2E_HOME/logs/strategist/week-review-last-status" 2>/dev/null
     && pass "the traffic-light status file records the failure" || fail "week-review-last-status must say FAILED"
 
 git -C "$E2E_WS/DS-strategy" fetch -q origin main && git -C "$E2E_WS/DS-strategy" reset -q --hard origin/main
-# The scheduler reruns every non-zero exit at its next dispatch. A second failed run the same day
-# must end the loop (exit 0) while still alarming; the first one must keep exit 70 so a retry is possible.
+# The scheduler reruns the first failure at its next dispatch. A second failed
+# run returns the distinct exhaustion code so the scheduler pauses automatic
+# retries for this day without marking the week done; manual retry stays open.
 rc_first=$(run_week_review nothing)
 rc_second=$(run_week_review nothing keep-logs)
 LOG_TEXT=$(e2e_log_text)
-if [ "$rc_first" = "70" ] && [ "$rc_second" = "0" ] && printf '%s' "$LOG_TEXT" | grep -q 'GAVE UP scenario: week-review after 2 failed runs' \
+if [ "$rc_first" = "70" ] && [ "$rc_second" = "76" ] && printf '%s' "$LOG_TEXT" | grep -q 'GAVE UP scenario: week-review after 2 failed runs' \
     && grep -q 'strategist week-review-failed' "$NOTIFY_LOG"; then
-    pass "first failed run exits 70 (retry allowed), second the same day gives up with exit 0 and still alarms"
+    pass "first failed run exits 70, second gives up with rc 76 and still alarms"
 else
     fail "retry cap: first=$rc_first second=$rc_second notify=$(cat "$NOTIFY_LOG" 2>/dev/null) log=$(printf '%s' "$LOG_TEXT" | tail -3)"
 fi

@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "dc3def95d86d3e91fc3ec5377ebbc80ff94662353688d5e094d036cfce4a03cd"
+      "sha256": "baf5b047af29d86b04fd2bf77dbe012c8f8907dffe0695eb95b38f277b14d2e9"
     },
     {
       "path": "CLAUDE.md",
@@ -1917,7 +1917,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "e1ae8e923b029edf349225c58cc403150e20e154a222fa1f0a731249cb6fc030"
+      "sha256": "083bfa58ff12f02bdd6c118deec8b7368a4b5a143de5ad40327483073d68d6bc"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1981,7 +1981,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "ed8b8b060fb066c7bfcb9c557a98b5ca1831ce8abc5db4562f6eaf92f87b4621"
+      "sha256": "7032167057b380a46773399d004f01f6d6c6e0efbab703b7148024500f52268c"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -2289,7 +2289,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "3dd569715fed65a73fd81198506225daca705ec0b62c3af4b0897f63968e7214"
+      "sha256": "698499b0fecd1b9ddafa529caf0a34d646f6aad21ffce569afb6199a0773d7b5"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3041,7 +3041,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "5c823b063c1c38fb96c976bbc7967d750512c6f93d769ddfa8983ed9a612c52c"
+      "sha256": "d8dc3114fe6752f58461e90910602af759fbe3065911b6ffafb7ab00134405dd"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3237,6 +3237,7 @@
     "scripts/tests/test_issue_1038_python_env.py",
     "scripts/tests/test_issue_1038_validator.sh",
     "scripts/tests/test_issue_1061_platform_bottleneck_map.sh",
+    "scripts/tests/test_issue_1067_week_review_gave_up.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",

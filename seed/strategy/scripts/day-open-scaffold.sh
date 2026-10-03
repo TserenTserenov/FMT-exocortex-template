@@ -929,7 +929,7 @@ render_iwe_status() {
   # strategist run is logged as SKIP, which is neutral but not proof of success.
   local scheduler_log_health=absent
   if [ -f "$scheduler_log" ]; then
-    if grep -Eq '(^|[[:space:]])(WARN|ALARM|ERROR|FATAL):' "$scheduler_log"; then
+    if grep -Eq '(^|[[:space:]])((WARN|ALARM|ERROR|FATAL):|(FAILED|GAVE UP) scenario:)' "$scheduler_log"; then
       scheduler_log_health=failed
     elif grep -Eq '(^|[[:space:]])SKIP:' "$scheduler_log"; then
       scheduler_log_health=deferred

@@ -139,6 +139,9 @@ run_strategist_scenario() {
                 notify_incomplete_morning_update || true
             fi
             ;;
+        76)
+            log "ALARM: strategist $scenario exhausted today's automatic attempts (rc=76; manual retry remains available)"
+            ;;
         *)
             log "WARN: strategist $scenario failed (rc=$rc; will retry next dispatch)"
             ;;
@@ -154,6 +157,24 @@ ran_today() {
 
 ran_this_week() {
     [ -f "$STATE_DIR/$1-W$WEEK" ]
+}
+
+# #1067: the strategist records its daily cap in its own dated log. That record
+# stops further scheduled model calls without misusing the weekly success marker.
+week_review_exhausted_today() {
+    local log_file="$HOME/logs/strategist/$DATE.log"
+    [ -f "$log_file" ] &&
+        grep -Eq "^\\[$DATE [0-9]{2}:[0-9]{2}:[0-9]{2}\\] GAVE UP scenario: week-review after [0-9]+ failed runs today;" "$log_file"
+}
+
+# A manual retry can succeed after the cap. The next scheduler dispatch then
+# observes its dated success status and records the weekly postcondition.
+week_review_recovered_today() {
+    local status_file="$HOME/logs/strategist/week-review-last-status"
+    local stamped_at outcome rc
+    [ -f "$status_file" ] || return 1
+    IFS=$'\t' read -r stamped_at outcome rc < "$status_file" || return 1
+    [ "${stamped_at%% *}" = "$DATE" ] && [ "$outcome" = SUCCESS ] && [ "$rc" = 0 ]
 }
 
 mark_done() {
@@ -259,9 +280,18 @@ dispatch() {
 
     # --- Стратег: week-review (Пн, до morning) ---
     if [ "$DOW" = "1" ] && ! ran_this_week "strategist-week-review"; then
-        log "→ strategist week-review (catch-up: hour=$HOUR)"
-        if run_strategist_scenario "week-review"; then
-            mark_done_week "strategist-week-review"
+        if week_review_exhausted_today; then
+            if week_review_recovered_today; then
+                mark_done_week "strategist-week-review"
+                log "week-review manual recovery confirmed; weekly marker recorded"
+            else
+                log "SKIP: strategist week-review exhausted today's automatic attempts; manual retry remains available"
+            fi
+        else
+            log "→ strategist week-review (catch-up: hour=$HOUR)"
+            if run_strategist_scenario "week-review"; then
+                mark_done_week "strategist-week-review"
+            fi
         fi
         ran=1
     fi
