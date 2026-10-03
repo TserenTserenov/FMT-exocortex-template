@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "81e7efa7794b933988ee7512784b9f5eb55f8d51bf6212ee8ba0dd5cebebc995"
+      "sha256": "2b7c0050dda5832d9fed5e0b01f4e33feb39c9e1c1414b39d5430f09ba792413"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "15c61b0c78c1a5e42dd9416859563f36561e18a21c5e67123729bbf7600963c4"
+      "sha256": "68b8edd631bef194e14c2de25014d06f6769076d23ff94d17e6149be7a241c5b"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2625,7 +2625,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "5895e2999c28467e9becb57c2c90a9d2e1355ebe0b513eadbec2c6a6a2cf25ec"
+      "sha256": "1a77a33ae1dbdaa39ef23fa803a402b7aede70d8dac07b42bb5bd106c8e55959"
     },
     {
       "path": "scripts/settings-promote.sh",
@@ -2794,6 +2794,10 @@
     {
       "path": "scripts/tests/test_install_hooks.py",
       "sha256": "afe084887934053e9208edd7702b9e25e14cf855dc17fc513012aeb0cd83aacd"
+    },
+    {
+      "path": "scripts/tests/test_issue_1032_strategy_session_offline.sh",
+      "sha256": "672997d18715efcc286ff09b8c478dd30636d2fc41dabd15ebdc376cac49f7b7"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",

@@ -1615,13 +1615,36 @@ if [ "$CMD" = "open" ]; then
         return 0
       fi
       if [ -z "${BASE_SHA:-}" ]; then
-        git -C "$ISOLATE_BASE_DIR" fetch origin main >/dev/null 2>&1 \
-          || fail "--isolate: git fetch origin main не удался" 1
+        local fetch_error fetch_reason fetch_rc local_sha offline_command
+        local offline_args
+        if fetch_error=$(LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C "$ISOLATE_BASE_DIR" fetch origin main 2>&1); then
+          :
+        else
+          fetch_rc=$?
+          # Git may echo credentials embedded in a remote URL. Report only a
+          # classified cause; the pilot can inspect the raw error locally.
+          case "$fetch_error" in
+            *"Could not resolve host"*|*"Name or service not known"*) fetch_reason="имя сервера не разрешается" ;;
+            *"Failed to connect"*|*"Connection refused"*|*"Network is unreachable"*|*"Could not connect"*) fetch_reason="нет соединения с origin" ;;
+            *"Authentication failed"*|*"Permission denied (publickey)"*|*"could not read Username"*) fetch_reason="ошибка авторизации origin" ;;
+            *"couldn't find remote ref main"*) fetch_reason="на origin нет ветки main" ;;
+            *) fetch_reason="причина не классифицирована; проверь git fetch origin main локально" ;;
+          esac
+          echo "session-guard: --isolate: origin/main недоступен: $fetch_reason (git fetch, код $fetch_rc)." >&2
+          local_sha=$(git -C "$ISOLATE_BASE_DIR" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
+          if [ -n "$local_sha" ]; then
+            printf 'session-guard: Проверь локальную ревизию: git -C %q show -s --format=%%H\\ %%s %q\n' "$ISOLATE_BASE_DIR" "$local_sha" >&2
+            offline_args=(bash "$SESSION_GUARD_SELF" open --isolate --wp "$WP" --task "$TASK" --slug "$SLUG" --agent "$AGENT" --base-sha "$local_sha")
+            [ -n "$SESSION_ID_ARG" ] && offline_args+=(--session-id "$SESSION_ID_ARG")
+            printf -v offline_command '%q ' "${offline_args[@]}"
+            printf 'session-guard: Офлайн после проверки ревизии: (cd -- %q && %s)\n' "$ISOLATE_BASE_DIR" "$offline_command" >&2
+          fi
+          return 1
+        fi
         git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" origin/main \
           || fail "--isolate: git worktree add не удался" 1
       else
-        # Pin exact commit; still refresh remotes best-effort so origin stays usable for later push
-        git -C "$ISOLATE_BASE_DIR" fetch origin main >/dev/null 2>&1 || true
+        # An explicit local commit is the offline path: no remote query here.
         git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "$BASE_SHA" \
           || fail "--isolate: git worktree add от --base-sha не удался" 1
       fi

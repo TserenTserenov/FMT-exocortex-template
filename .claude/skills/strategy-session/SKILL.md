@@ -54,7 +54,8 @@ if [ -n "$CAND" ]; then
 fi
 # кандидат годится, только если его общий git-каталог совпадает с каноном (тот же governance-репозиторий)
 if [ -n "$CAND_C" ] && [ "$CAND_COMMON" = "$CANON_COMMON" ]; then GOV_WT="$CAND_C"; else GOV_WT=""; fi
-# изоляция нужна, только когда есть origin (open --isolate берёт основу через git fetch origin main, публиковать тоже туда) и заморозка не выключена
+# изоляция нужна, только когда есть origin (обычно open --isolate берёт основу через git fetch origin main;
+# офлайн можно указать проверенный локальный коммит через --base-sha) и заморозка не выключена
 # (пустой IWE_FROZEN_CANONICAL_PATH выключает её и в самом session-guard.sh): иначе работа как раньше
 GUARD_OFF=""
 if [ "$GUARD_MODE" = required ]; then
@@ -67,7 +68,13 @@ if [ "$GUARD_MODE" = required ]; then
 fi
 if [ "$GUARD_MODE" = required ]; then
   if [ -z "$GOV_WT" ] || [ "$GOV_WT" = "$CANON_C" ]; then
-    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: (cd -- \"$CANON_C\" && bash \"$GUARD\" open --isolate --wp <WP-N>), затем повтори этот шаг внутри копии: (cd -- \"<worktree_path>\" || exit 1; <блок шага 0>)" >&2; exit 2
+    echo "NOT ISOLATED: канон под freeze, запись запрещена. Открой копию: (cd -- \"$CANON_C\" && bash \"$GUARD\" open --isolate --wp <WP-N>), затем повтори этот шаг внутри копии: (cd -- \"<worktree_path>\" || exit 1; <блок шага 0>)" >&2
+    LOCAL_BASE_SHA=$(git -C "$CANON_C" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
+    if [ -n "$LOCAL_BASE_SHA" ]; then
+      echo "Если origin недоступен: проверь локальный коммит: git -C \"$CANON_C\" show -s --format='%H %s' \"$LOCAL_BASE_SHA\"" >&2
+      echo "Затем добавь к команде открытия --base-sha $LOCAL_BASE_SHA; с этим флагом сеть не нужна. Локальная ревизия может отставать от origin." >&2
+    fi
+    exit 2
   fi
   echo "GOV_WT=$GOV_WT mode=isolated"
 else
@@ -86,7 +93,7 @@ fi
   <блок шага 0 без изменений>
   )
   ```
-  Офлайн (нет сети, `git fetch origin main` не удаётся): добавь к `open --isolate` флаг `--base-sha <коммит>` (копия создаётся от локального коммита без обращения к `origin`), либо пилот сам выключает заморозку пустым `IWE_FROZEN_CANONICAL_PATH` и скилл идёт в режиме `legacy`.
+  Офлайн (нет сети, `git fetch origin main` не удаётся): проверь локальный коммит командой из шага 0 и используй готовую команду с `--base-sha`, которую напечатает `session-guard.sh`. Она создаёт копию от указанного коммита без обращения к `origin`. Пилот может отдельно решить выключить заморозку пустым `IWE_FROZEN_CANONICAL_PATH` и перейти в режим `legacy`.
   Не получилось -> сообщи пилоту и остановись (fail-closed), в канон не пиши. Код 1 -> ошибка резолвера или путей: покажи сообщение и остановись.
 - КАЖДЫЙ последующий блок записи начинается с явного задания и проверки `GOV_WT` и выполняется в подоболочке внутри копии (git — `git -C "$GOV_WT" …`, файлы — абсолютные пути от `$GOV_WT`):
   ```bash

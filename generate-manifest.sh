@@ -243,6 +243,7 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     # ship with the template — a user's copy must be able to run its own
     # issue-regression gate (same rationale as the 03.08 block above).
     "scripts/tests/run-issue-tests.sh"
+    "scripts/tests/test_issue_1032_strategy_session_offline.sh"
     "scripts/tests/test_issue_434_pipeline_scaffold_only.sh"
     "scripts/tests/test_issue_453_calendar_private_visibility.sh"
     "scripts/tests/test_issue_455_scaffold_missing_lib_fatal.sh"
