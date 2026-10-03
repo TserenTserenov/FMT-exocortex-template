@@ -257,7 +257,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "7c07900eda58963500bf01af7a454cf0806499d1bb243981f6770ffa4496ad4a"
+      "sha256": "d551d5e1ab78fc79eb5ba4b96bc750a2310bef2d9b6de87d25a55594bc201c33"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -413,7 +413,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "0d1e7dfb68f71fca83fd71e21947573e34835ba06c5c7b0f1a16cfdecf4de23e"
+      "sha256": "5751a3818773793a9ace12180eda55b60dc2a60c2b6990cd0256a2e50a393be4"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "529909cbcd9d82ad0a7b9ec8b5ab4c6fb02c397e4e30865332a9f045db635f7e"
+      "sha256": "ad676634535ee8946bb5771af02eb3b493f664fdaa104580b6fbae226ee98987"
     },
     {
       "path": "CLAUDE.md",
@@ -2145,7 +2145,7 @@
     },
     {
       "path": "scripts/check-manifest-coverage.py",
-      "sha256": "8afcf3341c2c1005320da0385c8bc42573a61d872800d9119b76700eae94a9d7"
+      "sha256": "ee673d396ea6bfdb881e525d0964e2d6ed90cecc75b8999300f05c1cdee5fc12"
     },
     {
       "path": "scripts/check-open-sessions.sh",
@@ -2481,7 +2481,7 @@
     },
     {
       "path": "scripts/lib/git-sync-status.sh",
-      "sha256": "27e1e88bf831b549e302d1fbc4772fe9839ce77d3f3ff7621edd648f08456735"
+      "sha256": "4e5ad77b79742ca60d1ed246e50634b7dc1a3911cc5ebdecc87bbfcbf0f6ae4f"
     },
     {
       "path": "scripts/lib/language-check.py",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "419fe596022f88ea6d3af8bebe51d649f6ef133e38c502a8f93a8da30282bf4d"
+      "sha256": "ac26e3ddcf0c760b081fe61ef67581022d8b8b7c131f6bd1c5fc7b5d6a1de4a7"
     }
   ],
   "excluded_paths": [
@@ -3208,6 +3208,8 @@
     "scripts/tests/test_extractor_branch_cleanup.sh",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
     "scripts/tests/test_governance_ambiguity.sh",
+    "scripts/tests/test_issue_1005_sync_gate_no_posix_signals.sh",
+    "scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
@@ -3257,6 +3259,9 @@
     "scripts/tests/test_issue_912_extensions_gate_memory_symlink.sh",
     "scripts/tests/test_issue_913_skills_catalog_symlink.sh",
     "scripts/tests/test_issue_915_extractor_no_origin_pack.sh",
+    "scripts/tests/test_issue_927_windows_console_encoding.sh",
+    "scripts/tests/test_issue_932_audit_skill_paths.sh",
+    "scripts/tests/test_issue_933_renamed_template_dir.sh",
     "scripts/tests/test_issue_954_gate_ids.sh",
     "scripts/tests/test_issue_954_locate.sh",
     "scripts/tests/test_issue_954_wp_list_keys.py",
