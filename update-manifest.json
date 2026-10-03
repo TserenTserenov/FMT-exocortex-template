@@ -2285,7 +2285,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "5876d80e7d5335069836619f9f4cc6142caa53ac9b4dd38e2801a406784807b3"
+      "sha256": "3dd569715fed65a73fd81198506225daca705ec0b62c3af4b0897f63968e7214"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3037,7 +3037,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "e6c9980e4b4d288c13adae2f0909d32199b9c20b921584e3a163a3285f7bc8f5"
+      "sha256": "5c823b063c1c38fb96c976bbc7967d750512c6f93d769ddfa8983ed9a612c52c"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",

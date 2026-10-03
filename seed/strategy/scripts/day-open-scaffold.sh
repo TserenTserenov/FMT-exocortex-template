@@ -704,7 +704,10 @@ _is_nonneg_int() {
 triage_report_health() {
   local file="$1" day="$2"
   [ -f "$file" ] || { echo absent; return; }
-  if head -1 "$file" | grep -Eq '^(WARN|ALARM|ERROR|FATAL|SKIP):'; then
+  # Inspect every status line: a partially written report can contain valid
+  # counters followed by a producer error. Table cells start with `|` and may
+  # quote a user's ERROR text; they are report data, not producer status.
+  if grep -Eq '^[[:space:]]*(WARN|ALARM|ERROR|FATAL|SKIP):' "$file"; then
     echo failed
   elif grep -Fxq "## Отчёт QA: неудовлетворённые ответы ($day)" "$file" &&
        grep -Eq '^- Сегодня: [0-9]+' "$file" &&
