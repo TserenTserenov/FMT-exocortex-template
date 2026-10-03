@@ -83,7 +83,7 @@ if not kernel.GetProcessTimes(kernel.GetCurrentProcess(),
 birth = (created.high << 32) | created.low
 
 with open(sys.argv[1], "w", encoding="ascii") as record:
-    record.write(f"{os.getpid()} {birth}")
+    record.write(f"{os.getpid()} {birth} {os.getppid()}")
 time.sleep(30)
 PY
     cat > "$TMP/check-native-child.py" <<'PY'
@@ -110,7 +110,7 @@ kernel.WaitForSingleObject.restype = wintypes.DWORD
 kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
 
 with open(sys.argv[1], encoding="ascii") as record:
-    pid_text, birth_text = record.read().split()
+    pid_text, birth_text, _parent_text = record.read().split()
 pid, birth = int(pid_text), int(birth_text)
 mode = sys.argv[2]
 handle = kernel.OpenProcess(0x00100000 | 0x1000, False, pid)  # SYNCHRONIZE | QUERY_LIMITED_INFORMATION
@@ -159,6 +159,7 @@ PY
 #!/usr/bin/env bash
 for arg in "$@"; do
     if [ "$arg" = fetch ]; then
+        printf 'shell_pid=%s shell_winpid=%s\n' "$$" "$(cat "/proc/$$/winpid" 2>/dev/null)" > "$TEST_SHIM_PIDFILE"
         "$PYTHON3" "$TEST_CHILD_SCRIPT" "$TEST_CHILD_PIDFILE" >/dev/null 2>&1 &
         wait "$!"
         exit $?
@@ -171,7 +172,11 @@ SHIM
 if [ "$TEST_TASKKILL_MODE" = noop ]; then
     exit 0
 fi
-exec "$REAL_TASKKILL" "$@"
+printf 'args=%s\n' "$*" > "$TEST_TASKKILL_LOG"
+"$REAL_TASKKILL" "$@" > "$TEST_TASKKILL_OUT" 2>&1
+rc=$?
+printf 'rc=%s\n' "$rc" >> "$TEST_TASKKILL_LOG"
+exit "$rc"
 SHIM
     chmod +x "$NATIVE_TOOLS/git" "$NATIVE_TOOLS/taskkill"
     export TEST_CHILD_SCRIPT="$(cygpath -w "$TMP/native-child.py")"
@@ -180,6 +185,9 @@ SHIM
         local mode="$1" pidfile="$TMP/native-$1.pid" output start elapsed
         export TEST_TASKKILL_MODE="$mode"
         export TEST_CHILD_PIDFILE="$(cygpath -w "$pidfile")"
+        export TEST_SHIM_PIDFILE="$TMP/shim-$mode.pid"
+        export TEST_TASKKILL_LOG="$TMP/taskkill-$mode.log"
+        export TEST_TASKKILL_OUT="$TMP/taskkill-$mode.out"
         start=$(date +%s)
         output=$(PATH="$NATIVE_TOOLS:$PATH" IWE_FPF_FETCH_TIMEOUT=2 refresh_fpf_base_clone 2>&1)
         elapsed=$(( $(date +%s) - start ))
@@ -192,7 +200,7 @@ SHIM
                 || fail "red control: missing tree kill did not leave a live native child"
         else
             "$PYTHON3" "$(cygpath -w "$TMP/check-native-child.py")" "$(cygpath -w "$pidfile")" dead \
-                || fail "green control: timed-out native child survived taskkill"
+                || fail "green control: native child survived; output=$output; child=$(cat "$pidfile"); shim=$(cat "$TEST_SHIM_PIDFILE" 2>/dev/null); taskkill=$(cat "$TEST_TASKKILL_LOG" 2>/dev/null); taskkill_out=$(cat "$TEST_TASKKILL_OUT" 2>/dev/null)"
         fi
         rm -f "$pidfile"
     }
