@@ -81,6 +81,9 @@ cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR/.claude.md.base"
 WORKSPACE_DIR="$TEST_ROOT/repo"
 cp "$UPSTREAM/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"
 cp "$UPSTREAM/CLAUDE.md" "$WORKSPACE_DIR/.claude.md.base"
+printf 'GITHUB_USER="test-user"\nWORKSPACE_DIR="%s"\n' "$WORKSPACE_DIR" \
+  > "$WORKSPACE_DIR/.exocortex.env"
+chmod 600 "$WORKSPACE_DIR/.exocortex.env"
 git -C "$SCRIPT_DIR" init -q
 git -C "$SCRIPT_DIR" config user.email t@t; git -C "$SCRIPT_DIR" config user.name t
 git -C "$SCRIPT_DIR" add -A; git -C "$SCRIPT_DIR" commit -q -m init
@@ -445,10 +448,12 @@ else
   pass "no staged tmp files left behind"
 fi
 
-if [ -z "$(ls -A "$TEST_ROOT/step0-tmp" 2>/dev/null)" ]; then
+STEP0_LEFTOVERS=$(find "$TEST_ROOT/step0-tmp" -mindepth 1 -maxdepth 1 \
+  ! -name xcrun_db -print)
+if [ -z "$STEP0_LEFTOVERS" ]; then
   pass "no temp directory left behind by the Step 0 re-exec"
 else
-  fail "Step 0 re-exec left temp files behind: $(ls -A "$TEST_ROOT/step0-tmp" | tr '\n' ' ')"
+  fail "Step 0 re-exec left temp files behind: $(printf '%s' "$STEP0_LEFTOVERS" | tr '\n' ' ')"
 fi
 
 echo

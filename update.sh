@@ -1407,6 +1407,87 @@ begin_update_transaction() {
     UPDATE_TRANSACTION_STARTED=true
 }
 
+# #1028: a missing configuration used to be generated in Step 5b, after the
+# template and workspace CLAUDE.md had already changed. Stop before any apply
+# or repair-pass write, and leave a private draft for the operator to complete.
+require_env_before_update() {
+    if [ -L "$WORKSPACE_DIR/.exocortex.env" ]; then
+        echo "ОШИБКА: .exocortex.env является символической ссылкой: $WORKSPACE_DIR/.exocortex.env" >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    if [ -e "$WORKSPACE_DIR/.exocortex.env" ]; then
+        if [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
+            return 0
+        fi
+        echo "ОШИБКА: .exocortex.env существует, но не является обычным файлом: $WORKSPACE_DIR/.exocortex.env" >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    if [ -L "$SCRIPT_DIR/.exocortex.env" ]; then
+        echo "ОШИБКА: legacy .exocortex.env является символической ссылкой: $SCRIPT_DIR/.exocortex.env" >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    [ -f "$SCRIPT_DIR/.exocortex.env" ] && return 0  # legacy migration
+
+    # setup.sh and some consumers source this file as shell. Their other
+    # readers treat values as raw text, so shell escaping would corrupt paths.
+    # Decline automatic generation when a detected value cannot round-trip in
+    # plain double quotes; the operator can supply a safe config explicitly.
+    local draft claude_path user_name value
+    claude_path=$(command -v claude 2>/dev/null || echo 'claude')
+    user_name=$(id -un 2>/dev/null || true)
+    for value in "$WORKSPACE_DIR" "$HOME" "$claude_path" "$user_name"; do
+        case "$value" in
+            *'$'*|*'`'*|*'"'*|*'\'*|*$'\n'*|*$'\r'*)
+                echo "ОШИБКА: путь или имя содержит символы, опасные для автосоздания .exocortex.env; обновление не начато." >&2
+                echo "  Создайте $WORKSPACE_DIR/.exocortex.env вручную с безопасно записанными значениями и повторите обновление." >&2
+                exit "$EXIT_RUNTIME"
+                ;;
+        esac
+    done
+    draft=$(mktemp "$WORKSPACE_DIR/.exocortex.env.tmp.XXXXXX") || {
+        echo "ОШИБКА: не удалось подготовить черновик .exocortex.env; обновление не начато." >&2
+        exit "$EXIT_RUNTIME"
+    }
+    if ! chmod 600 "$draft"; then
+        rm -f "$draft"
+        echo "ОШИБКА: не удалось защитить черновик .exocortex.env; обновление не начато." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    if ! cat > "$draft" <<ENVEOF
+# Exocortex configuration (draft generated before update.sh applies files)
+# Check GITHUB_USER and other values, then rerun update.sh. Do not commit.
+GITHUB_USER="your-username"
+WORKSPACE_DIR="$WORKSPACE_DIR"
+CLAUDE_PATH="$claude_path"
+CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$WORKSPACE_DIR")"
+TIMEZONE_HOUR="4"
+TIMEZONE_DESC="4:00 (местное время)"
+HOME_DIR="$HOME"
+USER_NAME="$user_name"
+L4_BACKEND=
+L4_DATABASE_URL=
+ENVEOF
+    then
+        rm -f "$draft"
+        echo "ОШИБКА: не удалось записать черновик .exocortex.env; обновление не начато." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    # Same-directory hard link publishes the complete 0600 draft only when the
+    # destination is still absent; a concurrent creator wins without overwrite.
+    if ! ln "$draft" "$WORKSPACE_DIR/.exocortex.env" 2>/dev/null; then
+        rm -f "$draft"
+        echo "ОШИБКА: не удалось создать .exocortex.env без перезаписи; обновление не начато." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    rm -f "$draft"
+    echo "ОШИБКА: отсутствует .exocortex.env; обновление не начато, остальные файлы установки не менялись." >&2
+    echo "  Черновик создан с правами 600: $WORKSPACE_DIR/.exocortex.env" >&2
+    echo "  Укажите свой GITHUB_USER и проверьте пути/время в этом файле." >&2
+    printf '  Затем повторите тот же канал: IWE_UPDATE_CHANNEL=%s bash %q --yes\n' \
+        "$UPDATE_CHANNEL" "$SCRIPT_DIR/update.sh" >&2
+    exit "$EXIT_RUNTIME"
+}
+
 finish_update_transaction() {
     if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
         rm -f "$UPDATE_INCOMPLETE_MARKER"
@@ -3113,6 +3194,13 @@ if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
     echo ""
 fi
 
+# Step 0 can replace this running updater and exec an older release before any
+# later preflight runs. Missing configuration must stop every applying run here,
+# before even the self-update; --check remains read-only.
+if ! $CHECK_ONLY; then
+    require_env_before_update
+fi
+
 # step0_integrity_check FILE — 0 when the downloaded update.sh FILE may replace the running one.
 # No manifest, no network, no version parsing (#1004): the file says about itself whether it must
 # end with the marker. An update.sh of this generation carries UPDATE_SH_INTEGRITY_TAG on its own
@@ -4502,6 +4590,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
         # writes to disk with no open transaction, so a build-runtime failure
         # here would exit EXIT_RUNTIME with no .update-incomplete marker at all.
         # Same three calls, same order, as the branch below.
+        require_env_before_update
         begin_update_transaction
         repair_pass
         # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
@@ -4544,6 +4633,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         # (message text: "no transaction was opened" was true only because
         # nothing ever opened one here — the actual bug was the missing open,
         # not the message).
+        require_env_before_update
         begin_update_transaction
         repair_pass
         # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
@@ -4727,6 +4817,7 @@ fi
 # === Step 5: Apply updates ===
 echo ""
 echo "Применяю обновления..."
+require_env_before_update
 begin_update_transaction
 remember_untouched_memory_before_apply
 
@@ -4982,6 +5073,18 @@ done
 echo ""
 echo "Подстановка переменных..."
 
+# Recheck the path just before Step 5b writes to it. A file switched to a
+# symlink/non-file after the early preflight must not be edited through here.
+if [ -L "$WORKSPACE_DIR/.exocortex.env" ] || \
+   { [ -e "$WORKSPACE_DIR/.exocortex.env" ] && [ ! -f "$WORKSPACE_DIR/.exocortex.env" ]; }; then
+    echo "ОШИБКА: .exocortex.env больше не является обычным файлом; маркер .update-incomplete сохранён." >&2
+    exit "$EXIT_RUNTIME"
+fi
+if [ ! -f "$WORKSPACE_DIR/.exocortex.env" ] && [ -L "$SCRIPT_DIR/.exocortex.env" ]; then
+    echo "ОШИБКА: legacy .exocortex.env является символической ссылкой; маркер .update-incomplete сохранён." >&2
+    exit "$EXIT_RUNTIME"
+fi
+
 if [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
     ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
 elif [ -f "$SCRIPT_DIR/.exocortex.env" ]; then
@@ -5149,48 +5252,14 @@ if [ -f "$ENV_FILE" ]; then
         fi
     fi
 else
-    # No .exocortex.env — try to detect and generate (migration scenario С5)
-    echo "  ⚠ .exocortex.env не найден (установка до Ф0.5?)."
-    echo "  Попытка восстановления конфигурации..."
-
-    DETECTED_WORKSPACE="$WORKSPACE_DIR"
-    DETECTED_REPO="$(basename "$SCRIPT_DIR")"
-
-    # issue #316: значения ВСЕГДА в кавычках — тот же паттерн, что setup.sh
-    # применил для #223. Непроцитированное значение с пробелом (напр.
-    # TIMEZONE_DESC=4:00 UTC) ломает sourcing ('UTC: command not found').
-    cat > "$ENV_FILE" <<ENVEOF
-# Exocortex configuration (auto-detected by update.sh — verify and fix values)
-# SECURITY: chmod 600. Listed in .gitignore. Do NOT commit this file.
-GITHUB_USER="your-username"
-WORKSPACE_DIR="$DETECTED_WORKSPACE"
-CLAUDE_PATH="$(command -v claude 2>/dev/null || echo 'claude')"
-CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$DETECTED_WORKSPACE")"
-TIMEZONE_HOUR="4"
-TIMEZONE_DESC="4:00 (местное время)"
-HOME_DIR="$HOME"
-
-# === Knowledge Gateway (T3+) — fill in if using personal Pack index ===
-L4_BACKEND=
-L4_DATABASE_URL=
-ENVEOF
-    chmod 600 "$ENV_FILE"
-    echo "  Конфигурация восстановлена в $ENV_FILE"
-    echo "  ⚠ ПРОВЕРЬТЕ значения (особенно GITHUB_USER) и перезапустите: bash update.sh"
-
-    # Still substitute what we can (HOME_DIR and WORKSPACE_DIR)
-    for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
-        # issue #505: update.sh CONTAINS {{KEY}} sed templates as its own code —
-        # substituting into it bakes this install's paths into the updater and
-        # permanently desyncs its hash from upstream. Never touch it here.
-        [ "$f" = "update.sh" ] && continue
-        filepath="$SCRIPT_DIR/$f"
-        [ -f "$filepath" ] || continue
-        sed_inplace \
-            -e "s|{{WORKSPACE_DIR}}|$DETECTED_WORKSPACE|g" \
-            -e "s|{{HOME_DIR}}|$HOME|g" \
-            "$filepath" 2>/dev/null || true
-    done
+    # The preflight above covered the normal missing-file case. A file removed
+    # concurrently during apply must fail closed rather than inventing config
+    # after CLAUDE.md and other template files have already been copied.
+    echo "ОШИБКА: .exocortex.env исчез во время обновления; маркер .update-incomplete сохранён." >&2
+    echo "  Восстановите $WORKSPACE_DIR/.exocortex.env и повторите обновление." >&2
+    printf '  Команда: IWE_UPDATE_CHANNEL=%s bash %q --yes\n' \
+        "$UPDATE_CHANNEL" "$SCRIPT_DIR/update.sh" >&2
+    exit "$EXIT_RUNTIME"
 fi
 
 # Check remaining placeholders.

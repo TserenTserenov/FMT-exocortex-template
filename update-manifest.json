@@ -853,7 +853,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "594445356d95485c086b82493d15931b3b91e6885ac7a332d6af18971d28499e"
+      "sha256": "e80b8971a179fc168662f84b4a4d47f808456d92e118dfa10a48fb1c4694cf5b"
     },
     {
       "path": "CLAUDE.md",
@@ -2881,7 +2881,7 @@
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
-      "sha256": "f1fc7a6ad4233f71ec5d259a2ac5473bf62db39df2dc379b586169e09ab197f5"
+      "sha256": "eae95a58c9cff9e1bd624ae746af497c61591b89a6cf135c53a6074a0c4171fc"
     },
     {
       "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
@@ -3153,7 +3153,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "b5bdbb82cbc7190135f110df434972e4e0c750d7060d5ea028194f0cb61fef16"
+      "sha256": "5036b3ae0f01f99d48d5f02ebb3a76d740aa0c087cda07590f034be5bebbb3a4"
     }
   ],
   "excluded_paths": [

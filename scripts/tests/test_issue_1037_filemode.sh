@@ -101,6 +101,9 @@ cp "$upstream/CLAUDE.md" "$template/CLAUDE.md"
 cp "$upstream/CLAUDE.md" "$template/.claude.md.base"
 cp "$upstream/CLAUDE.md" "$workspace/CLAUDE.md"
 cp "$upstream/CLAUDE.md" "$workspace/.claude.md.base"
+printf 'GITHUB_USER="test-user"\nWORKSPACE_DIR="%s"\n' "$workspace" \
+    > "$workspace/.exocortex.env"
+chmod 600 "$workspace/.exocortex.env"
 cp "$upstream/.claude/lib/frontmatter.sh" "$template/.claude/lib/frontmatter.sh"
 cp "$repo_root/.githooks/pre-commit" "$template/.githooks/pre-commit"
 
