@@ -31,7 +31,11 @@ YOOKASSA_CANDIDATE_RE = re.compile(r"(?:live|test)_[A-Za-z0-9_-]{30,}")
 # against an actual key is structural (>=5 underscore-separated segments,
 # checked below), which a random blob or a Stripe/YooKassa-style unbroken
 # token never has, not the per-segment leading character.
-YOOKASSA_PYTEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){4,}\Z")
+# The bar is ">=5 underscore-separated segments" counting "test" itself, as the
+# comments here and in test_issue_896 state; the quantifier was {4,}, which asked
+# for six, so the 0.41.0 release's own def test_empty_answer_preserves_pending
+# (five segments, in a def-line context) was redacted as a key.
+YOOKASSA_PYTEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){3,}\Z")
 
 
 def redact_yookassa(match):
@@ -58,9 +62,18 @@ def redact_yookassa(match):
     current_line = before.rsplit("\n", 1)[-1]
     comment_mention = "#" in current_line
     cli_argument = re.search(r"=\Z", before) is not None
-    script_filename = re.match(r"\.(?:sh|py)\b", after) is not None
+    # The basename may also sit inside a regex, with the dot escaped
+    # (setup/validate-template.sh lists test files as ^scripts/tests/<name>\.sh$).
+    script_filename = re.match(r"\\?\.(?:sh|py)\b", after) is not None
+    # A test script announcing its own result: echo "<mark> <name>: all checks passed"
+    # (every scripts/tests/test_issue_*.sh of 0.41.0 ends this way).
+    status_line = (
+        re.search(r"\b(?:echo|printf)\b", current_line) is not None
+        and re.match(r":", after) is not None
+    )
     if YOOKASSA_PYTEST_SHAPE_RE.fullmatch(value) and (
-        source_definition or pytest_nodeid or comment_mention or cli_argument or script_filename
+        source_definition or pytest_nodeid or comment_mention or cli_argument
+        or script_filename or status_line
     ):
         return value
     return "[REDACTED-YOOKASSA-KEY]"
@@ -1828,6 +1841,10 @@ def self_test():
         # issue #896: a digit-leading segment (an issue number) must
         # still redact bare with no protecting context around it.
         "yookassa-digit-segment-bare-no-context": "test_issue_463_foo_bar_baz_qux_quux",
+        # A five-segment name is identifier-shaped now, but bare it still redacts;
+        # a dense token in a status line never had the shape.
+        "yookassa-five-segment-bare-no-context": "test_empty_answer_preserves_pending",
+        "yookassa-dense-in-status-line": 'echo "key test_' + "9" * 32 + ': ok"',
     }
     negatives = (
         "sk-proj-short",
@@ -1846,6 +1863,11 @@ def self_test():
         "# scripts/tests/test_alpha_bravo_charlie_delta_echo.sh",
         "--exclude=test_alpha_bravo_charlie_delta_echo.sh",
         "# see test_alpha_bravo_charlie_delta_echo for the fixture",
+        # Forms shipped by the 0.41.0 release itself: a five-segment def line,
+        # a test's own result line, a basename with an escaped dot in a regex.
+        "def test_empty_answer_preserves_pending(self):",
+        'echo "✅ test_issue_902_budget_spread_working_days: all checks passed"',
+        "^scripts/tests/test_issue_463_setup_reuses_resolved_python3\\.sh$",
     )
     for name, value in positives.items():
         ids, count, _details = scan(value)

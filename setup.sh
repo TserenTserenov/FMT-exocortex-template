@@ -486,7 +486,8 @@ if [ -z "$GOVERNANCE_REPO" ]; then
     for d in "$WORKSPACE_DIR"/DS-*; do
         [ -d "$d" ] || continue
         case "${d##*/}" in
-            DS-*strategy*)  # `DS-strategy` itself already matches this pattern (shellcheck SC2221/SC2222)
+            # `DS-strategy` itself already matches this pattern (shellcheck SC2221/SC2222)
+            DS-*strategy*)
                 GOVERNANCE_LOCAL_CANDIDATES+=("${d##*/}")
                 ;;
         esac
