@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0dba53e8cca18a951a61eba54eeb8ebaf7b3bb352319fa5731bac1c63fa84613"
+      "sha256": "8280f8050c4b6f04885b73c925f0548a77bce9ce8b438bb45d56016ddab53842"
     },
     {
       "path": "CLAUDE.md",
@@ -2333,7 +2333,7 @@
     },
     {
       "path": "scripts/generate-executor-catalog.py",
-      "sha256": "cc2223c230fce81c372fe0950e2aae14406271b34c4141a948b6394e1e0c1816"
+      "sha256": "f65af078a152eaa37b7973589944a3c95b3162c03bf4540fe8fb6e7561b1366b"
     },
     {
       "path": "scripts/generate-hot-files-list.sh",
@@ -2613,7 +2613,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "8408b14351c31dd7f08c52f46afec7d39ac7029c017f4b1eb36d757e03dc00ca"
+      "sha256": "6909e6345d780ad2247e33eb4932e42173aa58816c980f2194079e158e095b13"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -3053,7 +3053,7 @@
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
-      "sha256": "cc2223c230fce81c372fe0950e2aae14406271b34c4141a948b6394e1e0c1816"
+      "sha256": "f65af078a152eaa37b7973589944a3c95b3162c03bf4540fe8fb6e7561b1366b"
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",

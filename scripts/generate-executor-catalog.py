@@ -132,19 +132,42 @@ def validate_entry(entry: dict, template_root: Path) -> list[str]:
         errors.append(
             f"{entry['name']}: agent executor requires model: haiku|sonnet|opus"
         )
+    script_root = r.get("script_root", "template")
+    if script_root not in {"template", "workspace"}:
+        errors.append(f"{entry['name']}: invalid script_root '{script_root}'")
+    if "script_root" in r and executor != "script":
+        errors.append(f"{entry['name']}: script_root requires executor:script")
     if executor == "script":
         script_path = r.get("script_path")
         if not script_path:
             errors.append(f"{entry['name']}: executor:script requires routing.script_path")
-        # issue #634 (route-task.sh run_script()): a relative script_path is
-        # resolved against the TEMPLATE root, not wherever --skills-dir
-        # happened to point (it is frequently a workspace install's copy,
-        # e.g. <workspace>/.claude/skills, which has no top-level scripts/
-        # of its own). Checking existence against the wrong root broke
-        # every skill whose script lives outside .claude/skills/<name>/
-        # (agent-fault, consent, transcribe, w-reflection all share one
-        # scripts/ tree) the moment --skills-dir pointed at a workspace.
-        elif not (Path(script_path) if os.path.isabs(script_path) else template_root / script_path).is_file():
+        elif not isinstance(script_path, str):
+            errors.append(f"{entry['name']}: routing.script_path must be a string")
+        elif script_root == "workspace":
+            relative = Path(script_path)
+            if (
+                relative.is_absolute()
+                or not relative.parts
+                or relative.parts[0] != "scripts"
+                or ".." in relative.parts
+            ):
+                errors.append(f"{entry['name']}: workspace script_path must stay under scripts/")
+            else:
+                workspace = Path(os.environ.get("IWE_DIR") or _workspace_root()).expanduser().resolve()
+                target = (workspace / relative).resolve()
+                try:
+                    target.relative_to(workspace)
+                except ValueError:
+                    errors.append(f"{entry['name']}: workspace script_path escapes workspace")
+                else:
+                    if not target.is_file():
+                        errors.append(
+                            f"{entry['name']}: routing.script_path does not exist: {script_path}"
+                        )
+        # Existing routes still resolve relative to the template root.
+        elif script_root == "template" and not (
+            Path(script_path) if os.path.isabs(script_path) else template_root / script_path
+        ).is_file():
             errors.append(
                 f"{entry['name']}: routing.script_path does not exist: {script_path}"
             )

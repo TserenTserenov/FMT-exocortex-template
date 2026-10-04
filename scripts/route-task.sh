@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-IWE_DIR="${IWE_DIR:-$HOME/IWE}"
+IWE_DIR="${IWE_DIR:-${IWE_ROOT:-${IWE_WORKSPACE:-$HOME/IWE}}}"
 IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE_DIR/FMT-exocortex-template}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog.yaml}"
@@ -136,6 +136,8 @@ for entry in cat.get("entries", []):
         print(f"deterministic={'true' if r.get('deterministic') else 'false'}")
         if "script_path" in r:
             print(f"script_path={r['script_path']}")
+        if "script_root" in r:
+            print(f"script_root={r['script_root']}")
         if "model" in r:
             print(f"model={r['model']}")
         if "optimization_priority" in r:
@@ -172,18 +174,53 @@ _resolve_interpreter() {
     fi
 }
 
+_resolve_workspace_script() {
+    "$RESOLVED_PYTHON3" - "$IWE_DIR" "$1" << 'PYEOF'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).expanduser().resolve()
+relative = Path(sys.argv[2])
+if relative.is_absolute() or not relative.parts or relative.parts[0] != "scripts" or ".." in relative.parts:
+    sys.exit(2)
+try:
+    target = (root / relative).resolve(strict=True)
+    target.relative_to(root)
+except (OSError, ValueError):
+    sys.exit(2)
+if not target.is_file():
+    sys.exit(2)
+print(target)
+PYEOF
+}
+
 run_script() {
     local skill_name="$1"
     local script_path="$2"
     local args="${3:-}"
     local allow_fallback="${4:-true}"
     local routing_path="${5:-$skill_name → script}"
+    local script_root="${6:-template}"
 
-    # executor-catalog.yaml is generated from template SKILL.md frontmatter,
-    # so relative script_path is relative to the template root, not the
-    # workspace root (issue #634).
-    if [[ "$script_path" != /* ]]; then
-        script_path="$IWE_TEMPLATE/$script_path"
+    if [[ "$script_root" == "workspace" ]]; then
+        local resolved_path
+        if ! resolved_path=$(_resolve_workspace_script "$script_path"); then
+            warn "invalid workspace script path: $script_path (skill=$skill_name)"
+            emit_error "$skill_name" "EXEC_FAILED" "workspace script path rejected: $script_path"
+            emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+            exit 2
+        fi
+        script_path="$resolved_path"
+    elif [[ "$script_root" == "template" ]]; then
+        # Existing catalog entries continue to resolve from the template.
+        if [[ "$script_path" != /* ]]; then
+            script_path="$IWE_TEMPLATE/$script_path"
+        fi
+    else
+        warn "unknown script_root: $script_root (skill=$skill_name)"
+        emit_error "$skill_name" "EXEC_FAILED" "unknown script_root: $script_root"
+        emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+        exit 2
     fi
 
     if [[ ! -f "$script_path" ]]; then
@@ -346,9 +383,10 @@ dispatch_skill() {
         die "catalog lookup failed (exit=$lookup_exit)"
     fi
 
-    local executor script_path="" model="" deterministic=""
+    local executor script_path="" script_root="template" model="" deterministic=""
     executor=$(echo "$lookup_result" | grep "^executor=" | cut -d= -f2)
     script_path=$(echo "$lookup_result" | grep "^script_path=" | cut -d= -f2- || true)
+    script_root=$(echo "$lookup_result" | grep "^script_root=" | cut -d= -f2- || echo template)
     model=$(echo "$lookup_result" | grep "^model=" | cut -d= -f2- || true)
     deterministic=$(echo "$lookup_result" | grep "^deterministic=" | cut -d= -f2- || true)
     routing_path="${routing_path}${executor}"
@@ -364,7 +402,7 @@ dispatch_skill() {
 
     case "$executor" in
         script)
-            run_script "$skill_name" "$script_path" "$args" "$allow_fallback" "$routing_path"
+            run_script "$skill_name" "$script_path" "$args" "$allow_fallback" "$routing_path" "$script_root"
             ;;
         haiku)
             run_haiku "$skill_name" "$args"
@@ -477,6 +515,10 @@ for e in cat["entries"]:
         errors.append(f"{name}: missing deterministic")
     if r.get("executor") == "script" and "script_path" not in r:
         errors.append(f"{name}: script executor missing script_path")
+    if r.get("script_root", "template") not in {"template", "workspace"}:
+        errors.append(f"{name}: invalid script_root")
+    if "script_root" in r and r.get("executor") != "script":
+        errors.append(f"{name}: script_root requires script executor")
     if r.get("executor") == "agent" and r.get("model") not in VALID_AGENT_MODELS:
         errors.append(f"{name}: agent executor requires model: haiku|sonnet|opus")
 
