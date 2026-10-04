@@ -5269,17 +5269,20 @@ else
     exit "$EXIT_RUNTIME"
 fi
 
-# Check remaining placeholders.
-# WP-273 0.29.4 R6.2 fix: раньше сканировали $SCRIPT_DIR (FMT) — но в FMT
-# плейсхолдеры это by design (clean upstream). Получали навсегда «⚠ 54 файлов
-# содержат незаменённые переменные» у каждого пилота на каждом update.
-# Проверяем теперь .iwe-runtime/ — там их быть не должно после build-runtime.
+# Check only files produced by build-runtime. The directory also preserves
+# session state and isolated worktrees; scanning it recursively reported
+# placeholders in old source copies as defects of the current installation
+# and took minutes on a long-lived workspace (issue #1084).
 RUNTIME_CHECK_DIR="${WORKSPACE_DIR}/.iwe-runtime"
 if [ -d "$RUNTIME_CHECK_DIR" ]; then
-    REMAINING=$(grep -rl '{{[A-Z_]*}}' "$RUNTIME_CHECK_DIR" --include="*.md" --include="*.sh" --include="*.json" --include="*.yaml" --include="*.yml" --include="*.plist" 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$REMAINING" -gt 0 ]; then
-        echo "  ⚠ $REMAINING файлов в .iwe-runtime/ содержат незаменённые переменные."
-        echo "  Проверьте .exocortex.env (значения placeholders) и перезапустите: bash $SCRIPT_DIR/setup/build-runtime.sh"
+    if REMAINING=$(bash "$SCRIPT_DIR/scripts/lib/runtime-placeholder-count.sh" \
+        "$SCRIPT_DIR/.claude/runtime-overlay.yaml" "$RUNTIME_CHECK_DIR"); then
+        if [ "$REMAINING" -gt 0 ]; then
+            echo "  ⚠ $REMAINING собранных runtime-файлов содержат незаменённые переменные."
+            echo "  Проверьте .exocortex.env (значения placeholders) и перезапустите: bash $SCRIPT_DIR/setup/build-runtime.sh"
+        fi
+    else
+        echo "  ⚠ Проверка переменных собранного runtime не завершилась; проверьте runtime-overlay.yaml и повторите build-runtime.sh." >&2
     fi
 fi
 

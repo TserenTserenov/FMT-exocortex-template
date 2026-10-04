@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f449b2c1931df07702c2f0065f58bb44ab7df13a640b779dcbc0a01489c78028"
+      "sha256": "e8697cd27ba7d40d2623b5616a134d709b71225d3b20a35c1ea2c44ee29af0b6"
     },
     {
       "path": "CLAUDE.md",
@@ -2520,6 +2520,10 @@
       "sha256": "65b3a09582fb2bcb61b2c0a8ac7914b21ed5479ed8805ed438978264cb390682"
     },
     {
+      "path": "scripts/lib/runtime-placeholder-count.sh",
+      "sha256": "aaf8074591d8f4ffe86eda0e378a9a0c90b9ae9a4ff325d560246b30baded6ba"
+    },
+    {
       "path": "scripts/lib/session-guard-isolate-lib.sh",
       "sha256": "82e1e60a8080976c74de0758d8635c783731e39ab4695bb20f7f794b989dbfd7"
     },
@@ -3169,7 +3173,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "775f0e763184783763edab9233178856a99b92b408328f1aa6f9e301587aca70"
+      "sha256": "7360189ff9e8e92fa03b6de43f3a0c8dc781f825949ab34571a160e3af68dca6"
     }
   ],
   "excluded_paths": [
@@ -3238,6 +3242,7 @@
     "scripts/tests/test_issue_1038_validator.sh",
     "scripts/tests/test_issue_1061_platform_bottleneck_map.sh",
     "scripts/tests/test_issue_1067_week_review_gave_up.sh",
+    "scripts/tests/test_issue_1084_runtime_placeholder_scope.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
