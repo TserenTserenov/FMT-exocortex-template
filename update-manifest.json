@@ -837,7 +837,7 @@
     },
     {
       "path": ".gitleaks.toml",
-      "sha256": "1d86da22e3faa02a9c9789a8cfe5b000ce7daae9d04e3a99530fec2ca899d57c"
+      "sha256": "35e27ca3c58db2cc791c077d3e8bc5df9edd750d34a55bd4cb5999ee83c66376"
     },
     {
       "path": ".mcp.json",

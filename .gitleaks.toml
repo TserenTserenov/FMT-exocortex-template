@@ -14,3 +14,16 @@ paths = [
   '''guide-kit/structurer/test_quarantine\.py''',
   '''setup/test-update-release-channel\.sh''',
 ]
+# The one-file secret-path override in .claude/hooks/secret-bypass-lib.sh
+# initialises its state variables as SECRET_BYPASS_<NAME>=<literal>. The
+# default generic-api-key rule reads the two-line block
+# `SECRET_BYPASS_REASON=""` + `SECRET_BYPASS_REMAINING=0` as a key assignment
+# and reported it every night from 2026-09-30 (lines 10/79/140, reproduced
+# locally with gitleaks 8.26.0 on main 2a29133). The captured "secret" is the
+# literal initialiser `SECRET_BYPASS_REMAINING=0`, not a credential. The
+# exception is pinned to that exact captured string (fixed name, fixed
+# literal), so a real value such as SECRET_BYPASS_TOKEN="ghp_..." still trips
+# the scan (negative control in the fixing PR, WP-529).
+regexes = [
+  '''^SECRET_BYPASS_(STATE|REASON|REMAINING|JQ|MAX_TTL)=("absent"|""|0|900)$''',
+]
