@@ -245,7 +245,7 @@
     },
     {
       "path": ".claude/lib/capture_writer.sh",
-      "sha256": "03ea07a993c104a4108dcbae63d7cb8a671f7c19928b716206d30fa6fb004aff"
+      "sha256": "aa89826fd8509703e0d0dcc3efb6281a776ca27f4f0868f98847c9eb18d59043"
     },
     {
       "path": ".claude/lib/find-python3.sh",
@@ -933,7 +933,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "b4b6e56f27defa45286658ce89606115ec32d0d53a37b0cc7978acb7c7fc7a20"
+      "sha256": "313d29b1519ded28f1c7174a2d8339ec41912928bf515ecac90bbaa54322026d"
     },
     {
       "path": "docs/PORTABILITY.md",
@@ -2101,11 +2101,11 @@
     },
     {
       "path": "scripts/attestation-build-statement.sh",
-      "sha256": "2ab04bae2a6309fd73c872140679dd6a5f60558df52762a467178b2cb2eafe1c"
+      "sha256": "4f4b5e397bfd039218ae0e79d60fa69fd5ef5242eacf2cbdfd61823c4f361db5"
     },
     {
       "path": "scripts/attestation-canonical-digest.sh",
-      "sha256": "cd0bca61f82ed3aa59c4f1d8dd8df6835ca5543ac69f3aaaa4e53eb37549a31d"
+      "sha256": "00ea124c2a367c901350c61cad41561736e213af927ab592f41f44e91289d790"
     },
     {
       "path": "scripts/attestation-statement.schema.json",
@@ -2177,7 +2177,7 @@
     },
     {
       "path": "scripts/check-platform-compat.sh",
-      "sha256": "61c960813407e0b37df5522935d55d3ae7f12dadc90b26bcdfc53b88545f041e"
+      "sha256": "5a71cf594eb7655250e830deb8ccdaf1c25cbd8bde3d5a45deb05f914f9f6162"
     },
     {
       "path": "scripts/check-platform-systems-map.sh",
@@ -2309,7 +2309,7 @@
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
-      "sha256": "6ff39e49ae97b51eb1c18a0bec3123547cd556e6bf9055adfd512c9b4ebf3a2a"
+      "sha256": "48dd5866175b2806a45330c857c2dc8b13632e665c1054b2e8abc0a65274999c"
     },
     {
       "path": "scripts/day-open-smoke.sh",
@@ -2497,7 +2497,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "14945198cb6f6b99a2e0eb33ff46e475a20e9cd489ca51d96a7f117569b2c2d2"
+      "sha256": "811ef66188b9fefa20b00d7246047a32379aef05fa58faf653703979e6ceef02"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -2641,7 +2641,7 @@
     },
     {
       "path": "scripts/release-receipt.sh",
-      "sha256": "867598ce6ab8565af5c5820270082ffaa336a7ad739eca67c67537fe66adcb52"
+      "sha256": "ec519ec49111b3891ab3e5b05e33125d141e7d58de99f7ff917d6d97d8cc8cb4"
     },
     {
       "path": "scripts/restore-from-exocortex.sh",
@@ -3017,7 +3017,7 @@
     },
     {
       "path": "scripts/wp-pool-cascade.sh",
-      "sha256": "d1b82a9f4866ce0d546d493eb6b078026ee0b94450851c628707c23a47973039"
+      "sha256": "0b480c917fa84e1c8d299975a3c0116f36aac0af79cf5ac60dc01097ac9ed345"
     },
     {
       "path": "scripts/wp499-agent-coordination-test.sh",
@@ -3173,7 +3173,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "a16eb31f7cc0c543f579e97082b66096b70515bbde5a623cdfb4e95349dc0619"
+      "sha256": "9b8e12d96c56b836679631c75e233903faa0ccc07c0b13cb0be39b00d1475437"
     },
     {
       "path": "setup/build-runtime.sh",
