@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c54c316790962e3edd4a3664ae78c82c94afbd042a1b17767b57cfb9aca4b6d6"
+      "sha256": "465e9b6ba3a46bad8fdbd71d2227c3a5a9f7697e3fdb8f55e2d511be5c824bab"
     },
     {
       "path": "CLAUDE.md",
@@ -2484,6 +2484,10 @@
       "sha256": "fe64d2c112e40c9695884c3ceb6dac14e1ca41ad1da3bdc561b4fe84987d9964"
     },
     {
+      "path": "scripts/lib/dirty-guard-lock.sh",
+      "sha256": "caa00f78ba817ed16698670b01a1943c1c1bd4d7599fabbf6b2de1d1cf39ef18"
+    },
+    {
       "path": "scripts/lib/find-python3.sh",
       "sha256": "0458450073d95b1cfb9452067d4006468aa80fa7c4435415fbf060459d022964"
     },
@@ -3174,10 +3178,6 @@
     {
       "path": "update.sh",
       "sha256": "7360189ff9e8e92fa03b6de43f3a0c8dc781f825949ab34571a160e3af68dca6"
-    },
-    {
-      "path": "scripts/lib/dirty-guard-lock.sh",
-      "sha256": "caa00f78ba817ed16698670b01a1943c1c1bd4d7599fabbf6b2de1d1cf39ef18"
     }
   ],
   "excluded_paths": [
