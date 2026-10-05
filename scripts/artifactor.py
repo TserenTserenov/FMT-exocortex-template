@@ -93,35 +93,35 @@ KEYWORD_MAP = {
     "week close": ("week_close", "trivial", "WorkDone", "Итоги недели", "episteme"),
     "закрывай неделю": ("week_close", "trivial", "WorkDone", "Итоги недели", "episteme"),
     "month-close": ("month_close", "trivial", "WorkDone", "Итоги месяца", "episteme"),
-    "peer-сессия": ("peer_session", "trivial", None, "Итоговый отчёт пир-сессии", "unresolved"),  # SPECIAL_RESOLUTION: deferred-to-session; result_type тоже неизвестен до Decision Gate внутри сессии
-    "peer сессия": ("peer_session", "trivial", None, "Итоговый отчёт пир-сессии", "unresolved"),
+    "peer-сессия": ("peer_session", "trivial", None, "Отчёт пир-сессии", "unresolved"),  # SPECIAL_RESOLUTION: deferred-to-session; result_type тоже неизвестен до Decision Gate внутри сессии
+    "peer сессия": ("peer_session", "trivial", None, "Отчёт пир-сессии", "unresolved"),
     # closed-loop
-    "бот упал": ("bot_fix", "closed-loop", "WorkDone", "Исправленный бот", "system"),
-    "ошибк бота": ("bot_fix", "closed-loop", "WorkDone", "Исправленный бот", "system"),     # matches «ошибка» and «ошибки»
-    "фиксы": ("bug_fix", "closed-loop", "WorkDone", "Исправленный дефект", "system"),
-    "устранить": ("bug_fix", "closed-loop", "WorkDone", "Исправленный дефект", "system"),
-    "доделать рп": ("wp_finish", "closed-loop", "WorkDone", "Завершённая фаза РП", "unresolved"),  # результат зависит от конкретного РП — код или документ
-    "хвосты рп": ("wp_finish", "closed-loop", "WorkDone", "Завершённая фаза РП", "unresolved"),
+    "бот упал": ("bot_fix", "closed-loop", "WorkDone", "Бот", "system"),
+    "ошибк бота": ("bot_fix", "closed-loop", "WorkDone", "Бот", "system"),     # matches «ошибка» and «ошибки»
+    "фиксы": ("bug_fix", "closed-loop", "WorkDone", "Патч кода", "system"),
+    "устранить": ("bug_fix", "closed-loop", "WorkDone", "Патч кода", "system"),
+    "доделать рп": ("wp_finish", "closed-loop", "WorkDone", "Файлы фазы РП", "unresolved"),  # результат зависит от конкретного РП — код или документ
+    "хвосты рп": ("wp_finish", "closed-loop", "WorkDone", "Файлы фазы РП", "unresolved"),
     "закрыть рп": ("wp_close", "closed-loop", "WorkDone", "Отчёт о закрытии РП", "unresolved"),
-    "передать андрею": ("wp_close", "closed-loop", "WorkDone", "Переданный результат РП", "unresolved"),
-    "актуализация wp": ("wp_actualize", "closed-loop", "WorkDone", "Актуализированная карточка РП", "episteme"),
+    "передать андрею": ("wp_close", "closed-loop", "WorkDone", "Файлы РП", "unresolved"),
+    "актуализация wp": ("wp_actualize", "closed-loop", "WorkDone", "Карточка РП", "episteme"),
     "ревью рп": ("code_review", "closed-loop", "Episteme", "Отчёт ревью", "episteme"),
     "ревью работы": ("code_review", "closed-loop", "Episteme", "Отчёт ревью", "episteme"),
     "разбор ke": ("ke_review", "closed-loop", "ChoiceResult", "Решение по кандидатам знаний", "episteme"),  # R15 accept/reject/defer, не граф claim'ов
     "триаж": ("wp_triage", "closed-loop", "ChoiceResult", "Решение по триажу РП", "episteme"),
-    "реализация плана": ("wp_implement", "closed-loop", "WorkDone", "Реализованный план", "unresolved"),  # план может реализоваться и кодом, и документом
-    "миграция": ("wp_implement", "closed-loop", "WorkDone", "Выполненная миграция", "system"),
+    "реализация плана": ("wp_implement", "closed-loop", "WorkDone", "Рабочие пакеты из плана", "unresolved"),  # план уже был; появляются РП, кодом или документом
+    "миграция": ("wp_implement", "closed-loop", "WorkDone", "Данные в целевом контуре", "system"),
     "создай pack": ("pack_create", "closed-loop", "Episteme", "Паспорт Pack", "episteme"),
     "новый pack": ("pack_create", "closed-loop", "Episteme", "Паспорт Pack", "episteme"),
-    "ротация секретов": ("ops_security", "closed-loop", "WorkDone", "Ротированные секреты", "system"),
-    "fmt remaining": ("fmt_deploy", "closed-loop", "WorkDone", "Доставленный шаблон", "system"),
+    "ротация секретов": ("ops_security", "closed-loop", "WorkDone", "Секреты в хранилище", "system"),
+    "fmt remaining": ("fmt_deploy", "closed-loop", "WorkDone", "Файлы шаблона FMT", "system"),
     # open-loop
-    "диагностика": ("diagnosis", "open-loop", "Episteme", "Диагностический отчёт", "episteme"),
+    "диагностика": ("diagnosis", "open-loop", "Episteme", "Отчёт диагностики", "episteme"),
     "темы для пост": ("content_plan", "open-loop", "ChoiceResult", "План публикаций", "episteme"),   # matches «поста» and «постов»; выбор темы+аудитории+дня, не просто перечень
     "темы, идеи": ("content_plan", "open-loop", "ChoiceResult", "План публикаций", "episteme"),
     "темы идеи": ("content_plan", "open-loop", "ChoiceResult", "План публикаций", "episteme"),
-    "сценарии тз": ("spec_writing", "open-loop", None, "Техническое задание", "episteme"),  # SPECIAL_RESOLUTION: unresolved kind — ни один из 6 kind-ов не подходит (найдено на WP-421); result_type при этом однозначен (документ)
-    "стратег": ("strategy", "open-loop", "ChoiceResult", "Актуализированная стратегия", "episteme"),
+    "сценарии тз": ("spec_writing", "open-loop", None, "Задание на сценарии", "episteme"),  # SPECIAL_RESOLUTION: unresolved kind — ни один из 6 kind-ов не подходит (найдено на WP-421); result_type при этом однозначен (документ)
+    "стратег": ("strategy", "open-loop", "ChoiceResult", "Документ стратегии", "episteme"),
     # problem-framing
     "придумать": ("design", "problem-framing", "ProblemCard", "Карточка проблемы", "episteme"),
     "что-то с": ("design", "problem-framing", "ProblemCard", "Карточка проблемы", "episteme"),
