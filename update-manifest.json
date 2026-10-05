@@ -3174,6 +3174,10 @@
     {
       "path": "update.sh",
       "sha256": "7360189ff9e8e92fa03b6de43f3a0c8dc781f825949ab34571a160e3af68dca6"
+    },
+    {
+      "path": "scripts/lib/dirty-guard-lock.sh",
+      "sha256": "caa00f78ba817ed16698670b01a1943c1c1bd4d7599fabbf6b2de1d1cf39ef18"
     }
   ],
   "excluded_paths": [
