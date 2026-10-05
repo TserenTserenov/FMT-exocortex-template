@@ -33,6 +33,13 @@ if python3 -c 'import yaml' 2>/dev/null; then
 fi
 
 echo "== 3 extractor.sh portable timeout"
+# Only the `timeout() { ... }` function BODY is extracted here — not the
+# `if ! command -v timeout; then ... fi` guard wrapped around it in
+# extractor.sh — so this exercises the polyfill's own behavior (timeout,
+# exit codes, signal handling) deterministically below, regardless of
+# whether a real timeout(1) happens to be on this machine's PATH: sourcing
+# the extracted body always defines a local `timeout` function that shadows
+# any same-named external binary for the rest of each `bash -c` subshell.
 awk '/^    timeout\(\) \{/{c=1} c{print} c&&/^    \}$/{exit}' "$ROOT/roles/extractor/scripts/extractor.sh" > "$TMP/timeout_fn.sh"
 if [ ! -s "$TMP/timeout_fn.sh" ]; then
   fail "extractor.sh defines no timeout fallback"

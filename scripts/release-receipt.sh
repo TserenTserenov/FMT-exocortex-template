@@ -24,6 +24,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/scripts/lib/common.sh"
 MANIFEST="$SCRIPT_DIR/update-manifest.json"
 RECEIPT="${RELEASE_RECEIPT_OUT:-$SCRIPT_DIR/release-receipt.json}"
 
@@ -35,7 +37,9 @@ SHA="${RELEASE_RECEIPT_SHA:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 # published version — reused here, not reimplemented, so the receipt's
 # base_sha always agrees with what upgrade-test actually exercised.
 BASE_SHA="$(git -C "$SCRIPT_DIR" log --format=%H -- "$MANIFEST" | sed -n '2p')"
-MANIFEST_HASH="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+# iwe_sha256 (lib/common.sh): bare sha256sum is GNU-only, no shasum/macOS
+# fallback (issue #1108).
+MANIFEST_HASH="$(iwe_sha256 < "$MANIFEST")"
 GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Ordered, not an associative array — JSON key order in the receipt should

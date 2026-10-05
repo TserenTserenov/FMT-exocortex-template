@@ -1231,7 +1231,7 @@ create_governance_github_repo() {
         GOVERNANCE_REPO_PUSH_FAILED=true
         return 0
     fi
-    local create_err
+    local create_err ls_remote_rc
     create_err=$(mktemp)
     if gh repo create "$GITHUB_USER/$GOVERNANCE_REPO" --private --source=. --push 2>"$create_err"; then
         rm -f "$create_err"
@@ -1243,7 +1243,19 @@ create_governance_github_repo() {
         # itself (network blip mid-command), which also satisfies
         # remote_governance_repo_exists(). Check the branch actually has a
         # ref on the remote before calling this "already exists — skip".
-        if timeout 10 git ls-remote --exit-code --heads "https://github.com/$GITHUB_USER/$GOVERNANCE_REPO.git" main >/dev/null 2>&1; then
+        # timeout(1) is GNU/Homebrew-only — absent on stock macOS (issue
+        # #1108). This whole branch only runs after `gh repo create --push`
+        # already failed mid-command (rare), so a single call site without a
+        # perl-polyfill copy: best-effort with timeout(1) when it exists,
+        # unwrapped (no hard deadline) when it doesn't, rather than a hard
+        # "command not found" failure either way.
+        ls_remote_rc=0
+        if command -v timeout >/dev/null 2>&1; then
+            timeout 10 git ls-remote --exit-code --heads "https://github.com/$GITHUB_USER/$GOVERNANCE_REPO.git" main >/dev/null 2>&1 || ls_remote_rc=$?
+        else
+            git ls-remote --exit-code --heads "https://github.com/$GITHUB_USER/$GOVERNANCE_REPO.git" main >/dev/null 2>&1 || ls_remote_rc=$?
+        fi
+        if [ "$ls_remote_rc" -eq 0 ]; then
             echo "  GitHub repo $GOVERNANCE_REPO already exists — skipping creation."
             rm -f "$create_err"
             return 0

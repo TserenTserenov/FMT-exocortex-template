@@ -22,6 +22,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./log_formatter.sh
 source "$SCRIPT_DIR/log_formatter.sh"
+# shellcheck source=../../scripts/lib/common.sh
+source "$SCRIPT_DIR/../../scripts/lib/common.sh"
 
 LOG_FILE="${CAPTURE_LOG_FILE:-$HOME/IWE/.claude/logs/capture_log.jsonl}"
 
@@ -146,8 +148,10 @@ if [ "${CAPTURE_RAW_EVENTS:-0}" = "1" ]; then
   PSQL_BIN=$(which psql 2>/dev/null || true)
 
   if [ -n "$DB_URL" ] && [ -n "$PSQL_BIN" ]; then
-    # external_id: хэш от event_type + session_id + ts (idempotency key)
-    EXT_ID=$(echo "${EVENT_TYPE}:${SESSION_ID:-no-session}:${TS_ISO}" | md5sum | awk '{print $1}')
+    # external_id: хэш от event_type + session_id + ts (idempotency key).
+    # iwe_md5 (scripts/lib/common.sh) — bare md5sum is GNU-only, no md5/macOS
+    # fallback (issue #1108).
+    EXT_ID=$(echo "${EVENT_TYPE}:${SESSION_ID:-no-session}:${TS_ISO}" | iwe_md5)
     PAYLOAD_JSON=$(echo "$EVENT" | jq -c '.')
 
     PSQL_SQL="INSERT INTO development.raw_events (source, external_id, payload, fetched_at)

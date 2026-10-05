@@ -42,6 +42,11 @@
 
 set -euo pipefail
 
+# Resolved from this script's own location, not from REPO_ROOT below — tests
+# pass an explicit (throwaway) repo-path as $3, which must never change
+# where this script finds its own library.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
   echo "usage: $0 <commit-ish> <excluded-path|\"\"> [repo-path]" >&2
   exit 2
@@ -87,7 +92,7 @@ while IFS= read -r -d '' entry; do
   # 120000) that IS the target path text, not the referenced file's
   # content; treated uniformly as opaque blob bytes, same as any other
   # blob, deliberately (no special-casing symlinks).
-  if ! content_sha="$(git -C "$REPO_ROOT" cat-file -p "$blob_sha" 2>/dev/null | sha256sum | awk '{print $1}')"; then
+  if ! content_sha="$(git -C "$REPO_ROOT" cat-file -p "$blob_sha" 2>/dev/null | iwe_sha256)"; then
     echo "ERROR: could not read blob '$blob_sha' for '$path' — missing object (shallow/partial clone?), fail-closed" >&2
     exit 4
   fi
@@ -127,4 +132,4 @@ LC_ALL=C sort -z "$TMP_RECORDS" > "$SORTED_RECORDS"
 {
   printf 'wp529-canonical-digest-v1\0'
   cat "$SORTED_RECORDS"
-} | sha256sum | awk '{print $1}'
+} | iwe_sha256

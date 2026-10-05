@@ -24,6 +24,11 @@
 | `grep -P` | GNU-only (Perl regex) | `grep -E` (Extended regex) |
 | `stat -c` / `stat -f` | GNU vs BSD | Избегать; использовать `wc`, `ls -l`, `find` |
 | `mktemp -d -t` | Разное поведение | `mktemp -d` (без шаблона) |
+| `timeout N cmd` | GNU coreutils/Homebrew-only — `command not found` на стоковой macOS без Homebrew (issue #1108) | `iwe_timeout` (`lib/common.sh`) — делегирует реальному `timeout`, иначе perl-полифил |
+| `md5sum` | GNU-only, без macOS-замены (issue #1108) | `iwe_md5` (`lib/common.sh`) — делегирует `md5sum`, иначе BSD `md5` |
+| `sha256sum` | GNU-only; есть в `/sbin` только на macOS 26+, на более старых версиях отсутствует (issue #1108) | `iwe_sha256` (`lib/common.sh`) — делегирует `sha256sum`, иначе `shasum -a 256` |
+| `flock -n/-x/-s ...` | util-linux/Homebrew-only, отсутствует на стоковой macOS — голый вызов падает `command not found`, что код ошибочно принимал за «лок уже занят» (issue #1108) | `command -v flock` guard + mkdir-fallback lock (образец: `scripts/ledger-append.sh`, `scripts/wp-pool-cascade.sh`) |
+| `${var,,}` / `${var^^}` | bash 4+ (lowercase/uppercase expansion) — `bad substitution` на bash 3.2, дефолтный `/bin/bash` стоковой macOS (issue #1108) | `$(printf '%s' "$var" \| tr '[:upper:]' '[:lower:]')` |
 
 ## Обёртки (copy-paste в начало скрипта)
 
@@ -59,6 +64,41 @@ notify() {
 }
 ```
 
+### portable_lowercase (замена `${var,,}`)
+
+```bash
+# не copy-paste функция — однострочная замена на месте использования
+lower=$(printf '%s' "$var" | tr '[:upper:]' '[:lower:]')
+```
+
+### timeout / md5 / sha256 — через lib/common.sh, не copy-paste
+
+В отличие от обёрток выше (локальные, без внешних зависимостей), эти три
+достаточно сложны (perl-полифил `timeout`, GNU/BSD-ветвление) и уже
+централизованы в `scripts/lib/common.sh` — не дублировать inline:
+
+```bash
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+iwe_timeout 30 some_cmd   # вместо bare `timeout 30 some_cmd`
+iwe_sha256 < "$FILE"      # вместо bare `sha256sum`
+echo -n "$x" | iwe_md5    # вместо bare `md5sum`
+```
+
+Путь к `lib/common.sh` относительно вызывающего скрипта (`scripts/*.sh` →
+`lib/common.sh`; вне `scripts/` — see `.claude/lib/capture_writer.sh` для
+примера относительного пути из другой директории).
+
+### flock — guard + mkdir-fallback, не copy-paste
+
+`flock(1)` отсутствует на стоковой macOS, а голый `command not found` легко
+принять за «лок уже занят» (issue #1108). Готового `iwe_*`-хелпера нет — лок
+завязан на конкретный `$LOCK_FILE` и семантику блокирующего/неблокирующего
+ожидания вызывающего скрипта, поэтому шаблон не параметризован в
+`lib/common.sh`. Эталонные реализации (копировать и адаптировать, не
+изобретать заново): `scripts/ledger-append.sh` (блокирующий `-w 10`, с
+reclaim мёртвых локов по PID+hostname) и `scripts/wp-pool-cascade.sh`
+(неблокирующий `-n`, та же reclaim-логика, без retry-цикла).
+
 ## Архитектурные ограничения
 
 - **launchd / .plist** — macOS-only. На Linux нужен cron или systemd timer. Setup.sh пропускает шаг 5 на Linux.
@@ -78,8 +118,14 @@ grep -rn "osascript" --include="*.sh" .
 grep -rn "launchctl" --include="*.sh" .
 grep -rn "readlink -f" --include="*.sh" .
 grep -rn "grep -P" --include="*.sh" .
+grep -rn "\btimeout [\"\$0-9]" --include="*.sh" .
+grep -rn "\bsha256sum\b\|\bmd5sum\b" --include="*.sh" .
+grep -rnE '\bflock -[a-zA-Z]' --include="*.sh" .
+grep -rnE '\$\{[A-Za-z_][A-Za-z0-9_]*(,,?|\^\^?)\}' --include="*.sh" .
 ```
+
+Либо напрямую: `bash scripts/check-platform-compat.sh` — тот же чеклист как CI-гейт (`check_guarded`/`check_forbidden` по каждой строке таблицы выше), а не только список для ручной проверки.
 
 ---
 
-*Последнее обновление: 2026-03-16*
+*Последнее обновление: 2026-10-05 (issue #1108: timeout/md5sum/sha256sum/flock/bash4-isms)*

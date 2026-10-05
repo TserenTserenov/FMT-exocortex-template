@@ -18,6 +18,8 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 UPDATE_SH="$ROOT/update.sh"
+# shellcheck source=lib/common.sh
+source "$ROOT/scripts/lib/common.sh"
 CLEANUP_DIRS=()
 SERVER_PID=""
 # ${arr[@]+...} idiom: a bare "${CLEANUP_DIRS[@]}" on an EMPTY array is an
@@ -71,7 +73,7 @@ _CURL_SSL_OPT=""
 # DOWNLOAD_QUEUE/DOWNLOAD_HASHES built explicitly, matched by index — same
 # contract download_batch's caller in update.sh Step 2 relies on.
 WRONG_HASH="0000000000000000000000000000000000000000000000000000000000000"
-RIGHT_HASH=$(printf 'a second real file, also not empty\n' | sha256sum | cut -d' ' -f1)
+RIGHT_HASH=$(printf 'a second real file, also not empty\n' | iwe_sha256)
 DOWNLOAD_QUEUE=("tampered.txt" "clean.txt")
 DOWNLOAD_HASHES=("$WRONG_HASH" "$RIGHT_HASH")
 [ "${#DOWNLOAD_QUEUE[@]}" -eq "${#DOWNLOAD_HASHES[@]}" ] || {
