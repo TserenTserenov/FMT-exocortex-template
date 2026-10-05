@@ -123,13 +123,21 @@ if [ "$direct_upload" = "true" ]; then
 fi
 
 if [ "$direct_read" = "true" ]; then
+  # issue #1090: this used to point to scripts/with-aist-env.sh, a wrapper
+  # that was never shipped anywhere in the template -- the hook named a tool
+  # that does not exist. The bypass it was trying to describe already works
+  # today (secret_bypass_check INPUT above exits 0 before this branch runs),
+  # so point at that instead of a nonexistent wrapper.
   deny_command "deny-bash-read" "direct-sensitive-read" \
-    "Чтение чувствительного файла через Bash заблокировано до попадания значения в контекст. Не называй файл в команде: используй имеющийся scripts/with-aist-env.sh <команда> (он подгружает окружение внутри, путь не виден в команде), а программа читает переменные через os.environ/\$VAR. Через обёртку нельзя запускать то, что печатает окружение (env, printenv, отладочные дампы). Блок хука ≠ «доступа нет» — см. lessons_blocked_probe_is_not_verification.md."
+    "Чтение чувствительного файла через Bash заблокировано до попадания значения в контекст. Не называй файл в команде — передай значение через \$VAR/env, программа читает их через os.environ. Разовый обход требует CC_ALLOW_SECRETS_INPUT=1 и срока CC_ALLOW_SECRETS_INPUT_UNTIL не более 15 минут. Блок хука ≠ «доступа нет» — см. lessons_blocked_probe_is_not_verification.md."
 fi
 
 if [ "$bulk_enumeration" = "true" ]; then
+  # issue #1090: same dead scripts/with-aist-env.sh reference as the
+  # direct_sensitive_read branch above (found by cold code review of that
+  # fix -- it exists nowhere in the repo, see the comment there).
   deny_command "deny-bash-bulk-enumeration" "bulk-secret-enumeration" \
-    "Команда печатает все секреты сразу открытым текстом (env/printenv без имени переменной или railway variables/variable) — заблокирована до выполнения, независимо от формы значений: их не распознаёт сигнатурный анализ вывода. Нужна одна конкретная переменная — используй scripts/with-aist-env.sh <команда> (значение остаётся внутри процесса, не печатается) или printenv <ИМЯ_ПЕРЕМЕННОЙ>. Разовый обход требует CC_ALLOW_SECRETS_INPUT=1 и срока CC_ALLOW_SECRETS_INPUT_UNTIL не более 15 минут — вывод всё равно останется защищён редактирующим PostToolUse-хуком, но однократный факт печати уже не отменить."
+    "Команда печатает все секреты сразу открытым текстом (env/printenv без имени переменной или railway variables/variable) — заблокирована до выполнения, независимо от формы значений: их не распознаёт сигнатурный анализ вывода. Нужна одна конкретная переменная — передай значение через \$VAR/env (программа читает их через os.environ) или printenv <ИМЯ_ПЕРЕМЕННОЙ>. Разовый обход требует CC_ALLOW_SECRETS_INPUT=1 и срока CC_ALLOW_SECRETS_INPUT_UNTIL не более 15 минут — вывод всё равно останется защищён редактирующим PostToolUse-хуком, но однократный факт печати уже не отменить."
 fi
 
 if [ -n "$pattern_ids" ]; then

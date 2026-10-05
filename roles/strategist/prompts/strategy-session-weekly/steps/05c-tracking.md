@@ -20,7 +20,7 @@ gate: user
 
 1. **Обнови трекер** (`Lifework/Caliber-artifacts-tracker.md`):
    - Дата сессии
-   - C_vis, C_act (из 05a)
+   - V_scope, A_scope, D_scope, качественный статус (из 05a)
    - Статус рекомендации: `proposed` / `remind_monthly` / `dismissed` / `in-progress` / `done`
    - Следующий ремайндер (дата или `null`)
 

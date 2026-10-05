@@ -157,7 +157,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "adf731c45bc3d17251e86684098fb7cf5ab581072999533bb44d097427628eff"
+      "sha256": "087b1c684d91a2aaccfafcc416d2f57d3c5a5019a39bd9d420c4828e40a233ea"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -169,7 +169,7 @@
     },
     {
       "path": ".claude/hooks/secret-leak-block.sh",
-      "sha256": "f4b355d6c48d0360b377c168f7dc782fd3c2830c0f47e8033b542e731ac0cc07"
+      "sha256": "027d627bdbcb51f4379e61f69ea218a0337b651d2bd6075a1224e29b0c3ea554"
     },
     {
       "path": ".claude/hooks/secret-mcp-dump-guard.sh",
@@ -361,7 +361,7 @@
     },
     {
       "path": ".claude/scripts/settings-merge-preview.py",
-      "sha256": "1736fa40d7229ad26c5b7a61ba5fdbb5b7b5844f6288a2e927c7f67137281dfb"
+      "sha256": "76e59ebd7d6b97e313e048b6fcef37c8fc07185c467b86ed5a5e78f847d7b1e8"
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "465e9b6ba3a46bad8fdbd71d2227c3a5a9f7697e3fdb8f55e2d511be5c824bab"
+      "sha256": "43f9adc4a3fc385191df7c8d695c92cb27d4f0aaf52819f9882a7c87527fa983"
     },
     {
       "path": "CLAUDE.md",
@@ -1041,7 +1041,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "a70ea18e4a85e8840b9b63b53e2df74a00cbc075c7d24f626cfc451eb1ceba1a"
+      "sha256": "b11a6d9a17af1a840462009ab7fab6e33f8b45cd86eda1fca7b40fae6e30ff22"
     },
     {
       "path": "docs/roles-catalog.md",
@@ -1829,7 +1829,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/jump-handler.md",
-      "sha256": "211da10c9807a71be1319efc84add252115412ecb25b0cd88b2ca57aeebac311"
+      "sha256": "f6acaca6e4000d1bf082bac4a474d18018b5fecd314e7c4c605de0767c9bed26"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/00-open.md",
@@ -1853,15 +1853,15 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05a-measurement.md",
-      "sha256": "f844815388563f3c31e9edb8a02ed9bf1e010cfc131edbc63298bb4ea29e7248"
+      "sha256": "7e7b06c48cae00daf06fd9ea4698c79d8a3662096338b0fa1fae32b718ee375b"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05b-recommendation.md",
-      "sha256": "80d014d7d997a00fd22891c13c71697c0b749b8860a45860fd8f4c015f01b1de"
+      "sha256": "893de8c99ab963a38976da3dd85c775fcae402b87ee0a5e3205ab2289ac4f965"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05c-tracking.md",
-      "sha256": "dc37287fb7bb0f53c9dbe5825fcc5f3431f90d4780c6bb938216dc45a4241f18"
+      "sha256": "d37570b08c57b8f58bf60902279d1d9814b68cae12610badc1c51b03d44b4963"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
-      "sha256": "330affe88e15ddfe7e7f9c21044ec752c1cecda52405de84747da52b58053b7e"
+      "sha256": "21c3b09d2af94bc8c528bfb681e5831d094cacba6a9c881c6381d8bd04688fa5"
     },
     {
       "path": "roles/strategist/prompts/update-priorities.md",
@@ -1917,7 +1917,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "c22a1ca86f3874944ff181aea0758035a4811908427635b04fdeed26b2d79854"
+      "sha256": "a7249270b964eb825e8971849adbe6995fe4e1d70d16163917729954991d4ade"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2229,7 +2229,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "e018133ad37c2c91de16cd56c0b6e9d5c5382bbe479fc03a7e31c76b888b830e"
+      "sha256": "3e35d3e6ed608cb4b99da61791d09c1ba7d802d9ca7362acc67badbb67e2bd94"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2477,7 +2477,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "aeb3361337b9c6781b8102fa737080a34bc75e003f8ac1c5ce354b2911fecf56"
+      "sha256": "14945198cb6f6b99a2e0eb33ff46e475a20e9cd489ca51d96a7f117569b2c2d2"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -2773,7 +2773,7 @@
     },
     {
       "path": "scripts/tests/test_create_wp_weekplan_writer.py",
-      "sha256": "81823fe0efae612c335bcff79b92f54fc2ae0b061d15e01a9cb13748ad0fa6a2"
+      "sha256": "26f18fd79c79c816363cd403285019a3d7468c4746bb6e683a6cede1e63762ea"
     },
     {
       "path": "scripts/tests/test_critical_alert_contract.sh",
@@ -2841,7 +2841,7 @@
     },
     {
       "path": "scripts/tests/test_issue_469_settings_merge_hook_identity.py",
-      "sha256": "e9d5384908b54c80d52d95aaba5e4220bbe82d8c86ca4c8a6f748b1d37e42276"
+      "sha256": "aaf58edf91bcedd883f7f24a92e9a2eb25b68e99f794967a440adec91810be3d"
     },
     {
       "path": "scripts/tests/test_issue_471_drift_scan_status_boundary.py",
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/tests/test_update_settings_merge_drift.sh",
-      "sha256": "0bbff3338ba5176f2bf8d62c8d18de80bdaff7c8dde264ca6c0de7b3e0d34906"
+      "sha256": "2dcb6e415044e10273a7cde2a65a362e24434ae4b304ec7ff7db430967c2ed33"
     },
     {
       "path": "scripts/tests/test_upgrade_worktree_cleanup.sh",
@@ -3081,7 +3081,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "aeb3361337b9c6781b8102fa737080a34bc75e003f8ac1c5ce354b2911fecf56"
+      "sha256": "14945198cb6f6b99a2e0eb33ff46e475a20e9cd489ca51d96a7f117569b2c2d2"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3177,7 +3177,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "7360189ff9e8e92fa03b6de43f3a0c8dc781f825949ab34571a160e3af68dca6"
+      "sha256": "09cf9fe99cb7947bbc48b96950789c56509d86c25c8fbd120890c21208031198"
     }
   ],
   "excluded_paths": [

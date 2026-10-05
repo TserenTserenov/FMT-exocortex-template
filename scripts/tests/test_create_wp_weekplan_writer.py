@@ -64,11 +64,41 @@ def test_standard_schema_inserts_row(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "добавлена" in result.stdout
     content = weekplan.read_text(encoding="utf-8")
-    # h_val = re.sub(r"[^0-9\-]", "", budget) — единица измерения обрезается,
-    # колонка "h" содержит только число (единица уже в заголовке колонки).
+    # h_val берёт число(а) из budget регэкспом (issue #1088) — единица
+    # измерения обрезается, колонка "h" содержит только число (единица уже
+    # в заголовке колонки).
     assert "🟡 | 16 | **Новый РП** — [описание] | 3 | — | P2 | pending | [заполнить] |" in content
     # исходная строка не тронута
     assert "🟢 | 10 | **Существующий РП** | 5h | R1 | P3 | done | готово" in content
+
+
+def test_fractional_budget_keeps_decimal_point(tmp_path):
+    """issue #1088: старый `re.sub(r"[^0-9\\-]", "", budget)` читал "0.5h"
+    как "05" (пять часов на вид, не полчаса) — точка обрезалась вместе с
+    "h". Регрессия на нескольких форматов budget, включая те, что не
+    начинаются сразу с цифры (issue #1088 cold review, Fable)."""
+    weekplan = tmp_path / "WeekPlan W31.md"
+    weekplan.write_text(
+        "# WeekPlan W31\n\n"
+        "**Бюджет:** 40h\n\n"
+        "🚦 | # | РП | h | Источник | P | Статус | Результат\n"
+        "|---|---|---|---|----------|---|---|--------|-----------|\n",
+        encoding="utf-8",
+    )
+    for wp_num, budget, expected_h in [
+        ("20", "0.5h", "0.5"),
+        ("21", "0,5h", "0.5"),
+        ("22", "2.5-3.5h", "2.5-3.5"),
+        ("23", "~2h", "2"),
+        ("24", " 2h", "2"),
+        ("25", "бред", "?"),
+    ]:
+        result = _run_writer(weekplan, wp_num, f"РП {wp_num}", "P3", budget)
+        assert result.returncode == 0, result.stderr
+        content = weekplan.read_text(encoding="utf-8")
+        assert f"| {wp_num} | **РП {wp_num}** — [описание] | {expected_h} |" in content, (
+            f"budget={budget!r}: expected h={expected_h!r} in\n{content}"
+        )
 
 
 def test_unrecognized_schema_does_not_corrupt_file(tmp_path):

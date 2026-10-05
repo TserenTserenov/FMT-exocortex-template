@@ -68,6 +68,17 @@ external_tracker:
     owner: ""
     repositories: []
 
+# === Стратег: модели фоновых сценариев (issue #1092) ===
+
+# Алиасы модели для фоновых сценариев Стратега (roles/strategist/scripts/strategist.sh).
+# Отсутствующий ключ = прежнее поведение (значения ниже и есть эти прежние дефолты).
+# Пустое значение — ошибка конфигурации, не тихий откат к дефолту.
+scheduler_model_week_review: claude-opus-4-7
+scheduler_model_session_prep: claude-sonnet-4-6
+scheduler_model_day_plan: claude-sonnet-4-6
+scheduler_model_day_close: claude-sonnet-4-6
+scheduler_model_note_review: claude-haiku-4-5-20251001
+
 # === Расширения ===
 
 # Директория с пользовательскими расширениями протоколов

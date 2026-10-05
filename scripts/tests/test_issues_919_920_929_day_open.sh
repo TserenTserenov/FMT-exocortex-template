@@ -25,10 +25,15 @@ new_ws() {
   echo "$ws"
 }
 # scaffold NAME DATE → stdout of the scaffold
+# DAY_OPEN_FORCE_STRATEGY_DAY=1: this fixture has no memory/day-rhythm-config.yaml, so the
+# scaffold's strategy_day guard defaults to monday (exit 2, no output) whenever $TODAY falls
+# on a real Monday (issue #1104) — none of #919/#920/#929 exercise that guard, so it is
+# disabled uniformly rather than pinned to another weekday, which would just move the
+# collision to a different day of the week.
 scaffold() {
   local base="$TMP/$1" script="${3:-$ROOT/scripts/day-open-scaffold.sh}"
   env -i PATH="$PATH" HOME="$base/home" IWE_ROOT="$base/ws" IWE_WORKSPACE="$base/ws" \
-    IWE_GOVERNANCE_REPO=DS-strategy bash "$script" "$2" 2>/dev/null
+    IWE_GOVERNANCE_REPO=DS-strategy DAY_OPEN_FORCE_STRATEGY_DAY=1 bash "$script" "$2" 2>/dev/null
 }
 row() { printf '%s\n' "$1" | grep -F "| $2 |" | head -1; }
 scheduler_row() { row "$(scaffold "$1" "$TODAY")" 'Scheduler/триаж'; }

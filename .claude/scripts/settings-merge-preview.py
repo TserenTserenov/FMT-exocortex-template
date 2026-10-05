@@ -110,6 +110,15 @@ def merge_hook_entries(user_entries, template_entries, report, event):
     for idx, entry in enumerate(merged):
         by_key.setdefault(_hook_commands_key(entry), []).append(idx)
 
+    # issue #1089 cold review (Fable, 2026-10-05): count entries the user has
+    # under this event that the CURRENT template doesn't mention at all --
+    # computed from the original user-only by_key, before the loop below
+    # starts appending template-only entries into the same dict. A workspace
+    # entry the template dropped is not an addition and not a value conflict
+    # (both already counted below), so without this it was invisible.
+    template_keys = {_hook_commands_key(te) for te in template_entries}
+    orphaned = sum(len(idxs) for key, idxs in by_key.items() if key not in template_keys)
+
     added = deduped = 0
     for template_entry in template_entries:
         key = _hook_commands_key(template_entry)
@@ -126,7 +135,7 @@ def merge_hook_entries(user_entries, template_entries, report, event):
             by_key[key].append(len(merged))
             merged.append(template_entry)
             added += 1
-    return merged, added, deduped
+    return merged, added, deduped, orphaned
 
 
 def merge_hooks(user_hooks, template_hooks, report):
@@ -139,9 +148,16 @@ def merge_hooks(user_hooks, template_hooks, report):
         if not isinstance(user_entries, list):
             report["conflicts"].append(f"hooks.{event}")
             continue
-        merged[event], added, deduped = merge_hook_entries(user_entries, template_entries, report, event)
+        merged[event], added, deduped, orphaned = merge_hook_entries(user_entries, template_entries, report, event)
         report["hooks_added_from_template"] += added
         report["hooks_deduped"] += deduped
+        report["hooks_only_in_workspace"] += orphaned
+    # An event the template dropped ENTIRELY (not just some entries within
+    # it) never enters the loop above, since that loop only walks events the
+    # template still mentions -- count those user events separately.
+    for event, user_entries in user_hooks.items():
+        if event not in template_hooks and isinstance(user_entries, list):
+            report["hooks_only_in_workspace"] += len(user_entries)
     return merged
 
 
@@ -209,6 +225,7 @@ def main(argv):
         "keys_kept_user_only": 0,
         "hooks_added_from_template": 0,
         "hooks_deduped": 0,
+        "hooks_only_in_workspace": 0,
         "permissions_added_from_template": 0,
         "conflicts": [],
     }

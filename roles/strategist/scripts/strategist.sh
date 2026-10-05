@@ -732,7 +732,18 @@ find_common_sh() {
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
-    # Приоритет: аргумент > env > пустая строка (дефолт Claude CLI).
+    # Приоритет: аргумент > env > params.yaml (ниже, issue #1092) > сценарный
+    # дефолт, зашитый в код > пустая строка (дефолт Claude CLI). Пустая
+    # строка здесь значит «ничего не задано», не «использовать CLI-дефолт
+    # прямо сейчас» — до дефолта очередь дойдёт только если params.yaml
+    # тоже молчит про этот сценарий.
+    # Поведенческая правка issue #1092 (cold review, Fable): до этого issue
+    # 5 из 7 сценариев передавали аргумент литералом напрямую из call site,
+    # поэтому IWE_STRATEGIST_MODEL для них не делал вообще ничего (литерал
+    # аргумента всегда выигрывал). Сейчас эти 5 call sites передают "",
+    # поэтому ENV для них стал реально действовать — раньше мёртвая
+    # возможность, теперь рабочая; в репозитории сейчас никто эту
+    # переменную не задаёт, поведение существующих установок не меняется.
     local model_override="${2:-${IWE_STRATEGIST_MODEL:-}}"
     local command_path="$PROMPTS_DIR/$command_file.md"
     AI_CLI_OUT_START=""
@@ -766,6 +777,17 @@ run_claude() {
         -e "s|${_o}GITHUB_USER${_c}|$_gh_user|g" \
         "$command_path") || { log "ERROR: не удалось прочитать промпт $command_path (sed)"; return 1; }
 
+    # issue #1092: scenario default computed unconditionally, same literals
+    # as before this issue -- common.sh missing (old install) must still
+    # give the exact old hardcoded model, not fall through to the bare CLI
+    # default below.
+    local _scenario_default=""
+    case "$command_file" in
+        week-review) _scenario_default="claude-opus-4-7" ;;
+        session-prep|day-plan|day-close) _scenario_default="claude-sonnet-4-6" ;;
+        note-review) _scenario_default="claude-haiku-4-5-20251001" ;;
+    esac
+
     # issue #942: calendar_source (params.yaml) = connector | script | none.
     # Without the shared helper (old install) the calendar stays on, as before.
     local calendar_source="connector" _iwe_common
@@ -775,7 +797,27 @@ run_claude() {
         . "$_iwe_common" || { log "ERROR: не удалось загрузить $_iwe_common"; return 1; }
         calendar_source=$(iwe_calendar_source "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml") \
             || { log "ERROR: iwe_calendar_source не отработал"; return 1; }
+
+        # model_override is still empty here only when neither the caller
+        # nor IWE_STRATEGIST_MODEL named one. params.yaml gets a say before
+        # the scenario default -- this is the same common.sh already loaded
+        # two lines above for calendar_source, not a second source of it.
+        # type-check first (cold review, issue #1092): an older common.sh
+        # found on $PATH ahead of a fresh template copy would have
+        # iwe_calendar_source but not yet this function -- treat that the
+        # same as "no common.sh found" (fall back to the hardcoded default),
+        # not as a hard failure that skips the whole scenario.
+        if [ -z "$model_override" ] && [ -n "$_scenario_default" ] \
+            && type iwe_scheduler_model >/dev/null 2>&1; then
+            model_override=$(iwe_scheduler_model "scheduler_model_${command_file//-/_}" \
+                "$_scenario_default" "${IWE_WORKSPACE:-$HOME/IWE}/params.yaml") \
+                || { log "ERROR: iwe_scheduler_model не отработал для $command_file"; return 1; }
+        fi
     fi
+    # common.sh missing, or this command_file has no scenario default (e.g.
+    # "evening", "strategy-session" -- never had a hardcoded model): leave
+    # model_override as whatever it already was (caller arg, env, or empty).
+    [ -n "$model_override" ] || model_override="$_scenario_default"
     local calendar_note=""
     case "$calendar_source" in
         none) calendar_note=" Календарь отключён (params.yaml: calendar_source: none): шаг про календарь (3a) пропусти, секцию «Календарь» в плане не пиши, календарный коннектор не запрашивай." ;;
@@ -1478,7 +1520,7 @@ case "$1" in
 
         if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
             log "Strategy day ($STRATEGY_DAY_NAME): running session prep"
-            run_claude "session-prep" "claude-sonnet-4-6"
+            run_claude "session-prep" ""
             notify_telegram "session-prep"
         else
             # Canonical Day Open pipeline: deterministic scaffold (reads priorities.yaml,
@@ -1558,7 +1600,7 @@ case "$1" in
         # WP-561 Ф25: `set -e` would end the script silently on a failed run (no message at
         # all); keep the code, alarm the pilot, then exit with it.
         week_review_rc=0
-        run_claude_with_retry "week-review" "claude-opus-4-7" 3 60 300 || week_review_rc=$?
+        run_claude_with_retry "week-review" "" 3 60 300 || week_review_rc=$?
         # Fallback push for Knowledge Index (week-review creates a post there)
         # KI_REPO may not exist for all users — guard with [ -d ]
         KI_REPO="$HOME/IWE/DS-Knowledge-Index"
@@ -1584,12 +1626,12 @@ case "$1" in
         ;;
     "session-prep")
         log "Manual: running session prep"
-        run_claude "session-prep" "claude-sonnet-4-6"
+        run_claude "session-prep" ""
         notify_telegram "session-prep"
         ;;
     "day-plan")
         log "Manual: running day plan"
-        run_claude "day-plan" "claude-sonnet-4-6"
+        run_claude "day-plan" ""
         notify_telegram "day-plan"
         ;;
     "note-review")
@@ -1611,13 +1653,13 @@ case "$1" in
         acquire_captures_write_lock || true
         if [ "$ISOLATED_RUN" = 1 ]; then
             note_review_rc=0
-            run_claude "note-review" "claude-haiku-4-5-20251001" || note_review_rc=$?
+            run_claude "note-review" "" || note_review_rc=$?
             if [ "$note_review_rc" -ne 0 ]; then
                 log "ISOLATION: сбой запуска модели (rc=$note_review_rc), публикации нет, копия сохранена: $ISO_WORKTREE"
                 exit "$note_review_rc"
             fi
         else
-            run_claude "note-review" "claude-haiku-4-5-20251001"
+            run_claude "note-review" ""
         fi
 
         # Canary: count bold notes after (needs to be visible for the alert further below)
@@ -1721,7 +1763,7 @@ case "$1" in
         ;;
     "day-close")
         log "Manual: running day close"
-        run_claude "day-close" "claude-sonnet-4-6"
+        run_claude "day-close" ""
         notify_telegram "day-close"
         ;;
     "strategy-session")

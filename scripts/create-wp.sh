@@ -271,14 +271,19 @@ if [[ -f "$HYP_LOG" ]]; then
 fi
 
 # --- Decompose-reminder derivation (structural-hole fix) ---
-# Budget formats seen in the wild: "5h", "2h", "3-4h" (range). For a range we
-# want the upper bound — the more conservative read when deciding whether the
-# WP is big enough to need a staged plan. Plain `sed 's/[^0-9]//g'` (used
-# elsewhere in this script for a different, looser purpose) would mangle
-# "3-4h" into "34"; this instead takes the max of all digit groups found.
+# Budget formats seen in the wild: "5h", "2h", "3-4h" (range), "0.5h" / "0,5h"
+# (fractional). For a range we want the upper bound — the more conservative
+# read when deciding whether the WP is big enough to need a staged plan.
+# Plain `sed 's/[^0-9]//g'` (used elsewhere in this script for a different,
+# looser purpose) would mangle "3-4h" into "34"; this instead takes the max
+# of all digit groups found. issue #1088: a plain `[0-9]+` group split "0.5h"
+# into separate "0" and "5" groups, reading it as 5h instead of 0 (rounded
+# down); matching an optional fractional part first and then truncating to
+# its whole-number prefix keeps "3-4h" and ranges like "2.5-3.5h" correct too.
 budget_upper_bound_hours() {
   local budget="$1" n max=0
-  for n in $(grep -oE '[0-9]+' <<<"$budget"); do
+  for n in $(grep -oE '[0-9]+([.,][0-9]+)?' <<<"$budget"); do
+    n="${n%%[.,]*}"
     [[ "$n" -gt "$max" ]] && max="$n"
   done
   printf '%s\n' "$max"
@@ -763,7 +768,16 @@ weekplan_path, wp_num, title, priority, budget = sys.argv[1:6]
 # Маппинг приоритета → светофор
 flag_map = {"P1": "🔴", "P2": "🟡", "P3": "🟢", "P4": "⚪", "P5": "⚪"}
 flag = flag_map.get(priority, "⚪")
-h_val = re.sub(r"[^0-9\-]", "", budget) or "?"
+# issue #1088: `re.sub(r"[^0-9\-]", "", budget)` dropped the decimal
+# separator along with the "h" suffix, turning "0.5h" into "05" (read as
+# five hours at a glance, not half an hour). Find the number(s) anywhere in
+# the string instead of anchoring to its start -- a start-anchored version
+# of this fix (cold review, Fable) returned "?" for "~2h" or a leading-space
+# budget, and disagreed with the bash threshold parser on "2h-3h". Take the
+# first two numbers found, normalizing a locale comma to a dot; "h" is still
+# dropped, same as the old regex did for "3-4h" -> "3-4".
+_nums = re.findall(r"\d+(?:[.,]\d+)?", budget)
+h_val = "-".join(n.replace(",", ".") for n in _nums[:2]) or "?"
 
 with open(weekplan_path, "r", encoding="utf-8") as f:
     lines = f.readlines()
@@ -1158,7 +1172,11 @@ fi
 # --- Шаг 4: Strategy.md (только если --result задан и бюджет ≥3h) ---
 echo "4/5 Strategy.md..."
 
-BUDGET_H=$(echo "$BUDGET" | sed 's/[^0-9]//g')
+# issue #1088: this used to be its own `sed 's/[^0-9]//g'`, which read a
+# fractional budget like "0.5h" as "05" (five hours) -- the same bug as
+# budget_upper_bound_hours() above, duplicated with a different regex.
+# Reuse that function instead of a second copy of the same threshold logic.
+BUDGET_H=$(budget_upper_bound_hours "$BUDGET")
 if [[ -n "$RESULT" && "${BUDGET_H:-0}" -ge 3 ]]; then
   STRATEGY_FILE="$STRATEGY/docs/Strategy.md"
   python3 - "$STRATEGY_FILE" "$WP_ID" "$REPO" "$RESULT" <<'PYEOF'
