@@ -149,6 +149,7 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/server-calendar.sh (#1173).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/server-calendar.sh (#1169).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/governance-repo-path.sh, scripts/lib/session-index-draft.sh, scripts/grok-peer-adapter.sh, scripts/session-manifest-write.sh, scripts/session-dir-reserve.sh (#1163).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлён memory/roles.md (#1164).

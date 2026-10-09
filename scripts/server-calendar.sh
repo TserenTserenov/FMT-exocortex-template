@@ -21,22 +21,94 @@
 #   bash server-calendar.sh YYYY-MM-DD [CONFIG_PATH]
 #   bash server-calendar.sh --week [YYYY-MM-DD] [CONFIG_PATH]
 #   bash server-calendar.sh 2026-05-19
+#   bash server-calendar.sh --json [YYYY-MM-DD] [CONFIG_PATH]
+#   bash server-calendar.sh --json --tz Asia/Nicosia [YYYY-MM-DD] [CONFIG_PATH]
+#
+# --tz <IANA name>: only --json honors it. Without it, the queried window is
+#   a literal UTC day (unchanged default, every existing caller). With it,
+#   the window is the true local day/week in that zone, converted to UTC.
+#
+# --json: вместо markdown-секции печатает один JSON-объект на stdout —
+#   {schema_version, source_version, generated_at, window_start, window_end,
+#    events[], errors[], status}. events[] — та же структура, что строит
+#   markdown-режим (summary/start/duration/...), плюс id/updated_at/end для
+#   машинного потребителя (WP-389 Ф6, bounded-источник календаря для
+#   Секретаря). Контракт: generated_at — когда ИМЕННО вызван Google API
+#   (давность снимка должна считаться от него, не от времени чтения
+#   downstream-модулем); на любом раннем выходе (нет credentials, нет
+#   calendar_ids, OAuth error) events=[] и status="pending" с причиной в
+#   errors[] — тот же "всегда рендерится" принцип, что уже держит markdown-
+#   режим, только в машинной форме вместо текста-заглушки.
 
 set -uo pipefail
 
+SCRIPT_SOURCE_VERSION=1
+
+# Общий выход для каждого раннего "не могу продолжить" (python3/credentials/
+# OAuth/config отсутствуют). $reason идёт и в markdown-текст, и в JSON
+# errors[]; downstream-читателю из WP-389 Ф6 не нужно парсить markdown,
+# чтобы отличить "pending" от реального списка событий.
+report_pending() {
+  local reason="$1"
+  if [[ "$JSON_MODE" == true ]]; then
+    if [[ -n "${PYTHON3:-}" ]]; then
+      # Proper JSON string escaping (control characters included, not just
+      # quotes/backslashes) — the one call site before PYTHON3 resolves only
+      # ever passes a fixed literal with no embedded data, so the bash
+      # fallback below is sufficient there (code review finding, 2026-10-05:
+      # $ERROR/$CONFIG in the later call sites are not fixed literals).
+      $PYTHON3 -c "
+import json, sys
+print(json.dumps({
+    'schema_version': 1, 'source_version': $SCRIPT_SOURCE_VERSION,
+    'generated_at': None, 'window_start': None, 'window_end': None,
+    'events': [], 'errors': [sys.argv[1]], 'status': 'pending',
+}))
+" "$reason"
+    else
+      local esc="${reason//\\/\\\\}"
+      esc="${esc//\"/\\\"}"
+      printf '{"schema_version":1,"source_version":%s,"generated_at":null,"window_start":null,"window_end":null,"events":[],"errors":["%s"],"status":"pending"}\n' \
+        "$SCRIPT_SOURCE_VERSION" "$esc"
+    fi
+  else
+    echo "📅 **Календарь ($DATE):** ⚠️ PENDING — $reason"
+    echo ""
+    echo "⏱ Свободных блоков ≥1h: **не определено**"
+  fi
+  exit 0
+}
+
 # --- Разбор аргументов ---
 WEEK_MODE=false
+JSON_MODE=false
 DATE_ARG=""
 CONFIG_ARG=""
+# --tz <IANA name>: only --json honors this (see TIME_MIN/TIME_MAX below) —
+# markdown/day-open-pipeline.sh callers keep the UTC-day window unchanged,
+# a deliberate backward-compat boundary, not an oversight (WP-389 Ф6).
+TZ_ARG=""
 
-for arg in "$@"; do
-    if [[ "$arg" == "--week" ]]; then
-        WEEK_MODE=true
-    elif [[ "$arg" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-        DATE_ARG="$arg"
-    elif [[ -f "$arg" ]]; then
-        CONFIG_ARG="$arg"
-    fi
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --week) WEEK_MODE=true ;;
+        --json) JSON_MODE=true ;;
+        --tz)
+            # Only consume the next token as the zone if it isn't itself a
+            # recognized flag (`--tz --week ...` must not swallow --week as
+            # a bogus zone name — code review finding, 2026-10-05, second
+            # pass). A missing/flag-like value just leaves TZ_ARG empty;
+            # --json then keeps the literal-UTC window, same as omitting
+            # --tz entirely.
+            case "${2:-}" in
+                --* | "") ;;
+                *) shift; TZ_ARG="$1" ;;
+            esac
+            ;;
+        [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) DATE_ARG="$1" ;;
+        *) [ -f "$1" ] && CONFIG_ARG="$1" ;;
+    esac
+    shift
 done
 
 DATE="${DATE_ARG:-$(date +%Y-%m-%d)}"
@@ -51,10 +123,7 @@ if ! PYTHON3=$("$RESOLVER"); then
   # used to surface later as "calendar_ids не найдены в конфиге" (Evgenii,
   # 18.08). Same PENDING+exit 0 contract as the credentials branch below —
   # the section must always render.
-  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — не найден python3 с библиотекой PyYAML. Установить: pip3 install pyyaml (или sudo apt install python3-yaml); см. requirements.txt"
-  echo ""
-  echo "⏱ Свободных блоков ≥1h: **не определено**"
-  exit 0
+  report_pending "не найден python3 с библиотекой PyYAML. Установить: pip3 install pyyaml (или sudo apt install python3-yaml); см. requirements.txt"
 fi
 
 # --- Загружаем credentials ---
@@ -67,10 +136,7 @@ CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
 
 if [[ -z "$REFRESH_TOKEN" || -z "$CLIENT_ID" || -z "$CLIENT_SECRET" ]]; then
-  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — Google credentials не настроены. Установить: \`~/.secrets/google-calendar\` (GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)"
-  echo ""
-  echo "⏱ Свободных блоков ≥1h: **не определено**"
-  exit 0
+  report_pending "Google credentials не настроены. Установить: ~/.secrets/google-calendar (GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)"
 fi
 
 # --- Получаем access token ---
@@ -84,10 +150,7 @@ ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | $PYTHON3 -c "import sys,json; d=json.loa
 
 if [[ -z "$ACCESS_TOKEN" ]]; then
   ERROR=$(echo "$TOKEN_RESPONSE" | $PYTHON3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error_description', d.get('error','unknown')))" 2>/dev/null || echo "unknown")
-  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — OAuth error: $ERROR"
-  echo ""
-  echo "⏱ Свободных блоков ≥1h: **не определено**"
-  exit 0
+  report_pending "OAuth error: $ERROR"
 fi
 
 # --- Читаем calendar_ids из конфига ---
@@ -113,10 +176,7 @@ except Exception as e:
 ")
 
 if [[ "$CONFIG_READ" == "MISSING" ]]; then
-  echo "📅 **Календарь ($DATE):** ⚠️ PENDING — ключ calendar_ids отсутствует в конфиге ($CONFIG)"
-  echo ""
-  echo "⏱ Свободных блоков ≥1h: **не определено**"
-  exit 0
+  report_pending "ключ calendar_ids отсутствует в конфиге ($CONFIG)"
 fi
 
 CALENDAR_IDS="$CONFIG_READ"
@@ -159,15 +219,42 @@ for cid in ids:
 PYEOF
   )
   if [[ -z "$CALENDAR_IDS" ]]; then
-    echo "📅 **Календарь ($DATE):** ⚠️ PENDING — calendar_ids пуст (все доступные календари), но автоопределение через calendarList не вернуло ни одного календаря"
-    echo ""
-    echo "⏱ Свободных блоков ≥1h: **не определено**"
-    exit 0
+    report_pending "calendar_ids пуст (все доступные календари), но автоопределение через calendarList не вернуло ни одного календаря"
   fi
 fi
 
 # --- Временной диапазон ---
-if [[ "$WEEK_MODE" == true ]]; then
+if [[ -n "$TZ_ARG" && "$JSON_MODE" == true ]]; then
+    # True local-day (or local-week) boundary converted to UTC, not a
+    # literal UTC-day window — scoped to --json: markdown/day-open-
+    # pipeline.sh callers keep today's UTC-day window unchanged (WP-389 Ф6,
+    # code review 2026-10-05: treating DATE as a UTC day silently shifts the
+    # queried window by the zone's UTC offset — e.g. for a UTC+3 zone, events
+    # in the first ~3h of true local today fall outside it, and the window
+    # instead reaches ~3h into the *next* local day).
+    SPAN_DAYS=0
+    [[ "$WEEK_MODE" == true ]] && SPAN_DAYS=6
+    # Command substitution, not `read < <(...)`: the latter's `read` exit
+    # status reflects `read` itself, not the substituted command, so a bad
+    # --tz value (unknown zone, missing tzdata) would fall through with
+    # TIME_MIN/TIME_MAX silently empty instead of hitting report_pending
+    # like every other early-exit in this script (code review finding,
+    # 2026-10-05, second pass).
+    TZ_WINDOW_OUT=$($PYTHON3 -c "
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+zone = ZoneInfo('$TZ_ARG')
+start_local = datetime.strptime('$DATE', '%Y-%m-%d').replace(tzinfo=zone)
+end_local = start_local + timedelta(days=$SPAN_DAYS, hours=23, minutes=59, seconds=59)
+print(start_local.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+      end_local.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+" 2>/dev/null)
+    if [[ $? -ne 0 || -z "$TZ_WINDOW_OUT" ]]; then
+        report_pending "некорректная таймзона --tz '$TZ_ARG' или сбой вычисления окна (tzdata?)"
+    fi
+    read -r TIME_MIN TIME_MAX <<< "$TZ_WINDOW_OUT"
+    if [[ "$WEEK_MODE" == true ]]; then MODE_LABEL="неделю"; else MODE_LABEL="день"; fi
+elif [[ "$WEEK_MODE" == true ]]; then
     TIME_MIN="${DATE}T00:00:00Z"
     # +6 дней = неделя
     TIME_MAX=$($PYTHON3 -c "from datetime import datetime, timedelta; d=datetime.strptime('$DATE','%Y-%m-%d')+timedelta(days=6); print(d.strftime('%Y-%m-%dT23:59:59Z'))")
@@ -343,6 +430,7 @@ for cid in calendar_ids:
 
         all_events.append({
             "start_dt": start_dt.isoformat() if start_dt else None,
+            "end_dt": end_dt.isoformat() if end_dt else None,
             "start_time": start_time,
             "date": start_dt.strftime("%Y-%m-%d") if start_dt else date_arg,
             "date_short": fmt_date_short(start_dt) if start_dt else "",
@@ -353,6 +441,12 @@ for cid in calendar_ids:
             "status_emoji": status_emoji,
             "status_text": status_text,
             "all_day": all_day,
+            # Для машинного потребителя (WP-389 Ф6): stable_id переживает
+            # перезапись summary/времени того же события, updated_at — для
+            # обнаружения изменившегося события без сравнения всех полей.
+            "stable_id": item.get("id", ""),
+            "calendar_id": cid.strip(),
+            "updated_at": item.get("updated"),
         })
 
 # Сортируем по дате-времени
@@ -361,6 +455,39 @@ all_events.sort(key=lambda e: e["start_dt"] or "")
 print(json.dumps({"events": all_events, "errors": errors}, ensure_ascii=False))
 PYEOF
 )
+
+# --- Машинный вывод (--json): конверт с давностью снимка вместо markdown ---
+if [[ "$JSON_MODE" == true ]]; then
+  $PYTHON3 << PYEOF
+# -*- coding: utf-8 -*-
+import json
+from datetime import datetime, timezone
+
+try:
+    data = json.loads("""${EVENTS_JSON}""")
+except Exception:
+    data = {"events": [], "errors": ["parse error"]}
+
+events = data.get("events", [])
+errors = data.get("errors", [])
+has_calendar_api_error = any(e.startswith("calendar API error for") for e in errors)
+
+print(json.dumps({
+    "schema_version": 1,
+    "source_version": ${SCRIPT_SOURCE_VERSION},
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "window_start": "${TIME_MIN}",
+    "window_end": "${TIME_MAX}",
+    "events": events,
+    "errors": errors,
+    "status": "degraded" if has_calendar_api_error else "ok",
+}, ensure_ascii=False))
+
+import sys
+sys.exit(1 if has_calendar_api_error else 0)
+PYEOF
+  exit $?
+fi
 
 # --- Формируем markdown ---
 $PYTHON3 << PYEOF
