@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c117725a49bc0cabf2ab31ceef049aa721835245b849109ebcf379519ce08c2a"
+      "sha256": "0519668d6aa78c6051241f88985db9e68da26231360f63686d4bb06f47fdf9c1"
     },
     {
       "path": "CLAUDE.md",
@@ -2661,7 +2661,7 @@
     },
     {
       "path": "scripts/server-calendar.sh",
-      "sha256": "972a0f329342ba3e9c625061cce16a5cadf6e976ea821cc9d044f526f0795259"
+      "sha256": "7e2c56557c61a308af111fe5a0a8036ceb388b1235ca9b1a1868eef58b8dd1a8"
     },
     {
       "path": "scripts/server-news.sh",
