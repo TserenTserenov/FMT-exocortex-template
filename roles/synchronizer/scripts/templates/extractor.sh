@@ -53,14 +53,18 @@ build_message() {
                 captured=${captured:-0}
             fi
 
+            # Было: "Новых кандидатов нет" слала каждый тик таймера, даже когда
+            # ничего не изменилось с прошлого сообщения -- живой дамп 09.10
+            # поймал дубль дважды за 16 минут ровно с этим текстом. Ветка
+            # inbox-check выше уже молчит при пустом результате (echo "" ->
+            # notify.sh пропускает отправку); это делает то же самое для
+            # согласованности -- рутинное "ничего не произошло" идёт в
+            # тихий счётчик (notify.sh's caller decides), не в чат на каждый тик.
+            [ "$captured" -gt 0 ] || { echo ""; return; }
             printf "<b>🔍 Knowledge Feeder: %s</b>\n\n" "$process"
             printf "📅 %s\n\n" "$DATE"
-            if [ "$captured" -gt 0 ]; then
-                printf "Захвачено кандидатов за сегодня: %s\n" "$captured"
-                printf "Файл: <code>%s</code>" "${captures_target#"$inbox_dir/"}"
-            else
-                printf "Новых кандидатов нет."
-            fi
+            printf "Захвачено кандидатов за сегодня: %s\n" "$captured"
+            printf "Файл: <code>%s</code>" "${captures_target#"$inbox_dir/"}"
             ;;
 
         *)
