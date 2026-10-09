@@ -833,7 +833,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "6e5a9e26b583e9d55a4d94f6a958a64a1498e3aa1340350673ffc2769d2fe8ae"
+      "sha256": "41c84578294530af3de4b4b65eacf1b1872382a7f1de20c017b158ade72ccd48"
     },
     {
       "path": ".gitleaks.toml",
