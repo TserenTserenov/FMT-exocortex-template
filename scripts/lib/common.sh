@@ -77,6 +77,19 @@ iwe_sha256() {
   fi
 }
 
+# iwe_md5 — md5 of stdin, printed alone (no filename column). Same GNU-first
+# rationale as iwe_sha256 (issue #1108): md5sum is coreutils (every Linux,
+# absent on macOS by default); BSD `md5` with no file argument reads stdin
+# and already prints just the bare hex digest (verified: no "MD5(-)=" prefix
+# the way `md5 -p`/named-file invocations add one), so it needs no awk/cut.
+iwe_md5() {
+  if command -v md5sum >/dev/null 2>&1; then
+    md5sum | awk '{print $1}'
+  else
+    md5
+  fi
+}
+
 # iwe_file_mtime_date FILE — дата YYYY-MM-DD без смешивания stdout двух
 # несовместимых stat-реализаций. GNU и BSD ветки выбираются явно (#300).
 iwe_file_mtime_date() {
@@ -439,4 +452,45 @@ iwe_scheduler_model() {
     return 1
   fi
   printf '%s\n' "$value"
+}
+
+# iwe_timeout DURATION CMD [ARGS...] — portable `timeout`. Delegates to the
+# real timeout(1) when present (GNU coreutils on every Linux, Homebrew
+# coreutils on macOS); falls back to a perl polyfill when it's missing
+# (stock macOS with no Homebrew — issue #1006, re-found for a 4th call site
+# by #1108). Centralized here instead of a 4th inline copy-paste — three
+# scripts (roles/extractor/scripts/extractor.sh, scripts/active-wp-sweep.sh,
+# roles/strategist/scripts/strategist.sh) each still carry their own inline
+# copy of the #1006 fix predating this helper; left as-is (migrating them is
+# out of scope for #1108) but any new caller should use this instead of a
+# 5th copy. Same exit-code contract as GNU timeout: 124 on an actual
+# timeout, otherwise the child's own exit status (128+signal if the child
+# was killed by a signal, matching how the shell itself reports that case).
+iwe_timeout() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$@"
+    return $?
+  fi
+  local duration="$1"; shift
+  perl -e '
+      my $timeout = shift @ARGV;
+      my $timed_out = 0;
+      my $pid = fork();
+      if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
+      eval {
+          local $SIG{ALRM} = sub { $timed_out = 1; die "timeout\n"; };
+          alarm $timeout;
+          waitpid($pid, 0);
+          alarm 0;
+      };
+      if ($timed_out) {
+          kill "TERM", $pid;
+          select(undef, undef, undef, 0.5);
+          kill "KILL", $pid;
+          waitpid($pid, 0);
+          exit 124;
+      }
+      # A child ended by a signal reports 128+signal, like the shell does.
+      exit(($? & 127) ? 128 + ($? & 127) : ($? >> 8));
+  ' "$duration" "$@"
 }

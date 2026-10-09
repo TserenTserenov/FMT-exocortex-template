@@ -61,9 +61,56 @@ if [[ "$PROBE" == "true" ]]; then
 fi
 
 exec 7>"$LOCK_FILE"
-if ! flock -n 7; then
-  echo "ERROR: другой прогон wp-pool-cascade.sh уже держит лок ($LOCK_FILE)" >&2
-  exit 1
+if command -v flock >/dev/null 2>&1; then
+  if ! flock -n 7; then
+    echo "ERROR: другой прогон wp-pool-cascade.sh уже держит лок ($LOCK_FILE)" >&2
+    exit 1
+  fi
+else
+  # mkdir-fallback lock (issue #1108): flock(1) is util-linux/Homebrew-only —
+  # absent on stock macOS with no Homebrew. A bare `flock -n 7` there used to
+  # fail with "flock: command not found" (exit 127), which `if ! flock -n 7`
+  # caught the same as genuine contention and misreported as "another run
+  # already holds the lock" — wrong diagnosis, not just a missing feature.
+  # Same mkdir-based fallback as scripts/ledger-append.sh (WP-484 30.07),
+  # narrowed to a single non-blocking attempt: this cascade's own flock call
+  # was already non-blocking (-n, fail fast), so the fallback keeps that same
+  # contract instead of adding the retry-loop ledger-append.sh needs for its
+  # blocking (-w 10) case.
+  echo "WARN: flock(1) не найден в PATH — используется mkdir-fallback lock (слабее flock, переживает только падения на этом же хосте)" >&2
+  LOCKDIR="${LOCK_FILE}.lockdir"
+  LOCK_META="$LOCKDIR/owner"
+  HOSTNAME_NOW="${HOSTNAME:-$(cat /proc/sys/kernel/hostname 2>/dev/null || echo unknown)}"
+  if ! mkdir "$LOCKDIR" 2>/dev/null; then
+    # Held by someone else, or a stale dir from a dead process on this same
+    # host — one reclaim attempt (not a retry loop, see non-blocking note
+    # above). Never steal a lock whose metadata names another host, or
+    # hasn't been written yet (same invariant as ledger-append.sh).
+    stale=false
+    if [ -f "$LOCK_META" ]; then
+      OTHER_HOST=$(awk -F= '$1=="host"{print $2}' "$LOCK_META" 2>/dev/null)
+      OTHER_PID=$(awk -F= '$1=="pid"{print $2}' "$LOCK_META" 2>/dev/null)
+      if [ "$OTHER_HOST" = "$HOSTNAME_NOW" ] && [ -n "$OTHER_PID" ] && ! kill -0 "$OTHER_PID" 2>/dev/null; then
+        stale=true
+      fi
+    fi
+    if [ "$stale" = "true" ]; then
+      rm -rf "$LOCKDIR" 2>/dev/null
+      mkdir "$LOCKDIR" 2>/dev/null || { echo "ERROR: другой прогон wp-pool-cascade.sh уже держит лок ($LOCK_FILE)" >&2; exit 1; }
+    else
+      echo "ERROR: другой прогон wp-pool-cascade.sh уже держит лок ($LOCK_FILE)" >&2
+      exit 1
+    fi
+  fi
+  echo "host=$HOSTNAME_NOW" > "$LOCK_META"
+  echo "pid=$$" >> "$LOCK_META"
+  # Replaces (not chains) the PROBE trap above — still covers PROBE_DIR (a
+  # no-op "${PROBE_DIR:-}" when unset/non-probe) plus the new LOCKDIR, so
+  # probe cleanup keeps working in the no-flock branch too. Signal handlers
+  # terminate explicitly (not just cleanup-and-continue); EXIT still fires
+  # the same cleanup on the normal-return path.
+  trap 'rm -rf "$LOCKDIR" "${PROBE_DIR:-}" 2>/dev/null; exit 143' HUP INT TERM
+  trap 'rm -rf "$LOCKDIR" "${PROBE_DIR:-}" 2>/dev/null' EXIT
 fi
 
 [[ -f "$WP_LIST_SCRIPT" ]] || { echo "ERROR: $WP_LIST_SCRIPT не найден" >&2; exit 1; }

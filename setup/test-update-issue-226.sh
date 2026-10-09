@@ -19,6 +19,8 @@
 set -uo pipefail
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 UPDATE_SH_REAL="$(dirname "$SELF_DIR")/update.sh"
+# shellcheck source=../scripts/lib/common.sh
+source "$(dirname "$SELF_DIR")/scripts/lib/common.sh"
 TEST_ROOT="${ISSUE_226_WORKSPACE:-/tmp/iwe-issue-226-test-$$}"
 FAKE_HOME="$TEST_ROOT/fake-home"
 
@@ -779,7 +781,7 @@ with open(manifest_path, "w", encoding="utf-8") as handle:
     json.dump(manifest, handle)
 PY
 MEMO_BEFORE=$(cat "$SCRIPT_DIR/memory/dummy-memo.md")
-MANIFEST_HASH_BEFORE=$(sha256sum "$SCRIPT_DIR/update-manifest.json" | cut -d' ' -f1)
+MANIFEST_HASH_BEFORE=$(iwe_sha256 < "$SCRIPT_DIR/update-manifest.json")
 
 set +e
 PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main bash "$SCRIPT_DIR/update.sh" --yes > "$TEST_ROOT/out-e.log" 2>&1
@@ -804,7 +806,7 @@ else
     fail "E: dummy-memo.md was updated despite the aborted run — partial apply regression"
 fi
 
-if [ "$(sha256sum "$SCRIPT_DIR/update-manifest.json" | cut -d' ' -f1)" = "$MANIFEST_HASH_BEFORE" ]; then
+if [ "$(iwe_sha256 < "$SCRIPT_DIR/update-manifest.json")" = "$MANIFEST_HASH_BEFORE" ]; then
     pass "E: local update-manifest.json was not stamped as updated"
 else
     fail "E: local manifest changed despite the aborted run"

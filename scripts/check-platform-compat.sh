@@ -67,6 +67,21 @@ check_guarded "sed -i '' (BSD)" "sed -i ''" 'sed --version|sed_inplace'
 # `date -r FILE` (mtime as date) is portable on both BSD and GNU date, so it
 # counts as a valid fallback for `stat -f`/`stat -c` too, not just stat -c itself.
 check_guarded "stat -f (BSD)" 'stat -f' 'stat -c|date -r '
+# Issue #1108: four more GNU/Homebrew-only constructs with no polyfill found by
+# two independent post-release audits — same "checklist already named it,
+# nothing enforced it" pattern as the five checks above.
+# `(^|[^-'"'"'])` excludes two shapes that read like an invocation but
+# aren't one: a flag name ending in "-timeout" (curl's --connect-timeout/
+# --max-time), and a single-quoted string a test feeds to something else as
+# DATA — a fixture `command_text`, or a Python string inside a bash heredoc
+# (`'timeout "$X"'`) — never actually run by the file that contains it.
+check_guarded "timeout (GNU/Homebrew-only)" '(^|[^-'"'"'])\btimeout ["$0-9]' 'command -v timeout|which timeout|iwe_timeout'
+check_guarded "sha256sum (GNU-only, no shasum/macOS fallback)" '\bsha256sum\b' 'command -v sha256sum|which sha256sum|shasum|iwe_sha256'
+check_guarded "md5sum (GNU-only, no md5/macOS fallback)" '\bmd5sum\b' 'command -v md5sum|which md5sum|\bmd5\b|iwe_md5'
+# fcntl.flock(...) (Python) is a different, already cross-platform call — the
+# grep pattern requires a CLI flag ("flock -x"/"-n"/"-s") right after the
+# word, which a Python method call never has, so it doesn't need excluding.
+check_guarded "flock (util-linux, absent on stock macOS)" '\bflock -[a-zA-Z]' 'command -v flock|which flock'
 
 # Python equivalent of the osascript guard (subprocess.run(["osascript"...)
 while IFS= read -r file; do
@@ -77,6 +92,26 @@ while IFS= read -r file; do
     fail=1
   fi
 done <<< "$FILES_PY"
+
+# Issue #1108: ${var,,}/${var^^} (bash 4+ case-conversion parameter expansion)
+# is a "bad substitution" syntax error on bash 3.2 — stock macOS's /bin/bash,
+# last GPLv2 release, no coreutils/Homebrew needed to hit this one. No safe
+# runtime guard exists for it (unlike the constructs above): the fix is to
+# not use it (portable `tr '[:upper:]' '[:lower:]'`, already the idiom
+# elsewhere in this repo — e.g. update.sh, .claude/hooks/sql-pii-guard.sh).
+# Only checked under a shebang that doesn't itself guarantee bash 4+ — a
+# script pinned to an explicit newer-bash interpreter path is exempt.
+while IFS= read -r file; do
+  [ -n "$file" ] || continue
+  case "$(head -1 "$file" 2>/dev/null)" in
+    '#!/bin/bash'|'#!/usr/bin/env bash')
+      if grep -vE '^\s*#' "$file" 2>/dev/null | grep -qE '\$\{[A-Za-z_][A-Za-z0-9_]*(,,?|\^\^?)\}'; then
+        echo "FAIL: $file — \${var,,}/\${var^^} (bash 4+, bad substitution on stock macOS bash 3.2) без обёртки"
+        fail=1
+      fi
+      ;;
+  esac
+done <<< "$FILES_SH"
 
 # --- Unguardable constructs: no documented safe runtime pattern, checklist
 # says avoid entirely — any non-comment occurrence fails ---

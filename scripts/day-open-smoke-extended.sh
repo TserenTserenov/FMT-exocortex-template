@@ -25,6 +25,8 @@
 
 set -uo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
 START_TS=$(date +%s)
 FORCE=false
 [ "${1:-}" = "--force" ] && FORCE=true
@@ -52,8 +54,11 @@ check_dt_collect() {
     echo "fail:script-missing"
     return
   fi
-  # Запустить dry-run с timeout 30с
-  if timeout 30 bash "$script" --dry-run 2>/dev/null >/dev/null; then
+  # Запустить dry-run с timeout 30с. iwe_timeout (lib/common.sh) — issue #1108:
+  # a bare `timeout` here is GNU/Homebrew-only and "command not found" (exit
+  # 127) on stock macOS with no Homebrew, making every single check in this
+  # script fail:exit-127 with no indication the real cause was a missing tool.
+  if iwe_timeout 30 bash "$script" --dry-run 2>/dev/null >/dev/null; then
     echo "ok"
   else
     echo "fail:exit-$?"
