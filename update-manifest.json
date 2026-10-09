@@ -925,7 +925,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "343c8d19889547029cb7c16b04c9900f80f8e029e993a003491638fea1613427"
+      "sha256": "8d3738d4575453cc3958c522e0fa609d26ca687db7b98e3181e78771b78506be"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -1557,7 +1557,7 @@
     },
     {
       "path": "memory/hard-distinctions.md",
-      "sha256": "04493e61dbb2c4b0ea958b9f52a3b5a9c098e0ba19e1c7a4103a06c92b3e3178"
+      "sha256": "2262cfd8fa152efe976bcd60879fb1bb52015a3c99868b9cdcde257619a39a25"
     },
     {
       "path": "memory/hooks-design.md",
@@ -1685,7 +1685,7 @@
     },
     {
       "path": "roles/ROLE-CONTRACT.md",
-      "sha256": "b24ec541d1a370fce5295f7f1d5055486711c1016495d58160e94f7dc2c58c8b"
+      "sha256": "399bd631ec70e3a4759030d1b7d1c8c4d058767caaf5c9fddef5159c66272713"
     },
     {
       "path": "roles/auditor/README.md",
