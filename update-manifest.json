@@ -33,7 +33,7 @@
     },
     {
       "path": ".claude/detectors/detector_decision.sh",
-      "sha256": "7dbf61a3fec906cb15b74a53cdba2dc94e0b67f153489d0adf8659f0e6d30368"
+      "sha256": "f99beedd3ba95cf4b5fff9243e29f36cafa4eb1af8331bc07a4d6d4e0cd054dd"
     },
     {
       "path": ".claude/detectors/detector_incident.sh",
@@ -353,7 +353,7 @@
     },
     {
       "path": ".claude/scripts/memory-drift-scan.py",
-      "sha256": "65200a4f0e2f496d59c9206840cdb323eeb3e7e66fdbbc05a0612975af26f33c"
+      "sha256": "cd6b2e0c9ec6327d78feb3261f03bfd9ed09f49bc244f5468264b1b9ea120cd6"
     },
     {
       "path": ".claude/scripts/settings-merge-apply.sh",
@@ -725,7 +725,7 @@
     },
     {
       "path": ".claude/skills/skill-creator/scripts/verify-skill.sh",
-      "sha256": "13a0a084f86a6139a2b11248d0d1d14e641207c1047ca13c65b5137b9439bec5"
+      "sha256": "b27fc6221b54326d7cdd98287f44bccf6b821fb16565d330effaf4c50a4d0ba7"
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
@@ -797,7 +797,7 @@
     },
     {
       "path": ".claude/sync-manifest.yaml",
-      "sha256": "d4d1fddfce286cb7db3300b421a1bc0552210dd8e9356aafb7e3b84765a20cc7"
+      "sha256": "d7b4573c2206d8c487c7c7f5afe3c3a8491e00a4aeff5586aadd217cb97e2b9f"
     },
     {
       "path": ".claude/templates/drr-template.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "54db57af6a98fad01565f851d66d954c23632a4e30595d33637af024e5a15318"
+      "sha256": "317ab36e4e4039bc00bacd2c9f4d587cc56e81fe7fe76c6947a2623fb9cb7c72"
     },
     {
       "path": "CLAUDE.md",
@@ -2245,7 +2245,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "3e35d3e6ed608cb4b99da61791d09c1ba7d802d9ca7362acc67badbb67e2bd94"
+      "sha256": "81f0db62724eaa3f7039cc012e0a565198c414fac4f30e09bf13af68caf5116d"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2305,11 +2305,11 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "e72523659f36fd67be4fffb7aefaf93fc6ab6c27ca8a9802869a21e608daf36b"
+      "sha256": "0716573598784600072afd6d4083be0abed93b85f236bb322e548edd383ea07f"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
-      "sha256": "48dd5866175b2806a45330c857c2dc8b13632e665c1054b2e8abc0a65274999c"
+      "sha256": "4d2b9b902f32982446acdd5a1ec156f33b9e3a9f0136f56ef342ca66da5b754b"
     },
     {
       "path": "scripts/day-open-smoke.sh",
@@ -3085,7 +3085,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "f29aeafba55d586676b4a418540b70040a86d8b91d7b94b976599f7441a2551e"
+      "sha256": "36ded88bec48d8d320d6a9c7a0e798b26fc223b6a3256eff60165868c42792b9"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3285,6 +3285,12 @@
     "scripts/tests/test_issue_1067_week_review_gave_up.sh",
     "scripts/tests/test_issue_1084_runtime_placeholder_scope.sh",
     "scripts/tests/test_issue_1106_dt_collect_gov.sh",
+    "scripts/tests/test_issue_1146_smoke_cache_ignored.sh",
+    "scripts/tests/test_issue_1149_1156_windows_path_and_ru_regex.sh",
+    "scripts/tests/test_issue_1152_weekplan_row_layout.sh",
+    "scripts/tests/test_issue_1154_drift_scan_unresolved.py",
+    "scripts/tests/test_issue_1165_verify_skill_install_layout.sh",
+    "scripts/tests/test_issue_1174_detector_user_messages.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",

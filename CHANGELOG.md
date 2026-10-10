@@ -149,6 +149,13 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] `create-wp.sh`: строка в таблице плана недели с колонками `РП | Работа | Часы (потолок) | Источник | Ставка | Статус | Репо` раскладывается по колонкам (номер в «РП», название в «Работа», бюджет, ставка и репозиторий в своих), а не кладёт название в «РП» и оставляет остальное пустым при сообщении об успехе (#1152, #1170, #1177).
+- [behavior] `memory-drift-scan.py`: карточка РП с ведущими нулями в номере (`inbox/WP-038/`) находится; РП без найденной карточки больше не молчит, а выводится строкой «не удалось проверить N из M РП» (#1154, #1177).
+- [behavior] `day-open-scaffold.sh`: путь к `day-rhythm-config.yaml` передаётся в Python через `cygpath -m`, поэтому на Windows (Git Bash) настройки дня читаются, а не заменяются значениями по умолчанию (#1149, #1177).
+- [behavior] `sync-manifest.yaml`: проверка активности `lesson-hygiene` учитывает русские слова в сообщениях коммитов (урок, памят, архив, ротац, сжат, очист, гигиен) (#1156, #1177).
+- [behavior] `detector_decision.sh` снова видит реплики пользователя: фильтр искал `.role` на верхнем уровне записи, а в транскрипте Claude Code реплика имеет `type: user` и текст в `.message.content`; теперь читаются строка и текстовые блоки, а результаты инструментов, мета-записи и служебные вставки отбрасываются (#1174, #1177).
+- [behavior] `/skill-creator`, шаг проверки: `verify-skill.sh` находит Python-резолвер на пользовательской установке (`.claude/lib/find-python3.sh`, затем `$IWE_SCRIPTS/lib`, затем раскладка шаблона), а не только `scripts/lib` рядом с `.claude/` (#1165, #1177).
+- [behavior] `day-open-smoke-extended.sh` больше не оставляет неотслеживаемый `current/.smoke-cache.json` в репозитории управления: строка добавлена в `seed/strategy/.gitignore`, а у существующих установок скрипт сам вносит её в локальный `.git/info/exclude` (#1146, #1177).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/server-calendar.sh (#1173).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/server-calendar.sh (#1169).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/governance-repo-path.sh, scripts/lib/session-index-draft.sh, scripts/grok-peer-adapter.sh, scripts/session-manifest-write.sh, scripts/session-dir-reserve.sh (#1163).

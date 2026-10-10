@@ -102,4 +102,15 @@ cat > "$CACHE_FILE" <<EOF
 }
 EOF
 
+# The cache is a regenerable runtime file, not a work product (issue #1146):
+# keep it out of `git status` of installs whose seed .gitignore predates the entry.
+EXCLUDE_FILE=$(git -C "$DS_STRATEGY" rev-parse --git-path info/exclude 2>/dev/null || true)
+if [ -n "$EXCLUDE_FILE" ]; then
+  case "$EXCLUDE_FILE" in /*) ;; *) EXCLUDE_FILE="$DS_STRATEGY/$EXCLUDE_FILE" ;; esac
+  if ! grep -qxF 'current/.smoke-cache.json' "$EXCLUDE_FILE" 2>/dev/null; then
+    mkdir -p "$(dirname "$EXCLUDE_FILE")" 2>/dev/null \
+      && printf '%s\n' 'current/.smoke-cache.json' >> "$EXCLUDE_FILE" 2>/dev/null || true
+  fi
+fi
+
 echo "extended smoke cached → $CACHE_FILE (elapsed ${ELAPSED}s)" >&2

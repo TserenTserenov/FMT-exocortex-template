@@ -761,9 +761,12 @@ echo "3/5 WeekPlan..."
 # WEEKPLAN уже найден выше (снимок для отката, issue WP-507 про формат имени файла
 # применён там же) — здесь используется тот же путь, не ищем повторно.
 if [[ -n "$WEEKPLAN" ]]; then
-  if ! python3 - "$WEEKPLAN" "$WP_NUM" "$TITLE" "$PRIORITY" "$BUDGET" <<'PYEOF'
+  if ! python3 - "$WEEKPLAN" "$WP_NUM" "$TITLE" "$PRIORITY" "$BUDGET" "$REPO" "$STAKE_CELL" <<'PYEOF'
 import sys, re
 weekplan_path, wp_num, title, priority, budget = sys.argv[1:6]
+# Optional (issue #1152): the writer tests invoke this block with the first five only.
+repo = sys.argv[6] if len(sys.argv) > 6 else ""
+stake = sys.argv[7] if len(sys.argv) > 7 else "—"
 
 # Маппинг приоритета → светофор
 flag_map = {"P1": "🔴", "P2": "🟡", "P3": "🟢", "P4": "⚪", "P5": "⚪"}
@@ -1137,6 +1140,7 @@ if insert_at is None:
         print("   ⚠️  WeekPlan: таблица недели (заголовок РП/Статус вне блоков «Итоги») не найдена — добавить вручную", file=sys.stderr)
 else:
     header_cols = table_cells(header_line)
+    header_keys = [column_key(c) for c in header_cols]
     values_by_name = {
         "🚦": flag,
         "#": wp_num,
@@ -1147,6 +1151,15 @@ else:
         "Статус": "pending",
         "Результат": "[заполнить]",
     }
+    # issue #1152 / #1170: a layout `🚦 | РП | Работа | Часы (потолок) | Источник | Ставка |
+    # Статус | Репо` keeps the NUMBER in «РП» and the title in «Работа»; there is no «#»
+    # column. Without this the title landed in «РП» and the other columns stayed empty.
+    if "#" not in header_keys and "Работа" in header_keys:
+        values_by_name["РП"] = "WP-{}".format(wp_num)
+        values_by_name["Работа"] = "**{}** — [описание]".format(title)
+        values_by_name["Часы (потолок)"] = h_val
+        values_by_name["Ставка"] = stake
+        values_by_name["Репо"] = repo if repo else "—"
     row_cells = ["—"] * len(header_cols)
     for idx, name in enumerate(header_cols):
         key = column_key(name)  # the same normalization the header detection used

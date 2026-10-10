@@ -2,3 +2,6 @@
 # cache here. Not a work product — never add inbox/WP-NNN/ or any other
 # RP-numbered path here, that defeats the point of moving out of inbox/.
 .cache/
+
+# issue #1146: scripts/day-open-smoke-extended.sh writes a regenerable cache here.
+current/.smoke-cache.json
