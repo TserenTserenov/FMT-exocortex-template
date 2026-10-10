@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "934675bf58b412da3f6d3fdd136b1fad1d6ca20dac8b02e589c757d5d163dde2"
+      "sha256": "06e27f94219790611954c233e33de12dc6b36088c31c2854d9682066c2a8c099"
     },
     {
       "path": "CLAUDE.md",
@@ -2013,7 +2013,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/extractor.sh",
-      "sha256": "b06348f4b90945d739974f470f92614164a271188513d64c0aa4ddd39e78eacd"
+      "sha256": "60e1244c016f018f4be6098c52b28c6caf21f5a11b1de580444c7679cb57680a"
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
@@ -2021,7 +2021,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
-      "sha256": "7bdca449308bed6a6ad064cfb2620eac317458a6d4bb5544708f0d968020aea6"
+      "sha256": "527299e82841251c35db703227a3f89687293a5344191df4b90f51c27e75b384"
     },
     {
       "path": "roles/synchronizer/scripts/video-scan.sh",
