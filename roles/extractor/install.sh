@@ -129,10 +129,16 @@ fi
 cp "$PLIST_SRC" "$PLIST_DST"
 
 # Загружаем агент
-if [ -z "${SETUP_CI:-}" ]; then
-    launchctl load "$PLIST_DST"
-else
+if [ -n "${SETUP_CI:-}" ]; then
     echo "  ⊠ SETUP_CI: plist copied, launchctl activation skipped"
+elif [ -n "${IWE_SKIP_LOAD:-}" ]; then
+    # issue #1143: see roles/synchronizer/install.sh for the rationale —
+    # same convention, kept consistent even though this role's plist has
+    # RunAtLoad=false (no live dispatch risk today, but the contract
+    # between update.sh and install.sh should not differ per role).
+    echo "  ⊠ IWE_SKIP_LOAD: plist copied, launchctl load skipped (state the user set earlier is preserved, not loaded)"
+else
+    launchctl load "$PLIST_DST"
 fi
 
 echo "  ✓ Installed: com.extractor.inbox-check"

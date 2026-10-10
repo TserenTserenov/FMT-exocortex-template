@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "06e27f94219790611954c233e33de12dc6b36088c31c2854d9682066c2a8c099"
+      "sha256": "bafa656c4295a3b5ce622ba3d2aa7866b66d92258de544f0e927fcddf29f2620"
     },
     {
       "path": "CLAUDE.md",
@@ -1721,7 +1721,7 @@
     },
     {
       "path": "roles/extractor/install.sh",
-      "sha256": "f451dabef0e7e91052f8cfa5b838593679ee92271d2a38312c2e9cd137bfd3e3"
+      "sha256": "7dd4aff5cd9cd316f1ced6a2322007b8b46a5c2451a10e7e422dc2c843fea12c"
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
@@ -1933,7 +1933,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "e44c64bc5b0d2da42f191a8204a13655f43d4f9c423268891364abd725e964e2"
+      "sha256": "f22f40d7b561deaeaa761e503d12329fa327dfd6f179989c4e424bb56dd1f49f"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -1961,7 +1961,7 @@
     },
     {
       "path": "roles/synchronizer/install.sh",
-      "sha256": "2acb5ad0431e281a616e11b601ab8de397fe7dc277b811cfbd3df3a27be57fc2"
+      "sha256": "32b7ee5c9a2776857e024faef61def71480a16d5d2f1fd88458be1df3fd87d53"
     },
     {
       "path": "roles/synchronizer/role.yaml",
@@ -3213,7 +3213,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "ab3a0edb24afc456d8ce8134112119fa6645326a0f03e4e67926a14914c59826"
+      "sha256": "9082e04031ca0a21a996a2ab3a4c93fbbb06b6e5b02d3555550b12605ddfde16"
     }
   ],
   "excluded_paths": [

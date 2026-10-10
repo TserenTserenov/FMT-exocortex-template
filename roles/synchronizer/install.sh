@@ -138,10 +138,16 @@ mkdir -p "$HOME/logs/synchronizer"
 
 # Копируем и загружаем
 cp "$PLIST_SRC" "$PLIST_DST"
-if [ -z "${SETUP_CI:-}" ]; then
-    launchctl load "$PLIST_DST"
-else
+if [ -n "${SETUP_CI:-}" ]; then
     echo "  ⊠ SETUP_CI: plist copied, launchctl activation skipped"
+elif [ -n "${IWE_SKIP_LOAD:-}" ]; then
+    # issue #1143: caller (update.sh) already knows this role was
+    # deliberately unloaded by the user and will restore that state
+    # itself — `load` here would fire RunAtLoad once before that
+    # restore runs, dispatching a job the user turned off.
+    echo "  ⊠ IWE_SKIP_LOAD: plist copied, launchctl load skipped (state the user set earlier is preserved, not loaded)"
+else
+    launchctl load "$PLIST_DST"
 fi
 
 echo "  ✓ Installed: com.exocortex.scheduler"

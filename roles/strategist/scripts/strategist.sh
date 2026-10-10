@@ -1560,6 +1560,21 @@ case "$1" in
             if [ -z "${IWE_SCRIPTS:-}" ] || [ ! -f "$DAY_OPEN_PIPELINE" ]; then
                 DAY_OPEN_PIPELINE="$WORKSPACE/scripts/day-open-pipeline.sh"
             fi
+            # issue #1143: a launchd plist installed before IWE_SCRIPTS was
+            # added to its EnvironmentVariables (0.40.0) never gets refreshed
+            # for an auto:false role like the Synchronizer, so this run can
+            # still start without it. Neither path above found the pipeline —
+            # before declaring it not-delivered, try $IWE_TEMPLATE/scripts
+            # (already in that old plist's environment) as a last resort,
+            # same priority order as the two paths above (IWE_SCRIPTS still
+            # wins, then the workspace-root legacy copy, only then this).
+            if [ -z "${IWE_SCRIPTS:-}" ] && [ ! -f "$DAY_OPEN_PIPELINE" ] && [ -n "${IWE_TEMPLATE:-}" ]; then
+                FALLBACK_PIPELINE="$IWE_TEMPLATE/scripts/day-open-pipeline.sh"
+                if [ -f "$FALLBACK_PIPELINE" ]; then
+                    log "WARN: \$IWE_SCRIPTS not set and \$WORKSPACE/scripts/day-open-pipeline.sh missing — falling back to \$IWE_TEMPLATE/scripts (запущено из устаревшего plist, переустановите роль: bash \$IWE_TEMPLATE/roles/synchronizer/install.sh)"
+                    DAY_OPEN_PIPELINE="$FALLBACK_PIPELINE"
+                fi
+            fi
             if [ ! -f "$DAY_OPEN_PIPELINE" ]; then
                 # WP-529 F6: on user installs workspace-root scripts/ is not
                 # delivered at all (Evgenii defects #2/#3, 18.08) — say so
