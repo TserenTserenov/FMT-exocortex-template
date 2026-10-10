@@ -6040,15 +6040,54 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
     ROLE_REINSTALL_GOV="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
     for role_dir in "$SCRIPT_DIR"/roles/*/; do
         [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
-        if grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null; then
+        role_name="$(basename "$role_dir")"
+        is_auto=false
+        grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null && is_auto=true
+
+        # issue #1143: a role with auto:false (synchronizer, extractor) is
+        # never reinstalled here, so a user who installed it before the
+        # plist template changed (e.g. 0.40.0 added IWE_SCRIPTS, line 62)
+        # keeps running the stale plist forever — update.sh only knows how
+        # to activate a role the user never asked for (that's what `auto`
+        # means), not how to refresh one already on disk. Detect "already
+        # installed" generically: every role's install.sh declares its own
+        # `PLIST_DST=` line (same convention across synchronizer/extractor);
+        # the role is already installed if that file exists on disk.
+        plist_dst=""
+        plist_dst_line="$(grep -m1 '^PLIST_DST=' "$role_dir/install.sh" 2>/dev/null)" || true
+        if [ -n "$plist_dst_line" ]; then
+            plist_dst="$(eval "$plist_dst_line"; printf '%s' "$PLIST_DST")"
+        fi
+        already_installed=false
+        [ -n "$plist_dst" ] && [ -f "$plist_dst" ] && already_installed=true
+
+        if $is_auto || $already_installed; then
+            # install.sh unconditionally does `launchctl unload` + `load`
+            # (that's correct for auto:true and for a first-time install),
+            # but for an already-installed auto:false role the user may
+            # have deliberately `launchctl unload`-ed it while leaving the
+            # plist file in place — its `load` would fire RunAtLoad once
+            # before we could undo it, dispatching a job the user turned
+            # off. Detect that case before calling install.sh and tell it
+            # to skip `load` outright (IWE_SKIP_LOAD) instead of racing a
+            # load-then-unload after the fact.
+            was_loaded=false
+            skip_load=""
+            if ! $is_auto && [ -n "$plist_dst" ]; then
+                plist_label="$(basename "$plist_dst" .plist)"
+                launchctl list "$plist_label" >/dev/null 2>&1 && was_loaded=true
+                $was_loaded || skip_load=1
+            fi
+
             IWE_WORKSPACE="$WORKSPACE_DIR" \
             IWE_TEMPLATE="$SCRIPT_DIR" \
             IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
             IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
             IWE_GOVERNANCE_REPO="$ROLE_REINSTALL_GOV" \
+            IWE_SKIP_LOAD="$skip_load" \
             bash "$role_dir/install.sh" 2>/dev/null && \
-                echo "  ✓ $(basename "$role_dir") переустановлен" || \
-                echo "  ○ $(basename "$role_dir"): переустановите вручную"
+                echo "  ✓ $role_name переустановлен" || \
+                echo "  ○ $role_name: переустановите вручную"
         fi
     done
     fi
