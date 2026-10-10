@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4f88e61358cdd02bc182041ceb1f95d399c643001edbfae67074c7044522bfce"
+      "sha256": "317ab36e4e4039bc00bacd2c9f4d587cc56e81fe7fe76c6947a2623fb9cb7c72"
     },
     {
       "path": "CLAUDE.md",
@@ -2245,7 +2245,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "5d2e680d1251e0b4e77ed688fbeaae8b66b89ec96b278a6a2c72a0a82a05be50"
+      "sha256": "81f0db62724eaa3f7039cc012e0a565198c414fac4f30e09bf13af68caf5116d"
     },
     {
       "path": "scripts/day-close-lock.sh",
