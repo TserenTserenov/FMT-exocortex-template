@@ -28,6 +28,14 @@ build_message() {
             local repo_list
             repo_list=$(echo "$latest_run" | grep 'FOUND:' 2>/dev/null | sed 's/.*FOUND: /  /' || echo "")
 
+            # Было: слала "Репо с коммитами: 0" на каждый прогон, даже когда ни
+            # один репозиторий не менялся -- тот же запах, что у Knowledge
+            # Feeder (найдено той же сессией 09.10). Прогон, где что-то реально
+            # нашлось (found>0), остаётся realtime -- это не то же решение
+            # (перевод рутинного found>0 в дайджест -- отдельная архитектурная
+            # правка, не трогаем здесь).
+            [ "$found" -gt 0 ] || { echo ""; return; }
+
             printf "<b>🔄 Code Scan</b>\n\n"
             printf "📅 %s\n\n" "$DATE"
             printf "Репо с коммитами: %s\n" "$found"

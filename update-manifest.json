@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "934675bf58b412da3f6d3fdd136b1fad1d6ca20dac8b02e589c757d5d163dde2"
+      "sha256": "06e27f94219790611954c233e33de12dc6b36088c31c2854d9682066c2a8c099"
     },
     {
       "path": "CLAUDE.md",
@@ -2013,7 +2013,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/extractor.sh",
-      "sha256": "b06348f4b90945d739974f470f92614164a271188513d64c0aa4ddd39e78eacd"
+      "sha256": "60e1244c016f018f4be6098c52b28c6caf21f5a11b1de580444c7679cb57680a"
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
@@ -2021,7 +2021,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
-      "sha256": "7bdca449308bed6a6ad064cfb2620eac317458a6d4bb5544708f0d968020aea6"
+      "sha256": "527299e82841251c35db703227a3f89687293a5344191df4b90f51c27e75b384"
     },
     {
       "path": "roles/synchronizer/scripts/video-scan.sh",
@@ -3266,6 +3266,7 @@
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dry_run_gate.py",
     "scripts/tests/test_extractor_branch_cleanup.sh",
+    "scripts/tests/test_extractor_feed_quiet_on_empty.sh",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
     "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_issue_1003_ds_publish.sh",
@@ -3367,6 +3368,7 @@
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
+    "scripts/tests/test_sync_code_scan_quiet.sh",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",
     "scripts/tests/test_update_download_batch_network_failure_failclosed.sh",
