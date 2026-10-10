@@ -3426,6 +3426,7 @@
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-install-path-provenance.sh",
+    "setup/test-update-issue-1143.sh",
     "setup/test-update-issue-226.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
