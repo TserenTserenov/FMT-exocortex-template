@@ -1550,17 +1550,6 @@ case "$1" in
             # morning path: a failure alarms instead of a free-form plan (D16, see
             # day_open_give_up() above).
             log "Morning: running canonical Day Open pipeline"
-            # issue #1143: a launchd plist installed before IWE_SCRIPTS was
-            # added to its EnvironmentVariables (0.40.0) never gets refreshed
-            # for an auto:false role like the Synchronizer, so this run can
-            # still start without it. IWE_TEMPLATE was already in that old
-            # plist's environment — fall back to it before falling back to
-            # $WORKSPACE, and say so, or this looks identical to the
-            # not-delivered case below despite the pipeline being on disk.
-            if [ -z "${IWE_SCRIPTS:-}" ] && [ -n "${IWE_TEMPLATE:-}" ]; then
-                log "WARN: \$IWE_SCRIPTS not set — falling back to \$IWE_TEMPLATE/scripts (запущено из устаревшего plist, переустановите роль: bash \$IWE_TEMPLATE/roles/synchronizer/install.sh)"
-                IWE_SCRIPTS="$IWE_TEMPLATE/scripts"
-            fi
             # $IWE_SCRIPTS first (matches the interactive day-open skill's own
             # resolution order), $WORKSPACE/scripts/ as legacy fallback for
             # installs that still deliver a workspace-root copy. #598: this
@@ -1570,6 +1559,21 @@ case "$1" in
             DAY_OPEN_PIPELINE="${IWE_SCRIPTS:-}/day-open-pipeline.sh"
             if [ -z "${IWE_SCRIPTS:-}" ] || [ ! -f "$DAY_OPEN_PIPELINE" ]; then
                 DAY_OPEN_PIPELINE="$WORKSPACE/scripts/day-open-pipeline.sh"
+            fi
+            # issue #1143: a launchd plist installed before IWE_SCRIPTS was
+            # added to its EnvironmentVariables (0.40.0) never gets refreshed
+            # for an auto:false role like the Synchronizer, so this run can
+            # still start without it. Neither path above found the pipeline —
+            # before declaring it not-delivered, try $IWE_TEMPLATE/scripts
+            # (already in that old plist's environment) as a last resort,
+            # same priority order as the two paths above (IWE_SCRIPTS still
+            # wins, then the workspace-root legacy copy, only then this).
+            if [ -z "${IWE_SCRIPTS:-}" ] && [ ! -f "$DAY_OPEN_PIPELINE" ] && [ -n "${IWE_TEMPLATE:-}" ]; then
+                FALLBACK_PIPELINE="$IWE_TEMPLATE/scripts/day-open-pipeline.sh"
+                if [ -f "$FALLBACK_PIPELINE" ]; then
+                    log "WARN: \$IWE_SCRIPTS not set and \$WORKSPACE/scripts/day-open-pipeline.sh missing — falling back to \$IWE_TEMPLATE/scripts (запущено из устаревшего plist, переустановите роль: bash \$IWE_TEMPLATE/roles/synchronizer/install.sh)"
+                    DAY_OPEN_PIPELINE="$FALLBACK_PIPELINE"
+                fi
             fi
             if [ ! -f "$DAY_OPEN_PIPELINE" ]; then
                 # WP-529 F6: on user installs workspace-root scripts/ is not
