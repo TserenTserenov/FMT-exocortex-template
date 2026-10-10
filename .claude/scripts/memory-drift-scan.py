@@ -168,13 +168,25 @@ def parse_memory_table(memory_path: Path) -> dict[int, str]:
 
 
 def find_wp_context(governance_repo: Path, wp_num: int) -> Path | None:
-    """Ищет inbox/WP-N/WP-N.md, fallback archive/wp-contexts/WP-N*.md."""
+    """Ищет inbox/WP-N/WP-N.md, fallback archive/wp-contexts/WP-N*.md.
+
+    Номер может быть записан с ведущими нулями (WP-038): issue #1154.
+    """
     active = governance_repo / "inbox" / f"WP-{wp_num}" / f"WP-{wp_num}.md"
     if active.is_file():
         return active
+    padded = re.compile(rf"WP-0*{wp_num}")
+    inbox_dir = governance_repo / "inbox"
+    if inbox_dir.is_dir():
+        for folder in sorted(inbox_dir.iterdir()):
+            if folder.is_dir() and padded.fullmatch(folder.name):
+                card = folder / f"{folder.name}.md"
+                if card.is_file():
+                    return card
     archive_dir = governance_repo / "archive" / "wp-contexts"
     if archive_dir.is_dir():
-        matches = sorted(archive_dir.glob(f"WP-{wp_num}-*.md"))
+        padded_archive = re.compile(rf"WP-0*{wp_num}-.*\.md")
+        matches = sorted(f for f in archive_dir.iterdir() if padded_archive.fullmatch(f.name))
         if matches:
             return matches[0]
     return None
@@ -199,13 +211,23 @@ def read_context_status(context_path: Path) -> str | None:
     return str(status) if status is not None else None
 
 
-def scan(memory_path: Path, governance_repo: Path) -> list[str]:
-    """Возвращает список markdown-строк с найденными дрейфами."""
+def scan(
+    memory_path: Path,
+    governance_repo: Path,
+    unresolved: list[int] | None = None,
+) -> list[str]:
+    """Возвращает список markdown-строк с найденными дрейфами.
+
+    РП, чью карточку не нашли, дописываются в `unresolved` (если список передан):
+    «не удалось проверить» не то же самое, что «расхождений нет» (issue #1154).
+    """
     memory_statuses = parse_memory_table(memory_path)
     drifts: list[str] = []
     for wp_num, memory_status in sorted(memory_statuses.items()):
         context_path = find_wp_context(governance_repo, wp_num)
         if context_path is None:
+            if unresolved is not None:
+                unresolved.append(wp_num)
             continue
         context_status = read_context_status(context_path)
         if context_status is None:
@@ -251,9 +273,18 @@ def main() -> int:
         print(f"FAIL: MEMORY.md не найден: {args.memory}", file=sys.stderr)
         return 2
 
-    drifts = scan(args.memory, args.governance_repo)
+    unresolved: list[int] = []
+    drifts = scan(args.memory, args.governance_repo, unresolved)
+    if unresolved:
+        total = len(parse_memory_table(args.memory))
+        names = ", ".join(f"РП-{n}" for n in unresolved)
+        print(
+            f"Drift-scan: не удалось проверить {len(unresolved)} из {total} РП "
+            f"(WP-context не найден): {names}"
+        )
     if not drifts:
-        print("Drift-scan (структурный): 0 расхождений")
+        suffix = " среди проверенных" if unresolved else ""
+        print(f"Drift-scan (структурный): 0 расхождений{suffix}")
         return 0
 
     print(f"Drift-scan (структурный): {len(drifts)} расхождений")

@@ -44,6 +44,13 @@ IWE_ROOT="$IWE"
 export IWE_ROOT IWE
 DATE="${1:-$(date +%Y-%m-%d)}"
 CONFIG="$IWE/memory/day-rhythm-config.yaml"
+# issue #1149: the path is pasted into Python source text, and Git Bash converts
+# `/c/Users/...` only in command-line ARGUMENTS, not inside `-c "..."` code. Windows
+# Python then cannot open it and every config-driven section falls back to defaults.
+CONFIG_PY="$CONFIG"
+if command -v cygpath >/dev/null 2>&1; then
+  CONFIG_PY=$(cygpath -m "$CONFIG" 2>/dev/null || printf '%s' "$CONFIG")
+fi
 PARAMS_FILE="$IWE/params.yaml"
 MULTIPLIER_ENABLED="true"
 if [ -f "$PARAMS_FILE" ] && grep -qE '^multiplier_enabled:[[:space:]]*false([[:space:]]*(#.*)?)?$' "$PARAMS_FILE"; then
@@ -152,7 +159,7 @@ def flatten(d, prefix=''):
 # indistinguishable. Emit an explicit ok/error sentinel instead (bug-2026-06-05,
 # bug-2026-06-09, bug-2026-07-04).
 try:
-    with open('$CONFIG') as f:
+    with open('$CONFIG_PY') as f:
         d = yaml.safe_load(f) or {}
     for k, v in flatten(d):
         print(k + '\x1f' + v)
@@ -312,7 +319,7 @@ extract_mandatory_daily_wps() {
   "$_RESOLVED_PYTHON3" -c "
 import yaml, sys
 try:
-    with open('$CONFIG') as f:
+    with open('$CONFIG_PY') as f:
         d = yaml.safe_load(f) or {}
     items = d.get('mandatory_daily_wps') or []
     for item in items:

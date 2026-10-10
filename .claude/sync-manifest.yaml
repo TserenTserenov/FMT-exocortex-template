@@ -132,7 +132,7 @@ activity_checks:
     action: "Lesson Hygiene (ротация, архивация, сжатие MEMORY.md)"
     expected_per_period: 1
     period_days: 7
-    commit_pattern_regex: "(lesson|memory|lessons_).*(archive|rotate|clean|hygiene)"
+    commit_pattern_regex: "([Ll]esson|[Mm]emory|lessons_|[Уу]рок|[Пп]амят).*(archive|rotate|clean|hygiene|[Аа]рхив|[Рр]отаци|[Сс]жат|[Оо]чист|[Гг]игиен)"
     dormant_after_periods: 3
     archive_after_periods: 1
     notes: "Trigger: /week-close. Симптом мёртвости — MEMORY.md раздувается >100 строк."

@@ -74,19 +74,26 @@ if [ -z "$TARGET_REPO_HINT" ]; then
   fi
 fi
 
-# ── Извлечь human-сообщения из транскрипта ──────────────────────────────────
-# Транскрипт — JSONL. Human messages: type="human" или role="user".
-# Берём text-блоки из .content[] где .type == "text".
-HUMAN_MSGS=$(jq -r '
-  select(.role == "user" or .type == "human")
-  | if (.content | type) == "array" then
-      .content[] | select(.type == "text") | .text
-    elif (.content | type) == "string" then
-      .content
-    else
-      empty
-    end
-' "$TRANSCRIPT_PATH" 2>/dev/null || true)
+# ── Извлечь human-сообщения из транскрипта ───────────────────────────────
+# Транскрипт — JSONL. Реплика пользователя в Claude Code: type="user" и
+# .message.role="user", текст в .message.content (строка или массив блоков).
+# Старые формы (.role="user", type="human", .content) оставлены для совместимости.
+# Отбрасываются: tool_result-блоки (берём только type="text"), записи isMeta,
+# служебные вставки (<system-reminder>, <command-...>, тело загруженного скилла).
+# issue #1174: прежний фильтр искал .role на верхнем уровне и не находил ничего.
+# HUMAN_JQ_BEGIN
+HUMAN_JQ='
+  def body: if type == "string" then .
+            elif type == "array" then (map(select(.type == "text") | .text) | join("\n"))
+            else empty end;
+  select((.type == "user" and (.isMeta != true)) or .role == "user" or .type == "human")
+  | ((.message.content // .content) | body)
+  | select(length > 0)
+  | select(test("^\\s*<(system-reminder|command-|local-command|user-prompt-submit-hook)") | not)
+  | select(test("^\\s*Base directory for this skill:") | not)
+'
+# HUMAN_JQ_END
+HUMAN_MSGS=$(jq -r "$HUMAN_JQ" "$TRANSCRIPT_PATH" 2>/dev/null || true)
 
 if [ -z "$HUMAN_MSGS" ]; then
   exit 0
