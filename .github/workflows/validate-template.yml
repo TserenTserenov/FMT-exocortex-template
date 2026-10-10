@@ -679,6 +679,15 @@ jobs:
       - name: Run update.sh issue #226 regression test
         run: bash setup/test-update-issue-226.sh
 
+      # issue #1143: a role with auto:false (synchronizer, extractor) was never
+      # reinstalled, so an already-installed role's plist went stale forever —
+      # fixed in PR #1178 (WP-529, пир-сессия Claude+Kimi+Codex 10.10). Extracts
+      # the real role-reinstall loop from update.sh and evals it with a mocked
+      # launchctl — guards both the reinstall-by-presence fix and the set -e/grep
+      # regression a first code-review pass caught before merge.
+      - name: Run update.sh issue #1143 regression test
+        run: bash setup/test-update-issue-1143.sh
+
       # WP-529 Ф2 acceptance criterion: пропуск критичного файла и неверная
       # метка маршрута обязаны давать детерминированный отказ с понятной
       # причиной. Прогоняет реальный scripts/check-delivery-route-label.sh на

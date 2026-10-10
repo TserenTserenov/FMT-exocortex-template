@@ -6038,6 +6038,10 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
     # their environment. update.sh already knows all of these; pass them
     # explicitly instead of relying on a file that may not exist.
     ROLE_REINSTALL_GOV="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
+    # BEGIN-TESTABLE: role-reinstall-loop (setup/test-update-issue-1143.sh
+    # extracts exactly this block by these two sentinel comments and evals
+    # it in a sandbox — keep the sentinels on their own line, verbatim, if
+    # this block moves or is edited).
     for role_dir in "$SCRIPT_DIR"/roles/*/; do
         [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
         role_name="$(basename "$role_dir")"
@@ -6090,6 +6094,7 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
                 echo "  ○ $role_name: переустановите вручную"
         fi
     done
+    # END-TESTABLE: role-reinstall-loop
     fi
 fi
 

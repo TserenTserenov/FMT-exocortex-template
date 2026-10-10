@@ -857,7 +857,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bafa656c4295a3b5ce622ba3d2aa7866b66d92258de544f0e927fcddf29f2620"
+      "sha256": "54db57af6a98fad01565f851d66d954c23632a4e30595d33637af024e5a15318"
     },
     {
       "path": "CLAUDE.md",
@@ -3213,7 +3213,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "9082e04031ca0a21a996a2ab3a4c93fbbb06b6e5b02d3555550b12605ddfde16"
+      "sha256": "584d8f617d5a7a7e208651bdb0cd3899291aebf06801b7c6e59dbd04b36f2611"
     }
   ],
   "excluded_paths": [
@@ -3426,6 +3426,7 @@
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-install-path-provenance.sh",
+    "setup/test-update-issue-1143.sh",
     "setup/test-update-issue-226.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
