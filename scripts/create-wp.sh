@@ -763,7 +763,10 @@ echo "3/5 WeekPlan..."
 if [[ -n "$WEEKPLAN" ]]; then
   if ! python3 - "$WEEKPLAN" "$WP_NUM" "$TITLE" "$PRIORITY" "$BUDGET" "$REPO" "$STAKE_CELL" <<'PYEOF'
 import sys, re
-weekplan_path, wp_num, title, priority, budget, repo, stake = sys.argv[1:8]
+weekplan_path, wp_num, title, priority, budget = sys.argv[1:6]
+# Optional (issue #1152): the writer tests invoke this block with the first five only.
+repo = sys.argv[6] if len(sys.argv) > 6 else ""
+stake = sys.argv[7] if len(sys.argv) > 7 else "—"
 
 # Маппинг приоритета → светофор
 flag_map = {"P1": "🔴", "P2": "🟡", "P3": "🟢", "P4": "⚪", "P5": "⚪"}
