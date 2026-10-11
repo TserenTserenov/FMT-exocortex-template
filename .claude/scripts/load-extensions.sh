@@ -88,7 +88,7 @@ fi
 #   day-close.after.health.md
 #   day-close.after.linear.md
 if ! FOUND="$(
-    find "$EXT_DIR" -mindepth 1 -maxdepth 1 \
+    find -L "$EXT_DIR" -mindepth 1 -maxdepth 1 \
         \( -name "${PROTOCOL}.${HOOK}.md" \
         -o -name "${PROTOCOL}.${HOOK}.*.md" \) \
         -print | LC_ALL=C sort

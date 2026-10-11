@@ -38,6 +38,7 @@ extract_block() {  # <start regex> <end regex, first match at or after start>
 # functions need the same command to exist.
 TIMEOUT_SHIM='command -v timeout >/dev/null 2>&1 || timeout() { shift; "$@"; }'
 FUNCTIONS="$TIMEOUT_SHIM
+$(extract_block '^resolve_default_branch()' 'GIT_DEFAULT_BRANCH:-main')
 $(extract_block '^DELIVERY_POSTCONDITION_RC=' '^DELIVERY_POSTCONDITION_RC=')
 $(extract_block '^expected_delivery_path()' '^}')
 $(extract_block '^fetch_delivery_origin()' '^}')
