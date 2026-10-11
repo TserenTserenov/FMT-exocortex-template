@@ -861,7 +861,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5bb74b7e13d11fe085f152baaa575a696d9fcda05a4ee3b2156b28a72b44b93f"
+      "sha256": "64b5a48397168c4f463dd15a65fb8701b6cd6ce11473187bf8448ea018fcf695"
     },
     {
       "path": "CLAUDE.md",
@@ -2309,7 +2309,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "0716573598784600072afd6d4083be0abed93b85f236bb322e548edd383ea07f"
+      "sha256": "f83a6722a195c4d80c0ebb388bd073b1d0a349589b1d40eabb4503f1a847f83b"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2501,7 +2501,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "811ef66188b9fefa20b00d7246047a32379aef05fa58faf653703979e6ceef02"
+      "sha256": "5c6f516b13827dc802e08a630704557d11059640038d7840cedaa8275cfb42fa"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -3295,6 +3295,7 @@
     "scripts/tests/test_issue_1154_drift_scan_unresolved.py",
     "scripts/tests/test_issue_1165_verify_skill_install_layout.sh",
     "scripts/tests/test_issue_1174_detector_user_messages.sh",
+    "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
     "scripts/tests/test_issue_531_index_health_status_cell.py",
