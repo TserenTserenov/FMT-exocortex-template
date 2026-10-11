@@ -697,7 +697,7 @@
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
-      "sha256": "6a079a7870b756b1a312589b219b904e5cd56cd41e14a6744333b73ffc872c7d"
+      "sha256": "418f5de39b242ff190ca36132e07bed2e34bab4eb99bbac1a739a2d59955ef76"
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
@@ -3013,7 +3013,7 @@
     },
     {
       "path": "scripts/week-draft-append.sh",
-      "sha256": "306cf916e41b21099a3c573105a8e0b0cbaf6f394d5a7e2083c9dcae6df4f7ad"
+      "sha256": "012b68af86e990c7feadbc2633534aed5b808c827f0e1be2344413f60b5e37ea"
     },
     {
       "path": "scripts/week-draft-init.sh",
