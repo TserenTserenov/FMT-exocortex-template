@@ -861,7 +861,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "74df50030de76e62e63570d001ab5edce7dfd5cd376c9c3b0c4f33d96a83b0bd"
+      "sha256": "235b37b5151863496749bdd31ac74ea99158b8646de138b7c78ad702baf7a76d"
     },
     {
       "path": "CLAUDE.md",
@@ -1761,7 +1761,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "eadc2c9a2565be931d618fffaefd37a9815e7a63a185b5ee6aea8e6a6a146c7c"
+      "sha256": "e4d0d1c90018eb86cd1880763c88e8d2759357a63eba1e5db4b180ed069c591f"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",

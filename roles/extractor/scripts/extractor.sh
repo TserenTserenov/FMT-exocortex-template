@@ -60,7 +60,10 @@ ENV_FILE="$HOME/.config/aist/env"
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
-AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+# issue #1096: --allowedTools не ограничивает MCP — явно запрещаем отправку в Telegram
+# (точечно, не --strict-mcp-config: промпты session-close/on-demand/knowledge-audit
+# легитимно используют knowledge_search/knowledge_get_document того же сервера).
+AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash --disallowedTools mcp__iwe-knowledge__send_telegram_message}"
 
 # AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
 # иначе override остаётся декоративным, когда claude физически отсутствует, но
@@ -1264,7 +1267,8 @@ $(pack_snapshot_context)"
 
     local WORKSPACE="$isolated_workspace"
     local IWE_WORKSPACE="$isolated_workspace"
-    local AI_CLI_EXTRA_FLAGS="${IWE_EXTRACTOR_INBOX_AI_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep}"
+    # issue #1096: запрет отправки в Telegram через MCP и в inbox-режиме (см. выше)
+    local AI_CLI_EXTRA_FLAGS="${IWE_EXTRACTOR_INBOX_AI_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep --disallowedTools mcp__iwe-knowledge__send_telegram_message}"
     export IWE_WORKSPACE
     if ! run_claude "inbox-check" "$source_context" "isolated-inbox"; then
         log "WARN: isolated inbox-check failed; worktree preserved for review: $worktree"

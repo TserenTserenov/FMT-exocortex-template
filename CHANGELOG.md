@@ -190,6 +190,7 @@ Refs: WP-NNN
 ### Fixed
 
 - [behavior] `wp-sync-actualizer` больше не встаёт при отсутствии `scripts/lib/git-sync-status.sh` в установке: `checker_unavailable` с `reason=library_missing` принимается как штатное degraded (в чистой установке проверка свежести рабочей копии невозможна физически), любая другая причина остаётся stop condition; smoke-сценарий H (#1144, #1196).
+- [security] Фоновые роли (extractor, launchd) больше не оставляют агенту отправку в Telegram без подтверждения: `--allowedTools` не ограничивает MCP-инструменты, поэтому в обеих точках запуска Claude CLI добавлен явный запрет `mcp__iwe-knowledge__send_telegram_message` (точечно — `knowledge_search`/`knowledge_get_document` того же сервера продолжают работать) (#1096, #1197).
 - [behavior] Повторный ребейз #1012 на main 11.10: содержательная правка (тихие повторы Telegram после отсрочки Open Day) была готова и ждала слияния с 02.10, но main с тех пор ушёл дальше; запись здесь нужна только для гейта CI, сама находка уже описана выше в разделе [0.41.1] (#1012).
 - [optional] `docs/hindsight-setup.md`: вводный абзац теперь явно говорит, что гайд разворачивает только контейнер хранилища (слой L2), а не подключает Recall/Retain/Reflect к рабочему процессу — отсылка к разделу «4. Manual integration» для этого шага (#614).
 
