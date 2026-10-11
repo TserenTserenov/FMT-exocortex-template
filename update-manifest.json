@@ -117,7 +117,7 @@
     },
     {
       "path": ".claude/hooks/precompact-checkpoint.sh",
-      "sha256": "0fa68e1514a5260b5e4d35e46d88b9a8aa0107246a645fbaa66e16d2b86d10bc"
+      "sha256": "74cd1139e0ff98d0a9984e7c9f6e0263da000fce713f9fd3857dec66691a74ae"
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
@@ -129,7 +129,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "dcde39291460aa143c0f81d0a04107477790e1e7b6b1aa6cd65d7487cceea278"
+      "sha256": "b196812f254fd9d8749bf77dd15b308f90d683ea1d47b7987696def52cb1f1df"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -232,6 +232,14 @@
       "sha256": "5f95cd160628f1fa7a50bdba49bdfb687c45965919bd129275d1758533f4fe97"
     },
     {
+      "path": ".claude/hooks/tests/test_issue_1183_precompact_system_msg.sh",
+      "sha256": "c80b1e7c35ef6512bd0164eb262f73737f51d3e995b2dca1070bad0b829fac3f"
+    },
+    {
+      "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
+      "sha256": "e4b16469313e2fdac75cf2bee3c8ebe895c8614fd0cfe76e349a1df15b1aa904"
+    },
+    {
       "path": ".claude/hooks/wp-gate-reminder.sh",
       "sha256": "472bd3979eb3f0b6a3693c467a0e7b0b8396ce46d930cdf3344fe110c1b4a8e4"
     },
@@ -253,7 +261,7 @@
     },
     {
       "path": ".claude/lib/frontmatter.sh",
-      "sha256": "184ab6e9df7c9ea8589a6a960ed91db4491e56944e04022b9b9478bc04cae5a9"
+      "sha256": "c9040a9bd64b139be4933ecc78802db3d444dc5254049e5a096da7512b329b96"
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
@@ -1197,7 +1205,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "6a5668864a24f757d2e3ea7da3ca9850ee9a1aeed809dd20e7922e3928ea164d"
+      "sha256": "e5ff502f8fe5f8694e4cc7ff80c20227856c3bf2f85270a1a2a309eadae1a929"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2188,6 +2196,10 @@
       "sha256": "0be7e68545173d9f3accb5942ffcbfdf16dc4f2b2992e354195fd3a14813f488"
     },
     {
+      "path": "scripts/check-python-encoding.py",
+      "sha256": "a0359da3616a8e540b58aca19bc60f4f6245721d0ccc3f8086954c712de89728"
+    },
+    {
       "path": "scripts/check-python-resolver-contract.sh",
       "sha256": "6a8d56b16da06ec42597a01cba20622e333545840f1827a430ac7741d0ba5861"
     },
@@ -2597,7 +2609,7 @@
     },
     {
       "path": "scripts/memory-migrate.sh",
-      "sha256": "b5affc00bda0be96dcfcdc7bf55481c0c68aa9150cd27d7fe22b0e1142dd0305"
+      "sha256": "34f78d42038844b28edce1f3c4211692ad5830b147dc818ad97e1f52196bcd60"
     },
     {
       "path": "scripts/memory-validate.sh",
@@ -2756,6 +2768,10 @@
       "sha256": "f2ae015d394a447778e1ed75ecfa16d80fe98e1164655b3431940c7e783d206c"
     },
     {
+      "path": "scripts/tests/cp1251-smoke.sh",
+      "sha256": "d2f0f9db481159a634dbcc28446a92ea146337e02a5eab46fdd54b1ed480d85e"
+    },
+    {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
       "sha256": "d8744ffad6e9bc0fc03476aa77611cf15ad2a3b3713879e4b7240e718b79fc9b"
     },
@@ -2766,6 +2782,10 @@
     {
       "path": "scripts/tests/lib/seed_strategy_fixture.sh",
       "sha256": "68354ecd9583fcf1e02f1570c28552fd495f4a5da7bf58c99e43f86a879bf17e"
+    },
+    {
+      "path": "scripts/tests/python-encoding-baseline.txt",
+      "sha256": "5cd955a87015b5dbecc6fe9f2fc0a265d22926cc141f047522120a726526b53a"
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
@@ -2858,6 +2878,14 @@
     {
       "path": "scripts/tests/test_issue_1032_windows_fail_closed.sh",
       "sha256": "d8455cf45895ca293a894133b3e7670195d9ef1dca7a89d12a11d482308ac6e7"
+    },
+    {
+      "path": "scripts/tests/test_issue_1114_encoding_gate.sh",
+      "sha256": "438005ab6b34a58fe985784707b6796500df664f7683c3be63e3437294277db3"
+    },
+    {
+      "path": "scripts/tests/test_issue_1147_memory_migrate.sh",
+      "sha256": "e25904c841874ff2cdf9d08b4a10850ac1e6612744f67a970862e91ffd6f5d0d"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",

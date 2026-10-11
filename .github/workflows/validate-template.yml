@@ -645,6 +645,16 @@ jobs:
       - name: Check python-resolver contract (no new bare python3 calls)
         run: bash scripts/check-python-resolver-contract.sh
 
+      # issue #1114 (phase 1): ratchet gate against NEW open()/Path.open()
+      # calls without encoding= — on Windows cp1251 consoles these crash with
+      # UnicodeDecodeError/UnicodeEncodeError. Existing violations live in
+      # scripts/tests/python-encoding-baseline.txt; the regression test is
+      # picked up by run-issue-tests.sh below (test_issue_1114_*.sh).
+      - name: Check python encoding gate (issue #1114)
+        run: python3 scripts/check-python-encoding.py
+      - name: Run cp1251 smoke on platform scripts (issue #1114)
+        run: bash scripts/tests/cp1251-smoke.sh
+
       # setup.sh ↔ update.sh parity. Root (29 июня, peer-session 2026-06-29-03):
       # rules-lazy доставлялся через update.sh, но отсутствовал в setup.sh for-loop —
       # fresh install терял компонент. check-setup-update-parity существовал (WP-315),

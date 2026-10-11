@@ -20,17 +20,52 @@ _IWE_FRONTMATTER_SOURCED=1
 # next to the flat one this reader was built for (issue #229/#217). Top-level
 # match still wins when present (existing flat files keep working unchanged);
 # only when no top-level match is found do we look inside `metadata:` (first
-# line at column 0 that isn't blank closes the block). Does not parse
-# multi-line YAML lists (`domains:` as `- item` lines) — same pre-existing
-# limitation as the flat-field case; only extends WHERE the field is found.
+# line at column 0 that isn't blank closes the block).
+#
+# issue #1147: a columnar YAML list (`key:` with an empty value followed by
+# `- item` lines) is now collected too — both top-level and nested one level
+# under `metadata:` — and returned in the inline `[a, b]` format the codebase
+# uses (memory-migrate.sh's infer_domains, spec §3 `domains: [тег1, тег2]`),
+# so consumers (memory-validate.sh, memory-migrate.sh) see one consistent
+# value regardless of which serialization the author wrote. When BOTH a
+# scalar/inline value AND a columnar list exist for the same key (conflicting
+# forms, in either location), a warning goes to stderr and the returned value
+# is deterministic: the scalar/inline one wins, because flat is the canonical
+# form (spec §3). Otherwise precedence is unchanged: top-level beats nested.
 get_field() {
     local file="$1" field="$2"
     awk '
+        function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
         /^---/{f++; next}
         f!=1{next}
-        /^'"$field"':/{gsub(/^[^:]+: */,""); gsub(/["'"'"']/,""); gsub(/^[ \t]+|[ \t\r]+$/,""); print; exit}
+        collect && /^[ \t]*-[ \t]+/{
+            item=$0; gsub(/^[ \t]*-[ \t]+/, "", item); gsub(/["'"'"']/,"",item); item=trim(item)
+            if (src=="top") top_items=(top_items=="" ? item : top_items ", " item)
+            else            meta_items=(meta_items=="" ? item : meta_items ", " item)
+            next
+        }
+        { collect=0 }
         /^metadata:[ \t\r]*$/{in_meta=1; next}
         in_meta && /^[^ \t]/{in_meta=0}
-        in_meta && /^[ \t]+'"$field"':/{gsub(/^[ \t]*[^:]+: */,""); gsub(/["'"'"']/,""); gsub(/^[ \t]+|[ \t\r]+$/,""); print; exit}
+        in_meta && /^[ \t]+'"$field"':/{
+            v=$0; gsub(/^[ \t]*[^:]+: */,"",v); gsub(/["'"'"']/,"",v); v=trim(v)
+            if (v=="") { collect=1; src="meta" }
+            else if (meta_scalar=="") meta_scalar=v
+            next
+        }
+        /^'"$field"':/{
+            v=$0; gsub(/^[^:]+: */,"",v); gsub(/["'"'"']/,"",v); v=trim(v)
+            if (v=="") { collect=1; src="top" }
+            else if (top_scalar=="") top_scalar=v
+            next
+        }
+        END{
+            if ((top_scalar!="" || meta_scalar!="") && (top_items!="" || meta_items!=""))
+                printf "get_field: %s: key \"%s\" present both as scalar/inline value and columnar list; returning the scalar/inline value (canonical flat form, spec §3)\n", FILENAME, "'"$field"'" > "/dev/stderr"
+            if (top_scalar!="")       print top_scalar
+            else if (meta_scalar!="") print meta_scalar
+            else if (top_items!="")   print "[" top_items "]"
+            else if (meta_items!="")  print "[" meta_items "]"
+        }
     ' "$file"
 }

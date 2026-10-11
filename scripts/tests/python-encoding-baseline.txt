@@ -1,0 +1,15 @@
+# Known open()/Path.open() calls without encoding= (issue #1114 ratchet).
+# Format: relative/path.py :: <normalized source line>. A fix removes
+# its entry by re-scanning; regenerate with --regenerate after fixing.
+.claude/hooks/tests/destructive-guard/guarded_rm_cases.py :: with open(os.path.join(fake, tool), "w", newline="\n") as f:
+.claude/hooks/tests/destructive-guard/guarded_rm_cases.py :: with open(os.path.join(path, "f.txt"), "w") as f:
+.claude/hooks/tests/destructive-guard/guarded_rm_cases.py :: with open(os.path.join(stub, "realpath"), "w", newline="\n") as f:
+.claude/hooks/tests/destructive-guard/hook_cases.py :: with open(env_file, "w", newline="\n") as f:
+.claude/hooks/tests/destructive-guard/hook_cases.py :: with open(os.path.join(d, tool), "w", newline="\n") as f:
+.claude/hooks/tests/destructive-guard/hook_cases.py :: with open(os.path.join(repo, "a.txt"), "w") as f:
+guide-kit/generator/test_personal_export.py :: with open(overlay_path, "w") as fh:
+scripts/agent-dashboard.py :: with open(TOKEN_PATH) as f:
+scripts/agent-dashboard.py :: with open(TOKEN_PATH) as f:
+scripts/agent-dashboard.py :: with open(TOKEN_PATH, "w") as f:
+scripts/peer-adapter-filter.py :: with open(patterns_file) as f:
+seed/agents/tester/deepeval/eval_runner.py :: with open(rubrics_path) as f:

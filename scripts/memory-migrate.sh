@@ -6,6 +6,10 @@
 # Добавляет поля schema_version/horizon/domains/status/owner в существующие файлы.
 # НЕ перезаписывает поля, которые уже есть.
 # Определяет type/horizon/domains автоматически по имени файла.
+# issue #1147: присвоение horizon: hot проверяется против бюджета HOT
+# (≤150 строк суммарно, memory-lifecycle-spec.md §4) ДО любой записи — при
+# превышении миграция останавливается со списком кандидатов, ничего не пишет;
+# valid_from берётся из metadata.modified / mtime файла, не из даты запуска.
 #
 # Usage:
 #   bash scripts/memory-migrate.sh memory/file.md         # один файл
@@ -29,9 +33,9 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 # (type/horizon/status/owner/valid_from/...) read back as empty, which made
 # the migration below think the field was missing and propose a filename-
 # guessed flat duplicate on top of the real value. Sourcing the shared
-# reader fixes scalar fields; `domains:` written as a columnar YAML list is
-# a separate, deferred fix (frontmatter.sh itself doesn't parse `- item`
-# lists yet — same pre-existing limitation noted in its own comment).
+# reader fixes scalar fields. issue #1147: `domains:` as a columnar YAML
+# list (`- item` lines) is parsed by frontmatter.sh too, so a nested
+# columnar list no longer triggers a flat duplicate either.
 source "$_MEMORY_MIGRATE_DIR/../.claude/lib/frontmatter.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 DRY_RUN=0
@@ -40,6 +44,55 @@ FROM_VER=""
 TO_VER=""
 TARGET=""
 EXCLUDE="MEMORY.md"
+
+# issue #1147: бюджет HOT — memory-lifecycle-spec.md §4 (ось 2: horizon)
+# ограничивает суммарный размер тел всех hot-файлов 150 строками. Миграция
+# обязана проверять бюджет ДО записи, а не раздувать HOT по имени файла.
+HOT_LIMIT_LINES=150
+
+# Строки тела файла (после закрывающего ---) — то, что реально грузится.
+# f<2: строка "---" ВНУТРИ тела (горизонтальный разделитель markdown) не
+# считается разделителем frontmatter и не выпадает из подсчёта (cold-review).
+body_lines() {
+    awk '/^---/ && f<2{f++; next} f>=2{print}' "$1" | wc -l | tr -d ' '
+}
+
+# Сумма строк тел всех файлов с horizon: hot в MEMORY_DIR (читаем факт,
+# не заявку): горизонт — из frontmatter, строки — из тела файла.
+hot_total_lines() {
+    local total=0 f n skip exc
+    for f in "$MEMORY_DIR"/*.md; do
+        [ -f "$f" ] || continue
+        n=$(basename "$f"); skip=0
+        for exc in $EXCLUDE; do [ "$n" = "$exc" ] && skip=1 && break; done
+        [ $skip -eq 1 ] && continue
+        [ "$(get_field "$f" "horizon")" = "hot" ] || continue
+        total=$((total + $(body_lines "$f")))
+    done
+    echo "$total"
+}
+
+# Строгая проверка YYYY-MM-DD без привязки к диалекту date (GNU -d / BSD -j).
+validate_ymd() {
+    date -d "$1" >/dev/null 2>&1 && return 0
+    date -j -f "%Y-%m-%d" "$1" >/dev/null 2>&1 && return 0
+    return 1
+}
+
+# issue #1147: valid_from = дата появления факта, не дата запуска миграции.
+# Цепочка: metadata.modified (нормализация к YYYY-MM-DD) → mtime файла →
+# сегодня. Невалидное значение не подставляем — идём по цепочке дальше.
+infer_valid_from() {
+    local file="$1" v
+    v=$(get_field "$file" "modified" 2>/dev/null || true)
+    v=$(printf '%s' "$v" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)
+    if [ -n "$v" ] && validate_ymd "$v"; then echo "$v"; return 0; fi
+    # mtime: GNU stat -c, затем BSD stat -f (порядок как в canon-dirty-snapshot.sh)
+    v=$(stat -c %y "$file" 2>/dev/null | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}' || true)
+    [ -n "$v" ] || v=$(stat -f %Sm -t %Y-%m-%d "$file" 2>/dev/null || true)
+    if [ -n "$v" ] && validate_ymd "$v"; then echo "$v"; return 0; fi
+    date +%Y-%m-%d
+}
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -222,7 +275,20 @@ migrate_file() {
     new_schema="${cur_schema:-1}"
     new_name="${cur_name:-$(infer_name "$name")}"
     new_desc="${cur_desc:-$(infer_description "$name")}"
-    new_valid_from="${cur_valid_from:-$(date +%Y-%m-%d)}"
+    new_valid_from="${cur_valid_from:-$(infer_valid_from "$file")}"
+
+    # issue #1147: присвоение hot проверяется против бюджета ДО записи
+    # (одиночный файл и проход записи --all проходят одну и ту же проверку;
+    # сумма уже мигрированных в этом прогоне учитывается, т.к. hot_total_lines
+    # читает файлы заново). Отказ = ничего не записано.
+    if [ -z "$cur_horizon" ] && [ "$new_horizon" = "hot" ]; then
+        hot_now=$(hot_total_lines)
+        projected=$((hot_now + $(body_lines "$file")))
+        if [ "$projected" -gt "$HOT_LIMIT_LINES" ]; then
+            echo "REFUSE $name — horizon: hot вывел бы HOT за лимит $HOT_LIMIT_LINES строк (сейчас $hot_now, стало бы $projected; memory-lifecycle-spec.md §4). Понизьте горизонт файла или сократите существующие HOT." >&2
+            return 1
+        fi
+    fi
 
     # Если ничего добавлять не нужно — пропускаем
     if [ -n "$cur_type" ] && [ -n "$cur_horizon" ] && [ -n "$cur_domains" ] \
@@ -247,11 +313,12 @@ migrate_file() {
     fi
 
     # Построить новый frontmatter
-    # Читаем тело файла (без frontmatter)
-    body=$(awk '/^---/{f++; next} f>=2{print}' "$file")
+    # Читаем тело файла (без frontmatter); f<2: строка "---" внутри тела —
+    # не разделитель, такие строки не должны выпадать из файла (cold-review).
+    body=$(awk '/^---/ && f<2{f++; next} f>=2{print}' "$file")
 
     # Существующие поля frontmatter (без ---)
-    existing_fm=$(awk '/^---/{f++; next} f==1{print}' "$file")
+    existing_fm=$(awk '/^---/ && f<2{f++; next} f==1{print}' "$file")
 
     # Добавляем отсутствующие поля в конец frontmatter
     additions=""
@@ -279,9 +346,57 @@ migrate_file() {
 }
 
 # Основной цикл
+# cold-review #1147 (раунд 3): два одновременных запуска могли оба увидеть
+# запас бюджета HOT и переписывать одни файлы через `> "$file"` — риск порчи,
+# не только превышения бюджета. Общий mkdir-замок на весь прогон (проверка
+# бюджета + запись). Замок НИКОГДА не удаляется автоматически: любая схема
+# «проверить staleness, затем rm» оставляет окно, где сносится чужой свежий
+# замок (та же находка, что в protocol-stop-gate #1184). Занят → отказ с
+# инструкцией ручной очистки; свой замок снимает только trap EXIT создателя.
+MIGRATE_LOCK="$MEMORY_DIR/.migrate.lock"
+if ! mkdir "$MIGRATE_LOCK" 2>/dev/null; then
+    lock_pid=$(cat "$MIGRATE_LOCK/pid" 2>/dev/null || true)
+    echo "ОТКАЗ: другой запуск memory-migrate держит замок $MIGRATE_LOCK (pid ${lock_pid:-неизвестен})." >&2
+    echo "Если тот запуск упал — проверьте, что процесс не жив (kill -0 ${lock_pid:-PID}), и удалите каталог замка вручную." >&2
+    exit 1
+fi
+echo "$$" > "$MIGRATE_LOCK/pid" 2>/dev/null || true
+trap 'rm -rf "$MIGRATE_LOCK" 2>/dev/null || true' EXIT
+
 if [ $ALL -eq 1 ]; then
+    # Проход 1 (без записи, issue #1147): бюджет HOT проверяется на ВСЕМ наборе
+    # до любой записи — иначе отказ на середине дал бы частичную миграцию.
+    # Сумма = строки тел существующих hot-файлов + строки тел файлов, которым
+    # эта миграция присвоит hot (horizon отсутствует и infer_horizon = hot).
+    hot_base=$(hot_total_lines)
+    cand_lines=0
+    candidates=""
+    # Имена с пробелами/переносами не должны пропадать: обход через NUL
+    # (process substitution, не pipeline — иначе счётчики в subshell).
+    while IFS= read -r -d '' f; do
+        [ -f "$f" ] || continue
+        n=$(basename "$f"); skip=0
+        for exc in $EXCLUDE; do [ "$n" = "$exc" ] && skip=1 && break; done
+        [ $skip -eq 1 ] && continue
+        has_frontmatter "$f" || continue
+        [ -z "$(get_field "$f" "horizon")" ] || continue
+        cand_type=$(get_field "$f" "type")
+        [ -n "$cand_type" ] || cand_type=$(infer_type "$n")
+        [ "$(infer_horizon "$cand_type" "$n")" = "hot" ] || continue
+        candidates="$candidates  $n\n"
+        cand_lines=$((cand_lines + $(body_lines "$f")))
+    done < <(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" -print0)
+    projected_total=$((hot_base + cand_lines))
+    if [ "$projected_total" -gt "$HOT_LIMIT_LINES" ]; then
+        echo "СТОП: миграция выводит HOT за лимит $HOT_LIMIT_LINES строк (memory-lifecycle-spec.md §4)." >&2
+        echo "Сейчас в HOT: $hot_base строк; кандидаты добавили бы $cand_lines (итого $projected_total). Ничего не записано." >&2
+        echo "Кандидаты на hot — понизьте горизонт или сократите файлы, затем повторите:" >&2
+        printf "%b" "$candidates" >&2
+        exit 1
+    fi
+
     changed=0; skipped=0; ok=0
-    for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
+    while IFS= read -r -d '' f; do
         [ -f "$f" ] || continue
         n=$(basename "$f"); skip=0
         for exc in $EXCLUDE; do [ "$n" = "$exc" ] && skip=1 && break; done
@@ -291,7 +406,7 @@ if [ $ALL -eq 1 ]; then
         echo "$result" | grep -q "^DONE" && changed=$((changed+1)) || true
         echo "$result" | grep -q "^OK"   && ok=$((ok+1)) || true
         echo "$result" | grep -q "^SKIP" && skipped=$((skipped+1)) || true
-    done
+    done < <(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" -print0)
     echo ""
     [ $DRY_RUN -eq 1 ] && echo "Dry-run завершён" || echo "Итог: изменено=$changed, уже полные=$ok, пропущено=$skipped"
 elif [ -n "$TARGET" ]; then

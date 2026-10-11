@@ -4,10 +4,15 @@
 # Event: Stop
 # Проверяет: если в сессии был вызов Skill (day-open|day-close|run-protocol|wp-new),
 # то должен быть TodoWrite с ≥3 items. Иначе — block.
-# Принцип warn-before-block: action=warn (промоция в block после 2 нед обкатки).
+# Принцип warn-before-block (issue #1184): не более одного реального block на
+# сессию за 24ч (marker в $IWE_ROOT/.claude/state/protocol-stop-gate/,
+# gitignored — issue #250). Сессия длиннее 24ч может получить повторный block —
+# это намеренно. Деградации (нет session_id / замок недоступен) → прежний
+# systemMessage-предупреждение пользователю, не block.
 #
-# Защита от infinite loop: поле stop_hook_active во входном JSON (issue #819).
-# Read-only кроме gate_log.jsonl.
+# Защита от infinite loop: поле stop_hook_active во входном JSON (issue #819)
+# гасит повторы внутри одного хода; marker — клиенты без этого флага.
+# Read-only кроме gate_log.jsonl и .claude/state/protocol-stop-gate/.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -274,7 +279,7 @@ if [ "$STEP_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$STEP_MAX"; fi
 
 THRESHOLD=3
 
-# --- Шаг 3: логировать событие ---
+# --- Шаг 3: событие ---
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FIRED=0
 if [ "$LIST_MAX" -lt "$THRESHOLD" ]; then
@@ -284,6 +289,87 @@ fi
 TASK_MAX_SIGNAL="$TASK_CREATE_MAX"
 if [ "$TASK_UPDATE_MAX" -gt "$TASK_MAX_SIGNAL" ]; then TASK_MAX_SIGNAL="$TASK_UPDATE_MAX"; fi
 
+# --- Шаг 4: block-once (issue #1184) ---
+# Для Stop-события {"decision":"block","reason":...} — канал, доставляющий
+# текст АГЕНТУ; systemMessage видит только пользователь. Поэтому при нарушении
+# блокируем, но не более одного раза на сессию за 24ч (marker под замком).
+# Замок ПЕРСЕССИОННЫЙ (lock-<sid>-<crc>): разные сессии не конкурируют вовсе,
+# а одновременных Stop одной сессии клиент не порождает.
+# Протухший замок НЕ удаляется и НЕ переносится никогда (cold-review #1184,
+# раунды 1-2: любая схема «проверить staleness, затем mv/rm» оставляет окно,
+# где уносится чужой свежий замок). Цена: хук, упавший между mkdir и rm своего
+# замка, оставляет его навсегда — Stop этой сессии деградирует в systemMessage
+# (ровно поведение до #1184). Новые сессии получают свежие sid и не затронуты.
+# Захваченный замок удаляет только создавший его процесс (доказательство
+# владения = успешный mkdir). Каталоги marker/lock копятся по числу сессий
+# с нарушением — та же шкала, что у marker; отдельная уборка не вводится.
+ACTION="none"
+
+PSG_STATE_DIR="$IWE_ROOT/.claude/state/protocol-stop-gate"
+
+# crc полного session_id: tr-санитизация схлопывает разные sid в один marker
+# (a/b и ab → ab), вторая сессия лишилась бы своего блока (cold-review #1184).
+psg_sid_key() {
+  local safe crc
+  safe=$(printf '%s' "$1" | tr -cd 'A-Za-z0-9._-')
+  crc=$(printf '%s' "$1" | cksum | awk '{print $1}')
+  printf '%s-%s' "$safe" "$crc"
+}
+
+psg_lock_acquire() {  # $1 = каталог замка
+  local lock_dir="$1" tries=0
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -gt 3 ] && return 1
+    sleep 0.1 2>/dev/null || sleep 1
+  done
+  return 0
+}
+
+psg_lock_release() {  # $1 = каталог замка, созданный ЭТИМ процессом
+  rm -rf "$1" 2>/dev/null || true
+}
+
+if [ "$FIRED" = "1" ]; then
+  SID_KEY=$(psg_sid_key "$SESSION_ID")
+  if [ -z "$SESSION_ID" ]; then
+    # Без session_id частоту повторов не ограничить — не блокируем вовсе.
+    ACTION="warn-no-session"
+  else
+    PSG_LOCK_DIR="$PSG_STATE_DIR/lock-$SID_KEY"
+    mkdir -p "$PSG_STATE_DIR" 2>/dev/null || true
+    if ! psg_lock_acquire "$PSG_LOCK_DIR"; then
+      ACTION="warn-lock-unavailable"
+    else
+      # Вся последовательность проверка→удаление→создание→запись ts — строго
+      # под одним замком: иначе два конкурентных процесса блокируют оба, а
+      # delete протухшего marker'а может снести чужой свежий (peer-review #1184).
+      MARKER_DIR="$PSG_STATE_DIR/marker-$SID_KEY"
+      NOW_EPOCH=$(date +%s)
+      MARKER_FRESH=0
+      if [ -d "$MARKER_DIR" ]; then
+        MARKER_TS=$(cat "$MARKER_DIR/ts" 2>/dev/null || true)
+        if [ -n "$MARKER_TS" ] && [ "$MARKER_TS" -eq "$MARKER_TS" ] 2>/dev/null \
+           && [ $((NOW_EPOCH - MARKER_TS)) -lt 86400 ]; then
+          MARKER_FRESH=1
+        else
+          rm -rf "$MARKER_DIR" 2>/dev/null || true
+        fi
+      fi
+      if [ "$MARKER_FRESH" = "1" ]; then
+        ACTION="suppressed-fresh-marker"
+      elif mkdir "$MARKER_DIR" 2>/dev/null && echo "$NOW_EPOCH" > "$MARKER_DIR/ts" 2>/dev/null; then
+        ACTION="block-once"
+      else
+        # Хранилище состояния непригодно — повтор не ограничить, не блокируем.
+        ACTION="warn-lock-unavailable"
+      fi
+      psg_lock_release "$PSG_LOCK_DIR"
+    fi
+  fi
+fi
+
+# --- Шаг 5: логировать событие (action — честно: что реально произошло) ---
 LOG_ENTRY=$(jq -nc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
@@ -296,29 +382,36 @@ LOG_ENTRY=$(jq -nc \
   --arg list_max "$LIST_MAX" \
   --arg threshold "$THRESHOLD" \
   --arg fired "$FIRED" \
+  --arg action "$ACTION" \
   '{ts: $ts, gate: "protocol-stop-gate", session_id: $sid, skill: $skill,
     todo_max: ($todo_max|tonumber), task_max: ($task_max|tonumber),
     task_create_max: ($task_create_max|tonumber),
     task_update_max: ($task_update_max|tonumber),
     step_max: ($step_max|tonumber), list_max: ($list_max|tonumber),
-    threshold: ($threshold|tonumber), fired: ($fired == "1"), action: "warn"}' 2>/dev/null || true)
+    threshold: ($threshold|tonumber), fired: ($fired == "1"), action: $action}' 2>/dev/null || true)
 
 if [ -n "$LOG_ENTRY" ]; then
   echo "$LOG_ENTRY" >> "$GATE_LOG" 2>/dev/null || true
 fi
 
-# --- Шаг 4: action=warn (не block — обкатка 2 нед, WP-229 принцип warn-before-block) ---
-# issue #819: раньше здесь стоял {"decision": "block", ...} — для Stop-события
-# это реальный запрет остановиться, а не предупреждение (расходился с
-# action:"warn" в том же LOG_ENTRY выше). systemMessage без decision — тот же
-# паттерн ненавязчивого уведомления, что уже используют secret-leak-block.sh /
-# secret-file-read-block.sh / secret-mcp-dump-guard.sh.
-if [ "$FIRED" = "1" ]; then
-  cat <<EOF
+# --- Шаг 6: вывод ---
+case "$ACTION" in
+  block-once)
+    # reason уходит АГЕНТУ (Stop decision control); текст — то же требование,
+    # что в предупреждении: список задач или явная нумерация и протокол заново.
+    jq -nc --arg reason "⚠️ PROTOCOL-STOP-GATE [block-once]: Скилл '$PROTOCOL_SKILL' был вызван, но признак исполнения по шагам (TodoWrite/Task-инструменты/явная нумерация) с ≥$THRESHOLD задачами не найден (найдено: $LIST_MAX). Протокол требует пошаговый план ДО начала исполнения. Прежде чем завершить ход: создай TodoWrite/Task-лист с шагами скилла либо явно пронумеруй шаги в ответах, как разрешено SKILL.md, и пройди протокол заново. Это единственный block сессии за 24ч. (gate_log: $GATE_LOG)" \
+      '{"decision": "block", "reason": $reason}'
+    ;;
+  warn-no-session|warn-lock-unavailable)
+    # Деградация: прежнее ненавязчивое уведомление пользователю (тот же паттерн,
+    # что у secret-leak-block.sh / secret-file-read-block.sh / secret-mcp-dump-guard.sh).
+    cat <<EOF
 {"systemMessage": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но признак исполнения по шагам (TodoWrite/Task-инструменты/явная нумерация) с ≥$THRESHOLD задачами не найден (найдено: $LIST_MAX). Протокол требует пошаговый план ДО начала исполнения. Действие: создай TodoWrite/Task-лист с шагами скилла либо явно пронумеруй шаги в ответах, как разрешено SKILL.md, и пройди протокол заново. (gate_log: $GATE_LOG)"}
 EOF
-else
-  echo '{}'
-fi
+    ;;
+  *)
+    echo '{}'
+    ;;
+esac
 
 exit 0
