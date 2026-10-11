@@ -9,7 +9,7 @@
     },
     {
       "path": ".claude/agents/wp-sync-actualizer.md",
-      "sha256": "66547a1286cf094579cbc8970bce20e6307fa3cfcfc73a08864f084194b4a120"
+      "sha256": "85b401ee2daaa857527352ed1e06990008288ec3f2e26421ee4220ac6f3de73c"
     },
     {
       "path": ".claude/bin/guarded-rm",
@@ -865,7 +865,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fddc706669fae242365f0ec484038c9b040c3b180928726b84c8c9a0b2911d74"
+      "sha256": "93fa4f434cef8321e0c2e801eff6ecf78d6edaeeadf59be1c2547463d19aa444"
     },
     {
       "path": "CLAUDE.md",
