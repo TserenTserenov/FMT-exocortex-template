@@ -3173,7 +3173,7 @@
     },
     {
       "path": "seed/strategy/scripts/update-derived-snapshot.py",
-      "sha256": "d42ee80735e31bfe5df85555c5f610c0fd2614e07f768fe0f513dbbdb722bc59"
+      "sha256": "98d3bd5cce3c7c1f4ba253efcd2aee191031cb01dfddde2e1babc55db5df7b7c"
     },
     {
       "path": "sessions/00-index.md",
