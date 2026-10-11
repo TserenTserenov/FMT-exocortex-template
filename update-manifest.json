@@ -444,6 +444,10 @@
       "sha256": "c9e17d2a2202145ddc20f37476129b4b5a09f2eedde7821949adb2b7510fa4a3"
     },
     {
+      "path": ".claude/skills/day-close/day-close-helpers.sh",
+      "sha256": "b0cc9c75124cfd031faa42fcca9d630756555d04222e9946d0ff1aa1e5b2df51"
+    },
+    {
       "path": ".claude/skills/day-close/day-close/SKILL.md",
       "sha256": "95aa08ce8eec158f2851515a2ea1c949d6466af13958ef327d4b13855c1e5be2"
     },

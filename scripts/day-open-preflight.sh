@@ -100,10 +100,15 @@ fi
 # --- Triage: check file ---
 TRIAGE_STATUS="unknown"
 TRIAGE_REASON=""
-TRIAGE_FILE="$IWE/DS-agent-workspace/scheduler/feedback-triage/$DATE.md"
-if [ ! -d "$IWE/DS-agent-workspace/scheduler" ]; then
+TRIAGE_DIR="$IWE/DS-agent-workspace/scheduler/feedback-triage"
+TRIAGE_FILE="$TRIAGE_DIR/$DATE.md"
+# installed = directory exists AND at least one .md report was ever generated (not scaffold-only)
+_triage_installed() {
+  [ -d "$TRIAGE_DIR" ] && find "$TRIAGE_DIR" -maxdepth 1 -name "*.md" | grep -q .
+}
+if ! _triage_installed; then
   TRIAGE_STATUS="disabled"
-  TRIAGE_REASON="DS-agent-workspace/scheduler not present — feedback-triage subsystem not installed"
+  TRIAGE_REASON="feedback-triage not installed — directory absent or scaffold-only (.gitkeep only)"
 elif [ -f "$TRIAGE_FILE" ]; then
   TRIAGE_STATUS="ok"
 else

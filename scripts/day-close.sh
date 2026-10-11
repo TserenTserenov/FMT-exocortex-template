@@ -599,7 +599,11 @@ def open_destination_parent(relative, create_parents):
                     return None
                 os.mkdir(component, mode=0o700, dir_fd=descriptor)
                 os.fsync(descriptor)
-                entry_stat = exact_entry_stat(descriptor, component)
+                # direct stat avoids os.listdir fd-position issue on btrfs (issue #1181)
+                try:
+                    entry_stat = os.stat(component, dir_fd=descriptor, follow_symlinks=False)
+                except FileNotFoundError:
+                    entry_stat = None
             if entry_stat is None or not stat.S_ISDIR(entry_stat.st_mode):
                 raise PreflightError(
                     f"destination intermediate component is not a directory: {component}"
