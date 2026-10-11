@@ -9,7 +9,7 @@
     },
     {
       "path": ".claude/agents/wp-sync-actualizer.md",
-      "sha256": "66547a1286cf094579cbc8970bce20e6307fa3cfcfc73a08864f084194b4a120"
+      "sha256": "85b401ee2daaa857527352ed1e06990008288ec3f2e26421ee4220ac6f3de73c"
     },
     {
       "path": ".claude/bin/guarded-rm",
@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "ac9c09367773379a1b7d7ed0864a22ddf3d0a13cae708d002a9071a43660d249"
+      "sha256": "e576e3bdbe087be0ba3131dd6b0a64f3aba8c905af9fa4a9c9a54b40f22cced8"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -200,6 +200,10 @@
       "sha256": "12458212d56fb632908ff576e4d8f5050b3b65c2e733d64ebd9b29bcab2d9718"
     },
     {
+      "path": ".claude/hooks/tests/destructive-guard/perf_cases.py",
+      "sha256": "27197a8ddeb201ab34e96233af488e305434eb3a26ad326eee4ea9d35660011b"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "1c8e231b41f3c6739161aa4e248a5a05d73a21851812cba20ca4712f1dad3b08"
     },
@@ -265,7 +269,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "d551d5e1ab78fc79eb5ba4b96bc750a2310bef2d9b6de87d25a55594bc201c33"
+      "sha256": "acc620ba6737162c082a23a634f3c3d08acade8a724917220d4877373dc2459b"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -789,7 +793,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "f053af470f692c6b08e3a0fb94537312a48e9b244fec9b14b49a984a82ce8c78"
+      "sha256": "c39798eb0ddb02bda7f03b8fd59c1b73e62901f20715fa65b5fd73144cd7ca6f"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -869,7 +873,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "769b8eae1cc6183160bd897e9a0de3bb1a1f7bbc3435a111bfab3fb2ae01a6e5"
+      "sha256": "172e7ad0bb0be01a98484d9f6657464eefb083000d16ce7e572709dfac27b0f4"
     },
     {
       "path": "CLAUDE.md",
@@ -1541,7 +1545,7 @@
     },
     {
       "path": "memory/day-rhythm-config.yaml",
-      "sha256": "f22d52315dd5ef7ce4a5c1062a3b97a975797de88283016bb72c9b60dcfba1fd"
+      "sha256": "b5e728dacbd9e0fc26c35c2820f791e778ca635da494b336f7d3303c31f6bd61"
     },
     {
       "path": "memory/distinctions-warm.md",
@@ -1561,7 +1565,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "2714bd03876d5382490fb090c5ebb331210a2d26e716c82fc543cc6299c2ae4b"
+      "sha256": "775501db8c442e612d1b750ca1c9dfe8fbcd8a1a27b52ad149a9883eefae1ef9"
     },
     {
       "path": "memory/fpf-term-map.yaml",
@@ -1769,7 +1773,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "eadc2c9a2565be931d618fffaefd37a9815e7a63a185b5ee6aea8e6a6a146c7c"
+      "sha256": "e4d0d1c90018eb86cd1880763c88e8d2759357a63eba1e5db4b180ed069c591f"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1897,7 +1901,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
-      "sha256": "32f28e87381f1558239e7affc89baf135141fc3a3f7f08a9d856fadf6bdd1b3b"
+      "sha256": "294ee4f2a0730a5793ff87f3d978264d1abd0ff0b0093dad18bdead0e38edf9f"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md",
@@ -1913,7 +1917,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md",
-      "sha256": "68039549796074f3fcc3b359fadd718fab1136f0615825cb8243c3964c869b52"
+      "sha256": "fe9c274f8fb0b7beeb1bb0bbde8f012e593009af239068fdb908e516e62a6839"
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
@@ -1925,7 +1929,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "7a1d109e09e0c11e1d6ef8af6e9b6e63afacc33f7826c313ef7281c2ad310893"
+      "sha256": "ba835e3bb1a0346bf6a485580610231f2dbf912dd794c31a92103d6706e161b0"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -1949,7 +1953,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "8811d93eb673e2a621df273b01cc02ff09ce8f6ba3607fff9b2208d943ada655"
+      "sha256": "9d55ec7a097a7ca8041071ec1615ba4c45f349911644910aa01cc0a1e782f9f4"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2313,7 +2317,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "a284ceffebe23d5805201674d2068edcfb1782e67f9c8aef63d79a75850042df"
+      "sha256": "b8bebf66b3f062140060571d79542ec0d35ae2d51f19acfa05d57cdf67379147"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2325,7 +2329,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "f83a6722a195c4d80c0ebb388bd073b1d0a349589b1d40eabb4503f1a847f83b"
+      "sha256": "fa9d0af8d710c684511a1e999f6cdee3062668da78dfacb57bc5963b7b9fea5f"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3113,7 +3117,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "bcfde379d8877c65feecbb281cda6ce46e4478018722118f9547eb0277a696ff"
+      "sha256": "3cb0e00ba7b9de61c6e0b603eb78820d72af1a5c6527d6e6bb5e51361e0b46b4"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3121,7 +3125,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "9c2edb3d573b3355ae7c14bbd32d911677fd0d151443576880dc5b603b8daa34"
+      "sha256": "1974238d8cabbd1a5beb8daa6585a24b0e93e8fafa75d14106b7d1e74ef7b0bb"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",

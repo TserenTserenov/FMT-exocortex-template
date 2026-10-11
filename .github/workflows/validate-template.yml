@@ -736,6 +736,7 @@ jobs:
         run: |
           python3 .claude/hooks/tests/destructive-guard/hook_cases.py
           python3 .claude/hooks/tests/destructive-guard/long_cases.py
+          python3 .claude/hooks/tests/destructive-guard/perf_cases.py
           python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
           bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
           bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
