@@ -19,6 +19,12 @@ set -euo pipefail
 
 WORKSPACE="${WORKSPACE_DIR:-$HOME/IWE}"
 WAKATIME_CLI="${WAKATIME_CLI:-$HOME/.wakatime/wakatime-cli}"
+if [[ ! -x "$WAKATIME_CLI" ]]; then
+  # issue #1151: the VS Code WakaTime extension on Windows downloads the
+  # binary as wakatime-cli-windows-amd64.exe, not the bare name above.
+  WAKATIME_CLI=$(ls -d "$HOME"/.wakatime/wakatime-cli* 2>/dev/null | head -1 || true)
+  WAKATIME_CLI="${WAKATIME_CLI:-$HOME/.wakatime/wakatime-cli}"
+fi
 
 PARAMS_FILE="${WORKSPACE}/params.yaml"
 KNOWLEDGE_REPO_REL=""

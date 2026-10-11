@@ -34,6 +34,18 @@ reflection_enabled: false
 # Week Close: ротация уроков в MEMORY.md
 lesson_rotation: true
 
+# Week Close §7a/7b: место бэкапа (issue #880)
+#   Пусто (ключ не задан) — дефолт: iCloud Drive на macOS, нет бэкапа на других ОС.
+#   Непустое значение — свой путь (любая ОС); перекрывает iCloud-дефолт.
+#   Пример: "~/Dropbox/IWE-backups"
+backup_dir: ""
+
+# Week Close §7a/7b: встроенный бэкап и его проверка (issue #880).
+#   true  — встроенная проверка + бэкап выполняются (по умолчанию)
+#   false — пропустить оба шага целиком (свой бэкап через расширение
+#           week-close.after.*.md — встроенный шаг тогда не нужен и не мешает)
+backup_enabled: true
+
 # === Верификация ===
 
 # Автоматическая верификация кода через sub-agent Haiku

@@ -49,6 +49,7 @@ extract_until() {  # <start regex> <stop regex, exclusive>
 }
 TIMEOUT_SHIM='command -v timeout >/dev/null 2>&1 || timeout() { shift; "$@"; }'
 FUNCTIONS="$TIMEOUT_SHIM
+$(extract_block '^resolve_default_branch()' 'GIT_DEFAULT_BRANCH:-main')
 $(extract_block '^log() {' '^}')
 $(extract_block '^pick_publisher() {' '^}')
 $(extract_block '^publish_commit_or_explain() {' '^}')
