@@ -130,11 +130,13 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   my $text = do { local $/; <STDIN> };
   my @lines = split(/\n/, $text, -1);
   my (@out, @pending);
-  sub continued_header {
-    my ($line, $initial_quote) = @_;
-    my ($slashes) = $line =~ /(\\+)$/;
-    return 0 unless defined $slashes && length($slashes) % 2;
-    my $quote = $initial_quote;
+  # Скан состояния кавычек — чистая функция (состояние, текст): заголовок с
+  # переносами сканируется инкрементально, каждый новый сегмент один раз,
+  # состояние переносится между итерациями. Прежняя continued_header заново
+  # проходила всю уже склеенную строку на каждом переносе — квадратичное
+  # время на длинных `\`-цепочках (issue #1148).
+  sub scan_quote_state {
+    my ($line, $quote) = @_;
     for (my $i = 0; $i < length($line); $i++) {
       my $char = substr($line, $i, 1);
       if (defined $quote) {
@@ -146,7 +148,7 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
         $quote = $char;
       }
     }
-    return !defined $quote || $quote eq q{"};
+    return $quote;
   }
 
   sub is_data_command {
@@ -378,10 +380,21 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
       push @out, $line if $body->{keep};
       next;
     }
-    while ($line_no + 1 < @lines && continued_header($line, $header_quote)) {
-      $line =~ s/\\$//;
-      $line .= $lines[++$line_no];
+    # Сегменты накапливаются списком и склеиваются один раз; состояние
+    # кавычек переносится между сегментами явно ($seg_quote), поэтому каждый
+    # сегмент сканируется один раз — линейное время (issue #1148).
+    my @segments;
+    my $joined = $line;
+    my $seg_quote = $header_quote;
+    while ($line_no + 1 < @lines) {
+      my ($slashes) = $joined =~ /(\\+)$/;
+      last unless defined $slashes && length($slashes) % 2;
+      $seg_quote = scan_quote_state($joined, $seg_quote);
+      last if defined $seg_quote && $seg_quote ne q{"};
+      push @segments, substr($joined, 0, -1);
+      $joined = $lines[++$line_no];
     }
+    $line = @segments ? join(q{}, @segments, $joined) : $joined;
     push @out, $line;
     my ($specs, $after_quote, $after_depth) = line_heredocs($line, $header_quote, $header_group_depth, $group_source, \@compound_frames);
     push @pending, @$specs;
