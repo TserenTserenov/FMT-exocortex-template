@@ -60,10 +60,7 @@ ENV_FILE="$HOME/.config/aist/env"
 # AI CLI: переопределение через переменные окружения (см. strategist.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
-# issue #1096: --allowedTools не ограничивает MCP — явно запрещаем отправку в Telegram
-# (точечно, не --strict-mcp-config: промпты session-close/on-demand/knowledge-audit
-# легитимно используют knowledge_search/knowledge_get_document того же сервера).
-AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash --disallowedTools mcp__iwe-knowledge__send_telegram_message}"
+AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
 
 # AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
 # иначе override остаётся декоративным, когда claude физически отсутствует, но
@@ -71,6 +68,30 @@ AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allow
 if ! command -v "$AI_CLI" >/dev/null 2>&1 && [ ! -x "$AI_CLI" ]; then
     echo "[$(date '+%H:%M:%S')] ERROR: $AI_CLI CLI не найден (AI_CLI/CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$AI_CLI')." >&2
     exit 127
+fi
+
+# issue #1116: under root, Claude Code refuses --dangerously-skip-permissions
+# outright ("cannot be used with root/sudo privileges for security reasons")
+# -- a hard, permanent incompatibility, not a transient failure. Left
+# unchecked, every scheduled run silently failed deep inside run_claude()
+# (only visible in the log) and still left an isolated worktree behind each
+# time. Checked here (covers audit/session-close/on-demand/git-diff-feed,
+# none of which override the flags) and again wherever a caller overrides
+# AI_CLI_EXTRA_FLAGS locally, before it creates a worktree -- see
+# run_inbox_check_isolated().
+assert_ai_cli_root_compat() {  # <flags>
+    local flags="${1:-}"
+    local uid="${EUID:-$(id -u)}"
+    [ "$uid" -eq 0 ] || return 0
+    if printf '%s\n' "$flags" | grep -Eq '(^|[[:space:]])--dangerously-skip-permissions([[:space:]]|$)'; then
+        echo "[$(date '+%H:%M:%S')] ERROR: запуск от root несовместим с --dangerously-skip-permissions (AI CLI откажет на каждом вызове). Снимите флаг (AI_CLI_EXTRA_FLAGS/IWE_EXTRACTOR_INBOX_AI_FLAGS) или запускайте не от root." >&2
+        return 1
+    fi
+    return 0
+}
+
+if ! assert_ai_cli_root_compat "$AI_CLI_EXTRA_FLAGS"; then
+    exit 1
 fi
 
 # issue #17: load NOTIFY_SH_PATH from params.yaml if not already set in environment
@@ -584,10 +605,32 @@ prefilter_changed_reports() {
 # plain strings from `git diff --cached --name-only`), so it stays valid
 # through publish_commit's own cherry-pick in a separate disposable worktree
 # -- close only after publish, not right after the local commit.
+# issue #928: on a plain FMT-exocortex-template install (not the author's
+# own IWE_SCRIPTS layout), session-guard.sh lives under IWE_TEMPLATE/scripts,
+# not $HOME/IWE/scripts -- the old single-fallback lookup silently returned 1
+# with no indication of which path it even tried. Shared by both guard
+# wrappers below so a resolution fix lands in one place.
+resolve_tool_path() {  # <script-name>
+    local name="$1" candidate
+    for candidate in \
+        "${IWE_SCRIPTS:-}/$name" \
+        "${IWE_TEMPLATE:-}/scripts/$name" \
+        "$HOME/IWE/scripts/$name"
+    do
+        [ -n "$candidate" ] || continue
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    log "WARN: $name not found or not executable; tried: ${IWE_SCRIPTS:-<unset>}/$name, ${IWE_TEMPLATE:-<unset>}/scripts/$name, $HOME/IWE/scripts/$name"
+    return 1
+}
+
 extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason> <changed-paths (newline-separated, repo-relative)>
     local strategy_dir="$1" agent="$2" reason="$3" changed_paths="$4"
-    local guard="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh"
-    [ -x "$guard" ] || return 1
+    local guard
+    guard=$(resolve_tool_path session-guard.sh) || return 1
     bash "$guard" open --housekeeping "$reason" --agent "$agent" --canonical-owner "$reason" >> "$LOG_FILE" 2>&1 || return 1
     local rel
     while IFS= read -r rel; do
@@ -600,8 +643,8 @@ extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason> <changed-pa
 
 extractor_scope_close() {  # <strategy_dir> <agent> <reason>
     local strategy_dir="$1" agent="$2" reason="$3"
-    local guard="${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh"
-    [ -x "$guard" ] || return 0
+    local guard
+    guard=$(resolve_tool_path session-guard.sh) || return 0
     bash "$guard" close --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1
 }
 
@@ -906,6 +949,35 @@ acquire_inbox_lock() {  # <lock_dir> [label]
     return 1
 }
 
+# issues #1116/#1155: every failure path downstream of create_isolated_
+# worktree() used to log "worktree preserved for review" and leave it (and
+# its branch) behind unconditionally -- even when nothing had actually
+# happened in it yet (Pack mount failed before the agent ran, root-
+# incompatible AI CLI flags, "no pending captures"). 41+ and 38+ such copies
+# accumulated per the linked issues. A worktree with no uncommitted changes
+# and no commits past its own starting point has nothing worth reviewing;
+# clean it up the same way the pre-existing "no pending captures" branch
+# already did. <base_sha> is create_isolated_worktree()'s ISO_BASE_SHA.
+maybe_cleanup_empty_worktree() {  # <canonical_repo> <worktree> <branch> <isolated_workspace> <repo_name> <run_root> <base_sha> <preserve-log-message>
+    local canonical_repo="$1" worktree="$2" branch_name="$3" isolated_workspace="$4"
+    local repo_name="$5" run_root="$6" base_sha="$7" preserve_message="$8"
+    local dirty ahead_log
+    dirty=$(git -C "$worktree" status --porcelain 2>/dev/null) || dirty="?"
+    ahead_log=$(git -C "$worktree" log --oneline "${base_sha}..HEAD" 2>/dev/null) || ahead_log="?"
+    if [ "$dirty" = "?" ] || [ "$ahead_log" = "?" ]; then
+        log "WARN: cannot verify isolated worktree is clean (git failed); $preserve_message: $worktree"
+        return 1
+    fi
+    if [ -z "$dirty" ] && [ -z "$ahead_log" ]; then
+        cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
+            "$isolated_workspace" "$repo_name" "$run_root" || true
+        log "Cleaned up empty isolated worktree (no diff from $base_sha): $worktree"
+        return 0
+    fi
+    log "WARN: $preserve_message: $worktree"
+    return 1
+}
+
 cleanup_isolated_inbox_worktree() {
     local canonical_repo="$1"
     local worktree="$2"
@@ -1036,11 +1108,23 @@ mount_readonly_packs() {
         pack_count=$((pack_count + 1))
         log "Mounted published Pack snapshot: $pack_name@$snapshot_ref"
     done
-    if [ "$pack_count" -eq 0 ]; then
-        log "ERROR: no Pack repositories available; duplicate check and analysis were not started"
-        return 1
-    fi
     local total_skipped=$((${#EXTRACTOR_PACK_SKIPPED[@]} + ${#EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[@]}))
+    if [ "$pack_count" -eq 0 ]; then
+        if [ "$total_skipped" -eq 0 ]; then
+            # No PACK-* directories at all -- a genuinely broken/empty
+            # workspace, not an intentional skip. Unchanged: hard-stop.
+            log "ERROR: no Pack repositories available; duplicate check and analysis were not started"
+            return 1
+        fi
+        # issue #1155: every Pack was skipped on purpose (frozen/no-origin,
+        # not a clone failure -- those already hard-return inside the loop
+        # above) -- proceed with zero coverage instead of aborting the whole
+        # inbox-check. EXTRACTOR_PACK_VERIFIED_AT stays unset on purpose:
+        # pack_snapshot_context() already renders "freshness not confirmed"
+        # for that case, exactly the partial-coverage wording this needs.
+        log "WARN: all Packs skipped (frozen: ${EXTRACTOR_PACK_SKIPPED[*]:-none}; no origin: ${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]:-none}); proceeding with zero Pack coverage for duplicate-check"
+        return 0
+    fi
     if [ "$total_skipped" -gt 0 ]; then
         log "WARN: duplicate-check ran against $pack_count of $((pack_count + total_skipped)) Packs; skipped (frozen): ${EXTRACTOR_PACK_SKIPPED[*]:-none}; skipped (no origin): ${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]:-none}"
     fi
@@ -1158,7 +1242,11 @@ create_isolated_worktree() {  # <canonical_repo> <repo_name> <gov_branch> <label
     ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
     ISO_BRANCH="extractor/$label-$run_id"
 
-    if ! git -C "$canonical_repo" rev-parse --verify -q "origin/$gov_branch^{commit}" >/dev/null 2>&1 || \
+    # issues #1116/#1155: the base commit this worktree started from, so a
+    # later failure can tell "nothing happened here, safe to clean up
+    # immediately" from "there is a real diff worth preserving for review"
+    # (see maybe_cleanup_empty_worktree()).
+    if ! ISO_BASE_SHA=$(git -C "$canonical_repo" rev-parse --verify -q "origin/$gov_branch^{commit}" 2>/dev/null) || \
        ! git -C "$canonical_repo" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
         log "WARN: cannot create isolated $label worktree from origin/$gov_branch; empty run directory removed"
         git -C "$canonical_repo" worktree prune >> "$LOG_FILE" 2>&1 || true
@@ -1168,7 +1256,12 @@ create_isolated_worktree() {  # <canonical_repo> <repo_name> <gov_branch> <label
     git -C "$ISO_WORKTREE" branch --set-upstream-to="origin/$gov_branch" "$ISO_BRANCH" >> "$LOG_FILE" 2>&1 || true
 
     if ! mkdir "$ISO_WORKSPACE" || ! ln -s "$ISO_WORKTREE" "$ISO_WORKSPACE/$repo_name"; then
-        log "WARN: cannot prepare isolated $label workspace; worktree preserved: $ISO_WORKTREE"
+        # Nothing has run in this worktree yet (mkdir/ln -s failed before any
+        # agent call) -- always safe to clean up, no review-worthy diff
+        # possible at this point.
+        maybe_cleanup_empty_worktree "$canonical_repo" "$ISO_WORKTREE" "$ISO_BRANCH" "$ISO_WORKSPACE" \
+            "$repo_name" "$ISO_RUN_ROOT" "$ISO_BASE_SHA" \
+            "cannot prepare isolated $label workspace; worktree preserved" || true
         return 1
     fi
 }
@@ -1179,6 +1272,13 @@ run_inbox_check_isolated() {
     local canonical_repo="$canonical_workspace/$repo_name"
     local lock_dir="${IWE_EXTRACTOR_INBOX_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-inbox-check.lock}"
     local run_root worktree isolated_workspace branch_name isolated_template actual_pending gov_branch
+    # Resolved once, up front: issue #1116 needs it checked before any
+    # worktree is created, and run_claude() (further below) reads it back
+    # via dynamic scoping once this function's `local` is in scope.
+    local AI_CLI_EXTRA_FLAGS="${IWE_EXTRACTOR_INBOX_AI_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep}"
+    if ! assert_ai_cli_root_compat "$AI_CLI_EXTRA_FLAGS"; then
+        return 1
+    fi
 
     case "$repo_name" in
         ""|.*|*/*)
@@ -1218,7 +1318,9 @@ run_inbox_check_isolated() {
            "$isolated_workspace/FMT-exocortex-template/roles/extractor/config/routing.md" || \
        ! cp "$isolated_template/roles/extractor/prompts/session-close.md" \
            "$isolated_workspace/FMT-exocortex-template/roles/extractor/prompts/session-close.md"; then
-        log "WARN: cannot prepare isolated inbox-check workspace; worktree preserved: $worktree"
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "cannot prepare isolated inbox-check workspace; worktree preserved" || true
         release_inbox_lock "$lock_dir"
         return 1
     fi
@@ -1252,7 +1354,9 @@ run_inbox_check_isolated() {
     log "Found $actual_pending pending captures in refreshed inbox"
 
     if ! mount_readonly_packs "$canonical_workspace" "$isolated_workspace"; then
-        log "WARN: Pack refresh failed; inbox marks unchanged, worktree preserved: $worktree"
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "Pack refresh failed; inbox marks unchanged, worktree preserved" || true
         release_inbox_lock "$lock_dir"
         return 1
     fi
@@ -1267,11 +1371,11 @@ $(pack_snapshot_context)"
 
     local WORKSPACE="$isolated_workspace"
     local IWE_WORKSPACE="$isolated_workspace"
-    # issue #1096: запрет отправки в Telegram через MCP и в inbox-режиме (см. выше)
-    local AI_CLI_EXTRA_FLAGS="${IWE_EXTRACTOR_INBOX_AI_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep --disallowedTools mcp__iwe-knowledge__send_telegram_message}"
     export IWE_WORKSPACE
     if ! run_claude "inbox-check" "$source_context" "isolated-inbox"; then
-        log "WARN: isolated inbox-check failed; worktree preserved for review: $worktree"
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "isolated inbox-check failed; worktree preserved for review" || true
         release_inbox_lock "$lock_dir"
         return 1
     fi
@@ -1291,7 +1395,9 @@ $(pack_snapshot_context)"
             log "Completed process: inbox-check; report and input marks published"
             ;;
         *)
-            log "WARN: isolated inbox-check did not reach a safe publication state; worktree preserved: $worktree"
+            maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+                "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+                "isolated inbox-check did not reach a safe publication state; worktree preserved" || true
             release_inbox_lock "$lock_dir"
             return 1
             ;;
@@ -1359,7 +1465,9 @@ run_feed_isolated() {  # <prompt-file> <extra-args> <label> [mode]
 
     local EXTRACTOR_FEED_BASE_SHA EXTRACTOR_FEED_LABEL="$label"
     EXTRACTOR_FEED_BASE_SHA=$(git -C "$worktree" rev-parse HEAD 2>/dev/null) || {
-        log "WARN: cannot resolve isolated feed base commit; worktree preserved: $worktree"
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "cannot resolve isolated feed base commit; worktree preserved" || true
         return 1
     }
     local feed_context="Служебное: репозиторий $repo_name в этом запуске — изолированная рабочая копия (его .git — файл, не каталог): историю читай через git -C <путь> log, проверку -d .git для него не применяй. Не выполняй git add/commit/push: файлы captures только пиши, коммит и публикацию делает скрипт."
@@ -1377,7 +1485,9 @@ $feed_context"
     export IWE_WORKSPACE
     EXTRACTOR_COMMIT_RESULT=""
     if ! run_claude "$prompt_file" "$feed_context" "$commit_mode"; then
-        log "WARN: isolated $prompt_file failed; worktree preserved for review: $worktree"
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "isolated $prompt_file failed; worktree preserved for review" || true
         return 1
     fi
 
@@ -1388,7 +1498,9 @@ $feed_context"
             log "Completed process: $prompt_file (${EXTRACTOR_COMMIT_RESULT})"
             ;;
         *)
-            log "WARN: isolated $prompt_file did not reach a safe publication state; worktree preserved: $worktree"
+            maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+                "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+                "isolated $prompt_file did not reach a safe publication state; worktree preserved" || true
             return 1
             ;;
     esac

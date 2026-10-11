@@ -873,7 +873,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c1ec33eff69e94e584f59f3e5ed543884c93971d8dd7f2a47d8d7a5fbf3625f3"
+      "sha256": "9aba945edc1d742b0eeaeef44024255b68c00556770338c012a2558f241aa5fc"
     },
     {
       "path": "CLAUDE.md",
@@ -1209,7 +1209,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "e5ff502f8fe5f8694e4cc7ff80c20227856c3bf2f85270a1a2a309eadae1a929"
+      "sha256": "e5ec574764e332137e82644efcd2bdfee3ec2b634655f8b839e7a72915b6f0c8"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1773,7 +1773,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "e4d0d1c90018eb86cd1880763c88e8d2759357a63eba1e5db4b180ed069c591f"
+      "sha256": "c5298a65b2a3e15cdc564fb0c28e2ea34baaa826987467122332a694b2ce6c29"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1793,7 +1793,7 @@
     },
     {
       "path": "roles/extractor/tests/test_extractor_pipeline.py",
-      "sha256": "8e909876b311eb75213e63d376ee281f9ccae11fcfd1e2222b324c8447f19a69"
+      "sha256": "a7e80ffd2a73a15f95ca2360f12544c8e125c7873a01c160ed545d89074a2f5b"
     },
     {
       "path": "roles/lib/scheduler-cron.sh",
@@ -3188,6 +3188,10 @@
       "sha256": "50752c9b300b59d430e64d1cc03271c65b65640c4414d4628728831edeb79fe5"
     },
     {
+      "path": "seed/strategy/scripts/lib/publish-gate.sh",
+      "sha256": "f5f6d83684d7b9391e3e2e6348ee145dbf0a819768012dc6afdd90a845edf417"
+    },
+    {
       "path": "seed/strategy/scripts/lib/telegram.sh",
       "sha256": "a9463b647f354379c4939a9ca24f9c6837faedc9d11f5dbe3579666f6668de2e"
     },
@@ -3253,7 +3257,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "489001ad52f773035620a0620cc12d65d3bdee127fa5c277dceb1d4af9d16042"
+      "sha256": "e679ee36b9007510fb7790e2b6271b26e4ba438497ed2a14f06bc9717f7bb388"
     }
   ],
   "excluded_paths": [
@@ -3479,6 +3483,7 @@
     "setup/test-update-issue-226.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
+    "setup/test-update-publish-gate-delivery.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",

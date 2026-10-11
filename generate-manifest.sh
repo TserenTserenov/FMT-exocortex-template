@@ -171,6 +171,10 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/scripts/lib/notification-render.sh"
     "seed/strategy/scripts/lib/telegram.sh"
     "seed/strategy/scripts/lib/wp_inbox.py"
+    # issue #1102: extractor.sh looks for scripts/lib/publish-gate.sh since
+    # WP-5 F48, but it never shipped -- every install silently fell back to
+    # a raw `git push` with no retry on a stale origin/main.
+    "seed/strategy/scripts/lib/publish-gate.sh"
 )
 # #533: unlike ordinary seed content, these are platform-owned delivery and
 # upgrade infrastructure.  Keep each path explicit so the blanket seed/

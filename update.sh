@@ -2719,6 +2719,11 @@ run_post_apply_backfills_or_die() {
     backfill_ds_publish || echo "  ⚠ scripts/ds-publish.sh не доставлен: ночные роли оставят коммиты локальными, пока его нет (issue #941)." >&2
 
     echo ""
+    echo "Гейт публикации publish-gate.sh (upgrade backfill)..."
+    backfill_governance_seed_script "scripts/lib/publish-gate.sh" \
+        || echo "  ⚠ scripts/lib/publish-gate.sh не доставлен: Экстрактор останется на сыром git push без повтора при устаревшем origin/main (issue #1102)." >&2
+
+    echo ""
     echo "Executor catalog (upgrade backfill)..."
     backfill_executor_catalog || true
 
