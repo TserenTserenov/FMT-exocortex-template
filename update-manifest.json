@@ -121,7 +121,7 @@
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
-      "sha256": "8de09eb625eafe5642d6c10cb30346d46ed607b2a8ddfc58291a59d8b5ec1afc"
+      "sha256": "074208712719461127e9f37dcb49a6716da3bb774301f74aa4f445c101d6e3ec"
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
@@ -861,7 +861,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "64b5a48397168c4f463dd15a65fb8701b6cd6ce11473187bf8448ea018fcf695"
+      "sha256": "1a56a5a84d5633e899bf60935281e815a753618d14d491c75c4cf96d855d64c9"
     },
     {
       "path": "CLAUDE.md",
@@ -3430,6 +3430,7 @@
     "setup/test-detectors.sh",
     "setup/test-ds-publish.sh",
     "setup/test-extractor-subscription-env.sh",
+    "setup/test-hook-dayplan-validator.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
