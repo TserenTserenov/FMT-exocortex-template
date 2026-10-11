@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-10-11T10:15:16Z'
-last_synced_sha: 1c88a703923c9ee2c223feb058e3a01d032d9183
+files_translated:
+- docs/hindsight-setup.md
+last_run_utc: '2026-10-11T10:59:55Z'
+last_synced_sha: da4c9ab4e7f090c3e39a73e9b397b48b46ad9b5c
 schema_version: 1

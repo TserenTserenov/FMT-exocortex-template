@@ -1,6 +1,8 @@
 # Hindsight Setup Guide
 
-Quick start for IWE pilots who want semantic fault memory (L2 layer).
+Sets up the Hindsight storage backend (L2 layer) for IWE pilots. This guide
+only starts the container — it does not wire Recall, Retain, or Reflect into
+your workflow. See "4. Manual integration" below for that step.
 
 ## Prerequisites
 
@@ -36,7 +38,7 @@ curl http://localhost:8888/health
 
 Should return `{"status":"ok"}`.
 
-## 4. Manual Integration
+## 4. Manual integration
 
 Hindsight is an optional L2 extension. A standard IWE installation does not
 automatically invoke Recall, Retain, or Reflect.
