@@ -62,6 +62,27 @@ def _resolve_snapshot_path() -> pathlib.Path:
 
 SNAPSHOT_PATH = _resolve_snapshot_path()
 
+
+def _migrate_stray_old_snapshot() -> None:
+    """One-time cleanup for installs caught by #1132 before its fix landed
+    (issue #1171). The old cache path, inbox/WP-425/derived_snapshot.json,
+    kept getting recreated nightly and is never removed by the #1132 fix
+    itself, which only changed the path for new writes. Removes exactly that
+    one file -- never the inbox/WP-425/ directory, in case a real WP-425
+    work-product folder happens to live there under the same RP number.
+    """
+    root = SNAPSHOT_PATH.parent.parent
+    old_path = root / "inbox" / "WP-425" / "derived_snapshot.json"
+    if not old_path.exists():
+        return
+    if not SNAPSHOT_PATH.exists() or old_path.stat().st_mtime > SNAPSHOT_PATH.stat().st_mtime:
+        SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        old_path.replace(SNAPSHOT_PATH)
+        logging.info("Migrated stray snapshot from %s to %s", old_path, SNAPSHOT_PATH)
+    else:
+        old_path.unlink()
+        logging.info("Removed stray old snapshot at %s (current copy is newer)", old_path)
+
 # Maps stage_id strings from 3_4_qualification to integer stage levels.
 # Source: render-pilot-guides.py _STAGE_ID_TO_INT (OwnerIntegrity: single mapping table).
 _STAGE_ID_TO_INT = {
@@ -241,6 +262,9 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, stream=sys.stderr,
                         format="%(levelname)s %(message)s")
+
+    if not args.dry_run:
+        _migrate_stray_old_snapshot()
 
     if args.if_stale_days > 0 and not _is_stale(args.if_stale_days):
         logging.info("Snapshot is fresh (< %d days old) — skipping update", args.if_stale_days)

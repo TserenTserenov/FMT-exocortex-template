@@ -51,6 +51,35 @@ CONFIG_PY="$CONFIG"
 if command -v cygpath >/dev/null 2>&1; then
   CONFIG_PY=$(cygpath -m "$CONFIG" 2>/dev/null || printf '%s' "$CONFIG")
 fi
+
+# issue #924: day_boundary ("HH:MM", default none = no shift) lets the pilot say
+# that work done after midnight but before this hour still belongs to the day
+# that's ending, not a new one. Only the auto "today" default is a candidate —
+# an explicit date argument is the caller's exact choice and is never
+# second-guessed (mirrors the same check in day-open-pipeline.sh, issue #924).
+if [ -z "${1:-}" ]; then
+  # Scoped to the day_open: block (same precaution as STRATEGY_DAY_NAME in
+  # day-open-pipeline.sh — a same-named key elsewhere can't hijack this lookup;
+  # resets on the next top-level key so a later block's own day_boundary can't
+  # be picked up either) and skips commented-out lines: a bare top-level grep
+  # would also match the shipped default's commented-out example line,
+  # silently turning the shift on.
+  DAY_BOUNDARY=$(awk '
+    /^[^[:space:]]/ && !/^day_open:/ { f=0 }
+    /^day_open:/ { f=1 }
+    f && /day_boundary:/ && !/^[[:space:]]*#/ { print; exit }
+  ' "$CONFIG" 2>/dev/null \
+    | sed -E 's/.*day_boundary:[[:space:]]*"?([0-9]{1,2}:[0-9]{2})"?.*/\1/')
+  if [[ "$DAY_BOUNDARY" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+    boundary_min=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+    now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
+    if [ "$now_min" -lt "$boundary_min" ]; then
+      DATE=$(date -j -v-1d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
+        || date -d "$DATE - 1 day" "+%Y-%m-%d" 2>/dev/null)
+    fi
+  fi
+fi
+
 PARAMS_FILE="$IWE/params.yaml"
 MULTIPLIER_ENABLED="true"
 if [ -f "$PARAMS_FILE" ] && grep -qE '^multiplier_enabled:[[:space:]]*false([[:space:]]*(#.*)?)?$' "$PARAMS_FILE"; then
