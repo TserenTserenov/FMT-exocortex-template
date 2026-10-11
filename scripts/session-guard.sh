@@ -937,7 +937,14 @@ value = " ".join(sys.argv[1].splitlines())
 try:
     import yaml
 except ImportError:
-    print("task: %s" % value)
+    # #1006: the bare fallback used to print the raw value unescaped,
+    # reintroducing the exact ": "-in-value corruption this function exists
+    # to fix (bug-2026-09-09-...), just only when PyYAML happens to be
+    # missing. A double-quoted YAML scalar accepts the same range of values
+    # that PyYAML would reach for quoting on, without needing the full
+    # plain-scalar grammar.
+    escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+    print("task: \"%s\"" % escaped)
     raise SystemExit(0)
 sys.stdout.write(yaml.safe_dump({"task": value}, allow_unicode=True, default_flow_style=False, width=10**7).rstrip("\n"))
 ' "$1"
