@@ -1642,7 +1642,11 @@ IWE_STATUS_TABLE=$(render_iwe_status)
 WORLD_SECTION=$(render_world)
 
 # --- Output ---
-cat <<EOF
+# issue #496: heading style (details vs markdown) is a per-installation choice,
+# not a format migration — the validator already accepts both, so this only
+# changes what the generator prints, read from params.yaml.
+HEADING_STYLE=$(iwe_heading_style "$PARAMS_FILE")
+cat <<EOF | iwe_render_heading_style "$HEADING_STYLE"
 ---
 type: daily-plan
 date: $DATE
