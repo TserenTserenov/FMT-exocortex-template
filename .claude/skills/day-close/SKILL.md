@@ -121,7 +121,8 @@ TODAY_DAYPLAN="${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan $(d
 ```bash
 # issue #1176: helper functions live in day-close-helpers.sh, not inline here,
 # so Claude Code skill-arg substitution does not corrupt $1/$2 in function bodies.
-source "$HOME/IWE/.claude/skills/day-close/day-close-helpers.sh"
+# Relative to the workspace root, same convention as step 0's load-extensions.sh call.
+source .claude/skills/day-close/day-close-helpers.sh
 ```
 <!-- issue-511-guard:end -->
 

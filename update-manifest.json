@@ -437,7 +437,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "91ba3a163d768b7310aea92c34acd109f328d87ae54f19bdd106522fc1ead3cb"
+      "sha256": "fbccca31ef9ea6c5fe6d9f7deec2d78a1db0f71a1c2b8011676c3ee2833877b9"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -2897,7 +2897,7 @@
     },
     {
       "path": "scripts/tests/test_issue_511_day_close_commit_guard.sh",
-      "sha256": "c5f058979445a3d16d92c8370151101ecfbd145a0ae63c8db8467146701156c8"
+      "sha256": "d084becc4d92a3ee2864e2d025d41663b2f3837c9489a0cd3a1e1a21ce4068e0"
     },
     {
       "path": "scripts/tests/test_issue_533_agent_fault_delivery.py",
@@ -2909,7 +2909,7 @@
     },
     {
       "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
-      "sha256": "10515bdb3cfc793fbf3eb00a269675e00716f9b0daa8a8ac3aae85bc9d8fc06a"
+      "sha256": "3c798f1e177cc4bada710b2cc2b7385a242de2e5c6435da1791610fc789aa594"
     },
     {
       "path": "scripts/tests/test_issue_718_sync_canary.sh",

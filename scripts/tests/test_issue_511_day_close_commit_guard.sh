@@ -24,12 +24,21 @@ awk '
   capture && $0 !~ /^```/ { print }
 ' "$SKILL" > "$GUARD_SOURCE"
 
-if ! grep -q '^stage_and_commit_or_stop()' "$GUARD_SOURCE"; then
+if ! grep -q '^source ' "$GUARD_SOURCE"; then
     echo "❌ production guard could not be extracted from day-close/SKILL.md" >&2
     exit 1
 fi
+# issue #1176: the guard block now sources day-close-helpers.sh via a
+# workspace-root-relative path (same convention as step 0's
+# load-extensions.sh call) instead of defining functions inline; cd into
+# this checkout so the relative path resolves to the real production file.
+cd "$ROOT"
 # shellcheck source=/dev/null
 source "$GUARD_SOURCE"
+if ! declare -f stage_and_commit_or_stop >/dev/null; then
+    echo "❌ stage_and_commit_or_stop not defined after sourcing the extracted guard" >&2
+    exit 1
+fi
 
 git -C "$TEST_ROOT" init -q repo
 git -C "$REPO" config user.name "Issue 511 regression"

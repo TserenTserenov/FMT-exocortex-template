@@ -28,18 +28,26 @@ awk '
   capture && $0 !~ /^```/ { print }
 ' "$SKILL" > "$GUARD_SOURCE"
 
-if ! grep -q '^stage_and_commit_or_stop()' "$GUARD_SOURCE"; then
+if ! grep -q '^source ' "$GUARD_SOURCE"; then
     echo "❌ production guard could not be extracted from day-close/SKILL.md" >&2
     exit 1
 fi
+# issue #1176: the guard block now sources day-close-helpers.sh via a
+# workspace-root-relative path (same convention as step 0's
+# load-extensions.sh call) instead of defining functions inline; cd into
+# this checkout so the relative path and the extraction both resolve here.
+cd "$ROOT"
+# The actual function bodies live in day-close-helpers.sh, not in the
+# extracted guard block (just a `source` line) — scan that file.
+HELPERS_FILE="$ROOT/.claude/skills/day-close/day-close-helpers.sh"
 
 # --- 1. Static regression: zsh special parameter names must not come back. ---
 # `path`/`status` broke live (issue #557); the rest are the same failure class
 # waiting to happen. Only declarations/loop variables are dangerous, not
 # substrings of longer names — anchor on `local ... <name>` and `for <name>`.
 DANGEROUS='path|status|cdpath|fpath|manpath|argv|pipestatus|dirstack|funcstack'
-if grep -nE "^[[:space:]]*(local|typeset)([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(=[^[:space:]]*)?)*[[:space:]]+($DANGEROUS)([[:space:]=]|$)" "$GUARD_SOURCE" \
-   || grep -nE "^[[:space:]]*for[[:space:]]+($DANGEROUS)[[:space:]]" "$GUARD_SOURCE"; then
+if grep -nE "^[[:space:]]*(local|typeset)([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(=[^[:space:]]*)?)*[[:space:]]+($DANGEROUS)([[:space:]=]|$)" "$HELPERS_FILE" \
+   || grep -nE "^[[:space:]]*for[[:space:]]+($DANGEROUS)[[:space:]]" "$HELPERS_FILE"; then
     fail "guard declares a zsh special parameter name (see matches above)"
 else
     pass "guard avoids zsh special parameter names (path/status/…)"
