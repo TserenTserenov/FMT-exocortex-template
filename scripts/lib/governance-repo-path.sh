@@ -6,6 +6,8 @@
 # a future tip-snapshot audit (WP-535 "осталось") needs both paths at once,
 # a single resolver would have to be reworked or bypassed for that case.)
 # Source, don't execute: `. "$(dirname "${BASH_SOURCE[0]}")/lib/governance-repo-path.sh"`
+# Sourced, not executed: declares functions only, no shebang needed
+# (smoke-clean-env.sh exemption, issue #1013 — same marker as peer-adapter-common.sh).
 #
 # Root cause this replaces: 15+ scripts building "$IWE_ROOT/DS-strategy" or
 # "$IWE_ROOT/$GOV_REPO" by hand, none of them asking whether the calling

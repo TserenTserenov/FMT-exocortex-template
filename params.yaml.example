@@ -16,6 +16,15 @@ video_check: true
 #   none      — календарь не используется: без проверки, без секции в DayPlan, коннектор не подключается
 calendar_source: connector
 
+# Day Open: стиль заголовков секций в DayPlan (issue #496)
+#   details  — <details><summary> (по умолчанию; сворачивается в GitHub/VS Code,
+#               раскрывается как HTML-текст в Obsidian и похожих markdown-вьюерах)
+#   markdown — заголовки `## ` (не сворачиваются нигде, но читаемы везде)
+# Валидатор (.claude/hooks/protocol-artifact-validate.sh) принимает оба варианта.
+# Пока применяется только к day-open-scaffold.sh; build-active-wp.py и
+# day-open-llm-fill.py всё ещё печатают details независимо от этого параметра.
+dayplan_weekplan_heading_style: details
+
 # Day Close: расчёт мультипликатора IWE (требует WakaTime API key)
 multiplier_enabled: true
 

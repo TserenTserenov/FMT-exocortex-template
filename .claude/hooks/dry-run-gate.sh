@@ -421,19 +421,49 @@ case "$TOOL_NAME" in
         ;;
 esac
 
-# === MCP-write whitelist (точные совпадения tool_name) ===
+# === IWE knowledge-namespace MCP gate (match by action, not by namespace
+# prefix — issue #219, VxxxlBxxxxv) ===
+#
+# Было: точный список `mcp__claude_ai_IWE__<write-action>` ниже (перенесён из
+# git blame этого файла). Текущий MCP-сервер знаний называется `iwe-knowledge`
+# (см. mcp__iwe-knowledge__* в живом списке инструментов), и ни один из
+# write-инструментов под этим именем не совпадал ни с одной строкой списка —
+# gate был fail-open для всего пространства имён, ради которого и создан
+# (personal_write, dt_write_digital_twin, personal_delete, send_telegram_message
+# и т.д. проходили репетицию невалидированными).
+#
+# Стало: deny-by-default для любого MCP tool_name, чьё имя сервера содержит
+# "iwe" или "knowledge" (переживает будущее переименование сервера лучше
+# точного списка имён) — читающее действие проходит по паттерну имени
+# (search/get_*/list_*/read_*/describe_*/*_status/*_stats/*_traverse/*_expand/
+# *_search_by_name/backlinks/whoami/get_instructions), всё остальное блокируется.
+# Если новый read-only инструмент не попадёт под паттерн — ложный BLOCK
+# (безопасное направление ошибки), не ложный ALLOW.
 case "$TOOL_NAME" in
-    mcp__claude_ai_IWE__personal_write|\
-    mcp__claude_ai_IWE__personal_delete|\
-    mcp__claude_ai_IWE__personal_create_pack|\
-    mcp__claude_ai_IWE__personal_propose_capture|\
-    mcp__claude_ai_IWE__personal_reindex_source|\
-    mcp__claude_ai_IWE__personal_scaffold_notes|\
-    mcp__claude_ai_IWE__dt_write_digital_twin|\
-    mcp__claude_ai_IWE__create_repository|\
-    mcp__claude_ai_IWE__github_connect|\
-    mcp__claude_ai_IWE__github_disconnect|\
-    mcp__claude_ai_IWE__knowledge_feedback|\
+    mcp__*iwe*__*|mcp__*knowledge*__*|mcp__*IWE*__*)
+        ACTION="${TOOL_NAME##*__}"
+        # Подстрочные паттерны (`*get_*`, не только `get_*`): у половины
+        # read-инструментов действие не начинается с глагола, а содержит его
+        # в середине после доменного префикса (`knowledge_list_documents`,
+        # `user_profile_get_tier`, `dt_read_digital_twin`). Anchored-only
+        # `get_*`/`list_*`/`read_*`/`describe_*` ложно блокировал все такие —
+        # найдено живым прогоном regression-теста на полном списке инструментов
+        # сервера, не предположением.
+        case "$ACTION" in
+            search|whoami|get_instructions|backlinks|\
+            *get_*|*list_*|*read_*|*describe_*|\
+            *_status|*_stats|*_traverse|*_expand|*_search_by_name|*_search|*_list)
+                : # read-only действие — не блокируем здесь, падает в whitelist ниже/allow
+                ;;
+            *)
+                block "$TOOL_NAME"
+                ;;
+        esac
+        ;;
+esac
+
+# === MCP-write whitelist (точные совпадения tool_name, другие серверы) ===
+case "$TOOL_NAME" in
     mcp__claude_ai_Gmail__create_draft|\
     mcp__claude_ai_Gmail__create_label|\
     mcp__claude_ai_Gmail__label_message|\
