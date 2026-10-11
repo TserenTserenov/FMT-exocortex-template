@@ -125,4 +125,18 @@ assert "$rc" "0" "exit 0 (a missing archive/ does not break the snapshot)"
 assert "$(line 3 | cut -d' ' -f1-2)" "CARD_SOURCE: origin-pinned" "CARD_SOURCE is origin-pinned"
 assert "$(grep -c 'ORIGIN-ONLY-TASK-9201' "$OUT")" "1" "origin-side edit of the card is visible"
 
+echo "scenario H: install without scripts/lib/git-sync-status.sh -> checker_unavailable/library_missing, degraded exit 0 (issue #1144)"
+# The actualizer relies on exactly these machine lines to tell a clean template
+# install (degraded, continue) apart from a broken integration (stop).
+FAKE="$SANDBOX/fake-install"; mkdir -p "$FAKE/.claude/scripts" "$FAKE/scripts/lib"
+cp "$BUNDLE" "$FAKE/.claude/scripts/wp-sync-bundle.sh"
+cp "$(cd "$(dirname "$0")/../.." && pwd)/scripts/lib/wp-num.sh" "$FAKE/scripts/lib/wp-num.sh"
+# git-sync-status.sh deliberately absent -- the scenario under test.
+IWE_WORKSPACE="$WS2" IWE_GOVERNANCE_REPO="$GOV" WP_SYNC_GIT_TIMEOUT=5 bash "$FAKE/.claude/scripts/wp-sync-bundle.sh" WP-9201 > "$OUT" 2> "$ERR"; rc=$?
+assert "$rc" "0" "exit 0 (degraded, not blocking)"
+assert "$(line 1)" "GIT_SYNC_STATUS: checker_unavailable" "status checker_unavailable"
+assert "$(line 2 | grep -c 'reason=library_missing')" "1" "detail names reason=library_missing"
+assert "$(grep -c 'GIT_SYNC_GATE: degraded' "$OUT")" "1" "gate marked degraded (not blocking)"
+assert "$(grep -c 'Sync Gate пропущен' "$ERR")" "1" "human-readable warning on stderr"
+
 [ "$fails" = 0 ] && echo "PASS: all scenarios" || { echo "FAIL: $fails assertion(s)"; exit 1; }
