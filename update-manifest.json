@@ -77,7 +77,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "82a913079269ada31321c035674f40c390819fc95a7332f951b431ccd2e7f481"
+      "sha256": "7c11e7b10ee4fccd1b5c6f0b231f501493997b1f653bb6feb4d957a182b26e80"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -861,7 +861,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1a56a5a84d5633e899bf60935281e815a753618d14d491c75c4cf96d855d64c9"
+      "sha256": "f1125326eb63a220b51bc64989eb462be414a45afe27524dcd31422a6db29494"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "f1125326eb63a220b51bc64989eb462be414a45afe27524dcd31422a6db29494"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "f1125326eb63a220b51bc64989eb462be414a45afe27524dcd31422a6db29494"
     },
     {
       "path": "CLAUDE.md",
@@ -3247,6 +3255,7 @@
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
+    "scripts/tests/dryrun-gate-knowledge-namespace-regression.sh",
     "scripts/tests/fixtures/ds-publish-637a526.sh",
     "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
