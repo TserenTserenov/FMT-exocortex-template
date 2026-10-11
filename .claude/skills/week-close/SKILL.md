@@ -140,18 +140,25 @@ PY3="$(bash "$S/lib/find-python3.sh")" && "$PY3" "$S/archive-cadence-sweep.py" -
 #### 7a. Проверка здоровья бэкапов
 
 > Обязательный шаг перед бэкапом. Запускает `iwe-backup-check.sh` (WP-317 supplement).
+> **issue #880:** `backup_enabled: false` в `params.yaml` → пользователь ведёт свой бэкап через собственное расширение (`week-close.after.*.md`) — пропустить 7a и 7b целиком, не запускать встроенную проверку/бэкап вообще.
+
+```bash
+grep -qE '^backup_enabled:[[:space:]]*false([[:space:]]*(#.*)?)?$' "${WORKSPACE_DIR}/params.yaml" 2>/dev/null && BACKUP_DISABLED=1 || BACKUP_DISABLED=0
+```
+
+`BACKUP_DISABLED=1` → пропустить 7a и 7b, перейти к 7c. Иначе:
 
 ```bash
 bash ${IWE_SCRIPTS}/iwe-backup-check.sh
 ```
 
-Если вернул ❌ (exit 2) — устранить критичные gaps ДО бэкапа (устаревший бэкап >14 дней, нет iCloud).  
+Если вернул ❌ (exit 2) — устранить критичные gaps ДО бэкапа (устаревший бэкап >14 дней, нет директории бэкапа — по умолчанию iCloud, либо `backup_dir` из `params.yaml`, если задан).  
 Если вернул ⚠️ (exit 1) — зафиксировать warnings в WeekReport, продолжить.  
 Если ✅ (exit 0) — бэкап в норме.
 
 #### 7b. Бэкап IWE в iCloud
 
-> Условный шаг: только macOS с iCloud Drive. Запускать ТОЛЬКО если 7a не вернул ❌.
+> Условный шаг: только macOS с iCloud Drive, и только если `BACKUP_DISABLED=0` (см. 7a). Запускать ТОЛЬКО если 7a не вернул ❌.
 
 ```bash
 ${IWE_SCRIPTS}/backup-icloud.sh

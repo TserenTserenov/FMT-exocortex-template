@@ -95,6 +95,20 @@ if [ -f "$UPDATE_MARKER" ]; then
     exit 75
 fi
 
+# issue #1097: every delivery check below used to fetch/compare against the literal
+# "origin/main", so an install whose governance repo defaults to e.g. "master" failed
+# postcondition with rc=70 on every scheduled run even though delivery was fine. Resolved
+# once from the already-cloned repo's remote HEAD symref (no network call), "main" is only
+# the fallback when that symref is missing (fresh clone edge case).
+resolve_default_branch() {
+    # --short here would return "origin/master", not "master" (verified live,
+    # git 2.50.1): --short only drops the "refs/remotes/" prefix, not the
+    # remote name. Read the full ref and strip the known prefix ourselves.
+    git -C "$WORKSPACE" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##'
+}
+GIT_DEFAULT_BRANCH="$(resolve_default_branch)"
+GIT_DEFAULT_BRANCH="${GIT_DEFAULT_BRANCH:-main}"
+
 # PROMPTS_DIR резолв: $IWE_TEMPLATE (Generated runtime) → $HOME/IWE/FMT-exocortex-template (default) → relative (legacy fallback)
 if [ -n "${IWE_TEMPLATE:-}" ] && [ -d "$IWE_TEMPLATE/roles/strategist/prompts" ]; then
     PROMPTS_DIR="$IWE_TEMPLATE/roles/strategist/prompts"
@@ -311,7 +325,7 @@ fetch_delivery_origin() {
     case "$pause" in ''|0?*|*[!0-9]*|?????*) pause=5 ;; esac
     while :; do
         rc=0
-        GIT_TERMINAL_PROMPT=0 timeout "$per_try" "${DELIVERY_GIT_BIN:-git}" -C "$WORKSPACE" fetch -q origin main >/dev/null 2>>"$LOG_FILE" || rc=$?
+        GIT_TERMINAL_PROMPT=0 timeout "$per_try" "${DELIVERY_GIT_BIN:-git}" -C "$WORKSPACE" fetch -q origin "$GIT_DEFAULT_BRANCH" >/dev/null 2>>"$LOG_FILE" || rc=$?
         [ "$rc" -eq 0 ] && return 0
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] GIT-FETCH: попытка $n из $attempts не удалась (код $rc)" >> "$LOG_FILE"
         [ "$n" -lt "$attempts" ] || return 1
@@ -320,41 +334,41 @@ fetch_delivery_origin() {
     done
 }
 
-delivery_baseline() {  # <scenario> -> origin/main sha before the run; empty = no contract or origin not freshly read
+delivery_baseline() {  # <scenario> -> origin/$GIT_DEFAULT_BRANCH sha before the run; empty = no contract or origin not freshly read
     [ -n "$(expected_delivery_path "$1")" ] || return 0
-    # A failed fetch must NOT fall back to the old local origin/main: a stale baseline would let
-    # an earlier report commit pass as this run's delivery.
+    # A failed fetch must NOT fall back to the old local origin/$GIT_DEFAULT_BRANCH: a stale
+    # baseline would let an earlier report commit pass as this run's delivery.
     fetch_delivery_origin || return 0
-    git -C "$WORKSPACE" rev-parse origin/main 2>/dev/null || true
+    git -C "$WORKSPACE" rev-parse "origin/$GIT_DEFAULT_BRANCH" 2>/dev/null || true
 }
 
-verify_delivery_postcondition() {  # <scenario> <origin/main sha before the run>; 0 = delivered or none required
+verify_delivery_postcondition() {  # <scenario> <origin/$GIT_DEFAULT_BRANCH sha before the run>; 0 = delivered or none required
     local scenario="$1" pre_origin="$2" spec post_origin existing
     spec=$(expected_delivery_path "$scenario")
     [ -n "$spec" ] || return 0
     if [ -z "$pre_origin" ]; then
-        log "POSTCONDITION scenario: $scenario -- origin/main перед запуском прочитать не удалось (нужны remote origin и ветка main, сеть), доставку проверить нельзя"
+        log "POSTCONDITION scenario: $scenario -- origin/$GIT_DEFAULT_BRANCH перед запуском прочитать не удалось (нужны remote origin и ветка по умолчанию, сеть), доставку проверить нельзя"
         return 1
     fi
     if ! fetch_delivery_origin; then
-        log "POSTCONDITION scenario: $scenario -- git fetch не удался (нужны remote origin и ветка main, сеть), доставку проверить нельзя"
+        log "POSTCONDITION scenario: $scenario -- git fetch не удался (нужны remote origin и ветка по умолчанию, сеть), доставку проверить нельзя"
         return 1
     fi
-    post_origin=$(git -C "$WORKSPACE" rev-parse origin/main 2>/dev/null) || post_origin=""
+    post_origin=$(git -C "$WORKSPACE" rev-parse "origin/$GIT_DEFAULT_BRANCH" 2>/dev/null) || post_origin=""
     if [ -z "$post_origin" ] || ! git -C "$WORKSPACE" merge-base --is-ancestor "$pre_origin" "$post_origin" 2>/dev/null; then
-        log "POSTCONDITION scenario: $scenario -- origin/main не продолжает состояние до запуска (${pre_origin:0:12} не предок ${post_origin:0:12}): расхождение или force-push"
+        log "POSTCONDITION scenario: $scenario -- origin/$GIT_DEFAULT_BRANCH не продолжает состояние до запуска (${pre_origin:0:12} не предок ${post_origin:0:12}): расхождение или force-push"
         return 1
     fi
     # ACMRT: a deletion of the report file is a change, not a delivery.
     if [ -z "$(git -C "$WORKSPACE" diff --name-only --diff-filter=ACMRT "$pre_origin" "$post_origin" -- ":(glob)$spec")" ]; then
-        log "POSTCONDITION scenario: $scenario -- за запуск на origin/main не появилось созданного или изменённого файла '$spec': отчёт не доставлен"
+        log "POSTCONDITION scenario: $scenario -- за запуск на origin/$GIT_DEFAULT_BRANCH не появилось созданного или изменённого файла '$spec': отчёт не доставлен"
         # The proof is per run, on purpose: a report that was already there is not this run's work
         # (an empty stub or last week's file would otherwise pass). A rerun after an earlier delivery
         # still fails here, so name what IS there -- the reader can tell a false alarm at a glance.
         # diff against the empty tree: the same pathspec semantics as the delivery check above
         # (ls-tree reads its paths differently and would miss the glob).
         existing=$(git -C "$WORKSPACE" diff --name-only "$(git -C "$WORKSPACE" hash-object -t tree /dev/null)" "$post_origin" -- ":(glob)$spec" 2>/dev/null | tr '\n' ';')
-        [ -z "$existing" ] || log "POSTCONDITION scenario: $scenario -- на origin/main уже есть, без изменений за этот запуск: ${existing%;}"
+        [ -z "$existing" ] || log "POSTCONDITION scenario: $scenario -- на origin/$GIT_DEFAULT_BRANCH уже есть, без изменений за этот запуск: ${existing%;}"
         return 1
     fi
     return 0
@@ -488,9 +502,9 @@ ISO_WORKSPACE=""
 ISO_BRANCH=""
 ISO_BASE_SHA=""
 # The copy is created from origin/$ISO_BASE_BRANCH and its result is published back to it: the copy's
-# own branch ($ISO_BRANCH) exists only locally. The value must match the branch fetch_delivery_origin
-# refreshes (main, fixed there); change them together.
-ISO_BASE_BRANCH="main"
+# own branch ($ISO_BRANCH) exists only locally. Shares $GIT_DEFAULT_BRANCH with
+# fetch_delivery_origin (issue #1097) so both always agree without being kept in sync by hand.
+ISO_BASE_BRANCH="$GIT_DEFAULT_BRANCH"
 
 isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
     local list=",${STRATEGIST_ISOLATED_SCENARIOS:-},"
@@ -538,7 +552,7 @@ isolated_begin() {  # <scenario>; 0 = ready, 1 = not started (canon untouched)
         return 1
     fi
     if ! fetch_delivery_origin; then
-        log "ISOLATION: git fetch origin main не удался, свежую копию взять нельзя, сценарий $scenario не запущен"
+        log "ISOLATION: git fetch origin $GIT_DEFAULT_BRANCH не удался, свежую копию взять нельзя, сценарий $scenario не запущен"
         return 1
     fi
     if ! git -C "$canon" rev-parse --verify -q "origin/$ISO_BASE_BRANCH^{commit}" >/dev/null 2>&1; then
@@ -905,7 +919,7 @@ ${prompt}"
         # WP-530 Ф72: nothing the model committed is published unverified; the runner checks the
         # allowlist and publishes from the copy (isolated_finish).
         log "Isolated run: публикацию делает isolated_finish после проверки списка путей"
-    elif git -C "$WORKSPACE" diff --quiet origin/main..HEAD 2>/dev/null; then
+    elif git -C "$WORKSPACE" diff --quiet "origin/$GIT_DEFAULT_BRANCH..HEAD" 2>/dev/null; then
         log "No unpushed commits"
     else
         # WP-7 Ф101: raw pull --rebase + push on a checkout shared with
