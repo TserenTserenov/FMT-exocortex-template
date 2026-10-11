@@ -154,7 +154,8 @@ fetch_update_manifest() {
             # shellcheck disable=SC2086
             curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$url" >"$part" 2>"$errf" || rc=$?
         fi
-        err_line=$(tail -n 1 "$errf" 2>/dev/null | cut -c1-200)
+        # tr -d '\r': a native Windows curl ends its stderr lines with CRLF (issue #1150).
+        err_line=$(tail -n 1 "$errf" 2>/dev/null | tr -d '\r' | cut -c1-200)
         if [ "$rc" -eq 0 ] && [ ! -s "$part" ]; then
             err_line="curl завершился без ошибки, но файл пуст"
         elif [ "$rc" -eq 0 ] && [ "$(tr -d ' \t\r\n' < "$part" | head -c 1)" != "{" ]; then
@@ -164,7 +165,7 @@ fetch_update_manifest() {
             return 1
         elif [ "$rc" -eq 0 ]; then
             if ! mv -f "$part" "$dest" 2>"$errf"; then
-                FETCH_MANIFEST_DIAG="манифест скачан, но не записан на место: $(tail -n 1 "$errf" | cut -c1-200)"
+                FETCH_MANIFEST_DIAG="манифест скачан, но не записан на место: $(tail -n 1 "$errf" | tr -d '\r' | cut -c1-200)"
                 echo "  ⚠ Попытка $attempt из $max_attempts: $FETCH_MANIFEST_DIAG"
                 rm -f "$part" "$errf"
                 return 1
@@ -3575,6 +3576,30 @@ echo ""
 # только номер. python3 недоступен → откат на version-only с явной пометкой
 # (не тихий даунгрейд гарантии).
 if $CHECK_ONLY && $FAST_CHECK; then
+    # issue #1185: the fast path used to skip straight to the version/files
+    # comparison below, which only reports "differs" either way -- a local
+    # install ahead of the release read as "update available" instead of
+    # "applying this would roll you back". Same check and wording as the
+    # full --check path (#863), just run before the fast-path exit instead
+    # of after the full file-diff walk.
+    _fast_rollback_code=1
+    if detect_release_rollback; then
+        _fast_rollback_code=0
+    else
+        _fast_last_rc=$?
+        [ "$_fast_last_rc" -eq 2 ] && _fast_rollback_code=2
+    fi
+    if [ "$_fast_rollback_code" -eq 0 ]; then
+        echo "🔴 ВНИМАНИЕ: локальная установка новее последнего релиза."
+        echo "   Применение обновления release-каналом ОТКАТИТ установку на более старый снимок."
+        echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+        echo ""
+    elif [ "$_fast_rollback_code" -eq 2 ]; then
+        echo "⚠️ ВНИМАНИЕ: не удалось проверить историю релиза; автоматическое применение с --yes заблокировано."
+        echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+        echo ""
+    fi
+
     LOCAL_MANIFEST="$SCRIPT_DIR/update-manifest.json"
     LOCAL_VERSION=""
     [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(manifest_version "$LOCAL_MANIFEST")

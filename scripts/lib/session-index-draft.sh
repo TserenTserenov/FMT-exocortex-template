@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# Sourced, not executed: declares functions only, no shebang needed
+# (smoke-clean-env.sh exemption, issue #1013).
 # session-index-draft.sh — single point of truth for writing to the
 # sessions/00-index.md draft buffer (WP-537 Ф4, design consensus at
 # sessions/2026-08/17/2026-08-17-09-sessions-index-snapshotter/report.md).

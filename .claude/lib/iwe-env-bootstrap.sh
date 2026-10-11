@@ -140,13 +140,43 @@ case "$(uname -s)" in
   *)      export IWE_OS="unknown" ;;
 esac
 
-# IWE_ICLOUD_BACKUP_DIR: macOS iCloud Drive path for IWE backups.
-# Empty on non-macOS platforms — scripts must guard with [ -n "$IWE_ICLOUD_BACKUP_DIR" ].
-if [ "$IWE_OS" = "macos" ]; then
+# IWE_ICLOUD_BACKUP_DIR: backup destination for week-close §7a/7b.
+# Empty when there is none — scripts must guard with [ -n "$IWE_ICLOUD_BACKUP_DIR" ].
+#
+# issue #880: a user whose data-residency rules forbid iCloud had no way to
+# point this elsewhere — the var was unconditionally overwritten on every env
+# load, and params.yaml had no matching key. Precedence: a pre-exported
+# IWE_ICLOUD_BACKUP_DIR (set by the caller's shell) wins outright; else
+# params.yaml's backup_dir (any OS, not just macOS — the point is to let the
+# pilot choose, not to extend iCloud support to Linux); else the macOS-iCloud
+# default, unchanged for everyone who sets neither.
+PARAMS_FILE_FOR_BACKUP="${WORKSPACE_DIR}/params.yaml"
+BACKUP_DIR_OVERRIDE=""
+if [ -f "$PARAMS_FILE_FOR_BACKUP" ]; then
+  BACKUP_DIR_OVERRIDE=$(grep -E '^backup_dir:' "$PARAMS_FILE_FOR_BACKUP" 2>/dev/null | head -1 \
+    | sed -E 's/^backup_dir:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//')
+  # Same leading-~ expansion as WORKSPACE_DIR above and linear_sync_path in
+  # scripts/day-close.sh — bash does not expand ~ inside a variable
+  # substitution, so a params.yaml value written the same way as every other
+  # documented path key (e.g. "~/Backups") would otherwise be used literally.
+  BACKUP_DIR_OVERRIDE="${BACKUP_DIR_OVERRIDE/#\~/$HOME}"
+fi
+if [ -n "${IWE_ICLOUD_BACKUP_DIR:-}" ]; then
+  export IWE_ICLOUD_BACKUP_DIR
+elif [ -n "$BACKUP_DIR_OVERRIDE" ]; then
+  export IWE_ICLOUD_BACKUP_DIR="$BACKUP_DIR_OVERRIDE"
+elif [ "$IWE_OS" = "macos" ]; then
   export IWE_ICLOUD_BACKUP_DIR="${HOME}/Library/Mobile Documents/com~apple~CloudDocs/IWE-backups"
-  export IWE_ICLOUD_ROOT="${HOME}/Library/Mobile Documents/com~apple~CloudDocs"
 else
   export IWE_ICLOUD_BACKUP_DIR=""
+fi
+# IWE_ICLOUD_ROOT stays iCloud-specific (backup-icloud.sh's own mount sanity
+# check) regardless of backup_dir — a custom non-iCloud target skips
+# backup-icloud.sh entirely via backup_enabled: false (SKILL.md §7a/7b), it
+# does not repurpose this check.
+if [ "$IWE_OS" = "macos" ]; then
+  export IWE_ICLOUD_ROOT="${HOME}/Library/Mobile Documents/com~apple~CloudDocs"
+else
   export IWE_ICLOUD_ROOT=""
 fi
 

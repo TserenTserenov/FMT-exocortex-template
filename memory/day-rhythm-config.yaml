@@ -5,6 +5,13 @@
 day_open:
   week_close_day: sunday
   strategy_day: sunday          # Day for strategizing session (monday..sunday)
+  # day_boundary: "04:30"        # issue #924 — work done after midnight but before this
+                                 # hour still belongs to the day that's ending, not a new
+                                 # one. Shifts day-open-scaffold.sh/day-open-pipeline.sh's
+                                 # auto "today" (no explicit --date) back by one calendar
+                                 # day whenever the current time is earlier than this.
+                                 # Commented out = no shift (midnight boundary, unchanged
+                                 # from before this key existed).
   self_dev_slot: 1              # Slot number for self-development (always first by default)
   self_dev_missing_alert: true  # Explicitly say if no self-dev in today's plan
   interactive: false            # false = Day Open одним блоком. true = промежуточные вопросы.

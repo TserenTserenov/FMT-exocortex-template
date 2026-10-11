@@ -424,8 +424,17 @@ if command -v grep >/dev/null 2>&1; then
             PROMPT_SCRIPT_VIOLATIONS=$((PROMPT_SCRIPT_VIOLATIONS + 1))
         fi
     done < <(
+        # issue #884 cold-review: the old extraction (`grep -oE 'scripts/[^[:space:]/]+\.sh'`)
+        # matched "scripts/x.sh" as a SUBSTRING anywhere, so a perfectly valid
+        # ".claude/scripts/x.sh" or "roles/foo/scripts/x.sh" reference was reported as
+        # a missing root scripts/x.sh. Capture the whole shell token first (back to the
+        # nearest whitespace/quote), then only flag it if that token's path genuinely
+        # STARTS at scripts/ (optionally through a leading "./") -- a nested scripts/
+        # dir never reaches the root-scripts/ existence check below.
         grep -rh 'bash[[:space:]]\+.*scripts/[^[:space:]"'\'']*\.sh' roles/*/prompts/*.md 2>/dev/null \
-            | grep -oE 'scripts/[^[:space:]/]+\.sh' \
+            | grep -oE '[^[:space:]"'\'']*scripts/[^[:space:]"'\'']*\.sh' \
+            | sed -E 's#^\./##' \
+            | grep -E '^scripts/' \
             | sed 's|scripts/||' \
             | sort -u
     )

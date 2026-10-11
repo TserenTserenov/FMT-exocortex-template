@@ -25,16 +25,29 @@ routing:
 ### Шаг 1: wakatime-cli
 
 ```bash
-# Проверить наличие
-~/.wakatime/wakatime-cli --version 2>/dev/null || wakatime-cli --version 2>/dev/null
+# Проверить наличие (маска, не точное имя — issue #1151: расширение VS Code
+# на Windows скачивает бинарь как wakatime-cli-windows-amd64.exe)
+ls ~/.wakatime/wakatime-cli* 2>/dev/null || wakatime-cli --version 2>/dev/null
 ```
 
-Если не установлен:
+Если не установлен — путь зависит от ОС:
+
+**macOS:**
 ```bash
 brew install wakatime-cli
 mkdir -p ~/.wakatime
 ln -sf $(which wakatime-cli) ~/.wakatime/wakatime-cli
 ```
+
+**Windows (issue #1151):** нет пакетного менеджера для прямой установки CLI.
+Поставь расширение WakaTime для VS Code (Extensions → WakaTime) — оно само
+скачивает бинарь в `~/.wakatime/wakatime-cli-windows-amd64.exe` при первом
+запуске. Дальше шаги 2-4 работают как есть: скрипты шаблона ищут файл по
+маске `wakatime-cli*`, не по точному имени. Альтернатива без WakaTime вообще:
+ActivityWatch через `extensions/day-close.before.*.md` (см. README расширения).
+
+**Linux:** см. https://wakatime.com/plugins — пакет под дистрибутив или
+скачать бинарь вручную в `~/.wakatime/wakatime-cli`.
 
 ### Шаг 2: API Key
 
@@ -86,8 +99,13 @@ if [ "$EVENT" = "PostToolUse" ]; then
   esac
 fi
 
+# Resolve the CLI binary by mask, not exact name — issue #1151: the VS Code
+# WakaTime extension on Windows downloads it as wakatime-cli-windows-amd64.exe.
+WAKATIME_CLI=$(ls -d "$HOME"/.wakatime/wakatime-cli* 2>/dev/null | head -1)
+[ -z "$WAKATIME_CLI" ] && exit 0
+
 # Send heartbeat in background (non-blocking, silent)
-(~/.wakatime/wakatime-cli \
+("$WAKATIME_CLI" \
   --entity-type app \
   --entity "Claude Code" \
   --category "$CATEGORY" \
@@ -118,7 +136,10 @@ chmod +x ~/.claude/hooks/wakatime-heartbeat.sh
   {"hooks": [{"type": "command", "command": "~/.claude/hooks/wakatime-heartbeat.sh", "async": true}]}
   ```
 
-### Шаг 5: WakaTime Desktop App (спроси пользователя)
+### Шаг 5: WakaTime Desktop App (только macOS — спроси пользователя)
+
+На Windows/Linux нет `brew`-эквивалента в этом шаге — пропусти его молча
+(ActivityWatch из шага 1 уже закрывает трекинг фокуса окна там, где нужен).
 
 Спроси: «Установить WakaTime Desktop App? Он трекает время фокуса окна (когда читаешь ответы, работаешь в браузере). Требует Accessibility-разрешение в macOS.»
 
@@ -134,7 +155,8 @@ open -a WakaTime
 ```bash
 echo '{"cwd": "'$(pwd)'", "hook_event_name": "UserPromptSubmit", "prompt": "test"}' | ~/.claude/hooks/wakatime-heartbeat.sh
 sleep 3
-~/.wakatime/wakatime-cli --today
+WAKA_CLI=$(ls -d ~/.wakatime/wakatime-cli* 2>/dev/null | head -1)
+"$WAKA_CLI" --today
 ```
 
 Покажи результат пользователю. Скажи: «Хуки подхватятся при следующем запуске Claude Code (хуки загружаются при старте сессии).»

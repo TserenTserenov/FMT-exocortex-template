@@ -149,6 +149,14 @@ Refs: WP-NNN
 
 ### Changed
 
+- [optional] `.github/workflows/weekly-release.yml`: будильник недельного автовыпуска сдвинут с 23:00 МСК (20:00 UTC) на 20:00 МСК (17:00 UTC) — прежнее время (ночь на понедельник) было неудобно для живого наблюдения (#1193).
+- [optional] `memory/fpf-reference.md`: справочник описывает состав экосистемы FPF — помимо Core (`FPF-Spec.md`, Part A–G) перечислены DPF-сьюты (Foundational Thinking — 5 DPF, Engineering — 27 DPF, Narrativization), точки входа `Readme.md`/`USING-FPF.md`/Suite Reference и поиск паттернов по ID через rg; `fpf_version` обновлён до upstream `e2c6ac1` от 2026-10-10 (#925, #1190).
+- [optional] Шаги 6a и 8 стратегической сессии (`strategy-session-weekly/steps/06a-pool.md`, `08-confirm.md`): ручной путь описан как базовый и полный (пул недели собирается без личных скриптов), скрипты `week-open-scaffold.sh`/`week_pool_manifest.py`/`week-open-llm-fill.py`/`strategy-focus-hash.sh`/`strategy-session-checks-runner.sh` — явно помеченные опциональные ускорители, которых нет в поставке шаблона (#1100, #1191).
+- [behavior] `strategist.sh`: ветка доставки резолвится из `refs/remotes/origin/HEAD` вместо хардкода `main`, поэтому установки с веткой управления `master` не падают на проверке доставки `week-review` каждый ночной запуск (#1097, #1195).
+- [behavior] `day-open-scaffold.sh`/`day-open-pipeline.sh`: ключ `day_boundary` из `day-rhythm-config.yaml` читается и сдвигает автоматическую дату «сегодня» на день назад, если запуск идёт раньше этого часа (#924, #1195).
+- [behavior] `week-review.md` (ночной сценарий): перед публикацией поста итогов недели читаются расширения `week-close.before.*`, поэтому отмена публикации (например `no-weekly-post`) действует так же, как в ручном `/week-close` (#884, #1195).
+- [behavior] Week Close: место и включение встроенного бэкапа настраиваются через `backup_dir`/`backup_enabled` в `params.yaml`, не только через iCloud (#880, #1195).
+- [fix] `integration-contract-validator.sh`: проверка ссылок на скрипты в промптах (`prompt_script_refs`) больше не ложно отвергает путь во вложенной папке (например `.claude/scripts/...`) как отсутствующий корневой скрипт (#1195).
 - [behavior] `create-wp.sh`: строка в таблице плана недели с колонками `РП | Работа | Часы (потолок) | Источник | Ставка | Статус | Репо` раскладывается по колонкам (номер в «РП», название в «Работа», бюджет, ставка и репозиторий в своих), а не кладёт название в «РП» и оставляет остальное пустым при сообщении об успехе (#1152, #1170, #1177).
 - [behavior] `memory-drift-scan.py`: карточка РП с ведущими нулями в номере (`inbox/WP-038/`) находится; РП без найденной карточки больше не молчит, а выводится строкой «не удалось проверить N из M РП» (#1154, #1177).
 - [behavior] `day-open-scaffold.sh`: путь к `day-rhythm-config.yaml` передаётся в Python через `cygpath -m`, поэтому на Windows (Git Bash) настройки дня читаются, а не заменяются значениями по умолчанию (#1149, #1177).
@@ -157,6 +165,15 @@ Refs: WP-NNN
 - [behavior] `/skill-creator`, шаг проверки: `verify-skill.sh` находит Python-резолвер на пользовательской установке (`.claude/lib/find-python3.sh`, затем `$IWE_SCRIPTS/lib`, затем раскладка шаблона), а не только `scripts/lib` рядом с `.claude/` (#1165, #1177).
 - [behavior] `day-open-smoke-extended.sh` больше не оставляет неотслеживаемый `current/.smoke-cache.json` в репозитории управления: строка добавлена в `seed/strategy/.gitignore`, а у существующих установок скрипт сам вносит её в локальный `.git/info/exclude` (#1146, #1177).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/server-calendar.sh (#1173).
+- [bug] `scripts/lib/{governance-repo-path,session-index-draft}.sh`: добавлен маркер «Sourced, not executed», который требует `smoke-clean-env.sh` у sourced-only библиотек без shebang; бит исполнения выровнен до 100755 по образцу `peer-adapter-common.sh` (#1013, #1194).
+- [bug] `.claude/sync-manifest.yaml`: удалена запись `staging-promotion` из `activity_checks` — авторская инфраструктура обкатки, навсегда ложный кандидат на любой пользовательской установке (#1098, #1194).
+- [bug] `setup-wakatime`: детекция `wakatime-cli` идёт по маске `wakatime-cli*`, не по точному имени (расширение VS Code на Windows скачивает `wakatime-cli-windows-amd64.exe`); добавлены Windows-инструкции (#1151, #1194).
+- [bug] `.claude/scripts/load-extensions.sh`: `find -L` — `extensions/` как symlink/junction (штатно на Windows) теперь резолвится (#1157, #1194).
+- [bug] `update.sh`: `tr -d '\r'` в двух местах разбора `curl` stderr, где его не было — native Windows CRLF больше не ломает текст причины ошибки (#1150, #1194).
+- [bug] `update.sh --check --fast`: теперь тоже выводит предупреждение «установка новее релиза» до своего раннего выхода, а не только полный `--check` (#1185, #1194).
+- [bug] `scripts/session-guard.sh`: `yaml_task_line()` без PyYAML больше не пишет значение без экранирования (#1006, #1194).
+- [bug] `roles/strategist/install.sh`: расписание launchd-агента (`StartCalendarInterval`/`RunAtLoad`) из установленной копии теперь сохраняется при `update.sh` структурным слиянием, а не затирается шаблоном целиком (#981, #1194).
+- [bug] `scripts/update-derived-snapshot.py`: одноразовая миграция убирает устаревший `inbox/WP-425/derived_snapshot.json` (путь до фикса #1132), не трогая саму директорию (#1171, #1194).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/server-calendar.sh (#1169).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/lib/governance-repo-path.sh, scripts/lib/session-index-draft.sh, scripts/grok-peer-adapter.sh, scripts/session-manifest-write.sh, scripts/session-dir-reserve.sh (#1163).
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлён memory/roles.md (#1164).
@@ -175,6 +192,9 @@ Refs: WP-NNN
 
 ### Fixed
 
+- [behavior] `wp-sync-actualizer` больше не встаёт при отсутствии `scripts/lib/git-sync-status.sh` в установке: `checker_unavailable` с `reason=library_missing` принимается как штатное degraded (в чистой установке проверка свежести рабочей копии невозможна физически), любая другая причина остаётся stop condition; smoke-сценарий H (#1144, #1196).
+- [behavior] `destructive-guard.sh`: склейка `\`-переносов строк в perl-редукции heredoc переведена на линейное время (сегменты накапливаются списком, состояние кавычек переносится между итерациями явно) — было квадратичное, 2000 переносов ≈ 10 с на двухъядерной машине, стало ~0.1 с; добавлен регресс-тест по времени `perf_cases.py` (#1148, #1192).
+- [security] Фоновые роли (extractor, launchd) больше не оставляют агенту отправку в Telegram без подтверждения: `--allowedTools` не ограничивает MCP-инструменты, поэтому в обеих точках запуска Claude CLI добавлен явный запрет `mcp__iwe-knowledge__send_telegram_message` (точечно — `knowledge_search`/`knowledge_get_document` того же сервера продолжают работать) (#1096, #1197).
 - [behavior] Повторный ребейз #1012 на main 11.10: содержательная правка (тихие повторы Telegram после отсрочки Open Day) была готова и ждала слияния с 02.10, но main с тех пор ушёл дальше; запись здесь нужна только для гейта CI, сама находка уже описана выше в разделе [0.41.1] (#1012).
 - [optional] `docs/hindsight-setup.md`: вводный абзац теперь явно говорит, что гайд разворачивает только контейнер хранилища (слой L2), а не подключает Recall/Retain/Reflect к рабочему процессу — отсылка к разделу «4. Manual integration» для этого шага (#614).
 
