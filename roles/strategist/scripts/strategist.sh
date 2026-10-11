@@ -104,7 +104,14 @@ resolve_default_branch() {
     # --short here would return "origin/master", not "master" (verified live,
     # git 2.50.1): --short only drops the "refs/remotes/" prefix, not the
     # remote name. Read the full ref and strip the known prefix ourselves.
-    git -C "$WORKSPACE" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##'
+    # `|| true`: under `set -e` (top of this file) a failing pipe here --
+    # verified live with a shimmed sed that always exits 1 -- aborted the
+    # WHOLE script at load time, long before isolated_begin() ever ran, not
+    # just this one lookup (CI: "sed fails" scenario in
+    # setup/test-strategist-isolated-scenarios.sh, 1 regression caught
+    # post-merge). The fallback two lines below already covers empty output;
+    # this only stops that failure from propagating further.
+    git -C "$WORKSPACE" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true
 }
 GIT_DEFAULT_BRANCH="$(resolve_default_branch)"
 GIT_DEFAULT_BRANCH="${GIT_DEFAULT_BRANCH:-main}"
