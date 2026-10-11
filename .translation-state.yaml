@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-10-10T14:45:20Z'
-last_synced_sha: dd9784c879c24d04b2c86996afb15631f54647a3
+files_translated:
+- docs/LEARNING-PATH.md
+last_run_utc: '2026-10-11T09:09:11Z'
+last_synced_sha: b22977defddebb266c06ae6b4b73300374901bc0
 schema_version: 1
