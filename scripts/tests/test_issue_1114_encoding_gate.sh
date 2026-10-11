@@ -7,6 +7,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 CHECKER="$ROOT/scripts/check-python-encoding.py"
+# python-resolver contract: no bare python3 (stdlib suffices for the checker).
+PYTHON3=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || {
+  echo "FAIL: python3 not found (find-python3.sh)" >&2
+  exit 1
+}
 FIXTURE="$(mktemp -d)"
 trap 'rm -rf "$FIXTURE"' EXIT
 BASELINE="$FIXTURE/baseline.txt"
@@ -94,7 +99,7 @@ git -C "$FIXTURE" add -f ok_cases.py bad_builtin.py bad_path.py bad_varmode.py n
 
 run_checker() {  # captures output, returns the checker's exit code
     set +e
-    OUTPUT=$(cd "$FIXTURE" && python3 "$CHECKER" --baseline "$BASELINE" "$@" 2>&1)
+    OUTPUT=$(cd "$FIXTURE" && "$PYTHON3" "$CHECKER" --baseline "$BASELINE" "$@" 2>&1)
     CODE=$?
     set -e
 }

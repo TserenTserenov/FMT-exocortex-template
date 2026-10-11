@@ -2769,7 +2769,7 @@
     },
     {
       "path": "scripts/tests/cp1251-smoke.sh",
-      "sha256": "d2f0f9db481159a634dbcc28446a92ea146337e02a5eab46fdd54b1ed480d85e"
+      "sha256": "83e797bc375903984c7b0b982b4baa582434ed4967024be8c27a38c99b361c21"
     },
     {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
@@ -2881,7 +2881,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1114_encoding_gate.sh",
-      "sha256": "438005ab6b34a58fe985784707b6796500df664f7683c3be63e3437294277db3"
+      "sha256": "d04c72dfce30c1452999456b7f78b05fabe64332bf3668329e87866e14822aeb"
     },
     {
       "path": "scripts/tests/test_issue_1147_memory_migrate.sh",

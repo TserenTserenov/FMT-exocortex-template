@@ -26,6 +26,13 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# python-resolver contract: no bare python3 — resolve via find-python3.sh
+# (stdlib suffices for the covered scripts).
+PYTHON3=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || {
+  echo "FAIL: python3 not found (find-python3.sh)" >&2
+  exit 1
+}
+
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/DS-strategy/inbox"
@@ -55,11 +62,11 @@ run_case() {
 }
 
 run_case "check-manifest-coverage.py full run" 0 \
-  bash -c 'git ls-files | python3 scripts/check-manifest-coverage.py update-manifest.json'
+  bash -c 'git ls-files | "$1" scripts/check-manifest-coverage.py update-manifest.json' _ "$PYTHON3"
 run_case "check-manifest-coverage.py no-arg usage (exit 2, not a crash)" 2 \
-  python3 scripts/check-manifest-coverage.py
+  "$PYTHON3" scripts/check-manifest-coverage.py
 run_case "wp-list.py --list-cards on empty temp workspace" 0 \
-  python3 scripts/wp-list.py --list-cards --iwe-root "$TMP" --governance-repo DS-strategy
+  "$PYTHON3" scripts/wp-list.py --list-cards --iwe-root "$TMP" --governance-repo DS-strategy
 
 echo ""
 if [ "$FAILURES" -eq 0 ]; then
