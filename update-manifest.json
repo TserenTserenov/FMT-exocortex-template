@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "ac9c09367773379a1b7d7ed0864a22ddf3d0a13cae708d002a9071a43660d249"
+      "sha256": "e576e3bdbe087be0ba3131dd6b0a64f3aba8c905af9fa4a9c9a54b40f22cced8"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -198,6 +198,10 @@
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
       "sha256": "12458212d56fb632908ff576e4d8f5050b3b65c2e733d64ebd9b29bcab2d9718"
+    },
+    {
+      "path": ".claude/hooks/tests/destructive-guard/perf_cases.py",
+      "sha256": "27197a8ddeb201ab34e96233af488e305434eb3a26ad326eee4ea9d35660011b"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
@@ -861,7 +865,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8c223201d7b0bcdb59b2cf02abc681d7ef16b72c89455254ec28f29f69869376"
+      "sha256": "fddc706669fae242365f0ec484038c9b040c3b180928726b84c8c9a0b2911d74"
     },
     {
       "path": "CLAUDE.md",
