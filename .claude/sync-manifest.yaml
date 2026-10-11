@@ -137,11 +137,7 @@ activity_checks:
     archive_after_periods: 1
     notes: "Trigger: /week-close. Симптом мёртвости — MEMORY.md раздувается >100 строк."
 
-  - id: staging-promotion
-    action: "Staging-промоция validated правил в FMT"
-    expected_per_period: 1
-    period_days: 14
-    commit_pattern_regex: "(STAGING|staging|promote).*S-[0-9]+"
-    dormant_after_periods: 3
-    archive_after_periods: 1
-    notes: "Trigger: /week-close. Симптом мёртвости — S-NN validated >21 дня без промоции."
+  # staging-promotion removed (issue #1098): same class as staging-validated-to-fmt
+  # (#404) — source (STAGING.md, /author-mode) is author-only, author_mode: false
+  # installs never produce this commit pattern, so the detector reported a
+  # permanent false "dormant" candidate on every user install.
