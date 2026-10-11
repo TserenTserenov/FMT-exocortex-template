@@ -167,13 +167,28 @@ for label in com.strategist.morning com.strategist.weekreview; do
     # ограничение Weekday) без предупреждения и бэкапа при каждом update.sh —
     # backup+warn выбран вместо skip-if-diverged (пир-сессия с Codex,
     # 2026-09-09): skip навсегда заморозил бы апстрим-фиксы плиста для тех,
-    # кто его один раз отредактировал по несвязанной причине.
+    # кто его один раз отредактировал по несвязанной причине. Бэкап остаётся
+    # защитой на случай сбоя слияния ниже (issue #981).
     if [ -f "$TARGET_DIR/$label.plist" ] && ! cmp -s "$TARGET_DIR/$label.plist" "$LAUNCHD_DIR/$label.plist"; then
         BACKUP="$TARGET_DIR/$label.plist.bak-$(date +%Y%m%dT%H%M%S)"
         cp "$TARGET_DIR/$label.plist" "$BACKUP"
         echo "  ⚠ $label.plist отличается от шаблона — старая версия сохранена в $(basename "$BACKUP") перед перезаписью"
+        # issue #981: backup+overwrite reinstated the template schedule
+        # (Weekday/RunAtLoad) on every update, undoing a user's edit. Merge
+        # keeps the installed copy's schedule keys, template provides the
+        # rest (paths/env/labels), so upstream fixes still land.
+        if python3 "$SCRIPT_DIR/merge-launchd-schedule.py" \
+            "$LAUNCHD_DIR/$label.plist" "$BACKUP" "$TARGET_DIR/$label.plist.merged" 2>/dev/null; then
+            mv "$TARGET_DIR/$label.plist.merged" "$TARGET_DIR/$label.plist"
+            echo "  ↳ расписание из старой версии сохранено в новом $label.plist"
+        else
+            rm -f "$TARGET_DIR/$label.plist.merged"
+            echo "  ⚠ слияние расписания не удалось — установлен шаблон без сохранённого расписания" >&2
+            cp "$LAUNCHD_DIR/$label.plist" "$TARGET_DIR/"
+        fi
+    else
+        cp "$LAUNCHD_DIR/$label.plist" "$TARGET_DIR/"
     fi
-    cp "$LAUNCHD_DIR/$label.plist" "$TARGET_DIR/"
     if [ -z "${SETUP_CI:-}" ]; then
         launchctl load "$TARGET_DIR/$label.plist"
     fi
