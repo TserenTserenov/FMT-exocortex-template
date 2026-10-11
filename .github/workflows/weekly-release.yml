@@ -1,6 +1,6 @@
 name: Weekly Release
 
-# Еженедельно (Вс 20:00 UTC = Пн 00:00 MSK+1) проверяет CHANGELOG.md:
+# Еженедельно (Вс 20:00 MSK = 17:00 UTC) проверяет CHANGELOG.md:
 # если секция [Unreleased] непустая — по расписанию бампает patch-версию
 # в update-manifest.json и открывает PR. Ручной запуск позволяет явно
 # выбрать patch или minor; тип выпуска не выводится из сообщений коммитов.
@@ -31,7 +31,7 @@ name: Weekly Release
 
 on:
   schedule:
-    - cron: '0 20 * * 0'  # Вс 20:00 UTC
+    - cron: '0 17 * * 0'  # Вс 20:00 MSK
   workflow_dispatch:
     inputs:
       release_type:
