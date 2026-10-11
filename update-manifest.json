@@ -437,7 +437,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "950284adfb6ca2325aa71d1489b1f220ac653e8d6471d6a0c622b1f616075a4f"
+      "sha256": "91ba3a163d768b7310aea92c34acd109f328d87ae54f19bdd106522fc1ead3cb"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -929,7 +929,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "8d3738d4575453cc3958c522e0fa609d26ca687db7b98e3181e78771b78506be"
+      "sha256": "d5a53b84840d60aa411802ee7b5a67ee2351bb5958e4f68f248118eef73ea49a"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -2261,7 +2261,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "17360aceb8fc9c4cb51ec9e04a2fcb21f51cd6407fefa5d517734c02f2646e34"
+      "sha256": "c16eed8f4bb591def2971a9dd6664b1de0b55856f9aefaac2839dade3e6ba122"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
@@ -2301,7 +2301,7 @@
     },
     {
       "path": "scripts/day-open-preflight.sh",
-      "sha256": "fc89f990405a442504a8b53226310fb0c4e7613728385667244d45cb87a2a0e9"
+      "sha256": "79ccf951b65b8a9de6882694d148478eb3d6cc9a5ba72db4efa15fe08a9c64d2"
     },
     {
       "path": "scripts/day-open-priorities-patch.py",
