@@ -1797,7 +1797,7 @@
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "b65ad7b7d69dd8afb1c4f213198131784b424066f7153774f0dcd809981b4787"
+      "sha256": "fb886a7e7f4b8a2496fa1bb1d94f498fe2b75f7d060ab8fd19ba00fd912505c5"
     },
     {
       "path": "roles/strategist/merge-launchd-schedule.py",

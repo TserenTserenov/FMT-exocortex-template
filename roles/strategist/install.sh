@@ -22,6 +22,22 @@ else
     echo "  ⚠ Legacy mode: используются плейсхолдеры из FMT-substituted (запустите setup.sh ≥0.29.0 для архитектуры F)"
 fi
 
+# Resolve find-python3.sh for merge-launchd-schedule.py (issue #981) — same
+# resolver contract as the rest of the template (WP-529 Ф6/Ф9, #453/#463):
+# repo-owned .py files go through scripts/lib/find-python3.sh, not a bare
+# python3, so a Windows MS-Store python3 stub or a missing interpreter fails
+# loud instead of a silent domain error. --stdlib-only: the merge script only
+# needs plistlib, the same idiom as git-sync-status.sh/extractor.sh.
+if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/lib/find-python3.sh" ]; then
+    PYTHON3_RESOLVER="$IWE_SCRIPTS/lib/find-python3.sh"
+elif [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/scripts/lib/find-python3.sh" ]; then
+    PYTHON3_RESOLVER="$IWE_TEMPLATE/scripts/lib/find-python3.sh"
+else
+    # Legacy: roles/strategist is two levels under the template/repo root.
+    PYTHON3_RESOLVER="$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/lib/find-python3.sh"
+fi
+MERGE_PYTHON3=$(bash "$PYTHON3_RESOLVER" --stdlib-only 2>/dev/null) || MERGE_PYTHON3=""
+
 echo "Installing Strategist Agent launchd jobs..."
 echo "  LAUNCHD_DIR: $LAUNCHD_DIR"
 
@@ -177,7 +193,7 @@ for label in com.strategist.morning com.strategist.weekreview; do
         # (Weekday/RunAtLoad) on every update, undoing a user's edit. Merge
         # keeps the installed copy's schedule keys, template provides the
         # rest (paths/env/labels), so upstream fixes still land.
-        if python3 "$SCRIPT_DIR/merge-launchd-schedule.py" \
+        if [ -n "$MERGE_PYTHON3" ] && "$MERGE_PYTHON3" "$SCRIPT_DIR/merge-launchd-schedule.py" \
             "$LAUNCHD_DIR/$label.plist" "$BACKUP" "$TARGET_DIR/$label.plist.merged" 2>/dev/null; then
             mv "$TARGET_DIR/$label.plist.merged" "$TARGET_DIR/$label.plist"
             echo "  ↳ расписание из старой версии сохранено в новом $label.plist"
