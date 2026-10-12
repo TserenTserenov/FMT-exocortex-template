@@ -143,7 +143,8 @@ else
 fi
 
 # --- 5. update.sh: a link named by an older slug rule must not stop the updater ---
-awk '/^resolve_workspace_memory_dir\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }' "$ROOT/update.sh" > "$TMP/resolve_fn.sh"
+# the resolver calls memory_paths_equal (issue #1099 item 2), so both functions are carried over
+awk '/^(memory_paths_equal|resolve_workspace_memory_dir)\(\) \{/ { on = 1 } on { print } on && /^\}/ { on = 0 }' "$ROOT/update.sh" > "$TMP/resolve_fn.sh"
 if [ ! -s "$TMP/resolve_fn.sh" ]; then
     bad "could not extract resolve_workspace_memory_dir from update.sh"
 else
