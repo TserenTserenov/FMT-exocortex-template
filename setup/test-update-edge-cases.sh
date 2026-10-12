@@ -4409,7 +4409,7 @@ T43_BLOCK=$(awk '
 T43_FUNCS=""
 T43_MISSING=""
 for t43_fn in hash_file is_author_mode is_personal_config saving_cp_command backup_memory_file_before_overwrite \
-    apply_memory_policy record_memory_old_hash memory_old_hash report_memory_policy_summary \
+    apply_memory_policy record_memory_old_hash memory_old_hash report_memory_policy_summary prune_memory_backups \
     memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy; do
     t43_src=$(awk -v fn="$t43_fn" '$0 ~ "^" fn "\\(\\) \\{" {copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")
     if [ -z "$t43_src" ]; then
@@ -4697,7 +4697,7 @@ echo "--- T46: memory policy — untouched copies refreshed, edited ones kept (i
 T46_FUNCS=$(update_sh_functions hash_file is_personal_config is_author_mode report_author_skip \
     saving_cp_command backup_memory_file_before_overwrite sync_workspace_agents repair_pass \
     is_migrated_platform_memory_path migrate_platform_memory report_owner_user_memory_drift \
-    record_memory_old_hash memory_old_hash apply_memory_policy report_memory_policy_summary \
+    record_memory_old_hash memory_old_hash apply_memory_policy report_memory_policy_summary prune_memory_backups \
     memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy is_user_owned_memory report_author_user_memory report_author_skip_summary apply_refresh_stale \
     remember_untouched_memory_before_apply)
 T46_STEP6=$(awk '

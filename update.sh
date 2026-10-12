@@ -731,6 +731,27 @@ apply_memory_policy() {
     return 0
 }
 
+# prune_memory_backups — keep .backups/memory-pre-update/ from growing for ever (issue #1006).
+# Every run that replaces a memory file saves the old copy in its own dated directory; nothing
+# removed them. Remove run directories older than IWE_MEMORY_BACKUP_KEEP_DAYS (default 30), but
+# always keep the newest three. Only directories named like a run (YYYYMMDDTHHMMSSZ-PID) are touched.
+prune_memory_backups() {
+    local root="$WORKSPACE_DIR/.backups/memory-pre-update" days="${IWE_MEMORY_BACKUP_KEEP_DAYS:-30}" d n=0
+    [ -d "$root" ] || return 0
+    case "$days" in ''|*[!0-9]*) days=30 ;; esac
+    while IFS= read -r d; do
+        n=$((n + 1))
+        [ "$n" -le 3 ] && continue
+        case "$d" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z-*) ;;
+            *) continue ;;
+        esac
+        [ -d "$root/$d" ] || continue
+        [ -n "$(find "$root/$d" -maxdepth 0 -mtime +"$days" 2>/dev/null)" ] && rm -rf -- "$root/$d"
+    done < <(ls -1t "$root" 2>/dev/null)
+    return 0
+}
+
 # report_memory_policy_summary — the closing lines of the memory pass: every file this run
 # replaced with the backup directory, and every file it left as it was. repair_pass() prints them:
 # it runs after Step 6 on every path that writes memory, so the lists are complete there.
@@ -738,6 +759,9 @@ report_memory_policy_summary() {
     local f replaced="" kept=""
     for f in ${MEMORY_REPLACED[@]+"${MEMORY_REPLACED[@]}"}; do replaced="${replaced:+$replaced, }$f"; done
     for f in ${MEMORY_KEPT[@]+"${MEMORY_KEPT[@]}"}; do kept="${kept:+$kept, }$f"; done
+    # issue #1006: the closing lines of the memory pass are the one place every run goes through,
+    # so old backup runs are pruned here (the run just made is the newest and always stays).
+    prune_memory_backups
     if [ -n "$replaced" ]; then
         # issue #1006: only a copy proven untouched is ever replaced (apply_memory_policy), so this
         # is a note, not a warning: no edit of the user's was lost; the old copies stay in the backup.
@@ -2938,27 +2962,6 @@ backup_rule_before_overwrite() {
     echo "  ↳ backup: $dst → $backup"
 }
 
-# prune_memory_backups — keep .backups/memory-pre-update/ from growing for ever (issue #1006).
-# Every run that replaces a memory file saves the old copy in its own dated directory; nothing
-# removed them. Remove run directories older than IWE_MEMORY_BACKUP_KEEP_DAYS (default 30), but
-# always keep the newest three. Only directories named like a run (YYYYMMDDTHHMMSSZ-PID) are touched.
-prune_memory_backups() {
-    local root="$WORKSPACE_DIR/.backups/memory-pre-update" days="${IWE_MEMORY_BACKUP_KEEP_DAYS:-30}" d n=0
-    [ -d "$root" ] || return 0
-    case "$days" in ''|*[!0-9]*) days=30 ;; esac
-    while IFS= read -r d; do
-        n=$((n + 1))
-        [ "$n" -le 3 ] && continue
-        case "$d" in
-            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z-*) ;;
-            *) continue ;;
-        esac
-        [ -d "$root/$d" ] || continue
-        [ -n "$(find "$root/$d" -maxdepth 0 -mtime +"$days" 2>/dev/null)" ] && rm -rf -- "$root/$d"
-    done < <(ls -1t "$root" 2>/dev/null)
-    return 0
-}
-
 # issue #847: memory/* stale-repair (see repair_pass() below) used to overwrite
 # a workspace-local memory file with the template's version whenever hashes
 # differed, with no backup — unlike .claude/rules/* above, which already has
@@ -2975,7 +2978,6 @@ backup_memory_file_before_overwrite() {
     [ -f "$dst" ] || return 0
     if [ -z "$MEMORY_BACKUP_RUN" ]; then
         MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-        prune_memory_backups
     fi
     MEMORY_BACKUP_FILE="$MEMORY_BACKUP_RUN/${fpath#memory/}"
     mkdir -p "$(dirname "$MEMORY_BACKUP_FILE")" && cp "$dst" "$MEMORY_BACKUP_FILE"
