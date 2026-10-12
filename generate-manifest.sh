@@ -94,6 +94,7 @@ FILES_EXCLUDE_EXACT=(
     "PRIVACY.md"
     "CODEOWNERS"
     "CITATION.cff"
+    ".gitattributes"
     "params.yaml"
     "params.yaml.example"
     "extensions/day-close.after.md"

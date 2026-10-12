@@ -1,0 +1,7 @@
+# issue #1150: Git for Windows sets core.autocrlf=true system-wide, so a clone
+# of the template arrives with CRLF line endings while the update manifest
+# hashes LF content (hundreds of files read as "modified"; bash scripts with
+# CRLF break). Pin LF in the working tree; binaries are auto-detected.
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf

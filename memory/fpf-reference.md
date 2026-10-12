@@ -181,4 +181,4 @@ rg -n 'A\.7' {{HOME_DIR}}/IWE/FPF/FPF-Spec.md  # паттерн Core
 
 ## Обновление
 
-Периодически: `cd {{HOME_DIR}}/IWE/FPF && git pull`. FPF обновляется ~раз в 2 недели (апстрим). После pull — проверить `memory/fpf-term-map.yaml` на новые переименования (WP-481 Ф11).
+Периодически: `git -C {{HOME_DIR}}/IWE/FPF pull`. FPF обновляется ~раз в 2 недели (апстрим). После pull — проверить `memory/fpf-term-map.yaml` на новые переименования (WP-481 Ф11).

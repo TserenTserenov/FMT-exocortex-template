@@ -5,3 +5,9 @@
 
 # issue #1146: scripts/day-open-smoke-extended.sh writes a regenerable cache here.
 current/.smoke-cache.json
+
+# issue #1201: scripts/route-task.sh keeps its journal here
+# (routing-path-distribution.tsv, routing-errors.log). Runtime history lives with
+# the executor, not in the governance repo; route-task.sh also adds it to the
+# local .git/info/exclude of installs whose seed predates this entry.
+logs/

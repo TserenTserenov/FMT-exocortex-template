@@ -1739,7 +1739,36 @@ do_backup() {
   # a dedicated subtree so recovery never confuses platform rules with memory.
   if [ -d "$WORKSPACE_DIR/.claude/rules" ]; then
     mkdir -p "$EXOCORTEX_DST/rules"
-    rsync -a --delete "$WORKSPACE_DIR/.claude/rules/" "$EXOCORTEX_DST/rules/"
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --delete "$WORKSPACE_DIR/.claude/rules/" "$EXOCORTEX_DST/rules/"
+    else
+      # issue #1099: Git Bash ships no rsync. Copy into a sibling first and swap
+      # only after the copy succeeded, so a failed copy never leaves the mirror
+      # empty. The trailing "/." copies dotfiles as well.
+      rules_tmp="$EXOCORTEX_DST/rules.new.$$"
+      rules_old="$EXOCORTEX_DST/rules.old.$$"
+      rm -rf "$rules_tmp" "$rules_old"
+      if ! { mkdir -p "$rules_tmp" \
+             && cp -pR "$WORKSPACE_DIR/.claude/rules/." "$rules_tmp/"; }; then
+        rm -rf "$rules_tmp"
+        echo "ERROR: rules mirror copy failed without rsync" >&2
+        return 1
+      fi
+      # Set the previous mirror aside before the swap, so a failed move can put
+      # it back instead of leaving no mirror at all.
+      if [ -e "$EXOCORTEX_DST/rules" ] && ! mv "$EXOCORTEX_DST/rules" "$rules_old"; then
+        rm -rf "$rules_tmp"
+        echo "ERROR: rules mirror swap failed without rsync" >&2
+        return 1
+      fi
+      if ! mv "$rules_tmp" "$EXOCORTEX_DST/rules"; then
+        [ -e "$rules_old" ] && mv "$rules_old" "$EXOCORTEX_DST/rules"
+        rm -rf "$rules_tmp"
+        echo "ERROR: rules mirror swap failed without rsync" >&2
+        return 1
+      fi
+      rm -rf "$rules_old"
+    fi
   fi
 
   # day-rhythm is also a separate root artefact. Exact bytes win except for a

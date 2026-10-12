@@ -56,15 +56,38 @@ canon() {
   if realpath -m -- / >/dev/null 2>&1; then
     out=$(realpath -m -- "$path") || return 1
   else
-    out=$(perl -MCwd=realpath -MFile::Basename -e '
-      my $p = $ARGV[0];
-      my $r = realpath($p);
-      if (!defined $r) {
-        my $d = realpath(dirname($p));
-        exit 1 unless defined $d;
-        $r = "$d/" . basename($p);
+    # issue #1005: emulate `realpath -m`, segment by segment. Existing parts are
+    # resolved with symlinks expanded (so `link/..` means the parent of the
+    # link target, as on Linux); parts that do not exist yet are appended literally.
+    # The old code looked only one level up, so a target with two or more
+    # missing levels was refused on macOS while the same call passed on Linux.
+    out=$(perl -MCwd=realpath,getcwd -MFile::Basename -e '
+      # A symlink (even a dangling one) is replaced by its target and the walk
+      # continues from there; depth is capped against link loops.
+      sub canon_path {
+        my ($p, $depth) = @_;
+        exit 1 if $depth > 40;
+        my $cur = $p =~ m{^/} ? "/" : realpath(getcwd());
+        exit 1 unless defined $cur;
+        for my $seg (split m{/}, $p) {
+          next if $seg eq "" || $seg eq ".";
+          if ($seg eq "..") { $cur = dirname($cur); next; }
+          my $cand = $cur eq "/" ? "/$seg" : "$cur/$seg";
+          if (-l $cand) {
+            my $t = readlink($cand);
+            exit 1 unless defined $t;
+            $t = "$cur/$t" unless $t =~ m{^/};
+            $cur = canon_path($t, $depth + 1);
+          } elsif (-e $cand) {
+            my $r = realpath($cand);
+            $cur = defined $r ? $r : $cand;
+          } else {
+            $cur = $cand;
+          }
+        }
+        return $cur;
       }
-      print $r;
+      print canon_path($ARGV[0], 0);
     ' -- "$path") || return 1
   fi
   if [ "$WINDOWS" = 1 ]; then

@@ -121,7 +121,7 @@ bash $IWE_SCRIPTS/server-calendar.sh --week YYYY-MM-DD
 
 **Проверка обновлений IWE:**
 ```bash
-cd "$IWE_TEMPLATE" && bash update.sh --check --fast 2>&1
+(cd "$IWE_TEMPLATE" && bash update.sh --check --fast 2>&1)
 ```
 `--fast` (issue #230, v2.5.0) сравнивает только версию манифеста — секунда вместо 2+ минут полного пофайлового сравнения на 300+ файлах. Для полного списка изменений — `bash update.sh --check` (без `--fast`), отдельно, не в составе Day Open.
 Если доступно обновление → «Требует внимания»: «Доступно обновление IWE → `/iwe-update`».
@@ -133,7 +133,7 @@ for repo in FPF SPF ZP; do
   [ -d "$dir/.git" ] && (cd "$dir" && git fetch --quiet 2>/dev/null && behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0) && [ "$behind" -gt 0 ] && echo "$repo: $behind новых коммитов" || echo "$repo: актуален")
 done
 ```
-Если есть новые коммиты → «Требует внимания»: «[repo] обновлён upstream → `cd "$IWE_WORKSPACE/[repo]" && git pull --rebase`». После pull FPF/SPF — запустить локальный reindex MCP-индекса, если установлен.
+Если есть новые коммиты → «Требует внимания»: «[repo] обновлён upstream → `git -C "$IWE_WORKSPACE/[repo]" pull --rebase`». После pull FPF/SPF — запустить локальный reindex MCP-индекса, если установлен.
 
 ---
 

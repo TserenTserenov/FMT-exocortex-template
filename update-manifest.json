@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "649036905dd0d36db509078301b34d0dcbe620bc2baad4c4f853e20842753d46"
+      "sha256": "0af5336193bc9dbc10b76b4a18f95a6a09cd2132113a9c678c3b86ef4811f9a7"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -453,11 +453,11 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "fbccca31ef9ea6c5fe6d9f7deec2d78a1db0f71a1c2b8011676c3ee2833877b9"
+      "sha256": "e607db71621bf61fb2e5e4b9ca225d5bd47c8b246e7fecb2dbd1af5b54c3f000"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
-      "sha256": "c9e17d2a2202145ddc20f37476129b4b5a09f2eedde7821949adb2b7510fa4a3"
+      "sha256": "210a8473c97aac50950b98f3c17a89f680b1c7c8e98deb25be0bfb395414e43c"
     },
     {
       "path": ".claude/skills/day-close/day-close-helpers.sh",
@@ -473,7 +473,7 @@
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
-      "sha256": "8817fdd65c9808f8c7beedf1ed242b774ea092c940188385508ce102261dc12c"
+      "sha256": "f87a320f5f7bb2bcce47e404d6a4f162a390ce353d6d1f10b28bf2437791a984"
     },
     {
       "path": ".claude/skills/day-open/templates.md",
@@ -877,7 +877,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0a2252ee48a189dad936f41039cedf09d2a7960359e1de4ffed94f8f2a42600c"
+      "sha256": "4bbc72860bdf338bb2d9f9dc0c4b520ca20c8d8cc7c3511dfff021bba89ce5e7"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "4bbc72860bdf338bb2d9f9dc0c4b520ca20c8d8cc7c3511dfff021bba89ce5e7"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "4bbc72860bdf338bb2d9f9dc0c4b520ca20c8d8cc7c3511dfff021bba89ce5e7"
     },
     {
       "path": "CLAUDE.md",
@@ -1213,7 +1221,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "e5ec574764e332137e82644efcd2bdfee3ec2b634655f8b839e7a72915b6f0c8"
+      "sha256": "02fd51a463a651cc1f1ab2944c31bf4335d56c3fb688d8c8731352da82dc4271"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1569,7 +1577,7 @@
     },
     {
       "path": "memory/fpf-reference.md",
-      "sha256": "775501db8c442e612d1b750ca1c9dfe8fbcd8a1a27b52ad149a9883eefae1ef9"
+      "sha256": "fc1ba78c6378db239fa8f7c25635ddc1a4af7eb18be2d298971e159f21d2003d"
     },
     {
       "path": "memory/fpf-term-map.yaml",
@@ -1597,7 +1605,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "fc2e33f16c95e7024349cbe345f75cf33537a2d7bf6e92f54abd14ce2ba585e1"
+      "sha256": "aba5ced4b30cf312fb09527c87d3df07a015220c5483a0cf0f7c9ad57852c392"
     },
     {
       "path": "memory/protocol-dt-integration.md",
@@ -2189,7 +2197,7 @@
     },
     {
       "path": "scripts/check-manifest-coverage.py",
-      "sha256": "ee673d396ea6bfdb881e525d0964e2d6ed90cecc75b8999300f05c1cdee5fc12"
+      "sha256": "9ae61323c4447a989773b50aaaf75f7a14eab34e4c26dcab00ae23bfb4bf79f0"
     },
     {
       "path": "scripts/check-open-sessions.sh",
@@ -2285,7 +2293,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "c16eed8f4bb591def2971a9dd6664b1de0b55856f9aefaac2839dade3e6ba122"
+      "sha256": "384a8a900e5884ca001a29096ad43d28288cba32179ae58988a4cd812aeafb36"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
@@ -2333,7 +2341,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "fa9d0af8d710c684511a1e999f6cdee3062668da78dfacb57bc5963b7b9fea5f"
+      "sha256": "f04fadea84d5c04950acacf40c491a47574f08763a7d586549ebba8b7114300a"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2677,7 +2685,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "795ba299d507efd77ac1c343f9af28960fc29e98a354c2825cfbd2293d8f10b5"
+      "sha256": "0f73a4b0fb75abb68152c31ef626af50996da482608b4dcb65583e8bce3601c6"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -3129,7 +3137,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "1974238d8cabbd1a5beb8daa6585a24b0e93e8fafa75d14106b7d1e74ef7b0bb"
+      "sha256": "b3f831cf3102cc91e830c01f7c0412c0cc39caa94b6cd054543ead218d009d20"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3261,7 +3269,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "e679ee36b9007510fb7790e2b6271b26e4ba438497ed2a14f06bc9717f7bb388"
+      "sha256": "9809b313513f303134269d78f35044e34fac8e5c4cbc567ff1aeceff25f5c82d"
     }
   ],
   "excluded_paths": [
@@ -3321,6 +3329,7 @@
     "scripts/tests/test_issue_1003_ds_publish.sh",
     "scripts/tests/test_issue_1004_claude_md_backup.sh",
     "scripts/tests/test_issue_1004_step0_integrity.sh",
+    "scripts/tests/test_issue_1005_guarded_rm_canon.sh",
     "scripts/tests/test_issue_1005_sync_gate_no_posix_signals.sh",
     "scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh",
     "scripts/tests/test_issue_1006_minor_findings.sh",
@@ -3333,13 +3342,17 @@
     "scripts/tests/test_issue_1061_platform_bottleneck_map.sh",
     "scripts/tests/test_issue_1067_week_review_gave_up.sh",
     "scripts/tests/test_issue_1084_runtime_placeholder_scope.sh",
+    "scripts/tests/test_issue_1099_rules_no_rsync.sh",
     "scripts/tests/test_issue_1106_dt_collect_gov.sh",
     "scripts/tests/test_issue_1146_smoke_cache_ignored.sh",
     "scripts/tests/test_issue_1149_1156_windows_path_and_ru_regex.sh",
+    "scripts/tests/test_issue_1149_dayopen_carryover.sh",
+    "scripts/tests/test_issue_1150_curl_crlf.sh",
     "scripts/tests/test_issue_1152_weekplan_row_layout.sh",
     "scripts/tests/test_issue_1154_drift_scan_unresolved.py",
     "scripts/tests/test_issue_1165_verify_skill_install_layout.sh",
     "scripts/tests/test_issue_1174_detector_user_messages.sh",
+    "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

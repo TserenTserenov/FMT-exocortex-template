@@ -29,7 +29,7 @@ from pathlib import Path
 # - params.yaml     — пользовательский конфиг (авторский)
 # - generate-manifest.sh / update-manifest.json — инструментарий манифеста
 # - README.md / LICENSE / CONTRIBUTING.md / CHANGELOG.md / CODE_OF_CONDUCT.md /
-#   SECURITY.md / PRIVACY.md / CODEOWNERS / CITATION.cff — мета репо (только корень)
+#   SECURITY.md / PRIVACY.md / CODEOWNERS / CITATION.cff / .gitattributes — мета репо (только корень)
 # - .gitkeep        — маркеры пустых папок
 # - .DS_Store       — мусор macOS
 
@@ -47,6 +47,7 @@ _ROOT_ONLY_EXCLUDED_NAMES = frozenset({
     "PRIVACY.md",
     "CODEOWNERS",
     "CITATION.cff",
+    ".gitattributes",
 })
 
 # Имена файлов, исключаемые везде независимо от папки.

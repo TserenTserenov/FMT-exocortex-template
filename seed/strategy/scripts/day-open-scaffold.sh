@@ -189,7 +189,7 @@ def flatten(d, prefix=''):
 # indistinguishable. Emit an explicit ok/error sentinel instead (bug-2026-06-05,
 # bug-2026-06-09, bug-2026-07-04).
 try:
-    with open('$CONFIG_PY') as f:
+    with open('$CONFIG_PY', encoding='utf-8') as f:
         d = yaml.safe_load(f) or {}
     for k, v in flatten(d):
         print(k + '\x1f' + v)
@@ -261,11 +261,24 @@ extract_day_close_carry_over() {
   # 2. Yesterday DayPlan archive: section "Завтра начать с"
   local ydayplan="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan ${yday}.md"
   if [ -f "$ydayplan" ]; then
+    # issue #1149: the LAST heading-like "Завтра начать с" opens the section (an
+    # earlier mention in the body is not the handoff list); the section ends at
+    # the next heading, </details>, a rule, or the closing footer line.
     carry_over=$(awk '
-      /Завтра начать с/ { found=1; next }
-      found && /^## / { exit }
-      found && /^<\/details>/ { exit }
-      found { print }
+      { lines[NR] = $0 }
+      /^(#+[[:space:]]+|\*\*)[[:space:]]*Завтра начать с/ { strict = NR }
+      /^[[:space:]]*(-[[:space:]]+)?Завтра начать с/ { lead = NR }
+      /Завтра начать с/ { loose = NR }
+      END {
+        start = strict > lead ? strict : lead
+        if (!start) start = loose
+        if (!start) exit
+        for (i = start + 1; i <= NR; i++) {
+          l = lines[i]
+          if (l ~ /^#+[[:space:]]/ || l ~ /^<\/details>/ || l ~ /^---[[:space:]]*$/ || l ~ /^\*(Закрыто|Создан)/) break
+          print l
+        }
+      }
     ' "$ydayplan" | sed '/^$/d' | head -10)
     if [ -n "$carry_over" ]; then
       echo "$carry_over"
@@ -349,7 +362,7 @@ extract_mandatory_daily_wps() {
   "$_RESOLVED_PYTHON3" -c "
 import yaml, sys
 try:
-    with open('$CONFIG_PY') as f:
+    with open('$CONFIG_PY', encoding='utf-8') as f:
         d = yaml.safe_load(f) or {}
     items = d.get('mandatory_daily_wps') or []
     for item in items:

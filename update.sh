@@ -108,9 +108,12 @@ CURL_BASE_OPTS="${CURL_OPTS:---max-time 20}"
 _CURL_SSL_OPT=""
 case "${OSTYPE:-}" in
   msys*|cygwin*)
-    if curl --help 2>&1 | grep -q "ssl-revoke-best-effort"; then
+    # issue #1150: the short `curl --help` lists only the common options and
+    # never shows these two; the full list is `curl --help all`.
+    _CURL_HELP_ALL=$(curl --help all 2>&1 || true)
+    if printf '%s\n' "$_CURL_HELP_ALL" | grep -q "ssl-revoke-best-effort"; then
       _CURL_SSL_OPT="--ssl-revoke-best-effort"
-    elif curl --help 2>&1 | grep -q "ssl-no-revoke"; then
+    elif printf '%s\n' "$_CURL_HELP_ALL" | grep -q "ssl-no-revoke"; then
       _CURL_SSL_OPT="--ssl-no-revoke"
     fi
     ;;

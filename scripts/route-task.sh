@@ -95,6 +95,26 @@ emit_result() {
     fi
 }
 
+# issue #1201: the router journal is a regenerable runtime file, not a work
+# product. When its directory sits inside a git work tree (default: the
+# governance repo's logs/), keep it out of `git status` via the repo-local
+# info/exclude, so installs whose seed .gitignore predates the entry do not
+# see an untracked logs/ at every session close.
+exclude_log_dir_from_git() {
+    local dir="$1" rel exclude pattern
+    git -C "$dir" rev-parse --show-toplevel >/dev/null 2>&1 || return 0
+    rel="$(git -C "$dir" rev-parse --show-prefix 2>/dev/null)" || return 0
+    [[ -n "$rel" ]] || return 0
+    # --git-path is relative to the directory git runs in, which is $dir
+    exclude="$(git -C "$dir" rev-parse --git-path info/exclude 2>/dev/null)" || return 0
+    case "$exclude" in /*) ;; *) exclude="$dir/$exclude" ;; esac
+    pattern="/${rel}"
+    if ! grep -qxF "$pattern" "$exclude" 2>/dev/null; then
+        mkdir -p "$(dirname "$exclude")" 2>/dev/null \
+            && printf '%s\n' "$pattern" >> "$exclude" 2>/dev/null || true
+    fi
+}
+
 emit_error() {
     local skill="$1" result="$2" reason="$3"
     local ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -106,6 +126,7 @@ emit_error() {
     local err_dir
     err_dir="$(dirname "$ERROR_LOG")"
     [[ -d "$err_dir" ]] || mkdir -p "$err_dir"
+    exclude_log_dir_from_git "$err_dir"
     printf "%s\t%s\t%s\t%s\n" "$ts" "$skill" "$result" "$reason" >> "$ERROR_LOG"
 }
 
@@ -118,6 +139,7 @@ log_audit() {
     local audit_dir
     audit_dir="$(dirname "$AUDIT_LOG")"
     [[ -d "$audit_dir" ]] || mkdir -p "$audit_dir"
+    exclude_log_dir_from_git "$audit_dir"
     printf "%s\t%s\t%s\t%s\n" "$ts" "$tag" "$executor" "$result" >> "$AUDIT_LOG"
 }
 
