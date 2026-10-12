@@ -841,7 +841,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "dd5c3bcc538b49fc5faebab4d8cc1e84acc5f6816923f1975f93956582a9bf4b"
+      "sha256": "9a4a87081440f35953a2d5aa8ca56535ef553d3e187ff9811c4247fcbc3d766b"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -877,7 +877,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "71096eef640f321d6055fc68f91a9a27fb26d8ebee7030112b2637e23cd9a7e1"
+      "sha256": "f4deca3aea5e6e6d010310d64b6fe2b1cafaef7854c125d140f5c2ae6657f35e"
     },
     {
       "path": "CLAUDE.md",
@@ -2665,7 +2665,7 @@
     },
     {
       "path": "scripts/pre-commit-secret-scan.sh",
-      "sha256": "a203b7abc4aad366a46bcec3eb7de80cfccca773bcb1af6d562787c8df4fdec7"
+      "sha256": "b91187a8be7ca0dc653fc0dc904397bea5c82153b885a664c9fad8953d7baa09"
     },
     {
       "path": "scripts/promote-common.sh",
@@ -3269,7 +3269,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "9809b313513f303134269d78f35044e34fac8e5c4cbc567ff1aeceff25f5c82d"
+      "sha256": "8d0c32abbf22feb7a3046ef8cd9fcb6939f9fc12b6a390f2c878f677350115a5"
     }
   ],
   "excluded_paths": [
@@ -3342,6 +3342,7 @@
     "scripts/tests/test_issue_1061_platform_bottleneck_map.sh",
     "scripts/tests/test_issue_1067_week_review_gave_up.sh",
     "scripts/tests/test_issue_1084_runtime_placeholder_scope.sh",
+    "scripts/tests/test_issue_1099_residuals.sh",
     "scripts/tests/test_issue_1099_rules_no_rsync.sh",
     "scripts/tests/test_issue_1106_dt_collect_gov.sh",
     "scripts/tests/test_issue_1146_smoke_cache_ignored.sh",

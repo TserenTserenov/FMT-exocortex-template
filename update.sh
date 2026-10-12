@@ -739,7 +739,9 @@ report_memory_policy_summary() {
     for f in ${MEMORY_REPLACED[@]+"${MEMORY_REPLACED[@]}"}; do replaced="${replaced:+$replaced, }$f"; done
     for f in ${MEMORY_KEPT[@]+"${MEMORY_KEPT[@]}"}; do kept="${kept:+$kept, }$f"; done
     if [ -n "$replaced" ]; then
-        echo "  ⚠ Заменено файлов памяти: ${#MEMORY_REPLACED[@]} ($replaced); прежние версии сохранены в $MEMORY_BACKUP_RUN"
+        # issue #1006: only a copy proven untouched is ever replaced (apply_memory_policy), so this
+        # is a note, not a warning: no edit of the user's was lost; the old copies stay in the backup.
+        echo "  ℹ Заменено файлов памяти: ${#MEMORY_REPLACED[@]} ($replaced); ваших правок в них не было (заменяются только неизменённые копии), прежние версии сохранены в $MEMORY_BACKUP_RUN"
     fi
     if [ -n "$kept" ]; then
         echo "  ⚠ Не обновлено файлов памяти: ${#MEMORY_KEPT[@]} ($kept); почему и что сделать — в строке каждого файла выше"
@@ -2936,6 +2938,27 @@ backup_rule_before_overwrite() {
     echo "  ↳ backup: $dst → $backup"
 }
 
+# prune_memory_backups — keep .backups/memory-pre-update/ from growing for ever (issue #1006).
+# Every run that replaces a memory file saves the old copy in its own dated directory; nothing
+# removed them. Remove run directories older than IWE_MEMORY_BACKUP_KEEP_DAYS (default 30), but
+# always keep the newest three. Only directories named like a run (YYYYMMDDTHHMMSSZ-PID) are touched.
+prune_memory_backups() {
+    local root="$WORKSPACE_DIR/.backups/memory-pre-update" days="${IWE_MEMORY_BACKUP_KEEP_DAYS:-30}" d n=0
+    [ -d "$root" ] || return 0
+    case "$days" in ''|*[!0-9]*) days=30 ;; esac
+    while IFS= read -r d; do
+        n=$((n + 1))
+        [ "$n" -le 3 ] && continue
+        case "$d" in
+            [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z-*) ;;
+            *) continue ;;
+        esac
+        [ -d "$root/$d" ] || continue
+        [ -n "$(find "$root/$d" -maxdepth 0 -mtime +"$days" 2>/dev/null)" ] && rm -rf -- "$root/$d"
+    done < <(ls -1t "$root" 2>/dev/null)
+    return 0
+}
+
 # issue #847: memory/* stale-repair (see repair_pass() below) used to overwrite
 # a workspace-local memory file with the template's version whenever hashes
 # differed, with no backup — unlike .claude/rules/* above, which already has
@@ -2952,6 +2975,7 @@ backup_memory_file_before_overwrite() {
     [ -f "$dst" ] || return 0
     if [ -z "$MEMORY_BACKUP_RUN" ]; then
         MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+        prune_memory_backups
     fi
     MEMORY_BACKUP_FILE="$MEMORY_BACKUP_RUN/${fpath#memory/}"
     mkdir -p "$(dirname "$MEMORY_BACKUP_FILE")" && cp "$dst" "$MEMORY_BACKUP_FILE"
@@ -3011,6 +3035,22 @@ iwe_claude_project_slug() {
     printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
 }
 
+# memory_paths_equal A B — true when two directory paths name the same place.
+# issue #1099 (item 2): on Windows (Git Bash) the file system ignores case, and a
+# path built from `cygpath -w` may write the drive letter in the other case
+# ("C:" vs "c:"), so a plain string comparison stopped the updater at start for
+# one and the same directory. Elsewhere the comparison stays exact.
+memory_paths_equal() {
+    [ "$1" = "$2" ] && return 0
+    case "${OSTYPE:-}" in
+        msys*|cygwin*)
+            [ "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" = \
+              "$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')" ] && return 0
+            ;;
+    esac
+    return 1
+}
+
 resolve_workspace_memory_dir() {
     local workspace="$1" physical="" computed slug legacy_slug legacy_dir
     slug=$(iwe_claude_project_slug "$workspace")
@@ -3020,7 +3060,7 @@ resolve_workspace_memory_dir() {
     fi
     if [ -n "$physical" ] && [ -d "$computed" ]; then
         computed=$(cd -P "$computed" 2>/dev/null && pwd -P) || return 1
-        if [ "$physical" != "$computed" ]; then
+        if ! memory_paths_equal "$physical" "$computed"; then
             # issue #869: installs made before the single slug rule pointed workspace/memory at
             # a directory named by an older rule ("tr /", "tr /_.", "tr /_ "). For a path with a
             # space or other punctuation that is not the directory Claude Code uses. The physical

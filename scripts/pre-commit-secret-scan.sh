@@ -22,11 +22,22 @@ if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
   exit 2
 fi
 
-SECRET_LIB="$repo_root/.claude/hooks/secret-bypass-lib.sh"
-if [ ! -r "$SECRET_LIB" ]; then
-  SECRET_LIB="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/secret-bypass-lib.sh"
-fi
-if [ ! -r "$SECRET_LIB" ]; then
+# issue #1099 (item 6): the pattern library is looked up in the repo, then in
+# IWE_ROOT, then in the directory above the repo (the template normally sits in
+# the workspace root, so this works on an install whose workspace is not
+# $HOME/IWE and where IWE_ROOT is not exported into the hook), then $HOME/IWE.
+SECRET_LIB=""
+for candidate in \
+    "$repo_root/.claude/hooks/secret-bypass-lib.sh" \
+    "${IWE_ROOT:+$IWE_ROOT/.claude/hooks/secret-bypass-lib.sh}" \
+    "$(dirname "$repo_root")/.claude/hooks/secret-bypass-lib.sh" \
+    "$HOME/IWE/.claude/hooks/secret-bypass-lib.sh"; do
+  if [ -n "$candidate" ] && [ -r "$candidate" ]; then
+    SECRET_LIB="$candidate"
+    break
+  fi
+done
+if [ -z "$SECRET_LIB" ]; then
   printf 'Pre-commit secret scan unavailable: canonical pattern library is missing.\n' >&2
   exit 2
 fi
