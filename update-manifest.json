@@ -3249,7 +3249,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "4f8ba7ca83a5ca18dff794b1a3f74dbe12ef1daf4b60263d18ceb37ea9b14ca0"
+      "sha256": "98d796c68cee7aad774e59ba38b43968555b3888a968ecef75223aa54a212e10"
     },
     {
       "path": "shared/rubrics/form-089.yaml",

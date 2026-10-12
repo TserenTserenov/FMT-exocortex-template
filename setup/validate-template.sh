@@ -46,11 +46,12 @@ TEMPLATE_DIR="${TEMPLATE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 FAIL=0
 
 # Guard: post-setup state + default pristine mode → подсказать installed-режим и выйти.
-# Детектор стабильный: {{HOME_DIR}} в pristine FMT/CLAUDE.md гарантирован (используется в §4 Memory + §9 Авторское).
+# Детектор стабильный: {{WORKSPACE_DIR}} в pristine FMT/CLAUDE.md гарантирован (§4 Memory, раздел Working Directory).
+# Раньше детектором был {{HOME_DIR}} из §9; §9 в поставке теперь пустая заготовка (issue #883), плейсхолдера там нет.
 if [ "$MODE" = "pristine" ] \
    && [ -f "$TEMPLATE_DIR/CLAUDE.md" ] \
-   && ! grep -q '{{HOME_DIR}}' "$TEMPLATE_DIR/CLAUDE.md" 2>/dev/null; then
-    echo "ВНИМАНИЕ: FMT обработан setup.sh (плейсхолдер {{HOME_DIR}} в CLAUDE.md уже подставлен)."
+   && ! grep -q '{{WORKSPACE_DIR}}' "$TEMPLATE_DIR/CLAUDE.md" 2>/dev/null; then
+    echo "ВНИМАНИЕ: FMT обработан setup.sh (плейсхолдер {{WORKSPACE_DIR}} в CLAUDE.md уже подставлен)."
     echo ""
     echo "Pristine-режим (default) применим к:"
     echo "  • CI (.github/workflows/validate-template.yml)"
