@@ -75,7 +75,7 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 > **3 слоя:** L1 (§1-§7) = платформа (`update.sh`). L2 (§8) = staging. L3 (§9) = авторское.
 > Протоколы → `memory/protocol-*.md` · различения → `.claude/rules/distinctions.md` · форматирование → `.claude/rules/formatting.md` · стабильные знания → `memory/*.md` · свои правила → §8/§9.
 
-> **Extensions Gate (БЛОКИРУЮЩЕЕ для Edit/Write):** пользовательские правила идут в `extensions/*.md`, настройки в файл параметров (образец `params.yaml.example`); платформенные скиллы и `memory/protocol-*.md` напрямую не править (обновление их перезапишет). Новый project-local skill допустим в `.claude/skills/<name>/`, если такого каталога нет в `update-manifest.json`.
+> **Extensions Gate (БЛОКИРУЮЩЕЕ для Edit/Write; советующее в целом):** пользовательские правила идут в `extensions/*.md`, настройки в файл параметров (образец `params.yaml.example`); новый project-local skill допустим в `.claude/skills/<name>/`, если такого каталога нет в `update-manifest.json` (issue #311); платформенные скиллы и `memory/protocol-*.md` напрямую не править (обновление их перезапишет). Хук перехватывает `Edit|Write`, но не разбирает произвольные Bash-команды: это защита от случайной правки, не граница безопасности.
 
 <!-- PLATFORM-END -->
 
