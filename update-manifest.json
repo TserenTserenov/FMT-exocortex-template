@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.41.7",
+  "version": "0.41.8",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -877,7 +877,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1b5022ef2a8a55d38ea9a8381f7f3b3ff7d7920d6bba822e200181d2a46bffe8"
+      "sha256": "0be092eb05294458ce5ea8f2329372870259a5cb733901d3d05ab15bacbb3817"
     },
     {
       "path": "CLAUDE.md",
