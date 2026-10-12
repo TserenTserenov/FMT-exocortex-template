@@ -2789,7 +2789,7 @@
     },
     {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
-      "sha256": "d8744ffad6e9bc0fc03476aa77611cf15ad2a3b3713879e4b7240e718b79fc9b"
+      "sha256": "5df435357fbf68c2c2dba999d825f99dfa955f0a485c0a253b699f62d90850ce"
     },
     {
       "path": "scripts/tests/lib/capture_fixture.sh",
