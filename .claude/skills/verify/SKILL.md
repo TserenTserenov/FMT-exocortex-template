@@ -144,7 +144,7 @@ bash .claude/scripts/load-extensions.sh verify before
 > Двухэтапная проверка: 🔴 машинная (оркестратор) → 🟡 семантическая (sub-agent). 🟢 пилот не делается агентом.
 
 **Переменные окружения:**
-- `IWE_ROOT` — корень рабочей директории (default: `$HOME/IWE`). Используется для путей к Pack и `DS-principles-curriculum`.
+- `IWE_ROOT` — корень рабочей директории (default: `${IWE_WORKSPACE:-$HOME/IWE}`). Используется для путей к Pack и `DS-principles-curriculum`.
 
 **Hotfix-исключение:** если последний коммит содержит `[hotfix]` в message — запускается только 🔴, без 🟡 (см. CHECKLIST-subsection-v1.md §«Правило»).
 

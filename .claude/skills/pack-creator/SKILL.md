@@ -107,7 +107,7 @@ routing:
 
 Скилл устанавливает переменную окружения `PACK_CREATOR_ACTIVE=1` на время сессии.
 Hook `pack-creator-spf-guard.sh` блокирует Write/Edit/NotebookEdit в путях
-`~/IWE/SPF/*` и `~/IWE/FPF/*`. При срабатывании hook возвращает exit 2 с
+`${IWE_WORKSPACE:-$HOME/IWE}/SPF/*` и `${IWE_WORKSPACE:-$HOME/IWE}/FPF/*`. При срабатывании hook возвращает exit 2 с
 объяснением.
 
 **Что делать при срабатывании:**

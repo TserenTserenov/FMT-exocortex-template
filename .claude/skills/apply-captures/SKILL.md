@@ -106,7 +106,7 @@ defer_until: "после WP-245 Ф22"     # ОБЯЗАТЕЛЬНО — дата 
 ### Шаг 1. Найти незавершённые отчёты
 
 ```bash
-GOV_DIR="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+GOV_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 bash "$GOV_DIR/scripts/ke-queue-stats.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --list
 ```
 
@@ -186,7 +186,7 @@ ID из отчёта предварительный, резервировани�
 **SoT — `routing.yaml` целевого Pack** (WP-429 Ф6.1): `<PACK-repo>/pack/<domain>/routing.yaml` → `kinds.<KIND>.dir` даёт каноническую директорию для kind-кода кандидата (`DP.D`, `PD.METHOD`, `VR.M` и т.д.). Прочитать файл, найти секцию по префиксу ID кандидата:
 
 ```bash
-grep -A3 "^  <KIND>:" ~/IWE/<PACK-repo>/pack/<domain>/routing.yaml
+grep -A3 "^  <KIND>:" ${IWE_WORKSPACE:-$HOME/IWE}/<PACK-repo>/pack/<domain>/routing.yaml
 ```
 
 `dir:` → каноническая директория. `id_pattern:` → проверить соответствие имени файла. `frontmatter_check:` (если не `null`) → соответствующее поле/значение должно быть в кандидате.
@@ -223,7 +223,7 @@ ls <target_dir>/ | sort | grep -A5 -B5 "<ID-slug>"
 
 **Шаг 2 — grep ключевых существительных**. Взять 2-3 ключевых существительных из имени кандидата. Искать в целевом Pack-репо:
 ```bash
-grep -ri "<ключевое_слово>" ~/IWE/<PACK-repo>/pack/ --include="*.md" -l | head -10
+grep -ri "<ключевое_слово>" ${IWE_WORKSPACE:-$HOME/IWE}/<PACK-repo>/pack/ --include="*.md" -l | head -10
 ```
 Если найдено совпадение: прочитать файл. Проверить:
 - **Перекрытие**: кандидат описывает то же самое другими словами → reject (дубликат), паттерн для R2.
@@ -298,7 +298,7 @@ R15 выбирает вариант:
 
 **CLI-эквивалент** (для batch/автоматизации):
 ```bash
-(cd ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}
+(cd ${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}
 OPENROUTER_API_KEY="sk-or-v1-..." WP429_DB_ID=3 WP429_TABLE=concept_graph.concepts \
   python3 inbox/WP-429/f2-poc/detector.py --check-candidate \
     --name "<имя кандидата>" \

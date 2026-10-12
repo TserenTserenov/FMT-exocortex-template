@@ -58,28 +58,46 @@ fi
 # that's ending, not a new one. Only the auto "today" default is a candidate —
 # an explicit date argument is the caller's exact choice and is never
 # second-guessed (mirrors the same check in day-open-pipeline.sh, issue #924).
-if [ -z "${1:-}" ]; then
-  # Scoped to the day_open: block (same precaution as STRATEGY_DAY_NAME in
-  # day-open-pipeline.sh — a same-named key elsewhere can't hijack this lookup;
-  # resets on the next top-level key so a later block's own day_boundary can't
-  # be picked up either) and skips commented-out lines: a bare top-level grep
-  # would also match the shipped default's commented-out example line,
-  # silently turning the shift on.
-  DAY_BOUNDARY=$(awk '
-    /^[^[:space:]]/ && !/^day_open:/ { f=0 }
-    /^day_open:/ { f=1 }
-    f && /day_boundary:/ && !/^[[:space:]]*#/ { print; exit }
-  ' "$CONFIG" 2>/dev/null \
-    | sed -E 's/.*day_boundary:[[:space:]]*"?([0-9]{1,2}:[0-9]{2})"?.*/\1/')
-  if [[ "$DAY_BOUNDARY" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
-    boundary_min=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
-    now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
-    if [ "$now_min" -lt "$boundary_min" ]; then
-      DATE=$(date -j -v-1d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
-        || date -d "$DATE - 1 day" "+%Y-%m-%d" 2>/dev/null)
-    fi
+# Scoped to the day_open: block (same precaution as STRATEGY_DAY_NAME in
+# day-open-pipeline.sh — a same-named key elsewhere can't hijack this lookup;
+# resets on the next top-level key so a later block's own day_boundary can't
+# be picked up either) and skips commented-out lines: a bare top-level grep
+# would also match the shipped default's commented-out example line,
+# silently turning the shift on. Read for any date: the commit window of
+# "yesterday" follows the boundary even when the date is given explicitly.
+DAY_BOUNDARY=$(awk '
+  /^[^[:space:]]/ && !/^day_open:/ { f=0 }
+  /^day_open:/ { f=1 }
+  f && /day_boundary:/ && !/^[[:space:]]*#/ { print; exit }
+' "$CONFIG" 2>/dev/null \
+  | sed -E 's/.*day_boundary:[[:space:]]*"?([0-9]{1,2}:[0-9]{2})"?.*/\1/')
+if [ -z "${1:-}" ] && [[ "$DAY_BOUNDARY" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+  boundary_min=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+  now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
+  if [ "$now_min" -lt "$boundary_min" ]; then
+    DATE=$(date -j -v-1d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
+      || date -d "$DATE - 1 day" "+%Y-%m-%d" 2>/dev/null)
   fi
 fi
+
+# issue #924: the day boundary also decides which commits belong to "yesterday".
+# Half-open window [YDAY <boundary>, DATE <boundary>) as "SINCE|UNTIL" for
+# `git log`: a commit exactly at the boundary opens the new day, none is counted
+# twice. No boundary (or 00:00) keeps the calendar day. KEEP IN SYNC with the
+# copy in day-open-pipeline.sh / day-open-scaffold.sh (test_issue_924 compares them).
+iwe_day_window() {
+  local yday="$1" today="$2" b="${3:-}" bm=0 em
+  if [[ "$b" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+    bm=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+  fi
+  if [ "$bm" -eq 0 ]; then
+    printf '%s 00:00:00|%s 23:59:59' "$yday" "$yday"
+    return 0
+  fi
+  em=$(( bm - 1 ))
+  printf '%s %02d:%02d:00|%s %02d:%02d:59' \
+    "$yday" $(( bm / 60 )) $(( bm % 60 )) "$today" $(( em / 60 )) $(( em % 60 ))
+}
 
 PARAMS_FILE="$IWE/params.yaml"
 MULTIPLIER_ENABLED="true"
@@ -1449,10 +1467,13 @@ render_attention() {
 
 # --- Section: Итоги вчера (commits stats + sessions) ---
 render_yesterday() {
-  local total=0 repos=0
+  local total=0 repos=0 window YDAY_SINCE YDAY_UNTIL
+  window=$(iwe_day_window "$YDAY" "$DATE" "$DAY_BOUNDARY")
+  YDAY_SINCE=${window%%|*}
+  YDAY_UNTIL=${window##*|}
   while IFS= read -r repo; do
     local n
-    n=$(git -C "$repo" log --since="$YDAY 00:00" --until="$YDAY 23:59" --oneline 2>/dev/null | wc -l | tr -d ' ')
+    n=$(git -C "$repo" log --since="$YDAY_SINCE" --until="$YDAY_UNTIL" --oneline 2>/dev/null | wc -l | tr -d ' ')
     if [ "$n" -gt 0 ]; then
       total=$((total + n))
       repos=$((repos + 1))
@@ -1467,7 +1488,7 @@ render_yesterday() {
   # regardless of the grep below (bug 2026-07-02) — the else-branch then reports
   # "нет данных" honestly instead of letting the LLM invent a count.
   local dc_committed
-  dc_committed=$(cd "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" && git log --since="$YDAY 00:00:00" -i \
+  dc_committed=$(cd "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}" && git log --since="$YDAY_SINCE" -i \
     --grep="day-close.*$YDAY" --format=%H 2>/dev/null | head -1)
   # issue #929: same criterion as the pipeline race guard and extract_day_close_carry_over —
   # yesterday's archived DayPlan with the close sections. The commit-message wording is

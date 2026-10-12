@@ -24,7 +24,7 @@ related: ["#125"]
 
 ## Обещание (контракт)
 
-**Вход:** (опц.) путь к governance-репо. По умолчанию `$WORKSPACE_DIR/$GOVERNANCE_REPO` (`~/IWE/DS-strategy`).
+**Вход:** (опц.) путь к governance-репо. По умолчанию `$WORKSPACE_DIR/$GOVERNANCE_REPO` (`${IWE_WORKSPACE:-$HOME/IWE}/DS-strategy`).
 **Выход:** восстановленные `memory/` + `extensions/` + `CLAUDE.md` + симлинк `memory/`; отчёт + напоминание перезапустить Claude Code.
 **Инвариант:** НЕ перезаписывает населённую `memory/` или `extensions/` без явного подтверждения пользователя.
 

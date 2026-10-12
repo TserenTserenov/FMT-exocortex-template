@@ -35,7 +35,7 @@ realized_by:
 Если отсутствуют — сообщить пользователю и предложить команды:
 
 ```bash
-(cd ~/IWE
+(cd ${IWE_WORKSPACE:-$HOME/IWE}
 gh repo clone TserenTserenov/SPF SPF -- --depth=1   # если нет SPF/
 gh repo clone ailev/FPF FPF -- --depth=1             # если нет FPF/
 )
@@ -112,7 +112,7 @@ gh repo clone ailev/FPF FPF -- --depth=1             # если нет FPF/
 Алгоритм предложения кода: взять значимые слова slug'а (без предлогов/связок) → если домен однословный — первые 2-4 буквы (`education` → `EDU`); если из нескольких слов — по первой букве каждого значимого слова, заглавными (`product-management` → `PM`; `digital-platform` → `DP`). Предложить так полученный вариант + один альтернативный (например, первые буквы первого слова + первая буква второго, если инициалы дают <2 значимых слов) — дать пилоту выбрать/поправить. Если предложенный код уже занят (антипример ниже) — не переспрашивать пилота вслепую, а сразу предложить следующий по алгоритму вариант (например, добавить третью букву) и только если варианты исчерпаны — спросить пилота напрямую. Код тоже provisional — финализируется вместе со slug (см. «Финализация имени» ниже).
 
 **Антипримеры кода:**
-- Совпадение с уже существующим кодом другого Pack в IWE — проверить ПЕРЕД фиксацией: `find ~/IWE -maxdepth 4 -path "*/PACK-*/00-pack-manifest.md" -o -path "*/PACK-*/pack/*/00-pack-manifest.md" | xargs grep -l "^pack_id: <код>$" 2>/dev/null` (Pack бывают и плоские — `PACK-X/00-pack-manifest.md`, и вложенные — `PACK-X/pack/X/00-pack-manifest.md`, одна ветка `find` не покрывает оба варианта)
+- Совпадение с уже существующим кодом другого Pack в IWE — проверить ПЕРЕД фиксацией: `find ${IWE_WORKSPACE:-$HOME/IWE} -maxdepth 4 -path "*/PACK-*/00-pack-manifest.md" -o -path "*/PACK-*/pack/*/00-pack-manifest.md" | xargs grep -l "^pack_id: <код>$" 2>/dev/null` (Pack бывают и плоские — `PACK-X/00-pack-manifest.md`, и вложенные — `PACK-X/pack/X/00-pack-manifest.md`, одна ветка `find` не покрывает оба варианта)
 - Код длиннее 4 символов — теряет компактность в составных ID (`DIGPLAT.D.001` вместо `DP.D.001`)
 
 **Провизорность (PFAD-lite, источник — FPF `E.4.PFAD`/`F.18`).** Выбранное здесь имя (slug + код) — **не финальное**. Директория `PACK-{pack_id_slug}/` создаётся сразу под этим slug'ом (Шаг 4), но:
@@ -169,7 +169,7 @@ gh repo clone ailev/FPF FPF -- --depth=1             # если нет FPF/
 
 `{slug}` далее везде = `{pack_id_slug}`, выбранный на Шаге 2.
 
-Создать `~/IWE/PACK-{slug}/` со следующей структурой:
+Создать `${IWE_WORKSPACE:-$HOME/IWE}/PACK-{slug}/` со следующей структурой:
 
 ```
 PACK-{slug}/
@@ -337,7 +337,7 @@ distinction: {X} vs {Y}
 
 Затем инициализировать репо и установить CI guard:
 ```bash
-(cd ~/IWE/PACK-{slug}
+(cd ${IWE_WORKSPACE:-$HOME/IWE}/PACK-{slug}
 git init
 
 # Установить CI guard (ID collision detector)
@@ -355,7 +355,7 @@ CI guard — GitHub Action, который при каждом push/PR пров�
 
 Опционально — создать на GitHub:
 ```bash
-gh repo create {GITHUB_USER}/PACK-{slug} --private --source="$HOME/IWE/PACK-{slug}" --push
+gh repo create {GITHUB_USER}/PACK-{slug} --private --source="${IWE_WORKSPACE:-$HOME/IWE}/PACK-{slug}" --push
 ```
 
 ---

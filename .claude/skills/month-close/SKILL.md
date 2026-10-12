@@ -56,9 +56,9 @@ Month Close = протокол. Исполнять ТОЛЬКО пошагово
 **1b. Коммиты за месяц.**
 
 ```bash
-for repo in $(ls $HOME/IWE/); do
-  if [ -d $HOME/IWE/$repo/.git ]; then
-    count=$(git -C $HOME/IWE/$repo log --since="$MONTH_START" --until="$MONTH_END" --oneline --no-merges 2>/dev/null | wc -l)
+for repo in $(ls ${IWE_WORKSPACE:-$HOME/IWE}/); do
+  if [ -d ${IWE_WORKSPACE:-$HOME/IWE}/$repo/.git ]; then
+    count=$(git -C ${IWE_WORKSPACE:-$HOME/IWE}/$repo log --since="$MONTH_START" --until="$MONTH_END" --oneline --no-merges 2>/dev/null | wc -l)
     [ "$count" -gt 0 ] && echo "$repo: $count"
   fi
 done
@@ -172,7 +172,7 @@ HOT-лимит превышен → понизить horizon в frontmatter ну
 ### 11. Коммит ${IWE_GOVERNANCE_REPO:-DS-strategy}
 
 ```bash
-(cd ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}
+(cd ${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}
 # НЕ `git add -A`: в общем клоне (multi-agent) сметает чужое pre-staged → mis-attribution
 # (см. sessions/2026-06/2026-06-20-39-*). Перечисли артефакты month-close ЯВНО:
 MONTH_FILES=(

@@ -59,7 +59,7 @@ Verdict выносит subagent в роли Аудитора, читая отч�
 IWE_PATHS="${IWE_PATHS_FILE:-}"
 if [ -z "$IWE_PATHS" ]; then
     for _c in "${IWE_WORKSPACE:-}/.iwe-paths" "${WORKSPACE_DIR:-}/.iwe-paths" \
-              "$PWD/.iwe-paths" "$HOME/IWE/.iwe-paths" "$HOME/.iwe-paths"; do
+              "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do
         [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }
     done
 fi
@@ -68,8 +68,8 @@ if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "$IWE_SCRIPTS/iwe-audit.sh" ]; then
     # $IWE_SCRIPTS first (#566): the hardcoded workspace copy, when it exists at
     # all, is a stale leftover — the installer points IWE_SCRIPTS at the template.
     AUDIT_SCRIPT="$IWE_SCRIPTS/iwe-audit.sh"
-elif [ -f "$HOME/IWE/scripts/iwe-audit.sh" ]; then
-    AUDIT_SCRIPT="$HOME/IWE/scripts/iwe-audit.sh"
+elif [ -f "${IWE_WORKSPACE:-$HOME/IWE}/scripts/iwe-audit.sh" ]; then
+    AUDIT_SCRIPT="${IWE_WORKSPACE:-$HOME/IWE}/scripts/iwe-audit.sh"
 else
     echo "iwe-audit.sh не найден. \$IWE_PATHS ($IWE_PATHS) не даёт рабочий \$IWE_SCRIPTS — проверь, что файл существует и содержит export IWE_SCRIPTS=... (запусти setup.sh из FMT-шаблона, если файла нет)."
     exit 1
@@ -236,7 +236,7 @@ Coverage: N/4
    if [ -d "${IWE_SCRIPTS:-$HOME/IWE/scripts}" ]; then
        AUDIT_LOG_DIR="${IWE_SCRIPTS:-$HOME/IWE/scripts}"
    else
-       AUDIT_LOG_DIR="$HOME/IWE"
+       AUDIT_LOG_DIR="${IWE_WORKSPACE:-$HOME/IWE}"
    fi
    mkdir -p "$AUDIT_LOG_DIR"
    AUDIT_LOG="$AUDIT_LOG_DIR/iwe-audit-$(date +%Y%m%d-%H%M%S).log"

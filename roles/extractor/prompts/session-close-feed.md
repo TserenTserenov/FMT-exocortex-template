@@ -21,7 +21,7 @@
 1. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures/YYYY-MM.md` (текущий месяц) — целевой файл (куда писать); нет файла → создай с заголовком `# Captures YYYY-MM`. Папки `inbox/captures/` нет вовсе (ротация не включена) → писать в легаси `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/captures.md`. Легаси-файл при включённой ротации — только для де-дупликации.
 2. `{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}/inbox/feedback-log.md` — паттерны reject (не предлагай похожее)
 3. Транскрипт сессии (передаётся через `--extra-args` или путь в env)
-4. `git log --since="<session start timestamp>"` всех `~/IWE/*` репо
+4. `git log --since="<session start timestamp>"` всех `${IWE_WORKSPACE:-$HOME/IWE}/*` репо
 
 ## Алгоритм
 

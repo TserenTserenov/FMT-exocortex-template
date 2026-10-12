@@ -63,7 +63,7 @@ CLAUDE.md: `bash $IWE_SCRIPTS/template-sync.sh` (sync / `--dry-run` / `--check`)
 ### Именование (плейсхолдеры)
 
 - `{{GOVERNANCE_REPO}}` — личный governance-хаб
-- `$HOME/IWE/` — рабочая директория
+- `${IWE_WORKSPACE:-$HOME/IWE}/` — рабочая директория
 
 ### Блокирующие (авторские)
 

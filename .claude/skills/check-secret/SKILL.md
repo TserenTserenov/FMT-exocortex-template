@@ -55,7 +55,7 @@ bash "$IWE_SCRIPTS/route-task.sh" --skill check-secret --args "$ARGUMENTS"
 
 ## Шаг 4. Лог
 
-Каждое использование скилла логируется в `~/IWE/.claude/logs/check-secret.jsonl` (только metadata: timestamp, hash аргумента, decision; **не сами секреты**).
+Каждое использование скилла логируется в `${IWE_WORKSPACE:-$HOME/IWE}/.claude/logs/check-secret.jsonl` (только metadata: timestamp, hash аргумента, decision; **не сами секреты**).
 
 ## Связи
 

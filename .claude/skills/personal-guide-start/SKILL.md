@@ -75,7 +75,7 @@ Bootstrap-обёртка — создаёт пустой репо `DS-personal-g
 
 ## Шаг 1.5. Раздать скиллы в репо пилота (идемпотентно)
 
-> **Зачем:** скиллы (`/lesson`, `/lesson-close`, `/connect-guide`, `/personal-guide-render`, `/personal-guide-start`) живут в `~/IWE/.claude/skills/` платформы. При работе пилота в **claude.ai/code** (cloud sandbox) user-global `~/.claude/skills/` не пробрасывается. Чтобы скиллы работали в любом канале, их нужно положить в сам репо пилота.
+> **Зачем:** скиллы (`/lesson`, `/lesson-close`, `/connect-guide`, `/personal-guide-render`, `/personal-guide-start`) живут в `${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/` платформы. При работе пилота в **claude.ai/code** (cloud sandbox) user-global `~/.claude/skills/` не пробрасывается. Чтобы скиллы работали в любом канале, их нужно положить в сам репо пилота.
 
 Записать пять скиллов в порядке (порядок важен — `personal-guide-start/SKILL.md` идёт последним, используется как canary проверки):
 
@@ -89,7 +89,8 @@ SKILLS_TO_DISTRIBUTE = [
 ]
 
 for skill_path in SKILLS_TO_DISTRIBUTE:
-    content = Read(f"~/IWE/.claude/skills/{skill_path}")
+    workspace = os.environ.get("IWE_WORKSPACE") or os.path.expanduser("~/IWE")
+    content = Read(f"{workspace}/.claude/skills/{skill_path}")
     personal_write(
         source="DS-personal-guide",
         path=f".claude/skills/{skill_path}",
@@ -127,7 +128,7 @@ personal_write(
 Через `personal_search(source: "DS-personal-guide", path: "history/reflection-template.md")` проверь наличие. Если нет — записать:
 
 ```python
-template_content = Read("~/IWE/.claude/skills/personal-guide-render/templates/reflection-template.md")
+template_content = Read("${IWE_WORKSPACE:-$HOME/IWE}/.claude/skills/personal-guide-render/templates/reflection-template.md")
 personal_write(
     source="DS-personal-guide",
     path="history/reflection-template.md",
@@ -149,7 +150,7 @@ Render-скилл вызовет gateway → guide/<date>.md + panel/<date>.md �
 
 ```
 Чтобы работать с руководством локально — клонируй репо в свой IWE:
-  git clone https://github.com/<github-login>/DS-personal-guide.git ~/IWE/DS-personal-guide
+  git clone https://github.com/<github-login>/DS-personal-guide.git ${IWE_WORKSPACE:-$HOME/IWE}/DS-personal-guide
 
 (подставь свой GitHub-login в URL — `gh auth status` покажет, кто ты сейчас.)
 

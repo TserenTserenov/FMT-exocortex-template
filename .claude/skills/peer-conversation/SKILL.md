@@ -214,7 +214,7 @@ if verification_class in ("open-loop", "problem-framing"):
 ## Шаг 1. Инициализация
 
 ```bash
-SESSIONS_DIR="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions"
+SESSIONS_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions"
 TODAY=$(date +%Y-%m-%d)
 MONTH=$(date +%Y-%m)
 DAY=$(date +%d)
@@ -898,7 +898,7 @@ DURATION_MIN=$(( (NOW_EPOCH - START_EPOCH) / 60 ))
 2. Спросить: «Что в этой сессии стоит запомнить на будущее — не про саму задачу, а про то, как шла работа?» (дословно вопрос Ф18, `CONCEPT-night-cycle.md §18`).
 3. Записать ответ в дневной ledger (issue #409: скрипт есть не на каждой установке — не блокировать при отсутствии):
    ```bash
-   LEDGER_SCRIPT="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/ledger-append.sh"
+   LEDGER_SCRIPT="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/ledger-append.sh"
    if [ -f "$LEDGER_SCRIPT" ]; then
      bash "$LEDGER_SCRIPT" day "$(date +%F)" session_reflection "{\"wp\": \"<WP-NNN>\", \"answer\": <экранированный ответ>}" peer-conversation
    else
@@ -1097,7 +1097,7 @@ Slug-часть (без даты, с номером — та же формула
 # даты) — $SESSION_SLUG уже определён на Шаге 4.4. SESSION_ID здесь ВСЕГДА
 # начинается с "$TODAY-" (Шаг 1: "${TODAY}-${NUM}-${SLUG}"), поэтому склейка
 # "${TODAY}-${SESSION_ID}" без предварительного вычитания задваивала бы дату.
-GUARD_ORZ="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/$MONTH/${TODAY}-${SESSION_SLUG}.md"
+GUARD_ORZ="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/sessions/$MONTH/${TODAY}-${SESSION_SLUG}.md"
 cat > "$GUARD_ORZ" <<EOF
 ---
 date: $TODAY
@@ -1136,7 +1136,7 @@ EOF
 **4.5.1 Commit + push:**
 
 ```bash
-(cd "$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+(cd "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 # pathspec после `--`: commit ТОЛЬКО файлы сессии, не подметаем чужое
 # pre-staged из общего индекса (mis-attribution, см. 2026-06-20-39).
 # $GUARD_ORZ (Шаг 4.5.0) — тот же путь, что "$TODAY-$SESSION_SLUG.md" (Шаг 4.4),

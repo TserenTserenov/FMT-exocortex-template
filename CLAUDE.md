@@ -75,6 +75,8 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 > **3 слоя:** L1 (§1-§7) = платформа (`update.sh`). L2 (§8) = staging. L3 (§9) = авторское.
 > Протоколы → `memory/protocol-*.md` · различения → `.claude/rules/distinctions.md` · форматирование → `.claude/rules/formatting.md` · стабильные знания → `memory/*.md` · свои правила → §8/§9.
 
+> **Extensions Gate (БЛОКИРУЮЩЕЕ для Edit/Write):** пользовательские правила и настройки идут в `extensions/*.md` и `params.yaml`; платформенные скиллы и `memory/protocol-*.md` напрямую не править (обновление их перезапишет). Новый project-local skill допустим в `.claude/skills/<name>/`, если такого каталога нет в `update-manifest.json`.
+
 <!-- PLATFORM-END -->
 
 ---
@@ -160,29 +162,16 @@ Respond in Russian unless the user writes in English.
 
 ## 8. Staging (обкатка → шаблон)
 
-> Правила на обкатке (STAGING.md) → работают → переносятся в шаблон (L1). Новое поведение в §9 → ОДНОВРЕМЕННО строка в STAGING.md (`status: testing`). Промоция на Week Close (`validated`→`promoted`, `rejected` остаётся в §9 — не удалять) → скилл `/author-mode` и `.claude/rules-lazy/blocking-rules-full.md`.
-
-**Активная запись:** S-45 Agent Inbox (WP-324) — `inbox/agent/` + `iwe-agent-dispatcher.py`, промотировано в FMT `extensions/agent-inbox/`. Status: testing.
+> Раздел авторов шаблона: правила на обкатке и их промоция. В поставке пустой; свои правила ведите в `extensions/*.md` и `params.yaml`.
 
 ---
 
-## 9. Авторское (только мой IWE)
+## 9. Авторское (ваши правила)
 
-> Элаборации всех пунктов → `memory/reference/agent-core.md`.
+> Раздел ваш: платформа его не наполняет. Правила проекта пишите внутри блока ниже, обновление шаблона блок USER-SPACE сохраняет.
 
-- **Obsidian:** поддерживаемый vault — отдельный governance-репозиторий `{{GOVERNANCE_REPO}}`; корень `{{WORKSPACE_DIR}}` не открывать как vault из-за больших Markdown-файлов (например, `FPF/FPF-Spec.md`). Весь workspace просматривать через VS Code.
-- **Комментарии кода — только EN (решение Андрея, 14.06.2026):** весь `{{WORKSPACE_DIR}}/**`; исключение — user-facing строки по языку интерфейса.
-- **Различения (авторские):** `memory/distinctions-warm.md` и `extensions/`; `.claude/rules/distinctions.md` — поставляемый платформенный hot-слой, пользовательские правки допустимы только внутри явного `USER-SPACE` блока.
-- **Именование:** governance-репо называется `DS-strategy` по умолчанию; рабочая директория `{{HOME_DIR}}/IWE/`.
-- **Extensions Gate (БЛОКИРУЮЩЕЕ для Edit/Write; советующее в целом):** пользовательские правила и настройки идут в `extensions/*.md` + `params.yaml`; новый project-local skill допустим в `.claude/skills/<name>/`, только если этот каталог отсутствует в `update-manifest.json` (issue #311). Существующий платформенный skill или `memory/protocol-*.md` напрямую не править; автор (`author_mode: true`) редактирует L1 как SoT и доставляет через `template-sync.sh`. Хук перехватывает `Edit|Write`, но не разбирает произвольные Bash-команды: это guardrail от случайной правки, не tool-independent security boundary.
-- **README.md (FMT-exocortex-template):** изменение структуры — по согласованию с владельцем.
-- **WP Entry Filter (S-47, БЛОКИРУЮЩЕЕ):** новый РП — только при явной связи с R1-R6 месяца или внешнем заказчике; иначе → `inbox/backlog-with-triggers.md`. Исключения: spin-off закрытого РП; прямое поручение пилота.
-- **Именование РП:** существительное-артефакт, только русский (Pack-ID допустим); реестр ≤80 символов → SYNC-CORE; переименование — синхронно REGISTRY+MEMORY.md+WeekPlan+DayPlan+WP-context.
-- **Память (S-35):** новые `memory/*.md` — обязательный frontmatter; шаблон и горизонты → `memory/memory-lifecycle-spec.md` (единственный источник).
-- **Security Audit Cadence (WP-212, S-36):** per-ArchGate (§Б B7.1 + STRIDE) · Week Close (`security-posture.md §3`) · Daily (scheduled) · Month Close (VR.R.002).
-- **WeekPlan/WeekReport split (WP-297):** WeekPlan = только интенты, WeekReport = только факты; при создании WeekPlan итоги уезжают в WeekReport.
-- **Режим «на пальцах» (S-37):** триггеры «объясни», «на пальцах», «что сделали», «простыми словами» → Response Style + `memory/feedback_response_clarity_for_pilot.md`.
-- **Календарный конвейер (WP-357):** SoT — `DS-strategy/calendar/process-catalog.yaml` (+ derived `date-ledger.yaml`, не редактировать); новый процесс = каталог + plist; спецификация → `docs/calendar-pipeline.md`.
+<!-- USER-SPACE -->
+<!-- /USER-SPACE -->
 
 ---
 

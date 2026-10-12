@@ -136,7 +136,7 @@ Frontmatter: `name`, `description`, `user_invocable: true`.
 Расширения IWE — обычные Markdown-файлы. Установка:
 
 ```bash
-cp ~/Downloads/day-close.after.health.md ~/IWE/extensions/
+cp ~/Downloads/day-close.after.health.md ${IWE_WORKSPACE:-$HOME/IWE}/extensions/
 ```
 
 **Конфликт имён** (два файла одного hook):
@@ -154,6 +154,6 @@ my-extension-pack/
 
 Установка bundle:
 ```bash
-cp my-extension-pack/extensions/* ~/IWE/extensions/
-# Просмотреть params-defaults.yaml и добавить нужные параметры в ~/IWE/params.yaml вручную
+cp my-extension-pack/extensions/* ${IWE_WORKSPACE:-$HOME/IWE}/extensions/
+# Просмотреть params-defaults.yaml и добавить нужные параметры в ${IWE_WORKSPACE:-$HOME/IWE}/params.yaml вручную
 ```

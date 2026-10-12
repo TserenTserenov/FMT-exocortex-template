@@ -79,9 +79,9 @@ fi
 ## Шаг 1: Сбор данных
 
 ```bash
-for repo in $(ls $HOME/IWE/); do
-  if [ -d $HOME/IWE/$repo/.git ]; then
-    commits=$(git -C $HOME/IWE/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null \
+for repo in $(ls ${IWE_WORKSPACE:-$HOME/IWE}/); do
+  if [ -d ${IWE_WORKSPACE:-$HOME/IWE}/$repo/.git ]; then
+    commits=$(git -C ${IWE_WORKSPACE:-$HOME/IWE}/$repo log --since="today 00:00" --oneline --no-merges 2>/dev/null \
       | grep -vE "^(docs|chore|ci|style|perf|test)(\\(|:| )" \
       | grep -vE "memory/|\.claude/rules/|template-sync|backup|reindex" \
       || true)
@@ -223,7 +223,7 @@ TODAY=$(date +%Y-%m-%d)
 # пробел ("DayPlan YYYY-MM-DD.md"), поэтому xargs получал два несуществующих
 # токена и постусловие молча падало в FAIL независимо от реального содержимого
 # файла. Прямая проверка через переменную в кавычках не расщепляет путь.
-F="$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan ${TODAY}.md"
+F="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/archive/day-plans/DayPlan ${TODAY}.md"
 if grep -q "Итоги дня" "$F" 2>/dev/null && grep -q "${TODAY}" "$F" 2>/dev/null; then
   echo "9a OK"
 else
@@ -235,8 +235,8 @@ fi
 ```bash
 TODAY=$(date +%Y-%m-%d)
 DAY_NUM=$(date +%-d)
-( grep -rl "Итоги.*${DAY_NUM}" ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekReport\ W*.md 2>/dev/null \
-  || grep -rl "Итоги.*${DAY_NUM}" ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekPlan\ W*.md 2>/dev/null ) \
+( grep -rl "Итоги.*${DAY_NUM}" ${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekReport\ W*.md 2>/dev/null \
+  || grep -rl "Итоги.*${DAY_NUM}" ${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekPlan\ W*.md 2>/dev/null ) \
   | grep -q . && echo "9b OK" || echo "9b FAIL: итоги не найдены ни в WeekReport, ни в WeekPlan"
 ```
 

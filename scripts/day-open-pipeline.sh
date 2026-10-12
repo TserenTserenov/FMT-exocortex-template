@@ -200,35 +200,53 @@ CONFIG="$DS_STRATEGY/exocortex/day-rhythm-config.yaml"
 # that work done after midnight but before this hour still belongs to the day
 # that's ending, not a new one. Only the auto "today" default is a candidate —
 # an explicit --date/-d is the caller's exact choice and is never second-guessed.
-if [ "$DATE_WAS_AUTO" = true ]; then
-  # Reads $IWE/memory/day-rhythm-config.yaml (the pilot's live config), not
-  # $CONFIG ($DS_STRATEGY/exocortex/..., a snapshot day-close.sh only refreshes
-  # once at Day Close) -- a same-day edit to day_boundary must take effect on
-  # this same night's run, not wait for the next Day Close to refresh the
-  # snapshot. day-open-scaffold.sh (step 3 below) already treats the live copy
-  # as authoritative for the same reason (it passes it explicitly to
-  # day-open-preflight.sh), this is the same source for the same key.
-  # Scoped to the day_open: block (same precaution as STRATEGY_DAY_NAME below —
-  # a same-named key elsewhere can't hijack this lookup; resets on the next
-  # top-level key so a later block's own day_boundary can't be picked up
-  # either) and skips commented-out lines: a bare top-level grep would also
-  # match the shipped default's commented-out example line, silently turning
-  # the shift on.
-  DAY_BOUNDARY=$(awk '
-    /^[^[:space:]]/ && !/^day_open:/ { f=0 }
-    /^day_open:/ { f=1 }
-    f && /day_boundary:/ && !/^[[:space:]]*#/ { print; exit }
-  ' "$IWE/memory/day-rhythm-config.yaml" 2>/dev/null \
-    | sed -E 's/.*day_boundary:[[:space:]]*"?([0-9]{1,2}:[0-9]{2})"?.*/\1/')
-  if [[ "$DAY_BOUNDARY" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
-    boundary_min=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
-    now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
-    if [ "$now_min" -lt "$boundary_min" ]; then
-      DATE=$(date -j -v-1d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
-        || date -d "$DATE - 1 day" "+%Y-%m-%d" 2>/dev/null)
-    fi
+# Reads $IWE/memory/day-rhythm-config.yaml (the pilot's live config), not
+# $CONFIG ($DS_STRATEGY/exocortex/..., a snapshot day-close.sh only refreshes
+# once at Day Close) -- a same-day edit to day_boundary must take effect on
+# this same night's run, not wait for the next Day Close to refresh the
+# snapshot. day-open-scaffold.sh (step 3 below) already treats the live copy
+# as authoritative for the same reason (it passes it explicitly to
+# day-open-preflight.sh), this is the same source for the same key.
+# Scoped to the day_open: block (same precaution as STRATEGY_DAY_NAME below —
+# a same-named key elsewhere can't hijack this lookup; resets on the next
+# top-level key so a later block's own day_boundary can't be picked up
+# either) and skips commented-out lines: a bare top-level grep would also
+# match the shipped default's commented-out example line, silently turning
+# the shift on. Read for any date: the commit window of "yesterday" follows
+# the boundary even when --date is given explicitly.
+DAY_BOUNDARY=$(awk '
+  /^[^[:space:]]/ && !/^day_open:/ { f=0 }
+  /^day_open:/ { f=1 }
+  f && /day_boundary:/ && !/^[[:space:]]*#/ { print; exit }
+' "$IWE/memory/day-rhythm-config.yaml" 2>/dev/null \
+  | sed -E 's/.*day_boundary:[[:space:]]*"?([0-9]{1,2}:[0-9]{2})"?.*/\1/')
+if [ "$DATE_WAS_AUTO" = true ] && [[ "$DAY_BOUNDARY" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+  boundary_min=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+  now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
+  if [ "$now_min" -lt "$boundary_min" ]; then
+    DATE=$(date -j -v-1d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
+      || date -d "$DATE - 1 day" "+%Y-%m-%d" 2>/dev/null)
   fi
 fi
+
+# issue #924: the day boundary also decides which commits belong to "yesterday".
+# Half-open window [YDAY <boundary>, DATE <boundary>) as "SINCE|UNTIL" for
+# `git log`: a commit exactly at the boundary opens the new day, none is counted
+# twice. No boundary (or 00:00) keeps the calendar day. KEEP IN SYNC with the
+# copy in day-open-pipeline.sh / day-open-scaffold.sh (test_issue_924 compares them).
+iwe_day_window() {
+  local yday="$1" today="$2" b="${3:-}" bm=0 em
+  if [[ "$b" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+    bm=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+  fi
+  if [ "$bm" -eq 0 ]; then
+    printf '%s 00:00:00|%s 23:59:59' "$yday" "$yday"
+    return 0
+  fi
+  em=$(( bm - 1 ))
+  printf '%s %02d:%02d:00|%s %02d:%02d:59' \
+    "$yday" $(( bm / 60 )) $(( bm % 60 )) "$today" $(( em / 60 )) $(( em % 60 ))
+}
 
 # shellcheck source=lib/ledger-path.sh
 . "$SCRIPT_HOME/lib/ledger-path.sh"
@@ -626,7 +644,8 @@ if [ "$FORCE" != "true" ]; then
     # Only defer when there was actually work to close: if yesterday had zero commits
     # in the governance repo, there is nothing to close and deferring would stall the
     # plan forever on a genuinely quiet day.
-    YDAY_COMMITS=$(cd "$DS_STRATEGY" && git log HEAD origin/main --since="$YDAY 00:00:00" --until="$YDAY 23:59:59" --format=%H 2>/dev/null | head -1)
+    YDAY_WINDOW=$(iwe_day_window "$YDAY" "$DATE" "$DAY_BOUNDARY")
+    YDAY_COMMITS=$(cd "$DS_STRATEGY" && git log HEAD origin/main --since="${YDAY_WINDOW%%|*}" --until="${YDAY_WINDOW##*|}" --format=%H 2>/dev/null | head -1)
 
     if [ "${YDAY_DOW:-0}" = "$STRATEGY_DOW" ]; then
       YDAY_LEDGER="machine/ledger/$(ledger_path_rel day "$YDAY")"  # git-relative, see comment below

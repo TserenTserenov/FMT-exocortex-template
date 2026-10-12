@@ -63,7 +63,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 Запусти:
 ```bash
-git -C "$HOME/IWE/FMT-exocortex-template" log -1 --format="%h %ad" --date=short 2>/dev/null || echo "неизвестно"
+git -C "${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template" log -1 --format="%h %ad" --date=short 2>/dev/null || echo "неизвестно"
 ```
 
 ## Шаг 4. Проверить gh CLI
