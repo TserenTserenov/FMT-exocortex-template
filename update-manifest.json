@@ -829,7 +829,7 @@
     },
     {
       "path": ".githooks/post-commit",
-      "sha256": "bf5be587db3488945025b5e8c7b486996a0b2ae3895f01ab449fdd555fc221ed"
+      "sha256": "8c8b95aca5ddfbf9fcd5bbb93e256e83ec864de4335d6c5a465a2d4be32db873"
     },
     {
       "path": ".githooks/pre-commit",
@@ -877,7 +877,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c2d15eb502056d989718047a454796cf5571ba231eabaa450b4b3804732ea6b3"
+      "sha256": "dd2811544416452d123f32db42cc4475af668151530016e784b6aa50ba27d472"
     },
     {
       "path": "CLAUDE.md",
@@ -3249,7 +3249,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "98d796c68cee7aad774e59ba38b43968555b3888a968ecef75223aa54a212e10"
+      "sha256": "d3d18450ad1513f6eafc4715b122e6ac70b8c4908a855b12ba456015db9c776e"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3428,6 +3428,7 @@
     "scripts/tests/test_issue_983_morning_alarm.sh",
     "scripts/tests/test_issue_984_feeder_plist_iwe_scripts.sh",
     "scripts/tests/test_issue_989_snapshot_cross_api.py",
+    "scripts/tests/test_issue_backups_scan.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issue_wp516_verify_skill.py",
