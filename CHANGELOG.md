@@ -149,6 +149,8 @@ Refs: WP-NNN
 
 ### Changed
 
+- [fix] `scripts/session-guard.sh` (`open --isolate`) и `.claude/skills/strategy-session/SKILL.md` (блок публикации): ветка назначения резолвится из `origin/HEAD` рабочей копии (`main` — только фолбэк), а не зашита литералом; установка с управляющей веткой `master` больше не падает на `git fetch origin main` при открытии изолированной копии (#1209, #1215).
+- [fix] `scripts/day-open-scaffold.sh`: guard дня стратегической сессии больше не угадывает `monday`, когда `day-rhythm-config.yaml` вообще не прочитался (нет файла, недоступен python3) — раньше это выглядело неотличимо от настроенного `strategy_day: monday` и в реальный понедельник тихо блокировало генерацию плана дня (#1213, #1215).
 - [optional] Экстрактор (`roles/extractor/scripts/extractor.sh`, `roles/extractor/tests/test_extractor_pipeline.py`): прямые тесты на `assert_ai_cli_root_compat()` (root + `--dangerously-skip-permissions`) и `resolve_tool_path()` (цепочка `IWE_SCRIPTS → IWE_TEMPLATE/scripts → $HOME/IWE/scripts`) — тестовая переменная `IWE_EXTRACTOR_TEST_EUID` (не читается ни в одном production-пути) плюс отдельный интеграционный тест через `unshare --map-root-user` для честного EUID 0; тестовый файл подключён к `validate-template.yml`, где раньше не исполнялся вовсе (РП-545 Ф15, закрывает известное ограничение Ф14, #928, #1116, #1202).
 
 ## [0.41.8] — 2026-10-12
