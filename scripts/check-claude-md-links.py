@@ -51,6 +51,9 @@ ALLOWLIST = {
     "PACK-agent-rules/rules/AR.NNN.md",
     ".claude/rules-registry.yaml",
     "archive/wp-contexts/WP-457/CONCEPT-user-states.md",
+    # FPF is cloned into the user's workspace by setup.sh, it is not part of the
+    # template; the Obsidian rule (#522, #883) names its big spec file as the reason.
+    "FPF/FPF-Spec.md",
 }
 
 manifest_files = set()

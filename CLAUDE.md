@@ -77,6 +77,8 @@ Hot-каркас ≤20K токенов (M1), строгая цель ≤12K (M2)
 
 > **Extensions Gate (БЛОКИРУЮЩЕЕ для Edit/Write; советующее в целом):** пользовательские правила идут в `extensions/*.md`, настройки в файл параметров (образец `params.yaml.example`); новый project-local skill допустим в `.claude/skills/<name>/`, если такого каталога нет в `update-manifest.json` (issue #311); платформенные скиллы и `memory/protocol-*.md` напрямую не править (обновление их перезапишет). Хук перехватывает `Edit|Write`, но не разбирает произвольные Bash-команды: это защита от случайной правки, не граница безопасности.
 
+> **Obsidian:** поддерживаемый vault — отдельный governance-репозиторий `{{GOVERNANCE_REPO}}`; корень `{{WORKSPACE_DIR}}` не открывать как vault из-за больших Markdown-файлов (например, `FPF/FPF-Spec.md`). Весь workspace просматривать через VS Code.
+
 <!-- PLATFORM-END -->
 
 ---

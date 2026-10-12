@@ -881,7 +881,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "d52d341c27e3e3044b25f9e58114e5cee3f53a445812a56e41845145d0cc2662"
+      "sha256": "8e7e0ddeaa32bd3b583254a334d2513d21edeebde1cf3bf83a95c0336967f741"
     },
     {
       "path": "ONTOLOGY.md",
@@ -2173,7 +2173,7 @@
     },
     {
       "path": "scripts/check-claude-md-links.py",
-      "sha256": "795291d64b1661f0679ac2a6bf7152c326b8f74ba41a6506bc9812af125ebc71"
+      "sha256": "f82676f04a795e6b7f01b997b3fc30753903b456e88e41a1ff2d849f5ed59e95"
     },
     {
       "path": "scripts/check-critical-files-map.sh",
