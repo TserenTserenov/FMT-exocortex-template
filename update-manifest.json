@@ -633,7 +633,7 @@
     },
     {
       "path": ".claude/skills/peer-conversation/SKILL.md",
-      "sha256": "d04ebcfd6a99e9ab62fcd5871ca30a5fdcc6d57ac40822c2126fa6e0b3ae7e8a"
+      "sha256": "e12301964b456b6d6bf17778921d679eb42edd61d671bdcf7c9655c6dd782188"
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
@@ -877,7 +877,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fc82d1565fec28083656b5e4231074964b3cf67c50267d629753b118064a8eb8"
+      "sha256": "71096eef640f321d6055fc68f91a9a27fb26d8ebee7030112b2637e23cd9a7e1"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "71096eef640f321d6055fc68f91a9a27fb26d8ebee7030112b2637e23cd9a7e1"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "71096eef640f321d6055fc68f91a9a27fb26d8ebee7030112b2637e23cd9a7e1"
     },
     {
       "path": "CLAUDE.md",
