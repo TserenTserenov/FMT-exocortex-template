@@ -1561,6 +1561,13 @@ if [ "$CMD" = "open" ]; then
     [ -n "$SLUG" ] && validate_isolate_slug "$SLUG"
     ISOLATE_BASE_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     [ -n "$ISOLATE_BASE_DIR" ] || fail "--isolate: текущий каталог не git-репозиторий" 1
+    # issue #1209: fetch/worktree add below used to target the literal "origin/main",
+    # so an install whose governance repo defaults to e.g. "master" could never open
+    # an isolated worktree. Same resolution as strategist.sh resolve_default_branch()
+    # (issue #1097/#1195): read the already-cloned repo's remote HEAD symref, no
+    # network call; "main" only as fallback when that symref is missing.
+    ISOLATE_DEFAULT_BRANCH="$(git -C "$ISOLATE_BASE_DIR" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
+    ISOLATE_DEFAULT_BRANCH="${ISOLATE_DEFAULT_BRANCH:-main}"
     if [ -n "${BASE_SHA:-}" ]; then
       GIT_NO_LAZY_FETCH=1 git -C "$ISOLATE_BASE_DIR" cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
         || fail "--isolate: --base-sha '$BASE_SHA' не является коммитом в ($ISOLATE_BASE_DIR)" 1
@@ -1637,7 +1644,7 @@ if [ "$CMD" = "open" ]; then
       if [ -z "${BASE_SHA:-}" ]; then
         local fetch_error fetch_reason fetch_rc local_sha offline_command
         local offline_args
-        if fetch_error=$(LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C "$ISOLATE_BASE_DIR" fetch origin main 2>&1); then
+        if fetch_error=$(LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C "$ISOLATE_BASE_DIR" fetch origin "$ISOLATE_DEFAULT_BRANCH" 2>&1); then
           :
         else
           fetch_rc=$?
@@ -1647,10 +1654,10 @@ if [ "$CMD" = "open" ]; then
             *"Could not resolve host"*|*"Name or service not known"*) fetch_reason="имя сервера не разрешается" ;;
             *"Failed to connect"*|*"Connection refused"*|*"Network is unreachable"*|*"Could not connect"*) fetch_reason="нет соединения с origin" ;;
             *"Authentication failed"*|*"Permission denied (publickey)"*|*"could not read Username"*) fetch_reason="ошибка авторизации origin" ;;
-            *"couldn't find remote ref main"*) fetch_reason="на origin нет ветки main" ;;
-            *) fetch_reason="причина не классифицирована; проверь git fetch origin main локально" ;;
+            *"couldn't find remote ref"*) fetch_reason="на origin нет ветки $ISOLATE_DEFAULT_BRANCH" ;;
+            *) fetch_reason="причина не классифицирована; проверь git fetch origin $ISOLATE_DEFAULT_BRANCH локально" ;;
           esac
-          echo "session-guard: --isolate: origin/main недоступен: $fetch_reason (git fetch, код $fetch_rc)." >&2
+          echo "session-guard: --isolate: origin/$ISOLATE_DEFAULT_BRANCH недоступен: $fetch_reason (git fetch, код $fetch_rc)." >&2
           local_sha=$(git -C "$ISOLATE_BASE_DIR" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)
           if [ -n "$local_sha" ]; then
             printf 'session-guard: Проверь локальную ревизию: git -C %q show -s --format=%%H\\ %%s %q\n' "$ISOLATE_BASE_DIR" "$local_sha" >&2
@@ -1661,7 +1668,7 @@ if [ "$CMD" = "open" ]; then
           fi
           return 1
         fi
-        git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" origin/main \
+        git -C "$ISOLATE_BASE_DIR" worktree add -b "$ISOLATED_WORKTREE_BRANCH" "$ISOLATED_WORKTREE_PATH" "origin/$ISOLATE_DEFAULT_BRANCH" \
           || fail "--isolate: git worktree add не удался" 1
       else
         # An explicit local commit is the offline path: no remote query here.
@@ -2252,8 +2259,14 @@ print(json.dumps({"wp": sys.argv[1], "slug": sys.argv[2], "agent": sys.argv[3], 
   # Warn if local commits are not pushed in repos touched by this session
   _warn_unpushed() {
     local repo="$1"
-    local ahead
-    ahead=$(git -C "$repo" rev-list --left-only --count HEAD...origin/main 2>/dev/null || echo "")
+    local ahead default_branch
+    # issue #1209: same class as the --isolate fetch/worktree-add fix above — a
+    # repo whose default branch isn't "main" always compared against a
+    # nonexistent origin/main here (silently empty $ahead, no warning ever
+    # fired, but the comparison itself was still wrong for such installs).
+    default_branch="$(git -C "$repo" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/origin/##' || true)"
+    default_branch="${default_branch:-main}"
+    ahead=$(git -C "$repo" rev-list --left-only --count "HEAD...origin/$default_branch" 2>/dev/null || echo "")
     if [ -n "$ahead" ] && [ "$ahead" -gt 0 ]; then
       echo "⚠️  $ahead незапушенных коммита в $(basename "$repo"). Выполни: git -C $repo push" >&2
     fi

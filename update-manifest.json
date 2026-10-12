@@ -749,7 +749,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "b7e02dc65792660c1d2edfa95cd1080fb767e5b49e5647e399dff2e652daf6d2"
+      "sha256": "f5e0b082cd0d9d002dafb41cbb75c1e6bd44c2204607bda8e937850ab2859ef9"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -2337,7 +2337,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "0ba05b1983099838c9bcd65e2776f5ecfdc5dad2adc310e204d7f9e3a2d90678"
+      "sha256": "cb4ed573784ead72eaa9d5cfb9628d3eced91ac67f0000cabf6ac135801bd8c1"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2705,7 +2705,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "5f5a1e1f3ffda2c03380599c7e4328e6763d2045adbd301a04ba175b585221f4"
+      "sha256": "9de28de66c81b3254da3c2939c3d658d87f3e38767ebd1190eedb43cd34fbb0a"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3354,6 +3354,8 @@
     "scripts/tests/test_issue_1165_verify_skill_install_layout.sh",
     "scripts/tests/test_issue_1174_detector_user_messages.sh",
     "scripts/tests/test_issue_1201_router_log.sh",
+    "scripts/tests/test_issue_1209_isolate_branch.sh",
+    "scripts/tests/test_issue_1213_strategy_day_guard.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
