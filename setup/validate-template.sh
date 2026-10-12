@@ -174,6 +174,11 @@ filter_excluded_hits() {
         abs="${line%%:*}"
         rel="${abs#"$TEMPLATE_DIR"/}"
         is_excluded_path "$rel" && continue
+        # Local runtime directories are not template content: backups that update.sh,
+        # skill-promote and friends leave next to the files they replaced hold copies
+        # of OTHER people's files and would fail this scan for ever (FMT #1010, DS-ai-systems
+        # pre-commit validates a live checkout). Tracked files never live here.
+        case "$rel" in .backups/*|.iwe-runtime/*) continue ;; esac
         numbered="${line#"$abs":}"
         if is_author_context_exception "$rel" "${numbered#*:}"; then
             key="$rel:${numbered#*:}"

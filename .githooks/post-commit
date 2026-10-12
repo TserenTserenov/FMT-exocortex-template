@@ -14,7 +14,7 @@
 
 set -uo pipefail  # без -e: сбой побочного конвейера не должен валить git-поток
 
-REGISTRY_REPO="${IWE_REGISTRY_REPO:-$HOME/IWE/DS-my-strategy}"
+REGISTRY_REPO="${IWE_REGISTRY_REPO:-${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 
 COMMIT_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
