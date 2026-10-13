@@ -1847,6 +1847,11 @@ def self_test():
         # issue #896: a digit-leading segment (an issue number) must
         # still redact bare with no protecting context around it.
         "yookassa-digit-segment-bare-no-context": "test_issue_463_foo_bar_baz_qux_quux",
+        # issue #1220 follow-up (cold-review subagent, 2026-10-13): the new
+        # source_definition floor is 4+ segments, not lower -- a 3-segment
+        # name in a def-line must still redact. Without this the floor could
+        # silently drop further and no fixture here would catch it.
+        "yookassa-three-segment-def-context-still-redacted": "def test_aaaaaaaaaa_bbbbbbbbbb_cccccccccc(self):",
     }
     negatives = (
         "sk-proj-short",
