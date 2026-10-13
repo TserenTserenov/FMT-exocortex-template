@@ -841,7 +841,7 @@
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "9a4a87081440f35953a2d5aa8ca56535ef553d3e187ff9811c4247fcbc3d766b"
+      "sha256": "91f68152b1e9e0ea1931ef338e50fb1ed433dcece77b54ae671dec9cf9540ffa"
     },
     {
       "path": ".github/workflows/notify-update.yml",
@@ -850,6 +850,10 @@
     {
       "path": ".github/workflows/post-release-audit.yml",
       "sha256": "920f9517582f1c4cbb14b75035806f8d94aefdb9793a13d4a0c3d4e0848480ed"
+    },
+    {
+      "path": ".github/workflows/validate-template.yml",
+      "sha256": "9fbf56ab054a3b739a003e50347e72a7847d720c1e04b58f8e233ab470af2fd3"
     },
     {
       "path": ".gitignore",
@@ -877,7 +881,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "441909e50d487545a4a005bb7bb5cf0abae57ed6e9ca230daec6bd13a8313584"
+      "sha256": "43c1800fcc3f6fe75bafd23e23b189b933564eb5157879979e2e6a1bc226bc0e"
     },
     {
       "path": "CLAUDE.md",
@@ -1213,7 +1217,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "02fd51a463a651cc1f1ab2944c31bf4335d56c3fb688d8c8731352da82dc4271"
+      "sha256": "ea8ea61aa051a76dcfff36584342a5bb2117cb78f1138b4c3874168ae9089dfc"
     },
     {
       "path": "guide-kit/.gitignore",

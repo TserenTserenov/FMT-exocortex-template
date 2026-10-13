@@ -33,6 +33,10 @@ jobs:
   # Issue #1032: prove the early refusal on actual Git Bash and native Python.
   windows-session-guard:
     runs-on: windows-latest
+    # issue #1223: this job runs scripts/tests/* helpers, and scripts/tests/
+    # is in update-manifest.json excluded_paths -- a fork never has them and
+    # this check can never pass there regardless of fork content.
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     defaults:
       run:
         shell: bash
@@ -159,6 +163,12 @@ jobs:
   # nightly (catches a portability regression that slipped through by next
   # morning) — same coverage cadence, ~80% fewer macOS-minutes billed.
   integration-contract-ubuntu:
+    # issue #1223: setup/integration-contract-validator.sh and
+    # setup/smoke-test-fresh-install.sh are in excluded_paths -- a fork's
+    # copy is permanently stale (frozen at whatever sync delivered it last)
+    # and this check verifies an authored-only delivery contract, not fork
+    # content.
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     # GOVERNANCE_REPO matrix (12 мая, после Bug 1 b24639f): smoke прогоняется с
     # разными значениями GOVERNANCE_REPO, чтобы поймать hardcoded /DS-strategy/
     # пути которые проходят при дефолтном значении.
@@ -201,6 +211,9 @@ jobs:
   # stay in the ordinary Linux/macOS issue-test run.
   issue-1030-windows:
     runs-on: windows-latest
+    # issue #1223: exercises scripts/tests/test_issue_657.sh and friends,
+    # excluded from delivery the same way as integration-contract-ubuntu above.
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     timeout-minutes: 10
     defaults:
       run:
@@ -233,7 +246,10 @@ jobs:
           PATH="$shim_dir:$PATH" bash scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh --native-windows
 
   integration-contract-macos:
-    if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    # issue #1223: same undelivered setup/ dependency as integration-contract-ubuntu above.
+    if: >-
+      github.repository == 'TserenTserenov/FMT-exocortex-template' &&
+      (github.event_name == 'pull_request' || github.event_name == 'schedule')
     strategy:
       fail-fast: false
       matrix:
@@ -326,6 +342,9 @@ jobs:
   # checkout previous version → setup → checkout HEAD → re-run validator.
   upgrade-test:
     runs-on: ubuntu-latest
+    # issue #1223: calls setup/smoke-test-fresh-install.sh, excluded from
+    # delivery the same way as integration-contract-ubuntu above.
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     steps:
       - uses: actions/checkout@v6
         with:

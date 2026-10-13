@@ -110,6 +110,13 @@ GITHUB_EXPLICIT_INCLUDE=(
     ".github/workflows/notify-security.yml"
     ".github/workflows/notify-update.yml"
     ".github/workflows/post-release-audit.yml"
+    # issue #1223: never shipped at all (not in files, not in excluded_paths),
+    # so a fork's copy froze at whatever version it last had and stayed red
+    # forever on checks that need files this manifest deliberately never
+    # delivers (setup/integration-contract-validator.sh, scripts/tests/*).
+    # Shipping it now delivers the issue #1223 repo-gate fix (jobs skip on
+    # forks instead of failing) to existing forks, not just new ones.
+    ".github/workflows/validate-template.yml"
 )
 GITHUB_CI_ONLY_EXCLUDE=(
     ".github/workflows/nightly-template-audit.yml"

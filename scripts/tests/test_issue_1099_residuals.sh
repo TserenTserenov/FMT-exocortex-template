@@ -77,12 +77,18 @@ WORKSPACE_DIR="$TMP/wsc" bash -c "$prune"'
     && pass "the newest three runs are kept even when old" || fail_test "newest three were pruned: $(ls -1 "$C")"
 
 # --- 4. security notification: real commit count ---------------------------
+# issue #1222: `${{ length(github.event.commits) }}` is not a valid GitHub
+# Actions expression (no length() function) -- GitHub rejected the whole
+# workflow file (0 jobs). The count is now computed in shell from the event
+# payload instead of an env: expression.
 WF="$ROOT/.github/workflows/notify-security.yml"
-if grep -q 'PUSH_COMMIT_COUNT: ${{ length(github.event.commits) }}' "$WF" \
+if grep -q 'PUSH_COMMIT_COUNT=' "$WF" \
+   && grep -q "jq '.commits | length'" "$WF" \
+   && ! grep -q 'length(github.event.commits)' "$WF" \
    && ! grep -q -- '--arg commit_count "1"' "$WF"; then
     pass "notify-security passes the push commit count"
 else
-    fail_test "notify-security still hardcodes commit_count 1"
+    fail_test "notify-security still hardcodes commit_count 1 or uses the invalid length() expression"
 fi
 
 exit $fail

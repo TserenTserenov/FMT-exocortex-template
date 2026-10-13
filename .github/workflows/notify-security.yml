@@ -46,10 +46,17 @@ jobs:
           BOT_WEBHOOK_URL: ${{ secrets.BOT_WEBHOOK_URL }}
           TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
           SECURITY_LINES: ${{ steps.extract.outputs.lines }}
-          # issue #1010 (F8): the number of commits of this push, not a constant 1
-          # (GitHub caps event.commits at 20, which is enough for a notice).
-          PUSH_COMMIT_COUNT: ${{ length(github.event.commits) }}
         run: |
+          # issue #1222: length() does not exist in GitHub Actions expressions
+          # (only contains/startsWith/endsWith/format/join/toJSON/fromJSON/
+          # hashFiles and the status functions) -- an env: expression calling
+          # that nonexistent function made the whole workflow file invalid
+          # and GitHub rejected it outright (0 jobs, no log). Counted in
+          # shell instead.
+          # issue #1010 (F8): the number of commits of this push, not a
+          # constant 1 (GitHub caps event.commits at 20, enough for a notice).
+          PUSH_COMMIT_COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH" 2>/dev/null || echo 1)
+
           # issue #547: forks have no author secrets — every delivery with
           # security lines went red there forever. Same principle as #454:
           # gate on the CONFIGURED-CHANNEL fact, not on the repository name
