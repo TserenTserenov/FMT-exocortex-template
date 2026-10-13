@@ -18,12 +18,13 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MERGER="$ROOT/.claude/scripts/settings-merge-preview.py"
 SETTINGS="$ROOT/.claude/settings.json"
+PY3="$(bash "$ROOT/scripts/lib/find-python3.sh" --stdlib-only)" || { echo "no python3 for this test" >&2; exit 2; }
 
 fail=0
 pass() { echo "  ✅ PASS: $*"; }
 fail_test() { echo "  ❌ FAIL: $*" >&2; fail=1; }
 
-python3 -c "
+"$PY3" -c "
 import json
 d = json.load(open('$SETTINGS'))
 assert d.get('env', {}).get('CLAUDE_CODE_ENABLE_TODO_TOOLS') == '1', d.get('env')
@@ -40,8 +41,8 @@ EOF
 cat > "$TEST_ROOT/template.json" <<'EOF'
 {"permissions": {"defaultMode": "default", "allow": []}, "hooks": {}, "env": {"CLAUDE_CODE_ENABLE_TODO_TOOLS": "1"}}
 EOF
-python3 "$MERGER" "$TEST_ROOT/template.json" "$TEST_ROOT/workspace-no-overlap.json" "$TEST_ROOT/preview1.json" >/tmp/iwe-1216-report1.json
-python3 -c "
+"$PY3" "$MERGER" "$TEST_ROOT/template.json" "$TEST_ROOT/workspace-no-overlap.json" "$TEST_ROOT/preview1.json" >/tmp/iwe-1216-report1.json
+"$PY3" -c "
 import json
 d = json.load(open('$TEST_ROOT/preview1.json'))
 assert d['env'] == {'SOME_OTHER_VAR': 'x', 'CLAUDE_CODE_ENABLE_TODO_TOOLS': '1'}, d['env']
@@ -55,8 +56,8 @@ assert report['conflicts'] == [], report['conflicts']
 cat > "$TEST_ROOT/workspace-conflict.json" <<'EOF'
 {"permissions": {"defaultMode": "default", "allow": []}, "hooks": {}, "env": {"CLAUDE_CODE_ENABLE_TODO_TOOLS": "0"}}
 EOF
-python3 "$MERGER" "$TEST_ROOT/template.json" "$TEST_ROOT/workspace-conflict.json" "$TEST_ROOT/preview2.json" >/tmp/iwe-1216-report2.json
-python3 -c "
+"$PY3" "$MERGER" "$TEST_ROOT/template.json" "$TEST_ROOT/workspace-conflict.json" "$TEST_ROOT/preview2.json" >/tmp/iwe-1216-report2.json
+"$PY3" -c "
 import json
 d = json.load(open('$TEST_ROOT/preview2.json'))
 assert d['env']['CLAUDE_CODE_ENABLE_TODO_TOOLS'] == '0', d['env']
