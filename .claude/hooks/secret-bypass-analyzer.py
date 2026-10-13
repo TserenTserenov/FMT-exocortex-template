@@ -32,6 +32,11 @@ YOOKASSA_CANDIDATE_RE = re.compile(r"(?:live|test)_[A-Za-z0-9_-]{30,}")
 # checked below), which a random blob or a Stripe/YooKassa-style unbroken
 # token never has, not the per-segment leading character.
 YOOKASSA_PYTEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){4,}\Z")
+# issue #1220: only `source_definition` gets a lower floor. Python's own
+# grammar for `def NAME(` already rejects a hyphen or a leading digit in
+# NAME, a guarantee no other context here has -- see WP-7 backlog for the
+# broader fix considered and not adopted (unverified key-format assumption).
+YOOKASSA_SOURCE_TEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){3,}\Z")
 
 
 def redact_yookassa(match):
@@ -70,9 +75,12 @@ def redact_yookassa(match):
     comment_mention = "#" in current_line
     cli_argument = re.search(r"=\Z", before) is not None
     trailing_file_extension = re.match(r"(?:\.[A-Za-z0-9]+)+(?![A-Za-z0-9._-])", after) is not None
-    if YOOKASSA_PYTEST_SHAPE_RE.fullmatch(value) and (
-        source_definition or pytest_nodeid or comment_mention or cli_argument or trailing_file_extension
-    ):
+    source_test_name = source_definition and YOOKASSA_SOURCE_TEST_SHAPE_RE.fullmatch(value)
+    other_test_mention = (
+        (pytest_nodeid or comment_mention or cli_argument or trailing_file_extension)
+        and YOOKASSA_PYTEST_SHAPE_RE.fullmatch(value)
+    )
+    if source_test_name or other_test_mention:
         return value
     return "[REDACTED-YOOKASSA-KEY]"
 
@@ -1853,6 +1861,11 @@ def self_test():
         # segment (an issue number) the same way it rescues a
         # letter-only one.
         "def test_issue_463_foo_bar_baz(self):",
+        # issue #1220: a real four-segment test name (found live in
+        # guide-kit/generator/test_adapter_json_fences.py) must pass
+        # inside a def-line -- the lower floor (YOOKASSA_SOURCE_TEST_SHAPE_RE)
+        # is granted only there, not in the other four contexts below.
+        "def test_surrounding_whitespace_is_tolerated(self):",
         # issue #848: mentioning a test's name outside a def/nodeid context.
         "# scripts/tests/test_alpha_bravo_charlie_delta_echo.sh",
         "--exclude=test_alpha_bravo_charlie_delta_echo.sh",
