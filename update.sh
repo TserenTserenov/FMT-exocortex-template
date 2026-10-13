@@ -4571,10 +4571,21 @@ download_batch() {
         # bare mktemp location was outside that trap's reach.
         cfg=$(mktemp "$TMPDIR_UPDATE/curl-batch.XXXXXX")
         batch_err="$cfg.err"
+        local dst_cfg
         for p in "$@"; do
             dst="$TMPDIR_UPDATE/files/$p"
             mkdir -p "$(dirname "$dst")"
-            printf 'url = "%s/%s"\noutput = "%s"\n' "$RAW_BASE" "$p" "$dst" >> "$cfg"
+            # issue #1217 (continuation of #980): MSYS only rewrites a POSIX path
+            # inside a curl command-line argument, not inside a -K config file that
+            # curl itself reads — a native curl.exe given "output = /tmp/..." can't
+            # find that path and fails with exit 23. cygpath -m (forward slashes,
+            # drive letter) is what curl -K accepts without escaping; absent on
+            # Linux/macOS, where $dst is used as-is.
+            dst_cfg="$dst"
+            if command -v cygpath >/dev/null 2>&1; then
+                dst_cfg=$(cygpath -m "$dst" 2>/dev/null) || dst_cfg="$dst"
+            fi
+            printf 'url = "%s/%s"\noutput = "%s"\n' "$RAW_BASE" "$p" "$dst_cfg" >> "$cfg"
         done
         # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
         # `|| batch_rc=$?`: a batch failing outright (e.g. every URL in it

@@ -176,6 +176,24 @@ def merge_permissions(user_perms, template_perms, report):
     return merged
 
 
+def merge_env(user_env, template_env, report):
+    # issue #1216: an env var the template ships (e.g. CLAUDE_CODE_ENABLE_TODO_TOOLS,
+    # needed on models newer than Sonnet 4.6) used to be stuck on "whole-object
+    # conflict" the moment a workspace's env dict wasn't byte-identical to the
+    # template's — the common case, since a workspace settings.json routinely has
+    # its own unrelated env keys. Per-key, same semantics as merge_permissions:
+    # a missing key is added, an existing key with a different value is flagged,
+    # never silently overwritten.
+    merged = dict(user_env)
+    for key, template_value in template_env.items():
+        if key not in merged:
+            merged[key] = template_value
+            report["keys_added_from_template"] += 1
+        elif canonical(merged[key]) != canonical(template_value):
+            report["conflicts"].append(f"env.{key}")
+    return merged
+
+
 def merge_settings(template, workspace, report):
     merged = dict(workspace)
     for key, template_value in template.items():
@@ -192,6 +210,13 @@ def merge_settings(template, workspace, report):
                 merged["permissions"] = merge_permissions(user_value, template_value, report)
             else:
                 report["conflicts"].append("permissions")
+            continue
+        if key == "env" and isinstance(template_value, dict):
+            user_value = merged.get("env", {})
+            if isinstance(user_value, dict):
+                merged["env"] = merge_env(user_value, template_value, report)
+            else:
+                report["conflicts"].append("env")
             continue
         if key not in merged:
             merged[key] = template_value

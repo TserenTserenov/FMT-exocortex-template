@@ -377,7 +377,7 @@
     },
     {
       "path": ".claude/scripts/settings-merge-preview.py",
-      "sha256": "76e59ebd7d6b97e313e048b6fcef37c8fc07185c467b86ed5a5e78f847d7b1e8"
+      "sha256": "5b8c26c50f5d4c26bdf746dd6ce478e03501cfba936462cdfb06c3d0f07a9f9c"
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
@@ -389,7 +389,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "6fa288ca84fd2a0ce5ab0404b267041971b0bd4bc58b31e5779386719029d715"
+      "sha256": "a94d465db0243dab5aef7d885bd4424132d0c13ea44c7cbe0b98b6ecc0329b01"
     },
     {
       "path": ".claude/skills-catalog.yaml",
@@ -453,7 +453,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "ea620da63213e94ad4b883568df7e589afce2ede61fc723a4bb7ff69f26f3fc7"
+      "sha256": "bb92322e75583bc25bfdc61a87dbd045abc9f0ef6b8a309084c8d5ef177f9966"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -469,7 +469,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "f3b62f4787acc4d2e39805430783f361d9ebb87468dcca5449012a2fbf2a112a"
+      "sha256": "15fb5b73ee00a36e27577aef8c004d147df3950162a3f86f512691c95e3cf33a"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -709,7 +709,7 @@
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
-      "sha256": "0c5a9d7dda7ac26b2418591d0572b8cf5ebb802d4e6b7085f5a84773355f2018"
+      "sha256": "b04e875c3c0b38ca324fa1787cf161b3723be5d8a6eed7c22d41ab6fecb5a07c"
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
@@ -797,7 +797,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "9b5fe6c7e0ef67593b7803290b873d5c78116e50faf9dfb955565627a83735f8"
+      "sha256": "b3a05bc56117d401a46821e213540ba8b7271a3726d4e010bc740f1fff5b2c6e"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -3269,7 +3269,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "6996d9f0e105f8aa3b980efcf81efca8573cb4e139289dafaea59db2f849ea4b"
+      "sha256": "5a0aa652a47cb5ff0ec5db98c6e442c42c642d6d7bdee3d15e444928aa49d958"
     }
   ],
   "excluded_paths": [
@@ -3496,6 +3496,8 @@
     "setup/test-ds-publish.sh",
     "setup/test-extractor-subscription-env.sh",
     "setup/test-hook-dayplan-validator.sh",
+    "setup/test-issue-1216-env-merge-and-seed.sh",
+    "setup/test-issue-1217-download-batch-curl-k-path.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
