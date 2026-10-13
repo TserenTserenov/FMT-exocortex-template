@@ -434,7 +434,7 @@ def clean_repo():
     repo = tempfile.mkdtemp(prefix="dg-repo-")
     for args in (["init", "-q"], ["config", "user.email", "t@t.test"], ["config", "user.name", "t"]):
         subprocess.run(["git", "-C", repo, *args], check=True)
-    with open(os.path.join(repo, "a.txt"), "w") as f:
+    with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as f:
         f.write("a\n")
     subprocess.run(["git", "-C", repo, "add", "a.txt"], check=True)
     subprocess.run(["git", "-C", repo, "commit", "-qm", "a"], check=True)
@@ -444,7 +444,7 @@ def clean_repo():
 def fake_env(tool, condition="true"):
     """PATH with a fake `tool`: exits 3 when the sh condition over "$*" holds, else runs the real one."""
     d = tempfile.mkdtemp(prefix="dg-fake-")
-    with open(os.path.join(d, tool), "w", newline="\n") as f:
+    with open(os.path.join(d, tool), "w", newline="\n", encoding="utf-8") as f:
         f.write(f'#!/bin/sh\nif {condition}; then exit 3; fi\nexec {real(tool)} "$@"\n')
     os.chmod(os.path.join(d, tool), 0o755)
     return dict(os.environ, PATH=d + os.pathsep + os.environ["PATH"])
@@ -496,7 +496,7 @@ def main():
     else:
         check(False, "the hook has no exit trap")
     env_file = os.path.join(tempfile.mkdtemp(prefix="dg-env-"), "env.sh")
-    with open(env_file, "w", newline="\n") as f:
+    with open(env_file, "w", newline="\n", encoding="utf-8") as f:
         f.write('printf() { if [ "${FUNCNAME[1]:-}" = matches ]; then return 3; fi; builtin printf "$@"; }\n')
     code, err = run(hook, "git add -A", env=dict(os.environ, BASH_ENV=env_file))
     check(code == 2 and "ошибка проверки" in err, f"a failing printf inside matches -> {code}: blocked as a failed check")

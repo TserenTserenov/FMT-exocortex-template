@@ -30,13 +30,15 @@ fi
 
 Если `skills/month-close/SKILL.md` не найден:
 
+0. **Extensions (before)** — issue #884: делегирование в п.1 читает `month-close.before/.after` штатно (сам скилл их загружает), но этот inline-fallback skill вообще не открывает, значит и расширения не читает. `bash .claude/scripts/load-extensions.sh month-close before` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить как первые шаги. Exit 1: расширений нет, продолжить.
 1. **Ретро месяца** — сравнить R1-R6 (факт vs план) из WeekPlans
 2. **Архивация фокуса** — перенести достижения месяца в `Strategy.md`
 3. **Новые R1-R6** — сформулировать цели нового месяца
 4. **ТОС и гипотеза** — определить топ-3 приоритета и гипотезу роста
 5. **Red line проверка** — D7, runway, WakaTime, блокеры
 6. **MEMORY аудит** — ротация уроков, свежая таблица РП, проверка лимитов
-7. **Commit и push** — `git add` → commit → push
+7. **Extensions (after)** — `bash .claude/scripts/load-extensions.sh month-close after` → Exit 0: `Read` каждый файл из вывода (alphabetic), выполнить. Exit 1: расширений нет, продолжить.
+8. **Commit и push** — `git add` → commit → push
 
 ```
 📋 Month Close: Месяц YYYY-MM

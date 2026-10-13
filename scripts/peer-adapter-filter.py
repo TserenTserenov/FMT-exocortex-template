@@ -26,7 +26,7 @@ def main() -> int:
     dst = os.environ["DST_DIR"]
     patterns_file = os.environ["AGENTIGORE_FILE"]
 
-    with open(patterns_file) as f:
+    with open(patterns_file, encoding="utf-8") as f:
         patterns = [
             p.strip()
             for p in f.read().splitlines()

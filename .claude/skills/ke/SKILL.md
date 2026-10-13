@@ -44,7 +44,7 @@ routing:
 | Различение, метод, FM, WP | Соответствующий Pack | Close | Да |
 | Реализационное (вендор, стек, деплой) | DS docs/ | Close | Да (KE → DS) |
 | Крупный урок | `memory/<topic>.md` | Close | Нет |
-| Зерно для поста | `DS-strategy/drafts/draft-list.md` | Close | Нет |
+| Зерно для поста | `{{GOVERNANCE_REPO}}/drafts/draft-list.md` | Close | Нет |
 
 ## Шаг 2. Маршрутизация
 

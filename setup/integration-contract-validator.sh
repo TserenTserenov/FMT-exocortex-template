@@ -279,6 +279,8 @@ _detector07_scan_file() {
 }
 
 # Python scripts: должны читать GOVERNANCE_REPO из env, не хардкодить
+# issue #1006: .claude/skills добавлен в область сканирования — раньше
+# скиллы-хелперы (.py рядом с SKILL.md) не покрывались вовсе.
 while IFS= read -r py; do
     HITS=$(_detector07_scan_file "$py")
     if [ -n "$HITS" ]; then
@@ -286,7 +288,7 @@ while IFS= read -r py; do
         echo "$HITS" | while IFS= read -r line; do log "      $line"; done
         COVERAGE_VIOLATIONS=$((COVERAGE_VIOLATIONS + 1))
     fi
-done < <(find roles scripts guide-kit -name '*.py' -type f ! -path '*/tests/*' 2>/dev/null | sort)
+done < <(find roles scripts guide-kit .claude/skills -name '*.py' -type f ! -path '*/tests/*' 2>/dev/null | sort)
 
 # Shell scripts (12 мая, WP-291 follow-up; guide-kit добавлен issue #1106):
 # Bug 1 (b24639f) — в dt-collect.sh:238 (старая нумерация) был hardcode
@@ -302,7 +304,7 @@ while IFS= read -r sh; do
         echo "$HITS" | while IFS= read -r line; do log "      $line"; done
         COVERAGE_VIOLATIONS=$((COVERAGE_VIOLATIONS + 1))
     fi
-done < <(find roles scripts guide-kit -name '*.sh' -type f ! -path '*/tests/*' 2>/dev/null | sort)
+done < <(find roles scripts guide-kit .claude/skills -name '*.sh' -type f ! -path '*/tests/*' 2>/dev/null | sort)
 
 # Prompts: не должны иметь bare DS-strategy/, должны использовать {{GOVERNANCE_REPO}}
 while IFS= read -r prompt; do
@@ -316,6 +318,21 @@ while IFS= read -r prompt; do
         COVERAGE_VIOLATIONS=$((COVERAGE_VIOLATIONS + 1))
     fi
 done < <(find roles -name 'prompts' -type d 2>/dev/null | xargs -I{} find {} -name '*.md' -type f 2>/dev/null)
+
+# Skills + memory/ (issue #1006): не сканировались вовсе — SKILL.md и
+# memory/*.md доставляются пользователю так же, как prompts, и так же могут
+# утечь личный репозиторий автора. Richer _detector07_scan_file (комментарии,
+# parameter-expansion fallback, whole-file amnesty) — не упрощённая версия
+# из блока prompts выше, т.к. проза скиллов/памяти чаще легитимно обсуждает
+# переменную окружения рядом с примером значения.
+while IFS= read -r doc; do
+    HITS=$(_detector07_scan_file "$doc")
+    if [ -n "$HITS" ]; then
+        log "  ⚠ $doc: hardcoded DS-strategy без {{GOVERNANCE_REPO}} / GOVERNANCE_REPO env:"
+        echo "$HITS" | while IFS= read -r line; do log "      $line"; done
+        COVERAGE_VIOLATIONS=$((COVERAGE_VIOLATIONS + 1))
+    fi
+done < <(find .claude/skills memory -name '*.md' -type f 2>/dev/null | sort)
 
 if [ "$COVERAGE_VIOLATIONS" -eq 0 ]; then
     log "  ✅ PASS"

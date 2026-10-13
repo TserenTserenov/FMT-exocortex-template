@@ -30,7 +30,7 @@ description: "Операционный файл памяти IWE"
 | R5 | **Архитектор** | FX5 | скилл + inline | `/archgate` `/think` `/fpf` | ArchGate, ADR, BC-mapping, SOTA-update |
 | R6 | **Кодировщик** | FX5, FX8 | inline + скилл | `/transcribe` `/simplify`* `/claude-api`* `/review`* | Код, рефакторинг, баг-фикс |
 | R7 | **Триажёр** | — | скилл | `/iwe-bug-report` | Auto-triage feedback, triage-session |
-| R8 | **Синхронизатор** | — | скрипт + скилл | `/connect-guide` `/setup-wakatime` `/loop`* `/schedule`* | Scheduler, code-scan, pack projection, notify |
+| R8 | **Синхронизатор** | — | скрипт + скилл | `/connect-guide`* `/setup-wakatime` `/loop`* `/schedule`* | Scheduler, code-scan, pack projection, notify |
 | R9 | **Шаблонизатор** | FX8 | скилл | `/iwe-update` `/extend` `/init`* `/update-config`* `/keybindings-help`* `/fewer-permission-prompts`* | Template sync, drift detection, validation |
 | R10 | **Статистик** | — | скрипт | — | Метрики, аналитика, time tracking |
 | R11 | **Наладчик** | — | inline (носитель строится: WP-516 Ф3 аварийный контур + WP-545 Ф8 регламентный, 01.09.2026) | — | FSM unstick, auto-fix, restart, escalate; «ремонтник» — разговорный синоним пилота; каталог починок proposed/validated/enabled — общий артефакт двух РП |

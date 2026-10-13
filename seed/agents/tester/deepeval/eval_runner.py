@@ -42,7 +42,7 @@ Be strict but fair."""
 
 def load_rubrics() -> dict:
     rubrics_path = Path(__file__).parent / "rubrics.yaml"
-    with open(rubrics_path) as f:
+    with open(rubrics_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

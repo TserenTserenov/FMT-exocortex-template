@@ -152,7 +152,7 @@ def load_token() -> Optional[str]:
     # 2. Файл токенов Hermes
     if os.path.isfile(TOKEN_PATH):
         try:
-            with open(TOKEN_PATH) as f:
+            with open(TOKEN_PATH, encoding="utf-8") as f:
                 data = json.load(f)
             return data.get("access_token")
         except Exception:
@@ -167,7 +167,7 @@ def refresh_token() -> Optional[str]:
         return None
 
     try:
-        with open(TOKEN_PATH) as f:
+        with open(TOKEN_PATH, encoding="utf-8") as f:
             tokens = json.load(f)
     except Exception:
         return None
@@ -201,7 +201,7 @@ def refresh_token() -> Optional[str]:
         tokens["access_token"] = new_access
         if new_refresh:
             tokens["refresh_token"] = new_refresh
-        with open(TOKEN_PATH, "w") as f:
+        with open(TOKEN_PATH, "w", encoding="utf-8") as f:
             json.dump(tokens, f)
 
         return new_access

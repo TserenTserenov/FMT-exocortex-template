@@ -193,11 +193,11 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
-      "sha256": "c890efa1f922682770910d9307dbba63ee2e0c239c3fbd774405e8c994d4026d"
+      "sha256": "320f60cd868f5a9833e15dbffb53dd5bccc4d190e1f4e9cef9a821842a3d56cc"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "e9b48361f2be4e4515e6992b1aae7fac110a47b0d796e8643ff3c04f720bda5c"
+      "sha256": "c1a385987d866c0b7f30b7a0341b609ae18393ac0376aa1e38478b82a98ccdc7"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -429,7 +429,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "3942749b9c6ec3d71988a597ab19f30c950937770ef59f894eadcd021715ae1c"
+      "sha256": "9fa20f64a36b43d1f9b751eb5526405360a4003c21022a514804dbef661033d1"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -493,7 +493,7 @@
     },
     {
       "path": ".claude/skills/extend/SKILL.md",
-      "sha256": "1e8863d808f6edcf0882d2718af9ad20e798fcf0590a37487697c3feb08acb4e"
+      "sha256": "8898aeac400947ddc29425249d66c82315f06c11e7152cd5d1125e5499e170e4"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -597,7 +597,7 @@
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
-      "sha256": "ede0e4fcb3dc2545c7c9fbac1a94b12fc455cd4554a6781e584d7c92d68d7aaf"
+      "sha256": "b17a428c9441bff7c6c4a9f57c8ea3d29282136d5ca4928467fb3531db132a56"
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
@@ -653,7 +653,7 @@
     },
     {
       "path": ".claude/skills/repo-new/SKILL.md",
-      "sha256": "3c8834f2a31c5efa8db0208e7f6e31e8f74664f71482e4920cd96ed6cf2a9c2a"
+      "sha256": "88fe14a6c25a2c6d618243dc6aaa48c134d4d0281d5b68fab57f01a48453c4fe"
     },
     {
       "path": ".claude/skills/repo-new/assets/repository-skeleton/CLAUDE.md",
@@ -1369,7 +1369,7 @@
     },
     {
       "path": "guide-kit/generator/test_personal_export.py",
-      "sha256": "fc747e8334ed9bd8ebd3249a2037a9f8807153e1a5ec9fdde22f707b2dbb481a"
+      "sha256": "e236de4d11484198d0437006e4d6c4b60a13c30d4f1cd980b4fdac173be4ec99"
     },
     {
       "path": "guide-kit/generator/test_platform_knowledge.py",
@@ -1533,11 +1533,11 @@
     },
     {
       "path": "memory/checklists.md",
-      "sha256": "8472221c874f4a8c4a62627242047bc599d77cb58e5f04eb1cfa073da43fa658"
+      "sha256": "0be427c37338ba8e06d6217832190bc8848baa69edb72769a7d90f083c2a213d"
     },
     {
       "path": "memory/communication-style-base.md",
-      "sha256": "9775eda3c479f6149434469f7f925cfabb6925e5b0e410227c0070142f455f4f"
+      "sha256": "39d6e98885163af8f94b0b0ba79f7a32616c0d4174326895a71e6c30331318ce"
     },
     {
       "path": "memory/communication-style-downstream-template.md",
@@ -1577,7 +1577,7 @@
     },
     {
       "path": "memory/hard-distinctions.md",
-      "sha256": "2262cfd8fa152efe976bcd60879fb1bb52015a3c99868b9cdcde257619a39a25"
+      "sha256": "22025ffd3d8a86c19f79e42d718d3e7f15777993da4384a942b382d5dce2e909"
     },
     {
       "path": "memory/hooks-design.md",
@@ -1605,7 +1605,7 @@
     },
     {
       "path": "memory/protocol-month-close.md",
-      "sha256": "a9dcf9bc0c7df5c205cff6246c63212c691ccefbe31e0afccab01822244d9868"
+      "sha256": "94229852cb6af1232ad75772ff7a111528ee3fcb5253abf0c33c2a69a45c7800"
     },
     {
       "path": "memory/protocol-open.md",
@@ -1621,11 +1621,11 @@
     },
     {
       "path": "memory/reference/agent-core.md",
-      "sha256": "08e2f1601c52757ea8a266c593563e3e8faedd029a9b6936ebef0994e84322df"
+      "sha256": "c6689ed28da701b2bcac6512d374e50d6b48cfe94478722e892cbfd798893204"
     },
     {
       "path": "memory/repo-type-rules.md",
-      "sha256": "87ed9df2a5a75dec0d408019d06f1d0ce87d94dbcfb286bf361153973d9c0bd9"
+      "sha256": "430af2e7a160e2cbd25bf279cad528ccbdbb418b96c1f00ed5d88d350bd02749"
     },
     {
       "path": "memory/roles-detail.md",
@@ -1633,7 +1633,7 @@
     },
     {
       "path": "memory/roles.md",
-      "sha256": "f3e9c085d1ad4544ed5702b729a60cf0c56bde73fb25a5221a6213ba7a9fee9b"
+      "sha256": "c98019985e80f466377ac3631f68805a317fd2a9fdf486c3067904ed66ee1a73"
     },
     {
       "path": "memory/routing-vocab.md",
@@ -1833,7 +1833,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "74dd8607cd26692287488ef3d8b651e4a85de92bd847b9ed0e524f188263c9f4"
+      "sha256": "a24ae00941dc8804fc3351578710b2b47300c514ecf296d85357776c017af9d2"
     },
     {
       "path": "roles/strategist/prompts/evening.md",
@@ -1841,7 +1841,7 @@
     },
     {
       "path": "roles/strategist/prompts/month-close.md",
-      "sha256": "a4d8de9d61ec38577f15cbc303e62ac6c266aa40c0aa054e51c4844f1d53768d"
+      "sha256": "4ef1a832b4155cc92cc704987e660f567d45cfa6a362f5716361b73ce092607c"
     },
     {
       "path": "roles/strategist/prompts/note-review.md",
@@ -2649,7 +2649,7 @@
     },
     {
       "path": "scripts/peer-adapter-filter.py",
-      "sha256": "e9019119b7242fcc165cc8e16dad281505639853db824abf2f48227817b0ae75"
+      "sha256": "763b5c23f2a7dc793ac042d0034c750998769ef73293c85a41553f66bd0eeade"
     },
     {
       "path": "scripts/peer-session-finalize.sh",
@@ -2801,7 +2801,7 @@
     },
     {
       "path": "scripts/tests/python-encoding-baseline.txt",
-      "sha256": "5cd955a87015b5dbecc6fe9f2fc0a265d22926cc141f047522120a726526b53a"
+      "sha256": "7ad4d437c581d1a3de672fc8d07a54a380cb6829b716e00e7c246efeb501bdf7"
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
@@ -3391,6 +3391,7 @@
     "scripts/tests/test_issue_881_nudge_default.sh",
     "scripts/tests/test_issue_882_archgate_scale.sh",
     "scripts/tests/test_issue_884_ds_publish_missing.sh",
+    "scripts/tests/test_issue_884_ext.sh",
     "scripts/tests/test_issue_886_weekreport_skeleton.sh",
     "scripts/tests/test_issue_888_pull_on_touch_sync.sh",
     "scripts/tests/test_issue_890_executor_catalog_invariants.py",

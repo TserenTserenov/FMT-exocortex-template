@@ -97,7 +97,7 @@ description: "Операционный файл памяти IWE"
 
 > **ПРАВИЛО:** Перед выполнением Close — ПЕРЕЧИТАЙ CLAUDE.md § 2 чеклист Close. Не выполняй по памяти.
 
-- [ ] WP Context File создан/обновлён в `DS-strategy/inbox/WP-{N}/WP-{N}.md`
+- [ ] WP Context File создан/обновлён в `{{GOVERNANCE_REPO}}/inbox/WP-{N}/WP-{N}.md`
   - Текущее состояние, решения, следующие шаги
   - **Создавать при ПЕРВОМ Close**, не откладывать
 - [ ] Если создано новое репо → MAPSTRATEGIC.md (roadmap фаз)
@@ -110,7 +110,7 @@ description: "Операционный файл памяти IWE"
 
 - [ ] `template-sync.sh` — обновить список `mem_file` (passthrough или strip-author)
 - [ ] `validate-template.sh` — обновить список required files (если файл обязательный)
-- [ ] `DS-strategy/exocortex/` — удалить stale, добавить новые (backup)
+- [ ] `{{GOVERNANCE_REPO}}/exocortex/` — удалить stale, добавить новые (backup)
 - [ ] `protocol-open.md` — обновить таблицу «Обслуживание экзокортекса» (если структура изменилась)
 - [ ] Запустить `template-sync.sh` и убедиться, что валидация проходит
 

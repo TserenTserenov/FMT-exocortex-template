@@ -54,7 +54,7 @@ class Workspace:
     def make(self, *parts):
         path = os.path.join(*parts)
         os.makedirs(path, exist_ok=True)
-        with open(os.path.join(path, "f.txt"), "w") as f:
+        with open(os.path.join(path, "f.txt"), "w", encoding="utf-8") as f:
             f.write("x")
         return path
 
@@ -229,7 +229,7 @@ def main():
             fake = tempfile.mkdtemp(prefix="grm-fake-")
             counter = posix(os.path.join(fake, "count"))
             real_tool = subprocess.run([BASH, "-c", f"command -v {tool}"], capture_output=True, text=True).stdout.strip()
-            with open(os.path.join(fake, tool), "w", newline="\n") as f:
+            with open(os.path.join(fake, tool), "w", newline="\n", encoding="utf-8") as f:
                 f.write(f'#!/bin/sh\nn=$(cat "{counter}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "{counter}"\n'
                         f'if [ "$n" -ge {fail_from} ]; then exit 3; fi\nexec "{real_tool}" "$@"\n')
             os.chmod(os.path.join(fake, tool), 0o755)
@@ -281,7 +281,7 @@ def main():
         # root has two components used to refuse the temp-dir tokens themselves. ---
         if os.name != "nt":
             stub = tempfile.mkdtemp(prefix="dg-realpath-")
-            with open(os.path.join(stub, "realpath"), "w", newline="\n") as f:
+            with open(os.path.join(stub, "realpath"), "w", newline="\n", encoding="utf-8") as f:
                 f.write('#!/bin/sh\nfor a; do last="$a"; done\nprintf "%s\\n" "$last"\n')
             os.chmod(os.path.join(stub, "realpath"), 0o755)
             env = dict(os.environ, PATH=stub + os.pathsep + os.environ["PATH"])

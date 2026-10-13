@@ -433,7 +433,7 @@ class TestMergeDegree:
 class TestApplyPlatformOverlay:
     def _write_overlay(self, tmp_path, data):
         overlay_path = tmp_path / "profile.platform.yaml"
-        with open(overlay_path, "w") as fh:
+        with open(overlay_path, "w", encoding="utf-8") as fh:
             yaml.dump(data, fh)
         return overlay_path
 
