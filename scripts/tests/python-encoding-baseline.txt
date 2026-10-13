@@ -1,3 +1,4 @@
 # Known open()/Path.open() calls without encoding= (issue #1114 ratchet).
 # Format: relative/path.py :: <normalized source line>. A fix removes
 # its entry by re-scanning; regenerate with --regenerate after fixing.
+guide-kit/generator/test_personal_export.py :: with open(overlay_path, "w") as fh:

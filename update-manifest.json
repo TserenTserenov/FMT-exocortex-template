@@ -877,7 +877,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d561155b988f7b8725bdc5039eb7aa06b593c5551cdf534593f6550a6169ad45"
+      "sha256": "2a8a87c7b5fdb2e7839478aeb4707753f22c9d0c5b395e8ac258e0e8368af898"
     },
     {
       "path": "CLAUDE.md",
@@ -1369,7 +1369,7 @@
     },
     {
       "path": "guide-kit/generator/test_personal_export.py",
-      "sha256": "e236de4d11484198d0437006e4d6c4b60a13c30d4f1cd980b4fdac173be4ec99"
+      "sha256": "fc747e8334ed9bd8ebd3249a2037a9f8807153e1a5ec9fdde22f707b2dbb481a"
     },
     {
       "path": "guide-kit/generator/test_platform_knowledge.py",
@@ -2801,7 +2801,7 @@
     },
     {
       "path": "scripts/tests/python-encoding-baseline.txt",
-      "sha256": "7ad4d437c581d1a3de672fc8d07a54a380cb6829b716e00e7c246efeb501bdf7"
+      "sha256": "256c304bad380bdfecd0e5c6f0c2dca06e5d1dec3b680e485b2a9b6a7aa9f936"
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
