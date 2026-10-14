@@ -464,12 +464,44 @@ def ensure_workdir(workdir: Path) -> None:
 
 
 def commit_and_push(repo_dir: Path, message: str, files: list[Path]) -> None:
+    """Commit + push с повтором на сетевых шагах и TG-алертом, если все попытки упали.
+
+    РП-564: без этого push-сбой (конфликт/сеть) оставлял задачу молча висеть
+    в статусе assigned — find_pending_tasks() больше её не видит (ищет только
+    pending), а внешний try/except в главном цикле пишет только в лог-файл,
+    который пилот не читает постоянно.
+    """
     rel_files = [str(f.relative_to(repo_dir)) for f in files]
     run(["git", "add", *rel_files], cwd=repo_dir)
     run(["git", "commit", "-m", message], cwd=repo_dir)
-    run(["git", "fetch", "origin", GOV_BRANCH], cwd=repo_dir, timeout=30)
-    run(["git", "rebase", f"origin/{GOV_BRANCH}"], cwd=repo_dir, timeout=30)
-    run(["git", "push", "origin", GOV_BRANCH], cwd=repo_dir, timeout=60)
+
+    attempts = 3
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            run(["git", "fetch", "origin", GOV_BRANCH], cwd=repo_dir, timeout=30)
+            run(["git", "rebase", f"origin/{GOV_BRANCH}"], cwd=repo_dir, timeout=30)
+            run(["git", "push", "origin", GOV_BRANCH], cwd=repo_dir, timeout=60)
+            return
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            last_error = e
+            log(f"commit_and_push: попытка {attempt}/{attempts} упала: {e}", "WARN")
+            if attempt < attempts:
+                time.sleep(5 * attempt)
+
+    chat_id = os.environ.get("TG_ALERT_CHAT_ID")
+    if chat_id:
+        text = (
+            f"🚨 Dispatcher: commit_and_push упал {attempts} раз подряд\n"
+            f"Репо: {repo_dir.name}\n"
+            f"Коммит: {message[:120]}\n"
+            f"Коммит создан локально, push не прошёл — задача может висеть без видимого статуса."
+        )
+        _send_tg_with_routing(int(chat_id), text, target_bot=None)
+    else:
+        log("commit_and_push: TG_ALERT_CHAT_ID не задан — алерт о сбое push не отправлен", "WARN")
+    assert last_error is not None
+    raise last_error
 
 
 # === Task lifecycle ===
