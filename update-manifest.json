@@ -881,7 +881,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "43c1800fcc3f6fe75bafd23e23b189b933564eb5157879979e2e6a1bc226bc0e"
+      "sha256": "a0e01abadcc133cdf3445cbde230075f5807b9f8b457c74ed99b302bd9d45943"
     },
     {
       "path": "CLAUDE.md",
@@ -1113,7 +1113,7 @@
     },
     {
       "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
-      "sha256": "755ce5a2aa1729f757c28f0b4b72e7f43a0a0c7763c717a0e56179214f10cf28"
+      "sha256": "987d4684a0be6a54127e7969bebd235818881e8d72047576b9bce29851317e4a"
     },
     {
       "path": "extensions/agent-inbox/templates/_template.md",
@@ -2441,7 +2441,7 @@
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
-      "sha256": "755ce5a2aa1729f757c28f0b4b72e7f43a0a0c7763c717a0e56179214f10cf28"
+      "sha256": "987d4684a0be6a54127e7969bebd235818881e8d72047576b9bce29851317e4a"
     },
     {
       "path": "scripts/iwe-audit.sh",
