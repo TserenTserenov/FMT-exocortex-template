@@ -184,6 +184,10 @@
       "sha256": "6b54f91929897e8416d82b14454e301290dd90b6af87a7596fd71765404aa2af"
     },
     {
+      "path": ".claude/hooks/session-open-gate.sh",
+      "sha256": "f6ad04104f47572a1155fb9d952ecbf13f59c61daa1a24ea38d3af5ecb3ec8b6"
+    },
+    {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
       "sha256": "9ced3b69e749eef98bf2ccdc5a666f11064d62eb3b2dd5c20d837ef7e5a453d3"
     },
@@ -242,6 +246,10 @@
     {
       "path": ".claude/hooks/tests/test-secret-leak-block-unparsed-input.sh",
       "sha256": "5f95cd160628f1fa7a50bdba49bdfb687c45965919bd129275d1758533f4fe97"
+    },
+    {
+      "path": ".claude/hooks/tests/test-session-open-gate.sh",
+      "sha256": "402fdd96b9d3725b3376a359480e553be56550ed64a2c8f5497ff5817025e0cf"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
