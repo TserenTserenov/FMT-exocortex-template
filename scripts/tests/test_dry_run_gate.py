@@ -302,6 +302,24 @@ class TestIwePathsChainWhitelist:
             r = _run_hook(cmd)
             assert r.returncode == 2, f"{cmd!r}: {r.stderr}"
 
+    def test_disguised_cd_before_chain_blocked(self, sentinel):
+        """issue #1258 (independent red-team audit, 2026-10-17): the fix
+        above only matched the literal bytes "cd"/"pushd" with real
+        whitespace around them -- exactly the #1238 PoC's own shape. \\cd,
+        "cd", 'cd' and $'cd' all strip down to the plain word "cd" once bash
+        parses them and invoke the identical builtin -- confirmed live with
+        `bash -c '\\cd /tmp/x && pwd'` actually changing directory -- so they
+        bypassed the regex while working exactly like the PoC #1238 closed."""
+        for cmd in (
+            f'\\cd /tmp; {self.CHAIN}',
+            f'"cd" /tmp; {self.CHAIN}',
+            f"'cd' /tmp; {self.CHAIN}",
+            f"$'cd' /tmp; {self.CHAIN}",
+            f'\\pushd /tmp; {self.CHAIN}',
+        ):
+            r = _run_hook(cmd)
+            assert r.returncode == 2, f"{cmd!r}: {r.stderr}"
+
 
 class TestSentinelInactive:
     def test_no_sentinel_allows_everything(self):

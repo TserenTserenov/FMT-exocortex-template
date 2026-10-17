@@ -77,7 +77,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "750a092a2e92bbd1417196a2a54fa839dffdb3c26a480e6338d39eda46d2030a"
+      "sha256": "8e3102fd11531c8bfc2116726ea9e631ee5909a279a300462d3f6fc2d06ea6b3"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5e25248c1aa1f98af1fb17c13f72848c3c67230237cb7483a60c814d5bdb93d4"
+      "sha256": "54abb19a963b394c0d755cbef0aef076fb6ea24710045ec37510e38a04e0ee8f"
     },
     {
       "path": "CLAUDE.md",

@@ -631,6 +631,12 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # Шаг 2: разбить на простые команды.
     SPLIT=$(printf '%s\n' "$NORM" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
 
+    # issue #1258: same split, but from $CMD (before $NORM collapses every
+    # quoted span to the literal text "QSTR") -- a quoted/escaped command
+    # name like "cd" or \cd needs its quoting intact to tell it apart from
+    # QSTR by the time the cd/pushd check below runs.
+    SPLIT_RAW=$(printf '%s\n' "$CMD" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+
     # Live-review finding (Fable, 2026-09-14): whitelist для .iwe-paths матчит
     # ЛИТЕРАЛЬНЫЙ ТЕКСТ "$HOME/.iwe-paths"/"${IWE_PATHS_FILE:-...}", а не
     # разрешённое значение — цикл ниже классифицирует каждый сегмент НЕЗАВИСИМО
@@ -663,15 +669,101 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # ориентированным регексом выше (`cd` не матчит `VAR=`). Живой PoC подтвердил
     # полный обход: `cd /tmp/evil-poc; <цепочка>` проходил гейт (exit 0) и реально
     # сорсил подложный `/tmp/evil-poc/.iwe-paths` при настоящем исполнении.
-    # `pushd` даёт тот же эффект и добавлена туда же; `popd`/переход через функцию
-    # с другим именем — не покрыты, задокументированная остаточная граница
-    # (memory/dry-run-contract.md), не часть этого фикса.
+    # `pushd` даёт тот же эффект; `popd`/переход через функцию с другим именем —
+    # не покрыты, задокументированная остаточная граница (memory/dry-run-contract.md).
     HOME_OR_IWE_PATHS_TAMPERED=0
     if printf '%s\n' "$SPLIT" | grep -qE \
-        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(cd|pushd)([[:space:]]|$)' \
+        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)' \
     ; then
         HOME_OR_IWE_PATHS_TAMPERED=1
     fi
+
+    # issue #1258 (independent red-team audit, 2026-10-17): the `cd|pushd`
+    # alternative the regex above used to carry only matched the literal
+    # bytes "cd"/"pushd" with real whitespace around them — exactly the PoC
+    # #1238 itself used, nothing else. `\cd`, `"cd"`, `'cd'` and `$'cd'` all
+    # strip down to the plain word "cd" once bash parses them and invoke the
+    # identical builtin (confirmed live: `bash -c '\cd /tmp/x && pwd'` really
+    # changes directory) — the same attack #1238 closed, just not written in
+    # the one byte-exact shape the regex looked for. A fifth regex
+    # alternative for "\cd" would only buy one more round of the same trap
+    # (quoted-cd, ansi-c $'cd', ...), so this reuses the word tokenizer
+    # destructive-guard.sh already has for its own `rm` detection — it strips
+    # quotes/backslash/ANSI-C escapes the way bash's own parser does, so a
+    # command name survives disguising by construction, not by one more
+    # enumerated case.
+    CD_PUSHD_TOKEN_DETECTED=0
+    if printf '%s\n' "$SPLIT_RAW" | perl -e '
+        sub words {
+          my ($text) = @_;
+          my (@out, $word, $quote) = ();
+          for (my $i = 0; $i < length($text); $i++) {
+            my $char = substr($text, $i, 1);
+            if (defined $quote) {
+              if ($char eq "\\" && $quote eq "ansi" && $i + 1 < length($text)) {
+                my $esc = substr($text, $i + 1, 1);
+                my $tail = substr($text, $i + 1);
+                my %simple = (a => "\a", b => "\b", e => chr(27), E => chr(27), f => "\f", n => "\n", r => "\r", t => "\t", v => chr(11));
+                if ($esc eq "x" && $tail =~ /^x([0-9A-Fa-f]{1,2})/) {
+                  $word .= chr(hex $1);
+                  $i += length($1) + 1;
+                } elsif ($tail =~ /^([0-7]{1,3})/) {
+                  $word .= chr(oct($1) & 255);
+                  $i += length($1);
+                } elsif (($esc eq "u" && $tail =~ /^u([0-9A-Fa-f]{1,4})/) || ($esc eq "U" && $tail =~ /^U([0-9A-Fa-f]{1,8})/)) {
+                  $word .= chr(hex $1);
+                  $i += length($1) + 1;
+                } elsif (exists $simple{$esc}) {
+                  $word .= $simple{$esc};
+                  $i++;
+                } elsif ($esc eq "c" && $i + 2 < length($text)) {
+                  $word .= chr(ord(substr($text, $i + 2, 1)) & 31);
+                  $i += 2;
+                } elsif ($esc eq chr(92) || $esc eq chr(39) || $esc eq q{"} || $esc eq q{?}) {
+                  $word .= $esc;
+                  $i++;
+                } else {
+                  $word .= $char;
+                }
+              } elsif ($char eq "\\" && $quote eq q{"} && $i + 1 < length($text) && substr($text, $i + 1, 1) =~ /[\$`"\\\n]/) {
+                $word .= substr($text, ++$i, 1);
+              } elsif ($char eq ($quote eq "ansi" ? chr(39) : $quote)) {
+                undef $quote;
+              } else {
+                $word .= $char;
+              }
+            } elsif ($char eq q{$} && $i + 1 < length($text) && substr($text, $i + 1, 1) eq chr(39)) {
+              $quote = "ansi";
+              $i++;
+            } elsif ($char eq q{$} && $i + 1 < length($text) && substr($text, $i + 1, 1) eq q{"}) {
+              next;
+            } elsif ($char eq q{"} || $char eq chr(39)) {
+              $quote = $char;
+            } elsif ($char eq "\\" && $i + 1 < length($text)) {
+              $word .= substr($text, ++$i, 1);
+            } elsif ($char =~ /\s/) {
+              push @out, $word if length $word;
+              $word = q{};
+            } else {
+              $word .= $char;
+            }
+          }
+          push @out, $word if length $word;
+          return @out;
+        }
+        while (my $seg = <STDIN>) {
+          chomp $seg;
+          my @w = words($seg);
+          next unless @w;
+          my $i = 0;
+          $i++ if $i < @w && ($w[$i] eq "builtin" || $w[$i] eq "command");
+          exit 0 if $i < @w && ($w[$i] eq "cd" || $w[$i] eq "pushd");
+        }
+        exit 1;
+    '; then
+        CD_PUSHD_TOKEN_DETECTED=1
+    fi
+    [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
 
     while IFS= read -r SEG; do
         [ -z "$SEG" ] && continue
