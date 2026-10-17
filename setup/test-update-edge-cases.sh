@@ -61,6 +61,9 @@
 #   T49: governance script policy (update-derived-snapshot.py, generate-executor-catalog.py) decides
 #        by content against the template clone's own history, not by the deployed copy's git status;
 #        a kept file never aborts the rest of update.sh (WP-485 Ф17)
+#   T50: copy_platform_file_preserving_user_space() on a .claude/skills/*/SKILL.md path keeps the
+#        pilot's <!-- USER-SPACE --> block through an update while the rest of the file still moves
+#        to the upstream version (issue #1010 F3 fixed the drop; no end-to-end test existed — РП-529 Ф96)
 #
 # Exit: 0 = all PASS, N = N tests failed
 #
@@ -5624,6 +5627,102 @@ else
         pass "T49: the closing summary names the kept script by its own label, not as a 'файл памяти'"
     else
         fail "T49: closing summary missing or mislabeled: $T49_OUT"
+    fi
+fi
+
+# ============================================================
+# T50: skill personalization (<!-- USER-SPACE --> block) survives an update
+# through copy_platform_file_preserving_user_space() — issue #1010 F3 added
+# the preservation, but no test exercised the real function end-to-end
+# (РП-529 Ф96, S-33 authorized 17.10.2026).
+# ============================================================
+echo ""
+echo "=== T50: skill SKILL.md keeps its USER-SPACE block across an update ==="
+
+T50_DIR="$TEST_WS/t50-skill-user-space"
+mkdir -p "$T50_DIR"
+
+T50_FN_BLOCK=$(awk '
+    /^copy_platform_file_preserving_user_space\(\) \{$/{found=1}
+    found{print}
+    found && /^}$/{exit}
+' "$TEMPLATE_DIR/update.sh")
+T50_HASH_BLOCK=$(awk '/^hash_file\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+T50_SAFE_BLOCK=$(awk '/^rule_was_safe_to_update\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+T50_BACKUP_BLOCK=$(awk '/^backup_rule_before_overwrite\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+
+if [ -z "$T50_FN_BLOCK" ] || [ -z "$T50_HASH_BLOCK" ] || [ -z "$T50_SAFE_BLOCK" ] || [ -z "$T50_BACKUP_BLOCK" ]; then
+    fail "T50: could not extract copy_platform_file_preserving_user_space() or a dependency from update.sh — signature moved?"
+else
+    T50_FN_FILE="$T50_DIR/fn.sh"
+    {
+        printf '%s\n' "$T50_HASH_BLOCK"
+        printf '%s\n' "$T50_SAFE_BLOCK"
+        printf '%s\n' "$T50_BACKUP_BLOCK"
+        printf '%s\n' "$T50_FN_BLOCK"
+    } > "$T50_FN_FILE"
+    source "$T50_FN_FILE"
+
+    # Case A: the pilot's copy carries a USER-SPACE block (a personalization);
+    # upstream shipped a new version of the platform text with no block of
+    # its own (that's the normal shape — the block only ever exists in the
+    # workspace copy, never in the template source).
+    T50_SRC_A="$T50_DIR/src-a.md"
+    T50_DST_A="$T50_DIR/dst-a.md"
+    cat > "$T50_SRC_A" <<'HEREDOC'
+---
+name: demo
+---
+# Demo skill
+
+Platform text, new revision.
+HEREDOC
+    cat > "$T50_DST_A" <<'HEREDOC'
+---
+name: demo
+---
+# Demo skill
+
+Platform text, old revision.
+<!-- USER-SPACE -->
+my own note about this skill
+<!-- /USER-SPACE -->
+HEREDOC
+
+    WORKSPACE_DIR="$T50_DIR" RULES_SAFE_TO_UPDATE="" RULES_BACKUP_RUN=""
+    copy_platform_file_preserving_user_space "$T50_SRC_A" "$T50_DST_A" ".claude/skills/demo/SKILL.md"
+
+    if grep -qF "new revision" "$T50_DST_A"; then
+        pass "T50: Case A — the platform text outside the block moved to the upstream revision"
+    else
+        fail "T50: Case A — upstream revision did not land: $(cat "$T50_DST_A")"
+    fi
+    if grep -qF "my own note about this skill" "$T50_DST_A"; then
+        pass "T50: Case A — the pilot's USER-SPACE block survived the update"
+    else
+        fail "T50: Case A — the pilot's USER-SPACE block was dropped (issue #1010 F3 regression): $(cat "$T50_DST_A")"
+    fi
+    if grep -qF "old revision" "$T50_DST_A"; then
+        fail "T50: Case A — stale platform text from before the update is still present"
+    fi
+
+    # Case B: a skill with no USER-SPACE block (never personalized, or a
+    # fresh install) — plain overwrite, no markers appear out of nowhere.
+    T50_SRC_B="$T50_DIR/src-b.md"
+    T50_DST_B="$T50_DIR/dst-b.md"
+    printf '%s\n' "Platform text, new revision." > "$T50_SRC_B"
+    printf '%s\n' "Platform text, old revision." > "$T50_DST_B"
+
+    WORKSPACE_DIR="$T50_DIR" RULES_SAFE_TO_UPDATE="" RULES_BACKUP_RUN=""
+    copy_platform_file_preserving_user_space "$T50_SRC_B" "$T50_DST_B" ".claude/skills/demo/SKILL.md"
+
+    if [ "$(cat "$T50_DST_B")" = "Platform text, new revision." ]; then
+        pass "T50: Case B — a skill with no USER-SPACE block is a plain overwrite"
+    else
+        fail "T50: Case B — plain overwrite regressed: $(cat "$T50_DST_B")"
+    fi
+    if grep -qF "USER-SPACE" "$T50_DST_B"; then
+        fail "T50: Case B — markers appeared in a file that never had any"
     fi
 fi
 
