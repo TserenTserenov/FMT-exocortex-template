@@ -13,12 +13,31 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 IWE_DIR="$WORKSPACE_DIR"
 DIRTY=0
 UNPUSHED=0
+# RP-485 F21: a symlink (e.g. memory -> ~/.claude/.../memory) satisfies
+# `-d "$dir/.git"` once per path that points at it, so the same physical repo
+# was counted as a separate "dirty repo" for each symlink (live case: memory,
+# iwe-local-config/memory, wp561-wp530-close/memory all pointed at one path,
+# tripling the headline count). Dedup by `git rev-parse --show-toplevel`, not
+# by skipping symlinks outright: a symlink can be the only path to a repo, and
+# a git worktree has its own distinct toplevel even when it shares history
+# with another checkout, so two worktrees of the same repo still get scanned
+# separately (peer-session 2026-10-18-16-dirty-repos-fixes, Codex). Plain
+# string containment, not an associative array: this script runs under bash
+# 3.2 on macOS, which has no associative arrays.
+SEEN_TOPLEVELS="|"
 
 check_repo() {
     local dir="$1"
     local name="$2"
 
     if [ ! -d "$dir/.git" ]; then return; fi
+
+    local toplevel
+    toplevel=$(cd "$dir" && git rev-parse --show-toplevel 2>/dev/null) || toplevel="${dir%/}"
+    case "$SEEN_TOPLEVELS" in
+        *"|$toplevel|"*) return ;;
+    esac
+    SEEN_TOPLEVELS="$SEEN_TOPLEVELS$toplevel|"
 
     cd "$dir"
 
