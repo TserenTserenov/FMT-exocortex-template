@@ -147,6 +147,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.41.9] — 2026-10-18
+
 ### Added
 
 - [optional] `docs/release-audit-log.md`: independent post-release adversarial audit of v0.41.6→main (219 commits) recorded a new P1 finding — `dry-run-gate.sh`'s #1238 cd-bypass fix only matches the literal `cd`/`pushd` token; `\cd`, `"cd"` and `\pushd` still change directory in real bash while bypassing the regex, confirmed live against the exact #1238 chain-whitelist PoC (#1258). `destructive-guard.sh`'s token-based `rm` detection was checked against the same escaping tricks and holds (not affected). PR #1259.
