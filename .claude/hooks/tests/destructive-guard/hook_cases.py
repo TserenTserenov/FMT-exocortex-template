@@ -288,6 +288,16 @@ CASES = [
     ('bash -c -- перед строкой', 'bash -c -- "rm -rf /important"', 2, '.claude/bin/guarded-rm (те же ключи и цели)'),
     ('bash в кавычках с heredoc', "'bash' <<EOF\nrm -rf /important\nEOF", 2, '.claude/bin/guarded-rm (те же ключи и цели)'),
     ('верхнеуровневый cd с пробелом', ' cd /important', 2, 'cd'),
+    # issue #1258 (независимый аудит, 17.10): та же находка, что в
+    # dry-run-gate.sh (#1238/#1260) — \cd, "cd", 'cd', $'cd' реально меняют
+    # директорию (bash снимает кавычки/экранирование при разборе), но
+    # текстовый regex этой проверки видел только буквальные байты "cd".
+    ('верхнеуровневый \\\\cd не маскируется', '\\cd /important', 2, 'cd'),
+    ('верхнеуровневый "cd" не маскируется', '"cd" /important', 2, 'cd'),
+    ("верхнеуровневый 'cd' не маскируется", "'cd' /important", 2, 'cd'),
+    ("верхнеуровневый $'cd' не маскируется", "$'cd' /important", 2, 'cd'),
+    ('замаскированный cd после ; тоже блокируется', 'true; \\cd /important', 2, 'cd'),
+    ('маскировка внутри subshell остаётся разрешённой (как для обычного cd)', '(\\cd /important && ls)', 0, None),
     ('регистр RM на macOS/Windows', 'RM -rf /important', 2, '.claude/bin/guarded-rm (те же ключи и цели)'),
     ('регистр абсолютного пути на macOS/Windows', '/BIN/RM -rf /important', 2, '.claude/bin/guarded-rm (те же ключи и цели)'),
     ('-- завершает ключи rm', 'rm -r -- -f', 0, None),
