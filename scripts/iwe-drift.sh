@@ -78,6 +78,7 @@ parse_activity() {
         /^    period_days:/      { period = clean_prefix($0, "^    period_days:") }
         /^    commit_pattern_regex:/ { regex = clean_quoted(clean_prefix($0, "^    commit_pattern_regex:")) }
         /^    dormant_after_periods:/ { dormant = clean_prefix($0, "^    dormant_after_periods:") }
+        /^    mtime_files:/      { mtime = clean_quoted(clean_prefix($0, "^    mtime_files:")) }
         END { if (id != "") print_record() }
 
         function clean_prefix(line, pat,    v) {
@@ -91,10 +92,37 @@ parse_activity() {
             return v
         }
         function print_record() {
-            printf "%s\t%s\t%s\t%s\t%s\t%s\n", id, action, expected, period, regex, dormant
-            id=""; action=""; expected=""; period=""; regex=""; dormant=""
+            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", id, action, expected, period, regex, dormant, (mtime == "" ? "-" : mtime)
+            id=""; action=""; expected=""; period=""; regex=""; dormant=""; mtime=""
         }
     ' "$manifest"
+}
+
+# Время изменения файла в секундах (GNU stat на Linux, BSD stat на macOS); пусто, если файла нет.
+file_mtime() {
+    stat -c %Y -L "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
+# Репозиторий для проверки коммитов: корень IWE, если он git; иначе iwe-local-config
+# (на Linux-хосте корень ~/IWE не git, и git log по нему всегда пуст).
+activity_git_root() {
+    if [ -e "$IWE_ROOT/.git" ]; then echo "$IWE_ROOT"
+    elif [ -e "$IWE_ROOT/iwe-local-config/.git" ]; then echo "$IWE_ROOT/iwe-local-config"
+    else echo "$IWE_ROOT"; fi
+}
+
+# Число файлов из списка mtime_files (пути относительно IWE_ROOT, через запятую),
+# изменённых в окне [now - since_days, now - until_days]. Для действий, которые не
+# оставляют коммитов (например, гигиена уроков: память лежит вне git).
+count_mtime_hits() {
+    local files="$1" since_days="$2" until_days="$3" now lo hi f m hits=0
+    now=$(date +%s); lo=$(( now - since_days * 86400 )); hi=$(( now - until_days * 86400 ))
+    local IFS=','
+    for f in $files; do
+        m=$(file_mtime "$IWE_ROOT/$f")
+        [ -n "$m" ] && [ "$m" -ge "$lo" ] && [ "$m" -le "$hi" ] && hits=$(( hits + 1 ))
+    done
+    echo "$hits"
 }
 
 # Кандидаты в "спящий режим": N окон подряд (dormant_after_periods) без
@@ -109,16 +137,22 @@ report_activity() {
     echo ""
 
     local found=0
-    while IFS=$'\t' read -r id action expected period regex dormant; do
+    local git_root
+    git_root=$(activity_git_root)
+    while IFS=$'\t' read -r id action expected period regex dormant mtime_files; do
         [ -z "$id" ] && continue
 
         local window all_windows_empty=1 since_days until_days count
         for window in $(seq 0 $(( dormant - 1 ))); do
             since_days=$(( (window + 1) * period ))
             until_days=$(( window * period ))
-            count=$(git -C "$IWE_ROOT" log --oneline -E \
-                --since="${since_days} days ago" --until="${until_days} days ago" \
-                --grep="$regex" 2>/dev/null | wc -l | tr -d '[:space:]')
+            if [ "$mtime_files" != "-" ] && [ -n "$mtime_files" ]; then
+                count=$(count_mtime_hits "$mtime_files" "$since_days" "$until_days")
+            else
+                count=$(git -C "$git_root" log --oneline -E \
+                    --since="${since_days} days ago" --until="${until_days} days ago" \
+                    --grep="$regex" 2>/dev/null | wc -l | tr -d '[:space:]')
+            fi
             if [ "$count" -ge "$expected" ]; then
                 all_windows_empty=0
                 break
@@ -249,6 +283,19 @@ collect() {
         local dst_path="$derived"
         case "$src_path" in /*) ;; *) src_path="$IWE_ROOT/$src_path" ;; esac
         case "$dst_path" in /*) ;; *) dst_path="$IWE_ROOT/$dst_path" ;; esac
+
+        if [ "$check" = "content-diff" ]; then
+            local content_status
+            if [ ! -f "$src_path" ] || [ ! -f "$dst_path" ]; then
+                content_status="missing"
+            elif cmp -s "$src_path" "$dst_path"; then
+                content_status="ok"
+            else
+                content_status="critical"
+            fi
+            printf "%s\t%s\t%s\t%s\t%s\t%s\n" "?" "$id" "$relation" "$content_status" "$owner" "$symptom"
+            continue
+        fi
 
         local src_age dst_age lag status
         src_age=$(dir_newest_mtime_days_ago "$src_path")
