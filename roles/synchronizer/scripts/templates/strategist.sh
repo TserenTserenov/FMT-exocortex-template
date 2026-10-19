@@ -141,7 +141,7 @@ build_message() {
     # WP-561 Ф25: a failed week-review must alarm even when no WeekPlan file is found or the
     # model wrote nothing, so this message is static and skips the file lookup below.
     if [ "$scenario" = "week-review-failed" ]; then
-        printf "<b>🔴 Week-Review не доведён до сервера</b>\n\nОтчёт недели не подтверждён на origin/main (запуск не начался, модель упала или отчёт не доставлен), последующие сценарии могут остаться без итогов недели. Причина - в логе стратега за сегодня, строки POSTCONDITION или FAILED."
+        printf "<b>🔴 Week-Review не доведён до сервера</b>\n\nОтчёт недели не подтверждён на общей версии (запуск не начался, модель не справилась с заданием, или готовый отчёт не передан на сервер) - следующие сценарии недели могут остаться без итогов. В журнале стратега за сегодня видно, на каком именно шаге сорвалось."
         return
     fi
     if [ "$scenario" = "day-open-failed" ]; then
