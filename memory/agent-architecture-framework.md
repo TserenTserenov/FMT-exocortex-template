@@ -11,7 +11,7 @@ metadata:
     - roles
   status: active
   valid_from: 2026-05-25
-  owner: user
+  owner: platform
   schema_version: 1
   originSessionId: ae25144c-e026-495c-b6d0-616278d5d8b7
   modified: 2026-07-29T02:49:31.552Z
