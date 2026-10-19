@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a36069caf739ea2ab3af16efb3849c53a5da082fe432ee52ba4ac3efee51f897"
+      "sha256": "5da308863766b5b38bdaf69436692c950559c3f2b3cf75d86425c6280e3df20b"
     },
     {
       "path": "CLAUDE.md",
@@ -1101,7 +1101,7 @@
     },
     {
       "path": "docs/state-axes-registry.yaml",
-      "sha256": "69595b32e5106e4dd8b7882524b016c7cde5f3ecbf8158f2b328ad67aed7e7cd"
+      "sha256": "0e00b406d6380db86883475dadea339e7e60444b46266d9105ecacd90e7a2cc0"
     },
     {
       "path": "docs/use-cases/USE-CASES.md",
@@ -2517,7 +2517,7 @@
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
-      "sha256": "341f33fc68fc618655431464402584dc3d327b0fe3482ae957990b0868a7f6ee"
+      "sha256": "5fae05d64cb389ffba473ac6eec0e5ba9efd7aa5fdef87f77c62b5edd2ad54a6"
     },
     {
       "path": "scripts/iwe-transcribe.sh",
