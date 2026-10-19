@@ -1100,6 +1100,10 @@
       "sha256": "9cf28d0f72f967eb1b183e458c8b1214e9b97f8daf218847ccbde16b7244dc0a"
     },
     {
+      "path": "docs/state-axes-registry.yaml",
+      "sha256": "69595b32e5106e4dd8b7882524b016c7cde5f3ecbf8158f2b328ad67aed7e7cd"
+    },
+    {
       "path": "docs/use-cases/USE-CASES.md",
       "sha256": "a8b0fc6c865f980e1b09d286d9206d2b54d0dbb4fcd61b576a3e8e9bd1fba2d8"
     },
@@ -2510,6 +2514,10 @@
     {
       "path": "scripts/iwe-multipath.py",
       "sha256": "2bc20bf869195220748b1b0961a1219aab328279df5b36d48c092dcdaef6f631"
+    },
+    {
+      "path": "scripts/iwe-safe-pull.sh",
+      "sha256": "341f33fc68fc618655431464402584dc3d327b0fe3482ae957990b0868a7f6ee"
     },
     {
       "path": "scripts/iwe-transcribe.sh",
