@@ -897,11 +897,11 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5c976b39b0e37d20b78ebb483c7bd9b6b54ec690e08bda82f6fa0abc22d369ef"
+      "sha256": "a36069caf739ea2ab3af16efb3849c53a5da082fe432ee52ba4ac3efee51f897"
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "8e7e0ddeaa32bd3b583254a334d2513d21edeebde1cf3bf83a95c0336967f741"
+      "sha256": "c004a6484f229f25e7c60bfcc4cf40d84c6f0b5e6405eebca99241addf9933fd"
     },
     {
       "path": "ONTOLOGY.md",
@@ -2065,7 +2065,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "971e3b1c7e25436511deb92c82e972f5b33982832fe585fcf7424a7563b69d47"
+      "sha256": "54166753f13452503ed7b0067856252ff3c22adbf1822ced0fdbecacc3f41705"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
