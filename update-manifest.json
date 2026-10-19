@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "66e15553919cb8666b33181856dd2d57c94eae9b8f71ca6ab613ae9203100f49"
+      "sha256": "4929bce9b7bf665284166c00c51161f4027a798c8dd0296e7d6fe7547ae12ddd"
     },
     {
       "path": "CLAUDE.md",
@@ -2065,7 +2065,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "971e3b1c7e25436511deb92c82e972f5b33982832fe585fcf7424a7563b69d47"
+      "sha256": "54166753f13452503ed7b0067856252ff3c22adbf1822ced0fdbecacc3f41705"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
