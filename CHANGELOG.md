@@ -151,6 +151,10 @@ Refs: WP-NNN
 
 - [optional] `docs/state-axes-registry.yaml`: пустая заготовка-пример для State-Transition Gate (`axes: []`) — механизм гейта уже был в продукте (fail-open при нулевой записи), файл-образец для тех, кто захочет завести свою ось, раньше в шаблоне не поставлялся. `scripts/iwe-safe-pull.sh`: защита от устаревшей копии при параллельной работе нескольких агентов (Pull-on-Touch) — не-мутирующая проверка свежести origin без автоматического `git pull`, зависимость `git-dirty-guard.sh` уже была в шаблоне (WP-529 Ф216 п.2/п.5, пир-сессия 2026-10-19-12-wp529-f216-owner-deadline, PR #1272).
 
+### Fixed
+
+- `memory/agent-architecture-framework.md`, `memory/agent-vendor-connect-pattern.md`: обновлена схема фронтматтера (вложенный `metadata:` вместо плоских полей) — тело документов не менялось (WP-529 Ф215, пир-сессия 2026-10-19-15-wp529-f215-queue-run, PR #1273).
+
 ### Changed
 
 - [fix] `scripts/check-dirty-repos.sh`: дедупликация репозиториев теперь по `git rev-parse --show-toplevel`, не по пути — несколько символических ссылок на один каталог (живой случай: `memory`, `iwe-local-config/memory`, `wp561-wp530-close/memory`) считались тремя разными репозиториями и утраивали отчёт; разные git worktree одного репозитория всё равно проверяются по отдельности (у них разный toplevel) (PR #1269).
