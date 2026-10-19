@@ -154,6 +154,7 @@ Refs: WP-NNN
 ### Fixed
 
 - `memory/agent-architecture-framework.md`, `memory/agent-vendor-connect-pattern.md`: обновлена схема фронтматтера (вложенный `metadata:` вместо плоских полей) — тело документов не менялось (WP-529 Ф215, пир-сессия 2026-10-19-15-wp529-f215-queue-run, PR #1273).
+- [optional] `scripts/iwe-drift.sh`: добавлена проверка активности по `mtime_files` (для действий без коммитов, например гигиена памяти) и `activity_git_root()` (фикс для хоста, где корень workspace сам не git-репозиторий) — направление автор→шаблон, подтверждено git-историей. `memory/checklists.md`: урок про stale vector search. `memory/repo-type-rules.md`: конвенция семей `PD-*`/`MC-*`, восстановлен заголовок секции DS/governance (WP-529, пир-сессия 2026-10-19-23-wp529-diverge-inventory, PR #1276).
 
 ### Changed
 
