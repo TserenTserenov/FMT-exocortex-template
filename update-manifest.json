@@ -1553,11 +1553,11 @@
     },
     {
       "path": "memory/agent-architecture-framework.md",
-      "sha256": "5e4ea44843db92d0e633ed44dd57b25e083ee4e739b02106674840e7afdb9c5d"
+      "sha256": "2a2546ed0992bbc4e3cd511159c796a1100afc19fd0af9ba476efc3fda8bc5e9"
     },
     {
       "path": "memory/agent-vendor-connect-pattern.md",
-      "sha256": "46944ab2c4ea70f617808a34ae8f91994d8c952704d2f114b9af2b987f327715"
+      "sha256": "52a5ecdbc09de1e879f67039b4c7f1b8a83b22c45d997614890365e634b7cdfc"
     },
     {
       "path": "memory/checklists.md",
