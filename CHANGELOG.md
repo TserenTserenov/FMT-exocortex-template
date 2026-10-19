@@ -147,6 +147,10 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Changed
+
+- [fix] `scripts/check-dirty-repos.sh`: дедупликация репозиториев теперь по `git rev-parse --show-toplevel`, не по пути — несколько символических ссылок на один каталог (живой случай: `memory`, `iwe-local-config/memory`, `wp561-wp530-close/memory`) считались тремя разными репозиториями и утраивали отчёт; разные git worktree одного репозитория всё равно проверяются по отдельности (у них разный toplevel) (PR #1269).
+
 ## [0.41.9] — 2026-10-18
 
 ### Added
@@ -161,7 +165,6 @@ Refs: WP-NNN
 
 ### Changed
 
-- [fix] `scripts/check-dirty-repos.sh`: дедупликация репозиториев теперь по `git rev-parse --show-toplevel`, не по пути — несколько символических ссылок на один каталог (живой случай: `memory`, `iwe-local-config/memory`, `wp561-wp530-close/memory`) считались тремя разными репозиториями и утраивали отчёт; разные git worktree одного репозитория всё равно проверяются по отдельности (у них разный toplevel) (PR #1269).
 - [behavior] `roles/synchronizer/scripts/templates/strategist.sh`: сообщение "week-review-failed" ("Week-Review не доведён до сервера") больше не отсылает пилота читать технические маркеры лога `POSTCONDITION`/`FAILED` — три исходные причины (запуск не начался, модель не справилась, отчёт не передан) теперь сформулированы человеческим языком напрямую в самом сообщении (WP-538, PR #1271).
 - [behavior] Уточнено правило завершения ответа A12: доступное действие выполняется до финального ответа, результат подтверждает именно целевой вызов, а фоновая задача требует возвращённого ID. Неуспешные и чужие вызовы не подтверждают выполнение; чисто текстовые задачи не требуют инструмента. «Ничего не жду» допустимо только при завершённом объёме и отсутствии доступных действий (РП-603, PR #1267).
 - [security] `.claude/hooks/dry-run-gate.sh`: `cd`/`pushd` detection before the trusted `.iwe-paths` chain (#1238) now tokenizes each segment the way `destructive-guard.sh` already does for `rm` (strips quotes/backslash/ANSI-C escapes like bash's own parser) instead of a text regex — `\cd`, `"cd"`, `'cd'`, `$'cd'` and `\pushd` all physically change directory in real bash (confirmed live) while bypassing the regex #1238 shipped, same attack class, not yet closed. 6 new regression tests; the literal `cd` PoC from #1238 and the unchanged whitelisted chain keep their existing behavior (#1258, PR #1260).
