@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d5e812cdd5e3418f81466e2edd832d7a2bca794d1dd90da7184e632e7853a8be"
+      "sha256": "db34422ab127401fcd0a262ce42aff49a92fa3a21dbc3770f384f8aad512438b"
     },
     {
       "path": "CLAUDE.md",
@@ -1553,11 +1553,11 @@
     },
     {
       "path": "memory/agent-architecture-framework.md",
-      "sha256": "38fea9159f06418a2b5727964329d6c3e3a00bcd35a1d88b5f57571eeee4b4b2"
+      "sha256": "2a2546ed0992bbc4e3cd511159c796a1100afc19fd0af9ba476efc3fda8bc5e9"
     },
     {
       "path": "memory/agent-vendor-connect-pattern.md",
-      "sha256": "2c7c51d91ed3be09148fb927c8d52bb5ec75a0186f950f8bc0545bf16096935f"
+      "sha256": "52a5ecdbc09de1e879f67039b4c7f1b8a83b22c45d997614890365e634b7cdfc"
     },
     {
       "path": "memory/checklists.md",
