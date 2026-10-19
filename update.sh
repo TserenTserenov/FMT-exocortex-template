@@ -3612,6 +3612,12 @@ fi
 
 # Parse version from manifest
 UPSTREAM_VERSION=$(manifest_version "$MANIFEST")
+# Shown next to upstream so a pilot running the same install on two machines
+# sees at a glance whether they are about to converge or diverge.
+INSTALLED_VERSION=$(manifest_version "$SCRIPT_DIR/update-manifest.json" 2>/dev/null)
+if [ -n "$INSTALLED_VERSION" ]; then
+    echo "  Установленная версия: $INSTALLED_VERSION"
+fi
 echo "  Версия upstream: $UPSTREAM_VERSION"
 echo ""
 
