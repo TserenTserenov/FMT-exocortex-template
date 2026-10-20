@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b2939eca90d08bed99a76b23efcc7dc332cc2f2d34d9d494156fae2c784e4841"
+      "sha256": "306173fcbd5a8eb3038613621334ea6495d1567c3802fa1a5beca2d069cbbfc8"
     },
     {
       "path": "CLAUDE.md",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly.md",
-      "sha256": "9783f6942568627df8000c6f74f53c4a509b2373dcf01b106014fe3732602692"
+      "sha256": "608bf7d352f410e83c20aacd737fa066994b2cb169e1c3880ee7580be8e374d2"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/appendix/consent-check.md",
