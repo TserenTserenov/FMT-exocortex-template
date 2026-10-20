@@ -2697,7 +2697,7 @@
     },
     {
       "path": "scripts/peer-session-finalize.sh",
-      "sha256": "37d66e672547f34052bb3b2034078e61d89b7d611e1d3134cd04d78483a45722"
+      "sha256": "b09e99bc280fa9e963f29875aea32d3fe4720c1184815369e1978ae428125c3c"
     },
     {
       "path": "scripts/pending-phases-sweep.sh",
@@ -3354,6 +3354,7 @@
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
+    "scripts/tests/test-peer-session-finalize-index-lock.sh",
     "scripts/tests/test-setup-git-identity-precheck.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test-update-fpf-refresh.sh",

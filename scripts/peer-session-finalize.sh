@@ -18,8 +18,51 @@ IWE_DIR="${IWE_DIR:-$HOME/IWE}"
 REPO_DIR="${IWE_DIR}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 SESSIONS_DIR="${REPO_DIR}/sessions"
 INDEX_FILE="${SESSIONS_DIR}/00-index.md"
+INDEX_LOCK_DIR="${INDEX_FILE}.lock"
+INDEX_LOCK_TIMEOUT="${IWE_INDEX_LOCK_TIMEOUT:-10}"
 
 _now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# WP-529 ArchGate (вариант Б, 20.10.2026): awk читает $INDEX_FILE, строит
+# $tmpf, затем mv заменяет файл -- rename атомарен, но вся последовательность
+# "прочитать -> изменить -> заменить" не атомарна. Два параллельных вызова
+# finalize/interrupt на один governance-репо (подтверждено peer-сессией
+# Kimi+Codex механически, не предположением) могут оба прочитать одну и ту
+# же версию индекса -- второй mv молча затирает правку первого. Та же
+# схема reclaim-по-живости-pid, что acquire_captures_write_lock()
+# (strategist.sh/extractor.sh, issue #840): без зависимости от flock(1),
+# которого на свежем macOS без homebrew/util-linux может не быть.
+_acquire_index_lock() {
+  local waited=0
+  while true; do
+    if mkdir "$INDEX_LOCK_DIR" 2>/dev/null; then
+      printf '%s\n' "$$" > "$INDEX_LOCK_DIR/pid"
+      return 0
+    fi
+    local owner_pid=""
+    [[ -f "$INDEX_LOCK_DIR/pid" ]] && owner_pid="$(tr -d '[:space:]' < "$INDEX_LOCK_DIR/pid")"
+    # Та же асимметрия, что в acquire_captures_write_lock(): забираем лок
+    # только если pid-файл есть и непустой. Пустой/отсутствующий pid-файл
+    # значит mkdir другого писателя уже сработал, а его printf pid ещё не
+    # успел -- забрать лок здесь означало бы украсть его у живого держателя
+    # (TOCTOU), то есть вернуть ту же гонку, которую лок должен закрывать.
+    if [[ -n "$owner_pid" ]] && { ! [[ "$owner_pid" =~ ^[0-9]+$ ]] || ! kill -0 "$owner_pid" 2>/dev/null; }; then
+      rm -f "$INDEX_LOCK_DIR/pid"
+      rmdir "$INDEX_LOCK_DIR" 2>/dev/null
+      continue
+    fi
+    if (( waited >= INDEX_LOCK_TIMEOUT )); then
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
+_release_index_lock() {
+  rm -f "$INDEX_LOCK_DIR/pid" 2>/dev/null
+  rmdir "$INDEX_LOCK_DIR" 2>/dev/null || true
+}
 
 _usage() {
   echo "Usage: peer-session-finalize.sh --finalize <session_id>"
@@ -182,23 +225,25 @@ if [[ "$ACTION" == "--interrupt" ]]; then
 
   # Update index: status → interrupted, report → —
   if [[ -f "$INDEX_FILE" ]]; then
-    tmpf="$(mktemp)"
-    awk -v id="$SESSION_ID" '
-      $0 ~ id {
-        gsub(/\| (started|completed|interrupted) \|/, "| interrupted |")
-        gsub(/\| \[?report\.md[^|]*\|/, "| — |")
-        # If no report link column, ensure last column is —
-        if ($0 !~ /\| — \| *$/) { sub(/\| *$/, "| — |") }
-        print
-        next
-      }
-      { print }
-    ' "$INDEX_FILE" > "$tmpf"
     if [[ "$DRY_RUN" == true ]]; then
       echo "[DRY-RUN] Обновлю $INDEX_FILE: статус прерван, report удалён"
-      rm "$tmpf"
-    else
+    elif _acquire_index_lock; then
+      tmpf="$(mktemp)"
+      awk -v id="$SESSION_ID" '
+        $0 ~ id {
+          gsub(/\| (started|completed|interrupted) \|/, "| interrupted |")
+          gsub(/\| \[?report\.md[^|]*\|/, "| — |")
+          # If no report link column, ensure last column is —
+          if ($0 !~ /\| — \| *$/) { sub(/\| *$/, "| — |") }
+          print
+          next
+        }
+        { print }
+      ' "$INDEX_FILE" > "$tmpf"
       mv "$tmpf" "$INDEX_FILE"
+      _release_index_lock
+    else
+      echo "⚠️  Не удалось получить блокировку индекса за ${INDEX_LOCK_TIMEOUT}с — $INDEX_FILE не обновлён (status сессии в meta.yaml уже верный)" >&2
     fi
   fi
 
@@ -398,21 +443,23 @@ PYEOF
 
   # Update index
   if [[ -f "$INDEX_FILE" ]]; then
-    tmpf="$(mktemp)"
-    awk -v id="$SESSION_ID" -v link="[report.md](${MONTH}/${DAY}/${SESSION_ID}/report.md)" '
-      $0 ~ id {
-        gsub(/\| (started|interrupted) \|/, "| completed |")
-        gsub(/\| — \|/, "| " link " |")
-        print
-        next
-      }
-      { print }
-    ' "$INDEX_FILE" > "$tmpf"
     if [[ "$DRY_RUN" == true ]]; then
       echo "[DRY-RUN] Обновлю $INDEX_FILE: статус завершён, report.md добавлен"
-      rm "$tmpf"
-    else
+    elif _acquire_index_lock; then
+      tmpf="$(mktemp)"
+      awk -v id="$SESSION_ID" -v link="[report.md](${MONTH}/${DAY}/${SESSION_ID}/report.md)" '
+        $0 ~ id {
+          gsub(/\| (started|interrupted) \|/, "| completed |")
+          gsub(/\| — \|/, "| " link " |")
+          print
+          next
+        }
+        { print }
+      ' "$INDEX_FILE" > "$tmpf"
       mv "$tmpf" "$INDEX_FILE"
+      _release_index_lock
+    else
+      echo "⚠️  Не удалось получить блокировку индекса за ${INDEX_LOCK_TIMEOUT}с — $INDEX_FILE не обновлён (status сессии в meta.yaml уже верный)" >&2
     fi
   fi
 
