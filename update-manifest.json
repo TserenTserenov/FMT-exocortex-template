@@ -1605,7 +1605,7 @@
     },
     {
       "path": "memory/hard-distinctions.md",
-      "sha256": "22025ffd3d8a86c19f79e42d718d3e7f15777993da4384a942b382d5dce2e909"
+      "sha256": "8e088e05d3748bcabb83881826853e7f268de41ad94d3693c94652365fc80112"
     },
     {
       "path": "memory/hooks-design.md",
