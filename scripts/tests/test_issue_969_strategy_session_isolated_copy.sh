@@ -30,7 +30,11 @@ has 'PUB="$GOV_WT/scripts/ds-publish.sh"' && has 'bash "$PUB" "$GOV_WT" normal' 
 o1=$(grep -n '^### Шаг 0\. Рабочая копия' "$SKILL" | head -1 | cut -d: -f1)
 o2=$(grep -n 'load-extensions.sh strategy-session before' "$SKILL" | head -1 | cut -d: -f1)
 [ -n "$o1" ] && [ -n "$o2" ] && [ "$o1" -lt "$o2" ] && check "working copy step precedes before-extensions" ok || check "working copy step precedes before-extensions" bad
-for t in docs/Strategy.md docs/Dissatisfactions.md 'current/WeekPlan W{N}.md' docs/Backlog.md; do
+# docs/Backlog.md dropped from this list (wp518-f17): the dispatcher no longer touches it
+# directly -- it delegates the whole weekly ritual (including Backlog обход, step 07) to
+# strategy-session-weekly.md, so a literal "$GOV_WT/docs/Backlog.md" in SKILL.md would now be
+# dead text, not a safety signal.
+for t in docs/Strategy.md docs/Dissatisfactions.md 'current/WeekPlan W{N}.md'; do
   has "\$GOV_WT/$t" && check "GOV_WT path: $t" ok || check "GOV_WT path: $t" bad
 done
 
