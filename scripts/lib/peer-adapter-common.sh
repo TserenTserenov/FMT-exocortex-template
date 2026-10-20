@@ -10,16 +10,17 @@
 # had carried these blocks byte-identical since the 15.08 sandbox-network fix.
 
 # peer_adapter_check_sandbox_network <cli-label> <exit-code>
-# Codex's Linux sandbox disables network for non-escalated commands; the
-# vendor CLI then dies on its API call with little to no diagnostic output
-# (WP-524, verified live 15.08 on codex-cli 0.147). Fail fast with an
-# actionable message instead of leaking that opaque failure downstream.
+# Codex's sandbox disables network for non-escalated commands; the vendor CLI
+# then dies on its API call with little to no diagnostic output (WP-524,
+# verified live 15.08 on codex-cli 0.147). In an approved escalated command,
+# CODEX_SANDBOX is absent even if CODEX_SANDBOX_NETWORK_DISABLED remains 1;
+# the latter alone must not reject a reachable API (WP-524, 20.10.2026).
 # <exit-code> is the caller's, not this helper's: claude-peer-adapter.sh
 # passes 69, kimi-peer-adapter.sh passes 1 — unifying that divergence is a
 # separate decision, not bundled into this refactor (Codex review, WP-524).
 peer_adapter_check_sandbox_network() {
   local cli_label="$1" exit_code="${2:?peer_adapter_check_sandbox_network: exit code required}"
-  if [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = "1" ]; then
+  if [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = "1" ] && [ -n "${CODEX_SANDBOX:-}" ]; then
     echo "ERROR: network is disabled in this sandbox (CODEX_SANDBOX_NETWORK_DISABLED=1) — the $cli_label cannot reach its API. Re-run through the approved escalated route." >&2
     exit "$exit_code"
   fi
