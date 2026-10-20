@@ -67,8 +67,9 @@ client: claude-code
 | 0 | Открытие | skip-if-empty | `strategy-session-weekly/steps/00-open.md` *(MonthClose gate в этом шаге — не запускать и не упоминать: только monthly-диспетчер)* |
 | 1 | Ревью недели + стоп-лист | user | `strategy-session-weekly/steps/01-review.md` |
 | 7 | Нерегулярные блоки | skip-if-empty | `strategy-session-weekly/steps/07-irregular.md` |
-| 3 | Неудовлетворённости | user | `strategy-session-weekly/steps/03-dissatisfactions.md` |
-| — | **Weekly-stop gate** | — | Если любой сигнал (из 07 или 03) требует пересмотра состава РП текущей недели (убрать или добавить ≥1 РП) → **стоп**, предложи `strategy-session-monthly.md` |
+| 2 | Разбор входящих | user | `strategy-session-weekly/steps/02-inbox.md` |
+| 4 | Стратегическая сверка | user | `strategy-session-weekly/steps/04-strategy-sync.md` |
+| — | **Weekly-stop gate** | — | Если любой сигнал (из 07 или 04) требует пересмотра состава РП текущей недели (убрать или добавить ≥1 РП) → **стоп**, предложи `strategy-session-monthly.md` |
 | 6a | План: candidate pool | user | `strategy-session-weekly/steps/06a-pool.md` |
 | 6b | План: бюджет + ТОС | user | `strategy-session-weekly/steps/06b-budget.md` |
 | 8 | Утверждение | user | `strategy-session-weekly/steps/08-confirm.md` |
@@ -86,7 +87,7 @@ client: claude-code
 
 ## Weekly-stop gate (операционный критерий)
 
-После шага 03 оцени:
+После шага 04 оцени:
 > Требуется ли пересмотр состава РП текущей недели (убрать или добавить хотя бы один РП)?
 
 - **Да** → сообщи пилоту:
@@ -97,7 +98,7 @@ client: claude-code
 
 ## Jump-обработка
 
-В weekly-режиме jump-handler не используется. Критическая НЭП обрабатывается weekly-stop gate.
+В weekly-режиме jump-handler не используется. Критический сигнал (неудовлетворённость, прозвучавшая в разговоре, или расхождение стратегии из шага 04) обрабатывается weekly-stop gate.
 
 ## Проверка результата перед сессией (РП518 Ф17, решение пилота 19.10.2026)
 
