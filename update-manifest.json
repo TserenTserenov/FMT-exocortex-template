@@ -897,7 +897,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "306173fcbd5a8eb3038613621334ea6495d1567c3802fa1a5beca2d069cbbfc8"
+      "sha256": "34e562f50c4a16cb934506bc91846302cfcd6b4b4bf80cfb11927da267faea57"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "34e562f50c4a16cb934506bc91846302cfcd6b4b4bf80cfb11927da267faea57"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "34e562f50c4a16cb934506bc91846302cfcd6b4b4bf80cfb11927da267faea57"
     },
     {
       "path": "CLAUDE.md",
@@ -2621,7 +2629,7 @@
     },
     {
       "path": "scripts/lib/peer-adapter-common.sh",
-      "sha256": "65b3a09582fb2bcb61b2c0a8ac7914b21ed5479ed8805ed438978264cb390682"
+      "sha256": "8cd2e080c39c9282c1e29a7e0df0dfcf0e5c4771423b85dd731034fed90015b6"
     },
     {
       "path": "scripts/lib/runtime-placeholder-count.sh",
