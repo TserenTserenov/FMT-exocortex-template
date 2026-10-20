@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3dfe3a72a7732ab060df7b7f3e89e6e24980d175b3c4038a3e8746912527c0f5"
+      "sha256": "797713142ea06308161d1ac358f810c57f76149790719b4be0f1c9e5d3666ab0"
     },
     {
       "path": "CLAUDE.md",
@@ -2181,7 +2181,7 @@
     },
     {
       "path": "scripts/canon-reconcile-published.sh",
-      "sha256": "7d9737046a62328cd23a5252ea0f18a8753d8a6b95d7bc8107c52fa097cf6486"
+      "sha256": "10f7c2ece90f72f5eef63582baf5426c0debb5d3e428c5d18322e6b35442a5e1"
     },
     {
       "path": "scripts/changelog-append.sh",
