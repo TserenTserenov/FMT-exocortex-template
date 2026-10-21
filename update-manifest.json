@@ -185,7 +185,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "f6ad04104f47572a1155fb9d952ecbf13f59c61daa1a24ea38d3af5ecb3ec8b6"
+      "sha256": "e1dd6e6b373980ed896ce595969bd782ecd6e397f7c65178e452c5da3c0c9aab"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -249,7 +249,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "402fdd96b9d3725b3376a359480e553be56550ed64a2c8f5497ff5817025e0cf"
+      "sha256": "e450aa83021300595d0136f400e140cec552fecf8d1de5eed3781a5053e29f12"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -461,7 +461,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "5570798e12e51dc0379ec49f4e7d039753e94e163cf223c43d2433af3da2c637"
+      "sha256": "9a989b2847367b1bd470a20e129f68c55fa18096983d77119dd63de280252d47"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -477,7 +477,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "15fb5b73ee00a36e27577aef8c004d147df3950162a3f86f512691c95e3cf33a"
+      "sha256": "d92986a5c3a290c56deff3a4f70b8cc219c22255ffcf6b6b5d71722b0201817e"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -617,7 +617,7 @@
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
-      "sha256": "873ad4a815bc8de2abd679badb3381ccb267207ebfdc0d98e01a7f7dd619f637"
+      "sha256": "dd56ac96e65a9222143073ca8386bb4ca180f8bf22a3fe54aba9353e939a330f"
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
@@ -805,7 +805,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "b3a05bc56117d401a46821e213540ba8b7271a3726d4e010bc740f1fff5b2c6e"
+      "sha256": "4cfc22206c58d61504092ae2dec5652e9edac9a4a31765b0b3a3fd128c91f4ac"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9d61578d850f894b8c56d520a76cdb6f8cc1d03b7f0e1b577aac9291c94e649a"
+      "sha256": "dfe2f24db087b7494206418fb9a074e3299026fe9fb90d43a679956a9e8d8c73"
     },
     {
       "path": "CLAUDE.md",
