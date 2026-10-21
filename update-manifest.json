@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2227afee952563310cc29c8ff67896e3a65755a284c6088d75442039fc1858b8"
+      "sha256": "31a5f66de159e49c3ec11ed38f2b1e0dc318d6e6e05e18969aff904249f59157"
     },
     {
       "path": "CLAUDE.md",
@@ -1805,7 +1805,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "caee178ae1ddc633a9dd072df10e36d62c3a586a85fb330c56fa79cc9671e88e"
+      "sha256": "89984db371fa2428891c5a2eb7ea908ad3ef2a43819edfbb50cde8019cd231a4"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -3245,7 +3245,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/publish-gate.sh",
-      "sha256": "f5f6d83684d7b9391e3e2e6348ee145dbf0a819768012dc6afdd90a845edf417"
+      "sha256": "a9c2191dda6f55c0cd33d2ff99114caf7609b09244ffb7be4210dc783a82426c"
     },
     {
       "path": "seed/strategy/scripts/lib/telegram.sh",
