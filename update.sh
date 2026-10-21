@@ -2619,7 +2619,16 @@ backfill_ds_publish() {
     # Issue #1003: a copy that THIS template shipped earlier (sha256 on the list) is
     # not user content: it is replaced even though it lies untracked in the governance
     # repo (the generic backfill refuses untracked files). Any other file stays.
-    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
+    #
+    # Issue #1288 (21.10): this list is a trap by construction -- every edit to
+    # seed/strategy/scripts/ds-publish.sh mints a new hash that isn't on it yet,
+    # so an install that updated while an in-between version was current falls
+    # straight through to "not ours to replace" below and gets stuck on a stale
+    # template-shipped copy forever (two independent reports). Backfilled the two
+    # hashes minted since #1003 (03.10, 15.10) that were missing; the current
+    # seed file's own hash is deliberately NOT added here -- once it matches, the
+    # case below is moot since there is nothing left to replace it with.
+    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730 a86c3f628c06e8b7fe8d7a338c01ff0d7a0794751b4ce1a27affbb11295b2a36 13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e"
     local source_path="$SCRIPT_DIR/seed/strategy/scripts/ds-publish.sh" target_hash
     if [ -f "$target_path" ] && [ ! -L "$target_path" ] && [ ! -L "$(dirname "$target_path")" ] \
        && [ -f "$source_path" ] && [ ! -L "$source_path" ]; then
