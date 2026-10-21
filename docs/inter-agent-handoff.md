@@ -57,4 +57,3 @@ Claude (assessment / archgate / think)
 - **Lock collision:** both agents via MCP gateway → `acquire_file_lock` is required
 - **Context window:** `.handoff.md` ≤150 lines (Sawtooth compression — WP-207 P3)
 - **Freshness:** handoff becomes stale within hours → mandatory probe before start
-

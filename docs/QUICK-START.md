@@ -16,15 +16,15 @@ The `~/IWE` folder is your workspace. All IWE Repositories live inside it. This 
 
 ```bash
 mkdir -p ~/IWE && cd ~/IWE
-gh repo fork TserenTserenov/FMT-exocortex-template --clone
-cd FMT-exocortex-template
+gh repo fork iwesys/IWE --clone
+cd IWE
 bash setup.sh
 ```
 
 The Script will ask:
 
 - **GitHub username** — your GitHub username. You can see it in the top-right corner of github.com after signing in. For example: `ivan_petrov`
-- **Time zone** — enter in the format `Europe/Moscow` (Moscow), `Europe/Minsk` (Minsk), `Asia/Novosibirsk` (Novosibirsk), `Asia/Yekaterinburg` (Yekaterinburg). If you do not know your time zone — ask the AI.
+- **Time zone** — enter a standard time zone such as `Europe/London`, `America/New_York`, or `Asia/Tokyo`. If you do not know yours, ask the AI.
 
 For all other prompts — just press Enter.
 

@@ -1,0 +1,107 @@
+#!/bin/bash
+# routing: hook  trigger=pre-commit  deterministic=true
+# see DP.SC.159, DP.ROLE.059
+# Blocks staged additions that match the canonical secret corpus.
+#
+# The hook reports only pattern identifiers and counts. It must never echo a
+# matched diff line, secret value or content-derived digest.
+#
+# Activation: git config core.hooksPath .githooks
+# Bypass:     git commit --no-verify (only as an explicit operator decision)
+#
+# This is local defense in depth: it deliberately uses the helper from the
+# current working tree, so protected-branch CI remains the independent control
+# against a staged helper modification or an explicit --no-verify bypass.
+
+set -uo pipefail
+umask 077
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+
+if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+  printf 'Pre-commit secret scan unavailable: repository root is unknown.\n' >&2
+  exit 2
+fi
+
+# issue #1099 (item 6): the pattern library is looked up in the repo, then in
+# IWE_ROOT, then in the directory above the repo (the template normally sits in
+# the workspace root, so this works on an install whose workspace is not
+# $HOME/IWE and where IWE_ROOT is not exported into the hook), then $HOME/IWE.
+SECRET_LIB=""
+for candidate in \
+    "$repo_root/.claude/hooks/secret-bypass-lib.sh" \
+    "${IWE_ROOT:+$IWE_ROOT/.claude/hooks/secret-bypass-lib.sh}" \
+    "$(dirname "$repo_root")/.claude/hooks/secret-bypass-lib.sh" \
+    "$HOME/IWE/.claude/hooks/secret-bypass-lib.sh"; do
+  if [ -n "$candidate" ] && [ -r "$candidate" ]; then
+    SECRET_LIB="$candidate"
+    break
+  fi
+done
+if [ -z "$SECRET_LIB" ]; then
+  printf 'Pre-commit secret scan unavailable: canonical pattern library is missing.\n' >&2
+  exit 2
+fi
+# shellcheck source=../.claude/hooks/secret-bypass-lib.sh
+# shellcheck disable=SC1090,SC1091
+. "$SECRET_LIB"
+if ! command -v secret_pattern_process >/dev/null 2>&1 \
+  || [ ! -x "$SECRET_BYPASS_JQ" ] \
+  || [ ! -x "$SECRET_BYPASS_PYTHON" ]; then
+  printf 'Pre-commit secret scan unavailable: validated helpers are missing.\n' >&2
+  exit 2
+fi
+
+# issue #810/#832: the canonical pattern library and its extracted analyzer
+# necessarily contain the literal patterns they detect (a PEM header regex,
+# self-test corpus fixtures for classes like yookassa) -- scanning them for
+# "secrets" means the scanner trips on its own rule literals, the same class
+# of self-reference already excluded for check-platform-compat.sh below in
+# .githooks/pre-commit. Narrow, path-exact exclusion, not a general bypass;
+# a real secret pasted into either file by mistake still isn't the scanner's
+# job to catch (an unrelated content-review concern, same as for any file
+# whose entire purpose is to hold example/pattern text).
+if ! staged_diff=$(git diff --cached --diff-filter=ACMR --no-ext-diff --unified=0 -- . \
+    ':(exclude).claude/hooks/secret-bypass-lib.sh' \
+    ':(exclude).claude/hooks/secret-bypass-analyzer.py'); then
+  printf 'Pre-commit secret scan unavailable: staged diff could not be read.\n' >&2
+  exit 2
+fi
+if [ -z "$staged_diff" ]; then
+  exit 0
+fi
+
+# Drop diff metadata and the leading "+" marker. Line indexes returned by the
+# helper are internal only; the hook intentionally omits source lines entirely.
+added_lines=$(printf '%s\n' "$staged_diff" | sed -n '/^+++ /d; s/^+//p')
+if [ -z "$added_lines" ]; then
+  exit 0
+fi
+
+if ! analysis=$(printf '%s' "$added_lines" | secret_pattern_process detect-text 2>/dev/null) \
+  || ! printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -e '
+      type == "object"
+      and (.pattern_ids | type == "array" and all(.[]; type == "string"))
+      and (.patterns | type == "array" and all(.[];
+        type == "object"
+        and (.pattern_id | type == "string")
+        and (.count | type == "number" and . >= 1 and floor == .)))
+      and (.match_count | type == "number" and . >= 0 and floor == .)
+    ' >/dev/null 2>&1; then
+  printf 'Pre-commit secret scan unavailable: staged analysis failed closed.\n' >&2
+  exit 2
+fi
+
+match_count=$(printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -r '.match_count')
+if [ "$match_count" -eq 0 ]; then
+  exit 0
+fi
+
+pattern_count=$(printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -r '.pattern_ids | length')
+printf 'Pre-commit BLOCKED: %s possible secret(s) in %s pattern class(es).\n' \
+  "$match_count" "$pattern_count" >&2
+printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -r '
+  .patterns[] | "- \(.pattern_id): \(.count) match(es)"
+' >&2
+printf 'Matched values and source lines are intentionally hidden.\n' >&2
+printf 'Use git commit --no-verify only after an explicit operator review.\n' >&2
+exit 1

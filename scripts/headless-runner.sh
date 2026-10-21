@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# routing: helper  executor=script  called-by=agent-inbox-dispatcher
+# see DP.SC.159, DP.ROLE.059
+# headless-runner.sh — entry point Headless-adapter (DP.IWE.011-adapter-headless)
+#
+# Sets env per contract DP.IWE.011, then invokes iwe-agent-dispatcher.py
+# for running the ORZ-protocol or an arbitrary task via `claude -p`.
+#
+# Usage:
+#   headless-runner.sh [--protocol open|close|work] [--task TASK-ID] [--model sonnet|opus|haiku]
+#                      [--workdir PATH] [--dry-run] [--help]
+#
+# Examples:
+#   headless-runner.sh --protocol open
+#   headless-runner.sh --protocol close --dry-run
+#   headless-runner.sh --task TASK-2026-05-21-analyse --model opus
+#
+# see DP.IWE.011, DP.IWE.011-adapter-headless
+
+set -euo pipefail
+
+# === Defaults ===
+PROTOCOL=""
+TASK_ID=""
+MODEL="${IWE_DEFAULT_MODEL:-sonnet}"
+WORKDIR="${IWE_DISPATCHER_WORKDIR:-/tmp/iwe-headless}"
+DRY_RUN=0
+STATE_DIR="${IWE_STATE_DIR:-$HOME/.iwe/state}"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DISPATCHER="$SCRIPTS_DIR/iwe-agent-dispatcher.py"
+
+# WP-529 Phase9 (Evgenii 20.08): dispatcher imports yaml unconditionally, so a
+# plain `python3` here can silently pick a yaml-less interpreter (same class
+# as #453/#463) — unlike route-task.sh's per-skill interpreter resolution,
+# this entrypoint always needs PyYAML, so it hard-fails instead of falling
+# back.
+PYTHON3="$("$SCRIPTS_DIR/lib/find-python3.sh")" || exit 1
+
+# === Parse args ===
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --protocol)  PROTOCOL="$2"; shift 2 ;;
+    --task)      TASK_ID="$2"; shift 2 ;;
+    --model)     MODEL="$2"; shift 2 ;;
+    --workdir)   WORKDIR="$2"; shift 2 ;;
+    --dry-run)   DRY_RUN=1; shift ;;
+    --help|-h)
+      awk '/^# see /{exit} /^#[^!]/ && !/^# ===/{sub(/^# ?/,""); print}' "${BASH_SOURCE[0]}"
+      exit 0
+      ;;
+    *) echo "[headless-runner] Unknown arg: $1" >&2; exit 1 ;;
+  esac
+done
+
+# === Validate ===
+if [[ -z "$PROTOCOL" && -z "$TASK_ID" ]]; then
+  echo "[headless-runner] ERROR: specify --protocol or --task" >&2
+  exit 1
+fi
+if [[ -z "${IWE_DISPATCHER_REPO_URL:-}" ]]; then
+  echo "[headless-runner] ERROR: IWE_DISPATCHER_REPO_URL is not set" >&2
+  exit 1
+fi
+
+# === Set IWE_RUNTIME env (contract DP.IWE.011 §C) ===
+export IWE_RUNTIME="headless"
+
+# === Generate AGENT_SESSION_ID ===
+AGENT_SESSION_ID="$(date +%s%N | md5 | cut -c1-16 2>/dev/null || date +%s%N | md5sum | cut -c1-16)"
+export AGENT_SESSION_ID
+export CLAUDE_TASK_ID="${TASK_ID}"  # CC-CC compatibility for agent-trace-recorder.sh
+export AGENT_TASK_ID="${TASK_ID}"
+export AGENT_MODEL_ID="${MODEL}"
+export IWE_STATE_DIR="${STATE_DIR}"
+
+# === Write session env file (compatibility with hooks) ===
+mkdir -p "$STATE_DIR"
+cat > "$STATE_DIR/current-session.env" <<EOF
+IWE_RUNTIME=headless
+AGENT_SESSION_ID=${AGENT_SESSION_ID}
+AGENT_TASK_ID=${TASK_ID}
+AGENT_MODEL_ID=${MODEL}
+IWE_STATE_DIR=${STATE_DIR}
+SESSION_START_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+
+echo "[headless-runner] IWE_RUNTIME=headless AGENT_SESSION_ID=${AGENT_SESSION_ID} MODEL=${MODEL}"
+
+# === If specified --protocol, create task from template ===
+if [[ -n "$PROTOCOL" ]]; then
+  _create_protocol_task() {
+    local protocol="$1"
+    local task_id="TASK-$(date +%Y-%m-%d)-protocol-${protocol}-${AGENT_SESSION_ID}"
+    local repo_name
+    repo_name="$(basename "${IWE_DISPATCHER_REPO_URL%.git}")"
+    local tasks_dir="${WORKDIR}/${repo_name}/inbox/agent/tasks"
+
+    # If dispatcher the dispatcher has not yet cloned the repo — clone it
+    if [[ ! -d "${WORKDIR}/${repo_name}" ]]; then
+      echo "[headless-runner] Cloning repo to create task..." >&2
+      git clone -b "${IWE_DISPATCHER_REPO_BRANCH:-main}" \
+        "$IWE_DISPATCHER_REPO_URL" "${WORKDIR}/${repo_name}" >&2
+    fi
+    mkdir -p "$tasks_dir"
+
+    local template_name
+    case "$protocol" in
+      open)  template_name="protocol-open" ;;
+      close) template_name="protocol-close" ;;
+      work)  template_name="protocol-work" ;;
+      *)     echo "[headless-runner] Unknown protocol: $protocol" >&2; exit 1 ;;
+    esac
+
+    local task_file="${tasks_dir}/${task_id}.md"
+    local due_ts today
+    due_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    today="$(date +%Y-%m-%d)"
+
+    cat > "$task_file" <<TASKEOF
+---
+id: ${task_id}
+template: ${template_name}
+status: pending
+due: ${due_ts}
+model: ${MODEL}
+session_id: ${AGENT_SESSION_ID}
+result_location:
+  repo: ${IWE_DISPATCHER_REPO_URL}
+  branch: ${IWE_DISPATCHER_REPO_BRANCH:-main}
+  path: inbox/agent/results/RESULT-${task_id#TASK-}.md
+acceptance:
+  - Protocol ${protocol} completed without errors
+  - git status git status is clean in target repos
+params:
+  date: ${today}
+  context_note: "headless session ${AGENT_SESSION_ID}"
+---
+
+Automated task: execute the ORZ: execute the ORZ-protocol «${protocol}» via headless-adapter.
+Session: ${AGENT_SESSION_ID}
+TASKEOF
+
+    echo "[headless-runner] Created task: ${task_id}" >&2
+    echo "$task_id"
+  }
+
+  TASK_ID="$(_create_protocol_task "$PROTOCOL")"
+  export CLAUDE_TASK_ID="$TASK_ID"
+  export AGENT_TASK_ID="$TASK_ID"
+fi
+
+# === Starting dispatcher ===
+DISPATCHER_ARGS=(
+  --workdir "$WORKDIR"
+  --task "$TASK_ID"
+)
+[[ $DRY_RUN -eq 1 ]] && DISPATCHER_ARGS+=(--dry-run)
+
+echo "[headless-runner] Launching dispatcher: $PYTHON3 $DISPATCHER ${DISPATCHER_ARGS[*]}"
+"$PYTHON3" "$DISPATCHER" "${DISPATCHER_ARGS[@]}"
+EXIT_CODE=$?
+
+# === Log completion ===
+echo "[headless-runner] Done. exit=$EXIT_CODE session=$AGENT_SESSION_ID"
+
+# Update session env with completion time
+echo "SESSION_END_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$STATE_DIR/current-session.env"
+echo "SESSION_EXIT_CODE=${EXIT_CODE}" >> "$STATE_DIR/current-session.env"
+
+exit $EXIT_CODE

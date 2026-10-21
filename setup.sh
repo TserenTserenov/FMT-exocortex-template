@@ -1,0 +1,1601 @@
+#!/bin/bash
+# Exocortex Setup Script
+# Configures the English IWE template: placeholders, memory, launchd, DS-strategy
+#
+# Usage:
+#   bash setup.sh          # Full installation (git + GitHub CLI + Claude Code + automation)
+#   bash setup.sh --core   # Minimal installation (git only, no network)
+#
+set -e
+
+VERSION="0.7.0"  # WP-273 Stage 2: Generated runtime architecture (F)
+DRY_RUN=false
+CORE_ONLY=false
+VALIDATE_ONLY=false
+_MCP_AUTH_INCOMPLETE=false
+
+# === Cross-platform sed -i ===
+# macOS sed requires '' after -i, GNU sed does not
+if sed --version >/dev/null 2>&1; then
+    # GNU sed (Linux)
+    sed_inplace() { sed -i "$@"; }
+else
+    # BSD sed (macOS)
+    sed_inplace() { sed -i '' "$@"; }
+fi
+
+# sed_escape_replacement STR — escape values used as the replacement side of
+# `sed s|...|STR|`. Without this, &, | or \ in an installation value either
+# expands the match, terminates the expression or changes the following byte.
+sed_escape_replacement() {
+    printf '%s' "$1" | sed -e 's/[\&|]/\\&/g'
+}
+
+# === Parse arguments ===
+for arg in "$@"; do
+    case "$arg" in
+        --core)     CORE_ONLY=true ;;
+        --dry-run)  DRY_RUN=true ;;
+        --version)  echo "exocortex-setup v$VERSION"; exit 0 ;;
+        --validate)     VALIDATE_ONLY=true ;;
+        --help|-h)
+            echo "Usage: setup.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --validate  Verify current installation (env, files, extensions, MCP)"
+            echo "  --core      Offline installation: git only, no network"
+            echo "  --dry-run   Show what would be done, without making changes"
+            echo "  --version   Script version"
+            echo "  --help      This help message"
+            exit 0
+            ;;
+    esac
+done
+
+# === Validate mode ===
+if $VALIDATE_ONLY; then
+    echo "=========================================="
+    echo "  Exocortex Validate v$VERSION"
+    echo "=========================================="
+    echo ""
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    # WP-273 / issue #57: search order mirrors the write path in main setup mode.
+    # 1. $IWE_ENV_PATH (explicit override via env or exocortex.env.example)
+    # 2. $WORKSPACE_DIR/.exocortex.env (standard WP-273 location)
+    # 3. parent-of-template heuristic (most common layout: ~/IWE/IWE)
+    # 4. legacy: inside SCRIPT_DIR (pre-WP-273 installs)
+    WORKSPACE_GUESS="$(dirname "$SCRIPT_DIR")"
+    if [ -n "${IWE_ENV_PATH:-}" ] && [ -f "$IWE_ENV_PATH" ]; then
+        ENV_FILE="$IWE_ENV_PATH"
+    elif [ -n "${WORKSPACE_DIR:-}" ] && [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
+        ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
+    elif [ -f "$WORKSPACE_GUESS/.exocortex.env" ]; then
+        ENV_FILE="$WORKSPACE_GUESS/.exocortex.env"
+    else
+        ENV_FILE="$SCRIPT_DIR/.exocortex.env"  # legacy fallback (pre-WP-273)
+    fi
+    ERRORS=0
+
+    # Load .exocortex.env
+    if [ -f "$ENV_FILE" ]; then
+        echo "[1/4] Env config... ✓ .exocortex.env found ($ENV_FILE)"
+        # Safe read: grep KEY=VALUE, no eval/source (values may contain spaces)
+        _env_get() { grep "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-; }
+        # Check required keys
+        for key in GITHUB_USER WORKSPACE_DIR; do
+            val=$(_env_get "$key")
+            if [ -z "$val" ]; then
+                echo "  ✗ $key is not set"
+                ERRORS=$((ERRORS + 1))
+            fi
+        done
+    else
+        echo "[1/4] Env config... ✗ .exocortex.env not found"
+        echo "  Run setup.sh for initial configuration"
+        ERRORS=$((ERRORS + 1))
+    fi
+
+    # Check required files
+    echo "[2/4] Files..."
+    CHECK_FILES="CLAUDE.md memory/MEMORY.md memory/protocol-open.md memory/protocol-close.md memory/protocol-work.md memory/navigation.md memory/roles.md"
+    for f in $CHECK_FILES; do
+        if [ -f "$SCRIPT_DIR/$f" ]; then
+            echo "  ✓ $f"
+        else
+            echo "  ✗ $f missing"
+            ERRORS=$((ERRORS + 1))
+        fi
+    done
+
+    # Check extensions
+    echo "[3/4] Extensions..."
+    if [ -d "$SCRIPT_DIR/extensions" ]; then
+        EXT_COUNT=$(find "$SCRIPT_DIR/extensions" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+        echo "  ✓ extensions/ ($EXT_COUNT files)"
+    else
+        echo "  ⚠ extensions/ not found (optional)"
+    fi
+    # issue #348: only a sample file is stored in the repository; the working params.yaml is created
+    # by build-runtime.sh in the installation root and is not tracked by the template's git.
+    if [ -f "$SCRIPT_DIR/params.yaml.example" ]; then
+        echo "  ✓ params.yaml.example (parameter sample)"
+    else
+        echo "  ⚠ params.yaml.example not found (optional)"
+    fi
+
+    # Check MCP accessibility
+    echo "[4/4] MCP accessibility..."
+    echo "  MCP connects via claude.ai/settings/connectors"
+    echo "  Verify with /mcp in Claude Code"
+
+    # Delegate structural invariants to the template validator (installed mode:
+    # skips checks legitimately broken after setup — /Users/, /opt/homebrew, MEMORY skeleton).
+    # See setup/validate-template.sh — single source of checks 1, 5, 6, 7.
+    if [ -x "$SCRIPT_DIR/setup/validate-template.sh" ] || [ -f "$SCRIPT_DIR/setup/validate-template.sh" ]; then
+        echo ""
+        echo "[5/5] Structural invariants (delegate → validate-template.sh --mode=installed)..."
+        if bash "$SCRIPT_DIR/setup/validate-template.sh" --mode=installed "$SCRIPT_DIR" 2>&1 | sed 's/^/  /'; then
+            :
+        else
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+
+    echo ""
+    if [ "$ERRORS" -eq 0 ]; then
+        echo "✓ Validation passed"
+    else
+        echo "✗ Errors found: $ERRORS"
+    fi
+    exit "$ERRORS"
+fi
+
+if $CORE_ONLY; then
+    echo "=========================================="
+    echo "  Exocortex Setup v$VERSION (core)"
+    echo "=========================================="
+else
+    echo "=========================================="
+    echo "  Exocortex Setup v$VERSION"
+    echo "=========================================="
+fi
+echo ""
+
+# === Detect template directory ===
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TEMPLATE_DIR="$SCRIPT_DIR"
+
+# Verify we're inside the template
+if [ ! -f "$TEMPLATE_DIR/CLAUDE.md" ] || [ ! -f "$TEMPLATE_DIR/AGENTS.md" ] || [ ! -d "$TEMPLATE_DIR/memory" ]; then
+    echo "ERROR: This script must be run from the root of IWE."
+    echo "  Expected: $TEMPLATE_DIR/CLAUDE.md, $TEMPLATE_DIR/AGENTS.md and $TEMPLATE_DIR/memory/"
+    echo ""
+    echo "  Steps:"
+    echo "    gh repo fork iwesys/IWE --clone"
+    echo "    cd IWE"
+    echo "    bash setup.sh"
+    exit 1
+fi
+
+echo "Template: $TEMPLATE_DIR"
+echo ""
+
+# === Prerequisites check ===
+echo "Checking prerequisites..."
+PREREQ_FAIL=0
+
+check_command() {
+    local cmd="$1"
+    local name="$2"
+    local install_hint="$3"
+    local required="${4:-true}"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        echo "  ✓ $name: $(command -v "$cmd")"
+    else
+        if [ "$required" = "true" ]; then
+            echo "  ✗ $name: NOT FOUND"
+            echo "    Install: $install_hint"
+            PREREQ_FAIL=1
+        else
+            echo "  ○ $name: not installed (optional)"
+            echo "    Install: $install_hint"
+        fi
+    fi
+}
+
+# Git — always required
+check_command "git" "Git" "xcode-select --install"
+
+# Git identity — required in every mode: step 6 makes the initial commit of the
+# governance repo (full and --core). Without an identity that commit dies in the
+# middle of the install with git's own "Author identity unknown", after most of
+# the work is done and before the base repos are cloned; a new machine has none
+# until the user sets it (CI never saw this: its smoke passes GIT_AUTHOR_* env).
+# A throwaway empty commit is the only faithful probe: `git var` and `git config`
+# both answer differently from `git commit` in some environments (auto-detected
+# names, useConfigOnly). A dry run makes no commit, so it only warns.
+if command -v git >/dev/null 2>&1; then
+    _ID_PROBE=$(mktemp -d 2>/dev/null || true)
+    if [ -n "$_ID_PROBE" ] && git -C "$_ID_PROBE" init -q >/dev/null 2>&1 \
+            && git -C "$_ID_PROBE" commit -q --allow-empty -m probe >/dev/null 2>&1; then
+        echo "  ✓ Git identity: set"
+    else
+        echo "  ✗ Git identity: not set (name and email required for commits)"
+        echo "    Install: git config --global user.name \"Your Name\" && git config --global user.email \"you@example.com\""
+        $DRY_RUN || PREREQ_FAIL=1
+    fi
+    [ -z "$_ID_PROBE" ] || rm -rf "$_ID_PROBE"
+fi
+
+# jq — always required: .claude/hooks/dry-run-gate.sh (installed in every mode,
+# see step 4b) fails closed and blocks ALL tool calls without jq, with no explicit warning (issue #192).
+check_command "jq" "jq" "brew install jq (Linux: apt install jq / dnf install jq)"
+
+if $CORE_ONLY; then
+    echo ""
+    echo "  --core mode: only required dependencies are checked (git)."
+    echo "  GitHub CLI, Node.js, Claude Code — not required."
+else
+    # In CI mode (SETUP_CI=1) node/npm/claude are optional: Test 10 checks delivery
+    # and role installation, not the presence of runtime tools on the machine.
+    # Pattern already established for gh auth below (line with SETUP_CI).
+    _TOOL_REQUIRED="${SETUP_CI:+false}"; _TOOL_REQUIRED="${_TOOL_REQUIRED:-true}"
+    check_command "gh" "GitHub CLI" "brew install gh" "$_TOOL_REQUIRED"
+    check_command "node" "Node.js" "brew install node (or https://nodejs.org)" "$_TOOL_REQUIRED"
+    check_command "npm" "npm" "Comes with Node.js" "$_TOOL_REQUIRED"
+    # Multi-agent support: Claude Code, Kimi Code, Hermes — any of them works
+    AI_CLI_CANDIDATES="${AI_CLI_CANDIDATES:-claude kimi-code kimi hermes}"
+    _AGENT_FOUND=false
+    for _agent_cmd in $AI_CLI_CANDIDATES; do
+        if command -v "$_agent_cmd" >/dev/null 2>&1; then
+            echo "  ✓ AI Agent: $_agent_cmd ($(command -v "$_agent_cmd"))"
+            _AGENT_FOUND=true
+            break
+        fi
+    done
+    if ! $_AGENT_FOUND; then
+        if [ "${_TOOL_REQUIRED:-true}" = "true" ]; then
+            echo "  ✗ AI Agent: not found"
+            echo "    Install one of the supported agents:"
+            echo "      Claude Code: npm install -g @anthropic-ai/claude-code"
+            echo "      Kimi Code:   Kimi Code extension in VS Code"
+            echo "      Hermes:      see https://hermes-agent.nousresearch.com/"
+            echo "    Or set AI_CLI_CANDIDATES=<agent-command> in the environment"
+            echo "    Minimal installation without an agent: bash setup.sh --core"
+            PREREQ_FAIL=1
+        else
+            echo "  ○ AI Agent: not found (optional)"
+        fi
+    fi
+
+    # Check gh auth
+    if command -v gh >/dev/null 2>&1; then
+        if gh auth status >/dev/null 2>&1; then
+            echo "  ✓ GitHub CLI: authenticated"
+        else
+            echo "  ⚠ GitHub CLI: not authenticated"
+            if [ -z "${SETUP_CI:-}" ]; then
+                echo "    Run: gh auth login"
+                PREREQ_FAIL=1
+            fi
+        fi
+    fi
+fi
+
+echo ""
+
+if [ "$PREREQ_FAIL" -eq 1 ]; then
+    echo "ERROR: Prerequisites check failed. Install missing tools and try again."
+    exit 1
+fi
+
+# === Collect configuration ===
+# SETUP_CI=1: non-interactive mode for smoke tests and CI.
+# All values read from env vars; interactive prompts skipped.
+if [ -n "${SETUP_CI:-}" ]; then
+    GITHUB_USER="${GITHUB_USER:-smoke-test}"
+    WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
+    WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
+    CLAUDE_PATH="${CLAUDE_PATH:-claude}"
+    TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
+    TIMEZONE_DESC="${TIMEZONE_DESC:-4:00 (local time)}"
+    echo "  [CI] GITHUB_USER=$GITHUB_USER WORKSPACE_DIR=$WORKSPACE_DIR"
+else
+    read -p "GitHub username (or Enter to skip): " GITHUB_USER
+    GITHUB_USER="${GITHUB_USER:-your-username}"
+
+    read -p "Workspace directory [$(dirname "$TEMPLATE_DIR")]: " WORKSPACE_DIR
+    WORKSPACE_DIR="${WORKSPACE_DIR:-$(dirname "$TEMPLATE_DIR")}"
+    # Expand ~ to $HOME
+    WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
+
+    if $CORE_ONLY; then
+        # Core: use defaults, do not prompt for Claude-specific parameters
+        CLAUDE_PATH="${AI_CLI:-claude}"
+        TIMEZONE_HOUR="4"
+        TIMEZONE_DESC="4:00 (local time)"
+    else
+        read -p "Claude CLI path [$(command -v claude || echo '/opt/homebrew/bin/claude')]: " CLAUDE_PATH
+        CLAUDE_PATH="${CLAUDE_PATH:-$(command -v claude || echo '/opt/homebrew/bin/claude')}"
+
+        read -p "Strategist launch hour, machine local time (0-23) [4]: " TIMEZONE_HOUR
+        TIMEZONE_HOUR="${TIMEZONE_HOUR:-4}"
+
+        read -p "Timezone description (e.g. '7:00 MSK') [${TIMEZONE_HOUR}:00 (local time)]: " TIMEZONE_DESC
+        TIMEZONE_DESC="${TIMEZONE_DESC:-${TIMEZONE_HOUR}:00 (local time)}"
+    fi
+fi
+
+HOME_DIR="$HOME"
+USER_NAME="$(id -un)"
+
+# iwe_claude_project_slug PATH — the directory name Claude Code uses under
+# ~/.claude/projects for PATH: every character that is not an ASCII letter or
+# digit becomes "-" (so "/", ".", "_" and " " all do): /Users/alice/IWE → -Users-alice-IWE.
+# issue #869: three scripts used three different rules ("tr /", "tr /_.",
+# "tr /_ "), and none converted a Git Bash path ("/f/notes") to the native form
+# Claude Code actually sees ("F:\notes"). On Windows the native path comes from
+# cygpath; the drive-letter case does not matter there, the file system is
+# case-insensitive. A non-ASCII character becomes one dash (python3 counts characters
+# whatever the locale - launchd and cron run with none; the sed fallback does the same
+# only under a UTF-8 locale). Not verified against Claude Code for non-ASCII paths.
+# KEEP IN SYNC with update.sh and scripts/day-close.sh — the same function body;
+# scripts/tests/test_issue_869_claude_slug.sh fails when the copies diverge.
+iwe_claude_project_slug() {
+    local path="$1" native=""
+    if command -v cygpath >/dev/null 2>&1; then
+        native=$(cygpath -w "$path" 2>/dev/null) || native=""
+        [ -n "$native" ] && path="$native"
+    fi
+    if command -v python3 >/dev/null 2>&1 \
+       && python3 -c 'import os, re, sys; sys.stdout.write(re.sub("[^A-Za-z0-9]", "-", os.fsencode(sys.argv[1]).decode("utf-8", "replace")))' "$path" 2>/dev/null; then
+        return 0
+    fi
+    printf '%s' "$path" | sed 's/[^A-Za-z0-9]/-/g'
+}
+
+# hash_file FILE — the file's sha256, as update.sh computes it.
+# KEEP IN SYNC with update.sh — the same function body; setup/test-update-edge-cases.sh (T47) fails
+# when the copies diverge.
+hash_file() {
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        sha256sum "$1" | cut -d' ' -f1
+    fi
+}
+
+# memory_record_put FILE KEY HASH — the record of installed memory versions
+# ($WORKSPACE_DIR/.memory-deployed.tsv, one "key<TAB>sha256" line per file): afterwards its line for
+# KEY says HASH. update.sh reads it to tell a memory copy nobody changed from an edited one (issues
+# #965/#967). Written through a temporary file and mv; a record that is a link, no regular file or
+# unreadable is left as it is; returns non-zero, without a word, when it does not write.
+# KEEP IN SYNC with update.sh — the same function body; setup/test-update-edge-cases.sh (T47) fails
+# when the copies diverge.
+memory_record_put() {
+    local file="$1" key="$2" hash="$3" tmp line value tab
+    tab=$(printf '\t')
+    case "$hash" in *[!0-9a-f]*|'') return 1 ;; esac
+    [ "${#hash}" -eq 64 ] || return 1
+    if [ -L "$file" ] || { [ -e "$file" ] && { [ ! -f "$file" ] || [ ! -r "$file" ]; }; }; then
+        return 1
+    fi
+    tmp=$(mktemp "$file.XXXXXX" 2>/dev/null) || return 1
+    if [ -f "$file" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in *"$tab"*) ;; *) continue ;; esac
+            value="${line##*"$tab"}"
+            case "$value" in *[!0-9a-f]*|'') continue ;; esac
+            [ "${#value}" -eq 64 ] || continue
+            [ "${line%"$tab"*}" = "$key" ] || printf '%s\n' "$line"
+        done < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
+    fi
+    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" && mv -f "$tmp" "$file"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$WORKSPACE_DIR")"
+
+# === Governance repo contract (WP-560 Phase 5-Phase-2) ===
+# Single machine-readable source for the governance repo's default name and
+# the content markers that identify one as "the" governance repo — shared
+# with the server side (aisystant/github-integration-service,
+# src/governance-repo-contract.json). That repo's CI keeps this vendored copy
+# in sync (scheduled + on-push check against the public raw file here); a
+# mismatch there is a signal to update this file, not something this script
+# can detect on its own.
+GOVERNANCE_CONTRACT_FILE="$TEMPLATE_DIR/scripts/governance-repo-contract.json"
+if [ ! -f "$GOVERNANCE_CONTRACT_FILE" ]; then
+    echo "ERROR: governance contract not found: $GOVERNANCE_CONTRACT_FILE" >&2
+    echo "  Run 'git pull' in the template or re-clone, then re-run setup.sh." >&2
+    exit 1
+fi
+if ! GOVERNANCE_CONTRACT_SCHEMA_VERSION=$(jq -r '.schemaVersion // empty' "$GOVERNANCE_CONTRACT_FILE"); then
+    echo "ERROR: governance contract is not valid JSON: $GOVERNANCE_CONTRACT_FILE" >&2
+    exit 1
+fi
+if [ "$GOVERNANCE_CONTRACT_SCHEMA_VERSION" != "1" ]; then
+    echo "ERROR: unsupported governance contract schemaVersion: ${GOVERNANCE_CONTRACT_SCHEMA_VERSION:-<missing>}" >&2
+    exit 1
+fi
+GOVERNANCE_CONTRACT_DEFAULT_REPO=$(jq -r '.defaultRepoName // empty' "$GOVERNANCE_CONTRACT_FILE")
+if [ -z "$GOVERNANCE_CONTRACT_DEFAULT_REPO" ]; then
+    echo "ERROR: governance contract missing defaultRepoName" >&2
+    exit 1
+fi
+GOVERNANCE_MARKERS=()
+_governance_markers_raw=$(jq -r '.requiredMarkers[]? // empty' "$GOVERNANCE_CONTRACT_FILE")
+while IFS= read -r _governance_marker; do
+    [ -n "$_governance_marker" ] && GOVERNANCE_MARKERS+=("$_governance_marker")
+done <<< "$_governance_markers_raw"
+if [ "${#GOVERNANCE_MARKERS[@]}" -eq 0 ]; then
+    echo "ERROR: governance contract has no requiredMarkers" >&2
+    exit 1
+fi
+unset _governance_markers_raw _governance_marker
+
+# Honor an explicit governance repo, then preserve an existing installation's
+# config, then a trusted runtime override; only then auto-detect/default. This
+# makes setup reruns converge on arbitrary safe governance names instead of
+# silently creating a second DS-strategy repository.
+GOVERNANCE_REPO="${GOVERNANCE_REPO:-}"
+if [ -z "$GOVERNANCE_REPO" ] && [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
+    GOVERNANCE_REPO=$(grep '^GOVERNANCE_REPO=' "$WORKSPACE_DIR/.exocortex.env" 2>/dev/null |
+        head -1 | cut -d= -f2-)
+    case "$GOVERNANCE_REPO" in
+        \"*\") GOVERNANCE_REPO="${GOVERNANCE_REPO#\"}"; GOVERNANCE_REPO="${GOVERNANCE_REPO%\"}" ;;
+        \'*\') GOVERNANCE_REPO="${GOVERNANCE_REPO#\'}"; GOVERNANCE_REPO="${GOVERNANCE_REPO%\'}" ;;
+    esac
+fi
+if [ -z "$GOVERNANCE_REPO" ]; then
+    GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-}"
+fi
+# Applied both to an explicitly-supplied name (right here) and, again, to
+# whatever the auto-detect loop below resolves — a candidate directory found
+# on disk can itself contain spaces/other unsafe characters (the glob match
+# doesn't restrict that), so re-checking only the explicit-source value would
+# let an unsafe auto-detected name slip through unvalidated.
+validate_governance_repo_name() {
+    case "$1" in
+        "" ) ;;
+        .|..|.*|*/*|*[!A-Za-z0-9._-]*)
+            echo "ERROR: GOVERNANCE_REPO must be a safe directory name: $1" >&2
+            exit 1
+            ;;
+    esac
+}
+validate_governance_repo_name "$GOVERNANCE_REPO"
+# Scope note (WP-560 Phase 5-Phase-2 review, 02.09; fail-closed added 11.09; the
+# separate GOVERNANCE_CONTRACT_DEFAULT_REPO pre-check folded in the same day,
+# peer-review round 2 — it used to run before this loop and short-circuit it
+# whenever the default-named directory existed, so a second, differently
+# named candidate sitting right next to it was never even looked at): this
+# local name-glob mirrors only the contract's ambiguityPolicy.twoOrMore branch
+# — 2+ matching directories (the default name included: it matches the same
+# `DS-*strategy*` glob, so it is just another candidate here, not a
+# short-circuit) fail closed instead of silently picking one. `zero` stays
+# untouched on purpose: an empty match here falls through to the
+# GOVERNANCE_CONTRACT_DEFAULT_REPO fallback below, which governs local
+# directory names, not the GitHub content markers that ambiguityPolicy.zero
+# governs on the resolver.ts side.
+if [ -z "$GOVERNANCE_REPO" ]; then
+    GOVERNANCE_LOCAL_CANDIDATES=()
+    for d in "$WORKSPACE_DIR"/DS-*; do
+        [ -d "$d" ] || continue
+        case "${d##*/}" in
+            DS-*strategy*)  # `DS-strategy` itself already matches this pattern (shellcheck SC2221/SC2222)
+                GOVERNANCE_LOCAL_CANDIDATES+=("${d##*/}")
+                ;;
+        esac
+    done
+    case "${#GOVERNANCE_LOCAL_CANDIDATES[@]}" in
+        0) ;;
+        1) GOVERNANCE_REPO="${GOVERNANCE_LOCAL_CANDIDATES[0]}" ;;
+        *)
+            echo "ERROR: multiple local governance repo candidates found: ${GOVERNANCE_LOCAL_CANDIDATES[*]}." >&2
+            echo "Specify the correct one explicitly, in quotes: GOVERNANCE_REPO='<name>' bash setup.sh ..." >&2
+            exit 1
+            ;;
+    esac
+    unset GOVERNANCE_LOCAL_CANDIDATES
+fi
+GOVERNANCE_REPO="${GOVERNANCE_REPO:-$GOVERNANCE_CONTRACT_DEFAULT_REPO}"
+validate_governance_repo_name "$GOVERNANCE_REPO"
+if [ -L "$WORKSPACE_DIR/$GOVERNANCE_REPO" ]; then
+    echo "ERROR: governance repo cannot be a symbolic link: $WORKSPACE_DIR/$GOVERNANCE_REPO" >&2
+    exit 1
+fi
+if [ -d "$WORKSPACE_DIR/$GOVERNANCE_REPO" ] && [ -d "$TEMPLATE_DIR" ]; then
+    GOVERNANCE_REAL=$(cd -P "$WORKSPACE_DIR/$GOVERNANCE_REPO" 2>/dev/null && pwd -P) || exit 1
+    TEMPLATE_REAL=$(cd -P "$TEMPLATE_DIR" 2>/dev/null && pwd -P) || exit 1
+    if [ "$GOVERNANCE_REAL" = "$TEMPLATE_REAL" ]; then
+        echo "ERROR: GOVERNANCE_REPO points to the template repo: $GOVERNANCE_REPO" >&2
+        exit 1
+    fi
+fi
+
+# IWE_TEMPLATE = path to the FMT repo (where setup.sh lives).
+IWE_TEMPLATE_PATH="$TEMPLATE_DIR"
+
+echo ""
+echo "Configuration:"
+echo "  GitHub user:    $GITHUB_USER"
+echo "  Workspace:      $WORKSPACE_DIR"
+if $CORE_ONLY; then
+    echo "  Mode:           core (offline)"
+else
+    echo "  Claude path:    $CLAUDE_PATH"
+    echo "  Schedule hour:  $TIMEZONE_HOUR (local time)"
+    echo "  Time desc:      $TIMEZONE_DESC"
+fi
+echo "  Home dir:       $HOME_DIR"
+echo "  Project slug:   $CLAUDE_PROJECT_SLUG"
+echo ""
+
+# === Data Policy acceptance (skip in dry-run and CI) ===
+if ! $DRY_RUN && [ -z "${SETUP_CI:-}" ]; then
+    echo "Data Policy"
+    echo "  IWE collects and processes data as described in docs/DATA-POLICY.md"
+    echo "  Summary: profile, sessions, and learning data are stored on the platform (Neon DB)."
+    echo "  Your personal/ files stay local. Claude API receives prompts + profile context."
+    echo "  You can view your data (/mydata) and delete it at any time."
+    echo ""
+    echo "  Full policy: docs/DATA-POLICY.md"
+    echo ""
+    read -p "I have read and agree to the Data Policy (y/n): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Setup cancelled. Please review docs/DATA-POLICY.md first."
+        exit 0
+    fi
+    echo ""
+
+    read -p "Continue with setup? (y/n) " -n 1 -r
+    echo ""
+    [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
+fi
+
+# === Save configuration to .exocortex.env ===
+# WP-273 Stage 2: .exocortex.env lives in $WORKSPACE_DIR/, not in FMT.
+# FMT stays as a clean upstream (immutable). All substituted values are generated
+# by build-runtime.sh in $WORKSPACE_DIR/.iwe-runtime/.
+ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
+IWE_RUNTIME_PATH="$WORKSPACE_DIR/.iwe-runtime"
+# issue #805: build-runtime.sh --dry-run has no fresh-checkout exception —
+# it always requires a readable .exocortex.env, which on a genuinely first
+# run (before this script has ever written one) doesn't exist yet. Write the
+# would-be content to a disposable temp file so --dry-run below has
+# something real to read, without touching $WORKSPACE_DIR at all.
+DRY_RUN_ENV_FILE=$(mktemp)
+trap 'rm -f "$DRY_RUN_ENV_FILE"' EXIT
+cat > "$DRY_RUN_ENV_FILE" <<ENVEOF
+# Exocortex configuration (generated by setup.sh v$VERSION)
+# This file is read by build-runtime.sh / update.sh to substitute placeholders.
+# SECURITY: chmod 600. Listed in .gitignore. Do NOT commit this file.
+# Do not add shell commands — only KEY=VALUE lines are allowed.
+
+# === Core (substituted into runtime files via build-runtime.sh) ===
+# issue #223: values ALWAYS in quotes — the file is read by the shell,
+# an unquoted value with a space (e.g. TIMEZONE_DESC=4:00 UTC)
+# breaks sourcing: bash treats the trailing part as a command ("UTC: command not found").
+GITHUB_USER="$GITHUB_USER"
+WORKSPACE_DIR="$WORKSPACE_DIR"
+CLAUDE_PATH="$CLAUDE_PATH"
+CLAUDE_PROJECT_SLUG="$CLAUDE_PROJECT_SLUG"
+TIMEZONE_HOUR="$TIMEZONE_HOUR"
+TIMEZONE_DESC="$TIMEZONE_DESC"
+HOME_DIR="$HOME_DIR"
+USER_NAME="$USER_NAME"
+GOVERNANCE_REPO="$GOVERNANCE_REPO"
+IWE_TEMPLATE="$IWE_TEMPLATE_PATH"
+IWE_RUNTIME="$IWE_RUNTIME_PATH"
+IWE_SCRIPTS="$IWE_TEMPLATE_PATH/scripts"
+
+# === Platform LLM Proxy (optional own API key for unlimited usage) ===
+# No default address is written: the platform gateway does not answer yet (older
+# versions recorded an address here that returns HTTP 404 on every path). Fill it in
+# once a real gateway exists; day-open reads LLM_PROXY_URL first, then this value.
+# PLATFORM_LLM_PROXY_URL=
+# ANTHROPIC_API_KEY=  # Optional: own key for unlimited usage (Direct MCP mode)
+
+ENVEOF
+if $DRY_RUN; then
+    echo "[DRY RUN] Would save configuration to $ENV_FILE"
+else
+    mkdir -p "$WORKSPACE_DIR"
+    cp "$DRY_RUN_ENV_FILE" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    echo "  Configuration saved to $ENV_FILE"
+fi
+
+# === Ensure workspace exists ===
+if $DRY_RUN; then
+    echo "[DRY RUN] Would create workspace: $WORKSPACE_DIR"
+else
+    mkdir -p "$WORKSPACE_DIR"
+fi
+
+# === 1. Build generated runtime (.iwe-runtime/) ===
+# WP-273 Stage 2: substituted files live in $WORKSPACE_DIR/.iwe-runtime/
+# (Generated runtime, F). FMT stays as a clean upstream — no sed over $TEMPLATE_DIR.
+# Overlay file registry: .claude/runtime-overlay.yaml. Implementation: setup/build-runtime.sh.
+echo ""
+echo "[1/6] Building generated runtime..."
+
+if $DRY_RUN; then
+    # issue #805: read from $DRY_RUN_ENV_FILE, not $ENV_FILE — the real file
+    # was never written in this branch (see above), so build-runtime.sh would
+    # otherwise fail with "missing .exocortex.env" on every first-ever run.
+    bash "$TEMPLATE_DIR/setup/build-runtime.sh" --dry-run \
+        --workspace "$WORKSPACE_DIR" --env-file "$DRY_RUN_ENV_FILE" 2>&1 | sed 's/^/  /'
+    # PIPESTATUS[0], not `if cmd | sed; then`: without `set -o pipefail` (not
+    # set anywhere in this script — changing that here would affect every
+    # other pipe below, out of scope for this fix) the pipeline's exit status
+    # is sed's, which is always 0.
+    build_runtime_rc=${PIPESTATUS[0]}
+    if [ "$build_runtime_rc" -ne 0 ]; then
+        echo "  ERROR: build-runtime.sh --dry-run failed (exit $build_runtime_rc)" >&2
+        exit 1
+    fi
+else
+    bash "$TEMPLATE_DIR/setup/build-runtime.sh" \
+        --workspace "$WORKSPACE_DIR" --env-file "$ENV_FILE" 2>&1 | sed 's/^/  /'
+    build_runtime_rc=${PIPESTATUS[0]}
+    if [ "$build_runtime_rc" -ne 0 ]; then
+        echo "  ERROR: build-runtime.sh failed (exit $build_runtime_rc)" >&2
+        exit 1
+    fi
+
+    # Enable pre-commit hook for platform compatibility checks
+    if [ -d "$TEMPLATE_DIR/.githooks" ]; then
+        git -C "$TEMPLATE_DIR" config core.hooksPath .githooks 2>/dev/null && \
+            echo "  Pre-commit hook enabled (.githooks/)" || true
+    fi
+fi
+
+# The template directory keeps its cloned name.
+
+# === 2. Copy agent instructions to workspace root (with substitution) ===
+# FMT instruction files stay clean upstream. Workspace copies are substituted;
+# CLAUDE.md additionally keeps a substituted base for its 3-way merge.
+install_workspace_instruction() {
+    local source_name="$1"
+    local destination="$WORKSPACE_DIR/$source_name"
+    local destination_temp=""
+    if [ -L "$destination" ]; then
+        echo "  ERROR: $destination is a symbolic link; refusing instruction install" >&2
+        return 1
+    fi
+    if [ -e "$destination" ] && [ ! -f "$destination" ]; then
+        echo "  ERROR: $destination is not a regular file; refusing instruction install" >&2
+        return 1
+    fi
+    destination_temp=$(mktemp "$WORKSPACE_DIR/.${source_name}.install.XXXXXX") || return 1
+    if ! cp "$TEMPLATE_DIR/$source_name" "$destination_temp"; then
+        rm -f "$destination_temp"
+        return 1
+    fi
+    sed_inplace \
+        -e "s|{{GITHUB_USER}}|$(sed_escape_replacement "$GITHUB_USER")|g" \
+        -e "s|{{WORKSPACE_DIR}}|$(sed_escape_replacement "$WORKSPACE_DIR")|g" \
+        -e "s|{{CLAUDE_PATH}}|$(sed_escape_replacement "$CLAUDE_PATH")|g" \
+        -e "s|{{CLAUDE_PROJECT_SLUG}}|$(sed_escape_replacement "$CLAUDE_PROJECT_SLUG")|g" \
+        -e "s|{{TIMEZONE_HOUR}}|$(sed_escape_replacement "$TIMEZONE_HOUR")|g" \
+        -e "s|{{TIMEZONE_DESC}}|$(sed_escape_replacement "$TIMEZONE_DESC")|g" \
+        -e "s|{{HOME_DIR}}|$(sed_escape_replacement "$HOME_DIR")|g" \
+        -e "s|{{GOVERNANCE_REPO}}|$(sed_escape_replacement "$GOVERNANCE_REPO")|g" \
+        -e "s|{{IWE_TEMPLATE}}|$(sed_escape_replacement "$IWE_TEMPLATE_PATH")|g" \
+        -e "s|{{IWE_RUNTIME}}|$(sed_escape_replacement "$IWE_RUNTIME_PATH")|g" \
+        "$destination_temp" || {
+            rm -f "$destination_temp"
+            return 1
+        }
+    if ! mv -f "$destination_temp" "$destination"; then
+        rm -f "$destination_temp"
+        return 1
+    fi
+}
+
+install_workspace_merge_base() {
+    local source="$WORKSPACE_DIR/CLAUDE.md"
+    local destination="$WORKSPACE_DIR/.claude.md.base"
+    local destination_temp=""
+    if [ -L "$source" ] || [ ! -f "$source" ]; then
+        echo "  ERROR: $source is not a regular instruction file" >&2
+        return 1
+    fi
+    if [ -L "$destination" ]; then
+        echo "  ERROR: $destination is a symbolic link; refusing merge-base install" >&2
+        return 1
+    fi
+    if [ -e "$destination" ] && [ ! -f "$destination" ]; then
+        echo "  ERROR: $destination is not a regular file; refusing merge-base install" >&2
+        return 1
+    fi
+    destination_temp=$(mktemp "$WORKSPACE_DIR/.claude.md.base.install.XXXXXX") || return 1
+    if ! cp "$source" "$destination_temp" || \
+       ! mv -f "$destination_temp" "$destination"; then
+        rm -f "$destination_temp"
+        return 1
+    fi
+}
+
+install_agent_instruction_bundle() {
+    install_workspace_instruction "CLAUDE.md" || return 1
+    install_workspace_instruction "AGENTS.md" || return 1
+    install_workspace_merge_base || return 1
+}
+
+echo "[2/6] Installing CLAUDE.md + AGENTS.md..."
+if $DRY_RUN; then
+    echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/CLAUDE.md → $WORKSPACE_DIR/CLAUDE.md (substituted)"
+    echo "  [DRY RUN] Would copy: $TEMPLATE_DIR/AGENTS.md → $WORKSPACE_DIR/AGENTS.md (substituted)"
+else
+    # Workspace merge base is substituted. The template repo must never receive
+    # this copy: doing so publishes install paths when update.sh commits the fork.
+    # Any unsafe destination aborts the actual setup path; a helper refusal must
+    # never fall through into a false-success message or poisoned merge base.
+    install_agent_instruction_bundle || exit 1
+    echo "  Copied CLAUDE.md (+ merge base) and AGENTS.md (substituted)"
+fi
+
+# === 3. Copy memory to Claude projects directory ===
+echo "[3/6] Installing memory..."
+CLAUDE_MEMORY_DIR="$HOME/.claude/projects/$CLAUDE_PROJECT_SLUG/memory"
+if $DRY_RUN; then
+    # Recursive find, not a top-level glob: memory/ has nested paths (memory/reference/agent-core.md)
+    # that a "$TEMPLATE_DIR/memory/"*.md glob never matches (issue #1105).
+    MEM_COUNT=$(find "$TEMPLATE_DIR/memory" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    YAML_COUNT=$(find "$TEMPLATE_DIR/memory" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | wc -l | tr -d ' ')
+    echo "  [DRY RUN] Would copy $MEM_COUNT .md + $YAML_COUNT .yaml/.yml memory files (recursively) → $CLAUDE_MEMORY_DIR/"
+    if [ ! -e "$WORKSPACE_DIR/memory" ]; then
+        echo "  [DRY RUN] Would create symlink: $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
+    else
+        echo "  WARN: $WORKSPACE_DIR/memory already exists, symlink would be skipped."
+    fi
+else
+    mkdir -p "$CLAUDE_MEMORY_DIR"
+    # issue #1105: recurse into memory/** instead of globbing only the top level, so nested
+    # files (memory/reference/agent-core.md) are delivered on a fresh install too — mirrors
+    # update.sh's relative-path delivery (issue #287/#294), which keeps nesting via
+    # "${fpath#memory/}" rather than basename, both in repair_pass() and in Step 6 propagation.
+    # issues #965/#967: record what was installed, so update.sh can later prove a copy nobody
+    # changed untouched and refresh it. A record that cannot be written only costs that proof.
+    MEMORY_RECORD_FAILED=false
+    while IFS= read -r -d '' f; do
+        rel="${f#"$TEMPLATE_DIR"/memory/}"
+        dst="$CLAUDE_MEMORY_DIR/$rel"
+        mkdir -p "$(dirname "$dst")"
+        cp "$f" "$dst"
+        memory_record_put "$WORKSPACE_DIR/.memory-deployed.tsv" "memory/$rel" \
+            "$(hash_file "$dst")" || MEMORY_RECORD_FAILED=true
+    done < <(find "$TEMPLATE_DIR/memory" -type f \( -name "*.md" -o -name "*.yaml" -o -name "*.yml" \) -print0 2>/dev/null)
+    echo "  Copied to $CLAUDE_MEMORY_DIR"
+    if $MEMORY_RECORD_FAILED; then
+        echo "  WARNING: could not write $WORKSPACE_DIR/.memory-deployed.tsv; update.sh will distinguish unmodified memory files from changed ones by other means." >&2
+    fi
+
+    # Create symlink so CLAUDE.md references (memory/protocol-open.md etc.) resolve from workspace root
+    if [ ! -e "$WORKSPACE_DIR/memory" ]; then
+        MEMORY_LN_ERR=$(ln -s "$CLAUDE_MEMORY_DIR" "$WORKSPACE_DIR/memory" 2>&1) || true
+        # issue #869: on Windows (Git Bash without symlink rights) `ln -s` quietly
+        # makes a plain COPY instead of a link, and the failure only surfaced a
+        # day later as an ambiguous-memory error in update.sh. Check the result:
+        # a link, and one that points where it should (a dangling link made earlier
+        # makes `ln -s` fail with "File exists" yet still passes a bare [ -L ] test).
+        if [ -L "$WORKSPACE_DIR/memory" ] && [ "$(readlink "$WORKSPACE_DIR/memory")" = "$CLAUDE_MEMORY_DIR" ]; then
+            echo "  Symlink: $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
+        else
+            echo "  WARNING: symlink $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR was not created." >&2
+            [ -n "$MEMORY_LN_ERR" ] && echo "    ln: $MEMORY_LN_ERR" >&2
+            # The directory found here can only be the plain copy `ln -s` just made (the
+            # branch is entered only when nothing existed). Leaving it would keep two
+            # independent MEMORY.md copies AND make the next run skip this fix because
+            # "memory already exists" - so set it aside; the real memory in
+            # $CLAUDE_MEMORY_DIR was written above and is not touched.
+            if [ ! -L "$WORKSPACE_DIR/memory" ] && [ -e "$WORKSPACE_DIR/memory" ]; then
+                MEMORY_COPY_ASIDE="$WORKSPACE_DIR/memory.not-a-link-$(date +%Y%m%d%H%M%S)"
+                if mv "$WORKSPACE_DIR/memory" "$MEMORY_COPY_ASIDE" 2>/dev/null; then
+                    echo "    The plain copy created by ln instead of a symlink has been moved to $MEMORY_COPY_ASIDE (memory in $CLAUDE_MEMORY_DIR is untouched)." >&2
+                else
+                    echo "    Could not move the copy: delete $WORKSPACE_DIR/memory manually (memory in $CLAUDE_MEMORY_DIR is untouched)." >&2
+                fi
+            fi
+            echo "    Without the symlink, CLAUDE.md will not find memory/ in the workspace directory." >&2
+            case "$(uname -s 2>/dev/null)" in
+                MINGW*|MSYS*|CYGWIN*)
+                    echo "    Windows: enable Developer Mode and run the terminal with MSYS=winsymlinks:nativestrict," >&2
+                    echo "    then re-run the installation (or create the link via mklink /D)." >&2
+                    ;;
+            esac
+        fi
+    else
+        echo "  WARN: $WORKSPACE_DIR/memory already exists, symlink skipped."
+    fi
+fi
+
+# === 4. Copy .claude settings ===
+if $CORE_ONLY; then
+    echo "[4/6] Claude settings... skipped (core mode)"
+else
+    echo "[4/6] Installing Claude settings..."
+    if $DRY_RUN; then
+        if [ -f "$TEMPLATE_DIR/.claude/settings.local.json" ]; then
+            echo "  [DRY RUN] Would copy: settings.local.json → $WORKSPACE_DIR/.claude/settings.local.json"
+        else
+            echo "  WARN: settings.local.json not found in template."
+        fi
+        echo "  [DRY RUN] Would show MCP setup instructions (claude.ai/settings/connectors)"
+    else
+        mkdir -p "$WORKSPACE_DIR/.claude"
+        if [ -f "$TEMPLATE_DIR/.claude/settings.local.json" ]; then
+            cp "$TEMPLATE_DIR/.claude/settings.local.json" "$WORKSPACE_DIR/.claude/settings.local.json"
+            echo "  Copied to $WORKSPACE_DIR/.claude/settings.local.json"
+        else
+            echo "  WARN: settings.local.json not found in template, skipping."
+        fi
+
+        # MCP knowledge servers connect through Gateway (OAuth auto-flow)
+        echo "  Knowledge MCP servers connect through Gateway (automatically):"
+        echo ""
+        echo "  .mcp.json contains iwe-knowledge → https://mcp.aisystant.com/mcp"
+        echo "  T1-T2: browser opens on first launch (OAuth via Ory)."
+        echo "  T3-T4: CLI mode (IWE_TIER=T3 in env or tier: T3 in ~/.iwe/config.yaml)."
+        echo "  Requires an 'Intelligence Engineering' subscription (formerly 'Infinite Development')."
+        echo "  After login: /mcp in Claude Code."
+    fi
+fi
+
+# === 4b. Propagate skills, hooks, rules, lib, config, detectors, scripts, styles to workspace ===
+echo "[4b] Installing skills, hooks, rules, rules-lazy, lib, bin, config, detectors, scripts, styles..."
+if $DRY_RUN; then
+    echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,rules-lazy,lib,bin,config,detectors,scripts,agents,styles}/ → $WORKSPACE_DIR/.claude/"
+else
+    mkdir -p "$WORKSPACE_DIR/.claude"
+    # lib/config/detectors — runtime dependencies of the capture-bus (capture-bus.sh) and detectors
+    # scripts — required by skills (e.g. load-extensions.sh)
+    # styles — language style discipline (WP-412)
+    # rules-lazy — lazy-loaded rule expansions (role-prefixes-full), parity with update.sh
+    for subdir in skills hooks rules rules-lazy lib bin config detectors scripts agents styles templates; do
+        if [ -d "$TEMPLATE_DIR/.claude/$subdir" ]; then
+            cp -r "$TEMPLATE_DIR/.claude/$subdir" "$WORKSPACE_DIR/.claude/"
+            # .claude/bin holds extension-less executables (guarded-rm, issue #940)
+            [ "$subdir" = bin ] && chmod +x "$WORKSPACE_DIR/.claude/bin/"* 2>/dev/null || true
+            echo "  ✓ .claude/$subdir/ → $WORKSPACE_DIR/.claude/$subdir/"
+        fi
+    done
+    # Copy settings.json (project-level, not local)
+    if [ -f "$TEMPLATE_DIR/.claude/settings.json" ]; then
+        cp "$TEMPLATE_DIR/.claude/settings.json" "$WORKSPACE_DIR/.claude/settings.json"
+        echo "  ✓ .claude/settings.json"
+    fi
+    # issue #891: settings.json above was the only loose top-level .claude/
+    # file this installer ever copied. update-manifest.json declares several
+    # more (rules-registry.yaml among them — AR.112/AR.113, read by
+    # sql-pii-guard.sh on every .sql write) that this loop never delivered,
+    # so a fresh install has them checksummed in the manifest but absent on
+    # disk. Mirror every remaining loose file in the template's .claude/
+    # root instead of naming each one, the same way the subdir loop above
+    # mirrors directories rather than hardcoding a file list.
+    for f in "$TEMPLATE_DIR/.claude/"*; do
+        [ -f "$f" ] || continue
+        name=$(basename "$f")
+        case "$name" in
+            settings.json|settings.local.json) continue ;;  # already handled above
+        esac
+        cp "$f" "$WORKSPACE_DIR/.claude/$name"
+        echo "  ✓ .claude/$name"
+    done
+fi
+
+# Resolves IWE_TIER: env var → ~/.iwe/config.yaml → default T1
+check_user_tier() {
+    [ -n "${IWE_TIER:-}" ] && { echo "$IWE_TIER"; return; }
+    local cfg="${IWE_CONFIG:-$HOME/.iwe/config.yaml}"
+    if [ -f "$cfg" ]; then
+        local t; t=$(grep -E '^tier:' "$cfg" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"')
+        [ -n "$t" ] && { echo "$t"; return; }
+    fi
+    echo "T1"
+}
+
+# === 4c. Copy .mcp.json to workspace ===
+echo "[4c] Configuring .mcp.json..."
+
+MCP_TEMPLATE="$TEMPLATE_DIR/.mcp.json"
+MCP_DEST="$WORKSPACE_DIR/.mcp.json"
+MCP_USER_EXT="$WORKSPACE_DIR/extensions/mcp-user.json"
+
+# WP-7 Phase 133 (live user report, Ruslan, 2026-09-09): extensions/ was already
+# read here (MCP_USER_EXT above) and by day-open-hooks-runner.sh's step 0,
+# but setup.sh never created it — day-open-hooks.sh's fail-closed contract
+# ("every install ships extensions/") aborted the canonical Day Open
+# pipeline on every fresh install. Empty is sufficient: find_day_open_hook_files
+# only requires the directory to exist, not to be non-empty.
+if $DRY_RUN; then
+    echo "  [DRY RUN] Would create $WORKSPACE_DIR/extensions"
+else
+    mkdir -p "$WORKSPACE_DIR/extensions"
+fi
+
+if $DRY_RUN; then
+    _IWE_TIER=$(check_user_tier)
+    echo "  [DRY RUN] Would generate $MCP_DEST (tier=$_IWE_TIER)"
+    case "$_IWE_TIER" in
+        T3|T4) echo "    iwe-knowledge → https://mcp.aisystant.com/mcp (ict-token auth — requires IWE_ICT_TOKEN or ~/.iwe/config.yaml ict_token)" ;;
+        *)     echo "    iwe-knowledge → https://mcp.aisystant.com/mcp (browser OAuth)" ;;
+    esac
+    if [ -f "$MCP_USER_EXT" ] && command -v jq >/dev/null 2>&1; then
+        echo "  [DRY RUN] Would merge extensions/mcp-user.json into .mcp.json"
+    fi
+elif [ ! -f "$MCP_TEMPLATE" ]; then
+    echo "  WARN: $MCP_TEMPLATE not found, skipping."
+else
+    _IWE_TIER=$(check_user_tier)
+    _MCP_LOG="$WORKSPACE_DIR/logs/mcp-auth.log"
+    mkdir -p "$WORKSPACE_DIR/logs" && touch "$_MCP_LOG"
+
+    case "$_IWE_TIER" in
+        T3|T4)
+            # Resolve ict_ token: IWE_ICT_TOKEN env (primary) → ~/.iwe/config.yaml (best-effort)
+            # config.yaml expected format: ict_token: "ict_VALUE"  (no inline comments, no spaces in value)
+            _ICT_TOKEN="${IWE_ICT_TOKEN:-}"
+            if [ -z "$_ICT_TOKEN" ]; then
+                _cfg="${IWE_CONFIG:-$HOME/.iwe/config.yaml}"
+                if [ -f "$_cfg" ]; then
+                    _ICT_TOKEN=$(grep -E '^ict_token[[:space:]]*:' "$_cfg" 2>/dev/null | head -1 | \
+                        sed 's/^[[:space:]]*ict_token[[:space:]]*:[[:space:]]*//' | \
+                        tr -d '"' | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                fi
+            fi
+
+            if [ -n "$_ICT_TOKEN" ]; then
+                # Found in review after #786/#811: the branch previously built .mcp.json
+                # from scratch via `jq -n '{"mcpServers":{"iwe-knowledge":...}}' >
+                # "$MCP_DEST"` — an unconditional overwrite that erased ALL other
+                # template servers (ext-railway and any future ones), not just the
+                # placeholder. Now we copy and substitute placeholders first
+                # using the same path as T1/T2 (install_workspace_instruction),
+                # then merge the authenticated iwe-knowledge on top of the rest.
+                _MCP_MERGE_OK=false
+                if install_workspace_instruction ".mcp.json"; then
+                    if jq --arg token "$_ICT_TOKEN" \
+                        '.mcpServers["iwe-knowledge"] = {"type":"http","url":"https://mcp.aisystant.com/mcp","headers":{"Authorization":("Bearer " + $token)}}' \
+                        "$MCP_DEST" > "$MCP_DEST.tmp" 2>/dev/null \
+                        && mv "$MCP_DEST.tmp" "$MCP_DEST"; then
+                        _MCP_MERGE_OK=true
+                    fi
+                    rm -f "$MCP_DEST.tmp"
+                fi
+                if $_MCP_MERGE_OK; then
+                    echo "  ✓ $MCP_DEST → iwe-knowledge (authenticated, tier=$_IWE_TIER), other template servers preserved"
+                    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=ict_token" >> "$_MCP_LOG"
+                else
+                    echo "  ✗ jq error generating .mcp.json (check jq is installed)"
+                    _MCP_AUTH_INCOMPLETE=true
+                    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=jq_error" >> "$_MCP_LOG"
+                fi
+            else
+                echo ""
+                echo "  ✗ Tier=$_IWE_TIER — authentication token not found. .mcp.json was not written."
+                echo "  ─────────────────────────────────────────────────────────────"
+                echo "  To activate T3 knowledge access:"
+                echo "  1. Send the bot @aisystant_bot the command: /connect_external"
+                echo "  2. Add the token to ~/.iwe/config.yaml:"
+                echo "     ict_token: \"ict_YOURTOKEN\""
+                echo "     (or: export IWE_ICT_TOKEN=ict_YOURTOKEN && bash setup.sh)"
+                echo "  ─────────────────────────────────────────────────────────────"
+                _MCP_AUTH_INCOMPLETE=true
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=missing_token" >> "$_MCP_LOG"
+            fi
+            ;;
+        *)
+            # issue #786: bare cp copied .mcp.json bypassing placeholder substitution
+            # — {{HOME_DIR}} arrived literally, ext-railway could never start.
+            # install_workspace_instruction is the same atomic copy+sed+move
+            # already used for CLAUDE.md/AGENTS.md above.
+            if install_workspace_instruction ".mcp.json"; then
+                echo "  ✓ $MCP_DEST → iwe-knowledge (browser OAuth, tier=$_IWE_TIER)"
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=browser" >> "$_MCP_LOG"
+            else
+                # Codex review (2026-09-13): previously success lines printed
+                # unconditionally even on write failure — a false "success" after
+                # a real error. Failures now go to the same branch as other
+                # MCP_AUTH_INCOMPLETE cases above.
+                echo "  ✗ could not write $MCP_DEST"
+                _MCP_AUTH_INCOMPLETE=true
+                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=write_error" >> "$_MCP_LOG"
+            fi
+            ;;
+    esac
+
+    # Merge extensions/mcp-user.json if it exists and has content (skip if MCP_DEST was not written)
+    if [ -f "$MCP_USER_EXT" ] && [ -f "$MCP_DEST" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            USER_COUNT=$(jq '.mcpServers | length' "$MCP_USER_EXT" 2>/dev/null || echo "0")
+            if [ "$USER_COUNT" -gt 0 ]; then
+                MCP_MERGED=$(jq -s '.[0].mcpServers * .[1].mcpServers | {mcpServers: .}' "$MCP_DEST" "$MCP_USER_EXT" 2>/dev/null)
+                if [ -n "$MCP_MERGED" ]; then
+                    echo "$MCP_MERGED" > "$MCP_DEST"
+                    echo "  ✓ Merged $USER_COUNT server(s) from extensions/mcp-user.json"
+                fi
+            fi
+        else
+            echo "  ○ jq not found — extensions/mcp-user.json merge skipped"
+            echo "    Install jq: brew install jq"
+        fi
+    fi
+fi
+
+# === 4d. IWE environment variables (WP-219, DP.FM.009) ===
+# Lookup layer for script paths: protocols and skills reference
+# $IWE_SCRIPTS / $IWE_ROLES, not absolute paths. Moving a script
+# breaks one variable, not N protocols.
+#
+# Source of truth: setup/install-iwe-paths.sh (WP-273 R5).
+# Previously this block was duplicated here and was not in migrate-to-runtime-target.sh —
+# during migration ~/.iwe-paths was not upgraded (R5.3 Evgenii, 27 Apr).
+echo "[4d] Installing IWE environment variables..."
+
+if $DRY_RUN; then
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" \
+        --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" --dry-run 2>&1 | sed 's/^/  /'
+else
+    bash "$TEMPLATE_DIR/setup/install-iwe-paths.sh" \
+        --workspace "$WORKSPACE_DIR" --governance "$GOVERNANCE_REPO" 2>&1 | sed 's/^/  /'
+    echo "  ℹ  Restart shell or run: source $HOME/.zshenv"
+fi
+
+# === 4e. Generate executor-catalog.yaml for task routing (issue #197) ===
+# route-task.sh (DP.ROLE.059, Router) looks this up at
+# WP-529 F6 (#463): one visible PyYAML preflight instead of per-script
+# surprises. Warning only — never blocks install: calendar/news/wp-sweep are
+# optional features and every consumer now fails with an explicit dependency
+# error at use time (scripts/lib/find-python3.sh).
+#
+# Evgenii Red Team review 2026-08-19 (defect #2): this used to run the
+# resolver for its exit code only and discard stdout — the executor-catalog
+# generation below then called bare `python3` again, which on the same Apple
+# Silicon machine can be a DIFFERENT interpreter (no yaml) than the one the
+# resolver just found. Keep the resolved path and reuse it everywhere below.
+YAML_PYTHON3=""
+if YAML_PYTHON3=$("$TEMPLATE_DIR/scripts/lib/find-python3.sh" 2>/dev/null); then
+    :
+else
+    YAML_PYTHON3=""
+    echo "  ⚠ python3 >= 3.10 with PyYAML not found — calendar, World feed, WP review, and core scripts (artifactor.py, session-dispatcher-tsekh.py) will fail with an explicit dependency error."
+    if [ "$(uname)" = "Linux" ]; then
+        echo "    Install: sudo apt install python3-yaml (or python3.10 + pip3 install pyyaml)"
+    else
+        echo "    Install: brew install python3 && pip3 install pyyaml"
+    fi
+fi
+
+# The catalog belongs inside the governance repo. Do not call this helper until
+# step 6 has either found that repo or copied seed/strategy into place: writing
+# here used to create a non-empty plain directory that step 6 then rejected as
+# a failed prior install (#508.4).
+generate_executor_catalog_for_governance() {
+    if $CORE_ONLY; then
+        echo "[6a] executor-catalog.yaml... skipped (core mode, no agent for routing)"
+    elif $DRY_RUN; then
+        echo "[DRY RUN] Would generate executor-catalog.yaml after governance repo setup (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
+    elif [ -z "$YAML_PYTHON3" ]; then
+        echo "[6a] executor-catalog.yaml... skipped (python3 with PyYAML not found, see warning above)"
+    else
+        echo "[6a] Generating executor-catalog.yaml..."
+        if CATALOG_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" \
+            "$YAML_PYTHON3" "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" \
+            --skills-dir "$WORKSPACE_DIR/.claude/skills" \
+            --output "$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml" 2>&1); then
+            echo "$CATALOG_OUTPUT" | sed 's/^/  /'
+        else
+            echo "$CATALOG_OUTPUT" | sed 's/^/  /'
+            echo "  ⚠ executor-catalog.yaml was not generated — run manually:"
+            echo "    IWE_ROOT=\"$WORKSPACE_DIR\" \"$YAML_PYTHON3\" $TEMPLATE_DIR/scripts/generate-executor-catalog.py --skills-dir \"$WORKSPACE_DIR/.claude/skills\" --output \"$WORKSPACE_DIR/$GOVERNANCE_REPO/scripts/executor-catalog.yaml\""
+        fi
+    fi
+}
+
+# === 4f. Regenerate hot-files.list for the actual governance repo (issue #294/#291) ===
+# The repo ships hot-files.list pre-baked with the author's GOVERNANCE_REPO name —
+# without regenerating here, verify-context-budget.sh reports MISSING on any install
+# where GOVERNANCE_REPO differs from the author's.
+if $DRY_RUN; then
+    echo "[DRY RUN] Would regenerate hot-files.list (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
+else
+    echo "[4f] Regenerating hot-files.list..."
+    # POLICY (2026-08-23, matrix v0.38.7 finding 6, consensus with codex):
+    # critical IWE_* variables are passed to generators EXPLICITLY from this
+    # script's own variables — an inherited env from another workspace must not
+    # decide where this installation writes. Live case: an exported IWE_RUNTIME
+    # from workspace A overrode the passed IWE_ROOT, and hot-files.list ended up
+    # in a foreign runtime.
+    if HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_RUNTIME="$IWE_RUNTIME_PATH" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" bash "$TEMPLATE_DIR/scripts/generate-hot-files-list.sh" 2>&1); then
+        echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
+    else
+        echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
+        echo "  ⚠ hot-files.list was not regenerated — run manually:"
+        echo "    IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO bash $TEMPLATE_DIR/scripts/generate-hot-files-list.sh"
+    fi
+fi
+
+# === 5. Install roles (autodiscovery via role.yaml) ===
+if $CORE_ONLY; then
+    echo "[5/6] Automation... skipped (core mode)"
+elif ! command -v launchctl >/dev/null 2>&1; then
+    echo "[5/6] Automation... skipped (launchd not found — not macOS)"
+    echo "  Roles use launchd (macOS). On Linux use cron/systemd manually."
+    echo "  See $TEMPLATE_DIR/roles/ROLE-CONTRACT.md"
+else
+    echo "[5/6] Installing roles..."
+
+    # Source $WORKSPACE_DIR/.iwe-paths — ensures IWE_RUNTIME / IWE_WORKSPACE / IWE_TEMPLATE
+    # in env for role install.sh (same pattern as in update.sh:836).
+    # Without this, install.sh falls back to legacy mode and sees {{placeholders}}.
+    [ -f "$WORKSPACE_DIR/.iwe-paths" ] && . "$WORKSPACE_DIR/.iwe-paths"
+    # Same isolation policy as step 4f: role install.sh scripts read
+    # IWE_RUNTIME/IWE_WORKSPACE from env — pin them to THIS install's targets
+    # explicitly, so a foreign exported value (or a missing .iwe-paths) can
+    # never redirect a role install into another workspace.
+    export IWE_WORKSPACE="$WORKSPACE_DIR"
+    export IWE_RUNTIME="$IWE_RUNTIME_PATH"
+    export IWE_TEMPLATE="$TEMPLATE_DIR"
+
+    MANUAL_ROLES=()
+
+    # Discover roles by role.yaml manifests (sorted by priority)
+    for role_dir in "$TEMPLATE_DIR"/roles/*/; do
+        [ -d "$role_dir" ] || continue
+        role_yaml="$role_dir/role.yaml"
+        [ -f "$role_yaml" ] || continue
+        role_name=$(basename "$role_dir")
+
+        if grep -q 'auto:.*true' "$role_yaml" 2>/dev/null; then
+            # Auto-install role
+            if [ -f "$role_dir/install.sh" ]; then
+                if $DRY_RUN; then
+                    echo "  [DRY RUN] Would install role: $role_name (auto)"
+                else
+                    chmod +x "$role_dir/install.sh"
+                    runner=$(grep '^runner:' "$role_yaml" | sed 's/runner: *//' | tr -d '"' | tr -d "'")
+                    [ -n "$runner" ] && chmod +x "$role_dir/$runner" 2>/dev/null || true
+                    bash "$role_dir/install.sh"
+                    echo "  ✓ $role_name installed"
+                fi
+            else
+                echo "  WARN: $role_name/install.sh not found, skipping."
+            fi
+        else
+            display=$(grep 'display_name:' "$role_yaml" 2>/dev/null | sed 's/display_name: *//' | tr -d '"')
+            MANUAL_ROLES+=("  - ${display:-$role_name}: bash $role_dir/install.sh")
+        fi
+    done
+
+    if [ ${#MANUAL_ROLES[@]} -gt 0 ]; then
+        echo ""
+        echo "  Additional roles (install later when ready):"
+        printf '%s\n' "${MANUAL_ROLES[@]}"
+        echo "  See: $TEMPLATE_DIR/roles/ROLE-CONTRACT.md"
+    fi
+fi
+
+# === 6. Create DS-strategy repo ===
+echo "[6/6] Setting up $GOVERNANCE_REPO..."
+MY_STRATEGY_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
+STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
+
+# WP-560 Phase 5-Phase-1: the browser path (create_personal_data_space via
+# github-integration-service, family-catalog.ts) creates the same governance
+# repository under the same canonical name, independently of this script. A user
+# who started in the browser and then installs VS Code used to hit
+# `gh repo create` failing on "already exists" while a second, unrelated local
+# repo got initialised. Adopt the existing remote instead — but only after
+# proving it is ours (owner = GITHUB_USER) and shaped like a governance repo
+# (seed markers). Anything else aborts loudly; nothing is ever pushed over it.
+# GOVERNANCE_MARKERS itself is loaded from the shared contract earlier in this
+# script (WP-560 Phase 5-Phase-2) — not redefined here.
+
+# issue #807: `-b`/`--initial-branch` on `git init` requires git >= 2.28
+# (Jul 2020) — still missing on some LTS distros (e.g. Ubuntu 18.04 ships
+# 2.17). On those, `git init -b main` fails outright, and under `set -e`
+# (line 9) that would abort the whole script instead of just picking the
+# wrong branch name (the original bug). Fall back to init + rename.
+git_init_main() {
+    if ! git init -b main 2>/dev/null; then
+        git init
+        git symbolic-ref HEAD refs/heads/main
+    fi
+}
+
+stage_initial_governance_files() {
+    local file
+    local files=()
+    while IFS= read -r -d '' file; do
+        files+=("${file#./}")
+    done < <(find . -type f -not -path './.git/*' -print0)
+    if [ "${#files[@]}" -gt 0 ]; then
+        git add -- "${files[@]}"
+    fi
+}
+
+remote_governance_repo_exists() {
+    ! $CORE_ONLY && command -v gh >/dev/null 2>&1 \
+        && gh repo view "$GITHUB_USER/$GOVERNANCE_REPO" --json name >/dev/null 2>&1
+}
+
+# issue #806: the old `gh repo create ... 2>/dev/null || echo "already exists
+# or skipped"` treated every failure (auth, rate limit, network) the same as
+# the one truly harmless case (repo already exists) — the real cause never
+# reached the user, and "Setup Complete!" printed regardless. Distinguish the
+# two via remote_governance_repo_exists() instead of parsing stderr text, and
+# surface a genuine failure instead of a misleading "skipped" — but always
+# `return 0`: this script runs under `set -e` (line 9), and setup must stay
+# non-fatal here exactly like the code it replaces (SETUP_CI mode deliberately
+# runs without `gh` installed at all — smoke-test-fresh-install.sh Test 10 —
+# and a hard abort would be a regression, not a fix).
+create_governance_github_repo() {
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "  gh CLI not found — $GOVERNANCE_REPO stays local-only (no GitHub repo created)."
+        GOVERNANCE_REPO_PUSH_FAILED=true
+        return 0
+    fi
+    local create_err ls_remote_rc
+    create_err=$(mktemp)
+    if gh repo create "$GITHUB_USER/$GOVERNANCE_REPO" --private --source=. --push 2>"$create_err"; then
+        rm -f "$create_err"
+        return 0
+    fi
+    if remote_governance_repo_exists; then
+        # A repo existing isn't proof our push landed — `gh repo create
+        # --push` can create the (empty) remote and then fail the push step
+        # itself (network blip mid-command), which also satisfies
+        # remote_governance_repo_exists(). Check the branch actually has a
+        # ref on the remote before calling this "already exists — skip".
+        # timeout(1) is GNU/Homebrew-only — absent on stock macOS (issue
+        # #1108). This whole branch only runs after `gh repo create --push`
+        # already failed mid-command (rare), so a single call site without a
+        # perl-polyfill copy: best-effort with timeout(1) when it exists,
+        # unwrapped (no hard deadline) when it doesn't, rather than a hard
+        # "command not found" failure either way.
+        ls_remote_rc=0
+        if command -v timeout >/dev/null 2>&1; then
+            timeout 10 git ls-remote --exit-code --heads "https://github.com/$GITHUB_USER/$GOVERNANCE_REPO.git" main >/dev/null 2>&1 || ls_remote_rc=$?
+        else
+            git ls-remote --exit-code --heads "https://github.com/$GITHUB_USER/$GOVERNANCE_REPO.git" main >/dev/null 2>&1 || ls_remote_rc=$?
+        fi
+        if [ "$ls_remote_rc" -eq 0 ]; then
+            echo "  GitHub repo $GOVERNANCE_REPO already exists — skipping creation."
+            rm -f "$create_err"
+            return 0
+        fi
+        echo "  ERROR: GitHub repo $GOVERNANCE_REPO exists but has no main branch — push likely failed mid-command:" >&2
+        sed 's/^/    /' "$create_err" >&2
+        rm -f "$create_err"
+        GOVERNANCE_REPO_PUSH_FAILED=true
+        return 0
+    fi
+    echo "  ERROR: gh repo create failed for $GOVERNANCE_REPO:" >&2
+    sed 's/^/    /' "$create_err" >&2
+    rm -f "$create_err"
+    GOVERNANCE_REPO_PUSH_FAILED=true
+    return 0
+}
+
+governance_markers_missing() {
+    local root="$1" m
+    for m in "${GOVERNANCE_MARKERS[@]}"; do
+        [ -e "$root/$m" ] || echo "$m"
+    done
+}
+
+adopt_existing_governance_repo() {
+    local owner_login
+    owner_login=$(gh repo view "$GITHUB_USER/$GOVERNANCE_REPO" --json owner --jq '.owner.login' 2>/dev/null)
+    if [ "$owner_login" != "$GITHUB_USER" ]; then
+        echo "  ERROR: GitHub repo $GITHUB_USER/$GOVERNANCE_REPO resolves to owner '$owner_login', expected '$GITHUB_USER'."
+        echo "  Refusing to adopt a repository that is not yours. Set GOVERNANCE_REPO to another name and re-run."
+        exit 1
+    fi
+    if [ -d "$MY_STRATEGY_DIR" ] && [ -n "$(ls -A "$MY_STRATEGY_DIR" 2>/dev/null)" ]; then
+        echo "  ERROR: $MY_STRATEGY_DIR exists, is not a git repo, and is not empty — cannot clone into it."
+        echo "  Fix: inspect and clean it up (or rename it aside), then re-run setup.sh."
+        exit 1
+    fi
+    echo "  Remote $GITHUB_USER/$GOVERNANCE_REPO already exists (created elsewhere, e.g. from the browser) — adopting it."
+    if ! gh repo clone "$GITHUB_USER/$GOVERNANCE_REPO" "$MY_STRATEGY_DIR" -- --quiet 2>/dev/null; then
+        echo "  ERROR: could not clone $GITHUB_USER/$GOVERNANCE_REPO. Check network/access and re-run."
+        exit 1
+    fi
+    local missing
+    missing=$(governance_markers_missing "$MY_STRATEGY_DIR")
+    if ! find "$MY_STRATEGY_DIR" -mindepth 1 -maxdepth 1 ! -name .git -print -quit | grep -q .; then
+        # Empty remote (browser created the repository but nothing landed yet): seed it.
+        echo "  Remote is empty — seeding governance structure into it."
+        cp -r "$STRATEGY_TEMPLATE"/. "$MY_STRATEGY_DIR"/
+        generate_executor_catalog_for_governance
+        (cd "$MY_STRATEGY_DIR" && stage_initial_governance_files && git commit -q -m "Initial exocortex: $GOVERNANCE_REPO governance hub" && git push -q -u origin HEAD) || {
+            echo "  ERROR: seeded $MY_STRATEGY_DIR but could not commit/push. Fix manually: cd $MY_STRATEGY_DIR && git push -u origin HEAD"
+            exit 1
+        }
+    elif [ -n "$missing" ]; then
+        echo "  ERROR: $GITHUB_USER/$GOVERNANCE_REPO exists but does not look like an IWE governance repo — missing:"
+        printf '    - %s\n' $missing
+        echo "  It was left untouched in $MY_STRATEGY_DIR (cloned, nothing pushed)."
+        echo "  Fix: either point GOVERNANCE_REPO at a different name, or bring this repo to the seed structure and re-run."
+        exit 1
+    else
+        echo "  ✓ $GOVERNANCE_REPO adopted: owner and structure verified."
+        generate_executor_catalog_for_governance
+    fi
+    if [ -d "$MY_STRATEGY_DIR/.githooks" ]; then
+        (cd "$MY_STRATEGY_DIR" && git config core.hooksPath .githooks 2>/dev/null) && \
+            echo "  Pre-commit hook enabled (.githooks/)" || true
+    fi
+}
+
+# A dry run must not touch the network (test_fresh_seed_reproduction.sh pins this
+# with tripwire binaries), so the remote probe is skipped there and the preview
+# names both outcomes instead of guessing one (issue #956).
+# adopt_existing_governance_repo consequently only ever runs for real.
+if [ -d "$MY_STRATEGY_DIR/.git" ]; then
+    echo "  $GOVERNANCE_REPO already exists as git repo."
+    generate_executor_catalog_for_governance
+elif [ -d "$STRATEGY_TEMPLATE" ] && ! $DRY_RUN && remote_governance_repo_exists; then
+    adopt_existing_governance_repo
+elif $DRY_RUN; then
+    if [ -d "$STRATEGY_TEMPLATE" ]; then
+        echo "  [DRY RUN] Would create $GOVERNANCE_REPO from seed/strategy → $MY_STRATEGY_DIR"
+        echo "  [DRY RUN] Would init git repo + initial commit"
+        if ! $CORE_ONLY; then
+            echo "  [DRY RUN] Will check GitHub: adopt existing $GITHUB_USER/$GOVERNANCE_REPO repo or create a new one (private)"
+        fi
+    else
+        echo "  [DRY RUN] Would create minimal $GOVERNANCE_REPO (seed/strategy not found)"
+    fi
+    generate_executor_catalog_for_governance
+else
+    if [ -d "$STRATEGY_TEMPLATE" ]; then
+        # bug (issue #305): $MY_STRATEGY_DIR can exist as a plain non-git dir on a
+        # rerun after a prior failed setup.sh left it via the "seed/strategy not
+        # found" fallback below (mkdir -p .../{current,inbox,...}). `cp -r src dst`
+        # then nests src INSIDE an existing dst instead of merging — reproduces the
+        # reported "DS-strategy/strategy/..." double-nesting. Fail loud instead of
+        # silently producing a broken layout; `cp -r src/. dst/` copies contents
+        # correctly whether dst pre-exists (empty, after this guard) or not.
+        if [ -d "$MY_STRATEGY_DIR" ] && [ -n "$(ls -A "$MY_STRATEGY_DIR" 2>/dev/null)" ]; then
+            echo "  ERROR: $MY_STRATEGY_DIR already exists and is not a git repo (partial/failed prior run?)."
+            echo "  Fix: inspect and clean it up (or rename it aside), then re-run setup.sh."
+            exit 1
+        fi
+        # Copy my-strategy template into its own repo
+        mkdir -p "$MY_STRATEGY_DIR"
+        cp -r "$STRATEGY_TEMPLATE"/. "$MY_STRATEGY_DIR"/
+        generate_executor_catalog_for_governance
+        cd "$MY_STRATEGY_DIR"
+        # issue #807: without -b main, the branch name follows the user's
+        # git config init.defaultBranch (still "master" on older/unconfigured
+        # git) — the pipeline elsewhere hardcodes origin/main.
+        git_init_main
+        stage_initial_governance_files
+        git commit -m "Initial exocortex: $GOVERNANCE_REPO governance hub"
+
+        # Enable secrets-check pre-commit hook (issue #317: install-iwe-paths.sh
+        # runs at step [4d], before this repo exists — its auto-enable loop can't
+        # see it on first setup.sh run, and update.sh never calls that script).
+        if [ -d "$MY_STRATEGY_DIR/.githooks" ]; then
+            git config core.hooksPath .githooks 2>/dev/null && \
+                echo "  Pre-commit hook enabled (.githooks/)" || true
+        fi
+
+        if ! $CORE_ONLY; then
+            # Create GitHub repo (full mode only)
+            create_governance_github_repo
+        else
+            echo "  Local repository created. To publish to GitHub:"
+            echo "    cd $MY_STRATEGY_DIR && gh repo create $GITHUB_USER/$GOVERNANCE_REPO --private --source=. --push"
+        fi
+    else
+        echo "  ERROR: seed/strategy/ not found. $GOVERNANCE_REPO will be incomplete."
+        echo "  Fix: re-clone the template and run setup.sh again."
+        echo "  Creating minimal structure as fallback..."
+        mkdir -p "$MY_STRATEGY_DIR"/{current,inbox,archive/wp-contexts,docs,exocortex}
+        generate_executor_catalog_for_governance
+        cd "$MY_STRATEGY_DIR"
+        git_init_main  # issue #807 — see rationale above
+        stage_initial_governance_files
+        git commit -m "Initial exocortex: $GOVERNANCE_REPO governance hub (minimal)"
+
+        if ! $CORE_ONLY; then
+            create_governance_github_repo
+        fi
+    fi
+fi
+
+# === 7. Install Base repos (ZP + FPF + SPF) ===
+echo "[7/7] Installing Base repos (ZP, FPF, SPF)..."
+if $CORE_ONLY; then
+    echo "  skipped (core mode)"
+else
+    install_bundled_base_repo() {
+        local name="$1"
+        local source="$TEMPLATE_DIR/seed/$name"
+        local dest="$WORKSPACE_DIR/$name"
+        if [ -d "$dest/.git" ]; then
+            echo "  ✓ $name: already installed ($dest)"
+        elif $DRY_RUN; then
+            echo "  [DRY RUN] Would copy bundled $name → $dest"
+        elif [ ! -d "$source" ]; then
+            echo "  ERROR: bundled $name is missing: $source" >&2
+            return 1
+        else
+            cp -R "$source" "$dest"
+            git -C "$dest" init -q
+            (cd "$dest" && find . -type f -not -path './.git/*' -print0 |
+                xargs -0 git add --)
+            git -C "$dest" -c user.name='IWE Setup' -c user.email='setup@iwesys.local' \
+                commit -qm 'Install English base repository'
+            echo "  ✓ $name: installed from English bundle ($dest)"
+        fi
+    }
+    clone_base_repo() {
+        local name="$1"
+        local gh_repo="$2"
+        local dest="$WORKSPACE_DIR/$name"
+        if [ -d "$dest/.git" ]; then
+            echo "  ✓ $name: already installed ($dest)"
+        elif $DRY_RUN; then
+            echo "  [DRY RUN] Would clone $gh_repo → $dest (--depth=1)"
+        else
+            if gh repo clone "$gh_repo" "$dest" -- --depth=1 --quiet 2>/dev/null; then
+                echo "  ✓ $name: cloned ($dest)"
+            else
+                echo "  ⚠ $name: could not clone — check network or access to $gh_repo"
+                echo "    Clone manually: gh repo clone $gh_repo $dest -- --depth=1"
+            fi
+        fi
+    }
+
+    # Declarative list instead of 3 hardcoded calls (WP-526 Phase 6). PD-*/MC-*
+    # repo families are NOT added here — they are created on-demand by
+    # WP-527, not at install time (see hint printed at the end of setup).
+    install_bundled_base_repo ZP
+    if command -v gh >/dev/null 2>&1; then
+        clone_base_repo FPF ailev/FPF
+    else
+        echo "  ⚠ FPF: GitHub CLI is required; install FPF with gh repo clone ailev/FPF"
+    fi
+    install_bundled_base_repo SPF
+fi
+
+# === 8. Enable Knowledge Extractor feeders (WP-5) ===
+# Onboarding gap found live 03.09: setup.sh never called this script, so a
+# fresh install never got git-diff-feed/inbox-check running at all -- the
+# whole automated capture-to-Pack pipeline (Phase 46-Phase 52) silently never started
+# for a new user, with nothing in setup's own output to say so.
+echo "[8/8] Enabling Knowledge Extractor feeders..."
+if $CORE_ONLY; then
+    echo "  skipped (core mode)"
+else
+    EXTRACTOR_MODE="install"
+    $DRY_RUN && EXTRACTOR_MODE="--check"
+    if IWE_WORKSPACE="$WORKSPACE_DIR" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" IWE_RUNTIME="$IWE_RUNTIME_PATH" \
+        bash "$TEMPLATE_DIR/scripts/setup-extractor-feeders.sh" "$EXTRACTOR_MODE"; then
+        :
+    else
+        echo "  ⚠ setup-extractor-feeders.sh failed — Extractor will not start automatically"
+        echo "    Retry manually: bash $TEMPLATE_DIR/scripts/setup-extractor-feeders.sh"
+    fi
+fi
+
+# === 8b. VS Code default permission mode (WP-406, onboarding VS Code track) ===
+# Without this, every new VS Code window starts the Claude Code extension in
+# Manual (ask before each edit) — a newcomer picking Auto in one window sees
+# it reset in the next, because the extension's own default is Manual.
+if $CORE_ONLY; then
+    :
+else
+    echo "[8b] Configuring VS Code (Auto mode as default)..."
+    VSCODE_AUTO_MODE_ARG="apply"
+    $DRY_RUN && VSCODE_AUTO_MODE_ARG="--check"
+    if bash "$TEMPLATE_DIR/scripts/setup-vscode-auto-mode.sh" "$VSCODE_AUTO_MODE_ARG"; then
+        :
+    else
+        echo "  ⚠ setup-vscode-auto-mode.sh failed — Auto mode not set, VS Code not modified"
+        echo "    Retry manually: bash $TEMPLATE_DIR/scripts/setup-vscode-auto-mode.sh"
+    fi
+fi
+
+# === Done ===
+echo ""
+if $DRY_RUN; then
+    echo "=========================================="
+    echo "  [DRY RUN] No changes made."
+    echo "=========================================="
+    echo ""
+    echo "Run 'bash setup.sh' (without --dry-run) to apply."
+else
+    echo "=========================================="
+    if $CORE_ONLY; then
+        echo "  Setup Complete! (core)"
+    elif [ "${GOVERNANCE_REPO_PUSH_FAILED:-}" = "true" ]; then
+        # issue #806: don't claim success when the GitHub repo genuinely
+        # wasn't created — $GOVERNANCE_REPO exists locally (git init already
+        # committed) but was never pushed (missing gh CLI, or gh repo create
+        # itself failed; see the message above for which).
+        echo "  Setup Complete — with a warning (see above)."
+        echo "  $GOVERNANCE_REPO is local-only: not pushed to GitHub."
+    else
+        echo "  Setup Complete!"
+    fi
+    echo "=========================================="
+    echo ""
+    echo "Verify installation:"
+    echo "  ✓ CLAUDE.md:   $WORKSPACE_DIR/CLAUDE.md"
+    echo "  ✓ Memory:      $CLAUDE_MEMORY_DIR/ ($(find "$CLAUDE_MEMORY_DIR" -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ') files)"
+    echo "  ✓ Symlink:     $WORKSPACE_DIR/memory → $CLAUDE_MEMORY_DIR"
+    echo "  ✓ $GOVERNANCE_REPO: $MY_STRATEGY_DIR/"
+    echo "  ✓ Template:    $TEMPLATE_DIR/"
+    echo ""
+
+    echo "Next steps:"
+    echo "  1. cd $WORKSPACE_DIR"
+    if $CORE_ONLY; then
+        echo "  2. Launch your AI CLI (Claude Code, Codex, Aider, Continue.dev, etc.)"
+        echo "  3. Say: 'Let's run the first strategic session'"
+    else
+        echo "  2. claude"
+        echo "  3. Ask Claude: 'Let's run the first strategic session'"
+        echo ""
+        echo "Strategist will run automatically:"
+        echo "  - Morning at $TIMEZONE_DESC: strategy (Mon) / day-plan (Tue-Sun)"
+        echo "  - Sunday night: week review"
+    fi
+    echo ""
+    echo "Developer onboarding (T4+) — single entry point:"
+    echo "  cat docs/developer/README.md"
+    echo ""
+    echo "Update from upstream:"
+    echo "  cd $TEMPLATE_DIR && bash update.sh"
+    echo ""
+
+    echo "Personal (PD-*) and service (MC-*) repositories (WP-526/WP-527):"
+    echo "  created on demand, not at install time — see README.md § '5 repository families'"
+    echo ""
+
+    # === Post-install validation (WP-265 Phase 8) ===
+    # Not run automatically — this is an interactive prompt. Skip in --core (no gh/claude).
+    if ! $CORE_ONLY; then
+        echo "Final installation check (recommended):"
+        echo "  setup.sh --validate will check: env config, required files,"
+        echo "  extensions, MCP accessibility, structural invariants."
+        echo ""
+        # #1010 F11: no question without a person to answer it (SETUP_CI or no terminal on stdin):
+        # `read` on an open stdin with no TTY waits forever.
+        REPLY=""
+        if [ -z "${SETUP_CI:-}" ] && [ -t 0 ]; then
+            read -p "Run the check now? (y/n) " -n 1 -r || true
+        fi
+        echo ""
+        if [[ ${REPLY:-} =~ ^[Yy]$ ]]; then
+            echo ""
+            bash "$TEMPLATE_DIR/setup.sh" --validate
+        else
+            echo "Skipped. Run later: cd $TEMPLATE_DIR && bash setup.sh --validate"
+        fi
+        echo ""
+    fi
+
+    # === Final: MCP auth check ===
+    if [ "${_MCP_AUTH_INCOMPLETE:-false}" = "true" ]; then
+        echo ""
+        echo "════════════════════════════════════════════════════════════════"
+        echo "  ⚠ SETUP INCOMPLETE: T3/T4 MCP authentication not configured."
+        echo "  Complete the steps in section [4c] above and retry: bash setup.sh"
+        echo "════════════════════════════════════════════════════════════════"
+        exit 1
+    fi
+fi

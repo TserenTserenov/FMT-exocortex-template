@@ -234,4 +234,3 @@ IWE_FAULT_SUBJECT_ID=claude-code \
 - [ ] Run 1 Session with reminders (verify that the agent sees them)
 - [ ] After 5 days: smoke-test (3 Sessions with remind vs 3 without)
 - [ ] After 2 weeks: Retrospective + decision on delivering to the Template
-

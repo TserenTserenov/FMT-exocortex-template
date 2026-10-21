@@ -155,7 +155,7 @@ A minimum of **4 GiB of free RAM** is required while Claude Code (or another age
 ```bash
 mkdir -p ~/IWE && cd ~/IWE
 gh repo fork iwesys/IWE --clone
-cd FMT-exocortex-template
+cd IWE
 bash setup.sh
 ```
 
@@ -300,4 +300,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) — how to help the project.
 ## License
 
 MIT
-

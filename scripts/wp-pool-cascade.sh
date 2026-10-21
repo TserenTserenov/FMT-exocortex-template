@@ -1,0 +1,234 @@
+#!/bin/bash
+# wp-pool-cascade.sh — cascade of binary filters for the pre-approved pool (WP-503 Phase8)
+#
+# Selects from the WP portfolio candidates for autonomous headless-pipeline execution.
+# Implements the physical gate point from AR.001 §«Headless-pipeline and pre-approved
+# pool» (WP-503 Phase7): headless-pipeline cannot take a WP into work without pool: true.
+#
+# Filters in order (binary, without LLM — the classification itself pool/verification_class
+# already machine-readable via wp-list.py):
+#   1. pool == true                                  (AR.001, explicit pilot action)
+#   2. status not in {blocked, pending-pilot-decision} (not a blocker — otherwise goes to the Secretary queue)
+#   3. verification_class in {trivial, closed-loop}  (open-loop/problem-framing — not autonomous, HD #32)
+#
+# Tie-break: REAL tie-break — /bottleneck-pick (LLM-skill, DP.ROLE.054),
+# cannot physically be called from bash-script without LLM-session. Temporary
+# default-order below (priority, then created) — honest placeholder until Phase9,
+# where headless-agent with its own LLM-session will be able to call /bottleneck-pick.
+# This is an open item, not a finished solution — see. WP-503 ticket Phase8.
+#
+# Usage: wp-pool-cascade.sh [--dry-run] [--probe [--date YYYY-MM-DD]]
+# --probe: the same pattern, as wp-sync-bundle-batch.sh/wp-secretary-queue.sh —
+# IWE_LEDGER_DIR is redirected to an isolated temp, TG suppressed, heartbeat not to the production file.
+set -euo pipefail
+
+IWE_WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
+GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+WP_PIPELINE_CARDS_ROOT="${WP_PIPELINE_CARDS_ROOT:-$IWE_WORKSPACE}"
+STRATEGY_DIR="$IWE_WORKSPACE/$GOV_REPO"
+WP_LIST_SCRIPT="$IWE_WORKSPACE/IWE/scripts/wp-list.py"
+LEDGER_APPEND="$IWE_WORKSPACE/IWE/scripts/ledger-append.sh"
+TELEGRAM_LIB="$IWE_WORKSPACE/IWE/scripts/lib/telegram.sh"
+HEARTBEAT_FILE="$IWE_WORKSPACE/.claude/state/wp-pool-cascade.heartbeat"
+LOCK_FILE="$IWE_WORKSPACE/.claude/state/wp-pool-cascade.lock"
+
+DRY_RUN=false
+PROBE=false
+PROBE_DATE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=true; shift ;;
+    --probe) PROBE=true; shift ;;
+    --date) PROBE_DATE="${2:?--date requires YYYY-MM-DD}"; shift 2 ;;
+    *) echo "ERROR: unknown arg $1" >&2; exit 1 ;;
+  esac
+done
+
+if [[ -n "$PROBE_DATE" ]]; then
+  PERIOD="$PROBE_DATE"
+else
+  PERIOD=$(date +%Y-%m-%d)
+fi
+
+if [[ "$PROBE" == "true" ]]; then
+  PROBE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/wp-pool-cascade-probe.XXXXXX")
+  export IWE_LEDGER_DIR="$PROBE_DIR/ledger"
+  mkdir -p "$IWE_LEDGER_DIR"
+  HEARTBEAT_FILE="$PROBE_DIR/heartbeat"
+  LOCK_FILE="$PROBE_DIR/lock"
+  trap 'rm -rf "$PROBE_DIR"' EXIT
+  echo "[probe] IWE_LEDGER_DIR=$IWE_LEDGER_DIR (isolated, production ledger not touched)"
+fi
+
+exec 7>"$LOCK_FILE"
+if command -v flock >/dev/null 2>&1; then
+  if ! flock -n 7; then
+    echo "ERROR: another run wp-pool-cascade.sh already holds the lock ($LOCK_FILE)" >&2
+    exit 1
+  fi
+else
+  # mkdir-fallback lock (issue #1108): flock(1) is util-linux/Homebrew-only —
+  # absent on stock macOS with no Homebrew. A bare `flock -n 7` there used to
+  # fail with "flock: command not found" (exit 127), which `if ! flock -n 7`
+  # caught the same as genuine contention and misreported as "another run
+  # already holds the lock" — wrong diagnosis, not just a missing feature.
+  # Same mkdir-based fallback as scripts/ledger-append.sh (WP-484 30.07),
+  # narrowed to a single non-blocking attempt: this cascade's own flock call
+  # was already non-blocking (-n, fail fast), so the fallback keeps that same
+  # contract instead of adding the retry-loop ledger-append.sh needs for its
+  # blocking (-w 10) case.
+  echo "WARN: flock(1) not found in PATH — falling back to mkdir-fallback lock (weaker than flock, survives only crashes on this same host)" >&2
+  LOCKDIR="${LOCK_FILE}.lockdir"
+  LOCK_META="$LOCKDIR/owner"
+  HOSTNAME_NOW="${HOSTNAME:-$(cat /proc/sys/kernel/hostname 2>/dev/null || echo unknown)}"
+  if ! mkdir "$LOCKDIR" 2>/dev/null; then
+    # Held by someone else, or a stale dir from a dead process on this same
+    # host — one reclaim attempt (not a retry loop, see non-blocking note
+    # above). Never steal a lock whose metadata names another host, or
+    # hasn't been written yet (same invariant as ledger-append.sh).
+    stale=false
+    if [ -f "$LOCK_META" ]; then
+      OTHER_HOST=$(awk -F= '$1=="host"{print $2}' "$LOCK_META" 2>/dev/null)
+      OTHER_PID=$(awk -F= '$1=="pid"{print $2}' "$LOCK_META" 2>/dev/null)
+      if [ "$OTHER_HOST" = "$HOSTNAME_NOW" ] && [ -n "$OTHER_PID" ] && ! kill -0 "$OTHER_PID" 2>/dev/null; then
+        stale=true
+      fi
+    fi
+    if [ "$stale" = "true" ]; then
+      rm -rf "$LOCKDIR" 2>/dev/null
+      mkdir "$LOCKDIR" 2>/dev/null || { echo "ERROR: another run wp-pool-cascade.sh already holds the lock ($LOCK_FILE)" >&2; exit 1; }
+    else
+      echo "ERROR: another run wp-pool-cascade.sh already holds the lock ($LOCK_FILE)" >&2
+      exit 1
+    fi
+  fi
+  echo "host=$HOSTNAME_NOW" > "$LOCK_META"
+  echo "pid=$$" >> "$LOCK_META"
+  # Replaces (not chains) the PROBE trap above — still covers PROBE_DIR (a
+  # no-op "${PROBE_DIR:-}" when unset/non-probe) plus the new LOCKDIR, so
+  # probe cleanup keeps working in the no-flock branch too. Signal handlers
+  # terminate explicitly (not just cleanup-and-continue); EXIT still fires
+  # the same cleanup on the normal-return path.
+  trap 'rm -rf "$LOCKDIR" "${PROBE_DIR:-}" 2>/dev/null; exit 143' HUP INT TERM
+  trap 'rm -rf "$LOCKDIR" "${PROBE_DIR:-}" 2>/dev/null' EXIT
+fi
+
+[[ -f "$WP_LIST_SCRIPT" ]] || { echo "ERROR: $WP_LIST_SCRIPT not found" >&2; exit 1; }
+[[ -x "$LEDGER_APPEND" ]] || { echo "ERROR: $LEDGER_APPEND not found or not executable" >&2; exit 1; }
+
+tg_fail() {
+  local msg="🚨 wp-pool-cascade.sh: emergency exit (line $1)"
+  if [[ "$PROBE" == "true" ]]; then
+    echo "[probe: TG suppressed] $msg"
+  elif [[ -f "$TELEGRAM_LIB" ]]; then
+    # shellcheck source=lib/telegram.sh
+    . "$TELEGRAM_LIB"
+    telegram_send "$msg" || echo "WARN: telegram_send failed while sending FAIL" >&2
+  fi
+}
+trap 'tg_fail $LINENO' ERR
+
+WP_LIST_OUT=$(python3 "$WP_LIST_SCRIPT" --list-cards --governance-repo "$GOV_REPO" \
+  --iwe-root "$WP_PIPELINE_CARDS_ROOT" \
+  --format json --fields wp,status,pool,verification_class,priority,created 2>/dev/null)
+
+# Three binary filters in a single pass — sorting (priority then created) as
+# temporary tie-break, see. comment at the top of the file about /bottleneck-pick.
+CANDIDATES=$(echo "$WP_LIST_OUT" | python3 -c "
+import json, sys
+
+cards = json.load(sys.stdin)
+blocked = {'blocked', 'pending-pilot-decision'}
+autonomous_classes = {'trivial', 'closed-loop'}
+
+candidates = [
+    c for c in cards
+    if c.get('pool') == 'true'
+    and c.get('status') not in blocked
+    and c.get('verification_class') in autonomous_classes
+]
+
+# Temporary tie-break (priority as a string P0..P5, created ISO-date — both are sortable
+# lexicographically as-is; P0 before P1, earlier date before later date).
+candidates.sort(key=lambda c: (c.get('priority') or 'P9', c.get('created') or '9999-99-99'))
+
+for c in candidates:
+    print(json.dumps(c))
+")
+
+# How many cards in total have pool:true — needed only for heartbeat-message
+# (COUNT shows survivors after ALL filters, difference = how many were filtered out
+# status/verification_class filters, not only pool-filter).
+POOL_TRUE_COUNT=$(echo "$WP_LIST_OUT" | python3 -c "
+import json, sys
+cards = json.load(sys.stdin)
+print(sum(1 for c in cards if c.get('pool') == 'true'))
+")
+
+touch "$HEARTBEAT_FILE" 2>/dev/null || true
+
+# Heartbeat (2026-08-05, WP-503 peer-session discovery-session with Codex): «0 candidates»
+# and «pipeline did not start at all» looked identical to the operator — both
+# silence. tg_fail (ERR trap above) already covers failure with non-zero exit;
+# this signal covers the case «completed normally, simply nothing to process».
+# PROBE/DRY_RUN suppress actual sending by the same principle, as do the other
+# TG-calls in this file.
+send_pool_heartbeat() {
+  local count="$1" pool_true="$2"
+  local filtered=$(( pool_true - count ))
+  local msg="🫀 wp-pool-cascade: ${count} candidate(s) selected, ${filtered} filtered out (total in pool ${pool_true})"
+  if [[ "$PROBE" == "true" ]] || [[ "$DRY_RUN" == "true" ]]; then
+    echo "[dry-run/probe: TG heartbeat suppressed] $msg"
+    return 0
+  fi
+  if [[ -f "$TELEGRAM_LIB" ]]; then
+    # shellcheck source=lib/telegram.sh
+    . "$TELEGRAM_LIB"
+    telegram_send "$msg" || echo "WARN: telegram_send failed while sending heartbeat" >&2
+  fi
+}
+
+if [[ -z "$CANDIDATES" ]]; then
+  echo "wp-pool-cascade: no candidates (no WP with pool:true, not blocked, class trivial/closed-loop)"
+  send_pool_heartbeat 0 "$POOL_TRUE_COUNT"
+  [[ "$PROBE" == "true" ]] && echo "=== PROBE SUMMARY ===" && echo "candidates=0" && echo "🟢 PROBE: run completed without error exit (empty list — valid outcome)"
+  exit 0
+fi
+
+COUNT=0
+while IFS= read -r candidate_json; do
+  [[ -z "$candidate_json" ]] && continue
+  COUNT=$((COUNT + 1))
+  WP_NUM=$(echo "$candidate_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['wp'])")
+  echo "Candidate #$COUNT: WP-$WP_NUM"
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    continue
+  fi
+
+  DATA_JSON=$(echo "$candidate_json" | python3 -c "
+import json, sys
+c = json.load(sys.stdin)
+print(json.dumps({
+    'wp': c['wp'],
+    'priority': c.get('priority') or '',
+    'verification_class': c.get('verification_class') or '',
+    'rank': $COUNT,
+}))
+")
+  bash "$LEDGER_APPEND" day "$PERIOD" pool_candidate_selected "$DATA_JSON" wp-pool-cascade
+done <<< "$CANDIDATES"
+
+touch "$HEARTBEAT_FILE" 2>/dev/null || true
+
+echo "wp-pool-cascade: $COUNT candidate(s) selected"
+if [[ "$COUNT" -gt 1 ]]; then
+  echo "NOTE: multiple candidates — temporary tie-break by priority/created applied; proper tie-break via /bottleneck-pick not implemented (Phase9)"
+fi
+send_pool_heartbeat "$COUNT" "$POOL_TRUE_COUNT"
+
+if [[ "$PROBE" == "true" ]]; then
+  echo "=== PROBE SUMMARY ==="
+  echo "candidates=$COUNT"
+  echo "🟢 PROBE: run completed without abnormal exit"
+fi

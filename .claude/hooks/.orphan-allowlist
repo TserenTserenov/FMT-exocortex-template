@@ -1,0 +1,14 @@
+# Hooks, intentionally not registered in the template .claude/settings.json.
+# Format: one filename per line; everything after # — reason.
+# Checked by: scripts/check-orphan-hooks.sh (issue #310, #323).
+#
+# This list — is not the place, where defects become invisible. Every line must
+# name a reason and a next step. An empty reason = defect, not an exception.
+#
+# Libraries and CLI, residing alongside the hooks (rule-engine.sh, residency-gate-*.sh,
+# agent-trace-uploader.sh), are NOT added to this list: they carry the marker
+# `# claude-hook: false — …` in the header, and the guard recognizes it automatically (2026-08-04,
+# peer-session on issues #310/#321/#323).
+#
+agent-trace-recorder.sh     # local telemetry (tool traces in the home directory): enabled by deliberate opt-in user, retention-retention contract is not defined — disabled by default in the template. To enable: add to settings.json Stop+PostToolUse.
+pack-creator-spf-guard.sh   # hook is functional, but there is no activation contract: PACK_CREATOR_ACTIVE=1 nobody sets it in the template runtime (env hook-the skill cannot pass env to the hook process). Next step: activation via state-state file from the skill pack-creator + 3 test (normal session / active denial / active permission).

@@ -1,0 +1,97 @@
+# iwe-backup-sources.yaml — default backup sources outside ${HOME}/IWE
+#
+# WP-7 Phase233a, 2026-10-16 (peer-session 2026-10-16-18-iwe-template-backup,
+# Claude+Kimi+Codex, round-loop, consensus reached).
+#
+# Problem: the only existing mechanism (backup-icloud.sh) covers
+# only ${HOME}/IWE. Runtime-runtime directories of AI-agents (memory, conversation history,
+# configs) reside outside IWE and are not protected by anything — discovered during the loss incident
+# ~/.claude/logs/style-violations.log with no way to recover the examples
+# of violations.
+#
+# Classification by RECOVERABILITY, not by location (finding from the peer-session:
+# the split "logs=recoverable" was incorrect — a specific incident directly refutes it
+# refutes). Three levels:
+#
+#   tier0_unique       — unique data, no second copy anywhere-.
+#                         Back up ALWAYS, from the first implementation phase.
+#   tier1_scheduled     — recoverable with effort (time/manual work), but
+#                         not automatically. Back up on a schedule.
+#   tier2_optional      — reproducible automatically (reinstallation,
+#                         re-download) or of low value. Back up
+#                         optionally, by explicit user opt-in, by explicit user opt-in.
+#
+# New, unknown to the script runtime-runtime subdirectory is included BY DEFAULT in
+# tier1 with the flag unknown=true — is not silently excluded (decision
+# peer-session: "include by default and signal on growth, do not
+# silently exclude").
+#
+# Local override user: ${HOME}/.iwe-backup-sources.local.yaml —
+# this file is NOT touched by template updates (update.sh). Values from it
+# extend (do not replace) the defaults below; format override — the same schema.
+
+schema_version: 1
+
+tier0_unique:
+  # ~/IWE — the only path, which MUST exist for every
+  # template user; the rest — optional depending on whether specific agents are installed
+  # specific agents.
+  - path: "${HOME}/IWE"
+    agent: "core"
+    note: "platform working tree — git-git repositories are included IN FULL, including .git/ (peer-session revoked the .git exclusion .git: unpushed commits/stash/local branches are not recoverable from remote)"
+  - path: "${HOME}/.claude/projects"
+    agent: "claude"
+    note: "auto-memory (includes MEMORY.md) and full transcripts — not recoverable"
+  - path: "${HOME}/.claude.json"
+    agent: "claude"
+    note: "global Claude Code config Claude Code (OAuth-tokens, project history)"
+  - path: "${HOME}/.codex/config.toml"
+    agent: "codex"
+    note: "config Codex"
+  - path: "${HOME}/.gitconfig"
+    agent: "core"
+    note: "git identity + signing key reference"
+  - path: "${HOME}/.git-credentials"
+    agent: "core"
+    note: "HTTPS git-tokens, if credential helper = store"
+
+tier1_scheduled:
+  - path: "${HOME}/.claude/logs"
+    agent: "claude"
+    note: "logs with billing detail (incident-trigger for this phase: style-violations.log)"
+  - path: "${HOME}/.claude/state"
+    agent: "claude"
+  - path: "${HOME}/.codex"
+    agent: "codex"
+    note: "entire Codex directory Codex, excluding what is already listed in tier0"
+  - path: "${HOME}/.hermes"
+    agent: "hermes"
+  - path: "${HOME}/.kimi"
+    agent: "kimi"
+  - path: "${HOME}/.kimi-code"
+    agent: "kimi"
+  - path: "${HOME}/.grok"
+    agent: "grok"
+  - path: "${HOME}/.zshrc"
+    agent: "core"
+  - path: "${HOME}/.bash_profile"
+    agent: "core"
+
+tier2_optional:
+  - path: "${HOME}/.claude/file-history"
+    agent: "claude"
+    note: "editor edit history — large in size, partially recoverable from git"
+  - path: "${HOME}/.vscode"
+    agent: "core"
+    note: "extensions VS Code — recoverable by reinstalling"
+
+# Known-but-excluded — NOT backed up and no warning on absence (SSH/GPG/
+# Keychain). Separate follow-up (Phase233d): own dedicated secure mechanism,
+# not a generic tar/restic-snapshot without additional. protection of private keys.
+known_excluded:
+  - path: "${HOME}/.ssh"
+    reason: "private keys — separate dedicated secure mechanism (Phase233d), not this pipeline"
+  - path: "${HOME}/.gnupg"
+    reason: "GPG-keys — separate dedicated secure mechanism (Phase233d), not this pipeline"
+  - path: "macOS Keychain"
+    reason: "system keystore, not a file — outside the scope of file backup, documented as a known limitation"

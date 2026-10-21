@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Pre-commit hook: auto-regenerate MAP when Pack entities change.
+#
+# Checks if any .md files under pack/ are staged, runs generate-map.py,
+# and stages the updated MAP file if it changed.
+#
+# Install: symlink this file into each Pack repo's .git/hooks/pre-commit
+#   ln -sf ../../../SPF/scripts/pre-commit-pack-map .git/hooks/pre-commit
+#
+# Requires: python3, pyyaml
+
+set -euo pipefail
+
+# pack-lint (WP-242) — optional; set IWE_PACK_LINT=/path/to/pack-lint.sh to enable
+if [[ -n "${IWE_PACK_LINT:-}" ]]; then
+    bash "$IWE_PACK_LINT"
+else
+    echo "[auto-MAP] optional linter not configured — skip"
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")" && pwd)"
+
+# Delta-aware ID-collision guard (WP-388 Phase 14, DP.SC.181): blocks the commit
+# if a staged-added entity file introduces an already-occupied ID. Dual-path
+# resolution mirrors generate-map (on macOS readlink -f does not work →
+# SCRIPT_DIR may be .git/hooks; in that case the sibling SPF path is used).
+# Not found → skip (CI detector backstop).
+DELTA_GUARD=""
+if [[ -f "$SCRIPT_DIR/check-id-collision-delta.sh" ]]; then
+    DELTA_GUARD="$SCRIPT_DIR/check-id-collision-delta.sh"
+elif [[ -f "$REPO_ROOT/../SPF/scripts/check-id-collision-delta.sh" ]]; then
+    DELTA_GUARD="$REPO_ROOT/../SPF/scripts/check-id-collision-delta.sh"
+fi
+if [[ -n "$DELTA_GUARD" ]]; then
+    bash "$DELTA_GUARD" || exit 1
+fi
+
+# Resolve generate-map.py location
+# Priority: 1) same dir as this script, 2) SPF/scripts/ sibling repo
+if [[ -f "$SCRIPT_DIR/generate-map.py" ]]; then
+    GENERATE_MAP="$SCRIPT_DIR/generate-map.py"
+elif [[ -f "$REPO_ROOT/../SPF/scripts/generate-map.py" ]]; then
+    GENERATE_MAP="$REPO_ROOT/../SPF/scripts/generate-map.py"
+else
+    echo "[auto-MAP] generate-map.py not found, skipping."
+    exit 0
+fi
+
+# Find pack directory (pack/*/00-pack-manifest.md), skip _template
+PACK_DIR=""
+for manifest in "$REPO_ROOT"/pack/*/00-pack-manifest.md; do
+    if [[ -f "$manifest" ]]; then
+        dir="$(dirname "$manifest")"
+        dirname_base="$(basename "$dir")"
+        # Skip template directories
+        [[ "$dirname_base" == _* ]] && continue
+        PACK_DIR="$dir"
+        break
+    fi
+done
+
+if [[ -z "$PACK_DIR" ]]; then
+    # Not a Pack repo or no manifest — skip silently
+    exit 0
+fi
+
+# Check if any pack .md files are staged
+STAGED_PACK_FILES="$(git diff --cached --name-only --diff-filter=ACMR -- 'pack/*.md' 'pack/**/*.md' 2>/dev/null || true)"
+
+if [[ -z "$STAGED_PACK_FILES" ]]; then
+    # No pack files staged — nothing to do
+    exit 0
+fi
+
+echo "[auto-MAP] Pack files changed, regenerating MAP..."
+
+# Isolate the scan from concurrent uncommitted work (found 2026-07-17, WP-483
+# peer session): generate-map.py reads $PACK_DIR straight off disk, not the
+# git index — a parallel agent session's uncommitted new entity files sitting
+# in the working tree were getting folded into THIS commit's MAP/manifest
+# (their metadata staged and committed here, while the files themselves stayed
+# untracked). --keep-index leaves staged content visible on disk for the scan
+# and puts everything else out of the way; the trap restores it unconditionally.
+STASHED=0
+if git stash push --keep-index --include-untracked --quiet \
+    -m "pre-commit-pack-map: autostash $$" 2>/dev/null; then
+    STASHED=1
+fi
+restore_stash() {
+    if [[ "$STASHED" -eq 1 ]]; then
+        if ! git stash pop --quiet 2>/dev/null; then
+            echo "[auto-MAP] WARNING: could not auto-restore stashed changes — run 'git stash pop' manually (stash: pre-commit-pack-map: autostash $$)" >&2
+        fi
+    fi
+}
+trap restore_stash EXIT
+
+# Run generate-map.py
+if ! python3 "$GENERATE_MAP" "$PACK_DIR" --manifest 2>&1 | while read -r line; do
+    echo "[auto-MAP] $line"
+done; then
+    echo "[auto-MAP] Warning: MAP generation failed, committing without update."
+    exit 0
+fi
+
+# Stage updated MAP and manifest if changed
+for pattern in "$PACK_DIR/07-map/*.MAP.*.md" "$PACK_DIR/00-pack-manifest.md"; do
+    for changed_file in $pattern; do
+        [[ -f "$changed_file" ]] || continue
+        rel_path="${changed_file#$REPO_ROOT/}"
+        if ! git diff --quiet -- "$rel_path" 2>/dev/null; then
+            git add "$rel_path"
+            echo "[auto-MAP] Staged updated: $rel_path"
+        fi
+    done
+done
+
+echo "[auto-MAP] Done."
+exit 0

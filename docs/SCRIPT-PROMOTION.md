@@ -1,7 +1,7 @@
 # Script Promotion: L3 (author) → L1 (universal)
 
 > Process for moving a script from the author zone (`WORKSPACE/scripts/`) into the FMT
-> Template (`FMT-exocortex-template/scripts/`), from which `update.sh` delivers it to all pilots.
+> Template (`IWE/scripts/`), from which `update.sh` delivers it to all pilots.
 > Source: WP-5 #12, DP.KR.001 §5.6.
 
 ## When to promote
@@ -21,7 +21,7 @@ Do not promote:
 ### Step 1. Check for collisions
 
 ```bash
-~/IWE/FMT-exocortex-template/scripts/check-script-collisions.sh
+~/IWE/IWE/scripts/check-script-collisions.sh
 ```
 
 If a script with the same name already exists in FMT — resolve the collision: merge (keep
@@ -36,26 +36,26 @@ will break behavior for pilots who already have the script.
 | `$HOME/IWE/PACK-personal` | `params.yaml` → user key |
 | Personal paths (governance, knowledge-index) | `params.yaml` parameter + graceful skip if empty |
 | WakaTime CLI path | `${WAKATIME_CLI:-$HOME/.wakatime/wakatime-cli}` |
-| FMT path | `${FMT_PATH:-${WORKSPACE_DIR}/FMT-exocortex-template}` |
+| FMT path | `${FMT_PATH:-${WORKSPACE_DIR}/IWE}` |
 
 Rule: the script reads parameters from `${WORKSPACE_DIR}/params.yaml`. If a required
 parameter is missing — print a message and `exit 0` (do not fail).
 
 ### Step 3. Add the parameter to FMT/params.yaml
 
-If the script requires a new parameter — add it to `FMT-exocortex-template/params.yaml`
+If the script requires a new parameter — add it to `IWE/params.yaml`
 with a default value (usually an empty string) and a comment explaining its purpose.
 
 ### Step 4. Copy into FMT
 
 ```bash
-cp WORKSPACE/scripts/my-script.sh FMT-exocortex-template/scripts/my-script.sh
-chmod +x FMT-exocortex-template/scripts/my-script.sh
+cp WORKSPACE/scripts/my-script.sh IWE/scripts/my-script.sh
+chmod +x IWE/scripts/my-script.sh
 ```
 
 ### Step 5. Register in update-manifest.json
 
-Add an entry to `FMT-exocortex-template/update-manifest.json`:
+Add an entry to `IWE/update-manifest.json`:
 
 ```json
 {
@@ -77,12 +77,12 @@ manifest and CHANGELOG — without a bump, the commit will be blocked.
 
 ```bash
 # Smoke-test 1: script runs without params.yaml (graceful skip)
-bash FMT-exocortex-template/scripts/my-script.sh
+bash IWE/scripts/my-script.sh
 
 # Smoke-test 2: with params.yaml — performs the expected action
-WORKSPACE_DIR=/tmp/test-iwe bash FMT-exocortex-template/scripts/my-script.sh
+WORKSPACE_DIR=/tmp/test-iwe bash IWE/scripts/my-script.sh
 
-cd FMT-exocortex-template
+cd IWE
 git add scripts/my-script.sh params.yaml update-manifest.json CHANGELOG.md
 git commit -m "feat: promote my-script.sh from staging"
 git push
@@ -170,4 +170,3 @@ On a direct `git commit` — it is your responsibility to run it manually.
 - `scripts/staging-audit.sh` — detector for B12e
 - `scripts/promote-common.sh::record_promotion()` — writer for promotion-status.yaml
 - **RELEASE-PROCESS.md** — release checklist + `deprecated_files` convention
-

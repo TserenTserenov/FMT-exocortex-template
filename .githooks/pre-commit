@@ -1,0 +1,399 @@
+#!/bin/bash
+# Pre-commit hook: block platform-specific constructs without wrappers
+# Install: git config core.hooksPath .githooks
+# See: docs/PLATFORM-COMPAT.md
+
+ISSUES=0
+
+# === Block secrets file from being committed ===
+if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
+    echo "SECURITY: .exocortex.env is staged for commit — this file contains secrets!"
+    echo "  Remove from staging: git restore --staged .exocortex.env"
+    echo "  The file is in .gitignore — verify it's listed there."
+    exit 1
+fi
+
+# === issue #810: secret corpus scan ===
+# pre-commit-secret-scan.sh shipped since #410 but no hook ever called it --
+# check-secret/SKILL.md claimed an automatic layer that did not exist. The
+# script itself is fail-closed by design (exit 2 when its helpers are
+# missing/broken, exit 1 when it finds a match) -- calling it unconditionally
+# here is enough; no separate policy branch needed.
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOOK_DIR/..")"
+if [ -x "$REPO_ROOT/scripts/pre-commit-secret-scan.sh" ]; then
+    "$REPO_ROOT/scripts/pre-commit-secret-scan.sh" || exit 1
+else
+    echo "SECURITY: pre-commit-secret-scan.sh missing or not executable -- refusing to commit unscanned (fail-closed)." >&2
+    exit 1
+fi
+
+# === CHANGELOG ↔ update-manifest.json version sync ===
+# Root cause of the bug (25 Apr): drift by 5 versions between CHANGELOG (0.27.7) and
+# manifest (0.26.1) — update.sh --check reported «no updates», while
+# the user caught it manually. Memory does not help; a harness-gate.
+# Rule: top version in CHANGELOG.md == version in update-manifest.json. Always.
+# Assumption: new section in CHANGELOG.md ALWAYS at the top (Keep-a-Changelog convention).
+# If someone-inserts a section NOT at the top — top-grep will return the old version, drift
+# will not be detected. This is a deliberate trade-off (alternative — counting sections — produces FP).
+
+# (C) Hard-fail on rename/move: these files have a contract with update.sh,
+# they must not be moved.
+RENAMED_RELEASE_FILES=$(git diff --cached --name-status 2>/dev/null \
+    | grep -E '^R[0-9]*[[:space:]].*(CHANGELOG\.md|update-manifest\.json)' || true)
+if [ -n "$RENAMED_RELEASE_FILES" ]; then
+    echo "RELEASE-SYNC: detected rename CHANGELOG.md or update-manifest.json"
+    echo "  These files have a contract with update.sh — the path must be in the repo root."
+    echo "  Affected: $RENAMED_RELEASE_FILES"
+    exit 1
+fi
+
+# A fork with a conventional `upstream` remote never receives CHANGELOG.md
+# locally (WP-401 Phase6.1 — /iwe-update reads it by raw URL instead), so its
+# copy is frozen at whatever version it had when that delivery stopped while
+# update.sh keeps bumping update-manifest.json on every install. The version
+# match this guardrail checks becomes permanently unsatisfiable there,
+# blocking every post-update commit (issues #449, #451) — the check still
+# does its job in canon, where CHANGELOG.md is edited by hand for every
+# release and the drift it was built to catch remains real.
+IS_UPSTREAM_MIRROR=false
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git remote get-url upstream >/dev/null 2>&1; then
+    IS_UPSTREAM_MIRROR=true
+fi
+
+STAGED_RELEASE_FILES=$(git diff --cached --name-only 2>/dev/null \
+    | grep -E '^(CHANGELOG\.md|update-manifest\.json)$' || true)
+if [ -n "$STAGED_RELEASE_FILES" ] && [ "$IS_UPSTREAM_MIRROR" = false ]; then
+    if [ -f "CHANGELOG.md" ] && [ -f "update-manifest.json" ]; then
+        CHANGELOG_VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md \
+            | sed 's/^## \[//;s/\]$//' || true)
+        MANIFEST_VERSION=$(grep -m1 '"version"' update-manifest.json \
+            | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//' || true)
+
+        if [ -z "$CHANGELOG_VERSION" ]; then
+            echo "RELEASE-SYNC: failed to extract version from CHANGELOG.md (top section)"
+            echo "  Expected a line of the form: ## [X.Y.Z] — YYYY-MM-DD"
+            exit 1
+        fi
+        if [ -z "$MANIFEST_VERSION" ]; then
+            echo "RELEASE-SYNC: failed to extract version from update-manifest.json"
+            exit 1
+        fi
+        if [ "$CHANGELOG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "RELEASE-SYNC: version mismatch!"
+            echo "  CHANGELOG.md top:        $CHANGELOG_VERSION"
+            echo "  update-manifest.json:    $MANIFEST_VERSION"
+            echo ""
+            echo "  update.sh --check parses manifest, not CHANGELOG. On divergence"
+            echo "  users do not receive updates (drift 25 Apr: 5 versions)."
+            echo ""
+            echo "  Fix: bump version in update-manifest.json to $CHANGELOG_VERSION"
+            echo "       (or revert the new section in CHANGELOG, if bump premature)"
+            exit 1
+        fi
+        echo "RELEASE-SYNC: PASS ($CHANGELOG_VERSION)"
+    fi
+fi
+
+# === Promote script dry-run smoke (PD-2, WP-347) ===
+# Root cause of the bug (20 May): settings-promote.sh was breaking on pre-existing debt in env -i —
+# found Kimi-agent after the author did not notice it in the authors env.
+# Gate: when staged promote-scripts are staged we run the promote itself with a fixture in promote with a fixture in env -i.
+STAGED_PROMOTE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '^scripts/(settings|hook|script|skill)-promote\.sh$' || true)
+if [ -n "$STAGED_PROMOTE" ] && [ -d "setup/promote-fixtures" ]; then
+    FAIL=0
+    for promote in $STAGED_PROMOTE; do
+        case "$(basename "$promote")" in
+            script-promote.sh)
+                CMD="bash scripts/script-promote.sh setup/promote-fixtures/sample-script.sh --dry-run"
+                ;;
+            hook-promote.sh)
+                CMD="bash scripts/hook-promote.sh setup/promote-fixtures/sample-hook.sh --dry-run"
+                ;;
+            settings-promote.sh)
+                CMD="bash scripts/settings-promote.sh sample-hook.sh PreToolUse --matcher Bash --dry-run"
+                ;;
+            skill-promote.sh)
+                CMD="bash scripts/skill-promote.sh setup/promote-fixtures/sample-skill --dry-run"
+                ;;
+        esac
+        if ! env -i HOME="$HOME" PATH="$PATH" $CMD >/tmp/iwe-promote-dryrun.$$ 2>&1; then
+            echo "PROMOTE-DRY-RUN: $promote FAIL"
+            cat /tmp/iwe-promote-dryrun.$$
+            rm -f /tmp/iwe-promote-dryrun.$$
+            FAIL=1
+        else
+            echo "PROMOTE-DRY-RUN: $promote PASS"
+            rm -f /tmp/iwe-promote-dryrun.$$
+        fi
+    done
+    if [ "$FAIL" -eq 1 ]; then
+        echo "  Override: git commit --no-verify (only if you are sure)"
+        exit 1
+    fi
+fi
+
+# === Clean-env smoke for new scripts (PD-1, WP-347) ===
+# Root cause: new scripts/*.sh may work for the author (with the authors env vars),
+# but fail for users. Gate: when staged NEW file scripts/*.sh —
+# run smoke-clean-env.sh (bash -n + safe-mode check + shebang + optional --help in env -i).
+STAGED_NEW_SCRIPTS=$(git diff --cached --name-status --diff-filter=A 2>/dev/null \
+    | awk '$2 ~ /^scripts\/.*\.sh$/ {print $2}' || true)
+if [ -n "$STAGED_NEW_SCRIPTS" ] && [ -x "scripts/smoke-clean-env.sh" ]; then
+    FAIL=0
+    for script in $STAGED_NEW_SCRIPTS; do
+        # Skip promote-scripts (they are tested by a separate gate PROMOTE-DRY-RUN)
+        case "$(basename "$script")" in
+            *-promote.sh) continue ;;
+        esac
+        if ! bash scripts/smoke-clean-env.sh "$script" >/tmp/iwe-cleanenv.$$ 2>&1; then
+            echo "CLEAN-ENV-SMOKE: $script FAIL"
+            cat /tmp/iwe-cleanenv.$$
+            rm -f /tmp/iwe-cleanenv.$$
+            FAIL=1
+        else
+            cat /tmp/iwe-cleanenv.$$
+            rm -f /tmp/iwe-cleanenv.$$
+        fi
+    done
+    if [ "$FAIL" -eq 1 ]; then
+        echo "  Override: git commit --no-verify"
+        exit 1
+    fi
+fi
+
+# === Hook paths convention (.claude/settings.json) ===
+# Root cause of the bug (20 May 2026): settings.json manually copied into FMT with relative
+# paths .claude/hooks/X.sh. When the cwd shifts cwd (subagent/worktree/MCP) the hook is not found.
+# Convention: all hook-commands must start with $CLAUDE_PROJECT_DIR/.
+STAGED_SETTINGS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '^\.claude/settings\.json$' || true)
+if [ -n "$STAGED_SETTINGS" ] && [ -x "scripts/validate-fmt-scripts.sh" ]; then
+    # FMT7 (#150): validate only staged-scripts, and not the entire scripts/ —
+    # otherwise pre-existing pre-existing debt in someone elses file blocks registration of a new hook.
+    STAGED_SCRIPTS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+        | grep -E '\.(sh|py)$' || true)
+    if [ -n "$STAGED_SCRIPTS" ]; then
+        # shellcheck disable=SC2086
+        if ! bash scripts/validate-fmt-scripts.sh --files $STAGED_SCRIPTS >/tmp/iwe-settings-validate.$$ 2>&1; then
+            echo "HOOK-PATH-CONVENTION: FAIL"
+            cat /tmp/iwe-settings-validate.$$
+            rm -f /tmp/iwe-settings-validate.$$
+            echo ""
+            echo "  Use settings-promote.sh for registering new hooks."
+            echo "  Override: git commit --no-verify"
+            exit 1
+        fi
+        rm -f /tmp/iwe-settings-validate.$$
+    fi
+fi
+
+# === Template validation (author-specific leaks, hardcoded paths, hooks cross-ref) ===
+# Root cause of the bug (26 Apr): literal `DS-my-strategy` ended up in a new
+# templates/strategy-skeleton/README.md (commit cb22aaa); the validator is called
+# only from template-sync.sh — manual commits in FMT bypassed validation.
+# Gate: if staged at least one file with the extensions, that are scanned by validate-template.sh,
+# run full template validation. Escape hatch: `git commit --no-verify`.
+# B9 fix (0.28.5): validation is ABOVE exit STAGED_SH — otherwise md/yaml/json-only
+# commits skipped the check and allowed a leak leak into FMT.
+STAGED_TEMPLATE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '\.(md|sh|py|json|plist|yaml)$' || true)
+# Bootstrap TEMPLATE_DIR from .exocortex.env (parent of this repo) — no env var required
+if [ -z "${TEMPLATE_DIR:-}" ]; then
+  _repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  _env_file="$(dirname "${_repo_root:-}")/.exocortex.env"
+  if [ -f "$_env_file" ]; then
+    _td=$(grep '^IWE_TEMPLATE=' "$_env_file" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+    [ -n "${_td:-}" ] && export TEMPLATE_DIR="$_td"
+    unset _td
+  fi
+  unset _repo_root _env_file
+fi
+if [ -n "$STAGED_TEMPLATE" ] && [ -x "setup/validate-template.sh" ]; then
+    # --mode=staged: checks only staged files. Prevents false blocks
+    # from unstaged WIP parallel agents (multi-agent environment IWE). CI uses pristine.
+    if ! bash setup/validate-template.sh --mode=staged ${TEMPLATE_DIR:+"$TEMPLATE_DIR"} >/tmp/iwe-validate.$$ 2>&1; then
+        echo "TEMPLATE-VALIDATE: FAIL"
+        cat /tmp/iwe-validate.$$
+        rm -f /tmp/iwe-validate.$$
+        echo ""
+        echo "  Commit blocked. Fix issues above or override with: git commit --no-verify"
+        exit 1
+    fi
+    rm -f /tmp/iwe-validate.$$
+fi
+
+# === Integration contract validator (Spec↔State drift detection) ===
+# Root cause of the bug (29 Apr, 0.29.13 regression): template-sync overwrote FMT files
+# from the authors pre-0.29.5 IWE pre-0.29.5 IWE → 8 violations. Yevheniy found on a fresh clone, but
+# our own validator was NOT running at commit time. Gate: the same script that
+# Yevheniy, on our own staged files. Escape hatch: `git commit --no-verify`.
+# Run only if staged files are within the scope of the scope validator (roles/, .claude/, setup/,
+# memory/, extensions/, update-manifest.json).
+STAGED_VALIDATOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '^(roles/|\.claude/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
+# issue #1234: setup/integration-contract-validator.sh is in update-manifest.json
+# excluded_paths (issue #1223) -- update.sh deliberately never ships it to forks,
+# the same reason validate-template.yml skips the jobs that need it via
+# `if: github.repository == 'iwesys/IWE'`. A fork's
+# working-tree copy of the script is a frozen leftover from whenever it last had
+# one and goes stale, so this local hook must apply the same author-repo check --
+# no github.repository env var locally, so origin's identity is the equivalent
+# signal. Normalized the same way as the canonical form in a manifest.files
+# entry would be (scheme/creds/.git suffix stripped) so https and ssh remotes
+# both match; origin missing or unreadable also skips, since there is then no
+# basis to claim this is the author's repo.
+VALIDATOR_REPO_MATCH=false
+if command -v git >/dev/null 2>&1; then
+    ORIGIN_URL=$(git remote get-url origin 2>/dev/null || true)
+    # Lowercased: GitHub resolves org/repo names case-insensitively at the git
+    # protocol level (smart-HTTP/SSH clone, not just the web redirect), so an
+    # origin spelled in a different case is still the canonical repo -- found
+    # in review, the unnormalized comparison gave a false negative there.
+    ORIGIN_NORMALIZED=$(printf '%s' "$ORIGIN_URL" \
+        | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#^[^@/]*@##; s#:#/#; s#\.git$##' \
+        | tr '[:upper:]' '[:lower:]')
+    [ "$ORIGIN_NORMALIZED" = "github.com/tserentserenov/fmt-exocortex-template" ] && VALIDATOR_REPO_MATCH=true
+fi
+if [ -n "$STAGED_VALIDATOR_SCOPE" ] && [ "$VALIDATOR_REPO_MATCH" != "true" ]; then
+    echo "INTEGRATION-CONTRACT-VALIDATOR: skipped — origin not author-repository (#1234), setup/integration-contract-validator.sh in excluded_paths and is not synchronized by update.sh"
+elif [ -n "$STAGED_VALIDATOR_SCOPE" ] && [ -x "setup/integration-contract-validator.sh" ]; then
+    if ! bash setup/integration-contract-validator.sh >/tmp/iwe-icv.$$ 2>&1; then
+        echo "INTEGRATION-CONTRACT-VALIDATOR: FAIL"
+        cat /tmp/iwe-icv.$$
+        rm -f /tmp/iwe-icv.$$
+        echo ""
+        echo "  Commit blocked. Fix detector violations above or override with: git commit --no-verify"
+        exit 1
+    fi
+    rm -f /tmp/iwe-icv.$$
+fi
+
+# === Detector regex regression tests (0.29.18) ===
+# If staged staged changes in integration-contract-validator.sh OR in detector-fixtures/
+# — run test-detectors.sh. Catches regex-gap regressions in the detector'themselves.
+STAGED_DETECTOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
+    | grep -E '^setup/(integration-contract-validator\.sh|detector-fixtures/|test-detectors\.sh)' || true)
+if [ -n "$STAGED_DETECTOR_SCOPE" ] && [ -x "setup/test-detectors.sh" ]; then
+    if ! bash setup/test-detectors.sh >/tmp/iwe-detector-tests.$$ 2>&1; then
+        echo "DETECTOR-REGEX-TESTS: FAIL"
+        cat /tmp/iwe-detector-tests.$$
+        rm -f /tmp/iwe-detector-tests.$$
+        echo ""
+        echo "  Detector regex Detector regex regressed -- historical fixture is no longer caught. — historical fixture is no longer matched."
+        echo "  Override: git commit --no-verify"
+        exit 1
+    fi
+    rm -f /tmp/iwe-detector-tests.$$
+fi
+
+# === Manifest coverage check (MG5) ===
+# Root cause of the bug (25 May): orphan-scripts (day-open-scaffold.sh, iwe-backup-check.sh,
+# route-task.sh) ended up in git, but not in update-manifest.json → partial delivery.
+# Shift-left: catch BEFORE commit, not in CI.
+# issue #240: blocking check — only files of the CURRENT commit (staged);
+# full repo scan — non-blocking WARN (one foreign orphan must not
+# paralyze all commits of the fork; full scan remains in CI validate-template).
+STAGED_MANIFEST_SCOPE=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null \
+    | grep -E '^(scripts/|\.claude/|roles/|exocortex/|memory/|\.githooks/|pack-templates/|shared/|update-manifest\.json)' || true)
+if [ -n "$STAGED_MANIFEST_SCOPE" ] && [ -f "scripts/check-manifest-coverage.py" ]; then
+    # 1) Blocking: coverage staged-files of the current commit.
+    if ! printf '%s\n' "$STAGED_MANIFEST_SCOPE" | python3 scripts/check-manifest-coverage.py update-manifest.json >/tmp/iwe-manifest.$$ 2>&1; then
+        echo "MANIFEST-COVERAGE: FAIL (staged)"
+        cat /tmp/iwe-manifest.$$
+        rm -f /tmp/iwe-manifest.$$
+        echo ""
+        echo "  Commit blocked. Add orphan-file(s) to update-manifest.json"
+        echo "  or to excluded_paths, if intentionally excluded."
+        echo "  Override: git commit --no-verify"
+        exit 1
+    fi
+    # 2) Non-blocking: full repo scan (WARN, issue #240).
+    if ! git ls-files | python3 scripts/check-manifest-coverage.py update-manifest.json >/tmp/iwe-manifest.$$ 2>&1; then
+        ORPHANS=$(sed -n 's/.*manifest-coverage: \([0-9][0-9]*\) file.*/\1/p' /tmp/iwe-manifest.$$ | head -1)
+        if [ -t 1 ]; then YEL=$(printf '\033[1;33m'); RST=$(printf '\033[0m'); else YEL=""; RST=""; fi
+        echo "${YEL}MANIFEST-COVERAGE: WARN — ${ORPHANS:-?} orphan-file(s) outside the current commit (non-blocking)${RST}"
+        cat /tmp/iwe-manifest.$$
+        echo "  → Add them to update-manifest.json or excluded_paths in a separate commit."
+    fi
+    rm -f /tmp/iwe-manifest.$$
+fi
+
+# Get list of staged .sh files
+STAGED_SH=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null)
+
+# Executable-bit guard: every tracked shell script must be committed as 100755.
+# Prevents regressions where new .sh files arrive as 100644 and fail at runtime.
+if [ -n "$STAGED_SH" ]; then
+    NON_EXEC_SH=""
+    for file in $STAGED_SH; do
+        mode=$(git ls-files -s -- "$file" | awk '{print $1}' | head -1)
+        if [ "$mode" != "100755" ]; then
+            NON_EXEC_SH="${NON_EXEC_SH}${file} (${mode:-missing})\n"
+        fi
+    done
+    if [ -n "$NON_EXEC_SH" ]; then
+        echo "EXECUTABLE-BIT: FAIL — staged .sh files must be executable (100755)"
+        printf "%b" "$NON_EXEC_SH" | sed 's/^/  /'
+        echo "  Fix: git update-index --chmod=+x <file>"
+        exit 1
+    fi
+fi
+
+[ -z "$STAGED_SH" ] && exit 0
+
+check_pattern() {
+    local pattern="$1"
+    local description="$2"
+    local exclude="${3:-}"
+
+    for file in $STAGED_SH; do
+        # The canonical checker necessarily carries forbidden patterns as its
+        # own rule data and already excludes itself during repository scans.
+        # Match the exact path: an unrelated same-named script must not bypass
+        # the staged guard (issue #530).
+        [ "$file" = "scripts/check-platform-compat.sh" ] && continue
+
+        # Check staged content (not working tree)
+        local matches
+        if [ -n "$exclude" ]; then
+            matches=$(git show ":$file" 2>/dev/null | grep -nE "$pattern" | grep -v "$exclude" || true)
+        else
+            matches=$(git show ":$file" 2>/dev/null | grep -nE "$pattern" || true)
+        fi
+
+        if [ -n "$matches" ]; then
+            echo "PLATFORM-COMPAT: $description"
+            echo "  File: $file"
+            echo "$matches" | while read line; do echo "  $line"; done
+            echo "  Fix: docs/PLATFORM-COMPAT.md"
+            echo ""
+            ISSUES=1
+        fi
+    done
+}
+
+check_pattern "sed -i ''" "raw sed -i '' (use sed_inplace)" "sed_inplace"
+check_pattern "date -v-" "raw date -v (use portable_date_offset)" "portable_date_offset\|2>/dev/null"
+check_pattern "readlink -f" "readlink -f (not portable)"
+check_pattern "(^|[^a-zA-Z])grep -P " "grep -P (GNU-only, use grep -E)"
+
+if [ "$ISSUES" -eq 1 ]; then
+    echo "Commit blocked. See docs/PLATFORM-COMPAT.md for cross-platform wrappers."
+    exit 1
+fi
+
+# === WP-387: diagnose-iwe rubric sync check ===
+# Ensures derived SKILL.md is in sync with YAML SoT
+if git diff --cached --name-only | grep -qE "shared/rubrics/|\.claude/skills/diagnose-iwe/"; then
+  if [ -f "scripts/generate-diagnose-iwe-skill.py" ]; then
+    python3 scripts/generate-diagnose-iwe-skill.py --check || {
+      echo ""
+      echo "RUBRIC-SYNC: diagnose-iwe/SKILL.md is out of sync with shared/rubrics/form-089.yaml"
+      echo "  Fix: python3 scripts/generate-diagnose-iwe-skill.py"
+      echo "  Then: git add shared/rubrics/form-089.yaml .claude/skills/diagnose-iwe/SKILL.md"
+      exit 1
+    }
+  fi
+fi

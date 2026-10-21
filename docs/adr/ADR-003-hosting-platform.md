@@ -2,7 +2,7 @@
 
 **Status:** Accepted (specification)
 **Date:** 2026-03-29
-**Context:** WP-180 F4, FMT-exocortex-template, DP.EXOCORTEX.001
+**Context:** WP-180 F4, IWE, DP.EXOCORTEX.001
 
 ---
 
@@ -36,7 +36,7 @@ User manages files                           Agent manages files on behalf of us
 Update: bash update.sh                       Update: agent proposes automatically
 ```
 
-Both layers use the same distribution (FMT-exocortex-template). Platform hosting is a **thin layer** on top — not a separate product.
+Both layers use the same distribution (IWE). Platform hosting is a **thin layer** on top — not a separate product.
 
 ### Platform hosting Architecture
 
@@ -53,7 +53,7 @@ Both layers use the same distribution (FMT-exocortex-template). Platform hosting
 │  GET  /export           — git bundle (full export)      │
 ├─────────────────────────────────────────────────────────┤
 │  User Git Repository (private)                          │
-│  • Same FMT-exocortex-template fork                     │
+│  • Same IWE fork                     │
 │  • Stored on the platform (or user's GitHub)            │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -131,7 +131,7 @@ The Vagrant image is the third delivery method (for a DevOps audience and testin
 1. **30-day trial = full T1–T4.** The user does not need a subscription to install IWE.
 2. **Platform LLM Proxy (WP-200).** The user does NOT need their own Anthropic/OpenAI API key. The platform provides AI models as a service (included in the subscription and trial). `PLATFORM_LLM_PROXY_URL` replaces the mandatory `ANTHROPIC_API_KEY`.
 3. **T4 = two modes.** `--mode=direct` (Claude Code CLI + MCP + launchd) or `--mode=gateway` (Gateway URL + GitHub OAuth + MCP connector). Both are free.
-4. **GitHub OAuth — explicit T4 Gateway onboarding step.** The platform forks FMT-exocortex-template automatically.
+4. **GitHub OAuth — explicit T4 Gateway onboarding step.** The platform forks IWE automatically.
 5. **Gateway = full T4 (parity principle, DP.IWE.003 §8).** Server-side agents (WP-201) run on the platform.
 
 **New .exocortex.env variables:** `T4_MODE`, `PLATFORM_LLM_PROXY_URL`, `GITHUB_TOKEN`, `GATEWAY_URL`.
@@ -153,4 +153,3 @@ The Vagrant image is the third delivery method (for a DevOps audience and testin
 | Security | 8 | Private repos, git bundle export |
 
 **Total:** 60/70 — PASS (≥8 on all characteristics including Security ≥8).
-

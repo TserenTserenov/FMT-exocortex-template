@@ -1,0 +1,123 @@
+# Exocortex Parameters (user settings)
+#
+# This file contains persistent parameters, affecting protocol behaviour.
+# update.sh does NOT overwrite this file — your settings are safe.
+#
+# Format: YAML. Protocols read params.yaml and adapt behaviour.
+
+# === Protocols ===
+
+# Day Open: review video from the previous day
+video_check: true
+
+# Day Open: calendar source (issue #942)
+#   connector — calendar connector claude.ai, then scripts/server-calendar.sh (default, key not set = connector)
+#   script    — only scripts/server-calendar.sh (Google key file required Google)
+#   none      — calendar is not used: no check, no section in DayPlan, connector does not connect
+calendar_source: connector
+
+# Day Open: section heading style in DayPlan (issue #496)
+#   details  — <details><summary> (default; collapses in GitHub/VS Code,
+#               renders as HTML-text in Obsidian and similar markdown-viewers)
+#   markdown — headings `## ` (do not collapse anywhere, but readable everywhere)
+# Validator (.claude/hooks/protocol-artifact-validate.sh) accepts both options.
+# Currently applied only to day-open-scaffold.sh; build-active-wp.py and
+# day-open-llm-fill.py still output details details regardless of this parameter.
+dayplan_weekplan_heading_style: details
+
+# Day Close: IWE multiplier calculation IWE (requires WakaTime API key)
+multiplier_enabled: true
+
+# Day Close: reflection (end-of-day questions)
+reflection_enabled: false
+
+# Week Close: lesson rotation in MEMORY.md
+lesson_rotation: true
+
+# Week Close §7a/7b: backup location (issue #880)
+#   Empty (key not set) — default: iCloud Drive on macOS, no backup on other OS.
+#   Non-empty value — custom path (any OS); overrides iCloud-default.
+#   Example: "~/Dropbox/IWE-backups"
+backup_dir: ""
+
+# Week Close §7a/7b: built-in backup and its verification (issue #880).
+#   true  — built-in verification + backup are performed (default)
+#   false — skip both steps entirely (custom backup via extension
+#           week-close.after.*.md — the built-in step is then not needed and does not interfere)
+backup_enabled: true
+
+# === Verification ===
+
+# Automatic code verification via sub-agent Haiku
+auto_verify_code: true
+
+# Verification Quick Close via sub-agent Haiku
+verify_quick_close: true
+
+# === Notifications ===
+
+# Telegram notifications from roles (strategist, extractor, synchronizer)
+telegram_notifications: true
+
+# Path to custom notification script (issue #17, Linux/Docker).
+# If not set — the built-in macOS osascript is used macOS osascript.
+# The script receives: $1=title $2=message and must return exit 0.
+notify_sh_path: ""
+
+# === MCP / Capture ===
+
+# Agent initiative level for Capture-to-Pack (WP-189 Phase2):
+#   manual  — only on explicit user command
+#   propose — agent proposes capture, user confirms with one click (default)
+#   auto    — agent writes without confirmation
+capture_autonomy: propose
+
+# === Integrations ===
+
+# Path to Linear synchronization script Linear (day-close.sh step 3)
+# Empty or absent → step is skipped
+# Example: "~/IWE/path/to/linear-sync.sh"
+linear_sync_path: ""
+
+# Optional projection of local WPs into external tracker. Local context. Local context
+# always remains the source of truth; empty allowlist disallows external writes.
+external_tracker:
+  adapter: none # none | github_issues
+  failure_policy: preserve_local
+  source_of_truth: iwe
+  github:
+    owner: ""
+    repositories: []
+
+# === Strategist: background scenario models (issue #1092) ===
+
+# Model aliases for Strategist background scenarios (roles/strategist/scripts/strategist.sh).
+# Missing key = previous behavior (the values below are those previous defaults).
+# Empty value — configuration error, not a silent fallback to default, not a silent fallback to default.
+scheduler_model_week_review: claude-opus-4-7
+scheduler_model_session_prep: claude-sonnet-4-6
+scheduler_model_day_plan: claude-sonnet-4-6
+scheduler_model_day_close: claude-sonnet-4-6
+scheduler_model_note_review: claude-haiku-4-5-20251001
+
+# === Extensions ===
+
+# Directory with custom protocol extensions
+extensions_dir: extensions
+
+# === Cumulative draft of the weekly post (S-19) ===
+
+# Path to repository knowledge-index (relative to WORKSPACE_DIR).
+# Used by week-draft-init.sh + week-draft-append.sh for accumulating
+# material for the weekly post.
+# Empty string → scripts are skipped (feature is not activated).
+# Example: knowledge_repo: "DS-Knowledge-Index"
+knowledge_repo: ""
+
+# === Template author ===
+
+# Author mode: allows direct editing of L1 files (protocol-*, skills/)
+# Enable ONLY if you are the — template author (source-of-truth in your IWE,
+# propagation to FMT via template-sync.sh)
+# For regular users: false (customization only via extensions/)
+author_mode: false

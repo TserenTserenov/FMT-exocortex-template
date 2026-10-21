@@ -1,0 +1,40 @@
+# Exocortex agent schedule
+# Reference config — scheduler.sh uses hardcoded logic,
+# this file for documentation and future migration to config-driven dispatch.
+
+schedules:
+  strategist:
+    script: "{{IWE_RUNTIME}}/roles/strategist/scripts/strategist.sh"
+    scenarios:
+      morning:
+        type: daily
+        hour: "{{TIMEZONE_HOUR}}"     # Mon=session-prep, Tue-Sun=day-plan
+        window: "4-21"                # After 22:00 useless
+      # note-review has no scheduled run (template owner's decision, July 2026): notes are reviewed
+      # only by hand, in a live session with the pilot (e.g. the Day Open "Notes review" section).
+      week-review:
+        type: weekly
+        day: 1                        # Monday
+        hour: 0
+
+  extractor:
+    script: "{{IWE_RUNTIME}}/roles/extractor/scripts/extractor.sh"
+    scenarios:
+      inbox-check:
+        type: interval
+        seconds: 10800                # 3 hours
+        work_hours: "7-23"
+
+  synchronizer:
+    scenarios:
+      code-scan:
+        type: daily
+        hour: 0
+      daily-report:
+        type: daily
+        hour: 6                       # After strategist morning
+
+notify:
+  channels:
+    telegram:
+      env_file: "~/.config/aist/env"  # TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID

@@ -1,0 +1,143 @@
+# .claude/sync-manifest.yaml — registry of pairs "source → derived" for iwe-drift.sh
+#
+# Manifest — registry of pairs for DETECTION, not for execution.
+# Detector (`scripts/iwe-drift.sh`) outputs a report; operator (template-sync, update.sh,
+# own scripts) applies fix separately. Separation of roles: R23 detector ≠ R8 operator.
+#
+# Pair record format:
+#   id:              unique kebab-case
+#   source:          path (absolute or relative to $IWE_ROOT)
+#   derived:         path (the same)
+#   relation:        replication | projection | reference | reconciliation
+#   check:           mtime-lag | content-diff | script:<path>
+#   threshold_days:  lag until warn
+#   critical_days:   lag until critical
+#   owner_role:      R1 | R5 | R8 | human | agent
+#   symptom:         what the user will notice if skipped
+#   notes:           optional
+#
+# Format activity_check (decommission-triage in Month Close):
+#   id:                     unique kebab-case
+#   action:                 human-readable name
+#   expected_per_period:    expected number of executions
+#   period_days:            window size
+#   commit_pattern_regex:   how to identify an execution in git log / mtime
+#   dormant_after_periods:  empty windows → dormant
+#   archive_after_periods:  empty windows in dormant → archived
+
+version: 1
+
+pairs:
+
+  # 1. Protocols (memory/) ↔ skills (.claude/skills/) — implementation must follow the description
+  - id: protocols-to-skills
+    source: memory/protocol-close.md
+    derived: .claude/skills/day-close/
+    relation: reference
+    check: mtime-lag
+    threshold_days: 3
+    critical_days: 10
+    owner_role: agent
+    symptom: "Skill executes the protocol differently from what is described in memory/protocol-close.md, as described in memory/protocol-close.md"
+
+  - id: protocol-open-to-day-open-skill
+    source: memory/protocol-open.md
+    derived: .claude/skills/day-open/
+    relation: reference
+    check: mtime-lag
+    threshold_days: 3
+    critical_days: 10
+    owner_role: agent
+    symptom: "Day Open does not follow protocol-open.md"
+
+  # 2. (issue #404) staging-validated-to-fmt pair removed from here 2026-08-12:
+  #    its source (STAGING.md) — author infrastructure for staging (CLAUDE.md §8),
+  #    is not shipped by a user template installation. The pair unconditionally
+  #    was receiving status=missing (mtime-lag does not distinguish "source is absent and will never be
+  #    be" from "source genuinely gone") on every non-author installation
+  #    permanently — not an intentional delay. For the author, who maintains STAGING.md,
+  #    equivalent tracking — via a dedicated `author_mode` manifest,
+  #    not a shared hissing file.
+
+  # 3. ARCH-anchor ↔ downstream `derived_from:` (helper from scripts/iwe-drift-helpers/)
+  - id: arch-version-drift
+    source: <Pack-repo>/02-domain-entities/
+    derived: <Pack-repo>/
+    relation: reference
+    check: script:scripts/iwe-drift-helpers/check-arch-version.sh
+    threshold_days: 7
+    critical_days: 21
+    owner_role: R1
+    symptom: "ARCH-document updated (bump version), but downstream-documents with `derived_from: <ID>@vX.Y` have not been reviewed"
+    notes: "Helper extracts `version:` from ARCH-frontmatter and looks for mismatches in downstream `derived_from:` anchors. Requires explicit `version: vX.Y` in frontmatter each ARCH-document. If you do not have ARCH-documents with derived_from-anchors — the pair is useless, remove it."
+
+  # 4. WP-status legend (REGISTRY) ↔ format-compliance tables (helper from scripts/iwe-drift-helpers/)
+  - id: wp-status-legend-drift
+    source: <Governance-repo>/docs/WP-REGISTRY.md
+    derived: <Governance-repo>/docs/WP-REGISTRY.md
+    relation: reconciliation
+    check: script:scripts/iwe-drift-helpers/check-status-legend.sh
+    threshold_days: 7
+    critical_days: 14
+    owner_role: R1
+    symptom: "Consumer scripts-consumer scripts (linear-sync, day-close) diverge from the registry: new status-emoji is not documented in the legend, or active-id row has terminal-status (or vice versa)"
+    notes: "Helper checks 3 invariant: I1 legend completeness, I2/I3 format compliance (id-format ↔ status). Terminal statuses are hard-coded in the helper'helper (✅ 📦 ↗️) — the list is shorter and more stable, than active. Any new status is treated as active by default active. Adapt the path REGISTRY to your own structure (env REGISTRY=...)."
+
+# ---------------------------------------------------------------------------
+# Templates for your own pairs. Uncomment and adapt to your repo-set.
+# ---------------------------------------------------------------------------
+#
+#   # Pack ↔ DS (domain knowledge → implementation repos)
+#   - id: pack-to-ds-instrument
+#     source: <Pack-repo>/
+#     derived: <DS-instrument-repo>/
+#     relation: reference
+#     check: mtime-lag
+#     threshold_days: 7
+#     critical_days: 21
+#     owner_role: R1
+#     symptom: "DS uses outdated terms/SC from Pack"
+#
+#   # Root CLAUDE.md ↔ CLAUDE.md DS-repo (replica of platform-level rules)
+#   - id: root-claude-md-to-instrument
+#     source: CLAUDE.md
+#     derived: <DS-instrument-repo>/CLAUDE.md
+#     relation: replication
+#     check: mtime-lag
+#     threshold_days: 7
+#     critical_days: 14
+#     owner_role: agent
+#     symptom: "DS-repo does not know about new rules from the root CLAUDE.md"
+#
+#   # docs/ ↔ code in DS-instrument repo
+#   - id: instrument-docs-to-code
+#     source: <DS-instrument-repo>/
+#     derived: <DS-instrument-repo>/docs/
+#     relation: reference
+#     check: mtime-lag
+#     threshold_days: 7
+#     critical_days: 21
+#     owner_role: agent
+#     symptom: "docs/ lags behind the code by more than 1 week"
+
+# ---------------------------------------------------------------------------
+# activity_checks — decommissioning of dead T-actions.
+# Drift-script proposes candidates, R-questionnaire Month Close (M6) collects the decision,
+# a human confirms (active → dormant → archived).
+# ---------------------------------------------------------------------------
+
+activity_checks:
+
+  - id: lesson-hygiene
+    action: "Lesson Hygiene (rotation, archiving, compression MEMORY.md)"
+    expected_per_period: 1
+    period_days: 7
+    commit_pattern_regex: "([Ll]esson|[Mm]emory|lessons_|[Uu]rok|[Pp]amyat).*(archive|rotate|clean|hygiene|[Aa]rkhiv|[Rr]otaci|[Ss]zhat|[Oo]chist|[Gg]igien)"
+    dormant_after_periods: 3
+    archive_after_periods: 1
+    notes: "Trigger: /week-close. Symptom of staleness — MEMORY.md bloats >100 lines."
+
+  # staging-promotion removed (issue #1098): same class as staging-validated-to-fmt
+  # (#404) — source (STAGING.md, /author-mode) is author-only, author_mode: false
+  # installs never produce this commit pattern, so the detector reported a
+  # permanent false "dormant" candidate on every user install.

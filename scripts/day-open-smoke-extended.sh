@@ -1,0 +1,116 @@
+#!/bin/bash
+# day-open-smoke-extended.sh — extended smoke for Day Open (runs on hourly cron, cache)
+# see: peer-session 2026-05-30-07-gap-list-day-open substage 2
+# see: WP-356 «Pipeline Day Open: auto-run checks»
+#
+# Purpose: checks, taking >2s (dt-collect dry-run, projection cursor age, FPF upstream).
+# Runs hourly cron, result — in cache-file.
+# Day Open reads cache, does not call this script directly.
+#
+# Output: JSON to file `~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/.smoke-cache.json`
+#   {
+#     "timestamp": "ISO-8601",
+#     "ttl_min": 90,
+#     "dt_collect": "ok|fail:<reason>",
+#     "projection_cursor_age_min": <int>,
+#     "fpf_behind_count": <int>,
+#     "elapsed_sec": <float>
+#   }
+#
+# Usage:
+#   bash day-open-smoke-extended.sh         # normal run
+#   bash day-open-smoke-extended.sh --force # ignore TTL, always run
+#
+# Failure mode: individual sections may return "fail:<reason>", script does not fail.
+
+set -uo pipefail
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
+START_TS=$(date +%s)
+FORCE=false
+[ "${1:-}" = "--force" ] && FORCE=true
+
+IWE_BASE="${IWE_BASE:-$HOME/IWE}"
+DS_STRATEGY="$IWE_BASE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+CACHE_FILE="$DS_STRATEGY/current/.smoke-cache.json"
+TTL_MIN=90
+
+# Check TTL — if cache fresh, do not run (if not --force)
+if [ "$FORCE" = "false" ] && [ -f "$CACHE_FILE" ]; then
+  cache_ts=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0)
+  now_ts=$(date +%s)
+  age_min=$(( (now_ts - cache_ts) / 60 ))
+  if [ "$age_min" -lt "$TTL_MIN" ]; then
+    echo "cache fresh (${age_min}min < ${TTL_MIN}min) — skip" >&2
+    exit 0
+  fi
+fi
+
+# === 1. dt-collect dry-run ===
+check_dt_collect() {
+  local script="$DS_STRATEGY/scripts/dt-collect.sh"
+  if [ ! -x "$script" ]; then
+    echo "fail:script-missing"
+    return
+  fi
+  # Run dry-run with timeout 30s. iwe_timeout (lib/common.sh) — issue #1108:
+  # a bare `timeout` here is GNU/Homebrew-only and "command not found" (exit
+  # 127) on stock macOS with no Homebrew, making every single check in this
+  # script fail:exit-127 with no indication the real cause was a missing tool.
+  if iwe_timeout 30 bash "$script" --dry-run 2>/dev/null >/dev/null; then
+    echo "ok"
+  else
+    echo "fail:exit-$?"
+  fi
+}
+
+# === 2. Projection cursor age (via Neon) ===
+check_projection_cursor() {
+  # No DB-access in this context — mark as unknown
+  # TODO: when connecting psql + secrets — read MAX(updated_at) from projection_cursors
+  echo "-1"
+}
+
+# === 3. FPF upstream check ===
+check_fpf_upstream() {
+  local fpf="$IWE_BASE/FPF"
+  if [ ! -d "$fpf/.git" ]; then
+    echo "-1"
+    return
+  fi
+  (cd "$fpf" && git fetch --quiet 2>/dev/null && git rev-list --count HEAD..origin/main 2>/dev/null) || echo "-1"
+}
+
+DT_COLLECT=$(check_dt_collect)
+PROJECTION=$(check_projection_cursor)
+FPF_BEHIND=$(check_fpf_upstream)
+
+END_TS=$(date +%s)
+ELAPSED=$(( END_TS - START_TS ))
+ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+mkdir -p "$(dirname "$CACHE_FILE")"
+cat > "$CACHE_FILE" <<EOF
+{
+  "timestamp": "$ISO",
+  "ttl_min": $TTL_MIN,
+  "dt_collect": "$DT_COLLECT",
+  "projection_cursor_age_min": $PROJECTION,
+  "fpf_behind_count": $FPF_BEHIND,
+  "elapsed_sec": $ELAPSED
+}
+EOF
+
+# The cache is a regenerable runtime file, not a work product (issue #1146):
+# keep it out of `git status` of installs whose seed .gitignore predates the entry.
+EXCLUDE_FILE=$(git -C "$DS_STRATEGY" rev-parse --git-path info/exclude 2>/dev/null || true)
+if [ -n "$EXCLUDE_FILE" ]; then
+  case "$EXCLUDE_FILE" in /*) ;; *) EXCLUDE_FILE="$DS_STRATEGY/$EXCLUDE_FILE" ;; esac
+  if ! grep -qxF 'current/.smoke-cache.json' "$EXCLUDE_FILE" 2>/dev/null; then
+    mkdir -p "$(dirname "$EXCLUDE_FILE")" 2>/dev/null \
+      && printf '%s\n' 'current/.smoke-cache.json' >> "$EXCLUDE_FILE" 2>/dev/null || true
+  fi
+fi
+
+echo "extended smoke cached → $CACHE_FILE (elapsed ${ELAPSED}s)" >&2

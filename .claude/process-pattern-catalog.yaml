@@ -1,0 +1,156 @@
+# process-pattern-catalog.yaml — process TPF IWE
+#
+# The catalog indexes process patterns (how the agent works), does not duplicate their bodies.
+# The pattern body lives in CLAUDE.md / distinctions.md / protocol-*.md / .claude/rules/ — this file only points to them.
+#
+# Record schema:
+#   description:      single-line intent — why the pattern exists
+#   discoverability:   how the agent determines, that the pattern is applicable now
+#   first_move:        what to do first
+#   exit:               what counts as completion
+#   boundary:            when the pattern does NOT apply
+#   linked_artifact:   list of references to implementations in other catalogs, format "<catalog>:<id>"; [] if the catalog-entry does not exist
+#   source_ref:          textual primary sources (file + section) — origin, not integration
+
+schema_version: 1
+wp: WP-N  # replace when deploying into a specific WP
+
+patterns:
+
+  # --- Gates (decision point to allow in/or reject) ---
+
+  WPGate:
+    description: "Every task goes through the Opening protocol before work begins — prevents unplanned work."
+    discoverability: "A new task has been received from the pilot, or an additional task has been discovered. task >15 min, producing an artifact."
+    first_move: "Read the list of WPs for the week (MEMORY.md), verify the task against the plan."
+    exit: "The task matches a WP in the plan, or a new WP has been registered after explicit pilot approval."
+    boundary: "Does not apply to trivial questions and bug fixes ≤15 min without producing an artifact."
+    linked_artifact:
+      - "rules-registry:AR.001"
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§2 p.1 WP Gate"
+
+  RepoTouchGate:
+    description: "The first substantive action in a repository requires reading its CLAUDE.md — otherwise it is easy to miss locally mandatory instructions."
+    discoverability: "First Read/Edit/commit in the repo during the session, where CLAUDE.md has not yet been read."
+    first_move: "Read <repo>/CLAUDE.md."
+    exit: "If a block is found «mandatory load» — the specified files are loaded before responding."
+    boundary: "Does not repeat on every action — once per repo per session."
+    linked_artifact:
+      - "rules-registry:AR.010"
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§2 Pre-action Gates"
+
+  PullOnTouchGate:
+    description: "The local copy of the repo may be outdated — pull pulling before working prevents decisions based on stale data."
+    discoverability: "First access to git-repo during the session (any — ls/Read/Edit/commit), not yet synchronized."
+    first_move: "git status; if clean — git pull --rebase."
+    exit: "Local copy is synchronized with origin, or explicitly marked as potentially stale."
+    boundary: "With a dirty repo or rebase-conflict — do not resolve the conflict automatically: stash or mark as stale."
+    linked_artifact:
+      - "rules-registry:AR.006"
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§2 p.4 Pull-on-Touch"
+
+  RoutingGate:
+    description: "Before creating a new artifact file-the agent risks placing it in the wrong location by analogy with a neighboring file — the knowledge routing map eliminates this risk."
+    discoverability: "A Write of a new file is planned Write new file (not editing an existing one)."
+    first_move: "Open the knowledge routing map (routing-vocab.md fast-path, on miss — repo-type-rules.md)."
+    exit: "The file placement path is confirmed by the map, not chosen by analogy."
+    boundary: "Does not apply when editing an already existing file at a known location."
+    linked_artifact:
+      - "rules-registry:AR.009"
+    source_ref:
+      - file: "MEMORY.md"
+        section: "BLOCKING p.5 Routing Gate"
+
+  ArchGate:
+    description: "Architectural decision (new tool, system change) is evaluated against the EMOGSSB profile before implementation."
+    discoverability: "A new tool is being proposed/agent/system change or conflicting architectural choice."
+    first_move: "Run through the EMOGSSB checklist (7 characteristics, conjunctive screening)."
+    exit: "Profile is recorded (✅/⚠️/❌ for each characteristic), decision is made taking the profile into account."
+    boundary: "Does not apply to refactoring without functional changes or bugfix without changing external behavior."
+    linked_artifact:
+      - "rules-registry:AR.003"
+      - "skills-catalog:archgate"
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§5 ArchGate"
+
+  # --- Passes (checkpoint with a criterion) ---
+
+  QualityReviewPass:
+    description: "Control pass before committing the result — code review for bugs and quality from an independent perspective."
+    discoverability: "Implementation is complete, verification is required before deploy/consensus commit."
+    first_move: "Run /verify (comparison against the Pack reference Pack) and/or /code-review (bugs, simplification)."
+    exit: "Critical-no findings; High/Medium — pilot decision is recorded."
+    boundary: "Does not replace smoke-check — static analysis only and comparison against the reference."
+    linked_artifact:
+      - "skills-catalog:verify"
+    source_ref:
+      - file: ".claude/skills/code-review"
+        section: "harness built-in skill, outside DS-catalog"
+
+  LandingRegressionPass:
+    description: "Green tests do not guarantee, that a migration or change was correctly applied to the live system — a separate verification after deploy is required."
+    discoverability: "After deploy/migration, where a divergence between the test environment and prod is possible (DB, config, external service)."
+    first_move: "Verify the observable behavior in the target environment, not only exit-test exit code."
+    exit: "Target invariant is confirmed in the real environment, not only in CI."
+    boundary: "Does not apply to purely local changes with no external effect."
+    linked_artifact: []
+    source_ref:
+      - file: ".claude/rules/distinctions.md"
+        section: "Distinction «Tests are green ≠ migration is correct»"
+
+  ProtocolResiduePass:
+    description: "After closing WP in the registry/inbox drift entries remain (drift) — regular reconciliation prevents accumulation of stale data."
+    discoverability: "Close WP (done-status) or periodic hygiene (Day Open --deep-check, Week Close --semantic-check)."
+    first_move: "Synchronously update the WP context (inbox) and the entry in the WP registry."
+    exit: "Invariant «WP context ↔ WP registry updated synchronously» satisfied; derived index of active WPs regenerated."
+    boundary: "Does not apply to plain text edits that do not change WP status."
+    linked_artifact: []
+    source_ref:
+      - file: "<governance-repo>/CLAUDE.md"
+
+  # --- Procedures (top-level protocol) ---
+
+  CloseProtocol:
+    description: "Each work scale (session/day/week/month) is closed with a committed protocol — prevents an uncommitted result."
+    discoverability: "Closing trigger phrase («close it», «done») or a calendar event (end of day/week/month)."
+    first_move: "Invoke the corresponding closing skill."
+    exit: "Session file/report file created, git status clean across all affected repos, push completed."
+    boundary: "Does not apply, if session ≤15 min with no file changes (excl.. checklist-verification)."
+    linked_artifact:
+      - "skills-catalog:run-protocol"
+      - "skills-catalog:day-close"
+      - "skills-catalog:week-close"
+      - "skills-catalog:month-close"
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§2 OKR-fractal"
+
+  CaptureToPack:
+    description: "Knowledge, discovered during work (rule, pattern, distinction), requires explicit routing to persistent storage — otherwise it is lost after the session."
+    discoverability: "Work milestone (end of subtask, solution found/distinction)."
+    first_move: "Declare «Capture: [what] → [where]», determine the route (CLAUDE.md / Pack / DS docs / memory)."
+    exit: "Knowledge written to the target location, reference recorded."
+    boundary: "Does not apply to the ephemeral context of the current session (plan, tasks in progress)."
+    linked_artifact:
+      - "skills-catalog:ke"
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§2 Work Protocol — Capture-to-Pack"
+
+  DriftReporting:
+    description: "Detected discrepancy (file does not match the plan, stale content) is not fixed unilaterally outside the scope current move — decision is up to the pilot."
+    discoverability: "Discrepancy found outside scope current move (verified via git diff HEAD)."
+    first_move: "State: «Found drift: [what] in [file]. Should I fix it?»"
+    exit: "Pilot gave an explicit decision — fix now or defer."
+    boundary: "Within the scope current move — not Drift Reporting, but Self-correction: fix immediately, without asking."
+    linked_artifact: []
+    source_ref:
+      - file: "CLAUDE.md"
+        section: "§2 Work Protocol — Self-correction / AGENTS.md Drift Reporting"

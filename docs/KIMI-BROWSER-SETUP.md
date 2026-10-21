@@ -1,5 +1,5 @@
 ---
-scope: FMT-exocortex-template
+scope: IWE
 status: active
 title: Browser Access to IWE via the MIM Stand
 updated: 2026-08-06
@@ -48,6 +48,5 @@ The assistant does not respond instantly — a question that requires a search m
 ## Related Documents
 
 - `docs/KIMI-SETUP.md` — Kimi Code inside VS Code, for those who work with code.
-- `docs/onboarding/web-connect-guide.md` — connecting IWE to Claude through the browser connector.
+- `docs/onboarding/web-connect-guide.md` — connecting the public FPF Library to Claude through the browser connector.
 - `docs/inter-agent-handoff.md` — how different agents pass context to each other (for those already working in VS Code who want to go further).
-

@@ -76,7 +76,7 @@ Where agents write determines git status and race risk.
 | UTC | Agent | Repo/resource |
 |---|---|---|
 | 00:00 | pull-repos + code-scan | All repos |
-| 00:30 | template-sync | FMT-exocortex-template |
+| 00:30 | template-sync | IWE |
 | 01:00 | overnight-auditor | Local repos (security scan) |
 | 02:00 | synchronizer inbox-check | DS-agent-workspace inbox |
 | 02:30 | apply-captures janitor | {{GOVERNANCE_REPO}} inbox/auto/ |
@@ -118,4 +118,3 @@ Checklist before introducing an agent into the nightly window:
 - `memory/protocol-work.md` — general agent work rules
 - `docs/SCRIPT-PROMOTION.md` — how scripts are added to the repo
 - `docs/adr/` — architectural decisions on coordination
-

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-03-01
-**Context:** FMT-exocortex-template/roles, PACK-digital-platform (DP.D.033, DP.ROLE.001)
+**Context:** IWE/roles, PACK-digital-platform (DP.D.033, DP.ROLE.001)
 
 ---
 

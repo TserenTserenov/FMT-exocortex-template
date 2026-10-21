@@ -1,7 +1,7 @@
 # Why Skills Are Not Enough: Principles and the Generative Hierarchy
 
 > **Source-of-truth:** [PD.FORM.047](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.047-generative-principles-hierarchy.md)
-> **Hierarchy of principles:** [ZP/hierarchy.md](https://github.com/TserenTserenov/ZP/blob/main/hierarchy.md)
+> **Hierarchy of principles:** [ZP/hierarchy.md](https://github.com/iwesys/IWE/blob/main/seed/ZP/hierarchy.md)
 
 ---
 
@@ -82,7 +82,7 @@ An IWE user does not simply receive tools (Level 3). They receive **methodology*
 
 ## Further Reading
 
-- [ZP/hierarchy.md](https://github.com/TserenTserenov/ZP/blob/main/hierarchy.md) — structure of the principles hierarchy
+- [ZP/hierarchy.md](https://github.com/iwesys/IWE/blob/main/seed/ZP/hierarchy.md) — structure of the principles hierarchy
 - [PD.FORM.047](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.047-generative-principles-hierarchy.md) — full formalization (source-of-truth)
 - [PD.D.014](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/01-domain-contract/01B-distinctions.md) — Distinction: Knowledge vs. Skill
 - [PD.FORM.019](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.019-intelligence-stack.md) — intelligence stack (16 transdisciplines)

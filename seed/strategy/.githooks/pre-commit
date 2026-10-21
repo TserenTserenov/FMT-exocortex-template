@@ -1,0 +1,72 @@
+#!/bin/bash
+# Pre-commit hook: block secrets file from being committed
+# Install: git config core.hooksPath .githooks (done automatically by setup.sh)
+
+if git diff --cached --name-only 2>/dev/null | grep -q '\.exocortex\.env'; then
+    echo "SECURITY: .exocortex.env is staged for commit — this file contains secrets!"
+    echo "  Remove from staging: git restore --staged .exocortex.env"
+    echo "  The file is in .gitignore — verify it's listed there."
+    exit 1
+fi
+
+# === issue #810: secret corpus scan ===
+# pre-commit-secret-scan.sh shipped since #410 but no hook here ever called
+# it -- check-secret/SKILL.md claimed an automatic layer that did not exist.
+# Same fallback cascade as the validator below (template copy preferred over
+# the repo-local one, which is degraded because a local edit of the scanner
+# then affects the check on itself). The script is fail-closed by design
+# (exit 2 when its own helpers are missing/broken, exit 1 on a match) -- a
+# missing/non-executable scanner is refused here too, not silently skipped.
+HOOK_REPO_ROOT_SCAN=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+SECRET_SCANNER=""
+if [ -n "${IWE_SCRIPTS:-}" ] && [ -x "${IWE_SCRIPTS}/pre-commit-secret-scan.sh" ]; then
+    SECRET_SCANNER="${IWE_SCRIPTS}/pre-commit-secret-scan.sh"
+elif [ -x "$HOOK_REPO_ROOT_SCAN/../IWE/scripts/pre-commit-secret-scan.sh" ]; then
+    SECRET_SCANNER="$HOOK_REPO_ROOT_SCAN/../IWE/scripts/pre-commit-secret-scan.sh"
+elif [ -x "$HOOK_REPO_ROOT_SCAN/scripts/pre-commit-secret-scan.sh" ]; then
+    SECRET_SCANNER="$HOOK_REPO_ROOT_SCAN/scripts/pre-commit-secret-scan.sh"
+fi
+if [ -z "$SECRET_SCANNER" ]; then
+    echo "SECURITY: pre-commit-secret-scan.sh not found (checked \$IWE_SCRIPTS, sibling IWE, repo-local scripts/) -- refusing to commit unscanned (fail-closed)." >&2
+    exit 1
+fi
+"$SECRET_SCANNER" || exit 1
+
+# === Protocol artifacts (issue #544): staged-semantics validation ===
+# The real pre-commit sees the real index after any form of git add
+# (combined `git add && git commit`, globs, -A/-u) — PreToolUse-interceptor
+# protocol-artifact-validate.sh remains an early layer of fast feedback,
+# this boundary — correctness boundary. Reads staged blob, not the working tree.
+HOOK_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+VALIDATOR=""
+VALIDATOR_MODE=""
+if [ -n "${IWE_SCRIPTS:-}" ] && [ -f "${IWE_SCRIPTS}/validate-staged-artifacts.sh" ]; then
+    VALIDATOR="${IWE_SCRIPTS}/validate-staged-artifacts.sh"
+    VALIDATOR_MODE="template"
+elif [ -f "$HOOK_REPO_ROOT/../IWE/scripts/validate-staged-artifacts.sh" ]; then
+    VALIDATOR="$HOOK_REPO_ROOT/../IWE/scripts/validate-staged-artifacts.sh"
+    VALIDATOR_MODE="template"
+elif [ -f "$HOOK_REPO_ROOT/scripts/validate-staged-artifacts.sh" ]; then
+    # Degraded mode: the working tree version is executed instead of, not from
+    # index/template — a local edit of the validator affects the check itself.
+    VALIDATOR="$HOOK_REPO_ROOT/scripts/validate-staged-artifacts.sh"
+    VALIDATOR_MODE="degraded-repo-local"
+fi
+if [ -z "$VALIDATOR" ]; then
+    # Do not block: on a fresh install before the first /iwe-update the validator may
+    # not yet exist. The absence of the boundary must be visible, not silent.. The absence of a boundary must be visible, not silent.
+    echo "WARN: validate-staged-artifacts.sh not found — protocol artifacts are committed without staged-validation (update the template: /iwe-update)" >&2
+else
+    [ "$VALIDATOR_MODE" = "degraded-repo-local" ] && \
+        echo "WARN: validate-staged-artifacts.sh is executed from the repo working tree (degraded mode), and not from the template" >&2
+    if ! bash "$VALIDATOR"; then
+        exit 1
+    fi
+fi
+
+hook_dir="$(dirname "$0")"
+if [ -x "$hook_dir/pre-commit-deny-legacy-sessions.sh" ]; then
+    "$hook_dir/pre-commit-deny-legacy-sessions.sh" || exit 1
+fi
+
+exit 0

@@ -1,0 +1,32 @@
+# .agentigore — context filter Kimi (kimi-peer-adapter.sh)
+#
+# File name: .agentigore (with a dot, without 'n' before 'ore').
+# Copy this file to the repo root: cp extensions/agentigore.sample .agentigore
+#
+# Patterns in the style of .gitignore. Kimi does not receive the contents of matched files
+# as context when launched via kimi-peer-adapter.sh.
+# Does not affect git — Kimi reads, git does not see.
+#
+# Three priority levels (arrange from highest to lowest):
+#
+#   LEVEL-1 — secrets and private data (always ignore):
+#     .secrets/
+#     personal/
+#
+#   LEVEL-2 — heavy context (ignore if there is no direct task):
+#     docs/
+#     archive/
+#
+#   LEVEL-3 — enabled by default (do not add without a reason):
+#     (empty)
+#
+# Examples:
+
+# --- LEVEL-1: secrets ---
+.secrets/
+personal/
+
+# --- LEVEL-2: heavy context ---
+# docs/
+# archive/
+# DS-*/archive/

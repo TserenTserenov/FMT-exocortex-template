@@ -82,4 +82,3 @@ A Skill is planned to help you ask: what data of types 2.1–2.4 do you have and
 - **Back-reference from `DATA-POLICY.md`.** This document references `DATA-POLICY.md`, but not the reverse — `DATA-POLICY.md` is synchronised with an external Pack source (DP.D.035), and editing its content is a decision for the owner of that Pack document, not a task for this Phase.
 - **Formal registration of the principle in a Pack** (draft identifiers `DP.SC.475-residency`, `DP.ROLE.475`) — an open question since the first Phase of WP-475, awaiting a pilot decision.
 - **Consent mechanism (ResidencyGate)** — data need declaration, consent state, consent request points — designed and passed architectural Assessment within WP-475, but implementation (code) is a separate Phase/child work item.
-

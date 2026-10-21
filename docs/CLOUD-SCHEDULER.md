@@ -20,7 +20,7 @@ The Script verifies the gh CLI, configures secrets, and runs a test workflow.
 
 ## Manual Setup
 
-1. Make sure `.github/workflows/cloud-scheduler.yml` is pushed to your DS-strategy repository — **your own separate repository, not a fork of FMT-exocortex-template** (issue #454: the workflow only runs where `STRATEGY_REPO` is configured — a template fork does not set it by default and will receive an explanatory Skip rather than silent inaction)
+1. Make sure `.github/workflows/cloud-scheduler.yml` is pushed to your DS-strategy repository — **your own separate repository, not a fork of IWE** (issue #454: the workflow only runs where `STRATEGY_REPO` is configured — a template fork does not set it by default and will receive an explanatory Skip rather than silent inaction)
 2. (Optional) Configure Telegram:
    ```bash
    gh secret set TELEGRAM_BOT_TOKEN --repo YOUR_REPO --body "TOKEN"
@@ -38,4 +38,3 @@ Daily at 04:00 MSK (01:00 UTC): backup + health check.
 |------|---------|
 | `cloud-scheduler.yml` | GitHub Actions workflow (backup + health check) |
 | `setup-cloud-scheduler.sh` | Setup Script (gh secrets + test) |
-

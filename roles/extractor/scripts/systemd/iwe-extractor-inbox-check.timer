@@ -1,0 +1,10 @@
+[Unit]
+Description=IWE Extractor — inbox-check every 3 hours
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=3h
+Unit=iwe-extractor-inbox-check.service
+
+[Install]
+WantedBy=timers.target

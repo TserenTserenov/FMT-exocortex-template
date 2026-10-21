@@ -1,0 +1,139 @@
+#!/bin/bash
+# WP-295 Phase1 step 5: agent-trace-recorder hook.
+# Intercepts PostToolUse and Stop events Claude Code, emits agent.trace.* events
+# to a local NDJSON. Async upload to event-gateway via agent-trace-uploader.sh.
+#
+# see DP.SC.037 (agent-trace), DP.ROLE.047 (Trace Recorder).
+#
+# Registration in settings.json:
+#   "PostToolUse": [{ hooks: [{ command: ".../agent-trace-recorder.sh" }] }]
+#   "Stop": [{ hooks: [{ command: ".../agent-trace-recorder.sh" }] }]
+#
+# Integrations (see. WP-295 § Integrations):
+#   - $CLAUDE_TASK_ID — task_id from iwe-agent-dispatcher.py (WP-324), written to context_summary
+#   - $CLAUDE_AGENT_ID — agent model (default: claude-opus-4-7)
+#   - git status on Stop → produced_artifact_ids
+#
+# Never blocks (exit 0 on any error).
+
+set -uo pipefail
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+
+LOG_DIR="${HOME}/.claude/logs/agent-trace"
+STATE_DIR="${HOME}/.claude/state/agent-trace"
+mkdir -p "$LOG_DIR" "$STATE_DIR" 2>/dev/null || exit 0
+
+INPUT=$(cat 2>/dev/null || echo "{}")
+HOOK_EVENT=$(echo "$INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
+CLAUDE_SESSION=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+
+[ -z "$CLAUDE_SESSION" ] && exit 0  # without session_id nothing is written
+
+# Mapping Claude Code session_id → our UUID v4 (for agent_trace.session.session_id PK).
+STATE_FILE="${STATE_DIR}/${CLAUDE_SESSION}.uuid"
+if [ -f "$STATE_FILE" ]; then
+    SESSION_UUID=$(cat "$STATE_FILE")
+else
+    SESSION_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    echo "$SESSION_UUID" > "$STATE_FILE"
+
+    # Emit session.start (lazy init on the first hook'of this session).
+    NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    AGENT_ID="${CLAUDE_AGENT_ID:-claude-opus-4-7}"
+    TASK_ID="${CLAUDE_TASK_ID:-}"
+    # Improved WP detection — try several sources (WP-295 fix)
+    WP_ID=""
+    # 1. From CLAUDE_TASK_ID (may contain WP-xxx)
+    if [ -n "${CLAUDE_TASK_ID:-}" ]; then
+        WP_ID=$(echo "$CLAUDE_TASK_ID" | grep -oE "WP-[0-9]+" | head -1 || echo "")
+    fi
+    # 2. From the current directory
+    if [ -z "$WP_ID" ] && [ -n "$CWD" ]; then
+        WP_ID=$(echo "$CWD" | grep -oE "WP-[0-9]+" | head -1 || echo "")
+    fi
+    # 3. From git branch (if CWD — git repo)
+    if [ -z "$WP_ID" ] && [ -n "$CWD" ] && [ -d "$CWD/.git" ]; then
+        BRANCH=$(cd "$CWD" && git branch --show-current 2>/dev/null || echo "")
+        WP_ID=$(echo "$BRANCH" | grep -oE "WP-[0-9]+" | head -1 || echo "")
+    fi
+    # 4. From recent commits (heuristic: commits often start with WP-xxx)
+    if [ -z "$WP_ID" ] && [ -n "$CWD" ] && [ -d "$CWD/.git" ]; then
+        RECENT_COMMIT=$(cd "$CWD" && git log -1 --pretty=%s 2>/dev/null || echo "")
+        WP_ID=$(echo "$RECENT_COMMIT" | grep -oE "WP-[0-9]+" | head -1 || echo "")
+    fi
+    CTX_SUMMARY=""
+    [ -n "$TASK_ID" ] && CTX_SUMMARY="task:${TASK_ID}"
+
+    NDJSON="${LOG_DIR}/${SESSION_UUID}.ndjson"
+    jq -nc \
+        --arg sid "$SESSION_UUID" --arg aid "$AGENT_ID" --arg ts "$NOW" \
+        --arg ctx "$CTX_SUMMARY" --arg wp "$WP_ID" \
+        '{event_type: "agent_session_start", schema_version: "v1", emitted_at: $ts, payload: {
+            session_id: $sid,
+            agent_id: $aid,
+            started_at: $ts,
+            context_summary: (if $ctx != "" then $ctx else null end),
+            wp_id: (if $wp != "" then $wp else null end)
+        }}' >> "$NDJSON" 2>/dev/null || true
+fi
+
+NDJSON="${LOG_DIR}/${SESSION_UUID}.ndjson"
+
+# Hook-event-specific logic.
+case "$HOOK_EVENT" in
+    PostToolUse)
+        # Emit tool_call for significant tools (Bash/WebFetch/WebSearch).
+        # Edit/Write/Read — too much noise, do not write (artifact-emission, not reasoning).
+        case "$TOOL_NAME" in
+            Bash|WebFetch|WebSearch|mcp__*)
+                NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                TOOL_INPUT=$(echo "$INPUT" | jq -c '.tool_input // {}' 2>/dev/null || echo "{}")
+                # WP-500 Phase1: do not store response-body in traces.
+                # Keep only input_hash and response_size_bytes for replay-cache and metrics.
+                RAW_TOOL_RESPONSE=$(echo "$INPUT" | jq -c '.tool_response // {}' 2>/dev/null || echo "{}")
+                RESPONSE_SIZE=$(echo -n "$RAW_TOOL_RESPONSE" | wc -c | tr -d ' ')
+                INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | shasum -a 256 | cut -d' ' -f1)"
+
+                jq -nc \
+                    --arg sid "$SESSION_UUID" --arg tn "$TOOL_NAME" --arg ih "$INPUT_HASH" \
+                    --argjson rsz "$RESPONSE_SIZE" --arg ts "$NOW" \
+                    '{event_type: "agent_tool_called", schema_version: "v1", emitted_at: $ts, payload: {
+                        session_id: $sid,
+                        decision_id: null,
+                        tool_name: $tn,
+                        input_hash: $ih,
+                        response_size_bytes: $rsz,
+                        called_at: $ts
+                    }}' >> "$NDJSON" 2>/dev/null || true
+                ;;
+        esac
+        ;;
+    Stop)
+        # Session end + produced_artifact_ids from git diff (commits since session.start).
+        NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        # Collect produced_artifact_ids: recent commits + modified files.
+        ARTIFACTS="[]"
+        if command -v git >/dev/null 2>&1 && [ -n "$CWD" ] && [ -d "$CWD/.git" ]; then
+            # Commits of this session (heuristic: within the last hour).
+            COMMITS=$(cd "$CWD" && git log --since="1 hour ago" --pretty=tformat:"git:commit:%h" 2>/dev/null | head -5 || true)
+            ARTIFACTS=$(echo "$COMMITS" | jq -R -s -c 'split("\n") | map(select(length > 0))' 2>/dev/null || echo "[]")
+        fi
+
+        jq -nc \
+            --arg sid "$SESSION_UUID" --arg ts "$NOW" --argjson art "$ARTIFACTS" \
+            '{event_type: "agent_session_end", schema_version: "v1", emitted_at: $ts, payload: {
+                session_id: $sid,
+                ended_at: $ts,
+                closed_status: "completed",
+                produced_artifact_ids: $art
+            }}' >> "$NDJSON" 2>/dev/null || true
+
+        # Cleanup state-file, so that a new session with the same CLAUDE_SESSION (theoretically) receives a new UUID.
+        rm -f "$STATE_FILE" 2>/dev/null || true
+        ;;
+esac
+
+exit 0

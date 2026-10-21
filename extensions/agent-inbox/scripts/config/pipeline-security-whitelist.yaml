@@ -1,0 +1,30 @@
+# pipeline-security-whitelist.yaml — prohibited headless-calls for Executor-role (WP-503 Phase9)
+#
+# ArchGate Phase5 NBR №3 (2026-07-27): headless-pipeline must not repeat
+# incident WP-7 (23.07) — call `mcp__ext-railway__list_variables` without
+# filter argument printed-filter printed ~90 production variables (ANTHROPIC_API_KEY,
+# Neon-passwords, GITHUB_BOT_PAT, ...) into the transcript headless-session.
+#
+# Format: list of patterns for the flag --disallowedTools (claude CLI). Each
+# pattern — exact name MCP-tool or Bash(command-pattern), syntax
+# identical --allowedTools/--disallowedTools of the CLI itself CLI.
+#
+# Extension: add a new line here, do not touch the code — the dispatcher reads
+# the file every time before starting headless-process, does not cache the list.
+# File — required part of the distribution. Missing, empty or invalid
+# list blocks startup Claude Executor (fail-closed) and writes ERROR.
+disallowed_tools:
+  # Broad read-all without a filter — that exact incident.
+  - "mcp__ext-railway__list_variables"
+  # Direct access to secrets via shell — headless-executor must not
+  # read secret-files directly, only through already vetted lib/telegram.sh
+  # and similar wrappers with mask_pii().
+  - "Bash(cat ~/.secrets/*)"
+  - "Bash(cat ~/.env*)"
+  - "Bash(env)"
+  # git push --force / reset --hard — headless-executor must not have
+  # permission for destructive git-operations without explicit pilot approval (AR.* (AR.*
+  # rules already govern this for the interactive session; here — the same
+  # invariant for headless, mechanically, not relying on reading the text).
+  - "Bash(git push --force*)"
+  - "Bash(git reset --hard*)"

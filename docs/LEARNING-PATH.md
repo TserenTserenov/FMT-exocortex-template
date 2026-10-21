@@ -186,7 +186,7 @@ L1: Ecosystem    — the whole system: Platform + community + all user IWEs
 |-----------|----------------------|---------|---------------|
 | **L1: Ecosystem** | Community, seminars, content | systemsworld.club, Telegram channels | You participate |
 | **L2: Platform** | Services you connect to | Bot @aist_me_bot, Knowledge Index | Updated by the developer |
-| **L3: Template** | The template your IWE was created from | This repo (FMT-exocortex-template) | `update.sh` — Platform space |
+| **L3: Template** | The template your IWE was created from | This repo (IWE) | `update.sh` — Platform space |
 | **L4: Personal IWE** | Your work, plans, knowledge | ~/IWE/CLAUDE.md, DS-strategy/ | You only (User space) |
 
 **Where to learn:**
@@ -194,10 +194,10 @@ L1: Ecosystem    — the whole system: Platform + community + all user IWEs
 
 ### 2.2. From Template to Workspace
 
-#### FMT-exocortex-template repo structure
+#### IWE repo structure
 
 ```
-FMT-exocortex-template/
+IWE/
 │
 ├── CLAUDE.md                        # Rules for Claude Code
 ├── README.md                        # Quick start
@@ -253,7 +253,7 @@ FMT-exocortex-template/
 │   ├── current/DayPlan, WeekPlan      # Strategist writes, you read
 │   ├── inbox/WP-*.md                  # task contexts
 │   └── docs/Strategy.md              # your strategy
-├── FMT-exocortex-template/            # DO NOT touch (updated via update.sh)
+├── IWE/            # DO NOT touch (updated via update.sh)
 ├── PACK-{domain}/                     # when created: domain knowledge
 └── DS-{projects}/                     # when created: code, tools
 ```
@@ -298,7 +298,7 @@ Details on AUTHOR-ONLY zones: [CLAUDE.md §7](../CLAUDE.md).
 
 ### 2.5. Updates: update.sh
 
-**One command:** `cd ~/IWE/FMT-exocortex-template && bash update.sh`
+**One command:** `cd ~/IWE/IWE && bash update.sh`
 
 The Script downloads the update Manifest from GitHub, compares sha256 hashes of local files with upstream, shows a preview, and applies changes after confirmation:
 
@@ -399,8 +399,8 @@ Level 3: S2R etc. → DS                   ← frameworks + principles (separate
 | ZP.6 Computational limits | Account for finite resources |
 
 **Where to learn:**
-- [ZP/hierarchy.md](https://github.com/TserenTserenov/ZP/blob/main/hierarchy.md) — map of all 4 levels
-- [ZP/principles/](https://github.com/TserenTserenov/ZP/tree/main/principles) — each principle in detail
+- [ZP/hierarchy.md](https://github.com/iwesys/IWE/blob/main/seed/ZP/hierarchy.md) — map of all 4 levels
+- [ZP/principles/](https://github.com/iwesys/IWE/tree/main/seed/ZP/principles) — each principle in detail
 - [CLAUDE.md](../CLAUDE.md) § 1 — type table and fallback chain
 
 ### 3.2. Hard Distinctions
@@ -457,7 +457,7 @@ Each Repository belongs to one of 3 types. The type determines who creates it an
 | Type | Subtype | What it stores | Source of truth? | Examples |
 |------|---------|---------------|-----------------|---------|
 | **Base** | Principles | ZP, FPF, SPF — principles and frameworks | Yes | ZP, FPF, SPF |
-| **Base** | Formats | FMT-* — structure Protocols | Yes (for format) | FMT-exocortex-template, FMT-s2r |
+| **Base** | Formats | FMT-* — structure Protocols | Yes (for format) | IWE, FMT-s2r |
 | **Pack** | — | Domain passport | Yes | PACK-{domain} |
 | **DS** | instrument / governance / surface | Derived from Pack | No | DS-strategy, DS-ai-systems |
 
@@ -483,7 +483,7 @@ The Platform provides standard formats (Base/Formats) — Repository structure P
 
 | Format | Purpose | For whom |
 |--------|---------|---------|
-| **FMT-exocortex-template** | Personal workspace (IWE) | Every T4+ user |
+| **IWE** | Personal workspace (IWE) | Every T4+ user |
 | **FMT-s2r** | Project repos: 3×3 matrix (systems × roles) | Advanced users with multi-component projects |
 
 **FMT-s2r (System-to-Role)** organizes a project by kernels, each described through 9 documents (3 systems × 3 Roles). Useful when a project has multiple systems: mobile app + backend + Infrastructure.
@@ -526,7 +526,7 @@ The Platform provides standard formats (Base/Formats) — Repository structure P
 | Prefix | Type | Example |
 |--------|------|---------|
 | `ZP`, `FPF`, `SPF` | Base/Principles | ZP, FPF, SPF |
-| `FMT-` | Base/Formats | FMT-exocortex-template |
+| `FMT-` | Base/Formats | IWE |
 | `PACK-` | Pack | PACK-digital-platform |
 | `DS-` | DS | DS-ai-systems, DS-strategy |
 
@@ -541,7 +541,7 @@ The Platform provides standard formats (Base/Formats) — Repository structure P
 **Examples:** `DP.M.001` (method), `MIM.FM.003` (failure mode), `DP.ROLE.001` (agent)
 
 **Where to learn:**
-- [SPF/spec/SPF.SPEC.001-entity-coding.md](https://github.com/TserenTserenov/SPF/blob/main/spec/SPF.SPEC.001-entity-coding.md) — full specification
+- [SPF/spec/SPF.SPEC.001-entity-coding.md](https://github.com/iwesys/IWE/blob/main/seed/SPF/spec/SPF.SPEC.001-entity-coding.md) — full specification
 
 ## 5. Day-to-Day Work
 
@@ -674,7 +674,7 @@ Before work, Claude announces:
 - [ ] Selective Reindex: Pack changed? → `selective-reindex.sh`
 - [ ] Repo CLAUDE.md: feat commits → new rules?
 - [ ] Draft list: Pack enriched → suggest a draft?
-- [ ] Template CHANGELOG: commits in FMT-exocortex-template? → update
+- [ ] Template CHANGELOG: commits in IWE? → update
 - [ ] Session log: remove line from open-sessions.log
 - [ ] Close report: what was done, what remains
 
@@ -936,8 +936,8 @@ SPF defines the Pack creation process:
 **Quick start:** `/pack-new` — the Skill guides you through domain selection, Pack name, creates a scaffold, and shows the Roadmap F1–F6.
 
 **Where to learn:**
-- [SPF/process/](https://github.com/TserenTserenov/SPF/tree/main/process) — all 11 stages
-- [SPF/pack-template/](https://github.com/TserenTserenov/SPF/tree/main/pack-template) — structure Template
+- [SPF/process/](https://github.com/iwesys/IWE/tree/main/seed/SPF/process) — all 11 stages
+- [SPF/pack-template/](https://github.com/iwesys/IWE/tree/main/seed/SPF/pack-template) — structure Template
 - [docs/PACK-CREATION.md](PACK-CREATION.md) — practical guide for beginners
 
 ### 6.3. Pack Structure
@@ -981,7 +981,7 @@ PACK-{domain}/
 2. On Close → Claude activates the Extractor Role (R2) and shows the Extraction Report
 3. You approve → entities are written to Pack
 
-**Inbox-Check runs without you** — a headless scheduled run (every 3 hours) cannot use your interactive Claude Code login; it needs a separate long-lived subscription token. Connected once: `cd ~/IWE/FMT-exocortex-template && bash roles/extractor/scripts/connect.sh` (after `roles/extractor/install.sh`, see [roles/extractor/README.md](../roles/extractor/README.md)). Session-Close, On-Demand, and Bulk-Extraction run in your already-open Session — they require no separate connection.
+**Inbox-Check runs without you** — a headless scheduled run (every 3 hours) cannot use your interactive Claude Code login; it needs a separate long-lived subscription token. Connected once: `cd ~/IWE/IWE && bash roles/extractor/scripts/connect.sh` (after `roles/extractor/install.sh`, see [roles/extractor/README.md](../roles/extractor/README.md)). Session-Close, On-Demand, and Bulk-Extraction run in your already-open Session — they require no separate connection.
 
 **Where to learn:**
 - Close Protocol (§ 5.1) — when the Extractor activates
@@ -1041,8 +1041,8 @@ An Ontology is a graph of concepts and relationships. Each level has its own:
 **Principle:** SPF inherits FPF → Pack extends SPF → Downstream references Pack.
 
 **Where to learn:**
-- [SPF/ontology.md](https://github.com/TserenTserenov/SPF/blob/main/ontology.md) — SPF-level
-- [SPF/docs/conceptual-model.md](https://github.com/TserenTserenov/SPF/blob/main/docs/conceptual-model.md) — conceptual map
+- [SPF/ontology.md](https://github.com/iwesys/IWE/blob/main/seed/SPF/ontology.md) — SPF-level
+- [SPF/docs/conceptual-model.md](https://github.com/iwesys/IWE/blob/main/seed/SPF/docs/conceptual-model.md) — conceptual map
 
 ## 7. Roles and AI Agents
 
@@ -1099,7 +1099,7 @@ R8 Synchronizer (dispatcher)
     ├─→ R2 Extractor (knowledge)
     │   └─→ Pack entities, DS-strategy/inbox/
     ├─→ R9 Templater (updates)
-    │   └─→ FMT-exocortex-template/
+    │   └─→ IWE/
     ├─→ R11 Fixer (bot errors)
     │   └─→ GitHub PR, Issues
     ├─→ R10 Statistician (analytics)
@@ -1327,7 +1327,7 @@ The Telegram bot is the primary entry point for T1–T3. For T4+, the bot remain
 - 2.2: Exocortex backup (memory/ → DS-strategy/)
 - 2.3: Ontology sync (Pack → master)
 - 2.4: File sync (GitHub → local)
-- 2.5: Template sync (author → FMT-exocortex-template)
+- 2.5: Template sync (author → IWE)
 - 2.6: Pack projection (Pack → Downstream)
 
 **Where to learn:**
@@ -1642,7 +1642,7 @@ cd ~/IWE && ./setup.sh   # creates symlinks, installs packages, configures cron
 
 **Why keep files in WSL, not on the Windows drive (if you chose WSL)?** The WSL file system (`~/`) is 5–10× faster than access to `/mnt/c/` (Windows drive via WSL). Watch scripts, git operations, and MCP indexing on `/mnt/c/` run critically slowly.
 
-**Honest caveat.** Neither path has been tested live on Windows by this team (the template CI matrix runs only `ubuntu-latest`/`macos-latest`, no Windows runner). If you hit a specific breakage in Git Bash — not a vague "something is wrong," but a reproducible symptom — file an issue in FMT-exocortex-template. That is more valuable than guessing in advance.
+**Honest caveat.** Neither path has been tested live on Windows by this team (the template CI matrix runs only `ubuntu-latest`/`macos-latest`, no Windows runner). If you hit a specific breakage in Git Bash — not a vague "something is wrong," but a reproducible symptom — file an issue in IWE. That is more valuable than guessing in advance.
 
 #### "I do not understand what to record in notes"
 

@@ -1,0 +1,15 @@
+# fpf-term-map.yaml — terminology drift dictionary FPF (WP-481 Phase11)
+# deprecated -> canonical. Populated based on actual upstream renames
+# (github.com/ailev/FPF), not preemptively.
+# When adding a record: grep IWE-corpus (CLAUDE.md, .claude/rules/, memory/,
+# PACK-*, IWE/) for deprecated-form, report to the pilot
+# what was found (Drift Reporting) — do not fix silently.
+#
+# horizon: warm | status: active | valid_from: 2026-07-13 | owner: user
+
+terms:
+  - deprecated: "Principles-to-Work"
+    canonical: "Problem-to-Work"
+    scope: "the full phrase, NOT the abbreviation — P2W remains valid as a code (E.18.1), only the expansion changes"
+    found_at: "2026-07-12 (seminar 1 FPF, announced by Levenchuk)"
+    note: "the upstream is itself internally inconsistent as of 2026-07-13 — in several places FPF-Spec.md the old prose still appears 'Principles-to-Work (P2W)' alongside the new heading; do not grep for bare P2W"

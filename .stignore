@@ -1,0 +1,43 @@
+// Syncthing exclusions for IWE (Intellectual Work Environment)
+// Prevents noise during Claude Code sessions.
+//
+// Claude Code writes continuously to .claude/projects/ during sessions
+// (conversation transcripts, task outputs) — syncing these is wasteful
+// and triggers hundreds of change events per minute.
+
+// Claude Code session data (most noisy — kilobytes written every few seconds)
+.claude/projects/
+
+// Claude Code ephemeral state
+.claude/state/
+.claude/.cache/
+
+// Rule-engine classifier logs (written every session + hourly)
+logs/rule-engine/
+
+// General logs directory
+logs/*.log
+
+// Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+// macOS
+.DS_Store
+.Spotlight-V100
+.Trashes
+
+// Node
+node_modules/
+
+// Git objects (syncthing syncs .git/refs which can conflict)
+.git/
+
+// Temp/build
+*.tmp
+*.bak
+dist/
+build/

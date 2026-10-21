@@ -1,0 +1,88 @@
+# Parity Contract — paired scripts IWE
+# Contract: every «key pattern» is present in both paired scripts
+# (or in neither — if the pattern does not apply to the script).
+#
+# Regex: Extended Regular Expressions (grep -E), macOS-compatible.
+# Do not use: \d, \w, lookahead, PCRE-specific constructs.
+# For regex starting with `-` use the wrapper (grep -E -e).
+#
+# Related: WP-315 Phase4, DP.SC.125, AR.205
+
+version: "1.2"
+
+pairs:
+  - name: "setup ↔ update"
+    scripts:
+      - "setup.sh"
+      - "update.sh"
+    patterns:
+      - id: "iwe-paths"
+        description: "Mention of .iwe-paths (source or install)"
+        regex: '\.iwe-paths'
+        required_in_both: true
+
+      - id: "memory-files"
+        description: "Working with memory/ (copy, remove, list)"
+        regex: "memory/"
+        required_in_both: true
+
+      - id: "build-runtime-invoke"
+        description: "Invoking build-runtime.sh (dry or real)"
+        regex: 'build-runtime\.sh'
+        required_in_both: true
+
+      - id: "placeholder-check"
+        description: "Checking or substituting {{PLACEHOLDER}}"
+        regex: '\{\{'
+        required_in_both: false
+
+      - id: "cross-platform-sed"
+        description: "Defining sed_inplace for macOS/Linux"
+        regex: "sed_inplace"
+        required_in_both: true
+
+      - id: "workspace-dir"
+        description: "Defining WORKSPACE_DIR"
+        regex: "WORKSPACE_DIR="
+        required_in_both: true
+
+      - id: "script-dir"
+        description: "Defining SCRIPT_DIR"
+        regex: "SCRIPT_DIR="
+        required_in_both: true
+
+      - id: "help-flag"
+        description: "Support for --help / -h"
+        regex: "help"
+        required_in_both: true
+
+      - id: "version-flag"
+        description: "Support for --version"
+        regex: "version"
+        required_in_both: true
+
+      - id: "dry-run-flag"
+        description: "Support for --dry-run or --check (preview without changes)"
+        regex: "(--dry-run|--check)"
+        required_in_both: false
+
+  - name: "migrate scripts"
+    scripts:
+      - "scripts/migrate-initial-marker.sh"
+      - "scripts/migrate-to-runtime-target.sh"
+    patterns:
+      - id: "set-e"
+        description: "set -e at the top"
+        regex: "^set -e"
+        required_in_both: true
+
+      - id: "script-dir"
+        description: "Defining SCRIPT_DIR"
+        regex: "SCRIPT_DIR="
+        required_in_both: true
+
+# Parsing rules:
+# - regex is searched in each script of the pair
+# - required_in_both: true → must match in both
+# - required_in_both: false → sufficient to match in at least one (or in neither)
+# - Scripts are located relative to the repo root (IWE/)

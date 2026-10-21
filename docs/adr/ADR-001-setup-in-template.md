@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-02-28
-**Context:** FMT-exocortex-template, DS-ai-systems/setup
+**Context:** IWE, DS-ai-systems/setup
 
 ---
 
@@ -36,7 +36,7 @@ The current solution falls below the threshold of 8. Generativity (3) and Learna
 
 ## Solution
 
-Move `setup.sh` to the root of FMT-exocortex-template (alongside `update.sh`).
+Move `setup.sh` to the root of IWE (alongside `update.sh`).
 
 **What is moved:**
 - `setup.sh` — modified: auto-detection of TEMPLATE_DIR, fork step removed (the user forks manually)
@@ -48,8 +48,8 @@ Move `setup.sh` to the root of FMT-exocortex-template (alongside `update.sh`).
 
 **New user flow:**
 ```bash
-gh repo fork TserenTserenov/FMT-exocortex-template --clone
-cd FMT-exocortex-template
+gh repo fork iwesys/IWE --clone
+cd IWE
 bash setup.sh
 ```
 

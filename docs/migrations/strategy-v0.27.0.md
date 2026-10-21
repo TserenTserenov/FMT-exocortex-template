@@ -20,7 +20,7 @@ The following were added to `memory/templates-dayplan.md`: work priority selecti
 
 ## How to Migrate (≤15 min)
 
-1. Open `seed/strategy/docs/Strategy.md` in FMT-exocortex-template.
+1. Open `seed/strategy/docs/Strategy.md` in IWE.
 2. Open your `DS-strategy/docs/Strategy.md`.
 3. Copy the missing blocks into the correct locations:
    - The "Monthly State" section — between "Vision" and "Goals on the Horizon".
@@ -30,7 +30,7 @@ The following were added to `memory/templates-dayplan.md`: work priority selecti
 
 ## Alternative — Ask Claude
 
-Say: "Compare my `DS-strategy/docs/Strategy.md` with `~/IWE/FMT-exocortex-template/seed/strategy/docs/Strategy.md` and suggest which v0.27.0 blocks to add without breaking my existing content." Claude will produce a diff and propose targeted edits.
+Say: "Compare my `DS-strategy/docs/Strategy.md` with `~/IWE/IWE/seed/strategy/docs/Strategy.md` and suggest which v0.27.0 blocks to add without breaking my existing content." Claude will produce a diff and propose targeted edits.
 
 ## What Does Not Require Migration
 

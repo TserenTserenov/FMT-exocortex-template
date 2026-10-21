@@ -1,4 +1,4 @@
-# FMT-exocortex-template Release Process
+# IWE Release Process
 
 > Who bumps the template version, when, and how. Goal: a clear "ready to release"
 > criterion instead of a verbal agreement. Source: WP-347 Phase 3, 22 May 2026.
@@ -229,7 +229,7 @@ delivery is broken.
 
 **This configuration is not supported.** Results of `validate-template.yml` in
 such a mirror are not meaningful; compare against a run on the canon
-(`TserenTserenov/FMT-exocortex-template`) at the same commit/version before
+(`iwesys/IWE`) at the same commit/version before
 treating a difference as a real defect.
 
 ---

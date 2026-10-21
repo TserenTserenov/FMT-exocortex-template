@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.exocortex.scheduler</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{IWE_RUNTIME}}/roles/synchronizer/scripts/scheduler.sh</string>
+        <string>dispatch</string>
+    </array>
+
+    <!-- Wake up at key hours (local machine time, launchd schedules it exactly that way):
+         0:00  — week-review (Mon) + code-scan
+         3:00  — extractor inbox-check
+         {{TIMEZONE_HOUR}}:00  — strategist morning
+         6:00  — extractor + daily-report
+         9:00  — extractor
+         12:00 — extractor
+         15:00 — extractor
+         18:00 — extractor
+         21:00 — extractor
+         23:00 — catch-up tick only (note-review has no scheduled run, #961)
+    -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>{{TIMEZONE_HOUR}}</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>{{HOME_DIR}}/logs/synchronizer/launchd-scheduler.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{HOME_DIR}}/logs/synchronizer/launchd-scheduler-error.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{HOME_DIR}}/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>{{HOME_DIR}}</string>
+        <key>USER</key>
+        <string>{{USER_NAME}}</string>
+        <key>LOGNAME</key>
+        <string>{{USER_NAME}}</string>
+        <key>IWE_TEMPLATE</key>
+        <string>{{IWE_TEMPLATE}}</string>
+        <key>IWE_WORKSPACE</key>
+        <string>{{WORKSPACE_DIR}}</string>
+        <key>IWE_RUNTIME</key>
+        <string>{{IWE_RUNTIME}}</string>
+        <key>IWE_SCRIPTS</key>
+        <string>{{IWE_SCRIPTS}}</string>
+        <key>IWE_GOVERNANCE_REPO</key>
+        <string>{{GOVERNANCE_REPO}}</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

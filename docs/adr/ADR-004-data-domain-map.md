@@ -30,7 +30,7 @@ Change rate axis: **hot** (edited daily / per session) · **warm** (per work pha
 | 2.6 quarantine dialogues (subset of 2.5) | — | same home as 2.5, with separate access control | data about third parties inside dialogues requires stricter access control than the rest of domain 2.5 |
 | runtime / state | hot | outside git (e.g. `.iwe-runtime/`) | declared explicitly as a home class — not committed to git history |
 | code / scripts — working copy | hot | user working Repository | edited during any session that requires a tool fix |
-| code / scripts — promoted copy | warm | `FMT-exocortex-template/scripts/` | updated on a promotion decision, not daily — same logic, different stage |
+| code / scripts — promoted copy | warm | `IWE/scripts/` | updated on a promotion decision, not daily — same logic, different stage |
 | plans / work contexts | hot | `governance-personal`, with no telemetry Stream and no single growing Knowledge file inside | mixing planning with an active write Stream causes conflicts at session close |
 
 ### Storage Roles

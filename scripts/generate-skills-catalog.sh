@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# routing: helper  skill=extend  called-by=script
+# see DP.SC.159, DP.ROLE.059
+# generate-skills-catalog.sh — generator skills-catalog.yaml
+# see DP.SC.153
+#
+# Parses all .claude/skills/*/SKILL.md → builds skills-catalog.yaml with:
+#   - metadata from frontmatter (name, description, version, layer, status, triggers, depends_on)
+#   - computed invoked_by (from protocol-*.md + other SKILL.md + CLAUDE.md)
+#
+# Usage:
+#   bash generate-skills-catalog.sh [--skills-dir <path>] [--output <path>] [--dry-run]
+
+set -uo pipefail
+
+IWE="${IWE_WORKSPACE:-$HOME/IWE}"
+SKILLS_DIR="${IWE}/.claude/skills"
+PROTOCOLS_DIR="${IWE}/memory"
+OUTPUT="${IWE}/.claude/skills-catalog.yaml"
+dry_run=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --skills-dir) SKILLS_DIR="$2"; shift 2 ;;
+        --output) OUTPUT="$2"; shift 2 ;;
+        --dry-run) dry_run=true; shift ;;
+        *) echo "Unknown flag: $1" >&2; exit 1 ;;
+    esac
+done
+
+log() { echo "$*" >&2; }
+
+# Extract field value from YAML frontmatter (first occurrence).
+# Supports block scalar (`field: |` / `field: >`) — reads the following
+# more-indented lines until dedent and collapses them into a single line
+# (found 01.09, WP-527: `description: |` in repo-new/skill-creator
+# broke into the literal value "|", instead of being read as a block).
+get_field() {
+    local file="$1" field="$2"
+    local block value
+    block=$(sed -n "/^---$/,/^---$/p" "$file" 2>/dev/null)
+    value=$(echo "$block" | grep "^${field}:" | head -1 | sed "s/^${field}: *//")
+    case "$value" in
+        '|'|'>'|'|-'|'>-'|'|+'|'>+')
+            echo "$block" | awk -v field="^${field}:" '
+                BEGIN{found=0}
+                $0 ~ field {found=1; next}
+                found==1 {
+                    if ($0 !~ /^[ \t]/ || $0 == "") { exit }
+                    gsub(/^[ \t]+/, "");
+                    printf "%s ", $0
+                }
+            ' | sed 's/ *$//'
+            ;;
+        *)
+            echo "$value" | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/"
+            ;;
+    esac
+}
+
+# Extract list (slash) from triggers block. Supports also inline-style
+# (`slash: [/a, /b]`), and YAML-list (`slash:` + `- item` lines below —
+# format, produced by scaffold-init.sh; found 01.09 WP-527, previously produced
+# garbage of the form "- slash:" instead of real triggers).
+get_triggers_slash() {
+    local file="$1"
+    local block inline
+    block=$(sed -n '/^triggers:/,/^[a-z]/p' "$file" 2>/dev/null)
+    inline=$(echo "$block" | grep "slash: *\[" | sed 's/.*slash: *\[//;s/\].*//' \
+        | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$')
+    if [[ -n "$inline" ]]; then
+        echo "$inline" | sed 's/^\/\?/\//'
+        return
+    fi
+    echo "$block" | awk '
+        /slash:[ \t]*$/ {insl=1; next}
+        insl==1 {
+            if ($0 ~ /^[ \t]*-[ \t]*/) {
+                sub(/^[ \t]*-[ \t]*/, ""); print; next
+            } else { insl=0 }
+        }
+    ' | sed 's/^ *//;s/ *$//;s/^\/\?/\//' | grep -v '^$' || true
+}
+
+# Collect all files where the skill is mentioned (for invoked_by)
+build_invoked_by() {
+    local skill_name="$1"
+    local callers=""
+    # Search for /skill-name in protocol-*.md and CLAUDE.md
+    local search_files=""
+    # Trailing slash: PROTOCOLS_DIR is usually memory/, a symlink to auto-memory
+    # (junction on Windows). find does not descend into a symlinked start point
+    # without it (issue #913) — 0 files found instead of 5.
+    [[ -d "$PROTOCOLS_DIR" ]] && search_files+=" $(find "$PROTOCOLS_DIR/" -name "protocol-*.md" 2>/dev/null)"
+    [[ -f "${IWE}/CLAUDE.md" ]] && search_files+=" ${IWE}/CLAUDE.md"
+    # Search in other SKILL.md (depends_on)
+    [[ -d "$SKILLS_DIR" ]] && search_files+=" $(find "$SKILLS_DIR" -name "SKILL.md" 2>/dev/null)"
+
+    for f in $search_files; do
+        [[ -f "$f" ]] || continue
+        if grep -q "/${skill_name}\b\|depends_on:.*${skill_name}" "$f" 2>/dev/null; then
+            caller=$(basename "$(dirname "$f")")
+            # For protocol-*.md use the file name
+            [[ "$f" == *"protocol-"* ]] && caller=$(basename "$f" .md)
+            [[ "$f" == *"CLAUDE.md"* ]] && caller="CLAUDE.md"
+            callers+="    - ${caller}\n"
+        fi
+    done
+    echo -e "$callers"
+}
+
+log "🔍 Scanning skills in: $SKILLS_DIR"
+
+# Start of YAML YAML
+catalog_content="# skills-catalog.yaml — auto-generated generate-skills-catalog.sh
+# see DP.SC.153
+# DO NOT edit manually — regenerate using generate-skills-catalog.sh
+#
+generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+skills_dir: ${SKILLS_DIR}
+
+skills:"
+
+skill_count=0
+warn_count=0
+
+for skill_dir in "$SKILLS_DIR"/*/; do
+    [[ -d "$skill_dir" ]] || continue
+    skill_id=$(basename "$skill_dir")
+    [[ "$skill_id" == "_template" ]] && continue  # skip template
+
+    skill_md="${skill_dir}SKILL.md"
+    if [[ ! -f "$skill_md" ]]; then
+        log "  ⚠️  [$skill_id] SKILL.md not found — skipping"
+        (( warn_count++ )) || true
+        continue
+    fi
+
+    name=$(get_field "$skill_md" "name")
+    description=$(get_field "$skill_md" "description")
+    version=$(get_field "$skill_md" "version")
+    layer=$(get_field "$skill_md" "layer")
+    status_val=$(get_field "$skill_md" "status")
+    depends_raw=$(grep "^depends_on:" "$skill_md" 2>/dev/null | head -1 | sed 's/^depends_on: *//' || echo "[]")
+
+    # Defaults for missing fields
+    [[ -z "$name" ]] && name="$skill_id" && log "  ⚠️  [$skill_id] name not found, using id id"
+    [[ -z "$version" ]] && version="0.0.0" && log "  ⚠️  [$skill_id] version not found"
+    [[ -z "$layer" ]] && layer="unknown" && log "  ⚠️  [$skill_id] layer not found"
+    [[ -z "$status_val" ]] && status_val="active"
+
+    # triggers.slash
+    slash_triggers=$(get_triggers_slash "$skill_md")
+    slash_yaml=""
+    if [[ -n "$slash_triggers" ]]; then
+        slash_yaml="      slash:"$'\n'
+        while IFS= read -r t; do
+            [[ -n "$t" ]] && slash_yaml+="        - ${t}"$'\n'
+        done <<< "$slash_triggers"
+    fi
+
+    # invoked_by (computed)
+    invoked_by=$(build_invoked_by "$skill_id")
+
+    catalog_content+="
+  - id: ${skill_id}
+    name: \"${name}\"
+    description: \"${description}\"
+    version: ${version}
+    layer: ${layer}
+    status: ${status_val}
+    triggers:"
+
+    if [[ -n "$slash_yaml" ]]; then
+        catalog_content+="
+${slash_yaml%$'\n'}"
+    else
+        catalog_content+="
+      slash: []"
+    fi
+
+    catalog_content+="
+    depends_on: ${depends_raw}"
+
+    if [[ -n "$invoked_by" ]]; then
+        catalog_content+="
+    invoked_by:
+${invoked_by%$'\n'}"
+    else
+        catalog_content+="
+    invoked_by: []"
+    fi
+
+    (( skill_count++ )) || true
+done
+
+log ""
+log "📊 Total: ${skill_count} skills, ${warn_count} warnings"
+
+if $dry_run; then
+    log "--- dry-run: skills-catalog.yaml ---"
+    echo "$catalog_content"
+    exit 0
+fi
+
+echo "$catalog_content" > "$OUTPUT"
+log "✅ Catalog written: $OUTPUT"

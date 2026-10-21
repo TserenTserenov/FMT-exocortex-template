@@ -1,0 +1,15 @@
+# Install-time pre-grant list — the ONLY durable source of pre-granted consents.
+# A new inbound consumer may be added here only after the pilot explicitly
+# confirms it: every entry requires approved_by: pilot + approved_at date
+# (pilot decision 2026-07-16, WP-476 F1 gating condition 6). Outbound flows
+# can never be pre-granted at install time (WP-475 acceptance criterion 6).
+# Validate: python3 residency-gate.py validate-pre-grant
+schema_version: 1
+# An entry may narrow itself to specific need keys via an optional
+# 'needs: ["<type>_<flow>_<name>"]' list; without it, every inbound need
+# of the function is covered (outbound is refused by the gate regardless).
+pre_granted:
+  - function_id: render-pilot-guides
+    approved_by: pilot
+    approved_at: "2026-07-16"
+    note: "reading stage/course data for personal guide rendering (DATA-RESIDENCY.md install-time item)"

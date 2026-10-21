@@ -1,5 +1,5 @@
 ---
-scope: FMT-exocortex-template
+scope: IWE
 status: active
 title: Connecting a New AI Agent to IWE (Vendor-Agnostic)
 updated: 2026-07-29
@@ -7,7 +7,7 @@ updated: 2026-07-29
 
 # Connecting a New AI Agent to IWE
 
-> Audience: a pilot who wants to connect **any** AI agent vendor to their fork of `FMT-exocortex-template` — Claude Code, Kimi Code, Codex, Hermes, a ChatGPT extension, or any other file-based CLI/IDE agent not yet covered by a dedicated guide.
+> Audience: a pilot who wants to connect **any** AI agent vendor to their fork of `IWE` — Claude Code, Kimi Code, Codex, Hermes, a ChatGPT extension, or any other file-based CLI/IDE agent not yet covered by a dedicated guide.
 > Time: ~15–30 minutes, depending on whether the agent supports MCP out of the box.
 > Verified live (2026-07-28) on 4 different agents simultaneously (Claude, Kimi, Codex, Hermes) — coordination on shared files with no conflicts.
 
@@ -118,7 +118,7 @@ If no such mechanism exists, skip this step — it does not block the rest of th
 
 ## Step 6. Connect to the Aisystant MCP (Non-Claude Agents)
 
-> Claude Code connects to the aisystant knowledge base through `claude.ai` connectors (`docs/SETUP-GUIDE.md`, step 1.3b) — it has a separate browser settings page. Other agents (Hermes, etc.) connect differently: directly through their own MCP client, without `claude.ai`. This step covers those agents. Ready-to-use step-by-step prompts for ChatGPT (including a working Business/Enterprise account) and for local Codex are in `docs/CHATGPT-CODEX-SETUP.md`.
+> Claude Code connects to the aisystant knowledge base through `claude.ai` connectors (`docs/SETUP-GUIDE.md`, step 1.3b) — it has a separate browser settings page. Other agents (Hermes, etc.) connect differently: directly through their own MCP client, without `claude.ai`. This step covers those agents. For the read-only public library in ChatGPT or Codex, follow `docs/CHATGPT-CODEX-SETUP.md`.
 
 ### 6.1. Check the MCP Config
 
@@ -237,7 +237,6 @@ Do not confuse this connection with a wrapper adapter (`*-peer-adapter.sh`), whe
 - `AGENTS.md` — common rules for all agents.
 - `setup/optional/setup-local-gateway.sh` — gateway installation (clone, build, daemon start).
 - `docs/KIMI-SETUP.md` — specifics of connecting Kimi Code (detailed example for Step 5).
-- `docs/CHATGPT-CODEX-SETUP.md` — ready-to-use prompts for connecting ChatGPT and Codex to the aisystant MCP (Step 6).
+- `docs/CHATGPT-CODEX-SETUP.md` — connect ChatGPT or Codex to the public library.
 - `docs/inter-agent-handoff.md` — passing context between agents without a shared gateway.
 - `memory/agent-vendor-connect-pattern.md` — concise technical reference card for the same pattern (reference format for agent Memory, not a step-by-step guide for humans).
-

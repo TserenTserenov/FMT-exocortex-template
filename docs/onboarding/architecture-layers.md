@@ -37,4 +37,3 @@ No — and that is the whole point of the separation. The Repository clone (the 
 ## Further Reading (for Those Writing Code or Skills)
 
 A more technical version of this same division is in [CONTRIBUTING.md, section "Architecture: Three Layers"](../../CONTRIBUTING.md#architecture-three-layers) (in English, for those preparing a pull request to the Platform) and in [author-mode SKILL.md §9](../../.claude/skills/author-mode/SKILL.md) (for authors maintaining their own fork of the Template).
-

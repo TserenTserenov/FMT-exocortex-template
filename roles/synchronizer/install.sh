@@ -1,0 +1,176 @@
+#!/bin/bash
+# Synchronizer: installation of the central dispatcher (launchd)
+# Replaces individual launchd-Strategist agents with a unified scheduler scheduler
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROLE_NAME="$(basename "$SCRIPT_DIR")"
+PLIST_DST="$HOME/Library/LaunchAgents/com.exocortex.scheduler.plist"
+
+# Resolve PLIST source (Generated runtime → workspace fallback → FMT legacy).
+# WP-273 Stage 2: substituted plists and runtime-scripts reside in $IWE_RUNTIME.
+if [ -n "${IWE_RUNTIME:-}" ] && [ -d "$IWE_RUNTIME/roles/$ROLE_NAME/scripts/launchd" ]; then
+    PLIST_SRC="$IWE_RUNTIME/roles/$ROLE_NAME/scripts/launchd/com.exocortex.scheduler.plist"
+    SCRIPTS_DIR_RUNTIME="$IWE_RUNTIME/roles/$ROLE_NAME/scripts"
+elif [ -n "${IWE_WORKSPACE:-}" ] && [ -d "$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/launchd" ]; then
+    PLIST_SRC="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/launchd/com.exocortex.scheduler.plist"
+    SCRIPTS_DIR_RUNTIME="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts"
+else
+    PLIST_SRC="$SCRIPT_DIR/scripts/launchd/com.exocortex.scheduler.plist"
+    SCRIPTS_DIR_RUNTIME="$SCRIPT_DIR/scripts"
+    echo "  ⚠ Legacy mode: placeholders from FMT-substituted are being used FMT-substituted (run setup.sh ≥0.29.0 for Phase F)"
+fi
+
+echo "Installing Synchronizer (central scheduler)..."
+echo "  PLIST_SRC: $PLIST_SRC"
+
+if [ ! -f "$PLIST_SRC" ]; then
+    echo "ERROR: $PLIST_SRC not found"
+    exit 1
+fi
+
+# WP-273 R5 fix: fail-fast if plist contains literal {{...}}
+if grep -qE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" 2>/dev/null; then
+    echo "ERROR: $PLIST_SRC contains unresolved placeholders:" >&2
+    grep -oE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" | sort -u | sed 's/^/  /' >&2
+    echo "" >&2
+    echo "Possible causes:" >&2
+    echo "  1. IWE_RUNTIME is not exported → 'source ~/.zshenv' or 'source ~/.iwe-paths'" >&2
+    echo "  2. .iwe-runtime/ has not been created yet → 'bash \$IWE_TEMPLATE/setup/build-runtime.sh'" >&2
+    echo "  3. Old clone before WP-273 Stage 2 → 'bash \$IWE_TEMPLATE/scripts/migrate-to-runtime-target.sh'" >&2
+    exit 2
+fi
+
+# Making scripts executable (runtime path)
+if [ -d "$SCRIPTS_DIR_RUNTIME" ]; then
+    chmod +x "$SCRIPTS_DIR_RUNTIME/"*.sh 2>/dev/null || true
+    chmod +x "$SCRIPTS_DIR_RUNTIME/templates/"*.sh 2>/dev/null || true
+fi
+
+# Linux uses systemd/cron even if a launchctl binary is present on PATH.
+if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; then
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        if [ -n "${SETUP_CI:-}" ]; then
+            echo "  ⊠ SETUP_CI: systemd activation skipped for $ROLE_NAME"
+            exit 0
+        fi
+
+        source "$(cd "$SCRIPT_DIR/../lib" && pwd)/scheduler-cron.sh"
+
+        if [ -n "${IWE_RUNTIME:-}" ] && [ -d "$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd" ]; then
+            SYSTEMD_SRC="$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd"
+        elif [ -n "${IWE_WORKSPACE:-}" ] && [ -d "$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd" ]; then
+            SYSTEMD_SRC="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd"
+        else
+            echo "ERROR: systemd units not found. Run setup.sh first." >&2
+            exit 1
+        fi
+
+        if grep -qrE '\{\{[A-Z_]+\}\}' "$SYSTEMD_SRC" 2>/dev/null; then
+            echo "ERROR: systemd units contain unsubstituted placeholders" >&2
+            exit 2
+        fi
+
+        mkdir -p "$HOME/.local/state/exocortex"
+        mkdir -p "$HOME/logs/synchronizer"
+
+        # issue #454: `command -v systemctl` only proves the binary exists — on
+        # WSL2 without systemd, most containers, and some headless servers the
+        # session bus itself is gone ("Failed to connect to bus"), and
+        # `enable --now` below would just fail with no working scheduler left.
+        # Same functional probe as iwe_scheduler_state() (scripts/lib/common.sh)
+        # so install-time and runtime-detection never disagree.
+        if ! iwe_systemd_user_bus_ok; then
+            echo "  ⚠ systemd --user unavailable (no user session bus — typical for WSL2/container/server without an active login)"
+            echo "  Installing $ROLE_NAME via cron fallback (issue #454)..."
+            if ! cron_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-exocortex-scheduler.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPTS_DIR_RUNTIME/scheduler.sh dispatch >> $HOME/logs/synchronizer/cron-scheduler.log 2>&1"); then
+                echo "ERROR: cron-Synchronizer schedule was not built; crontab not changed" >&2
+                exit 2
+            fi
+            iwe_install_cron_fallback "synchronizer" "$cron_lines"
+            echo "  ✓ Installed via crontab. Verify: crontab -l | grep scheduler.sh"
+            echo "  ✓ Logs: ~/logs/synchronizer/cron-scheduler.log"
+            exit 0
+        fi
+
+        echo "Installing $ROLE_NAME systemd user service (Linux)..."
+        SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+        mkdir -p "$SYSTEMD_USER_DIR"
+
+        cp "$SYSTEMD_SRC"/*.service "$SYSTEMD_SRC"/*.timer "$SYSTEMD_USER_DIR/"
+        systemctl --user daemon-reload
+        systemctl --user enable --now iwe-exocortex-scheduler.timer
+
+        echo "  ✓ Installed: iwe-exocortex-scheduler.timer"
+        echo "  ✓ Schedule: 10 dispatch points per day"
+        echo "  ✓ State: ~/.local/state/exocortex/"
+        echo "  ✓ Logs: ~/logs/synchronizer/"
+        echo ""
+        echo "Verify: systemctl --user list-timers | grep exocortex"
+        echo "Status: bash $SCRIPTS_DIR_RUNTIME/scheduler.sh status"
+        echo ""
+        echo "Auto-wake (recommended): sudo rtcwake -m no -t \$(date -d 'tomorrow 03:55' +%s)"
+        echo ""
+        echo "Telegram (optional): create ~/.config/aist/env with:"
+        echo "  export TELEGRAM_BOT_TOKEN=\"your-token\""
+        echo "  export TELEGRAM_CHAT_ID=\"your-id\""
+        exit 0
+    fi
+    echo "  ⊠ launchctl not available (non-macOS/Linux), skipping $ROLE_NAME install"
+    exit 0
+fi
+
+mkdir -p "$(dirname "$PLIST_DST")"
+
+# SETUP_CI installs files only: unloading a host agent is still a global write.
+if [ -z "${SETUP_CI:-}" ]; then
+    # Unloading old agents and legacy Strategist-agents (if any existed)
+    launchctl unload "$PLIST_DST" 2>/dev/null || true
+    launchctl unload "$HOME/Library/LaunchAgents/com.strategist.morning.plist" 2>/dev/null || true
+    launchctl unload "$HOME/Library/LaunchAgents/com.strategist.weekreview.plist" 2>/dev/null || true
+fi
+
+# Creating state directories
+mkdir -p "$HOME/.local/state/exocortex"
+mkdir -p "$HOME/logs/synchronizer"
+
+# Copying and loading
+cp "$PLIST_SRC" "$PLIST_DST"
+if [ -n "${SETUP_CI:-}" ]; then
+    echo "  ⊠ SETUP_CI: plist copied, launchctl activation skipped"
+elif [ -n "${IWE_SKIP_LOAD:-}" ]; then
+    # issue #1143: caller (update.sh) already knows this role was
+    # deliberately unloaded by the user and will restore that state
+    # itself — `load` here would fire RunAtLoad once before that
+    # restore runs, dispatching a job the user turned off.
+    echo "  ⊠ IWE_SKIP_LOAD: plist copied, launchctl load skipped (state the user set earlier is preserved, not loaded)"
+else
+    launchctl load "$PLIST_DST"
+fi
+
+echo "  ✓ Installed: com.exocortex.scheduler"
+echo "  ✓ Schedule: 10 dispatch points per day"
+echo "  ✓ Manages: Strategist, Extractor, Code-Scan, Daily Report"
+echo "  ✓ State: ~/.local/state/exocortex/"
+echo "  ✓ Logs: ~/logs/synchronizer/"
+echo ""
+echo "Verify: launchctl list | grep exocortex"
+echo "Status: bash $SCRIPTS_DIR_RUNTIME/scheduler.sh status"
+echo ""
+echo "Auto-wake (recommended): plan ready before you wake up"
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "  sudo pmset repeat wakeorpoweron MTWRFSU 03:55:00"
+    echo "  sudo pmset -b sleep 0 && sudo pmset -b standby 0  # laptop: prevent sleep on battery profile"
+    echo "  (Cancel: sudo pmset repeat cancel)"
+else
+    echo "  Linux: sudo rtcwake or systemd timer with WakeSystem=true"
+    echo "  See docs/SETUP-GUIDE.md for details"
+fi
+echo ""
+echo "Telegram (optional): create ~/.config/aist/env with:"
+echo "  export TELEGRAM_BOT_TOKEN=\"your-token\""
+echo "  export TELEGRAM_CHAT_ID=\"your-id\""
+echo ""
+echo "Uninstall: launchctl unload $PLIST_DST && rm $PLIST_DST"

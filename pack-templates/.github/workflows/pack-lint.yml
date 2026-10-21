@@ -1,0 +1,17 @@
+name: Pack Lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check-id-collisions:
+    name: R4 — ID collision detector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for ID collisions
+        run: bash .github/scripts/check-pack-collisions.sh

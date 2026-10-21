@@ -26,4 +26,3 @@ A test describes system behavior at its **boundary** — what it accepts and wha
 ## Source
 
 This methodology emerged from a meeting with an external development expert (the Protocol is stored in your governance repo, `{{GOVERNANCE_REPO}}/inbox/`).
-

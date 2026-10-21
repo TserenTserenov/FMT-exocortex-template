@@ -83,9 +83,9 @@ Planning and reflection. Every morning (Tue–Sun) it builds a day plan from yes
 
 Manual run (in terminal or VS Code integrated terminal):
 ```bash
-bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-plan
+bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh day-plan
 # Note review: from terminal only marks ✅proposed and suggestions; archiving only in Claude Code session, on your word
-bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh note-review
+bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh note-review
 ```
 
 ### Extractor (R2)
@@ -93,12 +93,12 @@ Extracts Knowledge into Pack Repositories. 4 scenarios: session-close (on Sessio
 
 Always proposes, never writes without approval (human-in-the-loop).
 
-Install (in terminal): `bash ~/IWE/FMT-exocortex-template/roles/extractor/install.sh`
+Install (in terminal): `bash ~/IWE/IWE/roles/extractor/install.sh`
 
 ### Synchronizer (R8)
 Central dispatcher (bash, not AI). Manages the schedule for all Roles, sends Telegram notifications, runs a nightly code review.
 
-Install (in terminal): `bash ~/IWE/FMT-exocortex-template/roles/synchronizer/install.sh`
+Install (in terminal): `bash ~/IWE/IWE/roles/synchronizer/install.sh`
 
 ---
 
@@ -131,7 +131,7 @@ Other memory/*.md files are Platform files. They are updated from upstream via `
 ## Updating IWE
 
 ```bash
-cd ~/IWE/FMT-exocortex-template
+cd ~/IWE/IWE
 bash update.sh          # update
 bash update.sh --check  # check without applying
 ```
@@ -149,7 +149,7 @@ The bot @aist_me_bot accepts notes:
 - `.Note text` (period + text)
 - `.` + reply to or forward of a message
 
-Notes go to `DS-strategy/inbox/fleeting-notes.md` and wait for your action. Note-Review is manual; it does not run automatically in the evening. Three ways to trigger it: the "Note Review" section in the day plan (mini-review during Day Open); a "review notes" request in a Claude Code Session (all steps per `roles/strategist/prompts/note-review.md`, archiving only on your word); the command `bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh note-review` in the terminal (marks `✅proposed` and suggestions only, no archiving).
+Notes go to `DS-strategy/inbox/fleeting-notes.md` and wait for your action. Note-Review is manual; it does not run automatically in the evening. Three ways to trigger it: the "Note Review" section in the day plan (mini-review during Day Open); a "review notes" request in a Claude Code Session (all steps per `roles/strategist/prompts/note-review.md`, archiving only on your word); the command `bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh note-review` in the terminal (marks `✅proposed` and suggestions only, no archiving).
 
 ---
 

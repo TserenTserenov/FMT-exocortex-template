@@ -6,7 +6,7 @@ IWE is distributed as a rolling release (`update.sh` pulls the latest template v
 
 ## Reporting a Vulnerability
 
-The primary channel is private: use the **Security → Report a vulnerability** tab in this Repository ([GitHub Private Vulnerability Reporting](https://github.com/TserenTserenov/FMT-exocortex-template/security/advisories/new)). Do not open a public Issue for vulnerabilities that have not yet been fixed.
+The primary channel is private: use the **Security → Report a vulnerability** tab in this Repository ([GitHub Private Vulnerability Reporting](https://github.com/iwesys/IWE/security/advisories/new)). Do not open a public Issue for vulnerabilities that have not yet been fixed.
 
 If the private form is unavailable, contact **aisystant@gmail.com**.
 
@@ -25,4 +25,3 @@ IWE is not an isolated service. It is a set of scripts and agent instructions th
 ## Dependencies
 
 Report vulnerabilities in dependencies (Python packages in CI, GitHub Actions) through the same channel. `dependabot` and `secret-scanning` are not yet enabled in this Repository (see the open item in the public showcase benchmark).
-

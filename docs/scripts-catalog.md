@@ -21,7 +21,7 @@
 | `check-open-sessions.sh` | `scripts/check-open-sessions.sh` | WP-358 Phase 10 — detector for unclosed external sessions. |
 | `check-orphan-hooks.sh` | `scripts/check-orphan-hooks.sh` | Verifies that every Hook in .claude/hooks/ is actually invoked |
 | `check-platform-compat.sh` | `scripts/check-platform-compat.sh` | Enforces docs/PLATFORM-COMPAT.md as a CI gate. |
-| `check-script-collisions.sh` | `scripts/check-script-collisions.sh` | Check for script collisions between the author zone and the FMT-exocortex-template. |
+| `check-script-collisions.sh` | `scripts/check-script-collisions.sh` | Check for script collisions between the author zone and the IWE. |
 | `check-seed-drift.sh` | `scripts/check-seed-drift.sh` | Verifies that seed/strategy/scripts/ snapshots have not diverged from scripts/ |
 | `check-setup-update-parity.sh` | `scripts/check-setup-update-parity.sh` | Static analysis of paired scripts |
 | `check-wp-transfer-completeness.sh` | `scripts/check-wp-transfer-completeness.sh` | Pre-archiving check for inbox/WP-N/: |
@@ -93,8 +93,8 @@
 | `settings-promote.sh` | `scripts/settings-promote.sh` | Register a Hook in the .claude/settings.json template |
 | `setup-extractor-feeders.sh` | `scripts/setup-extractor-feeders.sh` | Onboarding script for activating the feeder system |
 | `skill-promote.sh` | `scripts/skill-promote.sh` | Promote a skill to the IWE platform Template (v2.1) |
-| `skills-pull.sh` | `scripts/skills-pull.sh` | Sync L1 skills from FMT-exocortex-template into a personal IWE |
-| `smoke-clean-env.sh` | `scripts/smoke-clean-env.sh` | Smoke test for new scripts/*.sh in FMT-exocortex-template. See WP-347 PD-1. |
+| `skills-pull.sh` | `scripts/skills-pull.sh` | Sync L1 skills from IWE into a personal IWE |
+| `smoke-clean-env.sh` | `scripts/smoke-clean-env.sh` | Smoke test for new scripts/*.sh in IWE. See WP-347 PD-1. |
 | `staging-audit.sh` | `scripts/staging-audit.sh` | Detector for B12e Decay drift in STAGING.md |
 | `style-check-post-run.sh` | `scripts/style-check-post-run.sh` | Check Kimi response style after a peer session (WP-388 Phase 9) |
 | `style-promote.sh` | `scripts/style-promote.sh` | Promote a style snapshot file to the IWE platform Template |

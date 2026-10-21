@@ -102,4 +102,3 @@ This file is a specification that the mechanical detector `.claude/hooks/respons
 3. Is there "exit", "PASS", or "SHA" stated as a fact? (P11/A10) → replace with a plain word.
 4. Is there "it was discovered" or "it turned out"? (P12/A11) → rewrite with "I".
 5. Are you listing intermediate steps instead of the outcome? (P7) → collapse into the result.
-

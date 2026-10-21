@@ -2,7 +2,7 @@
 
 > A Pack is a Repository with formalized Domain knowledge.
 > It is the single source-of-truth for domain knowledge in IWE.
-> Process source-of-truth: [SPF](https://github.com/TserenTserenov/SPF)
+> Process source-of-truth: [SPF](https://github.com/iwesys/IWE/tree/main/seed/SPF)
 
 ---
 
@@ -81,7 +81,7 @@ PACK-{slug}/
 └── 07-map/                        # Map of relationships between entities
 ```
 
-Template: [SPF/pack-template](https://github.com/TserenTserenov/SPF/tree/main/pack-template)
+Template: [SPF/pack-template](https://github.com/iwesys/IWE/tree/main/seed/SPF/pack-template)
 
 ---
 
@@ -153,9 +153,8 @@ Do not store in a DS: definitions, Distinctions, Methods, failure modes. Those g
 
 | Resource | What |
 |----------|------|
-| [SPF/process/](https://github.com/TserenTserenov/SPF/tree/main/process) | Detailed instructions for all 11 stages |
-| [SPF/pack-template/](https://github.com/TserenTserenov/SPF/tree/main/pack-template) | Templates for each Pack file |
+| [SPF/process/](https://github.com/iwesys/IWE/tree/main/seed/SPF/process) | Detailed instructions for all 11 stages |
+| [SPF/pack-template/](https://github.com/iwesys/IWE/tree/main/seed/SPF/pack-template) | Templates for each Pack file |
 | [LEARNING-PATH.md §6](LEARNING-PATH.md) | Principles and frameworks: FPF, SPF, Pack |
 | [principles-vs-skills.md](principles-vs-skills.md) | Why a Pack matters more than Skills |
 | `/fpf` in Claude Code | Verify entity correctness against FPF |
-

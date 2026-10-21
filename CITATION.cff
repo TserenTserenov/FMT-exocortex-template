@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: "Tserenov"
     given-names: "Tseren"
-repository-code: "https://github.com/TserenTserenov/FMT-exocortex-template"
-url: "https://github.com/TserenTserenov/FMT-exocortex-template"
+repository-code: "https://github.com/iwesys/IWE"
+url: "https://github.com/iwesys/IWE"
 license: MIT
 version: "0.35.5"
 date-released: "2026-06-30"

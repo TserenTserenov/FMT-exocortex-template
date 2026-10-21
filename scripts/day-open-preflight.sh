@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# routing: helper  skill=day-open  called-by=haiku  deterministic=true
+# see DP.SC.159, DP.ROLE.059
+# day-open-preflight.sh — pre-flight healthcheck for Day Open
+# WP-7 PhaseDay-Open-Hardening (DOC6 3-states: peer-session 2026-07-14-07)
+# Returns a single JSON: {"calendar":"ok|fail|pending|disabled","scout":"ok|fail|disabled|pending","scout_reason":"...",
+#   "triage":"ok|fail|disabled|pending","triage_reason":"...","memory":"ok|stale|missing"}
+# "disabled" = source is intentionally not configured on this machine (Scout/triage repos are absent;
+#   calendar: params.yaml → calendar_source: none, issue #942).
+# "fail" = source is configured, but data was not collected (diagnostics required).
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+# portable_date_offset <days_back> [format] — BSD `date -v` (macOS) vs GNU `date -d` (Linux)
+portable_date_offset() {
+  local days="$1" fmt="${2:-%Y-%m-%d}"
+  date -v-"${days}"d +"$fmt" 2>/dev/null || date -d "$days days ago" +"$fmt" 2>/dev/null
+}
+
+# Loading Telegram credentials (if available)
+AIST_ENV="$HOME/.config/aist/env"
+if [ -f "$AIST_ENV" ]; then
+  set -a
+  source "$AIST_ENV"
+  set +a
+fi
+
+DATE="${1:-$(date +%Y-%m-%d)}"
+IWE="$(iwe_resolve_root)"
+GOV_REPO="$(iwe_resolve_governance_repo)"
+CONFIG="${2:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
+
+# --- Calendar: server-calendar.sh ---
+# issue #942: calendar_source: none in params.yaml = the calendar is not used;
+# report "disabled" (like Scout) and do not call the script at all.
+CALENDAR_STATUS="unknown"
+CALENDAR_SOURCE=$(iwe_calendar_source "$IWE/params.yaml")
+if [ "$CALENDAR_SOURCE" = "none" ]; then
+  CALENDAR_STATUS="disabled"
+else
+  CALENDAR_OUT=$(bash "$SCRIPT_DIR/server-calendar.sh" "$DATE" "$CONFIG" 2>/dev/null || echo "")
+  if [ -z "$CALENDAR_OUT" ]; then
+    CALENDAR_STATUS="fail"
+  elif echo "$CALENDAR_OUT" | grep -q "PENDING"; then
+    CALENDAR_STATUS="pending"
+  elif echo "$CALENDAR_OUT" | grep -qE '(\| [0-9]{2}:[0-9]{2} \||✅)'; then
+    # "✅" covers successful responses with 0 events (no | HH:MM | rows)
+    CALENDAR_STATUS="ok"
+  else
+    CALENDAR_STATUS="fail"
+  fi
+fi
+
+# --- Scout: check backlog + latest log ---
+SCOUT_STATUS="unknown"
+SCOUT_REASON=""
+BACKLOG_FILE="$IWE/DS-agent-workspace/scout/backlog.yaml"
+# issue #827: DS-agent-workspace can exist for an unrelated subsystem
+# (e.g. feedback-triage) while Scout itself was never set up — check
+# Scout's own scout/ subdirectory, not just the parent repo's presence,
+# or a host without Scout falls through into the ok/fail branches below
+# and shows a misleading 🟡 instead of "not installed".
+if [ ! -d "$IWE/DS-agent-workspace/scout" ]; then
+  SCOUT_STATUS="disabled"
+  SCOUT_REASON="DS-agent-workspace/scout not present — Scout subsystem not installed"
+fi
+HAS_PENDING=false
+if [ -f "$BACKLOG_FILE" ] && grep -q "status: pending" "$BACKLOG_FILE" 2>/dev/null; then
+  HAS_PENDING=true
+fi
+
+SCOUT_LOG=$(ls -t "$IWE/DS-autonomous-agents/logs/scout-"*.log 2>/dev/null | head -1 || echo "")
+if [ "$SCOUT_STATUS" = "disabled" ]; then
+  :
+elif [ -n "$SCOUT_LOG" ]; then
+  LOG_DATE=$(basename "$SCOUT_LOG" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' || echo "")
+  if [ "$LOG_DATE" = "$DATE" ]; then
+    SCOUT_STATUS="ok"
+  elif [ "$HAS_PENDING" = "false" ]; then
+    # No tasks in backlog — absence of log = normal (Scout exited with NO_TASKS)
+    SCOUT_STATUS="ok"
+  else
+    SCOUT_STATUS="fail"
+    SCOUT_REASON="last log $LOG_DATE (expected $DATE), backlog has pending tasks"
+    tg_notify "🚨 Scout silent failure: last log $LOG_DATE (expected $DATE), backlog has pending tasks"
+  fi
+else
+  if [ "$HAS_PENDING" = "false" ]; then
+    SCOUT_STATUS="ok"
+  else
+    SCOUT_STATUS="fail"
+    SCOUT_REASON="no scout logs found at all, backlog has pending tasks"
+    tg_notify "🚨 Scout silent failure: no logs found at all, backlog has pending tasks"
+  fi
+fi
+
+# --- Triage: check file ---
+TRIAGE_STATUS="unknown"
+TRIAGE_REASON=""
+TRIAGE_DIR="$IWE/DS-agent-workspace/scheduler/feedback-triage"
+TRIAGE_FILE="$TRIAGE_DIR/$DATE.md"
+# installed = directory exists AND at least one .md report was ever generated (not scaffold-only)
+_triage_installed() {
+  [ -d "$TRIAGE_DIR" ] && find "$TRIAGE_DIR" -maxdepth 1 -name "*.md" | grep -q .
+}
+if ! _triage_installed; then
+  TRIAGE_STATUS="disabled"
+  TRIAGE_REASON="feedback-triage not installed — directory absent or scaffold-only (.gitkeep only)"
+elif [ -f "$TRIAGE_FILE" ]; then
+  TRIAGE_STATUS="ok"
+else
+  # Grace window: generator runs at 00:01 EEST, catch-up may be delayed
+  CURRENT_HOUR=$(date +%H)
+  if [ "$CURRENT_HOUR" -lt 6 ] || { [ "$CURRENT_HOUR" -eq 6 ] && [ "$(date +%M)" -lt 30 ]; }; then
+    TRIAGE_STATUS="pending"
+  else
+    TRIAGE_STATUS="fail"
+    TRIAGE_REASON="no report for $DATE"
+  fi
+  YESTERDAY=$(portable_date_offset 1)
+  YESTERDAY_FILE="$IWE/DS-agent-workspace/scheduler/feedback-triage/$YESTERDAY.md"
+  if [ ! -f "$YESTERDAY_FILE" ]; then
+    tg_notify "🚨 Feedback-triage silent failure: no reports since before $YESTERDAY"
+  fi
+fi
+
+# --- active-wp.md stale check ---
+MEMORY_STATUS="ok"
+ACTIVE_WP="$IWE/$GOV_REPO/current/active-wp.md"
+if [ -f "$ACTIVE_WP" ]; then
+  if stat -f%m "$ACTIVE_WP" > /dev/null 2>&1; then
+    AGE_DAYS=$(( ( $(date +%s) - $(stat -f%m "$ACTIVE_WP") ) / 86400 ))
+  else
+    AGE_DAYS=$(( ( $(date +%s) - $(stat -c%Y "$ACTIVE_WP") ) / 86400 ))
+  fi
+  if [ "$AGE_DAYS" -gt 7 ]; then
+    MEMORY_STATUS="stale"
+  fi
+else
+  MEMORY_STATUS="missing"
+fi
+
+# Output unified JSON (flat strings — backward-compatible with existing
+# consumers reading .scout/.triage as plain values; *_reason are additive)
+jq -n \
+  --arg calendar "$CALENDAR_STATUS" \
+  --arg scout "$SCOUT_STATUS" \
+  --arg scout_reason "$SCOUT_REASON" \
+  --arg triage "$TRIAGE_STATUS" \
+  --arg triage_reason "$TRIAGE_REASON" \
+  --arg memory "$MEMORY_STATUS" \
+  '{calendar: $calendar, scout: $scout, scout_reason: $scout_reason,
+    triage: $triage, triage_reason: $triage_reason, memory: $memory}'

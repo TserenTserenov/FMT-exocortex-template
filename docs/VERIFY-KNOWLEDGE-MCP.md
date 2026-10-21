@@ -1,5 +1,5 @@
 ---
-scope: FMT-exocortex-template
+scope: IWE
 status: active
 title: Verifying Knowledge MCP Server Correctness (Pack/SPF/FPF)
 updated: 2026-07-28

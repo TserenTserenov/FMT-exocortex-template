@@ -1,0 +1,29 @@
+# aisystant-sync-targets.yaml -- WP-415 Pipeline 1 (personal RU template -> aisystant private RU repos)
+# Source: iwesys/IWE (this repo, authoritative)
+# Direction: Variant A, pull-only (pilot decision 2026-07-13, WP-415).
+#   aisystant receives updates from this repo; the team reads/comments there
+#   but never edits the source directly -- no merge-back, no conflict logic.
+#
+# EMPTY BY DEFAULT ON PURPOSE: the actual target repo name(s) inside the
+# `aisystant` org have not been created or decided yet (see
+# DS-ecosystem-development/0.OPS/0.9.Inbox/WP-415-pipeline-architecture.md
+# -- placeholder name `aisystant/docs-aisystant`, "one or several" repos).
+# With this list empty, scripts/copy-to-aisystant.py has nothing to sync
+# against and reports "no targets configured" instead of guessing a name --
+# same defensive pattern as the `Check target repo exists` step in
+# translate-sync.yml (publish-to-iwesys job), which no-ops until the real
+# target exists rather than failing or auto-creating one.
+#
+# Populate one entry per target repo once the pilot confirms the name(s):
+#   targets:
+#     - repo: aisystant/docs-aisystant   # full "org/repo", must already exist
+#       branch: main                     # branch to publish onto
+#
+# Do NOT add an entry for a repo that does not exist yet -- this pipeline
+# never creates repositories, changes org settings, or touches billing/
+# permissions; it only pushes a commit onto an existing branch.
+
+schema_version: 1
+source_org: TserenTserenov
+source_repo: IWE
+targets: []

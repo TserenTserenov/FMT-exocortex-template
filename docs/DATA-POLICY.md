@@ -27,13 +27,13 @@ IWE is delivered in two ways: **distribution** (Git + CLI, for advanced users) a
 | What | Where | Who Controls It |
 |------|-------|-----------------|
 | Profile, sessions, tests, digital twin | Neon PostgreSQL (cloud) | IWE (server side) |
-| Template (methodology, scripts) | Git repo `FMT-exocortex-template` | IWE (updated via `update.sh`) |
+| Template (methodology, scripts) | Git repo `IWE` | IWE (updated via `update.sh`) |
 | `memory/`, `extensions/`, `params.yaml` (your context — in your working directory and in Claude Code memory) | **Your machine + your private GitHub** (memory backup goes to `DS-strategy`) | **You** |
 | DS-strategy (your strategy) | **Your machine + your private GitHub** | **You** |
 
 > **IWE does not have access to your personal files.** Your `memory/`, `extensions/`, and DS-strategy exist only on your machine and in your private GitHub repository.
 
-> **A template fork is not a private space.** `gh repo fork` creates a public fork: GitHub does not allow converting a fork of a public repository to private. The `memory/` and `extensions/` directories inside the `FMT-exocortex-template/` clone are platform samples, not your personal context. Do not place personal data inside the template directory and do not push from it: with a public fork, anyone can see that content. For details on creating a private copy of the template, see [SETUP-GUIDE §1.2b](SETUP-GUIDE.md).
+> **A template fork is not a private space.** `gh repo fork` creates a public fork: GitHub does not allow converting a fork of a public repository to private. The `memory/` and `extensions/` directories inside the `IWE/` clone are platform samples, not your personal context. Do not place personal data inside the template directory and do not push from it: with a public fork, anyone can see that content. For details on creating a private copy of the template, see [SETUP-GUIDE §1.2b](SETUP-GUIDE.md).
 
 ---
 

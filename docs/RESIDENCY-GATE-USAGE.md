@@ -240,4 +240,3 @@ Returns:
 - [ ] Test the denied-consent case
 - [ ] Document needs in the feature README
 - [ ] On release — the pilot runs `grant` or `deny` for each need
-

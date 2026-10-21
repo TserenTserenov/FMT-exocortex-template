@@ -226,7 +226,7 @@ governance vault via symbolic links.
 
 ### 1.1 Create a Workspace Folder
 
-Create **one folder** on your computer for all Repositories — current and future. All Repositories will be cloned into it: `FMT-exocortex-template/`, `DS-strategy/`, `PACK-{domain}/`, `DS-{projects}/`, and others. `CLAUDE.md` will also live in the root of this folder. The default is `~/IWE`:
+Create **one folder** on your computer for all Repositories — current and future. All Repositories will be cloned into it: `IWE/`, `DS-strategy/`, `PACK-{domain}/`, `DS-{projects}/`, and others. `CLAUDE.md` will also live in the root of this folder. The default is `~/IWE`:
 
 ```bash
 mkdir -p ~/IWE
@@ -244,8 +244,8 @@ In the terminal:
 cd ~/IWE
 
 # Fork the template to your GitHub and clone it
-gh repo fork TserenTserenov/FMT-exocortex-template --clone
-cd FMT-exocortex-template
+gh repo fork iwesys/IWE --clone
+cd IWE
 
 # Run the installer
 bash setup.sh
@@ -260,8 +260,8 @@ The Script will ask:
 | GitHub username | Your GitHub login | `ivan-petrov` |
 | Workspace directory | Workspace folder | Just press Enter (auto-detected) |
 | Claude CLI path | Path to claude | Just press Enter (auto-detected) |
-| Strategist launch hour (UTC) | Strategist launch hour | `4` (= 7:00 MSK, 8:00 Almaty) |
-| Timezone description | Time description | `7:00 MSK` |
+| Strategist launch hour (local time) | Hour for the morning plan | `7` |
+| Timezone description | Your local time label | `7:00 local time` |
 
 The Script performs 6 steps:
 1. Substitutes your details into all files (name, paths, timezone)
@@ -269,27 +269,27 @@ The Script performs 6 steps:
 3. Installs `memory/` — working Memory for Claude Code
 4. Configures permissions (`.claude/settings.local.json`) and displays instructions for connecting MCP
 5. Sets up automatic Strategist launch (launchd on macOS)
-6. Creates `DS-strategy/` — your private strategic Repository on GitHub
+6. Creates `DS-my-strategy/` — your private strategic repository on GitHub when GitHub CLI is available
 
 ### 1.2b Fork Visibility and Personal Data
 
 `gh repo fork` creates a **public** fork: GitHub does not allow making a fork of a public Repository private. Therefore:
 
-- The `FMT-exocortex-template/` directory contains platform files (methodology, Scripts, samples). Everything you commit and push from there is publicly visible.
+- The `IWE/` directory contains platform files (methodology, Scripts, samples). Everything you commit and push from there is publicly visible.
 - Personal data is stored **outside** this directory: `memory/` lives in Claude Code Memory (`~/.claude/projects/<slug>/memory`; in the workspace folder this is a symlink to it), `extensions/` and `params.yaml` are in the workspace folder, and strategy and Memory Backup are in the separate private Repository `DS-strategy`.
 - The `memory/` and `extensions/` directories inside the Template clone are platform samples, not your data. Do not edit them to add personal context and do not push personal context into the fork.
 
 **Need a private Template Repository?** It cannot be a fork. Make a private duplicate and keep the original as `upstream`:
 
 ```bash
-git clone --bare https://github.com/TserenTserenov/FMT-exocortex-template.git
-cd FMT-exocortex-template.git
-gh repo create FMT-exocortex-template --private
-git push --mirror "https://github.com/<your-login>/FMT-exocortex-template.git"
-cd .. && rm -rf FMT-exocortex-template.git
-git clone "https://github.com/<your-login>/FMT-exocortex-template.git"
-cd FMT-exocortex-template
-git remote add upstream https://github.com/TserenTserenov/FMT-exocortex-template.git
+git clone --bare https://github.com/iwesys/IWE.git
+cd IWE.git
+gh repo create IWE --private
+git push --mirror "https://github.com/<your-login>/IWE.git"
+cd .. && rm -rf IWE.git
+git clone "https://github.com/<your-login>/IWE.git"
+cd IWE
+git remote add upstream https://github.com/iwesys/IWE.git
 ```
 
 What is known about the private copy (derived by reading the code; a full run on a private copy has not been done):
@@ -297,7 +297,7 @@ What is known about the private copy (derived by reading the code; a full run on
 | Part | What happens |
 |------|--------------|
 | `update.sh` | Fetches updates from the hardcoded original address (`UPSTREAM-CONST`), not from your fork or copy, so switching from a fork to a copy does not change the update source. One exception: in the release channel the rollback check does `git fetch origin <release commit>` in your clone; if the copy does not have this commit, auto-apply with `--yes` stops, but an interactive run works. |
-| `scripts/fmt-critical-alert.sh` | A copy has no "parent", so the Script checks **its own** issue list, which is empty. A result of "0 (✅ clean)" means "nothing to check", not "no problems" (if the tracker is disabled, the Script exits with "cannot check"). Set `IWE_FMT_REPO=TserenTserenov/FMT-exocortex-template` (environment variable or a line in `.exocortex.env`) to make it check the original's issues. |
+| `scripts/fmt-critical-alert.sh` | A copy has no "parent", so the Script checks **its own** issue list, which is empty. A result of "0 (✅ clean)" means "nothing to check", not "no problems" (if the tracker is disabled, the Script exits with "cannot check"). Set `IWE_FMT_REPO=iwesys/IWE` (environment variable or a line in `.exocortex.env`) to make it check the original's issues. |
 | Template directory connection to knowledge search (MCP) | Not verified here. |
 
 ### 1.3 Verify the Installation
@@ -346,7 +346,7 @@ Claude should use `knowledge_search("principles")` and return a list of document
 
 ```bash
 # Verify the full installation (env, files, extensions, MCP availability)
-bash FMT-exocortex-template/setup.sh --validate
+bash IWE/setup.sh --validate
 ```
 
 | Problem | Solution |
@@ -374,7 +374,7 @@ After installation, indexing runs automatically: the initial index is usually fa
 
 In the terminal:
 ```bash
-cd ~/IWE/FMT-exocortex-template
+cd ~/IWE/IWE
 
 # Extractor — extracts knowledge from Sessions, checks inbox (every 3 hours)
 bash roles/extractor/install.sh
@@ -393,7 +393,7 @@ bash roles/synchronizer/install.sh
 
 **`CLAUDE.md` not found:**
 ```bash
-cp ~/IWE/FMT-exocortex-template/CLAUDE.md ~/IWE/CLAUDE.md
+cp ~/IWE/IWE/CLAUDE.md ~/IWE/CLAUDE.md
 ```
 
 **Memory not found:**
@@ -404,12 +404,12 @@ echo $HOME/IWE | tr '/' '-'
 
 # Create the directory and copy
 mkdir -p ~/.claude/projects/-Users-ivan-IWE/memory
-cp ~/IWE/FMT-exocortex-template/memory/*.md ~/.claude/projects/-Users-ivan-IWE/memory/
+cp ~/IWE/IWE/memory/*.md ~/.claude/projects/-Users-ivan-IWE/memory/
 ```
 
 **launchd not loaded:**
 ```bash
-cd ~/IWE/FMT-exocortex-template/roles/strategist
+cd ~/IWE/IWE/roles/strategist
 bash install.sh
 ```
 
@@ -431,11 +431,11 @@ If IWE is already set up on one device, a new device does **not** need to initia
 # 1. Stage 0 (binaries, gh auth, claude CLI) — as usual
 # 2. Workspace folder + clone the template and governance repo (it carries exocortex/)
 mkdir -p ~/IWE && cd ~/IWE
-gh repo fork TserenTserenov/FMT-exocortex-template --clone
+gh repo fork iwesys/IWE --clone
 git clone https://github.com/<your-login>/DS-strategy.git
 
 # 3. Restore Memory from Backup (instead of initializing from scratch)
-bash ~/IWE/FMT-exocortex-template/scripts/restore-from-exocortex.sh ~/IWE/DS-strategy
+bash ~/IWE/IWE/scripts/restore-from-exocortex.sh ~/IWE/DS-strategy
 #    --dry-run  — preview without changes
 #    --force    — overwrite an already-populated memory/
 
@@ -505,7 +505,7 @@ To send thoughts into the planning system directly from Telegram:
 - Write: `.My thought about architecture` (period + text)
 - Or forward/reply to any message with `.`
 
-The note goes to `DS-strategy/inbox/fleeting-notes.md` and waits there for your decision. Notes are not processed automatically in the evenings. When you are ready, process them in one of three ways: open the "Note Review" section in the day plan (a quick review in Day Open, which lists notes waiting for a decision); in a Claude Code Session, ask: "Review notes following the instructions in `roles/strategist/prompts/note-review.md`" (the agent will go through all steps); or run `bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh note-review` in the terminal (runs without a chat session: produces only `✅proposed` tags and suggestions). The Strategist will suggest where to put each note: task → plan, Knowledge → captures, idea → for discussion. Moving a note out of the inbox and into the archive requires your explicit instruction in a live Session.
+The note goes to `DS-strategy/inbox/fleeting-notes.md` and waits there for your decision. Notes are not processed automatically in the evenings. When you are ready, process them in one of three ways: open the "Note Review" section in the day plan (a quick review in Day Open, which lists notes waiting for a decision); in a Claude Code Session, ask: "Review notes following the instructions in `roles/strategist/prompts/note-review.md`" (the agent will go through all steps); or run `bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh note-review` in the terminal (runs without a chat session: produces only `✅proposed` tags and suggestions). The Strategist will suggest where to put each note: task → plan, Knowledge → captures, idea → for discussion. Moving a note out of the inbox and into the archive requires your explicit instruction in a live Session.
 
 ## Stage 4: WakaTime — Time Tracking (10 min, optional)
 
@@ -734,16 +734,16 @@ Note review for Telegram notes is not in this list: it does not run automaticall
 In the terminal:
 ```bash
 # Day plan right now
-bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh day-plan
+bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh day-plan
 
 # Strategy session (interactive)
-bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh strategy-session
+bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh strategy-session
 
 # Note review: from terminal, only tags and suggestions; archiving and clearing only in a Claude Code Session, at your instruction
-bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh note-review
+bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh note-review
 
 # Weekly summary
-bash ~/IWE/FMT-exocortex-template/roles/strategist/scripts/strategist.sh week-review
+bash ~/IWE/IWE/roles/strategist/scripts/strategist.sh week-review
 
 # Extractor: extract knowledge from the current session (assembled runtime copy, not the raw file in FMT)
 bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" session-close
@@ -752,7 +752,7 @@ bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" session-close
 bash "$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" inbox-check
 
 # Synchronizer: status of all tasks
-bash ~/IWE/FMT-exocortex-template/roles/synchronizer/scripts/scheduler.sh status
+bash ~/IWE/IWE/roles/synchronizer/scripts/scheduler.sh status
 ```
 
 ## Daily Work: Three Phases (Opening–Work–Closing)
@@ -774,7 +774,7 @@ The exocortex Template is updated with new Protocols, improved prompts, Skills, 
 
 In the terminal:
 ```bash
-cd ~/IWE/FMT-exocortex-template
+cd ~/IWE/IWE
 bash update.sh
 ```
 
@@ -875,7 +875,7 @@ Yes. The Strategist is automation (morning plans, Reviews). Without it, Claude C
 A Pack is a Domain knowledge base. It is created later, once you have accumulated enough captures. The first step is working with `captures.md` through the Extractor.
 
 **How do I check MCP?**
-Type `/mcp` in Claude Code — servers should show Connected. Ask: "Find documents about principles." Not working? Run `bash FMT-exocortex-template/setup.sh --validate` — it will show exactly what is broken. See step 1.3b for details.
+Type `/mcp` in Claude Code — servers should show Connected. Ask: "Find documents about principles." Not working? Run `bash IWE/setup.sh --validate` — it will show exactly what is broken. See step 1.3b for details.
 
 **Is my data safe?**
 DS-strategy is a private Repository. MEMORY.md is a local file. Nothing is published without your knowledge. For details on what is sent to external servers (Claude API, WakaTime, GitHub), see the [Security and Privacy](#security-and-privacy) section.
@@ -897,7 +897,7 @@ rm -rf ~/.claude/projects/*/memory/
 rm -rf ~/.local/state/exocortex/
 
 # Repositories (optional)
-rm -rf ~/IWE/FMT-exocortex-template
+rm -rf ~/IWE/IWE
 rm -rf ~/IWE/DS-strategy
 ```
 
@@ -931,4 +931,4 @@ rm -rf ~/IWE/DS-strategy
 | `DP.ROLE.001` | Full registry of AI roles (21 roles) |
 
 > **Need help?** Ask the bot @aist_me_bot — it searches the Platform knowledge base (Pack).
-> **Technical issue?** Open an issue: [github.com/aisystant/FMT-exocortex-template/issues](https://github.com/TserenTserenov/FMT-exocortex-template/issues)
+> **Technical issue?** Open an issue: [github.com/aisystant/IWE/issues](https://github.com/iwesys/IWE/issues)

@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""Detector for bloated index-files.
+
+Rule: feedback_memory_index_discipline.md (auto-memory).
+Headers and columns of registry files-registries are kept as an index with one-line hooks;
+changelog / status / entity context — in source-of-truth, not in the index.
+
+Usage:
+    check-index-health.py [ROOT]
+
+ROOT: scan root (default: ~/IWE).
+
+Exit code:
+    0 — all OK
+    1 — found WARN or FAIL
+    2 — startup error (root not found)
+
+Scans by file names: MEMORY.md, WP-REGISTRY.md, REGISTRY.md, INDEX.md,
+CATALOG.md, TOC.md, MAPSTRATEGIC.md, Projects.md, *-registry.md, *-index.md,
+*-catalog.md. Skips archive/, node_modules/, .git/, .venv/.
+
+Criteria (char count, not bytes):
+    FAIL: size >100KB | any line >500 ch | table cell >400 ch
+    WARN: size >30KB | any line >300 ch | table cell >200 ch
+    OK: all values are below thresholds.
+    Size on its own — weak indicator: registry 300 WP × 100 ch = 30KB.
+
+    MEMORY.md — separate thresholds: FAIL at the context loader limit
+    (~24.4 KiB characters), WARN — headroom before the limit (issue #677: live index
+    memory is truncated by the loader earlier, than the general thresholds trigger).
+
+Tree traversal follows symlink's (issue #677: `memory/` on a typical installation —
+symlink to auto-memory) with cycle protection. The directory, where the live
+MEMORY.md, is treated as the memory store — notes matching the pattern *-index.md/*-catalog.md
+inside it are not treated as registries (otherwise this is a new class of false positives
+after enabling symlink's).
+
+Skipping files via a comment at the top of the file:
+    <!-- index-health: skip --> — do not scan
+    <!-- index-health: skip-cells --> — do not check table cells
+        (for methodological matrix tables such as Projects.md-matrix tables of type Projects.md VDV cascade)
+"""
+from __future__ import annotations
+
+import os
+import re
+import sys
+from pathlib import Path
+
+# Row-WP in the registry: first cell = number (possibly bold/strikethrough).
+# Done-formatting (formatting.md §Done): a closed WP is struck through (~~...~~).
+# Defect: status ✅ is set, but the number is not wrapped in ~~ → the row appears active.
+_WP_NUM_CELL = re.compile(r"^\*{0,2}~{0,2}\*{0,2}\d+\*{0,2}~{0,2}\*{0,2}$")
+_DONE_EMOJI = "✅"
+_STATUS_EMOJI = (
+    "✅", "🔄", "⏳", "⏸", "↗️", "📦", "🚧", "❌", "⚪",
+    "🟢", "🟡", "🔴", "⚫",
+)
+_CELL_LEAD_MARKUP = "*~ \t"
+# Tolerates a trailing explanation inside the same comment, e.g.
+# "<!-- index-health: skip-cells — WP registry, long closure cells -->"
+# (issue #907 finding 2: the old literal substring check required the
+# comment to contain nothing else, so a marker written with any commentary
+# silently never matched -- no warning, no effect, for as long as nobody
+# happened to re-check it against the raw text). Anchored to the WHOLE
+# line (cold-review finding, 24.09): a wider search window (see
+# _index_health_window below) makes it reachable for prose that merely
+# mentions the marker's syntax as an example -- a real directive in this
+# codebase's own style is always alone on its line.
+_INDEX_HEALTH_RE = re.compile(r"^[ \t]*<!--\s*index-health:\s*(skip-cells|skip)\b[^>]*-->[ \t]*$", re.MULTILINE)
+_STATUS_HEADERS = {"st", "status", "status", "state"}
+_WP_NUMBER_HEADERS = {"#", "№", "wp", "wp", "id"}
+
+NAME_PATTERNS = {
+    "MEMORY.md",
+    "WP-REGISTRY.md",
+    "REGISTRY.md",
+    "INDEX.md",
+    "CATALOG.md",
+    "TOC.md",
+    "MAPSTRATEGIC.md",
+    "Projects.md",
+}
+GLOB_PATTERNS = ["*-registry.md", "*-index.md", "*-catalog.md"]
+SKIP_DIRS = {"archive", "inbox", "drafts", "sessions", "exocortex",
+             "node_modules", ".git", ".venv", "__pycache__"}
+# exocortex/ is skipped: it is a backup-mirror auto-memory (Day Close snapshot).
+# The actual source — ~/.claude/projects/.../memory/. Files are updated automatically.
+
+SIZE_WARN = 30 * 1024       # 30 KB — informational threshold
+SIZE_FAIL = 100 * 1024      # 100 KB — clearly hypertrophied
+LINE_WARN = 300
+LINE_FAIL = 500
+CELL_WARN = 200
+CELL_FAIL = 400
+# Size alone — is a weak marker: a registry of 300 WP × 100 chars = 30KB, normal.
+# Real markers — long lines/cells.
+
+# MEMORY.md — separate thresholds (issue #677): SIZE_WARN/FAIL above the limit
+# context loader, so for a live memory index it is unreachable by
+# design — the file will be truncated by the loader sooner, than this threshold triggers.
+# FAIL = FAIL = the loader limit itself (~24.4 KiB characters), WARN = WARN = headroom before it.
+MEMORY_SIZE_FAIL = 24986
+MEMORY_SIZE_WARN = int(MEMORY_SIZE_FAIL * 0.85)
+
+
+def _plain_table_cell(cell: str) -> str:
+    return cell.strip("*~` \t").rstrip(".").casefold()
+
+
+def _status_column(cells: list[str]) -> int | None:
+    """Find the status column from a Markdown registry header."""
+    if not cells or _plain_table_cell(cells[0]) not in _WP_NUMBER_HEADERS:
+        return None
+    for index, cell in enumerate(cells[1:], start=1):
+        if _plain_table_cell(cell) in _STATUS_HEADERS:
+            return index
+    return None
+
+
+def _status_cell(cells: list[str], status_column: int | None) -> str | None:
+    """Return the header-bound status, with a legacy emoji fallback."""
+    if status_column is not None and status_column < len(cells):
+        return cells[status_column].lstrip(_CELL_LEAD_MARKUP)
+    for cell in cells[1:]:
+        head = cell.lstrip(_CELL_LEAD_MARKUP)
+        if head.startswith(_STATUS_EMOJI):
+            return head
+    return None
+
+
+def _index_health_window(text: str) -> str:
+    """Where a skip marker is allowed to live (issue #907 finding 1).
+
+    The original fixed first-512-chars window has nowhere legal for the
+    marker once a file's YAML frontmatter alone exceeds it (an ordinary
+    long `summary` field is enough): before it breaks frontmatter parsing,
+    after it is invisible to the detector. Keep the original window as-is
+    (every placement that already works today keeps working) and add the
+    first ~20 lines right after a closing frontmatter `---`.
+    """
+    window = text[:512]
+    if text.startswith("---\n") or text.startswith("---\r\n"):
+        close = re.search(r"\n---[ \t]*\r?\n", text[3:])
+        if close:
+            body_start = 3 + close.end()
+            extra_lines = text[body_start:].splitlines()[:20]
+            window += "\n" + "\n".join(extra_lines)
+    return window
+
+
+def _index_health_marker(window: str) -> tuple[str | None, str | None]:
+    """Return (marker, warning); marker is 'skip', 'skip-cells' or None.
+
+    issue #907 finding 2: a marker comment that carries a trailing
+    explanation used to defeat the old literal substring check completely
+    -- the exemption silently never took effect, no warning, indistinguishable
+    from "no marker was ever placed". Parse with a regex tolerant of
+    trailing text inside the comment, and warn when the header mentions the
+    key but no known directive parses (typo, renamed value) instead of
+    doing nothing.
+    """
+    match = _INDEX_HEALTH_RE.search(window)
+    if match:
+        return match.group(1), None
+    if "index-health:" in window:
+        return None, "index-health: header marker is present, but the directive was not recognized (expected skip or skip-cells)"
+    return None, None
+
+
+def check_file(path: Path) -> dict:
+    out = {
+        "size": 0,
+        "long_lines": [],      # list of (lineno, char_len)
+        "long_cells": [],      # list of (lineno, cell_idx, char_len)
+        "done_no_strike": [],  # list of (lineno, wp_number) — ✅ without strikethrough
+        "skip": False,
+        "skip_cells": False,
+        "size_skip": False,
+        "marker_warning": None,
+    }
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        out["skip"] = True
+        return out
+    # Characters, not bytes (issue #677) — the docstring promises a char count char count, and
+    # a Cyrillic character in UTF-8 weighs twice as much as one character in UTF-8: a threshold, calibrated against
+    # bytes, fires at a different volume, than what the loader counts.
+    out["size"] = len(text)
+
+    head = _index_health_window(text)
+    marker, warning = _index_health_marker(head)
+    out["marker_warning"] = warning
+    # index-health: skip disables BLOAT checks (size/line length/cells),
+    # but NOT the semantics of done-done formatting — it is cheap and does not depend on size.
+    size_skip = marker == "skip"
+    out["size_skip"] = size_skip
+    if marker == "skip-cells":
+        out["skip_cells"] = True
+
+    status_column = None
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        n = len(line)
+        is_table_row = line.lstrip().startswith("|")
+        if not is_table_row:
+            status_column = None
+        # skip-cells: table with acceptably large cells → do not alert
+        # neither on cells, nor on the length of the table row itself
+        if not size_skip and n > LINE_WARN and not (out["skip_cells"] and is_table_row):
+            out["long_lines"].append((lineno, n))
+
+        if is_table_row:
+            # markdown table row: split by | and drop outer empties
+            raw = line.split("|")
+            cells = [c.strip() for c in raw[1:-1]] if len(raw) >= 3 else []
+            detected_status_column = _status_column(cells)
+            if detected_status_column is not None:
+                status_column = detected_status_column
+            # skip separator rows (all cells are dashes)
+            if cells and all(set(c) <= set("-: ") for c in cells):
+                continue
+            # done-done formatting: only the leading emoji of the STATUS CELL
+            # determines the state of the WP. A checkmark inside the description of a completed Phase does not
+            # turn an active WP into a closed one (issue #531).
+            if cells and _WP_NUM_CELL.match(cells[0]) and "~~" not in cells[0]:
+                status = _status_cell(cells, status_column)
+                if status is not None and status.startswith(_DONE_EMOJI):
+                    num = re.sub(r"[*~]", "", cells[0])
+                    out["done_no_strike"].append((lineno, num))
+            if not out["skip_cells"] and not size_skip:
+                for idx, cell in enumerate(cells):
+                    cn = len(cell)
+                    if cn > CELL_WARN:
+                        out["long_cells"].append((lineno, idx, cn))
+    return out
+
+
+def classify(findings: dict, size_warn: int = SIZE_WARN, size_fail: int = SIZE_FAIL) -> str:
+    # Defaults keep the pre-#677 single-arg call signature working for
+    # existing external callers (setup/test-update-edge-cases.sh T20) that
+    # never needed MEMORY.md's separate thresholds — main() below still
+    # passes them explicitly for that one filename.
+    size = 0 if findings["size_skip"] else findings["size"]
+    max_line = max((n for _, n in findings["long_lines"]), default=0)
+    max_cell = max((n for _, _, n in findings["long_cells"]), default=0)
+    if size > size_fail or max_line > LINE_FAIL or max_cell > CELL_FAIL:
+        return "FAIL"
+    if size > size_warn or max_line > LINE_WARN or max_cell > CELL_WARN \
+            or findings["done_no_strike"]:
+        return "WARN"
+    return "OK"
+
+
+def _walk_dirs(root: Path):
+    """os.walk with followlinks, guarded against symlink cycles.
+
+    rglob() does not descend into symlinked directories at all (issue #677) —
+    live indexes under `memory/` (a symlink to auto-memory on a standard
+    install) never reach the scanner. followlinks=True fixes that, at the
+    cost of needing an explicit cycle guard: a symlink loop would otherwise
+    walk forever.
+    """
+    visited_real_dirs: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+        real_dir = os.path.realpath(dirpath)
+        if real_dir in visited_real_dirs:
+            dirnames[:] = []
+            continue
+        visited_real_dirs.add(real_dir)
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        yield Path(dirpath), filenames
+
+
+def _find_memory_dirs(root: Path) -> set[Path]:
+    """Directories containing a live MEMORY.md — the memory store itself.
+
+    Notes inside it named like a registry (`*-index.md`, `*-catalog.md`) are
+    ordinary memory notes, not maintained indexes (issue #677) — flagging
+    them once symlinks are followed would be a new false-positive class.
+    """
+    return {
+        dirpath
+        for dirpath, filenames in _walk_dirs(root)
+        if "MEMORY.md" in filenames
+    }
+
+
+def iter_index_files(root: Path):
+    memory_dirs = _find_memory_dirs(root)
+    for dirpath, filenames in _walk_dirs(root):
+        in_memory_dir = dirpath in memory_dirs
+        for filename in filenames:
+            if not filename.endswith(".md"):
+                continue
+            path = dirpath / filename
+            if filename in NAME_PATTERNS:
+                yield path
+                continue
+            if in_memory_dir:
+                continue
+            for pat in GLOB_PATTERNS:
+                if path.match(pat):
+                    yield path
+                    break
+
+
+def fmt_file_line(path: Path, root: Path, findings: dict) -> str:
+    rel = path.relative_to(root)
+    size_kb = findings["size"] / 1024
+    parts = [f"{rel}  {size_kb:.1f}KB"]
+    if findings["long_lines"]:
+        top = max(findings["long_lines"], key=lambda x: x[1])
+        parts.append(f"long-line L{top[0]}={top[1]}ch ({len(findings['long_lines'])}×)")
+    if findings["long_cells"]:
+        top = max(findings["long_cells"], key=lambda x: x[2])
+        parts.append(f"long-cell L{top[0]}={top[2]}ch ({len(findings['long_cells'])}×)")
+    if findings["done_no_strike"]:
+        nums = ",".join(n for _, n in findings["done_no_strike"])
+        parts.append(f"done-no-strike WP-[{nums}] ({len(findings['done_no_strike'])}×)")
+    return "  " + "  ".join(parts)
+
+
+def _default_workspace() -> Path:
+    """Resolve the workspace root the same way the shell tooling does
+    (iwe-env-bootstrap.sh): explicit env var wins, ~/IWE is only a last
+    resort. Without this, an install at a non-default path is always
+    scanned at the wrong root and Day Close degrades silently (issue #834,
+    same root cause as #638 in memory-drift-scan.py)."""
+    for var in ("IWE_WORKSPACE", "IWE_ROOT", "WORKSPACE_DIR"):
+        value = os.environ.get(var)
+        if value:
+            return Path(value)
+    return Path.home() / "IWE"
+
+
+def main() -> int:
+    root = Path(sys.argv[1]) if len(sys.argv) > 1 else _default_workspace()
+    if not root.is_dir():
+        print(f"FAIL: root dir not found: {root}", file=sys.stderr)
+        return 2
+
+    buckets = {"FAIL": [], "WARN": [], "OK": [], "SKIP": []}
+    marker_warnings = []
+    for path in sorted(iter_index_files(root)):
+        findings = check_file(path)
+        if findings["marker_warning"]:
+            marker_warnings.append((path, findings["marker_warning"]))
+        if findings["skip"]:
+            buckets["SKIP"].append((path, findings))
+            continue
+        if path.name == "MEMORY.md":
+            size_warn, size_fail = MEMORY_SIZE_WARN, MEMORY_SIZE_FAIL
+        else:
+            size_warn, size_fail = SIZE_WARN, SIZE_FAIL
+        buckets[classify(findings, size_warn, size_fail)].append((path, findings))
+
+    total = sum(len(v) for v in buckets.values())
+    print(f"Index health scan — root: {root}")
+    print(f"Scanned: {total} files ({len(buckets['FAIL'])} FAIL, "
+          f"{len(buckets['WARN'])} WARN, {len(buckets['OK'])} OK, "
+          f"{len(buckets['SKIP'])} skip)")
+
+    for level in ("FAIL", "WARN"):
+        if not buckets[level]:
+            continue
+        print(f"\n=== {level} ({len(buckets[level])}) ===")
+        for path, findings in buckets[level]:
+            print(fmt_file_line(path, root, findings))
+
+    if buckets["SKIP"]:
+        print(f"\n=== SKIP ({len(buckets['SKIP'])}) ===")
+        for path, _ in buckets["SKIP"]:
+            print(f"  {path.relative_to(root)}")
+
+    if marker_warnings:
+        print(f"\n=== MARKER WARNINGS ({len(marker_warnings)}) ===")
+        for path, warning in marker_warnings:
+            print(f"  {path.relative_to(root)}: {warning}")
+
+    return 1 if (buckets["FAIL"] or buckets["WARN"]) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

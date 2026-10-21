@@ -1,0 +1,16 @@
+# Role manifest — Extractor (R2)
+# Source-of-truth: DP.ROLE.001 §3.2
+# Contract: roles/ROLE-CONTRACT.md
+
+name: extractor
+id: R2
+type: agential
+display_name: "Extractor"
+
+runner: scripts/extractor.sh
+
+install:
+  auto: false
+  priority: 2
+
+notify_template: extractor.sh

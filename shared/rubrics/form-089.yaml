@@ -1,0 +1,153 @@
+# FORM.089 §6.1 v5.0 — Mastery level diagnostic rubrics (WP-370)
+# Source of Truth for diagnose/SKILL.md
+# Changes here require updating SKILL.md; verify: python3 scripts/generate-diagnose-skill.py --check
+#
+# v5.0 changes (WP-370):
+# - cp.skl removed from Phase 1 slots (now derived: scores['cp.skl'] = scores['cp.rhy'])
+# - cp.rhy promoted to Phase 1 (was drill-down only)
+# - cp.int added to Phase 1
+# - All question texts updated to match SKILL.md v5.0
+
+schema_version: "5.0"
+method: "CAT (Cognitive Assessment Tool)"
+start_stage: 3
+max_questions: 6
+validity_days: 180
+
+slots:
+  cp.rhy:
+    name: "Regularity and time tracking"
+    phase: 1
+    order: 1
+    question: |
+      How do you track time spent on self-development and how regular is your rhythm?
+      Approximately how many hours per week?
+    scale:
+      1: "I do not set aside time, whatever happens"
+      2: "I try, but without a regular rhythm (1-2 hr/wk)"
+      3: "Clearly weekly (3-4 hr/wk)"
+      4: "Daily practice + tracker (5-10 hr/wk)"
+      5: "Automated + artifacts (10+ hr/wk)"
+    drill_down_slot: cp.rhy
+
+  cp.wld:
+    name: "Worldview and systems perspective"
+    phase: 1
+    order: 2
+    question: |
+      How do you make important decisions?
+      Through intuition, values or systems analysis?
+    scale:
+      1: "Mostly intuitively"
+      2: "I try different approaches, nothing has settled yet"
+      3: "Through articulated principles / worldview"
+      4: "Systematically: goals, constraints, alternatives"
+      5: "I pass my methods and principles on to others"
+    drill_down_slot: cp.wld
+
+  cp.int:
+    name: "Systems thinking"
+    phase: 1
+    order: 3
+    question: |
+      Do you apply systems thinking — do you see roles, boundaries,
+      interfaces, supersystems in real tasks?
+    scale:
+      1: "No experience"
+      2: "I have heard of it(), but do not apply it"
+      3: "Basic distinctions (role/function/boundary)"
+      4: "Systems analysis applied at work"
+      5: "I formalize models, teach others"
+    drill_down_slot: cp.int
+
+  cp.agt:
+    name: "Agency and initiative"
+    phase: 1
+    order: 4
+    question: |
+      What share of tasks over the past month were initiated by you personally —
+      not «handed down from above, but spotted and taken on by yourself», you noticed and picked up yourself?
+    scale:
+      1: "Almost everything is handed down from above"
+      2: "Sometimes on my own(my own), rarely"
+      3: "About half — mine"
+      4: "Most tasks — my own initiative"
+      5: "I set the agenda for others"
+    drill_down_slot: cp.agt
+
+  cp.iwe:
+    name: "Work environment and tools (informational)"
+    phase: 1
+    order: 5
+    informational: true
+    question: |
+      How well is your knowledge-work environment set up —
+      notes, knowledge base, tools (VS Code + Pack + AI, or alternatives)?
+    scale:
+      1: "No environment at all"
+      2: "Very basic (notes on phone, folder in the cloud)"
+      3: "Basically configured, I use it regularly"
+      4: "Several services, structure, links, search"
+      5: "Developing it as a system — Pack/protocols/agents"
+    drill_down_slot: null
+
+drill_down:
+  cp.rhy:
+    name: "Rituals and regularity"
+    question: "Do you have «rituals» start/end of the work week? Or regular reflection checkpoints?"
+    scale:
+      1: "Nothing at all"
+      2: "I sometimes do a wrap-up"
+      3: "Weekly ritual"
+      4: "Structured rituals"
+      5: "Full ORZ-practice"
+
+  cp.wld:
+    name: "Worldview (clarification)"
+    question: "Can you name 2-3 principles, that guide your decisions? How explicit are they?"
+    scale:
+      1: "Not formulated"
+      2: "Vague sense"
+      3: "Can name 1-2"
+      4: "Clear, recorded"
+      5: "Working system"
+
+  cp.int:
+    name: "Systems thinking (clarification)"
+    question: "Have you tried analysing the situation through the supersystem and subsystem? Identifying roles, functions, constraints?"
+    scale:
+      1: "Unfamiliar"
+      2: "Heard of it(), have not applied it()"
+      3: "Intuitively"
+      4: "Consciously"
+      5: "Teach others"
+
+  cp.agt:
+    name: "Agency (clarification)"
+    question: "Do you take responsibility for the outcome, even when circumstances were unfavourable?"
+    scale:
+      1: "I attribute it to circumstances"
+      2: "Sometimes I do"
+      3: "Usually I do"
+      4: "Always I do"
+      5: "I set the standards"
+
+scoring:
+  stage_formula: "min(vals.values())"
+  bottleneck_formula: "min(mandatory_scores, key=mandatory_scores.get)"
+  stream_formula: "S + max(1, min(4, stage))"
+  default_missing: 2
+  stages:
+    1: { name: "Ad hoc", label: "S1-Foundation" }
+    2: { name: "Practitioner", label: "S2-Systematisation" }
+    3: { name: "Systematic", label: "S3-Scale" }
+    4: { name: "Disciplined", label: "S4-Transfer" }
+    5: { name: "Proactive", label: "S5-Transfer" }
+
+bottleneck_labels:
+  cp.rhy: "regularity and rhythm of sessions"
+  cp.wld: "worldview and systems perspective"
+  cp.skl: "time tracking and focus"
+  cp.iwe: "work environment and tools"
+  cp.int: "systems thinking"
+  cp.agt: "agency and initiative"

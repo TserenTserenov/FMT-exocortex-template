@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# routing: helper  called-by=roles/strategist/scripts/strategist.sh  deterministic=true
+# ds-publish.sh — publish ONE local commit to origin without touching this checkout.
+#
+# Why (issue #941): scheduled roles (strategist, extractor) commit into the
+# governance repo while you may be working in the same checkout. A plain
+# `git pull --rebase && git push` there once lost a week-review commit. This script
+# leaves your checkout alone: it fetches origin, replays the commit in a throw-away
+# worktree on top of the fresh branch tip, and pushes from there.
+#
+# Usage:
+#   ds-publish.sh <repo-dir> <priority> [--reason TEXT] [--from-commit SHA] [--branch NAME]
+#                 [--exact-commit SHA] [--run-id ID]
+#     <priority>      normal | high (kept for the callers' contract; not used to reorder anything)
+#     --reason TEXT   shown in the output only
+#     --from-commit   the single commit to publish (default: HEAD of <repo-dir>)
+#     --branch NAME   the branch on origin to publish to (default: see Behaviour). An isolated
+#                     copy (a worktree on a local-only branch such as strategist/<scenario>-<id>
+#                     or session-isolate/<agent>-<session>) passes the branch it was created
+#                     from: origin has no branch named after the copy.
+#     --exact-commit  issue #1230: lib/publish-gate.sh::publish_commit() always passes this
+#                     with the same value as --from-commit (this script only ever publishes
+#                     one commit, never a range) -- accepted and asserted equal, never changes
+#                     behaviour. A mismatch means the caller's contract drifted; fail loud.
+#     --run-id ID     issue #1230: correlates one run's messages in the notification queue;
+#                     shown in the output, not otherwise used by this script.
+#
+# Behaviour:
+#   - target branch = --branch NAME when given; otherwise the branch currently checked out in
+#     <repo-dir> (origin/HEAD, then main, when HEAD is detached); a target that origin does
+#     not have is a fetch failure (exit 1), never a new branch on origin;
+#   - a commit already on origin (an ancestor of the tip, or an equivalent patch whose paths are
+#     still identical on the tip: a reverted patch does not count) is a successful no-op;
+#   - if origin moved between fetch and push, the commit is replayed on the new tip
+#     (up to 3 attempts); never a force push;
+#   - your working tree, index and HEAD are never modified.
+#
+# Exit codes: 0 published or already published | 1 usage / precondition / fetch failure |
+#             2 the commit is a merge commit (only single commits are carried) |
+#             3 cherry-pick conflict (the commit stays local) | 4 push refused after retries
+#
+# Not covered on purpose: the extractor publishes through scripts/lib/publish-gate.sh of
+# the governance repo and falls back to a plain push when that library is missing.
+
+set -uo pipefail
+
+MAX_ATTEMPTS=3
+
+die() { echo "ds-publish: $1" >&2; exit "${2:-1}"; }
+
+usage() {
+  echo "usage: ds-publish.sh <repo-dir> <priority: normal|high> [--reason TEXT] [--from-commit SHA] [--branch NAME] [--exact-commit SHA] [--run-id ID]" >&2
+  exit 1
+}
+
+# A --branch value must be a plain branch name: what git accepts under refs/heads/ (no blanks,
+# "..", "~^:?*[\", "@{" and the like) and not starting with "-", which would read as an option.
+is_branch_name() {
+  case "$1" in ""|-*) return 1 ;; esac
+  git check-ref-format "refs/heads/$1" 2>/dev/null
+}
+
+[ "$#" -ge 2 ] || usage
+REPO="$1"; PRIORITY="$2"; shift 2
+case "$PRIORITY" in normal|high) ;; *) usage ;; esac
+
+REASON=""; FROM_COMMIT=""; TARGET_BRANCH=""; EXACT_COMMIT=""; RUN_ID=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --reason)       [ "$#" -ge 2 ] || usage; REASON="$2"; shift 2 ;;
+    --from-commit)  [ "$#" -ge 2 ] || usage; FROM_COMMIT="$2"; shift 2 ;;
+    --exact-commit) [ "$#" -ge 2 ] || usage; EXACT_COMMIT="$2"; shift 2 ;;
+    --run-id)       [ "$#" -ge 2 ] || usage; RUN_ID="$2"; shift 2 ;;
+    --branch)
+      [ "$#" -ge 2 ] || usage
+      is_branch_name "$2" || { echo "ds-publish: --branch: not a branch name: '$2'" >&2; usage; }
+      TARGET_BRANCH="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+
+git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$REPO is not a git work tree"
+git -C "$REPO" remote get-url origin >/dev/null 2>&1 || die "$REPO has no remote 'origin'"
+
+SHA=$(git -C "$REPO" rev-parse --verify --quiet "${FROM_COMMIT:-HEAD}^{commit}") \
+  || die "commit '${FROM_COMMIT:-HEAD}' not found in $REPO"
+
+# --exact-commit never carries different information than --from-commit today (this script
+# only ever replays one commit); a mismatch means publish-gate.sh's contract drifted.
+if [ -n "$EXACT_COMMIT" ]; then
+  EXACT_SHA=$(git -C "$REPO" rev-parse --verify --quiet "${EXACT_COMMIT}^{commit}") \
+    || die "--exact-commit: commit '$EXACT_COMMIT' not found in $REPO"
+  [ "$EXACT_SHA" = "$SHA" ] \
+    || die "--exact-commit ($EXACT_SHA) does not match --from-commit ($SHA)"
+fi
+
+if [ "$(git -C "$REPO" rev-list --parents -n 1 "$SHA" | wc -w | tr -d ' ')" -gt 2 ]; then
+  die "$SHA is a merge commit; only single commits are published" 2
+fi
+
+if [ -n "$TARGET_BRANCH" ]; then
+  BRANCH="$TARGET_BRANCH"
+else
+  BRANCH=$(git -C "$REPO" symbolic-ref --quiet --short HEAD 2>/dev/null \
+    || git -C "$REPO" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+  BRANCH="${BRANCH:-main}"
+fi
+
+echo "ds-publish: ${SHA:0:12} -> origin/$BRANCH${REASON:+ ($REASON)}${RUN_ID:+ [run=$RUN_ID]}"
+
+WORK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/ds-publish.XXXXXX" 2>/dev/null || mktemp -d) || die "cannot create a temp directory"
+WORKTREE="$WORK_ROOT/wt"
+# origin's tip is fetched into a private ref, not into refs/remotes/origin/<branch>: a
+# single-branch clone (or any narrowed remote.origin.fetch) never updates the latter.
+TIP_REF="refs/ds-publish/$$"
+
+cleanup_worktree() {
+  git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+  git -C "$REPO" worktree prune >/dev/null 2>&1 || true
+  git -C "$REPO" update-ref -d "$TIP_REF" >/dev/null 2>&1 || true
+  rm -rf "$WORK_ROOT"
+}
+trap cleanup_worktree EXIT
+
+# Committer identity for the replay: the repo's own, else the commit's author.
+if [ -z "$(git -C "$REPO" config user.email 2>/dev/null)" ]; then
+  GIT_COMMITTER_NAME=$(git -C "$REPO" log -1 --format=%an "$SHA")
+  GIT_COMMITTER_EMAIL=$(git -C "$REPO" log -1 --format=%ae "$SHA")
+  export GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+fi
+
+already_published() {
+  git -C "$REPO" merge-base --is-ancestor "$SHA" "$TIP" 2>/dev/null && return 0
+  git -C "$REPO" rev-parse --verify --quiet "$SHA^" >/dev/null || return 1
+  # Not an ancestor: published only when an EQUIVALENT patch is on origin (`git cherry` marks it
+  # with "-") AND the tree still carries it: every path the commit touches is identical (mode and
+  # blob) on the tip. The patch alone is not enough: it may have been reverted on origin since;
+  # the tree alone is not enough either: two independent commits can converge on the same content.
+  local path seen=0 paths_match=1
+  while IFS= read -r -d '' path; do
+    seen=1
+    [ "$(git -C "$REPO" ls-tree -r "$SHA" -- "$path" 2>/dev/null)" = "$(git -C "$REPO" ls-tree -r "$TIP" -- "$path" 2>/dev/null)" ] || { paths_match=0; break; }
+  done < <(git -C "$REPO" diff-tree -r -z --no-renames --no-commit-id --name-only "$SHA^" "$SHA")
+  # A commit that changes no tree has nothing to deliver.
+  [ "$seen" -eq 0 ] && return 0
+  [ "$paths_match" -eq 1 ] || return 1
+  git -C "$REPO" cherry "$TIP" "$SHA" "$SHA^" 2>/dev/null | grep -q '^-'
+}
+
+attempt=1
+while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+  git -C "$REPO" fetch --quiet origin "+refs/heads/$BRANCH:$TIP_REF" 2>"$WORK_ROOT/fetch.err" \
+    || die "fetch origin/$BRANCH failed: $(tail -n 1 "$WORK_ROOT/fetch.err")"
+  TIP=$(git -C "$REPO" rev-parse --verify --quiet "$TIP_REF^{commit}") || die "origin/$BRANCH not found after fetch"
+
+  if already_published; then
+    echo "ds-publish: already on origin/$BRANCH, nothing to do"
+    exit 0
+  fi
+
+  git -C "$REPO" worktree add --detach --quiet "$WORKTREE" "$TIP" 2>"$WORK_ROOT/wt.err" \
+    || die "cannot create a temp worktree: $(tail -n 1 "$WORK_ROOT/wt.err")"
+
+  if ! git -C "$WORKTREE" cherry-pick "$SHA" >"$WORK_ROOT/pick.out" 2>&1; then
+    # Three different failures share this branch; only a PROVEN empty result may report success.
+    picking=$(git -C "$WORKTREE" rev-parse --verify --quiet CHERRY_PICK_HEAD || true)
+    conflicts=$(git -C "$WORKTREE" diff --name-only --diff-filter=U)
+    if [ -n "$conflicts" ]; then
+      git -C "$WORKTREE" cherry-pick --abort >/dev/null 2>&1 || true
+      die "conflict replaying ${SHA:0:12} on origin/$BRANCH; the commit stays local. $(tail -n 1 "$WORK_ROOT/pick.out")" 3
+    fi
+    if [ -n "$picking" ] && git -C "$WORKTREE" diff --cached --quiet && [ "$(git -C "$WORKTREE" rev-parse HEAD)" = "$TIP" ]; then
+      echo "ds-publish: the commit changes nothing on top of origin/$BRANCH, nothing to do"
+      exit 0
+    fi
+    die "cherry-pick of ${SHA:0:12} failed for a reason other than a conflict; the commit stays local. $(tail -n 1 "$WORK_ROOT/pick.out")"
+  fi
+
+  if git -C "$WORKTREE" push --quiet origin "HEAD:refs/heads/$BRANCH" 2>"$WORK_ROOT/push.err"; then
+    echo "ds-publish: published as $(git -C "$WORKTREE" rev-parse --short=12 HEAD)"
+    exit 0
+  fi
+  echo "ds-publish: push attempt $attempt of $MAX_ATTEMPTS refused: $(tail -n 1 "$WORK_ROOT/push.err")" >&2
+  git -C "$REPO" worktree remove --force "$WORKTREE" >/dev/null 2>&1 || true
+  attempt=$((attempt + 1))
+done
+
+die "push to origin/$BRANCH refused $MAX_ATTEMPTS times; the commit stays local" 4

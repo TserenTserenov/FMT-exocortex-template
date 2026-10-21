@@ -1,0 +1,19 @@
+#!/bin/bash
+# capture-config.sh.example — user configuration template capture_writer.sh.
+#
+# To activate: copy to `.claude/capture-config.sh` (without `.example`)
+# and adapt to your repo structure. File outside FMT-updates (update.sh does not
+# touch) — this is a local override.
+#
+# Default behavior (without file):
+#   agent_incident → is written to `<target_repo>/inbox/incident-log-YYYY-MM.md`,
+#   where target_repo is determined by the detector (HD «Log next to the executor»,
+#   DP.D.049). This means incidents are scattered across the repos, where they occurred.
+#
+# Why override override: if you have a dedicated governance-repo for aggregation
+# incidents (pattern monitoring, retrospectives), set the path — and all
+# agent_incident will flow there.
+
+# Example: aggregation into a dedicated governance-repo (adapt the path).
+# export INCIDENT_TARGET_REPO="${IWE_ROOT:-$HOME/IWE}/<your-governance-repo>"
+# export INCIDENT_REL_DIR="incidents"

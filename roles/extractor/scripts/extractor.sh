@@ -1,0 +1,1648 @@
+#!/bin/bash
+# Knowledge Extractor Agent Runner
+# Launches Claude Code with the specified process KE
+#
+# Usage:
+#   extractor.sh inbox-check     # headless: processing inbox (launchd)
+#   extractor.sh audit           # headless: audit Pack's
+#   extractor.sh audit-scheduled <pack>  # headless: audit of a single Pack' (monthly rotation)
+#   extractor.sh session-close   # convenience wrapper
+#   extractor.sh on-demand       # convenience wrapper
+
+set -e
+
+# Configuration
+# WP-273 R5 fix (Round 5 Evgenia): substituted runner lives in .iwe-runtime/,
+# but prompts/ — read-only, must be taken from FMT via $IWE_TEMPLATE.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Guard: raw file in IWE never substitutes placeholders
+# (build-runtime.sh substitutes them only in the assembled copy under .iwe-runtime/).
+# Running directly from here silently creates directories with the literal name "{{HOME_DIR}}"
+# (bug-2026-07-02-home-dir-placeholder-literal-directory.md).
+case "$SCRIPT_DIR" in
+    */IWE/roles/extractor/scripts)
+        echo "FATAL: extractor.sh was launched from the raw template IWE — placeholders have not been substituted." >&2
+        echo "  Use the assembled copy: \$IWE_RUNTIME/roles/extractor/scripts/extractor.sh" >&2
+        exit 1
+        ;;
+esac
+
+# WP-273 0.29.4 R6.1 fix (issue #271): runtime-resolve instead of build-time {{WORKSPACE_DIR}} — as in strategist.sh.
+WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
+
+# PROMPTS_DIR resolve: $IWE_TEMPLATE → standard FMT → relative (legacy)
+if [ -n "${IWE_TEMPLATE:-}" ] && [ -d "$IWE_TEMPLATE/roles/extractor/prompts" ]; then
+    PROMPTS_DIR="$IWE_TEMPLATE/roles/extractor/prompts"
+elif [ -d "$WORKSPACE/IWE/roles/extractor/prompts" ]; then
+    PROMPTS_DIR="$WORKSPACE/IWE/roles/extractor/prompts"
+    echo "[$(date '+%H:%M:%S')] WARN: \$IWE_TEMPLATE is not set, fallback to $WORKSPACE/IWE. source ~/.zshenv?" >&2
+else
+    PROMPTS_DIR="$REPO_DIR/prompts"
+    echo "[$(date '+%H:%M:%S')] WARN: legacy PROMPTS_DIR fallback to $PROMPTS_DIR (pre-WP-273). Run migrate-to-runtime-target.sh." >&2
+fi
+
+LOG_DIR="$HOME/logs/extractor"
+if [ -n "${CLAUDE_CLI_PATH:-}" ]; then
+    CLAUDE_PATH="$CLAUDE_CLI_PATH"
+elif command -v claude &>/dev/null; then
+    CLAUDE_PATH="$(command -v claude)"
+elif [ -x "$HOME/.local/bin/claude" ]; then
+    CLAUDE_PATH="$HOME/.local/bin/claude"
+elif [ -x "$HOME/.npm-global/bin/claude" ]; then
+    CLAUDE_PATH="$HOME/.npm-global/bin/claude"
+else
+    CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime should have substituted
+fi
+ENV_FILE="$HOME/.config/aist/env"
+
+# AI CLI: override via environment variables (see. strategist.sh)
+AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
+AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
+AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
+
+# AR.293: gate checks the effective program ($AI_CLI), not the literal CLAUDE_PATH —
+# otherwise override remains decorative, when claude is not physically present, but
+# AI_CLI points to a different program that is actually installed.
+if ! command -v "$AI_CLI" >/dev/null 2>&1 && [ ! -x "$AI_CLI" ]; then
+    echo "[$(date '+%H:%M:%S')] ERROR: $AI_CLI CLI not found (AI_CLI/CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$AI_CLI')." >&2
+    exit 127
+fi
+
+# issue #1116: under root, Claude Code refuses --dangerously-skip-permissions
+# outright ("cannot be used with root/sudo privileges for security reasons")
+# -- a hard, permanent incompatibility, not a transient failure. Left
+# unchecked, every scheduled run silently failed deep inside run_claude()
+# (only visible in the log) and still left an isolated worktree behind each
+# time. Checked here (covers audit/session-close/on-demand/git-diff-feed,
+# none of which override the flags) and again wherever a caller overrides
+# AI_CLI_EXTRA_FLAGS locally, before it creates a worktree -- see
+# run_inbox_check_isolated().
+assert_ai_cli_root_compat() {  # <flags>
+    local flags="${1:-}"
+    # IWE_EXTRACTOR_TEST_EUID: test-only override (EUID is bash-readonly, so a
+    # test harness cannot simulate root without it); unset in every real run.
+    local uid="${IWE_EXTRACTOR_TEST_EUID:-${EUID:-$(id -u)}}"
+    [ "$uid" -eq 0 ] || return 0
+    if printf '%s\n' "$flags" | grep -Eq '(^|[[:space:]])--dangerously-skip-permissions([[:space:]]|$)'; then
+        echo "[$(date '+%H:%M:%S')] ERROR: running as root is incompatible with root is incompatible with --dangerously-skip-permissions (AI CLI will reject every call). Remove the flag (AI_CLI_EXTRA_FLAGS/IWE_EXTRACTOR_INBOX_AI_FLAGS) or do not run as root." >&2
+        return 1
+    fi
+    return 0
+}
+
+if ! assert_ai_cli_root_compat "$AI_CLI_EXTRA_FLAGS"; then
+    exit 1
+fi
+
+# issue #17: load NOTIFY_SH_PATH from params.yaml if not already set in environment
+if [ -z "${NOTIFY_SH_PATH:-}" ]; then
+    _params="${IWE_WORKSPACE:-$HOME/IWE}/params.yaml"
+    if [ -f "$_params" ]; then
+        _notify_val=$(grep -E '^notify_sh_path:' "$_params" | sed 's/^notify_sh_path:[[:space:]]*//;s/^"//;s/"$//;s/^'"'"'//;s/'"'"'$//' | tr -d '[:space:]')
+        [ -n "$_notify_val" ] && export NOTIFY_SH_PATH="$_notify_val"
+    fi
+fi
+
+# Creating the log directory
+mkdir -p "$LOG_DIR"
+
+DATE=$(date +%Y-%m-%d)
+HOUR=$(date +%H)
+LOG_FILE="$LOG_DIR/$DATE.log"
+
+# Issue #1006: macOS (no coreutils) and launchd have no timeout(1); a bare `timeout 20 git fetch`
+# was "command not found" and the fetch was silently skipped. Same perl polyfill as
+# scripts/active-wp-sweep.sh and strategist.sh.
+if ! command -v timeout >/dev/null 2>&1; then
+    timeout() {
+        local duration="$1"; shift
+        perl -e '
+            my $timeout = shift @ARGV;
+            my $timed_out = 0;
+            my $pid = fork();
+            if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
+            eval {
+                local $SIG{ALRM} = sub { $timed_out = 1; die "timeout\n"; };
+                alarm $timeout;
+                waitpid($pid, 0);
+                alarm 0;
+            };
+            if ($timed_out) {
+                kill "TERM", $pid;
+                select(undef, undef, undef, 0.5);
+                kill "KILL", $pid;
+                waitpid($pid, 0);
+                exit 124;
+            }
+            # A child ended by a signal reports 128+signal, like the shell does.
+            exit(($? & 127) ? 128 + ($? & 127) : ($? >> 8));
+        ' "$duration" "$@"
+    }
+fi
+
+log() {
+    # `|| true`: a transient failure writing $LOG_FILE (seen live: macOS
+    # "Operation not permitted" on a handful of runs, cause unconfirmed) must
+    # not kill the whole run under `set -e` — every headless caller of this
+    # script treats extractor failure as best-effort, not fatal, and this is
+    # only the logger, not the work itself.
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+notify() {
+    local title="$1"
+    local message="$2"
+    # issue #17: NOTIFY_SH_PATH override for Linux/Docker (set in params.yaml or .exocortex.env)
+    if [ -n "${NOTIFY_SH_PATH:-}" ] && [ -x "$NOTIFY_SH_PATH" ]; then
+        "$NOTIFY_SH_PATH" "$title" "$message" 2>/dev/null || true
+    else
+        # macOS: osascript, Linux: notify-send, fallback: silent
+        printf 'display notification "%s" with title "%s"' "$message" "$title" | osascript 2>/dev/null \
+            || notify-send "$title" "$message" 2>/dev/null \
+            || true
+    fi
+}
+
+notify_telegram() {
+    local scenario="$1"
+    # WP-273 R5 fix: notify.sh — read-only from FMT (not substituted, no placeholders).
+    # Resolution order: $IWE_TEMPLATE → standard FMT path → runtime fallback (legacy).
+    local notify_script
+    if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then
+        notify_script="$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh"
+    elif [ -f "$WORKSPACE/IWE/roles/synchronizer/scripts/notify.sh" ]; then
+        notify_script="$WORKSPACE/IWE/roles/synchronizer/scripts/notify.sh"
+    elif [ -n "${IWE_RUNTIME:-}" ] && [ -f "$IWE_RUNTIME/roles/synchronizer/scripts/notify.sh" ]; then
+        notify_script="$IWE_RUNTIME/roles/synchronizer/scripts/notify.sh"
+    else
+        notify_script="$WORKSPACE/.iwe-runtime/roles/synchronizer/scripts/notify.sh"
+    fi
+    if [ -f "$notify_script" ]; then
+        "$notify_script" extractor "$scenario" >> "$LOG_FILE" 2>&1 || true
+    fi
+}
+
+# Loading environment variables
+load_env() {
+    # An explicit CLAUDE_CODE_OAUTH_TOKEN (launchd plist, shell) beats ENV_FILE too.
+    local explicit_token="${CLAUDE_CODE_OAUTH_TOKEN:-}"
+    if [ -f "$ENV_FILE" ]; then
+        set -a
+        source "$ENV_FILE"
+        set +a
+    fi
+    if [ -n "$explicit_token" ]; then
+        CLAUDE_CODE_OAUTH_TOKEN="$explicit_token"
+        export CLAUDE_CODE_OAUTH_TOKEN
+    fi
+    load_claude_subscription_token
+    prefer_subscription_over_proxy
+}
+
+# WP-5 Phase46: the subscription token lives in its own 600-mode file, not in
+# ENV_FILE. First non-empty source wins; an explicit env var (launchd plist,
+# shell) beats both files:
+#   ~/.secrets/claude_code_oauth_token  raw token, written by scripts/connect.sh
+#   ~/.secrets/claude-subscription      CLAUDE_CODE_OAUTH_TOKEN=<token> (add-secret.sh style)
+# The KEY=value file is parsed for that one key, not sourced: sourcing would run
+# the file as shell and export every other variable it happens to hold.
+load_claude_subscription_token() {
+    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        return 0
+    fi
+    local raw_file="$HOME/.secrets/claude_code_oauth_token"
+    local kv_file="$HOME/.secrets/claude-subscription"
+    local token=""
+    if [ -f "$raw_file" ]; then
+        token="$({ tr -d '[:space:]' <"$raw_file"; } 2>/dev/null || true)"
+    fi
+    if [ -z "$token" ] && [ -f "$kv_file" ]; then
+        # Value = first run of non-space characters after the key (a trailing
+        # `# comment` and CRLF fall away); the last matching line wins; quotes are dropped.
+        token="$({ sed -n -E 's/^(export[[:space:]]+)?CLAUDE_CODE_OAUTH_TOKEN=[[:space:]]*([^[:space:]]*).*/\2/p' "$kv_file" \
+            | tail -n 1 | tr -d "\"'"; } 2>/dev/null || true)"
+    fi
+    if [ -n "$token" ]; then
+        CLAUDE_CODE_OAUTH_TOKEN="$token"
+        export CLAUDE_CODE_OAUTH_TOKEN
+    else
+        # issue #909: without this, the only diagnostic a missing token ever
+        # produced was the later "expired or revoked" ERROR (line ~278) after
+        # a failed AI CLI call -- indistinguishable from a token that really
+        # did expire. Interactive runs can still succeed on the CLI's own
+        # separate interactive login, masking the gap; a launchd/headless run
+        # has no such fallback and fails every night silently in this same
+        # generic-looking way. Say plainly, up front, that no connection was
+        # ever made.
+        log "WARN: token not configured ($raw_file and $kv_file are missing) — nightly/headless runs will fail. Run: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+    fi
+}
+
+# A subscription token must reach the vendor API directly. ENV_FILE may carry a
+# proxy (ANTHROPIC_BASE_URL) and load_env sources it AFTER any wrapper already
+# dropped it, so the client sent the token to the proxy: 401 "Invalid or expired
+# token" (a pilot's remote host, 2026-09-21). That proxy also drops the `tools` array, so it
+# cannot serve headless tool-use at all. Auth policy: a connected subscription
+# wins over proxy/API-key env; IWE_EXTRACTOR_USE_API_ENV=1 opts out for a
+# deliberate custom gateway and then withholds the subscription token from it.
+# A non-Claude AI_CLI keeps its environment but never receives the Claude token
+# (a custom claude binary is declared with CLAUDE_CLI_PATH, not AI_CLI).
+prefer_subscription_over_proxy() {
+    if ! ai_cli_is_claude; then
+        unset CLAUDE_CODE_OAUTH_TOKEN
+        return 0
+    fi
+    if [ "${IWE_EXTRACTOR_USE_API_ENV:-}" = "1" ]; then
+        unset CLAUDE_CODE_OAUTH_TOKEN
+        return 0
+    fi
+    [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || return 0
+    if [ -n "${ANTHROPIC_BASE_URL:-}${ANTHROPIC_API_KEY:-}${ANTHROPIC_AUTH_TOKEN:-}${ANTHROPIC_CUSTOM_HEADERS:-}" ]; then
+        log "Auth: subscription oauth preferred — dropping proxy/API-key env"
+    fi
+    unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_CUSTOM_HEADERS
+}
+
+# AI_CLI may be overridden to a non-Claude CLI (see strategist.sh) — then
+# Claude auth checks and hints are meaningless.
+ai_cli_is_claude() {
+    [ "$AI_CLI" = "$CLAUDE_PATH" ] && return 0
+    # Another spelling of the same binary (`claude` vs /run/current-system/sw/bin/claude)
+    local resolved
+    resolved="$(command -v "$AI_CLI" 2>/dev/null)" || return 1
+    [ "$resolved" = "$CLAUDE_PATH" ] || [ "$resolved" -ef "$CLAUDE_PATH" ]
+}
+
+# WP-5 Phase46: preflight before any headless run. `claude auth status` is the
+# vendor's own answer to "is any login configured?" (env token, API key,
+# keychain on macOS, credentials file) — no API call, exit 1 when nothing is
+# set up. Without it an unauthenticated run dies deep inside run_claude with a
+# generic "AI CLI failed" that a regular user never reads.
+check_auth() {
+    ai_cli_is_claude || return 0
+    local status_out
+    if status_out=$("$AI_CLI" auth status --json 2>&1); then
+        return 0
+    fi
+    log "ERROR: login check Claude Code failed — headless-headless run is not possible. Response 'claude auth status': $(printf '%s' "$status_out" | tr -s '[:space:]' ' ')"
+    log "If this is not a network/transient failure, and the subscription is truly not connected: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+    return 1
+}
+
+run_claude() {
+    local command_file="$1"
+    local extra_args="${2:-}"
+    local commit_mode="${3:-main}"
+    local command_path="$PROMPTS_DIR/$command_file.md"
+
+    if [ ! -f "$command_path" ]; then
+        log "ERROR: Command file not found: $command_path"
+        exit 1
+    fi
+
+    # WP-273 0.29.6 R6.1** escape: build-runtime MUST NOT substitute placeholders
+    # in sed-expressions of this runner'otherwise (otherwise runner after build looks for values instead of
+    # placeholders in prompts). We assemble double-curly-brace tokens via bash-concatenation.
+    local prompt
+    local _gov_repo="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+    local _ws="${IWE_WORKSPACE:-$HOME/IWE}"
+    local _gh_user="${GITHUB_USER:-your-username}"
+    local _o='{''{' _c='}''}'
+    prompt=$(sed \
+        -e "s|${_o}GOVERNANCE_REPO${_c}|$_gov_repo|g" \
+        -e "s|${_o}WORKSPACE_DIR${_c}|$_ws|g" \
+        -e "s|${_o}GITHUB_USER${_c}|$_gh_user|g" \
+        "$command_path")
+
+    # Append extra args to the prompt
+    if [ -n "$extra_args" ]; then
+        prompt="$prompt
+
+## Additional context
+
+$extra_args"
+    fi
+
+    log "Starting process: $command_file"
+    log "Command file: $command_path"
+
+    cd "$WORKSPACE"
+
+    # Run AI CLI with the prompt
+    if ! "$AI_CLI" $AI_CLI_EXTRA_FLAGS \
+        $AI_CLI_PROMPT_FLAG "$prompt" \
+        >> "$LOG_FILE" 2>&1; then
+        log "ERROR: AI CLI failed for $command_file"
+        # WP-5 Phase46: an expired/revoked subscription token is the most likely
+        # cause (TTL is undocumented, seen live) and would otherwise drown in
+        # the generic failure above. Live wording of the CLI error:
+        # "Failed to authenticate. API Error: 401 OAuth access token is invalid."
+        if ai_cli_is_claude && tail -n 20 "$LOG_FILE" | \
+           grep -qiE "failed to authenticate|\b401\b|invalid.?api.?key|unauthorized|not logged in|token is (invalid|expired|revoked)"; then
+            log "ERROR: it appears, the subscription token has expired or been revoked. Reconnect: bash \$IWE_TEMPLATE/roles/extractor/scripts/connect.sh"
+        fi
+        return 1
+    fi
+
+    log "AI CLI finished: $command_file"
+
+    # Commit + push changes (reports, tagged captures)
+    local strategy_dir="$WORKSPACE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+
+    if git -C "$strategy_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        if [ "$commit_mode" = "isolated-inbox" ]; then
+            verify_inbox_outputs "$strategy_dir" || return 1
+        elif [ "$commit_mode" = "isolated-feed" ]; then
+            verify_feed_outputs "$strategy_dir" || return 1
+        elif [ "$commit_mode" = "isolated-audit" ]; then
+            # Read-only contract: a clean tree is the only success and there is
+            # nothing to commit or publish (the report stays in the log).
+            verify_audit_outputs "$strategy_dir" || return 1
+            EXTRACTOR_COMMIT_RESULT="no_changes"
+            notify "KE: $command_file" "Process completed"
+            return 0
+        fi
+        prefilter_changed_reports "$strategy_dir" || return 1
+
+        if ! commit_extractor_changes "$strategy_dir" "$_gov_repo" "$commit_mode"; then
+            return 1
+        fi
+    fi
+
+    # macOS notification
+    notify "KE: $command_file" "Process completed"
+}
+
+verify_inbox_outputs() {
+    local strategy_dir="$1" report new_reports=0
+    while IFS= read -r -d '' report; do
+        if [[ "$report" = *.md ]] && [ -s "$strategy_dir/$report" ]; then
+            new_reports=$((new_reports + 1))
+        fi
+    done < <(git -C "$strategy_dir" ls-files --others --exclude-standard -z -- inbox/extraction-reports/)
+    if [ "$new_reports" -eq 0 ]; then
+        log "ERROR: AI CLI returned success without a new extraction report; publication blocked"
+        return 1
+    fi
+    if [ "${#EXTRACTOR_CAPTURE_PATHS[@]}" -eq 0 ] || \
+       git -C "$strategy_dir" diff --quiet -- "${EXTRACTOR_CAPTURE_PATHS[@]}"; then
+        log "ERROR: AI CLI returned success without updated input marks; publication blocked"
+        return 1
+    fi
+}
+
+# Exit contract of the isolated feeders (session-close-feed, git-diff-feed).
+# Runs inside the throwaway worktree, before anything is committed:
+#   - whatever the agent did (its own commits, staged files) is normalised to
+#     plain working-tree changes against the base commit, so the script alone
+#     decides what is committed;
+#   - every changed path must be a captures input file (capture_source_files);
+#   - either nothing changed (no candidates = normal outcome, success without a
+#     commit) or at least one added line carries a "[feed:...]" marker.
+# Requires EXTRACTOR_FEED_BASE_SHA (set by run_feed_isolated).
+verify_feed_outputs() {
+    local strategy_dir="$1" base="${EXTRACTOR_FEED_BASE_SHA:-}"
+    local src entry path p ok violation=0 feed_lines=0 n
+    local allowed=() feed_changed=()
+    if [ -z "$base" ]; then
+        log "ERROR: feed base commit is unknown; publication blocked"
+        return 1
+    fi
+    if ! git -C "$strategy_dir" reset -q --mixed "$base" >> "$LOG_FILE" 2>&1; then
+        log "ERROR: cannot normalise feed worktree against $base; publication blocked"
+        return 1
+    fi
+    while IFS= read -r src; do
+        allowed+=("${src#"$strategy_dir/"}")
+    done < <(capture_source_files "$strategy_dir/inbox")
+    local status_file
+    status_file=$(mktemp "${TMPDIR:-/tmp}/iwe-feed-status.XXXXXX") || {
+        log "ERROR: cannot create status buffer; publication blocked"
+        return 1
+    }
+    if ! git -C "$strategy_dir" status --porcelain -z --untracked-files=all > "$status_file" 2>> "$LOG_FILE"; then
+        rm -f "$status_file"
+        log "ERROR: git status failed in feed worktree; publication blocked"
+        return 1
+    fi
+    while IFS= read -r -d '' entry; do
+        path="${entry:3}"
+        ok=0
+        for p in "${allowed[@]}"; do
+            if [ "$p" = "$path" ]; then ok=1; break; fi
+        done
+        if [ "$ok" -eq 0 ]; then
+            log "ERROR: feed touched a path outside the captures allowlist: $path"
+            violation=1
+        else
+            feed_changed+=("$path")
+        fi
+    done < "$status_file"
+    rm -f "$status_file"
+    if [ "$violation" -ne 0 ]; then
+        log "ERROR: feed output violates the captures-only contract; publication blocked"
+        return 1
+    fi
+    if [ "${#feed_changed[@]}" -eq 0 ]; then
+        log "Feed no_changes: no capture candidates written"
+        return 0
+    fi
+    local marker_re="\\[feed:${EXTRACTOR_FEED_LABEL:-feed} [0-9]{4}-[0-9]{2}-[0-9]{2}\\]"
+    local deleted
+    for path in "${feed_changed[@]}"; do
+        if git -C "$strategy_dir" cat-file -e "$base:$path" 2>/dev/null; then
+            # Feeders only append: any removed line means accumulated captures were rewritten.
+            # numstat prints "-" for a binary change: it cannot be proven append-only, refuse it.
+            deleted=$(git -C "$strategy_dir" diff --numstat "$base" -- "$path" | awk '$1 == "-" || $2 == "-" {b = 1} {d += $2} END {print (b ? "binary" : d + 0)}')
+            if [ "$deleted" = "binary" ]; then
+                log "ERROR: feed made a binary change to $path (append-only contract); publication blocked"
+                return 1
+            fi
+            if [ "$deleted" -ne 0 ]; then
+                log "ERROR: feed removed $deleted line(s) from $path (append-only contract); publication blocked"
+                return 1
+            fi
+            n=$(git -C "$strategy_dir" diff "$base" -- "$path" | grep -E '^\+### .*'"$marker_re" | wc -l | tr -d ' ')
+        else
+            n=$(grep -E '^### .*'"$marker_re" "$strategy_dir/$path" | wc -l | tr -d ' ')
+        fi
+        feed_lines=$((feed_lines + ${n:-0}))
+    done
+    if [ "$feed_lines" -eq 0 ]; then
+        log "ERROR: feed changed captures without a heading block '### ... [feed:<mode> YYYY-MM-DD]' for this mode; publication blocked"
+        return 1
+    fi
+    log "Feed output verified: $feed_lines [feed:...] block(s) in ${#feed_changed[@]} file(s)"
+}
+
+# Exit contract of the isolated knowledge audit (audit, audit-scheduled):
+# governance is READ-ONLY for it (the prompt only prints a report; fixes need
+# approval). Runs inside the throwaway worktree:
+#   - agent commits/staged files are normalised to plain working-tree changes
+#     against the base commit (EXTRACTOR_FEED_BASE_SHA, set by run_feed_isolated);
+#   - `git status` must then be EMPTY: any new/changed/deleted path is a
+#     violation and blocks; a failing `git status` blocks too (never "clean").
+verify_audit_outputs() {
+    local strategy_dir="$1" base="${EXTRACTOR_FEED_BASE_SHA:-}"
+    local entry violation=0 status_file
+    if [ -z "$base" ]; then
+        log "ERROR: audit base commit is unknown; publication blocked"
+        return 1
+    fi
+    if ! git -C "$strategy_dir" reset -q --mixed "$base" >> "$LOG_FILE" 2>&1; then
+        log "ERROR: cannot normalise audit worktree against $base; publication blocked"
+        return 1
+    fi
+    status_file=$(mktemp "${TMPDIR:-/tmp}/iwe-audit-status.XXXXXX") || {
+        log "ERROR: cannot create status buffer; publication blocked"
+        return 1
+    }
+    if ! git -C "$strategy_dir" status --porcelain -z --untracked-files=all > "$status_file" 2>> "$LOG_FILE"; then
+        rm -f "$status_file"
+        log "ERROR: git status failed in audit worktree; publication blocked"
+        return 1
+    fi
+    while IFS= read -r -d '' entry; do
+        log "ERROR: audit changed governance (read-only contract): ${entry:3}"
+        violation=1
+    done < "$status_file"
+    rm -f "$status_file"
+    if [ "$violation" -ne 0 ]; then
+        log "ERROR: audit output violates the read-only contract; publication blocked"
+        return 1
+    fi
+    log "Audit output verified: governance tree is clean, nothing to publish"
+}
+
+markdown_fence_awk() {
+    cat <<'AWK'
+    function markdown_in_code(line, marker, marker_length) {
+        if (line ~ /^[[:space:]]*(```|~~~)/) {
+            sub(/^[[:space:]]*/, "", line)
+            marker=substr(line,1,1)
+            match(line, /^`+|^~+/); marker_length=RLENGTH
+            if (fence == "") { fence=marker; fence_length=marker_length }
+            else if (fence == marker && marker_length >= fence_length &&
+                     substr(line,marker_length+1) ~ /^[[:space:]]*$/) fence=""
+            return 1
+        }
+        return fence != ""
+    }
+AWK
+}
+
+write_prefilter_section() {
+    local report="$1" status="$2" details="$3" temporary
+    temporary=$(mktemp "${report}.prefilter.XXXXXX") || return 1
+    # Reject malformed managed sections instead of truncating report content.
+    if ! awk "$(markdown_fence_awk)"'
+        { in_code=markdown_in_code($0) }
+        !in_code && /^<!-- extractor-prefilter:start -->$/ { if (inside) exit 1; inside=1; blanks=""; next }
+        !in_code && /^<!-- extractor-prefilter:end -->$/ { if (!inside) exit 1; inside=0; next }
+        !inside {
+            if ($0 ~ /^[[:space:]]*$/) blanks=blanks $0 "\n"
+            else { printf "%s%s\n", blanks, $0; blanks="" }
+        }
+        END { if (inside) exit 1 }
+    ' "$report" > "$temporary"; then
+        rm -f "$temporary"
+        log "ERROR: malformed prefilter section; report preserved: $report"
+        return 1
+    fi
+    {
+        printf '\n<!-- extractor-prefilter:start -->\n## Deterministic checks\n\n'
+        printf 'Status: %s\n\n%s\n' "$status" "$details"
+        pack_snapshot_context
+        printf '\nResult — a signal for pilot review, not an acceptance decision.\n'
+        printf '<!-- extractor-prefilter:end -->\n'
+    } >> "$temporary"
+    mv "$temporary" "$report"
+}
+
+prefilter_changed_reports() {
+    local strategy_dir="$1" report output status result pack_ref
+    local prefilter_script="$SCRIPT_DIR/wp429-extractor-prefilters.py"
+    local python_resolver="${IWE_TEMPLATE:-${PROMPTS_DIR%/roles/extractor/prompts}}/scripts/lib/find-python3.sh"
+    local prefilter_python=""
+    if [ -f "$python_resolver" ]; then
+        prefilter_python=$(bash "$python_resolver" --stdlib-only 2>> "$LOG_FILE") || prefilter_python=""
+    fi
+    local prefilter_args=()
+    for pack_ref in "${EXTRACTOR_PACK_REFS[@]}"; do
+        prefilter_args+=(--pack-ref "$pack_ref")
+    done
+    while IFS= read -r -d '' report; do
+        [[ "$report" = *.md ]] || continue
+        status="not-checked"
+        output="Check not performed: filter is missing or the standard Python 3 selection is unavailable Python 3."
+        if [ -f "$prefilter_script" ] && [ -n "$prefilter_python" ]; then
+            result=0
+            output=$("$prefilter_python" "$prefilter_script" --report "$strategy_dir/$report" \
+                --iwe-root "$WORKSPACE" "${prefilter_args[@]}" 2>&1) || result=$?
+            case "$result" in
+                0) status="clean" ;;
+                1) status="warnings" ;;
+                *) status="not-checked" ;;
+            esac
+        fi
+        write_prefilter_section "$strategy_dir/$report" "$status" "$output" || return 1
+        log "Pre-filters $status: $report"
+    done < <(git -C "$strategy_dir" ls-files --modified --others --exclude-standard -z -- inbox/extraction-reports/)
+}
+
+# WP-5 Phase48 follow-up (found live 02.09 on the first real test run after the
+# origin/main-alignment fix above): the shared pre-commit hook's Scope gate
+# (session-guard.sh pre-commit-check) refuses any new/modified path that
+# isn't registered under an active session semaphore. This was invisible
+# before today because the origin/main equality check always fired first and
+# the commit never reached this hook. extractor runs headless with no
+# interactive session open, so it needs its own lightweight housekeeping
+# semaphore -- the exact pattern session-guard.sh's own note-file error
+# message documents, and the one already used by process-runner.py's
+# terminal-card auto-commit (bug-2026-08-21-process-runner-auto-commit-
+# scope-gate.md). Registration is repo-relative (scope_has_path compares
+# plain strings from `git diff --cached --name-only`), so it stays valid
+# through publish_commit's own cherry-pick in a separate disposable worktree
+# -- close only after publish, not right after the local commit.
+# issue #928: on a plain IWE install (not the author's
+# own IWE_SCRIPTS layout), session-guard.sh lives under IWE_TEMPLATE/scripts,
+# not $HOME/IWE/scripts -- the old single-fallback lookup silently returned 1
+# with no indication of which path it even tried. Shared by both guard
+# wrappers below so a resolution fix lands in one place.
+resolve_tool_path() {  # <script-name>
+    local name="$1" candidate
+    for candidate in \
+        "${IWE_SCRIPTS:-}/$name" \
+        "${IWE_TEMPLATE:-}/scripts/$name" \
+        "$HOME/IWE/scripts/$name"
+    do
+        [ -n "$candidate" ] || continue
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    log "WARN: $name not found or not executable; tried: ${IWE_SCRIPTS:-<unset>}/$name, ${IWE_TEMPLATE:-<unset>}/scripts/$name, $HOME/IWE/scripts/$name"
+    return 1
+}
+
+extractor_scope_open_and_note() {  # <strategy_dir> <agent> <reason> <changed-paths (newline-separated, repo-relative)>
+    local strategy_dir="$1" agent="$2" reason="$3" changed_paths="$4"
+    local guard
+    guard=$(resolve_tool_path session-guard.sh) || return 1
+    bash "$guard" open --housekeeping "$reason" --agent "$agent" --canonical-owner "$reason" >> "$LOG_FILE" 2>&1 || return 1
+    local rel
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        bash "$guard" note-file "$strategy_dir/$rel" --agent "$agent" >> "$LOG_FILE" 2>&1 \
+            || log "WARN: note-file failed for $rel ($agent/$reason) — commit may still be blocked by the Scope gate"
+    done <<< "$changed_paths"
+    return 0
+}
+
+extractor_scope_close() {  # <strategy_dir> <agent> <reason>
+    local strategy_dir="$1" agent="$2" reason="$3"
+    local guard
+    guard=$(resolve_tool_path session-guard.sh) || return 0
+    bash "$guard" close --housekeeping "$reason" --agent "$agent" >> "$LOG_FILE" 2>&1
+}
+
+# issue #633: 'main' used to be hardcoded as the governance repo's default
+# branch in eight places across this file. A repo whose real default branch
+# is something else (e.g. master) silently never got fetched/pushed/read --
+# inbox-check exited immediately on every run, no capture ever processed.
+# Resolve it once per repo, in order: explicit override -> the repo's real
+# remote-tracking default -> whatever is currently checked out -> the
+# historical 'main' default as a last resort (keeps old repos working
+# unchanged).
+resolve_governance_branch() {
+    local repo="$1"
+    if [ -n "${IWE_GOVERNANCE_BRANCH:-}" ]; then
+        printf '%s\n' "$IWE_GOVERNANCE_BRANCH"
+        return 0
+    fi
+    local ref
+    if ref=$(git -C "$repo" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null); then
+        printf '%s\n' "${ref#origin/}"
+        return 0
+    fi
+    if ref=$(git -C "$repo" branch --show-current 2>/dev/null) && [ -n "$ref" ]; then
+        printf '%s\n' "$ref"
+        return 0
+    fi
+    printf '%s\n' "main"
+}
+
+commit_extractor_changes() {
+    local strategy_dir="$1"
+    local repo_name="$2"
+    local commit_mode="${3:-main}"
+    local branch head_before head_after target_changes gov_branch
+    local source_file target_paths=()
+    if [ "$commit_mode" = "isolated-inbox" ]; then
+        target_paths=("${EXTRACTOR_CAPTURE_PATHS[@]}")
+        for source_file in "${target_paths[@]}"; do
+            if [ ! -f "$strategy_dir/$source_file" ]; then
+                log "ERROR: input source disappeared during analysis: $source_file"
+                EXTRACTOR_COMMIT_RESULT="failed"
+                return 1
+            fi
+        done
+    else
+        while IFS= read -r source_file; do
+            target_paths+=("${source_file#"$strategy_dir/"}")
+        done < <(capture_source_files "$strategy_dir/inbox")
+    fi
+    if [ "$commit_mode" != "isolated-feed" ] && [ -d "$strategy_dir/inbox/extraction-reports" ]; then
+        while IFS= read -r -d '' source_file; do
+            target_paths+=("${source_file#"$strategy_dir/"}")
+        done < <(find "$strategy_dir/inbox/extraction-reports" -maxdepth 1 -type f -name '*.md' -print0)
+    fi
+
+    EXTRACTOR_COMMIT_RESULT=""
+
+    if ! branch=$(git -C "$strategy_dir" branch --show-current 2>/dev/null); then
+        log "WARN: cannot determine branch for $repo_name; skipping commit"
+        EXTRACTOR_COMMIT_RESULT="blocked"
+        return 0
+    fi
+    gov_branch=$(resolve_governance_branch "$strategy_dir")
+    # Isolated modes run on their own throwaway branch; every other mode must
+    # be on the governance branch.
+    local isolated_branch_ok=0
+    case "$commit_mode:$branch" in
+        isolated-inbox:extractor/inbox-check-*|isolated-feed:extractor/feed-*) isolated_branch_ok=1 ;;
+    esac
+    if [ "$branch" != "$gov_branch" ] && [ "$isolated_branch_ok" -ne 1 ]; then
+        log "SKIP: $repo_name is on branch '$branch', expected '$gov_branch'"
+        EXTRACTOR_COMMIT_RESULT="blocked"
+        return 0
+    fi
+
+    # WP-5 Phase48: no longer requires HEAD == origin/main before attempting a
+    # commit. That equality check made every commit fail on a busy day --
+    # origin/main routinely advances during the 2-8 minute Claude analysis
+    # window (dozens of concurrent sessions publishing elsewhere), so by the
+    # time this function runs the worktree is "stale" by definition, even
+    # though the extractor's own paths (inbox/captures*, inbox/extraction-
+    # reports/*) never touch the same lines as unrelated WP work. Staleness
+    # is now handled downstream by publish_commit (fetch + cherry-pick onto
+    # fresh origin/main + bounded retry, scripts/lib/publish-gate.sh) instead
+    # of being refused upfront.
+    if ! head_before=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null); then
+        log "WARN: cannot resolve HEAD for $repo_name; skipping commit"
+        EXTRACTOR_COMMIT_RESULT="blocked"
+        return 0
+    fi
+
+    # Do not touch extractor files, if they have already been prepared by another process.
+    # `commit --only` preserves staging of all other paths without a manual reset reset.
+    if [ "${#target_paths[@]}" -eq 0 ]; then
+        EXTRACTOR_COMMIT_RESULT="no_changes"
+        return 0
+    fi
+    if ! git -C "$strategy_dir" diff --cached --quiet -- "${target_paths[@]}"; then
+        log "SKIP: extractor paths are already staged; skipping commit"
+        EXTRACTOR_COMMIT_RESULT="blocked"
+        return 0
+    fi
+
+    target_changes=$(git -C "$strategy_dir" status --porcelain --untracked-files=all -- "${target_paths[@]}")
+    if [ -z "$target_changes" ]; then
+        log "No new changes to commit in $repo_name"
+        # issue #860: the agent may have already committed inside the prompt.
+        # If HEAD is ahead of origin by extractor-owned commits, publish them
+        # instead of leaving them local.
+        local ahead_count
+        ahead_count=$(git -C "$strategy_dir" rev-list --count "origin/${gov_branch}..HEAD" 2>/dev/null || echo 0)
+        ahead_count=${ahead_count:-0}
+        if [ "$ahead_count" -gt 0 ]; then
+            local latest_local latest_paths
+            latest_local=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null || true)
+            latest_paths=$(git -C "$strategy_dir" diff-tree --no-commit-id --name-only -r "$latest_local" 2>/dev/null || true)
+            if [ -n "$latest_paths" ]; then
+                local p is_extractor_commit=0
+                for p in "${target_paths[@]}"; do
+                    if printf '%s\n' "$latest_paths" | grep -qxF "$p"; then
+                        is_extractor_commit=1
+                        break
+                    fi
+                done
+                if [ "$is_extractor_commit" -eq 1 ]; then
+                    log "Found unpublished extractor commit ($latest_local) already on HEAD"
+                    local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
+                    if [ ! -f "$publish_gate" ]; then
+                        if git -C "$strategy_dir" push origin "$latest_local:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
+                            log "Pushed pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="published"
+                        else
+                            log "WARN: git push failed for pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="failed"
+                            return 1
+                        fi
+                    else
+                        # shellcheck source=/dev/null
+                        . "$publish_gate"
+                        if is_ds_repo_by_origin "$strategy_dir" \
+                            && IWE_WORKSPACE="${IWE_ROOT:-$HOME/IWE}" \
+                               publish_commit "$strategy_dir" "$latest_local" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+                            log "Published pre-existing extractor commit $latest_local via ds-publish.sh"
+                            EXTRACTOR_COMMIT_RESULT="published"
+                        elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
+                            log "Pushed pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="published"
+                        else
+                            log "WARN: publish failed for pre-existing extractor commit $latest_local"
+                            EXTRACTOR_COMMIT_RESULT="failed"
+                            return 1
+                        fi
+                    fi
+                    return 0
+                fi
+            fi
+        fi
+        EXTRACTOR_COMMIT_RESULT="no_changes"
+        return 0
+    fi
+
+    if ! head_after=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null) || \
+       [ "$head_after" != "$head_before" ]; then
+        log "SKIP: $repo_name changed before extractor commit"
+        EXTRACTOR_COMMIT_RESULT="blocked"
+        return 0
+    fi
+
+    # WP-5 Phase48 review fix: derive the paths to register from $target_changes
+    # (porcelain output, so every entry is a real file that exists right now)
+    # instead of a static guess list. The static list silently skipped a path
+    # via `[ -e ... ] || continue` on a repo/run where e.g. inbox/captures/
+    # didn't exist yet -- reintroducing the exact Scope-gate block this whole
+    # function exists to avoid, with no warning.
+    local changed_paths
+    changed_paths=$(awk '{print substr($0, 4)}' <<< "$target_changes")
+
+    local scope_agent="extractor" scope_reason="commit-$$" scope_opened=0
+    if extractor_scope_open_and_note "$strategy_dir" "$scope_agent" "$scope_reason" "$changed_paths"; then
+        scope_opened=1
+    else
+        log "ERROR: cannot open housekeeping session-guard session for $repo_name; commit and publication blocked"
+        EXTRACTOR_COMMIT_RESULT="blocked"
+        return 1
+    fi
+
+    # `git commit --only` does not discover a brand-new report directory. Stage only
+    # extractor-owned paths; `--only` below still leaves every foreign staged path intact.
+    if ! git -C "$strategy_dir" add -- "${target_paths[@]}" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot stage extractor changes for $repo_name"
+        EXTRACTOR_COMMIT_RESULT="failed"
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+        return 1
+    fi
+
+    local commit_message="inbox-check: extraction report $DATE"
+    if [ "$commit_mode" = "isolated-feed" ]; then
+        commit_message="feed(${EXTRACTOR_FEED_LABEL:-feed}): capture candidates $DATE"
+    fi
+    if ! git -C "$strategy_dir" commit --only \
+        -m "$commit_message" -- \
+        "${target_paths[@]}" >> "$LOG_FILE" 2>&1; then
+        log "WARN: git commit failed for $repo_name"
+        EXTRACTOR_COMMIT_RESULT="failed"
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+        return 1
+    fi
+
+    if ! head_after=$(git -C "$strategy_dir" rev-parse HEAD 2>/dev/null) || \
+       [ "$head_after" = "$head_before" ]; then
+        log "WARN: commit did not advance HEAD for $repo_name"
+        EXTRACTOR_COMMIT_RESULT="failed"
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+        return 1
+    fi
+    log "Committed $repo_name ($head_after)"
+
+    # WP-5 Phase48: publish through the shared coordination gate instead of a raw
+    # fast-forward-only push. ds-publish.sh/isolate-push.sh fetches fresh
+    # origin/main, cherry-picks this commit's patch onto it in a disposable
+    # worktree, and pushes -- the same mechanism day-open/day-close/
+    # peer-conversation already rely on for exactly this class of race. The
+    # housekeeping registration above stays open through this step (its
+    # repo-relative paths cover the cherry-picked commit too, not just this
+    # worktree's own) and is closed once, right after, regardless of outcome.
+    local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
+    if [ ! -f "$publish_gate" ]; then
+        log "WARN: publish-gate.sh not found at $publish_gate; falling back to raw push for $repo_name"
+        if git -C "$strategy_dir" push origin "$head_after:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
+            log "Pushed $repo_name ($head_after)"
+            EXTRACTOR_COMMIT_RESULT="published"
+        else
+            log "WARN: git push failed; only the extractor commit was offered"
+            EXTRACTOR_COMMIT_RESULT="failed"
+        fi
+        [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+        [ "$EXTRACTOR_COMMIT_RESULT" = "published" ] && return 0 || return 1
+    fi
+    # shellcheck source=/dev/null
+    . "$publish_gate"
+
+    # ds-publish.sh resolves its own IWE_WORKSPACE from the environment
+    # (LOCK_FILE/QUEUE_DIR/canon-refresh paths), not from the $strategy_dir
+    # argument. run_inbox_check_isolated() exports IWE_WORKSPACE pointing at
+    # its own throwaway sandbox for run_claude's benefit -- ds-publish.sh must
+    # not inherit that; it needs the real canonical workspace.
+    if is_ds_repo_by_origin "$strategy_dir" \
+        && IWE_WORKSPACE="${IWE_ROOT:-$HOME/IWE}" \
+           publish_commit "$strategy_dir" "$head_after" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+        log "Published $repo_name via ds-publish.sh (local commit $head_after)"
+        EXTRACTOR_COMMIT_RESULT="published"
+    elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
+        log "Pushed $repo_name ($head_after)"
+        EXTRACTOR_COMMIT_RESULT="published"
+    else
+        log "WARN: publish failed for $repo_name — commit stays local, see. $LOG_FILE"
+        EXTRACTOR_COMMIT_RESULT="failed"
+    fi
+    [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
+    [ "$EXTRACTOR_COMMIT_RESULT" = "published" ] && return 0 || return 1
+}
+
+release_inbox_lock() {  # <lock_dir> [label]
+    local lock_dir="$1" label="${2:-inbox-check}"
+    rm -f "$lock_dir/pid"
+    rmdir "$lock_dir" 2>/dev/null || log "WARN: cannot release $label lock: $lock_dir"
+}
+
+acquire_inbox_lock() {  # <lock_dir> [label]
+    local lock_dir="$1" label="${2:-inbox-check}"
+    local owner_pid=""
+
+    if mkdir "$lock_dir" 2>/dev/null; then
+        printf '%s\n' "$$" > "$lock_dir/pid"
+        return 0
+    fi
+
+    if [ -f "$lock_dir/pid" ]; then
+        owner_pid=$(tr -d '[:space:]' < "$lock_dir/pid")
+    fi
+    if [[ "$owner_pid" =~ ^[0-9]+$ ]] && kill -0 "$owner_pid" 2>/dev/null; then
+        log "SKIP: $label is already running (pid $owner_pid)"
+        return 1
+    fi
+
+    # Only reclaim a lock whose recorded process has ended. A non-empty or malformed
+    # directory stays blocked instead of risking deletion of another active run.
+    if [ -n "$owner_pid" ]; then
+        rm -f "$lock_dir/pid"
+        if ! rmdir "$lock_dir" 2>/dev/null; then
+            log "SKIP: stale $label lock needs manual review: $lock_dir"
+            return 1
+        fi
+        if mkdir "$lock_dir" 2>/dev/null; then
+            printf '%s\n' "$$" > "$lock_dir/pid"
+            log "WARN: reclaimed stale $label lock from pid $owner_pid"
+            return 0
+        fi
+    fi
+
+    log "SKIP: $label lock is unavailable: $lock_dir"
+    return 1
+}
+
+# issues #1116/#1155: every failure path downstream of create_isolated_
+# worktree() used to log "worktree preserved for review" and leave it (and
+# its branch) behind unconditionally -- even when nothing had actually
+# happened in it yet (Pack mount failed before the agent ran, root-
+# incompatible AI CLI flags, "no pending captures"). 41+ and 38+ such copies
+# accumulated per the linked issues. A worktree with no uncommitted changes
+# and no commits past its own starting point has nothing worth reviewing;
+# clean it up the same way the pre-existing "no pending captures" branch
+# already did. <base_sha> is create_isolated_worktree()'s ISO_BASE_SHA.
+maybe_cleanup_empty_worktree() {  # <canonical_repo> <worktree> <branch> <isolated_workspace> <repo_name> <run_root> <base_sha> <preserve-log-message>
+    local canonical_repo="$1" worktree="$2" branch_name="$3" isolated_workspace="$4"
+    local repo_name="$5" run_root="$6" base_sha="$7" preserve_message="$8"
+    local dirty ahead_log
+    dirty=$(git -C "$worktree" status --porcelain 2>/dev/null) || dirty="?"
+    ahead_log=$(git -C "$worktree" log --oneline "${base_sha}..HEAD" 2>/dev/null) || ahead_log="?"
+    if [ "$dirty" = "?" ] || [ "$ahead_log" = "?" ]; then
+        log "WARN: cannot verify isolated worktree is clean (git failed); $preserve_message: $worktree"
+        return 1
+    fi
+    if [ -z "$dirty" ] && [ -z "$ahead_log" ]; then
+        cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
+            "$isolated_workspace" "$repo_name" "$run_root" || true
+        log "Cleaned up empty isolated worktree (no diff from $base_sha): $worktree"
+        return 0
+    fi
+    log "WARN: $preserve_message: $worktree"
+    return 1
+}
+
+cleanup_isolated_inbox_worktree() {
+    local canonical_repo="$1"
+    local worktree="$2"
+    local branch_name="$3"
+    local isolated_workspace="$4"
+    local repo_name="$5"
+    local run_root="$6"
+
+    if ! git -C "$canonical_repo" worktree remove "$worktree" >> "$LOG_FILE" 2>&1; then
+        log "WARN: published inbox-check worktree was preserved after cleanup failure: $worktree"
+        return 1
+    fi
+
+    if ! git -C "$canonical_repo" branch -d "$branch_name" >> "$LOG_FILE" 2>&1; then
+        # Publication carries the commit to origin as a cherry-pick (new SHA), so
+        # `branch -d` never sees the branch as merged. Drop it only when every
+        # commit on it has a patch-equivalent on its upstream; otherwise keep it.
+        local upstream
+        upstream=$(git -C "$canonical_repo" rev-parse --abbrev-ref "${branch_name}@{upstream}" 2>/dev/null) || upstream=""
+        if [ -n "$upstream" ]; then
+            timeout 20 git -C "$canonical_repo" fetch -q "${upstream%%/*}" "${upstream#*/}" >> "$LOG_FILE" 2>&1 || true
+        fi
+        if [ -n "$upstream" ] \
+           && ! git -C "$canonical_repo" cherry "$upstream" "$branch_name" 2>/dev/null | grep -q '^+' \
+           && git -C "$canonical_repo" branch -D "$branch_name" >> "$LOG_FILE" 2>&1; then
+            log "Deleted isolated-run branch (all commits patch-equivalent on $upstream): $branch_name"
+        else
+            log "WARN: isolated-run branch was preserved for review: $branch_name"
+        fi
+    fi
+
+    # Read-only Pack clones (see mount_readonly_packs()) are chmod a-w
+    # recursively, including the directories themselves -- removing entries
+    # from a directory needs write permission on that directory, so restore
+    # it (owner-only, u+w) before rm -rf, or cleanup silently fails and the
+    # final rmdir below leaves the whole run_root behind as a "cannot remove"
+    # WARN forever.
+    local pack_clone
+    for pack_clone in "$isolated_workspace"/PACK-*; do
+        # Feeder workspaces link the real Packs: drop only the link, never
+        # chmod/rm through it.
+        if [ -L "$pack_clone" ]; then
+            rm -f "$pack_clone"
+            continue
+        fi
+        [ -d "$pack_clone" ] || continue
+        chmod -R u+w "$pack_clone" 2>/dev/null
+        rm -rf "$pack_clone"
+    done
+
+    # Feeder workspaces hold symlinks to every canonical repository; remove the
+    # links themselves (never their targets).
+    find "$isolated_workspace" -maxdepth 1 -type l -exec rm -f {} + 2>/dev/null || true
+    rm -f "$isolated_workspace/$repo_name" \
+        "$isolated_workspace/IWE/roles/extractor/config/routing.md" \
+        "$isolated_workspace/IWE/roles/extractor/prompts/session-close.md"
+    rmdir "$isolated_workspace/IWE/roles/extractor/config" 2>/dev/null || true
+    rmdir "$isolated_workspace/IWE/roles/extractor/prompts" 2>/dev/null || true
+    rmdir "$isolated_workspace/IWE/roles/extractor" 2>/dev/null || true
+    rmdir "$isolated_workspace/IWE/roles" 2>/dev/null || true
+    rmdir "$isolated_workspace/IWE" 2>/dev/null || true
+    rmdir "$isolated_workspace" 2>/dev/null || log "WARN: cannot remove isolated workspace shell: $isolated_workspace"
+    rmdir "$run_root" 2>/dev/null || log "WARN: cannot remove isolated run directory: $run_root"
+}
+
+# AR-gate 03.09 (arch-gate, see. bug-2026-07-07-r15-decisions-bypassed-pilot.md):
+# inbox-check.md never writes into a Pack -- headless steps only ever vote
+# accept/reject/defer into the report, the actual write happens exclusively
+# in the separate, pilot-triggered "Report Application" session. Mounting
+# Packs here only lets the headless vote be an informed one (duplicate/
+# bounded-context checks Step 2d already requires) instead of blanket defer
+# for "not mounted". Read-only is enforced by the filesystem (chmod), not
+# prompt wording -- run_claude launches Claude with
+# --dangerously-skip-permissions and Write/Edit in --allowedTools, so a
+# prompt-only "don't write here" instruction is not a real control (the
+# exact class of gap the cited bug found in a different skill). Each Pack
+# gets its own disposable shallow clone, never the live checkout, so even a
+# stray write attempt lands on a throwaway copy, not shared state other
+# sessions might be editing concurrently.
+mount_readonly_packs() {
+    local canonical_workspace="$1"
+    local isolated_workspace="$2"
+    local pack_dir pack_name remote_url snapshot_ref pack_count=0 pack_toplevel
+    EXTRACTOR_PACK_REFS=()
+    EXTRACTOR_PACK_SKIPPED=()
+    EXTRACTOR_PACK_SKIPPED_NO_ORIGIN=()
+    EXTRACTOR_PACK_VERIFIED_AT=""
+    for pack_dir in "$canonical_workspace"/PACK-*; do
+        [ -d "$pack_dir" ] || continue
+        pack_name=$(basename "$pack_dir")
+        # Frozen Pack has no live remote by design -- skip it instead of
+        # aborting duplicate-check for every other Pack too (WP-7 F156).
+        if [ -f "$pack_dir/.pack-frozen" ]; then
+            log "WARN: $pack_name marked .pack-frozen, skipping mount (not counted toward duplicate-check coverage)"
+            EXTRACTOR_PACK_SKIPPED+=("$pack_name")
+            continue
+        fi
+        # A Pack the user deliberately keeps local-only (personal data, not
+        # for remote hosting) is a real git repository with no `origin` --
+        # a different situation from a directory that fails to clone or is
+        # not a git repository at all. `rev-parse --is-inside-work-tree`
+        # alone is not enough to tell those apart (cold-review finding,
+        # 24.09): git looks UP the tree for `.git`, so a Pack directory
+        # with no `.git` of its own -- a broken/incomplete clone, the exact
+        # case the strict branch below exists to hard-abort on -- silently
+        # inherits the WORKSPACE's own git identity (the canonical checkout
+        # itself is a git repo) and would be misclassified as this
+        # intentional local-only case instead. Require the Pack directory
+        # to be the TOP of its own work tree, not merely inside one.
+        pack_toplevel=$(git -C "$pack_dir" rev-parse --show-toplevel 2>/dev/null)
+        if [ -n "$pack_toplevel" ] && [ "$pack_toplevel" = "$(cd "$pack_dir" && pwd -P)" ] && \
+           ! git -C "$pack_dir" remote get-url origin >/dev/null 2>&1; then
+            log "WARN: $pack_name has no origin remote, skipping mount (local-only Pack, not counted toward duplicate-check coverage)"
+            EXTRACTOR_PACK_SKIPPED_NO_ORIGIN+=("$pack_name")
+            continue
+        fi
+        if ! remote_url=$(git -C "$pack_dir" remote get-url origin 2>/dev/null) || \
+           ! (cd "$pack_dir" && git clone -q --no-local --depth 1 --single-branch --no-tags \
+               "$remote_url" "$isolated_workspace/$pack_name") >> "$LOG_FILE" 2>&1 || \
+           ! snapshot_ref=$(git -C "$isolated_workspace/$pack_name" rev-parse HEAD) || \
+           ! git -C "$isolated_workspace/$pack_name" checkout -q --detach "$snapshot_ref" >> "$LOG_FILE" 2>&1; then
+            log "ERROR: Pack freshness not verified: $pack_name; duplicate check and analysis were not started"
+            EXTRACTOR_PACK_REFS=()
+            return 1
+        fi
+        chmod -R a-w "$isolated_workspace/$pack_name" || return 1
+        EXTRACTOR_PACK_REFS+=("$pack_name=$snapshot_ref")
+        pack_count=$((pack_count + 1))
+        log "Mounted published Pack snapshot: $pack_name@$snapshot_ref"
+    done
+    local total_skipped=$((${#EXTRACTOR_PACK_SKIPPED[@]} + ${#EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[@]}))
+    if [ "$pack_count" -eq 0 ]; then
+        if [ "$total_skipped" -eq 0 ]; then
+            # No PACK-* directories at all -- a genuinely broken/empty
+            # workspace, not an intentional skip. Unchanged: hard-stop.
+            log "ERROR: no Pack repositories available; duplicate check and analysis were not started"
+            return 1
+        fi
+        # issue #1155: every Pack was skipped on purpose (frozen/no-origin,
+        # not a clone failure -- those already hard-return inside the loop
+        # above) -- proceed with zero coverage instead of aborting the whole
+        # inbox-check. EXTRACTOR_PACK_VERIFIED_AT stays unset on purpose:
+        # pack_snapshot_context() already renders "freshness not confirmed"
+        # for that case, exactly the partial-coverage wording this needs.
+        log "WARN: all Packs skipped (frozen: ${EXTRACTOR_PACK_SKIPPED[*]:-none}; no origin: ${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]:-none}); proceeding with zero Pack coverage for duplicate-check"
+        return 0
+    fi
+    if [ "$total_skipped" -gt 0 ]; then
+        log "WARN: duplicate-check ran against $pack_count of $((pack_count + total_skipped)) Packs; skipped (frozen): ${EXTRACTOR_PACK_SKIPPED[*]:-none}; skipped (no origin): ${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]:-none}"
+    fi
+    EXTRACTOR_PACK_VERIFIED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+}
+
+pack_snapshot_context() {
+    local pack_ref
+    if [ -z "${EXTRACTOR_PACK_VERIFIED_AT:-}" ]; then
+        printf '\nFreshness of published Pack not confirmed; absence of duplicates not established.\n'
+        return 0
+    fi
+    printf '\nPublished Pack snapshots Pack (verified %s):\n' "$EXTRACTOR_PACK_VERIFIED_AT"
+    for pack_ref in "${EXTRACTOR_PACK_REFS[@]}"; do
+        printf -- '- %s\n' "$pack_ref"
+    done
+    if [ "${#EXTRACTOR_PACK_SKIPPED[@]}" -gt 0 ]; then
+        printf 'Warning: the following Pack marked as frozen and did not participate in the duplicate check: %s\n' "${EXTRACTOR_PACK_SKIPPED[*]}"
+    fi
+    if [ "${#EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[@]}" -gt 0 ]; then
+        printf 'Warning: the following Pack without origin (local) and did not participate in the duplicate check — captures for them defer, not accept: %s\n' "${EXTRACTOR_PACK_SKIPPED_NO_ORIGIN[*]}"
+    fi
+}
+
+pending_capture_count() {
+    # A block owns its body until the next heading, including when it is empty.
+    awk "$(markdown_fence_awk)"'
+      function finish() { if (active && body) pending++; active=0; body=0 }
+      FNR == 1 { finish(); fence=""; comment=0 }
+      !comment && markdown_in_code($0) {
+        if (active) body=1
+        next
+      }
+      /^[[:space:]]*<!--/ { comment=1 }
+      comment { if (/-->/) comment=0; next }
+      /^### / {
+        finish()
+        active=($0 !~ /\[(analyzed|processed|duplicate|defer)([^[:alnum:]_]|$)/)
+        next
+      }
+      /^# |^## / { finish(); next }
+      active && /[^[:space:]]/ { body=1 }
+      END { finish(); print pending+0 }
+    ' "$@" 2>/dev/null
+}
+
+# Capture sources = legacy captures.md + monthly + fleeting notes.
+# inbox/captures/YYYY-MM.md files (whitelist by name, other files in the
+# directory are not inbox material).
+capture_source_files() {
+    local inbox_dir="$1"
+    [ -f "$inbox_dir/captures.md" ] && printf '%s\n' "$inbox_dir/captures.md"
+    if [ -d "$inbox_dir/captures" ]; then
+        find "$inbox_dir/captures" -maxdepth 1 -type f \
+            -name '[0-9][0-9][0-9][0-9]-[0-9][0-9].md' | sort
+    fi
+    [ ! -f "$inbox_dir/fleeting-notes.md" ] || printf '%s\n' "$inbox_dir/fleeting-notes.md"
+}
+
+# Browser-source captures: individual <type>_<slug>.md files (lesson_/
+# pattern_/distinction_/feedback_), produced by the browser's server-side
+# run_extractor (gateway-mcp -> agent-runner) via a direct GitHub commit.
+# Each such file IS one capture, with YAML frontmatter (status:
+# pending-review) instead of a "### " heading inside a shared monthly file --
+# pending_capture_count()'s awk cannot parse this shape at all (it looks for
+# "### " lines), so these files were entirely invisible to inbox-check no
+# matter how long they sat there. Found live (WP-560 Phase13, 2026-09-14,
+# peer-session Kimi+Codex): 3 real pending-review files unprocessed for
+# ~2 months since 2026-07-14. A file with any other status (active, applied,
+# analyzed, ...) is not pending and is skipped.
+standalone_capture_files() {
+    local inbox_dir="$1"
+    [ -d "$inbox_dir/captures" ] || return 0
+    local f
+    while IFS= read -r f; do
+        [ -r "$f" ] || continue
+        # Frontmatter block only (between the two "---" delimiters), not a
+        # whole-file grep: a lesson/pattern whose BODY happens to quote or
+        # describe this exact status line (very plausible -- these captures
+        # are lessons about this pipeline's own bugs) would otherwise match
+        # and falsely re-enter the queue. [[:space:]]* rather than a literal
+        # space: same bug class already fixed once in day-open-scaffold.sh
+        # (bug-2026-06-10-ke-queue-drift) -- a tab or CRLF right after
+        # "status:" breaks a literal-space regex and silently drops a real
+        # pending file; [[:space:]] also matches a trailing CRLF "\r" on the
+        # delimiter line itself.
+        awk '
+          NR == 1 {
+            if ($0 ~ /^---[[:space:]]*$/) { infm = 1; next }
+            exit
+          }
+          infm && $0 ~ /^---[[:space:]]*$/ { exit }
+          infm && $0 ~ /^status:[[:space:]]*pending-review[[:space:]]*$/ { found = 1 }
+          END { exit !found }
+        ' "$f" 2>/dev/null && printf '%s\n' "$f"
+    done < <(find "$inbox_dir/captures" -maxdepth 1 -type f \
+               \( -name 'lesson_*.md' -o -name 'pattern_*.md' \
+                  -o -name 'distinction_*.md' -o -name 'feedback_*.md' \) \
+               2>/dev/null | sort)
+}
+
+# Shared by the isolated inbox-check and the isolated feeders: a throwaway
+# worktree of origin/<gov_branch> on its own branch extractor/<label>-<id>, plus
+# a synthetic workspace whose <repo_name> entry links to that worktree. The
+# canonical checkout is never touched. Results (globals): ISO_RUN_ROOT,
+# ISO_WORKTREE, ISO_WORKSPACE, ISO_BRANCH. The caller owns lock handling.
+create_isolated_worktree() {  # <canonical_repo> <repo_name> <gov_branch> <label>
+    local canonical_repo="$1" repo_name="$2" gov_branch="$3" label="$4" run_id
+    ISO_RUN_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/iwe-extractor-$label.XXXXXX") || {
+        log "ERROR: cannot create isolated $label directory"
+        return 1
+    }
+    run_id="$(date +%Y%m%d%H%M%S)-$$"
+    ISO_WORKTREE="$ISO_RUN_ROOT/$repo_name"
+    ISO_WORKSPACE="$ISO_RUN_ROOT/workspace"
+    ISO_BRANCH="extractor/$label-$run_id"
+
+    # issues #1116/#1155: the base commit this worktree started from, so a
+    # later failure can tell "nothing happened here, safe to clean up
+    # immediately" from "there is a real diff worth preserving for review"
+    # (see maybe_cleanup_empty_worktree()).
+    if ! ISO_BASE_SHA=$(git -C "$canonical_repo" rev-parse --verify -q "origin/$gov_branch^{commit}" 2>/dev/null) || \
+       ! git -C "$canonical_repo" worktree add -b "$ISO_BRANCH" "$ISO_WORKTREE" "origin/$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot create isolated $label worktree from origin/$gov_branch; empty run directory removed"
+        git -C "$canonical_repo" worktree prune >> "$LOG_FILE" 2>&1 || true
+        rm -rf "$ISO_RUN_ROOT"
+        return 1
+    fi
+    git -C "$ISO_WORKTREE" branch --set-upstream-to="origin/$gov_branch" "$ISO_BRANCH" >> "$LOG_FILE" 2>&1 || true
+
+    if ! mkdir "$ISO_WORKSPACE" || ! ln -s "$ISO_WORKTREE" "$ISO_WORKSPACE/$repo_name"; then
+        # Nothing has run in this worktree yet (mkdir/ln -s failed before any
+        # agent call) -- always safe to clean up, no review-worthy diff
+        # possible at this point.
+        maybe_cleanup_empty_worktree "$canonical_repo" "$ISO_WORKTREE" "$ISO_BRANCH" "$ISO_WORKSPACE" \
+            "$repo_name" "$ISO_RUN_ROOT" "$ISO_BASE_SHA" \
+            "cannot prepare isolated $label workspace; worktree preserved" || true
+        return 1
+    fi
+}
+
+run_inbox_check_isolated() {
+    local canonical_workspace="$WORKSPACE"
+    local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+    local canonical_repo="$canonical_workspace/$repo_name"
+    local lock_dir="${IWE_EXTRACTOR_INBOX_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-inbox-check.lock}"
+    local run_root worktree isolated_workspace branch_name isolated_template actual_pending gov_branch
+    # Resolved once, up front: issue #1116 needs it checked before any
+    # worktree is created, and run_claude() (further below) reads it back
+    # via dynamic scoping once this function's `local` is in scope.
+    local AI_CLI_EXTRA_FLAGS="${IWE_EXTRACTOR_INBOX_AI_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep}"
+    if ! assert_ai_cli_root_compat "$AI_CLI_EXTRA_FLAGS"; then
+        return 1
+    fi
+
+    case "$repo_name" in
+        ""|.*|*/*)
+            log "ERROR: unsafe governance repository name for isolated inbox-check: '$repo_name'"
+            return 1
+            ;;
+    esac
+    if ! git -C "$canonical_repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log "ERROR: governance repository is unavailable for isolated inbox-check: $canonical_repo"
+        return 1
+    fi
+    if ! acquire_inbox_lock "$lock_dir"; then
+        return 0
+    fi
+
+    gov_branch=$(resolve_governance_branch "$canonical_repo")
+    if ! git -C "$canonical_repo" fetch origin "$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot refresh origin/$gov_branch; isolated inbox-check was not started"
+        release_inbox_lock "$lock_dir"
+        return 1
+    fi
+
+    if ! create_isolated_worktree "$canonical_repo" "$repo_name" "$gov_branch" "inbox-check"; then
+        release_inbox_lock "$lock_dir"
+        return 1
+    fi
+    run_root="$ISO_RUN_ROOT"
+    worktree="$ISO_WORKTREE"
+    isolated_workspace="$ISO_WORKSPACE"
+    branch_name="$ISO_BRANCH"
+    isolated_template="${IWE_TEMPLATE:-$canonical_workspace/IWE}"
+
+    if ! [ -d "$isolated_template" ] || \
+       ! mkdir -p "$isolated_workspace/IWE/roles/extractor/config" \
+           "$isolated_workspace/IWE/roles/extractor/prompts" || \
+       ! cp "$isolated_template/roles/extractor/config/routing.md" \
+           "$isolated_workspace/IWE/roles/extractor/config/routing.md" || \
+       ! cp "$isolated_template/roles/extractor/prompts/session-close.md" \
+           "$isolated_workspace/IWE/roles/extractor/prompts/session-close.md"; then
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "cannot prepare isolated inbox-check workspace; worktree preserved" || true
+        release_inbox_lock "$lock_dir"
+        return 1
+    fi
+
+    local capture_sources=() EXTRACTOR_CAPTURE_PATHS=()
+    while IFS= read -r src; do
+        capture_sources+=("$src")
+        EXTRACTOR_CAPTURE_PATHS+=("${src#"$worktree/"}")
+    done < <(capture_source_files "$worktree/inbox")
+    # Browser-source files count separately: each one already IS one
+    # pending capture (no "### " sub-sections to parse), so the array
+    # length itself is the pending count for this source -- no awk needed.
+    local standalone_sources=()
+    while IFS= read -r src; do
+        standalone_sources+=("$src")
+        EXTRACTOR_CAPTURE_PATHS+=("${src#"$worktree/"}")
+    done < <(standalone_capture_files "$worktree/inbox")
+    actual_pending=0
+    if [ "${#capture_sources[@]}" -gt 0 ]; then
+        actual_pending=$(pending_capture_count "${capture_sources[@]}")
+    fi
+    actual_pending=${actual_pending:-0}
+    actual_pending=$((actual_pending + ${#standalone_sources[@]}))
+    if [ "$actual_pending" -le 0 ]; then
+        log "SKIP: No pending captures in refreshed inbox"
+        cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
+            "$isolated_workspace" "$repo_name" "$run_root" || true
+        release_inbox_lock "$lock_dir"
+        return 0
+    fi
+    log "Found $actual_pending pending captures in refreshed inbox"
+
+    if ! mount_readonly_packs "$canonical_workspace" "$isolated_workspace"; then
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "Pack refresh failed; inbox marks unchanged, worktree preserved" || true
+        release_inbox_lock "$lock_dir"
+        return 1
+    fi
+
+    local source_context="Allowed incoming files (in this order):" src
+    for src in "${EXTRACTOR_CAPTURE_PATHS[@]}"; do
+        source_context="$source_context
+- $src"
+    done
+    source_context="$source_context
+$(pack_snapshot_context)"
+
+    local WORKSPACE="$isolated_workspace"
+    local IWE_WORKSPACE="$isolated_workspace"
+    export IWE_WORKSPACE
+    if ! run_claude "inbox-check" "$source_context" "isolated-inbox"; then
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "isolated inbox-check failed; worktree preserved for review" || true
+        release_inbox_lock "$lock_dir"
+        return 1
+    fi
+
+    case "${EXTRACTOR_COMMIT_RESULT:-}" in
+        published)
+            # WP-5 Phase48: no ls-remote SHA check here anymore. publish_commit
+            # routes through ds-publish.sh/isolate-push.sh, which cherry-picks
+            # this worktree's commit onto a fresh origin/main in its own
+            # disposable worktree -- the SHA that lands on origin is a new one
+            # (different parent), so comparing it against EXTRACTOR_PUBLISHED_SHA
+            # would always mismatch. ds-publish.sh already confirms its own
+            # push before returning 0; commit_extractor_changes() only sets
+            # EXTRACTOR_COMMIT_RESULT=published after that 0.
+            cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
+                "$isolated_workspace" "$repo_name" "$run_root" || true
+            log "Completed process: inbox-check; report and input marks published"
+            ;;
+        *)
+            maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+                "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+                "isolated inbox-check did not reach a safe publication state; worktree preserved" || true
+            release_inbox_lock "$lock_dir"
+            return 1
+            ;;
+    esac
+
+    release_inbox_lock "$lock_dir"
+}
+
+# Isolated feeder (session-close-feed, git-diff-feed): the agent works in a
+# throwaway worktree, never in the canonical governance checkout. The agent
+# only writes capture blocks; this script verifies (verify_feed_outputs),
+# commits and publishes. The caller holds the shared feed lock.
+# Also hosts the isolated knowledge audit (mode "isolated-audit", label "audit"):
+# same worktree/workspace/normalisation machinery, but a read-only exit
+# contract (verify_audit_outputs: clean tree = success, no commit/publication).
+run_feed_isolated() {  # <prompt-file> <extra-args> <label> [mode]
+    local prompt_file="$1" extra_args="${2:-}" label="${3:-feed}" commit_mode="${4:-isolated-feed}"
+    local canonical_workspace="$WORKSPACE"
+    local repo_name="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+    local canonical_repo="$canonical_workspace/$repo_name"
+    local run_root worktree isolated_workspace branch_name gov_branch repo_dir link_name
+
+    case "$repo_name" in
+        ""|.*|*/*)
+            log "ERROR: unsafe governance repository name for isolated feed: '$repo_name'"
+            return 1
+            ;;
+    esac
+    if ! git -C "$canonical_repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log "ERROR: governance repository is unavailable for isolated feed: $canonical_repo"
+        return 1
+    fi
+    # Branch/directory prefix (extractor/<prefix>-*) is what commit_extractor_changes allows.
+    local worktree_label="feed"
+    [ "$commit_mode" = "isolated-audit" ] && worktree_label="audit"
+    gov_branch=$(resolve_governance_branch "$canonical_repo")
+    if ! git -C "$canonical_repo" fetch origin "$gov_branch" >> "$LOG_FILE" 2>&1; then
+        log "WARN: cannot refresh origin/$gov_branch; isolated feed was not started"
+        return 1
+    fi
+    if ! create_isolated_worktree "$canonical_repo" "$repo_name" "$gov_branch" "$worktree_label"; then
+        return 1
+    fi
+    run_root="$ISO_RUN_ROOT"
+    worktree="$ISO_WORKTREE"
+    isolated_workspace="$ISO_WORKSPACE"
+    branch_name="$ISO_BRANCH"
+
+    # The feeder prompts read git history of every repository, so the synthetic
+    # workspace links all of them (governance repo excluded: it is the worktree).
+    local gov_real repo_real
+    gov_real=$(cd -P "$canonical_repo" && pwd -P)
+    for repo_dir in "$canonical_workspace"/*/; do
+        repo_dir="${repo_dir%/}"
+        link_name="$(basename "$repo_dir")"
+        repo_real=$(cd -P "$repo_dir" 2>/dev/null && pwd -P) || continue
+        # Governance is excluded by identity, not name: an alias symlink to the
+        # same repository would otherwise expose the frozen canon for writing.
+        [ "$repo_real" = "$gov_real" ] && continue
+        [ "$link_name" = "$repo_name" ] && continue
+        [ -e "$repo_dir/.git" ] || continue
+        ln -s "$repo_dir" "$isolated_workspace/$link_name" || \
+            log "WARN: cannot link $link_name into isolated feed workspace"
+    done
+
+    local EXTRACTOR_FEED_BASE_SHA EXTRACTOR_FEED_LABEL="$label"
+    EXTRACTOR_FEED_BASE_SHA=$(git -C "$worktree" rev-parse HEAD 2>/dev/null) || {
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "cannot resolve isolated feed base commit; worktree preserved" || true
+        return 1
+    }
+    local feed_context="Internal: repository $repo_name in this run — isolated working copy (its .git — file, not a directory): read history via git -C <path> log, the check -d .git do not apply for it. Do not run git add/commit/push: files captures only write, the script handles commit and publish."
+    if [ "$commit_mode" = "isolated-audit" ]; then
+        feed_context="Internal: repository $repo_name in this run — isolated working copy (its .git — file, not a directory). Run headless, no user prompts. Do not run git add/commit/push and do not edit Pack'and other files: audit is read-only: output the report in the response, do not create or modify files."
+    fi
+    if [ -n "$extra_args" ]; then
+        feed_context="$extra_args
+
+$feed_context"
+    fi
+
+    local WORKSPACE="$isolated_workspace"
+    local IWE_WORKSPACE="$isolated_workspace"
+    export IWE_WORKSPACE
+    EXTRACTOR_COMMIT_RESULT=""
+    if ! run_claude "$prompt_file" "$feed_context" "$commit_mode"; then
+        maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+            "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+            "isolated $prompt_file failed; worktree preserved for review" || true
+        return 1
+    fi
+
+    case "${EXTRACTOR_COMMIT_RESULT:-}" in
+        published|no_changes)
+            cleanup_isolated_inbox_worktree "$canonical_repo" "$worktree" "$branch_name" \
+                "$isolated_workspace" "$repo_name" "$run_root" || true
+            log "Completed process: $prompt_file (${EXTRACTOR_COMMIT_RESULT})"
+            ;;
+        *)
+            maybe_cleanup_empty_worktree "$canonical_repo" "$worktree" "$branch_name" "$isolated_workspace" \
+                "$repo_name" "$run_root" "$ISO_BASE_SHA" \
+                "isolated $prompt_file did not reach a safe publication state; worktree preserved" || true
+            return 1
+            ;;
+    esac
+}
+
+# Working hours check
+is_work_hours() {
+    local hour
+    hour=$(date +%H)
+    [ "$hour" -ge 7 ] && [ "$hour" -le 23 ]
+}
+
+# Loading env
+load_env
+
+# Displaying usage (without an argument/-h) does not require login — only the real commands below.
+if [ -n "${1:-}" ] && [ "$1" != "-h" ] && [ "$1" != "--help" ]; then
+    check_auth || exit 1
+fi
+
+# launchd loads a minimal environment. Compatibility is preserved for the old
+# GOVERNANCE_REPO, but all subsequent paths use a unified repository name.
+if [ -z "${IWE_GOVERNANCE_REPO:-}" ]; then
+    IWE_GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
+    export IWE_GOVERNANCE_REPO
+fi
+
+# Determining the process
+case "$1" in
+    "inbox-check")
+        if ! is_work_hours; then
+            log "SKIP: inbox-check outside work hours ($HOUR:00)"
+            exit 0
+        fi
+
+        run_inbox_check_isolated
+        notify_telegram "inbox-check"
+        ;;
+
+    "audit")
+        log "Running knowledge audit"
+        run_feed_isolated "knowledge-audit" "" "audit" "isolated-audit"
+        notify_telegram "audit"
+        ;;
+
+    "audit-scheduled")
+        # Monthly rotation (knowledge-audit-watchdog.sh): one Pack per run, headless.
+        # Governance writes are isolated (report-only worktree). The Pack itself is
+        # only READ by the prompt (fixes need approval, none is possible headless);
+        # Pack repositories are linked live into the workspace, not isolated.
+        case "${2:-}" in
+            ""|.*|*/*)
+                log "ERROR: audit-scheduled requires a Pack name (\$2), got '${2:-}'"
+                exit 1
+                ;;
+        esac
+        if [ ! -d "$WORKSPACE/$2" ]; then
+            log "ERROR: audit-scheduled: Pack not found: $WORKSPACE/$2"
+            exit 1
+        fi
+        log "Running scheduled knowledge audit: $2"
+        run_feed_isolated "knowledge-audit" "Scope: only Pack '$2' (headless, rotation — DP.SC.061). Do not prompt the user, do not check other Pack'and." "audit" "isolated-audit"
+        notify_telegram "audit"
+        ;;
+
+    "session-close")
+        log "Running session-close extraction"
+        run_claude "session-close" ""
+        ;;
+
+    "session-close-feed")
+        # WP-247 Phase-MULTI-SOURCE.1: feeder-mode (non-interactive).
+        # Extracts candidates from the transcript + git diff,
+        # writes ###-blocks into the monthly inbox/captures/YYYY-MM.md (rotation
+        # WP-526; without rotation — into captures.md) with marker [feed:session-close].
+        # Does not create extraction-report — that is the job of inbox-check later.
+        #
+        # WP-5 follow-up (02.09): quick-close's own handler (session-close-
+        # feeder.sh) now launches this call as a detached background job
+        # instead of waiting synchronously -- multiple session closes can fire
+        # in quick succession without one blocking on the other's completion.
+        # Without a lock they'd race writing the same monthly captures.md.
+        feed_lock_dir="${IWE_EXTRACTOR_FEED_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-session-close-feed.lock}"
+        if ! acquire_inbox_lock "$feed_lock_dir" "session-close-feed"; then
+            exit 0
+        fi
+        # Cold-context review (02.09): under this file's `set -e`, run_claude
+        # failing (exit 1 on a missing prompt file, or its own `return 1` on
+        # an AI CLI failure -- a live, not hypothetical, case per its own
+        # WP-5 Phase46 comment) aborted the script before release_inbox_lock ever
+        # ran, leaving the lock held by a now-dead PID until the next call's
+        # stale-reclaim path. Not a permanent deadlock, but a genuine
+        # concurrent run in between was wrongly told "already running", with
+        # nothing reported. The trap covers every exit path uniformly.
+        trap 'release_inbox_lock "$feed_lock_dir" "session-close-feed"' EXIT
+        log "Running session-close FEED (non-interactive, writes to captures inbox)"
+        run_feed_isolated "session-close-feed" "${2:-}" "session-close"
+        notify_telegram "session-close-feed"
+        ;;
+
+    "git-diff-feed")
+        # WP-247 Phase-MULTI-SOURCE.2: git-diff feeder (cron 06:00/21:00).
+        # Extracts candidates from git log for the window and writes ###-blocks into captures-inbox.
+        # Window: $2 (default "12 hours ago").
+        #
+        # issue #840: this case wrote to the same captures.md as
+        # session-close-feed without taking any lock -- a concurrent
+        # session-close-feed run could lose this run's edits (read-modify-
+        # write race, same class as the one already fixed for session-close-
+        # feed above). Reuses that same lock dir/var: both feeders append to
+        # the identical file, so one shared lock is correct, not two.
+        feed_lock_dir="${IWE_EXTRACTOR_FEED_LOCK_DIR:-${TMPDIR:-/tmp}/iwe-extractor-session-close-feed.lock}"
+        if ! acquire_inbox_lock "$feed_lock_dir" "git-diff-feed"; then
+            exit 0
+        fi
+        trap 'release_inbox_lock "$feed_lock_dir" "git-diff-feed"' EXIT
+        SINCE="${2:-12 hours ago}"
+        log "Running git-diff FEED (since: $SINCE)"
+        run_feed_isolated "git-diff-feed" "$SINCE" "git-diff"
+        notify_telegram "git-diff-feed"
+        ;;
+
+    "on-demand")
+        log "Running on-demand extraction"
+        run_claude "on-demand" ""
+        ;;
+
+    *)
+        echo "Knowledge Extractor (R2)"
+        echo ""
+        echo "Usage: $0 <process>"
+        echo ""
+        echo "Processes:"
+        echo "  inbox-check    Headless: processing pending captures (launchd, 3h)"
+        echo "  audit          Audit Pack's"
+        echo "  audit-scheduled <pack>  Audit of a single Pack' (monthly rotation)"
+        echo "  session-close  Extraction on session close"
+        echo "  on-demand      Extraction on demand"
+        exit 1
+        ;;
+esac
+
+log "Done"

@@ -75,7 +75,7 @@ strategy_day: sunday      # day of the strategy session
 **Cycle:**
 1. New behavior → `CLAUDE.md §9` (authoring) + a line in `STAGING.md` (status: testing)
 2. Runs stably for several weeks → `status: validated`
-3. At Week Close → remove authoring constants → move to L1 → commit to FMT-exocortex-template
+3. At Week Close → remove authoring constants → move to L1 → commit to IWE
 
 ---
 
@@ -87,7 +87,7 @@ strategy_day: sunday      # day of the strategy session
 | I want to change a protocol for all users | L2 staging → promote to L1 |
 | My rule is for me only | `CLAUDE.md §9` (L3) |
 | Stable knowledge about me | `memory/*.md` (L3) |
-| Found a bug in a platform Skill | `/iwe-bug-report` → issue in FMT-exocortex-template |
+| Found a bug in a platform Skill | `/iwe-bug-report` → issue in IWE |
 | Need a new platform feature | `/iwe-bug-report` with the `enhancement` label |
 
 ---

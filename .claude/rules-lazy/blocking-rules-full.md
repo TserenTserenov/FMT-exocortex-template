@@ -1,0 +1,49 @@
+# Blocking Rules §2 + Pre-action Gates — Full Text
+
+> Hot trigger: `${IWE_WORKSPACE:-$HOME/IWE}/CLAUDE.md` §2 (compact extract). This file contains full formulations (WP-7 HOTBUDGET-M2, spin-off WP-450 Phase 1).
+> **Source-of-truth:** `PACK-agent-rules/rules/AR.NNN.md` (registry — `.claude/rules-registry.yaml`) — the authoritative source; not shipped in the template. This file is an expanded hot extract of the same content, demoted to lazy for M2 budget (≤12K tokens); on a user installation, this file is the SoT.
+
+## Blocking Rules (Full Text)
+
+1. **WP Gate** [[gate:AR.001]]: ANY task → `memory/protocol-open.md` → BEFORE starting work. New Work milestone (not in the week plan) → Alignment Ritual (role/work/Work milestone/state transition/TBS mode/verification class/method/assessment/model) → wait for explicit "yes" / "let's do it" / "open it" — WITHOUT this, do not register the Work milestone in 4 places (REGISTRY/WeekPlan/context/Linear). Full algorithm → `memory/protocol-open.md`.
+2. **Push:** "push it" / "commit and push" / "close it out" → commit + push with no additional questions. Push BEFORE the Closing report. **On any Close Protocol (Quick/Day/Week):** `git status --short` across ALL repos in the session — uncommitted changes → commit + push BEFORE moving to the next protocol step.
+3. **Close** [[gate:AR.005]]: Closing trigger → Closing protocol → execute.
+4. **Pull-on-Touch:** The PreToolUse hook automatically performs a best-effort `git pull --rebase --autostash` once per repo. Do not perform a manual `cd && git pull`; if the hook fails it reports `potentially stale` — procedure → `memory/reference/agent-core.md`.
+5. **Checklist Verification (Haiku R23)** [[gate:AR.007]]: Quick Close and Day Close — sub-agent Haiku R23 (context isolation) checks formal checklist compliance, not result quality. Exceptions: session ≤15 min or no file changes.
+6. **Hooks/Scripts Bypass Gate (BLOCKING, S-33):** WITHOUT **explicit** user permission, do NOT modify template scripts (`.claude/hooks/`, `.claude/scripts/`, `.iwe-runtime/`, `IWE/`) and do NOT bypass hooks. A hook blocks → do not bypass it; write a bug file, report to the pilot, wait for instructions. Full algorithm and exceptions → `.claude/rules-lazy/hooks-bypass-gate.md`. 🧠 Cognitive: S-33 itself protects paths `.claude/hooks/`/`.claude/scripts/`/`IWE/` from modification without permission, but no PreToolUse hook enforces this protection — `Extensions Gate` covers only `.claude/skills/` and `memory/protocol-*`, not `.claude/hooks/`/`scripts/` (WP-7 GateEnforcement-Audit, 09.08.2026, finding 5 of 5).
+7. **Autonomy (behavioral):** Do NOT ask for confirmation ("add it?", "continue?", "would you like...?") — receive a task → execute it → report, no question at the end. Obvious consequences — act immediately; verifiable facts — verify, do not ask. **Exceptions:** irreversible destructive action; WP Gate Ritual (creating/closing/modifying a Work milestone); choice question (choosing between alternatives, not yes/no).
+8. **Reminders (S-44):** "remind me in X" / "set a timer" → `send_telegram_message` with `schedule_at` + simultaneously ScheduleWakeup as a fallback. When the fallback fires → send Telegram first (immediately, without `schedule_at`), then chat. No Telegram tool available → ScheduleWakeup only + explain why (rationale: Telegram delivers to any device; IDE chat does not).
+9. **Finish > defer (S-46):** An additional task is discovered in the current session (defect, incomplete work, next step from a sub-agent) → **default = do it now**, NOT "separate Work milestone / technical debt" as the first option. Choice question "now or later?" = anti-pattern (implicit suggestion to defer → inventory, not throughput). Exceptions for deferral: budget ×2–×3, requires a domain decision/data, requires ArchGate, context has fully switched (different part of the system). **WP Gate priority:** task >15 min + new Artifact → item 1 applies (AR.001); item 9 does not override it.
+
+## Pre-action Gates (Full Cell Formulations)
+
+> **Enforcement legend (issue #310, #323):** ⚙ **machine** — gate is held by a hook from `settings.json` (bypass is technically visible); 🧠 **cognitive** — gate is executed by the agent per instruction; no machine detector exists. A gate without a marker = cognitive. The gap "declared ⚙ but hook not connected" is caught by the watchdog `scripts/check-orphan-hooks.sh` (CI).
+
+| Moment | Check |
+|--------|-------|
+| Start of work | **Know your services** [[gate:services-map]]: which services (MAP.002) are affected? 🧠 Cognitive. |
+| Start of a non-trivial action/Work milestone | **State-Transition Gate (WP-457):** the activation condition and fail-closed trigger are in the hot core; full normative contract → `.claude/rules-lazy/state-transition-gate.md`. |
+| User scenario | **SC Gate:** which promise (08-service-clauses/) is affected? |
+| Creating/placing an Artifact (file, script, document, rule) | **Routing Gate:** consult DP.KR.001 §5 (PACK-digital-platform) first — the Knowledge routing map. Placing by analogy with a neighboring file without checking the map is prohibited. |
+| First substantive action in a repo (reading a file, editing, answering about structure, committing) | **Repo-Touch Gate:** read `<repo>/CLAUDE.md`. If it contains a "required load" block — load the specified files BEFORE responding. |
+| Architectural decision | **ArchGate** [[gate:AR.003]] → `/archgate`. 🧠 Cognitive: the section is declared "BLOCKING. MANDATORY assessment" in CLAUDE.md §5, but it is only a skill, not a hook — skipping `/archgate` before an architectural decision is not technically blocked (WP-7 GateEnforcement-Audit, 09.08.2026, finding 3 of 5). |
+| Work milestone touches PII (email, telegram_id, digital twin, tokens, user_events) | **Security Gate (B7.3):** answer the §B ArchGate checklist BEFORE implementation. Logging PII = blocker. ⚙ Machine for Point A: skills invoked via the Claude Code Skill tool are automatically checked by the `residency-gate-skill-adapter.sh` hook (PreToolUse:Skill) — a forgotten check in the skill code no longer means the check is absent. 🧠 Cognitive for Point B (lazy, data access inside an already-running execution) and for functions outside Claude Code (day-open pipeline, bot handlers) — `residency-gate-init.sh`/`-lazy.sh` remain a library called by the code itself (issue #323, WP-7 ResidencyGate-Event-Adapter, 09.08.2026). |
+| Work milestone ≥3h | **Priority Gate:** which R{N} does it lead to? |
+| New tool/agent/system | **IntegrationGate (BLOCKING):** design ONLY in sequence — (1) promise → (2) scenarios → (3) role → (4) implementation; checklist → `.claude/rules-lazy/integration-gate.md`. Jumping straight to implementation = P10 (DP.FM.010). 🧠 Cognitive: "blocking" = the rule's process status for the agent; no machine detector exists (`rule-engine.sh` is a library for future event-wrappers, not a hook; issue #310). |
+| Replacing a legacy component (migration from LMS/external system) | **LegacyPortGate (BLOCKING):** first run a 15-min sub-agent "how does this work now?"; the decision to port vs. new design — only after. Jumping ahead = DP.FM.014. 🧠 Cognitive: the classification exists in `rule-engine.sh`, but that is a library, not a registered hook (same contract that closed #310 for IntegrationGate) — jumping straight to implementation is not technically blocked (WP-7 GateEnforcement-Audit, 09.08.2026, finding 2 of 5). |
+| Before adding a resource | **Resource vs Policy check** [[gate:resource-policy]]: constraint identified, non-bottlenecks subordinated; otherwise return to Identify/Subordinate. 🧠 Cognitive. |
+| At a Work milestone | **Decision Capture** [[gate:decision-capture]]: record only user decisions; do not log agent decisions. 🧠 Cognitive. |
+| At a milestone after a repeatable process | **Skill Discovery** [[gate:skill-discovery]]: when all three criteria are met, declare a `Skill candidate`. 🧠 Cognitive. |
+| Before `git commit` in a repo with CLAUDE.md | **AR.010 Repo-Touch** [[gate:AR.010]]: read the repo's CLAUDE.md. 🧠 Cognitive: no separate pre-commit hook exists. |
+| Before commit after modifying a system | **Capture-back** [[gate:capture-back]]: find mentions of the system in memory/ and update anything outdated. 🧠 Cognitive. |
+| Before commit to DS-strategy | **AR.006 Pull-before-Commit** [[gate:AR.006]]: pull/rebase → change → commit → push. 🧠 Cognitive: pull-on-touch does not prove a pull occurred immediately before the commit. |
+
+## Work Protocol — Full Paragraphs of the Hot Extract
+
+**Capture-to-Pack** — at every Work milestone: is there Knowledge to record? Announce: *"Capture: [what] → [where]"*. Routing: rule (1–3 lines) → CLAUDE.md, domain content → Pack, implementation content → DS docs/, lesson → memory/. Capture-to-Pack is a shortcut within Knowledge routing, not a replacement for Routing Gate. When creating a new Artifact, Routing Gate (DP.KR.001 §5) is checked first. Full protocol → `memory/protocol-work.md`.
+
+**Self-correction:** divergence detected → immediately propose a fix (file, line, what to change). Applies only within the scope of the current Work turn: files/directories from the turn's agenda (verified via `git diff HEAD`). Outside scope — Drift Reporting (Agent Core SYNC-CORE): report to the pilot, do not fix.
+
+## §8 Staging — Full Promotion Text
+
+Promotion (Week Close): does STAGING.md have `validated`? → remove author constants (`{{PLACEHOLDER}}`) → move to FMT + commit → status `promoted`. Rejection (specific to the author environment) → status `rejected`, remains in §9 permanently — do not remove from the table; this is a deliberate decision. Step-by-step → skill `/author-mode`.

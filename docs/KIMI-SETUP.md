@@ -1,5 +1,5 @@
 ---
-scope: FMT-exocortex-template
+scope: IWE
 status: active
 title: Connecting Kimi to IWE
 updated: 2026-06-17
@@ -7,7 +7,7 @@ updated: 2026-06-17
 
 # Connecting Kimi to IWE
 
-> Audience: a pilot who has forked the `FMT-exocortex-template` and wants to work with IWE through Kimi Code.
+> Audience: a pilot who has forked the `IWE` and wants to work with IWE through Kimi Code.
 > Time: ~15 minutes.
 > Source-of-truth: `AGENTS.md`, `.claude/skills/kimi-peer-writer/SKILL.md`, `.claude/skills/peer-conversation/SKILL.md`.
 
@@ -21,7 +21,7 @@ updated: 2026-06-17
 
 - VS Code.
 - The **Kimi Code** extension installed (Moonshot AI).
-- The `FMT-exocortex-template` forked and cloned.
+- The `IWE` forked and cloned.
 - The **Claude Code CLI** (`claude`) installed — required for peer sessions where Kimi calls Claude.
 
 Verify that `claude` is available:
@@ -53,7 +53,7 @@ Open `~/.kimi/config.toml` and add the path to `.claude/skills` of your reposito
 ```toml
 merge_all_available_skills = true
 extra_skill_dirs = [
-  "/path/to/FMT-exocortex-template/.claude/skills",
+  "/path/to/IWE/.claude/skills",
   # other paths, if any already exist
 ]
 ```
@@ -79,8 +79,8 @@ Run three checks:
 2. **IWE skill files are in place**:
 
    ```bash
-   ls /path/to/FMT-exocortex-template/.claude/skills/kimi-peer-writer/SKILL.md
-   ls /path/to/FMT-exocortex-template/.claude/skills/peer-conversation/SKILL.md
+   ls /path/to/IWE/.claude/skills/kimi-peer-writer/SKILL.md
+   ls /path/to/IWE/.claude/skills/peer-conversation/SKILL.md
    ```
 
 3. **The skill responds in Kimi Code**:
@@ -162,4 +162,3 @@ When a task is transferred between Kimi and Claude, use one of the mechanisms fr
 - `.claude/skills/kimi-peer-writer/SKILL.md` — Kimi as writer.
 - `.claude/skills/peer-conversation/SKILL.md` — Kimi as Peer partner.
 - `docs/skills-catalog.md` and `docs/scripts-catalog.md` — skill and Script catalogs.
-

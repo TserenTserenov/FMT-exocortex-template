@@ -1,0 +1,18 @@
+# NameCard Level B template (SPF.SPEC.001 §NameCard Extension, WP-474 Phase 8.6c).
+# Copy to <CODE>.yaml when an entity's name reaches durable, cross-referenced
+# status — NOT automatically for every entity, NOT triggered by status: active.
+# Creating this file is itself the "this name is now public-grade" decision;
+# pair it with the Level A `name_card:` block in the entity's own frontmatter
+# (see spec) — never create one level without the other.
+
+code: DOMAIN.TYPE.XXX          # same code as the entity file this NameCard belongs to
+plain: ""                      # name for a general reader — no jargon, no code prefix
+tech: ""                       # name for precise cross-reference — the term other Packs cite by
+
+candidate_set: []              # names considered, e.g. ["Name A", "Name B", "Name C"]
+rejected_candidates: []        # [{name: "...", reason: "..."}] — why each alternative lost;
+                                # keeps the next author from re-proposing an already-rejected name
+selection_rationale: ""        # one paragraph: why this plain/tech pair, over the rejected ones
+
+lineage_entries: []            # append-only history — never edit/remove prior entries, only add:
+                                # - {date: YYYY-MM-DD, event: "renamed" | "created" | "reviewed", note: "..."}

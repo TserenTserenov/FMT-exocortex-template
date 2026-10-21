@@ -19,7 +19,7 @@ Anthropic does not use API data to train models ([API Terms](https://www.anthrop
 
 ## What Never Leaves Your Machine
 
-`memory/`, `extensions/`, `params.yaml`, and all DS-repository context exist only on your computer and in your private GitHub. This template repository (`FMT-exocortex-template`) has no access to them. The template fork on GitHub is public: do not place personal files in the fork directory or push them there — see [docs/SETUP-GUIDE.md §1.2b](docs/SETUP-GUIDE.md) for details.
+`memory/`, `extensions/`, `params.yaml`, and all DS-repository context exist only on your computer and in your private GitHub. This template repository (`IWE`) has no access to them. The template fork on GitHub is public: do not place personal files in the fork directory or push them there — see [docs/SETUP-GUIDE.md §1.2b](docs/SETUP-GUIDE.md) for details.
 
 ## Your Rights
 

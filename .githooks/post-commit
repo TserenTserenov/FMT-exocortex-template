@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# .githooks/post-commit
+# Part of WP-453: Section update pipeline 7 guide
+# Trigger T3: explicit markup [guide-update: S7.SS_N] in commit message.
+# Trigger T1: practice promotion with the label [guide-impact: S7.SS_N] in the file.
+#
+# Called AFTER the commit is created: HEAD is already the new commit — in section-state.yaml
+# receives the correct SHA (in commit-msg received SHA of the previous commit — bug,
+# found Codex in a peer-session 2026-07-31-22-wp453-t3-hook-test). Also: a crash of
+# another hook before the commit completes no longer leaves a false trigger.
+#
+# Blocks T3 and T1 are independent: the absence of one script does not disable the other,
+# the single exit 0 — at the end (Codex, peer-session 2026-08-01).
+
+set -uo pipefail  # without -e: a failure in a side pipeline must not abort the git-flow
+
+REGISTRY_REPO="${IWE_REGISTRY_REPO:-${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
+REPO_DIR=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+
+COMMIT_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+# === T3: explicit marker in commit message ===
+T3_SCRIPT="${REGISTRY_REPO}/scripts/fp453-t3-mark-guide-update.sh"
+if [[ -f "$T3_SCRIPT" ]]; then
+  if ! "$T3_SCRIPT" "$COMMIT_MSG" "$COMMIT_SHA"; then
+    # Do not block (post-commit must not abort the commit because of-of
+    # an external registry-repo), but do not stay silent either (Codex, 2026-07-31-22).
+    echo "WARN: WP-453 T3 trigger failed for commit ${COMMIT_SHA:0:8} — see. $T3_SCRIPT" >&2
+  fi
+fi
+
+# === T1: marker [guide-impact] in committed blobs ===
+# Scan ALL added/and modified files of the commit, rather than filtering by the word
+# "promote" in subject: a manual message may differ, and the cost of scanning
+# is negligible for a small number of files (Codex, 2026-08-01). Merge-commits
+# we skip (diff-tree on merge without -m is empty; promotions via merge commits are not done).
+T1_SCRIPT="${REGISTRY_REPO}/scripts/fp453-t1-check-guide-impact.sh"
+if [[ -f "$T1_SCRIPT" && -n "$REPO_DIR" ]]; then
+  PARENTS=$(git rev-list --parents -n 1 HEAD 2>/dev/null | wc -w | tr -d ' ')
+  if [[ "$PARENTS" -le 2 ]]; then
+    git diff-tree --root --no-commit-id -r --diff-filter=ACMR -z --name-only HEAD 2>/dev/null \
+      | while IFS= read -r -d '' path; do
+          # Skipping files >1MB (markers live in practice text files)
+          size=$(git cat-file -s "HEAD:$path" 2>/dev/null || echo 0)
+          [[ "$size" -gt 1048576 ]] && continue
+          if ! "$T1_SCRIPT" "$REPO_DIR" "$path"; then
+            echo "WARN: WP-453 T1 trigger failed for $path — see. $T1_SCRIPT" >&2
+          fi
+        done
+  fi
+fi
+
+exit 0

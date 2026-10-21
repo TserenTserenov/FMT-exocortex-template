@@ -1,0 +1,614 @@
+#!/usr/bin/env bash
+# route-task.sh — Task router IWE (DP.ROLE.059)
+# routing: executor=script  deterministic=true
+# see DP.SC.159, DP.ROLE.059
+#
+# Receives routing-tag from WP Gate or Artifactor → lookup in executor-catalog.yaml →
+# launches the required executor (script | haiku | sonnet | opus | mcp-direct | agent | script+judgment).
+#
+# Usage:
+#   route-task.sh --skill <skill-name> [--args "..."]   # strict: no fallback
+#   route-task.sh --tag  <routing-tag>  [--args "..."]   # flex: fallback to Sonnet on miss
+#   route-task.sh --list                                 # show catalog
+#   route-task.sh --validate                             # validate catalog
+#   route-task.sh --json                                 # machine-readable JSON output
+#
+# Exit: 0=OK, 1=error, 2=script_path not found, 3=unknown skill, 4=unsupported executor
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+
+# issue #1094: the old `${IWE_DIR:-${IWE_ROOT:-${IWE_WORKSPACE:-$HOME/IWE}}}`
+# guessed $HOME/IWE whenever none of the three variables was set — wrong for
+# any non-default workspace location (e.g. a Windows install under C:\iwe)
+# and failed only two steps later, as an opaque "catalog not found". Same
+# shared resolver already used by day-open-pipeline.sh / day-open-preflight.sh:
+# it also derives the root from this script's own location, with a structure
+# check (IWE/.iwe-runtime must exist there) before
+# accepting that candidate, and fails closed with a clear message instead of
+# guessing. IWE_DIR itself stays the highest-priority override.
+IWE_DIR="$(iwe_resolve_root "${IWE_DIR:-}")" || exit 1
+IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE_DIR/IWE}"
+GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog.yaml}"
+AUDIT_LOG="${IWE_ROUTER_AUDIT:-${IWE_DIR}/${GOV_REPO}/logs/routing-path-distribution.tsv}"
+ERROR_LOG="${IWE_ROUTER_ERRORS:-${IWE_DIR}/${GOV_REPO}/logs/routing-errors.log}"
+JSON_MODE="false"
+# issue #889: a bare `python3` only sees PATH's own interpreter, which on
+# hosts with a pyenv shim ahead of a real PyYAML-carrying python3 fails the
+# catalog lookup before the executor-substitution check ever runs. Resolve
+# once via the shared F6 resolver (scripts/lib/find-python3.sh, #453/#463)
+# and reuse for every python3 call below — same pattern as day-close.sh.
+RESOLVED_PYTHON3=""
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+die() {
+    local msg="$1" code="${2:-1}"
+    if [[ "$JSON_MODE" == "true" ]]; then
+        printf '{"exec_result":"ERROR","error_code":%s,"message":"%s"}\n' "$code" "$msg"
+    else
+        echo "ERROR: $msg" >&2
+    fi
+    exit "$code"
+}
+
+warn() { echo "WARN: $*" >&2; }
+
+require_python() {
+    [[ -n "$RESOLVED_PYTHON3" ]] && return 0
+    # Resolved next to this script (same install unit as route-task.sh
+    # itself, day-close.sh precedent) — not via $IWE_TEMPLATE/$IWE_DIR,
+    # which a caller may not have set to where the sibling lib/ actually is.
+    local resolver
+    resolver="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
+    if ! RESOLVED_PYTHON3=$("$resolver" 2>/dev/null); then
+        die "$("$resolver" 2>&1 >/dev/null)" 1
+    fi
+}
+
+require_catalog() {
+    if [[ ! -f "$CATALOG" ]]; then
+        die "executor-catalog.yaml not found: $CATALOG" 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Output formatting
+# ---------------------------------------------------------------------------
+
+emit_result() {
+    local skill="$1" executor="$2" result="$3" routing_path="$4" model="${5:-}"
+    if [[ "$JSON_MODE" == "true" ]]; then
+        if [[ -n "$model" ]]; then
+            printf '{"executor":"%s","routing_path":"%s","exec_result":"%s","model":"%s"}\n' \
+                "$executor" "$routing_path" "$result" "$model"
+        else
+            printf '{"executor":"%s","routing_path":"%s","exec_result":"%s"}\n' \
+                "$executor" "$routing_path" "$result"
+        fi
+    fi
+}
+
+# issue #1201: the router journal is a regenerable runtime file, not a work
+# product. When its directory sits inside a git work tree (default: the
+# governance repo's logs/), keep it out of `git status` via the repo-local
+# info/exclude, so installs whose seed .gitignore predates the entry do not
+# see an untracked logs/ at every session close.
+exclude_log_dir_from_git() {
+    local dir="$1" rel exclude pattern
+    git -C "$dir" rev-parse --show-toplevel >/dev/null 2>&1 || return 0
+    rel="$(git -C "$dir" rev-parse --show-prefix 2>/dev/null)" || return 0
+    [[ -n "$rel" ]] || return 0
+    # --git-path is relative to the directory git runs in, which is $dir
+    exclude="$(git -C "$dir" rev-parse --git-path info/exclude 2>/dev/null)" || return 0
+    case "$exclude" in /*) ;; *) exclude="$dir/$exclude" ;; esac
+    pattern="/${rel}"
+    if ! grep -qxF "$pattern" "$exclude" 2>/dev/null; then
+        mkdir -p "$(dirname "$exclude")" 2>/dev/null \
+            && printf '%s\n' "$pattern" >> "$exclude" 2>/dev/null || true
+    fi
+}
+
+emit_error() {
+    local skill="$1" result="$2" reason="$3"
+    local ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    if [[ "$JSON_MODE" == "true" ]]; then
+        printf '{"exec_result":"%s","skill":"%s","reason":"%s"}\n' \
+            "$result" "$skill" "$reason"
+    fi
+    # Always log to routing-errors.log
+    local err_dir
+    err_dir="$(dirname "$ERROR_LOG")"
+    [[ -d "$err_dir" ]] || mkdir -p "$err_dir"
+    exclude_log_dir_from_git "$err_dir"
+    printf "%s\t%s\t%s\t%s\n" "$ts" "$skill" "$result" "$reason" >> "$ERROR_LOG"
+}
+
+# ---------------------------------------------------------------------------
+# Audit log (routing-path-distribution)
+# ---------------------------------------------------------------------------
+
+log_audit() {
+    local ts="$1" tag="$2" executor="$3" result="$4"
+    local audit_dir
+    audit_dir="$(dirname "$AUDIT_LOG")"
+    [[ -d "$audit_dir" ]] || mkdir -p "$audit_dir"
+    exclude_log_dir_from_git "$audit_dir"
+    printf "%s\t%s\t%s\t%s\n" "$ts" "$tag" "$executor" "$result" >> "$AUDIT_LOG"
+}
+
+# ---------------------------------------------------------------------------
+# Catalog lookup via Python (reliable YAML parsing)
+# ---------------------------------------------------------------------------
+
+lookup_skill() {
+    local skill_name="$1"
+    require_python
+    require_catalog
+    "$RESOLVED_PYTHON3" - "$CATALOG" "$skill_name" << 'PYEOF'
+import sys, yaml
+
+catalog_path, skill_name = sys.argv[1], sys.argv[2]
+with open(catalog_path) as f:
+    cat = yaml.safe_load(f)
+
+for entry in cat.get("entries", []):
+    if entry["name"] == skill_name:
+        r = entry["routing"]
+        print(f"executor={r['executor']}")
+        # YAML `true`/`false` parse as Python bool — an f-string prints
+        # "True"/"False" (capitalized), which the bash-side comparison
+        # `[[ "$deterministic" == "true" ]]` (issue #679 deterministic-gate)
+        # never matches. Every real entry in executor-catalog.yaml writes
+        # the plain YAML boolean, not a quoted string, so this silently
+        # disabled the gate for 100% of deterministic:true entries.
+        print(f"deterministic={'true' if r.get('deterministic') else 'false'}")
+        if "script_path" in r:
+            print(f"script_path={r['script_path']}")
+        if "script_root" in r:
+            print(f"script_root={r['script_root']}")
+        if "model" in r:
+            print(f"model={r['model']}")
+        if "optimization_priority" in r:
+            print(f"optimization_priority={r['optimization_priority']}")
+        sys.exit(0)
+
+sys.exit(3)  # not found
+PYEOF
+}
+
+# ---------------------------------------------------------------------------
+# Executors
+# ---------------------------------------------------------------------------
+
+_resolve_interpreter() {
+    local script_path="$1"
+    local ext="${script_path##*.}"
+    if [[ "$ext" == "py" ]]; then
+        echo "python3"
+    elif [[ "$ext" == "rb" ]]; then
+        echo "ruby"
+    elif [[ -r "$script_path" ]]; then
+        local shebang
+        shebang=$(head -n1 "$script_path" 2>/dev/null)
+        if [[ "$shebang" =~ ^#!/usr/bin/env[[:space:]]+python ]]; then
+            echo "python3"
+        elif [[ "$shebang" =~ ^#!/usr/bin/env[[:space:]]+ruby ]]; then
+            echo "ruby"
+        else
+            echo "bash"
+        fi
+    else
+        echo "bash"
+    fi
+}
+
+_resolve_workspace_script() {
+    "$RESOLVED_PYTHON3" - "$IWE_DIR" "$1" << 'PYEOF'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).expanduser().resolve()
+relative = Path(sys.argv[2])
+if relative.is_absolute() or not relative.parts or relative.parts[0] != "scripts" or ".." in relative.parts:
+    sys.exit(2)
+try:
+    target = (root / relative).resolve(strict=True)
+    target.relative_to(root)
+except (OSError, ValueError):
+    sys.exit(2)
+if not target.is_file():
+    sys.exit(2)
+print(target)
+PYEOF
+}
+
+run_script() {
+    local skill_name="$1"
+    local script_path="$2"
+    local args="${3:-}"
+    local allow_fallback="${4:-true}"
+    local routing_path="${5:-$skill_name → script}"
+    local script_root="${6:-template}"
+
+    if [[ "$script_root" == "workspace" ]]; then
+        local resolved_path
+        if ! resolved_path=$(_resolve_workspace_script "$script_path"); then
+            warn "invalid workspace script path: $script_path (skill=$skill_name)"
+            emit_error "$skill_name" "EXEC_FAILED" "workspace script path rejected: $script_path"
+            emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+            exit 2
+        fi
+        script_path="$resolved_path"
+    elif [[ "$script_root" == "template" ]]; then
+        # Existing catalog entries continue to resolve from the template.
+        if [[ "$script_path" != /* ]]; then
+            script_path="$IWE_TEMPLATE/$script_path"
+        fi
+    else
+        warn "unknown script_root: $script_root (skill=$skill_name)"
+        emit_error "$skill_name" "EXEC_FAILED" "unknown script_root: $script_root"
+        emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+        exit 2
+    fi
+
+    if [[ ! -f "$script_path" ]]; then
+        if [[ "$allow_fallback" == "false" ]]; then
+            warn "script not found: $script_path (skill=$skill_name)"
+            emit_error "$skill_name" "EXEC_FAILED" "script_path not found: $script_path"
+            emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+            exit 2
+        fi
+        warn "script not found: $script_path (skill=$skill_name)"
+        warn "Script may be aspirational (pending Phase12 implementation)."
+        warn "Falling back to Haiku LLM executor."
+        run_haiku "$skill_name" "$args"
+        log_audit "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$skill_name" "haiku" "OK"
+        emit_result "$skill_name" "haiku" "OK" "$skill_name → haiku (fallback)"
+        return 0
+    fi
+
+    if [[ ! -x "$script_path" ]]; then
+        chmod +x "$script_path"
+    fi
+
+    local interpreter
+    interpreter=$(_resolve_interpreter "$script_path")
+
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=script interpreter=$interpreter path=$script_path"
+    fi
+    local script_exit=0
+    if [[ -n "$args" ]]; then
+        # issue #679: `read -r -a` splits only on IFS — does not understand quotes
+        # inside $args, therefore `--fault "text with spaces"` was split into 4
+        # array elements instead of 2. First fix attempt (`eval`) rejected
+        # in review: executes ANY shell-syntax in $args ($(...), `` ` ``,
+        # ;, &&), and $args can come from agent-fault SKILL.md, where --fault —
+        # free-form text describing an agent fault, not a fixed literal.
+        # Second attempt (shlex.split + newline-delimited + mapfile) also
+        # rejected: mapfile — bash4+, system /bin/bash on macOS without
+        # Homebrew — 3.2; and newline-delimiter breaks a token containing a literal
+        # newline inside (multi-paragraph --fault-description).
+        # NUL — the only byte, that cannot appear in any bash-token
+        # and which shlex-a shlex token also cannot contain, therefore safe
+        # as a delimiter; temporary file (not $()) — NUL does not survive
+        # command substitution. `while read -d ''` — bash3.2-compatible.
+        local ARGS_ARRAY=() shlex_tmp shlex_err
+        shlex_tmp=$(mktemp "${TMPDIR:-/tmp}/route-task-args.XXXXXX") || die "mktemp failed"
+        if ! shlex_err=$("$RESOLVED_PYTHON3" -c '
+import shlex, sys
+try:
+    toks = shlex.split(sys.argv[1])
+except ValueError as exc:
+    print(f"unbalanced quotes: {exc}", file=sys.stderr)
+    sys.exit(1)
+with open(sys.argv[2], "wb") as f:
+    for tok in toks:
+        f.write(tok.encode())
+        f.write(b"\0")
+' "$args" "$shlex_tmp" 2>&1); then
+            rm -f "$shlex_tmp"
+            warn "failed to parse args for $skill_name: $shlex_err"
+            emit_error "$skill_name" "EXEC_FAILED" "args parse error: $shlex_err"
+            emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+            return 1
+        fi
+        while IFS= read -r -d '' tok; do
+            ARGS_ARRAY+=("$tok")
+        done < "$shlex_tmp"
+        rm -f "$shlex_tmp"
+        "$interpreter" "$script_path" "${ARGS_ARRAY[@]}" || script_exit=$?
+    else
+        "$interpreter" "$script_path" || script_exit=$?
+    fi
+    if [[ $script_exit -ne 0 ]]; then
+        emit_error "$skill_name" "EXEC_FAILED" "script exit $script_exit"
+        emit_result "$skill_name" "script" "EXEC_FAILED" "$routing_path"
+        log_audit "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$skill_name" "script" "EXEC_FAILED"
+    else
+        emit_result "$skill_name" "script" "OK" "$routing_path"
+        log_audit "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$skill_name" "script" "OK"
+    fi
+    return $script_exit
+}
+
+run_llm() {
+    local skill_name="$1"
+    local model="$2"
+    local args="${3:-}"
+
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=llm model=$model"
+        echo "ROUTE_TO_LLM skill=$skill_name model=$model args=$args"
+    fi
+}
+
+run_haiku()  { run_llm "$1" "claude-haiku-4-5-20251001" "${2:-}"; }
+run_sonnet() { run_llm "$1" "claude-sonnet-4-6"          "${2:-}"; }
+run_opus()   { run_llm "$1" "claude-opus-4-7"            "${2:-}"; }
+
+run_mcp_direct() {
+    local skill_name="$1"
+    local args="${2:-}"
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=mcp-direct"
+        echo "ROUTE_TO_MCP skill=$skill_name args=$args"
+    fi
+}
+
+run_agent() {
+    local skill_name="$1"
+    local model="$2"
+    local args="${3:-}"
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=agent model=$model"
+        echo "ROUTE_TO_AGENT skill=$skill_name model=$model args=$args"
+    fi
+}
+
+run_script_judgment() {
+    local skill_name="$1"
+    local args="${2:-}"
+    if [[ "$JSON_MODE" != "true" ]]; then
+        echo "[router] skill=$skill_name executor=script+judgment"
+        echo "ROUTE_TO_JUDGMENT skill=$skill_name mode=script+judgment args=$args"
+    fi
+}
+
+fallback_to_sonnet() {
+    local skill_name="$1" args="$2" ts="$3" reason="$4"
+    warn "${reason} Falling back to Sonnet."
+    run_sonnet "$skill_name" "$args"
+    log_audit "$ts" "$skill_name" "sonnet" "OK"
+    emit_result "$skill_name" "sonnet" "OK" "$skill_name → sonnet (fallback)"
+}
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+dispatch_skill() {
+    local skill_name="$1"
+    local args="${2:-}"
+    local allow_fallback="${3:-true}"
+    local ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    local routing_path="$skill_name → "
+
+    local lookup_result lookup_exit
+    lookup_result=$(lookup_skill "$skill_name") && lookup_exit=0 || lookup_exit=$?
+    if [[ $lookup_exit -ne 0 ]]; then
+        if [[ $lookup_exit -eq 3 ]]; then
+            if [[ "$allow_fallback" == "false" ]]; then
+                warn "skill '$skill_name' not in catalog."
+                emit_error "$skill_name" "NO_MATCH" "skill not in catalog"
+                emit_result "$skill_name" "unknown" "NO_MATCH" "$skill_name → NO_MATCH"
+                log_audit "$ts" "$skill_name" "unknown" "NO_MATCH"
+                exit 3
+            fi
+            fallback_to_sonnet "$skill_name" "$args" "$ts" "skill '$skill_name' not in catalog."
+            return 0
+        fi
+        die "catalog lookup failed (exit=$lookup_exit)"
+    fi
+
+    local executor script_path="" script_root="template" model="" deterministic=""
+    executor=$(echo "$lookup_result" | grep "^executor=" | cut -d= -f2)
+    script_path=$(echo "$lookup_result" | grep "^script_path=" | cut -d= -f2- || true)
+    script_root=$(echo "$lookup_result" | grep "^script_root=" | cut -d= -f2- || echo template)
+    model=$(echo "$lookup_result" | grep "^model=" | cut -d= -f2- || true)
+    deterministic=$(echo "$lookup_result" | grep "^deterministic=" | cut -d= -f2- || true)
+    routing_path="${routing_path}${executor}"
+
+    # issue #679: deterministic:true in the catalog used to resolve nothing — LLM-
+    # the fallback for a missing script depended only on, which flag
+    # was used to invoke the router (--skill/--tag), not on the contract of the skill itself skill-a. A record,
+    # promising "without LLM", could silently receive LLM-substitution, if it was invoked
+    # via --tag. The catalog now takes precedence over the callers choice.
+    if [[ "$deterministic" == "true" ]]; then
+        allow_fallback="false"
+    fi
+
+    case "$executor" in
+        script)
+            run_script "$skill_name" "$script_path" "$args" "$allow_fallback" "$routing_path" "$script_root"
+            ;;
+        haiku)
+            run_haiku "$skill_name" "$args"
+            log_audit "$ts" "$skill_name" "haiku" "OK"
+            emit_result "$skill_name" "haiku" "OK" "$routing_path"
+            return 0
+            ;;
+        sonnet)
+            run_sonnet "$skill_name" "$args"
+            log_audit "$ts" "$skill_name" "sonnet" "OK"
+            emit_result "$skill_name" "sonnet" "OK" "$routing_path"
+            return 0
+            ;;
+        opus)
+            run_opus "$skill_name" "$args"
+            log_audit "$ts" "$skill_name" "opus" "OK"
+            emit_result "$skill_name" "opus" "OK" "$routing_path"
+            return 0
+            ;;
+        mcp-direct)
+            run_mcp_direct "$skill_name" "$args"
+            log_audit "$ts" "$skill_name" "mcp-direct" "OK"
+            emit_result "$skill_name" "mcp-direct" "OK" "$routing_path"
+            return 0
+            ;;
+        agent)
+            if [[ -z "$model" ]]; then
+                if [[ "$allow_fallback" == "false" ]]; then
+                    warn "agent executor missing model for skill '$skill_name'."
+                    emit_error "$skill_name" "EXEC_FAILED" "agent executor missing model"
+                    emit_result "$skill_name" "agent" "EXEC_FAILED" "$routing_path"
+                    log_audit "$ts" "$skill_name" "agent" "EXEC_FAILED"
+                    exit 4
+                fi
+                fallback_to_sonnet "$skill_name" "$args" "$ts" "agent executor missing model for skill '$skill_name'."
+                return 0
+            fi
+            run_agent "$skill_name" "$model" "$args"
+            log_audit "$ts" "$skill_name" "agent" "OK"
+            emit_result "$skill_name" "agent" "OK" "$routing_path" "$model"
+            return 0
+            ;;
+        script+judgment)
+            run_script_judgment "$skill_name" "$args"
+            log_audit "$ts" "$skill_name" "script+judgment" "OK"
+            emit_result "$skill_name" "script+judgment" "OK" "$routing_path"
+            return 0
+            ;;
+        *)
+            if [[ "$allow_fallback" == "false" ]]; then
+                warn "unknown executor '$executor' for skill '$skill_name'."
+                emit_error "$skill_name" "EXEC_FAILED" "unknown executor: $executor"
+                emit_result "$skill_name" "unknown" "EXEC_FAILED" "$routing_path"
+                log_audit "$ts" "$skill_name" "unknown" "EXEC_FAILED"
+                exit 4
+            fi
+            fallback_to_sonnet "$skill_name" "$args" "$ts" "unknown executor '$executor' for skill '$skill_name'."
+            return 0
+            ;;
+    esac
+}
+
+show_list() {
+    require_python
+    require_catalog
+    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
+import sys, yaml
+
+with open(sys.argv[1]) as f:
+    cat = yaml.safe_load(f)
+
+print(f"executor-catalog: {cat['total_entries']} entries  (generated {cat['generated_at']})")
+print(f"{'SKILL':<25} {'EXECUTOR':<12} {'DET':<6} SCRIPT_PATH")
+print("-" * 80)
+
+by_exec = {}
+for e in cat["entries"]:
+    ex = e["routing"]["executor"]
+    by_exec.setdefault(ex, []).append(e)
+
+for ex in ["script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"]:
+    for e in by_exec.get(ex, []):
+        r = e["routing"]
+        sp = r.get("script_path", "—")
+        det = "✓" if r.get("deterministic") else "✗"
+        prio = f" [{r['optimization_priority']}]" if "optimization_priority" in r else ""
+        print(f"{e['name']:<25} {ex:<12} {det:<6} {sp}{prio}")
+PYEOF
+}
+
+validate_catalog() {
+    require_python
+    require_catalog
+    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
+import sys, yaml
+
+VALID = {"script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"}
+VALID_AGENT_MODELS = {"haiku", "sonnet", "opus"}
+errors = []
+
+with open(sys.argv[1]) as f:
+    cat = yaml.safe_load(f)
+
+for e in cat["entries"]:
+    r = e["routing"]
+    name = e["name"]
+    if r.get("executor") not in VALID:
+        errors.append(f"{name}: invalid executor '{r.get('executor')}'")
+    if "deterministic" not in r:
+        errors.append(f"{name}: missing deterministic")
+    if r.get("executor") == "script" and "script_path" not in r:
+        errors.append(f"{name}: script executor missing script_path")
+    if r.get("script_root", "template") not in {"template", "workspace"}:
+        errors.append(f"{name}: invalid script_root")
+    if "script_root" in r and r.get("executor") != "script":
+        errors.append(f"{name}: script_root requires script executor")
+    if r.get("executor") == "agent" and r.get("model") not in VALID_AGENT_MODELS:
+        errors.append(f"{name}: agent executor requires model: haiku|sonnet|opus")
+
+if errors:
+    print("FAIL:")
+    for e in errors:
+        print(f"  ❌ {e}")
+    sys.exit(1)
+else:
+    print(f"PASS: {cat['total_entries']} entries validated, no errors")
+PYEOF
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+main() {
+    local skill_name=""
+    local args=""
+    local mode="dispatch"
+    local allow_fallback="true"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --skill)    skill_name="$2"; allow_fallback="false"; shift 2 ;;
+            --tag)      skill_name="$2"; allow_fallback="true";  shift 2 ;;
+            --args)     args="$2"; shift 2 ;;
+            --list)     mode="list"; shift ;;
+            --validate) mode="validate"; shift ;;
+            --json)     JSON_MODE="true"; shift ;;
+            -h|--help)  mode="help"; shift ;;
+            *)          die "unknown option: $1" ;;
+        esac
+    done
+
+    # Resolve python3 here, in the main shell, before any mode below can
+    # reach it through a `$(...)` subshell (dispatch_skill -> lookup_skill,
+    # line ~333) — a subshell inherits the parent's variables at fork time
+    # but can never write RESOLVED_PYTHON3 back, so resolving lazily inside
+    # lookup_skill() left every OTHER caller in the parent shell (run_script's
+    # shlex parser) with an empty $RESOLVED_PYTHON3.
+    [[ "$mode" == "help" ]] || require_python
+
+    case "$mode" in
+        list)     show_list ;;
+        validate) validate_catalog ;;
+        help)
+            grep "^# " "$0" | head -20 | sed 's/^# //'
+            ;;
+        dispatch)
+            [[ -z "$skill_name" && "$allow_fallback" == "false" ]] && die "required: --skill <name>"
+            dispatch_skill "$skill_name" "$args" "$allow_fallback"
+            ;;
+    esac
+}
+
+main "$@"
