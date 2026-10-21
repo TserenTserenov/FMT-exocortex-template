@@ -788,7 +788,7 @@ commit_extractor_changes() {
                         . "$publish_gate"
                         if is_ds_repo_by_origin "$strategy_dir" \
                             && IWE_WORKSPACE="${IWE_ROOT:-$HOME/IWE}" \
-                               publish_commit "$strategy_dir" "$latest_local" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+                               publish_commit "$strategy_dir" "$latest_local" normal "extractor $commit_mode $DATE" "$gov_branch" >> "$LOG_FILE" 2>&1; then
                             log "Published pre-existing extractor commit $latest_local via ds-publish.sh"
                             EXTRACTOR_COMMIT_RESULT="published"
                         elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
@@ -895,7 +895,7 @@ commit_extractor_changes() {
     # not inherit that; it needs the real canonical workspace.
     if is_ds_repo_by_origin "$strategy_dir" \
         && IWE_WORKSPACE="${IWE_ROOT:-$HOME/IWE}" \
-           publish_commit "$strategy_dir" "$head_after" normal "extractor $commit_mode $DATE" >> "$LOG_FILE" 2>&1; then
+           publish_commit "$strategy_dir" "$head_after" normal "extractor $commit_mode $DATE" "$gov_branch" >> "$LOG_FILE" 2>&1; then
         log "Published $repo_name via ds-publish.sh (local commit $head_after)"
         EXTRACTOR_COMMIT_RESULT="published"
     elif ! is_ds_repo_by_origin "$strategy_dir" && push_branch "$strategy_dir" >> "$LOG_FILE" 2>&1; then
