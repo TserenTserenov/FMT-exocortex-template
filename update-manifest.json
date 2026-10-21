@@ -1065,7 +1065,7 @@
     },
     {
       "path": "extensions/README.md",
-      "sha256": "ba9be7f75cf5edba832a8230004300a5399dda456d87f73b3c9d527cfe9ef36f"
+      "sha256": "74fcd91832349942e96d353318002190e436163bf04b60ab85efe012b60ac89f"
     },
     {
       "path": "extensions/agent-inbox/README.md",
@@ -1497,7 +1497,7 @@
     },
     {
       "path": "roles/strategist/prompts/day-plan.md",
-      "sha256": "3208d249eaa6fa9dc2e3e6842c5c0fecdbfda971f58225159ffec1a97e7bc85d"
+      "sha256": "307c594ebbeb51fe16d696e40b940da8419b510bfdf5085c891876a2ccb17129"
     },
     {
       "path": "roles/strategist/prompts/evening.md",

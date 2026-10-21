@@ -3,7 +3,6 @@ Execute a **complete** Day Open for the Strategist role (R1) **autonomously**.
 
 ## Algorithm (skill /day-open, steps 0-7)
 
-> **This prompt branch is the manual path** (`strategist.sh day-plan`, no LLM response needed in an automated run). The automated dawn run uses the deterministic `scripts/day-open-pipeline.sh`, which reads `day-open.before/.after/.checks` mechanically via `day-open-hooks-runner.sh` (extensions/README.md) — this step does not need to repeat there.
 
 ### Step -1 — Extensions (before)
 

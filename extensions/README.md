@@ -239,5 +239,4 @@ The `.agentigore` file does not affect git — it only affects Kimi. `update.sh`
 
 1. File names: `<protocol>.<hook>.md` or `<protocol>.<hook>.<suffix>.md`
 2. Content: Markdown — it will be inserted as a block into the protocol
-3. `update.sh` does not touch your files in `extensions/` (`*.after.md`, `*.before.md`, `*.checks.md`, `mcp-user.json`). Exception — `extensions/README.md` (platform reference)
 4. Multiple extensions for one hook: loaded in alphabetical order
