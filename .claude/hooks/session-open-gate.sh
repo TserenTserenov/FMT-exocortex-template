@@ -18,16 +18,23 @@
 # freeze guard then tells the agent to use an isolated worktree, this gate
 # does not re-implement that logic.
 #
-# Why `--wp` only, not `--housekeeping` (pilot decision 16.10.2026, S-68 in
-# STAGING.md): a free-text housekeeping reason isn't tracked anywhere as a
-# real work product, so every edit must carry a real WP-N — either the one
-# already active, the standing umbrella tech-debt РП (e.g. the author's own
-# WP-7), or a new one per the WP Entry Filter (S-47). This also happens to
-# already be how `session-guard.sh open --housekeeping` behaves today: that
-# path never writes a `harness_session_id:` line at all (confirmed by
-# reading its heredoc), so it could never have satisfied this gate anyway —
-# the wp: field check below just makes that requirement explicit instead of
-# relying on an incidental side effect of a different code path.
+# Why `--wp` only, not any `--housekeeping` reason (pilot decision 16.10.2026,
+# S-68 in STAGING.md): a free-text housekeeping reason isn't tracked anywhere
+# as a real work product, so every edit must carry a real WP-N -- either the
+# one already active, the standing umbrella tech-debt РП (e.g. the author's
+# own WP-7), or a new one per the WP Entry Filter (S-47).
+#
+# Exception, added 21.10.2026 (community report: day/week/month close
+# rejected outright, with no WP to bind to -- they are not a numbered work
+# product by design). ALLOWED_HOUSEKEEPING_REASONS below is a CLOSED,
+# platform-defined list, not an open door: S-68 forbids an arbitrary
+# `--housekeeping <anything>` from standing in for a real WP (that is exactly
+# what the first version of this fix got wrong -- it accepted any reason at
+# all, reverting S-68 wholesale; caught by adversarial review before merge).
+# These four names are the operational protocols that open this binding
+# themselves, from their own SKILL.md, not something a session can claim for
+# an arbitrary unrelated commit.
+ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close)$'
 #
 # What this gate does NOT do: it does not require the semaphore to live in the
 # repo being committed to — the semaphore directory is session-scoped, not
@@ -84,10 +91,15 @@ while IFS= read -r sem_file; do
     WP_BOUND=1
     break
   fi
+  HK_REASON=$(grep -E '^housekeeping: ' "$sem_file" 2>/dev/null | head -1 | cut -d' ' -f2-)
+  if [ -n "$HK_REASON" ] && printf '%s' "$HK_REASON" | grep -qE "$ALLOWED_HOUSEKEEPING_REASONS"; then
+    WP_BOUND=1
+    break
+  fi
 done <<< "$SEM_MATCHES"
 [ "$WP_BOUND" = 1 ] && exit 0
 
-echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
+echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
 
 cat >&2 <<EOF
 🚫 Session Open Gate (WP-561/S-68): прямой git commit/push без привязки к РП заблокирован.
@@ -99,6 +111,10 @@ cat >&2 <<EOF
 
 WP-N — РП, который уже обсуждался в этой сессии; если его нет, подойдёт
 зонтичный РП техдолга платформы или новый РП по фильтру входа (S-47).
+
+Исключение — закрытый список операционных протоколов без своего номера
+(day-open, day-close, week-close, month-close): их собственные SKILL.md уже
+открывают open --housekeeping REASON сами, в начале протокола.
 
 Канонический чекаут может быть заморожен (WP-520/WP-484) — session-guard.sh в
 этом случае сам укажет, как перейти в изолированную копию (EnterWorktree /

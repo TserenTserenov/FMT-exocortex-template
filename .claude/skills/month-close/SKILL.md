@@ -49,6 +49,23 @@ Month Close = протокол. Исполнять ТОЛЬКО пошагово
 ### 0. Extensions (before)
 Загрузить: `bash .claude/scripts/load-extensions.sh month-close before`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить как первые шаги. Exit 1 → пропустить. Поддерживает `extensions/month-close.before.md` И `extensions/month-close.before.<suffix>.md`.
 
+### 0а. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
+Month Close сам по себе не рабочий продукт, но `session-open-gate.sh` (S-68) не делает для него исключения — коммит шага ниже (`git commit -m "month-close: close YYYY-MM"`) без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
+```bash
+HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
+SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
+AGENT="${IWE_AGENT:-claude-code}"
+ALREADY_BOUND=0
+if [ -n "$HARNESS_ID" ]; then
+  while IFS= read -r sem; do
+    [ -z "$sem" ] && continue
+    grep -qE '^wp: .+' "$sem" 2>/dev/null && { ALREADY_BOUND=1; break; }
+  done < <(grep -lxF "harness_session_id: $HARNESS_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+fi
+[ "$ALREADY_BOUND" = 1 ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" open --housekeeping month-close --agent "$AGENT" 2>&1 || true
+```
+`session-open-gate.sh` принимает `housekeeping: month-close` как легитимную привязку — это закрытый список из 4 операционных протоколов, не произвольная причина (S-68 запрещает именно произвольные `--housekeeping`-обходы, не эти четыре). Отказ открытия (коллизия с параллельной сессией) не блокирует протокол.
+
 ### 1. Сбор данных (агент)
 
 **1a. Период.** Определить границы месяца: `YYYY-MM-01 .. YYYY-MM-{last}` (фактически — последний Week Close предыдущего месяца).
