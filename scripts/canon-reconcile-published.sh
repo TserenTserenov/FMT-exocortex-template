@@ -436,7 +436,7 @@ fi
 # that simply never called `session-guard.sh close` blocked reconcile indefinitely
 # (live case found 17.10: codex-*.open from WP-484, work on origin/main 9h earlier,
 # session never closed). session-guard.sh already has the right signal for this --
-# the commit-lease that `close`/`renew` manage (LEASE_SEC, default 4h) -- so a
+# the commit-lease that `close`/`renew` manage (LEASE_SEC, default 24h) -- so a
 # pid-less semaphore is only still counted as live while that lease has not expired.
 # Sourcing session-guard.sh itself is not an option: it ends in an unconditional
 # command dispatch on $CMD, so sourcing it would also execute whatever command this
@@ -448,7 +448,7 @@ fi
 # timed at all -- treated as live, same as before this fix (no regression for the
 # pre-WP-484 semaphore shape the existing smoke test scenario 8 already covers).
 pidless_semaphore_lease_expired() {  # <semaphore> -- 0 (expired, safe to not count as live) / 1 (valid or undecidable -> still live)
-  local sem="$1" ts base_epoch renewed_at renewed_epoch="" lease_sec="${IWE_SESSION_LEASE_SEC:-14400}"
+  local sem="$1" ts base_epoch renewed_at renewed_epoch="" lease_sec="${IWE_SESSION_LEASE_SEC:-86400}"
   ts=$(grep -E '^(opened_at|created_at): ' "$sem" | head -1 | cut -d' ' -f2-)
   [ -n "$ts" ] || return 1
   base_epoch=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || date -u -d "$ts" +%s 2>/dev/null) || return 1
