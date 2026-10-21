@@ -1029,7 +1029,13 @@ semaphore_epoch() {
 #      (sweep_orphaned_semaphores выше читает `head -1`);
 #   3. имя файла аренды производно от имени семафора — привязка к конкретной
 #      сессии структурная, продлить чужую аренду «заодно» нельзя.
-LEASE_SEC="${IWE_SESSION_LEASE_SEC:-14400}"  # 4h; продление — `renew`
+# Default 24h, not the author's 4h: WP-484 Ф49 protected against an orphaned
+# semaphore handing commit rights to a DIFFERENT concurrent agent on the same
+# checkout (author runs Kimi+Codex+Claude in parallel). A solo install has no
+# second agent to race against, so the original 4h just blocked a normal
+# single-session workday without protecting anything — set IWE_SESSION_LEASE_SEC
+# explicitly if you do run concurrent agents against one checkout.
+LEASE_SEC="${IWE_SESSION_LEASE_SEC:-86400}"  # 24h; продление — `renew`
 
 lease_deadline_epoch() {
   local semaphore="$1" base_epoch renewed_at renewed_epoch=""
