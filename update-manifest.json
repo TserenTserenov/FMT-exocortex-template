@@ -897,7 +897,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "31a5f66de159e49c3ec11ed38f2b1e0dc318d6e6e05e18969aff904249f59157"
+      "sha256": "855fed5fdf228fc301760f96e90693e37303aad235efd3362e91923f769ec1c0"
     },
     {
       "path": "CLAUDE.md",
@@ -1241,7 +1241,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "ea8ea61aa051a76dcfff36584342a5bb2117cb78f1138b4c3874168ae9089dfc"
+      "sha256": "bfead410fa189419d27716eacb5998f1b71f31ec78f966ec85d56eb652cbf5af"
     },
     {
       "path": "guide-kit/.gitignore",

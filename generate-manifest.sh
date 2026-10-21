@@ -15,6 +15,19 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
+# An unresolved conflict leaves each conflicted path in the index at stages
+# 1/2/3 with no stage 0 — plain `git ls-files` below lists such a path once
+# per stage (3x), and every stage-3 duplicate silently became a manifest
+# entry (found via 3 real CI failures on PR #1296/#1297, 2026-10-21: the
+# duplicate CHANGELOG.md entries broke scripts/verify-manifest.sh). Fail
+# before generating rather than ship a corrupt manifest.
+UNMERGED=$(git -C "$SCRIPT_DIR" diff --name-only --diff-filter=U)
+if [ -n "$UNMERGED" ]; then
+    echo "ERROR: незавершённый конфликт слияния — запустите generate-manifest.sh после git add/rebase --continue:" >&2
+    echo "$UNMERGED" >&2
+    exit 1
+fi
+
 echo "Генерация манифеста v$VERSION..."
 
 # === Исключения, которые НЕ попадают ни в files, ни в excluded_paths ===
