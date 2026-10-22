@@ -185,7 +185,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "e1dd6e6b373980ed896ce595969bd782ecd6e397f7c65178e452c5da3c0c9aab"
+      "sha256": "c7a17dffddfa325d3dac05b0945b3870dae8545dba1e88bfc4bd68b336bd5521"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -901,7 +901,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1d25be7d55b2c658dbb3f5ffc90bbc1f23eef018bd503bf4bde26bba5d18ace0"
+      "sha256": "9c18f1fac388a3188a1a0c44e51c4172fbff5f7cc3b39f5360f84b9bfa407ba6"
     },
     {
       "path": "CLAUDE.md",
@@ -2753,7 +2753,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "7caa83648a0d79b297a8b530c85f7edc8c0f45f6e26c2a11c0d86a1b3725eb44"
+      "sha256": "af312dafc80eaa8beb98d4ae56cec9d3a825889d3bdd5e4a0d1acb77d7290585"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3317,7 +3317,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "4fd5ca5cb75372a2f52ed8bed2eb0e0a37998af6e49306aebe7ae385ff88d32c"
+      "sha256": "30fe9a0ee90f7017baaf0d054da56d3b04fd29c080f9b0788cb251208af372f3"
     }
   ],
   "excluded_paths": [
