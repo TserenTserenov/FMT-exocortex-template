@@ -901,7 +901,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b616d4b6a274f00fedd215d82686c85f655fdd5a06c817aabf487c75702ad2c9"
+      "sha256": "fe5c618ec23a36c25d5e12f5dcd86ac08b4e569110d65cd4e1274dc3ac0063a3"
     },
     {
       "path": "CLAUDE.md",
@@ -2769,7 +2769,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "3d57da6e4d5339e46b645828b3b2c85199f6e9dcd3393ab4def76bed04d0af54"
+      "sha256": "9d2e537241e3cf2fd50ca49ea31cb7947e6fe5a66f769f315bdddd67f7789a4d"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
