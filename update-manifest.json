@@ -3435,6 +3435,7 @@
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_729_strategy_day.sh",
     "scripts/tests/test_issue_810_scan_selfexcl.sh",
+    "scripts/tests/test_issue_850_fork_guard.sh",
     "scripts/tests/test_issue_851_cyrillic_slug.sh",
     "scripts/tests/test_issue_869_claude_slug.sh",
     "scripts/tests/test_issue_870_dayplan_validator.sh",
