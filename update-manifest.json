@@ -185,7 +185,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "c7a17dffddfa325d3dac05b0945b3870dae8545dba1e88bfc4bd68b336bd5521"
+      "sha256": "e1dd6e6b373980ed896ce595969bd782ecd6e397f7c65178e452c5da3c0c9aab"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -901,7 +901,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9c18f1fac388a3188a1a0c44e51c4172fbff5f7cc3b39f5360f84b9bfa407ba6"
+      "sha256": "74b0c7a2478d5b54ebe369ceafc3177a656e9322a0b0eb8680f79d0e56526363"
     },
     {
       "path": "CLAUDE.md",
@@ -926,6 +926,10 @@
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
       "sha256": "c936a16f645374526601f7f797d09a1c1554fa63db885a2515205659407c2945"
+    },
+    {
+      "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
+      "sha256": "6a2f74b5bd486879bde643a5ef24058c3d6f2af9f75fa44ede6c235da0cf7c86"
     },
     {
       "path": "docs/BROWSER-CI-TEMPLATE.md",
@@ -2753,7 +2757,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "af312dafc80eaa8beb98d4ae56cec9d3a825889d3bdd5e4a0d1acb77d7290585"
+      "sha256": "7caa83648a0d79b297a8b530c85f7edc8c0f45f6e26c2a11c0d86a1b3725eb44"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3317,7 +3321,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "30fe9a0ee90f7017baaf0d054da56d3b04fd29c080f9b0788cb251208af372f3"
+      "sha256": "4fd5ca5cb75372a2f52ed8bed2eb0e0a37998af6e49306aebe7ae385ff88d32c"
     }
   ],
   "excluded_paths": [

@@ -13,6 +13,9 @@
 # Usage:
 #   bash setup/wp529-f21-toggle-required-review.sh on --dry-run|--apply
 #   bash setup/wp529-f21-toggle-required-review.sh off --dry-run|--apply
+#
+# Полное аварийное снятие защиты ветки (не только review) и её точное
+# восстановление — не этим скриптом, см. docs/BRANCH-PROTECTION-EMERGENCY.md.
 
 set -euo pipefail
 REPO="TserenTserenov/FMT-exocortex-template"
