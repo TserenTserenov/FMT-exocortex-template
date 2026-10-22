@@ -245,11 +245,24 @@ elif [ "$PLATFORM" = "Linux" ]; then
         systemctl --user daemon-reload
         ok "systemd units удалены"
     elif [ "$MODE" != "--check" ]; then
+        # issue #1303 (Linux-половина #984, macOS-плист чинили в PR #1022):
+        # extractor.sh resolves session-guard.sh as ${IWE_SCRIPTS:-$HOME/IWE/scripts};
+        # systemd --user не наследует login-shell окружение, поэтому без явных
+        # Environment= строк резолв падает на дефолт, которого в типичной
+        # установке нет — фид находит кандидатов, но не может их сохранить.
+        IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE_TEMPLATE_DIR/scripts}"
         cat > "$UNIT_DIR/extractor-git-diff-feed.service" <<UNIT
 [Unit]
 Description=IWE Extractor: git-diff-feed (WP-247 Ф-MULTI-SOURCE.2)
 [Service]
 Type=oneshot
+Environment=HOME=$HOME
+Environment=IWE_TEMPLATE=$IWE_TEMPLATE_DIR
+Environment=IWE_WORKSPACE=$IWE_WORKSPACE
+Environment=IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO
+Environment=IWE_RUNTIME=$IWE_RUNTIME
+Environment=IWE_SCRIPTS=$IWE_SCRIPTS
 ExecStart=$EXTRACTOR_SH git-diff-feed "12 hours ago"
 UNIT
         cat > "$UNIT_DIR/extractor-git-diff-feed.timer" <<TIMER
