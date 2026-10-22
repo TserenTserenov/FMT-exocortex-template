@@ -197,7 +197,7 @@
     },
     {
       "path": ".claude/hooks/style-check-text.sh",
-      "sha256": "26bf4ac637eeaff45f84f27af57965fac43f3612b74a52b703b6d6af76c65e33"
+      "sha256": "42dab4ed4f794dbeb973e582cede174607eb6362084f3dce5f737662c28704e2"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",

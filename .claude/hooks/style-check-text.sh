@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# claude-hook: false — standalone wrapper called directly by peer adapter
+# scripts (not a settings.json hook event); see check-orphan-hooks.sh.
 # style-check-text.sh <agent> <text-file> — thin wrapper feeding one agent's
 # reply text through the shared response-clarity-hook.sh core (РП-388 Ф17).
 #
