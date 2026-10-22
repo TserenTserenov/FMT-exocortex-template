@@ -34,7 +34,7 @@
 # These four names are the operational protocols that open this binding
 # themselves, from their own SKILL.md, not something a session can claim for
 # an arbitrary unrelated commit.
-ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close)$'
+ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close|update-delivery)$'
 #
 # What this gate does NOT do: it does not require the semaphore to live in the
 # repo being committed to — the semaphore directory is session-scoped, not

@@ -1391,6 +1391,13 @@ if [ "$CMD" = "open" ]; then
       echo "slug: $HOUSEKEEPING"
       echo "session_id: $HK_SESSION_ID"
       echo "created_at: $(now_iso)"
+      # WP-561, cold-review (peer-session 2026-10-22-17): session-open-gate.sh
+      # only ever selects semaphores carrying a literal `harness_session_id:
+      # $SESSION_ID` line -- without it ALL housekeeping reasons (day-open,
+      # day-close, week-close, month-close, update-delivery) are invisible to
+      # that gate's whitelist check, same gap as the plain open path already
+      # closes below (this fix mirrors that, scoped to housekeeping).
+      [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
       # $$ here is session-guard.sh's own transient process — already dead by
       # the time anyone checks it (verified live 08.08: recorded pid was dead
       # within the same second). $CLAUDE_PID is the actual long-lived Claude

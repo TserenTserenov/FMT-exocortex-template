@@ -6559,6 +6559,31 @@ echo "=========================================="
 echo ""
 echo "Перезапустите Claude Code для применения обновлений в memory/."
 
+# issue #1280 (WP-561 Ф46 tail, 22.10): update.sh never commits its own
+# delivery into the governance repo (it only copies files there -- see the
+# backfill_* functions above) -- that commit is always a separate, later
+# action by the pilot or an agent on their behalf. When the canonical
+# checkout is frozen (WP-520, default on), that later `git commit` is exactly
+# the direct write the freeze gate exists to block, with no WP to bind it to
+# (community report, issue #1280; peer-session 2026-10-22-17, Claude+Kimi+
+# Codex). `update-delivery` is now an allowed housekeeping reason (same
+# closed whitelist as day/week/month-close, session-open-gate.sh), and
+# `--canonical-owner` -- already reviewed for scheduled runners -- reused
+# here for a manual, single, exclusive delivery run rather than a new flag.
+GOVERNANCE_REPO_FOR_DELIVERY_HINT=$(effective_governance_repo 2>/dev/null) || GOVERNANCE_REPO_FOR_DELIVERY_HINT=""
+if [ -n "$GOVERNANCE_REPO_FOR_DELIVERY_HINT" ]; then
+    GOVERNANCE_DIR_FOR_DELIVERY_HINT="$WORKSPACE_DIR/$GOVERNANCE_REPO_FOR_DELIVERY_HINT"
+    if [ -d "$GOVERNANCE_DIR_FOR_DELIVERY_HINT/.git" ]; then
+        echo ""
+        echo "Если $GOVERNANCE_REPO_FOR_DELIVERY_HINT нужно закоммитить (канонический чекаут может быть заморожен, WP-520):"
+        echo "  bash \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT/scripts/session-guard.sh\" open --housekeeping update-delivery \\"
+        echo "    --canonical-owner \"update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)\" --agent manual"
+        echo "  (cd \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT\" && git add -A && git commit -m \"chore: sync template update\")"
+        echo "  bash \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT/scripts/session-guard.sh\" close --housekeeping update-delivery --agent manual"
+        echo "  Если open откажет \"канон уже под эксклюзивным владением\" — подожди close этого держателя, не форсируй."
+    fi
+fi
+
 # issue #226: остальная доставка (memory/hooks/skills, repair-pass, коммит) уже
 # выполнена выше независимо от конфликта — теперь сообщаем и выходим с ошибкой,
 # чтобы CI/скрипты-обёртки увидели неуспех, а пилот — список файлов на разрешение.
