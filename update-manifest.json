@@ -196,6 +196,10 @@
       "sha256": "4c567c88d1590531060cd09e19897ef31c91d2c26be3258410d03fc0b95b294d"
     },
     {
+      "path": ".claude/hooks/style-check-text.sh",
+      "sha256": "26bf4ac637eeaff45f84f27af57965fac43f3612b74a52b703b6d6af76c65e33"
+    },
+    {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
       "sha256": "320f60cd868f5a9833e15dbffb53dd5bccc4d190e1f4e9cef9a821842a3d56cc"
     },
@@ -897,7 +901,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5bf2dfffb7a548a26af62c75ac21409939cdb3807ab6caff913b37ae86b4e907"
+      "sha256": "34a9eabef06ecb77574463fc76367e0227db57d0739a9f92258879bca37c8e9b"
     },
     {
       "path": "CLAUDE.md",
@@ -2277,7 +2281,7 @@
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
-      "sha256": "3d8a1ddeaf3794a3aceaaa12508711b1ecfdf9314ba90a2f564b65b19b370e8f"
+      "sha256": "607f7cd9c4037a062e6fd7595d8fdbe55eed6d826d9814064934ed280ce4ddcc"
     },
     {
       "path": "scripts/config/pipeline-security-whitelist.yaml",
@@ -2553,7 +2557,7 @@
     },
     {
       "path": "scripts/kimi-peer-adapter.sh",
-      "sha256": "6a1cedb1e31cb846ff7147afbeee942864c08c87eed805467413f44d948c1d4c"
+      "sha256": "346c7d1cf1cdae50dd1823c4798580f671bc797ff705548bb98f5354706e51b3"
     },
     {
       "path": "scripts/kimi-session-watchdog.sh",
@@ -2621,7 +2625,7 @@
     },
     {
       "path": "scripts/lib/peer-adapter-common.sh",
-      "sha256": "8cd2e080c39c9282c1e29a7e0df0dfcf0e5c4771423b85dd731034fed90015b6"
+      "sha256": "159e7e44095f0e57ad8262f1f0fdf6ef4f432d47880250de3054524d82efbc1b"
     },
     {
       "path": "scripts/lib/runtime-placeholder-count.sh",

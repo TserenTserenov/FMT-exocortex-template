@@ -399,6 +399,23 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
       echo "WARNING: peer response may not be in Russian (language-check alert) — $_LANG_RESULT" >&2
     fi
   fi
+
+  # РП-388 Ф17: тот же общий style-check, что у Kimi (peer_adapter_check_style
+  # в lib/peer-adapter-common.sh) — здесь инлайн, не через ту функцию, потому
+  # что этот файл common.sh не сорсит (существующая архитектура этого файла,
+  # не правлю здесь). Один и тот же хук-ядро (response-clarity-hook.sh) через
+  # ту же обёртку (style-check-text.sh), не вторая реализация.
+  _STYLE_WRAPPER="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/style-check-text.sh"
+  if [ -x "$_STYLE_WRAPPER" ]; then
+    _STYLE_TMP=$(mktemp) && {
+      printf '%s' "$CODEX_OUTPUT" > "$_STYLE_TMP" 2>/dev/null
+      # timeout 10: same guard as peer_adapter_check_style in
+      # peer-adapter-common.sh (code review, this session) -- a hung hook
+      # here would stall delivery of CODEX_OUTPUT to stdout below.
+      timeout 10 bash "$_STYLE_WRAPPER" "codex" "$_STYLE_TMP" >/dev/null 2>&1 || true
+      rm -f "$_STYLE_TMP"
+    }
+  fi
 fi
 
 # cleanup_peer() через trap удалит lock и temp
