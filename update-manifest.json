@@ -2749,7 +2749,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "f8d51a6f27e6b1b0e1fe0d399d7269609c2acee85fa301636d9c10cabded1b47"
+      "sha256": "7caa83648a0d79b297a8b530c85f7edc8c0f45f6e26c2a11c0d86a1b3725eb44"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3073,7 +3073,7 @@
     },
     {
       "path": "scripts/validate-fmt-scripts.sh",
-      "sha256": "17f591f9c9a04417f1553154de4abfe5dc1023503b7160021e4e2aea43a457f3"
+      "sha256": "eb8be454f8a511161c1ceb5212c45241d89a4278b140682493eafe98735ef0f6"
     },
     {
       "path": "scripts/validate-hypothesis-priority.sh",
@@ -3213,7 +3213,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "c3a4035e4b0e92b077f4df55c5ece457bc5afa8d5dade9c6bb7e811bcc8c7e14"
+      "sha256": "13c8153358f9176babb3be3ccd63d3c9c2a08bb9b36673bf1de8e355ae6c0ae6"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3407,6 +3407,7 @@
     "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
+    "scripts/tests/test_issue_1279_open_log_isolate.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

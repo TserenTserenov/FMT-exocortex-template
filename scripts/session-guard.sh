@@ -1695,6 +1695,18 @@ if [ "$CMD" = "open" ]; then
       || fail "--isolate: не удалось канонизировать путь worktree" 1
   fi
 
+  # issue #1279: OPEN_LOG defaulted to the canonical governance repo
+  # ($IWE_ROOT/$GOV_REPO) at module scope, before --isolate was even parsed,
+  # so `open` under isolate still appended to the frozen canonical checkout —
+  # the same drift resolve_orz_sessions_dir() already avoids for the ORZ
+  # scaffold. Redirect it into the isolated worktree so the allowlist
+  # registration below (which keys off this same variable) and the actual
+  # append target agree.
+  if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -n "${ISOLATED_WORKTREE_PATH:-}" ]; then
+    OPEN_LOG="$ISOLATED_WORKTREE_PATH/inbox/open-sessions.log"
+    mkdir -p "$(dirname "$OPEN_LOG")"
+  fi
+
   if [ "${ISOLATE_FLAG:-0}" = "1" ] && [ -f "$SEM_FILE" ]; then
     echo "Session OPEN (re-entry): $SEM_FILE (WP: $WP, agent: $AGENT, slug: ${SLUG:-$WP})"
     printf '{"worktree_path": "%s", "branch": "%s", "session_id": "%s"}\n' \
