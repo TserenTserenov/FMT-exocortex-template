@@ -411,8 +411,12 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
       printf '%s' "$CODEX_OUTPUT" > "$_STYLE_TMP" 2>/dev/null
       # timeout 10: same guard as peer_adapter_check_style in
       # peer-adapter-common.sh (code review, this session) -- a hung hook
-      # here would stall delivery of CODEX_OUTPUT to stdout below.
-      timeout 10 bash "$_STYLE_WRAPPER" "codex" "$_STYLE_TMP" >/dev/null 2>&1 || true
+      # here would stall delivery of CODEX_OUTPUT to stdout below. `timeout`
+      # is GNU/Homebrew-only (platform-compat check, WP-5) -- command -v
+      # guard: no timeout(1) on this host -> skip the check entirely.
+      if command -v timeout >/dev/null 2>&1; then
+        timeout 10 bash "$_STYLE_WRAPPER" "codex" "$_STYLE_TMP" >/dev/null 2>&1 || true
+      fi
       rm -f "$_STYLE_TMP"
     }
   fi

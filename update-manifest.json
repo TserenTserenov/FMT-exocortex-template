@@ -2281,7 +2281,7 @@
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
-      "sha256": "607f7cd9c4037a062e6fd7595d8fdbe55eed6d826d9814064934ed280ce4ddcc"
+      "sha256": "cfdc89d3224b13fc84b6c5851f0d4655935278f8544aa91f3b3f3ac66334c449"
     },
     {
       "path": "scripts/config/pipeline-security-whitelist.yaml",
@@ -2625,7 +2625,7 @@
     },
     {
       "path": "scripts/lib/peer-adapter-common.sh",
-      "sha256": "159e7e44095f0e57ad8262f1f0fdf6ef4f432d47880250de3054524d82efbc1b"
+      "sha256": "4819d33ee9acbe417872232ea4067638608cf50931f38fad5f76e6c1aac31e74"
     },
     {
       "path": "scripts/lib/runtime-placeholder-count.sh",

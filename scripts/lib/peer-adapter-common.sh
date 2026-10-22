@@ -248,7 +248,15 @@ peer_adapter_check_style() {
   printf '%s' "$output" > "$tmp_file" 2>/dev/null
   # timeout 10: a hung hook here would stall delivery of the peer's own reply
   # to stdout (code review, this session) -- the Python wrapper already has
-  # this same guard, bash call sites need it too.
-  timeout 10 bash "$wrapper" "$agent_name" "$tmp_file" >/dev/null 2>&1 || true
+  # this same guard, bash call sites need it too. `timeout` itself is
+  # GNU/Homebrew-only (missing on stock macOS, platform-compat check, WP-5) --
+  # command -v guard: no timeout(1) on this host -> skip the check entirely
+  # rather than block on a hung hook. Not routed through iwe_timeout() in
+  # lib/common.sh to avoid a new source dependency in a file that is
+  # deliberately source-side-effect-free (see file header); if a 5th inline
+  # copy of this guard appears elsewhere, that's the signal to migrate.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 10 bash "$wrapper" "$agent_name" "$tmp_file" >/dev/null 2>&1 || true
+  fi
   rm -f "$tmp_file"
 }
