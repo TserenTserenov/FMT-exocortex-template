@@ -186,17 +186,66 @@ mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
 # issue #862 follow-up (Codex r3): транскрипт — JSONL (по одному JSON-объекту
 # на строку/сообщение), поэтому все jq-запросы используют -s и разворачивают
 # массив сообщений через .[].
-PROTOCOL_SKILL=$(jq -s -r '
+# issue #1311 (round-loop Kimi+Codex, 22.10): skill и args читаются ОДНОЙ
+# jq-выборкой из ОДНОГО tool_use-объекта, не двумя независимыми пайпами —
+# иначе риск взять args от другого вызова Skill в том же транскрипте.
+# `.[-1]` (последний найденный вызов), не `.[0]`: до этой правки "первый
+# найденный" был безопасен, потому что выбор влиял только на текст лога/
+# сообщения — порог Шага 2 сканировал весь транскрипт одинаково независимо
+# от того, какой вызов выбран. Теперь тот же объект решает Quick Close
+# exemption, и "первый" ломает инвариант — ранний `run-protocol close` в
+# начале сессии молча освобождал бы от чеклиста ПОЗДНИЙ `run-protocol
+# week-close` без собственного чеклиста (cold-review, Critical, 22.10,
+# воспроизведено синтетическим транскриптом с двумя вызовами).
+PROTOCOL_CALL_JSON=$(jq -s -c '
   [.[] | select((.message.role // "assistant") == "assistant") | .message.content[]?]
-  | .[]
-  | select(.type == "tool_use" and .name == "Skill")
-  | .input.skill // empty
-' "$TRANSCRIPT_PATH" 2>/dev/null \
-  | grep -E '^(day-open|day-close|run-protocol|wp-new)$' \
-  | head -1)
+  | map(select(.type == "tool_use" and .name == "Skill"))
+  | map(select((.input.skill // "") | test("^(day-open|day-close|run-protocol|wp-new)$")))
+  | .[-1] // empty
+' "$TRANSCRIPT_PATH" 2>/dev/null)
 
-if [ -z "$PROTOCOL_SKILL" ]; then
+if [ -z "$PROTOCOL_CALL_JSON" ] || [ "$PROTOCOL_CALL_JSON" = "null" ]; then
   # Протокольный скилл не запускался — gate не нужен
+  echo '{}'
+  exit 0
+fi
+
+PROTOCOL_SKILL=$(printf '%s' "$PROTOCOL_CALL_JSON" | jq -r '.input.skill // empty')
+
+# --- Шаг 1б: Quick Close exempt (issue #1311) ---
+# memory/protocol-close.md обещает Quick Close "inline, без TodoWrite, ~3 мин"
+# (триггеры «закрываю сессию»/«всё»/«закрывай» → run-protocol close/close
+# session). До этой правки ЛЮБОЙ run-protocol (включая week-close/month-close/
+# day-close, где список шагов реально нужен — через SKILL.md + TodoWrite)
+# требовал тот же порог THRESHOLD — Quick Close был неотличим от тяжёлых
+# протоколов. Нестрока или отсутствующий args → НЕ Quick Close (fail-closed,
+# round-loop консенсус Kimi+Codex 22.10: неопознанный ввод не ослабляет гейт).
+IS_QUICK_CLOSE=0
+if [ "$PROTOCOL_SKILL" = "run-protocol" ]; then
+  # `.input.args | type` НАПРЯМУЮ, без `// ""` — jq's `//` считает JSON
+  # `false` таким же falsy, как `null`, и подмена случилась БЫ до `type`,
+  # превращая булев `false` в тип "string" со значением "" (cold-review,
+  # High, 22.10: `{"args": false}` без чеклиста проходил как Quick Close —
+  # нарушение собственного заявленного fail-closed). Отсутствующий ключ
+  # `.input.args` у jq даёт `null`, поэтому "null" трактуется как пустая
+  # строка (= Quick Close), любой другой тип (boolean/number/object/array)
+  # — НЕ Quick Close.
+  ARGS_KIND=$(printf '%s' "$PROTOCOL_CALL_JSON" | jq -r '.input.args | type')
+  ARGS_NORM=""
+  if [ "$ARGS_KIND" = "string" ]; then
+    ARGS_NORM=$(printf '%s' "$PROTOCOL_CALL_JSON" | jq -r '.input.args' \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]+/ /g')
+  fi
+  if [ "$ARGS_KIND" = "null" ] || [ "$ARGS_KIND" = "string" ]; then
+    case "$ARGS_NORM" in
+      ""|"close"|"close session") IS_QUICK_CLOSE=1 ;;
+    esac
+  fi
+fi
+
+if [ "$IS_QUICK_CLOSE" = "1" ]; then
+  # Quick Close — по дизайну без TodoWrite/Task-чеклиста, Шаг 2 не нужен.
   echo '{}'
   exit 0
 fi

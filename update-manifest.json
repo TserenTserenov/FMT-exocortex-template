@@ -133,7 +133,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "b196812f254fd9d8749bf77dd15b308f90d683ea1d47b7987696def52cb1f1df"
+      "sha256": "45c581470f1366d4fd6452dfc60001da73b972e36d66b66895f301c8aaecbce2"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -238,6 +238,10 @@
     {
       "path": ".claude/hooks/tests/test-protocol-artifact-validate-mandatory-fail-closed.sh",
       "sha256": "6298b52f77be40dca698050a95fee94cca66cf4a9e64f119acde03b18d76f765"
+    },
+    {
+      "path": ".claude/hooks/tests/test-protocol-stop-gate-quick-close-exempt.sh",
+      "sha256": "34b8963001e12cbffc6542959ba1509327896befaf91c5a2411a0bcd6d391d58"
     },
     {
       "path": ".claude/hooks/tests/test-protocol-stop-gate-task-replacement.sh",
@@ -445,7 +449,7 @@
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
-      "sha256": "0fdce862c53d93851efe6dda1f8dfcc6c68c1551c613dd4099b11050def68689"
+      "sha256": "4e708c607865d9a5a410b9d45a39bc60a2444a63c79d87a25f8233b0cb914c4b"
     },
     {
       "path": ".claude/skills/bottleneck-pick/SKILL.md",
@@ -905,7 +909,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "c004a6484f229f25e7c60bfcc4cf40d84c6f0b5e6405eebca99241addf9933fd"
+      "sha256": "e58fe77703e89aabbda2eb220b3e4cfb2b44f0114ababa25118d6a372ec10dcd"
     },
     {
       "path": "ONTOLOGY.md",
