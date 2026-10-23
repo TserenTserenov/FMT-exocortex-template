@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 

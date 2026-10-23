@@ -51,7 +51,7 @@ jobs:
         github.event.workflow_run.head_branch == 'main' &&
         (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # workflow_run: pin to the exact commit Validate Template just
           # verified — this is what makes the gate actually mean something.

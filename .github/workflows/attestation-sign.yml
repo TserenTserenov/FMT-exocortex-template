@@ -50,7 +50,7 @@ jobs:
     environment: red-team-auditors
     steps:
       - name: Checkout trusted ref (main) — never the PR
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
           fetch-depth: 0
@@ -131,7 +131,7 @@ jobs:
           jq '.predicate' statement.json > predicate.json
 
       - name: Sign and publish via GitHub Attestations API
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-name: "${{ github.repository }}@${{ steps.meta.outputs.head_sha }}"
           subject-digest: "sha256:${{ steps.digest.outputs.digest }}"

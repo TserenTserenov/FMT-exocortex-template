@@ -48,12 +48,12 @@ jobs:
       author_email: ${{ steps.source_author.outputs.email }}
     steps:
       - name: Checkout main (full history for delta diff)
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
 
@@ -516,14 +516,14 @@ jobs:
     steps:
       - name: Generate iwesys installation token
         id: iwesys_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ vars.CANON_SYNC_APP_ID }}
           private-key: ${{ secrets.CANON_SYNC_APP_KEY }}
           owner: iwesys
 
       - name: Checkout en-draft
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: en-draft
           fetch-depth: 0
