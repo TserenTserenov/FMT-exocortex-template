@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fe4b094b8a2bcc1d68db647ac930d410cf773a4961f3fd78ba3abf54a1dab36e"
+      "sha256": "71dda71dff4a357c0e0f7c06f92c1824e1cd535f3079e729db7ef03dcd790b94"
     },
     {
       "path": "CLAUDE.md",
@@ -2385,7 +2385,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "cb4ed573784ead72eaa9d5cfb9628d3eced91ac67f0000cabf6ac135801bd8c1"
+      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3428,6 +3428,7 @@
     "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
+    "scripts/tests/test_issue_1254_repo_activity_utf8.py",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
