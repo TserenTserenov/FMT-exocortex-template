@@ -469,7 +469,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "9a989b2847367b1bd470a20e129f68c55fa18096983d77119dd63de280252d47"
+      "sha256": "ec3b5427f3d0541e5b021b707bb7969f0abf84a2e3e00fc325ae45b4a4a6ddef"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -625,7 +625,7 @@
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
-      "sha256": "dd56ac96e65a9222143073ca8386bb4ca180f8bf22a3fe54aba9353e939a330f"
+      "sha256": "a38900fc18c2a503e699b16906cf104854f540e6376586faec80198eeef89073"
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
@@ -813,7 +813,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "4cfc22206c58d61504092ae2dec5652e9edac9a4a31765b0b3a3fd128c91f4ac"
+      "sha256": "0a790259bf4b666b7afddad863fe2f843297c9c5b9770adaebc1fb6aaba9afbe"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "05d83ebe64211421dcc579290f93991454f3a3d6c1be945f25ae980b297f92d8"
+      "sha256": "087f509de2cbd05b9b5df1a50715786ddf092aeab9c1e504b3d07cce7ecec4d5"
     },
     {
       "path": "CLAUDE.md",
@@ -1689,7 +1689,7 @@
     },
     {
       "path": "memory/t-checklist.md",
-      "sha256": "7f423fddf2eccab668642785255176751401d4cbc3074c3713b191479053fab1"
+      "sha256": "a19c9d20f3ffc6f1077f964206be971189c315a927216903c379ef770c2d5709"
     },
     {
       "path": "memory/templates-dayplan.md",
@@ -1785,7 +1785,7 @@
     },
     {
       "path": "roles/extractor/prompts/git-diff-feed.md",
-      "sha256": "7238c88623997f57e634ad9b487d6ff9a6c5c44f9a58fb1dd1c9f43e15a75f33"
+      "sha256": "8405fb86c8e35c3c8acb985656ba0fbc8d82f620b61ba9392486a0615f726f18"
     },
     {
       "path": "roles/extractor/prompts/inbox-check.md",
@@ -1817,7 +1817,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "89984db371fa2428891c5a2eb7ea908ad3ef2a43819edfbb50cde8019cd231a4"
+      "sha256": "1ea0149f5276b85dc09285b1ec9a775777db32915483ad020ce4bbbd1433f46c"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/prompts/note-review.md",
-      "sha256": "9c11418e6eb4ebb0aad00f448468c987240b8ccaee27058339cd340807bff384"
+      "sha256": "c1ab5614d1b6a5d23aedd3eaaf24d2b1896e8f4f83f4123a2d44d971f015cac8"
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
@@ -1973,7 +1973,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "ba835e3bb1a0346bf6a485580610231f2dbf912dd794c31a92103d6706e161b0"
+      "sha256": "54778678a5380197e1add4ecfe10e554fa70fe2fbdd18dd8602bfc3dc3391302"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -2081,7 +2081,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "54166753f13452503ed7b0067856252ff3c22adbf1822ced0fdbecacc3f41705"
+      "sha256": "b8228c3540fcce5c2fa8af388002726da4657185b254c9fad4d412b268b1e460"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -2325,7 +2325,7 @@
     },
     {
       "path": "scripts/day-close-prepare.sh",
-      "sha256": "712b23afa31a21d8c046c81e148af1f485424feab8a7aa657fd5303821dcffe5"
+      "sha256": "d9777f3e7d40a15a36bd9df6bdb898e36d9428f7b04520c74ddadf19b4214c71"
     },
     {
       "path": "scripts/day-close.sh",
@@ -2773,7 +2773,7 @@
     },
     {
       "path": "scripts/setup-extractor-feeders.sh",
-      "sha256": "9d2e537241e3cf2fd50ca49ea31cb7947e6fe5a66f769f315bdddd67f7789a4d"
+      "sha256": "8df21cfa4c7d262aae75d8472d6e0be1248924d0d401c2b79f4d6dcb50ba195a"
     },
     {
       "path": "scripts/setup-vscode-auto-mode.sh",
@@ -3325,7 +3325,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "30fe9a0ee90f7017baaf0d054da56d3b04fd29c080f9b0788cb251208af372f3"
+      "sha256": "8ecadf87a17f709afe7eff9edbf255cb0cf4192369ae4f518f83f324b774878c"
     }
   ],
   "excluded_paths": [
@@ -3420,6 +3420,7 @@
     "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
+    "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",

@@ -8,7 +8,7 @@ DATE=$(date +%Y-%m-%d)
 
 find_strategy_file() {
     case "$1" in
-        "day-plan"|"evening"|"day-close"|"note-review")
+        "day-plan"|"evening"|"day-close")
             echo "$STRATEGY_DIR/DayPlan $DATE.md"
             ;;
         "session-prep")
@@ -148,6 +148,13 @@ build_message() {
         build_day_open_failed_message
         return
     fi
+    # #1261: this message never reads the DayPlan (see comment below), so it must not
+    # depend on one existing — days without a DayPlan (manual open, or none at all)
+    # silently dropped the notification before this scenario was moved above the lookup.
+    if [ "$scenario" = "note-review" ]; then
+        printf "<b>📝 Note-Review завершён</b>\n\nЗаметки остаются в inbox, пока вы не примете по ним решение."
+        return
+    fi
 
     file=$(find_strategy_file "$scenario")
 
@@ -183,11 +190,6 @@ build_message() {
             title=$(grep '^# ' "$file" | head -1 | sed 's/^# //' | escape_html)
 
             printf "<b>📊 Week-Review завершён</b>\n\n%s" "$title"
-            ;;
-
-        "note-review")
-            # The notifier cannot see what the model did, so the text claims nothing about written proposals
-            printf "<b>📝 Note-Review завершён</b>\n\nЗаметки остаются в inbox, пока вы не примете по ним решение."
             ;;
 
         *)

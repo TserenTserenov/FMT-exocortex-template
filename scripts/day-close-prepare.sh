@@ -131,10 +131,17 @@ echo "--- 6. LESSON / MEMORY STATS ---"
 for m in $(memory_files); do
   [ -f "$m" ] || continue
   LINES=$(wc -l < "$m" | tr -d ' ')
-  # Lesson files are named lesson-<topic>.md / lessons_<topic>.md — match both
-  # spellings; the old "lessons_" literal never matched and always counted 0 (#559).
-  LESSONS=$(grep -cE "lessons?[-_]" "$m" 2>/dev/null || true)
-  echo "MEMORY.md: $LINES lines (flag if >200), $LESSONS lesson references (target ≤8)"
+  # issue #1314: the "lessons_" filename grep always counted against a section
+  # ("Уроки" in MEMORY.md) that no longer exists under the frontmatter-based
+  # memory scheme (memory/memory-lifecycle-spec.md) -- it printed a number but
+  # no close protocol ever acted on it. memory-bleed.sh --hot-only is the real,
+  # already-wired signal (same one Week/Month Close already run for their own
+  # cadence); reuse it here instead of a second, disconnected counter.
+  # --hot-only still prints the (unconditional) orphan-files warning before the
+  # HOT-limit line when any memory/*.md lacks frontmatter -- a plain "first ###
+  # line" grep picked that warning up instead of the HOT status (cold-review).
+  BLEED_HOT=$(bash "$IWE_TEMPLATE/scripts/memory-bleed.sh" --hot-only --dir "$(dirname "$m")" 2>/dev/null | grep -E '^### .*HOT-лимит' | head -1)
+  echo "MEMORY.md: $LINES lines (flag if >200). ${BLEED_HOT:-memory-bleed.sh: нет данных}"
 done
 
 echo "--- 7. WAKATIME ---"
