@@ -2785,7 +2785,7 @@ run_post_apply_backfills_or_die() {
 # also fires in the TOTAL_CHANGES=0 recovery branches, so an install that is
 # otherwise up to date still gets its feeders. Re-running is safe: the feeders
 # script skips an unchanged, already-loaded launchd job instead of unload/load
-# (which would kill a run in flight at exactly 06:00/21:00).
+# (which would kill a run in flight at exactly 09:00/21:00).
 backfill_extractor_feeders() {
     local feeders="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
     local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-}"
