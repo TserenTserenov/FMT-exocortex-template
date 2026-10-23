@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c1578c33de358cbf4e603f9bc32247880509f932ee8e23edcab764ca7849daf6"
+      "sha256": "ac22acb9ac32662539e183f971e4f5c6d8ef427a394e15be4721720e1135217c"
     },
     {
       "path": "CLAUDE.md",
@@ -2289,7 +2289,7 @@
     },
     {
       "path": "scripts/claude-peer-adapter.sh",
-      "sha256": "f7185cafe9ca62e2c408e2502539811f81ac7b7c22e8bd91d083a19f77d33b8c"
+      "sha256": "452e6c4117bc445f255ebef30eb1386ff7e0fcade3705660ab7a4732d63fd228"
     },
     {
       "path": "scripts/close-wp.sh",
@@ -2297,7 +2297,7 @@
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
-      "sha256": "cba3a4d7d8d7abaa5e56ad848ad883330d60c83ab010fb6804c40643f0c164ee"
+      "sha256": "f973464b5c2adbdf4092e05860157073003f2182ec25584ba6fa3e4e2f4b3297"
     },
     {
       "path": "scripts/config/pipeline-security-whitelist.yaml",
