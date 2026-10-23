@@ -149,7 +149,7 @@ Refs: WP-NNN
 
 ### Added
 
-- [optional] `roles/strategist/scripts/launchd/com.strategist.notereview.plist`, `roles/strategist/scripts/systemd/iwe-strategist-notereview.{service,timer}`: заметка после занятий (notereview) унифицирована в конвейер подстановки путей (Architecture F) — раньше жила отдельным устаревшим author-source-репозиторием, не подхватывавшим обновления шаблона, установленная задача автозапуска ссылалась на несуществующий путь (WP-529 Ф224, пир-сессия 2026-10-23-04-wp529-f224-launchd-canon).
+- [optional] `roles/strategist/scripts/launchd/com.strategist.notereview.plist`, `roles/strategist/scripts/systemd/iwe-strategist-notereview.{service,timer}`: заметка после занятий (notereview) унифицирована в конвейер подстановки путей (Architecture F) — раньше жила отдельным устаревшим author-source-репозиторием, не подхватывавшим обновления шаблона, установленная задача автозапуска ссылалась на несуществующий путь (WP-529 Ф224, пир-сессия 2026-10-23-04-wp529-f224-launchd-canon, PR #1316).
 - [optional] `scripts/lib/peer-adapter-common.sh`, `scripts/codex-peer-adapter.sh`, `scripts/kimi-peer-adapter.sh`, `.claude/hooks/style-check-text.sh`: Kimi/Codex-реплики пир-сессий теперь проходят тот же стилевой чек (A1-A13.1), что уже применялся к ответам Claude — тонкая обёртка над существующим в шаблоне ядром `response-clarity-hook.sh`, warn-only, ничего не блокирует (РП-388 Ф17, доставлено через РП-529 Ф215, пир-сессия 2026-10-22-11-wp529-continue-f215-agent-auto, PR #1306).
 
 - [behavior] `update.sh`: перед полным дифом `CHANGELOG.md` теперь выводится секция «Главное в этом обновлении» — значимые пункты (не `[optional]`) впереди технического дифа, переиспользует существующую классификацию Changelog-Tag (WP-529 Ф220 продолжение, PR #1304).
