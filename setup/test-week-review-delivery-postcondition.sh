@@ -295,6 +295,7 @@ cat > "$TEST_ROOT/stub-model.sh" <<'STUB'
 # Stands in for the model. STUB_MODE: nothing (exit 0, deliver nothing) | deliver | crash
 # | commit-crash (a local report commit, no push, exit 1) | auth403 (the CLI's own auth error, exit 1)
 [ -z "${GUARD_LOG:-}" ] || echo MODEL >> "$GUARD_LOG"
+[ -z "${STUB_OWNER_LOG:-}" ] || printf '%s\n' "${IWE_CANONICAL_OWNER-UNSET}" > "$STUB_OWNER_LOG"
 case "${STUB_MODE:-nothing}" in
     deliver)
         cd "$STUB_WORKSPACE" || exit 9
@@ -413,9 +414,11 @@ run_guarded() {
         IWE_TEMPLATE="$E2E_TPL" IWE_SCRIPTS="$scripts_dir" AI_CLI="$TEST_ROOT/stub-model.sh" STUB_MODE="$1" \
         STUB_GUARD="$2" GUARD_LOG="$GUARD_LOG" STUB_WORKSPACE="$E2E_WS/DS-strategy" \
         DELIVERY_GIT_BIN="${E2E_DELIVERY_GIT_BIN:-}" FETCH_PLAN="${E2E_FETCH_PLAN:-}" STUB_SLEEP_LOG="${E2E_SLEEP_LOG:-}" \
+        STUB_OWNER_LOG="$OWNER_LOG" IWE_CANONICAL_OWNER="leaked-from-caller" \
         bash "$SCRIPT" week-review >/dev/null 2>"${E2E_STDERR:-/dev/null}"
     echo $?
 }
+OWNER_LOG="$TEST_ROOT/model-owner.log"
 # with_fetch_plan <plan>: the next run_guarded calls use the fetch stand-in until without_fetch_plan
 with_fetch_plan() { E2E_DELIVERY_GIT_BIN="$TEST_ROOT/fetch-git-stub.sh"; E2E_FETCH_PLAN="$1"; rm -f "$FETCH_STATE"; }
 without_fetch_plan() { E2E_DELIVERY_GIT_BIN=""; E2E_FETCH_PLAN=""; }
@@ -467,6 +470,18 @@ if [ "$rc" = "0" ] && [ "$(guard_calls)" = "MODEL|" ] && printf '%s' "$LOG_TEXT"
 else
     fail "an install with no guard must still run and deliver, no guard calls: rc=$rc calls=$(guard_calls)"
 fi
+# issue #1279: the model sees IWE_CANONICAL_OWNER only while the --canonical-owner session is open,
+# and a value inherited from the caller never reaches it.
+owner_seen=$(cat "$OWNER_LOG" 2>/dev/null)
+[ "$owner_seen" = "" ] \
+    && pass "no guard -> the model gets an empty IWE_CANONICAL_OWNER (caller's value overridden)" \
+    || fail "no guard must pass an empty IWE_CANONICAL_OWNER to the model, got: [$owner_seen]"
+reset_ws
+rc=$(run_guarded deliver ok); owner_seen=$(cat "$OWNER_LOG" 2>/dev/null)
+case "$owner_seen" in
+    week-review-*) pass "guarded week-review -> the model gets IWE_CANONICAL_OWNER = the session reason ($owner_seen)" ;;
+    *) fail "a guarded week-review must pass its session reason as IWE_CANONICAL_OWNER: rc=$rc got [$owner_seen]" ;;
+esac
 
 reset_ws
 mkdir -p "$(dirname "$STALE_SEM")"; : > "$STALE_SEM"
