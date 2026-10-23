@@ -26,6 +26,11 @@ substituted:
   # Strategist (стратегические сессии, планирование)
   - roles/strategist/scripts/launchd/com.strategist.morning.plist
   - roles/strategist/scripts/launchd/com.strategist.weekreview.plist
+  # WP-529 Ф224: notereview унифицирован в тот же конвейер, перестал жить
+  # отдельным author-source author в DS-strategist-agent (архивирован).
+  - roles/strategist/scripts/launchd/com.strategist.notereview.plist
+  - roles/strategist/scripts/systemd/iwe-strategist-notereview.service
+  - roles/strategist/scripts/systemd/iwe-strategist-notereview.timer
   # issue #319: symmetric Linux units, launchd/*.plist macOS-only until now
   - roles/strategist/scripts/systemd/iwe-strategist-morning.service
   - roles/strategist/scripts/systemd/iwe-strategist-morning.timer

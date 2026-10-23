@@ -48,6 +48,7 @@ assert_plist_identity() {
 PLISTS=(
     roles/strategist/scripts/launchd/com.strategist.morning.plist
     roles/strategist/scripts/launchd/com.strategist.weekreview.plist
+    roles/strategist/scripts/launchd/com.strategist.notereview.plist
     roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist
     roles/extractor/scripts/launchd/com.extractor.inbox-check.plist
 )
@@ -87,6 +88,7 @@ done
 SERVICES=(
     roles/strategist/scripts/systemd/iwe-strategist-morning.service
     roles/strategist/scripts/systemd/iwe-strategist-weekreview.service
+    roles/strategist/scripts/systemd/iwe-strategist-notereview.service
     roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service
     roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
 )

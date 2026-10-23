@@ -237,7 +237,7 @@ repo_root=$(cd "$SKILL_DIR/../../.." && pwd -P)
 for role in strategist synchronizer extractor; do
   mkdir -p "$service_run/runtime/roles/$role/scripts/launchd"
 done
-for label in com.strategist.morning com.strategist.weekreview; do
+for label in com.strategist.morning com.strategist.weekreview com.strategist.notereview; do
   printf '<plist>synthetic</plist>\n' > "$service_run/runtime/roles/strategist/scripts/launchd/$label.plist"
 done
 printf '<plist>synthetic</plist>\n' > "$service_run/runtime/roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist"
@@ -253,6 +253,7 @@ rc=$?
 if [ "$rc" -eq 0 ] && [ ! -e "$service_run/external-hit" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.strategist.morning.plist" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.strategist.weekreview.plist" ] &&
+   [ -f "$service_abs/Library/LaunchAgents/com.strategist.notereview.plist" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.exocortex.scheduler.plist" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.extractor.inbox-check.plist" ]; then
   pass "SETUP_CI installs all role plists without unloading host jobs"

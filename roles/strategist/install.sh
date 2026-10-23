@@ -44,7 +44,7 @@ echo "  LAUNCHD_DIR: $LAUNCHD_DIR"
 # WP-273 R5 fix (Round 5 Евгения): fail-fast если выбранный plist содержит literal {{...}}.
 # Это предотвращает копирование незаменённых плейсхолдеров в ~/Library/LaunchAgents/
 # (если IWE_RUNTIME не expanded, fallback падает на FMT с placeholder'ами).
-for plist_check in "$LAUNCHD_DIR/com.strategist.morning.plist" "$LAUNCHD_DIR/com.strategist.weekreview.plist"; do
+for plist_check in "$LAUNCHD_DIR/com.strategist.morning.plist" "$LAUNCHD_DIR/com.strategist.weekreview.plist" "$LAUNCHD_DIR/com.strategist.notereview.plist"; do
     if [ -f "$plist_check" ] && grep -qE '\{\{[A-Z_]+\}\}' "$plist_check" 2>/dev/null; then
         echo "ERROR: $plist_check содержит незаменённые плейсхолдеры:" >&2
         grep -oE '\{\{[A-Z_]+\}\}' "$plist_check" | sort -u | sed 's/^/  /' >&2
@@ -106,7 +106,13 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
                 echo "ERROR: недельное cron-расписание не собрано; crontab не изменён" >&2
                 exit 2
             fi
-            iwe_install_cron_fallback "strategist" "$morning_lines" "$week_lines"
+            if ! notereview_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-strategist-notereview.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPT_TARGET note-review >> $HOME/logs/strategist/cron-notereview.log 2>&1"); then
+                echo "ERROR: cron-расписание note-review не собрано; crontab не изменён" >&2
+                exit 2
+            fi
+            iwe_install_cron_fallback "strategist" "$morning_lines" "$week_lines" "$notereview_lines"
             echo "  ✓ Installed via crontab. Verify: crontab -l | grep strategist.sh"
             echo "  ✓ Logs: ~/logs/strategist/"
             exit 0
@@ -121,7 +127,7 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
         # — `systemctl --user is-enabled` тогда вернёт "disabled" (не "not-found",
         # это отличает «выключено» от «ещё не установлено»). Безусловный re-enable
         # при каждом апдейте роли отменял бы выбор пользователя молча.
-        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+        for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
             # A mask may be a symlink to /dev/null; never copy through it or
             # reactivate a timer the user deliberately stopped.
             if [ -L "$SYSTEMD_USER_DIR/$unit.service" ] || [ -L "$SYSTEMD_USER_DIR/$unit.timer" ]; then
@@ -171,7 +177,7 @@ fi
 # на изменения в roles/ и безусловно перезапускает install.sh каждой auto-роли —
 # без этой проверки .disabled-маркер молча игнорировался, отключённый агент
 # возвращался и перезагружался при каждом апдейте шаблона.
-for label in com.strategist.morning com.strategist.weekreview; do
+for label in com.strategist.morning com.strategist.weekreview com.strategist.notereview; do
     if [ -f "$TARGET_DIR/$label.plist.disabled" ]; then
         echo "  ⊘ $label — disabled by user (найден $label.plist.disabled), пропускаю"
         continue

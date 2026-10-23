@@ -43,8 +43,10 @@ case "$*" in
     '--user list-timers --no-legend') [ "$IWE_TEST_BUS" = 1 ] ;;
     '--user is-enabled '*weekreview.timer) printf '%s\n' "${IWE_TEST_WEEK_STATE:-enabled}" ;;
     '--user is-enabled '*morning.timer) printf '%s\n' "${IWE_TEST_MORNING_STATE:-enabled}" ;;
+    '--user is-enabled '*notereview.timer) printf '%s\n' "${IWE_TEST_NOTEREVIEW_STATE:-enabled}" ;;
     '--user is-active '*weekreview.timer) printf '%s\n' "${IWE_TEST_WEEK_ACTIVE:-active}" ;;
     '--user is-active '*morning.timer) printf '%s\n' "${IWE_TEST_MORNING_ACTIVE:-active}" ;;
+    '--user is-active '*notereview.timer) printf '%s\n' "${IWE_TEST_NOTEREVIEW_ACTIVE:-active}" ;;
     *) exit 0 ;;
 esac
 SYSTEMCTL
@@ -74,7 +76,8 @@ else
     source "$IWE_TEMPLATE/roles/lib/scheduler-cron.sh"
     iwe_install_cron_fallback strategist \
         "5 8 * * * $(iwe_cron_env_prefix) $IWE_RUNTIME/roles/strategist/scripts/strategist.sh morning >> $HOME/logs/strategist/cron-morning.log 2>&1" \
-        "0 0 * * 1 $(iwe_cron_env_prefix) $IWE_RUNTIME/roles/strategist/scripts/strategist.sh week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1"
+        "0 0 * * 1 $(iwe_cron_env_prefix) $IWE_RUNTIME/roles/strategist/scripts/strategist.sh week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1" \
+        "0 23 * * * $(iwe_cron_env_prefix) $IWE_RUNTIME/roles/strategist/scripts/strategist.sh note-review >> $HOME/logs/strategist/cron-notereview.log 2>&1"
 fi
 INSTALL
 mkdir -p "$SCRIPT_DIR/roles/lib"
@@ -87,10 +90,11 @@ runtime_units="$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/systemd"
 mkdir -p "$runtime_units"
 write_units() {
     local owner="$1" unit mode
-    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+    for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
         case "$unit" in
             iwe-strategist-morning) mode=morning ;;
             iwe-strategist-weekreview) mode=week-review ;;
+            iwe-strategist-notereview) mode=note-review ;;
         esac
         printf '[Service]\nExecStart=%s/.iwe-runtime/roles/strategist/scripts/strategist.sh %s\nEnvironment=IWE_WORKSPACE=%s\n' \
             "$WORKSPACE_DIR" "$mode" "$owner" > "$unit_dir/$unit.service"
@@ -116,6 +120,8 @@ write_cron_block() {
         "$prefix" "$WORKSPACE_DIR" "$HOME" >> "$IWE_TEST_CRON"
     printf '0 0 * * 1 %s %s/.iwe-runtime/roles/strategist/scripts/strategist.sh week-review >> %s/logs/strategist/cron-weekreview.log 2>&1\n' \
         "$prefix" "$WORKSPACE_DIR" "$HOME" >> "$IWE_TEST_CRON"
+    printf '0 23 * * * %s %s/.iwe-runtime/roles/strategist/scripts/strategist.sh note-review >> %s/logs/strategist/cron-notereview.log 2>&1\n' \
+        "$prefix" "$WORKSPACE_DIR" "$HOME" >> "$IWE_TEST_CRON"
     printf '# END IWE-strategist\n' >> "$IWE_TEST_CRON"
 }
 assert_no_install() {
@@ -130,7 +136,7 @@ write_units "$WORKSPACE_DIR"
 : > "$IWE_TEST_LOG"
 reinstall_linux_strategist > "$fixture/owned-systemd.log"
 grep -q '08:00:00' "$unit_dir/iwe-strategist-morning.timer"
-[ "$(grep -c '^systemctl --user restart ' "$IWE_TEST_LOG")" -eq 2 ]
+[ "$(grep -c '^systemctl --user restart ' "$IWE_TEST_LOG")" -eq 3 ]
 echo 'PASS: owned systemd unit updated and both active timers restarted'
 
 # A foreign service, a symlink, and a mixed backend cannot be rewritten.
@@ -282,13 +288,13 @@ echo 'PASS: mixed systemd/cron backend requires manual decision'
 cp "$template_dir/roles/strategist/install.sh" \
     "$SCRIPT_DIR/roles/strategist/install.sh"
 mkdir -p "$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/launchd"
-for label in com.strategist.morning com.strategist.weekreview; do
+for label in com.strategist.morning com.strategist.weekreview com.strategist.notereview; do
     printf '<plist>test</plist>\n' > \
         "$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/launchd/$label.plist"
 done
 write_units "$WORKSPACE_DIR"
 rm -f "$IWE_TEST_CRON"
-export IWE_TEST_BUS=1 IWE_TEST_MORNING_STATE=disabled IWE_TEST_WEEK_STATE=masked
+export IWE_TEST_BUS=1 IWE_TEST_MORNING_STATE=disabled IWE_TEST_WEEK_STATE=masked IWE_TEST_NOTEREVIEW_STATE=masked
 : > "$IWE_TEST_LOG"
 IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
     IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" \
@@ -300,14 +306,14 @@ if grep -q '^systemctl --user enable --now' "$IWE_TEST_LOG"; then
 fi
 echo 'PASS: real installer preserves disabled and masked timers'
 
-export IWE_TEST_MORNING_STATE=enabled IWE_TEST_WEEK_STATE=enabled
+export IWE_TEST_MORNING_STATE=enabled IWE_TEST_WEEK_STATE=enabled IWE_TEST_NOTEREVIEW_STATE=enabled
 : > "$IWE_TEST_LOG"
 IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
     IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" \
     > "$fixture/enabled-systemd.log"
 grep -q '08:00:00' "$unit_dir/iwe-strategist-morning.timer"
 grep -q '08:00:00' "$unit_dir/iwe-strategist-weekreview.timer"
-[ "$(grep -c '^systemctl --user enable --now ' "$IWE_TEST_LOG")" -eq 2 ]
+[ "$(grep -c '^systemctl --user enable --now ' "$IWE_TEST_LOG")" -eq 3 ]
 backup=$(find "$unit_dir" -maxdepth 1 -name 'iwe-strategist-morning.timer.bak-*' -print -quit)
 [ -n "$backup" ] && grep -q '07:00:00' "$backup"
 echo 'PASS: real installer loads rebuilt enabled timers'

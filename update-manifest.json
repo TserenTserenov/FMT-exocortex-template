@@ -365,7 +365,7 @@
     },
     {
       "path": ".claude/runtime-overlay.yaml",
-      "sha256": "882cd8c85f7a20a396e0955acdcaf5bc55cfd4cefc5fb9e4fa00e8d25ae372c0"
+      "sha256": "98ee6bd60b6548345c749e51df61c6120af3f32e5bcf424e30950053a7b19a05"
     },
     {
       "path": ".claude/scripts/check-index-health.py",
@@ -597,7 +597,7 @@
     },
     {
       "path": ".claude/skills/iwe-platform-redteam/tests/run-calibration.sh",
-      "sha256": "06ad9760e13b21e431a360e7a47d36615a9df9db3c34cbd4943777c261c651a3"
+      "sha256": "150380a8190446bfc955635011418a453bb8701ff8c8242c398fae61d665e4ee"
     },
     {
       "path": ".claude/skills/iwe-restore/SKILL.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a40ff131d070d32c26b3cf76b8476355875ff9ab0db5002c15f9d1f89d88a7c2"
+      "sha256": "153c9d27fa1ee41a5d0a9cdc85f293ccbb261b2392bc175d8fda428bcc815c57"
     },
     {
       "path": "CLAUDE.md",
@@ -1853,7 +1853,7 @@
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "fb886a7e7f4b8a2496fa1bb1d94f498fe2b75f7d060ab8fd19ba00fd912505c5"
+      "sha256": "9bc4c7d2b8fb6156eacebadde2447a063b8ae60d6646d64e448585d6f6c4a8ca"
     },
     {
       "path": "roles/strategist/merge-launchd-schedule.py",
@@ -1992,6 +1992,10 @@
       "sha256": "0324eb6af0de9d4ed63e7c9144aabf1668f38d5d49145260d6777afdb196ca03"
     },
     {
+      "path": "roles/strategist/scripts/launchd/com.strategist.notereview.plist",
+      "sha256": "6e4ba6042440b838ec73d7c2c1b318acbe5560b79f873b4c0bc33257dae8e1c0"
+    },
+    {
       "path": "roles/strategist/scripts/launchd/com.strategist.weekreview.plist",
       "sha256": "b96cd7bf763ff8e37be359d528bbb33507b93f4e286e034147027711fe7ffb37"
     },
@@ -2006,6 +2010,14 @@
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.timer",
       "sha256": "262ad3aadd2e292209118373c2b24f5d571f33968f2870c1df66a5ccc92c4073"
+    },
+    {
+      "path": "roles/strategist/scripts/systemd/iwe-strategist-notereview.service",
+      "sha256": "9b34ba5d18cd86498049bc82a7e1934db2c4766218d651dc369a3812ac2e7b15"
+    },
+    {
+      "path": "roles/strategist/scripts/systemd/iwe-strategist-notereview.timer",
+      "sha256": "cbe266baaa492510c63a339d6932af5c7eb370c006f6d67474a5e3dd15eb84e5"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-weekreview.service",
@@ -2697,7 +2709,7 @@
     },
     {
       "path": "scripts/migrate-to-runtime-target.sh",
-      "sha256": "108012b32f8783027c08e3395c640c9fe55d8ce2907a3766d9578d1996de7ac0"
+      "sha256": "a3270167993e3689e7361ba5e441f923d574a98872d30f53985cffa4d890fd4a"
     },
     {
       "path": "scripts/pack-ci-install.sh",
@@ -3033,7 +3045,7 @@
     },
     {
       "path": "scripts/tests/test_launchd_identity_runtime.sh",
-      "sha256": "6bd0d6ac517b0088a783fd7e866051872de53a05bc3ab717c8b55e5b234bf6e5"
+      "sha256": "1ed087272f28a475db8051f7dcb9f2e35bca58d6d90711f7b0d2fdc0d1129971"
     },
     {
       "path": "scripts/tests/test_role_runner_update_marker_guard.sh",
@@ -3325,7 +3337,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "30fe9a0ee90f7017baaf0d054da56d3b04fd29c080f9b0788cb251208af372f3"
+      "sha256": "0875211ba950656aa7b97ffef4e40fe0c5cec4e649a429026dc94e6350c8bdfb"
     }
   ],
   "excluded_paths": [

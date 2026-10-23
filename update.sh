@@ -5973,7 +5973,7 @@ run_build_runtime_or_die
 linux_systemd_strategist_owned() {
     local unit root count current_root service timer expected_command
     current_root="$(canonical_workspace_path "$WORKSPACE_DIR")"
-    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+    for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
         service="$HOME/.config/systemd/user/$unit.service"
         timer="$HOME/.config/systemd/user/$unit.timer"
         [ -f "$service" ] && [ -f "$timer" ] || return 1
@@ -5992,6 +5992,7 @@ linux_systemd_strategist_owned() {
         case "$unit" in
             iwe-strategist-morning) grep -Fxq "ExecStart=$expected_command morning" "$service" || return 1 ;;
             iwe-strategist-weekreview) grep -Fxq "ExecStart=$expected_command week-review" "$service" || return 1 ;;
+            iwe-strategist-notereview) grep -Fxq "ExecStart=$expected_command note-review" "$service" || return 1 ;;
         esac
     done
 }
@@ -5999,7 +6000,7 @@ linux_systemd_strategist_owned() {
 linux_cron_strategist_owned() {
     local cron_text expected_prefix expected_command begin end line
     local minute hour day month weekday command
-    local inside=false begins=0 ends=0 morning=0 weekreview=0
+    local inside=false begins=0 ends=0 morning=0 weekreview=0 notereview=0
     command -v crontab >/dev/null 2>&1 || return 1
     cron_text=$(crontab -l 2>/dev/null) || return 1
     [ -f "$SCRIPT_DIR/roles/lib/scheduler-cron.sh" ] || return 1
@@ -6038,6 +6039,8 @@ EOF
                             morning=$((morning + 1)) ;;
                         "$expected_prefix $expected_command week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1")
                             weekreview=$((weekreview + 1)) ;;
+                        "$expected_prefix $expected_command note-review >> $HOME/logs/strategist/cron-notereview.log 2>&1")
+                            notereview=$((notereview + 1)) ;;
                         *) return 1 ;;
                     esac
                 else
@@ -6052,7 +6055,7 @@ EOF
 $cron_text
 EOF
     ! $inside && [ "$begins" -eq 1 ] && [ "$ends" -eq 1 ] &&
-        [ "$morning" -eq 1 ] && [ "$weekreview" -eq 1 ]
+        [ "$morning" -eq 1 ] && [ "$weekreview" -eq 1 ] && [ "$notereview" -eq 1 ]
 }
 
 reinstall_linux_strategist() {
@@ -6060,7 +6063,7 @@ reinstall_linux_strategist() {
     local role_dir="$SCRIPT_DIR/roles/strategist" unit state active_units=()
     local cron_backup_dir cron_backup
 
-    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+    for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
         if [ -e "$systemd_dir/$unit.service" ] || [ -L "$systemd_dir/$unit.service" ] ||
            [ -e "$systemd_dir/$unit.timer" ] || [ -L "$systemd_dir/$unit.timer" ]; then
             systemd_found=true
@@ -6101,7 +6104,7 @@ reinstall_linux_strategist() {
             echo "  ○ Linux-расписание Стратега не изменено: владелец systemd units не подтверждён"
             return 0
         fi
-        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
+        for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
             state=$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)
             case "$state" in
                 disabled|masked|masked-runtime) continue ;;
