@@ -861,23 +861,23 @@
     },
     {
       "path": ".github/workflows/cloud-scheduler.yml",
-      "sha256": "7bfbe1a561531dea5f2d5539a99971dcbb1167877911a67072ee8330c7e86936"
+      "sha256": "4614e937c38f0a57f483573acdec55792eea6b48493265946dd6caa01ffb322c"
     },
     {
       "path": ".github/workflows/notify-security.yml",
-      "sha256": "91f68152b1e9e0ea1931ef338e50fb1ed433dcece77b54ae671dec9cf9540ffa"
+      "sha256": "694677ad185696d3520d46a0918a867422fffc7ef96ffdf2be578fc601cf4df2"
     },
     {
       "path": ".github/workflows/notify-update.yml",
-      "sha256": "d38bf9caa7b4eaccf0f86a6c96142d4b191c5919af95746eef57a341d288fa31"
+      "sha256": "ab7d2b5f41736a73791a50aea0d9f49ace8f7155419c823df0586658f1bf590c"
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
-      "sha256": "920f9517582f1c4cbb14b75035806f8d94aefdb9793a13d4a0c3d4e0848480ed"
+      "sha256": "328383e8318ce29ac35fa7f9970b50d4a9dc30d52c3aceeb25cef6f05b480b43"
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "1f27c63a53beff4e0f9cd7d7d78a0952326e979050ea446822e34dcc121f31a7"
+      "sha256": "93c2af934720a254197ed30f030c33551351651f6a5ed1d709b372ef6ef40299"
     },
     {
       "path": ".gitignore",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ac22acb9ac32662539e183f971e4f5c6d8ef427a394e15be4721720e1135217c"
+      "sha256": "fe4b094b8a2bcc1d68db647ac930d410cf773a4961f3fd78ba3abf54a1dab36e"
     },
     {
       "path": "CLAUDE.md",
