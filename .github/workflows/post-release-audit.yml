@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Determine version
         id: ver
         run: |
@@ -78,7 +78,7 @@ jobs:
       - name: Create or update audit reminder issue
         if: github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true'
         id: issue
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const fs = require('fs');
