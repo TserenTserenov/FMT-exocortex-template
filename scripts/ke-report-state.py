@@ -381,7 +381,7 @@ def write_projection(report, projection):
         raise InvalidReport("report_changed_during_reconcile")
     descriptor, temporary = tempfile.mkstemp(prefix=".ke-reconcile-", dir=report.path.parent)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as output:
             output.write(text)
         os.chmod(temporary, report.path.stat().st_mode & 0o777)
         if report.path.read_text(encoding="utf-8") != report.text:

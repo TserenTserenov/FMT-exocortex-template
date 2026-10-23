@@ -36,9 +36,13 @@ description: "Справочник FPF паттернов применимых �
 FPF — не один файл, а ядро + комплекты доменных фреймворков (DPF). Состав соответствует `fpf_version` из frontmatter:
 
 - **FPF Core** — `FPF-Spec.md`, части Part A–G (структура ниже)
-- **Foundational Thinking DPF Suite** — `Foundational Thinking DPF Suite/`: 5 фундаментальных DPF (математическая практика, математическое моделирование, физическое, вычислительное и нотационное мышление) + `README.md` и `FOUNDATIONAL-THINKING-DPF-SUITE-REFERENCE.md`
-- **Engineering DPF Suite** — `Engineering DPF Suite/`: 27 доменных фреймворков (системная инженерия, стратегирование, инженерия методов, развитие способностей человека и др.) + `README.md` и `ENGINEERING-DPF-SUITE-REFERENCE.md`
-- **Narrativization DPF** — `Narrativization-and-Narrative-Studies-Principles-Framework.md` (нарративизация)
+- Наборы DPF лежат в подпапке `FPF/DPFs/`, не в корне — на сегодня четыре:
+  - **Foundational Thinking DPF Suite** — `DPFs/Foundational Thinking DPF Suite/`: фундаментальные DPF (математическая практика, математическое моделирование, физическое, вычислительное и нотационное мышление) + `README.md` и `FOUNDATIONAL-THINKING-DPF-SUITE-REFERENCE.md`
+  - **Engineering DPF Suite** — `DPFs/Engineering DPF Suite/`: доменные фреймворки инженерии (системная инженерия и др.) + `README.md` и `ENGINEERING-DPF-SUITE-REFERENCE.md`
+  - **Management DPF Suite** — `DPFs/Management DPF Suite/`: доменные фреймворки управления и стратегирования + `README.md`
+  - **Human Capability Engineering DPF Suite** — `DPFs/Human Capability Engineering DPF Suite/`: развитие способностей человека, включая `HCD.*` (Human Capability Development) + `README.md`
+- **Narrativization DPF** — `DPFs/Narrativization-and-Narrative-Studies-Principles-Framework.md` (нарративизация)
+- Состав наборов меняется (автор переносит и добавляет их) — полный и актуальный список → `FPF/DPFs/README.md`, не этот файл
 
 ### Точки входа в репозитории FPF
 
@@ -51,7 +55,7 @@ FPF — не один файл, а ядро + комплекты доменны�
 Ищи по ID паттерна по всему репозиторию, не только по Core:
 
 ```bash
-rg -n 'HCD\.1' {{HOME_DIR}}/IWE/FPF        # паттерн из Engineering DPF Suite
+rg -n 'HCD\.1' {{HOME_DIR}}/IWE/FPF        # паттерн из Human Capability Engineering DPF Suite
 rg -n 'A\.7' {{HOME_DIR}}/IWE/FPF/FPF-Spec.md  # паттерн Core
 ```
 
