@@ -1022,11 +1022,11 @@ if command -v jq >/dev/null 2>&1; then
     printf '%s\n' \
         "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$HOOK_MEMORY/day-rhythm-config.yaml\"}}" | \
         env HOME="$HOOK_WS/home" WORKSPACE_DIR="$HOOK_WS" GOVERNANCE_REPO=governance \
-            IWE_MEMORY_SRC="$HOOK_MEMORY" bash "$MEMORY_HOOK"
+            IWE_MEMORY_SRC="$HOOK_MEMORY" IWE_FROZEN_CANONICAL_PATH="" bash "$MEMORY_HOOK"
     printf '%s\n' \
         "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$HOOK_MEMORY/direct.md\"}}" | \
         env HOME="$HOOK_WS/home" WORKSPACE_DIR="$HOOK_WS" GOVERNANCE_REPO=governance \
-            IWE_MEMORY_SRC="$HOOK_MEMORY" bash "$MEMORY_HOOK"
+            IWE_MEMORY_SRC="$HOOK_MEMORY" IWE_FROZEN_CANONICAL_PATH="" bash "$MEMORY_HOOK"
     if cmp -s "$HOOK_CASE/expected-rhythm.yaml" "$HOOK_EXO/day-rhythm-config.yaml" && \
        [ "$(cat "$HOOK_EXO/direct.md" 2>/dev/null || true)" = "ordinary direct" ]; then
         pass "direct hook skips day-rhythm but still mirrors ordinary memory"
@@ -1038,7 +1038,7 @@ if command -v jq >/dev/null 2>&1; then
     printf 'day_open:\n  calendar_ids: [new-source]\n' > "$HOOK_MEMORY/day-rhythm-config.yaml"
     printf '%s\n' '{"tool_name":"Bash","tool_input":{}}' | \
         env HOME="$HOOK_WS/home" WORKSPACE_DIR="$HOOK_WS" GOVERNANCE_REPO=governance \
-            IWE_MEMORY_SRC="$HOOK_MEMORY" bash "$MEMORY_HOOK"
+            IWE_MEMORY_SRC="$HOOK_MEMORY" IWE_FROZEN_CANONICAL_PATH="" bash "$MEMORY_HOOK"
     if cmp -s "$HOOK_CASE/expected-rhythm.yaml" "$HOOK_EXO/day-rhythm-config.yaml" && \
        [ "$(cat "$HOOK_EXO/bash.md" 2>/dev/null || true)" = "ordinary Bash reconcile" ]; then
         pass "Bash hook reconcile skips day-rhythm but mirrors ordinary memory"

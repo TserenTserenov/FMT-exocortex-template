@@ -914,8 +914,14 @@ ${prompt}"
     else
         extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash${calendar_mcp:+,$calendar_mcp}")
     fi
+    # issue #1279: memory-exocortex-sync.sh skips its mirror on a frozen canon unless the run
+    # really holds the --canonical-owner right; always set explicitly so nothing leaks in.
+    local canonical_owner=""
+    if [ "${RUNNER_SESSION_OPEN:-0}" = 1 ] && [ "$ISOLATED_RUN" != 1 ]; then
+        canonical_owner="$RUNNER_SESSION_REASON"
+    fi
     AI_CLI_OUT_START=$(log_size_bytes)
-    timeout "$CLAUDE_TIMEOUT" "$AI_CLI" \
+    timeout "$CLAUDE_TIMEOUT" env "IWE_CANONICAL_OWNER=$canonical_owner" "$AI_CLI" \
         "${extra_flags[@]}" \
         $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1 || rc=$?
