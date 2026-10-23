@@ -23,19 +23,14 @@ mkdir -p "$TEST_ROOT/workspace/memory" "$TEST_ROOT/workspace/GOVREPO"
 echo "hello" > "$TEST_ROOT/workspace/memory/test-file.md"
 
 run_hook() {
-    local tool_input="$1" frozen_override="${2-unset}"
-    if [ "$frozen_override" = "unset" ]; then
-        printf '%s' "$tool_input" | \
-            WORKSPACE_DIR="$TEST_ROOT/workspace" GOVERNANCE_REPO=GOVREPO \
-            IWE_MEMORY_SRC="$TEST_ROOT/workspace/memory" \
-            bash "$HOOK"
-    else
-        printf '%s' "$tool_input" | \
-            WORKSPACE_DIR="$TEST_ROOT/workspace" GOVERNANCE_REPO=GOVREPO \
-            IWE_MEMORY_SRC="$TEST_ROOT/workspace/memory" \
-            IWE_FROZEN_CANONICAL_PATH="$frozen_override" \
-            bash "$HOOK"
-    fi
+    local tool_input="$1" frozen_override="${2-unset}" canonical_owner="${3:-}"
+    local freeze_env=(env -u IWE_FROZEN_CANONICAL_PATH)
+    [ "$frozen_override" = "unset" ] || freeze_env=(env "IWE_FROZEN_CANONICAL_PATH=$frozen_override")
+    printf '%s' "$tool_input" | \
+        "${freeze_env[@]}" WORKSPACE_DIR="$TEST_ROOT/workspace" GOVERNANCE_REPO=GOVREPO \
+        IWE_MEMORY_SRC="$TEST_ROOT/workspace/memory" \
+        IWE_CANONICAL_OWNER="$canonical_owner" \
+        bash "$HOOK"
 }
 
 WRITE_EVENT=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TEST_ROOT/workspace/memory/test-file.md")
@@ -79,6 +74,26 @@ if [ "$RC" -eq 0 ] && [ -f "$MIRRORED" ] && [ "$(cat "$MIRRORED")" = "hello" ]; 
     pass "T4: freeze override points elsewhere — this repo's mirror is unaffected"
 else
     fail "T4: expected mirror unaffected by an unrelated frozen path, got rc=$RC mirrored-exists=$([ -f "$MIRRORED" ] && echo yes || echo no) out=[$OUT]"
+fi
+
+# --- T5: default freeze, but the run holds --canonical-owner (strategist.sh passes it) — mirror must work ---
+rm -rf "$TEST_ROOT/workspace/GOVREPO/exocortex"
+OUT=$(run_hook "$WRITE_EVENT" unset "week-review-2026-10-23-123" 2>&1)
+RC=$?
+if [ "$RC" -eq 0 ] && [ -f "$MIRRORED" ] && [ "$(cat "$MIRRORED")" = "hello" ] && ! echo "$OUT" | grep -q "freeze"; then
+    pass "T5: canonical-owner run under default freeze — mirror written, no skip warning"
+else
+    fail "T5: expected mirror under IWE_CANONICAL_OWNER, got rc=$RC mirrored-exists=$([ -f "$MIRRORED" ] && echo yes || echo no) out=[$OUT]"
+fi
+
+# --- T6: default freeze, no owner (e.g. an interactive --isolate session) — mirror into the canon skipped ---
+rm -rf "$TEST_ROOT/workspace/GOVREPO/exocortex"
+OUT=$(run_hook "$WRITE_EVENT" unset "" 2>&1)
+RC=$?
+if [ "$RC" -eq 0 ] && [ ! -e "$TEST_ROOT/workspace/GOVREPO/exocortex" ]; then
+    pass "T6: default freeze without owner — mirror skipped (empty IWE_CANONICAL_OWNER grants nothing)"
+else
+    fail "T6: expected skip with empty IWE_CANONICAL_OWNER, got rc=$RC out=[$OUT]"
 fi
 
 if [ "$FAIL" -eq 0 ]; then

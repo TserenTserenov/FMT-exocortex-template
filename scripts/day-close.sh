@@ -1690,6 +1690,7 @@ resolve_memory_src_fallback() {
 }
 
 # --- Шаг 1: Backup memory/ + CLAUDE.md → exocortex/ ---
+# FIXME(#1279): writes exocortex/ into the frozen canonical checkout; not yet aligned with session-guard freeze policy.
 do_backup() {
   log "Шаг 1/3: Backup memory/ → exocortex/"
 

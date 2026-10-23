@@ -105,7 +105,7 @@
     },
     {
       "path": ".claude/hooks/memory-exocortex-sync.sh",
-      "sha256": "f1b681ef3115595c157ace59fb75c795ca19ea0e1a047b07ac69dcd6c4e502d9"
+      "sha256": "d814b424b50f62373dca7f1b1a7f10a5730e52416d6784ab7c3063c6e0354838"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "92574cb9e6eb3f3b0fbe04888968c3b7501117c5e67e712947c03930b3516544"
+      "sha256": "16abd96bb3a49475df65b2255c8ac8e57a10fa5483f1b90e424a947db4fe5e24"
     },
     {
       "path": "CLAUDE.md",
@@ -1997,7 +1997,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "2bdc6bfaa0c6c0e5adce781d77b0bcbe5dd98f109bbd4b7c299be79630417a16"
+      "sha256": "f0ee52f504439f7a73ee82a73df0b87c165507e71e51ef9b560e599393df0435"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2329,7 +2329,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "384a8a900e5884ca001a29096ad43d28288cba32179ae58988a4cd812aeafb36"
+      "sha256": "eb60b7e11118225049e1f93758889e4d1f752c704e2e2f587fa5230447dbb625"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
