@@ -22,69 +22,6 @@ else
     echo "  ⚠ Legacy mode: используются плейсхолдеры из FMT-substituted (запустите setup.sh ≥0.29.0 для архитектуры F)"
 fi
 
-# note-review remains manual by default (#961/#988). Preserve an existing
-# optional job, but enable it on a fresh installation only when explicitly
-# requested: install.sh morning weekreview notereview.
-strategist_default_jobs() {
-    printf '%s\n' morning weekreview
-    if [[ "$(uname -s)" == Darwin ]]; then
-        if [ -e "$TARGET_DIR/com.strategist.notereview.plist" ] ||
-           [ -L "$TARGET_DIR/com.strategist.notereview.plist" ] ||
-           [ -e "$TARGET_DIR/com.strategist.notereview.plist.disabled" ] ||
-           [ -L "$TARGET_DIR/com.strategist.notereview.plist.disabled" ]; then
-            printf '%s\n' notereview
-        fi
-    elif [ "${strategist_cron_snapshot+x}" != x ]; then
-        if [ -e "$HOME/.config/systemd/user/iwe-strategist-notereview.service" ] ||
-           [ -L "$HOME/.config/systemd/user/iwe-strategist-notereview.service" ] ||
-           [ -e "$HOME/.config/systemd/user/iwe-strategist-notereview.timer" ] ||
-           [ -L "$HOME/.config/systemd/user/iwe-strategist-notereview.timer" ]; then
-            printf '%s\n' notereview
-        fi
-    else
-        if printf '%s\n' "$strategist_cron_snapshot" | awk '
-            /^# BEGIN IWE-strategist / { inside=1; next }
-            /^# END IWE-strategist$/ { inside=0; next }
-            inside && $0 !~ /^[[:space:]]*#/ { print }
-        ' | grep -Fq "$(iwe_cron_env_prefix) $SCRIPT_TARGET note-review >> $HOME/logs/strategist/cron-notereview.log 2>&1"; then
-            printf '%s\n' notereview
-        fi
-    fi
-}
-
-# The helpers only define functions; sourcing does not touch a scheduler.
-source "$(cd "$SCRIPT_DIR/../lib" && pwd)/scheduler-cron.sh"
-# Read once before selecting jobs. A failed read must not turn an existing
-# optional job into an absent one, even if a later read would recover.
-if [[ "$(uname -s)" == Linux ]] && [ -z "${SETUP_CI:-}" ] && ! iwe_systemd_user_bus_ok; then
-    strategist_cron_snapshot=$(iwe_read_crontab) || exit 1
-fi
-STRATEGIST_JOBS=()
-if [ "$#" -eq 0 ]; then
-    default_jobs=$(strategist_default_jobs) || exit 1
-    while IFS= read -r job; do STRATEGIST_JOBS+=("$job"); done <<< "$default_jobs"
-    set -- "${STRATEGIST_JOBS[@]}"
-fi
-STRATEGIST_JOBS=()
-for job in "$@"; do
-    case "$job" in
-        morning|weekreview|notereview) ;;
-        *) echo "ERROR: unknown strategist job: $job" >&2; exit 2 ;;
-    esac
-    case " ${STRATEGIST_JOBS[*]} " in
-        *" $job "*) echo "ERROR: duplicate strategist job: $job" >&2; exit 2 ;;
-    esac
-    STRATEGIST_JOBS+=("$job")
-done
-# cron replaces the complete role block. A partial selection would silently
-# delete the unselected core jobs, unlike a partial systemd/launchd install.
-for required_job in morning weekreview; do
-    case " ${STRATEGIST_JOBS[*]} " in
-        *" $required_job "*) ;;
-        *) echo "ERROR: select both morning and weekreview; optionally add notereview" >&2; exit 2 ;;
-    esac
-done
-
 # Resolve find-python3.sh for merge-launchd-schedule.py (issue #981) — same
 # resolver contract as the rest of the template (WP-529 Ф6/Ф9, #453/#463):
 # repo-owned .py files go through scripts/lib/find-python3.sh, not a bare
@@ -107,8 +44,7 @@ echo "  LAUNCHD_DIR: $LAUNCHD_DIR"
 # WP-273 R5 fix (Round 5 Евгения): fail-fast если выбранный plist содержит literal {{...}}.
 # Это предотвращает копирование незаменённых плейсхолдеров в ~/Library/LaunchAgents/
 # (если IWE_RUNTIME не expanded, fallback падает на FMT с placeholder'ами).
-for job in "${STRATEGIST_JOBS[@]}"; do
-    plist_check="$LAUNCHD_DIR/com.strategist.$job.plist"
+for plist_check in "$LAUNCHD_DIR/com.strategist.morning.plist" "$LAUNCHD_DIR/com.strategist.weekreview.plist"; do
     if [ -f "$plist_check" ] && grep -qE '\{\{[A-Z_]+\}\}' "$plist_check" 2>/dev/null; then
         echo "ERROR: $plist_check содержит незаменённые плейсхолдеры:" >&2
         grep -oE '\{\{[A-Z_]+\}\}' "$plist_check" | sort -u | sed 's/^/  /' >&2
@@ -130,6 +66,8 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
             exit 0
         fi
 
+        source "$(cd "$SCRIPT_DIR/../lib" && pwd)/scheduler-cron.sh"
+
         if [ -n "${IWE_RUNTIME:-}" ] && [ -d "$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd" ]; then
             SYSTEMD_SRC="$IWE_RUNTIME/roles/$ROLE_NAME/scripts/systemd"
         elif [ -n "${IWE_WORKSPACE:-}" ] && [ -d "$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/systemd" ]; then
@@ -150,27 +88,25 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
         # `command -v systemctl` alone can't tell WSL2/container hosts without a
         # session bus from a real systemd apart, and `enable --now` on those just
         # fails silently for the pilot.
-        if [ "${strategist_cron_snapshot+x}" = x ]; then
+        if ! iwe_systemd_user_bus_ok; then
             echo "  ⚠ systemd --user недоступен (нет пользовательской сессионной шины — типично для WSL2/контейнера/сервера без активного логина)"
             echo "  Installing $ROLE_NAME via cron fallback (issue #454)..."
-            # Convert every selected timer before changing crontab. One invalid
-            # timer must not leave a partial schedule installed.
-            cron_lines=()
-            for job in "${STRATEGIST_JOBS[@]}"; do
-                case "$job" in
-                    morning) mode=morning ;;
-                    weekreview) mode=week-review ;;
-                    notereview) mode=note-review ;;
-                esac
-                if ! job_lines=$(iwe_timer_to_cron_lines \
-                    "$SYSTEMD_SRC/iwe-strategist-$job.timer" \
-                    "$(iwe_cron_env_prefix) $SCRIPT_TARGET $mode >> $HOME/logs/strategist/cron-$job.log 2>&1"); then
-                    echo "ERROR: cron-расписание $mode не собрано; crontab не изменён" >&2
-                    exit 2
-                fi
-                cron_lines+=("$job_lines")
-            done
-            iwe_install_cron_snapshot "strategist" "$strategist_cron_snapshot" "${cron_lines[@]}"
+            # Command substitution preserves each conversion's exit status;
+            # process substitution used here before #1039 hid parser failures
+            # and could install only one of the two required jobs.
+            if ! morning_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-strategist-morning.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPT_TARGET morning >> $HOME/logs/strategist/cron-morning.log 2>&1"); then
+                echo "ERROR: утреннее cron-расписание не собрано; crontab не изменён" >&2
+                exit 2
+            fi
+            if ! week_lines=$(iwe_timer_to_cron_lines \
+                "$SYSTEMD_SRC/iwe-strategist-weekreview.timer" \
+                "$(iwe_cron_env_prefix) $SCRIPT_TARGET week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1"); then
+                echo "ERROR: недельное cron-расписание не собрано; crontab не изменён" >&2
+                exit 2
+            fi
+            iwe_install_cron_fallback "strategist" "$morning_lines" "$week_lines"
             echo "  ✓ Installed via crontab. Verify: crontab -l | grep strategist.sh"
             echo "  ✓ Logs: ~/logs/strategist/"
             exit 0
@@ -185,8 +121,7 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
         # — `systemctl --user is-enabled` тогда вернёт "disabled" (не "not-found",
         # это отличает «выключено» от «ещё не установлено»). Безусловный re-enable
         # при каждом апдейте роли отменял бы выбор пользователя молча.
-        for job in "${STRATEGIST_JOBS[@]}"; do
-            unit="iwe-strategist-$job"
+        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
             # A mask may be a symlink to /dev/null; never copy through it or
             # reactivate a timer the user deliberately stopped.
             if [ -L "$SYSTEMD_USER_DIR/$unit.service" ] || [ -L "$SYSTEMD_USER_DIR/$unit.timer" ]; then
@@ -228,6 +163,21 @@ if [ -f "$SCRIPT_TARGET" ]; then
     chmod +x "$SCRIPT_TARGET"
 fi
 
+# Repair only an existing note-review configuration, including .plist.disabled.
+# This helper never creates a job or calls launchctl; manual mode stays default.
+if [ -e "$TARGET_DIR/com.strategist.notereview.plist" ] ||
+   [ -L "$TARGET_DIR/com.strategist.notereview.plist" ] ||
+   [ -e "$TARGET_DIR/com.strategist.notereview.plist.disabled" ] ||
+   [ -L "$TARGET_DIR/com.strategist.notereview.plist.disabled" ]; then
+    if [ -z "$MERGE_PYTHON3" ] || [ -z "${IWE_WORKSPACE:-}" ]; then
+        echo "ERROR: note-review migration requires Python 3 and IWE_WORKSPACE; plist unchanged" >&2
+        exit 1
+    fi
+    "$MERGE_PYTHON3" "$SCRIPT_DIR/migrate-notereview-launchd.py" \
+        "$LAUNCHD_DIR/com.strategist.notereview.plist" "$TARGET_DIR" \
+        "$IWE_WORKSPACE" "$SCRIPT_TARGET"
+fi
+
 # issue #285: пользователь отключает агента документированным способом
 # (launchctl unload + переименование в <label>.plist.disabled — конвенция,
 # описанная в issue пилотом на его инсталляции для com.strategist.scout;
@@ -236,12 +186,7 @@ fi
 # на изменения в roles/ и безусловно перезапускает install.sh каждой auto-роли —
 # без этой проверки .disabled-маркер молча игнорировался, отключённый агент
 # возвращался и перезагружался при каждом апдейте шаблона.
-for job in "${STRATEGIST_JOBS[@]}"; do
-    label="com.strategist.$job"
-    if [ -L "$TARGET_DIR/$label.plist" ] || [ -L "$TARGET_DIR/$label.plist.disabled" ]; then
-        echo "  ⊘ $label — plist is a symlink, пропускаю"
-        continue
-    fi
+for label in com.strategist.morning com.strategist.weekreview; do
     if [ -f "$TARGET_DIR/$label.plist.disabled" ]; then
         echo "  ⊘ $label — disabled by user (найден $label.plist.disabled), пропускаю"
         continue

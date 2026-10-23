@@ -11,14 +11,6 @@
         <string>note-review</string>
     </array>
 
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>23</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
-
     <key>StandardOutPath</key>
     <string>{{HOME_DIR}}/logs/strategist/launchd-notereview.log</string>
 

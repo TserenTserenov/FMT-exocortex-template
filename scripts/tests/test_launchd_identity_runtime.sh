@@ -88,7 +88,6 @@ done
 SERVICES=(
     roles/strategist/scripts/systemd/iwe-strategist-morning.service
     roles/strategist/scripts/systemd/iwe-strategist-weekreview.service
-    roles/strategist/scripts/systemd/iwe-strategist-notereview.service
     roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service
     roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
 )

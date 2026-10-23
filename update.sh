@@ -5973,18 +5973,9 @@ run_build_runtime_or_die
 linux_systemd_strategist_owned() {
     local unit root count current_root service timer expected_command
     current_root="$(canonical_workspace_path "$WORKSPACE_DIR")"
-    for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
+    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
         service="$HOME/.config/systemd/user/$unit.service"
         timer="$HOME/.config/systemd/user/$unit.timer"
-        # Older installations have only morning/weekreview. Absence of the
-        # optional job is allowed; partial files, masks and drop-ins are not.
-        if [ "$unit" = iwe-strategist-notereview ] &&
-           [ ! -e "$service" ] && [ ! -L "$service" ] &&
-           [ ! -e "$timer" ] && [ ! -L "$timer" ] &&
-           [ ! -e "$service.d" ] && [ ! -L "$service.d" ] &&
-           [ ! -e "$timer.d" ] && [ ! -L "$timer.d" ]; then
-            continue
-        fi
         [ -f "$service" ] && [ -f "$timer" ] || return 1
         [ ! -L "$service" ] && [ ! -L "$timer" ] || return 1
         [ ! -e "$service.d" ] && [ ! -e "$timer.d" ] || return 1
@@ -6001,15 +5992,16 @@ linux_systemd_strategist_owned() {
         case "$unit" in
             iwe-strategist-morning) grep -Fxq "ExecStart=$expected_command morning" "$service" || return 1 ;;
             iwe-strategist-weekreview) grep -Fxq "ExecStart=$expected_command week-review" "$service" || return 1 ;;
-            iwe-strategist-notereview) grep -Fxq "ExecStart=$expected_command note-review" "$service" || return 1 ;;
         esac
     done
 }
 
 linux_cron_strategist_owned() {
-    local cron_text="$1" expected_prefix expected_command begin end line
+    local cron_text expected_prefix expected_command begin end line
     local minute hour day month weekday command
-    local inside=false begins=0 ends=0 morning=0 weekreview=0 notereview=0
+    local inside=false begins=0 ends=0 morning=0 weekreview=0
+    command -v crontab >/dev/null 2>&1 || return 1
+    cron_text=$(crontab -l 2>/dev/null) || return 1
     [ -f "$SCRIPT_DIR/roles/lib/scheduler-cron.sh" ] || return 1
     # This helper defines the exact prefix written by the role installer.
     # A partially edited block is left untouched for manual reconciliation.
@@ -6046,8 +6038,6 @@ EOF
                             morning=$((morning + 1)) ;;
                         "$expected_prefix $expected_command week-review >> $HOME/logs/strategist/cron-weekreview.log 2>&1")
                             weekreview=$((weekreview + 1)) ;;
-                        "$expected_prefix $expected_command note-review >> $HOME/logs/strategist/cron-notereview.log 2>&1")
-                            notereview=$((notereview + 1)) ;;
                         *) return 1 ;;
                     esac
                 else
@@ -6062,16 +6052,15 @@ EOF
 $cron_text
 EOF
     ! $inside && [ "$begins" -eq 1 ] && [ "$ends" -eq 1 ] &&
-        [ "$morning" -eq 1 ] && [ "$weekreview" -eq 1 ] && [ "$notereview" -le 1 ]
+        [ "$morning" -eq 1 ] && [ "$weekreview" -eq 1 ]
 }
 
 reinstall_linux_strategist() {
     local systemd_dir="$HOME/.config/systemd/user" cron_text="" systemd_found=false cron_found=false
     local role_dir="$SCRIPT_DIR/roles/strategist" unit state active_units=()
     local cron_backup_dir cron_backup
-    local installed_jobs=(morning weekreview)
 
-    for unit in iwe-strategist-morning iwe-strategist-weekreview iwe-strategist-notereview; do
+    for unit in iwe-strategist-morning iwe-strategist-weekreview; do
         if [ -e "$systemd_dir/$unit.service" ] || [ -L "$systemd_dir/$unit.service" ] ||
            [ -e "$systemd_dir/$unit.timer" ] || [ -L "$systemd_dir/$unit.timer" ]; then
             systemd_found=true
@@ -6112,11 +6101,7 @@ reinstall_linux_strategist() {
             echo "  ○ Linux-расписание Стратега не изменено: владелец systemd units не подтверждён"
             return 0
         fi
-        if [ -f "$systemd_dir/iwe-strategist-notereview.service" ]; then
-            installed_jobs+=(notereview)
-        fi
-        for unit in "${installed_jobs[@]}"; do
-            unit="iwe-strategist-$unit"
+        for unit in iwe-strategist-morning iwe-strategist-weekreview; do
             state=$(systemctl --user is-enabled "$unit.timer" 2>/dev/null || true)
             case "$state" in
                 disabled|masked|masked-runtime) continue ;;
@@ -6142,13 +6127,9 @@ reinstall_linux_strategist() {
             echo "  ○ Linux-расписание Стратега не изменено: cron установлен при доступном systemd; переход требует ручного решения"
             return 0
         fi
-        if ! linux_cron_strategist_owned "$cron_text"; then
+        if ! linux_cron_strategist_owned; then
             echo "  ○ Linux-расписание Стратега не изменено: владелец cron-блока не подтверждён или задание отключено"
             return 0
-        fi
-        if printf '%s\n' "$cron_text" | grep -v '^#' | grep -Fq \
-            "$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/strategist.sh note-review >> $HOME/logs/strategist/cron-notereview.log 2>&1"; then
-            installed_jobs+=(notereview)
         fi
         cron_backup_dir="$HOME/.local/state/iwe/cron-backups"
         mkdir -p -m 700 "$cron_backup_dir"
@@ -6174,7 +6155,7 @@ reinstall_linux_strategist() {
          IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
          IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
          IWE_GOVERNANCE_REPO="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}" \
-         bash "$role_dir/install.sh" "${installed_jobs[@]}"; then
+         bash "$role_dir/install.sh"; then
         echo "  ⚠ Стратег: переустановка расписания не завершена; проверьте её вручную"
         return 1
     fi

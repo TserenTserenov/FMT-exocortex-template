@@ -79,36 +79,22 @@ iwe_cron_env_prefix() {
     "/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin"
 }
 
-# Read an existing crontab or an empty snapshot when none is installed.
-# Other read failures must never be interpreted as an empty schedule.
-iwe_read_crontab() {
+# iwe_install_cron_fallback SENTINEL LINE...
+# Idempotently replaces a marked block in the current user's crontab (re-running
+# setup.sh updates the block instead of duplicating entries). SENTINEL must be
+# unique per role so the three installers don't clobber each other's lines.
+iwe_install_cron_fallback() {
+  # A container built without the cron package (common on minimal Docker
+  # bases — exactly the host class issue #454 targets) has no `crontab`
+  # binary at all. Without this check the caller's `set -e` turns that into a
+  # bare "crontab: command not found" and aborts install.sh with no hint what
+  # to do, unlike every other branch in these scripts.
   if ! command -v crontab >/dev/null 2>&1; then
     echo "ERROR: crontab недоступен — установите пакет cron (apt install cron / apk add cron / dnf install cronie) и повторите установку" >&2
     return 1
   fi
 
-  local current
-  if ! current=$(crontab -l 2>&1); then
-    case "$current" in
-      *'no crontab for '*) current="" ;;
-      *) echo "ERROR: не удалось прочитать crontab; расписание не изменено" >&2; return 1 ;;
-    esac
-  fi
-  printf '%s\n' "$current"
-}
-
-# iwe_install_cron_fallback SENTINEL LINE...
-# Replace only this role's marked block, preserving all unrelated entries.
-iwe_install_cron_fallback() {
-  local snapshot
-  snapshot=$(iwe_read_crontab) || return 1
-  iwe_install_cron_snapshot "$1" "$snapshot" "${@:2}"
-}
-
-# Use the same verified snapshot for selecting jobs and replacing the role
-# block. The caller must obtain it with iwe_read_crontab before any writes.
-iwe_install_cron_snapshot() {
-  local sentinel="$1" current="$2"; shift 2
+  local sentinel="$1"; shift
   [ "$#" -gt 0 ] || { echo "ERROR: пустое cron-расписание для $sentinel" >&2; return 1; }
   local line
   for line in "$@"; do
@@ -116,7 +102,13 @@ iwe_install_cron_snapshot() {
   done
   local begin="# BEGIN IWE-$sentinel (cron fallback, issue #454)"
   local end="# END IWE-$sentinel"
-  local kept
+  local current kept
+  if ! current=$(crontab -l 2>&1); then
+    case "$current" in
+      *'no crontab for '*) current="" ;;
+      *) echo "ERROR: не удалось прочитать crontab; расписание не изменено" >&2; return 1 ;;
+    esac
+  fi
   if ! printf '%s\n' "$current" | awk -v b="$begin" -v e="$end" '
     $0==b { if (inside || seen) bad=1; inside=1; seen++; next }
     $0==e { if (!inside) bad=1; inside=0; next }
