@@ -20,6 +20,24 @@ if [ -f "$ENV_FILE" ]; then
     set -a; source "$ENV_FILE"; set +a
 fi
 
+# Fallback (issue #1262): /setup-wakatime writes the key only to the standard
+# wakatime-cli location, not to aist/env. Read it from there if the env var is
+# still empty — but never override a key the caller already set explicitly,
+# and never echo/log the value.
+if [ -z "$WAKATIME_API_KEY" ] && [ -f "$HOME/.wakatime.cfg" ]; then
+    WAKATIME_API_KEY=$(python3 -c "
+import configparser, sys
+cfg = configparser.ConfigParser()
+try:
+    cfg.read(sys.argv[1])
+    print(cfg.get('settings', 'api_key', fallback='').strip())
+except Exception:
+    # Deliberately no str(exc): configparser error messages can echo back the
+    # offending line verbatim, which could be the key line itself.
+    print(f'fetch-wakatime: cannot parse {sys.argv[1]}', file=sys.stderr)
+" "$HOME/.wakatime.cfg")
+fi
+
 if [ -z "$WAKATIME_API_KEY" ]; then
     echo "WAKATIME_API_KEY not set"
     exit 0  # graceful — don't break strategist if no key

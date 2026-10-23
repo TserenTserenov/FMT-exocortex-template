@@ -253,7 +253,7 @@ rc=$?
 if [ "$rc" -eq 0 ] && [ ! -e "$service_run/external-hit" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.strategist.morning.plist" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.strategist.weekreview.plist" ] &&
-   [ -f "$service_abs/Library/LaunchAgents/com.strategist.notereview.plist" ] &&
+   [ ! -e "$service_abs/Library/LaunchAgents/com.strategist.notereview.plist" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.exocortex.scheduler.plist" ] &&
    [ -f "$service_abs/Library/LaunchAgents/com.extractor.inbox-check.plist" ]; then
   pass "SETUP_CI installs all role plists without unloading host jobs"

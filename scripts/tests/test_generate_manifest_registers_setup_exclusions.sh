@@ -31,7 +31,7 @@ trap cleanup EXIT INT TERM
 # .git entirely and silently produces an empty manifest (0 files) instead
 # of failing loud, which would have made every setup/ file look "uncovered"
 # for the wrong reason. `git clone --local` gives a real repo at HEAD.
-git clone --local --quiet "$ROOT" "$SCRATCH" \
+git clone --local --no-hardlinks --quiet "$ROOT" "$SCRATCH" \
     || { fail "git clone of $ROOT failed"; exit 1; }
 # A local clone contains committed HEAD only. Overlay the generator under test
 # so the check observes the current working-tree implementation before commit.

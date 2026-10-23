@@ -104,7 +104,7 @@ file_mtime() {
 }
 
 # Репозиторий для проверки коммитов: корень IWE, если он git; иначе iwe-local-config
-# (на Linux-хосте корень ~/IWE не git, и git log по нему всегда пуст).
+# (на Linux-хосте корень {{WORKSPACE_DIR}} не git, и git log по нему всегда пуст).
 activity_git_root() {
     if [ -e "$IWE_ROOT/.git" ]; then echo "$IWE_ROOT"
     elif [ -e "$IWE_ROOT/iwe-local-config/.git" ]; then echo "$IWE_ROOT/iwe-local-config"

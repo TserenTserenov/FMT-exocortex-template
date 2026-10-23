@@ -6,7 +6,8 @@
   2. --verify без итогов дня — FAIL по 9a/9b, exit 1.
   3. --verify с заархивированным DayPlan (итоги есть) и WeekReport — exit 0,
      включая английский заголовок "Day summary" (языко-толерантность 1c62621).
-  4. Ссылки lesson- и lessons_ считаются в digest (#559).
+  4. Секция 6 вызывает memory-bleed.sh --hot-only и показывает его статус
+     (issue #1314), с graceful fallback, когда инструмент недоступен.
   5. Отсутствующие необязательные шаги day-close дают skip
      в сводке и логе (#559).
 """
@@ -37,7 +38,7 @@ def _make_workspace(tmp_path: Path) -> Path:
 
 
 def _run(
-    ws: Path, tmp_path: Path, *args: str, script: Path = SCRIPT
+    ws: Path, tmp_path: Path, *args: str, script: Path = SCRIPT, env_overrides: dict = None
 ) -> subprocess.CompletedProcess:
     env = {
         "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
@@ -45,6 +46,7 @@ def _run(
         "WORKSPACE_DIR": str(ws),
         "IWE_TEMPLATE": str(tmp_path / "no-template"),  # forces dirty_scan fallback
     }
+    env.update(env_overrides or {})
     (tmp_path / "home").mkdir(exist_ok=True)
     return subprocess.run(
         ["bash", str(script), *args],
@@ -61,17 +63,40 @@ def test_digest_emits_all_sections(tmp_path):
     assert "END DIGEST" in result.stdout
 
 
-def test_digest_counts_lesson_links(tmp_path):
+def test_digest_reports_hot_limit_via_memory_bleed(tmp_path):
+    # issue #1314: section 6 used to count "lessons_"/"lesson-" filenames against
+    # a MEMORY.md "Уроки" section that no longer exists under the frontmatter
+    # scheme -- it now runs the already-shipped memory-bleed.sh --hot-only
+    # (same tool Week/Month Close already call) instead of that dead grep.
     ws = _make_workspace(tmp_path)
-    (ws / "memory" / "MEMORY.md").write_text(
-        "# Memory\n"
-        "- [First](lesson-first.md)\n"
-        "- [Second](lessons_second.md)\n",
+    (ws / "memory" / "feedback-example.md").write_text(
+        "---\n"
+        "name: feedback-example\n"
+        "description: test\n"
+        "type: feedback\n"
+        "horizon: hot\n"
+        "status: active\n"
+        "valid_from: 2026-01-01\n"
+        "owner: user\n"
+        "schema_version: 1\n"
+        "---\n"
+        "body\n",
         encoding="utf-8",
     )
+    repo_root = SCRIPT.parent.parent
+    result = _run(ws, tmp_path, env_overrides={"IWE_TEMPLATE": str(repo_root)})
+    assert result.returncode == 0, result.stderr
+    assert "HOT-лимит" in result.stdout
+
+
+def test_digest_falls_back_when_memory_bleed_unavailable(tmp_path):
+    # Same section 6, but IWE_TEMPLATE is the fake path _run() defaults to --
+    # memory-bleed.sh does not exist there, and the digest must say so instead
+    # of silently printing nothing or crashing (set -uo pipefail, no `set -e`).
+    ws = _make_workspace(tmp_path)
     result = _run(ws, tmp_path)
     assert result.returncode == 0, result.stderr
-    assert "2 lesson references" in result.stdout
+    assert "memory-bleed.sh: нет данных" in result.stdout
 
 
 def test_day_close_records_missing_optional_steps_as_skipped(tmp_path):

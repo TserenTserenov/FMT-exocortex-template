@@ -270,7 +270,7 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
                 new_lines[i] = "|".join(parts) + "\n"
 
     if (fix or fix_t2) and any(new_lines[i] != lines[i] for i in range(len(lines))):
-        with open(registry_path, "w", encoding="utf-8") as f:
+        with open(registry_path, "w", encoding="utf-8", newline="\n") as f:
             f.writelines(new_lines)
         print(f"   ✅ Исправлено {sum(1 for i in range(len(lines)) if new_lines[i] != lines[i])} строк")
 

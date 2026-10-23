@@ -318,6 +318,143 @@ backup=$(find "$unit_dir" -maxdepth 1 -name 'iwe-strategist-morning.timer.bak-*'
 [ -n "$backup" ] && grep -q '07:00:00' "$backup"
 echo 'PASS: real installer loads rebuilt enabled timers'
 
+# The pre-notereview layout must keep receiving updates. Use the real
+# installer here: a stub that copies all runtime units hides re-creation bugs.
+write_units "$WORKSPACE_DIR"
+rm "$unit_dir/iwe-strategist-notereview.service" "$unit_dir/iwe-strategist-notereview.timer"
+export IWE_TEST_NOTEREVIEW_STATE=not-found
+: > "$IWE_TEST_LOG"
+reinstall_linux_strategist > "$fixture/legacy-systemd.log"
+grep -q '08:00:00' "$unit_dir/iwe-strategist-morning.timer"
+grep -q '08:00:00' "$unit_dir/iwe-strategist-weekreview.timer"
+[ "$(grep -c '^systemctl --user restart ' "$IWE_TEST_LOG")" -eq 2 ]
+[ ! -e "$unit_dir/iwe-strategist-notereview.service" ]
+[ ! -e "$unit_dir/iwe-strategist-notereview.timer" ]
+! grep -q 'notereview' "$IWE_TEST_LOG"
+echo 'PASS: legacy systemd updates two existing jobs without enabling a new job'
+
+# A partial optional unit, a dangling mask or a drop-in cannot masquerade as
+# the legacy layout. Keep the entire schedule unchanged without owner proof.
+for artifact in partial dangling-mask dropin; do
+    write_units "$WORKSPACE_DIR"
+    rm "$unit_dir/iwe-strategist-notereview.service" "$unit_dir/iwe-strategist-notereview.timer"
+    case "$artifact" in
+        partial) cp "$runtime_units/iwe-strategist-notereview.service" "$unit_dir/" ;;
+        dangling-mask) ln -s "$fixture/missing-mask" "$unit_dir/iwe-strategist-notereview.timer" ;;
+        dropin) mkdir "$unit_dir/iwe-strategist-notereview.service.d" ;;
+    esac
+    : > "$IWE_TEST_LOG"
+    reinstall_linux_strategist > "$fixture/optional-$artifact.log"
+    grep -q '07:00:00' "$unit_dir/iwe-strategist-morning.timer"
+    ! grep -q '^systemctl --user enable\|^systemctl --user restart' "$IWE_TEST_LOG"
+    rm -f "$unit_dir/iwe-strategist-notereview.service" "$unit_dir/iwe-strategist-notereview.timer"
+    if [ "$artifact" = dropin ]; then rmdir "$unit_dir/iwe-strategist-notereview.service.d"; fi
+done
+echo 'PASS: incomplete optional units, dangling masks and drop-ins block update'
+
+write_units "$WORKSPACE_DIR"
+rm "$unit_dir/iwe-strategist-notereview.service" "$unit_dir/iwe-strategist-notereview.timer"
+export IWE_TEST_MORNING_STATE=disabled IWE_TEST_WEEK_STATE=masked
+: > "$IWE_TEST_LOG"
+reinstall_linux_strategist > "$fixture/legacy-disabled.log"
+grep -q '07:00:00' "$unit_dir/iwe-strategist-morning.timer"
+! grep -q '^systemctl --user enable\|^systemctl --user restart' "$IWE_TEST_LOG"
+[ ! -e "$unit_dir/iwe-strategist-notereview.timer" ]
+echo 'PASS: disabled legacy jobs stay disabled and do not enable notereview'
+export IWE_TEST_MORNING_STATE=enabled IWE_TEST_WEEK_STATE=enabled IWE_TEST_NOTEREVIEW_STATE=enabled
+
+clear_units
+export IWE_TEST_BUS=0
+printf '# unrelated user job\n12 4 * * * user-job\n' > "$IWE_TEST_CRON"
+write_cron_block "$WORKSPACE_DIR"
+sed '/ note-review /d' "$IWE_TEST_CRON" > "$fixture/legacy-cron"
+cp "$fixture/legacy-cron" "$IWE_TEST_CRON"
+# A comment mentioning the missing job must not select it for installation.
+printf '# %s/.iwe-runtime/roles/strategist/scripts/strategist.sh note-review >> %s/logs/strategist/cron-notereview.log 2>&1\n' \
+    "$WORKSPACE_DIR" "$HOME" >> "$IWE_TEST_CRON"
+reinstall_linux_strategist > "$fixture/legacy-cron.log"
+grep -q '^0 8 \* \* \* ' "$IWE_TEST_CRON"
+grep -q 'user-job' "$IWE_TEST_CRON"
+[ "$(grep -v '^#' "$IWE_TEST_CRON" | grep -c 'strategist.sh')" -eq 2 ]
+! grep -v '^#' "$IWE_TEST_CRON" | grep -q 'note-review'
+echo 'PASS: legacy cron updates only existing jobs and ignores comments'
+
+: > "$IWE_TEST_CRON"
+write_cron_block "$WORKSPACE_DIR"
+awk '/ note-review / { print } { print }' "$IWE_TEST_CRON" > "$fixture/duplicate-note-cron"
+cp "$fixture/duplicate-note-cron" "$IWE_TEST_CRON"
+reinstall_linux_strategist > "$fixture/duplicate-note.log"
+cmp "$fixture/duplicate-note-cron" "$IWE_TEST_CRON"
+echo 'PASS: duplicate optional cron job is not accepted as owned'
+
+# A fresh installation keeps note-review manual; the full three-job selection
+# is explicit. Subsequent default installs preserve an already selected job.
+rm -f "$IWE_TEST_CRON"
+clear_units
+export IWE_TEST_BUS=1 IWE_TEST_NOTEREVIEW_STATE=not-found
+: > "$IWE_TEST_LOG"
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/fresh-default.log"
+[ ! -e "$unit_dir/iwe-strategist-notereview.timer" ]
+[ "$(grep -c '^systemctl --user enable --now ' "$IWE_TEST_LOG")" -eq 2 ]
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" \
+    morning weekreview notereview > "$fixture/fresh-explicit.log"
+[ -f "$unit_dir/iwe-strategist-notereview.timer" ]
+echo 'PASS: fresh systemd keeps note-review manual until explicitly selected'
+
+clear_units
+export IWE_TEST_BUS=0
+rm -f "$IWE_TEST_CRON"
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/fresh-cron.log"
+[ "$(grep -c 'strategist.sh' "$IWE_TEST_CRON")" -eq 2 ]
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" \
+    morning weekreview notereview > "$fixture/explicit-cron.log"
+[ "$(grep -c 'strategist.sh' "$IWE_TEST_CRON")" -eq 3 ]
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/preserve-cron.log"
+[ "$(grep -c 'strategist.sh' "$IWE_TEST_CRON")" -eq 3 ]
+cp "$IWE_TEST_CRON" "$fixture/selection-before"
+for selection in notereview morning 'morning weekreview notereview notereview' unknown; do
+    # Intentional splitting: these fixed strings exercise the argv contract.
+    # shellcheck disable=SC2086
+    if IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+       IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" $selection \
+       > "$fixture/invalid-selection.log" 2>&1; then
+        echo 'FAIL: invalid/partial job selection accepted' >&2; exit 1
+    fi
+    cmp "$fixture/selection-before" "$IWE_TEST_CRON"
+done
+echo 'PASS: fresh cron requires explicit note-review and rejects partial selections'
+
+# The same default is required for macOS: update.sh invokes install.sh with
+# no arguments. SETUP_CI suppresses all service actions in this fixture.
+printf '#!/usr/bin/env bash\nprintf "Darwin\\n"\n' > "$fixture/bin/uname"
+printf '#!/usr/bin/env bash\necho "unexpected launchctl" >&2\nexit 99\n' > "$fixture/bin/launchctl"
+chmod +x "$fixture/bin/launchctl"
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" SETUP_CI=1 bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/mac-default.log"
+mac_plists="$HOME/Library/LaunchAgents"
+[ -f "$mac_plists/com.strategist.morning.plist" ]
+[ ! -e "$mac_plists/com.strategist.notereview.plist" ]
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" SETUP_CI=1 bash "$SCRIPT_DIR/roles/strategist/install.sh" \
+    morning weekreview notereview > "$fixture/mac-explicit.log" 2>&1
+[ -f "$mac_plists/com.strategist.notereview.plist" ]
+printf '<plist>new-note</plist>\n' > "$WORKSPACE_DIR/.iwe-runtime/roles/strategist/scripts/launchd/com.strategist.notereview.plist"
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" SETUP_CI=1 bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/mac-existing.log" 2>&1
+grep -q 'new-note' "$mac_plists/com.strategist.notereview.plist"
+mv "$mac_plists/com.strategist.notereview.plist" "$mac_plists/com.strategist.notereview.plist.disabled"
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" SETUP_CI=1 bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/mac-disabled.log" 2>&1
+[ ! -e "$mac_plists/com.strategist.notereview.plist" ]
+[ -f "$mac_plists/com.strategist.notereview.plist.disabled" ]
+echo 'PASS: macOS default preserves manual mode, existing opt-in and disabled marker'
+printf '#!/usr/bin/env bash\nprintf "Linux\\n"\n' > "$fixture/bin/uname"
+
 # A one-digit timezone hour is produced by setup.sh (TIMEZONE_HOUR=4). Invalid
 # or partial calendars must fail without emitting a partial cron schedule.
 source "$template_dir/roles/lib/scheduler-cron.sh"
