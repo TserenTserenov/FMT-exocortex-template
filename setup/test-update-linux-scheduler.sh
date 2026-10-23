@@ -53,7 +53,13 @@ SYSTEMCTL
 cat > "$fixture/bin/crontab" <<'CRONTAB'
 #!/usr/bin/env bash
 case "${1:-}" in
-    -l) if [ "${IWE_TEST_CRON_ERROR:-0}" = 1 ]; then echo 'permission denied' >&2; exit 1; fi
+    -l) if [ -n "${IWE_TEST_CRON_FAIL_ONCE:-}" ] && [ -f "$IWE_TEST_CRON_FAIL_ONCE" ]; then
+            rm "$IWE_TEST_CRON_FAIL_ONCE"
+            echo 'temporary read failure' >&2
+            exit 1
+        fi
+        if [ -n "${IWE_TEST_CRON_READS:-}" ]; then printf 'read\n' >> "$IWE_TEST_CRON_READS"; fi
+        if [ "${IWE_TEST_CRON_ERROR:-0}" = 1 ]; then echo 'permission denied' >&2; exit 1; fi
         if [ ! -f "$IWE_TEST_CRON" ]; then echo 'no crontab for test' >&2; exit 1; fi
         cat "$IWE_TEST_CRON" ;;
     -) cat > "$IWE_TEST_CRON" ;;
@@ -428,6 +434,25 @@ for selection in notereview morning 'morning weekreview notereview notereview' u
     cmp "$fixture/selection-before" "$IWE_TEST_CRON"
 done
 echo 'PASS: fresh cron requires explicit note-review and rejects partial selections'
+
+# A transient first-read error used to drop notereview when the writer's
+# second read succeeded. Do not write anything after the failed snapshot.
+export IWE_TEST_CRON_FAIL_ONCE="$fixture/fail-once"
+touch "$IWE_TEST_CRON_FAIL_ONCE"
+if IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+   IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" \
+   > "$fixture/transient-read.log" 2>&1; then
+    echo 'FAIL: installer accepted a transient cron read error' >&2; exit 1
+fi
+cmp "$fixture/selection-before" "$IWE_TEST_CRON"
+unset IWE_TEST_CRON_FAIL_ONCE
+export IWE_TEST_CRON_READS="$fixture/cron-reads"
+IWE_WORKSPACE="$WORKSPACE_DIR" IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+    IWE_TEMPLATE="$SCRIPT_DIR" bash "$SCRIPT_DIR/roles/strategist/install.sh" > "$fixture/single-read.log"
+[ "$(wc -l < "$IWE_TEST_CRON_READS" | tr -d ' ')" -eq 1 ]
+[ "$(grep -c 'strategist.sh' "$IWE_TEST_CRON")" -eq 3 ]
+unset IWE_TEST_CRON_READS
+echo 'PASS: installer preserves cron on transient errors and uses one snapshot'
 
 # The same default is required for macOS: update.sh invokes install.sh with
 # no arguments. SETUP_CI suppresses all service actions in this fixture.

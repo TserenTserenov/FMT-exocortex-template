@@ -30,20 +30,19 @@ strategist_default_jobs() {
     if [[ "$(uname -s)" == Darwin ]]; then
         if [ -e "$TARGET_DIR/com.strategist.notereview.plist" ] ||
            [ -L "$TARGET_DIR/com.strategist.notereview.plist" ] ||
-           [ -e "$TARGET_DIR/com.strategist.notereview.plist.disabled" ]; then
+           [ -e "$TARGET_DIR/com.strategist.notereview.plist.disabled" ] ||
+           [ -L "$TARGET_DIR/com.strategist.notereview.plist.disabled" ]; then
             printf '%s\n' notereview
         fi
-    elif iwe_systemd_user_bus_ok; then
+    elif [ "${strategist_cron_snapshot+x}" != x ]; then
         if [ -e "$HOME/.config/systemd/user/iwe-strategist-notereview.service" ] ||
            [ -L "$HOME/.config/systemd/user/iwe-strategist-notereview.service" ] ||
            [ -e "$HOME/.config/systemd/user/iwe-strategist-notereview.timer" ] ||
            [ -L "$HOME/.config/systemd/user/iwe-strategist-notereview.timer" ]; then
             printf '%s\n' notereview
         fi
-    elif command -v crontab >/dev/null 2>&1; then
-        local installed_cron
-        installed_cron=$(crontab -l 2>/dev/null) || return 0
-        if printf '%s\n' "$installed_cron" | awk '
+    else
+        if printf '%s\n' "$strategist_cron_snapshot" | awk '
             /^# BEGIN IWE-strategist / { inside=1; next }
             /^# END IWE-strategist$/ { inside=0; next }
             inside && $0 !~ /^[[:space:]]*#/ { print }
@@ -55,9 +54,15 @@ strategist_default_jobs() {
 
 # The helpers only define functions; sourcing does not touch a scheduler.
 source "$(cd "$SCRIPT_DIR/../lib" && pwd)/scheduler-cron.sh"
+# Read once before selecting jobs. A failed read must not turn an existing
+# optional job into an absent one, even if a later read would recover.
+if [[ "$(uname -s)" == Linux ]] && [ -z "${SETUP_CI:-}" ] && ! iwe_systemd_user_bus_ok; then
+    strategist_cron_snapshot=$(iwe_read_crontab) || exit 1
+fi
 STRATEGIST_JOBS=()
 if [ "$#" -eq 0 ]; then
-    while IFS= read -r job; do STRATEGIST_JOBS+=("$job"); done < <(strategist_default_jobs)
+    default_jobs=$(strategist_default_jobs) || exit 1
+    while IFS= read -r job; do STRATEGIST_JOBS+=("$job"); done <<< "$default_jobs"
     set -- "${STRATEGIST_JOBS[@]}"
 fi
 STRATEGIST_JOBS=()
@@ -145,7 +150,7 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
         # `command -v systemctl` alone can't tell WSL2/container hosts without a
         # session bus from a real systemd apart, and `enable --now` on those just
         # fails silently for the pilot.
-        if ! iwe_systemd_user_bus_ok; then
+        if [ "${strategist_cron_snapshot+x}" = x ]; then
             echo "  ⚠ systemd --user недоступен (нет пользовательской сессионной шины — типично для WSL2/контейнера/сервера без активного логина)"
             echo "  Installing $ROLE_NAME via cron fallback (issue #454)..."
             # Convert every selected timer before changing crontab. One invalid
@@ -165,7 +170,7 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
                 fi
                 cron_lines+=("$job_lines")
             done
-            iwe_install_cron_fallback "strategist" "${cron_lines[@]}"
+            iwe_install_cron_snapshot "strategist" "$strategist_cron_snapshot" "${cron_lines[@]}"
             echo "  ✓ Installed via crontab. Verify: crontab -l | grep strategist.sh"
             echo "  ✓ Logs: ~/logs/strategist/"
             exit 0

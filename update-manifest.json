@@ -1841,7 +1841,7 @@
     },
     {
       "path": "roles/lib/scheduler-cron.sh",
-      "sha256": "66cc781144c2ffe931024d081c3b229d6316654d17ada429262944bad4148f0c"
+      "sha256": "ee94643a13f6a065e8cad9aed7a9d111a8c8b61094bbf17894a3a04461b7fd7b"
     },
     {
       "path": "roles/role-boundaries.md",
@@ -1853,7 +1853,7 @@
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "e4f8a0479ece1b610af4794f4bc4072510070c59fecc6a9548b44ea39ebbbeb5"
+      "sha256": "52e5dfcf185d1da1ac1ae6e140884a6c9d0940fd749d4986b1e6c535cd122880"
     },
     {
       "path": "roles/strategist/merge-launchd-schedule.py",
