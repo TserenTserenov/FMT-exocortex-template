@@ -3173,7 +3173,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-ledger-render-patch.py",
-      "sha256": "bf178689e45a1242c3a1780c78b0b5b776abb3ccf5dc61e1d55e3b717a6ba726"
+      "sha256": "9b54676b1a53ff0d99bc192f38220555e0c78eb7b2b52a81766c4a9d9b4727ad"
     },
     {
       "path": "seed/strategy/scripts/day-open-llm-fill.py",
