@@ -48,6 +48,7 @@ assert_plist_identity() {
 PLISTS=(
     roles/strategist/scripts/launchd/com.strategist.morning.plist
     roles/strategist/scripts/launchd/com.strategist.weekreview.plist
+    roles/strategist/scripts/launchd/com.strategist.notereview.plist
     roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist
     roles/extractor/scripts/launchd/com.extractor.inbox-check.plist
 )

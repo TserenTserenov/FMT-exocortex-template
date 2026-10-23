@@ -365,7 +365,7 @@
     },
     {
       "path": ".claude/runtime-overlay.yaml",
-      "sha256": "882cd8c85f7a20a396e0955acdcaf5bc55cfd4cefc5fb9e4fa00e8d25ae372c0"
+      "sha256": "451709f928b9eebfbe7b31d9e2953b8718b85b645a67cc2fdc7ed98bd92e6213"
     },
     {
       "path": ".claude/scripts/check-index-health.py",
@@ -877,7 +877,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "8af00a95f9ad7e7b89a0793745dc87f7444443df1c0676d8d7d82a7ac6d3c546"
+      "sha256": "1f27c63a53beff4e0f9cd7d7d78a0952326e979050ea446822e34dcc121f31a7"
     },
     {
       "path": ".gitignore",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9868458522504bf4c38420e1b9d2efa03ae8434fc3955a3f363113cdbdd0765a"
+      "sha256": "c1578c33de358cbf4e603f9bc32247880509f932ee8e23edcab764ca7849daf6"
     },
     {
       "path": "CLAUDE.md",
@@ -1849,15 +1849,19 @@
     },
     {
       "path": "roles/strategist/README.md",
-      "sha256": "b4d7fb04437f5a5fb6fd5d576d4a47197742094b20b70c635d972762bf075a0a"
+      "sha256": "bfb74b9796f7a2d58d066a53c7c909200b36056ae42d0fc1260d43710b7ed288"
     },
     {
       "path": "roles/strategist/install.sh",
-      "sha256": "fb886a7e7f4b8a2496fa1bb1d94f498fe2b75f7d060ab8fd19ba00fd912505c5"
+      "sha256": "63b5b27d66880fbe559c535ee2e22d6d79827de83e954040e516ffd944e0d30c"
     },
     {
       "path": "roles/strategist/merge-launchd-schedule.py",
       "sha256": "7c5d5f05db5098fdd76e9dc1a0fe0fe713a3dc43660cf54ea434832143b350f2"
+    },
+    {
+      "path": "roles/strategist/migrate-notereview-launchd.py",
+      "sha256": "48bdcdcc8a03219602c560d8d05e8a538af50220ca41aa56e1c4dac995a38bda"
     },
     {
       "path": "roles/strategist/prompts/add-wp.md",
@@ -1990,6 +1994,10 @@
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.morning.plist",
       "sha256": "0324eb6af0de9d4ed63e7c9144aabf1668f38d5d49145260d6777afdb196ca03"
+    },
+    {
+      "path": "roles/strategist/scripts/launchd/com.strategist.notereview.plist",
+      "sha256": "6d65b4d72881c5c037165e27c90eb59d804612f197016f3665ff79bc891218c1"
     },
     {
       "path": "roles/strategist/scripts/launchd/com.strategist.weekreview.plist",
@@ -3033,7 +3041,7 @@
     },
     {
       "path": "scripts/tests/test_launchd_identity_runtime.sh",
-      "sha256": "6bd0d6ac517b0088a783fd7e866051872de53a05bc3ab717c8b55e5b234bf6e5"
+      "sha256": "1f0ce7d69ad35dac186703664d85abd1a21485ce2b227bf5cc0c8198bb10d257"
     },
     {
       "path": "scripts/tests/test_role_runner_update_marker_guard.sh",
@@ -3573,6 +3581,7 @@
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
+    "setup/test-strategist-notereview-migration.py",
     "setup/test-update-channel-enum.sh",
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",

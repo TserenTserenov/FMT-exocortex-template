@@ -163,6 +163,21 @@ if [ -f "$SCRIPT_TARGET" ]; then
     chmod +x "$SCRIPT_TARGET"
 fi
 
+# Repair only an existing note-review configuration, including .plist.disabled.
+# This helper never creates a job or calls launchctl; manual mode stays default.
+if [ -e "$TARGET_DIR/com.strategist.notereview.plist" ] ||
+   [ -L "$TARGET_DIR/com.strategist.notereview.plist" ] ||
+   [ -e "$TARGET_DIR/com.strategist.notereview.plist.disabled" ] ||
+   [ -L "$TARGET_DIR/com.strategist.notereview.plist.disabled" ]; then
+    if [ -z "$MERGE_PYTHON3" ] || [ -z "${IWE_WORKSPACE:-}" ]; then
+        echo "ERROR: note-review migration requires Python 3 and IWE_WORKSPACE; plist unchanged" >&2
+        exit 1
+    fi
+    "$MERGE_PYTHON3" "$SCRIPT_DIR/migrate-notereview-launchd.py" \
+        "$LAUNCHD_DIR/com.strategist.notereview.plist" "$TARGET_DIR" \
+        "$IWE_WORKSPACE" "$SCRIPT_TARGET"
+fi
+
 # issue #285: пользователь отключает агента документированным способом
 # (launchctl unload + переименование в <label>.plist.disabled — конвенция,
 # описанная в issue пилотом на его инсталляции для com.strategist.scout;
