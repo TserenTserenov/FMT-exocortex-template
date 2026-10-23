@@ -415,7 +415,7 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
       # is GNU/Homebrew-only (platform-compat check, WP-5) -- command -v
       # guard: no timeout(1) on this host -> skip the check entirely.
       if command -v timeout >/dev/null 2>&1; then
-        timeout 10 bash "$_STYLE_WRAPPER" "codex" "$_STYLE_TMP" >/dev/null 2>&1 || true
+        timeout 10 bash "$_STYLE_WRAPPER" "codex" "$_STYLE_TMP" peer >/dev/null 2>&1 || true
       fi
       rm -f "$_STYLE_TMP"
     }
