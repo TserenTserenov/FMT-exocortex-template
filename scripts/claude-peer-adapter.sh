@@ -21,6 +21,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/peer-adapter-common.sh
 source "$SCRIPT_DIR/lib/peer-adapter-common.sh"
 
+# The reply is read by this adapter, not by the pilot: the style guard inside the
+# vendor CLI must not ask for a rewrite (WP-388 Ф24). Same line in kimi/codex adapters.
+export IWE_STYLE_CONTEXT=peer
+
 # Claude Code can access its macOS Keychain credentials only outside Codex's
 # seatbelt. Running the adapter inside that sandbox produced intermittent blank
 # output that looked like success. A caller must use the approved external

@@ -36,6 +36,12 @@ IWE_TEMPLATE="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"
 TEMPLATE_SCRIPTS="$IWE_TEMPLATE/scripts"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# The reply is read by this adapter, not by the pilot: the style guard inside the
+# vendor CLI must not ask for a rewrite (WP-388 Ф24). Same line in claude/kimi adapters.
+# Codex loads the project hook only when the working directory is an IWE checkout
+# (e.g. --add-dir of the IWE root), so this is a safety net for that call shape.
+export IWE_STYLE_CONTEXT=peer
+
 # === Codex binary auto-detect: env override → PATH → VS Code extension (bundled, versioned dir) ===
 CODEX_BIN="${CODEX_BIN:-$(command -v codex 2>/dev/null || true)}"
 if [ -z "$CODEX_BIN" ]; then
