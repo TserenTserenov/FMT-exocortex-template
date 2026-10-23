@@ -1,7 +1,7 @@
 #!/bin/bash
 # pull-on-touch.sh — PreToolUse hook: ленивая подтяжка git-репо при первом касании за сессию.
 #
-# Реализует правило Pull-on-Touch (CLAUDE.md §2 п.5) детерминированно, а не "по памяти агента".
+# Реализует правило Pull-on-Touch (CLAUDE.md §2 п.4) детерминированно, а не "по памяти агента".
 # Причина: правило поведенческое → системно пропускается (инцидент 5 мая 2026 и 14 июня 2026 —
 # ложный диагноз "Day Open пропущен" из-за чтения устаревшей локальной копии).
 #
@@ -11,7 +11,7 @@
 #   Вход:    stdin JSON {tool_name, tool_input, session_id}.
 #   Действие: классификация read-only (scripts/lib/git-sync-status.sh, ls-remote,
 #             никогда не трогает stash/rebase/refs) + на заведомо чистом дереве —
-#             атомарный `git merge --ff-only` — один раз на репо на сессию.
+#             `git merge --ff-only --no-autostash` — один раз на репо на сессию.
 #             НИКОГДА не делает autostash: issue #1245 (16.10.2026, рецидив
 #             bug-2026-07-17) — конфликт при возврате стеша тихо топил несохранённые
 #             правки, предупреждение было видно только в additionalContext одной сессии.
@@ -22,7 +22,7 @@
 set -uo pipefail
 
 [[ "${1:-}" == "--help" ]] && {
-    echo "pull-on-touch.sh — lazy read-only freshness check + safe ff-only fast-forward on first repo touch per session (CLAUDE.md §2 п.5)"
+    echo "pull-on-touch.sh — lazy read-only freshness check + safe ff-only fast-forward on first repo touch per session (CLAUDE.md §2 п.4)"
     exit 0
 }
 
@@ -82,31 +82,48 @@ while IFS= read -r repo; do
     # Больше никогда не стешит (issue #1245, рецидив bug-2026-07-17): autostash
     # мог конфликтовать на возврате и тихо топить несохранённые правки — в stash,
     # с предупреждением, видимым только в additionalContext этого тул-колла.
-    # Теперь: грязное дерево (tracked ИЛИ untracked) — вообще не трогаем репо,
-    # чтобы не рисковать локальной работой. Чистое дерево — классифицируем
-    # read-only (ls-remote, та же библиотека, что Sync Gate) и продвигаем ветку
-    # только атомарным `merge --ff-only`: он либо чисто продвигает HEAD, либо
-    # отказывает без побочных эффектов — промежуточного состояния не существует.
-    if [ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ]; then
+    # Include untracked files even when status.showUntrackedFiles=no is set.
+    # A failed status query is not proof of a clean tree. Optional locks are
+    # disabled so inspecting another session's index does not refresh it.
+    if ! tree_status=$(GIT_OPTIONAL_LOCKS=0 git -C "$dir" status --porcelain --untracked-files=all 2>/dev/null); then
+        warns="${warns}${repo}: не удалось проверить несохранённые правки, данные potentially stale. "
+        continue
+    fi
+    if [ -n "$tree_status" ]; then
         warns="${warns}${repo}: есть несохранённые правки, свежее с origin не подтягиваю (чтобы не рисковать ими), данные potentially stale. "
         continue
     fi
 
+    initial_head=$(git -C "$dir" rev-parse HEAD 2>/dev/null) || {
+        warns="${warns}${repo}: не удалось определить текущий коммит, данные potentially stale. "
+        continue
+    }
     check_git_sync_status "$dir" "$branch" 20
     case "$GIT_SYNC_STATUS" in
         OK)
             ;;
         STALE)
-            # Single-ref fetch, not the library's "never fetch" guarantee: we
-            # need the new commit object locally before `merge --ff-only` can
-            # use it. Narrower than a full fetch, and `&&`-gated — a concurrent
-            # session's lock on the same ref surfaces as the warning below,
-            # not as a partial state.
-            if $TO git -C "$dir" fetch --quiet origin "$branch" 2>/dev/null \
-                && git -C "$dir" merge --ff-only --quiet "origin/$branch" 2>/dev/null; then
+            # Fetch does not touch working files, but another session can write
+            # while it runs. Recheck the branch, HEAD and tree before merging.
+            if ! $TO git -C "$dir" fetch --quiet --refmap= origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null; then
+                warns="${warns}${repo}: не удалось получить обновление, данные potentially stale. "
+                continue
+            fi
+            if ! target=$(git -C "$dir" rev-parse "refs/remotes/origin/$branch" 2>/dev/null) \
+                || ! tree_status=$(GIT_OPTIONAL_LOCKS=0 git -C "$dir" status --porcelain --untracked-files=all 2>/dev/null) \
+                || [ -n "$tree_status" ] \
+                || [ "$(git -C "$dir" symbolic-ref --quiet --short HEAD 2>/dev/null)" != "$branch" ] \
+                || [ "$(git -C "$dir" rev-parse HEAD 2>/dev/null)" != "$initial_head" ]; then
+                warns="${warns}${repo}: состояние изменилось или не проверено после fetch, обновление пропущено, данные potentially stale. "
+                continue
+            fi
+            # The final check cannot exclude a later concurrent write. Explicitly
+            # disable config-driven autostash so Git refuses overlapping edits
+            # instead of stashing them and reporting success after a failed pop.
+            if git -C "$dir" merge --ff-only --no-autostash --no-overwrite-ignore --quiet "$target" 2>/dev/null; then
                 pulled="${pulled}${repo} "
             else
-                warns="${warns}${repo}: подтяжка не удалась (сеть/конфликт при обновлении ветки), данные potentially stale. "
+                warns="${warns}${repo}: подтяжка не удалась (конфликт при обновлении ветки), данные potentially stale. "
             fi
             ;;
         *)

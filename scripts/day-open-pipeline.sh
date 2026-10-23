@@ -20,6 +20,42 @@ set -uo pipefail
 # ...) lives in the governance repository, $DS_STRATEGY.
 SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Git housekeeping must never hide work in a shared checkout (issue #1245).
+# These helpers are independent of rendering, credentials and notifications.
+day_open_fast_forward() {
+  local repo="$1" remote="${2:-origin}" source_ref="${3:-refs/heads/main}"
+  local upstream="${4:-refs/remotes/origin/main}" head branch tree target target_ref
+  head=$(git -C "$repo" rev-parse HEAD) || return 1
+  branch=$(git -C "$repo" symbolic-ref --quiet HEAD) || return 1
+  tree=$(GIT_OPTIONAL_LOCKS=0 git -C "$repo" status --porcelain --untracked-files=all) || return 1
+  [ -z "$tree" ] || return 1
+  target_ref=$(git -C "$repo" rev-parse --symbolic-full-name "$upstream") || return 1
+  # Refresh this exact tracking ref even with a restricted remote.fetch config.
+  # Never use a local branch as the fetch destination (e.g. remote=".").
+  case "$target_ref" in refs/remotes/*) ;; *) return 1 ;; esac
+  git -C "$repo" fetch --quiet --refmap= "$remote" "+$source_ref:$target_ref" || return 1
+  target=$(git -C "$repo" rev-parse "$target_ref") || return 1
+  [ "$(git -C "$repo" rev-parse HEAD)" = "$head" ] || return 1
+  [ "$(git -C "$repo" symbolic-ref --quiet HEAD)" = "$branch" ] || return 1
+  tree=$(GIT_OPTIONAL_LOCKS=0 git -C "$repo" status --porcelain --untracked-files=all) || return 1
+  [ -z "$tree" ] || return 1
+  # A concurrent edit can still land after the check; Git must refuse an
+  # overlapping update, even when the user configured merge.autoStash=true.
+  git -C "$repo" merge --ff-only --no-autostash --no-overwrite-ignore --quiet "$target"
+}
+
+day_open_publish() {
+  local repo="$1"
+  # A rejected push must not trigger rebase/autostash in the shared checkout.
+  # Keep the source commit and every unsaved file for an explicit later retry.
+  # Preserve the repository's configured push destination.
+  if git -C "$repo" push; then
+    return 0
+  fi
+  echo "Day Open: push failed; local commit and unsaved work are preserved. Publish from an isolated copy." >&2
+  return 1
+}
+
 # --- CLI args ---
 FORCE=false
 PROBE=false
@@ -340,7 +376,7 @@ raise SystemExit(1)
 # plain environment (see 1.5 above) and before the first tg_notify call ---
 load_secrets
 
-# --- Guard: already committed today (D2 dedup) ---
+# --- Guard: already published today (D2 dedup) ---
 # Checks by file presence in git history, not commit message prefix —
 # so both automated ("feat(dayplan):") and manual ("day-open:") commits are detected.
 # WP-484 (2026-07-14): fetch origin first. Day Open now runs independently from
@@ -349,20 +385,20 @@ load_secrets
 # log missed a same-day commit the other side had already pushed, so whichever
 # ran second redid the whole scaffold+LLM-fill for nothing.
 if [ "$FORCE" != "true" ]; then
-  cd "$DS_STRATEGY" 2>/dev/null || true
-  git fetch origin main --quiet 2>/dev/null || true
+  cd "$DS_STRATEGY" || exit 1
   DAYPLAN_FILE="current/DayPlan $DATE.md"
-  ALREADY_COMMITTED=$(git log HEAD origin/main --since="$DATE 00:00:00" --until="$DATE 23:59:59" --name-only --format="" -- "$DAYPLAN_FILE" 2>/dev/null | grep -c "DayPlan $DATE" || true)
-  if [ "${ALREADY_COMMITTED:-0}" -gt 0 ]; then
-    echo "  DayPlan already committed today ($DATE, this machine or the other) — nothing to do."
-    tg_notify "📋 DayPlan $DATE already committed today. Use --force to regenerate." terminal
+  OTHER_COMMIT=""
+  if git fetch --quiet --refmap= origin '+refs/heads/main:refs/remotes/origin/main' 2>/dev/null; then
+    OTHER_COMMIT=$(git log -1 --format=%H refs/remotes/origin/main --since="$DATE 00:00:00" --until="$DATE 23:59:59" -- "$DAYPLAN_FILE" 2>/dev/null) || OTHER_COMMIT=""
+  fi
+  if [ -n "$OTHER_COMMIT" ]; then
+    echo "  DayPlan already published today ($DATE, this machine or the other) — nothing to do."
+    tg_notify "📋 DayPlan $DATE already published today. Use --force to regenerate." terminal
     # Record success heartbeat here too: the other machine did the work, but
     # day-open-pipeline-watchdog.sh only checks THIS machine's heartbeat file.
     # Without this, every day the two machines settle this D2 race the "losing"
     # side never writes success — its watchdog fires a false dead-man's-switch
     # alert even though a DayPlan genuinely exists for today.
-    OTHER_COMMIT=$(git log -1 --format=%H HEAD origin/main -- "$DAYPLAN_FILE" 2>/dev/null | head -1)
-    OTHER_COMMIT="${OTHER_COMMIT:-unknown}"
     mkdir -p "$HOME/.claude/state"
     jq -n \
       --arg date "$DATE" \
@@ -371,6 +407,12 @@ if [ "$FORCE" != "true" ]; then
       '{date: $date, commit_hash: $commit, timestamp: $ts, status: "success", note: "done by the other machine"}' \
       > "$HOME/.claude/state/day-open-pipeline-last-success.json"
     exit 0
+  fi
+  LOCAL_COMMIT=$(git log -1 --format=%H HEAD --since="$DATE 00:00:00" --until="$DATE 23:59:59" -- "$DAYPLAN_FILE" 2>/dev/null) || LOCAL_COMMIT=""
+  if [ -n "$LOCAL_COMMIT" ]; then
+    echo "  DayPlan is committed locally, but publication is not confirmed; preserving it for an explicit isolated retry."
+    tg_notify "⚠️ DayPlan $DATE сохранён локально, публикация не подтверждена. Повторная генерация пропущена; проверьте сеть и публикацию из изолированной копии." protective
+    exit 1
   fi
 fi
 
@@ -1051,8 +1093,11 @@ mkdir -p "$(dirname "$DAY_OPEN_LOG")"
 # any other unconfigured optional integration in this pipeline.
 PD_DASHBOARD_DIR="$IWE/${DASHBOARD_REPO_NAME:-PD-dashboard}"
 if [ -d "$PD_DASHBOARD_DIR/.git" ]; then
-  if ! git -C "$PD_DASHBOARD_DIR" pull --ff-only >>"$DAY_OPEN_LOG" 2>&1; then
-    echo "  [pd-dashboard-sync] git pull failed -- панель покажет последний доступный снимок" | tee -a "$DAY_OPEN_LOG"
+  if ! { DASHBOARD_BRANCH=$(git -C "$PD_DASHBOARD_DIR" symbolic-ref --quiet --short HEAD) \
+      && DASHBOARD_REMOTE=$(git -C "$PD_DASHBOARD_DIR" config --get "branch.$DASHBOARD_BRANCH.remote") \
+      && DASHBOARD_SOURCE_REF=$(git -C "$PD_DASHBOARD_DIR" config --get "branch.$DASHBOARD_BRANCH.merge") \
+      && day_open_fast_forward "$PD_DASHBOARD_DIR" "$DASHBOARD_REMOTE" "$DASHBOARD_SOURCE_REF" '@{upstream}'; } >>"$DAY_OPEN_LOG" 2>&1; then
+    echo "  [pd-dashboard-sync] safe update skipped -- панель покажет последний доступный снимок" | tee -a "$DAY_OPEN_LOG"
   fi
 elif [ -n "${PD_DASHBOARD_CLONE_URL:-}" ]; then
   if ! git clone "$PD_DASHBOARD_CLONE_URL" "$PD_DASHBOARD_DIR" >>"$DAY_OPEN_LOG" 2>&1; then
@@ -1238,39 +1283,12 @@ ARCHIVED_PATHS=()
 ARCHIVE_TARGETS=()
 
 if [ "$PROBE" = "true" ] || [ "$SCAFFOLD_ONLY" = "true" ]; then
-  # WP-484 27.07 (found by independent review of the --probe stand itself): this whole
-  # block used to run unconditionally BEFORE the PROBE check below, which only wrapped
-  # the archive-move loop. git-dirty-guard.sh can self-heal a stale mirror via
-  # `git reset --hard origin/<branch>` — a real, destructive operation on the production
-  # checkout — and the plain `git pull --rebase` below it is a real mutation too. A
-  # "dry run" that can silently `reset --hard` or rebase the real repo isn't a dry run.
-  echo "  [draft/probe] git-dirty-guard/pull/archive-move all skipped — no git state touched"
+  echo "  [draft/probe] sync/archive-move skipped — no git state touched"
 else
-# Sync with remote to avoid non-fast-forward push (race with other agents)
-# WP-484 (2026-07-19): route through git-dirty-guard.sh first — a bare pull --rebase
-# aborts the whole pipeline on the routine dirty tree sync-strategy-files.sh leaves on
-# the remote server (see git-dirty-guard.sh header). The guard either self-heals a stale mirror
-# or confirms real uncommitted work is present; a plain pull is only safe after that.
-#
-# NON-FATAL as of 2026-07-26 (WP-484, root-caused the 04:35 26.07 ledger-render
-# incident): this used to `abort` the whole pipeline on real uncommitted work, which
-# discarded everything steps 1-4.5 had already correctly rendered (including an honest
-# ledger section) and forced strategist.sh's free-form LLM fallback, which has no
-# awareness of the LEDGER-RENDER block and silently overwrote it with fabricated
-# numbers — exactly the "no fabrication" invariant §5 CONCEPT-night-cycle.md exists to
-# prevent, just via a path this guard didn't cover. Sync/archive is housekeeping, not
-# required for today's DayPlan content, so a failure here degrades gracefully (skip
-# pull, keep the already-written file) instead of discarding a good render.
-if ! bash "$IWE_SCRIPTS/git-dirty-guard.sh" "$DS_STRATEGY"; then
-  tg_notify "⚠️ Day Open: git-dirty-guard нашёл незакоммиченную работу — pull пропущен, но уже отрендеренный DayPlan сохраняется (не абортим pipeline, WP-484 fix 26.07)" protective
-else
-  # Sync failures are reported out-of-repo only. Appending sync_skipped to the
-  # tracked ledger here would make the next git-dirty-guard invocation reject the
-  # pipeline's own diagnostic write and turn a transient failure into a permanent
-  # dirty-tree loop. The periodic sync service owns persistent failure counters.
-  git pull --rebase || {
-    tg_notify "⚠️ Day Open: git pull --rebase failed — continuing without pull (WP-484 fix 26.07)" protective
-  }
+# Sync is optional housekeeping: a stale or dirty copy must not discard the
+# DayPlan already rendered above. No stash/rebase/reset in the source tree.
+if ! day_open_fast_forward "$DS_STRATEGY"; then
+  tg_notify "⚠️ Day Open: обновление пропущено (несохранённые правки, сеть или расхождение истории); локальная работа и готовый DayPlan сохранены" protective
 fi
 
 # Archive stale DayPlans (move + overwrite, and record the deletion).
@@ -1388,21 +1406,11 @@ done
 # after this line was written and nobody updated it (bug found 2026-07-02).
 git commit -m "feat(dayplan): $DATE — auto Day Open (WP-356) [allow:current]" --trailer "Co-Authored-By: Kimi <noreply@moonshot.ai>" -- "$DAYPLAN_PATH" ${ARCHIVE_TARGETS[@]+"${ARCHIVE_TARGETS[@]}"} ${ARCHIVED_PATHS[@]+"${ARCHIVED_PATHS[@]}"} || abort "Git commit failed"
 
-# Push with fetch+rebase retries: origin/main moves continuously (parallel agent
-# sessions, ledger-publish every 30 min), so a plain push loses the race whenever
-# anything landed between this run's start and its commit — exactly how the
-# 2026-08-14 07:22 run died after an otherwise green pipeline (WP-520 class:
-# shared checkout vs busy origin). --autostash covers the routinely dirty shared
-# worktree; on rebase failure we abort the rebase and leave the checkout as-is,
-# which is no worse than the old unconditional abort.
-PUSH_OK=false
-for PUSH_ATTEMPT in 1 2 3; do
-  if git push; then PUSH_OK=true; break; fi
-  echo "  push rejected (attempt $PUSH_ATTEMPT/3) — fetch+rebase onto origin/main and retry"
-  git fetch origin main --quiet || true
-  git rebase origin/main --autostash || { git rebase --abort 2>/dev/null || true; break; }
-done
-[ "$PUSH_OK" = "true" ] || abort "Git push failed (after fetch+rebase retries)"
+# Capture the local result for the success receipt; publication keeps the
+# existing Git destination configuration and never rebases this checkout.
+COMMIT_HASH=$(git rev-parse HEAD) || abort "Cannot resolve DayPlan commit"
+day_open_publish "$DS_STRATEGY" \
+  || abort "Git push failed — local DayPlan commit and unsaved work preserved; see publication diagnostics"
 
 # WP-484 F64: input-hash means "this data set is PUBLISHED", so it is recorded
 # only after the remote accepted the commit (see the guard comment at step 3).
@@ -1412,8 +1420,7 @@ fi
 
 bash "$IWE_SCRIPTS/session-guard.sh" close --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
 
-COMMIT_HASH=$(git log -1 --format=%H)
-echo "  Committed: $COMMIT_HASH"
+echo "  Committed locally: $COMMIT_HASH"
 fi
 
 # ============================================
