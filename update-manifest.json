@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/tests/test_generate_manifest_registers_setup_exclusions.sh",
-      "sha256": "b9b360036eb38e0ea24b2ab11611a1251555a6d3e1ba72400c7441b8db099e3f"
+      "sha256": "f2bbbbc6a4a74a1ddcee6b29723a31422d7093e8f8c9923132f6ba108dafa34f"
     },
     {
       "path": "scripts/tests/test_hindsight_docs_contract.sh",
