@@ -105,7 +105,7 @@
     },
     {
       "path": ".claude/hooks/memory-exocortex-sync.sh",
-      "sha256": "112ea22978d9e6a95cba82306e03e919dea591776b403005c336fe6b0566e407"
+      "sha256": "f1b681ef3115595c157ace59fb75c795ca19ea0e1a047b07ac69dcd6c4e502d9"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "df8636e8aed1f7ec2de5ac6acfd1564c0add306a2b221625a7dbdd87d037b401"
+      "sha256": "f866cf971c1d0768677f2a2d7d512feba181595cd5c1792e629f261d021872b5"
     },
     {
       "path": "CLAUDE.md",
@@ -3005,7 +3005,7 @@
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",
-      "sha256": "512108486010ace38c9de67ce6dbb0568618966f8b09feb9511a51818e0d62cd"
+      "sha256": "cfdfa3ad05aa60706e5d3c4dbba242dd76875effd7e2d8f5d6353c50be088c77"
     },
     {
       "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
@@ -3421,6 +3421,7 @@
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
+    "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",

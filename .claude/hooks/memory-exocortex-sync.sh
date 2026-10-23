@@ -61,6 +61,20 @@ WORKSPACE_SLUG=$(echo "$WORKSPACE_DIR" | tr '/_.' '-')
 MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${WORKSPACE_SLUG}/memory}"
 EXOCORTEX_DST="$WORKSPACE_DIR/$GOVERNANCE_REPO/exocortex"
 
+# issue #1279: skip the mirror while GOVERNANCE_REPO is frozen, instead of
+# writing into it unconditionally. Same default-on condition as
+# session-guard.sh's FROZEN_CANONICAL_PATHS (duplicated, not sourced — this
+# hook stays standalone by design).
+if [ -z "${IWE_FROZEN_CANONICAL_PATH+x}" ] || [ -n "${IWE_FROZEN_CANONICAL_PATH:-}" ]; then
+    FROZEN_PATH="${IWE_FROZEN_CANONICAL_PATH:-$WORKSPACE_DIR/$GOVERNANCE_REPO}"
+    FROZEN_PATH_REAL=$(cd "$FROZEN_PATH" 2>/dev/null && pwd -P) || FROZEN_PATH_REAL=""
+    EXOCORTEX_PARENT_REAL=$(cd "$WORKSPACE_DIR/$GOVERNANCE_REPO" 2>/dev/null && pwd -P) || EXOCORTEX_PARENT_REAL=""
+    if [ -n "$FROZEN_PATH_REAL" ] && [ -n "$EXOCORTEX_PARENT_REAL" ] && [ "$FROZEN_PATH_REAL" = "$EXOCORTEX_PARENT_REAL" ]; then
+        echo "memory-exocortex-sync: $GOVERNANCE_REPO под freeze — зеркало пропущено на этот раз (issue #1279), exocortex/ временно отстаёт до снятия заморозки" >&2
+        exit 0
+    fi
+fi
+
 # Канонический реальный путь memory/. Приоритет — симлинк $WORKSPACE_DIR/memory
 # (указывает на auto-memory независимо от правил слугификации); fallback — MEMORY_SRC.
 if [ -z "${IWE_MEMORY_SRC:-}" ] && [ -d "$WORKSPACE_DIR/memory" ]; then
