@@ -105,8 +105,17 @@ export IWE_RUNTIME="${IWE_RUNTIME:-${WORKSPACE_DIR}/.iwe-runtime}"
 # a README and audit logs, or personal scripts plus symlinks into the template,
 # must not hide the platform scripts. The marker proves "live checkout", not a
 # complete file set. Keep in sync with setup/install-iwe-paths.sh (same rule).
+#
+# Issue #957 recurrence (Artem, 21.10): a short local exec-wrapper around the
+# template's session-guard.sh (common workaround for an env/launchd gap) is a
+# regular, non-symlink file too -- it used to win this check the same way a
+# real checkout would. Treat a small file that execs into IWE_TEMPLATE as a
+# wrapper, not a checkout.
+_IWE_SG_MARKER="${WORKSPACE_DIR}/scripts/session-guard.sh"
 if [ -z "${IWE_SCRIPTS:-}" ]; then
-  if [ -f "${WORKSPACE_DIR}/scripts/session-guard.sh" ] && [ ! -L "${WORKSPACE_DIR}/scripts/session-guard.sh" ]; then
+  if [ -f "$_IWE_SG_MARKER" ] && [ ! -L "$_IWE_SG_MARKER" ] \
+     && ! { [ "$(wc -l < "$_IWE_SG_MARKER" 2>/dev/null || echo 0)" -le 30 ] \
+            && grep -qE 'exec[[:space:]]+(bash[[:space:]]+)?"?\$\{?IWE_TEMPLATE' "$_IWE_SG_MARKER" 2>/dev/null; }; then
     export IWE_SCRIPTS="${WORKSPACE_DIR}/scripts"
   else
     # IWE_TEMPLATE honours .exocortex.env (renamed template folder, #933);
@@ -114,6 +123,7 @@ if [ -z "${IWE_SCRIPTS:-}" ]; then
     export IWE_SCRIPTS="${IWE_TEMPLATE}/scripts"
   fi
 fi
+unset _IWE_SG_MARKER
 
 # Export to child processes
 export WORKSPACE_DIR

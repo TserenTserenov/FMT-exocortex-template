@@ -40,6 +40,23 @@ Week Close = протокол. Блокирующее требование — �
 ### 0. Extensions (before)
 Загрузить: `bash .claude/scripts/load-extensions.sh week-close before`. Exit 0 → `Read` каждый файл из вывода (alphabetic) → выполнить как первые шаги. Exit 1 → пропустить. Поддерживает `extensions/week-close.before.md` И `extensions/week-close.before.<suffix>.md`.
 
+### 0а. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
+Week Close сам по себе не рабочий продукт (см. `gates_rationale` выше — исключение из WP Gate уже заявлено для этого скилла), но `session-open-gate.sh` (отдельный, более узкий гейт именно на `git commit`/`push`, S-68) исключения не делает — финальный коммит протокола без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
+```bash
+HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
+SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
+AGENT="${IWE_AGENT:-claude-code}"
+ALREADY_BOUND=0
+if [ -n "$HARNESS_ID" ]; then
+  while IFS= read -r sem; do
+    [ -z "$sem" ] && continue
+    grep -qE '^wp: .+' "$sem" 2>/dev/null && { ALREADY_BOUND=1; break; }
+  done < <(grep -lxF "harness_session_id: $HARNESS_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+fi
+[ "$ALREADY_BOUND" = 1 ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" open --housekeeping week-close --agent "$AGENT" 2>&1 || true
+```
+`session-open-gate.sh` принимает `housekeeping: week-close` как легитимную привязку — это закрытый список из 4 операционных протоколов, не произвольная причина (S-68 запрещает именно произвольные `--housekeeping`-обходы, не эти четыре). Отказ открытия (коллизия с параллельной сессией) не блокирует протокол.
+
 ### 1. Сбор данных за 7 дней
 
 **Коммиты:**
@@ -107,7 +124,7 @@ WP-NNN: pending-фазы (M):
 ### 6. Captures и уроки
 
 - Просмотреть `inbox/fleeting-notes.md` за неделю → маршрутизировать невыключенные.
-- Уроки сессий → MEMORY.md + thematic `lessons_*.md` (если есть).
+- Уроки сессий памяти — см. §7d ниже (`memory-bleed.sh`, issue #1314: прежняя формулировка здесь ссылалась на несуществующую секцию «Уроки» в MEMORY.md и дублировала §7d).
 - Drift-scan недели: что в MEMORY.md устарело за 7 дней.
 - **Проверка полноты переноса перед архивацией (WP-5, 2026-07-10):** `bash {{IWE_SCRIPTS}}/check-wp-transfer-completeness.sh --all "${IWE_ROOT:-$HOME/IWE}"` по `inbox/WP-N/` — выводит `results_not_captured`-флаги (проставленные при закрытии без заполненного `results_in`) и файлы в подпапках без учёта в основном контекст-файле. Для каждого warning — пилот решает: (a) действительно нужен перенос знания, найти куда; (b) файл технический/устарел, можно оставить; (c) `results_in` заполнить постфактум. Не блокирует Close.
 

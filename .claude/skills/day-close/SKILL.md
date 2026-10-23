@@ -42,6 +42,23 @@ Day Close = протокол. Блокирующее требование — н
 Проверить `day_open.strategy_day` в `day-rhythm-config.yaml` (тот же ключ, что читает `/day-open`, по умолчанию `monday`) против дня недели сегодня. Симметрично `/day-open` (SKILL.md шаг 4: «Если `strategy_day` → DayPlan НЕ создавать»): в стратегический день `current/DayPlan <дата>.md` не создавался — шаги 1, 2b, 3, 9a **неприменимы** (не FAIL), см. пометки внутри них. Итоги дня идут только в WeekReport (шаг 9b), как и предписывает § ниже.
 <!-- Детали: day-close-details.md § Шаг 0в -->
 
+### 0г. Session-guard: привязка к РП-1 (S-68 — каждый коммит обязан нести реальный РП)
+Day Close сам по себе не рабочий продукт, но `session-open-gate.sh` (S-68) не делает для него исключения — финальный коммит шага 3 ниже без привязки к `--wp` будет отклонён. Если сессия уже привязана к другому РП, вторая привязка не нужна:
+```bash
+HARNESS_ID="${CLAUDE_CODE_SESSION_ID:-}"
+SESSION_DIR="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions"
+AGENT="${IWE_AGENT:-claude-code}"
+ALREADY_BOUND=0
+if [ -n "$HARNESS_ID" ]; then
+  while IFS= read -r sem; do
+    [ -z "$sem" ] && continue
+    grep -qE '^wp: .+' "$sem" 2>/dev/null && { ALREADY_BOUND=1; break; }
+  done < <(grep -lxF "harness_session_id: $HARNESS_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+fi
+[ "$ALREADY_BOUND" = 1 ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" open --housekeeping day-close --agent "$AGENT" 2>&1 || true
+```
+`session-open-gate.sh` принимает `housekeeping: day-close` как легитимную привязку — это закрытый список из 4 операционных протоколов, не произвольная причина (S-68 запрещает именно произвольные `--housekeeping`-обходы, не эти четыре). Отказ открытия (коллизия с параллельной сессией) не блокирует протокол.
+
 ### 1. Сбор данных
 **Strategy_day (шаг 0в) → неприменимо, пропустить** (нет DayPlan, сверять таблицу «На сегодня» не с чем). Иначе: запустить bash-скрипт сбора коммитов за день по всем git-репо в `${IWE_WORKSPACE:-$HOME/IWE}/`. Сопоставить с таблицей «На сегодня» из DayPlan → определить статусы.
 <!-- Детали: day-close-details.md § Шаг 1 -->
@@ -75,7 +92,7 @@ Day Close = протокол. Блокирующее требование — н
 <!-- Детали: day-close-details.md § Шаг 4в -->
 
 ### 4. Lesson Hygiene
-Просмотреть «Уроки» в MEMORY.md. Не применялся >1 нед и есть в `lessons_*.md` → удалить. Новый урок → строка в MEMORY.md + `lessons_*.md`. Цель: ≤8 уроков.
+`IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS" 2>/dev/null; T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; bash "$T/scripts/memory-bleed.sh" --hot-only` — HOT-лимит памяти (issue #1314: прежний текст ссылался на несуществующую секцию «Уроки» в MEMORY.md и на `lessons_*.md` по имени файла; современная схема — frontmatter `type`/`horizon`/`status`, `memory/memory-lifecycle-spec.md`). Превышен → перевести часть файлов из `horizon: hot` в `warm` до коммита. Полный скан дормантных кандидатов (HOT→WARM/WARM→COLD/COLD→archive) — не здесь, это уже делают Week Close §7d и Month Close §1f на своей каденции.
 
 ### 5. Автоматические шаги
 `IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS" 2>/dev/null; "$IWE_SCRIPTS/day-close.sh"` — источник переменных явный (issue #688, см. шаг 0б), Linear sync, backup (memory/ + CLAUDE.md), reindex, консолидация сессий дня. Обновление платформы (`update.sh`) сюда НЕ входит (issue #945): это сетевая операция со своим ритуалом; о доступном обновлении сообщает таблица состояния IWE при Day Open (`update.sh --check --fast`), применяется отдельно (`/iwe-update`).
@@ -170,7 +187,7 @@ Sub-agent Haiku R23 (context isolation): передать чеклист + че�
 - [ ] Repo CLAUDE.md: feat-коммиты → новые правила?
 - [ ] DayPlan сегодня → `archive/day-plans/` (старые DayPlan'ы в `current/` тоже) — **DayPlan сегодня N/A на strategy_day** (шаг 0в), старые — архивировать в любом случае
 - [ ] WP context: done → `mv inbox/ → archive/wp-contexts/`
-- [ ] Lesson Hygiene: уроки MEMORY.md ≤8
+- [ ] Lesson Hygiene: HOT-лимит памяти (`memory-bleed.sh --hot-only`) в норме
 - [ ] Draft-list: Pack обогащён → черновик предложен?
 - [ ] Видео: обработанные помечены (если video.enabled)
 - [ ] Governance: REPOSITORY-REGISTRY, navigation.md, MAP.002

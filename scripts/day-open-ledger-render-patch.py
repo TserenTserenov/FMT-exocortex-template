@@ -255,7 +255,7 @@ def main():
             if new_content == content:
                 print("  ledger-render-patch: marker present but block pattern didn't match — left untouched, needs manual look")
                 return 0
-            with open(args.dayplan, "w", encoding="utf-8") as f:
+            with open(args.dayplan, "w", encoding="utf-8", newline="\n") as f:
                 f.write(new_content)
             print(f"  ledger-render-patch: SELF-HEAL — removed stray block for {yday} (no real ledger data behind it)")
             return 0
@@ -287,7 +287,7 @@ def main():
         # Marker present but content differs from what a fresh, honest render
         # produces — self-heal (see module docstring "Self-heal on marker mismatch").
         new_content = BLOCK_PATTERN.sub(lambda m: insertion, content, count=1)
-        with open(args.dayplan, "w", encoding="utf-8") as f:
+        with open(args.dayplan, "w", encoding="utf-8", newline="\n") as f:
             f.write(new_content)
         print(f"  ledger-render-patch: SELF-HEAL — block for {yday} didn't match a fresh render, overwrote with honest data"
               + (f" (partial — errors: {'; '.join(errors)})" if errors else ""))
@@ -298,7 +298,7 @@ def main():
         print("  ledger-render-patch: footer anchor not found — DayPlan structure unexpected, left untouched")
         return 0
 
-    with open(args.dayplan, "w", encoding="utf-8") as f:
+    with open(args.dayplan, "w", encoding="utf-8", newline="\n") as f:
         f.write(new_content)
     print(f"  ledger-render-patch: inserted {len(blocks)} section(s) for {yday}/{today_str}"
           + (f" (partial — errors: {'; '.join(errors)})" if errors else ""))

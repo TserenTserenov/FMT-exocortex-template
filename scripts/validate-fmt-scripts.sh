@@ -50,6 +50,12 @@ fi
 FMT_ROOT="$(cd "$SCRIPTS_DIR/.." && pwd)"
 AUTHOR_HOME="${HOME}"
 AUTHOR_GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+# issue #1278: for a user whose $HOME is a short, common path segment ("/root"),
+# a bare substring match fires on any unrelated word containing it, e.g. the
+# comment "workspace/root paths" in iwe-env-bootstrap.sh. Require a path-like
+# boundary on both sides (not alnum/"_") so "/root" still matches as a real
+# path ("/root/foo", "//root") but not inside a longer word ("workspace/root").
+AUTHOR_HOME_ESCAPED="$(printf '%s' "$AUTHOR_HOME" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
 
 errors=0
 checked=0
@@ -69,9 +75,9 @@ if [[ "$MODE" != "settings-json" ]]; then
         checked=$((checked + 1))
 
         # Проверка 1: абсолютный личный путь (resolved $HOME, не переменная)
-        if grep -qF "$AUTHOR_HOME" "$f" 2>/dev/null; then
+        if grep -qE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" 2>/dev/null; then
             echo "  ❌ $fname: содержит '$AUTHOR_HOME'" >&2
-            grep -nF "$AUTHOR_HOME" "$f" | head -3 | sed 's/^/     /' >&2
+            grep -nE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" | head -3 | sed 's/^/     /' >&2
             errors=$((errors + 1))
         fi
 

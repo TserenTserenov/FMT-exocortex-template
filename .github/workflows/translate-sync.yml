@@ -314,6 +314,56 @@ jobs:
           [issue]($EN/issues) describing the change instead.
           EOF
 
+      - name: Normalize English paths and refresh the update manifest
+        if: always() && steps.en_draft.outcome == 'success'
+        run: |
+          python3 - <<'PYEOF'
+          from pathlib import Path
+          import hashlib
+          import json
+
+          root = Path('../en-draft')
+          replacements = (
+              ('https://github.com/TserenTserenov/FMT-exocortex-template', 'https://github.com/iwesys/IWE'),
+              ('TserenTserenov/FMT-exocortex-template', 'iwesys/IWE'),
+              ('FMT-exocortex-template', 'IWE'),
+          )
+          for path in root.rglob('*'):
+              if not path.is_file() or path.is_symlink() or path.name in {'.git', '.translation-state.yaml', 'badge-data.json'}:
+                  continue
+              try:
+                  original = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              normalized = original
+              for old, new in replacements:
+                  normalized = normalized.replace(old, new)
+              if normalized != original:
+                  path.write_text(normalized, encoding='utf-8')
+
+          ignored = {'.git', '.translation-state.yaml', 'badge-data.json', 'update-manifest.json'}
+          files = []
+          for path in sorted(root.rglob('*')):
+              if not path.is_file() or path.is_symlink():
+                  continue
+              relative = str(path.relative_to(root))
+              if relative in ignored:
+                  continue
+              files.append({'path': relative, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+          manifest = {
+              'schema_version': 2,
+              'version': '0.41.9',
+              'description': 'Manifest of files in the standalone English IWE distribution. Used by update.sh.',
+              'files': files,
+              'excluded_paths': [],
+              'deprecated_files': [],
+          }
+          (root / 'update-manifest.json').write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8'
+          )
+          print(f'English update manifest: {len(files)} files')
+          PYEOF
+
       - name: Cyrillic gate for en-draft
         id: staging_cyrillic
         # Publish has the same hard gate, but stopping here prevents an LLM

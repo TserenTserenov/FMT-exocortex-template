@@ -443,7 +443,7 @@ def main() -> int:
         return 0
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(new_content, encoding="utf-8")
+    OUTPUT.write_text(new_content, encoding="utf-8", newline="\n")
     print(f"build-active-wp: {OUTPUT.relative_to(ROOT)} обновлён ({len(rows)} РП)")
     return 0
 

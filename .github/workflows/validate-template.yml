@@ -407,6 +407,14 @@ jobs:
   # (the "edited the wrong clone" failure mode on dev machines) must go red
   # here, not be discovered by users after delivery.
   guide-kit-drift:
+    # issue #850: scripts/guide-kit-sync-state.yaml and scripts/guide-kit-sync.sh
+    # are in excluded_paths -- a fork's copy is permanently stale, and this
+    # check verifies the author's own vendoring is in sync with upstream, not
+    # anything a fork needs. Same guard as validate/windows-session-guard/
+    # integration-contract-*/issue-1030-windows/upgrade-test above; found by
+    # the generic test_issue_850_fork_guard.sh regression test, not reported
+    # separately.
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -510,6 +518,14 @@ jobs:
         run: bash scripts/check-platform-compat.sh
 
   validate:
+    # issue #850/#1223: this job runs dozens of scripts/tests/* and
+    # setup/test-*.sh helpers that are in excluded_paths -- a fork's copy is
+    # permanently stale (frozen at whatever sync delivered it last) and this
+    # check verifies an authored-only delivery contract, not fork content.
+    # Same guard as windows-session-guard/integration-contract-*/upgrade-test
+    # above; this job was the one left uncovered, causing the false-positive
+    # drift reported in #850.
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

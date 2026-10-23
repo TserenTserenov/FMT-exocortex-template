@@ -734,7 +734,7 @@ for name, idx in col_index.items():
 new_row = "| " + " | ".join(row_cells) + " |\n"
 lines.insert(insert_at, new_row)
 
-with open(registry_path, "w", encoding="utf-8") as f:
+with open(registry_path, "w", encoding="utf-8", newline="\n") as f:
     f.writelines(lines)
 
 print("   ✅ REGISTRY: строка {} добавлена".format(wp_num))
@@ -1169,7 +1169,7 @@ else:
     indent = re.match(r"[ \t]*", lines[insert_at - 1]).group()
     new_row = indent + "| " + " | ".join(row_cells) + " |\n"
     lines.insert(insert_at, new_row)
-    with open(weekplan_path, "w", encoding="utf-8") as f:
+    with open(weekplan_path, "w", encoding="utf-8", newline="\n") as f:
         f.writelines(lines)
     print("   ✅ WeekPlan: строка WP-{} добавлена".format(wp_num))
 PYEOF
@@ -1234,7 +1234,7 @@ repo_cell = repo if repo else "—"
 new_row = "| WP-{} | {} | {} | pending |\n".format(wp_id, repo_cell, result)
 content = content[:insert_at] + new_row + content[insert_at:]
 
-with open(strategy_path, "w", encoding="utf-8") as f:
+with open(strategy_path, "w", encoding="utf-8", newline="\n") as f:
     f.write(content)
 print("   ✅ Strategy.md: WP-{} → {} добавлен".format(wp_id, result))
 PYEOF

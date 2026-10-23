@@ -67,6 +67,7 @@ API_BASE="https://api.github.com/repos/$REPO"
 RELEASE_SHA=""
 
 CHECK_ONLY=false
+STRICT_CHECK=false   # WP-529 Ф220: --dry-run-strict — структурная проверка плана доставки, не ручной список
 AUTO_YES=false
 FAST_CHECK=false
 # Stage B opt-ins (WP-7 F71, поведение settings-merge скорректировано issue
@@ -205,6 +206,7 @@ fetch_update_manifest() {
 for arg in "$@"; do
     case "$arg" in
         --check|--dry-run)  CHECK_ONLY=true ;;
+        --dry-run-strict)   CHECK_ONLY=true; STRICT_CHECK=true ;;
         --fast)             FAST_CHECK=true ;;
         --yes)              AUTO_YES=true ;;
         --apply-settings-merge) APPLY_SETTINGS_MERGE=true ;;
@@ -216,6 +218,7 @@ for arg in "$@"; do
             echo ""
             echo "Options:"
             echo "  --check     Показать доступные обновления без применения"
+            echo "  --dry-run-strict  С --check: структурная проверка плана доставки (целевые файлы на месте, пути безопасны)"
             echo "  --fast      С --check: сравнить только версию манифеста (без скачивания 300+ файлов, issue #230)"
             echo "  --yes       Применить обновления без подтверждения (включает settings.json merge, см. --no-settings-merge)"
             echo "  --apply-settings-merge  Применить слияние settings.json отдельно от --yes (бэкап + пост-валидация; без флага и без --yes — только предпросмотр)"
@@ -2619,7 +2622,17 @@ backfill_ds_publish() {
     # Issue #1003: a copy that THIS template shipped earlier (sha256 on the list) is
     # not user content: it is replaced even though it lies untracked in the governance
     # repo (the generic backfill refuses untracked files). Any other file stays.
-    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730"
+    #
+    # Issue #1288 (21.10): this list is a trap by construction -- every edit to
+    # seed/strategy/scripts/ds-publish.sh mints a new hash that isn't on it yet,
+    # so an install that updated while an in-between version was current falls
+    # straight through to "not ours to replace" below and gets stuck on a stale
+    # template-shipped copy forever (two independent reports). Backfilled the two
+    # hashes minted since #1003 (02.10, 03.10) that were missing; the hash of the
+    # version shipped since 15.10 (the current one as of this fix) is deliberately
+    # NOT added here -- once an install matches it, the case below is moot since
+    # there is nothing left to replace it with.
+    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730 a86c3f628c06e8b7fe8d7a338c01ff0d7a0794751b4ce1a27affbb11295b2a36 13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e"
     local source_path="$SCRIPT_DIR/seed/strategy/scripts/ds-publish.sh" target_hash
     if [ -f "$target_path" ] && [ ! -L "$target_path" ] && [ ! -L "$(dirname "$target_path")" ] \
        && [ -f "$source_path" ] && [ ! -L "$source_path" ]; then
@@ -2772,7 +2785,7 @@ run_post_apply_backfills_or_die() {
 # also fires in the TOTAL_CHANGES=0 recovery branches, so an install that is
 # otherwise up to date still gets its feeders. Re-running is safe: the feeders
 # script skips an unchanged, already-loaded launchd job instead of unload/load
-# (which would kill a run in flight at exactly 06:00/21:00).
+# (which would kill a run in flight at exactly 09:00/21:00).
 backfill_extractor_feeders() {
     local feeders="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
     local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-}"
@@ -5077,6 +5090,34 @@ fi
 if $CHECK_ONLY; then
     echo "Режим --check: изменения не применяются."
     echo "Для применения: bash update.sh"
+
+    # WP-529 Ф220: --dry-run-strict проверяет уже вычисленный план доставки
+    # (NEW_FILES/UPDATED_FILES этого прогона), а не повторно парсит текст
+    # update.sh — пир-сессия 2026-10-22-04-wp529-continue-items, возражение
+    # Codex на предложение Kimi (парсинг текста скрипта — хрупкое дублирование
+    # логики). CHECK_ONLY завершается здесь, до Step 5, поэтому это отдельный
+    # проверочный проход, не ветка внутри apply-циклов.
+    # BEGIN-TESTABLE: dry-run-strict-check
+    if $STRICT_CHECK; then
+        STRICT_FAILURES=()
+        for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
+            case "$f" in
+                /*|*..*) STRICT_FAILURES+=("$f: путь выходит за пределы установки") ;;
+            esac
+            [ -f "$TMPDIR_UPDATE/files/$f" ] || STRICT_FAILURES+=("$f: отсутствует в загруженном плане доставки")
+        done
+        if [ "${#STRICT_FAILURES[@]}" -gt 0 ]; then
+            echo ""
+            echo "🔴 --dry-run-strict: план доставки не прошёл структурную проверку:"
+            for reason in "${STRICT_FAILURES[@]}"; do
+                echo "  - $reason"
+            done
+            exit "$EXIT_RUNTIME"
+        fi
+        echo "--dry-run-strict: план доставки (${#NEW_FILES[@]} новых + ${#UPDATED_FILES[@]} обновляемых) структурно корректен. Это не гарантирует отсутствие регрессий в поведении после apply."
+    fi
+    # END-TESTABLE: dry-run-strict-check
+
     assert_self_unmutated
     if ! run_sync_canary; then
         exit "$EXIT_CANARY_FAILED"
@@ -5128,6 +5169,14 @@ echo "Применяю обновления..."
 require_env_before_update
 begin_update_transaction
 remember_untouched_memory_before_apply
+
+# WP-529 Ф220: снимок CHANGELOG.md до перезаписи — источник для дифа и
+# дисклеймера после apply-циклов ниже. Снимаем содержимым файла (не git-тегом):
+# тег текущей ревизии не доказывает, какая версия была установлена у
+# пользователя до этого запуска, и может отсутствовать вовсе (пир-сессия
+# 2026-10-22-02-wp529-peer-continue, предложение Codex принято над git tag от Kimi).
+CHANGELOG_SNAPSHOT=""
+[ -f "$SCRIPT_DIR/CHANGELOG.md" ] && CHANGELOG_SNAPSHOT=$(cat "$SCRIPT_DIR/CHANGELOG.md")
 
 APPLIED=0
 REMOVED=0
@@ -5306,6 +5355,47 @@ for f in "${UPDATED_FILES[@]}"; do
     fi
     APPLIED=$((APPLIED + 1))
 done
+
+# BEGIN-TESTABLE: changelog-diff-disclaimer
+# WP-529 Ф220: диф и дисклеймер CHANGELOG.md — только если содержимое реально
+# изменилось (не на каждом прогоне). Решение зафиксировано пир-сессией
+# 2026-10-22-02-wp529-peer-continue + продолжением 2026-10-22-04: --check/--dry-run
+# не гарантирует отсутствие регрессий после настоящего обновления — честное
+# предупреждение здесь закрывает только "не знал, что изменилось", не сам риск
+# регрессии (его закрывает --dry-run-strict выше).
+if [ -n "$CHANGELOG_SNAPSHOT" ] && [ ! -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
+    # Cold-review (2026-10-22): существовал до apply, пропал после (removal,
+    # не UPDATED_FILES) — редкий путь (CHANGELOG.md сейчас ни в одном списке
+    # удаления), но диф без этой ветки был бы тихо пропущен, хотя контент
+    # содержательно изменился (на "отсутствует").
+    echo ""
+    echo "⚠ CHANGELOG.md был удалён этим обновлением (ранее присутствовал)."
+elif [ -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
+    CHANGELOG_AFTER=$(cat "$SCRIPT_DIR/CHANGELOG.md")
+    if [ "$CHANGELOG_AFTER" != "$CHANGELOG_SNAPSHOT" ]; then
+        # WP-529 Ф220 продолжение (2026-10-22, "слой зачем"): выделить значимые
+        # пункты (не [optional]) впереди полного дифа — переиспользует уже
+        # существующую классификацию Changelog-Tag (CLAUDE.md: security/
+        # migration/behavior/optional), не вводит новый слой авторства записей.
+        # Немаркированная строка тоже считается значимой (CLAUDE.md:
+        # «отсутствие метки не означает безопасно»).
+        ADDED_LINES=$(diff <(printf '%s\n' "$CHANGELOG_SNAPSHOT") <(printf '%s\n' "$CHANGELOG_AFTER") | grep '^>' | sed 's/^> //')
+        HIGHLIGHTS=$(printf '%s\n' "$ADDED_LINES" | grep '^- ' | grep -v '^- \[optional\]') || true
+        if [ -n "$HIGHLIGHTS" ]; then
+            echo ""
+            echo "Главное в этом обновлении:"
+            printf '%s\n' "$HIGHLIGHTS" | sed 's/^/  + /'
+        fi
+        echo ""
+        echo "Изменения в CHANGELOG.md:"
+        # [ -n ] перед печатью — иначе пустой $ADDED_LINES (diff только удалял,
+        # ничего не добавил) печатает одну паразитную строку "  + " (cold-review).
+        [ -n "$ADDED_LINES" ] && printf '%s\n' "$ADDED_LINES" | sed 's/^/  + /'
+        echo ""
+        echo "⚠ Чистый --check/--dry-run не гарантирует отсутствие регрессий после этого обновления — он проверяет совпадение файлов, не поведение. Для структурной проверки плана доставки используйте --dry-run-strict."
+    fi
+fi
+# END-TESTABLE: changelog-diff-disclaimer
 
 # issue #229: hard-require frontmatter.sh now — NEW_FILES/UPDATED_FILES above have
 # just delivered it to disk if this is the first run after upgrading from a
@@ -6468,6 +6558,31 @@ report_author_skip_summary
 echo "=========================================="
 echo ""
 echo "Перезапустите Claude Code для применения обновлений в memory/."
+
+# issue #1280 (WP-561 Ф46 tail, 22.10): update.sh never commits its own
+# delivery into the governance repo (it only copies files there -- see the
+# backfill_* functions above) -- that commit is always a separate, later
+# action by the pilot or an agent on their behalf. When the canonical
+# checkout is frozen (WP-520, default on), that later `git commit` is exactly
+# the direct write the freeze gate exists to block, with no WP to bind it to
+# (community report, issue #1280; peer-session 2026-10-22-17, Claude+Kimi+
+# Codex). `update-delivery` is now an allowed housekeeping reason (same
+# closed whitelist as day/week/month-close, session-open-gate.sh), and
+# `--canonical-owner` -- already reviewed for scheduled runners -- reused
+# here for a manual, single, exclusive delivery run rather than a new flag.
+GOVERNANCE_REPO_FOR_DELIVERY_HINT=$(effective_governance_repo 2>/dev/null) || GOVERNANCE_REPO_FOR_DELIVERY_HINT=""
+if [ -n "$GOVERNANCE_REPO_FOR_DELIVERY_HINT" ]; then
+    GOVERNANCE_DIR_FOR_DELIVERY_HINT="$WORKSPACE_DIR/$GOVERNANCE_REPO_FOR_DELIVERY_HINT"
+    if [ -d "$GOVERNANCE_DIR_FOR_DELIVERY_HINT/.git" ]; then
+        echo ""
+        echo "Если $GOVERNANCE_REPO_FOR_DELIVERY_HINT нужно закоммитить (канонический чекаут может быть заморожен, WP-520):"
+        echo "  bash \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT/scripts/session-guard.sh\" open --housekeeping update-delivery \\"
+        echo "    --canonical-owner \"update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)\" --agent manual"
+        echo "  (cd \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT\" && git add -A && git commit -m \"chore: sync template update\")"
+        echo "  bash \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT/scripts/session-guard.sh\" close --housekeeping update-delivery --agent manual"
+        echo "  Если open откажет \"канон уже под эксклюзивным владением\" — подожди close этого держателя, не форсируй."
+    fi
+fi
 
 # issue #226: остальная доставка (memory/hooks/skills, repair-pass, коммит) уже
 # выполнена выше независимо от конфликта — теперь сообщаем и выходим с ошибкой,

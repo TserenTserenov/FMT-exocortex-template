@@ -68,9 +68,27 @@ GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
 # is not a checkout: pointing IWE_SCRIPTS there hides every platform script.
 # The marker proves "live checkout", not completeness of its file set.
 # Keep in sync with .claude/lib/iwe-env-bootstrap.sh (same rule, same marker).
+#
+# Issue #957 recurrence (Artem, 21.10): a real session-guard.sh file is not
+# necessarily a live checkout either. He had a short local workaround for
+# #928 (`exec bash "$IWE_TEMPLATE/scripts/session-guard.sh" "$@"`, 13 lines)
+# sitting at this exact path -- a non-symlink "real" file by this marker's
+# own test, so it won the same way a genuine checkout would, and IWE_SCRIPTS
+# pointed at $WORKSPACE_DIR/scripts where only the wrapper and its own
+# small handful of lines actually live. A thin exec-wrapper is common enough
+# (anyone working around a launchd/env issue reaches for exactly this) that
+# it deserves its own signal, not silent treatment as a checkout: warn and
+# keep pointing at the template, since the wrapper's own target already
+# proves that's where the real scripts are.
 SCRIPTS_MARKER="$WORKSPACE_DIR/scripts/session-guard.sh"
 if [ -f "$SCRIPTS_MARKER" ] && [ ! -L "$SCRIPTS_MARKER" ]; then
-    IWE_SCRIPTS_TARGET="\$IWE_WORKSPACE/scripts"
+    if [ "$(wc -l < "$SCRIPTS_MARKER" 2>/dev/null || echo 0)" -le 30 ] \
+       && grep -qE 'exec[[:space:]]+(bash[[:space:]]+)?"?\$\{?IWE_TEMPLATE' "$SCRIPTS_MARKER" 2>/dev/null; then
+        $QUIET || echo "  ⚠ $SCRIPTS_MARKER выглядит как тонкая обёртка (exec в шаблон), не как живая копия -- IWE_SCRIPTS указан на шаблон, не на эту папку. Если обёртка больше не нужна, удалите её."
+        IWE_SCRIPTS_TARGET="\$IWE_TEMPLATE/scripts"
+    else
+        IWE_SCRIPTS_TARGET="\$IWE_WORKSPACE/scripts"
+    fi
 else
     IWE_SCRIPTS_TARGET="\$IWE_TEMPLATE/scripts"
 fi

@@ -2949,6 +2949,7 @@ PYEOF
 if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   peer_adapter_check_frontmatter "$KIMI_OUTPUT"
   peer_adapter_check_language "$KIMI_OUTPUT"
+  peer_adapter_check_style "kimi" "$KIMI_OUTPUT"
 fi
 
 # cleanup_peer() через trap переведёт статус в idle и удалит lock

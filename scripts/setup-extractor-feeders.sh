@@ -152,7 +152,7 @@ HOOK
 fi
 fi  # SCHEDULE_ONLY
 
-# === 3. Cron для git-diff-feed (06:00 / 21:00) ===
+# === 3. Cron для git-diff-feed (09:00 / 21:00) ===
 
 log "3/4 Cron для git-diff-feed"
 
@@ -187,11 +187,11 @@ if [ "$PLATFORM" = "Darwin" ]; then
     <array>
         <string>$EXTRACTOR_SH</string>
         <string>git-diff-feed</string>
-        <string>12 hours ago</string>
+        <string>13 hours ago</string>
     </array>
     <key>StartCalendarInterval</key>
     <array>
-        <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>StandardOutPath</key><string>$HOME/logs/extractor/launchd-git-diff-feed.log</string>
@@ -214,7 +214,7 @@ PLIST
         # Idempotency (WP-5, found 03.09 — setup.sh now calls this on every
         # run, not just a one-off manual invocation): re-installing an
         # unchanged, already-loaded job would still unload/reload it, which
-        # could kill a run in flight at exactly 06:00/21:00. Skip only when
+        # could kill a run in flight at exactly 09:00/21:00. Skip only when
         # content is unchanged AND the job is actually loaded -- content
         # unchanged but not loaded (e.g. a prior `launchctl unload` left it
         # stopped) must still fall through to `load`.
@@ -245,18 +245,31 @@ elif [ "$PLATFORM" = "Linux" ]; then
         systemctl --user daemon-reload
         ok "systemd units удалены"
     elif [ "$MODE" != "--check" ]; then
+        # issue #1303 (Linux-половина #984, macOS-плист чинили в PR #1022):
+        # extractor.sh resolves session-guard.sh as ${IWE_SCRIPTS:-$HOME/IWE/scripts};
+        # systemd --user не наследует login-shell окружение, поэтому без явных
+        # Environment= строк резолв падает на дефолт, которого в типичной
+        # установке нет — фид находит кандидатов, но не может их сохранить.
+        IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE_TEMPLATE_DIR/scripts}"
         cat > "$UNIT_DIR/extractor-git-diff-feed.service" <<UNIT
 [Unit]
 Description=IWE Extractor: git-diff-feed (WP-247 Ф-MULTI-SOURCE.2)
 [Service]
 Type=oneshot
-ExecStart=$EXTRACTOR_SH git-diff-feed "12 hours ago"
+Environment=HOME=$HOME
+Environment=IWE_TEMPLATE=$IWE_TEMPLATE_DIR
+Environment=IWE_WORKSPACE=$IWE_WORKSPACE
+Environment=IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO
+Environment=IWE_RUNTIME=$IWE_RUNTIME
+Environment=IWE_SCRIPTS=$IWE_SCRIPTS
+ExecStart=$EXTRACTOR_SH git-diff-feed "13 hours ago"
 UNIT
         cat > "$UNIT_DIR/extractor-git-diff-feed.timer" <<TIMER
 [Unit]
-Description=IWE Extractor git-diff-feed schedule (06:00 + 21:00)
+Description=IWE Extractor git-diff-feed schedule (09:00 + 21:00)
 [Timer]
-OnCalendar=*-*-* 06:00:00
+OnCalendar=*-*-* 09:00:00
 OnCalendar=*-*-* 21:00:00
 Persistent=true
 [Install]
@@ -299,7 +312,7 @@ echo ""
 log "Готово."
 log "Что включено (по результатам):"
 log " - post-commit hook на изменения captures/fleeting-notes (для нового clone — git init)"
-log " - cron 06:00 + 21:00 для git-diff-feed (на этой машине)"
+log " - cron 09:00 + 21:00 для git-diff-feed (на этой машине)"
 log " - fleeting-notes.md inbox создан"
 log ""
 log "Что НЕ требует настройки (работает автоматически после update.sh):"

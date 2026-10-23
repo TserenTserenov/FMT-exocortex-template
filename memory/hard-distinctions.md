@@ -237,7 +237,7 @@ modified: 2026-08-24T14:30:00.000Z
 | Код агента (instrument) | Данные агента (governance) | Решения человека (governance) |
 |---|---|---|
 | Промпты, скрипты, agent-card, trajectory cache | Черновики, отчёты, находки, extraction-reports | Утверждённые планы, подтверждённые captures |
-| DS-autonomous-agents | **DS-agent-workspace** | DS-strategy (пример реализации) |
+| DS-autonomous-agents | **DS-agent-workspace** | {{GOVERNANCE_REPO}} (пример реализации) |
 | Меняется редко (версии кода) | Создаётся ежедневно (ночные циклы) | Создаётся при утверждении |
 | Автор: разработчик | Автор: агент | Автор: человек |
 

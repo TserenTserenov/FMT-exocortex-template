@@ -10,16 +10,17 @@
 # had carried these blocks byte-identical since the 15.08 sandbox-network fix.
 
 # peer_adapter_check_sandbox_network <cli-label> <exit-code>
-# Codex's Linux sandbox disables network for non-escalated commands; the
-# vendor CLI then dies on its API call with little to no diagnostic output
-# (WP-524, verified live 15.08 on codex-cli 0.147). Fail fast with an
-# actionable message instead of leaking that opaque failure downstream.
+# Codex's sandbox disables network for non-escalated commands; the vendor CLI
+# then dies on its API call with little to no diagnostic output (WP-524,
+# verified live 15.08 on codex-cli 0.147). In an approved escalated command,
+# CODEX_SANDBOX is absent even if CODEX_SANDBOX_NETWORK_DISABLED remains 1;
+# the latter alone must not reject a reachable API (WP-524, 20.10.2026).
 # <exit-code> is the caller's, not this helper's: claude-peer-adapter.sh
 # passes 69, kimi-peer-adapter.sh passes 1 — unifying that divergence is a
 # separate decision, not bundled into this refactor (Codex review, WP-524).
 peer_adapter_check_sandbox_network() {
   local cli_label="$1" exit_code="${2:?peer_adapter_check_sandbox_network: exit code required}"
-  if [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = "1" ]; then
+  if [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = "1" ] && [ -n "${CODEX_SANDBOX:-}" ]; then
     echo "ERROR: network is disabled in this sandbox (CODEX_SANDBOX_NETWORK_DISABLED=1) — the $cli_label cannot reach its API. Re-run through the approved escalated route." >&2
     exit "$exit_code"
   fi
@@ -226,4 +227,36 @@ peer_adapter_check_language() {
       echo "WARNING: peer response may not be in Russian (language-check alert) — $lang_result" >&2
     fi
   fi
+}
+
+# peer_adapter_check_style <agent-name> <output-text>
+# РП-388 Ф17: feeds a peer reply through the shared response-clarity-hook.sh
+# core via the style-check-text.sh wrapper, so Kimi/Codex replies get the
+# same A1-A13.1 checks as Claude's own Stop-hook — one core, thin wrappers,
+# not a third parallel reimplementation (style-check-post-run.sh was exactly
+# that, and dead: never wired into any adapter). Second call site (Codex)
+# below is why this lives here, not inline in kimi-peer-adapter.sh (P2).
+# Warn-only, never blocks: both the wrapper and the hook always exit 0, and
+# any failure to even find the wrapper (sync lag to the ~/IWE mirror, WP-388
+# Ф15 "два прыжка") is swallowed the same way.
+peer_adapter_check_style() {
+  local agent_name="${1-}" output="${2-}"
+  local wrapper="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/style-check-text.sh"
+  [ -x "$wrapper" ] || return 0
+  local tmp_file
+  tmp_file=$(mktemp) || return 0
+  printf '%s' "$output" > "$tmp_file" 2>/dev/null
+  # timeout 10: a hung hook here would stall delivery of the peer's own reply
+  # to stdout (code review, this session) -- the Python wrapper already has
+  # this same guard, bash call sites need it too. `timeout` itself is
+  # GNU/Homebrew-only (missing on stock macOS, platform-compat check, WP-5) --
+  # command -v guard: no timeout(1) on this host -> skip the check entirely
+  # rather than block on a hung hook. Not routed through iwe_timeout() in
+  # lib/common.sh to avoid a new source dependency in a file that is
+  # deliberately source-side-effect-free (see file header); if a 5th inline
+  # copy of this guard appears elsewhere, that's the signal to migrate.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 10 bash "$wrapper" "$agent_name" "$tmp_file" >/dev/null 2>&1 || true
+  fi
+  rm -f "$tmp_file"
 }

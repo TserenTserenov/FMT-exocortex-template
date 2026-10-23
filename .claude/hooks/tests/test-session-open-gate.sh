@@ -24,8 +24,13 @@ open_semaphore() { # --wp-backed semaphore (satisfies the gate)
     > "$SESSION_DIR/claude-code-$SID.open"
 }
 
-open_housekeeping_semaphore() { # no wp: field, mirrors real session-guard.sh --housekeeping output
+open_housekeeping_semaphore() { # no wp: field, arbitrary reason — mirrors real session-guard.sh --housekeeping output
   printf 'agent: claude-code\nharness_session_id: %s\nhousekeeping: some-reason\nopened_at: test\n' "$SID" \
+    > "$SESSION_DIR/claude-code-$SID.open"
+}
+
+open_allowed_housekeeping_semaphore() { # $1 = one of the 4 whitelisted reasons
+  printf 'agent: claude-code\nharness_session_id: %s\nhousekeeping: %s\nopened_at: test\n' "$SID" "$1" \
     > "$SESSION_DIR/claude-code-$SID.open"
 }
 
@@ -68,10 +73,22 @@ open_semaphore
 expect "wp semaphore open: commit"    0 'git commit -m x'
 expect "wp semaphore open: -C push"   0 'git -C repo push'
 
-# === Семафор этой сессии открыт, но без wp: (--housekeeping) → по-прежнему блок (S-68) ===
+# === Семафор этой сессии открыт, но без wp: и с произвольной housekeeping-причиной → по-прежнему блок (S-68) ===
 close_semaphore
 open_housekeeping_semaphore
-expect "housekeeping semaphore: commit" 2 'git commit -m x'
+expect "arbitrary housekeeping semaphore: commit" 2 'git commit -m x'
+close_semaphore
+
+# === Семафор с одной из 4 разрешённых housekeeping-причин (day-open/day-close/week-close/month-close) → пропуск ===
+for reason in day-open day-close week-close month-close; do
+  open_allowed_housekeeping_semaphore "$reason"
+  expect "allowed housekeeping ($reason): commit" 0 'git commit -m x'
+  close_semaphore
+done
+
+# === Похожая, но не точно разрешённая причина (подстрока/префикс) → по-прежнему блок ===
+open_allowed_housekeeping_semaphore "day-open-extra"
+expect "near-miss housekeeping reason: commit" 2 'git commit -m x'
 close_semaphore
 
 # === Семафор чужой сессии (другой harness_session_id) → не считается ===

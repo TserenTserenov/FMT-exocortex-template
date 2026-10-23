@@ -78,6 +78,8 @@ categories:
     # to category G (manual_adapt) instead of chasing per-file exceptions.
     exclude:
       - docs/developer/card-template.md
+      - docs/CHATGPT-CODEX-SETUP.md
+      - docs/onboarding/web-connect-guide.md
 
   I:
     policy: manual_adapt
