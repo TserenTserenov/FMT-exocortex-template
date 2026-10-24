@@ -653,7 +653,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
-      "sha256": "c142ad023dbffdf6e746d6185bf6a82e088848b24f144d0491a95e2076766138"
+      "sha256": "8eec1d0cdb85a5d4fee140b068b04f248e75d6ecfc08e66d01aef2c26acc810e"
     },
     {
       "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
@@ -661,7 +661,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-start/SKILL.md",
-      "sha256": "0f485fb8ef6983e71333534537ec6c60f7e456ce3d36b1a07f62b113ddaccb24"
+      "sha256": "47f8f4c32aaa8998c063c16c8ac29438fe40ebb9d7afb33e9260ebaf4f18b62f"
     },
     {
       "path": ".claude/skills/platform-bottleneck/SKILL.md",
@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "e1ef03e3bd1debc7268c86c7ef67e143e6fa6d8e2b2a243ea5221eac8da596ae"
+      "sha256": "a1a4f10133f66d4fd49a4b0f808a1bc8c63579b7d5bbe4aa22268f029a9cda59"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -821,7 +821,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "b25f544a67b728930da0582e6f8c6f537d6b3d76ef3a7d10ec573c570f0de99a"
+      "sha256": "bfb316eb7e42c71c15772113d8bcc63ebba539fbbe96da30e7fc83186addd740"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "05bd408d5a591cbd8fdf37e5a8586602f3db38191dafa3a359abaf229d42b442"
+      "sha256": "2066da93fa23f85e490a54fccbeccd514a0f9cad85754be9ebbdf8791bb1071e"
     },
     {
       "path": "CLAUDE.md",
@@ -1221,7 +1221,7 @@
     },
     {
       "path": "extensions/protocol-close.after.session-record.md",
-      "sha256": "1734506683fbc22dec42731ef8cef26e3198e68251a19469cf0ad2a43e032b5c"
+      "sha256": "76cb7ec30ba6fb3ee4f8169093fe0bd8a8812383c6ba3df5432bbb1a4ee8dd01"
     },
     {
       "path": "extensions/protocol-close.checks.fault.md",
@@ -1253,7 +1253,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "f9e538b6ce1dbe49ea939dac7280360431935383a33be6a6fc3921ef347314a0"
+      "sha256": "bfead410fa189419d27716eacb5998f1b71f31ec78f966ec85d56eb652cbf5af"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1893,11 +1893,11 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "d2b826c08acca00dbd2132575d9ac802410147c2ba09da4ed542e1f69d889f36"
+      "sha256": "e9d03b989f3bf65e0d5faa5e5ac187099c5a7e561c3ac27b8d294a1e3e0618ba"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
-      "sha256": "b9582cff6366b0a454dd7f3d50ff67585ed36375a09262b19895da6688153f6e"
+      "sha256": "567cb2f18691c4106342885b879e8540e2f7357da5ddc7c92935f7138a1c521f"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly.md",
@@ -1949,7 +1949,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
-      "sha256": "8816001aad145f314c4caa690eb15fd3642f3e217e752236f3d44304239dc8d5"
+      "sha256": "294ee4f2a0730a5793ff87f3d978264d1abd0ff0b0093dad18bdead0e38edf9f"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md",
@@ -1957,7 +1957,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06c-finalize.md",
-      "sha256": "e8e9a80fa0c535873e61ad5489e98a938fa21119e1f0589e3949d7573319cac0"
+      "sha256": "18e1c1778cf1bbaa2699a9db1482067c2e78a3ba3aedd9d5721aa9e5a816f24b"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/07-irregular.md",
@@ -1965,7 +1965,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md",
-      "sha256": "43e736e25da374fa33cdce71785b26b9ac357ffe5a99a4d2d2de6f388d74dedd"
+      "sha256": "fe9c274f8fb0b7beeb1bb0bbde8f012e593009af239068fdb908e516e62a6839"
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
@@ -2284,10 +2284,6 @@
       "sha256": "4ccac6cf5ff4a65c024984770f6718855078b449693a52be48447a5530ddae0b"
     },
     {
-      "path": "scripts/check-wp-registered.sh",
-      "sha256": "43f8f071622782d786969f8a33ad9b006a3d79dcc15f32829a20876bcb8218da"
-    },
-    {
       "path": "scripts/check-wp-transfer-completeness.sh",
       "sha256": "ee37ce41697ee0976cdf9c180c41319e804c5d2dc33c7ef6c4fafe87bd8d17c0"
     },
@@ -2389,7 +2385,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "cb4ed573784ead72eaa9d5cfb9628d3eced91ac67f0000cabf6ac135801bd8c1"
+      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2597,7 +2593,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "5c6f516b13827dc802e08a630704557d11059640038d7840cedaa8275cfb42fa"
+      "sha256": "aa8567ffec08e127b132ed5a93f08711bf6eb56b1c07b5363af135a7e23a1bc9"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -2972,10 +2968,6 @@
       "sha256": "e25904c841874ff2cdf9d08b4a10850ac1e6612744f67a970862e91ffd6f5d0d"
     },
     {
-      "path": "scripts/tests/test_issue_1257_strategy_registration.sh",
-      "sha256": "a0e79673e57f7094f6b95e4d8bc1b65465db72f0fb7d5c16577856166b2288ef"
-    },
-    {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
       "sha256": "2f6bf87b5911bf84c2ae392bf89df55e98f28ffde3a1998c043cdff0e8db2f71"
     },
@@ -3209,7 +3201,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "ecab3930cc565e77eb43b53ca1d0cb28dbf066d2a7ab22f4336c67756aa0888f"
+      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3241,7 +3233,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "13c8153358f9176babb3be3ccd63d3c9c2a08bb9b36673bf1de8e355ae6c0ae6"
+      "sha256": "c7234a152ff31ee656ea8645188d0dab029fe6fd5a2f481dd58830bf5586360b"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3368,7 +3360,6 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/ancestry-hardening-lib.sh",
     "scripts/tests/canon-reconcile-published-smoke.sh",
-    "scripts/tests/check-wp-registered-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
@@ -3437,6 +3428,8 @@
     "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
+    "scripts/tests/test_issue_1254_repo_activity_utf8.py",
+    "scripts/tests/test_issue_1256_strategy_session_record.sh",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",

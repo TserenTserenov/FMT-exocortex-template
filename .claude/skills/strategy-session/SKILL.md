@@ -167,13 +167,28 @@ fi
 ```bash
 GOV_WT="<записанный путь>"; : "${GOV_WT:?}"
 (cd -- "$GOV_WT" || exit 1
-SESSIONS_DIR=$(source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null && iwe_sessions_dir 2>/dev/null) || SESSIONS_DIR="$GOV_WT/sessions"
-grep -rl "strategy-session\|Strategy Session" \
+IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-{{WORKSPACE_DIR}}}}"
+case "${IWE_SESSIONS_ROOT:-}" in
+  ""|/*) ;;
+  *) IWE_SESSIONS_ROOT="$IWE_ROOT/$IWE_SESSIONS_ROOT" ;;
+esac
+if [ -n "${IWE_SESSIONS_ROOT:-}" ] && [ ! -d "$IWE_SESSIONS_ROOT" ]; then
+  echo "ERROR: IWE_SESSIONS_ROOT недоступен: $IWE_SESSIONS_ROOT" >&2
+  exit 1
+fi
+SESSIONS_DIR=$(
+  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-{{GOVERNANCE_REPO}}}}"
+  source "${IWE_SCRIPTS:-{{IWE_TEMPLATE}}/scripts}/lib/common.sh" 2>/dev/null \
+    || source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null \
+    || exit 1
+  iwe_sessions_dir "$GOV_WT"
+) || SESSIONS_DIR="${IWE_SESSIONS_ROOT:-$GOV_WT/sessions}"
+grep -rlE 'strategy-session|Strategy Session|^session_type:[[:space:]]*strategy[[:space:]]*$' \
   "$SESSIONS_DIR/$(date +%Y-%m)-"*.md \
   "$SESSIONS_DIR/$(date +%Y-%m)/" 2>/dev/null
 )
 ```
-Первая сессия месяца = дата сессии ≤7 числа месяца И поиск выше пуст. Журнал сессий берётся из `iwe_sessions_dir` (общий журнал вне копии), при его отсутствии из `$GOV_WT/sessions`.
+Первая сессия месяца = дата сессии ≤7 числа месяца И поиск выше пуст. Записи с `session_type: strategy` распознаются и с русским заголовком; прежние текстовые маркеры сохраняются. Журнал берётся из `iwe_sessions_dir` тем же способом, что в `extensions/protocol-close.after.session-record.md`: относительный override — от корня установки, legacy — от активной governance-копии `$GOV_WT`; без библиотеки — из существующего явного `IWE_SESSIONS_ROOT` или `$GOV_WT/sessions`. Недоступный явный override — ошибка конфигурации, не отсутствие записей: сообщить её и не выбирать режим по пустому результату.
 
 > **Найдено платформенным аудитом 17.08.2026:** до этого исправления диспетчер знал только про initial/weekly — monthly-вариант (`strategy-session-monthly.md`) был реализован, но ничем не вызывался, кроме редкой ручной эскалации из weekly-stop-gate. Результат — шаги, привязанные только к monthly (стратегическая сверка, линза калибра/lifework-пакет, разбор inbox), фактически никогда не запускались ни у одного пользователя. Этот шаг — фикс маршрутизации, не новая функциональность.
 >
@@ -310,7 +325,7 @@ grep -rl "strategy-session\|Strategy Session" \
 скриптом): пилот прямо сказал 01.09.2026, что это его сознательный выбор, не то, что можно
 вывести из данных.
 
-**Extensions (after):** `bash .claude/scripts/load-extensions.sh strategy-session after` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить.
+**Extensions (after):** `bash .claude/scripts/load-extensions.sh strategy-session after` → Exit 0: Read каждый файл, выполнить. Exit 1: пропустить. Если weekly перешёл в monthly, выполнить after по monthly-сценарию после его завершения; повторно здесь не вызывать.
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->
