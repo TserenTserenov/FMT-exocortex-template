@@ -179,7 +179,7 @@ PLATFORM_HOOKS_EXPLICIT_INCLUDE=(
     "seed/strategy/scripts/day-open-ledger-render-patch.py"
     "seed/strategy/scripts/day-open-multiplier-backfill-patch.py"
     "seed/strategy/scripts/day-open-priorities-patch.py"
-    "seed/strategy/scripts/day-open-sync-banner-patch.py"
+    "seed/strategy/scripts/day-open-sync-banner-patch.py"  # stale-input banner step 4.58 (#1245)
     "seed/strategy/scripts/day-open-version-check-patch.py"
     "seed/strategy/scripts/ledger-append.sh"
     "seed/strategy/scripts/llm-proxy-launcher.sh"
