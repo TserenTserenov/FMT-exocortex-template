@@ -20,8 +20,6 @@ set -uo pipefail
 # ...) lives in the governance repository, $DS_STRATEGY.
 SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Git housekeeping must never hide work in a shared checkout (issue #1245).
-# These helpers are independent of rendering, credentials and notifications.
 day_open_fast_forward() {
   local repo="$1" remote="${2:-origin}" source_ref="${3:-refs/heads/main}"
   local upstream="${4:-refs/remotes/origin/main}" head branch tree target target_ref
@@ -41,8 +39,80 @@ day_open_fast_forward() {
   [ -z "$tree" ] || return 1
   # A concurrent edit can still land after the check; Git must refuse an
   # overlapping update, even when the user configured merge.autoStash=true.
-  git -C "$repo" merge --ff-only --no-autostash --no-overwrite-ignore --quiet "$target" \
-    || day_open_adopt_twins "$repo" "$target"
+  if git -C "$repo" merge --ff-only --no-autostash --no-overwrite-ignore --quiet "$target"; then
+    day_open_sync_marker_clear "$repo"
+    day_open_prune_superseded "$repo" "$target"
+    return 0
+  fi
+  day_open_adopt_twins "$repo" "$target"
+}
+
+# A full commit id (SHA-1 or SHA-256), nothing else: HEAD, a branch name, an empty
+# field or "-x" in the list file must never reach a git command.
+day_open_is_sha() {
+  [[ "$1" =~ ^[0-9a-f]{40,64}$ ]]
+}
+
+# --- sync-blocked marker -------------------------------------------------------
+# When the shared checkout cannot be moved to the published tip (overlapping local
+# edits, an unpublished local commit) the reason is kept in a marker file and
+# reported once: when the marker appears, when the reason or the paths change, and
+# then at most once a week. A successful move removes the marker.
+day_open_sync_marker_file() {
+  local root
+  # Keyed by the physical top level, so a symlinked path and its target share one marker.
+  root=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$1")
+  printf '%s/day-open-sync-blocked.%s.marker\n' "${DAY_OPEN_STATE_DIR:-$HOME/.claude/state}" \
+    "$(printf '%s' "$root" | cksum | cut -d' ' -f1)"
+}
+
+day_open_sync_marker_exists() {
+  [ -f "$(day_open_sync_marker_file "$1")" ]
+}
+
+day_open_sync_marker_clear() {
+  rm -f "$(day_open_sync_marker_file "$1")"
+}
+
+day_open_sync_blocked() {
+  local repo="$1" target="$2" class="$3" reason="$4" paths="$5"
+  local file head behind sig now last_sig="" last_at=0 notify=0
+  file=$(day_open_sync_marker_file "$repo")
+  mkdir -p "$(dirname "$file")" || return 0
+  head=$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null) || return 0
+  behind=$(git -C "$repo" rev-list --count "$head..$target" 2>/dev/null || echo "?")
+  sig="$class|$paths"
+  now=${DAY_OPEN_NOW:-$(date +%s)}
+  if [ -f "$file" ]; then
+    last_sig=$(sed -n 's/^sig=//p' "$file")
+    last_at=$(sed -n 's/^notified=//p' "$file")
+    if [ "$last_sig" != "$sig" ] || [ $((now - ${last_at:-0})) -ge 604800 ]; then
+      notify=1
+    fi
+  else
+    notify=1
+  fi
+  [ "$notify" -eq 1 ] && last_at=$now
+  {
+    printf 'head=%s\ntarget=%s\nbehind=%s\nreason=%s\nsig=%s\nnotified=%s\n' \
+      "$head" "$target" "$behind" "$(echo "$reason" | tr '\n' ' ')" "$sig" "$last_at"
+  } > "$file.tmp" && mv "$file.tmp" "$file"
+  if [ "$notify" -eq 1 ] && command -v tg_notify >/dev/null 2>&1; then
+    tg_notify "⚠️ Day Open: рабочая копия $(basename "$repo") отстаёт от опубликованной на $behind коммитов и не обновляется сама. Причина: $reason. Затронуто: ${paths:-—}. Нужно решение вручную: закоммитить или убрать свои правки, после этого копия догонит сама." protective || true
+  fi
+}
+
+# Superseded refs older than 90 days (by commit date) are dropped once the commit
+# is reachable from the published tip; a commit that is not there stays protected.
+day_open_prune_superseded() {
+  local repo="$1" target="$2" now cutoff ref sha when
+  now=${DAY_OPEN_NOW:-$(date +%s)}
+  cutoff=$((now - 90 * 86400))
+  while IFS=$'\t' read -r ref sha when; do
+    [ -n "$ref" ] && [ "${when:-0}" -lt "$cutoff" ] || continue
+    git -C "$repo" merge-base --is-ancestor "$sha" "$target" 2>/dev/null || continue
+    git -C "$repo" update-ref -d "$ref"
+  done < <(git -C "$repo" for-each-ref --format='%(refname)%09%(objectname)%09%(committerdate:unix)' refs/day-open/superseded/)
 }
 
 # Publication never resets, rebases or stashes the shared checkout, so a dirty
@@ -133,44 +203,62 @@ day_open_published_equivalent() {
   git -C "$repo" rev-parse "$target"
 }
 
-# Same change of the list without the kernel lock: used only when python3 with
-# fcntl is missing, so a publication still goes through (two runs at the very same
-# moment could then lose a record; the warning says so).
-day_open_pending_update_unlocked() {
-  local file="$1" mode="$2" tmp
+# Same change of the list when python3 with fcntl is missing. A mkdir lock with a
+# spin and a timeout keeps concurrent runs from losing each other's changes; a lock
+# older than the timeout is treated as left by a crashed run and taken over.
+day_open_pending_update_fallback() {
+  local file="$1" mode="$2" lockdir tries=0 tmp rc=0
   shift 2
-  if [ "$mode" = record ]; then
-    grep -qxF "$(printf '%s\t%s\t%s\t%s' "$@")" "$file" 2>/dev/null \
-      || printf '%s\t%s\t%s\t%s\n' "$@" >> "$file"
-    return
-  fi
-  [ -f "$file" ] || return 0
-  tmp=$(mktemp "$file.XXXXXX") || return 1
-  # shellcheck disable=SC2086
-  if awk -F'\t' -v repo="$1" -v list="$(echo $2)" '
-        BEGIN { n = split(list, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 }
-        !($1 == repo && ($4 in drop))' "$file" > "$tmp"; then
-    mv "$tmp" "$file"
-  else
-    rm -f "$tmp"
-    return 1
-  fi
+  lockdir="$file.lockdir"
+  while ! mkdir "$lockdir" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -gt 100 ]; then
+      echo "Day Open: pending-publish lock held for over 10 s; taking it over." >&2
+      rm -rf "$lockdir"
+      tries=0
+    fi
+    sleep 0.1
+  done
+  case "$mode" in
+    record)
+      grep -qxF "$(printf '%s\t%s\t%s\t%s' "$@")" "$file" 2>/dev/null \
+        || printf '%s\t%s\t%s\t%s\n' "$@" >> "$file" || rc=1
+      ;;
+    *)
+      if [ -f "$file" ]; then
+        tmp=$(mktemp "$file.XXXXXX") || { rmdir "$lockdir"; return 1; }
+        if [ "$mode" = prune ]; then
+          awk -F'\t' -v repo="$1" '!($1 == repo && !(length($4) >= 40 && length($4) <= 64 && $4 ~ /^[0-9a-f]+$/))' "$file" > "$tmp"
+        else
+          # shellcheck disable=SC2086
+          awk -F'\t' -v repo="$1" -v list="$(echo $2)" '
+            BEGIN { n = split(list, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 }
+            !($1 == repo && ($4 in drop))' "$file" > "$tmp"
+        fi
+        if [ $? -eq 0 ]; then mv "$tmp" "$file" || rc=1; else rm -f "$tmp"; rc=1; fi
+      fi
+      ;;
+  esac
+  rmdir "$lockdir" 2>/dev/null
+  return "$rc"
 }
 
-# Serialised change of the pending list: day_open_pending_update record <repo> <remote> <ref> <sha>
-# or day_open_pending_update remove <repo> "<sha> <sha> ...". Only the named
-# records are touched; the file is replaced atomically.
+# Serialised change of the pending list:
+#   day_open_pending_update record <repo> <remote> <ref> <sha>
+#   day_open_pending_update remove <repo> "<sha> <sha> ..."
+#   day_open_pending_update prune  <repo>     (drops this repo's records with a malformed sha)
+# Only the matching records are touched; the file is replaced atomically.
 day_open_pending_update() {
   local file py="${DAY_OPEN_PYTHON:-python3}"
   file=$(day_open_pending_file)
   mkdir -p "$(dirname "$file")" || return 1
   if ! "$py" -I -c 'import fcntl' >/dev/null 2>&1; then
-    echo "Day Open: python3 with fcntl is needed to lock the pending-publish list; continuing without a lock." >&2
-    day_open_pending_update_unlocked "$file" "$@"
+    echo "Day Open: python3 with fcntl is needed for the kernel lock on the pending-publish list; using a directory lock instead." >&2
+    day_open_pending_update_fallback "$file" "$@"
     return
   fi
   "$py" -I -c '
-import fcntl, os, sys, tempfile, time
+import fcntl, os, re, sys, tempfile, time
 path, mode, args = sys.argv[1], sys.argv[2], sys.argv[3:]
 with open(path + ".flock", "a") as lock:
     deadline = time.time() + 30
@@ -183,7 +271,7 @@ with open(path + ".flock", "a") as lock:
                 sys.exit("Day Open: pending-publish list is locked by another run; giving up.")
             time.sleep(0.05)
     try:
-        with open(path) as handle:
+        with open(path, encoding="utf-8") as handle:
             lines = handle.read().splitlines(True)
     except FileNotFoundError:
         lines = []
@@ -192,17 +280,25 @@ with open(path + ".flock", "a") as lock:
         if entry in lines:
             sys.exit(0)
         lines.append(entry)
+    elif mode == "prune":
+        valid = re.compile(r"[0-9a-f]{40,64}")
+        lines = [l for l in lines
+                 if not (l.split("\t")[0] == args[0] and not valid.fullmatch(l.rstrip("\n").split("\t")[-1]))]
     else:
         repo, drop = args[0], set(args[1].split())
         lines = [l for l in lines if not (l.split("\t")[0] == repo and l.rstrip("\n").split("\t")[-1] in drop)]
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".pending-")
-    with os.fdopen(fd, "w") as out:
+    with os.fdopen(fd, "w", encoding="utf-8") as out:
         out.writelines(lines)
     os.replace(tmp, path)
 ' "$file" "$@"
 }
 
 day_open_pending_record() {
+  if ! day_open_is_sha "$4"; then
+    echo "Day Open: '$4' is not a commit id; not recording it." >&2
+    return 1
+  fi
   day_open_pending_update record "$@"
 }
 
@@ -214,14 +310,19 @@ day_open_pending_remove() {
 
 # Prints this repository's recorded commits (one per line). A record for another
 # destination is skipped with a warning; a record whose commit is gone (gc, a
-# rewrite by another agent) or no longer passes the DayPlan-only check is dropped
-# from the list. Neither blocks the rest.
+# rewrite by another agent), whose id is malformed, or that no longer passes the
+# DayPlan-only check is dropped from the list. None of them blocks the rest.
 day_open_pending_shas() {
-  local repo="$1" remote="$2" ref="$3" file entry_repo entry_remote entry_ref sha missing=""
+  local repo="$1" remote="$2" ref="$3" file entry_repo entry_remote entry_ref sha missing="" malformed=0
   file=$(day_open_pending_file)
   [ -f "$file" ] || return 0
   while IFS=$'\t' read -r entry_repo entry_remote entry_ref sha; do
     [ "$entry_repo" = "$repo" ] || continue
+    if ! day_open_is_sha "$sha"; then
+      echo "Day Open: a record with a malformed commit id ('$sha') was dropped from the list." >&2
+      malformed=1
+      continue
+    fi
     if [ "$entry_remote" != "$remote" ] || [ "$entry_ref" != "$ref" ]; then
       echo "Day Open: skipping $sha, recorded for $entry_remote $entry_ref, not $remote $ref." >&2
       continue
@@ -238,7 +339,17 @@ day_open_pending_shas() {
     fi
     printf '%s\n' "$sha"
   done < "$file"
+  [ "$malformed" -eq 0 ] || day_open_pending_update prune "$repo"
   [ -z "$missing" ] || day_open_pending_remove "$repo" "$missing"
+}
+
+# True when $path existed on $target with exactly this blob at some point.
+day_open_blob_in_history() {
+  local repo="$1" target="$2" path="$3" blob="$4" candidate
+  while IFS= read -r candidate; do
+    [ "$(git -C "$repo" rev-parse --verify --quiet "$candidate:$path")" = "$blob" ] && return 0
+  done < <(git -C "$repo" log -n 50 --format=%H "$target" -- "$path")
+  return 1
 }
 
 # Our commit is already published when the target holds its content for every
@@ -247,25 +358,37 @@ day_open_pending_shas() {
 # only today's new plan file travelled in a different commit, so no patch-id matches.
 # Chosen over recording sha -> published sha at salvage time: it needs no state that
 # can be lost or go stale, and it is checked against the real target every time.
-# One exception, narrow on purpose: a file that our commit ADDS under
-# archive/day-plans/ (a stale copy of yesterday's plan) is superseded by the same
-# path on the target, because Day Close owns it and may have added a closing summary.
-# A commit that CHANGES an archive file existing before it is never covered: that
-# edit would exist only in the reflog after the branch moves.
+# Two exceptions, both narrow and both only for a file our commit ADDS (a path that
+# was not in sha^), so an edit to an existing file is never covered (an edit would
+# exist only in the reflog after the branch moves):
+#  - archive/day-plans/<plan>: the same path on the target is authoritative, because
+#    Day Close owns the archive and may have added a closing summary;
+#  - current/<plan>: gone from the target because Day Close has moved it. It counts
+#    as published when the archive copy exists on the target (any content, for the
+#    same reason: the archived file is the plan's final form and our copy is a stale
+#    earlier version), or when the target's history holds exactly our blob.
 # On refusal, DAY_OPEN_UNPUBLISHED_PATH names the first path that is not covered.
 day_open_content_published() {
-  local repo="$1" target="$2" sha="$3" path mine theirs count=0
+  local repo="$1" target="$2" sha="$3" path mine theirs count=0 added
   DAY_OPEN_UNPUBLISHED_PATH=""
   while IFS= read -r -d '' path; do
     count=$((count + 1))
     mine=$(git -C "$repo" rev-parse --verify --quiet "$sha:$path" || true)
     theirs=$(git -C "$repo" rev-parse --verify --quiet "$target:$path" || true)
     [ "$mine" = "$theirs" ] && continue
+    added=""
+    [ -z "$(git -C "$repo" rev-parse --verify --quiet "$sha^:$path" || true)" ] && added=1
     case "$path" in
       archive/day-plans/*)
-        if [ -n "$theirs" ] && day_open_is_plan_path "$path" \
-            && [ -z "$(git -C "$repo" rev-parse --verify --quiet "$sha^:$path" || true)" ]; then
+        if [ -n "$theirs" ] && [ -n "$added" ] && day_open_is_plan_path "$path"; then
           continue
+        fi ;;
+      current/*)
+        if [ -n "$mine" ] && [ -z "$theirs" ] && day_open_is_plan_path "$path"; then
+          day_open_blob_in_history "$repo" "$target" "$path" "$mine" && continue
+          if [ -n "$added" ] && git -C "$repo" rev-parse --verify --quiet "$target:archive/day-plans/${path#current/}" >/dev/null; then
+            continue
+          fi
         fi ;;
     esac
     DAY_OPEN_UNPUBLISHED_PATH="$path"
@@ -409,16 +532,20 @@ day_open_publish_attempt() {
 # unrelated staged/unstaged/untracked work is kept, an overlapping edit makes Git
 # refuse. Every commit the move leaves behind first gets a ref under
 # refs/day-open/superseded/, so nothing lives only in the reflog. No reset, rebase
-# or stash. Refusal is not an error of the publication: the reason (with the
-# overlapping paths) is left in DAY_OPEN_ADOPT_REASON.
-day_open_adopt_twins() {
+# or stash. Refusal is not an error of the publication: the reason, its class and
+# the overlapping paths are left in DAY_OPEN_ADOPT_REASON/_CLASS/_PATHS.
+# Class "transient" is a lost race; every other class is reported through the marker.
+day_open_adopt_try() {
   local repo="$1" target="$2" head ref sha path out local_commits
   DAY_OPEN_ADOPT_REASON=""
-  head=$(git -C "$repo" rev-parse --verify HEAD) || { DAY_OPEN_ADOPT_REASON="no HEAD"; return 1; }
-  ref=$(git -C "$repo" symbolic-ref --quiet HEAD) || { DAY_OPEN_ADOPT_REASON="detached HEAD"; return 1; }
+  DAY_OPEN_ADOPT_CLASS=""
+  DAY_OPEN_ADOPT_PATHS=""
+  head=$(git -C "$repo" rev-parse --verify HEAD) || { DAY_OPEN_ADOPT_REASON="no HEAD"; DAY_OPEN_ADOPT_CLASS=transient; return 1; }
+  ref=$(git -C "$repo" symbolic-ref --quiet HEAD) || { DAY_OPEN_ADOPT_REASON="detached HEAD"; DAY_OPEN_ADOPT_CLASS=transient; return 1; }
   [ "$head" != "$target" ] || return 0
   if [ -n "$(git -C "$repo" rev-list --merges "$target..$head")" ]; then
     DAY_OPEN_ADOPT_REASON="merge commits between the branch and the published tip"
+    DAY_OPEN_ADOPT_CLASS=merges
     return 1
   fi
   local_commits=$(git -C "$repo" rev-list "$target..$head")
@@ -426,6 +553,8 @@ day_open_adopt_twins() {
     if ! day_open_published_equivalent "$repo" "$target" "$sha" >/dev/null \
         && ! day_open_content_published "$repo" "$target" "$sha"; then
       DAY_OPEN_ADOPT_REASON="local commit $sha is not published (${DAY_OPEN_UNPUBLISHED_PATH:-no twin}: its content is not on the published tip)"
+      DAY_OPEN_ADOPT_CLASS=unpublished
+      DAY_OPEN_ADOPT_PATHS="$DAY_OPEN_UNPUBLISHED_PATH"
       return 1
     fi
   done
@@ -433,11 +562,20 @@ day_open_adopt_twins() {
   while IFS= read -r -d '' path; do
     if [ -e "$repo/$path" ] && ! git -C "$repo" ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
       DAY_OPEN_ADOPT_REASON="untracked or ignored file would be overwritten: $path"
+      DAY_OPEN_ADOPT_CLASS=untracked
+      DAY_OPEN_ADOPT_PATHS="$path"
       return 1
     fi
   done < <(git -C "$repo" diff --name-only --diff-filter=A -z "$head" "$target")
   if ! out=$(git -C "$repo" read-tree -m -u "$head" "$target" 2>&1); then
     DAY_OPEN_ADOPT_REASON="overlapping local edits: $(echo "$out" | tr '\n' ' ')"
+    DAY_OPEN_ADOPT_CLASS=overlap
+    # Read-tree names only the first clash; the real overlap is every path that differs
+    # between the branch and the tip AND carries local edits.
+    DAY_OPEN_ADOPT_PATHS=$(comm -12 \
+      <(git -C "$repo" -c core.quotepath=off diff --name-only "$head" "$target" | sort) \
+      <(git -C "$repo" -c core.quotepath=off status --porcelain --untracked-files=all | cut -c4- | sort) \
+      | tr '\n' ' ')
     return 1
   fi
   for sha in $local_commits; do
@@ -449,6 +587,7 @@ day_open_adopt_twins() {
   for sha in $local_commits; do
     git -C "$repo" update-ref -d "refs/day-open/superseded/$sha"
   done
+  DAY_OPEN_ADOPT_CLASS=transient
   # Roll the tree back only while HEAD is still where we started; if another agent
   # moved it meanwhile, undoing would mix their commit with a reverted tree.
   if [ "$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null)" = "$head" ]; then
@@ -456,6 +595,20 @@ day_open_adopt_twins() {
     DAY_OPEN_ADOPT_REASON="branch update was refused; tree restored"
   else
     DAY_OPEN_ADOPT_REASON="HEAD moved during the update; the merged tree was left as is, not rolled back"
+  fi
+  return 1
+}
+
+# Wrapper: success clears the sync-blocked marker and prunes old superseded refs;
+# a lasting refusal is reported through the marker (once per reason).
+day_open_adopt_twins() {
+  if day_open_adopt_try "$1" "$2"; then
+    day_open_sync_marker_clear "$1"
+    day_open_prune_superseded "$1" "$2"
+    return 0
+  fi
+  if [ "$DAY_OPEN_ADOPT_CLASS" != transient ]; then
+    day_open_sync_blocked "$1" "$2" "$DAY_OPEN_ADOPT_CLASS" "$DAY_OPEN_ADOPT_REASON" "$DAY_OPEN_ADOPT_PATHS"
   fi
   return 1
 }
@@ -471,6 +624,10 @@ day_open_publish() {
   remote=${dest%% *}
   ref=${dest#* }
   if [ -n "$sha" ]; then
+    if ! day_open_is_sha "$sha"; then
+      echo "Day Open: '$sha' is not a commit id; refusing to publish it." >&2
+      return 1
+    fi
     if ! day_open_commit_paths_ok "$root" "$sha"; then
       echo "Day Open: commit $sha touches paths outside DayPlan/archive; not publishing it automatically (preserved locally)." >&2
       return 1
@@ -1753,7 +1910,10 @@ else
 # Sync is optional housekeeping: a stale or dirty copy must not discard the
 # DayPlan already rendered above. No stash/rebase/reset in the source tree.
 if ! day_open_fast_forward "$DS_STRATEGY"; then
-  tg_notify "⚠️ Day Open: обновление пропущено (несохранённые правки, сеть или расхождение истории); локальная работа и готовый DayPlan сохранены" protective
+  # A lasting refusal (overlapping edits, an unpublished local commit) is reported
+  # once, with paths and the number of commits behind, through the sync-blocked marker.
+  day_open_sync_marker_exists "$DS_STRATEGY" \
+    || tg_notify "⚠️ Day Open: обновление пропущено (несохранённые правки или нет связи); локальная работа и готовый DayPlan сохранены" protective
 fi
 
 # Archive stale DayPlans (move + overwrite, and record the deletion).
