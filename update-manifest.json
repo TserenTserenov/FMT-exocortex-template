@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "a1a4f10133f66d4fd49a4b0f808a1bc8c63579b7d5bbe4aa22268f029a9cda59"
+      "sha256": "efd8659e3287a4963fb43692ae4d547a34a4c1dea46e5db07d6f57551ad5a541"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -821,7 +821,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "bfb316eb7e42c71c15772113d8bcc63ebba539fbbe96da30e7fc83186addd740"
+      "sha256": "b25f544a67b728930da0582e6f8c6f537d6b3d76ef3a7d10ec573c570f0de99a"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2066da93fa23f85e490a54fccbeccd514a0f9cad85754be9ebbdf8791bb1071e"
+      "sha256": "f57c90da5c76ff7456b859d2e8be41a8f10f119cf44e9e0e1d56a0da802c28f6"
     },
     {
       "path": "CLAUDE.md",
@@ -1253,7 +1253,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "bfead410fa189419d27716eacb5998f1b71f31ec78f966ec85d56eb652cbf5af"
+      "sha256": "7d4fb783b53c62cd5cde52fa6b18a6b70cbd8e9fa3581421e255af529e47514f"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1893,7 +1893,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "e9d03b989f3bf65e0d5faa5e5ac187099c5a7e561c3ac27b8d294a1e3e0618ba"
+      "sha256": "d2b826c08acca00dbd2132575d9ac802410147c2ba09da4ed542e1f69d889f36"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
@@ -1949,7 +1949,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
-      "sha256": "294ee4f2a0730a5793ff87f3d978264d1abd0ff0b0093dad18bdead0e38edf9f"
+      "sha256": "8816001aad145f314c4caa690eb15fd3642f3e217e752236f3d44304239dc8d5"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md",
@@ -1957,7 +1957,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06c-finalize.md",
-      "sha256": "18e1c1778cf1bbaa2699a9db1482067c2e78a3ba3aedd9d5721aa9e5a816f24b"
+      "sha256": "e8e9a80fa0c535873e61ad5489e98a938fa21119e1f0589e3949d7573319cac0"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/07-irregular.md",
@@ -1965,7 +1965,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md",
-      "sha256": "fe9c274f8fb0b7beeb1bb0bbde8f012e593009af239068fdb908e516e62a6839"
+      "sha256": "43e736e25da374fa33cdce71785b26b9ac357ffe5a99a4d2d2de6f388d74dedd"
     },
     {
       "path": "roles/strategist/prompts/strategy-session.md",
@@ -2282,6 +2282,10 @@
     {
       "path": "scripts/check-wp-format.py",
       "sha256": "4ccac6cf5ff4a65c024984770f6718855078b449693a52be48447a5530ddae0b"
+    },
+    {
+      "path": "scripts/check-wp-registered.sh",
+      "sha256": "43f8f071622782d786969f8a33ad9b006a3d79dcc15f32829a20876bcb8218da"
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
@@ -2968,6 +2972,10 @@
       "sha256": "e25904c841874ff2cdf9d08b4a10850ac1e6612744f67a970862e91ffd6f5d0d"
     },
     {
+      "path": "scripts/tests/test_issue_1257_wp_registration.sh",
+      "sha256": "a0e79673e57f7094f6b95e4d8bc1b65465db72f0fb7d5c16577856166b2288ef"
+    },
+    {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
       "sha256": "2f6bf87b5911bf84c2ae392bf89df55e98f28ffde3a1998c043cdff0e8db2f71"
     },
@@ -3360,6 +3368,7 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/ancestry-hardening-lib.sh",
     "scripts/tests/canon-reconcile-published-smoke.sh",
+    "scripts/tests/check-wp-registered-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
