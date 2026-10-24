@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "d80331f9f6bde88452a4dc11d5547fc2807043239f5cf2b4af5912482d3f866a"
+      "sha256": "a1a4f10133f66d4fd49a4b0f808a1bc8c63579b7d5bbe4aa22268f029a9cda59"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "36dcdaf5c08ee58923e1f187e039631e1134856e09fb4f1315cff7c35747854b"
+      "sha256": "c6019177bc8734ba1b4527ea1bf404ec586efc8955f46d4557df982ad5f515c6"
     },
     {
       "path": "CLAUDE.md",
@@ -1221,7 +1221,7 @@
     },
     {
       "path": "extensions/protocol-close.after.session-record.md",
-      "sha256": "1734506683fbc22dec42731ef8cef26e3198e68251a19469cf0ad2a43e032b5c"
+      "sha256": "76cb7ec30ba6fb3ee4f8169093fe0bd8a8812383c6ba3df5432bbb1a4ee8dd01"
     },
     {
       "path": "extensions/protocol-close.checks.fault.md",
@@ -1897,7 +1897,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
-      "sha256": "b9582cff6366b0a454dd7f3d50ff67585ed36375a09262b19895da6688153f6e"
+      "sha256": "567cb2f18691c4106342885b879e8540e2f7357da5ddc7c92935f7138a1c521f"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly.md",
@@ -2593,7 +2593,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "5c6f516b13827dc802e08a630704557d11059640038d7840cedaa8275cfb42fa"
+      "sha256": "aa8567ffec08e127b132ed5a93f08711bf6eb56b1c07b5363af135a7e23a1bc9"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -3233,7 +3233,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "13c8153358f9176babb3be3ccd63d3c9c2a08bb9b36673bf1de8e355ae6c0ae6"
+      "sha256": "c7234a152ff31ee656ea8645188d0dab029fe6fd5a2f481dd58830bf5586360b"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3430,6 +3430,7 @@
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
     "scripts/tests/test_issue_1254_repo_activity_utf8.py",
+    "scripts/tests/test_issue_1256_strategy_session_record.sh",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
