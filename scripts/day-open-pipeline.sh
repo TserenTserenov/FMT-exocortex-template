@@ -44,15 +44,209 @@ day_open_fast_forward() {
   git -C "$repo" merge --ff-only --no-autostash --no-overwrite-ignore --quiet "$target"
 }
 
-day_open_publish() {
-  local repo="$1"
-  # A rejected push must not trigger rebase/autostash in the shared checkout.
-  # Keep the source commit and every unsaved file for an explicit later retry.
-  # Preserve the repository's configured push destination.
-  if git -C "$repo" push; then
+# Publication never moves the shared checkout (no stash/rebase/reset), so a
+# dirty tree or a busy origin cannot lose work or wedge the next run.
+# The list of our unpublished DayPlan commits survives a failed run; a retry
+# publishes exactly that list, never "whatever happens to be ahead of origin".
+day_open_pending_file() {
+  printf '%s/day-open-pending-publish.list\n' "${DAY_OPEN_STATE_DIR:-$HOME/.claude/state}"
+}
+
+# One destination (remote + remote branch) for fetch, verification and push.
+# Prints "<remote> <ref>"; refuses configurations where those could differ.
+day_open_publish_target() {
+  local repo="$1" branch remote ref push_remote
+  branch=$(git -C "$repo" symbolic-ref --quiet --short HEAD) || {
+    echo "Day Open: detached HEAD, publication destination is ambiguous." >&2
+    return 1
+  }
+  remote=$(git -C "$repo" config --get "branch.$branch.remote") || remote=origin
+  ref=$(git -C "$repo" config --get "branch.$branch.merge") || ref="refs/heads/$branch"
+  case "$ref" in refs/heads/?*) ;; *)
+    echo "Day Open: unsupported upstream ref '$ref' for branch '$branch'." >&2
+    return 1 ;;
+  esac
+  if ! git -C "$repo" remote get-url "$remote" >/dev/null 2>&1; then
+    echo "Day Open: '$remote' is not a configured remote for branch '$branch'." >&2
+    return 1
+  fi
+  push_remote=$(git -C "$repo" config --get "branch.$branch.pushRemote" \
+    || git -C "$repo" config --get remote.pushDefault || true)
+  if [ -n "$push_remote" ] && [ "$push_remote" != "$remote" ]; then
+    echo "Day Open: push remote '$push_remote' differs from upstream remote '$remote'; refusing." >&2
+    return 1
+  fi
+  printf '%s %s\n' "$remote" "$ref"
+}
+
+# A commit is ours to publish only when it touches DayPlan files and the DayPlan archive.
+day_open_commit_paths_ok() {
+  local repo="$1" sha="$2" path count=0
+  while IFS= read -r -d '' path; do
+    count=$((count + 1))
+    case "$path" in
+      current/DayPlan\ *.md | archive/day-plans/DayPlan\ *.md) ;;
+      *) return 1 ;;
+    esac
+  done < <(git -C "$repo" diff-tree -r --no-commit-id --name-only -z "$sha")
+  [ "$count" -gt 0 ]
+}
+
+day_open_patch_id() {
+  git -C "$1" diff-tree -p --root --no-commit-id "$2" 2>/dev/null \
+    | git -C "$1" patch-id --stable | cut -d' ' -f1
+}
+
+# Prints the commit on $target that carries our change: the commit itself, or a
+# cherry-picked twin with the same patch-id. Fails when our change is not there.
+day_open_published_equivalent() {
+  local repo="$1" target="$2" sha="$3" want candidate
+  if git -C "$repo" merge-base --is-ancestor "$sha" "$target" 2>/dev/null; then
+    echo "$sha"
     return 0
   fi
-  echo "Day Open: push failed; local commit and unsaved work are preserved. Publish from an isolated copy." >&2
+  want=$(day_open_patch_id "$repo" "$sha")
+  [ -n "$want" ] || return 1
+  while IFS= read -r candidate; do
+    if [ "$(day_open_patch_id "$repo" "$candidate")" = "$want" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done < <(git -C "$repo" log --no-merges -n 100 --format=%H "$target")
+  return 1
+}
+
+day_open_pending_record() {
+  local repo="$1" remote="$2" ref="$3" sha="$4" file
+  file=$(day_open_pending_file)
+  mkdir -p "$(dirname "$file")" || return 1
+  if grep -qxF "$(printf '%s\t%s\t%s\t%s' "$repo" "$remote" "$ref" "$sha")" "$file" 2>/dev/null; then
+    return 0
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$repo" "$remote" "$ref" "$sha" >> "$file"
+}
+
+# Prints this repository's recorded commits (one per line). A record made for
+# another destination, or for a commit that no longer exists, is an error.
+day_open_pending_shas() {
+  local repo="$1" remote="$2" ref="$3" file entry_repo entry_remote entry_ref sha
+  file=$(day_open_pending_file)
+  [ -f "$file" ] || return 0
+  while IFS=$'\t' read -r entry_repo entry_remote entry_ref sha; do
+    [ "$entry_repo" = "$repo" ] || continue
+    if [ "$entry_remote" != "$remote" ] || [ "$entry_ref" != "$ref" ]; then
+      echo "Day Open: commit $sha was recorded for $entry_remote $entry_ref, not $remote $ref; refusing." >&2
+      return 1
+    fi
+    if ! git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
+      echo "Day Open: recorded commit $sha is missing locally; refusing." >&2
+      return 1
+    fi
+    printf '%s\n' "$sha"
+  done < "$file"
+}
+
+day_open_pending_clear() {
+  local repo="$1" file tmp
+  file=$(day_open_pending_file)
+  [ -f "$file" ] || return 0
+  tmp=$(mktemp "$file.XXXXXX") || return 1
+  awk -F'\t' -v repo="$repo" '$1 != repo' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+# Apply our commits onto a clean detached copy of $target and push it.
+# Returns 0 published, 2 conflict (never retried, nothing chosen automatically),
+# 1 transient failure. The shared checkout is not touched.
+day_open_isolated_push() {
+  local repo="$1" remote="$2" ref="$3" target="$4" shas="$5"
+  local base wt sha conflicts rc=0
+  base=$(mktemp -d "${TMPDIR:-/tmp}/day-open-publish.XXXXXX") || return 1
+  wt="$base/tree"
+  git -C "$repo" worktree prune >/dev/null 2>&1
+  if ! git -C "$repo" worktree add --detach --quiet "$wt" "$target" >/dev/null 2>&1; then
+    rm -rf "$base"
+    return 1
+  fi
+  for sha in $shas; do
+    if ! git -C "$wt" cherry-pick "$sha" >/dev/null 2>&1; then
+      conflicts=$(git -C "$wt" diff --name-only --diff-filter=U)
+      git -C "$wt" cherry-pick --abort >/dev/null 2>&1
+      if [ -n "$conflicts" ]; then
+        echo "Day Open: conflict while applying $sha on $remote $ref in: $(echo "$conflicts" | tr '\n' ' ')- original commit and unsaved work preserved; resolve by hand." >&2
+        rc=2
+      else
+        rc=1
+      fi
+      break
+    fi
+  done
+  if [ "$rc" -eq 0 ]; then
+    if git -C "$wt" push --quiet "$remote" "HEAD:$ref" >/dev/null 2>&1; then
+      DAY_OPEN_PUBLISHED_SHA=$(git -C "$wt" rev-parse HEAD)
+    else
+      rc=1
+    fi
+  fi
+  git -C "$repo" worktree remove --force "$wt" >/dev/null 2>&1
+  rm -rf "$base"
+  return "$rc"
+}
+
+# One publication attempt against the freshest remote state.
+day_open_publish_attempt() {
+  local repo="$1" remote="$2" ref="$3" shas="$4" target sha open="" equivalent
+  git -C "$repo" fetch --quiet --refmap= "$remote" "+$ref:refs/day-open/target" 2>/dev/null || return 1
+  target=$(git -C "$repo" rev-parse --verify refs/day-open/target) || return 1
+  for sha in $shas; do
+    if equivalent=$(day_open_published_equivalent "$repo" "$target" "$sha"); then
+      DAY_OPEN_PUBLISHED_SHA="$equivalent"
+    else
+      open="${open}${sha}"$'\n'
+    fi
+  done
+  [ -n "$open" ] || return 0
+  # Fast path keeps the checkout and origin identical: our single commit sits
+  # directly on the remote tip, so a plain push carries nothing else.
+  sha=${open%%$'\n'*}
+  if [ "$open" = "${sha}"$'\n' ] && [ "$(git -C "$repo" rev-parse "$sha^" 2>/dev/null)" = "$target" ] \
+      && git -C "$repo" push --quiet "$remote" "$sha:$ref" >/dev/null 2>&1; then
+    DAY_OPEN_PUBLISHED_SHA="$sha"
+    return 0
+  fi
+  day_open_isolated_push "$repo" "$remote" "$ref" "$target" "$open"
+}
+
+# day_open_publish <repo> [commit]: record <commit> (if given), then publish
+# every recorded commit of this repository. Sets DAY_OPEN_PUBLISHED_SHA.
+day_open_publish() {
+  local repo="$1" sha="${2:-}" root dest remote ref shas rc=1
+  DAY_OPEN_PUBLISHED_SHA=""
+  root=$(git -C "$repo" rev-parse --show-toplevel) || return 1
+  dest=$(day_open_publish_target "$root") || return 1
+  remote=${dest%% *}
+  ref=${dest#* }
+  if [ -n "$sha" ]; then
+    if ! day_open_commit_paths_ok "$root" "$sha"; then
+      echo "Day Open: commit $sha touches paths outside DayPlan/archive; not publishing it automatically (preserved locally)." >&2
+      return 1
+    fi
+    day_open_pending_record "$root" "$remote" "$ref" "$sha" || return 1
+  fi
+  shas=$(day_open_pending_shas "$root" "$remote" "$ref") || return 1
+  if [ -z "$shas" ]; then
+    echo "Day Open: no recorded DayPlan commit to publish." >&2
+    return 1
+  fi
+  for _attempt in 1 2 3; do
+    day_open_publish_attempt "$root" "$remote" "$ref" "$shas"
+    rc=$?
+    [ "$rc" -eq 2 ] && break
+    if [ "$rc" -eq 0 ]; then
+      day_open_pending_clear "$root"
+      return 0
+    fi
+  done
+  echo "Day Open: publication failed; local commit and unsaved work are preserved, the commit stays recorded for the next run." >&2
   return 1
 }
 
@@ -410,8 +604,22 @@ if [ "$FORCE" != "true" ]; then
   fi
   LOCAL_COMMIT=$(git log -1 --format=%H HEAD --since="$DATE 00:00:00" --until="$DATE 23:59:59" -- "$DAYPLAN_FILE" 2>/dev/null) || LOCAL_COMMIT=""
   if [ -n "$LOCAL_COMMIT" ]; then
-    echo "  DayPlan is committed locally, but publication is not confirmed; preserving it for an explicit isolated retry."
-    tg_notify "⚠️ DayPlan $DATE сохранён локально, публикация не подтверждена. Повторная генерация пропущена; проверьте сеть и публикацию из изолированной копии." protective
+    # A previous run committed but could not publish. Publish that exact commit
+    # from an isolated copy instead of regenerating or failing forever.
+    if day_open_publish "$DS_STRATEGY" "$LOCAL_COMMIT"; then
+      echo "  DayPlan was committed locally but not published; published now ($DAY_OPEN_PUBLISHED_SHA) — nothing to regenerate."
+      tg_notify "📋 DayPlan $DATE опубликован из локального коммита (восстановление после сбоя публикации)." terminal
+      mkdir -p "$HOME/.claude/state"
+      jq -n \
+        --arg date "$DATE" \
+        --arg commit "$DAY_OPEN_PUBLISHED_SHA" \
+        --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{date: $date, commit_hash: $commit, timestamp: $ts, status: "success", note: "published from a local commit after an earlier failure"}' \
+        > "$HOME/.claude/state/day-open-pipeline-last-success.json"
+      exit 0
+    fi
+    echo "  DayPlan is committed locally and publication still fails; the commit stays recorded, regeneration skipped."
+    tg_notify "⚠️ DayPlan $DATE сохранён локально, публикация не удалась. Коммит записан для повтора, повторная генерация пропущена; проверьте сеть или конфликт." protective
     exit 1
   fi
 fi
@@ -1409,8 +1617,10 @@ git commit -m "feat(dayplan): $DATE — auto Day Open (WP-356) [allow:current]" 
 # Capture the local result for the success receipt; publication keeps the
 # existing Git destination configuration and never rebases this checkout.
 COMMIT_HASH=$(git rev-parse HEAD) || abort "Cannot resolve DayPlan commit"
-day_open_publish "$DS_STRATEGY" \
-  || abort "Git push failed — local DayPlan commit and unsaved work preserved; see publication diagnostics"
+day_open_publish "$DS_STRATEGY" "$COMMIT_HASH" \
+  || abort "Git push failed — local DayPlan commit and unsaved work preserved; the commit stays recorded for the next run"
+# The receipt names the commit that is actually on the remote (a cherry-picked twin after a race).
+COMMIT_HASH="${DAY_OPEN_PUBLISHED_SHA:-$COMMIT_HASH}"
 
 # WP-484 F64: input-hash means "this data set is PUBLISHED", so it is recorded
 # only after the remote accepted the commit (see the guard comment at step 3).
@@ -1420,7 +1630,7 @@ fi
 
 bash "$IWE_SCRIPTS/session-guard.sh" close --housekeeping day-open --agent "$SG_AGENT" 2>/dev/null || true
 
-echo "  Committed locally: $COMMIT_HASH"
+echo "  Published: $COMMIT_HASH"
 fi
 
 # ============================================

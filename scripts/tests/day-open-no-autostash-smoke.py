@@ -37,15 +37,19 @@ class DayOpenGitTests(unittest.TestCase):
         self.env = dict(os.environ, IWE_WORKSPACE=str(self.root),
                         IWE_ROOT=str(self.root), IWE_GOVERNANCE_REPO="source",
                         IWE_SCRIPTS=str(ROOT / "scripts"))
-        definitions = []
-        for name in ("day_open_fast_forward", "day_open_publish"):
-            match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n",
-                              PIPELINE.read_text(), re.MULTILINE | re.DOTALL)
-            self.assertIsNotNone(match, name + " production helper missing")
-            definitions.append(match.group())
+        self.env["DAY_OPEN_STATE_DIR"] = str(self.root / "state")
+        source = PIPELINE.read_text()
+        definitions = [match.group() for match in re.finditer(
+            r"^day_open_\w+\(\) \{\n.*?^\}\n", source, re.MULTILINE | re.DOTALL)]
+        names = {re.match(r"day_open_\w+", d).group() for d in definitions}
+        for required in ("day_open_fast_forward", "day_open_publish",
+                         "day_open_isolated_push", "day_open_pending_clear"):
+            self.assertIn(required, names, required + " production helper missing")
         self.helpers = self.root / "helpers.sh"
-        self.helpers.write_text("set -uo pipefail\n" + "\n".join(definitions)
-                                + '\n"$@"\n')
+        # `published` reports the SHA the production helper recorded as published.
+        self.helpers.write_text(
+            "set -uo pipefail\n" + "\n".join(definitions)
+            + '\npublished() { day_open_publish "$@" && printf "published=%s\\n" "$DAY_OPEN_PUBLISHED_SHA"; }\n"$@"\n')
 
     @staticmethod
     def git(repo, *args, check=True):
@@ -67,11 +71,29 @@ class DayOpenGitTests(unittest.TestCase):
         self.git(other, "commit", "-qam", "remote")
         self.git(other, "push", "-q")
 
-    def commit_plan(self):
-        (self.repo / "plan.md").write_text("DayPlan\n")
-        self.git(self.repo, "add", "plan.md")
+    PLAN = "current/DayPlan 2000-01-01.md"
+
+    def commit_plan(self, text="DayPlan\n"):
+        (self.repo / "current").mkdir(exist_ok=True)
+        (self.repo / self.PLAN).write_text(text)
+        self.git(self.repo, "add", self.PLAN)
         self.git(self.repo, "commit", "-qm", "DayPlan")
-        return self.git(self.repo, "rev-parse", "HEAD").decode().strip()
+        return self.head()
+
+    def head(self, repo=None):
+        return self.git(repo or self.repo, "rev-parse", "HEAD").decode().strip()
+
+    def origin_main(self):
+        return self.git(self.origin, "rev-parse", "main").decode().strip()
+
+    def pending(self):
+        path = self.root / "state/day-open-pending-publish.list"
+        return path.read_text() if path.exists() else ""
+
+    def published_sha(self, result):
+        lines = [l for l in result.stdout.splitlines() if l.startswith("published=")]
+        self.assertEqual(1, len(lines), result.stdout + result.stderr)
+        return lines[0].split("=", 1)[1]
 
     def dirty(self):
         (self.repo / "shared.txt").write_text("staged work\n")
@@ -152,45 +174,171 @@ class DayOpenGitTests(unittest.TestCase):
         self.assertNotEqual(0, self.run_helper("day_open_fast_forward").returncode)
         self.assertEqual(before, self.snapshot())
 
-    def test_rejected_push_preserves_dirty_source_and_local_commit(self):
-        self.advance_remote()
+    def equivalent_on_origin(self, sha):
+        """True when origin/main carries sha's change (same commit or cherry-picked twin)."""
+        self.git(self.repo, "fetch", "-q", "origin", "main")
+        cherry = self.git(self.repo, "cherry", "FETCH_HEAD", sha, sha + "^").decode()
+        return "+" not in cherry
+
+    def install_origin_shift_hook(self, shifts):
+        """pre-push hook: the first `shifts` pushes see origin move just before they land."""
+        counter = self.root / "shift-count"
+        counter.write_text("0")
+        hook = self.repo / ".git/hooks/pre-push"
+        hook.write_text(
+            "#!/bin/bash\n"
+            # Git exports GIT_DIR to hooks; without this `git -C origin` would hit the pusher's repo.
+            "unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE\n"
+            f"n=$(cat '{counter}')\n"
+            f'if [ "$n" -lt {shifts} ]; then\n'
+            f"  echo $((n + 1)) > '{counter}'\n"
+            f"  tree=$(git -C '{self.origin}' rev-parse 'main^{{tree}}')\n"
+            f"  new=$(git -C '{self.origin}' commit-tree \"$tree\" -p main -m \"shift $n\")\n"
+            f"  git -C '{self.origin}' update-ref refs/heads/main \"$new\"\n"
+            "fi\n")
+        hook.chmod(0o755)
+        return counter
+
+    def test_publish_uses_plain_push_when_origin_has_not_moved(self):
         commit = self.commit_plan()
         self.dirty()
         before = self.snapshot()
-        remote = self.git(self.origin, "rev-parse", "main")
-        result = self.run_helper("day_open_publish")
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn("preserved", result.stderr)
-        self.assertEqual(before, self.snapshot())
-        self.assertEqual(remote, self.git(self.origin, "rev-parse", "main"))
-
-    def test_rejected_push_preserves_clean_source_for_explicit_retry(self):
-        self.advance_remote()
-        commit = self.commit_plan()
-        before = self.snapshot()
-        remote = self.git(self.origin, "rev-parse", "main")
-        result = self.run_helper("day_open_publish")
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn("preserved", result.stderr)
-        self.assertEqual(before, self.snapshot())
-        self.assertEqual(remote, self.git(self.origin, "rev-parse", "main"))
-        self.assertEqual(b"DayPlan\n", self.git(self.repo, "show", commit + ":plan.md"))
-
-    def test_direct_push_can_publish_without_touching_dirty_files(self):
-        commit = self.commit_plan()
-        self.dirty()
-        before = self.snapshot()
-        result = self.run_helper("day_open_publish")
+        result = self.run_helper("published", commit)
         self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(commit, self.published_sha(result))
+        self.assertEqual(commit, self.origin_main())
+        self.assertEqual("", self.pending())
         self.assertEqual(before, self.snapshot())
-        self.assertEqual((commit + "\n").encode(), self.git(self.origin, "rev-parse", "main"))
+
+    def test_dirty_tree_and_moved_origin_publish_from_isolated_copy(self):
+        self.advance_remote()
+        commit = self.commit_plan()
+        self.dirty()
+        before = self.snapshot()
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        published = self.published_sha(result)
+        self.assertEqual(published, self.origin_main())
+        self.assertNotEqual(commit, published)
+        self.assertEqual(b"DayPlan\n", self.git(self.origin, "show", published + ":" + self.PLAN))
+        self.assertTrue(self.equivalent_on_origin(commit))
+        self.assertEqual("", self.pending())
+        self.assertEqual(before, self.snapshot())
+        self.assertEqual(b"", self.git(self.repo, "stash", "list"))
+        worktrees = self.git(self.repo, "worktree", "list", "--porcelain").decode()
+        self.assertEqual(1, worktrees.count("worktree "), worktrees)
+
+    def test_second_origin_shift_before_push_is_retried(self):
+        self.advance_remote()
+        commit = self.commit_plan()
+        counter = self.install_origin_shift_hook(2)
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("2", counter.read_text().strip())
+        self.assertEqual(self.published_sha(result), self.origin_main())
+        self.assertTrue(self.equivalent_on_origin(commit))
+        self.assertEqual("", self.pending())
+
+    def test_network_failure_keeps_the_commit_recorded_and_retry_publishes(self):
+        self.advance_remote()
+        commit = self.commit_plan()
+        self.dirty()
+        good_url = self.git(self.repo, "remote", "get-url", "origin").decode().strip()
+        self.git(self.repo, "remote", "set-url", "origin", str(self.root / "missing.git"))
+        before = self.snapshot()
+        failed = self.run_helper("published", commit)
+        self.assertNotEqual(0, failed.returncode)
+        self.assertIn("preserved", failed.stderr)
+        self.assertIn(commit, self.pending())
+        self.assertEqual(before, self.snapshot())
+        self.git(self.repo, "remote", "set-url", "origin", good_url)
+        retry = self.run_helper("published")
+        self.assertEqual(0, retry.returncode, retry.stderr)
+        self.assertEqual(self.published_sha(retry), self.origin_main())
+        self.assertTrue(self.equivalent_on_origin(commit))
+        self.assertEqual("", self.pending())
+        self.assertEqual(before, self.snapshot())
+
+    def test_same_file_conflict_is_refused_without_choosing_a_side(self):
+        other = self.root / "other"
+        self.git(self.root, "clone", "-q", str(self.origin), str(other))
+        self.configure(other)
+        (other / "current").mkdir()
+        (other / self.PLAN).write_text("remote plan\n")
+        self.git(other, "add", self.PLAN)
+        self.git(other, "commit", "-qm", "remote plan")
+        self.git(other, "push", "-q")
+        remote = self.origin_main()
+        commit = self.commit_plan("local plan\n")
+        self.dirty()
+        before = self.snapshot()
+        result = self.run_helper("published", commit)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("conflict", result.stderr)
+        self.assertIn("DayPlan 2000-01-01.md", result.stderr)
+        self.assertEqual(remote, self.origin_main())
+        self.assertEqual(b"remote plan\n", self.git(self.origin, "show", "main:" + self.PLAN))
+        self.assertIn(commit, self.pending())
+        self.assertEqual(before, self.snapshot())
+
+    def test_only_the_recorded_commit_is_published_not_foreign_local_work(self):
+        (self.repo / "foreign.txt").write_text("another agent\n")
+        self.git(self.repo, "add", "foreign.txt")
+        self.git(self.repo, "commit", "-qm", "foreign local commit")
+        foreign = self.head()
+        commit = self.commit_plan()
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(b"DayPlan\n", self.git(self.origin, "show", "main:" + self.PLAN))
+        self.assertEqual(b"", self.git(self.origin, "ls-tree", "-r", "--name-only", "main", "foreign.txt"))
+        self.assertEqual(foreign, self.git(self.repo, "rev-parse", commit + "^").decode().strip())
+        self.assertEqual(commit, self.head())
+
+    def test_commit_touching_other_paths_is_never_published(self):
+        (self.repo / "shared.txt").write_text("not a plan\n")
+        self.git(self.repo, "commit", "-qam", "edit shared file")
+        commit = self.head()
+        remote = self.origin_main()
+        result = self.run_helper("published", commit)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("outside DayPlan", result.stderr)
+        self.assertEqual(remote, self.origin_main())
+        self.assertEqual("", self.pending())
+
+    def test_receipt_lost_after_push_is_recovered_without_a_new_commit(self):
+        self.advance_remote()
+        commit = self.commit_plan()
+        first = self.run_helper("published", commit)
+        self.assertEqual(0, first.returncode, first.stderr)
+        tip = self.origin_main()
+        count = self.git(self.origin, "rev-list", "--count", "main")
+        again = self.run_helper("published", commit)
+        self.assertEqual(0, again.returncode, again.stderr)
+        self.assertEqual(tip, self.published_sha(again))
+        self.assertEqual(tip, self.origin_main())
+        self.assertEqual(count, self.git(self.origin, "rev-list", "--count", "main"))
+
+    def test_ambiguous_destination_is_rejected_before_any_write(self):
+        commit = self.commit_plan()
+        remote = self.origin_main()
+        self.git(self.repo, "config", "branch.main.pushRemote", "elsewhere")
+        pushed = self.run_helper("published", commit)
+        self.assertNotEqual(0, pushed.returncode)
+        self.assertIn("push remote", pushed.stderr)
+        self.git(self.repo, "config", "--unset", "branch.main.pushRemote")
+        self.git(self.repo, "config", "branch.main.remote", ".")
+        local = self.run_helper("published", commit)
+        self.assertNotEqual(0, local.returncode)
+        self.assertIn("not a configured remote", local.stderr)
+        self.assertEqual(remote, self.origin_main())
+        self.assertEqual("", self.pending())
 
     def test_push_preserves_configured_topic_destination(self):
         main = self.git(self.origin, "rev-parse", "main")
         self.git(self.repo, "checkout", "-qb", "topic")
         self.git(self.repo, "push", "-qu", "origin", "topic")
         commit = self.commit_plan()
-        result = self.run_helper("day_open_publish")
+        result = self.run_helper("published", commit)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(main, self.git(self.origin, "rev-parse", "main"))
         self.assertEqual((commit + "\n").encode(), self.git(self.origin, "rev-parse", "topic"))
@@ -256,22 +404,43 @@ class DayOpenGitTests(unittest.TestCase):
         # Redirect only the receipt directory; run the production guard and Git.
         block = block.replace("$HOME/.claude/state", "$TEST_STATE")
         script = self.root / "dedup.sh"
-        script.write_text('set -uo pipefail\nFORCE=false\nDS_STRATEGY="$1"\n'
-                          'DATE="$2"\nTEST_STATE="$3"\ntg_notify() { echo "$1"; }\n'
+        script.write_text(self.helpers.read_text().replace('\n"$@"\n', "\n")
+                          + 'FORCE=false\nDS_STRATEGY="$1"\n'
+                          'DATE="$2"\nTEST_STATE="$3"\n'
+                          'tg_notify() { echo "$1"; }\n'
                           + block + '\necho generation-next\n')
         return subprocess.run(["bash", str(script), str(self.repo), day,
                                str(self.root / "receipts")],
                               env=self.env, capture_output=True, text=True)
 
-    def test_local_only_plan_never_records_success_or_regenerates(self):
+    def test_local_plan_is_published_by_the_guard_without_regeneration(self):
         self.advance_remote()
         day = self.commit_today_plan()
-        self.assertNotEqual(0, self.run_helper("day_open_publish").returncode)
+        local = self.head()
+        self.dirty()
+        before = self.snapshot()
+        result = self.run_dedup(day)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("generation-next", result.stdout)
+        receipt = json.loads((self.root / "receipts/day-open-pipeline-last-success.json").read_text())
+        self.assertEqual("success", receipt["status"])
+        self.assertEqual(self.origin_main(), receipt["commit_hash"])
+        self.assertNotEqual(local, receipt["commit_hash"])
+        self.assertEqual(b"preserve this plan\n", self.git(
+            self.origin, "show", "main:current/DayPlan " + day + ".md"))
+        self.assertEqual(before, self.snapshot())
+
+    def test_local_plan_that_cannot_be_published_never_records_success(self):
+        self.advance_remote()
+        day = self.commit_today_plan()
+        local = self.head()
+        self.git(self.repo, "remote", "set-url", "origin", str(self.root / "missing.git"))
         before = self.snapshot()
         result = self.run_dedup(day)
         self.assertEqual(1, result.returncode, result.stderr)
         self.assertNotIn("generation-next", result.stdout)
         self.assertFalse((self.root / "receipts").exists())
+        self.assertIn(local, self.pending())
         self.assertEqual(before, self.snapshot())
 
     def test_published_plan_records_success(self):
@@ -306,9 +475,14 @@ class DayOpenGitTests(unittest.TestCase):
                  "+refs/heads/topic:refs/remotes/origin/topic")
         before = self.snapshot()
         result = self.run_dedup(day)
-        self.assertEqual(1, result.returncode, result.stderr)
+        # The rolled-back remote no longer holds the plan: the refreshed state
+        # shows it unpublished, so the guard publishes it instead of trusting the stale ref.
+        self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("generation-next", result.stdout)
-        self.assertFalse((self.root / "receipts").exists())
+        receipt = json.loads((self.root / "receipts/day-open-pipeline-last-success.json").read_text())
+        self.assertEqual(self.origin_main(), receipt["commit_hash"])
+        self.assertEqual(b"preserve this plan\n", self.git(
+            self.origin, "show", "main:current/DayPlan " + day + ".md"))
         self.assertEqual(before, self.snapshot())
         self.assertEqual((parent + "\n").encode(),
                          self.git(self.repo, "rev-parse", "origin/main"))
