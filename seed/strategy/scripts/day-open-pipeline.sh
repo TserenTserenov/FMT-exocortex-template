@@ -213,19 +213,13 @@ day_open_published_equivalent() {
   git -C "$repo" rev-parse "$target"
 }
 
-# Same change of the list when python3 with fcntl is missing: a lock FILE, created
-# atomically WITH its content (`ln` of a prepared file fails when the lock exists), so a
-# lock without an owner never exists. Content: "<pid> <process start time>".
-#
-# A waiter takes a lock over only inside the takeover mutex (mkdir <lock>.takeover) and
-# only after re-reading it there: older than DAY_OPEN_LOCK_STALE_SECS (10 s, by mtime)
-# AND its owner is gone (no such pid, or the pid now belongs to a process started at
-# another time). While the mutex is held nothing can replace a lock whose owner is dead:
-# the owner cannot release it, other waiters cannot take it over, and nobody can create
-# a lock while the file exists. So the check and the removal cannot see two different
-# locks, and nothing is ever put back. A live owner is never robbed; after
-# DAY_OPEN_LOCK_WAIT_SECS (120 s) a waiter gives up instead. A takeover mutex left by a
-# killed waiter is removed after 60 s.
+# Same change of the list when python3 with fcntl is missing. Simple on purpose: the lock
+# is a FILE <list>.lock whose content is the holder's pid, created atomically (`ln` of a
+# prepared file fails when the lock exists). A waiter waits up to DAY_OPEN_LOCK_WAIT_SECS
+# (120 s) and then refuses with a message naming the file; it NEVER takes a lock over. If
+# the holder was killed inside the millisecond critical section the lock stays until a
+# person deletes the file (the message says so). The python/fcntl path locks <list>.flock,
+# this one <list>.lock: runs that use different paths do not exclude each other.
 day_open_file_mtime() {
   local m
   m=$(stat -c %Y "$1" 2>/dev/null) || m=$(stat -f %m "$1" 2>/dev/null) || return 1
@@ -233,63 +227,38 @@ day_open_file_mtime() {
   printf '%s\n' "$m"
 }
 
-# Start time of process <pid> on one line; empty when there is no such process. `ps -p`
-# (not `kill -0`) so that a process of another user counts as alive, not as gone.
-day_open_process_start() {
-  ps -p "$1" -o lstart= 2>/dev/null | tr -s ' ' | sed 's/^ //; s/ $//'
-}
-
-# Is the process named by lock content "<pid> <start>" still running?
-day_open_lock_owner_alive() {
-  local pid="${1%% *}" start="" now
-  case "$1" in *" "*) start="${1#* }" ;; esac
-  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  now=$(day_open_process_start "$pid")
-  [ -n "$now" ] || return 1
-  [ -z "$start" ] || [ "$now" = "$start" ]
-}
-
-# Lock <file> can be taken over: old enough and without a living owner. Unreadable
-# content counts as no owner, since a live owner always has a complete lock.
-day_open_lock_is_stale() {
-  local lock="$1" mtime
-  mtime=$(day_open_file_mtime "$lock") || return 1
-  [ $(( $(date +%s) - mtime )) -gt "${DAY_OPEN_LOCK_STALE_SECS:-10}" ] || return 1
-  ! day_open_lock_owner_alive "$(cat "$lock" 2>/dev/null)"
-}
-
-# One attempt to remove a dead owner's lock. Returns 0 when the lock was removed.
-day_open_lock_take_over() {
-  local lock="$1" mutex="$1.takeover" mtime rc=1
-  if ! mkdir "$mutex" 2>/dev/null; then
-    mtime=$(day_open_file_mtime "$mutex") || return 1
-    [ $(( $(date +%s) - mtime )) -gt 60 ] && rmdir "$mutex" 2>/dev/null
-    return 1
+# Why the lock <file> refused us, in Russian, for the pilot.
+day_open_lock_refusal() {
+  local lock="$1" pid="" mtime created="неизвестно" err hint=""
+  if [ -d "$lock" ]; then
+    echo "Day Open: список публикаций не обновлён: $lock — папка, а должен быть файл; удалите её." >&2
+    return 0
   fi
-  # Test hook: hold the mutex after the first look, to interleave other processes here.
-  if [ -n "${DAY_OPEN_LOCK_TEST_GATE:-}" ]; then
-    while [ ! -e "$DAY_OPEN_LOCK_TEST_GATE" ]; do sleep 0.05; done
+  pid=$(cat "$lock" 2>/dev/null)
+  if mtime=$(day_open_file_mtime "$lock"); then
+    created=$(date -d "@$mtime" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -r "$mtime" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "$mtime")
   fi
-  if day_open_lock_is_stale "$lock"; then
-    echo "Day Open: pending-publish lock was left by a finished run; taking it over." >&2
-    rm -f "$lock" && rc=0
-  fi
-  rmdir "$mutex" 2>/dev/null
-  return "$rc"
+  case "$pid" in
+    ''|*[!0-9]*) ;;
+    *)
+      err=$(LC_ALL=C kill -0 "$pid" 2>&1)
+      case "$err" in *"No such process"*) hint=" Процесс с этим PID не найден: прежний запуск, судя по всему, был прерван." ;; esac
+      ;;
+  esac
+  echo "Day Open: список публикаций заблокирован файлом $lock (PID ${pid:-?}, создан $created); если Day Open не запущен — удалите этот файл.$hint" >&2
 }
 
-# Takes <lock>; sets DAY_OPEN_LOCK_IDENT. Returns 1 when a live owner outlasts the wait.
+# Takes <lock>; returns 1 (after saying why) when it stays taken past the wait.
 day_open_lock_acquire() {
-  local lock="$1" started=$SECONDS prepared="$1.tmp.$$"
-  DAY_OPEN_LOCK_IDENT="$$ $(day_open_process_start "$$")"
-  printf '%s\n' "$DAY_OPEN_LOCK_IDENT" > "$prepared" || return 1
-  while ! ln "$prepared" "$lock" 2>/dev/null; do
-    if day_open_lock_is_stale "$lock"; then
-      day_open_lock_take_over "$lock" && continue
-    fi
-    if [ $((SECONDS - started)) -gt "${DAY_OPEN_LOCK_WAIT_SECS:-120}" ]; then
+  local lock="$1" started=$SECONDS prepared
+  prepared=$(mktemp "$lock.XXXXXX") || return 1
+  printf '%s\n' "$$" > "$prepared"
+  while :; do
+    # `ln` into an existing directory would succeed by linking inside it.
+    [ -d "$lock" ] || ! ln "$prepared" "$lock" 2>/dev/null || break
+    if [ -d "$lock" ] || [ $((SECONDS - started)) -gt "${DAY_OPEN_LOCK_WAIT_SECS:-120}" ]; then
       rm -f "$prepared"
-      echo "Day Open: pending-publish list is locked by a running process; giving up." >&2
+      day_open_lock_refusal "$lock"
       return 1
     fi
     sleep 0.1
@@ -297,9 +266,9 @@ day_open_lock_acquire() {
   rm -f "$prepared"
 }
 
-# Removes <lock> only while it still carries this process's content.
+# Removes <lock> only while it still carries this process's pid.
 day_open_lock_release() {
-  [ "$(cat "$1" 2>/dev/null)" = "${DAY_OPEN_LOCK_IDENT:-}" ] && rm -f "$1"
+  [ "$(cat "$1" 2>/dev/null)" = "$$" ] && rm -f "$1"
   return 0
 }
 
@@ -342,7 +311,7 @@ day_open_pending_update() {
   file=$(day_open_pending_file)
   mkdir -p "$(dirname "$file")" || return 1
   if ! "$py" -I -c 'import fcntl' >/dev/null 2>&1; then
-    echo "Day Open: python3 with fcntl is needed for the kernel lock on the pending-publish list; using a directory lock instead." >&2
+    echo "Day Open: python3 with fcntl is needed for the kernel lock on the pending-publish list; using a lock file instead." >&2
     day_open_pending_update_fallback "$file" "$@"
     return
   fi

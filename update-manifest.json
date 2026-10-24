@@ -2377,7 +2377,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "a075d303f83f3115d099057d21bca55d3dc64137c9ef23bb7ffaf69bf7033201"
+      "sha256": "c2784537c93f8c00b303e46baea35c575278603d9c54ffc62fef2c9ad5924329"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -3209,7 +3209,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "8b1350e5fd44a97564dd538086d9727383d8715461b426f39f0ebcedd9f97131"
+      "sha256": "2adb55772774ab8420bdfb83161a51b49ed397b6c3f6302241330c4f92a9e0cf"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
