@@ -85,7 +85,8 @@ day_open_sync_blocked() {
   mkdir -p "$(dirname "$file")" || return 0
   head=$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null) || return 0
   behind=$(git -C "$repo" rev-list --count "$head..$target" 2>/dev/null || echo "?")
-  sig="$class|$paths"
+  # One line, always: a path with a line break must not forge another marker field.
+  sig="$class|$(printf '%s' "$paths" | tr '\n' ' ')"
   now=${DAY_OPEN_NOW:-$(date +%s)}
   if [ -f "$file" ]; then
     notified_sig=$(sed -n 's/^notified_sig=//p' "$file")
@@ -104,7 +105,8 @@ day_open_sync_blocked() {
   fi
   {
     printf 'head=%s\ntarget=%s\nbehind=%s\nreason=%s\nsig=%s\n' \
-      "$head" "$target" "$behind" "$(echo "$reason" | tr '\n' ' ')" "$sig"
+      "$head" "$target" "$behind" "$(printf '%s' "$reason" | tr '\n' ' ')" "$sig"
+    printf 'paths=%s\n' "$(printf '%s' "$paths" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
     [ -z "$notified" ] || printf 'notified_sig=%s\nnotified=%s\n' "$notified_sig" "$notified"
   } > "$file.tmp" && mv "$file.tmp" "$file"
 }
@@ -1870,6 +1872,20 @@ else
 fi
 
 # ============================================
+# 4.58. Sync-banner patch (deterministic, AFTER LLM Fill so the fill cannot erase
+# it — Refs #1245). While the sync-blocked marker of the shared checkout is
+# present the registry of work products, the week plan and the inbox were read
+# from a stale copy; the plan says so once. No marker: the plan stays as it was
+# (a block left by an earlier run is removed). Never blocks Open.
+# ============================================
+echo "=== 4.58. Sync-banner patch ==="
+SYNC_MARKER=$(day_open_sync_marker_file "$DS_STRATEGY")
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+  --dayplan "$DAYPLAN_PATH" --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" 2>&1 || true
+SYNC_WARN=$("$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+  --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" --print-text 2>/dev/null || true)
+
+# ============================================
 # 4.59. Multiplier backfill patch (deterministic — WP-484 Ф117, pilot decision
 # 18.08 + peer-session 2026-09-01-18-wp484-backlog-continue: wakatime-cli only
 # supports --today, so a Close that ran late or on a host without the CLI
@@ -1944,6 +1960,16 @@ for f in "$CURRENT_DIR"/DayPlan\ *.md; do
   ARCHIVED_PATHS+=("$f")   # old current/ path: include below so the deletion is committed
   ARCHIVE_TARGETS+=("$ARCHIVE_DIR/$basename_f")   # new archive/ path: staged individually below
 done
+fi
+
+# Refs #1245: the sync above may have just created the marker (first refusal). The inputs
+# were read before it, so the plan and the digest say so now. Only ever adds or refreshes
+# the block here: a marker cleared by a successful move does not make today's inputs fresh.
+if [ "$PROBE" != "true" ] && [ "$SCAFFOLD_ONLY" != "true" ] && [ -f "$SYNC_MARKER" ]; then
+  "$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --dayplan "$DAYPLAN_PATH" --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" 2>&1 || true
+  SYNC_WARN=$("$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" --print-text 2>/dev/null || true)
 fi
 
 # session-guard.sh scope gate (added 2026-07-07, WP-7 SGFIX3) blocks any new/renamed
@@ -2083,6 +2109,15 @@ if [ -f "$GATE_STATUS_FILE" ]; then
     echo "  ⚠️ rung_fidelity: $GATE_ST — проверь $GATE_STATUS_FILE"
     MSG+="\n⚠️ Руководство: rung_fidelity=$GATE_ST (gate-status.yaml)"
   fi
+fi
+
+# Refs #1245: the same stale-input warning as in the DayPlan (one source of text). It goes in
+# LAST, after every other line of the digest, so the 4096 limit counts the finished text.
+# Telegram refuses a message over 4096 characters and the whole digest would be lost: the
+# script cuts only the banner, never the digest.
+if [ -n "${SYNC_WARN:-}" ]; then
+  MSG_WITH_WARN=$(printf '%s' "$MSG" | "$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --digest "$SYNC_WARN" 2>/dev/null) && [ -n "$MSG_WITH_WARN" ] && MSG="$MSG_WITH_WARN"
 fi
 
 tg_notify "$MSG" terminal
