@@ -43,7 +43,7 @@ class DayOpenGitTests(unittest.TestCase):
             r"^day_open_\w+\(\) \{\n.*?^\}\n", source, re.MULTILINE | re.DOTALL)]
         names = {re.match(r"day_open_\w+", d).group() for d in definitions}
         for required in ("day_open_fast_forward", "day_open_publish",
-                         "day_open_isolated_push", "day_open_pending_clear"):
+                         "day_open_isolated_push", "day_open_adopt_twins"):
             self.assertIn(required, names, required + " production helper missing")
         self.helpers = self.root / "helpers.sh"
         # `published` reports the SHA the production helper recorded as published.
@@ -73,11 +73,13 @@ class DayOpenGitTests(unittest.TestCase):
 
     PLAN = "current/DayPlan 2000-01-01.md"
 
-    def commit_plan(self, text="DayPlan\n"):
+    def commit_plan(self, text="DayPlan\n", plan=None):
+        plan = plan or self.PLAN
         (self.repo / "current").mkdir(exist_ok=True)
-        (self.repo / self.PLAN).write_text(text)
-        self.git(self.repo, "add", self.PLAN)
-        self.git(self.repo, "commit", "-qm", "DayPlan")
+        (self.repo / plan).write_text(text)
+        self.git(self.repo, "add", plan)
+        # Pathspec: unrelated staged work must never ride along in the plan commit.
+        self.git(self.repo, "commit", "-qm", "DayPlan", "--", plan)
         return self.head()
 
     def head(self, repo=None):
@@ -274,11 +276,12 @@ class DayOpenGitTests(unittest.TestCase):
         before = self.snapshot()
         result = self.run_helper("published", commit)
         self.assertNotEqual(0, result.returncode)
-        self.assertIn("conflict", result.stderr)
+        self.assertIn(commit, result.stderr)
         self.assertIn("DayPlan 2000-01-01.md", result.stderr)
+        self.assertIn("removed from the publication list", result.stderr)
         self.assertEqual(remote, self.origin_main())
         self.assertEqual(b"remote plan\n", self.git(self.origin, "show", "main:" + self.PLAN))
-        self.assertIn(commit, self.pending())
+        self.assertEqual("", self.pending())
         self.assertEqual(before, self.snapshot())
 
     def test_only_the_recorded_commit_is_published_not_foreign_local_work(self):
@@ -342,6 +345,180 @@ class DayOpenGitTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(main, self.git(self.origin, "rev-parse", "main"))
         self.assertEqual((commit + "\n").encode(), self.git(self.origin, "rev-parse", "topic"))
+
+    def ahead_behind(self):
+        """(local-only, origin-only) commit counts against a freshly fetched origin/main."""
+        self.git(self.repo, "fetch", "-q", "origin", "main")
+        out = self.git(self.repo, "rev-list", "--left-right", "--count", "HEAD...FETCH_HEAD")
+        ahead, behind = out.decode().split()
+        return int(ahead), int(behind)
+
+    def shift_origin(self, name, text="remote\n"):
+        """Another machine pushes a commit adding file `name`."""
+        other = self.root / "other"
+        if other.exists():
+            self.git(other, "pull", "-q", "--ff-only")
+        else:
+            self.git(self.root, "clone", "-q", str(self.origin), str(other))
+            self.configure(other)
+        (other / name).write_text(text)
+        self.git(other, "add", name)
+        self.git(other, "commit", "-qm", "remote " + name)
+        self.git(other, "push", "-q")
+
+    def work_state(self, paths):
+        """Observable local work: staged and unstaged diffs plus bytes of untracked files."""
+        return (self.git(self.repo, "diff", "--", "notes.txt"),
+                self.git(self.repo, "diff", "--cached", "--", "notes.txt"),
+                {p: (self.repo / p).read_bytes() for p in paths})
+
+    def test_three_days_in_a_row_leave_the_checkout_in_sync_with_origin(self):
+        (self.repo / "notes.txt").write_text("notes\n")
+        self.git(self.repo, "add", "notes.txt")
+        self.git(self.repo, "commit", "-qm", "notes")
+        self.git(self.repo, "push", "-q")
+        drafts = []
+        for day in (1, 2, 3):
+            self.shift_origin("remote-%d.txt" % day)
+            plan = "current/DayPlan 2000-01-0%d.md" % day
+            commit = self.commit_plan("plan %d\n" % day, plan)
+            (self.repo / "notes.txt").write_text("staged %d\n" % day)
+            self.git(self.repo, "add", "notes.txt")
+            (self.repo / "notes.txt").write_text("unstaged %d\n" % day)
+            drafts.append("draft-%d.md" % day)
+            (self.repo / drafts[-1]).write_text("untracked %d\n" % day)
+            before = self.work_state(drafts)
+            result = self.run_helper("published", commit)
+            self.assertEqual(0, result.returncode, "day %d: %s" % (day, result.stderr))
+            self.assertEqual((0, 0), self.ahead_behind(), "day %d diverged" % day)
+            self.assertEqual(self.published_sha(result), self.head())
+            self.assertEqual(before, self.work_state(drafts), "day %d lost work" % day)
+            self.assertTrue((self.repo / ("remote-%d.txt" % day)).exists())
+            self.assertEqual("", self.pending())
+        self.assertEqual(b"plan 3\n", self.git(self.origin, "show", "main:current/DayPlan 2000-01-03.md"))
+        self.assertEqual(b"", self.git(self.repo, "stash", "list"))
+
+    def close_yesterday_elsewhere(self):
+        """Day Close on the other machine archived yesterday's plan with different content."""
+        yesterday = "current/DayPlan 2000-01-01.md"
+        archived = "archive/day-plans/DayPlan 2000-01-01.md"
+        (self.repo / "current").mkdir(exist_ok=True)
+        (self.repo / yesterday).write_text("yesterday\n")
+        self.git(self.repo, "add", yesterday)
+        self.git(self.repo, "commit", "-qm", "yesterday plan")
+        self.git(self.repo, "push", "-q")
+        other = self.root / "other"
+        self.git(self.root, "clone", "-q", str(self.origin), str(other))
+        self.configure(other)
+        (other / "archive/day-plans").mkdir(parents=True)
+        self.git(other, "mv", yesterday, archived)
+        (other / archived).write_text("closed on the other machine\n")
+        self.git(other, "add", archived)
+        self.git(other, "commit", "-qm", "day close")
+        self.git(other, "push", "-q")
+        (self.repo / "archive/day-plans").mkdir(parents=True)
+        self.git(self.repo, "mv", yesterday, archived)
+        return yesterday, archived
+
+    def test_day_close_elsewhere_does_not_block_todays_plan(self):
+        _, archived = self.close_yesterday_elsewhere()
+        today = "current/DayPlan 2000-01-02.md"
+        (self.repo / today).write_text("today\n")
+        self.git(self.repo, "add", today)
+        self.git(self.repo, "commit", "-qm", "day open")
+        commit = self.head()
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(b"today\n", self.git(self.origin, "show", "main:" + today))
+        self.assertEqual(b"closed on the other machine\n",
+                         self.git(self.origin, "show", "main:" + archived))
+        self.assertEqual("", self.pending())
+
+    def test_move_only_commit_is_dropped_reported_and_never_accumulates(self):
+        self.close_yesterday_elsewhere()
+        self.git(self.repo, "commit", "-qm", "move only")
+        commit = self.head()
+        remote = self.origin_main()
+        result = self.run_helper("published", commit)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(commit, result.stderr)
+        self.assertIn("removed from the publication list", result.stderr)
+        self.assertEqual("", self.pending())
+        self.assertEqual(remote, self.origin_main())
+        self.assertEqual(b"closed on the other machine\n", self.git(
+            self.origin, "show", "main:archive/day-plans/DayPlan 2000-01-01.md"))
+
+    def seed_pending(self, *entries):
+        root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
+        state = self.root / "state"
+        state.mkdir(exist_ok=True)
+        with open(state / "day-open-pending-publish.list", "a") as handle:
+            for remote, ref, sha in entries:
+                handle.write("\t".join([root, remote, ref, sha]) + "\n")
+
+    def test_lost_commit_and_foreign_destination_do_not_block_the_rest(self):
+        commit = self.commit_plan()
+        self.seed_pending(("origin", "refs/heads/main", "0" * 39 + "1"),
+                          ("elsewhere", "refs/heads/main", "0" * 39 + "2"))
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(commit, self.origin_main())
+        self.assertIn("is gone from the repository", result.stderr)
+        self.assertIn("skipping", result.stderr)
+        left = self.pending()
+        self.assertNotIn("0" * 39 + "1", left)
+        self.assertIn("0" * 39 + "2", left)
+
+    def test_parallel_updates_of_the_list_do_not_lose_each_other(self):
+        root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
+        seeded = ["%040d" % n for n in range(1, 41)]
+        self.seed_pending(*[("origin", "refs/heads/main", sha) for sha in seeded])
+        first = ["%040d" % n for n in range(101, 141)]
+        second = ["%040d" % n for n in range(201, 241)]
+        script = self.root / "parallel.sh"
+        script.write_text(
+            self.helpers.read_text().replace('\n"$@"\n', "\n")
+            + 'record_all() { for sha in "$@"; do day_open_pending_record "$ROOT" origin refs/heads/main "$sha" || exit 1; done; }\n'
+            'remove_all() { for sha in "$@"; do day_open_pending_remove "$ROOT" "$sha" || exit 1; done; }\n'
+            'mode="$1"; shift\n"$mode" "$@"\n')
+        env = dict(self.env, ROOT=root)
+        jobs = [subprocess.Popen(["bash", str(script), mode, *shas], env=env,
+                                 stderr=subprocess.PIPE, text=True)
+                for mode, shas in (("record_all", first), ("record_all", second),
+                                   ("remove_all", seeded))]
+        for job in jobs:
+            _, err = job.communicate(timeout=120)
+            self.assertEqual(0, job.returncode, err)
+        kept = {line.split("\t")[3] for line in self.pending().splitlines()}
+        self.assertEqual(set(first + second), kept)
+
+    def test_adopt_refuses_overlapping_edits_and_loses_nothing(self):
+        self.advance_remote()
+        commit = self.commit_plan()
+        self.dirty()
+        before = self.snapshot()
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("left on its own commits", result.stderr)
+        self.assertEqual(before, self.snapshot())
+        self.assertEqual((1, 2), self.ahead_behind())
+        # Once the overlapping work is gone, the skipped fast-forward adopts the twins.
+        self.git(self.repo, "reset", "-q", "--hard")
+        (self.repo / "draft.md").unlink()
+        moved = self.run_helper("day_open_fast_forward")
+        self.assertEqual(0, moved.returncode, moved.stderr)
+        self.assertEqual((0, 0), self.ahead_behind())
+        self.assertEqual(self.origin_main(), self.head())
+
+    def test_adopt_refuses_when_a_local_commit_has_no_twin(self):
+        (self.repo / "foreign.txt").write_text("another agent\n")
+        self.git(self.repo, "add", "foreign.txt")
+        self.git(self.repo, "commit", "-qm", "foreign local commit")
+        commit = self.commit_plan()
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(commit, self.head())
+        self.assertEqual(b"", self.git(self.origin, "ls-tree", "--name-only", "main", "foreign.txt"))
 
     def test_ignored_collision_preserves_local_bytes(self):
         (self.repo / ".gitignore").write_text("draft.md\n")
