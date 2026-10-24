@@ -1253,7 +1253,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "7d4fb783b53c62cd5cde52fa6b18a6b70cbd8e9fa3581421e255af529e47514f"
+      "sha256": "f6fe1ce03bbecb5c9cd6833db6d65b35d2c679d461c350a1b882c4a55ffa7eea"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2852,6 +2852,10 @@
       "sha256": "f2ae015d394a447778e1ed75ecfa16d80fe98e1164655b3431940c7e783d206c"
     },
     {
+      "path": "scripts/tests/check-wp-registered-smoke.sh",
+      "sha256": "bb527d3d2c18e836369c66c320bdf0faa027eb531a7208c0dfdb6044193a2cca"
+    },
+    {
       "path": "scripts/tests/cp1251-smoke.sh",
       "sha256": "83e797bc375903984c7b0b982b4baa582434ed4967024be8c27a38c99b361c21"
     },
@@ -3368,7 +3372,6 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/ancestry-hardening-lib.sh",
     "scripts/tests/canon-reconcile-published-smoke.sh",
-    "scripts/tests/check-wp-registered-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-no-autostash-smoke.py",
