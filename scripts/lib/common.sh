@@ -108,7 +108,7 @@ iwe_resolve_governance_repo() {
   echo "${1:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 }
 
-# iwe_sessions_dir — корень журналов сессий для ЧИТАТЕЛЕЙ (issue #545).
+# iwe_sessions_dir [GOVERNANCE_WORKTREE] — корень журналов сессий (issues #545, #1256).
 # Тот же контракт, что у писателя (session-guard.sh resolve_orz_sessions_dir,
 # порт WP-526 Ф2): писатель переключается на MC-sessions после миграции, а
 # читатели, жёстко смотрящие в legacy-путь, теряли перенос со вчера на
@@ -118,7 +118,9 @@ iwe_resolve_governance_repo() {
 #      return 1 (явный override — осознанный выбор, молчаливый обход скрыл бы
 #      реальную расконфигурацию; решение о WARN/пропуске — у читателя).
 #   2. Существует $IWE_ROOT/MC-sessions → он (мигрированная установка).
-#   3. Иначе — legacy $IWE_ROOT/<governance-repo>/sessions. Имя репозитория:
+#   3. Иначе — legacy <GOVERNANCE_WORKTREE>/sessions, если активная рабочая
+#      копия передана аргументом (абсолютный путь, проверенный вызывающим).
+#      Без аргумента сохраняется $IWE_ROOT/<governance-repo>/sessions. Имя репозитория:
 #      GOVERNANCE_REPO (старший override, семантика day-close.sh) >
 #      IWE_GOVERNANCE_REPO > DS-strategy.
 # В отличие от писательского резолвера — без side-эффектов: ничего не создаёт
@@ -136,6 +138,10 @@ iwe_sessions_dir() {
   [ -n "$root" ] || return 1
   if [ -d "$root/MC-sessions" ]; then
     printf '%s\n' "$root/MC-sessions"
+    return 0
+  fi
+  if [ -n "${1:-}" ]; then
+    printf '%s\n' "${1%/}/sessions"
     return 0
   fi
   printf '%s\n' "$root/$(iwe_resolve_governance_repo "${GOVERNANCE_REPO:-}")/sessions"
