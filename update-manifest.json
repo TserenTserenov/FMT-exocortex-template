@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4ea240db47931d92c6d45fa9cb3f83030ead677285afde67ee995868961ec85c"
+      "sha256": "50f62a4d504042d3658e3332b3886c04705d53bf365ec643cb5c751c717788f9"
     },
     {
       "path": "CLAUDE.md",
@@ -2377,7 +2377,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "806397d9e5cf277f737557d3cf735398bbdd9614715cda8b49b72f4e5900cbcd"
+      "sha256": "c2784537c93f8c00b303e46baea35c575278603d9c54ffc62fef2c9ad5924329"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -3209,7 +3209,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "5901ac3add150c05c09fdcb6b47acb71a9fae372626971b2a1aad30a8ab621d7"
+      "sha256": "2adb55772774ab8420bdfb83161a51b49ed397b6c3f6302241330c4f92a9e0cf"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3538,6 +3538,7 @@
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",
+    "scripts/tests/test_pending_lock.py",
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",

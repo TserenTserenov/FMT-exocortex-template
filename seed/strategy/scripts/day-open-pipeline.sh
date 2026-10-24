@@ -213,22 +213,70 @@ day_open_published_equivalent() {
   git -C "$repo" rev-parse "$target"
 }
 
-# Same change of the list when python3 with fcntl is missing. A mkdir lock with a
-# spin and a timeout keeps concurrent runs from losing each other's changes; a lock
-# older than the timeout is treated as left by a crashed run and taken over.
-day_open_pending_update_fallback() {
-  local file="$1" mode="$2" lockdir tries=0 tmp rc=0
-  shift 2
-  lockdir="$file.lockdir"
-  while ! mkdir "$lockdir" 2>/dev/null; do
-    tries=$((tries + 1))
-    if [ "$tries" -gt 100 ]; then
-      echo "Day Open: pending-publish lock held for over 10 s; taking it over." >&2
-      rm -rf "$lockdir"
-      tries=0
+# Same change of the list when python3 with fcntl is missing. Simple on purpose: the lock
+# is a FILE <list>.lock whose content is the holder's pid, created atomically (`ln` of a
+# prepared file fails when the lock exists). A waiter waits up to DAY_OPEN_LOCK_WAIT_SECS
+# (120 s) and then refuses with a message naming the file; it NEVER takes a lock over. If
+# the holder was killed inside the millisecond critical section the lock stays until a
+# person deletes the file (the message says so). The python/fcntl path locks <list>.flock,
+# this one <list>.lock: runs that use different paths do not exclude each other.
+day_open_file_mtime() {
+  local m
+  m=$(stat -c %Y "$1" 2>/dev/null) || m=$(stat -f %m "$1" 2>/dev/null) || return 1
+  case "$m" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$m"
+}
+
+# Why the lock <file> refused us, in Russian, for the pilot.
+day_open_lock_refusal() {
+  local lock="$1" pid="" mtime created="неизвестно" err hint=""
+  if [ -d "$lock" ]; then
+    echo "Day Open: список публикаций не обновлён: $lock — папка, а должен быть файл; удалите её." >&2
+    return 0
+  fi
+  pid=$(cat "$lock" 2>/dev/null)
+  if mtime=$(day_open_file_mtime "$lock"); then
+    created=$(date -d "@$mtime" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -r "$mtime" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "$mtime")
+  fi
+  case "$pid" in
+    ''|*[!0-9]*) ;;
+    *)
+      err=$(LC_ALL=C kill -0 "$pid" 2>&1)
+      case "$err" in *"No such process"*) hint=" Процесс с этим PID не найден: прежний запуск, судя по всему, был прерван." ;; esac
+      ;;
+  esac
+  echo "Day Open: список публикаций заблокирован файлом $lock (PID ${pid:-?}, создан $created); если Day Open не запущен — удалите этот файл.$hint" >&2
+}
+
+# Takes <lock>; returns 1 (after saying why) when it stays taken past the wait.
+day_open_lock_acquire() {
+  local lock="$1" started=$SECONDS prepared
+  prepared=$(mktemp "$lock.XXXXXX") || return 1
+  printf '%s\n' "$$" > "$prepared"
+  while :; do
+    # `ln` into an existing directory would succeed by linking inside it.
+    [ -d "$lock" ] || ! ln "$prepared" "$lock" 2>/dev/null || break
+    if [ -d "$lock" ] || [ $((SECONDS - started)) -gt "${DAY_OPEN_LOCK_WAIT_SECS:-120}" ]; then
+      rm -f "$prepared"
+      day_open_lock_refusal "$lock"
+      return 1
     fi
     sleep 0.1
   done
+  rm -f "$prepared"
+}
+
+# Removes <lock> only while it still carries this process's pid.
+day_open_lock_release() {
+  [ "$(cat "$1" 2>/dev/null)" = "$$" ] && rm -f "$1"
+  return 0
+}
+
+day_open_pending_update_fallback() {
+  local file="$1" mode="$2" lock tmp rc=0
+  shift 2
+  lock="$file.lock"
+  day_open_lock_acquire "$lock" || return 1
   case "$mode" in
     record)
       grep -qxF "$(printf '%s\t%s\t%s\t%s' "$@")" "$file" 2>/dev/null \
@@ -236,7 +284,7 @@ day_open_pending_update_fallback() {
       ;;
     *)
       if [ -f "$file" ]; then
-        tmp=$(mktemp "$file.XXXXXX") || { rmdir "$lockdir"; return 1; }
+        tmp=$(mktemp "$file.XXXXXX") || { day_open_lock_release "$lock"; return 1; }
         if [ "$mode" = prune ]; then
           awk -F'\t' -v repo="$1" '!($1 == repo && !(length($4) >= 40 && length($4) <= 64 && $4 ~ /^[0-9a-f]+$/))' "$file" > "$tmp"
         else
@@ -249,7 +297,7 @@ day_open_pending_update_fallback() {
       fi
       ;;
   esac
-  rmdir "$lockdir" 2>/dev/null
+  day_open_lock_release "$lock"
   return "$rc"
 }
 
@@ -263,7 +311,7 @@ day_open_pending_update() {
   file=$(day_open_pending_file)
   mkdir -p "$(dirname "$file")" || return 1
   if ! "$py" -I -c 'import fcntl' >/dev/null 2>&1; then
-    echo "Day Open: python3 with fcntl is needed for the kernel lock on the pending-publish list; using a directory lock instead." >&2
+    echo "Day Open: python3 with fcntl is needed for the kernel lock on the pending-publish list; using a lock file instead." >&2
     day_open_pending_update_fallback "$file" "$@"
     return
   fi
@@ -315,7 +363,10 @@ day_open_pending_record() {
 # Removes only the named commits of this repository; other records stay.
 day_open_pending_remove() {
   [ -f "$(day_open_pending_file)" ] || return 0
-  day_open_pending_update remove "$1" "$2"
+  day_open_pending_update remove "$1" "$2" || {
+    echo "Day Open: the pending-publish list could not be updated; the record(s) stay: $2" >&2
+    return 1
+  }
 }
 
 # Prints this repository's recorded commits (one per line). A record for another
