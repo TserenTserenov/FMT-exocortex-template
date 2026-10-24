@@ -31,7 +31,7 @@ expect() {
   local out rc
   out=$(bash "$CHECK" "$@" 2>&1); rc=$?
   if [ "$rc" -ne "$want_rc" ] || ! printf '%s' "$out" | grep -qF -- "$want_msg"; then
-    echo "FAIL: $name (rc=$rc, want $want_rc; want «$want_msg»)"; printf '%s\n' "$out" | sed 's/^/    /'
+    echo "FAIL: $name (rc=$rc, want $want_rc; want «${want_msg}»)"; printf '%s\n' "$out" | sed 's/^/    /'
     FAILS=$((FAILS + 1))
   else
     echo "PASS: $name"
@@ -130,6 +130,23 @@ add_plan "$G" 1 "Первый"; add_plan "$G" 1 "Первый"
 printf '\n## Перенос\n\n| 🚦 | # | РП | h | Источник | P | Статус | Результат |\n|---|---|---|---|---|---|---|---|\n' >> "$G/current/WeekPlan W1.md"
 add_plan "$G" 1 "Первый"
 expect "дубль внутри «План» при таблице «Перенос»" 1 "строк с номером 1: 2" -- 1 "$G" "$G/current/WeekPlan W1.md"
+
+# A row in «Перенос» cannot replace a missing row in the existing «План» table.
+G="$TMP/planmiss"; new_fixture "$G"; add_card "$G" 1 "Первый"; add_registry "$G" 1 "Первый"
+printf '%s\n' '## План' '' '| 🚦 | # | РП | h | Источник | P | Статус | Результат |' \
+  '|---|---|---|---|---|---|---|---|' '| — | — | — | — | — | — | — | — |' '' \
+  '## Перенос' '' '| 🚦 | # | РП | h | Источник | P | Статус | Результат |' \
+  '|---|---|---|---|---|---|---|---|' > "$G/current/WeekPlan W1.md"
+add_plan "$G" 1 "Первый"
+expect "пустой План не заменяется Переносом" 1 "в таблице «План»" -- 1 "$G" "$G/current/WeekPlan W1.md"
+
+# A matching title in another column does not repair the wrong title cell.
+G="$TMP/regtitle"; new_fixture "$G"; add_card "$G" 1 "Первый"; add_plan "$G" 1 "Первый"
+printf '| 1 | P2 | **Другое** | ⏳ | Первый | 1h |\n' >> "$G/docs/WP-REGISTRY.md"
+expect "название в репозитории не заменяет название реестра" 1 "название в реестре" -- 1 "$G" "$G/current/WeekPlan W1.md"
+G="$TMP/plantitle"; new_fixture "$G"; add_card "$G" 1 "Первый"; add_registry "$G" 1 "Первый"
+printf '| 🟡 | 1 | Другое | 1 | ПС | P2 | pending | Первый |\n' >> "$G/current/WeekPlan W1.md"
+expect "название в результате не заменяет название плана" 1 "название в плане" -- 1 "$G" "$G/current/WeekPlan W1.md"
 
 # --- long title: the registry cuts it to 80 characters ---
 LONG="Очень длинное название рабочего продукта которое заведомо превышает восемьдесят символов и режется реестром"

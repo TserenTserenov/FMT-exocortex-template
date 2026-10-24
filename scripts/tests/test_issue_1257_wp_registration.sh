@@ -91,3 +91,6 @@ with tempfile.TemporaryDirectory(prefix='issue-1257-') as temporary:
     assert snapshot(base) == before, 'Missing-copy refusal wrote files'
     print('PASS: missing governance copy refused before any write')
 PY
+
+# This family is the delivered CI entrypoint for the registration verifier.
+bash "$ROOT/scripts/tests/check-wp-registered-smoke.sh"

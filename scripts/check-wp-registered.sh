@@ -12,7 +12,7 @@
 #      «Итоги», «Сводка», «Summary» и упоминания вне таблиц записью не считаются;
 #      если есть таблица под заголовком «План», считаются только такие таблицы;
 #      заголовок: «Статус…» и («#» или «Работа»), номер — в колонке «#», иначе «РП»);
-#   4. название в обеих строках содержит первые 80 символов названия из карточки
+#   4. колонка названия в обеих строках содержит первые 80 символов названия из карточки
 #      (create-wp.sh режет название в реестре до 80 символов).
 # Код 2 — неверные аргументы или нечитаемые файлы.
 set -uo pipefail
@@ -93,8 +93,8 @@ else:
         errors.append('в карточке нет названия (поле title)')
 
 
-def check_title(where, row_text):
-    if title is not None and title[:80] not in plain(row_text):
+def check_title(where, title_cell):
+    if title is not None and plain(title[:80]) not in plain(title_cell):
         errors.append(f'название в {where} не совпадает с карточкой: ожидалось «{title[:80]}»')
 
 
@@ -102,9 +102,11 @@ def check_title(where, row_text):
 registry_lines = read(gov / 'docs/WP-REGISTRY.md')
 registry_rows = []
 number_col = None
+registry_title_col = None
 for line in registry_lines:
     if not is_row(line):
         number_col = None  # a table ended: never reuse its column in the next one
+        registry_title_col = None
         continue
     if is_separator(line):
         continue
@@ -112,9 +114,10 @@ for line in registry_lines:
     names = [plain(c) for c in row]
     if '#' in names and 'Название' in names:
         number_col = names.index('#')
+        registry_title_col = names.index('Название')
         continue
     if number_col is not None and number_col < len(row) and cell_number(row[number_col]) == number:
-        registry_rows.append(line)
+        registry_rows.append(row[registry_title_col] if registry_title_col < len(row) else '')
 if len(registry_rows) != 1:
     errors.append(f'в реестре строк с номером {number}: {len(registry_rows)} (нужна ровно одна)')
 else:
@@ -123,14 +126,16 @@ else:
 # 3. WeekPlan: таблицы с ячейками «РП», «#» и «Статус…», не под заголовками фактов
 FACTS = re.compile(r'итог|сводк|summary', re.IGNORECASE)
 PLAN = re.compile(r'план', re.IGNORECASE)
-plan_rows = []      # (row, под заголовком «План»)
+plan_rows = []      # (ячейка названия, под заголовком «План»)
 heading_stack = []  # (уровень, текст)
 summaries = []      # <summary> открытых <details>
 in_fence = False
 in_comment = False
 table_ok = None     # None — вне таблицы, True/False — кандидат или нет
 plan_col = None
+plan_title_col = None
 table_titled = False
+titled_table_seen = False
 plan_lines = read(weekplan)
 for line in plan_lines:
     stripped = line.strip()
@@ -167,21 +172,26 @@ for line in plan_lines:
     if table_ok is None:
         names = [plain(c) for c in row]
         starts_status = any(c.startswith('Статус') for c in names)
-        if starts_status and ('#' in names or 'Работа' in names) and ('#' in names or 'РП' in names):
+        has_number = '#' in names or 'РП' in names
+        has_title = ('#' in names and 'РП' in names) or 'Работа' in names
+        if starts_status and has_number and has_title:
             ancestors = [h[1] for h in heading_stack] + [s or '' for s in summaries]
             table_ok = not any(FACTS.search(a) for a in ancestors)
             table_titled = any(PLAN.search(a) for a in ancestors)
             plan_col = names.index('#') if '#' in names else names.index('РП')
+            plan_title_col = names.index('РП') if '#' in names and 'РП' in names else names.index('Работа')
+            titled_table_seen |= table_ok and table_titled
         else:
             table_ok = False
         continue
     if is_separator(line) or not table_ok:
         continue
     if plan_col < len(row) and cell_number(row[plan_col]) == number:
-        plan_rows.append((line, table_titled))
-if any(titled for _, titled in plan_rows):
+        title_cell = row[plan_title_col] if plan_title_col < len(row) else ''
+        plan_rows.append((title_cell, table_titled))
+if titled_table_seen:
     plan_rows = [r for r in plan_rows if r[1]]
-plan_rows = [line for line, _ in plan_rows]
+plan_rows = [title_cell for title_cell, _ in plan_rows]
 if len(plan_rows) != 1:
     errors.append(f'в таблице «План» {weekplan} строк с номером {number}: {len(plan_rows)} (нужна ровно одна)')
 else:

@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9e8b05e6f15dd111476a2fc528ef61c364ea718ffa08d0a3aa5393b377be9a49"
+      "sha256": "b6ee3eb3db4bd8ada47f02ef1411d680bcda66870a931d45cb1a04a62669e60b"
     },
     {
       "path": "CLAUDE.md",
@@ -2285,7 +2285,7 @@
     },
     {
       "path": "scripts/check-wp-registered.sh",
-      "sha256": "43f8f071622782d786969f8a33ad9b006a3d79dcc15f32829a20876bcb8218da"
+      "sha256": "b64344f84c5b78019d0a64faff6e92fda4c9fe2b4baa0c5079d1e98bc8f4e1f5"
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
@@ -2973,7 +2973,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1257_wp_registration.sh",
-      "sha256": "a0e79673e57f7094f6b95e4d8bc1b65465db72f0fb7d5c16577856166b2288ef"
+      "sha256": "b608a580b0992950f219d9c48660d45989de63df74d71e918eff8c42645d9e86"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
