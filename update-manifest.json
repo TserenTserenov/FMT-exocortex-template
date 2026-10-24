@@ -1253,7 +1253,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "f6fe1ce03bbecb5c9cd6833db6d65b35d2c679d461c350a1b882c4a55ffa7eea"
+      "sha256": "da5cdbfc11164106633e14ed23aa5ee28339e59d21e4d6ddd4a2457a7ae8cd77"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2377,7 +2377,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "d6ecfe9d33b408e23402962f1a8b32ee780a1085fafa0316fa7a6e64a337f9ca"
+      "sha256": "aa114259df18aaf201fb1a1959c8d320e4debd4926eee2ddc025f7cbde6b3159"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -2398,6 +2398,10 @@
     {
       "path": "scripts/day-open-smoke.sh",
       "sha256": "7008e489f92ff0264b44dccea98a568da0afd2d57c1f24fdf8638ce2d9f0bdd8"
+    },
+    {
+      "path": "scripts/day-open-sync-banner-patch.py",
+      "sha256": "7275fafc8a512cf02a217d618a2796d9934d42daec77e11008a45da7159b780d"
     },
     {
       "path": "scripts/day-open-version-check-patch.py",
@@ -3205,7 +3209,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "51a5f120e2e9c3bb4a1252a1428ca92e6082988e6d7da89c12e77dab464effa9"
+      "sha256": "5a7927d583951d49171ac23b973c4779291a18c93ef1b5ca7808c32646b04724"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3214,6 +3218,10 @@
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
       "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
+    },
+    {
+      "path": "seed/strategy/scripts/day-open-sync-banner-patch.py",
+      "sha256": "744bf0ccc957c1a05b528ab45fc8af888aaefc74dc705dfe8ec9a09d8ef29cde"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3536,6 +3544,7 @@
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
+    "scripts/tests/test_sync_banner.py",
     "scripts/tests/test_sync_code_scan_quiet.sh",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",

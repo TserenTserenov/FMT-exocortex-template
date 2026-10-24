@@ -106,6 +106,7 @@ day_open_sync_blocked() {
   {
     printf 'head=%s\ntarget=%s\nbehind=%s\nreason=%s\nsig=%s\n' \
       "$head" "$target" "$behind" "$(echo "$reason" | tr '\n' ' ')" "$sig"
+    printf 'paths=%s\n' "$(echo "$paths" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
     [ -z "$notified" ] || printf 'notified_sig=%s\nnotified=%s\n' "$notified_sig" "$notified"
   } > "$file.tmp" && mv "$file.tmp" "$file"
 }
@@ -1871,6 +1872,20 @@ else
 fi
 
 # ============================================
+# 4.58. Sync-banner patch (deterministic, AFTER LLM Fill so the fill cannot erase
+# it — Refs #1245). While the sync-blocked marker of the shared checkout is
+# present the registry of work products, the week plan and the inbox were read
+# from a stale copy; the plan says so once. No marker: the plan stays as it was
+# (a block left by an earlier run is removed). Never blocks Open.
+# ============================================
+echo "=== 4.58. Sync-banner patch ==="
+SYNC_MARKER=$(day_open_sync_marker_file "$DS_STRATEGY")
+"$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+  --dayplan "$DAYPLAN_PATH" --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" 2>&1 || true
+SYNC_WARN=$("$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+  --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" --print-text 2>/dev/null || true)
+
+# ============================================
 # 4.59. Multiplier backfill patch (deterministic — WP-484 Ф117, pilot decision
 # 18.08 + peer-session 2026-09-01-18-wp484-backlog-continue: wakatime-cli only
 # supports --today, so a Close that ran late or on a host without the CLI
@@ -1945,6 +1960,16 @@ for f in "$CURRENT_DIR"/DayPlan\ *.md; do
   ARCHIVED_PATHS+=("$f")   # old current/ path: include below so the deletion is committed
   ARCHIVE_TARGETS+=("$ARCHIVE_DIR/$basename_f")   # new archive/ path: staged individually below
 done
+fi
+
+# Refs #1245: the sync above may have just created the marker (first refusal). The inputs
+# were read before it, so the plan and the digest say so now. Only ever adds or refreshes
+# the block here: a marker cleared by a successful move does not make today's inputs fresh.
+if [ "$PROBE" != "true" ] && [ "$SCAFFOLD_ONLY" != "true" ] && [ -f "$SYNC_MARKER" ]; then
+  "$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --dayplan "$DAYPLAN_PATH" --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" 2>&1 || true
+  SYNC_WARN=$("$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" --print-text 2>/dev/null || true)
 fi
 
 # session-guard.sh scope gate (added 2026-07-07, WP-7 SGFIX3) blocks any new/renamed
@@ -2075,6 +2100,9 @@ PLAN_ROWS="${PLAN_ROWS:-  нет данных}"
 MSG="✅ День открыт: $DATE"$'\n\n'
 MSG+="📋 Сегодня:"$'\n'"${PLAN_ROWS}"$'\n\n'
 MSG+="💾 ${SHORT_HASH}"
+
+# Refs #1245: the same stale-input warning as in the DayPlan (one source of text).
+[ -z "${SYNC_WARN:-}" ] || MSG+=$'\n\n'"⚠️ ${SYNC_WARN}"
 
 # WP-149 gate-dopo (peer-session 2026-06-23-07): surface rung_fidelity from last render.
 GATE_STATUS_FILE="$DS_STRATEGY/current/gate-status.yaml"
