@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "d2fdce2619f01c9cc7d93c2963c994cf38b3486cf3245ec6bd924950dc522bc1"
+      "sha256": "e1ef03e3bd1debc7268c86c7ef67e143e6fa6d8e2b2a243ea5221eac8da596ae"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -821,7 +821,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "59de5825f2e436cac9e0585edd9e6c7913752800358441646d36a612b3792463"
+      "sha256": "b25f544a67b728930da0582e6f8c6f537d6b3d76ef3a7d10ec573c570f0de99a"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "12395e09befdee7230288cab00c6a1fdc95568ac267f39e4b25e8a84c23be5f2"
+      "sha256": "05bd408d5a591cbd8fdf37e5a8586602f3db38191dafa3a359abaf229d42b442"
     },
     {
       "path": "CLAUDE.md",
@@ -2285,7 +2285,7 @@
     },
     {
       "path": "scripts/check-wp-registered.sh",
-      "sha256": "6dc7efb58aa5b6e875e5edab62c99912499f170b59d6fb655355f0465d7ba053"
+      "sha256": "43f8f071622782d786969f8a33ad9b006a3d79dcc15f32829a20876bcb8218da"
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",

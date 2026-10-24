@@ -89,6 +89,54 @@ else
   echo "FAIL: после дозаписи появилась лишняя карточка"; FAILS=$((FAILS + 1))
 fi
 
+# --- alternative plan layout: no «#», number as WP-N in «РП», title in «Работа» ---
+alt_fixture() {
+  new_fixture "$1"
+  printf '%s\n' '# WeekPlan W1' '' '## План' '' '| 🚦 | РП | Работа | Часы | Источник | Ставка | Статус | Репо |' \
+    '|----|----|--------|------|----------|--------|--------|------|' > "$1/current/WeekPlan W1.md"
+}
+G="$TMP/alt"; alt_fixture "$G"; add_card "$G" 5 "Альтернативный"; add_registry "$G" 5 "Альтернативный"
+printf '| 🟡 | WP-5 | Альтернативный | 1 | ПС | — | pending | DS |\n' >> "$G/current/WeekPlan W1.md"
+expect "раскладка без «#»: успех" 0 "согласованы" -- 5 "$G" "$G/current/WeekPlan W1.md"
+G="$TMP/altmiss"; alt_fixture "$G"; add_card "$G" 5 "Альтернативный"; add_registry "$G" 5 "Альтернативный"
+printf '| 🟡 | WP-6 | Чужой | 1 | ПС | — | pending | DS |\n' >> "$G/current/WeekPlan W1.md"
+expect "раскладка без «#»: нет строки" 1 "в таблице «План»" -- 5 "$G" "$G/current/WeekPlan W1.md"
+
+# --- case-insensitive prefix and bold headers ---
+G="$TMP/lower"; new_fixture "$G"; add_card "$G" 12 "Нижний"; add_registry "$G" wp-12 "Нижний"; add_plan "$G" wp-12 "Нижний"
+expect "префикс wp-12 в нижнем регистре" 0 "согласованы" -- 12 "$G" "$G/current/WeekPlan W1.md"
+G="$TMP/bold"; new_fixture "$G"; add_card "$G" 1 "Первый"
+printf '%s\n' '| **#** | P | **Название** | Ст | Репо | Бюджет |' '|---|---|---|---|---|---|' > "$G/docs/WP-REGISTRY.md"
+add_registry "$G" 1 "Первый"; add_plan "$G" 1 "Первый"
+printf '%s\n' '| **🚦** | **#** | **РП** | h | Источник | P | **Статус** | Результат |' '|---|---|---|---|---|---|---|---|' > "$G/current/WeekPlan W1.md"
+add_plan "$G" 1 "Первый"
+expect "жирные заголовки реестра и плана" 0 "согласованы" -- 1 "$G" "$G/current/WeekPlan W1.md"
+
+# --- a column index must not leak from a previous table ---
+G="$TMP/leak"; new_fixture "$G"; add_card "$G" 1 "Первый"; add_registry "$G" 1 "Первый"; add_plan "$G" 1 "Первый"
+printf '\n| Статус | Расшифровка |\n|---|---|\n| 1 | done |\n' >> "$G/docs/WP-REGISTRY.md"
+expect "колонка номера не тянется из прошлой таблицы" 0 "согласованы" -- 1 "$G" "$G/current/WeekPlan W1.md"
+
+# --- «План» wins over another candidate table with the same РП ---
+G="$TMP/two"; new_fixture "$G"; add_card "$G" 1 "Первый"; add_registry "$G" 1 "Первый"
+printf '%s\n' '# WeekPlan W1' '' '## План' '' '| 🚦 | # | РП | h | Источник | P | Статус | Результат |' '|---|---|---|---|---|---|---|---|' > "$G/current/WeekPlan W1.md"
+add_plan "$G" 1 "Первый"
+printf '\n## Перенос\n\n| 🚦 | # | РП | h | Источник | P | Статус | Результат |\n|---|---|---|---|---|---|---|---|\n' >> "$G/current/WeekPlan W1.md"
+add_plan "$G" 1 "Первый"
+expect "таблицы «План» и «Перенос»" 0 "согласованы" -- 1 "$G" "$G/current/WeekPlan W1.md"
+G="$TMP/twodup"; new_fixture "$G"; add_card "$G" 1 "Первый"; add_registry "$G" 1 "Первый"
+printf '%s\n' '## План' '' '| 🚦 | # | РП | h | Источник | P | Статус | Результат |' '|---|---|---|---|---|---|---|---|' > "$G/current/WeekPlan W1.md"
+add_plan "$G" 1 "Первый"; add_plan "$G" 1 "Первый"
+printf '\n## Перенос\n\n| 🚦 | # | РП | h | Источник | P | Статус | Результат |\n|---|---|---|---|---|---|---|---|\n' >> "$G/current/WeekPlan W1.md"
+add_plan "$G" 1 "Первый"
+expect "дубль внутри «План» при таблице «Перенос»" 1 "строк с номером 1: 2" -- 1 "$G" "$G/current/WeekPlan W1.md"
+
+# --- long title: the registry cuts it to 80 characters ---
+LONG="Очень длинное название рабочего продукта которое заведомо превышает восемьдесят символов и режется реестром"
+G="$TMP/long"; new_fixture "$G"; add_card "$G" 1 "$LONG"
+add_registry "$G" 1 "${LONG:0:80}"; add_plan "$G" 1 "$LONG"
+expect "длинное название: реестр режет до 80" 0 "согласованы" -- 1 "$G" "$G/current/WeekPlan W1.md"
+
 # --- bad arguments ---
 expect "неверный номер" 2 "Неверный номер" -- abc "$G" "$G/current/WeekPlan W1.md"
 expect "нет аргументов" 2 "Использование" --

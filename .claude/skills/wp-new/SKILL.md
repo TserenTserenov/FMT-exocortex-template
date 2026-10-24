@@ -184,7 +184,9 @@ result_type: {system|episteme}
 Проверку выполняет скрипт: ненулевой код означает неполную регистрацию, успех не объявлять. Передай номер, каталог governance и WeekPlan, в который скрипт записал строку:
 
 ```bash
-bash "$IWE_SCRIPTS/check-wp-registered.sh" "{N}" "${GOV_WT:-${IWE_ROOT:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}" "<путь WeekPlan, в который скрипт записал строку>" || exit 1
+WEEKPLAN_PATH="<путь WeekPlan, в который скрипт записал строку>"   # задай явно
+: "${WEEKPLAN_PATH:?путь WeekPlan не задан}"
+bash "$IWE_SCRIPTS/check-wp-registered.sh" "{N}" "${GOV_WT:-${IWE_ROOT:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}" "$WEEKPLAN_PATH" || { echo "регистрация не согласована" >&2; false; }
 ```
 
 При пропущенной записи не подтверждай создание: сохрани уже записанное, сообщи конкретную неполноту и восстанови регистрацию с тем же номером. Для стратегической сессии действуют также проверка повторного вызова и итоговая синхронизация MEMORY из раздела «Регистрация РП перед утверждением» скилла `strategy-session`.
