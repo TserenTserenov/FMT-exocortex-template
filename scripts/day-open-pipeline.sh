@@ -23,6 +23,7 @@ SCRIPT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 day_open_fast_forward() {
   local repo="$1" remote="${2:-origin}" source_ref="${3:-refs/heads/main}"
   local upstream="${4:-refs/remotes/origin/main}" head branch tree target target_ref
+  DAY_OPEN_SYNC_REPORTED=0
   head=$(git -C "$repo" rev-parse HEAD) || return 1
   branch=$(git -C "$repo" symbolic-ref --quiet HEAD) || return 1
   tree=$(GIT_OPTIONAL_LOCKS=0 git -C "$repo" status --porcelain --untracked-files=all) || return 1
@@ -66,17 +67,20 @@ day_open_sync_marker_file() {
     "$(printf '%s' "$root" | cksum | cut -d' ' -f1)"
 }
 
-day_open_sync_marker_exists() {
-  [ -f "$(day_open_sync_marker_file "$1")" ]
-}
-
 day_open_sync_marker_clear() {
   rm -f "$(day_open_sync_marker_file "$1")"
 }
 
+# Records why the checkout cannot move and tells the pilot, once per reason. The
+# delivery time is stored only after the message was really delivered (tg_notify
+# succeeded), together with the reason it was delivered for; a failed send leaves
+# the old values, so the next run tries again. Probe runs write nothing.
+# DAY_OPEN_SYNC_REPORTED=1 tells the caller the pilot already knows about this block.
 day_open_sync_blocked() {
   local repo="$1" target="$2" class="$3" reason="$4" paths="$5"
-  local file head behind sig now last_sig="" last_at=0 notify=0
+  local file head behind sig now notified_sig="" notified="" notify=0
+  DAY_OPEN_SYNC_REPORTED=0
+  [ "${PROBE:-false}" != true ] || return 0
   file=$(day_open_sync_marker_file "$repo")
   mkdir -p "$(dirname "$file")" || return 0
   head=$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null) || return 0
@@ -84,22 +88,25 @@ day_open_sync_blocked() {
   sig="$class|$paths"
   now=${DAY_OPEN_NOW:-$(date +%s)}
   if [ -f "$file" ]; then
-    last_sig=$(sed -n 's/^sig=//p' "$file")
-    last_at=$(sed -n 's/^notified=//p' "$file")
-    if [ "$last_sig" != "$sig" ] || [ $((now - ${last_at:-0})) -ge 604800 ]; then
-      notify=1
-    fi
-  else
+    notified_sig=$(sed -n 's/^notified_sig=//p' "$file")
+    notified=$(sed -n 's/^notified=//p' "$file")
+  fi
+  if [ "$notified_sig" != "$sig" ] || [ -z "$notified" ] || [ $((now - notified)) -ge 604800 ]; then
     notify=1
   fi
-  [ "$notify" -eq 1 ] && last_at=$now
-  {
-    printf 'head=%s\ntarget=%s\nbehind=%s\nreason=%s\nsig=%s\nnotified=%s\n' \
-      "$head" "$target" "$behind" "$(echo "$reason" | tr '\n' ' ')" "$sig" "$last_at"
-  } > "$file.tmp" && mv "$file.tmp" "$file"
-  if [ "$notify" -eq 1 ] && command -v tg_notify >/dev/null 2>&1; then
-    tg_notify "⚠️ Day Open: рабочая копия $(basename "$repo") отстаёт от опубликованной на $behind коммитов и не обновляется сама. Причина: $reason. Затронуто: ${paths:-—}. Нужно решение вручную: закоммитить или убрать свои правки, после этого копия догонит сама." protective || true
+  if [ "$notify" -eq 0 ]; then
+    DAY_OPEN_SYNC_REPORTED=1
+  elif command -v tg_notify >/dev/null 2>&1 \
+      && tg_notify "⚠️ Day Open: рабочая копия $(basename "$repo") отстаёт от опубликованной на $behind коммитов и не обновляется сама. Причина: $reason. Затронуто: ${paths:-—}. Нужно решение вручную: закоммитить или убрать свои правки, после этого копия догонит сама." protective; then
+    notified_sig=$sig
+    notified=$now
+    DAY_OPEN_SYNC_REPORTED=1
   fi
+  {
+    printf 'head=%s\ntarget=%s\nbehind=%s\nreason=%s\nsig=%s\n' \
+      "$head" "$target" "$behind" "$(echo "$reason" | tr '\n' ' ')" "$sig"
+    [ -z "$notified" ] || printf 'notified_sig=%s\nnotified=%s\n' "$notified_sig" "$notified"
+  } > "$file.tmp" && mv "$file.tmp" "$file"
 }
 
 # Superseded refs older than 90 days (by commit date) are dropped once the commit
@@ -1910,9 +1917,10 @@ else
 # Sync is optional housekeeping: a stale or dirty copy must not discard the
 # DayPlan already rendered above. No stash/rebase/reset in the source tree.
 if ! day_open_fast_forward "$DS_STRATEGY"; then
-  # A lasting refusal (overlapping edits, an unpublished local commit) is reported
-  # once, with paths and the number of commits behind, through the sync-blocked marker.
-  day_open_sync_marker_exists "$DS_STRATEGY" \
+  # A lasting refusal (overlapping edits, an unpublished local commit) that the pilot
+  # already got through the sync-blocked marker is not repeated in general words;
+  # any other failure (unsaved edits before the check, no connection) still is.
+  [ "${DAY_OPEN_SYNC_REPORTED:-0}" = 1 ] \
     || tg_notify "⚠️ Day Open: обновление пропущено (несохранённые правки или нет связи); локальная работа и готовый DayPlan сохранены" protective
 fi
 

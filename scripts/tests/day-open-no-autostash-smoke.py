@@ -40,6 +40,7 @@ class DayOpenGitTests(unittest.TestCase):
                         IWE_SCRIPTS=str(ROOT / "scripts"))
         self.env["DAY_OPEN_STATE_DIR"] = str(self.root / "state")
         self.env["TG_LOG"] = str(self.root / "tg.log")
+        self.env["TG_ATTEMPTS"] = str(self.root / "tg-attempts.log")
         source = PIPELINE.read_text()
         definitions = [match.group() for match in re.finditer(
             r"^day_open_\w+\(\) \{\n.*?^\}\n", source, re.MULTILINE | re.DOTALL)]
@@ -53,7 +54,7 @@ class DayOpenGitTests(unittest.TestCase):
             "set -uo pipefail\n" + "\n".join(definitions)
             + '\npublished() { day_open_publish "$@" && printf "published=%s\\n" "$DAY_OPEN_PUBLISHED_SHA"; }\n'
             + 'isolated() { day_open_isolated_push "$@"; local rc=$?; printf "published=%s\\n" "$DAY_OPEN_PUBLISHED_SHA"; return $rc; }\n'
-            + 'tg_notify() { printf "%s\\t%s\\n" "$2" "$1" >> "$TG_LOG"; }\n'
+            + 'tg_notify() { printf "%s\\n" "$2" >> "$TG_ATTEMPTS"; [ "${TG_RC:-0}" -eq 0 ] || return 1; printf "%s\\t%s\\n" "$2" "$1" >> "$TG_LOG"; }\n'
             + 'adopt() { day_open_adopt_twins "$@"; }\n'
             + 'prune() { day_open_prune_superseded "$@"; }\n"$@"\n')
 
@@ -853,6 +854,103 @@ class DayOpenGitTests(unittest.TestCase):
         left = self.git(self.repo, "for-each-ref", "--format=%(refname:lstrip=3)",
                         "refs/day-open/superseded/").decode().split()
         self.assertEqual(sorted([recent_reachable, old_lost]), sorted(left))
+
+    def tg_attempts(self):
+        path = self.root / "tg-attempts.log"
+        return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+
+    def blocked_setup(self):
+        """An overlapping local edit holds the checkout behind a published plan."""
+        self.advance_remote()
+        commit = self.commit_plan()
+        self.dirty()
+        return self.run_helper("published", commit)
+
+    def test_tg_failure_is_retried(self):
+        self.env["TG_RC"] = "1"
+        result = self.blocked_setup()
+        self.assertEqual(0, result.returncode, result.stderr)
+        marker = self.markers()[0]
+        self.assertNotIn("notified", marker.read_text(encoding="utf-8"))
+        self.assertEqual(1, len(self.tg_attempts()))
+        self.assertEqual([], self.tg_messages())
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(2, len(self.tg_attempts()), "a failed send must be tried again")
+        self.assertNotIn("notified", marker.read_text(encoding="utf-8"))
+        self.env["TG_RC"] = "0"
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.tg_messages()))
+        text = marker.read_text(encoding="utf-8")
+        self.assertIn("notified=", text)
+        self.assertIn("notified_sig=", text)
+        # Delivered once, so the next runs stay silent.
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.tg_messages()))
+        self.assertEqual(3, len(self.tg_attempts()))
+
+    def test_probe_writes_no_marker(self):
+        self.env["PROBE"] = "true"
+        result = self.blocked_setup()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], self.markers())
+        self.assertEqual([], self.tg_attempts())
+        del self.env["PROBE"]
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.markers()))
+        self.assertEqual(1, len(self.tg_messages()))
+
+    def run_call_site(self):
+        source = PIPELINE.read_text(encoding="utf-8")
+        match = re.search(r'if ! day_open_fast_forward "\$DS_STRATEGY"; then\n.*?\nfi', source, re.DOTALL)
+        self.assertIsNotNone(match, "the pipeline call site moved")
+        script = self.root / "call-site.sh"
+        script.write_text(self.helpers.read_text(encoding="utf-8").replace('\n"$@"\n', "\n")
+                          + 'DS_STRATEGY="$1"\n' + match.group() + "\n", encoding="utf-8")
+        return subprocess.run(["bash", str(script), str(self.repo)], env=self.env,
+                              capture_output=True, text=True)
+
+    def test_call_site_gag_only_when_reported(self):
+        # A clean checkout with an unpublished local commit: refused, reported once, no general message.
+        (self.repo / "foreign.txt").write_text("another agent\n")
+        self.git(self.repo, "add", "foreign.txt")
+        self.git(self.repo, "commit", "-qm", "foreign local commit")
+        self.shift_origin("remote.txt")
+        result = self.run_call_site()
+        self.assertEqual(0, result.returncode, result.stderr)
+        messages = self.tg_messages()
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn("отстаёт", messages[0])
+        self.assertNotIn("обновление пропущено", messages[0])
+        # Same run again: the pilot already knows, nothing new is sent.
+        self.run_call_site()
+        self.assertEqual(1, len(self.tg_messages()))
+
+    def test_old_marker_does_not_gag(self):
+        self.shift_origin("remote.txt")
+        self.dirty()
+        marker = Path(subprocess.run(
+            ["bash", str(self.helpers), "day_open_sync_marker_file", str(self.repo)],
+            env=self.env, capture_output=True, text=True).stdout.strip())
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        # An old block for another reason, delivered long ago.
+        marker.write_text("head=0\ntarget=0\nbehind=9\nreason=old\nsig=overlap|old.txt\n"
+                          "notified_sig=overlap|old.txt\nnotified=1\n", encoding="utf-8")
+        result = self.run_call_site()
+        self.assertEqual(0, result.returncode, result.stderr)
+        messages = self.tg_messages()
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn("обновление пропущено", messages[0])
+
+    def test_failed_marker_send_still_gets_the_general_message(self):
+        self.env["TG_RC"] = "1"
+        (self.repo / "foreign.txt").write_text("another agent\n")
+        self.git(self.repo, "add", "foreign.txt")
+        self.git(self.repo, "commit", "-qm", "foreign local commit")
+        self.shift_origin("remote.txt")
+        self.run_call_site()
+        attempts = self.tg_attempts()
+        # One attempt for the marker message, one for the general one: silence is not an option.
+        self.assertEqual(2, len(attempts), attempts)
 
     def seed_pending(self, *entries):
         root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
