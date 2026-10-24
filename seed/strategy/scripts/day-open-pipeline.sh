@@ -2102,14 +2102,6 @@ MSG="✅ День открыт: $DATE"$'\n\n'
 MSG+="📋 Сегодня:"$'\n'"${PLAN_ROWS}"$'\n\n'
 MSG+="💾 ${SHORT_HASH}"
 
-# Refs #1245: the same stale-input warning as in the DayPlan (one source of text).
-# Telegram refuses a message over 4096 characters and the whole digest would be lost: the
-# script cuts only the banner, never the digest.
-if [ -n "${SYNC_WARN:-}" ]; then
-  MSG_WITH_WARN=$(printf '%s' "$MSG" | "$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
-    --digest "$SYNC_WARN" 2>/dev/null) && [ -n "$MSG_WITH_WARN" ] && MSG="$MSG_WITH_WARN"
-fi
-
 # WP-149 gate-dopo (peer-session 2026-06-23-07): surface rung_fidelity from last render.
 GATE_STATUS_FILE="$DS_STRATEGY/current/gate-status.yaml"
 if [ -f "$GATE_STATUS_FILE" ]; then
@@ -2118,6 +2110,15 @@ if [ -f "$GATE_STATUS_FILE" ]; then
     echo "  ⚠️ rung_fidelity: $GATE_ST — проверь $GATE_STATUS_FILE"
     MSG+="\n⚠️ Руководство: rung_fidelity=$GATE_ST (gate-status.yaml)"
   fi
+fi
+
+# Refs #1245: the same stale-input warning as in the DayPlan (one source of text). It goes in
+# LAST, after every other line of the digest, so the 4096 limit counts the finished text.
+# Telegram refuses a message over 4096 characters and the whole digest would be lost: the
+# script cuts only the banner, never the digest.
+if [ -n "${SYNC_WARN:-}" ]; then
+  MSG_WITH_WARN=$(printf '%s' "$MSG" | "$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --digest "$SYNC_WARN" 2>/dev/null) && [ -n "$MSG_WITH_WARN" ] && MSG="$MSG_WITH_WARN"
 fi
 
 tg_notify "$MSG" terminal

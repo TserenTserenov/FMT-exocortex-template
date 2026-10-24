@@ -331,6 +331,37 @@ class SyncBannerTests(unittest.TestCase):
         self.assertIn("paths=-n behind=999 -e x", raw)
         self.assertIn("на 1 коммит", self.patch("--print-text").stdout)
 
+    def test_banner_goes_last_so_the_gate_line_is_counted_and_kept(self):
+        self.block(paths=self.many_paths())
+        source = PIPELINE.read_text(encoding="utf-8")
+        self.assertLess(source.index('GATE_STATUS_FILE="$DS_STRATEGY'), source.index('--digest "$SYNC_WARN"'))
+        self.assertLess(source.index('--digest "$SYNC_WARN"'), source.index('tg_notify "$MSG" terminal'))
+        step = re.search(r'^SYNC_MARKER=.*?^SYNC_WARN=.*?\|\| true\)\n', source,
+                         re.MULTILINE | re.DOTALL)
+        gate = re.search(r'^GATE_STATUS_FILE=.*?^fi\n', source, re.MULTILINE | re.DOTALL)
+        digest = re.search(r'^if \[ -n "\$\{SYNC_WARN:-\}" \]; then\n.*?^fi\n', source,
+                           re.MULTILINE | re.DOTALL)
+        (self.repo / "current").mkdir()
+        (self.repo / "current" / "gate-status.yaml").write_text(
+            "gate:\n  status: degraded\n", encoding="utf-8")
+        script = self.root / "gate.sh"
+        script.write_text(
+            "set -uo pipefail\n" + self.helpers.read_text(encoding="utf-8").replace('\n"$@"\n', "\n")
+            + f'SCRIPT_HOME="{ROOT / "scripts"}"\n_PATCH_PY=python3\nDS_STRATEGY="$1"\nDAYPLAN_PATH="$2"\n'
+            + step.group() + 'MSG="$(printf \'row %s\\n\' $(seq 1 470))"\nMSG+="💾 abcd1234"\n'
+            + gate.group() + digest.group() + 'printf "%s" "$MSG" > "$3"\n', encoding="utf-8")
+        out = self.root / "gate.txt"
+        done = subprocess.run([BASH, str(script), str(self.repo), str(self.plan), str(out)],
+                              env=self.env, capture_output=True, text=True)
+        self.assertEqual(0, done.returncode, done.stderr)
+        msg = out.read_text(encoding="utf-8")
+        self.assertLessEqual(len(msg.encode("utf-16-le")) // 2, 4096)
+        self.assertIn("\\n⚠️ Руководство: rung_fidelity=degraded (gate-status.yaml)", msg)
+        self.assertIn("row 470", msg)
+        self.assertEqual(1, msg.count("rung_fidelity"))
+        self.assertTrue(msg.endswith("…"), "only the banner was cut")
+        self.assertIn("Вход Day Open мог устареть", msg)
+
 
 if __name__ == "__main__":
     unittest.main()
