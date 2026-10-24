@@ -653,7 +653,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-render/SKILL.md",
-      "sha256": "c142ad023dbffdf6e746d6185bf6a82e088848b24f144d0491a95e2076766138"
+      "sha256": "8eec1d0cdb85a5d4fee140b068b04f248e75d6ecfc08e66d01aef2c26acc810e"
     },
     {
       "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
@@ -661,7 +661,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-start/SKILL.md",
-      "sha256": "0f485fb8ef6983e71333534537ec6c60f7e456ce3d36b1a07f62b113ddaccb24"
+      "sha256": "47f8f4c32aaa8998c063c16c8ac29438fe40ebb9d7afb33e9260ebaf4f18b62f"
     },
     {
       "path": ".claude/skills/platform-bottleneck/SKILL.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4091e49183961e30fb7debd0feb8ec399a135459efdcf32b9e653e71a60869fa"
+      "sha256": "97dd58fcf2c09156fcc50389e55a2f92286d26162d6629a45521b8132c2e1787"
     },
     {
       "path": "CLAUDE.md",
@@ -2385,7 +2385,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
+      "sha256": "cb4ed573784ead72eaa9d5cfb9628d3eced91ac67f0000cabf6ac135801bd8c1"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3201,7 +3201,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
+      "sha256": "ecab3930cc565e77eb43b53ca1d0cb28dbf066d2a7ab22f4336c67756aa0888f"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3428,7 +3428,6 @@
     "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
-    "scripts/tests/test_issue_1254_repo_activity_utf8.py",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
