@@ -691,7 +691,7 @@ class DayOpenGitTests(unittest.TestCase):
         root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
         state = self.root / "state"
         state.mkdir(exist_ok=True)
-        with open(state / "day-open-pending-publish.list", "a") as handle:
+        with open(state / "day-open-pending-publish.list", "a", encoding="utf-8") as handle:
             for remote, ref, sha in entries:
                 handle.write("\t".join([root, remote, ref, sha]) + "\n")
 
