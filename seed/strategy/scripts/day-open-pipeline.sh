@@ -213,22 +213,63 @@ day_open_published_equivalent() {
   git -C "$repo" rev-parse "$target"
 }
 
-# Same change of the list when python3 with fcntl is missing. A mkdir lock with a
-# spin and a timeout keeps concurrent runs from losing each other's changes; a lock
-# older than the timeout is treated as left by a crashed run and taken over.
+# Same change of the list when python3 with fcntl is missing. A mkdir lock keeps
+# concurrent runs from losing each other's changes. The holder writes its pid into the
+# lock; a waiter takes a lock over only when it is older than DAY_OPEN_LOCK_STALE_SECS
+# (10 s by default, by the lock's own mtime) AND its holder is gone (or never wrote
+# its pid). A live holder is never robbed, however long the waiter has been waiting;
+# after DAY_OPEN_LOCK_WAIT_SECS (120 s) the waiter gives up instead of stealing.
+day_open_file_mtime() {
+  local m
+  m=$(stat -c %Y "$1" 2>/dev/null) || m=$(stat -f %m "$1" 2>/dev/null) || return 1
+  case "$m" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$m"
+}
+
+# Is the lock <dir> abandoned? Prints the pid it was judged by (empty = no pid written).
+day_open_lock_is_stale() {
+  local dir="$1" mtime pid
+  mtime=$(day_open_file_mtime "$dir") || return 1
+  [ $(( $(date +%s) - mtime )) -gt "${DAY_OPEN_LOCK_STALE_SECS:-10}" ] || return 1
+  pid=$(cat "$dir/owner" 2>/dev/null)
+  case "$pid" in
+    '') ;;
+    *[!0-9]*) ;;
+    *) ! kill -0 "$pid" 2>/dev/null || return 1 ;;
+  esac
+  printf '%s\n' "$pid"
+}
+
+# Takes an abandoned lock over. The rename is atomic, so two waiters cannot both take
+# the same one; the renamed directory is checked to be the one that was judged stale (a
+# third process may have re-created the lock in between) and put back if it is not.
+day_open_lock_take_over() {
+  local dir="$1" judged_pid="$2" moved="$1.stale.$$"
+  mv "$dir" "$moved" 2>/dev/null || return 1
+  if [ "$(cat "$moved/owner" 2>/dev/null)" != "$judged_pid" ]; then
+    mv "$moved" "$dir" 2>/dev/null || rm -rf "$moved"
+    return 1
+  fi
+  echo "Day Open: pending-publish lock was left by a finished run; taking it over." >&2
+  rm -rf "$moved"
+}
+
 day_open_pending_update_fallback() {
-  local file="$1" mode="$2" lockdir tries=0 tmp rc=0
+  local file="$1" mode="$2" lockdir started tmp rc=0 pid
   shift 2
   lockdir="$file.lockdir"
+  started=$SECONDS
   while ! mkdir "$lockdir" 2>/dev/null; do
-    tries=$((tries + 1))
-    if [ "$tries" -gt 100 ]; then
-      echo "Day Open: pending-publish lock held for over 10 s; taking it over." >&2
-      rm -rf "$lockdir"
-      tries=0
+    if pid=$(day_open_lock_is_stale "$lockdir"); then
+      day_open_lock_take_over "$lockdir" "$pid" && continue
+    fi
+    if [ $((SECONDS - started)) -gt "${DAY_OPEN_LOCK_WAIT_SECS:-120}" ]; then
+      echo "Day Open: pending-publish list is locked by a running process; giving up." >&2
+      return 1
     fi
     sleep 0.1
   done
+  printf '%s\n' "$$" > "$lockdir/owner"
   case "$mode" in
     record)
       grep -qxF "$(printf '%s\t%s\t%s\t%s' "$@")" "$file" 2>/dev/null \
@@ -236,7 +277,7 @@ day_open_pending_update_fallback() {
       ;;
     *)
       if [ -f "$file" ]; then
-        tmp=$(mktemp "$file.XXXXXX") || { rmdir "$lockdir"; return 1; }
+        tmp=$(mktemp "$file.XXXXXX") || { rm -f "$lockdir/owner"; rmdir "$lockdir"; return 1; }
         if [ "$mode" = prune ]; then
           awk -F'\t' -v repo="$1" '!($1 == repo && !(length($4) >= 40 && length($4) <= 64 && $4 ~ /^[0-9a-f]+$/))' "$file" > "$tmp"
         else
@@ -249,7 +290,11 @@ day_open_pending_update_fallback() {
       fi
       ;;
   esac
-  rmdir "$lockdir" 2>/dev/null
+  # Release only a lock that is still ours.
+  if [ "$(cat "$lockdir/owner" 2>/dev/null)" = "$$" ]; then
+    rm -f "$lockdir/owner"
+    rmdir "$lockdir" 2>/dev/null
+  fi
   return "$rc"
 }
 
