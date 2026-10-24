@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
 # routing: helper  skill=day-open  called-by=haiku  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 # day-open-scaffold.sh — детерминированная генерация скелета DayPlan
@@ -748,7 +747,7 @@ render_repo_activity() {
   local since out="" any=0 repo slug n last
   since=$(date -v-2d +%Y-%m-%d 2>/dev/null || date -d "2 days ago" +%Y-%m-%d 2>/dev/null)
   [ -z "$since" ] && { echo "_не удалось вычислить дату фильтра — пропуск._"; return; }
-  out="| Репозиторий | Коммитов (2д) | Последний |\n|---|---|---|\n"
+  printf -v out '| Репозиторий | Коммитов (2д) | Последний |\n|---|---|---|\n'
   # issue #1131: `cut -c1-50` counts bytes under the C/POSIX locale (launchd's
   # EnvironmentVariables carry no LANG/LC_*) and can split a multibyte UTF-8
   # character mid-sequence, corrupting the whole scaffold file for every
@@ -761,19 +760,24 @@ render_repo_activity() {
     n=$(git -C "$repo" log --since="$since 00:00:00" --oneline 2>/dev/null | wc -l | tr -d ' ')
     [ "${n:-0}" -eq 0 ] && continue
     if [ -n "$_resolved_python3" ]; then
-      last=$(git -C "$repo" log -1 --format='%s' 2>/dev/null | "$_resolved_python3" -c "
+      if ! last=$(git -C "$repo" log -1 --format='%s' 2>/dev/null | "$_resolved_python3" -c "
 import sys
 line = sys.stdin.buffer.readline().decode('utf-8', errors='replace').rstrip('\n')
-print(line if len(line) <= 50 else line[:50] + '…')
-")
+result = line if len(line) <= 50 else line[:50] + '\u2026'
+sys.stdout.buffer.write((result + '\n').encode('utf-8'))
+"); then
+        last="_заголовок недоступен: ошибка чтения_"
+      fi
     else
-      last=$(git -C "$repo" log -1 --format='%s' 2>/dev/null | cut -c1-50)
+      # issue #1254: never fall back to byte truncation and corrupt the DayPlan.
+      last="_заголовок недоступен: Python 3 не найден_"
     fi
-    out="${out}| ${slug} | ${n} | ${last} |\n"
+    # Commit subjects are data: %b would interpret literal \\xNN / \\c escapes.
+    printf -v out '%s| %s | %s | %s |\n' "$out" "$slug" "$n" "$last"
     any=1
   done < <(iwe_repo_dirs "$IWE"/*/)
   if [ "$any" = "1" ]; then
-    printf "%b" "$out"
+    printf '%s' "$out"
   else
     echo "Активности в репозиториях за 2 дня нет."
   fi
