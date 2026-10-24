@@ -137,7 +137,7 @@
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
-      "sha256": "29b4433747795109d9a85ffaac316c50044d6cc8ad7cbce4bec4511dcc8e0644"
+      "sha256": "5d5d677c01de0a330616c656ff1c6e1b25917d8540d5a04e0a656661b5488caa"
     },
     {
       "path": ".claude/hooks/residency-gate-init.sh",
@@ -313,7 +313,7 @@
     },
     {
       "path": ".claude/rules-lazy/blocking-rules-full.md",
-      "sha256": "66e7cf02a570e640210002c376fe1e01e7cc65506549d81365503bfe1e1c09f4"
+      "sha256": "1d05cb7d6c09b0126956fea4c25b34f46754906d16f669071e4f713b47fa32ae"
     },
     {
       "path": ".claude/rules-lazy/drift-guard.md",
@@ -877,7 +877,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "93c2af934720a254197ed30f030c33551351651f6a5ed1d709b372ef6ef40299"
+      "sha256": "b636998eb60b41cceb72f65034c7f0aa2507efcad194a10458819fbf16e79145"
     },
     {
       "path": ".gitignore",
@@ -905,11 +905,11 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f57c90da5c76ff7456b859d2e8be41a8f10f119cf44e9e0e1d56a0da802c28f6"
+      "sha256": "9e8b05e6f15dd111476a2fc528ef61c364ea718ffa08d0a3aa5393b377be9a49"
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "e58fe77703e89aabbda2eb220b3e4cfb2b44f0114ababa25118d6a372ec10dcd"
+      "sha256": "f24291cdfd237369e438002dfd0a3a6c317fd513ec8d6c57b34360b7ec0a5d72"
     },
     {
       "path": "ONTOLOGY.md",
@@ -1661,7 +1661,7 @@
     },
     {
       "path": "memory/reference/agent-core.md",
-      "sha256": "c6689ed28da701b2bcac6512d374e50d6b48cfe94478722e892cbfd798893204"
+      "sha256": "9ffa80ae096f6e7b874af02bf90acc05eb186b3e93926365bff6097868d9c9b7"
     },
     {
       "path": "memory/repo-type-rules.md",
@@ -2377,7 +2377,7 @@
     },
     {
       "path": "scripts/day-open-pipeline.sh",
-      "sha256": "6a46adce82420f63d23050598a487c528184cd616f3a8af8df9aba67c530c00d"
+      "sha256": "2559bddd73ec620b04421a2a814b571c9216e8d39564dc6e45c2c126fb033239"
     },
     {
       "path": "scripts/day-open-preflight.sh",
@@ -3201,7 +3201,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-pipeline.sh",
-      "sha256": "2bfc3aade92dce668e9443312565a4a30523639a0b08c87394c574de107f8504"
+      "sha256": "25078a24ade94457db0ef5a1635f3974fad434bed9f442544402f897462106b2"
     },
     {
       "path": "seed/strategy/scripts/day-open-priorities-patch.py",
@@ -3371,6 +3371,7 @@
     "scripts/tests/check-wp-registered-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
+    "scripts/tests/day-open-no-autostash-smoke.py",
     "scripts/tests/day-open-world-fill-smoke.sh",
     "scripts/tests/dryrun-gate-knowledge-namespace-regression.sh",
     "scripts/tests/fixtures/ds-publish-637a526.sh",
