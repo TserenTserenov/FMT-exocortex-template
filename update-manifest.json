@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9e8b05e6f15dd111476a2fc528ef61c364ea718ffa08d0a3aa5393b377be9a49"
+      "sha256": "475722d751cc40d87efc73b2bbb8aa3fa8d7ad164ca3b421bf09f795cdd46893"
     },
     {
       "path": "CLAUDE.md",
@@ -1253,7 +1253,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "7d4fb783b53c62cd5cde52fa6b18a6b70cbd8e9fa3581421e255af529e47514f"
+      "sha256": "f6fe1ce03bbecb5c9cd6833db6d65b35d2c679d461c350a1b882c4a55ffa7eea"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2285,7 +2285,7 @@
     },
     {
       "path": "scripts/check-wp-registered.sh",
-      "sha256": "43f8f071622782d786969f8a33ad9b006a3d79dcc15f32829a20876bcb8218da"
+      "sha256": "b64344f84c5b78019d0a64faff6e92fda4c9fe2b4baa0c5079d1e98bc8f4e1f5"
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
@@ -2852,6 +2852,10 @@
       "sha256": "f2ae015d394a447778e1ed75ecfa16d80fe98e1164655b3431940c7e783d206c"
     },
     {
+      "path": "scripts/tests/check-wp-registered-smoke.sh",
+      "sha256": "bb527d3d2c18e836369c66c320bdf0faa027eb531a7208c0dfdb6044193a2cca"
+    },
+    {
       "path": "scripts/tests/cp1251-smoke.sh",
       "sha256": "83e797bc375903984c7b0b982b4baa582434ed4967024be8c27a38c99b361c21"
     },
@@ -2973,7 +2977,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1257_wp_registration.sh",
-      "sha256": "a0e79673e57f7094f6b95e4d8bc1b65465db72f0fb7d5c16577856166b2288ef"
+      "sha256": "b608a580b0992950f219d9c48660d45989de63df74d71e918eff8c42645d9e86"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
@@ -3368,7 +3372,6 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/ancestry-hardening-lib.sh",
     "scripts/tests/canon-reconcile-published-smoke.sh",
-    "scripts/tests/check-wp-registered-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-no-autostash-smoke.py",

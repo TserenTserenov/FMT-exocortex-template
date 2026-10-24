@@ -270,6 +270,8 @@ SCRIPT_CONTRACT_EXPLICIT_INCLUDE=(
     "scripts/tests/run-issue-tests.sh"
     "scripts/tests/test_issue_1032_strategy_session_offline.sh"
     "scripts/tests/test_issue_1032_windows_fail_closed.sh"
+    # The delivered #1257 test invokes this verifier regression suite.
+    "scripts/tests/check-wp-registered-smoke.sh"
     "scripts/tests/test_issue_1257_wp_registration.sh"
     "scripts/tests/test_issue_434_pipeline_scaffold_only.sh"
     "scripts/tests/test_issue_453_calendar_private_visibility.sh"
