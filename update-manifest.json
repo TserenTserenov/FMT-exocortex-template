@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "97dd58fcf2c09156fcc50389e55a2f92286d26162d6629a45521b8132c2e1787"
+      "sha256": "6db92a086426f90246938f5f7598d573017f67f137875386fd20f8c7b2c61295"
     },
     {
       "path": "CLAUDE.md",
@@ -2385,7 +2385,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "cb4ed573784ead72eaa9d5cfb9628d3eced91ac67f0000cabf6ac135801bd8c1"
+      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3201,7 +3201,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "ecab3930cc565e77eb43b53ca1d0cb28dbf066d2a7ab22f4336c67756aa0888f"
+      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
     },
     {
       "path": "seed/strategy/scripts/day-open-version-check-patch.py",
@@ -3428,6 +3428,7 @@
     "scripts/tests/test_issue_1201_router_log.sh",
     "scripts/tests/test_issue_1209_isolate_branch.sh",
     "scripts/tests/test_issue_1213_strategy_day_guard.sh",
+    "scripts/tests/test_issue_1254_repo_activity_utf8.py",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
