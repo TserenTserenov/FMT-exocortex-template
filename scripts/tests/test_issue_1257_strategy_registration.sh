@@ -54,6 +54,10 @@ def check_creation(root, governance, environment):
     assert len(plans) == 1, plans
     assert plans[0].read_text().count('Registration fixture') == 1
     assert (state / 'wp-numbers/1').is_dir(), 'Reservation escaped shared workspace'
+    checked = subprocess.run(
+        ['bash', str(repo / 'scripts/check-wp-registered.sh'), '1', str(governance), str(plans[0])],
+        text=True, capture_output=True)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
 with tempfile.TemporaryDirectory(prefix='issue-1257-') as temporary:

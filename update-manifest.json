@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "c51a11c422f40041c4a1eef069168229e4a465de7c0cfd1dbb9a5c6203ebf4a2"
+      "sha256": "d2fdce2619f01c9cc7d93c2963c994cf38b3486cf3245ec6bd924950dc522bc1"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -821,7 +821,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "c90110a57a52aa665af9a26456bdaa9a3b0d89c1e9eac45ba8c325f39abc129d"
+      "sha256": "59de5825f2e436cac9e0585edd9e6c7913752800358441646d36a612b3792463"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "aec6ebc52a83277cd8c1844b8e44d3f5d855ab3de636bf1155ea4c0558566211"
+      "sha256": "12395e09befdee7230288cab00c6a1fdc95568ac267f39e4b25e8a84c23be5f2"
     },
     {
       "path": "CLAUDE.md",
@@ -2284,6 +2284,10 @@
       "sha256": "4ccac6cf5ff4a65c024984770f6718855078b449693a52be48447a5530ddae0b"
     },
     {
+      "path": "scripts/check-wp-registered.sh",
+      "sha256": "6dc7efb58aa5b6e875e5edab62c99912499f170b59d6fb655355f0465d7ba053"
+    },
+    {
       "path": "scripts/check-wp-transfer-completeness.sh",
       "sha256": "ee37ce41697ee0976cdf9c180c41319e804c5d2dc33c7ef6c4fafe87bd8d17c0"
     },
@@ -2969,7 +2973,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1257_strategy_registration.sh",
-      "sha256": "d66b024bbf5cab6b37588585331c26d2bb78c27455c0733ee262a11dba6bccae"
+      "sha256": "a0e79673e57f7094f6b95e4d8bc1b65465db72f0fb7d5c16577856166b2288ef"
     },
     {
       "path": "scripts/tests/test_issue_434_pipeline_scaffold_only.sh",
@@ -3364,6 +3368,7 @@
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/ancestry-hardening-lib.sh",
     "scripts/tests/canon-reconcile-published-smoke.sh",
+    "scripts/tests/check-wp-registered-smoke.sh",
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
