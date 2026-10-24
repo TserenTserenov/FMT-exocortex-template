@@ -85,7 +85,8 @@ day_open_sync_blocked() {
   mkdir -p "$(dirname "$file")" || return 0
   head=$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null) || return 0
   behind=$(git -C "$repo" rev-list --count "$head..$target" 2>/dev/null || echo "?")
-  sig="$class|$paths"
+  # One line, always: a path with a line break must not forge another marker field.
+  sig="$class|$(printf '%s' "$paths" | tr '\n' ' ')"
   now=${DAY_OPEN_NOW:-$(date +%s)}
   if [ -f "$file" ]; then
     notified_sig=$(sed -n 's/^notified_sig=//p' "$file")
@@ -104,8 +105,8 @@ day_open_sync_blocked() {
   fi
   {
     printf 'head=%s\ntarget=%s\nbehind=%s\nreason=%s\nsig=%s\n' \
-      "$head" "$target" "$behind" "$(echo "$reason" | tr '\n' ' ')" "$sig"
-    printf 'paths=%s\n' "$(echo "$paths" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+      "$head" "$target" "$behind" "$(printf '%s' "$reason" | tr '\n' ' ')" "$sig"
+    printf 'paths=%s\n' "$(printf '%s' "$paths" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
     [ -z "$notified" ] || printf 'notified_sig=%s\nnotified=%s\n' "$notified_sig" "$notified"
   } > "$file.tmp" && mv "$file.tmp" "$file"
 }
@@ -2101,7 +2102,12 @@ MSG+="📋 Сегодня:"$'\n'"${PLAN_ROWS}"$'\n\n'
 MSG+="💾 ${SHORT_HASH}"
 
 # Refs #1245: the same stale-input warning as in the DayPlan (one source of text).
-[ -z "${SYNC_WARN:-}" ] || MSG+=$'\n\n'"⚠️ ${SYNC_WARN}"
+# Telegram refuses a message over 4096 characters and the whole digest would be lost: the
+# script cuts only the banner, never the digest.
+if [ -n "${SYNC_WARN:-}" ]; then
+  MSG_WITH_WARN=$(printf '%s' "$MSG" | "$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
+    --digest "$SYNC_WARN" 2>/dev/null) && [ -n "$MSG_WITH_WARN" ] && MSG="$MSG_WITH_WARN"
+fi
 
 # WP-149 gate-dopo (peer-session 2026-06-23-07): surface rung_fidelity from last render.
 GATE_STATUS_FILE="$DS_STRATEGY/current/gate-status.yaml"
