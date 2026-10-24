@@ -53,33 +53,6 @@ day_open_pending_file() {
   printf '%s/day-open-pending-publish.list\n' "${DAY_OPEN_STATE_DIR:-$HOME/.claude/state}"
 }
 
-# mkdir-based lock around every change of the list. A lock whose owner is dead
-# (or never wrote its pid) is taken over, so a crashed run cannot block the next.
-day_open_pending_lock() {
-  local lock waited=0 owner
-  lock="$(day_open_pending_file).lock"
-  mkdir -p "$(dirname "$lock")" || return 1
-  while ! mkdir "$lock" 2>/dev/null; do
-    owner=$(cat "$lock/pid" 2>/dev/null || true)
-    if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
-        || { [ -z "$owner" ] && [ "$waited" -ge 20 ]; }; then
-      rm -rf "$lock"
-      continue
-    fi
-    waited=$((waited + 1))
-    if [ "$waited" -gt 100 ]; then
-      echo "Day Open: pending-publish list is locked by pid ${owner:-unknown}; giving up." >&2
-      return 1
-    fi
-    sleep 0.1
-  done
-  echo "$$" > "$lock/pid"
-}
-
-day_open_pending_unlock() {
-  rm -rf "$(day_open_pending_file).lock"
-}
-
 # One destination (remote + remote branch) for fetch, verification and push.
 # Prints "<remote> <ref>"; refuses configurations where those could differ.
 day_open_publish_target() {
@@ -151,35 +124,54 @@ day_open_published_equivalent() {
   git -C "$repo" rev-parse "$target"
 }
 
-day_open_pending_record() {
-  local repo="$1" remote="$2" ref="$3" sha="$4" file rc=0
+# Serialised change of the pending list: day_open_pending_update record <repo> <remote> <ref> <sha>
+# or day_open_pending_update remove <repo> "<sha> <sha> ...". Only the named
+# records are touched; the file is replaced atomically.
+day_open_pending_update() {
+  local file
   file=$(day_open_pending_file)
-  day_open_pending_lock || return 1
-  if ! grep -qxF "$(printf '%s\t%s\t%s\t%s' "$repo" "$remote" "$ref" "$sha")" "$file" 2>/dev/null; then
-    printf '%s\t%s\t%s\t%s\n' "$repo" "$remote" "$ref" "$sha" >> "$file" || rc=1
-  fi
-  day_open_pending_unlock
-  return "$rc"
+  mkdir -p "$(dirname "$file")" || return 1
+  "${DAY_OPEN_PYTHON:-python3}" -I -c '
+import fcntl, os, sys, tempfile, time
+path, mode, args = sys.argv[1], sys.argv[2], sys.argv[3:]
+with open(path + ".flock", "a") as lock:
+    deadline = time.time() + 30
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except OSError:
+            if time.time() > deadline:
+                sys.exit("Day Open: pending-publish list is locked by another run; giving up.")
+            time.sleep(0.05)
+    try:
+        with open(path) as handle:
+            lines = handle.read().splitlines(True)
+    except FileNotFoundError:
+        lines = []
+    if mode == "record":
+        entry = "\t".join(args) + "\n"
+        if entry in lines:
+            sys.exit(0)
+        lines.append(entry)
+    else:
+        repo, drop = args[0], set(args[1].split())
+        lines = [l for l in lines if not (l.split("\t")[0] == repo and l.rstrip("\n").split("\t")[-1] in drop)]
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".pending-")
+    with os.fdopen(fd, "w") as out:
+        out.writelines(lines)
+    os.replace(tmp, path)
+' "$file" "$@"
+}
+
+day_open_pending_record() {
+  day_open_pending_update record "$@"
 }
 
 # Removes only the named commits of this repository; other records stay.
 day_open_pending_remove() {
-  local repo="$1" shas="$2" file tmp rc=0
-  file=$(day_open_pending_file)
-  [ -f "$file" ] || return 0
-  day_open_pending_lock || return 1
-  tmp=$(mktemp "$file.XXXXXX") || { day_open_pending_unlock; return 1; }
-  # shellcheck disable=SC2086
-  if awk -F'\t' -v repo="$repo" -v list="$(echo $shas)" '
-        BEGIN { n = split(list, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 }
-        !($1 == repo && ($4 in drop))' "$file" > "$tmp"; then
-    mv "$tmp" "$file" || rc=1
-  else
-    rm -f "$tmp"
-    rc=1
-  fi
-  day_open_pending_unlock
-  return "$rc"
+  [ -f "$(day_open_pending_file)" ] || return 0
+  day_open_pending_update remove "$1" "$2"
 }
 
 # Prints this repository's recorded commits (one per line). A record for another
@@ -205,23 +197,59 @@ day_open_pending_shas() {
   [ -z "$missing" ] || day_open_pending_remove "$repo" "$missing"
 }
 
-# Our commit conflicted on the pilot-visible pair "move yesterday, add today"
-# (Day Close ran on the other machine). Transfer only today's new plan files;
-# an existing file with different content is never resolved by picking a side.
+# Our commit is already published when the target holds its content for every
+# path it touches (all or nothing; a path absent on both sides counts as equal).
+# This covers the two-machine case: Day Close elsewhere moved yesterday's plan and
+# only today's new plan file travelled in a different commit, so no patch-id matches.
+# Chosen over recording sha -> published sha at salvage time: it needs no state that
+# can be lost or go stale, and it is checked against the real target every time.
+# One exception: archive/day-plans/* belongs to Day Close, so a file that exists on
+# the target there is authoritative even when its content differs (the other machine
+# may have added a closing summary); our stale copy is superseded, never merged.
+day_open_content_published() {
+  local repo="$1" target="$2" sha="$3" path mine theirs count=0
+  while IFS= read -r -d '' path; do
+    count=$((count + 1))
+    mine=$(git -C "$repo" rev-parse --verify --quiet "$sha:$path" || true)
+    theirs=$(git -C "$repo" rev-parse --verify --quiet "$target:$path" || true)
+    [ "$mine" = "$theirs" ] && continue
+    case "$path" in
+      archive/day-plans/DayPlan\ *.md) [ -n "$theirs" ] || return 1 ;;
+      *) return 1 ;;
+    esac
+  done < <(git -C "$repo" diff-tree -r --no-commit-id --name-only -z --root "$sha")
+  [ "$count" -gt 0 ]
+}
+
+# Our commit conflicted on the pair "move yesterday, add today" (Day Close ran on
+# the other machine). Transfer only today's new plan files, as a new commit built
+# with plumbing (no hooks run, author and message are the original's). An existing
+# file with different content is never resolved by picking a side.
+# Returns 0 committed, 3 nothing left to carry (today's plan is already there
+# with identical content), 1 cannot be carried.
 day_open_salvage_new_plan() {
-  local wt="$1" sha="$2" path
+  local wt="$1" sha="$2" path same=0 tree new
   local added=()
   while IFS= read -r -d '' path; do
     case "$path" in current/DayPlan\ *.md) ;; *) continue ;; esac
     if git -C "$wt" cat-file -e "HEAD:$path" 2>/dev/null; then
       [ "$(git -C "$wt" rev-parse "HEAD:$path")" = "$(git -C "$wt" rev-parse "$sha:$path")" ] || return 1
+      same=$((same + 1))
       continue
     fi
     added+=("$path")
   done < <(git -C "$wt" diff-tree -r --no-commit-id --name-only --diff-filter=A -z "$sha")
-  [ "${#added[@]}" -gt 0 ] || return 1
+  if [ "${#added[@]}" -eq 0 ]; then
+    [ "$same" -gt 0 ] && return 3
+    return 1
+  fi
   git -C "$wt" checkout "$sha" -- "${added[@]}" >/dev/null 2>&1 || return 1
-  git -C "$wt" commit -q -C "$sha" >/dev/null 2>&1
+  tree=$(git -C "$wt" write-tree) || return 1
+  new=$(git -C "$wt" log -1 --format=%B "$sha" | GIT_AUTHOR_NAME=$(git -C "$wt" log -1 --format=%an "$sha") \
+    GIT_AUTHOR_EMAIL=$(git -C "$wt" log -1 --format=%ae "$sha") \
+    GIT_AUTHOR_DATE=$(git -C "$wt" log -1 --format=%aI "$sha") \
+    git -C "$wt" commit-tree "$tree" -p HEAD) || return 1
+  git -C "$wt" update-ref --no-deref HEAD "$new"
 }
 
 day_open_report_dropped() {
@@ -233,12 +261,12 @@ day_open_report_dropped() {
 }
 
 # Apply our commits onto a clean detached copy of $target and push it.
-# Returns 0 published (commits that could not be applied are listed in
-# DAY_OPEN_DROPPED), 2 nothing publishable, 1 transient failure.
+# Returns 0 published or already there (commits that could not be applied are
+# listed in DAY_OPEN_DROPPED), 2 nothing publishable, 1 transient failure.
 # The shared checkout is not touched.
 day_open_isolated_push() {
   local repo="$1" remote="$2" ref="$3" target="$4" shas="$5"
-  local base wt sha conflicts applied=0 rc=0
+  local base wt sha conflicts salvage applied=0 skipped=0 rc=0
   DAY_OPEN_DROPPED=""
   base=$(mktemp -d "${TMPDIR:-/tmp}/day-open-publish.XXXXXX") || return 1
   wt="$base/tree"
@@ -253,26 +281,39 @@ day_open_isolated_push() {
       continue
     fi
     conflicts=$(git -C "$wt" diff --name-only --diff-filter=U | tr '\n' ' ')
+    # Nothing unmerged, index and tree clean: the change is already on the target
+    # (an empty cherry-pick), so it counts as published instead of retrying forever.
+    if [ -z "$conflicts" ] && git -C "$wt" diff --cached --quiet && git -C "$wt" diff --quiet; then
+      git -C "$wt" cherry-pick --skip >/dev/null 2>&1 || git -C "$wt" cherry-pick --abort >/dev/null 2>&1
+      skipped=$((skipped + 1))
+      continue
+    fi
     git -C "$wt" cherry-pick --abort >/dev/null 2>&1
     if [ -z "$conflicts" ]; then
       rc=1
       break
     fi
-    if day_open_salvage_new_plan "$wt" "$sha"; then
+    day_open_salvage_new_plan "$wt" "$sha"
+    salvage=$?
+    if [ "$salvage" -eq 0 ]; then
       applied=$((applied + 1))
+    elif [ "$salvage" -eq 3 ]; then
+      skipped=$((skipped + 1))
     else
       DAY_OPEN_DROPPED="${DAY_OPEN_DROPPED}${sha}"$'\n'
       day_open_report_dropped "$sha" "conflict in ${conflicts}and no new plan file to carry over"
     fi
   done
-  if [ "$rc" -eq 0 ] && [ "$applied" -eq 0 ]; then
-    rc=2
-  elif [ "$rc" -eq 0 ]; then
+  if [ "$rc" -eq 0 ] && [ "$applied" -gt 0 ]; then
     if git -C "$wt" push --quiet "$remote" "HEAD:$ref" >/dev/null 2>&1; then
       DAY_OPEN_PUBLISHED_SHA=$(git -C "$wt" rev-parse HEAD)
     else
       rc=1
     fi
+  elif [ "$rc" -eq 0 ] && [ "$skipped" -gt 0 ]; then
+    DAY_OPEN_PUBLISHED_SHA=$(git -C "$repo" rev-parse "$target")
+  elif [ "$rc" -eq 0 ]; then
+    rc=2
   fi
   git -C "$repo" worktree remove --force "$wt" >/dev/null 2>&1
   rm -rf "$base"
@@ -288,6 +329,8 @@ day_open_publish_attempt() {
   for sha in $shas; do
     if equivalent=$(day_open_published_equivalent "$repo" "$target" "$sha"); then
       DAY_OPEN_PUBLISHED_SHA="$equivalent"
+    elif day_open_content_published "$repo" "$target" "$sha"; then
+      DAY_OPEN_PUBLISHED_SHA="$target"
     else
       open="${open}${sha}"$'\n'
     fi
@@ -305,31 +348,53 @@ day_open_publish_attempt() {
 }
 
 # After a cherry-pick publication the checkout holds the original commits and
-# origin their twins, so the branch would stay diverged and every later
-# fast-forward would be skipped. When every local-only commit has a patch-equivalent
-# on $target, move the branch to $target in one two-way tree merge: unrelated
-# staged/unstaged/untracked work is kept, an overlapping edit makes Git refuse.
-# No reset, rebase or stash. Refusal is not an error of the publication.
+# origin their twins (or, with Day Close elsewhere, a commit carrying only today's
+# plan), so the branch would stay diverged and every later fast-forward would be
+# skipped. When every local-only commit is published (patch-equivalent twin, or its
+# content already on $target), move the branch to $target in one two-way tree merge:
+# unrelated staged/unstaged/untracked work is kept, an overlapping edit makes Git
+# refuse. No reset, rebase or stash. Refusal is not an error of the publication:
+# the reason (with the overlapping paths) is left in DAY_OPEN_ADOPT_REASON.
 day_open_adopt_twins() {
-  local repo="$1" target="$2" head ref sha path
-  head=$(git -C "$repo" rev-parse --verify HEAD) || return 1
-  ref=$(git -C "$repo" symbolic-ref --quiet HEAD) || return 1
+  local repo="$1" target="$2" head ref sha path out
+  DAY_OPEN_ADOPT_REASON=""
+  head=$(git -C "$repo" rev-parse --verify HEAD) || { DAY_OPEN_ADOPT_REASON="no HEAD"; return 1; }
+  ref=$(git -C "$repo" symbolic-ref --quiet HEAD) || { DAY_OPEN_ADOPT_REASON="detached HEAD"; return 1; }
   [ "$head" != "$target" ] || return 0
-  [ -z "$(git -C "$repo" rev-list --merges "$target..$head")" ] || return 1
+  if [ -n "$(git -C "$repo" rev-list --merges "$target..$head")" ]; then
+    DAY_OPEN_ADOPT_REASON="merge commits between the branch and the published tip"
+    return 1
+  fi
   for sha in $(git -C "$repo" rev-list "$target..$head"); do
-    day_open_published_equivalent "$repo" "$target" "$sha" >/dev/null || return 1
+    if ! day_open_published_equivalent "$repo" "$target" "$sha" >/dev/null \
+        && ! day_open_content_published "$repo" "$target" "$sha"; then
+      DAY_OPEN_ADOPT_REASON="local commit $sha is not published (no twin, content differs)"
+      return 1
+    fi
   done
   # read-tree would silently overwrite an ignored file that the move creates.
   while IFS= read -r -d '' path; do
     if [ -e "$repo/$path" ] && ! git -C "$repo" ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      DAY_OPEN_ADOPT_REASON="untracked or ignored file would be overwritten: $path"
       return 1
     fi
   done < <(git -C "$repo" diff --name-only --diff-filter=A -z "$head" "$target")
-  git -C "$repo" read-tree -m -u "$head" "$target" >/dev/null 2>&1 || return 1
-  if ! git -C "$repo" update-ref -m "day-open: adopt published twins" "$ref" "$target" "$head" 2>/dev/null; then
-    git -C "$repo" read-tree -m -u "$target" "$head" >/dev/null 2>&1
+  if ! out=$(git -C "$repo" read-tree -m -u "$head" "$target" 2>&1); then
+    DAY_OPEN_ADOPT_REASON="overlapping local edits: $(echo "$out" | tr '\n' ' ')"
     return 1
   fi
+  if git -C "$repo" update-ref -m "day-open: adopt published twins" "$ref" "$target" "$head" 2>/dev/null; then
+    return 0
+  fi
+  # Roll the tree back only while HEAD is still where we started; if another agent
+  # moved it meanwhile, undoing would mix their commit with a reverted tree.
+  if [ "$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null)" = "$head" ]; then
+    git -C "$repo" read-tree -m -u "$target" "$head" >/dev/null 2>&1
+    DAY_OPEN_ADOPT_REASON="branch update was refused; tree restored"
+  else
+    DAY_OPEN_ADOPT_REASON="HEAD moved during the update; the merged tree was left as is, not rolled back"
+  fi
+  return 1
 }
 
 # day_open_publish <repo> [commit]: record <commit> (if given), then publish
@@ -371,7 +436,7 @@ day_open_publish() {
         fresh=$(git -C "$root" rev-parse refs/day-open/target)
       fi
       day_open_adopt_twins "$root" "$fresh" \
-        || echo "Day Open: shared checkout left on its own commits (overlapping local edits, merges or unrelated local commits); it is not moved automatically." >&2
+        || echo "Day Open: shared checkout left on its own commits, not moved automatically: $DAY_OPEN_ADOPT_REASON" >&2
       return 0
     fi
   done
