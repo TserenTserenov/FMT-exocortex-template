@@ -81,15 +81,24 @@ day_open_publish_target() {
   printf '%s %s\n' "$remote" "$ref"
 }
 
+# A DayPlan file directly inside current/ or archive/day-plans/ (no further
+# directories: a shell glob star would also match "/").
+day_open_is_plan_path() {
+  local path="$1" name
+  case "$path" in
+    current/DayPlan\ *.md | archive/day-plans/DayPlan\ *.md) ;;
+    *) return 1 ;;
+  esac
+  name=${path#*DayPlan }
+  case "$name" in */*) return 1 ;; esac
+}
+
 # A commit is ours to publish only when it touches DayPlan files and the DayPlan archive.
 day_open_commit_paths_ok() {
   local repo="$1" sha="$2" path count=0
   while IFS= read -r -d '' path; do
     count=$((count + 1))
-    case "$path" in
-      current/DayPlan\ *.md | archive/day-plans/DayPlan\ *.md) ;;
-      *) return 1 ;;
-    esac
+    day_open_is_plan_path "$path" || return 1
   done < <(git -C "$repo" diff-tree -r --no-commit-id --name-only -z "$sha")
   [ "$count" -gt 0 ]
 }
@@ -125,14 +134,43 @@ day_open_published_equivalent() {
   git -C "$repo" rev-parse "$target"
 }
 
+# Same change of the list without the kernel lock: used only when python3 with
+# fcntl is missing, so a publication still goes through (two runs at the very same
+# moment could then lose a record; the warning says so).
+day_open_pending_update_unlocked() {
+  local file="$1" mode="$2" tmp
+  shift 2
+  if [ "$mode" = record ]; then
+    grep -qxF "$(printf '%s\t%s\t%s\t%s' "$@")" "$file" 2>/dev/null \
+      || printf '%s\t%s\t%s\t%s\n' "$@" >> "$file"
+    return
+  fi
+  [ -f "$file" ] || return 0
+  tmp=$(mktemp "$file.XXXXXX") || return 1
+  # shellcheck disable=SC2086
+  if awk -F'\t' -v repo="$1" -v list="$(echo $2)" '
+        BEGIN { n = split(list, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 }
+        !($1 == repo && ($4 in drop))' "$file" > "$tmp"; then
+    mv "$tmp" "$file"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
 # Serialised change of the pending list: day_open_pending_update record <repo> <remote> <ref> <sha>
 # or day_open_pending_update remove <repo> "<sha> <sha> ...". Only the named
 # records are touched; the file is replaced atomically.
 day_open_pending_update() {
-  local file
+  local file py="${DAY_OPEN_PYTHON:-python3}"
   file=$(day_open_pending_file)
   mkdir -p "$(dirname "$file")" || return 1
-  "${DAY_OPEN_PYTHON:-python3}" -I -c '
+  if ! "$py" -I -c 'import fcntl' >/dev/null 2>&1; then
+    echo "Day Open: python3 with fcntl is needed to lock the pending-publish list; continuing without a lock." >&2
+    day_open_pending_update_unlocked "$file" "$@"
+    return
+  fi
+  "$py" -I -c '
 import fcntl, os, sys, tempfile, time
 path, mode, args = sys.argv[1], sys.argv[2], sys.argv[3:]
 with open(path + ".flock", "a") as lock:
@@ -177,7 +215,8 @@ day_open_pending_remove() {
 
 # Prints this repository's recorded commits (one per line). A record for another
 # destination is skipped with a warning; a record whose commit is gone (gc, a
-# rewrite by another agent) is dropped from the list. Neither blocks the rest.
+# rewrite by another agent) or no longer passes the DayPlan-only check is dropped
+# from the list. Neither blocks the rest.
 day_open_pending_shas() {
   local repo="$1" remote="$2" ref="$3" file entry_repo entry_remote entry_ref sha missing=""
   file=$(day_open_pending_file)
@@ -193,6 +232,11 @@ day_open_pending_shas() {
       missing="$missing $sha"
       continue
     fi
+    if ! day_open_commit_paths_ok "$repo" "$sha"; then
+      echo "Day Open: recorded commit $sha touches paths outside DayPlan/archive; dropping the record, never publishing it." >&2
+      missing="$missing $sha"
+      continue
+    fi
     printf '%s\n' "$sha"
   done < "$file"
   [ -z "$missing" ] || day_open_pending_remove "$repo" "$missing"
@@ -204,20 +248,29 @@ day_open_pending_shas() {
 # only today's new plan file travelled in a different commit, so no patch-id matches.
 # Chosen over recording sha -> published sha at salvage time: it needs no state that
 # can be lost or go stale, and it is checked against the real target every time.
-# One exception: archive/day-plans/* belongs to Day Close, so a file that exists on
-# the target there is authoritative even when its content differs (the other machine
-# may have added a closing summary); our stale copy is superseded, never merged.
+# One exception, narrow on purpose: a file that our commit ADDS under
+# archive/day-plans/ (a stale copy of yesterday's plan) is superseded by the same
+# path on the target, because Day Close owns it and may have added a closing summary.
+# A commit that CHANGES an archive file existing before it is never covered: that
+# edit would exist only in the reflog after the branch moves.
+# On refusal, DAY_OPEN_UNPUBLISHED_PATH names the first path that is not covered.
 day_open_content_published() {
   local repo="$1" target="$2" sha="$3" path mine theirs count=0
+  DAY_OPEN_UNPUBLISHED_PATH=""
   while IFS= read -r -d '' path; do
     count=$((count + 1))
     mine=$(git -C "$repo" rev-parse --verify --quiet "$sha:$path" || true)
     theirs=$(git -C "$repo" rev-parse --verify --quiet "$target:$path" || true)
     [ "$mine" = "$theirs" ] && continue
     case "$path" in
-      archive/day-plans/DayPlan\ *.md) [ -n "$theirs" ] || return 1 ;;
-      *) return 1 ;;
+      archive/day-plans/*)
+        if [ -n "$theirs" ] && day_open_is_plan_path "$path" \
+            && [ -z "$(git -C "$repo" rev-parse --verify --quiet "$sha^:$path" || true)" ]; then
+          continue
+        fi ;;
     esac
+    DAY_OPEN_UNPUBLISHED_PATH="$path"
+    return 1
   done < <(git -C "$repo" diff-tree -r --no-commit-id --name-only -z --root "$sha")
   [ "$count" -gt 0 ]
 }
@@ -232,7 +285,8 @@ day_open_salvage_new_plan() {
   local wt="$1" sha="$2" path same=0 tree new
   local added=()
   while IFS= read -r -d '' path; do
-    case "$path" in current/DayPlan\ *.md) ;; *) continue ;; esac
+    case "$path" in current/*) ;; *) continue ;; esac
+    day_open_is_plan_path "$path" || continue
     if git -C "$wt" cat-file -e "HEAD:$path" 2>/dev/null; then
       [ "$(git -C "$wt" rev-parse "HEAD:$path")" = "$(git -C "$wt" rev-parse "$sha:$path")" ] || return 1
       same=$((same + 1))
@@ -354,10 +408,12 @@ day_open_publish_attempt() {
 # skipped. When every local-only commit is published (patch-equivalent twin, or its
 # content already on $target), move the branch to $target in one two-way tree merge:
 # unrelated staged/unstaged/untracked work is kept, an overlapping edit makes Git
-# refuse. No reset, rebase or stash. Refusal is not an error of the publication:
-# the reason (with the overlapping paths) is left in DAY_OPEN_ADOPT_REASON.
+# refuse. Every commit the move leaves behind first gets a ref under
+# refs/day-open/superseded/, so nothing lives only in the reflog. No reset, rebase
+# or stash. Refusal is not an error of the publication: the reason (with the
+# overlapping paths) is left in DAY_OPEN_ADOPT_REASON.
 day_open_adopt_twins() {
-  local repo="$1" target="$2" head ref sha path out
+  local repo="$1" target="$2" head ref sha path out local_commits
   DAY_OPEN_ADOPT_REASON=""
   head=$(git -C "$repo" rev-parse --verify HEAD) || { DAY_OPEN_ADOPT_REASON="no HEAD"; return 1; }
   ref=$(git -C "$repo" symbolic-ref --quiet HEAD) || { DAY_OPEN_ADOPT_REASON="detached HEAD"; return 1; }
@@ -366,10 +422,11 @@ day_open_adopt_twins() {
     DAY_OPEN_ADOPT_REASON="merge commits between the branch and the published tip"
     return 1
   fi
-  for sha in $(git -C "$repo" rev-list "$target..$head"); do
+  local_commits=$(git -C "$repo" rev-list "$target..$head")
+  for sha in $local_commits; do
     if ! day_open_published_equivalent "$repo" "$target" "$sha" >/dev/null \
         && ! day_open_content_published "$repo" "$target" "$sha"; then
-      DAY_OPEN_ADOPT_REASON="local commit $sha is not published (no twin, content differs)"
+      DAY_OPEN_ADOPT_REASON="local commit $sha is not published (${DAY_OPEN_UNPUBLISHED_PATH:-no twin}: its content is not on the published tip)"
       return 1
     fi
   done
@@ -384,9 +441,15 @@ day_open_adopt_twins() {
     DAY_OPEN_ADOPT_REASON="overlapping local edits: $(echo "$out" | tr '\n' ' ')"
     return 1
   fi
+  for sha in $local_commits; do
+    git -C "$repo" update-ref "refs/day-open/superseded/$sha" "$sha"
+  done
   if git -C "$repo" update-ref -m "day-open: adopt published twins" "$ref" "$target" "$head" 2>/dev/null; then
     return 0
   fi
+  for sha in $local_commits; do
+    git -C "$repo" update-ref -d "refs/day-open/superseded/$sha"
+  done
   # Roll the tree back only while HEAD is still where we started; if another agent
   # moved it meanwhile, undoing would mix their commit with a reverted tree.
   if [ "$(git -C "$repo" rev-parse --verify HEAD 2>/dev/null)" = "$head" ]; then

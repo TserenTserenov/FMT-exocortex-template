@@ -434,6 +434,9 @@ class DayOpenGitTests(unittest.TestCase):
         self.assertEqual(b"closed on the other machine\n",
                          self.git(self.origin, "show", "main:" + archived))
         self.assertEqual("", self.pending())
+        self.assertEqual(commit, self.git(self.repo, "rev-parse", "refs/day-open/superseded/" + commit)
+                         .decode().strip())
+        self.assertEqual(self.origin_main(), self.head())
 
     def test_move_only_commit_is_already_published_by_the_other_machine(self):
         self.close_yesterday_elsewhere()
@@ -491,6 +494,8 @@ class DayOpenGitTests(unittest.TestCase):
             self.assertEqual((0, 0), self.ahead_behind(), "day %d diverged: %s" % (day, result.stderr))
             self.assertEqual(before, self.work_state(drafts), "day %d lost work" % day)
             self.assertEqual("", self.pending(), "day %d left records" % day)
+            self.assertEqual(commit, self.git(self.repo, "rev-parse", "refs/day-open/superseded/" + commit)
+                             .decode().strip(), "day %d: replaced commit is not kept by a ref" % day)
             self.assertEqual(("closed with a summary %d\n" % day).encode(), self.git(
                 self.origin, "show", "main:archive/day-plans/" + yesterday))
             self.assertEqual(("plan %d\n" % day).encode(), self.git(self.origin, "show", "main:" + today))
@@ -604,6 +609,83 @@ class DayOpenGitTests(unittest.TestCase):
         os.killpg(process.pid, 9)  # the whole group: the python child owns the lock
         process.wait()
         self.run_parallel_records(5)
+
+    def test_edit_of_an_existing_archive_file_is_not_adopted_away(self):
+        archived = "archive/day-plans/DayPlan 2000-01-01.md"
+        (self.repo / "archive/day-plans").mkdir(parents=True)
+        (self.repo / archived).write_text("shared base\n")
+        self.git(self.repo, "add", archived)
+        self.git(self.repo, "commit", "-qm", "common archive file")
+        self.git(self.repo, "push", "-q")
+        other = self.root / "other"
+        self.git(self.root, "clone", "-q", str(self.origin), str(other))
+        self.configure(other)
+        (other / archived).write_text("shared base\nsummary from machine B\n")
+        self.git(other, "commit", "-qam", "machine B closes the day")
+        self.git(other, "push", "-q")
+        today = "current/DayPlan 2000-01-02.md"
+        (self.repo / "current").mkdir()
+        (self.repo / today).write_text("today\n")
+        (self.repo / archived).write_text("shared base\nlocal edit\n")
+        self.git(self.repo, "add", today, archived)
+        self.git(self.repo, "commit", "-qm", "machine A edits the archive and opens today", "--", today, archived)
+        local = self.head()
+        result = self.run_helper("published", local)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(b"today\n", self.git(self.origin, "show", "main:" + today))
+        self.assertIn(archived, result.stderr)
+        self.assertEqual(local, self.head())
+        self.assertEqual(b"shared base\nlocal edit\n", self.git(self.repo, "show", "HEAD:" + archived))
+        self.assertNotEqual((0, 0), self.ahead_behind())
+        # The skipped fast-forward must refuse for the same reason and lose nothing.
+        moved = self.run_helper("day_open_fast_forward")
+        self.assertNotEqual(0, moved.returncode)
+        self.assertEqual(local, self.head())
+        self.assertEqual(b"shared base\nlocal edit\n", (self.repo / archived).read_bytes())
+        self.assertEqual(b"", self.git(self.repo, "for-each-ref", "refs/day-open/superseded"))
+
+    def test_missing_python_does_not_block_publication(self):
+        self.env["DAY_OPEN_PYTHON"] = "/nonexistent/python"
+        self.advance_remote()
+        commit = self.commit_plan()
+        good_url = self.git(self.repo, "remote", "get-url", "origin").decode().strip()
+        self.git(self.repo, "remote", "set-url", "origin", str(self.root / "missing.git"))
+        failed = self.run_helper("published", commit)
+        self.assertNotEqual(0, failed.returncode)
+        self.assertIn("python3 with fcntl", failed.stderr)
+        self.assertIn(commit, self.pending())
+        self.git(self.repo, "remote", "set-url", "origin", good_url)
+        retry = self.run_helper("published")
+        self.assertEqual(0, retry.returncode, retry.stderr)
+        self.assertEqual(self.published_sha(retry), self.origin_main())
+        self.assertEqual("", self.pending())
+
+    def commit_evil_path(self):
+        evil = "current/DayPlan y/s/evil.md"
+        (self.repo / "current/DayPlan y/s").mkdir(parents=True)
+        (self.repo / evil).write_text("nested path\n")
+        self.git(self.repo, "add", evil)
+        self.git(self.repo, "commit", "-qm", "nested path under a plan prefix")
+        return evil, self.head()
+
+    def test_plan_path_with_extra_directories_is_rejected(self):
+        _, evil_commit = self.commit_evil_path()
+        remote = self.origin_main()
+        result = self.run_helper("published", evil_commit)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("outside DayPlan", result.stderr)
+        self.assertEqual(remote, self.origin_main())
+        self.assertEqual("", self.pending())
+
+    def test_recorded_commit_is_rechecked_when_read_from_the_list(self):
+        evil, evil_commit = self.commit_evil_path()
+        self.seed_pending(("origin", "refs/heads/main", evil_commit))
+        legit = self.commit_plan()
+        result = self.run_helper("published", legit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("touches paths outside DayPlan/archive", result.stderr)
+        self.assertEqual(b"", self.git(self.origin, "ls-tree", "-r", "--name-only", "main", evil))
+        self.assertNotIn(evil_commit, self.pending())
 
     def seed_pending(self, *entries):
         root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
