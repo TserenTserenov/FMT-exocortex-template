@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +39,8 @@ class DayOpenGitTests(unittest.TestCase):
                         IWE_ROOT=str(self.root), IWE_GOVERNANCE_REPO="source",
                         IWE_SCRIPTS=str(ROOT / "scripts"))
         self.env["DAY_OPEN_STATE_DIR"] = str(self.root / "state")
+        self.env["TG_LOG"] = str(self.root / "tg.log")
+        self.env["TG_ATTEMPTS"] = str(self.root / "tg-attempts.log")
         source = PIPELINE.read_text()
         definitions = [match.group() for match in re.finditer(
             r"^day_open_\w+\(\) \{\n.*?^\}\n", source, re.MULTILINE | re.DOTALL)]
@@ -50,7 +53,10 @@ class DayOpenGitTests(unittest.TestCase):
         self.helpers.write_text(
             "set -uo pipefail\n" + "\n".join(definitions)
             + '\npublished() { day_open_publish "$@" && printf "published=%s\\n" "$DAY_OPEN_PUBLISHED_SHA"; }\n'
-            + 'isolated() { day_open_isolated_push "$@"; local rc=$?; printf "published=%s\\n" "$DAY_OPEN_PUBLISHED_SHA"; return $rc; }\n"$@"\n')
+            + 'isolated() { day_open_isolated_push "$@"; local rc=$?; printf "published=%s\\n" "$DAY_OPEN_PUBLISHED_SHA"; return $rc; }\n'
+            + 'tg_notify() { printf "%s\\n" "$2" >> "$TG_ATTEMPTS"; [ "${TG_RC:-0}" -eq 0 ] || return 1; printf "%s\\t%s\\n" "$2" "$1" >> "$TG_LOG"; }\n'
+            + 'adopt() { day_open_adopt_twins "$@"; }\n'
+            + 'prune() { day_open_prune_superseded "$@"; }\n"$@"\n')
 
     @staticmethod
     def git(repo, *args, check=True):
@@ -686,6 +692,265 @@ class DayOpenGitTests(unittest.TestCase):
         self.assertIn("touches paths outside DayPlan/archive", result.stderr)
         self.assertEqual(b"", self.git(self.origin, "ls-tree", "-r", "--name-only", "main", evil))
         self.assertNotIn(evil_commit, self.pending())
+
+    def tg_messages(self):
+        path = self.root / "tg.log"
+        return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+
+    def markers(self):
+        return sorted((self.root / "state").glob("day-open-sync-blocked.*.marker"))
+
+    def test_four_days_then_clean(self):
+        """Salvage publishes only the new plan; Day Close elsewhere later removes it from current/."""
+        (self.repo / "current").mkdir(exist_ok=True)
+        (self.repo / "current/DayPlan 2000-01-00.md").write_text("plan 0\n")
+        self.git(self.repo, "add", "current/DayPlan 2000-01-00.md")
+        self.git(self.repo, "commit", "-qm", "plan 0")
+        self.git(self.repo, "push", "-q")
+        other = self.root / "other"
+        self.git(self.root, "clone", "-q", str(self.origin), str(other))
+        self.configure(other)
+        (self.repo / "shared.txt").write_text("local work\n")  # overlaps every remote change
+        for day in (1, 2, 3, 4):
+            prev = "DayPlan 2000-01-0%d.md" % (day - 1)
+            self.git(other, "pull", "-q", "--ff-only")
+            (other / "archive/day-plans").mkdir(parents=True, exist_ok=True)
+            self.git(other, "mv", "current/" + prev, "archive/day-plans/" + prev)
+            (other / "archive/day-plans" / prev).write_text("closed %d\n" % day)
+            (other / "shared.txt").write_text("remote %d\n" % day)
+            self.git(other, "add", "archive/day-plans/" + prev, "shared.txt")
+            self.git(other, "commit", "-qm", "day close %d" % day)
+            self.git(other, "push", "-q")
+            (self.repo / "archive/day-plans").mkdir(parents=True, exist_ok=True)
+            self.git(self.repo, "mv", "current/" + prev, "archive/day-plans/" + prev)
+            today = "current/DayPlan 2000-01-0%d.md" % day
+            (self.repo / today).write_text("plan %d\n" % day)
+            self.git(self.repo, "add", today)
+            self.git(self.repo, "commit", "-qm", "day open %d" % day, "--",
+                     today, "current/" + prev, "archive/day-plans/" + prev)
+            commit = self.head()
+            result = self.run_helper("published", commit)
+            self.assertEqual(0, result.returncode, "day %d: %s" % (day, result.stderr))
+            self.assertEqual(commit, self.head(), "day %d: the overlapping edit must hold the branch" % day)
+        # The last plan is archived on the other machine as well.
+        self.git(other, "pull", "-q", "--ff-only")
+        self.git(other, "mv", "current/DayPlan 2000-01-04.md", "archive/day-plans/DayPlan 2000-01-04.md")
+        self.git(other, "commit", "-qm", "day close 5")
+        self.git(other, "push", "-q")
+        self.git(self.repo, "checkout", "--", "shared.txt")
+        moved = self.run_helper("day_open_fast_forward")
+        self.assertEqual(0, moved.returncode, moved.stderr)
+        self.assertEqual((0, 0), self.ahead_behind())
+        self.assertEqual(self.origin_main(), self.head())
+        self.assertEqual([], self.markers())
+
+    def test_bad_ids_rejected(self):
+        commit = self.commit_plan()
+        bad = ("HEAD", "main", "", "-x", "abc123")
+        self.seed_pending(*[("origin", "refs/heads/main", sha) for sha in bad])
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("malformed commit id", result.stderr)
+        self.assertEqual(commit, self.origin_main())
+        self.assertEqual("", self.pending())
+        refused = self.run_helper("published", "HEAD")
+        self.assertNotEqual(0, refused.returncode)
+        self.assertIn("not a commit id", refused.stderr)
+
+    def test_mixed_ops_no_python(self):
+        self.env["DAY_OPEN_PYTHON"] = "/nonexistent/python"
+        root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
+        seeded = ["%040d" % n for n in range(1, 31)]
+        added = ["%040d" % n for n in range(101, 106)]
+        self.seed_pending(*[("origin", "refs/heads/main", sha) for sha in seeded])
+        script = self.root / "mixed.sh"
+        script.write_text(
+            self.helpers.read_text(encoding="utf-8").replace('\n"$@"\n', "\n")
+            + 'case "$1" in\n'
+            '  record) day_open_pending_record "$ROOT" origin refs/heads/main "$2" ;;\n'
+            '  remove) day_open_pending_remove "$ROOT" "$2" ;;\nesac\n')
+        env = dict(self.env, ROOT=root)
+        jobs = [subprocess.Popen(["bash", str(script), mode, sha], env=env,
+                                 stderr=subprocess.PIPE, text=True)
+                for mode, sha in [("remove", s) for s in seeded] + [("record", s) for s in added]]
+        for job in jobs:
+            _, err = job.communicate(timeout=180)
+            self.assertEqual(0, job.returncode, err)
+        kept = sorted(line.split("\t")[3] for line in self.pending().splitlines())
+        self.assertEqual(sorted(added), kept)
+
+    def test_marker_and_telegram(self):
+        (self.repo / "notes.txt").write_text("notes\n")
+        self.git(self.repo, "add", "notes.txt")
+        self.git(self.repo, "commit", "-qm", "notes")
+        self.git(self.repo, "push", "-q")
+        self.advance_remote()
+        commit = self.commit_plan()
+        self.dirty()
+        result = self.run_helper("published", commit)
+        self.assertEqual(0, result.returncode, result.stderr)
+        markers = self.markers()
+        self.assertEqual(1, len(markers))
+        text = markers[0].read_text(encoding="utf-8")
+        self.assertIn("head=" + commit, text)
+        self.assertIn("target=" + self.origin_main(), text)
+        self.assertIn("behind=2", text)
+        self.assertIn("overlapping local edits", text)
+        first = self.tg_messages()
+        self.assertEqual(1, len(first), first)
+        self.assertTrue(first[0].startswith("protective"))
+        self.assertIn("shared.txt", first[0])
+        self.assertIn("на 2 коммитов", first[0])
+        # Same reason, same paths: silent.
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.tg_messages()))
+        # The overlap grows by a path: one new message naming it.
+        other = self.root / "other"
+        self.git(other, "pull", "-q", "--ff-only")
+        (other / "notes.txt").write_text("remote notes\n")
+        self.git(other, "commit", "-qam", "remote notes")
+        self.git(other, "push", "-q")
+        self.git(self.repo, "fetch", "-q", "origin", "main")
+        (self.repo / "notes.txt").write_text("local notes\n")
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        second = self.tg_messages()
+        self.assertEqual(2, len(second), second)
+        self.assertIn("notes.txt", second[1])
+        # Same state a week later: one reminder, then silence again.
+        week = int(time.time()) + 8 * 86400
+        self.env["DAY_OPEN_NOW"] = str(week)
+        self.run_helper("adopt", self.origin_main())
+        self.assertEqual(3, len(self.tg_messages()))
+        self.env["DAY_OPEN_NOW"] = str(week + 86400)
+        self.run_helper("adopt", self.origin_main())
+        self.assertEqual(3, len(self.tg_messages()))
+        # Once the overlapping work is gone, the move succeeds and the marker disappears.
+        self.git(self.repo, "reset", "-q", "--hard")
+        (self.repo / "draft.md").unlink()
+        moved = self.run_helper("day_open_fast_forward")
+        self.assertEqual(0, moved.returncode, moved.stderr)
+        self.assertEqual([], self.markers())
+        self.assertEqual(3, len(self.tg_messages()))
+        self.assertEqual((0, 0), self.ahead_behind())
+
+    def commit_at(self, repo, days_ago, message):
+        when = "%d +0000" % (int(time.time()) - days_ago * 86400)
+        env = dict(os.environ, GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
+        subprocess.run(["git", "-C", str(repo), "commit", "--allow-empty", "-qm", message],
+                       check=True, env=env, capture_output=True)
+        return self.head(repo)
+
+    def test_prune_old_refs(self):
+        old_reachable = self.commit_at(self.repo, 200, "old but published")
+        recent_reachable = self.commit_at(self.repo, 1, "recent and published")
+        self.git(self.repo, "checkout", "-qb", "side", "HEAD~2")
+        old_lost = self.commit_at(self.repo, 200, "old and never published")
+        self.git(self.repo, "checkout", "-q", "main")
+        self.git(self.repo, "branch", "-qD", "side")
+        for sha in (old_reachable, recent_reachable, old_lost):
+            self.git(self.repo, "update-ref", "refs/day-open/superseded/" + sha, sha)
+        result = self.run_helper("prune", self.head())
+        self.assertEqual(0, result.returncode, result.stderr)
+        left = self.git(self.repo, "for-each-ref", "--format=%(refname:lstrip=3)",
+                        "refs/day-open/superseded/").decode().split()
+        self.assertEqual(sorted([recent_reachable, old_lost]), sorted(left))
+
+    def tg_attempts(self):
+        path = self.root / "tg-attempts.log"
+        return path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+
+    def blocked_setup(self):
+        """An overlapping local edit holds the checkout behind a published plan."""
+        self.advance_remote()
+        commit = self.commit_plan()
+        self.dirty()
+        return self.run_helper("published", commit)
+
+    def test_tg_failure_is_retried(self):
+        self.env["TG_RC"] = "1"
+        result = self.blocked_setup()
+        self.assertEqual(0, result.returncode, result.stderr)
+        marker = self.markers()[0]
+        self.assertNotIn("notified", marker.read_text(encoding="utf-8"))
+        self.assertEqual(1, len(self.tg_attempts()))
+        self.assertEqual([], self.tg_messages())
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(2, len(self.tg_attempts()), "a failed send must be tried again")
+        self.assertNotIn("notified", marker.read_text(encoding="utf-8"))
+        self.env["TG_RC"] = "0"
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.tg_messages()))
+        text = marker.read_text(encoding="utf-8")
+        self.assertIn("notified=", text)
+        self.assertIn("notified_sig=", text)
+        # Delivered once, so the next runs stay silent.
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.tg_messages()))
+        self.assertEqual(3, len(self.tg_attempts()))
+
+    def test_probe_writes_no_marker(self):
+        self.env["PROBE"] = "true"
+        result = self.blocked_setup()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], self.markers())
+        self.assertEqual([], self.tg_attempts())
+        del self.env["PROBE"]
+        self.assertNotEqual(0, self.run_helper("adopt", self.origin_main()).returncode)
+        self.assertEqual(1, len(self.markers()))
+        self.assertEqual(1, len(self.tg_messages()))
+
+    def run_call_site(self):
+        source = PIPELINE.read_text(encoding="utf-8")
+        match = re.search(r'if ! day_open_fast_forward "\$DS_STRATEGY"; then\n.*?\nfi', source, re.DOTALL)
+        self.assertIsNotNone(match, "the pipeline call site moved")
+        script = self.root / "call-site.sh"
+        script.write_text(self.helpers.read_text(encoding="utf-8").replace('\n"$@"\n', "\n")
+                          + 'DS_STRATEGY="$1"\n' + match.group() + "\n", encoding="utf-8")
+        return subprocess.run(["bash", str(script), str(self.repo)], env=self.env,
+                              capture_output=True, text=True)
+
+    def test_call_site_gag_only_when_reported(self):
+        # A clean checkout with an unpublished local commit: refused, reported once, no general message.
+        (self.repo / "foreign.txt").write_text("another agent\n")
+        self.git(self.repo, "add", "foreign.txt")
+        self.git(self.repo, "commit", "-qm", "foreign local commit")
+        self.shift_origin("remote.txt")
+        result = self.run_call_site()
+        self.assertEqual(0, result.returncode, result.stderr)
+        messages = self.tg_messages()
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn("отстаёт", messages[0])
+        self.assertNotIn("обновление пропущено", messages[0])
+        # Same run again: the pilot already knows, nothing new is sent.
+        self.run_call_site()
+        self.assertEqual(1, len(self.tg_messages()))
+
+    def test_old_marker_does_not_gag(self):
+        self.shift_origin("remote.txt")
+        self.dirty()
+        marker = Path(subprocess.run(
+            ["bash", str(self.helpers), "day_open_sync_marker_file", str(self.repo)],
+            env=self.env, capture_output=True, text=True).stdout.strip())
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        # An old block for another reason, delivered long ago.
+        marker.write_text("head=0\ntarget=0\nbehind=9\nreason=old\nsig=overlap|old.txt\n"
+                          "notified_sig=overlap|old.txt\nnotified=1\n", encoding="utf-8")
+        result = self.run_call_site()
+        self.assertEqual(0, result.returncode, result.stderr)
+        messages = self.tg_messages()
+        self.assertEqual(1, len(messages), messages)
+        self.assertIn("обновление пропущено", messages[0])
+
+    def test_failed_marker_send_still_gets_the_general_message(self):
+        self.env["TG_RC"] = "1"
+        (self.repo / "foreign.txt").write_text("another agent\n")
+        self.git(self.repo, "add", "foreign.txt")
+        self.git(self.repo, "commit", "-qm", "foreign local commit")
+        self.shift_origin("remote.txt")
+        self.run_call_site()
+        attempts = self.tg_attempts()
+        # One attempt for the marker message, one for the general one: silence is not an option.
+        self.assertEqual(2, len(attempts), attempts)
 
     def seed_pending(self, *entries):
         root = self.git(self.repo, "rev-parse", "--show-toplevel").decode().strip()
