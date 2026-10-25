@@ -2864,6 +2864,10 @@
       "sha256": "83e797bc375903984c7b0b982b4baa582434ed4967024be8c27a38c99b361c21"
     },
     {
+      "path": "scripts/tests/day-open-observer-smoke.sh",
+      "sha256": "69ace3b139027c093f569d1fafb91b68adfb19956805ed79d9817fbe8d39d586"
+    },
+    {
       "path": "scripts/tests/fixtures/python-resolver-baseline.txt",
       "sha256": "5df435357fbf68c2c2dba999d825f99dfa955f0a485c0a253b699f62d90850ce"
     },
