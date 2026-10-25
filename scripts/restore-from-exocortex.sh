@@ -35,7 +35,12 @@ for arg in "$@"; do
 done
 
 # === Конфигурация (настраивается через env) ===
-WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
+# issue #1336: резолвим workspace по канону конвейера (memory/dry-run-contract.md,
+# issues #1233/#784/#785): env WORKSPACE_DIR > .iwe-paths (IWE_WORKSPACE) > $HOME/IWE.
+# Без этого restore на установке с нестандартным workspace искал exocortex/ не там.
+# Однострочная форма цепочки — байт-в-байт из вайтлиста dry-run-gate.sh.
+IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS"
+WORKSPACE_DIR="${WORKSPACE_DIR:-${IWE_WORKSPACE:-$HOME/IWE}}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 DS_STRATEGY="${GOV_ARG:-$WORKSPACE_DIR/$GOVERNANCE_REPO}"
 EXOCORTEX_SRC="$DS_STRATEGY/exocortex"

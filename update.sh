@@ -2724,10 +2724,12 @@ run_post_apply_backfills_or_die() {
     # scripts/day-open-llm-fill.py is no longer backfilled here (WP-485 Ф17,
     # 2026-10-05): the Day Open pipeline runs it from $IWE_SCRIPTS (the template's
     # own copy, confirmed on a live installation -- ~/.iwe-paths resolves
-    # IWE_SCRIPTS to "$IWE_TEMPLATE/scripts" unconditionally), so a governance-repo
-    # copy is never executed. Delivering it there only risked silently replacing a
-    # pilot's own committed, more-advanced version with an older seed -- the
-    # mechanism behind the reported user incident.
+    # IWE_SCRIPTS to "$IWE_TEMPLATE/scripts" whenever workspace/scripts has no
+    # regular non-wrapper session-guard.sh, per install-iwe-paths.sh #957
+    # recurrence rule), so a governance-repo copy is never executed. Delivering
+    # it there only risked silently replacing a pilot's own committed,
+    # more-advanced version with an older seed -- the mechanism behind the
+    # reported user incident.
 
     echo ""
     echo "Agent fault profile (safe update hardening)..."
@@ -6576,11 +6578,19 @@ if [ -n "$GOVERNANCE_REPO_FOR_DELIVERY_HINT" ]; then
     if [ -d "$GOVERNANCE_DIR_FOR_DELIVERY_HINT/.git" ]; then
         echo ""
         echo "Если $GOVERNANCE_REPO_FOR_DELIVERY_HINT нужно закоммитить (канонический чекаут может быть заморожен, WP-520):"
-        echo "  bash \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT/scripts/session-guard.sh\" open --housekeeping update-delivery \\"
-        echo "    --canonical-owner \"update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)\" --agent manual"
+        # Путь к session-guard.sh — из ТОЛЬКО ЧТО ОБНОВЛЁННОГО шаблона ($SCRIPT_DIR/scripts),
+        # не из governance-репо: туда update.sh session-guard.sh не доставляет, и подсказка
+        # с governance-путём падает на community-установке сразу (issue #1280, находка из
+        # живого разбора 25.10). --agent раскрывается в сессии оператора, а не при
+        # прогоне update.sh: строка печатается с экранированным \${IWE_AGENT...}, иначе
+        # прогон из обычного терминала запекал бы чужое/пустое имя (peer-находка WP-7 Ф259).
+        # страж open-gate матчит семафоры только вида ${IWE_AGENT}-*.open.
+        echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" open --housekeeping update-delivery \\"
+        echo "    --canonical-owner \"update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)\" --agent \"\${IWE_AGENT:-claude-code}\""
         echo "  (cd \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT\" && git add -A && git commit -m \"chore: sync template update\")"
-        echo "  bash \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT/scripts/session-guard.sh\" close --housekeeping update-delivery --agent manual"
+        echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" close --housekeeping update-delivery --agent \"\${IWE_AGENT:-claude-code}\""
         echo "  Если open откажет \"канон уже под эксклюзивным владением\" — подожди close этого держателя, не форсируй."
+        echo "  Важно: open, commit и close выполняй внутри ОДНОЙ сессии агента — страж привязывает семафор к её harness_session_id; open из обычного терминала с последующим commit из сессии агента пропущен не будет (issue #1280)."
     fi
 fi
 

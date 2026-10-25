@@ -53,7 +53,13 @@ fi
 # '_' и '.'. Если в $HOME есть '_' (напр. username john_doe), реальная папка проекта —
 # '-home-john-doe-IWE', а 'tr / -' даёт фантом '-home-john_doe-IWE' → зеркало не пишется.
 # Поэтому slug = tr '/_.' '-', а первичный источник — симлинк (не зависит от слугификации).
-WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/IWE}"
+# issue #1336: резолвим workspace как остальные скрипты конвейера (canon из
+# memory/dry-run-contract.md, issues #1233/#784/#785): env WORKSPACE_DIR >
+# .iwe-paths (IWE_WORKSPACE) > $HOME/IWE. Раньше хук читал только env/$HOME
+# и на установке с нестандартным workspace молча зеркалировал в несуществующий
+# путь. Однострочная форма цепочки — байт-в-байт из вайтлиста dry-run-gate.sh.
+IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS"
+WORKSPACE_DIR="${WORKSPACE_DIR:-${IWE_WORKSPACE:-$HOME/IWE}}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 # issue #875: the fallback slug comes from the workspace itself, not from "$HOME" + "-IWE"
 # (an install in a folder not named IWE would otherwise mirror another workspace's memory).
