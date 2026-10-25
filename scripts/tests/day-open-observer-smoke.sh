@@ -91,6 +91,11 @@ printf '%s\n' "$body" >> "$CURL_LOG"
 printf '{"ok":true}'
 EOF
 chmod +x "$STUBS"/*
+# Desktop-notification stubs must actually shadow the real binaries in PATH
+# (osascript on macOS, notify-send on Linux) — this test never touches the desktop.
+[ "$(PATH="$STUBS:$PATH" command -v osascript)" = "$STUBS/osascript" ] || {
+    echo "FATAL: stub dir does not shadow osascript" >&2; exit 1
+}
 
 # --- the pipeline stand-in: logs every invocation, exits ${PIPE_RC:-0}
 SCRIPTS="$TMP/scripts"
