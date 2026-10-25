@@ -905,7 +905,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "50f62a4d504042d3658e3332b3886c04705d53bf365ec643cb5c751c717788f9"
+      "sha256": "f943b86e3e6ca0792266426951cd6eed107f5c20b50af91b2ce27542d17d95a5"
     },
     {
       "path": "CLAUDE.md",
@@ -2005,7 +2005,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "f0ee52f504439f7a73ee82a73df0b87c165507e71e51ef9b560e599393df0435"
+      "sha256": "3c8034747cb7ff165ec1adf1dcad96332d477742776924d7d9ebaee1a5ab3862"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2089,7 +2089,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
-      "sha256": "b8228c3540fcce5c2fa8af388002726da4657185b254c9fad4d412b268b1e460"
+      "sha256": "3c45e31cc6c0af27fb4ca1bb198bfe32a6b60a9265f05f2168b3516d18ec3179"
     },
     {
       "path": "roles/synchronizer/scripts/templates/synchronizer.sh",
@@ -3383,6 +3383,7 @@
     "scripts/tests/conftest.py",
     "scripts/tests/day-open-llm-fill-today-plan-detect-smoke.sh",
     "scripts/tests/day-open-no-autostash-smoke.py",
+    "scripts/tests/day-open-observer-smoke.sh",
     "scripts/tests/day-open-world-fill-smoke.sh",
     "scripts/tests/dryrun-gate-knowledge-namespace-regression.sh",
     "scripts/tests/fixtures/ds-publish-637a526.sh",

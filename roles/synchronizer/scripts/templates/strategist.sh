@@ -4,7 +4,9 @@
 
 STRATEGY_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/current"
 STRATEGY_REPO_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
-DATE=$(date +%Y-%m-%d)
+# WP-568: день сверки фиксирует стратег (DAY_OPEN_PLAN_DATE) — иначе прогон через полночь
+# назвал бы в сигнале уже следующий день, хотя сверял предыдущий.
+DATE="${DAY_OPEN_PLAN_DATE:-$(date +%Y-%m-%d)}"
 
 find_strategy_file() {
     case "$1" in
@@ -142,6 +144,10 @@ build_message() {
     # model wrote nothing, so this message is static and skips the file lookup below.
     if [ "$scenario" = "week-review-failed" ]; then
         printf "<b>🔴 Week-Review не доведён до сервера</b>\n\nОтчёт недели не подтверждён на общей версии (запуск не начался, модель не справилась с заданием, или готовый отчёт не передан на сервер) - следующие сценарии недели могут остаться без итогов. В журнале стратега за сегодня видно, на каком именно шаге сорвалось."
+        return
+    fi
+    if [ "$scenario" = "day-open-missing" ]; then
+        printf "<b>🟡 План дня не опубликован сервером</b>\n\nDayPlan за %s отсутствует на общей версии хранилища после окна серверного Открытия дня. Серверный конвейер не подтвердил публикацию: либо не запустился, либо не довёл push. Этот хост — наблюдатель и сам день не открывает. Подробности - в журнале стратега за сегодня (logs/strategist/%s.log в домашнем каталоге)." "$DATE" "$DATE"
         return
     fi
     if [ "$scenario" = "day-open-failed" ]; then
