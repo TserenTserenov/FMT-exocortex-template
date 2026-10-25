@@ -105,7 +105,7 @@
     },
     {
       "path": ".claude/hooks/memory-exocortex-sync.sh",
-      "sha256": "d814b424b50f62373dca7f1b1a7f10a5730e52416d6784ab7c3063c6e0354838"
+      "sha256": "39f83ccfe8ca5bb77eec72afcfe55a6e07cbf048ce2e5dc4a08ba3e4febf993a"
     },
     {
       "path": ".claude/hooks/pack-creator-spf-guard.sh",
@@ -133,7 +133,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "45c581470f1366d4fd6452dfc60001da73b972e36d66b66895f301c8aaecbce2"
+      "sha256": "0e6d146a9715b41396c1cd319c4bb43c3b474ff5c5b1d7456b215c75ca06a2ed"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -262,6 +262,10 @@
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
       "sha256": "e4b16469313e2fdac75cf2bee3c8ebe895c8614fd0cfe76e349a1df15b1aa904"
+    },
+    {
+      "path": ".claude/hooks/tests/test_issue_1340_step_caps.sh",
+      "sha256": "86022483fd4fcbb5c18bda962da6a8131d7af97326ea9acb0a094db62fe05cf3"
     },
     {
       "path": ".claude/hooks/wp-gate-reminder.sh",
@@ -905,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f943b86e3e6ca0792266426951cd6eed107f5c20b50af91b2ce27542d17d95a5"
+      "sha256": "df90e75069c192c240106f2cb52c57704b8ac951771a0ed5065f707f08231ec0"
     },
     {
       "path": "CLAUDE.md",
@@ -2749,7 +2753,7 @@
     },
     {
       "path": "scripts/restore-from-exocortex.sh",
-      "sha256": "7958cc78749734f5f316864138abc0d906cdd737bb5e5ad8c0d2174cb3e3d363"
+      "sha256": "f69a374cffb4f61a6df9ab3d66a821763f89532c792cdc4253b171ee5e1d7164"
     },
     {
       "path": "scripts/route-task.sh",
@@ -3353,7 +3357,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8ecadf87a17f709afe7eff9edbf255cb0cf4192369ae4f518f83f324b774878c"
+      "sha256": "8cb7c06cedfcee6caee4c06735399e3565f79d9e0c44e7f7ec19320d0f61fd46"
     }
   ],
   "excluded_paths": [
@@ -3455,6 +3459,8 @@
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
+    "scripts/tests/test_issue_1280_delivery_hint.sh",
+    "scripts/tests/test_issue_1336_ws_paths.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
