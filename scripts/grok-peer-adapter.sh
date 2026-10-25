@@ -34,6 +34,21 @@
 # built-in denies). Do not silently fall back to a weaker profile
 # ("workspace"/"none") to route around it: fail loudly instead (see below).
 #
+# Second upstream limitation found live 25.10 (WP-7 Ф259, grok-4.7-build):
+# if the model decides to request a tool call anyway (e.g. run_terminal_command
+# to "find the branch first"), the headless session has no permission UI —
+# the call is answered PermissionCancelled and the WHOLE session ends after
+# the first assistant paragraph (stopReason "cancelled", one model call,
+# output truncated to the preamble). Symptoms: exit 0, tiny output (one
+# introductory sentence), elapsed ~5-10 s. Diagnose with --debug-file
+# (look for cancellationCategory PermissionCancelled). Mitigations that
+# worked: (a) prompt MUST explicitly forbid tool calls ("Tools and terminal
+# are DISABLED... do NOT request any tool calls") — without it the model
+# reliably reaches for the terminal on review/diagnosis tasks; (b) --model
+# grok-4.6 (4.7 went into a multi-minute hang even with the forbiddance);
+# (c) raise GROK_PEER_TIMEOUT_SEC for long reviews. A preamble-only reply
+# under ~20 s with stopReason cancelled is this failure, not a verdict.
+#
 # Env overrides:
 #   GROK_BIN      — override grok binary path
 #   IWE_PEER_LOCK_DIR — same as codex-peer-adapter.sh
