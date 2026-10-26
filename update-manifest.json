@@ -769,7 +769,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "ec0518efe0857db6ed1087aa711087c8208e650f36a96cbbec50ec42ef3e0574"
+      "sha256": "3d0cf7e7c0ccf3f1fb18e1ff566a2e5aa505cf7606447b271625b84d9d2b0c6d"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -1897,15 +1897,15 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "d2b826c08acca00dbd2132575d9ac802410147c2ba09da4ed542e1f69d889f36"
+      "sha256": "14c2915a939e8a47c810e83f30c64acf5cf0638f1ea71ced205fb816e6dc6294"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
-      "sha256": "1d7ea20221ddd55fdcbec5b27c38fc5cbb8904dc8eec7f3977f886886f38a270"
+      "sha256": "92a8240d34e7245ad237d3c0fe815099f03c8abeb0d09af96545436576642791"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly.md",
-      "sha256": "aacb513e055adb9ef394742327831b3b0cf2d80e9b841948e2f0226bf804a195"
+      "sha256": "2ddf054dbfa1f88b89a0843f066ab8d72f203790484f5c64fda033630b468561"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/appendix/consent-check.md",
@@ -1917,11 +1917,11 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/jump-handler.md",
-      "sha256": "886b040e55349fb106bda12629b935cc9f4990699fcb0131e6e9a80199df1c94"
+      "sha256": "1db209f8730b0672c817caa4ebe02bce7a16351fd9f19d1d2dfdea110bd01add"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/00-open.md",
-      "sha256": "75a7d9c6d66ca7507735d298d37251e43d5e2a14cce929924cfa8d68f65e9c97"
+      "sha256": "2c3f49310ddfa17a758e5f7695cd0de41b88cbb4625e62577d9ab2480324aa94"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/01-review.md",
@@ -1949,7 +1949,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05c-tracking.md",
-      "sha256": "1a959872e8411ca143800b6df4d31e1635771d7f02dfa538ed75b1b12747833b"
+      "sha256": "302eb271f62b65c6fba861c5a3c9928bf1533861354bd1b77e414278c128d965"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
