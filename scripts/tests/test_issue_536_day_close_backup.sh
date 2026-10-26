@@ -12,6 +12,13 @@ TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iwe-issue-536-backup.XXXXXX")"
 BACKUP_MANIFEST=".day-close-backup-manifest.json"
 BACKUP_QUARANTINE=".day-close-backup-incomplete"
 
+# Runs below swap HOME for a fake one. With PyYAML installed by
+# `pip install --user`, that hid the module and day-close took its
+# "no PyYAML" branch — two false failures on macOS (issue #1342). Pin the
+# real user site; the no-PyYAML case still wins via PYTHONPATH.
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+export PYTHONUSERBASE
+
 FAIL=0
 fail() { echo "  ❌ FAIL: $*" >&2; FAIL=$((FAIL + 1)); }
 pass() { echo "  ✅ PASS: $*"; }

@@ -1,9 +1,7 @@
 # See https://docs.github.com/articles/about-codeowners
 #
-# WP-529 Ф21 (подготовка ревью перед релизом, не включена — см. карточку
-# РП-529): оба текущих коллабораторa с правом push/review. Внешние
-# ревьюеры (community, по предложению Артёма) добавляются сюда отдельной
-# строкой после подтверждения их GitHub-логина пилотом — до этого момента
-# требование одобрения владельцев кода (require_code_owner_reviews) в защите
-# ветки main остаётся выключенным, этот файл сам по себе ничего не блокирует.
+# Both current collaborators with push/review rights. External reviewers are
+# added on separate lines once their GitHub login is confirmed by the
+# maintainer. Until then, require_code_owner_reviews stays off in the main
+# branch protection, so this file does not block anything by itself.
 * @TserenTserenov @tserenovmailru

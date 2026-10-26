@@ -402,11 +402,17 @@ else
     # ГБ) занимает минуты и ломает заявленное «≤3 секунды» этого скрипта
     # (найдено живым прогоном при реализации, WP-7 Ф233а) — для статуса
     # покрытия размер не нужен, только факт наличия.
-    SOURCES_TSV=$(HOME="$HOME" SOURCES_FILE="$SOURCES_FILE" SOURCES_OVERRIDE="$SOURCES_OVERRIDE" python3 <<'PYEOF'
+    # Only the workspace itself is mandatory: other tier0 sources exist only if
+    # that agent / credential helper is installed (issue #1351). An entry may
+    # say `optional: true`; a local override with the same expanded path
+    # replaces the default entry, but can never make the workspace optional.
+    # WORKSPACE_ROOT is passed explicitly — IWE_ROOT may come from --root.
+    SOURCES_TSV=$(HOME="$HOME" WORKSPACE_ROOT="$IWE_ROOT" SOURCES_FILE="$SOURCES_FILE" SOURCES_OVERRIDE="$SOURCES_OVERRIDE" python3 <<'PYEOF'
 import os
 import yaml
 
 home = os.environ["HOME"]
+workspace = os.path.realpath(os.environ["WORKSPACE_ROOT"])
 
 
 def load(path):
@@ -425,14 +431,23 @@ if defaults.get("schema_version") != 1:
     sys.exit(1)
 
 tiers = ["tier0_unique", "tier1_scheduled", "tier2_optional"]
-for tier in tiers:
-    entries = list(defaults.get(tier, [])) + list(override.get(tier, []))
-    for entry in entries:
-        raw_path = entry.get("path", "")
-        path = raw_path.replace("${HOME}", home)
-        note = entry.get("note", "")
-        exists = os.path.exists(path)
-        print(f"{tier}\t{path}\t{int(exists)}\t{note}")
+sources = {}
+for layer in (defaults, override):
+    for tier in tiers:
+        for entry in layer.get(tier) or []:
+            raw_path = entry.get("path") or ""
+            if not raw_path:
+                continue
+            path = os.path.realpath(
+                raw_path.replace("${HOME}", home).replace("${WORKSPACE_DIR}", workspace)
+            )
+            if path == workspace:
+                tier = "tier0_unique"
+            sources[path] = (tier, entry)
+for path, (tier, entry) in sources.items():
+    optional = bool(entry.get("optional")) and path != workspace
+    note = entry.get("note", "")
+    print(f"{tier}\t{path}\t{int(os.path.exists(path))}\t{int(optional)}\t{note}")
 PYEOF
 ) || SOURCES_TSV=""
 
@@ -443,24 +458,24 @@ PYEOF
         MISSING_TIER0=0
         echo "| Tier | Путь | Статус | Примечание |"
         echo "|---|---|---|---|"
-        while IFS=$'\t' read -r tier path exists note; do
+        while IFS=$'\t' read -r tier path exists optional note; do
             [ -z "$tier" ] && continue
             if [ "$exists" = "1" ]; then
                 printf "| %s | \`%s\` | есть | %s |\n" "$tier" "$path" "${note:--}"
+            elif [ "$tier" = "tier0_unique" ] && [ "$optional" = "0" ]; then
+                printf "| %s | \`%s\` | НЕ НАЙДЕНО (обязательный) | %s |\n" "$tier" "$path" "${note:--}"
+                MISSING_TIER0=$((MISSING_TIER0 + 1))
             else
                 printf "| %s | \`%s\` | пропущено (не существует) | %s |\n" "$tier" "$path" "${note:--}"
-                if [ "$tier" = "tier0_unique" ]; then
-                    MISSING_TIER0=$((MISSING_TIER0 + 1))
-                fi
             fi
         done <<< "$SOURCES_TSV"
         echo ""
 
         if [ "$MISSING_TIER0" -gt 0 ]; then
-            crit "$MISSING_TIER0 источник(а) уровня tier0 (невосстановимые данные) не найдено — проверьте путь или override"
+            crit "$MISSING_TIER0 обязательный(х) источник(а) уровня tier0 (невосстановимые данные) не найдено — проверьте путь или override"
             CRITICALS=$((CRITICALS + 1))
         else
-            pass "Все tier0-источники (невосстановимые данные) присутствуют на диске"
+            pass "Обязательные tier0-источники (невосстановимые данные) присутствуют на диске"
         fi
     fi
     echo ""

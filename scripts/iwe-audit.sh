@@ -404,7 +404,13 @@ else
                 PROMOTED_DRIFT=$((PROMOTED_DRIFT + 1))
             fi
             if [ $((present & 1)) -eq 1 ] && [ "$seed_ok" = 0 ]; then
-                echo "- ⚠️ \`seed/strategy/scripts/$rel\` отстал от \`scripts/$rel\` — обновить снимок: \`bash \"$IWE_ROOT/FMT-exocortex-template/scripts/check-seed-drift.sh\" --fix\`"
+                # check-seed-drift.sh --fix only rebuilds snapshots that carry the
+                # marker; advising it for an unmarked one changed nothing (#1350).
+                if grep -qF "$SEED_SNAPSHOT_MARKER" "$seed_f"; then
+                    echo "- ⚠️ \`seed/strategy/scripts/$rel\` отстал от \`scripts/$rel\` — обновить снимок: \`bash \"$IWE_ROOT/FMT-exocortex-template/scripts/check-seed-drift.sh\" --fix\`"
+                else
+                    echo "- ⚠️ \`seed/strategy/scripts/$rel\` отстал от \`scripts/$rel\` и не несёт маркер SNAPSHOT — \`check-seed-drift.sh --fix\` такой файл не обновляет; обновить шаблон (\`update.sh\`) или сообщить об устаревшем снимке в issue шаблона"
+                fi
                 PROMOTED_DRIFT=$((PROMOTED_DRIFT + 1))
             fi
             if [ "$present" = 3 ] && [ "$inst_ok" = 1 ] && [ "$seed_ok" = 1 ]; then

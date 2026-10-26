@@ -77,6 +77,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE_DIR="$(dirname "$SCRIPT_DIR")"
 TEST_WS="${EDGE_CASE_WORKSPACE:-/tmp/iwe-edge-test-$$}"
 
+# Many cases swap HOME for a fake one. A `pip install --user` PyYAML lives
+# under the real HOME, so find-python3.sh stopped finding it (issue #1343).
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+export PYTHONUSERBASE
+
 cleanup() {
     local rc=$?
     if [ -d "$TEST_WS" ] && [ "${KEEP_WORKSPACE:-0}" != "1" ]; then
@@ -1938,7 +1943,9 @@ fi
 mkdir -p "$T25_STAND/custom-memory" "$T25_STAND/workspace"
 ln -s "$T25_STAND/custom-memory" "$T25_STAND/workspace/memory"
 eval "$(awk '/^resolve_workspace_memory_dir\(\)/{copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")"
-HOME="$T25_HOME" T25_MEMORY=$(resolve_workspace_memory_dir "$T25_STAND/workspace")
+# Two assignments, not a command prefix: HOME stayed swapped for the rest of
+# the run (issue #1343). Swap it only inside the substitution.
+T25_MEMORY=$(HOME="$T25_HOME"; resolve_workspace_memory_dir "$T25_STAND/workspace")
 T25_CUSTOM_PHYSICAL=$(cd "$T25_STAND/custom-memory" && pwd -P)
 if [ "$T25_MEMORY" = "$T25_CUSTOM_PHYSICAL" ]; then
     pass "T25: physical workspace/memory target wins over a guessed Claude slug"
@@ -3104,6 +3111,10 @@ fi
 # T40: Kimi peer heartbeat is observational, never a session semaphore (WP-484)
 # ============================================================
 echo "--- T40: Kimi peer heartbeat namespace and watchdog consumer (WP-484) ---"
+# T40 asserts the v4 (st_dev + inode) OAuth fence/lineage records. On macOS the
+# adapter writes v5 records (volume UUID + birthtime) instead, so T40 failed
+# only there (issue #1343); pin the adapter's own test switch to the v4 path.
+export IWE_PEER_TEST_FORCE_NOT_MACOS=1
 
 T40_ROOT="$TEST_WS/t40-kimi-peer-heartbeat"
 T40_IWE="$T40_ROOT/iwe"
@@ -4247,6 +4258,7 @@ then
 else
     fail "T40u: peer language-check dependency is missing or inactive"
 fi
+unset IWE_PEER_TEST_FORCE_NOT_MACOS
 
 # ============================================================================
 # T41: sync_workspace_claude_md() accepts a hand-resolved conflict instead of

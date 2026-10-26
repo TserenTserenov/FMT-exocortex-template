@@ -373,10 +373,12 @@ dispatch() {
         elapsed=$(last_run_seconds_ago "extractor-inbox-check")
         if interval_reached "$elapsed" 10800; then
             log "→ extractor inbox-check (${elapsed}s since last)"
-            if timeout "$TASK_TIMEOUT_LONG" "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
-                mark_interval "extractor-inbox-check"
-            else
-                log "WARN: extractor inbox-check failed (will retry next dispatch)"
+            # A failed run is stamped too: every run is a full AI pass, so retrying on
+            # each 10-min dispatch turned one persistent post-AI failure into an
+            # unbounded loop burning the subscription (issue #1348).
+            mark_interval "extractor-inbox-check"
+            if ! timeout "$TASK_TIMEOUT_LONG" "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
+                log "WARN: extractor inbox-check failed (next try after the 3h interval)"
             fi
             ran=1
         fi

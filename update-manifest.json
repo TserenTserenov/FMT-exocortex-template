@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "692c9e38f1dc48d8ca91bf084acd726f833bd3c2df1d50318683aaf406ef0209"
+      "sha256": "a260fee33d51073cb81e3a61b2204c3e1ae13ff677c9d35f48f0c34258001b10"
     },
     {
       "path": "CLAUDE.md",
@@ -2073,7 +2073,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "64401ec8a532b1993cfb84ede698e1819a90705faab14e2316ed20dd2fcea092"
+      "sha256": "ede837d47c75c57af1ec4362e16ced6689293b92bce4b35a5b0ed57379cfe799"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -2501,11 +2501,11 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "01eb7263962384ffda9210f8b4074c48869f81c6819446c862c1d2187515923f"
+      "sha256": "8607d9618c99ac3550ed36056cef38d9d03218da41b6d78adc0d7d3244cd01bf"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
-      "sha256": "eb078d6b5ca0a94d0c98389811dff72ba5cda8435be0b35e4e3b63bd137eb26d"
+      "sha256": "054ddafd9e692a7924f1f72804c320d222891f85e6b4ad37d29e799f2da85b22"
     },
     {
       "path": "scripts/iwe-backup-protect.sh",
@@ -2513,11 +2513,11 @@
     },
     {
       "path": "scripts/iwe-backup-run.sh",
-      "sha256": "17d74d1acf86ca245f1dedbb468c1061398b9c055e5d7edff316f221a8a85854"
+      "sha256": "c9fb1051612a6f953a6b6030aaa735839317e2113505b6a15f9fe9918b4f7f14"
     },
     {
       "path": "scripts/iwe-backup-sources.yaml",
-      "sha256": "4e0cb830c5d6674a80466abeacf96a298d061660770ebf5880ee5bcf7a01a973"
+      "sha256": "fbf4b706c70a8045f8ac51602fa87c51f3a5c804df3e2f85e90b708d272bbf60"
     },
     {
       "path": "scripts/iwe-bug-report.sh",
@@ -2693,7 +2693,7 @@
     },
     {
       "path": "scripts/memory-bleed.sh",
-      "sha256": "6e17b5d41562ce24326cd4b1556d30c0ef2ae60f5a83e31012f05982ca6a16e8"
+      "sha256": "7e6e7ebe6b55948c8b1c5a7648b7ecf4749c1cc92c2b59a24513dc8e268d2883"
     },
     {
       "path": "scripts/memory-health.sh",
@@ -3037,7 +3037,7 @@
     },
     {
       "path": "scripts/tests/test_issue_536_day_close_backup.sh",
-      "sha256": "cfdfa3ad05aa60706e5d3c4dbba242dd76875effd7e2d8f5d6353c50be088c77"
+      "sha256": "fde42eeab69b9344933f93f437a288309958cc3a054da9a10e3a77029189c260"
     },
     {
       "path": "scripts/tests/test_issue_557_zsh_special_vars.sh",
@@ -3465,6 +3465,9 @@
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
     "scripts/tests/test_issue_1280_delivery_hint.sh",
     "scripts/tests/test_issue_1336_ws_paths.sh",
+    "scripts/tests/test_issue_1350_audit.sh",
+    "scripts/tests/test_issue_1351_tier0.sh",
+    "scripts/tests/test_issue_1352_bleed.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
