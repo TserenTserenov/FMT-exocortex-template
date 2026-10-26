@@ -410,7 +410,8 @@ absent_in_texts "roles/README: the Strategist has no evening job" 'launchd (ут
 absent_in_texts "session-prep: no 'daily triage' of Note-Review" 'ежедневного triage Note-Review'
 absent_in_texts "strategy-session: no ambiguous 'clean the processed'" 'Очисти обработанные из'
 absent_in_texts "strategy-session steps: no ambiguous 'clean the processed'" '**Очисти** обработанные из'
-for f in "roles/strategist/prompts/strategy-session.md" "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md"; do
+# strategy-session.md is a pointer to the dispatcher since WP-518 F21; the cleanup rule lives in step 08 only
+for f in "roles/strategist/prompts/strategy-session-weekly/steps/08-confirm.md"; do
     check "$f: only notes the pilot already decided on are cleaned" "1" "$(count_fixed 'по которым пилот уже принял решение' "$ROOT/$f")"
 done
 echo "== G2b: every text that sends the user to a manual review names a route that exists =="
