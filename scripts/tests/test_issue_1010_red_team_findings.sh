@@ -17,7 +17,7 @@ pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*" >&2; fails=$((fails + 1)); }
 
 echo "== F3 USER-SPACE kept by the stale/repair copy of a skill"
-for fn in hash_file backup_rule_before_overwrite rule_was_safe_to_update copy_platform_file_preserving_user_space; do
+for fn in hash_file backup_rule_before_overwrite rule_was_safe_to_update reinject_user_section copy_platform_file_preserving_user_space; do
   eval "$(awk -v sig="$fn() {" '$0 == sig {c=1} c {print} c && /^}$/ {exit}' "$ROOT/update.sh")"
 done
 declare -F copy_platform_file_preserving_user_space >/dev/null || { echo "FATAL: cannot extract copy_platform_file_preserving_user_space" >&2; exit 2; }

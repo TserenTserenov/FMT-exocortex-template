@@ -200,30 +200,37 @@ fi
 # older managed block in $1 (marker presence alone is not proof that it
 # sources this workspace), then appends a fresh block if missing.
 install_iwe_env_block() {
-    local rc_file="$1"
+    local rc_file="$1" rc_tmp
+    rc_tmp=$(mktemp)
+    # Build the whole new file first and write it only when it differs: the
+    # old strip-then-append left the blank line before the removed block, so
+    # every update.sh run added one more empty line (issue #1010).
     if [ -f "$rc_file" ]; then
-        local rc_tmp
-        rc_tmp=$(mktemp)
         awk '
           /^# IWE environment \(WP-219, DP.FM.009\):/{skip=1; next}
           skip && /^unset _IWE_ROOT$/{skip=0; next}
-          /\[ -f "\$HOME\/\.iwe-paths" \] && source "\$HOME\/\.iwe-paths"/{next}
-          !skip{print}
+          # The legacy block ends with this line (no `unset _IWE_ROOT`): it must
+          # end the skip too, or every user line after it was dropped.
+          /\[ -f "\$HOME\/\.iwe-paths" \] && source "\$HOME\/\.iwe-paths"/{skip=0; next}
+          !skip{lines[++n]=$0}
+          END{while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--; for (i = 1; i <= n; i++) print lines[i]}
         ' "$rc_file" > "$rc_tmp"
-        mv "$rc_tmp" "$rc_file"
     fi
-    if ! grep -qF "_IWE_ROOT=\"$WORKSPACE_DIR\"" "$rc_file" 2>/dev/null; then
-        cat >> "$rc_file" <<RC_EOF
-
+    [ -s "$rc_tmp" ] && printf '\n' >> "$rc_tmp"
+    cat >> "$rc_tmp" <<RC_EOF
 # IWE environment (WP-219, DP.FM.009): lookup-слой для путей к скриптам
 _IWE_ROOT="$WORKSPACE_DIR"
 [ -f "\$_IWE_ROOT/.iwe-paths" ] && source "\$_IWE_ROOT/.iwe-paths"
 unset _IWE_ROOT
 RC_EOF
-        $QUIET || echo "  ✓ $rc_file → sources \$WORKSPACE_DIR/.iwe-paths"
-    else
+    if [ -f "$rc_file" ] && cmp -s "$rc_tmp" "$rc_file"; then
         $QUIET || echo "  ○ $rc_file already sources $WORKSPACE_DIR/.iwe-paths"
+    else
+        # cat > keeps the file's inode, mode and a symlinked rc file intact.
+        cat "$rc_tmp" > "$rc_file"
+        $QUIET || echo "  ✓ $rc_file → sources \$WORKSPACE_DIR/.iwe-paths"
     fi
+    rm -f "$rc_tmp"
 }
 
 if $SKIP_ZSHENV; then

@@ -703,8 +703,10 @@ else
     fi
     if git -C "$E2E_GOV10" ls-files --error-unmatch -- \
             scripts/generate-executor-catalog.py >/dev/null 2>&1 \
-        && cmp -s "$TEMPLATE_DIR/scripts/generate-executor-catalog.py" \
+        && cmp -s "$TEMPLATE_DIR/seed/strategy/scripts/generate-executor-catalog.py" \
             "$E2E_GOV10/scripts/generate-executor-catalog.py"; then
+        # The installed copy comes from seed/ (a SNAPSHOT-marked copy); seed ↔
+        # scripts/ identity is held by scripts/check-seed-drift.sh.
         pass "e2e full mode: installed catalog generator matches the template source"
     else
         fail "e2e full mode: installed catalog generator is absent, untracked, or drifted"

@@ -55,6 +55,23 @@ else
     fail "T4: hint lost the harness_session_id same-session warning"
 fi
 
+# --- T6: the hint stages only delivered paths, never the whole tree ---
+HINT_BLOCK=$(sed -n '/^GOVERNANCE_REPO_FOR_DELIVERY_HINT=/,/^fi$/p' "$UPDATE_SH")
+if ! printf '%s\n' "$HINT_BLOCK" | grep -qE 'git add -A|git add \.|git add -u' \
+   && printf '%s\n' "$HINT_BLOCK" | grep -qF 'git add -- $DELIVERY_PATHS_FOR_HINT'; then
+    pass "T6: hint stages only the delivered paths (no git add -A)"
+else
+    fail "T6: hint sweeps the whole governance tree or lost the explicit path list"
+fi
+
+# --- T7: no --canonical-owner / exclusive-owner text in the housekeeping hint ---
+# session-guard.sh's housekeeping branch exits before CANONICAL_OWNER is read.
+if ! printf '%s\n' "$HINT_BLOCK" | grep -qE 'canonical-owner|эксклюзивным владением'; then
+    pass "T7: hint does not promise a canonical-owner refusal that does not exist"
+else
+    fail "T7: hint still prints --canonical-owner or the exclusive-owner refusal"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
     echo "test_issue_1280_delivery_hint: ALL PASS"
     exit 0

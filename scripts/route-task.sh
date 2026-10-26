@@ -528,43 +528,37 @@ for ex in ["script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+j
 PYEOF
 }
 
+# issue #894: the routing rules live in one place, validate_entry of
+# generate-executor-catalog.py; --validate runs that same code on the built
+# catalog instead of a second, weaker copy of the rules embedded here.
+# Lookup order: next to this script (template scripts/, same install unit as
+# route-task.sh itself), the configured template, then next to the catalog
+# (the governance repo's scripts/, where update.sh delivers the generator).
+find_catalog_generator() {
+    local candidate
+    for candidate in \
+        "$SCRIPT_DIR/generate-executor-catalog.py" \
+        "$IWE_TEMPLATE/scripts/generate-executor-catalog.py" \
+        "$(dirname "$CATALOG")/generate-executor-catalog.py"; do
+        if [[ -f "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 validate_catalog() {
     require_python
     require_catalog
-    "$RESOLVED_PYTHON3" - "$CATALOG" << 'PYEOF'
-import sys, yaml
-
-VALID = {"script", "haiku", "sonnet", "opus", "mcp-direct", "agent", "script+judgment"}
-VALID_AGENT_MODELS = {"haiku", "sonnet", "opus"}
-errors = []
-
-with open(sys.argv[1]) as f:
-    cat = yaml.safe_load(f)
-
-for e in cat["entries"]:
-    r = e["routing"]
-    name = e["name"]
-    if r.get("executor") not in VALID:
-        errors.append(f"{name}: invalid executor '{r.get('executor')}'")
-    if "deterministic" not in r:
-        errors.append(f"{name}: missing deterministic")
-    if r.get("executor") == "script" and "script_path" not in r:
-        errors.append(f"{name}: script executor missing script_path")
-    if r.get("script_root", "template") not in {"template", "workspace"}:
-        errors.append(f"{name}: invalid script_root")
-    if "script_root" in r and r.get("executor") != "script":
-        errors.append(f"{name}: script_root requires script executor")
-    if r.get("executor") == "agent" and r.get("model") not in VALID_AGENT_MODELS:
-        errors.append(f"{name}: agent executor requires model: haiku|sonnet|opus")
-
-if errors:
-    print("FAIL:")
-    for e in errors:
-        print(f"  ❌ {e}")
-    sys.exit(1)
-else:
-    print(f"PASS: {cat['total_entries']} entries validated, no errors")
-PYEOF
+    local generator
+    if ! generator=$(find_catalog_generator); then
+        die "generate-executor-catalog.py not found (looked in $SCRIPT_DIR, $IWE_TEMPLATE/scripts, $(dirname "$CATALOG")); cannot validate the catalog" 1
+    fi
+    # Template-relative script_path is checked against $IWE_TEMPLATE and
+    # workspace script_path against $IWE_DIR: the same roots run_script uses.
+    IWE_DIR="$IWE_DIR" "$RESOLVED_PYTHON3" "$generator" \
+        --validate-catalog "$CATALOG" --template-root "$IWE_TEMPLATE" || exit 1
 }
 
 # ---------------------------------------------------------------------------

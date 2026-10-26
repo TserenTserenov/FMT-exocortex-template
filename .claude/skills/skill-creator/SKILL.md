@@ -227,7 +227,7 @@ before the skill is used in practice.
 Fields used by some existing skills but not yet in the standard frontmatter schema:
 
 - `argument-hint` — CLI-style hint for script-executor skills (e.g. agent-fault, apply-captures). Encodes the argument contract. Keep until schema is extended or absorbed into `description`.
-- `routing.executor` — indicates whether the skill runs via `script`, `sonnet`, or another executor. Useful for the dispatcher but not validated by `verify-skill.sh`. Candidate for standardization.
+- `routing.executor` — indicates whether the skill runs via `script`, `sonnet`, or another executor. When the block is present, `verify-skill.sh` checks it with the catalog generator's own rules (`generate-executor-catalog.py --validate-skill`, issue #894); the block itself is not mandatory yet. Candidate for standardization.
 
 Until standardized: leave these fields as-is in existing skills; do not remove during Step 2.5 updates.
 

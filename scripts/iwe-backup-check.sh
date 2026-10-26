@@ -276,7 +276,14 @@ if [ "$CHECK_ICLOUD" -eq 1 ]; then
 else
     echo "## 1. iCloud-бэкапы"
     echo ""
-    info "N/A (платформа: $IWE_OS — iCloud доступен только на macOS)"
+    if [ "$IWE_OS" != "macos" ] && [ -n "$ICLOUD_DIR" ]; then
+        # backup_dir is read on any OS, but the built-in archive backup and
+        # this check only run on macOS: say so instead of a silent N/A (#1349).
+        warn "backup_dir задан ($ICLOUD_DIR), но встроенный бэкап и проверка его свежести на $IWE_OS не выполняются — архивы туда не создаются. Ведите свой бэкап: backup_enabled: false в params.yaml + расширение week-close.after.*.md"
+        WARNINGS=$((WARNINGS + 1))
+    else
+        info "N/A (платформа: $IWE_OS — iCloud доступен только на macOS)"
+    fi
     echo ""
 fi
 

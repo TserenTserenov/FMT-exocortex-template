@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Issue #1032: native Windows Git Bash must refuse a session before writing.
 set -euo pipefail
+# Hermetic: an operator's IWE_SESSIONS_ROOT would point open at the real
+# sessions repo and leave test scaffolds there.
+unset IWE_SESSIONS_ROOT
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd -P)"
 FIXTURE="$(mktemp -d)"

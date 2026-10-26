@@ -9,6 +9,9 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 GUARD="$ROOT_DIR/scripts/session-guard.sh"
 GOV="$TMP_DIR/DS-strategy"
 SESSIONS="$TMP_DIR/.iwe-runtime/sessions"
+# Hermetic: an operator's IWE_SESSIONS_ROOT pointed open at the real
+# sessions repo and left test scaffolds there.
+unset IWE_SESSIONS_ROOT
 
 # Exercise the delivered writer and its actual seed dependencies. A stub keeps
 # ledger writes local even on hosts with an active ledger-publish service.

@@ -316,7 +316,7 @@ class HorizonContext:
     summary_events: str = ""    # events from render-pilot-guides.py (B2)
     mastery_by_area: dict = field(default_factory=dict)  # Phase 4.1: {area_key: depth} from Memory.Derived
     domain_traits: list[DomainTrait] = field(default_factory=list)  # Ф5b: applied track, WP-493 Step 8
-    pilot_reflection: str = ""  # pilot's reflection from yesterday (history/YYYY-MM-DD-reflection.txt)
+    pilot_reflection: str = ""  # pilot's reflection from yesterday (history/YYYY-MM/YYYY-MM-DD-reflection.md|.txt)
     reflection_learned: list[str] = field(default_factory=list)  # Q3 "What I learned" over 7 days
     tomorrow_intention: str = ""  # Q5 "What's next" from the latest reflection
 

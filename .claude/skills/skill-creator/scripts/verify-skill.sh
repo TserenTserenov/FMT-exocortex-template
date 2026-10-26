@@ -24,4 +24,30 @@ if ! PYTHON=$(bash "$RESOLVER"); then
     echo "FAIL: skill verification requires Python 3.10+ and PyYAML" >&2
     exit 1
 fi
-exec "$PYTHON" "$SCRIPT_DIR/verify-skill.py" "$@"
+status=0
+"$PYTHON" "$SCRIPT_DIR/verify-skill.py" "$@" || status=$?
+# Usage errors (argparse exits 2) leave no skill to check the routing block of.
+[ "$status" -eq 2 ] && exit 2
+
+# issue #894: the routing block is checked by the same validate_entry code the
+# catalog generator and route-task.sh --validate use, not by rules of its own.
+# A skill without a routing block passes — routing is not mandatory yet.
+SKILL_DIR="${2:-.claude/skills}/${1:-}"
+GENERATOR=""
+for candidate in \
+    "$SCRIPT_DIR/../../../../scripts/generate-executor-catalog.py" \
+    "${IWE_TEMPLATE:+$IWE_TEMPLATE/scripts/generate-executor-catalog.py}" \
+    "$SCRIPT_DIR/../../../../FMT-exocortex-template/scripts/generate-executor-catalog.py" \
+    "${IWE_SCRIPTS:+$IWE_SCRIPTS/generate-executor-catalog.py}"; do
+    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+        GENERATOR="$candidate"
+        break
+    fi
+done
+if [ -n "$GENERATOR" ]; then
+    "$PYTHON" "$GENERATOR" --validate-skill "$SKILL_DIR" || status=1
+elif [ -f "$SKILL_DIR/SKILL.md" ] && grep -q '^routing:' "$SKILL_DIR/SKILL.md"; then
+    echo "FAIL: $SKILL_DIR declares a routing block, but generate-executor-catalog.py was not found (looked in scripts/, \$IWE_TEMPLATE/scripts, FMT-exocortex-template/scripts, \$IWE_SCRIPTS)" >&2
+    status=1
+fi
+exit "$status"

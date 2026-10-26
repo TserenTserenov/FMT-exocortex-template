@@ -18,6 +18,13 @@ ARCHIVE="IWE-backup-${DATE}.tar.gz"
 MAX_BACKUPS=4
 
 # Проверка платформы и iCloud
+if [ "$IWE_OS" != "macos" ] && [ -n "$ICLOUD_DIR" ]; then
+    # issue #1349: backup_dir is honoured on any OS by the bootstrap, but this
+    # built-in backup is macOS-only; refuse loudly with the supported way out.
+    echo "❌ backup_dir задан ($ICLOUD_DIR), но встроенный бэкап работает только на macOS (текущая платформа: $IWE_OS) — архив не создан." >&2
+    echo "   Ведите свой бэкап: backup_enabled: false в params.yaml + расширение week-close.after.*.md." >&2
+    exit 1
+fi
 if [ "$IWE_OS" != "macos" ] || [ -z "$ICLOUD_DIR" ]; then
     echo "❌ backup-icloud.sh требует macOS с iCloud Drive (текущая платформа: $IWE_OS)."
     exit 1

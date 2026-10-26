@@ -124,8 +124,30 @@ run_test "T6: --tag '' (empty → unknown → fallback Sonnet, exit 0)" 0 --tag 
 # 7. --list
 run_test "T7: --list (exit 0)" 0 --list
 
-# 8. --validate
-run_test "T8: --validate (exit 0)" 0 --validate
+# 8. --validate. issue #894: --validate now runs the generator's own rules,
+# which include "script_path must exist" — the dispatch fixture above holds
+# two entries with an intentionally missing script, so it must be rejected.
+run_test "T8: --validate rejects the fixture's missing scripts (exit 1)" 1 --validate
+
+# 8b. The same fixture without the missing-script entries validates.
+T8B_CATALOG="$HARNESS_TMP/valid-catalog.yaml"
+cat > "$T8B_CATALOG" <<'YAML'
+schema_version: '1.0'
+generated_at: '2026-08-24T00:00:00Z'
+total_entries: 2
+entries:
+  - name: consent
+    routing:
+      executor: script
+      script_path: scripts/consent-fixture.sh
+      deterministic: true
+  - name: agent-fault
+    routing:
+      executor: script
+      script_path: scripts/agent-fault-fixture.sh
+      deterministic: true
+YAML
+IWE_EXECUTOR_CATALOG="$T8B_CATALOG" run_test "T8b: --validate on existing scripts only (exit 0)" 0 --validate
 
 # 9. Broken YAML catalog → exit 1 (error)
 echo "=== T9: broken YAML catalog → exit 1 ==="

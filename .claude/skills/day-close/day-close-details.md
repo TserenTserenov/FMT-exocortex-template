@@ -15,7 +15,7 @@
 |------------|---------------------|
 | 1 commits today | шаг 1 — цикл `git log` по репо |
 | 2 dirty repos | шаг 10b — `check-dirty-repos.sh` |
-| 3 open-sessions.log | шаг 2d — чтение лога |
+| 3 open-sessions.log | шаг 2d — строки открытий за сегодня (журнал накопительный, не правится) |
 | 4 memory drift hits | шаг 4б — grep |
 | 5 index health | шаг 4в — запуск `check-index-health.py` |
 | 6 lesson/memory stats | шаг 4 — скан |
