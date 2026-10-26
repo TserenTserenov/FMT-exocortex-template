@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "aa21c183c514463e4a8a395a6805c15372e1c3b7847bce694dfdefb0745fac6d"
+      "sha256": "fa2d862baf22b7da5281c4e0a8970b6e5ed21c0d376dff6c37a348011189669b"
     },
     {
       "path": "CLAUDE.md",
@@ -1901,7 +1901,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
-      "sha256": "92a8240d34e7245ad237d3c0fe815099f03c8abeb0d09af96545436576642791"
+      "sha256": "1cde07d035a2de17bbd2f89cf0378addd254a835f1b4afef59255a4c8d461818"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly.md",
@@ -1941,7 +1941,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05a-measurement.md",
-      "sha256": "62fdf52565ad67dbfb994c6d12b9275eba4774b846a7733403139d44ef320c53"
+      "sha256": "807c94222f7611a4c2c4fb3c00372eb384cf4ce9efc0d16ce51afaab2d537d0c"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05b-recommendation.md",
@@ -1949,7 +1949,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/05c-tracking.md",
-      "sha256": "302eb271f62b65c6fba861c5a3c9928bf1533861354bd1b77e414278c128d965"
+      "sha256": "172afc30d1527c5372ed069654a408912dc8a7f7f68acbca5662b751e0593eeb"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
