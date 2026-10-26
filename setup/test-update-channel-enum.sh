@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# WP-529 F26: IWE_UPDATE_CHANNEL accepts only "release" and "main".
+# WP-529 F26: IWE_UPDATE_CHANNEL accepts only "release", "main" and (since
+# WP-529 Ф239) "rc".
 #
 # Before this guard an unknown value (a typo like "realese", or a channel name
 # invented by a user reading old docs) fell through to the main branch without
@@ -62,13 +63,23 @@ for bad in realese RELEASE dev " " main-branch; do
     fi
 done
 
-echo "--- Accepted: the two real channels pass the guard ---"
-for good in release main; do
+echo "--- Accepted: the three real channels pass the guard ---"
+for good in release main rc; do
     OUT=$(run_channel "$good")
     if echo "$OUT" | grep -q "Неизвестный канал обновления"; then
         fail "channel '$good' was rejected by the enum guard: $OUT"
     else
         pass "channel '$good' passes the enum guard"
+    fi
+done
+
+echo "--- Rejection message lists all three accepted values ---"
+OUT=$(run_channel bogus)
+for v in release rc main; do
+    if echo "$OUT" | grep -q "$v"; then
+        pass "rejection message lists '$v'"
+    else
+        fail "rejection message misses '$v': $OUT"
     fi
 done
 

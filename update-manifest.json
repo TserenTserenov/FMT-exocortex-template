@@ -2720,6 +2720,10 @@
       "sha256": "108012b32f8783027c08e3395c640c9fe55d8ce2907a3766d9578d1996de7ac0"
     },
     {
+      "path": "scripts/next-rc-tag.sh",
+      "sha256": "249c8965904638e7ba38325835044433bc96961782eeeb16c95307bd5b9f596d"
+    },
+    {
       "path": "scripts/pack-ci-install.sh",
       "sha256": "f2f28c26900c065f700dbbc79dfb0b5942e1bafd25d084224bc57b8410645934"
     },
@@ -3357,7 +3361,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8cb7c06cedfcee6caee4c06735399e3565f79d9e0c44e7f7ec19320d0f61fd46"
+      "sha256": "15aeb69e498e56386f183bb8cec9c915a6c3b58f45e62e430166baf06f27f049"
     }
   ],
   "excluded_paths": [
@@ -3610,6 +3614,7 @@
     "setup/test-hook-dayplan-validator.sh",
     "setup/test-issue-1216-env-merge-and-seed.sh",
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
+    "setup/test-next-rc-tag.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
@@ -3624,6 +3629,7 @@
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-publish-gate-delivery.sh",
+    "setup/test-update-rc-channel.sh",
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",
