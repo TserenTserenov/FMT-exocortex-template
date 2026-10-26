@@ -17,8 +17,8 @@ gate: user
 ## Инструкция для Claude
 
 1. **Прочитать:**
-   - `docs/Strategy.md` — фокусы года, результаты месяца, ТОС и главные
-     гипотезы месяца; это единственный владелец месячной рамки
+   - `docs/Strategy.md` — фокусы года и главные гипотезы месяца;
+     рамка месяца — `current/monthly-priorities.md`, если в его frontmatter `period` совпадает с месяцем недели; иначе раздел «Фокус: <месяц> <год>» этого месяца в `docs/Strategy.md`; раздел другого месяца рамкой не считается (результаты месяца, ТОС, red lines). Рамки месяца нет — этап начинается с её создания вместе с пилотом
    - пакет вердиктов гипотез из шага 01
    - `context/session-context-YYYY-MM-DD.md` (если есть — DT + Guide срез из session-prep; формат и предусловие согласия — [../appendix/dt-guide-prep.md](../appendix/dt-guide-prep.md)). При denied/null согласии файл отсутствует → degraded ([../appendix/consent-check.md](../appendix/consent-check.md)).
    - MonthClose-сводку (если шаг 00 сработал)
