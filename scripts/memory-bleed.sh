@@ -26,7 +26,9 @@ HOT_DOWNGRADE_DAYS=14   # HOT → WARM если не упоминался N дн
 WARM_DOWNGRADE_DAYS=30  # WARM → COLD
 COLD_ARCHIVE_DAYS=90    # COLD → archive
 HOT_ONLY=0
-EXCLUDE="MEMORY.md"
+# Instruction files have no memory frontmatter by design; day-close copies
+# CLAUDE.md/AGENTS.md next to memory in the exocortex/ backup (issue #1352).
+EXCLUDE="MEMORY.md CLAUDE.md AGENTS.md"
 
 while [ $# -gt 0 ]; do
     case "$1" in

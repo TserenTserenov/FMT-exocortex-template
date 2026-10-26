@@ -28,30 +28,42 @@
 #
 # Локальный override пользователя: ${HOME}/.iwe-backup-sources.local.yaml —
 # этот файл НЕ трогается обновлением шаблона (update.sh). Значения оттуда
-# дополняют (не заменяют) дефолты ниже; формат override — та же схема.
+# дополняют дефолты ниже; запись с тем же (раскрытым) путём заменяет
+# дефолтную — так источник можно, например, пометить optional: true.
+# Формат override — та же схема.
+#
+# optional: true — источник есть только при установленном агенте или
+# выбранном способе хранения; его отсутствие не критично (issue #1351).
+# Рабочее дерево ${WORKSPACE_DIR} обязательно всегда, override это не
+# меняет.
 
 schema_version: 1
 
 tier0_unique:
-  # ~/IWE — единственный путь, который ДОЛЖЕН существовать у любого
-  # пользователя шаблона; остальные — опциональны по факту установки
-  # конкретных агентов.
-  - path: "${HOME}/IWE"
+  # Рабочее дерево — единственный путь, который ДОЛЖЕН существовать у
+  # любого пользователя шаблона (с учётом нестандартного WORKSPACE_DIR);
+  # остальные — опциональны по факту установки конкретных агентов.
+  - path: "${WORKSPACE_DIR}"
     agent: "core"
     note: "рабочее дерево платформы — git-репозитории включаются ЦЕЛИКОМ, включая .git/ (пир-сессия отозвала исключение .git: непушнутые коммиты/stash/локальные ветки не восстановимы из remote)"
   - path: "${HOME}/.claude/projects"
+    optional: true
     agent: "claude"
     note: "auto-memory (включает MEMORY.md) и полные стенограммы — невосстановимо"
   - path: "${HOME}/.claude.json"
+    optional: true
     agent: "claude"
     note: "глобальный конфиг Claude Code (OAuth-токены, project history)"
   - path: "${HOME}/.codex/config.toml"
+    optional: true
     agent: "codex"
     note: "конфиг Codex"
   - path: "${HOME}/.gitconfig"
+    optional: true
     agent: "core"
     note: "git identity + signing key reference"
   - path: "${HOME}/.git-credentials"
+    optional: true
     agent: "core"
     note: "HTTPS git-токены, если credential helper = store"
 

@@ -51,6 +51,43 @@ else
     fail "the extractor gate no longer uses interval_reached (raw comparison creeps back)"
 fi
 
+# issue #1348: a failed inbox-check must still stamp its interval. Every run is a full
+# AI pass, so the old "retry next dispatch" re-ran it every 10 min with no limit. The block
+# is cut out of dispatch() and run with stubs; extractor exit code is the only variable.
+BLOCK="$(mktemp)"
+trap 'rm -f "$SNIPPET" "$BLOCK"' EXIT
+{
+    echo 'run_inbox_block() {'
+    sed -n '/# --- Экстрактор: inbox-check/,/^    if \[ "\$ran" -eq 0 \]; then/p' "$SCHEDULER" | sed '$d'
+    echo '}'
+} > "$BLOCK"
+if ! grep -q 'EXTRACTOR_SH" inbox-check' "$BLOCK"; then
+    fail "inbox-check block is missing from $SCHEDULER"
+else
+    # expect_inbox EXTRACTOR_RC STAMPED(yes|no) NAME
+    expect_inbox() {
+        local stamped=no
+        (
+            # shellcheck disable=SC2034  # read by the sourced dispatch block
+            HOUR=10 TASK_TIMEOUT_LONG=5 EXTRACTOR_SH="/bin/sh -c 'exit $1'" ran=0 LOG_FILE=/dev/null
+            STAMPS="$(mktemp)"
+            last_run_seconds_ago() { echo 999999; }
+            mark_interval() { echo "$1" >> "$STAMPS"; }
+            log() { :; }
+            timeout() { shift; eval "$*"; }
+            # shellcheck source=/dev/null
+            . "$BLOCK"
+            run_inbox_block
+            grep -qx 'extractor-inbox-check' "$STAMPS"; rc=$?
+            rm -f "$STAMPS"
+            exit "$rc"
+        ) && stamped=yes
+        if [ "$stamped" = "$2" ]; then pass "$3"; else fail "$3 — extractor rc=$1 want stamped=$2 got=$stamped"; fi
+    }
+    expect_inbox 0 yes "a successful inbox-check stamps its interval"
+    expect_inbox 1 yes "a failed inbox-check stamps its interval too (no 10-min retry loop, #1348)"
+fi
+
 echo ""
 echo "PASS=$PASS_COUNT FAIL=$FAIL_COUNT"
 [ "$FAIL_COUNT" -eq 0 ]

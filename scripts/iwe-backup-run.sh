@@ -59,11 +59,12 @@ fi
 
 # Тот же разбор, что в iwe-backup-check.sh (раздел 4) — печатает только
 # существующие пути, т.к. restic backup отказывает на несуществующем пути.
-PATHS_TSV=$(HOME="$HOME" SOURCES_FILE="$SOURCES_FILE" SOURCES_OVERRIDE="$SOURCES_OVERRIDE" WITH_OPTIONAL="$WITH_OPTIONAL" python3 <<'PYEOF'
+PATHS_TSV=$(HOME="$HOME" WORKSPACE_ROOT="$IWE_ROOT" SOURCES_FILE="$SOURCES_FILE" SOURCES_OVERRIDE="$SOURCES_OVERRIDE" WITH_OPTIONAL="$WITH_OPTIONAL" python3 <<'PYEOF'
 import os
 import yaml
 
 home = os.environ["HOME"]
+workspace = os.environ["WORKSPACE_ROOT"]
 with_optional = os.environ["WITH_OPTIONAL"] == "1"
 
 
@@ -86,12 +87,20 @@ tiers = ["tier0_unique", "tier1_scheduled"]
 if with_optional:
     tiers.append("tier2_optional")
 
-for tier in tiers:
-    entries = list(defaults.get(tier, [])) + list(override.get(tier, []))
-    for entry in entries:
-        path = entry.get("path", "").replace("${HOME}", home)
-        if os.path.exists(path):
-            print(path)
+# Same merge as iwe-backup-check.sh: an override entry with the same path
+# replaces the default one; `tierX:` with an empty value is an empty list.
+sources = {}
+for layer in (defaults, override):
+    for tier in tiers:
+        for entry in layer.get(tier) or []:
+            raw_path = entry.get("path") or ""
+            if not raw_path:
+                continue
+            path = raw_path.replace("${HOME}", home).replace("${WORKSPACE_DIR}", workspace)
+            sources[os.path.realpath(path)] = path
+for path in sources.values():
+    if os.path.exists(path):
+        print(path)
 PYEOF
 ) || PATHS_TSV=""
 
