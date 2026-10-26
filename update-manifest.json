@@ -1225,7 +1225,7 @@
     },
     {
       "path": "extensions/protocol-close.after.session-record.md",
-      "sha256": "76cb7ec30ba6fb3ee4f8169093fe0bd8a8812383c6ba3df5432bbb1a4ee8dd01"
+      "sha256": "99563973bf0d5083db2ebcd31cb789073fe567f9c20bf43767553399e4244cb0"
     },
     {
       "path": "extensions/protocol-close.checks.fault.md",
@@ -1953,7 +1953,7 @@
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06a-pool.md",
-      "sha256": "f48a8367da10b36d29a3d6cb6d403f1befdf20514559301bd1a25dd75aacd749"
+      "sha256": "06f0b0f08eeaae39375c042b5df2b04e61a26012cab3d797e4fd0c7532b86160"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-weekly/steps/06b-budget.md",

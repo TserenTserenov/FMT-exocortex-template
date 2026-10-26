@@ -48,6 +48,7 @@ SESSION_RECORD="$SESSIONS_DIR/$(date +%F)-<тема>.md"
 ---
 date: YYYY-MM-DD
 session_type: strategy | work | review | planning
+session_variant: weekly | monthly | initial  # только для session_type: strategy, иначе убрать
 wp: WP-NNN  # основной РП (если один), иначе убрать
 duration_estimate: Xh
 ---
