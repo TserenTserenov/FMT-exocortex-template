@@ -230,7 +230,7 @@ agent: Стратег
 
 **Результат:** черновик WeekPlan (`status: draft`) с повесткой сессии в `current/`.
 
-> Следующий шаг: сессия стратегирования с пользователем → диспетчер `.claude/skills/strategy-session/SKILL.md` (`prompts/strategy-session.md` — устаревший, до разделения на weekly/monthly, не используется).
+> Следующий шаг: сессия стратегирования с пользователем → диспетчер `.claude/skills/strategy-session/SKILL.md` (`prompts/strategy-session.md` — только отсылка к этому диспетчеру для `strategist.sh strategy-session`, своего описания сессии в нём нет).
 
 ---
 
