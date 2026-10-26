@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Hermetic: an operator's IWE_SESSIONS_ROOT would point open at the real
+# sessions repo and leave test scaffolds there.
+unset IWE_SESSIONS_ROOT
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TMP=$(mktemp -d)

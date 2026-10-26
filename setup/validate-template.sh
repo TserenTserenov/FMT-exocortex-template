@@ -203,7 +203,7 @@ CHECK1_FAIL=0
 for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                "DS-Knowledge-Index" "DS-IT-systems" "DS-ai-systems" \
                "DS-my-strategy" "engines/tailor" "tsekh" "DS-ecosystem-development" \
-               "tseren"; do
+               "tseren" "aist_pilot_bot"; do
     if [ "$MODE" = "staged" ]; then
         # staged-режим: проверяем только содержимое staged-файлов (git show :path)
         count=0

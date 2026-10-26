@@ -176,6 +176,7 @@ bash ${IWE_SCRIPTS}/iwe-backup-check.sh
 #### 7b. Бэкап IWE в iCloud
 
 > Условный шаг: только macOS с iCloud Drive, и только если `BACKUP_DISABLED=0` (см. 7a). Запускать ТОЛЬКО если 7a не вернул ❌.
+> Вне macOS при заданном `backup_dir` 7a выдаёт предупреждение «встроенный бэкап на этой ОС не выполняется» — передать его пилоту в отчёте недели, не пропускать молча (issue #1349).
 
 ```bash
 ${IWE_SCRIPTS}/backup-icloud.sh

@@ -473,11 +473,11 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "ec3b5427f3d0541e5b021b707bb7969f0abf84a2e3e00fc325ae45b4a4a6ddef"
+      "sha256": "2d7e7c77b40b5cc23e8fcd8a30be6961d0619fa67eaaa63ea1ca808f33dae040"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
-      "sha256": "bae710ec622060751814937a85173b238b416b76a0aecdb120bfcdf2b976ff63"
+      "sha256": "841e5103b4d1ff106c162a4a95288f2487e7f8c1483adccb7372fd5a6b8bc191"
     },
     {
       "path": ".claude/skills/day-close/day-close-helpers.sh",
@@ -661,7 +661,7 @@
     },
     {
       "path": ".claude/skills/personal-guide-render/templates/reflection-template.md",
-      "sha256": "2e18d87006ea2f5fc2379ba8bbb32b3cf59bd33abd9d2b6da70aeec86749c3ad"
+      "sha256": "551098e55f647790ec9cc966521694ef836e6c885e08ccc42a6fbfc8f897d025"
     },
     {
       "path": ".claude/skills/personal-guide-start/SKILL.md",
@@ -737,7 +737,7 @@
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
-      "sha256": "8ada56fc87e9e1358dd335c04ee07928d8143bc5873f299d898e1b8a7851b191"
+      "sha256": "c20c9fc9e21ed2a885ef6aedbe9390cf3edb8aa3276873d5670098654d5011bc"
     },
     {
       "path": ".claude/skills/skill-creator/assets/skill-scaffold-full.md",
@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/skill-creator/scripts/verify-skill.sh",
-      "sha256": "b27fc6221b54326d7cdd98287f44bccf6b821fb16565d330effaf4c50a4d0ba7"
+      "sha256": "2ec24b8315a3def646f96bf8858292166379131ee837160b6c03a183d3a6c1c5"
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
@@ -817,7 +817,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "0a790259bf4b666b7afddad863fe2f843297c9c5b9770adaebc1fb6aaba9afbe"
+      "sha256": "c2b2efb11f5ae298f221af997863ed832c16d1388d98272dcfcafb4f915b7d4f"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a260fee33d51073cb81e3a61b2204c3e1ae13ff677c9d35f48f0c34258001b10"
+      "sha256": "15e221be3f99b9ba576e67f4970e479e7cbf37cf7d8be565b75170f83cc744c7"
     },
     {
       "path": "CLAUDE.md",
@@ -1677,7 +1677,7 @@
     },
     {
       "path": "memory/roles.md",
-      "sha256": "c98019985e80f466377ac3631f68805a317fd2a9fdf486c3067904ed66ee1a73"
+      "sha256": "5ad569d299d0b7c5fc963cfc0652d4ab2498206392a4776510e725d538d83fe2"
     },
     {
       "path": "memory/routing-vocab.md",
@@ -1721,7 +1721,7 @@
     },
     {
       "path": "pack-templates/digital-platform/02-domain-entities/DP.ROLE.NNN-external-session-adapter.md",
-      "sha256": "750b5e2974683809a25e6daf7876d9397deffb0e4ada39893685ae94f4fac81c"
+      "sha256": "a2bb27d7fd7e63979c127141728f1fc8746fc47e969b6f126257c19e8e00d203"
     },
     {
       "path": "pack-templates/digital-platform/04-work-products/DP.WP.NNN-stage-dependency-map.md",
@@ -1737,7 +1737,7 @@
     },
     {
       "path": "pack-templates/digital-platform/08-service-clauses/DP.SC.NNN-external-session-request.md",
-      "sha256": "f8d89efca6d757f019b59dd643f7f3f720cf48cde1e4f09eed36ca996c87b6f0"
+      "sha256": "8ac3334f96da5ad14baae3e1e82cd147b622eefcd686cb452307464d1bceb941"
     },
     {
       "path": "requirements.txt",
@@ -2189,7 +2189,7 @@
     },
     {
       "path": "scripts/backup-icloud.sh",
-      "sha256": "952484d862c8b6975656d21362d59dd43ce9ea280a20611e6b4fd277d1de7bd4"
+      "sha256": "a5039fcc7eb4a87f45808d42b6b215b6b97f053ea89743a618fc4846b372db9f"
     },
     {
       "path": "scripts/build-active-wp.py",
@@ -2341,7 +2341,7 @@
     },
     {
       "path": "scripts/day-close-prepare.sh",
-      "sha256": "d9777f3e7d40a15a36bd9df6bdb898e36d9428f7b04520c74ddadf19b4214c71"
+      "sha256": "f169551e73acf551492c3d335a7e1c3c15feb0a0c6837e5b71b67c97747895da"
     },
     {
       "path": "scripts/day-close.sh",
@@ -2393,7 +2393,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
+      "sha256": "fa7142cba4c8d9204b53a269798643f7cc7ef80557b7e547eabef9794407c5f7"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -2441,7 +2441,7 @@
     },
     {
       "path": "scripts/generate-executor-catalog.py",
-      "sha256": "f65af078a152eaa37b7973589944a3c95b3162c03bf4540fe8fb6e7561b1366b"
+      "sha256": "7de9ce386e40e5985ffa7de22da9d29d4700843ab845f0aed445862d06fd8246"
     },
     {
       "path": "scripts/generate-hot-files-list.sh",
@@ -2505,7 +2505,7 @@
     },
     {
       "path": "scripts/iwe-backup-check.sh",
-      "sha256": "054ddafd9e692a7924f1f72804c320d222891f85e6b4ad37d29e799f2da85b22"
+      "sha256": "759459934f791ef043fa8cdb4e2b466cf9fa6b52ee4ae86d9e98d2326f9ae667"
     },
     {
       "path": "scripts/iwe-backup-protect.sh",
@@ -2761,7 +2761,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "0f73a4b0fb75abb68152c31ef626af50996da482608b4dcb65583e8bce3601c6"
+      "sha256": "c8bd574e504128901829f8acf608472f15f32a453219de9232985a6250acc184"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -2785,7 +2785,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "af312dafc80eaa8beb98d4ae56cec9d3a825889d3bdd5e4a0d1acb77d7290585"
+      "sha256": "d6e74844b0a2ec25afd43c05672c4c3033c5dce1d6f5b464e26781059d1d2202"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -2849,7 +2849,7 @@
     },
     {
       "path": "scripts/test-route-task.sh",
-      "sha256": "bf78d9a53c7abd48e30322694ad53bbc582399e57f13fa4321f45cace6243d20"
+      "sha256": "60d92d596203c6040a15ca65de18d77b7f0e21e0f417676c1229cccc15b6d15c"
     },
     {
       "path": "scripts/test-session-guard-yaml-task-escaping.sh",
@@ -2889,7 +2889,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "0889c4266cd7565d8e881bedd8e717976f50d4ae5a599fd9b044bc6e4c3cb3f5"
+      "sha256": "ac356cad46a38652966edb840b278a7522a301dd7bacf02262ec5390c1430876"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -2965,7 +2965,7 @@
     },
     {
       "path": "scripts/tests/test_hook_classification.sh",
-      "sha256": "0d683edb6c08c8f2358c34daa9121c1d6fc1143704598a84214bf338ff7776df"
+      "sha256": "dca3047457c8598dae1c01c316195c9cec95f5c57887caa86539ae3419f1c22b"
     },
     {
       "path": "scripts/tests/test_install_hooks.py",
@@ -2977,7 +2977,7 @@
     },
     {
       "path": "scripts/tests/test_issue_1032_windows_fail_closed.sh",
-      "sha256": "d8455cf45895ca293a894133b3e7670195d9ef1dca7a89d12a11d482308ac6e7"
+      "sha256": "2d77117a6f32ab0b1ef249029ca7ba608676b9e1aa6c58101204bbeeb74bf8bb"
     },
     {
       "path": "scripts/tests/test_issue_1114_encoding_gate.sh",
@@ -3073,7 +3073,7 @@
     },
     {
       "path": "scripts/tests/test_session_guard_hypothesis_gate.sh",
-      "sha256": "a2ffd22d845d6fba8a3e07e2da388b798e314687cd743a772e5d48bf8d0c7048"
+      "sha256": "8c16cf447b1cbfa0ee3702e84530bd54924993a1bed290e3992e475d34451d6d"
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
@@ -3225,7 +3225,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "191b12d513ac02fae00b27c0f1d84181ce077eeab42d02986d70c69df14d6af5"
+      "sha256": "fa7142cba4c8d9204b53a269798643f7cc7ef80557b7e547eabef9794407c5f7"
     },
     {
       "path": "seed/strategy/scripts/day-open-sync-banner-patch.py",
@@ -3241,7 +3241,7 @@
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
-      "sha256": "f65af078a152eaa37b7973589944a3c95b3162c03bf4540fe8fb6e7561b1366b"
+      "sha256": "7de9ce386e40e5985ffa7de22da9d29d4700843ab845f0aed445862d06fd8246"
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",
@@ -3329,7 +3329,7 @@
     },
     {
       "path": "setup/install-iwe-paths.sh",
-      "sha256": "10139df3e52142023d298de281af1d1fae74f0919d9e0f82f8c2e7edc76da191"
+      "sha256": "fb8bf524ae23f0c720ae95ea1492b656ca3457717cbf66992d37882a84f0b1ab"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3341,7 +3341,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "d3d18450ad1513f6eafc4715b122e6ac70b8c4908a855b12ba456015db9c776e"
+      "sha256": "4ad0ef2f57afae6f40dcaea217541efc6ea264864055dfbc2fe5dadf783cb4b7"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3361,7 +3361,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "15aeb69e498e56386f183bb8cec9c915a6c3b58f45e62e430166baf06f27f049"
+      "sha256": "4816428bb259d1eb756b13a40a11b858dac55c3c5d41423159540119cc2cac93"
     }
   ],
   "excluded_paths": [
@@ -3436,7 +3436,10 @@
     "scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh",
     "scripts/tests/test_issue_1006_minor_findings.sh",
     "scripts/tests/test_issue_1006_yml_author_scan.sh",
+    "scripts/tests/test_issue_1010_detectors.sh",
+    "scripts/tests/test_issue_1010_rc_idem.sh",
     "scripts/tests/test_issue_1010_red_team_findings.sh",
+    "scripts/tests/test_issue_1010_update_idem.sh",
     "scripts/tests/test_issue_1036_migration_source.sh",
     "scripts/tests/test_issue_1037_filemode.sh",
     "scripts/tests/test_issue_1038_python_env.py",
@@ -3461,10 +3464,14 @@
     "scripts/tests/test_issue_1254_repo_activity_utf8.py",
     "scripts/tests/test_issue_1256_strategy_session_record.sh",
     "scripts/tests/test_issue_1261_note_review_no_dayplan.sh",
+    "scripts/tests/test_issue_1263_refs.sh",
+    "scripts/tests/test_issue_1266_open_log.sh",
     "scripts/tests/test_issue_1279_exocortex_freeze.sh",
     "scripts/tests/test_issue_1279_open_log_isolate.sh",
+    "scripts/tests/test_issue_1279_orz_isolate.sh",
     "scripts/tests/test_issue_1280_delivery_hint.sh",
     "scripts/tests/test_issue_1336_ws_paths.sh",
+    "scripts/tests/test_issue_1349_backup_dir.sh",
     "scripts/tests/test_issue_1350_audit.sh",
     "scripts/tests/test_issue_1351_tier0.sh",
     "scripts/tests/test_issue_1352_bleed.sh",
@@ -3491,6 +3498,8 @@
     "scripts/tests/test_issue_713_registry_status.sh",
     "scripts/tests/test_issue_729_strategy_day.sh",
     "scripts/tests/test_issue_810_scan_selfexcl.sh",
+    "scripts/tests/test_issue_823_linked_wt.sh",
+    "scripts/tests/test_issue_836_reflection.sh",
     "scripts/tests/test_issue_850_fork_guard.sh",
     "scripts/tests/test_issue_851_cyrillic_slug.sh",
     "scripts/tests/test_issue_869_claude_slug.sh",
@@ -3510,6 +3519,7 @@
     "scripts/tests/test_issue_890_executor_catalog_invariants.py",
     "scripts/tests/test_issue_891_loose_claude_files_delivery.sh",
     "scripts/tests/test_issue_893_scaffold_only_fallback.sh",
+    "scripts/tests/test_issue_894_routing.sh",
     "scripts/tests/test_issue_895_dangling_classifier_stub.sh",
     "scripts/tests/test_issue_896_yookassa_digit_segment.sh",
     "scripts/tests/test_issue_898_truncation_signal.sh",
@@ -3752,7 +3762,7 @@
     },
     {
       "path": ".claude/skills/lesson-close/SKILL.md",
-      "reason": "removed 2026-09-17 (ffceb51, issue #778): shipped in the general template without its counterpart /lesson (author-only skill). personal-guide-start already distributes both /lesson and /lesson-close together when a pilot starts that flow -- the standalone shipment was redundant."
+      "reason": "removed 2026-09-17 (ffceb51, issue #778): shipped in the general template without its counterpart /lesson (author-only skill). Since #1334 personal-guide-start does not ship /lesson or /lesson-close either: both are author-only skills, outside the template."
     },
     {
       "path": "scripts/lesson-close.sh",

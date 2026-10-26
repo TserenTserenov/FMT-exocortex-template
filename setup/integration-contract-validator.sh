@@ -116,7 +116,9 @@ log "[3/11] extension_table — extensions/README.md table ↔ EXTENSION POINT �
 EXT_VIOLATIONS=0
 if [ -f extensions/README.md ]; then
     # Parse extension table from README.md: lines like "| protocol-close | checks | ..."
-    declare_table=$(grep -E '^\|\s*`?[a-z][a-z-]*`?\s*\|\s*`?[a-z]+`?\s*\|' extensions/README.md 2>/dev/null | head -20 || true)
+    # Whole table: a `head -20` cap silently skipped every row past the 20th
+    # (issue #1010 F13, the table has more than 20 rows).
+    declare_table=$(grep -E '^\|\s*`?[a-z][a-z-]*`?\s*\|\s*`?[a-z]+`?\s*\|' extensions/README.md 2>/dev/null || true)
 
     # Find actual EXTENSION POINT references in protocols/skills.
     # WP-273 R6 fix (Round 5 sub-agent assessment): regex терминировался на первом
@@ -352,13 +354,18 @@ while IFS= read -r path; do
     [ -f "$path" ] || continue
     case "$path" in *.sh)
         # Ищем sed -e "s|{{X}}|...|" — это bare placeholder в substituted-файле = регрессия R6.1**.
-        if grep -qE 'sed.*-e.*"s\|\{\{[A-Z_]+\}\}\|' "$path" 2>/dev/null; then
+        # Any sed form: `sed -e "s|{{X}}|..."`, `sed "s|{{X}}|..."`, single quotes
+        # (issue #1010 F13: only the -e form was caught).
+        if grep -qE "sed[^|]*[\"']s\|\{\{[A-Z_]+\}\}\|" "$path" 2>/dev/null; then
             log "  ⚠ $path: bare {{X}} в sed-выражении (R6.1** antipattern, build-runtime подменит литерал)"
             SED_VIOLATIONS=$((SED_VIOLATIONS + 1))
         fi
         ;;
     esac
-done < <(awk '/^substituted:/,/^[a-z_]+:/' .claude/runtime-overlay.yaml 2>/dev/null | grep -oE '^\s+- .*' | sed 's/^[[:space:]]*-[[:space:]]*//' | sed 's/[[:space:]]*#.*//')
+# The section header itself matches the end pattern, so an awk range
+# `/^substituted:/,/^[a-z_]+:/` ended on its first line and fed no file at all
+# (issue #1010 F13): track the section with a flag instead.
+done < <(awk '/^substituted:/ {f=1; next} /^[a-z_]+:/ {f=0} f' .claude/runtime-overlay.yaml 2>/dev/null | grep -oE '^\s+- .*' | sed 's/^[[:space:]]*-[[:space:]]*//' | sed 's/[[:space:]]*#.*//')
 
 if [ "$SED_VIOLATIONS" -eq 0 ]; then
     log "  ✅ PASS"

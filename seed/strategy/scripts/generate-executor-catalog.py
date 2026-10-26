@@ -7,8 +7,14 @@ generate-executor-catalog.py — собрать executor-catalog.yaml из routi
 
 Запуск:
     python3 generate-executor-catalog.py [--validate] [--skills-dir PATH] [--output PATH]
+    python3 generate-executor-catalog.py --validate-catalog FILE [--template-root PATH]
+    python3 generate-executor-catalog.py --validate-skill DIR [--template-root PATH]
 
-Exit: 0 = OK, 1 = error, 2 = validation failure (missing routing: sections)
+--validate-catalog и --validate-skill (issue #894) применяют те же правила
+validate_entry к готовому каталогу и к routing-блоку одного скилла: одна
+реализация правил для генератора, route-task.sh --validate и verify-skill.sh.
+
+Exit: 0 = OK, 1 = error, 2 = validation failure (routing rules violated)
 
 see DP.SC.159, DP.ROLE.059
 """
@@ -179,14 +185,14 @@ def validate_entry(entry: dict, template_root: Path) -> list[str]:
     return errors
 
 
-def build_catalog(skills_dir: Path) -> dict:
+def build_catalog(skills_dir: Path, template_root: Optional[Path] = None) -> dict:
     entries = []
     skipped = []
     all_errors = []
-    # This file's own location, not skills_dir (which --skills-dir can point
-    # at a workspace install of skills/ with no scripts/ tree of its own —
-    # see the comment on the template_root parameter in validate_entry).
-    template_root = Path(__file__).resolve().parent.parent
+    # Default: this file's own location, not skills_dir (which --skills-dir can
+    # point at a workspace install of skills/ with no scripts/ tree of its own).
+    if template_root is None:
+        template_root = Path(__file__).resolve().parent.parent
 
     for skill_dir in sorted(skills_dir.iterdir()):
         if not skill_dir.is_dir():
@@ -232,6 +238,66 @@ def build_catalog(skills_dir: Path) -> dict:
         "entries": entries,
         "reflexes": [],
     }
+
+
+def _structure_errors(catalog: object, source: Path) -> list[str]:
+    """Shape checks a catalog must pass before validate_entry can read it."""
+    if not isinstance(catalog, dict):
+        return [f"{source}: catalog must be a YAML mapping"]
+    entries = catalog.get("entries")
+    if not isinstance(entries, list):
+        return [f"{source}: catalog has no 'entries' list"]
+    errors = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+            errors.append(f"{source}: entries[{index}] must be a mapping with a string 'name'")
+        elif not isinstance(entry.get("routing"), dict):
+            errors.append(f"{entry['name']}: routing must be a mapping")
+    return errors
+
+
+def validate_catalog_file(catalog_path: Path, template_root: Path) -> int:
+    """Run validate_entry on every entry of an already built catalog (issue #894)."""
+    try:
+        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        print(f"ERROR: cannot read catalog {catalog_path}: {exc}", file=sys.stderr)
+        return 1
+    errors = _structure_errors(catalog, catalog_path)
+    if not errors:
+        for entry in catalog["entries"]:
+            errors.extend(validate_entry(entry, template_root))
+    if errors:
+        print(f"FAIL: {catalog_path}: {len(errors)} routing error(s)", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        return 2
+    print(f"PASS: {len(catalog['entries'])} entries validated, no errors")
+    return 0
+
+
+def validate_skill_dir(skill_dir: Path, template_root: Path) -> int:
+    """Validate one skill's routing block with the generator's own rules (issue #894).
+
+    A skill without a routing block is reported as skipped and passes: the
+    generator itself only skips such skills, so making routing mandatory is a
+    separate decision, not part of sharing the rules.
+    """
+    if not (skill_dir / "SKILL.md").is_file():
+        print(f"ERROR: {skill_dir / 'SKILL.md'} not found", file=sys.stderr)
+        return 1
+    entry = process_skill(skill_dir)
+    if "skipped" in entry:
+        print(f"SKIP: {entry['skipped']}: no routing block ({entry['skip_reason']})")
+        return 0
+    errors = validate_entry(entry, template_root)
+    if errors:
+        print(f"FAIL: {entry['name']}: {len(errors)} routing error(s)", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        return 2
+    print(f"PASS: {entry['name']}: routing block validated")
+    return 0
 
 
 def _read_existing_catalog(output_path: Path) -> dict:
@@ -347,6 +413,32 @@ def _parse_args() -> argparse.Namespace:
             "not a general-purpose catalog fixer."
         ),
     )
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--validate-catalog",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="Validate every entry of an existing catalog YAML with the generator rules",
+    )
+    modes.add_argument(
+        "--validate-skill",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Validate the routing block of one skill directory with the generator rules",
+    )
+    parser.add_argument(
+        "--template-root",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Root that template-relative script_path values resolve against "
+            "(default: the directory above this script); route-task.sh passes "
+            "its own $IWE_TEMPLATE so validation checks where dispatch looks"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -432,6 +524,16 @@ def main():
         print(f"OK: added empty reflexes: [] to {args.repair_add_reflexes}")
         return
 
+    template_root = (
+        args.template_root.expanduser().resolve()
+        if args.template_root is not None
+        else Path(__file__).resolve().parent.parent
+    )
+    if args.validate_catalog is not None:
+        sys.exit(validate_catalog_file(args.validate_catalog.expanduser(), template_root))
+    if args.validate_skill is not None:
+        sys.exit(validate_skill_dir(args.validate_skill.expanduser(), template_root))
+
     skills_dir = args.skills_dir.expanduser()
     output_path = args.output.expanduser()
 
@@ -439,7 +541,7 @@ def main():
         print(f"ERROR: {skills_dir} not found", file=sys.stderr)
         sys.exit(1)
 
-    catalog = build_catalog(skills_dir)
+    catalog = build_catalog(skills_dir, template_root)
 
     if args.validate:
         print(f"OK: {catalog['total_entries']} entries validated")

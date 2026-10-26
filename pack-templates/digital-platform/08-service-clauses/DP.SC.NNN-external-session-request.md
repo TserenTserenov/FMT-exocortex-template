@@ -156,7 +156,7 @@ Claude: inbox/WP-361.md создан с Ф1 IntegrationGate (~2h): SC + Role + s
 
 | # | Шаг | Кто | Результат |
 |---|-----|-----|----------|
-| 1 | Отправить сообщение в @aist_pilot_bot | Пилот | — |
+| 1 | Отправить сообщение в `@<ваш_бот>` | Пилот | — |
 | 2 | Проверить `tg_chat_id ∈ allowed_list` + найти активную сессию | Ingress Adapter | ack или «не авторизован» |
 | 3 | Дописать ход в `SESSION-<id>-thread.md` через GitHub API | Ingress Adapter | Новый ход в thread |
 | 4 | Ответить «Работаю…» в Telegram | Ingress Adapter | Acknowledgment ≤10с |

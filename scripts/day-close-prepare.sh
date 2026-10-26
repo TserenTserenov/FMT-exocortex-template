@@ -103,8 +103,10 @@ echo "--- 2. DIRTY REPOS ---"
 dirty_scan
 
 echo "--- 3. OPEN SESSIONS LOG ---"
+# The log is append-only history (issue #1266): head showed the oldest lines.
+# Show today's openings; lines start with "YYYY-MM-DD HH:MM |".
 if [ -s "$GOV/inbox/open-sessions.log" ]; then
-  head -30 "$GOV/inbox/open-sessions.log"
+  grep "^$TODAY " "$GOV/inbox/open-sessions.log" || echo "(no sessions opened today)"
 else
   echo "(empty or absent)"
 fi

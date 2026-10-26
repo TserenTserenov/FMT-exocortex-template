@@ -282,6 +282,22 @@ hash_file() {
     fi
 }
 
+# reinject_user_section FILE USER_SECTION — replace FILE's own USER-SPACE block
+# with the user's one: drop the shipped block, squash trailing blank lines,
+# append the user block. render_skill_with_user_section UPSTREAM USER_SECTION
+# OUT builds the same file from an upstream copy. One definition for every
+# apply path and for the change detector, so a skill with a user block is not
+# reported as "updated" on every run (issue #1010 F10).
+reinject_user_section() {
+    perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$1"
+    perl -i -0pe 's/\n+$/\n/' "$1"
+    printf '\n%s\n' "$2" >> "$1"
+}
+render_skill_with_user_section() {
+    cp "$1" "$3"
+    reinject_user_section "$3" "$2"
+}
+
 # === Cross-platform Python resolution (issue #402) ===
 # On Windows Git Bash, `command -v python3` finds the Microsoft Store App
 # Execution Alias stub (prints "Python was not found..." and exits non-zero)
@@ -3021,11 +3037,7 @@ copy_platform_file_preserving_user_space() {
         backup_rule_before_overwrite "$fpath" "$dst"
     fi
     cp "$src" "$dst"
-    if [ -n "$user_section" ]; then
-        perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$dst"
-        perl -i -0pe 's/\n+$/\n/' "$dst"
-        printf '\n%s\n' "$user_section" >> "$dst"
-    fi
+    [ -z "$user_section" ] || reinject_user_section "$dst" "$user_section"
 }
 
 # iwe_claude_project_slug PATH — the directory name Claude Code uses under
@@ -4883,8 +4895,17 @@ for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
                 continue
             fi
         fi
+        COMPARE_FILE="$REMOTE_FILE"
+        if [ "$LOCAL_HASH" != "$REMOTE_HASH" ] && [[ "$fpath" == .claude/skills/*/SKILL.md ]]; then
+            SKILL_USER_SECTION=$(sed -n '/^<!-- USER-SPACE -->/,/^<!-- \/USER-SPACE -->/p' "$SCRIPT_DIR/$fpath")
+            if [ -n "$SKILL_USER_SECTION" ]; then
+                COMPARE_FILE="$TMPDIR_UPDATE/skill-render.tmp"
+                render_skill_with_user_section "$REMOTE_FILE" "$SKILL_USER_SECTION" "$COMPARE_FILE"
+                REMOTE_HASH=$(hash_file "$COMPARE_FILE")
+            fi
+        fi
         if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
-            DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$REMOTE_FILE" 2>/dev/null | grep -c '^[<>]' || true); DIFF_COUNT=${DIFF_COUNT:-?}
+            DIFF_COUNT=$(diff "$SCRIPT_DIR/$fpath" "$COMPARE_FILE" 2>/dev/null | grep -c '^[<>]' || true); DIFF_COUNT=${DIFF_COUNT:-?}
             UPDATED_FILES+=("$fpath")
             UPDATED_LINES+=("$DIFF_COUNT")
             # issues #965/#967: the version update.sh installed last time, before Step 5 replaces
@@ -4895,6 +4916,7 @@ for _dq_i in "${!DOWNLOAD_QUEUE[@]}"; do
         else
             UNCHANGED=$((UNCHANGED + 1))
         fi
+        [ "$COMPARE_FILE" = "$REMOTE_FILE" ] || rm -f "$COMPARE_FILE"
     fi
 done
 printf "\n"
@@ -4902,6 +4924,7 @@ printf "\n"
 # === Step 2b: Deprecated files (устаревшие L1-файлы к удалению) ===
 DEPRECATED_FOUND=()
 DEPRECATED_REASONS=()
+DEPRECATED_TRACKED_KEPT=()
 
 if is_upstream_git_mirror; then
     echo "  ⚠ Каталог шаблона — git-зеркало с remote upstream: удаление устаревших файлов пропущено. Их должен удалить сам канон."
@@ -4918,6 +4941,13 @@ while IFS='|' read -r fpath freason; do
     # listed the same path under deprecated_files — defeating the guarantee
     # this whole feature exists to give.
     is_fork_owned_path "$fpath" && continue
+    # issue #1010 F9: a path the local template clone still tracks in git is
+    # part of that checkout; deleting it leaves the clone with a tracked
+    # deletion after a clean update. Keep it and say so once.
+    if [ -f "$SCRIPT_DIR/$fpath" ] && git -C "$SCRIPT_DIR" ls-files --error-unmatch -- "$fpath" >/dev/null 2>&1; then
+        DEPRECATED_TRACKED_KEPT+=("$fpath")
+        continue
+    fi
     if [ -f "$SCRIPT_DIR/$fpath" ]; then
         DEPRECATED_FOUND+=("$fpath")
         DEPRECATED_REASONS+=("${freason:-устарел}")
@@ -4942,6 +4972,11 @@ for entry in data.get('deprecated_files', []):
     print(path + '|' + entry.get('reason',''))
 " "$MANIFEST" || true
     fi)
+fi
+
+if [ "${#DEPRECATED_TRACKED_KEPT[@]}" -gt 0 ]; then
+    echo "  ○ Устаревшие по манифесту, но отслеживаются git этой копии шаблона — оставлены: ${DEPRECATED_TRACKED_KEPT[*]}"
+    echo "    Удалить из своей копии: git -C \"$SCRIPT_DIR\" rm -- ${DEPRECATED_TRACKED_KEPT[*]}"
 fi
 
 TOTAL_CHANGES=$(( ${#NEW_FILES[@]} + ${#UPDATED_FILES[@]} + ${#DEPRECATED_FOUND[@]} ))
@@ -5448,13 +5483,11 @@ for f in "${UPDATED_FILES[@]}"; do
         else
             USER_SECTION=""
         fi
-        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
         if [ -n "$USER_SECTION" ]; then
-            perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$SCRIPT_DIR/$f"
-            perl -i -0pe 's/\n+$/\n/' "$SCRIPT_DIR/$f"
-            printf '\n%s\n' "$USER_SECTION" >> "$SCRIPT_DIR/$f"
+            render_skill_with_user_section "$TMPDIR_UPDATE/files/$f" "$USER_SECTION" "$SCRIPT_DIR/$f"
             echo "  ~ $f (USER-SPACE preserved)"
         else
+            cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
             echo "  ~ $f"
         fi
     else
@@ -5543,6 +5576,25 @@ if [ "$CLAUDE_CONFLICTS" -gt 0 ]; then
     CLAUDE_CONFLICT_FILES+=("$SCRIPT_DIR/CLAUDE.md")
 fi
 
+# remove_propagated_copies REL — drop the copies of a deprecated template file
+# that update.sh propagated out of SCRIPT_DIR: workspace .claude/ (L1 files)
+# and the Claude memory dir (relative path from memory/, not basename,
+# symmetric with repair_pass() delivery, issue #287).
+remove_propagated_copies() {
+    local f="$1" ws_path mem_path
+    case "$f" in .claude/*)
+        ws_path="$WORKSPACE_DIR/$f"
+        [ -f "$ws_path" ] && rm "$ws_path" && echo "    (также из workspace)"
+        ;;
+    esac
+    case "$f" in memory/*.md|memory/*.yaml|memory/*.yml)
+        mem_path="$CLAUDE_MEMORY_DIR/${f#memory/}"
+        [ -f "$mem_path" ] && rm "$mem_path" && echo "    (также из memory/)"
+        ;;
+    esac
+    return 0
+}
+
 # Remove deprecated files
 for i in "${!DEPRECATED_FOUND[@]}"; do
     f="${DEPRECATED_FOUND[$i]}"
@@ -5551,20 +5603,14 @@ for i in "${!DEPRECATED_FOUND[@]}"; do
         rm "$fpath"
         echo "  - $f (удалён: устарел)"
         REMOVED=$((REMOVED + 1))
-        # Also remove from workspace .claude/ (propagated L1 files)
-        case "$f" in .claude/*)
-            ws_path="$WORKSPACE_DIR/$f"
-            [ -f "$ws_path" ] && rm "$ws_path" && echo "    (также из workspace)"
-            ;;
-        esac
-        # Also remove from Claude memory dir (memory/* files) — relative path from
-        # memory/ (not basename), symmetric with repair_pass() delivery (issue #287).
-        case "$f" in memory/*.md|memory/*.yaml|memory/*.yml)
-            mem_path="$CLAUDE_MEMORY_DIR/${f#memory/}"
-            [ -f "$mem_path" ] && rm "$mem_path" && echo "    (также из memory/)"
-            ;;
-        esac
+        remove_propagated_copies "$f"
     fi
+done
+# issue #1010 F9: the template clone keeps a git-tracked deprecated file, but
+# its propagated copies are not part of that checkout and still go — otherwise
+# a deprecated skill/hook/rule stayed active in the workspace forever.
+for f in ${DEPRECATED_TRACKED_KEPT[@]+"${DEPRECATED_TRACKED_KEPT[@]}"}; do
+    remove_propagated_copies "$f"
 done
 # Clean up empty deprecated directories
 for i in "${!DEPRECATED_FOUND[@]}"; do
@@ -5874,9 +5920,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
             fi
             # 5. Reinject USER_SECTION
             if [ -n "$USER_SECTION" ]; then
-                perl -i -0pe 's/^<!-- USER-SPACE -->.*?^<!-- \/USER-SPACE -->//ms' "$dst"
-                perl -i -0pe 's/\n+$/\n/' "$dst"
-                printf '\n%s\n' "$USER_SECTION" >> "$dst"
+                reinject_user_section "$dst" "$USER_SECTION"
                 echo "  ✓ $f → workspace (USER-SPACE preserved)"
             else
                 echo "  ✓ $f → workspace"
@@ -6677,9 +6721,12 @@ echo "Перезапустите Claude Code для применения обн�
 # the direct write the freeze gate exists to block, with no WP to bind it to
 # (community report, issue #1280; peer-session 2026-10-22-17, Claude+Kimi+
 # Codex). `update-delivery` is now an allowed housekeeping reason (same
-# closed whitelist as day/week/month-close, session-open-gate.sh), and
-# `--canonical-owner` -- already reviewed for scheduled runners -- reused
-# here for a manual, single, exclusive delivery run rather than a new flag.
+# closed whitelist as day/week/month-close, session-open-gate.sh).
+# The hint stages only what this run delivers into the governance repo
+# (backfill_* write scripts/ and .githooks/), never `git add -A`, which would
+# also sweep the operator's unrelated edits (issue #1280 follow-up). No
+# --canonical-owner: the housekeeping branch of session-guard.sh exits before
+# it is read, and no exclusive-owner refusal exists there.
 GOVERNANCE_REPO_FOR_DELIVERY_HINT=$(effective_governance_repo 2>/dev/null) || GOVERNANCE_REPO_FOR_DELIVERY_HINT=""
 if [ -n "$GOVERNANCE_REPO_FOR_DELIVERY_HINT" ]; then
     GOVERNANCE_DIR_FOR_DELIVERY_HINT="$WORKSPACE_DIR/$GOVERNANCE_REPO_FOR_DELIVERY_HINT"
@@ -6693,11 +6740,15 @@ if [ -n "$GOVERNANCE_REPO_FOR_DELIVERY_HINT" ]; then
         # прогоне update.sh: строка печатается с экранированным \${IWE_AGENT...}, иначе
         # прогон из обычного терминала запекал бы чужое/пустое имя (peer-находка WP-7 Ф259).
         # страж open-gate матчит семафоры только вида ${IWE_AGENT}-*.open.
-        echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" open --housekeeping update-delivery \\"
-        echo "    --canonical-owner \"update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)\" --agent \"\${IWE_AGENT:-claude-code}\""
-        echo "  (cd \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT\" && git add -A && git commit -m \"chore: sync template update\")"
+        DELIVERY_PATHS_FOR_HINT="scripts"
+        # Only when git already tracks it: an untracked or ignored .githooks/
+        # makes `git add`/`git commit -- .githooks` fail and stops the chain.
+        [ -n "$(git -C "$GOVERNANCE_DIR_FOR_DELIVERY_HINT" ls-files -- .githooks 2>/dev/null)" ] \
+            && DELIVERY_PATHS_FOR_HINT="scripts .githooks"
+        echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" open --housekeeping update-delivery --agent \"\${IWE_AGENT:-claude-code}\""
+        echo "  (cd \"$GOVERNANCE_DIR_FOR_DELIVERY_HINT\" && git add -- $DELIVERY_PATHS_FOR_HINT && git diff --cached --name-only && git commit -m \"chore: sync template update\" -- $DELIVERY_PATHS_FOR_HINT)"
         echo "  bash \"$SCRIPT_DIR/scripts/session-guard.sh\" close --housekeeping update-delivery --agent \"\${IWE_AGENT:-claude-code}\""
-        echo "  Если open откажет \"канон уже под эксклюзивным владением\" — подожди close этого держателя, не форсируй."
+        echo "  Стейджатся только пути доставки ($DELIVERY_PATHS_FOR_HINT); остальные незакоммиченные правки в $GOVERNANCE_REPO_FOR_DELIVERY_HINT останутся как были."
         echo "  Важно: open, commit и close выполняй внутри ОДНОЙ сессии агента — страж привязывает семафор к её harness_session_id; open из обычного терминала с последующим commit из сессии агента пропущен не будет (issue #1280)."
     fi
 fi
