@@ -31,7 +31,7 @@ status=0
 
 # issue #894: the routing block is checked by the same validate_entry code the
 # catalog generator and route-task.sh --validate use, not by rules of its own.
-# A skill without a routing block passes — routing is not mandatory yet.
+# The routing block is mandatory: a skill without one fails.
 SKILL_DIR="${2:-.claude/skills}/${1:-}"
 GENERATOR=""
 for candidate in \
@@ -46,8 +46,8 @@ for candidate in \
 done
 if [ -n "$GENERATOR" ]; then
     "$PYTHON" "$GENERATOR" --validate-skill "$SKILL_DIR" || status=1
-elif [ -f "$SKILL_DIR/SKILL.md" ] && grep -q '^routing:' "$SKILL_DIR/SKILL.md"; then
-    echo "FAIL: $SKILL_DIR declares a routing block, but generate-executor-catalog.py was not found (looked in scripts/, \$IWE_TEMPLATE/scripts, FMT-exocortex-template/scripts, \$IWE_SCRIPTS)" >&2
+elif [ -f "$SKILL_DIR/SKILL.md" ]; then
+    echo "FAIL: $SKILL_DIR: the routing block cannot be checked, generate-executor-catalog.py was not found (looked in scripts/, \$IWE_TEMPLATE/scripts, FMT-exocortex-template/scripts, \$IWE_SCRIPTS)" >&2
     status=1
 fi
 exit "$status"

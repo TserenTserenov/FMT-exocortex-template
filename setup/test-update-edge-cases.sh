@@ -835,6 +835,10 @@ else
         GOVERNANCE_REPO="governance"
         IWE_MEMORY_SRC="$T12_SRC"
         IWE_DAY_CLOSE_LOG="$T12_ROOT/day-close.log"
+        # T12 checks the copy rules, which are the same code in both modes; the
+        # frozen default publishes them from an isolated worktree instead
+        # (issue #1279, scripts/tests/test_issue_1279_exo_publish.sh).
+        IWE_FROZEN_CANONICAL_PATH=""
     )
     T12_FIRST_RC=0
     env "${T12_ENV[@]}" bash "$T12_SCRIPT" --backup \

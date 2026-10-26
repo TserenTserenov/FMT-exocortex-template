@@ -12,7 +12,7 @@
 | `agent-status-report.sh` | `scripts/agent-status-report.sh` | РП-395 Ф3 fail-safe writer. |
 | `agent_fault_remind.sh` | `scripts/agent_fault_remind.sh` | WP-316: Agent Fault Profile reminder wrapper |
 | `archive-done-wp.sh` | `scripts/archive-done-wp.sh` | атомарная архивация завершённого РП |
-| `backup-icloud.sh` | `scripts/backup-icloud.sh` | Бэкап IWE в iCloud Drive (без .git, node_modules, .venv) |
+| `backup-icloud.sh` | `scripts/backup-icloud.sh` | Бэкап IWE в архив (без .git, node_modules, .venv) |
 | `changelog-append.sh` | `scripts/changelog-append.sh` | идемпотентное обновление секции [Unreleased] в CHANGELOG.md |
 | `changelog-flush.sh` | `scripts/changelog-flush.sh` | переименовывает [Unreleased] → конкретную версию в CHANGELOG.md |
 | `check-component-parity.sh` | `scripts/check-component-parity.sh` | asserts setup.sh (fresh install) and update.sh |

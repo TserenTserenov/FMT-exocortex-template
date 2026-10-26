@@ -31,6 +31,8 @@ FIELDS = {
     "gates_enforced": "[]",
     "gates_rationale": '"This local example only reads an already provided fixture."',
     "triggers": "\n  slash:\n    - /sample",
+    # issue #894: verify-skill.sh fails a skill without a routing block.
+    "routing": "\n  executor: sonnet\n  deterministic: false",
 }
 BODY = """
 # /sample
@@ -434,16 +436,18 @@ def test_standard_scaffold_templates_are_valid_with_placeholders(
 
 
 @pytest.mark.parametrize("template", TEMPLATES)
-@pytest.mark.parametrize("field", ["gates_required", "gates_enforced", "triggers"])
+@pytest.mark.parametrize(
+    "field", ["gates_required", "gates_enforced", "triggers", "routing"]
+)
 def test_scaffold_templates_must_retain_gate_and_trigger_fields(
     validator: Validator, template: str, field: str
 ) -> None:
     skill = validator.creator()
     path = skill / "assets" / template
     content = path.read_text(encoding="utf-8")
-    if field == "triggers":
+    if field in ("triggers", "routing"):
         content, removed = re.subn(
-            r"(?m)^triggers:\n(?:  [^\n]*\n|\{\{[^\n]+\}\}\n)*", "", content, count=1
+            rf"(?m)^{field}:\n(?:  [^\n]*\n|\{{\{{[^\n]+\}}\}}\n)*", "", content, count=1
         )
     else:
         content, removed = re.subn(rf"(?m)^{field}:[^\n]*\n", "", content, count=1)

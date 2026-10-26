@@ -40,9 +40,15 @@ sha256_file() {
     fi
 }
 
+# This test covers day-close's copy rules (ownership manifest, protected roots,
+# byte-preserving configs) — the same code in both modes. It runs the unfrozen
+# mode, which writes them straight into <governance>/exocortex/; under the
+# default freeze the same rules fill a snapshot that is published from an
+# isolated worktree instead (issue #1279, test_issue_1279_exo_publish.sh).
 run_backup() {
     local workspace=$1 memory=$2 output=$3
     env \
+        IWE_FROZEN_CANONICAL_PATH="" \
         HOME="$workspace/home" \
         PATH="$PATH" \
         WORKSPACE_DIR="$workspace" \

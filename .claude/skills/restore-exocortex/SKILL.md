@@ -14,6 +14,10 @@ annotations:
   destructive: true
   interactive: true
 related: ["#125"]
+routing:
+  executor: script+judgment
+  deterministic: false
+  model_step: "Шаг 2 pre-flight: свежее устройство или населённая память, подтверждение пользователя перед --force; восстановление делает scripts/restore-from-exocortex.sh"
 ---
 
 # /restore-exocortex — Восстановление памяти из exocortex

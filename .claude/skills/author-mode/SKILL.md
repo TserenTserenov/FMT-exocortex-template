@@ -16,6 +16,9 @@ triggers:
     - "L3"
     - "авторское"
     - "шаблон FMT"
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # /author-mode — Авторский режим IWE

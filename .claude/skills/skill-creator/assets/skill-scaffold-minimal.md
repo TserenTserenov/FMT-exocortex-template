@@ -10,6 +10,9 @@ interaction: {{interaction}}
 gates_required: {{gates_required}}
 gates_enforced: {{gates_enforced}}
 gates_rationale: "{{gates_rationale}}"
+routing:
+  executor: {{executor}}
+  deterministic: {{deterministic}}{{routing_extra}}
 triggers:
   slash:
 {{slash_triggers}}

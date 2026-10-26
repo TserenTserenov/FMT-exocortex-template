@@ -27,6 +27,13 @@ Optional:
   --gates-required wp|integration|routing  Gate, repeatable
   --gates-enforced wp|integration|routing  Gate, repeatable
   --gates-rationale <text>    Required explanation when no gates declared
+  --executor <value>          routing.executor: script|mcp-direct|haiku|sonnet|opus|agent|script+judgment
+                              (default: TODO — verify-skill.sh fails until it is chosen)
+  --deterministic true|false  routing.deterministic (default: false; true only for script|mcp-direct)
+  --script-path <path>        routing.script_path (required for --executor script)
+  --model haiku|sonnet|opus   routing.model (required for --executor agent)
+  --model-step <text>         routing.model_step: the step that needs the model
+                              (required for --executor script+judgment)
   --full                      Use full scaffold template (default: minimal)
   --target <path>             Output path (default: .claude/skills/<name>/SKILL.md)
 EOF
@@ -41,6 +48,11 @@ SKILL_INTERACTION="multi-step"
 SKILL_VERSION="0.1.0"
 SKILL_STATUS="experimental"
 SKILL_GATES_RATIONALE=""
+SKILL_EXECUTOR="TODO"
+SKILL_DETERMINISTIC="false"
+SKILL_SCRIPT_PATH=""
+SKILL_MODEL=""
+SKILL_MODEL_STEP=""
 USE_FULL=false
 TARGET_PATH=""
 
@@ -63,6 +75,11 @@ while [[ $# -gt 0 ]]; do
     --gates-required)   GATES_REQUIRED+=("$2");          shift 2 ;;
     --gates-enforced)   GATES_ENFORCED+=("$2");          shift 2 ;;
     --gates-rationale)  SKILL_GATES_RATIONALE="$2";      shift 2 ;;
+    --executor)         SKILL_EXECUTOR="$2";             shift 2 ;;
+    --deterministic)    SKILL_DETERMINISTIC="$2";        shift 2 ;;
+    --script-path)      SKILL_SCRIPT_PATH="$2";          shift 2 ;;
+    --model)            SKILL_MODEL="$2";                shift 2 ;;
+    --model-step)       SKILL_MODEL_STEP="$2";           shift 2 ;;
     --full)             USE_FULL=true;                   shift ;;
     --target)           TARGET_PATH="$2";                shift 2 ;;
     -h|--help)          usage ;;
@@ -130,9 +147,15 @@ export SKILL_NAME SKILL_DESCRIPTION SKILL_LAYER SKILL_AGENTS SKILL_INTERACTION
 export SKILL_VERSION SKILL_STATUS SKILL_GATES_RATIONALE
 export SKILL_SLASH_TRIGGERS SKILL_PHRASE_TRIGGERS
 export SKILL_GATES_REQUIRED SKILL_GATES_ENFORCED
+export SKILL_EXECUTOR SKILL_DETERMINISTIC SKILL_SCRIPT_PATH SKILL_MODEL SKILL_MODEL_STEP
+
+if [ "$SKILL_EXECUTOR" = "TODO" ]; then
+  echo "WARNING: --executor not set; routing.executor is TODO and verify-skill.sh will FAIL" >&2
+  echo "         until the creator chooses who executes the skill (issue #894)." >&2
+fi
 
 python3 - "$TEMPLATE" "$TARGET_PATH" <<'PYEOF'
-import sys, os, pathlib
+import sys, os, pathlib, json
 
 template_path, output_path = sys.argv[1], sys.argv[2]
 text = pathlib.Path(template_path).read_text()
@@ -151,6 +174,20 @@ replacements = {
     "{{gates_enforced}}":  os.environ["SKILL_GATES_ENFORCED"],
     "{{gates_rationale}}": os.environ["SKILL_GATES_RATIONALE"],
 }
+
+# Optional routing fields go on their own lines after deterministic; values are
+# JSON-quoted, which is valid YAML for any text the creator passes.
+routing_extra = ""
+for field, variable in (
+    ("script_path", "SKILL_SCRIPT_PATH"),
+    ("model", "SKILL_MODEL"),
+    ("model_step", "SKILL_MODEL_STEP"),
+):
+    if os.environ[variable]:
+        routing_extra += f"\n  {field}: {json.dumps(os.environ[variable], ensure_ascii=False)}"
+replacements["{{executor}}"] = os.environ["SKILL_EXECUTOR"]
+replacements["{{deterministic}}"] = os.environ["SKILL_DETERMINISTIC"]
+replacements["{{routing_extra}}"] = routing_extra
 
 for placeholder, value in replacements.items():
     text = text.replace(placeholder, value)

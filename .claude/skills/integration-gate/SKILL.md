@@ -16,6 +16,9 @@ triggers:
     - "integration gate"
     - "IntegrationGate"
 related: [archgate]
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # /integration-gate — IntegrationGate

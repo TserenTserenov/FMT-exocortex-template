@@ -1301,6 +1301,13 @@ TRIAGE_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.triage // "unknown"')
 MEMORY_PF=$(echo "$PREFLIGHT_JSON" | jq -r '.memory // "unknown"')
 
 echo "  calendar=$CALENDAR_PF scout=$SCOUT_PF triage=$TRIAGE_PF memory=$MEMORY_PF"
+# issue #1279: under a frozen canon the memory backup is published in the
+# background; a failed last attempt is surfaced here (advisory, never aborts).
+if [ -f "$IWE_SCRIPTS/exocortex-publish.sh" ]; then
+  EXO_PUBLISH_RC=0
+  EXO_PUBLISH_LINE=$(bash "$IWE_SCRIPTS/exocortex-publish.sh" status 2>/dev/null) || EXO_PUBLISH_RC=$?
+  [ "$EXO_PUBLISH_RC" -eq 3 ] && echo "  ⚠ $EXO_PUBLISH_LINE"
+fi
 
 if [ "$CALENDAR_PF" = "fail" ]; then abort "Calendar preflight failed"; fi
 if [ "$SCOUT_PF" = "fail" ]; then abort "Scout preflight failed"; fi

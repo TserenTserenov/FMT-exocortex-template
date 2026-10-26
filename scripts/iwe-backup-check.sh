@@ -9,7 +9,8 @@
 # ОБЕЩАНИЕ
 # ═══════════════════════════════════════════════════════════════════════════════
 # За ≤3 секунды проверить 4 уровня резервирования IWE и выдать markdown-отчёт:
-#   1. iCloud-бэкапы (основной оффлайн-канал)
+#   1. Архивы бэкапа (основной оффлайн-канал: backup_dir из params.yaml
+#      на любой ОС либо iCloud Drive на macOS по умолчанию)
 #   2. Локальные копии .backups/ (legacy / fallback)
 #   3. Git-hygiene (удалённые репо на GitHub как живой backup-код)
 #   4. Runtime-каталоги агентов вне ${HOME}/IWE (WP-7 Ф233а) — покрытие
@@ -37,7 +38,8 @@
 # ЗАВИСИМОСТИ
 # ═══════════════════════════════════════════════════════════════════════════════
 #   bash, git, stat, date, find, du, wc, cut, sort (всё POSIX / macOS-совместимо)
-#   Платформа: macOS (требуется iCloud Drive). На Linux — iCloud-секция будет N/A.
+#   Платформа: любая ОС с заданной целью бэкапа (backup_dir в params.yaml);
+#   без него — iCloud Drive на macOS, на других ОС секция архивов будет N/A.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 # USAGE
@@ -48,7 +50,7 @@
 #   --root PATH         Корень IWE (default: $HOME/IWE)
 #   --warn-days N       Порог "предупреждения" для бэкапа в днях (default: 7)
 #   --critical-days N   Порог "критично" для бэкапа в днях (default: 14)
-#   --no-icloud         Пропустить проверку iCloud (Linux / headless)
+#   --no-icloud         Пропустить проверку архивов бэкапа (headless / свой бэкап)
 #   --reset-baseline    Установить baseline (число файлов в архиве) для проверки
 #                       целостности ротации. Требует локально доступный (не
 #                       iCloud-заглушку) архив. Коммитит + пушит baseline-файл.
@@ -57,7 +59,7 @@
 # EXIT CODES:
 #   0 — всё ОК (backup свежий, git чистый)
 #   1 — warnings (backup 7–14 дней, или ≤2 dirty repos, или stale .backups/)
-#   2 — critical (backup >14 дней, или нет iCloud, или >2 dirty repos)
+#   2 — critical (backup >14 дней, или цель бэкапа недоступна, или >2 dirty repos)
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -71,8 +73,9 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 WARN_DAYS=7
 CRITICAL_DAYS=14
 MODE="check"
-# Auto-disable iCloud check on non-macOS; can be overridden via --no-icloud
-[ "$IWE_OS" = "macos" ] && CHECK_ICLOUD=1 || CHECK_ICLOUD=0
+# The archive section runs whenever a backup target is set: the macOS iCloud
+# default or backup_dir on any OS (issue #1349). --no-icloud disables it.
+[ -n "$IWE_ICLOUD_BACKUP_DIR" ] && CHECK_ARCHIVES=1 || CHECK_ARCHIVES=0
 
 # ---------- Аргументы ----------
 while [ $# -gt 0 ]; do
@@ -80,7 +83,7 @@ while [ $# -gt 0 ]; do
         --root) IWE_ROOT="$2"; shift 2 ;;
         --warn-days) WARN_DAYS="$2"; shift 2 ;;
         --critical-days) CRITICAL_DAYS="$2"; shift 2 ;;
-        --no-icloud) CHECK_ICLOUD=0; shift ;;
+        --no-icloud) CHECK_ARCHIVES=0; shift ;;
         --reset-baseline) MODE="reset-baseline"; shift ;;
         -h|--help) sed -n '/^# ═══/,/^[^#]/p' "$0" | sed -e '/^[^#]/d' -e 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "Unknown arg: $1" >&2; exit 1 ;;
@@ -122,7 +125,7 @@ stat_mtime() {
     fi
 }
 
-# Последний архив IWE-backup-*.tar.gz в iCloud (пусто, если директории/архивов нет)
+# Последний архив IWE-backup-*.tar.gz в цели бэкапа (пусто, если директории/архивов нет)
 find_latest_icloud_archive() {
     [ -d "$ICLOUD_DIR" ] || return 0
     find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | sort | tail -1
@@ -187,105 +190,142 @@ EXIT_CODE=0
 WARNINGS=0
 CRITICALS=0
 
-# ---------- Раздел 1: iCloud-бэкапы ----------
+# ---------- Раздел 1: Архивы бэкапа ----------
 
-if [ "$CHECK_ICLOUD" -eq 1 ]; then
-    echo "## 1. iCloud-бэкапы"
-    echo ""
+# Writable = a probe file can be created and removed in the directory: this
+# catches read-only mounts and root-owned mount points of an unplugged volume.
+dir_writable() {
+    local probe
+    probe=$(mktemp "$1/.iwe-backup-check.XXXXXX" 2>/dev/null) || return 1
+    rm -f "$probe"
+}
 
-    if [ ! -d "$ICLOUD_DIR" ]; then
-        crit "Директория iCloud не найдена: $ICLOUD_DIR"
-        CRITICALS=$((CRITICALS + 1))
+# Nearest existing ancestor of a target that has not been created yet.
+nearest_existing_dir() {
+    local d="$1"
+    while [ ! -d "$d" ]; do d=$(dirname "$d"); done
+    printf '%s\n' "$d"
+}
+
+echo "## 1. Архивы бэкапа"
+echo ""
+
+if [ "$CHECK_ARCHIVES" -eq 1 ]; then
+    # iCloud wording and the mount check only for a target inside iCloud Drive;
+    # backup_dir elsewhere is an ordinary directory on any OS (issue #1349).
+    if iwe_path_inside "$ICLOUD_DIR" "$IWE_ICLOUD_ROOT"; then
+        TARGET_IS_ICLOUD=1
+        TARGET_LABEL="Директория iCloud"
     else
-        # Последний архив
-        LATEST=$(find_latest_icloud_archive)
-        TOTAL_ARCHIVES=$(find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | wc -l | tr -d ' ')
+        TARGET_IS_ICLOUD=0
+        TARGET_LABEL="Папка бэкапа (backup_dir)"
+    fi
+    info "Цель бэкапа: $ICLOUD_DIR"
 
-        if [ -z "$LATEST" ]; then
-            crit "Архивы IWE-backup-*.tar.gz не найдены в iCloud"
-            CRITICALS=$((CRITICALS + 1))
+    # TARGET_STATE: ready (exists, writable) | creatable (missing, the first
+    # backup-icloud.sh run will mkdir it) | broken (critical).
+    TARGET_STATE=broken
+    if [ "$TARGET_IS_ICLOUD" -eq 1 ] && [ ! -d "$IWE_ICLOUD_ROOT" ]; then
+        crit "iCloud Drive не найден ($IWE_ICLOUD_ROOT) — включите iCloud Drive в System Settings"
+    elif [ -d "$ICLOUD_DIR" ]; then
+        if dir_writable "$ICLOUD_DIR"; then
+            TARGET_STATE=ready
         else
-            LATEST_NAME=$(basename "$LATEST")
-            LATEST_SIZE=$(du -sh "$LATEST" 2>/dev/null | cut -f1)
-            LATEST_MTIME=$(stat_mtime "$LATEST")
-            AGE_SEC=$((now_epoch - LATEST_MTIME))
-            AGE_DAYS=$((AGE_SEC / 86400))
+            crit "$TARGET_LABEL недоступна для записи: $ICLOUD_DIR (том не подключён или только для чтения)"
+        fi
+    else
+        TARGET_PARENT=$(nearest_existing_dir "$ICLOUD_DIR")
+        if dir_writable "$TARGET_PARENT"; then
+            TARGET_STATE=creatable
+        else
+            crit "$TARGET_LABEL не найдена и не может быть создана: $ICLOUD_DIR (нет записи в $TARGET_PARENT — том не подключён?)"
+        fi
+    fi
+    [ "$TARGET_STATE" = broken ] && CRITICALS=$((CRITICALS + 1))
 
-            echo "| Метрика | Значение |"
-            echo "|---|---|"
-            echo "| Последний архив | \`$LATEST_NAME\` |"
-            echo "| Размер | $LATEST_SIZE |"
-            echo "| Возраст | ${AGE_DAYS}d |"
-            echo "| Всего архивов | $TOTAL_ARCHIVES |"
-            echo ""
+    LATEST=""
+    [ "$TARGET_STATE" = ready ] && LATEST=$(find_latest_icloud_archive)
 
-            if [ "$AGE_SEC" -gt "$CRIT_SEC" ]; then
-                crit "Последний бэкап старше $CRITICAL_DAYS дней (${AGE_DAYS}d)"
+    if [ "$TARGET_STATE" != broken ] && [ -z "$LATEST" ]; then
+        # A fresh install has no archive yet; making this critical would forbid
+        # week-close 7b, the only step that creates the first one.
+        warn "Архивов IWE-backup-*.tar.gz пока нет в $ICLOUD_DIR — первый бэкап создаст шаг 7b закрытия недели (backup-icloud.sh)"
+        WARNINGS=$((WARNINGS + 1))
+    elif [ -n "$LATEST" ]; then
+        TOTAL_ARCHIVES=$(find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | wc -l | tr -d ' ')
+        LATEST_NAME=$(basename "$LATEST")
+        LATEST_SIZE=$(du -sh "$LATEST" 2>/dev/null | cut -f1)
+        LATEST_MTIME=$(stat_mtime "$LATEST")
+        AGE_SEC=$((now_epoch - LATEST_MTIME))
+        AGE_DAYS=$((AGE_SEC / 86400))
+
+        echo "| Метрика | Значение |"
+        echo "|---|---|"
+        echo "| Последний архив | \`$LATEST_NAME\` |"
+        echo "| Размер | $LATEST_SIZE |"
+        echo "| Возраст | ${AGE_DAYS}d |"
+        echo "| Всего архивов | $TOTAL_ARCHIVES |"
+        echo ""
+
+        if [ "$AGE_SEC" -gt "$CRIT_SEC" ]; then
+            crit "Последний бэкап старше $CRITICAL_DAYS дней (${AGE_DAYS}d)"
+            CRITICALS=$((CRITICALS + 1))
+        elif [ "$AGE_SEC" -gt "$WARN_SEC" ]; then
+            warn "Последний бэкап старше $WARN_DAYS дней (${AGE_DAYS}d)"
+            WARNINGS=$((WARNINGS + 1))
+        else
+            pass "Бэкап свежий (${AGE_DAYS}d ≤ $WARN_DAYS d)"
+        fi
+
+        if [ "$TOTAL_ARCHIVES" -lt 2 ]; then
+            warn "В цели бэкапа только $TOTAL_ARCHIVES архив(а) — ротация может быть нарушена"
+            WARNINGS=$((WARNINGS + 1))
+        else
+            pass "Ротация: $TOTAL_ARCHIVES архив(а)"
+        fi
+
+        # du -k == 0 inside iCloud → a stub (Optimize Mac Storage, not downloaded
+        # locally): integrity and file count cannot be checked there — N/A, not
+        # an error (ход 22 BAK1). Outside iCloud a 0 KB archive is just broken,
+        # so it goes through the smoke test below.
+        LATEST_SIZE_KB=$(archive_local_size_kb "$LATEST")
+        if [ "$TARGET_IS_ICLOUD" -eq 1 ] && { [ -z "$LATEST_SIZE_KB" ] || [ "$LATEST_SIZE_KB" -eq 0 ]; }; then
+            info "Архив — iCloud-заглушка (не скачан локально): smoke-тест и сравнение с baseline пропущены"
+        else
+            if tar -tzf "$LATEST" >/dev/null 2>&1; then
+                pass "Smoke-тест целостности архива (tar -tzf) — OK"
+            else
+                crit "Архив повреждён — tar -tzf провалился"
                 CRITICALS=$((CRITICALS + 1))
-            elif [ "$AGE_SEC" -gt "$WARN_SEC" ]; then
-                warn "Последний бэкап старше $WARN_DAYS дней (${AGE_DAYS}d)"
-                WARNINGS=$((WARNINGS + 1))
-            else
-                pass "Бэкап свежий (${AGE_DAYS}d ≤ $WARN_DAYS d)"
             fi
 
-            if [ "$TOTAL_ARCHIVES" -lt 2 ]; then
-                warn "В iCloud только $TOTAL_ARCHIVES архив(а) — ротация может быть нарушена"
-                WARNINGS=$((WARNINGS + 1))
+            if [ ! -f "$BASELINE_FILE" ]; then
+                info "Baseline не установлен — запустите: $0 --reset-baseline"
             else
-                pass "Ротация: $TOTAL_ARCHIVES архив(а)"
-            fi
-
-            # du -k == 0 → iCloud-заглушка (Optimize Mac Storage, файл не скачан
-            # локально). Целостность и подсчёт файлов на заглушке не проверить —
-            # не ошибка, а N/A (ход 22 BAK1: раньше это давало ложный "0 файлов").
-            LATEST_SIZE_KB=$(archive_local_size_kb "$LATEST")
-            if [ -z "$LATEST_SIZE_KB" ] || [ "$LATEST_SIZE_KB" -eq 0 ]; then
-                info "Архив — iCloud-заглушка (не скачан локально): smoke-тест и сравнение с baseline пропущены"
-            else
-                if tar -tzf "$LATEST" >/dev/null 2>&1; then
-                    pass "Smoke-тест целостности архива (tar -tzf) — OK"
+                BASELINE_COUNT=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['file_count'])" 2>/dev/null || echo "")
+                BASELINE_DATE=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['baseline_date'])" 2>/dev/null || echo "")
+                if [ -z "$BASELINE_COUNT" ]; then
+                    warn "Baseline-файл повреждён ($BASELINE_FILE) — запустите --reset-baseline"
+                    WARNINGS=$((WARNINGS + 1))
                 else
-                    crit "Архив повреждён — tar -tzf провалился"
-                    CRITICALS=$((CRITICALS + 1))
-                fi
-
-                if [ ! -f "$BASELINE_FILE" ]; then
-                    info "Baseline не установлен — запустите: $0 --reset-baseline"
-                else
-                    BASELINE_COUNT=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['file_count'])" 2>/dev/null || echo "")
-                    BASELINE_DATE=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['baseline_date'])" 2>/dev/null || echo "")
-                    if [ -z "$BASELINE_COUNT" ]; then
-                        warn "Baseline-файл повреждён ($BASELINE_FILE) — запустите --reset-baseline"
-                        WARNINGS=$((WARNINGS + 1))
+                    CURRENT_COUNT=$(tar -tzf "$LATEST" 2>/dev/null | wc -l | tr -d '[:space:]')
+                    THRESHOLD_COUNT=$(( BASELINE_COUNT * BASELINE_THRESHOLD_PCT / 100 ))
+                    if [ "$CURRENT_COUNT" -lt "$THRESHOLD_COUNT" ]; then
+                        crit "Архив содержит $CURRENT_COUNT файлов — меньше $BASELINE_THRESHOLD_PCT% от baseline ($BASELINE_COUNT, установлен $BASELINE_DATE)"
+                        CRITICALS=$((CRITICALS + 1))
                     else
-                        CURRENT_COUNT=$(tar -tzf "$LATEST" 2>/dev/null | wc -l | tr -d '[:space:]')
-                        THRESHOLD_COUNT=$(( BASELINE_COUNT * BASELINE_THRESHOLD_PCT / 100 ))
-                        if [ "$CURRENT_COUNT" -lt "$THRESHOLD_COUNT" ]; then
-                            crit "Архив содержит $CURRENT_COUNT файлов — меньше $BASELINE_THRESHOLD_PCT% от baseline ($BASELINE_COUNT, установлен $BASELINE_DATE)"
-                            CRITICALS=$((CRITICALS + 1))
-                        else
-                            pass "Архив: $CURRENT_COUNT файлов (≥$BASELINE_THRESHOLD_PCT% от baseline $BASELINE_COUNT, установлен $BASELINE_DATE)"
-                        fi
+                        pass "Архив: $CURRENT_COUNT файлов (≥$BASELINE_THRESHOLD_PCT% от baseline $BASELINE_COUNT, установлен $BASELINE_DATE)"
                     fi
                 fi
             fi
         fi
     fi
-    echo ""
+elif [ -n "$ICLOUD_DIR" ]; then
+    info "Пропущено (--no-icloud): архивы в $ICLOUD_DIR не проверяются"
 else
-    echo "## 1. iCloud-бэкапы"
-    echo ""
-    if [ "$IWE_OS" != "macos" ] && [ -n "$ICLOUD_DIR" ]; then
-        # backup_dir is read on any OS, but the built-in archive backup and
-        # this check only run on macOS: say so instead of a silent N/A (#1349).
-        warn "backup_dir задан ($ICLOUD_DIR), но встроенный бэкап и проверка его свежести на $IWE_OS не выполняются — архивы туда не создаются. Ведите свой бэкап: backup_enabled: false в params.yaml + расширение week-close.after.*.md"
-        WARNINGS=$((WARNINGS + 1))
-    else
-        info "N/A (платформа: $IWE_OS — iCloud доступен только на macOS)"
-    fi
-    echo ""
+    info "N/A (платформа: $IWE_OS — iCloud доступен только на macOS; свой путь для встроенного бэкапа задаётся backup_dir в params.yaml)"
 fi
+echo ""
 
 # ---------- Раздел 2: Локальные .backups/ ----------
 
@@ -316,6 +356,9 @@ else
         # Проверим, есть ли очень старые (>30 дней)
         STALE=0
         while IFS= read -r folder; do
+            # Archives update.sh keeps on purpose (retired files, replaced
+            # publishers) are not stale clutter: never nag about them.
+            case "$(basename "$folder")" in deprecated|ds-publish-pre-update) continue ;; esac
             mtime=$(stat_mtime "$folder")
             age_days=$(((now_epoch - mtime) / 86400))
             if [ "$age_days" -gt 30 ]; then
@@ -565,7 +608,7 @@ if [ "$CRITICALS" -gt 0 ]; then
     echo "**Действия:**"
     echo "1. Запустить \`bash $IWE_ROOT/scripts/backup-icloud.sh\` если бэкап устарел"
     echo "2. Закоммитить / запушить изменения в грязных репо"
-    echo "3. Проверить iCloud Drive в System Settings если директория не найдена"
+    echo "3. Проверить, что цель бэкапа доступна: iCloud Drive в System Settings или подключённый том для backup_dir"
     EXIT_CODE=2
 elif [ "$WARNINGS" -gt 0 ]; then
     echo "⚠️ **Warnings:** $WARNINGS  |  Critical: 0"

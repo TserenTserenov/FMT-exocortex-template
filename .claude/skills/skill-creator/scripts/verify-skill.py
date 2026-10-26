@@ -251,6 +251,9 @@ def check_templates(skill_dir, checks):
         "gates_rationale": "Local classification of supplied text only.",
         "slash_triggers": "    - /template-skill",
         "phrase_triggers": "    - classify template-skill notes",
+        "executor": "sonnet",
+        "deterministic": "false",
+        "routing_extra": "",
     }
     for name in ("skill-scaffold-minimal.md", "skill-scaffold-full.md"):
         path = skill_dir / "assets" / name
@@ -264,6 +267,13 @@ def check_templates(skill_dir, checks):
             continue
         print(f"=== template/{name} ===")
         check_metadata(data, "template-skill", checks)
+        # issue #894: the routing block is mandatory, so a scaffold without it
+        # would produce skills that fail verification right after creation.
+        routing = data.get("routing")
+        checks.require(
+            isinstance(routing, dict) and nonempty_string(routing.get("executor")),
+            f"template/{name}: routing block with executor",
+        )
         check_sections(body, checks)
 
 

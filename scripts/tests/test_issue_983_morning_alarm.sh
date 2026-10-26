@@ -6,8 +6,8 @@
 #
 # Now the morning run never starts that prompt. It logs the reason and alarms with one
 # day-open-failed message a day; only a DELIVERED message counts, a failed send is retried by the
-# next attempt. A structural failure (the pipeline is not delivered; no model gateway and the
-# --scaffold-only retry failed too) ends the day: "GAVE UP scenario: day-plan (...)", exit 0, and
+# next attempt. A structural failure (the pipeline is not delivered) ends the day: "GAVE UP scenario:
+# day-plan (...)", exit 0, and
 # already_ran_today() skips later launchd runs -- but only once the alarm is out: while a configured
 # Telegram refuses it, the run exits 74 without GAVE UP and the scheduler sends it again (three
 # sends a day at most; with no Telegram configured there is nothing to wait for). What the run gave
@@ -17,6 +17,11 @@
 # out so the scheduler retries (2 as 73: the scheduler reads 2 as "lock held"); attempts are
 # counted when they START (the scheduler's timeout kills the run before it can record an end), at
 # most three a day. The explicit `strategist.sh day-plan` keeps running the prompt by hand.
+#
+# Issue #1346: no model gateway (pipeline exit 9) is no daily failure either. There is no --scaffold-only
+# retry any more; the run gives up for the day, and only the first DELIVERED message says so
+# (no-gateway-disabled). A marker in the runtime state records that delivery, so the next mornings give up
+# quietly; a morning that builds the plan removes it, and a gateway lost again yields one new message.
 #
 # Runs the REAL roles/strategist/scripts/strategist.sh end to end under `env -i` with the REAL
 # notify.sh and message template; stand-ins replace the pipeline, the model, curl (the Telegram
@@ -113,7 +118,8 @@ chmod +x "$STUBS"/*
     || { echo "the stand-in osascript does not shadow the real one" >&2; exit 2; }
 
 # --- the pipeline stand-in. PIPE_RC: exit code of a plain run; PIPE_SCAFFOLD_RC: of a
-# --scaffold-only run; PIPE_MODE=killparent: the run dies from outside, as when the
+# --scaffold-only run (strategist.sh no longer starts one, issue #1346: the PIPE_LOG shows it if it
+# did); PIPE_MODE=killparent: the run dies from outside, as when the
 # scheduler's timeout kills it (the stand-in kills the strategist that started it).
 SCRIPTS="$TMP/scripts"
 mkdir -p "$SCRIPTS" "$TMP/no-scripts"
@@ -173,7 +179,20 @@ new_case() {
     CURL_LOG="$C/telegram.log"
     NET_DOWN_FILE="$C/net-down"
     OUT="$C/out.txt"
+    # env -i leaves IWE_RUNTIME unset: strategist.sh keeps the issue #1346 marker in the
+    # workspace's runtime state ($IWE_WORKSPACE/.iwe-runtime)
+    NOTIFIED="$WS/.iwe-runtime/state/day-open-no-gateway.notified"
+    DAY_N=0
 }
+
+# next_day: the strategist keeps one log per calendar day; moving today's log away is what a new day
+# looks like to it (the issue #1346 marker in the runtime state stays where it is)
+next_day() {
+    DAY_N=$((DAY_N + 1))
+    mkdir -p "$C/past-days"
+    mv "$TEST_HOME"/logs/strategist/2*.log "$C/past-days/day$DAY_N.log"
+}
+marker() { if [ -e "$NOTIFIED" ]; then echo есть; else echo нет; fi; }
 
 # run_strategist <scenario> [VAR=value ...] -> exit code of the real strategist.sh on stdout
 run_strategist() {
@@ -221,39 +240,59 @@ check "1: повторный запуск не шлёт второе сообщ�
 check "1: модель так и не запускалась" "0" "$(model_runs)"
 
 # ---------------------------------------------------------------- 2
-echo "== 2: шлюза нет (код 9), повтор --scaffold-only тоже упал (код 4) — отказ на сегодня с сохранённым кодом"
+echo "== 2 (#1346 а): шлюза нет (код 9), первый день — одно сообщение «план выключен», отметка, отказ на день"
 new_case
-rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
+rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4 PROXY_SHARED_SECRET=fixture-secret-must-not-appear)
 check "2: код выхода" "0" "$rc"
 check "2: модель не запускалась" "0" "$(model_runs)"
-check "2: конвейер вызван дважды: как есть и с --scaffold-only" \
-    "pipeline plain|pipeline --scaffold-only" "$(tr '\n' '|' < "$PIPE_LOG" | sed 's/|$//')"
-check "2: GAVE UP называет код повтора 4" "1" "$(day_log | grep -F 'GAVE UP scenario: day-plan (' | grep -c 'код 4')"
-check "2: одно сообщение" "1" "$(messages)"
-check_has "2: сообщение о шлюзе с кодом повтора" "$(message_texts)" "Шлюз модели не настроен"
-check_has "2: в сообщении код 4" "$(message_texts)" "(код 4)"
-check "2: ложного SUCCESS нет" "0" "$(log_count 'SUCCESS scenario')"
-rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
-check "2: повторный запуск: выход 0 и конвейер больше не вызывается" "0/2" "$rc/$(count_lines "$PIPE_LOG")"
+check "2: конвейер вызван один раз, без повтора --scaffold-only" "pipeline plain" "$(tr '\n' '|' < "$PIPE_LOG" | sed 's/|$//')"
+check "2: в журнале отказ на сегодня GAVE UP" "1" "$(log_count 'GAVE UP scenario: day-plan (')"
+check "2: ложного SUCCESS и «pipeline OK» нет" "0/0" "$(log_count 'SUCCESS scenario')/$(log_count 'Morning: Day Open pipeline OK')"
+check "2: ровно одно сообщение" "1" "$(messages)"
+check_has "2: сообщение: план выключен" "$(message_texts)" "Шлюз модели не настроен — автоматический утренний план выключен"
+check_has "2: сообщение: больше не повторится" "$(message_texts)" "Это сообщение больше не повторится."
+check_has "2: сообщение: что делать" "$(message_texts)" "Когда шлюз появится, утренний сбор включится сам."
+check "2: в журнале тревога называет шлюз" "1" "$(day_log | grep -F 'ALARM: day-open-failed' | grep -c 'шлюз модели не настроен')"
+check "2: отметка о доставленном сообщении записана" "есть" "$(marker)"
+if ! message_texts | grep -q 'fixture-secret-must-not-appear'; then
+    ok "2: секрет шлюза не попал в сообщение"
+else
+    bad "2: секрет шлюза попал в сообщение"
+fi
+rc=$(run_strategist morning PIPE_RC=9)
+check "2: повторный запуск в тот же день: выход 0, конвейер больше не вызывается, сообщение одно" \
+    "0/1/1" "$rc/$(count_lines "$PIPE_LOG")/$(messages)"
 
 # ---------------------------------------------------------------- 3
-echo "== 3: шлюза нет (код 9), сохранён неполный каркас — честная тревога"
-new_case
-rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=10 PROXY_SHARED_SECRET=fixture-secret-must-not-appear)
+echo "== 3 (#1346 б): шлюза нет и на следующий день — ни одного сообщения, отказ на день, выход 0"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
 check "3: код выхода" "0" "$rc"
-check "3: каркас не отмечен как успешный Day Open" "0" "$(log_count 'Morning: Day Open pipeline OK')"
-check "3: одна тревога, модель не запускалась" "1/0" "$(messages)/$(model_runs)"
-check_has "3: тревога называет локальный черновик" "$(message_texts)" ".tmp/day-open-scaffold/DayPlan"
-check_has "3: тревога объясняет перенос правок" "$(message_texts)" "не переносятся автоматически"
-if ! message_texts | grep -q 'fixture-secret-must-not-appear'; then
-    ok "3: секрет шлюза не попал в тревогу"
-else
-    bad "3: секрет шлюза попал в тревогу"
-fi
-rc2=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=10)
-rc3=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=10)
-check "3: повторные запуски не собирают каркас и не шлют тревогу снова" \
-    "0/0/2/1" "$rc2/$rc3/$(count_lines "$PIPE_LOG")/$(messages)"
+check "3: новых сообщений нет" "1" "$(messages)"
+check "3: тревога даже не начиналась" "0" "$(log_count 'ALARM: day-open-failed')"
+check "3: GAVE UP с объяснением «сообщение уже отправлено»" "1" \
+    "$(log_count 'GAVE UP scenario: day-plan (шлюз модели не настроен — автоматический утренний план выключен, сообщение уже отправлено; вручную: «открывай»)')"
+check "3: конвейер вызывался утром (включится сам, когда шлюз появится), один раз за день" "2" "$(count_lines "$PIPE_LOG")"
+check "3: отметка на месте, модель не запускалась" "есть/0" "$(marker)/$(model_runs)"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
+check "3: третий день тоже молчит" "0/1/1" "$rc/$(messages)/$(log_count 'сообщение уже отправлено')"
+
+# ---------------------------------------------------------------- 3e
+echo "== 3е (#1346 д): шлюз появился — план собран, отметка снята; шлюз пропал снова — одно новое сообщение"
+rc=$(run_strategist morning PIPE_RC=0)
+# the same day as the quiet give-up above was "done" already: the plan comes on the next day
+check "3е: день, отданный без шлюза, не перезапускается" "0/1" "$rc/$(log_count 'SKIP: day-plan already completed today')"
+next_day
+rc=$(run_strategist morning PIPE_RC=0)
+check "3е: план собран, отметка снята" "0/1/нет" "$rc/$(log_count 'Morning: Day Open pipeline OK')/$(marker)"
+check "3е: в журнале сказано, что отметка снята" "1" "$(log_count 'отметка о сообщении «шлюз не настроен» снята')"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
+check "3е: шлюз пропал снова: одно новое сообщение, отметка снова есть" "0/2/есть" "$rc/$(messages)/$(marker)"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
+check "3е: и снова тишина на следующий день" "0/2" "$rc/$(messages)"
 
 # ---------------------------------------------------------------- 4
 echo "== 4: переходный отказ (код 5): код наружу, повтор планировщиком, одна тревога, отказ после 3-й попытки"
@@ -326,9 +365,11 @@ rc=$(run_strategist morning PIPE_RC=0)
 check "8: шестой запуск после закрытия дня строит план" "0/1" "$rc/$(log_count 'Morning: Day Open pipeline OK (scaffold + llm-fill)')"
 check "8: конвейер вызывался все шесть раз" "6" "$(count_lines "$PIPE_LOG")"
 new_case
-rc=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=7)
-check "8: отсрочка при повторе --scaffold-only — тоже код 7, без тревоги и без GAVE UP" \
-    "7/0/0" "$rc/$(messages)/$(log_count 'GAVE UP')"
+rc1=$(run_strategist morning PIPE_RC=7)
+rc2=$(run_strategist morning PIPE_RC=9)
+check "8: отсрочка, потом шлюза нет: 7, потом 0 с одним сообщением о шлюзе (отсрочка не засчитана), без --scaffold-only" \
+    "7/0/1/1/pipeline plain|pipeline plain" \
+    "$rc1/$rc2/$(messages)/$(log_count 'GAVE UP scenario: day-plan (')/$(tr '\n' '|' < "$PIPE_LOG" | sed 's/|$//')"
 
 # ---------------------------------------------------------------- 9
 echo "== 9: код 2 конвейера не выдаёт себя за «замок занят»"
@@ -360,7 +401,7 @@ message() { # <reason> <code> -> the message the real template builds
     ( HOME="$TMP/msg-home" IWE_WORKSPACE="$TMP/msg-ws" DAY_OPEN_FAILED_REASON="$1" DAY_OPEN_FAILED_RC="$2" \
         bash -c '. "$1" && build_message day-open-failed' _ "$MESSAGE_TEMPLATE" ) 2>/dev/null
 }
-for reason in not-delivered scaffold-only-failed scaffold-incomplete pipeline-failed attempts-exhausted unknown-reason; do
+for reason in not-delivered no-gateway-disabled pipeline-failed attempts-exhausted unknown-reason; do
     text=$(message "$reason" 4)
     case "$text" in
         *"$HEADER"*"«открывай»"*) ok "11: $reason — заголовок и что делать (сессия, «открывай»)" ;;
@@ -368,7 +409,15 @@ for reason in not-delivered scaffold-only-failed scaffold-incomplete pipeline-fa
     esac
 done
 check_has "11: «не доставлен» советует запустить update.sh" "$(message not-delivered '')" "update.sh"
-check_has "11: код отказа виден в сообщении" "$(message scaffold-only-failed 4)" "(код 4)"
+check_has "11: код отказа виден в сообщении" "$(message pipeline-failed 4)" "(код 4)"
+check_has "11: «шлюз не настроен» обещает, что сообщение не повторится" "$(message no-gateway-disabled 9)" \
+    "Шлюз модели не настроен — автоматический утренний план выключен. Это сообщение больше не повторится."
+check_has "11: «шлюз не настроен» говорит, что утренний сбор включится сам" "$(message no-gateway-disabled 9)" \
+    "Открывайте день в сессии Claude Code командой «открывай». Когда шлюз появится, утренний сбор включится сам."
+case "$(message no-gateway-disabled 9)" in
+    *"(код 9)"*) bad "11: «шлюз не настроен» показывает пользователю внутренний код" ;;
+    *) ok "11: «шлюз не настроен» без внутреннего кода" ;;
+esac
 text=$(message pipeline-failed 'x;<i>')
 case "$text" in
     *'x;<i>'*) bad "11: нецифровой код попал в HTML-сообщение" ;;
@@ -395,20 +444,47 @@ check "12: третий запуск пропущен, второго сообщ
 check "12: модель так и не запускалась" "0" "$(model_runs)"
 
 # ---------------------------------------------------------------- 12b
-echo "== 12б: шлюза нет, повтор --scaffold-only упал, Telegram отказал: доставка повторяется без нового запуска конвейера"
+echo "== 12б (#1346 в): шлюза нет, Telegram отказал: отметки нет, доставка повторяется без нового запуска конвейера"
 new_case
 touch "$NET_DOWN_FILE"
-rc1=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
-check "12б: первый запуск: код 74, день не закрыт, конвейер вызван дважды (как есть и с --scaffold-only)" \
-    "74|0|2" "$rc1|$(log_count 'GAVE UP')|$(count_lines "$PIPE_LOG")"
-check "12б: в журнале запись об отложенном отказе с причиной и кодом 4" "1" \
-    "$(log_count 'RECORDED: day-open give-up pending|scaffold-only-failed|4|')"
+rc1=$(run_strategist morning PIPE_RC=9)
+check "12б: первый запуск: код 74, день не закрыт, конвейер вызван один раз, отметки нет" \
+    "74|0|1|нет" "$rc1|$(log_count 'GAVE UP')|$(count_lines "$PIPE_LOG")|$(marker)"
+check "12б: в журнале запись об отложенном отказе с причиной и кодом 9" "1" \
+    "$(log_count 'RECORDED: day-open give-up pending|no-gateway-disabled|9|')"
 rm -f "$NET_DOWN_FILE"
-rc2=$(run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=4)
-check "12б: второй запуск: выход 0, тревога доставлена, день закрыт, конвейер НЕ вызывался снова" "0|1|1|2" \
+rc2=$(run_strategist morning PIPE_RC=9)
+check "12б: второй запуск: выход 0, сообщение доставлено, день закрыт, конвейер НЕ вызывался снова" "0|1|1|1" \
     "$rc2|$(messages)|$(log_count 'GAVE UP scenario: day-plan (')|$(count_lines "$PIPE_LOG")"
-check_has "12б: в сообщении код 4 из записи" "$(message_texts)" "(код 4)"
+check_has "12б: доставлено именно сообщение «план выключен»" "$(message_texts)" "Это сообщение больше не повторится."
+check "12б: отметку записал запуск, доставивший сообщение из записи" "есть" "$(marker)"
 check "12б: начата одна попытка, повторная доставка её не тратила" "1" "$(log_count 'RECORDED: day-open attempt')"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
+check "12б: следующий день молчит" "0/1" "$rc/$(messages)"
+new_case
+touch "$NET_DOWN_FILE"
+rcs=""
+for n in 1 2 3; do
+    rcs="$rcs$(run_strategist morning PIPE_RC=9) "
+done
+check "12б: Telegram отказывает весь день: 74 74 0, ни одного сообщения, отметки нет" "74 74 0 |0|нет" "$rcs|$(messages)|$(marker)"
+rm -f "$NET_DOWN_FILE"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
+check "12б: на следующий день, когда Telegram ответил, сообщение уходит и отметка пишется" "0/1/есть" "$rc/$(messages)/$(marker)"
+
+# ---------------------------------------------------------------- 12c
+echo "== 12в (#1346 г): шлюза нет, Telegram не настроен: отказ на день, отметки нет — первое сообщение уйдёт после настройки"
+new_case
+rm -f "$TEST_HOME/.config/aist/env"
+rc=$(run_strategist morning PIPE_RC=9)
+check "12в: выход 0, GAVE UP, сообщений нет, отметки нет" "0/1/0/нет" \
+    "$rc/$(log_count 'GAVE UP scenario: day-plan (')/$(messages)/$(marker)"
+printf 'TELEGRAM_BOT_TOKEN=fake-token-983\nTELEGRAM_CHAT_ID=983\n' > "$TEST_HOME/.config/aist/env"
+next_day
+rc=$(run_strategist morning PIPE_RC=9)
+check "12в: Telegram настроили — на следующий день одно сообщение и отметка" "0/1/есть" "$rc/$(messages)/$(marker)"
 
 # ---------------------------------------------------------------- 13
 echo "== 13: Telegram отказывает всё время: три отправки, потом отказ на день без бесконечных повторов"
@@ -497,10 +573,10 @@ for n in 1 2; do
 done
 check "16: переходный сбой не отсрочка: повторы громкие, флага нет" "none none" "$(quiet_flags)"
 new_case
-for n in 1 2; do
-    run_strategist morning PIPE_RC=9 PIPE_SCAFFOLD_RC=7 PIPE_NOTICE=delivered > /dev/null
-done
-check "16: шлюза нет, отсрочка при --scaffold-only: повтор тихий в обоих вызовах конвейера" "none none 1 1" "$(quiet_flags)"
+run_strategist morning PIPE_RC=7 PIPE_NOTICE=delivered > /dev/null
+run_strategist morning PIPE_RC=9 > /dev/null
+check "16: после доставленной отсрочки шлюза нет: повтор конвейера тихий, сообщение стратега о шлюзе всё равно уходит" \
+    "none 1|1" "$(quiet_flags)|$(messages)"
 
 # The pipeline's own tg_notify, extracted from the real script: with the flag only the "started" notice and the
 # four "deferred" notices are kept back; the digest and every abort or warning still go out.

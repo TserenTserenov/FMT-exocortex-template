@@ -13,6 +13,9 @@ gates_rationale: "IntegrationGate пропущен явным разрешени
 triggers:
   slash: [/verify-hypotheses]
   phrases: ["сверь гипотезы недели", "сверь гипотезы"]
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # /verify-hypotheses

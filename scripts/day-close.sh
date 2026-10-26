@@ -1690,9 +1690,13 @@ resolve_memory_src_fallback() {
 }
 
 # --- Шаг 1: Backup memory/ + CLAUDE.md → exocortex/ ---
-# FIXME(#1279): writes exocortex/ into the frozen canonical checkout; not yet aligned with session-guard freeze policy.
+# do_backup [TARGET] — copies into TARGET (default: the canon's exocortex/). The
+# helpers below read EXOCORTEX_DST, so the local shadows the global for them too.
+# A frozen canon is never written: main() routes that case to do_backup_frozen
+# (issue #1279), which calls this function with a snapshot directory as TARGET.
 do_backup() {
-  log "Шаг 1/3: Backup memory/ → exocortex/"
+  local EXOCORTEX_DST="${1:-$EXOCORTEX_DST}"
+  log "Шаг 1/3: Backup memory/ → $EXOCORTEX_DST/"
 
   if [ ! -d "$MEMORY_SRC" ]; then
     # issue #536 regression test asserts an explicit IWE_MEMORY_SRC override
@@ -1792,6 +1796,58 @@ do_backup() {
   local count
   count=$(find "$EXOCORTEX_DST" -maxdepth 1 -type f \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' \) | wc -l | tr -d ' ')
   log "  Синхронизировано: $count файлов → $EXOCORTEX_DST/"
+  if $BACKUP_WARNING; then
+    return "$RC_BACKUP_WARNING"
+  fi
+}
+
+# issue #1279: the same freeze condition as session-guard.sh FROZEN_CANONICAL_PATHS
+# and .claude/hooks/memory-exocortex-sync.sh (duplicated, KEEP IN SYNC): frozen by
+# default, IWE_FROZEN_CANONICAL_PATH="" disables it, another path freezes that one.
+# A run holding --canonical-owner (IWE_CANONICAL_OWNER, set by strategist.sh) may
+# write the canon directly.
+exocortex_canon_frozen() {
+  [ -z "${IWE_CANONICAL_OWNER:-}" ] || return 1
+  if [ -n "${IWE_FROZEN_CANONICAL_PATH+x}" ] && [ -z "$IWE_FROZEN_CANONICAL_PATH" ]; then
+    return 1
+  fi
+  local frozen="${IWE_FROZEN_CANONICAL_PATH:-$DS_STRATEGY}" frozen_real canon_real
+  frozen_real=$(cd "$frozen" 2>/dev/null && pwd -P) || return 1
+  canon_real=$(cd "$DS_STRATEGY" 2>/dev/null && pwd -P) || return 1
+  [ "$frozen_real" = "$canon_real" ]
+}
+
+# Frozen canon: a durable snapshot is taken synchronously (local, fast) and the
+# publish through an isolated worktree + ds-publish.sh runs in the background
+# (scripts/exocortex-publish.sh). The previous attempt's outcome is surfaced
+# here, so a failing publish is never hidden behind a green step.
+do_backup_frozen() {
+  local publisher="$SCRIPT_DIR/exocortex-publish.sh" rc=0 last=""
+  log "Шаг 1/3: Backup memory/ → снимок ($GOVERNANCE_REPO заморожен, канон не пишется)"
+  if [ ! -f "$publisher" ]; then
+    err "  exocortex-publish.sh не найден рядом с day-close.sh — бэкап памяти не выполнен"
+    return 1
+  fi
+  bash "$publisher" snapshot || rc=$?
+  case "$rc" in
+    0) ;;
+    "$RC_STEP_SKIPPED") return "$RC_STEP_SKIPPED" ;;
+    *) err "  снимок памяти не сохранён (код $rc)"; return 1 ;;
+  esac
+  local prev_rc=0
+  last=$(bash "$publisher" status 2>/dev/null) || prev_rc=$?
+  if bash "$publisher" publish --background >/dev/null 2>&1; then
+    log "  снимок памяти сохранён, публикация запущена в фоне (или поставлена в очередь)"
+  else
+    warn "  снимок памяти сохранён, но фоновую публикацию запустить не удалось — повтор при следующем запуске"
+    BACKUP_WARNING=true
+  fi
+  if [ "$prev_rc" -eq 3 ]; then
+    warn "  ⚠ $last"
+    BACKUP_WARNING=true
+  elif [ -n "$last" ]; then
+    log "  предыдущая попытка: $last"
+  fi
   if $BACKUP_WARNING; then
     return "$RC_BACKUP_WARNING"
   fi
@@ -2036,6 +2092,14 @@ write_log() {
 
 # --- Main ---
 main() {
+  # Internal mode for scripts/exocortex-publish.sh: step 1 only, into the given
+  # snapshot directory instead of the canon; no day-close log line.
+  if [ "${1:-}" = "--exocortex-snapshot" ]; then
+    [ "$#" -eq 2 ] && [ -n "$2" ] || { err "Использование: day-close.sh --exocortex-snapshot DIR"; return 1; }
+    do_backup "$2"
+    return $?
+  fi
+
   local do_all=true
   local run_backup=false
   local run_reindex=false
@@ -2073,7 +2137,11 @@ main() {
 
   if $run_backup; then
     local backup_rc=0
-    do_backup || backup_rc=$?
+    if exocortex_canon_frozen; then
+      do_backup_frozen || backup_rc=$?
+    else
+      do_backup || backup_rc=$?
+    fi
     case "$backup_rc" in
       0)                     backup_status="ok" ;;
       "$RC_BACKUP_WARNING") backup_status="warn" ;;
