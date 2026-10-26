@@ -50,11 +50,12 @@ UPDATE_CHANNEL="${IWE_UPDATE_CHANNEL:-release}"
 # user who explicitly asked for the pinned release. Fail closed and name the
 # accepted values instead of guessing which one was meant.
 case "$UPDATE_CHANNEL" in
-    release|main) ;;
+    release|main|rc) ;;
     *)
         echo "✗ Неизвестный канал обновления: IWE_UPDATE_CHANNEL='$UPDATE_CHANNEL'" >&2
         echo "  Допустимые значения:" >&2
         echo "    release — последний опубликованный выпуск (по умолчанию)" >&2
+        echo "    rc      — кандидат в выпуск (для тестировщиков; ставит ровно то, что проверяется перед релизом)" >&2
         echo "    main    — движущаяся ветка разработки (только для автора)" >&2
         echo "  Обновление остановлено: неизвестное значение раньше молча уводило на main." >&2
         exit "$EXIT_USAGE"
@@ -3358,6 +3359,113 @@ github_api_get() {
 
 resolve_delivery_ref() {
     local resolved_ref release_tag release_json commit_json api_status
+    local rc_tag refs_json latest_tag
+    if [ "$UPDATE_CHANNEL" = "rc" ]; then
+        # WP-529 Ф239: канал кандидата в выпуск. weekly-release.yml ставит
+        # неизменяемый тег vX.Y.Z-rc.N на bump-коммит релизной ветки. Тег без
+        # GitHub Release невидим для /releases — резолв через git refs API,
+        # выбор максимума по (X,Y,Z,N). Fail-closed как #501: нет кандидата,
+        # сбой API или незакреплённый SHA — отказ, никогда не откат на
+        # main/release молча.
+        if ! py_available; then
+            echo "ОШИБКА: канал rc требует python3 — без него нельзя выбрать свежий кандидат среди rc-тегов." >&2
+            echo "  Повторите на машине с python3 или выберите другой канал (release/main)." >&2
+            exit "$EXIT_NETWORK"
+        fi
+        refs_json=""
+        if refs_json=$(github_api_get "$API_BASE/git/matching-refs/tags/v"); then
+            api_status=0
+        else
+            api_status=$?
+        fi
+        if [ "$api_status" -ne 0 ]; then
+            echo "ОШИБКА: не удалось получить список rc-тегов (API недоступен)." >&2
+            echo "  Канал rc fail-closed: без списка кандидатов обновление не выполняется." >&2
+            exit "$EXIT_NETWORK"
+        fi
+        rc_tag=$(printf '%s\n' "$refs_json" | "$PY_BIN" -c '
+import json, re, sys
+best = None
+try:
+    items = json.load(sys.stdin)
+except ValueError:
+    raise SystemExit(1)
+# Full page (100) means the answer may be truncated — the true maximum could
+# sit on the next page. Fail closed instead of picking a stale candidate.
+if len(items) >= 100:
+    print("too many tags, pagination required", file=sys.stderr)
+    raise SystemExit(2)
+for item in items:
+    m = re.fullmatch(r"refs/tags/v(\d+)\.(\d+)\.(\d+)-rc\.(\d+)", item.get("ref", ""))
+    if m:
+        key = tuple(int(g) for g in m.groups())
+        if best is None or key > best[0]:
+            best = (key, item["ref"][len("refs/tags/"):])
+if best is None:
+    raise SystemExit(1)
+print(best[1])') || rc_tag=""
+        if [ -z "$rc_tag" ]; then
+            echo "ОШИБКА: кандидатов в выпуск (теги v*-rc.N) нет, либо список тегов не поместился в один ответ API." >&2
+            echo "  Канал rc работает только от опубликованного кандидата (fail-closed)." >&2
+            echo "  Дождитесь кандидата от Weekly Release или выберите другой канал (release/main)." >&2
+            exit "$EXIT_NETWORK"
+        fi
+        commit_json=""
+        if commit_json=$(github_api_get "$API_BASE/commits/$rc_tag"); then
+            api_status=0
+        else
+            api_status=$?
+        fi
+        if [ "$api_status" -eq "$GITHUB_API_AUTH_FAILURE" ] || \
+           [ "$api_status" -eq "$GITHUB_API_INVALID_TOKEN" ] || \
+           [ "$api_status" -eq "$GITHUB_API_UNSAFE_CURL_OPTIONS" ]; then
+            echo "ОШИБКА: authenticated rc commit lookup failed; refusing fallback to tag." >&2
+            exit "$EXIT_NETWORK"
+        fi
+        if [ -n "$commit_json" ] && \
+           resolved_ref=$(printf '%s\n' "$commit_json" | "$PY_BIN" -c '
+import json, re, sys
+sha = json.load(sys.stdin).get("sha", "")
+if not re.fullmatch(r"[0-9a-f]{40}", sha):
+    raise SystemExit(1)
+print(sha)'); then
+            RAW_BASE="https://raw.githubusercontent.com/$REPO/$resolved_ref"
+            echo "  Канал поставки: кандидат $rc_tag (снимок ${resolved_ref:0:12})"
+            RELEASE_SHA="$resolved_ref"
+        else
+            # В отличие от release-канала (тег — допустимый пин), rc fail-closed
+            # и здесь: незакреплённый SHA = непроверяемый снимок (cold review).
+            echo "ОШИБКА: не удалось закрепить кандидат $rc_tag по SHA коммита." >&2
+            echo "  Канал rc fail-closed: обновление по подвижному имени тега не выполняется." >&2
+            exit "$EXIT_NETWORK"
+        fi
+        # Устаревший кандидат: релиз той же или более новой версии уже вышел —
+        # тестировщик обязан это видеть, а не молча ставить старый снимок.
+        latest_tag=""
+        if release_json=$(github_api_get "$API_BASE/releases/latest"); then
+            latest_tag=$(printf '%s\n' "$release_json" | \
+                sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        fi
+        if [ -z "$latest_tag" ]; then
+            echo "  ⚠ Актуальность кандидата проверить не удалось (releases/latest недоступен или не распознан)." >&2
+        fi
+        if [ -n "$latest_tag" ]; then
+            local _cmp
+            _cmp=$(printf '%s\n%s\n' "$latest_tag" "$rc_tag" | "$PY_BIN" -c '
+import re, sys
+def ver(tag):
+    m = re.match(r"v(\d+)\.(\d+)\.(\d+)", tag)
+    return tuple(int(g) for g in m.groups()) if m else None
+lines = [l.strip() for l in sys.stdin if l.strip()]
+rel, rc = (ver(t) for t in lines[:2])
+print("stale" if rel and rc and rel >= rc else "fresh")')
+            if [ "$_cmp" = "stale" ]; then
+                echo "  ⚠ ВНИМАНИЕ: кандидат $rc_tag устарел — релиз $latest_tag уже опубликован." >&2
+                echo "    Переключитесь на release-канал: IWE_UPDATE_CHANNEL=release bash update.sh" >&2
+            fi
+        fi
+        return 0
+    fi
     if [ "$UPDATE_CHANNEL" = "release" ]; then
         # sed, not python: the tag must be resolvable even on installs where
         # py_available fails — a release tag is already an immutable-enough

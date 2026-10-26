@@ -127,6 +127,39 @@ jobs:
           git push origin "$BRANCH"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
+      - name: Tag the release candidate (WP-529 Ф239)
+        # Тестировщики ставят каналом IWE_UPDATE_CHANNEL=rc ровно тот снимок,
+        # который проверяется перед релизом. Тег неизменяемый, на bump-коммите
+        # релизной ветки. Нумерация — по УДАЛЁННЫМ тегам (локальный git tag -l
+        # не видит параллельный запуск); при гонке push — пересчёт и повтор.
+        # Новый коммит в релизной ветке = новый rc.N+1 (старый кандидат не
+        # переиспользуется). Тождество кандидата и релиза — по дереву, не по
+        # SHA коммита: сверку делает release.yml перед созданием релизного тега.
+        if: steps.check.outputs.has_content == 'true'
+        id: rc
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          RC_TAG=""
+          for attempt in 1 2 3; do
+            RC_TAG=$(bash scripts/next-rc-tag.sh "$VERSION" origin)
+            git tag -a "$RC_TAG" -m "Release candidate $RC_TAG" HEAD
+            if git push origin "refs/tags/${RC_TAG}"; then
+              break
+            fi
+            git tag -d "$RC_TAG" >/dev/null
+            RC_TAG=""
+          done
+          if [ -z "$RC_TAG" ]; then
+            echo "FAIL: не удалось опубликовать rc-тег после 3 попыток (гонка запусков?)"
+            exit 1
+          fi
+          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+          echo "rc_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "rc_tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+          echo "Кандидат $RC_TAG опубликован."
+
       - name: Open release PR
         # Смердженный PR даёт обычный push-коммит, который штатно запускает
         # validate-template.yml → release.yml. До слияния владелец одобряет
@@ -135,9 +168,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          BODY="Еженедельный автобамп версии. Для PR от GITHUB_TOKEN владелец одобряет запуск workflows (Approve workflows to run), затем проверяет успешный pull_request Validate Template и release-receipt на актуальном PR-коммите. Только после этого слияние запускает обычный релизный конвейер (validate → release) через push в main."
+          BODY="$BODY"$'\n\n'"Кандидат в выпуск (WP-529 Ф239): ${{ steps.rc.outputs.rc_tag }}"
+          BODY="$BODY"$'\n'"commit: ${{ steps.rc.outputs.rc_commit }}"
+          BODY="$BODY"$'\n'"tree: ${{ steps.rc.outputs.rc_tree }}"
+          BODY="$BODY"$'\n'"Проверка тестировщиком: IWE_UPDATE_CHANNEL=rc bash update.sh --check"
+          BODY="$BODY"$'\n'"Релизный конвейер остановится, если дерево релиза разойдётся с деревом кандидата."
           gh pr create \
             --title "chore(release): weekly auto-bump to v${{ steps.bump.outputs.version }}" \
-            --body "Еженедельный автобамп версии. Для PR от GITHUB_TOKEN владелец одобряет запуск workflows (Approve workflows to run), затем проверяет успешный pull_request Validate Template и release-receipt на актуальном PR-коммите. Только после этого слияние запускает обычный релизный конвейер (validate → release) через push в main." \
+            --body "$BODY" \
             --base main \
             --head "${{ steps.commit.outputs.branch }}"
 
@@ -150,7 +189,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MIN_COMMITS: "5"
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' --exclude 'v*-rc*' 2>/dev/null || true)
           if [ -z "$LAST_TAG" ]; then
             echo "Нет тегов v* — сигнал не нужен."
             exit 0

@@ -89,6 +89,32 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Verify release tree matches the release candidate (WP-529 Ф239)
+        # Тождество «проверенного кандидата» и «выпускаемого релиза» — по
+        # содержимому (дереву), не по SHA коммита: релизный тег встаёт на
+        # merge-коммит, которого в момент проверки кандидата ещё не было.
+        # Расхождение = релиз ушёл бы НЕ тем, что проверяли тестировщики —
+        # блокируем. Отсутствие кандидата для версии — предупреждение
+        # (переходный период и ручные релизы), обязательность вводит Ф240.
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git fetch --tags origin
+          RC_TAGS=$(git tag -l "v${VERSION}-rc.*")
+          if [ -z "$RC_TAGS" ]; then
+            echo "⚠️ Для v$VERSION нет rc-кандидата — релиз без проверки тождества с кандидатом."
+            exit 0
+          fi
+          RC_LATEST=$(printf '%s\n' "$RC_TAGS" | sort -V | tail -1)
+          RC_TREE=$(git rev-parse "${RC_LATEST}^{tree}")
+          HEAD_TREE=$(git rev-parse "HEAD^{tree}")
+          echo "rc=$RC_LATEST rc_tree=$RC_TREE head_tree=$HEAD_TREE" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$RC_TREE" != "$HEAD_TREE" ]; then
+            echo "::error::Дерево релиза v$VERSION ($HEAD_TREE) не совпадает с деревом кандидата $RC_LATEST ($RC_TREE). Релиз остановлен: кандидат проверялся не на этом содержимом — опубликуйте новый rc и проверьте заново."
+            exit 1
+          fi
+          echo "Дерево релиза совпадает с кандидатом $RC_LATEST."
+
       - name: Extract CHANGELOG section for this version
         if: steps.tag_check.outputs.exists == 'false'
         id: changelog
