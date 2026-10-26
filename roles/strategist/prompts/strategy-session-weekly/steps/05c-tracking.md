@@ -18,7 +18,7 @@ gate: auto
 
 0. **Проверь согласие** перед записью — [../appendix/consent-check.md](../appendix/consent-check.md). При `denied`/`null` — НЕ писать трекинг/domain_event, идти на самодекларации.
 
-1. **Обнови трекер** (`Lifework/Caliber-artifacts-tracker.md`):
+1. **Обнови трекер** — тот `Caliber-artifacts-tracker.md`, который нашёл шаг 05a (п.1). Трекера нет (05a шёл на самооценке) — ничего не записывай и не создавай, скажи пилоту одной строкой:
    - Дата сессии
    - V_scope, A_scope, D_scope, качественный статус (из 05a)
    - Статус рекомендации: `proposed` / `remind_monthly` / `dismissed` / `in-progress` / `done`
