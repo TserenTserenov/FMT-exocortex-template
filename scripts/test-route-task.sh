@@ -303,6 +303,8 @@ entries:
     routing:
       executor: script+judgment
       deterministic: false
+      # issue #894: a mixed executor names the step that needs the model.
+      model_step: judge the script findings
 YAML
 if IWE_EXECUTOR_CATALOG="$TMP_MODE_CATALOG" bash "$SCRIPT" --validate >/dev/null 2>&1; then
     echo "PASS: generated taxonomy validates"

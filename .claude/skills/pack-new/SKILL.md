@@ -5,6 +5,9 @@ argument-hint: "[область знания или домен]"
 browser_safe: false
 realized_by:
   - DP.SC.048
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # Pack New — создание нового Pack

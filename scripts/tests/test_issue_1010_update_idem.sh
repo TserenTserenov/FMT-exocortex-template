@@ -17,6 +17,13 @@
 #      clone was deleted, leaving a tracked deletion behind. It must now stay
 #      (with an "отслеживаются git" line); an UNtracked deprecated file is
 #      still removed (control).
+# F9 follow-up: removal is a MOVE into one per-run backup directory
+#      $WORKSPACE_DIR/.backups/deprecated/<UTC>-<pid>/{template,workspace,memory}/<rel>
+#      — the untracked deprecated file, the workspace copy of a deprecated
+#      .claude file and the memory copy of a deprecated memory file land there
+#      byte for byte; move_deprecated_to_backup never overwrites an existing
+#      backup entry, never moves through a symlinked parent directory, and
+#      moves a symlink itself, not its target.
 #
 # Usage: bash scripts/tests/test_issue_1010_update_idem.sh   (KEEP=1 keeps the sandbox)
 
@@ -50,6 +57,7 @@ SKILL=".claude/skills/demo/SKILL.md"
 DEP_TRACKED="scripts/tests/old_test.sh"
 DEP_UNTRACKED="scripts/tests/old_untracked.sh"
 DEP_SKILL=".claude/skills/oldskill/SKILL.md"
+DEP_MEM="memory/old-note.md"
 mkdir -p "$FAKE_HOME" "$UPSTREAM/.claude/skills/demo" "$SHIM_DIR"
 
 # ------------------------------------------------------------------
@@ -74,10 +82,10 @@ EOF
 
 write_manifest() {
     # $1 = manifest version
-    python3 - "$UPSTREAM" "$1" "$SKILL" "$DEP_TRACKED" "$DEP_UNTRACKED" "$DEP_SKILL" <<'PY'
+    python3 - "$UPSTREAM" "$1" "$SKILL" "$DEP_TRACKED" "$DEP_UNTRACKED" "$DEP_SKILL" "$DEP_MEM" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
-root, version, skill, dep_tracked, dep_untracked, dep_skill = sys.argv[1:7]
+root, version, skill, dep_tracked, dep_untracked, dep_skill, dep_mem = sys.argv[1:8]
 root = Path(root)
 manifest = {
     "schema_version": 2,
@@ -87,6 +95,7 @@ manifest = {
         {"path": dep_tracked, "reason": "test: replaced"},
         {"path": dep_untracked, "reason": "test: replaced"},
         {"path": dep_skill, "reason": "test: replaced"},
+        {"path": dep_mem, "reason": "test: replaced"},
     ],
 }
 (root / "update-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -131,7 +140,9 @@ cp "$SCRIPT_DIR/$SKILL" "$TEST_ROOT/skill.initial"
 printf '#!/usr/bin/env bash\necho old tracked test\n' > "$SCRIPT_DIR/$DEP_TRACKED"
 mkdir -p "$SCRIPT_DIR/$(dirname "$DEP_SKILL")" "$WORKSPACE_DIR/$(dirname "$DEP_SKILL")"
 printf -- '---\nname: oldskill\n---\nold\n' > "$SCRIPT_DIR/$DEP_SKILL"
-cp "$SCRIPT_DIR/$DEP_SKILL" "$WORKSPACE_DIR/$DEP_SKILL"
+# The workspace copy carries a local edit: the backup must keep THESE bytes.
+printf -- '---\nname: oldskill\n---\nold, edited in the workspace\n' > "$WORKSPACE_DIR/$DEP_SKILL"
+cp "$WORKSPACE_DIR/$DEP_SKILL" "$TEST_ROOT/dep_skill_ws.expected"
 git -C "$SCRIPT_DIR" init -q
 git -C "$SCRIPT_DIR" config user.email t@t
 git -C "$SCRIPT_DIR" config user.name t
@@ -139,6 +150,14 @@ git -C "$SCRIPT_DIR" add -A
 git -C "$SCRIPT_DIR" commit -q -m init
 # Untracked deprecated file appears after the commit (control for F9).
 printf '#!/usr/bin/env bash\necho old untracked test\n' > "$SCRIPT_DIR/$DEP_UNTRACKED"
+cp "$SCRIPT_DIR/$DEP_UNTRACKED" "$TEST_ROOT/dep_untracked.expected"
+# Deprecated memory file: untracked in the clone, its propagated copy lives in
+# the Claude memory dir (workspace/memory is a plain directory here, so
+# update.sh resolves CLAUDE_MEMORY_DIR to it).
+mkdir -p "$SCRIPT_DIR/memory" "$WORKSPACE_DIR/memory"
+printf 'old note (template)\n' > "$SCRIPT_DIR/$DEP_MEM"
+printf 'old note (memory copy, edited)\n' > "$WORKSPACE_DIR/$DEP_MEM"
+cp "$WORKSPACE_DIR/$DEP_MEM" "$TEST_ROOT/dep_mem.expected"
 
 # ------------------------------------------------------------------
 # curl shim (single-file -o mode, --help all probe, -K batch mode)
@@ -236,6 +255,39 @@ if grep -F "отслеживаются git" "$TEST_ROOT/run1.log" | grep -Fq "$D
 else
     pass "F9 control: untracked file not reported as git-tracked"
 fi
+
+# F9 follow-up: removal = move into one per-run backup directory.
+BACKUP_RUNS=$(find "$WORKSPACE_DIR/.backups/deprecated" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+RUN_DIR=$(find "$WORKSPACE_DIR/.backups/deprecated" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)
+if [ "$BACKUP_RUNS" = "1" ] && basename "$RUN_DIR" | grep -Eq '^[0-9]{8}T[0-9]{6}Z-[0-9]+$'; then
+    pass "F9 backup: exactly one run directory <UTC>-<pid> under .backups/deprecated/"
+else
+    fail "F9 backup: expected one run dir, found $BACKUP_RUNS ($RUN_DIR)"
+fi
+if [ -n "$RUN_DIR" ] && cmp -s "$TEST_ROOT/dep_untracked.expected" "$RUN_DIR/template/$DEP_UNTRACKED"; then
+    pass "F9 backup: untracked deprecated file moved byte-for-byte to template/$DEP_UNTRACKED"
+else
+    fail "F9 backup: $RUN_DIR/template/$DEP_UNTRACKED missing or different"
+fi
+if [ -n "$RUN_DIR" ] && cmp -s "$TEST_ROOT/dep_skill_ws.expected" "$RUN_DIR/workspace/$DEP_SKILL"; then
+    pass "F9 backup: workspace copy of the deprecated skill moved byte-for-byte to workspace/$DEP_SKILL"
+else
+    fail "F9 backup: $RUN_DIR/workspace/$DEP_SKILL missing or different"
+fi
+if [ -n "$RUN_DIR" ] && [ ! -e "$WORKSPACE_DIR/$DEP_MEM" ] && cmp -s "$TEST_ROOT/dep_mem.expected" "$RUN_DIR/memory/${DEP_MEM#memory/}"; then
+    pass "F9 backup: memory copy moved byte-for-byte to memory/${DEP_MEM#memory/}"
+else
+    fail "F9 backup: memory copy not moved ($RUN_DIR/memory/${DEP_MEM#memory/}); still in memory dir: $([ -e "$WORKSPACE_DIR/$DEP_MEM" ] && echo y || echo n)"
+fi
+# update.sh prints normalised absolute paths (TMPDIR may end in "/", so the
+# sandbox paths here can carry a "//"): match the stable parts only.
+RUN_NAME=$(basename "${RUN_DIR:-none}")
+if grep -E "^  - " "$TEST_ROOT/run1.log" | grep -F "$DEP_UNTRACKED (устарел, перенесён в резервную копию: " | grep -Fq "/.backups/deprecated/$RUN_NAME)" \
+   && grep -E "^    - /" "$TEST_ROOT/run1.log" | grep -F "/repo/$DEP_SKILL (устарел, перенесён в резервную копию: " | grep -Fq "/.backups/deprecated/$RUN_NAME)"; then
+    pass "F9 backup: one output line per moved file names the backup directory"
+else
+    fail "F9 backup: expected move lines missing: $(grep -F 'резервную копию' "$TEST_ROOT/run1.log" | head -5)"
+fi
 cp "$SCRIPT_DIR/$SKILL" "$TEST_ROOT/skill.after1"
 
 # ------------------------------------------------------------------
@@ -298,6 +350,59 @@ if [ "$RC4" -eq 0 ] && ! skill_listed_updated "$TEST_ROOT/run4.log"; then
     pass "F10-b: update applied once — the following run lists nothing for SKILL.md"
 else
     fail "F10-b: SKILL.md listed again after being updated (rc=$RC4)"
+fi
+
+# ------------------------------------------------------------------
+# move_deprecated_to_backup safety cases (function extracted from update.sh:
+# the run directory name carries the pid of the update.sh process, so a
+# pre-existing destination cannot be planted for a real run)
+# ------------------------------------------------------------------
+echo "--- move_deprecated_to_backup: safety cases ---"
+MV_FUNCS="$TEST_ROOT/mv-funcs.sh"
+: > "$MV_FUNCS"
+for fn in physical_dir move_deprecated_to_backup; do
+    awk -v sig="$fn() {" '$0 == sig {found=1} found {print} found && /^}$/ {exit}' "$UPDATE_SH_REAL" >> "$MV_FUNCS"
+    grep -q "^$fn() {" "$MV_FUNCS" || fail "cannot extract $fn from update.sh"
+done
+MV_WS="$TEST_ROOT/mv-ws"
+MV_ROOT="$MV_WS/tpl"
+MV_RUN="$MV_WS/.backups/deprecated/19990101T000000Z-1"
+mkdir -p "$MV_ROOT/a" "$MV_RUN/template/a" "$TEST_ROOT/outside"
+printf 'live\n' > "$MV_ROOT/a/f.txt"
+printf 'earlier backup\n' > "$MV_RUN/template/a/f.txt"
+mv_call() {
+    MV_OUT=$(WORKSPACE_DIR="$MV_WS" DEPRECATED_BACKUP_DIR="$MV_RUN" \
+        bash -c '. "$1"; move_deprecated_to_backup "$2" "$3" template "$3"' _ "$MV_FUNCS" "$MV_ROOT" "$1" 2>&1)
+    MV_RC=$?
+}
+mv_call a/f.txt
+if [ "$MV_RC" -ne 0 ] && grep -qx 'live' "$MV_ROOT/a/f.txt" && grep -qx 'earlier backup' "$MV_RUN/template/a/f.txt" \
+   && printf '%s' "$MV_OUT" | grep -Fq 'не перезаписываю'; then
+    pass "pre-existing backup destination: not overwritten, original kept, warning printed"
+else
+    fail "pre-existing destination (rc=$MV_RC): $MV_OUT"
+fi
+printf 'outside data\n' > "$TEST_ROOT/outside/g.txt"
+ln -s "$TEST_ROOT/outside" "$MV_ROOT/linked"
+mv_call linked/g.txt
+if [ "$MV_RC" -ne 0 ] && [ -f "$TEST_ROOT/outside/g.txt" ] && [ ! -e "$MV_RUN/template/linked/g.txt" ]; then
+    pass "symlinked parent directory leading outside the root: refused, file kept"
+else
+    fail "symlinked parent (rc=$MV_RC): $MV_OUT"
+fi
+ln -s "$TEST_ROOT/outside/g.txt" "$MV_ROOT/a/link.txt"
+mv_call a/link.txt
+if [ "$MV_RC" -eq 0 ] && [ -L "$MV_RUN/template/a/link.txt" ] && [ ! -e "$MV_ROOT/a/link.txt" ] && [ ! -L "$MV_ROOT/a/link.txt" ] \
+   && grep -qx 'outside data' "$TEST_ROOT/outside/g.txt"; then
+    pass "symlink entry: the link itself is moved, its target is untouched"
+else
+    fail "symlink entry (rc=$MV_RC): $MV_OUT"
+fi
+mv_call ../escape.txt
+if [ "$MV_RC" -ne 0 ] && printf '%s' "$MV_OUT" | grep -Fq 'недопустимый путь'; then
+    pass "'..' in the manifest path: refused"
+else
+    fail "'..' path (rc=$MV_RC): $MV_OUT"
 fi
 
 echo ""

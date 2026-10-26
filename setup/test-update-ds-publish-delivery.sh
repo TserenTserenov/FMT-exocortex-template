@@ -16,7 +16,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 FUNCS="$TMP/funcs.sh"
-for fn in agent_fault_git atomic_copy_executable backfill_governance_seed_script backfill_ds_publish; do
+for fn in hash_file agent_fault_git atomic_copy_executable backfill_governance_seed_script ds_publish_version replace_ds_publish_with_backup backfill_ds_publish; do
   awk -v sig="$fn() {" '$0 == sig {found=1} found {print} found && /^}$/ {exit}' "$UPDATE_SH" >> "$FUNCS"
   grep -q "^$fn() {" "$FUNCS" || { echo "FATAL: cannot extract $fn" >&2; exit 2; }
 done

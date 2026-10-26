@@ -245,11 +245,38 @@ jobs:
           PATH="$shim_dir:$PATH" bash scripts/tests/test_issue_1005_sync_gate_no_posix_signals.sh --native-windows
           PATH="$shim_dir:$PATH" bash scripts/tests/test_issue_1005_update_fpf_timeout_no_pkill.sh --native-windows
 
+  # #1010a: decides whether this run is the one release.yml turns into a
+  # release, with the rule release-receipt.sh enforces (one implementation:
+  # scripts/release-receipt.sh --release-run). The macOS job below runs on
+  # such a run even on push, because the receipt treats its skip as a failure.
+  release-run:
+    runs-on: ubuntu-latest
+    outputs:
+      release_run: ${{ steps.detect.outputs.release_run }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0  # tags are needed: an already tagged version is not a release
+      - name: Detect release run
+        id: detect
+        run: |
+          release_run=$(bash scripts/release-receipt.sh --release-run)
+          echo "release_run=$release_run" >> "$GITHUB_OUTPUT"
+          echo "release run: $release_run"
+
   integration-contract-macos:
     # issue #1223: same undelivered setup/ dependency as integration-contract-ubuntu above.
+    # #1010a: also on a release run (see release-run above); an ordinary push
+    # to main still skips it, and the receipt reports that skip as «пропущено».
+    # !cancelled(): a failed detector must not skip the PR/schedule runs; on a
+    # push its empty output skips the job and the receipt, which decides the
+    # release run itself, fails on that skip.
+    needs: release-run
     if: >-
+      !cancelled() &&
       github.repository == 'TserenTserenov/FMT-exocortex-template' &&
-      (github.event_name == 'pull_request' || github.event_name == 'schedule')
+      (github.event_name == 'pull_request' || github.event_name == 'schedule' ||
+       needs.release-run.outputs.release_run == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -892,6 +919,54 @@ jobs:
           python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
           sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
 
+      # issue #894 steps 4-5: the routing block of a skill is mandatory and is
+      # checked by the catalog generator's own rules (--validate-skill), the
+      # same code route-task.sh --validate and verify-skill.sh run. Only the
+      # SKILL.md files this push/PR changed are checked; a change to the rules
+      # themselves (generator, its seed copy, route-task.sh, verify-skill.sh)
+      # re-checks every skill. No usable base (schedule, workflow_dispatch,
+      # first push of a branch, rewritten history) also checks every skill —
+      # about 5 s, so the fallback costs nothing worth saving.
+      - name: Validate routing block of changed skills (issue #894)
+        run: |
+          EVENT="${{ github.event_name }}"
+          if [ "$EVENT" = "push" ]; then
+            BASE="${{ github.event.before }}"
+          elif [ "$EVENT" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE=""
+          fi
+          ALL=false
+          if [ -z "$BASE" ] || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "No usable diff base for '$EVENT' (base '${BASE:-none}'): checking every skill"
+            ALL=true
+          else
+            CHANGED=$(git diff --name-only --diff-filter=d "$BASE" HEAD)
+            if printf '%s\n' "$CHANGED" | grep -qxE 'scripts/generate-executor-catalog\.py|seed/strategy/scripts/generate-executor-catalog\.py|scripts/route-task\.sh|\.claude/skills/skill-creator/scripts/verify-skill\.(sh|py)|\.claude/skills/skill-creator/assets/skill-scaffold-[a-z]+\.md'; then
+              echo "Routing rules changed: checking every skill"
+              ALL=true
+            fi
+          fi
+          if [ "$ALL" = true ]; then
+            SKILLS=$(ls .claude/skills/*/SKILL.md)
+          else
+            SKILLS=$(printf '%s\n' "$CHANGED" | grep -E '^\.claude/skills/[^/]+/SKILL\.md$' || true)
+          fi
+          if [ -z "$SKILLS" ]; then
+            echo "PASS: no SKILL.md changed since $BASE"
+            exit 0
+          fi
+          failed=0
+          while IFS= read -r skill_md; do
+            python3 scripts/generate-executor-catalog.py \
+              --validate-skill "$(dirname "$skill_md")" --template-root "$PWD" || failed=1
+          done <<< "$SKILLS"
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::routing block check failed for at least one SKILL.md (see FAIL lines above)"
+            exit 1
+          fi
+
       # Единый версионируемый раннер: новый test_issue_*.sh подключается самим
       # фактом появления файла, забыть подключить к CI больше нельзя.
       - name: Run issue-regression tests (single runner, WP-529 Ф6)
@@ -975,10 +1050,11 @@ jobs:
   # failure upstream still produces a receipt recording that failure,
   # instead of the receipt job itself being skipped and leaving no artifact
   # to show why the commit isn't publishable. integration-contract-macos is
-  # included even though it only runs on pull_request/schedule (see its own
-  # `if:` above) — on a plain push its result is "skipped", which
-  # release-receipt.sh already treats as pass; on the triggers where it DOES
-  # run, this receipt actually gates on it instead of silently ignoring it.
+  # included even though it runs only on pull_request/schedule and on a
+  # release run (see its own `if:` above) — on an ordinary push its result is
+  # "skipped", which release-receipt.sh lists as «пропущено», not as success;
+  # on a release run (#1010a) the receipt fails on that skip, so a release
+  # cannot ship without the macOS proof.
   release-receipt:
     needs:
       - release-sync

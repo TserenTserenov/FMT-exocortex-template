@@ -34,8 +34,9 @@
 #   G  early refusals (C and E layouts, an invalid IWE_ROOT) notify like a late abort does,
 #      stay silent without a token and under --probe; the hint names the source of the root
 #   H  issue #983 as reported: nothing but IWE_SCRIPTS in the environment, no model gateway,
-#      the strategist's two calls (the pipeline as is, then --scaffold-only), a governance repo
-#      with history; everything the pipeline reads or writes belongs to the governance repo
+#      the pipeline as is, then by hand with --scaffold-only (the strategist no longer retries with it,
+#      issue #1346), a governance repo with history; everything the pipeline reads or writes belongs
+#      to the governance repo
 #   I  a gateway that passes both probes but whose fill fails hard or leaves PENDING sections:
 #      the real pipeline preserves the scaffold, returns failure, and cannot push a false plan
 #   S  static guard on both copies of the pipeline: no executable path built from $DS_STRATEGY
@@ -499,7 +500,7 @@ governance_before=$(git -C "$H/ws/DS-strategy" status --porcelain --untracked-fi
 run_pipeline scaffold "$H/ws" "$SCRIPT_H" "$H/call2.txt"
 rc2=$?
 if [ "$rc1" -eq 9 ] && has "$H/call1.txt" "LLM gateway is not configured"; then
-    ok "H: первый вызов отказывает «шлюз не задан» с кодом 9 — по нему strategist.sh повторяет с --scaffold-only"
+    ok "H: первый вызов отказывает «шлюз не задан» с кодом 9 — по нему strategist.sh выключает утренний план (issue #1346)"
 else
     bad "H: первый вызов: rc=$rc1, ожидалось 9 и «LLM gateway is not configured»: $(tail -2 "$H/call1.txt" | tr '\n' ' ')"
 fi
@@ -753,7 +754,7 @@ else
 fi
 
 # ---------------------------------------------------------------- case L
-echo "== L: реальный morning + pipeline без шлюза шлют одну итоговую тревогу"
+echo "== L: реальный morning + pipeline без шлюза шлют одно итоговое сообщение «план выключен» (issue #1346)"
 L="$TMP/l"
 build_skeleton "$L/ws"
 build_working_governance "$L/ws/DS-strategy" "$L/remote.git"
@@ -771,9 +772,11 @@ env -i HOME="$L_HOME" PATH="$STUBS_TG:$STUBS:$PATH" TMPDIR="$TMPDIR" PYTHONDONTW
 rc=$?
 draft="$L/ws/.tmp/day-open-scaffold/DayPlan $DATE.md"
 messages=$(tg_text "$L/tg")
-if [ "$rc" -eq 0 ] && [ -f "$draft" ] \
+# issue #1346: no --scaffold-only retry from the strategist any more, so no local draft either
+if [ "$rc" -eq 0 ] && [ ! -e "$draft" ] \
    && [ "$(tg_calls "$L/tg")" -eq 1 ] \
    && [[ "$messages" == *"План дня не собран"* ]] \
+   && [[ "$messages" == *"Это сообщение больше не повторится."* ]] \
    && [[ "$messages" != *"Day Open pipeline started"* ]] \
    && [[ "$messages" != *"Day Open pipeline aborted"* ]]; then
     ok "L: первый утренний запуск передал ровно одну итоговую тревогу без промежуточного шума"

@@ -8,9 +8,12 @@
 # deterministic scaffold. Fix: day-open-pipeline.sh's "no gateway configured"
 # abort now exits 9 (a distinct code, not text-parsing); strategist.sh
 # retries with --scaffold-only on exactly that code.
-# Since D16 (#983) no failure reaches the free-form prompt any more: a failed
-# retry gives up for the day with an alarm, any other code is passed out with an
-# alarm (the full contract is in test_issue_983_morning_alarm.sh).
+# Since D16 (#983) no failure reaches the free-form prompt any more: any other
+# code is passed out with an alarm (the full contract is in
+# test_issue_983_morning_alarm.sh).
+# Issue #1346 dropped the --scaffold-only retry: its draft is incomplete by design
+# (#983), so it only produced a daily alarm. Exit 9 now gives up for the day with
+# ONE delivered no-gateway-disabled message; the next mornings stay quiet.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -83,7 +86,7 @@ if [ ! -s "$BLOCK_FILE" ]; then
     echo "Result: $fail FAIL"
     exit 1
 fi
-if ! grep -q 'pipeline_rc" -eq 9' "$BLOCK_FILE"; then
+if ! grep -q 'pipeline_rc" -eq "$DAY_OPEN_NO_GATEWAY_RC"' "$BLOCK_FILE"; then
     fail_test "extracted block does not contain the exit-9 retry branch — extraction anchors are wrong"
     echo "Result: $fail FAIL"
     exit 1
@@ -95,7 +98,7 @@ extract_function() {  # <name> -> the function, from its header line to the firs
     awk -v head="$1() {" 'index($0, head) == 1 { on = 1 } on { print } on && /^}/ { exit }' "$STRATEGIST"
 }
 HELPERS="$(grep -E '^DAY_OPEN_[A-Z_]+=' "$STRATEGIST")
-$(for fn in count_in_log day_open_alarm day_open_give_up day_open_start_attempt day_open_deferred day_open_transient_failure; do extract_function "$fn"; done)"
+$(for fn in count_in_log day_open_alarm day_open_give_up day_open_no_gateway_mark_notified day_open_no_gateway_clear day_open_no_gateway day_open_start_attempt day_open_deferred day_open_transient_failure; do extract_function "$fn"; done)"
 if ! printf '%s\n' "$HELPERS" | grep -q '^day_open_transient_failure() {'; then
     fail_test "could not cut the D16 helpers out of strategist.sh — names changed, update this test"
     echo "Result: $fail FAIL"
@@ -104,10 +107,14 @@ fi
 
 run_block() {  # -> exit code of the block
     local pipeline_script="$1" workspace="$2"
-    : > "$TMP/log.txt" "$TMP/calls.txt"
+    # each run starts from empty records (`: > a b` would truncate only the first file)
+    : > "$TMP/log.txt"
+    : > "$TMP/calls.txt"
     bash -c '
         set -e
         IWE_SCRIPTS="$1"; WORKSPACE="$2"; LOG_FILE="$3"
+        # the no-gateway marker (issue #1346) must not touch the real runtime
+        IWE_RUNTIME="'"$TMP"'/runtime"
         log() { printf "%s\n" "$*" >> "'"$TMP"'/log.txt"; }
         run_claude() { printf "run_claude %s\n" "$*" >> "'"$TMP"'/calls.txt"; }
         notify_telegram() { printf "notify_telegram %s\n" "$*" >> "'"$TMP"'/calls.txt"; }
@@ -117,47 +124,46 @@ run_block() {  # -> exit code of the block
     ' _ "$(dirname "$pipeline_script")" "$workspace" "$TMP/log.txt"
 }
 
-# --- 1. Pipeline exits 9 (no gateway), --scaffold-only saves an incomplete
-# draft: the strategist alarms and never reports a completed day.
-cat > "$TMP/pipeline1.sh" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = "--scaffold-only" ]; then exit 10; fi
-exit 9
-SH
-chmod +x "$TMP/pipeline1.sh"
-mv "$TMP/pipeline1.sh" "$TMP/day-open-pipeline.sh"
-run_block "$TMP/day-open-pipeline.sh" "$TMP/ws1"
-if grep -q 'GAVE UP scenario: day-plan (.*неполный каркас' "$TMP/log.txt" 2>/dev/null \
-   && ! grep -q 'Day Open pipeline OK' "$TMP/log.txt" 2>/dev/null; then
-    pass "exit 9 + scaffold-only returns 10: incomplete draft is alarmed, not marked ready"
-else
-    fail_test "exit 9 + scaffold-only returns 10: wrong status: $(cat "$TMP/log.txt" 2>/dev/null)"
-fi
-if grep -q 'run_claude' "$TMP/calls.txt" 2>/dev/null \
-   || ! grep -q 'notify_telegram day-open-failed' "$TMP/calls.txt" 2>/dev/null; then
-    fail_test "exit 9 + scaffold-only returns 10: missing alarm or free-form day-plan ran: $(cat "$TMP/calls.txt")"
-else
-    pass "exit 9 + scaffold-only returns 10: alarm sent, free-form day-plan prompt NOT called"
-fi
-rm -f "$TMP/day-open-pipeline.sh"
-
-# --- 2. Pipeline exits 9, --scaffold-only retry ALSO fails: no free-form
-# prompt (D16, #983); the day gives up with an alarm instead of silently.
+# --- 1. Pipeline exits 9 (no gateway): no --scaffold-only retry (issue #1346);
+# the day gives up with the no-gateway alarm, never marked ready.
 cat > "$TMP/day-open-pipeline.sh" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = "--scaffold-only" ]; then
+    echo "SCAFFOLD-ONLY RETRY STARTED" >&2
+    exit 10
+fi
 exit 9
 SH
 chmod +x "$TMP/day-open-pipeline.sh"
+run_block "$TMP/day-open-pipeline.sh" "$TMP/ws1"
+rc=$?
+if grep -q 'SCAFFOLD-ONLY RETRY STARTED' "$TMP/log.txt" 2>/dev/null; then
+    fail_test "exit 9: --scaffold-only retry still started"
+else
+    pass "exit 9: no --scaffold-only retry"
+fi
+if [ "$rc" -eq 0 ] && grep -q 'GAVE UP scenario: day-plan (шлюз модели не настроен' "$TMP/log.txt" 2>/dev/null \
+    && ! grep -q 'Day Open pipeline OK' "$TMP/log.txt" 2>/dev/null \
+    && [ "$(grep -c 'notify_telegram day-open-failed' "$TMP/calls.txt" 2>/dev/null)" = 1 ] \
+    && ! grep -q 'run_claude' "$TMP/calls.txt" 2>/dev/null; then
+    pass "exit 9: gives up for the day with one no-gateway alarm, free-form prompt NOT called"
+else
+    fail_test "exit 9: rc=$rc calls=$(cat "$TMP/calls.txt" 2>/dev/null) log=$(tail -3 "$TMP/log.txt" 2>/dev/null)"
+fi
+
+# --- 2. Exit 9 once the no-gateway message is on record: quiet give-up, no alarm.
+mkdir -p "$TMP/runtime/state"
+: > "$TMP/runtime/state/day-open-no-gateway.notified"
 run_block "$TMP/day-open-pipeline.sh" "$TMP/ws2"
 rc=$?
-if [ "$rc" -eq 0 ] && grep -q 'GAVE UP scenario: day-plan (' "$TMP/log.txt" 2>/dev/null \
-    && grep -q 'notify_telegram day-open-failed' "$TMP/calls.txt" 2>/dev/null \
+if [ "$rc" -eq 0 ] && grep -q 'GAVE UP scenario: day-plan (.*сообщение уже отправлено' "$TMP/log.txt" 2>/dev/null \
+    && ! grep -q 'notify_telegram' "$TMP/calls.txt" 2>/dev/null \
     && ! grep -q 'run_claude' "$TMP/calls.txt" 2>/dev/null; then
-    pass "exit 9 + scaffold-only also fails: gives up for the day with an alarm, free-form prompt NOT called"
+    pass "exit 9 with the message on record: quiet give-up, no alarm, free-form prompt NOT called"
 else
-    fail_test "exit 9 + scaffold-only also fails: rc=$rc calls=$(cat "$TMP/calls.txt" 2>/dev/null) log=$(tail -3 "$TMP/log.txt" 2>/dev/null)"
+    fail_test "exit 9 with the message on record: rc=$rc calls=$(cat "$TMP/calls.txt" 2>/dev/null) log=$(tail -3 "$TMP/log.txt" 2>/dev/null)"
 fi
-rm -f "$TMP/day-open-pipeline.sh"
+rm -rf "$TMP/runtime" "$TMP/day-open-pipeline.sh"
 
 # --- 3. Pipeline fails for an UNRELATED reason (exit 1, not 9): no
 # --scaffold-only retry and no free-form prompt; the code goes out with an alarm.

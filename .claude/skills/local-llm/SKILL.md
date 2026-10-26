@@ -21,6 +21,7 @@ triggers:
 routing:
   executor: script+judgment
   deterministic: false
+  model_step: "разбор запроса на естественном языке в выбор скрипта и Шаг 4 — суждение об adopt по находкам монитора новых моделей; установка, запуск и переключение делают скрипты бандла"
   optimization_priority: 2
 agents: single
 interaction: multi-step

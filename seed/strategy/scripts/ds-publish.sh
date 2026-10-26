@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # routing: helper  called-by=roles/strategist/scripts/strategist.sh  deterministic=true
+# ds-publish version: 1
+# Version stamp (issue #1280): update.sh replaces an installed copy only when its
+# stamp is LOWER than this one. Bump N by one on every change to this file that
+# installs must receive; a copy with an equal or higher stamp is never replaced.
+# Keep the stamp line exactly in this form (no trailing text), it is parsed strictly.
 # ds-publish.sh — publish ONE local commit to origin without touching this checkout.
 #
 # Why (issue #941): scheduled roles (strategist, extractor) commit into the

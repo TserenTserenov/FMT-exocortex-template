@@ -17,6 +17,9 @@ triggers:
   phrases:
     - создай репозиторий
     - новый репозиторий IWE
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # /repo-new

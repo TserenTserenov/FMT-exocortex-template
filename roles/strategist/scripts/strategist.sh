@@ -916,8 +916,9 @@ ${prompt}"
     else
         extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash${calendar_mcp:+,$calendar_mcp}")
     fi
-    # issue #1279: memory-exocortex-sync.sh skips its mirror on a frozen canon unless the run
-    # really holds the --canonical-owner right; always set explicitly so nothing leaks in.
+    # issue #1279: on a frozen canon memory-exocortex-sync.sh mirrors into it only when the run
+    # really holds the --canonical-owner right (otherwise it hands the change to
+    # scripts/exocortex-publish.sh); always set explicitly so nothing leaks in.
     local canonical_owner=""
     if [ "${RUNNER_SESSION_OPEN:-0}" = 1 ] && [ "$ISOLATED_RUN" != 1 ]; then
         canonical_owner="$RUNNER_SESSION_REASON"
@@ -1199,8 +1200,15 @@ DAY_OPEN_ALARM_RETRY_RC=74
 # The pipeline's own contract (day-open-pipeline.sh, steps 1 and 1.1/1.1b): 7 = deferred, not done
 # (yesterday is not closed yet, the triage report is still being published, the week is closing).
 DAY_OPEN_DEFERRED_RC=7
-# A saved scaffold is useful local work, but never a completed Day Open.
-DAY_OPEN_SCAFFOLD_RC=10
+# Issue #1346: the pipeline's own code for "no model gateway configured" (day-open-pipeline.sh §2). Such an
+# install never gets a morning plan, so the morning run says so in ONE message and then stays quiet: this file
+# records that the message was DELIVERED (never written on "Telegram not configured" or on exhausted sends, so the
+# first message still goes out on the first morning after Telegram works). The pipeline is still started every
+# morning (it stops before any model call), so a gateway that appears later re-enables the plan by itself, and the
+# first successful morning removes the file: a gateway that disappears again yields one new message.
+DAY_OPEN_NO_GATEWAY_RC=9
+DAY_OPEN_NO_GATEWAY_REASON=no-gateway-disabled
+DAY_OPEN_NO_GATEWAY_NOTIFIED="${IWE_RUNTIME:-${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime}/state/day-open-no-gateway.notified"
 # The scheduler reads exit 2 as "lock held, another run is in progress" (scheduler.sh
 # run_strategist_scenario); a pipeline that failed with 2 is passed out as this code instead.
 DAY_OPEN_RC2_SUBSTITUTE=73
@@ -1254,7 +1262,13 @@ day_open_alarm_owed() {  # 0 = the alarm is not delivered, Telegram is configure
 # record before the pipeline is looked at. That also bounds the sends: every one comes from a give-up or
 # from a transient failure of attempts 1 and 2, and the owed test stops at DAY_OPEN_ALARM_MAX_ATTEMPTS.
 day_open_give_up() {  # <reason code> <reason text> [exit code]
+    local sent_before
+    sent_before=$(count_in_log "$DAY_OPEN_ALARM_SENT_MARK")
     day_open_alarm "$@"
+    if [ "$1" = "$DAY_OPEN_NO_GATEWAY_REASON" ] \
+        && [ "$(count_in_log "$DAY_OPEN_ALARM_SENT_MARK")" -gt "$sent_before" ]; then
+        day_open_no_gateway_mark_notified
+    fi
     if day_open_alarm_owed; then
         log "$DAY_OPEN_GIVEUP_PENDING_MARK$1|${3:-}|$2"
         log "Day Open: тревога не доставлена, повтор доставки при следующем запуске планировщика без нового запуска конвейера, код $DAY_OPEN_ALARM_RETRY_RC ($2)"
@@ -1262,6 +1276,32 @@ day_open_give_up() {  # <reason code> <reason text> [exit code]
     fi
     log "GAVE UP scenario: day-plan ($2)"
     exit 0
+}
+
+day_open_no_gateway_mark_notified() {  # records that THIS run delivered the no-gateway message (issue #1346)
+    if mkdir -p "$(dirname "$DAY_OPEN_NO_GATEWAY_NOTIFIED")" 2>/dev/null \
+        && : > "$DAY_OPEN_NO_GATEWAY_NOTIFIED" 2>/dev/null; then
+        log "Day Open: сообщение «шлюз модели не настроен» доставлено, отметка записана: $DAY_OPEN_NO_GATEWAY_NOTIFIED"
+    else
+        log "WARN: не удалось записать отметку $DAY_OPEN_NO_GATEWAY_NOTIFIED — завтра сообщение о шлюзе уйдёт снова"
+    fi
+}
+
+day_open_no_gateway_clear() {  # a morning that built the plan: the next loss of the gateway yields one new message
+    [ -e "$DAY_OPEN_NO_GATEWAY_NOTIFIED" ] || return 0
+    if rm -f "$DAY_OPEN_NO_GATEWAY_NOTIFIED"; then
+        log "Day Open: шлюз модели снова работает, отметка о сообщении «шлюз не настроен» снята"
+    else
+        log "WARN: не удалось снять отметку $DAY_OPEN_NO_GATEWAY_NOTIFIED — при новой пропаже шлюза сообщения не будет"
+    fi
+}
+
+day_open_no_gateway() {  # pipeline exit 9: no plan attempt without a gateway; one delivered message, then quiet days
+    if [ -e "$DAY_OPEN_NO_GATEWAY_NOTIFIED" ]; then
+        log "GAVE UP scenario: day-plan (шлюз модели не настроен — автоматический утренний план выключен, сообщение уже отправлено; вручную: «открывай»)"
+        exit 0
+    fi
+    day_open_give_up "$DAY_OPEN_NO_GATEWAY_REASON" "шлюз модели не настроен — автоматический утренний план выключен; конвейер по-прежнему запускается каждое утро без обращения к модели и включит план сам, когда шлюз появится; вручную: «открывай»" "$DAY_OPEN_NO_GATEWAY_RC"
 }
 
 day_open_resume_pending_give_up() {  # finishes a give-up whose alarm is still owed; returns when there is none
@@ -1742,6 +1782,7 @@ case "$1" in
             DAY_OPEN_NOTIFICATION_OWNER=strategist DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" >> "$LOG_FILE" 2>&1 || pipeline_rc=$?
             if [ "$pipeline_rc" -eq 0 ]; then
                 log "$DAY_OPEN_OK_MARK (scaffold + llm-fill)"
+                day_open_no_gateway_clear
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
                 day_open_deferred
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_REFUSED_RC" ]; then
@@ -1754,22 +1795,12 @@ case "$1" in
                 # DAY_OPEN_MAX_ATTEMPTS и вызовут ложную тревогу attempts-exhausted (ред-комментарий Codex, РП-568).
                 log "$DAY_OPEN_DEFERRED_MARK: гард WP-539 отказал прямому вызову (код $DAY_OPEN_REFUSED_RC) — этот хост не владеет Открытием дня; не сбой: тревоги нет, попытка не засчитана"
                 exit 0
-            elif [ "$pipeline_rc" -eq 9 ]; then
-                # issue #893: exit 9 = no gateway configured (day-open-pipeline.sh
-                # §2), a case the pipeline itself already ships an answer for
-                # (--scaffold-only, issue #434). The retry's own code is kept
-                # right away: it is what the alarm reports.
-                log "Morning: Day Open pipeline has no gateway configured — retrying with --scaffold-only"
-                scaffold_rc=0
-                DAY_OPEN_NOTIFICATION_OWNER=strategist DAY_OPEN_QUIET_RETRY="$retry_quiet" bash "$DAY_OPEN_PIPELINE" --scaffold-only >> "$LOG_FILE" 2>&1 || scaffold_rc=$?
-                if [ "$scaffold_rc" -eq "$DAY_OPEN_SCAFFOLD_RC" ]; then
-                    scaffold_path="${IWE_WORKSPACE:-$HOME/IWE}/.tmp/day-open-scaffold/DayPlan $(date +%Y-%m-%d).md"
-                    day_open_give_up scaffold-incomplete "шлюз модели не настроен; неполный каркас сохранён: $scaffold_path. День не открыт; правки черновика не переносятся автоматически в полный план" "$scaffold_rc"
-                elif [ "$scaffold_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
-                    day_open_deferred
-                else
-                    day_open_give_up scaffold-only-failed "шлюз модели не настроен (код 9), повтор с --scaffold-only тоже не прошёл: код $scaffold_rc (причина в строках выше)" "$scaffold_rc"
-                fi
+            elif [ "$pipeline_rc" -eq "$DAY_OPEN_NO_GATEWAY_RC" ]; then
+                # issue #1346: no gateway configured (day-open-pipeline.sh §2). No --scaffold-only retry: its
+                # draft is incomplete by design (#983), so it only produced a daily alarm and never a plan.
+                # One delivered message, then quiet days -- see day_open_no_gateway() above.
+                log "Morning: Day Open pipeline has no gateway configured — automatic morning plan is off (issue #1346)"
+                day_open_no_gateway
             else
                 day_open_transient_failure "$pipeline_rc"
             fi

@@ -247,6 +247,7 @@ description: Script plus judgment fixture.
 routing:
   executor: script+judgment
   deterministic: false
+  model_step: judge the script findings
 ---
 EOF
 cat > "$CUSTOM_SKILLS/skip-explicit/SKILL.md" <<'EOF'

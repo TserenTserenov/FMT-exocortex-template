@@ -4,7 +4,7 @@ description: |
   Create a new IWE skill with proper frontmatter, gates, scaffold and verification.
   Use when the pilot says: /skill-creator or «создай скилл <name>».
   The skill enforces WP Gate precondition, Routing Gate, IntegrationGate hard-check,
-  collects parameters in 4 short steps, generates a scaffold SKILL.md from a template,
+  collects parameters in 5 short steps, generates a scaffold SKILL.md from a template,
   shows a draft, writes files, and reminds about verify-skill.sh.
 version: 0.4.0
 status: experimental
@@ -21,6 +21,9 @@ triggers:
   phrases:
     - "создай скилл <name>"
     - "новый скилл <name>"
+routing:
+  executor: sonnet
+  deterministic: false
 ---
 
 # /skill-creator — create an IWE skill
@@ -94,6 +97,8 @@ Collect the pilot's choices. A requested description must contain at least 10 wo
 
 Skip Steps 3–6 **unless** the pilot selected "bundled resource" or any change that expands the skill's scope or gates — in that case, run **Step 3 (IntegrationGate)** before applying.
 
+If the pilot selected "algorithm step" or "bundled resource", ask question **4e (executor)** again and update the `routing:` block: a changed algorithm can make the recorded executor wrong, and nothing else detects that.
+
 For Step 7 (register + verify): run `verify-skill.sh` always. Run `generate-skills-catalog.sh` only if frontmatter changed (name, description, triggers, version).
 
 Version bump rule: bump patch for trigger / description edits; bump minor for algorithm changes **or adding a bundled resource**; bump major for gate or scope changes.
@@ -112,7 +117,7 @@ Service Clause (DP.SC.*) и Role (DP.ROLE.*) не найдены.
 
 Stop until the gate is satisfied or explicitly bypassed by pilot words.
 
-### Step 4 — Collect parameters (4 short steps)
+### Step 4 — Collect parameters (5 short steps)
 
 **4a. Name and description**
 
@@ -150,6 +155,20 @@ Keep phrase triggers narrow: include a skill name placeholder to avoid accidenta
 
 Default: `assets/` for scaffold template, `scripts/` for verify script.
 
+**4e. Executor (`routing:` block, mandatory — issue #894)**
+
+```
+Какие части работы полностью заданы входами и правилами (их делает код),
+а где нужно суждение модели?
+executor: script | mcp-direct | haiku | sonnet | opus | agent | script+judgment
+```
+
+- `script` / `mcp-direct` — no model at run time; `script` needs `script_path`. Only these may set `deterministic: true`.
+- `haiku` / `sonnet` / `opus` — a model does the work (the value names the tier); `agent` — a subagent, needs `model: haiku|sonnet|opus`.
+- `script+judgment` — code does the formal part, a model the judgment; needs `model_step:` naming the step that needs the model.
+
+Do not leave the answer to a default: the scaffold writes `executor: TODO` until it is chosen, and verification fails on it.
+
 ### Step 5 — Generate scaffold
 
 Choose scaffold template based on skill complexity:
@@ -161,6 +180,7 @@ Copy chosen template to target path and substitute:
 - `{{agents}}`, `{{interaction}}`, `{{layer}}`
 - `{{slash_triggers}}`, `{{phrase_triggers}}`
 - `{{gates_rationale}}` — required when `gates_required` and `gates_enforced` are both empty
+- `{{executor}}`, `{{deterministic}}`, `{{routing_extra}}` — from 4e (`scaffold-init.sh --executor … [--deterministic true] [--script-path …] [--model …] [--model-step …]`)
 
 Create selected bundled resource directories with placeholder files.
 
@@ -227,7 +247,7 @@ before the skill is used in practice.
 Fields used by some existing skills but not yet in the standard frontmatter schema:
 
 - `argument-hint` — CLI-style hint for script-executor skills (e.g. agent-fault, apply-captures). Encodes the argument contract. Keep until schema is extended or absorbed into `description`.
-- `routing.executor` — indicates whether the skill runs via `script`, `sonnet`, or another executor. When the block is present, `verify-skill.sh` checks it with the catalog generator's own rules (`generate-executor-catalog.py --validate-skill`, issue #894); the block itself is not mandatory yet. Candidate for standardization.
+- `routing.executor` — indicates whether the skill runs via `script`, `sonnet`, or another executor. The block is mandatory: `verify-skill.sh` and the template CI check it with the catalog generator's own rules (`generate-executor-catalog.py --validate-skill`, issue #894). Whether the chosen executor is the right one (code vs judgment) stays a review decision; the check only catches a declaration that contradicts the rules.
 
 Until standardized: leave these fields as-is in existing skills; do not remove during Step 2.5 updates.
 

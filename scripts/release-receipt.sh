@@ -11,11 +11,21 @@
 #
 # publishable=true requires all three Windows jobs to report success. Other
 # mandatory checks may be intentionally skipped for this trigger (e.g. macOS
-# integration on push). Failure/cancelled/unknown, or a skipped Windows job,
-# produces false. The script exits 1 so branch protection can require this
-# receipt instead of enumerating every individual job (Ф2).
+# integration on an ordinary push); a skip is listed in the receipt's
+# "skipped" array and printed as «пропущено», never counted as success.
+# On a release run (#1010a) the macOS integration job is mandatory too: its
+# skip blocks the receipt. Failure/cancelled/unknown, or a skipped Windows
+# job, produces false. The script exits 1 so branch protection can require
+# this receipt instead of enumerating every individual job (Ф2).
+#
+# Release run = the run whose green result makes release.yml publish a new
+# release: same repository, a push or workflow_dispatch run on main, and no
+# tag v<manifest version> yet (release.yml's job `if:` plus its tag check).
+# `--release-run` prints that decision (true/false) so the macOS job can be
+# scheduled with the same rule the receipt enforces.
 #
 # Usage (CI): RESULT_<JOB>=<needs.<job>.result> bash scripts/release-receipt.sh
+# Usage (CI): bash scripts/release-receipt.sh --release-run
 # Usage (local dry-run): bash scripts/release-receipt.sh — reads "unknown" for
 # unset RESULT_* vars, which counts as a failure (fail-closed, not fail-open).
 #
@@ -30,6 +40,41 @@ MANIFEST="$SCRIPT_DIR/update-manifest.json"
 RECEIPT="${RELEASE_RECEIPT_OUT:-$SCRIPT_DIR/release-receipt.json}"
 
 [ -f "$MANIFEST" ] || { echo "ERROR: $MANIFEST не найден"; exit 2; }
+
+# The repository whose main branch release.yml publishes from (its job `if:`).
+RELEASE_REPOSITORY="TserenTserenov/FMT-exocortex-template"
+
+# Prints true when this run is the one release.yml would turn into a release.
+# Mirrors release.yml: repository gate, event push|workflow_dispatch on main,
+# version read from the manifest the same way, release only if the tag
+# v<version> does not exist yet. Anything that cannot be determined (no
+# version, git unavailable) answers true: the stricter gate applies.
+is_release_run() {
+  local version
+  [ "${GITHUB_REPOSITORY:-}" = "$RELEASE_REPOSITORY" ] || { echo false; return; }
+  case "${GITHUB_EVENT_NAME:-}" in
+    push|workflow_dispatch) ;;
+    *) echo false; return ;;
+  esac
+  [ "${GITHUB_REF_NAME:-}" = main ] || { echo false; return; }
+  version=$(grep -m1 '"version"' "$MANIFEST" \
+    | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+  if [ -z "$version" ] || ! git -C "$SCRIPT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    echo true
+    return
+  fi
+  if git -C "$SCRIPT_DIR" rev-parse "refs/tags/v$version" >/dev/null 2>&1; then
+    echo false
+  else
+    echo true
+  fi
+}
+
+if [ "${1:-}" = "--release-run" ]; then
+  is_release_run
+  exit 0
+fi
+RELEASE_RUN="$(is_release_run)"
 
 SHA="${RELEASE_RECEIPT_SHA:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 # Same "second version bump in update-manifest.json history" logic
@@ -74,6 +119,7 @@ CHECK_ENV_VARS=(
 PUBLISHABLE=true
 CHECKS_JSON="[]"
 FAILED_NAMES=()
+SKIPPED_NAMES=()
 
 for i in "${!CHECK_NAMES[@]}"; do
   name="${CHECK_NAMES[$i]}"
@@ -83,10 +129,15 @@ for i in "${!CHECK_NAMES[@]}"; do
     success) ;;
     skipped)
       # These Windows jobs run on every trigger; skipped bypasses their proof.
+      # The macOS job is scheduled on release runs, so a skip there means the
+      # release would ship without the macOS proof (#1010a).
       if [ "$name" = issue-1030-windows ] || [ "$name" = guarded-rm-windows ] ||
-         [ "$name" = windows-session-guard ]; then
+         [ "$name" = windows-session-guard ] ||
+         { [ "$name" = integration-contract-macos ] && [ "$RELEASE_RUN" = true ]; }; then
         PUBLISHABLE=false
         FAILED_NAMES+=("$name:$result")
+      else
+        SKIPPED_NAMES+=("$name")
       fi
       ;;
     *)
@@ -105,14 +156,23 @@ jq -n \
   --arg generated_at "$GENERATED_AT" \
   --argjson publishable "$PUBLISHABLE" \
   --argjson checks "$CHECKS_JSON" \
+  --argjson release_run "$RELEASE_RUN" \
+  --argjson skipped "$(printf '%s\n' "${SKIPPED_NAMES[@]+"${SKIPPED_NAMES[@]}"}" | jq -R . | jq -s 'map(select(length > 0))')" \
   '{sha: $sha, base_sha: $base_sha, manifest_hash: $manifest_hash,
-    generated_at: $generated_at, checks: $checks, publishable: $publishable}' \
+    generated_at: $generated_at, release_run: $release_run, checks: $checks,
+    skipped: $skipped, publishable: $publishable}' \
   > "$RECEIPT"
 
+if [ "${#SKIPPED_NAMES[@]}" -gt 0 ]; then
+  echo "  пропущено (не проверялось на этом запуске): ${SKIPPED_NAMES[*]}"
+fi
 if [ "$PUBLISHABLE" = "true" ]; then
   echo "PASS: publishable=true — $SHA"
 else
   echo "FAIL: publishable=false — $SHA"
   echo "  Обязательные проверки с недопустимым результатом: ${FAILED_NAMES[*]}"
+  if [ "$RELEASE_RUN" = true ]; then
+    echo "  Релизный запуск: macOS-проверка обязательна, пропуск блокирует выпуск."
+  fi
   exit 1
 fi

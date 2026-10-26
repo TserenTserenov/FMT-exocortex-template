@@ -188,15 +188,58 @@ elif [ "$IWE_OS" = "macos" ]; then
 else
   export IWE_ICLOUD_BACKUP_DIR=""
 fi
-# IWE_ICLOUD_ROOT stays iCloud-specific (backup-icloud.sh's own mount sanity
-# check) regardless of backup_dir — a custom non-iCloud target skips
-# backup-icloud.sh entirely via backup_enabled: false (SKILL.md §7a/7b), it
-# does not repurpose this check.
+# IWE_ICLOUD_ROOT stays iCloud-specific regardless of backup_dir: it is the
+# mount that must exist when the backup target lies inside iCloud Drive
+# (backup-icloud.sh, iwe-backup-check.sh — issue #1349). A backup_dir outside it
+# is a plain directory on any OS and is not checked against this root; use
+# iwe_path_inside to tell the two cases apart.
 if [ "$IWE_OS" = "macos" ]; then
   export IWE_ICLOUD_ROOT="${HOME}/Library/Mobile Documents/com~apple~CloudDocs"
 else
   export IWE_ICLOUD_ROOT=""
 fi
+
+# iwe_normalize_path PATH — physical absolute path (symlinks resolved). The
+# path may not exist yet (a backup target is created on first use): the
+# nearest existing ancestor is resolved and the missing tail is appended
+# lexically, with "." and ".." folded.
+iwe_normalize_path() {
+  local path="$1" tail="" name head skip=0
+  case "$path" in /*) ;; *) path="$PWD/$path" ;; esac
+  while [ ! -d "$path" ]; do
+    name="${path##*/}"
+    path="${path%/*}"
+    [ -n "$path" ] || path="/"
+    case "$name" in
+      ""|.) ;;
+      ..) skip=$((skip + 1)) ;;
+      *) if [ "$skip" -gt 0 ]; then skip=$((skip - 1)); else tail="/$name$tail"; fi ;;
+    esac
+  done
+  head=$(CDPATH='' cd -P -- "$path" 2>/dev/null && pwd -P) || return 1
+  while [ "$skip" -gt 0 ]; do
+    head="${head%/*}"
+    skip=$((skip - 1))
+  done
+  [ "$head" = "/" ] && head=""
+  head="${head}${tail}"
+  printf '%s\n' "${head:-/}"
+}
+
+# iwe_path_inside CHILD PARENT — true when CHILD is PARENT or lies under it,
+# compared component-wise on normalised paths (not a raw string prefix, so
+# ".../CloudDocs-other" is not inside ".../CloudDocs"). Empty PARENT → false.
+iwe_path_inside() {
+  local child parent
+  [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
+  child=$(iwe_normalize_path "$1") || return 1
+  parent=$(iwe_normalize_path "$2") || return 1
+  [ "$parent" = "/" ] && return 0
+  case "$child/" in
+    "$parent"/*) return 0 ;;
+  esac
+  return 1
+}
 
 # Debug output (optional)
 if [ "${IWE_ENV_BOOTSTRAP_DEBUG:-0}" = "1" ]; then

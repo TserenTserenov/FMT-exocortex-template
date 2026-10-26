@@ -2629,47 +2629,104 @@ backfill_governance_seed_script() {
     fi
 }
 
+# ds_publish_version FILE — print the "# ds-publish version: N" stamp of FILE as a
+# plain decimal (leading zeros dropped) and return 0; return 1 when FILE has no
+# well-formed stamp. Only the FIRST line starting with "# ds-publish version:" is
+# considered and it must match ^# ds-publish version: ([0-9]+)$ exactly: a
+# malformed first stamp ("1a", trailing text, CRLF) means "no stamp", it is never
+# rescued by a later well-formed line. More than 9 digits is also "no stamp": the
+# value is compared with shell arithmetic and must not overflow.
+ds_publish_version() {
+    local line digits
+    line=$(grep -m1 '^# ds-publish version:' "$1" 2>/dev/null) || return 1
+    case "$line" in
+        "# ds-publish version: "*) digits=${line#"# ds-publish version: "} ;;
+        *) return 1 ;;
+    esac
+    case "$digits" in
+        ""|*[!0-9]*) return 1 ;;
+    esac
+    [ "${#digits}" -le 9 ] || return 1
+    printf '%s\n' "$((10#$digits))"
+}
+
+# replace_ds_publish_with_backup TARGET SOURCE GOVERNANCE_REPO REASON — keep a copy
+# of TARGET under .backups/ds-publish-pre-update/ (the file is usually untracked, so
+# git has no copy of it), then replace it with SOURCE. Returns 1 and leaves TARGET
+# as it was when the backup cannot be made.
+replace_ds_publish_with_backup() {
+    local target_path="$1" source_path="$2" governance_repo="$3" reason="$4"
+    local backup_dir
+    backup_dir="$WORKSPACE_DIR/.backups/ds-publish-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    if [ -L "$WORKSPACE_DIR/.backups" ] || ! mkdir -p "$backup_dir" \
+       || ! cp -p "$target_path" "$backup_dir/ds-publish.sh"; then
+        echo "  ✗ scripts/ds-publish.sh: не удалось сделать резервную копию, прежняя копия остаётся." >&2
+        return 1
+    fi
+    echo "  ↳ backup: $target_path → $backup_dir/ds-publish.sh"
+    atomic_copy_executable "$source_path" "$target_path" || return 1
+    echo "  ⟳ scripts/ds-publish.sh: $reason — заменена на текущую в $governance_repo."
+}
+
 # ds-publish.sh (issue #941): strategist.sh publishes its commits through
-# $governance/scripts/ds-publish.sh, which the template never shipped. Delivered only
-# when the governance repo has no such file: an existing one is not ours to replace
-# (an installation may keep its own, larger publisher at the same path).
+# $governance/scripts/ds-publish.sh, which the template never shipped. Missing copy →
+# delivered. Existing copy → decided by its version stamp (issue #1280):
+#   installed stamp <  shipped stamp → an older template copy: replaced, backup kept;
+#   installed stamp >= shipped stamp → never touched, even if the content differs
+#                                      (that is a deliberate local edit);
+#   no (well-formed) stamp           → migration from the pre-stamp era: a copy whose
+#                                      sha256 is on known_old_publishers was shipped
+#                                      by this template and is replaced; any other
+#                                      unstamped file is the user's own publisher —
+#                                      kept, with a loud warning.
 backfill_ds_publish() {
     local governance_repo="${EFFECTIVE_GOVERNANCE_REPO:-$(effective_governance_repo)}"
     local target_path="$WORKSPACE_DIR/$governance_repo/scripts/ds-publish.sh"
-    # Issue #1003: a copy that THIS template shipped earlier (sha256 on the list) is
-    # not user content: it is replaced even though it lies untracked in the governance
-    # repo (the generic backfill refuses untracked files). Any other file stays.
-    #
-    # Issue #1288 (21.10): this list is a trap by construction -- every edit to
-    # seed/strategy/scripts/ds-publish.sh mints a new hash that isn't on it yet,
-    # so an install that updated while an in-between version was current falls
-    # straight through to "not ours to replace" below and gets stuck on a stale
-    # template-shipped copy forever (two independent reports). Backfilled the two
-    # hashes minted since #1003 (02.10, 03.10) that were missing; the hash of the
-    # version shipped since 15.10 (the current one as of this fix) is deliberately
-    # NOT added here -- once an install matches it, the case below is moot since
-    # there is nothing left to replace it with.
-    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730 a86c3f628c06e8b7fe8d7a338c01ff0d7a0794751b4ce1a27affbb11295b2a36 13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e"
-    local source_path="$SCRIPT_DIR/seed/strategy/scripts/ds-publish.sh" target_hash
+    # FROZEN (issue #1280): no new entries. Every version of
+    # seed/strategy/scripts/ds-publish.sh shipped BEFORE the version stamp existed,
+    # i.e. the whole pre-stamp git history of that file (issue #1003, #1288; the
+    # last one, 19649ea8..., is the copy shipped 15.10-26.10). A hash list was a
+    # trap by construction -- every seed edit minted a hash that was not on it yet
+    # and stranded installs on a stale copy. The "# ds-publish version:" stamp
+    # replaces it; this list only recognises the unstamped legacy copies.
+    local known_old_publishers="dd9a0e7a3116281763b26a351904f5e21de8d730559a1a77dd2a248f2a986730 a86c3f628c06e8b7fe8d7a338c01ff0d7a0794751b4ce1a27affbb11295b2a36 13af55c37bfbf2c74fc4c6d9ac446758a28fc8e727b8f169c96920babc90115e 19649ea85169a92d20890fe68cb97182c53f5616675010edbf428b3eea75ce03"
+    local source_path="$SCRIPT_DIR/seed/strategy/scripts/ds-publish.sh"
+    local target_hash shipped_version installed_version
     if [ -f "$target_path" ] && [ ! -L "$target_path" ] && [ ! -L "$(dirname "$target_path")" ] \
        && [ -f "$source_path" ] && [ ! -L "$source_path" ]; then
+        if ! shipped_version=$(ds_publish_version "$source_path"); then
+            # A release defect, not a user state: never guess, leave the copy alone.
+            echo "  ⚠ scripts/ds-publish.sh: в поставке нет строки «# ds-publish version: N» — существующая копия в $governance_repo оставлена без изменений." >&2
+            return 0
+        fi
+        if installed_version=$(ds_publish_version "$target_path"); then
+            if [ "$installed_version" -lt "$shipped_version" ]; then
+                replace_ds_publish_with_backup "$target_path" "$source_path" "$governance_repo" \
+                    "версия $installed_version старше поставляемой $shipped_version"
+                return
+            fi
+            if ! cmp -s "$source_path" "$target_path"; then
+                echo "  ○ scripts/ds-publish.sh: версия $installed_version не старше поставляемой $shipped_version, содержимое отличается — считаю это вашей правкой, не заменяю."
+            else
+                echo "  ✓ scripts/ds-publish.sh уже совпадает с поставкой (версия $installed_version)."
+            fi
+            return 0
+        fi
         target_hash=$(hash_file "$target_path" 2>/dev/null) || target_hash=""
-        case " $known_old_publishers " in
-            *" $target_hash "*)
-                if [ -n "$target_hash" ]; then
-                    # The file is usually untracked (git has no copy): keep one before replacing.
-                    local backup_dir="$WORKSPACE_DIR/.backups/ds-publish-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-                    if [ -L "$WORKSPACE_DIR/.backups" ] || ! mkdir -p "$backup_dir" \
-                       || ! cp -p "$target_path" "$backup_dir/ds-publish.sh"; then
-                        echo "  ✗ scripts/ds-publish.sh: не удалось сделать резервную копию, прежняя копия остаётся." >&2
-                        return 1
-                    fi
-                    echo "  ↳ backup: $target_path → $backup_dir/ds-publish.sh"
-                    atomic_copy_executable "$source_path" "$target_path" || return 1
-                    echo "  ⟳ scripts/ds-publish.sh: прежняя копия шаблона заменена на текущую в $governance_repo."
-                    return 0
-                fi ;;
-        esac
+        if [ -n "$target_hash" ]; then
+            case " $known_old_publishers " in
+                *" $target_hash "*)
+                    replace_ds_publish_with_backup "$target_path" "$source_path" "$governance_repo" \
+                        "прежняя копия шаблона (без номера версии)"
+                    return ;;
+            esac
+        fi
+        {
+            echo "  ⚠ ВНИМАНИЕ: $target_path — без строки «# ds-publish version: N» и не совпадает ни с одной копией, которую поставлял шаблон."
+            echo "    Считаю его вашим собственным публикатором и не заменяю: ночные роли продолжат работать через него."
+            echo "    Принять поставляемую версию вручную: cp \"$target_path\" \"$target_path.mine\" && cp \"$source_path\" \"$target_path\" && chmod +x \"$target_path\""
+        } >&2
+        return 0
     fi
     if [ -e "$target_path" ] || [ -L "$target_path" ]; then
         echo "  ✓ scripts/ds-publish.sh уже есть в $governance_repo, не заменяю."
@@ -5201,7 +5258,7 @@ if [ ${#UPDATED_FILES[@]} -gt 0 ]; then
 fi
 
 if [ ${#DEPRECATED_FOUND[@]} -gt 0 ]; then
-    echo "Устаревшие файлы к удалению (${#DEPRECATED_FOUND[@]}):"
+    echo "Устаревшие файлы — будут перенесены в резервную копию .backups/deprecated/ (${#DEPRECATED_FOUND[@]}):"
     for i in "${!DEPRECATED_FOUND[@]}"; do
         f="${DEPRECATED_FOUND[$i]}"
         r="${DEPRECATED_REASONS[$i]}"
@@ -5576,34 +5633,111 @@ if [ "$CLAUDE_CONFLICTS" -gt 0 ]; then
     CLAUDE_CONFLICT_FILES+=("$SCRIPT_DIR/CLAUDE.md")
 fi
 
-# remove_propagated_copies REL — drop the copies of a deprecated template file
-# that update.sh propagated out of SCRIPT_DIR: workspace .claude/ (L1 files)
+# Deprecated files are never deleted outright (issue #1010 F9 follow-up): each
+# one is MOVED into a per-run backup directory, so a file the manifest wrongly
+# retired, or a local edit to it, can be restored by hand. Layout of one run:
+#   $WORKSPACE_DIR/.backups/deprecated/<UTC timestamp>-<pid>/
+#     template/<rel>             the file from SCRIPT_DIR (local template clone)
+#     workspace/<rel>            its propagated copy under $WORKSPACE_DIR/.claude/
+#     memory/<rel without memory/>  its copy in the Claude memory dir
+# Old run directories are deliberately never rotated: a backup that update.sh
+# deletes on its own would defeat the purpose of keeping it.
+DEPRECATED_BACKUP_DIR="$WORKSPACE_DIR/.backups/deprecated/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+
+# physical_dir DIR — print DIR with every symlink resolved; fails if DIR is missing.
+physical_dir() {
+    (cd -P "$1" 2>/dev/null && pwd -P)
+}
+
+# move_deprecated_to_backup ROOT REL KIND DISPLAY — move ROOT/REL to
+# $DEPRECATED_BACKUP_DIR/KIND/REL and print one line naming DISPLAY. Returns 1 and
+# leaves the file in place (with a warning) when the move is not provably safe or
+# fails; never aborts the run.
+# Symlinks: the LINK itself is moved, never its target. The old code rm'ed the
+# link (target untouched); moving it is the reversible equivalent and still reads
+# or writes nothing outside ROOT. What must resolve inside ROOT is the directory
+# that holds the entry — a symlinked parent directory would move a file that
+# lives outside ROOT, so that case is refused.
+move_deprecated_to_backup() {
+    local root="$1" rel="$2" kind="$3" display="$4"
+    local src="$root/$rel" dest="$DEPRECATED_BACKUP_DIR/$kind/$rel"
+    local root_real parent_real dest_parent_real
+    case "/$rel/" in
+        //|*/../*|*/./*|*//*)
+            echo "  ⚠ $display: недопустимый путь в манифесте, файл оставлен на месте." >&2
+            return 1 ;;
+    esac
+    root_real=$(physical_dir "$root") && parent_real=$(physical_dir "$(dirname "$src")") || {
+        echo "  ⚠ $display: каталог файла недоступен, файл оставлен на месте." >&2
+        return 1
+    }
+    case "$parent_real/" in
+        "$root_real"/*) ;;
+        *)
+            echo "  ⚠ $display: каталог файла ведёт за пределы $root (символическая ссылка), файл оставлен на месте." >&2
+            return 1 ;;
+    esac
+    if [ -L "$WORKSPACE_DIR/.backups" ] || [ -L "$WORKSPACE_DIR/.backups/deprecated" ]; then
+        echo "  ⚠ $display: каталог резервных копий .backups — символическая ссылка, файл оставлен на месте." >&2
+        return 1
+    fi
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+        echo "  ⚠ $display: в резервной копии уже есть $dest, не перезаписываю — файл оставлен на месте." >&2
+        return 1
+    fi
+    if ! mkdir -p "$(dirname "$dest")" 2>/dev/null \
+       || ! dest_parent_real=$(physical_dir "$(dirname "$dest")"); then
+        echo "  ⚠ $display: не удалось создать каталог резервной копии $(dirname "$dest"), файл оставлен на месте." >&2
+        return 1
+    fi
+    case "$dest_parent_real/" in
+        "$(physical_dir "$DEPRECATED_BACKUP_DIR")"/*) ;;
+        *)
+            echo "  ⚠ $display: каталог резервной копии ведёт за пределы $DEPRECATED_BACKUP_DIR, файл оставлен на месте." >&2
+            return 1 ;;
+    esac
+    if ! mv -- "$src" "$dest" 2>/dev/null; then
+        echo "  ⚠ $display: не удалось перенести в резервную копию $DEPRECATED_BACKUP_DIR, файл оставлен на месте." >&2
+        return 1
+    fi
+    # Template files head the list; their propagated copies are indented below.
+    local indent="  "
+    [ "$kind" = template ] || indent="    "
+    echo "${indent}- $display (устарел, перенесён в резервную копию: $DEPRECATED_BACKUP_DIR)"
+}
+
+# remove_propagated_copies REL — move away the copies of a deprecated template
+# file that update.sh propagated out of SCRIPT_DIR: workspace .claude/ (L1 files)
 # and the Claude memory dir (relative path from memory/, not basename,
 # symmetric with repair_pass() delivery, issue #287).
 remove_propagated_copies() {
-    local f="$1" ws_path mem_path
+    local f="$1" mem_rel
     case "$f" in .claude/*)
-        ws_path="$WORKSPACE_DIR/$f"
-        [ -f "$ws_path" ] && rm "$ws_path" && echo "    (также из workspace)"
+        if [ -f "$WORKSPACE_DIR/$f" ] || [ -L "$WORKSPACE_DIR/$f" ]; then
+            move_deprecated_to_backup "$WORKSPACE_DIR" "$f" workspace "$WORKSPACE_DIR/$f" || true
+        fi
         ;;
     esac
     case "$f" in memory/*.md|memory/*.yaml|memory/*.yml)
-        mem_path="$CLAUDE_MEMORY_DIR/${f#memory/}"
-        [ -f "$mem_path" ] && rm "$mem_path" && echo "    (также из memory/)"
+        mem_rel="${f#memory/}"
+        if [ -n "${CLAUDE_MEMORY_DIR:-}" ] && \
+           { [ -f "$CLAUDE_MEMORY_DIR/$mem_rel" ] || [ -L "$CLAUDE_MEMORY_DIR/$mem_rel" ]; }; then
+            move_deprecated_to_backup "$CLAUDE_MEMORY_DIR" "$mem_rel" memory "$CLAUDE_MEMORY_DIR/$mem_rel" || true
+        fi
         ;;
     esac
     return 0
 }
 
-# Remove deprecated files
+# Move deprecated files into the run's backup directory
 for i in "${!DEPRECATED_FOUND[@]}"; do
     f="${DEPRECATED_FOUND[$i]}"
     fpath="$SCRIPT_DIR/$f"
-    if [ -f "$fpath" ]; then
-        rm "$fpath"
-        echo "  - $f (удалён: устарел)"
-        REMOVED=$((REMOVED + 1))
-        remove_propagated_copies "$f"
+    if [ -f "$fpath" ] || [ -L "$fpath" ]; then
+        if move_deprecated_to_backup "$SCRIPT_DIR" "$f" template "$f"; then
+            REMOVED=$((REMOVED + 1))
+            remove_propagated_copies "$f"
+        fi
     fi
 done
 # issue #1010 F9: the template clone keeps a git-tracked deprecated file, but
@@ -6701,7 +6835,7 @@ fi
 echo ""
 echo "=========================================="
 SUMMARY_MSG="  Обновление завершено ($APPLIED файлов"
-[ "$REMOVED" -gt 0 ] && SUMMARY_MSG="$SUMMARY_MSG, $REMOVED удалено"
+[ "$REMOVED" -gt 0 ] && SUMMARY_MSG="$SUMMARY_MSG, $REMOVED устаревших перенесено в резервную копию"
 SUMMARY_MSG="$SUMMARY_MSG)"
 echo "$SUMMARY_MSG"
 if [ "${AUTHOR_SKIPPED:-0}" -gt 0 ]; then

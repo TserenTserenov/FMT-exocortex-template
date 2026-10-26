@@ -84,6 +84,10 @@ status: active${owner_line}
 triggers:
   slash: [/${skill_id}]
   phrases: []
+# routing is mandatory (issue #894): choose the executor, verify-skill.sh fails on TODO
+routing:
+  executor: TODO                # script | mcp-direct | haiku | sonnet | opus | agent (+ model:) | script+judgment (+ model_step:)
+  deterministic: false          # true only for script | mcp-direct
 # depends_on: []
 ---
 
