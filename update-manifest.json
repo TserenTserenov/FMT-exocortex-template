@@ -1321,7 +1321,7 @@
     },
     {
       "path": "guide-kit/generator/horizons.py",
-      "sha256": "eaabeaef9ac9c4ae3633206f666da0f33f76249c084da913b2035fdb5bf5b3ff"
+      "sha256": "e4c0198b6c163f46f60ef096dc40c5eee7d636d640bf9fc17fb2d6bca4e94f34"
     },
     {
       "path": "guide-kit/generator/llm_backends/__init__.py",
@@ -3241,7 +3241,7 @@
     },
     {
       "path": "seed/strategy/scripts/generate-executor-catalog.py",
-      "sha256": "d7ab8ce135fc406f237907861f6ee736092f57131886134cc31dcfc50eb9a3dd"
+      "sha256": "7de9ce386e40e5985ffa7de22da9d29d4700843ab845f0aed445862d06fd8246"
     },
     {
       "path": "seed/strategy/scripts/install-hooks.sh",

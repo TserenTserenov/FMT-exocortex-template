@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
 """
 generate-executor-catalog.py — собрать executor-catalog.yaml из routing: секций SKILL.md.
 
