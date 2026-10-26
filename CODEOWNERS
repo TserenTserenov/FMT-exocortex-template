@@ -1,2 +1,7 @@
 # See https://docs.github.com/articles/about-codeowners
-* @TserenTserenov
+#
+# Both current collaborators with push/review rights. External reviewers are
+# added on separate lines once their GitHub login is confirmed by the
+# maintainer. Until then, require_code_owner_reviews stays off in the main
+# branch protection, so this file does not block anything by itself.
+* @TserenTserenov @tserenovmailru

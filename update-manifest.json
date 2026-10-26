@@ -809,7 +809,7 @@
     },
     {
       "path": "CODEOWNERS",
-      "sha256": "0dc1279c511356b2fa5ac071ad6683450bb8996b86df707a76d846aeb5fd78a6"
+      "sha256": "bd9fbe60210ad7b2bb681509d29032bd013faf74e381f6da785708c55447e913"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -829,7 +829,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "172195b33ec86f3798fdbfb1036adc0cb94b340ea31a4ad54cded55979f906b5"
+      "sha256": "fba8c96620974becbafe7e5ab78a9200319fee74bb4fc9be436618b4ff8e537e"
     },
     {
       "path": "REPO-TYPE.md",
@@ -850,6 +850,10 @@
     {
       "path": "docs/AGENT-VENDOR-SETUP.md",
       "sha256": "a06b4eb942706d5ec8541771e535dacd13959c33d7a0e48afcb1beb89edf6dc2"
+    },
+    {
+      "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
+      "sha256": "fb926443aa1cf589ba97a6fedb00fa5118c3a57c5f84b0a455ac0e78829f5a10"
     },
     {
       "path": "docs/BROWSER-CI-TEMPLATE.md",

@@ -1,4 +1,6 @@
-files_translated: []
-last_run_utc: '2026-10-22T08:32:40Z'
-last_synced_sha: 9816469fb1aaa2d4d480aa51564666152a8e3073
+files_translated:
+- README.md
+- docs/BRANCH-PROTECTION-EMERGENCY.md
+last_run_utc: '2026-10-26T16:10:42Z'
+last_synced_sha: f1fb661ef2048f2ef6393dcdf7f7665d2c7447a8
 schema_version: 1
