@@ -238,6 +238,43 @@ if [ -z "$YAML_PARSE_OK" ]; then
 fi
 
 # --- Deterministic context extractors (WP-7 DAP: strategy + day-close) ---
+weekreport_day_close_section() {
+  local yday="$1" week_start week_num report gov
+  # Day Close writes the strategy day's summary to the paired WeekReport, not
+  # to a DayPlan. Resolve its exact week so an older report cannot supply a
+  # same-looking day/month heading in a different year.
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    week_start=$(date -j -v-mon -f '%Y-%m-%d' "$yday" '+%Y-%m-%d' 2>/dev/null)
+    week_num=$(date -j -f '%Y-%m-%d' "$yday" '+%V' 2>/dev/null)
+  else
+    local weekday
+    weekday=$(date -d "$yday" '+%u' 2>/dev/null) || return 1
+    week_start=$(date -d "$yday -$((weekday - 1)) days" '+%Y-%m-%d' 2>/dev/null)
+    week_num=$(date -d "$yday" '+%V' 2>/dev/null)
+  fi
+  [[ "$week_start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && "$week_num" =~ ^[0-9]{2}$ ]] || return 1
+
+  gov="$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+  local filename="WeekReport W$((10#$week_num)) $week_start.md"
+  report="$gov/current/$filename"
+  [ -f "$report" ] || report="$gov/archive/week-reports/$filename"
+  [ -f "$report" ] || return 1
+
+  local short="${yday:8:2}.${yday:5:2}"
+  local long="$((10#${yday:8:2})) ${MONTH_NAMES[$((10#${yday:5:2}))]} ${yday:0:4}"
+  # An unclosed details block is only a partial write, not yesterday's summary.
+  awk -v iso="$yday" -v short="$short" -v long="$long" '
+    /<summary><b>Итоги / {
+      if (inside) exit 1
+      if (index($0, iso) || index($0, short) || index($0, long)) inside = 1
+      next
+    }
+    inside && /<\/details>/ { closed = 1; exit }
+    inside { print }
+    END { if (!closed) exit 1 }
+  ' "$report"
+}
+
 extract_day_close_carry_over() {
   local yday="$1"
   # issue #545: корень журналов — тем же контрактом, что писатель
@@ -301,6 +338,30 @@ extract_day_close_carry_over() {
       echo "$carry_over"
       return 0
     fi
+  fi
+
+  # Strategy day has no DayPlan. The dated WeekReport section is its handoff.
+  local week_section
+  if week_section=$(weekreport_day_close_section "$yday") && [ -n "$week_section" ]; then
+    carry_over=$(printf '%s\n' "$week_section" | awk '
+      /Завтра начать с/ {
+        found = 1
+        inline = $0
+        sub(/^.*Завтра начать с[^:]*:[[:space:]]*/, "", inline)
+        sub(/^\*\*[[:space:]]*/, "", inline)
+        sub(/[[:space:]]*\*\*$/, "", inline)
+        if (inline != $0 && inline != "") print inline
+        next
+      }
+      found && (/^#+[[:space:]]/ || /^\*\*[^*]+:\*\*/) { exit }
+      found && NF { print }
+    ' | head -10)
+    if [ -n "$carry_over" ]; then
+      echo "$carry_over"
+    else
+      echo 'нет (итоги в WeekReport, точка входа не зафиксирована)'
+    fi
+    return 0
   fi
 
   echo "нет (Day Close за $yday не найден)"
@@ -1513,8 +1574,13 @@ render_yesterday() {
       dc_committed="archived-plan"
     fi
   fi
+  local source_note=""
+  if [ -z "$dc_committed" ] && weekreport_day_close_section "$YDAY" >/dev/null; then
+    dc_committed="weekreport-summary"
+    source_note=" (итоги в WeekReport)"
+  fi
   if [ -n "$dc_committed" ]; then
-    echo "**Коммиты:** $total в $repos репо | **РП закрыто:** <!-- PENDING: count из Day Close отчёта за $YDAY -->"
+    echo "**Коммиты:** $total в $repos репо | **РП закрыто:** <!-- PENDING: count из Day Close отчёта за $YDAY -->$source_note"
   else
     echo "**Коммиты:** $total в $repos репо | **РП закрыто:** нет данных (Day Close за $YDAY не найден)"
   fi

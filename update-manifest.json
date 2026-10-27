@@ -473,7 +473,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "2d7e7c77b40b5cc23e8fcd8a30be6961d0619fa67eaaa63ea1ca808f33dae040"
+      "sha256": "d310b3eade628f55bde5cd677d212249f46b228e9d3018617466db48d88ca5b2"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -817,7 +817,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "732a841c7969b86c7b9e41aebdbf2febe2975d746b0e81677d165d5a8f401d90"
+      "sha256": "946e65993ebfc3b3470e19a281837f4185ebbe617e3b3460bcff6dd937fd16bb"
     },
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3849f2e5d7ef441a2b0e2434bab4b5cfd9311eb5cb404ad1699febc42115900f"
+      "sha256": "e8c59eebf8d23f517b357561112a6f4239d01ddf6eda77c04144486c90bbdf0d"
     },
     {
       "path": "CLAUDE.md",
@@ -1641,7 +1641,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "aba5ced4b30cf312fb09527c87d3df07a015220c5483a0cf0f7c9ad57852c392"
+      "sha256": "918d3ae5ad45728f0fddabfb95c2e8b65d788a49e171d753d81df9345d6acddd"
     },
     {
       "path": "memory/protocol-dt-integration.md",
@@ -2349,7 +2349,7 @@
     },
     {
       "path": "scripts/day-close.sh",
-      "sha256": "13fee9aa6035542399c09a9b1d2c93bc948772f8fe0e94d0004a613d226397a7"
+      "sha256": "7dbc8f76c96495a3525bbb815d63db4aae53efbc7973145e252689759b92abe9"
     },
     {
       "path": "scripts/day-open-bottleneck-patch.sh",
@@ -2397,7 +2397,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "fa7142cba4c8d9204b53a269798643f7cc7ef80557b7e547eabef9794407c5f7"
+      "sha256": "1dafa4a0edb42a7a84133042308a70de5a0a40b57ecd293293fceefe2d340d7e"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3249,7 +3249,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "fa7142cba4c8d9204b53a269798643f7cc7ef80557b7e547eabef9794407c5f7"
+      "sha256": "1dafa4a0edb42a7a84133042308a70de5a0a40b57ecd293293fceefe2d340d7e"
     },
     {
       "path": "seed/strategy/scripts/day-open-sync-banner-patch.py",
@@ -3501,6 +3501,8 @@
     "scripts/tests/test_issue_1350_audit.sh",
     "scripts/tests/test_issue_1351_tier0.sh",
     "scripts/tests/test_issue_1352_bleed.sh",
+    "scripts/tests/test_issue_1362_strategy_day_carryover.sh",
+    "scripts/tests/test_issue_1367_sessions.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
