@@ -157,7 +157,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "ca85e1362cfd8b0210bad6466f6d3623d6636bcf03d7268f42dbe6113444565f"
+      "sha256": "f3e75d651df2f4ca9cdeb98f0e58fe4fb1da578ee7ef29a81b4932431269100f"
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
@@ -461,7 +461,7 @@
     },
     {
       "path": ".claude/skills/check-secret/SKILL.md",
-      "sha256": "d36aaa217e003c8e8ac6a1e2d14f7b019e6220b75bd1c3c9529df72ff721c2a9"
+      "sha256": "1eb733ec271c92dff928e9ab80532b32e6fa49302e87796cb308b1c67204a142"
     },
     {
       "path": ".claude/skills/check-secret/check.sh",
@@ -825,7 +825,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "b25f544a67b728930da0582e6f8c6f537d6b3d76ef3a7d10ec573c570f0de99a"
+      "sha256": "94356acb6339fb8b42add85fd42214308fcec827c35b74d44ce3baf90173fb55"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -1606,6 +1606,10 @@
     {
       "path": "memory/feedback_community_communication_style.md",
       "sha256": "f4dc097e77c2e880477f0875ee0622f3892c1940fd5c308bd892c28f0df91ad4"
+    },
+    {
+      "path": "memory/feedback_decision_gates.md",
+      "sha256": "90e91987f055fcf936eafe59167d69cc351e3254bedf0ef3089839cd017b1438"
     },
     {
       "path": "memory/feedback_response_clarity_for_pilot.md",

@@ -50,7 +50,7 @@ bash "$IWE_SCRIPTS/route-task.sh" --skill check-secret --args "$ARGUMENTS"
 1. Перечислить найденные паттерны (с метками: Neon API key, GitHub token, и т.д.).
 2. Для каждого — рекомендация:
    - Если плейсхолдер/тест/документация — добавить маркер `# secret-ok` в строку или `[REDACTED]` placeholder.
-   - Если реальный секрет — НЕ публиковать; запустить cascade rotation (см. `DP.RUNBOOK.003-cascade-secret-rotation.md`); см. правило 25 в `feedback_behaviour.md`.
+   - Если реальный секрет — НЕ публиковать; запустить cascade rotation (см. `DP.RUNBOOK.003-cascade-secret-rotation.md`); правило: плейнтекст секрета не передаётся в чат, показанный секрет считается скомпрометированным (отозвать и заменить во всех местах хранения).
 3. После redaction — повторить проверку.
 
 ## Шаг 4. Лог
