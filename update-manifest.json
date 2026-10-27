@@ -185,7 +185,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "c7a17dffddfa325d3dac05b0945b3870dae8545dba1e88bfc4bd68b336bd5521"
+      "sha256": "2a9cc404e799e3e78ee21720557a4fbba9e8b197f65a5074e0fd4749b3dd31e2"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -257,7 +257,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "e450aa83021300595d0136f400e140cec552fecf8d1de5eed3781a5053e29f12"
+      "sha256": "7f2aa864cf90c96d017e7233fe5ac86697067aa8186eccf656733dbdfcfc0984"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
