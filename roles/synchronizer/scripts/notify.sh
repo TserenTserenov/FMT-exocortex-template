@@ -2,7 +2,14 @@
 # notify.sh — единый dispatch уведомлений экзокортекса
 #
 # Использование:
-#   notify.sh <agent> <scenario>
+#   notify.sh [--require-delivery] <agent> <scenario>
+#
+# --require-delivery: выход 0 ТОЛЬКО если Telegram подтвердил доставку. Без флага
+# поведение прежнее (нет токена или ответ не ok - выход 0, только текст в stdout),
+# поэтому вызывающий не может по коду выхода понять, дошло ли сообщение. Коды с флагом:
+#   3 - не настроены TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID
+#   4 - Telegram не подтвердил отправку
+#   5 - сообщение пустое, отправлять нечего
 #
 # Примеры:
 #   notify.sh strategist day-plan
@@ -34,6 +41,12 @@ if [ -z "${TEMPLATES_DIR:-}" ]; then
 fi
 ENV_FILE="$HOME/.config/aist/env"
 
+REQUIRE_DELIVERY=0
+if [ "${1:-}" = "--require-delivery" ]; then
+    REQUIRE_DELIVERY=1
+    shift
+fi
+
 AVAILABLE=$(ls "$TEMPLATES_DIR"/*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
 AGENT="${1:?Ошибка: укажи агента (${AVAILABLE:-нет шаблонов})}"
 SCENARIO="${2:?Ошибка: укажи сценарий}"
@@ -48,6 +61,7 @@ fi
 # Проверка env vars
 if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
     echo "SKIP: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set (configure ~/.config/aist/env)"
+    [ "$REQUIRE_DELIVERY" -eq 1 ] && exit 3
     exit 0
 fi
 
@@ -90,7 +104,9 @@ send_telegram() {
     else
         echo "Telegram send FAILED: $AGENT/$SCENARIO"
         echo "Response: $response"
+        [ "$REQUIRE_DELIVERY" -eq 1 ] && return 4
     fi
+    return 0
 }
 
 # Загружаем шаблон агента
@@ -106,7 +122,17 @@ MESSAGE=$(build_message "$SCENARIO")
 BUTTONS=$(build_buttons "$SCENARIO" 2>/dev/null || echo "[]")
 
 if [ -n "$MESSAGE" ]; then
-    send_telegram "$MESSAGE" "$BUTTONS"
+    # Without the flag send_telegram stays a plain command, so `set -e` behaves as it
+    # always did (a curl failure ends the script with curl's code). With the flag the
+    # `||` is deliberate: the failure must reach the exit code as 4, not as curl's code.
+    if [ "$REQUIRE_DELIVERY" -eq 1 ]; then
+        send_telegram "$MESSAGE" "$BUTTONS" || exit $?
+    else
+        send_telegram "$MESSAGE" "$BUTTONS"
+    fi
 else
     echo "Empty message for $AGENT/$SCENARIO, skip"
+    if [ "$REQUIRE_DELIVERY" -eq 1 ]; then
+        exit 5
+    fi
 fi

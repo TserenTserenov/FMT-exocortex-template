@@ -254,6 +254,69 @@ interval_reached() {
     [ "$1" -ge $(( $2 - INTERVAL_SLACK_SECONDS )) ]
 }
 
+# === Бэкап и возможности установки (WP-7 Ф267, этап 2) ===
+
+# Platform scripts live outside the role directory: IWE_SCRIPTS comes from the scheduler
+# unit (launchd plist / systemd service); the template checkout is the fallback.
+PLATFORM_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts}"
+
+# Daily backup through the one entry point (scripts/iwe-backup.sh picks the engine from
+# the backup contract in params.yaml). The ATTEMPT is stamped first, so a hang or a
+# failure is retried after the interval and never every 10 minutes. The daily "done"
+# marker is set only when the entry point reported success (a confirmed snapshot) or
+# had nothing to do (switched off / undecided); an invalid contract is also marked done
+# so it does not retry all day - the warning is in the log and in audit section 8.
+run_backup_task() {
+    local rc=0
+    mark_interval "synchronizer-backup"
+    # A missing entry point means the template update did not finish: that is not a failed
+    # backup, so it must not look like one. The DayPlan scheduler row reads this log:
+    # WARN:/ALARM: lines make it red and SKIP: lines make it "deferred", so this is a plain line.
+    if [ ! -f "$PLATFORM_SCRIPTS/iwe-backup.sh" ]; then
+        log "backup: iwe-backup.sh is not in $PLATFORM_SCRIPTS (template update incomplete), nothing to run; next try after the 3h interval"
+        return 0
+    fi
+    timeout "$TASK_TIMEOUT_LONG" bash "$PLATFORM_SCRIPTS/iwe-backup.sh" >> "$LOG_FILE" 2>&1 || rc=$?
+    case "$rc" in
+        0)
+            mark_done "synchronizer-backup"
+            log "backup: finished (a confirmed snapshot, or switched off / undecided - see the output above)"
+            ;;
+        2)
+            mark_done "synchronizer-backup"
+            log "WARN: backup contract is invalid (rc=2): fix backup_engine in params.yaml; no retry today"
+            ;;
+        124)
+            # A timed-out run holds the shared dispatch lock for the whole limit; repeating it
+            # every 3 hours would block the other roles again and again. Not retried today.
+            mark_done "synchronizer-backup"
+            log "WARN: backup timed out after ${TASK_TIMEOUT_LONG}s; no retry today (check the size of the IWE directory)"
+            ;;
+        *)
+            log "WARN: backup failed (rc=$rc; next try after the 3h interval)"
+            ;;
+    esac
+}
+
+# Once a day: did something that worked disappear? One Telegram message per regression,
+# repeated only after the thing came back and went away again. A failed delivery leaves
+# the regression pending and the check is retried after the 3h interval, not on every
+# dispatch (a broken token would otherwise cost a network call every 10 minutes).
+run_capability_regress_task() {
+    local rc=0
+    mark_interval "synchronizer-cap-regress"
+    if [ ! -f "$PLATFORM_SCRIPTS/iwe-capabilities.sh" ]; then
+        log "capability regress check: iwe-capabilities.sh is not in $PLATFORM_SCRIPTS (template update incomplete), nothing to run; next try after the 3h interval"
+        return 0
+    fi
+    timeout "$TASK_TIMEOUT_SHORT" bash "$PLATFORM_SCRIPTS/iwe-capabilities.sh" regress --notify >> "$LOG_FILE" 2>&1 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        mark_done "synchronizer-cap-regress"
+    else
+        log "WARN: capability regress check did not finish (rc=$rc; will retry next dispatch)"
+    fi
+}
+
 # === Очистка старых маркеров (>7 дней) ===
 
 cleanup_state() {
@@ -380,6 +443,28 @@ dispatch() {
             if ! timeout "$TASK_TIMEOUT_LONG" "$EXTRACTOR_SH" inbox-check >> "$LOG_FILE" 2>&1; then
                 log "WARN: extractor inbox-check failed (next try after the 3h interval)"
             fi
+            ran=1
+        fi
+    fi
+
+    # --- Бэкап: раз в сутки, не раньше 06:00; повтор после сбоя не чаще раза в 3 часа ---
+    if (( 10#$HOUR >= 6 )) && ! ran_today "synchronizer-backup"; then
+        local backup_elapsed
+        backup_elapsed=$(last_run_seconds_ago "synchronizer-backup")
+        if interval_reached "$backup_elapsed" 10800; then
+            log "→ backup (${backup_elapsed}s since the last attempt)"
+            run_backup_task
+            ran=1
+        fi
+    fi
+
+    # --- Возможности установки: проверка регресса, раз в сутки (после бэкапа) ---
+    if ! ran_today "synchronizer-cap-regress"; then
+        local regress_elapsed
+        regress_elapsed=$(last_run_seconds_ago "synchronizer-cap-regress")
+        if interval_reached "$regress_elapsed" 10800; then
+            log "→ capability regress check (${regress_elapsed}s since the last attempt)"
+            run_capability_regress_task
             ran=1
         fi
     fi

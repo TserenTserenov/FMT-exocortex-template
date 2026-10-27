@@ -12,7 +12,10 @@
 # (согласована пир-сессией: 7 дневных / 4 недельных / 6 месячных для тега
 # `scheduled`; тег `protect` не трогается этим скриптом вовсе).
 #
-# Расписание — вне этого скрипта (launchd plist, см. templates/iwe-backup-run.plist).
+# Расписание — вне этого скрипта: ежедневный запуск делает планировщик роли
+# Synchronizer (roles/synchronizer/scripts/scheduler.sh) через scripts/iwe-backup.sh,
+# отдельного файла расписания у restic нет. Без установленной роли — только вручную.
+# Выбор движка (tar/restic) и договор бэкапа — в scripts/iwe-backup.sh.
 #
 # USAGE:
 #   iwe-backup-run.sh [--with-optional]
@@ -109,7 +112,13 @@ if [ -z "$PATHS_TSV" ]; then
     exit 1
 fi
 
-mapfile -t PATHS <<< "$PATHS_TSV"
+# bash 3.2 (macOS /bin/bash) has no mapfile
+PATHS=()
+while IFS= read -r source_path; do
+    if [ -n "$source_path" ]; then
+        PATHS+=("$source_path")
+    fi
+done <<< "$PATHS_TSV"
 
 PROTECT_DIR="$HOME/.iwe-backup"
 REPO_DIR="$PROTECT_DIR/protect-repo"
@@ -124,6 +133,37 @@ if [ ! -s "$KEY_FILE" ]; then
     mv "$KEY_TMP" "$KEY_FILE"
     echo "ℹ️  [backup-run] создан новый ключ шифрования защитного хранилища: $KEY_FILE" >&2
     echo "    Сохраните резервную копию этого файла отдельно — его потеря делает все будущие снимки нечитаемыми." >&2
+fi
+
+# A key readable by other users, owned by someone else or replaced by a symlink makes
+# the encrypted store only as safe as that file. Stop BEFORE restic touches it; the
+# content of the key is never printed.
+key_file_unsafe() {  # prints the reason and returns 0 when the key file must not be used
+    local f="$1" mode owner
+    if [ -L "$f" ]; then
+        echo "файл ключа - символьная ссылка"
+        return 0
+    fi
+    if [ "$(uname -s)" = Darwin ]; then
+        read -r mode owner < <(stat -f '%Lp %u' "$f")
+    else
+        read -r mode owner < <(stat -c '%a %u' "$f")
+    fi
+    if [ "$owner" != "$(id -u)" ]; then
+        echo "владелец файла ключа - другой пользователь"
+        return 0
+    fi
+    if [ "${mode: -2}" != "00" ]; then
+        echo "файл ключа доступен другим пользователям (права $mode)"
+        return 0
+    fi
+    return 1
+}
+
+if KEY_PROBLEM="$(key_file_unsafe "$KEY_FILE")"; then
+    echo "❌ [backup-run] небезопасный файл ключа: $KEY_PROBLEM — снимок не снят." >&2
+    echo "    Исправить: chmod 600 \"$KEY_FILE\" (владелец - вы, не ссылка). Содержимое ключа не показывается." >&2
+    exit 1
 fi
 
 export RESTIC_REPOSITORY="$REPO_DIR"
