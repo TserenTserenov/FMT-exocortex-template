@@ -214,6 +214,11 @@ run_preview_scenario "untagged" $'- old' $'- old\n- пункт без метки
 run_preview_scenario "optional-only" $'- old' $'- old\n- [optional] косметика' "только необязательные пункты" "Главное в этом обновлении ("
 run_preview_scenario "no-new-lines" $'- a\n- b' $'- a' "в CHANGELOG.md нового выпуска нет добавленных пунктов" "Главное в этом обновлении ("
 run_preview_scenario "not-shipped" $'- old' "__NONE__" "не скачался" "Главное в этом обновлении ("
+# Длинный пункт: в табло только первое предложение, хвост абзаца не печатается.
+run_preview_scenario "first-sentence" $'- old' $'- old\n- [behavior] Первое предложение. Второе предложение с подробностями реализации.' "Первое предложение." "подробностями реализации"
+# Одно очень длинное предложение режется по границе слова и получает многоточие.
+LONG_ITEM="- [behavior] $(printf 'слово%.0s ' $(seq 1 60))"
+run_preview_scenario "long-sentence" $'- old' $'- old\n'"$LONG_ITEM" "…" ""
 # Первая установка (локального CHANGELOG.md нет): весь файл не выдаётся за "добавленное".
 run_preview_scenario "first-install" "__NONE__" $'- [security] закрыта дыра\n- [behavior] старая версия' "первая установка" "закрыта дыра"
 
