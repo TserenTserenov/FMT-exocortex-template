@@ -64,7 +64,8 @@ jobs:
         run: |
           pytest scripts/tests/test_delivery_formal.py \
                  scripts/tests/test_delivery_content.py \
-                 scripts/tests/test_translate_delta.py -q
+                 scripts/tests/test_translate_delta.py \
+                 scripts/tests/test_normalize_en_phase_labels.py -q
 
       - name: Fetch or create en-draft staging branch
         id: en_draft
@@ -265,6 +266,18 @@ jobs:
                   path.write_text(cleaned, encoding="utf-8")
                   print(f"normalized subsection letters: {path}")
           PYEOF
+
+      - name: Normalize Cyrillic phase labels (Ф21 → F21)
+        # Phase labels are identifiers: the translator keeps "Ф21" as written
+        # and the hard Cyrillic gate below then fails on the single letter Ф
+        # (found 2026-10-27: Translate Sync red on main after
+        # docs/BRANCH-PROTECTION-EMERGENCY.md entered the tree with three
+        # such lines). Same reason as the subsection step above: the fix has
+        # to live in the pipeline, because a manual fix on en-draft does not
+        # survive the next delta run. The rewrite is limited to "Ф" directly
+        # before a digit; see scripts/normalize_en_phase_labels.py.
+        if: always() && steps.en_draft.outcome == 'success'
+        run: python3 scripts/normalize_en_phase_labels.py ../en-draft
 
       - name: Write EN-side community files to en-draft
         # Feedback lives on iwesys/IWE itself (pilot decision 2026-07-10):
