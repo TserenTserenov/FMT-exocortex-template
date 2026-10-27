@@ -522,7 +522,7 @@ check_memory_drift() {
     memory_updated=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("memory_updated",False)).lower())' 2>/dev/null)
 
     if [ "$captures_pending" = "true" ] && [ "$memory_updated" != "true" ]; then
-        emit_verdict "warn" "AR.103" "есть Capture-маркеры в сессии — обнови memory ДО следующего Day Open (правило «факт из карточки РП переносится в память ДО следующего открытия дня»). «Обновить в Day Close» = задача, не намерение"
+        emit_verdict "warn" "AR.103" "есть Capture-маркеры в сессии — обнови memory ДО следующего Day Open (правило памяти: при закрытии задачи, снятии блокера или смене внешнего факта память обновляется ДО следующего открытия дня). «Обновить в Day Close» = задача, не намерение"
         return
     fi
     emit_verdict "ok" "AR.103" "memory drift: нет pending captures или memory уже обновлена"
