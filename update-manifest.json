@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "dd3a0dda49906efc146507adf494df43751d2e16fb7f67541fc6157eec7ff28d"
+      "sha256": "29cdd0d5f0ad83c20997c72a6776196a98a864c3a8cb5cf71cbfdc1b5073f913"
     },
     {
       "path": "CLAUDE.md",
@@ -2736,6 +2736,10 @@
       "sha256": "249c8965904638e7ba38325835044433bc96961782eeeb16c95307bd5b9f596d"
     },
     {
+      "path": "scripts/normalize_en_phase_labels.py",
+      "sha256": "07ca409c06164b19abf22bb75f8a301bdd9730db0b5dd93c55c72a6ec9c3cd94"
+    },
+    {
       "path": "scripts/pack-ci-install.sh",
       "sha256": "f2f28c26900c065f700dbbc79dfb0b5942e1bafd25d084224bc57b8410645934"
     },
@@ -3577,6 +3581,7 @@
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",
+    "scripts/tests/test_normalize_en_phase_labels.py",
     "scripts/tests/test_pending_lock.py",
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_receipt.sh",
