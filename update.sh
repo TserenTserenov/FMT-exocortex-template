@@ -3848,6 +3848,11 @@ if $CHECK_ONLY && $FAST_CHECK; then
         echo ""
     fi
 
+    # WP-529 Ф220: the "what changes for me" summary needs the release's CHANGELOG.md,
+    # which --fast never downloads; say so instead of staying silent.
+    echo "ℹ Сводка «Главное в этом обновлении» в режиме --fast недоступна: файлы релиза не скачиваются. Полная проверка со сводкой: bash update.sh --check"
+    echo ""
+
     LOCAL_MANIFEST="$SCRIPT_DIR/update-manifest.json"
     LOCAL_VERSION=""
     [ -f "$LOCAL_MANIFEST" ] && LOCAL_VERSION=$(manifest_version "$LOCAL_MANIFEST")
@@ -5324,6 +5329,36 @@ if $CHECK_ONLY; then
         echo "--dry-run-strict: план доставки (${#NEW_FILES[@]} новых + ${#UPDATED_FILES[@]} обновляемых) структурно корректен. Это не гарантирует отсутствие регрессий в поведении после apply."
     fi
     # END-TESTABLE: dry-run-strict-check
+
+    # BEGIN-TESTABLE: changelog-check-preview
+    # WP-529 Ф220 (вопрос пилота 2: «что я получу, до установки»): сводка «Главное в
+    # этом обновлении» раньше печаталась только после apply. Файлы релиза уже
+    # скачаны в $TMPDIR_UPDATE/files/ (скачиваются только изменённые), поэтому дифф
+    # локального и нового CHANGELOG.md доступен здесь. Только печать: код выхода
+    # проверки не зависит от этого блока. Правило выбора пунктов (не [optional],
+    # немаркированная строка значима) то же, что в блоке changelog-diff-disclaimer
+    # ниже; при правке одного блока сверить другой.
+    CHANGELOG_NEW_FILE="$TMPDIR_UPDATE/files/CHANGELOG.md"
+    if [ ! -f "$CHANGELOG_NEW_FILE" ]; then
+        echo ""
+        echo "ℹ Сводка «Главное в этом обновлении» недоступна: CHANGELOG.md в этом выпуске не менялся или не входит в план доставки."
+    else
+        CHANGELOG_OLD_TEXT=""
+        [ -f "$SCRIPT_DIR/CHANGELOG.md" ] && CHANGELOG_OLD_TEXT=$(cat "$SCRIPT_DIR/CHANGELOG.md")
+        CHANGELOG_NEW_TEXT=$(cat "$CHANGELOG_NEW_FILE")
+        PREVIEW_ADDED=$(diff <(printf '%s\n' "$CHANGELOG_OLD_TEXT") <(printf '%s\n' "$CHANGELOG_NEW_TEXT") | grep '^>' | sed 's/^> //') || true
+        PREVIEW_HIGHLIGHTS=$(printf '%s\n' "$PREVIEW_ADDED" | grep '^- ' | grep -v '^- \[optional\]') || true
+        echo ""
+        if [ -n "$PREVIEW_HIGHLIGHTS" ]; then
+            echo "Главное в этом обновлении (то, что вы получите после установки):"
+            printf '%s\n' "$PREVIEW_HIGHLIGHTS" | sed 's/^/  + /'
+        elif [ -n "$PREVIEW_ADDED" ]; then
+            echo "В CHANGELOG.md нового выпуска есть только необязательные пункты ([optional]); значимых изменений нет."
+        else
+            echo "ℹ Сводка «Главное в этом обновлении» недоступна: в CHANGELOG.md нового выпуска нет добавленных пунктов."
+        fi
+    fi
+    # END-TESTABLE: changelog-check-preview
 
     assert_self_unmutated
     if ! run_sync_canary; then

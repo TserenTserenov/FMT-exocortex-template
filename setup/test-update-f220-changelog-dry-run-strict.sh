@@ -39,6 +39,8 @@ CHANGELOG_BLOCK="$TEST_ROOT/changelog-block.sh"
 extract_block "changelog-diff-disclaimer" "$CHANGELOG_BLOCK"
 STRICT_BLOCK="$TEST_ROOT/strict-block.sh"
 extract_block "dry-run-strict-check" "$STRICT_BLOCK"
+PREVIEW_BLOCK="$TEST_ROOT/preview-block.sh"
+extract_block "changelog-check-preview" "$PREVIEW_BLOCK"
 
 echo "=== CHANGELOG diff+disclaimer ==="
 
@@ -174,6 +176,45 @@ run_strict_scenario "all-present" 0 "scripts/foo.sh:1" "CLAUDE.md:1"
 run_strict_scenario "missing-source" 3 "scripts/foo.sh:1" "scripts/missing.sh:0"
 run_strict_scenario "path-traversal" 3 "../etc/passwd:1"
 run_strict_scenario "absolute-path" 3 "/etc/passwd:1"
+
+echo ""
+echo "=== --check: сводка «Главное в этом обновлении» до установки ==="
+
+# $1 name, $2 local CHANGELOG ("__NONE__" = no file), $3 downloaded CHANGELOG
+# ("__NONE__" = not in delivery plan), $4 marker that must be present ("" = n/a),
+# $5 marker that must be absent ("" = n/a)
+run_preview_scenario() {
+    local name="$1" local_cl="$2" new_cl="$3" must_have="$4" must_not="$5"
+    local d="$TEST_ROOT/preview-$name"
+    rm -rf "$d"; mkdir -p "$d/install" "$d/tmp/files"
+    [ "$local_cl" = "__NONE__" ] || printf '%s' "$local_cl" > "$d/install/CHANGELOG.md"
+    [ "$new_cl" = "__NONE__" ] || printf '%s' "$new_cl" > "$d/tmp/files/CHANGELOG.md"
+    OUTPUT=$(
+        SCRIPT_DIR="$d/install"
+        TMPDIR_UPDATE="$d/tmp"
+        set +u; set -e; set +o pipefail  # match update.sh's real shell options
+        source "$PREVIEW_BLOCK"
+    2>&1)
+    local rc=$?
+    [ "$rc" = "0" ] && pass "preview-$name: блок не меняет код выхода (rc=0)" || fail "preview-$name: rc=$rc"
+    if [ -n "$must_have" ]; then
+        printf '%s' "$OUTPUT" | grep -qF "$must_have" \
+            && pass "preview-$name: найдено '$must_have'" \
+            || fail "preview-$name: нет '$must_have', вывод: $OUTPUT"
+    fi
+    if [ -n "$must_not" ]; then
+        printf '%s' "$OUTPUT" | grep -qF "$must_not" \
+            && fail "preview-$name: не должно быть '$must_not', вывод: $OUTPUT" \
+            || pass "preview-$name: нет '$must_not'"
+    fi
+}
+
+run_preview_scenario "behavior" $'- old' $'- old\n- [behavior] важная правка' "важная правка" ""
+run_preview_scenario "untagged" $'- old' $'- old\n- пункт без метки' "пункт без метки" ""
+run_preview_scenario "optional-only" $'- old' $'- old\n- [optional] косметика' "только необязательные пункты" "Главное в этом обновлении ("
+run_preview_scenario "no-new-lines" $'- a\n- b' $'- a' "в CHANGELOG.md нового выпуска нет добавленных пунктов" "Главное в этом обновлении ("
+run_preview_scenario "not-shipped" $'- old' "__NONE__" "не менялся или не входит в план доставки" "Главное в этом обновлении ("
+run_preview_scenario "first-install" "__NONE__" $'- [security] закрыта дыра' "закрыта дыра" ""
 
 echo ""
 echo "=== Итог: $PASS_COUNT passed, $FAIL_COUNT failed ==="
