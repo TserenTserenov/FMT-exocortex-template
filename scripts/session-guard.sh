@@ -43,14 +43,179 @@
 
 set -euo pipefail
 
-# The transition lock below uses Unix fcntl, inode ownership and /bin/bash.
-# Git Bash with native Windows Python cannot uphold that contract. Refuse every
-# command before creating the session directory or touching the canonical repo.
+# The transition lock below uses Unix fcntl, directory fsync through Python and
+# /bin/bash re-exec. Git Bash with native Windows Python cannot uphold that
+# contract (issue #1359). Everything except the three commands the nightly
+# loop needs is refused before creating the session directory or touching the
+# canonical repo; those three run in a separate degraded implementation that
+# needs no Python, no fcntl and no fsync, and says so on every call.
+_gb_refuse() { # <command text>
+  echo "session-guard: на Git Bash (Windows) доступен только упрощённый режим: open --housekeeping, close --housekeeping, note-file для служебной сессии. Команде '$1' нужны Unix-замок (fcntl) и сброс каталога на диск (fsync); запустите её в WSL2." >&2
+  exit 1
+}
+
+_GB_LOCK_HELD=""
+_gb_lock_release() {
+  if [ -n "$_GB_LOCK_HELD" ]; then
+    rm -rf "$_GB_LOCK_HELD"
+    _GB_LOCK_HELD=""
+  fi
+}
+
+# mkdir is atomic, so one holder at a time. A held lock is never taken over
+# automatically: a PID alone cannot tell a dead owner from a reused PID or a
+# live child, so the operator removes a stale lock by hand (the message says how).
+_gb_lock_acquire() { # <lock dir>
+  local lock="$1" tries=0 max="${IWE_SG_GITBASH_LOCK_TRIES:-30}"
+  # Handlers first: a signal between mkdir and the trap must not strand the lock.
+  trap '_gb_lock_release' EXIT
+  trap '_gb_lock_release; exit 130' INT TERM
+  until mkdir "$lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge "$max" ]; then
+      echo "session-guard: замок '$lock' занят (владелец: $(cat "$lock/owner" 2>/dev/null || echo неизвестен)). Если уверены, что владелец завершён, удалите каталог вручную: rm -rf '$lock'" >&2
+      return 1
+    fi
+    sleep 1
+  done
+  _GB_LOCK_HELD="$lock"
+  printf 'pid=%s host=%s since=%s\n' "$$" "$(hostname)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lock/owner"
+}
+
+# A semaphore we may touch: regular file, not a symlink, ours, carrying exactly
+# the expected agent and session id. File mode is not checked: NTFS does not
+# keep Unix mode bits reliably.
+_gb_semaphore_trusted() { # <path> <agent> <session id>
+  [ -f "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 1
+  [ "$(grep -c '^agent: ' "$1")" = 1 ] && [ "$(grep '^agent: ' "$1")" = "agent: $2" ] || return 1
+  [ "$(grep -c '^session_id: ' "$1")" = 1 ] && [ "$(grep '^session_id: ' "$1")" = "session_id: $3" ] || return 1
+}
+
+_gb_main() {
+  local cmd="${1:-}" agent="${IWE_AGENT:-}" housekeeping="" slug="" path="" personality="" owner_pid=""
+  shift || true
+  case "$cmd" in
+    open|close|note-file) ;;
+    *) _gb_refuse "$cmd" ;;
+  esac
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --agent) agent="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
+      --housekeeping) housekeeping="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
+      --slug) slug="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
+      --personality) personality="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
+      --owner-pid) owner_pid="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
+      --*) _gb_refuse "$cmd $1" ;;
+      *) [ -z "$path" ] || _gb_refuse "$cmd"; path="$1"; shift ;;
+    esac
+  done
+  case "$cmd" in
+    open|close) [ -n "$housekeeping" ] && [ -z "$path" ] && [ -z "$slug" ] || _gb_refuse "$cmd" ;;
+    note-file) [ -z "$housekeeping" ] && [ -n "$slug" ] && [ -n "$path" ] || _gb_refuse "$cmd" ;;
+  esac
+
+  local token='^[a-zA-Z0-9][a-zA-Z0-9._-]{0,255}$'
+  [[ "$agent" =~ $token ]] || { echo "session-guard: небезопасный или пустой --agent '$agent'" >&2; exit 1; }
+  local reason="${housekeeping:-$slug}"
+  [[ "$reason" =~ $token ]] || { echo "session-guard: причина должна быть безопасным slug" >&2; exit 1; }
+  local session_id="housekeeping-$reason"
+  [[ "$session_id" =~ $token ]] || { echo "session-guard: идентификатор слишком длинный" >&2; exit 1; }
+  # Same input checks as the full implementation: both values go into the
+  # semaphore file verbatim, so a newline would forge extra lines.
+  [[ -z "$personality" || "$personality" =~ ^(unassigned|[0-9a-fA-F-]{36})$ ]] \
+    || { echo "session-guard: --personality должен быть 'unassigned' или UUID" >&2; exit 1; }
+  [[ -z "$owner_pid" || "$owner_pid" =~ ^[1-9][0-9]*$ ]] \
+    || { echo "session-guard: --owner-pid должен быть положительным PID" >&2; exit 1; }
+
+  local root="${IWE_ROOT:-$HOME/IWE}" dir file
+  dir="$root/.iwe-runtime/sessions"
+  mkdir -p "$dir"
+  file="$dir/${agent}-housekeeping-${reason}.open"
+  echo "session-guard: упрощённый режим Git Bash (без fcntl и без сброса каталога на диск): взаимное исключение есть, долговечность после сбоя питания не гарантируется; полная защита — в WSL2" >&2
+  _gb_lock_acquire "$dir/.gb-lock-${agent}-${session_id}" || exit 1
+
+  local now epoch created created_epoch age tmp
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  case "$cmd" in
+    open)
+      if [ -e "$file" ]; then
+        created="$(grep '^created_at: ' "$file" | cut -d' ' -f2- || true)"
+        created_epoch=""
+        # GNU date -d "" means today's midnight, so an empty value must not reach it.
+        [ -z "$created" ] || created_epoch="$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$created" +%s 2>/dev/null || date -d "$created" +%s 2>/dev/null || true)"
+        [ -n "$created_epoch" ] || { echo "session-guard: open --housekeeping: возраст семафора '$file' определить нельзя; существующий файл сохранён" >&2; exit 1; }
+        age=$(( $(date +%s) - created_epoch ))
+        if [ "$age" -le 1800 ]; then
+          echo "session-guard: open --housekeeping: уже есть активная housekeeping-сессия '$reason' (возраст ${age}s). Закрой её или дождись TTL 1800s" >&2
+          exit 1
+        fi
+        [ ! -e "${file}.stale" ] || { echo "session-guard: open --housekeeping: .stale destination collision; существующий open сохранён" >&2; exit 1; }
+        mv "$file" "${file}.stale"
+        echo "WARNING: housekeeping semaphore '$reason' stale (${age}s), renamed to .stale" >&2
+      fi
+      tmp="$(mktemp "$dir/.session-open.XXXXXX")"
+      {
+        echo "---"
+        echo "agent: $agent"
+        echo "personality: $personality"
+        echo "housekeeping: $reason"
+        echo "slug: $reason"
+        echo "session_id: $session_id"
+        echo "created_at: $now"
+        [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && echo "harness_session_id: $CLAUDE_CODE_SESSION_ID"
+        echo "pid: ${owner_pid:-${CLAUDE_PID:-$$}}"
+        echo "---"
+      } > "$tmp"
+      # No-clobber: the full implementation uses another lock, so under WSL2 and
+      # Git Bash on one disk a semaphore may appear after the check above.
+      mv -n "$tmp" "$file"
+      if [ -e "$tmp" ]; then
+        rm -f "$tmp"
+        echo "session-guard: open --housekeeping: семафор появился параллельно; существующий файл не изменён" >&2
+        exit 1
+      fi
+      echo "Housekeeping OPEN: $file (reason: $reason)"
+      ;;
+    close)
+      [ -f "$file" ] || { echo "session-guard: close --housekeeping: нет активной housekeeping-сессии '$reason' для $agent" >&2; exit 3; }
+      _gb_semaphore_trusted "$file" "$agent" "$session_id" || { echo "session-guard: close --housekeeping: семафор не прошёл проверку подлинности" >&2; exit 1; }
+      [ ! -e "${file}.closed" ] || { echo "session-guard: close --housekeeping: terminal destination занят; open сохранён" >&2; exit 1; }
+      grep -q '^close_protocol: ' "$file" && { echo "session-guard: close --housekeeping: закрытие уже начато другой реализацией; завершите его там (WSL2)" >&2; exit 1; }
+      { echo "close_protocol: degraded-gitbash-v1"; echo "closed_at: $now"; } >> "$file"
+      mv "$file" "${file}.closed"
+      rm -f "${file}.lease"
+      echo "Housekeeping CLOSE: ${reason} ✅"
+      ;;
+    note-file)
+      [ -f "$file" ] || { echo "session-guard: note-file: нет открытой housekeeping-сессии '$reason' для $agent. Откройте её: session-guard.sh open --housekeeping $reason --agent $agent" >&2; exit 1; }
+      _gb_semaphore_trusted "$file" "$agent" "$session_id" || { echo "session-guard: note-file: семафор не прошёл проверку подлинности" >&2; exit 1; }
+      grep -q '^close_protocol: ' "$file" && { echo "session-guard: note-file: сессия уже начала закрытие" >&2; exit 1; }
+      local parent base prefix rel
+      if [ -d "$path" ]; then parent="$path"; base=""; else parent="$(dirname "$path")"; base="$(basename "$path")"; fi
+      # A future file may sit in a directory that does not exist yet (the day
+      # close notes archive destinations in advance): resolve against the
+      # nearest existing ancestor and keep the missing tail as written.
+      local anchor="$parent" tail=""
+      while [ ! -d "$anchor" ] && [ "$anchor" != "." ] && [ "$anchor" != "/" ]; do
+        tail="$(basename "$anchor")/$tail"
+        anchor="$(dirname "$anchor")"
+      done
+      # --show-prefix gives the path relative to the repo root without the
+      # drive-letter form of the root, which differs between Git Bash and git.
+      prefix="$(git -C "$anchor" rev-parse --show-prefix 2>/dev/null || true)"
+      if git -C "$anchor" rev-parse --git-dir >/dev/null 2>&1; then rel="${prefix}${tail}${base}"; else rel="$path"; fi
+      [ -n "$rel" ] || rel="./"
+      [ -n "$rel" ] || { echo "session-guard: note-file: не удалось определить путь '$path'" >&2; exit 1; }
+      case "$rel" in *$'\n'*|*$'\r'*) echo "session-guard: note-file: путь с переводом строки запрещён" >&2; exit 1 ;; esac
+      printf 'file: %s\n' "$rel" >> "$file"
+      echo "Noted in scope: $rel"
+      ;;
+  esac
+  exit 0
+}
+
 case "$(uname -s)" in
-  MINGW*|MSYS*)
-    echo 'session-guard: Git Bash на Windows с нативным Python не поддерживается: Unix-блокировка fcntl недоступна. Запустите рабочую сессию в WSL2.' >&2
-    exit 1
-    ;;
+  MINGW*|MSYS*) _gb_main "$@" ;;
 esac
 
 IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
