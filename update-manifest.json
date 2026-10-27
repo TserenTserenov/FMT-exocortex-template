@@ -797,7 +797,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "36c226a8b7b0df41dc7557346984d214a70149c1ec8b8df256734cb295cbee1c"
+      "sha256": "995fd445a8b877a49d4f6f2c41dbab3d02a2ee0bf0f566f4d4709bad94bf6c91"
     },
     {
       "path": "CITATION.cff",
@@ -829,7 +829,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "fba8c96620974becbafe7e5ab78a9200319fee74bb4fc9be436618b4ff8e537e"
+      "sha256": "f7c51cf0582da5e1b905f0f75b760aa056047f9dd09bfd9bbabcadd5e98f3f5b"
     },
     {
       "path": "REPO-TYPE.md",
