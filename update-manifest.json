@@ -369,7 +369,7 @@
     },
     {
       "path": ".claude/runtime-overlay.yaml",
-      "sha256": "451709f928b9eebfbe7b31d9e2953b8718b85b645a67cc2fdc7ed98bd92e6213"
+      "sha256": "7131136f939f1da69ce09b1721756256ee9d52b62bb7619316973bd945add20e"
     },
     {
       "path": ".claude/scripts/check-index-health.py",
@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d19379f60ffe8980ba6f1b39bd85863481906bb5a88c79cfe53e6ba097706ed7"
+      "sha256": "205a346909acc69d250bd6fda87356e02c639b5ed432cc11dbac23adba6701f9"
     },
     {
       "path": "CLAUDE.md",
@@ -2069,11 +2069,11 @@
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
-      "sha256": "3e10c056592b6c5ecdaeeb428f179ce6cce8945b849020f14fa4e7f5b60a2337"
+      "sha256": "37ca62bd1893f3010a791b72682a6b042f5c4121d908a0220a5d2c74bf1f22f6"
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
-      "sha256": "ede837d47c75c57af1ec4362e16ced6689293b92bce4b35a5b0ed57379cfe799"
+      "sha256": "16abed185aaa9a2a8228264f7d3b921ad76a0d534d7bf14df3e258233773d698"
     },
     {
       "path": "roles/synchronizer/scripts/sync-files.sh",
@@ -2086,6 +2086,10 @@
     {
       "path": "roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.timer",
       "sha256": "c82c53025bd93cbf7aece9133ba39f31e753c0830d7f994da80cbe8faf2fdfcf"
+    },
+    {
+      "path": "roles/synchronizer/scripts/templates/capabilities.sh",
+      "sha256": "dbbfc3d691652345835e48c0e32490906e51e10cfdcc76e0c54781e8cd3d169c"
     },
     {
       "path": "roles/synchronizer/scripts/templates/extractor.sh",
@@ -2505,11 +2509,11 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "4b1ee045d5788327c36b0de759759a9c40d5861e613b06a821e8e5b26e19b446"
+      "sha256": "427ffa61f8720f20ea24ff387a321dd5807d1b80cc5927e4841a90c811e33d63"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
-      "sha256": "3e8d6d46f25d6a6aac945eae4f30c67b0d933a169557c14461f40a2f9de12675"
+      "sha256": "8d89d5067958af6e2bb5cf41fabd3298fbc416ffa7ec6779b7429795b84cd7f3"
     },
     {
       "path": "scripts/iwe-backup-protect.sh",
@@ -2517,11 +2521,15 @@
     },
     {
       "path": "scripts/iwe-backup-run.sh",
-      "sha256": "c9fb1051612a6f953a6b6030aaa735839317e2113505b6a15f9fe9918b4f7f14"
+      "sha256": "3a179c4ea54f9262351b65490aad61853d775a46501c18d3feeb1d7e21b212a2"
     },
     {
       "path": "scripts/iwe-backup-sources.yaml",
       "sha256": "fbf4b706c70a8045f8ac51602fa87c51f3a5c804df3e2f85e90b708d272bbf60"
+    },
+    {
+      "path": "scripts/iwe-backup.sh",
+      "sha256": "611364c8d7a8ad2100746309cf8956d6e93c2a2509b1e5ae8bb0780b5608b797"
     },
     {
       "path": "scripts/iwe-bug-report.sh",
@@ -2529,7 +2537,7 @@
     },
     {
       "path": "scripts/iwe-capabilities.sh",
-      "sha256": "3ffb708a6ee732ffca42aa4907922008af01ca4ea9345bace931141ca308cf34"
+      "sha256": "4a6458033a79ad37b045b2c6e54919c397a61dc819da8d07d8714633952d104a"
     },
     {
       "path": "scripts/iwe-consent.sh",
@@ -2637,7 +2645,7 @@
     },
     {
       "path": "scripts/lib/iwe-capabilities.sh",
-      "sha256": "5c90692c7fb6e4ec93b90e03e3c32150e58fa466a148267dfffe396490eaacf0"
+      "sha256": "a8c4bebdc34532c273a73d7929908768a58399d3a475cc5394b914822b091774"
     },
     {
       "path": "scripts/lib/language-check.py",
@@ -3575,6 +3583,8 @@
     "scripts/tests/test_issue_backups_scan.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
     "scripts/tests/test_issue_f267_capabilities.sh",
+    "scripts/tests/test_issue_f267_capability_guard.sh",
+    "scripts/tests/test_issue_f267_stage2.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",

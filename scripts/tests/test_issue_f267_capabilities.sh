@@ -145,11 +145,12 @@ else
     fail "tar: $(state tar status) '$tar_path'"
 fi
 bad=0
-for n in os tar restic claude_cli gateway backup; do
+for n in os tar restic claude_cli gateway telegram backup; do
     f="$WS/.iwe-runtime/state/capabilities/$n"
-    [ "$(wc -l < "$f" | tr -d ' ')" = 3 ] && grep -q '^status: ' "$f" && grep -q '^value: ' "$f" && grep -q '^checked_at: ' "$f" || bad=1
+    [ "$(wc -l < "$f" | tr -d ' ')" = 5 ] && grep -q '^status: ' "$f" && grep -q '^value: ' "$f" && grep -q '^checked_at: ' "$f" \
+        && grep -q '^was: ' "$f" && grep -q '^alerted: ' "$f" || bad=1
 done
-[ "$bad" -eq 0 ] && pass "every file is exactly status/value/checked_at" || fail "a capability file has the wrong shape"
+[ "$bad" -eq 0 ] && pass "every file is exactly status/value/checked_at/was/alerted" || fail "a capability file has the wrong shape"
 
 # --- 5. the one message --------------------------------------------------------------
 reset_ws; rm -f "$WS/params.yaml"
@@ -190,8 +191,8 @@ for _ in 1 2 3 4 5 6 7 8; do run_cap linux >/dev/null 2>&1 & done
 wait
 leftovers=$(find "$WS/.iwe-runtime/state/capabilities" -name '.*.??????' 2>/dev/null | wc -l | tr -d ' ')
 bad=0
-for n in os tar restic claude_cli gateway backup; do
-    [ "$(wc -l < "$WS/.iwe-runtime/state/capabilities/$n" | tr -d ' ')" = 3 ] || bad=1
+for n in os tar restic claude_cli gateway telegram backup; do
+    [ "$(wc -l < "$WS/.iwe-runtime/state/capabilities/$n" | tr -d ' ')" = 5 ] || bad=1
 done
 [ "$leftovers" = 0 ] && [ "$bad" -eq 0 ] && pass "8 parallel probes: whole files, no temp leftovers" || fail "parallel probes: leftovers=$leftovers bad=$bad"
 

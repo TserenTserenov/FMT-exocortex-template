@@ -77,6 +77,20 @@ MODE="check"
 # default or backup_dir on any OS (issue #1349). --no-icloud disables it.
 [ -n "$IWE_ICLOUD_BACKUP_DIR" ] && CHECK_ARCHIVES=1 || CHECK_ARCHIVES=0
 
+# The backup contract (WP-7 F267 stage 2): an EXPLICIT backup_engine decides which kind
+# of freshness is checked, so a healthy restic install is not accused over missing tar
+# archives and the other way round. An unset key keeps the old behaviour (both checked).
+# shellcheck source=lib/iwe-capabilities.sh
+source "$SCRIPT_DIR/lib/iwe-capabilities.sh" || exit 1
+BACKUP_ENGINE="$(cap_backup_engine)"
+ENGINE_EXPLICIT=0
+cap_backup_engine_explicit && ENGINE_EXPLICIT=1
+ARCHIVES_SKIP_REASON=""
+if [ "$ENGINE_EXPLICIT" -eq 1 ] && [ "$BACKUP_ENGINE" = restic ]; then
+    CHECK_ARCHIVES=0
+    ARCHIVES_SKIP_REASON="движок бэкапа restic (backup_engine в params.yaml)"
+fi
+
 # ---------- Аргументы ----------
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -207,6 +221,14 @@ nearest_existing_dir() {
     printf '%s\n' "$d"
 }
 
+if [ "$BACKUP_ENGINE" = invalid ]; then
+    warn "Недопустимое значение backup_engine в params.yaml: допустимо tar или restic. iwe-backup.sh не запустит бэкап, пока значение не исправлено"
+    WARNINGS=$((WARNINGS + 1))
+fi
+if [ "$BACKUP_ENGINE" = restic ] && [ -n "$(cap_backup_dir_param)" ]; then
+    info "backup_dir относится к архивам tar и для restic не используется: restic пишет в защитное хранилище ~/.iwe-backup/protect-repo"
+fi
+
 echo "## 1. Архивы бэкапа"
 echo ""
 
@@ -320,6 +342,8 @@ if [ "$CHECK_ARCHIVES" -eq 1 ]; then
             fi
         fi
     fi
+elif [ -n "$ARCHIVES_SKIP_REASON" ]; then
+    info "Архивы tar не проверяются: $ARCHIVES_SKIP_REASON"
 elif [ -n "$ICLOUD_DIR" ]; then
     info "Пропущено (--no-icloud): архивы в $ICLOUD_DIR не проверяются"
 else
@@ -540,7 +564,9 @@ PROTECT_REPO_DIR="$HOME/.iwe-backup/protect-repo"
 PROTECT_KEY_FILE="$HOME/.iwe-backup/protect-repo.key"
 FRESHNESS_CRIT_HOURS=48
 
-if ! command -v restic >/dev/null 2>&1; then
+if [ "$ENGINE_EXPLICIT" -eq 1 ] && [ "$BACKUP_ENGINE" = tar ]; then
+    info "Движок бэкапа tar (backup_engine в params.yaml): свежесть снимков restic не проверяется"
+elif ! command -v restic >/dev/null 2>&1; then
     info "restic не установлен — регулярный бэкап (iwe-backup-run.sh) не настроен"
 elif [ ! -d "$PROTECT_REPO_DIR" ]; then
     info "Хранилище $PROTECT_REPO_DIR ещё не создано — запустите scripts/iwe-backup-run.sh хотя бы раз"
@@ -606,7 +632,7 @@ if [ "$CRITICALS" -gt 0 ]; then
     echo "❌ **Critical:** $CRITICALS  |  ⚠️ **Warnings:** $WARNINGS"
     echo ""
     echo "**Действия:**"
-    echo "1. Запустить \`bash $IWE_ROOT/scripts/backup-icloud.sh\` если бэкап устарел"
+    echo "1. Запустить \`bash $IWE_ROOT/scripts/iwe-backup.sh\` (выбирает движок по backup_engine) если бэкап устарел"
     echo "2. Закоммитить / запушить изменения в грязных репо"
     echo "3. Проверить, что цель бэкапа доступна: iCloud Drive в System Settings или подключённый том для backup_dir"
     EXIT_CODE=2
