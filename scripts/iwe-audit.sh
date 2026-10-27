@@ -946,27 +946,28 @@ else
             echo "ℹ️ Бэкап выключен явно (\`backup_enabled: false\`)."
             ;;
     esac
-    # Stage 2: the engine of the backup contract and what disappeared. Yellow lines only:
-    # they never change the audit's exit code.
-    case "$(cap_backup_engine)" in
-        invalid)
-            echo "⚠️ Недопустимое значение \`backup_engine\` в \`params.yaml\`: допустимо \`tar\` (по умолчанию) или \`restic\`. Бэкап не запустится, пока значение не исправлено. Это не влияет на код выхода аудита."
-            ;;
-        restic)
-            echo "ℹ️ Движок бэкапа: restic (защитное хранилище \`~/.iwe-backup/protect-repo\`)."
-            if [ -n "$(cap_backup_dir_param)" ]; then
-                echo "ℹ️ \`backup_dir\` относится к архивам tar и для restic не используется: снимки пишутся в защитное хранилище, не в \`backup_dir\`."
-            fi
-            ;;
-        tar)
-            [ "$(cap_status backup)" = configured ] && echo "ℹ️ Движок бэкапа: tar (архивы в \`backup_dir\` или в iCloud на macOS)."
-            ;;
-    esac
-    cap_regressions | while read -r reg_name reg_was reg_status; do
-        [ -n "$reg_name" ] || continue
-        echo "⚠️ Пропала возможность \`$reg_name\` (была: $reg_was, сейчас: $reg_status). Это не влияет на код выхода аудита."
-    done
 fi
+# Stage 2: the engine of the backup contract and what disappeared. Read from params.yaml and
+# from the recorded facts, so they show even before the first probe. Yellow lines only: they
+# never change the audit's exit code.
+case "$(cap_backup_engine)" in
+    invalid)
+        echo "⚠️ Недопустимое значение \`backup_engine\` в \`params.yaml\`: допустимо \`tar\` (по умолчанию) или \`restic\`. Бэкап не запустится, пока значение не исправлено. Это не влияет на код выхода аудита."
+        ;;
+    restic)
+        echo "ℹ️ Движок бэкапа: restic (защитное хранилище \`~/.iwe-backup/protect-repo\`)."
+        if [ -n "$(cap_backup_dir_param)" ]; then
+            echo "ℹ️ \`backup_dir\` относится к архивам tar и для restic не используется: снимки пишутся в защитное хранилище, не в \`backup_dir\`."
+        fi
+        ;;
+    tar)
+        [ "$(cap_status backup)" = configured ] && echo "ℹ️ Движок бэкапа: tar (архивы в \`backup_dir\` или в iCloud на macOS)."
+        ;;
+esac
+cap_regressions | while read -r reg_name reg_was reg_status; do
+    [ -n "$reg_name" ] || continue
+    echo "⚠️ Пропала возможность \`$reg_name\` (была: $reg_was, сейчас: $reg_status). Это не влияет на код выхода аудита."
+done
 echo ""
 
 # ---------- Exit code ----------

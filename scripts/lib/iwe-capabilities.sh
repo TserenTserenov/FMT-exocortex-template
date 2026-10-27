@@ -185,11 +185,25 @@ cap_backup_off() {
     grep -qE '^backup_enabled:[[:space:]]*false([[:space:]]*(#.*)?)?$' "${WORKSPACE_DIR:-}/params.yaml" 2>/dev/null
 }
 
+# A target inside iCloud Drive works only while iCloud Drive exists. The macOS default points
+# there on EVERY Mac, including one that never turned iCloud Drive on, so an existing target
+# is not yet a usable one. (Found by the stage 2 acceptance run: the scheduler would have
+# failed the daily backup on such a Mac every day.)
+cap_backup_target_usable() {
+    local target="${IWE_ICLOUD_BACKUP_DIR:-}"
+    [ -n "$target" ] || return 1
+    if [ -n "${IWE_ICLOUD_ROOT:-}" ] && type iwe_path_inside >/dev/null 2>&1 \
+        && iwe_path_inside "$target" "$IWE_ICLOUD_ROOT" && [ ! -d "$IWE_ICLOUD_ROOT" ]; then
+        return 1
+    fi
+    return 0
+}
+
 cap_probe_backup() {
     local target="${IWE_ICLOUD_BACKUP_DIR:-}"
     if cap_backup_off; then
         cap_write backup off ""
-    elif [ -n "$target" ] || { cap_backup_engine_explicit && [ "$(cap_backup_engine)" = restic ]; }; then
+    elif cap_backup_target_usable || { cap_backup_engine_explicit && [ "$(cap_backup_engine)" = restic ]; }; then
         # An explicit restic engine is a decision on its own: restic writes to its fixed
         # protected store and needs no backup_dir. The target path stays out of the record (it can be any caller-exported value);
         # the audit prints it from the bootstrap it already sources.
