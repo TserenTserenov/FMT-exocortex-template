@@ -5341,7 +5341,12 @@ if $CHECK_ONLY; then
     CHANGELOG_NEW_FILE="$TMPDIR_UPDATE/files/CHANGELOG.md"
     if [ ! -f "$CHANGELOG_NEW_FILE" ]; then
         echo ""
-        echo "ℹ Сводка «Главное в этом обновлении» недоступна: CHANGELOG.md в этом выпуске не менялся или не входит в план доставки."
+        echo "ℹ Сводка «Главное в этом обновлении» недоступна: CHANGELOG.md в этом выпуске не менялся, не входит в план доставки или не скачался (смотрите предупреждения о загрузке выше)."
+    elif [ ! -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
+        # No local CHANGELOG.md (first install): diffing against nothing would list every
+        # item of every past version as "new", which is noise, not a summary.
+        echo ""
+        echo "ℹ Сводка «Главное в этом обновлении» не строится: у вас ещё нет CHANGELOG.md (первая установка), сравнивать не с чем. Полный список изменений - в CHANGELOG.md после установки."
     else
         CHANGELOG_OLD_TEXT=""
         [ -f "$SCRIPT_DIR/CHANGELOG.md" ] && CHANGELOG_OLD_TEXT=$(cat "$SCRIPT_DIR/CHANGELOG.md")

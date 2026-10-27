@@ -213,8 +213,9 @@ run_preview_scenario "behavior" $'- old' $'- old\n- [behavior] важная пр
 run_preview_scenario "untagged" $'- old' $'- old\n- пункт без метки' "пункт без метки" ""
 run_preview_scenario "optional-only" $'- old' $'- old\n- [optional] косметика' "только необязательные пункты" "Главное в этом обновлении ("
 run_preview_scenario "no-new-lines" $'- a\n- b' $'- a' "в CHANGELOG.md нового выпуска нет добавленных пунктов" "Главное в этом обновлении ("
-run_preview_scenario "not-shipped" $'- old' "__NONE__" "не менялся или не входит в план доставки" "Главное в этом обновлении ("
-run_preview_scenario "first-install" "__NONE__" $'- [security] закрыта дыра' "закрыта дыра" ""
+run_preview_scenario "not-shipped" $'- old' "__NONE__" "не скачался" "Главное в этом обновлении ("
+# Первая установка (локального CHANGELOG.md нет): весь файл не выдаётся за "добавленное".
+run_preview_scenario "first-install" "__NONE__" $'- [security] закрыта дыра\n- [behavior] старая версия' "первая установка" "закрыта дыра"
 
 echo ""
 echo "=== Итог: $PASS_COUNT passed, $FAIL_COUNT failed ==="
