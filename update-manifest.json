@@ -853,7 +853,7 @@
     },
     {
       "path": "docs/BRANCH-PROTECTION-EMERGENCY.md",
-      "sha256": "fb926443aa1cf589ba97a6fedb00fa5118c3a57c5f84b0a455ac0e78829f5a10"
+      "sha256": "ba838935206f4518d9672a7241c229db08d6d2f1ec79a0b4751f422d79388958"
     },
     {
       "path": "docs/BROWSER-CI-TEMPLATE.md",
@@ -1045,7 +1045,7 @@
     },
     {
       "path": "docs/scripts-catalog.md",
-      "sha256": "8c2c2c4611794cdba2cfbfb3ac704bf34fccf7cff63913e589fad7ec3704e423"
+      "sha256": "3e6555f4bbb99db7fa097f44a0b739773397447876c28f58a59492d2cace1d7e"
     },
     {
       "path": "docs/skills-catalog.md",

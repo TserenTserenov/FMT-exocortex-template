@@ -1,6 +1,5 @@
 files_translated:
-- README.md
-- docs/BRANCH-PROTECTION-EMERGENCY.md
-last_run_utc: '2026-10-26T16:10:42Z'
-last_synced_sha: f1fb661ef2048f2ef6393dcdf7f7665d2c7447a8
+- docs/scripts-catalog.md
+last_run_utc: '2026-10-27T09:40:22Z'
+last_synced_sha: d51dcbea7382a8f2dfb28ddb6a70057276d003e9
 schema_version: 1

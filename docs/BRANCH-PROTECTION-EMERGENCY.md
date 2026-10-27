@@ -1,6 +1,6 @@
 # Removing and Restoring `main` Branch Protection (Emergency Procedure)
 
-> WP-529 Ф21. Write this on a calm day — not during an incident.
+> WP-529 F21. Write this on a calm day — not during an incident.
 > Toggling the normal mode (`required_approving_review_count` /
 > `require_code_owner_reviews`) uses a separate script:
 > `setup/wp529-f21-toggle-required-review.sh` — see its `--help` comment at
@@ -104,14 +104,14 @@ Compare the output against the "Current Base Profile" block line by line — do 
 
 ## Known Open Issues
 
-**Parallel peer-session identity deadlock (Ф21, open).** If
+**Parallel peer-session identity deadlock (F21, open).** If
 `required_approving_review_count` is ever enabled (`on --apply`) and two
 peer sessions are simultaneously waiting for each other to approve their
 respective PRs, neither can proceed. Either both are waiting, or neither is
 allowed to approve its own PR under the same GitHub account — when both
 sessions push from the same `gh auth` identity. This document addresses only
 "remove and restore full protection"; it does not resolve this specific
-deadlock. That remains an open Ф21 item for a separate discussion.
+deadlock. That remains an open F21 item for a separate discussion.
 
 **`enforce_admins: true` in the current profile.** This means that even the
 repository owner cannot bypass protection through the UI without explicitly
