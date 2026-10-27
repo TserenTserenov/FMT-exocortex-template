@@ -5204,6 +5204,11 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
     apply_settings_merge_if_requested
     report_author_skip_summary
     report_executable_index_mismatches manifest
+    # WP-7 F267 stage 1: an install with nothing to update still gets its capability record.
+    if ! $CHECK_ONLY && [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
+        bash "$SCRIPT_DIR/scripts/iwe-capabilities.sh" probe --announce \
+            || echo "  ⚠ iwe-capabilities.sh не записал состояние (не критично). Повторить: bash $SCRIPT_DIR/scripts/iwe-capabilities.sh probe"
+    fi
     echo "✓ Всё актуально. Обновлений нет. ($UNCHANGED файлов проверено)"
     exit_clean
 fi
@@ -6927,6 +6932,13 @@ fi
 if $CLAUDE_CONFLICT_DETECTED || [ "${#CLAUDE_BASE_MISSING_FILES[@]}" -gt 0 ] || [ "${#CLAUDE_SILENT_LOSS_FILES[@]}" -gt 0 ] \
     || [ "${#CLAUDE_MERGE_FAILED_FILES[@]}" -gt 0 ]; then
     exit "$EXIT_CONFLICT"
+fi
+
+# WP-7 F267 stage 1: refresh the record of what this installation has (programs, gateway,
+# backup target) after the files are in place. Best effort: never changes the update result.
+if [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
+    bash "$SCRIPT_DIR/scripts/iwe-capabilities.sh" probe --announce \
+        || echo "  ⚠ iwe-capabilities.sh не записал состояние (не критично). Повторить: bash $SCRIPT_DIR/scripts/iwe-capabilities.sh probe"
 fi
 
 finish_update_transaction

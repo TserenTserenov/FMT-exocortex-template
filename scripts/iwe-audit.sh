@@ -912,6 +912,43 @@ else
 fi
 echo ""
 
+# ---------- 8. Capabilities (WP-7 F267 stage 1) ----------
+#
+# Reads what scripts/iwe-capabilities.sh recorded; it checks nothing itself, so the
+# audit and the scripts can never disagree about the same fact. Written at install
+# and update, or by hand: bash scripts/iwe-capabilities.sh probe.
+
+echo "## 8. Возможности установки"
+echo ""
+
+# shellcheck source=lib/iwe-capabilities.sh
+source "$SCRIPT_DIR/lib/iwe-capabilities.sh"
+if [ "$(cap_status os)" = "unknown" ]; then
+    echo "_Возможности ещё не определены. Определить: \`bash scripts/iwe-capabilities.sh probe\` (то же делают установка и обновление)._"
+else
+    echo "| Возможность | Состояние | Значение | Проверено |"
+    echo "|---|---|---|---|"
+    for cap_name in $CAP_NAMES; do
+        printf '| %s | %s | %s | %s |\n' "$cap_name" "$(cap_status "$cap_name")" \
+            "$(cap_field "$cap_name" value 2>/dev/null || true)" "$(cap_field "$cap_name" checked_at 2>/dev/null || true)"
+    done
+    echo ""
+    case "$(cap_status backup)" in
+        undecided)
+            # A yellow line, not a counted warning: "undecided" must not turn the audit's
+            # exit code into an alarm for every install that never chose a backup.
+            echo "⚠️ Бэкап не решён: в \`params.yaml\` нет \`backup_dir\`, а iCloud по умолчанию есть только на macOS. Это не влияет на код выхода аудита. Включить: задайте \`backup_dir\`; отказаться явно: \`backup_enabled: false\`."
+            ;;
+        configured)
+            echo "✅ Бэкап настроен: цель — \`${IWE_ICLOUD_BACKUP_DIR:-}\`."
+            ;;
+        off)
+            echo "ℹ️ Бэкап выключен явно (\`backup_enabled: false\`)."
+            ;;
+    esac
+fi
+echo ""
+
 # ---------- Exit code ----------
 
 # 2 = критичные gaps; 1 = warnings; 0 = ОК
