@@ -55,16 +55,30 @@ INPUT=$(cat)
 [ -z "$INPUT" ] && exit 0
 
 TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
-[ "$TOOL_NAME" = "Bash" ] || exit 0
+# Kimi names its shell tool "Shell" (~/.kimi/config.toml matcher); Claude uses "Bash".
+case "$TOOL_NAME" in Bash|Shell) ;; *) exit 0 ;; esac
 
 COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [ -n "$COMMAND" ] || exit 0
 
+AGENT="${IWE_AGENT:-claude-code}"
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
 # Same fallback as close-runner-gate.sh (bug-2026-08-31): payload .session_id
 # has come back empty while CLAUDE_CODE_SESSION_ID was present and correct.
-if [ -z "$SESSION_ID" ] && [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+# Claude only: a Kimi process started from a Claude shell inherits the variable,
+# and it names a Claude session that no kimi-*.open semaphore can carry.
+if [ "$AGENT" = "claude-code" ] && [ -z "$SESSION_ID" ] && [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
   SESSION_ID="$CLAUDE_CODE_SESSION_ID"
+fi
+# Non-Claude agents (Kimi: tool "Shell", own payload id that no semaphore
+# records) -> agent-keyed mode, WP-561 Ф51 (27.10.2026, pilot permission S-33):
+# block only the proven incident shape "newest closed semaphore of this agent is
+# a housekeeping one and no open semaphore exists"; any other state stays
+# fail-open. Claude keeps the original session-id logic untouched.
+AGENT_KEYED=0
+if [ "$AGENT" != "claude-code" ]; then
+  AGENT_KEYED=1
+  SESSION_ID="agent-keyed"
 fi
 [ -n "$SESSION_ID" ] || exit 0
 case "$SESSION_ID" in
@@ -79,11 +93,14 @@ GIT_GLOBAL_FLAGS_RE='(-C [^ ]+|-c [^ ]+|--(git-dir|work-tree|namespace|exec-path
 echo "$NORMALIZED_COMMAND" | grep -qE "(^|[;&|(]) *(([A-Za-z_][A-Za-z0-9_]*=[^ ]+ *)*)(command |builtin |exec )?git( $GIT_GLOBAL_FLAGS_RE)* (commit|push)( |$)" || exit 0
 
 SESSION_DIR="$IWE_ROOT/.iwe-runtime/sessions"
-AGENT="${IWE_AGENT:-claude-code}"
 # -x (whole-line match), not a bare -F substring search (close-runner-gate.sh
 # ПП-74б/31.08 already hit this exact defect: a shorter session_id that is a
 # prefix of a longer one would otherwise match it as a substring).
-SEM_MATCHES=$(grep -lxF "harness_session_id: $SESSION_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+if [ "$AGENT_KEYED" = 1 ]; then
+  SEM_MATCHES=$(ls "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+else
+  SEM_MATCHES=$(grep -lxF "harness_session_id: $SESSION_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+fi
 WP_BOUND=0
 while IFS= read -r sem_file; do
   [ -z "$sem_file" ] && continue
@@ -99,6 +116,20 @@ while IFS= read -r sem_file; do
 done <<< "$SEM_MATCHES"
 [ "$WP_BOUND" = 1 ] && exit 0
 
+if [ "$AGENT_KEYED" = 1 ]; then
+  # Any open semaphore of the agent means a session exists, including scheduled
+  # runs (`--housekeeping sched-<id>`, kimi-wp-run-scheduled.sh), whose reason is
+  # outside the allowed list: the Ф51 shape is "nothing open at all".
+  [ -n "$SEM_MATCHES" ] && exit 0
+  # Fail-open unless the newest closed semaphore proves the Ф51 shape.
+  # -c (change time): closing renames .open -> .open.closed without a write, so
+  # mtime would keep the time of the last write, ctime moves with the rename.
+  LAST_CLOSED=$(ls -tc "$SESSION_DIR/${AGENT}"-*.open.closed 2>/dev/null | head -1)
+  [ -n "$LAST_CLOSED" ] || exit 0
+  LAST_HK=$(grep -E '^housekeeping: ' "$LAST_CLOSED" 2>/dev/null | head -1 | cut -d' ' -f2-)
+  { [ -n "$LAST_HK" ] && printf '%s' "$LAST_HK" | grep -qE "$ALLOWED_HOUSEKEEPING_REASONS"; } || exit 0
+fi
+
 echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
 
 cat >&2 <<EOF
@@ -107,7 +138,7 @@ cat >&2 <<EOF
 Эта сессия ни разу не открывала себя на конкретный РП — каждая правка обязана
 нести номер рабочего продукта, свободная причина без номера не считается.
 
-  bash scripts/session-guard.sh open --wp WP-N --task "..." --agent claude-code
+  bash scripts/session-guard.sh open --wp WP-N --task "..." --agent ${AGENT}
 
 WP-N — РП, который уже обсуждался в этой сессии; если его нет, подойдёт
 зонтичный РП техдолга платформы или новый РП по фильтру входа (S-47).

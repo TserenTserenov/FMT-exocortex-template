@@ -5356,7 +5356,18 @@ if $CHECK_ONLY; then
         echo ""
         if [ -n "$PREVIEW_HIGHLIGHTS" ]; then
             echo "Главное в этом обновлении (то, что вы получите после установки):"
-            printf '%s\n' "$PREVIEW_HIGHLIGHTS" | sed 's/^/  + /'
+            # A CHANGELOG item can be a whole paragraph; the board shows the first
+            # sentence, cut at a word boundary after PREVIEW_MAX_CHARS. Full text stays in CHANGELOG.md.
+            PREVIEW_MAX_CHARS=160
+            while IFS= read -r preview_line; do
+                preview_line=${preview_line#- }
+                preview_line=$(printf '%s' "$preview_line" | sed -E 's/^([^.!?]*[.!?])[[:space:]].*$/\1/')
+                if [ "${#preview_line}" -gt "$PREVIEW_MAX_CHARS" ]; then
+                    preview_line=${preview_line:0:$PREVIEW_MAX_CHARS}
+                    preview_line="${preview_line% *}…"
+                fi
+                echo "  + $preview_line"
+            done <<< "$PREVIEW_HIGHLIGHTS"
         elif [ -n "$PREVIEW_ADDED" ]; then
             echo "В CHANGELOG.md нового выпуска есть только необязательные пункты ([optional]); значимых изменений нет."
         else
