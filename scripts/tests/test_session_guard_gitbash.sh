@@ -141,11 +141,17 @@ gb open --housekeeping held --agent kimi
 grep -q "rm -rf" <<<"$out" || fail "no manual-removal hint: $out"
 [ ! -e "$SESSIONS/kimi-housekeeping-held.open" ] || fail "semaphore created under a held lock"
 
-# 7. outside Windows the old path runs: no degraded-mode notice.
-rm -rf "$TMP_DIR/.iwe-runtime"
-rc=0
-out=$(IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO=DS-strategy bash "$GUARD" open --housekeeping plain --agent kimi 2>&1) || rc=$?
-! grep -q "упрощённый режим Git Bash" <<<"$out" || fail "degraded notice leaked into the normal path: $out"
-[ "$rc" -eq 0 ] || fail "normal-path open failed rc=$rc: $out"
+# 7. outside Windows the old path runs: no degraded-mode notice. On a real
+#    Windows runner the real uname IS MINGW, so there is no "outside" to check.
+case "$(uname -s)" in
+  MINGW*|MSYS*) echo "SKIP: step 7 (normal path) needs a non-Windows uname" ;;
+  *)
+    rm -rf "$TMP_DIR/.iwe-runtime"
+    rc=0
+    out=$(IWE_ROOT="$TMP_DIR" IWE_GOVERNANCE_REPO=DS-strategy bash "$GUARD" open --housekeeping plain --agent kimi 2>&1) || rc=$?
+    ! grep -q "упрощённый режим Git Bash" <<<"$out" || fail "degraded notice leaked into the normal path: $out"
+    [ "$rc" -eq 0 ] || fail "normal-path open failed rc=$rc: $out"
+    ;;
+esac
 
 echo "PASS: session guard on Git Bash: three nightly commands run degraded, the rest refused, normal path untouched"
