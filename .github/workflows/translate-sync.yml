@@ -384,7 +384,11 @@ jobs:
         # every later delta run.
         if: always() && steps.en_draft.outcome == 'success'
         run: |
-          if git -C ../en-draft grep -nP '[А-Яа-яЁё]' -- .; then
+          # --untracked: plain `git grep` reads only tracked files, so a file the
+          # translator has just created (not yet `git add`-ed) slipped through
+          # this gate, was committed by `git add -A` below, and only the publish
+          # gate caught it (found 2026-10-27, run of 26.10 16:08).
+          if git -C ../en-draft grep --untracked -nP '[А-Яа-яЁё]' -- .; then
             echo '::error::Cyrillic remains in en-draft; fix the translation before staging it.'
             exit 1
           fi

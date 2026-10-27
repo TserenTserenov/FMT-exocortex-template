@@ -7,9 +7,13 @@ them as written, and the gate then fails on the single letter Ф (found
 2026-10-27: Translate Sync red on main because docs/BRANCH-PROTECTION-EMERGENCY.md
 carries "Ф21" in three lines).
 
-Only the letter Ф directly followed by a digit and not preceded by a word
-character is rewritten, so ordinary Russian words that happen to contain Ф
-are left to the translator and to the gate.
+Only the letter Ф directly followed by a digit and not preceded by another
+Cyrillic letter is rewritten, so ordinary Russian words that happen to
+contain Ф are left to the translator and to the gate. A label glued to a
+Latin letter or digit ("WP-529Ф21") is still a label and is rewritten. Known
+limits: lowercase "ф21" and "Ф 21" (with a space) are not labels in this
+repository and stay visible to the gate; a Ф21 inside a code block or URL is
+rewritten too (it would fail the gate there anyway).
 
 Usage: normalize_en_phase_labels.py <en-draft dir>
 """
@@ -18,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-PHASE_LABEL = re.compile(r"(?<!\w)Ф(?=\d)")
+PHASE_LABEL = re.compile(r"(?<![А-Яа-яЁё])Ф(?=\d)")
 
 
 def normalize(text: str) -> str:

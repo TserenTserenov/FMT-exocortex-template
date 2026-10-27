@@ -32,6 +32,15 @@ def test_letter_inside_a_word_is_left_alone():
     assert nl.normalize("аФ21") == "аФ21"
 
 
+def test_label_glued_to_latin_letter_or_digit_is_rewritten():
+    assert nl.normalize("WP-529Ф21 and 9Ф21") == "WP-529F21 and 9F21"
+
+
+def test_lowercase_and_spaced_forms_stay_visible_to_the_gate():
+    # Documented limit: these are not labels in this repository.
+    assert nl.normalize("ф21 and Ф 21") == "ф21 and Ф 21"
+
+
 def test_already_latin_label_is_unchanged():
     assert nl.normalize("F21 and Ф") == "F21 and Ф"
 
