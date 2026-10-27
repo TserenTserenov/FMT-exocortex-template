@@ -487,6 +487,16 @@ MEMORY_REPLACED=()         # replaced in this run (report_memory_policy_summary)
 MEMORY_KEPT=()             # left as they were although they differ from the template
 MEMORY_RECORD_WARNED=false # the record could not be written: said once per run
 
+# Reject an unusable proof record before parsing it; never truncate it (#1010).
+# KEEP IN SYNC with setup.sh/update.sh.
+memory_record_size_ok() {
+    local file="$1" size
+    [ ! -L "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 1
+    size=$(stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null) || return 1
+    case "$size" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$size" -le 1048576 ]
+}
+
 # memory_record_put FILE KEY HASH — FILE holds one "key<TAB>sha256" line per memory file (bash
 # 3.2 has no associative arrays); afterwards its line for KEY says HASH. FILE is rewritten through
 # a temporary file next to it and mv, so a broken-off run leaves the old record or the new one,
@@ -504,6 +514,9 @@ memory_record_put() {
     if [ -L "$file" ] || { [ -e "$file" ] && { [ ! -f "$file" ] || [ ! -r "$file" ]; }; }; then
         return 1
     fi
+    if [ -e "$file" ]; then
+        memory_record_size_ok "$file" || return 1
+    fi
     tmp=$(mktemp "$file.XXXXXX" 2>/dev/null) || return 1
     if [ -f "$file" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
@@ -514,7 +527,8 @@ memory_record_put() {
             [ "${line%"$tab"*}" = "$key" ] || printf '%s\n' "$line"
         done < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
     fi
-    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" && mv -f "$tmp" "$file"; then
+    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" \
+        && memory_record_size_ok "$tmp" && mv -f "$tmp" "$file"; then
         return 0
     fi
     rm -f "$tmp"
@@ -529,7 +543,7 @@ memory_record_put() {
 memory_record_get() {
     local file="$1" key="$2" line value tab found=""
     tab=$(printf '\t')
-    [ ! -L "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 0
+    memory_record_size_ok "$file" || return 0
     while IFS= read -r line || [ -n "$line" ]; do
         case "$line" in *"$tab"*) ;; *) continue ;; esac
         [ "${line%"$tab"*}" = "$key" ] || continue

@@ -448,8 +448,10 @@ SEGMENTER_PL='
   sub words {
     my ($text) = @_;
     my (@out, $word, $quote) = ();
+    my $started = 0;
     for (my $i = 0; $i < length($text); $i++) {
       my $char = substr($text, $i, 1);
+      $started = 1 if defined $quote || $char !~ /\s/;
       if (defined $quote) {
         if ($char eq "\\" && $quote eq "ansi" && $i + 1 < length($text)) {
           # Decode what bash decodes inside dollar-single-quote: the flag -rf can be written -r\x66.
@@ -497,17 +499,54 @@ SEGMENTER_PL='
       } elsif ($char eq "\\" && $i + 1 < length($text)) {
         $word .= substr($text, ++$i, 1);
       } elsif ($char =~ /\s/) {
-        push @out, $word if length $word;
+        push @out, $word // q{} if $started;
         $word = q{};
+        $started = 0;
       } else {
         $word .= $char;
       }
     }
-    push @out, $word if length $word;
+    push @out, $word // q{} if $started;
     return @out;
   }
 
-  sub segments {
+  sub expand_literals {
+    my ($text, $values) = @_;
+    my ($out, $quote) = (q{}, undef);
+    for (my $i = 0; $i < length($text); $i++) {
+      my $char = substr($text, $i, 1);
+      if (!defined $quote && $char eq q{$} && substr($text, $i + 1, 1) eq chr(39)) {
+        $out .= $char . chr(39);
+        $quote = "ansi";
+        $i++;
+        next;
+      }
+      if ($char eq chr(92) && (!defined $quote || $quote ne chr(39)) && $i + 1 < length($text)) {
+        $out .= $char . substr($text, ++$i, 1);
+        next;
+      }
+      if ($char eq chr(39) && (!defined $quote || $quote eq chr(39) || $quote eq "ansi")) {
+        $quote = defined $quote ? undef : $char;
+      } elsif ($char eq q{"} && (!defined $quote || $quote eq q{"})) {
+        $quote = defined $quote ? undef : $char;
+      } elsif ($char eq q{$} && (!defined $quote || ($quote ne chr(39) && $quote ne "ansi"))) {
+        pos($text) = $i;
+        if ($text =~ /\G\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))/gc) {
+          my $name = defined $1 ? $1 : $2;
+          my $end = pos($text);
+          if (exists $values->{$name}) {
+            $out .= $values->{$name};
+            $i = $end - 1;
+            next;
+          }
+        }
+      }
+      $out .= $char;
+    }
+    return $out;
+  }
+
+  sub lex_segments {
     my ($text) = @_;
     my (@out, $segment, $quote) = ((), q{}, undef);
     my $n = length($text);
@@ -543,6 +582,15 @@ SEGMENTER_PL='
         # that swallows the next lines (and a command hidden behind them).
         my $end = index($text, "\n", $i);
         $i = ($end < 0 ? $n : $end) - 1;
+      } elsif ($char eq q{$} && $next eq chr(123)) {
+        pos($text) = $i;
+        if ($text =~ /\G\$\{[A-Za-z_][A-Za-z0-9_]*\}/gc) {
+          my $end = pos($text);
+          $segment .= substr($text, $i, $end - $i);
+          $i = $end - 1;
+        } else {
+          $segment .= $char;
+        }
       } elsif ($char eq chr(123) && $next eq chr(125)) {
         # `{}` — the placeholder of `find -exec` / `xargs -I {}`, not a brace group.
         $segment .= $char . $next;
@@ -561,16 +609,57 @@ SEGMENTER_PL='
         # later line of a multi-line call was glued onto the first command
         # of the call — how a `source` dot two lines below a `git add <path>`
         # was read as `git add .` (WP-545).
-        push @out, $segment;
+        my $operator = $char;
+        if (($char eq q{|} || $char eq q{&}) && $next eq $char) {
+          $operator .= $next;
+          $i++;
+        }
+        push @out, [$segment, $operator];
         $segment = q{};
         $escaped_at = -1;
       } else {
         $segment .= $char;
       }
     }
-    push @out, $segment;
+    push @out, [$segment, q{}];
+    my (%values, $previous, $conditional);
+    for my $item (@out) {
+      $item->[0] = expand_literals($item->[0], \%values) if %values;
+      my @tokens = words($item->[0]);
+      $conditional = 1 if @tokens && $tokens[0] =~ /^(?:if|for|while|until|case|select)$/;
+      # A pipeline/background/subshell/function may execute assignments in a
+      # different process or later. Never turn that into a known safe command.
+      $conditional = 1 if $item->[1] =~ /[(){}&|]/;
+      if (@tokens && !grep { !/^[A-Za-z_][A-Za-z0-9_]*=/ } @tokens) {
+        for my $token (@tokens) {
+          my ($name, $value) = split(/=/, $token, 2);
+          # Only literal words, without substitutions or shell metacharacters.
+          unless ($value =~ m{^[A-Za-z0-9_./-]+$}) {
+            # Computed values remain outside literal-name resolution. Do not
+            # turn ordinary provider/path variables into new blanket blocks.
+            if ($conditional && exists $values{$name}) { $values{$name} = "IWE_UNCERTAIN_LITERAL"; }
+            else { delete $values{$name}; }
+            next;
+          }
+          if ($conditional || ($previous // q{}) =~ /^(?:&&|\|\|)$/) {
+            $value = "IWE_UNCERTAIN_LITERAL" if !exists $values{$name} || $values{$name} ne $value;
+          }
+          $values{$name} = $value;
+        }
+      } elsif (@tokens && $tokens[0] eq "unset") {
+        unless (grep { /^-/ && !/^(?:-v|--)$/ } @tokens[1 .. $#tokens]) {
+          for my $name (grep { /^[A-Za-z_][A-Za-z0-9_]*$/ } @tokens[1 .. $#tokens]) {
+            if ($conditional && exists $values{$name}) { $values{$name} = "IWE_UNCERTAIN_LITERAL"; }
+            else { delete $values{$name}; }
+          }
+        }
+      }
+      $previous = $item->[1];
+    }
     return @out;
   }
+
+  sub segments { return map { $_->[0] } lex_segments($_[0]); }
 
   # Basename of a command word: /bin/rm, /usr/bin/rm, C:\Git\usr\bin\rm.exe all name `rm`.
   # macOS and Windows can resolve /BIN/RM or GIT to the same executable; normalise
@@ -689,9 +778,96 @@ SEGMENTER_PL='
     return @indices;
   }
 
+  sub shell_reads_stdin {
+    my @args = @_;
+    my $stdin_script = 0;
+    for (my $i = 0; $i < @args; $i++) {
+      next if is_redirection($args[$i], 0);
+      if (is_redirection($args[$i], 1)) { $i++; next; }
+      if ($args[$i] =~ /^(?:[-+]o|[-+]O|--rcfile|--init-file)$/) { $i++; next; }
+      if ($args[$i] =~ /^([-+])([A-Za-z]+)$/) {
+        my ($sign, $flags) = ($1, $2);
+        for (my $j = 0; $j < length($flags); $j++) {
+          my $flag = substr($flags, $j, 1);
+          return 0 if $flag eq "c" && $sign eq "-";
+          $stdin_script = $sign eq "-" if $flag eq "s";
+          if ($flag eq "o" || $flag eq "O") {
+            $i++ if $j == length($flags) - 1;
+            last;
+          }
+        }
+        next;
+      }
+      return 1 if $args[$i] eq "--" && $stdin_script;
+      if ($args[$i] eq "--") { return $i == $#args; }
+      next if $args[$i] =~ /^-/;
+      return $stdin_script;            # Filename, or positional arguments with -s.
+    }
+    return 1;
+  }
+
+  sub literal_output {
+    my ($base, @args) = @_;
+    die "nonliteral shell input\n" if grep { /[\$`]/ } @args;
+    my %escapes = (n => "\n", t => "\t", r => "\r", chr(92) => chr(92));
+    if ($base eq "echo") {
+      shift @args while @args && $args[0] =~ /^(?:-[neE]+|--)$/;
+      my $output = join(" ", @args);
+      die "unsupported echo escape in shell input\n" if $output =~ /\\/;
+      return $output;
+    }
+    shift @args if @args && $args[0] eq "--";
+    my $format = shift @args // q{};
+    my $probe = $format;
+    $probe =~ s/%%|%s//g;
+    die "unsupported printf format in shell input\n" if $probe =~ /%/ || $format =~ /\\(?![ntr\\])/;
+    $format =~ s/\\([ntr\\])/$escapes{$1}/ge;
+    my $slots = 0;
+    while ($format =~ /%%|(%s)/g) { $slots++ if defined $1; }
+    return sprintf($format) unless $slots;
+    my $output = q{};
+    do {
+      my @group = splice(@args, 0, $slots);
+      push @group, q{} while @group < $slots;
+      $output .= sprintf($format, @group);
+      die "literal shell input exceeds 1 MiB\n" if length($output) > 1048576;
+    } while (@args);
+    return $output;
+  }
+
+  sub piped_scripts {
+    my @lexed = @_;
+    my @scripts;
+    for (my $i = 0; $i + 1 < @lexed; $i++) {
+      next unless $lexed[$i][1] eq q{|};
+      my @producer = words($lexed[$i][0]);
+      my @consumer = words($lexed[$i + 1][0]);
+      my ($source) = command_indices(@producer);
+      my ($sink) = command_indices(@consumer);
+      next unless defined $source && defined $sink;
+      my $base = command_base($producer[$source]);
+      next unless $base =~ /^(?:echo|printf)$/;
+      next unless command_base($consumer[$sink]) =~ /^(?:ba|z|k|da|a)?sh$/;
+      next unless shell_reads_stdin(@consumer[$sink + 1 .. $#consumer]);
+      push @scripts, literal_output($base, @producer[$source + 1 .. $#producer]);
+    }
+    return @scripts;
+  }
+
+  sub inspected_segments {
+    my ($text, $depth) = @_;
+    $depth //= 0;
+    my @lexed = lex_segments($text);
+    my @out = map { $_->[0] } @lexed;
+    if ($depth < 3) {
+      push @out, inspected_segments($_, $depth + 1) for piped_scripts(@lexed);
+    }
+    return @out;
+  }
+
   my $cmd_scan = do { local $/; <STDIN> };
-  my @found = grep { /\S/ } segments($cmd_scan);
   if ($ENV{"MODE"} eq "count") {
+    my @found = grep { /\S/ } segments($cmd_scan);
     # A hit is the pattern standing where a COMMAND name stands: the segment
     # executable, a command carried by find/xargs, or the script argument of a
     # shell interpreter (`bash /path/wrapper.sh`). The same name inside an
@@ -724,7 +900,7 @@ SEGMENTER_PL='
   my %global_option_with_argument = map { $_ => 1 } qw(-C -c --git-dir --work-tree --namespace --super-prefix --config-env);
   # A string handed to a shell (`bash -c "..."`, `eval "..."`) is commands too; it goes back
   # into the queue, a few levels deep.
-  my @queue = map { [$_, 0] } @found;
+  my @queue = map { [$_, 0] } grep { /\S/ } inspected_segments($cmd_scan);
   while (my $item = shift @queue) {
     my ($segment, $depth) = @$item;
     my @tokens = words($segment);
@@ -732,8 +908,9 @@ SEGMENTER_PL='
     for my $index (command_indices(@tokens)) {
       next unless $index <= $#tokens;
       my $base = command_base($tokens[$index]);
+      die "ambiguous literal command\n" if $base eq "iwe_uncertain_literal";
       if ($depth < 3 && $tokens[$index] =~ /\s/) {
-        push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$index]);
+        push @queue, map { [$_, $depth + 1] } grep { /\S/ } inspected_segments($tokens[$index]);
       }
       # Candidate command positions: the executable itself and, after a command that is not
       # known to only print its arguments, every later word (ssh host rm -rf x, docker exec c
@@ -750,7 +927,7 @@ SEGMENTER_PL='
             if ($tokens[$j] =~ /^-[A-Za-z]*c[A-Za-z]*$/ && $j < $#tokens) {
               my $script = $j + 1;
               $script++ if $tokens[$script] eq "--" && $script < $#tokens;
-              push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$script]);
+              push @queue, map { [$_, $depth + 1] } grep { /\S/ } inspected_segments($tokens[$script]);
               last;
             }
             if ($tokens[$j] =~ /^-[oO]$/ && $j < $#tokens) { $j++; next; }
@@ -759,10 +936,10 @@ SEGMENTER_PL='
         } elsif ($cand == $index && $cbase =~ /^(?:ssh|su)$/) {
           # ssh host "rm -rf /x": a word with blanks after ssh/su is a command line for the far side.
           for (my $j = $cand + 1; $j <= $#tokens; $j++) {
-            push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments($tokens[$j]) if $tokens[$j] =~ /\s/;
+            push @queue, map { [$_, $depth + 1] } grep { /\S/ } inspected_segments($tokens[$j]) if $tokens[$j] =~ /\s/;
           }
         } elsif ($cbase eq "eval" && $cand < $#tokens) {
-          push @queue, map { [$_, $depth + 1] } grep { /\S/ } segments(join(" ", @tokens[$cand + 1 .. $#tokens]));
+          push @queue, map { [$_, $depth + 1] } grep { /\S/ } inspected_segments(join(" ", @tokens[$cand + 1 .. $#tokens]));
         }
       }
       next unless $cbase eq $name;
@@ -861,6 +1038,9 @@ if [ -n "$PUSH_SEGMENT" ]; then
   fi
   if matches "$PUSH_SEGMENT" -E -- '(^|[[:space:]])\+?:[^[:space:]]+'; then
     block "git push с refspec-удалением (:<ref> или +:<ref>) запрещён — удаление удалённой ветки/тега необратимо. Согласуй с владельцем (CLAUDE.md §2)."
+  fi
+  if matches "$PUSH_SEGMENT" -E -- '(^|[[:space:]])\+[^[:space:]]+'; then
+    block "git push с принудительным refspec (+<ref>) запрещён. Используй --force-with-lease или согласуй с владельцем (CLAUDE.md §2)."
   fi
 
   # git push --mirror — same class again (found in peer review, WP-544 Ф8,

@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "e576e3bdbe087be0ba3131dd6b0a64f3aba8c905af9fa4a9c9a54b40f22cced8"
+      "sha256": "fffc4511b9066b9e9e0ab3aa29d59f8a9057158324c09cb7e28d947270a30c64"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "c1a385987d866c0b7f30b7a0341b609ae18393ac0376aa1e38478b82a98ccdc7"
+      "sha256": "28bcd5d8453922c78c7e9f0de6796169121e39cda2fd044a3e78cf6b7486d0fd"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -218,6 +218,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "1c8e231b41f3c6739161aa4e248a5a05d73a21851812cba20ca4712f1dad3b08"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
+      "sha256": "3cab8839dfe97ade213e042281fd741e47fbec6924fd2a05a11416ec601d614b"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh",
@@ -881,7 +885,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "15797b61483f1f101c451f61f0ec7dcdf4c9b296b642664dd7b562a8050bba53"
+      "sha256": "871b6891674d67cc3c17e58bb630d931dbb3a7332049138f7cb98e8aaaa73750"
     },
     {
       "path": ".gitignore",
@@ -909,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "98b1faeec4a27b99e19f3fa6d1f53f92388fe0fd248c28d9960591fd926cdc9c"
+      "sha256": "16d6285c41ae989b59da272c9cd02987e2c274582b402d7ff19ecbd8643c9532"
     },
     {
       "path": "CLAUDE.md",
@@ -965,7 +969,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "e1f7aa6d3c87c35b7df7709c83421bc4c265318aafbdc3da7a60bd7b8d284e0b"
+      "sha256": "f62ef3f32baf53bb3f6dfdbbe02d3c66421681f664ac1d17f9f271b5727576f0"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -3345,7 +3349,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "1ec1537da1c6fffe96d9ff9350a6e64536c8490df9ceb7a1a09861e415f2e9e6"
+      "sha256": "e93b40eef33b30f9751a1948e1f0e70c4eaa56171d81ee9dc66342a12c678238"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3385,7 +3389,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "4d7305632ef25c9a329d885185126d9249098238df1c8e752100a9368ca67037"
+      "sha256": "bac6a14293df22bef15fd48b953393966378597339d7f3767dfdf4003399a732"
     }
   ],
   "excluded_paths": [
@@ -3461,6 +3465,7 @@
     "scripts/tests/test_issue_1006_minor_findings.sh",
     "scripts/tests/test_issue_1006_yml_author_scan.sh",
     "scripts/tests/test_issue_1010_detectors.sh",
+    "scripts/tests/test_issue_1010_memory_limit.sh",
     "scripts/tests/test_issue_1010_rc_idem.sh",
     "scripts/tests/test_issue_1010_red_team_findings.sh",
     "scripts/tests/test_issue_1010_update_idem.sh",

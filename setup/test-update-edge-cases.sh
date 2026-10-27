@@ -1421,7 +1421,7 @@ fi
 if (
     set +u
     eval "$(update_sh_functions hash_file saving_cp_command backup_memory_file_before_overwrite apply_memory_policy \
-        memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text \
+        memory_record_size_ok memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text \
         memory_copy_verdict replace_memory_copy)"
     SCRIPT_DIR="$TEMPLATE_DIR"
     WORKSPACE_DIR="$TEST_WS/t21-workspace"
@@ -4430,7 +4430,7 @@ T43_FUNCS=""
 T43_MISSING=""
 for t43_fn in hash_file is_author_mode is_personal_config saving_cp_command backup_memory_file_before_overwrite \
     apply_memory_policy record_memory_old_hash memory_old_hash report_memory_policy_summary prune_memory_backups \
-    memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy; do
+    memory_record_size_ok memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy; do
     t43_src=$(awk -v fn="$t43_fn" '$0 ~ "^" fn "\\(\\) \\{" {copy=1} copy{print} copy && /^}/{exit}' "$TEMPLATE_DIR/update.sh")
     if [ -z "$t43_src" ]; then
         T43_MISSING="$T43_MISSING $t43_fn"
@@ -4645,7 +4645,7 @@ echo "--- T45: kept memory copy: odd paths, the hint's two runs keep two copies 
 # the saving command for it; a copy that equals a committed older version it refreshes itself,
 # after a backup. Both on paths with a space, double quotes, a $(...), backticks and a backslash.
 T45_FUNCS=$(update_sh_functions hash_file saving_cp_command backup_memory_file_before_overwrite apply_memory_policy \
-    memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy)
+    memory_record_size_ok memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy)
 if ! grep -q '^apply_memory_policy() {' <<<"$T45_FUNCS"; then
     fail "T45: could not extract apply_memory_policy() from update.sh"
 else
@@ -4718,7 +4718,7 @@ T46_FUNCS=$(update_sh_functions hash_file is_personal_config is_author_mode repo
     saving_cp_command backup_memory_file_before_overwrite sync_workspace_agents repair_pass \
     is_migrated_platform_memory_path migrate_platform_memory report_owner_user_memory_drift \
     record_memory_old_hash memory_old_hash apply_memory_policy report_memory_policy_summary prune_memory_backups \
-    memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy is_user_owned_memory report_author_user_memory report_author_skip_summary apply_refresh_stale \
+    memory_record_size_ok memory_record_put memory_record_get remember_memory_deployed memory_decided_once memory_reason_text memory_copy_verdict replace_memory_copy is_user_owned_memory report_author_user_memory report_author_skip_summary apply_refresh_stale \
     remember_untouched_memory_before_apply)
 T46_STEP6=$(awk '
     /^# Copy memory files to Claude projects directory$/ { armed=1; next }
@@ -5127,7 +5127,7 @@ t47_line() { printf '%s\t%s' "$1" "$(t47_sha "$2")"; }
 
 # --- 47a: setup.sh writes the record with the same writer and hash as update.sh.
 t47_same=true
-for t47_fn in memory_record_put hash_file; do
+for t47_fn in memory_record_size_ok memory_record_put hash_file; do
     t47_u=$(awk -v fn="$t47_fn" '$0 ~ "^" fn "\\(\\) \\{" {c=1} c{print} c && /^}/{exit}' "$TEMPLATE_DIR/update.sh")
     t47_s=$(awk -v fn="$t47_fn" '$0 ~ "^" fn "\\(\\) \\{" {c=1} c{print} c && /^}/{exit}' "$TEMPLATE_DIR/setup.sh")
     if [ -z "$t47_u" ] || [ "$t47_u" != "$t47_s" ]; then
@@ -5301,7 +5301,7 @@ T47S_SETUP=$(awk '
     /^# === 4\. / { exit }
     on { print }
 ' "$TEMPLATE_DIR/setup.sh")
-T47S_FUNCS=$(for t47_fn in hash_file memory_record_put; do
+T47S_FUNCS=$(for t47_fn in hash_file memory_record_size_ok memory_record_put; do
     awk -v fn="$t47_fn" '$0 ~ "^" fn "\\(\\) \\{" {c=1} c{print} c && /^}/{exit}' "$TEMPLATE_DIR/setup.sh"
 done)
 T47S_DIR="$TEST_WS/t47-setup"
@@ -5415,7 +5415,7 @@ else
 fi
 
 # The functions below are update.sh's own; each check runs them in a subshell under set -e.
-T48_FUNCS=$(update_sh_functions hash_file memory_record_put memory_record_get remember_memory_deployed replace_memory_copy)
+T48_FUNCS=$(update_sh_functions hash_file memory_record_size_ok memory_record_put memory_record_get remember_memory_deployed replace_memory_copy)
 T48_H1=$(printf one | shasum -a 256 | cut -d' ' -f1)
 T48_H2=$(printf two | shasum -a 256 | cut -d' ' -f1)
 T48_DIR="$TEST_WS/t48-units"
@@ -5550,7 +5550,7 @@ fi
 # ============================================================================
 echo "--- T49: governance script policy — content decides, never git status; never aborts (WP-485 Ф17) ---"
 
-T49_FUNCS=$(update_sh_functions hash_file atomic_copy_executable memory_record_put memory_record_get \
+T49_FUNCS=$(update_sh_functions hash_file atomic_copy_executable memory_record_size_ok memory_record_put memory_record_get \
     memory_old_hash remember_memory_deployed memory_reason_text memory_copy_verdict saving_cp_command \
     backup_governance_script_before_overwrite apply_governance_script_policy report_governance_script_policy_summary)
 if ! grep -q '^apply_governance_script_policy() {' <<<"$T49_FUNCS"; then
