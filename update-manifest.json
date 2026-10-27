@@ -2505,7 +2505,7 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "8607d9618c99ac3550ed36056cef38d9d03218da41b6d78adc0d7d3244cd01bf"
+      "sha256": "4b1ee045d5788327c36b0de759759a9c40d5861e613b06a821e8e5b26e19b446"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
@@ -2526,6 +2526,10 @@
     {
       "path": "scripts/iwe-bug-report.sh",
       "sha256": "b225f50c32bd11a45e608edc93d604bddc9bbb06edda4065720decbf1d1cd7c7"
+    },
+    {
+      "path": "scripts/iwe-capabilities.sh",
+      "sha256": "3ffb708a6ee732ffca42aa4907922008af01ca4ea9345bace931141ca308cf34"
     },
     {
       "path": "scripts/iwe-consent.sh",
@@ -2630,6 +2634,10 @@
     {
       "path": "scripts/lib/governance-repo-path.sh",
       "sha256": "e8ab011616ebdff726294e3ab600e6d8aa1d2577841e7efbbb628faf301c379e"
+    },
+    {
+      "path": "scripts/lib/iwe-capabilities.sh",
+      "sha256": "5c90692c7fb6e4ec93b90e03e3c32150e58fa466a148267dfffe396490eaacf0"
     },
     {
       "path": "scripts/lib/language-check.py",
@@ -3325,7 +3333,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "9b8e12d96c56b836679631c75e233903faa0ccc07c0b13cb0be39b00d1475437"
+      "sha256": "1ec1537da1c6fffe96d9ff9350a6e64536c8490df9ceb7a1a09861e415f2e9e6"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3365,7 +3373,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "9fb14840e973d0033e61366a076035414095d8111ccc202cb86e0aaf63f6200d"
+      "sha256": "05f07a4dbe3803f8c4f3793d9256297f91b105d09a29715fad48722542374219"
     }
   ],
   "excluded_paths": [
@@ -3562,6 +3570,7 @@
     "scripts/tests/test_issue_989_snapshot_cross_api.py",
     "scripts/tests/test_issue_backups_scan.sh",
     "scripts/tests/test_issue_extensions_dir_missing.sh",
+    "scripts/tests/test_issue_f267_capabilities.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",

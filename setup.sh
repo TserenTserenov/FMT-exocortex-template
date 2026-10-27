@@ -1479,6 +1479,17 @@ else
     fi
 fi
 
+# === 8c. Capabilities of this installation (WP-7 F267 stage 1) ===
+# Records what the machine has (programs, gateway, backup target) as small state files
+# that scripts and the audit read. Best effort: a failure here never stops the install.
+if $DRY_RUN || $CORE_ONLY; then
+    :
+elif [ -f "$TEMPLATE_DIR/scripts/iwe-capabilities.sh" ]; then
+    echo "[8c] Определение возможностей установки..."
+    bash "$TEMPLATE_DIR/scripts/iwe-capabilities.sh" probe --announce \
+        || echo "  ⚠ iwe-capabilities.sh не записал состояние (не критично). Повторить: bash $TEMPLATE_DIR/scripts/iwe-capabilities.sh probe"
+fi
+
 # === Done ===
 echo ""
 if $DRY_RUN; then
