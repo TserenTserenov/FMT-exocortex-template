@@ -881,7 +881,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "e33a7822b3b09d1731f721b6ed020576f65b28f986a64be36b1309cd5a345e00"
+      "sha256": "15797b61483f1f101c451f61f0ec7dcdf4c9b296b642664dd7b562a8050bba53"
     },
     {
       "path": ".gitignore",
@@ -909,7 +909,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f1335462f3de3a7f995f056003f1a728c3509bf68427af1a251bd35938ded0db"
+      "sha256": "98b1faeec4a27b99e19f3fa6d1f53f92388fe0fd248c28d9960591fd926cdc9c"
     },
     {
       "path": "CLAUDE.md",
@@ -2809,7 +2809,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "d6e74844b0a2ec25afd43c05672c4c3033c5dce1d6f5b464e26781059d1d2202"
+      "sha256": "1b4514ad393d936764ddc42c236b11d6e12cbdcf70dd516433097c9d4a4a42e2"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3598,6 +3598,7 @@
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
+    "scripts/tests/test_session_guard_gitbash.sh",
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
