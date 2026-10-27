@@ -53,6 +53,11 @@ case "$ENGINE" in
             echo "   Включить: задайте backup_dir; отказаться явно: backup_enabled: false."
             exit 0
         fi
+        if ! cap_backup_target_usable; then
+            echo "ℹ️  Бэкап не запущен: цель лежит в iCloud Drive, которого на этой машине нет (или он выключен). Тревоги нет."
+            echo "   Включить: включите iCloud Drive или задайте backup_dir вне iCloud; отказаться явно: backup_enabled: false."
+            exit 0
+        fi
         ENGINE_SCRIPT="$SCRIPT_DIR/backup-icloud.sh"
         ;;
     restic)

@@ -132,8 +132,12 @@ reset_ws_keep_params; run_cap linux >/dev/null 2>&1
 rm -f "$WS/params.yaml"
 reset_ws_keep_params; run_cap linux IWE_ICLOUD_BACKUP_DIR="$TMP/pre" >/dev/null 2>&1
 [ "$(state backup status)" = configured ] && pass "pre-exported IWE_ICLOUD_BACKUP_DIR counts as a target" || fail "pre-exported target ignored: $(state backup status)"
+mkdir -p "$TMP/home/Library/Mobile Documents/com~apple~CloudDocs"
 reset_ws_keep_params; run_cap darwin >/dev/null 2>&1
-[ "$(state backup status)" = configured ] && pass "macOS without params → configured (iCloud default kept)" || fail "macOS default: $(state backup status)"
+[ "$(state backup status)" = configured ] && pass "macOS without params, iCloud Drive present → configured (iCloud default kept)" || fail "macOS default: $(state backup status)"
+rm -rf "$TMP/home/Library"
+reset_ws_keep_params; run_cap darwin >/dev/null 2>&1
+[ "$(state backup status)" = undecided ] && pass "macOS without params and WITHOUT iCloud Drive → undecided (the default target is not usable)" || fail "macOS without iCloud: $(state backup status)"
 
 # --- types ---------------------------------------------------------------------------
 reset_ws; run_cap linux >/dev/null 2>&1

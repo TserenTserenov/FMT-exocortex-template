@@ -35,11 +35,12 @@ TMP="$(mktemp -d)"
 trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP"' EXIT
 WS="$TMP/ws"
 CAPDIR="$WS/.iwe-runtime/state/capabilities"
-mkdir -p "$TMP/linux" "$TMP/home" "$WS" "$TMP/fakebin"
+mkdir -p "$TMP/linux" "$TMP/darwin" "$TMP/home" "$WS" "$TMP/fakebin"
 
 REAL_UNAME="$(command -v uname)"
 printf '#!/bin/sh\n[ "${1:-}" = "-s" ] && { echo Linux; exit 0; }\nexec %s "$@"\n' "$REAL_UNAME" > "$TMP/linux/uname"
-chmod +x "$TMP/linux/uname"
+printf '#!/bin/sh\n[ "${1:-}" = "-s" ] && { echo Darwin; exit 0; }\nexec %s "$@"\n' "$REAL_UNAME" > "$TMP/darwin/uname"
+chmod +x "$TMP/linux/uname" "$TMP/darwin/uname"
 
 reset_ws() { rm -rf "$WS/.iwe-runtime" "$WS/params.yaml"; mkdir -p "$WS"; }
 state() { sed -n "s/^$2: \{0,1\}//p" "$CAPDIR/$1" | head -1; }
@@ -215,7 +216,7 @@ printf '#!/bin/bash\necho "TAR-RAN $* PROG=$(command -v tar)" >> "%s"\n' "$MARK"
 printf '#!/bin/bash\necho "RESTIC-RAN $* PROG=$(command -v restic)" >> "%s"\n' "$MARK" > "$TREE/scripts/iwe-backup-run.sh"
 printf '#!/bin/sh\nexit 0\n' > "$TMP/fakebin2/restic"; chmod +x "$TMP/fakebin2/restic"
 run_entry() {  # run_entry [ARGS] - stdout+stderr in $TMP/entry.out; EXTRA_DIRS selects the fake restic
-    env -i HOME="$TMP/home" PATH="$TMP/linux:/usr/bin:/bin" WORKSPACE_DIR="$WS" IWE_ROOT="$WS" IWE_WORKSPACE="$WS" \
+    env -i HOME="$TMP/home" PATH="${UNAME_DIR:-$TMP/linux}:/usr/bin:/bin" WORKSPACE_DIR="$WS" IWE_ROOT="$WS" IWE_WORKSPACE="$WS" \
         IWE_RUNTIME="$WS/.iwe-runtime" CAP_EXTRA_DIRS="${EXTRA_DIRS:-}" bash "$TREE/scripts/iwe-backup.sh" "$@" > "$TMP/entry.out" 2>&1
     echo $?
 }
@@ -227,7 +228,22 @@ reset_ws; rc=$(run_entry)
 printf 'backup_dir: "%s"\n' "$TMP/bk" > "$WS/params.yaml"
 rc=$(run_entry)
 [ "$rc" = 0 ] && grep -q '^TAR-RAN' "$MARK" && ! grep -q RESTIC-RAN "$MARK" && pass "default engine → the tar script, exit 0" || fail "default engine: rc=$rc marks=$(cat "$MARK" 2>/dev/null)"
-rm -f "$MARK"; rc=$(run_entry --with-optional)
+# a Mac without iCloud Drive: the default target points into iCloud, which is not there. The scheduler
+# runs this daily, so it must be a quiet "not configured", never a daily failure (acceptance finding)
+rm -f "$MARK"; reset_ws; rm -rf "$TMP/home/Library"
+rc=$(UNAME_DIR="$TMP/darwin" run_entry)
+if [ "$rc" = 0 ] && [ ! -e "$MARK" ] && grep -q 'iCloud Drive' "$TMP/entry.out" && ! grep -q '❌' "$TMP/entry.out"; then
+    pass "macOS without iCloud Drive and without backup_dir → quiet exit 0, nothing runs, no error line"
+else
+    fail "Mac without iCloud: rc=$rc out=$(cat "$TMP/entry.out")"
+fi
+[ "$(libcall 'IWE_ICLOUD_ROOT="$HOME/Library/CloudDocs"; IWE_ICLOUD_BACKUP_DIR="$IWE_ICLOUD_ROOT/IWE-backups"; iwe_path_inside() { case "$1" in "$2"/*) return 0 ;; *) return 1 ;; esac; }; cap_probe_backup; cap_status backup')" = undecided ] \
+    && pass "backup target inside a missing iCloud Drive → undecided, not configured" || fail "missing iCloud counted as configured"
+mkdir -p "$TMP/home/Library/Mobile Documents/com~apple~CloudDocs"
+rc=$(UNAME_DIR="$TMP/darwin" run_entry)
+[ "$rc" = 0 ] && grep -q '^TAR-RAN' "$MARK" && pass "macOS with iCloud Drive present → the tar script runs" || fail "Mac with iCloud: rc=$rc marks=$(cat "$MARK" 2>/dev/null)"
+rm -rf "$TMP/home/Library"; rm -f "$MARK"; reset_ws; printf 'backup_dir: "%s"\n' "$TMP/bk" > "$WS/params.yaml"
+rc=$(run_entry --with-optional)
 [ "$rc" = 2 ] && [ ! -e "$MARK" ] && pass "tar with an argument → exit 2, nothing runs" || fail "tar + argument: rc=$rc"
 printf 'backup_dir: "%s"\nbackup_engine: zip\n' "$TMP/bk" > "$WS/params.yaml"
 rc=$(run_entry)
@@ -275,6 +291,13 @@ if ! printf '%s' "$out" | grep -q 'Архивы tar не проверяются:
 else
     fail "an unset engine switched a check off"
 fi
+
+# the audit shows an invalid engine even before the first probe (the facts are not recorded yet)
+reset_ws; printf 'backup_engine: zip\n' > "$WS/params.yaml"
+aud=$(env -u LLM_PROXY_URL -u PLATFORM_LLM_PROXY_URL -u IWE_ICLOUD_BACKUP_DIR HOME="$TMP/home" PATH="$TMP/linux:$PATH" \
+    WORKSPACE_DIR="$WS" IWE_ROOT="$WS" IWE_WORKSPACE="$WS" IWE_RUNTIME="$WS/.iwe-runtime" IWE_GOVERNANCE_REPO=DS-strategy \
+    bash "$ROOT/scripts/iwe-audit.sh" 2>&1 | sed -n '/^## 8\./,$p')
+printf '%s' "$aud" | grep -q 'Недопустимое значение `backup_engine`' && pass "audit section 8 warns about an invalid engine before any probe" || fail "no engine warning in the unprobed audit: $(printf '%s' "$aud" | head -4 | tr '\n' ' ')"
 
 # --- 9. restic key safety + bash 3.2 ----------------------------------------------------------------------------
 RH="$TMP/rhome"; RB="$TMP/rbin"; RMARK="$TMP/rmark"

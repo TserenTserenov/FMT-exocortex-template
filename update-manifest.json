@@ -2509,7 +2509,7 @@
     },
     {
       "path": "scripts/iwe-audit.sh",
-      "sha256": "427ffa61f8720f20ea24ff387a321dd5807d1b80cc5927e4841a90c811e33d63"
+      "sha256": "ad258b2b7e3a386b0ab8b03a6a2e195880c1bb8a4046d936e50f1c7d25735662"
     },
     {
       "path": "scripts/iwe-backup-check.sh",
@@ -2529,7 +2529,7 @@
     },
     {
       "path": "scripts/iwe-backup.sh",
-      "sha256": "611364c8d7a8ad2100746309cf8956d6e93c2a2509b1e5ae8bb0780b5608b797"
+      "sha256": "fcb69297811f0b689c5149ab78efcb308f82bafcbcf900ad6c3a36de8d9506d3"
     },
     {
       "path": "scripts/iwe-bug-report.sh",
@@ -2645,7 +2645,7 @@
     },
     {
       "path": "scripts/lib/iwe-capabilities.sh",
-      "sha256": "a8c4bebdc34532c273a73d7929908768a58399d3a475cc5394b914822b091774"
+      "sha256": "8b7fad3a2ba961deb1470185b710671c23c9b3e27f52c17eea685a7b41dbfe56"
     },
     {
       "path": "scripts/lib/language-check.py",
