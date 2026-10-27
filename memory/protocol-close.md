@@ -203,7 +203,7 @@ fi
 7. **R-вопросник** (3 вопроса, `memory/r-questionnaire.md`, шаг 3 Части А `week-close/SKILL.md`, WP-484 30.07 — переставлен к началу) → ответы в Week Report [[gate]]
 8. **Архивация done-WP** → `archive/wp-contexts/` (T) [[gate]]
 9. **Обновить WeekPlan** — пометить итоги, создать carry-over секцию [[gate]]
-10. **Ретро недели свободным текстом** (WP-484, 30.07) — вопрос-рефлексия задан пилоту, ответ записан в ledger через `pilot_answer/preclose_retro` (шаг 1 Части А `week-close/SKILL.md`, переставлен к началу 30.07 вечер) [[gate]]
+10. **Ретро недели свободным текстом** (WP-484, 30.07) — вопрос-рефлексия задан пилоту, ответ записан в ledger через `pilot_answer/preclose_retro` (шаг 0б `week-close/SKILL.md`) [[gate]]
 
 ### Симптом пропуска Week Close
 
