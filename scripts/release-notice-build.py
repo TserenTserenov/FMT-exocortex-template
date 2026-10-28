@@ -106,9 +106,10 @@ EDITOR_PROMPT = """Ты редактор анонса выпуска. Прове
 
 Для каждого пункта верни:
 - number: номер пункта анонса;
-- supported: true, только если всё сказанное в пункте прямо следует из этой записи и смысл не искажён;
+- supported: true, только если всё сказанное в пункте прямо следует из этой записи и смысл не искажён.
+  Упрощение и опущенные подробности — не проблема: анонс короче журнала. Проблема — только утверждение, которого в записи нет или которое ей противоречит;
 - quote: дословная цитата из записи (5–25 слов), на которой держится пункт; копируй символы точно;
-- problems: список проблем — орфография, искажение смысла, утверждение без опоры в записи, внутренние имена, обрыв текста. Пустой, если проблем нет.
+- problems: список проблем — орфография, искажение смысла, утверждение без опоры в записи, внутренние имена, обрыв текста. Не считай проблемой то, что пункт короче записи. Пустой, если проблем нет.
 ok: true, только если у всех пунктов supported=true и problems пуст."""
 
 
@@ -187,29 +188,53 @@ def _normalize(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
-def editor_problems(verdict: dict, items: list[dict], entries: list[str]) -> tuple[list[str], list[str]]:
-    """Return (problems, remarks): every reason to reject, and the part the generator can fix.
+def editor_problems(verdict: dict, items: list[dict], entries: list[str]) -> tuple[list[str], list[str], set[int]]:
+    """Return (problems, remarks, rejected): every reason to reject, the part the generator
+    can fix, and the numbers of items that are not confirmed.
 
     The editor is trusted only where its quote is really found in the cited entry.
-    A missing or unfound quote rejects the attempt but is the editor's fault, so it
+    A missing or unfound quote rejects the item but is the editor's fault, so it
     is not sent back to the generator as a remark.
     """
-    remarks, editor_faults = [], []
+    remarks, editor_faults, rejected = [], [], set()
     by_number = {row["number"]: row for row in verdict["items"]}
     for n, item in enumerate(items, 1):
         row = by_number.get(n)
         if row is None:
             editor_faults.append(f"пункт {n}: редактор не проверил")
+            rejected.add(n)
             continue
-        remarks.extend(f"пункт {n}: {p}" for p in row["problems"])
+        item_remarks = [f"пункт {n}: {p}" for p in row["problems"]]
         if not row["supported"]:
-            remarks.append(f"пункт {n}: нет опоры в записи журнала")
+            item_remarks.append(f"пункт {n}: нет опоры в записи журнала")
         source = entries[item["source_index"] - 1] if 1 <= item["source_index"] <= len(entries) else ""
-        if not row["quote"].strip() or _normalize(row["quote"]) not in _normalize(source):
+        quote_found = row["quote"].strip() and _normalize(row["quote"]) in _normalize(source)
+        if not quote_found:
             editor_faults.append(f"пункт {n}: цитата редактора не найдена в записи {item['source_index']}")
+        if item_remarks or not quote_found:
+            rejected.add(n)
+        remarks.extend(item_remarks)
     if not verdict["ok"] and not remarks and not editor_faults:
         editor_faults.append("редактор не одобрил текст без замечаний")
-    return remarks + editor_faults, remarks
+        rejected.update(range(1, len(items) + 1))
+    return remarks + editor_faults, remarks, rejected
+
+
+def salvage(version: str, attempts: list[dict], entries: list[str]) -> dict | None:
+    """After both attempts failed, keep only confirmed items if there are still enough of them."""
+    candidates = []
+    for attempt in attempts:
+        if "rejected" not in attempt:
+            continue
+        rejected = set(attempt["rejected"])
+        kept = [item for n, item in enumerate(attempt["items"], 1) if n not in rejected]
+        message = render(version, kept)
+        if not program_problems(kept, entries, message):
+            candidates.append((len(kept), message, attempt["rejected"]))
+    if not candidates:
+        return None
+    _, message, dropped = max(candidates, key=lambda c: c[0])
+    return {"message_html": message, "dropped": dropped}
 
 
 def numbered(entries: list[str]) -> str:
@@ -284,8 +309,8 @@ def build(version: str, entries: list[str], client) -> dict:
             attempt.update(items=items, program=program_problems(items, entries, message))
             if not attempt["program"]:
                 verdict = review(client, items, entries)
-                problems, editor_remarks = editor_problems(verdict, items, entries)
-                attempt.update(editor=verdict, editor_problems=problems, editor_remarks=editor_remarks)
+                problems, editor_remarks, rejected = editor_problems(verdict, items, entries)
+                attempt.update(editor=verdict, editor_problems=problems, editor_remarks=editor_remarks, rejected=sorted(rejected))
         except NoticeError as exc:
             attempt["error"] = str(exc)
             attempts.append(attempt)
@@ -295,6 +320,9 @@ def build(version: str, entries: list[str], client) -> dict:
         if not attempt["program"] and not attempt["editor_problems"]:
             return {"kind": "built", "message_html": message, "attempts": attempts}
         remarks = attempt["program"] or attempt["editor_remarks"]
+    kept = salvage(version, attempts, entries)
+    if kept:
+        return {"kind": "built", "message_html": kept["message_html"], "dropped_items": kept["dropped"], "attempts": attempts}
     return {"kind": "short", "message_html": short_notice(version), "reason": "checks failed", "attempts": attempts}
 
 

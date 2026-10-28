@@ -145,8 +145,8 @@ def test_quote_matches_despite_markdown_and_quotes():
     entries = ["[behavior] `update.sh --check` показывает сводку **«Главное»** — см. [доку](docs/x.md)."]
     verdict = {"ok": True, "items": [{"number": 1, "supported": True, "problems": [],
                                        "quote": "update.sh --check показывает сводку Главное — см. доку"}]}
-    problems, remarks = rnb.editor_problems(verdict, [dict(GOOD_ITEMS[0], source_index=1)], entries)
-    assert problems == [] and remarks == []
+    problems, remarks, rejected = rnb.editor_problems(verdict, [dict(GOOD_ITEMS[0], source_index=1)], entries)
+    assert problems == [] and remarks == [] and rejected == set()
 
 
 def test_apostrophe_is_not_escaped_as_entity():
@@ -224,3 +224,51 @@ def test_network_error_is_a_failure_not_a_crash():
     record = rnb.build("0.41.10", ENTRIES, Broken())
     assert record["kind"] == "short"
     assert all("URLError" in a["error"] for a in record["attempts"])
+
+
+FIFTH_ITEM = {"title": "Метки фаз", "text": "Проверка перевода принимает новые метки фаз.", "source_index": 5}
+FIFTH_QUOTE = "Проверка перевода принимает новые метки фаз"
+
+
+def editor_with_bad(bad_number):
+    verdict = editor_ok(quotes=QUOTES + [FIFTH_QUOTE])
+    verdict["ok"] = False
+    verdict["items"][bad_number - 1].update(supported=False, problems=["слово «ночной» без опоры"])
+    return verdict
+
+
+def test_salvage_drops_unconfirmed_item():
+    """0.41.10 CI run: each attempt had exactly one unsupported item out of six."""
+    items = GOOD_ITEMS + [FIFTH_ITEM]
+    client = FakeClient(
+        response({"items": items}), response(editor_with_bad(2)),
+        response({"items": items}), response(editor_with_bad(5)),
+    )
+
+    record = rnb.build("0.41.10", ENTRIES, client)
+
+    assert record["kind"] == "built"
+    assert len(record["dropped_items"]) == 1
+    assert record["message_html"].count("</b> — ") == 4
+    json.dumps(record, ensure_ascii=False)  # notice.json must stay serialisable
+
+
+def test_no_salvage_below_minimum():
+    verdict = editor_ok()
+    verdict["ok"] = False
+    verdict["items"][0].update(supported=False)
+    client = FakeClient(response({"items": GOOD_ITEMS}), response(verdict),
+                        response({"items": GOOD_ITEMS}), response(verdict))
+
+    record = rnb.build("0.41.10", ENTRIES, client)
+
+    assert record["kind"] == "short"
+
+
+def test_successful_record_is_serialisable():
+    client = FakeClient(response({"items": GOOD_ITEMS}), response(editor_ok()))
+    json.dumps(rnb.build("0.41.10", ENTRIES, client), ensure_ascii=False)
+
+
+def test_editor_prompt_allows_simplification():
+    assert "Упрощение и опущенные подробности — не проблема" in rnb.EDITOR_PROMPT
