@@ -421,7 +421,7 @@
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
-      "sha256": "089a8a8776cfb071bd69c49da387d9b3d185235cffc7b5c18f264d2a75d3ebd1"
+      "sha256": "f4556aef3c81bf9ab899948f215fd932a361ef4686971acb9ad17184090db9ea"
     },
     {
       "path": ".claude/skills/_template/SKILL.md",
@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9023b41f7c8565b046bd492f84fd587817a35f57998b561662ecc8c62cef6d11"
+      "sha256": "2a3c3fdaf7e30516f4ee661d3673b14c663dca99ed7f18695775ba5a36114206"
     },
     {
       "path": "CLAUDE.md",
