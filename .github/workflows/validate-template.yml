@@ -829,6 +829,12 @@ jobs:
       - name: Run update.sh manifest fetch test
         run: bash setup/test-update-manifest-fetch.sh
 
+      # WP-529 Ф241: pins today's behaviour for a pilot-edited platform hook
+      # (overwritten, no backup, no warning, second run is a no-op) on the real
+      # update.sh in a sandbox with a curl shim and scheduler stubs.
+      - name: Run update.sh modified-hook test
+        run: bash setup/test-update-modified-hook.sh
+
       # Issue #941: the strategist's commit publisher shipped in seed/ and delivered by update.sh.
       - name: Run ds-publish tests
         run: |

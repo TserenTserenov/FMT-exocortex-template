@@ -1546,6 +1546,9 @@ fi
 WORKSPACE_DIR="$(dirname "$SCRIPT_DIR")"
 RULES_BACKUP_RUN=""
 RULES_SAFE_TO_UPDATE="|"
+HOOKS_BACKUP_RUN=""
+HOOK_BACKUP_FILE=""
+HOOKS_REPLACED=()
 MEMORY_BACKUP_RUN=""
 # The record of installed memory versions, proof (a) of the memory policy (issues #965/#967).
 # The workspace is not a git repository: the record stays local to this installation.
@@ -3038,9 +3041,11 @@ refresh_fpf_base_clone() {
     return 0
 }
 
+# Rules and hooks (WP-529 Ф246): a workspace copy equal to the previous template is
+# safe to replace silently; any other copy carries the user's own edit.
 record_rule_workspace_state() {
     local fpath="$1" src dst
-    case "$fpath" in .claude/rules/*) ;; *) return 0 ;; esac
+    case "$fpath" in .claude/rules/*|.claude/hooks/*) ;; *) return 0 ;; esac
     src="$SCRIPT_DIR/$fpath"
     dst="$WORKSPACE_DIR/$fpath"
     if [ ! -f "$dst" ] || { [ -f "$src" ] && [ "$(hash_file "$src")" = "$(hash_file "$dst")" ]; }; then
@@ -3086,6 +3091,28 @@ backup_memory_file_before_overwrite() {
     mkdir -p "$(dirname "$MEMORY_BACKUP_FILE")" && cp "$dst" "$MEMORY_BACKUP_FILE"
 }
 
+# WP-529 Ф246: a user-edited protective hook is still replaced by the template
+# version (otherwise the install silently stays unprotected), but the edit is kept
+# here first. HOOK_BACKUP_FILE names the copy; non-zero when it could not be saved,
+# and the caller must then leave DST alone.
+backup_hook_before_overwrite() {
+    local fpath="$1" dst="$2"
+    HOOK_BACKUP_FILE=""
+    if [ -z "$HOOKS_BACKUP_RUN" ]; then
+        HOOKS_BACKUP_RUN="$WORKSPACE_DIR/.backups/hooks-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    fi
+    HOOK_BACKUP_FILE="$HOOKS_BACKUP_RUN/${fpath#.claude/hooks/}"
+    [ ! -L "$WORKSPACE_DIR/.backups" ] && mkdir -p "$(dirname "$HOOK_BACKUP_FILE")" && cp -p "$dst" "$HOOK_BACKUP_FILE"
+}
+
+report_replaced_hooks_summary() {
+    [ "${#HOOKS_REPLACED[@]}" -gt 0 ] || return 0
+    echo ""
+    echo "  ⚠ Защитные хуки с вашими правками заменены версией шаблона (${#HOOKS_REPLACED[@]}); ваши версии — в $HOOKS_BACKUP_RUN"
+    printf '    %s\n' "${HOOKS_REPLACED[@]}"
+    echo "    Свои изменения переносите в extensions/ — туда обновление не пишет."
+}
+
 copy_platform_file_preserving_user_space() {
     local src="$1" dst="$2" fpath="$3" user_section=""
     if [ -f "$dst" ]; then
@@ -3097,6 +3124,16 @@ copy_platform_file_preserving_user_space() {
                     echo "  ⚠ $fpath — рабочая копия отличается от прежнего шаблона; пользовательская правка сохранена."
                     echo "    Сверьте: diff \"$src\" \"$dst\""
                     return 1
+                fi
+                ;;
+            .claude/hooks/*)
+                if [ "$(hash_file "$src")" != "$(hash_file "$dst")" ] && ! rule_was_safe_to_update "$fpath"; then
+                    if ! backup_hook_before_overwrite "$fpath" "$dst"; then
+                        echo "  ⚠ $fpath — ваша версия хука не заменена: не удалось сохранить её копию. Сверьте: diff \"$src\" \"$dst\""
+                        return 1
+                    fi
+                    echo "  ⚠ $fpath — ваша версия хука заменена версией шаблона; копия: $HOOK_BACKUP_FILE"
+                    HOOKS_REPLACED+=("$fpath")
                 fi
                 ;;
             .claude/skills/*/SKILL.md)
@@ -5222,6 +5259,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
     # отстать от уже актуального шаблона (repair_pass выше их классифицировал).
     apply_settings_merge_if_requested
     report_author_skip_summary
+    report_replaced_hooks_summary
     report_executable_index_mismatches manifest
     # WP-7 F267 stage 1: an install with nothing to update still gets its capability record.
     if ! $CHECK_ONLY && [ -f "$SCRIPT_DIR/scripts/iwe-capabilities.sh" ]; then
@@ -6913,6 +6951,7 @@ if [ "${AUTHOR_SKIPPED:-0}" -gt 0 ]; then
     echo "    Синхронизация — через promote-скрипты, либо вручную после git push."
 fi
 report_author_skip_summary
+report_replaced_hooks_summary
 echo "=========================================="
 echo ""
 echo "Перезапустите Claude Code для применения обновлений в memory/."
