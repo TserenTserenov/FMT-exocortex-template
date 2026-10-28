@@ -1,6 +1,6 @@
 #!/bin/bash
-# test-update-modified-hook.sh — pins what update.sh does today when the pilot has edited a
-# protective hook that is a platform file (WP-529 Ф241 benchmark).
+# test-update-modified-hook.sh — what update.sh does when the pilot has edited a protective
+# hook that is a platform file (WP-529 Ф241 benchmark, Ф246 fix).
 #
 # Runs the REAL update.sh against a sandbox: its own SCRIPT_DIR/WORKSPACE_DIR under a temp dir,
 # a fake HOME passed only to the child process, a curl shim serving fixture "upstream" content
@@ -13,17 +13,17 @@
 # Scenario B: upstream ships a new version of the hook, the pilot edited the workspace copy.
 #   Step 5 propagation copies the new version over it (copy_platform_file_preserving_user_space).
 #
-# Observed behaviour pinned here (update.sh at the time of writing):
-#   - the platform version overwrites the pilot's edit byte for byte;
-#   - NO backup of the pilot's version is kept: backup_rule_before_overwrite() only backs up
-#     .claude/rules/*, the .backups/ tree stays empty for a hook;
-#   - NO warning: the only line is the ordinary progress line
-#     "⟲ .claude/hooks/destructive-guard.sh → workspace (stale repair)" (A) or
-#     "✓ .claude/hooks/destructive-guard.sh → workspace" (B), no "⚠";
+# Scenario C: upstream ships a new hook version, the workspace copy equals the old template —
+#   nothing of the pilot's to keep.
+#
+# Expected (WP-529 Ф246; before it the edit was lost silently, no copy, no warning):
+#   - the platform version still overwrites the pilot's edit byte for byte (the install must
+#     not stay unprotected);
+#   - the pilot's version is kept under .backups/hooks-pre-update/<run>/ byte for byte;
+#   - a "⚠ ... ваша версия хука заменена" line and the final summary name the hook;
 #   - the executable bit stays set;
-#   - a second run changes nothing in the install tree.
-# If update.sh starts backing up or warning, the "no backup"/"no warning" checks fail on purpose:
-# update the expectations together with the fix.
+#   - a second run changes nothing and keeps no new copy;
+#   - C: an untouched hook is replaced silently, with no copy and no warning.
 #
 # Usage:
 #   bash setup/test-update-modified-hook.sh
@@ -192,11 +192,11 @@ check_rc() {  # $1 = exit code, $2 = pass text, $3 = fail text
 
 hook_line() { grep -F "$HOOK" "$1" || true; }
 
-# check_overwrite_without_backup SCENARIO LOG — the assertions shared by both scenarios.
-check_overwrite_without_backup() {
-    local s="$1" log="$2"
+# check_overwrite_with_backup SCENARIO LOG — the assertions shared by A and B.
+check_overwrite_with_backup() {
+    local s="$1" log="$2" backups
     if cmp -s "$UPSTREAM/$HOOK" "$WORKSPACE_DIR/$HOOK"; then
-        pass "$s: hook bytes == upstream bytes (pilot's edit overwritten)"
+        pass "$s: hook bytes == upstream bytes (protection restored)"
     else
         fail "$s: hook bytes differ from upstream"
     fi
@@ -205,25 +205,21 @@ check_overwrite_without_backup() {
     else
         fail "$s: hook lost its executable bit"
     fi
-    # Pinned: no backup anywhere in the install tree holds the pilot's version.
-    local found=""
-    while IFS= read -r f; do
-        cmp -s "$f" "$TEST_ROOT/user-hook.sh" && found="$f"
-    done < <(find "$WORKSPACE_DIR" -path "$SCRIPT_DIR/.git" -prune -o -type f -print)
-    if [ -z "$found" ]; then
-        pass "$s: no copy of the pilot's version kept (current behaviour: no backup for .claude/hooks/*)"
+    backups=$(find "$WORKSPACE_DIR/.backups/hooks-pre-update" -type f -name "$(basename "$HOOK")" 2>/dev/null)
+    if [ "$(printf '%s\n' "$backups" | grep -c .)" -eq 1 ] && cmp -s "$backups" "$TEST_ROOT/user-hook.sh"; then
+        pass "$s: the pilot's version is kept byte for byte at ${backups#"$WORKSPACE_DIR"/}"
     else
-        fail "$s: the pilot's version was kept at $found — update.sh now backs hooks up, update this test"
+        fail "$s: expected exactly one copy of the pilot's version, found: ${backups:-none}"
     fi
-    if [ ! -d "$WORKSPACE_DIR/.backups" ]; then
-        pass "$s: no .backups/ directory created"
+    if hook_line "$log" | grep -q '⚠.*ваша версия хука заменена.*копия:'; then
+        pass "$s: warning line names the hook and its copy"
     else
-        fail "$s: .backups/ appeared: $(find "$WORKSPACE_DIR/.backups" -type f | head -3)"
+        fail "$s: no warning about the replaced hook; hook lines: $(hook_line "$log")"
     fi
-    if hook_line "$log" | grep -q '⚠'; then
-        fail "$s: a warning about the hook is printed now — update this test: $(hook_line "$log")"
+    if grep -q 'Защитные хуки с вашими правками заменены версией шаблона (1)' "$log"; then
+        pass "$s: final summary reports the replaced hook"
     else
-        pass "$s: no warning about the hook (current behaviour)"
+        fail "$s: final summary does not report the replaced hook"
     fi
 }
 
@@ -242,11 +238,11 @@ else
     fail "A: expected the 'всё актуально' path"
 fi
 if grep -Fq "⟲ $HOOK → workspace (stale repair)" "$TEST_ROOT/out-a1.log"; then
-    pass "A: the only hook line is the progress line '⟲ $HOOK → workspace (stale repair)'"
+    pass "A: progress line '⟲ $HOOK → workspace (stale repair)'"
 else
     fail "A: progress line missing; hook lines: $(hook_line "$TEST_ROOT/out-a1.log")"
 fi
-check_overwrite_without_backup A "$TEST_ROOT/out-a1.log"
+check_overwrite_with_backup A "$TEST_ROOT/out-a1.log"
 
 tree_digest "$WORKSPACE_DIR" > "$TEST_ROOT/tree-a-before.txt"
 run_update "$TEST_ROOT/out-a2.log"; RC_A2=$?
@@ -267,6 +263,7 @@ fi
 # Scenario B: upstream ships a new hook version, pilot edited the workspace hook
 # ------------------------------------------------------------------
 echo "--- Scenario B: modified hook, upstream ships a new version ---"
+rm -rf "$WORKSPACE_DIR/.backups"  # A's copy would be counted as a second one
 # The clone and the workspace hold the "old" platform version; upstream moves on.
 { cat "$TEMPLATE_DIR/$HOOK"; printf '# old platform version\n'; } > "$SCRIPT_DIR/$HOOK"
 chmod +x "$SCRIPT_DIR/$HOOK"
@@ -296,7 +293,7 @@ if grep -Fq "✓ $HOOK → workspace" "$TEST_ROOT/out-b1.log"; then
 else
     fail "B: progress line missing; hook lines: $(hook_line "$TEST_ROOT/out-b1.log")"
 fi
-check_overwrite_without_backup B "$TEST_ROOT/out-b1.log"
+check_overwrite_with_backup B "$TEST_ROOT/out-b1.log"
 
 tree_digest "$WORKSPACE_DIR" > "$TEST_ROOT/tree-b-before.txt"
 run_update "$TEST_ROOT/out-b2.log"; RC_B2=$?
@@ -306,6 +303,46 @@ if diff -q "$TEST_ROOT/tree-b-before.txt" "$TEST_ROOT/tree-b-after.txt" >/dev/nu
     pass "B: second run changes no file (sha256 + mode of the whole install tree)"
 else
     fail "B: second run changed files:"; diff "$TEST_ROOT/tree-b-before.txt" "$TEST_ROOT/tree-b-after.txt" >&2
+fi
+
+# ------------------------------------------------------------------
+# Scenario C: upstream ships a new hook version, the workspace copy is the untouched old one
+# ------------------------------------------------------------------
+echo "--- Scenario C: untouched hook, upstream ships a new version ---"
+rm -rf "$WORKSPACE_DIR/.backups"
+cp -p "$UPSTREAM/$HOOK" "$SCRIPT_DIR/$HOOK"
+cp -p "$UPSTREAM/$HOOK" "$WORKSPACE_DIR/$HOOK"
+python3 - "$SCRIPT_DIR" "$HOOK" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+root, hook = Path(sys.argv[1]), sys.argv[2]
+m = json.loads((root / "update-manifest.json").read_text(encoding="utf-8"))
+for e in m["files"]:
+    if e["path"] == hook:
+        e["sha256"] = hashlib.sha256((root / hook).read_bytes()).hexdigest()
+(root / "update-manifest.json").write_text(json.dumps(m), encoding="utf-8")
+PY
+git -C "$SCRIPT_DIR" add -- "$HOOK" update-manifest.json
+git -C "$SCRIPT_DIR" commit -q -m "hook at previous upstream"
+{ cat "$TEMPLATE_DIR/$HOOK"; printf '# newer platform version\n'; } > "$UPSTREAM/$HOOK"
+write_upstream_manifest
+
+run_update "$TEST_ROOT/out-c1.log"; RC_C1=$?
+check_rc "$RC_C1" "C: run exits 0" "C: run exit $RC_C1"
+if cmp -s "$UPSTREAM/$HOOK" "$WORKSPACE_DIR/$HOOK"; then
+    pass "C: untouched hook updated to the new upstream version"
+else
+    fail "C: hook not updated to the new upstream version"
+fi
+if [ ! -d "$WORKSPACE_DIR/.backups/hooks-pre-update" ]; then
+    pass "C: no copy kept for an untouched hook"
+else
+    fail "C: a copy was kept for an untouched hook: $(find "$WORKSPACE_DIR/.backups/hooks-pre-update" -type f | head -3)"
+fi
+if hook_line "$TEST_ROOT/out-c1.log" | grep -q '⚠' || grep -q 'Защитные хуки с вашими правками' "$TEST_ROOT/out-c1.log"; then
+    fail "C: warning printed for an untouched hook: $(hook_line "$TEST_ROOT/out-c1.log")"
+else
+    pass "C: no warning for an untouched hook"
 fi
 
 # Scheduler calls (if any) went to the refusing stubs, never to the host: reported, not asserted.
