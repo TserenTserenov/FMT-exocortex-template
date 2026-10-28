@@ -76,6 +76,7 @@ EXCLUDED_SCRIPTS=(
     "scripts/verify-template-integrity.sh"      # локальное зеркало CI-гейта для контрибьюторов шаблона, не для пользователей
     "scripts/translate.py"                      # CI-only: translate-sync.yml (синхронизация EN-доков автором шаблона)
     "scripts/delivery_checks.py"                # CI-only: translate-sync.yml
+    "scripts/release-notice-build.py"           # CI-only: notify-update.yml (анонс выпуска, WP-529)
     "scripts/audit-ad-hoc-roles.py"             # нет ссылок ни из одного доставляемого артефакта
     "scripts/agent-dashboard.py"                # только scripts/tests/, нет ссылок из доставляемого
     "scripts/generate-helper-catalog.py"        # нет ссылок из доставляемого

@@ -877,7 +877,7 @@
     },
     {
       "path": ".github/workflows/notify-update.yml",
-      "sha256": "ab7d2b5f41736a73791a50aea0d9f49ace8f7155419c823df0586658f1bf590c"
+      "sha256": "41f7b3253fd875424d11242f1c0f44a0823a474ed8c0ee1a2b9b59f6164fe41f"
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
@@ -885,7 +885,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "871b6891674d67cc3c17e58bb630d931dbb3a7332049138f7cb98e8aaaa73750"
+      "sha256": "aeb1db488e50e57322e83a36f8262bd00ee10cec87b7988dd5de9788fb22f5f0"
     },
     {
       "path": ".gitignore",
@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d51ea701576e02c1a3d350c92dd397be68fc3d0ebf6dc94840c96ef55c80c479"
+      "sha256": "6289c4f72347e926461925159dfa9e694f99f5ff1a87ca7a038d71e500777110"
     },
     {
       "path": "CLAUDE.md",
@@ -1261,7 +1261,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "ff0892ccd02cbda2de4bc9c837a116d6f31498c1a07eb5a941e570ee57efe449"
+      "sha256": "a2e1d01c8abcb59a23f226e6bddbe6dff12acd7597842cb4b6ae4a5d340d01e7"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3417,6 +3417,7 @@
     "scripts/guide-kit-sync.sh",
     "scripts/iwe-catalog-list.py",
     "scripts/iwe-trace.py",
+    "scripts/release-notice-build.py",
     "scripts/session-dispatcher-tsekh.py",
     "scripts/tests/ancestry-hardening-lib.sh",
     "scripts/tests/canon-reconcile-published-smoke.sh",
@@ -3605,6 +3606,7 @@
     "scripts/tests/test_normalize_en_phase_labels.py",
     "scripts/tests/test_pending_lock.py",
     "scripts/tests/test_pending_phases_sweep.sh",
+    "scripts/tests/test_release_notice_build.py",
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
     "scripts/tests/test_session_guard_gitbash.sh",
