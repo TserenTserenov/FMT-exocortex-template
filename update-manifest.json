@@ -3689,6 +3689,7 @@
     "setup/test-update-issue-226.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
+    "setup/test-update-modified-hook.sh",
     "setup/test-update-publish-gate-delivery.sh",
     "setup/test-update-rc-channel.sh",
     "setup/test-update-release-channel.sh",
