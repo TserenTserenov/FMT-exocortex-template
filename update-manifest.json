@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.41.9",
+  "version": "0.41.10",
   "description": "Manifest of files in the standalone English IWE distribution. Used by update.sh.",
   "files": [
     {
