@@ -95,3 +95,8 @@ skills:
     browser: false
     keywords: ["staging", "promote", "author_mode", "extensions gate", "авторское", "шаблон FMT", "L3"]
     description: "Author-only: staging channel (testing → FMT), Extensions Gate, L3 rules."
+
+  - name: mentor-participant-brief
+    browser: true
+    keywords: ["помоги ответить ученику", "помоги ответить участнику", "подготовь ответ участнику", "что известно об участнике", "сводка по участнику", "наставник", "mentor"]
+    description: "MIM mentor helper: find a participant across the mentor's streams, fill the mandatory summary (source and date per field), draft a reply, save a note after the mentor confirms sending. MCP-only (mentorship_* tools)."
