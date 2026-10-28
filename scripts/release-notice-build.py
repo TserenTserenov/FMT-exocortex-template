@@ -10,8 +10,9 @@ program checks -> editor check (model cites the source entry for every item, the
 code verifies the quote) -> one regeneration with the editor's remarks -> otherwise
 the short deterministic notice (version + release link + how to update).
 
-Without ANTHROPIC_API_KEY the short notice is produced; the build never fails on
-the model, only on bad input.
+Models are called through OpenRouter (OPENROUTER_API_KEY, the same secret as
+translate-sync). Without the key the short notice is produced; the build never
+fails on the model, only on bad input.
 """
 
 import argparse
@@ -20,11 +21,20 @@ import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 REPO_URL = "https://github.com/TserenTserenov/FMT-exocortex-template"
-GENERATOR_MODEL = "claude-opus-5-5"
-EDITOR_MODEL = "claude-sonnet-5-5"
+GENERATOR_MODEL = "anthropic/claude-opus-5.5"
+EDITOR_MODEL = "anthropic/claude-sonnet-5.5"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+# Attribution headers give the standard (non-strict) OpenRouter rate limit, as in translate.py.
+OPENROUTER_HEADERS = {
+    "HTTP-Referer": REPO_URL,
+    "X-Title": "IWE Release Notice",
+}
+REQUEST_TIMEOUT_S = 300
 MAX_MESSAGE_CHARS = 3500  # Telegram limit is 4096; headroom for the bot boundary check
 MAX_ITEM_TEXT_CHARS = 300
 MIN_ITEMS, MAX_ITEMS = 4, 6
@@ -206,23 +216,37 @@ def numbered(entries: list[str]) -> str:
     return "\n".join(f"{i}. {entry}" for i, entry in enumerate(entries, 1))
 
 
+class OpenRouterClient:
+    """Chat completions with a strict JSON schema; returns (finish_reason, content)."""
+
+    def __init__(self, api_key: str) -> None:
+        self._headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}", **OPENROUTER_HEADERS}
+
+    def chat_json(self, model: str, system: str, user: str, schema: dict) -> tuple[str, str]:
+        body = {
+            "model": model,
+            "max_tokens": 16000,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "response_format": {"type": "json_schema", "json_schema": {"name": "answer", "strict": True, "schema": schema}},
+            # Route only to providers that honour response_format, never silently drop it.
+            "provider": {"require_parameters": True},
+        }
+        request = urllib.request.Request(OPENROUTER_URL, data=json.dumps(body).encode("utf-8"),
+                                         method="POST", headers=self._headers)
+        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_S) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        choice = payload["choices"][0]
+        return choice["finish_reason"], choice["message"]["content"] or ""
+
+
 def ask_json(client, model: str, system: str, user: str, schema: dict) -> dict:
     """One structured call; an unfinished answer is a failure, never a partial text."""
-    import anthropic
-
     try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=16000,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            output_config={"format": {"type": "json_schema", "schema": schema}},
-        )
-    except anthropic.APIError as exc:
+        finish_reason, text = client.chat_json(model, system, user, schema)
+    except (urllib.error.URLError, TimeoutError, KeyError, IndexError, json.JSONDecodeError) as exc:
         raise NoticeError(f"{model}: {type(exc).__name__}: {exc}") from exc
-    if response.stop_reason != "end_turn":
-        raise NoticeError(f"{model}: stop_reason={response.stop_reason}")
-    text = next((block.text for block in response.content if block.type == "text"), "")
+    if finish_reason != "stop":
+        raise NoticeError(f"{model}: finish_reason={finish_reason}")
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
@@ -251,7 +275,7 @@ def build(version: str, entries: list[str], client) -> dict:
     attempts: list[dict] = []
     remarks: list[str] = []
     if client is None:
-        return {"kind": "short", "message_html": short_notice(version), "reason": "no ANTHROPIC_API_KEY", "attempts": attempts}
+        return {"kind": "short", "message_html": short_notice(version), "reason": "no OPENROUTER_API_KEY", "attempts": attempts}
     for _ in range(2):
         attempt: dict = {"remarks_in": remarks}
         try:
@@ -290,11 +314,8 @@ def main() -> int:
         print("release-notice-build: no CHANGELOG entries", file=sys.stderr)
         return 2
 
-    client = None
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        import anthropic
-
-        client = anthropic.Anthropic()
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    client = OpenRouterClient(api_key) if api_key else None
     record = {"version": args.version, "sha": args.sha, "source_entries": len(entries), **build(args.version, entries, client)}
 
     args.out_dir.mkdir(parents=True, exist_ok=True)

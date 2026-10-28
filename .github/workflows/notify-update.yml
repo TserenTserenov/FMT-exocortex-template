@@ -176,20 +176,13 @@ jobs:
           echo "is_significant=false" >> "$GITHUB_OUTPUT"
           echo "Not significant: only minor/internal changes ($BULLET_COUNT entries, no significant patterns)"
 
-      - name: Set up Python
-        if: steps.check.outputs.has_changes == 'true' && steps.changelog.outputs.has_changelog == 'true' && steps.significance.outputs.is_significant == 'true'
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: '3.12'
-
       - name: Build release notice
         if: steps.check.outputs.has_changes == 'true' && steps.changelog.outputs.has_changelog == 'true' && steps.significance.outputs.is_significant == 'true'
         id: notice
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           VERSION=$(sed -E 's/^\[([^]]+)\].*/\1/' /tmp/changelog_version.txt)
-          python3 -m pip install --quiet anthropic==1.17.0
           python3 scripts/release-notice-build.py --version "$VERSION" \
             --entries /tmp/changelog_entry.txt --out-dir release-notice
           cat release-notice/notice.html

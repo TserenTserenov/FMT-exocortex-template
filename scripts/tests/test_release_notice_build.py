@@ -8,7 +8,6 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -53,22 +52,21 @@ def editor_ok(quotes=QUOTES, supported=True, problems=()):
     }
 
 
-def response(payload, stop_reason="end_turn"):
+def response(payload, finish_reason="stop"):
     text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
-    return SimpleNamespace(stop_reason=stop_reason, content=[SimpleNamespace(type="text", text=text)])
+    return finish_reason, text
 
 
 class FakeClient:
-    """Returns scripted responses in order and records which model was asked."""
+    """Stands in for OpenRouterClient: scripted (finish_reason, content) in order, records models."""
 
     def __init__(self, *responses):
         self._responses = list(responses)
         self.models = []
-        self.messages = SimpleNamespace(create=self._create)
 
-    def _create(self, **kwargs):
-        self.models.append(kwargs["model"])
-        assert kwargs["output_config"]["format"]["type"] == "json_schema"
+    def chat_json(self, model, system, user, schema):
+        self.models.append(model)
+        assert schema["additionalProperties"] is False
         return self._responses.pop(0)
 
 
@@ -94,15 +92,15 @@ def test_happy_path_builds_escaped_html_from_items():
 
 
 def test_truncated_generation_is_not_published():
-    """stop_reason=max_tokens twice → no partial text, short notice."""
-    client = FakeClient(response('{"items": [{"title": "Встроенный', stop_reason="max_tokens"),
-                        response('{"items": [', stop_reason="max_tokens"))
+    """finish_reason=length twice → no partial text, short notice."""
+    client = FakeClient(response('{"items": [{"title": "Встроенный', finish_reason="length"),
+                        response('{"items": [', finish_reason="length"))
 
     record = rnb.build("0.41.10", ENTRIES, client)
 
     assert record["kind"] == "short"
     assert record["message_html"] == rnb.short_notice("0.41.10")
-    assert all("stop_reason=max_tokens" in a["error"] for a in record["attempts"])
+    assert all("finish_reason=length" in a["error"] for a in record["attempts"])
 
 
 def test_invalid_json_counts_as_failure():
@@ -192,11 +190,11 @@ def test_program_checks_reject_unknown_source_and_long_message():
 def test_no_client_gives_short_notice():
     record = rnb.build("0.41.10", ENTRIES, None)
     assert record["kind"] == "short"
-    assert record["reason"] == "no ANTHROPIC_API_KEY"
+    assert record["reason"] == "no OPENROUTER_API_KEY"
 
 
 def test_main_writes_artifacts_without_key(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     entries = tmp_path / "entries.txt"
     entries.write_text(ENTRIES_TEXT, encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["x", "--version", "0.41.10", "--entries", str(entries),
@@ -214,3 +212,15 @@ def test_main_rejects_bad_version(tmp_path, monkeypatch, version):
     entries.write_text(ENTRIES_TEXT, encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["x", "--version", version, "--entries", str(entries), "--out-dir", str(tmp_path)])
     assert rnb.main() == 2
+
+
+def test_network_error_is_a_failure_not_a_crash():
+    import urllib.error
+
+    class Broken:
+        def chat_json(self, *args):
+            raise urllib.error.URLError("timed out")
+
+    record = rnb.build("0.41.10", ENTRIES, Broken())
+    assert record["kind"] == "short"
+    assert all("URLError" in a["error"] for a in record["attempts"])
