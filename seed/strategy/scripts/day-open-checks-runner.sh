@@ -12,9 +12,29 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/day-open-hooks.sh
 . "$SCRIPT_DIR/lib/day-open-hooks.sh"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-IWE="${IWE_ROOT:-$HOME/IWE}"
-IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE/FMT-exocortex-template}"
+# WP-5 (2026-10-28): was `${IWE_ROOT:-$HOME/IWE}`. On a flat install (the
+# checkout IS the workspace) $HOME/IWE does not exist, so the runner printed
+# "DayPlan not found in current/" and blocked the commit while the plan was
+# sitting right there. iwe_resolve_root() walks up from the library instead.
+if ! IWE=$(iwe_resolve_root); then
+  echo "❌ day-open-checks-runner: workspace root not resolved — commit BLOCKED (cannot check what it cannot find)" >&2
+  exit 1
+fi
+# Container install: the template is a sibling checkout. Flat install: the
+# workspace IS the template — the shared-extensions-dir branch below already
+# assumes that, but this default pointed at a nested FMT-exocortex-template a
+# flat install does not have, so the runner reported "no template
+# day-open.checks*.md found" and blocked the commit of a plan that was fine.
+if [ -z "${IWE_TEMPLATE:-}" ]; then
+  if [ -d "$IWE/FMT-exocortex-template" ]; then
+    IWE_TEMPLATE="$IWE/FMT-exocortex-template"
+  else
+    IWE_TEMPLATE="$IWE"
+  fi
+fi
 EXT_DIR="$IWE/extensions"
 DAYPLAN="${1:-}"
 

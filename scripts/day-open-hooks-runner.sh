@@ -22,6 +22,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/day-open-hooks.sh
 . "$SCRIPT_DIR/lib/day-open-hooks.sh"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
 HOOK="${1:-}"
 case "$HOOK" in
@@ -32,7 +34,13 @@ case "$HOOK" in
     ;;
 esac
 
-IWE="${IWE_ROOT:-$HOME/IWE}"
+# WP-5 (2026-10-28): was `${IWE_ROOT:-$HOME/IWE}` — same flat-install defect as
+# day-open-checks-runner.sh: hooks were looked for under a path that does not
+# exist, and the runner reported the extensions directory as missing.
+if ! IWE=$(iwe_resolve_root); then
+  echo "❌ day-open-hooks-runner ($HOOK): workspace root not resolved — cannot enumerate hooks" >&2
+  exit 1
+fi
 EXT_DIR="$IWE/extensions"
 export HOME
 export IWE

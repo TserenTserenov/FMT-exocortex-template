@@ -293,7 +293,7 @@
     },
     {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
-      "sha256": "ba5a04328388f1bdade46bf0e35774c897f67945c0f5ff243c63d32d2a08af8d"
+      "sha256": "10a4dc39615db4beb6b8782923ebfe1b275bfd5545f738c645eedac638687c87"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -881,7 +881,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "15797b61483f1f101c451f61f0ec7dcdf4c9b296b642664dd7b562a8050bba53"
+      "sha256": "10168a6f2e2aabc6c2ed5af04b8b910668270bba235958682d191484344c1a59"
     },
     {
       "path": ".gitignore",
@@ -2337,7 +2337,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "cac7e223c4fc2b59fd11c883a15fed9be65802301d2fccad3f02d072fb2f3276"
+      "sha256": "6541e88c2f4698d24e2a7c441cf9464268a34fea107aaca40547a9597a2fd030"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2361,7 +2361,7 @@
     },
     {
       "path": "scripts/day-open-checks-runner.sh",
-      "sha256": "718821b37c8e66da3578fae3bbc044ad61e50807628c6e8127e6021af7ac2240"
+      "sha256": "361f442336716cb12e2a3176423b0b00a12102b6af797db25f0e72713accdfb3"
     },
     {
       "path": "scripts/day-open-close-error-patch.py",
@@ -2369,7 +2369,7 @@
     },
     {
       "path": "scripts/day-open-hooks-runner.sh",
-      "sha256": "cc630fdd33d46be16b11771028277be6b205834833c0ba42bcc78deeee8f584d"
+      "sha256": "0500647fad02a37f44c547b887dd042a1000d783dd7dc5994c82286c28fcb200"
     },
     {
       "path": "scripts/day-open-ledger-render-patch.py",
@@ -2621,7 +2621,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "aa8567ffec08e127b132ed5a93f08711bf6eb56b1c07b5363af135a7e23a1bc9"
+      "sha256": "df93f4544d6cab0c794ff495f16cee8a0a3abda755e49dc1605403836bb57a28"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -2797,11 +2797,11 @@
     },
     {
       "path": "scripts/server-calendar.sh",
-      "sha256": "972a0f329342ba3e9c625061cce16a5cadf6e976ea821cc9d044f526f0795259"
+      "sha256": "b18a02814375e675a85c329fef13295399a9f8ab7f5ee87faceda24a838a2d10"
     },
     {
       "path": "scripts/server-news.sh",
-      "sha256": "28be1a113884e4f747e43ee659221201456837a49258e645d8342426163f2b1c"
+      "sha256": "5da71ecf1cec766ed7b06848a3a31365c2e93dca3a67bd9e6dcce1d72448ae58"
     },
     {
       "path": "scripts/session-dir-reserve.sh",
@@ -3173,7 +3173,7 @@
     },
     {
       "path": "scripts/week-report-ensure.sh",
-      "sha256": "08ebe1a872d0a02fbdd5ba92115773b919181eda541816286f9f4920e62b2024"
+      "sha256": "4d558a4a34a73a38a2006961d2b07fb092c43ca6d54e203578f800c7bd6238ea"
     },
     {
       "path": "scripts/wp-list.py",
@@ -3217,7 +3217,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-checks-runner.sh",
-      "sha256": "160875cc50b15615dbfa3a43ab4f93abbe5342a11f55f8a8a6bc9dafc6a598de"
+      "sha256": "47972aa3448eb5587220e90d64df674cb733c93170ed80a495e0ddfea5e02788"
     },
     {
       "path": "seed/strategy/scripts/day-open-close-error-patch.py",
@@ -3285,7 +3285,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "c7234a152ff31ee656ea8645188d0dab029fe6fd5a2f481dd58830bf5586360b"
+      "sha256": "231021eedfee411df5846697e77e9198a86d0a59af2b4057a652df7f8010bf52"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3441,6 +3441,7 @@
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_ar293_ai_cli_override.sh",
+    "scripts/tests/test_common_resolve_root.sh",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",

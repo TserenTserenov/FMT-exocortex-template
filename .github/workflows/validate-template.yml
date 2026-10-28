@@ -996,6 +996,15 @@ jobs:
           python3 .claude/skills/residency-gate/tests/test_parser.py
           python3 .claude/skills/residency-gate/tests/test_pre_grant.py
 
+      # WP-5 (2026-10-28): починка 20.10 закрыла резолв корня только в python
+      # (iwe_root.py), а bash-половина (iwe_resolve_root в lib/common.sh) осталась
+      # с прыжком на три уровня вверх — на плоской раскладке она возвращает
+      # РОДИТЕЛЯ репозитория, и скрипты дневного контура молча рапортовали «нет
+      # данных» вместо падения. Тест держит обе раскладки и запрет на догадку
+      # $HOME/IWE; без него дефект вернулся бы так же незаметно, как в 16.10.
+      - name: Test bash workspace-root resolver (flat and container layouts)
+        run: bash scripts/tests/test_common_resolve_root.sh
+
       # Сбой build-runtime обязан оставлять .update-incomplete и валить update.sh
       # ненулевым кодом; recovery-ветка TOTAL_CHANGES=0 обязана его выполнять.
       - name: Test update.sh build-runtime fail-closed contract (WP-529 Ф6)

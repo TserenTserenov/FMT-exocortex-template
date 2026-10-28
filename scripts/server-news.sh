@@ -16,7 +16,14 @@
 
 set -uo pipefail
 
-IWE="${IWE_ROOT:-$HOME/IWE}"
+# WP-5 (2026-10-28): was `${IWE_ROOT:-$HOME/IWE}` — same flat-install defect as
+# the day-open runners: the config was looked for one directory too high.
+# shellcheck source=lib/common.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+if ! IWE=$(iwe_resolve_root); then
+  echo "❌ server-news.sh: workspace root not resolved — news config not found" >&2
+  exit 1
+fi
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 CONFIG="${1:-$IWE/$GOV_REPO/exocortex/day-rhythm-config.yaml}"
 MAX_ITEMS_PER_TOPIC=3

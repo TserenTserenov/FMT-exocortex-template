@@ -27,7 +27,17 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$GOV_DIR" ]; then
-    ROOT="${IWE_WORKSPACE:-${WORKSPACE_DIR:-$HOME/IWE}}"
+    # WP-5 (2026-10-28): was `${IWE_WORKSPACE:-${WORKSPACE_DIR:-$HOME/IWE}}`.
+    # iwe_resolve_root() covers the same env vars plus the workspace
+    # .exocortex.env, and fails loudly instead of guessing $HOME/IWE — on a
+    # flat install the old default pointed one directory above the workspace,
+    # so the script printed "skipped no current/" and exited 0 at Week Close.
+    # shellcheck source=lib/common.sh
+    . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+    if ! ROOT=$(iwe_resolve_root); then
+        echo "WEEKREPORT: workspace root not resolved — cannot ensure the week report" >&2
+        exit 1
+    fi
     GOV_DIR="$ROOT/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 fi
 CURRENT="$GOV_DIR/current"

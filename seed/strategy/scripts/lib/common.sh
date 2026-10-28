@@ -34,30 +34,47 @@ iwe_env_get() {
 }
 
 # iwe_resolve_root [EXPLICIT] — canonical $IWE workspace root.
-# Precedence: explicit arg > IWE_WORKSPACE > IWE_ROOT > workspace .exocortex.env
-# > root derived from this installed library. No $HOME/IWE guess: a wrong root
-# must fail loudly instead of letting a script succeed against another install.
+# Precedence: explicit arg > IWE_WORKSPACE > IWE_ROOT > walk up from this
+# library: at every level, .exocortex.env → WORKSPACE_DIR (only when that
+# directory exists), then that level's workspace markers (governance repo,
+# .iwe-runtime). No $HOME/IWE guess: a wrong root must fail loudly instead of
+# letting a script succeed against another install.
 # (IWE_ROOT_ARG, a third variant seen in some scripts, is intentionally NOT
 # consulted here — callers that need a positional-arg override should pass
 # it as EXPLICIT instead of adding a 4th env var to this precedence chain.)
+#
+# WP-5 (2026-10-28): the walk replaces a fixed three-level jump, which landed
+# on the PARENT of a flat install. Synced with scripts/lib/common.sh — see the
+# comment there and scripts/tests/test_common_resolve_root.sh.
 iwe_resolve_root() {
-  local explicit="${1:-}" library_root configured
+  local explicit="${1:-}" dir gov configured
   [ -n "$explicit" ] && { printf '%s\n' "$explicit"; return 0; }
   [ -n "${IWE_WORKSPACE:-}" ] && { printf '%s\n' "$IWE_WORKSPACE"; return 0; }
   [ -n "${IWE_ROOT:-}" ] && { printf '%s\n' "$IWE_ROOT"; return 0; }
 
-  library_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P) || return 1
-  if [ -f "$library_root/.exocortex.env" ]; then
-    configured=$(iwe_env_get "$library_root/.exocortex.env" WORKSPACE_DIR 2>/dev/null || true)
-    if [ -n "$configured" ] && [ -d "$configured" ]; then
-      printf '%s\n' "$configured"
+  gov="${IWE_GOVERNANCE_REPO:-DS-strategy}"
+  dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || return 1
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if [ -f "$dir/.exocortex.env" ]; then
+      configured=$(iwe_env_get "$dir/.exocortex.env" WORKSPACE_DIR 2>/dev/null || true)
+      if [ -n "$configured" ] && [ -d "$configured" ]; then
+        printf '%s\n' "$configured"
+        return 0
+      fi
+    fi
+    if [ -d "$dir/$gov" ] || [ -d "$dir/.iwe-runtime" ]; then
+      printf '%s\n' "$dir"
       return 0
     fi
-  fi
-  if [ -d "$library_root/FMT-exocortex-template" ] || [ -d "$library_root/.iwe-runtime" ]; then
-    printf '%s\n' "$library_root"
-    return 0
-  fi
+    # Container layout last: the workspace is the directory CONTAINING the
+    # template checkout. A flat install matches the markers above first, so it
+    # is never lifted to its parent.
+    if [ -d "$dir/FMT-exocortex-template" ]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir=$(cd "$dir/.." 2>/dev/null && pwd -P) || dir=""
+  done
   echo "iwe_resolve_root: cannot determine workspace root; pass an explicit path or set IWE_WORKSPACE/IWE_ROOT" >&2
   return 1
 }

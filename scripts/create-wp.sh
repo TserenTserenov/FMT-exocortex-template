@@ -42,7 +42,16 @@
 
 set -uo pipefail
 
-IWE="${IWE_ROOT:-$HOME/IWE}"
+# WP-5 (2026-10-28): was `${IWE_ROOT:-$HOME/IWE}` — on a flat install the
+# script refused to register a WP ("DS-strategy not found in $HOME/IWE"),
+# which is exactly how this defect surfaced: it blocked the registration of
+# the work package that fixes it. iwe_resolve_root() walks up from the library.
+# shellcheck source=lib/common.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+if ! IWE=$(iwe_resolve_root); then
+  echo "ERROR: cannot determine workspace root — set IWE_WORKSPACE or pass the script from inside the workspace" >&2
+  exit 1
+fi
 
 # --- Определить governance-репо ---
 # Приоритет: (1) явная переменная IWE_GOVERNANCE_REPO → (2) DS-strategy (конвенция по умолчанию)

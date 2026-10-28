@@ -39,10 +39,27 @@ if [ -z "${WORKSPACE_DIR:-}" ]; then
     # (update-manifest.json) AND by sitting inside a workspace (.exocortex.env
     # in the parent, none inside it). Either alone is too broad: a partial
     # layout must not lift WORKSPACE_DIR to an unrelated parent.
-    if [[ "$(basename "$_IWE_BOOTSTRAP_CANDIDATE")" == "FMT-exocortex-template" ]] \
-       || { [ -f "$_IWE_BOOTSTRAP_CANDIDATE/update-manifest.json" ] \
-            && [ ! -f "$_IWE_BOOTSTRAP_CANDIDATE/.exocortex.env" ] \
-            && [ -f "$_IWE_BOOTSTRAP_CANDIDATE/../.exocortex.env" ]; }; then
+    #
+    # WP-5 (2026-10-28): the name test alone lifted a FLAT install — where the
+    # checkout IS the workspace — to its parent, so every script sourcing this
+    # bootstrap read WORKSPACE_DIR one directory above the real data. 40 call
+    # sites were affected; the visible symptom was silent, not loud:
+    # memory-validate.sh reported "0/0 files OK" while finding no memory
+    # folder at all. Markers below are the same set iwe_resolve_root()
+    # (scripts/lib/common.sh) and iwe_root.py accept, so the three root
+    # resolvers in this template cannot disagree. A bare template checkout has
+    # none of them: .exocortex.env and .iwe-runtime are created by update.sh,
+    # and the governance repo lives beside the checkout, not inside it.
+    _IWE_CANDIDATE_IS_WORKSPACE=0
+    if [ -f "$_IWE_BOOTSTRAP_CANDIDATE/.exocortex.env" ] \
+       || [ -d "$_IWE_BOOTSTRAP_CANDIDATE/.iwe-runtime" ] \
+       || [ -d "$_IWE_BOOTSTRAP_CANDIDATE/${IWE_GOVERNANCE_REPO:-DS-strategy}" ]; then
+      _IWE_CANDIDATE_IS_WORKSPACE=1
+    fi
+    if [ "$_IWE_CANDIDATE_IS_WORKSPACE" -eq 0 ] \
+       && { [[ "$(basename "$_IWE_BOOTSTRAP_CANDIDATE")" == "FMT-exocortex-template" ]] \
+            || { [ -f "$_IWE_BOOTSTRAP_CANDIDATE/update-manifest.json" ] \
+                 && [ -f "$_IWE_BOOTSTRAP_CANDIDATE/../.exocortex.env" ]; }; }; then
       WORKSPACE_DIR="$(cd "$_IWE_BOOTSTRAP_CANDIDATE/.." && pwd)"
     else
       WORKSPACE_DIR="$_IWE_BOOTSTRAP_CANDIDATE"

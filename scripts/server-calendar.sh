@@ -112,7 +112,14 @@ while [ "$#" -gt 0 ]; do
 done
 
 DATE="${DATE_ARG:-$(date +%Y-%m-%d)}"
-IWE="${IWE_ROOT:-$HOME/IWE}"
+# WP-5 (2026-10-28): was `${IWE_ROOT:-$HOME/IWE}` — the fallback calendar script
+# looked for its config under a path a flat install does not have.
+# shellcheck source=lib/common.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+if ! IWE=$(iwe_resolve_root); then
+  echo "❌ server-calendar.sh: workspace root not resolved — calendar config not found" >&2
+  exit 1
+fi
 CONFIG="${CONFIG_ARG:-$IWE/.iwe-runtime/day-rhythm-config.yaml}"
 SECRETS_FILE="${HOME}/.secrets/google-calendar"
 
