@@ -363,9 +363,12 @@ jobs:
               if relative in ignored:
                   continue
               files.append({'path': relative, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+          # The English distribution ships the same release as the Russian one;
+          # a literal here stayed at 0.41.9 after 0.41.10 (WP-529 Ф241).
+          ru_version = json.loads(Path('update-manifest.json').read_text(encoding='utf-8'))['version']
           manifest = {
               'schema_version': 2,
-              'version': '0.41.9',
+              'version': ru_version,
               'description': 'Manifest of files in the standalone English IWE distribution. Used by update.sh.',
               'files': files,
               'excluded_paths': [],

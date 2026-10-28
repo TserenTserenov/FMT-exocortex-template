@@ -1,21 +1,34 @@
 name: Notify Template Update
 
 # Ежедневно в 7:28 MSK (4:28 UTC) проверяет коммиты за 24ч
-# и отправляет дайджест подписчикам через webhook бота @aist_me_bot.
-# Также можно запустить вручную для тестирования.
+# и отправляет анонс выпуска подписчикам через webhook бота @aist_me_bot.
+# WP-529: текст анонса собирает и проверяет scripts/release-notice-build.py
+# (модель → проверки → редактор → одна поправка → иначе короткий анонс).
+# Готовый текст сохраняется артефактом и уходит предпросмотром автору;
+# рассылка — отдельной задачей в окружении release-notice (там задаются
+# задержка и право остановить рассылку). Ручной запуск по умолчанию — dry-run.
 
 on:
   schedule:
     - cron: '28 4 * * *'  # 7:28 MSK
-  workflow_dispatch:       # ручной запуск для тестирования
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Только собрать анонс и показать артефакт, без предпросмотра и рассылки'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 jobs:
-  notify:
+  build:
     runs-on: ubuntu-latest
     if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    outputs:
+      ready: ${{ steps.notice.outputs.ready }}
+      version: ${{ steps.notice.outputs.version }}
+      notice_b64: ${{ steps.notice.outputs.notice_b64 }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -97,10 +110,8 @@ jobs:
               # Last block
               if current_block and current_date in (today, yesterday) and released(current_ver):
                   entries.extend(current_block)
-          result = ''.join(entries).strip()
-          # Limit to ~50 lines
-          lines = result.split('\n')[:50]
-          print('\n'.join(lines))
+          # Полный текст: обрыв на 50 строках выбрасывал пункты из анонса (WP-529).
+          print(''.join(entries).strip())
           " > /tmp/changelog_entry.txt
 
           echo "$VERSION" > /tmp/changelog_version.txt
@@ -165,25 +176,70 @@ jobs:
           echo "is_significant=false" >> "$GITHUB_OUTPUT"
           echo "Not significant: only minor/internal changes ($BULLET_COUNT entries, no significant patterns)"
 
-      - name: Send notification via bot webhook
+      - name: Set up Python
         if: steps.check.outputs.has_changes == 'true' && steps.changelog.outputs.has_changelog == 'true' && steps.significance.outputs.is_significant == 'true'
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Build release notice
+        if: steps.check.outputs.has_changes == 'true' && steps.changelog.outputs.has_changelog == 'true' && steps.significance.outputs.is_significant == 'true'
+        id: notice
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          VERSION=$(sed -E 's/^\[([^]]+)\].*/\1/' /tmp/changelog_version.txt)
+          python3 -m pip install --quiet anthropic==1.17.0
+          python3 scripts/release-notice-build.py --version "$VERSION" \
+            --entries /tmp/changelog_entry.txt --out-dir release-notice
+          cat release-notice/notice.html
+          {
+            echo "ready=true"
+            echo "version=$VERSION"
+            echo "notice_b64=$(base64 -w0 release-notice/notice.html)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Save notice artifact
+        if: steps.notice.outputs.ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-notice-${{ steps.notice.outputs.version }}
+          path: release-notice/
+
+      - name: Send preview to the author
+        if: steps.notice.outputs.ready == 'true' && (github.event_name == 'schedule' || inputs.dry_run == false)
         env:
           BOT_WEBHOOK_URL: ${{ secrets.BOT_WEBHOOK_URL }}
           TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
         run: |
-          VERSION=$(cat /tmp/changelog_version.txt)
-          ENTRY=$(cat /tmp/changelog_entry.txt)
-          COMMIT_COUNT="${{ steps.check.outputs.commit_count }}"
+          jq -n --arg version "${{ steps.notice.outputs.version }}" --rawfile html release-notice/notice.html \
+            '{version: $version, message_html: $html, preview: true}' > /tmp/preview.json
+          curl -fsS -X POST "${BOT_WEBHOOK_URL}/api/template-update" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: ${TEMPLATE_WEBHOOK_SECRET}" \
+            --data @/tmp/preview.json
 
-          # Send to bot webhook (bot broadcasts to subscribers)
+  send:
+    needs: build
+    if: needs.build.outputs.ready == 'true' && (github.event_name == 'schedule' || inputs.dry_run == false)
+    runs-on: ubuntu-latest
+    environment: release-notice
+    steps:
+      - name: Send notice via bot webhook
+        env:
+          BOT_WEBHOOK_URL: ${{ secrets.BOT_WEBHOOK_URL }}
+          TEMPLATE_WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
+          VERSION: ${{ needs.build.outputs.version }}
+          NOTICE_B64: ${{ needs.build.outputs.notice_b64 }}
+        run: |
+          printf '%s' "$NOTICE_B64" | base64 -d > /tmp/notice.html
+          jq -n --arg version "$VERSION" --rawfile html /tmp/notice.html \
+            '{version: $version, message_html: $html}' > /tmp/notice.json
+
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BOT_WEBHOOK_URL}/api/template-update" \
             -H "Content-Type: application/json" \
             -H "X-Webhook-Secret: ${TEMPLATE_WEBHOOK_SECRET}" \
-            -d "$(jq -n \
-              --arg version "$VERSION" \
-              --arg changelog "$ENTRY" \
-              --arg commit_count "$COMMIT_COUNT" \
-              '{version: $version, changelog: $changelog, commit_count: ($commit_count | tonumber)}')")
+            --data @/tmp/notice.json)
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | sed '$d')
