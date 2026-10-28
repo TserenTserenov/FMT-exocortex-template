@@ -365,6 +365,16 @@ hash_file() {
     fi
 }
 
+# Reject an unusable proof record before parsing it; never truncate it (#1010).
+# KEEP IN SYNC with setup.sh/update.sh.
+memory_record_size_ok() {
+    local file="$1" size
+    [ ! -L "$file" ] && [ -f "$file" ] && [ -r "$file" ] || return 1
+    size=$(stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null) || return 1
+    case "$size" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$size" -le 1048576 ]
+}
+
 # memory_record_put FILE KEY HASH — the record of installed memory versions
 # ($WORKSPACE_DIR/.memory-deployed.tsv, one "key<TAB>sha256" line per file): afterwards its line for
 # KEY says HASH. update.sh reads it to tell a memory copy nobody changed from an edited one (issues
@@ -380,6 +390,9 @@ memory_record_put() {
     if [ -L "$file" ] || { [ -e "$file" ] && { [ ! -f "$file" ] || [ ! -r "$file" ]; }; }; then
         return 1
     fi
+    if [ -e "$file" ]; then
+        memory_record_size_ok "$file" || return 1
+    fi
     tmp=$(mktemp "$file.XXXXXX" 2>/dev/null) || return 1
     if [ -f "$file" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
@@ -390,7 +403,8 @@ memory_record_put() {
             [ "${line%"$tab"*}" = "$key" ] || printf '%s\n' "$line"
         done < "$file" > "$tmp" || { rm -f "$tmp"; return 1; }
     fi
-    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" && mv -f "$tmp" "$file"; then
+    if printf '%s\t%s\n' "$key" "$hash" >> "$tmp" \
+        && memory_record_size_ok "$tmp" && mv -f "$tmp" "$file"; then
         return 0
     fi
     rm -f "$tmp"

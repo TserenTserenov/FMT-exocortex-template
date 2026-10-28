@@ -813,8 +813,10 @@ jobs:
           python3 .claude/hooks/tests/destructive-guard/perf_cases.py
           python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
           bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
+          bash .claude/hooks/tests/test-destructive-guard-indirect-input.sh
           bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
           bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
+          bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
       # last published release by default, moving main only via explicit
