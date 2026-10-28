@@ -490,7 +490,7 @@ check_snapshot_before_action() {
     if [ "$snapshot_done" = "true" ]; then
         emit_verdict "ok" "AR.101" "snapshot сделан ДО action — OK"
     else
-        emit_verdict "warn" "AR.101" "DDL/migration/bulk-delete без предварительного snapshot — выполни \\dt / SELECT COUNT(*) / find ПЕРЕД действием (feedback_behaviour Правило 1b, WP-183 incident)"
+        emit_verdict "warn" "AR.101" "DDL/migration/bulk-delete без предварительного snapshot — выполни \\dt / SELECT COUNT(*) / find ПЕРЕД действием (правило «проверить состояние ДО действия»: handoff и память могут врать, проверка занимает секунды)"
     fi
 }
 
@@ -503,7 +503,7 @@ check_incident_diagnosis() {
     hypothesis_count=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("hypothesis_count",0))' 2>/dev/null)
 
     if [ "$backends_checked" != "true" ] && python3 -c "exit(0 if int('${hypothesis_count:-0}') > 0 else 1)" 2>/dev/null; then
-        emit_verdict "warn" "AR.102" "сформированы гипотезы без проверки ВСЕХ backends — сначала вызвать каждый backend через другого клиента, потом гипотезы (feedback_behaviour Правило 8, WP-183: 1.5h на ложных гипотезах)"
+        emit_verdict "warn" "AR.102" "сформированы гипотезы без проверки ВСЕХ backends — сначала вызвать каждый backend через другого клиента, потом гипотезы (правило диагностики инцидента: совпадение во времени не причина, ложные гипотезы стоят часов)"
         return
     fi
     if [ "$backends_checked" = "true" ]; then
@@ -522,7 +522,7 @@ check_memory_drift() {
     memory_updated=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("memory_updated",False)).lower())' 2>/dev/null)
 
     if [ "$captures_pending" = "true" ] && [ "$memory_updated" != "true" ]; then
-        emit_verdict "warn" "AR.103" "есть Capture-маркеры в сессии — обнови memory ДО следующего Day Open (feedback_behaviour Правило 9). «Обновить в Day Close» = задача, не намерение"
+        emit_verdict "warn" "AR.103" "есть Capture-маркеры в сессии — обнови memory ДО следующего Day Open (правило памяти: при закрытии задачи, снятии блокера или смене внешнего факта память обновляется ДО следующего открытия дня). «Обновить в Day Close» = задача, не намерение"
         return
     fi
     emit_verdict "ok" "AR.103" "memory drift: нет pending captures или memory уже обновлена"
@@ -549,7 +549,7 @@ check_systemic_review() {
     if [ "$review_done" = "true" ]; then
         emit_verdict "ok" "AR.104" "независимый ревью проведён — OK"
     else
-        emit_verdict "warn" "AR.104" "заявка на «системный фикс» / «root cause» без независимого ревью — запусти Agent(haiku, R23) ДО финального отчёта (feedback_behaviour Правило 13)"
+        emit_verdict "warn" "AR.104" "заявка на «системный фикс» / «root cause» без независимого ревью — запусти Agent(haiku, R23) ДО финального отчёта (правило «заявка на системный фикс подтверждается независимой проверкой»)"
     fi
 }
 
@@ -575,7 +575,7 @@ check_rebrand_e2e() {
     if [ "$retest_done" = "true" ]; then
         emit_verdict "ok" "AR.106" "end-to-end retest в реальном клиенте пройден — OK"
     else
-        emit_verdict "warn" "AR.106" "изменение display identity без end-to-end retest — ОБЯЗАТЕЛЕН ручной тест в реальном клиенте: «как называется сервис?», OAuth consent screen, connector label (feedback_behaviour Правило 20, WP-259 incident)"
+        emit_verdict "warn" "AR.106" "изменение display identity без end-to-end retest — ОБЯЗАТЕЛЕН ручной тест в реальном клиенте: «как называется сервис?», OAuth consent screen, connector label (правило смены названия: автоматическая проверка не ловит путаницу identity, ручной тест в реальном клиенте блокирует закрытие)"
     fi
 }
 
