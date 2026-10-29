@@ -251,6 +251,15 @@ rm -f "$SKIP_LOG"
 printf '%s: %s\n' "$K" "$(day_offset +5)" > "$PARAMS"
 run_gate_os msys 'git commit -m x' >/dev/null
 if grep -q "until=$(day_offset +5)" "$SKIP_LOG" 2>/dev/null; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: строка журнала не записана"; fi
+if grep -qE "ostype=msys uname_s=[^ ]+$" "$SKIP_LOG" 2>/dev/null; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: в журнале нет ostype=msys и uname_s= (F272)"; fi
+# поля журнала независимы: при подменённом OSTYPE uname_s остаётся настоящим (на Linux = Linux)
+if [ "$(uname -s)" = Linux ] && grep -q "uname_s=Linux" "$SKIP_LOG" 2>/dev/null; then PASS=$((PASS+1)); elif [ "$(uname -s)" != Linux ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: uname_s должен показать настоящую платформу при подменённом OSTYPE (F272)"; fi
+# фальшивый uname в PATH не попадает в поле uname_s
+FAKE_BIN="$TMP_ROOT/fakebin"; mkdir -p "$FAKE_BIN"; printf '#!/bin/sh\necho MSYS_NT-FAKE\n' > "$FAKE_BIN/uname"; chmod +x "$FAKE_BIN/uname"
+rm -f "$SKIP_LOG"
+printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"},"session_id":"%s"}' "$SID" | PATH="$FAKE_BIN:$PATH" OSTYPE=msys IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
+if grep -q "uname_s=MSYS_NT-FAKE" "$SKIP_LOG" 2>/dev/null; then FAIL=$((FAIL+1)); echo "FAIL: skip: uname_s взят из пользовательского PATH (F272)"; else PASS=$((PASS+1)); fi
+rm -rf "$FAKE_BIN"
 rm -rf "$TMP_ROOT/.iwe-runtime/session-open-gate-skip.log"
 mkdir -p "$SKIP_LOG"   # каталог вместо файла: запись невозможна
 got=$(run_gate_os msys 'git commit -m x')
