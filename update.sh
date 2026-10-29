@@ -1780,6 +1780,38 @@ ENVEOF
     exit "$EXIT_RUNTIME"
 }
 
+# issue #1326 п.4: a .backups/ root the update can't write into used to be
+# discovered mid-apply, by the first backup call that happened to need it —
+# some files already replaced by then. Stop before Step 5 touches anything.
+require_backup_root_writable() {
+    local backup_root="$WORKSPACE_DIR/.backups" probe
+    if [ -L "$backup_root" ]; then
+        echo "ОШИБКА: .backups является символической ссылкой: $backup_root" >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    if [ -e "$backup_root" ] && [ ! -d "$backup_root" ]; then
+        echo "ОШИБКА: .backups существует, но не является каталогом: $backup_root" >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    if ! mkdir -p "$backup_root" 2>/dev/null; then
+        echo "ОШИБКА: не удалось создать каталог резервных копий: $backup_root" >&2
+        echo "  Обновление не начато, файлы не менялись." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    # Re-check right after mkdir -p: narrows (does not close) the window
+    # where something swaps the path between the checks above and here.
+    if [ -L "$backup_root" ] || [ ! -d "$backup_root" ]; then
+        echo "ОШИБКА: .backups изменился во время проверки: $backup_root" >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    probe=$(mktemp -d "$backup_root/.write-probe.XXXXXXXXXX" 2>/dev/null) || {
+        echo "ОШИБКА: каталог резервных копий недоступен на запись: $backup_root" >&2
+        echo "  Обновление не начато, файлы не менялись. Проверьте права доступа и повторите." >&2
+        exit "$EXIT_RUNTIME"
+    }
+    rmdir "$probe" 2>/dev/null || true
+}
+
 finish_update_transaction() {
     if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
         rm -f "$UPDATE_INCOMPLETE_MARKER"
@@ -5476,6 +5508,7 @@ fi
 # === Step 5: Apply updates ===
 echo ""
 echo "Применяю обновления..."
+require_backup_root_writable
 require_env_before_update
 begin_update_transaction
 remember_untouched_memory_before_apply

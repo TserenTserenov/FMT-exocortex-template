@@ -5745,6 +5745,112 @@ HEREDOC
     fi
 fi
 
+# ============================================================================
+# T51: require_backup_root_writable() stops Step 5 before any file is
+# replaced when .backups/ can't take new entries (issue #1326 п.4)
+# ============================================================================
+echo "--- T51: .backups/ unwritable stops the update before it touches anything ---"
+
+T51_FN_BLOCK=$(awk '/^require_backup_root_writable\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
+if [ -z "$T51_FN_BLOCK" ]; then
+    fail "T51: could not extract require_backup_root_writable() from update.sh — signature moved?"
+else
+    T51_DIR="$TEST_WS/t51-backup-root-guard"
+    mkdir -p "$T51_DIR"
+    printf '%s\n' "$T51_FN_BLOCK" > "$T51_DIR/fn.sh"
+
+    # chmod 000 only means anything for a non-root test process — a root
+    # runner (seen on some CI containers) ignores the mode bits entirely, so
+    # this one scenario is skipped there rather than reported as a failure.
+    T51_IS_ROOT=false
+    [ "$(id -u)" = "0" ] && T51_IS_ROOT=true
+
+    t51_run() {
+        # $1 = workspace dir; isolates EXIT_RUNTIME/WORKSPACE_DIR to the
+        # subshell so the guard's own `exit` can't end this test script.
+        bash -c 'set -e; EXIT_RUNTIME=3; WORKSPACE_DIR="$1"; source "$2"; require_backup_root_writable; echo T51_PASSED_GATE' \
+            -- "$1" "$T51_DIR/fn.sh"
+    }
+
+    if $T51_IS_ROOT; then
+        echo "  (skip: running as root — chmod 000 is a no-op for this scenario)"
+    else
+        T51_WS="$T51_DIR/ws-unwritable"
+        mkdir -p "$T51_WS/.backups/memory-pre-update"
+        printf 'a prior backup' > "$T51_WS/.backups/memory-pre-update/old.md"
+        T51_SUM_BEFORE=$(find "$T51_WS" -type f -exec shasum -a 256 {} \; | sort)
+        chmod 000 "$T51_WS/.backups"
+        set +e
+        T51_OUT=$(t51_run "$T51_WS" 2>&1)
+        T51_RC=$?
+        set -e
+        chmod 755 "$T51_WS/.backups"
+        T51_SUM_AFTER=$(find "$T51_WS" -type f -exec shasum -a 256 {} \; | sort)
+
+        if [ "$T51_RC" -eq 3 ] && ! printf '%s' "$T51_OUT" | grep -q T51_PASSED_GATE; then
+            pass "T51: an existing .backups/ with mode 000 fails the gate with exit 3"
+        else
+            fail "T51: expected exit 3 before the gate passes, got rc=$T51_RC out=$T51_OUT"
+        fi
+        if [ "$T51_SUM_BEFORE" = "$T51_SUM_AFTER" ]; then
+            pass "T51: the prior backup under .backups/ is untouched by the failed probe"
+        else
+            fail "T51: files under the workspace changed even though the gate should run before any apply"
+        fi
+    fi
+
+    T51_SYMLINK_WS="$T51_DIR/ws-symlink"
+    mkdir -p "$T51_SYMLINK_WS" "$T51_DIR/elsewhere"
+    ln -s "$T51_DIR/elsewhere" "$T51_SYMLINK_WS/.backups"
+    set +e
+    T51_SYMLINK_RC=$(t51_run "$T51_SYMLINK_WS" >/dev/null 2>&1; echo $?)
+    set -e
+    if [ "$T51_SYMLINK_RC" -eq 3 ]; then
+        pass "T51: .backups as a symlink (even to a writable target) fails the gate with exit 3"
+    else
+        fail "T51: expected exit 3 for a symlinked .backups, got rc=$T51_SYMLINK_RC"
+    fi
+
+    T51_BROKEN_WS="$T51_DIR/ws-broken-symlink"
+    mkdir -p "$T51_BROKEN_WS"
+    ln -s "$T51_DIR/does-not-exist" "$T51_BROKEN_WS/.backups"
+    set +e
+    T51_BROKEN_RC=$(t51_run "$T51_BROKEN_WS" >/dev/null 2>&1; echo $?)
+    set -e
+    if [ "$T51_BROKEN_RC" -eq 3 ]; then
+        pass "T51: a broken .backups symlink fails the gate with exit 3"
+    else
+        fail "T51: expected exit 3 for a broken .backups symlink, got rc=$T51_BROKEN_RC"
+    fi
+
+    T51_FILE_WS="$T51_DIR/ws-file-not-dir"
+    mkdir -p "$T51_FILE_WS"
+    touch "$T51_FILE_WS/.backups"
+    set +e
+    T51_FILE_RC=$(t51_run "$T51_FILE_WS" >/dev/null 2>&1; echo $?)
+    set -e
+    if [ "$T51_FILE_RC" -eq 3 ]; then
+        pass "T51: .backups as a plain file (not a directory) fails the gate with exit 3"
+    else
+        fail "T51: expected exit 3 for a non-directory .backups, got rc=$T51_FILE_RC"
+    fi
+
+    T51_OK_WS="$T51_DIR/ws-missing-but-writable"
+    mkdir -p "$T51_OK_WS"
+    if t51_run "$T51_OK_WS" | grep -q T51_PASSED_GATE && [ -d "$T51_OK_WS/.backups" ]; then
+        pass "T51: a missing .backups/ under a writable parent is created and the gate passes"
+    else
+        fail "T51: the positive case (no .backups yet, writable parent) regressed"
+    fi
+
+    T51_WIRED=$(grep -c '^require_backup_root_writable$' "$TEMPLATE_DIR/update.sh")
+    if [ "$T51_WIRED" -ge 1 ]; then
+        pass "T51: Step 5 actually calls require_backup_root_writable()"
+    else
+        fail "T51: require_backup_root_writable() exists but Step 5 never calls it"
+    fi
+fi
+
 # ============================================================
 # Summary
 # ============================================================
