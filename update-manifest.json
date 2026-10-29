@@ -417,7 +417,7 @@
     },
     {
       "path": ".claude/skills-catalog.yaml",
-      "sha256": "7872639bec4c56ef1b9f4e7a9f3f04995314c6be8bd7a6d5af060f440ddf0e3a"
+      "sha256": "bd683f4ab60130fd4b5917914786485ec03085de52b8263efb7bc5f0d3917221"
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
@@ -509,7 +509,7 @@
     },
     {
       "path": ".claude/skills/diagnose/SKILL.md",
-      "sha256": "6cd49fb0c6d81f79fdd01350ad19218bbada178e982e9fae3c6cfc3570f3f7ad"
+      "sha256": "c9a3d9e5fb1ad86c1a68a1e3c9cd36d830c2208dd3b9508e012e860b3b843ed6"
     },
     {
       "path": ".claude/skills/discovery-session/SKILL.md",
@@ -641,7 +641,7 @@
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
-      "sha256": "a6fc861d0d5f5469a713c99efcbe225d0a87ab45d7fff00e9925fff09c467fef"
+      "sha256": "c127e53f2a2b321b94ebb15e8e7588fdca18784077541fa418a12232f66c059d"
     },
     {
       "path": ".claude/skills/org-dev/test_skill.sh",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6587c7246fa6fbde4778e12fdc13f90a4dad45c9d3aa48c403284c3b50bff3d7"
+      "sha256": "c8f7187b97c2522306aa222d06034fdea6b630cd2e71b20bafe7f48badfbe0eb"
     },
     {
       "path": "CLAUDE.md",
