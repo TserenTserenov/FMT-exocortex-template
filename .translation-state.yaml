@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-10-29T17:43:57Z'
-last_synced_sha: 67be296562f2ac43ca1dc76f0a1e7921da2f5f91
+files_translated:
+- docs/PLATFORM-COMPAT.md
+last_run_utc: '2026-10-29T18:02:05Z'
+last_synced_sha: 6dccc33af7db28827b44a4976bda9ccb021a4b10
 schema_version: 1
