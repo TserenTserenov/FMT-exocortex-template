@@ -130,6 +130,75 @@ if [ "$AGENT_KEYED" = 1 ]; then
   { [ -n "$LAST_HK" ] && printf '%s' "$LAST_HK" | grep -qE "$ALLOWED_HOUSEKEEPING_REASONS"; } || exit 0
 fi
 
+# Opt-in skip for Windows / Git Bash (WP-7 Ф271, issue #1281). session-guard.sh
+# cannot open a `--wp` semaphore there (no fcntl), so without a way out every
+# commit is blocked although PLATFORM-COMPAT.md calls Git Bash "best-effort".
+# The gate stays mandatory by default: the skip needs an explicit, dated key in
+# $IWE_ROOT/params.yaml, works only where bash reports OSTYPE msys/cygwin, and
+# every use is announced on stderr and logged. Any doubt (missing/duplicate/garbled
+# key, impossible date, date in the past or more than 30 days ahead) keeps the gate on.
+#   session_open_gate_skip_until: 2026-11-05   # optional trailing comment
+# Platform is read from $OSTYPE, not from `uname`: uname is looked up through PATH,
+# which holds user-writable directories, so a fake `uname` would turn the skip on
+# under Linux/macOS with one command (found by the cold review of Ф271).
+# Residual risks, accepted in the peer session (Kimi dissented on the first):
+# (1) an agent that can write params.yaml can set or renew the key itself;
+# (2) an `env` entry in settings.local.json can set OSTYPE for the next session.
+# Visibility (warning with the end date, log) is the only control, see
+# docs/PLATFORM-COMPAT.md.
+SKIP_MAX_DAYS=30
+SKIP_LOG="$IWE_ROOT/.iwe-runtime/session-open-gate-skip.log"
+
+gate_day_num() { # $1 = offset in days from today -> YYYYMMDD; empty on failure
+  local ts
+  # printf %(..)T needs bash >= 4.2 (Git Bash has it); older bash falls back to date
+  if ts=$(printf '%(%s)T' -1 2>/dev/null) && [ -n "$ts" ]; then
+    printf '%(%Y%m%d)T' $((ts + $1 * 86400))
+    return
+  fi
+  command date -d "$1 days" +%Y%m%d 2>/dev/null || command date -v+"$1"d +%Y%m%d 2>/dev/null
+}
+
+gate_is_calendar_date() { # $1 = YYYY-MM-DD, already shape-checked
+  local y=${1:0:4} m=$((10#${1:5:2})) d=$((10#${1:8:2})) dim
+  dim=(0 31 28 31 30 31 30 31 31 30 31 30 31)
+  if [ $((10#$y % 4)) = 0 ] && { [ $((10#$y % 100)) != 0 ] || [ $((10#$y % 400)) = 0 ]; }; then dim[2]=29; fi
+  [ "$m" -ge 1 ] && [ "$m" -le 12 ] && [ "$d" -ge 1 ] && [ "$d" -le "${dim[$m]}" ]
+}
+
+gate_skip_check() { # prints the end date and returns 0 only when the skip is valid today
+  local params lines val today_num val_num max_num
+  params="$IWE_ROOT/params.yaml"
+  [ -f "$params" ] || return 1
+  lines=$(tr -d '\r' < "$params" | grep -E '^session_open_gate_skip_until:')
+  [ -n "$lines" ] || return 1
+  case "${OSTYPE:-}" in
+    msys*|cygwin*) ;;
+    *) echo "[session-open-gate] session_open_gate_skip_until в params.yaml не действует на этой платформе (${OSTYPE:-?}): пропуск только для Git Bash" >&2; return 1 ;;
+  esac
+  [ "$(printf '%s\n' "$lines" | wc -l | tr -d ' ')" = 1 ] || { echo "[session-open-gate] ключ session_open_gate_skip_until повторён — пропуск не действует" >&2; return 1; }
+  printf '%s' "$lines" | grep -qE '^session_open_gate_skip_until:[[:space:]]+[0-9]{4}-[0-9]{2}-[0-9]{2}([[:space:]]+#.*|[[:space:]]*)$' \
+    || { echo "[session-open-gate] ключ session_open_gate_skip_until записан не как ГГГГ-ММ-ДД — пропуск не действует" >&2; return 1; }
+  val=$(printf '%s' "$lines" | sed -E 's/^session_open_gate_skip_until:[[:space:]]+([0-9]{4}-[0-9]{2}-[0-9]{2}).*$/\1/')
+  gate_is_calendar_date "$val" || { echo "[session-open-gate] session_open_gate_skip_until=$val не календарная дата — пропуск не действует" >&2; return 1; }
+  today_num=$(gate_day_num 0)
+  max_num=$(gate_day_num "$SKIP_MAX_DAYS")
+  val_num="${val//-/}"
+  case "$today_num$max_num" in *[!0-9]*|'') return 1 ;; esac
+  if [ "${#today_num}" != 8 ] || [ "${#max_num}" != 8 ]; then return 1; fi
+  if [ "$val_num" -lt "$today_num" ]; then echo "[session-open-gate] срок session_open_gate_skip_until=$val истёк — гейт снова обязателен" >&2; return 1; fi
+  if [ "$val_num" -gt "$max_num" ]; then echo "[session-open-gate] session_open_gate_skip_until=$val дальше $SKIP_MAX_DAYS дней — пропуск не действует" >&2; return 1; fi
+  printf '%s' "$val"
+}
+
+if SKIP_UNTIL=$(gate_skip_check); then
+  echo "[session-open-gate] ВНИМАНИЕ: проверка сессии отключена по params.yaml (session_open_gate_skip_until=$SKIP_UNTIL), git commit/push пропущен без семафора. Ключ ставит человек; если ты его не ставил, удали строку. Сверяй params.yaml и .iwe-runtime/session-open-gate-skip.log." >&2
+  # Best-effort audit: a failed write must not change the decision.
+  { mkdir -p "$(dirname "$SKIP_LOG")" && printf '%s agent=%s until=%s\n' "$(command date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$SKIP_UNTIL" >> "$SKIP_LOG"; } 2>/dev/null \
+    || echo "[session-open-gate] не удалось записать $SKIP_LOG — пропуск всё равно действует" >&2
+  exit 0
+fi
+
 echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
 
 cat >&2 <<EOF
