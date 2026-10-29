@@ -47,6 +47,8 @@ from pathlib import Path
 
 # WP-436 Ф1 gate integration: single-writer classify_and_log routes + logs in one call.
 sys.path.insert(0, str(Path(__file__).parent))
+from gate_launch_usage import LaunchUsage, PipeCapture, drain_after_exit, kill_owned_process
+
 try:
     from iwe_gate import classify_and_log as _gate_classify_and_log, GateInput
     _GATE_AVAILABLE = True
@@ -636,13 +638,25 @@ def build_prompt(task_path: Path, repo_dir: Path) -> str:
     return full_prompt
 
 
-def invoke_claude(prompt: str, model: str, repo_dir: Path | None = None) -> tuple[bool, str]:
+def invoke_claude(
+    prompt: str,
+    model: str,
+    repo_dir: Path | None = None,
+    gate_context: dict | None = None,
+) -> tuple[bool, str]:
     """Возвращает (ok, output).
 
     Backward-compatible obвёртка вокруг `invoke_claude_with_heartbeat` без heartbeat-канала.
     Используется в task-mode (Agent Inbox). Session-mode использует `invoke_claude_with_heartbeat`.
     """
-    return invoke_claude_with_heartbeat(prompt, model, session_id=None, turn_n=None, repo_dir=repo_dir)
+    return invoke_claude_with_heartbeat(
+        prompt,
+        model,
+        session_id=None,
+        turn_n=None,
+        repo_dir=repo_dir,
+        gate_context=gate_context,
+    )
 
 
 # WP-358 follow-up Ф3a (2026-05-30): inline POST в event-gateway, без shell.
@@ -813,7 +827,16 @@ class ClaudeCodeExecutor(Executor):
     supports_heartbeat = True
 
     def build_cmd(self, prompt: str, model: str) -> list[str]:
-        cmd = ["claude", "-p", prompt, "--model", model, "--output-format", "text"]
+        cmd = [
+            "claude",
+            "-p",
+            prompt,
+            "--model",
+            model,
+            "--output-format",
+            "stream-json",
+            "--verbose",
+        ]
         disallowed = _load_disallowed_tools()
         cmd += ["--disallowedTools", ",".join(disallowed)]
         return cmd
@@ -882,6 +905,7 @@ def invoke_claude_with_heartbeat(
     turn_n: int | None,
     repo_dir: Path | None = None,
     executor_key: str = DEFAULT_EXECUTOR,
+    gate_context: dict | None = None,
 ) -> tuple[bool, str]:
     """Run an agentic executor headless via Popen, emitting session.heartbeat
     events every HEARTBEAT_INTERVAL_SEC for streaming runtimes.
@@ -899,58 +923,85 @@ def invoke_claude_with_heartbeat(
         log(output, "ERROR")
         return False, output
     started = time.monotonic()
+    usage = LaunchUsage(executor.name, gate_context)
 
     try:
         proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=str(repo_dir) if repo_dir else None,
+            env=usage.child_env(),
+            start_new_session=True,
         )
         log(f"[RC5] dispatch executor={executor.name} pid={proc.pid} cwd={repo_dir}")
     except FileNotFoundError:
+        usage.finish("failed", "not_found")
         return False, f"{executor.name} CLI not found in PATH"
+    except OSError as exc:
+        usage.finish("failed", "process_error")
+        return False, f"{executor.name} CLI launch failed ({type(exc).__name__})"
 
+    usage.started()
     last_heartbeat = 0.0
     timed_out = False
     stopped_by_user = False  # WP-428 Ф6 mid-session control
 
-    while True:
-        elapsed = time.monotonic() - started
-        if elapsed > CLAUDE_TIMEOUT_SEC:
-            proc.kill()
-            timed_out = True
-            break
-
-        if (executor.supports_heartbeat and session_id
-                and (elapsed - last_heartbeat) >= HEARTBEAT_INTERVAL_SEC):
-            _emit_event(
-                "session.heartbeat",
-                f"{session_id}-turn{turn_n}-{int(elapsed)}",
-                {
-                    "session_id": session_id,
-                    "turn_n": turn_n,
-                    "elapsed_sec": int(elapsed),
-                    "progress_hint": "Claude генерирует ответ",
-                },
-            )
-            last_heartbeat = elapsed
-            # WP-428 Ф6: check for pilot stop/cancel on each heartbeat tick.
-            if _poll_stop_command(session_id):
-                proc.kill()
-                stopped_by_user = True
-                break
-
-        if proc.poll() is not None:
-            break
-
-        time.sleep(1)  # tight poll, lightweight
-
+    capture = None
     try:
-        stdout, stderr = proc.communicate(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        stdout, stderr = proc.communicate()
+        capture = PipeCapture(proc, usage)
+        while True:
+            # Drain both pipes during execution. Waiting for poll() to report
+            # exit before reading can deadlock on a full stdout/stderr pipe.
+            capture.drain()
+            elapsed = time.monotonic() - started
+            # A heartbeat callback may have blocked past the deadline. The
+            # child's exact exit time is then unknown, so even an exited child
+            # cannot establish timely completion until this check passes.
+            if elapsed > CLAUDE_TIMEOUT_SEC:
+                kill_owned_process(proc)
+                timed_out = True
+                break
+            if proc.poll() is not None:
+                break
+            if (
+                executor.supports_heartbeat
+                and session_id
+                and (elapsed - last_heartbeat) >= HEARTBEAT_INTERVAL_SEC
+            ):
+                _emit_event(
+                    "session.heartbeat",
+                    f"{session_id}-turn{turn_n}-{int(elapsed)}",
+                    {
+                        "session_id": session_id,
+                        "turn_n": turn_n,
+                        "elapsed_sec": int(elapsed),
+                        "progress_hint": "Claude генерирует ответ",
+                    },
+                )
+                last_heartbeat = elapsed
+                if _poll_stop_command(session_id):
+                    kill_owned_process(proc)
+                    stopped_by_user = True
+                    break
+        drain_after_exit(proc, capture)
+        stdout, stderr = capture.output()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        kill_owned_process(proc)
+        proc.wait()
+        usage.finish("failed", "process_error", exit_code=proc.poll())
+        return False, f"{executor.name} CLI capture failed ({type(exc).__name__})"
+    except BaseException:
+        kill_owned_process(proc)
+        proc.wait()
+        usage.finish("cancelled", "cancelled", exit_code=proc.poll())
+        raise
+    finally:
+        if capture is not None:
+            capture.close()
 
     if timed_out:
+        usage.finish("timeout", "timeout", exit_code=proc.returncode)
         output = f"TIMEOUT after {CLAUDE_TIMEOUT_SEC}s"
         if session_id:
             _emit_event(
@@ -961,10 +1012,19 @@ def invoke_claude_with_heartbeat(
         return False, output
 
     if stopped_by_user:
+        usage.finish("cancelled", "cancelled", exit_code=proc.returncode)
         log(f"[RC5] session {session_id} stopped by user command")
         return False, _STOPPED_BY_USER
 
-    ok = (proc.returncode == 0)
+    ok = proc.returncode == 0 and not usage.result_error and not usage.output_limited
+    status, reason = ("complete", None) if ok else ("failed", "cli_error")
+    if usage.output_limited:
+        status, reason = "incomplete", "output_limit_exceeded"
+        stdout = "CLI output exceeded the capture limit"
+    elif executor.name == "claude" and usage.result is None and ok:
+        ok, status, reason = False, "incomplete", "missing_result"
+        stdout = "Claude CLI returned no final text result"
+    usage.finish(status, reason, exit_code=proc.returncode)
     output = (stdout or "") + (("\n" + stderr) if stderr else "")
 
     if session_id:
@@ -972,7 +1032,11 @@ def invoke_claude_with_heartbeat(
             _emit_event(
                 "session.turn_completed",
                 f"{session_id}-turn{turn_n}",
-                {"session_id": session_id, "turn_n": turn_n, "elapsed_sec": int(elapsed)},
+                {
+                    "session_id": session_id,
+                    "turn_n": turn_n,
+                    "elapsed_sec": int(elapsed),
+                },
             )
         else:
             reason = _classify_claude_failure(stderr or "", stdout or "")
@@ -1214,7 +1278,7 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
 
     # Invoke claude (LLM path). The llm decision was already logged at classify time by
     # classify_and_log -- the dispatcher is no longer a second writer of the journal.
-    ok, output = invoke_claude(prompt, model, repo_dir)
+    ok, output = invoke_claude(prompt, model, repo_dir, gate_context=_gate_out)
     finished_at = now_utc()
     log(f"claude done ok={ok} duration={(finished_at - started_at).total_seconds():.0f}s")
 

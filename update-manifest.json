@@ -1160,8 +1160,12 @@
       "sha256": "d9c77d539574864d55431a84568ea0c873f371b769e6c786603749d24848d27e"
     },
     {
+      "path": "extensions/agent-inbox/scripts/gate_launch_usage.py",
+      "sha256": "6fdd28758c5d681203a8be0ac9a2a7176b36c14a8278eb318662cbfa04fe0c26"
+    },
+    {
       "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
-      "sha256": "987d4684a0be6a54127e7969bebd235818881e8d72047576b9bce29851317e4a"
+      "sha256": "9a652cd248e7c6e771e2eafce48d20fba10d5aff0a4e25d2fdd611ee63a10bdd"
     },
     {
       "path": "extensions/agent-inbox/templates/_template.md",
@@ -2452,6 +2456,10 @@
       "sha256": "508d93213a9d61716cce1a80064893a12ca4d8eb774de008ca54e74aa2eed215"
     },
     {
+      "path": "scripts/gate_launch_usage.py",
+      "sha256": "6fdd28758c5d681203a8be0ac9a2a7176b36c14a8278eb318662cbfa04fe0c26"
+    },
+    {
       "path": "scripts/generate-catalogs.py",
       "sha256": "843e14a9fd76e313d2bed965fbf4dab8cf379abcc848aeade655636daf8b9a8e"
     },
@@ -2517,7 +2525,7 @@
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
-      "sha256": "987d4684a0be6a54127e7969bebd235818881e8d72047576b9bce29851317e4a"
+      "sha256": "9a652cd248e7c6e771e2eafce48d20fba10d5aff0a4e25d2fdd611ee63a10bdd"
     },
     {
       "path": "scripts/iwe-audit.sh",
