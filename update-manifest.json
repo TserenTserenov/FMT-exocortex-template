@@ -3704,7 +3704,9 @@
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",
+    "setup/test-update-write-sites.sh",
     "setup/test-week-review-delivery-postcondition.sh",
+    "setup/update-write-sites.tsv",
     "setup/ux-walkthrough-prompt.md",
     "setup/wp529-f21-toggle-required-review.sh"
   ],

@@ -835,6 +835,11 @@ jobs:
       - name: Run update.sh modified-hook test
         run: bash setup/test-update-modified-hook.sh
 
+      # WP-529 Ф245: every write command in update.sh belongs to a block that
+      # setup/update-write-sites.tsv classifies; the rollback plan is built from it.
+      - name: Run update.sh write-sites registry test
+        run: bash setup/test-update-write-sites.sh
+
       # WP-529 Ф244: --check ends with one readiness verdict; refusals use the
       # same predicates as the real run and leave the install unchanged.
       - name: Run update.sh check verdict test

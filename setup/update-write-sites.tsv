@@ -1,0 +1,74 @@
+# Registry of write sites in update.sh (WP-529 Ф245, step 1). Checked by test-update-write-sites.sh.
+# Columns (tab-separated): block <TAB> class <TAB> coverage <TAB> notes
+# block: fn:NAME (enclosing function) or top:Step N (top level under that header).
+# class: A = file write to the install / memory / workspace / governance repo
+#        B = outside script or tool that writes on its own
+#        C = non-file effect (scheduler, shell rc, git config)
+#        H = helper that writes to the path its caller passes (coverage follows the caller)
+#        R = read only (false positive of the scanner: classifier, probe, git read)
+#        T = temporary file or directory outside the install
+# coverage: plan = goes through the frozen plan and the single executor;
+#           staging = outside script builds its output in staging, update.sh applies it by plan;
+#           atomic+inverse = outside script is one atomic operation with an inverse;
+#           not-covered = rollback does not undo it, the update summary says so;
+#           caller = see the calling block; none = nothing to undo.
+# "provisional" in notes = classified from the block's commands and callers, re-check when the executor is built (step 2).
+fn:fetch_update_manifest	T	none	manifest download into the temp directory
+top:preamble	T	none	sed_inplace helper definition and creation of the temp directory TMPDIR_UPDATE
+fn:reinject_user_section	H	caller	rewrites the USER-SPACE block of the file its caller names (callers: copy_platform_file_preserving_user_space, Step 6, render_skill_with_user_section)
+fn:render_skill_with_user_section	H	caller	copies a skill and re-appends the user block; target is the caller's path (Step 2 compare file in temp, Step 5 install path)
+fn:substitute_claude_placeholders	H	caller	writes the workspace copy of CLAUDE.md or AGENTS.md at the caller's path
+fn:restore_claude_placeholders	T	none	builds temp copies of base and current CLAUDE.md for the three-way merge (called from Step 5 with temp targets)
+fn:memory_record_put	A	plan	.memory-deployed.tsv record of delivered memory copies; ordinary plan element, snapshot and restore
+fn:memory_copy_verdict	R	none	runs the memory classifier, reads only
+fn:replace_memory_copy	A	plan	memory file replacement through a sibling temp file; follows an intentional symlink on purpose (allowed-link category)
+fn:apply_memory_policy	A	plan	creates the memory directory and calls replace_memory_copy
+fn:prune_memory_backups	A	plan	deletes old memory backup directories under .backups; excluded from the rollback comparison, deletion itself is not undone
+fn:backup_governance_script_before_overwrite	A	plan	copy of a governance script into .backups before overwrite
+fn:apply_governance_script_policy	A	plan	installs a governance-repo script through atomic_copy_executable
+fn:detect_release_rollback	R	none	git merge-base, read only
+fn:report_author_skip	R	none	runs the classifier, reads only
+fn:apply_refresh_stale	A	plan	author-mode refresh of files that fell behind the template: backup, copy, chmod
+fn:apply_settings_merge_if_requested	B	staging	settings-merge-apply.sh rewrites the settings file; run it on a staged copy and apply by plan
+fn:build_settings_merge_report	T	none	merge preview written to a report file
+fn:run_build_runtime_or_die	B	staging	build-runtime.sh rebuilds .iwe-runtime; build in staging and swap the directory by plan, live sessions inside it need the open-session check
+fn:begin_update_transaction	A	plan	writes the .update-incomplete marker; the rollback restores it to the snapshot state, status of the new mechanism lives in its own journal
+fn:require_env_before_update	A	plan	draft .exocortex.env and hard link into place; one of the two allowed writes before the plan exists
+fn:require_backup_root_writable	A	plan	creates the backup root and probes it with a temp directory; the second allowed write before the plan
+fn:finish_update_transaction	A	plan	removes the .update-incomplete marker
+fn:atomic_copy_executable	H	caller	copy to a sibling temp file, chmod on the temp file, rename; the pattern the executor reuses
+fn:apply_legacy_agent_fault_shims	A	plan	local transaction with its own rollback of a prefix; dismantle when the executor exists, two rollback mechanisms must not touch the same files
+fn:backfill_platform_hooks	B	atomic+inverse	copies the hook installer into governance scripts, then runs it; the installer sets core.hooksPath, see class C
+fn:backfill_executor_catalog	B	staging	generate-executor-catalog.py writes the governance catalog; generate into staging and apply by plan
+fn:replace_ds_publish_with_backup	A	plan	replaces ds-publish.sh with a copy in .backups
+fn:run_post_apply_backfills_or_die	B	not-covered	install-iwe-paths.sh writes .iwe-paths and edits shell rc files in the home directory; rc edits are class C
+fn:backfill_extractor_feeders	C	not-covered	setup-extractor-feeders.sh --schedule-only installs scheduler jobs; printed in the update summary
+fn:refresh_fpf_base_clone	B	atomic+inverse	git merge --ff-only in the FPF clone; excluded from snapshot and plan, inverse is git reset --hard to the previous revision
+fn:backup_rule_before_overwrite	A	plan	copy of a rule file into .backups before overwrite
+fn:backup_memory_file_before_overwrite	A	plan	copy of a memory file into .backups before overwrite
+fn:backup_hook_before_overwrite	A	plan	copy of a hook into .backups before overwrite
+fn:copy_platform_file_preserving_user_space	A	plan	copies a platform file and re-appends the user block
+fn:run_sync_canary	R	none	runs the sync bundle self-test, reads only
+fn:cleanup_update	T	none	removes the temp directory on exit
+top:Step 0	A	plan	self-update: staged copy, chmod, rename over update.sh, then exec; the plan holds update.sh as a sibling rename only, and the lock is taken before this step
+fn:sync_workspace_agents	A	plan	writes the workspace AGENTS.md through a temp file and rename
+fn:repair_pass	A	plan	re-copies critical runtime files and memory; also runs when nothing changed, so the plan has two sources
+fn:sync_workspace_claude_md	A	plan	workspace CLAUDE.md three-way merge and its base, backup and conflict-pending files; service files are ordinary plan elements
+fn:claude_backup_before_replace	A	plan	copy of CLAUDE.md into .backups before replace
+fn:claude_record_delivered	A	plan	.claude.md.delivered hash record
+top:Step 2	T	none	counting files, parsed manifest, fork-owned path list, compare files: all in the temp directory
+fn:download_batch	T	none	downloads into the temp directory
+fn:verify_batch_integrity	T	none	removes a temp remote file
+top:Step 3	B	not-covered	copies the manifest and runs iwe-capabilities.sh probe --announce; the probe writes its own announcement state, provisional
+fn:move_deprecated_to_backup	A	plan	moves a deprecated file to .backups/deprecated; operation type moved, inverse restores it when the source hash matches
+top:Step 5	A	plan	applies the downloaded files: new files, replacements, CLAUDE.md merge, empty-directory removal; chmod happens on the temp file before rename once the executor exists
+top:Step 5b	A	plan	re-substitutes placeholders and rewrites .exocortex.env line by line; the executor writes it as one planned file
+fn:linux_cron_strategist_owned	R	none	reads the crontab, read only
+fn:reinstall_linux_strategist	C	not-covered	rewrites crontab or systemd units after a backup of the crontab; inverse is restoring the crontab backup, provisional
+fn:print_optional_linux_role_instruction	R	none	prints the install command, writes nothing
+top:Step 6	A	plan	reinstalls platform-space files into the workspace
+top:Step 5e	A	plan	creates the extensions directory in the workspace; directory is a plan element
+top:Step 6c	A	plan	rewrites the workspace .mcp.json through Python
+top:Step 6d	B	not-covered	role install.sh scripts write launchd plists and call launchctl; generate-hot-files-list.sh writes the hot list; the update summary lists scheduler changes as not covered
+top:Step 6e	A	plan	replaces the local manifest with the downloaded one
+top:Step 7	B	not-covered	iwe-capabilities.sh probe --announce, same as Step 3
