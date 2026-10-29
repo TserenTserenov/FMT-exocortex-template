@@ -617,7 +617,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "2b7f65072acc7013f90ec9bdcdc9e660e824481fd21b0979be178d3109eb040a"
+      "sha256": "3fd3a2768e9f9e7ef2335f2b58e1251b41e4b0e40289dd93fc1531d5cc0bdc78"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "15672937907c3c18a26851ef022653ce470e6835bba2de189f9d464811cec967"
+      "sha256": "b6cb9eb37ceed538533baf672f22c6c1faf028903f04c294e9beb1df35c37cfb"
     },
     {
       "path": "CLAUDE.md",

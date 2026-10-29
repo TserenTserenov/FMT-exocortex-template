@@ -12,6 +12,10 @@
 #     "ВЕРДИКТ: нельзя ставить" and exit 3 — the same predicates the apply gates use;
 #   - incomplete download → "нельзя подтвердить", exit 2; no Python (tainted) → "нельзя
 #     подтвердить", exit 4; failed registry canary → "нельзя ставить", exit 5;
+#   - rollback / unverifiable release history: without --yes → positive verdict plus its own
+#     caveat line (a --yes run would be stopped), exit 0; with --yes → "нельзя ставить", exit 1
+#     and no positive line (the apply step refuses exactly this combination);
+#   - a newer update.sh upstream: positive verdict plus its own caveat line, exit 0;
 #   - --fast gives no verdict line at all;
 #   - every --check leaves the installation unchanged: file contents, types, modes and symlink
 #     targets (atime is not compared), and creates no env draft and no write probe.
@@ -99,7 +103,9 @@ done
 cat > "$STUB_DIR/curl" <<'SHIMEOF'
 #!/bin/bash
 serve() {
-    local rel="${1#*/main/}"
+    # raw URL is .../OWNER/REPO/<ref>/<path>; <ref> is main, a tag or a commit SHA
+    local rel
+    rel=$(printf '%s' "$1" | sed -E 's#^https://raw\.githubusercontent\.com/[^/]+/[^/]+/[^/]+/##')
     case "$rel" in
         update.sh) cp "$SHIM_UPDATER" "$2" ;;
         *) [ -f "$SHIM_UPSTREAM/$rel" ] && cp "$SHIM_UPSTREAM/$rel" "$2" \
@@ -112,6 +118,14 @@ if [ "${1:-}" = "--help" ] && [ "${2:-}" = "all" ]; then
 fi
 url="" out="" cfg=""
 args=("$@")
+# GitHub API (release channel): the latest release is v9.9.9, resolved to $SHIM_RELEASE_SHA
+for a in "${args[@]}"; do
+    case "$a" in
+        https://api.github.com/*/releases/latest) printf '{"tag_name":"v9.9.9"}\n'; exit 0 ;;
+        https://api.github.com/*/commits/v9.9.9) printf '{"sha":"%s"}\n' "$SHIM_RELEASE_SHA"; exit 0 ;;
+        https://api.github.com/*) echo "curl: (22) The requested URL returned error: 404" >&2; exit 22 ;;
+    esac
+done
 for ((i=0; i<${#args[@]}; i++)); do
     case "${args[i]}" in
         http*) url="${args[i]}" ;;
@@ -134,6 +148,10 @@ serve "$url" "$out"
 SHIMEOF
 chmod +x "$STUB_DIR/curl"
 
+# No authenticated gh: github_api_get must take the anonymous curl path served by the shim.
+printf '#!/bin/bash\nexit 1\n' > "$STUB_DIR/gh"
+chmod +x "$STUB_DIR/gh"
+
 # ------------------------------------------------------------------
 # Per-scenario installation
 # ------------------------------------------------------------------
@@ -141,6 +159,8 @@ chmod +x "$STUB_DIR/curl"
 # clone is one release behind (CLAUDE.md differs → the full check block runs); "current" puts
 # it at the upstream version (the "всё актуально" branch). Sets WS and SD.
 new_install() {
+    # per-scenario knobs never leak into the next installation
+    unset CHANNEL SHIM_RELEASE_SHA SHIM_UPDATER_OVERRIDE
     WS="$TEST_ROOT/$1/repo"
     SD="$WS/FMT-exocortex-template"
     mkdir -p "$SD/.claude/lib" "$SD/scripts/lib" "$TEST_ROOT/$1/home"
@@ -202,10 +222,19 @@ PY
 run_check() {
     local name="$1" log="$2"
     shift 2
-    env HOME="$TEST_ROOT/$name/home" PATH="${EXTRA_PATH:+$EXTRA_PATH:}$STUB_DIR:$PATH" \
-        IWE_UPDATE_CHANNEL=main SHIM_UPSTREAM="${SHIM_UPSTREAM:-$UPSTREAM}" \
-        SHIM_UPDATER="$TEMPLATE_DIR/update.sh" \
-        bash "$SD/update.sh" --check "$@" > "$log" 2>&1
+    run_update "$name" "$log" --check "$@"
+}
+
+# run_update NAME LOG update.sh args... — one update.sh run in the sandbox; sets RC.
+run_update() {
+    local name="$1" log="$2"
+    shift 2
+    env -u GH_TOKEN -u GITHUB_TOKEN HOME="$TEST_ROOT/$name/home" \
+        PATH="${EXTRA_PATH:+$EXTRA_PATH:}$STUB_DIR:$PATH" \
+        IWE_UPDATE_CHANNEL="${CHANNEL:-main}" SHIM_UPSTREAM="${SHIM_UPSTREAM:-$UPSTREAM}" \
+        SHIM_RELEASE_SHA="${SHIM_RELEASE_SHA:-}" \
+        SHIM_UPDATER="${SHIM_UPDATER_OVERRIDE:-$TEMPLATE_DIR/update.sh}" \
+        bash "$SD/update.sh" "$@" > "$log" 2>&1
     RC=$?
 }
 
@@ -331,6 +360,108 @@ if grep -q '^Оговорка: найден маркер незавершённ�
 else
     fail "A3-incomplete-marker: caveat line missing"
 fi
+
+# ------------------------------------------------------------------
+# Caveats: the verdict is positive, the caveat sits on its own line (WP-529 Ф244 tail)
+# ------------------------------------------------------------------
+ROLLBACK_CAVEAT='^Оговорка: вердикт относится к ручному запуску; запуск с --yes будет остановлен'
+UPDATER_CAVEAT='^Оговорка: вердикт вынесен текущей версией update.sh'
+FAKE_SHA=$(printf 'a%.0s' $(seq 1 40))   # a commit the install does not have and cannot fetch
+
+# release channel, release commit is an ancestor of the installed HEAD → rollback detected
+rollback_detected() {
+    CHANNEL=release
+    SHIM_RELEASE_SHA=$(git -C "$SD" rev-parse HEAD)
+    printf 'local commit after the release\n' > "$SD/ahead.txt"
+    git -C "$SD" add -- ahead.txt && git -C "$SD" commit -q -m "ahead of release"
+}
+# release commit unknown and unfetchable → history cannot be verified
+rollback_uncertain() { CHANNEL=release; SHIM_RELEASE_SHA="$FAKE_SHA"; }
+# upstream update.sh differs from the installed one (a comment line, still a valid script)
+updater_outdated() {
+    SHIM_UPDATER_OVERRIDE="$TEST_ROOT/update-newer.sh"
+    { head -n 1 "$TEMPLATE_DIR/update.sh"; echo '# a newer updater'; tail -n +2 "$TEMPLATE_DIR/update.sh"; } \
+        > "$SHIM_UPDATER_OVERRIDE"
+}
+
+# expect_line_count NAME LOG REGEX WANT — exactly WANT lines match; a caveat must not repeat
+# and a clean positive verdict must not carry a foreign one
+expect_line_count() {
+    local name="$1" log="$2" re="$3" want="$4" got
+    got=$(grep -c -- "$re" "$log")
+    if [ "$got" -eq "$want" ]; then
+        pass "$name: «${re:0:48}…» on $want line(s)"
+    else
+        fail "$name: «${re:0:48}…» on $got line(s), expected $want"
+    fi
+}
+expect_one_verdict() {
+    local name="$1" log="$2" got
+    got=$(grep -c '^ВЕРДИКТ:' "$log")
+    if [ "$got" -eq 1 ]; then pass "$name: exactly one verdict line"; else fail "$name: $got verdict lines"; fi
+}
+
+# the reason that put the run into each rollback state — "detected" must not pass as "uncertain"
+ROLLBACK_DETECTED_MSG='^🔴 ВНИМАНИЕ: локальная установка новее последнего релиза'
+ROLLBACK_UNCERTAIN_MSG='^⚠️ ВНИМАНИЕ: не удалось проверить историю релиза'
+# rollback_msg KIND — the warning line of that rollback state
+rollback_msg() { if [ "$1" = detected ]; then echo "$ROLLBACK_DETECTED_MSG"; else echo "$ROLLBACK_UNCERTAIN_MSG"; fi; }
+other_kind() { if [ "$1" = detected ]; then echo uncertain; else echo detected; fi; }
+
+for kind in detected uncertain; do
+    # without --yes: positive, with the caveat that a --yes run is stopped
+    scenario "B-rollback-$kind" 0 "$POSITIVE_LINE" "rollback_$kind"
+    expect_line_count "B-rollback-$kind" "$TEST_ROOT/B-rollback-$kind.log" "$ROLLBACK_CAVEAT" 1
+    expect_line_count "B-rollback-$kind" "$TEST_ROOT/B-rollback-$kind.log" "$UPDATER_CAVEAT" 0
+    expect_one_verdict "B-rollback-$kind" "$TEST_ROOT/B-rollback-$kind.log"
+    # with --yes: the apply step would refuse, so the preview refuses too
+    scenario "B-rollback-$kind-yes" 1 "ВЕРДИКТ: нельзя ставить" "rollback_$kind" --yes
+    expect_line_count "B-rollback-$kind-yes" "$TEST_ROOT/B-rollback-$kind-yes.log" "$ROLLBACK_CAVEAT" 0
+    expect_one_verdict "B-rollback-$kind-yes" "$TEST_ROOT/B-rollback-$kind-yes.log"
+    # the state itself, in both runs: its own warning once, the other state's warning never
+    for log in "$TEST_ROOT/B-rollback-$kind.log" "$TEST_ROOT/B-rollback-$kind-yes.log"; do
+        expect_line_count "B-rollback-$kind ($(basename "$log"))" "$log" "$(rollback_msg "$kind")" 1
+        expect_line_count "B-rollback-$kind ($(basename "$log"))" "$log" "$(rollback_msg "$(other_kind "$kind")")" 0
+    done
+done
+
+# Control: the release is NEWER than the installed commit (or equal to it) — not a rollback.
+# Guards the direction of the ancestor test: a flipped check would flag this install.
+release_newer() {
+    CHANNEL=release
+    printf 'release commit\n' > "$SD/newer.txt"
+    git -C "$SD" add -- newer.txt && git -C "$SD" commit -q -m "release is newer"
+    SHIM_RELEASE_SHA=$(git -C "$SD" rev-parse HEAD)
+    git -C "$SD" reset -q --hard HEAD~1   # the install sits one commit behind the release
+}
+release_equal() { CHANNEL=release; SHIM_RELEASE_SHA=$(git -C "$SD" rev-parse HEAD); }
+for control in newer equal; do
+    scenario "B-no-rollback-release-$control" 0 "$POSITIVE_LINE" "release_$control"
+    log="$TEST_ROOT/B-no-rollback-release-$control.log"
+    expect_line_count "B-no-rollback-release-$control" "$log" '^Оговорка:' 0
+    expect_line_count "B-no-rollback-release-$control" "$log" "$ROLLBACK_DETECTED_MSG" 0
+    expect_line_count "B-no-rollback-release-$control" "$log" "$ROLLBACK_UNCERTAIN_MSG" 0
+done
+
+# The real run (no --check) must stop on the same combination the preview refuses.
+for kind in detected uncertain; do
+    echo "--- B-apply-rollback-$kind-yes ---"
+    new_install "B-apply-rollback-$kind-yes"
+    "rollback_$kind"
+    before=$(snapshot "$WS")
+    run_update "B-apply-rollback-$kind-yes" "$TEST_ROOT/B-apply-$kind.log" --yes
+    if [ "$RC" -eq 1 ]; then pass "B-apply-rollback-$kind-yes: exit 1"; else fail "B-apply-rollback-$kind-yes: exit $RC, expected 1"; fi
+    expect_line_count "B-apply-rollback-$kind-yes" "$TEST_ROOT/B-apply-$kind.log" "$(rollback_msg "$kind")" 1
+    expect_unchanged "B-apply-rollback-$kind-yes" "$before"
+done
+
+scenario "B-updater-outdated" 0 "$POSITIVE_LINE" updater_outdated
+expect_line_count "B-updater-outdated" "$TEST_ROOT/B-updater-outdated.log" "$UPDATER_CAVEAT" 1
+expect_line_count "B-updater-outdated" "$TEST_ROOT/B-updater-outdated.log" "$ROLLBACK_CAVEAT" 0
+expect_one_verdict "B-updater-outdated" "$TEST_ROOT/B-updater-outdated.log"
+
+# a clean install carries no caveat at all
+expect_line_count "A1-healthy-update-available" "$TEST_ROOT/A1-healthy-update-available.log" '^Оговорка:' 0
 
 echo "--- A4-up-to-date ---"
 new_install "A4-up-to-date" current
