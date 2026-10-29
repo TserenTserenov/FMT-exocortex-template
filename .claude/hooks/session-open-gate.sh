@@ -194,7 +194,11 @@ gate_skip_check() { # prints the end date and returns 0 only when the skip is va
 if SKIP_UNTIL=$(gate_skip_check); then
   echo "[session-open-gate] ВНИМАНИЕ: проверка сессии отключена по params.yaml (session_open_gate_skip_until=$SKIP_UNTIL), git commit/push пропущен без семафора. Ключ ставит человек; если ты его не ставил, удали строку. Сверяй params.yaml и .iwe-runtime/session-open-gate-skip.log." >&2
   # Best-effort audit: a failed write must not change the decision.
-  { mkdir -p "$(dirname "$SKIP_LOG")" && printf '%s agent=%s until=%s\n' "$(command date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$SKIP_UNTIL" >> "$SKIP_LOG"; } 2>/dev/null \
+  # uname_s comes from the default system PATH (command -p), not from the user's PATH
+  # or from $OSTYPE: an `env` entry can fake OSTYPE, so the logged ostype alone proves
+  # nothing; ostype=msys next to uname_s=Linux shows the faked platform.
+  GATE_UNAME_S=$(command -p uname -s 2>/dev/null) || GATE_UNAME_S=UNKNOWN
+  { mkdir -p "$(dirname "$SKIP_LOG")" && printf '%s agent=%s until=%s ostype=%s uname_s=%s\n' "$(command date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$SKIP_UNTIL" "${OSTYPE:-?}" "${GATE_UNAME_S:-UNKNOWN}" >> "$SKIP_LOG"; } 2>/dev/null \
     || echo "[session-open-gate] не удалось записать $SKIP_LOG — пропуск всё равно действует" >&2
   exit 0
 fi
