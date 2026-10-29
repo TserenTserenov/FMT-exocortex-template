@@ -218,7 +218,8 @@ for arg in "$@"; do
             echo "Usage: update.sh [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --check     Показать доступные обновления без применения"
+            echo "  --check     Показать доступные обновления без применения; в конце строка «ВЕРДИКТ: …»"
+            echo "              (ставить можно только при коде 0 и строке «ВЕРДИКТ: можно ставить»)"
             echo "  --dry-run-strict  С --check: структурная проверка плана доставки (целевые файлы на месте, пути безопасны)"
             echo "  --fast      С --check: сравнить только версию манифеста (без скачивания 300+ файлов, issue #230)"
             echo "  --yes       Применить обновления без подтверждения (включает settings.json merge, см. --no-settings-merge)"
@@ -1699,26 +1700,42 @@ begin_update_transaction() {
     UPDATE_TRANSACTION_STARTED=true
 }
 
+# WP-529 F244: read-only classification of the configuration, shared by
+# require_env_before_update() and --check, so a preview cannot report green for
+# an install the real run refuses. Prints the reason on stdout. Returns 0 when
+# the config is usable (workspace file or legacy migration), 1 when it blocks
+# the update outright, 2 when it is missing — the apply gate then writes a
+# draft and still stops. Never writes anything.
+env_preflight_reason() {
+    if [ -L "$WORKSPACE_DIR/.exocortex.env" ]; then
+        echo ".exocortex.env является символической ссылкой: $WORKSPACE_DIR/.exocortex.env"
+        return 1
+    fi
+    if [ -e "$WORKSPACE_DIR/.exocortex.env" ]; then
+        [ -f "$WORKSPACE_DIR/.exocortex.env" ] && return 0
+        echo ".exocortex.env существует, но не является обычным файлом: $WORKSPACE_DIR/.exocortex.env"
+        return 1
+    fi
+    if [ -L "$SCRIPT_DIR/.exocortex.env" ]; then
+        echo "legacy .exocortex.env является символической ссылкой: $SCRIPT_DIR/.exocortex.env"
+        return 1
+    fi
+    [ -f "$SCRIPT_DIR/.exocortex.env" ] && return 0  # legacy migration
+    echo "отсутствует .exocortex.env: обновление создаст черновик и остановится до его заполнения: $WORKSPACE_DIR/.exocortex.env"
+    return 2
+}
+
 # #1028: a missing configuration used to be generated in Step 5b, after the
 # template and workspace CLAUDE.md had already changed. Stop before any apply
 # or repair-pass write, and leave a private draft for the operator to complete.
 require_env_before_update() {
-    if [ -L "$WORKSPACE_DIR/.exocortex.env" ]; then
-        echo "ОШИБКА: .exocortex.env является символической ссылкой: $WORKSPACE_DIR/.exocortex.env" >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    if [ -e "$WORKSPACE_DIR/.exocortex.env" ]; then
-        if [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
-            return 0
-        fi
-        echo "ОШИБКА: .exocortex.env существует, но не является обычным файлом: $WORKSPACE_DIR/.exocortex.env" >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    if [ -L "$SCRIPT_DIR/.exocortex.env" ]; then
-        echo "ОШИБКА: legacy .exocortex.env является символической ссылкой: $SCRIPT_DIR/.exocortex.env" >&2
-        exit "$EXIT_RUNTIME"
-    fi
-    [ -f "$SCRIPT_DIR/.exocortex.env" ] && return 0  # legacy migration
+    local reason env_status=0
+    reason=$(env_preflight_reason) || env_status=$?
+    case "$env_status" in
+        0) return 0 ;;
+        1) echo "ОШИБКА: $reason" >&2
+           exit "$EXIT_RUNTIME" ;;
+    esac
 
     # setup.sh and some consumers source this file as shell. Their other
     # readers treat values as raw text, so shell escaping would corrupt paths.
@@ -1783,14 +1800,37 @@ ENVEOF
 # issue #1326 п.4: a .backups/ root the update can't write into used to be
 # discovered mid-apply, by the first backup call that happened to need it —
 # some files already replaced by then. Stop before Step 5 touches anything.
-require_backup_root_writable() {
-    local backup_root="$WORKSPACE_DIR/.backups" probe
+#
+# WP-529 F244: read-only classification shared with --check. Returns 1 when
+# .backups has the wrong type (the gate refuses outright), 2 when the permission
+# bits say the write will fail. Bits are a necessary condition only, so on 2 the
+# gate still goes through its own mkdir -p and real write probe.
+backup_root_preflight_reason() {
+    local backup_root="$WORKSPACE_DIR/.backups" parent
     if [ -L "$backup_root" ]; then
-        echo "ОШИБКА: .backups является символической ссылкой: $backup_root" >&2
-        exit "$EXIT_RUNTIME"
+        echo ".backups является символической ссылкой: $backup_root"
+        return 1
     fi
     if [ -e "$backup_root" ] && [ ! -d "$backup_root" ]; then
-        echo "ОШИБКА: .backups существует, но не является каталогом: $backup_root" >&2
+        echo ".backups существует, но не является каталогом: $backup_root"
+        return 1
+    fi
+    if [ -d "$backup_root" ]; then
+        [ -w "$backup_root" ] && [ -x "$backup_root" ] && return 0
+        echo "каталог резервных копий недоступен на запись: $backup_root"
+        return 2
+    fi
+    parent=$(dirname "$backup_root")
+    [ -w "$parent" ] && [ -x "$parent" ] && return 0
+    echo "не удалось создать каталог резервных копий: $backup_root"
+    return 2
+}
+
+require_backup_root_writable() {
+    local backup_root="$WORKSPACE_DIR/.backups" probe reason type_status=0
+    reason=$(backup_root_preflight_reason) || type_status=$?
+    if [ "$type_status" -eq 1 ]; then
+        echo "ОШИБКА: $reason" >&2
         exit "$EXIT_RUNTIME"
     fi
     if ! mkdir -p "$backup_root" 2>/dev/null; then
@@ -3350,6 +3390,68 @@ run_sync_canary() {
     return "$EXIT_CANARY_FAILED"
 }
 
+# WP-529 F244: --check ends with one verdict line. An update is allowed only on
+# exit 0 together with the exact line "ВЕРДИКТ: можно ставить"; caveats are
+# printed on separate lines so consumers never parse suffixes.
+print_check_verdict() {
+    echo ""
+    echo "ВЕРДИКТ: $1"
+}
+
+# Runs the same read-only predicates the apply gates use (env, .backups) and
+# stops --check with EXIT_RUNTIME when the real run would refuse. Both
+# predicates are independent, so every reason found is reported. The .backups
+# check runs even when nothing is to update (the real run then skips that
+# gate): a broken backup root fails the next update anyway, so this errs safe.
+check_install_preflight() {
+    local reason reasons=()
+    reason=$(env_preflight_reason) || reasons+=("$reason")
+    reason=$(backup_root_preflight_reason) || reasons+=("$reason")
+    [ "${#reasons[@]}" -eq 0 ] && return 0
+    echo "🔴 Установка не готова к обновлению:"
+    for reason in "${reasons[@]}"; do
+        echo "  - $reason"
+    done
+    print_check_verdict "нельзя ставить"
+    echo "Причина: настоящий запуск update.sh остановится на этих проверках до изменения файлов."
+    echo "Дальнейшие проверки (сеть, состав обновления) не выполнялись."
+    exit "$EXIT_RUNTIME"
+}
+
+# The verdict of a --check that finished without an operational error, shared
+# by the "up to date" and the "updates available" branches so both run the
+# registry canary before any positive line. Mirrors exit_clean(): tainted means
+# file content was never compared, so the update cannot be confirmed.
+check_verdict_exit_clean() {
+    if ! run_sync_canary; then
+        print_check_verdict "нельзя ставить"
+        echo "Причина: проверка синхронизации реестра РП (canary) не прошла (подробности выше)."
+        exit "$EXIT_CANARY_FAILED"
+    fi
+    if $INTEGRITY_TAINTED; then
+        print_check_verdict "нельзя подтвердить"
+        echo "Причина: Python недоступен, содержимое файлов не сверялось по контрольной сумме."
+    elif $AUTO_YES && { [ "${ROLLBACK_DETECTED:-false}" = true ] || [ "${ROLLBACK_UNCERTAIN:-false}" = true ]; }; then
+        # Step 4 refuses exactly this combination with EXIT_USAGE.
+        print_check_verdict "нельзя ставить"
+        echo "Причина: обнаружен откат или история релиза не проверена, а --yes запрещает ручное подтверждение."
+        exit "$EXIT_USAGE"
+    else
+        print_check_verdict "можно ставить"
+        if [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
+            echo "Оговорка: найден маркер незавершённого обновления; успешный повторный запуск снимет маркер."
+        fi
+        if [ "${ROLLBACK_DETECTED:-false}" = true ] || [ "${ROLLBACK_UNCERTAIN:-false}" = true ]; then
+            echo "Оговорка: вердикт относится к ручному запуску; запуск с --yes будет остановлен (откат или непроверенная история релиза)."
+        fi
+        if [ "${CHECK_UPDATER_OUTDATED:-false}" = true ]; then
+            echo "Оговорка: вердикт вынесен текущей версией update.sh; настоящий запуск сначала обновит update.sh и проверит установку новой версией."
+        fi
+    fi
+    echo "Граница проверки: конфликты слияния CLAUDE.md не прогнозируются, существующие маркеры конфликтов в нём не проверяются."
+    exit_clean
+}
+
 # exit_clean — the shared exit for every "this run completed with no
 # operational error" path (peer-session 2026-08-21-09, Codex review
 # consensus). Overrides EXIT_OK with EXIT_TAINTED when INTEGRITY_TAINTED is
@@ -3738,9 +3840,13 @@ fi
 
 # Step 0 can replace this running updater and exec an older release before any
 # later preflight runs. Missing configuration must stop every applying run here,
-# before even the self-update; --check remains read-only.
+# before even the self-update; --check remains read-only and reports the same
+# conditions through the shared predicates (WP-529 F244). --fast checks the
+# version only and gives no readiness verdict.
 if ! $CHECK_ONLY; then
     require_env_before_update
+elif ! $FAST_CHECK; then
+    check_install_preflight
 fi
 
 # step0_integrity_check FILE — 0 when the downloaded update.sh FILE may replace the running one.
@@ -3823,6 +3929,7 @@ else
     elif $CHECK_ONLY; then
         # In --check mode: report available update without touching the file
         echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
+        CHECK_UPDATER_OUTDATED=true
     else
         echo "  Найдена новая версия update.sh — обновляю..."
         # issue #505 class (residual, found in the same sweep): replace
@@ -3986,6 +4093,8 @@ else:
         echo "⚠ Версия отличается: локально v${LOCAL_VERSION:-неизвестно}, upstream v$UPSTREAM_VERSION."
         echo "  Для полного списка изменений: bash update.sh --check (без --fast)."
     fi
+    echo ""
+    echo "Вердикт о готовности не выдаётся: --fast сверяет только версию. Для вердикта: bash update.sh --check"
     exit 0
 fi
 
@@ -5192,6 +5301,11 @@ if [ "$TOTAL_CHANGES" -eq 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
     echo "  Повторите запуск, когда сеть будет доступна. Версия манифеста намеренно не синхронизирована."
     if $CHECK_ONLY; then
         assert_self_unmutated
+        # WP-529 F244: an incomplete comparison is not "up to date" — it used
+        # to exit 0 here, a green preview nobody had actually verified.
+        print_check_verdict "нельзя подтвердить"
+        echo "Причина: ${#SKIPPED_DOWNLOAD[@]} файл(ов) не скачались или не прошли проверку целостности."
+        exit "$EXIT_NETWORK"
     else
         # Evgenii Red Team review 2026-08-19 (defect #3 continued, found on the
         # sibling branch below): the TOTAL_CHANGES=0 branch two if-blocks down
@@ -5299,6 +5413,7 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
             || echo "  ⚠ iwe-capabilities.sh не записал состояние (не критично). Повторить: bash $SCRIPT_DIR/scripts/iwe-capabilities.sh probe"
     fi
     echo "✓ Всё актуально. Обновлений нет. ($UNCHANGED файлов проверено)"
+    $CHECK_ONLY && check_verdict_exit_clean
     exit_clean
 fi
 
@@ -5384,6 +5499,15 @@ fi
 
 # === Check-only mode ===
 if $CHECK_ONLY; then
+    # WP-529 F244: the real run refuses changes with skipped downloads
+    # (EXIT_NETWORK above, guarded by ! $CHECK_ONLY); the preview must not
+    # report them as installable.
+    if [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
+        assert_self_unmutated
+        print_check_verdict "нельзя подтвердить"
+        echo "Причина: ${#SKIPPED_DOWNLOAD[@]} файл(ов) не скачались или не прошли проверку целостности; настоящий запуск остановится."
+        exit "$EXIT_NETWORK"
+    fi
     echo "Режим --check: изменения не применяются."
     echo "Для применения: bash update.sh"
 
@@ -5408,6 +5532,8 @@ if $CHECK_ONLY; then
             for reason in "${STRICT_FAILURES[@]}"; do
                 echo "  - $reason"
             done
+            print_check_verdict "нельзя ставить"
+            echo "Причина: план доставки не прошёл структурную проверку (список выше)."
             exit "$EXIT_RUNTIME"
         fi
         echo "--dry-run-strict: план доставки (${#NEW_FILES[@]} новых + ${#UPDATED_FILES[@]} обновляемых) структурно корректен. Это не гарантирует отсутствие регрессий в поведении после apply."
@@ -5461,10 +5587,7 @@ if $CHECK_ONLY; then
     # END-TESTABLE: changelog-check-preview
 
     assert_self_unmutated
-    if ! run_sync_canary; then
-        exit "$EXIT_CANARY_FAILED"
-    fi
-    exit_clean
+    check_verdict_exit_clean
 fi
 
 # === Step 4: Confirmation ===
