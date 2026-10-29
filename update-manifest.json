@@ -901,7 +901,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "df6b0c41d0c48e3c56b61cfd37c3e1d3777535b9b995a3f83aec4feffe86bdcf"
+      "sha256": "8fc34f909879361fd5439893ce93aad71d629939bf8c2b3a69a088b52ca6cd4d"
     },
     {
       "path": "docs/PORTABILITY.md",
@@ -925,7 +925,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "86a178f3b79f9a5f76ea6c949aa081ebcca4f925543624379f4dfa3c62c68520"
+      "sha256": "ba05f72cba83a30c30137cf8ff85e24b65ec83c7e0d91aabfc0e22784a3554a8"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
