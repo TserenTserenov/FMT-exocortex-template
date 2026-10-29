@@ -20,9 +20,16 @@
 #
 # Why `--wp` only, not any `--housekeeping` reason (pilot decision 16.10.2026,
 # S-68 in STAGING.md): a free-text housekeeping reason isn't tracked anywhere
-# as a real work product, so every edit must carry a real WP-N -- either the
-# one already active, the standing umbrella tech-debt РП (e.g. the author's
-# own WP-7), or a new one per the WP Entry Filter (S-47).
+# as a real work product, so every edit must carry a real WP-N -- the one the
+# work actually belongs to, or a new one per the WP Entry Filter (S-47).
+#
+# Sessions with no WP at all (pilot decision 29.10.2026, WP-7 Ф274, option
+# "entry without commits"): reading, research and reversible local checks need
+# no semaphore, this gate stays silent until commit/push. A commit needs a
+# session opened on a real WP. An umbrella tech-debt WP is fine only for work
+# that really is tech debt, never as a stub for unbound work -- a convention
+# this gate cannot check. There is deliberately no separate "read-only" mode:
+# a session without a WP binding is that mode.
 #
 # Exception, added 21.10.2026 (community report: day/week/month close
 # rejected outright, with no WP to bind to -- they are not a numbered work
@@ -35,6 +42,9 @@
 # themselves, from their own SKILL.md, not something a session can claim for
 # an arbitrary unrelated commit.
 ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close|update-delivery)$'
+# Scheduled runs of non-Claude agents, whole-value match: no trim, case-sensitive,
+# so `sched-1 extra`, a trailing space or a tab do not pass (WP-7 Ф274).
+SCHED_HOUSEKEEPING_REASON='sched-[A-Za-z0-9._-]+'
 #
 # What this gate does NOT do: it does not require the semaphore to live in the
 # repo being committed to — the semaphore directory is session-scoped, not
@@ -71,10 +81,11 @@ if [ "$AGENT" = "claude-code" ] && [ -z "$SESSION_ID" ] && [ -n "${CLAUDE_CODE_S
   SESSION_ID="$CLAUDE_CODE_SESSION_ID"
 fi
 # Non-Claude agents (Kimi: tool "Shell", own payload id that no semaphore
-# records) -> agent-keyed mode, WP-561 Ф51 (27.10.2026, pilot permission S-33):
-# block only the proven incident shape "newest closed semaphore of this agent is
-# a housekeeping one and no open semaphore exists"; any other state stays
-# fail-open. Claude keeps the original session-id logic untouched.
+# records) -> agent-keyed mode: any open semaphore of this agent counts, since
+# the session that opened it cannot be told apart. WP-561 Ф51 (27.10.2026) made
+# this mode fail-open except for one proven incident shape; WP-7 Ф274
+# (29.10.2026, pilot decision) closes it: no WP-bound, allowed or scheduled
+# semaphore of the agent -> block, the same rule as for Claude.
 AGENT_KEYED=0
 if [ "$AGENT" != "claude-code" ]; then
   AGENT_KEYED=1
@@ -92,42 +103,59 @@ NORMALIZED_COMMAND=$(printf '%s' "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' 
 GIT_GLOBAL_FLAGS_RE='(-C [^ ]+|-c [^ ]+|--(git-dir|work-tree|namespace|exec-path)(=[^ ]+| [^ ]+)|--(literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs|no-optional-locks|no-lazy-fetch|no-replace-objects|no-pager|paginate|bare)|-P)'
 echo "$NORMALIZED_COMMAND" | grep -qE "(^|[;&|(]) *(([A-Za-z_][A-Za-z0-9_]*=[^ ]+ *)*)(command |builtin |exec )?git( $GIT_GLOBAL_FLAGS_RE)* (commit|push)( |$)" || exit 0
 
+# The agent name goes into the semaphore globs below: `*` or `[...]` would match
+# other agents' semaphores (a claude-code one with `wp:`) and let the commit
+# through (WP-7 Ф274). Checked after commit detection, so it blocks nothing else.
+case "$AGENT" in
+  *[!A-Za-z0-9._-]*)
+    echo "[session-open-gate] IWE_AGENT='$AGENT' содержит недопустимые символы (разрешены A-Z a-z 0-9 . _ -) — git commit/push заблокирован. Исправьте IWE_AGENT." >&2
+    exit 2 ;;
+esac
+
 SESSION_DIR="$IWE_ROOT/.iwe-runtime/sessions"
+SCHED_LOG="$IWE_ROOT/.iwe-runtime/session-open-gate-sched.log"
 # -x (whole-line match), not a bare -F substring search (close-runner-gate.sh
 # ПП-74б/31.08 already hit this exact defect: a shorter session_id that is a
 # prefix of a longer one would otherwise match it as a substring).
 if [ "$AGENT_KEYED" = 1 ]; then
-  SEM_MATCHES=$(ls "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+  SEM_MATCHES=$(ls -d "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
 else
   SEM_MATCHES=$(grep -lxF "harness_session_id: $SESSION_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
 fi
-WP_BOUND=0
+# Semaphore files are named <agent>-<id>.open, so an agent name that is a prefix
+# of another one (claude / claude-code, kimi / kimi-peer) globs foreign files too.
+# The owner is the single `agent:` line, the same check session-guard.sh applies.
+OWN_SEMS=()
 while IFS= read -r sem_file; do
-  [ -z "$sem_file" ] && continue
-  if grep -qE '^wp: .+' "$sem_file" 2>/dev/null; then
-    WP_BOUND=1
-    break
-  fi
-  HK_REASON=$(grep -E '^housekeeping: ' "$sem_file" 2>/dev/null | head -1 | cut -d' ' -f2-)
-  if [ -n "$HK_REASON" ] && printf '%s' "$HK_REASON" | grep -qE "$ALLOWED_HOUSEKEEPING_REASONS"; then
-    WP_BOUND=1
-    break
-  fi
+  [ -f "$sem_file" ] && [ ! -L "$sem_file" ] || continue
+  [ "$(grep -c '^agent: ' "$sem_file" 2>/dev/null)" = 1 ] && grep -qxF "agent: $AGENT" "$sem_file" 2>/dev/null || continue
+  OWN_SEMS+=("$sem_file")
 done <<< "$SEM_MATCHES"
-[ "$WP_BOUND" = 1 ] && exit 0
 
+sem_housekeeping_reason() { # $1 = semaphore file -> first housekeeping reason, verbatim
+  grep -E '^housekeeping: ' "$1" 2>/dev/null | head -1 | cut -d' ' -f2-
+}
+
+# ${arr[@]+...}: an empty array under `set -u` is an error in bash 3.2 (macOS /bin/bash).
+for sem_file in ${OWN_SEMS[@]+"${OWN_SEMS[@]}"}; do
+  grep -qE '^wp: *[^[:space:]]' "$sem_file" 2>/dev/null && exit 0
+  HK_REASON=$(sem_housekeeping_reason "$sem_file")
+  [ -n "$HK_REASON" ] && printf '%s' "$HK_REASON" | grep -qE "$ALLOWED_HOUSEKEEPING_REASONS" && exit 0
+done
+
+# Scheduled runs without a WP (`--housekeeping sched-<id>`, Kimi queue runner)
+# are a launcher, not an agent's choice. The hook cannot tell a real queue id
+# from a self-chosen `sched-research`: a self-certified loophole, accepted by
+# the pilot; every pass is logged for the weekly review (docs/PLATFORM-COMPAT.md).
+# Checked only after no WP-bound semaphore was found, so the log holds real sched passes.
 if [ "$AGENT_KEYED" = 1 ]; then
-  # Any open semaphore of the agent means a session exists, including scheduled
-  # runs (`--housekeeping sched-<id>`, kimi-wp-run-scheduled.sh), whose reason is
-  # outside the allowed list: the Ф51 shape is "nothing open at all".
-  [ -n "$SEM_MATCHES" ] && exit 0
-  # Fail-open unless the newest closed semaphore proves the Ф51 shape.
-  # -c (change time): closing renames .open -> .open.closed without a write, so
-  # mtime would keep the time of the last write, ctime moves with the rename.
-  LAST_CLOSED=$(ls -tc "$SESSION_DIR/${AGENT}"-*.open.closed 2>/dev/null | head -1)
-  [ -n "$LAST_CLOSED" ] || exit 0
-  LAST_HK=$(grep -E '^housekeeping: ' "$LAST_CLOSED" 2>/dev/null | head -1 | cut -d' ' -f2-)
-  { [ -n "$LAST_HK" ] && printf '%s' "$LAST_HK" | grep -qE "$ALLOWED_HOUSEKEEPING_REASONS"; } || exit 0
+  for sem_file in ${OWN_SEMS[@]+"${OWN_SEMS[@]}"}; do
+    HK_REASON=$(sem_housekeeping_reason "$sem_file")
+    printf '%s' "$HK_REASON" | grep -qxE "$SCHED_HOUSEKEEPING_REASON" || continue
+    { mkdir -p "$(dirname "$SCHED_LOG")" && printf '%s agent=%s reason=%s\n' "$(command date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENT" "$HK_REASON" >> "$SCHED_LOG"; } 2>/dev/null \
+      || echo "[session-open-gate] не удалось записать $SCHED_LOG — плановый запуск всё равно пропущен" >&2
+    exit 0
+  done
 fi
 
 # Opt-in skip for Windows / Git Bash (WP-7 Ф271, issue #1281). session-guard.sh
@@ -203,22 +231,29 @@ if SKIP_UNTIL=$(gate_skip_check); then
   exit 0
 fi
 
-echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
+if [ "$AGENT_KEYED" = 1 ]; then
+  echo "[session-open-gate] agent=$AGENT no open ${SESSION_DIR}/${AGENT}-*.open semaphore with exactly one matching agent: line and a wp:, an allowed housekeeping or a sched-<id> reason — blocking direct git commit/push" >&2
+else
+  echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
+fi
 
 cat >&2 <<EOF
 🚫 Session Open Gate (WP-561/S-68): прямой git commit/push без привязки к РП заблокирован.
 
-Эта сессия ни разу не открывала себя на конкретный РП — каждая правка обязана
-нести номер рабочего продукта, свободная причина без номера не считается.
+Сессия без РП работает только на чтение: читать, исследовать и проверять
+локально можно, коммитить и пушить нельзя (WP-7 Ф274). Чтобы закоммитить,
+откройте сессию на РП, к которому относится работа:
 
   bash scripts/session-guard.sh open --wp WP-N --task "..." --agent ${AGENT}
 
-WP-N — РП, который уже обсуждался в этой сессии; если его нет, подойдёт
-зонтичный РП техдолга платформы или новый РП по фильтру входа (S-47).
+WP-N — РП, который уже обсуждался в этой сессии, или новый РП по фильтру
+входа (S-47). Зонтичный РП техдолга — только для работы, которая и есть
+техдолг, не как заглушка для работы без своего РП.
 
-Исключение — закрытый список операционных протоколов без своего номера
-(day-open, day-close, week-close, month-close): их собственные SKILL.md уже
-открывают open --housekeeping REASON сами, в начале протокола.
+Исключения без своего номера: закрытый список операционных протоколов
+(day-open, day-close, week-close, month-close, update-delivery) — их SKILL.md
+открывают open --housekeeping REASON сами — и плановые запуски не-Claude
+агентов (housekeeping sched-<id>, каждый пропуск пишется в журнал).
 
 Канонический чекаут может быть заморожен (WP-520/WP-484) — session-guard.sh в
 этом случае сам укажет, как перейти в изолированную копию (EnterWorktree /
