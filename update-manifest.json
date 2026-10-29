@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "e8b67e6caa82d05a56e0e9cffa3f448af40f535fedde77ac13a5ca44102870d8"
+      "sha256": "72758fe20d0539038e42cef7e9750358d85597e0cab3ead41bfe4cfcf8b9c29d"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e094d0015687d3442199922eac3ae51a4a6ef966e8aad583a8eaf39966fc459a"
+      "sha256": "c9b70327d566bb30103ed511f816766a386784d31305390966ced25a1f48b60f"
     },
     {
       "path": "CLAUDE.md",
@@ -3704,7 +3704,9 @@
     "setup/test-update-release-channel.sh",
     "setup/test-update-self-overwrite.sh",
     "setup/test-update-step0-staged-rename.sh",
+    "setup/test-update-write-sites.sh",
     "setup/test-week-review-delivery-postcondition.sh",
+    "setup/update-write-sites.tsv",
     "setup/ux-walkthrough-prompt.md",
     "setup/wp529-f21-toggle-required-review.sh"
   ],
