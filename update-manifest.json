@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "e8b67e6caa82d05a56e0e9cffa3f448af40f535fedde77ac13a5ca44102870d8"
+      "sha256": "72758fe20d0539038e42cef7e9750358d85597e0cab3ead41bfe4cfcf8b9c29d"
     },
     {
       "path": ".gitignore",
