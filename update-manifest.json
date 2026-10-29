@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "b6adefb12999e7aad0b402141ba1efcb11d23e17cbdcff4c339f0992f56e8248"
+      "sha256": "a13eea3114d4a9e2d1f0e105eca78ae39c481bfad71e0fdd1bc44863a1b6e8f5"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -997,7 +997,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "d8b966768e43ac99c90f62a2ea12f6793c09441cc10753a81da3c4a433ba9c7d"
+      "sha256": "c8851f940aa46fcaf140f4d76553ec1cf60ed329d2e8cfe0e0c8e31a2e16575e"
     },
     {
       "path": "docs/PORTABILITY.md",

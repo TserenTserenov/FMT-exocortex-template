@@ -258,7 +258,8 @@ if [ "$(uname -s)" = Linux ] && grep -q "uname_s=Linux" "$SKIP_LOG" 2>/dev/null;
 FAKE_BIN="$TMP_ROOT/fakebin"; mkdir -p "$FAKE_BIN"; printf '#!/bin/sh\necho MSYS_NT-FAKE\n' > "$FAKE_BIN/uname"; chmod +x "$FAKE_BIN/uname"
 rm -f "$SKIP_LOG"
 printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"},"session_id":"%s"}' "$SID" | PATH="$FAKE_BIN:$PATH" OSTYPE=msys IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
-if grep -q "uname_s=MSYS_NT-FAKE" "$SKIP_LOG" 2>/dev/null; then FAIL=$((FAIL+1)); echo "FAIL: skip: uname_s взят из пользовательского PATH (F272)"; else PASS=$((PASS+1)); fi
+if ! grep -q "uname_s=" "$SKIP_LOG" 2>/dev/null; then FAIL=$((FAIL+1)); echo "FAIL: skip: журнал с uname_s не записан при фальшивом uname (F272)"
+elif grep -q "uname_s=MSYS_NT-FAKE" "$SKIP_LOG" 2>/dev/null; then FAIL=$((FAIL+1)); echo "FAIL: skip: uname_s взят из пользовательского PATH (F272)"; else PASS=$((PASS+1)); fi
 rm -rf "$FAKE_BIN"
 rm -rf "$TMP_ROOT/.iwe-runtime/session-open-gate-skip.log"
 mkdir -p "$SKIP_LOG"   # каталог вместо файла: запись невозможна
