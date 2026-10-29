@@ -3681,6 +3681,7 @@
     "setup/test-strategist-mark-done.sh",
     "setup/test-strategist-notereview-migration.py",
     "setup/test-update-channel-enum.sh",
+    "setup/test-update-check-verdict.sh",
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-f220-changelog-dry-run-strict.sh",
