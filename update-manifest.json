@@ -185,7 +185,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "18f15f033bef358d52e4b8de346063cffbf8e9ae1b71e543215ac258b8f2aa28"
+      "sha256": "40a9d5471c87161b9a32f83dde23497cc641f0c54ed413b14e076b01dd674c94"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "8807bebf48fe7856f16edccaf765d41c924b14e649e484db367d22caef51bf6f"
+      "sha256": "eaffb07aa81a172f2b126b4bcc447456841b0ccdbd52a3f830033bf37184d6f9"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c9b70327d566bb30103ed511f816766a386784d31305390966ced25a1f48b60f"
+      "sha256": "329b9cbe2ca1926dc399ed6e4af77f241cbc19f4e81d01f10605805ec4739865"
     },
     {
       "path": "CLAUDE.md",
@@ -997,7 +997,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "18ad50b6b7a11cb5027948786c98b38f1c7e1beee838172cef81cccbc60122b4"
+      "sha256": "1abb679869c51c0a6afd42f7c1ea6b82e374f72bd767c26642617b047e7da80d"
     },
     {
       "path": "docs/PORTABILITY.md",

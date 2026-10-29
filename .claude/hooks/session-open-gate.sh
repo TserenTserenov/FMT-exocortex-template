@@ -72,6 +72,9 @@ COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/nul
 [ -n "$COMMAND" ] || exit 0
 
 AGENT="${IWE_AGENT:-claude-code}"
+# WP-484 Ф261: `claude` is an alias of `claude-code` (session-guard.sh normalizes it
+# on open); normalized before the mode is chosen, so the alias is not agent-keyed.
+[ "$AGENT" = claude ] && AGENT=claude-code
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
 # Same fallback as close-runner-gate.sh (bug-2026-08-31): payload .session_id
 # has come back empty while CLAUDE_CODE_SESSION_ID was present and correct.
@@ -91,9 +94,13 @@ if [ "$AGENT" != "claude-code" ]; then
   AGENT_KEYED=1
   SESSION_ID="agent-keyed"
 fi
-[ -n "$SESSION_ID" ] || exit 0
+# Claude without a usable session id (payload and CLAUDE_CODE_SESSION_ID both empty,
+# or unsafe characters) cannot be matched to a semaphore: Claude Code always sends
+# one, so this is a fault, not a legitimate path. Decided after commit detection and
+# after the Git Bash skip below; earlier versions let such a commit through (Ф275).
+NO_SESSION_ID=0
 case "$SESSION_ID" in
-  *[!A-Za-z0-9._-]*) exit 0 ;;
+  ''|*[!A-Za-z0-9._-]*) NO_SESSION_ID=1; SESSION_ID="" ;;
 esac
 SESSION_ID_SAFE="$SESSION_ID"
 
@@ -117,18 +124,39 @@ SCHED_LOG="$IWE_ROOT/.iwe-runtime/session-open-gate-sched.log"
 # -x (whole-line match), not a bare -F substring search (close-runner-gate.sh
 # ПП-74б/31.08 already hit this exact defect: a shorter session_id that is a
 # prefix of a longer one would otherwise match it as a substring).
-if [ "$AGENT_KEYED" = 1 ]; then
-  SEM_MATCHES=$(ls -d "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
-else
-  SEM_MATCHES=$(grep -lxF "harness_session_id: $SESSION_ID" "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null)
+# Names that denote one agent, the same family as session-guard.sh _agent_family
+# (WP-484 Ф261): `claude` and `claude-code` are one agent, and older `open --agent
+# claude` wrote claude-<id>.open with `agent: claude`. Change both places together.
+AGENT_FAMILY="$AGENT"
+SEM_GLOB="${AGENT}-*.open"
+if [ "$AGENT" = claude-code ]; then
+  AGENT_FAMILY="claude claude-code"
+  SEM_GLOB="claude-*.open"
 fi
+if [ "$AGENT_KEYED" = 1 ]; then
+  SEM_MATCHES=$(ls -d "$SESSION_DIR"/$SEM_GLOB 2>/dev/null)
+elif [ "$NO_SESSION_ID" = 1 ]; then
+  SEM_MATCHES=""
+else
+  SEM_MATCHES=$(grep -lxF "harness_session_id: $SESSION_ID" "$SESSION_DIR"/$SEM_GLOB 2>/dev/null)
+fi
+
+sem_owned() { # $1 = semaphore file -> 0 if its single `agent:` line names this agent's family
+  local name
+  [ "$(grep -c '^agent: ' "$1" 2>/dev/null)" = 1 ] || return 1
+  for name in $AGENT_FAMILY; do
+    grep -qxF "agent: $name" "$1" 2>/dev/null && return 0
+  done
+  return 1
+}
+
 # Semaphore files are named <agent>-<id>.open, so an agent name that is a prefix
-# of another one (claude / claude-code, kimi / kimi-peer) globs foreign files too.
+# of another one (kimi / kimi-peer) globs foreign files too.
 # The owner is the single `agent:` line, the same check session-guard.sh applies.
 OWN_SEMS=()
 while IFS= read -r sem_file; do
   [ -f "$sem_file" ] && [ ! -L "$sem_file" ] || continue
-  [ "$(grep -c '^agent: ' "$sem_file" 2>/dev/null)" = 1 ] && grep -qxF "agent: $AGENT" "$sem_file" 2>/dev/null || continue
+  sem_owned "$sem_file" || continue
   OWN_SEMS+=("$sem_file")
 done <<< "$SEM_MATCHES"
 
@@ -231,10 +259,15 @@ if SKIP_UNTIL=$(gate_skip_check); then
   exit 0
 fi
 
+if [ "$NO_SESSION_ID" = 1 ]; then
+  echo "[session-open-gate] Claude без пригодного идентификатора сессии (session_id в запросе хука пуст или содержит символы вне A-Za-z0-9._-, а при пустом нет и CLAUDE_CODE_SESSION_ID): семафор этой беседы найти нельзя — git commit/push заблокирован. Это сбой окружения, а не обычный путь; перезапустите сессию Claude Code или откройте сессию на РП и повторите в ней." >&2
+  exit 2
+fi
+
 if [ "$AGENT_KEYED" = 1 ]; then
-  echo "[session-open-gate] agent=$AGENT no open ${SESSION_DIR}/${AGENT}-*.open semaphore with exactly one matching agent: line and a wp:, an allowed housekeeping or a sched-<id> reason — blocking direct git commit/push" >&2
+  echo "[session-open-gate] agent=$AGENT no open ${SESSION_DIR}/${SEM_GLOB} semaphore with exactly one matching agent: line and a wp:, an allowed housekeeping or a sched-<id> reason — blocking direct git commit/push" >&2
 else
-  echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${AGENT}-*.open) — blocking direct git commit/push" >&2
+  echo "[session-open-gate] session=$SESSION_ID_SAFE no semaphore with both harness_session_id: $SESSION_ID and a wp: field or an allowed housekeeping reason (${SESSION_DIR}/${SEM_GLOB}) — blocking direct git commit/push" >&2
 fi
 
 cat >&2 <<EOF
