@@ -192,5 +192,93 @@ printf '{"tool_name":"Shell","tool_input":{"command":"git commit -m x"},"session
 got=$?
 if [ "$got" = 2 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: claude Shell without semaphore (ожидалось 2, получено $got)"; fi
 
+# === Пропуск на Git Bash по session_open_gate_skip_until (Ф271, issue #1281) ===
+# Платформа читается из $OSTYPE: тест подставляет его в окружение хука (в настоящем
+# Git Bash он равен msys). Подмена `uname` через PATH на решение не влияет.
+close_semaphore
+PARAMS="$TMP_ROOT/params.yaml"
+SKIP_LOG="$TMP_ROOT/.iwe-runtime/session-open-gate-skip.log"
+
+day_offset() { # $1 = сдвиг в днях от сегодня -> ГГГГ-ММ-ДД (GNU date, затем BSD)
+  date -d "$1 days" +%Y-%m-%d 2>/dev/null || date -v"$1"d +%Y-%m-%d
+}
+
+run_gate_os() { # $1 = OSTYPE, $2 = команда -> печатает код выхода хука
+  local json_cmd
+  json_cmd=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$2")
+  printf '{"tool_name":"Bash","tool_input":{"command":%s},"session_id":"%s"}' \
+    "$json_cmd" "$SID" | OSTYPE="$1" IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
+  echo $?
+}
+
+expect_skip() { # $1 = описание, $2 = ожидаемый код, $3 = OSTYPE, $4 = содержимое params.yaml
+  local got
+  printf '%b' "$4" > "$PARAMS"
+  got=$(run_gate_os "$3" 'git commit -m x')
+  if [ "$got" = "$2" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: $1 (ожидалось $2, получено $got)"; fi
+}
+
+K=session_open_gate_skip_until
+rm -f "$SKIP_LOG" "$PARAMS"
+expect_skip "нет params.yaml → блок"                 2 msys ""
+rm -f "$PARAMS"
+got=$(run_gate_os msys 'git commit -m x'); [ "$got" = 2 ] && PASS=$((PASS+1)) || { FAIL=$((FAIL+1)); echo "FAIL: skip: файла params.yaml нет (получено $got)"; }
+expect_skip "ключ валиден, Linux → блок"             2 linux-gnu "$K: $(day_offset +5)\n"
+expect_skip "ключ валиден, macOS → блок"             2 darwin23 "$K: $(day_offset +5)\n"
+expect_skip "ключ валиден, Git Bash (msys) → пропуск" 0 msys "$K: $(day_offset +5)\n"
+expect_skip "ключ валиден, cygwin → пропуск"         0 cygwin "$K: $(day_offset +5)\n"
+expect_skip "срок = сегодня → пропуск"               0 msys "$K: $(day_offset +0)\n"
+expect_skip "срок = +30 дней → пропуск"              0 msys "$K: $(day_offset +30)\n"
+expect_skip "срок = +31 день → блок"                 2 msys "$K: $(day_offset +31)\n"
+expect_skip "срок вчера → блок"                      2 msys "$K: $(day_offset -1)\n"
+expect_skip "31 февраля → блок"                      2 msys "$K: 2026-02-31\n"
+expect_skip "29 февраля невисокосного → блок"        2 msys "$K: 2027-02-29\n"
+expect_skip "тринадцатый месяц → блок"               2 msys "$K: 2026-13-01\n"
+expect_skip "CRLF в файле → пропуск"                 0 msys "$K: $(day_offset +5)\r\n"
+expect_skip "комментарий после пробела → пропуск"    0 msys "$K: $(day_offset +5) # временно\n"
+expect_skip "комментарий без пробела → блок"         2 msys "$K: $(day_offset +5)# x\n"
+expect_skip "закомментированный ключ → блок"         2 msys "# $K: $(day_offset +5)\n"
+expect_skip "ключ с отступом → блок"                 2 msys "  $K: $(day_offset +5)\n"
+expect_skip "ключ в кавычках → блок"                 2 msys "$K: \"$(day_offset +5)\"\n"
+expect_skip "пустое значение → блок"                 2 msys "$K:\n"
+expect_skip "нет пробела после двоеточия → блок"     2 msys "$K:$(day_offset +5)\n"
+expect_skip "хвост после даты → блок"                2 msys "$K: $(day_offset +5) x\n"
+expect_skip "дубликат с разными датами → блок"       2 msys "$K: $(day_offset +5)\n$K: $(day_offset +6)\n"
+expect_skip "опечатка в имени ключа → блок"          2 msys "session_open_gate_skip_untill: $(day_offset +5)\n"
+
+# журнал: пропуск оставляет строку с датой окончания; сбой записи решение не меняет
+rm -f "$SKIP_LOG"
+printf '%s: %s\n' "$K" "$(day_offset +5)" > "$PARAMS"
+run_gate_os msys 'git commit -m x' >/dev/null
+if grep -q "until=$(day_offset +5)" "$SKIP_LOG" 2>/dev/null; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: строка журнала не записана"; fi
+rm -rf "$TMP_ROOT/.iwe-runtime/session-open-gate-skip.log"
+mkdir -p "$SKIP_LOG"   # каталог вместо файла: запись невозможна
+got=$(run_gate_os msys 'git commit -m x')
+if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: сбой журнала не должен менять решение (получено $got)"; fi
+rmdir "$SKIP_LOG"
+
+# фальшивый uname в PATH не включает пропуск на Linux
+FAKE_BIN=$(mktemp -d)
+printf '#!/bin/sh\necho MINGW64_NT\n' > "$FAKE_BIN/uname"; chmod +x "$FAKE_BIN/uname"
+printf '%s: %s\n' "$K" "$(day_offset +5)" > "$PARAMS"
+json_fake=$(python3 -c 'import json; print(json.dumps("git commit -m x"))')
+printf '{"tool_name":"Bash","tool_input":{"command":%s},"session_id":"%s"}' "$json_fake" "$SID" \
+  | PATH="$FAKE_BIN:$PATH" OSTYPE=linux-gnu IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
+got=$?
+if [ "$got" = 2 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: фальшивый uname в PATH дал обход (получено $got)"; fi
+rm -rf "$FAKE_BIN"
+
+# есть семафор с wp: → ключ не читается, журнал не пишется
+rm -f "$SKIP_LOG"
+open_semaphore
+got=$(run_gate_os msys 'git commit -m x')
+if [ "$got" = 0 ] && [ ! -e "$SKIP_LOG" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: при открытом семафоре ключ не должен читаться (код $got)"; fi
+close_semaphore
+
+# команды без commit/push под действующим пропуском остаются как были (пропуск и так)
+got=$(run_gate_os linux-gnu 'git status')
+if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: skip: git status должен проходить (получено $got)"; fi
+rm -f "$PARAMS"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

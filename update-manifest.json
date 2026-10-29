@@ -185,7 +185,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "2a9cc404e799e3e78ee21720557a4fbba9e8b197f65a5074e0fd4749b3dd31e2"
+      "sha256": "7ea4921bab05032383e608845fdb02cfb2c4e2d21f1fe8eaa987465686cfb8eb"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -261,7 +261,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-session-open-gate.sh",
-      "sha256": "7f2aa864cf90c96d017e7233fe5ac86697067aa8186eccf656733dbdfcfc0984"
+      "sha256": "d355fe434531774977a93e598cbf2d723fffd5ad3804dbbf0b80ea08f3d09826"
     },
     {
       "path": ".claude/hooks/tests/test_issue_1184_stop_gate_block_once.sh",
@@ -617,7 +617,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "2b7f65072acc7013f90ec9bdcdc9e660e824481fd21b0979be178d3109eb040a"
+      "sha256": "8704bca18a128bfdfa2d770dd7885cd3d5727deae8591d6a240b16281fd6f826"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "e8b67e6caa82d05a56e0e9cffa3f448af40f535fedde77ac13a5ca44102870d8"
+      "sha256": "5e7a3fd586e0cdfa4f97fa37a6d5ed8d4fd4c09ae666a00adf699e5cc4dd5d2b"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b3288d5ba0892b08b8b3c8d9ff7ce905714eaf9ab87e1d286c44268a53298822"
+      "sha256": "f73b9e1ce24b3ae030c732b09941e47e16783702479d118e88790dbbfe3a9410"
     },
     {
       "path": "CLAUDE.md",
@@ -997,7 +997,7 @@
     },
     {
       "path": "docs/PLATFORM-COMPAT.md",
-      "sha256": "313d29b1519ded28f1c7174a2d8339ec41912928bf515ecac90bbaa54322026d"
+      "sha256": "b36be87b0c14fa6e616ba6edf2ca64f8066155fff6f4c869cb0f627d75049f52"
     },
     {
       "path": "docs/PORTABILITY.md",
@@ -1021,7 +1021,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "27829f2770ba2a996b225a4e77da1a5bb0e483f3e80591b2b1e1c9da9d834daf"
+      "sha256": "1105c2530faae77482d18c3ee0d18af784bd0e3b39164fd424edf47c85240d53"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -3113,7 +3113,7 @@
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
-      "sha256": "5a2455db4d7b7d24ca1632b1bcf242349fc6663f2fb4abe60974f5942fd9ffbc"
+      "sha256": "2b0fbcddb8aeba6e8fd107b0e322fc44add48fcef8584547c708e02dc2ced666"
     },
     {
       "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
@@ -3397,7 +3397,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "d8c257539f69644f03800c701898e3b103df48cc60ecb305867c8b3a45a6b709"
+      "sha256": "2548be26407e08033cc79b9d5e2128c0a8edb79181c053dff88d80b2f7b7ff50"
     }
   ],
   "excluded_paths": [
@@ -3681,7 +3681,6 @@
     "setup/test-strategist-mark-done.sh",
     "setup/test-strategist-notereview-migration.py",
     "setup/test-update-channel-enum.sh",
-    "setup/test-update-check-verdict.sh",
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-f220-changelog-dry-run-strict.sh",
