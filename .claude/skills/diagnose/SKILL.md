@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 мин. Сохраняет cp-профиль в канонический журнал learning.cp_assessments — через MCP-инструмент (browser) или напрямую в Neon (VS Code). Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда видишь пустой cp_profile или нового пользователя без данных."
+description: "Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 мин. Сохраняет cp-профиль в канонический журнал learning.cp_assessments через MCP-инструмент сервиса учебного контекста — в браузере и в VS Code одинаково. Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда learning_ctx_get_my_cp_assessment вернул null или устаревший профиль, или видишь нового пользователя без данных."
 argument-hint: "[необязательно: --check для просмотра профиля без нового опроса]"
 related: [WP-318, WP-370, DP.ROLE.042, DP.SC.132, PD.FORM.089]
 version: 5.0.0
@@ -29,63 +29,36 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 ## When to use
 
-Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 минуты. Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда видишь пустой cp_profile.
+Диагностика ступени мастерства (Диагност R28, FORM.089 §6.1 v5.0) прямо в VS Code / claude.ai. До 6 вопросов, ~3 минуты. Запускай когда: пилот говорит «пройди диагностику», «какая моя ступень», «/diagnose» — или ПРОАКТИВНО когда прошлой диагностики нет или она устарела.
 
 ## Контракт скилла
 
-- **Вход:** пилот вызвал `/diagnose`, или Claude видит пустой cp_profile.
-- **Выход:** cp-профиль в чате + сохранение (путь зависит от интерфейса — см. Шаг 5).
+- **Вход:** пилот вызвал `/diagnose`, или прошлой диагностики нет (`learning_ctx_get_my_cp_assessment` вернул null или устаревший профиль).
+- **Выход:** cp-профиль в чате + сохранение через `learning_ctx_record_cp_assessment` (см. Шаг 5).
 - **Время:** ≤3 мин (5-6 вопросов).
 - **Не делает:** не даёт рекомендации по развитию (это Навигатор R27), не строит персональное руководство.
 
-## Определить интерфейс (ПЕРВЫМ действием)
+## Один путь чтения и записи (оба интерфейса)
 
-**Браузер (claude.ai):** инструмент Bash недоступен → сохранение через `learning_ctx_record_cp_assessment` (канонический журнал).
-**VS Code / локальный:** Bash доступен → сохранение в Neon через psycopg2 (+ локальный fallback).
+В браузере (claude.ai) и в VS Code навык работает через одни и те же MCP-инструменты сервиса учебного контекста — Bash, база данных и переменные окружения не нужны:
 
-Проверка: попробовать Bash. Если недоступен — работаем в браузерном режиме.
+- **чтение** прошлой диагностики — `learning_ctx_get_my_cp_assessment` (своя последняя самооценка из журнала, с датой);
+- **запись** — `learning_ctx_record_cp_assessment` (статус `pending_evaluation`: это самооценка, ступень подтверждает оценщик ступени, не навык).
+
+Навык не пишет в базу напрямую и не сохраняет профиль в локальные файлы или цифровой двойник (WP-578 Ф21.3: у самооценки один писатель). Инструменты недоступны (MCP Aisystant не подключён) — диагностику провести можно, результат показать в чате, но сказать прямо, что он не сохранён, и как подключить MCP.
 
 ## Algorithm
 
 ## Шаг 0. Проверить существующий профиль
 
-### Браузерный режим
+Вызвать `learning_ctx_get_my_cp_assessment` (без параметров).
 
-Вызвать `mcp__claude_ai_IWE__learning_ctx_get_onboarding_state` (читает из того же канона `learning.cp_assessments`, куда пишет Шаг 5).
-
-- `has_diagnosis: true` → показать текущий `cp_stage`, предложить пройти заново (кнопка «Повторить»). Инструмент не отдаёт `assessed_at` — точный 7-дневный кулдаун (как в VS Code режиме) здесь не проверить; решение «повторять или нет» оставить пилоту.
+- Вернул профиль → показать его (формат ниже, дата — `assessed_at`). Если `assessed_at` моложе 7 дней — спросить «Пройти заново?». Если `expired: true` — сказать, что профиль устарел, и предложить пройти заново.
+- Вернул `null` → прошлой диагностики нет, продолжить с Шага 1.
 - `--check` → показать и завершить.
-- `has_diagnosis: false` → продолжить с Шага 1.
+- **Ошибка инструмента ≠ `null`.** Сказать: «Не смог проверить прошлую диагностику» — и спросить, проходить ли сейчас. Не утверждать, что профиля нет.
 
-### VS Code режим
-
-```bash
-source ~/.config/aist/env
-python3 -c "
-import os, json
-try:
-    import psycopg2
-    conn = psycopg2.connect(os.environ['NEON_LEARNING_URL'])
-    cur = conn.cursor()
-    cur.execute('''SELECT stage, bottleneck_slot, recommended_stream, assessed_at, valid_until
-                   FROM learning.cp_assessments
-                   WHERE account_id = %s::uuid
-                   ORDER BY assessed_at DESC LIMIT 1''',
-                (os.environ['DT_USER_ID'],))
-    row = cur.fetchone()
-    conn.close()
-    if row:
-        stage, bottleneck, stream, assessed_at, valid_until = row
-        print(json.dumps({'stage': stage, 'bottleneck': bottleneck, 'stream': stream,
-                          'assessed_at': str(assessed_at)[:10], 'valid_until': str(valid_until)[:10]}))
-    else:
-        print('null')
-except Exception as e:
-    print(f'error: {e}')
-"
-```
-
-**Кулдаун:** 7 дней. При свежем профиле — показать и спросить «Пройти заново?».
+**Кулдаун:** 7 дней — мягкий: при свежем профиле показать и спросить «Пройти заново?», решает пользователь.
 
 **Формат вывода существующего профиля:**
 
@@ -268,13 +241,13 @@ cp.iwe [N] | cp.int [N] | cp.agt [N]
 (действителен 180 дней)
 ```
 
-Затем сохранить — путь зависит от интерфейса:
+Затем сохранить — одинаково в браузере и в VS Code.
 
-### Браузерный режим (claude.ai) — сохранить через learning_ctx_record_cp_assessment
+### Сохранить через learning_ctx_record_cp_assessment
 
-Вычислить `occurred_at` (сейчас, ISO UTC). Сгенерировать `event_id` для идемпотентности: `diagnose-browser-<occurred_at>` (ISO-время без разделителей допустимо, важно только не повторить в рамках одной сессии).
+**Одно прохождение — один `event_id`.** Сгенерировать его один раз перед первой попыткой записи: `diagnose-<интерфейс>-<occurred_at>` (например, `diagnose-vscode-20261029T081500Z`), где `occurred_at` — момент завершения опроса (ISO UTC). При повторе после сбоя использовать **тот же `event_id` и тот же набор полей целиком**, включая `occurred_at`: повтор идемпотентен и не создаёт вторую запись. Исправленная самооценка — это новое прохождение и новый `event_id`.
 
-Вызвать `mcp__claude_ai_IWE__learning_ctx_record_cp_assessment` (пишет в канонический журнал `learning.cp_assessments`, тот же, что и VS Code режим ниже — не в личный цифровой двойник):
+Вызвать `learning_ctx_record_cp_assessment`:
 - **event_id:** `<сгенерированный>`
 - **stage:** `<N>`
 - **cp_scores:** `{"cp.rhy": <N>, "cp.wld": <N>, "cp.skl": <N>, "cp.iwe": <N>, "cp.int": <N>, "cp.agt": <N>}`
@@ -284,76 +257,17 @@ cp.iwe [N] | cp.int [N] | cp.agt [N]
 - **questions_count:** `<число заданных вопросов>`
 - **rcs_version:** `v5.0`
 - **occurred_at:** `<occurred_at>`
-- **written_by:** `browser`
+- **written_by:** `browser` в claude.ai, `vscode` в VS Code
 
-Если вызов вернул успех → сообщить: `✅ Профиль сохранён` (без упоминания «цифровой двойник» — запись идёт в общий журнал).
-Если ошибка → показать профиль в чате и попросить пользователя скопировать его вручную.
+**Три исхода — говорить пользователю ровно то, что произошло:**
 
-### VS Code режим — сохранить в Neon через Bash
+| Ответ инструмента | Что сказать |
+|---|---|
+| Успех, в том числе `duplicate: true` | `✅ Профиль сохранён` |
+| Ошибка аргументов, авторизации или инструмента нет | «Профиль не сохранён: <причина>». Показать профиль в чате |
+| Тайм-аут, обрыв связи | «Сохранение не подтверждено» — повторить один раз тем же вызовом; снова не вышло — показать профиль в чате и предложить повторить позже |
 
-```bash
-source ~/.config/aist/env
-CP_SCORES='<JSON с финальными scores>' \
-CP_Q_COUNT=<число заданных вопросов> \
-python3 -c "
-import os, json, datetime as dt_lib
-
-scores_raw = os.environ['CP_SCORES']
-q_count    = int(os.environ.get('CP_Q_COUNT', '5'))
-account_id = os.environ.get('DT_USER_ID', '')
-url        = os.environ.get('NEON_LEARNING_URL', '')
-
-ALL_SLOTS     = ['cp.rhy', 'cp.wld', 'cp.skl', 'cp.iwe', 'cp.int', 'cp.agt']
-MANDATORY     = ['cp.rhy', 'cp.wld', 'cp.skl', 'cp.int', 'cp.agt']
-scores = json.loads(scores_raw)
-vals   = {s: int(scores.get(s, 2)) for s in ALL_SLOTS}
-
-# derive cp.skl from cp.rhy (FORM.089 §6.1 v5.0)
-vals['cp.skl'] = vals['cp.rhy']
-
-stage  = min(vals[s] for s in MANDATORY)
-bn     = 'none' if stage >= 4 else min(MANDATORY, key=lambda s: vals[s])
-stream = 'РР' if stage == 5 else 'S' + str(max(1, min(4, stage)))
-valid  = dt_lib.datetime.now(dt_lib.timezone.utc) + dt_lib.timedelta(days=180)
-
-saved = False
-if url and account_id:
-    try:
-        import psycopg2
-        conn = psycopg2.connect(url)
-        cur  = conn.cursor()
-        cur.execute(
-            '''INSERT INTO learning.cp_assessments
-               (account_id, stage, bottleneck_slot, recommended_stream, skip_to_stage,
-                cp_scores, source, interface, questions_count, rcs_version, valid_until)
-               VALUES (%s::uuid, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
-               RETURNING id''',
-            (account_id, stage, bn, stream, stage, json.dumps(vals),
-             'self_report', 'vscode', q_count, 'v5.0', valid)
-        )
-        row_id = cur.fetchone()[0]
-        conn.commit()
-        conn.close()
-        print(f'OK neon id={row_id}')
-        saved = True
-    except Exception as e:
-        print(f'neon error: {e}')
-
-if not saved:
-    import pathlib
-    d = pathlib.Path.home() / '.aist' / 'cp-assessments'
-    d.mkdir(parents=True, exist_ok=True)
-    path = d / (dt_lib.date.today().isoformat() + '.json')
-    path.write_text(json.dumps({'account_id': account_id, 'stage': stage,
-        'bottleneck_slot': bn, 'recommended_stream': stream,
-        'cp_scores': vals, 'source': 'self_report', 'interface': 'vscode',
-        'questions_count': q_count, 'rcs_version': 'v5.0',
-        'valid_until': valid.isoformat()}, indent=2))
-    print(f'saved local: {path}')
-"
-```
-
-Если вывод содержит `OK neon` — профиль в Neon. Если `saved local` — сохранён локально.
+`event_recorded: false` в ответе значит: профиль сохранён, но событие для ленты активности не записалось. Сказать «сохранён», повторить тот же вызов один раз — повтор дописывает событие.
 
 ## Шаг 6. Следующий шаг
 
@@ -361,7 +275,6 @@ if not saved:
 ```
 Следующий шаг:
 → Навигатор, как развивать [bottleneck по-русски]? — рекомендации по росту
-→ /diagnose в боте — синхронизировать профиль
 → /progress в боте — посмотреть полный профиль прогресса
 ```
 
@@ -372,14 +285,14 @@ if not saved:
 | Пилот не отвечает числом 1-5 | Переспросить: «Выбери цифру от 1 до 5» |
 | Пилот хочет пропустить вопрос | Присвоить дефолт 2 (conservative), перейти дальше |
 | Менее 4 mandatory-ответов | Показать «Диагностика не завершена», предложить `/diagnose` заново |
-| learning_ctx_record_cp_assessment недоступен | Показать профиль в чате, попросить скопировать |
-| psycopg2 не установлен (VS Code) | Сохранить в `~/.aist/cp-assessments/YYYY-MM-DD.json` |
+| Инструменты сервиса учебного контекста недоступны | Провести диагностику, показать профиль в чате, сказать «не сохранено» и как подключить MCP Aisystant |
+| Чтение прошлой диагностики вернуло ошибку | «Не смог проверить прошлую диагностику», спросить, проходить ли сейчас |
 | Профиль уже есть (< 7 дней) | Показать и спросить: «Пройти заново?» |
 
 ## Проактивный триггер
 
 Claude должен предложить `/diagnose` **без явного запроса** когда:
-1. В `learning_ctx_get_onboarding_state` — `has_diagnosis: false` или `cp_stage = null`
+1. `learning_ctx_get_my_cp_assessment` вернул `null` или профиль с `expired: true`
 2. В `day-open` IWE-данные пустые или `stage = null`
 3. Пилот говорит «с чего начать», «как мне развиваться», «что делать дальше» — без контекста ступени
 

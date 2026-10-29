@@ -131,8 +131,9 @@ margin   = scores[dominant] - second
 
 Цель: получить `cp.iwe` субъекта.
 
-- **VS Code режим** (Bash доступен): попытаться через `mcp__claude_ai_IWE__dt_read_digital_twin` (path `1_declarative/cp_profile`) или через psycopg2 запрос к `learning.cp_assessments` (для self-субъекта).
-- **Браузерный режим**: `mcp__claude_ai_IWE__dt_read_digital_twin` тот же.
+- **`subject = self`** (браузер и VS Code одинаково): `learning_ctx_get_my_cp_assessment` → `cp_scores["cp.iwe"]`. Это последняя самооценка из журнала (диагностика `/diagnose`), не подтверждённая ступень. Цифровой двойник (`1_declarative/cp_profile`) не читать: навык диагностики туда больше не пишет (WP-578 Ф21.3).
+- **Другой человек или команда:** чужую самооценку этот инструмент не отдаёт — сразу уточняющий вопрос ниже.
+- Инструмент вернул `null`, профиль с `expired: true`, без `cp.iwe` или ошибку → уточняющий вопрос ниже (ошибку назвать: «не смог прочитать прошлую диагностику», не «диагностики нет»).
 
 Маршрутизация:
 - `cp.iwe ≥ 2` → к Шагу 3.
