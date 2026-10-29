@@ -617,7 +617,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "8704bca18a128bfdfa2d770dd7885cd3d5727deae8591d6a240b16281fd6f826"
+      "sha256": "2b7f65072acc7013f90ec9bdcdc9e660e824481fd21b0979be178d3109eb040a"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "5e7a3fd586e0cdfa4f97fa37a6d5ed8d4fd4c09ae666a00adf699e5cc4dd5d2b"
+      "sha256": "e8b67e6caa82d05a56e0e9cffa3f448af40f535fedde77ac13a5ca44102870d8"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c791aa2353cad41293f38ba34417b536a42a4cc6eb10e97b911fa33fb9888b6e"
+      "sha256": "681d889164e84ec6a16785ced5f46bf095115bca45b79b4c91750ee53ec63a2a"
     },
     {
       "path": "CLAUDE.md",
@@ -3113,7 +3113,7 @@
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
-      "sha256": "2b0fbcddb8aeba6e8fd107b0e322fc44add48fcef8584547c708e02dc2ced666"
+      "sha256": "5a2455db4d7b7d24ca1632b1bcf242349fc6663f2fb4abe60974f5942fd9ffbc"
     },
     {
       "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
@@ -3397,7 +3397,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "2548be26407e08033cc79b9d5e2128c0a8edb79181c053dff88d80b2f7b7ff50"
+      "sha256": "d8c257539f69644f03800c701898e3b103df48cc60ecb305867c8b3a45a6b709"
     }
   ],
   "excluded_paths": [
@@ -3681,6 +3681,7 @@
     "setup/test-strategist-mark-done.sh",
     "setup/test-strategist-notereview-migration.py",
     "setup/test-update-channel-enum.sh",
+    "setup/test-update-check-verdict.sh",
     "setup/test-update-ds-publish-delivery.sh",
     "setup/test-update-edge-cases.sh",
     "setup/test-update-f220-changelog-dry-run-strict.sh",

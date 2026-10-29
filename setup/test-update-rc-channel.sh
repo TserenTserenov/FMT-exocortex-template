@@ -26,6 +26,17 @@ trap 'rm -rf "$TEST_ROOT"' EXIT INT TERM
 STUB_DIR="$TEST_ROOT/stub"
 mkdir -p "$STUB_DIR"
 
+# WP-529 F244: --check now runs the install preflight (.exocortex.env, .backups/)
+# before channel resolution, exactly where the real run stops. Run a copy of the
+# updater inside a minimal workspace with a config, not in the template checkout,
+# whose parent directory is not an installation.
+RC_WORKSPACE="$TEST_ROOT/ws"
+mkdir -p "$RC_WORKSPACE/FMT-exocortex-template"
+cp "$UPDATE_SH" "$RC_WORKSPACE/FMT-exocortex-template/update.sh"
+cp "$(dirname "$UPDATE_SH")/CLAUDE.md" "$RC_WORKSPACE/FMT-exocortex-template/CLAUDE.md"
+UPDATE_SH="$RC_WORKSPACE/FMT-exocortex-template/update.sh"
+printf 'GOVERNANCE_REPO="pilot-governance"\n' > "$RC_WORKSPACE/.exocortex.env"
+
 REFS_FIXTURE='[
   {"ref":"refs/tags/v0.41.9","object":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
   {"ref":"refs/tags/v0.42.0-rc.2","object":{"sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}},

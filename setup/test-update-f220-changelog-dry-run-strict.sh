@@ -41,6 +41,13 @@ STRICT_BLOCK="$TEST_ROOT/strict-block.sh"
 extract_block "dry-run-strict-check" "$STRICT_BLOCK"
 PREVIEW_BLOCK="$TEST_ROOT/preview-block.sh"
 extract_block "changelog-check-preview" "$PREVIEW_BLOCK"
+# WP-529 F244: the strict block prints the --check verdict through this helper.
+VERDICT_FN="$TEST_ROOT/verdict-fn.sh"
+awk '/^print_check_verdict\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$UPDATE_SH_REAL" > "$VERDICT_FN"
+if [ ! -s "$VERDICT_FN" ]; then
+    echo "FATAL: print_check_verdict() not found in $UPDATE_SH_REAL" >&2
+    exit 2
+fi
 
 echo "=== CHANGELOG diff+disclaimer ==="
 
@@ -162,6 +169,7 @@ run_strict_scenario() {
         UPDATED_FILES=("${updated_files[@]}")
         STRICT_CHECK=true
         set +u; set -e; set +o pipefail  # match update.sh's real shell options
+        source "$VERDICT_FN"
         source "$STRICT_BLOCK"
     )
     local rc=$?
