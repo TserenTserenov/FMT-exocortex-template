@@ -61,6 +61,7 @@ snapshot() {
 }
 
 new_install() {
+    apply_op_end
     INSTALL="$SANDBOX/install-$1"
     STAGING="$SANDBOX/staging-$1"
     PLAN="$SANDBOX/plan-$1.tsv"
@@ -321,6 +322,89 @@ run apply_op_begin "$PLAN"
 assert_rc "корень не канонический" "$RC" 1
 APPLY_OP_ROOTS=("$INSTALL")
 assert_eq "0644 и 644 — один режим" "$(apply_op__norm_mode 0644)" 644
+
+# --- 13. defects found by the cold review -------------------------------------
+# A backslash in the name must not leak into the hash (shasum prefixes it).
+new_install 14
+printf 'x\n' > "$STAGING/back"
+apply_op_plan_add "$PLAN" write "$INSTALL/back\\slash" "$STAGING/back" 644
+run apply_op_run "$PLAN"
+assert_rc "имя файла с обратной косой чертой" "$RC" 0
+assert_eq "файл с обратной косой записан" "$(cat "$INSTALL/back\\slash")" x
+# Spaces and glob characters in names.
+new_install 15
+apply_op_plan_add "$PLAN" write "$INSTALL/a b [1]*?.md" "$STAGING/added.md" 644
+apply_op_plan_add "$PLAN" write "$INSTALL/-dash.md" "$STAGING/added.md" 644
+run apply_op_run "$PLAN"
+assert_rc "пробелы, glob-символы и ведущий дефис в именах" "$RC" 0
+assert_eq "файл с пробелом и glob-символами записан" "$(cat "$INSTALL/a b [1]*?.md")" added
+assert_eq "файл с ведущим дефисом записан" "$(cat "$INSTALL/-dash.md")" added
+# Operation number: past the end, leading zero, zero.
+new_install 16
+apply_op_plan_add "$PLAN" replace "$INSTALL/rule.md" "$STAGING/rule.md" 644
+apply_op_begin "$PLAN"
+run apply_op 2
+assert_rc "номер за концом плана не убивает вызывающего" "$RC" 1
+assert_err_has "за концом плана" "номер вне плана"
+run apply_op 0
+assert_rc "нулевой номер" "$RC" 1
+run apply_op 01
+assert_rc "номер с ведущим нулём читается как десятичный" "$RC" 0
+assert_eq "операция выполнена" "$(cat "$INSTALL/rule.md")" "new rule"
+# A plan that is bound to fail halfway is refused before the first write.
+new_install 17
+apply_op_plan_add "$PLAN" replace "$INSTALL/rule.md" "$STAGING/rule.md" 644
+apply_op_plan_add "$PLAN" mkdir "$INSTALL/nd" - 755
+apply_op_plan_add "$PLAN" rmdir_if_empty "$INSTALL/nd"
+apply_op_plan_add "$PLAN" write "$INSTALL/nd/child.md" "$STAGING/added.md" 644
+BEFORE=$(snapshot "$INSTALL")
+run apply_op_begin "$PLAN"
+assert_rc "родитель удалён раньше операции" "$RC" 1
+assert_err_has "родитель удалён" "родитель не существует к моменту операции"
+assert_eq "дерево не менялось (план отвергнут целиком)" "$(snapshot "$INSTALL")" "$BEFORE"
+# A refusal after earlier operations ran is a partial application, code 2.
+new_install 18
+apply_op_plan_add "$PLAN" replace "$INSTALL/rule.md" "$STAGING/rule.md" 644
+apply_op_plan_add "$PLAN" rmdir_if_empty "$INSTALL/old"
+run apply_op_run "$PLAN"
+assert_rc "отказ после выполненной операции — частичное применение" "$RC" 2
+assert_err_has "частичное применение" "применён частично"
+run apply_op_begin "$PLAN"
+assert_rc "новый план после остановки без apply_op_end" "$RC" 1
+assert_err_has "защёлка остановки" "остановлен после сбоя"
+# The builder does not run while the executor holds a plan.
+run apply_op_plan_add "$PLAN" remove "$INSTALL/rule.md"
+assert_rc "построитель при занятом исполнителе" "$RC" 1
+assert_err_has "общее состояние" "apply_op_end"
+# Modes the executor cannot install and read back are refused at acceptance.
+new_install 19
+apply_op_plan_add "$PLAN" write "$INSTALL/m.md" "$STAGING/added.md" 000
+run apply_op_begin "$PLAN"
+assert_rc "режим без чтения владельцем" "$RC" 1
+assert_err_has "режим 000" "без чтения"
+new_install 20
+apply_op_plan_add "$PLAN" write "$INSTALL/m.md" "$STAGING/added.md" 4755
+run apply_op_begin "$PLAN"
+assert_rc "режим со спецбитом" "$RC" 1
+assert_err_has "спецбит" "спецбитами"
+new_install 21
+apply_op_plan_add "$PLAN" write "$INSTALL/m.md" "$STAGING/added.md" 044
+run apply_op_begin "$PLAN"
+assert_rc "режим 044 без чтения владельцем" "$RC" 1
+printf 'x\n' > "$INSTALL/readable.md"
+chmod 400 "$INSTALL/readable.md"
+assert_eq "режим 400 даёт трёхзначный отпечаток" "$(apply_op_fingerprint "$INSTALL/readable.md" | cut -d: -f1,2)" "file:400"
+# A link target that ends with a newline is seen, not trimmed to another target.
+new_install 22
+ln -s "$(printf 'a\nx')" "$INSTALL/nl-link" 2>/dev/null
+run apply_op_fingerprint "$INSTALL/nl-link"
+assert_rc "цель ссылки с переводом строки" "$RC" 1
+# Unset roots variable under set -u: a refusal, not a dead shell.
+new_install 23
+unset APPLY_OP_ROOTS
+run apply_op_begin "$PLAN"
+assert_rc "переменная корней не задана" "$RC" 1
+assert_err_has "корни не заданы" "APPLY_OP_ROOTS пуст"
 
 echo "apply-op: $PASS проверок прошли, $FAIL не прошли"
 [ "$FAIL" -eq 0 ]

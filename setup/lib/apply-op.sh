@@ -27,9 +27,12 @@
 # Mode is part of the "after" fingerprint: it is set on the temporary file
 # before the rename, there is no separate chmod operation.
 #
-# Return codes of apply_op / apply_op_run: 0 done, 1 refused before the tree was
-# touched, 2 failed after a change started (the executor stops; retry is unsafe
-# until the journal exists).
+# Return codes: apply_op 0 done, 1 this operation refused and the tree was not
+# touched by it, 2 failed after a change started (the executor stops; retry is
+# unsafe until the journal exists). apply_op_run adds: a refusal after earlier
+# operations ran is a partial application, code 2. The builder and the executor
+# share state, so a plan is built completely first; after a stop apply_op_end
+# releases the executor.
 #
 # Caller sets APPLY_OP_ROOTS (array of canonical absolute directories) before
 # apply_op_begin; every path of the plan must be inside one of them.
@@ -66,19 +69,20 @@ apply_op__reset
 apply_op__sha256() {
     local out
     if command -v shasum >/dev/null 2>&1; then
-        out=$(shasum -a 256 "$1" 2>/dev/null) || return 1
+        out=$(shasum -a 256 < "$1" 2>/dev/null) || return 1
     elif command -v sha256sum >/dev/null 2>&1; then
-        out=$(sha256sum "$1" 2>/dev/null) || return 1
+        out=$(sha256sum < "$1" 2>/dev/null) || return 1
     else
         return 1
     fi
     printf '%s\n' "${out%% *}"
 }
 
-# 0644 and 644 are the same mode; stat prints the short form.
+# 0644 and 644 are the same mode; the short form is padded to three digits.
 apply_op__norm_mode() {
     case "$1" in
         0[0-7][0-7][0-7]) printf '%s\n' "${1#0}" ;;
+        [0-7] | [0-7][0-7]) printf '%03d\n' "$1" ;;
         *) printf '%s\n' "$1" ;;
     esac
 }
@@ -87,7 +91,9 @@ apply_op__norm_mode() {
 apply_op_fingerprint() {
     local p=$1 mode hash target
     if [ -L "$p" ]; then
-        target=$(readlink "$p") || return 1
+        target=$(readlink "$p"; printf x) || return 1
+        target=${target%x}
+        target=${target%$'\n'}   # readlink's own newline; one more means a real one
         case "$target" in
             *$'\t'* | *$'\n'*)
                 apply_op__msg "цель ссылки содержит табуляцию или перевод строки: $p"
@@ -97,9 +103,10 @@ apply_op_fingerprint() {
         printf 'link:%s\n' "$target"
     elif [ -d "$p" ]; then
         mode=$(apply_op__mode_of "$p") || return 1
-        printf 'dir:%s\n' "$mode"
+        printf 'dir:%s\n' "$(apply_op__norm_mode "$mode")"
     elif [ -f "$p" ]; then
         mode=$(apply_op__mode_of "$p") || return 1
+        mode=$(apply_op__norm_mode "$mode")
         hash=$(apply_op__sha256 "$p") || {
             apply_op__msg "нет инструмента sha256 (shasum или sha256sum)"
             return 1
@@ -131,7 +138,7 @@ apply_op__fp_valid() {
 # Allowed roots must exist as canonical directories and must not be "/".
 apply_op__roots_ok() {
     local root resolved
-    if [ "${#APPLY_OP_ROOTS[@]}" -eq 0 ]; then
+    if [ -z "${APPLY_OP_ROOTS+x}" ] || [ "${#APPLY_OP_ROOTS[@]}" -eq 0 ]; then
         apply_op__msg "APPLY_OP_ROOTS пуст: не заданы корни, куда разрешена запись"
         return 1
     fi
@@ -252,6 +259,21 @@ apply_op__check_row() {
             ;;
     esac
 
+    case "$after" in
+        file:[0-7][0-7][0-7]:* | dir:[0-7][0-7][0-7]) ;;
+        absent) ;;
+        *)
+            apply_op__msg "операция $i: режим со спецбитами не поддерживается: «${after}»"
+            return 1
+            ;;
+    esac
+    case "$after" in
+        file:[0-3]* | dir:[0-4]* | dir:6*)
+            apply_op__msg "операция $i: режим без чтения (и обхода для каталога) владельцем не поддерживается: «${after}»"
+            return 1
+            ;;
+    esac
+
     case "$type" in
         write | replace)
             case "$arg" in /*) ;; *)
@@ -301,10 +323,32 @@ apply_op__check_row() {
     fi
 }
 
+# The parent of a path must exist when its operation runs: live, or made by an
+# earlier mkdir of this plan and not removed since. Caught here, a plan that is
+# bound to fail halfway is refused before the first write.
+apply_op__parent_planned() {
+    local i=$1 parent
+    parent=$(dirname "$2")
+    apply_op__chain "$parent" $((i - 1))
+    if [ -n "$AO_CHAIN" ]; then
+        case "$AO_CHAIN" in
+            dir:*) return 0 ;;
+        esac
+    elif [ -d "$parent" ] && [ ! -L "$parent" ]; then
+        return 0
+    fi
+    apply_op__msg "операция $i: родитель не существует к моменту операции: $parent"
+    return 1
+}
+
 # Accepts the plan: layout, every row, chains between rows, then the live tree
 # against the first touch of every path. Nothing is written.
 apply_op_begin() {
-    local plan=$1 i live expected
+    local plan=$1 i live parent
+    if [ -n "$APPLY_OP_STOPPED" ]; then
+        apply_op__msg "исполнитель остановлен после сбоя на операции $APPLY_OP_STOPPED; новый план принимать только после apply_op_end"
+        return 1
+    fi
     apply_op__roots_ok || return 1
     apply_op__load "$plan" || return 1
     i=1
@@ -331,7 +375,9 @@ apply_op_begin() {
                     return 1
                 fi
             fi
+            apply_op__parent_planned "$i" "${AO_ARG[$i]}" || return 1
         fi
+        apply_op__parent_planned "$i" "${AO_PATH[$i]}" || return 1
         i=$((i + 1))
     done
     APPLY_OP_NEXT=1
@@ -372,15 +418,20 @@ apply_op__install_file() {
         apply_op__refuse "$id" "не создать временный файл рядом с $path"
         return 1
     }
-    if ! cp "$src" "$tmp" || ! chmod "$mode" "$tmp"; then
+    if ! cp "$src" "$tmp"; then
         rm -f "$tmp"
-        apply_op__refuse "$id" "не подготовить временный файл для $path"
+        apply_op__refuse "$id" "не скопировать источник во временный файл для $path"
         return 1
     fi
     tmp_hash=$(apply_op__sha256 "$tmp") || tmp_hash=""
     if [ "$tmp_hash" != "$hash" ]; then
         rm -f "$tmp"
         apply_op__refuse "$id" "источник изменился во время копирования: $src"
+        return 1
+    fi
+    if ! chmod "0$mode" "$tmp"; then
+        rm -f "$tmp"
+        apply_op__refuse "$id" "не выставить права временного файла для $path"
         return 1
     fi
     if ! mv -f "$tmp" "$path"; then
@@ -405,6 +456,11 @@ apply_op() {
         return 1
         ;;
     esac
+    id=$((10#$id))
+    if [ "$id" -lt 1 ] || [ "$id" -gt "$APPLY_OP_TOTAL" ]; then
+        apply_op__refuse "$id" "номер вне плана (в плане операций: $APPLY_OP_TOTAL)"
+        return 1
+    fi
     if [ "$id" -ne "$APPLY_OP_NEXT" ]; then
         apply_op__refuse "$id" "порядок нарушен или операция уже выполнена (следующая по плану: $APPLY_OP_NEXT)"
         return 1
@@ -441,7 +497,7 @@ apply_op() {
                 apply_op__refuse "$id" "не создать каталог $path"
                 return 1
             fi
-            if ! chmod "${after#dir:}" "$path"; then
+            if ! chmod "0${after#dir:}" "$path"; then
                 apply_op__fail "$id" "не выставить права каталога $path"
                 return 2
             fi
@@ -493,9 +549,20 @@ apply_op_run() {
     while [ "$id" -le "$APPLY_OP_TOTAL" ]; do
         apply_op "$id"
         rc=$?
+        if [ "$rc" -eq 1 ] && [ "$id" -gt 1 ]; then
+            APPLY_OP_STOPPED=$id
+            apply_op__msg "план применён частично: операции 1..$((id - 1)) выполнены, операция $id отклонена; исполнитель остановлен"
+            return 2
+        fi
         [ "$rc" -eq 0 ] || return "$rc"
         id=$((id + 1))
     done
+    apply_op_end
+}
+
+# Releases the executor: after a run that stopped, or when the plan is dropped.
+apply_op_end() {
+    apply_op__reset
 }
 
 # Plan builder: the only writer of the plan format. "before" is derived from the
@@ -510,6 +577,10 @@ apply_op_plan_new() {
 
 apply_op_plan_add() {
     local file=$1 type=$2 path=$3 arg=${4:--} mode=${5:--} before after hash field
+    if [ -n "$APPLY_OP_ACCEPTED" ]; then
+        apply_op__msg "исполнитель держит принятый план: сначала apply_op_end (построитель и исполнитель делят состояние)"
+        return 1
+    fi
     for field in "$path" "$arg"; do
         case "$field" in
             *$'\t'* | *$'\n'*)
