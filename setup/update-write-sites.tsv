@@ -18,12 +18,12 @@ top:preamble	T	none	sed_inplace helper definition and creation of the temp direc
 fn:reinject_user_section	H	caller	rewrites the USER-SPACE block of the file its caller names (callers: copy_platform_file_preserving_user_space, Step 6, render_skill_with_user_section)
 fn:render_skill_with_user_section	H	caller	copies a skill and re-appends the user block; target is the caller's path (Step 2 compare file in temp, Step 5 install path)
 fn:substitute_claude_placeholders	H	caller	writes the workspace copy of CLAUDE.md or AGENTS.md at the caller's path
-fn:restore_claude_placeholders	T	none	builds temp copies of base and current CLAUDE.md for the three-way merge (called from Step 5 with temp targets)
+fn:restore_claude_placeholders	T	none	builds temp copies of base and current CLAUDE.md for the three-way merge; both targets are under TMPDIR_UPDATE at the only call site (RAW_BASE_FILE, RAW_CURRENT_FILE), re-check if a caller is added
 fn:memory_record_put	A	plan	.memory-deployed.tsv record of delivered memory copies; ordinary plan element, snapshot and restore
 fn:memory_copy_verdict	R	none	runs the memory classifier, reads only
 fn:replace_memory_copy	A	plan	memory file replacement through a sibling temp file; follows an intentional symlink on purpose (allowed-link category)
 fn:apply_memory_policy	A	plan	creates the memory directory and calls replace_memory_copy
-fn:prune_memory_backups	A	plan	deletes old memory backup directories under .backups; excluded from the rollback comparison, deletion itself is not undone
+fn:prune_memory_backups	A	not-covered	deletes old memory backup directories under .backups; excluded from the rollback comparison, the deletion is not undone and the summary says so
 fn:backup_governance_script_before_overwrite	A	plan	copy of a governance script into .backups before overwrite
 fn:apply_governance_script_policy	A	plan	installs a governance-repo script through atomic_copy_executable
 fn:detect_release_rollback	R	none	git merge-base, read only
@@ -33,12 +33,12 @@ fn:apply_settings_merge_if_requested	B	staging	settings-merge-apply.sh rewrites 
 fn:build_settings_merge_report	T	none	merge preview written to a report file
 fn:run_build_runtime_or_die	B	staging	build-runtime.sh rebuilds .iwe-runtime; build in staging and swap the directory by plan, live sessions inside it need the open-session check
 fn:begin_update_transaction	A	plan	writes the .update-incomplete marker; the rollback restores it to the snapshot state, status of the new mechanism lives in its own journal
-fn:require_env_before_update	A	plan	draft .exocortex.env and hard link into place; one of the two allowed writes before the plan exists
+fn:require_env_before_update	A	plan	draft .exocortex.env and hard link into place; one of the two allowed writes before the plan exists, removes its own draft on every failure branch, provisional
 fn:require_backup_root_writable	A	plan	creates the backup root and probes it with a temp directory; the second allowed write before the plan
 fn:finish_update_transaction	A	plan	removes the .update-incomplete marker
 fn:atomic_copy_executable	H	caller	copy to a sibling temp file, chmod on the temp file, rename; the pattern the executor reuses
 fn:apply_legacy_agent_fault_shims	A	plan	local transaction with its own rollback of a prefix; dismantle when the executor exists, two rollback mechanisms must not touch the same files
-fn:backfill_platform_hooks	B	atomic+inverse	copies the hook installer into governance scripts, then runs it; the installer sets core.hooksPath, see class C
+fn:backfill_platform_hooks	B	not-covered	copies the hook installer into governance scripts (file part, plan) and runs it; the installer sets git core.hooksPath (class C, not undone by removing the copy), so the block as a whole is not-covered until the config part is split out
 fn:backfill_executor_catalog	B	staging	generate-executor-catalog.py writes the governance catalog; generate into staging and apply by plan
 fn:replace_ds_publish_with_backup	A	plan	replaces ds-publish.sh with a copy in .backups
 fn:run_post_apply_backfills_or_die	B	not-covered	install-iwe-paths.sh writes .iwe-paths and edits shell rc files in the home directory; rc edits are class C

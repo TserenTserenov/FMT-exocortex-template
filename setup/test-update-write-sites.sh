@@ -75,6 +75,20 @@ hits = collections.OrderedDict()
 for key, lineno in block_of(src):
     hits.setdefault(key, []).append(lineno)
 
+# Constructs that can hide a write from the scanner above. update.sh uses none
+# today: eval only restores saved signal traps and reads one indirect variable.
+# A new one must be reviewed and either removed or added to the allowed forms.
+HIDING = re.compile(r"\bxargs\b|\btee\b|\bsh\s+-c\b")
+EVAL = re.compile(r"\beval\s")
+EVAL_ALLOWED = re.compile(r"\beval\s+\"(?:\$saved_|existing=)")
+hiding = []
+for i, line in enumerate(src, 1):
+    if re.match(r"\s*#", line):
+        continue
+    blanked = re.sub(r"\"[^\"]*\"|'[^']*'", '""', line)
+    if HIDING.search(blanked) or (EVAL.search(blanked) and not EVAL_ALLOWED.search(line)):
+        hiding.append(i)
+
 if mode == "--list":
     for key, nums in hits.items():
         print("%s\t%d\t%d-%d" % (key, len(nums), nums[0], nums[-1]))
@@ -100,6 +114,9 @@ for key in missing:
     bad.append("unclassified write block %s (lines %s)" % (key, ",".join(map(str, hits[key][:6]))))
 for key in stale:
     bad.append("registry block %s has no write commands in update.sh any more" % key)
+
+for lineno in hiding:
+    bad.append("line %d uses xargs/tee/sh -c/eval, which can hide a write from the scanner; review it" % lineno)
 
 if bad:
     print("FAIL: %d problem(s)" % len(bad))
@@ -141,5 +158,12 @@ if out=$("$PY" -I "$SCAN" "$NEG_DIR/update.sh" "$REGISTRY" "" 2>&1); then
 elif ! printf '%s' "$out" | grep -q 'unclassified write block fn:new_unclassified_writer'; then
     echo "FAIL: new-function case failed for another reason: $out"; fail=1
 fi
-[ "$fail" -eq 0 ] && echo "PASS: negative cases detected (missing row, stale row, new unclassified function)"
+cp "$UPDATE_SH" "$NEG_DIR/update-hidden.sh"
+printf '\nsneaky() {\n    printf x | xargs -I{} sh -c "true"\n}\n' >> "$NEG_DIR/update-hidden.sh"
+if out=$("$PY" -I "$SCAN" "$NEG_DIR/update-hidden.sh" "$REGISTRY" "" 2>&1); then
+    echo "FAIL: a write hidden behind xargs was not flagged"; fail=1
+elif ! printf '%s' "$out" | grep -q 'can hide a write'; then
+    echo "FAIL: hidden-write case failed for another reason: $out"; fail=1
+fi
+[ "$fail" -eq 0 ] && echo "PASS: negative cases detected (missing row, stale row, new unclassified function, hidden write)"
 exit "$fail"
