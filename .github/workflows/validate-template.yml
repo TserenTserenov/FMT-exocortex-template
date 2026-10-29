@@ -840,6 +840,12 @@ jobs:
       - name: Run update.sh write-sites registry test
         run: bash setup/test-update-write-sites.sh
 
+      # WP-529 Ф245 step 2: the frozen plan and the single executor of file
+      # writes (setup/lib/apply-op.sh, not wired into update.sh yet), checked on
+      # a synthetic install: every refusal leaves the tree unchanged.
+      - name: Run apply-op executor test
+        run: bash setup/test-apply-op.sh
+
       # WP-529 Ф244: --check ends with one readiness verdict; refusals use the
       # same predicates as the real run and leave the install unchanged.
       - name: Run update.sh check verdict test
