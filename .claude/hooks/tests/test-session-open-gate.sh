@@ -182,12 +182,44 @@ rmdir "$SCHED_LOG"; rm -f "$SESSION_DIR"/kimi-*
 printf 'agent: kimi-peer\nwp: WP-1\nopened_at: test\n' > "$SESSION_DIR/kimi-peer-x.open"
 expect_kimi "kimi: only kimi-peer wp semaphore" 2 'git commit -m x'
 rm -f "$SESSION_DIR"/kimi-*
+
+# Ф275 (WP-484 Ф261): claude и claude-code — один агент. IWE_AGENT=claude нормализуется,
+# семафор этой беседы засчитывается по session_id; режим по агенту алиасом не включается
 open_semaphore
-printf '{"tool_name":"Shell","tool_input":{"command":"git commit -m x"}}' \
-  | CLAUDE_CODE_SESSION_ID= IWE_AGENT=claude IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
+printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"},"session_id":"%s"}' "$SID" \
+  | IWE_AGENT=claude IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
 got=$?
-if [ "$got" = 2 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: IWE_AGENT=claude с открытым claude-code wp (ожидалось 2, получено $got)"; fi
+if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: IWE_AGENT=claude с семафором этой беседы (ожидалось 0, получено $got)"; fi
 close_semaphore
+printf 'agent: claude-code\nwp: WP-1\nopened_at: test\n' > "$SESSION_DIR/claude-code-other.open"
+printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"},"session_id":"%s"}' "$SID" \
+  | IWE_AGENT=claude IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
+got=$?
+if [ "$got" = 2 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: IWE_AGENT=claude не должен засчитывать семафор другой беседы (ожидалось 2, получено $got)"; fi
+rm -f "$SESSION_DIR/claude-code-other.open"
+
+# семафор под коротким именем (claude-<id>.open, agent: claude) засчитывается беседе claude-code
+printf 'agent: claude\nharness_session_id: %s\nwp: WP-1\nopened_at: test\n' "$SID" > "$SESSION_DIR/claude-$SID.open"
+expect "claude: alias-named semaphore of this session" 0 'git commit -m x'
+rm -f "$SESSION_DIR/claude-$SID.open"
+# чужое имя агента в файле claude-*.open не засчитывается
+printf 'agent: kimi\nharness_session_id: %s\nwp: WP-1\nopened_at: test\n' "$SID" > "$SESSION_DIR/claude-$SID.open"
+expect "claude: claude-*.open owned by another agent" 2 'git commit -m x'
+rm -f "$SESSION_DIR/claude-$SID.open"
+# режим по агенту (kimi) не принимает семафоры семейства claude
+printf 'agent: claude\nwp: WP-1\nopened_at: test\n' > "$SESSION_DIR/kimi-k.open"
+expect_kimi "kimi: does not count agent: claude semaphore" 2 'git commit -m x'
+rm -f "$SESSION_DIR/kimi-k.open"
+# формы строки agent:, которые не должны засчитываться семейству claude (ревью Ф275)
+for agent_lines in 'agent: claude claude-code' 'agent:claude' "$(printf 'agent: claude\nagent: claude-code')" 'agent: claude-headless' 'agent: claude '; do
+  printf '%s\nharness_session_id: %s\nwp: WP-1\nopened_at: test\n' "$agent_lines" "$SID" > "$SESSION_DIR/claude-$SID.open"
+  expect "claude: agent line '$agent_lines'" 2 'git commit -m x'
+done
+rm -f "$SESSION_DIR/claude-$SID.open"
+printf 'agent: claude\nharness_session_id: %s\nwp: WP-1\nopened_at: test\n' "$SID" > "$TMP_ROOT/alias-target"
+ln -s "$TMP_ROOT/alias-target" "$SESSION_DIR/claude-$SID.open"
+expect "claude: symlinked alias semaphore" 2 'git commit -m x'
+rm -f "$SESSION_DIR/claude-$SID.open" "$TMP_ROOT/alias-target"
 
 # семафор с двумя строками agent: не считается своим
 printf 'agent: kimi\nagent: other\nwp: WP-1\nopened_at: test\n' > "$SESSION_DIR/kimi-d2.open"
@@ -226,13 +258,34 @@ got=$?
 if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: kimi with inherited CLAUDE_CODE_SESSION_ID and wp semaphore (ожидалось 0, получено $got)"; fi
 rm -f "$SESSION_DIR"/kimi-*
 
-# Claude без session_id и без переменной окружения: поведение прежнее (пропуск), даже если последний закрытый служебный
-printf 'agent: claude-code\nhousekeeping: day-close\nopened_at: test\n' > "$SESSION_DIR/claude-code-j.open.closed"
-printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' \
-  | CLAUDE_CODE_SESSION_ID= IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>&1
-got=$?
-if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: claude without session id must stay fail-open (ожидалось 0, получено $got)"; fi
-rm -f "$SESSION_DIR"/claude-code-j.open.closed
+# Ф275: Claude без session_id и без переменной окружения — сбой: коммит блокируется, прочие команды нет
+NO_ID_ERR="$TMP_ROOT/no-id.err"
+run_claude_no_id() { # $1 = command, $2 = OSTYPE -> exit code; stderr in $NO_ID_ERR
+  local json_cmd
+  json_cmd=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1")
+  printf '{"tool_name":"Bash","tool_input":{"command":%s}}' "$json_cmd" \
+    | CLAUDE_CODE_SESSION_ID= OSTYPE="$2" IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>"$NO_ID_ERR"
+  echo $?
+}
+expect_no_id_block() { # $1 = description, $2 = exit code; the dedicated branch must have fired
+  if [ "$2" = 2 ] && grep -q 'без пригодного идентификатора сессии' "$NO_ID_ERR"; then PASS=$((PASS+1))
+  else FAIL=$((FAIL+1)); echo "FAIL: $1 (ожидалось 2 и текст про идентификатор, получено $2): $(head -c 200 "$NO_ID_ERR")"; fi
+}
+open_semaphore
+expect_no_id_block "claude without session id: commit" "$(run_claude_no_id 'git commit -m x' linux-gnu)"
+expect_no_id_block "claude without session id: push" "$(run_claude_no_id 'git push' linux-gnu)"
+got=$(run_claude_no_id 'git status --short' linux-gnu)
+if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: claude without session id: git status (ожидалось 0, получено $got)"; fi
+# небезопасный session_id — то же, что отсутствующий
+printf '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"},"session_id":"a b"}' \
+  | CLAUDE_CODE_SESSION_ID="$SID" IWE_ROOT="$TMP_ROOT" bash "$HOOK" >/dev/null 2>"$NO_ID_ERR"
+expect_no_id_block "claude with unsafe session id" "$?"
+# пропуск Git Bash по ключу действует и без идентификатора (проверка стоит до блока)
+printf 'session_open_gate_skip_until: %s\n' "$(python3 -c 'import datetime; print(datetime.date.today() + datetime.timedelta(days=3))')" > "$TMP_ROOT/params.yaml"
+got=$(run_claude_no_id 'git commit -m x' msys)
+if [ "$got" = 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: claude without session id in Git Bash with skip key (ожидалось 0, получено $got)"; fi
+rm -f "$TMP_ROOT/params.yaml" "$TMP_ROOT/.iwe-runtime/session-open-gate-skip.log"
+close_semaphore
 
 # Claude с инструментом Shell и своим session_id ведёт себя как с Bash (нет семафора → блок)
 close_semaphore
