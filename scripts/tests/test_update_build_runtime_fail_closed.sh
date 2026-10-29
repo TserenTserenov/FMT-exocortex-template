@@ -569,9 +569,12 @@ PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main \
     bash "$SCRIPT_DIR/update.sh" --check > "$TEST_ROOT/out-f0.log" 2>&1
 RC_F0=$?
 set -e
-if [ "$RC_F0" -eq 0 ] && [ ! -e "$WORKSPACE_DIR/.exocortex.env" ] && \
+# WP-529 F244: --check reports the missing env as the real run would (exit 3,
+# "ВЕРДИКТ: нельзя ставить"), and still writes nothing.
+if [ "$RC_F0" -eq 3 ] && grep -Fxq 'ВЕРДИКТ: нельзя ставить' "$TEST_ROOT/out-f0.log" && \
+   [ ! -e "$WORKSPACE_DIR/.exocortex.env" ] && \
    [ "$F_UPDATER_BEFORE" = "$(shasum -a 256 "$SCRIPT_DIR/update.sh" | cut -d' ' -f1)" ]; then
-    pass "F0: --check stays read-only without env even when remote updater differs"
+    pass "F0: --check refuses without env and stays read-only even when remote updater differs"
 else
     fail "F0: --check rc=$RC_F0 created env or replaced updater"
 fi

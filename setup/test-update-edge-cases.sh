@@ -5751,9 +5751,17 @@ fi
 # ============================================================================
 echo "--- T51: .backups/ unwritable stops the update before it touches anything ---"
 
-T51_FN_BLOCK=$(awk '/^require_backup_root_writable\(\) \{$/{found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh")
-if [ -z "$T51_FN_BLOCK" ]; then
-    fail "T51: could not extract require_backup_root_writable() from update.sh — signature moved?"
+# WP-529 F244: the gate's type and permission checks live in
+# backup_root_preflight_reason(), shared with --check — extract both.
+t51_extract_fn() {
+    awk -v header="$1() {" '$0 == header {found=1} found{print} found && /^}$/{exit}' "$TEMPLATE_DIR/update.sh"
+}
+T51_PREFLIGHT_BLOCK=$(t51_extract_fn backup_root_preflight_reason)
+T51_GATE_BLOCK=$(t51_extract_fn require_backup_root_writable)
+T51_FN_BLOCK="$T51_PREFLIGHT_BLOCK
+$T51_GATE_BLOCK"
+if [ -z "$T51_PREFLIGHT_BLOCK" ] || [ -z "$T51_GATE_BLOCK" ]; then
+    fail "T51: could not extract backup_root_preflight_reason()/require_backup_root_writable() from update.sh — signature moved?"
 else
     T51_DIR="$TEST_WS/t51-backup-root-guard"
     mkdir -p "$T51_DIR"

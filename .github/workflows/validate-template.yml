@@ -835,6 +835,11 @@ jobs:
       - name: Run update.sh modified-hook test
         run: bash setup/test-update-modified-hook.sh
 
+      # WP-529 Ф244: --check ends with one readiness verdict; refusals use the
+      # same predicates as the real run and leave the install unchanged.
+      - name: Run update.sh check verdict test
+        run: bash setup/test-update-check-verdict.sh
+
       # Issue #941: the strategist's commit publisher shipped in seed/ and delivered by update.sh.
       - name: Run ds-publish tests
         run: |
