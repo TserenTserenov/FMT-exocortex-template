@@ -433,7 +433,7 @@
     },
     {
       "path": ".claude/skills/apply-captures/SKILL.md",
-      "sha256": "7245e8a4b7622abbbaa8acbce46e91a5d931fc9d61f16100813506c418a343c5"
+      "sha256": "3d3a209c9b84478cbe6e3c220dcff7c960d7f93e97cc8e2015efe629b6959092"
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8540fb8a273252aafbc1ecb77e9ca53a9383e0d8e15a3ebd36305ae4c9c72ef5"
+      "sha256": "881034af2e08c9ea7303321584359947a8f933e473e1ac71c68045a27b1b1012"
     },
     {
       "path": "CLAUDE.md",
