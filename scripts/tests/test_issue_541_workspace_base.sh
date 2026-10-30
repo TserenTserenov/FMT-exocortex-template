@@ -261,6 +261,10 @@ upstream_to_v3() {
 
 # write_manifest DIR VERSION — schema v2 update-manifest.json for DIR's CLAUDE.md and update.sh
 write_manifest() {
+    # WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh —
+    # фикстурный манифест доставляет его, как это делает настоящий генератор.
+    mkdir -p "$1/setup/lib"
+    cp "$ROOT/setup/lib/apply-op.sh" "$1/setup/lib/apply-op.sh"
     python3 - "$1" "$2" <<'PY'
 import hashlib
 import json
@@ -270,7 +274,7 @@ import sys
 root, version = pathlib.Path(sys.argv[1]), sys.argv[2]
 files = [
     {"path": path, "sha256": hashlib.sha256((root / path).read_bytes()).hexdigest()}
-    for path in ("CLAUDE.md", "update.sh")
+    for path in ("CLAUDE.md", "update.sh", "setup/lib/apply-op.sh")
 ]
 manifest = {"schema_version": 2, "version": version, "files": files, "deprecated_files": []}
 (root / "update-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -691,10 +695,18 @@ if [ "$(id -u)" -eq 0 ]; then
     echo "  SKIP: running as root, a read-only file does not stop cp"
 else
     build_case unwritable modern
-    chmod a-w "$SD/CLAUDE.md"
+    # WP-529 Ф245: инъекция отказа обновлена под исполнителя. Раньше запись
+    # падала на read-only ФАЙЛЕ (cp не смог открыть его на запись); исполнитель
+    # пишет через rename, которому права файла безразличны, — эквивалентный
+    # барьер теперь read-only КАТАЛОГ (не создать временный файл, не сделать
+    # rename). Маркер транзакции создаём заранее: в read-only каталоге
+    # begin_update_transaction не смог бы его записать, а отказ нужен именно
+    # на записи CLAUDE.md, не раньше.
+    printf 'state=applying\n' > "$SD/.update-incomplete"
+    chmod a-w "$SD"
     cp "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
     run_update
-    chmod u+w "$SD/CLAUDE.md"
+    chmod u+w "$SD"
     check "16 the run does not report success" test "$RUN_RC" -ne 0
     check "16 no false 'updated' line" log_lacks "$B1_LINE"
     check "16 the workspace copy is untouched" same "$WS/CLAUDE.md" "$CASE_DIR/ws-before.md"
@@ -713,9 +725,13 @@ else
     check "17 run 1: exit 0" rc_is 0
     cp "$CASE_DIR/manifest-installed.json" "$SD/update-manifest.json"
     upstream_to_v3
-    chmod a-w "$SD/CLAUDE.md"
+    # WP-529 Ф245: отказ на read-only каталоге (rename-исполнитель), не на
+    # read-only файле; маркер заранее — иначе прогон упал бы ещё на его записи,
+    # до проверяемой операции.
+    printf 'state=applying\n' > "$SD/.update-incomplete"
+    chmod a-w "$SD"
     run_update
-    chmod u+w "$SD/CLAUDE.md"
+    chmod u+w "$SD"
     check "17 run 2: the failed copy stops the run" test "$RUN_RC" -ne 0
     check "17 run 2: the copy in place is still v2" lacks_text "$SD/CLAUDE.md" "version three"
     check "17 run 2: the record vouches for the copy in place (v2)" grep -qxF "$(sha256_of "$SD/CLAUDE.md")" "$WS/.claude.md.delivered"
@@ -739,12 +755,16 @@ else
     run_update
     check "18 run 1: exit 0" rc_is 0
     cp "$CASE_DIR/manifest-installed.json" "$SD/update-manifest.json"
+    # WP-529 Ф245: отказ на read-only каталоге (rename-исполнитель), не на
+    # read-only файле; маркер заранее — иначе прогон упал бы ещё на его записи,
+    # до проверяемой операции.
+    printf 'state=applying\n' > "$SD/.update-incomplete"
     for word in three four five six; do
         sed "s/^Platform rule A: version [a-z]*\.$/Platform rule A: version $word./" "$UP/CLAUDE.md" > "$UP/CLAUDE.md.tmp" &&
             mv "$UP/CLAUDE.md.tmp" "$UP/CLAUDE.md" && write_manifest "$UP" "0.40.9"
-        chmod a-w "$SD/CLAUDE.md"
+        chmod a-w "$SD"
         run_update
-        chmod u+w "$SD/CLAUDE.md"
+        chmod u+w "$SD"
         check "18 failed delivery '$word': the run stops" test "$RUN_RC" -ne 0
     done
     check "18 the copy in place is still v2" lacks_text "$SD/CLAUDE.md" "version six"
