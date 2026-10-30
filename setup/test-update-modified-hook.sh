@@ -87,13 +87,17 @@ Upstream content.
 EOF
 
 write_upstream_manifest() {
+    # WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh —
+    # фикстура доставляет его, как это делает настоящий манифест.
+    mkdir -p "$UPSTREAM/setup/lib"
+    cp "$TEMPLATE_DIR/setup/lib/apply-op.sh" "$UPSTREAM/setup/lib/apply-op.sh"
     python3 - "$UPSTREAM" "$HOOK" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
 root, hook = Path(sys.argv[1]), sys.argv[2]
 entry = lambda p: {"path": p, "sha256": hashlib.sha256((root / p).read_bytes()).hexdigest()}
 manifest = {"schema_version": 2, "version": "0.99.0-test-modified-hook",
-            "files": [entry("CLAUDE.md"), entry(hook)], "deprecated_files": []}
+            "files": [entry("CLAUDE.md"), entry(hook), entry("setup/lib/apply-op.sh")], "deprecated_files": []}
 (root / "update-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 PY
 }
@@ -108,6 +112,8 @@ cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR/CLAUDE.md"
 cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR/.claude.md.base"
 cp -p "$UPSTREAM/$HOOK" "$SCRIPT_DIR/$HOOK"
 cp "$UPSTREAM/update-manifest.json" "$SCRIPT_DIR/update-manifest.json"
+mkdir -p "$SCRIPT_DIR/setup/lib"
+cp "$UPSTREAM/setup/lib/apply-op.sh" "$SCRIPT_DIR/setup/lib/apply-op.sh"
 
 cat > "$WORKSPACE_DIR/.exocortex.env" <<'EOF'
 GOVERNANCE_REPO="pilot-governance"
@@ -119,7 +125,7 @@ git -C "$SCRIPT_DIR" init -q -b main 2>/dev/null || git -C "$SCRIPT_DIR" init -q
 git -C "$SCRIPT_DIR" config user.email t@t
 git -C "$SCRIPT_DIR" config user.name t
 git -C "$SCRIPT_DIR" add -- update.sh update-manifest.json CLAUDE.md .claude.md.base "$HOOK" \
-    .claude/lib/frontmatter.sh scripts/lib/common.sh
+    .claude/lib/frontmatter.sh scripts/lib/common.sh setup/lib/apply-op.sh
 git -C "$SCRIPT_DIR" commit -q -m "at upstream version"
 
 # The pilot's edit: a protective rule switched off, the file stays executable.

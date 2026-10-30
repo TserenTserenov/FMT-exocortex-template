@@ -139,6 +139,7 @@ SETUP_EXPLICIT_INCLUDE=(
     "setup/build-runtime.sh"
     "setup/install-iwe-paths.sh"
     "setup/validate-template.sh"
+    "setup/lib/apply-op.sh"                     # WP-529 Ф245: Step 5 update.sh пишет через этот исполнитель, без доставки обновление остановится
     "setup/optional/setup-cloud-scheduler.sh"   # install-time, but requires one-time delivery — issue #325
     "setup/optional/setup-local-gateway.sh"     # referenced by delivered docs/AGENT-VENDOR-SETUP.md (WP-499 Ф16), same class as #325
 )

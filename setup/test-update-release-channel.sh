@@ -578,6 +578,10 @@ build_release_run() {
     cp "$UPDATE_SH" "$UP_DIR/update.sh"
     printf '# Template CLAUDE.md\n\nSame content both sides.\n' > "$UP_DIR/CLAUDE.md"
     printf 'release content\n' > "$UP_DIR/docs/note.md"
+    # WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — релизная
+    # фикстура доставляет его, как это делает настоящий манифест.
+    mkdir -p "$UP_DIR/setup/lib"
+    cp "$REPO_ROOT/setup/lib/apply-op.sh" "$UP_DIR/setup/lib/apply-op.sh"
     python3 - "$UP_DIR" "$release_version" <<'PY'
 import hashlib
 import json
@@ -587,7 +591,7 @@ import sys
 root, version = pathlib.Path(sys.argv[1]), sys.argv[2]
 files = [
     {"path": path, "sha256": hashlib.sha256((root / path).read_bytes()).hexdigest()}
-    for path in ("CLAUDE.md", "docs/note.md", "update.sh")
+    for path in ("CLAUDE.md", "docs/note.md", "update.sh", "setup/lib/apply-op.sh")
 ]
 manifest = {"schema_version": 2, "version": version, "files": files, "deprecated_files": []}
 (root / "update-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
