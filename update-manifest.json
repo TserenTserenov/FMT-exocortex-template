@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "26a6a47bb48428a20375ccf55fe5737f520e0c6648b65216bbb10dddecfa19d1"
+      "sha256": "db7e6a5c5ef6e8d47a32c6609e2b80f4282d3c2d12495d2c2dbc67174631e6a6"
     },
     {
       "path": "CLAUDE.md",
@@ -1593,7 +1593,7 @@
     },
     {
       "path": "memory/communication-style-base.md",
-      "sha256": "4bed973c46c972d13a53ca6b4d90ecbbdea8c677cd1a23118cc972a332313318"
+      "sha256": "25ae0b96f01e97791b5db13367f3c5c02b9217354f2d36b4c39bfa6fd7e44d2d"
     },
     {
       "path": "memory/communication-style-downstream-template.md",
