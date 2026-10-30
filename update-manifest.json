@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "72758fe20d0539038e42cef7e9750358d85597e0cab3ead41bfe4cfcf8b9c29d"
+      "sha256": "fcd624a4431779ee2c4965f6970217edff8c6c34f6efefb7a87230d66a3a4f71"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "329b9cbe2ca1926dc399ed6e4af77f241cbc19f4e81d01f10605805ec4739865"
+      "sha256": "bc5e751d528fe46341fe165d5fb7b572c22a05dd129ccc34d527a37e6db2d64b"
     },
     {
       "path": "CLAUDE.md",
@@ -3656,6 +3656,7 @@
     "setup/detector-fixtures/detector_07/positive_uppercase.sh",
     "setup/detector-regex.sh",
     "setup/integration-contract-validator.sh",
+    "setup/lib/apply-op.sh",
     "setup/optional/COVER-IMAGES.md",
     "setup/optional/README.md",
     "setup/optional/generate-post-image.py",
@@ -3671,6 +3672,7 @@
     "setup/promote-fixtures/sample-skill/scripts/sample-tool.sh",
     "setup/release-audit-prompt.md",
     "setup/smoke-test-fresh-install.sh",
+    "setup/test-apply-op.sh",
     "setup/test-attestation-build-statement.sh",
     "setup/test-attestation-canonical-digest.sh",
     "setup/test-build-runtime-preserves-live-state.sh",
