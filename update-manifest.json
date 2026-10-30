@@ -633,7 +633,7 @@
     },
     {
       "path": ".claude/skills/mentor-participant-brief/SKILL.md",
-      "sha256": "16cd730424a5acaffa7857daba82eab10c06deb06e2840d8f8c98dde152a6313"
+      "sha256": "0a67bbb906f2ef4ecec34a1ce57ef5420f492c21ee1063794dbea2114c234b1d"
     },
     {
       "path": ".claude/skills/month-close/SKILL.md",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c6d8835fb22760f86e044a30ebf53a8d86e87d29dbca002b096a31fbaddadc3f"
+      "sha256": "905e2ef157e9d1f8e088d8053b7589261ac9238c0b8e6940d77cca7ddfa39348"
     },
     {
       "path": "CLAUDE.md",

@@ -149,6 +149,7 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены .claude/skills/mentor-participant-brief/SKILL.md (#1399).
 - [behavior] `session-open-gate.sh`: Claude без пригодного идентификатора сессии (`session_id` в запросе хука пуст или содержит символы вне `A-Za-z0-9._-`, а при пустом нет и `CLAUDE_CODE_SESSION_ID`) больше не коммитит и не пушит: отдельный отказ после проверки пропуска Git Bash, прочие команды не затрагиваются; раньше такой коммит пропускался (WP-7 Ф275, [PR #1394](https://github.com/TserenTserenov/FMT-exocortex-template/pull/1394)).
 - [behavior] `session-open-gate.sh`: имена `claude` и `claude-code` — один агент, как в охраннике сессий: `IWE_AGENT=claude` считается `claude-code`, семафор `claude-<id>.open` со строкой `agent: claude` засчитывается беседе Claude. Хук и его тест теперь одинаковы в шаблоне и у автора, синхронизация не даёт конфликта; 100 проверок (WP-7 Ф275, [PR #1394](https://github.com/TserenTserenov/FMT-exocortex-template/pull/1394)).
 - [optional] Тест `test-update-write-sites.sh` и реестр `setup/update-write-sites.tsv`: каждая команда `update.sh`, которая пишет, переносит, удаляет или меняет права (или запускает внешний скрипт, который пишет сам), обязана относиться к классифицированному блоку; новая неклассифицированная запись роняет проверку (WP-529 Ф245, шаг 1 базового отката установки). Поведение `update.sh` не менялось (#1393).
