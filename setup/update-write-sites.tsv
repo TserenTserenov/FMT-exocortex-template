@@ -61,7 +61,8 @@ fn:download_batch	T	none	downloads into the temp directory
 fn:verify_batch_integrity	T	none	removes a temp remote file
 top:Step 3	B	not-covered	copies the manifest and runs iwe-capabilities.sh probe --announce; the probe writes its own announcement state, provisional
 fn:move_deprecated_to_backup	A	plan	moves a deprecated file to .backups/deprecated; operation type moved, inverse restores it when the source hash matches
-top:Step 5	A	plan	applies the downloaded files: new files, replacements, CLAUDE.md merge, empty-directory removal; chmod happens on the temp file before rename once the executor exists
+fn:update_plan_mkdirs_for	R	none	false positive of the scanner: mkdir there is an argument word of update_plan_add, not a command; the directory is created by the executor's own mkdir operation (setup/lib/apply-op.sh)
+top:Step 5	A	plan	applies the downloaded files through the frozen plan and the single executor (setup/lib/apply-op.sh sourced at the step start): new files, replacements, CLAUDE.md merge from staging, empty-directory removal after the deprecated moves (still direct); chmod happens on the temp file before rename; the plan file itself is built and frozen under TMPDIR_UPDATE; the deprecated move below stays direct in this increment (destination .backups is outside the clone root)
 top:Step 5b	A	plan	re-substitutes placeholders and rewrites .exocortex.env line by line; the executor writes it as one planned file
 fn:linux_cron_strategist_owned	R	none	reads the crontab, read only
 fn:reinstall_linux_strategist	C	not-covered	rewrites crontab or systemd units after a backup of the crontab; inverse is restoring the crontab backup, provisional

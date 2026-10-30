@@ -54,6 +54,11 @@ sed '$d' "$UPDATE_SH_REAL" > "$UPSTREAM/update.sh"
 printf '\n# step0-staged-rename-marker issue-505-residual\n%s\n' "$END_MARKER" >> "$UPSTREAM/update.sh"
 tail -n 1 "$UPDATE_SH_REAL" | grep -qxF "$END_MARKER" || { echo "FATAL: update.sh does not end with the marker" >&2; exit 2; }
 
+# WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — фикстура
+# доставляет его, как это делает настоящий манифест.
+mkdir -p "$UPSTREAM/setup/lib"
+cp "$SELF_DIR/lib/apply-op.sh" "$UPSTREAM/setup/lib/apply-op.sh"
+
 python3 - "$UPSTREAM" <<'PYEOF'
 import hashlib, json, sys
 from pathlib import Path
@@ -63,7 +68,7 @@ def entry(p):
 manifest = {
     'schema_version': 2,
     'version': '0.99.0-test-505-residual',
-    'files': [entry('CLAUDE.md'), entry('.claude/hooks/dummy-hook.sh'), entry('update.sh')],
+    'files': [entry('CLAUDE.md'), entry('.claude/hooks/dummy-hook.sh'), entry('update.sh'), entry('setup/lib/apply-op.sh')],
     'deprecated_files': [],
 }
 (root / 'update-manifest.json').write_text(json.dumps(manifest))

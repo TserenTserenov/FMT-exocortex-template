@@ -5649,6 +5649,159 @@ REMOVED=0
 AUTHOR_SKIPPED=0
 APPLIED_PATHS=()
 
+# --- WP-529 Ф245 (шаг 2, подключение): Step 5 пишет в клон шаблона только ---
+# через замороженный план и единый исполнитель setup/lib/apply-op.sh. Все
+# условия (author_diverged, author_release_regression, пропуск update.sh,
+# исходы merge CLAUDE.md) раскрываются при ПОСТРОЕНИИ плана — в apply-фазе
+# условий нет. План строится во временное имя и замораживается одним mv;
+# дальше исполнитель его только читает. Корень записи один — клон шаблона
+# (SCRIPT_DIR); записи вне его (workspace, memory, .backups — в т.ч. перенос
+# deprecated) остаются прямыми вызовами своих функций, это граница инкремента.
+UPDATE_PLAN_TMP="$TMPDIR_UPDATE/update-plan.build.$$"
+UPDATE_PLAN_FILE="$TMPDIR_UPDATE/update-plan.tsv"
+UPDATE_PLAN_COUNT=0
+UPDATE_PLAN_MSG=()
+UPDATE_PLAN_MKDIRS="|"
+
+# Исполнитель доставлен манифестом: в переходный прогон (первая версия с этим
+# механизмом) он приезжает с самим обновлением в $TMPDIR_UPDATE/files, дальше
+# уже лежит в установке. Ни там, ни там — установка сломана, это не fallback.
+APPLY_OP_LIB=""
+for _apply_op_candidate in "$TMPDIR_UPDATE/files/setup/lib/apply-op.sh" "$SCRIPT_DIR/setup/lib/apply-op.sh"; do
+    if [ -f "$_apply_op_candidate" ]; then
+        APPLY_OP_LIB="$_apply_op_candidate"
+        break
+    fi
+done
+if [ -z "$APPLY_OP_LIB" ]; then
+    echo "ОШИБКА: исполнитель плана setup/lib/apply-op.sh не найден ни среди скачанных файлов обновления, ни в установке." >&2
+    exit "$EXIT_RUNTIME"
+fi
+# shellcheck source=setup/lib/apply-op.sh
+. "$APPLY_OP_LIB"
+
+# Корни исполнителя обязаны быть каноническими каталогами: клон может лежать
+# за ссылкой (/tmp -> /private/tmp на macOS), пути плана строим от физического.
+UPDATE_CLONE_ROOT=$(cd -P "$SCRIPT_DIR" && pwd -P) || {
+    echo "ОШИБКА: не разрешить физический путь клона шаблона: $SCRIPT_DIR" >&2
+    exit "$EXIT_RUNTIME"
+}
+APPLY_OP_ROOTS=("$UPDATE_CLONE_ROOT")
+
+if ! declare -F update_journal_hook >/dev/null 2>&1; then
+    # update_journal_hook intent|done|skip OP_ID — заглушка будущего журнала
+    # отката с зафиксированным контрактом: intent вызывается до создания
+    # временного файла операции, done — только после успешного rename, skip —
+    # когда цель уже в состоянии «после» (в этом шаге не возникает: повторный
+    # прогон строит план заново с живого дерева). Ненулевой код хука
+    # останавливает прогон до любой мутации операции. Журнал не ведётся; при
+    # IWE_UPDATE_JOURNAL_FAKE_LOG каждый вызов пишется строкой «событие op_id»
+    # в этот файл, и сбой записи читается как отказ настоящего журнала.
+    update_journal_hook() {
+        [ -n "${IWE_UPDATE_JOURNAL_FAKE_LOG:-}" ] || return 0
+        printf '%s %s\n' "$1" "$2" >> "$IWE_UPDATE_JOURNAL_FAKE_LOG"
+    }
+fi
+
+# update_mode_umask BASE — права создаваемого файла: BASE (три восьмеричные
+# цифры), прикрытые umask, как делает cp для нового файла.
+update_mode_umask() {
+    local _um
+    _um=$(umask)
+    printf '%03o\n' "$(( 8#$1 & ~8#$_um ))"
+}
+
+# update_mode_plus_x MODE — MODE с битами, которые добавил бы `chmod +x`
+# (a+x, прикрытый umask).
+update_mode_plus_x() {
+    local _um
+    _um=$(umask)
+    printf '%03o\n' "$(( 8#$1 | ( 8#111 & ~8#$_um ) ))"
+}
+
+# Паттерн «исполняемых» путей apply-циклов: файлы приезжают через raw
+# `curl -o` без прав, поэтому +x выставляется при доставке (на временном
+# файле до rename). issue #308: .githooks/* не косметика (git молча пропускает
+# неисполняемый хук); wp-list.py/check-claude-md-links.py — 755 в git upstream.
+update_needs_exec_bit() {
+    case "$1" in
+        *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# update_dest_mode REL — текущие права цели в клоне: cp в существующий файл
+# сохраняет его права, исполнитель повторяет их на временном файле.
+# Спецбиты (setuid/setgid/sticky) не воспроизводим: исполнитель принимает
+# только три восьмеричные цифры, а 4-значный режим цели не должен обрывать
+# весь прогон — берём три младшие цифры (владелец/группа/остальные).
+update_dest_mode() {
+    local _mode
+    _mode=$(apply_op__mode_of "$UPDATE_CLONE_ROOT/$1") || return 1
+    _mode=$(apply_op__norm_mode "$_mode")
+    printf '%s\n' "${_mode:$((${#_mode} - 3))}"
+}
+
+# update_plan_add TYPE REL [ARG [MODE]] — одна строка плана; REL относителен
+# клону, в план уходит абсолютный канонический путь. Сбой построения — выход
+# до первой записи плана (дерево установки ещё не тронуто).
+update_plan_add() {
+    apply_op_plan_add "$UPDATE_PLAN_TMP" "$1" "$UPDATE_CLONE_ROOT/$2" "${3:--}" "${4:--}" || {
+        echo "ОШИБКА: не построить операцию плана ($1 $2); прогон остановлен до первой записи." >&2
+        exit "$EXIT_RUNTIME"
+    }
+    UPDATE_PLAN_COUNT=$((UPDATE_PLAN_COUNT + 1))
+}
+
+# update_plan_mkdirs_for REL — явные mkdir-операции недостающих родителей REL,
+# с дедупликацией; `mkdir -p` внутри create-операции нет, каждый каталог —
+# своя операция со своим op_id, родитель раньше потомка.
+update_plan_mkdirs_for() {
+    local _dir _i
+    local _dirs=()
+    _dir=$(dirname "$1")
+    while [ "$_dir" != "." ]; do
+        if [ -d "$UPDATE_CLONE_ROOT/$_dir" ]; then break; fi
+        case "$UPDATE_PLAN_MKDIRS" in
+            *"|$_dir|"*) break ;;
+        esac
+        _dirs+=("$_dir")
+        UPDATE_PLAN_MKDIRS="${UPDATE_PLAN_MKDIRS}${_dir}|"
+        _dir=$(dirname "$_dir")
+    done
+    _i=$((${#_dirs[@]} - 1))
+    while [ "$_i" -ge 0 ]; do
+        update_plan_add mkdir "${_dirs[$_i]}" - "$(update_mode_umask 777)"
+        _i=$((_i - 1))
+    done
+}
+
+# update_plan_add_file REL SRC — write или replace в зависимости от цели;
+# права повторяют прежнюю семантику cp (новый файл — 666&~umask, существующий
+# сохраняет свои), паттерн исполняемости — как в прежних apply-циклах.
+update_plan_add_file() {
+    local _rel="$1" _src="$2" _mode
+    if [ -e "$UPDATE_CLONE_ROOT/$_rel" ] || [ -L "$UPDATE_CLONE_ROOT/$_rel" ]; then
+        _mode=$(update_dest_mode "$_rel") || {
+            echo "ОШИБКА: не прочитать права цели $_rel; прогон остановлен до первой записи." >&2
+            exit "$EXIT_RUNTIME"
+        }
+        if update_needs_exec_bit "$_rel"; then
+            _mode=$(update_mode_plus_x "$_mode")
+        fi
+        update_plan_add replace "$_rel" "$_src" "$_mode"
+    else
+        update_plan_mkdirs_for "$_rel"
+        _mode=$(update_mode_umask 666)
+        if update_needs_exec_bit "$_rel"; then
+            _mode=$(update_mode_plus_x "$_mode")
+        fi
+        update_plan_add write "$_rel" "$_src" "$_mode"
+    fi
+}
+
+apply_op_plan_new "$UPDATE_PLAN_TMP"
+
 for f in "${NEW_FILES[@]}"; do
     record_rule_workspace_state "$f"
     if author_diverged "$f"; then
@@ -5656,15 +5809,9 @@ for f in "${NEW_FILES[@]}"; do
         AUTHOR_SKIPPED=$((AUTHOR_SKIPPED + 1))
         continue
     fi
-    mkdir -p "$SCRIPT_DIR/$(dirname "$f")"
-    cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
+    update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
+    UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  + $f"
     APPLIED_PATHS+=("$f")
-    # Make scripts executable — files arrive via raw `curl -o` (no file-mode
-    # metadata survives), so the +x bit must be reapplied explicitly here.
-    # issue #308: .githooks/* is not cosmetic (git silently skips a non-executable
-    # hook); wp-list.py/check-claude-md-links.py are git-tracked 755 upstream.
-    case "$f" in *.sh|.githooks/*|.claude/bin/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
-    echo "  + $f"
     APPLIED=$((APPLIED + 1))
 done
 
@@ -5700,7 +5847,11 @@ for f in "${UPDATED_FILES[@]}"; do
         continue
     fi
     APPLIED_PATHS+=("$f")
-    # Special handling for CLAUDE.md: 3-way merge preserving user customizations
+    # Special handling for CLAUDE.md: 3-way merge preserving user customizations.
+    # Слияние вычисляется при построении плана в staging-файлы под
+    # $TMPDIR_UPDATE; исходы, которые пишут файл, становятся операциями плана
+    # из staging, диагностика исходов печатается здесь же, apply-фаза молчаливо
+    # исполняет (строка «  ~ ...» — после успешного apply_op).
     if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
         BASE_FILE="$SCRIPT_DIR/.claude.md.base"
         NEW_FILE="$TMPDIR_UPDATE/files/$f"
@@ -5726,19 +5877,19 @@ for f in "${UPDATED_FILES[@]}"; do
                     echo "  ⚠ $f НЕ тронут — слияние потеряло бы $SILENT_LOSS строк(и) без маркеров конфликта."
                     echo "    Сверьте вручную: diff \"$CURRENT_FILE\" \"$NEW_FILE\""
                 else
-                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
-                    cp "$NEW_FILE" "$BASE_FILE"
-                    echo "  ~ $f (3-way merge, чисто)"
+                    update_plan_add_file "CLAUDE.md" "$TMPDIR_UPDATE/claude-merged.md"
+                    UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (3-way merge, чисто)"
+                    update_plan_add_file ".claude.md.base" "$NEW_FILE"
                 fi
             else
                 CONFLICT_COUNT=$(grep -c '^<<<<<<<' "$TMPDIR_UPDATE/claude-merged.md" 2>/dev/null || true); CONFLICT_COUNT=${CONFLICT_COUNT:-0}
                 if [ "$CONFLICT_COUNT" -gt 0 ]; then
-                    # Conflicts detected — save merged file with markers
-                    cp "$TMPDIR_UPDATE/claude-merged.md" "$CURRENT_FILE"
-                    cp "$NEW_FILE" "$BASE_FILE"
+                    # Conflicts detected — the plan installs the merged file with markers
+                    update_plan_add_file "CLAUDE.md" "$TMPDIR_UPDATE/claude-merged.md"
+                    UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (3-way merge, $CONFLICT_COUNT конфликтов — разрешите вручную)
+    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
+                    update_plan_add_file ".claude.md.base" "$NEW_FILE"
                     CLAUDE_CONFLICTS=$((CLAUDE_CONFLICTS + CONFLICT_COUNT))
-                    echo "  ~ $f (3-way merge, $CONFLICT_COUNT конфликтов — разрешите вручную)"
-                    echo "    Конфликты обозначены <<<<<<< / ======= / >>>>>>>"
                 else
                     # Non-zero without a single marker is not a conflict: git did not merge.
                     # This branch used to "treat it as success" and copy the (empty) output
@@ -5752,14 +5903,14 @@ for f in "${UPDATED_FILES[@]}"; do
             # receives one); sync_workspace_claude_md() in Step 6 merges the
             # workspace copy against the workspace base, keeping the pilot's edits.
             # The record first, from the source: nothing can change what it hashes, and an interrupt
-            # after the copy finds the record already in place. cp stays a plain statement: as the left
-            # side of && a failure would not stop the run under set -e and "обновлён" would be a lie.
+            # before the replace finds the record already in place (запись вне корня
+            # клона — прямой вызов, не операция плана).
             claude_record_delivered "$NEW_FILE"
-            cp "$NEW_FILE" "$CURRENT_FILE"
-            echo "  ~ $f обновлён (копия в каталоге шаблона совпадает с доставленной ранее или с закоммиченной в клоне; ваша правка, закоммиченная в клоне, остаётся в его истории git)"
+            update_plan_add_file "CLAUDE.md" "$NEW_FILE"
+            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f обновлён (копия в каталоге шаблона совпадает с доставленной ранее или с закоммиченной в клоне; ваша правка, закоммиченная в клоне, остаётся в его истории git)"
         else
             # issue #336: no base file (first migration or lost .claude.md.base) — a
-            # blind `cp $NEW_FILE $CURRENT_FILE` silently discarded any pilot edit to
+            # blind overwrite silently discarded any pilot edit to
             # §8/§9 that wasn't wrapped in explicit <!-- USER-SPACE --> markers (those
             # markers don't exist in the real §8/§9 format). Without a real base there
             # is no safe 3-way merge — leave the pilot's file untouched and surface it
@@ -5771,12 +5922,17 @@ for f in "${UPDATED_FILES[@]}"; do
                 echo "  ⚠ $f НЕ тронут — не удалось сделать резервную копию перед заменой."
             elif [ -n "$USER_SECTION" ]; then
                 echo "  ⚠ $f: правки вне блока USER-SPACE будут заменены версией шаблона; резервная копия: $CLAUDE_BACKUP_DIR"
-                cp "$NEW_FILE" "$CURRENT_FILE"
-                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CURRENT_FILE"
-                echo "" >> "$CURRENT_FILE"
-                printf '%s\n' "$USER_SECTION" >> "$CURRENT_FILE"
-                cp "$NEW_FILE" "$SCRIPT_DIR/.claude.md.base"
-                echo "  ~ $f (USER-SPACE сохранён, базовый файл создан)"
+                # Результат (версия шаблона с возвращённым USER-SPACE) собирается
+                # в staging; прежний код правил CURRENT_FILE на месте теми же
+                # тремя шагами после cp.
+                CLAUDE_STAGED_FILE="$TMPDIR_UPDATE/claude-userspace-result.md"
+                cp "$NEW_FILE" "$CLAUDE_STAGED_FILE"
+                sed_inplace '/^<!-- USER-SPACE/,/^<!-- \/USER-SPACE/d' "$CLAUDE_STAGED_FILE"
+                echo "" >> "$CLAUDE_STAGED_FILE"
+                printf '%s\n' "$USER_SECTION" >> "$CLAUDE_STAGED_FILE"
+                update_plan_add_file "CLAUDE.md" "$CLAUDE_STAGED_FILE"
+                UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (USER-SPACE сохранён, базовый файл создан)"
+                update_plan_add_file ".claude.md.base" "$NEW_FILE"
             else
                 # issue #541 hvost 2 (Evgenii Red Team v0.38.11): a retry right
                 # after this exact run used to silently "succeed". Writing
@@ -5805,20 +5961,57 @@ for f in "${UPDATED_FILES[@]}"; do
             USER_SECTION=""
         fi
         if [ -n "$USER_SECTION" ]; then
-            render_skill_with_user_section "$TMPDIR_UPDATE/files/$f" "$USER_SECTION" "$SCRIPT_DIR/$f"
-            echo "  ~ $f (USER-SPACE preserved)"
+            # render в staging (условие «USER-SPACE есть» решено выше, при
+            # построении); имя staging уникально на операцию — план хранит
+            # отпечаток источника с момента заморозки.
+            SKILL_STAGED_FILE="$TMPDIR_UPDATE/skill-staged-$UPDATE_PLAN_COUNT.md"
+            render_skill_with_user_section "$TMPDIR_UPDATE/files/$f" "$USER_SECTION" "$SKILL_STAGED_FILE"
+            update_plan_add_file "$f" "$SKILL_STAGED_FILE"
+            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f (USER-SPACE preserved)"
         else
-            cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-            echo "  ~ $f"
+            update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
+            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f"
         fi
     else
-        cp "$TMPDIR_UPDATE/files/$f" "$SCRIPT_DIR/$f"
-        # issue #308: same +x reapply as the NEW_FILES loop above (curl fetch drops file mode).
-        case "$f" in *.sh|.githooks/*|.claude/bin/*|scripts/wp-list.py|scripts/check-claude-md-links.py) chmod +x "$SCRIPT_DIR/$f" ;; esac
-        echo "  ~ $f"
+        update_plan_add_file "$f" "$TMPDIR_UPDATE/files/$f"
+        UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f"
     fi
     APPLIED=$((APPLIED + 1))
 done
+
+# Заморозка плана: переименование в финальное имя один раз, дальше только чтение.
+mv "$UPDATE_PLAN_TMP" "$UPDATE_PLAN_FILE"
+
+# Исполнение: порядок (строго подряд с 1) и предусловия каждой операции
+# проверяет исполнитель; строки «  + f »/«  ~ f » печатаются только после
+# успешного apply_op, чтобы вывод не врал при остановке. Первая ошибка любой
+# операции — остановка всего прогона, хвост плана не применяется; повторный
+# запуск перестроит план с живого дерева.
+apply_op_begin "$UPDATE_PLAN_FILE" || {
+    echo "ОШИБКА: замороженный план обновления не прошёл проверку перед записью; дерево установки не тронуто." >&2
+    exit "$EXIT_RUNTIME"
+}
+_update_plan_id=1
+while [ "$_update_plan_id" -le "$APPLY_OP_TOTAL" ]; do
+    update_journal_hook intent "$_update_plan_id" || {
+        echo "ОШИБКА: журнальный хук отклонил операцию $_update_plan_id; прогон остановлен до записи этой операции." >&2
+        exit "$EXIT_RUNTIME"
+    }
+    if apply_op "$_update_plan_id"; then
+        update_journal_hook "done" "$_update_plan_id" || {
+            echo "ОШИБКА: журнальный хук не подтвердил операцию $_update_plan_id; прогон остановлен." >&2
+            exit "$EXIT_RUNTIME"
+        }
+        if [ -n "${UPDATE_PLAN_MSG[$_update_plan_id]:-}" ]; then
+            echo "${UPDATE_PLAN_MSG[$_update_plan_id]}"
+        fi
+    else
+        echo "ОШИБКА: применение обновления остановлено на операции $_update_plan_id из $APPLY_OP_TOTAL; хвост плана не применялся, маркер .update-incomplete сохранён." >&2
+        exit "$EXIT_RUNTIME"
+    fi
+    _update_plan_id=$((_update_plan_id + 1))
+done
+apply_op_end
 
 # BEGIN-TESTABLE: changelog-diff-disclaimer
 # WP-529 Ф220: диф и дисклеймер CHANGELOG.md — только если содержимое реально

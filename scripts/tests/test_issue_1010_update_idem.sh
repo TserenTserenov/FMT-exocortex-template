@@ -81,16 +81,21 @@ EOF
 }
 
 write_manifest() {
+    # WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh —
+    # фикстурный манифест доставляет его, как это делает настоящий генератор.
+    mkdir -p "$UPSTREAM/setup/lib"
+    cp "$REPO_ROOT/setup/lib/apply-op.sh" "$UPSTREAM/setup/lib/apply-op.sh"
     # $1 = manifest version
     python3 - "$UPSTREAM" "$1" "$SKILL" "$DEP_TRACKED" "$DEP_UNTRACKED" "$DEP_SKILL" "$DEP_MEM" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
 root, version, skill, dep_tracked, dep_untracked, dep_skill, dep_mem = sys.argv[1:8]
 root = Path(root)
+entry = lambda p: {"path": p, "sha256": hashlib.sha256((root / p).read_bytes()).hexdigest()}
 manifest = {
     "schema_version": 2,
     "version": version,
-    "files": [{"path": skill, "sha256": hashlib.sha256((root / skill).read_bytes()).hexdigest()}],
+    "files": [entry(skill), entry("setup/lib/apply-op.sh")],
     "deprecated_files": [
         {"path": dep_tracked, "reason": "test: replaced"},
         {"path": dep_untracked, "reason": "test: replaced"},
@@ -114,6 +119,10 @@ cp "$UPDATE_SH_REAL" "$SCRIPT_DIR/update.sh"
 chmod +x "$SCRIPT_DIR/update.sh"
 cp "$REPO_ROOT/.claude/lib/frontmatter.sh" "$SCRIPT_DIR/.claude/lib/frontmatter.sh"
 cp "$REPO_ROOT/scripts/lib/common.sh" "$SCRIPT_DIR/scripts/lib/common.sh"
+# WP-529 Ф245: исполнитель лежит и в установке (прогоны «всё актуально» его не
+# скачивают — update.sh берёт копию из клона).
+mkdir -p "$SCRIPT_DIR/setup/lib"
+cp "$REPO_ROOT/setup/lib/apply-op.sh" "$SCRIPT_DIR/setup/lib/apply-op.sh"
 printf 'GOVERNANCE_REPO="pilot-governance"\n' > "$WORKSPACE_DIR/.exocortex.env"
 # update.sh refuses to run without CLAUDE.md at the template root; not in the
 # fixture manifest, so no run touches it.

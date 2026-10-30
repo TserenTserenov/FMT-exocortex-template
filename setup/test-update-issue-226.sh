@@ -72,6 +72,11 @@ test -f "$FILE"
 ```
 EOF
 
+# WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — фикстура
+# доставляет его, как это делает настоящий манифест.
+mkdir -p "$UPSTREAM/setup/lib"
+cp "$SELF_DIR/lib/apply-op.sh" "$UPSTREAM/setup/lib/apply-op.sh"
+
 python3 -c "
 import hashlib
 import json
@@ -90,6 +95,7 @@ manifest = {
         entry('.claude/hooks/dummy-hook.sh'),
         entry('memory/dummy-memo.md'),
         entry('extensions/day-open.checks.md'),
+        entry('setup/lib/apply-op.sh'),
     ],
     'deprecated_files': [],
 }
