@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "26a6a47bb48428a20375ccf55fe5737f520e0c6648b65216bbb10dddecfa19d1"
+      "sha256": "d99ece71830f2e425d07a7383f9c6ae96c64fa46a483bf1eefb83d38f406fe38"
     },
     {
       "path": "CLAUDE.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "a2e1d01c8abcb59a23f226e6bddbe6dff12acd7597842cb4b6ae4a5d340d01e7"
+      "sha256": "564ec81e3fbfb3b18c76022fe2c3c3d4861f1288b49071d27b11d78263004a3f"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3121,7 +3121,7 @@
     },
     {
       "path": "scripts/tests/test_update_build_runtime_fail_closed.sh",
-      "sha256": "5a2455db4d7b7d24ca1632b1bcf242349fc6663f2fb4abe60974f5942fd9ffbc"
+      "sha256": "6c447e8cf710a3359466119bd594f2b6308d5918c9d4352536ed490faa305760"
     },
     {
       "path": "scripts/tests/test_update_delivers_python_resolver_before_roles.sh",
@@ -3376,6 +3376,10 @@
       "sha256": "fb8bf524ae23f0c720ae95ea1492b656ca3457717cbf66992d37882a84f0b1ab"
     },
     {
+      "path": "setup/lib/apply-op.sh",
+      "sha256": "0224efbaa8f682584e9d76d365964363db7e1a575d9a53fe2c6d8fae5b64dee6"
+    },
+    {
       "path": "setup/optional/setup-cloud-scheduler.sh",
       "sha256": "b4b721412fffe448d61e0709badacc4210109ce938cb8723fa56b938cf1346ba"
     },
@@ -3405,7 +3409,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "d8c257539f69644f03800c701898e3b103df48cc60ecb305867c8b3a45a6b709"
+      "sha256": "ebf1f22f93aee02d848c197b5976922605edd6829068f0de0dd4156379abd517"
     }
   ],
   "excluded_paths": [
@@ -3656,7 +3660,6 @@
     "setup/detector-fixtures/detector_07/positive_uppercase.sh",
     "setup/detector-regex.sh",
     "setup/integration-contract-validator.sh",
-    "setup/lib/apply-op.sh",
     "setup/optional/COVER-IMAGES.md",
     "setup/optional/README.md",
     "setup/optional/generate-post-image.py",
@@ -3701,6 +3704,7 @@
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-modified-hook.sh",
+    "setup/test-update-plan-executor.sh",
     "setup/test-update-publish-gate-delivery.sh",
     "setup/test-update-rc-channel.sh",
     "setup/test-update-release-channel.sh",

@@ -112,6 +112,12 @@ cp "$repo_root/.githooks/pre-commit" "$template/.githooks/pre-commit"
 printf '#!/bin/sh\nexit 0\n' > "$template/scripts/pre-commit-secret-scan.sh"
 chmod +x "$template/scripts/pre-commit-secret-scan.sh"
 
+# WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — фикстура
+# доставляет его, как это делает настоящий манифест, и держит в установке.
+mkdir -p "$upstream/setup/lib" "$template/setup/lib"
+cp "$repo_root/setup/lib/apply-op.sh" "$upstream/setup/lib/apply-op.sh"
+cp "$repo_root/setup/lib/apply-op.sh" "$template/setup/lib/apply-op.sh"
+
 python3 - "$upstream" "$template" <<'PY'
 import hashlib
 import json
@@ -119,7 +125,7 @@ import sys
 from pathlib import Path
 
 upstream, template = map(Path, sys.argv[1:])
-base = ("CLAUDE.md", ".claude/lib/frontmatter.sh")
+base = ("CLAUDE.md", ".claude/lib/frontmatter.sh", "setup/lib/apply-op.sh")
 new = ("scripts/new-tool.sh", ".claude/bin/guarded-rm")
 for root, paths in ((upstream, base + new), (template, base)):
     manifest = {

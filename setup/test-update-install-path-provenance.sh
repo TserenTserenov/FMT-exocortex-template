@@ -121,6 +121,10 @@ write_upstream() {
     printf '%s' "$claude_content" > "$upstream_dir/CLAUDE.md"
     cp "$UPDATE_SH_REAL" "$upstream_dir/update.sh"
     printf '#!/bin/bash\n%s\necho "fixture"\n' "$FIXTURE_LINE" > "$upstream_dir/$FIXTURE_PATH"
+    # WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh —
+    # фикстура доставляет его, как это делает настоящий манифест.
+    mkdir -p "$upstream_dir/setup/lib"
+    cp "$SELF_DIR/lib/apply-op.sh" "$upstream_dir/setup/lib/apply-op.sh"
     python3 - "$upstream_dir" <<'PYEOF'
 import hashlib, json, sys
 from pathlib import Path
@@ -130,7 +134,7 @@ def entry(p):
 manifest = {
     'schema_version': 2,
     'version': '0.99.0-test-524',
-    'files': [entry('CLAUDE.md'), entry('scripts/tests/test_launchd_identity_runtime.sh')],
+    'files': [entry('CLAUDE.md'), entry('scripts/tests/test_launchd_identity_runtime.sh'), entry('setup/lib/apply-op.sh')],
     'deprecated_files': [],
 }
 (root / 'update-manifest.json').write_text(json.dumps(manifest, indent=2))
@@ -303,7 +307,9 @@ NO_PY_DIR="$TEST_ROOT/no-py-path"
 mkdir -p "$NO_PY_DIR"
 # curl deliberately excluded: it must keep resolving to this scenario's shim,
 # not the real system curl -- only python3/python are hidden from PATH here.
-for tool in bash sh grep sed awk cp mv rm mkdir cat chmod git date wc head tail cut tr diff mktemp dirname basename find sort uniq shasum sha256sum; do
+# stat — WP-529 Ф245: снятие отпечатков прав исполнителем плана (Step 5),
+# на macOS/Linux/Git Bash входит в базовую поставку, как shasum рядом.
+for tool in bash sh grep sed awk cp mv rm mkdir cat chmod git date wc head tail cut tr diff mktemp dirname basename find sort uniq shasum sha256sum stat; do
     real=$(command -v "$tool" 2>/dev/null) && ln -sf "$real" "$NO_PY_DIR/$tool"
 done
 S4="$TEST_ROOT/s4"; mkdir -p "$S4"

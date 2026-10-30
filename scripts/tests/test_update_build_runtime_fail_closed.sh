@@ -29,9 +29,12 @@ mkdir -p "$TEST_ROOT" "$FAKE_HOME"
 
 # --- Fixture: fake upstream (served by the curl shim) ---
 UPSTREAM="$TEST_ROOT/upstream"
-mkdir -p "$UPSTREAM/scripts"
+mkdir -p "$UPSTREAM/scripts" "$UPSTREAM/setup/lib"
 printf '# Template CLAUDE.md\n' > "$UPSTREAM/CLAUDE.md"
 printf '#!/bin/bash\necho v2\n' > "$UPSTREAM/scripts/dummy-new.sh"
+# WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — фикстурный
+# манифест доставляет его, как это делает настоящий генератор.
+cp "$ROOT/setup/lib/apply-op.sh" "$UPSTREAM/setup/lib/apply-op.sh"
 python3 - "$UPSTREAM" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
@@ -41,7 +44,7 @@ def entry(path):
 manifest = {
     "schema_version": 2,
     "version": "0.99.0-brt-test",
-    "files": [entry("CLAUDE.md"), entry("scripts/dummy-new.sh")],
+    "files": [entry("CLAUDE.md"), entry("scripts/dummy-new.sh"), entry("setup/lib/apply-op.sh")],
     "deprecated_files": [],
 }
 (root / "update-manifest.json").write_text(json.dumps(manifest))
@@ -56,6 +59,10 @@ cp "$ROOT/scripts/lib/common.sh" "$SCRIPT_DIR/scripts/lib/common.sh"
 chmod +x "$SCRIPT_DIR/update.sh"
 cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR/CLAUDE.md"
 cp "$SCRIPT_DIR/CLAUDE.md" "$SCRIPT_DIR/.claude.md.base"
+# Исполнитель и в установке: прогоны восстановления («всё актуально») его не
+# скачивают — update.sh берёт копию из клона.
+mkdir -p "$SCRIPT_DIR/setup/lib"
+cp "$ROOT/setup/lib/apply-op.sh" "$SCRIPT_DIR/setup/lib/apply-op.sh"
 
 WORKSPACE_DIR="$TEST_ROOT/repo"
 cp "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"

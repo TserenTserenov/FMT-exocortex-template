@@ -112,6 +112,12 @@ for name in day-open-llm-fill.py update-derived-snapshot.py generate-executor-ca
     cp "$repo_root/seed/strategy/scripts/$name" "$template/seed/strategy/scripts/$name"
 done
 
+# WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — фикстура
+# доставляет его, как это делает настоящий манифест, и держит в установке.
+mkdir -p "$upstream/setup/lib" "$template/setup/lib"
+cp "$repo_root/setup/lib/apply-op.sh" "$upstream/setup/lib/apply-op.sh"
+cp "$repo_root/setup/lib/apply-op.sh" "$template/setup/lib/apply-op.sh"
+
 python3 - "$upstream" "$template" <<'PY'
 import hashlib
 import json
@@ -119,7 +125,7 @@ import sys
 from pathlib import Path
 
 upstream, template = map(Path, sys.argv[1:])
-paths = ("CHANGELOG.md", "CLAUDE.md", ".claude/lib/frontmatter.sh")
+paths = ("CHANGELOG.md", "CLAUDE.md", ".claude/lib/frontmatter.sh", "setup/lib/apply-op.sh")
 for root in (upstream, template):
     manifest = {
         "schema_version": 2,
