@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "905e2ef157e9d1f8e088d8053b7589261ac9238c0b8e6940d77cca7ddfa39348"
+      "sha256": "3df4f5d26bb73206d81ea7d80fe92d65320c0d85397e69aebbe8ef95bc191a45"
     },
     {
       "path": "CLAUDE.md",
@@ -2489,7 +2489,7 @@
     },
     {
       "path": "scripts/grok-peer-adapter.sh",
-      "sha256": "ab25412bafc46392d608daa2abc2a3b56d3f1017609d55e5e7a7f3d5ef8fcd8d"
+      "sha256": "3441e0e27ef06ccc1bc6573611441eaf9f4746cd557a19afac2ade2117d0318d"
     },
     {
       "path": "scripts/headless-runner.sh",
