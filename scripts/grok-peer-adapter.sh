@@ -37,9 +37,11 @@
 # Env overrides:
 #   GROK_BIN      — override grok binary path
 #   IWE_PEER_LOCK_DIR — same as codex-peer-adapter.sh
-#   GROK_PEER_TIMEOUT_SEC — internal watchdog deadline in seconds (default: 270,
-#     same rationale as codex-peer-adapter.sh: shorter than the peer-conversation
-#     contract's documented "5 minutes" so this adapter's own timeout fires first)
+#   GROK_PEER_TIMEOUT_SEC — internal watchdog deadline in seconds (default: 560).
+#     Raised from 270 after a real WP-568 turn (7.5 KB prompt) hit the 270 s
+#     watchdog while the same call finished fine at 560 s. Note: this now exceeds
+#     the peer-conversation contract's documented "5 minutes" — the adapter's own
+#     timeout no longer fires before the contract mark.
 #
 # Exit codes (same contract as kimi/codex-peer-adapter.sh, §0в.1):
 #   0 — OK
@@ -233,7 +235,7 @@ kill_tree() {
   kill -TERM "$pid" 2>/dev/null || true
 }
 
-GROK_TIMEOUT_SEC="${GROK_PEER_TIMEOUT_SEC:-270}"
+GROK_TIMEOUT_SEC="${GROK_PEER_TIMEOUT_SEC:-560}"
 GROK_CALL_START=$(date -u +%s)
 GROK_TIMEOUT_MARKER="$TMP_ROOT/.watchdog-fired"
 OUT_FILE="$TMP_ROOT/grok-output.txt"
