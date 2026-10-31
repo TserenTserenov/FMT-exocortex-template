@@ -1,0 +1,39 @@
+# Белый список публичного снимка терминов (WP-5 Ф67, решение D').
+# Строка графа вне этого списка в снимок для iwesys не попадает.
+# Добавить домен — правка этого файла до первого боевого снимка, не правка кода.
+schema: glossary-snapshot-allowlist/1
+levels:
+  - zp
+  - fpf
+  - pack
+# Домен pack-понятия — первый сегмент кода (concept-indexer).
+# Префиксы сняты с id паков и с фильтра шлюза (MIM, DP, PD, ECO).
+pack_domains:
+  - AR
+  - AS
+  - DP
+  - ECO
+  - EM
+  - LS
+  - MIM
+  - PD
+  - SA
+  - VR
+foundation:
+  - level: zp
+    code_prefixes:
+      - "ZP."
+    domains:
+      - ZP
+    allow_null_domain: true
+  - level: fpf
+    code_prefixes:
+      - "U."
+      - "FPF."
+    domains:
+      - U
+      - FPF
+    allow_null_domain: true
+# Заведомо закрытый код. Если он есть во входной выгрузке, снимок не пишется.
+canary_codes:
+  - CANARY.CLOSED.001

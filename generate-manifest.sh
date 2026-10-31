@@ -75,6 +75,7 @@ EXCLUDED_SCRIPTS=(
     "scripts/check-manifest-rename-coverage.py" # CI-only: validate-template.yml
     "scripts/verify-template-integrity.sh"      # локальное зеркало CI-гейта для контрибьюторов шаблона, не для пользователей
     "scripts/translate.py"                      # CI-only: translate-sync.yml (синхронизация EN-доков автором шаблона)
+    "scripts/export-glossary-snapshot.py"       # CI-only: снимок терминов графа для перевода (WP-5 Ф67)
     "scripts/delivery_checks.py"                # CI-only: translate-sync.yml
     "scripts/release-notice-build.py"           # CI-only: notify-update.yml (анонс выпуска, WP-529)
     "scripts/audit-ad-hoc-roles.py"             # нет ссылок ни из одного доставляемого артефакта
@@ -88,6 +89,7 @@ EXCLUDED_SCRIPTS=(
 
 EXCLUDED_EXACT=(
     "promotion-status.yaml"
+    "translation/glossary-snapshot-allowlist.yaml"  # CI-only: белый список снимка терминов (WP-5 Ф67)
     "scripts/guide-kit-sync-state.yaml"         # provenance vendored-копии guide-kit/ — нужен CI drift-check, не пользователям
     "${EXCLUDED_SCRIPTS[@]}"
 )
