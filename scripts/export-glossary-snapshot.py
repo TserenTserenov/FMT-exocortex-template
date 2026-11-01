@@ -4,8 +4,9 @@
 Вход — JSON с полями шлюза (name_en, name_en_status_raw, name_en_publishable,
 name_en_publishable_rules_version). Скрипт не ходит в базу и в сеть.
 В снимок попадают только активные понятия из белого списка, с английским
-именем статуса «ок» и признаком публикации. Канарейка закрытого кода
-останавливает выгрузку и не оставляет файл.
+именем статуса «ок» и признаком публикации. Канарейка AR.D.005 обязана
+быть во входе и отсеяться фильтром. Нет её на входе или она попала в
+снимок — файл не пишется.
 
 Пока боевой снимок не зафиксирован коммитом, translate.py читает
 translation/glossary-v0.1.csv.
@@ -108,8 +109,6 @@ def classify_row(row: dict, allowlist: dict) -> tuple[str, str]:
     code = row["code"]
     if not isinstance(code, str) or not code.strip():
         return "reject", "empty-code"
-    if code in allowlist["canary_codes"]:
-        return "reject", "canary"
     if not isinstance(row["name_en_publishable"], bool):
         return "reject", "publishable-not-bool"
     if row["status"] != "active":
@@ -144,8 +143,8 @@ def build_rows(payload: dict, allowlist: dict) -> tuple[list[dict], Counter, str
         raise SnapshotError("пустой список строк: снимок не пишется")
     codes = [row.get("code") if isinstance(row, dict) else None for row in rows]
     for canary in allowlist["canary_codes"]:
-        if canary in codes:
-            raise SnapshotError(f"канарейка закрытого кода во входе: {canary}")
+        if canary not in codes:
+            raise SnapshotError(f"канарейки нет на входе: {canary}")
 
     included: list[dict] = []
     excluded: Counter = Counter()

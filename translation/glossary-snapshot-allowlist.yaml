@@ -7,18 +7,14 @@ levels:
   - fpf
   - pack
 # Домен pack-понятия — первый сегмент кода (concept-indexer).
-# Префиксы сняты с id паков и с фильтра шлюза (MIM, DP, PD, ECO).
+# Решение пилота 01.11: DP, ECO, MIM, LS, PD.
+# AR, AS, EM, SA, VR сняты: репозитории закрытые.
 pack_domains:
-  - AR
-  - AS
   - DP
   - ECO
-  - EM
-  - LS
   - MIM
+  - LS
   - PD
-  - SA
-  - VR
 foundation:
   - level: zp
     code_prefixes:
@@ -34,6 +30,8 @@ foundation:
       - U
       - FPF
     allow_null_domain: true
-# Заведомо закрытый код. Если он есть во входной выгрузке, снимок не пишется.
+# Закрытый код AR.D.005 (PACK-agent-rules). Решение пилота 01.11.
+# Код обязан быть во входе и обязан отсеяться фильтром.
+# Нет кода на входе или код попал в снимок — файл не пишется.
 canary_codes:
-  - CANARY.CLOSED.001
+  - AR.D.005
