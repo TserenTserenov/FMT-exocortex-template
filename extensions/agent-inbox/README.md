@@ -49,7 +49,7 @@
 | `evolution-cron.md` | Weekly evolution правила Pack (WP-272 паттерн) |
 | `soak-verify.md` | Soak-verify сервиса после deploy (WP-277 паттерн) |
 
-## Жизненный цикл task'а
+## Состояния task'а
 
 ```
 pending ─→ assigned ─→ in_progress ─→ completed | failed | blocked
