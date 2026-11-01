@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "fcd624a4431779ee2c4965f6970217edff8c6c34f6efefb7a87230d66a3a4f71"
+      "sha256": "2d574aec06c8984abf2de38fa6f8fb95f57c8f6d2e4aa01b47cc4b4da6115852"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7c5a395761aaf57f170cf49d9f8b42175305d87d4aae9bad38592e62d9bd8d0d"
+      "sha256": "078454974082ab4e4cbf8349c1cfe3dcfb74f09128cf13b27d168d18a9306277"
     },
     {
       "path": "CLAUDE.md",
@@ -3409,7 +3409,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "ebf1f22f93aee02d848c197b5976922605edd6829068f0de0dd4156379abd517"
+      "sha256": "93966f95aec2a06603fb8cfd881c3d8ee28a4ee4f4139041ce40d5c3d8a508da"
     }
   ],
   "excluded_paths": [
@@ -3696,6 +3696,7 @@
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
     "setup/test-strategist-notereview-migration.py",
+    "setup/test-update-author-readonly-mirror.sh",
     "setup/test-update-channel-enum.sh",
     "setup/test-update-check-verdict.sh",
     "setup/test-update-ds-publish-delivery.sh",

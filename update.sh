@@ -1326,11 +1326,36 @@ report_author_skip() {
     return 0
 }
 
+# Author hosts can keep workspace .claude/ subdirectories as a read-only mirror
+# delivered from the author's own config repository (e.g. hooks/, skills/,
+# scripts/ are r-x, refreshed by another sync). A NEW template file there used
+# to hit `cp: Permission denied` and abort the whole run with the
+# .update-incomplete marker left behind — the marker of 22.10 then blocked the
+# morning Strategist for ten days (WP-568 F11). In author_mode such a target is
+# skipped with one line; outside author_mode a read-only workspace stays a real
+# error, as before.
+AUTHOR_SKIP_READONLY=0
+AUTHOR_READONLY_SEEN=$'\n'   # paths already reported: Step 6 and repair_pass meet the same file in one run
+skip_author_readonly_target() {  # <fpath> <dst>; 0 = skipped, caller continues
+    local fpath="$1" dst="$2" dir
+    is_author_mode || return 1
+    dir=$(dirname "$dst")
+    while [ ! -d "$dir" ] && [ "$dir" != "/" ] && [ "$dir" != "." ]; do
+        dir=$(dirname "$dir")
+    done
+    [ -w "$dir" ] && [ -x "$dir" ] && return 1
+    case "$AUTHOR_READONLY_SEEN" in *$'\n'"$fpath"$'\n'*) return 0 ;; esac
+    AUTHOR_READONLY_SEEN="$AUTHOR_READONLY_SEEN$fpath"$'\n'
+    echo "  ⚠ $fpath — author_mode: каталог рабочей копии только для чтения ($dir), новый файл не создан; доставьте его своим источником этого каталога"
+    AUTHOR_SKIP_READONLY=$((AUTHOR_SKIP_READONLY + 1))
+    return 0
+}
+
 report_author_skip_summary() {
-    local total=$((AUTHOR_SKIP_AUTHORED + AUTHOR_SKIP_STALE + AUTHOR_SKIP_UNKNOWN))
+    local total=$((AUTHOR_SKIP_AUTHORED + AUTHOR_SKIP_STALE + AUTHOR_SKIP_UNKNOWN + AUTHOR_SKIP_READONLY))
     [ "$total" -gt 0 ] || return 0
     echo ""
-    echo "  author_mode: пропущено $total файл(ов) — авторских $AUTHOR_SKIP_AUTHORED, отставших $AUTHOR_SKIP_STALE, неизвестно $AUTHOR_SKIP_UNKNOWN"
+    echo "  author_mode: пропущено $total файл(ов) — авторских $AUTHOR_SKIP_AUTHORED, отставших $AUTHOR_SKIP_STALE, неизвестно $AUTHOR_SKIP_UNKNOWN, в каталогах только для чтения $AUTHOR_SKIP_READONLY"
     if [ "$AUTHOR_SKIP_STALE" -gt 0 ] && [ "$REFRESH_STALE" != "true" ]; then
         echo "  Отставшие можно обновить автоматически (с бэкапом): bash update.sh --refresh-stale"
     fi
@@ -4225,6 +4250,7 @@ for entry in data.get('files', []):
             .claude/skills/*|.claude/hooks/*|.claude/rules/*|.claude/rules-lazy/*|.claude/lib/*|.claude/bin/*|.claude/config/*|.claude/detectors/*|.claude/scripts/*|.claude/agents/*|.claude/styles/*|.claude/templates/*|.claude/*.yaml|.claude/*.yml|.claude/*.example)
                 dst="$WORKSPACE_DIR/$fpath"
                 if [ ! -f "$dst" ]; then
+                    skip_author_readonly_target "$fpath" "$dst" && continue
                     mkdir -p "$(dirname "$dst")"
                     if copy_platform_file_preserving_user_space "$SCRIPT_DIR/$fpath" "$dst" "$fpath"; then
                         case "$fpath" in *.sh|.claude/bin/*) chmod +x "$dst" ;; esac
@@ -6485,6 +6511,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
                 report_author_skip "$f" "$dst" templated
                 continue
             fi
+            skip_author_readonly_target "$f" "$dst" && continue
             mkdir -p "$(dirname "$dst")"
             # 1. Extract USER_SECTION from workspace before overwriting
             if [ -f "$dst" ]; then
@@ -6531,6 +6558,7 @@ for f in "${NEW_FILES[@]}" "${UPDATED_FILES[@]}"; do
                 report_author_skip "$f" "$dst"
                 continue
             fi
+            skip_author_readonly_target "$f" "$dst" && continue
             mkdir -p "$(dirname "$dst")"
             if copy_platform_file_preserving_user_space "$src" "$dst" "$f"; then
                 # .claude/bin holds extension-less executables (guarded-rm, issue #940)
