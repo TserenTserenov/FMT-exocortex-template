@@ -141,28 +141,40 @@ def test_publishable_flag_must_match_ok_status():
         )
 
 
-def test_english_name_equal_to_code_writes_nothing(tmp_path: Path):
+def test_english_name_equal_to_code_is_dropped_and_snapshot_is_written(tmp_path: Path):
     allowlist = MOD.load_allowlist(ALLOWLIST)
     body = payload(
+        row(),
         row(code="ECO.FM.001", name_ru="Ошибка", name_en="ECO.FM.001", domain="ECO"),
         canary_row(),
     )
-    with pytest.raises(MOD.SnapshotError, match="equals-code"):
-        MOD.build_rows(body, allowlist)
+    included, excluded, _ = MOD.build_rows(body, allowlist)
+    assert [item["code"] for item in included] == ["DP.METHOD.049"]
+    assert excluded["equals-code"] == 1
     source = tmp_path / "in.json"
     source.write_text(json.dumps(body), encoding="utf-8")
     out = tmp_path / "glossary-snapshot.csv"
     result = _run_cli(source, ALLOWLIST, out)
-    assert result.returncode == 2
-    assert "equals-code" in result.stderr
-    assert not out.exists()
-    assert not out.with_suffix(".meta.json").exists()
+    assert result.returncode == 0, result.stderr
+    text = out.read_text(encoding="utf-8")
+    assert "Method" in text
+    assert "ECO.FM.001" not in text
+    assert out.with_suffix(".meta.json").exists()
 
 
-def test_english_name_that_looks_like_a_code_aborts():
+def test_english_name_that_looks_like_a_code_is_dropped():
     allowlist = MOD.load_allowlist(ALLOWLIST)
-    with pytest.raises(MOD.SnapshotError, match="looks-like-code"):
-        MOD.build_rows(payload(row(name_en="LS.BC.001"), canary_row()), allowlist)
+    included, excluded, _ = MOD.build_rows(
+        payload(
+            row(code="U.Entity", name_ru="Сущность", name_en="Entity", level="fpf", domain=None),
+            row(code="DP.SC.045", name_ru="Анализ", name_en="TOC"),
+            row(code="DP.METHOD.050", name_ru="Другой", name_en="LS.BC.001"),
+            canary_row(),
+        ),
+        allowlist,
+    )
+    assert [item["code"] for item in included] == ["DP.SC.045", "U.Entity"]
+    assert excluded["looks-like-code"] == 1
 
 
 def test_cyrillic_english_name_aborts():

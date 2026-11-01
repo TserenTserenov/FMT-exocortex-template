@@ -7,7 +7,7 @@ name_en_publishable_rules_version). Скрипт не ходит в базу и 
 именем статуса «ок» и признаком публикации. Канарейка VR.FM.002 обязана
 быть во входе и отсеяться фильтром. Нет её на входе или она попала в
 снимок — файл не пишется. Английское имя, равное коду или похожее на код,
-тоже останавливает выгрузку без файла.
+в снимок не берётся и считается среди отсеянных; из-за такой строки файл пишется.
 
 Пока боевой снимок не зафиксирован коммитом, translate.py читает
 translation/glossary-v0.1.csv.
@@ -128,6 +128,8 @@ def classify_row(row: dict, allowlist: dict) -> tuple[str, str]:
     if row["name_en_status_raw"] != PUBLISHABLE_STATUS:
         return "reject", "publishable-contradiction"
     name_error = english_name_error(row["name_en"], code)
+    if name_error in ("equals-code", "looks-like-code"):
+        return "exclude", name_error
     if name_error:
         return "reject", "english:" + name_error
     if not isinstance(row["name_ru"], str) or not row["name_ru"].strip():
