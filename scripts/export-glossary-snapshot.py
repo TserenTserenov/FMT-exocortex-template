@@ -4,9 +4,10 @@
 Вход — JSON с полями шлюза (name_en, name_en_status_raw, name_en_publishable,
 name_en_publishable_rules_version). Скрипт не ходит в базу и в сеть.
 В снимок попадают только активные понятия из белого списка, с английским
-именем статуса «ок» и признаком публикации. Канарейка AR.D.005 обязана
+именем статуса «ок» и признаком публикации. Канарейка VR.FM.002 обязана
 быть во входе и отсеяться фильтром. Нет её на входе или она попала в
-снимок — файл не пишется.
+снимок — файл не пишется. Английское имя, равное коду или похожее на код,
+в снимок не берётся и считается среди отсеянных; из-за такой строки файл пишется.
 
 Пока боевой снимок не зафиксирован коммитом, translate.py читает
 translation/glossary-v0.1.csv.
@@ -29,6 +30,7 @@ import yaml
 SCHEMA = "glossary-snapshot/1"
 PUBLISHABLE_STATUS = "ok"
 CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
+CODE_LIKE_RE = re.compile(r"^[A-Z][A-Z0-9]*(?:\.[A-Z0-9]+)+$")
 REQUIRED_KEYS = (
     "code",
     "name_ru",
@@ -60,7 +62,7 @@ def load_allowlist(path: Path) -> dict:
     return data
 
 
-def english_name_error(name: object) -> str | None:
+def english_name_error(name: object, code: object = None) -> str | None:
     if not isinstance(name, str):
         return "not-a-string"
     text = name.strip()
@@ -74,6 +76,10 @@ def english_name_error(name: object) -> str | None:
         return "cyrillic"
     if any(ord(ch) < 32 for ch in text):
         return "control-char"
+    if isinstance(code, str) and text == code:
+        return "equals-code"
+    if CODE_LIKE_RE.fullmatch(text):
+        return "looks-like-code"
     return None
 
 
@@ -121,7 +127,9 @@ def classify_row(row: dict, allowlist: dict) -> tuple[str, str]:
         return "exclude", "not-publishable"
     if row["name_en_status_raw"] != PUBLISHABLE_STATUS:
         return "reject", "publishable-contradiction"
-    name_error = english_name_error(row["name_en"])
+    name_error = english_name_error(row["name_en"], code)
+    if name_error in ("equals-code", "looks-like-code"):
+        return "exclude", name_error
     if name_error:
         return "reject", "english:" + name_error
     if not isinstance(row["name_ru"], str) or not row["name_ru"].strip():

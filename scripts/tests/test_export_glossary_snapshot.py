@@ -42,7 +42,7 @@ def row(**overrides):
 
 
 def canary_row():
-    return row(code="AR.D.005", name_ru="Отложить", name_en="Defer", domain="AR")
+    return row(code="VR.FM.002", name_ru="Ложная уверенность", name_en="False Confidence", domain="VR")
 
 
 def payload(*rows, as_of="2026-10-31T00:00:00Z"):
@@ -69,7 +69,7 @@ def test_public_row_is_included_and_closed_levels_are_not(tmp_path: Path):
     assert excluded["level"] == 1
     assert excluded["not-publishable"] == 1
     assert excluded["domain"] == 2
-    assert "AR.D.005" not in [item["code"] for item in included]
+    assert "VR.FM.002" not in [item["code"] for item in included]
     out = tmp_path / "glossary-snapshot.csv"
     meta = MOD.export_snapshot(payload(row(), canary_row()), allowlist, ALLOWLIST, out)
     assert meta["schema"] == "glossary-snapshot/1"
@@ -78,7 +78,7 @@ def test_public_row_is_included_and_closed_levels_are_not(tmp_path: Path):
     assert out.with_suffix(".meta.json").exists()
     text = out.read_text(encoding="utf-8")
     assert "Method" in text
-    assert "AR.D.005" not in text
+    assert "VR.FM.002" not in text
 
 
 def _run_cli(source: Path, allowlist: Path, out: Path) -> subprocess.CompletedProcess[str]:
@@ -115,12 +115,12 @@ def test_canary_missing_from_input_writes_nothing(tmp_path: Path):
 def test_canary_that_reaches_snapshot_writes_nothing(tmp_path: Path):
     allowlist = MOD.load_allowlist(ALLOWLIST)
     leaked = dict(allowlist)
-    leaked["pack_domains"] = list(allowlist["pack_domains"]) + ["AR"]
+    leaked["pack_domains"] = list(allowlist["pack_domains"]) + ["VR"]
     body = payload(row(), canary_row())
     with pytest.raises(MOD.SnapshotError, match="попала в снимок"):
         MOD.build_rows(body, leaked)
     allowlist_path = tmp_path / "allowlist.yaml"
-    text = ALLOWLIST.read_text(encoding="utf-8").replace("  - PD\n", "  - PD\n  - AR\n")
+    text = ALLOWLIST.read_text(encoding="utf-8").replace("  - PD\n", "  - PD\n  - VR\n")
     allowlist_path.write_text(text, encoding="utf-8")
     source = tmp_path / "in.json"
     source.write_text(json.dumps(body), encoding="utf-8")
@@ -139,6 +139,42 @@ def test_publishable_flag_must_match_ok_status():
             payload(row(name_en_status_raw="pending", name_en_publishable=True), canary_row()),
             allowlist,
         )
+
+
+def test_english_name_equal_to_code_is_dropped_and_snapshot_is_written(tmp_path: Path):
+    allowlist = MOD.load_allowlist(ALLOWLIST)
+    body = payload(
+        row(),
+        row(code="ECO.FM.001", name_ru="Ошибка", name_en="ECO.FM.001", domain="ECO"),
+        canary_row(),
+    )
+    included, excluded, _ = MOD.build_rows(body, allowlist)
+    assert [item["code"] for item in included] == ["DP.METHOD.049"]
+    assert excluded["equals-code"] == 1
+    source = tmp_path / "in.json"
+    source.write_text(json.dumps(body), encoding="utf-8")
+    out = tmp_path / "glossary-snapshot.csv"
+    result = _run_cli(source, ALLOWLIST, out)
+    assert result.returncode == 0, result.stderr
+    text = out.read_text(encoding="utf-8")
+    assert "Method" in text
+    assert "ECO.FM.001" not in text
+    assert out.with_suffix(".meta.json").exists()
+
+
+def test_english_name_that_looks_like_a_code_is_dropped():
+    allowlist = MOD.load_allowlist(ALLOWLIST)
+    included, excluded, _ = MOD.build_rows(
+        payload(
+            row(code="U.Entity", name_ru="Сущность", name_en="Entity", level="fpf", domain=None),
+            row(code="DP.SC.045", name_ru="Анализ", name_en="TOC"),
+            row(code="DP.METHOD.050", name_ru="Другой", name_en="LS.BC.001"),
+            canary_row(),
+        ),
+        allowlist,
+    )
+    assert [item["code"] for item in included] == ["DP.SC.045", "U.Entity"]
+    assert excluded["looks-like-code"] == 1
 
 
 def test_cyrillic_english_name_aborts():
