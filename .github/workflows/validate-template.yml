@@ -835,6 +835,12 @@ jobs:
       - name: Run update.sh modified-hook test
         run: bash setup/test-update-modified-hook.sh
 
+      # WP-568 F11: an author host whose workspace .claude/ dirs are a read-only
+      # mirror must finish the update (new file skipped with a warning) instead of
+      # aborting on `cp: Permission denied` and leaving .update-incomplete behind.
+      - name: Run update.sh author read-only mirror test
+        run: bash setup/test-update-author-readonly-mirror.sh
+
       # WP-529 Ф245: every write command in update.sh belongs to a block that
       # setup/update-write-sites.tsv classifies; the rollback plan is built from it.
       - name: Run update.sh write-sites registry test
