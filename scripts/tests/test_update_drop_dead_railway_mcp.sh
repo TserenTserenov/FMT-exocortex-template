@@ -218,7 +218,17 @@ done
 mkdir -p "$TMP/none"
 write_mcp "$TMP/none/f.json" "$HOME_FAKE/$WRAPPER_REL"
 cp "$TMP/none/f.json" "$TMP/none/f.orig"
-out=$(PATH="$NOTOOLS" drop_dead_railway_mcp "$TMP/none/f.json" "$HOME_FAKE")
+# Отдельный экземпляр bash, а не PATH=... перед вызовом функции: в текущей
+# оболочке jq уже запомнен в таблице путей (hash) после ветки jq выше, и на
+# macOS (/bin/bash 3.2) суженный PATH его не прятал — шаг уходил в ветку jq
+# (найдено CI на macOS в запросе #1409). Новый bash таблицу не наследует.
+printf '%s\n' "$BLOCK" > "$TMP/block.sh"
+out=$(PATH="$NOTOOLS" "$BASH" -c '
+    . "$1"
+    PY_BIN=""
+    py_available() { return 1; }
+    drop_dead_railway_mcp "$2" "$3"
+' _ "$TMP/block.sh" "$TMP/none/f.json" "$HOME_FAKE")
 if cmp -s "$TMP/none/f.json" "$TMP/none/f.orig" && printf '%s' "$out" | grep -q 'нет ни python3, ни jq'; then
     pass "без Python и jq — шаг пропущен с сообщением, файл не тронут"
 else

@@ -73,8 +73,8 @@ EXCLUDED_PATTERNS=(
 EXCLUDED_SCRIPTS=(
     "scripts/check-component-parity.sh"        # CI-only: validate-template.yml + verify-template-integrity.sh
     "scripts/check-manifest-rename-coverage.py" # CI-only: validate-template.yml
-    "scripts/check-copy-pairs.sh"               # CI-only: validate-template.yml (WP-7, чистка шаблона)
-    "scripts/check-shipped-config-secrets.sh"   # CI-only: validate-template.yml (WP-7, чистка шаблона)
+    "scripts/check-copy-pairs.sh"               # CI-only: validate-template.yml и scripts/tests/test_template_hygiene_checks.sh (WP-7, чистка шаблона)
+    "scripts/check-shipped-config-secrets.sh"   # CI-only: validate-template.yml и scripts/tests/test_template_hygiene_checks.sh (WP-7, чистка шаблона)
     "scripts/verify-template-integrity.sh"      # локальное зеркало CI-гейта для контрибьюторов шаблона, не для пользователей
     "scripts/translate.py"                      # CI-only: translate-sync.yml (синхронизация EN-доков автором шаблона)
     "scripts/export-glossary-snapshot.py"       # CI-only: снимок терминов графа для перевода (WP-5 Ф67)

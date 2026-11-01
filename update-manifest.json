@@ -1273,7 +1273,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "eee0d45eb4d81caab04329e3a99d5bbd752d284c22ebd2c3b81fd91a0dc89dd5"
+      "sha256": "b43f746c564ef0fac08a7f7e00831ef72991acb04276750328c39d84efde69d0"
     },
     {
       "path": "guide-kit/.gitignore",
