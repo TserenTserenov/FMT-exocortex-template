@@ -12,6 +12,8 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 TEMPLATE="$ROOT/roles/synchronizer/scripts/templates/extractor.sh"
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
+# The template records the last message per scenario; keep that out of $HOME.
+export IWE_NOTIFY_STATE_DIR="$TMP/notify-state"
 fails=0
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*" >&2; fails=$((fails + 1)); }
