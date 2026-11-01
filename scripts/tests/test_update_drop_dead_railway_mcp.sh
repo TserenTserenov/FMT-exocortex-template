@@ -175,7 +175,19 @@ JSON
         fail "$mode: railway со своей командой удалён"
     fi
 
-    # 6. Временные файлы не остаются рядом с .mcp.json.
+    # 6. .mcp.json — ярлык: ни ярлык, ни его цель не трогаются, есть сообщение.
+    write_mcp "$dir/target.json" "$HOME_FAKE/$WRAPPER_REL"
+    cp "$dir/target.json" "$dir/target.orig"
+    ln -s target.json "$dir/link.json"
+    out=$(drop_dead_railway_mcp "$dir/link.json" "$HOME_FAKE")
+    if [ -L "$dir/link.json" ] && cmp -s "$dir/target.json" "$dir/target.orig" \
+       && printf '%s' "$out" | grep -q 'ярлык, автоматическая чистка пропущена'; then
+        pass "$mode: .mcp.json-ярлык не подменён обычным файлом, цель не тронута, есть сообщение"
+    else
+        fail "$mode: .mcp.json-ярлык — ярлык=$([ -L "$dir/link.json" ] && echo да || echo нет), вывод: $out"
+    fi
+
+    # 7. Временные файлы не остаются рядом с .mcp.json.
     if ls "$dir"/*.railway.* >/dev/null 2>&1; then
         fail "$mode: рядом с .mcp.json остались временные файлы"
     else

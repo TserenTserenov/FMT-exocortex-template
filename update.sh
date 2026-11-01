@@ -6751,6 +6751,15 @@ drop_dead_railway_mcp() {
     grep -qF 'mcp-railway.sh' "$mcp_file" 2>/dev/null || return 0
     [ -e "$real_cmd" ] && return 0
 
+    # .mcp.json — ярлык (например, из менеджера домашних файлов): mv заменил бы
+    # ярлык обычным файлом и молча сломал бы схему пользователя. Не трогаем,
+    # говорим, что убрать вручную.
+    if [ -L "$mcp_file" ]; then
+        echo "  ○ .mcp.json — ярлык, автоматическая чистка пропущена: в нём осталась запись railway без файла запуска."
+        echo "    Удалите сервер с командой .../.secrets/mcp-railway.sh в исходном файле, на который ведёт ярлык."
+        return 0
+    fi
+
     tmp=$(mktemp "${mcp_file}.railway.XXXXXX") || {
         echo "  ✗ .mcp.json: не удалось создать временный файл, ext-railway не проверен"
         return 0
