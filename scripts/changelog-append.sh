@@ -150,14 +150,22 @@ awk '
     !skip                { print }
 ' "$CHANGELOG" > "$tmp"
 
+# Пустые строки в конце шапки снимаются перед вставкой: удаление старого блока
+# выше оставляет пустую строку, стоявшую перед ним, а `echo` ниже добавляет
+# свою. Без этого каждый запуск прибавлял одну пустую строку перед [Unreleased]
+# (к ноябрю 2026 их накопилось 125). Ровно одна пустая строка — от `echo`.
+strip_trailing_blank_lines() {
+    awk '/^[[:space:]]*$/ { blank++; next } { for (i = 0; i < blank; i++) print ""; blank = 0; print }'
+}
+
 # Препендить новый блок после заголовка (до первой строки ## [)
 header_end=$(grep -n '^## \[' "$tmp" | head -1 | cut -d: -f1)
 if [[ -z "$header_end" ]]; then
     # Б1: CHANGELOG без именованных версий — корректная запись
-    { cat "$tmp"; echo; printf '%s\n' "$new_block"; } > "$CHANGELOG"
+    { strip_trailing_blank_lines < "$tmp"; echo; printf '%s\n' "$new_block"; } > "$CHANGELOG"
 else
     head_lines=$((header_end - 1))
-    { head -n "$head_lines" "$tmp"; echo; printf '%s\n' "$new_block"; tail -n +"$header_end" "$tmp"; } > "$CHANGELOG"
+    { head -n "$head_lines" "$tmp" | strip_trailing_blank_lines; echo; printf '%s\n' "$new_block"; tail -n +"$header_end" "$tmp"; } > "$CHANGELOG"
 fi
 
 rm -f "$tmp"

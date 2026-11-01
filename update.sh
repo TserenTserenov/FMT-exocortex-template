@@ -6724,6 +6724,95 @@ if [ -f "$MCP_WORKSPACE" ] && grep -qF '{{HOME_DIR}}' "$MCP_WORKSPACE" 2>/dev/nu
     fi
 fi
 
+# WP-7 (чистка шаблона, 2026-11-01): до этого выпуска шаблонный .mcp.json
+# поставлял авторский сервер ext-railway, чья команда — обёртка из авторского
+# каталога секретов. У пользователя этого файла нет, сервер падал при каждом
+# запуске агента. Шаг 6c выше сохраняет все серверы пользователя, поэтому одно
+# удаление из шаблона лечит только новые установки; здесь — миграция для
+# уже установленных копий.
+#
+# Правило одно на все случаи: запись удаляется, только если её команда ведёт
+# на обёртку railway в домашней папке (с подставленным путём или с
+# неподставленной заготовкой) И этого файла на месте нет. Есть файл — человек
+# подключил railway сам, запись остаётся. Существование проверяет bash, а не
+# Python: на Windows нативный Python не понимает пути Git Bash вида /c/Users/...
+# Шаг стоит ПОСЛЕ подстановки домашней папки и ДО вливания mcp-user.json:
+# railway, который человек сам описал в extensions/mcp-user.json, вольётся
+# обратно. Python или jq — что есть; нет ни того, ни другого — шаг пропускается
+# с сообщением (как мёрж ниже): резать JSON заменой текста ненадёжно.
+# BEGIN-TESTABLE: drop-dead-railway-mcp
+drop_dead_railway_mcp() {
+    local mcp_file="$1" home_dir="${2%/}"
+    local tpl_cmd='{{HOME_DIR}}/.secrets/mcp-railway.sh'
+    local real_cmd="$home_dir/.secrets/mcp-railway.sh"
+    local tmp removed
+
+    [ -f "$mcp_file" ] || return 0
+    grep -qF 'mcp-railway.sh' "$mcp_file" 2>/dev/null || return 0
+    [ -e "$real_cmd" ] && return 0
+
+    tmp=$(mktemp "${mcp_file}.railway.XXXXXX") || {
+        echo "  ✗ .mcp.json: не удалось создать временный файл, ext-railway не проверен"
+        return 0
+    }
+    if py_available; then
+        removed=$($PY_BIN - "$mcp_file" "$tmp" "$tpl_cmd" "$real_cmd" <<'PY'
+import json, sys
+
+src, dst, tpl_cmd, real_cmd = sys.argv[1:5]
+with open(src, encoding='utf-8') as f:
+    data = json.load(f)
+servers = data.get('mcpServers')
+removed = []
+if isinstance(servers, dict):
+    for name, cfg in list(servers.items()):
+        if isinstance(cfg, dict) and cfg.get('command') in (tpl_cmd, real_cmd):
+            del servers[name]
+            removed.append(name)
+if removed:
+    with open(dst, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write('\n')
+print(' '.join(removed))
+PY
+        ) || removed="__error__"
+    elif command -v jq >/dev/null 2>&1; then
+        # Как в Python-ветке: только записи-объекты; значение другого типа
+        # (null, строка) фильтр не трогает, а не удаляет заодно.
+        local jq_match='(.value | type) == "object" and (.value.command == $tpl or .value.command == $real)'
+        removed=$(jq -r --arg tpl "$tpl_cmd" --arg real "$real_cmd" \
+            "[(.mcpServers // {}) | objects | to_entries[] | select($jq_match) | .key] | join(\" \")" \
+            "$mcp_file" 2>/dev/null) || removed="__error__"
+        if [ -n "$removed" ] && [ "$removed" != "__error__" ]; then
+            jq --arg tpl "$tpl_cmd" --arg real "$real_cmd" \
+                ".mcpServers |= with_entries(select(($jq_match) | not))" \
+                "$mcp_file" > "$tmp" 2>/dev/null || removed="__error__"
+        fi
+    else
+        rm -f "$tmp"
+        echo "  ○ .mcp.json: нет ни python3, ни jq — проверка устаревшего ext-railway пропущена"
+        echo "    Если агент сообщает, что ext-railway не запускается, удалите этот сервер из .mcp.json вручную."
+        return 0
+    fi
+
+    if [ "$removed" = "__error__" ]; then
+        rm -f "$tmp"
+        echo "  ✗ .mcp.json: не удалось разобрать файл, ext-railway не проверен"
+    elif [ -n "$removed" ]; then
+        if mv "$tmp" "$mcp_file"; then
+            echo "  ✓ .mcp.json: убран неработающий сервер railway ($removed) — файла его запуска нет в домашней папке"
+        else
+            rm -f "$tmp"
+            echo "  ✗ .mcp.json: не удалось записать файл, ext-railway не убран"
+        fi
+    else
+        rm -f "$tmp"
+    fi
+    return 0
+}
+# END-TESTABLE: drop-dead-railway-mcp
+drop_dead_railway_mcp "$MCP_WORKSPACE" "${ENV_HOME_DIR:-$HOME}"
+
 # Merge extensions/mcp-user.json into workspace .mcp.json (always, if both exist)
 if [ -f "$MCP_WORKSPACE" ] && [ -f "$MCP_USER" ]; then
     if command -v jq >/dev/null 2>&1; then

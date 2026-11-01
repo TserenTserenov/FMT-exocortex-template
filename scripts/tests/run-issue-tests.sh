@@ -38,6 +38,9 @@ ADDITIONAL_ISSUE_TESTS=(
     "scripts/tests/test_1230_publish.sh"
     "scripts/tests/test_1231_artifactor.sh"
     "scripts/tests/test_update_install_path_guard_provenance.sh"
+    "scripts/tests/test_changelog_append_blank_lines.sh"
+    "scripts/tests/test_update_drop_dead_railway_mcp.sh"
+    "scripts/tests/test_template_hygiene_checks.sh"
 )
 
 run_shell_test() {
