@@ -23,6 +23,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.41.11] — 2026-11-01
+
 ### Added
 
 - [optional] `scripts/fetch-glossary-concepts.py`: обход инструмента шлюза знаний `concept_list` по сервисному ключу (переменная окружения `GLOSSARY_EXPORTER_SERVICE_SECRET`) готовит вход для `export-glossary-snapshot.py`. Перед записью сверяет контрольные коды эталона и полноту со счётчиками `graph_stats`; расхождение — повтор обхода до трёх раз, затем отказ без файла. Первый боевой снимок `translation/glossary-snapshot.csv` (495 терминов из 5023 видимых понятий) и его паспорт `.meta.json` лежат в репозитории; `translate.py` на него пока не переключён (WP-617, #1412).
