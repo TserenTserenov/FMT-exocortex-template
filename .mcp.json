@@ -4,11 +4,6 @@
     "iwe-knowledge": {
       "type": "http",
       "url": "https://mcp.aisystant.com/mcp"
-    },
-
-    "ext-railway": {
-      "command": "{{HOME_DIR}}/.secrets/mcp-railway.sh",
-      "args": []
     }
 
   }

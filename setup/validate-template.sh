@@ -368,12 +368,26 @@ HARDCODE_USER_PATH_RE='/Users/\|C:\\Users\\'
 # existing "# ... e.g." exclusion for POSIX comments, just not restricted to
 # `#`-comments since this one lives in markdown prose, not a script comment.
 HARDCODE_USER_PATH_EXCLUDE_RE='/Users/\.\.\./|C:\\Users\\\.\.\.|# .*(/Users/|C:\\Users\\|e\.g\.)|C:\\Users\\(твоё-имя|<[^>]+>)'
+# Файлы, где /Users/ — не захардкоженный путь, а шаблон поиска таких путей
+# (сторож настроек по умолчанию WP-7 и его тест). Исключение по файлу, не по
+# строке: строковое исключение пропустило бы такой же текст в любом другом файле.
+# Один список путей от корня шаблона для обоих режимов: staged сверяет путь
+# целиком (^...$), pristine отбрасывает строки grep именно этих файлов, а не
+# любых файлов с тем же именем в других каталогах.
+HARDCODE_USER_PATH_SKIP_FILES=(scripts/check-shipped-config-secrets.sh scripts/tests/test_template_hygiene_checks.sh)
+HARDCODE_USER_PATH_SKIP_FILES_RE=''
+HARDCODE_USER_PATH_SKIP_GREP=()
+for _skip in "${HARDCODE_USER_PATH_SKIP_FILES[@]}"; do
+    HARDCODE_USER_PATH_SKIP_FILES_RE="${HARDCODE_USER_PATH_SKIP_FILES_RE:+$HARDCODE_USER_PATH_SKIP_FILES_RE|}^$(printf '%s' "$_skip" | sed 's/[.]/\\./g')\$"
+    HARDCODE_USER_PATH_SKIP_GREP+=(-e "$TEMPLATE_DIR/$_skip:")
+done
+unset _skip
 echo -n "[2/5] Hardcoded /Users/ or C:\\Users\\ paths... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — путь подставлен setup'ом)"
 elif [ "$MODE" = "staged" ]; then
     TMPDIR_CHECK2_HITS_FILE="$(mktemp)"
-    count=$(hardcode_scan_staged "$HARDCODE_USER_PATH_RE" "$HARDCODE_USER_PATH_EXCLUDE_RE" "$TMPDIR_CHECK2_HITS_FILE")
+    count=$(hardcode_scan_staged "$HARDCODE_USER_PATH_RE" "$HARDCODE_USER_PATH_EXCLUDE_RE" "$TMPDIR_CHECK2_HITS_FILE" "$HARDCODE_USER_PATH_SKIP_FILES_RE")
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
         head -3 "$TMPDIR_CHECK2_HITS_FILE" || true
@@ -386,6 +400,7 @@ else
     count=$(grep -rn "$HARDCODE_USER_PATH_RE" "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
+            | grep -vF "${HARDCODE_USER_PATH_SKIP_GREP[@]}" \
             | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" \
             | wc -l | tr -d ' ' || true)
     if [ "$count" -gt 0 ]; then
@@ -393,6 +408,7 @@ else
         grep -rn "$HARDCODE_USER_PATH_RE" "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
             --exclude='validate-template.sh' --exclude='setup.sh' \
             --exclude='CHANGELOG.md' 2>/dev/null \
+            | grep -vF "${HARDCODE_USER_PATH_SKIP_GREP[@]}" \
             | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" | head -3 || true
         FAIL=1
     else

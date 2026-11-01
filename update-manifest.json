@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "2d574aec06c8984abf2de38fa6f8fb95f57c8f6d2e4aa01b47cc4b4da6115852"
+      "sha256": "0b883ff009652770253df9ef7fcbddd65e07248a323924faa34a5dce16e8941d"
     },
     {
       "path": ".gitignore",
@@ -901,7 +901,7 @@
     },
     {
       "path": ".mcp.json",
-      "sha256": "ecd2f0ef900004f49208fed8f71500ca23876807a0cd3ae3525de306f25df6d8"
+      "sha256": "fe9c9d80ac2f282c17fd1f8692f8e088104e1b6a01555cda33289744e9526c56"
     },
     {
       "path": ".stignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a9ec98d0c1ec0174912e767d48529a328dfe505ea444f629521fbd841deb7dae"
+      "sha256": "56a2ff385d78e462343d44f6d293e0ea8f531e8dc01d073abebe8472b7ec45ed"
     },
     {
       "path": "CLAUDE.md",
@@ -1145,7 +1145,7 @@
     },
     {
       "path": "extensions/README.md",
-      "sha256": "2f9d19f7ad85c1709ccb24f04a9ce697c622ef41773f3f905edbc73d4bb341fe"
+      "sha256": "be1f3f6adeacb88d263c9e8fb7d515cb6c146eada96fb3811d2cb8e5127b4ce2"
     },
     {
       "path": "extensions/agent-inbox/README.md",
@@ -1236,6 +1236,10 @@
       "sha256": "cb3329efabaa4e49c05a71d3c58f708323ab0fa04b48e7bf3840cafbc192e6b7"
     },
     {
+      "path": "extensions/mcp-railway.json.sample",
+      "sha256": "6e78a639eac1f15a74ed51e0f3bde82504370601bb28db69ada063be1509bbd6"
+    },
+    {
       "path": "extensions/protocol-close.after.session-record.md",
       "sha256": "99563973bf0d5083db2ebcd31cb789073fe567f9c20bf43767553399e4244cb0"
     },
@@ -1269,7 +1273,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "39354fd256e79ff4d78459ebf445db5be4b0743259a465fff5a5aa657ec057cc"
+      "sha256": "b43f746c564ef0fac08a7f7e00831ef72991acb04276750328c39d84efde69d0"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2229,7 +2233,7 @@
     },
     {
       "path": "scripts/changelog-append.sh",
-      "sha256": "53fd0abc41b738a69f9e85607c09918f552fe8eb071404b098706bf7f1514884"
+      "sha256": "ab3428797f1d79d86dc9125923bdff44bf62908f1c6122ba59d9cf2dc69f1d0f"
     },
     {
       "path": "scripts/changelog-diff-lines.sh",
@@ -2933,7 +2937,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "ac356cad46a38652966edb840b278a7522a301dd7bacf02262ec5390c1430876"
+      "sha256": "558c8ca51ddd1f2d9e46619f5a203ad3df7a6017d5b561e81bc99fbdc96dfff6"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3361,7 +3365,7 @@
     },
     {
       "path": "sessions/00-index.md",
-      "sha256": "462b1b9de70848d56e0f94b09893a09eaa93e4b81666565d6b6d969f42b3d94d"
+      "sha256": "0f54f13f5d2fdaaf890b0383ef39da6b253091a2ec4680269733de6d7137343e"
     },
     {
       "path": "setup.sh",
@@ -3389,7 +3393,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "4ad0ef2f57afae6f40dcaea217541efc6ea264864055dfbc2fe5dadf783cb4b7"
+      "sha256": "ae8c6bb0aba2969c74f2ee40ecb3d53d7a2597622d5c23f46436d0812dad3632"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3409,7 +3413,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "e4a57dd1af53f3da556770a073830c864ce9a7c4582fa1fe4897270513f42ec3"
+      "sha256": "4716f0d994aa52d2ee74616c7ba3f87154fecbe41ff0072f6c2a6d112efa6bc8"
     }
   ],
   "excluded_paths": [
@@ -3426,7 +3430,9 @@
     "scripts/agent-dashboard.py",
     "scripts/audit-ad-hoc-roles.py",
     "scripts/check-component-parity.sh",
+    "scripts/check-copy-pairs.sh",
     "scripts/check-manifest-rename-coverage.py",
+    "scripts/check-shipped-config-secrets.sh",
     "scripts/delivery_checks.py",
     "scripts/export-glossary-snapshot.py",
     "scripts/generate-helper-catalog.py",
@@ -3467,6 +3473,7 @@
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_ar293_ai_cli_override.sh",
+    "scripts/tests/test_changelog_append_blank_lines.sh",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",
@@ -3634,9 +3641,11 @@
     "scripts/tests/test_skill_promote.py",
     "scripts/tests/test_sync_banner.py",
     "scripts/tests/test_sync_code_scan_quiet.sh",
+    "scripts/tests/test_template_hygiene_checks.sh",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",
     "scripts/tests/test_update_download_batch_network_failure_failclosed.sh",
+    "scripts/tests/test_update_drop_dead_railway_mcp.sh",
     "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
     "scripts/tests/test_update_verify_batch_integrity_hash_mismatch_failclosed.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",

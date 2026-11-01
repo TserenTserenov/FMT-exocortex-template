@@ -70,6 +70,7 @@ fn:print_optional_linux_role_instruction	R	none	prints the install command, writ
 top:Step 6	A	plan	reinstalls platform-space files into the workspace
 top:Step 5e	A	plan	creates the extensions directory in the workspace; directory is a plan element
 top:Step 6c	A	plan	rewrites the workspace .mcp.json through Python
+fn:drop_dead_railway_mcp	A	plan	removes the stale template ext-railway entry from the workspace .mcp.json (Step 6c) through a sibling temp file and rename, Python or jq; the same file and coverage as Step 6c (WP-7)
 top:Step 6d	B	not-covered	role install.sh scripts write launchd plists and call launchctl; generate-hot-files-list.sh writes the hot list; the update summary lists scheduler changes as not covered
 top:Step 6e	A	plan	replaces the local manifest with the downloaded one
 top:Step 7	B	not-covered	iwe-capabilities.sh probe --announce, same as Step 3

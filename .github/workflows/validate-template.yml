@@ -366,6 +366,17 @@ jobs:
       - name: Run WP-529 Ф21 attestation statement tests
         run: /bin/bash setup/test-attestation-build-statement.sh
 
+      # WP-7 (чистка шаблона, 2026-11-01): шаг update.sh, убирающий авторский
+      # ext-railway, держит heredoc внутри $( ) и опирается на BSD mktemp/cp -p/
+      # stat; changelog-append.sh — на BSD date и awk; check-copy-pairs.sh — на
+      # BSD find/xargs/cksum. Ревью отметило, что на системном bash 3.2 это не
+      # проверялось. Запуск под /bin/bash по той же причине, что шаги выше.
+      - name: Run WP-7 template cleanup tests on system /bin/bash (3.2)
+        run: |
+          /bin/bash scripts/tests/test_update_drop_dead_railway_mcp.sh
+          /bin/bash scripts/tests/test_changelog_append_blank_lines.sh
+          /bin/bash scripts/tests/test_template_hygiene_checks.sh
+
   # Upgrade-flow regression test (0.29.18).
   # Корень бага (0.29.13): template-sync перезаписал FMT файлы — smoke-test fresh
   # build не ловит это, потому что build-runtime создаёт `.iwe-runtime` с нуля,
@@ -739,6 +750,19 @@ jobs:
       # пайплайн (нашлось: day-open-pipeline.sh/scaffold.sh разошлись на сотни строк).
       - name: Check seed snapshots match scripts/ (drift guard)
         run: bash scripts/check-seed-drift.sh
+
+      # WP-7 (чистка шаблона, 2026-11-01): check-seed-drift.sh видит только
+      # копии с пометкой SNAPSHOT. Побайтовые копии без пометки (seed/,
+      # extensions/agent-inbox/, .claude/lib/) не сверял никто; заодно ловим
+      # новые незарегистрированные копии.
+      - name: Check byte-identical copy pairs (drift guard)
+        run: bash scripts/check-copy-pairs.sh
+
+      # WP-7 (чистка шаблона, 2026-11-01): шаблонный .mcp.json поставлял
+      # авторский ext-railway с командой из каталога секретов автора — у
+      # пользователей сервер падал при каждом запуске.
+      - name: Check shipped default config has no author secret paths
+        run: bash scripts/check-shipped-config-secrets.sh
 
       # issue #343/#347: 14 регрессионных тестов лежали в репо и не запускались нигде —
       # ни один из них не сторожил ни один прогон. Полный набор идёт ~2 минуты.
