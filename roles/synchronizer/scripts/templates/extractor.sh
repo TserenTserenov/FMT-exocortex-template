@@ -5,7 +5,49 @@
 REPORTS_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/extraction-reports"
 DATE=$(date +%Y-%m-%d)
 
+# Repeat suppression (WP-568 F11). The scheduler runs inbox-check 4-5 times a
+# day and the feeds up to 4 times; each run used to resend the same text
+# ("за сегодня: N" with N unchanged, the same X/Y for inbox-check). A message
+# is dropped when it is byte-identical to the last one built for the same
+# scenario. Every message carries $DATE, so the first message of a new day
+# always goes out, and a feed message only changes when N grows.
+#
+# The record is written when the message is built, not when Telegram confirms
+# delivery: notify.sh on author hosts can lag behind this template, so a
+# post-send hook there would silently never fire. Cost of that choice: if a
+# send fails, the same text is not retried; the next change still goes out.
+NOTIFY_REPEAT_STATE_DIR="${IWE_NOTIFY_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/iwe/notify}"
+
+# Prints <message> unless it repeats the last one recorded for <scenario>.
+emit_unless_repeat() {  # <scenario> <message>
+    local scenario="$1" message="$2"
+    local state="$NOTIFY_REPEAT_STATE_DIR/extractor-$scenario.last"
+    [ -n "$message" ] || return 0
+    if [ -f "$state" ] && [ "$(cat "$state")" = "$message" ]; then
+        echo "extractor/$scenario: same text as the last message, not resent" >&2
+        return 0
+    fi
+    # tmp + mv: a concurrent tick never reads a truncated record.
+    if ! { mkdir -p "$NOTIFY_REPEAT_STATE_DIR" && printf '%s' "$message" > "$state.$$" && mv -f "$state.$$" "$state"; }; then
+        rm -f "$state.$$" 2>/dev/null
+        echo "WARN: extractor/$scenario: cannot record $state, repeats will not be suppressed" >&2
+    fi
+    printf '%s' "$message"
+}
+
 build_message() {
+    local process="$1"
+    case "$process" in
+        "inbox-check"|"session-close-feed"|"git-diff-feed")
+            emit_unless_repeat "$process" "$(compose_message "$process")"
+            ;;
+        *)
+            compose_message "$process"
+            ;;
+    esac
+}
+
+compose_message() {
     local process="$1"
 
     case "$process" in
