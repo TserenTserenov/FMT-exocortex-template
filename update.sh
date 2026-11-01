@@ -6755,6 +6755,18 @@ drop_dead_railway_mcp() {
         echo "  ✗ .mcp.json: не удалось создать временный файл, ext-railway не проверен"
         return 0
     }
+    # Права .mcp.json сохраняются: mktemp создаёт файл с правами 600, и после
+    # mv они молча заменили бы права пользователя. Режим запоминается до записи
+    # (GNU stat, иначе BSD stat) и ставится на временный файл перед mv. Не
+    # cp -p: тот перенёс бы режим «только чтение» (400/444) на временный файл
+    # ДО записи, и запись в него упала бы.
+    local mode
+    mode=$(stat -c '%a' "$mcp_file" 2>/dev/null || stat -f '%Lp' "$mcp_file" 2>/dev/null) || mode=""
+    if [ -z "$mode" ]; then
+        rm -f "$tmp"
+        echo "  ✗ .mcp.json: не удалось прочитать права файла, ext-railway не проверен"
+        return 0
+    fi
     if py_available; then
         removed=$($PY_BIN - "$mcp_file" "$tmp" "$tpl_cmd" "$real_cmd" <<'PY'
 import json, sys
@@ -6799,7 +6811,7 @@ PY
         rm -f "$tmp"
         echo "  ✗ .mcp.json: не удалось разобрать файл, ext-railway не проверен"
     elif [ -n "$removed" ]; then
-        if mv "$tmp" "$mcp_file"; then
+        if chmod "$mode" "$tmp" && mv "$tmp" "$mcp_file"; then
             echo "  ✓ .mcp.json: убран неработающий сервер railway ($removed) — файла его запуска нет в домашней папке"
         else
             rm -f "$tmp"

@@ -78,8 +78,12 @@ expect "заготовка пути к секретам в .mcp.json пойма�
     bash "$ROOT/scripts/check-shipped-config-secrets.sh" "$CFG"
 mv "$CFG/.mcp.json.clean" "$CFG/.mcp.json"
 
+printf '{"mcpServers": {"x": {"command": "/Users/someone/bin/x.sh"}}}\n' > "$CFG/extensions/extra.json"
+expect "личная папка macOS в extensions/*.json поймана" 1 "FAIL: extensions/extra.json" \
+    bash "$ROOT/scripts/check-shipped-config-secrets.sh" "$CFG"
+rm "$CFG/extensions/extra.json"
 printf '{"mcpServers": {"x": {"command": "/home/someone/bin/x.sh"}}}\n' > "$CFG/extensions/extra.json"
-expect "личная папка в extensions/*.json поймана" 1 "FAIL: extensions/extra.json" \
+expect "личная папка Linux в extensions/*.json поймана" 1 "FAIL: extensions/extra.json" \
     bash "$ROOT/scripts/check-shipped-config-secrets.sh" "$CFG"
 rm "$CFG/extensions/extra.json"
 

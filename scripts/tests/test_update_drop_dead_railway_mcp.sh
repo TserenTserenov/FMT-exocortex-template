@@ -70,6 +70,11 @@ write_mcp() {
 JSON
 }
 
+# Права файла: GNU stat (Linux) или BSD stat (macOS).
+mode_of() {
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
+}
+
 servers_of() {
     python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1], encoding="utf-8"))["mcpServers"]))' "$1"
 }
@@ -82,6 +87,7 @@ run_cases() {
 
     # 1. Путь подставлен, файла нет → railway убран, остальные на месте и по порядку.
     write_mcp "$dir/a.json" "$HOME_FAKE/$WRAPPER_REL"
+    chmod 644 "$dir/a.json"
     drop_dead_railway_mcp "$dir/a.json" "$HOME_FAKE" >/dev/null
     if [ "$(servers_of "$dir/a.json")" = "iwe-knowledge ext-figma local-notes" ]; then
         pass "$mode: подставленный путь без файла — railway убран, три других сервера целы и в том же порядке"
@@ -93,6 +99,34 @@ run_cases() {
     else
         fail "$mode: содержимое оставшихся серверов повреждено"
     fi
+
+    if [ "$(mode_of "$dir/a.json")" = "644" ]; then
+        pass "$mode: права .mcp.json (644) сохранены после удаления записи"
+    else
+        fail "$mode: права .mcp.json изменились: $(mode_of "$dir/a.json"), ожидались 644"
+    fi
+    write_mcp "$dir/a2.json" "$HOME_FAKE/$WRAPPER_REL"
+    chmod 600 "$dir/a2.json"
+    drop_dead_railway_mcp "$dir/a2.json" "$HOME_FAKE" >/dev/null
+    if [ "$(mode_of "$dir/a2.json")" = "600" ] && [ "$(servers_of "$dir/a2.json")" = "iwe-knowledge ext-figma local-notes" ]; then
+        pass "$mode: закрытые права .mcp.json (600) тоже сохранены"
+    else
+        fail "$mode: права 600 не сохранены: $(mode_of "$dir/a2.json")"
+    fi
+
+    # Файл «только для чтения»: прежняя версия с cp -p переносила режим 400 на
+    # временный файл до записи, запись падала, мёртвая запись оставалась. Под
+    # root запрет на запись не действует, поэтому полноценно случай проверяется
+    # запуском от обычного пользователя (CI на macOS, локально без root).
+    write_mcp "$dir/a3.json" "$HOME_FAKE/$WRAPPER_REL"
+    chmod 400 "$dir/a3.json"
+    drop_dead_railway_mcp "$dir/a3.json" "$HOME_FAKE" >/dev/null
+    if [ "$(mode_of "$dir/a3.json")" = "400" ] && [ "$(servers_of "$dir/a3.json")" = "iwe-knowledge ext-figma local-notes" ]; then
+        pass "$mode: файл только для чтения (400) — railway убран, права 400 сохранены"
+    else
+        fail "$mode: файл 400 — права $(mode_of "$dir/a3.json"), серверы: $(servers_of "$dir/a3.json")"
+    fi
+    chmod 600 "$dir/a3.json"
 
     # 2. Заготовка не подставлена, файла нет → railway убран.
     write_mcp "$dir/b.json" "{{HOME_DIR}}/$WRAPPER_REL"
@@ -166,7 +200,7 @@ echo "--- без Python и jq ---"
 PY_BIN=""
 NOTOOLS="$TMP/notools-bin"
 mkdir -p "$NOTOOLS"
-for tool in grep mktemp mv rm; do
+for tool in grep mktemp mv rm stat chmod; do
     ln -s "$(command -v "$tool")" "$NOTOOLS/$tool"
 done
 mkdir -p "$TMP/none"

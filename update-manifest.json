@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "38c9197dd64a0891cd95ef25e8c9087aa385ae746261e29810023da7521fc3b9"
+      "sha256": "0b883ff009652770253df9ef7fcbddd65e07248a323924faa34a5dce16e8941d"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d513d38e3a9a8406e257a25c15744269e06f747108c6ddda41ea6ad474bc8a49"
+      "sha256": "17b0fc8f9b59a9c01907056feddf5a670c0a60ad8e8fb5099b801ca77e39bbee"
     },
     {
       "path": "CLAUDE.md",
@@ -3393,7 +3393,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "4ad0ef2f57afae6f40dcaea217541efc6ea264864055dfbc2fe5dadf783cb4b7"
+      "sha256": "ae8c6bb0aba2969c74f2ee40ecb3d53d7a2597622d5c23f46436d0812dad3632"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3413,7 +3413,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "b61348bdf477029f7e83ad486f1bcf0a7ec913111a69151f100ba58a6642445d"
+      "sha256": "e88f60492e9f1e9a530d2252a64cc66cd752a6e09e76aaf5c01680de340e1499"
     }
   ],
   "excluded_paths": [
