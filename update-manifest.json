@@ -437,7 +437,7 @@
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
-      "sha256": "646cf2f1da405777a386707e69789bb4866b9368347af70e6e29341513f1b2c2"
+      "sha256": "df61f19f6e3aeb5b20c60a19602c958006cf60bded11e8f171d1f01bd7862196"
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3df4f5d26bb73206d81ea7d80fe92d65320c0d85397e69aebbe8ef95bc191a45"
+      "sha256": "8634da725426ff5aaf280fcb9e39310b4cf1d6d9de519b38a46c0bad1be47255"
     },
     {
       "path": "CLAUDE.md",
@@ -989,7 +989,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "d5a53b84840d60aa411802ee7b5a67ee2351bb5958e4f68f248118eef73ea49a"
+      "sha256": "4420b4c6e43a38ac22c8479ac2bfa887607f050bb9f7403e06c8d534bddccf69"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -1149,7 +1149,7 @@
     },
     {
       "path": "extensions/agent-inbox/README.md",
-      "sha256": "a62be09a112f7fafbe4b40840e3ba810de753bbbe89ccaeb7575f919df557813"
+      "sha256": "074ddef099b78c3560a3467a4da4c49798b1f3b3c6e8fb3ecdbe3f7c902067f1"
     },
     {
       "path": "extensions/agent-inbox/SPEC.md",
@@ -1205,11 +1205,11 @@
     },
     {
       "path": "extensions/local-llm/ADR-001-local-llm-stack.md",
-      "sha256": "70849c5b4ce154361e4745fb8edcfdd585fc93802a2e5e4fd13da4a1e618a243"
+      "sha256": "952db012ed459ad163f1def16d64ec75b968f7e000aa3fdcf0e19f135b39b6bd"
     },
     {
       "path": "extensions/local-llm/README.md",
-      "sha256": "520d9d529ad202b7ca4c1e3757301cbf0f6c800b39c15dd1b351dddf6c14a28f"
+      "sha256": "d5feac72b2cfd77891f913270938d79eb419a515b950624b849ab50153a22e96"
     },
     {
       "path": "extensions/local-llm/detect-hardware.sh",
@@ -1225,7 +1225,7 @@
     },
     {
       "path": "extensions/local-llm/model-catalog.yaml",
-      "sha256": "4143552c5bc45931aea81faca34cae2a0f056b8e097f678a2458aa05ec18e670"
+      "sha256": "8f9070238411792c0d1835a78fdbdb780f5ddbe61981b8d6006eb3c65b5678c6"
     },
     {
       "path": "extensions/local-llm/model-lifecycle.py",
@@ -1613,7 +1613,7 @@
     },
     {
       "path": "memory/dry-run-contract.md",
-      "sha256": "fe142d82617652e5aa0fdf129cf7a106bac9daed1f94662ae501fce5bc42c231"
+      "sha256": "716e971af4d4a8bddc74f9bcf831372a2e2295bc00faca8c4b4946a870eb47bf"
     },
     {
       "path": "memory/feedback_community_communication_style.md",
@@ -1645,7 +1645,7 @@
     },
     {
       "path": "memory/lpf-hypothesis-log.md",
-      "sha256": "058bb2a0adbeee41a5512a572c82f78b24325814e1b3244fd69e10bcd823e8ff"
+      "sha256": "bd55df716e560fc4f7df83b34dd5e4b3edab99ceb155069dcb08b171db15fb6c"
     },
     {
       "path": "memory/memory-lifecycle-spec.md",
@@ -1825,7 +1825,7 @@
     },
     {
       "path": "roles/extractor/prompts/session-close.md",
-      "sha256": "5721090b978bb0a5f1273a43c2bac938002d77671932f514d4cc923cc1222dc9"
+      "sha256": "36ade7350d8f3761a2caacf0ae3204bc865b88b146bf1174b11b2fc00bfca0ec"
     },
     {
       "path": "roles/extractor/role.yaml",
