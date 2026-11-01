@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "56a2ff385d78e462343d44f6d293e0ea8f531e8dc01d073abebe8472b7ec45ed"
+      "sha256": "f0878b0c1e0d40b356e97f27aec2d7d5237b19c4754bc1cbf169f645b42e63d4"
     },
     {
       "path": "CLAUDE.md",
@@ -1273,7 +1273,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "b43f746c564ef0fac08a7f7e00831ef72991acb04276750328c39d84efde69d0"
+      "sha256": "d009edebba40ec59bd364ddcf6ce6e9a32c023a0ccfcd1f6535a99b2dfcdadf5"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3435,6 +3435,7 @@
     "scripts/check-shipped-config-secrets.sh",
     "scripts/delivery_checks.py",
     "scripts/export-glossary-snapshot.py",
+    "scripts/fetch-glossary-concepts.py",
     "scripts/generate-helper-catalog.py",
     "scripts/guide-kit-sync-state.yaml",
     "scripts/guide-kit-sync.sh",
@@ -3485,6 +3486,7 @@
     "scripts/tests/test_extractor_branch_cleanup.sh",
     "scripts/tests/test_extractor_feed_quiet_on_empty.sh",
     "scripts/tests/test_extractor_notify_repeat.sh",
+    "scripts/tests/test_fetch_glossary_concepts.py",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
     "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_issue_1003_ds_publish.sh",
@@ -3728,7 +3730,9 @@
     "setup/update-write-sites.tsv",
     "setup/ux-walkthrough-prompt.md",
     "setup/wp529-f21-toggle-required-review.sh",
-    "translation/glossary-snapshot-allowlist.yaml"
+    "translation/glossary-snapshot-allowlist.yaml",
+    "translation/glossary-snapshot.csv",
+    "translation/glossary-snapshot.meta.json"
   ],
   "deprecated_files": [
     {

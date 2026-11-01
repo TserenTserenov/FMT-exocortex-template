@@ -1,0 +1,15 @@
+{
+  "allowlist_sha256": "a5ff2f9824ae0ad7c4dc31946c8732d538e3ae3f7854b9d34a8df5dd12707a33",
+  "as_of": "2026-11-01T18:56:11.530Z",
+  "excluded": {
+    "domain": 260,
+    "equals-code": 319,
+    "level": 2704,
+    "not-publishable": 1245
+  },
+  "included": 495,
+  "input_rows": 5023,
+  "output_sha256": "63b516015588354551191a403f29b231817ff166a1386a09c671c72ba9bc3b7b",
+  "rules_version": "name-en-publishable/1",
+  "schema": "glossary-snapshot/1"
+}

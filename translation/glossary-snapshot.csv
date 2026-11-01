@@ -1,0 +1,496 @@
+code,term_ru,term_en,level,domain,name_en_status_raw,rules_version
+DP.AISYS.008,ДЗ-чекер,Homework Checker,pack,DP,ok,name-en-publishable/1
+DP.AISYS.014,AIST Bot,AIST Bot,pack,DP,ok,name-en-publishable/1
+DP.AISYS.015,Анализатор проговаривания и письма,Verbalization and Writing Analyzer,pack,DP,ok,name-en-publishable/1
+DP.ARCH.001,Архитектура платформы,Platform Architecture,pack,DP,ok,name-en-publishable/1
+DP.ARCH.002,Тиры платформы,Platform Tiers,pack,DP,ok,name-en-publishable/1
+DP.ARCH.003,Архитектура Digital Twin — единая точка расчёта и чтения,Digital Twin Architecture (3-Layer),pack,DP,ok,name-en-publishable/1
+DP.ARCH.004,Архитектура данных Neon (Database-per-BoundedContext),Neon Data Architecture (Database-per-Service),pack,DP,ok,name-en-publishable/1
+DP.ARCH.005,Персона (декларативная модель созидателя),Persona (Creator Declarative Model),pack,DP,ok,name-en-publishable/1
+DP.ARCH.006,Память (Observed события + Derived агрегаты),Memory (Observed Events + Derived Aggregates),pack,DP,ok,name-en-publishable/1
+DP.ARCH.007,Проекция (runtime-компиляция под потребителя),Projection (Runtime Compilation for Consumer),pack,DP,ok,name-en-publishable/1
+DP.ASSIST.001,ИИ-ассистенты (superseded),AI Assistants (superseded),pack,DP,ok,name-en-publishable/1
+DP.CONCEPT.001,Концепция платформы,Platform Concept,pack,DP,ok,name-en-publishable/1
+DP.CONCEPT.003,Адаптивная персонализация,Adaptive Personalization,pack,DP,ok,name-en-publishable/1
+DP.D.025,Harness \u2260 Agent,Harness \u2260 Agent,pack,DP,ok,name-en-publishable/1
+DP.D.033,Role-Centric Architecture (Ролецентричная архитектура),Role-Centric Architecture,pack,DP,ok,name-en-publishable/1
+DP.D.034,Three-Axis Access Control Model (Трёхосевая модель доступов),Three-Axis Access Control Model,pack,DP,ok,name-en-publishable/1
+DP.D.035,Data Policy — политика данных IWE,IWE Data Policy,pack,DP,ok,name-en-publishable/1
+DP.D.050,Роли Созидателя,Creator Roles,pack,DP,ok,name-en-publishable/1
+DP.D.052,Различение: Персона / Память / Контекст,Distinction: Persona/Memory/Context,pack,DP,ok,name-en-publishable/1
+DP.D.289,Лестница ИИ-агентов: чат-бот ≠ stateless-агент ≠ stateful-агент с памятью пользователя ≠ агент с непрерывной личностью,AI Agent Ladder (four rungs),pack,DP,ok,name-en-publishable/1
+DP.D.291,Вещь (физический объект) ≠ «вещь» (разговорное «нечто»),Thing (physical object) ≠ 'thing' (colloquial 'something'),pack,DP,ok,name-en-publishable/1
+DP.ECON.001,Points Engine — движок начисления баллов,Points Engine,pack,DP,ok,name-en-publishable/1
+DP.EXOCORTEX.001,Модульный экзокортекс,Modular Exocortex,pack,DP,ok,name-en-publishable/1
+DP.FM.001,Информация как знание,Information as Knowledge,pack,DP,ok,name-en-publishable/1
+DP.FM.002,Смешение слоёв,Layer Mixing,pack,DP,ok,name-en-publishable/1
+DP.FM.003,Контекстная слепота AI-агента,AI Agent Context Blindness,pack,DP,ok,name-en-publishable/1
+DP.FM.005,Дрейф модель\u2013реальность (Model-Reality Drift),Model–Reality Drift,pack,DP,ok,name-en-publishable/1
+DP.FM.006,Когнитивный долг как следствие агентного ИИ,Cognitive Debt from Agentic AI,pack,DP,ok,name-en-publishable/1
+DP.FM.007,Дрейф представлений (View Drift),View Drift,pack,DP,ok,name-en-publishable/1
+DP.FM.008,Auto-Promote Without Confirmation,Auto-Promote Without Confirmation,pack,DP,ok,name-en-publishable/1
+DP.FM.009,Protocol Hardcoded Script Path,Protocol Hardcoded Script Path,pack,DP,ok,name-en-publishable/1
+DP.FM.010,Agent Failure Patterns Catalog,Agent Failure Patterns Catalog,pack,DP,ok,name-en-publishable/1
+DP.FM.011,Not Capturing Patterns,Not Capturing Patterns,pack,DP,ok,name-en-publishable/1
+DP.FM.012,Lexical Deduplication (Lossful Ontology Merge),Lexical Deduplication (Lossful Ontology Merge),pack,DP,ok,name-en-publishable/1
+DP.FM.013,Conservative Rewrite Failure (Смысловая контаминация при перефразировании),Conservative Rewrite Failure,pack,DP,ok,name-en-publishable/1
+DP.FM.046,Render-queue timeout — отсутствующий deadline на вызов подзадачи,Render-queue timeout — missing callsite deadline in async worker,pack,DP,ok,name-en-publishable/1
+DP.FM.057,cp.iwe в контенте Guides 1-2 — нарушение bounded-context,cp.iwe Bounded Context Violation in Guides 1-2,pack,DP,ok,name-en-publishable/1
+DP.FM.070,Dispatcher Git Reset Race Condition,Dispatcher Race Condition,pack,DP,ok,name-en-publishable/1
+DP.FM.147,aiogram Bot() без try/finally session.close() → leak HTTP-коннектов в scheduler,aiogram Bot session leak without try/finally in scheduler,pack,DP,ok,name-en-publishable/1
+DP.FM.148,Regex-detector semantic blindspot — 98% нарушений одно правило,Regex-detector semantic blindspot,pack,DP,ok,name-en-publishable/1
+DP.FM.149,Channel-style-bleed — технический стиль стенограмм заражает pilot-facing синтез,Channel-style-bleed in peer-session synthesis,pack,DP,ok,name-en-publishable/1
+DP.FM.150,Silent rule decay — нарушение без видимого cost делает правило мёртвым,Silent rule decay without violation cost,pack,DP,ok,name-en-publishable/1
+DP.FM.151,Subscription gate multi-path divergence,Subscription gate multi-path divergence,pack,DP,ok,name-en-publishable/1
+DP.FM.156,Agent requests manual pilot action before exhausting available tools,Agent B1 axis: manual pilot escalation before tool check,pack,DP,ok,name-en-publishable/1
+DP.FM.157,Cloud scheduler backs up wrong CLAUDE.md in layered topology,Cloud backup overwrites workspace-root CLAUDE.md slot with governance layer,pack,DP,ok,name-en-publishable/1
+DP.FM.158,xargs word-splitting on filenames with spaces causes false-FAIL,xargs word-splitting false-FAIL on IWE filenames with spaces,pack,DP,ok,name-en-publishable/1
+DP.FM.159,Creation-flow gap between linked identity providers,Creation-flow gap between linked identity providers,pack,DP,ok,name-en-publishable/1
+DP.FM.160,Интерфейс без ядра порождает галлюцинацию данных,Interface without core produces data hallucination,pack,DP,ok,name-en-publishable/1
+DP.FM.170,Guard с literal-паттерном строки коммита сломался в день добавления,Literal commit guard pattern mismatch at initial deployment,pack,DP,ok,name-en-publishable/1
+DP.FM.246,Закрытый РП в таблице «Текущая работа» до явной синхронизации,Closed work product hangs in active work table until explicit sync,pack,DP,ok,name-en-publishable/1
+DP.IWE.001,Intellectual Work Environment (IWE),Intellectual Work Environment (IWE),pack,DP,ok,name-en-publishable/1
+DP.IWE.002,IWE Template & Setup,IWE Template & Setup,pack,DP,ok,name-en-publishable/1
+DP.IWE.003,Gateway-архитектура IWE,IWE Gateway Architecture,pack,DP,ok,name-en-publishable/1
+DP.IWE.004,Интерфейсы IWE — различения клиентов,IWE Interfaces — Client Distinctions,pack,DP,ok,name-en-publishable/1
+DP.IWE.011,IWE Runtime Host Contract,Host contract,pack,DP,ok,name-en-publishable/1
+DP.KR.001,Маршрутизация знаний IWE,IWE Knowledge Routing,pack,DP,ok,name-en-publishable/1
+DP.M.001,Извлечение знаний,Knowledge Extraction,pack,DP,ok,name-en-publishable/1
+DP.M.002,Применение стратегического DDD,Strategic DDD Application,pack,DP,ok,name-en-publishable/1
+DP.M.003,Context Engineering Protocol,Context Engineering Protocol,pack,DP,ok,name-en-publishable/1
+DP.M.004,Адаптивная персонализация по состоянию,Adaptive Personalization by State,pack,DP,ok,name-en-publishable/1
+DP.M.005,АрхГейт (ArchGate),ArchGate,pack,DP,ok,name-en-publishable/1
+DP.M.006,Самопроверка вайб-режима (Vibe-Check),Vibe-Check Self-Assessment,pack,DP,ok,name-en-publishable/1
+DP.M.007,Intervention Loop (Петля интервенции),Intervention Loop,pack,DP,ok,name-en-publishable/1
+DP.M.008,Культура работы IWE (Work Culture),IWE Work Culture,pack,DP,ok,name-en-publishable/1
+DP.M.009,Расширяемость шаблонных систем (Template Extensibility),Template System Extensibility,pack,DP,ok,name-en-publishable/1
+DP.M.010,Управление жизненным циклом рабочего продукта,Work Product Lifecycle Management,pack,DP,ok,name-en-publishable/1
+DP.M.013,Security Audit Cadence,Security Audit Cadence (3-tier governance),pack,DP,ok,name-en-publishable/1
+DP.M.017,Runtime Tool Discovery через JSON-RPC,Runtime Tool Discovery via JSON-RPC,pack,DP,ok,name-en-publishable/1
+DP.M.027,12-factor Matrix для инвентаризации production deployment,12-factor Matrix for Production Inventory,pack,DP,ok,name-en-publishable/1
+DP.M.032,Предпочтение MD-формата для плотного LLM-контекста,MD Context Format Preference,pack,DP,ok,name-en-publishable/1
+DP.M.033,Matrix-CI по конфигурационному параметру шаблона,Matrix CI for Template Parameter Testing,pack,DP,ok,name-en-publishable/1
+DP.M.048,Дисциплина scope-решений при закрытии РП,Scope Discipline at WP Closure,pack,DP,ok,name-en-publishable/1
+DP.M.058,Гейт создания нового Pack при доменных кандидатах без дома,Domain-Pack Creation Gate,pack,DP,ok,name-en-publishable/1
+DP.M.059,Триада артефактов закрытия фазы РП,Phase-Closure Artifact Triad,pack,DP,ok,name-en-publishable/1
+DP.M.061,Детекция bottleneck-shift после устранения tech-блокера,Bottleneck-Shift Detection After Tech-Blocker Removal,pack,DP,ok,name-en-publishable/1
+DP.M.062,Bridge-backfill через shared identifier при blocked identity-provider,Bridge Backfill via Shared Identifier When Identity Provider Blocked,pack,DP,ok,name-en-publishable/1
+DP.M.063,Triple-deploy + URL-derived basename для tool promotion,Triple-Deploy with URL-Derived Basename for Tool Promotion,pack,DP,ok,name-en-publishable/1
+DP.M.064,Manual smoke + analogous-pattern coverage как substitute полной автоматизации,Manual Smoke + Analogous-Pattern Coverage as Validation Substitute,pack,DP,ok,name-en-publishable/1
+DP.M.065,4 условия легитимации temporal-derivation routing,Four Conditions for Legitimate Temporal-Derivation Routing,pack,DP,ok,name-en-publishable/1
+DP.M.079,Pack-watcher cross-repo trigger,Pack-Watcher Cross-Repo Trigger,pack,DP,ok,name-en-publishable/1
+DP.M.088,CI + pre-commit как defense-in-depth для Pack-инвариантов,CI + pre-commit defense-in-depth for Pack invariants,pack,DP,ok,name-en-publishable/1
+DP.M.101,Семантическое версионирование для Docs-as-Code,Semver Automation for Docs-as-Code,pack,DP,ok,name-en-publishable/1
+DP.M.102,Условный автоматический merge через метки PR и CI-гейт,Conditional Auto-Merge via PR Labels and CI Gate,pack,DP,ok,name-en-publishable/1
+DP.M.103,Жизненный цикл создания доменного Pack (7 фаз),Pack Creation Lifecycle (7-phase),pack,DP,ok,name-en-publishable/1
+DP.M.104,Cross-repo publication pipeline via workflow_dispatch + PR gate,Cross-Repo Publication Pipeline via workflow_dispatch + PR Gate,pack,DP,ok,name-en-publishable/1
+DP.M.115,Конвейер руководств из Pack (Living Documentation CI/CD),Living Pack-to-Guides Pipeline,pack,DP,ok,name-en-publishable/1
+DP.M.116,Решение о распределении captures по Pack (Вариант B > Вариант A),Pack Source Distribution Decision (Variant B vs New Pack),pack,DP,ok,name-en-publishable/1
+DP.M.150,Multi-Driver Compat via Duck-Typing of Connection API,Database Driver Compatibility Duck Typing,pack,DP,ok,name-en-publishable/1
+DP.M.177,Управление жизненным циклом bug-report в inbox,Bug Inbox Lifecycle Management,pack,DP,ok,name-en-publishable/1
+DP.M.255,Поликорневая сборка контекста,Poly-root Context Assembly,pack,DP,ok,name-en-publishable/1
+DP.M.300,gh pr diff branch-on-branch: проверка реального scope PR через checkout,gh pr diff branch-on-branch verification,pack,DP,ok,name-en-publishable/1
+DP.M.301,"Sync source-of-truth → derived: edit-commit-push в SoT, derived read-only",Sync source-of-truth to derived workflow,pack,DP,ok,name-en-publishable/1
+DP.M.310,Три измерения консистентности при автопереводе,Three consistency dimensions for auto-translation pipeline,pack,DP,ok,name-en-publishable/1
+DP.M.311,File-fallback из шаблона: graceful degradation при отсутствии Pack,File fallback from template: graceful degradation when Pack absent,pack,DP,ok,name-en-publishable/1
+DP.M.312,OAuth prompt=login: принудительная re-authentication через стандартный параметр,OAuth prompt=login: force re-authentication via standard parameter,pack,DP,ok,name-en-publishable/1
+DP.M.313,Enforcement ladder: уровни и критерии promotion правил,Enforcement ladder: levels and rule-promotion criteria,pack,DP,ok,name-en-publishable/1
+DP.M.314,Structural criterion over symbol heuristic,Structural criterion over symbol heuristic for markdown artifact validators,pack,DP,ok,name-en-publishable/1
+DP.M.331,Agent Audit Trail as Append-only Sidecar,Agent action audit trail as append-only sidecar alongside the session thread,pack,DP,ok,name-en-publishable/1
+DP.M.332,Sanity-guard quarantine pattern,Sanity-guard quarantine: anomaly gets quarantine status and durable incident record,pack,DP,ok,name-en-publishable/1
+DP.M.333,Failure mode matrix per event type,Per-event-type failure mode matrix as explicit design artifact,pack,DP,ok,name-en-publishable/1
+DP.M.339,Break-glass Key Distribution via Agent,"Agent as break-glass key generator and transmitter, not custodian",pack,DP,ok,name-en-publishable/1
+DP.M.340,"Skill Resource Guard: Open-first, Close-last","Skill resource guard: open as first step, close as last step",pack,DP,ok,name-en-publishable/1
+DP.M.350,Idempotent SQL migration: DDL-guards для safe re-run,Idempotent SQL migration: DDL-guards for safe re-run,pack,DP,ok,name-en-publishable/1
+DP.M.352,Pull-based offline-consent handover,Pull-based handover for offline-consent split-storage,pack,DP,ok,name-en-publishable/1
+DP.M.353,Event dedup window in routing catalog,"Event dedup window as routing catalog parameter, not component constant",pack,DP,ok,name-en-publishable/1
+DP.M.354,consent_unverified infra-fault write-path,consent_unverified as infra-fault status on write-path,pack,DP,ok,name-en-publishable/1
+DP.M.355,Reflex classify-before-llm-invoke dispatcher gate,Reflex classify-before-llm-invoke: dispatcher gate invariant,pack,DP,ok,name-en-publishable/1
+DP.M.356,Routing Gate: extend existing convention over parallel structure,Routing Gate: Extend Existing Convention Over Creating Parallel Structure,pack,DP,ok,name-en-publishable/1
+DP.M.357,Multistage pipeline carry-over: starvation guard via accumulators,Multistage Pipeline Carry-Over: Starvation Guard via Accumulators,pack,DP,ok,name-en-publishable/1
+DP.M.358,Grep existing planning slots before creating new ones,Grep Existing Planning Slots Before Creating New Ones,pack,DP,ok,name-en-publishable/1
+DP.M.362,Prefetch snapshot empty guard,Prefetch snapshot empty guard — never overwrite working snapshot with empty result,pack,DP,ok,name-en-publishable/1
+DP.M.363,FSM reset via write-ahead new key,FSM session reset via write-ahead new key — race-condition-free alternative to delete-then-recreate,pack,DP,ok,name-en-publishable/1
+DP.M.364,Offline-fallback с явным TTL снапшота,Snapshot load with explicit TTL and graceful offline fallback to local seeds,pack,DP,ok,name-en-publishable/1
+DP.M.366,Detector Baseline Forward Only,"Detector baseline starts from the first tagged event, not from script creation date",pack,DP,ok,name-en-publishable/1
+DP.M.367,Per-Entity Advisory Lock for Concurrent Background Tasks,Per-entity advisory lock prevents race conditions between concurrent background workers,pack,DP,ok,name-en-publishable/1
+DP.M.368,Per-file byte/token ratio calibration,Per-file byte/token ratio calibration via per-file median,pack,DP,ok,name-en-publishable/1
+DP.M.369,DRR Adequacy Pass,Decision readiness review adequacy pass — 6-question operationalization checklist,pack,DP,ok,name-en-publishable/1
+DP.M.370,Dual-source behavioral scanner,Dual-source behavioral scanner: tagged (high-confidence) + pattern-matched (low-confidence),pack,DP,ok,name-en-publishable/1
+DP.MAP.001,Pack Navigation Map,Pack Navigation Map,pack,DP,ok,name-en-publishable/1
+DP.MAP.002,IWE Service Catalog,IWE Service Catalog,pack,DP,ok,name-en-publishable/1
+DP.MAP.003,Guide Pipeline Source Map,Guide Pipeline Source Map,pack,DP,ok,name-en-publishable/1
+DP.METHOD.010,Kinds + Owner Roles,Kinds + Owner Roles,pack,DP,ok,name-en-publishable/1
+DP.METHOD.020,Траектория развития Созидателя,Creator Development Trajectory,pack,DP,ok,name-en-publishable/1
+DP.NAV.001,Навигация знаний,Knowledge Navigation,pack,DP,ok,name-en-publishable/1
+DP.ROLE.001,ИИ-системы,AI Systems,pack,DP,ok,name-en-publishable/1
+DP.ROLE.037,Регистратор РП,WP Registrar,pack,DP,ok,name-en-publishable/1
+DP.ROLE.054,R30 Аналитик ограничений,Constraint Analyst,pack,DP,ok,name-en-publishable/1
+DP.ROLE.055,Агент поддержки IWE,Helpdesk Support Agent,pack,DP,ok,name-en-publishable/1
+DP.ROLE.056,R32 Мейнтейнер скиллов,Skill Maintainer,pack,DP,ok,name-en-publishable/1
+DP.ROLE.057,R33 Автор скилла,Skill Author,pack,DP,ok,name-en-publishable/1
+DP.ROLE.058,R?? Артефактор-Постановщик,R?? Task Formulator,pack,DP,ok,name-en-publishable/1
+DP.ROLE.059,R30 Маршрутизатор,R30 Task Router,pack,DP,ok,name-en-publishable/1
+DP.ROLE.060,Презентатор,R60 Presenter,pack,DP,ok,name-en-publishable/1
+DP.ROLE.061,External Session Adapter,External Session Adapter,pack,DP,ok,name-en-publishable/1
+DP.ROLE.064,Сторож новых задач (issue watcher),Issue watcher,pack,DP,ok,name-en-publishable/1
+DP.ROLE.067,Онбордер,Onboarder,pack,DP,ok,name-en-publishable/1
+DP.ROLE.073,Хранитель реестра стилей,Style Registry Keeper,pack,DP,ok,name-en-publishable/1
+DP.ROLE.074,Диспетчер стилей,Style Dispatcher,pack,DP,ok,name-en-publishable/1
+DP.ROLE.091,Сторож данных (data-gap watchdog),Data-gap watchdog,pack,DP,ok,name-en-publishable/1
+DP.ROLE.092,Аудитор знаний (knowledge-audit watchdog),Knowledge-audit watchdog,pack,DP,ok,name-en-publishable/1
+DP.ROLE.093,Декомпозитор источника (source decomposer),Source decomposer,pack,DP,ok,name-en-publishable/1
+DP.ROLE.097,Следователь (Causal Investigator),Causal Investigator,pack,DP,ok,name-en-publishable/1
+DP.RUNBOOK.001,Runbook: Aist Bot Errors,Runbook: Aist Bot Errors,pack,DP,ok,name-en-publishable/1
+DP.SC.001,Планирование дня,Day Planning,pack,DP,ok,name-en-publishable/1
+DP.SC.002,Планирование и ревью недели,Week Planning and Review,pack,DP,ok,name-en-publishable/1
+DP.SC.003,Обучение и развитие,Learning and Development,pack,DP,ok,name-en-publishable/1
+DP.SC.004,Фиксация и экстракция знаний,Knowledge Capture and Extraction,pack,DP,ok,name-en-publishable/1
+DP.SC.005,Публикация контента,Content Publishing,pack,DP,ok,name-en-publishable/1
+DP.SC.006,Автоматическое обслуживание,Automatic Maintenance,pack,DP,ok,name-en-publishable/1
+DP.SC.007,Триаж и техдолг,Triage and Technical Debt,pack,DP,ok,name-en-publishable/1
+DP.SC.008,Самовосстановление,Self-Recovery,pack,DP,ok,name-en-publishable/1
+DP.SC.009,Аналитика и метрики,Analytics and Metrics,pack,DP,ok,name-en-publishable/1
+DP.SC.010,Рабочий ритм (ОРЗ),Work Rhythm (ORZ),pack,DP,ok,name-en-publishable/1
+DP.SC.011,Стратегирование и Планирование,Strategizing,pack,DP,ok,name-en-publishable/1
+DP.SC.012,Онбординг,Onboarding,pack,DP,ok,name-en-publishable/1
+DP.SC.013,Рабочая сессия с Claude Code,Work Session with Claude Code,pack,DP,ok,name-en-publishable/1
+DP.SC.014,Формализация знаний (Pack),Knowledge Formalization (Pack),pack,DP,ok,name-en-publishable/1
+DP.SC.015,Развитие системы (DS),System Development (DS),pack,DP,ok,name-en-publishable/1
+DP.SC.016,Коллективное управление рабочими продуктами,Collective Work Product Management,pack,DP,ok,name-en-publishable/1
+DP.SC.017,Адаптивное задание на день,Adaptive Daily Assignment,pack,DP,ok,name-en-publishable/1
+DP.SC.018,Переход T3 → T4 (присоединение к git),T3 → T4 Transition (Joining Git),pack,DP,ok,name-en-publishable/1
+DP.SC.019,Автономная работа IWE (Cloud Runtime),Exocortex Update,pack,DP,ok,name-en-publishable/1
+DP.SC.020,Персональная программа развития,Personal Development Program,pack,DP,ok,name-en-publishable/1
+DP.SC.026,Мониторинг поведения агента,Agent Behavior Monitoring,pack,DP,ok,name-en-publishable/1
+DP.SC.028,Семиотическое качество Pack,Pack Semiotic Quality,pack,DP,ok,name-en-publishable/1
+DP.SC.033,Целостность жизненного цикла РП,Work Product Lifecycle Integrity,pack,DP,ok,name-en-publishable/1
+DP.SC.034,Local MCP Gateway для multi-agent VS Code,Local MCP Gateway for multi-agent VS Code,pack,DP,ok,name-en-publishable/1
+DP.SC.035,Peer-agent choreography (turn-based координация),Peer-agent choreography (turn-based coordination),pack,DP,ok,name-en-publishable/1
+DP.SC.041,Индикатор мультипликатора IWE в характеристике мастерства,IWE Multiplier Indicator in Mastery Characteristic,pack,DP,ok,name-en-publishable/1
+DP.SC.045,Анализ ограничения системы (TOC),Constraint Analysis (TOC),pack,DP,ok,name-en-publishable/1
+DP.SC.046,Runtime-цикл IWE (open → work → close),IWE Runtime Cycle (open → work → close),pack,DP,ok,name-en-publishable/1
+DP.SC.047,Презентация к публичному событию,Presentation for Public Event,pack,DP,ok,name-en-publishable/1
+DP.SC.048,Создатель паков,Pack Creator,pack,DP,ok,name-en-publishable/1
+DP.SC.049,Менеджер оргразвития,Organizational Development Manager,pack,DP,ok,name-en-publishable/1
+DP.SC.053,Локальная сборка персонального руководства (приватный IWE-контур),Local personal guide assembly (private IWE contour),pack,DP,ok,name-en-publishable/1
+DP.SC.055,Разметка пользовательской базы знаний по типам данных,Personal knowledge base type structuring,pack,DP,ok,name-en-publishable/1
+DP.SC.056,Портативная сборка персонального руководства без серверов,"Portable personal guide generation, zero servers",pack,DP,ok,name-en-publishable/1
+DP.SC.057,Маршрутизация знаний пользователя,User knowledge routing,pack,DP,ok,name-en-publishable/1
+DP.SC.058,Route skill — маршрутизация материала пользователя,Material routing via /route skill,pack,DP,ok,name-en-publishable/1
+DP.SC.060,Живой доступ guide-kit к курируемым материалам платформы,Live guide-kit access to curated platform materials,pack,DP,ok,name-en-publishable/1
+DP.SC.062,Публикация курируемого манифеста в исследовательский репозиторий iwesys,Curated manifest publish to an iwesys research repository,pack,DP,ok,name-en-publishable/1
+DP.SC.063,Agent connect & select (простое подключение и выбор агента),Agent connect & select,pack,DP,ok,name-en-publishable/1
+DP.SC.065,Декомпозиция прикладных источников,Applied source decomposition,pack,DP,ok,name-en-publishable/1
+DP.SC.066,honest-rung-labelling,Honest rung labelling for development claims,pack,DP,ok,name-en-publishable/1
+DP.SC.101,Вход и онбординг на платформе,Platform Entry and Onboarding,pack,DP,ok,name-en-publishable/1
+DP.SC.102,Непрерывное обучение,Continuous Learning,pack,DP,ok,name-en-publishable/1
+DP.SC.103,Работа над целевыми системами,Working on Target Systems,pack,DP,ok,name-en-publishable/1
+DP.SC.104,"Адаптивная персонализация через Персону, Память и Проекцию",Adaptive Personalization via Digital Twin,pack,DP,ok,name-en-publishable/1
+DP.SC.105,Экономика вклада — баллы и репутация,Contribution Economy — Points and Reputation,pack,DP,ok,name-en-publishable/1
+DP.SC.106,Сообщество и культурная диффузия,Community and Cultural Diffusion,pack,DP,ok,name-en-publishable/1
+DP.SC.107,Мультиповерхностный доступ,Multi-Surface Access,pack,DP,ok,name-en-publishable/1
+DP.SC.108,Формирование команд,Team Formation,pack,DP,ok,name-en-publishable/1
+DP.SC.109,Масштабирование — Global Core + Local Edge,Scaling — Global Core + Local Edge,pack,DP,ok,name-en-publishable/1
+DP.SC.110,Управление потоками и наставничество,Stream Management and Mentoring,pack,DP,ok,name-en-publishable/1
+DP.SC.111,Назначение на позицию,Position Assignment,pack,DP,ok,name-en-publishable/1
+DP.SC.112,Подписка и оплата,Subscription and Payment,pack,DP,ok,name-en-publishable/1
+DP.SC.113,Авторство и Revenue Sharing,Authorship and Revenue Sharing,pack,DP,ok,name-en-publishable/1
+DP.SC.114,CRM и работа с участниками,CRM and Participant Management,pack,DP,ok,name-en-publishable/1
+DP.SC.115,Маркетинг и привлечение,Marketing and Acquisition,pack,DP,ok,name-en-publishable/1
+DP.SC.116,Уведомления и nudges,Notifications and Nudges,pack,DP,ok,name-en-publishable/1
+DP.SC.117,Асинхронная проверка и обсуждение ДЗ,Async Homework Review and Discussion,pack,DP,ok,name-en-publishable/1
+DP.SC.118,Ассистент упоминаний в каналах,Channel Mention Assistant,pack,DP,ok,name-en-publishable/1
+DP.SC.119,Рабочее пространство из браузера,Browser-Based Workspace,pack,DP,ok,name-en-publishable/1
+DP.SC.152,Анализ ограничения ИТ-платформы (platform-bottleneck),Platform Constraint Analysis,pack,DP,ok,name-en-publishable/1
+DP.SC.153,Скилл-система IWE,IWE Skill System,pack,DP,ok,name-en-publishable/1
+DP.SC.154,Мульти-агентная диалоговая сессия,Multi-agent conversational session,pack,DP,ok,name-en-publishable/1
+DP.SC.159,Маршрутизатор задач IWE,IWE Task Router,pack,DP,ok,name-en-publishable/1
+DP.SC.160,Артефактор-Постановщик задач IWE,IWE Task Formulator,pack,DP,ok,name-en-publishable/1
+DP.SC.161,Session Memory Injector,Session Memory Injector,pack,DP,ok,name-en-publishable/1
+DP.SC.162,External Session Request,External Working Session,pack,DP,ok,name-en-publishable/1
+DP.SC.164,Доставка персонального руководства пилоту,Personal guide delivery,pack,DP,ok,name-en-publishable/1
+DP.SC.166,Сторож новых задач — ежедневный дайджест в Telegram,Issue watcher — daily new-issues digest,pack,DP,ok,name-en-publishable/1
+DP.SC.168,Онбординг платформы — зонтичное обещание,Platform Onboarding Umbrella Promise,pack,DP,ok,name-en-publishable/1
+DP.SC.173,Реестр языковых стилей,Language Style Registry,pack,DP,ok,name-en-publishable/1
+DP.SC.174,Диспетчер контекста стилей,Style Context Dispatcher,pack,DP,ok,name-en-publishable/1
+DP.SC.175,Выбор стиля пользователем,User Style Selection,pack,DP,ok,name-en-publishable/1
+DP.SC.176,Табло показателей пользователя,User Indicator Dashboard,pack,DP,ok,name-en-publishable/1
+DP.SC.NNN,"{""Название обещания""}",{Service Promise Name},pack,DP,ok,name-en-publishable/1
+DP.SOTA.001,DDD Strategic (Khononov),DDD Strategic (Khononov),pack,DP,ok,name-en-publishable/1
+DP.SOTA.002,Context Engineering,Context Engineering,pack,DP,ok,name-en-publishable/1
+DP.SOTA.003,Open API Specifications,Open API Specifications,pack,DP,ok,name-en-publishable/1
+DP.SOTA.004,GraphRAG + Knowledge Graphs,GraphRAG + Knowledge Graphs,pack,DP,ok,name-en-publishable/1
+DP.SOTA.005,AI-Native Org Design,AI-Native Org Design,pack,DP,ok,name-en-publishable/1
+DP.SOTA.006,Agentic Development,Agentic Development,pack,DP,ok,name-en-publishable/1
+DP.SOTA.007,AI-Accelerated Ontology Engineering,AI-Accelerated Ontology Engineering,pack,DP,ok,name-en-publishable/1
+DP.SOTA.008,Real-Time Knowledge Capture,Real-Time Knowledge Capture,pack,DP,ok,name-en-publishable/1
+DP.SOTA.009,Knowledge-Based User Models (Persona / Memory / Projection),Knowledge-Based Digital Twins,pack,DP,ok,name-en-publishable/1
+DP.SOTA.010,DSL → DSLM Evolution,DSL → DSLM Evolution,pack,DP,ok,name-en-publishable/1
+DP.SOTA.011,Coupling Model (Khononov 2024),Coupling Model (Khononov 2024),pack,DP,ok,name-en-publishable/1
+DP.SOTA.012,Multi-Representation Knowledge Architecture,Multi-Representation Knowledge Architecture,pack,DP,ok,name-en-publishable/1
+DP.SOTA.013,World Models,World Models,pack,DP,ok,name-en-publishable/1
+DP.SOTA.014,MCP как де-факто стандарт 2026,MCP as De Facto Standard 2026,pack,DP,ok,name-en-publishable/1
+DP.SOTA.015,AI/LLM System Observability (3+1 Framework),AI/LLM System Observability (3+1 Framework),pack,DP,ok,name-en-publishable/1
+DP.SOTA.016,Database-per-Service (паттерн изоляции данных),Database-per-Service (Data Isolation Pattern),pack,DP,ok,name-en-publishable/1
+DP.SOTA.017,Концептуальные графы — мировой опыт,Concept Graphs — World Experience,pack,DP,ok,name-en-publishable/1
+DP.SYS.001,Детерминированные системы,Deterministic Systems,pack,DP,ok,name-en-publishable/1
+DP.VM.001,Calibration Matrix — P1-P9 Value Milestones,P1-P9 Value Milestones Calibration Matrix,pack,DP,ok,name-en-publishable/1
+DP.WP.001,Отчёт экстракции,Extraction Report,pack,DP,ok,name-en-publishable/1
+DP.WP.002,Ubiquitous Language,Ubiquitous Language,pack,DP,ok,name-en-publishable/1
+DP.WP.003,DayPlan,DayPlan,pack,DP,ok,name-en-publishable/1
+DP.WP.004,WeekPlan,WeekPlan,pack,DP,ok,name-en-publishable/1
+DP.WP.005,WeekReport,WeekReport,pack,DP,ok,name-en-publishable/1
+DP.WP.006,Fleeting Notes,Fleeting Notes,pack,DP,ok,name-en-publishable/1
+DP.WP.007,Consistency Report,Consistency Report,pack,DP,ok,name-en-publishable/1
+DP.WP.008,Code Scan Report,Code Scan Report,pack,DP,ok,name-en-publishable/1
+DP.WP.009,Unsatisfied Questions Report,Unsatisfied Questions Report,pack,DP,ok,name-en-publishable/1
+DP.WP.010,CQRS Pack Projection,CQRS Pack Projection,pack,DP,ok,name-en-publishable/1
+DP.WP.011,Triage Backlog,Triage Backlog,pack,DP,ok,name-en-publishable/1
+DP.WP.012,Analytics Report,Analytics Report,pack,DP,ok,name-en-publishable/1
+DP.WP.013,Publication Schedule,Publication Schedule,pack,DP,ok,name-en-publishable/1
+DP.WP.014,Validation Report,Validation Report,pack,DP,ok,name-en-publishable/1
+DP.WP.015,WP-Registry,WP-Registry,pack,DP,ok,name-en-publishable/1
+DP.WP.016,Stage Dependency Map (Карта этапов с зависимостями),Stage Dependency Map,pack,DP,ok,name-en-publishable/1
+ECO.D.001,SAFE ≠ Convertible Note ≠ Priced Equity Round,SAFE ≠ Convertible Note ≠ Priced Equity Round,pack,ECO,ok,name-en-publishable/1
+ECO.D.002,Lean Canvas ≠ Business Model Canvas,Lean Canvas ≠ Business Model Canvas,pack,ECO,ok,name-en-publishable/1
+ECO.D.003,Education ≠ Intelligence Development,Education ≠ Intelligence Development,pack,ECO,ok,name-en-publishable/1
+ECO.M.002,Canvas Selection Method,Canvas Selection Method,pack,ECO,ok,name-en-publishable/1
+ECO.M.003,Jobs-to-be-Done + Value Proposition Canvas Integration,Jobs-to-be-Done + Value Proposition Canvas Integration,pack,ECO,ok,name-en-publishable/1
+ECO.MAP.001,Pack Navigation Map,Pack Navigation Map,pack,ECO,ok,name-en-publishable/1
+ECO.MAP.002,S2R Domain View,S2R Domain View,pack,ECO,ok,name-en-publishable/1
+ECO.SOTA.001,EdTech Seed Funding Environment (2024-2026),EdTech Seed Funding Environment (2024-2026),pack,ECO,ok,name-en-publishable/1
+ECO.SOTA.002,Freemium Models in EdTech (2025-2026),Freemium Models in EdTech (2025-2026),pack,ECO,ok,name-en-publishable/1
+LS.D.003,Агент-агентный стиль (база),Agent-to-agent style (base),pack,LS,ok,name-en-publishable/1
+LS.D.004,Академический стиль руководства (база),Academic guide style (base),pack,LS,ok,name-en-publishable/1
+LS.FORM.000,Базовый регистр (fallback),Base register (fallback),pack,LS,ok,name-en-publishable/1
+LS.FORM.001,Регистр пилота в IDE (разговорный),Pilot-in-IDE register (conversational),pack,LS,ok,name-en-publishable/1
+LS.FORM.002,Регистр разработчика (инженерный код),Developer register (engineering code),pack,LS,ok,name-en-publishable/1
+LS.FORM.003,Регистр peer-стенограммы (напарник),Peer transcript register,pack,LS,ok,name-en-publishable/1
+LS.FORM.004,Регистр handoff (исполнитель),Handoff register,pack,LS,ok,name-en-publishable/1
+LS.FORM.005,Регистр контракта задачи (исполнитель),Task-contract register,pack,LS,ok,name-en-publishable/1
+LS.FORM.006,Регистр коммита (исполнитель),Commit register,pack,LS,ok,name-en-publishable/1
+LS.FORM.007,Регистр PR (исполнитель),Pull request register,pack,LS,ok,name-en-publishable/1
+LS.FORM.008,Регистр поста (автор-публикатор),Post register,pack,LS,ok,name-en-publishable/1
+LS.FORM.009,Регистр универсального руководства (ученик),Universal guide register,pack,LS,ok,name-en-publishable/1
+LS.FORM.010,Регистр Telegram (новичок),Telegram register,pack,LS,ok,name-en-publishable/1
+LS.FORM.011,Регистр браузера (пилот),Browser register,pack,LS,ok,name-en-publishable/1
+MIM.FM.001,Послушал = научился,Heard = Learned,pack,MIM,ok,name-en-publishable/1
+MIM.FM.002,Заучивание ошибок,Learning Errors by Rote,pack,MIM,ok,name-en-publishable/1
+MIM.FM.003,Застревание на повторе,Stuck in Repetition,pack,MIM,ok,name-en-publishable/1
+MIM.FM.004,Лекция = Обучение,Lecture = Learning,pack,MIM,ok,name-en-publishable/1
+MIM.FM.005,Один размер для всех,One Size Fits All,pack,MIM,ok,name-en-publishable/1
+MIM.FM.006,Проверка знаний вместо навыков,Knowledge Testing instead of Skills,pack,MIM,ok,name-en-publishable/1
+MIM.FM.007,Контент без практики,Content without Practice,pack,MIM,ok,name-en-publishable/1
+MIM.FM.008,Игнорирование предварительного опыта,Ignoring Prior Experience,pack,MIM,ok,name-en-publishable/1
+MIM.FM.009,Поверхностная геймификация,Shallow Gamification,pack,MIM,ok,name-en-publishable/1
+MIM.FMT.001,Семинар,Seminar,pack,MIM,ok,name-en-publishable/1
+MIM.FMT.002,Практикум,Workshop,pack,MIM,ok,name-en-publishable/1
+MIM.FMT.003,Резидентура,Residency,pack,MIM,ok,name-en-publishable/1
+MIM.FMT.004,Разбор,Case Review,pack,MIM,ok,name-en-publishable/1
+MIM.FMT.005,Марафон,Marathon,pack,MIM,ok,name-en-publishable/1
+MIM.FORM.001,Таксономия Блума (Bloom's Taxonomy),Bloom's Taxonomy,pack,MIM,ok,name-en-publishable/1
+MIM.FORM.002,Модель ADDIE,ADDIE Model,pack,MIM,ok,name-en-publishable/1
+MIM.FORM.003,Возрастные группы обучения,Age Groups in Learning,pack,MIM,ok,name-en-publishable/1
+MIM.FORM.004,Three-Level Method Hierarchy,Three-Level Method Hierarchy,pack,MIM,ok,name-en-publishable/1
+MIM.FORM.006,Модель профиля мышления (МПМ),Thinking Profile Model (TPM),pack,MIM,ok,name-en-publishable/1
+MIM.FORM.007,Конструктор программ (КП),Program Constructor (PC),pack,MIM,ok,name-en-publishable/1
+MIM.M.001,Deliberate Practice,Deliberate Practice,pack,MIM,ok,name-en-publishable/1
+MIM.M.002,Наставничество через разбор,Mentoring through Case Review,pack,MIM,ok,name-en-publishable/1
+MIM.M.003,Инженерный цикл развития,Engineering Development Cycle,pack,MIM,ok,name-en-publishable/1
+MIM.M.004,Квалификационная рамка: три шкалы,Qualification Framework: Three Scales,pack,MIM,ok,name-en-publishable/1
+MIM.M.005,Интеллектуальные партнёры,Intellectual Partners,pack,MIM,ok,name-en-publishable/1
+MIM.M.006,Scaffolding,Scaffolding,pack,MIM,ok,name-en-publishable/1
+MIM.M.007,Problem-Based Learning (PBL),Problem-Based Learning (PBL),pack,MIM,ok,name-en-publishable/1
+MIM.M.008,Case Method,Case Method,pack,MIM,ok,name-en-publishable/1
+MIM.M.009,Experiential Learning Cycle,Experiential Learning Cycle,pack,MIM,ok,name-en-publishable/1
+MIM.M.010,Backwards Design (Understanding by Design),Backwards Design (Understanding by Design),pack,MIM,ok,name-en-publishable/1
+MIM.M.011,Retrieval Practice,Retrieval Practice,pack,MIM,ok,name-en-publishable/1
+MIM.M.012,Spaced Repetition,Spaced Repetition,pack,MIM,ok,name-en-publishable/1
+MIM.M.013,Spiral Curriculum (Спиральный учебный план),Spiral Curriculum,pack,MIM,ok,name-en-publishable/1
+MIM.M.030,Классификатор типа системы,System Type Classifier,pack,MIM,ok,name-en-publishable/1
+MIM.M.031,Маршрутная таблица руководств программы РР,PR Program Guide Routing Table,pack,MIM,ok,name-en-publishable/1
+MIM.MAP.001,Шаблон ячейки Компетенция × Глубина,Competency-Depth Cell Template,pack,MIM,ok,name-en-publishable/1
+MIM.MAP.002,Матрица применения различений в форматах МИМ,Distinction Application Matrix in MIM Formats,pack,MIM,ok,name-en-publishable/1
+MIM.MAP.003,S2R Domain View,S2R Domain View,pack,MIM,ok,name-en-publishable/1
+MIM.PRG.001,Программа личного развития,Personal Development Program,pack,MIM,ok,name-en-publishable/1
+MIM.PRG.002,Программа рабочего развития,Professional Development Program,pack,MIM,ok,name-en-publishable/1
+MIM.PRG.003,Программа исследовательского развития,Research Development Program,pack,MIM,ok,name-en-publishable/1
+MIM.R.001,Наставник,Mentor,pack,MIM,ok,name-en-publishable/1
+MIM.R.002,Докладчик,Speaker,pack,MIM,ok,name-en-publishable/1
+MIM.R.003,Резидент,Resident,pack,MIM,ok,name-en-publishable/1
+MIM.R.004,Мастер,Master,pack,MIM,ok,name-en-publishable/1
+MIM.R.005,Интеллектуальный партнёр,Intellectual Partner,pack,MIM,ok,name-en-publishable/1
+MIM.R.006,Ментор,Mentor Coach,pack,MIM,ok,name-en-publishable/1
+MIM.R.007,Навигатор,Navigator,pack,MIM,ok,name-en-publishable/1
+MIM.R.008,Проектировщик программ,Program Designer,pack,MIM,ok,name-en-publishable/1
+MIM.R.009,Диагност узких мест,Bottleneck Diagnostician,pack,MIM,ok,name-en-publishable/1
+MIM.R.010,Конструктор ячеек,Cell Constructor,pack,MIM,ok,name-en-publishable/1
+MIM.SOP.001,Сборка занятия (Tailor Assembly),Tailor Assembly,pack,MIM,ok,name-en-publishable/1
+MIM.WP.001,Слайдомент,Slidument,pack,MIM,ok,name-en-publishable/1
+MIM.WP.002,Шедевр,Masterpiece,pack,MIM,ok,name-en-publishable/1
+MIM.WP.003,Замер квалификации,Qualification Assessment,pack,MIM,ok,name-en-publishable/1
+MIM.WP.004,Learning Requirements (ТЗ на обучение),Learning Requirements,pack,MIM,ok,name-en-publishable/1
+MIM.WP.005,Assessment Rubric (Оценочная рубрика),Assessment Rubric,pack,MIM,ok,name-en-publishable/1
+MIM.WP.006,Lesson Plan (План занятия),Lesson Plan,pack,MIM,ok,name-en-publishable/1
+MIM.WP.007,Learning Progression Map (Карта прогресса),Learning Progression Map,pack,MIM,ok,name-en-publishable/1
+MIM.WP.008,Diagnostic Assessment (Диагностический тест принципов),Principles Proficiency Diagnostic Assessment,pack,MIM,ok,name-en-publishable/1
+PD.CAT.003,Карточки практик саморазвития,Self-Development Practice Cards,pack,PD,ok,name-en-publishable/1
+PD.CAT.006,PD.CAT.006 — Осваиваемые прикладные мастерства,Applied Mastery Focus,pack,PD,ok,name-en-publishable/1
+PD.FAIL.001,Time Accounting Confused with Pomodoro,Time Accounting Confused with Pomodoro,pack,PD,ok,name-en-publishable/1
+PD.FAIL.002,Time Accounting Confused with Discipline,Time Accounting Confused with Discipline,pack,PD,ok,name-en-publishable/1
+PD.FAIL.003,Time Accounting Confused with Control,Time Accounting Confused with Control,pack,PD,ok,name-en-publishable/1
+PD.FAIL.004,Time Accounting Confused with Productivity Hack,Time Accounting Confused with Productivity Hack,pack,PD,ok,name-en-publishable/1
+PD.FAIL.005,Tool Confused with Method,Tool Confused with Method,pack,PD,ok,name-en-publishable/1
+PD.FAIL.006,Work Product Confused with Description,Work Product Confused with Description,pack,PD,ok,name-en-publishable/1
+PD.FAIL.007,Description Confused with Knowledge,Description Confused with Knowledge,pack,PD,ok,name-en-publishable/1
+PD.FAIL.008,Learner-Client Role Confusion,Learner-Client Role Confusion,pack,PD,ok,name-en-publishable/1
+PD.FAIL.009,Inability to Sustain Long-Term Learning,Inability to Sustain Long-Term Learning,pack,PD,ok,name-en-publishable/1
+PD.FAIL.010,High Time Accounting Without Echeloned Leisure,High Time Accounting Without Echeloned Leisure,pack,PD,ok,name-en-publishable/1
+PD.FAIL.011,Master Stagnation Without Transition to Educator,Master Stagnation Without Transition to Educator,pack,PD,ok,name-en-publishable/1
+PD.FAIL.012,Environment-Driven Reading,Environment-Driven Reading,pack,PD,ok,name-en-publishable/1
+PD.FAIL.013,Writing from Blank Page,Writing from Blank Page,pack,PD,ok,name-en-publishable/1
+PD.FAIL.014,Perfectionism Paralysis,Perfectionism Paralysis,pack,PD,ok,name-en-publishable/1
+PD.FAIL.015,Unsorted Notes Accumulation,Unsorted Notes Accumulation,pack,PD,ok,name-en-publishable/1
+PD.FAIL.016,Pleasant Conversation Mistaken for Practice,Pleasant Conversation Mistaken for Practice,pack,PD,ok,name-en-publishable/1
+PD.FAIL.017,Blaming Everything on Planning,Blaming Everything on Planning,pack,PD,ok,name-en-publishable/1
+PD.FAIL.018,Too Much Urgent Displacing Important,Too Much Urgent Displacing Important,pack,PD,ok,name-en-publishable/1
+PD.FAIL.019,Procrastination as Refusal of Unclear Task,Procrastination as Refusal of Unclear Task,pack,PD,ok,name-en-publishable/1
+PD.FAIL.020,Passive Leisure Default,Passive Leisure Default,pack,PD,ok,name-en-publishable/1
+PD.FAIL.021,Ignoring Sleep and Daily Routine,Ignoring Sleep and Daily Routine,pack,PD,ok,name-en-publishable/1
+PD.FAIL.022,Fatal Strategic Error,Fatal Strategic Error,pack,PD,ok,name-en-publishable/1
+PD.FAIL.023,High Agency Without Mastery,High Agency Without Mastery,pack,PD,ok,name-en-publishable/1
+PD.FAIL.024,Mental Aging / Knowledge Decay Without Learning,Mental Aging / Knowledge Decay Without Learning,pack,PD,ok,name-en-publishable/1
+PD.FAIL.025,Indoctrination Default / Unexamined Beliefs,Indoctrination Default / Unexamined Beliefs,pack,PD,ok,name-en-publishable/1
+PD.FAIL.026,Role-Person Conflation in Conflict,Role-Person Conflation in Conflict,pack,PD,ok,name-en-publishable/1
+PD.FAIL.027,Non-Integral Success / Success in One Sphere at Cost of Others,Non-Integral Success / Success in One Sphere at Cost of Others,pack,PD,ok,name-en-publishable/1
+PD.FAIL.028,Social Environment Dependency Cycle,Social Environment Dependency Cycle,pack,PD,ok,name-en-publishable/1
+PD.FAIL.029,Discomposure Cycle (Цикл разобранности),Discomposure Cycle,pack,PD,ok,name-en-publishable/1
+PD.FAIL.030,Excessive Composure / Hyper-Focus,Excessive Composure / Hyper-Focus,pack,PD,ok,name-en-publishable/1
+PD.FAIL.031,Uncontrolled Self-Reflection (Rumination),Uncontrolled Self-Reflection (Rumination),pack,PD,ok,name-en-publishable/1
+PD.FAIL.032,Careerist Trap (Ловушка карьериста),Careerist Trap,pack,PD,ok,name-en-publishable/1
+PD.FAIL.033,No External Work Products (Productivity Illusion),No External Work Products (Productivity Illusion),pack,PD,ok,name-en-publishable/1
+PD.FAIL.034,Acting Without Role Awareness (Unconscious Method),Acting Without Role Awareness (Unconscious Method),pack,PD,ok,name-en-publishable/1
+PD.FAIL.035,Force-Through Instead of Regulation,Force-Through Instead of Regulation,pack,PD,ok,name-en-publishable/1
+PD.FAIL.036,Overtraining Without Recovery,Overtraining Without Recovery,pack,PD,ok,name-en-publishable/1
+PD.FAIL.044,Development-as-Sacrifice Framing,Development-as-Sacrifice Framing,pack,PD,ok,name-en-publishable/1
+PD.FAIL.045,Affordance Delegation to AI,Affordance Delegation to AI,pack,PD,ok,name-en-publishable/1
+PD.FAIL.046,Role Legitimacy Triad Mismatch,Role Legitimacy Triad Mismatch,pack,PD,ok,name-en-publishable/1
+PD.FAIL.047,Pomodoro Without Conceptual Guidance,Pomodoro Without Conceptual Guidance,pack,PD,ok,name-en-publishable/1
+PD.FAIL.048,Knowledge Base Without Priorities,Knowledge Base Without Priorities,pack,PD,ok,name-en-publishable/1
+PD.FAIL.050,Self-Criticism as Resource Leak,Self-Criticism as Resource Leak,pack,PD,ok,name-en-publishable/1
+PD.FAIL.052,Impostor Syndrome as Transition Block,Impostor Syndrome as Transition Block,pack,PD,ok,name-en-publishable/1
+PD.FAIL.053,Unrecognized Intelligence Deficit,Unrecognized Intelligence Deficit,pack,PD,ok,name-en-publishable/1
+PD.FAIL.054,Quality Inversion in Impostor Syndrome,Quality Inversion in Impostor Syndrome,pack,PD,ok,name-en-publishable/1
+PD.FAIL.055,Накопление знания без компиляции,Knowledge Without Compilation,pack,PD,ok,name-en-publishable/1
+PD.FAIL.057,Quiet Fear Autopilot Life,Quiet Fear Autopilot Life,pack,PD,ok,name-en-publishable/1
+PD.FAIL.058,No-Time Thinking Bug,No-Time Thinking Bug,pack,PD,ok,name-en-publishable/1
+PD.FAIL.060,Shame as Development Blocker,Shame as Development Blocker,pack,PD,ok,name-en-publishable/1
+PD.FAIL.061,Insight Without Rhythm,Insight Without Rhythm,pack,PD,ok,name-en-publishable/1
+PD.FAIL.062,Entropy Capitulation,Entropy Capitulation,pack,PD,ok,name-en-publishable/1
+PD.FAIL.063,Disappearing Notes Spiral,Disappearing Notes Spiral,pack,PD,ok,name-en-publishable/1
+PD.FAIL.064,Five Breakpoints of Adult Learning,Five Breakpoints of Adult Learning,pack,PD,ok,name-en-publishable/1
+PD.FAIL.065,Easy Life Trap,Easy Life Trap,pack,PD,ok,name-en-publishable/1
+PD.FAIL.066,Evening Trap,Evening Trap,pack,PD,ok,name-en-publishable/1
+PD.FAIL.071,Коллекционирование методов без изменения культуры (эффект Земмельвейса),Method Collecting Without Culture (Semmelweis Effect),pack,PD,ok,name-en-publishable/1
+PD.FAIL.072,AI Thinking Atrophy,Cognitive Atrophy With Daily AI Use,pack,PD,ok,name-en-publishable/1
+PD.FORM.019,Интеллект-стек — 16 трансдисциплин,Intelligence Stack,pack,PD,ok,name-en-publishable/1
+PD.FORM.078,Strategic Position States & Playbooks,Strategic Position States & Playbooks,pack,PD,ok,name-en-publishable/1
+PD.FORM.080,Матрица нормативных состояний по ступеням,Normative State Matrix By Level,pack,PD,ok,name-en-publishable/1
+PD.FORM.082,3 контекста стиля жизни,Three Lifestyle Development Contexts,pack,PD,ok,name-en-publishable/1
+PD.FORM.087,Ролевая траектория созидателя,Creator Role Trajectory Model,pack,PD,ok,name-en-publishable/1
+PD.FORM.090,Уровни деятельностного охвата созидателя,Creator Activity Scope Levels,pack,PD,ok,name-en-publishable/1
+PD.FORM.091,Карта роста созидателя,Creator Growth Map,pack,PD,ok,name-en-publishable/1
+PD.FORM.092,ЛР как массовая программа,LR as Mass Program,pack,PD,ok,name-en-publishable/1
+PD.FORM.097,Мировоззрение как исполняемый код,Worldview as Executable Code,pack,PD,ok,name-en-publishable/1
+PD.FORM.098,Стиль как материал личного развития,Style as Personal Development Material,pack,PD,ok,name-en-publishable/1
+PD.FORM.099,Внутренние маркеры развития интеллекта,Internal Markers of Intellectual Development,pack,PD,ok,name-en-publishable/1
+PD.FORM.105,Квалификационная шкала ШСМ,ShSM Qualification Scale: Eight Levels of Creator Mastery,pack,PD,ok,name-en-publishable/1
+PD.FORM.106,Степени квалификации программы Рабочего развития,Worker Development Program Qualification Levels,pack,PD,ok,name-en-publishable/1
+PD.FORM.107,Нормативная матрица по степеням квалификации программы РР,Worker Development Qualification-Level × Direction Normative Matrix,pack,PD,ok,name-en-publishable/1
+PD.FORM.108,RCS Интеллектуала,Intellectual RCS: Diagnostic Slices of Thinking Mastery,pack,PD,ok,name-en-publishable/1
+PD.FORM.109,Каталог характеристик выпускника-Мастера,Catalog of Master-Graduate Characteristics,pack,PD,ok,name-en-publishable/1
+PD.FORM.123,Практика,Practice,pack,PD,ok,name-en-publishable/1
+PD.FORM.138,Физический слой ст. 0 — saneness,Physical Layer Stage 0 (Saneness) — Pre-condition of Personal Development Program,pack,PD,ok,name-en-publishable/1
+PD.MAP.001,Pack Navigation Map,Pack Navigation Map,pack,PD,ok,name-en-publishable/1
+PD.METHOD.001,Time Accounting,Time Accounting,pack,PD,ok,name-en-publishable/1
+PD.METHOD.003,Systematic Slow Reading,Systematic Slow Reading,pack,PD,ok,name-en-publishable/1
+PD.METHOD.004,Thinking in Writing,Thinking in Writing,pack,PD,ok,name-en-publishable/1
+PD.METHOD.005,Thinking by Speaking,Thinking by Speaking,pack,PD,ok,name-en-publishable/1
+PD.METHOD.006,Leisure Organization,Leisure Organization,pack,PD,ok,name-en-publishable/1
+PD.METHOD.007,Environment Formation,Environment Formation,pack,PD,ok,name-en-publishable/1
+PD.METHOD.008,Strategizing,Strategizing,pack,PD,ok,name-en-publishable/1
+PD.METHOD.009,Planning,Planning,pack,PD,ok,name-en-publishable/1
+PD.METHOD.010,Daily Reflective Role-Product Review,Daily Reflective Role-Product Review,pack,PD,ok,name-en-publishable/1
+PD.METHOD.012,Day Rhythm (OWC Fractal),Day Rhythm (OWC Fractal),pack,PD,ok,name-en-publishable/1
+PD.METHOD.015,Первый слот саморазвития,First Development Slot,pack,PD,ok,name-en-publishable/1
+PD.METHOD.018,Lifework Pack Composition,Lifework Pack Composition,pack,PD,ok,name-en-publishable/1
+PD.METHOD.019,Творческий конвейер,Creative Pipeline,pack,PD,ok,name-en-publishable/1
+PD.METHOD.020,Гигиенический минимум развития,Hygiene Minimum of Development,pack,PD,ok,name-en-publishable/1
+PD.METHOD.021,Культура ученика как допуск к SoTA,Learner Culture as SoTA Gateway,pack,PD,ok,name-en-publishable/1
+PD.METHOD.022,Работа с состоянием,State Work,pack,PD,ok,name-en-publishable/1
+PD.METHOD.023,Управление тремя потоками созидателя,Managing Three Creator Streams,pack,PD,ok,name-en-publishable/1
+PD.METHOD.024,Мастерство взаимодействия с ИИ,AI Interaction Mastery,pack,PD,ok,name-en-publishable/1
+PD.METHOD.025,[PD.METHOD.025] Каскад планирования Ученика,Learner Planning Cascade,pack,PD,ok,name-en-publishable/1
+PD.METHOD.028,[PD.METHOD.028] Рефлексия с read-back агентом,Reflection with Read-Back Agent,pack,PD,ok,name-en-publishable/1
+PD.METHOD.030,Шкала качества с якорями на каждом делении (Anchored Quality Scale),Anchored Quality Scale,pack,PD,ok,name-en-publishable/1
+PD.METHOD.031,Node Tree + bh/cp views: структура модели развития созидателя,Node Tree and bh/cp Views,pack,PD,ok,name-en-publishable/1
+PD.METHOD.032,Шаблон подраздела руководства v4,Guide Subsection Template v4,pack,PD,ok,name-en-publishable/1
+PD.METHOD.037,Понятийная работа,Conceptual Work,pack,PD,ok,name-en-publishable/1
+PD.METHOD.038,Моделирование (мыслительный приём),Modelling as Thinking Technique,pack,PD,ok,name-en-publishable/1
+PD.METHOD.039,Эпистемический ритм,Epistemic Rhythm,pack,PD,ok,name-en-publishable/1
+PD.METHOD.040,Перенос теории в практику,Transfer of Learning,pack,PD,ok,name-en-publishable/1
+PD.METHOD.041,Работа Интеллектуала с наставником,Intellectual's Mentor Partnership,pack,PD,ok,name-en-publishable/1
+PD.METHOD.046,[PD.METHOD.046] Установка baseline сна,Sleep Baseline (Physical Layer Stage 0),pack,PD,ok,name-en-publishable/1
+PD.METHOD.047,[PD.METHOD.047] Ритм вечерних прогулок,Walk Rhythm Evening (Physical Layer Stage 0),pack,PD,ok,name-en-publishable/1
+PD.METHOD.048,[PD.METHOD.048] Ежедневная самооценка энергии,Energy Self-Assessment Daily (Physical Layer Stage 0),pack,PD,ok,name-en-publishable/1
+PD.METHOD.049,Метод расчёта мультипликатора IWE,IWE Multiplier Calculation Method,pack,PD,ok,name-en-publishable/1
+PD.METHOD.054,PD.METHOD.054 — Детерминированная маршрутизация заданий,Deterministic Assignment Routing by Stage (IR=0 Invariant),pack,PD,ok,name-en-publishable/1
+PD.METHOD.056,Двухслойная формула коммуникации,Two-Layer Communication Formula,pack,PD,ok,name-en-publishable/1
+PD.METHOD.057,Тест границы «личное ≠ продуктовое»,Personal-vs-Product Brand Boundary Test,pack,PD,ok,name-en-publishable/1
+PD.ROLE.002,Интеллектуал,Intellectual,pack,PD,ok,name-en-publishable/1
+PD.ROLE.003,Профессионал,Professional,pack,PD,ok,name-en-publishable/1
+PD.ROLE.006,Тело как первая система,Body as First System (Carrier of Personal Development Program),pack,PD,ok,name-en-publishable/1
+PD.ROLE.TRAJ.001,Ролевая траектория созидателя,Creator Role Trajectory Model,pack,PD,ok,name-en-publishable/1
+PD.SOTA.002,Strategy Tools,Strategy Tools,pack,PD,ok,name-en-publishable/1
+PD.SOTA.003,Cognitive Patterns of Multitasking and Parallel Orchestration,Cognitive Patterns of Multitasking and Parallel Orchestration,pack,PD,ok,name-en-publishable/1
+PD.SOTA.006,[PD.SOTA.006] Адаптивная персонализация в обучении,Adaptive Personalization in Learning,pack,PD,ok,name-en-publishable/1
+PD.SPEC.001,Контракт контекста Портного (Tailor Context Contract),Tailor Context Contract,pack,PD,ok,name-en-publishable/1
+PD.WP.001,Time Budget,Time Budget,pack,PD,ok,name-en-publishable/1
+PD.WP.003,Educational Notes,Educational Notes,pack,PD,ok,name-en-publishable/1
+PD.WP.004,Draft (Заготовка),Draft,pack,PD,ok,name-en-publishable/1
+PD.WP.005,Dissatisfaction List,Dissatisfaction List,pack,PD,ok,name-en-publishable/1
+PD.WP.006,Strategy (Document),Strategy (Document),pack,PD,ok,name-en-publishable/1
+PD.WP.007,Priority Projects List,Priority Projects List,pack,PD,ok,name-en-publishable/1
+PD.WP.008,Self-Development Mastery Progress,Self-Development Mastery Progress,pack,PD,ok,name-en-publishable/1
+PD.WP.009,Information Resources List,Information Resources List,pack,PD,ok,name-en-publishable/1
+PD.WP.010,Fleeting Notes,Fleeting Notes,pack,PD,ok,name-en-publishable/1
+PD.WP.011,Draft List,Draft List,pack,PD,ok,name-en-publishable/1
+PD.WP.012,Communication Errors List,Communication Errors List,pack,PD,ok,name-en-publishable/1
+PD.WP.013,My Leisure Practices,My Leisure Practices,pack,PD,ok,name-en-publishable/1
+PD.WP.014,Daily Routine,Daily Routine,pack,PD,ok,name-en-publishable/1
+PD.WP.015,Task List,Task List,pack,PD,ok,name-en-publishable/1
+PD.WP.016,Selection Criteria,Selection Criteria,pack,PD,ok,name-en-publishable/1
+PD.WP.017,Learner Diagnostic Map,Learner Diagnostic Map,pack,PD,ok,name-en-publishable/1
+PD.WP.018,Meaning Canvas,Meaning Canvas,pack,PD,ok,name-en-publishable/1
+PD.WP.019.stage-2,Практикующий,Practitioner,pack,PD,ok,name-en-publishable/1
+PD.WP.019.stage-3,Систематический,Systematic,pack,PD,ok,name-en-publishable/1
+PD.WP.019.stage-4,Дисциплинированный,Disciplined,pack,PD,ok,name-en-publishable/1
+U.BoundedContext,BoundedContext,BoundedContext,fpf,,ok,name-en-publishable/1
+U.Capability,Capability,Capability,fpf,,ok,name-en-publishable/1
+U.Characteristic,Characteristic,Characteristic,fpf,,ok,name-en-publishable/1
+U.Entity,Entity,Entity,fpf,,ok,name-en-publishable/1
+U.Episteme,Episteme,Episteme,fpf,,ok,name-en-publishable/1
+U.Holon,Holon,Holon,fpf,,ok,name-en-publishable/1
+U.Method,Method,Method,fpf,,ok,name-en-publishable/1
+U.Role,Role,Role,fpf,,ok,name-en-publishable/1
+U.RoleAssignment,RoleAssignment,RoleAssignment,fpf,,ok,name-en-publishable/1
+U.ServiceClause,ServiceClause,ServiceClause,fpf,,ok,name-en-publishable/1
+U.System,System,System,fpf,,ok,name-en-publishable/1
+U.Work,Work,Work,fpf,,ok,name-en-publishable/1
+ZP.1,Аксиоматичность,Axiomaticity,zp,,ok,name-en-publishable/1
+ZP.2,Структурность и симметрии,Structurality and Symmetries,zp,,ok,name-en-publishable/1
+ZP.3,Многомасштабность,Multi-Scale,zp,,ok,name-en-publishable/1
+ZP.4,Оптимизация,Optimization,zp,,ok,name-en-publishable/1
+ZP.5,Вероятность и информация,Probability and Information,zp,,ok,name-en-publishable/1
+ZP.6,Вычислительные ограничения,Computational Constraints,zp,,ok,name-en-publishable/1

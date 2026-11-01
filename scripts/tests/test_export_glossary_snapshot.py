@@ -42,7 +42,7 @@ def row(**overrides):
 
 
 def canary_row():
-    return row(code="VR.FM.002", name_ru="Ложная уверенность", name_en="False Confidence", domain="VR")
+    return row(code="GUIDE.33", name_ru="жизненное мастерство", name_en="Life mastery", level="guide", domain=None)
 
 
 def payload(*rows, as_of="2026-10-31T00:00:00Z"):
@@ -66,10 +66,10 @@ def test_public_row_is_included_and_closed_levels_are_not(tmp_path: Path):
     )
     assert as_of == "2026-10-31T00:00:00Z"
     assert [item["code"] for item in included] == ["DP.METHOD.049", "LS.GENRE.1", "U.Method", "ZP.1"]
-    assert excluded["level"] == 1
+    assert excluded["level"] == 2
     assert excluded["not-publishable"] == 1
-    assert excluded["domain"] == 2
-    assert "VR.FM.002" not in [item["code"] for item in included]
+    assert excluded["domain"] == 1
+    assert "GUIDE.33" not in [item["code"] for item in included]
     out = tmp_path / "glossary-snapshot.csv"
     meta = MOD.export_snapshot(payload(row(), canary_row()), allowlist, ALLOWLIST, out)
     assert meta["schema"] == "glossary-snapshot/1"
@@ -78,7 +78,7 @@ def test_public_row_is_included_and_closed_levels_are_not(tmp_path: Path):
     assert out.with_suffix(".meta.json").exists()
     text = out.read_text(encoding="utf-8")
     assert "Method" in text
-    assert "VR.FM.002" not in text
+    assert "GUIDE.33" not in text
 
 
 def _run_cli(source: Path, allowlist: Path, out: Path) -> subprocess.CompletedProcess[str]:
@@ -115,12 +115,17 @@ def test_canary_missing_from_input_writes_nothing(tmp_path: Path):
 def test_canary_that_reaches_snapshot_writes_nothing(tmp_path: Path):
     allowlist = MOD.load_allowlist(ALLOWLIST)
     leaked = dict(allowlist)
-    leaked["pack_domains"] = list(allowlist["pack_domains"]) + ["VR"]
+    leaked["levels"] = list(allowlist["levels"]) + ["guide"]
+    leaked["foundation"] = list(allowlist["foundation"]) + [
+        {"level": "guide", "code_prefixes": ["GUIDE."], "domains": [], "allow_null_domain": True}
+    ]
     body = payload(row(), canary_row())
     with pytest.raises(MOD.SnapshotError, match="попала в снимок"):
         MOD.build_rows(body, leaked)
     allowlist_path = tmp_path / "allowlist.yaml"
-    text = ALLOWLIST.read_text(encoding="utf-8").replace("  - PD\n", "  - PD\n  - VR\n")
+    text = ALLOWLIST.read_text(encoding="utf-8").replace(
+        "foundation:\n", "foundation:\n  - level: guide\n    code_prefixes: [\"GUIDE.\"]\n    allow_null_domain: true\n"
+    ).replace("  - pack\n", "  - pack\n  - guide\n", 1)
     allowlist_path.write_text(text, encoding="utf-8")
     source = tmp_path / "in.json"
     source.write_text(json.dumps(body), encoding="utf-8")
