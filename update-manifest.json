@@ -3409,7 +3409,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "93966f95aec2a06603fb8cfd881c3d8ee28a4ee4f4139041ce40d5c3d8a508da"
+      "sha256": "e4a57dd1af53f3da556770a073830c864ce9a7c4582fa1fe4897270513f42ec3"
     }
   ],
   "excluded_paths": [

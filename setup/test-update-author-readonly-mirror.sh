@@ -24,6 +24,13 @@
 #    repair_pass meets the same files) -> run succeeds, each warning printed once,
 #    the summary counts 2, not 4.
 #
+# The second blocker of the same run: the author's workspace CLAUDE.md is the author's
+# own source (the template copy is derived from it), so it has no .claude.md.base.
+# E: author_mode, workspace CLAUDE.md differs from the template, no base -> run
+#    succeeds, marker cleared, CLAUDE.md byte-identical to before, one author_mode line.
+# F: ordinary user, same state -> the file stays untouched and the marker stays
+#    (manual reconciliation, issue #336/#541 behavior unchanged).
+#
 # Usage: bash setup/test-update-author-readonly-mirror.sh   (KEEP=1 keeps the temp dir)
 
 set -uo pipefail
@@ -221,6 +228,36 @@ if [ -f "$WS/FMT-exocortex-template/$NEW_HOOK" ]; then
     pass "D: the template clone itself received the new hook (Step 6 path ran)"
 else
     fail "D: the new hook did not reach the template clone (Step 6 path not exercised)"
+fi
+
+# own_claude_md WORKSPACE — the workspace CLAUDE.md becomes an authored file without a base.
+own_claude_md() {
+    printf '# Author CLAUDE.md\n\n## 1. Platform section\n\nAuthor wording, the template is derived from it.\n' > "$1/CLAUDE.md"
+    rm -f "$1/.claude.md.base"
+    cp -p "$1/CLAUDE.md" "$TEST_ROOT/$(basename "$1")-claude-before.md"
+}
+
+echo "== E: author_mode, own workspace CLAUDE.md without a merge base"
+WS=$(make_sandbox e true false at)
+own_claude_md "$WS"
+run_update "$WS" "$TEST_ROOT/e.log"; rc=$?
+if [ "$rc" -eq 0 ]; then pass "E: update.sh finished"; else fail "E: update.sh exit $rc; tail: $(tail -5 "$TEST_ROOT/e.log")"; fi
+if [ ! -e "$WS/FMT-exocortex-template/.update-incomplete" ]; then pass "E: marker cleared"; else fail "E: marker still present"; fi
+if cmp -s "$WS/CLAUDE.md" "$TEST_ROOT/e-claude-before.md"; then pass "E: author CLAUDE.md untouched"; else fail "E: author CLAUDE.md changed"; fi
+if grep -qF 'CLAUDE.md — author_mode: базового файла для слияния нет, авторская копия не тронута' "$TEST_ROOT/e.log"; then
+    pass "E: one author_mode line names CLAUDE.md"
+else
+    fail "E: no author_mode line for CLAUDE.md"
+fi
+
+echo "== F: ordinary user, same CLAUDE.md state"
+WS=$(make_sandbox f false false at)
+own_claude_md "$WS"
+run_update "$WS" "$TEST_ROOT/f.log"; rc=$?
+if [ "$rc" -ne 0 ] && [ -e "$WS/FMT-exocortex-template/.update-incomplete" ] && cmp -s "$WS/CLAUDE.md" "$TEST_ROOT/f-claude-before.md"; then
+    pass "F: CLAUDE.md untouched, run asks for manual reconciliation and keeps the marker"
+else
+    fail "F: exit $rc, marker present: $(exists "$WS/FMT-exocortex-template/.update-incomplete")"
 fi
 
 echo

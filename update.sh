@@ -4436,9 +4436,17 @@ sync_workspace_claude_md() {
                 # merge treat the still-stale WS_CURRENT as an intentional pilot
                 # edit and clear .update-incomplete without ever really syncing it.
                 # Leave the base absent so the drift keeps surfacing until resolved.
-                CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
-                echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
-                echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
+                if is_author_mode; then
+                    # WP-568 F11: in author_mode the workspace CLAUDE.md is the author's own
+                    # source (the template copy is derived from it), so a missing base is the
+                    # normal state, not a lost one. Same treatment as every other authored L1
+                    # file: untouched, one line, no blocking of .update-incomplete.
+                    echo "  ⚠ $WS_CURRENT — author_mode: базового файла для слияния нет, авторская копия не тронута. Сверь: diff \"$WS_CURRENT\" \"$WS_NEW\""
+                else
+                    CLAUDE_BASE_MISSING_FILES+=("$WS_CURRENT")
+                    echo "  ⚠ $WS_CURRENT НЕ тронут — базовый файл для слияния отсутствовал."
+                    echo "    Сверьте свои правки §8/§9 вручную с шаблонной версией: diff \"$WS_CURRENT\" \"$WS_NEW\""
+                fi
             fi
         fi
         CLAUDE_UPDATED=true
