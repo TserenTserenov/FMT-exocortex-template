@@ -2109,7 +2109,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/templates/extractor.sh",
-      "sha256": "60e1244c016f018f4be6098c52b28c6caf21f5a11b1de580444c7679cb57680a"
+      "sha256": "23adfba1a68a638fce0897ebaa007096bef2904c6d431f379ae17c36ef357cf6"
     },
     {
       "path": "roles/synchronizer/scripts/templates/strategist.sh",
@@ -3477,6 +3477,7 @@
     "scripts/tests/test_export_glossary_snapshot.py",
     "scripts/tests/test_extractor_branch_cleanup.sh",
     "scripts/tests/test_extractor_feed_quiet_on_empty.sh",
+    "scripts/tests/test_extractor_notify_repeat.sh",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
     "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_issue_1003_ds_publish.sh",
