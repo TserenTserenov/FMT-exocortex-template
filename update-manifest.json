@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8634da725426ff5aaf280fcb9e39310b4cf1d6d9de519b38a46c0bad1be47255"
+      "sha256": "9b9286f2edeb5cb51e0035a5463394b64b9b5b1665fc9365e5ba06c1fd2bb9e2"
     },
     {
       "path": "CLAUDE.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "564ec81e3fbfb3b18c76022fe2c3c3d4861f1288b49071d27b11d78263004a3f"
+      "sha256": "39354fd256e79ff4d78459ebf445db5be4b0743259a465fff5a5aa657ec057cc"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3428,6 +3428,7 @@
     "scripts/check-component-parity.sh",
     "scripts/check-manifest-rename-coverage.py",
     "scripts/delivery_checks.py",
+    "scripts/export-glossary-snapshot.py",
     "scripts/generate-helper-catalog.py",
     "scripts/guide-kit-sync-state.yaml",
     "scripts/guide-kit-sync.sh",
@@ -3473,6 +3474,7 @@
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dry_run_gate.py",
+    "scripts/tests/test_export_glossary_snapshot.py",
     "scripts/tests/test_extractor_branch_cleanup.sh",
     "scripts/tests/test_extractor_feed_quiet_on_empty.sh",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
@@ -3714,7 +3716,8 @@
     "setup/test-week-review-delivery-postcondition.sh",
     "setup/update-write-sites.tsv",
     "setup/ux-walkthrough-prompt.md",
-    "setup/wp529-f21-toggle-required-review.sh"
+    "setup/wp529-f21-toggle-required-review.sh",
+    "translation/glossary-snapshot-allowlist.yaml"
   ],
   "deprecated_files": [
     {
