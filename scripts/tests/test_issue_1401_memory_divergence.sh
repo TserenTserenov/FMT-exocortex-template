@@ -154,6 +154,62 @@ else
     fail "T8: rc=$RC notes=[$(origin_file notes.md)] diverged=[$(status_of diverged)] out=[$OUT]"
 fi
 
+BASE_FILE="$WS/.iwe-runtime/exocortex-publish/published-base.json"
+sha_of() { python3 -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'; }
+
+# --- T9: upgrade without a base file: the base is rebuilt from the commit this
+# machine published last, so the other machine's notes.md is still protected,
+# and stays protected after a further publish of other files ---
+rm -f "$BASE_FILE"
+OUT=$(publish run 2>&1); RC=$?
+echo "memory after upgrade" > "$MEM/MEMORY.md"
+OUT2=$(publish run 2>&1); RC2=$?
+if [ "$RC" -eq 0 ] && [ "$RC2" -eq 0 ] && [ "$(origin_file notes.md)" = "notes from other machine v2" ] \
+   && [ "$(origin_file MEMORY.md)" = "memory after upgrade" ] \
+   && echo "$(status_of diverged)" | grep -q "notes.md"; then
+    pass "T9: no base file — rebuilt from our last published commit; other machine's edit kept across two publishes"
+else
+    fail "T9: rc=$RC/$RC2 notes=[$(origin_file notes.md)] MEMORY=[$(origin_file MEMORY.md)] diverged=[$(status_of diverged)] out=[$OUT2]"
+fi
+
+# --- T10: a corrupt base file behaves like a missing one, never like "no check" ---
+echo "{broken" > "$BASE_FILE"
+OUT=$(publish run 2>&1); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(origin_file notes.md)" = "notes from other machine v2" ] \
+   && echo "$(status_of diverged)" | grep -q "notes.md"; then
+    pass "T10: corrupt base — other machine's edit still kept and flagged"
+else
+    fail "T10: rc=$RC notes=[$(origin_file notes.md)] diverged=[$(status_of diverged)] out=[$OUT]"
+fi
+
+# --- T11: origin's manifest keeps origin's hash for the skipped file ---
+MANIFEST_HASH=$(origin_file .day-close-backup-manifest.json | python3 -c 'import json, sys; print(json.load(sys.stdin)["files"]["notes.md"])')
+if [ "$MANIFEST_HASH" = "$(origin_file notes.md | sha_of)" ]; then
+    pass "T11: published manifest records origin's notes.md hash, not ours"
+else
+    fail "T11: manifest=[$MANIFEST_HASH] origin=[$(origin_file notes.md | sha_of)]"
+fi
+
+# --- T12: a machine that never published does not overwrite differing files ---
+rm -f "$BASE_FILE"
+sed -i.bak 's/^published_sha=.*/published_sha=/' "$STATUS" && rm -f "$STATUS.bak"
+echo "memory of a new machine" > "$MEM/MEMORY.md"
+OUT=$(publish run 2>&1); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(origin_file MEMORY.md)" = "memory after upgrade" ] \
+   && echo "$(status_of diverged)" | grep -q "MEMORY.md (правили обе машины)"; then
+    pass "T12: never-published machine — differing MEMORY.md kept on origin, flagged as both"
+else
+    fail "T12: rc=$RC MEMORY=[$(origin_file MEMORY.md)] diverged=[$(status_of diverged)] out=[$OUT]"
+fi
+
+# --- T13: accept refuses a path that is not a file under exocortex/ ---
+ACC=$(publish accept ../README.md 2>&1); ACC_RC=$?
+if [ "$ACC_RC" -ne 0 ] && ! grep -q 'README' "$BASE_FILE" 2>/dev/null; then
+    pass "T13: accept of ../README.md refused, base untouched"
+else
+    fail "T13: acc_rc=$ACC_RC acc=[$ACC] base=[$(cat "$BASE_FILE" 2>/dev/null)]"
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then
     echo "test_issue_1401_memory_divergence: all checks passed"
