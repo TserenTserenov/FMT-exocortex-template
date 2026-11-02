@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d0c37f6dc46562dc71762b86190fa7e7c2bd44d23453fc62148a3c65264820ef"
+      "sha256": "0b96d6f76fbb6afffca845faa314bdd9a25301027601798677e0736dacc43c81"
     },
     {
       "path": "CLAUDE.md",
@@ -1269,7 +1269,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "d009edebba40ec59bd364ddcf6ce6e9a32c023a0ccfcd1f6535a99b2dfcdadf5"
+      "sha256": "23293728f3e58087ee5efb6f5615d231872a0400cfcc9b8cdae96f3ee89fb096"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3428,6 +3428,7 @@
     "docs/developer/working-with-claude.md",
     "promotion-status.yaml",
     "scripts/agent-dashboard.py",
+    "scripts/assemble_distribution.py",
     "scripts/audit-ad-hoc-roles.py",
     "scripts/check-component-parity.sh",
     "scripts/check-copy-pairs.sh",
@@ -3476,6 +3477,7 @@
     "scripts/tests/test_adopt_governance.sh",
     "scripts/tests/test_agent_dashboard.py",
     "scripts/tests/test_ar293_ai_cli_override.sh",
+    "scripts/tests/test_assemble_distribution.py",
     "scripts/tests/test_changelog_append_blank_lines.sh",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_day_close_prepare.py",
