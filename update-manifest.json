@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f0878b0c1e0d40b356e97f27aec2d7d5237b19c4754bc1cbf169f645b42e63d4"
+      "sha256": "d17d81de0a11a36b360ad7fa0700f54aeea8f7d0044d1364303c887f28e89b19"
     },
     {
       "path": "CLAUDE.md",
@@ -1661,7 +1661,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "918d3ae5ad45728f0fddabfb95c2e8b65d788a49e171d753d81df9345d6acddd"
+      "sha256": "8cff23fe8561dea5e7e4009e889a6a3f4c28b1f9955c12686a3a9827132d273b"
     },
     {
       "path": "memory/protocol-dt-integration.md",
