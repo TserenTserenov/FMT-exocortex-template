@@ -16,7 +16,7 @@ BACKUP_QUARANTINE=".day-close-backup-incomplete"
 # `pip install --user`, that hid the module and day-close took its
 # "no PyYAML" branch — two false failures on macOS (issue #1342). Pin the
 # real user site; the no-PyYAML case still wins via PYTHONPATH.
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 
 FAIL=0

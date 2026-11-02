@@ -1115,7 +1115,7 @@ def test_update_consumer_scan_refuses_symlinked_directory_without_reading_target
     tmp_path: Path,
 ):
     workspace, governance_dir = _install_seed(tmp_path)
-    secret = "outside-directory-secret-must-not-leak-533"
+    secret = "outside-dir-secret-must-not-leak-533"
     outside = tmp_path / "outside-vendor"
     outside.mkdir()
     outside_consumer = outside / "legacy-consumer.py"

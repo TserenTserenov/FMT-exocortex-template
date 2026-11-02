@@ -15,7 +15,7 @@ pass() { echo "  ✅ PASS: $*"; }
 fail() { echo "  ❌ FAIL: $*"; FAIL=$((FAIL + 1)); }
 
 # Resolve the real user site-packages before HOME is swapped (same trap as #1342).
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 
 TMP="$(mktemp -d)"

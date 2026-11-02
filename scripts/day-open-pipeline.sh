@@ -878,6 +878,8 @@ fi
 # Child patch steps (4.2/4.3) fall back to ~/IWE when IWE_ROOT is unset —
 # a launchd/cron env typically has no IWE_ROOT, so pass the resolved root down.
 export IWE_ROOT="$IWE"
+# Install time zone from params.yaml (issue #1410); empty = host system zone.
+IWE_TZ="$( . "$SCRIPT_HOME/lib/common.sh" && iwe_timezone "$IWE/params.yaml" )"
 # issue #756: session-guard.sh, day-open-scaffold.sh and the other shared helpers
 # called below live inside the template (FMT-exocortex-template/scripts/), not
 # directly under $IWE/scripts -- that directory does not exist on any install
@@ -1473,7 +1475,11 @@ fi
 #          code, never silently treated as "not closed" from stale/absent data.
 # ============================================
 TARGET_DOW=$(portable_date_field "$DATE" "+%u")
-CURRENT_HOUR=$(TZ=Asia/Nicosia date +%H)
+if [ -n "$IWE_TZ" ]; then
+  CURRENT_HOUR=$(TZ="$IWE_TZ" date +%H)
+else
+  CURRENT_HOUR=$(date +%H)
+fi
 if [ "$FORCE" != "true" ] && [ "${TARGET_DOW:-0}" = "7" ] && [ "$((10#$CURRENT_HOUR))" -ge 23 ]; then
   TARGET_WEEK_NUM=$((10#$(portable_date_field "$DATE" "+%V")))
   TARGET_WEEK_MONDAY=$(date -j -v-6d -f "%Y-%m-%d" "$DATE" "+%Y-%m-%d" 2>/dev/null \
@@ -1961,7 +1967,8 @@ else
     --dayplan "$DAYPLAN_PATH" \
     --ledger-root "$DS_STRATEGY/machine/ledger/day" \
     --date "$DATE" \
-    --ledger-append "$SCRIPT_HOME/ledger-append.sh" 2>&1 || true
+    --ledger-append "$SCRIPT_HOME/ledger-append.sh" \
+    ${IWE_TZ:+--tz "$IWE_TZ"} 2>&1 || true
 fi
 
 # ============================================

@@ -197,9 +197,19 @@ mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
 # начале сессии молча освобождал бы от чеклиста ПОЗДНИЙ `run-protocol
 # week-close` без собственного чеклиста (cold-review, Critical, 22.10,
 # воспроизведено синтетическим транскриптом с двумя вызовами).
+# issue #1411 item 7: a Skill call rejected before it ran (PreToolUse hook
+# deny, permission denial, unknown skill) is answered by a tool_result with
+# is_error=true for the same tool_use_id; such a call is not counted.
+# A tool_use with no tool_result (truncated transcript, crash mid-call) still
+# counts: Stop fires after the turn's tools have returned, so a missing
+# result is not evidence of rejection — stay fail-closed.
 PROTOCOL_CALL_JSON=$(jq -s -c '
-  [.[] | select((.message.role // "assistant") == "assistant") | .message.content[]?]
+  ([.[] | .message.content? | if type == "array" then .[] else empty end
+     | select(type == "object" and .type == "tool_result" and .is_error == true)
+     | .tool_use_id | select(type == "string")]) as $rejected
+  | [.[] | select((.message.role // "assistant") == "assistant") | .message.content[]?]
   | map(select(.type == "tool_use" and .name == "Skill"))
+  | map(select(.id as $id | ($id == null) or (any($rejected[]; . == $id) | not)))
   | map(select((.input.skill // "") | test("^(day-open|day-close|run-protocol|wp-new)$")))
   | .[-1] // empty
 ' "$TRANSCRIPT_PATH" 2>/dev/null)
