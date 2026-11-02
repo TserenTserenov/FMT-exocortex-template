@@ -7,10 +7,16 @@
 # cost does not scale with the size of the day's conversation.
 #
 # Usage:
-#   day-close-prepare.sh            # full digest (SKILL.md step 0б)
-#   day-close-prepare.sh --verify   # postconditions 9a/9b + dirty-repo recheck
+#   day-close-prepare.sh                      # full digest (SKILL.md step 0б)
+#   day-close-prepare.sh --date 2026-11-01    # the day being closed (Day Close after midnight)
+#   day-close-prepare.sh --verify [--date D]  # postconditions 9a/9b + dirty-repo recheck
 #
-# Exit codes: digest mode always 0; --verify returns 1 if any check FAILs.
+# The closed day comes from --date, else from day_boundary in
+# memory/day-rhythm-config.yaml (before that hour the previous calendar day is
+# still open), else from the clock. Every dated section uses that one day.
+#
+# Exit codes: digest mode 0; --verify returns 1 if any check FAILs;
+# invalid arguments return 2.
 #
 # Contributed by @maxborovik (issue #234), adapted to iwe-env-bootstrap conventions.
 
@@ -21,8 +27,83 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 
 GOV="$IWE_DS_MY_STRATEGY"
-TODAY=$(date +%Y-%m-%d)
-DAY_NUM=$(date +%-d)
+
+VERIFY=false
+CLOSE_DATE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --verify) VERIFY=true; shift ;;
+    # --for-date: the name the governance-repo port of this script uses.
+    --date|--for-date)
+      [ $# -ge 2 ] || { echo "ERR: --date ожидает YYYY-MM-DD" >&2; exit 2; }
+      CLOSE_DATE="$2"; shift 2 ;;
+    *) echo "ERR: неизвестный аргумент: $1" >&2; exit 2 ;;
+  esac
+done
+
+# Calendar arithmetic on YYYY-MM-DD: BSD date first, GNU date as fallback.
+shift_date() {
+  date -j -v"$2"d -f "%Y-%m-%d" "$1" "+%Y-%m-%d" 2>/dev/null \
+    || date -d "$1 $2 day" "+%Y-%m-%d" 2>/dev/null
+}
+
+# issue #924 day_boundary, read the same way as day-open-pipeline.sh: scoped
+# to the day_open: block, commented-out lines skipped, live memory/ copy.
+DAY_BOUNDARY=$(awk '
+  /^[^[:space:]]/ && !/^day_open:/ { f=0 }
+  /^day_open:/ { f=1 }
+  f && /day_boundary:/ && !/^[[:space:]]*#/ { print; exit }
+' "$WORKSPACE_DIR/memory/day-rhythm-config.yaml" 2>/dev/null \
+  | sed -E 's/.*day_boundary:[[:space:]]*"?([0-9]{1,2}:[0-9]{2})"?.*/\1/')
+
+# A Day Close after midnight used to digest the new calendar day: commits,
+# sessions, WakaTime and the 9a/9b checks all looked at the wrong date.
+DATE_SOURCE="--date"
+if [ -z "$CLOSE_DATE" ]; then
+  CLOSE_DATE=$(date +%Y-%m-%d)
+  DATE_SOURCE="clock"
+  if [[ "$DAY_BOUNDARY" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+    boundary_min=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+    now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
+    if [ "$now_min" -lt "$boundary_min" ]; then
+      CLOSE_DATE=$(shift_date "$CLOSE_DATE" -1)
+      DATE_SOURCE="day_boundary $DAY_BOUNDARY"
+    fi
+  fi
+fi
+# Round trip, not a single parse: BSD date rolls 2026-02-30 over to March
+# without an error, GNU date rejects it.
+NEXT_DATE=""
+if [[ "$CLOSE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  NEXT_DATE=$(shift_date "$CLOSE_DATE" +1)
+fi
+if [ -z "$NEXT_DATE" ] || [ "$(shift_date "$NEXT_DATE" -1)" != "$CLOSE_DATE" ]; then
+  if [ "$DATE_SOURCE" = "--date" ]; then
+    echo "ERR: --date ожидает YYYY-MM-DD, получено: $CLOSE_DATE" >&2
+  else
+    echo "ERR: не удалось вычислить закрываемый день (date не умеет -v/-d?)" >&2
+  fi
+  exit 2
+fi
+DAY_NUM=$(( 10#${CLOSE_DATE##*-} ))
+
+# Half-open commit window of the closed day, [D <boundary>, D+1 <boundary>).
+# KEEP IN SYNC with day-open-pipeline.sh / day-open-scaffold.sh
+# (test_issue_924 compares all three copies).
+iwe_day_window() {
+  local yday="$1" today="$2" b="${3:-}" bm=0 em
+  if [[ "$b" =~ ^([0-9]{1,2}):([0-9]{2})$ ]]; then
+    bm=$(( 10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]} ))
+  fi
+  if [ "$bm" -eq 0 ]; then
+    printf '%s 00:00:00|%s 23:59:59' "$yday" "$yday"
+    return 0
+  fi
+  em=$(( bm - 1 ))
+  printf '%s %02d:%02d:00|%s %02d:%02d:59' \
+    "$yday" $(( bm / 60 )) $(( bm % 60 )) "$today" $(( em / 60 )) $(( em % 60 ))
+}
+DAY_WINDOW=$(iwe_day_window "$CLOSE_DATE" "$NEXT_DATE" "$DAY_BOUNDARY")
 
 # MEMORY.md location: workspace symlink first, auto-memory glob as fallback.
 memory_files() {
@@ -50,12 +131,12 @@ dirty_scan() {
 # ---------------------------------------------------------------- --verify --
 # Postcondition patterns mirror SKILL.md step 9 (language-tolerant, 1c62621):
 # 9a "Итоги дня|Day summary", 9b "Итоги|Сводка|Results" + day number.
-if [ "${1:-}" = "--verify" ]; then
+if $VERIFY; then
   FAIL=0
 
-  DP="$GOV/archive/day-plans/DayPlan $TODAY.md"
-  if [ -f "$DP" ] && grep -qE "Итоги дня|Day summary" "$DP" && grep -q "$TODAY" "$DP"; then
-    echo "9a OK: day summary present in archived DayPlan $TODAY"
+  DP="$GOV/archive/day-plans/DayPlan $CLOSE_DATE.md"
+  if [ -f "$DP" ] && grep -qE "Итоги дня|Day summary" "$DP" && grep -q "$CLOSE_DATE" "$DP"; then
+    echo "9a OK: day summary present in archived DayPlan $CLOSE_DATE"
   else
     echo "9a FAIL: no day summary in $DP (file missing, not archived, or summary heading absent)"
     FAIL=1
@@ -82,13 +163,19 @@ if [ "${1:-}" = "--verify" ]; then
 fi
 
 # ----------------------------------------------------------------- digest --
-echo "=== DAY CLOSE DIGEST $TODAY $(date +%H:%M) ==="
+echo "=== DAY CLOSE DIGEST $CLOSE_DATE (now $(date '+%Y-%m-%d %H:%M'), date from: $DATE_SOURCE) ==="
+# Hint only, never a guess: without day_boundary the clock decides, and in the
+# small hours that is usually the day after the one being closed.
+if [ "$DATE_SOURCE" = "clock" ] && [ -z "$DAY_BOUNDARY" ] && [ "$(( 10#$(date +%H) ))" -lt 6 ]; then
+  echo "⚠️ после полуночи: если закрываешь вчерашний день — перезапусти с --date $(shift_date "$CLOSE_DATE" -1) или задай day_boundary"
+fi
 
 echo "--- 1. COMMITS TODAY (filtered) ---"
 FOUND=0
 for d in "$WORKSPACE_DIR"/*/; do
   [ -d "$d/.git" ] || continue
-  commits=$(git -C "$d" log --since="today 00:00" --oneline --no-merges 2>/dev/null \
+  commits=$(git -C "$d" log --since="${DAY_WINDOW%%|*}" --until="${DAY_WINDOW##*|}" \
+    --oneline --no-merges 2>/dev/null \
     | grep -vE "^[a-f0-9]+ (docs|chore|ci|style|perf|test)(\(|:| )" \
     | grep -vE "memory/|\.claude/rules/|template-sync|backup|reindex" || true)
   if [ -n "$commits" ]; then
@@ -97,7 +184,7 @@ for d in "$WORKSPACE_DIR"/*/; do
     FOUND=1
   fi
 done
-[ "$FOUND" -eq 0 ] && echo "(no substantive commits today)"
+[ "$FOUND" -eq 0 ] && echo "(no substantive commits on $CLOSE_DATE)"
 
 echo "--- 2. DIRTY REPOS ---"
 dirty_scan
@@ -106,7 +193,7 @@ echo "--- 3. OPEN SESSIONS LOG ---"
 # The log is append-only history (issue #1266): head showed the oldest lines.
 # Show today's openings; lines start with "YYYY-MM-DD HH:MM |".
 if [ -s "$GOV/inbox/open-sessions.log" ]; then
-  grep "^$TODAY " "$GOV/inbox/open-sessions.log" || echo "(no sessions opened today)"
+  grep "^$CLOSE_DATE " "$GOV/inbox/open-sessions.log" || echo "(no sessions opened on $CLOSE_DATE)"
 else
   echo "(empty or absent)"
 fi
@@ -151,7 +238,7 @@ echo "--- 7. WAKATIME ---"
 # scripts/wakatime-day-total.py prints seconds, or a reason in parentheses.
 if ! WAKA_PY=$(bash "$SCRIPT_DIR/lib/find-python3.sh" --stdlib-only); then
   echo "(python3 not found — use Neon fallback: domain_event coding_time)"
-elif WAKA_OUT=$("$WAKA_PY" "$SCRIPT_DIR/wakatime-day-total.py" "$TODAY"); then
+elif WAKA_OUT=$("$WAKA_PY" "$SCRIPT_DIR/wakatime-day-total.py" "$CLOSE_DATE"); then
   awk -v s="$WAKA_OUT" 'BEGIN { printf "%.2f h (WakaTime summaries)\n", s / 3600 }'
 else
   echo "$WAKA_OUT"
@@ -159,7 +246,7 @@ fi
 
 echo "--- 8. PEER SESSIONS TODAY ---"
 if [ -f "$GOV/sessions/00-index.md" ]; then
-  grep "$TODAY" "$GOV/sessions/00-index.md" || echo "(none today)"
+  grep "$CLOSE_DATE" "$GOV/sessions/00-index.md" || echo "(none on $CLOSE_DATE)"
 else
   echo "(no sessions index)"
 fi

@@ -4,12 +4,14 @@
 # [YDAY <day_boundary>, DATE <day_boundary>), not over the calendar day.
 #   - a commit exactly at the boundary opens the new day (counted once);
 #   - without a boundary (or 00:00) the calendar day is kept;
-#   - day-open-scaffold.sh and day-open-pipeline.sh carry the same function.
+#   - day-open-scaffold.sh, day-open-pipeline.sh and day-close-prepare.sh
+#     carry the same function.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 SCAFFOLD="$ROOT/scripts/day-open-scaffold.sh"
 PIPELINE="$ROOT/scripts/day-open-pipeline.sh"
+CLOSE_PREPARE="$ROOT/scripts/day-close-prepare.sh"
 
 fail=0
 pass() { echo "  ✅ PASS: $*"; }
@@ -21,6 +23,12 @@ if [ -n "$(extract "$SCAFFOLD")" ] && [ "$(extract "$SCAFFOLD")" = "$(extract "$
     pass "both scripts carry an identical iwe_day_window"
 else
     fail_test "iwe_day_window is missing or differs between scaffold and pipeline"
+fi
+
+if [ "$(extract "$SCAFFOLD")" = "$(extract "$CLOSE_PREPARE")" ]; then
+    pass "day-close-prepare.sh carries the same iwe_day_window"
+else
+    fail_test "iwe_day_window is missing or differs in day-close-prepare.sh"
 fi
 
 window() {
