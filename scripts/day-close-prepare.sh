@@ -149,7 +149,9 @@ done
 echo "--- 7. WAKATIME ---"
 # Summaries endpoint, not `wakatime-cli --today` (issues #859, #1414):
 # scripts/wakatime-day-total.py prints seconds, or a reason in parentheses.
-if WAKA_OUT=$(python3 "$SCRIPT_DIR/wakatime-day-total.py" "$TODAY"); then
+if ! WAKA_PY=$(bash "$SCRIPT_DIR/lib/find-python3.sh" --stdlib-only); then
+  echo "(python3 not found — use Neon fallback: domain_event coding_time)"
+elif WAKA_OUT=$("$WAKA_PY" "$SCRIPT_DIR/wakatime-day-total.py" "$TODAY"); then
   awk -v s="$WAKA_OUT" 'BEGIN { printf "%.2f h (WakaTime summaries)\n", s / 3600 }'
 else
   echo "$WAKA_OUT"

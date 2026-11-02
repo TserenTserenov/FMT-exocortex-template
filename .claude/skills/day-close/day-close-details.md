@@ -146,7 +146,7 @@ PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/che
 ## Шаг 6: Мультипликатор IWE — алгоритм
 
 1. **WakaTime** — физическое время за день:
-   - Сводка WakaTime за дату закрытия: `python3 "${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts/wakatime-day-total.py" YYYY-MM-DD` → секунды (код 0) или причина в скобках (код 3). Работает и после полуночи для вчерашнего дня. `wakatime-cli --today` не использовать: отвечает только за день вызова (issue #732), без категории AI Coding (issue #859) и на части установок пустой строкой (issue #1414).
+   - Сводка WakaTime за дату закрытия: `T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; "$(bash "$T/scripts/lib/find-python3.sh" --stdlib-only)" "$T/scripts/wakatime-day-total.py" YYYY-MM-DD` → секунды (код 0) или причина в скобках (код 3). Работает и после полуночи для вчерашнего дня. `wakatime-cli --today` не использовать: отвечает только за день вызова (issue #732), без категории AI Coding (issue #859) и на части установок пустой строкой (issue #1414).
    - Fallback Neon: `SELECT payload->>'human_readable', payload->>'total_seconds' FROM learning.public.domain_event WHERE event_type='coding_time' AND account_id='{DT_USER_ID}' AND external_id='wakatime:{DT_USER_ID}:{YYYY-MM-DD}'`
    - Если Neon тоже пуст → пометить «pending Neon», пересчитать при следующей сессии
 

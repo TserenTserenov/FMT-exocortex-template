@@ -102,7 +102,7 @@ fi
 > при записи итогов выбрать только ветку `multiplier:off` из шаблона. Не добавлять
 > WakaTime, физическое время, формулу или заглушку «мультипликатор не посчитан».
 
-WakaTime за закрываемый день — `python3 "${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts/wakatime-day-total.py" YYYY-MM-DD` (секунды по сводке WakaTime; не `wakatime-cli --today`: та отвечает только за текущие сутки, без категории AI Coding и на части установок пустой строкой, issues #859, #1414) или Neon-fallback → Бюджет ПО ФАКТУ / WakaTime = мультипликатор `N.Nx`. Prerequisite: прочитать `sessions/00-index.md` (grep сегодня) → список peer-сессий с числом ходов. Sanity check: <1.5x при ≥10 peer-сессий → пересчитать.
+WakaTime за закрываемый день — `T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; "$(bash "$T/scripts/lib/find-python3.sh" --stdlib-only)" "$T/scripts/wakatime-day-total.py" YYYY-MM-DD` (секунды по сводке WakaTime; не `wakatime-cli --today`: та отвечает только за текущие сутки, без категории AI Coding и на части установок пустой строкой, issues #859, #1414) или Neon-fallback → Бюджет ПО ФАКТУ / WakaTime = мультипликатор `N.Nx`. Prerequisite: прочитать `sessions/00-index.md` (grep сегодня) → список peer-сессий с числом ходов. Sanity check: <1.5x при ≥10 peer-сессий → пересчитать.
 <!-- Детали: day-close-details.md § Шаг 6 -->
 
 ### 7. Черновик итогов (показать пользователю)

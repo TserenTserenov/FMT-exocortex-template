@@ -122,8 +122,10 @@ waka_cli_minutes() {
 }
 
 WAKA="—"
+WAKA_SECONDS="python3 not found"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if WAKA_SECONDS=$(python3 "$SCRIPT_DIR/wakatime-day-total.py" "$DAY_ISO"); then
+if WAKA_PY=$(bash "$SCRIPT_DIR/lib/find-python3.sh" --stdlib-only 2>/dev/null) \
+   && WAKA_SECONDS=$("$WAKA_PY" "$SCRIPT_DIR/wakatime-day-total.py" "$DAY_ISO"); then
   WAKA=$(waka_format $((WAKA_SECONDS / 60)))
 elif [[ "$DAY_ISO" == "$TODAY_ISO" && -x "$WAKATIME_CLI" ]]; then
   WAKA_RAW=$("$WAKATIME_CLI" --today 2>/dev/null || true)
