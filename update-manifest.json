@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6fe7438d1e327da29230f7e73e67c760a4cb3ec2caee43da9a094f763c15b207"
+      "sha256": "4efb0dcda45b7eaf3f764025fb834f7e16f53fb58c21242173e816bb28644845"
     },
     {
       "path": "CLAUDE.md",
@@ -1913,7 +1913,7 @@
     },
     {
       "path": "roles/strategist/prompts/session-prep.md",
-      "sha256": "14c2915a939e8a47c810e83f30c64acf5cf0638f1ea71ced205fb816e6dc6294"
+      "sha256": "169df96af7662cb8478cfe436b4da36978a5ddffb6c774fc89da10441805a933"
     },
     {
       "path": "roles/strategist/prompts/strategy-session-monthly.md",
