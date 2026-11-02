@@ -1032,12 +1032,22 @@ jobs:
 
       # Cold review 2026-08-19 (Medium): раннер выше гоняет только .sh — три
       # python-регрессии семьи иначе не исполняются нигде (тот же класс
-      # «тест есть, CI о нём не знает»).
+      # «тест есть, CI о нём не знает»). WP-7 Ф284: ещё 8 файлов (агентская
+      # панель, гейт репетиции, снимок глоссария и др.) раньше гонял только
+      # неблокирующий шаг в CI шлюза на закреплённой ревизии шаблона.
       - name: Run issue-regression python tests (pytest, WP-529 Ф6)
         run: |
-          python3 -c "import pytest, markdown_it" >/dev/null 2>&1 || python3 -m pip install --user pytest markdown-it-py
+          python3 -c "import pytest, markdown_it, yaml" >/dev/null 2>&1 || python3 -m pip install --user pytest markdown-it-py pyyaml
           python3 -m pytest -q \
             scripts/tests/test_issue_*.py \
+            scripts/tests/test_agent_dashboard.py \
+            scripts/tests/test_dry_run_gate.py \
+            scripts/tests/test_export_glossary_snapshot.py \
+            scripts/tests/test_fetch_glossary_concepts.py \
+            scripts/tests/test_manifest_coverage_local.py \
+            scripts/tests/test_pending_lock.py \
+            scripts/tests/test_sync_banner.py \
+            scripts/tests/test_translate_parse.py \
             scripts/tests/test_day_close_prepare.py \
             scripts/tests/test_create_wp_number_padding.py \
             scripts/tests/test_create_wp_weekplan_writer.py \

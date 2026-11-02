@@ -885,7 +885,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "0b883ff009652770253df9ef7fcbddd65e07248a323924faa34a5dce16e8941d"
+      "sha256": "1be3308f8fa3f8814096606deaa51118b4f86f3b98de3835039a886cccd68555"
     },
     {
       "path": ".gitignore",
@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e20a29a5f1e35e747828252d8d5f9bd2b0f1cb5569cf7efc22a8a442af347936"
+      "sha256": "1956c90505d43427026aad567fad42d2989883df9101d0cf53ec633a636ec4c8"
     },
     {
       "path": "CLAUDE.md",
@@ -3857,6 +3857,14 @@
     {
       "path": "scripts/lesson-close.sh",
       "reason": "removed 2026-09-17 (ffceb51, issue #778): companion script to the removed lesson-close skill, same reason."
+    },
+    {
+      "path": ".claude/skills/day-close/day-close/SKILL.md",
+      "reason": "issue #1415: stale v1.0.0 alias nested inside the day-close skill folder; recursive SKILL.md scanners (OpenCode) reported duplicate skill name day-close. The top-level .claude/skills/day-close/SKILL.md is the only skill."
+    },
+    {
+      "path": ".claude/skills/week-close/week-close/SKILL.md",
+      "reason": "issue #1415: stale v1.0.0 alias nested inside the week-close skill folder; recursive SKILL.md scanners (OpenCode) reported duplicate skill name week-close. The top-level .claude/skills/week-close/SKILL.md is the only skill."
     }
   ]
 }
