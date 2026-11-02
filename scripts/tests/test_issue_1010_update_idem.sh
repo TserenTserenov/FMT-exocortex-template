@@ -36,7 +36,7 @@ UPDATE_SH_REAL="$REPO_ROOT/update.sh"
 # HOME is swapped for every update.sh run below; pin the real user site so a
 # `pip install --user` PyYAML stays importable (issue #1342, same trick as
 # test_issue_536_day_close_backup.sh).
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 
 PASS_COUNT=0

@@ -438,6 +438,35 @@ iwe_calendar_source() {
   esac
 }
 
+# iwe_timezone [PARAMS_FILE] — the install's IANA time zone (issue #1410):
+# the `timezone:` key of params.yaml, e.g. Asia/Vladivostok. A missing key or
+# file prints nothing, meaning "use the host's system zone" (/etc/localtime) —
+# callers set TZ only when this prints a value. A value with no zoneinfo file
+# behind it warns on stderr and also prints nothing: glibc silently treats an
+# unknown TZ as UTC, which is worse than the system zone.
+iwe_timezone() {
+  local file="${1:-}" value
+  [ -f "$file" ] || return 0
+  value=$(grep -E '^timezone:' "$file" 2>/dev/null | head -1 \
+    | sed -E 's/^timezone:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//')
+  [ -n "$value" ] || return 0
+  local zdir found_db=false
+  for zdir in ${TZDIR:+"$TZDIR"} /usr/share/zoneinfo /etc/zoneinfo /var/db/timezone/zoneinfo /usr/lib/zoneinfo; do
+    [ -d "$zdir" ] || continue
+    found_db=true
+    if [ -f "$zdir/$value" ]; then
+      echo "$value"
+      return 0
+    fi
+  done
+  # No zoneinfo database at all (e.g. Git Bash): trust the value as given.
+  if [ "$found_db" = false ]; then
+    echo "$value"
+    return 0
+  fi
+  echo "WARN: params.yaml: timezone «${value}» не найден в базе часовых поясов, использую системный" >&2
+}
+
 # iwe_heading_style [PARAMS_FILE] — DayPlan/WeekPlan section heading style
 # (issue #496): details (default) uses <details><summary> per formatting.md
 # (collapsible in GitHub/VS Code); markdown uses `## ` headings instead

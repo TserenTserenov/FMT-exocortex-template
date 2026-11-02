@@ -26,6 +26,10 @@ import pytest
 
 HOOK = Path(__file__).parent.parent.parent / ".claude" / "hooks" / "dry-run-gate.sh"
 STOP_HOOK = Path(__file__).parent.parent.parent / ".claude" / "hooks" / "protocol-stop-gate.sh"
+# The hook whitelists absolute paths under the IWE root it derives from its own
+# location (`$HOOK_DIR/../..`, `pwd -P`), not under $HOME/IWE. Derive the same
+# root here so the whitelist tests pass in any checkout, including CI.
+IWE_ROOT = HOOK.parent.parent.parent.resolve()
 SENTINEL = Path("/tmp/iwe-dry-run.flag")
 OWNER = Path("/tmp/iwe-dry-run-owner-pytest-session.token")
 
@@ -75,7 +79,7 @@ class TestSentinelActive:
 
     def test_whitelisted_absolute_path_allowed(self, sentinel):
         """Абсолютный путь разрешён только привязанный к workspace ($HOME/IWE)."""
-        r = _run_hook(f"bash {Path.home()}/IWE/.claude/scripts/load-extensions.sh day-open after")
+        r = _run_hook(f"bash {IWE_ROOT}/.claude/scripts/load-extensions.sh day-open after")
         assert r.returncode == 0, r.stderr
 
     def test_decoy_tmp_path_blocked(self, sentinel):
@@ -191,7 +195,7 @@ class TestSentinelActive:
         first step, exactly the "❌ ритуал ломается рано" case the contract
         itself warns about. Confirmed no write paths in both scripts."""
         for script in ("memory-drift-scan.py", "check-index-health.py"):
-            cmd = f"python3 ${{IWE_TEMPLATE:-{Path.home()}/IWE/FMT-exocortex-template}}/.claude/scripts/{script}"
+            cmd = f"python3 ${{IWE_TEMPLATE:-{IWE_ROOT}/FMT-exocortex-template}}/.claude/scripts/{script}"
             r = _run_hook(cmd)
             assert r.returncode == 0, f"{script}: {r.stderr}"
 

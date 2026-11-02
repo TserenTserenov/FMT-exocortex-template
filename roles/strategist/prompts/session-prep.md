@@ -117,7 +117,7 @@
 
 #### 8. Сохрани черновик (ОБЯЗАТЕЛЬНО)
 
-1. Перемести предыдущий `WeekPlan W*.md` из `current/` в `archive/week-plans/`
+1. Перемести предыдущий `WeekPlan W*.md` из `current/` в `archive/week-plans/` (только план прошлой недели W{N-1}; `WeekPlan W{N} *.md` текущей недели не трогай — это заготовка ночного открытия недели, см. п. 7)
 2. Перемести предыдущий `DayPlan *.md` из `current/` в `archive/day-plans/` (если есть)
 3. Перемести предыдущий `WeekReport W*.md` из `current/` в `archive/week-reports/` (issue #596: создаётся week-review.md, Пн 00:00, до этого шага — должен уже лежать в `current/` к моменту session-prep)
 4. Перемести предыдущий `SchedulerReport *.md` из `current/` в `archive/scheduler-reports/` (если есть и не текущий)
@@ -133,7 +133,9 @@
    - `captures.md` — записи с `[processed ...]` старше 14 дней → **архивируй** в `archive/captures/captures-{period}.md` (НЕ удалять — это аудитный след записи в Pack). Записи с `[rejected ...]` старше 14 дней → архивируй туда же.
    - Записи **без** метки `[processed]` или `[rejected]` → оставить (ещё не обработаны Экстрактором)
    - Прочие файлы (не fleeting-notes.md, не captures.md, не активные WP-*) → «Ещё нужен?» Нет → удали или `archive/notes/`
-7. Создай `current/WeekPlan W{N} YYYY-MM-DD.md` (Пн текущей недели)
+7. `current/WeekPlan W{N} YYYY-MM-DD.md` (Пн текущей недели):
+   - **Файл уже есть** (заготовка ночного открытия недели `week-open-scaffold.sh`, `generated_by` во frontmatter) → **дополни его**: впиши повестку, таблицу РП и вопросы в существующие разделы, заголовки разделов и frontmatter заготовки не меняй и не удаляй. Файл заново не создавай — по разделам заготовки его читают ночные проверки плана.
+   - **Файла нет** → проверь `git log origin/main -- "current/WeekPlan W{N}*"` (заготовка могла не дойти до этой копии). Нашлась на origin → возьми её (`git checkout origin/main -- <путь>`) и дополни, как выше. Нет и на origin → создай файл по формату ниже.
 8. Закоммить в {{GOVERNANCE_REPO}}
 
 **Формат WeekPlan:**

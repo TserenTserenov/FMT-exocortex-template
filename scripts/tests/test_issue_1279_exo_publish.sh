@@ -13,7 +13,7 @@ HOOK="$ROOT/.claude/hooks/memory-exocortex-sync.sh"
 TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iwe-1279-exo-publish.XXXXXX")"
 
 # Runs below swap HOME; keep a --user PyYAML visible (issue #1342).
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 unset IWE_SESSIONS_ROOT IWE_FROZEN_CANONICAL_PATH IWE_CANONICAL_OWNER IWE_RUNTIME_DIR \
       IWE_EXOCORTEX_DS_PUBLISH IWE_EXOCORTEX_PUBLISH_BRANCH IWE_EXOCORTEX_PUBLISH_STALE_HOURS \

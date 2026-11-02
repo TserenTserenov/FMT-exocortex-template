@@ -292,4 +292,21 @@ WP-N — РП, который уже обсуждался в этой сесси
 этом случае сам укажет, как перейти в изолированную копию (EnterWorktree /
 git worktree add); следовать этой инструкции, не обходить её другим путём.
 EOF
+# issue #1411: on Git Bash `open --wp` itself is refused (issue #1359), so the
+# advice above is a dead end there; point to what does work on this platform.
+case "${OSTYPE:-}" in
+  msys*|cygwin*)
+    cat >&2 <<'GITBASH'
+
+Git Bash (Windows): open --wp здесь недоступен, работает только упрощённый
+режим (open/close --housekeeping, note-file). Варианты:
+  - коммит обновления шаблона: open --housekeeping update-delivery, затем
+    close --housekeeping update-delivery;
+  - временно снять проверку: человек ставит в params.yaml строку
+    session_open_gate_skip_until: ГГГГ-ММ-ДД (не дальше 30 дней,
+    см. params.yaml.example и docs/PLATFORM-COMPAT.md);
+  - полноценный режим: WSL2.
+GITBASH
+    ;;
+esac
 exit 2

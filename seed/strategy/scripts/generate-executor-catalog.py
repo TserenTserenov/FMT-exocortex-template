@@ -557,6 +557,11 @@ def _write_catalog_if_changed(catalog: dict, output_path: Path) -> bool:
 
 
 def main():
+    # issue #1411: a Windows console in cp1251 cannot encode "→" in the
+    # summary; the crash after a successful write read as "not generated".
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args = _parse_args()
 
     if args.repair_add_reflexes is not None:

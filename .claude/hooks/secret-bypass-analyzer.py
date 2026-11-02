@@ -37,12 +37,36 @@ YOOKASSA_PYTEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){4,}\Z")
 # NAME, a guarantee no other context here has -- see WP-7 backlog for the
 # broader fix considered and not adopted (unverified key-format assumption).
 YOOKASSA_SOURCE_TEST_SHAPE_RE = re.compile(r"test_[a-z0-9]+(?:_[a-z0-9]+){3,}\Z")
+# issue #1411 (item 2): the context list above kept missing real template
+# lines (a JSON path to a four-segment test script, a `name()` call, an
+# escaped `\.sh` in a regex) and blocked the update commit itself. A real
+# YooKassa secret is `test_`/`live_` plus a random base64url string: it has
+# uppercase letters and no word structure. A tail of four or more short
+# lowercase underscore-joined words, at least three of them with a letter,
+# is an identifier in any context. A dense single blob (`test_` + digits)
+# or anything with an uppercase letter or hyphen still redacts.
+YOOKASSA_WORD_SEGMENT_RE = re.compile(r"[a-z0-9]{1,20}")
+YOOKASSA_IDENTIFIER_MIN_SEGMENTS = 4
+YOOKASSA_IDENTIFIER_MIN_WORDS = 3
+
+
+def is_lowercase_word_identifier(value):
+    # A trailing underscore is a name wrapped across comment lines.
+    segments = value[len("test_"):].rstrip("_").split("_")
+    if len(segments) < YOOKASSA_IDENTIFIER_MIN_SEGMENTS:
+        return False
+    if not all(YOOKASSA_WORD_SEGMENT_RE.fullmatch(segment) for segment in segments):
+        return False
+    words = sum(1 for segment in segments if re.search(r"[a-z]", segment))
+    return words >= YOOKASSA_IDENTIFIER_MIN_WORDS
 
 
 def redact_yookassa(match):
     value = match.group(0)
     if not value.startswith("test_"):
         return "[REDACTED-YOOKASSA-KEY]"
+    if is_lowercase_word_identifier(value):
+        return value
     before = match.string[max(0, match.start() - 160):match.start()]
     after = match.string[match.end():match.end() + 32]
     source_definition = (
@@ -1843,10 +1867,11 @@ def self_test():
         "private-key": "-----BEGIN PRIVATE KEY-----",
         "bearer": "Bearer " + "Q" * 28,
         "yookassa-dense": "test_" + "9" * 32,
-        "yookassa-bare-pytest-shape-no-context": "test_alpha_bravo_charlie_delta_echo",
-        # issue #896: a digit-leading segment (an issue number) must
-        # still redact bare with no protecting context around it.
-        "yookassa-digit-segment-bare-no-context": "test_issue_463_foo_bar_baz_qux_quux",
+        # issue #1411: a base64url-shaped key (mixed case, no word
+        # structure) and a lowercase blob too few segments to be words.
+        "yookassa-mixed-case-key": "test_Fh8hUAVVBGUGbjmlzba6TB0iyUbos_lueTHE-axOwM0",
+        "yookassa-lowercase-two-segment-blob": "test_q8w2e7r1t6y3u9i4o0p5a2s8d7f1g6h3_j9k4l0",
+        "yookassa-uppercase-segment": "test_issue_1411_foo_bar_bazQuxQuuxCorgeGrault",
         # issue #1220 follow-up (cold-review subagent, 2026-10-13): the new
         # source_definition floor is 4+ segments, not lower -- a 3-segment
         # name in a def-line must still redact. Without this the floor could
@@ -1875,6 +1900,13 @@ def self_test():
         "# scripts/tests/test_alpha_bravo_charlie_delta_echo.sh",
         "--exclude=test_alpha_bravo_charlie_delta_echo.sh",
         "# see test_alpha_bravo_charlie_delta_echo for the fixture",
+        # issue #1411: lowercase word identifiers are not keys in any
+        # context (previously bare-no-context positives, #896).
+        "test_alpha_bravo_charlie_delta_echo",
+        "test_issue_463_foo_bar_baz_qux_quux",
+        '"path": "scripts/tests/test_critical_alert_disabled_tracker.sh",',
+        "    test_yaml_need_without_schema_version_raises()",
+        "^scripts/tests/test_issue_463_setup_reuses_resolved_python3\\\\.sh$",
     )
     for name, value in positives.items():
         ids, count, _details = scan(value)
