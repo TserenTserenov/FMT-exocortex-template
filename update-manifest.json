@@ -481,7 +481,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "e27ced8da2ba90bfb1371343ce666f43f0bb2a037a922b66dec10f66eee87e4c"
+      "sha256": "3a65a6979728e7478da27daaae6cd5b09976fd30e8ed5157abb9b9155790fe05"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1956c90505d43427026aad567fad42d2989883df9101d0cf53ec633a636ec4c8"
+      "sha256": "6fe7438d1e327da29230f7e73e67c760a4cb3ec2caee43da9a094f763c15b207"
     },
     {
       "path": "CLAUDE.md",
@@ -2361,7 +2361,7 @@
     },
     {
       "path": "scripts/day-close-prepare.sh",
-      "sha256": "76193c8ec30b7dab69de1e2d4e478b5476751dbd8f901d79111de9657ec18282"
+      "sha256": "11c1752deb65ff37fa9c6c45dcaf7dcec2a5dd4cc4a3f155192bcf077b0cd66c"
     },
     {
       "path": "scripts/day-close.sh",
@@ -2441,7 +2441,7 @@
     },
     {
       "path": "scripts/exocortex-publish.sh",
-      "sha256": "dc46822af0e5882c5d37e989ceb66b3778d539de7d2e371bddd4d79b59c0705a"
+      "sha256": "944ec31903346c42534f847172d7ae4794ebde3cd363f3bd1028bca7cfca9721"
     },
     {
       "path": "scripts/external-tracker.py",
