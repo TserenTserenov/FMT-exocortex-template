@@ -9,7 +9,7 @@
     },
     {
       "path": ".claude/agents/wp-sync-actualizer.md",
-      "sha256": "85b401ee2daaa857527352ed1e06990008288ec3f2e26421ee4220ac6f3de73c"
+      "sha256": "97d019e4e618622af080ed19bb2e69898af1528194747c3cb3175c96049e0780"
     },
     {
       "path": ".claude/bin/guarded-rm",
@@ -413,7 +413,7 @@
     },
     {
       "path": ".claude/scripts/wp-sync-bundle.sh",
-      "sha256": "07b621c9c38aad3ba7263d80b21fca719444ce69813e6b26399e7d47c5c3f7cf"
+      "sha256": "c11adac6d900511b53204571685fece1f79757583936c295dad4add4ce56c949"
     },
     {
       "path": ".claude/settings.json",
@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "36d9daf4288eb649cccc5ac516ac928a2dc216af256e2b90267b8e985db2706b"
+      "sha256": "1d29202f34805985fb336ba2e3a549f02b304192a8c3f658aa6b78606124a729"
     },
     {
       "path": "CLAUDE.md",
@@ -1669,7 +1669,7 @@
     },
     {
       "path": "memory/protocol-open.md",
-      "sha256": "cc24bbf125646f850a95aaa06984b640da45133ebb29b9af17d395841beccd62"
+      "sha256": "425db723b686419756cb6dce46de7585350a0a72970b6d789f211457916c4123"
     },
     {
       "path": "memory/protocol-work.md",
@@ -3660,6 +3660,7 @@
     "scripts/tests/test_update_verify_batch_integrity_hash_mismatch_failclosed.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
+    "scripts/tests/test_wp_inbox_bundle_signal.sh",
     "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",
     "scripts/translate.py",
     "scripts/verify-template-integrity.sh",
