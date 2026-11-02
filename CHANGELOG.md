@@ -23,6 +23,10 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+### Changed
+
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/wp-inbox.sh, scripts/test-wp-inbox.sh (#1428).
+
 ## [0.41.11] — 2026-11-02
 
 ### Added

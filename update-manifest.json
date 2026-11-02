@@ -913,7 +913,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "56911ed473288e98ec3d09be109a6ccf540588beb03e9ef515155deba66cca31"
+      "sha256": "3a2f1717bf2e9e41e436062016b5148081ebc49f5632c720b5e7f60945fcfd58"
     },
     {
       "path": "CLAUDE.md",
@@ -2900,6 +2900,10 @@
       "sha256": "36706ca648d1782376db6923c1a37cc74fab2d103089255875bb67c560c0008a"
     },
     {
+      "path": "scripts/test-wp-inbox.sh",
+      "sha256": "e5d7db6da10510994c9fa4a906c6a88ab37f6f3f2b5cdb1822a36eb97ac6305c"
+    },
+    {
       "path": "scripts/test_archive_cadence_sweep.py",
       "sha256": "a2a648d4243c69a92b2f6cf4ba1ecb4697c585e3c028d682b353b1b0dbd660d0"
     },
@@ -3198,6 +3202,10 @@
     {
       "path": "scripts/week-report-ensure.sh",
       "sha256": "08ebe1a872d0a02fbdd5ba92115773b919181eda541816286f9f4920e62b2024"
+    },
+    {
+      "path": "scripts/wp-inbox.sh",
+      "sha256": "7f677d5b75656cedc9dc7dcbbb7b2038373d37ee7c093dcc2a7ba0cd4c729499"
     },
     {
       "path": "scripts/wp-list.py",
