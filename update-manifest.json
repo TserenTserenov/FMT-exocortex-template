@@ -3544,6 +3544,7 @@
     "scripts/tests/test_issue_1362_strategy_day_carryover.sh",
     "scripts/tests/test_issue_1367_sessions.sh",
     "scripts/tests/test_issue_1398_week_draft_append.sh",
+    "scripts/tests/test_issue_1401_memory_divergence.sh",
     "scripts/tests/test_issue_1401_memory_source.sh",
     "scripts/tests/test_issue_1410_timezone_param.sh",
     "scripts/tests/test_issue_496_heading_style.sh",

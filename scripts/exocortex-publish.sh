@@ -27,9 +27,19 @@
 #               and publishes through a stamped scripts/ds-publish.sh (the canon's when it
 #               carries "# ds-publish version:", otherwise the template's seed copy).
 #   run       — snapshot, then publish.
+#   accept F… — after merging a memory file both machines edited (see "Divergence"),
+#               take this machine's copy as the one to publish.
 #   status    — one line about the last publish attempt; exit 3 when it failed or when
 #               the snapshot has waited longer than IWE_EXOCORTEX_PUBLISH_STALE_HOURS
 #               (default 24) for a successful publish (a killed run writes no status).
+#
+# Divergence (issue #1401): several machines publish into the same exocortex/. publish
+# compares three hashes of every memory file: ours (snapshot), theirs (fresh origin) and
+# the one this machine published last (BASE, machine-local). Theirs differs from both
+# ours and the base -> another machine changed it since our last publish; copying would
+# silently revert that edit, so the file is skipped and listed in the status (cmd_status
+# exits 3, Day Open and Day Close show it). No base yet (first publish) keeps the old
+# behaviour. It clears when the copies match again or after `accept`.
 #
 # Options: --background (detach; output goes to the publish log), --if-due (publish only
 # when the last attempt is older than IWE_EXOCORTEX_PUBLISH_MIN_INTERVAL seconds, default
@@ -78,6 +88,9 @@ RUN_PENDING="$META/run.pending"
 PUBLISH_LOG="$META/publish.log"
 STATUS_FILE="$RUNTIME_DIR/state/exocortex-publish.status"
 TIP_REF="refs/exocortex-publish/tip"
+BASE="$META/published-base.json"
+NEXT_BASE="$META/published-base.next.json"
+DIVERGED="$META/diverged.tsv"
 MIN_INTERVAL="${IWE_EXOCORTEX_PUBLISH_MIN_INTERVAL:-900}"
 STALE_HOURS="${IWE_EXOCORTEX_PUBLISH_STALE_HOURS:-24}"
 DAY_CLOSE="$SCRIPT_DIR/day-close.sh"
@@ -92,6 +105,7 @@ warn() { echo "exocortex-publish: $*" >&2; }
 
 usage() {
   echo "usage: exocortex-publish.sh snapshot|publish|run|status [--background] [--if-due]" >&2
+  echo "       exocortex-publish.sh accept FILE..." >&2
   exit 2
 }
 
@@ -120,9 +134,9 @@ status_get() {  # <key>
   sed -n "s/^$1=//p" "$STATUS_FILE" | tail -n 1
 }
 
-# write_status <ok|fail> <reason> [published_sha]
+# write_status <ok|fail> <reason> [published_sha] [diverged]
 write_status() {
-  local result="$1" reason="$2" sha="${3:-}" last_ok last_ok_epoch tmp
+  local result="$1" reason="$2" sha="${3:-}" diverged="${4:-}" last_ok last_ok_epoch tmp
   mkdir -p "$(dirname "$STATUS_FILE")" || return 0
   last_ok=$(status_get last_ok); last_ok_epoch=$(status_get last_ok_epoch)
   [ -n "$sha" ] || sha=$(status_get published_sha)
@@ -137,6 +151,7 @@ write_status() {
     echo "published_sha=$sha"
     echo "last_ok=$last_ok"
     echo "last_ok_epoch=$last_ok_epoch"
+    echo "diverged=$diverged"
   } > "$tmp" && mv -f "$tmp" "$STATUS_FILE"
 }
 
@@ -162,9 +177,14 @@ cmd_status() {
     echo "публикация бэкапа памяти ещё не выполнялась"
     return 0
   fi
-  local result reason when sha
+  local result reason when sha diverged
   result=$(status_get result); reason=$(status_get reason)
   when=$(status_get last_attempt); sha=$(status_get published_sha)
+  diverged=$(status_get diverged)
+  if [ "$result" = ok ] && [ -n "$diverged" ]; then
+    echo "память правили и на этой машине, и на другой — не опубликованы, чтобы не затереть чужую правку ($when): $diverged. Версия с другой машины: git -C $CANON show $TIP_REF:exocortex/<файл>; сведите её с вашей memory/<файл> и выполните exocortex-publish.sh accept <файл> (или скопируйте её к себе без изменений — пометка снимется сама)"
+    return 3
+  fi
   case "$result" in
     ok)   echo "последняя публикация бэкапа памяти успешна ($when${sha:+, коммит ${sha:0:12}}): $reason"; return 0 ;;
     *)    echo "последняя публикация бэкапа памяти НЕ удалась ($when): $reason; снимок сохранён, повтор при следующем запуске"; return 3 ;;
@@ -305,13 +325,15 @@ cmd_apply() {
     dglock_release; trap - EXIT
     return 1
   fi
-  "$py" - "$SNAP" "$1/exocortex" "$PRESERVED_ROOTS" <<'PY' || rc=$?
+  rm -f "$NEXT_BASE" "$DIVERGED"
+  "$py" - "$SNAP" "$1/exocortex" "$PRESERVED_ROOTS" "$BASE" "$NEXT_BASE" "$DIVERGED" <<'PY' || rc=$?
 # Applies the snapshot under the #536 ownership contract (see the header).
 import hashlib, json, os, shutil, sys
 from pathlib import Path, PurePosixPath
 
 snap, dst = Path(sys.argv[1]), Path(sys.argv[2])
 preserved = set(sys.argv[3].split())
+base_path, next_base_path, diverged_path = (Path(a) for a in sys.argv[4:7])
 MANIFEST = ".day-close-backup-manifest.json"
 SPECIALS = ["CLAUDE.md", "AGENTS.md", "params.yaml", "day-rhythm-config.yaml", MANIFEST]
 OWNED_TREES = ["rules", "extensions"]
@@ -346,6 +368,16 @@ def sha256(path):
             h.update(chunk)
     return h.hexdigest()
 
+def load_base():
+    try:
+        payload = json.loads(base_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as exc:
+        print(f"exocortex-publish: {base_path} unreadable ({exc}); divergence check off for this run", file=sys.stderr)
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
 snap_owned = owned_files(snap)
 origin_owned = owned_files(dst)  # read before the snapshot's manifest replaces it
 
@@ -363,6 +395,29 @@ for tree in OWNED_TREES:
         for path in base.rglob("*"):
             if path.is_file() and not path.is_symlink():
                 to_copy.add(PurePosixPath(path.relative_to(snap).as_posix()))
+
+# issue #1401: never overwrite a memory file another machine changed since our
+# last publish (see "Divergence" in the header).
+base = load_base()
+next_base = dict(base)
+diverged = []
+for raw in sorted(snap_owned):
+    rel = safe_rel(raw)
+    if rel is None or rel not in to_copy:
+        continue
+    ours = sha256(snap / rel)
+    target = dst / rel
+    theirs = sha256(target) if target.is_file() and not target.is_symlink() else None
+    last = base.get(raw)
+    if theirs is None or theirs == ours or last is None or theirs == last:
+        next_base[raw] = ours
+        continue
+    to_copy.discard(rel)
+    diverged.append(f"{raw}\t{'both' if ours != last else 'other'}")
+next_base_path.write_text(json.dumps(next_base, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+diverged_path.write_text("".join(f"{line}\n" for line in diverged), encoding="utf-8")
+for line in diverged:
+    print(f"exocortex-publish: not published, changed on another machine: {line}", file=sys.stderr)
 
 for rel in sorted(to_copy):
     target = dst / rel
@@ -482,8 +537,11 @@ publish_once() {
     write_status fail "в коммит попали пути вне exocortex/: $(printf '%s' "$stray" | head -n 3 | tr '\n' ' ')"; return 1
   fi
   tip=$(git -C "$WT" rev-parse "$TIP_REF")
+  local diverged=""
+  [ -s "$DIVERGED" ] && diverged=$(awk -F'\t' '{ printf "%s%s (%s)", (NR > 1 ? ", " : ""), $1, ($2 == "both" ? "правили обе машины" : "правила другая машина") }' "$DIVERGED")
   if [ -z "$staged" ]; then
-    write_status ok "без изменений: origin/$branch уже содержит снимок" "$tip"
+    mv -f "$NEXT_BASE" "$BASE"
+    write_status ok "без изменений: origin/$branch уже содержит снимок" "$tip" "$diverged"
     say "без изменений — origin/$branch уже содержит снимок памяти"
     return 0
   fi
@@ -511,7 +569,8 @@ publish_once() {
   else
     published=$(git -C "$CANON" rev-parse --verify --quiet "$TIP_REF^{commit}" 2>/dev/null || printf '%s' "$sha")
   fi
-  write_status ok "опубликовано в origin/$branch" "$published"
+  mv -f "$NEXT_BASE" "$BASE"
+  write_status ok "опубликовано в origin/$branch" "$published" "$diverged"
   say "опубликовано в origin/$branch как ${published:0:12}"
   return 0
 }
@@ -550,6 +609,39 @@ cmd_publish() {
     # A marker written between the last check and the release has no other
     # reader: take the lock again for it (a busy lock means its holder sees it).
     [ -f "$PENDING" ] && [ "$round" -lt 5 ] || break
+  done
+  return "$rc"
+}
+
+# accept FILE... — the pilot merged a diverged memory file: record the version
+# origin had at the last publish attempt as this machine's base, so the next
+# publish sends our copy.
+cmd_accept() {
+  local f digest py rc=0
+  [ "$#" -ge 1 ] || usage
+  py=$(find_python3) || { warn "python3 не найден"; return 1; }
+  for f in "$@"; do
+    if ! git -C "$CANON" cat-file -e "$TIP_REF:exocortex/$f" 2>/dev/null; then
+      warn "exocortex/$f нет в последней версии с сервера ($TIP_REF) — сначала publish"
+      rc=1; continue
+    fi
+    digest=$(git -C "$CANON" cat-file blob "$TIP_REF:exocortex/$f" \
+      | "$py" -c 'import hashlib, sys; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())')
+    "$py" - "$BASE" "$f" "$digest" <<'ACCEPT' || { rc=1; continue; }
+import json, os, sys
+from pathlib import Path
+path, name, digest = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+try:
+    base = json.loads(path.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    base = {}
+base[name] = digest
+path.parent.mkdir(parents=True, exist_ok=True)
+tmp = path.with_suffix(".tmp")
+tmp.write_text(json.dumps(base, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+os.replace(tmp, path)
+ACCEPT
+    say "$f: ваша версия будет опубликована при следующей публикации"
   done
   return "$rc"
 }
@@ -599,6 +691,9 @@ CMD="$1"; shift
 if [ "$CMD" = "_apply" ]; then
   [ "$#" -eq 1 ] || usage
   cmd_apply "$1"; exit $?
+fi
+if [ "$CMD" = "accept" ]; then
+  cmd_accept "$@"; exit $?
 fi
 BACKGROUND=0; IF_DUE=0
 while [ "$#" -gt 0 ]; do
