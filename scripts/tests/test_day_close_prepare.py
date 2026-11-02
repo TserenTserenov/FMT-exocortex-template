@@ -10,9 +10,12 @@
      (issue #1314), с graceful fallback, когда инструмент недоступен.
   5. Отсутствующие необязательные шаги day-close дают skip
      в сводке и логе (#559).
+  6. Закрытие дня после полуночи (РП-7 Ф286): все датированные секции и
+     --verify берут закрываемый день (--date или day_boundary), не часы.
 """
 
 import datetime
+import os
 import subprocess
 from pathlib import Path
 
@@ -144,3 +147,119 @@ def test_verify_passes_with_closed_day_english_headings(tmp_path):
     assert "9a OK" in result.stdout
     assert "9b OK" in result.stdout
     assert "dirty OK" in result.stdout
+
+
+CLOSED = "2026-10-31"  # a past day, never the clock date
+NEXT = "2026-11-01"
+
+
+def _git_repo_with_commits(ws: Path) -> None:
+    """One commit inside the closed day, one just after its midnight."""
+    repo = ws / "DS-sample"
+    repo.mkdir()
+    git = ["git", "-C", str(repo)]
+    subprocess.run([*git, "init", "-q"], check=True)
+    for stamp, msg in [(f"{CLOSED}T15:00:00", "feat: closed-day work"),
+                       (f"{NEXT}T00:30:00", "feat: after-midnight work")]:
+        env = {**os.environ, "GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp}
+        subprocess.run(
+            [*git, "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+             "-q", "--allow-empty", "-m", msg],
+            check=True, env=env,
+        )
+
+
+def _run_live_path(ws: Path, tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
+    # git and date must resolve on hosts where they are not in /usr/bin (NixOS).
+    return _run(ws, tmp_path, *args, env_overrides={"PATH": os.environ["PATH"]})
+
+
+def test_date_arg_scopes_every_dated_section_to_the_closed_day(tmp_path):
+    ws = _make_workspace(tmp_path)
+    gov = ws / "DS-strategy"
+    _git_repo_with_commits(ws)
+    (gov / "inbox" / "open-sessions.log").write_text(
+        f"{CLOSED} 21:00 | closed-day session\n{NEXT} 00:40 | next-day session\n",
+        encoding="utf-8",
+    )
+    result = _run_live_path(ws, tmp_path, "--date", CLOSED)
+    assert result.returncode == 0, result.stderr
+    assert f"DAY CLOSE DIGEST {CLOSED} " in result.stdout
+    assert "date from: --date" in result.stdout
+    assert "closed-day work" in result.stdout
+    assert "after-midnight work" not in result.stdout
+    assert "closed-day session" in result.stdout
+    assert "next-day session" not in result.stdout
+
+
+def test_day_boundary_moves_after_midnight_work_into_the_closed_day(tmp_path):
+    # Boundary 04:30: the 00:30 commit of NEXT still belongs to CLOSED.
+    ws = _make_workspace(tmp_path)
+    _git_repo_with_commits(ws)
+    (ws / "memory" / "day-rhythm-config.yaml").write_text(
+        'day_open:\n  day_boundary: "04:30"\n', encoding="utf-8"
+    )
+    result = _run_live_path(ws, tmp_path, "--date", CLOSED)
+    assert result.returncode == 0, result.stderr
+    assert "closed-day work" in result.stdout
+    assert "after-midnight work" in result.stdout
+
+
+def test_auto_date_honours_day_boundary(tmp_path):
+    # Boundary 23:59 puts the clock before it all day except one minute,
+    # so the auto date is the previous calendar day.
+    now = datetime.datetime.now()
+    if now.hour == 23 and now.minute == 59:
+        return
+    ws = _make_workspace(tmp_path)
+    (ws / "memory" / "day-rhythm-config.yaml").write_text(
+        'day_open:\n  day_boundary: "23:59"\n', encoding="utf-8"
+    )
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    result = _run_live_path(ws, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert f"DAY CLOSE DIGEST {yesterday} " in result.stdout
+    assert "date from: day_boundary 23:59" in result.stdout
+
+
+def test_commented_day_boundary_keeps_the_clock_date(tmp_path):
+    ws = _make_workspace(tmp_path)
+    (ws / "memory" / "day-rhythm-config.yaml").write_text(
+        'day_open:\n  # day_boundary: "23:59"\n', encoding="utf-8"
+    )
+    result = _run_live_path(ws, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert f"DAY CLOSE DIGEST {datetime.date.today().isoformat()} " in result.stdout
+    assert "date from: clock" in result.stdout
+
+
+def test_verify_checks_the_closed_day_not_the_clock(tmp_path):
+    ws = _make_workspace(tmp_path)
+    gov = ws / "DS-strategy"
+    (gov / "archive/day-plans" / f"DayPlan {CLOSED}.md").write_text(
+        f"# DayPlan\n## Итоги дня ({CLOSED})\ndone\n", encoding="utf-8"
+    )
+    (gov / "current" / "WeekReport W44.md").write_text(
+        "## Итоги 31 октября\nok\n", encoding="utf-8"
+    )
+    result = _run_live_path(ws, tmp_path, "--verify", "--date", CLOSED)
+    assert result.returncode == 0, result.stdout
+    assert f"9a OK: day summary present in archived DayPlan {CLOSED}" in result.stdout
+    assert "9b OK" in result.stdout
+
+
+def test_invalid_date_is_rejected(tmp_path):
+    ws = _make_workspace(tmp_path)
+    for bad in ["2026-13-01", "2026-02-30", "yesterday"]:
+        result = _run_live_path(ws, tmp_path, "--date", bad)
+        assert result.returncode == 2, (bad, result.stdout)
+        assert "--date ожидает YYYY-MM-DD" in result.stderr
+    assert _run_live_path(ws, tmp_path, "--bogus").returncode == 2
+
+
+def test_for_date_is_an_alias_of_date(tmp_path):
+    # The governance-repo port of this script and its skill pass --for-date.
+    ws = _make_workspace(tmp_path)
+    result = _run_live_path(ws, tmp_path, "--for-date", CLOSED)
+    assert result.returncode == 0, result.stderr
+    assert f"DAY CLOSE DIGEST {CLOSED} " in result.stdout
