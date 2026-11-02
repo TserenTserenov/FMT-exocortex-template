@@ -10,12 +10,12 @@ import sys
 import tempfile
 
 PAD = 70_000
-# Обрыв канала случается, когда совпадение — в начальной строке, а за ней ещё больше ~64 КБ строк:
-# grep -q выходит после первой строки, echo ещё пишет. Одну длинную строку grep дочитывает до конца.
-FILLER = "; : " + "\n: filler line" * (PAD // 14)          # команды-заполнители отдельными строками
-ARGS = " \\\n" + " \\\n".join(f"b{i}" for i in range(PAD // 8))   # хвост аргументов той же git-команды, с переносами
+# A channel break happens when the match is in the first line and more than ~64 KB of lines follow it:
+# grep -q exits after the first line while echo is still writing. grep reads one long line to the end.
+FILLER = "; : " + "\n: filler line" * (PAD // 14)          # filler commands as separate lines
+ARGS = " \\\n" + " \\\n".join(f"b{i}" for i in range(PAD // 8))   # the argument tail of the same git command, with line breaks
 
-# (правило, команда, cwd или None)
+# (rule, command, cwd or None)
 CASES = [
     ("rm -r -f", "rm -rf /important" + FILLER, None),
     ("psql DROP", 'psql -c "DROP TABLE users"' + FILLER, None),
@@ -33,12 +33,12 @@ CASES = [
      'git reset --hard HEAD "' + "\n".join(f"h{i}" for i in range(PAD // 6)) + '"', None),
     ("git add ., многострочный аргумент в кавычках", 'git add . "' + "\n".join(f"d{i}" for i in range(PAD // 6)) + '"', None),
     ("git clean -fdx, многострочный аргумент в кавычках", 'git clean -fdx "' + "\n".join(f"c{i}" for i in range(PAD // 6)) + '"', None),
-    # Разрешённые длинные команды (отрицательные условия): ожидается 0.
+    # Allowed long commands (negative conditions): 0 is expected.
     ("разрешено: guarded-rm во временном каталоге", "/home/user/IWE/.claude/bin/guarded-rm -rf /tmp/build-x" + FILLER, None),
     ("обычный rm -rf во временном каталоге (вариант Г)", "rm -rf /tmp/build-x" + FILLER, None),
     ("разрешено: psql DELETE ... WHERE", "psql -c \"DELETE FROM users WHERE id = 1\"" + FILLER, None),
-    # Правило «путь от корня IWE не из корня» здесь не проверяется: хук читает stdin дважды,
-    # cwd у него всегда пуст, и правило не срабатывает ни на какой длине (отдельная находка).
+    # The rule "a path from the IWE root not from the root" is not checked here: the hook reads stdin twice,
+    # its cwd is always empty, and the rule does not fire at any length (a separate finding).
 ]
 
 

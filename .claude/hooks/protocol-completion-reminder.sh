@@ -1,9 +1,9 @@
 #!/bin/bash
 # Protocol Completion Reminder Hook
 # Event: PostToolUse (matcher: Read | Skill)
-# Ф2 WP-229: расширен на Skill tool (day-open, day-close, run-protocol, wp-new)
-# После чтения протокола или вызова скилла напоминает: выполни ВСЕ шаги.
-# Read-only: только возвращает JSON.
+# Phase 2 WP-229: extended to the Skill tool (day-open, day-close, run-protocol, wp-new)
+# After reading a protocol or calling a skill it reminds: perform ALL steps.
+# Read-only: only returns JSON.
 #
 # R23 (issue #975). The verification item belongs to closings only: R23 is the
 # Haiku sub-agent that checks a closing against its checklist (Quick Close in
@@ -128,7 +128,7 @@ is_protocol_file() {
 
 R23_ITEM="После завершения запусти sub-agent Haiku в роли R23 (изоляция контекста): он сверяет выполнение с чеклистом закрытия."
 
-# Срабатываем на чтение протоколов (Read memory/protocol-*.md)
+# Fire on reading protocols (Read memory/protocol-*.md)
 if [ "$TOOL" = "Read" ] && is_protocol_file "$FILE_PATH"; then
   PROTOCOL_NAME=$(basename "$FILE_PATH" .md)
   ITEMS="(1) Выполни ВСЕ шаги алгоритма."
@@ -145,7 +145,7 @@ if [ "$TOOL" = "Read" ] && is_protocol_file "$FILE_PATH"; then
   CTX="📝 ПРОТОКОЛ ЗАГРУЖЕН: $PROTOCOL_NAME. ОБЯЗАТЕЛЬНО: $ITEMS $WARN"
   jq -n --arg ctx "$CTX" '{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": $ctx}}'
 
-# Срабатываем на вызов протокольных скиллов (Skill tool)
+# Fire on calling protocol skills (Skill tool)
 elif [ "$TOOL" = "Skill" ] && echo "$SKILL_NAME" | grep -qE '^(day-open|day-close|run-protocol|wp-new)$'; then
   ITEMS="(1) Создай таск-лист ВСЕХ шагов скилла ДО начала исполнения — TodoWrite, TaskCreate/TaskUpdate или явная нумерация шагов в ответах, если Task-инструменты недоступны. (2) Выполни ВСЕ шаги последовательно, отмечая каждый."
   WARN="НЕ пропускай шаги."

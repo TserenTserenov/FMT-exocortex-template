@@ -1,4 +1,4 @@
-# Role manifest — Верификатор (R23)
+# Role manifest — Verifier (R23)
 # Source-of-truth: PACK-verification (VR.R.001), DP.ROLE.001 §3.2 (R23)
 # Contract: roles/ROLE-CONTRACT.md
 
@@ -7,7 +7,7 @@ id: R23
 type: agential
 display_name: "Верификатор"
 
-# Нет runner — вызывается через /verify или Verification Gate (protocol-close)
+# No runner — invoked via /verify or the Verification Gate (protocol-close)
 # runner: scripts/verifier.sh
 
 install:

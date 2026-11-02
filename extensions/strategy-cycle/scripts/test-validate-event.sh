@@ -1,8 +1,8 @@
 #!/bin/bash
-# test-validate-event.sh — смоук-тест validate-event.sh на валидном и невалидном
-# событии (WP-518, живая приёмка 2026-08-16).
+# test-validate-event.sh — smoke test of validate-event.sh on a valid and an invalid
+# event (WP-518, live acceptance 2026-08-16).
 #
-# Использование: bash test-validate-event.sh
+# Usage: bash test-validate-event.sh
 
 set -uo pipefail
 
@@ -11,8 +11,8 @@ VALIDATOR="$SCRIPT_DIR/validate-event.sh"
 FAILS=0
 
 check() {
-  # $2 пуст → вызов validate-event.sh вообще без аргумента (usage-проверка);
-  # иначе — обычный вызов с фикстурой.
+  # $2 empty → call validate-event.sh with no argument at all (usage check);
+  # otherwise — a normal call with the fixture.
   local desc="$1" fixture="$2" expected_exit="$3"
   local out
   out=$(mktemp)

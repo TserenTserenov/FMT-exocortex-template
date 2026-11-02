@@ -1,25 +1,25 @@
 #!/bin/bash
-# Воспроизводимый координационный тест N агентов IWE (WP-499 Ф7/Ф11, расширен Ф17 п.3-4,
-# пир-сессия 2026-08-01-03-wp499-coord-test-agent-id).
+# Reproducible coordination test of N IWE agents (WP-499 Phase 7/11, extended in Phase 17 items 3-4,
+# peer session 2026-08-01-03-wp499-coord-test-agent-id).
 #
-# Три блока на прогон:
-#   1. ТРАНСПОРТ — демон шлюза отвечает на gateway_status (без LLM).
-#   2. ИДЕНТИЧНОСТЬ-КОНФИГ — у каждого CLI в его РЕАЛЬНОМ конфиге ровно одна
-#      регистрация шлюза с ЕГО ожидаемым IWE_AGENT_ID (без LLM; ловит класс
-#      «два ID у одного агента» / «чужая регистрация», прецедент 19.07).
-#   3. ЖИВАЯ КООРДИНАЦИЯ — каждый агент САМ (через свой реальный MCP, не
-#      симуляция env): acquire_file_lock(ttl 600) → дописать строку → commit со
-#      своей атрибуцией → release_file_lock. Скрипт наблюдает holder через
-#      gateway_status (poll) и проверяет: holder == ожидаемый ID агента,
-#      trailer коммита (%B, не %an), отсутствие лока тестового файла после,
-#      чистый worktree без посторонних staged-файлов.
+# Three blocks per run:
+#   1. TRANSPORT — the gateway daemon answers gateway_status (no LLM).
+#   2. IDENTITY-CONFIG — each CLI's REAL config has exactly one
+#      gateway registration with ITS expected IWE_AGENT_ID (no LLM; catches the class
+#      "two IDs for one agent" / "foreign registration", precedent 19.07).
+#   3. LIVE COORDINATION — each agent ITSELF (via its real MCP, not an
+#      env simulation): acquire_file_lock(ttl 600) -> append a line -> commit with
+#      its own attribution -> release_file_lock. The script observes the holder via
+#      gateway_status (poll) and checks: holder == the agent's expected ID,
+#      commit trailer (%B, not %an), no lock on the test file afterwards,
+#      clean worktree without stray staged files.
 #
 # Usage:
 #   bash wp499-agent-coordination-test.sh [--agents claude,kimi,codex,hermes] [--file PATH] [--skip-live]
-#   --skip-live — только блоки 1-2 (без LLM-вызовов, бесплатно).
+#   --skip-live — only blocks 1-2 (no LLM calls, free).
 #
-# Exit: 0 = все выбранные агенты прошли все блоки; 1 = хотя бы один FAIL
-# (per-agent FAIL фиксируется, остальные продолжаются — полный отчёт в конце).
+# Exit: 0 = all selected agents passed all blocks; 1 = at least one FAIL
+# (per-agent FAIL is recorded, the rest continue — full report at the end).
 
 set -uo pipefail
 
@@ -28,9 +28,9 @@ AGENTS="claude,kimi,codex,hermes"
 SKIP_LIVE=0
 LOCK_TTL=600
 CLAUDE_MAX_TURNS="${CLAUDE_MAX_TURNS:-16}"
-# Governance-репо берётся из окружения, не из имени авторской копии: жёстко
-# зашитое имя ломает файл у любого пользователя шаблона (validator FMT,
-# integration_contracts, поймал это при доставке 03.08, WP-484 Ф38).
+# The governance repo is taken from the environment, not from the author's copy name: a hard-coded
+# name breaks the file for any template user (validator FMT,
+# integration_contracts, caught this on delivery 03.08, WP-484 Phase 38).
 GOVERNANCE_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 GW_CALL="$HOME/IWE/$GOVERNANCE_REPO/scripts/lib/gateway-mcp-call.sh"
 IWE_ROOT="$HOME/IWE"
@@ -50,7 +50,7 @@ done
 
 IFS=',' read -ra AGENT_LIST <<< "$AGENTS"
 
-# Явная таблица CLI alias → зарегистрированный IWE_AGENT_ID (аудит 31.07).
+# Explicit table CLI alias -> registered IWE_AGENT_ID (audit 31.07).
 expected_trailer_domain() {
   case "$1" in
     claude) echo "anthropic" ;;
@@ -144,7 +144,7 @@ run_agent_cli() {
   fi
 }
 
-# ── Блок 1: ТРАНСПОРТ ──
+# ── Block 1: TRANSPORT ──
 echo
 echo "=== Блок 1: транспорт шлюза ==="
 TRANSPORT_OK=1
@@ -157,7 +157,7 @@ else
   exit 1
 fi
 
-# ── Блок 2: ИДЕНТИЧНОСТЬ-КОНФИГ ──
+# ── Block 2: IDENTITY-CONFIG ──
 echo
 echo "=== Блок 2: идентичность в реальных конфигах ==="
 for agent in "${AGENT_LIST[@]}"; do
@@ -183,7 +183,7 @@ for agent in "${AGENT_LIST[@]}"; do
   fi
 done
 
-# ── Блок 3: ЖИВАЯ КООРДИНАЦИЯ ──
+# ── Block 3: LIVE COORDINATION ──
 if [ "$SKIP_LIVE" = "1" ]; then
   echo
   echo "=== Блок 3 пропущен (--skip-live) ==="
@@ -208,7 +208,7 @@ else
   LIVE_TEST_STARTED=1
   touch "$TEST_FILE"
 
-  # фиксация чистого состояния: посторонние staged-файлы до теста — отдельный FAIL
+  # record the clean state: stray staged files before the test are a separate FAIL
   PRE_STAGED=$(git -C "$IWE_ROOT" diff --cached --name-only 2>/dev/null || true)
   if [ -n "$PRE_STAGED" ]; then
     echo "  ⚠️  В индексе уже есть staged-файлы (чужая работа) — коммиты агентов делаем только pathspec-строкой"
@@ -234,7 +234,7 @@ except Exception: pass
     line="[$agent] строка от $ts"
     holder_seen=""
 
-    # poll в фоне: кто держит лок тестового файла во время работы CLI
+    # poll in the background: who holds the test file lock while the CLI runs
     (
       for _ in $(seq 1 60); do
         h=$(poll_holder)
@@ -271,7 +271,7 @@ except Exception: pass
       pass "holder == $exp (живая проверка идентичности)"
     fi
 
-    # проверка коммита: subject + файл + trailer (через %B, не %an)
+    # commit check: subject + file + trailer (via %B, not %an)
     BODY=$(git -C "$HOME/IWE" log -1 --format=%B -- "$TEST_FILE" 2>/dev/null || true)
     if echo "$BODY" | head -1 | grep -q "coord-test: $agent"; then
       pass "commit subject 'coord-test: $agent' на тестовом файле"
@@ -279,7 +279,7 @@ except Exception: pass
       fail "$agent: последний коммит тестового файла не его: $(echo "$BODY" | head -1)" "$agent"
       continue
     fi
-    # trailer атрибуции (Codex, ход 1: %B, не %an — author у всех одинаковый)
+    # attribution trailer (Codex, turn 1: %B, not %an — the author is the same for all)
     if echo "$BODY" | grep -qi "Co-Authored-By: .*$(expected_trailer_domain "$agent")"; then
       pass "trailer атрибуции агента на месте"
     else
@@ -287,7 +287,7 @@ except Exception: pass
       continue
     fi
 
-    # лок тестового файла освобождён
+    # test file lock released
     leftover=$(poll_holder)
     if [ -n "$leftover" ]; then
       fail "$agent: лок тестового файла не освобождён (holder: $leftover)" "$agent"

@@ -163,7 +163,7 @@ class ExtractorPipelineTests(unittest.TestCase):
         # one file IS one capture, YAML frontmatter status instead of a
         # "### " heading. pending_capture_count() cannot parse this shape at
         # all -- these files sat unprocessed for ~2 months in production
-        # before this fix (WP-560 Ф13, 2026-09-14).
+        # before this fix (WP-560 Phase 13, 2026-09-14).
         inbox = self.workspace / "inbox"
         pending_lesson = self.write(inbox / "captures/lesson_a.md", "---\nstatus: pending-review\n---\n# A\n")
         pending_pattern = self.write(inbox / "captures/pattern_b.md", "---\nstatus: pending-review\n---\n# B\n")
@@ -293,7 +293,7 @@ reports.mkdir()
         published = self.git(remote, "show", "main:inbox/fleeting-notes.md")
         self.assertIn("[analyzed 2026-09-12]", published)
 
-    # issue #1116 cold-review follow-up (WP-545 Ф15): assert_ai_cli_root_compat
+    # issue #1116 cold-review follow-up (WP-545 Phase 15): assert_ai_cli_root_compat
     # had no direct test. IWE_EXTRACTOR_TEST_EUID lets the fixture drive both
     # branches deterministically; the unshare variant below additionally
     # proves the real (non-overridden) $EUID path under a genuine EUID 0.
@@ -325,7 +325,7 @@ reports.mkdir()
         self.assertEqual(result.returncode, 1)
         self.assertIn("несовместим с --dangerously-skip-permissions", result.stderr)
 
-    # issue #928 cold-review follow-up (WP-545 Ф15): resolve_tool_path had no
+    # issue #928 cold-review follow-up (WP-545 Phase 15): resolve_tool_path had no
     # direct test for its three-step fallback chain.
     def test_resolve_tool_path_finds_iwe_scripts_first(self):
         scripts_dir = self.base / "iwe-scripts"

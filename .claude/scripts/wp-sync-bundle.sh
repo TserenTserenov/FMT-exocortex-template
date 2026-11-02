@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# wp-sync-bundle.sh — детерминированный bundler контекста РП для sync-фазы WP Gate
-# Контракт: вход WP-N или N → stdout markdown bundle, exit 0/1/2/3/4
-#   Первые машинные строки stdout: GIT_SYNC_STATUS / GIT_SYNC_DETAIL /
+# wp-sync-bundle.sh — deterministic bundler of WP context for the sync phase of WP Gate
+# Contract: input WP-N or N → stdout markdown bundle, exit 0/1/2/3/4
+#   First machine lines of stdout: GIT_SYNC_STATUS / GIT_SYNC_DETAIL /
 #   [GIT_SYNC_OVERRIDE] / CARD_SOURCE (worktree | origin-pinned oid=<40hex>
-#   behind=N ahead=M | worktree-forced). WP-561 Ф24: при STALE/DIVERGED и
-#   свежем remote-tracking ref карточки читаются со снимка origin (exit 0).
-#   exit 4: не найден scripts/lib/wp-num.sh — ошибка установки, а не «РП не найден»
-#   (exit 1); проверяется первым, до чтения конфигурации и реестра. Тот же код 4
-#   отдаёт сверка handoff_snapshot, когда его не нашёл wp-phase-digest.sh.
+#   behind=N ahead=M | worktree-forced). WP-561 Phase 24: on STALE/DIVERGED and
+#   a fresh remote-tracking ref, cards are read from the origin snapshot (exit 0).
+#   exit 4: scripts/lib/wp-num.sh not found — an installation error, not "WP not found"
+#   (exit 1); checked first, before reading config and registry. The same code 4
+#   is returned by the handoff_snapshot check when wp-phase-digest.sh did not find it.
 # see WP-294
 # Compatible: bash 3.2+
 
@@ -23,7 +23,7 @@ _WPN_OPTIONAL=""
 # IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
 # just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
 # The library is mandatory: not finding it is an installation error, not "WP not found",
-# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "WP not found").
 # A consumer that must keep working without the library (session-guard: its hypothesis gate
 # warns and checks the exact card names, it never blocks a session over a missing library)
 # sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
@@ -69,7 +69,7 @@ if [[ ! -d "$IWE_WORKSPACE" ]]; then
 fi
 
 GOV_REPO="${IWE_GOVERNANCE_REPO:-governance}"
-# Resilience: если GOV_REPO задан извне, но в нём нет WP-REGISTRY.md — ищем любой repo с ним
+# Resilience: if GOV_REPO is set externally but has no WP-REGISTRY.md — look for any repo that has it
 if [[ ! -f "$IWE_WORKSPACE/$GOV_REPO/docs/WP-REGISTRY.md" ]]; then
   found_repo=""
   for cand in "$IWE_WORKSPACE"/*/; do
@@ -91,7 +91,7 @@ fi
 STRATEGY_DIR="$IWE_WORKSPACE/$GOV_REPO"
 INBOX_DIR="$STRATEGY_DIR/inbox"
 ARCHIVE_DIR="$STRATEGY_DIR/archive/wp-contexts"
-# WP-561 Ф24 (peer-session 2026-09-27-09, Claude+Kimi+Codex): where the cards
+# WP-561 Phase 24 (peer-session 2026-09-27-09, Claude+Kimi+Codex): where the cards
 # are actually read from. Normally the working copy ($STRATEGY_DIR). When the
 # working copy is STALE/DIVERGED from origin and the remote-tracking ref is
 # provably fresh, the cards are read from a full snapshot of ONE pinned origin
@@ -109,14 +109,14 @@ GIT_LOG_REV=""
 ORIGIN_WS=""
 DRIFT_FILE=""   # global on purpose: the EXIT trap runs after main() returned, a `local` would be out of scope (cold review 27.09: 569 leaked /tmp/wp-sync-drift.* files)
 
-# Sibling helper — единственный источник дайджеста фаз (см. его собственный
-# заголовок: WP-561 2026-09-03-19, Codex "один и тот же парсер на обоих
-# концах"). Резолвится от расположения ЭТОГО файла, не хардкодом пути.
+# Sibling helper — the single source of the phase digest (see its own
+# header: WP-561 2026-09-03-19, Codex "one and the same parser on both
+# ends"). Resolved relative to THIS file's location, not by a hardcoded path.
 PHASE_DIGEST_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/wp-phase-digest.sh"
 REGISTRY_FILE="$STRATEGY_DIR/docs/WP-REGISTRY.md"
 GIT_LOG_DAYS="${WP_SYNC_GIT_DAYS:-14}"
 
-# WP-561 Ф20: git-vs-origin sync gate. Read-only (ls-remote, no fetch) — see
+# WP-561 Phase 20: git-vs-origin sync gate. Read-only (ls-remote, no fetch) — see
 # lib header for why a full fetch is wrong on a checkout dozens of worktrees
 # share. Missing lib is not fatal here (checked at call site below).
 #
@@ -355,7 +355,7 @@ extract_related_wps() {
 }
 
 # Extract WP numbers from blockers: block in frontmatter (symmetric to
-# extract_related_wps — see WP-503 Ф6 peer-session 2026-07-28: blockers:
+# extract_related_wps — see WP-503 Phase 6 peer-session 2026-07-28: blockers:
 # schema is not standardized (5/~100 cards, 3 different shapes), but any
 # shape that embeds a WP-NNN reference is caught by the same regex).
 extract_blocker_wps() {
@@ -365,14 +365,14 @@ extract_blocker_wps() {
     || true
 }
 
-# Снимок зависимостей, записанный закрывающим агентом в frontmatter текущей
-# карточки (WP-561 A/B: `wp-context-update` пишет его при close для каждого
-# `depends_on`). Формат:
+# Dependency snapshot written by the closing agent into the frontmatter of the current
+# card (WP-561 A/B: `wp-context-update` writes it on close for each
+# `depends_on`). Format:
 #   handoff_snapshot:
 #     - ref: WP-484
 #       observed_status: in_progress
 #       observed_phase_digest: 64d50a10e003
-# Вывод: одна строка на запись, "ref|observed_status|observed_phase_digest".
+# Output: one line per entry, "ref|observed_status|observed_phase_digest".
 extract_handoff_snapshot() {
   local file="$1"
   awk '
@@ -472,22 +472,22 @@ grep_body_wps() {
     || true
 }
 
-# issue #473: колонка статуса регистра — по шапке `| # | ... |`, не по
-# жёсткой позиции (совпадает по духу с find_header_columns() в
-# scripts/build-active-wp.py: разные реестры называют/переставляют колонки).
+# issue #473: the registry status column is found by the `| # | ... |` header, not by
+# a hard-coded position (in the same spirit as find_header_columns() in
+# scripts/build-active-wp.py: different registries name/reorder columns).
 registry_status_column() {
   local header
   header=$(grep -E '^\|[[:space:]]*#[[:space:]]*\|' "$REGISTRY_FILE" 2>/dev/null | head -1)
   [[ -z "$header" ]] && return 1
-  # issue #717 follow-up (найдено при regression-тестах на этой же фазе, тот
-  # же класс бага, другой сбой): под некоторыми локалями (напр. en_US.UTF-8
-  # на macOS/awk-BWK 20200816) `==` в awk между двумя РАЗНЫМИ кириллическими
-  # строками возвращал true — не проблема регистра, а порча самого сравнения
-  # многобайтовых строк на уровне locale-aware коллации. `tolower()` для
-  # кириллицы при этом тоже locale-зависим (под голым `C` не сворачивает
-  # регистр вообще). Решение — не полагаться ни на `tolower()`, ни на
-  # locale-aware `==`: перечислить оба регистра литералом И считать байты под
-  # `LC_ALL=C`, где `==` — простое побайтовое сравнение без коллации.
+  # issue #717 follow-up (found by regression tests in this same phase, the same
+  # class of bug, a different failure): under some locales (e.g. en_US.UTF-8
+  # on macOS/awk-BWK 20200816) `==` in awk between two DIFFERENT Cyrillic
+  # strings returned true — not a case problem, but corruption of the comparison itself
+  # of multibyte strings at the level of locale-aware collation. `tolower()` for
+  # Cyrillic is also locale-dependent (under a bare `C` it does not fold
+  # case at all). The solution is to rely neither on `tolower()` nor on
+  # locale-aware `==`: list both cases as a literal AND count bytes under
+  # `LC_ALL=C`, where `==` is a plain bytewise comparison without collation.
   LC_ALL=C awk -F'|' -v h="$header" 'BEGIN {
     n = split(h, cells, "|")
     for (i = 1; i <= n; i++) {
@@ -499,10 +499,10 @@ registry_status_column() {
 
 registry_status() {
   local num="$1" prev="" malformed="_некорректный номер РП: ${1}_"
-  # Найдено пир-сессией с Codex (ход 3): единственный вызывающий (строка ~514)
-  # сейчас всегда передаёт голое число (та же инвариантность проверяется
-  # соседним `grep -cE '^[0-9]+$'` на строке ~608), но публичная функция не
-  # обязана полагаться на дисциплину вызывающего — "WP-47" тихо не находился бы.
+  # Found by the peer session with Codex (turn 3): the only caller (line ~514)
+  # currently always passes a bare number (the same invariant is checked by the
+  # neighbouring `grep -cE '^[0-9]+$'` on line ~608), but a public function is not
+  # obliged to rely on the caller's discipline — "WP-47" would silently not be found.
   #
   # issue #954: the number is read by the SAME rules as wp_num_normalize (scripts/lib/wp-num.sh),
   # which this function must not call (the #473/#713/#871 tests cut it out by name and run it
@@ -510,7 +510,7 @@ registry_status() {
   # compares the two on a table of inputs: at most 64 characters in all (a prefix counts),
   # surrounding spaces and ~~ / ** wrappers peeled, a WP- prefix in any case, digits only, at most
   # 9 of them after the leading zeros. It used to take 1-4 digits and only "WP-" / "wp-", so
-  # "00044" -- and "wP-044" -- came back as "некорректный номер" and failed the canary although
+  # "00044" -- and "wP-044" -- came back as "invalid number" and failed the canary although
   # the library, the card lookup and close-wp.sh all read them as 44.
   [[ "${#num}" -le 64 ]] || { echo "$malformed"; return; }
   num="${num#"${num%%[![:space:]]*}"}"
@@ -526,10 +526,10 @@ registry_status() {
     [Ww][Pp]-*) num="${num#???}" ;;
   esac
   [[ "$num" =~ ^[0-9]+$ ]] || { echo "$malformed"; return; }
-  # issue #715: ведущие нули (WP-038) не совпадали с голым "38" в реестре —
-  # нормализуем ДО построения regex поиска строки. Нули снимаются текстом, не арифметикой:
-  # `10#` держит базу 10 (иначе bash читает "038" как некорректный восьмеричный литерал),
-  # но длинная строка цифр переполнила бы 64-битное целое молча.
+  # issue #715: leading zeros (WP-038) did not match a bare "38" in the registry —
+  # normalize BEFORE building the row-lookup regex. Zeros are stripped textually, not arithmetically:
+  # `10#` pins base 10 (otherwise bash reads "038" as an invalid octal literal),
+  # but a long digit string would silently overflow a 64-bit integer.
   num="${num#"${num%%[!0]*}"}"
   [[ -n "$num" ]] || num=0
   [[ "${#num}" -le 9 ]] || { echo "$malformed"; return; }
@@ -538,28 +538,28 @@ registry_status() {
     echo "_нет файла REGISTRY_"
     return
   fi
-  # issue #473: раньше строка искалась через `grep "WP-${num}[^0-9]"` —
-  # подстрока, которая срабатывает и на прозу ЧУЖИХ строк (например,
-  # "открыт как спин-офф WP-47" в статусе WP-49 возвращал статус WP-49 при
-  # запросе WP-47). Строка опознаётся по СВОЕЙ первой ячейке (номер РП),
-  # тем же приёмом, что ROW_RE в build-active-wp.py.
-  # issue #716: пометка рядом с номером ("13★") не проходила прежний шаблон
-  # (требовал пробел/pipe сразу после числа) — поиск перескакивал на другую
-  # строку с тем же номером (например зачёркнутую предыдущую итерацию).
-  # `[^0-9|]*` разрешает произвольный суффикс между числом и разделителем
-  # колонки, но не цифру — иначе "13" совпал бы и с "138".
-  # issue #871: колонку номера пишут и с префиксом ("| **WP-117** |") — канон
-  # (create-wp.sh) хранит голое число, но реестр — журнальный файл, его ведут и
-  # руками. Без `(WP-|wp-)?` такая строка молча давала «не в реестре», неотличимое
-  # от настоящего отсутствия. Префикс допустим только сразу перед числом, поэтому
-  # "WP-1170" по-прежнему не совпадает с 117.
-  # issue #954: та же ячейка пишется и с ведущими нулями ("| WP-044 |", как называет
-  # папку карточки create-wp.sh) — `0*` между префиксом и числом. Запрос уже
-  # нормализован выше (44), так что "440" и "0440" по-прежнему не совпадают с 44:
-  # после числа цифра запрещена `[^0-9|]*`. Тот же шаблон отдаёт
-  # wp_num_registry_cell_regex (scripts/lib/wp-num.sh) для close-wp.sh; функция
-  # намеренно не зовёт библиотеку — тесты #473/#713/#871 вырезают её по имени и
-  # прогоняют отдельно от остального файла.
+  # issue #473: the row used to be found via `grep "WP-${num}[^0-9]"` —
+  # a substring that also fires on the prose of OTHER rows (for example,
+  # "opened as a spin-off of WP-47" in the status of WP-49 returned the status of WP-49 when
+  # WP-47 was queried). The row is now identified by ITS OWN first cell (the WP number),
+  # using the same technique as ROW_RE in build-active-wp.py.
+  # issue #716: a mark next to the number ("13★") did not pass the previous pattern
+  # (it required a space/pipe right after the number) — the search jumped to another
+  # row with the same number (for example a struck-through previous iteration).
+  # `[^0-9|]*` allows an arbitrary suffix between the number and the column
+  # separator, but not a digit — otherwise "13" would also match "138".
+  # issue #871: the number column is also written with a prefix ("| **WP-117** |") — the canon
+  # (create-wp.sh) stores a bare number, but the registry is a journal file, also maintained
+  # by hand. Without `(WP-|wp-)?` such a row silently yielded "not in registry", indistinguishable
+  # from a genuine absence. The prefix is allowed only immediately before the number, so
+  # "WP-1170" still does not match 117.
+  # issue #954: the same cell is also written with leading zeros ("| WP-044 |", as create-wp.sh names
+  # the card folder) — `0*` between the prefix and the number. The query is already
+  # normalized above (44), so "440" and "0440" still do not match 44:
+  # a digit after the number is forbidden by `[^0-9|]*`. The same pattern is returned by
+  # wp_num_registry_cell_regex (scripts/lib/wp-num.sh) for close-wp.sh; the function
+  # deliberately does not call the library — tests #473/#713/#871 cut it out by name and
+  # run it separately from the rest of the file.
   local regex="^\|[[:space:]]*(~~)?(\*\*)?(WP-|wp-)?0*${num}(\*\*)?(~~)?[^0-9|]*[[:space:]]*\|"
   local match_count
   match_count=$(grep -cE "$regex" "$REGISTRY_FILE" 2>/dev/null || true)
@@ -569,9 +569,9 @@ registry_status() {
     return
   fi
   if [[ "$match_count" -gt 1 ]]; then
-    # issue #716: раньше молчаливый `head -1` без предупреждения мог отдать
-    # ПРОТИВОПОЛОЖНЫЙ действительности статус — теперь неоднозначность хотя
-    # бы видна в stderr, вместо тихой уверенной ошибки на первой строке.
+    # issue #716: a silent `head -1` used to be able to return, with no warning, a status
+    # OPPOSITE to reality — now the ambiguity is at least
+    # visible in stderr, instead of a quiet confident error on the first line.
     echo "неоднозначно: $match_count совпадений по номеру ${num} в реестре, взята первая строка" >&2
   fi
   local line
@@ -582,17 +582,17 @@ registry_status() {
     echo "_колонка статуса не найдена в шапке реестра_"
     return
   fi
-  # Статус берётся из СВОЕЙ ячейки, не грепом эмодзи по всей строке —
-  # эмодзи в описании соседней колонки раньше мог перебить вердикт (issue #473).
+  # The status is taken from ITS OWN cell, not by grepping an emoji across the whole row —
+  # an emoji in the description of a neighbouring column used to be able to override the verdict (issue #473).
   status_cell=$(echo "$line" | awk -F'|' -v col="$status_col" '{ v=$col; gsub(/^[ \t]+|[ \t]+$/, "", v); print v }')
-  # issue #717: обычный `grep -q 'ЭМОДЗИ'` зависит от локали/сборки grep — на
-  # части машин (напр. GNU grep 3.0 + en_US.UTF-8) многобайтовый literal
-  # молча не матчился, хотя байты совпадали, и вся ось статуса слепла тихо.
-  # `LC_ALL=C grep -F` сравнивает как байтовую fixed-строку, не парсит эмодзи
-  # как regex-класс символов — не зависит от локали сборки. Область действия
-  # — только эти вызовы, не весь скрипт (глобальный `export LC_ALL=C` рискует
-  # сломать сортировку/срез многобайтовых строк в других местах файла, не
-  # относящихся к этой функции).
+  # issue #717: a plain `grep -q 'EMOJI'` depends on the locale/grep build — on
+  # some machines (e.g. GNU grep 3.0 + en_US.UTF-8) a multibyte literal
+  # silently failed to match even though the bytes were identical, and the whole status axis went blind quietly.
+  # `LC_ALL=C grep -F` compares as a fixed byte string, does not parse the emoji
+  # as a regex character class — independent of the grep build locale. The scope
+  # is only these calls, not the whole script (a global `export LC_ALL=C` risks
+  # breaking sorting/slicing of multibyte strings in other places of the file that are not
+  # related to this function).
   local resolved=""
   if   LC_ALL=C grep -qF '✅' <<<"$status_cell"; then resolved="✅ done"
   elif LC_ALL=C grep -qF '🔄' <<<"$status_cell"; then resolved="🔄 in_progress"
@@ -601,7 +601,7 @@ registry_status() {
   elif LC_ALL=C grep -qF '⏸' <<<"$status_cell"; then resolved="⏸ paused"
   elif LC_ALL=C grep -qF '⏹' <<<"$status_cell"; then resolved="⏹ снят"
   elif LC_ALL=C grep -qF '🔁' <<<"$status_cell"; then resolved="🔁 свёрнут в спринт"
-  # issue #964: "↗️ merged в другой РП" is in the registry legend the template ships
+  # issue #964: "↗️ merged in another WP" is in the registry legend the template ships
   # (seed/strategy/docs/WP-REGISTRY.md) and is a terminal status like ✅ and 📦, yet the
   # resolver did not know it. Matched by its base character, like ⏸ above (the ️ variation
   # selector is optional in registries). Last on purpose: it never outranks a status
@@ -619,15 +619,15 @@ registry_status() {
     echo "$text_status"
     return
   fi
-  # issue #714: зачёркивание — фолбэк ПОСЛЕ того, как своя колонка статуса не
-  # дала ответа, не проверка по всей строке раньше чтения колонки. Раньше
-  # зачёркнутое НАЗВАНИЕ при активном статусе в колонке (например 📦) давало
-  # ложный "~~done~~" — своя колонка теперь всегда главнее оформления строки.
-  # issue #713: код возврата пайплайна `grep | head` брался от `head`,
-  # который всегда завершается успешно даже на пустом входе — `||` был
-  # недостижим, и пустой результат утекал наружу как есть. Промежуточная
-  # переменная (text_status выше) — единственный надёжный способ отличить
-  # "нашли" от "не нашли" на пустом выводе grep.
+  # issue #714: strikethrough is a fallback AFTER the own status column
+  # gave no answer, not a check over the whole row before reading the column. Previously
+  # a struck-through TITLE with an active status in the column (e.g. 📦) gave
+  # a false "~~done~~" — the own column now always outranks the row's formatting.
+  # issue #713: the exit code of the `grep | head` pipeline was taken from `head`,
+  # which always succeeds even on empty input — the `||` was
+  # unreachable, and an empty result leaked out as is. The intermediate
+  # variable (text_status above) is the only reliable way to tell
+  # "found" from "not found" on empty grep output.
   if echo "$line" | grep -qE '~~'; then
     echo "~~done~~ (зачёркнут)"
   else
@@ -753,9 +753,9 @@ canary_card_numbers() {
 
 # Choose the card the canary checks (issue #964). The first inbox card used to be taken
 # whatever its status, so a user's own "❄️ frozen" failed `update.sh --check` (exit 5).
-# Only a card whose registry row IS found but whose status is unknown ("_статус неизвестен_")
+# Only a card whose registry row IS found but whose status is unknown ("_status unknown_")
 # is passed over. Any other answer ends the search on that card: a recognised status, or a
-# "cannot resolve" answer -- above all "_не в реестре_" -- on which the canary then fails
+# "cannot resolve" answer -- above all "_not in registry_" -- on which the canary then fails
 # as before: skipping such cards would blind it to a row format the reader cannot parse
 # (#717/#718; #954 A was caught exactly so). Every card unknown: the FIRST one is chosen
 # and refused. Sets CANARY_PICK ("" when inbox holds no cards) and, for cards passed over
@@ -808,7 +808,7 @@ main() {
 
   local input="$1"
 
-  # Self-test / canary mode (diagnostic — see WP-294 Ф7; extended issue #718:
+  # Self-test / canary mode (diagnostic — see WP-294 Phase 7; extended issue #718:
   # a canary that only checks file lookup passes even when the registry
   # itself is unreadable or the WP's status cell can't be resolved — exactly
   # the class of "plausible result instead of a loud failure" the issue
@@ -914,7 +914,7 @@ main() {
 
   log_sync "$wp_num" "START" ""
 
-  # WP-561 Ф20: classify STRATEGY_DIR against its own origin before reading
+  # WP-561 Phase 20: classify STRATEGY_DIR against its own origin before reading
   # anything from it — a shared checkout under 20+ concurrent sessions is
   # routinely behind, and every consumer of this bundle (protocol-open.md,
   # wp-sync-actualizer, the nightly batch/secretary runners) needs to know
@@ -944,7 +944,7 @@ main() {
   local git_sync_checked_at
   git_sync_checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  # WP-561 Ф24: STALE/DIVERGED working copy + provably fresh remote-tracking
+  # WP-561 Phase 24: STALE/DIVERGED working copy + provably fresh remote-tracking
   # ref -> read the cards from a snapshot of that ONE origin commit and stop
   # blocking. fetch_failed/lagging ref/broken checker stay fail-closed
   # (exit 3). --force-sync keeps its old meaning: read the working copy
@@ -1008,7 +1008,7 @@ main() {
     exit 1
   fi
 
-  # Exit 2: parsing error (frontmatter не валиден)
+  # Exit 2: parsing error (frontmatter is invalid)
   if ! validate_frontmatter "$wp_file"; then
     log_sync "$wp_num" "FAIL" "parse_error card_source=${CARD_SOURCE}"
     cleanup_tmp
@@ -1023,12 +1023,12 @@ main() {
   name=$(extract_wp_display_name "$wp_file")
   spawned=$(extract_fm_field "$wp_file" "spawned")
   updated=$(extract_fm_field "$wp_file" "updated")
-  # F19 (REVIEW-ARCHITECTURE.md, WP-503 Ф6.6 план): карточки без `updated:` в
-  # frontmatter (created вручную, не auto-touched) молча выключали drift-детектор
-  # №2 ("коммиты завершения после ref_date") — сам ref_date оставался пустым для
-  # них, включая WP-503. `created`/`last_session` расширяют цепочку без изменения
-  # приоритета уже используемых полей (updated по-прежнему первый — самый свежий
-  # признак реальной активности карточки).
+  # F19 (REVIEW-ARCHITECTURE.md, WP-503 Phase 6.6 plan): cards without `updated:` in
+  # frontmatter (created manually, not auto-touched) silently disabled drift detector
+  # No. 2 ("completion commits after ref_date") — ref_date itself stayed empty for
+  # them, including WP-503. `created`/`last_session` extend the chain without changing
+  # the priority of the fields already used (updated is still first — the freshest
+  # sign of real activity on the card).
   created=$(extract_fm_field "$wp_file" "created")
   last_session=$(extract_fm_field "$wp_file" "last_session")
 
@@ -1067,9 +1067,9 @@ main() {
 
   local ref_date="${updated:-${last_session:-${spawned:-$created}}}"
 
-  # WP-561 C: снимок зависимостей, записанный прошлым close (см.
-  # extract_handoff_snapshot() выше) — читается один раз, сверяется внутри
-  # цикла по связанным РП ниже.
+  # WP-561 C: dependency snapshot written by the previous close (see
+  # extract_handoff_snapshot() above) — read once, compared inside
+  # the loop over related WPs below.
   local handoff_snapshot
   handoff_snapshot=$(extract_handoff_snapshot "$wp_file")
 
@@ -1166,7 +1166,7 @@ main() {
         # Drift: related is closed, but open phase references it
         local is_closed=0
         # "↗️ merged" (issue #964) is as terminal as ✅: before the resolver knew ↗️ a
-        # struck-through merged row came back as "~~done~~ (зачёркнут)" and matched here.
+        # struck-through merged row came back as "~~done~~ (struck through)" and matched here.
         if echo "$reg_status" | grep -qiE '✅|done|closed|merged|~~'; then
           is_closed=1
         fi
@@ -1202,11 +1202,11 @@ main() {
           fi
         fi
 
-        # Drift: stale_handoff (WP-561 C) — прошлый close записал снимок
-        # {status, phase_digest} для этого WP-N в depends_on; если сейчас
-        # (тем же скриптом wp-phase-digest.sh, что писал снимок) дайджест
-        # или статус другие — план "what_next" мог устареть. Warn, не gate:
-        # расхождение часто означает "мир просто изменился", не ошибку агента.
+        # Drift: stale_handoff (WP-561 C) — the previous close wrote a snapshot
+        # {status, phase_digest} for this WP-N into depends_on; if now
+        # (by the same wp-phase-digest.sh script that wrote the snapshot) the digest
+        # or status differs, the "what_next" plan may be stale. Warn, not gate:
+        # a mismatch often means "the world just changed", not an agent error.
         if [[ -n "$handoff_snapshot" ]] && [[ -x "$PHASE_DIGEST_SCRIPT" ]]; then
           local snap_line
           snap_line=$(printf '%s\n' "$handoff_snapshot" | grep "^WP-${rnum}|" || true)
@@ -1218,7 +1218,7 @@ main() {
             # issue #954: the helper's exit code is decided here, not swallowed. It used to be
             # hidden (`|| true`, stderr to /dev/null) and the `grep` on its empty output then
             # ended the bundle with a bare exit 1 under `set -e` -- for exit 4 (no wp-num.sh:
-            # an installation error) that is "РП не найден" to memory/protocol-open.md. Now 4
+            # an installation error) that is "WP not found" to memory/protocol-open.md. Now 4
             # stays 4 with the helper's own message; any other failure still ends the bundle
             # with exit 1, as it always did, but says what failed. IWE_TEMPLATE points the
             # helper at the library THIS bundle loaded (what update.sh passes for the canary),

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_update_delivers_python_resolver_before_roles.sh — WP-529 F6 acceptance
-# (peer-session 2026-08-19-01, codex requirement on В1): the shared python
+# (peer-session 2026-08-19-01, codex requirement on B1): the shared python
 # resolver must be delivered before any role reload can consume it, and every
 # consumer must actually go through it. Checked as a structural invariant of
 # update.sh mechanics (file apply = Step 5 precedes runtime rebuild = Step 6d

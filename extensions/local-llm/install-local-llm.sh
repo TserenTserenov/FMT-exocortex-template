@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# see ADR-001-local-llm-stack.md (РП404, Ф3)
-# Hardware-aware установщик локального LLM-стека (MLX) для шаблона IWE.
-# Раздаёт ПРОЦЕСС выбора, а не фиксированную модель (см. "Костюм != Оснащение").
-# По умолчанию ставит рекомендованную модель, влезающую в память; --max — самую тяжёлую.
-# Идемпотентен: повторный запуск не ломает уже установленное.
+# see ADR-001-local-llm-stack.md (WP-404, Phase 3)
+# Hardware-aware installer of the local LLM stack (MLX) for the IWE template.
+# Distributes the selection PROCESS, not a fixed model (see "Костюм != Оснащение").
+# By default installs the recommended model that fits in memory; --max — the heaviest one.
+# Idempotent: a rerun does not break what is already installed.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,8 +15,8 @@ PY="$VENV/bin/python"
 LIFECYCLE="$HERE/model-lifecycle.py"
 PYVER="${IWE_LLM_PYVER:-3.12}"
 
-# По умолчанию ставится рекомендованная модель (recommended: true), влезающая в память.
-# --max берёт самого тяжёлого влезающего кандидата (выше качество, медленнее).
+# By default the recommended model (recommended: true) that fits in memory is installed.
+# --max takes the heaviest fitting candidate (higher quality, slower).
 pick_mode="recommended"
 [ "${1:-}" = "--max" ] && pick_mode="max"
 
@@ -29,7 +29,7 @@ log() { echo "[install-local-llm] $*"; }
 
 mkdir -p "$LLM_HOME"
 
-# 1. Железо
+# 1. Hardware
 ram_gb=$("$DETECT" | awk -F= '/^ram_gb=/{print $2}')
 [ -n "$ram_gb" ] || die "не удалось определить объём памяти"
 log "память: ${ram_gb} GB"
@@ -57,7 +57,7 @@ else
   log "зависимости уже установлены"
 fi
 
-# 4. Выбор модели под железо (venv python с pyyaml — после установки mlx-lm)
+# 4. Model selection for the hardware (venv python with pyyaml — after installing mlx-lm)
 model=$("$PY" - "$CATALOG" "$ram_gb" "$pick_mode" <<'PY'
 import sys, yaml
 catalog, ram, mode = sys.argv[1], int(sys.argv[2]), sys.argv[3]
@@ -77,15 +77,15 @@ PY
 [ -n "$model" ] || die "не удалось выбрать модель"
 log "режим выбора: $pick_mode → модель под ${ram_gb} GB: $model"
 
-# 5. Скачать модель в кэш
+# 5. Download the model into the cache
 log "скачиваю модель (первый раз — несколько ГБ)"
 "$PY" -m mlx_lm generate --model "$model" --max-tokens 1 --prompt "ok" >/dev/null
 
-# 6. Сделать модель активной в каталоге (жизненный цикл, единый источник)
+# 6. Make the model active in the catalog (lifecycle, single source)
 "$PY" "$LIFECYCLE" use "$model"
 log "активная модель в каталоге → $model"
 
-# 7. Smoke: совместимый интерфейс на localhost
+# 7. Smoke: compatible interface on localhost
 log "проверка: запуск сервера + shim"
 IWE_LLM_HOME="$LLM_HOME" bash "$HERE/iwe-local-llm.sh" start
 shim=$(IWE_LLM_HOME="$LLM_HOME" bash "$HERE/iwe-local-llm.sh" test || true)

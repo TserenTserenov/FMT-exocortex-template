@@ -1,5 +1,5 @@
 #!/bin/bash
-# check-critical-files-map.sh — WP-529 Ф1 acceptance check for
+# check-critical-files-map.sh — WP-529 Phase 1 acceptance check for
 # docs/critical-files-map.yaml: (1) every category/special_route references
 # a bash array that still exists in generate-manifest.sh (catches the map
 # silently drifting from the real classification), (2) every git-tracked
@@ -84,7 +84,7 @@ while IFS= read -r block; do
 done < "$WORKDIR/referenced_blocks.txt"
 
 echo "[2/3] Покрытие: каждый git-tracked файл — ровно в одной категории..."
-# WP-529 Ф9 (Evgenii 20.08, bash 3.2 finding): membership used to be two
+# WP-529 Phase 9 (Evgenii 20.08, bash 3.2 finding): membership used to be two
 # `declare -A` hash sets checked per file. Bash 3.2 (stock macOS /bin/bash)
 # has no associative arrays. Replaced with one set-difference over sorted
 # files (`comm`) instead of a bash4 hash *or* an N×grep loop — same O(n log n)

@@ -1,31 +1,31 @@
 #!/bin/bash
-# Локальный шлюз координации агентов (iwe-local-gateway) — установка
+# Local agent coordination gateway (iwe-local-gateway) — installation
 #
-# ПРАВИЛО ДОСТАВКИ MCP-МОДУЛЕЙ:
-#   модуль работает с ЛОКАЛЬНЫМ диском пилота  -> локальная доставка (этот скрипт)
-#   модуль работает с облачными данными        -> mcp.aisystant.com, не клонируем
-# iwe-local-gateway координирует file-locks на диске -> облачным быть не может.
+# MCP MODULE DELIVERY RULE:
+#   the module works with the pilot's LOCAL disk  -> local delivery (this script)
+#   the module works with cloud data        -> mcp.aisystant.com, we do not clone
+# iwe-local-gateway coordinates file-locks on disk -> it cannot be cloud-based.
 #
-# FMT-ONLY АРТЕФАКТ: этот файл не идёт через авторский конвейер синхронизации
-# platform-space (template-sync.sh) — тот конвейер переписал бы GATEWAY_REPO_URL
-# на GitHub-логин случайного пользователя и вырезал бы строки с DS-MCP. Правки —
-# прямо в этом репозитории.
+# FMT-ONLY ARTIFACT: this file does not go through the author's synchronization pipeline
+# of platform-space (template-sync.sh) — that pipeline would rewrite GATEWAY_REPO_URL
+# to a random user's GitHub login and cut out the DS-MCP lines. Edits go
+# directly in this repository.
 #
 # Usage:
 #   bash setup/optional/setup-local-gateway.sh
 #
 set -euo pipefail
 
-# Upstream-константы. URL умышленно указывает на репозиторий автора платформы,
-# а не на форк пользователя — это общая зависимость всех инсталляций.
-# GATEWAY_SHA дублирует тег: тег можно передвинуть force-push'ем, SHA — нельзя;
-# несовпадение = подмена тега, установка останавливается.
+# Upstream constants. The URL deliberately points to the platform author's repository,
+# not to the user's fork — it is a shared dependency of all installations.
+# GATEWAY_SHA duplicates the tag: a tag can be moved by force-push, a SHA cannot;
+# a mismatch = tag substitution, installation stops.
 GATEWAY_REPO_URL="https://github.com/TserenTserenov/iwe-local-gateway.git"
-GATEWAY_REF="v0.1.1"   # бамп только вместе со строкой в CHANGELOG шаблона
+GATEWAY_REF="v0.1.1"   # bump only together with a line in the template CHANGELOG
 GATEWAY_SHA="e3f1697b59691e13108850a1277379a713594990"
 
-# Workspace = корень репозитория, в котором лежит этот скрипт (setup/optional/../..) —
-# тот же приём, что setup-calendar.sh; env-переменная переопределяет.
+# Workspace = root of the repository containing this script (setup/optional/../..) —
+# the same technique as setup-calendar.sh; an env variable overrides.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_DIR="${IWE_WORKSPACE:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 GATEWAY_DIR="$WORKSPACE_DIR/DS-MCP/local-gateway"
@@ -35,8 +35,8 @@ SOCK="${IWE_GATEWAY_SOCKET:-$HOME/.iwe/gateway.sock}"
 SOCK_DEFAULT="$HOME/.iwe/gateway.sock"
 SOCK_DIR="$(dirname "$SOCK")"
 DAEMON_LOG="$SOCK_DIR/gateway-daemon.log"
-# С v0.1.1 pid-файл живёт рядом с сокетом (daemon-paths.ts: resolveDaemonPaths) —
-# тот же приём, что SOCK_DIR, кастомный IWE_GATEWAY_SOCKET больше не путает pid.
+# Since v0.1.1 the pid file lives next to the socket (daemon-paths.ts: resolveDaemonPaths) —
+# the same technique as SOCK_DIR; a custom IWE_GATEWAY_SOCKET no longer confuses the pid.
 PID_FILE="$SOCK_DIR/gateway.pid"
 
 echo "========================================"
@@ -52,7 +52,7 @@ command -v node >/dev/null 2>&1 || { echo "ОШИБКА: нужен Node.js >= 1
 node -e 'process.exit(parseInt(process.versions.node) >= 18 ? 0 : 1)' \
     || { echo "ОШИБКА: Node.js $(node --version) слишком старый — нужен >= 18."; exit 1; }
 
-# macOS ограничивает путь Unix-сокета ~104 байтами — демон умрёт с EINVAL.
+# macOS limits the Unix socket path to ~104 bytes — the daemon would die with EINVAL.
 if [ "${#SOCK}" -ge 100 ]; then
     echo "ОШИБКА: путь сокета длиннее 100 символов (${#SOCK}): $SOCK"
     echo "Задайте более короткий через IWE_GATEWAY_SOCKET."
@@ -69,20 +69,20 @@ verify_pin() {
     fi
 }
 
-# --- 1. Клон / обновление до пина ---
+# --- 1. Clone / update to the pin ---
 NEEDS_BUILD=false
 if [ ! -d "$GATEWAY_DIR/.git" ]; then
     mkdir -p "$(dirname "$GATEWAY_DIR")"
-    # git может напечатать "refs/tags/... is not a commit!" для annotated-тегов —
-    # безвредный шум git, клон при этом разрешается на правильный коммит.
+    # git may print "refs/tags/... is not a commit!" for annotated tags —
+    # harmless git noise, the clone still resolves to the correct commit.
     git clone --branch "$GATEWAY_REF" "$GATEWAY_REPO_URL" "$GATEWAY_DIR"
     verify_pin
     echo "  ✓ Закреплено на $(git -C "$GATEWAY_DIR" rev-parse --short HEAD) ($GATEWAY_REF)"
     NEEDS_BUILD=true
 else
-    # Guard вместо rollback-гейта template-sync.sh: там источник и приёмник не
-    # связаны через VCS, здесь связаны через origin — git сам защищает чужую
-    # работу. Наша обязанность — не делать checkout поверх правок молча.
+    # Guard instead of the rollback gate of template-sync.sh: there the source and target are not
+    # linked via VCS, here they are linked via origin — git itself protects others'
+    # work. Our duty is not to check out over edits silently.
     if [ -n "$(git -C "$GATEWAY_DIR" status --porcelain)" ]; then
         echo "СТОП: в $GATEWAY_DIR есть незакоммиченные правки."
         echo "Закоммитьте или отмените их, затем перезапустите скрипт."
@@ -104,24 +104,24 @@ else
     elif [ ! -f "$GATEWAY_DIR/dist/proxy.js" ] \
       || [ ! -f "$GATEWAY_DIR/dist/daemon.js" ] \
       || [ ! -d "$GATEWAY_DIR/node_modules" ]; then
-        # dist/ неполный или зависимости снесены — прошлая сборка оборвалась
+        # dist/ is incomplete or dependencies were removed — the previous build was interrupted
         NEEDS_BUILD=true
     fi
 fi
 
-# --- 2. Воспроизводимая сборка ---
+# --- 2. Reproducible build ---
 if $NEEDS_BUILD; then
     echo "Собираю шлюз ($GATEWAY_REF)..."
     ( cd "$GATEWAY_DIR" && npm ci --no-audit --no-fund && npm run build )
     echo "  ✓ Собран."
 fi
 
-# --- 3. .mcp.json: не патчить программно, только показать блок для вставки ---
-# Прецедент этого репозитория (setup-calendar.sh) — существующий .mcp.json
-# не переписывается автоматически, чтобы не сломать формат чужих правок.
-# env.IWE_AGENT_ID обязателен: без него proxy.ts подставляет случайный
-# unknown-agent-<uuid> при каждом перезапуске — координация между агентами
-# молча ломается (см. AGENT-VENDOR-SETUP.md).
+# --- 3. .mcp.json: do not patch programmatically, only show the block to paste ---
+# This repository's precedent (setup-calendar.sh) — an existing .mcp.json
+# is not rewritten automatically, so as not to break the format of others' edits.
+# env.IWE_AGENT_ID is required: without it proxy.ts substitutes a random
+# unknown-agent-<uuid> on every restart — coordination between agents
+# silently breaks (see AGENT-VENDOR-SETUP.md).
 if [ -f "$MCP_JSON" ] && grep -q '"iwe-local-gateway"' "$MCP_JSON" 2>/dev/null; then
     echo "  ✓ iwe-local-gateway уже в .mcp.json"
 else
@@ -132,8 +132,8 @@ else
     echo "      \"args\": [\"$GATEWAY_DIR/dist/proxy.js\"],"
     echo '      "env": {'
     if [ "$SOCK" != "$SOCK_DEFAULT" ]; then
-        # нестандартный сокет обязан попасть и в env прокси — иначе прокси
-        # возьмёт свой дефолт и получит ECONNREFUSED
+        # a non-standard socket must also reach the proxy env — otherwise the proxy
+        # takes its own default and gets ECONNREFUSED
         echo "        \"IWE_AGENT_ID\": \"$AGENT_ID\","
         echo "        \"IWE_GATEWAY_SOCKET\": \"$SOCK\""
     else
@@ -144,11 +144,11 @@ else
     echo ""
 fi
 
-# --- 4. Демон: без него proxy падает ("Start daemon first") ---
+# --- 4. Daemon: without it the proxy fails ("Start daemon first") ---
 mkdir -p "$SOCK_DIR"
 
-# Сокет-файл переживает перезагрузку и kill -9 — наличие файла не означает
-# живой демон. Единственная честная проверка — реальное подключение.
+# The socket file survives reboot and kill -9 — the presence of the file does not mean a
+# live daemon. The only honest check is a real connection.
 daemon_alive() {
     [ -S "$SOCK" ] || return 1
     node -e '
@@ -161,7 +161,7 @@ setTimeout(() => process.exit(1), 2000);
 
 start_daemon() {
     echo "Запускаю демон..."
-    rm -f "$SOCK"   # мёртвый сокет после ребута/kill -9 мешает bind
+    rm -f "$SOCK"   # dead socket after reboot/kill -9 blocks bind
     IWE_GATEWAY_SOCKET="$SOCK" nohup node "$GATEWAY_DIR/dist/daemon.js" >>"$DAEMON_LOG" 2>&1 &
     for _ in $(seq 1 50); do
         daemon_alive && return 0
@@ -183,12 +183,12 @@ if daemon_alive; then
         echo "  ✓ Демон уже работает (сокет: $SOCK)."
     fi
 else
-    # Lock: два одновременных запуска иначе стартуют два демона (split-brain
-    # менеджеров блокировок) и портят pid-файл.
+    # Lock: two simultaneous runs would otherwise start two daemons (split-brain
+    # of the lock managers) and corrupt the pid file.
     LOCK_DIR="$SOCK_DIR/setup-local-gateway.lock"
     if mkdir "$LOCK_DIR" 2>/dev/null; then
         trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
-        # Перепроверка под локом: демон мог подняться, пока мы ждали
+        # Re-check under the lock: the daemon could have come up while we waited
         if daemon_alive || start_daemon; then
             echo "  ✓ Демон запущен (сокет: $SOCK)."
         else

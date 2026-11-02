@@ -47,9 +47,9 @@ import re
 import sys
 from pathlib import Path
 
-# Строка-РП в реестре: первая ячейка = номер (возможно жирный/зачёркнутый).
-# Done-форматирование (formatting.md §Done): закрытый РП зачёркнут (~~...~~).
-# Дефект: статус ✅ проставлен, а номер не обёрнут в ~~ → строка выглядит активной.
+# WP row in the registry: first cell = number (possibly bold/struck through).
+# Done formatting (formatting.md §Done): a closed WP is struck through (~~...~~).
+# Defect: status ✅ is set but the number is not wrapped in ~~ → the row looks active.
 _WP_NUM_CELL = re.compile(r"^\*{0,2}~{0,2}\*{0,2}\d+\*{0,2}~{0,2}\*{0,2}$")
 _DONE_EMOJI = "✅"
 _STATUS_EMOJI = (
@@ -58,7 +58,7 @@ _STATUS_EMOJI = (
 )
 _CELL_LEAD_MARKUP = "*~ \t"
 # Tolerates a trailing explanation inside the same comment, e.g.
-# "<!-- index-health: skip-cells — реестр РП, длинные ячейки закрытия -->"
+# "<!-- index-health: skip-cells — WP registry, long closing cells -->"
 # (issue #907 finding 2: the old literal substring check required the
 # comment to contain nothing else, so a marker written with any commentary
 # silently never matched -- no warning, no effect, for as long as nobody
@@ -84,22 +84,22 @@ NAME_PATTERNS = {
 GLOB_PATTERNS = ["*-registry.md", "*-index.md", "*-catalog.md"]
 SKIP_DIRS = {"archive", "inbox", "drafts", "sessions", "exocortex",
              "node_modules", ".git", ".venv", "__pycache__"}
-# exocortex/ пропускается: это backup-зеркало auto-memory (Day Close snapshot).
-# Настоящий source — ~/.claude/projects/.../memory/. Файлы обновляются автоматически.
+# exocortex/ is skipped: it is a backup mirror of auto-memory (Day Close snapshot).
+# The real source is ~/.claude/projects/.../memory/. The files are updated automatically.
 
-SIZE_WARN = 30 * 1024       # 30 KB — информационный порог
-SIZE_FAIL = 100 * 1024      # 100 KB — явно гипертрофия
+SIZE_WARN = 30 * 1024       # 30 KB — informational threshold
+SIZE_FAIL = 100 * 1024      # 100 KB — clearly hypertrophy
 LINE_WARN = 300
 LINE_FAIL = 500
 CELL_WARN = 200
 CELL_FAIL = 400
-# Размер сам по себе — слабый маркер: реестр из 300 РП × 100 chars = 30KB, норма.
-# Настоящие маркеры — длинные строки/ячейки.
+# Size by itself is a weak marker: a registry of 300 WPs × 100 chars = 30KB, normal.
+# The real markers are long lines/cells.
 
-# MEMORY.md — отдельные пороги (issue #677): SIZE_WARN/FAIL выше предела
-# загрузчика контекста, поэтому для живого индекса памяти он недостижим по
-# конструкции — файл раньше обрежется загрузчиком, чем сработает этот порог.
-# FAIL = сам предел загрузчика (~24.4 KiB символов), WARN = запас до него.
+# MEMORY.md — separate thresholds (issue #677): SIZE_WARN/FAIL is above the limit of the
+# context loader, so for the live memory index it is unreachable by
+# construction — the loader truncates the file before this threshold fires.
+# FAIL = the loader limit itself (~24.4 KiB of characters), WARN = headroom before it.
 MEMORY_SIZE_FAIL = 24986
 MEMORY_SIZE_WARN = int(MEMORY_SIZE_FAIL * 0.85)
 
@@ -173,7 +173,7 @@ def check_file(path: Path) -> dict:
         "size": 0,
         "long_lines": [],      # list of (lineno, char_len)
         "long_cells": [],      # list of (lineno, cell_idx, char_len)
-        "done_no_strike": [],  # list of (lineno, wp_number) — ✅ без зачёркивания
+        "done_no_strike": [],  # list of (lineno, wp_number) — ✅ without strikethrough
         "skip": False,
         "skip_cells": False,
         "size_skip": False,
@@ -184,16 +184,16 @@ def check_file(path: Path) -> dict:
     except (UnicodeDecodeError, OSError):
         out["skip"] = True
         return out
-    # Символы, не байты (issue #677) — докстринг обещает char count, а
-    # кириллица в UTF-8 весит вдвое больше символа: порог, сверенный по
-    # байтам, срабатывает не на том объёме, который считает загрузчик.
+    # Characters, not bytes (issue #677) — the docstring promises a char count, and
+    # Cyrillic in UTF-8 weighs twice a character: a threshold checked in
+    # bytes fires at a different volume than the loader counts.
     out["size"] = len(text)
 
     head = _index_health_window(text)
     marker, warning = _index_health_marker(head)
     out["marker_warning"] = warning
-    # index-health: skip отключает проверки РАЗДУТИЯ (размер/длина/ячейки),
-    # но НЕ семантику done-форматирования — она дешёвая и не зависит от размера.
+    # index-health: skip disables the BLOAT checks (size/length/cells),
+    # but NOT the done-formatting semantics — it is cheap and does not depend on size.
     size_skip = marker == "skip"
     out["size_skip"] = size_skip
     if marker == "skip-cells":
@@ -205,8 +205,8 @@ def check_file(path: Path) -> dict:
         is_table_row = line.lstrip().startswith("|")
         if not is_table_row:
             status_column = None
-        # skip-cells: таблица с допустимо большими ячейками → не алертим
-        # ни на ячейки, ни на длину самой строки таблицы
+        # skip-cells: a table with legitimately large cells → do not alert
+        # on either cells or the length of the table row itself
         if not size_skip and n > LINE_WARN and not (out["skip_cells"] and is_table_row):
             out["long_lines"].append((lineno, n))
 
@@ -220,9 +220,9 @@ def check_file(path: Path) -> dict:
             # skip separator rows (all cells are dashes)
             if cells and all(set(c) <= set("-: ") for c in cells):
                 continue
-            # done-форматирование: только ведущий эмодзи ЯЧЕЙКИ СТАТУСА
-            # задаёт состояние РП. Галочка внутри описания завершённой фазы не
-            # превращает активный РП в закрытый (issue #531).
+            # done-formatting: only the leading emoji of the STATUS CELL
+            # sets the WP state. A checkmark inside the description of a completed phase does not
+            # turn an active WP into a closed one (issue #531).
             if cells and _WP_NUM_CELL.match(cells[0]) and "~~" not in cells[0]:
                 status = _status_cell(cells, status_column)
                 if status is not None and status.startswith(_DONE_EMOJI):

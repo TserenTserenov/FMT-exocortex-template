@@ -1,24 +1,24 @@
 #!/bin/bash
 # routing: migration  one-time=true
 # see DP.SC.159, DP.ROLE.059
-# migrate-initial-marker.sh — добавить skeleton-marker IWE-INITIAL-NEEDED в Strategy.md
-# для существующих пользователей (clone до 0.28.5).
+# migrate-initial-marker.sh — add the IWE-INITIAL-NEEDED skeleton marker to Strategy.md
+# for existing users (clone before 0.28.5).
 #
-# Сценарий: old clone → user делает update до 0.28.5 → у него уже есть
-# Strategy.md без маркера. Skill /strategy-session уйдёт в weekly mode,
-# initial flow не сработает.
+# Scenario: old clone → the user updates to 0.28.5 → they already have
+# Strategy.md without the marker. The /strategy-session skill goes into weekly mode,
+# the initial flow does not fire.
 #
-# Скрипт безопасен:
-#   1. Если маркер уже есть — выходит без изменений.
-#   2. Если Strategy.md содержит seed-сигнатуру (placeholder dates `YYYY-MM-DD`
-#      в frontmatter) — автоматически добавляет маркер.
-#   3. Если контент выглядит реальным (заполненные даты, кастомные блоки) —
-#      спрашивает confirmation; по умолчанию skip.
+# The script is safe:
+#   1. If the marker is already there — exits without changes.
+#   2. If Strategy.md contains a seed signature (placeholder dates `YYYY-MM-DD`
+#      in the frontmatter) — adds the marker automatically.
+#   3. If the content looks real (filled dates, custom blocks) —
+#      asks for confirmation; skip by default.
 #
 # Usage:
-#   bash migrate-initial-marker.sh                           # auto-detect путь
-#   bash migrate-initial-marker.sh /path/to/Strategy.md      # явный путь
-#   bash migrate-initial-marker.sh --force /path/to/file     # без confirmation
+#   bash migrate-initial-marker.sh                           # auto-detect path
+#   bash migrate-initial-marker.sh /path/to/Strategy.md      # explicit path
+#   bash migrate-initial-marker.sh --force /path/to/file     # without confirmation
 
 set -euo pipefail
 
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Auto-detect путь, если не передан
+# Auto-detect the path if not passed
 if [ -z "$TARGET" ]; then
     # Try .exocortex.env
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -70,13 +70,13 @@ if [ ! -w "$TARGET" ]; then
     exit 1
 fi
 
-# Уже есть маркер?
+# Is the marker already there?
 if grep -qF 'IWE-INITIAL-NEEDED' "$TARGET"; then
     echo "✓ Маркер уже присутствует в $TARGET — миграция не нужна."
     exit 0
 fi
 
-# Эвристика: seed-сигнатура (placeholder dates в frontmatter)
+# Heuristic: seed signature (placeholder dates in the frontmatter)
 IS_SEED=0
 if grep -qE '^created: YYYY-MM-DD$' "$TARGET" || \
    grep -qE '^updated: YYYY-MM-DD$' "$TARGET" || \
@@ -98,12 +98,12 @@ BACKUP="${TARGET}.pre-marker.$(date +%Y%m%d-%H%M%S)"
 cp "$TARGET" "$BACKUP"
 echo "Backup: $BACKUP"
 
-# Вставить маркер после frontmatter (после второго `---`).
-# Если frontmatter нет ИЛИ broken (только один `---`) — вставить в начало.
+# Insert the marker after the frontmatter (after the second `---`).
+# If there is no frontmatter OR it is broken (only one `---`) — insert at the start.
 TMP=$(mktemp)
 INSERTED_AFTER_FM=0
 if head -1 "$TARGET" | grep -q '^---$'; then
-    # frontmatter есть, ищем второй ---
+    # frontmatter exists, look for the second ---
     if [ "$(grep -c '^---$' "$TARGET")" -ge 2 ]; then
         awk -v marker="$MARKER" '
             BEGIN { fm_count = 0; inserted = 0 }
@@ -115,7 +115,7 @@ if head -1 "$TARGET" | grep -q '^---$'; then
 fi
 
 if [ "$INSERTED_AFTER_FM" -eq 0 ]; then
-    # Нет frontmatter ИЛИ broken (один ---) — вставить в самое начало.
+    # No frontmatter OR broken (one ---) — insert at the very beginning.
     {
         echo "$MARKER"
         echo ""
@@ -123,7 +123,7 @@ if [ "$INSERTED_AFTER_FM" -eq 0 ]; then
     } > "$TMP"
 fi
 
-# Sanity check: TMP не должен быть пустым (защита от silent corruption)
+# Sanity check: TMP must not be empty (protection against silent corruption)
 if [ ! -s "$TMP" ]; then
     echo "Ошибка: миграция произвела пустой результат — оригинал не тронут." >&2
     rm -f "$TMP"

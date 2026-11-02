@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# wp-phase-digest.sh — детерминированный дайджест состояния фаз карточки РП
-# Контракт: вход WP-N (или N) → stdout `status=...` + `phase_digest=...` +
-#           `phase_count=...`, exit 0/1/4 (4: не найден scripts/lib/wp-num.sh —
-#           ошибка установки, а не «РП не найден»; см. wp-sync-bundle.sh)
+# wp-phase-digest.sh — deterministic digest of the phase state of a WP card
+# Contract: input WP-N (or N) → stdout `status=...` + `phase_digest=...` +
+#           `phase_count=...`, exit 0/1/4 (4: scripts/lib/wp-num.sh not found —
+#           an installation error, not "WP not found"; see wp-sync-bundle.sh)
 #
-# Зачем: пир-сессия WP-561 2026-09-03-19 (Kimi+Codex) — snapshot-механизм
-# "handoff_snapshot" (при close агент записывает {ref, observed_status,
-# observed_phase_state}, при следующем open wp-sync-bundle.sh сверяет)
-# требует ОДНОГО И ТОГО ЖЕ парсера на обоих концах, иначе два независимых
-# способа читать один файл разойдутся сами по себе — Codex, ход 1 раунда 1.
-# Этот скрипт — единственный источник дайджеста; закрывающий агент вызывает
-# его напрямую (руками, для записи снимка), wp-sync-bundle.sh вызывает его
-# же (для сверки при открытии).
+# Why: peer-session WP-561 2026-09-03-19 (Kimi+Codex) — the snapshot mechanism
+# "handoff_snapshot" (on close the agent records {ref, observed_status,
+# observed_phase_state}, on the next open wp-sync-bundle.sh compares)
+# requires THE SAME parser at both ends, otherwise two independent
+# ways of reading one file will drift apart on their own — Codex, turn 1 of round 1.
+# This script is the single source of the digest; the closing agent calls
+# it directly (by hand, to record the snapshot), wp-sync-bundle.sh calls the
+# same one (to compare on open).
 #
-# Дайджест — НЕ счётчик открытых фаз (тот слеп к переоткрытию/смене статуса
-# при том же числе фаз, Codex ход 1) — это хеш нормализованной
-# последовательности "маркер+текст" всех строк-фаз в файле (закрытых и
-# открытых), либо (для structured-phases картотек) "id+status" всех записей.
+# The digest is NOT a count of open phases (that is blind to reopening/status change
+# with the same number of phases, Codex turn 1) — it is a hash of the normalized
+# sequence "marker+text" of all phase lines in the file (closed and
+# open), or (for structured-phases cards) "id+status" of all entries.
 #
 # Compatible: bash 3.2+ (macOS), bash 4+ (Linux)
 
@@ -32,7 +32,7 @@ _WPN_OPTIONAL=""
 # IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
 # just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
 # The library is mandatory: not finding it is an installation error, not "WP not found",
-# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "WP not found").
 # A consumer that must keep working without the library (session-guard: its hypothesis gate
 # warns and checks the exact card names, it never blocks a session over a missing library)
 # sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
@@ -83,10 +83,10 @@ ARCHIVE_DIR="$STRATEGY_DIR/archive/wp-contexts"
 
 log_err() { echo "[ERROR] $*" >&2; }
 
-# Тот же поиск, что find_wp_file() в wp-sync-bundle.sh (WP-434: папочная конвенция
-# первична): оба зовут wp_num_find_card — один парсер на обоих концах снимка. Раньше
-# здесь жила урезанная копия функции, и поиск расходился (#954): без нулей в имени
-# папки, без плоских файлов со slug. Всегда возвращает 0 (set -e у вызывающих).
+# The same lookup as find_wp_file() in wp-sync-bundle.sh (WP-434: the folder convention
+# comes first): both call wp_num_find_card — one parser at both ends of the snapshot. Before,
+# a truncated copy of the function lived here, and the lookup diverged (#954): no zeros in the folder
+# name, no flat files with a slug. Always returns 0 (set -e of the callers).
 find_wp_file() {
   wp_num_find_card "$INBOX_DIR" "$ARCHIVE_DIR" "$1" || true
 }
@@ -108,9 +108,9 @@ has_structured_phases() {
   ' "$file" 2>/dev/null
 }
 
-# Все записи structured-phases (id+status), не только открытые — в отличие
-# от extract_structured_open_phases() в wp-sync-bundle.sh, которая по
-# назначению фильтрует на pending/in_progress/blocked для отображения.
+# All structured-phases entries (id+status), not only open ones — unlike
+# extract_structured_open_phases() in wp-sync-bundle.sh, which by
+# design filters on pending/in_progress/blocked for display.
 extract_all_structured_phases() {
   local file="$1"
   awk '
@@ -132,9 +132,9 @@ extract_all_structured_phases() {
   ' "$file" 2>/dev/null || true
 }
 
-# Все строки-чекбоксы тела карточки (после закрывающего --- фронтматтера),
-# нормализованные к "маркер|текст" — [x]/[ ]/[→] и вычеркнутый ~~[x]~~
-# (см. .claude/rules/formatting.md) сводятся к одному маркеру 'x'.
+# All checkbox lines of the card body (after the closing --- of the frontmatter),
+# normalized to "marker|text" — [x]/[ ]/[→] and a struck-through ~~[x]~~
+# (see .claude/rules/formatting.md) are reduced to a single marker 'x'.
 extract_all_checkbox_lines() {
   local file="$1"
   awk '/^---$/{fm++; next} fm<2{next} {print}' "$file" 2>/dev/null \
@@ -145,8 +145,8 @@ extract_all_checkbox_lines() {
 }
 
 digest_of() {
-  # sha256 в 12 hex-символах — достаточно для detect-changed, не для
-  # security-инварианта; shasum есть на macOS и Linux по умолчанию.
+  # sha256 in 12 hex characters — enough for detect-changed, not for a
+  # security invariant; shasum is available on macOS and Linux by default.
   shasum -a 256 2>/dev/null | cut -c1-12 || echo "nodigest"
 }
 

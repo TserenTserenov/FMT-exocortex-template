@@ -17,7 +17,7 @@
 # invocation, and a synthetic dangerous-looking string in the test's own body
 # risks tripping the guard on the test runner itself.
 #
-# Запуск: bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
+# Run: bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
 
 set -uo pipefail
 

@@ -20,7 +20,7 @@
 # (analyze()), and the end-to-end hook still allows the call and still denies
 # a genuine secret (hook_decision()).
 #
-# Запуск: bash .claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh
+# Run: bash .claude/hooks/tests/test-secret-leak-block-heredoc-in-dollar-paren.sh
 
 set -uo pipefail
 
@@ -89,10 +89,10 @@ check() {  # check <desc> <expected> <actual>
   fi
 }
 
-# === 1. Глубокий репро из истории issue (WP-570, 10.09) -- раньше крашил
-#        analyze-bash целиком (fail() -> guard-failure); теперь деградирует. ===
-# Собрано конкатенацией, чтобы сама конструкция не выглядела как heredoc для
-# скрипта, которым запускается этот тест.
+# === 1. Deep repro from the issue history (WP-570, 10.09) -- used to crash
+#        analyze-bash entirely (fail() -> guard-failure); now it degrades. ===
+# Assembled by concatenation so that the construct itself does not look like a heredoc for
+# the script that runs this test.
 DEEP_REPRO='echo "$(cat <<'"'"'EOF'"'"'
 $ printf '"'"'gh x --body "$(cat <<%sBODY%s\nfoo # bar\nBODY\n)"\n'"'"' "'"'"'" "'"'"'" > /tmp/cmd.txt
 EOF
@@ -100,24 +100,24 @@ EOF
 check "глубокий репро больше не роняет анализатор" "unsupported" "$(analyze "$DEEP_REPRO")"
 check "и вызов инструмента при этом разрешён, не заблокирован" "allow" "$(hook_decision "$DEEP_REPRO")"
 
-# === 2. Простой репро из текста issue -- уже не крашился (shlex разбирает
-#        как один токен), остаётся так же не крашится (regression guard). ===
+# === 2. Simple repro from the issue text -- did not crash already (shlex parses
+#        as a single token), stays not crashing (regression guard). ===
 SIMPLE_REPRO='echo "$(cat <<'"'"'EOF'"'"'
 hello
 EOF
 )"'
 check "простой репро из issue не ломается" "allow" "$(hook_decision "$SIMPLE_REPRO")"
 
-# === 3. Обычный heredoc с # в теле, unquoted delimiter -- поведение не
-#        изменилось (# внутри heredoc-тела не читается как shell-комментарий). ===
+# === 3. Plain heredoc with # in the body, unquoted delimiter -- behavior has not
+#        changed (# inside a heredoc body is not read as a shell comment). ===
 check "heredoc с # в теле (unquoted delimiter) не блокируется" "allow" \
   "$(hook_decision 'cat <<EOF
 foo # bar
 EOF')"
 
-# === 4. То же самое, но quoted delimiter -- явный guard по просьбе
-#        ревьюера (Kimi, ход 5-6 сессии): scan() не различает
-#        quoted/unquoted delimiter, поведение должно быть тем же. ===
+# === 4. The same, but a quoted delimiter -- an explicit guard at the request of
+#        the reviewer (Kimi, turn 5-6 of the session): scan() does not distinguish
+#        quoted/unquoted delimiter, the behavior must be the same. ===
 check "heredoc с # в теле (quoted delimiter) не блокируется" "allow" \
   "$(hook_decision "cat <<'EOF'
 foo # bar

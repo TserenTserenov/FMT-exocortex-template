@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# iwe-backup.sh — единая точка запуска бэкапа IWE по договору установки
+# iwe-backup.sh — single entry point for running an IWE backup per the installation contract
 #
-# WP-7 Ф267 этап 2 (пир-сессия 2026-10-27-08-wp7-f267-stage2-backup-contract).
+# WP-7 Phase 267 stage 2 (peer session 2026-10-27-08-wp7-f267-stage2-backup-contract).
 #
-# ДОГОВОР (читается из params.yaml при каждом запуске, ничего не кэшируется):
-#   включён ли   backup_enabled: false — выключен явно, скрипт ничего не делает
-#   чем          backup_engine: tar (по умолчанию) | restic (только явно, автоперехода нет)
-#   куда         tar    — backup_dir (либо iCloud на macOS по умолчанию)
-#                restic — фиксированное защитное хранилище ~/.iwe-backup/protect-repo
-#                         (общее с iwe-backup-protect.sh); backup_dir для restic не используется
-#   что          tar    — весь каталог IWE (без .git, node_modules и т.п.)
-#                restic — источники из iwe-backup-sources.yaml
-#   Охват «что» у движков различается сознательно: единый список — отдельное решение.
+# CONTRACT (read from params.yaml on every run, nothing is cached):
+#   whether on   backup_enabled: false — explicitly off, the script does nothing
+#   with what    backup_engine: tar (default) | restic (only explicit, no automatic switch)
+#   where        tar    — backup_dir (or iCloud on macOS by default)
+#                restic — fixed protected storage ~/.iwe-backup/protect-repo
+#                         (shared with iwe-backup-protect.sh); backup_dir is not used for restic
+#   what         tar    — the whole IWE directory (without .git, node_modules, etc.)
+#                restic — sources from iwe-backup-sources.yaml
+#   The coverage of "what" deliberately differs between engines: a single list is a separate decision.
 #
 # USAGE:
-#   iwe-backup.sh                  запустить бэкап выбранным движком
-#   iwe-backup.sh --with-optional  то же, restic берёт ещё и tier2 (для tar недопустимо)
+#   iwe-backup.sh                  run a backup with the selected engine
+#   iwe-backup.sh --with-optional  the same, restic also takes tier2 (not allowed for tar)
 #
 # EXIT CODES:
-#   0 — снимок снят, либо бэкап выключен явно / не решён (одна строка причины, не ошибка)
-#   1 — снимок не снят (движок отказал или программа не найдена)
-#   2 — договор недопустим (неизвестный backup_engine, лишний аргумент)
+#   0 — snapshot taken, or backup is explicitly off / not decided (a one-line reason, not an error)
+#   1 — snapshot not taken (the engine refused or the program was not found)
+#   2 — contract invalid (unknown backup_engine, extra argument)
 
 set -uo pipefail
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WP-5 Ф38 / #430 and #523: every Hindsight consumer must preserve the same
+# WP-5 Phase 38 / #430 and #523: every Hindsight consumer must preserve the same
 # optional, explicit-opt-in and no-autostart contract.
 set -euo pipefail
 

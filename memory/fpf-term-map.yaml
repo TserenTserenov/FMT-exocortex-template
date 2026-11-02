@@ -1,9 +1,9 @@
-# fpf-term-map.yaml — словарь дрейфа терминологии FPF (WP-481 Ф11)
-# deprecated -> canonical. Заполняется по факту переименований в апстриме
-# (github.com/ailev/FPF), не превентивно.
-# При добавлении записи: grep IWE-корпус (CLAUDE.md, .claude/rules/, memory/,
-# PACK-*, FMT-exocortex-template/) на deprecated-форму, доложить пилоту
-# найденное (Drift Reporting) — не чинить молча.
+# fpf-term-map.yaml — FPF terminology drift dictionary (WP-481 Phase 11)
+# deprecated -> canonical. Filled in after the fact of renames in upstream
+# (github.com/ailev/FPF), not preventively.
+# When adding an entry: grep the IWE corpus (CLAUDE.md, .claude/rules/, memory/,
+# PACK-*, FMT-exocortex-template/) for the deprecated form, report to the pilot
+# what is found (Drift Reporting) — do not fix silently.
 #
 # horizon: warm | status: active | valid_from: 2026-07-13 | owner: user
 

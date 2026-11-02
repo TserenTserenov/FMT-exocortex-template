@@ -1,33 +1,33 @@
 #!/bin/bash
-# agent-status-report.sh — РП-395 Ф3 fail-safe writer.
+# agent-status-report.sh — WP-395 Phase 3 fail-safe writer.
 #
-# НАЗНАЧЕНИЕ: детерминированная запись runtime-статуса агента (Claude/Kimi) в
-# платформенный реестр indicators.agent_status, КОГДА агент-LLM не отчитался сам.
+# PURPOSE: deterministic recording of the agent runtime status (Claude/Kimi) in
+# the platform registry indicators.agent_status WHEN the LLM agent did not report itself.
 #
-# Это FAIL-SAFE, не primary. Primary write-path = поведенческий вызов MCP-инструмента
-# agent_status_update самим агентом (см. Agent Core в CLAUDE.md/AGENTS.md). Этот helper
-# пишет напрямую в БД (degraded-путь) — осознанное исключение для надёжности, т.к. OAuth
-# у Claude/Kimi не рефрешится как у Hermes-runtime, а dashboard должен видеть статус даже
-# если LLM забыл позвать инструмент (fault-profile ~15-20%).
+# This is a FAIL-SAFE, not primary. Primary write path = the behavioral call of the MCP tool
+# agent_status_update by the agent itself (see Agent Core in CLAUDE.md/AGENTS.md). This helper
+# writes directly to the DB (degraded path) — a deliberate exception for reliability, since OAuth
+# of Claude/Kimi is not refreshed like in Hermes runtime, and the dashboard must see the status even
+# if the LLM forgot to call the tool (fault-profile ~15-20%).
 #
-# Вызывается: Claude SessionStart/SessionEnd-хук (settings) + kimi-peer-adapter.sh (Kimi headless).
-# Пишет под user_id пилота (тот же Ory sub, что и MCP-путь) — строки консистентны.
+# Called by: Claude SessionStart/SessionEnd hook (settings) + kimi-peer-adapter.sh (Kimi headless).
+# Writes under the pilot's user_id (the same Ory sub as the MCP path) — rows are consistent.
 #
-# КОНТРАКТ STALENESS (cold-review H1/R1): SessionEnd/idle не гарантирован при крэше/kill.
-# Поэтому читатель (dashboard, agent_status_list) ОБЯЗАН трактовать `working`/`peer-session`
-# с устаревшим updated_at (> ~15 мин) как stale.
+# STALENESS CONTRACT (cold-review H1/R1): SessionEnd/idle is not guaranteed on crash/kill.
+# Therefore the reader (dashboard, agent_status_list) MUST treat `working`/`peer-session`
+# with a stale updated_at (> ~15 min) as stale.
 #
-# Использование:
+# Usage:
 #   agent-status-report.sh [--session-id <id>] <agent> <status> [task] [files-csv]
 #   agent-status-report.sh claude-code working "WP-395 Ф3" "src/a.ts,src/b.ts"
 #   agent-status-report.sh --session-id 20260604-s1 kimi idle
 #   agent-status-report.sh --gc                    # one-time stale cleanup (client-side)
 #
-# WP-398 Ф2: --session-id <id> (default 'default') — многосессионный режим.
-# Без флага = 'default' (backward-compat, одиночная сессия). Флаг можно ставить в любом
-# месте до позиционных аргументов; парсится отдельно от <agent>/<status>/[task]/[files].
+# WP-398 Phase 2: --session-id <id> (default 'default') — multi-session mode.
+# Without the flag = 'default' (backward-compat, single session). The flag can be put anywhere
+# before the positional arguments; parsed separately from <agent>/<status>/[task]/[files].
 #
-# Никогда не валит вызвавший процесс: всегда exit 0, ошибки тихо в stderr.
+# Never fails the calling process: always exit 0, errors quietly to stderr.
 
 GC_MODE=""
 SESSION_ID="default"
@@ -53,20 +53,20 @@ UID_FILE="$SECRETS_DIR/pilot-user-id"
 
 fail() { echo "agent-status-report: $1" >&2; exit 0; }   # fail-safe: never break caller
 
-# В GC mode agent не требуется — skip validation
+# In GC mode agent is not required — skip validation
 if [ -z "$GC_MODE" ]; then
   [ -z "$AGENT" ] && fail "agent required (claude-code|kimi|hermes)"
-  # Enum синхронизирован с AGENT_STATUS_VALUES (gateway-mcp/src/agent-status.ts).
-  # При расширении enum в TS — обновить и здесь.
+  # Enum is synchronized with AGENT_STATUS_VALUES (gateway-mcp/src/agent-status.ts).
+  # When extending the enum in TS — update here too.
   case "$STATUS" in idle|working|peer-session|blocked) ;; *) fail "bad status '$STATUS'";; esac
 fi
 
-# user_id пилота (Ory sub) — из секрета или env. tr -d: устойчивость к случайному \n в файле.
+# pilot's user_id (Ory sub) — from the secret or env. tr -d: robust to a stray \n in the file.
 USER_ID="${IWE_PILOT_USER_ID:-}"
 [ -z "$USER_ID" ] && [ -f "$UID_FILE" ] && USER_ID="$(tr -d '[:space:]' < "$UID_FILE")"
 [ -z "$USER_ID" ] && fail "pilot user_id not found ($UID_FILE)"
 
-# DSN базы indicators
+# DSN of the indicators DB
 INDICATORS_URL="${INDICATORS_URL:-}"
 if [ -z "$INDICATORS_URL" ] && [ -f "$NEON_ENV" ]; then
   # shellcheck disable=SC1090
@@ -99,8 +99,8 @@ SQL
   exit 0
 fi
 
-# UPSERT (зеркалит gateway-mcp/src/agent-status.ts). psql :'var' квотирование = защита от инъекций.
-# files: CSV → text[] через string_to_array; пустое → '{}'.
+# UPSERT (mirrors gateway-mcp/src/agent-status.ts). psql :'var' quoting = injection protection.
+# files: CSV -> text[] via string_to_array; empty -> '{}'.
 psql "$INDICATORS_URL" -v ON_ERROR_STOP=1 \
   -v uid="$USER_ID" -v ag="$AGENT" -v st="$STATUS" -v tk="$TASK" -v fl="$FILES_CSV" -v sid="$SESSION_ID" \
   >/dev/null 2>&1 <<'SQL' || fail "db write failed"

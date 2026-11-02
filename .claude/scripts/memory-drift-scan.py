@@ -43,22 +43,22 @@ try:
 except ImportError:
     sys.exit("pyyaml не найден. Установите: pip3 install --user pyyaml")
 
-# Строка таблицы РП: `| 1 | Название | Бюджет | Статус | ... |` — берём
-# первую числовую ячейку (номер РП) и ячейку под заголовком «Статус».
+# WP table row: `| 1 | Название | Бюджет | Статус | ... |` -- we take
+# the first numeric cell (the WP number) and the cell under the "Статус" header.
 _TABLE_ROW = re.compile(r"^\|\s*(\d+)\s*\|(.+)\|\s*$")
 
-# Заголовок колонки статуса: дефолтный шаблон использует полное слово
-# «Статус» с текстовыми значениями (pending/in_progress/done); наблюдалась
-# и сокращённая пользовательская колонка «ст» с эмодзи-значениями —
-# оба варианта распознаём по алиасу заголовка.
+# Status column header: the default template uses the full word
+# "Статус" with text values (pending/in_progress/done); a shortened
+# user column "ст" with emoji values was also observed --
+# we recognize both variants by the header alias.
 _STATUS_HEADER_ALIASES = {"Статус", "ст"}
 
-# Эмодзи → канонический текстовый статус (см. .claude/rules/formatting.md
-# «Эмодзи-статусы»). Список best-effort по наблюдаемому употреблению в
-# MEMORY.md пользователей, не закрытый — расширять по мере встречи новых
-# значений. Эмодзи без записи в маппинге сравниваются как есть (буквально)
-# и, скорее всего, не совпадут ни с одним текстовым `status:` — это то же
-# поведение, что было бы без маппинга вообще, не регрессия.
+# Emoji → canonical text status (see .claude/rules/formatting.md
+# "Emoji statuses"). A best-effort list based on observed usage in
+# users' MEMORY.md, not closed -- extend as new values
+# are met. An emoji with no entry in the mapping is compared as is (literally)
+# and most likely will not match any text `status:` -- this is the same
+# behavior as without a mapping at all, not a regression.
 _EMOJI_TO_STATUS = {
     "🔄": "in_progress",
     "⏳": "pending",
@@ -88,9 +88,9 @@ _TEXT_STATUS_PATTERNS = (
     ("pending", re.compile(r"\b(?:ожидает|не[ _-]?начат)\b", re.IGNORECASE)),
 )
 
-# «ждёт» само по себе описывает и активную работу (🔄 ждёт ревью), и блокировку
-# (⏸ ждёт внешнего решения). Используем его только если явный статус и значок
-# отсутствуют; иначе он подменяет более точное свидетельство.
+# "ждёт" on its own describes both active work (🔄 ждёт ревью) and a block
+# (⏸ ждёт внешнего решения). We use it only if the explicit status and icon
+# are absent; otherwise it overrides more precise evidence.
 _FALLBACK_TEXT_STATUS_PATTERNS = (
     ("pending", re.compile(r"\bждёт\b", re.IGNORECASE)),
 )
@@ -155,7 +155,7 @@ def parse_memory_table(memory_path: Path) -> dict[int, str]:
             continue
         m = _TABLE_ROW.match(line)
         if not m:
-            # Пустая строка или конец таблицы — сбрасываем колонку, ищем следующую таблицу.
+            # Empty line or end of table -- reset the column, look for the next table.
             if not line.strip().startswith("|"):
                 status_col = None
             continue

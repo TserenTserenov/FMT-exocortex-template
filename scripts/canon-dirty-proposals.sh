@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # canon-dirty-proposals.sh <repo-path> <snapshot-dir> <new-head-oid> -- turn a
 # canon-dirty-snapshot.sh snapshot into per-path proposals against the new HEAD
-# (WP-530 Ф38 / Ф3 step 5, Kimi: the pilot must see both sides -- what origin
+# (WP-530 Phase 38 / Phase 3 step 5, Kimi: the pilot must see both sides -- what origin
 # added and what the snapshot carries -- before anything is committed).
 #
 # For every snapshotted path:
@@ -53,7 +53,7 @@ while read -r h p; do
       printf '| %s | бинарный, снимок как есть | - | 0 | proposals/%s |\n' "$p" "$p" >> "$INDEX"; continue
     fi
     conflicts=$(grep -c '^<<<<<<< ' "$PROPOSALS/$p")
-    # append-only sections (Осталось/Журнал) usually conflict only because both
+    # append-only sections (Remaining/Journal) usually conflict only because both
     # sides appended at the same spot; the union variant keeps both blocks in
     # order (snapshot first) for the pilot to compare against the marked one.
     [ "$conflicts" -gt 0 ] && git merge-file -p --union "$snap" "$base" "$theirs" > "$PROPOSALS/$p.union"

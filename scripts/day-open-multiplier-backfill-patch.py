@@ -302,7 +302,7 @@ def main():
     if events is None:
         # Counts as a failed attempt (not silently skipped) so a corrupt ledger
         # doesn't understate a genuine source_absent streak in
-        # classify_source_absence()'s window scan (cold review Ф117 Medium).
+        # classify_source_absence()'s window scan (cold review Phase 117 Medium).
         append_attempt(args.ledger_append, args.ledger_root, today, target, "wakatime_unavailable", "corrupt-ledger")
         patch_dayplan(args.dayplan, finding_lines("wakatime_unavailable", "ledger повреждён"))
         return 0

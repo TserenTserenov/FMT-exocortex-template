@@ -1,12 +1,12 @@
 name: Notify Template Update
 
-# Ежедневно в 7:28 MSK (4:28 UTC) проверяет коммиты за 24ч
-# и отправляет анонс выпуска подписчикам через webhook бота @aist_me_bot.
-# WP-529: текст анонса собирает и проверяет scripts/release-notice-build.py
-# (модель → проверки → редактор → одна поправка → иначе короткий анонс).
-# Готовый текст сохраняется артефактом и уходит предпросмотром автору;
-# рассылка — отдельной задачей в окружении release-notice (там задаются
-# задержка и право остановить рассылку). Ручной запуск по умолчанию — dry-run.
+# Daily at 7:28 MSK (4:28 UTC) checks commits from the last 24h
+# and sends the release announcement to subscribers via the @aist_me_bot webhook.
+# WP-529: the announcement text is built and checked by scripts/release-notice-build.py
+# (model → checks → editor → one correction → otherwise a short announcement).
+# The ready text is saved as an artifact and goes to the author as a preview;
+# the mailing is a separate job in the release-notice environment (the delay
+# and the right to stop the mailing are set there). A manual run is dry-run by default.
 
 on:
   schedule:
@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0  # нужна полная история для git log
+          fetch-depth: 0  # the full history is needed for git log
 
       - name: Check for recent commits
         id: check

@@ -2,33 +2,33 @@
 # routing: helper  skill=day-open,week-close  called-by=skill-day-open  deterministic=true
 # see DP.SC.NNN (pending IntegrationGate), peer-session 2026-06-01-18
 #
-# fmt-critical-alert.sh — MVP-механизм обнаружения критических FMT issues.
+# fmt-critical-alert.sh — MVP mechanism for detecting critical FMT issues.
 #
-# WP-356 Ф?, peer-session 2026-06-01-18-fmt-issues-triage-verify, 2026-06-01.
+# WP-356 Phase ?, peer-session 2026-06-01-18-fmt-issues-triage-verify, 2026-06-01.
 #
-# РОЛЬ: helper для скиллов day-open / week-close. Запрашивает у GitHub
-# открытые issues с label critical/deadline в FMT-exocortex-template и:
-#   - выводит markdown-таблицу в stdout (для DayPlan/WeekClose отчёта)
-#   - отправляет Telegram-уведомление если есть critical issues и есть
-#     TG_BOT_TOKEN+TG_CHAT_ID в окружении (MVP detection chain — закрывает
-#     gap для weekend P0).
+# ROLE: helper for the day-open / week-close skills. Requests from GitHub
+# open issues with the critical/deadline label in FMT-exocortex-template and:
+#   - prints a markdown table to stdout (for the DayPlan/WeekClose report)
+#   - sends a Telegram notification if there are critical issues and
+#     TG_BOT_TOKEN+TG_CHAT_ID are in the environment (MVP detection chain — closes
+#     the gap for weekend P0).
 #
-# Принцип «детектор отчитывается, оператор делает»: скрипт ТОЛЬКО детектит,
-# никаких автофиксов.
+# Principle «the detector reports, the operator acts»: the script ONLY detects,
+# no autofixes.
 #
 # Usage:
-#   bash fmt-critical-alert.sh                  # markdown-таблица + TG если настроен
-#   bash fmt-critical-alert.sh --no-telegram    # только stdout, без TG
-#   bash fmt-critical-alert.sh --repo OWNER/R   # альтернативный репо (default FMT-exocortex-template)
+#   bash fmt-critical-alert.sh                  # markdown table + TG if configured
+#   bash fmt-critical-alert.sh --no-telegram    # stdout only, no TG
+#   bash fmt-critical-alert.sh --repo OWNER/R   # alternative repo (default FMT-exocortex-template)
 #   bash fmt-critical-alert.sh -h | --help
 #
 # Exit code:
-#   0 — нет critical/deadline issues (или они есть и оповещение отправлено)
-#   1 — есть critical issues, но TG_BOT_TOKEN/TG_CHAT_ID не настроены (warning только в stdout)
-#   2 — ошибка вызова gh (нет авторизации, repo недоступен, issue tracker отключён)
-#      или issue tracker отключён (issue #340 — отличаем от «0 issues»).
+#   0 — no critical/deadline issues (or they exist and the notification was sent)
+#   1 — there are critical issues, but TG_BOT_TOKEN/TG_CHAT_ID are not configured (warning in stdout only)
+#   2 — gh call error (no auth, repo unavailable, issue tracker disabled)
+#      or the issue tracker is disabled (issue #340 — distinguished from «0 issues»).
 #
-# Требования: bash, gh, curl, jq. Без внешних зависимостей.
+# Requirements: bash, gh, curl, jq. No external dependencies.
 
 set -eu
 
@@ -77,12 +77,12 @@ if [ -z "$REPO" ]; then
     exit 2
 fi
 
-# Проверка зависимостей
+# Dependency check
 command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not found" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "Error: jq not found" >&2; exit 2; }
 command -v curl >/dev/null 2>&1 || { echo "Error: curl not found" >&2; exit 2; }
 
-# gh auth check (proactive, иначе error будет в gh issue list но с менее ясным сообщением)
+# gh auth check (proactive, otherwise the error appears in gh issue list but with a less clear message)
 if ! gh auth status >/dev/null 2>&1; then
     echo "Error: gh not authenticated. Run 'gh auth login' first." >&2
     exit 2
@@ -123,10 +123,10 @@ if [ "$HAS_ISSUES" != "true" ]; then
     exit 2
 fi
 
-# Запрос issues
-# Note: gh issue list --label "X,Y" применяет AND-логику (issue должен иметь оба label).
-# Нам нужен OR — issue хотя бы с одним из label'ов. Используем gh api repos/.../issues?labels=
-# (REST API также AND) с отдельным запросом per label + jq merge с dedup.
+# Query issues
+# Note: gh issue list --label "X,Y" applies AND logic (the issue must have both labels).
+# We need OR — an issue with at least one of the labels. We use gh api repos/.../issues?labels=
+# (REST API is also AND) with a separate request per label + jq merge with dedup.
 set +e
 LABELS_ARRAY=()
 IFS=',' read -ra LABELS_ARRAY <<< "$LABEL_QUERY"
@@ -177,7 +177,7 @@ if [ $PY_RC -ne 0 ]; then
     exit 2
 fi
 
-# Если массив пуст — тихий success
+# If the array is empty — silent success
 set +e
 COUNT=$(echo "$ISSUES_JSON" | jq 'length' 2>&1)
 JQ_RC=$?
@@ -188,12 +188,12 @@ if [ $JQ_RC -ne 0 ]; then
     exit 2
 fi
 if [ "$COUNT" = "0" ]; then
-    # Нет критичных/застрявших issues — markdown-таблица не нужна
+    # No critical/stuck issues — a markdown table is not needed
     echo "_FMT critical/deadline/stale issues:_ 0 (✅ clean)"
     exit 0
 fi
 
-# Markdown-таблица для DayPlan / WeekClose отчёта
+# Markdown table for the DayPlan / WeekClose report
 echo "## ⚠️ FMT issues требуют внимания ($COUNT)"
 echo ""
 echo "| # | Issue | Labels |"
@@ -232,7 +232,7 @@ if $SEND_TG; then
 
     OK=$(echo "$TG_RESPONSE" | jq -r '.ok // false' 2>/dev/null)
     if [ "$OK" = "true" ]; then
-        # Маскируем chat_id в STDOUT (DayPlan/WeekReport коммитятся в Git — PII-сигнал).
+        # Mask chat_id in STDOUT (DayPlan/WeekReport are committed to Git — a PII signal).
         TG_CHAT_MASKED="${TG_CHAT:0:3}***"
         echo "_TG alert sent:_ chat ${TG_CHAT_MASKED}"
     else

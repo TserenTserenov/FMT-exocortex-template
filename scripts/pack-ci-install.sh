@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# Устанавливает CI guard (ID collision detector) во все Pack-репо в ~/IWE/
-# Использование: bash pack-ci-install.sh [--dry-run]
-# Источник: WP-5 F-pack-ci-auto-setup (18 мая 2026)
+# Installs the CI guard (ID collision detector) into all Pack repos in ~/IWE/
+# Usage: bash pack-ci-install.sh [--dry-run]
+# Source: WP-5 F-pack-ci-auto-setup (18 May 2026)
 
 set -euo pipefail
 
@@ -28,14 +28,14 @@ for pack_dir in "$IWE_DIR"/PACK-*/; do
   [ -d "$pack_dir" ] || continue
   pack_name=$(basename "$pack_dir")
 
-  # Проверить — это git-репо?
+  # Check — is it a git repo?
   if ! git -C "$pack_dir" rev-parse --git-dir &>/dev/null; then
     echo "  ⚠️  $pack_name — не git-репо, пропускаю"
     SKIPPED=$((SKIPPED + 1))
     continue
   fi
 
-  # Уже есть страж?
+  # Is there already a guard?
   if [ -f "$pack_dir/.github/workflows/pack-lint.yml" ]; then
     echo "  ✅ $pack_name — страж уже установлен"
     SKIPPED=$((SKIPPED + 1))

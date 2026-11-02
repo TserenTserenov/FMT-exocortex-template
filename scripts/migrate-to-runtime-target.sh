@@ -1,32 +1,32 @@
 #!/bin/bash
 # routing: migration  one-time=true
 # see DP.SC.159, DP.ROLE.059
-# migrate-to-runtime-target.sh — миграция с dirty FMT (≤0.28.x) на Generated runtime (≥0.29.0).
+# migrate-to-runtime-target.sh — migration from dirty FMT (<=0.28.x) to Generated runtime (>=0.29.0).
 #
-# WP-273 Этап 2 Ф21. ArchGate v2 → F.
+# WP-273 Stage 2 Phase 21. ArchGate v2 -> F.
 #
-# Что делает:
-#   1. Detect: FMT dirty (substituted значения вместо плейсхолдеров)?
-#   2. Извлекает substituted значения из FMT в .exocortex.env (если ещё не там)
-#   3. Переносит .exocortex.env из FMT в $WORKSPACE_DIR/ (если legacy location)
-#   4. git restore в FMT (возвращает clean upstream)
-#   5. Запускает build-runtime.sh для генерации .iwe-runtime/
-#   6. Hint: переустановите launchd-агенты (`bash roles/X/install.sh`)
+# What it does:
+#   1. Detect: is FMT dirty (substituted values instead of placeholders)?
+#   2. Extracts substituted values from FMT into .exocortex.env (if not already there)
+#   3. Moves .exocortex.env from FMT to $WORKSPACE_DIR/ (if legacy location)
+#   4. git restore in FMT (returns clean upstream)
+#   5. Runs build-runtime.sh to generate .iwe-runtime/
+#   6. Hint: reinstall the launchd agents (`bash roles/X/install.sh`)
 #
-# Безопасность:
-#   - Idempotent: повторный запуск ничего не ломает.
-#   - Backup: сохраняет dirty FMT в .iwe-runtime-migration-backup/ перед git restore.
-#   - launchctl unload автоматически перед git restore (предотвращает запуск битых скриптов).
+# Safety:
+#   - Idempotent: a rerun breaks nothing.
+#   - Backup: saves the dirty FMT to .iwe-runtime-migration-backup/ before git restore.
+#   - launchctl unload automatically before git restore (prevents running broken scripts).
 #
 # Usage:
 #   bash scripts/migrate-to-runtime-target.sh [--dry-run] [--workspace PATH]
 #
 # Exit codes:
-#   0 — успех (или нечего мигрировать, или dry-run)
-#   1 — некорректные аргументы
-#   2 — нет git в FMT (не может проверить dirty status)
-#   3 — build-runtime.sh не найден
-#   4 — git restore failed (разрешите конфликты вручную)
+#   0 — success (or nothing to migrate, or dry-run)
+#   1 — invalid arguments
+#   2 — no git in FMT (cannot check dirty status)
+#   3 — build-runtime.sh not found
+#   4 — git restore failed (resolve conflicts manually)
 
 set -eu
 
@@ -36,7 +36,7 @@ DEFAULT_WORKSPACE="$(dirname "$TEMPLATE_DIR")"
 
 WORKSPACE_DIR="$DEFAULT_WORKSPACE"
 DRY_RUN=false
-BACKUP_DIR=""  # set в Step 5 при clean→dirty ветке; защита от unbound в финальном hint под set -eu
+BACKUP_DIR=""  # set in Step 5 on the clean->dirty branch; protects against unbound in the final hint under set -eu
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -81,7 +81,7 @@ DIRTY_COUNT=$(echo "$DIRTY_FILES" | grep -c . || true)
 
 if [ "$DIRTY_COUNT" -eq 0 ]; then
     echo "[1/6] FMT clean — миграция не требуется."
-    # Continue to step 3 anyway: возможно .exocortex.env в FMT нужно мигрировать
+    # Continue to step 3 anyway: .exocortex.env in FMT may need to be migrated
 else
     echo "[1/6] Detected dirty FMT: $DIRTY_COUNT файлов с изменениями."
     if [ "$DIRTY_COUNT" -le 10 ]; then
@@ -112,10 +112,10 @@ else
 fi
 echo ""
 
-# === Determine effective ENV_FILE (resilient к dry-run, где copy не выполнялся) ===
-# Real-run: workspace/.exocortex.env уже создан или существовал → используем его.
-# Dry-run без workspace-файла: legacy FMT/.exocortex.env как source для build-runtime --dry-run.
-# Без этого dry-run падает с exit 2 "не найден" сразу после "Would copy" hint'а.
+# === Determine effective ENV_FILE (resilient to dry-run, where copy was not performed) ===
+# Real-run: workspace/.exocortex.env was already created or existed -> use it.
+# Dry-run without a workspace file: legacy FMT/.exocortex.env as the source for build-runtime --dry-run.
+# Without this, dry-run fails with exit 2 "not found" right after the "Would copy" hint.
 if [ -f "$WORKSPACE_DIR/.exocortex.env" ]; then
     ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
 elif [ -f "$TEMPLATE_DIR/.exocortex.env" ]; then
@@ -158,7 +158,7 @@ if [ "$DIRTY_COUNT" -gt 0 ]; then
         done
         echo "  ✓ Dirty files backed up to $BACKUP_DIR/"
 
-        # Unload launchd-агенты (предотвращает запуск битых substituted-скриптов)
+        # Unload launchd agents (prevents running broken substituted scripts)
         if command -v launchctl >/dev/null 2>&1; then
             for plist in com.strategist.morning com.strategist.weekreview com.extractor.inbox-check com.extractor.git-diff-feed com.exocortex.scheduler; do
                 launchctl unload "$HOME/Library/LaunchAgents/${plist}.plist" 2>/dev/null || true
@@ -190,10 +190,10 @@ else
 fi
 echo ""
 
-# === Step 7: Refresh ~/.iwe-paths (R5.3 Евгения, 27 апр) ===
-# 0.28.x clone не знал про IWE_RUNTIME — после миграции ~/.iwe-paths остаётся без
-# export IWE_RUNTIME, и launchd install.sh / scheduler видят неполный env.
-# Source-of-truth: setup/install-iwe-paths.sh (вызывается также из setup.sh [4d]).
+# === Step 7: Refresh ~/.iwe-paths (R5.3 of Evgeny, 27 Apr) ===
+# The 0.28.x clone did not know about IWE_RUNTIME — after migration ~/.iwe-paths stays without
+# export IWE_RUNTIME, and the launchd install.sh / scheduler see an incomplete env.
+# Source-of-truth: setup/install-iwe-paths.sh (also called from setup.sh [4d]).
 echo "[6/6] Refreshing ~/.iwe-paths..."
 GOVERNANCE_REPO_VAL=$(grep '^GOVERNANCE_REPO=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
 GOVERNANCE_REPO_VAL="${GOVERNANCE_REPO_VAL:-DS-strategy}"

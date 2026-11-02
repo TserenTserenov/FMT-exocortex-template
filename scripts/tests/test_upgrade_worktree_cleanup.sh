@@ -22,7 +22,7 @@ git -C "$TMP" checkout -q "$PREV_SHA"
 printf 'dirty\n' > "$TMP/tracked.txt"
 printf 'garbage\n' > "$TMP/untracked.txt"
 
-# Дословный контракт cleanup-блока workflow.
+# Verbatim contract of the workflow cleanup block.
 git -C "$TMP" reset --hard -q
 git -C "$TMP" clean -fdq
 if [ -n "$CURRENT_REF" ]; then

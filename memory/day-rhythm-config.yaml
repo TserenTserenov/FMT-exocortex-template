@@ -14,7 +14,7 @@ day_open:
                                  # from before this key existed).
   self_dev_slot: 1              # Slot number for self-development (always first by default)
   self_dev_missing_alert: true  # Explicitly say if no self-dev in today's plan
-  interactive: false            # false = Day Open одним блоком. true = промежуточные вопросы.
+  interactive: false            # false = Day Open as one block. true = intermediate questions.
   calendar_ids: []              # Calendar IDs to check. Empty = all available calendars.
                                 # Examples: ['primary', 'work@company.com', 'team-calendar-id@group']
 
@@ -51,8 +51,8 @@ video:
 
 content_editor:
   enabled: false                # Enable content-editor draft review at Day Open (issue #804:
-                                 # секция отсутствовала в дефолтном конфиге, при отсутствии ключа
-                                 # "не false" читалось как "включено" — тот же паттерн, что news/video)
+                                 # the section was absent in the default config, and when the key was absent
+                                 # "not false" was read as "enabled" — the same pattern as news/video)
 
 # mandatory_daily_wps:             # WPs that MUST appear in every DayPlan
 #   - wp: 7                        # WP number (from WeekPlan)

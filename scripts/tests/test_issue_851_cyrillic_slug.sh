@@ -25,7 +25,7 @@ bad() { echo "FAIL: $1"; fail=$((fail + 1)); }
 # Extracts the real "Slug из title" block (TITLE -> SLUG) by unique markers.
 extract_slug_block() {
     awk '
-        /^# --- Slug из title \(если не задан\) ---$/{found=1}
+        /^# --- Slug from title \(if not set\) ---$/{found=1}
         found{print}
         found && /^fi$/{exit}
     ' "$TARGET"

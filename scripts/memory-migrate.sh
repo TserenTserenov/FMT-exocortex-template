@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # routing: migration  one-time=true
 # see DP.SC.159, DP.ROLE.059
-# memory-migrate.sh — добавление отсутствующих frontmatter-полей (WP-217 Ф10.2/Ф10.4)
+# memory-migrate.sh — add missing frontmatter fields (WP-217 Phase 10.2/10.4)
 #
-# Добавляет поля schema_version/horizon/domains/status/owner в существующие файлы.
-# НЕ перезаписывает поля, которые уже есть.
-# Определяет type/horizon/domains автоматически по имени файла.
-# issue #1147: присвоение horizon: hot проверяется против бюджета HOT
-# (≤150 строк суммарно, memory-lifecycle-spec.md §4) ДО любой записи — при
-# превышении миграция останавливается со списком кандидатов, ничего не пишет;
-# valid_from берётся из metadata.modified / mtime файла, не из даты запуска.
+# Adds the fields schema_version/horizon/domains/status/owner to existing files.
+# Does NOT overwrite fields that are already present.
+# Determines type/horizon/domains automatically from the file name.
+# issue #1147: assigning horizon: hot is checked against the HOT budget
+# (≤150 lines in total, memory-lifecycle-spec.md §4) BEFORE any write — when
+# exceeded, the migration stops with a list of candidates and writes nothing;
+# valid_from is taken from metadata.modified / the file mtime, not from the run date.
 #
 # Usage:
-#   bash scripts/memory-migrate.sh memory/file.md         # один файл
-#   bash scripts/memory-migrate.sh --all                  # все memory/*.md
-#   bash scripts/memory-migrate.sh --dry-run --all        # показать без изменений
-#   bash scripts/memory-migrate.sh --from 1 --to 2 file   # будущая миграция схем
+#   bash scripts/memory-migrate.sh memory/file.md         # one file
+#   bash scripts/memory-migrate.sh --all                  # all memory/*.md
+#   bash scripts/memory-migrate.sh --dry-run --all        # show without changes
+#   bash scripts/memory-migrate.sh --from 1 --to 2 file   # future schema migration
 #
-# Spec: memory/memory-lifecycle-spec.md §8 (WP-217 Ф10.1)
+# Spec: memory/memory-lifecycle-spec.md §8 (WP-217 Phase 10.1)
 
 set -eu
 
@@ -45,20 +45,20 @@ TO_VER=""
 TARGET=""
 EXCLUDE="MEMORY.md"
 
-# issue #1147: бюджет HOT — memory-lifecycle-spec.md §4 (ось 2: horizon)
-# ограничивает суммарный размер тел всех hot-файлов 150 строками. Миграция
-# обязана проверять бюджет ДО записи, а не раздувать HOT по имени файла.
+# issue #1147: HOT budget — memory-lifecycle-spec.md §4 (axis 2: horizon)
+# limits the total size of the bodies of all hot files to 150 lines. The migration
+# must check the budget BEFORE writing, not inflate HOT by file name.
 HOT_LIMIT_LINES=150
 
-# Строки тела файла (после закрывающего ---) — то, что реально грузится.
-# f<2: строка "---" ВНУТРИ тела (горизонтальный разделитель markdown) не
-# считается разделителем frontmatter и не выпадает из подсчёта (cold-review).
+# Lines of the file body (after the closing ---) — what is actually loaded.
+# f<2: a "---" line INSIDE the body (a markdown horizontal rule) is not
+# counted as a frontmatter delimiter and does not drop out of the count (cold-review).
 body_lines() {
     awk '/^---/ && f<2{f++; next} f>=2{print}' "$1" | wc -l | tr -d ' '
 }
 
-# Сумма строк тел всех файлов с horizon: hot в MEMORY_DIR (читаем факт,
-# не заявку): горизонт — из frontmatter, строки — из тела файла.
+# Sum of body lines of all files with horizon: hot in MEMORY_DIR (we read the fact,
+# not the claim): the horizon from frontmatter, the lines from the file body.
 hot_total_lines() {
     local total=0 f n skip exc
     for f in "$MEMORY_DIR"/*.md; do
@@ -72,22 +72,22 @@ hot_total_lines() {
     echo "$total"
 }
 
-# Строгая проверка YYYY-MM-DD без привязки к диалекту date (GNU -d / BSD -j).
+# Strict YYYY-MM-DD check independent of the date dialect (GNU -d / BSD -j).
 validate_ymd() {
     date -d "$1" >/dev/null 2>&1 && return 0
     date -j -f "%Y-%m-%d" "$1" >/dev/null 2>&1 && return 0
     return 1
 }
 
-# issue #1147: valid_from = дата появления факта, не дата запуска миграции.
-# Цепочка: metadata.modified (нормализация к YYYY-MM-DD) → mtime файла →
-# сегодня. Невалидное значение не подставляем — идём по цепочке дальше.
+# issue #1147: valid_from = the date the fact appeared, not the migration run date.
+# Chain: metadata.modified (normalized to YYYY-MM-DD) → file mtime →
+# today. An invalid value is not substituted — we go further along the chain.
 infer_valid_from() {
     local file="$1" v
     v=$(get_field "$file" "modified" 2>/dev/null || true)
     v=$(printf '%s' "$v" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 || true)
     if [ -n "$v" ] && validate_ymd "$v"; then echo "$v"; return 0; fi
-    # mtime: GNU stat -c, затем BSD stat -f (порядок как в canon-dirty-snapshot.sh)
+    # mtime: GNU stat -c, then BSD stat -f (order as in canon-dirty-snapshot.sh)
     v=$(stat -c %y "$file" 2>/dev/null | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}' || true)
     [ -n "$v" ] || v=$(stat -f %Sm -t %Y-%m-%d "$file" 2>/dev/null || true)
     if [ -n "$v" ] && validate_ymd "$v"; then echo "$v"; return 0; fi
@@ -114,7 +114,7 @@ has_frontmatter() {
     head -1 "$1" | grep -q '^---$'
 }
 
-# Сгенерировать name из имени файла
+# Generate name from the file name
 infer_name() {
     local name="$1"
     local stem="${name%.md}"
@@ -166,7 +166,7 @@ infer_name() {
     esac
 }
 
-# Сгенерировать description из имени файла
+# Generate description from the file name
 infer_description() {
     local stem="${1%.md}"
     case "$stem" in
@@ -181,7 +181,7 @@ infer_description() {
     esac
 }
 
-# Определить type по имени файла
+# Determine type by file name
 infer_type() {
     local name="$1"
     case "$name" in
@@ -197,13 +197,13 @@ infer_type() {
     esac
 }
 
-# Определить horizon по type
+# Determine horizon by type
 infer_horizon() {
     local type="$1" name="$2"
     case "$type" in
         user)     echo "hot" ;;
         feedback)
-            # Активные feedback → hot, архивные → warm
+            # Active feedback → hot, archived → warm
             case "$name" in
                 *_archive*) echo "warm" ;;
                 *)           echo "hot" ;;
@@ -217,7 +217,7 @@ infer_horizon() {
     esac
 }
 
-# Определить domains по имени файла
+# Determine domains by file name
 infer_domains() {
     local name="$1"
     case "$name" in
@@ -255,7 +255,7 @@ migrate_file() {
         return 1
     fi
 
-    # Собираем текущие поля
+    # Collect the current fields
     cur_type=$(get_field "$file" "type")
     cur_horizon=$(get_field "$file" "horizon")
     cur_domains=$(get_field "$file" "domains")
@@ -266,7 +266,7 @@ migrate_file() {
     cur_desc=$(get_field "$file" "description")
     cur_valid_from=$(get_field "$file" "valid_from")
 
-    # Определяем defaults
+    # Determine defaults
     new_type="${cur_type:-$(infer_type "$name")}"
     new_horizon="${cur_horizon:-$(infer_horizon "$new_type" "$name")}"
     new_domains="${cur_domains:-$(infer_domains "$name")}"
@@ -277,10 +277,10 @@ migrate_file() {
     new_desc="${cur_desc:-$(infer_description "$name")}"
     new_valid_from="${cur_valid_from:-$(infer_valid_from "$file")}"
 
-    # issue #1147: присвоение hot проверяется против бюджета ДО записи
-    # (одиночный файл и проход записи --all проходят одну и ту же проверку;
-    # сумма уже мигрированных в этом прогоне учитывается, т.к. hot_total_lines
-    # читает файлы заново). Отказ = ничего не записано.
+    # issue #1147: assigning hot is checked against the budget BEFORE writing
+    # (a single file and the --all write pass go through the same check;
+    # the sum of those already migrated in this run is accounted for, since hot_total_lines
+    # reads the files again). Refusal = nothing written.
     if [ -z "$cur_horizon" ] && [ "$new_horizon" = "hot" ]; then
         hot_now=$(hot_total_lines)
         projected=$((hot_now + $(body_lines "$file")))
@@ -290,7 +290,7 @@ migrate_file() {
         fi
     fi
 
-    # Если ничего добавлять не нужно — пропускаем
+    # If there is nothing to add — skip
     if [ -n "$cur_type" ] && [ -n "$cur_horizon" ] && [ -n "$cur_domains" ] \
        && [ -n "$cur_status" ] && [ -n "$cur_owner" ] && [ -n "$cur_schema" ] \
        && [ -n "$cur_name" ] && [ -n "$cur_desc" ] && [ -n "$cur_valid_from" ]; then
@@ -312,15 +312,15 @@ migrate_file() {
         return 0
     fi
 
-    # Построить новый frontmatter
-    # Читаем тело файла (без frontmatter); f<2: строка "---" внутри тела —
-    # не разделитель, такие строки не должны выпадать из файла (cold-review).
+    # Build the new frontmatter
+    # Read the file body (without frontmatter); f<2: a "---" line inside the body is
+    # not a delimiter, such lines must not drop out of the file (cold-review).
     body=$(awk '/^---/ && f<2{f++; next} f>=2{print}' "$file")
 
-    # Существующие поля frontmatter (без ---)
+    # Existing frontmatter fields (without ---)
     existing_fm=$(awk '/^---/ && f<2{f++; next} f==1{print}' "$file")
 
-    # Добавляем отсутствующие поля в конец frontmatter
+    # Add the missing fields to the end of the frontmatter
     additions=""
     [ -z "$cur_type" ]       && additions="$additions\ntype: $new_type"
     [ -z "$cur_horizon" ]    && additions="$additions\nhorizon: $new_horizon"
@@ -332,7 +332,7 @@ migrate_file() {
     [ -z "$cur_desc" ]       && additions="$additions\ndescription: \"$new_desc\""
     [ -z "$cur_valid_from" ] && additions="$additions\nvalid_from: $new_valid_from"
 
-    # Записываем обновлённый файл
+    # Write the updated file
     {
         echo "---"
         echo "$existing_fm"
@@ -345,14 +345,14 @@ migrate_file() {
     echo "DONE $name"
 }
 
-# Основной цикл
-# cold-review #1147 (раунд 3): два одновременных запуска могли оба увидеть
-# запас бюджета HOT и переписывать одни файлы через `> "$file"` — риск порчи,
-# не только превышения бюджета. Общий mkdir-замок на весь прогон (проверка
-# бюджета + запись). Замок НИКОГДА не удаляется автоматически: любая схема
-# «проверить staleness, затем rm» оставляет окно, где сносится чужой свежий
-# замок (та же находка, что в protocol-stop-gate #1184). Занят → отказ с
-# инструкцией ручной очистки; свой замок снимает только trap EXIT создателя.
+# Main loop
+# cold-review #1147 (round 3): two simultaneous runs could both see
+# HOT budget headroom and rewrite the same files via `> "$file"` — a risk of corruption,
+# not only of exceeding the budget. A common mkdir lock for the whole run (budget
+# check + write). The lock is NEVER removed automatically: any scheme
+# "check staleness, then rm" leaves a window where someone else's fresh
+# lock is wiped (the same finding as in protocol-stop-gate #1184). Busy → refusal with
+# manual cleanup instructions; only the creator's trap EXIT removes its own lock.
 MIGRATE_LOCK="$MEMORY_DIR/.migrate.lock"
 if ! mkdir "$MIGRATE_LOCK" 2>/dev/null; then
     lock_pid=$(cat "$MIGRATE_LOCK/pid" 2>/dev/null || true)
@@ -364,15 +364,15 @@ echo "$$" > "$MIGRATE_LOCK/pid" 2>/dev/null || true
 trap 'rm -rf "$MIGRATE_LOCK" 2>/dev/null || true' EXIT
 
 if [ $ALL -eq 1 ]; then
-    # Проход 1 (без записи, issue #1147): бюджет HOT проверяется на ВСЕМ наборе
-    # до любой записи — иначе отказ на середине дал бы частичную миграцию.
-    # Сумма = строки тел существующих hot-файлов + строки тел файлов, которым
-    # эта миграция присвоит hot (horizon отсутствует и infer_horizon = hot).
+    # Pass 1 (no writing, issue #1147): the HOT budget is checked on the WHOLE set
+    # before any write — otherwise a refusal midway would give a partial migration.
+    # Sum = body lines of existing hot files + body lines of files to which
+    # this migration will assign hot (horizon is missing and infer_horizon = hot).
     hot_base=$(hot_total_lines)
     cand_lines=0
     candidates=""
-    # Имена с пробелами/переносами не должны пропадать: обход через NUL
-    # (process substitution, не pipeline — иначе счётчики в subshell).
+    # Names with spaces/newlines must not get lost: traversal via NUL
+    # (process substitution, not a pipeline — otherwise counters live in a subshell).
     while IFS= read -r -d '' f; do
         [ -f "$f" ] || continue
         n=$(basename "$f"); skip=0

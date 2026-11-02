@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# check-pack-collisions.sh — глобальный детектор ID-коллизий в Pack-репо.
+# check-pack-collisions.sh — global detector of ID collisions in a Pack repo.
 #
-# Назначение: для CI и локальных pre-commit hooks. Самодостаточный (нет зависимостей
-# вне bash + стандартных unix-утилит).
+# Purpose: for CI and local pre-commit hooks. Self-contained (no dependencies
+# beyond bash + standard unix utilities).
 #
-# Каждый базовый ID (DP.M.NNN, DP.D.NNN, DP.SC.NNN, AR.NNN и т.д.) должен быть уникален
-# в репо. При обнаружении дубликата basename → exit 1 с указанием путей.
+# Every base ID (DP.M.NNN, DP.D.NNN, DP.SC.NNN, AR.NNN, etc.) must be unique
+# in the repo. On finding a duplicate basename → exit 1 listing the paths.
 #
-# Источник: WP-7 Ф-PACK-COLLISIONS (18 мая 2026) — обнаружено 14 коллизий, вызванных
-# параллельной разработкой без проверки свободного номера.
+# Source: WP-7 Phase PACK-COLLISIONS (18 May 2026) — 14 collisions found, caused by
+# parallel development without checking for a free number.
 #
-# Использование:
-#   check-pack-collisions.sh          # запуск из корня репо
-#   REPO_ROOT=/path check-pack-collisions.sh  # явный путь
+# Usage:
+#   check-pack-collisions.sh          # run from the repo root
+#   REPO_ROOT=/path check-pack-collisions.sh  # explicit path
 
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
-# `|| true` на конце — защита от grep/awk exit 1 при пустом результате с set -e/pipefail
+# `|| true` at the end — protection against grep/awk exit 1 on an empty result under set -e/pipefail
 COLLISIONS=$(find "$REPO_ROOT" -name "*.md" -type f 2>/dev/null \
   | grep -v '/\.git/' \
   | grep -v '/archive/' \

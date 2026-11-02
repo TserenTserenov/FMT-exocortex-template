@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# day-open-pipeline.sh — оркестратор полного конвейера Day Open (WP-356 DOE3)
-# Поток: preflight → scaffold → llm-fill (per-section) → checks → commit/push
+# day-open-pipeline.sh — orchestrator of the full Day Open pipeline (WP-356 DOE3)
+# Flow: preflight → scaffold → llm-fill (per-section) → checks → commit/push
 #
 # FMT promotion note (WP-7 FMT-PROMOTE-DAYOPEN1): this entry point plus its 5
 # dependencies (day-open-checks-runner.sh, day-open-llm-fill.py,
@@ -756,7 +756,7 @@ DATE="${DATE:-$(date +%Y-%m-%d)}"
 PROBE_START_S=$SECONDS
 
 # --- Secrets (must load before the first tg_notify call of a normal run — WP-5 Ubuntu-audit
-# П2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
+# P2, 2026-07-22: TG_TOKEN/TG_CHAT used to be assigned after both the D2-dedup and
 # pipeline-started notifications, so those two silently no-op'd every run) ---
 source_env_if_present() {
   [ -f "$1" ] || return 0
@@ -767,14 +767,14 @@ source_env_if_present() {
 load_secrets() {
   source_env_if_present "$HOME/.config/aist/env"
   source_env_if_present "$HOME/IWE/.secrets/anthropic_key.env"  # Anthropic API key for llm-proxy (WP-356)
-  # WP-484 Ф50b named this file as the readable ANTHROPIC_API_KEY source for the
+  # WP-484 Phase 50b named this file as the readable ANTHROPIC_API_KEY source for the
   # remote-gateway fallback below (line ~534) but never sourced it -- the fallback
   # chain silently resolved to empty and the authorized probe 401'd (found live
   # 2026-08-05 running --probe ahead of a scheduled test run).
   source_env_if_present "$HOME/.iwe/.proxy-env"
   # WP-484 F64 (06.08): TELEGRAM_* live in ~/.secrets/tg-bots (canonical source per
   # lib/telegram.sh) — none of the three files above carry them on the remote server, so every
-  # tg_notify on the server (incl. the "День открыт" digest and all aborts) was a
+  # tg_notify on the server (incl. the "Day opened" digest and all aborts) was a
   # silent no-op since the migration. Same fix as day-open-pipeline-watchdog.sh.
   source_env_if_present "$HOME/.secrets/tg-bots"
   TG_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
@@ -782,7 +782,7 @@ load_secrets() {
 }
 
 # --- Helper: send TG notification, transport unified onto lib/telegram.sh ---
-# MUST be defined before first call (regression fix 2026-06-29). WP-538 Ф3:
+# MUST be defined before first call (regression fix 2026-06-29). WP-538 Phase 3:
 # was a raw curl POST duplicating http_code/ok:true checking that
 # scripts/lib/telegram.sh already does, with 3x retry instead of one shot.
 # Template note: the admission-gate rate limiter (telegram_send_gated) lives
@@ -1138,14 +1138,14 @@ if [ "$SCAFFOLD_ONLY" = "true" ] && [ "$PROBE" != "true" ]; then
   # making git-dirty-guard mistake the draft for governance work.
   DAYPLAN_PATH="$IWE/.tmp/day-open-scaffold/$DAYPLAN_NAME"
 fi
-# WP-484 27.07: старый формат "WeekPlan W{N} {дата}.md" сменился на
-# "WeekPlan {год}-W{N} {дата} (night-cycle).md" (week-open-orchestrator.sh) — жёсткий
-# glob "WeekPlan W*.md" переставал матчить ЛЮБОЙ реальный файл сразу как только старый
-# формат исчез из current/ (обнаружено 27.07 при сборке --probe: пайплайн абортил бы на
-# каждом прогоне, включая strategy_day, ещё ДО собственной проверки этого случая —
-# тот же класс регрессии, что WP-149 уже поймал у build-strategic-context.py). Принимает
-# оба формата, берёт самый свежий по mtime (не первый по алфавиту — конвенции WeekPlan
-# W* и WeekPlan {год}-W* сортируются по-разному, mtime однозначен).
+# WP-484 27.07: the old format "WeekPlan W{N} {date}.md" was replaced by
+# "WeekPlan {year}-W{N} {date} (night-cycle).md" (week-open-orchestrator.sh) — the rigid
+# glob "WeekPlan W*.md" stopped matching ANY real file as soon as the old
+# format disappeared from current/ (discovered 27.07 while building --probe: the pipeline would abort on
+# every run, including strategy_day, even BEFORE its own check of this case —
+# the same class of regression that WP-149 already caught in build-strategic-context.py). Accepts
+# both formats, takes the newest by mtime (not the first alphabetically — the WeekPlan conventions
+# W* and WeekPlan {year}-W* sort differently, mtime is unambiguous).
 # Excludes "(probe)" files defensively (WP-484 27.07, independent review): a
 # week-open-orchestrator.sh --probe run writes a "(probe)"-suffixed WeekPlan into
 # this same directory — if it were ever left behind (crash before its own cleanup),
@@ -1154,10 +1154,10 @@ fi
 # end-of-run cleanup.
 WEEKPLAN_PATH=$(ls -t "$CURRENT_DIR"/WeekPlan\ *.md 2>/dev/null | grep -v '(probe)' | head -1 || true)
 WP_REGISTRY="$DS_STRATEGY/docs/WP-REGISTRY.md"
-# WP-7 Ф-DRIFT-DATA-PIPELINES D1 (13.07): было memory/cp-profile.json, который не
-# писал ни один механизм. update-derived-snapshot.py (шаг 1.5 выше) уже пишет сюда.
-# issue #1132: inbox/WP-425/ — платформенный номер РП автора, не имеющий смысла
-# для чужого governance-репо; путь должен совпадать с _resolve_snapshot_path().
+# WP-7 Phase DRIFT-DATA-PIPELINES D1 (13.07): it used to be memory/cp-profile.json, which no
+# mechanism wrote. update-derived-snapshot.py (step 1.5 above) already writes here.
+# issue #1132: inbox/WP-425/ — the platform WP number of the author, meaningless
+# for someone else's governance repo; the path must match _resolve_snapshot_path().
 CP_PROFILE="$DS_STRATEGY/.cache/derived_snapshot.json"
 CALENDAR_OUT="$IWE/.tmp/calendar-$DATE.txt"
 # issue #877: the shipped script carries NO built-in gateway address. The old
@@ -1194,7 +1194,7 @@ LLM_PROXY_URL="${LLM_PROXY_URL%/}"
 LLM_PROXY_URL="${LLM_PROXY_URL%/v1}"
 PROXY_PORT="${PROXY_PORT:-18765}"
 PROXY_PID=""
-# WP-484 Ф48b (04.08): a remote gateway is the normal target. This pipeline runs
+# WP-484 Phase 48b (04.08): a remote gateway is the normal target. This pipeline runs
 # on either machine of the dual-machine pair (see note below) -- a Mac-local
 # address is simply wrong on the remote server, and was the root cause of the
 # 30.07/02.08/04.08 stale-credential recurrences on the Mac. Local-only
@@ -1206,7 +1206,7 @@ case "$LLM_PROXY_URL" in
 esac
 
 # --- Helper: reap a stale .git/HEAD.lock left by a crashed prior git process ---
-# WP-484 Ф95 (15.08): a run that dies mid-commit (any abort() after `git add`)
+# WP-484 Phase 95 (15.08): a run that dies mid-commit (any abort() after `git add`)
 # leaves this lock behind — nothing swept it, so it blocked every commit until
 # a human found it manually. Only ever removes a lock whose holder is provably
 # dead (no live git process at all); a live git process (this run's own, or a
@@ -1272,7 +1272,7 @@ if [ "$SCAFFOLD_ONLY" = "true" ] && [ "$PROBE" != "true" ] && [ -e "$DAYPLAN_PAT
 fi
 
 # ============================================
-# 0. Extension graph — "before" hooks (WP-529 Ф11)
+# 0. Extension graph — "before" hooks (WP-529 Phase 11)
 # ============================================
 # extensions/day-open.before*.md — same bash-block-in-Markdown mechanism as
 # the existing "checks" hook (day-open-checks-runner.sh), so it runs
@@ -1335,7 +1335,7 @@ fi
 # yesterday's Day Close isn't done yet — the day-close.after trigger will
 # re-run this pipeline with --force once the close lands. --force bypasses the guard.
 #
-# WP-5 Ubuntu-portability audit (2026-07-22, П1): replaced the commit-message regex
+# WP-5 Ubuntu-portability audit (2026-07-22, P1): replaced the commit-message regex
 # guard (matched literal "day-close.*$YDAY" text — broke silently whenever the close
 # commit's wording drifted, most recently detecting only the close's *start* lock
 # marker instead of its completion) with a deterministic signal: presence of
@@ -1414,7 +1414,7 @@ if [ "$FORCE" != "true" ]; then
       if [ -z "$DC_DONE" ] && [ -n "$YDAY_COMMITS" ]; then
         echo "  Day Close for $YDAY (strategy_day) not done yet (no facts_digest in ledger) — deferring Day Open (will regenerate after close)."
         tg_notify "⏸ Day Open $DATE отложен: Day Close за $YDAY (день стратегирования) ещё не сделан. Пересоберётся после закрытия (или запусти с --force)." terminal
-        # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7 tells the scheduler to
+        # Phase 32 item 11 (WP-484, 31.07): deferred ≠ done — exit 7 tells the scheduler to
         # retry on the next window tick instead of burning the daily marker.
         exit 7
       fi
@@ -1429,7 +1429,7 @@ if [ "$FORCE" != "true" ]; then
       if [ -z "$DC_DONE" ] && [ -n "$YDAY_COMMITS" ]; then
         echo "  Day Close for $YDAY not done yet (no archived DayPlan) — deferring Day Open (will regenerate after close)."
         tg_notify "⏸ Day Open $DATE отложен: закрытие $YDAY ещё не долетело до сервера (гонка расписаний, не поломка). Пересоберётся автоматически после закрытия (или запусти с --force)." terminal
-        # Ф32 п.11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
+        # Phase 32 item 11 (WP-484, 31.07): deferred ≠ done — exit 7, scheduler retries next tick.
         exit 7
       fi
       if [ -n "$DC_DONE" ]; then
@@ -1442,7 +1442,7 @@ if [ "$FORCE" != "true" ]; then
 fi
 
 # ============================================
-# 1.1b. Week Close race guard (WP-484 Ф46, found 2026-08-02/03: 3x "LLM Proxy
+# 1.1b. Week Close race guard (WP-484 Phase 46, found 2026-08-02/03: 3x "LLM Proxy
 # authorized probe failed" Telegram alerts near midnight on a Sunday). Late
 # Sunday night, an author-only night-cycle orchestrator (week-open-orchestrator.sh,
 # ~23:50, not delivered by this template -- it depends on the author's shared-
@@ -1452,7 +1452,7 @@ fi
 # while that cycle is mid-flight, it can burn an attempt on an LLM Proxy call
 # that's about to become moot, or produce a plan for a day whose week context
 # is still in flux. On a template install without that orchestrator, WeekReport
-# is produced earlier and by a different, delivered path: week-review.md, Пн
+# is produced earlier and by a different, delivered path: week-review.md, Mon
 # 00:00 (issue #596) -- so this guard only matters in practice for that
 # orchestrator's ~23:50 Sunday window; it's a no-op wait otherwise.
 #
@@ -1527,7 +1527,7 @@ if [ -d "$DS_STRATEGY/.githooks" ] && [ -n "$(ls -A "$DS_STRATEGY/.githooks" 2>/
 fi
 
 # ============================================
-# 1.3. Input freshness self-heal (WP-484 Ф90, 2026-08-12): priorities.yaml and
+# 1.3. Input freshness self-heal (WP-484 Phase 90, 2026-08-12): priorities.yaml and
 # WP-REGISTRY.md are read straight off local disk by LLM Fill below. On a
 # shared checkout (remote server) a live agent session can hold the tree's sync
 # semaphore for hours after finishing its own work (found live: 11h46m past
@@ -1613,7 +1613,7 @@ echo "  Proxy OK"
 # real call (2026-07-30 04:30 — 7/7 fill chunks failed with HTTP 401, day not
 # opened). Same request contract as day-open-llm-fill.py: no "model" field, the
 # proxy routes by verification_class.
-# WP-484 Ф50b (04.08): LLM_PROXY_SECRET was never actually provisioned anywhere
+# WP-484 Phase 50b (04.08): LLM_PROXY_SECRET was never actually provisioned anywhere
 # this pipeline runs -- confirmed live from the remote server. What IS already provisioned
 # and already authenticates against this same gateway: PROXY_SHARED_SECRET
 # (root-only /etc/iwe/env, used by iwe-llm-health/iwe-overnight-auditor) and
@@ -1646,7 +1646,7 @@ if [ "$AUTH_CODE" != "200" ]; then
       echo "  Waiting for proxy respawn (attempt $_i/10)..."
     done
   else
-    # Remote gateway (WP-484 Ф48b, 04.08): no local process to kill -- Railway
+    # Remote gateway (WP-484 Phase 48b, 04.08): no local process to kill -- Railway
     # supervises its own restarts (railway.toml restartPolicyType=ON_FAILURE).
     # A 401 here almost always means LLM_PROXY_SECRET is unset/wrong on this
     # host (confirmed missing on the remote server at cutover time), not a crashed
@@ -1703,7 +1703,7 @@ DAY_OPEN_SCAFFOLD_READ_ONLY="$SCAFFOLD_READ_ONLY" bash "$SCAFFOLD_SCRIPT" "$DATE
     tg_notify "📋 Strategy day — Day Open skipped." terminal
     exit 0
   fi
-  # Diagnostics for bug-2026-07-10 repro (день, когда scaffold "не найден" без явной причины)
+  # Diagnostics for bug-2026-07-10 repro (the day when scaffold was "not found" with no explicit reason)
   DIAG="pwd=$(pwd) PATH=$PATH scaffold_exists=$([ -e "$SCAFFOLD_SCRIPT" ] && echo yes || echo no) scaffold_x=$([ -x "$SCAFFOLD_SCRIPT" ] && echo yes || echo no) ls=$(ls -la "$SCAFFOLD_SCRIPT" 2>&1)"
   echo "  DIAG: $DIAG"
   tg_notify "🚨 Day Open pipeline aborted: Scaffold failed (exit $SC)
@@ -1854,7 +1854,7 @@ fi
 # ============================================
 # 4.2. Bottleneck patch (deterministic, AFTER LLM Fill — WP-484, moved 2026-07-14)
 # llm-fill.py's has_pending check is whole-chunk: a second marker (week_context) in the
-# same <details> block as "Горлышко недели" made it regenerate that whole chunk even
+# same <details> block as "Weekly bottleneck" made it regenerate that whole chunk even
 # when this script had already run first, overwriting its BOTTLENECK-PENDING/BY-SCRIPT
 # marker with unmarked prose. Running last makes this script the authoritative source.
 # ============================================
@@ -1871,11 +1871,11 @@ _PATCH_PY=$("$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh" 
 [ -n "$_PATCH_PY" ] || _PATCH_PY=python3
 # ============================================
 # 4.3. Ledger render (deterministic, AFTER LLM Fill — same reason as 4.2 above:
-# WP-484 Ф16.2 2b). Appends render-open.py's ledger sections (Итоги вчера/Очередь
-# решений/Предлагаемые действия, Ф16.2 2c) as an ADDITIONAL block near the end of
-# the DayPlan — never touches day-open-scaffold.sh's own legacy "Итоги вчера" block
+# WP-484 Phase 16.2 2b). Appends render-open.py's ledger sections (Yesterday's results/Queue of
+# decisions/Proposed actions, Phase 16.2 2c) as an ADDITIONAL block near the end of
+# the DayPlan — never touches day-open-scaffold.sh's own legacy "Yesterday's results" block
 # (CONCEPT-night-cycle.md §16: parallel run during migration, not a replacement).
-# True no-op (file byte-identical) until scripts/day-close-prepare.sh (Ф16.2 2a,
+# True no-op (file byte-identical) until scripts/day-close-prepare.sh (Phase 16.2 2a,
 # WP-485) starts landing facts_digest ledger events most nights — see the script's
 # own docstring for the graceful-degradation design.
 # ============================================
@@ -1896,7 +1896,7 @@ python3 "$SCRIPT_HOME/day-open-budget-patch.py" \
 # 4.55. Priorities patch (deterministic — WP-484, pilot instruction 16.08: Day
 # Open must never fail to run because of a priorities discrepancy; the finding
 # belongs in the DayPlan itself, not as a commit-blocking exit 1). Writes into
-# «Требует внимания» while the section header is still guaranteed to exist
+# "Needs attention" while the section header is still guaranteed to exist
 # (before archive/sync can touch the file) — same slot pattern as 4.5 above.
 # Ported from the author pipeline (WP-529 F7): resolver-based interpreter, not
 # bare python3 — see _PATCH_PY above.
@@ -1923,7 +1923,7 @@ echo "=== 4.56. Close-error patch ==="
 # guard (WP-529 F7, peer consensus 2026-08-21-17): comparing HEAD..origin/main
 # only makes sense when such a remote ref exists. A template/offline install
 # without it is a NORMAL mode, not a pipeline error — diagnose to stderr and
-# move on, never non-zero, never a DayPlan «Требует внимания» entry.
+# move on, never non-zero, never a DayPlan "Needs attention" entry.
 # ============================================
 echo "=== 4.57. Version-check patch ==="
 if git -C "$DS_STRATEGY" remote get-url origin >/dev/null 2>&1 \
@@ -1950,7 +1950,7 @@ SYNC_WARN=$("$_PATCH_PY" "$SCRIPT_HOME/day-open-sync-banner-patch.py" \
   --marker "$SYNC_MARKER" --repo "$DS_STRATEGY" --print-text 2>/dev/null || true)
 
 # ============================================
-# 4.59. Multiplier backfill patch (deterministic — WP-484 Ф117, pilot decision
+# 4.59. Multiplier backfill patch (deterministic — WP-484 Phase 117, pilot decision
 # 18.08 + peer-session 2026-09-01-18-wp484-backlog-continue: wakatime-cli only
 # supports --today, so a Close that ran late or on a host without the CLI
 # leaves yesterday's multiplier honestly PENDING. This backfills it from the
@@ -1972,9 +1972,9 @@ else
 fi
 
 # ============================================
-# 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Ф2)
+# 4.6. Sync + archive stale DayPlans (moved ahead of Checks — WP-484 Phase 2)
 # BUGFIX (2026-07-13): this used to run in step 6, AFTER Checks (step 5) — but one of
-# the checks (day-open.checks.md «current/ без зависших DayPlan») hard-blocks commit
+# the checks (day-open.checks.md "current/ without stale DayPlans") hard-blocks commit
 # if any non-today DayPlan sits in current/. Archiving only after that check had
 # already failed meant the pipeline could never self-heal a leftover from a Day Close
 # that ran late or incompletely: the one mechanism able to fix the condition always
@@ -2061,7 +2061,7 @@ if [ "$PROBE" != "true" ] && [ "$SCAFFOLD_ONLY" != "true" ]; then
 fi
 
 # ============================================
-# 4.8. Extension graph — "after" hooks (WP-529 Ф11)
+# 4.8. Extension graph — "after" hooks (WP-529 Phase 11)
 # ============================================
 # Same mechanism and failure semantics as the "before" hook at the top of
 # this script (see its comment) — runs after DayPlan generation/patches, so

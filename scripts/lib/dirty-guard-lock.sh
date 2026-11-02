@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# dirty-guard-lock.sh -- the repository lock of the guard scripts, in ONE place (WP-530 Ф81 remainder; peer session 2026-10-02-01
+# dirty-guard-lock.sh -- the repository lock of the guard scripts, in ONE place (WP-530 Phase 81 remainder; peer session 2026-10-02-01
 # with Kimi and Codex). SOURCED by git-dirty-guard.sh, canon-refresh.sh, canon-reconcile.sh, canon-reconcile-published.sh and
-# sync-strategy-files.sh, never executed. The code is the lock section that Ф81 wrote inside canon-reconcile-published.sh, moved here
+# sync-strategy-files.sh, never executed. The code is the lock section that Phase 81 wrote inside canon-reconcile-published.sh, moved here
 # so that the five scripts share it; the protocol is the same: $GIT_DIR/dirty-guard.lock is a directory and its file "owner" holds
 # node=, pid=, epoch=, token= and script=. The name of the host is written as node=, NOT host=, on purpose (see "Old and new guards").
 #
@@ -38,7 +38,7 @@
 # DGLOCK_LIB_READY=1 is the last line of this file: a file that was cut short while it was being delivered does not set it (the guard unsets it
 # BEFORE the source, so that a value left in the environment cannot vouch for a cut file).
 #
-# The takeover rule (WP-530 Ф81): a lock is taken over ONLY when its owner is PROVEN gone, that is when the builtin kill -0 answers
+# The takeover rule (WP-530 Phase 81): a lock is taken over ONLY when its owner is PROVEN gone, that is when the builtin kill -0 answers
 # "No such process" AND one successful listing of all processes (ps -A) holds this very run and pid 1 and not the pid. NOT proof: a
 # missing, empty, unreadable or damaged owner file, another host name, a pid whose state cannot be established (ps fails, kill answers
 # anything else), and a pid that is ALIVE (a number handed to another process looks exactly like that: the lock stays and the reason says

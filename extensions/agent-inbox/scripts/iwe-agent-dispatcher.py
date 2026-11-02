@@ -45,7 +45,7 @@ import sys
 import time
 from pathlib import Path
 
-# WP-436 Ф1 gate integration: single-writer classify_and_log routes + logs in one call.
+# WP-436 Phase 1 gate integration: single-writer classify_and_log routes + logs in one call.
 sys.path.insert(0, str(Path(__file__).parent))
 from gate_launch_usage import LaunchUsage, PipeCapture, drain_after_exit, kill_owned_process
 
@@ -55,25 +55,25 @@ try:
 except ImportError:
     _GATE_AVAILABLE = False
 
-# === Конфигурация (можно переопределить через env vars или CLI args) ===
-GOV_REPO_URL = os.environ.get("IWE_DISPATCHER_REPO_URL", "")  # обязательно задать через env
+# === Configuration (can be overridden via env vars or CLI args) ===
+GOV_REPO_URL = os.environ.get("IWE_DISPATCHER_REPO_URL", "")  # must be set via env
 GOV_BRANCH = os.environ.get("IWE_DISPATCHER_REPO_BRANCH", "main")
 LOCK_FILE = os.environ.get("IWE_DISPATCHER_LOCK_FILE", "/tmp/iwe-agent-dispatcher.lock")
 LOCK_TTL_MIN = int(os.environ.get("IWE_DISPATCHER_LOCK_TTL_MIN", "50"))
 MODEL_DEFAULT = os.environ.get("IWE_DISPATCHER_MODEL_DEFAULT", "sonnet")
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("IWE_DISPATCHER_CLAUDE_TIMEOUT_SEC", "1800"))
 
-# WP-7 TGSH (2026-05-30): heartbeat в event-gateway для session-mode.
-# Каждые HEARTBEAT_INTERVAL_SEC dispatcher publish session.heartbeat → бот edits "⏳ Работаю..." с счётчиком.
+# WP-7 TGSH (2026-05-30): heartbeat to event-gateway for session-mode.
+# Every HEARTBEAT_INTERVAL_SEC the dispatcher publishes session.heartbeat -> the bot edits "⏳ Работаю..." with a counter.
 HEARTBEAT_INTERVAL_SEC = int(os.environ.get("IWE_DISPATCHER_HEARTBEAT_INTERVAL_SEC", "15"))
-# WP-358 follow-up Ф3a (2026-05-30): inline Python POST в event-gateway (без shell-обёртки).
-# Зависимости только из stdlib — нужно для Y.2 deploy без локального клона репо.
+# WP-358 follow-up Phase 3a (2026-05-30): inline Python POST to event-gateway (no shell wrapper).
+# Stdlib-only dependencies -- needed for Y.2 deploy without a local repo clone.
 IWE_EVENT_GATEWAY_URL = os.environ.get(
     "IWE_EVENT_GATEWAY_URL", "https://event-gateway.aisystant.workers.dev"
 )
 IWE_OWNER_ORY_UUID = os.environ.get("IWE_OWNER_ORY_UUID", "")
 
-# WP-428 Ф6 mid-session control: sentinel returned by invoke_claude_with_heartbeat
+# WP-428 Phase 6 mid-session control: sentinel returned by invoke_claude_with_heartbeat
 # when the pilot issued /stop or /cancel via the event-gateway command channel.
 _STOPPED_BY_USER = "STOPPED_BY_USER"
 _STOP_ACTIONS = frozenset(("stop", "cancel"))
@@ -81,10 +81,10 @@ _STOP_ACTIONS = frozenset(("stop", "cancel"))
 COMMIT_AUTHOR_NAME = os.environ.get("IWE_DISPATCHER_AUTHOR_NAME", "IWE Agent Dispatcher")
 COMMIT_AUTHOR_EMAIL = os.environ.get("IWE_DISPATCHER_AUTHOR_EMAIL", "noreply@example.com")
 
-# WP-358 follow-up Ф3 (2026-05-30): Y.2 deploy — stateless dispatcher на удалённом сервере.
-# При наличии GITHUB_TOKEN session-mode использует GitHub Contents API (read) +
-# Git Data API (atomic write blob+tree+commit+ref). Без TOKEN — fallback на старый
-# stateful session-mode через локальный клон (--workdir обязателен).
+# WP-358 follow-up Phase 3 (2026-05-30): Y.2 deploy -- stateless dispatcher on a remote server.
+# When GITHUB_TOKEN is present, session-mode uses the GitHub Contents API (read) +
+# Git Data API (atomic write blob+tree+commit+ref). Without TOKEN -- fallback to the old
+# stateful session-mode via a local clone (--workdir is required).
 IWE_DISPATCHER_GITHUB_TOKEN = os.environ.get("IWE_DISPATCHER_GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
 IWE_DISPATCHER_GITHUB_REPO = os.environ.get("IWE_DISPATCHER_GITHUB_REPO", "your-username/your-governance-repo")
 IWE_DISPATCHER_GITHUB_BRANCH = os.environ.get("IWE_DISPATCHER_GITHUB_BRANCH", "main")
@@ -94,10 +94,10 @@ IWE_DISPATCHER_ETAG_DB = os.path.expanduser(
 
 # Version self-check — see _check_dispatcher_version().
 __version__ = "2026-05-30-y2-1"
-# WP-503 Ф5.2 Security pre-flight (2026-07-26): PII-filter + shell-injection guard
+# WP-503 Phase 5.2 Security pre-flight (2026-07-26): PII-filter + shell-injection guard
 _SECURITY_VERSION = "2026-08-06-security-2"
 
-# === Security: PII-filter + shell-injection guard (WP-503 Ф5.2) ===
+# === Security: PII-filter + shell-injection guard (WP-503 Phase 5.2) ===
 # See also: WP-500 (agent-trace-recorder.sh) for similar PII-masking pattern.
 
 # PII blocking patterns (Security Gate B7.3)
@@ -166,7 +166,7 @@ def build_safe_digest(task_id: str, output: str, fm: dict, max_len: int = 200) -
 
     return digest
 
-# === Утилиты ===
+# === Utilities ===
 
 def now_utc() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
@@ -187,8 +187,8 @@ def run(cmd: list[str], cwd: Path | None = None, check: bool = True,
     )
 
 
-# === Frontmatter parser (минимальный) ===
-# Поддержка:
+# === Frontmatter parser (minimal) ===
+# Supports:
 #   key: scalar
 #   key:
 #     nested_key: value
@@ -215,19 +215,19 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
         indent = len(raw_line) - len(raw_line.lstrip())
         line = raw_line.lstrip()
 
-        # Pop stack до текущего отступа
+        # Pop stack to the current indent
         while stack and indent < stack[-1][0]:
             stack.pop()
 
         parent_indent, parent, parent_key = stack[-1]
 
-        # Item списка
+        # List item
         if line.startswith("- "):
             value = parse_scalar(line[2:].strip())
             if isinstance(parent, list):
                 parent.append(value)
             else:
-                # parent ещё dict, переключаем родителя на list
+                # parent is still a dict, switch the parent to a list
                 if parent_key and isinstance(parent.get(parent_key), list):
                     parent[parent_key].append(value)
                 else:
@@ -240,17 +240,17 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
             key = key.strip()
             val = val.strip()
             if val == "":
-                # Nested block следует
-                # Заглядываем, что начнётся — список (- item) или dict
-                # Создаём оба варианта lazy через placeholder, но проще:
-                # сначала dict, при первом `- ` переключаем на list
+                # A nested block follows
+                # Peek at what starts next -- a list (- item) or a dict
+                # Create both variants lazily via a placeholder, but simpler:
+                # dict first, switch to list on the first `- `
                 placeholder: dict = {}
                 if isinstance(parent, dict):
                     parent[key] = placeholder
                 else:
                     raise ValueError(f"Cannot nest under list at: {line}")
                 stack.append((indent + 2, placeholder, key))
-                # для возможности list-переключения помечаем
+                # mark to allow switching to a list
                 _maybe_promote_list_next(stack, parent, key)
             else:
                 value = parse_scalar(val)
@@ -262,11 +262,11 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
 
         raise ValueError(f"Unparsed line: {raw_line!r}")
 
-    # Post-process: dict с только списочными элементами стоит сразу — мы их и так
-    # обрабатывали. Но проще: пройдёмся и сконвертируем dict, у которых
-    # все элементы добавлены через "- " (мы не различали) — пропускаем,
-    # парсер выше уже обрабатывает item списка как append к parent dict с
-    # placeholder, что не так. Упростим: переписать как двухпроходный парсер.
+    # Post-process: a dict with only list items stands immediately -- we already
+    # handled those. But simpler: walk through and convert dicts whose
+    # elements were all added via "- " (we did not distinguish) -- skip,
+    # the parser above already treats a list item as an append to the parent dict with
+    # a placeholder, which is wrong. Simplify: rewrite as a two-pass parser.
 
     return data, body
 
@@ -308,7 +308,7 @@ def parse_scalar(s: str):
     return s
 
 
-# Двухпроходный фронтматер-парсер (на случай если выше глючит на списках):
+# Two-pass frontmatter parser (in case the above misbehaves on lists):
 
 def parse_frontmatter_v2(text: str) -> tuple[dict, str]:
     """Простой парсер frontmatter — двухпроходный, толерантный к ошибкам."""
@@ -456,7 +456,7 @@ def ensure_workdir(workdir: Path) -> None:
         (repo_dir / ".git" / "index.lock").unlink(missing_ok=True)
         run(["git", "fetch", "origin", GOV_BRANCH], cwd=repo_dir, timeout=60)
         # Re-check right before the destructive op — closes the TOCTOU window
-        # left by only checking once at function entry (WP-7 Ф73).
+        # left by only checking once at function entry (WP-7 Phase 73).
         _guard_repo_dir_is_isolated(repo_dir)
         run(["git", "reset", "--hard", f"origin/{GOV_BRANCH}"], cwd=repo_dir,
             timeout=30)
@@ -523,7 +523,7 @@ def find_pending_tasks(repo_dir: Path, filter_id: str | None = None) -> list[Pat
         except Exception as e:
             log(f"Не парсится frontmatter {f.name}: {e}", "WARN")
             continue
-        # process-run cards (WP-482 Ф3) already miss this TASK-*.md glob by naming
+        # process-run cards (WP-482 Phase 3) already miss this TASK-*.md glob by naming
         # convention; this check makes that an invariant, not just a filename habit,
         # in case the glob is ever widened for an unrelated reason.
         if fm.get("kind") == "process-run":
@@ -565,7 +565,7 @@ def update_task_frontmatter(task_path: Path, updates: dict) -> None:
                 continue
         new_lines.append(line)
 
-    # Добавить новые ключи в конец
+    # Add new keys at the end
     for k, v in updates.items():
         if k not in handled_keys:
             new_lines.append(f"{k}: {_yaml_repr(v)}")
@@ -595,9 +595,9 @@ def build_prompt(task_path: Path, repo_dir: Path) -> str:
         raise FileNotFoundError(f"Template not found: {template_path}")
     template_text = template_path.read_text()
 
-    # Extract prompt section from template (между ```...``` под "## Промпт").
-    # Используем "первый открывающий ``` после ## Промпт" + "последний ``` в файле".
-    # Это позволяет промпту содержать nested code blocks.
+    # Extract prompt section from template (between ```...``` under "## Промпт").
+    # We use "the first opening ``` after ## Промпт" + "the last ``` in the file".
+    # This allows the prompt to contain nested code blocks.
     header_idx = template_text.find("## Промпт")
     if header_idx < 0:
         raise ValueError(f"Template {template_name}: нет секции '## Промпт'")
@@ -615,7 +615,7 @@ def build_prompt(task_path: Path, repo_dir: Path) -> str:
     params = fm.get("params", {})
     if isinstance(params, dict):
         for k, v in params.items():
-            # Поддержка {{section_number:02d}}
+            # Support for {{section_number:02d}}
             for match in re.finditer(rf"\{{\{{{re.escape(k)}(?::([^}}]+))?\}}\}}", prompt_raw):
                 fmt = match.group(1)
                 if fmt:
@@ -624,7 +624,7 @@ def build_prompt(task_path: Path, repo_dir: Path) -> str:
                     formatted = str(v)
                 prompt_raw = prompt_raw.replace(match.group(0), formatted)
 
-    # Add task body как контекст
+    # Add task body as context
     full_prompt = (
         f"# Контекст задачи\n\n"
         f"Это автоматическая задача из Agent Inbox (task_id: {fm.get('id')}).\n"
@@ -659,8 +659,8 @@ def invoke_claude(
     )
 
 
-# WP-358 follow-up Ф3a (2026-05-30): inline POST в event-gateway, без shell.
-# Source-of-truth контракта: DP.SC.044 (event-gateway envelope).
+# WP-358 follow-up Phase 3a (2026-05-30): inline POST to event-gateway, no shell.
+# Source-of-truth of the contract: DP.SC.044 (event-gateway envelope).
 _ACTIVITY_DOMAIN_MAP = {
     "session.heartbeat": "practice",
     "session.turn_completed": "practice",
@@ -678,7 +678,7 @@ def _emit_event(event_type: str, ext_suffix: str, payload: dict) -> None:
     import urllib.request as _urlreq
     import urllib.error as _urlerr
     try:
-        payload = dict(payload)  # copy, чтобы не мутировать caller
+        payload = dict(payload)  # copy, so as not to mutate the caller's dict
         if IWE_OWNER_ORY_UUID and "ory_uuid" not in payload:
             payload["ory_uuid"] = IWE_OWNER_ORY_UUID
         if "activity_domain" not in payload:
@@ -712,7 +712,7 @@ def _emit_event(event_type: str, ext_suffix: str, payload: dict) -> None:
         except Exception as exc:  # noqa: BLE001
             log(f"event_emit {event_type}: {type(exc).__name__}: {exc}", level="WARN")
     except Exception as exc:  # noqa: BLE001
-        # Никогда не блокируем dispatcher из-за event-gateway отказа.
+        # Never block the dispatcher because of an event-gateway failure.
         log(f"event_emit failed for {event_type}: {type(exc).__name__}", level="WARN")
 
 
@@ -738,7 +738,7 @@ def _poll_stop_command(session_id: str) -> bool:
         return False
 
 
-# Регэкспы для классификации Claude API failure modes (WP-7 TGSH8).
+# Regexes for classifying Claude API failure modes (WP-7 TGSH8).
 _USAGE_LIMIT_PATTERNS = re.compile(
     r"usage.{0,5}limit|regain.{0,5}access|exceeded.{0,15}quota|"
     r"rate.{0,5}limit|429|insufficient.{0,5}credit",
@@ -762,7 +762,7 @@ def _classify_claude_failure(stderr: str, stdout: str) -> str:
 
 
 # =============================================================================
-# Executor selection (WP-428 Ф5) — runtime factory for agentic session execution.
+# Executor selection (WP-428 Phase 5) — runtime factory for agentic session execution.
 # The bot writes `executor` into the SESSION meta; the dispatcher builds the
 # headless CLI command per runtime here. Adding a 4th runtime = new subclass +
 # one EXECUTORS entry, with no change to the invocation loop (anti-coupling
@@ -873,9 +873,9 @@ class KimiCliExecutor(Executor):
 
 
 # Registry of agentic runtimes reachable through the bot SESSION path.
-# Note: `hermes` is intentionally absent — in Ф5 it is a conversational
+# Note: `hermes` is intentionally absent — in Phase 5 it is a conversational
 # bot-side route to hermes_chat and never reaches the dispatcher. Full agentic
-# Hermes is a separate spin-off РП.
+# Hermes is a separate spin-off WP.
 EXECUTORS: dict[str, "Executor"] = {
     "claude": ClaudeCodeExecutor(),
     "kimi": KimiCliExecutor(),
@@ -945,7 +945,7 @@ def invoke_claude_with_heartbeat(
     usage.started()
     last_heartbeat = 0.0
     timed_out = False
-    stopped_by_user = False  # WP-428 Ф6 mid-session control
+    stopped_by_user = False  # WP-428 Phase 6 mid-session control
 
     capture = None
     try:
@@ -1069,7 +1069,7 @@ def _send_tg_alert(task_id: str, verdict: str, output: str) -> None:
     if not chat_id:
         log("TG_ALERT_CHAT_ID not set — skipping alert", "WARN")
         return
-    # WP-503 Ф5.2: use safe_digest instead of raw output excerpt
+    # WP-503 Phase 5.2: use safe_digest instead of raw output excerpt
     summary = build_safe_digest(task_id, output, {"verdict": verdict}, max_len=120)
     text = (
         f"🚨 Agent Inbox FAIL\n"
@@ -1138,11 +1138,11 @@ def _collect_extra_task_files(repo_dir: Path, exclude: set[Path]) -> list[Path]:
     safety-net не подхватывает — это принятое ограничение, не баг.
     """
     tasks_dir = repo_dir / "inbox" / "agent" / "tasks"
-    # -z: git не квотирует путь в кавычки/octal-escape для пробелов и non-ASCII
-    # (кириллица) — обычный --porcelain это делает, и построчный парсинг
-    # молча терял такие файлы (найдено ревью этой же пир-сессии). В -z формате
-    # rename/copy — это второе NUL-поле (ORIG_PATH) СЛЕДОМ за записью, не
-    # часть текста самой записи, поэтому спецкейс " -> " больше не нужен.
+    # -z: git does not quote the path or octal-escape spaces and non-ASCII
+    # (Cyrillic) -- plain --porcelain does that, and line-by-line parsing
+    # silently lost such files (found by review in this same peer session). In -z format
+    # rename/copy is a second NUL field (ORIG_PATH) FOLLOWING the entry, not
+    # part of the entry text itself, so the " -> " special case is no longer needed.
     cp = run(["git", "status", "--porcelain", "-z", "--untracked-files=all", "--", str(tasks_dir)],
              cwd=repo_dir, check=True)
 
@@ -1155,15 +1155,15 @@ def _collect_extra_task_files(repo_dir: Path, exclude: set[Path]) -> list[Path]:
         if len(record) < 4:
             continue
         status, rel = record[:2], record[3:]
-        if "R" in status:  # copy-detection выключен (нет --find-copies) — "C" сюда не приходит
-            i += 1  # ORIG_PATH — отдельное NUL-поле, нас интересует только новый путь
-        if "D" in status:  # удаления — не наша забота
+        if "R" in status:  # copy-detection is off (no --find-copies) -- "C" never comes here
+            i += 1  # ORIG_PATH is a separate NUL field; we only care about the new path
+        if "D" in status:  # deletions are not our concern
             continue
-        # Без .resolve(): repo_dir уже абсолютный (см. вызов в process_task), а
-        # commit_and_push() сам делает f.relative_to(repo_dir) без резолва
-        # симлинков (iwe-agent-dispatcher.py:467) — резолвить здесь и не резолвить
-        # там значило бы сравнивать разные представления одного пути (найдено
-        # ревью /verify этой же пир-сессии).
+        # Without .resolve(): repo_dir is already absolute (see the call in process_task), and
+        # commit_and_push() itself does f.relative_to(repo_dir) without resolving
+        # symlinks (iwe-agent-dispatcher.py:467) -- resolving here and not resolving
+        # there would compare different representations of the same path (found by
+        # the /verify review in this same peer session).
         candidate = repo_dir / rel
         if candidate.suffix.lower() != ".md" or candidate in exclude:
             continue
@@ -1175,7 +1175,7 @@ def _collect_extra_task_files(repo_dir: Path, exclude: set[Path]) -> list[Path]:
     return collected
 
 
-# === Главный цикл ===
+# === Main loop ===
 
 def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
     """Возвращает True если task была обработана (status изменился)."""
@@ -1207,7 +1207,7 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
         f"dispatch(WP-324): {task_id} pending→assigned via claude-cli-headless",
         [task_path])
 
-    # WP-436 Ф1 gate: classify+log via the single writer; reflex execution driven by catalog exec_kind
+    # WP-436 Phase 1 gate: classify+log via the single writer; reflex execution driven by catalog exec_kind
     _gate_out = None
     if _GATE_AVAILABLE:
         _gate_inp: GateInput = {
@@ -1305,18 +1305,18 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
         "verdict": domain_verdict or ("PASS" if ok else "UNKNOWN"),
     })
 
-    # WP-564 Ф3: подобрать то, что агент создал сам через Write и не закоммитил
-    # (см. docstring _collect_extra_task_files).
+    # WP-564 Phase 3: pick up what the agent created itself via Write and did not commit
+    # (see docstring of _collect_extra_task_files).
     try:
         extra_files = _collect_extra_task_files(repo_dir, exclude={task_path, result_path})
     except Exception as e:
-        # Не даём новому шагу уронить уже готовый completed/failed-коммит —
-        # откатываемся к поведению до Ф3 (только task_path+result_path), но
-        # громко, не молча (найдено /verify этой же пир-сессии).
+        # Do not let the new step bring down an already-ready completed/failed commit --
+        # fall back to the pre-Phase 3 behavior (only task_path+result_path), but
+        # loudly, not silently (found by /verify in this same peer session).
         log(f"safety-net: git status упал, extra_files пропущены: {e}", "WARN")
         extra_files = []
-    # Лог всегда, не только при extra_files>0 — иначе "агент ничего не оставил"
-    # неотличимо от "safety-net не отработал/упал" (риск найден Kimi, ход 4).
+    # Always log, not only when extra_files>0 -- otherwise "the agent left nothing"
+    # is indistinguishable from "safety-net did not run/crashed" (risk found by Kimi, turn 4).
     log(f"safety-net: extra_files={len(extra_files)} в inbox/agent/tasks/", "DEBUG")
 
     commit_and_push(repo_dir,
@@ -1327,13 +1327,13 @@ def process_task(task_path: Path, repo_dir: Path, dry_run: bool) -> bool:
 
 
 def _agent_to_model(agent: str) -> str:
-    # WP-366 Ф4.C+D ч.2: dispatcher = Claude-only runtime by design.
-    # Agent Inbox задачи агентские (tool-use: читают репо, пишут RESULT, коммитят),
-    # поэтому плоский OpenRouter /chat/completions их НЕ исполняет. Дешёвая OR-миграция
-    # агентских задач = отдельный OR-tool-use-loop (backlog, триггер >=1000 calls/day).
-    # Не-Claude значения agent (kimi/gpt/gemini/...) не имеют серверного backend здесь —
-    # раньше они МОЛЧА коэрсились в MODEL_DEFAULT. Теперь fallback громкий (structured WARN),
-    # чтобы логи/пилот не врали о том, кто и на чём исполняется.
+    # WP-366 Phase 4.C+D part 2: dispatcher = Claude-only runtime by design.
+    # Agent Inbox tasks are agentic (tool-use: read the repo, write RESULT, commit),
+    # so the flat OpenRouter /chat/completions does NOT execute them. A cheap OR migration
+    # of agentic tasks = a separate OR tool-use loop (backlog, trigger >=1000 calls/day).
+    # Non-Claude agent values (kimi/gpt/gemini/...) have no server backend here --
+    # previously they were SILENTLY coerced to MODEL_DEFAULT. Now the fallback is loud (structured WARN),
+    # so that logs/the pilot do not lie about who runs on what.
     if "opus" in agent:
         return "opus"
     if "sonnet" in agent:
@@ -1373,12 +1373,12 @@ def main():
 
     try:
         if args.mode == "session":
-            # WP-358 follow-up Ф3 (2026-05-30): Y.2 stateless через GitHub API
-            # активируется наличием GITHUB_TOKEN или явным --use-api. Fallback —
-            # старая stateful реализация через локальный клон (требует --workdir).
+            # WP-358 follow-up Phase 3 (2026-05-30): Y.2 stateless via GitHub API
+            # activated by the presence of GITHUB_TOKEN or an explicit --use-api. Fallback --
+            # the old stateful implementation via a local clone (requires --workdir).
             use_api = args.use_api or bool(IWE_DISPATCHER_GITHUB_TOKEN)
             if use_api:
-                _check_dispatcher_version()  # WARN при drift'е версии
+                _check_dispatcher_version()  # WARN on version drift
                 session_mode_main_api(args.dry_run)
             else:
                 if args.workdir is None:
@@ -1415,7 +1415,7 @@ def main():
 
 
 # =============================================================================
-# SESSION MODE (--mode session, WP-358 Ф2, DP.SC.162)
+# SESSION MODE (--mode session, WP-358 Phase 2, DP.SC.162)
 # =============================================================================
 # See: PACK-digital-platform/.../08-service-clauses/DP.SC.162-external-session-request.md
 #      inbox/agent/sessions/SPEC.md
@@ -1440,7 +1440,7 @@ TURN_RESERVATION_TTL_MIN = int(os.environ.get("IWE_DISPATCHER_TURN_RESERVATION_T
 _SESSION_ID_RE = re.compile(r'^SESSION-[A-Za-z0-9-]+$')
 
 _TURN_HEADER_RE = re.compile(
-    r"^\[turn:(\d+),\s*role:([\w-]+)"  # WP-428 Ф5: role = pilot | claude | kimi | hermes | …
+    r"^\[turn:(\d+),\s*role:([\w-]+)"  # WP-428 Phase 5: role = pilot | claude | kimi | hermes | …
     r"(?:,\s*tg_msg_id:(\d+))?"
     r"(?:,\s*ts:([^\]]+))?\]$"
 )
@@ -1496,10 +1496,10 @@ def _is_turn_processed(conn: sqlite3.Connection, session_id: str, turn_n: int) -
 
 
 def _mark_turn_processed(conn: sqlite3.Connection, session_id: str, turn_n: int) -> None:
-    # WP-5 Ф-21 hotfix (peer-session 2026-05-30-41 consensus):
-    # Explicit column list — БД на диске может иметь legacy колонки
-    # (commit_sha, committed_at) от предыдущей миграции. Implicit VALUES
-    # упадёт с OperationalError «table has 5 columns but 3 values were supplied».
+    # WP-5 Phase -21 hotfix (peer-session 2026-05-30-41 consensus):
+    # Explicit column list -- the on-disk DB may have legacy columns
+    # (commit_sha, committed_at) from a previous migration. Implicit VALUES
+    # would fail with OperationalError «table has 5 columns but 3 values were supplied».
     conn.execute(
         "INSERT OR IGNORE INTO processed_turns (session_id, turn_n, processed_at) VALUES (?,?,?)",
         (session_id, turn_n, now_utc().isoformat()),
@@ -1608,7 +1608,7 @@ def _build_session_prompt(session_id: str, tg_chat_id: int,
 
     latest = next(t for t in turns if t["n"] == new_turn_n)
 
-    # WP-428 Ф5: identity follows the actual runtime, not a hardcoded "Claude Code"
+    # WP-428 Phase 5: identity follows the actual runtime, not a hardcoded "Claude Code"
     # (a kimi run that is told "you are Claude Code" is a false-green smoke).
     agent_label = {"claude": "Claude Code", "kimi": "Kimi",
                    "hermes": "Hermes"}.get(executor, executor)
@@ -1693,7 +1693,7 @@ def _update_session_meta(repo_dir: Path, session_id: str, updates: dict) -> Path
     return meta_path
 
 
-# -------- Ф6 audit-trail (WP-428) --------
+# -------- Phase 6 audit-trail (WP-428) --------
 # Append-only, machine-readable journal of agent actions, co-located with the
 # SESSION files in the pilot's repo (their trust boundary, NOT Telegram —
 # Security Gate B7.3 invariant 2). Distinct from `_emit_event` (the remote
@@ -1816,7 +1816,7 @@ def _process_session_turn(
         log(f"Turn {turn_n} already processed — skip")
         return False
 
-    # WP-428 Ф5: runtime chosen by the bot, carried in SESSION meta `executor`.
+    # WP-428 Phase 5: runtime chosen by the bot, carried in SESSION meta `executor`.
     executor_key = fm.get("executor") or DEFAULT_EXECUTOR
     executor_name = resolve_executor(executor_key).name  # actual runtime: prompt + audit role
 
@@ -1829,12 +1829,12 @@ def _process_session_turn(
 
     _heartbeat_ping(db_conn, session_id)
 
-    # Ф6 audit-trail: record the dispatch and outcome of this agent turn.
+    # Phase 6 audit-trail: record the dispatch and outcome of this agent turn.
     audit_events = [_audit_build(session_id, executor_name, "turn_dispatch",
                                  turn_n=turn_n)]
 
     started_at = now_utc()
-    # WP-7 TGSH4/TGSH8: heartbeat в event-gateway каждые HEARTBEAT_INTERVAL_SEC + usage_limit classification.
+    # WP-7 TGSH4/TGSH8: heartbeat to event-gateway every HEARTBEAT_INTERVAL_SEC + usage_limit classification.
     ok, output = invoke_claude_with_heartbeat(
         prompt, MODEL_DEFAULT, session_id=session_id, turn_n=turn_n, repo_dir=repo_dir,
         executor_key=executor_key,
@@ -1842,13 +1842,13 @@ def _process_session_turn(
     finished_at = now_utc()
     log(f"agent done executor={executor_key} ok={ok} dur={(finished_at-started_at).total_seconds():.0f}s")
 
-    # WP-428 Ф6: pilot issued /stop or /cancel — abort without writing a response.
+    # WP-428 Phase 6: pilot issued /stop or /cancel — abort without writing a response.
     if not ok and output == _STOPPED_BY_USER:
         return _handle_session_stop(
             repo_dir, session_id, executor_name, audit_events,
             db_conn, tg_chat_id, turn_n)
 
-    # Ф6 audit-trail: capture what the agent touched (before the reset-hard sync
+    # Phase 6 audit-trail: capture what the agent touched (before the reset-hard sync
     # in the push loop below discards uncommitted working-tree changes) and the
     # turn outcome.
     _porcelain = subprocess.run(
@@ -1896,7 +1896,7 @@ def _process_session_turn(
             "status": "active" if ok else "failed",
         })
 
-        # Ф6: append this turn's audit events (fresh on top of the just-reset
+        # Phase 6: append this turn's audit events (fresh on top of the just-reset
         # base) and include the audit log in the turn commit, so it survives the
         # reset-hard sync above and reaches the pilot's repo.
         audit_file = _audit_append(repo_dir, session_id, audit_events)
@@ -1960,7 +1960,7 @@ def _find_pending_session_turns(
         if fm.get("status") not in ("active", "pending"):
             continue
 
-        # WP-428 Ф6: tombstone written by _handle_session_stop → do not re-process.
+        # WP-428 Phase 6: tombstone written by _handle_session_stop → do not re-process.
         if fm.get("stop_requested"):
             log(f"Session {fm.get('session_id', meta_file.stem)} has stop_requested tombstone — skip")
             continue
@@ -2058,15 +2058,15 @@ def session_mode_main(workdir: Path, dry_run: bool) -> None:
 
 
 # =============================================================================
-# SESSION MODE — Y.2 API IMPLEMENTATION (WP-358 follow-up Ф3, 2026-05-30)
+# SESSION MODE — Y.2 API IMPLEMENTATION (WP-358 follow-up Phase 3, 2026-05-30)
 # =============================================================================
-# Архитектура Y′ + Y.2 (peer-session 2026-05-30-36-dispatcher-unification-cleanup):
-#   - Read: GitHub Contents API + ETag conditional polling (304 не считается в rate-limit).
+# Architecture Y′ + Y.2 (peer-session 2026-05-30-36-dispatcher-unification-cleanup):
+#   - Read: GitHub Contents API + ETag conditional polling (304 does not count against the rate limit).
 #   - Write: GitHub Git Data API (blob → tree → commit → ref) — atomic commit thread+meta
-#     без локального клона. Retry-on-422 (non-fast-forward) — first-class.
-#   - Deploy: dispatcher.py выкатывается на удалённый сервер через scp/CI без локального клона репо.
+#     without a local clone. Retry-on-422 (non-fast-forward) — first-class.
+#   - Deploy: dispatcher.py is rolled out to the remote server via scp/CI without a local repo clone.
 #   - Heartbeat: inline _emit_event (stdlib).
-#   - ETag cache: SQLite на удалённом сервере (~/.iwe/dispatcher-etags.db).
+#   - ETag cache: SQLite on the remote server (~/.iwe/dispatcher-etags.db).
 # See: sessions/2026-05/2026-05-30-36-dispatcher-unification-cleanup/report.md §4.
 import hashlib
 
@@ -2318,7 +2318,7 @@ def _gh_atomic_commit(
         new_commit_sha = parsed.get("sha")
 
         # 6. Ref update — fast-forward only (force=false).
-        # 422 non-fast-forward = другой writer commit'нулся между нашими шагами 1 и 6 — retry.
+        # 422 non-fast-forward = another writer committed between our steps 1 and 6 — retry.
         status, parsed, _ = _gh_request(
             "PATCH",
             f"/repos/{IWE_DISPATCHER_GITHUB_REPO}/git/refs/heads/{IWE_DISPATCHER_GITHUB_BRANCH}",
@@ -2455,7 +2455,7 @@ def _process_session_turn_api(
         log(f"Skip {session_id} turn {turn_n}: last turn role is not pilot", "INFO")
         return False
 
-    # WP-428 Ф5: runtime chosen by the bot, carried in SESSION meta `executor`.
+    # WP-428 Phase 5: runtime chosen by the bot, carried in SESSION meta `executor`.
     executor_key = fm.get("executor") or DEFAULT_EXECUTOR
     executor_name = resolve_executor(executor_key).name  # actual runtime: prompt + audit role
 
@@ -2476,7 +2476,7 @@ def _process_session_turn_api(
     finished_at = now_utc()
     log(f"agent done executor={executor_key} ok={ok} dur={(finished_at - started_at).total_seconds():.0f}s")
 
-    # WP-428 Ф6: pilot issued /stop or /cancel — write tombstone in API mode too.
+    # WP-428 Phase 6: pilot issued /stop or /cancel — write tombstone in API mode too.
     if not ok and output == _STOPPED_BY_USER:
         return _handle_session_stop(
             repo_dir, session_id, executor_name, [],
@@ -2569,7 +2569,7 @@ def session_mode_main_api(dry_run: bool) -> None:
     etag_conn = _gh_etag_db()
     db_conn = _get_session_db()
     try:
-        # 1. List sessions dir с ETag conditional polling.
+        # 1. List sessions dir with ETag conditional polling.
         changed, items = _gh_list_sessions_dir(etag_conn)
         if not changed:
             log("Sessions dir not modified (304) — nothing to do")

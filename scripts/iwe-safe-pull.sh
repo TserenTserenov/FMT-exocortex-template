@@ -78,7 +78,7 @@ query_guard() {
   # agent "potentially stale". A dirty shared checkout under parallel agent
   # sessions is normal work, not an incident for the pilot: 9 of 13 Telegram
   # alerts on 2026-09-02 were this path, one per dirty repo per new session
-  # (WP-538 Ф4). Callers that do want the pilot told (e.g. a server-side git
+  # (WP-538 Phase 4). Callers that do want the pilot told (e.g. a server-side git
   # sync job, day-open-pipeline) keep their own guard invocation and alert policy.
   GIT_DIRTY_GUARD_TG_ALERTS=false \
     GIT_DIRTY_GUARD_REQUIRE_FETCH=true \

@@ -1,28 +1,28 @@
 #!/bin/bash
-# day-open-smoke.sh — core smoke для Day Open (≤10с)
-# see: peer-сессия 2026-05-30-07-gap-list-day-open подэтап 2
+# day-open-smoke.sh — core smoke for Day Open (≤10s)
+# see: peer session 2026-05-30-07-gap-list-day-open sub-stage 2
 # see: WP-356 «Pipeline Day Open: auto-run checks»
 #
-# Назначение: быстрая проверка здоровья ключевых подсистем для светофора DayPlan.
-# Только быстрые операции (≤2с каждая, суммарно ≤10с).
-# Расширенные проверки → day-open-smoke-extended.sh (hourly cron + кэш).
+# Purpose: a quick health check of key subsystems for the DayPlan traffic light.
+# Quick operations only (≤2s each, ≤10s total).
+# Extended checks → day-open-smoke-extended.sh (hourly cron + cache).
 #
-# Вывод: JSON в stdout, одна строка с полями:
+# Output: JSON to stdout, one line with the fields:
 #   scheduler_pulse: "ok" | "stale:<days>d" | "missing"
 #   ke_count: <int>
 #   ke_oldest_days: <int>
 #   elapsed_sec: <float>
 #
-# Использование:
+# Usage:
 #   bash day-open-smoke.sh
-#   bash day-open-smoke.sh --human   # формат для светофора DayPlan
+#   bash day-open-smoke.sh --human   # format for the DayPlan traffic light
 #
-# Зависимости:
-#   - python3 (для JSON)
-#   - ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/extraction-reports/ (для KE-count)
+# Dependencies:
+#   - python3 (for JSON)
+#   - ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/extraction-reports/ (for the KE count)
 #   - ~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/.scheduler-last-run (primary scheduler pulse)
 #
-# Failure mode: любая проверка возвращает sentinel ("missing" / -1), не падает.
+# Failure mode: any check returns a sentinel ("missing" / -1), does not crash.
 
 set -uo pipefail
 
@@ -35,7 +35,7 @@ HUMAN_MODE=false
 IWE_BASE="${IWE_BASE:-$HOME/IWE}"
 DS_STRATEGY="$IWE_BASE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
-# === 1. Scheduler pulse (primary: локальный файл, fallback: статус launchctl) ===
+# === 1. Scheduler pulse (primary: local file, fallback: launchctl status) ===
 scheduler_pulse() {
   local pulse_file="$DS_STRATEGY/current/.scheduler-last-run"
   if [ -f "$pulse_file" ]; then
@@ -53,7 +53,7 @@ scheduler_pulse() {
     fi
   else
     # Fallback: launchd (macOS) / systemd --user (Linux) via iwe_scheduler_active
-    # (lib/common.sh) — WP-5 Ubuntu-audit факт #4: the bare launchctl call always
+    # (lib/common.sh) — WP-5 Ubuntu-audit fact #4: the bare launchctl call always
     # read "missing" on Linux.
     if iwe_scheduler_active; then
       echo "registered-no-pulse"
@@ -63,7 +63,7 @@ scheduler_pulse() {
   fi
 }
 
-# === 2. KE-очередь (count + oldest) ===
+# === 2. KE queue (count + oldest) ===
 ke_stats() {
   local ke_dir="$DS_STRATEGY/inbox/extraction-reports"
   if [ ! -d "$ke_dir" ]; then
@@ -110,7 +110,7 @@ END_TS=$(date +%s)
 ELAPSED=$(( END_TS - START_TS ))
 
 if [ "$HUMAN_MODE" = "true" ]; then
-  # Формат для светофора DayPlan
+  # Format for the DayPlan traffic light
   case "$SCHED" in
     ok)               sched_emoji="🟢"; sched_desc="scheduler-pulse свежий (<26h)" ;;
     registered-no-pulse) sched_emoji="🟡"; sched_desc="scheduler зарегистрирован, но нет локального pulse-файла" ;;
@@ -133,7 +133,7 @@ if [ "$HUMAN_MODE" = "true" ]; then
   echo "| KE-очередь | $ke_emoji | $KE_COUNT отчётов, oldest ${KE_OLDEST}д |"
   echo "| Core smoke elapsed | — | ${ELAPSED}s |"
 else
-  # JSON для машинного потребления
+  # JSON for machine consumption
   cat <<EOF
 {"scheduler_pulse":"$SCHED","ke_count":$KE_COUNT,"ke_oldest_days":$KE_OLDEST,"elapsed_sec":$ELAPSED}
 EOF

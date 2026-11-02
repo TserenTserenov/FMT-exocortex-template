@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # routing: helper  skill=validate-template
-# check-changelog-entry.sh — гейт заметок выпуска (WP-529, 29.09.2026).
+# check-changelog-entry.sh — release-notes gate (WP-529, 29.09.2026).
 #
-# Проверяет, что PR добавил в секцию [Unreleased] CHANGELOG.md хотя бы одну
-# запись-пункт "- ..." под заголовком подраздела "### ..." со ссылкой на номер
-# этого PR ("#<номер>"). Запись вне [Unreleased] (например, в уже выпущенной
-# секции) или без ссылки на PR не засчитывается: иначе гейт проходил бы от
-# косметической правки (P1: проверка наблюдаемого результата).
+# Checks that the PR added to the [Unreleased] section of CHANGELOG.md at least one
+# list entry "- ..." under a subsection heading "### ..." with a reference to the number of
+# this PR ("#<number>"). An entry outside [Unreleased] (e.g. in an already released
+# section) or without a PR reference does not count: otherwise the gate would pass on
+# a cosmetic edit (P1: checking an observable result).
 #
-# Использование:
+# Usage:
 #   bash check-changelog-entry.sh <base-sha> <head-sha> <pr-number>
-# Выход: 0 - запись есть; 1 - записи нет (причина в stdout); 2 - ошибка вызова.
+# Exit: 0 - entry exists; 1 - no entry (reason in stdout); 2 - invocation error.
 
 set -uo pipefail
 
@@ -20,7 +20,7 @@ if [[ -z "$base" || -z "$head" || ! "$pr" =~ ^[0-9]+$ ]]; then
     exit 2
 fi
 
-# Пункты секции [Unreleased] на указанном коммите: "<подраздел>\t<пункт>".
+# Items of the [Unreleased] section at the given commit: "<subsection>\t<item>".
 unreleased_entries() {
     git show "$1:CHANGELOG.md" 2>/dev/null | awk '
         /^## \[/ { in_unreleased = ($0 ~ /^## \[Unreleased\]/); heading = ""; next }
@@ -33,7 +33,7 @@ unreleased_entries() {
 base_entries=$(unreleased_entries "$base")
 head_entries=$(unreleased_entries "$head")
 
-# Добавленные пункты: есть на head, нет на base (построчно, порядок не важен).
+# Added items: present on head, absent on base (line by line, order does not matter).
 added=$(comm -13 <(printf '%s\n' "$base_entries" | sort) <(printf '%s\n' "$head_entries" | sort) | sed '/^$/d')
 
 if [[ -z "$added" ]]; then

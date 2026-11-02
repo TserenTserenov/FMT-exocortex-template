@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # routing: helper  skill=day-open  called-by=haiku  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# day-open-preflight.sh — pre-flight healthcheck для Day Open
-# WP-7 ФDay-Open-Hardening (DOC6 3-состояния: peer-session 2026-07-14-07)
-# Возвращает единый JSON: {"calendar":"ok|fail|pending|disabled","scout":"ok|fail|disabled|pending","scout_reason":"...",
+# day-open-preflight.sh — pre-flight healthcheck for Day Open
+# WP-7 Phase Day-Open-Hardening (DOC6 3 states: peer-session 2026-07-14-07)
+# Returns a single JSON: {"calendar":"ok|fail|pending|disabled","scout":"ok|fail|disabled|pending","scout_reason":"...",
 #   "triage":"ok|fail|disabled|pending","triage_reason":"...","memory":"ok|stale|missing"}
-# "disabled" = источник намеренно не настроен на этой машине (Scout/triage репо отсутствуют;
-#   календарь: params.yaml → calendar_source: none, issue #942).
-# "fail" = источник настроен, но данные не собрались (диагностика нужна).
+# "disabled" = the source is intentionally not configured on this machine (Scout/triage repos are absent;
+#   calendar: params.yaml → calendar_source: none, issue #942).
+# "fail" = the source is configured, but the data was not collected (diagnostics needed).
 
 set -uo pipefail
 
@@ -20,7 +20,7 @@ portable_date_offset() {
   date -v-"${days}"d +"$fmt" 2>/dev/null || date -d "$days days ago" +"$fmt" 2>/dev/null
 }
 
-# Загрузка Telegram credentials (если доступны)
+# Load Telegram credentials (if available)
 AIST_ENV="$HOME/.config/aist/env"
 if [ -f "$AIST_ENV" ]; then
   set -a
@@ -80,7 +80,7 @@ elif [ -n "$SCOUT_LOG" ]; then
   if [ "$LOG_DATE" = "$DATE" ]; then
     SCOUT_STATUS="ok"
   elif [ "$HAS_PENDING" = "false" ]; then
-    # Нет заданий в backlog — отсутствие лога = норма (Scout вышел с NO_TASKS)
+    # No tasks in the backlog — absence of a log is normal (Scout exited with NO_TASKS)
     SCOUT_STATUS="ok"
   else
     SCOUT_STATUS="fail"

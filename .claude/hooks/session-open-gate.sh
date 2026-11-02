@@ -1,11 +1,11 @@
 #!/bin/bash
 # Session Open Gate (PreToolUse, WP-561, 16.10.2026)
 #
-# Проблема, которую решает: session-guard.sh's own header claims "mechanical
+# Problem it solves: session-guard.sh's own header claims "mechanical
 # enforcement: git pre-commit hook checks for an active semaphore" — but the
 # live .git/hooks/pre-commit only runs syntax checks, never session-guard.sh.
 # A short/trivial session (explicitly exempt from the full WP Gate Ritual per
-# CLAUDE.md §2.1 — "тривиальный вопрос, исправление ≤15 мин") can escalate
+# CLAUDE.md §2.1 — "trivial question, fix ≤15 min") can escalate
 # into an actual file edit and `git commit` with zero open semaphore at all:
 # found live 16.10.2026, a question-only session committed+pushed a CLAUDE.md
 # edit directly to the frozen canonical checkout with no session-guard.sh open
@@ -23,7 +23,7 @@
 # as a real work product, so every edit must carry a real WP-N -- the one the
 # work actually belongs to, or a new one per the WP Entry Filter (S-47).
 #
-# Sessions with no WP at all (pilot decision 29.10.2026, WP-7 Ф274, option
+# Sessions with no WP at all (pilot decision 29.10.2026, WP-7 Phase 274, option
 # "entry without commits"): reading, research and reversible local checks need
 # no semaphore, this gate stays silent until commit/push. A commit needs a
 # session opened on a real WP. An umbrella tech-debt WP is fine only for work
@@ -43,7 +43,7 @@
 # an arbitrary unrelated commit.
 ALLOWED_HOUSEKEEPING_REASONS='^(day-open|day-close|week-close|month-close|update-delivery)$'
 # Scheduled runs of non-Claude agents, whole-value match: no trim, case-sensitive,
-# so `sched-1 extra`, a trailing space or a tab do not pass (WP-7 Ф274).
+# so `sched-1 extra`, a trailing space or a tab do not pass (WP-7 Phase 274).
 SCHED_HOUSEKEEPING_REASON='sched-[A-Za-z0-9._-]+'
 #
 # What this gate does NOT do: it does not require the semaphore to live in the
@@ -53,9 +53,9 @@ SCHED_HOUSEKEEPING_REASON='sched-[A-Za-z0-9._-]+'
 # PreToolUse only observes the top-level Bash tool call, same limitation
 # close-runner-gate.sh documents for the same reason.
 #
-# Контракт PreToolUse hook (Claude Code):
+# PreToolUse hook contract (Claude Code):
 # - Stdin: JSON {"tool_name", "tool_input", "session_id", ...}
-# - Exit 0 = allow; exit 2 = block (stderr = причина, показывается LLM).
+# - Exit 0 = allow; exit 2 = block (stderr = the reason, shown to the LLM).
 
 set -uo pipefail
 
@@ -72,7 +72,7 @@ COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/nul
 [ -n "$COMMAND" ] || exit 0
 
 AGENT="${IWE_AGENT:-claude-code}"
-# WP-484 Ф261: `claude` is an alias of `claude-code` (session-guard.sh normalizes it
+# WP-484 Phase 261: `claude` is an alias of `claude-code` (session-guard.sh normalizes it
 # on open); normalized before the mode is chosen, so the alias is not agent-keyed.
 [ "$AGENT" = claude ] && AGENT=claude-code
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
@@ -85,8 +85,8 @@ if [ "$AGENT" = "claude-code" ] && [ -z "$SESSION_ID" ] && [ -n "${CLAUDE_CODE_S
 fi
 # Non-Claude agents (Kimi: tool "Shell", own payload id that no semaphore
 # records) -> agent-keyed mode: any open semaphore of this agent counts, since
-# the session that opened it cannot be told apart. WP-561 Ф51 (27.10.2026) made
-# this mode fail-open except for one proven incident shape; WP-7 Ф274
+# the session that opened it cannot be told apart. WP-561 Phase 51 (27.10.2026) made
+# this mode fail-open except for one proven incident shape; WP-7 Phase 274
 # (29.10.2026, pilot decision) closes it: no WP-bound, allowed or scheduled
 # semaphore of the agent -> block, the same rule as for Claude.
 AGENT_KEYED=0
@@ -97,14 +97,14 @@ fi
 # Claude without a usable session id (payload and CLAUDE_CODE_SESSION_ID both empty,
 # or unsafe characters) cannot be matched to a semaphore: Claude Code always sends
 # one, so this is a fault, not a legitimate path. Decided after commit detection and
-# after the Git Bash skip below; earlier versions let such a commit through (Ф275).
+# after the Git Bash skip below; earlier versions let such a commit through (Phase 275).
 NO_SESSION_ID=0
 case "$SESSION_ID" in
   ''|*[!A-Za-z0-9._-]*) NO_SESSION_ID=1; SESSION_ID="" ;;
 esac
 SESSION_ID_SAFE="$SESSION_ID"
 
-# Same hardened git-commit/push detection as close-runner-gate.sh (Ф74а) —
+# Same hardened git-commit/push detection as close-runner-gate.sh (Phase 74a) —
 # reused verbatim, not reinvented, to inherit its evasion coverage.
 NORMALIZED_COMMAND=$(printf '%s' "$COMMAND" | tr '\n' ';' | tr -s '[:space:]' ' ')
 GIT_GLOBAL_FLAGS_RE='(-C [^ ]+|-c [^ ]+|--(git-dir|work-tree|namespace|exec-path)(=[^ ]+| [^ ]+)|--(literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs|no-optional-locks|no-lazy-fetch|no-replace-objects|no-pager|paginate|bare)|-P)'
@@ -112,7 +112,7 @@ echo "$NORMALIZED_COMMAND" | grep -qE "(^|[;&|(]) *(([A-Za-z_][A-Za-z0-9_]*=[^ ]
 
 # The agent name goes into the semaphore globs below: `*` or `[...]` would match
 # other agents' semaphores (a claude-code one with `wp:`) and let the commit
-# through (WP-7 Ф274). Checked after commit detection, so it blocks nothing else.
+# through (WP-7 Phase 274). Checked after commit detection, so it blocks nothing else.
 case "$AGENT" in
   *[!A-Za-z0-9._-]*)
     echo "[session-open-gate] IWE_AGENT='$AGENT' содержит недопустимые символы (разрешены A-Z a-z 0-9 . _ -) — git commit/push заблокирован. Исправьте IWE_AGENT." >&2
@@ -125,7 +125,7 @@ SCHED_LOG="$IWE_ROOT/.iwe-runtime/session-open-gate-sched.log"
 # ПП-74б/31.08 already hit this exact defect: a shorter session_id that is a
 # prefix of a longer one would otherwise match it as a substring).
 # Names that denote one agent, the same family as session-guard.sh _agent_family
-# (WP-484 Ф261): `claude` and `claude-code` are one agent, and older `open --agent
+# (WP-484 Phase 261): `claude` and `claude-code` are one agent, and older `open --agent
 # claude` wrote claude-<id>.open with `agent: claude`. Change both places together.
 AGENT_FAMILY="$AGENT"
 SEM_GLOB="${AGENT}-*.open"
@@ -186,7 +186,7 @@ if [ "$AGENT_KEYED" = 1 ]; then
   done
 fi
 
-# Opt-in skip for Windows / Git Bash (WP-7 Ф271, issue #1281). session-guard.sh
+# Opt-in skip for Windows / Git Bash (WP-7 Phase 271, issue #1281). session-guard.sh
 # cannot open a `--wp` semaphore there (no fcntl), so without a way out every
 # commit is blocked although PLATFORM-COMPAT.md calls Git Bash "best-effort".
 # The gate stays mandatory by default: the skip needs an explicit, dated key in
@@ -196,7 +196,7 @@ fi
 #   session_open_gate_skip_until: 2026-11-05   # optional trailing comment
 # Platform is read from $OSTYPE, not from `uname`: uname is looked up through PATH,
 # which holds user-writable directories, so a fake `uname` would turn the skip on
-# under Linux/macOS with one command (found by the cold review of Ф271).
+# under Linux/macOS with one command (found by the cold review of Phase 271).
 # Residual risks, accepted in the peer session (Kimi dissented on the first):
 # (1) an agent that can write params.yaml can set or renew the key itself;
 # (2) an `env` entry in settings.local.json can set OSTYPE for the next session.

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# test_skill.sh — smoke test для /org-dev SKILL.md
-# Проверяет: (1) MIM.M.031 file exists, (2) SKILL.md frontmatter валиден, (3) basic markdown structure.
-# Совместимость: bash 3.2 (macOS).
+# test_skill.sh — smoke test for /org-dev SKILL.md
+# Checks: (1) MIM.M.031 file exists, (2) SKILL.md frontmatter is valid, (3) basic markdown structure.
+# Compatibility: bash 3.2 (macOS).
 
 set -eu
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_FILE="$SKILL_DIR/SKILL.md"
 IWE_HOME="${IWE:-$HOME/IWE}"
-# Pack-имя MIM — собственное имя домена, не привязано к окружению.
-# Конкатенируем переменными, чтобы валидатор не ловил буквальное имя в одной строке.
+# The Pack name MIM is the domain's own name, not tied to the environment.
+# Concatenate via variables so that the validator does not catch the literal name in a single line.
 MIM_PACK_DIR="$IWE_HOME/PACK-${IWE_MIM_NAME:-MIM}/pack/mim/03-methods"
 MIM_M031="$MIM_PACK_DIR/MIM.M.031-rr-guide-routing.md"
 MIM_M030="$MIM_PACK_DIR/MIM.M.030-system-type-diagnosis.md"

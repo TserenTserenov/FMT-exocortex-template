@@ -1,26 +1,26 @@
 #!/bin/bash
-# Настройка Cloud Scheduler (GitHub Actions) для IWE
-# DP.SC.019 — Автономная работа IWE (базовый уровень)
+# Cloud Scheduler (GitHub Actions) setup for IWE
+# DP.SC.019 — Autonomous IWE operation (basic level)
 #
-# Что делает:
-# 1. Проверяет наличие gh CLI и авторизации
-# 2. Настраивает GitHub Secrets для Telegram-уведомлений (опционально)
-# 3. Запускает тестовый workflow
+# What it does:
+# 1. Checks for the gh CLI and authorization
+# 2. Configures GitHub Secrets for Telegram notifications (optional)
+# 3. Runs a test workflow
 #
-# Использование:
+# Usage:
 #   bash setup/optional/setup-cloud-scheduler.sh
 #
-# Предварительные требования:
-# - gh CLI установлен (brew install gh)
-# - gh auth login выполнен
-# - Репо DS-strategy запушен на GitHub
+# Prerequisites:
+# - gh CLI installed (brew install gh)
+# - gh auth login done
+# - The DS-strategy repo is pushed to GitHub
 
 set -euo pipefail
 
 echo "=== Настройка IWE Cloud Scheduler ==="
 echo ""
 
-# 1. Проверка gh CLI
+# 1. Check the gh CLI
 if ! command -v gh &>/dev/null; then
     echo "❌ gh CLI не установлен. Установите: brew install gh"
     exit 1
@@ -33,8 +33,8 @@ fi
 
 echo "✅ gh CLI готов"
 
-# 2. Определяем репо DS-strategy
-# Ищем первый репо с паттерном DS-*strategy* в текущем workspace
+# 2. Determine the DS-strategy repo
+# Look for the first repo matching the DS-*strategy* pattern in the current workspace
 WORKSPACE="${WORKSPACE_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 STRATEGY_DIR=$(find "$WORKSPACE" -maxdepth 1 -type d -name "DS-*strategy*" | head -1)
 
@@ -53,7 +53,7 @@ fi
 
 echo "✅ Репо: $STRATEGY_REPO_NAME"
 
-# 3. Проверяем наличие workflow
+# 3. Check that the workflow exists
 if ! gh workflow list --repo "$STRATEGY_REPO_NAME" 2>/dev/null | grep -q "cloud-scheduler"; then
     echo "⚠️  Workflow cloud-scheduler.yml не найден в $STRATEGY_REPO_NAME"
     echo "   Убедитесь, что файл .github/workflows/cloud-scheduler.yml существует и запушен"
@@ -62,7 +62,7 @@ fi
 
 echo "✅ Workflow cloud-scheduler.yml найден"
 
-# 4. Telegram-уведомления (опционально)
+# 4. Telegram notifications (optional)
 echo ""
 echo "--- Telegram-уведомления (опционально) ---"
 echo "Для получения health check отчётов в Telegram нужны:"
@@ -86,7 +86,7 @@ else
     echo "⏭  Telegram пропущен"
 fi
 
-# 5. Тестовый запуск
+# 5. Test run
 echo ""
 read -p "Запустить тестовый workflow? (y/n): " RUN_TEST
 

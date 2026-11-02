@@ -29,16 +29,16 @@ else
 fi
 
 # === CHANGELOG ↔ update-manifest.json version sync ===
-# Корень бага (25 апр): drift на 5 версий между CHANGELOG (0.27.7) и
-# manifest (0.26.1) — update.sh --check отдавал «нет обновлений», пока
-# пользователь не словил это вручную. Память не помогает; нужен harness-гейт.
-# Правило: top version в CHANGELOG.md == version в update-manifest.json. Всегда.
-# Допущение: новая секция в CHANGELOG.md ВСЕГДА вверху (Keep-a-Changelog convention).
-# Если кто-то вставит секцию НЕ в начало — top-grep вернёт старую версию, drift
-# не задетектится. Это сознательный trade-off (alternative — счёт секций — даёт FP).
+# Root of the bug (Apr 25): a 5-version drift between CHANGELOG (0.27.7) and
+# manifest (0.26.1) — update.sh --check reported "no updates" until the
+# user caught it manually. Memory does not help; a harness gate is needed.
+# Rule: top version in CHANGELOG.md == version in update-manifest.json. Always.
+# Assumption: a new section in CHANGELOG.md is ALWAYS at the top (Keep-a-Changelog convention).
+# If someone inserts a section NOT at the start — top-grep returns the old version, drift
+# will not be detected. This is a deliberate trade-off (alternative — counting sections — gives FPs).
 
-# (C) Hard-fail при переименовании/перемещении: эти файлы имеют контракт с update.sh,
-# двигать их нельзя.
+# (C) Hard-fail on rename/move: these files have a contract with update.sh,
+# they must not be moved.
 RENAMED_RELEASE_FILES=$(git diff --cached --name-status 2>/dev/null \
     | grep -E '^R[0-9]*[[:space:]].*(CHANGELOG\.md|update-manifest\.json)' || true)
 if [ -n "$RENAMED_RELEASE_FILES" ]; then
@@ -49,7 +49,7 @@ if [ -n "$RENAMED_RELEASE_FILES" ]; then
 fi
 
 # A fork with a conventional `upstream` remote never receives CHANGELOG.md
-# locally (WP-401 Ф6.1 — /iwe-update reads it by raw URL instead), so its
+# locally (WP-401 Phase 6.1 — /iwe-update reads it by raw URL instead), so its
 # copy is frozen at whatever version it had when that delivery stopped while
 # update.sh keeps bumping update-manifest.json on every install. The version
 # match this guardrail checks becomes permanently unsatisfiable there,
@@ -96,9 +96,9 @@ if [ -n "$STAGED_RELEASE_FILES" ] && [ "$IS_UPSTREAM_MIRROR" = false ]; then
 fi
 
 # === Promote script dry-run smoke (PD-2, WP-347) ===
-# Корень бага (20 мая): settings-promote.sh ломался на pre-existing debt в env -i —
-# найдено Kimi-агентом после того как автор не заметил в авторском env.
-# Гейт: при staged promote-скриптах запускаем сам promote с фикстурой в env -i.
+# Root of the bug (May 20): settings-promote.sh broke on pre-existing debt in env -i —
+# found by the Kimi agent after the author did not notice it in the author env.
+# Gate: when promote scripts are staged, run the promote itself with a fixture in env -i.
 STAGED_PROMOTE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
     | grep -E '^scripts/(settings|hook|script|skill)-promote\.sh$' || true)
 if [ -n "$STAGED_PROMOTE" ] && [ -d "setup/promote-fixtures" ]; then
@@ -135,15 +135,15 @@ if [ -n "$STAGED_PROMOTE" ] && [ -d "setup/promote-fixtures" ]; then
 fi
 
 # === Clean-env smoke for new scripts (PD-1, WP-347) ===
-# Корень: новые scripts/*.sh могут работать у автора (с авторскими env vars),
-# но падать у пользователей. Гейт: при staged НОВОМ файле scripts/*.sh —
-# прогон smoke-clean-env.sh (bash -n + safe-mode check + shebang + optional --help в env -i).
+# Root: new scripts/*.sh may work for the author (with author env vars)
+# but fail for users. Gate: when a NEW scripts/*.sh file is staged —
+# run smoke-clean-env.sh (bash -n + safe-mode check + shebang + optional --help in env -i).
 STAGED_NEW_SCRIPTS=$(git diff --cached --name-status --diff-filter=A 2>/dev/null \
     | awk '$2 ~ /^scripts\/.*\.sh$/ {print $2}' || true)
 if [ -n "$STAGED_NEW_SCRIPTS" ] && [ -x "scripts/smoke-clean-env.sh" ]; then
     FAIL=0
     for script in $STAGED_NEW_SCRIPTS; do
-        # Skip promote-скрипты (они тестируются отдельным гейтом PROMOTE-DRY-RUN)
+        # Skip promote scripts (they are tested by a separate PROMOTE-DRY-RUN gate)
         case "$(basename "$script")" in
             *-promote.sh) continue ;;
         esac
@@ -164,14 +164,14 @@ if [ -n "$STAGED_NEW_SCRIPTS" ] && [ -x "scripts/smoke-clean-env.sh" ]; then
 fi
 
 # === Hook paths convention (.claude/settings.json) ===
-# Корень бага (20 мая 2026): settings.json вручную скопирован в FMT с относительными
-# путями .claude/hooks/X.sh. При сдвиге cwd (subagent/worktree/MCP) хук не находится.
-# Конвенция: все хук-команды должны начинаться с $CLAUDE_PROJECT_DIR/.
+# Root of the bug (May 20, 2026): settings.json was manually copied to FMT with relative
+# paths .claude/hooks/X.sh. When cwd shifts (subagent/worktree/MCP) the hook is not found.
+# Convention: all hook commands must start with $CLAUDE_PROJECT_DIR/.
 STAGED_SETTINGS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
     | grep -E '^\.claude/settings\.json$' || true)
 if [ -n "$STAGED_SETTINGS" ] && [ -x "scripts/validate-fmt-scripts.sh" ]; then
-    # FMT7 (#150): валидировать только staged-скрипты, а не весь scripts/ —
-    # иначе pre-existing долг в чужом файле блокирует регистрацию нового хука.
+    # FMT7 (#150): validate only staged scripts, not all of scripts/ —
+    # otherwise pre-existing debt in someone else's file blocks registering a new hook.
     STAGED_SCRIPTS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
         | grep -E '\.(sh|py)$' || true)
     if [ -n "$STAGED_SCRIPTS" ]; then
@@ -190,13 +190,13 @@ if [ -n "$STAGED_SETTINGS" ] && [ -x "scripts/validate-fmt-scripts.sh" ]; then
 fi
 
 # === Template validation (author-specific leaks, hardcoded paths, hooks cross-ref) ===
-# Корень бага (26 апр): литерал `DS-my-strategy` попал в новый
-# templates/strategy-skeleton/README.md (commit cb22aaa); валидатор зовётся
-# только из template-sync.sh — ручные коммиты в FMT валидацию обходили.
-# Гейт: если staged хоть один файл из расширений, что сканит validate-template.sh,
-# прогнать полную валидацию шаблона. Escape hatch: `git commit --no-verify`.
-# B9 fix (0.28.5): валидация ВЫШЕ exit STAGED_SH — иначе md/yaml/json-only
-# коммиты пропускали проверку и пускали leak в FMT.
+# Root of the bug (Apr 26): the literal `DS-my-strategy` got into the new
+# templates/strategy-skeleton/README.md (commit cb22aaa); the validator is called
+# only from template-sync.sh — manual commits to FMT bypassed validation.
+# Gate: if at least one staged file has an extension that validate-template.sh scans,
+# run the full template validation. Escape hatch: `git commit --no-verify`.
+# B9 fix (0.28.5): validation ABOVE the exit STAGED_SH — otherwise md/yaml/json-only
+# commits skipped the check and let a leak into FMT.
 STAGED_TEMPLATE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
     | grep -E '\.(md|sh|py|json|plist|yaml)$' || true)
 # Bootstrap TEMPLATE_DIR from .exocortex.env (parent of this repo) — no env var required
@@ -211,8 +211,8 @@ if [ -z "${TEMPLATE_DIR:-}" ]; then
   unset _repo_root _env_file
 fi
 if [ -n "$STAGED_TEMPLATE" ] && [ -x "setup/validate-template.sh" ]; then
-    # --mode=staged: проверяет только staged файлы. Предотвращает ложные блокировки
-    # от unstaged WIP параллельных агентов (мультиагентная среда IWE). CI использует pristine.
+    # --mode=staged: checks only staged files. Prevents false blocks
+    # from unstaged WIP of parallel agents (IWE multi-agent environment). CI uses pristine.
     if ! bash setup/validate-template.sh --mode=staged ${TEMPLATE_DIR:+"$TEMPLATE_DIR"} >/tmp/iwe-validate.$$ 2>&1; then
         echo "TEMPLATE-VALIDATE: FAIL"
         cat /tmp/iwe-validate.$$
@@ -225,11 +225,11 @@ if [ -n "$STAGED_TEMPLATE" ] && [ -x "setup/validate-template.sh" ]; then
 fi
 
 # === Integration contract validator (Spec↔State drift detection) ===
-# Корень бага (29 апр, 0.29.13 регрессия): template-sync перезаписал FMT файлы
-# из авторского pre-0.29.5 IWE → 8 violations. Євгений нашёл на fresh clone, но
-# наш собственный валидатор НЕ запускался при коммите. Гейт: тот же скрипт что
-# Євгений, на наших же staged файлах. Escape hatch: `git commit --no-verify`.
-# Запускаем только если staged файлы из scope валидатора (roles/, .claude/, setup/,
+# Root of the bug (Apr 29, 0.29.13 regression): template-sync overwrote FMT files
+# from the author's pre-0.29.5 IWE → 8 violations. Євгений found it on a fresh clone, but
+# our own validator was NOT run at commit time. Gate: the same script as
+# Євгений, on our own staged files. Escape hatch: `git commit --no-verify`.
+# Run only if staged files are within the validator scope (roles/, .claude/, setup/,
 # memory/, extensions/, update-manifest.json).
 STAGED_VALIDATOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
     | grep -E '^(roles/|\.claude/|setup/|memory/|extensions/|seed/|update-manifest\.json)' || true)
@@ -271,8 +271,8 @@ elif [ -n "$STAGED_VALIDATOR_SCOPE" ] && [ -x "setup/integration-contract-valida
 fi
 
 # === Detector regex regression tests (0.29.18) ===
-# Если staged изменения в integration-contract-validator.sh ИЛИ в detector-fixtures/
-# — прогнать test-detectors.sh. Ловит regex-gap регрессии в самих detector'ах.
+# If staged changes are in integration-contract-validator.sh OR in detector-fixtures/
+# — run test-detectors.sh. Catches regex-gap regressions in the detectors themselves.
 STAGED_DETECTOR_SCOPE=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null \
     | grep -E '^setup/(integration-contract-validator\.sh|detector-fixtures/|test-detectors\.sh)' || true)
 if [ -n "$STAGED_DETECTOR_SCOPE" ] && [ -x "setup/test-detectors.sh" ]; then
@@ -289,16 +289,16 @@ if [ -n "$STAGED_DETECTOR_SCOPE" ] && [ -x "setup/test-detectors.sh" ]; then
 fi
 
 # === Manifest coverage check (MG5) ===
-# Корень бага (25 мая): orphan-скрипты (day-open-scaffold.sh, iwe-backup-check.sh,
-# route-task.sh) попали в git, но не в update-manifest.json → partial delivery.
-# Shift-left: ловим ДО коммита, а не в CI.
-# issue #240: блокирующая проверка — только файлы ТЕКУЩЕГО коммита (staged);
-# сверка всего репо — неблокирующий WARN (одна чужая сирота не должна
-# парализовать все коммиты форка; полная сверка остаётся в CI validate-template).
+# Root of the bug (May 25): orphan scripts (day-open-scaffold.sh, iwe-backup-check.sh,
+# route-task.sh) got into git but not into update-manifest.json → partial delivery.
+# Shift-left: catch BEFORE the commit, not in CI.
+# issue #240: the blocking check covers only files of the CURRENT commit (staged);
+# the whole-repo reconciliation is a non-blocking WARN (one foreign orphan must not
+# paralyze all commits of a fork; the full reconciliation stays in CI validate-template).
 STAGED_MANIFEST_SCOPE=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null \
     | grep -E '^(scripts/|\.claude/|roles/|exocortex/|memory/|\.githooks/|pack-templates/|shared/|update-manifest\.json)' || true)
 if [ -n "$STAGED_MANIFEST_SCOPE" ] && [ -f "scripts/check-manifest-coverage.py" ]; then
-    # 1) Блокирующе: покрытие staged-файлов текущего коммита.
+    # 1) Blocking: coverage of the staged files of the current commit.
     if ! printf '%s\n' "$STAGED_MANIFEST_SCOPE" | python3 scripts/check-manifest-coverage.py update-manifest.json >/tmp/iwe-manifest.$$ 2>&1; then
         echo "MANIFEST-COVERAGE: FAIL (staged)"
         cat /tmp/iwe-manifest.$$
@@ -309,7 +309,7 @@ if [ -n "$STAGED_MANIFEST_SCOPE" ] && [ -f "scripts/check-manifest-coverage.py" 
         echo "  Override: git commit --no-verify"
         exit 1
     fi
-    # 2) Неблокирующе: сверка всего репо (WARN, issue #240).
+    # 2) Non-blocking: whole-repo reconciliation (WARN, issue #240).
     if ! git ls-files | python3 scripts/check-manifest-coverage.py update-manifest.json >/tmp/iwe-manifest.$$ 2>&1; then
         ORPHANS=$(sed -n 's/.*manifest-coverage: \([0-9][0-9]*\) файл.*/\1/p' /tmp/iwe-manifest.$$ | head -1)
         if [ -t 1 ]; then YEL=$(printf '\033[1;33m'); RST=$(printf '\033[0m'); else YEL=""; RST=""; fi

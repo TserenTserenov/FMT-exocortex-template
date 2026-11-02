@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# content-audit.sh — minimal content check for IWE skills (WP-422 Ф9 + Ф10)
-# Ф9: 5 structural+content criteria (C1-C5).
-# Ф10: C6 verification-anchor (ВДВ — выгода-действие-верификация), calibrated.
+# content-audit.sh — minimal content check for IWE skills (WP-422 Phase 9 + Phase 10)
+# Phase 9: 5 structural+content criteria (C1-C5).
+# Phase 10: C6 verification-anchor (ВДВ — benefit-action-verification), calibrated.
 # Outputs: RED (>=2 issues), YELLOW (1 issue), GREEN (0 issues)
 set -euo pipefail
 
 SKILLS_DIR="${IWE_DIR:-$HOME/IWE}/.claude/skills"
-# SKIP_SKILLS — intentional exemptions, NOT "forgot to remove" (WP-422 Ф10):
+# SKIP_SKILLS — intentional exemptions, NOT "forgot to remove" (WP-422 Phase 10):
 #   skill-creator    — meta-skill that bundles this very script (bootstrap circularity);
 #                      its own quality is gated by verify-skill.sh + /vdv audit (Step 7).
 #   agent-fault      — script-executor skill (argument-hint contract, no numbered steps);
 #   apply-captures   — script-executor skill; both structurally diverge from the step template.
 SKIP_SKILLS="${SKIP_SKILLS:-agent-fault apply-captures skill-creator}"
 
-# C6 verification-anchor vocabulary (Ф10). Broad on purpose — a skill "has a verification
+# C6 verification-anchor vocabulary (Phase 10). Broad on purpose — a skill "has a verification
 # notion" if any of: a Verification section (RU/EN), a verify/audit script, an acceptance
 # criterion, or an inline check (Expected/PASS/FAIL/smoke/test -f/проверь).
 C6_ANCHOR_RE='(^## .*[Вв]ерификаци|^## (Verification|Проверка)|[Вв]ерификаци|verify[-_a-z]*\.sh|[-_a-z]*audit\.sh|verify-skill|критери[йи] (готовности|приёмки|приемки)|acceptance|Expected result|Expected:|PASS\b|FAIL\b|smoke|смоук|test -f |проверь|проверить, что|sanity)'
@@ -107,7 +107,7 @@ audit_skill() {
     issue_list+=" C5:no_when_to_use"
   fi
 
-  # C6: verification-anchor (Ф10, ВДВ). Calibrated two-tier:
+  # C6: verification-anchor (Phase 10, ВДВ). Calibrated two-tier:
   #   - gate-critical skill (irreversible action) WITHOUT any verify notion → counted issue;
   #   - non-gate skill without anchor → advisory only (not counted), for manual triage.
   local has_anchor=false gate_crit=false

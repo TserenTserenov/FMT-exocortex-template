@@ -1,6 +1,6 @@
 #!/bin/bash
-# Шаблон уведомлений: Экстрактор (R2)
-# Вызывается из notify.sh через source
+# Notification template: Extractor (R2)
+# Called from notify.sh via source
 
 REPORTS_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/extraction-reports"
 DATE=$(date +%Y-%m-%d)
@@ -95,13 +95,13 @@ compose_message() {
                 captured=${captured:-0}
             fi
 
-            # Было: "Новых кандидатов нет" слала каждый тик таймера, даже когда
-            # ничего не изменилось с прошлого сообщения -- живой дамп 09.10
-            # поймал дубль дважды за 16 минут ровно с этим текстом. Ветка
-            # inbox-check выше уже молчит при пустом результате (echo "" ->
-            # notify.sh пропускает отправку); это делает то же самое для
-            # согласованности -- рутинное "ничего не произошло" идёт в
-            # тихий счётчик (notify.sh's caller decides), не в чат на каждый тик.
+            # Was: "Новых кандидатов нет" was sent on every timer tick, even when
+            # nothing had changed since the last message -- a live dump on 09.10
+            # caught a duplicate twice within 16 minutes with exactly this text. The
+            # inbox-check branch above already stays silent on an empty result (echo "" ->
+            # notify.sh skips sending); this does the same thing for
+            # consistency -- a routine "nothing happened" goes to
+            # a quiet counter (notify.sh's caller decides), not to the chat on every tick.
             [ "$captured" -gt 0 ] || { echo ""; return; }
             printf "<b>🔍 Knowledge Feeder: %s</b>\n\n" "$process"
             printf "📅 %s\n\n" "$DATE"

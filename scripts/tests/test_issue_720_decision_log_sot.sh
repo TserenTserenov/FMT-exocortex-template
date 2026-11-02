@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regression coverage for issue #720: the template shipped two homes for
 # decisions (decisions/decision-log-YYYY-MM.md and seed Strategy.md §
-# "Ключевые решения") with a rule only for the journal — no cross-link, no
+# "Key decisions") with a rule only for the journal — no cross-link, no
 # indication which one is source-of-truth. Separately, the Decision Capture
 # nudge in protocol-work.md referenced cognitive_budget.daily_decision_points,
 # a key that never existed anywhere in the shipped config, so the nudge could

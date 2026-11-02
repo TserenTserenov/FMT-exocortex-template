@@ -1,37 +1,37 @@
 #!/bin/bash
 # inject-communication-style.sh
 # Event: UserPromptSubmit
-# see DP.SC.050 (обещание «Единый разговорный стиль агентов»), WP-388 Ф8
+# see DP.SC.050 (promise "Unified conversational style of agents"), WP-388 Phase 8
 #
-# Назначение: доставить S0 базовый разговорный стиль (SoT в Pack) + S1 авторские
-#             надстройки в контекст Claude Code ПЕРЕД ответом. Заменяет хрупкую
-#             вклейку маркер-блока в генерируемые CLAUDE.md / AGENTS.md (которые
-#             перезаписываются template-sync.sh / sync-agent-instructions.sh).
+# Purpose: deliver S0 base conversational style (SoT in Pack) + S1 author
+#             add-ons into the Claude Code context BEFORE the reply. Replaces the fragile
+#             pasting of a marker block into the generated CLAUDE.md / AGENTS.md (which are
+#             overwritten by template-sync.sh / sync-agent-instructions.sh).
 #
-# Архитектура (WP-388 Ф8, АрхГейт пройден):
+# Architecture (WP-388 Phase 8, ArchGate passed):
 #   S0 = PACK-digital-platform/.../02-domain-entities/communication-style-base.md (read-only)
 #   S1 = ${IWE_GOVERNANCE_REPO:-DS-strategy}/memory/communication-style-author.md (additive-only,
-#        только через личный диспетчер — доступен только автору с PACK-rhetoric)
-#   S2 = memory/communication-style-personal.md (additive-only, файл-fallback — WP-412 Ф13).
-#        Пользователь копирует memory/communication-style-personal-template.md под этим именем
-#        и заполняет; шаблон-образец сам хук не читает никогда.
-#   Доставка = этот хук (UserPromptSubmit). Генерируемые файлы не трогаются.
+#        only through the personal dispatcher — available only to the author with PACK-rhetoric)
+#   S2 = memory/communication-style-personal.md (additive-only, file fallback — WP-412 Phase 13).
+#        The user copies memory/communication-style-personal-template.md under this name
+#        and fills it in; the hook itself never reads the sample template.
+#   Delivery = this hook (UserPromptSubmit). Generated files are not touched.
 #
-# Поведение (density-based reinjection, peer-session 2026-06-08-23):
-# - Освежается по ходу сессии: первый ход + при росте переписки (не один раз)
-# - L0-файл отсутствует → silent skip (echo '{}')
-# - L1-файл отсутствует → инжектим только L0
-# - Пороги: STYLE_REINJECT_TURNS (12), STYLE_REINJECT_BYTES (60000)
+# Behavior (density-based reinjection, peer-session 2026-06-08-23):
+# - Refreshed during the session: the first turn + as the conversation grows (not once)
+# - L0 file missing → silent skip (echo '{}')
+# - L1 file missing → inject only L0
+# - Thresholds: STYLE_REINJECT_TURNS (12), STYLE_REINJECT_BYTES (60000)
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# jq нужен для вывода JSON. Нет jq → тихий валидный '{}', не пустой stdout (иначе Claude Code не распарсит).
+# jq is needed for JSON output. No jq → quiet valid '{}', not empty stdout (otherwise Claude Code cannot parse it).
 command -v jq >/dev/null 2>&1 || { echo '{}'; exit 0; }
 
 INPUT=$(cat 2>/dev/null || echo '{}')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null)
-# Пустой/битый id → unknown; санитизация против path traversal в имени state-файла
+# Empty/broken id → unknown; sanitization against path traversal in the state file name
 [ -n "$SESSION_ID" ] || SESSION_ID="unknown"
 SESSION_ID=$(printf '%s' "$SESSION_ID" | tr -cd 'A-Za-z0-9._-')
 [ -n "$SESSION_ID" ] || SESSION_ID="unknown"
@@ -40,12 +40,12 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$HOME/IWE}"
 STATE_DIR="$PROJECT_DIR/.claude/state"
 STATE_FILE="$STATE_DIR/comm-style-injected-$SESSION_ID"
 
-# Density-based reinjection: впрыск НЕ один раз за сессию, а освежается по ходу.
-# Триггер: первый ход ИЛИ прошло >= N ходов ИЛИ выросло >= M байт стенограммы.
+# Density-based reinjection: injection is NOT once per session, but refreshed along the way.
+# Trigger: first turn OR >= N turns have passed OR the transcript has grown by >= M bytes.
 REINJECT_EVERY_TURNS="${STYLE_REINJECT_TURNS:-12}"
 REINJECT_BYTES="${STYLE_REINJECT_BYTES:-60000}"
 
-# Текущий объём контекста — размер стенограммы (если харнесс её передал)
+# Current context volume — transcript size (if the harness passed it)
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || echo "")
 CUR_BYTES=0
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
@@ -53,7 +53,7 @@ if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
   [ -n "$CUR_BYTES" ] || CUR_BYTES=0
 fi
 
-# Состояние: "turn last_inject_turn last_inject_bytes"
+# State: "turn last_inject_turn last_inject_bytes"
 TURN=0; LAST_INJECT_TURN=0; LAST_INJECT_BYTES=0
 if [ -f "$STATE_FILE" ]; then
   read -r TURN LAST_INJECT_TURN LAST_INJECT_BYTES < "$STATE_FILE" 2>/dev/null || true
@@ -65,14 +65,14 @@ TURN=$((TURN + 1))
 
 DO_INJECT=0
 if [ ! -f "$STATE_FILE" ]; then
-  DO_INJECT=1                                                   # первый ход
+  DO_INJECT=1                                                   # first turn
 elif [ $((TURN - LAST_INJECT_TURN)) -ge "$REINJECT_EVERY_TURNS" ]; then
-  DO_INJECT=1                                                   # по числу ходов
+  DO_INJECT=1                                                   # by number of turns
 elif [ "$CUR_BYTES" -gt 0 ] && [ $((CUR_BYTES - LAST_INJECT_BYTES)) -ge "$REINJECT_BYTES" ]; then
-  DO_INJECT=1                                                   # по объёму переписки
+  DO_INJECT=1                                                   # by conversation volume
 fi
 
-# Не пора впрыскивать — обновить счётчик хода и выйти
+# Not time to inject yet — update the turn counter and exit
 if [ "$DO_INJECT" -eq 0 ]; then
   mkdir -p "$STATE_DIR"
   echo "$TURN $LAST_INJECT_TURN $LAST_INJECT_BYTES" > "$STATE_FILE"
@@ -80,10 +80,10 @@ if [ "$DO_INJECT" -eq 0 ]; then
   exit 0
 fi
 
-# Контент: диспетчер реестра (если доступен) → файл-снимок s0-core.md → пропуск.
-# Диспетчер: WP-412 Ф6 (тонкий хук с каскадом L0+L1+author). Путь к нему через PROJECT_DIR.
-# Файл-снимок: WP-412 Ф11 (FMT-fallback, самодостаточен). Путь через BASH_SOURCE — работает в env -i.
-# Рантайм-механика (переинъекция, state) остаётся в хуке. Откат: git revert.
+# Content: registry dispatcher (if available) → snapshot file s0-core.md → skip.
+# Dispatcher: WP-412 Phase 6 (thin hook with the L0+L1+author cascade). The path to it goes through PROJECT_DIR.
+# Snapshot file: WP-412 Phase 11 (FMT-fallback, self-sufficient). Path via BASH_SOURCE — works in env -i.
+# Runtime mechanics (reinjection, state) stay in the hook. Rollback: git revert.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 S0_CORE="$HOOK_DIR/../styles/s0-core.md"
 
@@ -92,18 +92,18 @@ if [ -f "$DISPATCHER" ]; then
   FRAGMENT=$(python3 "$DISPATCHER" --event userpromptsubmit-ide --quiet --no-cache 2>/dev/null)
 fi
 
-# Если диспетчер не дал контент — читаем файл-снимок (обрезаем frontmatter между --- --- )
+# If the dispatcher gave no content — read the snapshot file (cut the frontmatter between --- --- )
 if [ -z "${FRAGMENT:-}" ] && [ -f "$S0_CORE" ]; then
   FRAGMENT=$(awk '/^---/{n++; if(n==2){found=1; next}} found' "$S0_CORE" 2>/dev/null)
 fi
 
-[ -n "${FRAGMENT:-}" ] || { echo '{}'; exit 0; }   # оба источника пусты/упали → пропуск (safe)
+[ -n "${FRAGMENT:-}" ] || { echo '{}'; exit 0; }   # both sources empty/failed → skip (safe)
 
-# S2: личный оверрайд пользователя шаблона (WP-412 Ф13). Отдельный файл от
-# шаблона-образца (communication-style-personal-template.md) — его хук
-# никогда не читает, иначе placeholder-инструкция попала бы в промпт как
-# «стиль пользователя» на каждой чистой установке. Пусто/нет файла → просто
-# не добавляем, FRAGMENT остаётся как был (additive-only, не блокирует S0).
+# S2: personal override of the template user (WP-412 Phase 13). A file separate from
+# the sample template (communication-style-personal-template.md) — the hook
+# never reads it, otherwise the placeholder instruction would land in the prompt as
+# the "user's style" on every clean install. Empty/no file → simply
+# do not add, FRAGMENT stays as it was (additive-only, does not block S0).
 PERSONAL_OVERRIDE="$PROJECT_DIR/memory/communication-style-personal.md"
 if [ -f "$PERSONAL_OVERRIDE" ]; then
   PERSONAL_FRAGMENT=$(awk '/^---/{n++; if(n==2){found=1; next}} found' "$PERSONAL_OVERRIDE" 2>/dev/null)
@@ -120,14 +120,14 @@ CONTEXT="## 🗣 Разговорный стиль IWE (S0 база + S1 авт�
 
 $FRAGMENT"
 
-# Записать state: текущий ход = последний впрыск, запомнить байты стенограммы
+# Write state: current turn = last injection, remember the transcript bytes
 mkdir -p "$STATE_DIR"
 echo "$TURN $TURN $CUR_BYTES" > "$STATE_FILE"
 
-# Cleanup старых state-файлов (>24h)
+# Cleanup of old state files (>24h)
 find "$STATE_DIR" -name "comm-style-injected-*" -mmin +1440 -delete 2>/dev/null || true
 
-# JSON для Claude Code UserPromptSubmit hook
+# JSON for the Claude Code UserPromptSubmit hook
 jq -n --arg ctx "$CONTEXT" '{
   "hookSpecificOutput": {
     "hookEventName": "UserPromptSubmit",

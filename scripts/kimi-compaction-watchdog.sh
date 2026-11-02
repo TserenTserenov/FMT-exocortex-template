@@ -1,11 +1,11 @@
 #!/bin/bash
 # Kimi Compaction Watchdog
-# Отслеживает логи Kimi Code CLI и отправляет уведомления при compaction / высоком usage
-# Запуск: ./scripts/kimi-compaction-watchdog.sh &
+# Watches Kimi Code CLI logs and sends notifications on compaction / high usage
+# Run: ./scripts/kimi-compaction-watchdog.sh &
 
 set -euo pipefail
 
-# WP-5 Ubuntu-audit факт #4: hardcoded to the macOS VS Code log path — on Linux
+# WP-5 Ubuntu-audit fact #4: hardcoded to the macOS VS Code log path — on Linux
 # LOG_DIR silently didn't exist, `find` always returned nothing, and the main
 # loop below (find_latest_log empty → sleep 5 → continue) ran forever with no
 # signal that the watchdog was doing nothing at all.
@@ -14,7 +14,7 @@ case "$(uname -s)" in
   Linux)  LOG_DIR="${HOME}/.config/Code/logs" ;;
   *)      LOG_DIR="${HOME}/.config/Code/logs" ;;
 esac
-# Находим самый свежий лог-файл Kimi Code
+# Find the freshest Kimi Code log file
 find_latest_log() {
   find "${LOG_DIR}" -name "7-Kimi Code*.log" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1
 }
@@ -45,7 +45,7 @@ while true; do
     continue
   fi
 
-  # Если лог сменился — сбрасываем позицию
+  # If the log changed — reset the position
   if [ "${CURRENT_LOG}" != "${LAST_LOG}" ]; then
     LAST_LOG="${CURRENT_LOG}"
     LAST_POS=$(wc -c < "${CURRENT_LOG}" | tr -d ' ')
@@ -59,23 +59,23 @@ while true; do
     continue
   fi
 
-  # Читаем новые строки
+  # Read new lines
   tail -c +$((LAST_POS + 1)) "${CURRENT_LOG}" | while IFS= read -r line; do
-    # Уведомление о начале compaction
+    # Notification about the start of compaction
     if echo "${line}" | grep -q "CompactionBegin"; then
       send_notification "Kimi: Compaction начался" "Контекст сжимается. Экран может быть пустым 1–2 минуты."
     fi
 
-    # Уведомление о завершении compaction
+    # Notification about the end of compaction
     if echo "${line}" | grep -q "CompactionEnd"; then
       send_notification "Kimi: Compaction завершён" "Можно продолжать работу."
     fi
 
-    # Предупреждение при высоком context_usage (> 0.65)
+    # Warning on high context_usage (> 0.65)
     if echo "${line}" | grep -q '"context_usage":[0-9]\+\.[0-9]\+'; then
       usage=$(echo "${line}" | grep -o '"context_usage":[0-9]\+\.[0-9]\+' | cut -d: -f2)
       if [ -n "${usage}" ]; then
-        # сравнение через awk для float
+        # comparison via awk for floats
         if awk "BEGIN {exit !(${usage} > 0.65)}"; then
           if [ "${USAGE_ALERTED}" = "false" ]; then
             send_notification "Kimi: Контекст на ${usage}%" "Рекомендую /compact или новую сессию."

@@ -30,8 +30,8 @@ check() {  # <description> <expected> <actual>
     if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (expected '$2', got '$3')"; fi
 }
 
-# sha256: shasum (macOS) первым, sha256sum (GNU) запасным — pattern из
-# canon-reconcile-published-smoke.sh (check-platform-compat.sh требует).
+# sha256: shasum (macOS) first, sha256sum (GNU) as a fallback — pattern from
+# canon-reconcile-published-smoke.sh (required by check-platform-compat.sh).
 sha256() {
     if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$@"; else sha256sum "$@"; fi
 }
@@ -41,8 +41,8 @@ append_body() {  # <file> <n-lines>
     for i in $(seq 1 "$n"); do echo "body line $i" >> "$f"; done
 }
 
-# Fixture: полный frontmatter, НЕ хватает только domains; domains лежит
-# столбиком внутри metadata: (диалект автопамяти Claude Code, issue #281).
+# Fixture: full frontmatter, only domains is MISSING; domains lies
+# as a column list inside metadata: (the Claude Code auto-memory dialect, issue #281).
 cat > "$MEM/reference_dialogs.md" <<'EOF'
 ---
 metadata:
@@ -71,7 +71,7 @@ check "get_field читает столбик как inline" "[meetings, skill-tr
 bash "$VALIDATE" --dir "$MEM" "$MEM/reference_dialogs.md" >/dev/null 2>&1 \
     && pass "валидатор принимает файл" || fail "валидатор всё ещё ругается на domains"
 
-# Конфликт форм: плоское значение И столбик — предупреждение, побеждает плоская.
+# Conflict of forms: a flat value AND a column list — a warning, the flat one wins.
 cat > "$MEM/lesson_conflict.md" <<'EOF'
 ---
 metadata:
@@ -114,7 +114,7 @@ check "valid_from = mtime файла" "valid_from: 2026-07-05" "$(grep '^valid_f
 echo "== 4. --all: превышение бюджета HOT — стоп до любой записи"
 MEM2="$SB/memory-hot"
 mkdir -p "$MEM2"
-# существующий hot-файл на 140 строк тела
+# an existing hot file with a 140-line body
 cat > "$MEM2/user_main.md" <<'EOF'
 ---
 type: user
@@ -129,7 +129,7 @@ description: "Профиль пользователя"
 ---
 EOF
 append_body "$MEM2/user_main.md" 140
-# кандидат без horizon: user_* → infer hot, тело 20 строк (140+20=160 > 150)
+# a candidate without horizon: user_* → infer hot, 20-line body (140+20=160 > 150)
 cat > "$MEM2/user_extra.md" <<'EOF'
 ---
 type: user

@@ -1,23 +1,23 @@
 #!/bin/bash
 # inject-fault-profile.sh
 # Event: UserPromptSubmit
-# Назначение: инжектировать профиль повторяющихся ошибок агента в системный промпт
-#             ПЕРЕД первой работой в сессии. Замена секции «Профиль ошибок» в DayPlan
-#             (которая показывалась пилоту — что неправильно: профиль для агента).
+# Purpose: inject the profile of the agent's recurring errors into the system prompt
+#             BEFORE the first work in a session. Replaces the "Error profile" section in DayPlan
+#             (which was shown to the pilot — wrong: the profile is for the agent).
 #
-# Архитектура: вызывает единый scripts/agent-fault/iwe_checklist_memory.py
-#             remind --protocol open с явным субъектом → парсит вывод
-#             → возвращает additionalContext с топ-3 критическими напоминаниями.
+# Architecture: calls the single scripts/agent-fault/iwe_checklist_memory.py
+#             remind --protocol open with an explicit subject → parses the output
+#             → returns additionalContext with the top-3 critical reminders.
 #
-# see: peer-сессия 2026-05-30-07-gap-list-day-open подэтап 3
+# see: peer-session 2026-05-30-07-gap-list-day-open sub-stage 3
 # see: WP-356 «Pipeline Day Open: auto-run checks»
-# see: WP-316 (Agent Fault Profile, источник данных)
+# see: WP-316 (Agent Fault Profile, data source)
 #
-# Поведение:
-# - Активируется один раз в сессии (state-файл `.claude/state/fault-profile-injected-<session_id>`)
-# - Если БД профиля отсутствует — silent skip
-# - Если нет напоминаний с n≥3 — silent skip
-# - Иначе — additionalContext с 2-3 напоминаниями
+# Behavior:
+# - Activates once per session (state file `.claude/state/fault-profile-injected-<session_id>`)
+# - If the profile DB is absent — silent skip
+# - If there are no reminders with n≥3 — silent skip
+# - Otherwise — additionalContext with 2-3 reminders
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -39,7 +39,7 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$HOME/IWE}"
 STATE_DIR="$PROJECT_DIR/.claude/state"
 STATE_FILE="$STATE_DIR/fault-profile-injected-$SESSION_ID"
 
-# Только один инжект в сессию
+# Only one injection per session
 if [ -f "$STATE_FILE" ]; then
   echo '{}'
   exit 0
@@ -118,13 +118,13 @@ REMIND_ARGS=(
   --subject-id "$SUBJECT_ID"
 )
 
-# Запустить скрипт (с timeout если есть, иначе без — на macOS нет timeout по умолчанию)
+# Run the script (with timeout if available, otherwise without — macOS has no timeout by default)
 if command -v timeout >/dev/null 2>&1; then
   REMIND_OUT=$(IWE_WORKSPACE="$PROJECT_DIR" timeout 5 "$PYTHON_BIN" "${REMIND_ARGS[@]}" 2>/dev/null || echo "")
 elif command -v gtimeout >/dev/null 2>&1; then
   REMIND_OUT=$(IWE_WORKSPACE="$PROJECT_DIR" gtimeout 5 "$PYTHON_BIN" "${REMIND_ARGS[@]}" 2>/dev/null || echo "")
 else
-  # Fallback без timeout — скрипт быстрый (sqlite-read)
+  # Fallback without timeout — the script is fast (sqlite-read)
   REMIND_OUT=$(IWE_WORKSPACE="$PROJECT_DIR" "$PYTHON_BIN" "${REMIND_ARGS[@]}" 2>/dev/null || echo "")
 fi
 if [ -z "$REMIND_OUT" ]; then
@@ -132,15 +132,15 @@ if [ -z "$REMIND_OUT" ]; then
   exit 0
 fi
 
-# Парсинг строк формата: "🔴 [CRITICAL | n=8] WP context читается bottom-up..."
-# Берём топ-3 с n >= 3 (статистически значимо)
+# Parsing lines of the format: "🔴 [CRITICAL | n=8] WP context is read bottom-up..."
+# Take the top-3 with n >= 3 (statistically significant)
 RELEVANT=$(echo "$REMIND_OUT" | grep -E "^🔴 \[(CRITICAL|MAJOR) \| n=[0-9]+\]" | head -3)
 if [ -z "$RELEVANT" ]; then
   echo '{}'
   exit 0
 fi
 
-# Сформировать additionalContext
+# Build additionalContext
 CONTEXT="## 🧠 Профиль повторяющихся ошибок агента (n≥3 за историю сессий)
 
 Применить ДО первой Read/Write/Bash в сессии. Источник: единый \`agent-fault\` CLI (приватная база \`exocortex/agent-fault-profile/iwe_memory.db\`, субъект \`$SUBJECT_KIND:$SUBJECT_ID\`).
@@ -150,14 +150,14 @@ $RELEVANT
 Источник правил: WP-316 (Session Memory). Не показывать пользователю — это внутренний инструмент агента.
 "
 
-# Записать state-файл
+# Write the state file
 mkdir -p "$STATE_DIR"
 touch "$STATE_FILE"
 
-# Cleanup старых state-файлов (>24h)
+# Cleanup of old state files (>24h)
 find "$STATE_DIR" -name "fault-profile-injected-*" -mmin +1440 -delete 2>/dev/null || true
 
-# Вернуть JSON с additionalContext (Claude Code UserPromptSubmit hook protocol)
+# Return JSON with additionalContext (Claude Code UserPromptSubmit hook protocol)
 jq -n --arg ctx "$CONTEXT" '{
   "hookSpecificOutput": {
     "hookEventName": "UserPromptSubmit",

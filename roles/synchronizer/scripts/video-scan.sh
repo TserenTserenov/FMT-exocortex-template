@@ -1,30 +1,30 @@
 #!/bin/bash
-# video-scan.sh — сканирование видеозаписей и привязка к РП
+# video-scan.sh — scan video recordings and link them to WPs
 #
-# Обходит директории видеозаписей (Zoom, Телемост и др.), находит
-# новые/необработанные файлы, привязывает к РП по имени или дате.
+# Walks video recording directories (Zoom, Telemost, etc.), finds
+# new/unprocessed files, links them to a WP by name or date.
 #
-# Использование:
-#   video-scan.sh                # полное сканирование
-#   video-scan.sh --new          # только новые (с последнего сканирования)
-#   video-scan.sh --stale        # только просроченные (> stale_days)
-#   video-scan.sh --dry-run      # показать что найдёт, не записывать
+# Usage:
+#   video-scan.sh                # full scan
+#   video-scan.sh --new          # new only (since the last scan)
+#   video-scan.sh --stale        # overdue only (> stale_days)
+#   video-scan.sh --dry-run      # show what it finds, do not write
 #
-# Триггер: Day Open (шаг 5b), Strategy Session (видео-ревью)
-# Конфиг: memory/day-rhythm-config.yaml → секция video
+# Trigger: Day Open (step 5b), Strategy Session (video review)
+# Config: memory/day-rhythm-config.yaml → section video
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)/memory"
-# WP-273 0.29.4 R6.1 fix (issue #271): runtime-резолв вместо build-time {{WORKSPACE_DIR}} — как в strategist.sh.
+# WP-273 0.29.4 R6.1 fix (issue #271): runtime resolution instead of build-time {{WORKSPACE_DIR}} — as in strategist.sh.
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 LOG_DIR="$HOME/logs/synchronizer"
 DATE=$(date +%Y-%m-%d)
 LOG_FILE="$LOG_DIR/video-scan-$DATE.log"
 STATE_FILE="$LOG_DIR/.video-scan-last"
 
-# === Аргументы ===
+# === Arguments ===
 
 MODE="full"
 DRY_RUN=false
@@ -42,8 +42,8 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [video-scan] $1" | tee -a "$LOG_FILE"
 }
 
-# === Чтение конфига (YAML → переменные) ===
-# Простой парсер — без зависимостей (yq/jq не обязательны)
+# === Reading the config (YAML → variables) ===
+# A simple parser — no dependencies (yq/jq not required)
 
 parse_config() {
     local config="$CONFIG_DIR/day-rhythm-config.yaml"
@@ -56,35 +56,35 @@ parse_config() {
     STALE_DAYS=$(awk '/^video:/{found=1} found && /stale_days:/{print $2; exit}' "$config")
     TRANSCRIPTS_DIR=$(awk '/^video:/{found=1} found && /transcripts_dir:/{print $2; exit}' "$config")
 
-    # Директории: парсим YAML list (строки с "- ")
+    # Directories: parse the YAML list (lines with "- ")
     VIDEO_DIRS=()
     local in_dirs=false
     while IFS= read -r line; do
-        # Начало секции directories:
+        # Start of the directories: section
         if [[ "$line" =~ ^[[:space:]]+directories: ]]; then
             in_dirs=true
             continue
         fi
-        # Внутри directories — строки с "- "
+        # Inside directories — lines with "- "
         if [ "$in_dirs" = true ]; then
             if [[ "$line" =~ ^[[:space:]]+-[[:space:]]+(.*) ]]; then
                 local dir="${BASH_REMATCH[1]}"
-                # Убрать кавычки
+                # Strip quotes
                 dir="${dir#\"}"
                 dir="${dir%\"}"
                 dir="${dir#\'}"
                 dir="${dir%\'}"
-                # Развернуть ~
+                # Expand ~
                 dir="${dir/#\~/$HOME}"
                 VIDEO_DIRS+=("$dir")
             elif [[ "$line" =~ ^[[:space:]]+[a-z] ]]; then
-                # Следующий ключ — выход из directories
+                # Next key — exit from directories
                 in_dirs=false
             fi
         fi
     done < "$config"
 
-    # Расширения: парсим массив [mp4, mov, ...]
+    # Extensions: parse the array [mp4, mov, ...]
     EXTENSIONS=$(awk '/^video:/{found=1} found && /extensions:/{gsub(/[\[\]]/, ""); n=split($0, a, ":"); val=a[2]; gsub(/[ ]/, "", val); split(val, b, ","); for(i in b) print b[i]; exit}' "$config")
 
     VIDEO_ENABLED="${VIDEO_ENABLED:-false}"
@@ -92,7 +92,7 @@ parse_config() {
     TRANSCRIPTS_DIR="${TRANSCRIPTS_DIR:-transcripts/}"
 }
 
-# === Поиск видеофайлов по всем директориям ===
+# === Search for video files across all directories ===
 
 find_videos() {
     for video_dir in "${VIDEO_DIRS[@]}"; do
@@ -112,7 +112,7 @@ find_videos() {
         done
         find_args+=(")")
 
-        # Фильтр по режиму
+        # Filter by mode
         case "$MODE" in
             new)
                 if [ -f "$STATE_FILE" ]; then
@@ -124,7 +124,7 @@ find_videos() {
                 ;;
         esac
 
-        # macOS-совместимый вывод (без GNU -printf)
+        # macOS-compatible output (without GNU -printf)
         while IFS= read -r -d '' file; do
             local mtime
             mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null || echo 0)
@@ -133,20 +133,20 @@ find_videos() {
     done | sort -rn | cut -d' ' -f2-
 }
 
-# === Привязка к РП по имени файла ===
+# === Linking to a WP by file name ===
 
 match_wp() {
     local filename="$1"
     local base
     base=$(basename "$filename")
 
-    # Паттерн 1: WP-{N} в имени файла
+    # Pattern 1: WP-{N} in the file name
     if [[ "$base" =~ WP-([0-9]+) ]]; then
         echo "WP-${BASH_REMATCH[1]}"
         return 0
     fi
 
-    # Паттерн 2: Дата в имени файла (YYYY-MM-DD)
+    # Pattern 2: Date in the file name (YYYY-MM-DD)
     if [[ "$base" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
         echo "date:${BASH_REMATCH[1]}"
         return 0
@@ -156,14 +156,14 @@ match_wp() {
     return 1
 }
 
-# === Проверка транскрипта ===
+# === Transcript check ===
 
 has_transcript() {
     local video_path="$1"
     local base
     base=$(basename "$video_path" | sed 's/\.[^.]*$//')
 
-    # Проверить transcripts/ рядом с видео и в первой директории
+    # Check transcripts/ next to the video and in the first directory
     local video_parent
     video_parent=$(dirname "$video_path")
 
@@ -173,7 +173,7 @@ has_transcript() {
     [ -f "${VIDEO_DIRS[0]}/$TRANSCRIPTS_DIR/${base}.md" ] 2>/dev/null
 }
 
-# === Длительность видео (ffprobe) ===
+# === Video duration (ffprobe) ===
 
 get_duration() {
     local video_path="$1"
@@ -184,13 +184,13 @@ get_duration() {
     fi
 }
 
-# === Источник (какая папка) ===
+# === Source (which folder) ===
 
 get_source() {
     local video_path="$1"
     local dir
     dir=$(dirname "$video_path")
-    # Показать имя родительской папки верхнего уровня
+    # Show the name of the top-level parent folder
     for vd in "${VIDEO_DIRS[@]}"; do
         if [[ "$video_path" == "$vd"* ]]; then
             basename "$vd"
@@ -200,7 +200,7 @@ get_source() {
     basename "$dir"
 }
 
-# === Основное сканирование ===
+# === Main scan ===
 
 scan() {
     parse_config
@@ -224,7 +224,7 @@ scan() {
     local stale=0
     local no_transcript=0
 
-    # Вывод в формате для Day Open
+    # Output in the format for Day Open
     echo ""
     echo "## Видеозаписи ($MODE)"
     echo ""
@@ -248,7 +248,7 @@ scan() {
         local age_days
         age_days=$(( ($(date +%s) - $(stat -c %Y "$video_path" 2>/dev/null || stat -f %m "$video_path" 2>/dev/null || echo 0)) / 86400 ))
 
-        # Подсчёт
+        # Counting
         if [ "$wp_match" = "unmatched" ]; then
             unmatched=$((unmatched + 1))
             wp_match="—"
@@ -258,7 +258,7 @@ scan() {
         [ "$has_tr" = "нет" ] && no_transcript=$((no_transcript + 1))
         [ "$age_days" -gt "$STALE_DAYS" ] && stale=$((stale + 1))
 
-        # Маркер просрочки
+        # Overdue marker
         local age_str="${age_days}д"
         [ "$age_days" -gt "$STALE_DAYS" ] && age_str="⚠️ ${age_str}"
 
@@ -271,7 +271,7 @@ scan() {
 
     log "Итого: $total видео, $matched привязано, $unmatched без РП, $stale просрочено"
 
-    # Обновить timestamp последнего сканирования
+    # Update the timestamp of the last scan
     if [ "$DRY_RUN" = false ]; then
         touch "$STATE_FILE"
     fi

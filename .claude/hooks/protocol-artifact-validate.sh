@@ -7,10 +7,10 @@
 #
 # Validated artifacts:
 #   - DayPlan: 11 required sections + ## headings structure + non-empty key sections + carry-over
-#   - DayClose: итоги, carry-over (day-close protocol) [future]
+#   - DayClose: results, carry-over (day-close protocol) [future]
 #
 # Parameterized: sections list is a variable, not hardcoded per format.
-# Ф3 WP-229: добавлены проверки структуры (## заголовки, непустые секции, мультипликатор, carry-over)
+# Phase 3 WP-229: added structure checks (## headings, non-empty sections, multiplier, carry-over)
 
 INPUT=$(cat)
 TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
@@ -28,8 +28,8 @@ if ! echo "$TOOL_INPUT" | grep -qE 'git (add.*&&.*git )?commit'; then
   exit 0
 fi
 
-# Governance-репо: из env $IWE_GOVERNANCE_REPO (по умолчанию ${IWE_GOVERNANCE_REPO:-DS-strategy}).
-# Workspace: $IWE_WORKSPACE или $IWE_ROOT (синонимы), default ~/IWE.
+# Governance repo: from env $IWE_GOVERNANCE_REPO (default ${IWE_GOVERNANCE_REPO:-DS-strategy}).
+# Workspace: $IWE_WORKSPACE or $IWE_ROOT (synonyms), default ~/IWE.
 GOV_REPO="${IWE_GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 WORKSPACE="${IWE_WORKSPACE:-${IWE_ROOT:-$HOME/IWE}}"
 GOV_PATH="$WORKSPACE/$GOV_REPO"
@@ -52,39 +52,39 @@ resolve_find_python3() {
     return 1
 }
 
-# R4.5 fix (WP-273): trigger ТОЛЬКО по staged files, НЕ по тексту команды.
-# Старая логика грепала TOOL_INPUT на «DayPlan|day-close» — false positive
-# на любой коммит файла `day-close/SKILL.md` или сообщения с «day-close».
-# Принцип: «hook trigger = artifact (staged file), не TOOL_INPUT текст» (memory/hooks-design.md).
+# R4.5 fix (WP-273): trigger ONLY on staged files, NOT on the command text.
+# The old logic grepped TOOL_INPUT for "DayPlan|day-close" — a false positive
+# on any commit of the file `day-close/SKILL.md` or a message with "day-close".
+# Principle: "hook trigger = artifact (staged file), not TOOL_INPUT text" (memory/hooks-design.md).
 STAGED=$(cd "$GOV_PATH" 2>/dev/null && git diff --cached --name-only 2>/dev/null || echo "")
 
-# bug-2026-07-24 fix: индекс читается ДО запуска команды, поэтому связка
-# `git add X && git commit` проходила без валидации — на момент проверки индекс
-# ещё пуст, и хук выходил на строке ниже. Дополняем фактический индекс путями,
-# которые команда собирается застейджить сама.
+# bug-2026-07-24 fix: the index is read BEFORE the command runs, so the chain
+# `git add X && git commit` passed without validation — at the time of the check the index
+# is still empty, and the hook exited at the line below. We supplement the actual index with the paths
+# that the command is going to stage itself.
 #
-# Принцип WP-273 не нарушается: парсится не весь текст команды, а ТОЛЬКО
-# сегменты, начинающиеся с `git add`. Сообщение коммита с упоминанием DayPlan
-# false positive не даёт, потому что сегмент `git commit -m ...` не парсится.
+# The WP-273 principle is not violated: not the whole command text is parsed, but ONLY
+# segments starting with `git add`. A commit message mentioning DayPlan
+# gives no false positive, because the `git commit -m ...` segment is not parsed.
 extract_git_add_paths() {
   local segments seg args toks tok out=""
-  # Разбиваем команду на сегменты по разделителям — валидируем только `git add`.
-  # awk, а не `sed 's/&&/\n/g'`: BSD sed (macOS) вставил бы литерал «n».
+  # Split the command into segments by separators — validate only `git add`.
+  # awk, not `sed 's/&&/\n/g'`: BSD sed (macOS) would insert a literal "n".
   segments=$(printf '%s\n' "$TOOL_INPUT" | awk '{gsub(/&&|\|\||;|\|/, "\n"); print}')
   while IFS= read -r seg; do
     echo "$seg" | grep -qE '(^|[[:space:]])git[[:space:]]+add([[:space:]]|$)' || continue
     args=${seg#*git}
     args=${args#*add}
-    # xargs разбирает кавычки по-шелловски — пути с пробелами не рвутся.
+    # xargs parses quotes shell-style — paths with spaces are not split.
     toks=$(printf '%s' "$args" | xargs -n1 2>/dev/null) || toks=""
     while IFS= read -r tok; do
       [ -z "$tok" ] && continue
       case "$tok" in
-        # Массовый стейджинг (запрещён CLAUDE.md, но дыру не оставляем):
-        # берём изменённые артефакты из рабочего дерева.
+        # Mass staging (forbidden by CLAUDE.md, but we do not leave the hole):
+        # take the changed artifacts from the working tree.
         .|-A|--all|-u|--update)
-          # -uall: без него неотслеживаемый каталог схлопывается в `current/`
-          # и новый DayPlan не виден.
+          # -uall: without it an untracked directory collapses into `current/`
+          # and the new DayPlan is not visible.
           out="$out$(cd "$GOV_PATH" 2>/dev/null && git status --porcelain -uall 2>/dev/null \
             | sed -e 's/^...//' -e 's/^.* -> //' -e 's/^"//' -e 's/"$//')"$'\n'
           continue
@@ -92,7 +92,7 @@ extract_git_add_paths() {
         -*) continue ;;
       esac
       tok=${tok#./}
-      # Абсолютный или вложенный путь -> repo-relative.
+      # Absolute or nested path -> repo-relative.
       case "$tok" in
         */current/*) tok="current/${tok#*/current/}" ;;
       esac
@@ -109,12 +109,12 @@ if ! echo "$STAGED" | grep -qE '^current/DayPlan.*\.md$|^current/WeekPlan.*\.md$
   exit 0
 fi
 
-# --- DayPlan Validation (выполняется только если DayPlan застейджен в этом коммите) ---
-# issue #248 (тот же корень, что чинили для WeekPlan/WeekReport ниже): `ls | head -1`
-# резолвил алфавитно первый (= самый старый по ISO-дате) DayPlan на диске, а не тот,
-# что реально коммитится — не мигрированный старый DayPlan в current/ ложно блокировал
-# коммит корректного застейженного DayPlan (или коммит WeekPlan, раз DayPlan вообще
-# не участвовал). Резолвим из $STAGED, как WEEKPLAN/WEEKREPORT.
+# --- DayPlan Validation (runs only if a DayPlan is staged in this commit) ---
+# issue #248 (same root as what was fixed for WeekPlan/WeekReport below): `ls | head -1`
+# resolved the alphabetically first (= oldest by ISO date) DayPlan on disk, not the one
+# actually being committed — a non-migrated old DayPlan in current/ falsely blocked
+# the commit of a correct staged DayPlan (or a WeekPlan commit, since the DayPlan was not
+# involved at all). We resolve from $STAGED, like WEEKPLAN/WEEKREPORT.
 DAYPLAN_STAGED=$(echo "$STAGED" | grep -E '^current/DayPlan.*\.md$' | sort | tail -1)
 DAYPLAN=""
 [ -n "$DAYPLAN_STAGED" ] && DAYPLAN="$GOV_PATH/$DAYPLAN_STAGED"
@@ -124,7 +124,7 @@ ERRORS=()
 if [ -n "$DAYPLAN" ] && [ -f "$DAYPLAN" ]; then
 
 # Required sections (parameterized — update this list when format changes).
-# Scout раздел опционален: проверяется отдельно ниже (см. блок "Scout").
+# The Scout section is optional: checked separately below (see the "Scout" block).
 SECTIONS=(
   "План на сегодня|Plan for Today|Today.s Plan"
   "Календарь|Calendar"
@@ -141,51 +141,51 @@ done
 
 # Check mandatory format elements
 
-# --- Ф3 Check 1: заголовки секций — ## (Obsidian-совместимый) или <summary> (сворачиваемые секции, formatting.md) ---
-# issue #221: formatting.md требует <details><summary> для DayPlan/WeekPlan (более новое решение,
-# заменившее старый Obsidian-only запрет на HTML-теги) — считаем оба варианта заголовком секции.
+# --- Phase 3 Check 1: section headings — ## (Obsidian-compatible) or <summary> (collapsible sections, formatting.md) ---
+# issue #221: formatting.md requires <details><summary> for DayPlan/WeekPlan (a newer decision,
+# which replaced the old Obsidian-only ban on HTML tags) — we count both variants as a section heading.
 HEADINGS_COUNT=$(grep -cE '^## |^[[:space:]]*<summary>' "$DAYPLAN" 2>/dev/null || true); HEADINGS_COUNT=${HEADINGS_COUNT:-0}
 if [ "$HEADINGS_COUNT" -lt 3 ]; then
   ERRORS+=("Секций (## или <summary>) < 3 найдено: $HEADINGS_COUNT. DayPlan должен иметь структуру из заголовков секций")
 fi
 
-# --- Ф3 Check 2: непустые обязательные секции ---
-# Календарь: должна содержать хотя бы одну строку с | (таблица) или "нет событий".
-# Флаг-диапазон вместо awk-range '/start/,/^## /': заголовок секции (## Календарь ...)
-# совпадает и со start, и с end-ограничителем /^## /, из-за чего range схлопывается в
-# одну строку и тело секции теряется (ложный блок коммита — issue #207).
-# EN-альтернатива заголовка (Calendar) — для двуязычных DayPlan (issue #210).
+# --- Phase 3 Check 2: non-empty mandatory sections ---
+# Calendar: must contain at least one line with | (table) or "нет событий" (no events).
+# Flag-range instead of awk-range '/start/,/^## /': the section heading (## Календарь ...)
+# matches both the start and the end delimiter /^## /, because of which the range collapses into
+# a single line and the section body is lost (false commit block — issue #207).
+# EN alternative of the heading (Calendar) — for bilingual DayPlans (issue #210).
 CALENDAR_CONTENT=$(awk 'f && /^## /{exit} /Календарь|Calendar/{f=1} f' "$DAYPLAN" 2>/dev/null | wc -l || echo 0)
 if [ "$CALENDAR_CONTENT" -lt 3 ]; then
   ERRORS+=("Секция 'Календарь' пустая или слишком короткая (${CALENDAR_CONTENT} строк)")
 fi
 
-# Scout: проверяется только если секция вообще присутствует в DayPlan (опциональный компонент,
-# зависит от DS-agent-workspace). Если секции нет — Scout не сконфигурирован, валидатор не блокирует.
+# Scout: checked only if the section is present in the DayPlan at all (an optional component,
+# depends on DS-agent-workspace). If there is no section — Scout is not configured, the validator does not block.
 if grep -q "Наработки Scout" "$DAYPLAN" 2>/dev/null; then
-  # Флаг-диапазон вместо awk-range (см. Календарь выше, issue #207): заголовок
-  # '## Наработки Scout' совпадает с end-ограничителем /^## /, range схлопывается.
+  # Flag-range instead of awk-range (see Calendar above, issue #207): the heading
+  # '## Наработки Scout' matches the end delimiter /^## /, the range collapses.
   if ! awk 'f && /^## /{exit} /Наработки Scout/{f=1} f' "$DAYPLAN" 2>/dev/null | grep -iqE 'наход|capture|статус|нет|find|disabled|not configured'; then
     ERRORS+=("Секция 'Наработки Scout' пустая (допустимы маркеры 'нет находок', 'disabled', 'not configured')")
   fi
 fi
 
-# --- Ф3 Check 3: формат мультипликатора ---
-# issue #328: без сконфигурированного учёта времени мультипликатор считать не из
-# чего — принуждение к числу даёт фиктивное '~1.0x', которое через месяц читается
-# как измерение. Явная текстовая оговорка ("мультипликатор не считаю"/"не
-# настроен") — такое же честное состояние поля, как и само число.
-# issue #870: дробная часть — точка ИЛИ запятая (русский Day Open пишет «~1,2x»).
-# Число только проверяется на формат (grep), в вычислениях не участвует.
+# --- Phase 3 Check 3: multiplier format ---
+# issue #328: without configured time tracking there is nothing to compute the multiplier
+# from — forcing a number gives a fictitious '~1.0x', which a month later reads
+# as a measurement. An explicit textual disclaimer ("мультипликатор не считаю" = multiplier not counted / "не
+# настроен" = not configured) is as honest a field state as the number itself.
+# issue #870: the fractional part is a dot OR a comma (the Russian Day Open writes "~1,2x").
+# The number is only format-checked (grep), it does not take part in calculations.
 if ! grep -qE "~[0-9]+[.,]?[0-9]*x" "$DAYPLAN" && ! grep -qiE "мультипликатор.*(не считаю|не наст)" "$DAYPLAN"; then
   ERRORS+=("Мультипликатор не найден — нужен формат '~N.Nx' в строке бюджета, либо явная оговорка 'мультипликатор не считаю'")
 fi
 
-# --- Ф3 Check 4 (legacy): mandatory check и бюджет ---
-# issue #328: "mandatory" был зашит текстом одной конкретной установки (WP-7 +
-# авторский контентный РП). Источник истины — mandatory_daily_wps в
-# day-rhythm-config.yaml; закомментирован/пуст → пользователь явно сконфигурировал
-# "обязательных РП нет", секцию в DayPlan не требуем.
+# --- Phase 3 Check 4 (legacy): mandatory check and budget ---
+# issue #328: "mandatory" was hard-wired in the text of one specific installation (WP-7 +
+# the author's content WP). The source of truth is mandatory_daily_wps in
+# day-rhythm-config.yaml; commented out/empty → the user explicitly configured
+# "no mandatory WPs", we do not require the section in the DayPlan.
 MANDATORY_WPS_CONFIGURED=false
 DAY_RHYTHM_CONFIG="$WORKSPACE/memory/day-rhythm-config.yaml"
 if [ -f "$DAY_RHYTHM_CONFIG" ]; then
@@ -198,12 +198,12 @@ if [ -f "$DAY_RHYTHM_CONFIG" ]; then
   _RESOLVED_PYTHON3=""
   [ -n "$_RESOLVER" ] && _RESOLVED_PYTHON3=$("$_RESOLVER" 2>/dev/null) || true
   if [ -z "$_RESOLVED_PYTHON3" ]; then
-    # issue #765: резолвер python3 не менее надёжен, чем сам YAML — та же
-    # fail-closed граница, что применяется ниже к битому/нечитаемому конфигу.
+    # issue #765: the python3 resolver is no less reliable than the YAML itself — the same
+    # fail-closed boundary that applies below to a broken/unreadable config.
     ERRORS+=("day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор) — mandatory-проверка невозможна, fail-closed")
   else
-    # Коды: 0 = mandatory сконфигурирован; 1 = валидный конфиг без mandatory;
-    # 2+ = битый/нечитаемый YAML — fail-closed (тот же контракт, что sibling
+    # Codes: 0 = mandatory configured; 1 = valid config without mandatory;
+    # 2+ = broken/unreadable YAML — fail-closed (same contract as sibling
     # validate-staged-artifacts.sh).
     _MANDATORY_RC=0
     "$_RESOLVED_PYTHON3" -c "
@@ -219,7 +219,7 @@ sys.exit(0 if d.get('mandatory_daily_wps') else 1)
 " "$DAY_RHYTHM_CONFIG" 2>/dev/null || _MANDATORY_RC=$?
     case "$_MANDATORY_RC" in
       0) MANDATORY_WPS_CONFIGURED=true ;;
-      1) : ;; # валидный конфиг без mandatory — проверка не требуется
+      1) : ;; # valid config without mandatory — check not required
       *) ERRORS+=("day-rhythm-config.yaml существует, но не читается (нет PyYAML / битый или пустой YAML / корень не map / интерпретатор упал rc=$_MANDATORY_RC) — mandatory-проверка невозможна, fail-closed") ;;
     esac
   fi
@@ -228,22 +228,22 @@ if [ "$MANDATORY_WPS_CONFIGURED" = "true" ] && ! grep -qi "mandatory" "$DAYPLAN"
   ERRORS+=("Mandatory check не найден (mandatory_daily_wps сконфигурирован в day-rhythm-config.yaml)")
 fi
 
-# issue #328: русская 'ч' — стандартный формат formatting.md, латинская 'h' — старый
-# формат, оставлена для обратной совместимости с уже существующими артефактами.
+# issue #328: the Russian 'ч' is the standard formatting.md format, the Latin 'h' is the old
+# format, kept for backward compatibility with already existing artifacts.
 if ! grep -qE "~[0-9]+[.,]?[0-9]* ?[hч] РП" "$DAYPLAN"; then
   ERRORS+=("Бюджет дня не в формате '~Xч РП / ~Yч физ' (латинская 'h' тоже принимается)")
 fi
 
-# --- Ф3 Check 5: Carry-over цитата (если есть предыдущий DayPlan) ---
-# issue #870: предшественник ЗАСТЕЙДЖЕННОГО плана в отсортированном списке, а не
-# «предпоследний на диске»: при коммите не самого свежего плана он сравнивался бы
-# со своим будущим. Самый старый план предшественника не имеет — сравнивать не с чем.
-# Сам застейдженный план добавлен в список: имя вне канона («DayPlan_…», не «DayPlan …»)
-# тоже получает предшественника, как и до этой правки.
+# --- Phase 3 Check 5: Carry-over quote (if there is a previous DayPlan) ---
+# issue #870: the predecessor of the STAGED plan in the sorted list, not the
+# "second-to-last on disk": when committing not the newest plan, it would be compared
+# with its own future. The oldest plan has no predecessor — nothing to compare with.
+# The staged plan itself is added to the list: a name outside the canon ("DayPlan_…", not "DayPlan …")
+# also gets a predecessor, as before this fix.
 PREV_DAYPLAN=$({ ls "$GOV_PATH"/current/DayPlan\ *.md 2>/dev/null; printf '%s\n' "$DAYPLAN"; } | sort -u \
   | CUR="$DAYPLAN" awk '$0 == ENVIRON["CUR"] { print prev; exit } { prev = $0 }')
 if [ -n "$PREV_DAYPLAN" ] && [ "$PREV_DAYPLAN" != "$DAYPLAN" ]; then
-  # Предыдущий DayPlan существует — текущий должен содержать Carry-over
+  # The previous DayPlan exists — the current one must contain Carry-over
   if ! grep -qiE 'carry.over|carry_over' "$DAYPLAN"; then
     ERRORS+=("Carry-over цитата из предыдущего Day Close отсутствует (предыдущий DayPlan: $(basename "$PREV_DAYPLAN"))")
   fi
@@ -251,11 +251,11 @@ fi
 
 fi  # endif [ -n "$DAYPLAN" ]
 
-# --- WeekPlan Validation (Ф6.1 WP-265) ---
-# issue #248: раньше валидировался ПОСЛЕДНИЙ WeekPlan на диске по mtime/имени,
-# даже если в этом коммите менялся только DayPlan — старый, не мигрированный
-# WeekPlan блокировал коммиты, к которым не имел отношения. Теперь валидируем
-# ТОЛЬКО если сам WeekPlan застейджен в этом коммите.
+# --- WeekPlan Validation (Phase 6.1 WP-265) ---
+# issue #248: previously the LAST WeekPlan on disk by mtime/name was validated,
+# even if only the DayPlan changed in this commit — an old, non-migrated
+# WeekPlan blocked commits it had nothing to do with. Now we validate
+# ONLY if the WeekPlan itself is staged in this commit.
 WEEKPLAN_STAGED=$(echo "$STAGED" | grep -E '^current/WeekPlan.*\.md$' | sort | tail -1)
 WEEKPLAN=""
 [ -n "$WEEKPLAN_STAGED" ] && WEEKPLAN="$GOV_PATH/$WEEKPLAN_STAGED"
@@ -264,23 +264,23 @@ if [ -n "$WEEKPLAN" ] && [ -f "$WEEKPLAN" ]; then
   WP_ERRORS=()
   WP_MISSING_LIST=()
 
-  # Детектор (а): >80 строк без достаточного числа заголовков — ## или <summary> (issue #221, см. Check 1 выше)
+  # Detector (a): >80 lines without a sufficient number of headings — ## or <summary> (issue #221, see Check 1 above)
   WP_HEADINGS_COUNT=$(grep -cE '^## |^[[:space:]]*<summary>' "$WEEKPLAN" 2>/dev/null || true); WP_HEADINGS_COUNT=${WP_HEADINGS_COUNT:-0}
   if [ "$WP_LINES" -gt 80 ] && [ "$WP_HEADINGS_COUNT" -lt 3 ]; then
     WP_ERRORS+=("WeekPlan >80 строк ($WP_LINES) но секций (## или <summary>) < 3 ($WP_HEADINGS_COUNT). Используй ## заголовки или <details><summary> для структурирования.")
   fi
 
-  # Детектор (в) — обязательные секции WeekPlan — удалён (issue #318 hotfix,
-  # 2026-07-28): список заголовков дважды подряд отставал от реальной структуры
-  # и при проверке на всей истории пилота блокировал 23 из 24 архивных файлов
-  # (секции вроде "## Carry-over" появляются только на Week Close, не в течение
-  # недели). Структура WeekPlan меняется слишком часто для жёсткого gate по
-  # именам заголовков — детектор (а) выше остаётся, он от них не зависит.
+  # Detector (c) — mandatory WeekPlan sections — removed (issue #318 hotfix,
+  # 2026-07-28): the list of headings twice in a row lagged behind the real structure
+  # and when checked against the pilot's entire history blocked 23 of 24 archived files
+  # (sections like "## Carry-over" appear only at Week Close, not during
+  # the week). The WeekPlan structure changes too often for a hard gate on
+  # heading names — detector (a) above stays, it does not depend on them.
 
-  # Детектор (г): WeekReport валидация (ОПТ-5 WP-297)
-  # issue #248: та же болезнь — раньше брался ПОСЛЕДНИЙ WeekReport на диске,
-  # который может относиться к уже закрытой прошлой неделе. Валидируем только
-  # если WeekReport сам застейджен в этом коммите.
+  # Detector (d): WeekReport validation (OPT-5 WP-297)
+  # issue #248: the same disease — the LAST WeekReport on disk was taken,
+  # which may belong to an already closed past week. We validate only
+  # if the WeekReport itself is staged in this commit.
   WEEKREPORT_STAGED=$(echo "$STAGED" | grep -E '^current/WeekReport.*\.md$' | sort | tail -1)
   if [ -n "$WEEKREPORT_STAGED" ]; then
     WEEKREPORT="$GOV_PATH/$WEEKREPORT_STAGED"

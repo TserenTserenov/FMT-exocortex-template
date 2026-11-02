@@ -71,9 +71,9 @@ latest_heartbeat_age() {
     return
   fi
   local hb_epoch now
-  # heartbeat_at пишется в UTC с суффиксом Z. macOS date -j -f интерпретирует
-  # литеральный Z как часть формата и парсит время как локальное, завышая возраст
-  # на смещение часового пояса. Убираем Z и парсим как UTC (-u).
+  # heartbeat_at is written in UTC with a Z suffix. macOS date -j -f interprets the
+  # literal Z as part of the format and parses the time as local, inflating the age
+  # by the timezone offset. We strip the Z and parse as UTC (-u).
   hb_epoch="$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${last_hb%Z}" +%s 2>/dev/null || date -d "$last_hb" +%s 2>/dev/null || echo "0")"
   now="$(now_epoch)"
   echo "$((now - hb_epoch))"

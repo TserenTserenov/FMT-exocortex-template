@@ -1,10 +1,10 @@
 #!/bin/bash
-# Тест issue #1183: PreCompact-хук пишет слепок в файл вне репозитория
-# ($CLAUDE_CONFIG_DIR/iwe-checkpoints/), SessionStart(compact)-хук возвращает его
-# агенту через stdout. Проверяется наблюдаемый результат: содержимое файла и
-# текст, который получит модель, а не только форма JSON.
+# Test issue #1183: the PreCompact hook writes a snapshot to a file outside the repository
+# ($CLAUDE_CONFIG_DIR/iwe-checkpoints/), the SessionStart(compact) hook returns it
+# to the agent via stdout. The observable result is checked: the file content and
+# the text the model will receive, not just the JSON shape.
 #
-# Запуск: bash .claude/hooks/tests/test-issue-1183-precompact-checkpoint.sh
+# Run: bash .claude/hooks/tests/test-issue-1183-precompact-checkpoint.sh
 
 set -uo pipefail
 
@@ -27,9 +27,9 @@ trap 'rm -rf "$TMP"' EXIT
 export CLAUDE_CONFIG_DIR="$TMP/.claude"
 SID="sess-1183_x"
 
-# Транскрипт: реплика пользователя (строка-JSON, формат -p), реплика с
-# многострочным текстом, многострочный ответ ассистента, служебная вставка
-# ВТОРЫМ блоком того же сообщения пользователя (issue #1183, M2).
+# Transcript: a user turn (JSON string, -p format), a turn with
+# multi-line text, a multi-line assistant reply, a service insertion
+# as the SECOND block of the same user message (issue #1183, M2).
 cat > "$TMP/transcript.jsonl" <<'JSONL'
 {"type":"user","message":{"role":"user","content":"Начни протокол ОБРАЗЕЦ"}}
 {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Доделай РП-777, шаг верификации"},{"type":"text","text":"<system-reminder>служебное</system-reminder>"}]}}
@@ -40,7 +40,7 @@ JSONL
 PRE_IN=$(jq -nc --arg sid "$SID" --arg cwd "$TMP" --arg tp "$TMP/transcript.jsonl" \
   '{session_id:$sid,cwd:$cwd,transcript_path:$tp,hook_event_name:"PreCompact",trigger:"manual"}')
 
-# 1. PreCompact: молчит, пишет файл вне проекта (не в $cwd/.claude/)
+# 1. PreCompact: silent, writes a file outside the project (not in $cwd/.claude/)
 OUT=$(printf '%s' "$PRE_IN" | bash "$HOOK_DIR/precompact-checkpoint.sh"); CODE=$?
 check "pre: exit 0" "0" "$CODE"
 check "pre: stdout пуст (канала к модели нет)" "" "$OUT"
@@ -55,8 +55,8 @@ check "pre: служебная вставка (второй блок) не по�
 check "pre: многострочный ответ сохранён целиком" "yes" "$(grep -q 'Итог по задаче.*Следом шаг 5' "$CP" && echo yes || echo no)"
 check "pre: строка-напоминание (type=string) отфильтрована" "no" "$(grep -q 'чистая строка-напоминание' "$CP" && echo yes || echo no)"
 
-# 2. SessionStart(compact): возвращает слепок тем же session_id, помечает как
-# недоверенные данные, после выдачи слепок одноразовый.
+# 2. SessionStart(compact): returns the snapshot for the same session_id, marks it as
+# untrusted data, after delivery the snapshot is one-time.
 POST_IN=$(jq -nc --arg sid "$SID" --arg cwd "$TMP" '{session_id:$sid,cwd:$cwd,hook_event_name:"SessionStart",source:"compact"}')
 OUT=$(printf '%s' "$POST_IN" | bash "$HOOK_DIR/precompact-restore.sh"); CODE=$?
 check "restore: exit 0" "0" "$CODE"
@@ -64,12 +64,12 @@ check "restore: агент получает слепок" "yes" "$(printf '%s' "
 check "restore: слепок помечен как недоверенные данные" "yes" "$(printf '%s' "$OUT" | grep -q 'недоверенные данные' && echo yes || echo no)"
 check "restore: слепок одноразовый (файл удалён)" "no" "$([ -e "$CP" ] && echo yes || echo no)"
 
-# 3. Нет слепка (другая сессия) → ничего не печатаем
+# 3. No snapshot (another session) → we print nothing
 POST_OTHER=$(jq -nc --arg cwd "$TMP" '{session_id:"other",cwd:$cwd,source:"compact"}')
 OUT=$(printf '%s' "$POST_OTHER" | bash "$HOOK_DIR/precompact-restore.sh")
 check "restore: без слепка тишина" "" "$OUT"
 
-# 4. Отклонение небезопасного/слишком длинного session_id — ничего не пишем
+# 4. Rejection of an unsafe/too long session_id — we write nothing
 EVIL=$(jq -nc --arg cwd "$TMP" '{session_id:"../../evil",cwd:$cwd,trigger:"auto"}')
 printf '%s' "$EVIL" | bash "$HOOK_DIR/precompact-checkpoint.sh"
 check "pre: небезопасный session_id отклонён" "0" "$(find "$CLAUDE_CONFIG_DIR/iwe-checkpoints" -name 'checkpoint-*evil*' 2>/dev/null | wc -l | tr -d ' ')"
@@ -78,12 +78,12 @@ TOOLONG=$(jq -nc --arg sid "$LONG_ID" --arg cwd "$TMP" '{session_id:$sid,cwd:$cw
 printf '%s' "$TOOLONG" | bash "$HOOK_DIR/precompact-checkpoint.sh"
 check "pre: слишком длинный session_id отклонён" "0" "$(find "$CLAUDE_CONFIG_DIR/iwe-checkpoints" -maxdepth 1 -name "checkpoint-$LONG_ID.md" 2>/dev/null | wc -l | tr -d ' ')"
 
-# 5. Нет session_id → без ошибки и без файла
+# 5. No session_id → no error and no file
 printf '%s' '{"cwd":"'"$TMP"'"}' | bash "$HOOK_DIR/precompact-checkpoint.sh"
 check "pre: без session_id exit 0" "0" "$?"
 
-# 6. Транскрипт с длинными строками (например вывод инструмента) и недописанной
-# последней строкой не должен обрывать разбор остального хвоста (issue #1183, H1).
+# 6. A transcript with long lines (e.g. tool output) and an unfinished
+# last line must not abort the parsing of the rest of the tail (issue #1183, H1).
 BIGSID="big-sess"
 BIG_TRANSCRIPT="$TMP/big.jsonl"
 python3 - "$BIG_TRANSCRIPT" <<'PYEOF'
@@ -101,9 +101,9 @@ BIG_CP="$CLAUDE_CONFIG_DIR/iwe-checkpoints/checkpoint-$BIGSID.md"
 check "pre: большой транскрипт с обрывом — файл создан" "yes" "$([ -f "$BIG_CP" ] && echo yes || echo no)"
 check "pre: разбор не оборвался на битой строке, валидная запись видна" "yes" "$(grep -q 'финальный запрос перед обрывом' "$BIG_CP" && echo yes || echo no)"
 
-# 7. Перевод строки ВНУТРИ одного text-блока не должен разбивать запись на
-# части под внешним tail -n N (issue #1183, холодное ревью раунда 2, M1):
-# join(" ") склеивает блоки между собой, но раньше не чистил \n внутри блока.
+# 7. A newline INSIDE a single text block must not split an entry into
+# parts under an outer tail -n N (issue #1183, cold review round 2, M1):
+# join(" ") glues the blocks together, but previously did not clean \n inside a block.
 MULTISID="multiline-sess"
 MULTI_TRANSCRIPT="$TMP/multiline.jsonl"
 cat > "$MULTI_TRANSCRIPT" <<'JSONL'
@@ -114,7 +114,7 @@ printf '%s' "$MULTI_IN" | bash "$HOOK_DIR/precompact-checkpoint.sh"
 MULTI_CP="$CLAUDE_CONFIG_DIR/iwe-checkpoints/checkpoint-$MULTISID.md"
 check "pre: перевод строки внутри одного блока не режет запись (M1)" "yes" "$(grep -q 'Многострочный блок:.*строка два.*строка три (конец)' "$MULTI_CP" && echo yes || echo no)"
 
-# 8. Слепок больше 6000 байт — restore сообщает об обрезке, а не молчит про неё.
+# 8. A snapshot larger than 6000 bytes — restore reports the truncation rather than staying silent about it.
 BIGSNAP_SID="big-snapshot-sess"
 BIGSNAP_CP="$CLAUDE_CONFIG_DIR/iwe-checkpoints/checkpoint-$BIGSNAP_SID.md"
 python3 -c "print('x' * 7000)" > "$BIGSNAP_CP"

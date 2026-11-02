@@ -1,24 +1,24 @@
 #!/bin/bash
-# restore-from-exocortex.sh — восстановление памяти IWE из exocortex-бэкапа (closes #125)
+# restore-from-exocortex.sh — restore IWE memory from an exocortex backup (closes #125)
 #
-# Вторая половина истории портируемости (первая — backup в day-close.sh + авто-зеркало
-# memory-exocortex-sync.sh). Применяется на НОВОМ устройстве или после потери/повреждения
-# локальной memory/: разворачивает exocortex/ обратно в auto-memory + CLAUDE.md + симлинк.
+# The second half of the portability story (the first is backup in day-close.sh + the auto-mirror
+# memory-exocortex-sync.sh). Applies on a NEW device or after loss/corruption of the
+# local memory/: unfolds exocortex/ back into auto-memory + CLAUDE.md + symlink.
 #
-# Использование:
+# Usage:
 #   restore-from-exocortex.sh [<governance-repo-path>] [--force] [--dry-run]
 #
-#   <governance-repo-path>  путь к governance-репо (default: $WORKSPACE_DIR/$GOVERNANCE_REPO)
-#   --force                 перезаписать НЕпустую memory/ (по умолчанию — отказ)
-#   --dry-run               показать что будет сделано, без изменений
+#   <governance-repo-path>  path to the governance repo (default: $WORKSPACE_DIR/$GOVERNANCE_REPO)
+#   --force                 overwrite a NON-empty memory/ (by default — refusal)
+#   --dry-run               show what would be done, without changes
 #
-# Источник: последний завершённый Day Close из .iwe-runtime/day-close-backups,
-# если он есть; иначе прежний exocortex/ канонического репозитория.
-# Path-схема идентична scripts/day-close.sh (v0.35.2): HOME_SLUG + override через env.
+# Source: the last completed Day Close from .iwe-runtime/day-close-backups,
+# if it exists; otherwise the previous exocortex/ of the canonical repository.
+# Path scheme is identical to scripts/day-close.sh (v0.35.2): HOME_SLUG + override via env.
 
 set -euo pipefail
 
-# === Парсинг аргументов ===
+# === Argument parsing ===
 FORCE=false
 DRY_RUN=false
 GOV_ARG=""
@@ -34,11 +34,11 @@ for arg in "$@"; do
     esac
 done
 
-# === Конфигурация (настраивается через env) ===
-# issue #1336: резолвим workspace по канону конвейера (memory/dry-run-contract.md,
+# === Configuration (configurable via env) ===
+# issue #1336: resolve the workspace by the pipeline canon (memory/dry-run-contract.md,
 # issues #1233/#784/#785): env WORKSPACE_DIR > .iwe-paths (IWE_WORKSPACE) > $HOME/IWE.
-# Без этого restore на установке с нестандартным workspace искал exocortex/ не там.
-# Однострочная форма цепочки — байт-в-байт из вайтлиста dry-run-gate.sh.
+# Without this, restore on an install with a non-standard workspace looked for exocortex/ in the wrong place.
+# One-line form of the chain — byte-for-byte from the dry-run-gate.sh whitelist.
 IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS"
 WORKSPACE_DIR="${WORKSPACE_DIR:-${IWE_WORKSPACE:-$HOME/IWE}}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
@@ -66,10 +66,10 @@ if [ -z "$GOV_ARG" ]; then
         BACKUP_SELECTED=true
     fi
 fi
-# Claude Code слугифицирует путь проекта, заменяя на '-' не только '/', но и '_' и '.'.
-# Если в $HOME есть '_' (напр. username john_doe), реальная папка — '-home-john-doe-IWE'.
-# tr '/' '-' дал бы фантом '-home-john_doe-IWE' → restore промахнётся мимо auto-memory.
-# Здесь symlink-резолв непригоден: на новой машине $WORKSPACE_DIR/memory ещё не создан.
+# Claude Code slugifies the project path, replacing with '-' not only '/', but also '_' and '.'.
+# If $HOME contains '_' (e.g. username john_doe), the real folder is '-home-john-doe-IWE'.
+# tr '/' '-' would give a phantom '-home-john_doe-IWE' → restore would miss the auto-memory.
+# Symlink resolution is unusable here: on a new machine $WORKSPACE_DIR/memory is not created yet.
 WORKSPACE_SLUG=$(printf '%s' "$WORKSPACE_DIR" | tr '/_.' '-')
 COMPUTED_MEMORY="$HOME/.claude/projects/${WORKSPACE_SLUG}/memory"
 PHYSICAL_MEMORY=""
@@ -241,7 +241,7 @@ atomic_restore_claude() {
     fi
 }
 
-# === Проверки ===
+# === Checks ===
 if [ ! -d "$EXOCORTEX_SRC" ]; then
     err "exocortex не найден: $EXOCORTEX_SRC"
     err "Укажи путь к governance-репо: restore-from-exocortex.sh <path>"
@@ -293,7 +293,7 @@ if $DAY_RHYTHM_SRC_PRESENT && [ -L "$DAY_RHYTHM_SRC" ]; then
     exit 1
 fi
 
-# Отказ от тихой перезаписи населённой memory/ (если не --force)
+# Refuse to silently overwrite a populated memory/ (unless --force)
 if [ -d "$MEMORY_DST" ] && [ -n "$(ls -A -- "$MEMORY_DST" 2>/dev/null)" ] && ! $FORCE && ! $DRY_RUN; then
     err "memory/ уже не пуста: $MEMORY_DST"
     err "Это похоже на существующую инсталляцию. Для перезаписи — --force (или --dry-run для превью)."
@@ -304,13 +304,13 @@ log "Источник:    $EXOCORTEX_SRC"
 log "Назначение:  $MEMORY_DST"
 $DRY_RUN && warn "режим --dry-run: изменения не применяются"
 
-# === Шаг 1: memory-файлы → auto-memory ===
+# === Step 1: memory files → auto-memory ===
 run_cmd mkdir -p -- "$MEMORY_DST"
 mem_count=0
-# issue #343, вторая половина: плоский glob по верхнему уровню возвращал только
-# memory/*.md и молча терял подпапки — memory/reference/agent-core.md не восстанавливался
-# даже из бэкапа, где он есть. find обходит дерево целиком, относительный путь
-# сохраняется, поэтому вложенность доезжает как есть.
+# issue #343, second half: a flat glob over the top level returned only
+# memory/*.md and silently lost subfolders — memory/reference/agent-core.md was not restored
+# even from a backup where it exists. find walks the whole tree, the relative path
+# is preserved, so nesting arrives as is.
 while IFS= read -r -d '' f; do
     [ -f "$f" ] || continue
     rel="${f#"$EXOCORTEX_SRC"/}"
@@ -344,8 +344,8 @@ else
     warn "day-rhythm-config.yaml в exocortex отсутствует — пропуск"
 fi
 
-# === Шаг 1b: extensions/ → workspace (issue #235: exocortex/extensions/ зеркалится
-# хуком memory-exocortex-sync.sh с 2026-07-11; бэкапы старше этой даты его не содержат) ===
+# === Step 1b: extensions/ → workspace (issue #235: exocortex/extensions/ is mirrored
+# by the memory-exocortex-sync.sh hook since 2026-07-11; backups older than this date do not contain it) ===
 EXTENSIONS_DST="$WORKSPACE_DIR/extensions"
 if [ -d "$EXOCORTEX_SRC/extensions" ]; then
     if [ -d "$EXTENSIONS_DST" ] && [ -n "$(ls -A -- "$EXTENSIONS_DST" 2>/dev/null)" ] && ! $FORCE && ! $DRY_RUN; then
@@ -367,7 +367,7 @@ else
     warn "exocortex/extensions/ отсутствует (бэкап старее фикса #235, или extensions/ был пуст) — пропуск"
 fi
 
-# === Шаг 1c: rules/ → workspace ===
+# === Step 1c: rules/ → workspace ===
 RULES_DST="$WORKSPACE_DIR/.claude/rules"
 if [ -d "$EXOCORTEX_SRC/rules" ]; then
     if [ -d "$RULES_DST" ] && [ -n "$(ls -A -- "$RULES_DST" 2>/dev/null)" ] && ! $FORCE && ! $DRY_RUN; then
@@ -388,11 +388,11 @@ else
     warn "exocortex/rules/ отсутствует (старый бэкап) — пропуск"
 fi
 
-# === Шаг 2: CLAUDE.md → workspace root ===
-# issue #217: прямая подстановка {{HOME_DIR}} -> $HOME делает восстановление
-# ОС-агностичным (бэкап пишется на плейсхолдере в day-close.sh, шаг 1).
-# $HOME стоит в replacement-части sed s/// — экранируем & и \, иначе HOME с &
-# трактуется как «весь совпавший текст» и портит путь (cold-review находка).
+# === Step 2: CLAUDE.md → workspace root ===
+# issue #217: direct substitution {{HOME_DIR}} -> $HOME makes the restore
+# OS-agnostic (the backup is written on the placeholder in day-close.sh, step 1).
+# $HOME sits in the replacement part of sed s/// — escape & and \, otherwise a HOME with &
+# is treated as "the whole matched text" and corrupts the path (cold-review finding).
 HOME_SED_SAFE=$(printf '%s' "$HOME" | sed 's/[|&\]/\\&/g')
 if [ -f "$EXOCORTEX_SRC/CLAUDE.md" ]; then
     atomic_restore_claude "$EXOCORTEX_SRC/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md" || exit 1
@@ -414,7 +414,7 @@ else
     warn "params.yaml в exocortex отсутствует — пропуск"
 fi
 
-# === Шаг 3: симлинк $WORKSPACE_DIR/memory → auto-memory ===
+# === Step 3: symlink $WORKSPACE_DIR/memory → auto-memory ===
 LINK="$WORKSPACE_DIR/memory"
 if [ -L "$LINK" ]; then
     current=$(readlink -- "$LINK")

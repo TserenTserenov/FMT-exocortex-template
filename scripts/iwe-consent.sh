@@ -2,17 +2,17 @@
 # routing: executor=script  deterministic=true  skill=consent  optimization_priority=1
 # see DP.SC.159, DP.ROLE.059
 # iwe-consent.sh
-# WP-253 Блок 2 Ф0.6 — opt-in / opt-out / status для learning.tracking_consent.
+# WP-253 Block 2 Phase 0.6 — opt-in / opt-out / status for learning.tracking_consent.
 #
 # Usage:
-#   iwe-consent.sh status                # показать текущий consent
+#   iwe-consent.sh status                # show the current consent
 #   iwe-consent.sh opt-in [scope1,scope2] # default: stage_evaluation
-#   iwe-consent.sh opt-out               # opt_in=FALSE (сохраняет историю)
-#   iwe-consent.sh revoke                # DELETE row (GDPR — полное удаление)
+#   iwe-consent.sh opt-out               # opt_in=FALSE (keeps history)
+#   iwe-consent.sh revoke                # DELETE row (GDPR — full deletion)
 #
 # Env:
-#   IWE_OWNER_ORY_UUID                  — account_id (обязателен)
-#   DATABASE_URL_CONSENT_WRITER         — preferred (миграция 113)
+#   IWE_OWNER_ORY_UUID                  — account_id (required)
+#   DATABASE_URL_CONSENT_WRITER         — preferred (migration 113)
 #   DATABASE_URL_LEARNING_DIRECT        — fallback
 
 set -euo pipefail

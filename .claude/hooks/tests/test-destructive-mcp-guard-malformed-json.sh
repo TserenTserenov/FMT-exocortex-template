@@ -1,6 +1,6 @@
 #!/bin/bash
 # test-destructive-mcp-guard-malformed-json.sh — regression corpus for the
-# WP-544 Д22 fail-closed fix (08.09, peer session
+# WP-544 D22 fail-closed fix (08.09, peer session
 # 2026-09-08-25-wp544-continue-f7, Codex): a malformed/schema-invalid MCP
 # call envelope must deny, not exit 0.
 #
@@ -9,7 +9,7 @@
 # `mcp__*` case and fell through to `exit 0` — a truncated payload naming
 # e.g. `mcp__railway__remove_service` inside broken JSON passed silently.
 #
-# Запуск: bash .claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh
+# Run: bash .claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh
 
 set -uo pipefail
 
@@ -76,7 +76,7 @@ expect "валидный разрушительный MCP-вызов блоки�
 expect "не-MCP tool_name НЕ блокируется (матчер вне scope этого хука)" pass \
   '{"tool_name":"Bash"}'
 
-# === отсутствие jq — тоже fail-closed (deny), не fail-open. This script hard-
+# === missing jq — also fail-closed (deny), not fail-open. This script hard-
 # codes PATH to standard system dirs on its own (line 15) specifically to
 # resist a hijacked PATH — so a PATH edit alone cannot hide jq if it lives in
 # one of those dirs. A bash function named `jq`, exported into the child bash
@@ -96,7 +96,7 @@ else
   echo "  stderr: $(cat "$TMP_DIR/err.nojq")"
 fi
 
-# === сырой payload не попадает в диагностику stderr (может содержать секреты) ===
+# === the raw payload does not end up in stderr diagnostics (may contain secrets) ===
 SECRET_PAYLOAD='{"tool_name":"mcp__x__remove_service","secret":"sk-ant-super-secret-token-do-not-leak"'
 printf '%s' "$SECRET_PAYLOAD" | IWE_ROOT="$TMP_DIR/iwe-root" bash "$HOOK" >/dev/null 2>"$TMP_DIR/err.secret" || true
 if grep -q "sk-ant-super-secret-token-do-not-leak" "$TMP_DIR/err.secret" 2>/dev/null; then

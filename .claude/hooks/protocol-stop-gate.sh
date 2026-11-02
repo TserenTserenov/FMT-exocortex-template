@@ -1,18 +1,18 @@
 #!/bin/bash
 # protocol-stop-gate.sh
-# see DP.SC.025 (capture-bus), WP-229 Ф4
+# see DP.SC.025 (capture-bus), WP-229 Phase 4
 # Event: Stop
-# Проверяет: если в сессии был вызов Skill (day-open|day-close|run-protocol|wp-new),
-# то должен быть TodoWrite с ≥3 items. Иначе — block.
-# Принцип warn-before-block (issue #1184): не более одного реального block на
-# сессию за 24ч (marker в $IWE_ROOT/.claude/state/protocol-stop-gate/,
-# gitignored — issue #250). Сессия длиннее 24ч может получить повторный block —
-# это намеренно. Деградации (нет session_id / замок недоступен) → прежний
-# systemMessage-предупреждение пользователю, не block.
+# Checks: if the session had a Skill call (day-open|day-close|run-protocol|wp-new),
+# there must be a TodoWrite with >=3 items. Otherwise -- block.
+# Warn-before-block principle (issue #1184): no more than one real block per
+# session per 24h (marker in $IWE_ROOT/.claude/state/protocol-stop-gate/,
+# gitignored -- issue #250). A session longer than 24h may get a repeated block --
+# this is intentional. Degradations (no session_id / lock unavailable) → the former
+# systemMessage warning to the user, not a block.
 #
-# Защита от infinite loop: поле stop_hook_active во входном JSON (issue #819)
-# гасит повторы внутри одного хода; marker — клиенты без этого флага.
-# Read-only кроме gate_log.jsonl и .claude/state/protocol-stop-gate/.
+# Protection against an infinite loop: the stop_hook_active field in the input JSON (issue #819)
+# suppresses repeats within one turn; the marker covers clients without this flag.
+# Read-only except gate_log.jsonl and .claude/state/protocol-stop-gate/.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -24,10 +24,10 @@ if [ -z "$INPUT" ]; then
 fi
 
 # --- Infinite loop guard (issue #819) ---
-# Claude Code запускает этот хук новым bash-процессом на каждое Stop-событие,
-# поэтому env-переменная не переживает между вызовами — старый guard через
-# STOP_HOOK_ACTIVE был мёртвым кодом с рождения. Claude Code сам передаёт
-# признак повтора в JSON; читаем его оттуда (boolean или строка "true").
+# Claude Code launches this hook as a new bash process on every Stop event,
+# so an env variable does not survive between calls -- the old guard via
+# STOP_HOOK_ACTIVE was dead code from birth. Claude Code itself passes
+# the repeat flag in the JSON; we read it from there (boolean or the string "true").
 STOP_ACTIVE=$(printf '%s' "$INPUT" | jq -r 'if (.stop_hook_active == true or .stop_hook_active == "true") then "1" else "0" end' 2>/dev/null || echo 0)
 if [ "$STOP_ACTIVE" = "1" ]; then
   echo '{}'
@@ -60,21 +60,21 @@ cleanup_owned_dry_run_sentinel() {
 
 cleanup_owned_dry_run_sentinel "$SESSION_ID"
 
-# issue #549 stage 2: идемпотентный fallback — если репетиция этой сессии
-# ещё active (сессия умерла до штатного завершения), Stop переводит её в
-# completed. Переход выполняется САМИМ хуком (доверенный код рантайма), без
-# helper'а и флага --trusted-stop. Строгость (Codex r3): весь скан под одним
-# замком; продолжаем только при РОВНО одном валидном v2 active-state этой
-# сессии — corruption/множественные active не превращаем в allow, ничего не
-# трогаем. Sentinel снимается только после УСПЕШНОГО перехода.
+# issue #549 stage 2: idempotent fallback -- if this session's rehearsal
+# is still active (the session died before normal completion), Stop moves it to
+# completed. The transition is performed BY THE HOOK itself (trusted runtime code), without a
+# helper and the --trusted-stop flag. Strictness (Codex r3): the whole scan under one
+# lock; we continue only with EXACTLY one valid v2 active-state of this
+# session -- corruption/multiple actives are not turned into allow, nothing is
+# touched. The sentinel is removed only after a SUCCESSFUL transition.
 complete_dry_run_on_stop() {
   local sid="$1" dry_dir lock_dir sf gid recorded tmp nonce tries lock_pid lock_start cur_start
   local active_file="" active_gid="" corrupted=0 active_count=0
   [ -n "$sid" ] || return 0
   dry_dir="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
   local sentinel="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
-  # Единый резолвер путей (Codex r3): ЛЮБОЙ override без маркера сбрасывает
-  # ОБА пути на production — как у gate/begin/complete.
+  # Single path resolver (Codex r3): ANY override without a marker resets
+  # BOTH paths to production -- as in gate/begin/complete.
   if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
     if [ ! -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ]; then
       dry_dir="/tmp/iwe-dry-run-$(id -u)"
@@ -84,7 +84,7 @@ complete_dry_run_on_stop() {
   [ -d "$dry_dir" ] && [ ! -L "$dry_dir" ] || return 0
   lock_dir="$dry_dir/transaction.lock"
 
-  # Замок на весь скан+переход.
+  # Lock for the whole scan+transition.
   tries=0
   while ! mkdir "$lock_dir" 2>/dev/null; do
     tries=$((tries + 1))
@@ -106,7 +106,7 @@ complete_dry_run_on_stop() {
   fi
   trap 'if [ "$(sed -n "2p" "$lock_dir/pid" 2>/dev/null)" = "$nonce" ]; then rm -rf "$lock_dir" 2>/dev/null; fi' RETURN 2>/dev/null || true
 
-  # Строгий скан: битый/чужая версия/mismatch — corruption (ничего не трогаем).
+  # Strict scan: broken/foreign version/mismatch is corruption (touch nothing).
   shopt -s nullglob
   for sf in "$dry_dir"/gate-*.state; do
     jq -e . "$sf" >/dev/null 2>&1 || { corrupted=1; break; }
@@ -127,14 +127,14 @@ complete_dry_run_on_stop() {
   shopt -u nullglob
 
   if [ "$corrupted" = "0" ] && [ "$active_count" -le 1 ] && [ -n "$active_file" ]; then
-    # Ровно один валидный active, и он наш — безопасный переход.
+    # Exactly one valid active, and it is ours -- a safe transition.
     if [ "$(jq -r '.state // empty' "$active_file" 2>/dev/null)" = "active" ]; then
       tmp=$(mktemp "$dry_dir/.complete.XXXXXX" 2>/dev/null || true)
       if [ -n "$tmp" ] && \
          jq --arg completed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '.state="completed" | .completed_at=$completed | .completion_reason="stop-hook-fallback"' \
             "$active_file" > "$tmp" 2>/dev/null && mv -f "$tmp" "$active_file" 2>/dev/null; then
-        # Sentinel — только ПОСЛЕ успешного перехода и только своего gate_id.
+        # Sentinel -- only AFTER a successful transition and only for our own gate_id.
         if [ -f "$sentinel" ] && [ ! -L "$sentinel" ] && \
            [ "$(jq -r '.gate_id // empty' "$sentinel" 2>/dev/null)" = "$active_gid" ]; then
           rm -f "$sentinel"
@@ -144,17 +144,17 @@ complete_dry_run_on_stop() {
       fi
     fi
   fi
-  # corruption / active_count>1 / чужой active — ничего не трогаем (fail-closed
-  # со стороны гейта: сам he разберёт состояние при следующем tool-call).
+  # corruption / active_count>1 / foreign active -- touch nothing (fail-closed
+  # on the gate's side: it will sort out the state itself at the next tool-call).
   if [ "$(sed -n '2p' "$lock_dir/pid" 2>/dev/null)" = "$nonce" ]; then
     rm -rf "$lock_dir" 2>/dev/null || true
   fi
-  # issue #818: RETURN trap (строка ~98) переживает эту функцию — bash не
-  # скоупит `trap ... RETURN` к функции, где он поставлен, он остаётся
-  # армированным для ЛЮБОГО следующего возврата функции/sourced-скрипта в
-  # этом же процессе. Без явной очистки здесь — обычный Stop без активной
-  # репетиции падает под `set -u`, когда хук позже сорсит bootstrap: trap
-  # срабатывает повторно на уже мёртвых $lock_dir/$nonce.
+  # issue #818: the RETURN trap (line ~98) outlives this function -- bash does not
+  # scope `trap ... RETURN` to the function where it was set; it stays
+  # armed for ANY following return of a function/sourced script in
+  # the same process. Without an explicit cleanup here, a normal Stop without an active
+  # rehearsal fails under `set -u` when the hook later sources the bootstrap: the trap
+  # fires again on the already dead $lock_dir/$nonce.
   trap - RETURN 2>/dev/null || true
   return 0
 }
@@ -163,7 +163,7 @@ complete_dry_run_on_stop "$SESSION_ID"
 
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-# Нет транскрипта — пропустить
+# No transcript -- skip
 if [ -z "$TRANSCRIPT_PATH" ] || [ ! -f "$TRANSCRIPT_PATH" ]; then
   echo '{}'
   exit 0
@@ -177,26 +177,26 @@ source "$CLAUDE_DIR/lib/iwe-env-bootstrap.sh" || exit 1
 GATE_LOG="$IWE_ROOT/.claude/logs/gate_log.jsonl"
 mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
 
-# --- Шаг 1: был ли вызов протокольного скилла? ---
-# issue #758: в транскрипте Claude Code tool_use лежит вложенно, в
-# .message.content[], а не на верхнем уровне строки (там type=assistant/
-# user/attachment) — select(.type=="tool_use") на верхнем уровне не
-# совпадал никогда. `[]?` гасит ошибку, если .message/.content отсутствует
-# или не массив, — этого достаточно, широкий `try` не нужен.
-# issue #862 follow-up (Codex r3): транскрипт — JSONL (по одному JSON-объекту
-# на строку/сообщение), поэтому все jq-запросы используют -s и разворачивают
-# массив сообщений через .[].
-# issue #1311 (round-loop Kimi+Codex, 22.10): skill и args читаются ОДНОЙ
-# jq-выборкой из ОДНОГО tool_use-объекта, не двумя независимыми пайпами —
-# иначе риск взять args от другого вызова Skill в том же транскрипте.
-# `.[-1]` (последний найденный вызов), не `.[0]`: до этой правки "первый
-# найденный" был безопасен, потому что выбор влиял только на текст лога/
-# сообщения — порог Шага 2 сканировал весь транскрипт одинаково независимо
-# от того, какой вызов выбран. Теперь тот же объект решает Quick Close
-# exemption, и "первый" ломает инвариант — ранний `run-protocol close` в
-# начале сессии молча освобождал бы от чеклиста ПОЗДНИЙ `run-protocol
-# week-close` без собственного чеклиста (cold-review, Critical, 22.10,
-# воспроизведено синтетическим транскриптом с двумя вызовами).
+# --- Step 1: was there a protocol skill call? ---
+# issue #758: in the Claude Code transcript tool_use is nested, in
+# .message.content[], not at the top level of the line (there type=assistant/
+# user/attachment) -- select(.type=="tool_use") at the top level
+# never matched. `[]?` suppresses the error if .message/.content is absent
+# or not an array -- this is enough, a broad `try` is not needed.
+# issue #862 follow-up (Codex r3): the transcript is JSONL (one JSON object
+# per line/message), so all jq queries use -s and unwrap the
+# message array via .[].
+# issue #1311 (round-loop Kimi+Codex, 22.10): skill and args are read by ONE
+# jq selection from ONE tool_use object, not by two independent pipes --
+# otherwise there is a risk of taking args from another Skill call in the same transcript.
+# `.[-1]` (the last found call), not `.[0]`: before this change "the first
+# found" was safe, because the choice affected only the log/message text --
+# the Step 2 threshold scanned the whole transcript the same way regardless
+# of which call was chosen. Now the same object decides the Quick Close
+# exemption, and "first" breaks the invariant -- an early `run-protocol close` at the
+# start of the session would silently exempt a LATE `run-protocol
+# week-close` without its own checklist (cold-review, Critical, 22.10,
+# reproduced with a synthetic transcript with two calls).
 # issue #1411 item 7: a Skill call rejected before it ran (PreToolUse hook
 # deny, permission denial, unknown skill) is answered by a tool_result with
 # is_error=true for the same tool_use_id; such a call is not counted.
@@ -215,31 +215,31 @@ PROTOCOL_CALL_JSON=$(jq -s -c '
 ' "$TRANSCRIPT_PATH" 2>/dev/null)
 
 if [ -z "$PROTOCOL_CALL_JSON" ] || [ "$PROTOCOL_CALL_JSON" = "null" ]; then
-  # Протокольный скилл не запускался — gate не нужен
+  # The protocol skill was not launched -- the gate is not needed
   echo '{}'
   exit 0
 fi
 
 PROTOCOL_SKILL=$(printf '%s' "$PROTOCOL_CALL_JSON" | jq -r '.input.skill // empty')
 
-# --- Шаг 1б: Quick Close exempt (issue #1311) ---
-# memory/protocol-close.md обещает Quick Close "inline, без TodoWrite, ~3 мин"
-# (триггеры «закрываю сессию»/«всё»/«закрывай» → run-protocol close/close
-# session). До этой правки ЛЮБОЙ run-protocol (включая week-close/month-close/
-# day-close, где список шагов реально нужен — через SKILL.md + TodoWrite)
-# требовал тот же порог THRESHOLD — Quick Close был неотличим от тяжёлых
-# протоколов. Нестрока или отсутствующий args → НЕ Quick Close (fail-closed,
-# round-loop консенсус Kimi+Codex 22.10: неопознанный ввод не ослабляет гейт).
+# --- Step 1b: Quick Close exempt (issue #1311) ---
+# memory/protocol-close.md promises Quick Close "inline, without TodoWrite, ~3 min"
+# (triggers «закрываю сессию»/«всё»/«закрывай» → run-protocol close/close
+# session). Before this change ANY run-protocol (including week-close/month-close/
+# day-close, where the step list is really needed -- via SKILL.md + TodoWrite)
+# required the same THRESHOLD -- Quick Close was indistinguishable from the heavy
+# protocols. A non-string or missing args → NOT Quick Close (fail-closed,
+# round-loop consensus Kimi+Codex 22.10: unrecognized input does not weaken the gate).
 IS_QUICK_CLOSE=0
 if [ "$PROTOCOL_SKILL" = "run-protocol" ]; then
-  # `.input.args | type` НАПРЯМУЮ, без `// ""` — jq's `//` считает JSON
-  # `false` таким же falsy, как `null`, и подмена случилась БЫ до `type`,
-  # превращая булев `false` в тип "string" со значением "" (cold-review,
-  # High, 22.10: `{"args": false}` без чеклиста проходил как Quick Close —
-  # нарушение собственного заявленного fail-closed). Отсутствующий ключ
-  # `.input.args` у jq даёт `null`, поэтому "null" трактуется как пустая
-  # строка (= Quick Close), любой другой тип (boolean/number/object/array)
-  # — НЕ Quick Close.
+  # `.input.args | type` DIRECTLY, without `// ""` -- jq's `//` treats JSON
+  # `false` as falsy the same as `null`, and the substitution would happen BEFORE `type`,
+  # turning boolean `false` into type "string" with the value "" (cold-review,
+  # High, 22.10: `{"args": false}` without a checklist passed as Quick Close --
+  # a violation of its own declared fail-closed). A missing key
+  # `.input.args` gives `null` in jq, so "null" is treated as an empty
+  # string (= Quick Close), any other type (boolean/number/object/array)
+  # is NOT Quick Close.
   ARGS_KIND=$(printf '%s' "$PROTOCOL_CALL_JSON" | jq -r '.input.args | type')
   ARGS_NORM=""
   if [ "$ARGS_KIND" = "string" ]; then
@@ -255,18 +255,18 @@ if [ "$PROTOCOL_SKILL" = "run-protocol" ]; then
 fi
 
 if [ "$IS_QUICK_CLOSE" = "1" ]; then
-  # Quick Close — по дизайну без TodoWrite/Task-чеклиста, Шаг 2 не нужен.
+  # Quick Close is by design without a TodoWrite/Task checklist, Step 2 is not needed.
   echo '{}'
   exit 0
 fi
 
-# --- Шаг 2: был ли таск-лист с ≥3 items? --- (та же вложенность, что в Шаге 1)
-# issue #862: TodoWrite устарел и заменён TaskCreate/TaskUpdate; кроме того,
-# SKILL.md явно разрешает нумерацию шагов в ответах, когда Task-инструменты
-# недоступны. Учитываем все три признака.
-# issue #862 follow-up (Codex r3): транскрипт JSONL, считаем только сообщения
-# ассистента, TaskCreate и TaskUpdate разделяем (обновления одной задачи не
-# должны множиться), TodoWrite берём по максимальному списку.
+# --- Step 2: was there a task list with >=3 items? --- (same nesting as in Step 1)
+# issue #862: TodoWrite is obsolete and replaced by TaskCreate/TaskUpdate; besides,
+# SKILL.md explicitly allows numbering steps in replies when the Task tools are
+# unavailable. We count all three signals.
+# issue #862 follow-up (Codex r3): the transcript is JSONL, we count only assistant
+# messages, separate TaskCreate and TaskUpdate (updates of one task
+# must not multiply), and take TodoWrite by the maximum list.
 TODO_MAX=$(jq -s -r '
   [.[] | select((.message.role // "assistant") == "assistant") | .message]
   | .[] | .content[]?
@@ -313,15 +313,15 @@ TASK_UPDATE_MAX=$(jq -s -r '
   | sort -n | tail -1)
 TASK_UPDATE_MAX="${TASK_UPDATE_MAX:-0}"
 
-# Явная нумерация шагов в ответах ассистента: "Шаг N из M" / "Step N of M".
-# Берём максимальный общий знаменатель M, потому что ответ может содержать
-# промежуточные шаги без полной формулы.
-# issue #1340: регистровые классы перечислены явно, без -i: в Git Bash на Windows
-# (LC_CTYPE=C.UTF-8) grep -i не сводит кириллицу к одному регистру, и форма в
-# начале предложения («Шаг 2 из 15») не находилась — гейт блокировал честный ход.
-# Peer-раунд WP-7 Ф259: классы покрывают каждую букву («[Шш][Аа]г»), а не только
-# первую — иначе терялся капс-лок («ШАГ 2 ИЗ 15», «STEP 2 OF 15»), который -i
-# раньше находил.
+# Explicit step numbering in assistant replies: "Шаг N из M" / "Step N of M".
+# We take the maximum common denominator M, because a reply may contain
+# intermediate steps without the full formula.
+# issue #1340: case classes are listed explicitly, without -i: in Git Bash on Windows
+# (LC_CTYPE=C.UTF-8) grep -i does not fold Cyrillic to a single case, and the form at the
+# start of a sentence («Шаг 2 из 15») was not found -- the gate blocked an honest turn.
+# Peer round WP-7 Phase 259: the classes cover every letter («[Шш][Аа]г»), not only
+# the first -- otherwise caps lock was lost («ШАГ 2 ИЗ 15», «STEP 2 OF 15»), which -i
+# used to find.
 STEP_MAX=$(jq -s -r '
   [.[] | select((.message.role // "assistant") == "assistant") | .message]
   | .[] | .content[]?
@@ -333,18 +333,18 @@ STEP_MAX=$(jq -s -r '
   | sort -n | tail -1)
 STEP_MAX="${STEP_MAX:-0}"
 
-# TodoWrite и TaskCreate — сигналы планирования (список задач); суммируем,
-# потому что отдельные TaskCreate = отдельные шаги, а TodoWrite может быть
-# дополнен TaskCreate. TaskUpdate — обновления, берём max, чтобы обновления
-# одной задачи не размножались. Явная нумерация в тексте — независимый
-# источник; берём max.
+# TodoWrite and TaskCreate are planning signals (a task list); we sum them,
+# because separate TaskCreate = separate steps, and TodoWrite may be
+# supplemented by TaskCreate. TaskUpdate are updates, we take max so that updates
+# of one task do not multiply. Explicit numbering in the text is an independent
+# source; we take max.
 LIST_MAX=$(( TODO_MAX + TASK_CREATE_MAX ))
 if [ "$TASK_UPDATE_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$TASK_UPDATE_MAX"; fi
 if [ "$STEP_MAX" -gt "$LIST_MAX" ]; then LIST_MAX="$STEP_MAX"; fi
 
 THRESHOLD=3
 
-# --- Шаг 3: событие ---
+# --- Step 3: event ---
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FIRED=0
 if [ "$LIST_MAX" -lt "$THRESHOLD" ]; then
@@ -354,26 +354,26 @@ fi
 TASK_MAX_SIGNAL="$TASK_CREATE_MAX"
 if [ "$TASK_UPDATE_MAX" -gt "$TASK_MAX_SIGNAL" ]; then TASK_MAX_SIGNAL="$TASK_UPDATE_MAX"; fi
 
-# --- Шаг 4: block-once (issue #1184) ---
-# Для Stop-события {"decision":"block","reason":...} — канал, доставляющий
-# текст АГЕНТУ; systemMessage видит только пользователь. Поэтому при нарушении
-# блокируем, но не более одного раза на сессию за 24ч (marker под замком).
-# Замок ПЕРСЕССИОННЫЙ (lock-<sid>-<crc>): разные сессии не конкурируют вовсе,
-# а одновременных Stop одной сессии клиент не порождает.
-# Протухший замок НЕ удаляется и НЕ переносится никогда (cold-review #1184,
-# раунды 1-2: любая схема «проверить staleness, затем mv/rm» оставляет окно,
-# где уносится чужой свежий замок). Цена: хук, упавший между mkdir и rm своего
-# замка, оставляет его навсегда — Stop этой сессии деградирует в systemMessage
-# (ровно поведение до #1184). Новые сессии получают свежие sid и не затронуты.
-# Захваченный замок удаляет только создавший его процесс (доказательство
-# владения = успешный mkdir). Каталоги marker/lock копятся по числу сессий
-# с нарушением — та же шкала, что у marker; отдельная уборка не вводится.
+# --- Step 4: block-once (issue #1184) ---
+# For a Stop event {"decision":"block","reason":...} is the channel that delivers
+# text to the AGENT; systemMessage is seen only by the user. So on a violation
+# we block, but no more than once per session per 24h (marker under lock).
+# The lock is PER-SESSION (lock-<sid>-<crc>): different sessions do not compete at all,
+# and the client does not produce concurrent Stops of one session.
+# A stale lock is NEVER deleted and NEVER moved (cold-review #1184,
+# rounds 1-2: any "check staleness, then mv/rm" scheme leaves a window
+# in which someone else's fresh lock is carried off). Cost: a hook that died between mkdir and rm of its own
+# lock leaves it forever -- Stop of this session degrades to systemMessage
+# (exactly the behavior before #1184). New sessions get fresh sids and are unaffected.
+# A held lock is removed only by the process that created it (proof
+# of ownership = a successful mkdir). The marker/lock directories accumulate by the number of sessions
+# with a violation -- the same scale as the marker; no separate cleanup is introduced.
 ACTION="none"
 
 PSG_STATE_DIR="$IWE_ROOT/.claude/state/protocol-stop-gate"
 
-# crc полного session_id: tr-санитизация схлопывает разные sid в один marker
-# (a/b и ab → ab), вторая сессия лишилась бы своего блока (cold-review #1184).
+# crc of the full session_id: tr-sanitization collapses different sids into one marker
+# (a/b and ab → ab), the second session would lose its block (cold-review #1184).
 psg_sid_key() {
   local safe crc
   safe=$(printf '%s' "$1" | tr -cd 'A-Za-z0-9._-')
@@ -381,7 +381,7 @@ psg_sid_key() {
   printf '%s-%s' "$safe" "$crc"
 }
 
-psg_lock_acquire() {  # $1 = каталог замка
+psg_lock_acquire() {  # $1 = lock directory
   local lock_dir="$1" tries=0
   while ! mkdir "$lock_dir" 2>/dev/null; do
     tries=$((tries + 1))
@@ -391,14 +391,14 @@ psg_lock_acquire() {  # $1 = каталог замка
   return 0
 }
 
-psg_lock_release() {  # $1 = каталог замка, созданный ЭТИМ процессом
+psg_lock_release() {  # $1 = lock directory created by THIS process
   rm -rf "$1" 2>/dev/null || true
 }
 
 if [ "$FIRED" = "1" ]; then
   SID_KEY=$(psg_sid_key "$SESSION_ID")
   if [ -z "$SESSION_ID" ]; then
-    # Без session_id частоту повторов не ограничить — не блокируем вовсе.
+    # Without session_id the repeat rate cannot be limited -- do not block at all.
     ACTION="warn-no-session"
   else
     PSG_LOCK_DIR="$PSG_STATE_DIR/lock-$SID_KEY"
@@ -406,9 +406,9 @@ if [ "$FIRED" = "1" ]; then
     if ! psg_lock_acquire "$PSG_LOCK_DIR"; then
       ACTION="warn-lock-unavailable"
     else
-      # Вся последовательность проверка→удаление→создание→запись ts — строго
-      # под одним замком: иначе два конкурентных процесса блокируют оба, а
-      # delete протухшего marker'а может снести чужой свежий (peer-review #1184).
+      # The whole sequence check→delete→create→write ts -- strictly
+      # under one lock: otherwise two concurrent processes both block, and
+      # deleting a stale marker may remove someone else's fresh one (peer-review #1184).
       MARKER_DIR="$PSG_STATE_DIR/marker-$SID_KEY"
       NOW_EPOCH=$(date +%s)
       MARKER_FRESH=0
@@ -426,7 +426,7 @@ if [ "$FIRED" = "1" ]; then
       elif mkdir "$MARKER_DIR" 2>/dev/null && echo "$NOW_EPOCH" > "$MARKER_DIR/ts" 2>/dev/null; then
         ACTION="block-once"
       else
-        # Хранилище состояния непригодно — повтор не ограничить, не блокируем.
+        # State storage is unusable -- the repeat rate cannot be limited, do not block.
         ACTION="warn-lock-unavailable"
       fi
       psg_lock_release "$PSG_LOCK_DIR"
@@ -434,7 +434,7 @@ if [ "$FIRED" = "1" ]; then
   fi
 fi
 
-# --- Шаг 5: логировать событие (action — честно: что реально произошло) ---
+# --- Step 5: log the event (action -- honestly: what actually happened) ---
 LOG_ENTRY=$(jq -nc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
@@ -459,17 +459,17 @@ if [ -n "$LOG_ENTRY" ]; then
   echo "$LOG_ENTRY" >> "$GATE_LOG" 2>/dev/null || true
 fi
 
-# --- Шаг 6: вывод ---
+# --- Step 6: output ---
 case "$ACTION" in
   block-once)
-    # reason уходит АГЕНТУ (Stop decision control); текст — то же требование,
-    # что в предупреждении: список задач или явная нумерация и протокол заново.
+    # reason goes to the AGENT (Stop decision control); the text is the same requirement
+    # as in the warning: a task list or explicit numbering, and the protocol again.
     jq -nc --arg reason "⚠️ PROTOCOL-STOP-GATE [block-once]: Скилл '$PROTOCOL_SKILL' был вызван, но признак исполнения по шагам (TodoWrite/Task-инструменты/явная нумерация) с ≥$THRESHOLD задачами не найден (найдено: $LIST_MAX). Протокол требует пошаговый план ДО начала исполнения. Прежде чем завершить ход: создай TodoWrite/Task-лист с шагами скилла либо явно пронумеруй шаги в ответах, как разрешено SKILL.md, и пройди протокол заново. Это единственный block сессии за 24ч. (gate_log: $GATE_LOG)" \
       '{"decision": "block", "reason": $reason}'
     ;;
   warn-no-session|warn-lock-unavailable)
-    # Деградация: прежнее ненавязчивое уведомление пользователю (тот же паттерн,
-    # что у secret-leak-block.sh / secret-file-read-block.sh / secret-mcp-dump-guard.sh).
+    # Degradation: the former unobtrusive notification to the user (the same pattern
+    # as in secret-leak-block.sh / secret-file-read-block.sh / secret-mcp-dump-guard.sh).
     cat <<EOF
 {"systemMessage": "⚠️ PROTOCOL-STOP-GATE [warn]: Скилл '$PROTOCOL_SKILL' был вызван, но признак исполнения по шагам (TodoWrite/Task-инструменты/явная нумерация) с ≥$THRESHOLD задачами не найден (найдено: $LIST_MAX). Протокол требует пошаговый план ДО начала исполнения. Действие: создай TodoWrite/Task-лист с шагами скилла либо явно пронумеруй шаги в ответах, как разрешено SKILL.md, и пройди протокол заново. (gate_log: $GATE_LOG)"}
 EOF

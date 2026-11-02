@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # routing: helper  called-by=archive-done-wp,week-close  deterministic=true
-# see WP-5 (фаза «Проверка полноты переноса перед архивацией inbox/WP-N»), DP.SC.033
+# see WP-5 (phase "Transfer completeness check before archiving inbox/WP-N"), DP.SC.033
 #
-# check-wp-transfer-completeness.sh — проверка перед архивацией inbox/WP-N/:
-#   (а) results_in в frontmatter основного WP-N.md непусто; если пусто —
-#       выставляет results_not_captured: true + results_not_captured_deadline
-#       (+7 дней), если ещё не проставлено;
-#   (б) файлы в подпапках (кроме data/, scripts/, .venv/, node_modules/,
-#       __pycache__), не упомянутые (по имени) в основном WP-N.md.
+# check-wp-transfer-completeness.sh — check before archiving inbox/WP-N/:
+#   (a) results_in in the frontmatter of the main WP-N.md is non-empty; if empty —
+#       sets results_not_captured: true + results_not_captured_deadline
+#       (+7 days), if not set yet;
+#   (b) files in subfolders (except data/, scripts/, .venv/, node_modules/,
+#       __pycache__) not mentioned (by name) in the main WP-N.md.
 #
-# Warn-not-block: не блокирует архивацию, только сигнализирует. Не exit 1 на
-# найденные предупреждения — только на ошибку использования.
+# Warn-not-block: does not block archiving, only signals. Not exit 1 on
+# found warnings — only on a usage error.
 #
-# Использование:
+# Usage:
 #   check-wp-transfer-completeness.sh <WP_NUM> [--dry-run] [IWE_ROOT]
 #   check-wp-transfer-completeness.sh --all [--dry-run] [IWE_ROOT]
 #
-# Совместимость: bash 3.2+ (macOS), bash 4+ (Linux)
+# Compatibility: bash 3.2+ (macOS), bash 4+ (Linux)
 
 set -uo pipefail
 
@@ -30,7 +30,7 @@ _WPN_OPTIONAL=""
 # IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
 # just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
 # The library is mandatory: not finding it is an installation error, not "WP not found",
-# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "WP not found").
 # A consumer that must keep working without the library (session-guard: its hypothesis gate
 # warns and checks the exact card names, it never blocks a session over a missing library)
 # sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
@@ -153,7 +153,7 @@ PYEOF
 
 # Inspect the card of the WP given as typed (44, 044, WP-044). issue #954: the folder is
 # WP-044/ (create-wp.sh) or the older WP-44/; the path that exists is used, and the old
-# "<N> не найден — пропуск" no longer fires for a card that is simply spelled with zeros.
+# "<N> not found — skipped" no longer fires for a card that is simply spelled with zeros.
 check_one() {
   local wp_num="$1" wp_file padded
   wp_file=$(wp_num_card_path "$INBOX" "$wp_num" || true)

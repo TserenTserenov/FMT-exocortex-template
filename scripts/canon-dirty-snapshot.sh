@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # canon-dirty-snapshot.sh <repo-path> <snapshot-dir> -- double snapshot of every
-# uncommitted path of a checkout before the Ф3 ref replacement (WP-530 Ф38,
+# uncommitted path of a checkout before the Phase 3 ref replacement (WP-530 Phase 38,
 # Kimi amendment 1: `cp -a` copies + textual diffs + untracked hash list, then a
 # self-check that every listed path is in the snapshot with the same hash).
 # Read-only towards the repo. Exit 0 = snapshot complete and verified; 1 = not.

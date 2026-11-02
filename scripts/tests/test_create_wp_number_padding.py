@@ -92,10 +92,10 @@ def test_registry_number_column_stays_bare(tmp_path):
 
     assert result.returncode == 0, result.stderr
     registry = (strategy / "docs" / "WP-REGISTRY.md").read_text(encoding="utf-8")
-    # колонка "#" — чистое число (та же конвенция, что frontmatter), НЕ "009"
+    # the "#" column is a plain number (same convention as the frontmatter), NOT "009"
     assert "| 9 |" in registry
     assert "| 009 |" not in registry
-    # дефолтный "Репо" (когда --repo не передан) обязан указывать на РЕАЛЬНЫЙ (паддированный) путь
+    # the default "Репо" (when --repo is not passed) must point to the REAL (padded) path
     assert "DS-strategy/inbox/WP-009/" in registry
 
 

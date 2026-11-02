@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# hook-promote.sh — промоция личного хука в платформенный шаблон IWE
+# hook-promote.sh — promote a personal hook into the IWE platform template
 #
-# Поток: личная папка/<hook>.sh → подстановки → FMT/.claude/hooks/<hook>.sh
+# Flow: personal folder/<hook>.sh → substitutions → FMT/.claude/hooks/<hook>.sh
 #
-# Использование:
-#   bash hook-promote.sh <путь-к-хуку> [--dry-run]
+# Usage:
+#   bash hook-promote.sh <path-to-hook> [--dry-run]
 
 set -uo pipefail
 
@@ -45,7 +45,7 @@ if $dry_run; then
     exit 0
 fi
 
-# Валидация через временный файл
+# Validation via a temporary file
 tmp_dir=$(mktemp -d)
 tmp_file="$tmp_dir/$fname"
 printf '%s\n' "$result" > "$tmp_file"
@@ -60,7 +60,7 @@ if [[ -f "$VALIDATOR" ]]; then
     fi
 fi
 
-# Smoke-тест в изолированном env с шаблонными переменными
+# Smoke test in an isolated env with template variables
 echo "   smoke-test с шаблонным окружением..."
 smoke_result=0
 env -i \

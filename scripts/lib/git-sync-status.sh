@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034  # GIT_SYNC_* are the library's public output API, read by callers after sourcing
 # git-sync-status.sh — read-only git-vs-origin sync classifier for gates that
-# run on every WP session open and in the nightly cycle (WP-561 Ф20).
+# run on every WP session open and in the nightly cycle (WP-561 Phase 20).
 #
 # Never fetches: a full `git fetch` writes refs/remotes/*/FETCH_HEAD into the
 # shared .git that dozens of worktrees share on this machine (see

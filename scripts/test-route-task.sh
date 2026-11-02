@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-route-task.sh — изолированные regression-кейсы для route-task.sh (WP-350 Ф14)
+# test-route-task.sh — isolated regression cases for route-task.sh (WP-350 Phase 14)
 # routing: executor=script deterministic=true
 set -euo pipefail
 

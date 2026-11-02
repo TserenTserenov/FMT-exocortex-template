@@ -1,20 +1,20 @@
-# Каталог локальных моделей IWE (РП404, ADR-001).
-# Единый источник для установщика (install-local-llm.sh), монитора (model-monitor.py)
-# и состояний модели (model-lifecycle.py).
+# Catalog of local IWE models (WP-404, ADR-001).
+# A single source for the installer (install-local-llm.sh), the monitor (model-monitor.py)
+# and the model states (model-lifecycle.py).
 #
-# Состояния модели (поле status):
-#   analysis  — найдена монитором, на рассмотрении (ещё не скачана, не вошла в работу)
-#   testing   — скачана для проверки (в кэше), сравнивается с активной
-#   active     — стоит в работе (сервер поднимает именно её); ровно одна
-#   archived   — выведена из обращения (устарела/проиграла сравнение)
-# job: privacy=приватность(PII), fallback=без сети/токенов, bulk=дешёвый поток.
+# Model states (the status field):
+#   analysis  — found by the monitor, under consideration (not yet downloaded, not put into work)
+#   testing   — downloaded for verification (in the cache), compared with the active one
+#   active     — in work (the server brings up exactly this one); exactly one
+#   archived   — withdrawn from use (obsolete/lost the comparison)
+# job: privacy=privacy(PII), fallback=no network/tokens, bulk=cheap stream.
 #
-# Шаблонный дефолт: все модели в analysis. install-local-llm.sh при установке
-# сделает рекомендованную (или --max) активной под железо пилота.
+# Template default: all models are in analysis. On install, install-local-llm.sh
+# makes the recommended one (or --max) active for the pilot's hardware.
 
 updated: 2026-06-10
 
-# Источники сигнала для biweekly-мониторинга (model-monitor.py)
+# Signal sources for biweekly monitoring (model-monitor.py)
 sources:
 - name: lmarena
   url: https://lmarena.ai
@@ -23,7 +23,7 @@ sources:
   api: https://huggingface.co/api/models?author=mlx-community&sort=trendingScore&limit=25&pipeline_tag=text-generation
   note: релизы квантованных моделей под Apple Silicon
 
-# Модели. status — текущее состояние модели. min_ram_gb — порог установщика.
+# Models. status — the model's current state. min_ram_gb — the installer's threshold.
 models:
 - id: mlx-community/Llama-3.2-3B-Instruct-4bit
   status: analysis
@@ -38,7 +38,7 @@ models:
   quant: 4bit
   min_ram_gb: 12
   job: [privacy, fallback]
-  recommended: true   # дефолт установщика; проверена на PII-редактировании
+  recommended: true   # installer default; verified on PII redaction
   note: MVP, general, сильная
 - id: mlx-community/Qwen2.5-14B-Instruct-4bit
   status: analysis

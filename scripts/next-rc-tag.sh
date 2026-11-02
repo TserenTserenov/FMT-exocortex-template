@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WP-529 Ф239: print the next release-candidate tag name for a version.
+# WP-529 Phase 239: print the next release-candidate tag name for a version.
 #
 # Numbering is computed from REMOTE tags (a parallel workflow run is invisible
 # to a local `git tag -l`), taking the maximum existing N — not the count:

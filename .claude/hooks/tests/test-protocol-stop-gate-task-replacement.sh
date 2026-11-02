@@ -1,9 +1,9 @@
 #!/bin/bash
 # test-protocol-stop-gate-task-replacement.sh — issue #862 follow-up:
-# protocol-stop-gate.sh учитывает TaskCreate/TaskUpdate как замену TodoWrite,
-# включая одиночные вызовы с полями одной задачи (не массив) и JSONL-транскрипты.
+# protocol-stop-gate.sh counts TaskCreate/TaskUpdate as a replacement for TodoWrite,
+# including single calls with the fields of one task (not an array) and JSONL transcripts.
 #
-# Запуск: bash .claude/hooks/tests/test-protocol-stop-gate-task-replacement.sh
+# Run: bash .claude/hooks/tests/test-protocol-stop-gate-task-replacement.sh
 
 set -uo pipefail
 

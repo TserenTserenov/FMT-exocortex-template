@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # routing: server  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# server-news.sh — кросс-платформенная замена WebSearch для server-mode
+# server-news.sh — cross-platform replacement of WebSearch for server-mode
 # see WP-283 (DS-strategy/inbox/WP-283-server-day-open-crossplatform.md)
 #
-# Выводит готовую markdown-секцию «Мир» для DayPlan.
+# Outputs a ready markdown section «Мир» for the DayPlan.
 #
-# Читает: day-rhythm-config.yaml → news.topics[].feeds (RSS URL-ы)
-# Парсит RSS через curl + python3
-# Fallback: если feeds пусты или недоступны → явный PENDING-маркер
+# Reads: day-rhythm-config.yaml -> news.topics[].feeds (RSS URLs)
+# Parses RSS via curl + python3
+# Fallback: if feeds are empty or unavailable -> explicit PENDING marker
 #
-# Использование:
+# Usage:
 #   bash server-news.sh [CONFIG_PATH]
 #   bash server-news.sh ~/IWE/DS-strategy/exocortex/day-rhythm-config.yaml
 

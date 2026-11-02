@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # routing: migration  one-time=true
 # see DP.SC.159, DP.ROLE.059
-# migrate-skills-to-v2.sh — миграция существующих скиллов под стандарт SKILL.md v2
+# migrate-skills-to-v2.sh — migration of existing skills to the SKILL.md v2 standard
 # see DP.SC.153
 #
-# Добавляет недостающие обязательные поля frontmatter:
+# Adds the missing required frontmatter fields:
 #   version, layer, status, triggers
-# НЕ меняет: name, description, тело SKILL.md, существующие поля.
+# Does NOT change: name, description, SKILL.md body, existing fields.
 #
-# layer определяется автоматически:
-#   - скилл есть в FMT-exocortex-template/.claude/skills/ → L1
-#   - скилл только в личном IWE → L3
+# layer is determined automatically:
+#   - skill exists in FMT-exocortex-template/.claude/skills/ -> L1
+#   - skill only in the personal IWE -> L3
 #
-# Использование:
+# Usage:
 #   bash migrate-skills-to-v2.sh [--skills-dir <path>] [--dry-run] [--skill <id>]
 
 set -uo pipefail
@@ -34,13 +34,13 @@ done
 
 log() { echo "$*" >&2; }
 
-# Проверить есть ли поле в frontmatter
+# Check whether a field is in the frontmatter
 has_field() {
     local file="$1" field="$2"
     sed -n "/^---$/,/^---$/p" "$file" 2>/dev/null | grep "^${field}:" > /dev/null
 }
 
-# Определить layer по наличию скилла в FMT
+# Determine the layer by whether the skill exists in FMT
 detect_layer() {
     local skill_id="$1"
     if [[ -d "${FMT_SKILLS}/${skill_id}" ]]; then
@@ -67,14 +67,14 @@ for skill_dir in "$SKILLS_DIR"/*/; do
         continue
     fi
 
-    # Проверить нужна ли миграция
+    # Check whether migration is needed
     needs_fm=false
     ! has_field "$skill_md" "version" && needs_fm=true
     ! has_field "$skill_md" "layer" && needs_fm=true
     ! has_field "$skill_md" "status" && needs_fm=true
     ! has_field "$skill_md" "triggers" && needs_fm=true
 
-    # Скиллы без frontmatter вообще — нужна отдельная обработка
+    # Skills without any frontmatter — need separate handling
     has_frontmatter=true
     head -1 "$skill_md" | grep -q "^---" || has_frontmatter=false
 
@@ -101,11 +101,11 @@ for skill_dir in "$SKILLS_DIR"/*/; do
         continue
     fi
 
-    # Применить миграцию
+    # Apply the migration
     tmp=$(mktemp)
 
     if ! $has_frontmatter; then
-        # Добавить frontmatter в начало файла
+        # Add frontmatter at the start of the file
         name_from_id=$(head -5 "$skill_md" | grep "^# " | head -1 | sed 's/^# *//' | sed 's/ — .*//' | sed 's/ *(.*)//' || echo "$skill_id")
         {
             echo "---"
@@ -122,7 +122,7 @@ for skill_dir in "$SKILLS_DIR"/*/; do
             cat "$skill_md"
         } > "$tmp"
     else
-        # Добавить недостающие поля перед закрывающим ---
+        # Add the missing fields before the closing ---
         python3 - "$skill_md" "$layer" "$slash_trigger" <<'PYEOF' > "$tmp"
 import sys, re
 
@@ -164,7 +164,7 @@ sys.stdout.write('---\n' + '\n'.join(new_lines) + '\n---\n' + rest)
 PYEOF
     fi
 
-    # Проверить что python не сломал файл
+    # Check that python did not break the file
     if [[ ! -s "$tmp" ]]; then
         log "  ❌ [$skill_id] ошибка миграции — файл пустой, пропускаю"
         rm -f "$tmp"

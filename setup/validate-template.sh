@@ -1,26 +1,26 @@
 #!/bin/bash
-# Validate Template — проверка целостности FMT-exocortex-template
+# Validate Template — integrity check of FMT-exocortex-template
 #
-# Режимы (--mode=...):
-#   pristine  (default) — все 9 проверок. Для CI, author template-sync, fresh clone до setup.sh.
-#   installed           — пропускает чеки 2/3/4, которые легитимно нарушаются после setup.sh
-#                         (/Users/ подставлен, /opt/homebrew в CLAUDE_PATH, MEMORY заполняется работой).
-#                         Используется setup.sh --validate как делегат структурных чеков.
+# Modes (--mode=...):
+#   pristine  (default) — all 9 checks. For CI, author template-sync, fresh clone before setup.sh.
+#   installed           — skips checks 2/3/4, which are legitimately violated after setup.sh
+#                         (/Users/ substituted, /opt/homebrew in CLAUDE_PATH, MEMORY filled with work).
+#                         Used by setup.sh --validate as a delegate for structural checks.
 #
-# 9 проверок:
-# 1. Нет автор-специфичного контента                              [pristine + installed]
-# 2. Нет захардкоженных путей /Users/                             [pristine only]
-# 3. Нет захардкоженных путей /opt/homebrew                       [pristine only]
-# 4. MEMORY.md — скелет (мало строк в РП-таблице)                 [pristine only]
-# 5. Обязательные файлы существуют                                [pristine + installed]
-# 6. Нет хардкод-путей к FMT/scripts|roles в протоколах (WP-219)  [pristine + installed]
+# 9 checks:
+# 1. No author-specific content                                   [pristine + installed]
+# 2. No hardcoded /Users/ paths                                   [pristine only]
+# 3. No hardcoded /opt/homebrew paths                             [pristine only]
+# 4. MEMORY.md — skeleton (few lines in the WP table)             [pristine only]
+# 5. Required files exist                                         [pristine + installed]
+# 6. No hardcoded paths to FMT/scripts|roles in protocols (WP-219)  [pristine + installed]
 # 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)   [pristine + installed]
-# 8. Нет устаревших семантических ссылок FPF                     [pristine + staged]
+# 8. No stale FPF semantic references                             [pristine + staged]
 # 9. SKILL.md claims of an active hook match settings.json (#1109) [pristine + installed]
 
 set -euo pipefail
 
-# Parse args: --mode=pristine|installed|staged (default pristine) + позиционный TEMPLATE_DIR
+# Parse args: --mode=pristine|installed|staged (default pristine) + positional TEMPLATE_DIR
 MODE="pristine"
 TEMPLATE_DIR=""
 for arg in "$@"; do
@@ -45,9 +45,9 @@ done
 TEMPLATE_DIR="${TEMPLATE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 FAIL=0
 
-# Guard: post-setup state + default pristine mode → подсказать installed-режим и выйти.
-# Детектор стабильный: {{WORKSPACE_DIR}} в pristine FMT/CLAUDE.md гарантирован (§4 Memory, раздел Working Directory).
-# Раньше детектором был {{HOME_DIR}} из §9; §9 в поставке теперь пустая заготовка (issue #883), плейсхолдера там нет.
+# Guard: post-setup state + default pristine mode -> suggest installed mode and exit.
+# Stable detector: {{WORKSPACE_DIR}} in pristine FMT/CLAUDE.md is guaranteed (§4 Memory, Working Directory section).
+# Previously the detector was {{HOME_DIR}} from §9; §9 in the distribution is now an empty stub (issue #883), no placeholder there.
 if [ "$MODE" = "pristine" ] \
    && [ -f "$TEMPLATE_DIR/CLAUDE.md" ] \
    && ! grep -q '{{WORKSPACE_DIR}}' "$TEMPLATE_DIR/CLAUDE.md" 2>/dev/null; then
@@ -67,14 +67,14 @@ fi
 
 echo "=== Validating: $TEMPLATE_DIR (mode=$MODE) ==="
 
-# Утилита: подсчёт совпадений grep (безопасно с pipefail)
+# Utility: count grep matches (safe with pipefail)
 grep_count() {
     local pattern="$1"
     shift
     grep -rn "$pattern" "$@" 2>/dev/null | wc -l | tr -d ' ' || true
 }
 
-# Staged-режим: список staged файлов (относительные пути). Пусто если не в git или нет staged.
+# Staged mode: list of staged files (relative paths). Empty if not in git or nothing staged.
 STAGED_FILES=""
 if [ "$MODE" = "staged" ]; then
     STAGED_FILES=$(cd "$TEMPLATE_DIR" && git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
@@ -142,12 +142,12 @@ is_author_context_exception() {
         '.claude/hooks/rule-engine.sh:        if ! echo "$file_path" | grep -qE '"'"'DS-[^/]+-strategy/|DS-ecosystem-development/'"'"'; then'|\
         'update-manifest.json:    "scripts/session-dispatcher-tsekh.py",'|\
         'setup.sh:    echo "  ⚠ Не найден python3 >= 3.10 с библиотекой PyYAML — календарь, лента «Мир», обзор РП и core-скрипты (artifactor.py, session-dispatcher-tsekh.py) будут отключаться с явной ошибкой зависимости."'|\
-        'generate-manifest.sh:    "scripts/session-dispatcher-tsekh.py"       # нет ссылок из доставляемого'|\
+        'generate-manifest.sh:    "scripts/session-dispatcher-tsekh.py"       # no references from delivered artifacts'|\
         'seed/strategy/scripts/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
         '.claude/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
         'scripts/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort: under `set -eu`, a single'|\
-        'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort (продолжение): leftovers from'|\
+        'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort (continuation): leftovers from'|\
         'update.sh:# author_release_regression FPATH PAYLOAD — bug-2026-09-17-tsekh1-release-') return 0 ;;
     esac
     return 1
@@ -192,20 +192,20 @@ filter_excluded_hits() {
     done
 }
 
-# 1. Нет автор-специфичного контента
+# 1. No author-specific content
 echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
 
-# Глобальные (запрет везде, кроме CHANGELOG и GitHub URLs)
-# grep -i ниже (все вызовы этого паттерна): "tserentserenov" всегда встречался в
-# коде как "TserenTserenov" (mixed-case) — case-sensitive grep никогда не ловил
-# его, поймано только парным паттерном "DS-my-strategy" на тех же строках (2026-07-27).
+# Global (forbidden everywhere except CHANGELOG and GitHub URLs)
+# grep -i below (all calls of this pattern): "tserentserenov" always appeared in the
+# code as "TserenTserenov" (mixed-case) — case-sensitive grep never caught
+# it, it was caught only by the paired pattern "DS-my-strategy" on the same lines (2026-07-27).
 for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                "DS-Knowledge-Index" "DS-IT-systems" "DS-ai-systems" \
                "DS-my-strategy" "engines/tailor" "tsekh" "DS-ecosystem-development" \
                "tseren" "aist_pilot_bot"; do
     if [ "$MODE" = "staged" ]; then
-        # staged-режим: проверяем только содержимое staged-файлов (git show :path)
+        # staged mode: check only the content of staged files (git show :path)
         count=0
         hits=""
         while IFS= read -r f; do
@@ -262,7 +262,7 @@ for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
     fi
 done
 
-# Protocol-only — запрет в протоколах/скиллах/хуках/CLAUDE.md (разрешено в README/docs/onboarding как упоминание продукта)
+# Protocol-only — forbidden in protocols/skills/hooks/CLAUDE.md (allowed in README/docs/onboarding as a product mention)
 for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
                "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
     if [ "$MODE" = "staged" ]; then
@@ -299,7 +299,7 @@ for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
     fi
 done
 
-# staged-режим: WARN о unstaged forbidden content (не блокирует — параллельные агенты)
+# staged mode: WARN about unstaged forbidden content (does not block — parallel agents)
 if [ "$MODE" = "staged" ] && [ "$(cd "$TEMPLATE_DIR" && git status --porcelain 2>/dev/null | grep -c '^.M')" -gt 0 ]; then
     UNSTAGED_WARN=0
     for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-IT-systems"; do
@@ -315,19 +315,19 @@ if [ "$MODE" = "staged" ] && [ "$(cd "$TEMPLATE_DIR" && git status --porcelain 2
 fi
 [ "$CHECK1_FAIL" -eq 0 ] && echo "PASS"
 
-# Общий список расширений для чеков 2 и 3 (issue #247 п.2: count и print раньше
-# сканировали разные наборы --include, из-за чего FAIL (N hits) мог не показать
-# ни одной строки, если попадание было только в *.json/*.plist).
+# Common extension list for checks 2 and 3 (issue #247 item 2: count and print used to
+# scan different --include sets, so FAIL (N hits) could show
+# no lines at all if the hit was only in *.json/*.plist).
 # --exclude-dir=guide-kit: vendored byte-identical release slice (WP-483) —
 # the CI drift gate forbids in-place edits, so scanning it here would deadlock
 # two blocking gates; its own upstream CI is responsible for content checks.
 HARDCODE_SCAN_INCLUDES=(--include="*.md" --include="*.sh" --include="*.json" --include="*.plist" --exclude-dir="guide-kit")
 
-# Staged-режим для чеков 2/3: сканировать только staged-содержимое перечисленных
-# в STAGED_FILES файлов (git show ":$f"), не весь $TEMPLATE_DIR — то же исправление,
-# что уже применено к чеку 1 выше (issue #330: staged заявлял "checks ONLY staged
-# files" в своём --help, но фактически сканировал весь репозиторий).
-# Печатает совпадение-count в stdout, построчные hits — в файл $3.
+# Staged mode for checks 2/3: scan only the staged content of the files listed
+# in STAGED_FILES (git show ":$f"), not the whole $TEMPLATE_DIR — the same fix
+# already applied to check 1 above (issue #330: staged claimed "checks ONLY staged
+# files" in its --help, but actually scanned the whole repository).
+# Prints the match count to stdout, line-by-line hits to file $3.
 hardcode_scan_staged() {
     # $4 (optional): regex of file PATHS to skip for this scan only — the
     # $2 exclude_re filters content lines (no filename in them), so per-file
@@ -357,23 +357,23 @@ hardcode_scan_staged() {
     echo "$count"
 }
 
-# 2. Нет захардкоженных /Users/ или C:\Users\ путей [pristine + staged; skip
-# только installed]. В installed-режиме setup.sh легитимно подставил
-# $WORKSPACE_DIR → /Users/<user>/... (issue #835: раньше матчился только
-# POSIX-стиль macOS — нативный Windows-путь вида C:\Users\<user>\... через
-# этот барьер проходил незамеченным).
+# 2. No hardcoded /Users/ or C:\Users\ paths [pristine + staged; skip
+# only installed]. In installed mode setup.sh legitimately substituted
+# $WORKSPACE_DIR -> /Users/<user>/... (issue #835: previously only the
+# POSIX macOS style matched — a native Windows path like C:\Users\<user>\... got
+# through this barrier unnoticed).
 HARDCODE_USER_PATH_RE='/Users/\|C:\\Users\\'
 # Third alternative excludes placeholder instructional text (QUICK-START.md
 # telling a Windows user to type their own name) — same intent as the
 # existing "# ... e.g." exclusion for POSIX comments, just not restricted to
 # `#`-comments since this one lives in markdown prose, not a script comment.
 HARDCODE_USER_PATH_EXCLUDE_RE='/Users/\.\.\./|C:\\Users\\\.\.\.|# .*(/Users/|C:\\Users\\|e\.g\.)|C:\\Users\\(твоё-имя|<[^>]+>)'
-# Файлы, где /Users/ — не захардкоженный путь, а шаблон поиска таких путей
-# (сторож настроек по умолчанию WP-7 и его тест). Исключение по файлу, не по
-# строке: строковое исключение пропустило бы такой же текст в любом другом файле.
-# Один список путей от корня шаблона для обоих режимов: staged сверяет путь
-# целиком (^...$), pristine отбрасывает строки grep именно этих файлов, а не
-# любых файлов с тем же именем в других каталогах.
+# Files where /Users/ is not a hardcoded path but a search pattern for such paths
+# (the default settings guard WP-7 and its test). Exclusion by file, not by
+# line: a line exclusion would let the same text pass in any other file.
+# One list of paths from the template root for both modes: staged matches the whole
+# path (^...$), pristine drops grep lines of exactly these files, not of
+# any files with the same name in other directories.
 HARDCODE_USER_PATH_SKIP_FILES=(scripts/check-shipped-config-secrets.sh scripts/tests/test_template_hygiene_checks.sh)
 HARDCODE_USER_PATH_SKIP_FILES_RE=''
 HARDCODE_USER_PATH_SKIP_GREP=()
@@ -416,8 +416,8 @@ else
     fi
 fi
 
-# 3. Нет захардкоженных /opt/homebrew путей [pristine + staged; skip только installed]
-# В installed-режиме CLAUDE_PATH=/opt/homebrew/bin/claude — легитимная подстановка.
+# 3. No hardcoded /opt/homebrew paths [pristine + staged; skip only installed]
+# In installed mode CLAUDE_PATH=/opt/homebrew/bin/claude is a legitimate substitution.
 echo -n "[3/5] Hardcoded /opt/homebrew paths... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — CLAUDE_PATH может быть /opt/homebrew/...)"
@@ -426,7 +426,7 @@ elif [ "$MODE" = "staged" ]; then
     # The shipped resolver copies are sanctioned exceptions (WP-529 F6,
     # #453/#463): their job is enumerating STANDARD system Python locations
     # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    # secret-bypass-lib.sh (WP-544 Д28) is the same class: it resolves
+    # secret-bypass-lib.sh (WP-544 D28) is the same class: it resolves
     # jq/python3 across the standard FHS locations on macOS (both Intel
     # /usr/local/bin and Apple Silicon /opt/homebrew/bin) and Linux (/usr/bin,
     # /bin), falling back to PATH-based `command -v` only for non-standard
@@ -471,8 +471,8 @@ else
     fi
 fi
 
-# 4. MEMORY.md — скелет (≤15 строк в таблице) [pristine only]
-# В installed-режиме MEMORY заполняется работой пользователя (РП, заметки).
+# 4. MEMORY.md — skeleton (<=15 lines in the table) [pristine only]
+# In installed mode MEMORY is filled by the user's work (WPs, notes).
 echo -n "[4/5] MEMORY.md is skeleton... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — MEMORY заполняется работой)"
@@ -491,7 +491,7 @@ else
     fi
 fi
 
-# 5. Обязательные файлы
+# 5. Required files
 echo -n "[5/5] Required files... "
 MISSING=0
 for f in CLAUDE.md ONTOLOGY.md README.md \
@@ -508,16 +508,16 @@ for f in CLAUDE.md ONTOLOGY.md README.md \
 done
 [ "$MISSING" -eq 0 ] && echo "PASS"
 
-# 6. Нет хардкод-путей к скриптам в протоколах/скиллах (WP-219, DP.FM.009)
-# Протоколы и скиллы должны использовать $IWE_SCRIPTS / $IWE_ROLES / $IWE_TEMPLATE / $IWE_WORKSPACE
-# вместо абсолютных путей к FMT-exocortex-template/scripts|roles или bare ~/IWE/scripts.
-# Enumerate-all: собираем ВСЕ нарушения по всем паттернам, выводим списком, потом fail (предотвращает iterative fix-retry).
+# 6. No hardcoded script paths in protocols/skills (WP-219, DP.FM.009)
+# Protocols and skills must use $IWE_SCRIPTS / $IWE_ROLES / $IWE_TEMPLATE / $IWE_WORKSPACE
+# instead of absolute paths to FMT-exocortex-template/scripts|roles or bare ~/IWE/scripts.
+# Enumerate-all: collect ALL violations across all patterns, print as a list, then fail (prevents iterative fix-retry).
 echo -n "[6/6] Hardcoded script paths in protocols/skills... "
 CHECK6_FAIL=0
 CHECK6_HITS=""
-# Паттерн 1-2: ссылки на FMT-template путь (legacy DP.FM.009)
-# Паттерн 3: bare `bash ~/IWE/scripts/X.sh` или `bash $HOME/IWE/scripts/X.sh` без fallback на $IWE_SCRIPTS
-#   (исключает корректные `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/X.sh`, т.к. после `bash ` идёт `${`, не `~` и не `$HOME`)
+# Pattern 1-2: references to the FMT-template path (legacy DP.FM.009)
+# Pattern 3: bare `bash ~/IWE/scripts/X.sh` or `bash $HOME/IWE/scripts/X.sh` without fallback to $IWE_SCRIPTS
+#   (excludes correct `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/X.sh`, since after `bash ` comes `${`, not `~` or `$HOME`)
 for pattern in 'FMT-exocortex-template/scripts' \
                'FMT-exocortex-template/roles/[a-z]*/scripts' \
                'bash (~|\$HOME)/IWE/scripts/'; do
@@ -541,10 +541,10 @@ else
 fi
 
 # 7. settings.json hooks ↔ .claude/hooks/ cross-ref (issue #13)
-# Проверка в обе стороны:
-#   (a) FAIL: hook упомянут в settings.json, но файла нет в .claude/hooks/
-#   (b) WARN: hook есть в .claude/hooks/, но не упомянут ни в одном settings.json
-#       (может быть вызываем напрямую, например wakatime-heartbeat.sh)
+# Check in both directions:
+#   (a) FAIL: hook mentioned in settings.json but the file is missing in .claude/hooks/
+#   (b) WARN: hook exists in .claude/hooks/ but is not mentioned in any settings.json
+#       (may be invoked directly, e.g. wakatime-heartbeat.sh)
 echo -n "[7/7] Hooks cross-ref (settings.json ↔ .claude/hooks/)... "
 CHECK7_FAIL=0
 HOOKS_DIR="$TEMPLATE_DIR/.claude/hooks"
@@ -573,10 +573,10 @@ else
     for hook in "$HOOKS_DIR"/*.sh; do
         [ -f "$hook" ] || continue
         name=$(basename "$hook")
-        # Каталог исторически содержит не только Claude hooks. Не угадываем по
-        # имени: самостоятельный сервис/CLI/библиотека обязан явно объявить
-        # контракт в собственной шапке. Новый неклассифицированный файл всё
-        # равно даст warning и потребует решения владельца.
+        # The directory historically holds not only Claude hooks. We do not guess by
+        # name: a standalone service/CLI/library must explicitly declare the
+        # contract in its own header. A new unclassified file will still
+        # produce a warning and require the owner's decision.
         grep -q '^# claude-hook: false — ' "$hook" && continue
         # Skip known user-deployed hooks (see .claude/skills/setup-wakatime/SKILL.md)
         skip=0
@@ -593,12 +593,12 @@ else
     [ "$CHECK7_FAIL" -eq 0 ] && [ "$ORPHAN_WARN" -eq 0 ] && echo "PASS"
 fi
 
-# 8. Устаревшие семантические ссылки FPF (issue #390 follow-up).
-# A.2 и A.2.1 сами по себе действительны для ролей и назначений. Запрещены только
-# две доказанно ложные привязки: удалённая A.6.8 и трактовка слова mastery/
-# «мастерство» как сущности A.2. В installed-режиме пользовательская память может
-# содержать исторические цитаты, поэтому проверка относится только к поставляемому
-# pristine/staged шаблону.
+# 8. Stale FPF semantic references (issue #390 follow-up).
+# A.2 and A.2.1 are valid on their own for roles and assignments. Only two
+# provably false bindings are forbidden: the removed A.6.8 and treating the word mastery/
+# «мастерство» as an A.2 entity. In installed mode user memory may
+# contain historical quotes, so the check applies only to the delivered
+# pristine/staged template.
 echo -n "[8/8] Obsolete FPF semantic references... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — пользовательская память может содержать исторические цитаты)"

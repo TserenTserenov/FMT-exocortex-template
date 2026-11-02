@@ -1,35 +1,35 @@
-# .claude/sync-manifest.yaml — реестр пар "источник → производное" для iwe-drift.sh
+# .claude/sync-manifest.yaml — registry of "source → derived" pairs for iwe-drift.sh
 #
-# Манифест — реестр пар для ДЕТЕКЦИИ, не для исполнения.
-# Детектор (`scripts/iwe-drift.sh`) выводит отчёт; оператор (template-sync, update.sh,
-# собственные скрипты) применяет fix отдельно. Разделение ролей: R23 детектор ≠ R8 оператор.
+# The manifest is a registry of pairs for DETECTION, not for execution.
+# The detector (`scripts/iwe-drift.sh`) emits a report; the operator (template-sync, update.sh,
+# own scripts) applies the fix separately. Role separation: R23 detector ≠ R8 operator.
 #
-# Формат записи пары:
-#   id:              уникальный kebab-case
-#   source:          path (absolute или относительно $IWE_ROOT)
-#   derived:         path (то же)
+# Pair entry format:
+#   id:              unique kebab-case
+#   source:          path (absolute or relative to $IWE_ROOT)
+#   derived:         path (same)
 #   relation:        replication | projection | reference | reconciliation
 #   check:           mtime-lag | content-diff | script:<path>
-#   threshold_days:  lag до warn
-#   critical_days:   lag до critical
+#   threshold_days:  lag before warn
+#   critical_days:   lag before critical
 #   owner_role:      R1 | R5 | R8 | human | agent
-#   symptom:         как заметит пользователь при пропуске
-#   notes:           опционально
+#   symptom:         how the user will notice it if missed
+#   notes:           optional
 #
-# Формат activity_check (decommission-триаж в Month Close):
-#   id:                     уникальный kebab-case
-#   action:                 человекочитаемое название
-#   expected_per_period:    ожидаемое число исполнений
-#   period_days:            размер окна
-#   commit_pattern_regex:   как опознать исполнение в git log / mtime
-#   dormant_after_periods:  пустых окон → dormant
-#   archive_after_periods:  пустых окон в dormant → archived
+# activity_check format (decommission triage in Month Close):
+#   id:                     unique kebab-case
+#   action:                 human-readable name
+#   expected_per_period:    expected number of executions
+#   period_days:            window size
+#   commit_pattern_regex:   how to recognize an execution in git log / mtime
+#   dormant_after_periods:  empty windows → dormant
+#   archive_after_periods:  empty windows in dormant → archived
 
 version: 1
 
 pairs:
 
-  # 1. Протоколы (memory/) ↔ скиллы (.claude/skills/) — реализация должна следовать описанию
+  # 1. Protocols (memory/) ↔ skills (.claude/skills/) — the implementation must follow the description
   - id: protocols-to-skills
     source: memory/protocol-close.md
     derived: .claude/skills/day-close/
@@ -50,16 +50,16 @@ pairs:
     owner_role: agent
     symptom: "Day Open работает не по protocol-open.md"
 
-  # 2. (issue #404) staging-validated-to-fmt пара удалена отсюда 2026-08-12:
-  #    её source (STAGING.md) — авторская инфраструктура обкатки (CLAUDE.md §8),
-  #    не поставляется пользовательской установкой шаблона. Пара безусловно
-  #    получала status=missing (mtime-lag не различает "источника нет и не
-  #    будет" от "источник реально пропал") на каждой не-авторской установке
-  #    навсегда — не намеренная задержка. Автору, кто ведёт STAGING.md,
-  #    эквивалентный трекинг — через собственный `author_mode` манифест,
-  #    не общий шипящийся файл.
+  # 2. (issue #404) the staging-validated-to-fmt pair was removed from here 2026-08-12:
+  #    its source (STAGING.md) is the author's trial infrastructure (CLAUDE.md §8),
+  #    not shipped with the user installation of the template. The pair unconditionally
+  #    got status=missing (mtime-lag does not distinguish "the source does not exist and
+  #    never will" from "the source really disappeared") on every non-author installation
+  #    forever — not an intentional delay. For the author who maintains STAGING.md,
+  #    equivalent tracking goes through their own `author_mode` manifest,
+  #    not the shared shipped file.
 
-  # 3. ARCH-якорь ↔ downstream `derived_from:` (helper из scripts/iwe-drift-helpers/)
+  # 3. ARCH anchor ↔ downstream `derived_from:` (helper from scripts/iwe-drift-helpers/)
   - id: arch-version-drift
     source: <Pack-репо>/02-domain-entities/
     derived: <Pack-репо>/
@@ -71,7 +71,7 @@ pairs:
     symptom: "ARCH-документ обновлён (bump version), но downstream-документы с `derived_from: <ID>@vX.Y` не пересмотрены"
     notes: "Helper извлекает `version:` из ARCH-frontmatter и ищет несовпадения в downstream `derived_from:` якорях. Требует явных `version: vX.Y` в frontmatter каждого ARCH-документа. Если у вас нет ARCH-документов с derived_from-якорями — пара бесполезна, удалите."
 
-  # 4. WP-status легенда (REGISTRY) ↔ format-compliance таблицы (helper из scripts/iwe-drift-helpers/)
+  # 4. WP-status legend (REGISTRY) ↔ format-compliance tables (helper from scripts/iwe-drift-helpers/)
   - id: wp-status-legend-drift
     source: <Governance-репо>/docs/WP-REGISTRY.md
     derived: <Governance-репо>/docs/WP-REGISTRY.md
@@ -84,46 +84,46 @@ pairs:
     notes: "Helper проверяет 3 invariant: I1 legend completeness, I2/I3 format compliance (id-format ↔ status). Терминальные статусы захардкожены в helper'е (✅ 📦 ↗️) — список короче и стабильнее, чем active. Любой новый статус по умолчанию active. Адаптируйте путь REGISTRY под свою структуру (env REGISTRY=...)."
 
 # ---------------------------------------------------------------------------
-# Шаблоны для ваших собственных пар. Раскомментируйте и адаптируйте под свой репо-набор.
+# Templates for your own pairs. Uncomment and adapt to your repo set.
 # ---------------------------------------------------------------------------
 #
-#   # Pack ↔ DS (доменное знание → реализационные репо)
+#   # Pack ↔ DS (domain knowledge → implementation repos)
 #   - id: pack-to-ds-instrument
-#     source: <Pack-репо>/
-#     derived: <DS-instrument-репо>/
+#     source: <Pack-repo>/
+#     derived: <DS-instrument-repo>/
 #     relation: reference
 #     check: mtime-lag
 #     threshold_days: 7
 #     critical_days: 21
 #     owner_role: R1
-#     symptom: "DS использует устаревшие термины/SC из Pack"
+#     symptom: "DS uses outdated terms/SC from Pack"
 #
-#   # Корневой CLAUDE.md ↔ CLAUDE.md DS-репо (реплика платформенных правил)
+#   # Root CLAUDE.md ↔ CLAUDE.md of a DS repo (replica of platform rules)
 #   - id: root-claude-md-to-instrument
 #     source: CLAUDE.md
-#     derived: <DS-instrument-репо>/CLAUDE.md
+#     derived: <DS-instrument-repo>/CLAUDE.md
 #     relation: replication
 #     check: mtime-lag
 #     threshold_days: 7
 #     critical_days: 14
 #     owner_role: agent
-#     symptom: "DS-репо не знает про новые правила из корневого CLAUDE.md"
+#     symptom: "DS repo does not know about new rules from the root CLAUDE.md"
 #
-#   # docs/ ↔ код в DS-instrument репо
+#   # docs/ ↔ code in a DS-instrument repo
 #   - id: instrument-docs-to-code
-#     source: <DS-instrument-репо>/
-#     derived: <DS-instrument-репо>/docs/
+#     source: <DS-instrument-repo>/
+#     derived: <DS-instrument-repo>/docs/
 #     relation: reference
 #     check: mtime-lag
 #     threshold_days: 7
 #     critical_days: 21
 #     owner_role: agent
-#     symptom: "docs/ отстаёт от кода более 1 недели"
+#     symptom: "docs/ lags behind code by more than 1 week"
 
 # ---------------------------------------------------------------------------
-# activity_checks — декомиссия мёртвых T-действий.
-# Drift-скрипт предлагает кандидатов, R-вопросник Month Close (M6) собирает решение,
-# человек подтверждает (active → dormant → archived).
+# activity_checks — decommissioning of dead T-actions.
+# The drift script proposes candidates, the R-questionnaire of Month Close (M6) collects the decision,
+# a human confirms (active → dormant → archived).
 # ---------------------------------------------------------------------------
 
 activity_checks:

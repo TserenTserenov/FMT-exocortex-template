@@ -1,9 +1,9 @@
 #!/bin/bash
 # SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
-# telegram.sh — общий helper для Telegram Bot API (WP-357 Ф4)
-# Источник credentials: ~/.secrets/tg-bots (sourceable, должен экспортировать
+# telegram.sh — shared helper for the Telegram Bot API (WP-357 Phase 4)
+# Source of credentials: ~/.secrets/tg-bots (sourceable, must export
 # TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID).
-# Использование: . "$SCRIPT_DIR/lib/telegram.sh" && telegram_send "сообщение"
+# Usage: . "$SCRIPT_DIR/lib/telegram.sh" && telegram_send "message"
 
 TG_SECRETS_FILE="${TG_SECRETS_FILE:-$HOME/.secrets/tg-bots}"
 
@@ -12,9 +12,9 @@ TG_SECRETS_FILE="${TG_SECRETS_FILE:-$HOME/.secrets/tg-bots}"
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/notification-render.sh"
 
-# Секреты нельзя читать или использовать при включённом xtrace: bash печатает
-# значения присваиваний и аргументы curl в stderr. Диагностический `bash -x` уже
-# раскрывал таким образом рабочий и пилотский токены.
+# Secrets must not be read or used with xtrace enabled: bash prints
+# assignment values and curl arguments to stderr. A diagnostic `bash -x` has already
+# exposed the working and the pilot tokens this way.
 telegram_load_creds() {
     local restore_xtrace=0
     local creds_rc=0
@@ -44,9 +44,9 @@ telegram_load_creds() {
 }
 
 # telegram_send <text> [parse_mode]
-# Kimi-fix #2 (critical, 26 мая): передаём $text через stdin, не через интерполяцию.
-# Защита от command injection ($(cmd), backticks) и syntax break (''').
-# Retry logic (WP-server-fix, 23 июня): 3 попытки, backoff 5/10s.
+# Kimi-fix #2 (critical, 26 May): pass $text via stdin, not via interpolation.
+# Protection against command injection ($(cmd), backticks) and syntax break (''').
+# Retry logic (WP-server-fix, 23 June): 3 attempts, backoff 5/10s.
 # DNS/network (curl exit 6/28) → retry. HTTP 4xx → fail-fast (wrong token, bad chat).
 telegram_send() {
     local restore_xtrace=0
@@ -107,11 +107,11 @@ print(json.dumps(data))
         curl_err=$(cat "$tmp_err"); rm -f "$tmp_err"
 
         if [[ $curl_exit -eq 0 ]]; then
-            # Kimi-fix #4: парсим JSON через python вместо хрупкого grep
+            # Kimi-fix #4: parse JSON via python instead of a fragile grep
             if printf '%s' "$http_body" | python3 -c 'import sys, json; sys.exit(0 if json.load(sys.stdin).get("ok") else 1)' 2>/dev/null; then
                 return 0
             fi
-            # HTTP 4xx (wrong token, chat not found): fail-fast, retry бессмысленен
+            # HTTP 4xx (wrong token, chat not found): fail-fast, retry is pointless
             if [[ "${http_code:0:1}" == "4" ]]; then
                 echo "[telegram] FAIL HTTP $http_code (no retry): ${http_body:0:150}" >&2
                 return 1
@@ -129,13 +129,13 @@ print(json.dumps(data))
     return 1
 }
 
-# telegram_send_and_get_id <text> [parse_mode] — как telegram_send, но печатает
-# message_id отправленного сообщения в stdout (WP-503 Ф8.5: поллер сопоставляет
-# входящий reply_to_message.message_id с этим числом, чтобы найти РП, на который
-# отвечает пилот). Отдельная функция, не расширение telegram_send — контракт
-# той функции (только exit-код) используется в 12 местах, менять его рискованно.
-# Использует TG_SECRETS_FILE того же вызывающего скрипта (может отличаться от
-# прод-бота, см. TG_SECRETS_FILE у telegram-poller.sh — отдельный токен, WP-503 Ф5).
+# telegram_send_and_get_id <text> [parse_mode] — like telegram_send, but prints
+# the message_id of the sent message to stdout (WP-503 Phase 8.5: the poller matches
+# an incoming reply_to_message.message_id with this number to find the WP the pilot
+# is replying to). A separate function, not an extension of telegram_send — the contract
+# of that function (exit code only) is used in 12 places, changing it is risky.
+# Uses TG_SECRETS_FILE of the same calling script (may differ from
+# the production bot, see TG_SECRETS_FILE in telegram-poller.sh — a separate token, WP-503 Phase 5).
 telegram_send_and_get_id() {
     local restore_xtrace=0
     local send_rc=0

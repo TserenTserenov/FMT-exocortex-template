@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # routing: helper  skill=extend  called-by=script
 # see DP.SC.159, DP.ROLE.059
-# generate-skills-catalog.sh — генератор skills-catalog.yaml
+# generate-skills-catalog.sh — generator of skills-catalog.yaml
 # see DP.SC.153
 #
-# Парсит все .claude/skills/*/SKILL.md → строит skills-catalog.yaml с:
-#   - метаданными из frontmatter (name, description, version, layer, status, triggers, depends_on)
-#   - вычисляемым invoked_by (из protocol-*.md + других SKILL.md + CLAUDE.md)
+# Parses all .claude/skills/*/SKILL.md → builds skills-catalog.yaml with:
+#   - metadata from frontmatter (name, description, version, layer, status, triggers, depends_on)
+#   - computed invoked_by (from protocol-*.md + other SKILL.md + CLAUDE.md)
 #
-# Использование:
+# Usage:
 #   bash generate-skills-catalog.sh [--skills-dir <path>] [--output <path>] [--dry-run]
 
 set -uo pipefail
@@ -30,11 +30,11 @@ done
 
 log() { echo "$*" >&2; }
 
-# Извлечь значение поля из YAML frontmatter (первое вхождение).
-# Поддерживает block scalar (`field: |` / `field: >`) — читает следующие
-# более-отступленные строки до дедента и схлопывает их в одну строку
-# (найдено 01.09, WP-527: `description: |` в repo-new/skill-creator
-# ломался в буквальное значение "|", а не читался как блок).
+# Extract a field value from the YAML frontmatter (first occurrence).
+# Supports a block scalar (`field: |` / `field: >`) — reads the following
+# more-indented lines until the dedent and collapses them into one line
+# (found 01.09, WP-527: `description: |` in repo-new/skill-creator
+# broke into the literal value "|" instead of being read as a block).
 get_field() {
     local file="$1" field="$2"
     local block value
@@ -58,10 +58,10 @@ get_field() {
     esac
 }
 
-# Извлечь список (slash) из triggers блока. Поддерживает и inline-стиль
-# (`slash: [/a, /b]`), и YAML-список (`slash:` + `- item` строками ниже —
-# формат, который выдаёт scaffold-init.sh; найден 01.09 WP-527, раньше давал
-# мусор вида "- slash:" вместо реальных триггеров).
+# Extract the list (slash) from the triggers block. Supports both inline style
+# (`slash: [/a, /b]`) and a YAML list (`slash:` + `- item` lines below —
+# the format that scaffold-init.sh emits; found 01.09 WP-527, previously gave
+# garbage like "- slash:" instead of the real triggers).
 get_triggers_slash() {
     local file="$1"
     local block inline
@@ -82,25 +82,25 @@ get_triggers_slash() {
     ' | sed 's/^ *//;s/ *$//;s/^\/\?/\//' | grep -v '^$' || true
 }
 
-# Собрать все файлы где упоминается скилл (для invoked_by)
+# Collect all files where a skill is mentioned (for invoked_by)
 build_invoked_by() {
     local skill_name="$1"
     local callers=""
-    # Ищем /skill-name в protocol-*.md и CLAUDE.md
+    # Look for /skill-name in protocol-*.md and CLAUDE.md
     local search_files=""
     # Trailing slash: PROTOCOLS_DIR is usually memory/, a symlink to auto-memory
     # (junction on Windows). find does not descend into a symlinked start point
     # without it (issue #913) — 0 files found instead of 5.
     [[ -d "$PROTOCOLS_DIR" ]] && search_files+=" $(find "$PROTOCOLS_DIR/" -name "protocol-*.md" 2>/dev/null)"
     [[ -f "${IWE}/CLAUDE.md" ]] && search_files+=" ${IWE}/CLAUDE.md"
-    # Ищем в других SKILL.md (depends_on)
+    # Look in other SKILL.md files (depends_on)
     [[ -d "$SKILLS_DIR" ]] && search_files+=" $(find "$SKILLS_DIR" -name "SKILL.md" 2>/dev/null)"
 
     for f in $search_files; do
         [[ -f "$f" ]] || continue
         if grep -q "/${skill_name}\b\|depends_on:.*${skill_name}" "$f" 2>/dev/null; then
             caller=$(basename "$(dirname "$f")")
-            # Для protocol-*.md берём имя файла
+            # For protocol-*.md take the file name
             [[ "$f" == *"protocol-"* ]] && caller=$(basename "$f" .md)
             [[ "$f" == *"CLAUDE.md"* ]] && caller="CLAUDE.md"
             callers+="    - ${caller}\n"
@@ -111,7 +111,7 @@ build_invoked_by() {
 
 log "🔍 Сканирую скиллы в: $SKILLS_DIR"
 
-# Начало YAML
+# Start of YAML
 catalog_content="# skills-catalog.yaml — автогенерировано generate-skills-catalog.sh
 # see DP.SC.153
 # НЕ редактировать вручную — перегенерировать через generate-skills-catalog.sh
@@ -127,7 +127,7 @@ warn_count=0
 for skill_dir in "$SKILLS_DIR"/*/; do
     [[ -d "$skill_dir" ]] || continue
     skill_id=$(basename "$skill_dir")
-    [[ "$skill_id" == "_template" ]] && continue  # пропустить шаблон
+    [[ "$skill_id" == "_template" ]] && continue  # skip the template
 
     skill_md="${skill_dir}SKILL.md"
     if [[ ! -f "$skill_md" ]]; then
@@ -143,7 +143,7 @@ for skill_dir in "$SKILLS_DIR"/*/; do
     status_val=$(get_field "$skill_md" "status")
     depends_raw=$(grep "^depends_on:" "$skill_md" 2>/dev/null | head -1 | sed 's/^depends_on: *//' || echo "[]")
 
-    # Дефолты для отсутствующих полей
+    # Defaults for missing fields
     [[ -z "$name" ]] && name="$skill_id" && log "  ⚠️  [$skill_id] name не найден, используем id"
     [[ -z "$version" ]] && version="0.0.0" && log "  ⚠️  [$skill_id] version не найден"
     [[ -z "$layer" ]] && layer="unknown" && log "  ⚠️  [$skill_id] layer не найден"
@@ -159,7 +159,7 @@ for skill_dir in "$SKILLS_DIR"/*/; do
         done <<< "$slash_triggers"
     fi
 
-    # invoked_by (вычисляемое)
+    # invoked_by (computed)
     invoked_by=$(build_invoked_by "$skill_id")
 
     catalog_content+="

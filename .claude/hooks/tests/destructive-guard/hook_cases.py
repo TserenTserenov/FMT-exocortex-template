@@ -512,7 +512,7 @@ def main():
     check(code == 2, f"CC_ALLOW_DESTRUCTIVE_INPUT=0 is not a bypass -> {code}")
 
     # --- the guide tells the truth (WP-7): a pass-through below that the hook really has is named
-    # under «Вне гарантии»; the bypass is described as covering the whole process, not one command ---
+    # under "Outside the guarantee"; the bypass is described as covering the whole process, not one command ---
     doc_path = pathlib.Path(hook).resolve().parents[2] / "docs" / "DESTRUCTIVE-GUARD.md"
     if doc_path.is_file():
         doc = doc_path.read_text(encoding="utf-8")

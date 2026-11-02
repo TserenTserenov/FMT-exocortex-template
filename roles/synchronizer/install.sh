@@ -1,6 +1,6 @@
 #!/bin/bash
-# Synchronizer: установка центрального диспетчера (launchd)
-# Заменяет отдельные launchd-агенты Стратега единым scheduler
+# Synchronizer: installation of the central dispatcher (launchd)
+# Replaces the separate Strategist launchd agents with a single scheduler
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,7 +8,7 @@ ROLE_NAME="$(basename "$SCRIPT_DIR")"
 PLIST_DST="$HOME/Library/LaunchAgents/com.exocortex.scheduler.plist"
 
 # Resolve PLIST source (Generated runtime → workspace fallback → FMT legacy).
-# WP-273 Этап 2: substituted plists и runtime-скрипты живут в $IWE_RUNTIME.
+# WP-273 Stage 2: substituted plists and runtime scripts live in $IWE_RUNTIME.
 if [ -n "${IWE_RUNTIME:-}" ] && [ -d "$IWE_RUNTIME/roles/$ROLE_NAME/scripts/launchd" ]; then
     PLIST_SRC="$IWE_RUNTIME/roles/$ROLE_NAME/scripts/launchd/com.exocortex.scheduler.plist"
     SCRIPTS_DIR_RUNTIME="$IWE_RUNTIME/roles/$ROLE_NAME/scripts"
@@ -29,7 +29,7 @@ if [ ! -f "$PLIST_SRC" ]; then
     exit 1
 fi
 
-# WP-273 R5 fix: fail-fast если plist содержит literal {{...}}
+# WP-273 R5 fix: fail-fast if the plist contains a literal {{...}}
 if grep -qE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" 2>/dev/null; then
     echo "ERROR: $PLIST_SRC содержит незаменённые плейсхолдеры:" >&2
     grep -oE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" | sort -u | sed 's/^/  /' >&2
@@ -41,7 +41,7 @@ if grep -qE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" 2>/dev/null; then
     exit 2
 fi
 
-# Делаем скрипты исполняемыми (runtime path)
+# Make scripts executable (runtime path)
 if [ -d "$SCRIPTS_DIR_RUNTIME" ]; then
     chmod +x "$SCRIPTS_DIR_RUNTIME/"*.sh 2>/dev/null || true
     chmod +x "$SCRIPTS_DIR_RUNTIME/templates/"*.sh 2>/dev/null || true
@@ -126,17 +126,17 @@ mkdir -p "$(dirname "$PLIST_DST")"
 
 # SETUP_CI installs files only: unloading a host agent is still a global write.
 if [ -z "${SETUP_CI:-}" ]; then
-    # Выгружаем старые агенты и legacy Стратег-агенты (если были)
+    # Unload old agents and legacy Strategist agents (if any)
     launchctl unload "$PLIST_DST" 2>/dev/null || true
     launchctl unload "$HOME/Library/LaunchAgents/com.strategist.morning.plist" 2>/dev/null || true
     launchctl unload "$HOME/Library/LaunchAgents/com.strategist.weekreview.plist" 2>/dev/null || true
 fi
 
-# Создаём директории состояния
+# Create state directories
 mkdir -p "$HOME/.local/state/exocortex"
 mkdir -p "$HOME/logs/synchronizer"
 
-# Копируем и загружаем
+# Copy and load
 cp "$PLIST_SRC" "$PLIST_DST"
 if [ -n "${SETUP_CI:-}" ]; then
     echo "  ⊠ SETUP_CI: plist copied, launchctl activation skipped"

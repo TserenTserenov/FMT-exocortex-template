@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # routing: helper  skill=week-close  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# changelog-flush.sh — переименовывает [Unreleased] → конкретную версию в CHANGELOG.md
+# changelog-flush.sh — renames [Unreleased] → a concrete version in CHANGELOG.md
 #
-# Использование:
+# Usage:
 #   bash changelog-flush.sh --version 0.31.0 [--dry-run]
 #
-# Если [Unreleased] нет — сначала вызвать changelog-append.sh.
+# If there is no [Unreleased] — call changelog-append.sh first.
 
 set -uo pipefail
 
@@ -28,10 +28,10 @@ if [[ -z "$version" ]]; then
     exit 1
 fi
 
-# #9 High-2 (ревью Ф14): после первого flush пустой заголовок [Unreleased]
-# остаётся навсегда — проверка «заголовок существует» стала бы мёртвой и
-# позволила бы чеканить пустые релизы. Сторож требует НЕПУСТОГО содержимого
-# между [Unreleased] и следующим версионным заголовком.
+# #9 High-2 (review Phase 14): after the first flush an empty [Unreleased] header
+# stays forever — the "header exists" check would become dead and
+# allow minting empty releases. The guard requires NON-EMPTY content
+# between [Unreleased] and the next version header.
 UNRELEASED_CONTENT=$(awk '
     /^## \[Unreleased\]/ { in_u=1; next }
     in_u && /^## \[/ { exit }
@@ -51,11 +51,11 @@ if $dry_run; then
     exit 0
 fi
 
-# 2026-08-23 (живой сбой перед v0.38.8): flush ПЕРЕИМЕНОВЫВАЛ заголовок
-# [Unreleased] в версию — секция исчезала, changelog-append писал в пустоту,
-# следующий бамп видел «нечего выпускать». awk вместо sed: заголовок остаётся
-# на месте пустой секцией, версия вставляется новой секцией под ним
-# (переносы строк в replacement непортируемы между GNU и BSD sed).
+# 2026-08-23 (live failure before v0.38.8): flush RENAMED the [Unreleased]
+# header to a version — the section vanished, changelog-append wrote into the void,
+# the next bump saw "nothing to release". awk instead of sed: the header stays
+# in place as an empty section, the version is inserted as a new section under it
+# (line breaks in a replacement are not portable between GNU and BSD sed).
 _flush_tmp="$CHANGELOG.flush.$$"
 awk -v hdr="$new_header" '
     !done && /^## \[Unreleased\]/ { print "## [Unreleased]"; print ""; print hdr; done=1; next }

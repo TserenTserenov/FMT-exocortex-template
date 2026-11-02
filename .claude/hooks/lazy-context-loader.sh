@@ -1,9 +1,9 @@
 #!/bin/bash
-# Lazy Context Loader — WP-16 Токенная диета сессии
+# Lazy Context Loader — WP-16 Session token diet
 # Event: UserPromptSubmit
-# Загружает warm memory-файлы в контекст по ключевым словам промпта.
-# Правило: не более 1 файла на промпт (не перегружать контекст).
-# Добавлено: 2026-06-23
+# Loads warm memory files into the context by prompt keywords.
+# Rule: no more than 1 file per prompt (do not overload the context).
+# Added: 2026-06-23
 
 set -uo pipefail
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # kimi-auto-heartbeat.sh
-# Запускает фоновый heartbeat для активной Kimi standalone-сессии.
-# Должен вызываться сразу после session-guard.sh open.
+# Starts a background heartbeat for the active Kimi standalone session.
+# Must be called right after session-guard.sh open.
 #
 # Usage: bash scripts/kimi-auto-heartbeat.sh [--interval 120] [--session-id <id>]
 

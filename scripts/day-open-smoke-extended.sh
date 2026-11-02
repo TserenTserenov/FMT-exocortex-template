@@ -1,13 +1,13 @@
 #!/bin/bash
-# day-open-smoke-extended.sh — extended smoke для Day Open (запускается hourly cron, кэш)
-# see: peer-сессия 2026-05-30-07-gap-list-day-open подэтап 2
+# day-open-smoke-extended.sh — extended smoke for Day Open (runs on hourly cron, cached)
+# see: peer session 2026-05-30-07-gap-list-day-open sub-stage 2
 # see: WP-356 «Pipeline Day Open: auto-run checks»
 #
-# Назначение: проверки, занимающие >2с (dt-collect dry-run, projection cursor age, FPF upstream).
-# Запускается hourly cron, результат — в cache-файле.
-# Day Open читает cache, не вызывает этот скрипт напрямую.
+# Purpose: checks that take >2s (dt-collect dry-run, projection cursor age, FPF upstream).
+# Runs on hourly cron, the result goes to a cache file.
+# Day Open reads the cache, does not call this script directly.
 #
-# Вывод: JSON в файл `~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/.smoke-cache.json`
+# Output: JSON into the file `~/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/.smoke-cache.json`
 #   {
 #     "timestamp": "ISO-8601",
 #     "ttl_min": 90,
@@ -17,11 +17,11 @@
 #     "elapsed_sec": <float>
 #   }
 #
-# Использование:
-#   bash day-open-smoke-extended.sh         # обычный запуск
-#   bash day-open-smoke-extended.sh --force # игнорировать TTL, всегда запускать
+# Usage:
+#   bash day-open-smoke-extended.sh         # normal run
+#   bash day-open-smoke-extended.sh --force # ignore the TTL, always run
 #
-# Failure mode: индивидуальные секции могут возвращать "fail:<reason>", скрипт не падает.
+# Failure mode: individual sections may return "fail:<reason>", the script does not crash.
 
 set -uo pipefail
 
@@ -36,7 +36,7 @@ DS_STRATEGY="$IWE_BASE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 CACHE_FILE="$DS_STRATEGY/current/.smoke-cache.json"
 TTL_MIN=90
 
-# Проверить TTL — если cache свежий, не запускаться (если не --force)
+# Check the TTL — if the cache is fresh, do not run (unless --force)
 if [ "$FORCE" = "false" ] && [ -f "$CACHE_FILE" ]; then
   cache_ts=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0)
   now_ts=$(date +%s)
@@ -54,7 +54,7 @@ check_dt_collect() {
     echo "fail:script-missing"
     return
   fi
-  # Запустить dry-run с timeout 30с. iwe_timeout (lib/common.sh) — issue #1108:
+  # Run dry-run with a 30s timeout. iwe_timeout (lib/common.sh) — issue #1108:
   # a bare `timeout` here is GNU/Homebrew-only and "command not found" (exit
   # 127) on stock macOS with no Homebrew, making every single check in this
   # script fail:exit-127 with no indication the real cause was a missing tool.
@@ -65,10 +65,10 @@ check_dt_collect() {
   fi
 }
 
-# === 2. Projection cursor age (через Neon) ===
+# === 2. Projection cursor age (via Neon) ===
 check_projection_cursor() {
-  # Без БД-доступа в этом контексте — отметить как unknown
-  # TODO: при подключении psql + secrets — прочитать MAX(updated_at) из projection_cursors
+  # No DB access in this context — mark as unknown
+  # TODO: when psql + secrets are connected — read MAX(updated_at) from projection_cursors
   echo "-1"
 }
 

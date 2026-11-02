@@ -1,24 +1,24 @@
 #!/bin/bash
-# daily-report.sh — ежедневный отчёт работы scheduler
+# daily-report.sh — daily scheduler work report
 #
-# Формирует отчёт: что должно было сработать, что сработало, что нет.
+# Builds the report: what should have run, what ran, what did not.
 #
-# Если DS-agent-workspace/ существует → пишет туда (scheduler/reports/).
-# Иначе → DS-strategy/current/ (обратная совместимость).
+# If DS-agent-workspace/ exists → writes there (scheduler/reports/).
+# Otherwise → DS-strategy/current/ (backward compatibility).
 #
-# Использование:
-#   daily-report.sh           # сформировать отчёт за сегодня
-#   daily-report.sh --dry-run # показать отчёт, не записывать
+# Usage:
+#   daily-report.sh           # build the report for today
+#   daily-report.sh --dry-run # show the report, do not write
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="$HOME/.local/state/exocortex"
 LOG_DIR="$HOME/logs/synchronizer"
-# WP-273 0.29.4 R6.1 fix (issue #271): runtime-резолв вместо build-time плейсхолдеров — как в strategist.sh.
+# WP-273 0.29.4 R6.1 fix (issue #271): runtime resolve instead of build-time placeholders — as in strategist.sh.
 STRATEGY_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
-# Agent Workspace: если существует — отчёты идут туда
+# Agent Workspace: if it exists — reports go there
 AGENT_WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}/DS-agent-workspace"
 if [ -d "$AGENT_WORKSPACE/.git" ]; then
     REPORT_DIR="$AGENT_WORKSPACE/scheduler/reports"
@@ -158,7 +158,7 @@ agent: Синхронизатор
 | 1 | Сканирование кода | **❌** | — |"
     fi
 
-    # 2. Стратег утренний
+    # 2. Morning strategist
     local sm_time
     if sm_time=$(check_ran "strategist-morning"); then
         report+="
@@ -171,7 +171,7 @@ agent: Синхронизатор
     # The note-review row and its traffic-light check are gone: the scheduler no longer runs
     # note-review (template owner's decision, July 2026), so a missing marker is not a failure.
 
-    # 3. Week-review (Пн)
+    # 3. Week-review (Mon)
     if [ "$DOW" = "1" ]; then
         local wr_time
         if wr_time=$(check_ran_week "strategist-week-review"); then
@@ -183,7 +183,7 @@ agent: Синхронизатор
         fi
     fi
 
-    # 4. Экстрактор inbox-check
+    # 4. Extractor inbox-check
     local ic_detail
     if ic_detail=$(check_interval "extractor-inbox-check"); then
         report+="
@@ -197,7 +197,7 @@ agent: Синхронизатор
 
 "
 
-    # Ошибки
+    # Errors
     report+="## Ошибки и предупреждения
 "
     local warnings=""

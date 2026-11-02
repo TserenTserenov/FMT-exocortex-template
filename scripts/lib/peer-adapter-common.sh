@@ -192,7 +192,7 @@ peer_adapter_check_frontmatter() {
   local first_line fm_fences
   # awk in one process: a `sed | head` pipeline hit SIGPIPE under `pipefail`
   # on a long valid reply and killed the adapter without diagnostics
-  # (review-02, WP-516 Ф5) — kept from the original inline check.
+  # (review-02, WP-516 Phase 5) — kept from the original inline check.
   first_line=$(printf '%s\n' "$output" | awk 'length { print; exit }')
   fm_fences=$(printf '%s\n' "$output" | grep -c '^---$' || true)
   if [ "$first_line" != "---" ] || [ "${fm_fences:-0}" -lt 2 ]; then
@@ -202,14 +202,14 @@ peer_adapter_check_frontmatter() {
 }
 
 # peer_adapter_check_language <output-text>
-# WP-484 Ф89/Ф92: alert-only self-check — доля кириллицы в ответе после
-# вычитания кода/путей/A2-глосс. Никогда не блокирует вывод, только
-# предупреждает в stderr (не видна peer-реплике, IWE_PEER_PLAIN=1 её не
-# печатает). Уже жила инлайн-копией в codex-/hermes-peer-adapter.sh
-# (Ф89, 11.08) — здесь единственное определение для новых вызывающих
-# (kimi/claude), чтобы не плодить третью копию (P2). language-check.py
-# лежит рядом с этим файлом (scripts/lib/), путь резолвится через
-# BASH_SOURCE этого файла — не зависит от cwd вызывающего адаптера.
+# WP-484 Phase 89/Phase 92: alert-only self-check — share of Cyrillic in the answer after
+# subtracting code/paths/A2 glosses. Never blocks output, only
+# warns on stderr (not visible to the peer turn, IWE_PEER_PLAIN=1 does not
+# print it). It already lived as an inline copy in codex-/hermes-peer-adapter.sh
+# (Phase 89, 11.08) — here is the single definition for new callers
+# (kimi/claude), so as not to breed a third copy (P2). language-check.py
+# lies next to this file (scripts/lib/), the path is resolved via
+# BASH_SOURCE of this file — independent of the calling adapter's cwd.
 peer_adapter_check_language() {
   local output="${1-}"
   local lib_dir lang_check python_resolver resolved_python lang_result
@@ -230,7 +230,7 @@ peer_adapter_check_language() {
 }
 
 # peer_adapter_check_style <agent-name> <output-text>
-# РП-388 Ф17: feeds a peer reply through the shared response-clarity-hook.sh
+# WP-388 Phase 17: feeds a peer reply through the shared response-clarity-hook.sh
 # core via the style-check-text.sh wrapper, so Kimi/Codex replies get the
 # same A1-A13.1 checks as Claude's own Stop-hook — one core, thin wrappers,
 # not a third parallel reimplementation (style-check-post-run.sh was exactly
@@ -238,7 +238,7 @@ peer_adapter_check_language() {
 # below is why this lives here, not inline in kimi-peer-adapter.sh (P2).
 # Warn-only, never blocks: both the wrapper and the hook always exit 0, and
 # any failure to even find the wrapper (sync lag to the ~/IWE mirror, WP-388
-# Ф15 "два прыжка") is swallowed the same way.
+# Phase 15 "two hops") is swallowed the same way.
 peer_adapter_check_style() {
   local agent_name="${1-}" output="${2-}"
   local wrapper="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/style-check-text.sh"

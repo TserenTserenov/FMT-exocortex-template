@@ -1,4 +1,4 @@
-# Role manifest — Аудитор (R24)
+# Role manifest — Auditor (R24)
 # Source-of-truth: PACK-verification (VR.R.002), DP.ROLE.001 §3.2 (R24)
 # Contract: roles/ROLE-CONTRACT.md
 
@@ -7,7 +7,7 @@ id: R24
 type: agential
 display_name: "Аудитор"
 
-# Нет runner — вызывается по запросу или встроен в Day Open / стратегирование
+# No runner — called on request or embedded in Day Open / strategizing
 # runner: scripts/auditor.sh
 
 install:

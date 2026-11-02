@@ -3,12 +3,12 @@
 # Configures a forked FMT-exocortex-template: placeholders, memory, launchd, DS-strategy
 #
 # Usage:
-#   bash setup.sh          # Полная установка (git + GitHub CLI + Claude Code + автоматизация)
-#   bash setup.sh --core   # Минимальная установка (только git, без сети)
+#   bash setup.sh          # Full installation (git + GitHub CLI + Claude Code + automation)
+#   bash setup.sh --core   # Minimal installation (git only, no network)
 #
 set -e
 
-VERSION="0.7.0"  # WP-273 Этап 2: Generated runtime architecture (F)
+VERSION="0.7.0"  # WP-273 Stage 2: Generated runtime architecture (F)
 DRY_RUN=false
 CORE_ONLY=false
 VALIDATE_ONLY=false
@@ -115,8 +115,8 @@ if $VALIDATE_ONLY; then
     else
         echo "  ⚠ extensions/ не найдена (опционально)"
     fi
-    # issue #348: в репозитории лежит только образец; рабочий params.yaml создаётся
-    # build-runtime.sh в корне установки и под git-контроль шаблона не попадает.
+    # issue #348: the repository holds only a sample; the working params.yaml is created
+    # by build-runtime.sh at the installation root and does not end up under the template's git control.
     if [ -f "$SCRIPT_DIR/params.yaml.example" ]; then
         echo "  ✓ params.yaml.example (образец параметров)"
     else
@@ -128,9 +128,9 @@ if $VALIDATE_ONLY; then
     echo "  MCP подключается через claude.ai/settings/connectors"
     echo "  Проверьте командой /mcp в Claude Code"
 
-    # Delegate структурные инварианты валидатору шаблона (installed-режим:
-    # пропускает чеки, легитимно нарушаемые после setup — /Users/, /opt/homebrew, MEMORY skeleton).
-    # См. setup/validate-template.sh — единый источник чеков 1, 5, 6, 7.
+    # Delegate structural invariants to the template validator (installed mode:
+    # skips checks that are legitimately violated after setup — /Users/, /opt/homebrew, MEMORY skeleton).
+    # See setup/validate-template.sh — the single source of checks 1, 5, 6, 7.
     if [ -x "$SCRIPT_DIR/setup/validate-template.sh" ] || [ -f "$SCRIPT_DIR/setup/validate-template.sh" ]; then
         echo ""
         echo "[5/5] Структурные инварианты (delegate → validate-template.sh --mode=installed)..."
@@ -203,7 +203,7 @@ check_command() {
     fi
 }
 
-# Git — обязателен всегда
+# Git — always required
 check_command "git" "Git" "xcode-select --install"
 
 # Git identity — required in every mode: step 6 makes the initial commit of the
@@ -227,8 +227,8 @@ if command -v git >/dev/null 2>&1; then
     [ -z "$_ID_PROBE" ] || rm -rf "$_ID_PROBE"
 fi
 
-# jq — обязателен всегда: .claude/hooks/dry-run-gate.sh (устанавливается в любом режиме,
-# см. шаг 4b) fail-closed блокирует ВСЕ tool calls без jq, без явного предупреждения (issue #192).
+# jq — always required: .claude/hooks/dry-run-gate.sh (installed in any mode,
+# see step 4b) fail-closed blocks ALL tool calls without jq, with no explicit warning (issue #192).
 check_command "jq" "jq" "brew install jq (Linux: apt install jq / dnf install jq)"
 
 if $CORE_ONLY; then
@@ -236,14 +236,14 @@ if $CORE_ONLY; then
     echo "  Режим --core: проверяются только обязательные зависимости (git)."
     echo "  GitHub CLI, Node.js, Claude Code — не требуются."
 else
-    # В CI-режиме (SETUP_CI=1) node/npm/claude — необязательны: Test 10 проверяет delivery
-    # и role-installation, а не наличие runtime-инструментов на машине.
-    # Паттерн уже установлен для gh auth ниже (строка с SETUP_CI).
+    # In CI mode (SETUP_CI=1) node/npm/claude are optional: Test 10 checks delivery
+    # and role installation, not the presence of runtime tools on the machine.
+    # The pattern is already set for gh auth below (the line with SETUP_CI).
     _TOOL_REQUIRED="${SETUP_CI:+false}"; _TOOL_REQUIRED="${_TOOL_REQUIRED:-true}"
     check_command "gh" "GitHub CLI" "brew install gh" "$_TOOL_REQUIRED"
     check_command "node" "Node.js" "brew install node (or https://nodejs.org)" "$_TOOL_REQUIRED"
     check_command "npm" "npm" "Comes with Node.js" "$_TOOL_REQUIRED"
-    # Multi-agent support: Claude Code, Kimi Code, Hermes — любой из них подходит
+    # Multi-agent support: Claude Code, Kimi Code, Hermes — any of them will do
     AI_CLI_CANDIDATES="${AI_CLI_CANDIDATES:-claude kimi-code kimi hermes}"
     _AGENT_FOUND=false
     for _agent_cmd in $AI_CLI_CANDIDATES; do
@@ -310,7 +310,7 @@ else
     WORKSPACE_DIR="${WORKSPACE_DIR/#\~/$HOME}"
 
     if $CORE_ONLY; then
-        # Core: используем defaults, не спрашиваем Claude-специфичные параметры
+        # Core: use defaults, do not ask Claude-specific parameters
         CLAUDE_PATH="${AI_CLI:-claude}"
         TIMEZONE_HOUR="4"
         TIMEZONE_DESC="4:00 (местное время)"
@@ -413,7 +413,7 @@ memory_record_put() {
 
 CLAUDE_PROJECT_SLUG="$(iwe_claude_project_slug "$WORKSPACE_DIR")"
 
-# === Governance repo contract (WP-560 Ф5-Phase-2) ===
+# === Governance repo contract (WP-560 Phase 5-Phase-2) ===
 # Single machine-readable source for the governance repo's default name and
 # the content markers that identify one as "the" governance repo — shared
 # with the server side (aisystant/github-integration-service,
@@ -482,7 +482,7 @@ validate_governance_repo_name() {
     esac
 }
 validate_governance_repo_name "$GOVERNANCE_REPO"
-# Scope note (WP-560 Ф5-Phase-2 review, 02.09; fail-closed added 11.09; the
+# Scope note (WP-560 Phase 5-Phase-2 review, 02.09; fail-closed added 11.09; the
 # separate GOVERNANCE_CONTRACT_DEFAULT_REPO pre-check folded in the same day,
 # peer-review round 2 — it used to run before this loop and short-circuit it
 # whenever the default-named directory existed, so a second, differently
@@ -531,7 +531,7 @@ if [ -d "$WORKSPACE_DIR/$GOVERNANCE_REPO" ] && [ -d "$TEMPLATE_DIR" ]; then
     fi
 fi
 
-# IWE_TEMPLATE = путь к FMT-репо (где живёт setup.sh).
+# IWE_TEMPLATE = path to the FMT repo (where setup.sh lives).
 IWE_TEMPLATE_PATH="$TEMPLATE_DIR"
 
 echo ""
@@ -573,9 +573,9 @@ if ! $DRY_RUN && [ -z "${SETUP_CI:-}" ]; then
 fi
 
 # === Save configuration to .exocortex.env ===
-# WP-273 Этап 2: .exocortex.env живёт в $WORKSPACE_DIR/, не в FMT.
-# FMT остаётся clean upstream (immutable). Все substituted значения генерируются
-# build-runtime.sh в $WORKSPACE_DIR/.iwe-runtime/.
+# WP-273 Stage 2: .exocortex.env lives in $WORKSPACE_DIR/, not in FMT.
+# FMT stays a clean upstream (immutable). All substituted values are generated by
+# build-runtime.sh in $WORKSPACE_DIR/.iwe-runtime/.
 ENV_FILE="$WORKSPACE_DIR/.exocortex.env"
 IWE_RUNTIME_PATH="$WORKSPACE_DIR/.iwe-runtime"
 # issue #805: build-runtime.sh --dry-run has no fresh-checkout exception —
@@ -633,9 +633,9 @@ else
 fi
 
 # === 1. Build generated runtime (.iwe-runtime/) ===
-# WP-273 Этап 2: substituted-файлы живут в $WORKSPACE_DIR/.iwe-runtime/
-# (Generated runtime, F). FMT остаётся clean upstream — никаких sed по $TEMPLATE_DIR.
-# Реестр overlay-файлов: .claude/runtime-overlay.yaml. Реализация: setup/build-runtime.sh.
+# WP-273 Stage 2: substituted files live in $WORKSPACE_DIR/.iwe-runtime/
+# (Generated runtime, F). FMT stays a clean upstream — no sed over $TEMPLATE_DIR.
+# Registry of overlay files: .claude/runtime-overlay.yaml. Implementation: setup/build-runtime.sh.
 echo ""
 echo "[1/6] Building generated runtime..."
 
@@ -869,9 +869,9 @@ if $DRY_RUN; then
     echo "  [DRY RUN] Would copy .claude/{skills,hooks,rules,rules-lazy,lib,bin,config,detectors,scripts,agents,styles}/ → $WORKSPACE_DIR/.claude/"
 else
     mkdir -p "$WORKSPACE_DIR/.claude"
-    # lib/config/detectors — runtime dependencies капчер-шины (capture-bus.sh) и детекторов
-    # scripts — требуется скиллами (напр. load-extensions.sh)
-    # styles — дисциплина языковых стилей (WP-412)
+    # lib/config/detectors — runtime dependencies of the capture bus (capture-bus.sh) and detectors
+    # scripts — required by skills (e.g. load-extensions.sh)
+    # styles — language style discipline (WP-412)
     # rules-lazy — lazy-loaded rule expansions (role-prefixes-full), parity with update.sh
     for subdir in skills hooks rules rules-lazy lib bin config detectors scripts agents styles templates; do
         if [ -d "$TEMPLATE_DIR/.claude/$subdir" ]; then
@@ -923,7 +923,7 @@ MCP_TEMPLATE="$TEMPLATE_DIR/.mcp.json"
 MCP_DEST="$WORKSPACE_DIR/.mcp.json"
 MCP_USER_EXT="$WORKSPACE_DIR/extensions/mcp-user.json"
 
-# WP-7 Ф133 (live user report, Ruslan, 2026-09-09): extensions/ was already
+# WP-7 Phase 133 (live user report, Ruslan, 2026-09-09): extensions/ was already
 # read here (MCP_USER_EXT above) and by day-open-hooks-runner.sh's step 0,
 # but setup.sh never created it — day-open-hooks.sh's fail-closed contract
 # ("every install ships extensions/") aborted the canonical Day Open
@@ -967,13 +967,13 @@ else
             fi
 
             if [ -n "$_ICT_TOKEN" ]; then
-                # Найдено ревью после #786/#811: ветка раньше строила .mcp.json
-                # с нуля через `jq -n '{"mcpServers":{"iwe-knowledge":...}}' >
-                # "$MCP_DEST"` — безусловный overwrite стирал ВСЕ остальные
-                # серверы шаблона (ext-railway и любые будущие), не только
-                # плейсхолдер. Теперь сначала копируем и подставляем плейсхолдеры
-                # тем же путём, что T1/T2 (install_workspace_instruction), затем
-                # мёржим аутентифицированный iwe-knowledge поверх остального.
+                # Found by review after #786/#811: the branch used to build .mcp.json
+                # from scratch via `jq -n '{"mcpServers":{"iwe-knowledge":...}}' >
+                # "$MCP_DEST"` — the unconditional overwrite erased ALL other
+                # template servers (ext-railway and any future ones), not just the
+                # placeholder. Now we first copy and substitute the placeholders
+                # by the same path as T1/T2 (install_workspace_instruction), then
+                # merge the authenticated iwe-knowledge over the rest.
                 _MCP_MERGE_OK=false
                 if install_workspace_instruction ".mcp.json"; then
                     if jq --arg token "$_ICT_TOKEN" \
@@ -1007,18 +1007,18 @@ else
             fi
             ;;
         *)
-            # issue #786: голый cp копировал .mcp.json мимо процедуры подстановки
-            # плейсхолдеров — {{HOME_DIR}} доезжал буквально, ext-railway не мог
-            # стартовать никогда. install_workspace_instruction — тот же атомарный
-            # copy+sed+move, что уже используют CLAUDE.md/AGENTS.md выше по файлу.
+            # issue #786: a bare cp copied .mcp.json bypassing the placeholder
+            # substitution procedure — {{HOME_DIR}} arrived literally, ext-railway could
+            # never start. install_workspace_instruction is the same atomic
+            # copy+sed+move that CLAUDE.md/AGENTS.md already use earlier in the file.
             if install_workspace_instruction ".mcp.json"; then
                 echo "  ✓ $MCP_DEST → iwe-knowledge (браузерный OAuth, tier=$_IWE_TIER)"
                 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=browser" >> "$_MCP_LOG"
             else
-                # Codex review (2026-09-13): раньше success-строки печатались
-                # безусловно даже при провале записи — ложный "успех" после
-                # реального сбоя. Провал теперь идёт в ту же ветку, что и
-                # остальные MCP_AUTH_INCOMPLETE-случаи выше по файлу.
+                # Codex review (2026-09-13): success lines used to be printed
+                # unconditionally even when the write failed — a false "success" after
+                # a real failure. A failure now goes to the same branch as the
+                # other MCP_AUTH_INCOMPLETE cases earlier in the file.
                 echo "  ✗ не удалось записать $MCP_DEST"
                 _MCP_AUTH_INCOMPLETE=true
                 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) setup tier=$_IWE_TIER mode=write_error" >> "$_MCP_LOG"
@@ -1045,13 +1045,13 @@ else
 fi
 
 # === 4d. IWE environment variables (WP-219, DP.FM.009) ===
-# Lookup-слой для путей к скриптам: протоколы и скиллы ссылаются на
-# $IWE_SCRIPTS / $IWE_ROLES, а не на абсолютные пути. Перемещение скрипта
-# ломает одну переменную, а не N протоколов.
+# Lookup layer for script paths: protocols and skills refer to
+# $IWE_SCRIPTS / $IWE_ROLES rather than absolute paths. Moving a script
+# breaks one variable, not N protocols.
 #
 # Source-of-truth: setup/install-iwe-paths.sh (WP-273 R5).
-# Раньше блок дублировался здесь и в migrate-to-runtime-target.sh не было —
-# при миграции ~/.iwe-paths не апгрейдился (R5.3 Евгения, 27 апр).
+# Previously the block was duplicated here and migrate-to-runtime-target.sh did not have it —
+# on migration ~/.iwe-paths was not upgraded (R5.3 Evgeny, 27 Apr).
 echo "[4d] Installing IWE environment variables..."
 
 if $DRY_RUN; then
@@ -1064,7 +1064,7 @@ else
 fi
 
 # === 4e. Generate executor-catalog.yaml for task routing (issue #197) ===
-# route-task.sh (DP.ROLE.059, Маршрутизатор) looks this up at
+# route-task.sh (DP.ROLE.059, Router) looks this up at
 # WP-529 F6 (#463): one visible PyYAML preflight instead of per-script
 # surprises. Warning only — never blocks install: calendar/news/wp-sweep are
 # optional features and every consumer now fails with an explicit dependency
@@ -1122,11 +1122,11 @@ if $DRY_RUN; then
     echo "[DRY RUN] Would regenerate hot-files.list (IWE_GOVERNANCE_REPO=$GOVERNANCE_REPO)"
 else
     echo "[4f] Regenerating hot-files.list..."
-    # POLICY (2026-08-23, матрица v0.38.7 находка 6, консенсус с codex):
-    # критичные IWE_*-переменные передаются генераторам ЯВНО из переменных
-    # самого setup — унаследованный env другого workspace не должен решать,
-    # куда пишет установка. Живой случай: exported IWE_RUNTIME workspace A
-    # побеждал переданный IWE_ROOT, и hot-files.list уезжал в чужой runtime.
+    # POLICY (2026-08-23, matrix v0.38.7 finding 6, consensus with codex):
+    # critical IWE_* variables are passed to the generators EXPLICITLY from the variables
+    # of setup itself — the inherited env of another workspace must not decide
+    # where the installation writes. Live case: the exported IWE_RUNTIME of workspace A
+    # won over the passed IWE_ROOT, and hot-files.list ended up in someone else's runtime.
     if HOTFILES_OUTPUT=$(IWE_ROOT="$WORKSPACE_DIR" IWE_RUNTIME="$IWE_RUNTIME_PATH" IWE_GOVERNANCE_REPO="$GOVERNANCE_REPO" bash "$TEMPLATE_DIR/scripts/generate-hot-files-list.sh" 2>&1); then
         echo "$HOTFILES_OUTPUT" | sed 's/^/  /'
     else
@@ -1146,9 +1146,9 @@ elif ! command -v launchctl >/dev/null 2>&1; then
 else
     echo "[5/6] Installing roles..."
 
-    # Source $WORKSPACE_DIR/.iwe-paths — гарантирует IWE_RUNTIME / IWE_WORKSPACE / IWE_TEMPLATE
-    # в env для role install.sh (тот же паттерн что в update.sh:836).
-    # Без этого install.sh падает в legacy fallback и видит {{плейсхолдеры}}.
+    # Source $WORKSPACE_DIR/.iwe-paths — guarantees IWE_RUNTIME / IWE_WORKSPACE / IWE_TEMPLATE
+    # in the env for role install.sh (same pattern as in update.sh:836).
+    # Without this install.sh falls into the legacy fallback and sees {{placeholders}}.
     [ -f "$WORKSPACE_DIR/.iwe-paths" ] && . "$WORKSPACE_DIR/.iwe-paths"
     # Same isolation policy as step 4f: role install.sh scripts read
     # IWE_RUNTIME/IWE_WORKSPACE from env — pin them to THIS install's targets
@@ -1201,7 +1201,7 @@ echo "[6/6] Setting up $GOVERNANCE_REPO..."
 MY_STRATEGY_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
 STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
 
-# WP-560 Ф5-Phase-1: the browser path (create_personal_data_space via
+# WP-560 Phase 5-Phase-1: the browser path (create_personal_data_space via
 # github-integration-service, family-catalog.ts) creates the same governance
 # repository under the same canonical name, independently of this script. A user
 # who started in the browser and then installs VS Code used to hit
@@ -1210,7 +1210,7 @@ STRATEGY_TEMPLATE="$TEMPLATE_DIR/seed/strategy"
 # proving it is ours (owner = GITHUB_USER) and shaped like a governance repo
 # (seed markers). Anything else aborts loudly; nothing is ever pushed over it.
 # GOVERNANCE_MARKERS itself is loaded from the shared contract earlier in this
-# script (WP-560 Ф5-Phase-2) — not redefined here.
+# script (WP-560 Phase 5-Phase-2) — not redefined here.
 
 # issue #807: `-b`/`--initial-branch` on `git init` requires git >= 2.28
 # (Jul 2020) — still missing on some LTS distros (e.g. Ubuntu 18.04 ships
@@ -1442,7 +1442,7 @@ else
         fi
     }
 
-    # Declarative list instead of 3 hardcoded calls (WP-526 Ф6). PD-*/MC-*
+    # Declarative list instead of 3 hardcoded calls (WP-526 Phase 6). PD-*/MC-*
     # repo families are NOT added here — they are created on-demand by
     # WP-527, not at install time (see hint printed at the end of setup).
     BOOTSTRAP_REPOS=(
@@ -1458,7 +1458,7 @@ fi
 # === 8. Enable Knowledge Extractor feeders (WP-5) ===
 # Onboarding gap found live 03.09: setup.sh never called this script, so a
 # fresh install never got git-diff-feed/inbox-check running at all -- the
-# whole automated capture-to-Pack pipeline (Ф46-Ф52) silently never started
+# whole automated capture-to-Pack pipeline (Phase 46-Phase 52) silently never started
 # for a new user, with nothing in setup's own output to say so.
 echo "[8/8] Enabling Knowledge Extractor feeders..."
 if $CORE_ONLY; then
@@ -1561,8 +1561,8 @@ else
     echo "  создаются по запросу, не при установке — см. README.md § «5 семей репозиториев»"
     echo ""
 
-    # === Post-install validation (WP-265 Ф8) ===
-    # Не запускаем автоматически — это interactive prompt. Skip в --core (нет gh/claude).
+    # === Post-install validation (WP-265 Phase 8) ===
+    # Do not run automatically — this is an interactive prompt. Skip in --core (no gh/claude).
     if ! $CORE_ONLY; then
         echo "Финальная проверка инсталляции (рекомендуется):"
         echo "  validate-режим setup.sh проверит: env-конфиг, обязательные файлы,"

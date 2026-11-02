@@ -1,26 +1,26 @@
 #!/bin/bash
 # detector_pattern_awareness.sh
-# see DP.SC.025 (capture-bus service clause), DP.ROLE.001#R47 (Детектор)
+# see DP.SC.025 (capture-bus service clause), DP.ROLE.001#R47 (Detector)
 # event_type: agent_incident
-# cost_class: free (rule-based, grep на содержимое файла)
+# cost_class: free (rule-based, grep on file content)
 # runtime: shell
 # triggers: PostToolUse
 #
-# WP-217 Ф8.5. Детектирует паттерн P1 (DP.FM.011): запись нового правила
-# в feedback_*.md без ссылки на паттерн каталога DP.FM.010.
+# WP-217 Phase 8.5. Detects pattern P1 (DP.FM.011): writing a new rule
+# into feedback_*.md without a reference to a catalog pattern DP.FM.010.
 #
-# Логика:
-#   1. Срабатывает на Write/Edit/MultiEdit в файл matching feedback_*.md.
-#   2. Читает содержимое файла после записи.
-#   3. Проверяет последний добавленный блок на наличие:
-#      - поля "pattern: P{N}" (явная ссылка)
-#      - или цитаты "DP.FM." (ссылка на каталог)
-#   4. Если ссылки нет — emit agent_incident с pattern=P1_not_capturing.
-#   5. НИКОГДА не блокирует (exit 0). Принцип warn-before-block.
+# Logic:
+#   1. Fires on Write/Edit/MultiEdit to a file matching feedback_*.md.
+#   2. Reads the file content after the write.
+#   3. Checks the last added block for:
+#      - the field "pattern: P{N}" (explicit reference)
+#      - or the quote "DP.FM." (catalog reference)
+#   4. If there is no reference — emit agent_incident with pattern=P1_not_capturing.
+#   5. NEVER blocks (exit 0). Warn-before-block principle.
 #
-# Heuristic: смотрим на "свежие" строки файла (последние 30 строк после write),
-# т.к. правила добавляются в конец файла. Это v1 — без diff, без git blame.
-# v2: использовать tool_input.old_string/new_string из Edit-события.
+# Heuristic: look at the "fresh" lines of the file (last 30 lines after the write),
+# since rules are appended to the end of the file. This is v1 — no diff, no git blame.
+# v2: use tool_input.old_string/new_string from the Edit event.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -35,16 +35,16 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 
-# Только PostToolUse
+# PostToolUse only
 [ "$HOOK_EVENT" != "PostToolUse" ] && exit 0
 
-# Только Write / Edit / MultiEdit
+# Write / Edit / MultiEdit only
 case "$TOOL_NAME" in
   Write|Edit|MultiEdit) ;;
   *) exit 0 ;;
 esac
 
-# Только feedback_*.md файлы
+# feedback_*.md files only
 if [ -z "$FILE_PATH" ]; then
   exit 0
 fi
@@ -54,12 +54,12 @@ if [[ "$BASENAME" != feedback_*.md ]]; then
   exit 0
 fi
 
-# Файл должен существовать и быть читаемым
+# The file must exist and be readable
 if [ ! -f "$FILE_PATH" ] || [ ! -r "$FILE_PATH" ]; then
   exit 0
 fi
 
-# ── Определяем target_repo ───────────────────────────────────────────────────
+# ── Determine target_repo ───────────────────────────────────────────────────
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 DETECTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$(cd "$DETECTOR_DIR/.." && pwd)"
@@ -90,17 +90,17 @@ if [ -z "$TARGET_REPO_HINT" ] && [ -n "$CWD" ]; then
   fi
 fi
 
-# OwnerIntegrity: не угадываем репо
+# OwnerIntegrity: do not guess the repo
 if [ -z "$TARGET_REPO_HINT" ]; then
   exit 0
 fi
 
-# ── Проверка на ссылку паттерна ──────────────────────────────────────────────
-# Смотрим последние 30 строк файла (heuristic: правило добавлено в конец).
-# Ищем признаки явной ссылки на паттерн:
-#   - "pattern: P" (frontmatter-style или inline)
-#   - "DP.FM." (ссылка на каталог)
-#   - "P1" / "P2" / ... "P10" как отдельное слово (слабый маркер)
+# ── Check for a pattern reference ──────────────────────────────────────────────
+# Look at the last 30 lines of the file (heuristic: the rule is appended to the end).
+# Look for signs of an explicit pattern reference:
+#   - "pattern: P" (frontmatter-style or inline)
+#   - "DP.FM." (catalog reference)
+#   - "P1" / "P2" / ... "P10" as a separate word (weak marker)
 
 TAIL_CONTENT=$(tail -30 "$FILE_PATH" 2>/dev/null || true)
 
@@ -108,21 +108,21 @@ if [ -z "$TAIL_CONTENT" ]; then
   exit 0
 fi
 
-# Сильные признаки наличия ссылки → НЕ emit
+# Strong signs of a reference → do NOT emit
 if echo "$TAIL_CONTENT" | grep -qiE '(pattern:\s*P[0-9]|DP\.FM\.[0-9])'; then
   exit 0
 fi
 
-# Слабые признаки (самодостаточные слова P1..P10) → НЕ emit
-# Паттерн: P{N} как отдельное слово (не P1a, не P10x).
-# BSD grep не поддерживает \b, используем ERE с пробелами/началом/концом строки.
+# Weak signs (self-sufficient words P1..P10) → do NOT emit
+# Pattern: P{N} as a separate word (not P1a, not P10x).
+# BSD grep does not support \b, use ERE with spaces/start/end of line.
 if echo "$TAIL_CONTENT" | grep -qE '(^|[[:space:]])P([1-9]|10)([[:space:],\.)]|$)'; then
   exit 0
 fi
 
 # ── Emit P1_not_capturing ────────────────────────────────────────────────────
-# Последние 200 символов содержимого как контекст
-# tr -d control chars: предотвращает jq parse error из-за \r, \0, etc.
+# Last 200 characters of the content as context
+# tr -d control chars: prevents jq parse error from \r, \0, etc.
 SNIPPET=$(tail -10 "$FILE_PATH" 2>/dev/null | tr -d '\000-\037' | head -c 200 || true)
 
 jq -n \

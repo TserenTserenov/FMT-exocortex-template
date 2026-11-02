@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# check-script-collisions.sh — проверить коллизии скриптов между авторской зоной и FMT-шаблоном.
+# check-script-collisions.sh — check script collisions between the author zone and the FMT template.
 #
-# Назначение: запускается ПЕРЕД промоцией скрипта L3→L1 (author → universal в FMT)
-# и периодически (Month Close), чтобы отследить drift.
+# Purpose: runs BEFORE promoting a script L3→L1 (author → universal in FMT)
+# and periodically (Month Close) to track drift.
 #
-# Типы скриптов (DP.KR.001 §5.6):
-#   Тип 1 (universal): FMT/scripts/ → WORKSPACE/scripts/ через update.sh
-#   Тип 2 (author):    только в WORKSPACE/scripts/ (не в FMT)
-# Коллизия: имя есть в обоих местах → нужно решить (merge или rename).
+# Script types (DP.KR.001 §5.6):
+#   Type 1 (universal): FMT/scripts/ → WORKSPACE/scripts/ via update.sh
+#   Type 2 (author):    only in WORKSPACE/scripts/ (not in FMT)
+# Collision: the name exists in both places → must be resolved (merge or rename).
 #
-# Использование:
-#   check-script-collisions.sh              # показать коллизии
-#   check-script-collisions.sh --verbose    # + diff для каждой коллизии
-#   check-script-collisions.sh --quiet      # только код выхода (0=нет коллизий, 1=есть)
+# Usage:
+#   check-script-collisions.sh              # show collisions
+#   check-script-collisions.sh --verbose    # + diff for each collision
+#   check-script-collisions.sh --quiet      # exit code only (0=no collisions, 1=there are)
 
 set -euo pipefail
 

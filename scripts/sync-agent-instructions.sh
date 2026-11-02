@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
-# see WP-394 Ф4.2, DP.SC.159
-# sync-agent-instructions.sh — генерация AGENTS.md из единого ядра CLAUDE.md + agent-blocks
+# see WP-394 Phase 4.2, DP.SC.159
+# sync-agent-instructions.sh — generates AGENTS.md from the single core of CLAUDE.md + agent-blocks
 #
-# Single-source инструкций агентов (WP-394 Ф4.2). Устраняет молчаливую дивергенцию
-# между CLAUDE.md (Claude), AGENTS.md (Kimi) и инструкциями Hermes.
+# Single-source of agent instructions (WP-394 Phase 4.2). Eliminates silent divergence
+# between CLAUDE.md (Claude), AGENTS.md (Kimi) and the Hermes instructions.
 #
-# Сборка (полная регенерация, НЕ маркерная вставка):
-#   AGENTS.md = [header] + [SYNC-CORE из CLAUDE.md] + [AGENTS-agent-blocks.md]
+# Build (full regeneration, NOT a marker insertion):
+#   AGENTS.md = [header] + [SYNC-CORE from CLAUDE.md] + [AGENTS-agent-blocks.md]
 #
-# Источники (в $IWE_ROOT, default $HOME/IWE):
-#   CLAUDE.md             — секция между <!-- SYNC-CORE-START --> и <!-- SYNC-CORE-END -->
-#   AGENTS-agent-blocks.md — агент-специфика (commit attribution, MCP, instructions level)
+# Sources (in $IWE_ROOT, default $HOME/IWE):
+#   CLAUDE.md             — the section between <!-- SYNC-CORE-START --> and <!-- SYNC-CORE-END -->
+#   AGENTS-agent-blocks.md — agent specifics (commit attribution, MCP, instructions level)
 #
-# Использование:
-#   ./sync-agent-instructions.sh            # dry-run: unified diff, без записи (DEFAULT)
-#   ./sync-agent-instructions.sh --force    # записать AGENTS.md (с бэкапом .bak)
-#   ./sync-agent-instructions.sh --check    # exit 1 если drift (для CI / Day Open), без записи
-#   ./sync-agent-instructions.sh --with-hermes  # дополнительно сгенерить persona.md Гермеса
+# Usage:
+#   ./sync-agent-instructions.sh            # dry-run: unified diff, no write (DEFAULT)
+#   ./sync-agent-instructions.sh --force    # write AGENTS.md (with a .bak backup)
+#   ./sync-agent-instructions.sh --check    # exit 1 on drift (for CI / Day Open), no write
+#   ./sync-agent-instructions.sh --with-hermes  # additionally generate Hermes persona.md
 #   ./sync-agent-instructions.sh --help
 #
-# Переменные окружения:
-#   IWE_ROOT            — корень рабочего пространства (default $HOME/IWE)
-#   HERMES_RUNTIME_DIR  — каталог рантайма Hermes для --with-hermes (default $HOME/.hermes)
+# Environment variables:
+#   IWE_ROOT            — workspace root (default $HOME/IWE)
+#   HERMES_RUNTIME_DIR  — Hermes runtime directory for --with-hermes (default $HOME/.hermes)
 #
-# Инвариант: CLAUDE.md SYNC-CORE — source-of-truth общего ядра. AGENTS.md derived, не править руками.
+# Invariant: CLAUDE.md SYNC-CORE is the source-of-truth of the shared core. AGENTS.md is derived, do not edit by hand.
 
 set -euo pipefail
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
@@ -49,7 +49,7 @@ for arg in "$@"; do
   esac
 done
 
-# --- Валидация источников ---
+# --- Source validation ---
 for f in "$CLAUDE_MD" "$BLOCKS_MD"; do
   if [ ! -f "$f" ]; then
     echo "[ERROR] Источник не найден: $f" >&2
@@ -57,16 +57,16 @@ for f in "$CLAUDE_MD" "$BLOCKS_MD"; do
   fi
 done
 
-# --- Guard: маркеры SYNC-CORE обязаны присутствовать (pre-миграция завершена?) ---
+# --- Guard: SYNC-CORE markers must be present (pre-migration done?) ---
 if ! grep -q '<!-- SYNC-CORE-START -->' "$CLAUDE_MD" || ! grep -q '<!-- SYNC-CORE-END -->' "$CLAUDE_MD"; then
   echo "[ABORT] В $CLAUDE_MD нет маркеров <!-- SYNC-CORE-START/END -->." >&2
   echo "        Pre-миграция не завершена — разметь ядро ДО генерации (WP-394 Ф4.2)." >&2
   exit 3
 fi
 
-# --- Извлечь SYNC-CORE ядро (между маркерами, не включая сами маркеры) ---
+# --- Extract the SYNC-CORE core (between markers, excluding the markers themselves) ---
 extract_core() {
-  # Маркеры якорятся ^...$ — строка-маркер внутри тела ядра не закроет блок преждевременно.
+  # Markers are anchored ^...$ — a marker-like line inside the core body will not close the block prematurely.
   awk '
     /^[[:space:]]*<!-- SYNC-CORE-START -->[[:space:]]*$/ { grab=1; next }
     /^[[:space:]]*<!-- SYNC-CORE-END -->[[:space:]]*$/   { grab=0 }
@@ -74,7 +74,7 @@ extract_core() {
   ' "$CLAUDE_MD"
 }
 
-# --- Извлечь агент-блоки (убрать внешние маркер-комментарии и HTML-комментарий-инструкцию) ---
+# --- Extract agent blocks (strip outer marker comments and the HTML instruction comment) ---
 extract_blocks() {
   awk '
     /^[[:space:]]*<!-- AGENT-SPECIFIC-START -->[[:space:]]*$/ { grab=1; next }
@@ -88,7 +88,7 @@ extract_blocks() {
   ' "$BLOCKS_MD"
 }
 
-# --- Собрать целевой AGENTS.md ---
+# --- Assemble the target AGENTS.md ---
 build_agents() {
   cat <<'HEADER'
 # AGENTS.md
@@ -104,7 +104,7 @@ HEADER
 
 GENERATED="$(build_agents)"
 
-# --- Режимы ---
+# --- Modes ---
 case "$MODE" in
   check)
     if [ ! -f "$OUT_MD" ]; then
@@ -145,7 +145,7 @@ case "$MODE" in
     ;;
 esac
 
-# --- Опционально: persona.md Hermes ---
+# --- Optional: Hermes persona.md ---
 if [ "$WITH_HERMES" -eq 1 ]; then
   if [ ! -d "$HERMES_DIR" ]; then
     echo "[WARN] --with-hermes: каталог $HERMES_DIR не найден — persona.md пропущен (рантайм Hermes отсутствует)." >&2

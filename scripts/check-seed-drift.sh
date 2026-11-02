@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
-# check-seed-drift.sh — seed/strategy/scripts/ снапшоты не разъехались с scripts/
+# check-seed-drift.sh — seed/strategy/scripts/ snapshots have not diverged from scripts/
 #
-# Найдено WP-5 (2026-07-22, Ubuntu-audit П3): seed-копии day-open-pipeline.sh/
-# day-open-scaffold.sh расходились с scripts/ на сотни строк без предупреждения —
-# новый пользователь получал старый пайплайн (падал на анти-чит проверке
-# «Горлышко недели», архивация после Checks вместо до). Синхронизация ручная
-# (script-promote.sh не пишет в seed/), драйфит молча.
+# Found by WP-5 (2026-07-22, Ubuntu-audit P3): seed copies of day-open-pipeline.sh/
+# day-open-scaffold.sh diverged from scripts/ by hundreds of lines without warning —
+# a new user got the old pipeline (it failed on the anti-cheat check of
+# «Горлышко недели», archiving after Checks instead of before). Synchronization is manual
+# (script-promote.sh does not write to seed/), it drifts silently.
 #
-# Конвенция: файл в seed/, помеченный строкой "# SNAPSHOT — synced manually
+# Convention: a file in seed/ marked with the line "# SNAPSHOT — synced manually
 # via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here
-# directly." — обязан быть побайтово идентичен scripts/<basename> после
-# вычитания этой одной маркерной строки. Файл без маркера — не проверяется
-# (не претендует на синхронность, напр. seed-only скрипты).
+# directly." — must be byte-identical to scripts/<basename> after
+# subtracting this one marker line. A file without the marker is not checked
+# (it does not claim to be in sync, e.g. seed-only scripts).
 #
-# Использование: bash scripts/check-seed-drift.sh [--fix] [FMT_DIR]
+# Usage: bash scripts/check-seed-drift.sh [--fix] [FMT_DIR]
 #
-# issue #347: сторож печатал инструкцию «скопировать вручную, сохранив маркерную
-# строку» — ручной шаг после каждой правки исходника, и именно он не выполнялся:
-# снимок отставал на три фикса подряд. --fix выполняет ту же операцию сам.
+# issue #347: the watchdog printed the instruction "copy manually, keeping the marker
+# line" — a manual step after every source edit, and it was the one that was skipped:
+# the snapshot lagged three fixes in a row. --fix performs the same operation itself.
 
 set -uo pipefail
 

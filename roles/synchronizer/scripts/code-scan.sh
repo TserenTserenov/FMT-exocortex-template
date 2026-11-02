@@ -1,19 +1,19 @@
 #!/bin/bash
-# code-scan.sh — ночное сканирование Downstream-репо (статистика активности)
+# code-scan.sh — nightly scan of Downstream repos (activity statistics)
 #
-# Обходит downstream-репозитории, собирает коммиты за последние 24ч,
-# логирует активность.
+# Walks the downstream repositories, collects commits for the last 24h,
+# logs the activity.
 #
-# Использование:
-#   code-scan.sh           # сканировать все downstream-репо
-#   code-scan.sh --dry-run # показать что найдёт, не записывать
+# Usage:
+#   code-scan.sh           # scan all downstream repos
+#   code-scan.sh --dry-run # show what it finds, do not write
 #
-# Триггер: scheduler.sh dispatch (ежедневно)
+# Trigger: scheduler.sh dispatch (daily)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# WP-273 0.29.4 R6.1 fix (issue #271): runtime-резолв вместо build-time {{WORKSPACE_DIR}} — как в strategist.sh.
+# WP-273 0.29.4 R6.1 fix (issue #271): runtime resolve instead of build-time {{WORKSPACE_DIR}} — as in strategist.sh.
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 LOG_DIR="$HOME/logs/synchronizer"
 DATE=$(date +%Y-%m-%d)
@@ -28,12 +28,12 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [code-scan] $1" | tee -a "$LOG_FILE"
 }
 
-# === Обнаружение Downstream-репо ===
+# === Downstream repo discovery ===
 
 discover_repos() {
     local repos=()
 
-    # Governance-репо — исключаем из сканирования
+    # Governance repo — excluded from scanning
     local exclude=(
         "${IWE_GOVERNANCE_REPO:-DS-strategy}"
     )
@@ -53,7 +53,7 @@ discover_repos() {
     printf '%s\n' "${repos[@]}"
 }
 
-# === Основной цикл ===
+# === Main loop ===
 
 scan_repos() {
     local total_repos=0
@@ -83,7 +83,7 @@ scan_repos() {
 
     log "Итого: $total_repos репо, $total_commits коммитов"
 
-    # Уведомление в Telegram
+    # Telegram notification
     if [ "$DRY_RUN" = false ] && [ "$total_repos" -gt 0 ]; then
         "$SCRIPT_DIR/notify.sh" synchronizer code-scan 2>/dev/null || true
     fi

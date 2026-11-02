@@ -16,12 +16,12 @@ on:
   # portability regressions this matrix exists for (0.28.12 BUG-2..4), just
   # not within minutes of a push nobody's about to release from unreviewed.
   schedule:
-    - cron: '0 2 * * *'  # 05:00 МСК
-  # WP-529: weekly-release.yml открывает PR через GITHUB_TOKEN; его
-  # pull_request-запуски ждут одобрения владельца с правом записи.
-  # workflow_dispatch оставлен для ручной диагностики, но его jobs не
-  # удовлетворяют обязательный release-receipt PR даже на том же head.
-  # release.yml слушает завершение проверки только на ветке main.
+    - cron: '0 2 * * *'  # 05:00 MSK
+  # WP-529: weekly-release.yml opens a PR via GITHUB_TOKEN; its
+  # pull_request runs wait for approval from an owner with write access.
+  # workflow_dispatch is kept for manual diagnostics, but its jobs do not
+  # satisfy the required release-receipt PR even on the same head.
+  # release.yml listens for check completion only on the main branch.
   workflow_dispatch:
 
 # #1010 F16: every job only reads the repository and uploads artifacts; a token with the
@@ -52,14 +52,14 @@ jobs:
       - name: Reject native Windows session before canonical writes
         run: bash scripts/tests/test_issue_1032_windows_fail_closed.sh
 
-  # Defense-in-depth для случая --no-verify в pre-commit + прямого push.
-  # Отдельный job, чтобы шёл независимо от validate/shellcheck (не зависит от их успеха).
+  # Defense-in-depth for the case of --no-verify in pre-commit + a direct push.
+  # A separate job so it runs independently of validate/shellcheck (does not depend on their success).
   release-sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0  # WP-7 Ф62 п.4: нужна полная история для git diff (keyword-warning ниже)
+          fetch-depth: 0  # WP-7 Phase 62 item 4: full history is needed for git diff (keyword-warning below)
       - name: Check CHANGELOG/manifest version sync
         run: |
           if [ ! -f "CHANGELOG.md" ] || [ ! -f "update-manifest.json" ]; then
@@ -86,9 +86,9 @@ jobs:
       - name: Check README version badge sync
         run: bash scripts/sync-version-badge.sh --check
 
-      # WP-7 Ф62 п.4: подстраховка от пропуска метки [security] при разметке
-      # CHANGELOG (allowlist/рендер — scripts/changelog-append.sh). Только
-      # предупреждение, никогда не блокирует — DRR:
+      # WP-7 Phase 62 item 4: a safety net against a missed [security] label when marking up the
+      # CHANGELOG (allowlist/render -- scripts/changelog-append.sh). Warning
+      # only, never blocks -- DRR:
       # decisions/2026-08/2026-08-10-wp-7-arhgeyt-changelog-klassifikaciya-bez-lts.md
       - name: Warn on unlabeled security-like CHANGELOG entries
         run: |
@@ -153,13 +153,13 @@ jobs:
           echo "PASS: проверка завершена (предупреждение — не блокировка)"
 
   # Integration contract validator + fresh-install smoke-test.
-  # Defense-in-depth для случая `git commit --no-verify` в pre-commit.
-  # Корень бага (29 апр, 0.29.13 регрессия): template-sync пропихнул pre-0.29.5
-  # код в FMT, валидаторы НЕ были в CI — Євгений нашёл на fresh clone, у нас
-  # commit прошёл. Гейт: те же 2 скрипта что Євгений запускает локально.
+  # Defense-in-depth for the case of `git commit --no-verify` in pre-commit.
+  # Root of the bug (29 Apr, 0.29.13 regression): template-sync pushed pre-0.29.5
+  # code into FMT, the validators were NOT in CI -- Evgenii found it on a fresh clone, ours
+  # commit went through. Gate: the same 2 scripts that Evgenii runs locally.
   #
-  # Split ubuntu/macOS into two jobs (CI-MacOS-Costs, WP-7, 09.08.2026, вариант
-  # В1): macOS is 10x an ubuntu-minute in GitHub's billing, and every one of
+  # Split ubuntu/macOS into two jobs (CI-MacOS-Costs, WP-7, 09.08.2026, option
+  # B1): macOS is 10x an ubuntu-minute in GitHub's billing, and every one of
   # 196 push-to-main runs/month paid that rate for portability coverage that
   # doesn't need to fire within minutes of an agentic commit to do its job.
   # ubuntu below still runs on every push/PR (fast feedback for the common
@@ -173,9 +173,9 @@ jobs:
     # and this check verifies an authored-only delivery contract, not fork
     # content.
     if: github.repository == 'TserenTserenov/FMT-exocortex-template'
-    # GOVERNANCE_REPO matrix (12 мая, после Bug 1 b24639f): smoke прогоняется с
-    # разными значениями GOVERNANCE_REPO, чтобы поймать hardcoded /DS-strategy/
-    # пути которые проходят при дефолтном значении.
+    # GOVERNANCE_REPO matrix (12 May, after Bug 1 b24639f): smoke runs with
+    # different GOVERNANCE_REPO values to catch hardcoded /DS-strategy/
+    # paths that pass with the default value.
     strategy:
       fail-fast: false
       matrix:
@@ -291,10 +291,10 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 20  # WP-529 Ф9: check-delivery-route-label.sh needs a resolvable prior commit for its smoke run below
+          fetch-depth: 20  # WP-529 Phase 9: check-delivery-route-label.sh needs a resolvable prior commit for its smoke run below
       - name: Install dependencies
         run: brew install jq  # python3 preinstalled
-      # WP-529 Ф9 (found live by this job's own first real run, 20.08):
+      # WP-529 Phase 9 (found live by this job's own first real run, 20.08):
       # check-critical-files-map.sh/check-delivery-route-label.sh both go
       # through find-python3.sh, which hard-requires PyYAML importable —
       # this job installed jq but never PyYAML, so the resolver failed
@@ -316,7 +316,7 @@ jobs:
       - name: Run detector regression fixtures (regex gap guard)
         run: bash setup/test-detectors.sh
 
-      # WP-529 Ф9 (Evgenii 20.08): these two scripts used to hard-fail on
+      # WP-529 Phase 9 (Evgenii 20.08): these two scripts used to hard-fail on
       # stock macOS /bin/bash (3.2, `declare -A`/`mapfile`) — the `validate`
       # job already runs them, but only on ubuntu-latest, so the exact defect
       # class Evgenii reported went unexercised. Pinned to `/bin/bash`
@@ -353,7 +353,7 @@ jobs:
           python3 -c "import jsonschema" 2>/dev/null && exit 0
           python3 -m pip install --user jsonschema 2>/dev/null && python3 -c "import jsonschema" && exit 0
           python3 -m pip install --user --break-system-packages jsonschema
-      # WP-529 Ф21 (peer-session 2026-08-27-14-wp529-f21-implement-attestation,
+      # WP-529 Phase 21 (peer-session 2026-08-27-14-wp529-f21-implement-attestation,
       # turn 11): this is the actual cross-OS determinism guard for the
       # attestation digest — same golden vector, same hardcoded expected
       # hash, run on both ubuntu-latest (above) and macos-latest (here). Run
@@ -366,11 +366,11 @@ jobs:
       - name: Run WP-529 Ф21 attestation statement tests
         run: /bin/bash setup/test-attestation-build-statement.sh
 
-      # WP-7 (чистка шаблона, 2026-11-01): шаг update.sh, убирающий авторский
-      # ext-railway, держит heredoc внутри $( ) и опирается на BSD mktemp/cp -p/
-      # stat; changelog-append.sh — на BSD date и awk; check-copy-pairs.sh — на
-      # BSD find/xargs/cksum. Ревью отметило, что на системном bash 3.2 это не
-      # проверялось. Запуск под /bin/bash по той же причине, что шаги выше.
+      # WP-7 (template cleanup, 2026-11-01): the update.sh step that removes the author's
+      # ext-railway holds a heredoc inside $( ) and relies on BSD mktemp/cp -p/
+      # stat; changelog-append.sh relies on BSD date and awk; check-copy-pairs.sh relies on
+      # BSD find/xargs/cksum. The review noted that this was not verified on the system
+      # bash 3.2. Run under /bin/bash for the same reason as the steps above.
       - name: Run WP-7 template cleanup tests on system /bin/bash (3.2)
         run: |
           /bin/bash scripts/tests/test_update_drop_dead_railway_mcp.sh
@@ -378,9 +378,9 @@ jobs:
           /bin/bash scripts/tests/test_template_hygiene_checks.sh
 
   # Upgrade-flow regression test (0.29.18).
-  # Корень бага (0.29.13): template-sync перезаписал FMT файлы — smoke-test fresh
-  # build не ловит это, потому что build-runtime создаёт `.iwe-runtime` с нуля,
-  # а пилот делает upgrade поверх существующего состояния. Этот job симулирует:
+  # Root of the bug (0.29.13): template-sync overwrote FMT files -- the fresh
+  # build smoke test does not catch this, because build-runtime creates `.iwe-runtime` from scratch,
+  # while the pilot upgrades on top of the existing state. This job simulates:
   # checkout previous version → setup → checkout HEAD → re-run validator.
   upgrade-test:
     runs-on: ubuntu-latest
@@ -390,7 +390,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0  # full history для git log
+          fetch-depth: 0  # full history for git log
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y python3 jq
       - name: Determine previous version
@@ -445,7 +445,7 @@ jobs:
 
   # Vendored guide-kit copy: the tree under guide-kit/ is derived-only — a
   # byte-identical slice of a tagged iwesys/guide-kit release, pinned by
-  # scripts/guide-kit-sync-state.yaml (WP-483 Ф4). In-place edits of the copy
+  # scripts/guide-kit-sync-state.yaml (WP-483 Phase 4). In-place edits of the copy
   # (the "edited the wrong clone" failure mode on dev machines) must go red
   # here, not be discovered by users after delivery.
   guide-kit-drift:
@@ -548,7 +548,7 @@ jobs:
           done < <(find . -path ./guide-kit -prune -o -name "*.sh" -type f -print0)
           exit $FAIL
 
-  # WP-5 Ubuntu-audit факт #4/#6: docs/PLATFORM-COMPAT.md listed the safe
+  # WP-5 Ubuntu-audit fact #4/#6: docs/PLATFORM-COMPAT.md listed the safe
   # patterns for macOS-only constructs (osascript, launchctl, date -v, etc.)
   # but nothing enforced them — every concrete bug this audit found was a
   # case the checklist already named. Turns the checklist into a gate.
@@ -572,32 +572,32 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0  # WP-529 Ф2: check-delivery-route-label.sh нужна полная история для git diff/show против base
+          fetch-depth: 0  # WP-529 Phase 2: check-delivery-route-label.sh needs full history for git diff/show against base
 
       # C1 fix (0.28.6): CI source-of-truth = local validator (setup/validate-template.sh).
-      # Раньше CI имел собственный inline blacklist, который расходился с local — например,
-      # PROTOCOL_PATHS включал `roles/`, что ловило conditional refs в strategist prompts.
-      # Теперь CI делегирует author-specific / hardcoded-paths / MEMORY-skeleton / required-files /
-      # hooks-cross-ref в local validator; CI-only остаются: smoke-test, MCP doc, placeholders.
+      # CI used to have its own inline blacklist that diverged from the local one -- for example,
+      # PROTOCOL_PATHS included `roles/`, which caught conditional refs in strategist prompts.
+      # Now CI delegates author-specific / hardcoded-paths / MEMORY-skeleton / required-files /
+      # hooks-cross-ref to the local validator; CI-only remain: smoke-test, MCP doc, placeholders.
       - name: Run local validator (source-of-truth)
         run: bash setup/validate-template.sh "$PWD"
 
-      # validate-fmt-scripts: проверка на личные хардкоды и нарушения конвенций.
-      # Корень бага (май 2026): detector ловил legitimate uses (template identity,
-      # python fallback, env override) как false positives. Исправлено в validate-fmt-scripts.sh.
-      # Гейт: прогоняем в CI, чтобы не полагаться только на pre-commit (который зовётся
-      # только при staged .claude/settings.json) и ручной запуск.
+      # validate-fmt-scripts: check for personal hardcodes and convention violations.
+      # Root of the bug (May 2026): the detector caught legitimate uses (template identity,
+      # python fallback, env override) as false positives. Fixed in validate-fmt-scripts.sh.
+      # Gate: run in CI so as not to rely only on pre-commit (which is called
+      # only when .claude/settings.json is staged) and a manual run.
       - name: Run validate-fmt-scripts (author-specific hardcodes & conventions)
         run: bash scripts/validate-fmt-scripts.sh
 
-      # issue #291: путь в бэктиках платформенной части CLAUDE.md (start..SYNC-CORE-END,
-      # доставляется на 100% установок через update.sh §1-7 + Agent Core) обязан
-      # существовать в репо или в update-manifest.json — иначе это мёртвая ссылка на
-      # каждой пользовательской установке, не только у автора.
+      # issue #291: a path in backticks in the platform part of CLAUDE.md (start..SYNC-CORE-END,
+      # delivered to 100% of installations via update.sh §1-7 + Agent Core) must
+      # exist in the repo or in update-manifest.json -- otherwise it is a dead link on
+      # every user installation, not only the author's.
       - name: Check CLAUDE.md platform-section links resolve (issue #291)
         run: python3 scripts/check-claude-md-links.py --strict
 
-      # CI-only check: MCP — серверы подключаются через claude.ai/settings/connectors
+      # CI-only check: MCP -- servers connect via claude.ai/settings/connectors
       - name: Check MCP documentation
         run: |
           if grep -q "claude.ai/settings/connectors" setup.sh; then
@@ -607,7 +607,7 @@ jobs:
             exit 1
           fi
 
-      # 6. Smoke-test: хуки не падают на чистом пользовательском окружении.
+      # 6. Smoke-test: hooks do not crash on a clean user environment.
       # Имитируем pristine user: DS-strategy вместо DS-my-strategy, DayPlan с минимальным шаблоном.
       - name: Smoke-test protocol hooks on clean user env
         run: |
@@ -677,9 +677,9 @@ jobs:
           rm -rf "$TMP"
           exit $FAIL
 
-      # B2 gap closure: проверяем что update-manifest.json синхронизирован с git tree.
-      # verify-manifest.sh запускает generate-manifest.sh и сравнивает с текущим.
-      # При рассинхроне показывает diff и инструкцию по фиксу.
+      # B2 gap closure: check that update-manifest.json is in sync with the git tree.
+      # verify-manifest.sh runs generate-manifest.sh and compares with the current one.
+      # On a mismatch it shows the diff and fix instructions.
       - name: Check manifest completeness (B2)
         run: |
           bash scripts/verify-manifest.sh
@@ -694,17 +694,17 @@ jobs:
         run: |
           git ls-files | python3 scripts/check-manifest-coverage.py update-manifest.json
 
-      # WP-529 Ф1: docs/critical-files-map.yaml должна оставаться согласованной
-      # с живой классификацией generate-manifest.sh — та же гарантия, что B2
-      # выше даёт для update-manifest.json, только для карты категорий.
+      # WP-529 Phase 1: docs/critical-files-map.yaml must stay consistent
+      # with the live classification of generate-manifest.sh -- the same guarantee that B2
+      # above gives for update-manifest.json, only for the category map.
       - name: Check critical-files-map consistency
         run: bash scripts/check-critical-files-map.sh
 
-      # WP-529 Ф2: изменение состава ручно курируемой категории доставки
-      # (explicit-include/exclude списки, deprecated_files) обязано нести
-      # trailer Delivery-Route: <category-id> — иначе такое решение проходит
-      # без явного сигнала ревьюеру/CI. base определяется так же, как в
-      # release-sync выше (push → event.before, PR → base.sha).
+      # WP-529 Phase 2: a change to the composition of a manually curated delivery category
+      # (explicit-include/exclude lists, deprecated_files) must carry the
+      # trailer Delivery-Route: <category-id> -- otherwise such a decision passes
+      # without an explicit signal to the reviewer/CI. base is determined the same way as in
+      # release-sync above (push → event.before, PR → base.sha).
       - name: Check delivery-route label on curated category changes
         run: |
           EVENT="${{ github.event_name }}"
@@ -717,7 +717,7 @@ jobs:
           fi
           bash scripts/check-delivery-route-label.sh "$BASE"
 
-      # WP-529 Ф9 (Evgenii 20.08): anti-regression ratchet, not a compliance
+      # WP-529 Phase 9 (Evgenii 20.08): anti-regression ratchet, not a compliance
       # proof — stops the count of bare python3/python .py-invocations from
       # growing past the ~15 legacy sites already baselined (see the script's
       # own header for the baseline-update recipe and known blind spots).
@@ -734,38 +734,38 @@ jobs:
       - name: Run cp1251 smoke on platform scripts (issue #1114)
         run: bash scripts/tests/cp1251-smoke.sh
 
-      # setup.sh ↔ update.sh parity. Root (29 июня, peer-session 2026-06-29-03):
-      # rules-lazy доставлялся через update.sh, но отсутствовал в setup.sh for-loop —
-      # fresh install терял компонент. check-setup-update-parity существовал (WP-315),
-      # но НЕ был подключён к CI (dormant guard), а его regex-контракт не покрывал
-      # измерение «список компонентов». Подключаем оба: контракт-паттерны + set-diff.
+      # setup.sh ↔ update.sh parity. Root (29 June, peer-session 2026-06-29-03):
+      # rules-lazy was delivered via update.sh but was absent from the setup.sh for-loop --
+      # a fresh install lost the component. check-setup-update-parity existed (WP-315),
+      # but was NOT wired into CI (dormant guard), and its regex contract did not cover
+      # the "component list" dimension. We wire in both: contract patterns + set-diff.
       - name: Check setup/update parity contract
         run: bash scripts/check-setup-update-parity.sh
       - name: Check setup/update component-set parity
         run: bash scripts/check-component-parity.sh
 
-      # seed-снапшоты (WP-5 Ubuntu-audit, 2026-07-22 факт #3): script-promote.sh
-      # промотирует личный скрипт → scripts/, но НЕ пишет в seed/strategy/scripts/ —
-      # без этого гейта дрейф молчит, пока новый пользователь не упрётся в старый
-      # пайплайн (нашлось: day-open-pipeline.sh/scaffold.sh разошлись на сотни строк).
+      # seed snapshots (WP-5 Ubuntu-audit, 2026-07-22 fact #3): script-promote.sh
+      # promotes a personal script → scripts/, but does NOT write to seed/strategy/scripts/ --
+      # without this gate drift stays silent until a new user runs into the old
+      # pipeline (found: day-open-pipeline.sh/scaffold.sh diverged by hundreds of lines).
       - name: Check seed snapshots match scripts/ (drift guard)
         run: bash scripts/check-seed-drift.sh
 
-      # WP-7 (чистка шаблона, 2026-11-01): check-seed-drift.sh видит только
-      # копии с пометкой SNAPSHOT. Побайтовые копии без пометки (seed/,
-      # extensions/agent-inbox/, .claude/lib/) не сверял никто; заодно ловим
-      # новые незарегистрированные копии.
+      # WP-7 (template cleanup, 2026-11-01): check-seed-drift.sh only sees
+      # copies marked SNAPSHOT. Byte-for-byte copies without the mark (seed/,
+      # extensions/agent-inbox/, .claude/lib/) were checked by nobody; we also catch
+      # new unregistered copies.
       - name: Check byte-identical copy pairs (drift guard)
         run: bash scripts/check-copy-pairs.sh
 
-      # WP-7 (чистка шаблона, 2026-11-01): шаблонный .mcp.json поставлял
-      # авторский ext-railway с командой из каталога секретов автора — у
-      # пользователей сервер падал при каждом запуске.
+      # WP-7 (template cleanup, 2026-11-01): the template .mcp.json shipped the
+      # author's ext-railway with a command from the author's secrets directory --
+      # on user machines the server failed on every start.
       - name: Check shipped default config has no author secret paths
         run: bash scripts/check-shipped-config-secrets.sh
 
-      # issue #343/#347: 14 регрессионных тестов лежали в репо и не запускались нигде —
-      # ни один из них не сторожил ни один прогон. Полный набор идёт ~2 минуты.
+      # issue #343/#347: 14 regression tests sat in the repo and ran nowhere --
+      # none of them guarded any run. The full set takes ~2 minutes.
       - name: Run update.sh edge-case regression tests (T1-T26)
         run: bash setup/test-update-edge-cases.sh
 
@@ -777,26 +777,26 @@ jobs:
       - name: Run existing note-review launchd migration tests
         run: python3 setup/test-strategist-notereview-migration.py
 
-      # issue #226: тест лежал в репо с 6 июля, ни разу не был подключён к CI —
-      # найдено 2026-08-10 при аудите конвейера доставки (WP-7 Ф62). E2E smoke на
-      # 3 фиксах реального инцидента (конфликт CLAUDE.md при merge, repair-pass
-      # при TOTAL_CHANGES=0) — сторожит именно тот класс регрессии, что уже был.
+      # issue #226: the test sat in the repo since 6 July, never wired into CI --
+      # found 2026-08-10 during an audit of the delivery pipeline (WP-7 Phase 62). E2E smoke on
+      # 3 fixes of a real incident (CLAUDE.md conflict on merge, repair-pass
+      # at TOTAL_CHANGES=0) -- guards exactly the class of regression that has already occurred.
       - name: Run update.sh issue #226 regression test
         run: bash setup/test-update-issue-226.sh
 
       # issue #1143: a role with auto:false (synchronizer, extractor) was never
       # reinstalled, so an already-installed role's plist went stale forever —
-      # fixed in PR #1178 (WP-529, пир-сессия Claude+Kimi+Codex 10.10). Extracts
+      # fixed in PR #1178 (WP-529, peer session Claude+Kimi+Codex 10.10). Extracts
       # the real role-reinstall loop from update.sh and evals it with a mocked
       # launchctl — guards both the reinstall-by-presence fix and the set -e/grep
       # regression a first code-review pass caught before merge.
       - name: Run update.sh issue #1143 regression test
         run: bash setup/test-update-issue-1143.sh
 
-      # WP-529 Ф2 acceptance criterion: пропуск критичного файла и неверная
-      # метка маршрута обязаны давать детерминированный отказ с понятной
-      # причиной. Прогоняет реальный scripts/check-delivery-route-label.sh на
-      # throwaway git-фикстуре — не переписывает его логику вторым разом.
+      # WP-529 Phase 2 acceptance criterion: skipping a critical file and a wrong
+      # route label must produce a deterministic failure with a clear
+      # reason. Runs the real scripts/check-delivery-route-label.sh on a
+      # throwaway git fixture -- does not rewrite its logic a second time.
       - name: Run delivery-route-label acceptance test
         run: bash setup/test-delivery-route-label.sh
 
@@ -853,7 +853,7 @@ jobs:
       - name: Run update.sh manifest fetch test
         run: bash setup/test-update-manifest-fetch.sh
 
-      # WP-529 Ф241: pins today's behaviour for a pilot-edited platform hook
+      # WP-529 Phase 241: pins today's behaviour for a pilot-edited platform hook
       # (overwritten, no backup, no warning, second run is a no-op) on the real
       # update.sh in a sandbox with a curl shim and scheduler stubs.
       - name: Run update.sh modified-hook test
@@ -865,18 +865,18 @@ jobs:
       - name: Run update.sh author read-only mirror test
         run: bash setup/test-update-author-readonly-mirror.sh
 
-      # WP-529 Ф245: every write command in update.sh belongs to a block that
+      # WP-529 Phase 245: every write command in update.sh belongs to a block that
       # setup/update-write-sites.tsv classifies; the rollback plan is built from it.
       - name: Run update.sh write-sites registry test
         run: bash setup/test-update-write-sites.sh
 
-      # WP-529 Ф245 step 2: the frozen plan and the single executor of file
+      # WP-529 Phase 245 step 2: the frozen plan and the single executor of file
       # writes (setup/lib/apply-op.sh, not wired into update.sh yet), checked on
       # a synthetic install: every refusal leaves the tree unchanged.
       - name: Run apply-op executor test
         run: bash setup/test-apply-op.sh
 
-      # WP-529 Ф244: --check ends with one readiness verdict; refusals use the
+      # WP-529 Phase 244: --check ends with one readiness verdict; refusals use the
       # same predicates as the real run and leave the install unchanged.
       - name: Run update.sh check verdict test
         run: bash setup/test-update-check-verdict.sh
@@ -919,7 +919,7 @@ jobs:
       - name: Test Extractor feeders backfill in update.sh
         run: bash scripts/tests/test-update-extractor-feeders.sh
 
-      # WP-529 Ф3: release-receipt.sh (the release-receipt job below) must
+      # WP-529 Phase 3: release-receipt.sh (the release-receipt job below) must
       # fail closed — the Windows lock check must succeed; other mandatory
       # checks may succeed or be intentionally skipped. Anything else blocks.
       # Tested here the same way every other guard in
@@ -927,8 +927,8 @@ jobs:
       - name: Test release-receipt fail-closed logic
         run: bash scripts/tests/test_release_receipt.sh
 
-      # WP-529 Ф4 (peer-session 2026-08-20-06-wp546-wp529-update-parallel,
-      # rewritten against the merged WP-546 Ф2 implementation — commit
+      # WP-529 Phase 4 (peer-session 2026-08-20-06-wp546-wp529-update-parallel,
+      # rewritten against the merged WP-546 Phase 2 implementation — commit
       # 8112b1a, curl --parallel — after an earlier draft of these three
       # tests targeted a since-abandoned parallel xargs/worker draft): three
       # negative delivery scenarios for update.sh Step 2's parallel fetch —
@@ -936,7 +936,7 @@ jobs:
       # deliverable through the retry pass. Each must land in
       # SKIPPED_DOWNLOAD, never silently pass as delivered — if any of them
       # regressed, this job (RESULT_VALIDATE) goes red, which
-      # release-receipt.sh (Ф3, tested above) turns into publishable=false.
+      # release-receipt.sh (Phase 3, tested above) turns into publishable=false.
       - name: Test update.sh download_batch — network failure is fail-closed
         run: bash scripts/tests/test_update_download_batch_network_failure_failclosed.sh
       - name: Test update.sh verify_batch_integrity — sha256 mismatch is fail-closed
@@ -944,20 +944,20 @@ jobs:
       - name: Test update.sh retry+classify — undeliverable file is fail-closed
         run: bash scripts/tests/test_update_retry_and_classify_undeliverable_file.sh
 
-      # issue #310/#323: хук-страж, не зарегистрированный ни в одном событии, не
-      # срабатывает никогда — и «не сработал» неотличимо от «нарушений не было».
+      # issue #310/#323: a guard hook not registered on any event
+      # never fires -- and "did not fire" is indistinguishable from "no violations".
       - name: Check every hook is actually wired (orphan-hook guard)
         run: bash scripts/check-orphan-hooks.sh
 
-      # Сам сторож тоже под тестом: оба пути распознавания (маркер claude-hook: false
-      # и .orphan-allowlist) плюс гарантия, что настоящая сирота всё ещё валит проверку.
+      # The watchdog itself is also under test: both recognition paths (the claude-hook: false marker
+      # and .orphan-allowlist) plus a guarantee that a real orphan still fails the check.
       - name: Test the orphan-hook guard itself (marker + allowlist + real orphan)
         run: bash scripts/tests/test_check_orphan_hooks.sh
 
-      # АрхГейт 03.09 (WP-5): изолированная песочница inbox-check теперь
-      # монтирует Pack-репозитории для проверки дублей — read-only должен быть
-      # реальным (файловая система), не только текстом промпта, иначе тот же
-      # класс дыры, что в bug-2026-07-07-r15-decisions-bypassed-pilot.md.
+      # ArchGate 03.09 (WP-5): the isolated inbox-check sandbox now
+      # mounts the Pack repositories for duplicate checking -- read-only must be
+      # real (file system), not just prompt text, otherwise the same
+      # class of hole as in bug-2026-07-07-r15-decisions-bypassed-pilot.md.
       - name: Test read-only Pack mount is filesystem-enforced
         run: bash scripts/tests/test_mount_readonly_packs.sh
 
@@ -967,10 +967,10 @@ jobs:
       - name: Calibrate disposable Red Team boundary (#1072)
         run: bash .claude/skills/iwe-platform-redteam/tests/run-calibration.sh
 
-      # WP-529 Ф6 (находки Евгения 18.08): PyYAML — заявленная зависимость
-      # (requirements.txt, #463), но CI её не гарантировал, а вся семья
-      # scripts/tests/test_issue_*.sh лежала в репо не подключённой — тот же
-      # класс «тест есть, CI о нём не знает», что issue #226 выше.
+      # WP-529 Phase 6 (Evgenii's findings 18.08): PyYAML is a declared dependency
+      # (requirements.txt, #463), but CI did not guarantee it, and the whole family
+      # scripts/tests/test_issue_*.sh sat in the repo not wired in -- the same
+      # class of "the test exists, CI does not know about it" as issue #226 above.
       - name: Ensure PyYAML available for issue-regression tests (#463)
         run: |
           python3 -c "import yaml" 2>/dev/null && exit 0
@@ -1025,16 +1025,16 @@ jobs:
             exit 1
           fi
 
-      # Единый версионируемый раннер: новый test_issue_*.sh подключается самим
-      # фактом появления файла, забыть подключить к CI больше нельзя.
+      # A single versioned runner: a new test_issue_*.sh is wired in by the mere
+      # fact of the file appearing; forgetting to wire it into CI is no longer possible.
       - name: Run issue-regression tests (single runner, WP-529 Ф6)
         run: bash scripts/tests/run-issue-tests.sh
 
-      # Cold review 2026-08-19 (Medium): раннер выше гоняет только .sh — три
-      # python-регрессии семьи иначе не исполняются нигде (тот же класс
-      # «тест есть, CI о нём не знает»). WP-7 Ф284: ещё 8 файлов (агентская
-      # панель, гейт репетиции, снимок глоссария и др.) раньше гонял только
-      # неблокирующий шаг в CI шлюза на закреплённой ревизии шаблона.
+      # Cold review 2026-08-19 (Medium): the runner above runs only .sh -- the three
+      # python regressions of the family otherwise run nowhere (the same class of
+      # "the test exists, CI does not know about it"). WP-7 Phase 284: 8 more files (agent
+      # panel, rehearsal gate, glossary snapshot, etc.) were previously run only by a
+      # non-blocking step in the gateway CI on a pinned template revision.
       - name: Run issue-regression python tests (pytest, WP-529 Ф6)
         run: |
           python3 -c "import pytest, markdown_it, yaml" >/dev/null 2>&1 || python3 -m pip install --user pytest markdown-it-py pyyaml
@@ -1061,22 +1061,22 @@ jobs:
           python3 .claude/skills/residency-gate/tests/test_parser.py
           python3 .claude/skills/residency-gate/tests/test_pre_grant.py
 
-      # Сбой build-runtime обязан оставлять .update-incomplete и валить update.sh
-      # ненулевым кодом; recovery-ветка TOTAL_CHANGES=0 обязана его выполнять.
+      # A build-runtime failure must leave .update-incomplete and make update.sh fail
+      # with a non-zero code; the TOTAL_CHANGES=0 recovery branch must do so as well.
       - name: Test update.sh build-runtime fail-closed contract (WP-529 Ф6)
         run: bash scripts/tests/test_update_build_runtime_fail_closed.sh
 
-      # Инвариант порядка доставки: резолвер python синхронизируется раньше
-      # любой перезагрузки ролей; consumers ходят только через общий резолвер.
+      # Delivery-order invariant: the python resolver is synchronized before
+      # any role reload; consumers go only through the shared resolver.
       - name: Test python-resolver delivery order invariant (WP-529 Ф6)
         run: bash scripts/tests/test_update_delivers_python_resolver_before_roles.sh
 
-      # Мутирующий runner роли обязан пропускать запуск, пока открыт маркер
-      # незавершённого обновления (RunAtLoad-выстрел при переустановке ролей).
+      # A role's mutating runner must skip the run while the incomplete-update
+      # marker is open (a RunAtLoad shot when roles are reinstalled).
       - name: Test role-runner update-marker guard (WP-529 Ф6)
         run: bash scripts/tests/test_role_runner_update_marker_guard.sh
 
-      # 7. Только допустимые placeholders
+      # 7. Only allowed placeholders
       - name: Check placeholders are valid
         run: |
           # Найти все {{...}} и проверить что они из допустимого списка
@@ -1113,7 +1113,7 @@ jobs:
           python -c 'import os, subprocess; subprocess.run([os.environ["GRM_BASH"], "-c", "command -v cygpath"], check=True)'
           python .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm
 
-  # WP-529 Ф3: single fail-closed receipt for this commit, built from the
+  # WP-529 Phase 3: single fail-closed receipt for this commit, built from the
   # results of THIS workflow run (needs.<job>.result — same trigger, same
   # SHA), not from querying job status elsewhere. `if: always()` so a
   # failure upstream still produces a receipt recording that failure,

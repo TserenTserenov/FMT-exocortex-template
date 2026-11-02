@@ -1,22 +1,22 @@
 #!/bin/bash
-# install-iwe-paths.sh — генерация workspace/.iwe-paths + sourcing из ~/.zshenv.
+# install-iwe-paths.sh — generation of workspace/.iwe-paths + sourcing from ~/.zshenv.
 #
-# Source-of-truth для IWE_* path-переменных (WP-219, DP.FM.009).
-# Вызывается из:
-#   - setup.sh (первичная установка)
-#   - scripts/migrate-to-runtime-target.sh (миграция 0.28.x → 0.29.x)
-#   - update.sh (повторная генерация после апгрейда — на случай если шаблон строки меняется)
+# Source of truth for the IWE_* path variables (WP-219, DP.FM.009).
+# Called from:
+#   - setup.sh (initial installation)
+#   - scripts/migrate-to-runtime-target.sh (migration 0.28.x → 0.29.x)
+#   - update.sh (regeneration after an upgrade — in case the line template changes)
 #
-# OwnerIntegrity: один файл — одно место. Раньше блок был дублирован в setup.sh [4d];
-# при миграции ~/.iwe-paths не апгрейдился (Round 5 Евгения, 27 апр).
+# OwnerIntegrity: one file — one place. Before, the block was duplicated in setup.sh [4d];
+# on migration ~/.iwe-paths was not upgraded (Evgeny's Round 5, 27 Apr).
 #
 # Usage:
 #   bash install-iwe-paths.sh --workspace PATH --governance REPO_NAME
 #       [--skip-zshenv] [--dry-run] [--quiet]
 #
 # Exit codes:
-#   0 — успех
-#   1 — некорректные аргументы
+#   0 — success
+#   1 — invalid arguments
 
 set -eu
 
@@ -181,7 +181,7 @@ if [ -n "$OLD_IWE_SCRIPTS" ]; then
     fi
 fi
 
-# WP-529 Ф94 (peer-session 2026-09-08-32): $HOME/.iwe-paths was the ORIGINAL
+# WP-529 Phase 94 (peer-session 2026-09-08-32): $HOME/.iwe-paths was the ORIGINAL
 # canonical file (Round 5, pre-WP-219) before the source-of-truth moved to
 # $WORKSPACE_DIR/.iwe-paths above. Installs from that era can still have a
 # real (non-symlink) file there that nothing regenerates or reads anymore —

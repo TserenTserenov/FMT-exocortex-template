@@ -21,7 +21,7 @@ OUTPUT = Path.home() / "IWE" / ".claude" / "rules-registry.yaml"
 REQUIRED_FIELDS = {"id", "name", "type", "priority", "status", "triggers", "tests", "hook"}
 VALID_TYPES = {"structural", "behavioural", "procedural"}
 VALID_STATUSES = {"active", "draft", "deprecated", "superseded"}
-# WP-295 Ф5: deterministic step pre/post-conditions. Optional, backward-compatible.
+# WP-295 Phase 5: deterministic step pre/post-conditions. Optional, backward-compatible.
 VALID_ON_FAIL = {"warn", "block"}
 
 def parse_frontmatter(filepath):
@@ -63,14 +63,14 @@ def validate_rule(rule, filename):
 
     tests = rule.get("tests", {})
     if not isinstance(tests, dict):
-        # Старый формат `tests: [...]` (список) не несёт семантики positive/negative —
-        # помечаем невалидным, НЕ коэрсим. Без этого .get() падает с AttributeError
-        # и роняет весь генератор (WP-419, peer-session 2026-06-14-03).
+        # The old format `tests: [...]` (a list) carries no positive/negative semantics —
+        # mark it invalid, do NOT coerce. Without this .get() fails with AttributeError
+        # and takes down the whole generator (WP-419, peer-session 2026-06-14-03).
         errors.append(f"{filename}: tests must be a dict with positive+negative keys, got {type(tests).__name__}")
     elif not tests.get("positive") or not tests.get("negative"):
         errors.append(f"{filename}: must have both positive and negative tests")
 
-    # WP-295 Ф5: optional pre/post-conditions. When present, each must be a mapping
+    # WP-295 Phase 5: optional pre/post-conditions. When present, each must be a mapping
     # with a non-empty 'check' (named deterministic check resolved by rule-engine.sh)
     # and 'on_fail' in {warn, block}. Absent field = no conditions (backward-compatible).
     errors.extend(validate_conditions(rule, filename))
@@ -149,7 +149,7 @@ def build_registry(skip_invalid=False):
     собирается из валидных. Без этого один дрейфующий файл (старый формат tests) блокировал
     регенерацию всего реестра — генератор был мёртв с 8 мая (WP-419, peer-session 2026-06-14-03)."""
     rules = []
-    invalid_errors = []   # per-file: невалидный файл пропускается
+    invalid_errors = []   # per-file: an invalid file is skipped
 
     if not PACK_DIR.exists():
         print(f"ERROR: PACK-agent-rules/rules/ not found at {PACK_DIR}", file=sys.stderr)
@@ -166,7 +166,7 @@ def build_registry(skip_invalid=False):
             invalid_errors.extend(errors)
             continue
 
-        # `related` иногда оформлено списком вместо словаря — нормализуем, иначе .get() падает.
+        # `related` is sometimes written as a list instead of a dict — normalize, otherwise .get() fails.
         related = fm.get("related", {})
         if not isinstance(related, dict):
             related = {}
@@ -189,8 +189,8 @@ def build_registry(skip_invalid=False):
             "source_file": str(rule_file.relative_to(Path.home() / "IWE")),
         })
 
-    # Cross-ref + cycle: считаются только по собранным валидным правилам.
-    # depends_on на пропущенное (невалидное) правило → предупреждение, не блок (в skip-режиме).
+    # Cross-ref + cycle: counted only over the collected valid rules.
+    # depends_on on a skipped (invalid) rule → a warning, not a block (in skip mode).
     ref_errors = validate_cross_refs(rules) + validate_no_cycles(rules)
 
     if not skip_invalid:
@@ -223,7 +223,7 @@ def build_registry(skip_invalid=False):
 def main():
     validate_only = "--validate" in sys.argv
 
-    # generate: skip-invalid (best-effort реестр из валидных); --validate: строгий gate
+    # generate: skip-invalid (best-effort registry from valid ones); --validate: strict gate
     registry = build_registry(skip_invalid=not validate_only)
 
     if validate_only:

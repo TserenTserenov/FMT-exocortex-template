@@ -1,15 +1,15 @@
 #!/bin/bash
-# Destructive MCP Guard (WP-544 Ф1, пир-сессия с Codex 20.08)
+# Destructive MCP Guard (WP-544 Phase 1, peer-session with Codex 20.08)
 # Event: PreToolUse (matcher: mcp__.*)
-# Блокирует разрушительные MCP-вызовы (удаление облачных ресурсов), для которых
-# сейчас нет вообще никакой проверки — интерактивный вопрос выключен (bypassPermissions),
-# а до этого хука ни один matcher не смотрел на конкретное имя MCP-инструмента.
+# Blocks destructive MCP calls (deleting cloud resources), for which
+# there is currently no check at all — the interactive question is disabled (bypassPermissions),
+# and before this hook no matcher looked at the specific MCP tool name.
 #
-# Bypass: CC_ALLOW_DESTRUCTIVE_INPUT=1 (тот же контракт, что destructive-guard.sh —
-# хук читает свой процессный env, агент не может выставить это сам себе через
-# ещё не выполненный tool call).
+# Bypass: CC_ALLOW_DESTRUCTIVE_INPUT=1 (the same contract as destructive-guard.sh —
+# the hook reads its own process env, the agent cannot set this for itself via
+# a tool call that has not been executed yet).
 #
-# Лог: ~/IWE/.claude/logs/destructive-mcp-guard.jsonl
+# Log: ~/IWE/.claude/logs/destructive-mcp-guard.jsonl
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -28,7 +28,7 @@ log_decision() {
 
 input=$(cat 2>/dev/null || true)
 
-# Fail-closed on a malformed/schema-invalid envelope (WP-544 Д22, peer session
+# Fail-closed on a malformed/schema-invalid envelope (WP-544 D22, peer session
 # 2026-09-08-25-wp544-continue-f7, Codex). The old `jq -r '.tool_name //
 # empty'` turned any jq parse error or wrong-typed field into an empty
 # string, which then missed every `mcp__*` case below and fell through to
@@ -44,7 +44,7 @@ input=$(cat 2>/dev/null || true)
 # unwrapped jq call downstream that still catches that case and keeps it
 # testable; this hook's single combined call has no such second call, so
 # wrapping it would make "jq missing" permanently unverifiable by test
-# (confirmed live, cold review WP-544 Д22, 08.09) for a payload class (MCP
+# (confirmed live, cold review WP-544 D22, 08.09) for a payload class (MCP
 # tool-call metadata) much smaller than the Bash-guard's command strings —
 # not worth trading away test coverage for.
 if ! tool_name=$(printf '%s' "$input" | jq -er '.tool_name | select(type == "string" and length > 0)' 2>/dev/null); then
@@ -59,7 +59,7 @@ tn=$(printf '%s' "$tool_name" | tr 'A-Z' 'a-z')
 case "$tn" in
   *remove_service*|*remove_volume*|*remove_tcp_proxy*|*remove_bucket*|*delete_domain*)
     ;;
-  *) exit 0 ;;  # не разрушительный вызов — пропускаем
+  *) exit 0 ;;  # not a destructive call — let it through
 esac
 
 if [ "${CC_ALLOW_DESTRUCTIVE_INPUT:-}" = "1" ]; then

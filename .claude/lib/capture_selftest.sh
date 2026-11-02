@@ -1,19 +1,19 @@
 #!/bin/bash
 # capture_selftest.sh
-# see DP.SC.025 (capture-bus service clause), DP.SC.026 (мониторинг поведения), WP-217 Ф8.6
-# Self-test capture-bus инфраструктуры.
-# Три уровня:
-#   L1 — синтаксис и исполняемость (bash -n + chmod)
-#   L2 — smoke-test каждого детектора: null-event → exit 0, пустой output
-#   L3 — latency замер: каждый детектор на PostToolUse-event, порог 150ms
+# see DP.SC.025 (capture-bus service clause), DP.SC.026 (behavior monitoring), WP-217 Phase 8.6
+# Self-test of the capture-bus infrastructure.
+# Three levels:
+#   L1 — syntax and executability (bash -n + chmod)
+#   L2 — smoke test of each detector: null-event -> exit 0, empty output
+#   L3 — latency measurement: each detector on a PostToolUse event, threshold 150ms
 #
-# Использование:
-#   bash .claude/lib/capture_selftest.sh          — все уровни
-#   bash .claude/lib/capture_selftest.sh --l1     — только синтаксис
+# Usage:
+#   bash .claude/lib/capture_selftest.sh          — all levels
+#   bash .claude/lib/capture_selftest.sh --l1     — syntax only
 #   bash .claude/lib/capture_selftest.sh --l2     — L1 + smoke
-#   bash .claude/lib/capture_selftest.sh --quiet  — только итог (CI-режим)
+#   bash .claude/lib/capture_selftest.sh --quiet  — summary only (CI mode)
 #
-# Exit code: 0 = все OK, 1 = есть FAIL.
+# Exit code: 0 = all OK, 1 = there are FAILs.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -45,7 +45,7 @@ fail() { echo "FAIL: $*" >&2; FAIL=$((FAIL + 1)); }
 warn() { $QUIET || echo "WARN: $*"; WARN=$((WARN + 1)); }
 pass() { log "  ✓ $*"; PASS=$((PASS + 1)); }
 
-# ── L1: синтаксис и исполняемость ───────────────────────────────────────────
+# ── L1: syntax and executability ───────────────────────────────────────────
 log "=== L1: синтаксис и исполняемость ==="
 
 CHECK_FILES=(
@@ -64,7 +64,7 @@ for f in "${CHECK_FILES[@]}"; do
   else
     fail "синтаксис ERROR: $(basename "$f"): $(cat /tmp/selftest_syntax_err_$$)"
   fi
-  # capture-detectors.sh — sourced конфиг, не запускается напрямую, chmod не нужен
+  # capture-detectors.sh — a sourced config, not run directly, chmod not needed
   base=$(basename "$f")
   if [ "$base" != "capture-detectors.sh" ]; then
     if [ -x "$f" ]; then
@@ -110,7 +110,7 @@ done
   [ "$FAIL" -gt 0 ] && exit 1 || exit 0
 }
 
-# ── L2: smoke-test (null-event → exit 0, пустой output) ─────────────────────
+# ── L2: smoke test (null-event -> exit 0, empty output) ─────────────────────
 log ""; log "=== L2: smoke-test (null-event) ==="
 
 NULL_EVENT='{}'
@@ -137,7 +137,7 @@ done
   [ "$FAIL" -gt 0 ] && exit 1 || exit 0
 }
 
-# ── L3: latency-тест (PostToolUse-event, порог 150ms) ───────────────────────
+# ── L3: latency test (PostToolUse event, threshold 150ms) ───────────────────────
 log ""; log "=== L3: latency-тест (порог=${LATENCY_THRESHOLD}ms) ==="
 
 TEST_EVENT=$(jq -n \
@@ -165,7 +165,7 @@ for entry in "${DETECTORS[@]}"; do
   fi
 done
 
-# ── Итог ────────────────────────────────────────────────────────────────────
+# ── Summary ────────────────────────────────────────────────────────────────────
 rm -f /tmp/selftest_syntax_err_$$ /tmp/selftest_smoke_err_$$
 log ""
 log "══════════════════════════════════════"

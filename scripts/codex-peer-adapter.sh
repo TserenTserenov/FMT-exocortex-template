@@ -37,7 +37,7 @@ TEMPLATE_SCRIPTS="$IWE_TEMPLATE/scripts"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The reply is read by this adapter, not by the pilot: the style guard inside the
-# vendor CLI must not ask for a rewrite (WP-388 Ф24). Same line in claude/kimi adapters.
+# vendor CLI must not ask for a rewrite (WP-388 Phase 24). Same line in claude/kimi adapters.
 # Codex loads the project hook only when the working directory is an IWE checkout
 # (e.g. --add-dir of the IWE root), so this is a safety net for that call shape.
 export IWE_STYLE_CONTEXT=peer
@@ -91,11 +91,11 @@ fi
 ADD_DIRS=()
 MODEL_ARG=()
 
-# WP-516 Ф5: межвендорский whitelist (§0в.1) = {-p, --model, --add-dir}.
-# Неизвестный флаг — явная ошибка, не молчаливый игнор: иначе запрошенный
-# режим (напр. безопасности) может не примениться незаметно для вызывающего.
-# --permission-mode исключён из whitelist: способен ослабить read-only
-# гарантию sandbox; claude-адаптер отклоняет его всегда (exit 64).
+# WP-516 Phase 5: cross-vendor whitelist (§0в.1) = {-p, --model, --add-dir}.
+# An unknown flag is an explicit error, not a silent ignore: otherwise the requested
+# mode (e.g. a security one) may fail to apply unnoticed by the caller.
+# --permission-mode is excluded from the whitelist: it can weaken the read-only
+# guarantee of the sandbox; the claude adapter always rejects it (exit 64).
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -p)                shift ;;
@@ -118,7 +118,7 @@ if [ ${#MODEL_ARG[@]} -ge 2 ]; then
   esac
 fi
 
-# === Фильтрация --add-dir через .agentigore + PII sanity-check (соседние копии) ===
+# === Filtering --add-dir via .agentigore + PII sanity-check (neighboring copies) ===
 
 FILTERED_DIRS=()
 # `-t template` is BSD/GNU compatible in practice but its exact semantics
@@ -137,7 +137,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ -f "$ADD_DIR/.agentigore" ] && cat "$ADD_DIR/.agentigore" >> "$MERGED_AGENTIGORE"
 done
 
-# === Fail-fast на размер ===
+# === Fail-fast on size ===
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   SIZE_MB=$(du -sm "$ADD_DIR" 2>/dev/null | awk '{print $1}')
@@ -148,7 +148,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   fi
 done
 
-# === Фильтрация через Python fnmatch + PII sanity-check (локальный peer-adapter-filter.py) ===
+# === Filtering via Python fnmatch + PII sanity-check (local peer-adapter-filter.py) ===
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   CLEAN_DIR="$TMP_ROOT/$(basename "$ADD_DIR")"
@@ -167,7 +167,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   FILTERED_DIRS+=("--add-dir" "$CLEAN_DIR")
 done
 
-# === Content-filter guard (локальная копия content-filter-map.txt) ===
+# === Content-filter guard (local copy of content-filter-map.txt) ===
 PROMPT_FILE="$TMP_ROOT/peer-prompt.in"
 cat > "$PROMPT_FILE"
 
@@ -205,7 +205,7 @@ PYEOF
     PROMPT_FILE="$PROMPT_FILE.clean"
 fi
 
-# === Pidfile lock: предотвращаем параллельные/зависшие копии одной peer-сессии ===
+# === Pidfile lock: prevent parallel/hung copies of one peer session ===
 CODEX_TASK="$(basename "${ADD_DIRS[0]:-}" 2>/dev/null)"
 if [ -z "$CODEX_TASK" ]; then CODEX_TASK="codex-peer-ppid-${PPID:-$$}"; fi
 CODEX_SESSION_ID="$CODEX_TASK"
@@ -241,7 +241,7 @@ cleanup_peer() {
 trap cleanup_peer EXIT INT TERM
 [ -x "$_IWE_ARS" ] && bash "$_IWE_ARS" --session-id "$CODEX_SESSION_ID" codex peer-session "$CODEX_TASK" </dev/null >/dev/null 2>&1 &
 
-# === Запуск Codex headless: `codex exec`, -o для чистого файла с финальным ответом + process-group watchdog ===
+# === Launch Codex headless: `codex exec`, -o for a clean file with the final answer + process-group watchdog ===
 OUT_FILE="$TMP_ROOT/codex-output.txt"
 # BUGFIX (found by review, issue #296): -C is Codex's sandbox root — Codex reads
 # from and writes to whatever this points at. Using $ADD_DIRS[0] (the RAW,
@@ -250,11 +250,11 @@ OUT_FILE="$TMP_ROOT/codex-output.txt"
 # root itself was still the unfiltered source. Must be the FILTERED copy of the
 # first --add-dir (FILTERED_DIRS[1] — [0] is the literal "--add-dir" token).
 #
-# WP-516 Ф5 (peer-session 2026-08-11-22-wp516-f5-contract-adapter): без
-# --add-dir корнем sandbox был $PWD писателя, причём в режиме workspace-write —
-# неявный write-доступ к рабочему дереву писателя. Теперь: без --add-dir
-# корень = пустой временный каталог; режим ВСЕГДА read-only (контракт §0в.1:
-# peer не пишет файлы; --add-dir даёт чтение контекста, не согласие на запись).
+# WP-516 Phase 5 (peer-session 2026-08-11-22-wp516-f5-contract-adapter): without
+# --add-dir the sandbox root was the writer's $PWD, and in workspace-write mode —
+# implicit write access to the writer's working tree. Now: without --add-dir
+# the root = an empty temporary directory; the mode is ALWAYS read-only (contract §0в.1:
+# the peer does not write files; --add-dir gives read access to context, not consent to write).
 if [ ${#FILTERED_DIRS[@]} -ge 2 ]; then
   PRIMARY_DIR="${FILTERED_DIRS[1]}"
 else
@@ -345,16 +345,16 @@ if [ "$CODEX_TIMED_OUT" = true ]; then
   exit 1
 fi
 
-# WP-516 Ф5 (§0в.1, находка Codex 12.08): non-timeout ненулевой exit CLI
-# обязан нормализоваться в 1 — иначе упавший CLI с непустым output-файлом
-# мог вернуть успешный 0 адаптера.
+# WP-516 Phase 5 (§0в.1, Codex finding 12.08): a non-timeout nonzero CLI exit
+# must be normalized to 1 — otherwise a failed CLI with a non-empty output file
+# could return a successful adapter 0.
 if [ "$CODEX_EXIT" -ne 0 ]; then
   echo "ERROR: Codex peer call failed with exit code $CODEX_EXIT (cli_exit=$CODEX_EXIT, elapsed_s=$CODEX_CALL_ELAPSED)" >&2
   exit 1
 fi
 
 if [ ! -s "$OUT_FILE" ]; then
-  # WP-524 Ф1 (12.08): reproduced live — provider is OpenRouter on hosts without
+  # WP-524 Phase 1 (12.08): reproduced live — provider is OpenRouter on hosts without
   # a ChatGPT login (see reference_codex_peer_openrouter_linux.md), and a missing
   # OPENROUTER_API_KEY in the caller's shell produces this exact symptom with no
   # other signal. Distinguishing it here turns a silent bootstrap failure into an
@@ -380,14 +380,14 @@ if [ "${IWE_HINDSIGHT_RETAIN:-}" = "1" ] && [ -n "$CODEX_OUTPUT" ] && [ -f "$HIN
   } &
 fi
 
-# WP-516 Ф5 (§0в.1): stdout обязан начинаться с frontmatter; ответ без
-# frontmatter = нарушение формата → exit 1 с диагностикой.
-# Проверка — для peer-реплик turn-loop. Служебные вызовы писателя
-# (review/verify/synth), чей вывод — НЕ peer-реплика, отключают её
-# через IWE_PEER_PLAIN=1 (слой IWE-интеграции, §0в.1).
+# WP-516 Phase 5 (§0в.1): stdout must start with frontmatter; an answer without
+# frontmatter = a format violation → exit 1 with a diagnostic.
+# The check is for the peer replies of the turn-loop. The writer's service calls
+# (review/verify/synth), whose output is NOT a peer reply, disable it
+# via IWE_PEER_PLAIN=1 (IWE integration layer, §0в.1).
 if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
-  # awk одним процессом: 'sed | head' под pipefail ловит SIGPIPE на длинной
-  # валидной реплике и роняет адаптер без диагностики (review-02, WP-516 Ф5).
+  # awk in one process: 'sed | head' under pipefail catches SIGPIPE on a long
+  # valid reply and crashes the adapter without a diagnostic (review-02, WP-516 Phase 5).
   _FIRST_LINE=$(printf '%s\n' "$CODEX_OUTPUT" | awk 'length { print; exit }')
   _FM_FENCES=$(printf '%s\n' "$CODEX_OUTPUT" | grep -c '^---$' || true)
   if [ "$_FIRST_LINE" != "---" ] || [ "${_FM_FENCES:-0}" -lt 2 ]; then
@@ -395,9 +395,9 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
     exit 1
   fi
 
-  # WP-484 Ф89: alert-only self-check — доля кириллицы в ответе после
-  # вычитания кода/путей/A2-глосс. Никогда не блокирует вывод, только
-  # предупреждает в stderr — не peer-реплика (IWE_PEER_PLAIN=1) её не видит.
+  # WP-484 Phase 89: alert-only self-check — the share of Cyrillic in the reply after
+  # subtracting code/paths/A2 glosses. Never blocks the output, only
+  # warns on stderr — a non-peer reply (IWE_PEER_PLAIN=1) does not see it.
   _LANG_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/language-check.py"
   if [ -f "$_LANG_CHECK" ]; then
     _LANG_RESULT=$(printf '%s' "$CODEX_OUTPUT" | python3 "$_LANG_CHECK" 2>/dev/null || true)
@@ -406,11 +406,11 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
     fi
   fi
 
-  # РП-388 Ф17: тот же общий style-check, что у Kimi (peer_adapter_check_style
-  # в lib/peer-adapter-common.sh) — здесь инлайн, не через ту функцию, потому
-  # что этот файл common.sh не сорсит (существующая архитектура этого файла,
-  # не правлю здесь). Один и тот же хук-ядро (response-clarity-hook.sh) через
-  # ту же обёртку (style-check-text.sh), не вторая реализация.
+  # WP-388 Phase 17: the same shared style-check as Kimi's (peer_adapter_check_style
+  # in lib/peer-adapter-common.sh) — here inline, not via that function, because
+  # this file does not source common.sh (the existing architecture of this file,
+  # not changing it here). The same hook core (response-clarity-hook.sh) via
+  # the same wrapper (style-check-text.sh), not a second implementation.
   _STYLE_WRAPPER="${IWE_ROOT:-$HOME/IWE}/.claude/hooks/style-check-text.sh"
   if [ -x "$_STYLE_WRAPPER" ]; then
     _STYLE_TMP=$(mktemp) && {
@@ -428,5 +428,5 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   fi
 fi
 
-# cleanup_peer() через trap удалит lock и temp
+# cleanup_peer() via trap will remove the lock and temp
 echo "$CODEX_OUTPUT"

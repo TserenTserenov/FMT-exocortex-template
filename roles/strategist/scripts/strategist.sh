@@ -1,6 +1,6 @@
 #!/bin/bash
-# Strategist (Стратег) Agent Runner
-# Запускает Claude Code с заданным сценарием
+# Strategist Agent Runner
+# Runs Claude Code with a given scenario
 
 set -e
 
@@ -51,20 +51,20 @@ elif command -v systemd-inhibit &>/dev/null; then
     add_exit_cleanup 'kill $_INHIBIT_PID 2>/dev/null'
 fi
 
-# Конфигурация
-# WP-273 R5 fix (Round 5 Евгения): substituted runner живёт в .iwe-runtime/,
-# но prompts/ и notify.sh — read-only данные, должны браться из FMT (immutable upstream).
-# Архитектурный принцип: substituted в runtime, read-only из FMT через $IWE_TEMPLATE.
+# Configuration
+# WP-273 R5 fix (Evgenii's Round 5): the substituted runner lives in .iwe-runtime/,
+# but prompts/ and notify.sh are read-only data and must come from FMT (immutable upstream).
+# Architectural principle: substituted into runtime, read-only from FMT via $IWE_TEMPLATE.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-# WP-273 0.29.4 R6.1 fix: было хардкоженое имя governance-репо.
-# На Mac: build-runtime подставляет плейсхолдеры в .iwe-runtime/strategist.sh.
-# На сервере (без build-runtime): резолвится через env vars с fallback.
-# IWE_WORKSPACE / IWE_GOVERNANCE_REPO задаются в /etc/iwe/env или ~/.config/aist/env.
+# WP-273 0.29.4 R6.1 fix: the governance repo name used to be hardcoded.
+# On Mac: build-runtime substitutes placeholders in .iwe-runtime/strategist.sh.
+# On the server (no build-runtime): resolved via env vars with a fallback.
+# IWE_WORKSPACE / IWE_GOVERNANCE_REPO are set in /etc/iwe/env or ~/.config/aist/env.
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
 # Guard: IWE_GOVERNANCE_REPO mismatch (Claude peer-review, 2026-05-26)
-# WP-529 Ф94 (peer-session 2026-09-08-32, Evgenii's report): $HOME/.iwe-paths
+# WP-529 Phase 94 (peer-session 2026-09-08-32, Evgenii's report): $HOME/.iwe-paths
 # is a legacy path install-iwe-paths.sh stopped writing (canonical file is
 # $WORKSPACE_DIR/.iwe-paths, see WORKSPACE above). Read the current path, and
 # read it without a pipe: `grep|sed || echo` masked grep's exit code behind
@@ -116,13 +116,13 @@ resolve_default_branch() {
 GIT_DEFAULT_BRANCH="$(resolve_default_branch)"
 GIT_DEFAULT_BRANCH="${GIT_DEFAULT_BRANCH:-main}"
 
-# PROMPTS_DIR резолв: $IWE_TEMPLATE (Generated runtime) → $HOME/IWE/FMT-exocortex-template (default) → relative (legacy fallback)
+# PROMPTS_DIR resolution: $IWE_TEMPLATE (Generated runtime) → $HOME/IWE/FMT-exocortex-template (default) → relative (legacy fallback)
 if [ -n "${IWE_TEMPLATE:-}" ] && [ -d "$IWE_TEMPLATE/roles/strategist/prompts" ]; then
     PROMPTS_DIR="$IWE_TEMPLATE/roles/strategist/prompts"
 elif [ -d "$HOME/IWE/FMT-exocortex-template/roles/strategist/prompts" ]; then
     PROMPTS_DIR="$HOME/IWE/FMT-exocortex-template/roles/strategist/prompts"
     # WP-273 0.29.3 (sub-agent assessment R3): silent degradation guard.
-    # Если IWE_TEMPLATE не экспортирована — env неполная, дальше будут проблемы.
+    # If IWE_TEMPLATE is not exported, the env is incomplete and problems will follow.
     echo "[$(date '+%H:%M:%S')] WARN: \$IWE_TEMPLATE не задана, fallback на $HOME/IWE/FMT-exocortex-template. source ~/.zshenv?" >&2
 else
     PROMPTS_DIR="$REPO_DIR/prompts"  # legacy: same dir as runner (pre-WP-273)
@@ -130,7 +130,7 @@ else
 fi
 
 LOG_DIR="$HOME/logs/strategist"
-# На Mac: build-runtime подставляет {{CLAUDE_PATH}}. На сервере — резолв через env/PATH/known paths.
+# On Mac: build-runtime substitutes {{CLAUDE_PATH}}. On the server: resolved via env/PATH/known paths.
 if [ -n "${CLAUDE_CLI_PATH:-}" ]; then
     CLAUDE_PATH="$CLAUDE_CLI_PATH"
 elif command -v claude &>/dev/null; then
@@ -140,23 +140,23 @@ elif [ -x "$HOME/.local/bin/claude" ]; then
 elif [ -x "$HOME/.npm-global/bin/claude" ]; then
     CLAUDE_PATH="$HOME/.npm-global/bin/claude"
 else
-    CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime должен был подставить
+    CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime should have substituted it
 fi
-CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
+CLAUDE_TIMEOUT=1800  # 30 min: protection against Claude CLI hanging
 
-# AI CLI: переопределение через переменные окружения (см. extractor.sh)
+# AI CLI: override via environment variables (see extractor.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 
-# AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
-# иначе override остаётся декоративным, когда claude физически отсутствует, но
-# AI_CLI указывает на реально установленную другую программу.
+# AR.293: the gate checks the effective program ($AI_CLI), not the CLAUDE_PATH literal --
+# otherwise the override stays decorative when claude is physically absent but
+# AI_CLI points to another program that is actually installed.
 if ! command -v "$AI_CLI" >/dev/null 2>&1 && [ ! -x "$AI_CLI" ]; then
     echo "[$(date '+%H:%M:%S')] ERROR: $AI_CLI CLI не найден (AI_CLI/CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$AI_CLI')." >&2
     exit 127
 fi
 
-# macOS не имеет GNU timeout — используем perl fallback
+# macOS has no GNU timeout -- use the perl fallback
 if ! command -v timeout &>/dev/null; then
     timeout() {
         local duration="$1"; shift
@@ -177,25 +177,25 @@ if ! command -v timeout &>/dev/null; then
     }
 fi
 
-# Создаём папку для логов
+# Create the log directory
 mkdir -p "$LOG_DIR"
 
-# Определяем день недели и тип сценария
+# Determine the day of week and the scenario type
 DAY_OF_WEEK=$(date +%u)  # 1=Mon, 7=Sun
-# STRATEGIST_DATE_OVERRIDE — шов для тестов границы полуночи (WP-568): наблюдатель
-# обязан сигналить о плане «вчера», а не молча defer'ить, когда сверка пересекла 00:00.
+# STRATEGIST_DATE_OVERRIDE is a seam for midnight-boundary tests (WP-568): the observer
+# must signal about yesterday's plan, not silently defer, when the check crossed 00:00.
 DATE="${STRATEGIST_DATE_OVERRIDE:-$(date +%Y-%m-%d)}"
-# issue #616: "первый Пн месяца" — календарная арифметика, не факт даты;
-# LLM однажды вывела её из головы и ошиблась (последний Пн августа принят за
-# первый Пн сентября). Считаем детерминированно здесь и передаём как готовый
-# факт (тот же принцип, что DAY_OF_WEEK ниже) — модели больше не нужно её
-# выводить самой.
+# issue #616: "first Monday of the month" is calendar arithmetic, not a date fact;
+# the LLM once derived it from memory and got it wrong (the last Monday of August was taken for
+# the first Monday of September). We compute it deterministically here and pass it as a ready
+# fact (same principle as DAY_OF_WEEK below) so the model no longer has to
+# derive it itself.
 IS_FIRST_MONDAY_OF_MONTH="нет"
 if [ "$DAY_OF_WEEK" = "1" ] && [ "$(date +%d)" -le 7 ]; then
     IS_FIRST_MONDAY_OF_MONTH="да"
 fi
 
-# Лог файл
+# Log file
 LOG_FILE="$LOG_DIR/$DATE.log"
 
 log() {
@@ -234,7 +234,7 @@ pick_publisher() {  # <target branch, empty = the publisher's default> <fallback
 }
 
 # Publish one commit via scripts/ds-publish.sh. The script is not shipped with
-# the template (issue #884, regression of WP-7 Ф101): when it is absent, say so
+# the template (issue #884, regression of WP-7 Phase 101): when it is absent, say so
 # and keep the commit local instead of failing on a bare "No such file".
 # Returns 0 only when the publisher reported success.
 # The optional 5th argument names the branch on origin to publish to; empty = the
@@ -264,7 +264,7 @@ publish_commit_or_explain() {
         log "$ok_msg"
         return 0
     fi
-    PUBLISH_LAST_RC="$prc"  # WP-530 Ф72: the isolated path passes the publisher's own status on
+    PUBLISH_LAST_RC="$prc"  # WP-530 Phase 72: the isolated path passes the publisher's own status on
     if [ -n "$target_branch" ] && [ -z "$PUBLISHER_BRANCH_ARG" ]; then
         advice=" (публикатор $PUBLISHER вызван без --branch $target_branch: по тексту файла он не знает --branch — старая копия шаблона или собственный публикатор установки; если отказ из-за этого, замените scripts/ds-publish.sh в репозитории управления версией шаблона seed/strategy/scripts/ds-publish.sh)"
     fi
@@ -282,7 +282,7 @@ notify() {
 
 notify_telegram() {
     local scenario="$1"
-    # WP-273 R5: notify.sh — read-only из FMT, не substituted (нет плейсхолдеров).
+    # WP-273 R5: notify.sh is read-only from FMT, not substituted (no placeholders).
     local notify_script
     if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then
         notify_script="$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh"
@@ -294,7 +294,7 @@ notify_telegram() {
     [ -f "$notify_script" ] && "$notify_script" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
 }
 
-# WP-561 Ф25: a scenario that must deliver a document proves it on origin/main, not by the
+# WP-561 Phase 25: a scenario that must deliver a document proves it on origin/main, not by the
 # CLI exit code. 28.09: week-review wrote WeekReport/WeekPlan, could not commit (the commit
 # guard refused its session), was logged "SUCCESS", sent the "завершён" message and marked the
 # day done -- the pilot learned of it from the model's own last lines.
@@ -383,7 +383,7 @@ verify_delivery_postcondition() {  # <scenario> <origin/$GIT_DEFAULT_BRANCH sha 
     return 0
 }
 
-# WP-561 Ф25: a scenario whose result is committed under the session guard gets a session owned by
+# WP-561 Phase 25: a scenario whose result is committed under the session guard gets a session owned by
 # THIS script, opened as a scheduled runner (--canonical-owner: on a frozen checkout only that mode
 # may open a housekeeping session). The guard's scope gate does not look at who commits: a live
 # semaphore covering a path authorises it, so the model needs no session of its own and cannot
@@ -487,7 +487,7 @@ open_runner_session() {  # <scenario>
     return 0
 }
 
-# WP-530 Ф72: isolated scenario runs. A scheduled scenario used to write straight into the shared
+# WP-530 Phase 72: isolated scenario runs. A scheduled scenario used to write straight into the shared
 # (frozen) governance checkout; the isolated mode runs it in a throwaway git worktree of origin/main,
 # so the canonical checkout is only read. The model and the deterministic steps write into the copy;
 # this script then checks that only the scenario's allowlisted paths changed, commits and publishes
@@ -523,7 +523,7 @@ isolation_enabled() {  # <scenario>; 0 = listed in STRATEGIST_ISOLATED_SCENARIOS
 }
 
 # An allowlist is exact repo-relative paths, so a scenario gets one only where its prompt fixes every
-# path it writes (checked against roles/strategist/prompts/, WP-530 Ф72 steps V-D). Scenarios left
+# path it writes (checked against roles/strategist/prompts/, WP-530 Phase 72 steps V-D). Scenarios left
 # out, and why -- each is refused with rc=72 when listed, never run un-isolated:
 #   day-plan     the morning path is only scripts/day-open-pipeline.sh (its own commit/push and state
 #                files, not run_claude); the run_claude prompt (manual `strategist.sh day-plan` only)
@@ -820,7 +820,7 @@ run_claude() {
     local _gov_repo="${IWE_GOVERNANCE_REPO:-DS-strategy}"
     local _ws="${ISOLATED_PROMPT_WORKSPACE:-${IWE_WORKSPACE:-$HOME/IWE}}"  # WP-530 Ф72: the copy's workspace in an isolated run
     local _gh_user="${GITHUB_USER:-your-username}"
-    local _o='{''{' _c='}''}'  # escape: build-runtime ищет цельный двойно-фигурный токен с UPPER_NAME внутри, поэтому конкатенация одиночных скобок его не матчит
+    local _o='{''{' _c='}''}'  # escape: build-runtime looks for a whole double-brace token with UPPER_NAME inside, so concatenating single braces does not match it
     prompt=$(sed \
         -e "s|${_o}GOVERNANCE_REPO${_c}|$_gov_repo|g" \
         -e "s|${_o}WORKSPACE_DIR${_c}|$_ws|g" \
@@ -831,7 +831,7 @@ run_claude() {
     # as before this issue -- common.sh missing (old install) must still
     # give the exact old hardcoded model, not fall through to the bare CLI
     # default below.
-    # WP-577 Ф3 (2026-10-14): claude-opus-4-7 was disabled org-wide ("403 Model
+    # WP-577 Phase 3 (2026-10-14): claude-opus-4-7 was disabled org-wide ("403 Model
     # 'claude-opus-4-7' is disabled. Use a non-Opus model.") -- found live on
     # a deployed copy of this file, where it silenced week-review (fails in
     # 3s, every Monday, forever) for weeks. Every new install carries the
@@ -907,7 +907,7 @@ ${prompt}"
 
     cd "$WORKSPACE" || { log "ERROR: не удалось перейти в $WORKSPACE"; return 1; }
 
-    # WP-561 Ф25: origin/main до запуска модели, точка отсчёта для постусловия доставки.
+    # WP-561 Phase 25: origin/main before the model starts, the reference point for the delivery postcondition.
     local delivery_pre_origin
     delivery_pre_origin=$(delivery_baseline "$command_file") || { log "ERROR: не удалось прочитать базу доставки"; return 1; }
 
@@ -916,29 +916,29 @@ ${prompt}"
         return "$SESSION_OPEN_FAILED_RC"
     fi
 
-    # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
+    # Run Claude Code with the command content as the prompt (with timeout protection)
     local rc=0
     local model_args=()
     if [ -n "$model_override" ]; then
         model_args=(--model "$model_override")
         log "Model override: $model_override"
     fi
-    # NB: --dangerously-skip-permissions не используется — Claude Code блокирует флаг
-    # под root/sudo (Linux cron). --allowedTools задаёт явный whitelist, чего достаточно.
-    # Календарный коннектор в whitelist (issue #581): без него morning-прогон не видит
-    # встречи дня ни при какой конфигурации. Имя сервера зависит от установки —
-    # переопределяется через IWE_CALENDAR_MCP_SERVERS (список через запятую);
-    # дефолт — проверенный mcp__claude_ai_Google_Calendar. Неизвестные имена в
-    # whitelist безвредны — просто никогда не совпадут.
+    # NB: --dangerously-skip-permissions is not used -- Claude Code blocks the flag
+    # under root/sudo (Linux cron). --allowedTools sets an explicit whitelist, which is enough.
+    # The calendar connector is in the whitelist (issue #581): without it the morning run does not see
+    # the day's meetings under any configuration. The server name depends on the installation --
+    # override via IWE_CALENDAR_MCP_SERVERS (comma-separated list);
+    # the default is the verified mcp__claude_ai_Google_Calendar. Unknown names in the
+    # whitelist are harmless -- they simply never match.
     local calendar_mcp="${IWE_CALENDAR_MCP_SERVERS:-mcp__claude_ai_Google_Calendar}"
     [ "$calendar_source" = "connector" ] || calendar_mcp=""
-    # AR.293: AI_CLI_EXTRA_FLAGS — точка подмены на случай, когда AI_CLI указывает
-    # не на Claude Code (--model/--allowedTools — его флаги, не переносимы как есть).
-    # Дефолт воспроизводит прежнее поведение один в один.
+    # AR.293: AI_CLI_EXTRA_FLAGS is a substitution point for when AI_CLI points
+    # to something other than Claude Code (--model/--allowedTools are its flags, not portable as is).
+    # The default reproduces the previous behavior one to one.
     local extra_flags
     if [ -n "${AI_CLI_EXTRA_FLAGS:-}" ]; then
-        # намеренный word-splitting единой override-строки — тот же контракт,
-        # что уже принят в extractor.sh
+        # intentional word-splitting of the single override string -- the same contract
+        # already accepted in extractor.sh
         read -ra extra_flags <<< "$AI_CLI_EXTRA_FLAGS" || { log "ERROR: не удалось разобрать AI_CLI_EXTRA_FLAGS"; return 1; }
     else
         extra_flags=("${model_args[@]}" --allowedTools "Read,Write,Edit,Glob,Grep,Bash${calendar_mcp:+,$calendar_mcp}")
@@ -964,15 +964,15 @@ ${prompt}"
         log "WARN: Claude CLI exited with code $rc for scenario: $command_file"
     fi
 
-    # Push changes to GitHub (чтобы бот мог читать через API)
+    # Push changes to GitHub (so the bot can read via the API)
     if [ "$ISOLATED_RUN" = 1 ]; then
-        # WP-530 Ф72: nothing the model committed is published unverified; the runner checks the
+        # WP-530 Phase 72: nothing the model committed is published unverified; the runner checks the
         # allowlist and publishes from the copy (isolated_finish).
         log "Isolated run: публикацию делает isolated_finish после проверки списка путей"
     elif git -C "$WORKSPACE" diff --quiet "origin/$GIT_DEFAULT_BRANCH..HEAD" 2>/dev/null; then
         log "No unpushed commits"
     else
-        # WP-7 Ф101: raw pull --rebase + push on a checkout shared with
+        # WP-7 Phase 101: raw pull --rebase + push on a checkout shared with
         # concurrent agent sessions routinely hit a dirty tree or a
         # non-fast-forward push and silently dropped the commit (found via a
         # W36 week-review that never reached origin/main). ds-publish.sh
@@ -986,14 +986,14 @@ ${prompt}"
             "Pushed to GitHub" "WARN: ds-publish.sh failed — публикация не удалась" || true
     fi
 
-    # Очистить staging area после Claude сессии (предотвращает staging leak в следующие скрипты)
-    # НЕ трогаем working tree — только unstage orphaned changes
+    # Clear the staging area after the Claude session (prevents a staging leak into the next scripts)
+    # Do NOT touch the working tree -- only unstage orphaned changes
     git -C "$WORKSPACE" reset --quiet 2>/dev/null || true
     log "Cleared staging area after Claude session"
 
     close_runner_session
 
-    # WP-561 Ф25: SUCCESS is written only after delivery is proven -- already_ran_today() keys
+    # WP-561 Phase 25: SUCCESS is written only after delivery is proven -- already_ran_today() keys
     # on it, so an undelivered run must not mark the day done (a manual rerun stays possible).
     if [ $rc -eq 0 ] && ! verify_delivery_postcondition "$command_file" "$delivery_pre_origin"; then
         rc=$DELIVERY_POSTCONDITION_RC
@@ -1168,7 +1168,7 @@ _marked_done_this_week() {
     [ -f "$(_mark_done_file "$scenario" "$(date +%G-W%V)")" ]
 }
 
-# Проверка: уже запускался ли сценарий сегодня
+# Check: whether the scenario has already run today
 # Done for today = it succeeded, or it gave up for the day with "GAVE UP scenario: <name> (<reason>)"
 # (the morning Day Open below), so a launchd RunAtLoad/CalendarInterval rerun does not start it again.
 # week-review's own "GAVE UP scenario: week-review after ..." line does not match on purpose: after
@@ -1240,17 +1240,17 @@ DAY_OPEN_NO_GATEWAY_NOTIFIED="${IWE_RUNTIME:-${IWE_WORKSPACE:-$HOME/IWE}/.iwe-ru
 # The scheduler reads exit 2 as "lock held, another run is in progress" (scheduler.sh
 # run_strategist_scenario); a pipeline that failed with 2 is passed out as this code instead.
 DAY_OPEN_RC2_SUBSTITUTE=73
-# WP-568 (25.10.2026, пир-сессия Kimi+Codex+Grok): отказ гарда WP-539 прямому вызову
-# (не night-cycle-runner) — НЕ «конвейер завершился с ошибкой». Свой код, чтобы
-# вызывающий отличал «мне запрещено запускаться» от реального сбоя сборки плана.
-# 77 не уникален в экосистеме (внутренний маркер week-review, exit kimi-session-guard)
-# — но утренний сценарий перехватывает его до выхода, коллизии потоков данных нет.
+# WP-568 (25.10.2026, peer session Kimi+Codex+Grok): WP-539 guard refusal of a direct call
+# (not night-cycle-runner) is NOT "the pipeline finished with an error". Its own code, so the
+# caller can tell "I am forbidden to run" from a real plan-build failure.
+# 77 is not unique in the ecosystem (internal week-review marker, exit of kimi-session-guard)
+# -- but the morning scenario intercepts it before exit, so there is no data-flow collision.
 DAY_OPEN_REFUSED_RC=77
-# Хост-наблюдатель (ключ observer: true в секции day_open файла day-rhythm-config.yaml):
-# Открытием дня владеет другой хост (серверный night-cycle-runner). План на origin —
-# молчаливый skip; окно владельца не прошло — defer; окно прошло, плана нет — один
-# сигнал «сервер не опубликовал план» в день. Пайплайн не вызываем.
-DAY_OPEN_OBSERVER_AFTER="${DAY_OPEN_OBSERVER_AFTER:-03:30}"  # конец окна владельца, локальное время
+# Observer host (key observer: true in the day_open section of day-rhythm-config.yaml):
+# Another host (the server night-cycle-runner) owns Day Open. Plan on origin --
+# silent skip; owner's window not passed -- defer; window passed, no plan -- one
+# "server did not publish the plan" signal per day. The pipeline is not invoked.
+DAY_OPEN_OBSERVER_AFTER="${DAY_OPEN_OBSERVER_AFTER:-03:30}"  # end of the owner's window, local time
 DAY_OPEN_MISSING_MARK="RECORDED: day-open plan missing on origin"
 DAY_OPEN_MISSING_SENT_MARK="Telegram notification sent: strategist/day-open-missing"
 DAY_OPEN_ATTEMPT=0
@@ -1343,12 +1343,12 @@ day_open_resume_pending_give_up() {  # finishes a give-up whose alarm is still o
     day_open_give_up "$code" "${rec#*|}" "$rc"
 }
 
-# WP-568 (25.10.2026): включено ключом observer: true в секции day_open файла
-# day-rhythm-config.yaml — для установок, где Открытием дня владеет другой хост
-# (серверный night-cycle-runner; гард WP-539 отказывает прямым вызовам). Без ключа
-# поведение прежнее: эта установка сама открывает день утренним прогоном.
-# Источники конфига — те же, что у остального контура: сначала rhythm-конфиг
-# стратега (RHYTHM_CONFIG), затем runtime-конфиг установки (его же читает пайплайн).
+# WP-568 (25.10.2026): enabled by the key observer: true in the day_open section of
+# day-rhythm-config.yaml -- for installations where another host owns Day Open
+# (server night-cycle-runner; the WP-539 guard refuses direct calls). Without the key
+# the behavior is as before: this installation opens the day itself with the morning run.
+# Config sources are the same as for the rest of the loop: first the strategist rhythm
+# config (RHYTHM_CONFIG), then the installation runtime config (the pipeline reads it too).
 day_open_observer_enabled() {
     local cfg
     for cfg in "${RHYTHM_CONFIG:-}" "${IWE_RUNTIME:-$HOME/IWE/.iwe-runtime}/day-rhythm-config.yaml"; do
@@ -1358,20 +1358,20 @@ day_open_observer_enabled() {
     return 1
 }
 
-# Наблюдатель вместо запуска пайплайна. Сверка read-only для дерева и индекса:
-# fetch пишет только remote-tracking ref (явный refspec ниже), cat-file проверяет
-# путь в том же коммите. fetch недоступен (сеть) — defer и никакого сигнала: иначе
-# сетевой сбой превратился бы в ложное «сервер не опубликовал план».
-# Выходы функции: 0 (план есть / сигнал доставлен / Telegram не настроен),
-# 7 (отложить: fetch невозможен или окно владельца не прошло), 74 (сигнал не
-# доставлен — повторить при следующем запуске). Выходы — exit; день стратегии
-# зовёт функцию в подоболочке, чтобы exit'ы не прерывали session-prep.
+# Observer instead of running the pipeline. The check is read-only for the tree and index:
+# fetch writes only the remote-tracking ref (explicit refspec below), cat-file checks
+# the path in the same commit. fetch unavailable (network) -- defer and no signal: otherwise
+# a network failure would turn into a false "server did not publish the plan".
+# Function exits: 0 (plan exists / signal delivered / Telegram not configured),
+# 7 (defer: fetch impossible or owner's window not passed), 74 (signal not
+# delivered -- retry on the next run). Exits are exit; strategy day
+# calls the function in a subshell so the exits do not interrupt session-prep.
 day_open_observe() {
     local plan_path="current/DayPlan $DATE.md"
-    # Ветка по умолчанию — из resolve_default_branch() (issue #1097), не литерал «main»:
-    # на установке с master fetch в main дал бы постоянный ложный defer. Явный refspec
-    # вместо FETCH_HEAD: перезапись ref чужим fetch между командами безопасна — сервер
-    # план только добавляет, так что ref движется монотонно и сверка не врёт.
+    # Default branch comes from resolve_default_branch() (issue #1097), not the literal "main":
+    # on an installation with master, fetching main would give a permanent false defer. Explicit refspec
+    # instead of FETCH_HEAD: overwriting the ref by someone else's fetch between commands is safe -- the server
+    # only adds to the plan, so the ref moves monotonically and the check does not lie.
     if ! timeout 30 git -C "$WORKSPACE" fetch --quiet origin \
             "+refs/heads/$GIT_DEFAULT_BRANCH:refs/remotes/origin/$GIT_DEFAULT_BRANCH" 2>/dev/null; then
         log "Day Open: сверка плана с origin не удалась (сеть?) — сигнал «нет плана» не шлю, отложил (код $DAY_OPEN_DEFERRED_RC)"
@@ -1384,9 +1384,9 @@ day_open_observe() {
     local now today
     now=$(date +%H:%M)
     today=$(date +%Y-%m-%d)
-    # Полночь между стартом и сверкой: для вчерашнего DATE окно владельца однозначно
-    # прошло — не defer'им, иначе сигнал о вчерашнем плане потерялся бы навсегда
-    # (следующий запуск проверит уже новую дату; ред-комментарий Codex, РП-568).
+    # Midnight between start and check: for yesterday's DATE the owner's window has unambiguously
+    # passed -- do not defer, otherwise the signal about yesterday's plan would be lost forever
+    # (the next run would already check the new date; Codex red-comment, WP-568).
     if [ "$DATE" = "$today" ] && [ "$now" \< "$DAY_OPEN_OBSERVER_AFTER" ]; then
         log "Day Open: окно владельца ещё не прошло ($now < $DAY_OPEN_OBSERVER_AFTER, локальное время) — план ещё может появиться; отложил (код $DAY_OPEN_DEFERRED_RC)"
         exit "$DAY_OPEN_DEFERRED_RC"
@@ -1396,20 +1396,20 @@ day_open_observe() {
         exit 0
     fi
     log "$DAY_OPEN_MISSING_MARK (окно владельца прошло: $now >= $DAY_OPEN_OBSERVER_AFTER, сверка с origin выполнена)"
-    # Дата сверки фиксируется здесь: шаблон при отправке пересчитывает свою дату сам,
-    # и прогон через полночь назвал бы в сигнале не тот день (ред-комментарий Codex, РП-568).
+    # The check date is fixed here: the template recomputes its own date on sending,
+    # and a run across midnight would name the wrong day in the signal (Codex red-comment, WP-568).
     DAY_OPEN_PLAN_DATE="$DATE" notify_telegram "day-open-missing"
     if grep -qF "$DAY_OPEN_MISSING_SENT_MARK" "$LOG_FILE" 2>/dev/null; then
         log "GAVE UP scenario: day-plan (плана нет на origin после окна владельца; сигнал доставлен; пайплайн наблюдатель не запускает)"
         exit 0
     fi
     if grep -qF "$DAY_OPEN_ALARM_UNCONFIGURED_MARK" "$LOG_FILE" 2>/dev/null; then
-        # Как day_open_alarm_owed(): Telegram не настроен — повторы бесполезны, день отдаём без сигнала.
+        # Like day_open_alarm_owed(): Telegram not configured -- retries are useless, we hand the day over without a signal.
         log "GAVE UP scenario: day-plan (плана нет на origin после окна владельца; Telegram не настроен — сигнал невозможен, повторы бесполезны)"
         exit 0
     fi
-    # Доставка не подтверждена (сеть/Telegram молчит) — день НЕ отдаём: следующий запуск
-    # планировщика повторит сигнал. Иначе единственный сигнал терялся бы до конца дня.
+    # Delivery not confirmed (network/Telegram silent) -- do NOT hand the day over: the next scheduler
+    # run will repeat the signal. Otherwise the only signal would be lost until the end of the day.
     log "Day Open: сигнал «сервер не опубликовал план» не доставлен — повтор доставки при следующем запуске планировщика, код $DAY_OPEN_ALARM_RETRY_RC"
     exit "$DAY_OPEN_ALARM_RETRY_RC"
 }
@@ -1653,26 +1653,26 @@ acquire_captures_write_lock() {
     done
 }
 
-# Читаем strategy_day из конфига (L4 Personal)
-# issue #729: раньше единственным источником был auto-memory Claude Code по
-# литеральному пути "-Users-$(whoami)-IWE" — ломается молча, если workspace
-# не буквально ~/IWE (симлинк или другой путь на Linux/WSL), а fallback на
-# monday ничем не сигнализировал об ошибке. Governance-репо копия — тот же
-# источник, что уже читают day-open-scaffold.sh и server-calendar.sh, и она
-# не зависит от workspace-пути. Функция вынесена отдельно ради регрессионного
-# теста (scripts/tests/test_issue_729_rhythm_config_resolve.sh).
+# Read strategy_day from the config (L4 Personal)
+# issue #729: previously the only source was Claude Code auto-memory at the
+# literal path "-Users-$(whoami)-IWE" -- it breaks silently if the workspace
+# is not literally ~/IWE (a symlink or another path on Linux/WSL), and the fallback to
+# monday gave no signal of the error. The governance repo copy is the same
+# source that day-open-scaffold.sh and server-calendar.sh already read, and it
+# does not depend on the workspace path. The function is separated out for the regression
+# test (scripts/tests/test_issue_729_rhythm_config_resolve.sh).
 resolve_rhythm_config() {
     local ws="$1" iwe_workspace="$2"
     local rhythm_config="$ws/exocortex/day-rhythm-config.yaml"
     if [ ! -f "$rhythm_config" ]; then
-        # Fallback: auto-memory Claude Code, путь выводим из РЕАЛЬНОГО workspace
-        # (pwd -P разворачивает симлинки), не из literal "~/IWE".
+        # Fallback: Claude Code auto-memory, the path is derived from the REAL workspace
+        # (pwd -P resolves symlinks), not from the literal "~/IWE".
         local ws_real
         ws_real="$(cd "${iwe_workspace:-$HOME/IWE}" 2>/dev/null && pwd -P || true)"
         if [ -n "$ws_real" ]; then
-            # tr '/_.' '-', не sed 's#/#-#g': Claude Code слугифицирует путь,
-            # заменяя на "-" также "_" и "." (см. memory-exocortex-sync.sh) —
-            # sed-only вариант молча ломался бы для workspace-путей с "." или "_".
+            # tr '/_.' '-', not sed 's#/#-#g': Claude Code slugifies the path,
+            # replacing "_" and "." with "-" as well (see memory-exocortex-sync.sh) --
+            # the sed-only variant would silently break for workspace paths with "." or "_".
             local ws_slug
             ws_slug="$(printf '%s' "$ws_real" | tr '/_.' '-')"
             rhythm_config="$HOME/.claude/projects/${ws_slug}/memory/day-rhythm-config.yaml"
@@ -1687,7 +1687,7 @@ if [ -z "$STRATEGY_DAY_NAME" ]; then
     log "WARN: strategy_day not found in $RHYTHM_CONFIG — fallback: monday"
     STRATEGY_DAY_NAME="monday"
 fi
-# Конвертируем имя дня в номер (1=Mon..7=Sun)
+# Convert the day name to a number (1=Mon..7=Sun)
 case "$STRATEGY_DAY_NAME" in
     monday)    STRATEGY_DAY_NUM=1 ;;
     tuesday)   STRATEGY_DAY_NUM=2 ;;
@@ -1699,23 +1699,23 @@ case "$STRATEGY_DAY_NAME" in
     *)         STRATEGY_DAY_NUM=1 ;;  # fallback: monday
 esac
 
-# WP-530 Ф72: only scenarios with an isolated setup may be listed in STRATEGIST_ISOLATED_SCENARIOS.
+# WP-530 Phase 72: only scenarios with an isolated setup may be listed in STRATEGIST_ISOLATED_SCENARIOS.
 if isolation_enabled "${1:-}" && [ -z "$(isolated_allowlist "$1")" ]; then
     log "ISOLATION: сценарий $1 указан в STRATEGIST_ISOLATED_SCENARIOS, но списка разрешённых путей для него нет — изолированный запуск не поддержан, сценарий не запущен (rc=$ISOLATION_BLOCKED_RC)"
     exit "$ISOLATION_BLOCKED_RC"
 fi
 
-# Определяем какой сценарий запускать
+# Determine which scenario to run
 case "$1" in
     "morning")
-        # Определяем нужный сценарий: strategy_day → session-prep, иначе → day-plan
+        # Determine the needed scenario: strategy_day → session-prep, otherwise → day-plan
         if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
             SCENARIO="session-prep"
         else
             SCENARIO="day-plan"
         fi
 
-        # WP-530 Ф72: `morning` itself is not a listed name, but the scenario it resolves to is. The
+        # WP-530 Phase 72: `morning` itself is not a listed name, but the scenario it resolves to is. The
         # day-plan branch is served by day-open-pipeline.sh (no run_claude, no isolation), so a listed
         # day-plan must stop here, before the pipeline writes into the shared checkout.
         if isolation_enabled "$SCENARIO" && [ -z "$(isolated_allowlist "$SCENARIO")" ]; then
@@ -1723,7 +1723,7 @@ case "$1" in
             exit "$ISOLATION_BLOCKED_RC"
         fi
 
-        # Защита от повторного запуска (RunAtLoad + CalendarInterval race condition)
+        # Protection against a repeated run (RunAtLoad + CalendarInterval race condition)
         acquire_lock "$SCENARIO"
         if already_ran_today "$SCENARIO"; then
             log "SKIP: $SCENARIO already completed today"
@@ -1738,8 +1738,8 @@ case "$1" in
             run_claude "session-prep" ""
             notify_telegram "session-prep"
         else
-            # WP-568 (25.10.2026): хост-наблюдатель (day_open.observer в day-rhythm-config.yaml)
-            # сам день не открывает — смотри day_open_observe().
+            # WP-568 (25.10.2026): the observer host (day_open.observer in day-rhythm-config.yaml)
+            # does not open the day itself -- see day_open_observe().
             if day_open_observer_enabled; then
                 day_open_observe
             fi
@@ -1801,13 +1801,13 @@ case "$1" in
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_DEFERRED_RC" ]; then
                 day_open_deferred
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_REFUSED_RC" ]; then
-                # Гард WP-539: прямой вызов вне night-cycle-runner. Не сбой и не «план не
-                # собран» — владелец дня живёт на другом хосте. Тихий skip, тревоги нет.
+                # WP-539 guard: direct call outside night-cycle-runner. Not a failure and not "plan not
+                # built" -- the day owner lives on another host. Quiet skip, no alarm.
                 log "Day Open: пайплайн отказал прямому вызову (гард WP-539: не night-cycle-runner) — не сбой, тревоги нет, пропускаю"
-                # Попытка уже записана day_open_start_attempt выше, а отказ — не «день прогнан»
-                # (SUCCESS/GAVE UP нет, already_ran_today пропустит повтор) — компенсируем отсрочкой,
-                # иначе N прямых запусков за день (RunAtLoad после перезагрузок) исчерпают
-                # DAY_OPEN_MAX_ATTEMPTS и вызовут ложную тревогу attempts-exhausted (ред-комментарий Codex, РП-568).
+                # The attempt is already recorded by day_open_start_attempt above, and a refusal is not "day run"
+                # (no SUCCESS/GAVE UP, already_ran_today would skip the repeat) -- we compensate with a deferral,
+                # otherwise N direct runs per day (RunAtLoad after reboots) would exhaust
+                # DAY_OPEN_MAX_ATTEMPTS and raise a false attempts-exhausted alarm (Codex red-comment, WP-568).
                 log "$DAY_OPEN_DEFERRED_MARK: гард WP-539 отказал прямому вызову (код $DAY_OPEN_REFUSED_RC) — этот хост не владеет Открытием дня; не сбой: тревоги нет, попытка не засчитана"
                 exit 0
             elif [ "$pipeline_rc" -eq "$DAY_OPEN_NO_GATEWAY_RC" ]; then
@@ -1844,7 +1844,7 @@ case "$1" in
         # transiently unavailable. Retry auth failures with backoff and leave a
         # status file so the morning traffic light can distinguish fresh from
         # stale failures.
-        # WP-561 Ф25: `set -e` would end the script silently on a failed run (no message at
+        # WP-561 Phase 25: `set -e` would end the script silently on a failed run (no message at
         # all); keep the code, alarm the pilot, then exit with it.
         week_review_rc=0
         run_claude_with_retry "week-review" "" 3 60 300 || week_review_rc=$?
@@ -1934,14 +1934,14 @@ case "$1" in
     "note-review")
         acquire_lock "note-review"
         log "Manual: running note review"
-        # WP-530 Ф72: opt-in isolation (STRATEGIST_ISOLATED_SCENARIOS); off = the legacy path below.
+        # WP-530 Phase 72: opt-in isolation (STRATEGIST_ISOLATED_SCENARIOS); off = the legacy path below.
         if isolation_enabled "note-review"; then
             isolated_begin "note-review" || { log "FAILED scenario: note-review (rc=$ISOLATION_BLOCKED_RC) -- изолированная копия не создана, канон не тронут"; exit "$ISOLATION_BLOCKED_RC"; }
         fi
         # Canary: count bold notes before. "New" = bold without 🔄 (deferred ideas stay bold by design)
         # and without ✅предложено (already proposed; stays bold until the pilot closes it, #961).
-        # NB: `grep -c` при exit 1 (no matches) печатает "0" до `||`, так что `|| echo 0`
-        # давал двухстрочный "0\n0" и ломал арифметику. Используем `|| true` + fallback.
+        # NB: `grep -c` on exit 1 (no matches) prints "0" before `||`, so `|| echo 0`
+        # gave a two-line "0\n0" and broke the arithmetic. Use `|| true` + a fallback.
         FLEETING="$WORKSPACE/inbox/fleeting-notes.md"
         BOLD_BEFORE=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || true); BOLD_BEFORE=${BOLD_BEFORE:-0}
         BOLD_NEW_BEFORE=$(count_new_bold_notes "$FLEETING")
@@ -1998,7 +1998,7 @@ case "$1" in
         done
         unset _cleanup_python_candidate
         log "Running deterministic cleanup..."
-        # WP-530 Ф72: in an isolated run the script edits the copy's files, not the canon's.
+        # WP-530 Phase 72: in an isolated run the script edits the copy's files, not the canon's.
         cleanup_env=()
         [ "$ISOLATED_RUN" != 1 ] || cleanup_env=(IWE_CLEANUP_ISOLATED=1 IWE_CLEANUP_REPO_DIR="$WORKSPACE")
         cleanup_rc=0
@@ -2027,7 +2027,7 @@ case "$1" in
             log "Cleanup (isolated): $ISOLATED_RESULT"
         elif ! git -C "$WORKSPACE" diff --quiet -- inbox/fleeting-notes.md archive/notes/Notes-Archive.md 2>/dev/null; then
             git -C "$WORKSPACE" add inbox/fleeting-notes.md archive/notes/Notes-Archive.md
-            # WP-7 Ф101: same ds-publish.sh move as the main push block above,
+            # WP-7 Phase 101: same ds-publish.sh move as the main push block above,
             # plus an explicit commit-result check — `|| true` here used to
             # swallow a failed commit while still reporting "Cleanup: pushed"
             # for a commit that never happened.

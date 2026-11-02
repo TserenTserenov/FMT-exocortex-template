@@ -1,11 +1,11 @@
 #!/bin/bash
 # log_formatter.sh
-# Shared JSONL formatter для capture_log.jsonl / gate_log.jsonl.
-# Пишет одну строку JSON в указанный файл, atomic append.
+# Shared JSONL formatter for capture_log.jsonl / gate_log.jsonl.
+# Writes one JSON line to the given file, atomic append.
 #
 # Usage:
 #   log_jsonl <file> <key=val>...
-# Пример:
+# Example:
 #   log_jsonl .claude/logs/capture_log.jsonl detector=incident status=fired latency_ms=42
 
 set -euo pipefail
@@ -30,7 +30,7 @@ log_jsonl() {
   jq -nc "${args[@]}" "$jq_obj" >> "$file"
 }
 
-# Если скрипт вызван напрямую — работает как CLI
+# If the script is called directly — works as a CLI
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   log_jsonl "$@"
 fi

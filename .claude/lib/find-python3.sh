@@ -2,7 +2,7 @@
 # find-python3.sh — single Python resolver for template scripts (WP-529 F6,
 # issues #453/#463, Evgenii 18.08).
 #
-# Contract (peer-session 2026-08-19-01, codex В1): standalone executable, not a
+# Contract (peer-session 2026-08-19-01, codex B1): standalone executable, not a
 # sourced lib. By default stdout = path to a python3 whose `import yaml`
 # succeeds, exit 0. `--stdlib-only` keeps the same candidate resolution but
 # requires only the Python standard library; callers that do not import PyYAML

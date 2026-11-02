@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install Strategist Agent launchd jobs
-# WP-273 Этап 2: plists берутся из $IWE_RUNTIME (Generated runtime, F).
-# Fallback на $SCRIPT_DIR/scripts/launchd/ — для старых установок до 0.29.0.
+# WP-273 Stage 2: plists are taken from $IWE_RUNTIME (Generated runtime, F).
+# Fallback to $SCRIPT_DIR/scripts/launchd/ — for old installs before 0.29.0.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,14 +16,14 @@ elif [ -n "${IWE_WORKSPACE:-}" ] && [ -d "$IWE_WORKSPACE/.iwe-runtime/roles/$ROL
     LAUNCHD_DIR="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/launchd"
     SCRIPT_TARGET="$IWE_WORKSPACE/.iwe-runtime/roles/$ROLE_NAME/scripts/strategist.sh"
 else
-    # Legacy: substituted FMT (до WP-273 Этап 2)
+    # Legacy: substituted FMT (before WP-273 Stage 2)
     LAUNCHD_DIR="$SCRIPT_DIR/scripts/launchd"
     SCRIPT_TARGET="$SCRIPT_DIR/scripts/strategist.sh"
     echo "  ⚠ Legacy mode: используются плейсхолдеры из FMT-substituted (запустите setup.sh ≥0.29.0 для архитектуры F)"
 fi
 
 # Resolve find-python3.sh for merge-launchd-schedule.py (issue #981) — same
-# resolver contract as the rest of the template (WP-529 Ф6/Ф9, #453/#463):
+# resolver contract as the rest of the template (WP-529 Phase 6/Phase 9, #453/#463):
 # repo-owned .py files go through scripts/lib/find-python3.sh, not a bare
 # python3, so a Windows MS-Store python3 stub or a missing interpreter fails
 # loud instead of a silent domain error. --stdlib-only: the merge script only
@@ -41,9 +41,9 @@ MERGE_PYTHON3=$(bash "$PYTHON3_RESOLVER" --stdlib-only 2>/dev/null) || MERGE_PYT
 echo "Installing Strategist Agent launchd jobs..."
 echo "  LAUNCHD_DIR: $LAUNCHD_DIR"
 
-# WP-273 R5 fix (Round 5 Евгения): fail-fast если выбранный plist содержит literal {{...}}.
-# Это предотвращает копирование незаменённых плейсхолдеров в ~/Library/LaunchAgents/
-# (если IWE_RUNTIME не expanded, fallback падает на FMT с placeholder'ами).
+# WP-273 R5 fix (Evgenii Round 5): fail-fast if the chosen plist contains a literal {{...}}.
+# This prevents copying unreplaced placeholders into ~/Library/LaunchAgents/
+# (if IWE_RUNTIME is not expanded, the fallback falls onto FMT with placeholders).
 for plist_check in "$LAUNCHD_DIR/com.strategist.morning.plist" "$LAUNCHD_DIR/com.strategist.weekreview.plist"; do
     if [ -f "$plist_check" ] && grep -qE '\{\{[A-Z_]+\}\}' "$plist_check" 2>/dev/null; then
         echo "ERROR: $plist_check содержит незаменённые плейсхолдеры:" >&2
@@ -116,11 +116,11 @@ if [[ "$(uname -s)" == "Linux" ]] || ! command -v launchctl >/dev/null 2>&1; the
         SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
         mkdir -p "$SYSTEMD_USER_DIR"
 
-        # issue #285 (same class of bug, Linux equivalent): пользователь мог явно
-        # выключить таймер (`systemctl --user disable iwe-strategist-morning.timer`)
-        # — `systemctl --user is-enabled` тогда вернёт "disabled" (не "not-found",
-        # это отличает «выключено» от «ещё не установлено»). Безусловный re-enable
-        # при каждом апдейте роли отменял бы выбор пользователя молча.
+        # issue #285 (same class of bug, Linux equivalent): the user could explicitly
+        # disable the timer (`systemctl --user disable iwe-strategist-morning.timer`)
+        # — `systemctl --user is-enabled` then returns "disabled" (not "not-found",
+        # this distinguishes «disabled» from «not installed yet»). An unconditional re-enable
+        # on every role update would silently cancel the user's choice.
         for unit in iwe-strategist-morning iwe-strategist-weekreview; do
             # A mask may be a symlink to /dev/null; never copy through it or
             # reactivate a timer the user deliberately stopped.
@@ -178,14 +178,14 @@ if [ -e "$TARGET_DIR/com.strategist.notereview.plist" ] ||
         "$IWE_WORKSPACE" "$SCRIPT_TARGET"
 fi
 
-# issue #285: пользователь отключает агента документированным способом
-# (launchctl unload + переименование в <label>.plist.disabled — конвенция,
-# описанная в issue пилотом на его инсталляции для com.strategist.scout;
-# в этом репо scout-плист не поставляется, конвенция применяется здесь
-# первым делом). update.sh реагирует
-# на изменения в roles/ и безусловно перезапускает install.sh каждой auto-роли —
-# без этой проверки .disabled-маркер молча игнорировался, отключённый агент
-# возвращался и перезагружался при каждом апдейте шаблона.
+# issue #285: the user disables the agent in the documented way
+# (launchctl unload + rename to <label>.plist.disabled — a convention
+# described in the issue by the pilot on his installation for com.strategist.scout;
+# in this repo the scout plist is not shipped, the convention is applied here
+# first). update.sh reacts
+# to changes in roles/ and unconditionally restarts install.sh of every auto-role —
+# without this check the .disabled marker was silently ignored, the disabled agent
+# came back and was reloaded on every template update.
 for label in com.strategist.morning com.strategist.weekreview; do
     if [ -f "$TARGET_DIR/$label.plist.disabled" ]; then
         echo "  ⊘ $label — disabled by user (найден $label.plist.disabled), пропускаю"
@@ -194,12 +194,12 @@ for label in com.strategist.morning com.strategist.weekreview; do
     if [ -z "${SETUP_CI:-}" ]; then
         launchctl unload "$TARGET_DIR/$label.plist" 2>/dev/null || true
     fi
-    # issue #725: безусловный cp стирал ручную правку пользователя (например,
-    # ограничение Weekday) без предупреждения и бэкапа при каждом update.sh —
-    # backup+warn выбран вместо skip-if-diverged (пир-сессия с Codex,
-    # 2026-09-09): skip навсегда заморозил бы апстрим-фиксы плиста для тех,
-    # кто его один раз отредактировал по несвязанной причине. Бэкап остаётся
-    # защитой на случай сбоя слияния ниже (issue #981).
+    # issue #725: an unconditional cp erased the user's manual edit (for example,
+    # a Weekday restriction) without warning or backup on every update.sh —
+    # backup+warn was chosen over skip-if-diverged (peer session with Codex,
+    # 2026-09-09): skip would freeze upstream plist fixes forever for those
+    # who edited it once for an unrelated reason. The backup remains
+    # a safeguard in case the merge below fails (issue #981).
     if [ -f "$TARGET_DIR/$label.plist" ] && ! cmp -s "$TARGET_DIR/$label.plist" "$LAUNCHD_DIR/$label.plist"; then
         BACKUP="$TARGET_DIR/$label.plist.bak-$(date +%Y%m%dT%H%M%S)"
         cp "$TARGET_DIR/$label.plist" "$BACKUP"

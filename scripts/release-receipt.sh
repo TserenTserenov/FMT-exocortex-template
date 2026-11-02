@@ -1,11 +1,11 @@
 #!/bin/bash
-# release-receipt.sh — WP-529 Ф3 fail-closed release receipt.
+# release-receipt.sh — WP-529 Phase 3 fail-closed release receipt.
 #
 # Aggregates the mandatory CI jobs of validate-template.yml into a single
 # receipt tied to one commit: which checks ran, what they returned, and
 # whether the tree is publishable. Fed by `needs.<job>.result` from the same
 # workflow run — same trigger, same SHA — not by querying job status from
-# elsewhere, which is exactly the trust gap Ф3 exists to close (a red main
+# elsewhere, which is exactly the trust gap Phase 3 exists to close (a red main
 # for two days, one accidental green run, proved that "we run this check
 # somewhere" says nothing about whether THIS commit passed it).
 #
@@ -16,7 +16,7 @@
 # On a release run (#1010a) the macOS integration job is mandatory too: its
 # skip blocks the receipt. Failure/cancelled/unknown, or a skipped Windows
 # job, produces false. The script exits 1 so branch protection can require
-# this receipt instead of enumerating every individual job (Ф2).
+# this receipt instead of enumerating every individual job (Phase 2).
 #
 # Release run = the run whose green result makes release.yml publish a new
 # release: same repository, a push or workflow_dispatch run on main, and no

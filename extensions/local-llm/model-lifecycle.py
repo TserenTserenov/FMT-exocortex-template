@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-# see ADR-001-local-llm-stack.md (РП404, Ф2)
-# Жизненный цикл локальных моделей: analysis -> testing -> active -> archived.
-# Источник истины — model-catalog.yaml (правится с сохранением комментариев).
-# "Скачана" проверяется по кэшу HuggingFace (реальный факт, не флаг).
+# see ADR-001-local-llm-stack.md (WP-404, Phase 2)
+# Lifecycle of local models: analysis -> testing -> active -> archived.
+# Source of truth — model-catalog.yaml (edited with comments preserved).
+# "Downloaded" is checked against the HuggingFace cache (a real fact, not a flag).
 #
-# Команды:
-#   list                 показать модели по четырём состояниям + факт скачивания
-#   active               напечатать id активной модели (для сервера)
-#   use <id>             сделать активной (прежняя active -> testing)
-#   archive <id>         вывести в архив
-#   set <id> <status>    перевести в произвольное состояние
+# Commands:
+#   list                 show models by the four states + download fact
+#   active               print the id of the active model (for the server)
+#   use <id>             make active (the previous active -> testing)
+#   archive <id>         move to archive
+#   set <id> <status>    move to an arbitrary state
 #   add <id> [--status S --params-b N --min-ram-gb M --note T]
 import argparse
 import os
@@ -20,8 +20,8 @@ from ruamel.yaml import YAML
 STATES = ("analysis", "testing", "active", "archived")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CATALOG = os.path.join(HERE, "model-catalog.yaml")
-yaml = YAML()  # round-trip по умолчанию: комментарии и порядок сохраняются
-yaml.width = 4096  # не переносить длинные строки (URL источника)
+yaml = YAML()  # round-trip by default: comments and order are preserved
+yaml.width = 4096  # do not wrap long lines (source URL)
 
 
 def load(path):
@@ -30,7 +30,7 @@ def load(path):
 
 
 def save(path, data):
-    tmp = path + ".tmp"   # атомарно: пишем во временный, потом подменяем (каталог не побьётся при сбое)
+    tmp = path + ".tmp"   # atomic: write to a temporary file, then swap (the directory won't break on failure)
     with open(tmp, "w", encoding="utf-8") as f:
         yaml.dump(data, f)
     os.replace(tmp, path)
@@ -48,7 +48,7 @@ def find(data, model_id):
 
 
 def is_downloaded(model_id):
-    # HF кэширует как hub/models--<org>--<name>
+    # HF caches as hub/models--<org>--<name>
     hf = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
     slug = "models--" + model_id.replace("/", "--")
     return os.path.isdir(os.path.join(hf, "hub", slug))
@@ -83,7 +83,7 @@ def cmd_active(data, _args):
     if actives:
         print(actives[0]["id"])
         return 0
-    for m in models(data):  # фолбэк: рекомендованная
+    for m in models(data):  # fallback: the recommended one
         if m.get("recommended"):
             print(m["id"])
             return 0
@@ -99,7 +99,7 @@ def set_status(data, model_id, status):
     if status == "active":
         for other in models(data):
             if other.get("status") == "active" and other.get("id") != model_id:
-                other["status"] = "testing"  # прежняя активная остаётся скачанной
+                other["status"] = "testing"  # the previous active stays downloaded
     m["status"] = status
 
 
@@ -129,7 +129,7 @@ def cmd_add(data, args):
     if args.note:
         entry["note"] = args.note
     models(data).append(entry)
-    set_status(data, args.id, args.status)  # через инвариант: --status active демотит прежнюю
+    set_status(data, args.id, args.status)  # via the invariant: --status active demotes the previous one
     return 0
 
 

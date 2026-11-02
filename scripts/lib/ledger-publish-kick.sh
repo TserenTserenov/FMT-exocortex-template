@@ -20,7 +20,7 @@
 # `systemctl --user start --no-block ledger-publish.service`. Always returns
 # 0 — a failed/unavailable kick is diagnostic, not a pipeline error (the
 # ledger write already succeeded; the periodic watchdog timer remains the
-# backstop, per PILOT DECISION 09.08's "один редкий писатель" model).
+# backstop, per PILOT DECISION 09.08's "a single rare writer" model).
 kick_ledger_publish() {
   echo "LEDGER_COMMIT_OK"
 

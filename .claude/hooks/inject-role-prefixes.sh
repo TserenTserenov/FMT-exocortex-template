@@ -1,20 +1,20 @@
 #!/bin/bash
 # inject-role-prefixes.sh
 # Event: UserPromptSubmit
-# see DP.SC.154 (Префиксы ролей), WP-445 Ф4
+# see DP.SC.154 (Role prefixes), WP-445 Phase 4
 #
-# Назначение: lazy-инжекция полного контекста роли ТОЛЬКО когда пользователь
-#   начинает сообщение с роль-префикса (Навигатор, / Диагност, / ...).
-#   Иначе — пустой ответ (stub уже в rules/role-prefixes.md).
+# Purpose: lazy injection of the full role context ONLY when the user
+#   starts a message with a role prefix (Navigator, / Diagnostician, / ...).
+#   Otherwise — an empty reply (the stub is already in rules/role-prefixes.md).
 #
-# Архитектура (WP-445, ArchGate Ф3 М2-митигация):
-#   Hot stub:   .claude/rules/role-prefixes.md (~709 байт, always-loaded)
+# Architecture (WP-445, ArchGate Phase 3 M2 mitigation):
+#   Hot stub:   .claude/rules/role-prefixes.md (~709 bytes, always-loaded)
 #   Full:       .claude/rules-lazy/role-prefixes-full.md (~23 KB, lazy)
-#   Триггеры:   читаются ДИНАМИЧЕСКИ из §Активация таблицы full-файла — не hardcode.
+#   Triggers:   read DYNAMICALLY from the §Activation table of the full file — not hardcoded.
 #
-# Savings: ~23 105 байт (~4 620 токенов) при обычном сообщении без роль-префикса.
-# Инвариант (ArchGate М2): при добавлении новой роли в role-prefixes-full.md §Активация
-#   хук автоматически подхватит новый триггер — ничего не надо менять в хуке.
+# Savings: ~23 105 bytes (~4 620 tokens) on an ordinary message without a role prefix.
+# Invariant (ArchGate M2): when a new role is added to role-prefixes-full.md §Activation
+#   the hook picks up the new trigger automatically — nothing to change in the hook.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -32,8 +32,8 @@ HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FULL_FILE="$HOOK_DIR/../rules-lazy/role-prefixes-full.md"
 [ -f "$FULL_FILE" ] || { echo '{}'; exit 0; }
 
-# Extract triggers dynamically from §Активация table (М2 mitigation).
-# Looks for backtick-quoted strings containing ", ..." in the §Активация section.
+# Extract triggers dynamically from §Activation table (M2 mitigation).
+# Looks for backtick-quoted strings containing ", ..." in the §Activation section.
 # Works with macOS grep/awk — no GNU extensions required.
 TRIGGERS=$(awk '/^## Активация/,/^## [^А]/' "$FULL_FILE" 2>/dev/null | \
   grep -o '`[^`]*`' | \

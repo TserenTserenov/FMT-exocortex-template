@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # gate-metrics.sh -- WP-436: measure reflex/passthrough/llm routing from gate-decisions.jsonl
 #
-# History: written for WP-423 Ф6.4 ("dummy test: % tasks without LLM"). That phase
+# History: written for WP-423 Phase 6.4 ("dummy test: % tasks without LLM"). That phase
 # closed 2026-06-21 as "mechanism verified, coverage metric N/A" -- this script no
 # longer gates a closure decision for it. It now just reports the live split for
 # whoever is reading gate-decisions.jsonl (currently WP-436's headless-executor door).
 #
-# routing=passthrough (WP-436 Ф5б, added 2026-07-08): a caller that set
+# routing=passthrough (WP-436 Phase 5b, added 2026-07-08): a caller that set
 # GateInput.self_decided=True -- e.g. a watchdog's own quiet-branch verdict -- and
 # hit no catalog reflex. Before this, such calls fell back to routing=llm even
 # though no model was ever consulted: ~850 of ~930 "llm" records in the first two

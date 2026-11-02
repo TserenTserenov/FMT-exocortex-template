@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # behaviour-report.sh
-# see DP.SC.026 (мониторинг поведения агента), WP-229 Ф8
-# Агрегатор паттернов: читает gate_log + все incident-log → сводка по P{N}.
+# see DP.SC.026 (agent behavior monitoring), WP-229 Phase 8
+# Pattern aggregator: reads gate_log + all incident-logs → summary by P{N}.
 #
-# Поддерживает два формата:
-#   (A) JSON payload из автодетекторов: {"payload": {"pattern": "P1_not_capturing"}}
-#   (B) YAML-блок из ручных записей:   pattern: P5
+# Supports two formats:
+#   (A) JSON payload from auto-detectors: {"payload": {"pattern": "P1_not_capturing"}}
+#   (B) YAML block from manual entries:   pattern: P5
 #
-# Использование:
+# Usage:
 #   behaviour-report.sh [--period YYYY-MM] [--threshold N] [--json]
 #
-#   --period YYYY-MM   период (default: текущий месяц)
-#   --threshold N      порог для рекомендации «создать детектор» (default: 3)
-#   --json             вывод в JSON вместо текста
+#   --period YYYY-MM   period (default: current month)
+#   --threshold N      threshold for the "create a detector" recommendation (default: 3)
+#   --json             output as JSON instead of text
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -34,13 +34,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Временные файлы для агрегации (key=паттерн, value=count через sort|uniq -c)
+# Temporary files for aggregation (key=pattern, value=count via sort|uniq -c)
 TMP_GATE_ALL=$(mktemp /tmp/br_gate_all.XXXX)
 TMP_GATE_FIRED=$(mktemp /tmp/br_gate_fired.XXXX)
 TMP_INCIDENTS=$(mktemp /tmp/br_incidents.XXXX)
 trap "rm -f $TMP_GATE_ALL $TMP_GATE_FIRED $TMP_INCIDENTS" EXIT
 
-# --- Шаг 1: gate_log ---
+# --- Step 1: gate_log ---
 GATE_LOG="$IWE_ROOT/.claude/logs/gate_log.jsonl"
 if [ -f "$GATE_LOG" ]; then
   while IFS= read -r line; do
@@ -54,24 +54,24 @@ if [ -f "$GATE_LOG" ]; then
   done < "$GATE_LOG"
 fi
 
-# --- Шаг 2: все incident-log файлы ---
+# --- Step 2: all incident-log files ---
 while IFS= read -r logfile; do
   [ -f "$logfile" ] || continue
 
-  # Формат A: JSON  "pattern": "P1_not_capturing"
+  # Format A: JSON  "pattern": "P1_not_capturing"
   grep -o '"pattern"[[:space:]]*:[[:space:]]*"[^"]*"' "$logfile" 2>/dev/null \
     | sed 's/.*"pattern"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
     >> "$TMP_INCIDENTS" || true
 
-  # Формат B: YAML  pattern: P5  (с отступом или без; может быть "P2, P5 (×3)")
+  # Format B: YAML  pattern: P5  (indented or not; may be "P2, P5 (×3)")
   grep -E 'pattern:[[:space:]]*P[0-9]' "$logfile" 2>/dev/null \
     | grep -oE 'P[0-9]+[a-zA-Z_]*' \
     >> "$TMP_INCIDENTS" || true
 
 done < <(find "$IWE_ROOT" -name "incident-log-${PERIOD}.md" -not -path "*/.git/*" 2>/dev/null)
 
-# --- Шаг 3: подсчёт ---
-# Функция: count pattern in file
+# --- Step 3: counting ---
+# Function: count pattern in file
 count_pat() {
   local pat="$1" file="$2"
   [ -f "$file" ] || { echo "0"; return; }
@@ -80,7 +80,7 @@ count_pat() {
   echo "${n:-0}"
 }
 
-# Собрать список всех уникальных паттернов
+# Collect the list of all unique patterns
 ALL_PATS=$(cat "$TMP_GATE_ALL" "$TMP_GATE_FIRED" "$TMP_INCIDENTS" 2>/dev/null \
   | sort -u)
 
@@ -93,7 +93,7 @@ if [ -z "$ALL_PATS" ]; then
   exit 1
 fi
 
-# --- Шаг 4: сводка ---
+# --- Step 4: summary ---
 INCIDENT_FILE_COUNT=$(find "$IWE_ROOT" -name "incident-log-${PERIOD}.md" \
   -not -path "*/.git/*" 2>/dev/null | wc -l | tr -d ' ')
 
@@ -115,7 +115,7 @@ if [ "$OUTPUT_JSON" = "1" ]; then
     PATTERNS_ARR+="{\"pattern\":\"$pat\",\"gate_total\":$gate_total,\"gate_fired\":$gate_fired,\"incidents\":$incidents,\"total\":$total}"
     first_p=0
 
-    # Рекомендации
+    # Recommendations
     rec_code=""
     if [ "$gate_total" -gt 0 ]; then
       fp=$(( gate_total - gate_fired ))
@@ -156,7 +156,7 @@ else
     incidents=$(count_pat "$pat" "$TMP_INCIDENTS")
     total=$(( gate_fired + incidents ))
 
-    # Статус
+    # Status
     status=""
     if [ "$gate_total" -gt 0 ]; then
       fp=$(( gate_total - gate_fired ))

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
-# add-secret.sh — единый способ сохранить любой API-ключ/токен в ~/.secrets/
+# add-secret.sh — a single way to save any API key/token to ~/.secrets/
 #
-# Ввод скрыт (read -s) — значение не отображается на экране и не попадает
-# в историю команд терминала. Права на файл выставляются автоматически (600).
+# Input is hidden (read -s) — the value is not shown on screen and does not end up
+# in the terminal command history. File permissions are set automatically (600).
 #
-# Использование:
-#   bash add-secret.sh <имя_ключа>
+# Usage:
+#   bash add-secret.sh <key_name>
 #
-# Пример:
+# Example:
 #   bash add-secret.sh openai_api_key
-#   → спросит значение скрыто, сохранит в ~/.secrets/openai_api_key
+#   → will ask for the value silently, save to ~/.secrets/openai_api_key
 
 set -euo pipefail
 

@@ -3,7 +3,7 @@
 # lib/common.sh — shared shell helpers for IWE template scripts.
 # Source, don't execute: `source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"`
 #
-# WP-5 Ubuntu-portability audit (2026-07-22, факт #5): 132 scripts, no shared
+# WP-5 Ubuntu-portability audit (2026-07-22, fact #5): 132 scripts, no shared
 # library — IWE workspace root was resolved 5 different ways (IWE_WORKSPACE/
 # IWE_ROOT/IWE_ROOT_ARG env vars, in varying precedence), governance-repo
 # default duplicated with 4 variable names, and Telegram notification existed
@@ -11,11 +11,11 @@
 # TELEGRAM_BOT_TOKEN directly) — some alert paths silently dropped messages
 # because a caller used a convention no other caller tested. Pilot migration
 # (this file) covers day-open-pipeline.sh + day-open-preflight.sh; the other
-# ~40 call sites are backlog (WP-5 П4), not blind-swept in one pass.
+# ~40 call sites are backlog (WP-5 P4), not blind-swept in one pass.
 
-# iwe_env_get FILE KEY — безопасно читает одно KEY=VALUE без source/eval.
-# Поддерживаются только shell-подобные строки с простым ключом; внешние кавычки
-# снимаются, команды и подстановки никогда не исполняются.
+# iwe_env_get FILE KEY — safely reads a single KEY=VALUE without source/eval.
+# Only shell-like lines with a simple key are supported; outer quotes
+# are stripped, commands and substitutions are never executed.
 iwe_env_get() {
   local file="${1:-}" key="${2:-}" line value
   [ -f "$file" ] || return 1
@@ -64,7 +64,7 @@ iwe_resolve_root() {
 # iwe_sha256 — sha256 of stdin, printed alone (no filename column).
 # GNU-first (sha256sum, coreutils — on every Linux, absent on macOS by
 # default) then shasum -a 256 (macOS default, also present on Linux only if
-# perl's Digest::SHA happens to be installed — WP-5 Ubuntu-audit факт #4:
+# perl's Digest::SHA happens to be installed — WP-5 Ubuntu-audit fact #4:
 # 3 callers used bare `shasum -a 256` with no fallback, so a minimal Ubuntu
 # install without it silently broke dedup/hash checks depending on it).
 # lessons_stat_f_gnu_bsd_fallback_order.md: GNU-first is deliberate — the
@@ -90,8 +90,8 @@ iwe_md5() {
   fi
 }
 
-# iwe_file_mtime_date FILE — дата YYYY-MM-DD без смешивания stdout двух
-# несовместимых stat-реализаций. GNU и BSD ветки выбираются явно (#300).
+# iwe_file_mtime_date FILE — date YYYY-MM-DD without mixing the stdout of two
+# incompatible stat implementations. GNU and BSD branches are chosen explicitly (#300).
 iwe_file_mtime_date() {
   local file="$1" epoch
   if stat --version >/dev/null 2>&1; then
@@ -108,23 +108,23 @@ iwe_resolve_governance_repo() {
   echo "${1:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 }
 
-# iwe_sessions_dir [GOVERNANCE_WORKTREE] — корень журналов сессий (issues #545, #1256).
-# Тот же контракт, что у писателя (session-guard.sh resolve_orz_sessions_dir,
-# порт WP-526 Ф2): писатель переключается на MC-sessions после миграции, а
-# читатели, жёстко смотрящие в legacy-путь, теряли перенос со вчера на
-# мигрированной установке — и «не найдено» было неотличимо от «нечего
-# находить».
-#   1. IWE_SESSIONS_ROOT задан явно → он; каталог обязан существовать, иначе
-#      return 1 (явный override — осознанный выбор, молчаливый обход скрыл бы
-#      реальную расконфигурацию; решение о WARN/пропуске — у читателя).
-#   2. Существует $IWE_ROOT/MC-sessions → он (мигрированная установка).
-#   3. Иначе — legacy <GOVERNANCE_WORKTREE>/sessions, если активная рабочая
-#      копия передана аргументом (абсолютный путь, проверенный вызывающим).
-#      Без аргумента сохраняется $IWE_ROOT/<governance-repo>/sessions. Имя репозитория:
-#      GOVERNANCE_REPO (старший override, семантика day-close.sh) >
+# iwe_sessions_dir [GOVERNANCE_WORKTREE] — root of session logs (issues #545, #1256).
+# The same contract as the writer (session-guard.sh resolve_orz_sessions_dir,
+# port of WP-526 Phase 2): the writer switches to MC-sessions after migration, and
+# readers hard-wired to the legacy path lost the carry-over from yesterday on a
+# migrated install — and «not found» was indistinguishable from «nothing to
+# find».
+#   1. IWE_SESSIONS_ROOT is set explicitly → it; the directory must exist, otherwise
+#      return 1 (an explicit override is a deliberate choice, a silent bypass would hide
+#      a real misconfiguration; the WARN/skip decision is the reader's).
+#   2. $IWE_ROOT/MC-sessions exists → it (migrated install).
+#   3. Otherwise — legacy <GOVERNANCE_WORKTREE>/sessions, if the active working
+#      copy is passed as an argument (an absolute path, verified by the caller).
+#      Without an argument $IWE_ROOT/<governance-repo>/sessions is kept. Repository name:
+#      GOVERNANCE_REPO (the senior override, day-close.sh semantics) >
 #      IWE_GOVERNANCE_REPO > DS-strategy.
-# В отличие от писательского резолвера — без side-эффектов: ничего не создаёт
-# и не падает, git-валидность не требует (читателю достаточно файлов).
+# Unlike the writer resolver — without side effects: creates nothing
+# and does not fail, git validity is not required (files are enough for the reader).
 iwe_sessions_dir() {
   local root="${IWE_ROOT:-${IWE_WORKSPACE:-}}"
   if [ -n "${IWE_SESSIONS_ROOT:-}" ]; then
@@ -132,9 +132,9 @@ iwe_sessions_dir() {
     printf '%s\n' "$IWE_SESSIONS_ROOT"
     return 0
   fi
-  # Пустой root (ни IWE_ROOT, ни IWE_WORKSPACE) — та же честная ошибка, что у
-  # сломанного явного override: иначе функция вернула бы путь от корня
-  # файловой системы, прочитанный как валидный.
+  # An empty root (neither IWE_ROOT nor IWE_WORKSPACE) — the same honest error as for a
+  # broken explicit override: otherwise the function would return a path from the filesystem
+  # root, read as valid.
   [ -n "$root" ] || return 1
   if [ -d "$root/MC-sessions" ]; then
     printf '%s\n' "$root/MC-sessions"
@@ -151,7 +151,7 @@ iwe_sessions_dir() {
 # extractor) registered AND active with the launcher this OS actually uses?
 # Returns 0 (active) / 1 (not active).
 #
-# WP-5 Ubuntu-audit факт #4: day-open-scaffold.sh checked `launchctl list`
+# WP-5 Ubuntu-audit fact #4: day-open-scaffold.sh checked `launchctl list`
 # unconditionally — on Linux launchctl doesn't exist, so the check silently
 # saw empty output and reported the scheduler as down (🔴) every single day
 # even when the equivalent systemd --user timer was running fine. Two
@@ -297,7 +297,7 @@ tg_notify() {
 # callers keep their own `|| abort "..."` / cleanup-trap flow.
 #
 # Folded in from the formerly-standalone scripts/safe-pull.sh (found with
-# zero callers in the same audit, факт #5) rather than deleted: this exact
+# zero callers in the same audit, fact #5) rather than deleted: this exact
 # failure mode is a live, open risk this pilot's own sessions hit twice on
 # 2026-07-23 (see feedback_parallel_agents_shared_workdir_git_race.md), and
 # several callers were still doing a naive `git pull --rebase`.

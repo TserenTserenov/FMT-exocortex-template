@@ -137,7 +137,7 @@ chmod +x "$SNIPPET"
 # to avoid the generator's own "SKILLS_DIR not found" exit(1) keeps both
 # reads and writes inside $TEST_ROOT.
 FAKE_HOME="$TEST_ROOT/home"
-# issue #890 (WP-7 Ф164): script_path now must resolve to a real file
+# issue #890 (WP-7 Phase 164): script_path now must resolve to a real file
 # (checked against the generator's own location, template-root-relative
 # per #634 -- an isolated sandbox HOME cannot satisfy a relative one).
 # Give the fixture skill a real, absolute dummy script instead.

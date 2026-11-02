@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # routing: helper  skill=day-close  called-by=day-close.sh,memory-exocortex-sync.sh  deterministic=true
-# see issue #1279 (WP-7 Ф265 item Е), WP-520 (frozen governance canon)
+# see issue #1279 (WP-7 Phase 265 item E), WP-520 (frozen governance canon)
 # exocortex-publish.sh — publishes the memory backup mirror <governance>/exocortex/
 # while the governance checkout ("canon") is frozen, without ever writing into it.
 #

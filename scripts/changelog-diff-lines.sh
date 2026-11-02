@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # routing: helper  skill=notify-update,validate-template
-# changelog-diff-lines.sh — извлекает добавленные строки CHANGELOG.md за
-# диапазон коммитов, с опциональным фильтром по бирке [security].
+# changelog-diff-lines.sh — extracts the added lines of CHANGELOG.md over
+# a commit range, with an optional filter by the [security] tag.
 #
-# Единая логика для .github/workflows/notify-security.yml (push) и
-# validate-template.yml (push + pull_request) — WP-7 Ф62 п.4. Выделена из
-# трёх независимых копий, найденных code review 13.08.2026 (DP.SC.172 P2:
-# третье повторение → функция); там же найден баг дублирования — голый
-# `grep '\[security\]'` матчил подстроку где угодно в тексте коммита, не
-# только позицию бирки-префикса (ложные "🔒 срочно"-алерты на коммитах вида
+# Single logic for .github/workflows/notify-security.yml (push) and
+# validate-template.yml (push + pull_request) — WP-7 Phase 62 item 4. Extracted from
+# three independent copies found by code review 13.08.2026 (DP.SC.172 P2:
+# third repetition → function); a duplication bug was found there too — a bare
+# `grep '\[security\]'` matched the substring anywhere in the commit text, not
+# only the position of the prefix tag (false "🔒 urgent" alerts on commits like
 # "fix: drop obsolete [security]-only migration shim").
 #
-# Использование:
+# Usage:
 #   bash changelog-diff-lines.sh <base-sha|""> [--security-only]
 #
-# base-sha пустой или все нули → нет валидной base (initial push/новая
-# ветка): берём весь верхний блок CHANGELOG.md (до следующего "## [").
+# base-sha empty or all zeros → no valid base (initial push/new
+# branch): take the whole top block of CHANGELOG.md (up to the next "## [").
 
 set -uo pipefail
 
@@ -49,7 +49,7 @@ else
 fi
 
 if $security_only; then
-    # Якорим на позицию бирки-префикса ("- [security] "), не голую подстроку.
+    # Anchor on the position of the prefix tag ("- [security] "), not a bare substring.
     if ! lines=$(printf '%s\n' "$lines" | awk '/^- \[security\] /'); then
         echo "ERROR: CHANGELOG security filter failed" >&2
         exit 1

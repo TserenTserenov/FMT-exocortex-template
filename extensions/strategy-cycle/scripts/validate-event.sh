@@ -1,22 +1,22 @@
 #!/bin/bash
-# validate-event.sh — проверяльщик формы события контракта цикла стратегирования
-# see: extensions/strategy-cycle/SPEC.md §3, живая приёмка WP-518
-#   (сессия 2026-08-16-22-wp518-strategy-cycle-acceptance)
+# validate-event.sh — form checker for a strategy-cycle contract event
+# see: extensions/strategy-cycle/SPEC.md §3, live acceptance of WP-518
+#   (session 2026-08-16-22-wp518-strategy-cycle-acceptance)
 #
-# Назначение: механически проверить, что YAML-блок события (producer любого
-# закрытия/сверки) содержит все 5 обязательных полей контракта в валидной
-# форме — до того, как его прочитает consumer (пакет решений §4 или шаг
-# strategy-session-weekly). Не проверяет смысл summary и не ограничивает
-# список event_type — SPEC.md §3 намеренно держит его открытым для новых
-# producer'ов (см. п.3 обсуждения приёмки).
+# Purpose: mechanically check that the event's YAML block (from a producer of any
+# closing/reconciliation) contains all 5 required contract fields in a valid
+# form — before the consumer reads it (decision package §4 or the
+# strategy-session-weekly step). It does not check the meaning of summary and does not restrict
+# the event_type list — SPEC.md §3 deliberately keeps it open for new
+# producers (see item 3 of the acceptance discussion).
 #
-# Портируемость: только POSIX awk/grep (см. coordination-pattern-weekly-stats.sh —
-# та же норма для скриптов этого контракта).
+# Portability: POSIX awk/grep only (see coordination-pattern-weekly-stats.sh —
+# the same norm for scripts of this contract).
 #
-# Использование:
-#   bash validate-event.sh <file>   # ищет блок полей в файле, печатает вердикт
+# Usage:
+#   bash validate-event.sh <file>   # looks for the field block in the file, prints a verdict
 #
-# Exit: 0 = валиден, 1 = невалиден (список причин в stderr), 2 = usage error.
+# Exit: 0 = valid, 1 = invalid (list of reasons on stderr), 2 = usage error.
 
 set -uo pipefail
 
@@ -29,8 +29,8 @@ FILE="$1"
 ERRORS=0
 
 get_field() {
-  # Первое совпадение поля верхнего уровня — не в глубине другого блока,
-  # значение до конца строки, без внешних кавычек.
+  # First match of a top-level field — not deep inside another block,
+  # the value up to the end of the line, without outer quotes.
   awk -v key="$1" '
     $0 ~ "^" key ":" {
       sub("^" key ":[ \t]*", "")

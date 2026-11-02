@@ -1,10 +1,10 @@
 #!/bin/bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# backup-icloud.sh — Бэкап IWE в архив (без .git, node_modules, .venv)
-# Использование: ./scripts/backup-icloud.sh
-# Хранит последние 4 архива, удаляет старые.
-# Цель: backup_dir из params.yaml (любая ОС) либо iCloud Drive на macOS по умолчанию.
+# backup-icloud.sh — IWE backup into an archive (without .git, node_modules, .venv)
+# Usage: ./scripts/backup-icloud.sh
+# Keeps the last 4 archives, deletes older ones.
+# Goal: backup_dir from params.yaml (any OS) or iCloud Drive on macOS by default.
 
 set -euo pipefail
 
@@ -67,7 +67,7 @@ fi
 SIZE=$(du -h "$BACKUP_DIR/$ARCHIVE" | cut -f1)
 echo "✅ Архив создан: $BACKUP_DIR/$ARCHIVE ($SIZE)"
 
-# Удалить старые архивы (оставить последние MAX_BACKUPS)
+# Delete old archives (keep the last MAX_BACKUPS)
 cd "$BACKUP_DIR"
 TOTAL=$(ls -1 IWE-backup-*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
 if [ "$TOTAL" -gt "$MAX_BACKUPS" ]; then

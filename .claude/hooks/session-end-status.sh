@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionEnd — fail-safe agent-status write (issue #266, РП-395 Ф3 promise).
+# SessionEnd — fail-safe agent-status write (issue #266, WP-395 Phase 3 promise).
 # agent-status-report.sh never fails the caller (always exit 0 itself); this
 # hook mirrors that and never blocks session end.
 set -uo pipefail

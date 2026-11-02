@@ -18,8 +18,8 @@ import time
 CONTINUATIONS = 2000
 TIME_LIMIT_S = 1.0
 
-# Хук читает репозиторий в своём cwd — запускаем из каталога вне репозитория,
-# как в long_cases.py.
+# The hook reads the repository in its cwd — run from a directory outside the repository,
+# as in long_cases.py.
 NEUTRAL_CWD = tempfile.mkdtemp(prefix="dg-perf-")
 
 

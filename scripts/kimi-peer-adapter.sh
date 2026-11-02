@@ -1,10 +1,10 @@
 #!/bin/bash
-# kimi-peer-adapter.sh v4 — адаптер Kimi для peer-conversation.sh с PII-фильтрацией
-# see DP.SC.154 (З-Ф5), DP.ROLE.039, WP-365 Ф2-Ф3 (peer-session 2026-05-29-27)
+# kimi-peer-adapter.sh v4 — Kimi adapter for peer-conversation.sh with PII filtering
+# see DP.SC.154 (Z-Phase5), DP.ROLE.039, WP-365 Phase 2-Phase 3 (peer-session 2026-05-29-27)
 #
-# Принимает аргументы в стиле Claude (-p --model X --add-dir Y --permission-mode Z),
-# применяет .agentigore filter + PII sanity-check,
-# вызывает Kimi с очищенной директорией.
+# Accepts Claude-style arguments (-p --model X --add-dir Y --permission-mode Z),
+# applies the .agentigore filter + PII sanity-check,
+# calls Kimi with a cleaned directory.
 #
 # Env overrides:
 #   IWE_PEER_LOCK_DIR     — pidfile lock directory (default: ~/.iwe/kimi-peer-locks; legacy /tmp/kimi-peer-locks is used only while it alone holds the OAuth fence, see kimi_lock_root)
@@ -29,8 +29,8 @@
 #   3 — PII Hard Block (sanity-check found high-severity pattern)
 #   4 — --add-dir too large (>100MB or >5000 files or >KIMI_MAX_ADD_DIR_TOKENS)
 #   5 — peer session already running (pidfile lock)
-#   6 — auth failure (§0в.1, WP-516 Ф5); до 12.08.2026 код 6 означал «WP Gate блок
-#       отсутствует в peer-prompt.md» — теперь этот случай возвращает 1
+#   6 — auth failure (§0в.1, WP-516 Phase 5); until 12.08.2026 code 6 meant "WP Gate block
+#       missing from peer-prompt.md" — now this case returns 1
 #   77 — session stopped by token guard (limit exceeded)
 
 set -uo pipefail
@@ -496,11 +496,11 @@ esac
 ADD_DIRS=()
 MODEL_ARG=()
 
-# WP-516 Ф5: межвендорский whitelist (§0в.1) = {-p, --model, --add-dir}.
-# Неизвестный флаг — явная ошибка, не молчаливый игнор: иначе запрошенный
-# режим (напр. безопасности) может не примениться незаметно для вызывающего.
-# --permission-mode исключён из whitelist: способен ослабить read-only
-# гарантию sandbox; claude-адаптер отклоняет его всегда (exit 64).
+# WP-516 Phase 5: inter-vendor whitelist (§0в.1) = {-p, --model, --add-dir}.
+# An unknown flag is an explicit error, not a silent ignore: otherwise the requested
+# mode (e.g. a safety one) might fail to apply unnoticed by the caller.
+# --permission-mode is excluded from the whitelist: it can weaken the read-only
+# sandbox guarantee; the claude adapter always rejects it (exit 64).
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -p)                shift ;;
@@ -524,30 +524,30 @@ if [ ${#MODEL_ARG[@]} -ge 2 ]; then
 fi
 
 # === Pre-flight: WP Gate check (peer-session 2026-06-09) ===
-# Если в --add-dir есть peer-prompt.md — проверить наличие блока «Открытие (WP Gate)».
-# Эффективная дата: 2026-06-09. Сессии до этой даты не проверяются (grandfathered).
+# If --add-dir contains peer-prompt.md — check for the "Opening (WP Gate)" block.
+# Effective date: 2026-06-09. Sessions before this date are not checked (grandfathered).
 WP_GATE_EFFECTIVE_DATE="20260609"
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   PEER_PROMPT_FILE="$ADD_DIR/peer-prompt.md"
   [ ! -f "$PEER_PROMPT_FILE" ] && continue
-  # Определить дату сессии из имени директории (YYYY-MM-DD-NN-slug)
+  # Determine the session date from the directory name (YYYY-MM-DD-NN-slug)
   SESSION_DATE=$(basename "$ADD_DIR" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}' | tr -d '-' || true)
-  [ -z "$SESSION_DATE" ] && SESSION_DATE="99999999"  # без даты — проверять всегда
-  [[ "$SESSION_DATE" =~ ^[0-9]{8}$ ]] || SESSION_DATE="99999999"  # нечисловой формат — проверять всегда
+  [ -z "$SESSION_DATE" ] && SESSION_DATE="99999999"  # no date — always check
+  [[ "$SESSION_DATE" =~ ^[0-9]{8}$ ]] || SESSION_DATE="99999999"  # non-numeric format — always check
   if [ "$SESSION_DATE" -ge "$WP_GATE_EFFECTIVE_DATE" ]; then
     if ! grep -q "Открытие (WP Gate)" "$PEER_PROMPT_FILE"; then
       echo "WP-GATE-WARN: peer-prompt.md не содержит блок «Открытие (WP Gate)»." >&2
       echo "  Файл: $PEER_PROMPT_FILE" >&2
       echo "  Добавьте секцию по шаблону ~/.tmp/peer-prompt-TEMPLATE.md" >&2
       echo "  Чтобы продолжить без блока — удалите peer-prompt.md или добавьте # WP_GATE_SKIP" >&2
-      # WP-516 Ф5 (§0в.1): код 6 зарезервирован под auth failure — WP-Gate
-      # возвращает общий код 1 (ранее 6, конфликтовало с каноническим контрактом).
+      # WP-516 Phase 5 (§0в.1): code 6 is reserved for auth failure — WP-Gate
+      # returns the generic code 1 (formerly 6, conflicted with the canonical contract).
       exit 1
     fi
   fi
 done
 
-# === Фильтрация --add-dir через .agentigore + PII sanity-check ===
+# === Filtering --add-dir via .agentigore + PII sanity-check ===
 
 FILTERED_DIRS=()
 TMP_ROOT=$(mktemp -d)
@@ -557,7 +557,7 @@ MERGED_AGENTIGORE="$TMP_ROOT/.agentigore"
 : > "$MERGED_AGENTIGORE"
 [ -f "$HOME/.iwe/.agentigore" ] && cat "$HOME/.iwe/.agentigore" >> "$MERGED_AGENTIGORE"
 
-# Per --add-dir: merge git-root + session-dir .agentigore (если есть)
+# Per --add-dir: merge git-root + session-dir .agentigore (if present)
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   GIT_ROOT=$(git -C "$ADD_DIR" rev-parse --show-toplevel 2>/dev/null || true)
@@ -565,7 +565,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ -f "$ADD_DIR/.agentigore" ] && cat "$ADD_DIR/.agentigore" >> "$MERGED_AGENTIGORE"
 done
 
-# === Fail-fast на размер ===
+# === Fail-fast on size ===
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   SIZE_MB=$(du -sm "$ADD_DIR" 2>/dev/null | awk '{print $1}')
@@ -577,11 +577,11 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   fi
 done
 
-# === Token budget pre-flight (WP-394 Ф3.2 guard, lessons_kimi_adapter_adddir_token_limit) ===
+# === Token budget pre-flight (WP-394 Phase 3.2 guard, lessons_kimi_adapter_adddir_token_limit) ===
 MAX_ADD_DIR_TOKENS="${KIMI_MAX_ADD_DIR_TOKENS:-130000}"
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
-  # Консервативная оценка: ~2 символа на токен (русский + markdown + code)
+  # Conservative estimate: ~2 characters per token (Russian + markdown + code)
   CHARS=$(find "$ADD_DIR" -type f -not -path '*/\.*' -exec cat {} + 2>/dev/null | wc -c | tr -d ' ')
   EST_TOKENS=$(( CHARS / 2 ))
   if [ "${EST_TOKENS:-0}" -gt "$MAX_ADD_DIR_TOKENS" ]; then
@@ -593,7 +593,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   fi
 done
 
-# === Фильтрация через Python fnmatch + PII sanity-check ===
+# === Filtering via Python fnmatch + PII sanity-check ===
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   CLEAN_DIR="$TMP_ROOT/$(basename "$ADD_DIR")"
@@ -614,26 +614,26 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   FILTERED_DIRS+=("--add-dir" "$CLEAN_DIR")
 done
 
-# === Content-filter guard (WP-394 Ф3.2; дизайн Kimi, реализация+правки Claude) ===
-# Переформулирует слова-маркеры чувствительных данных в промпте ДО подачи в Moonshot,
-# чтобы defensive content policy не давала ложный block (HTTP 400 high risk) на
-# легитимных peer-сессиях про auth/secrets. См. memory/lessons_kimi_content_filter.md.
-# Map optional: отсутствует/пуст → identity passthrough (zero overhead).
-# Byte-exact: промпт пишется в файл (в TMP_ROOT, уже под trap) и подаётся редиректом.
-# no-op режим сохраняет stdin байт-в-байт, включая trailing newlines
-# (фикс регрессии $(cat), которая их срезала — cold-review Kimi, ход 3).
+# === Content-filter guard (WP-394 Phase 3.2; design by Kimi, implementation+edits by Claude) ===
+# Rephrases marker words of sensitive data in the prompt BEFORE sending to Moonshot,
+# so the defensive content policy does not give a false block (HTTP 400 high risk) on
+# legitimate peer sessions about auth/secrets. See memory/lessons_kimi_content_filter.md.
+# Map optional: missing/empty → identity passthrough (zero overhead).
+# Byte-exact: the prompt is written to a file (in TMP_ROOT, already under trap) and fed by redirect.
+# no-op mode preserves stdin byte for byte, including trailing newlines
+# (fix for the $(cat) regression that stripped them — cold-review Kimi, turn 3).
 PROMPT_FILE="$TMP_ROOT/peer-prompt.in"
 cat > "$PROMPT_FILE"
 
-# === Session-state diff (WP-383 peer-session 2026-06-04-35; дизайн Claude, ревью Kimi) ===
-# Системно закрывает statefulness-пробел: Kimi не видит правок кода, сделанных писателем
-# в текущей сессии (через --add-dir идёт только markdown-журнал). Адаптер сам собирает
-# git diff HEAD затронутых репо и подклеивает в начало промпта.
-# Opt-in via IWE_PEER_DIFF=1 (решение пилота: opt-in = "пилот должен помнить"); size-guard 60KB soft.
-# Репо: env IWE_PEER_DIFF_REPOS (CSV) ИЛИ git-root первой --add-dir; null git-root → skip.
+# === Session-state diff (WP-383 peer-session 2026-06-04-35; design by Claude, review by Kimi) ===
+# Systematically closes the statefulness gap: Kimi does not see code edits made by the writer
+# in the current session (only the markdown journal goes through --add-dir). The adapter itself collects
+# git diff HEAD of the affected repos and prepends it to the prompt.
+# Opt-in via IWE_PEER_DIFF=1 (pilot decision: opt-in = "the pilot must remember"); size-guard 60KB soft.
+# Repos: env IWE_PEER_DIFF_REPOS (CSV) OR the git-root of the first --add-dir; null git-root → skip.
 if [ "${IWE_PEER_DIFF:-0}" = "1" ]; then
   DIFF_SOFT_LIMIT="${IWE_PEER_DIFF_LIMIT:-61440}"   # 60 KB
-  DIFF_PARTIAL="${IWE_PEER_DIFF_PARTIAL:-30720}"    # 30 KB при усечении
+  DIFF_PARTIAL="${IWE_PEER_DIFF_PARTIAL:-30720}"    # 30 KB on truncation
   DIFF_REPOS=()
   if [ -n "${IWE_PEER_DIFF_REPOS:-}" ]; then
     IFS=',' read -ra DIFF_REPOS <<< "$IWE_PEER_DIFF_REPOS"
@@ -711,11 +711,11 @@ if [ -f "$CONTENT_FILTER_MAP" ] && [ -s "$CONTENT_FILTER_MAP" ]; then
      && [ -s "$PROMPT_FILE.filtered" ]; then
     PROMPT_FILE="$PROMPT_FILE.filtered"
   fi
-  # ошибка/пустой вывод Python → остаётся исходный $PROMPT_FILE (fallback)
+  # Python error/empty output → the original $PROMPT_FILE remains (fallback)
 fi
 
-# === Sanitize surrogate characters before Kimi call (WP-395 Ф3) ===
-# Lazy-check: только если файл содержит surrogates, иначе zero overhead.
+# === Sanitize surrogate characters before Kimi call (WP-395 Phase 3) ===
+# Lazy-check: only if the file contains surrogates, otherwise zero overhead.
 if python3 - "$PROMPT_FILE" << 'PYEOF'
 import sys
 try:
@@ -739,7 +739,7 @@ PYEOF
     PROMPT_FILE="$PROMPT_FILE.clean"
 fi
 
-# === Inline session files into prompt (WP-395 Ф3 performance fix) ===
+# === Inline session files into prompt (WP-395 Phase 3 performance fix) ===
 # --add-dir causes Kimi CLI to index/analyze files, taking 5+ minutes.
 # Instead, include file contents inline in the prompt — reduces time to ~10s.
 # Kimi peer calls are text-only by contract: the model receives a filtered text
@@ -769,11 +769,11 @@ if [ ${#FILTERED_DIRS[@]} -ge 2 ]; then
   PROMPT_FILE="$INLINE_FILES"
 fi
 
-# === РП-395 Ф3 fail-safe: статус kimi=peer-session на время прогона (backgrounded, best-effort) ===
-# task = имя session-dir из --add-dir (информативно в dashboard); fallback — generic
-# WP-398 Ф2: session_id = имя session-dir (реальный id peer-сессии), не 'default'.
-# Fallback: если --add-dir не передан, используем PPID родителя вместо generic имени,
-# чтобы избежать коллизии lock'ов между независимыми вызовами без --add-dir.
+# === WP-395 Phase 3 fail-safe: status kimi=peer-session for the duration of the run (backgrounded, best-effort) ===
+# task = session-dir name from --add-dir (informational in the dashboard); fallback — generic
+# WP-398 Phase 2: session_id = session-dir name (the real peer-session id), not 'default'.
+# Fallback: if --add-dir is not passed, use the parent's PPID instead of a generic name,
+# to avoid lock collisions between independent calls without --add-dir.
 KIMI_TASK="$(basename "${ADD_DIRS[0]:-}" 2>/dev/null)"
 if [ -z "$KIMI_TASK" ]; then
   KIMI_TASK="kimi-peer-ppid-${PPID:-$$}"
@@ -2500,7 +2500,7 @@ PY
   return 1
 }
 
-# Cleanup: удалить lock + перевести статус в idle при любом выходе
+# Cleanup: remove the lock + set the status to idle on any exit
 CLEANUP_PEER_STARTED=false
 cleanup_peer() {
   local hb_reap_guard
@@ -2553,7 +2553,7 @@ if [ -x "$_IWE_ARS" ]; then
     </dev/null >/dev/null 2>&1 9>&- &
 fi
 
-# === Запуск Kimi with process-group deadline ===
+# === Run Kimi with process-group deadline ===
 # `perl alarm; exec` used to signal only the CLI launcher.  If Kimi had spawned
 # an MCP/tool child, the child could survive and hold the writer indefinitely.
 # The supervisor below starts the CLI in its own session and terminates that
@@ -2708,7 +2708,7 @@ if ! acquire_oauth_lock; then
       echo "ERROR: OAuth lineage v4 cutover is required. Disable and drain every legacy Kimi launcher, then run with --cutover-oauth-lineage-v4 and IWE_OAUTH_CUTOVER_QUIESCED=1." >&2
       ;;
     oauth-v5-attrlist-unavailable:*)
-      # WP-484 Ф181 v5: distinct from a missing/invalid fence -- the
+      # WP-484 Phase 181 v5: distinct from a missing/invalid fence -- the
       # macOS volume-identity syscall itself failed, so no amount of
       # re-running --cutover-oauth-lineage-v4 will fix this on its own.
       echo "ERROR: $LOCK_FAILURE_TEXT -- macOS volume-identity API (fgetattrlist) failed; the OAuth fence cannot be verified without it on this filesystem/host." >&2
@@ -2879,7 +2879,7 @@ if [ "$PERL_EXIT" -ne 0 ]; then
   exit 1
 fi
 
-# Empty output guard — writer-сторона должна отличать "Kimi не ответил" от "Kimi ответил пусто"
+# Empty output guard — the writer side must distinguish "Kimi did not respond" from "Kimi responded empty"
 if [ -z "$KIMI_OUTPUT" ]; then
   echo "ERROR: kimi returned empty output (network/auth/quota?)" >&2
   if [ -s "$KIMI_STDERR" ]; then
@@ -2901,7 +2901,7 @@ if [ "${IWE_HINDSIGHT_RETAIN:-}" = "1" ] && [ -n "$KIMI_OUTPUT" ] && [ -f "$HIND
   } &
 fi
 
-# === WP-454 Ф3: write to agent-sessions journal (best-effort, non-blocking) ===
+# === WP-454 Phase 3: write to agent-sessions journal (best-effort, non-blocking) ===
 # Writes one entry per adapter call. Caller groups by session_id on read.
 # Security: only timestamps and duration written — no content from KIMI_OUTPUT.
 {
@@ -2941,16 +2941,16 @@ with open(path, "a", encoding="utf-8") as f:
 PYEOF
 } 2>/dev/null &
 
-# WP-516 Ф5 (§0в.1): stdout обязан начинаться с frontmatter; ответ без
-# frontmatter = нарушение формата → exit 1 с диагностикой.
-# Проверка — для peer-реплик turn-loop. Служебные вызовы писателя
-# (review/verify/synth), чей вывод — НЕ peer-реплика, отключают её
-# через IWE_PEER_PLAIN=1 (слой IWE-интеграции, §0в.1).
+# WP-516 Phase 5 (§0в.1): stdout must begin with frontmatter; a response without
+# frontmatter = format violation → exit 1 with diagnostics.
+# The check is for turn-loop peer replies. The writer's service calls
+# (review/verify/synth), whose output is NOT a peer reply, disable it
+# via IWE_PEER_PLAIN=1 (IWE integration layer, §0в.1).
 if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   peer_adapter_check_frontmatter "$KIMI_OUTPUT"
   peer_adapter_check_language "$KIMI_OUTPUT"
   peer_adapter_check_style "kimi" "$KIMI_OUTPUT"
 fi
 
-# cleanup_peer() через trap переведёт статус в idle и удалит lock
+# cleanup_peer() via trap will set the status to idle and remove the lock
 echo "$KIMI_OUTPUT"

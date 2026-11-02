@@ -1,9 +1,9 @@
 #!/bin/bash
 # day-open-hooks.sh — shared bash-block extraction/execution for
-# extensions/day-open.<hook>*.md (WP-529 Ф11).
+# extensions/day-open.<hook>*.md (WP-529 Phase 11).
 #
 # Same mechanism day-open-checks-runner.sh already uses for "checks" (WP-7
-# Ф-DayOpen-Enforcement DOE2): each ```bash``` fenced block in a matching
+# Phase DayOpen-Enforcement DOE2): each ```bash``` fenced block in a matching
 # extensions/ markdown file is extracted and eval'd directly, no LLM involved.
 # That is the point — day-open-pipeline.sh runs unattended under launchd/cron,
 # where no LLM is present to read a Markdown instruction the way day-close's

@@ -1,19 +1,19 @@
 #!/bin/bash
 # resolve_target_repo.sh
-# OwnerIntegrity: определение целевого репо для capture-записи.
+# OwnerIntegrity: determining the target repo for a capture record.
 #
-# Цепочка:
-#   1. Явный hint (аргумент --hint=PATH или переменная TARGET_REPO_HINT)
-#   2. Абсолютный file_path из tool_input — найти git-корень выше
-#   3. cwd, если внутри ~/IWE/*/ — взять первый сегмент
-#   4. НЕТ FALLBACK. Возврат 1 + reason на stderr.
+# Chain:
+#   1. Explicit hint (argument --hint=PATH or variable TARGET_REPO_HINT)
+#   2. Absolute file_path from tool_input — find the git root above it
+#   3. cwd, if inside ~/IWE/*/ — take the first segment
+#   4. NO FALLBACK. Return 1 + reason on stderr.
 #
 # Usage:
 #   resolve_target_repo --hint=<path> --file=<path> --cwd=<path>
 # Stdout:
-#   абсолютный путь к целевому репо (успех)
+#   absolute path to the target repo (success)
 # Stderr:
-#   reason при неуспехе
+#   reason on failure
 # Exit:
 #   0 — success
 #   1 — unresolved
@@ -38,10 +38,10 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/iwe-env-bootstrap.sh" || exit 1
 
 normalize() {
-  # Принимает путь, возвращает абсолютный без trailing slash
+  # Accepts a path, returns an absolute one without a trailing slash
   local p="$1"
   [ -z "$p" ] && return 1
-  # Если путь существует — realpath. Если нет — простое сокращение ~
+  # If the path exists — realpath. If not — a simple ~ abbreviation
   if [ -e "$p" ]; then
     realpath "$p" 2>/dev/null || echo "$p"
   else
@@ -49,7 +49,7 @@ normalize() {
   fi
 }
 
-# Шаг 1. Явный hint
+# Step 1. Explicit hint
 if [ -n "$HINT" ]; then
   RESOLVED=$(normalize "$HINT")
   if [ -d "$RESOLVED" ]; then
@@ -60,7 +60,7 @@ if [ -n "$HINT" ]; then
   exit 1
 fi
 
-# Шаг 2. file_path → git root (директория должна существовать, файл может быть new)
+# Step 2. file_path → git root (the directory must exist, the file may be new)
 if [ -n "$FILE" ]; then
   FILE_ABS=$(normalize "$FILE")
   DIR=$(dirname "$FILE_ABS")
@@ -73,7 +73,7 @@ if [ -n "$FILE" ]; then
   fi
 fi
 
-# Шаг 3. cwd внутри ~/IWE/*/
+# Step 3. cwd inside ~/IWE/*/
 if [ -n "$CWD" ]; then
   CWD_ABS=$(normalize "$CWD")
   if [[ "$CWD_ABS" == "$IWE_ROOT"/* ]]; then

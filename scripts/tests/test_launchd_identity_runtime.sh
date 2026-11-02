@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WP-5 Ф43: launchd provides a minimal environment, so USER and LOGNAME must
+# WP-5 Phase 43: launchd provides a minimal environment, so USER and LOGNAME must
 # be rendered from explicit runtime configuration in every shipped job.
 # Issue #527 additionally pins Synchronizer lifecycle and Strategist outcomes.
 set -euo pipefail
@@ -57,7 +57,7 @@ for rel in "${PLISTS[@]}"; do
     [ -f "$plist" ] || { echo "FAIL: missing rendered plist $rel" >&2; exit 1; }
     assert_plist_identity "$plist" USER runtime-test-user
     assert_plist_identity "$plist" LOGNAME runtime-test-user
-    # WP-529 Ф94 (peer-session 2026-09-08-32): every scheduled agent job reads
+    # WP-529 Phase 94 (peer-session 2026-09-08-32): every scheduled agent job reads
     # IWE_SCRIPTS (day-open-pipeline.sh lookup, extractor, ~10 other scripts).
     # It was never in a shipped plist, so this asserts the key itself is
     # present — the class of defect the substitution engine's own
@@ -66,7 +66,7 @@ for rel in "${PLISTS[@]}"; do
     assert_plist_identity "$plist" IWE_SCRIPTS "$ROOT/scripts"
     if [ "$rel" = "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist" ] || \
        [ "$rel" = "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist" ]; then
-        # WP-529 Ф94: scheduler.plist ended at IWE_RUNTIME and never passed
+        # WP-529 Phase 94: scheduler.plist ended at IWE_RUNTIME and never passed
         # IWE_GOVERNANCE_REPO, though it execs strategist.sh as a child
         # process that reads it (strategist.sh:59).
         assert_plist_identity "$plist" IWE_GOVERNANCE_REPO DS-strategy
@@ -81,7 +81,7 @@ for rel in "${PLISTS[@]}"; do
     fi
 done
 
-# WP-529 Ф94: the Linux equivalent of these 4 launchd jobs is a matching
+# WP-529 Phase 94: the Linux equivalent of these 4 launchd jobs is a matching
 # systemd unit per role (build-runtime.sh substitutes both regardless of
 # host OS — it's plain text substitution). Same defect class, same fix,
 # needed its own assertion: nothing here was covering .service files at all.

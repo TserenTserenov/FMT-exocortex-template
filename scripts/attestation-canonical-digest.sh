@@ -1,5 +1,5 @@
 #!/bin/bash
-# attestation-canonical-digest.sh — WP-529 Ф21 canonical digest for red-team attestation.
+# attestation-canonical-digest.sh — WP-529 Phase 21 canonical digest for red-team attestation.
 #
 # Computes a deterministic digest over every tracked file in a commit's
 # tree. Used by both the untrusted compute job (diagnostic only) and the

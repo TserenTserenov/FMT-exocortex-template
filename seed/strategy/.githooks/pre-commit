@@ -33,10 +33,10 @@ fi
 "$SECRET_SCANNER" || exit 1
 
 # === Protocol artifacts (issue #544): staged-semantics validation ===
-# Настоящий pre-commit видит реальный индекс после любой формы git add
-# (слитные `git add && git commit`, маски, -A/-u) — PreToolUse-перехватчик
-# protocol-artifact-validate.sh остаётся ранним слоем быстрой обратной связи,
-# эта граница — корректностная. Читает staged blob, не рабочее дерево.
+# A real pre-commit sees the actual index after any form of git add
+# (chained `git add && git commit`, globs, -A/-u) — the PreToolUse interceptor
+# protocol-artifact-validate.sh stays an early fast-feedback layer,
+# this boundary is the correctness one. Reads the staged blob, not the working tree.
 HOOK_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 VALIDATOR=""
 VALIDATOR_MODE=""
@@ -47,14 +47,14 @@ elif [ -f "$HOOK_REPO_ROOT/../FMT-exocortex-template/scripts/validate-staged-art
     VALIDATOR="$HOOK_REPO_ROOT/../FMT-exocortex-template/scripts/validate-staged-artifacts.sh"
     VALIDATOR_MODE="template"
 elif [ -f "$HOOK_REPO_ROOT/scripts/validate-staged-artifacts.sh" ]; then
-    # Деградированный режим: исполняется версия из рабочего дерева, а не из
-    # индекса/шаблона — локальная правка валидатора влияет на саму проверку.
+    # Degraded mode: the version from the working tree is executed, not from the
+    # index/template — a local edit of the validator affects the check itself.
     VALIDATOR="$HOOK_REPO_ROOT/scripts/validate-staged-artifacts.sh"
     VALIDATOR_MODE="degraded-repo-local"
 fi
 if [ -z "$VALIDATOR" ]; then
-    # Не блокируем: на свежей установке до первого /iwe-update валидатора может
-    # ещё не быть. Отсутствие границы обязано быть видимым, не тихим.
+    # Do not block: on a fresh install the validator may not exist yet before the first /iwe-update.
+    # The absence of the boundary must be visible, not silent.
     echo "WARN: validate-staged-artifacts.sh не найден — протокольные артефакты коммитятся без staged-проверки (обновите шаблон: /iwe-update)" >&2
 else
     [ "$VALIDATOR_MODE" = "degraded-repo-local" ] && \

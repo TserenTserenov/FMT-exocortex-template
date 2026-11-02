@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# script-promote.sh — промоция личного скрипта (или всех общих скриптов) в платформенный шаблон IWE
+# script-promote.sh -- promotion of a personal script (or all shared scripts) into the IWE platform template
 #
-# Поток: личная папка/<script> → подстановки → FMT/scripts/<script>
-# Личные константы заменяются на параметры среды (env vars).
+# Flow: personal folder/<script> → substitutions → FMT/scripts/<script>
+# Personal constants are replaced with environment parameters (env vars).
 #
-# Использование:
-#   bash script-promote.sh <путь-к-скрипту> [--dry-run] [--force]
+# Usage:
+#   bash script-promote.sh <path-to-script> [--dry-run] [--force]
 #   bash script-promote.sh --all [--dry-run] [--force]
 #
-# Примеры:
+# Examples:
 #   bash script-promote.sh ~/IWE/DS-strategy/scripts/my-tool.sh --dry-run
 #   bash script-promote.sh ~/IWE/DS-strategy/scripts/my-tool.sh
 #   bash script-promote.sh ~/IWE/DS-strategy/scripts/my-tool.sh --force
 #   bash script-promote.sh --all
 #
-# --force: пропустить guard сравнения с FMT HEAD (если FMT отличается намеренно)
-# --all: пройти по всем scripts/*.sh|*.py, общим для личной копии и FMT — без --force
-#        каждый диверзировавший файл ПРОПУСКАЕТСЯ (не блокирует остальные), см. WP-485:
-#        ручное копирование в обход этого guard уже стирало фиксы, сделанные прямо в FMT
-#        (issue #220/#259, коммит 238a5c1) — --all существует, чтобы массовая
-#        синхронизация впредь шла через тот же guard, что и промоция одного файла.
+# --force: skip the guard comparison with FMT HEAD (if FMT differs intentionally)
+# --all: walk all scripts/*.sh|*.py shared by the personal copy and FMT -- without --force
+#        each diverged file is SKIPPED (does not block the others), see WP-485:
+#        manual copying bypassing this guard has already wiped out fixes made directly in FMT
+#        (issue #220/#259, commit 238a5c1) -- --all exists so that bulk
+#        synchronization henceforth goes through the same guard as promoting a single file.
 
 set -uo pipefail
 
@@ -52,8 +52,8 @@ if ! $batch_all && [[ -z "$SRC" || ! -f "$SRC" ]]; then
     exit 1
 fi
 
-# promote_one SRC — промотирует один файл. Возврат: 0 промотирован/эквивалентен,
-# 2 пропущен guard'ом (FMT ушёл вперёд), 1 прочая ошибка (валидация/smoke-test).
+# promote_one SRC -- promotes one file. Returns: 0 promoted/equivalent,
+# 2 skipped by the guard (FMT moved ahead), 1 other error (validation/smoke-test).
 promote_one() {
     local src="$1" fname dest result head_version tmp_dir tmp_file smoke_result
     fname=$(basename "$src")
@@ -64,20 +64,20 @@ promote_one() {
     echo "   Куда:   $dest"
     echo ""
 
-    # Подстановки: личные константы → параметры среды
-    # Порядок важен: сначала длинный путь ($HOME/IWE), потом короткий ($HOME)
+    # Substitutions: personal constants → environment parameters
+    # Order matters: first the long path ($HOME/IWE), then the short one ($HOME)
     result=$(sed \
         -e "s|$HOME/IWE|\${IWE:-\$HOME/IWE}|g" \
         -e "s|$HOME|\$HOME|g" \
         -e "s|$GOV_REPO_AUTHOR|\${IWE_GOVERNANCE_REPO:-$GOV_REPO_TMPL}|g" \
         "$src")
 
-    # Guard: FMT HEAD содержит более свежую версию? Проверяется и в --dry-run —
-    # иначе `--all --dry-run` рапортует «всё промотируется», хотя часть файлов
-    # разошлась и реальный прогон их пропустит (WP-485).
-    # Сравниваем $result (после подстановок) с HEAD:scripts/$fname — не с working tree.
-    # Цель: поймать случай когда runtime-копия stale и перетирает фиксы, уже залитые в FMT.
-    # Новый файл (нет в HEAD) → guard молчит. FMT не git-репо → guard молчит.
+    # Guard: does FMT HEAD contain a newer version? Also checked in --dry-run --
+    # otherwise `--all --dry-run` reports "everything gets promoted", although some files
+    # diverged and the real run will skip them (WP-485).
+    # Compare $result (after substitutions) with HEAD:scripts/$fname -- not with the working tree.
+    # Goal: catch the case when the runtime copy is stale and overwrites fixes already pushed to FMT.
+    # New file (not in HEAD) → guard is silent. FMT is not a git repo → guard is silent.
     if ! $force && git -C "$FMT_DIR" rev-parse HEAD >/dev/null 2>&1; then
         head_version=$(git -C "$FMT_DIR" show "HEAD:scripts/$fname" 2>/dev/null || true)
         if [[ -n "$head_version" ]]; then
@@ -105,7 +105,7 @@ promote_one() {
         return 0
     fi
 
-    # Валидация результата через временный файл
+    # Validate the result via a temporary file
     tmp_dir=$(mktemp -d)
     tmp_file="$tmp_dir/$fname"
     printf '%s\n' "$result" > "$tmp_file"
@@ -121,12 +121,12 @@ promote_one() {
         fi
     fi
 
-    # Smoke-тест: запустить в изолированном env с шаблонными переменными
-    # Цель: убедиться что скрипт не падает с exit 1 при чужом окружении
-    # Используем --help или пустой запуск — ожидаем exit 0 или exit 1 только от validation
-    # 5s alarm (perl, портативно — тот же приём, что в kimi-peer-adapter.sh): демон-скрипты
-    # (while true; do ...; done без обработки --help) иначе висят здесь бесконечно —
-    # нашлось на kimi-session-watchdog.sh, script-promote.sh завис на смоук-тесте.
+    # Smoke test: run in an isolated env with template variables
+    # Goal: make sure the script does not fail with exit 1 in a foreign environment
+    # We use --help or an empty run -- we expect exit 0 or exit 1 only from validation
+    # 5s alarm (perl, portable -- the same trick as in kimi-peer-adapter.sh): daemon scripts
+    # (while true; do ...; done without --help handling) otherwise hang here forever --
+    # found on kimi-session-watchdog.sh, script-promote.sh hung on the smoke test.
     echo "   smoke-test с шаблонным окружением..."
     smoke_result=0
     # PATH inherited from the caller's own environment, not a hardcoded macOS list
@@ -143,10 +143,10 @@ promote_one() {
         PATH="$PATH" \
         perl -e 'alarm 5; exec @ARGV' -- bash "$tmp_file" --help > /dev/null 2>&1 || smoke_result=$?
 
-    # exit 0 = OK, exit 1 = validation error (приемлемо — скрипт без аргументов)
-    # exit 127 = команда не найдена (зависимость сломана) — блокер
-    # exit 142 = SIGALRM (perl alarm) — скрипт не завершился за 5с, похоже на демон
-    # с циклом while true; это не баг зависимости, просто пропускаем дальше.
+    # exit 0 = OK, exit 1 = validation error (acceptable -- the script without arguments)
+    # exit 127 = command not found (dependency broken) -- blocker
+    # exit 142 = SIGALRM (perl alarm) — the script did not finish in 5s, looks like a daemon
+    # with a while true loop; this is not a dependency bug, just skip it.
     if [[ $smoke_result -eq 127 ]]; then
         rm -rf "$tmp_dir"
         echo "❌ Smoke-тест: exit 127 — скрипт не может запуститься в чужом окружении." >&2
@@ -159,7 +159,7 @@ promote_one() {
         echo "   smoke-test: OK (exit $smoke_result)"
     fi
 
-    # Скопировать в FMT
+    # Copy to FMT
     cp "$tmp_file" "$dest"
     chmod +x "$dest"
     rm -rf "$tmp_dir"
@@ -187,7 +187,7 @@ if $batch_all; then
     for f in "$IWE"/scripts/*.sh "$IWE"/scripts/*.py; do
         [[ -f "$f" ]] || continue
         fname=$(basename "$f")
-        [[ -f "$FMT_DIR/scripts/$fname" ]] || continue  # только общие файлы — новые сюда не добавляем автоматом
+        [[ -f "$FMT_DIR/scripts/$fname" ]] || continue  # only shared files — do not add new ones here automatically
         total=$((total + 1))
         promote_one "$f"; rc=$?
         case "$rc" in

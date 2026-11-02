@@ -1,23 +1,23 @@
 #!/bin/bash
-# claude-hook: false — библиотека-диспетчер для event-specific wrappers и тестов
-# rule-engine.sh — единый диспатчер правил агента (WP-272 Ф1)
+# claude-hook: false — dispatcher library for event-specific wrappers and tests
+# rule-engine.sh — single dispatcher of agent rules (WP-272 Phase 1)
 #
-# Входы (env vars):
-#   RULE_EVENT — событие триггер (task_received, wp_create_attempt, response_emitted, ...)
-#   RULE_CONTEXT — JSON-контекст события (response, file_path, command, ...)
+# Inputs (env vars):
+#   RULE_EVENT — trigger event (task_received, wp_create_attempt, response_emitted, ...)
+#   RULE_CONTEXT — JSON event context (response, file_path, command, ...)
 #
-# Выход (stdout JSON):
+# Output (stdout JSON):
 #   {"verdict": "block|warn|ok", "rule_id": "AR.NNN", "reason": "...", "applied_rules": [...]}
 #
-# Использование (как hook): event-specific обёртки делают source этого файла и вызывают
-# dispatch_event. Прямой запуск тоже доступен — для тестов.
+# Usage (as a hook): event-specific wrappers source this file and call
+# dispatch_event. Direct invocation is also available — for tests.
 #
 # CLI exit codes: dispatch/list-rules/session-summary/session-clear/test — 0.
 # check-trace-satisfaction|list-gates|mark-gate — 3 (NOT_IMPLEMENTED, issue #678:
-# protocol-close.md ссылается на них, механика ещё не реализована). Неизвестная
-# подкоманда — 1 (usage).
+# protocol-close.md references them, the mechanics are not implemented yet). An unknown
+# subcommand — 1 (usage).
 #
-# REGISTRY: ~/IWE/.claude/rules-registry.yaml (генерируется из PACK-agent-rules/)
+# REGISTRY: ~/IWE/.claude/rules-registry.yaml (generated from PACK-agent-rules/)
 
 set -uo pipefail
 umask 077
@@ -27,13 +27,13 @@ JOURNAL_DIR="${RULE_JOURNAL_DIR:-$HOME/logs/rule-engine}"
 mkdir -p "$JOURNAL_DIR"
 JOURNAL_FILE="$JOURNAL_DIR/$(date +%Y-%m-%d).jsonl"
 
-# Session-state: per-session warn/block log (WP-272 Ф5)
+# Session-state: per-session warn/block log (WP-272 Phase 5)
 SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 SESSION_STATE_DIR="$HOME/.claude/state"
 mkdir -p "$SESSION_STATE_DIR" 2>/dev/null || true
 SESSION_WARN_LOG="$SESSION_STATE_DIR/session-${SESSION_ID}-warns.jsonl"
 
-# === Утилиты ===
+# === Utilities ===
 
 log_journal() {
     local rule_id="$1" verdict="$2" reason="$3"
@@ -62,7 +62,7 @@ except Exception:
     print(json.dumps({"content_redacted": True, "context_parse_error": True}))
 ' 2>/dev/null) || ctx='{"content_redacted":true,"context_parse_error":true}'
     fi
-    # WP-272 Ф1 fix (R23 audit #4): ensure_ascii=False для читаемости в логах
+    # WP-272 Phase 1 fix (R23 audit #4): ensure_ascii=False for readable logs
     printf '{"ts":"%s","event":"%s","rule":"%s","verdict":"%s","reason":%s,"context":%s}\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         "${RULE_EVENT:-unknown}" \
@@ -76,7 +76,7 @@ except Exception:
 emit_verdict() {
     local verdict="$1" rule_id="$2" reason="$3"
     log_journal "$rule_id" "$verdict" "$reason"
-    # Session-state: сохранить warn/block в per-session лог для summary при Close (WP-272 Ф5)
+    # Session-state: save warn/block to the per-session log for the summary at Close (WP-272 Phase 5)
     if [ "$verdict" = "warn" ] || [ "$verdict" = "block" ]; then
         printf '{"ts":"%s","event":"%s","rule":"%s","verdict":"%s","reason":%s}\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -92,8 +92,8 @@ emit_verdict() {
         "$(printf '%s' "$reason" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read(), ensure_ascii=False))')"
 }
 
-# === Загрузка реестра ===
-# Парсим YAML через python (yaml stdlib не имеет в bash)
+# === Registry loading ===
+# Parse YAML via python (bash has no stdlib yaml)
 load_rules_for_event() {
     local event="$1"
     if [ ! -f "$REGISTRY" ]; then
@@ -119,16 +119,16 @@ print(json.dumps(matches))
 PYEOF
 }
 
-# === Чек-функции для конкретных правил ===
-# Каждое правило AR.NNN имеет свой check_<name>. Вызывается диспатчером.
+# === Check functions for specific rules ===
+# Each AR.NNN rule has its own check_<name>. Called by the dispatcher.
 
 check_wp_gate() {
-    # AR.001: проверить, есть ли согласие пользователя на новый РП
-    # RULE_CONTEXT может содержать {"file_path": "inbox/WP-NNN-*.md", "wp_number": N, "user_consent": bool}
+    # AR.001: check whether the user consented to a new WP
+    # RULE_CONTEXT may contain {"file_path": "inbox/WP-NNN-*.md", "wp_number": N, "user_consent": bool}
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local consent
-    # WP-272 Ф1 fix (R23 audit #1): try/except — невалидный JSON не должен ронять traceback
+    # WP-272 Phase 1 fix (R23 audit #1): try/except — invalid JSON must not crash with a traceback
     consent=$(echo "$ctx" | python3 -c '
 import sys, json
 try:
@@ -147,19 +147,19 @@ except (json.JSONDecodeError, ValueError):
 }
 
 check_autonomy() {
-    # AR.002: проверить, содержит ли ответ агента yes/no запрос подтверждения
+    # AR.002: check whether the agent response contains a yes/no confirmation request
     # RULE_CONTEXT: {"response_text": "..."}
     local resp
     resp=$(echo "${RULE_CONTEXT:-}" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("response_text", ""))' 2>/dev/null)
 
-    # Простая regex-проверка (Ф1). В Ф2 заменится на Haiku R23 классификатор.
-    # Сначала проверяем choice-question (исключение) — раньше чем yes/no
+    # Simple regex check (Phase 1). In Phase 2 it will be replaced by a Haiku R23 classifier.
+    # First check for a choice-question (exception) — before yes/no
     if echo "$resp" | grep -qE 'или\s+[А-Яа-яA-Za-z0-9]+\?'; then
         emit_verdict "ok" "AR.002" "exception: choice_question detected"
         return
     fi
 
-    # Yes/no запрос подтверждения
+    # Yes/no confirmation request
     if echo "$resp" | grep -qE 'ОК\?|применить\?|продолжить\?|записать\?|хотите\?|добавить\?|подтвер|Согласовываем'; then
         emit_verdict "warn" "AR.002" "yes/no запрос подтверждения обнаружен — проверить exceptions (wp_gate_ritual, choice_question, quoted_question_in_analysis)"
     else
@@ -168,18 +168,18 @@ check_autonomy() {
 }
 
 check_arch_gate() {
-    # AR.003: архитектурное решение → /archgate ПЕРЕД финализацией
+    # AR.003: architectural decision -> /archgate BEFORE finalization
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local file_path
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
 
-    # Создание нового Pack → ArchGate обязателен
+    # Creating a new Pack -> ArchGate is mandatory
     if echo "$file_path" | grep -qE '/PACK-[^/]+/(00-pack-manifest|pack-manifest)'; then
         emit_verdict "warn" "AR.003" "создание нового Pack — ArchGate обязателен ДО начала (CLAUDE.md §5). Запусти /archgate → ЭМОГССБ профиль"
         return
     fi
-    # new_system_creation (крупная система) → ArchGate обязателен
+    # new_system_creation (large system) -> ArchGate is mandatory
     local event="${RULE_EVENT:-}"
     if [[ "$event" == "new_system_creation" ]]; then
         local archgate_done
@@ -189,8 +189,8 @@ check_arch_gate() {
             return
         fi
     fi
-    # new_tool_creation — IntegrationGate (AR.013) достаточен, ArchGate только если сложная архитектура
-    # arch_decision_attempt — всегда проверяем
+    # new_tool_creation — IntegrationGate (AR.013) is sufficient, ArchGate only for complex architecture
+    # arch_decision_attempt — always check
     if [[ "$event" == "arch_decision_attempt" ]]; then
         emit_verdict "warn" "AR.003" "архитектурное решение — /archgate ПЕРЕД финализацией (CLAUDE.md §5)"
         return
@@ -199,8 +199,8 @@ check_arch_gate() {
 }
 
 check_push() {
-    # AR.004: «заливай»/«запуши» → commit + push без доп. вопросов
-    # Post-condition check (WP-295 Ф5): emits push-state JSON for journal
+    # AR.004: "заливай"/"запуши" -> commit + push without extra questions
+    # Post-condition check (WP-295 Phase 5): emits push-state JSON for journal
     emit_verdict "ok" "AR.004" "push trigger — proceed: commit + push без подтверждения"
     _check_pushed
 }
@@ -218,7 +218,7 @@ _safe_timeout() {
 }
 
 _check_repo_clean() {
-    # WP-295 Ф5: ${IWE_GOVERNANCE_REPO:-DS-strategy} has no uncommitted changes at Close time.
+    # WP-295 Phase 5: ${IWE_GOVERNANCE_REPO:-DS-strategy} has no uncommitted changes at Close time.
     # Does NOT verify a commit was made this session; scope limited to ${IWE_GOVERNANCE_REPO:-DS-strategy}
     # (home-repo excluded: always has in-progress work from other agents → warn-fatigue).
     local repo_dir="${RULE_REPO_DIR:-$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
@@ -235,7 +235,7 @@ _check_repo_clean() {
 }
 
 _check_orz_filled() {
-    # WP-295 Ф5: ORZ session file for today exists and has a non-empty # Главный инсайт section.
+    # WP-295 Phase 5: ORZ session file for today exists and has a non-empty # Главный инсайт section.
     local today month repo_dir sessions_dir orz_file
     today=$(date +%Y-%m-%d)
     month=$(date +%Y-%m)
@@ -254,7 +254,7 @@ _check_orz_filled() {
 }
 
 _check_pushed() {
-    # WP-295 Ф5: verifies ${IWE_GOVERNANCE_REPO:-DS-strategy} has no unpushed commits (all commits reached the remote).
+    # WP-295 Phase 5: verifies ${IWE_GOVERNANCE_REPO:-DS-strategy} has no unpushed commits (all commits reached the remote).
     local repo_dir="${RULE_REPO_DIR:-$HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
     local unpushed
     if ! unpushed=$(_safe_timeout 5 git -C "$repo_dir" log '@{u}..' --oneline 2>/dev/null); then
@@ -271,7 +271,7 @@ _check_pushed() {
 }
 
 _run_postconditions_for_close() {
-    # WP-295 Ф5: deterministic post-condition checks on Close event (on_fail: warn).
+    # WP-295 Phase 5: deterministic post-condition checks on Close event (on_fail: warn).
     local rc_result rc_verdict orz_result orz_verdict
 
     rc_result=$(_check_repo_clean)
@@ -290,7 +290,7 @@ _run_postconditions_for_close() {
 }
 
 check_close() {
-    # AR.005: Close-триггер → протокол закрытия
+    # AR.005: Close trigger -> close protocol
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local has_changes
@@ -300,7 +300,7 @@ check_close() {
         return
     fi
 
-    # WP-295 Ф5: post-condition checks (deterministic, on_fail: warn)
+    # WP-295 Phase 5: post-condition checks (deterministic, on_fail: warn)
     local pc_result pc_verdict pc_detail
     pc_result=$(_run_postconditions_for_close)
     pc_verdict=$(echo "$pc_result" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())["result"])' 2>/dev/null)
@@ -314,7 +314,7 @@ check_close() {
 }
 
 check_pull_on_touch() {
-    # AR.006: первая модификация репо → git pull --rebase
+    # AR.006: first modification of a repo -> git pull --rebase
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local repo pull_done
@@ -328,7 +328,7 @@ check_pull_on_touch() {
 }
 
 check_checklist_verification() {
-    # AR.007: Quick Close / Day Close → sub-agent Haiku R23 (если сессия ≥15 мин и есть изменения файлов)
+    # AR.007: Quick Close / Day Close -> sub-agent Haiku R23 (if session >=15 min and files changed)
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local verification_done files_changed
@@ -345,10 +345,10 @@ check_checklist_verification() {
     fi
 }
 
-# === AR.012-014, AR.101-106, AR.200-202: check-функции (WP-272 Ф5.4) ===
+# === AR.012-014, AR.101-106, AR.200-202: check functions (WP-272 Phase 5.4) ===
 
 check_priority_gate() {
-    # AR.012: РП с budget ≥ 3h → должен быть явный R{N}
+    # AR.012: WP with budget >= 3h -> must have an explicit R{N}
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local budget r_goal
@@ -357,7 +357,7 @@ check_priority_gate() {
     local verification_class
     verification_class=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("verification_class",""))' 2>/dev/null)
 
-    # open-loop всегда требует R{N}
+    # open-loop always requires R{N}
     local needs_r=false
     if python3 -c "import sys; exit(0 if float('$budget') >= 3 else 1)" 2>/dev/null; then
         needs_r=true
@@ -374,8 +374,8 @@ check_priority_gate() {
 }
 
 _classify_integration_phase() {
-    # Субагент-классификатор фазы IntegrationGate (AR.013).
-    # Принимает JSON-контекст как $1; возвращает JSON через integration-gate-classifier.py.
+    # Sub-agent classifier of the IntegrationGate phase (AR.013).
+    # Takes JSON context as $1; returns JSON via integration-gate-classifier.py.
     local classifier="$HOME/IWE/.claude/scripts/integration-gate-classifier.py"
     if [ ! -f "$classifier" ]; then
         # issue #895: this file was read as "almost-working machinery" — the
@@ -395,8 +395,8 @@ _classify_integration_phase() {
 }
 
 check_integration_gate() {
-    # AR.013: создание нового инструмента/агента/системы → обещание → сценарии → роль → реализация.
-    # Использует _classify_integration_phase() — субагент-классификатор фазы (хэвристика без LLM).
+    # AR.013: creating a new tool/agent/system -> promise -> scenarios -> role -> implementation.
+    # Uses _classify_integration_phase() — phase classifier sub-agent (heuristic, no LLM).
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -404,18 +404,18 @@ check_integration_gate() {
     creation_type=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("creation_type",""))' 2>/dev/null)
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
 
-    # Быстрый путь: file_path — SC-артефакт (08-service-clauses) → правильная фаза, не warn
+    # Fast path: file_path is an SC artifact (08-service-clauses) -> correct phase, no warn
     if echo "$file_path" | grep -qE '08-service-clauses|DP\.SC\.[0-9]+'; then
         emit_verdict "ok" "AR.013" "IntegrationGate: файл = SC-артефакт (обещание-фаза) — последовательность соблюдена"
         return
     fi
-    # Быстрый путь: file_path — Role-артефакт (02-domain-entities/DP.ROLE) → правильная фаза
+    # Fast path: file_path is a Role artifact (02-domain-entities/DP.ROLE) -> correct phase
     if echo "$file_path" | grep -qE 'DP\.ROLE\.[0-9]+'; then
         emit_verdict "ok" "AR.013" "IntegrationGate: файл = Role-артефакт (роль-фаза) — последовательность соблюдена"
         return
     fi
 
-    # Запускаем классификатор фазы
+    # Run the phase classifier
     local phase_result
     phase_result=$(_classify_integration_phase "$ctx")
 
@@ -426,7 +426,7 @@ check_integration_gate() {
     local phase
     phase=$(echo "$phase_result" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("phase","unknown"))' 2>/dev/null)
 
-    # Классификатор определил фазу явно (не unknown) — доверяем его решению
+    # The classifier determined the phase explicitly (not unknown) — trust its decision
     if [ "$phase" != "unknown" ]; then
         if [ "$skip_detected" = "true" ] && [ -n "$missing_str" ]; then
             emit_verdict "warn" "AR.013" "IntegrationGate: создание нового ${creation_type:-инструмента/агента} — пропуск фазы impl без [${missing_str}]. Последовательность: обещание → сценарии → роль → реализация. Пропуск = P10 (DP.FM.010)"
@@ -436,7 +436,7 @@ check_integration_gate() {
         return
     fi
 
-    # Fallback: классификатор вернул phase=unknown → проверяем явные ссылки SC/Role в контексте
+    # Fallback: classifier returned phase=unknown -> check explicit SC/Role references in the context
     local sc_ref role_ref scenarios_defined
     sc_ref=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("sc_ref",""))' 2>/dev/null)
     role_ref=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("role_ref",""))' 2>/dev/null)
@@ -457,7 +457,7 @@ check_integration_gate() {
 }
 
 check_legacy_port_gate() {
-    # AR.014: замена legacy-компонента → сначала 15-мин субагент «как работает сейчас»
+    # AR.014: replacing a legacy component -> first a 15-min sub-agent "how it works now"
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local legacy_component subagent_done
@@ -472,14 +472,14 @@ check_legacy_port_gate() {
 }
 
 check_snapshot_before_action() {
-    # AR.101: миграция/DDL/bulk → snapshot ПЕРЕД действием
+    # AR.101: migration/DDL/bulk -> snapshot BEFORE the action
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local command snapshot_done
     command=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("command",""))' 2>/dev/null)
     snapshot_done=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("snapshot_done",False)).lower())' 2>/dev/null)
 
-    # Паттерны опасных операций
+    # Patterns of dangerous operations
     local is_dangerous=false
     if echo "$command" | grep -qiE '(ALTER TABLE|DROP TABLE|CREATE TABLE|TRUNCATE|DELETE FROM|UPDATE .* WHERE|INSERT INTO .* SELECT|COPY .* FROM|pg_restore|pg_dump.*restore|rm -rf|find .* -exec rm)'; then
         is_dangerous=true
@@ -495,7 +495,7 @@ check_snapshot_before_action() {
 }
 
 check_incident_diagnosis() {
-    # AR.102: инцидент → проверить ВСЕ backends ПЕРЕД гипотезами
+    # AR.102: incident -> check ALL backends BEFORE hypotheses
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local backends_checked hypothesis_count
@@ -514,7 +514,7 @@ check_incident_diagnosis() {
 }
 
 check_memory_drift() {
-    # AR.103: Day Close / Quick Close → обновить memory если есть Capture-маркеры
+    # AR.103: Day Close / Quick Close -> update memory if there are Capture markers
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local captures_pending memory_updated
@@ -529,7 +529,7 @@ check_memory_drift() {
 }
 
 check_systemic_review() {
-    # AR.104: «системный фикс» / «root cause» → независимый ревью ДО отчёта
+    # AR.104: "system fix" / "root cause" -> independent review BEFORE the report
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local response_text review_done
@@ -537,7 +537,7 @@ check_systemic_review() {
     review_done=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("independent_review_done",False)).lower())' 2>/dev/null)
 
     local claims_systemic=false
-    # WP-272 ревизия 2026-04-30: требуется маркер завершения; описание ("фикс закрывает X") без done-маркера не триггер
+    # WP-272 revision 2026-04-30: a completion marker is required; a description ("fix closes X") without a done-marker is not a trigger
     if echo "$response_text" | grep -qiE '(системный фикс|systemic fix|архитектурн.* решен|не костыль).*(done|готов|завершен|выполнен|закрыт|✅|DONE)'; then
         claims_systemic=true
     elif echo "$response_text" | grep -qiE '(root cause).*(done|готов|завершен|решён|устранён|fix.?complete)'; then
@@ -554,14 +554,14 @@ check_systemic_review() {
 }
 
 check_rebrand_e2e() {
-    # AR.106: изменение display identity → end-to-end retest в реальном клиенте
+    # AR.106: display identity change -> end-to-end retest in a real client
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local file_path retest_done
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
     retest_done=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("e2e_retest_done",False)).lower())' 2>/dev/null)
 
-    # Проверяем display identity паттерны в файле
+    # Check display identity patterns in the file
     local is_display_identity=false
     case "$file_path" in
         */serverInfo*|*/oauth_client*|*/tool_descriptions*|*index.ts|*/get_instructions*) is_display_identity=true ;;
@@ -580,7 +580,7 @@ check_rebrand_e2e() {
 }
 
 check_formal_vs_content() {
-    # AR.200: «DONE»/«выполнено» — реально ли отвечает на исходный вопрос?
+    # AR.200: "DONE"/"выполнено" — does it really answer the original question?
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local response_text
@@ -594,19 +594,19 @@ check_formal_vs_content() {
 }
 
 check_owner_integrity() {
-    # AR.201: один факт — одно место; дублирование Pack↔DS = ошибка
+    # AR.201: one fact — one place; Pack<->DS duplication = error
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local target_path source_type
     target_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("target_path",""))' 2>/dev/null)
     source_type=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("source_type",""))' 2>/dev/null)
 
-    # Доменное знание записывается в DS → нарушение
+    # Domain knowledge is written to DS -> violation
     if echo "$target_path" | grep -qE '/DS-[^/]+/' && [ "$source_type" = "domain_knowledge" ]; then
         emit_verdict "warn" "AR.201" "доменное знание записывается в DS-репо — domain knowledge → Pack (не DS). OwnerIntegrity: один факт = одно место (distinctions)"
         return
     fi
-    # Реализационное решение записывается в Pack → нарушение
+    # Implementation decision is written to Pack -> violation
     if echo "$target_path" | grep -qE '/PACK-[^/]+/' && [ "$source_type" = "implementation" ]; then
         if echo "$target_path" | grep -qiE '\.(sh|ts|py|js)$'; then
             emit_verdict "warn" "AR.201" "реализационный файл (.sh/.ts/.py) в Pack — implementation → DS, Pack только доменное (DP.KR.001 §5.2)"
@@ -617,15 +617,15 @@ check_owner_integrity() {
 }
 
 check_log_incident_state() {
-    # AR.202: лог / инцидент / state-file → правильное место
+    # AR.202: log / incident / state-file -> correct location
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
     local file_path
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
     [ -z "$file_path" ] && { emit_verdict "ok" "AR.202" "no file_path"; return; }
 
-    # Инциденты → правильное место если: (a) в /incidents/ поддиректории любого репо, или (b) в governance-репо
-    # WP-272 ревизия 2026-04-30: incidents/ в любом репо = корректное размещение (FP: DS-MCP/.../incidents/ → ok)
+    # Incidents -> correct location if: (a) in an /incidents/ subdirectory of any repo, or (b) in the governance repo
+    # WP-272 revision 2026-04-30: incidents/ in any repo = correct placement (FP: DS-MCP/.../incidents/ -> ok)
     if echo "$file_path" | grep -qiE '(incident|инцидент)'; then
         if echo "$file_path" | grep -qE '/incidents/'; then
             emit_verdict "ok" "AR.202" "инцидент-файл в /incidents/ директории — корректное размещение"
@@ -636,7 +636,7 @@ check_log_incident_state() {
             return
         fi
     fi
-    # State-файлы (*.json, *.state) в governance-репо → нарушение
+    # State files (*.json, *.state) in the governance repo -> violation
     if echo "$file_path" | grep -qE '\.(json|state)$'; then
         if echo "$file_path" | grep -qE '${IWE_GOVERNANCE_REPO:-DS-strategy}/' && ! echo "$file_path" | grep -qE '/(inbox|current|archive)/'; then
             emit_verdict "warn" "AR.202" "state-файл в governance-репо вне inbox/current/archive — state files рядом с исполнителем, не в strategy-хабе"
@@ -646,10 +646,10 @@ check_log_incident_state() {
     emit_verdict "ok" "AR.202" "log/incident/state routing OK"
 }
 
-# === WP-272 Ф5.1: реализованные check-функции (5 наиболее критичных) ===
+# === WP-272 Phase 5.1: implemented check functions (5 most critical) ===
 
 check_security_gate() {
-    # AR.011: PII / payment_credentials / secrets в file_path + content_snippet
+    # AR.011: PII / payment_credentials / secrets in file_path + content_snippet
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -657,13 +657,13 @@ check_security_gate() {
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
     content=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("content_snippet",""))' 2>/dev/null)
 
-    # Проверяем только если есть контент для анализа
+    # Check only if there is content to analyze
     if [ -z "$content" ] && [ -n "$file_path" ] && [ -f "$file_path" ]; then
         content=$(head -100 "$file_path" 2>/dev/null || true)
     fi
     [ -z "$content" ] && { emit_verdict "ok" "AR.011" "no content to analyze"; return; }
 
-    # Паттерны логирования PII (строки с logger/print/console.log + PII-термины)
+    # PII logging patterns (lines with logger/print/console.log + PII terms)
     if echo "$content" | grep -qiE '(logger|print|console\.log|logging\.)\.*.*telegram_id'; then
         emit_verdict "block" "AR.011" "PII в log statement: telegram_id обнаружен в logging-вызове — заменить на account_id"
         return
@@ -673,13 +673,13 @@ check_security_gate() {
         return
     fi
 
-    # payment_credentials в открытом виде (payment_method_id в любом контексте строго запрещено логировать)
+    # payment_credentials in plain text (logging payment_method_id in any context is strictly forbidden)
     if echo "$content" | grep -qiE '(logger|print|console\.log).*payment_method_id'; then
         emit_verdict "block" "AR.011" "payment_credentials в log statement: payment_method_id — запрещено даже маскированное логирование"
         return
     fi
 
-    # Secrets в git-tracked файлах (не в .env)
+    # Secrets in git-tracked files (not in .env)
     if echo "$file_path" | grep -qvE '\.(env|gitignore|example)$'; then
         if echo "$content" | grep -qiE '(sk_live_|pk_live_|napi_[a-zA-Z0-9]{30}|Authorization.*Bearer [a-zA-Z0-9+/]{20})'; then
             emit_verdict "block" "AR.011" "secret в tracked-файле: API ключ обнаружен вне .env/.gitignore — перенести в env vars"
@@ -687,7 +687,7 @@ check_security_gate() {
         fi
     fi
 
-    # API keys в не-.env файлах
+    # API keys in non-.env files
     if echo "$content" | grep -qiE '(password\s*=\s*["\x27][^"\x27]{8,})'; then
         if ! echo "$file_path" | grep -qE '\.(env|example|test|spec)'; then
             emit_verdict "warn" "AR.011" "hardcoded password обнаружен — проверь, не secret ли (перенести в env если да)"
@@ -699,7 +699,7 @@ check_security_gate() {
 }
 
 check_sc_gate() {
-    # AR.008: user-facing path должен иметь ссылку на DP.SC.NNN
+    # AR.008: a user-facing path must have a reference to DP.SC.NNN
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -707,7 +707,7 @@ check_sc_gate() {
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path",""))' 2>/dev/null)
     [ -z "$file_path" ] && { emit_verdict "ok" "AR.008" "no file_path in context"; return; }
 
-    # Проверяем только user-facing пути
+    # Check only user-facing paths
     local is_user_facing=false
     case "$file_path" in
         */handlers/*.py|*/routes/*.ts|*/tools/*.ts|*/api/*|*/subscriptions/tariffs*)
@@ -719,7 +719,7 @@ check_sc_gate() {
         return
     fi
 
-    # Проверить наличие DP.SC.NNN ссылки в файле
+    # Check for a DP.SC.NNN reference in the file
     if [ -f "$file_path" ]; then
         if grep -qE 'DP\.SC\.[0-9]+' "$file_path" 2>/dev/null; then
             emit_verdict "ok" "AR.008" "SC reference found in file"
@@ -727,13 +727,13 @@ check_sc_gate() {
             emit_verdict "warn" "AR.008" "user-facing файл без DP.SC.NNN ссылки — какое обещание затронуто? Создай/обнови SC в 08-service-clauses/"
         fi
     else
-        # Новый файл — напоминание создать SC
+        # New file — reminder to create an SC
         emit_verdict "warn" "AR.008" "новый user-facing файл — убедись, что DP.SC.NNN создан/обновлён в 08-service-clauses/"
     fi
 }
 
 check_routing_gate() {
-    # AR.009: новый файл должен соответствовать карте маршрутизации DP.KR.001 §5
+    # AR.009: a new file must match the routing map DP.KR.001 §5
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -742,7 +742,7 @@ check_routing_gate() {
     is_new=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("is_new_file",False)).lower())' 2>/dev/null)
 
     [ -z "$target_path" ] && { emit_verdict "ok" "AR.009" "no target_path in context"; return; }
-    # Если файл существует — не новый, routing gate N/A
+    # If the file exists — it is not new, routing gate N/A
     [ -f "$target_path" ] && { emit_verdict "ok" "AR.009" "file exists, routing gate N/A (edit, not create)"; return; }
     [ "$is_new" = "false" ] && { emit_verdict "ok" "AR.009" "not a new file write"; return; }
 
@@ -754,7 +754,7 @@ check_routing_gate() {
         */extraction-reports/*.md|*/drafts/*.md|*/archive/*) emit_verdict "ok" "AR.009" "known pattern (workspace artifacts)"; return ;;
     esac
 
-    # Heuristic риски
+    # Heuristic risks
     if echo "$target_path" | grep -qiE '/(health|log|incident).*\.(json|csv|log)$'; then
         emit_verdict "warn" "AR.009" "health/log в FS — DP.KR.001 §5.7: должно быть в БД #8 или рядом с исполнителем"
         return
@@ -769,10 +769,10 @@ check_routing_gate() {
 }
 
 check_schema_registration_gate() {
-    # AR.234: создание новой кодовой схемы/реестра → чеклист дизайна осей DP.METHOD.054 §5.
-    # ADR-IWE-020: membership живёт в schema-triggers.yaml (один источник, два потребителя).
-    # Уровень — E3-prompted: review (мягкий nudge), не block. Корректность дизайна осей
-    # машина не судит — поднимает вопрос ДО фиксации, пока у агента есть design-контекст.
+    # AR.234: creating a new code schema/registry -> axis design checklist DP.METHOD.054 §5.
+    # ADR-IWE-020: membership lives in schema-triggers.yaml (one source, two consumers).
+    # Level — E3-prompted: review (soft nudge), not block. The machine does not judge the correctness of the axis
+    # design — it raises the question BEFORE it is fixed, while the agent still has design context.
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -780,10 +780,10 @@ check_schema_registration_gate() {
     target_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("target_path",""))' 2>/dev/null)
     [ -z "$target_path" ] && { emit_verdict "ok" "AR.234" "no target_path in context"; return; }
 
-    # Exception: существующий файл = экземпляр/edit/rename, не новая схема → AR.211/AR.233
+    # Exception: an existing file = instance/edit/rename, not a new schema -> AR.211/AR.233
     [ -f "$target_path" ] && { emit_verdict "ok" "AR.234" "file exists — экземпляр/edit, не новая схема (AR.211/AR.233)"; return; }
 
-    # is_in_scope: тот же конфиг, что читает обёртка-хук (single-source membership)
+    # is_in_scope: the same config the wrapper hook reads (single-source membership)
     local cfg="${SCHEMA_TRIGGERS_CONFIG:-$HOME/IWE/.claude/hooks/schema-triggers.yaml}"
     local in_scope
     # WP-529 (continuation, 19.08, cold review — missed in the initial `import
@@ -812,7 +812,7 @@ PYEOF
         return
     fi
     if [ "$in_scope" = "error" ]; then
-        # fail-open: nudge advisory, не должен блокировать работу при битом конфиге
+        # fail-open: the nudge is advisory, must not block work on a broken config
         emit_verdict "ok" "AR.234" "schema-triggers.yaml unreadable — fail-open (nudge пропущен)"
         return
     fi
@@ -820,8 +820,8 @@ PYEOF
 }
 
 check_repo_touch_gate() {
-    # AR.010: при первом касании репо — проверить CLAUDE.md на «обязательно загружай»
-    # WP-272 Ф5.3: добавлена READ-ONLY защита (tool_name + sub-path check)
+    # AR.010: on first touch of a repo — check CLAUDE.md for "обязательно загружай"
+    # WP-272 Phase 5.3: added READ-ONLY protection (tool_name + sub-path check)
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -833,7 +833,7 @@ check_repo_touch_gate() {
 
     [ -z "$tool_arg" ] && { emit_verdict "ok" "AR.010" "no tool_arg in context"; return; }
 
-    # READ-ONLY: проверить ДО session-state (блокировать даже повторные касания)
+    # READ-ONLY: check BEFORE session-state (block even repeated touches)
     local rel_path=""
     if [[ "$tool_arg" == "$HOME/IWE/"* ]]; then
         rel_path="${tool_arg#$HOME/IWE/}"
@@ -851,13 +851,13 @@ check_repo_touch_gate() {
                         emit_verdict "block" "AR.010" "READ-ONLY репо ${ro} — ${tool_name} запрещён (CLAUDE.md §9). Только чтение."
                         return ;;
                 esac
-                # Read и прочие операции — разрешены; выходим из цикла, идём дальше
+                # Read and other operations are allowed; exit the loop and move on
                 break
             fi
         done
     fi
 
-    # Извлекаем имя репо (верхний уровень) для session-state
+    # Extract the repo name (top level) for session-state
     local repo=""
     if [[ "$tool_arg" =~ $HOME/IWE/([^/]+)/ ]]; then
         repo="${BASH_REMATCH[1]}"
@@ -866,7 +866,7 @@ check_repo_touch_gate() {
     fi
     [ -z "$repo" ] && { emit_verdict "ok" "AR.010" "path outside ~/IWE/, gate N/A"; return; }
 
-    # Проверяем state-файл: уже ли был touch этого репо
+    # Check the state file: was this repo already touched
     local state_dir="$HOME/.claude/state"
     local state_file="$state_dir/repo-touched-${session_id}.json"
     mkdir -p "$state_dir" 2>/dev/null || true
@@ -884,7 +884,7 @@ except Exception:
         [ "$already_touched" = "yes" ] && { emit_verdict "ok" "AR.010" "repo $repo already touched this session"; return; }
     fi
 
-    # Первое касание — отметить и проверить CLAUDE.md
+    # First touch — mark it and check CLAUDE.md
     _SF="$state_file" _REPO="$repo" python3 -c '
 import json, os
 sf = os.environ["_SF"]
@@ -913,7 +913,7 @@ if repo not in repos:
 }
 
 check_entry_point() {
-    # AR.105: при Edit index.*/main.*/app.* — напомнить проверить конфиг entry point
+    # AR.105: on Edit of index.*/main.*/app.* — remind to check the entry point config
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -924,13 +924,13 @@ check_entry_point() {
     local basename
     basename=$(basename "$target_path")
 
-    # Триггерится только на entry-point паттерны
+    # Triggers only on entry-point patterns
     case "$basename" in
         index.*|main.*|app.*) ;;
         *) emit_verdict "ok" "AR.105" "not an entry-point filename pattern"; return ;;
     esac
 
-    # Найти конфиги в репо
+    # Find configs in the repo
     local repo_root
     repo_root=$(git -C "$(dirname "$target_path")" rev-parse --show-toplevel 2>/dev/null || true)
     [ -z "$repo_root" ] && { emit_verdict "ok" "AR.105" "not in a git repo, gate N/A"; return; }
@@ -951,7 +951,7 @@ check_entry_point() {
 }
 
 check_auto_verify_code() {
-    # AR.107: после изменения .py/.ts/.sh файлов — напомнить запустить sub-agent R23 ДО коммита
+    # AR.107: after changing .py/.ts/.sh files — remind to run sub-agent R23 BEFORE commit
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -966,7 +966,7 @@ check_auto_verify_code() {
 }
 
 check_script_errors() {
-    # AR.108: при обнаружении ошибок в выводе скрипта — диагностировать и поднимать немедленно
+    # AR.108: when errors are found in script output — diagnose and raise immediately
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -987,7 +987,7 @@ check_script_errors() {
 }
 
 check_domain_question_pack() {
-    # AR.109: доменный вопрос (IWE/FPF/Pack-терминология) → искать в Pack до использования общих знаний
+    # AR.109: domain question (IWE/FPF/Pack terminology) -> search Pack before using general knowledge
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -1003,7 +1003,7 @@ check_domain_question_pack() {
 }
 
 check_instruction_deviation() {
-    # AR.110: намеренное отклонение от буквальной инструкции — обязательно уведомить
+    # AR.110: intentional deviation from the literal instruction — must notify
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -1018,7 +1018,7 @@ check_instruction_deviation() {
 }
 
 check_release_verification_trigger() {
-    # AR.203: version bump update-manifest.json или staged изменение в release scope → 5-layer verify
+    # AR.203: version bump of update-manifest.json or staged change in release scope -> 5-layer verify
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -1026,10 +1026,10 @@ check_release_verification_trigger() {
     file_path=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(d.get("file_path","") or d.get("target_path",""))' 2>/dev/null)
     staged_files=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(" ".join(d.get("staged_files",[])))' 2>/dev/null)
 
-    # Собираем все пути для проверки
+    # Collect all paths to check
     local all_paths="$file_path $staged_files"
 
-    # Release scope паттерны (из AR.203 applies_when)
+    # Release scope patterns (from AR.203 applies_when)
     local in_scope=false
     if echo "$all_paths" | grep -qE 'update-manifest\.json'; then
         in_scope=true
@@ -1041,7 +1041,7 @@ check_release_verification_trigger() {
 
     $in_scope || { emit_verdict "ok" "AR.203" "not in FMT release scope"; return; }
 
-    # Проверить, выполнена ли верификация
+    # Check whether verification was performed
     local verification_done
     verification_done=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("release_verification_done",False)).lower())' 2>/dev/null)
 
@@ -1053,7 +1053,7 @@ check_release_verification_trigger() {
 }
 
 check_secret_in_chat() {
-    # AR.111: секрет/API-key в чате — блокировать запрос, при получении — rotation-алерт
+    # AR.111: secret/API key in chat — block the request, on receipt — rotation alert
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
 
@@ -1063,12 +1063,12 @@ check_secret_in_chat() {
     local secret_request
     secret_request=$(echo "$ctx" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read() or "{}"); print(str(d.get("secret_request","false")).lower())' 2>/dev/null)
 
-    # Активный паттерн секрета в тексте (postgres:// и postgresql://, пароль ≥4 символа)
+    # Active secret pattern in text (postgres:// and postgresql://, password >= 4 chars)
     if echo "$chat_content" | grep -qE '(napi_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|postgre(s|sql)://[^@:]+:[^@]{4,}@|-----BEGIN (PRIVATE|RSA) KEY-----|Bearer eyJ[A-Za-z0-9._-]{50,})'; then
         emit_verdict "block" "AR.111" "Секрет в чате — считать скомпрометированным: revoke → новый → cascade rotation по всем точкам использования"
         return
     fi
-    # Запрос плейнтекстного секрета
+    # Plaintext secret request
     if [ "$secret_request" = "true" ]; then
         emit_verdict "warn" "AR.111" "Запрос значения секрета — передавать через ссылку на источник (.secrets/, env var name), не плейнтекстом"
         return
@@ -1309,7 +1309,7 @@ check_pii_consent_two_tier() {
 }
 
 check_git_staged_only() {
-    # AR.216: git add -A / -u / . — запрещено; использовать явные пути
+    # AR.216: git add -A / -u / . — forbidden; use explicit paths
     # RULE_CONTEXT: {"command": "git add -A ..."}
     local ctx="${RULE_CONTEXT:-}"
     [ -z "$ctx" ] && ctx='{}'
@@ -1329,7 +1329,7 @@ print(d.get("command",""))
     emit_verdict "ok" "AR.216" "git staging scope OK"
 }
 
-# === Диспатчер ===
+# === Dispatcher ===
 
 dispatch_event() {
     local event="${RULE_EVENT:?error: RULE_EVENT required}"
@@ -1345,7 +1345,7 @@ dispatch_event() {
         return
     fi
 
-    # Применяем правила в порядке priority (sorted в load_rules_for_event)
+    # Apply rules in priority order (sorted in load_rules_for_event)
     local final_verdict="ok"
     local final_rule="none"
     local final_reason=""
@@ -1368,12 +1368,12 @@ dispatch_event() {
         verdict=$(echo "$result" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())["verdict"])')
         applied+=("$rule_id:$verdict")
 
-        # Block перевешивает warn перевешивает ok
+        # Block outweighs warn outweighs ok
         if [ "$verdict" = "block" ]; then
             final_verdict="block"
             final_rule="$rule_id"
             final_reason=$(echo "$result" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read())["reason"])')
-            break  # priority-sorted, первый block — финальный
+            break  # priority-sorted, the first block is final
         elif [ "$verdict" = "warn" ] && [ "$final_verdict" != "block" ]; then
             final_verdict="warn"
             final_rule="$rule_id"
@@ -1395,7 +1395,7 @@ case "${1:-dispatch}" in
         dispatch_event
         ;;
     session-summary)
-        # WP-272 Ф5: вывод warn/block за текущую сессию для Close-протокола
+        # WP-272 Phase 5: output warn/block for the current session for the Close protocol
         SID="${2:-$SESSION_ID}"
         WARN_LOG="$SESSION_STATE_DIR/session-${SID}-warns.jsonl"
         if [ ! -f "$WARN_LOG" ] || [ ! -s "$WARN_LOG" ]; then
@@ -1437,7 +1437,7 @@ print(json.dumps({
 PYEOF
         ;;
     session-clear)
-        # Очистить session warn-log (после Close)
+        # Clear the session warn log (after Close)
         SID="${2:-$SESSION_ID}"
         WARN_LOG="$SESSION_STATE_DIR/session-${SID}-warns.jsonl"
         [ -f "$WARN_LOG" ] && rm -f "$WARN_LOG" && echo "cleared: $WARN_LOG" || echo "nothing to clear"
@@ -1463,7 +1463,7 @@ for r in reg.get('rules', []):
 "
         ;;
     test)
-        # WP-272 ревизия 2026-04-30: тесты пишут в отдельный журнал, не в production
+        # WP-272 revision 2026-04-30: tests write to a separate journal, not to production
         export RULE_JOURNAL_DIR="${HOME}/logs/rule-engine/test"
         mkdir -p "$RULE_JOURNAL_DIR"
         PASS=0; FAIL=0
@@ -1519,7 +1519,7 @@ for r in reg.get('rules', []):
             RULE_EVENT="runtime_file_edit_attempt" \
             RULE_CONTEXT='{"target_path":"/tmp/main.py"}'
 
-        # AR.010 Repo-Touch Gate — READ-ONLY block (WP-272 Ф5.3)
+        # AR.010 Repo-Touch Gate — READ-ONLY block (WP-272 Phase 5.3)
         # Configure IWE_READONLY_REPOS="DS-sample/repo-a,DS-sample/repo-b" to activate
         run_test 11 "Edit в readonly repo → block (IWE_READONLY_REPOS set)" "block" \
             IWE_READONLY_REPOS="DS-sample/readonly-repo" \
@@ -1530,7 +1530,7 @@ for r in reg.get('rules', []):
             RULE_EVENT="first_repo_action" \
             RULE_CONTEXT="{\"tool_arg\":\"$HOME/IWE/DS-sample/readonly-repo/README.md\",\"tool_name\":\"Write\",\"session_id\":\"test-ro-2\"}"
 
-        # AR.012 Priority Gate (WP-272 Ф5.4)
+        # AR.012 Priority Gate (WP-272 Phase 5.4)
         run_test 13 "РП budget=8h без R{N} → warn" "warn" \
             RULE_EVENT="wp_creation_with_budget_attempt" \
             RULE_CONTEXT='{"budget_h":8,"r_goal":"","verification_class":"closed-loop"}'
@@ -1555,7 +1555,7 @@ for r in reg.get('rules', []):
             RULE_CONTEXT='{"command":"ALTER TABLE finance.payments ADD COLUMN x INT","snapshot_done":true}'
 
         # AR.104 Systemic Fix Review
-        # WP-272 ревизия 2026-04-30: теперь требуется done-маркер; описание без done = не триггер
+        # WP-272 revision 2026-04-30: a done-marker is now required; a description without done = not a trigger
         run_test 19 "системный фикс DONE без ревью → warn" "warn" \
             RULE_EVENT="systemic_fix_completion" \
             RULE_CONTEXT='{"response_text":"системный фикс закрывает root cause — DONE","independent_review_done":false}'
@@ -1567,7 +1567,7 @@ for r in reg.get('rules', []):
             RULE_CONTEXT='{"response_text":"системный фикс закрывает root cause","independent_review_done":false}'
 
         # AR.202 Log/Incident/State routing
-        # WP-272 ревизия 2026-04-30: incidents/ в любом репо = ok; warn только если вне /incidents/ AND вне governance
+        # WP-272 revision 2026-04-30: incidents/ in any repo = ok; warn only if outside /incidents/ AND outside governance
         run_test 21 "инцидент в /incidents/ поддиректории → ok (корректное место)" "ok" \
             RULE_EVENT="incident_creation_attempt" \
             RULE_CONTEXT="{\"file_path\":\"$HOME/IWE/DS-sample/sample-service/incidents/incident-001.md\"}"
@@ -1699,7 +1699,7 @@ for r in reg.get('rules', []):
             RULE_EVENT="new_tool_creation" \
             RULE_CONTEXT="{\"creation_type\":\"hook\",\"file_path\":\"$HOME/IWE/PACK-digital-platform/pack/digital-platform/08-service-clauses/DP.SC.125.md\",\"sc_ref\":\"\",\"role_ref\":\"\",\"scenarios_defined\":false}"
 
-        # AR.203 Release Verification Trigger (WP-272 Ф5)
+        # AR.203 Release Verification Trigger (WP-272 Phase 5)
         run_test 33 "изменение update-manifest.json → warn (verify before push)" "warn" \
             RULE_EVENT="version_bump_in_update_manifest_json" \
             RULE_CONTEXT='{"file_path":"${IWE:-$HOME/IWE}/FMT-exocortex-template/update-manifest.json","release_verification_done":false}'
@@ -1724,8 +1724,8 @@ for r in reg.get('rules', []):
             RULE_EVENT="schema_registration_attempt" \
             RULE_CONTEXT="{\"target_path\":\"$HOME/IWE/.claude/rules-registry.yaml\",\"is_new_file\":false}"
 
-        # AR.234 dogfood: живость membership-конфига (ADR-IWE-020 §5 — анти-молчаливая-смерть).
-        # Проверяет: (1) schema-triggers.yaml читается; (2) fired_event совпадает с triggers AR.234 в реестре.
+        # AR.234 dogfood: liveness of the membership config (ADR-IWE-020 §5 — anti-silent-death).
+        # Checks: (1) schema-triggers.yaml is readable; (2) fired_event matches the AR.234 triggers in the registry.
         # Cold review 2026-08-19 (Codex, High): this PyYAML consumer was missed
         # by the initial two-pass `import yaml` grep — a self-test that fails
         # closed ("FAIL config unreadable") on a yaml-less bare python3 would
@@ -1769,13 +1769,13 @@ PYEOF
         [ "$FAIL" -eq 0 ] && exit 0 || exit 1
         ;;
     check-trace-satisfaction|list-gates|mark-gate)
-        # issue #678: memory/protocol-close.md ссылается на эти три
-        # подкоманды (Quick/Week/Month Close, gate-трассировка WP-481 Ф5.1),
-        # но механика никогда не была реализована. Раньше это падало в
-        # безымянную ветку *) ниже с generic usage — на практике неотличимо
-        # от опечатки в имени подкоманды и не сообщает, что именно не
-        # работает. Явная ветка с понятным сообщением вместо тихой догадки:
-        # проверка гейтов реально не произошла, это не «прошла с exit 1».
+        # issue #678: memory/protocol-close.md references these three
+        # subcommands (Quick/Week/Month Close, gate tracing WP-481 Phase 5.1),
+        # but the mechanics were never implemented. Previously this fell
+        # into the anonymous branch *) below with a generic usage — in practice indistinguishable
+        # from a typo in the subcommand name and does not say what exactly
+        # does not work. An explicit branch with a clear message instead of a silent guess:
+        # the gate check really did not happen, it is not "passed with exit 1".
         echo "NOT_IMPLEMENTED: '$1' (rule-engine.sh) — gate-трассировка (WP-481 Ф5.1) описана в protocol-close.md, но не реализована (issue #678)." >&2
         echo "Гейты этой секции НЕ проверены автоматически — Close-протокол должен считать этот шаг непройденным, не пропущенным." >&2
         exit 3

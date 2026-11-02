@@ -1,12 +1,12 @@
 #!/bin/bash
 # test-protocol-stop-gate-quick-close-exempt.sh — issue #1311:
-# run-protocol close/close session (Quick Close, по дизайну "inline, без
-# TodoWrite" — memory/protocol-close.md) не должен требовать TodoWrite/Task
-# чеклист из 3+ пунктов. Тяжёлые протоколы (week-close/month-close/day-close
-# и прямые skill-имена day-open/day-close/wp-new) продолжают требовать его
-# как раньше — регрессия не допускается.
+# run-protocol close/close session (Quick Close, by design "inline, without
+# TodoWrite" — memory/protocol-close.md) must not require a TodoWrite/Task
+# checklist of 3+ items. Heavy protocols (week-close/month-close/day-close
+# and direct skill names day-open/day-close/wp-new) continue to require it
+# as before — no regression allowed.
 #
-# Запуск: bash .claude/hooks/tests/test-protocol-stop-gate-quick-close-exempt.sh
+# Run: bash .claude/hooks/tests/test-protocol-stop-gate-quick-close-exempt.sh
 
 set -uo pipefail
 
@@ -27,9 +27,9 @@ write_transcript() {
   printf '%s\n' "$*" > "$TMP_DIR/$name.jsonl"
 }
 
-# run_gate <transcript-name> -> true|false (fired?) — отсутствие новой
-# строки в gate_log (ранний выход Quick Close ничего не логирует, как и
-# ветка "протокольный скилл не вызывался") читается как "false".
+# run_gate <transcript-name> -> true|false (fired?) — the absence of a new
+# line in gate_log (Quick Close's early exit logs nothing, as does the
+# branch "protocol skill was not invoked") is read as "false".
 run_gate() {
   local transcript="$TMP_DIR/$1.jsonl"
   local log="$IWE_ROOT/.claude/logs/gate_log.jsonl"
@@ -76,7 +76,7 @@ msg_rp_null_args='{"message":{"role":"assistant","content":[{"type":"tool_use","
 msg_day_close='{"message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"day-close"}}]}}'
 msg_text_plain='{"message":{"role":"assistant","content":[{"type":"text","text":"просто текст"}]}}'
 
-# === Quick Close exempt: run-protocol close/close session/empty, без чеклиста ===
+# === Quick Close exempt: run-protocol close/close session/empty, no checklist ===
 write_transcript rp-close-no-todo "$msg_rp_close" "$msg_text_plain"
 check "run-protocol close без чеклиста не firing" "false" "$(run_gate rp-close-no-todo)"
 
@@ -89,7 +89,7 @@ check "run-protocol '  CLOSE  ' (регистр/пробелы) без чекл�
 write_transcript rp-no-args-no-todo "$msg_rp_no_args" "$msg_text_plain"
 check "run-protocol без args вовсе (пусто = Quick Close) не firing" "false" "$(run_gate rp-no-args-no-todo)"
 
-# === Регрессия: тяжёлые протоколы продолжают требовать чеклист ===
+# === Regression: heavy protocols continue to require the checklist ===
 write_transcript rp-week-close-no-todo "$msg_rp_week_close" "$msg_text_plain"
 check "run-protocol week-close без чеклиста firing (не экземптится)" "true" "$(run_gate rp-week-close-no-todo)"
 
@@ -108,9 +108,9 @@ check "run-protocol с явным args=null (как отсутствие) не f
 write_transcript rp-array-args-no-todo '{"message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"run-protocol","args":["close"]}}]}}' "$msg_text_plain"
 check "run-protocol с args-массивом (не строка) firing (fail-closed)" "true" "$(run_gate rp-array-args-no-todo)"
 
-# === Самый важный регресс: ПОЗДНИЙ тяжёлый вызов после РАННЕГО Quick Close
-# в одном транскрипте не должен застревать на раннем "close" (issue #1311
-# cold-review, Critical) — гейт должен смотреть на ПОСЛЕДНИЙ вызов run-protocol.
+# === The most important regression: a LATE heavy call after an EARLY Quick Close
+# in one transcript must not get stuck on the early "close" (issue #1311
+# cold-review, Critical) — the gate must look at the LAST run-protocol call.
 write_transcript rp-early-close-late-week-close "$msg_rp_close" "$msg_rp_week_close" "$msg_text_plain"
 check "ранний close + поздний week-close без чеклиста firing (не застревает на первом вызове)" "true" "$(run_gate rp-early-close-late-week-close)"
 

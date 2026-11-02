@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionStart — idempotent, best-effort activation of .githooks/ (WP-559 Ф2).
+# SessionStart — idempotent, best-effort activation of .githooks/ (WP-559 Phase 2).
 #
 # GitHub's "generate from template" API copies repository files but not
 # .git/config — so a repository forked through fork_platform_template ships
@@ -32,7 +32,7 @@ if [ -n "$CURRENT_HOOKSPATH" ]; then
   # Braces are required here, not stylistic: on this bash/locale combination,
   # a bare $VAR immediately followed by a non-ASCII byte (» below) gets
   # misparsed as part of the variable name — "unbound variable" under set -u
-  # instead of the intended message (found by direct testing, WP-559 Ф2).
+  # instead of the intended message (found by direct testing, WP-559 Phase 2).
   echo "⚠️ [hooks-bootstrap] core.hooksPath уже установлен в «${CURRENT_HOOKSPATH}» — не переопределяю. Чтобы включить .githooks/ этого репозитория вручную: git config --local core.hooksPath .githooks" >&2
   exit 0
 fi

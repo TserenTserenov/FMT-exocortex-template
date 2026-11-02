@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Artifactor Gate contract for create-wp.sh (WP-7 Ф142, 2026-09-11; issue #956).
+# Artifactor Gate contract for create-wp.sh (WP-7 Phase 142, 2026-09-11; issue #956).
 #
 # The gate runs BEFORE every other check and before anything is written: a new WP
 # must carry the Artifactor result (--artifactor-result), its title comes from the

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regression test for the structural-hole fix (protocol-open.md Шаг 4.5 /
+# Regression test for the structural-hole fix (protocol-open.md Step 4.5 /
 # create-wp.sh): 18 of 20 audited WPs that needed a staged plan (/decompose)
 # never got one, because create-wp.sh had no --verification-class flag at
 # all and could not know whether the WP qualified. This test locks down the

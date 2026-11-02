@@ -1,6 +1,6 @@
 #!/bin/bash
 # test-destructive-guard-malformed-json.sh — regression corpus for the WP-544
-# Д22 fail-closed fix (08.09, peer session 2026-09-08-25-wp544-continue-f7,
+# D22 fail-closed fix (08.09, peer session 2026-09-08-25-wp544-continue-f7,
 # Codex): a malformed/schema-invalid envelope must block, not exit 0.
 #
 # The live fail-open this closes: `jq -r '.tool_input.command // empty' || true`
@@ -9,7 +9,7 @@
 # real `rm -rf /x` passed silently. Reproduced with the fixtures below before
 # the fix; all must block after it.
 #
-# Запуск: bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
+# Run: bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
 
 set -uo pipefail
 
@@ -27,7 +27,7 @@ trap cleanup EXIT
 # got_exit is classified into exactly three outcomes, not two: "block" (2),
 # "pass" (0), or "crashed" (anything else). Collapsing "crashed" into "pass"
 # is itself a bug that hid the ARG_MAX crash this suite's oversized-command
-# case exists to catch (cold review, WP-544 Д22, 08.09) — a hook that dies
+# case exists to catch (cold review, WP-544 D22, 08.09) — a hook that dies
 # with exit 126 before reaching either block() or its final exit 0 has not
 # decided to pass anything; treating that the same as a real pass would make
 # a crash regression invisible to `want=pass`, and any exit code the test
@@ -58,7 +58,7 @@ expect_raw() {
 # suite's own big-command case exists to catch, which silently turned that
 # case into an empty $input (block on empty stdin, for the wrong reason)
 # rather than actually exercising the hook against a huge command (found
-# live while adding the oversized-command test itself, WP-544 Д22, 08.09).
+# live while adding the oversized-command test itself, WP-544 D22, 08.09).
 expect_wellformed() {
   local desc="$1" want="$2" cmd="$3"
   local input
@@ -112,7 +112,7 @@ expect_wellformed "валидный опасный запрос (git push --forc
   'git push --force origin main'
 
 # === oversized command must not crash the perl scanners (cold review,
-# WP-544 Д22, 08.09): command text was passed to `perl -e` through the
+# WP-544 D22, 08.09): command text was passed to `perl -e` through the
 # process environment (CMD_SCAN="$CMD" perl -e ...) at four call sites,
 # which is subject to execve ARG_MAX exactly like argv — a ~1.2MB command
 # crashed with "Argument list too long" (exit 126) before any block()/exit 0
@@ -123,7 +123,7 @@ BIG_PADDING=$(python3 -c "print('x' * 1200000)")
 expect_wellformed "негабаритная опасная команда (>1.2МБ) вне /tmp блокируется, не крашится" block \
   "rm -rf $WORKSPACE_ROOT/DS-strategy/sessions # $BIG_PADDING"
 
-# === отсутствие jq — тоже fail-closed, не fail-open. A bash function named
+# === absence of jq is also fail-closed, not fail-open. A bash function named
 # `jq`, exported into the child bash process, wins command lookup over any
 # PATH entry (functions resolve before external binaries) — this shadows the
 # real jq regardless of which directory it lives in, which a PATH edit alone
@@ -142,7 +142,7 @@ else
   echo "  stderr: $(cat "$TMP_DIR/err.nojq")"
 fi
 
-# === сырой payload не попадает в диагностику stderr (может содержать секреты) ===
+# === the raw payload does not get into the stderr diagnostics (may contain secrets) ===
 SECRET_PAYLOAD='{"tool_input":{"command":"echo sk-ant-super-secret-token-do-not-leak"'
 printf '%s' "$SECRET_PAYLOAD" | bash "$HOOK" >/dev/null 2>"$TMP_DIR/err.secret" || true
 if grep -q "sk-ant-super-secret-token-do-not-leak" "$TMP_DIR/err.secret" 2>/dev/null; then

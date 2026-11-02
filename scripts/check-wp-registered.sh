@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# check-wp-registered.sh — блокирующая проверка: РП зарегистрирован согласованно (issue #1257).
+# check-wp-registered.sh — blocking check: a WP is registered consistently (issue #1257).
 #
-# Использование: check-wp-registered.sh <номер РП> <каталог governance> <файл WeekPlan>
-#   номер: 1, WP-1 и WP-001 — один номер; WP-10 — другой.
+# Usage: check-wp-registered.sh <WP number> <governance directory> <WeekPlan file>
+#   number: 1, WP-1 and WP-001 are one number; WP-10 is another.
 #
-# Проверяет (каждое нарушение — строка в stderr, код возврата 1):
-#   1. карточка inbox/WP-<NNN>/WP-<NNN>.md существует, её поле `wp:` равно номеру;
-#   2. ровно одна строка таблицы docs/WP-REGISTRY.md, где номер стоит в ОТДЕЛЬНОЙ
-#      ячейке колонки «#» (подстрока не считается: WP-1 не находит WP-10);
-#   3. ровно одна строка в таблице «План» файла WeekPlan (таблицы под заголовками
-#      «Итоги», «Сводка», «Summary» и упоминания вне таблиц записью не считаются;
-#      если есть таблица под заголовком «План», считаются только такие таблицы;
-#      заголовок: «Статус…» и («#» или «Работа»), номер — в колонке «#», иначе «РП»);
-#   4. колонка названия в обеих строках содержит первые 80 символов названия из карточки
-#      (create-wp.sh режет название в реестре до 80 символов).
-# Код 2 — неверные аргументы или нечитаемые файлы.
+# Checks (each violation is a line in stderr, return code 1):
+#   1. the card inbox/WP-<NNN>/WP-<NNN>.md exists, its `wp:` field equals the number;
+#   2. exactly one row of the docs/WP-REGISTRY.md table where the number stands in a SEPARATE
+#      cell of the "#" column (a substring does not count: WP-1 does not find WP-10);
+#   3. exactly one row in the "Plan" table of the WeekPlan file (tables under the headings
+#      "Results", "Overview", "Summary" and mentions outside tables do not count as an entry;
+#      if there is a table under the "Plan" heading, only such tables count;
+#      header: "Status…" and ("#" or "Work"), the number is in the "#" column, otherwise "WP");
+#   4. the title column in both rows contains the first 80 characters of the title from the card
+#      (create-wp.sh cuts the title in the registry to 80 characters).
+# Code 2 — wrong arguments or unreadable files.
 set -uo pipefail
 
 if [ "$#" -ne 3 ]; then

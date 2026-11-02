@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# iwe-transcribe.sh — транскрипция аудио/видео через MLX Whisper (Apple Silicon)
+# iwe-transcribe.sh — transcription of audio/video via MLX Whisper (Apple Silicon)
 # routing: executor=script  deterministic=true  skill=transcribe  optimization_priority=2
 # see DP.SC.159, DP.ROLE.059
 #
