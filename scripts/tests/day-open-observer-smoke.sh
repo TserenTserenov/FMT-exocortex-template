@@ -274,7 +274,7 @@ check_has "8: заголовок сигнала" "$(message_texts)" "$MISSING_HE
 check "8: после доставки — GAVE UP" "1" "$(log_count 'GAVE UP scenario: day-plan (плана нет на origin')"
 
 # ---------------------------------------------------------------- 9
-echo "== 9: день стратегии — наблюдатель сигналит о пропаже плана, но не блокирует session-prep"
+echo "== 9: день стратегии — сервер день не открывает, пропажа плана не тревога (WP-568, 02.11)"
 new_case
 TODAY_NAME=$(weekday_name "$(date +%u)")
 printf 'strategy_day: %s\n' "$TODAY_NAME" > "$WS/DS-strategy/exocortex/day-rhythm-config.yaml"
@@ -284,8 +284,8 @@ git -C "$WS/DS-strategy" -c user.name=fixture -c user.email=fixture@example.inva
     -c core.hooksPath=/dev/null commit -q -m "fixture: strategy day today"
 git -C "$WS/DS-strategy" push -q origin main 2>/dev/null
 rc=$(run_strategist morning DAY_OPEN_OBSERVER_AFTER=00:00)
-check "9: код выхода (session-prep не заблокирован)" "0" "$rc"
-check_has "9: сигнал «сервер не опубликовал» доставлен" "$(message_texts)" "$MISSING_HEADER"
+check "9: код выхода" "0" "$rc"
+check "9: сигнала «сервер не опубликовал» нет" "0" "$(log_count 'RECORDED: day-open plan missing on origin')"
 check "9: пайплайн не вызывался" "0" "$(count_lines "$PIPE_LOG")"
 check "9: session-prep запустился" "1" "$(log_count 'running session prep')"
 
@@ -304,23 +304,6 @@ check "10: код выхода" "0" "$rc"
 check "10: сигнала «сервер не опубликовал» нет" "0" "$(log_count 'RECORDED: day-open plan missing on origin')"
 check "10: session-prep запустился" "1" "$(log_count 'running session prep')"
 
-# ---------------------------------------------------------------- 11
-echo "== 11: день стратегии, fetch невозможен — session-prep ОТЛОЖЕН (код 7), SUCCESS не пишется"
-new_case
-TODAY_NAME=$(weekday_name "$(date +%u)")
-printf 'strategy_day: %s\n' "$TODAY_NAME" > "$WS/DS-strategy/exocortex/day-rhythm-config.yaml"
-git -C "$WS/DS-strategy" -c user.name=fixture -c user.email=fixture@example.invalid \
-    -c core.hooksPath=/dev/null add exocortex/day-rhythm-config.yaml
-git -C "$WS/DS-strategy" -c user.name=fixture -c user.email=fixture@example.invalid \
-    -c core.hooksPath=/dev/null commit -q -m "fixture: strategy day today"
-git -C "$WS/DS-strategy" push -q origin main 2>/dev/null
-break_origin
-rc=$(run_strategist morning DAY_OPEN_OBSERVER_AFTER=00:00)
-check "11: код выхода (defer)" "7" "$rc"
-check "11: session-prep НЕ запускался" "0" "$(log_count 'running session prep')"
-check "11: SUCCESS session-prep не записан" "0" "$(log_count 'SUCCESS scenario: session-prep')"
-check "11: сообщений нет" "0" "$(messages)"
-
 # ---------------------------------------------------------------- 12
 echo "== 12: сверка пересекла полночь — сигнал о вчерашнем плане, не defer"
 new_case
@@ -330,23 +313,5 @@ check "12: код выхода" "0" "$rc"
 check "12: доставлено одно сообщение" "1" "$(messages)"
 check_has "12: сигнал назван про вчерашний день" "$(message_texts)" "$YESTERDAY"
 check "12: GAVE UP с причиной" "1" "$(log_count 'GAVE UP scenario: day-plan (плана нет на origin')"
-
-# ---------------------------------------------------------------- 13
-echo "== 13: день стратегии, сигнал не доставлен (сеть) — session-prep отложен (код 74)"
-new_case
-TODAY_NAME=$(weekday_name "$(date +%u)")
-printf 'strategy_day: %s\n' "$TODAY_NAME" > "$WS/DS-strategy/exocortex/day-rhythm-config.yaml"
-git -C "$WS/DS-strategy" -c user.name=fixture -c user.email=fixture@example.invalid \
-    -c core.hooksPath=/dev/null add exocortex/day-rhythm-config.yaml
-git -C "$WS/DS-strategy" -c user.name=fixture -c user.email=fixture@example.invalid \
-    -c core.hooksPath=/dev/null commit -q -m "fixture: strategy day today"
-git -C "$WS/DS-strategy" push -q origin main 2>/dev/null
-rc=$(run_strategist morning DAY_OPEN_OBSERVER_AFTER=00:00 CURL_FAIL=1)
-check "13: код выхода (повтор доставки)" "74" "$rc"
-check "13: session-prep НЕ запускался" "0" "$(log_count 'running session prep')"
-check "13: SUCCESS session-prep не записан" "0" "$(log_count 'SUCCESS scenario: session-prep')"
-rc=$(run_strategist morning DAY_OPEN_OBSERVER_AFTER=00:00)
-check "13: повторный запуск доставляет сигнал и отдаёт день" "0" "$rc"
-check "13: доставлено одно сообщение" "1" "$(messages)"
 
 [ "$fail" -eq 0 ] && echo "PASS" || { echo "FAILED: $fail"; exit 1; }
