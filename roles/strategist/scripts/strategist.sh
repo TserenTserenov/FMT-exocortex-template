@@ -752,6 +752,33 @@ find_common_sh() {
     return 1
 }
 
+# Same auth policy as roles/extractor/scripts/extractor.sh: the gateway in
+# ANTHROPIC_BASE_URL drops the `tools` array, so a headless run through it never
+# gets an answer (a server host, 02.11: week-review waited 6 x 5 min on "502 upstream
+# error" three times a night). A connected subscription wins over proxy/API-key
+# env; IWE_STRATEGIST_USE_API_ENV=1 keeps a deliberate custom gateway.
+prefer_subscription_over_proxy() {
+    [ "$AI_CLI" = "$CLAUDE_PATH" ] || return 0
+    [ "${IWE_STRATEGIST_USE_API_ENV:-}" = "1" ] && return 0
+    if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        local raw_file="$HOME/.secrets/claude_code_oauth_token" kv_file="$HOME/.secrets/claude-subscription" token=""
+        if [ -f "$raw_file" ]; then
+            token="$({ tr -d '[:space:]' <"$raw_file"; } 2>/dev/null || true)"
+        fi
+        if [ -z "$token" ] && [ -f "$kv_file" ]; then
+            token="$({ sed -n -E 's/^(export[[:space:]]+)?CLAUDE_CODE_OAUTH_TOKEN=[[:space:]]*([^[:space:]]*).*/\2/p' "$kv_file" \
+                | tail -n 1 | tr -d "\"'"; } 2>/dev/null || true)"
+        fi
+        [ -n "$token" ] || return 0
+        CLAUDE_CODE_OAUTH_TOKEN="$token"
+        export CLAUDE_CODE_OAUTH_TOKEN
+    fi
+    if [ -n "${ANTHROPIC_BASE_URL:-}${ANTHROPIC_API_KEY:-}${ANTHROPIC_AUTH_TOKEN:-}${ANTHROPIC_CUSTOM_HEADERS:-}" ]; then
+        log "Auth: subscription oauth preferred — dropping proxy/API-key env"
+    fi
+    unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_CUSTOM_HEADERS
+}
+
 run_claude() {
     local command_file="$1"
     # Опциональная модель: второй аргумент или IWE_STRATEGIST_MODEL из env.
@@ -923,6 +950,7 @@ ${prompt}"
     if [ "${RUNNER_SESSION_OPEN:-0}" = 1 ] && [ "$ISOLATED_RUN" != 1 ]; then
         canonical_owner="$RUNNER_SESSION_REASON"
     fi
+    prefer_subscription_over_proxy
     AI_CLI_OUT_START=$(log_size_bytes)
     timeout "$CLAUDE_TIMEOUT" env "IWE_CANONICAL_OWNER=$canonical_owner" "$AI_CLI" \
         "${extra_flags[@]}" \
@@ -1704,21 +1732,8 @@ case "$1" in
         day_open_resume_pending_give_up
 
         if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
-            # WP-568: и в день стратегии наблюдатель смотрит серверный план — иначе пропажа
-            # плана осталась бы незамеченной ровно в этот день (утро уходит в session-prep).
-            # Подоболочка: exit'ы наблюдателя (0/7/74) гасятся в ней и не прерывают сценарий.
-            observe_rc=0
-            if day_open_observer_enabled; then
-                ( day_open_observe ) || observe_rc=$?
-            fi
-            if [ "$observe_rc" -eq "$DAY_OPEN_DEFERRED_RC" ] || [ "$observe_rc" -eq "$DAY_OPEN_ALARM_RETRY_RC" ]; then
-                # Проверка не состоялась (сеть) или сигнал не доставлен. НЕ глушим код:
-                # иначе SUCCESS session-prep закроет день и пропажа плана останется
-                # незамеченной до завтра (ред-комментарий Codex, РП-568). session-prep
-                # откладывается до следующего тика планировщика.
-                log "Day Open: наблюдатель не подтвердил серверный план (код $observe_rc) — session-prep отложен до следующего запуска планировщика"
-                exit "$observe_rc"
-            fi
+            # No observer here (WP-568, 02.11): on the strategy day the server skips Day Open
+            # on purpose, so a missing plan is expected and the old check alarmed every Monday.
             log "Strategy day ($STRATEGY_DAY_NAME): running session prep"
             run_claude "session-prep" ""
             notify_telegram "session-prep"

@@ -135,6 +135,13 @@ build_message() {
     local scenario="$1"
     local file
 
+    # A retry event of week-review (scheduler) is not a finished review: the strategist
+    # already sent its own "week-review-failed" message (WP-568, 02.11).
+    if [ "$scenario" = "week-review" ] && [ -n "${RETRY_EVENT:-}" ]; then
+        echo ""
+        return
+    fi
+
     # WP-561 Ф25: a failed week-review must alarm even when no WeekPlan file is found or the
     # model wrote nothing, so this message is static and skips the file lookup below.
     if [ "$scenario" = "week-review-failed" ]; then
