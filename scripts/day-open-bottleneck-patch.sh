@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# day-open-bottleneck-patch.sh — deterministic "Горлышко недели" injection (WP-484 Ф2)
+# day-open-bottleneck-patch.sh — deterministic "Weekly bottleneck" injection (WP-484 Phase 2)
 #
 # Runs AFTER day-open-llm-fill.py in day-open-pipeline.sh (moved 2026-07-14 — see BUGFIX
-# below) so this script always has the last, authoritative word on "Горлышко недели":
+# below) so this script always has the last, authoritative word on "Weekly bottleneck":
 # llm-fill.py fills whole `<details>` chunks generically and cannot be trusted to leave
 # this sub-section untouched, since day-open.checks.md hard-blocks hand-written content
 # here without the BY-SCRIPT marker (feedback_skill_manual_synthesis_bypass, 2026-05-28-04).
@@ -10,8 +10,8 @@
 # Reused by extensions/day-open.after.md (interactive path) so both call sites share one
 # correct implementation instead of two divergent copies.
 #
-# BUGFIX (WP-484 Ф2, 2026-07-13): the previous inline copy of this logic (still visible in
-# after.md's git history) anchored its replacement regex on a closing "**Контекст недели W"
+# BUGFIX (WP-484 Phase 2, 2026-07-13): the previous inline copy of this logic (still visible in
+# after.md's git history) anchored its replacement regex on a closing "**Week context W"
 # markdown-bold string that day-open-scaffold.sh has not emitted since it moved to
 # <details><summary><b> HTML markup — the substitution silently no-opped on every run.
 # Verified empirically against scaffold.sh's actual output before fixing.
@@ -78,7 +78,7 @@ if [ -z "$LATEST_YAML" ]; then
   fi
   # Honest, visible "not done" marker — never a silent gap (WP-484 invariant).
   # Distinct from a hand-written heading: day-open.checks.md recognizes this marker
-  # and reports it as a non-blocking 🟡 in «Требует внимания» instead of hard-blocking,
+  # and reports it as a non-blocking 🟡 in "Needs attention" instead of hard-blocking,
   # since nobody is claiming a fake analysis — the headless run structurally cannot
   # invoke the /bottleneck-pick LLM skill on its own.
   SECTION="<!-- BOTTLENECK-PENDING: no-yaml-headless -->

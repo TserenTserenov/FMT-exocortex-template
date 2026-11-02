@@ -20,16 +20,16 @@ import sys
 import re
 import os
 
-# --- Паттерны загрязнения имён (NC) ---
+# --- Name pollution patterns (NC) ---
 NAME_CONTAMINATION_PATTERNS = [
     re.compile(r"—\s*closed\b", re.IGNORECASE),
     re.compile(r"—\s*closed-partial\b", re.IGNORECASE),
     re.compile(r"\(peer-session\b", re.IGNORECASE),
     re.compile(r"\bPHASE\d*\s*="),
     re.compile(r"\bbacklinks\s*:"),
-    re.compile(r"(?:^|\s)[0-9a-f]{40}(?:\s|$)"),  # полный SHA (40 символов)
-    re.compile(r"(?:^|\s)[0-9a-f]{7}(?:\s|$)"),   # короткий SHA (7 символов) — только с пробельными границами
-    re.compile(r"Ф\d+[-–—]Ф\d+\s+done"),    # «Ф1-Ф5 done»
+    re.compile(r"(?:^|\s)[0-9a-f]{40}(?:\s|$)"),  # full SHA (40 chars)
+    re.compile(r"(?:^|\s)[0-9a-f]{7}(?:\s|$)"),   # short SHA (7 chars) — only with whitespace boundaries
+    re.compile(r"Ф\d+[-–—]Ф\d+\s+done"),    # e.g. «Ф1-Ф5 done»
     re.compile(r"\bФ\d+\s+done\b"),
     re.compile(r"\bФ\d+-Ф\d+\b"),
     re.compile(r"\bpassed\b", re.IGNORECASE),
@@ -50,12 +50,12 @@ def is_table_row(line):
 def parse_cells(line):
     """Разбить строку таблицы на ячейки."""
     parts = line.strip().split("|")
-    # parts[0] пустой (до первого |), parts[-1] пустой (после последнего |)
+    # parts[0] is empty (before the first |), parts[-1] is empty (after the last |)
     return [p.strip() for p in parts[1:-1]]
 
-# Фолбэк-индексы для канонической 6-колоночной схемы
-# (# | P | Название | Ст | Репо | Бюджет) — используются только если заголовок
-# таблицы не найден/не распознан (см. find_column_indices).
+# Fallback indices for the canonical 6-column schema
+# (# | P | Название | Ст | Репо | Бюджет) — used only if the table header
+# is not found/not recognized (see find_column_indices).
 FALLBACK_INDICES = {"#": 0, "P": 1, "Название": 2, "Ст": 3, "Репо": 4, "Бюджет": 5}
 
 def find_column_indices(lines):
@@ -75,10 +75,10 @@ def find_column_indices(lines):
         if stripped.startswith("| #"):
             cells = parse_cells(line)
             found = {name: i for i, name in enumerate(cells)}
-            # Точечный fallback: колонку, которой нет в заголовке этой конкретной
-            # таблицы, подставляем из канонической схемы — но найденные колонки
-            # (например «Название» в старой 4-колоночной схеме) не теряем ради
-            # недостающих соседей (P/Репо там просто отсутствуют по смыслу схемы).
+            # Targeted fallback: a column missing from the header of this particular
+            # table is filled from the canonical schema — but the columns found
+            # (e.g. «Название» in the old 4-column schema) are not lost for the sake of
+            # missing neighbors (P/Репо are simply absent there by the schema's meaning).
             missing = [name for name in FALLBACK_INDICES if name not in found]
             indices = {name: found.get(name, FALLBACK_INDICES[name]) for name in FALLBACK_INDICES}
             if missing:
@@ -108,8 +108,8 @@ def check_t2(cells, line_num, indices):
     issues = []
     if not is_done_row(cells):
         return issues
-    # Проверяем ячейки #, P, Название, Репо — позиции берутся из фактического
-    # заголовка таблицы (indices), не хардкодятся (issue #263).
+    # Check the cells #, P, Название, Репо — positions are taken from the actual
+    # table header (indices), not hardcoded (issue #263).
     if len(cells) >= 5:
         check_indices = sorted({indices["#"], indices["P"], indices["Название"], indices["Репо"]})
     else:
@@ -120,9 +120,9 @@ def check_t2(cells, line_num, indices):
         cell = cells[i]
         if not cell or cell in DONE_STATUS_EMOJIS | ACTIVE_STATUS_EMOJIS:
             continue
-        # Поле с содержимым должно быть в ~~...~~
+        # The field with content must be wrapped in ~~...~~
         if not has_strikethrough(cell):
-            # Проверить что не просто тире/прочерк
+            # Check that it is not just a dash/hyphen placeholder
             if cell not in ("—", "-", ""):
                 issues.append({
                     "line": line_num,
@@ -148,24 +148,24 @@ def check_nc(cells, line_num, name_col):
                 "cell_value": name_cell[:80],
                 "message": f"загрязнение имени (паттерн «{pattern.pattern}»): «{name_cell[:60]}»"
             })
-            break  # Одно сообщение на строку достаточно
+            break  # one message per row is enough
     return issues
 
 def clean_name_cell(name_cell):
     """Очистить колонку «Название» от служебных данных."""
     cleaned = name_cell
 
-    # Убрать «— closed DATE (details)»
+    # Remove «— closed DATE (details)»
     cleaned = re.sub(r"\s*—\s*closed(?:-partial)?\b.*$", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
-    # Убрать «— Ф1-Ф5 done DATE (...); Ф6 — backlog» (все виды тире)
+    # Remove «— Ф1-Ф5 done DATE (...); Ф6 — backlog» (all kinds of dashes)
     cleaned = re.sub(r"\s*[-–—]\s*Ф\d[^|]*$", "", cleaned, flags=re.DOTALL)
-    # Убрать «(backlinks: WP-123 ...)»
+    # Remove «(backlinks: WP-123 ...)»
     cleaned = re.sub(r"\s*\(backlinks\s*:[^)]*\).*$", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
-    # Убрать «(peer-session ...) ...»
+    # Remove «(peer-session ...) ...»
     cleaned = re.sub(r"\s*\(peer-session\b[^)]*\).*$", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
-    # Убрать «(PHASE1=5...) ...»
+    # Remove «(PHASE1=5...) ...»
     cleaned = re.sub(r"\s*\(PHASE\d*\s*=[^)]*\).*$", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
-    # Убрать batch disposition / final closeout хвосты
+    # Remove batch disposition / final closeout tails
     cleaned = re.sub(r"\s*—\s*(?:batch disposition|final closeout|зомби-триаж)\b.*$", "", cleaned,
                      flags=re.DOTALL | re.IGNORECASE)
 
@@ -175,7 +175,7 @@ def clean_name_cell(name_cell):
 def fix_t2_row(parts, cells, indices):
     """Добавить ~~ вокруг ячеек done-строки без strikethrough (#, P, Репо — не Название,
     её вручную оборачивать рискованно из-за markdown-разметки внутри)."""
-    # Маппинг: cell_index → part_index (parts[0] пустой, parts[-1] пустой, ячейки с 1)
+    # Mapping: cell_index -> part_index (parts[0] is empty, parts[-1] is empty, cells start at 1)
     cell_to_part = {i: i + 1 for i in range(len(cells))}
     changed = False
     for cell_idx in sorted({indices["#"], indices["P"], indices["Репо"]}):
@@ -191,8 +191,8 @@ def fix_t2_row(parts, cells, indices):
             continue
         if has_strikethrough(cell):
             continue
-        # Ячейка без ~~ → обернуть
-        # Убрать ** вокруг если есть
+        # Cell without ~~ -> wrap
+        # Remove ** around if present
         clean = re.sub(r"^\*\*(.+)\*\*$", r"\1", cell.strip())
         parts[part_idx] = f" ~~{clean}~~ "
         changed = True
@@ -231,17 +231,17 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
                 new_lines[i] = "|".join(parts) + "\n"
 
         if fix and nc_issues:
-            # Исправить NC в этой строке
+            # Fix NC in this row
             parts = line.rstrip("\n").split("|")
-            name_part = name_col + 1  # parts[0] пустой из-за ведущего "|"
+            name_part = name_col + 1  # parts[0] is empty because of the leading "|"
             if len(parts) >= name_part + 1:
                 original_cell = parts[name_part]
                 stripped_content = original_cell.strip()
 
-                # Разобраться с ~~...~~ обёрткой
+                # Deal with the ~~...~~ wrapper
                 has_strike_before = stripped_content.startswith("~~") and "~~" in stripped_content[2:]
                 if has_strike_before:
-                    # Извлечь содержимое из ~~...~~ с хвостом
+                    # Extract the content from ~~...~~ with the tail
                     inner_match = re.match(r"~~(.+?)~~(.*)", stripped_content, re.DOTALL)
                     if inner_match:
                         inner = inner_match.group(1)
@@ -254,13 +254,13 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
                     else:
                         cleaned_cell = clean_name_cell(stripped_content)
                 else:
-                    # Активная строка (без ~~)
+                    # Active row (without ~~)
                     inner_match = re.match(r"\*?\*?(.+?)\*?\*?$", stripped_content, re.DOTALL)
                     inner = inner_match.group(1) if inner_match else stripped_content
-                    # Убрать ** вокруг
+                    # Remove ** around
                     inner = re.sub(r"^\*\*(.+)\*\*$", r"\1", inner)
                     cleaned = clean_name_cell(inner)
-                    # Восстановить ** если были
+                    # Restore ** if there were any
                     if stripped_content.startswith("**"):
                         cleaned_cell = f"**{cleaned}**"
                     else:
@@ -274,7 +274,7 @@ def process_file(registry_path, fix=False, fix_t2=False, exit_nonzero=False):
             f.writelines(new_lines)
         print(f"   ✅ Исправлено {sum(1 for i in range(len(lines)) if new_lines[i] != lines[i])} строк")
 
-    # Сводка
+    # Summary
     t2_count = sum(1 for iss in all_issues if iss["type"] == "T2")
     nc_count = sum(1 for iss in all_issues if iss["type"] == "NC")
 
@@ -308,7 +308,7 @@ if __name__ == "__main__":
     else:
         iwe = os.environ.get("IWE_ROOT", os.path.expanduser("~/IWE"))
         gov = os.environ.get("IWE_GOVERNANCE_REPO", "DS-strategy")
-        # Попробовать найти REGISTRY через env-var имя репо
+        # Try to find REGISTRY via the repo-name env var
         for gov_name in [gov]:
             candidate = os.path.join(iwe, gov_name, "docs", "WP-REGISTRY.md")
             if os.path.exists(candidate):

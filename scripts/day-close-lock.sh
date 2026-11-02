@@ -1,36 +1,36 @@
 #!/bin/bash
 # requires: IWE_GOVERNANCE_REPO set via iwe-env-bootstrap.sh (fallback: DS-strategy, same as other scripts)
-# day-close-lock.sh — git-native cross-machine lock against duplicate Day Close runs (WP-484 Ф2).
+# day-close-lock.sh — git-native cross-machine lock against duplicate Day Close runs (WP-484 Phase 2).
 #
-# Инцидент 17.07: сервер (удалённый) и пилот вручную закрыли один день независимо друг от друга,
-# gap обнаружился только в момент commit+push. Git log сам по себе неатомарен (read-then-act),
-# поэтому источник истины — сам факт push: кто раньше запушил "day-close-start:", тот и работает,
-# остальные видят чужой свежий маркер (или reject при попытке запушить свой) и останавливаются
-# ДО начала работы, а не после.
+# Incident of 17.07: the server (remote) and the pilot closed the same day manually, independently of each other,
+# the gap was discovered only at the moment of commit+push. Git log by itself is non-atomic (read-then-act),
+# so the source of truth is the push itself: whoever pushed "day-close-start:" first is the one who works,
+# the others see someone else's fresh marker (or a reject when trying to push their own) and stop
+# BEFORE starting work, not after.
 #
-# Маркеры — ПУСТЫЕ коммиты, созданные через commit-tree (не `git commit --allow-empty`, которая
-# не гарантирует пустой diff если в индексе есть чужие staged-файлы — реальный риск в репо, где
-# параллельно работают несколько агентов). Два независимых пустых коммита с разными сообщениями
-# никогда не конфликтуют при rebase — проверено тестом на реальной гонке.
+# Markers are EMPTY commits created via commit-tree (not `git commit --allow-empty`, which
+# does not guarantee an empty diff if the index holds someone else's staged files — a real risk in a repo where
+# several agents work in parallel). Two independent empty commits with different messages
+# never conflict on rebase — verified by a test on a real race.
 #
-# После push-reject проверка идёт по origin/<branch> НАПРЯМУЮ (git fetch, без rebase) — если
-# сначала перебазировать свой маркер поверх новых чужих коммитов и только потом проверять лог,
-# собственный только что перебазированный маркер (committer-date обновляется rebase'ом на "сейчас")
-# становится самым свежим совпадением и маскирует реальную причину reject'а — ревью нашло это
-# эмпирически (reject от ПОСТОРОННЕГО коммита давал ложное "кто-то закрывает день" на каждый раз).
+# After a push reject the check goes against origin/<branch> DIRECTLY (git fetch, no rebase) — if
+# we first rebase our own marker on top of new foreign commits and only then check the log,
+# our own just-rebased marker (committer-date is updated by rebase to "now")
+# becomes the freshest match and masks the real cause of the reject — review found this
+# empirically (a reject caused by a FOREIGN commit gave a false "someone is closing the day" every time).
 #
-# Календарная дата следует системной зоне установки — той же зоне, в которой
-# протокол пишет финальный маркер day-close. Epoch-возраст маркера от зоны не зависит.
+# The calendar date follows the system zone of the installation — the same zone in which the
+# protocol writes the final day-close marker. The marker's epoch age does not depend on the zone.
 #
-# Двухуровневая защита: сначала быстрый локальный барьер (gateway-lock.py, для двух процессов на
-# ОДНОЙ машине), затем git-маркер (для гонки МЕЖДУ машинами — ровно инцидент 17.07). Первый уровень
-# не обязателен (gateway недоступен → просто пропускается), второй — единственный источник истины.
+# Two-level protection: first a fast local barrier (gateway-lock.py, for two processes on
+# ONE machine), then a git marker (for a race BETWEEN machines — exactly the incident of 17.07). The first level
+# is optional (gateway unavailable → simply skipped), the second is the only source of truth.
 #
 # Usage: day-close-lock.sh acquire
-#   exit 0 — лок взят, можно приступать к закрытию дня
-#   exit 1 — день уже закрыт сегодня (найден финальный коммит "day-close: YYYY-MM-DD")
-#   exit 3 — кто-то уже закрывает день прямо сейчас (свежий "day-close-start:", локально или на другой машине)
-#   exit 2 — git/gateway-операция не удалась однозначно (сеть/хук/окружение) — ретраить снаружи, не считать "уже закрыто"
+#   exit 0 — lock taken, can proceed with closing the day
+#   exit 1 — the day is already closed today (final commit "day-close: YYYY-MM-DD" found)
+#   exit 3 — someone is already closing the day right now (fresh "day-close-start:", locally or on another machine)
+#   exit 2 — git/gateway operation failed outright (network/hook/environment) — retry from outside, do not treat as "already closed"
 
 set -euo pipefail
 
@@ -39,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 REPO_DIR="$WORKSPACE_DIR/$GOVERNANCE_REPO"
-TTL_SECONDS=1800  # та же конвенция, что scripts/session-guard.sh HK_MAX_AGE (30 мин)
+TTL_SECONDS=1800  # same convention as scripts/session-guard.sh HK_MAX_AGE (30 min)
 GATEWAY_LOCK_PY="$REPO_DIR/scripts/lib/gateway-lock.py"
 
 log() { echo "[day-close-lock] $1"; }
@@ -48,8 +48,8 @@ calendar_today() {
   date +%Y-%m-%d
 }
 
-# Единая точка выхода после того, как локальный маркер-коммит уже создан: откатывает его
-# и завершает с нужным кодом — вместо повторения "discard + exit" по трём местам (P2).
+# Single exit point after the local marker commit has already been created: rolls it back
+# and exits with the needed code — instead of repeating "discard + exit" in three places (P2).
 abort_after_marker() {
   local code="$1" msg="$2"
   log "$msg"
@@ -57,8 +57,8 @@ abort_after_marker() {
   exit "$code"
 }
 
-# Быстрый барьер для двух процессов на ОДНОЙ машине — необязательный, gateway недоступен → просто
-# продолжаем и полагаемся на git-проверку ниже (она единственная работает между машинами).
+# Fast barrier for two processes on ONE machine — optional, gateway unavailable → simply
+# continue and rely on the git check below (it alone works between machines).
 local_barrier() {
   [ -x "$GATEWAY_LOCK_PY" ] || { log "gateway-lock.py не найден — пропускаю локальный барьер"; return 0; }
   local rc=0
@@ -71,9 +71,9 @@ local_barrier() {
   fi
 }
 
-# Возвращает: "closed" | "start:<age_seconds>" | "" (пусто — сегодня ничего не было).
-# $1 — git-ref для проверки (по умолчанию HEAD; для пост-reject проверки — origin/<branch>,
-# НЕ локальный HEAD после rebase, см. комментарий в заголовке файла).
+# Returns: "closed" | "start:<age_seconds>" | "" (empty — nothing happened today).
+# $1 — git ref to check (HEAD by default; for the post-reject check — origin/<branch>,
+# NOT the local HEAD after rebase, see the comment in the file header).
 check_today_history() {
   local ref="${1:-HEAD}"
   local today; today=$(calendar_today)
@@ -98,7 +98,7 @@ check_today_history() {
   echo ""
 }
 
-# Коммит гарантированно без diff (не зависит от состояния индекса, в отличие от --allow-empty).
+# The commit is guaranteed to have no diff (independent of index state, unlike --allow-empty).
 create_start_marker() {
   local who="$1" today="$2"
   local parent tree new
@@ -108,8 +108,8 @@ create_start_marker() {
   git update-ref HEAD "$new" || return 1
 }
 
-# Откатывает локальный незапушенный маркер к последнему известному состоянию origin — если мы
-# зависли в rebase (для пустых коммитов маловероятно, но не исключено), сначала выходим из него.
+# Rolls the local unpushed marker back to the last known origin state — if we
+# got stuck in a rebase (unlikely for empty commits, but not excluded), first leave it.
 discard_local_marker() {
   local git_dir rm_dir ra_dir
   git_dir=$(git rev-parse --git-dir 2>/dev/null) || return 0
@@ -156,9 +156,9 @@ acquire() {
     return 0
   fi
 
-  # Push отклонён. Проверяем origin/<branch> НАПРЯМУЮ через fetch, БЕЗ rebase: если сначала
-  # перебазировать свой маркер, он сам станет "самым свежим" в логе и замаскирует реальную
-  # причину reject'а (в т.ч. посторонний, не связанный с day-close коммит) — см. заголовок файла.
+  # Push rejected. Check origin/<branch> DIRECTLY via fetch, WITHOUT rebase: if we first
+  # rebase our own marker, it itself becomes "the freshest" in the log and masks the real
+  # cause of the reject (including a foreign commit unrelated to day-close) — see the file header.
   git fetch origin "$branch" || abort_after_marker 2 "git fetch после reject не удался — эскалирую"
 
   state=$(check_today_history "origin/$branch")
@@ -166,8 +166,8 @@ acquire() {
     abort_after_marker 3 "После reject подтверждено: день уже закрывается/закрыт кем-то другим на origin — выхожу"
   fi
 
-  # На origin нет конкурента — reject был вызван чем-то посторонним. Безопасно перебазировать
-  # свой маркер поверх актуального origin и повторить push.
+  # There is no competitor on origin — the reject was caused by something unrelated. It is safe to rebase
+  # our marker on top of the current origin and retry the push.
   git rebase --autostash "origin/$branch" || abort_after_marker 2 "rebase после fetch не удался — эскалирую"
   git push || abort_after_marker 2 "Повторный push не удался — эскалирую"
   log "Lock acquired на втором заходе: day-close-start: ${today} by ${who}"

@@ -3,7 +3,7 @@
 # canonical checkout's branch ref with the just-published origin tip when, and
 # only when, the local history it would drop is provably already on origin.
 #
-# The gap this closes (WP-530 Ф38, peer-session 2026-09-11-07, Claude+Kimi+Codex):
+# The gap this closes (WP-530 Phase 38, peer-session 2026-09-11-07, Claude+Kimi+Codex):
 # sessions commit straight into the canonical checkout, isolate-push.sh carries
 # those commits to origin as cherry-picks (new SHAs), and nothing afterwards
 # moves the canonical ref -- so the canon is never an ancestor of origin again.
@@ -17,11 +17,11 @@
 #              live pid -- Codex, round 3: a re-check right before reset shrinks
 #              the race with a concurrent writer but cannot close it, and this
 #              script takes no snapshot of tracked dirt; until a barrier every
-#              writer honours exists (Ф5.1) the only safe answer is skip + retry
+#              writer honours exists (Phase 5.1) the only safe answer is skip + retry
 #              on the next publish; re-checked right before the swap) · branch
 #              as expected · index clean · tracked-tree dirt only where the
 #              on-disk entry already equals the target's (mode+blob) or the
-#              path is deleted here and absent there (WP-561 Ф24: point-
+#              path is deleted here and absent there (WP-561 Phase 24: point-
 #              installed published bytes must not freeze the canon forever) ·
 #              every local-only commit patch-equivalent to the target (`git
 #              cherry` has no `+`) OR content-superseded (every path it touched
@@ -42,7 +42,7 @@
 # event inside the canon would dirty the very tree it is reconciling -- cold
 # review 11.09 found the resulting 15-minute publish loop).
 #
-# Loudness (WP-530 Ф76): a refusal is silent by design, so a canon that cannot be reconciled used to look exactly like a
+# Loudness (WP-530 Phase 76): a refusal is silent by design, so a canon that cannot be reconciled used to look exactly like a
 # healthy one. Every refusal prints how many times in a row this same class (the text before the first ':') has
 # refused, over how many minutes, and how many tracked paths are dirty; when the class has lasted
 # CANON_RECONCILE_ALERT_AFTER_SEC (default 3600) and at least CANON_RECONCILE_ALERT_MIN_COUNT times (default 3), one
@@ -78,7 +78,7 @@
 set -uo pipefail
 
 # The delivery proof (git cherry) must not trust local replacement refs or legacy
-# grafts: a forged object can make an undelivered commit look published (WP-7 Ф161).
+# grafts: a forged object can make an undelivered commit look published (WP-7 Phase 161).
 export GIT_NO_REPLACE_OBJECTS=1
 export GIT_GRAFT_FILE=/dev/null/iwe-no-grafts
 # Every pathspec here is a literal path name, never a glob or ":(magic)" (WP-530 F72 review).
@@ -298,7 +298,7 @@ healthy() {  # a healthy exit ends the refusal streak; a refusal appended at the
 
 # A refusal must stop the script, and bash gives no guarantee for it: a FAILED ARITHMETIC EXPANSION discards the whole
 # top-level command that is running -- the function that failed, its callers and their exit 1 included -- and the script
-# goes on to the next line. Round 1 of Ф76 had exactly that: a state field "12.3" broke `$((10#$first))` inside
+# goes on to the next line. Round 1 of Phase 76 had exactly that: a state field "12.3" broke `$((10#$first))` inside
 # refuse(), the refusal was dropped and the run went on to reset the canon over a local-only commit. The hazard is
 # structural (anything in a report that aborts has this effect; origin/main's refuse() has nothing abort-prone, so no
 # trigger is known there). So: (1) the whole report runs in a SUBSHELL, where an abort ends only the subshell, and the
@@ -391,7 +391,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ "$CURRENT_BRANCH" = "$BRANCH" ] || refuse "checked-out branch is not the expected one: '$CURRENT_BRANCH' instead of '$BRANCH'"
 
 # The repository lock is the one the other guard scripts take ($GIT_DIR/dirty-guard.lock) and it lives in ONE place, scripts/lib/
-# dirty-guard-lock.sh (WP-530 Ф81 and its remainder, peer session 2026-10-02-01 with Kimi and Codex): the takeover rule (only when
+# dirty-guard-lock.sh (WP-530 Phase 81 and its remainder, peer session 2026-10-02-01 with Kimi and Codex): the takeover rule (only when
 # the owner is PROVEN gone), the owner record, the release (only a lock with our token), the scope and the limits are described in
 # the header of that file. What stays HERE is what happens when the lock is busy: the skip is printed, logged as "skipped" and
 # recorded in its own journal (canon-reconcile-published.KEY.lockbusy: the series of skips because the lock is held, same law as the
@@ -474,7 +474,7 @@ live_canonical_writers() {  # prints " name name ..." or nothing
     # hasn't closed yet only because this reconcile call is part of its own
     # publish/close sequence (WP-7, found 2026-10-13). A pid is only unique
     # within one host's process namespace (same guard as session-guard.sh's
-    # _quarantine_dead_interactive, WP-530 Ф53): require the recorded host,
+    # _quarantine_dead_interactive, WP-530 Phase 53): require the recorded host,
     # when present, to match ours too, or a restored/foreign semaphore whose
     # pid numerically collides with ours would be skipped as if it were us.
     if [ -n "$self_pid" ] && [ "$sem_pid" = "$self_pid" ] \
@@ -517,14 +517,14 @@ tracked_and_deleted_by_target() {  # <path> -- a blob in OLD_HEAD that the targe
   [ -n "$(git ls-tree "$OLD_HEAD" -- "$1" | awk '$1!="040000"')" ] && [ -z "$(git ls-tree "$PINNED" -- "$1" | awk '$1!="040000"')" ]
 }
 ANCESTRAL_HISTORY_LIMIT=400
-# ANCESTRAL_PATH criterion (WP-530 Ф72, next to "entry equals the target's"): the
+# ANCESTRAL_PATH criterion (WP-530 Phase 72, next to "entry equals the target's"): the
 # canon's version of <path> (`<mode> <oid>`) already occurred in the target's
 # history of the SAME path, and the path is still alive on the target (a blob,
 # not deleted, not renamed away, not a directory now). The canon then holds an
 # older state of origin -- nothing of it is unique. A path missing on the target,
 # a deletion on the canon side and any version origin never had all stay
 # refusals. History-based evidence ("nothing is lost"), not a compatibility
-# proof; no line-by-line subset mode (rejected in Ф71). Literal pathspecs: a
+# proof; no line-by-line subset mode (rejected in Phase 71). Literal pathspecs: a
 # name with glob characters must not match its neighbours.
 ancestral_path() {  # <path> <"mode oid"> -- return 0 when the criterion holds
   local p="$1" want="$2" alive sha
@@ -551,7 +551,7 @@ disk_entry() {  # <path> -> "<mode> <hash>" of what is on disk, or "" if absent
 # 2. index must be clean. Tracked-tree dirt is tolerated ONLY when what is on
 #    disk already equals the target's entry (mode + blob, or "deleted here and
 #    absent on the target"): `git reset --hard` would write the very same bytes,
-#    so nothing is lost. WP-561 Ф24 / WP-530 (peer-session 2026-09-27-09,
+#    so nothing is lost. WP-561 Phase 24 / WP-530 (peer-session 2026-09-27-09,
 #    Claude+Kimi+Codex): published fixes were being point-installed into the
 #    frozen canon, which then refused every reconcile as "tracked/staged changes
 #    present" -- and stayed frozen precisely because it was dirty. Any other

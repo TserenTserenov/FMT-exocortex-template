@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run-issue-tests.sh — single versioned runner for issue-regression tests
-# (WP-529 F6, peer-session 2026-08-19-01, codex В3).
+# (WP-529 F6, peer-session 2026-08-19-01, codex V3).
 #
 # A new scripts/tests/test_issue_*.sh is picked up by mere existence of the
 # file. Legacy-named issue regressions live in ADDITIONAL_ISSUE_TESTS below:

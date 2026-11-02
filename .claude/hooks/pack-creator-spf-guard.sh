@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 # routing: hook  see DP.SC.048, DP.ROLE.062
-# Pre-tool-use guard: блокирует Write/Edit на путях SPF/, FPF/ когда активна
-# сессия скилла /pack-creator. Fail-safe от усталости (DP.ROLE.062 §FM.02).
+# Pre-tool-use guard: blocks Write/Edit on SPF/, FPF/ paths when a
+# /pack-creator skill session is active. Fail-safe against fatigue (DP.ROLE.062 §FM.02).
 #
-# Срабатывает только если переменная окружения PACK_CREATOR_ACTIVE=1.
-# Иначе — pass-through (другие скиллы не блокируются).
+# Triggers only if the environment variable PACK_CREATOR_ACTIVE=1.
+# Otherwise — pass-through (other skills are not blocked).
 #
 # Exit codes:
-#   0 — действие разрешено
-#   2 — действие заблокировано (PreToolUse contract — Claude получит ошибку)
+#   0 — action allowed
+#   2 — action blocked (PreToolUse contract — Claude will get an error)
 
 set -uo pipefail
 
-# Если не в режиме pack-creator — pass-through
+# If not in pack-creator mode — pass-through
 if [ "${PACK_CREATOR_ACTIVE:-0}" != "1" ]; then
     exit 0
 fi
 
-# Читаем PreToolUse JSON из stdin (Claude Code formal contract)
-# Парсим целиком (вход может быть в одну или несколько строк).
+# Read PreToolUse JSON from stdin (Claude Code formal contract)
+# Parse it whole (the input may be on one or several lines).
 TOOL_NAME=""
 FILE_PATH=""
 PAYLOAD=$(cat)
@@ -46,13 +46,13 @@ if [ -z "$FILE_PATH" ]; then
     esac
 fi
 
-# Защищаем только Write/Edit/MultiEdit/NotebookEdit
+# Guard only Write/Edit/MultiEdit/NotebookEdit
 case "$TOOL_NAME" in
     Write|Edit|MultiEdit|NotebookEdit) ;;
     *) exit 0 ;;
 esac
 
-# Проверяем path на блокируемые директории. $CLAUDE_PROJECT_DIR is Claude
+# Check the path against blocked directories. $CLAUDE_PROJECT_DIR is Claude
 # Code's own, always-set-in-a-real-session project root (same idiom already
 # used in inject-fault-profile.sh and sibling hooks) -- a bare "$HOME/IWE"
 # guessed wrong on any non-default workspace location, the same bug class

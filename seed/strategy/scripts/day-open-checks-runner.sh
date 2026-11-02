@@ -1,7 +1,7 @@
 #!/bin/bash
 # SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
-# day-open-checks-runner.sh — парсер и исполнитель bash-блоков из extensions/day-open.checks.md
-# see WP-7 Ф-DayOpen-Enforcement DOE2
+# day-open-checks-runner.sh — parser and executor of bash blocks from extensions/day-open.checks.md
+# see WP-7 Phase DayOpen-Enforcement DOE2
 # NOTE: checks.md is a trusted local source (not shared/untrusted input).
 
 set -uo pipefail

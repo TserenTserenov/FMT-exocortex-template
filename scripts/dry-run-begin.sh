@@ -1,23 +1,23 @@
 #!/bin/bash
 # routing: guard  deterministic=true
-# dry-run-begin.sh — эксклюзивное создание dry-run репетиции (issue #549 stage 2).
+# dry-run-begin.sh — exclusive creation of a dry-run rehearsal (issue #549 stage 2).
 #
-# Единственная штатная точка создания: транзакционный замок → отказ, если
-# активная репетиция уже есть (печатает её gate_id) → строгая валидация
-# существующих state-файлов → атомарное создание state(active) → sentinel
-# со ссылкой на gate_id → unlock. Печатает в stdout:
+# The only standard creation point: transactional lock → refusal if an
+# active rehearsal already exists (prints its gate_id) → strict validation of
+# existing state files → atomic creation of state(active) → sentinel
+# referencing gate_id → unlock. Prints to stdout:
 #   gate_id=<id>
-#   owner_token=<token>          ← держать в shell инициатора, НЕ в state
+#   owner_token=<token>          ← keep in the initiator's shell, NOT in state
 #   owner_session_id=<sid>
-# Token хранится в state только как sha256 — репетиция, читающая state
-# read-only командой, не получает preimage и не может завершить gate сама
-# (Codex review r1: декоративный token + whitelisted helper = штатный обход).
+# The token is stored in state only as sha256 — a rehearsal that reads state with a
+# read-only command does not get the preimage and cannot finish the gate itself
+# (Codex review r1: a decorative token + a whitelisted helper = a standard bypass).
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-# --help/-h — до любых side-effects (issue #757): голый exit 0 без этой ветки
-# заставлял --help реально вооружать гейт (INITIATOR="--help"), а HELP-smoke
-# в validate-fmt-scripts.sh считал такой exit 0 доказательством безопасности.
+# --help/-h — before any side effects (issue #757): a bare exit 0 without this branch
+# made --help actually arm the gate (INITIATOR="--help"), and the HELP smoke
+# in validate-fmt-scripts.sh took such an exit 0 as proof of safety.
 [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
     echo "dry-run-begin.sh — эксклюзивное создание dry-run репетиции (issue #549 stage 2)"
     echo "Использование: dry-run-begin.sh [initiator] [session_id]"
@@ -30,8 +30,8 @@ command -v jq >/dev/null 2>&1 || { echo "dry-run-begin: jq required" >&2; exit 2
 
 SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
 DRY_DIR="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-# Единый резолвер путей (Codex r2): override действует только с маркером
-# тест-режима — иначе компоненты смотрят в разные места.
+# A single path resolver (Codex r2): the override works only with a test-mode
+# marker — otherwise components look in different places.
 if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
     [ -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ] || {
         DRY_DIR="/tmp/iwe-dry-run-$(id -u)"
@@ -42,7 +42,7 @@ LOCK_DIR="$DRY_DIR/transaction.lock"
 
 fail() { echo "dry-run-begin: $*" >&2; exit 1; }
 
-# Каталог: lstat-инварианты гейта.
+# Directory: lstat invariants of the gate.
 [ -L "$DRY_DIR" ] && fail "dir $DRY_DIR is a symlink — refusing"
 if [ ! -d "$DRY_DIR" ]; then
     mkdir -m 0700 "$DRY_DIR" 2>/dev/null || fail "cannot create $DRY_DIR with 0700"
@@ -75,14 +75,14 @@ while ! mkdir "$LOCK_DIR" 2>/dev/null; do
     sleep 0.1 2>/dev/null || sleep 1
 done
 NONCE=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
-# Ошибка записи owner-файла = замок не захвачен (иначе он вечный).
+# An owner-file write error = lock not acquired (otherwise it is eternal).
 if ! { echo "$$"; echo "$NONCE"; ps -o lstart= -p $$ 2>/dev/null || echo "unknown"; } > "$LOCK_DIR/pid" 2>/dev/null; then
     rm -rf "$LOCK_DIR" 2>/dev/null || true
     fail "cannot record lock owner"
 fi
 trap 'if [ "$(sed -n "2p" "$LOCK_DIR/pid" 2>/dev/null)" = "$NONCE" ]; then rm -rf "$LOCK_DIR" 2>/dev/null; fi' EXIT
 
-# Эксклюзивность + строгая валидация существующих state под замком.
+# Exclusivity + strict validation of existing state under the lock.
 shopt -s nullglob
 for sf in "$DRY_DIR"/gate-*.state; do
     jq -e . "$sf" >/dev/null 2>&1 || fail "corrupted state file: $sf"
@@ -107,8 +107,8 @@ case "$OWNER_PID" in ''|*[!0-9]*) fail "cannot determine owner pid" ;; esac
 case "$OWNER_PGID" in ''|*[!0-9]*|0) fail "cannot determine owner pgid (got '$OWNER_PGID')" ;; esac
 [ -n "$OWNER_PID_START" ] || fail "cannot determine owner pid start"
 
-# Sentinel проверяется ДО создания state (Codex r4: иначе при уже
-# существующем sentinel остаётся active-state без выданного token).
+# The sentinel is checked BEFORE creating state (Codex r4: otherwise with an already
+# existing sentinel an active state remains without an issued token).
 [ ! -e "$SENTINEL" ] && [ ! -L "$SENTINEL" ] || fail "sentinel $SENTINEL already exists — refusing"
 
 umask 077
@@ -119,8 +119,8 @@ jq -nc --arg gid "$GID" --arg sid "$SID" --arg tsha "$TOKEN_SHA" \
   '{version:2,gate_id:$gid,owner_session_id:$sid,owner_pid:$pid,owner_pgid:$pgid,owner_pid_start:$pstart,owner_token_sha256:$tsha,state:"active",created_at:$created,initiator:$init}' \
   > "$TMP" && mv -f "$TMP" "$DRY_DIR/gate-$GID.state" || { rm -f "$TMP"; fail "atomic state create failed"; }
 
-# Sentinel — эксклюзивное создание, только после state. При гонке (кто-то
-# создал его после нашей проверки) — откат именно нашего state.
+# The sentinel is an exclusive creation, only after state. On a race (someone
+# created it after our check) — roll back exactly our own state.
 if ! ( set -C; jq -nc --arg gid "$GID" --arg sid "$SID" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{gate_id:$gid,created_at:$created,session_id:$sid,initiator:"audit-installation"}' \
     > "$SENTINEL" ) 2>/dev/null; then

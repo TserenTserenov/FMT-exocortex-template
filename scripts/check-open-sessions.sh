@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# WP-358 Ф10 — детектор незакрытых external-сессий.
-# Выводит markdown-секцию для вставки в DayPlan (Day Open) или warning (Day Close).
+# WP-358 Phase 10 — detector of unclosed external sessions.
+# Prints a markdown section to paste into DayPlan (Day Open) or a warning (Day Close).
 #
-# Открытая сессия = SESSION-<id>.md в inbox/agent/sessions/ И:
-#   - mtime ≥ CUTOVER_DATE (после внедрения Ф10, backfill 52 старых не делаем) И
-#   - status != "completed" ИЛИ (status: completed И age ≥ STALE_HOURS)
+# An open session = SESSION-<id>.md in inbox/agent/sessions/ AND:
+#   - mtime ≥ CUTOVER_DATE (after Phase 10 rollout, we do not backfill the 52 old ones) AND
+#   - status != "completed" OR (status: completed AND age ≥ STALE_HOURS)
 #
-# Финализированная (по Ф10) = перемещена в sessions/external/YYYY-MM/SESSION-<id>/
-# — детектор её не видит, так как файла нет в inbox/agent/sessions/.
+# Finalized (per Phase 10) = moved to sessions/external/YYYY-MM/SESSION-<id>/
+# — the detector does not see it, since there is no file in inbox/agent/sessions/.
 #
-# Выход 0 всегда. Stdout = markdown (пустой если N=0).
+# Exit 0 always. Stdout = markdown (empty if N=0).
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 REPO_ROOT="$IWE_DS_MY_STRATEGY"
 SESSIONS_DIR="$REPO_ROOT/inbox/agent/sessions"
 CUTOVER_DATE="${SESSION_CUTOVER_DATE:-2026-05-29}"   # ISO date
-STALE_HOURS="${SESSION_STALE_HOURS:-24}"             # для status: completed
+STALE_HOURS="${SESSION_STALE_HOURS:-24}"             # for status: completed
 
 [[ -d "$SESSIONS_DIR" ]] || exit 0
 

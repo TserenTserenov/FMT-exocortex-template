@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Проверяет WP-518 и минимальный FMT-контракт exact session transitions.
+# Checks WP-518 and the minimal FMT contract of exact session transitions.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

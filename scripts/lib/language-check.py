@@ -36,8 +36,8 @@ import json
 import re
 import sys
 
-# non-blocking self-check шаг (решение Ф89: alert, не block) — порог и лимиты
-# рабочие гипотезы, требуют калибровки на живых ответах.
+# non-blocking self-check step (Phase 89 decision: alert, not block) — the threshold and limits
+# are working hypotheses, need calibration on live responses.
 CYRILLIC_RATIO_THRESHOLD = 0.30
 MIN_RESIDUAL_LEN = 20
 GLOSS_LATIN_THRESHOLD = 0.50
@@ -49,12 +49,12 @@ _ALPHA_RE = re.compile(r"[Ѐ-ӿA-Za-z]")
 _FENCED_CODE_RE = re.compile(r"```.*?```", re.DOTALL)
 _INLINE_CODE_RE = re.compile(r"`[^`]*`")
 _URL_RE = re.compile(r"https?://\S+")
-# Путь: содержит `/` ИЛИ известное файловое расширение, без пробелов внутри.
-# `\w` в Python re юникодный по умолчанию — матчит кириллицу наравне с
-# латиницей, из-за чего обычные русские конструкции через слэш («и/или»,
-# «да/нет», «чтение/запись») распознавались как путь и вырезались вместе с
-# кириллицей внутри них (review-02, peer-session ход 18). Явный ASCII-класс
-# вместо `\w` — пути и расширения файлов физически не бывают кириллическими.
+# Path: contains `/` OR a known file extension, no spaces inside.
+# `\w` in Python re is Unicode by default — it matches Cyrillic on a par with
+# Latin, because of which ordinary Russian slash constructions ("and/or",
+# "yes/no", "read/write") were recognized as a path and cut out together with the
+# Cyrillic inside them (review-02, peer-session turn 18). An explicit ASCII class
+# instead of `\w` — file paths and extensions are physically never Cyrillic.
 _PATH_RE = re.compile(
     r"\b(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\b|\b[A-Za-z0-9_-]+\.(?:sh|py|md|yaml|yml|json|ts|tsx|js|txt|log)\b"
 )
@@ -108,11 +108,11 @@ def check_language(text):
     residual = strip_non_prose(text)
     alpha_chars = _ALPHA_RE.findall(residual)
 
-    # MIN_RESIDUAL_LEN гейтит статистическую значимость ratio, которая зависит
-    # от количества БУКВ, не общей длины остатка (review-02, peer-session ход
-    # 18): текст с обилием WP-номеров/дат/хэшей давал длинный residual с 1-2
-    # буквами внутри — ratio считался по микровыборке (0/1, 1/2…), давая
-    # alert почти из ничего. Мерить len(alpha_chars) напрямую.
+    # MIN_RESIDUAL_LEN gates the statistical significance of the ratio, which depends
+    # on the number of LETTERS, not the total length of the remainder (review-02, peer-session turn
+    # 18): text with plenty of WP numbers/dates/hashes gave a long residual with 1-2
+    # letters inside — the ratio was computed on a micro-sample (0/1, 1/2…), producing an
+    # alert out of almost nothing. Measure len(alpha_chars) directly.
     if len(alpha_chars) < MIN_RESIDUAL_LEN:
         return {"alert": False, "ratio": None, "reason": "too few alphabetic chars after stripping code/paths/glosses, skipped"}
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # routing: helper  executor=script  called-by=agent-inbox-dispatcher
 # see DP.SC.159, DP.ROLE.059
-# headless-runner.sh — точка входа Headless-адаптера (DP.IWE.011-adapter-headless)
+# headless-runner.sh — entry point of the Headless adapter (DP.IWE.011-adapter-headless)
 #
-# Устанавливает env по контракту DP.IWE.011, затем вызывает iwe-agent-dispatcher.py
-# для запуска ОРЗ-протокола или произвольной задачи через `claude -p`.
+# Sets env per the DP.IWE.011 contract, then calls iwe-agent-dispatcher.py
+# to run an ORZ protocol or an arbitrary task via `claude -p`.
 #
-# Использование:
+# Usage:
 #   headless-runner.sh [--protocol open|close|work] [--task TASK-ID] [--model sonnet|opus|haiku]
 #                      [--workdir PATH] [--dry-run] [--help]
 #
-# Примеры:
+# Examples:
 #   headless-runner.sh --protocol open
 #   headless-runner.sh --protocol close --dry-run
 #   headless-runner.sh --task TASK-2026-05-21-analyse --model opus
@@ -29,7 +29,7 @@ STATE_DIR="${IWE_STATE_DIR:-$HOME/.iwe/state}"
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCHER="$SCRIPTS_DIR/iwe-agent-dispatcher.py"
 
-# WP-529 Ф9 (Evgenii 20.08): dispatcher imports yaml unconditionally, so a
+# WP-529 Phase 9 (Evgenii 20.08): dispatcher imports yaml unconditionally, so a
 # plain `python3` here can silently pick a yaml-less interpreter (same class
 # as #453/#463) — unlike route-task.sh's per-skill interpreter resolution,
 # this entrypoint always needs PyYAML, so it hard-fails instead of falling
@@ -62,18 +62,18 @@ if [[ -z "${IWE_DISPATCHER_REPO_URL:-}" ]]; then
   exit 1
 fi
 
-# === Set IWE_RUNTIME env (контракт DP.IWE.011 §C) ===
+# === Set IWE_RUNTIME env (contract DP.IWE.011 §C) ===
 export IWE_RUNTIME="headless"
 
 # === Generate AGENT_SESSION_ID ===
 AGENT_SESSION_ID="$(date +%s%N | md5 | cut -c1-16 2>/dev/null || date +%s%N | md5sum | cut -c1-16)"
 export AGENT_SESSION_ID
-export CLAUDE_TASK_ID="${TASK_ID}"  # CC-совместимость для agent-trace-recorder.sh
+export CLAUDE_TASK_ID="${TASK_ID}"  # CC compatibility for agent-trace-recorder.sh
 export AGENT_TASK_ID="${TASK_ID}"
 export AGENT_MODEL_ID="${MODEL}"
 export IWE_STATE_DIR="${STATE_DIR}"
 
-# === Write session env file (совместимость с хуками) ===
+# === Write session env file (compatibility with hooks) ===
 mkdir -p "$STATE_DIR"
 cat > "$STATE_DIR/current-session.env" <<EOF
 IWE_RUNTIME=headless
@@ -86,7 +86,7 @@ EOF
 
 echo "[headless-runner] IWE_RUNTIME=headless AGENT_SESSION_ID=${AGENT_SESSION_ID} MODEL=${MODEL}"
 
-# === Если указан --protocol, создать task из шаблона ===
+# === If --protocol is given, create a task from the template ===
 if [[ -n "$PROTOCOL" ]]; then
   _create_protocol_task() {
     local protocol="$1"
@@ -95,7 +95,7 @@ if [[ -n "$PROTOCOL" ]]; then
     repo_name="$(basename "${IWE_DISPATCHER_REPO_URL%.git}")"
     local tasks_dir="${WORKDIR}/${repo_name}/inbox/agent/tasks"
 
-    # Если dispatcher ещё не клонировал репо — клонировать
+    # If the dispatcher has not cloned the repo yet — clone it
     if [[ ! -d "${WORKDIR}/${repo_name}" ]]; then
       echo "[headless-runner] Клонирую репо для создания task..." >&2
       git clone -b "${IWE_DISPATCHER_REPO_BRANCH:-main}" \
@@ -149,7 +149,7 @@ TASKEOF
   export AGENT_TASK_ID="$TASK_ID"
 fi
 
-# === Запуск dispatcher ===
+# === Run dispatcher ===
 DISPATCHER_ARGS=(
   --workdir "$WORKDIR"
   --task "$TASK_ID"
@@ -160,10 +160,10 @@ echo "[headless-runner] Запускаю dispatcher: $PYTHON3 $DISPATCHER ${DISP
 "$PYTHON3" "$DISPATCHER" "${DISPATCHER_ARGS[@]}"
 EXIT_CODE=$?
 
-# === Log завершения ===
+# === Log completion ===
 echo "[headless-runner] Завершено. exit=$EXIT_CODE session=$AGENT_SESSION_ID"
 
-# Обновить session env с временем завершения
+# Update the session env with the completion time
 echo "SESSION_END_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$STATE_DIR/current-session.env"
 echo "SESSION_EXIT_CODE=${EXIT_CODE}" >> "$STATE_DIR/current-session.env"
 

@@ -1,25 +1,25 @@
 #!/bin/bash
 # Knowledge Extractor Agent Runner
-# Запускает Claude Code с заданным процессом KE
+# Runs Claude Code with the given KE process
 #
-# Использование:
-#   extractor.sh inbox-check     # headless: обработка inbox (launchd)
-#   extractor.sh audit           # headless: аудит Pack'ов
-#   extractor.sh audit-scheduled <pack>  # headless: аудит одного Pack'а (месячная ротация)
+# Usage:
+#   extractor.sh inbox-check     # headless: process inbox (launchd)
+#   extractor.sh audit           # headless: audit Packs
+#   extractor.sh audit-scheduled <pack>  # headless: audit a single Pack (monthly rotation)
 #   extractor.sh session-close   # convenience wrapper
 #   extractor.sh on-demand       # convenience wrapper
 
 set -e
 
-# Конфигурация
-# WP-273 R5 fix (Round 5 Евгения): substituted runner живёт в .iwe-runtime/,
-# но prompts/ — read-only, должны браться из FMT через $IWE_TEMPLATE.
+# Configuration
+# WP-273 R5 fix (Round 5 of Evgeny): the substituted runner lives in .iwe-runtime/,
+# but prompts/ is read-only and must be taken from FMT via $IWE_TEMPLATE.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Guard: сырой файл в FMT-exocortex-template никогда не подставляет плейсхолдеры
-# (build-runtime.sh подставляет их только в собранную копию под .iwe-runtime/).
-# Запуск отсюда напрямую тихо создаёт директории с буквальным именем "{{HOME_DIR}}"
+# Guard: the raw file in FMT-exocortex-template never substitutes placeholders
+# (build-runtime.sh substitutes them only in the built copy under .iwe-runtime/).
+# Running from here directly silently creates directories with the literal name "{{HOME_DIR}}"
 # (bug-2026-07-02-home-dir-placeholder-literal-directory.md).
 case "$SCRIPT_DIR" in
     */FMT-exocortex-template/roles/extractor/scripts)
@@ -29,10 +29,10 @@ case "$SCRIPT_DIR" in
         ;;
 esac
 
-# WP-273 0.29.4 R6.1 fix (issue #271): runtime-резолв вместо build-time {{WORKSPACE_DIR}} — как в strategist.sh.
+# WP-273 0.29.4 R6.1 fix (issue #271): runtime resolve instead of build-time {{WORKSPACE_DIR}} — as in strategist.sh.
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 
-# PROMPTS_DIR резолв: $IWE_TEMPLATE → standard FMT → relative (legacy)
+# PROMPTS_DIR resolve: $IWE_TEMPLATE -> standard FMT -> relative (legacy)
 if [ -n "${IWE_TEMPLATE:-}" ] && [ -d "$IWE_TEMPLATE/roles/extractor/prompts" ]; then
     PROMPTS_DIR="$IWE_TEMPLATE/roles/extractor/prompts"
 elif [ -d "$WORKSPACE/FMT-exocortex-template/roles/extractor/prompts" ]; then
@@ -53,18 +53,18 @@ elif [ -x "$HOME/.local/bin/claude" ]; then
 elif [ -x "$HOME/.npm-global/bin/claude" ]; then
     CLAUDE_PATH="$HOME/.npm-global/bin/claude"
 else
-    CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime должен был подставить
+    CLAUDE_PATH="{{CLAUDE_PATH}}"  # fallback: build-runtime should have substituted this
 fi
 ENV_FILE="$HOME/.config/aist/env"
 
-# AI CLI: переопределение через переменные окружения (см. strategist.sh)
+# AI CLI: override via environment variables (see strategist.sh)
 AI_CLI="${AI_CLI:-$CLAUDE_PATH}"
 AI_CLI_PROMPT_FLAG="${AI_CLI_PROMPT_FLAG:--p}"
 AI_CLI_EXTRA_FLAGS="${AI_CLI_EXTRA_FLAGS:---dangerously-skip-permissions --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
 
-# AR.293: гейт проверяет эффективную программу ($AI_CLI), не литерал CLAUDE_PATH —
-# иначе override остаётся декоративным, когда claude физически отсутствует, но
-# AI_CLI указывает на реально установленную другую программу.
+# AR.293: the gate checks the effective program ($AI_CLI), not the CLAUDE_PATH literal —
+# otherwise the override stays decorative when claude is physically absent but
+# AI_CLI points to another actually installed program.
 if ! command -v "$AI_CLI" >/dev/null 2>&1 && [ ! -x "$AI_CLI" ]; then
     echo "[$(date '+%H:%M:%S')] ERROR: $AI_CLI CLI не найден (AI_CLI/CLAUDE_CLI_PATH/PATH/~/.local/bin/~/.npm-global/fallback='$AI_CLI')." >&2
     exit 127
@@ -105,7 +105,7 @@ if [ -z "${NOTIFY_SH_PATH:-}" ]; then
     fi
 fi
 
-# Создаём папку для логов
+# Create the log folder
 mkdir -p "$LOG_DIR"
 
 DATE=$(date +%Y-%m-%d)
@@ -168,7 +168,7 @@ notify() {
 
 notify_telegram() {
     local scenario="$1"
-    # WP-273 R5 fix: notify.sh — read-only из FMT (не substituted, нет плейсхолдеров).
+    # WP-273 R5 fix: notify.sh — read-only from FMT (not substituted, no placeholders).
     # Resolution order: $IWE_TEMPLATE → standard FMT path → runtime fallback (legacy).
     local notify_script
     if [ -n "${IWE_TEMPLATE:-}" ] && [ -f "$IWE_TEMPLATE/roles/synchronizer/scripts/notify.sh" ]; then
@@ -185,7 +185,7 @@ notify_telegram() {
     fi
 }
 
-# Загрузка переменных окружения
+# Load environment variables
 load_env() {
     # An explicit CLAUDE_CODE_OAUTH_TOKEN (launchd plist, shell) beats ENV_FILE too.
     local explicit_token="${CLAUDE_CODE_OAUTH_TOKEN:-}"
@@ -202,7 +202,7 @@ load_env() {
     prefer_subscription_over_proxy
 }
 
-# WP-5 Ф46: the subscription token lives in its own 600-mode file, not in
+# WP-5 Phase 46: the subscription token lives in its own 600-mode file, not in
 # ENV_FILE. First non-empty source wins; an explicit env var (launchd plist,
 # shell) beats both files:
 #   ~/.secrets/claude_code_oauth_token  raw token, written by scripts/connect.sh
@@ -276,7 +276,7 @@ ai_cli_is_claude() {
     [ "$resolved" = "$CLAUDE_PATH" ] || [ "$resolved" -ef "$CLAUDE_PATH" ]
 }
 
-# WP-5 Ф46: preflight before any headless run. `claude auth status` is the
+# WP-5 Phase 46: preflight before any headless run. `claude auth status` is the
 # vendor's own answer to "is any login configured?" (env token, API key,
 # keychain on macOS, credentials file) — no API call, exit 1 when nothing is
 # set up. Without it an unauthenticated run dies deep inside run_claude with a
@@ -303,9 +303,9 @@ run_claude() {
         exit 1
     fi
 
-    # WP-273 0.29.6 R6.1** escape: build-runtime НЕ должен подменять плейсхолдеры
-    # в sed-выражениях этого runner'а (иначе runner после build ищет values вместо
-    # placeholders в промптах). Собираем двойно-фигурные токены через bash-конкатенацию.
+    # WP-273 0.29.6 R6.1** escape: build-runtime must NOT substitute placeholders
+    # in the sed expressions of this runner (otherwise after build the runner looks for values instead of
+    # placeholders in prompts). Build the double-brace tokens via bash concatenation.
     local prompt
     local _gov_repo="${IWE_GOVERNANCE_REPO:-DS-strategy}"
     local _ws="${IWE_WORKSPACE:-$HOME/IWE}"
@@ -317,7 +317,7 @@ run_claude() {
         -e "s|${_o}GITHUB_USER${_c}|$_gh_user|g" \
         "$command_path")
 
-    # Добавить extra args к промпту
+    # Add extra args to the prompt
     if [ -n "$extra_args" ]; then
         prompt="$prompt
 
@@ -331,12 +331,12 @@ $extra_args"
 
     cd "$WORKSPACE"
 
-    # Запуск AI CLI с промптом
+    # Run the AI CLI with the prompt
     if ! "$AI_CLI" $AI_CLI_EXTRA_FLAGS \
         $AI_CLI_PROMPT_FLAG "$prompt" \
         >> "$LOG_FILE" 2>&1; then
         log "ERROR: AI CLI failed for $command_file"
-        # WP-5 Ф46: an expired/revoked subscription token is the most likely
+        # WP-5 Phase 46: an expired/revoked subscription token is the most likely
         # cause (TTL is undocumented, seen live) and would otherwise drown in
         # the generic failure above. Live wording of the CLI error:
         # "Failed to authenticate. API Error: 401 OAuth access token is invalid."
@@ -349,7 +349,7 @@ $extra_args"
 
     log "AI CLI finished: $command_file"
 
-    # Commit + push changes (отчёты, помеченные captures)
+    # Commit + push changes (reports, marked captures)
     local strategy_dir="$WORKSPACE/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 
     if git -C "$strategy_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -593,7 +593,7 @@ prefilter_changed_reports() {
     done < <(git -C "$strategy_dir" ls-files --modified --others --exclude-standard -z -- inbox/extraction-reports/)
 }
 
-# WP-5 Ф48 follow-up (found live 02.09 on the first real test run after the
+# WP-5 Phase 48 follow-up (found live 02.09 on the first real test run after the
 # origin/main-alignment fix above): the shared pre-commit hook's Scope gate
 # (session-guard.sh pre-commit-check) refuses any new/modified path that
 # isn't registered under an active session semaphore. This was invisible
@@ -722,7 +722,7 @@ commit_extractor_changes() {
         return 0
     fi
 
-    # WP-5 Ф48: no longer requires HEAD == origin/main before attempting a
+    # WP-5 Phase 48: no longer requires HEAD == origin/main before attempting a
     # commit. That equality check made every commit fail on a busy day --
     # origin/main routinely advances during the 2-8 minute Claude analysis
     # window (dozens of concurrent sessions publishing elsewhere), so by the
@@ -738,8 +738,8 @@ commit_extractor_changes() {
         return 0
     fi
 
-    # Не трогаем файлы экстрактора, если их уже подготовил другой процесс.
-    # `commit --only` сохраняет staging всех остальных путей без ручного reset.
+    # Do not touch the extractor files if another process has already prepared them.
+    # `commit --only` preserves staging of all other paths without a manual reset.
     if [ "${#target_paths[@]}" -eq 0 ]; then
         EXTRACTOR_COMMIT_RESULT="no_changes"
         return 0
@@ -815,7 +815,7 @@ commit_extractor_changes() {
         return 0
     fi
 
-    # WP-5 Ф48 review fix: derive the paths to register from $target_changes
+    # WP-5 Phase 48 review fix: derive the paths to register from $target_changes
     # (porcelain output, so every entry is a real file that exists right now)
     # instead of a static guess list. The static list silently skipped a path
     # via `[ -e ... ] || continue` on a repo/run where e.g. inbox/captures/
@@ -864,7 +864,7 @@ commit_extractor_changes() {
     fi
     log "Committed $repo_name ($head_after)"
 
-    # WP-5 Ф48: publish through the shared coordination gate instead of a raw
+    # WP-5 Phase 48: publish through the shared coordination gate instead of a raw
     # fast-forward-only push. ds-publish.sh/isolate-push.sh fetches fresh
     # origin/main, cherry-picks this commit's patch onto it in a disposable
     # worktree, and pushes -- the same mechanism day-open/day-close/
@@ -1045,7 +1045,7 @@ cleanup_isolated_inbox_worktree() {
     rmdir "$run_root" 2>/dev/null || log "WARN: cannot remove isolated run directory: $run_root"
 }
 
-# AR-gate 03.09 (архгейт, см. bug-2026-07-07-r15-decisions-bypassed-pilot.md):
+# AR-gate 03.09 (arch gate, see bug-2026-07-07-r15-decisions-bypassed-pilot.md):
 # inbox-check.md never writes into a Pack -- headless steps only ever vote
 # accept/reject/defer into the report, the actual write happens exclusively
 # in the separate, pilot-triggered "Применение отчёта" session. Mounting
@@ -1193,7 +1193,7 @@ capture_source_files() {
 # pending-review) instead of a "### " heading inside a shared monthly file --
 # pending_capture_count()'s awk cannot parse this shape at all (it looks for
 # "### " lines), so these files were entirely invisible to inbox-check no
-# matter how long they sat there. Found live (WP-560 Ф13, 2026-09-14,
+# matter how long they sat there. Found live (WP-560 Phase 13, 2026-09-14,
 # peer-session Kimi+Codex): 3 real pending-review files unprocessed for
 # ~2 months since 2026-07-14. A file with any other status (active, applied,
 # analyzed, ...) is not pending and is skipped.
@@ -1384,7 +1384,7 @@ $(pack_snapshot_context)"
 
     case "${EXTRACTOR_COMMIT_RESULT:-}" in
         published)
-            # WP-5 Ф48: no ls-remote SHA check here anymore. publish_commit
+            # WP-5 Phase 48: no ls-remote SHA check here anymore. publish_commit
             # routes through ds-publish.sh/isolate-push.sh, which cherry-picks
             # this worktree's commit onto a fresh origin/main in its own
             # disposable worktree -- the SHA that lands on origin is a new one
@@ -1508,29 +1508,29 @@ $feed_context"
     esac
 }
 
-# Проверка рабочих часов
+# Working hours check
 is_work_hours() {
     local hour
     hour=$(date +%H)
     [ "$hour" -ge 7 ] && [ "$hour" -le 23 ]
 }
 
-# Загружаем env
+# Load env
 load_env
 
-# Показ usage (без аргумента/-h) не требует входа — только реальные команды ниже.
+# Showing usage (no argument/-h) does not require login — only the real commands below do.
 if [ -n "${1:-}" ] && [ "$1" != "-h" ] && [ "$1" != "--help" ]; then
     check_auth || exit 1
 fi
 
-# launchd загружает минимальное окружение. Совместимость сохранена для старого
-# GOVERNANCE_REPO, но все последующие пути используют единое имя репозитория.
+# launchd loads a minimal environment. Compatibility is kept for the old
+# GOVERNANCE_REPO, but all subsequent paths use a single repository name.
 if [ -z "${IWE_GOVERNANCE_REPO:-}" ]; then
     IWE_GOVERNANCE_REPO="${GOVERNANCE_REPO:-DS-strategy}"
     export IWE_GOVERNANCE_REPO
 fi
 
-# Определяем процесс
+# Determine the process
 case "$1" in
     "inbox-check")
         if ! is_work_hours; then
@@ -1574,11 +1574,11 @@ case "$1" in
         ;;
 
     "session-close-feed")
-        # WP-247 Ф-MULTI-SOURCE.1: feeder-режим (non-interactive).
-        # Извлекает кандидатов из транскрипта + git diff,
-        # пишет ###-блоки в помесячный inbox/captures/YYYY-MM.md (ротация
-        # WP-526; без ротации — в captures.md) с маркером [feed:session-close].
-        # Не создаёт extraction-report — это работа inbox-check потом.
+        # WP-247 Phase MULTI-SOURCE.1: feeder mode (non-interactive).
+        # Extracts candidates from the transcript + git diff,
+        # writes ###-blocks to the monthly inbox/captures/YYYY-MM.md (rotation
+        # WP-526; without rotation — to captures.md) with the marker [feed:session-close].
+        # Does not create an extraction-report — that is the job of inbox-check later.
         #
         # WP-5 follow-up (02.09): quick-close's own handler (session-close-
         # feeder.sh) now launches this call as a detached background job
@@ -1592,7 +1592,7 @@ case "$1" in
         # Cold-context review (02.09): under this file's `set -e`, run_claude
         # failing (exit 1 on a missing prompt file, or its own `return 1` on
         # an AI CLI failure -- a live, not hypothetical, case per its own
-        # WP-5 Ф46 comment) aborted the script before release_inbox_lock ever
+        # WP-5 Phase 46 comment) aborted the script before release_inbox_lock ever
         # ran, leaving the lock held by a now-dead PID until the next call's
         # stale-reclaim path. Not a permanent deadlock, but a genuine
         # concurrent run in between was wrongly told "already running", with
@@ -1604,10 +1604,10 @@ case "$1" in
         ;;
 
     "git-diff-feed")
-        # WP-247 Ф-MULTI-SOURCE.2: git-diff feeder (cron 09:00/21:00, issue #1252 —
-        # было 06:00/21:00 с окном 12ч, промежутки 9ч/15ч оставляли дыру и дубль).
-        # Извлекает кандидатов из git log за окно и пишет ###-блоки в captures-inbox.
-        # Окно: $2 (по умолчанию "13 hours ago" — покрывает оба промежутка без дыры).
+        # WP-247 Phase MULTI-SOURCE.2: git-diff feeder (cron 09:00/21:00, issue #1252 —
+        # was 06:00/21:00 with a 12h window, the 9h/15h gaps left a hole and a duplicate).
+        # Extracts candidates from git log over the window and writes ###-blocks to captures-inbox.
+        # Window: $2 (default "13 hours ago" — covers both gaps without a hole).
         #
         # issue #840: this case wrote to the same captures.md as
         # session-close-feed without taking any lock -- a concurrent

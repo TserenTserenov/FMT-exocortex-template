@@ -708,8 +708,8 @@ HOOK_FILE="$TEMPLATE_DIR/.claude/hooks/protocol-artifact-validate.sh"
 # the real checks diverge. Requires DAYPLAN/WORKSPACE/ERRORS to be set by the
 # caller, exactly like the hook itself expects them from its own preamble.
 T11_CHECKS_BLOCK=$(awk '
-/^# --- Ф3 Check 3: формат мультипликатора ---$/{found=1}
-/^# --- Ф3 Check 5:/{found=0}
+/^# --- Phase 3 Check 3: multiplier format ---$/{found=1}
+/^# --- Phase 3 Check 5:/{found=0}
 found' "$HOOK_FILE")
 
 # Check 4 calls resolve_find_python3() (issue #764/#765 fix), defined earlier

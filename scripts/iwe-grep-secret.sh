@@ -4,8 +4,8 @@
 #
 # iwe-grep-secret.sh — Secret Drift Detector (WP-315)
 #
-# Сканирует ВСЕ места хранения секретов по всем слоям инфраструктуры IWE.
-# Не логирует сам секрет — только hit-count и location-identifier.
+# Scans ALL secret storage locations across all layers of the IWE infrastructure.
+# Does not log the secret itself — only hit-count and location-identifier.
 #
 # Usage:
 #   iwe-grep-secret.sh '<secret-value>' [--layer env|cloud|pg|smoke|all]
@@ -19,9 +19,9 @@
 #                            ssh attempted, no wait).
 #
 # Exit codes:
-#   0 — N = 0 (ни одного hit)
-#   1 — N ≥ 1 (есть hits, требуется ручная проверка)
-#   2 — ошибка инфраструктуры (нет ssh, нет psql, нет доступа)
+#   0 — N = 0 (no hits)
+#   1 — N ≥ 1 (hits found, manual review required)
+#   2 — infrastructure error (no ssh, no psql, no access)
 #   3 — usage error
 #
 # Related: DP.SC.125, AR.205, security-posture.md §6
@@ -64,7 +64,7 @@ EOF
 die() { echo -e "${RED}ERROR:${NC} $1" >&2; exit 3; }
 warn() { echo -e "${YELLOW}WARN:${NC} $1" >&2; }
 
-# Не логируем secret_value нигде, даже в debug
+# Do not log secret_value anywhere, even in debug
 # shellcheck disable=SC2317
 log_layer_start() { echo "→ Layer $1: scanning..." >&2; }
 log_layer_done() { echo "  Layer $1: $2 hit(s)" >&2; }
@@ -98,7 +98,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# Если secret не передан как аргумент — читаем из stdin
+# If secret is not passed as an argument — read from stdin
 if [[ -z "$SECRET_VALUE" ]]; then
   if [[ -t 0 ]]; then
     die "Secret value required. Pass as argument or via stdin."
@@ -114,7 +114,7 @@ case "$LAYER_FILTER" in
   *) die "Invalid layer: $LAYER_FILTER. Use: env, cloud, pg, smoke, all" ;;
 esac
 
-# ── Layer 1: Env-файлы (local + optional remote hosts) ───────────────────
+# ── Layer 1: Env files (local + optional remote hosts) ───────────────────
 scan_layer_env() {
   log_layer_start "1 (env files)"
   local hits=0
@@ -124,10 +124,10 @@ scan_layer_env() {
     "$HOME/.config/exocortex/secrets.env"
   )
 
-  # Локальные env-файлы
+  # Local env files
   for p in "${paths[@]}"; do
     if [[ -e "$p" ]]; then
-      # grep -c — только count, не выводит совпадение
+      # grep -c — count only, does not print the match
       local c
       c=$(grep -cF "$SECRET_VALUE" "$p" 2>/dev/null || true)
       if [[ "$c" -gt 0 ]]; then
@@ -137,7 +137,7 @@ scan_layer_env() {
     fi
   done
 
-  # Рекурсивный grep по IWE (только .env файлы, исключая node_modules и т.п.)
+  # Recursive grep over IWE (only .env files, excluding node_modules etc.)
   local iwe_ws="${IWE_WORKSPACE:-$HOME/IWE}"
   if [[ -d "$iwe_ws" ]]; then
     while IFS= read -r -d '' f; do
@@ -179,7 +179,7 @@ scan_layer_env() {
             ((ssh_hits += c2)) || true
           fi
 
-          # IWE .env на удалённом хосте
+          # IWE .env on the remote host
           local c3
           c3=$(ssh -o ConnectTimeout=5 "$remote_host" "find ~/IWE -type f \( -name '.env*' -o -name 'secrets*' \) ! -path '*/node_modules/*' -print0 2>/dev/null | xargs -0 grep -cF '$SECRET_VALUE' 2>/dev/null | awk -F: '{s+=\$2} END {print s+0}'" 2>/dev/null || echo 0)
           if [[ "$c3" -gt 0 ]]; then
@@ -208,7 +208,7 @@ scan_layer_cloud() {
   local hits=0
 
   # ── Railway (GraphQL API v2) ──────────────────────────────────────────
-  # Токен: RAILWAY_TOKEN env var → ~/.secrets/railway-api-token → skip
+  # Token: RAILWAY_TOKEN env var → ~/.secrets/railway-api-token → skip
   local railway_token="${RAILWAY_TOKEN:-}"
   # Fallback: IWE .secrets directory (IWE_WORKSPACE > ~/IWE > ~/.secrets)
   if [[ -z "$railway_token" ]]; then
@@ -229,7 +229,7 @@ scan_layer_cloud() {
       warn "Railway: jq не установлен (Railway skipped)"
       ((INFRA_ERRORS++)) || true
     else
-      # Шаг 1: получаем структуру workspaces → projects → services за один запрос
+      # Step 1: get the workspaces → projects → services structure in one request
       local structure
       structure=$(curl -sf --max-time 15 \
         -H "Authorization: Bearer ${railway_token}" \
@@ -253,7 +253,7 @@ scan_layer_cloud() {
             proj_id=$(echo "$structure" | jq -r ".data.me.workspaces[${wi}].projects.edges[${pi}].node.id")
             proj_name=$(echo "$structure" | jq -r ".data.me.workspaces[${wi}].projects.edges[${pi}].node.name")
 
-            # Шаг 2: environments для проекта
+            # Step 2: environments for the project
             local env_payload envs nenv
             env_payload=$(jq -nc --arg q "{ environments(projectId: \"${proj_id}\") { edges { node { id name } } } }" '{"query": $q}')
             envs=$(curl -sf --max-time 10 \
@@ -276,7 +276,7 @@ scan_layer_cloud() {
                 env_id=$(echo "$envs" | jq -r ".data.environments.edges[${ei}].node.id")
                 env_name=$(echo "$envs" | jq -r ".data.environments.edges[${ei}].node.name")
 
-                # Шаг 3: переменные сервиса — возвращает JSON-объект {KEY: VALUE}
+                # Step 3: service variables — returns a JSON object {KEY: VALUE}
                 local var_payload vars
                 var_payload=$(jq -nc \
                   --arg q "{ variables(projectId: \"${proj_id}\", environmentId: \"${env_id}\", serviceId: \"${svc_id}\") }" \
@@ -293,7 +293,7 @@ scan_layer_cloud() {
                   continue
                 fi
 
-                # grep -cF: считаем вхождения, не выводим значение
+                # grep -cF: count occurrences, do not print the value
                 local c
                 c=$(echo "$vars" | jq -r '.data.variables // {} | to_entries[].value' 2>/dev/null \
                   | grep -cF "$SECRET_VALUE" 2>/dev/null || true)
@@ -315,14 +315,14 @@ scan_layer_cloud() {
   fi
 
   # ── Cloudflare Workers ───────────────────────────────────────────────
-  # CF Workers secrets зашифрованы write-only: после установки значение
-  # невозможно прочитать ни через CLI, ни через API (by design, Cloudflare).
-  # Скан по значению невозможен. Layer 2 для CF = структурный аудит + инструкция.
+  # CF Workers secrets are encrypted write-only: after setting, the value
+  # cannot be read via CLI or API (by design, Cloudflare).
+  # Scanning by value is impossible. Layer 2 for CF = structural audit + instructions.
   if command -v wrangler &>/dev/null && [[ -n "${CF_API_TOKEN:-}" ]]; then
     warn "CF Workers: secrets write-only — скан по значению невозможен (Cloudflare design)."
     warn "  После ротации обновить вручную: wrangler secret put <VAR> --name <worker>"
     warn "  Список workers с этим секретом: security-posture.md §6"
-    # 0 hits, нет INFRA_ERROR — это известное ограничение, не сбой инфраструктуры
+    # 0 hits, no INFRA_ERROR — this is a known limitation, not an infrastructure failure
   elif command -v wrangler &>/dev/null; then
     warn "CF_API_TOKEN не задан (CF Workers Layer 2 skipped)"
     ((INFRA_ERRORS++)) || true
@@ -347,7 +347,7 @@ scan_layer_pg() {
     return
   fi
 
-  # Inventory БД с FDW (из security-posture.md §6)
+  # DB inventory with FDW (from security-posture.md §6)
   local databases=(
     "${NEON_REWARDS_URL:-}"
     "${NEON_LEARNING_URL:-}"
@@ -360,8 +360,8 @@ scan_layer_pg() {
     [[ -n "$db_url" ]] || continue
 
     local c
-    # Параметризованный запрос через PGPASSWORD из URL (или .pgpass)
-    # Не передаём secret_value в SQL — ищем через LIKE в umoptions
+    # Parameterized query via PGPASSWORD from the URL (or .pgpass)
+    # Do not pass secret_value into SQL — search via LIKE in umoptions
     c=$(psql "$db_url" -t -A -c "
       SELECT COUNT(*)
       FROM pg_user_mapping um
@@ -392,7 +392,7 @@ scan_layer_smoke() {
   local hits=0
 
   warn "Smoke-test layer not yet implemented (WP-315 Ф5-Ф7)"
-  # TODO: подключение через каждую роль, FDW-функция, API call
+  # TODO: connection through each role, FDW function, API call
 
   log_layer_done "4" "$hits"
   (( TOTAL_HITS += hits )) || true
@@ -401,7 +401,7 @@ scan_layer_smoke() {
 # ── Main ─────────────────────────────────────────────────────────────────
 echo "=== Secret Drift Detector v${VERSION} ===" >&2
 echo "Layer filter: ${LAYER_FILTER}" >&2
-# Не выводим secret_value
+# Do not print secret_value
 echo "" >&2
 
 if [[ "$LAYER_FILTER" == "all" || "$LAYER_FILTER" == "env" ]]; then

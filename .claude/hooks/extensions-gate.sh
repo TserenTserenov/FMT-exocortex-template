@@ -1,47 +1,47 @@
 #!/bin/bash
 # Extensions Gate Hook
-# Event: PreToolUse (matcher: Edit, Write). Это блокирующий guardrail для двух
-# структурированных file tools, а не tool-independent security boundary:
-# произвольный Bash не разбирается (issue #528), что прямо раскрыто в CLAUDE.md.
-# Блокирует прямое редактирование .claude/skills/, memory/protocol-*.md и
-# update-manifest.json (манифест определяет, какие скиллы платформенные, —
-# правка одного файла отключала бы гейт целиком).
+# Event: PreToolUse (matcher: Edit, Write). This is a blocking guardrail for two
+# structured file tools, not a tool-independent security boundary:
+# arbitrary Bash is not parsed (issue #528), which is stated openly in CLAUDE.md.
+# Blocks direct editing of .claude/skills/, memory/protocol-*.md and
+# update-manifest.json (the manifest defines which skills are platform skills —
+# editing that one file would disable the gate entirely).
 #
-# Инвариант (отчёт Константина 14.08.2026, WP-7 Ф71): разрешение выдаётся
-# только при ДОКАЗАННО успешной проверке; отсутствие или отказ любого
-# инструмента (jq, python3, битый манифест) — блокировка, не пропуск.
-# До этого гейт был fail-open: пустой вывод `jq ... 2>/dev/null` читался как
-# «скилла нет в манифесте» → разрешение; путь с «..» давал имя чужого скилла;
-# симлинк из своей папки на платформенный файл проходил.
+# Invariant (Konstantin's report of 14.08.2026, WP-7 Phase 71): permission is granted
+# only after a PROVEN successful check; the absence or failure of any
+# tool (jq, python3, a broken manifest) means a block, not a pass.
+# Before that the gate was fail-open: an empty output of `jq ... 2>/dev/null` was read as
+# "skill is not in the manifest" → permission; a path with ".." gave the name of another skill;
+# a symlink from one's own folder to a platform file went through.
 #
-# Исключения:
-#   - FMT-exocortex-template (шаблон — всегда разрешён, кроме манифеста)
-#   - author_mode: true в params.yaml (автор шаблона — source-of-truth в IWE,
-#     пропагация в FMT через template-sync.sh)
-#   - issue #311: новая директория .claude/skills/<name>/, которой нет в
-#     update-manifest.json — свой навык, update.sh её не тронет. extend/SKILL.md
-#     документирует ровно этот путь как штатный.
-#   - issue #872: правка платформенного .claude/skills/<name>/SKILL.md, весь
-#     эффект которой лежит ВНУТРИ единственного блока между строками
-#     <!-- USER-SPACE --> и <!-- /USER-SPACE --> (update.sh сохраняет этот блок
-#     при обновлении; scripts/add-skill-markers.sh добавляет его в L1-скиллы).
-#     Решение принимается по ИНВАРИАНТУ результирующего документа, не по
-#     old_string/new_string: считаем содержимое файла ПОСЛЕ вызова и требуем
-#     побайтово те же маркеры, тот же текст до открывающего и после закрывающего
-#     маркера. Исключение относится ТОЛЬКО к обычному существующему файлу с
-#     физическим путём <workspace>/.claude/skills/<имя>/SKILL.md; для любого
-#     другого файла (другие хуки, settings, CLAUDE.md, соседние файлы скилла,
-#     memory/protocol-*) оно ничего не меняет: прежнее решение хука сохраняется
-#     как есть (в частности, хук по-прежнему не закрывает .claude/hooks/*).
-#     Любая ошибка разбора/чтения = блок (fail-closed); нет python3 — исключение
-#     не действует.
-#     Принадлежность скилла к платформенному слою доказана ПОРЯДКОМ веток, а не
-#     маркерами: исключение 3 (#311) раньше выпускает любой скилл, чей каталог
-#     отсутствует в прочитанном манифесте, поэтому сюда доходят только скиллы,
-#     записанные в манифесте. Остаточный риск: проверка содержимого и сама запись
-#     инструментом не атомарны (гонка при подмене файла между ними), а хук не может
-#     передать инструменту проверенный inode — он остаётся guardrail от случайной
-#     правки, а не границей безопасности (см. CLAUDE.md §9, Extensions Gate).
+# Exceptions:
+#   - FMT-exocortex-template (the template is always allowed, except the manifest)
+#   - author_mode: true in params.yaml (the template author — source-of-truth in IWE,
+#     propagation to FMT via template-sync.sh)
+#   - issue #311: a new directory .claude/skills/<name>/ that is not in
+#     update-manifest.json — a custom skill, update.sh will not touch it. extend/SKILL.md
+#     documents exactly this path as the standard one.
+#   - issue #872: an edit of a platform .claude/skills/<name>/SKILL.md whose entire
+#     effect lies INSIDE the single block between the lines
+#     <!-- USER-SPACE --> and <!-- /USER-SPACE --> (update.sh preserves this block
+#     on update; scripts/add-skill-markers.sh adds it to L1 skills).
+#     The decision is made by the INVARIANT of the resulting document, not by
+#     old_string/new_string: we compute the file content AFTER the call and require
+#     byte-for-byte the same markers, the same text before the opening marker and after the closing
+#     marker. The exception applies ONLY to a regular existing file with the
+#     physical path <workspace>/.claude/skills/<name>/SKILL.md; for any
+#     other file (other hooks, settings, CLAUDE.md, neighbouring skill files,
+#     memory/protocol-*) it changes nothing: the hook's previous decision is kept
+#     as is (in particular, the hook still does not cover .claude/hooks/*).
+#     Any parse/read error = block (fail-closed); no python3 — the exception
+#     does not apply.
+#     Membership of a skill in the platform layer is proven by the ORDER of branches, not by
+#     markers: exception 3 (#311) lets through earlier any skill whose directory
+#     is absent from the manifest that was read, so only skills
+#     listed in the manifest get here. Residual risk: the content check and the write
+#     by the tool itself are not atomic (a race if the file is swapped between them), and the hook cannot
+#     hand the tool the verified inode — it stays a guardrail against accidental
+#     edits, not a security boundary (see CLAUDE.md §9, Extensions Gate).
 
 block() {
   printf '{"decision": "block", "reason": "⛔ Extensions Gate: %s"}\n' "$1"
@@ -277,9 +277,9 @@ real_path() {
     "$(native_path "$1")" 2>/dev/null
 }
 
-# Resolve symlinks: симлинк из своей папки скилла на платформенный файл обязан
-# классифицироваться по ЦЕЛИ, не по имени симлинка. Без резолвера защита молча
-# исчезает — поэтому его отказ = блок, не откат к сырому пути.
+# Resolve symlinks: a symlink from a skill's own folder to a platform file must be
+# classified by its TARGET, not by the symlink name. Without a resolver the protection silently
+# disappears — so its failure = block, not a fallback to the raw path.
 REAL_PATH=$(real_path "$FILE_PATH")
 if [ -z "$REAL_PATH" ]; then
   block "python3 недоступен или не смог нормализовать путь — без этого не проверить симлинки, блокирую."
@@ -330,34 +330,34 @@ case "$FILE_PATH" in
     ;;
 esac
 
-# Манифест — always-block, ДО исключения для путей шаблона: управляющая копия
-# лежит внутри клона шаблона, и правка её через Edit/Write отключала бы гейт.
-# Штатный путь изменения манифеста — bash generate-manifest.sh, не Edit.
+# The manifest is always-block, BEFORE the exception for template paths: the control copy
+# lies inside the template clone, and editing it via Edit/Write would disable the gate.
+# The standard way to change the manifest is bash generate-manifest.sh, not Edit.
 case "$REAL_PATH" in
   */update-manifest.json)
     block "update-manifest.json правится только генератором (bash generate-manifest.sh), не напрямую — файл определяет, какие скиллы платформенные."
     ;;
 esac
 
-# Проверяем: это L1 файл? Точные workspace-relative префиксы не захватывают
-# глобальный ~/.claude или соседний каталог с похожим именем (issue #528).
+# Check: is this an L1 file? Exact workspace-relative prefixes do not capture
+# the global ~/.claude or a neighbouring directory with a similar name (issue #528).
 case "$REL_PATH" in
   .claude/skills/*|memory/protocol-*)
 
-  # Исключение 1: FMT-exocortex-template — всегда разрешён
+  # Exception 1: FMT-exocortex-template — always allowed
   if printf '%s' "$REAL_PATH" | grep -q 'FMT-exocortex-template'; then
     exit 0
   fi
 
-  # Исключение 2: author_mode в params.yaml
+  # Exception 2: author_mode in params.yaml
   if [ -f "$WORKSPACE_DIR/params.yaml" ] && grep -qE '^author_mode:\s*true' "$WORKSPACE_DIR/params.yaml" 2>/dev/null; then
     exit 0
   fi
 
-  # Исключение 3 (issue #311): свой навык — .claude/skills/<name>/ отсутствует
-  # в манифесте платформы, update.sh его не затронет и не затрёт.
-  # Требуем ИМЕННО поддиректорию (name/...) — плоский файл прямо в .claude/skills/
-  # (напр. SKILL-INDEX.yaml) НЕ подпадает и блокируется ниже.
+  # Exception 3 (issue #311): a custom skill — .claude/skills/<name>/ is absent
+  # from the platform manifest, update.sh will not touch or overwrite it.
+  # We require EXACTLY a subdirectory (name/...) — a flat file directly in .claude/skills/
+  # (e.g. SKILL-INDEX.yaml) does NOT qualify and is blocked below.
   if printf '%s' "$REL_PATH" | grep -qE '^\.claude/skills/[^/]+/'; then
     SKILL_NAME="${REL_PATH#\.claude/skills/}"
     SKILL_NAME="${SKILL_NAME%%/*}"
@@ -393,9 +393,9 @@ EOF_MF
       block "update-manifest.json не найден ни в одном известном месте шаблона:${MANIFEST_TRIED} — принадлежность скилла не доказать, блокирую. Задай IWE_TEMPLATE=<путь к клону FMT-exocortex-template> (или восстанови клон через update.sh) и повтори."
     fi
     if [ -n "$SKILL_NAME" ]; then
-      # Разрешение только при ДОКАЗАННО прочитанном манифесте: сначала проверка,
-      # что jq видит непустой .files (битый JSON / нет ключа / пустой список =
-      # отказ инструмента, не «скилла нет»), и только потом поиск совпадения.
+      # Permission only when the manifest was PROVEN read: first check
+      # that jq sees a non-empty .files (broken JSON / no key / empty list =
+      # tool failure, not "no such skill"), and only then look for a match.
       if jq -e '.files | type=="array" and length>0' "$MANIFEST" >/dev/null 2>&1; then
         IN_MANIFEST=$(jq -r --arg prefix ".claude/skills/${SKILL_NAME}/" \
           '.files[]? | select(.path | startswith($prefix)) | .path' \
@@ -409,9 +409,9 @@ EOF_MF
     fi
   fi
 
-  # Исключение 4 (issue #872): SKILL.md платформенного скилла, правка целиком
-  # внутри блока USER-SPACE. Форма пути — ровно .claude/skills/<имя>/SKILL.md
-  # (один уровень каталога); всё остальное сюда не попадает и блокируется ниже.
+  # Exception 4 (issue #872): SKILL.md of a platform skill, the edit entirely
+  # inside the USER-SPACE block. The path form is exactly .claude/skills/<name>/SKILL.md
+  # (one directory level); everything else does not get here and is blocked below.
   SKILL_MD_DIR=""
   case "$REL_PATH" in
     .claude/skills/*/SKILL.md)
@@ -423,8 +423,8 @@ EOF_MF
       ;;
   esac
   if [ -n "$SKILL_MD_DIR" ]; then
-    # Разрешение только при явном ALLOW от проверки инварианта; пустой вывод,
-    # падение python или любое иное значение = отказ.
+    # Permission only on an explicit ALLOW from the invariant check; empty output, python
+    # failure or any other value = denial.
     US_VERDICT=$(printf '%s' "$INPUT" | python3 -I -c "$USER_SPACE_PY" "$WORKSPACE_REAL" "$REAL_PATH" "$FILE_PATH" 2>/dev/null)
     if [ "$US_VERDICT" = "ALLOW" ]; then
       echo '{}'
@@ -439,11 +439,11 @@ EOF_MF
     block "SKILL.md платформенного скилла принадлежит платформе (L1), update.sh перезаписывает его при обновлении. Свои дополнения вноси ТОЛЬКО между строками <!-- USER-SPACE --> и <!-- /USER-SPACE --> этого же файла: update.sh сохраняет этот блок. Всё остальное в файле, сами маркеры и текст до/после них не трогай. Причина отказа: ${US_WHY}. Каталог extensions/ помогает только скиллам, которые сами вызывают load-extensions.sh (например day-open, day-close); для остальных, включая fpf, он не читается. Если в этом SKILL.md нет маркеров, исключение не действует: маркеры в платформенный скилл добавляет сопровождающий шаблона (scripts/add-skill-markers.sh в клоне шаблона). Платформенное изменение → FMT-exocortex-template → update.sh."
   fi
 
-  # Блокировать для обычных пользователей
+  # Block for regular users
   block "платформенные (L1) и пользовательские (L3) файлы — разные слои. Правило (CLAUDE.md §9): Авторская кастомизация → extensions/*.md. Платформенное изменение → FMT-exocortex-template → update.sh. Смешение слоёв = хрупкость при обновлении. Создай или обнови нужный файл в extensions/."
   ;;
 esac
 
-# Разрешить редактирование обычных файлов
+# Allow editing of regular files
 echo '{}'
 exit 0

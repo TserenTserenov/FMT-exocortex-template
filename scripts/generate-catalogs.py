@@ -83,11 +83,11 @@ def render_skills(skills: list[dict], root: Path) -> str:
 def script_desc(path: Path) -> str:
     text = path.read_text(encoding="utf-8", errors="replace")
     name = path.name
-    # 1) "# name.sh — описание" / "name.py — описание"
+    # 1) "# name.sh — description" / "name.py — description"
     m = re.search(rf"^#\s*{re.escape(name)}\s*[—-]\s*(.+)$", text, re.MULTILINE)
     if m:
         return short(m.group(1))
-    # 2) python docstring — первая содержательная строка
+    # 2) python docstring — first substantive line
     if path.suffix == ".py":
         dm = re.search(r'"""(.*?)"""', text, re.DOTALL)
         if dm:
@@ -95,7 +95,7 @@ def script_desc(path: Path) -> str:
                 ln = ln.strip()
                 if ln and not ln.endswith(".py") and "routing:" not in ln:
                     return short(ln)
-    # 3) первый осмысленный комментарий после shebang (не routing/see/shellcheck)
+    # 3) first meaningful comment after the shebang (not routing/see/shellcheck)
     for ln in text.splitlines():
         s = ln.strip()
         if not s.startswith("#"):

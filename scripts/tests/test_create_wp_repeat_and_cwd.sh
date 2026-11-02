@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Idempotency + arbitrary-directory contract for create-wp.sh (Ф-script-contract-gate,
-# Этап 2). create-wp.sh has no idempotency key or retry token — two calls with
+# Idempotency + arbitrary-directory contract for create-wp.sh (Phase script-contract-gate,
+# Stage 2). create-wp.sh has no idempotency key or retry token — two calls with
 # the same title are two distinct, intentional WPs by design, not a duplicate
 # to collapse. The contract that actually matters: (1) it works when invoked
 # from a directory that is not the governance repo itself, and (2) repeated

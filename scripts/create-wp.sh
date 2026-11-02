@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # routing: helper  called-by=wp-gate  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# create-wp.sh — атомарное создание РП в локальных местах (inbox, REGISTRY, WeekPlan);
-# внешний трекер (Linear) — условный пост-шаг, только при подключённом MCP (issue #321)
-# see WP-297 Ф6.2 (<governance-repo>/inbox/WP-297-wp-lifecycle-architecture.md)
+# create-wp.sh — atomic creation of a WP in local locations (inbox, REGISTRY, WeekPlan);
+# external tracker (Linear) — conditional post-step, only when MCP is connected (issue #321)
+# see WP-297 Phase 6.2 (<governance-repo>/inbox/WP-297-wp-lifecycle-architecture.md)
 # see DP.M.010, DP.ROLE.037
 #
-# Использование:
+# Usage:
 #   bash create-wp.sh --artifactor-result result.json --budget 5h --priority P3 --verification-class closed-loop [--slug slug] [--repo "репо"] [--related "WP-150:dependency,WP-167:продукт"]
 #   bash create-wp.sh --artifactor-result result.json --budget 5h --priority P3 --verification-class open-loop --state "belonging (Оснащённость): из → в" --hypothesis "H-101 | —:infra|techdebt|order|spinoff" [--hypothesis-relation tests]
 #   bash create-wp.sh --artifactor-result result.json --budget 5h --priority P3 --verification-class trivial --no-consent-check
@@ -16,36 +16,36 @@
 #   with budget ≥3h get an extra checklist item in the generated context file's «Осталось»
 #   section reminding the pilot to run /decompose. Unlike --state/--hypothesis this gate is
 #   NOT conditional on a governance-repo file existing — every WP declares its class.
-# --artifactor-result (WP-7 Ф142, 2026-09-11): путь к JSON-результату вызова
-#   Артефактора (scripts/artifactor.py или LLM-fallback скилла /artifactor,
-#   поле обязательно: "artifact"). TITLE берётся из поля "artifact" этого
-#   файла -- --title больше не источник имени сам по себе, только сверка/явная
-#   правка пилота: если задан ОБА (--title и --artifactor-result) и они
-#   расходятся, нужен --pilot-revision "причина" (иначе отказ -- имя придумано
-#   в обход результата Артефактора). Обязателен для ЛЮБОГО класса задачи (нет
-#   исключения для trivial/closed-loop, go-ahead пилота 2026-09-11) --
-#   экстренный обход: --no-artifactor-check.
+# --artifactor-result (WP-7 Phase 142, 2026-09-11): path to the JSON result of an
+#   Artifactor call (scripts/artifactor.py or the LLM fallback of the /artifactor skill,
+#   field required: "artifact"). TITLE is taken from the "artifact" field of this
+#   file -- --title is no longer a source of the name on its own, only a cross-check/explicit
+#   pilot edit: if BOTH are given (--title and --artifactor-result) and they
+#   differ, --pilot-revision "reason" is required (otherwise refused -- the name was invented
+#   bypassing the Artifactor result). Mandatory for ANY task class (no
+#   exception for trivial/closed-loop, pilot go-ahead 2026-09-11) --
+#   emergency bypass: --no-artifactor-check.
 # --state (WP-505): target state transition (WP-457 State-Transition Gate).
 #   REQUIRED when <governance>/docs/state-axes-registry.yaml exists (author install);
 #   optional otherwise (typical user install — gate inactive per template contract).
 #   Must mention at least one gate_ready axis code from the registry file.
-# --hypothesis (WP-496 Ф8): REQUIRED when <governance>/current/hypotheses-log.md exists —
+# --hypothesis (WP-496 Phase 8): REQUIRED when <governance>/current/hypotheses-log.md exists —
 #   H-NNN anchored in the log, or explicit dash with reason code (—:infra|techdebt|order|spinoff).
 # --hypothesis-relation: tests|enables|responds|researches|operational|unclassified.
 # New work must resolve unclassified before it is started; the default preserves
 # older callers while making the missing strategic basis visible in frontmatter.
 #
-# Предусловие: consent state file должен существовать:
+# Precondition: the consent state file must exist:
 #   touch ${IWE_ROOT:-$HOME/IWE}/.claude/state/wp-consent-{N}
 #
-# Совместимость: bash 3.2+ (macOS), bash 4+ (Linux)
+# Compatibility: bash 3.2+ (macOS), bash 4+ (Linux)
 
 set -uo pipefail
 
 IWE="${IWE_ROOT:-$HOME/IWE}"
 
-# --- Определить governance-репо ---
-# Приоритет: (1) явная переменная IWE_GOVERNANCE_REPO → (2) DS-strategy (конвенция по умолчанию)
+# --- Determine the governance repo ---
+# Priority: (1) explicit variable IWE_GOVERNANCE_REPO -> (2) DS-strategy (default convention)
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 if [[ -z "${IWE_GOVERNANCE_REPO:-}" ]] && [[ ! -d "$IWE/$GOV_REPO" ]]; then
   echo "ERROR: IWE_GOVERNANCE_REPO not set and $GOV_REPO not found in $IWE" >&2
@@ -57,7 +57,7 @@ REGISTRY="$STRATEGY/docs/WP-REGISTRY.md"
 INBOX="$STRATEGY/inbox"
 STATE_DIR="$IWE/.claude/state"
 
-# --- Параметры ---
+# --- Parameters ---
 TITLE=""
 BUDGET=""
 PRIORITY="P3"
@@ -95,11 +95,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Artefactor Gate (WP-7 Ф142, 2026-09-11) ---
-# Title обязан прийти из результата Артефактора, не быть придуманным агентом
-# в обход него — go-ahead пилота: без исключения для trivial/closed-loop.
-# Разошедшийся --title без --pilot-revision — отказ (агент вписал своё имя,
-# хотя результат Артефактора был другим); экстренный обход — --no-artifactor-check.
+# --- Artefactor Gate (WP-7 Phase 142, 2026-09-11) ---
+# Title must come from the Artifactor result, not be invented by the agent
+# bypassing it — pilot go-ahead: no exception for trivial/closed-loop.
+# A diverging --title without --pilot-revision is a refusal (the agent wrote its own name
+# although the Artifactor result was different); emergency bypass — --no-artifactor-check.
 ARTF_RESOLUTION_PATH="bypassed"
 ARTF_SHA256=""
 if [[ -n "$ARTIFACTOR_RESULT_FILE" ]]; then
@@ -154,7 +154,7 @@ elif [[ "$SKIP_ARTIFACTOR" -eq 0 ]]; then
   exit 1
 fi
 
-# --- Валидация ---
+# --- Validation ---
 if [[ -z "$TITLE" || -z "$BUDGET" ]]; then
   echo "Использование: $0 --artifactor-result result.json --budget 5h --verification-class <trivial|closed-loop|open-loop|problem-framing> [--priority P3] [--slug slug] [--repo репо] [--related \"WP-NNN:тип\"] [--result R3] [--state \"ось: из → в\"] [--hypothesis H-NNN] [--hypothesis-relation tests]" >&2
   exit 1
@@ -233,7 +233,7 @@ PYEOF
   fi
 fi
 
-# --- Hypothesis Gate (WP-496 Ф8) ---
+# --- Hypothesis Gate (WP-496 Phase 8) ---
 # Mirror of the State-Transition Gate: when the hypotheses log exists (author
 # install), --hypothesis is mandatory — either an H-NNN recorded in the log or
 # an explicit dash with a reason code. A WP references an EXISTING bet
@@ -289,7 +289,7 @@ budget_upper_bound_hours() {
   printf '%s\n' "$max"
 }
 
-# Шаг 4.5 protocol-open.md (/decompose): open-loop/problem-framing + budget
+# Step 4.5 of protocol-open.md (/decompose): open-loop/problem-framing + budget
 # ≥3h needs a staged plan. create-wp.sh is deterministic=true and cannot call
 # the (non-deterministic) /decompose skill itself — instead it plants a
 # checklist reminder directly in the generated «Осталось» section, so the
@@ -302,11 +302,11 @@ if [[ "$VERIFICATION_CLASS" == "open-loop" || "$VERIFICATION_CLASS" == "problem-
   fi
 fi
 
-# YAML double-quoted scalar escape (WP-7 Ф142, найдено cold-review 2026-09-11):
-# title теперь обязательно приходит из внешнего JSON (в т.ч. LLM-fallback
-# Артефактора), не только с клавиатуры агента -- кавычка или перевод строки
-# в значении раньше молча ломали frontmatter карточки (title: "${TITLE}" без
-# экранирования). Применяется к любому свободному тексту, идущему в YAML
+# YAML double-quoted scalar escape (WP-7 Phase 142, found by cold-review 2026-09-11):
+# title now necessarily comes from external JSON (including the LLM fallback
+# of the Artifactor), not only from the agent's keyboard -- a quote or newline
+# in the value used to silently break the card frontmatter (title: "${TITLE}" without
+# escaping). Applies to any free text going into YAML
 # double-quoted scalar: title, --state, --hypothesis, --pilot-revision.
 yaml_dq_escape() {  # yaml_dq_escape <string>
   local s="$1"
@@ -340,14 +340,14 @@ if [[ -n "$STATE" && -n "${STATE_AXES:-}" ]]; then
   fi
 fi
 
-# --- Найти и атомарно зарезервировать следующий номер WP ---
-# issue #743: max(REGISTRY)+1 без резервирования отдаёт один и тот же номер
-# двум параллельным агентам (Claude/Kimi/Codex — штатный режим платформы,
-# см. AGENTS.md § Git Staging), и повторно — любому сокращению активного
-# реестра (архивация, разделение). Тот же класс гонки уже закрыт для номеров
-# пир-сессий (session-dir-reserve.sh, WP-530): маркер-каталог + `mkdir` без
-# -p как единственный атомарный арбитр на POSIX-файловой системе, retry на
-# EEXIST. Маркеры никогда не удаляются при архивации WP — номер не переиздаётся.
+# --- Find and atomically reserve the next WP number ---
+# issue #743: max(REGISTRY)+1 without reservation hands out the same number
+# to two parallel agents (Claude/Kimi/Codex — the platform's normal mode,
+# see AGENTS.md § Git Staging), and again after any shrinking of the active
+# registry (archiving, splitting). The same class of race is already closed for peer-session
+# numbers (session-dir-reserve.sh, WP-530): a marker directory + `mkdir` without
+# -p as the only atomic arbiter on a POSIX file system, retry on
+# EEXIST. Markers are never deleted on WP archiving — the number is not reissued.
 WP_NUMBERS_DIR="$STATE_DIR/wp-numbers"
 mkdir -p "$WP_NUMBERS_DIR"
 # Fail fast on a real filesystem problem (permissions, read-only, disk full)
@@ -393,8 +393,8 @@ highest_taken() {
 WP_NUM=""
 for ((_attempt = 1; _attempt <= 50; _attempt++)); do
   next=$(( $(highest_taken) + 1 ))
-  # Без -p: EEXIST — сигнал, что номер выиграла другая сессия, повторить со
-  # свежим highest_taken (могла также вырасти сама REGISTRY-часть максимума).
+  # Without -p: EEXIST is a signal that the number was won by another session, retry with
+  # a fresh highest_taken (the REGISTRY part of the maximum could also have grown on its own).
   if mkdir "$WP_NUMBERS_DIR/$next" 2>/dev/null; then
     WP_NUM="$next"
     break
@@ -408,20 +408,20 @@ fi
 
 echo "📋 Следующий номер WP: $WP_NUM (зарезервирован: $WP_NUMBERS_DIR/$WP_NUM)"
 
-# issue #338 п.4: без паддинга "WP-9" в листинге сортируется после "WP-10".
-# WP_ID — только для строк с префиксом "WP-" (пути, заголовки); frontmatter
-# wp:, consent-файл и колонки "#" REGISTRY/WeekPlan остаются bare-числом.
+# issue #338 item 4: without padding "WP-9" sorts after "WP-10" in a listing.
+# WP_ID — only for lines with the "WP-" prefix (paths, headings); frontmatter
+# wp:, consent file and "#" columns of REGISTRY/WeekPlan stay a bare number.
 WP_ID=$(printf '%03d' "$WP_NUM")
 
-# --- Проверка consent ---
-# Отказ здесь — штатный первый круг WP Gate (реальный пользователь ещё не
-# подтвердил создание), не гонка за номером: ничего для WP_NUM не создано,
-# поэтому маркер резервации снимаем перед выходом — иначе повторный запуск
-# после `touch` резервирует СЛЕДУЮЩИЙ номер, а не тот, что пользователь только
-# что подтвердил, и WP Gate никогда не проходит (живой тест поймал это до
-# релиза: touch consent-2 → второй запуск требует consent-3 → бесконечная
-# погоня). Отличие от "не удалось создать WP-N" ниже (rollback_wp_creation):
-# там уже могли быть частичные файловые следы, здесь — гарантированно нет.
+# --- Consent check ---
+# A refusal here is the normal first round of the WP Gate (the real user has not yet
+# confirmed creation), not a race for the number: nothing was created for WP_NUM,
+# so we release the reservation marker before exiting — otherwise a rerun
+# after `touch` reserves the NEXT number, not the one the user just
+# confirmed, and the WP Gate never passes (a live test caught this before
+# release: touch consent-2 -> second run requires consent-3 -> endless
+# chase). Differs from "failed to create WP-N" below (rollback_wp_creation):
+# there partial file traces could already exist, here there are guaranteed none.
 CONSENT_FILE="$STATE_DIR/wp-consent-${WP_NUM}"
 if [[ "$SKIP_CONSENT" -eq 0 ]]; then
   if [[ ! -f "$CONSENT_FILE" ]]; then
@@ -434,10 +434,10 @@ if [[ "$SKIP_CONSENT" -eq 0 ]]; then
   echo "✅ Consent: $CONSENT_FILE"
 fi
 
-# --- Дата ---
+# --- Date ---
 TODAY=$(date +%Y-%m-%d)
 
-# --- Slug из title (если не задан) ---
+# --- Slug from title (if not set) ---
 if [[ -z "$SLUG" ]]; then
   SLUG=$(echo "$TITLE" | python3 -c "
 import sys, re
@@ -475,8 +475,8 @@ print(result)
 fi
 
 # Inbox convention (WP-434): every WP is a folder inbox/WP-N/ with main file WP-N.md.
-# Slug lives in the title/frontmatter.  Архив появляется только при закрытии:
-# предварительный stub конфликтовал с close-wp.sh и мог затереть контекст.
+# Slug lives in the title/frontmatter.  The archive appears only on closing:
+# a preliminary stub conflicted with close-wp.sh and could overwrite the context.
 WP_DIR="$INBOX/WP-${WP_ID}"
 WP_FILE="$WP_DIR/WP-${WP_ID}.md"
 mkdir -p "$WP_DIR"
@@ -485,19 +485,19 @@ echo "🚀 Создаю WP-${WP_ID}: $TITLE"
 echo "   Папка: inbox/WP-${WP_ID}/WP-${WP_ID}.md"
 echo "   Бюджет: $BUDGET | Приоритет: $PRIORITY"
 
-# --- Atomicity (Ф-script-contract-gate, Этап 2): шаги 1-4 пишут в 3 разных
-# места (inbox, REGISTRY, WeekPlan) без общей транзакции. Раньше отказ на шаге
-# 3/4 оставлял частично созданный WP и не считался ошибкой — падение WeekPlan
-# просто печаталось в stderr и скрипт продолжал к «✅ WP создан». Снимок +
-# откат ниже гарантируют: либо все 4 шага прошли, либо ни один след не остался.
+# --- Atomicity (Phase script-contract-gate, Stage 2): steps 1-4 write to 3 different
+# places (inbox, REGISTRY, WeekPlan) without a shared transaction. Previously a failure at step
+# 3/4 left a partially created WP and was not treated as an error — a WeekPlan failure
+# was just printed to stderr and the script continued to "✅ WP создан". The snapshot +
+# rollback below guarantee: either all 4 steps passed, or no trace is left.
 #
-# Снимки — файловые копии, не `$(cat file)`: command substitution обрезает
-# завершающий перевод строки, а `printf '%s' "$snapshot" > "$file"` на откате
-# его не возвращает — тихо портит форматирование REGISTRY/WeekPlan на КАЖДОМ
-# срабатывании отката (найдено код-ревью 03.08, оба файла seed сегодня
-# заканчиваются на \n). `cp` сохраняет содержимое байт-в-байт, включая случай
-# отсутствующего файла (тогда снимка нет — откат просто убирает файл, а не
-# создаёт пустой там, где раньше не было никакого).
+# Snapshots are file copies, not `$(cat file)`: command substitution strips the
+# trailing newline, and `printf '%s' "$snapshot" > "$file"` on rollback
+# does not restore it — silently corrupting REGISTRY/WeekPlan formatting on EVERY
+# rollback (found by code review 03.08, both seed files today
+# end with \n). `cp` preserves content byte for byte, including the case of a
+# missing file (then there is no snapshot — rollback just removes the file rather than
+# creating an empty one where there was none before).
 SNAPSHOT_DIR=$(mktemp -d)
 trap 'rm -rf "$SNAPSHOT_DIR"' EXIT
 REGISTRY_SNAPSHOT="$SNAPSHOT_DIR/registry.snapshot"
@@ -523,7 +523,7 @@ rollback_wp_creation() {
   fi
 }
 
-# --- Сформировать строки таблицы связок ---
+# --- Build the link table rows ---
 RELATED_ROWS="| — | — | — | нет связок |"
 if [[ -n "$RELATED" ]]; then
   RELATED_ROWS=""
@@ -538,7 +538,7 @@ if [[ -n "$RELATED" ]]; then
   done
 fi
 
-# --- Шаг 1: context file ---
+# --- Step 1: context file ---
 echo ""
 echo "1/5 context file..."
 
@@ -623,7 +623,7 @@ if [[ "$HYPOTHESIS_RELATION" == "unclassified" ]]; then
   echo "   ⚠️  Связь с гипотезой не определена: до начала РП выберите tests/enables/responds/researches/operational" >&2
 fi
 
-# --- Шаг 2: WP-REGISTRY.md ---
+# --- Step 2: WP-REGISTRY.md ---
 echo "2/5 WP-REGISTRY.md..."
 
 if ! python3 - "$REGISTRY" "$WP_NUM" "$PRIORITY" "$TITLE" "$REPO" "$BUDGET" "$GOV_REPO" "$STAKE_CELL" "$WP_ID" <<'PYEOF'
@@ -747,19 +747,19 @@ fi
 # Post-write verification (issue #256): create-wp.sh once reported success here
 # without the row actually landing in REGISTRY — the writer above has no retry/lock,
 # so confirm the row is really there before moving on.
-# issue #263: некоторые репо исторически пишут номер РП с префиксом (| WP-N |),
-# не голым числом (| N |) — grep должен принимать оба формата.
+# issue #263: some repos historically write the WP number with a prefix (| WP-N |),
+# not a bare number (| N |) — grep must accept both formats.
 if ! grep -qE "\| \*?\*?(WP-)?${WP_NUM}\*?\*? \|" "$REGISTRY"; then
   echo "❌ REGISTRY write verification FAILED: строка WP-${WP_NUM} не найдена после записи" >&2
   rollback_wp_creation
   exit 1
 fi
 
-# --- Шаг 3: WeekPlan ---
+# --- Step 3: WeekPlan ---
 echo "3/5 WeekPlan..."
 
-# WEEKPLAN уже найден выше (снимок для отката, issue WP-507 про формат имени файла
-# применён там же) — здесь используется тот же путь, не ищем повторно.
+# WEEKPLAN was already found above (snapshot for rollback, issue WP-507 about the file name format
+# applied there too) — the same path is used here, no repeated search.
 if [[ -n "$WEEKPLAN" ]]; then
   if ! python3 - "$WEEKPLAN" "$WP_NUM" "$TITLE" "$PRIORITY" "$BUDGET" "$REPO" "$STAKE_CELL" <<'PYEOF'
 import sys, re
@@ -1182,7 +1182,7 @@ else
   echo "   ⚠️  WeekPlan не найден в current/ — добавить вручную" >&2
 fi
 
-# --- Шаг 4: Strategy.md (только если --result задан и бюджет ≥3h) ---
+# --- Step 4: Strategy.md (only if --result is given and budget >=3h) ---
 echo "4/5 Strategy.md..."
 
 # issue #1088: this used to be its own `sed 's/[^0-9]//g'`, which read a
@@ -1244,7 +1244,7 @@ else
   echo "   ℹ️  РП <3h — маппинг в Strategy.md не требуется"
 fi
 
-# --- Шаг 5: active-wp.md ---
+# --- Step 5: active-wp.md ---
 echo "5/5 active-wp.md..."
 
 BUILD_ACTIVE_WP=""
@@ -1262,7 +1262,7 @@ else
   echo "   ⚠️  scripts/build-active-wp.py не найден (искали в \`$STRATEGY/scripts/\` и \`$IWE/FMT-exocortex-template/scripts/\`) — пересобрать вручную" >&2
 fi
 
-# --- Внешний трекер (условный пост-шаг, #432) ---
+# --- External tracker (conditional post-step, #432) ---
 # The local transaction above is already complete.  The adapter is deliberately
 # best-effort: its UNAVAILABLE/INVALID_CONFIG result is visible but never rolls
 # back a valid local WP.
@@ -1283,9 +1283,9 @@ else
   echo "ℹ️  Внешний трекер не установлен; локальная регистрация РП завершена"
 fi
 
-# --- Consent file остаётся в папке WP для аудит-следа ---
-# Ранее consent file удалялся здесь; это ломало последующие wp-gate-check
-# редактирования в той же сессии. Файл сохраняется; уборка по усмотрению пилота.
+# --- Consent file stays in the WP folder for the audit trail ---
+# Previously the consent file was deleted here; this broke subsequent wp-gate-check
+# edits in the same session. The file is kept; cleanup at the pilot's discretion.
 if [[ "$SKIP_CONSENT" -eq 0 && -f "$CONSENT_FILE" ]]; then
   echo ""
   echo "ℹ️  Consent file сохранён: $CONSENT_FILE"

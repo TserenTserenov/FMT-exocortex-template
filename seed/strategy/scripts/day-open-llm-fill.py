@@ -178,7 +178,7 @@ def rebuild_compact_dashboard(text: str) -> str:
     """
     lines = text.split("\n")
 
-    # 1. Собрать топ-7 строк-РП из таблицы 'План на сегодня'
+    # 1. Collect the top-7 WP rows from the 'План на сегодня' table
     plan_rows = []
     in_plan = False
     for ln in lines:
@@ -193,11 +193,11 @@ def rebuild_compact_dashboard(text: str) -> str:
             if len(plan_rows) >= 7:
                 break
         elif plan_rows and not s.startswith("|"):
-            break  # таблица закончилась (Бюджет дня / пустая строка / </details>)
+            break  # the table ended (Day budget / empty line / </details>)
     if not plan_rows:
         return text
 
-    # 2. Компактные строки: | флаг | # краткое-название |
+    # 2. Compact rows: | flag | # short-name |
     compact = ["**Сегодня (топ-7 по приоритету):**"]
     for row in plan_rows:
         cols = [c.strip() for c in row.strip("|").split("|")]
@@ -209,7 +209,7 @@ def rebuild_compact_dashboard(text: str) -> str:
             short = short[:57] + "…"
         compact.append(f"| {flag} | {num} {short} |")
 
-    # 3. Заменить старый подблок РП внутри Compact Dashboard на compact
+    # 3. Replace the old WP sub-block inside the Compact Dashboard with the compact one
     out = []
     in_dash = False
     skipping = False
@@ -232,7 +232,7 @@ def rebuild_compact_dashboard(text: str) -> str:
             if s == "":
                 skipping = False
                 out.append(ln)
-            continue  # пропускаем старые строки таблицы
+            continue  # skip the old table rows
         out.append(ln)
     return "\n".join(out)
 
@@ -246,7 +246,7 @@ def _dashboard_today_iso() -> str:
     try:
         from zoneinfo import ZoneInfo
         now = datetime.now(ZoneInfo("Europe/Moscow"))
-    except Exception:  # noqa: BLE001 — zoneinfo нет → Москва = UTC+3 (без DST с 2014)
+    except Exception:  # noqa: BLE001 — no zoneinfo → Moscow = UTC+3 (no DST since 2014)
         from datetime import timedelta
         now = datetime.now(timezone.utc) + timedelta(hours=3)
     return now.date().isoformat()
@@ -261,7 +261,7 @@ def _strip_panel_block(text: str, begin: str, end: str) -> str:
     if stop == -1:
         return text
     stop += len(end)
-    after = stop + 1 if text[stop:stop + 1] == "\n" else stop  # съесть хвостовой \n
+    after = stop + 1 if text[stop:stop + 1] == "\n" else stop  # consume the trailing \n
     return text[:start] + text[after:]
 
 
@@ -437,17 +437,17 @@ def inject_panel_tile(text: str) -> str:
         from dashboard_render import (
             PANEL_BEGIN, PANEL_END, read_dashboard_snapshot, render_dashboard_panel_block,
         )
-    except Exception:  # noqa: BLE001 — dashboard-модули недоступны → тайл просто не показываем
+    except Exception:  # noqa: BLE001 — dashboard modules unavailable → simply do not show the tile
         print("[inject_panel_tile] dashboard-модули недоступны — тайл пропущен", file=sys.stderr)
         return text
 
     marker = "---END-COMPACT-DASHBOARD---"
     if marker not in text:
-        return text  # нет дашборда (необычный scaffold) — некуда врезать
+        return text  # no dashboard (unusual scaffold) — nowhere to insert
 
     try:
         snapshot = read_dashboard_snapshot(_fault_profile_workspace())
-    except Exception:  # noqa: BLE001 — PD-dashboard недоступен → тайл пропускаем, день не валим
+    except Exception:  # noqa: BLE001 — PD dashboard unavailable → skip the tile, do not fail the day
         print("[inject_panel_tile] чтение PD-dashboard не удалось — тайл пропущен", file=sys.stderr)
         return text
 
@@ -736,7 +736,7 @@ def fill_world_lens_inplace(chunk: dict, weekplan: str, active_wps: str,
     lens_indices = [i for i, line in enumerate(_mask_code("".join(chunk["lines"])).splitlines())
                     if line.startswith("**Вывод:**") and "<!-- PENDING" in line]
     if not lens_indices:
-        return False  # deterministic «нет данных» Вывод from the scaffold — nothing to fill
+        return False  # deterministic "no data" conclusion from the scaffold — nothing to fill
     if len(lens_indices) != 1:
         raise ValueError("World lens is ambiguous; original PENDING retained")
     lens_idx = lens_indices[0]
@@ -798,7 +798,7 @@ def fill_chunk(chunk: dict, weekplan: str, active_wps: str, calendar: str,
                fault_profile: str = "",
                fleeting_notes: str = "") -> str:
     header = chunk["header"]
-    content = "".join(chunk["lines"][1:])  # без заголовка
+    content = "".join(chunk["lines"][1:])  # without the header
 
     # Consolidated prompt with JSON facts for today_plan.
     # `header` is usually the bare "<details>"/"<details open>" tag (chunking
@@ -883,7 +883,7 @@ def main() -> None:
             filled_chunks.append(chunk)
             continue
         # World section: targeted single-line lens fill, list stays byte-identical
-        # (Ф32 п.1 — the generic whole-chunk path lost the scaffold's news list).
+        # (Phase 32 item 1 — the generic whole-chunk path lost the scaffold's news list).
         if is_world_chunk(chunk):
             try:
                 if fill_world_lens_inplace(chunk, weekplan, active_wps,
@@ -956,11 +956,11 @@ def main() -> None:
         result_lines.extend(chunk["lines"])
     result = "".join(result_lines)
 
-    # WP-5 Ф 2026-06-11 П1: Compact Dashboard — топ-7 из готового плана, не sweep
+    # WP-5 Phase 2026-06-11 item 1: Compact Dashboard — top-7 from the ready plan, not a sweep
     result = rebuild_compact_dashboard(result)
-    # WP-417 Ф3.4: тайл табло за вчера — ПОСЛЕ rebuild (иначе он сотрёт блок), локально
+    # WP-417 Phase 3.4: yesterday's dashboard tile — AFTER rebuild (otherwise it would wipe the block), locally
     result = inject_panel_tile(result)
-    # Gate-метрики: заменить тело секции реальным выводом gate-metrics.sh (только Mac)
+    # Gate metrics: replace the section body with the real output of gate-metrics.sh (Mac only)
     result = inject_gate_metrics(result)
     # Inspect the actual output after all local post-processing.
     # A failed LLM call can also leave the original scaffold table in this output.

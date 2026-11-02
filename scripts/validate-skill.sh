@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # routing: helper  skill=audit-installation  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# validate-skill.sh — валидация SKILL.md v2 (pre-promote checklist)
+# validate-skill.sh — validation of SKILL.md v2 (pre-promote checklist)
 # see DP.SC.153, DP.ROLE.057
 #
-# Проверяет:
-#   - Обязательные поля frontmatter (name, description, version, layer, status, triggers)
-#   - Формат semver для version
-#   - Допустимые значения layer (L1|L3) и status (active|experimental|deprecated)
-#   - Наличие хотя бы одного slash-триггера
-#   - depends_on ссылается на существующие скиллы (предупреждение, не блокер)
+# Checks:
+#   - Required frontmatter fields (name, description, version, layer, status, triggers)
+#   - semver format for version
+#   - Allowed values of layer (L1|L3) and status (active|experimental|deprecated)
+#   - Presence of at least one slash trigger
+#   - depends_on references existing skills (warning, not a blocker)
 #
-# Использование:
+# Usage:
 #   bash validate-skill.sh <skill-id> [--skills-dir <path>]
 #
-# Exit 0 = OK, Exit 1 = ошибка валидации
+# Exit 0 = OK, Exit 1 = validation error
 
 set -uo pipefail
 
@@ -52,7 +52,7 @@ echo "🔍 Валидация скилла: $skill_id"
 echo "   Файл: $skill_md"
 echo ""
 
-# ── 1. Наличие frontmatter ──────────────────────────────────────────────────
+# ── 1. Presence of frontmatter ──────────────────────────────────────────────
 if ! head -1 "$skill_md" | grep -q "^---"; then
     fail "Отсутствует frontmatter (файл не начинается с ---)"
     echo ""
@@ -60,7 +60,7 @@ if ! head -1 "$skill_md" | grep -q "^---"; then
     exit 1
 fi
 
-# Вспомогательная функция: получить значение поля из frontmatter
+# Helper function: get a field value from the frontmatter
 get_field() {
     local field="$1"
     sed -n "/^---$/,/^---$/p" "$skill_md" 2>/dev/null \
@@ -72,7 +72,7 @@ get_field() {
       | tr -d '\r'
 }
 
-# ── 2. Обязательные поля ────────────────────────────────────────────────────
+# ── 2. Required fields ──────────────────────────────────────────────────────
 name_val=$(get_field "name")
 if [[ -z "$name_val" ]]; then
     fail "Поле 'name' отсутствует или пусто"
@@ -131,7 +131,7 @@ else
     fi
 fi
 
-# ── 4. Проверка depends_on (предупреждение) ─────────────────────────────────
+# ── 4. Check depends_on (warning) ───────────────────────────────────────────
 catalog="${IWE}/.claude/skills-catalog.yaml"
 depends_line=$(grep "^depends_on:" "$skill_md" 2>/dev/null | head -1 || echo "")
 if [[ -n "$depends_line" ]] && [[ "$depends_line" != "# depends_on: []" ]]; then
@@ -151,13 +151,13 @@ if [[ -n "$depends_line" ]] && [[ "$depends_line" != "# depends_on: []" ]]; then
     done
 fi
 
-# ── 5. Проверка TODO-заглушек в теле ────────────────────────────────────────
+# ── 5. Check for TODO stubs in the body ─────────────────────────────────────
 todo_count=$(grep -c "^TODO\b\|^\*\*.*TODO\|: TODO$" "$skill_md" 2>/dev/null) || todo_count=0
 if [[ "$todo_count" -gt 0 ]]; then
     warn "В теле SKILL.md найдено TODO-заглушек: $todo_count (рекомендуется заполнить перед promote)"
 fi
 
-# ── 6. Deprecated без sunset ────────────────────────────────────────────────
+# ── 6. Deprecated without sunset ────────────────────────────────────────────
 if [[ "$status_val" == "deprecated" ]]; then
     sunset_val=$(get_field "sunset")
     if [[ -z "$sunset_val" ]]; then
@@ -165,7 +165,7 @@ if [[ "$status_val" == "deprecated" ]]; then
     fi
 fi
 
-# ── Итог ────────────────────────────────────────────────────────────────────
+# ── Summary ─────────────────────────────────────────────────────────────────
 echo ""
 echo "📊 Итого: ошибок=$errors, предупреждений=$warnings"
 

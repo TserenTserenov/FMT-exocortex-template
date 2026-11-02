@@ -60,11 +60,11 @@ log_decision() {
 
 input=$(cat) || security_failure "не удалось прочитать ввод"
 analysis=$(printf '%s' "$input" | secret_pattern_process analyze-bash 2>/dev/null) || security_failure "анализатор не отработал"
-# Только поля, которые есть у анализатора любой версии. Новые поля читаются
-# ниже со значением по умолчанию: жёсткое требование в этой проверке означало
-# бы, что рассинхрон хука и библиотеки (обычное дело, когда их правят
-# параллельные сессии) кладёт ВСЮ работу агента, а не одну проверку
-# (WP-545, 06.09 — ровно этот отказ случился дважды за день).
+# Only the fields that every analyzer version has. New fields are read
+# below with a default value: a hard requirement in this check would mean
+# that a hook/library desync (routine when parallel sessions edit them)
+# brings down ALL of the agent's work, not a single check
+# (WP-545, 06.09 — exactly this failure happened twice in one day).
 printf '%s' "$analysis" | "$SECRET_BYPASS_JQ" -e '
   type == "object"
   and (.applicable | type == "boolean")
@@ -145,19 +145,19 @@ if [ -n "$pattern_ids" ]; then
     "В Bash-команде найден возможный секрет (классы: $pattern_ids). Не передавай его аргументом; используй \$VAR/env или wrapper. Разовый обход требует CC_ALLOW_SECRETS_INPUT=1 и срока CC_ALLOW_SECRETS_INPUT_UNTIL не более 15 минут; вывод отдельно остаётся защищённым."
 fi
 
-# Команда — валидный Bash, грамматику которого модель переменных не покрывает
-# (elif, незакрытый if, ветвление внутри цикла/группы/функции). Проверки, не
-# требующие разбора, выше уже отработали на этой же команде; потеряна только
-# половина анализа путей по переменным, и это повод для видимой пометки, а не
-# для отказа выполнять вызов (WP-545, 06.09: «unsupported shell conditional»
-# доезжал до агента как «страж не смог проверить ввод» и останавливал сессию).
+# The command is valid Bash whose grammar the variable model does not cover
+# (elif, an unclosed if, branching inside a loop/group/function). The checks that do not
+# require parsing have already run above on this same command; only
+# half of the variable-based path analysis is lost, and that is a reason for a visible note, not
+# for refusing to execute the call (WP-545, 06.09: «unsupported shell conditional»
+# reached the agent as «the guard could not check the input» and stopped the session).
 case "$shell_model" in
   complete)
     log_decision "allow" "" || true
     ;;
   unreported)
-    # Библиотека старше этого хука: поля нет вовсе. Работать не мешаем, но
-    # говорим вслух — иначе рассинхрон versions живёт молча.
+    # The library is older than this hook: the field is absent altogether. We do not prevent work, but
+    # say so out loud — otherwise a version desync lives silently.
     log_decision "allow-shell-model-unreported" "" || true
     DEGRADED_NOTICE="Страж секретов и его библиотека из разных версий: библиотека не сообщает полноту разбора команды. Проверки отработали, но полагаться на них как на полные нельзя."
     ;;

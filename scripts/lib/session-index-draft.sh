@@ -2,14 +2,14 @@
 # Sourced, not executed: declares functions only, no shebang needed
 # (smoke-clean-env.sh exemption, issue #1013).
 # session-index-draft.sh — single point of truth for writing to the
-# sessions/00-index.md draft buffer (WP-537 Ф4, design consensus at
+# sessions/00-index.md draft buffer (WP-537 Phase 4, design consensus at
 # sessions/2026-08/17/2026-08-17-09-sessions-index-snapshotter/report.md).
 #
 # Every session-index writer (session-index.sh, peer-conversation SKILL.md
 # §1.3/§4.3, kimi-peer-writer SKILL.md, peer-session-finalize.sh) calls
 # session_index_draft_write instead of touching sessions/00-index.md
 # directly. session-index-snapshot.sh is the ONLY process allowed to write
-# that git-tracked file — same split as WP-530 Ф3 made for open-sessions.log,
+# that git-tracked file — same split as WP-530 Phase 3 made for open-sessions.log,
 # for the same reason: two writers editing the same tracked row concurrently
 # resolve as a git add/add conflict, not a merge, and one side's update can
 # be lost.

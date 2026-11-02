@@ -1,20 +1,20 @@
 #!/bin/bash
-# WP-295 Ф1 шаг 5: agent-trace-recorder hook.
-# Перехватывает PostToolUse и Stop события Claude Code, эмитит agent.trace.* events
-# в локальный NDJSON. Async upload в event-gateway через agent-trace-uploader.sh.
+# WP-295 Phase 1 step 5: agent-trace-recorder hook.
+# Intercepts Claude Code PostToolUse and Stop events, emits agent.trace.* events
+# into a local NDJSON. Async upload to event-gateway via agent-trace-uploader.sh.
 #
 # see DP.SC.037 (agent-trace), DP.ROLE.047 (Trace Recorder).
 #
-# Регистрация в settings.json:
+# Registration in settings.json:
 #   "PostToolUse": [{ hooks: [{ command: ".../agent-trace-recorder.sh" }] }]
 #   "Stop": [{ hooks: [{ command: ".../agent-trace-recorder.sh" }] }]
 #
-# Интеграции (см. WP-295 § Интеграции):
-#   - $CLAUDE_TASK_ID — task_id от iwe-agent-dispatcher.py (WP-324), пишется в context_summary
-#   - $CLAUDE_AGENT_ID — модель агента (default: claude-opus-4-7)
-#   - git status при Stop → produced_artifact_ids
+# Integrations (see WP-295 § Integrations):
+#   - $CLAUDE_TASK_ID — task_id from iwe-agent-dispatcher.py (WP-324), written into context_summary
+#   - $CLAUDE_AGENT_ID — agent model (default: claude-opus-4-7)
+#   - git status on Stop → produced_artifact_ids
 #
-# Никогда не блокирует (exit 0 при любой ошибке).
+# Never blocks (exit 0 on any error).
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -29,9 +29,9 @@ CLAUDE_SESSION=$(echo "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
 
-[ -z "$CLAUDE_SESSION" ] && exit 0  # без session_id ничего не пишем
+[ -z "$CLAUDE_SESSION" ] && exit 0  # without a session_id we write nothing
 
-# Маппинг Claude Code session_id → наш UUID v4 (для agent_trace.session.session_id PK).
+# Mapping Claude Code session_id → our UUID v4 (for agent_trace.session.session_id PK).
 STATE_FILE="${STATE_DIR}/${CLAUDE_SESSION}.uuid"
 if [ -f "$STATE_FILE" ]; then
     SESSION_UUID=$(cat "$STATE_FILE")
@@ -39,26 +39,26 @@ else
     SESSION_UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
     echo "$SESSION_UUID" > "$STATE_FILE"
 
-    # Эмитим session.start (lazy init на первом hook'е этой сессии).
+    # Emit session.start (lazy init on the first hook of this session).
     NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     AGENT_ID="${CLAUDE_AGENT_ID:-claude-opus-4-7}"
     TASK_ID="${CLAUDE_TASK_ID:-}"
-    # Улучшенный WP detection — пробуем несколько источников (WP-295 fix)
+    # Improved WP detection — try several sources (WP-295 fix)
     WP_ID=""
-    # 1. Из CLAUDE_TASK_ID (может содержать WP-xxx)
+    # 1. From CLAUDE_TASK_ID (may contain WP-xxx)
     if [ -n "${CLAUDE_TASK_ID:-}" ]; then
         WP_ID=$(echo "$CLAUDE_TASK_ID" | grep -oE "WP-[0-9]+" | head -1 || echo "")
     fi
-    # 2. Из текущей директории
+    # 2. From the current directory
     if [ -z "$WP_ID" ] && [ -n "$CWD" ]; then
         WP_ID=$(echo "$CWD" | grep -oE "WP-[0-9]+" | head -1 || echo "")
     fi
-    # 3. Из git branch (если CWD — git repo)
+    # 3. From the git branch (if CWD is a git repo)
     if [ -z "$WP_ID" ] && [ -n "$CWD" ] && [ -d "$CWD/.git" ]; then
         BRANCH=$(cd "$CWD" && git branch --show-current 2>/dev/null || echo "")
         WP_ID=$(echo "$BRANCH" | grep -oE "WP-[0-9]+" | head -1 || echo "")
     fi
-    # 4. Из последних коммитов (heuristic: часто коммит начинается с WP-xxx)
+    # 4. From recent commits (heuristic: a commit often starts with WP-xxx)
     if [ -z "$WP_ID" ] && [ -n "$CWD" ] && [ -d "$CWD/.git" ]; then
         RECENT_COMMIT=$(cd "$CWD" && git log -1 --pretty=%s 2>/dev/null || echo "")
         WP_ID=$(echo "$RECENT_COMMIT" | grep -oE "WP-[0-9]+" | head -1 || echo "")
@@ -81,17 +81,17 @@ fi
 
 NDJSON="${LOG_DIR}/${SESSION_UUID}.ndjson"
 
-# Hook-event-specific логика.
+# Hook-event-specific logic.
 case "$HOOK_EVENT" in
     PostToolUse)
-        # Эмитим tool_call для значимых tools (Bash/WebFetch/WebSearch).
-        # Edit/Write/Read — слишком много шума, не пишем (artifact-emission, не reasoning).
+        # Emit tool_call for significant tools (Bash/WebFetch/WebSearch).
+        # Edit/Write/Read — too much noise, not written (artifact-emission, not reasoning).
         case "$TOOL_NAME" in
             Bash|WebFetch|WebSearch|mcp__*)
                 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
                 TOOL_INPUT=$(echo "$INPUT" | jq -c '.tool_input // {}' 2>/dev/null || echo "{}")
-                # WP-500 Ф1: не сохраняем response-body в трейсах.
-                # Оставляем только input_hash и response_size_bytes для replay-кэша и метрик.
+                # WP-500 Phase 1: do not store response-body in traces.
+                # Keep only input_hash and response_size_bytes for the replay cache and metrics.
                 RAW_TOOL_RESPONSE=$(echo "$INPUT" | jq -c '.tool_response // {}' 2>/dev/null || echo "{}")
                 RESPONSE_SIZE=$(echo -n "$RAW_TOOL_RESPONSE" | wc -c | tr -d ' ')
                 INPUT_HASH="sha256:$(echo -n "$TOOL_INPUT" | shasum -a 256 | cut -d' ' -f1)"
@@ -111,13 +111,13 @@ case "$HOOK_EVENT" in
         esac
         ;;
     Stop)
-        # Session end + produced_artifact_ids из git diff (commits с момента session.start).
+        # Session end + produced_artifact_ids from git diff (commits since session.start).
         NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        # Соберём produced_artifact_ids: последние коммиты + изменённые файлы.
+        # Collect produced_artifact_ids: recent commits + changed files.
         ARTIFACTS="[]"
         if command -v git >/dev/null 2>&1 && [ -n "$CWD" ] && [ -d "$CWD/.git" ]; then
-            # Коммиты этой сессии (heuristic: за последний час).
+            # Commits of this session (heuristic: within the last hour).
             COMMITS=$(cd "$CWD" && git log --since="1 hour ago" --pretty=tformat:"git:commit:%h" 2>/dev/null | head -5 || true)
             ARTIFACTS=$(echo "$COMMITS" | jq -R -s -c 'split("\n") | map(select(length > 0))' 2>/dev/null || echo "[]")
         fi
@@ -131,7 +131,7 @@ case "$HOOK_EVENT" in
                 produced_artifact_ids: $art
             }}' >> "$NDJSON" 2>/dev/null || true
 
-        # Очистка state-файла, чтобы новая сессия с тем же CLAUDE_SESSION (теоретически) получила новый UUID.
+        # Clear the state file so that a new session with the same CLAUDE_SESSION (theoretically) gets a new UUID.
         rm -f "$STATE_FILE" 2>/dev/null || true
         ;;
 esac

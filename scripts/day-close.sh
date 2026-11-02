@@ -1,28 +1,28 @@
 #!/bin/bash
 # routing: helper  skill=day-close  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# day-close.sh — Автоматические шаги Day Close (backup + reindex + linear sync + sessions)
+# day-close.sh — Automatic Day Close steps (backup + reindex + linear sync + sessions)
 #
-# Вызывается Claude из протокола Day Close (protocol-close.md § День, шаг 4).
-# Объединяет четыре механических операции в одну команду.
+# Called by Claude from the Day Close protocol (protocol-close.md § Day, step 4).
+# Combines four mechanical operations into one command.
 #
-# Использование:
-#   day-close.sh                # все четыре шага
-#   day-close.sh --backup       # только backup
-#   day-close.sh --reindex      # только reindex
-#   day-close.sh --linear       # только linear sync
-#   day-close.sh --sessions     # только консолидация сессий дня (DAP1-B, WP-7)
+# Usage:
+#   day-close.sh                # all four steps
+#   day-close.sh --backup       # backup only
+#   day-close.sh --reindex      # reindex only
+#   day-close.sh --linear       # linear sync only
+#   day-close.sh --sessions     # day's session consolidation only (DAP1-B, WP-7)
 #
-# Конфигурация: Пути заданы через переменные ниже — настроить при установке.
+# Configuration: Paths are set via the variables below — configure at installation.
 
 set -euo pipefail
 
-# === КОНФИГУРАЦИЯ (настроить при установке) ===
+# === CONFIGURATION (configure at installation) ===
 # Load unified environment: WORKSPACE_DIR, IWE_ROOT, IWE_SCRIPTS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
-# issue #545: iwe_sessions_dir (резолвер корня журналов по контракту писателя)
+# issue #545: iwe_sessions_dir (resolver of the journals root per the writer's contract)
 source "$SCRIPT_DIR/lib/common.sh" || {
   echo "FATAL: lib/common.sh not found next to $0 — промотированная копия устарела, обновите её вместе с шаблоном" >&2
   exit 1
@@ -76,8 +76,8 @@ if [ -z "${IWE_MEMORY_SRC:-}" ] && [ -d "$WORKSPACE_DIR/memory" ]; then
   unset _link_memory _slug_memory
 fi
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
-# MCP reindex — опциональный компонент (WP-187 iwe-knowledge Gateway заменяет локальный knowledge-mcp).
-# Переопределить путь можно через env IWE_SELECTIVE_REINDEX.
+# MCP reindex — an optional component (WP-187 iwe-knowledge Gateway replaces the local knowledge-mcp).
+# The path can be overridden via env IWE_SELECTIVE_REINDEX.
 # do_reindex() exit code for "some branches indexed, some failed" (see do_reindex).
 readonly RC_REINDEX_PARTIAL=3
 # A step that cannot run (missing script/dir/interpreter) is a SKIP, not an
@@ -86,10 +86,10 @@ readonly RC_STEP_SKIPPED=90
 SELECTIVE_REINDEX="${IWE_SELECTIVE_REINDEX:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/selective-reindex.sh}"
 SOURCES_JSON="${IWE_SOURCES_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources.json}"
 SOURCES_PERSONAL_JSON="${IWE_SOURCES_PERSONAL_JSON:-$WORKSPACE_DIR/DS-MCP/knowledge-mcp/scripts/sources-personal.json}"
-# issue #463: linear_sync_path и защита day-rhythm-config.yaml ниже читаются через
-# python3+yaml с fallback на пустую строку — без pyyaml это не падает, а тихо
-# возвращает пустую строку, неотличимую от «поля нет в конфиге». Один явный
-# warning здесь вместо голого ModuleNotFoundError на каждом отдельном вызове.
+# issue #463: linear_sync_path and the day-rhythm-config.yaml guard below are read via
+# python3+yaml with a fallback to an empty string — without pyyaml this does not fail but quietly
+# returns an empty string, indistinguishable from "the field is not in the config". One explicit
+# warning here instead of a bare ModuleNotFoundError on every individual call.
 #
 # Evgenii Red Team review 2026-08-19 (defect #5 class): resolve python3+PyYAML
 # ONCE via the F6 shared resolver (scripts/lib/find-python3.sh, #453/#463),
@@ -118,7 +118,7 @@ BACKUP_MANIFEST_NAME=".day-close-backup-manifest.json"
 BACKUP_QUARANTINE_NAME=".day-close-backup-incomplete"
 readonly RC_BACKUP_WARNING=4
 BACKUP_WARNING=false
-# Linear sync: путь читается из params.yaml (ключ linear_sync_path)
+# Linear sync: the path is read from params.yaml (key linear_sync_path)
 PARAMS_YAML="$WORKSPACE_DIR/params.yaml"
 LINEAR_SYNC=""
 if [ -n "$RESOLVED_PYTHON3" ] && [ -f "$PARAMS_YAML" ]; then
@@ -128,9 +128,9 @@ if [ -n "$RESOLVED_PYTHON3" ] && [ -f "$PARAMS_YAML" ]; then
   fi
 fi
 LOG_FILE="${IWE_DAY_CLOSE_LOG:-$HOME/logs/day-close.log}"
-# === /КОНФИГУРАЦИЯ ===
+# === /CONFIGURATION ===
 
-# Цвета
+# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -1706,7 +1706,7 @@ resolve_memory_src_fallback() {
   return 1
 }
 
-# --- Шаг 1: Backup memory/ + CLAUDE.md → exocortex/ ---
+# --- Step 1: Backup memory/ + CLAUDE.md → exocortex/ ---
 # do_backup [TARGET] — copies into TARGET (default: the canon's exocortex/). The
 # helpers below read EXOCORTEX_DST, so the local shadows the global for them too.
 # A frozen canon is never written: main() routes that case to do_backup_frozen
@@ -1803,8 +1803,8 @@ do_backup() {
   # destination list. No YAML parser means preserve rather than guess.
   backup_day_rhythm_config || return 1
 
-  # issue #217: обратная подстановка $HOME -> {{HOME_DIR}} делает бэкап ОС-агностичным
-  # (симметрично прямой подстановке в setup.sh и restore-from-exocortex.sh).
+  # issue #217: reverse substitution $HOME -> {{HOME_DIR}} makes the backup OS-agnostic
+  # (symmetric to the forward substitution in setup.sh and restore-from-exocortex.sh).
   if [ -f "$WORKSPACE_DIR/CLAUDE.md" ]; then
     atomic_instruction_backup \
       "$WORKSPACE_DIR/CLAUDE.md" "$EXOCORTEX_DST/CLAUDE.md" "CLAUDE.md" || return 1
@@ -1875,9 +1875,9 @@ do_backup_frozen() {
   fi
 }
 
-# iwe_repo_dirs — печатает поддиректории с .git, дедуплицированные по реальному
-# физическому пути (repo-symlink алиас иначе считается отдельным репозиторием
-# наравне с оригиналом — двойной reindex одного источника, найдено 2026-07-17).
+# iwe_repo_dirs — prints subdirectories with .git, deduplicated by real
+# physical path (a repo-symlink alias would otherwise count as a separate repository
+# alongside the original — a double reindex of one source, found 2026-07-17).
 iwe_repo_dirs() {
   local repo real seen=""
   for repo in "$@"; do
@@ -1891,7 +1891,7 @@ iwe_repo_dirs() {
   done
 }
 
-# --- Шаг 2: Knowledge-MCP reindex ---
+# --- Step 2: Knowledge-MCP reindex ---
 do_reindex() {
   log "Шаг 2/3: Knowledge-MCP reindex"
 
@@ -1905,8 +1905,8 @@ do_reindex() {
     return "$RC_STEP_SKIPPED"
   fi
 
-  # Маппинг dir→source+config из L2 (sources.json) и L4 (sources-personal.json)
-  # Python резолвит path→git-root, чтобы связать dirname репо с source-именем.
+  # Mapping dir→source+config from L2 (sources.json) and L4 (sources-personal.json)
+  # Python resolves path→git-root to link the repo dirname with the source name.
   local dir_map
   dir_map=$("$RESOLVED_PYTHON3" - "$SOURCES_JSON" "$SOURCES_PERSONAL_JSON" << 'PYEOF'
 import sys, json, os
@@ -1923,7 +1923,7 @@ for config_path in sys.argv[1:]:
 PYEOF
   ) || { warn "  Mapping build failed — пропуск reindex"; return 0; }
 
-  # Определяем, какие Pack/DS были изменены сегодня
+  # Determine which Pack/DS were changed today
   local l2_sources="" l4_sources=""
   while IFS= read -r repo; do
     local repo_name
@@ -1959,7 +1959,7 @@ PYEOF
   # stalled on a failed L4 while L2 had already indexed 3078/2116 docs).
   local l2_rc=0 l4_rc=0 ran=0 failed=0
 
-  # Вызов 1: L2 источники (sources.json — дефолт selective-reindex)
+  # Call 1: L2 sources (sources.json — the selective-reindex default)
   if [ -n "$l2_sources" ]; then
     log "  L2 источники:$l2_sources"
     ran=$((ran + 1))
@@ -1971,7 +1971,7 @@ PYEOF
     fi
   fi
 
-  # Вызов 2: L4 источники (sources-personal.json через SOURCES_CONFIG)
+  # Call 2: L4 sources (sources-personal.json via SOURCES_CONFIG)
   if [ -n "$l4_sources" ]; then
     log "  L4 источники:$l4_sources"
     ran=$((ran + 1))
@@ -1993,7 +1993,7 @@ PYEOF
   fi
 }
 
-# --- Шаг 3: Linear sync ---
+# --- Step 3: Linear sync ---
 do_linear() {
   log "Шаг 3/3: Linear sync"
 
@@ -2005,7 +2005,7 @@ do_linear() {
   "$LINEAR_SYNC"
 }
 
-# --- Шаг 4: Консолидация сессий дня (DAP1-B, WP-7) ---
+# --- Step 4: Consolidation of the day's sessions (DAP1-B, WP-7) ---
 do_session_consolidation() {
   log "Шаг 4/4: Консолидация сессий дня"
 
@@ -2018,8 +2018,8 @@ do_session_consolidation() {
   today=$(date +%Y-%m-%d)
   local month_dir
   month_dir=$(date +%Y-%m)
-  # issue #545: корень журналов — тем же контрактом, что писатель
-  # (session-guard.sh): MC-sessions после миграции, legacy иначе.
+  # issue #545: journals root — by the same contract as the writer
+  # (session-guard.sh): MC-sessions after migration, legacy otherwise.
   local sessions_base
   if ! sessions_base=$(iwe_sessions_dir); then
     warn "  IWE_SESSIONS_ROOT=${IWE_SESSIONS_ROOT:-} недоступен — консолидация читает legacy-путь"
@@ -2140,7 +2140,7 @@ PY
   log "  Записано $count сессий → $(basename "$output_file")"
 }
 
-# --- Лог ---
+# --- Log ---
 write_log() {
   local date_str
   date_str=$(date "+%Y-%m-%d %H:%M")

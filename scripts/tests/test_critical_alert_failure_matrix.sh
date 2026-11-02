@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Failure-injection matrix for fmt-critical-alert.sh (Ф-script-contract-gate,
-# Этап 2): missing utilities and 4xx/5xx API errors must all classify as a
+# Failure-injection matrix for fmt-critical-alert.sh (Phase script-contract-gate,
+# Stage 2): missing utilities and 4xx/5xx API errors must all classify as a
 # critical, non-clean, bounded-diagnostic failure — never a false "0 (✅ clean)".
 #
 # The script's current contract collapses every gh/API failure to exit 2 (it

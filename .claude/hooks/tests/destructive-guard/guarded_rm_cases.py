@@ -84,7 +84,7 @@ def main():
 
     w = Workspace()
     try:
-        # --- разрешено ---
+        # --- allowed ---
         a = w.make(w.allowed, "a")
         code, err = w.run("-rf", mixed(a))
         check("цель внутри корня, форма C:/…", code == 0 and not os.path.exists(a), err)
@@ -150,7 +150,7 @@ def main():
         code, err = w.run("-rf")
         check("без целей — ничего не делает", code == 0, err)
 
-        # --- отказ, ничего не удалено ---
+        # --- refusal, nothing deleted ---
         o = w.make(w.outside, "o")
         code, err = w.run("-rf", mixed(o))
         check("цель вне корней", code == 1 and os.path.exists(o) and "вне разрешённых" in err, err)
@@ -223,7 +223,7 @@ def main():
             else:
                 check("Windows junction доступна для проверки", False, "mklink /J не создал junction")
 
-        # --- сбой внешних программ: отказ, ничего не удалено (рецензия Codex, круг 1) ---
+        # --- external program failure: refusal, nothing deleted (Codex review, round 1) ---
         def faulty(tool, fail_from=1):
             """Подделка tool: с вызова номер fail_from выходит с кодом 3, до того — настоящий tool."""
             fake = tempfile.mkdtemp(prefix="grm-fake-")
@@ -248,8 +248,8 @@ def main():
                   and "ничего не удалено" in proc.stderr, proc.stderr.strip())
             shutil.rmtree(fake, ignore_errors=True)
 
-        # Сбой на второй записи реестра, когда первая уже принята (класс дефекта из рецензии Codex, круг 1:
-        # там падал sed на строке {WORKSPACE}/..., а уже принятого корня хватало для удаления).
+        # Failure on the second registry entry when the first is already accepted (defect class from the Codex review, round 1:
+        # sed failed there on the line {WORKSPACE}/..., while the already accepted root was enough for deletion).
         if os.name == "nt":
             fake = faulty("cygpath", fail_from=2)
             victim = w.make(w.allowed, "victim-second-entry")
@@ -258,7 +258,7 @@ def main():
                   proc.returncode != 0 and os.path.exists(victim) and "ничего не удалено" in proc.stderr, proc.stderr.strip())
             shutil.rmtree(fake, ignore_errors=True)
 
-        # --- реестр ---
+        # --- registry ---
         w.registry("")
         code, err = w.run("-rf", mixed(keep))
         check("пустой реестр", code == 1 and os.path.exists(keep) and "пуст" in err, err)

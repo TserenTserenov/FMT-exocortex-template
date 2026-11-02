@@ -1,11 +1,11 @@
 #!/bin/bash
-# Шаблон уведомлений: Стратег (R1)
-# Вызывается из notify.sh через source
+# Notification template: Strategist (R1)
+# Called from notify.sh via source
 
 STRATEGY_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/current"
 STRATEGY_REPO_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
-# WP-568: день сверки фиксирует стратег (DAY_OPEN_PLAN_DATE) — иначе прогон через полночь
-# назвал бы в сигнале уже следующий день, хотя сверял предыдущий.
+# WP-568: the reconciliation day is fixed by the strategist (DAY_OPEN_PLAN_DATE) — otherwise a run past midnight
+# would name the already next day in the signal, though it reconciled the previous one.
 DATE="${DAY_OPEN_PLAN_DATE:-$(date +%Y-%m-%d)}"
 
 find_strategy_file() {
@@ -25,10 +25,10 @@ find_strategy_file() {
     esac
 }
 
-# HTML-escape для контента из markdown-источника (parse_mode=HTML).
-# Применять к переменным, которые приходят из DayPlan/WeekPlan текста, ДО подстановки в printf.
-# Не применять к статическим <b>/<a> тегам из printf — они должны остаться буквальными.
-# Причина: фразы вида "<4/5", "a < b" в markdown ломают Telegram parser (Bad Request: Unsupported start tag).
+# HTML-escape for content from a markdown source (parse_mode=HTML).
+# Apply to variables that come from DayPlan/WeekPlan text, BEFORE substitution into printf.
+# Do not apply to the static <b>/<a> tags from printf — they must remain literal.
+# Reason: phrases like "<4/5", "a < b" in markdown break the Telegram parser (Bad Request: Unsupported start tag).
 escape_html() {
     python3 -c 'import sys, html; sys.stdout.write(html.escape(sys.stdin.read()))'
 }
@@ -142,7 +142,7 @@ build_message() {
         return
     fi
 
-    # WP-561 Ф25: a failed week-review must alarm even when no WeekPlan file is found or the
+    # WP-561 Phase 25: a failed week-review must alarm even when no WeekPlan file is found or the
     # model wrote nothing, so this message is static and skips the file lookup below.
     if [ "$scenario" = "week-review-failed" ]; then
         printf "<b>🔴 Week-Review не доведён до сервера</b>\n\nОтчёт недели не подтверждён на общей версии (запуск не начался, модель не справилась с заданием, или готовый отчёт не передан на сервер) - следующие сценарии недели могут остаться без итогов. В журнале стратега за сегодня видно, на каком именно шаге сорвалось."

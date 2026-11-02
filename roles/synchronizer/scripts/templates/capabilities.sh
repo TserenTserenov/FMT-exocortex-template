@@ -1,7 +1,7 @@
 #!/bin/bash
-# Шаблон уведомлений: возможности установки (WP-7 F267, этап 2)
-# Вызывается из notify.sh через source. Текст собирает iwe-capabilities.sh regress
-# и передаёт в IWE_CAP_ALERT_TEXT; здесь только имена возможностей, без адресов и секретов.
+# Notification template: installation capabilities (WP-7 F267, stage 2)
+# Called from notify.sh via source. The text is assembled by iwe-capabilities.sh regress
+# and passed in IWE_CAP_ALERT_TEXT; here only capability names, without addresses and secrets.
 
 build_message() {
     case "$1" in

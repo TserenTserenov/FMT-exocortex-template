@@ -1,15 +1,15 @@
 #!/bin/bash
-# sync-files.sh — точечное обновление файлов из remote
+# sync-files.sh — targeted update of files from the remote
 #
-# Использование:
+# Usage:
 #   sync-files.sh <repo-path> <file1> [file2] ...
 #
-# Примеры:
+# Examples:
 #   sync-files.sh ~/IWE/DS-strategy inbox/fleeting-notes.md
 #   sync-files.sh ~/IWE/DS-strategy inbox/fleeting-notes.md inbox/captures.md
 #
-# Скрипт делает git fetch и обновляет ТОЛЬКО указанные файлы,
-# не трогая остальные локальные изменения.
+# The script does a git fetch and updates ONLY the specified files,
+# leaving other local changes untouched.
 
 set -euo pipefail
 

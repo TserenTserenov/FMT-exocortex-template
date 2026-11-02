@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # kimi-standalone-preflight.sh
-# Hard gate для Kimi standalone-сессий.
-# Проверяет, что сессия открыта через session-guard.sh и не устарела.
+# Hard gate for Kimi standalone sessions.
+# Checks that the session was opened via session-guard.sh and is not stale.
 #
 # Usage: bash scripts/kimi-standalone-preflight.sh
 

@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# guarded-rm — rm, который удаляет только внутри разрешённых корней (issue #940).
+# guarded-rm — rm that deletes only inside allowed roots (issue #940).
 #
-# Хук destructive-guard блокирует обычный `rm` с признаками рекурсии и принудительности;
-# вместо него агент вызывает этот скрипт с теми же аргументами. Скрипт при выполнении,
-# когда оболочка уже раскрыла переменные и шаблоны имён, вычисляет канонический путь
-# каждой цели (ссылки и `..` раскрыты, формы Windows `C:/…`, `/c/…`, `/tmp/…` сведены
-# к одной) и сверяет его с реестром корней по границе компонента. Удаляет, только если
-# ВСЕ цели лежат внутри корней; сам корень, путь вне корней, пустая цель, сбой реестра
-# или нормализации — отказ без удаления. Затем один вызов настоящего rm с исходными
-# аргументами (канонический путь — только для проверки).
+# The destructive-guard hook blocks a plain `rm` with recursion and force flags;
+# instead the agent calls this script with the same arguments. At run time, when the shell
+# has already expanded variables and name patterns, the script computes the canonical path
+# of each target (links and `..` resolved, Windows forms `C:/…`, `/c/…`, `/tmp/…` reduced
+# to one) and checks it against the roots registry at the component boundary. It deletes only if
+# ALL targets lie inside the roots; the root itself, a path outside the roots, an empty target, a registry failure
+# or normalization failure — refusal without deleting. Then one call of the real rm with the original
+# arguments (the canonical path is only for the check).
 #
-# Реестр: <IWE>/.claude/config/guarded-rm-roots.txt — данные, не shell.
-# Строгий режим: любая непредусмотренная ошибка — выход до удаления (рецензия Codex, круг 1:
-# сбой sed при чтении реестра не останавливал удаление).
+# Registry: <IWE>/.claude/config/guarded-rm-roots.txt — data, not shell.
+# Strict mode: any unexpected error — exit before deletion (Codex review, round 1:
+# a sed failure while reading the registry did not stop the deletion).
 set -euo pipefail
 
 refuse() {
@@ -29,9 +29,9 @@ REGISTRY="$WORKSPACE/.claude/config/guarded-rm-roots.txt"
 WINDOWS=0
 command -v cygpath >/dev/null 2>&1 && WINDOWS=1
 
-# cygpath -m сохраняет короткие 8.3-имена (RUNNER~1), даже если тот же корень
-# реестра записан длинным именем. Раскрываем их у существующего предка; суффикс
-# несуществующей цели оставляем, чтобы `rm -rf` сохранял обычную семантику.
+# cygpath -m keeps short 8.3 names (RUNNER~1), even if the same registry
+# root is written with the long name. We expand them for the existing ancestor; the suffix
+# of a nonexistent target is left so that `rm -rf` keeps its usual semantics.
 windows_long_path() {
   local path=$1 parent name suffix='' long
   parent=$(cygpath -u -- "$path") || return 1
@@ -50,7 +50,7 @@ windows_long_path() {
   printf '%s%s' "${long%/}" "$suffix"
 }
 
-# Канонический путь: ссылки и `..` раскрыты; на Windows — длинная форма C:/…, нижний регистр.
+# Canonical path: links and `..` resolved; on Windows — long form C:/…, lowercase.
 canon() {
   local path=$1 out
   if realpath -m -- / >/dev/null 2>&1; then
@@ -101,7 +101,7 @@ canon() {
 ROOTS=()
 while IFS= read -r line || [ -n "$line" ]; do
   line=${line%%#*}
-  # Обрезка пробелов средствами оболочки — без внешних программ.
+  # Whitespace trimming with shell means — no external programs.
   line=${line#"${line%%[![:space:]]*}"}
   line=${line%"${line##*[![:space:]]}"}
   [ -n "$line" ] || continue
@@ -115,12 +115,12 @@ while IFS= read -r line || [ -n "$line" ]; do
     *) refuse "непонятная запись реестра: $line" ;;
   esac
   root=$(canon "$root") || refuse "не нормализуется корень реестра: $line"
-  # Корень ФС и корень диска никогда не корень удаления (canon отдаёт для `/` пустую строку).
+  # The FS root and a drive root are never a deletion root (canon returns an empty string for `/`).
   case "$root" in
     ""|[a-z]:) refuse "корень реестра — корень файловой системы или диска: $line → ${root:-/}" ;;
   esac
-  # Не меньше двух частей пути после нормализации: `/c`, `/home` — слишком широкие корни.
-  # Исключение — сами метки временного каталога: `{TMP}` на Linux это `/tmp`, одна часть по природе.
+  # At least two path parts after normalization: `/c`, `/home` are too broad roots.
+  # Exception — the temp directory labels themselves: `{TMP}` on Linux is `/tmp`, one part by nature.
   if [ "$temp_token" != 1 ]; then
     case "$root" in
       */?*/?*) ;;

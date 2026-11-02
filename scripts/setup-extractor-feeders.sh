@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# setup-extractor-feeders.sh — Onboarding скрипт для активации feeder-системы
-# (WP-247 Ф-MULTI-SOURCE).
+# setup-extractor-feeders.sh — onboarding script for activating the feeder system
+# (WP-247 Phase MULTI-SOURCE).
 #
-# Что делает:
-#  1. Проверяет платформу (macOS/Linux)
-#  2. Создаёт launchd plist (macOS) или systemd timer (Linux) для git-diff-feed
-#  3. Включает git-templates для post-commit hook (одна команда)
-#  4. Создаёт пустой fleeting-notes.md если его нет
-#  5. Сообщает что включено
+# What it does:
+#  1. Checks the platform (macOS/Linux)
+#  2. Creates a launchd plist (macOS) or systemd timer (Linux) for git-diff-feed
+#  3. Enables git-templates for the post-commit hook (one command)
+#  4. Creates an empty fleeting-notes.md if it does not exist
+#  5. Reports what is enabled
 #
-# Использование:
+# Usage:
 #   bash {{IWE_TEMPLATE}}/scripts/setup-extractor-feeders.sh
-#   bash {{IWE_TEMPLATE}}/scripts/setup-extractor-feeders.sh --check  # только проверка
+#   bash {{IWE_TEMPLATE}}/scripts/setup-extractor-feeders.sh --check  # check only
 #   bash {{IWE_TEMPLATE}}/scripts/setup-extractor-feeders.sh --uninstall
 
 set -euo pipefail
@@ -48,7 +48,7 @@ ok() { echo "  ✅ $*"; }
 warn() { echo "  ⚠️  $*"; }
 fail() { echo "  ❌ $*"; }
 
-# === 1. Проверки ===
+# === 1. Checks ===
 
 log "1/4 Проверка зависимостей"
 
@@ -58,9 +58,9 @@ if [ ! -x "$EXTRACTOR_SH" ]; then
 fi
 ok "extractor.sh найден"
 
-# AR.293: гейт смотрит на эффективную программу (AI_CLI override у
-# extractor.sh), не на литерал claude — иначе override самого вызова
-# остаётся декоративным, расписание не заводится ни при какой настройке.
+# AR.293: the gate looks at the effective program (the AI_CLI override in
+# extractor.sh), not at the literal claude — otherwise the call's own override
+# stays decorative and the schedule is not set up under any configuration.
 AI_CLI="${AI_CLI:-claude}"
 if ! command -v "$AI_CLI" >/dev/null 2>&1; then
     fail "$AI_CLI CLI не установлен (https://docs.anthropic.com/en/docs/claude-code)"
@@ -117,7 +117,7 @@ if [ "$MODE" = "--check" ]; then
     fi
 elif [ "$MODE" = "--uninstall" ]; then
     if [ -f "$TEMPLATE_HOOK" ]; then
-        # Удаляем только наш блок
+        # Remove only our block
         sed -i.bak "/$HOOK_MARKER/,/^fi\$/d" "$TEMPLATE_HOOK"
         ok "post-commit hook (наш блок) удалён"
     fi
@@ -161,7 +161,7 @@ HOOK
 fi
 fi  # SCHEDULE_ONLY
 
-# === 3. Cron для git-diff-feed (09:00 / 21:00) ===
+# === 3. Cron for git-diff-feed (09:00 / 21:00) ===
 
 log "3/4 Cron для git-diff-feed"
 
@@ -172,14 +172,14 @@ if [ "$PLATFORM" = "Darwin" ]; then
     elif [ "$MODE" = "--uninstall" ]; then
         if [ -f "$PLIST" ]; then launchctl unload "$PLIST" 2>/dev/null || true; rm "$PLIST"; ok "launchd plist удалён"; fi
     else
-        # launchd не создаёт каталог для StandardOutPath сам и без него не
-        # стартует. Раньше каталог появлялся только в Linux-ветке
-        # roles/extractor/install.sh, то есть на чистом Маке задача ставилась
-        # и молча не запускалась (WP-5 F55, находка холодного ревью).
+        # launchd does not create the directory for StandardOutPath itself and without it
+        # does not start. Previously the directory appeared only in the Linux branch of
+        # roles/extractor/install.sh, so on a clean Mac the job was installed
+        # and silently did not run (WP-5 F55, a finding of the cold review).
         mkdir -p "$HOME/logs/extractor"
-        # launchd не наследует login-shell PATH (WP-5, найдено 03.09 — job падал
-        # exit 127 "claude CLI не найден"), поэтому PATH нужно прописать явно, а
-        # не полагаться на окружение launchd по умолчанию (/usr/bin:/bin:/usr/sbin:/sbin).
+        # launchd does not inherit the login-shell PATH (WP-5, found 03.09 — the job failed with
+        # exit 127 "claude CLI not found"), so PATH must be set explicitly rather than
+        # relying on the default launchd environment (/usr/bin:/bin:/usr/sbin:/sbin).
         CLAUDE_BIN_DIR="$(dirname "$(command -v "$AI_CLI")")"
         PLIST_PATH="$CLAUDE_BIN_DIR:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
         IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -235,11 +235,11 @@ PLIST
             && launchctl list "com.extractor.git-diff-feed" >/dev/null 2>&1; then
             ok "launchd plist уже установлен и активен, без изменений"
         else
-            # Unload ДО перезаписи файла: unload читает Label из ТЕКУЩЕГО
-            # содержимого на диске. Если Label когда-нибудь изменится в
-            # heredoc выше, unload после перезаписи снял бы задачу по НОВОМУ
-            # Label (которого ещё нет в реестре launchd), и старая задача
-            # осталась бы висеть орфаном.
+            # Unload BEFORE overwriting the file: unload reads the Label from the CURRENT
+            # content on disk. If the Label ever changes in
+            # the heredoc above, unload after the overwrite would remove the job by the NEW
+            # Label (which is not yet in the launchd registry), and the old job
+            # would stay hanging as an orphan.
             launchctl unload "$PLIST" 2>/dev/null || warn "launchctl unload: задача не была загружена (норма при первой установке)"
             printf '%s\n' "$NEW_PLIST_CONTENT" > "$PLIST"
             launchctl load "$PLIST" 2>/dev/null || warn "launchctl load failed (повторите вручную)"
@@ -254,11 +254,11 @@ elif [ "$PLATFORM" = "Linux" ]; then
         systemctl --user daemon-reload
         ok "systemd units удалены"
     elif [ "$MODE" != "--check" ]; then
-        # issue #1303 (Linux-половина #984, macOS-плист чинили в PR #1022):
+        # issue #1303 (the Linux half of #984, the macOS plist was fixed in PR #1022):
         # extractor.sh resolves session-guard.sh as ${IWE_SCRIPTS:-$HOME/IWE/scripts};
-        # systemd --user не наследует login-shell окружение, поэтому без явных
-        # Environment= строк резолв падает на дефолт, которого в типичной
-        # установке нет — фид находит кандидатов, но не может их сохранить.
+        # systemd --user does not inherit the login-shell environment, so without explicit
+        # Environment= lines the resolution falls back to a default that a typical
+        # installation does not have — the feed finds candidates but cannot save them.
         IWE_TEMPLATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
         IWE_SCRIPTS="${IWE_SCRIPTS:-$IWE_TEMPLATE_DIR/scripts}"
         cat > "$UNIT_DIR/extractor-git-diff-feed.service" <<UNIT
@@ -315,7 +315,7 @@ FN
     fi
 fi
 
-# === Итог ===
+# === Summary ===
 
 echo ""
 log "Готово."

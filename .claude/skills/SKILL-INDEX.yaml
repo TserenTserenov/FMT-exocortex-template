@@ -3,7 +3,7 @@
 # Suggestion rule: propose exactly ONE skill per response, most specific match wins.
 # Only skills with browser: true are suggested in browser context.
 #
-# WP-560 Ф11 (2026-09-04): reconciled against the per-skill `browser_safe`
+# WP-560 Phase 11 (2026-09-04): reconciled against the per-skill `browser_safe`
 # frontmatter field added the same day (source of truth = an actual read of each
 # skill's mandatory Algorithm steps, not the skill's name/description). 8 entries
 # below were `browser: true` here but read as browser-unsafe in their current

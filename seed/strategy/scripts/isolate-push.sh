@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # routing: helper  called-by=session-guard.sh(close)  deterministic=true
-# see WP-484 Ф102, DRR-f102-isolated-push-cherry-pick.md — pushes an isolated
+# see WP-484 Phase 102, DRR-f102-isolated-push-cherry-pick.md — pushes an isolated
 # session worktree's own commits to origin/<target-branch>.
 #
 # Isolated worktrees (WP-520 freeze) drift from origin/<target-branch> by
@@ -42,7 +42,7 @@
 
 set -uo pipefail
 
-# WP-485 Ф14: no silent personal governance-repo default anywhere in this script.
+# WP-485 Phase 14: no silent personal governance-repo default anywhere in this script.
 : "${IWE_GOVERNANCE_REPO:?isolate-push: IWE_GOVERNANCE_REPO is required, no silent default}"
 
 MAX_RETRIES=3
@@ -533,7 +533,7 @@ fi
 
 SOURCE_BRANCH=$(git -C "$SOURCE_WORKTREE" rev-parse --abbrev-ref HEAD 2>/dev/null)
 
-# WP-530 Ф38 (peer-session 2026-09-11-07, Claude+Kimi+Codex): the canonical
+# WP-530 Phase 38 (peer-session 2026-09-11-07, Claude+Kimi+Codex): the canonical
 # checkout this worktree was forked from still points at its own commits, which
 # now live on origin under new SHAs (cherry-pick republish). Nothing else moves
 # that ref, so the canon diverges further with every publish (74/230 on 11.09).
@@ -566,14 +566,14 @@ fi
 
 TEMP_STORE_DIR="$(dirname "$SOURCE_WORKTREE")/.isolate-push-tmp"
 
-# F5 (пир-сессия 2026-08-21-02-day-close-anomaly-classes): паспорт попытки —
-# во внешнем реестре, НЕ внутри worktree (маркер в checkout делал бы worktree
-# dirty и ломал критерий clean для будущего свипера). Статусы: active при
-# создании; retry-pending-classification — пока retry-wrapper единолично решает,
-# удалять ли конфликт; needs-manual-resolve — после атомарной передачи человеку;
-# removed/done — когда worktree убран. Свипер (каталог WP-545)
-# вправе трогать только маркированные записи с доказанной достижимостью
-# коммитов — само удаление этим фиксом не вводится.
+# F5 (peer-session 2026-08-21-02-day-close-anomaly-classes): attempt passport —
+# in an external registry, NOT inside the worktree (a marker in the checkout would make the worktree
+# dirty and break the clean criterion for a future sweeper). Statuses: active on
+# creation; retry-pending-classification — while the retry wrapper alone decides
+# whether to delete the conflict; needs-manual-resolve — after atomic handoff to a human;
+# removed/done — when the worktree is removed. The sweeper (WP-545 catalog)
+# may touch only marked entries with proven reachability
+# of commits — this fix does not introduce deletion itself.
 ATTEMPT_REGISTRY=""
 if [ "$(basename "$(dirname "$SOURCE_WORKTREE")")" = "isolated-worktrees" ]; then
   ATTEMPT_REGISTRY="$(dirname "$(dirname "$SOURCE_WORKTREE")")/isolate-push-attempts"
@@ -581,8 +581,8 @@ else
   ATTEMPT_REGISTRY="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/isolate-push-attempts"
 fi
 
-# review-01 High-7: attempt-<n>-$$ переиспользуется после реюза PID — добавляем
-# uuid-суффикс, а начальную запись создаём exclusive (не перезаписать чужую).
+# review-01 High-7: attempt-<n>-$$ is reused after PID reuse — add a
+# uuid suffix, and create the initial entry exclusively (do not overwrite someone else's).
 ATTEMPT_UUID=$(uuidgen 2>/dev/null | cut -c1-8 || true)
 if [ -z "$ATTEMPT_UUID" ]; then
   ATTEMPT_UUID=$(python3 -c "import secrets; print(secrets.token_hex(4))" 2>/dev/null || true)
@@ -593,10 +593,10 @@ if [ -z "$ATTEMPT_UUID" ]; then
 fi
 
 attempt_marker() {
-  # $1=attempt_id $2=status $3=worktree_path $4=commits(через пробел)
+  # $1=attempt_id $2=status $3=worktree_path $4=commits (space-separated)
   # [$5=create_only] [$6=retry_cleanup_token] [$7=conflict_state_hash]
-  # review-01 High-6: запись под lock реестра, через temp+rename; сбой НАЧАЛЬНОЙ
-  # записи (create_only=1) — не WARN, а отказ (паспорт обязателен до работы).
+  # review-01 High-6: write under the registry lock, via temp+rename; failure of the INITIAL
+  # write (create_only=1) is not a WARN but a refusal (the passport is mandatory before work).
   [ -d "$ATTEMPT_REGISTRY" ] || mkdir -p "$ATTEMPT_REGISTRY" 2>/dev/null
   python3 - "$ATTEMPT_REGISTRY" "$1" "$2" "$3" "$4" "$SOURCE_WORKTREE" "${5:-0}" "$TARGET_BRANCH" "${6:-}" "${7:-}" <<'PYEOF'
 import json, sys, time, os, fcntl
@@ -670,7 +670,7 @@ patch_equivalent_to_head() {  # <commit> -- true only for a non-empty patch alre
   [ "$cherry_line" = "- $commit" ]
 }
 
-# WP-530 Ф29/Ф30: `patch_equivalent_to_head` compares the patch-id of the
+# WP-530 Phase 29/Phase 30: `patch_equivalent_to_head` compares the patch-id of the
 # WHOLE commit. If the same file with the same content lands on origin as
 # part of a DIFFERENT commit (e.g. a batch publisher bundling several queue
 # files into one commit), the whole-commit patch-id never matches even
@@ -759,20 +759,20 @@ content_equivalent_to_head() {  # <commit> -- true only if every file the commit
   return 0
 }
 
-# --- Резюмируемость (WP-484 Ф132/Ф133 ← WP-530, пир-сессия 2026-08-30-01) ---
-# Раньше повторный запуск после конфликта всегда переигрывал перенос с нуля в
-# НОВОМ worktree — ручное разрешение конфликта в сохранённой копии молча
-# терялось (живой инцидент 24.08: разрешение потеряно, финальный коммит
-# восстанавливали вручную по SHA). Теперь запуск сначала ищет в реестре
-# попыток свежую needs-manual-resolve запись этого же источника с тем же
-# набором коммитов и ПРОДОЛЖАЕТ из её worktree вместо replay: push-отказ не
-# откатывает разрешение, а оставляет его в pending-состоянии (контракт
-# prepared/pending_publish из консенсуса пир-сессии).
-# Строгий ключ операции (Codex, раунд 3, блокер 1): паспорт подбирается только
-# при ПОЛНОМ совпадении {источник, целевая ветка, точный упорядоченный список
-# коммитов текущего вызова} -- иначе resume мог подхватить worktree другого
-# диапазона/ветки и запушить его, минуя merge-guard и patch-equivalent логику.
-# Список текущего вызова считается той же формулой, что в основном цикле.
+# --- Resumability (WP-484 Phase 132/Phase 133 ← WP-530, peer-session 2026-08-30-01) ---
+# Previously, re-running after a conflict always replayed the transfer from scratch in a
+# NEW worktree — manual conflict resolution in the saved copy was silently
+# lost (live incident 24.08: resolution lost, the final commit was
+# restored manually by SHA). Now a run first looks in the attempt
+# registry for a fresh needs-manual-resolve entry of the same source with the same
+# set of commits and CONTINUES from its worktree instead of replay: a push refusal does not
+# roll back the resolution but leaves it in the pending state (the
+# prepared/pending_publish contract from the peer-session consensus).
+# Strict operation key (Codex, round 3, blocker 1): a passport is matched only
+# on a FULL match of {source, target branch, exact ordered list of
+# commits of the current call} -- otherwise resume could pick up the worktree of another
+# range/branch and push it, bypassing merge-guard and the patch-equivalent logic.
+# The current call's list is computed by the same formula as in the main loop.
 if ! git -C "$SOURCE_WORKTREE" fetch origin "$TARGET_BRANCH" --quiet 2>&1; then
   echo "isolate-push: git fetch origin $TARGET_BRANCH не прошёл" >&2
   exit 1
@@ -787,12 +787,12 @@ else
 fi
 RESUME_INFO=""
 if [ -n "$RESUME_KEY_COMMITS" ]; then
-  # Выбор и захват паспорта -- атомарно под замком реестра (cold review
-  # 2026-08-30 Critical-2): два одновременных вызова иначе подбирают одну
-  # запись, победитель удаляет worktree, проигравший портит паспорт. Захват =
-  # переход needs-manual-resolve → resume-in-progress; проигравший просто не
-  # находит кандидата и идёт обычным replay-путём. Застрявший
-  # resume-in-progress (упавший процесс) лечится вручную -- см.
+  # Selecting and claiming the passport -- atomically under the registry lock (cold review
+  # 2026-08-30 Critical-2): two simultaneous calls would otherwise pick the same
+  # entry, the winner deletes the worktree, the loser corrupts the passport. Claim =
+  # transition needs-manual-resolve → resume-in-progress; the loser simply does not
+  # find a candidate and takes the ordinary replay path. A stuck
+  # resume-in-progress (crashed process) is fixed manually -- see
   # docs/isolate-push-states.md.
   RESUME_INFO=$(python3 - "$ATTEMPT_REGISTRY" "$SOURCE_WORKTREE" "$TARGET_BRANCH" "$RESUME_KEY_COMMITS" <<'PYEOF'
 import fcntl, glob, hashlib, json, os, sys, time
@@ -857,9 +857,9 @@ if [ -n "$RESUME_INFO" ]; then
   RESUME_COMMITS=$(sed -n 3p <<<"$RESUME_INFO")
   echo "isolate-push: найдена сохранённая попытка с ручным разбором ($RESUME_ID) — продолжаю из неё, не с нуля"
 
-  # На каждом «заверши руками и повтори» возвращаем паспорт в
-  # needs-manual-resolve -- захват (resume-in-progress) иначе спрячет запись
-  # от следующего вызова.
+  # On every "finish by hand and retry" we return the passport to
+  # needs-manual-resolve -- the claim (resume-in-progress) would otherwise hide the entry
+  # from the next call.
   if git -C "$RESUME_WT" rev-parse CHERRY_PICK_HEAD >/dev/null 2>&1; then
     attempt_marker "$RESUME_ID" "needs-manual-resolve" "$RESUME_WT" "$RESUME_COMMITS" || true
     echo "isolate-push: разрешение конфликта в $RESUME_WT не завершено." >&2
@@ -869,8 +869,8 @@ if [ -n "$RESUME_INFO" ]; then
     echo "$RESUME_WT"
     exit 3
   fi
-  # Прерванный rebase проверяется ДО общего теста «дерево грязное» (Codex,
-  # раунд 4): иначе он попадал в подсказку про незакоммиченные правки.
+  # An interrupted rebase is checked BEFORE the general "tree is dirty" test (Codex,
+  # round 4): otherwise it landed in the hint about uncommitted edits.
   if git -C "$RESUME_WT" rev-parse --verify REBASE_HEAD >/dev/null 2>&1; then
     attempt_marker "$RESUME_ID" "needs-manual-resolve" "$RESUME_WT" "$RESUME_COMMITS" || true
     echo "isolate-push: в $RESUME_WT незавершённый rebase — заверши его и повтори вызов:" >&2
@@ -888,10 +888,10 @@ if [ -n "$RESUME_INFO" ]; then
     exit 3
   fi
 
-  # Помечает done только после проверки, что HEAD реально виден на remote
-  # (Codex, раунд 3, критерий приёмки 2: push-код возврата -- не доказательство
-  # публикации, "published" требует remote verification).
-  finish_resume_publish() {  # $1=контекст для сообщения
+  # Marks done only after verifying that HEAD is actually visible on the remote
+  # (Codex, round 3, acceptance criterion 2: the push return code is not proof
+  # of publication, "published" requires remote verification).
+  finish_resume_publish() {  # $1=context for the message
     if ! git -C "$RESUME_WT" fetch origin "$TARGET_BRANCH" --quiet 2>&1 \
        || ! git -C "$RESUME_WT" merge-base --is-ancestor HEAD "origin/$TARGET_BRANCH" 2>/dev/null; then
       attempt_marker "$RESUME_ID" "needs-manual-resolve" "$RESUME_WT" "$RESUME_COMMITS" || true
@@ -913,10 +913,10 @@ if [ -n "$RESUME_INFO" ]; then
     finish_resume_publish "replay не понадобился"
   fi
 
-  # origin уехал, пока конфликт разбирали руками. Одна попытка догнать rebase'ом
-  # ВНУТРИ той же копии: разрешение сохраняется; новый конфликт остаётся ЛЕЖАТЬ
-  # (без --abort -- Codex, раунд 3, блокер 2: abort стирал то, что тут же
-  # предлагалось разобрать) — снова к рукам, НЕ к replay с нуля.
+  # origin moved on while the conflict was being resolved by hand. One attempt to catch up with a rebase
+  # INSIDE the same copy: the resolution is preserved; a new conflict is left IN PLACE
+  # (no --abort -- Codex, round 3, blocker 2: abort erased what was about
+  # to be offered for resolution) — back to hands, NOT a replay from scratch.
   echo "isolate-push: push из сохранённой попытки отклонён — origin уехал, догоняю rebase'ом в той же копии"
   if git -C "$RESUME_WT" pull --rebase origin "$TARGET_BRANCH" 2>&1 \
      && git -C "$RESUME_WT" push origin "HEAD:$TARGET_BRANCH" 2>&1; then
@@ -980,9 +980,9 @@ while [ "$attempt" -le "$MAX_RETRIES" ]; do
   ATTEMPT_ID="attempt-${attempt}-$$-${ATTEMPT_UUID}"
   TEMP_WORKTREE="$TEMP_STORE_DIR/$ATTEMPT_ID"
 
-  # Паспорт ДО worktree add: при сбое создания worktree запись creating
-  # остаётся маркером прерванной попытки, при сбое паспорта worktree не
-  # существует вовсе — немаркированного worktree не бывает ни в одном порядке.
+  # Passport BEFORE worktree add: if worktree creation fails, the creating
+  # entry remains as a marker of the interrupted attempt; if the passport fails, the worktree does
+  # not exist at all — an unmarked worktree is impossible in either order.
   if ! attempt_marker "$ATTEMPT_ID" "creating" "$TEMP_WORKTREE" "$COMMITS" 1; then
     echo "isolate-push: не удалось создать паспорт попытки $ATTEMPT_ID — попытка не начинается" >&2
     exit 1
@@ -1061,9 +1061,9 @@ while [ "$attempt" -le "$MAX_RETRIES" ]; do
       echo "$TEMP_WORKTREE"
       exit 3
     fi
-    # review-01 Critical-4: needs-manual-resolve — только при факте конфликта
-    # (CHERRY_PICK_HEAD существует); прочая ошибка — отдельный статус failed,
-    # иначе будущий свипер читал бы ложное «ждёт ручного разбора конфликта».
+    # review-01 Critical-4: needs-manual-resolve — only on an actual conflict
+    # (CHERRY_PICK_HEAD exists); any other error — a separate status failed,
+    # otherwise a future sweeper would read a false "awaiting manual conflict resolution".
     attempt_marker "$ATTEMPT_ID" "failed" "$TEMP_WORKTREE" "$COMMITS" || echo "isolate-push: WARN паспорт попытки не обновлён (failed)" >&2
     echo "isolate-push: cherry-pick упал не в конфликт (неожиданная ошибка) — временный worktree сохранён:" >&2
     echo "$TEMP_WORKTREE" >&2

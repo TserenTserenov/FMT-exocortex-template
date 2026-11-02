@@ -1,20 +1,20 @@
 #!/bin/bash
 # routing: guard  deterministic=true
 # dry-run-complete.sh <gate_id> <reason> [owner_session_id] <token>
-# Атомарное завершение dry-run репетиции (issue #549 stage 2).
+# Atomic completion of a dry-run rehearsal (issue #549 stage 2).
 #
-# Единственная штатная точка перехода active→completed: транзакционный замок,
-# строгая schema-проверка state (валидный JSON v2, имя файла == .gate_id),
-# монотонный tmp+mv, снятие sentinel ТОЛЬКО если его gate_id совпадает.
-# Идемпотентно: повторное завершение — no-op, исходные metadata не перетираются.
+# The only regular active→completed transition point: a transactional lock,
+# strict schema check of state (valid JSON v2, file name == .gate_id),
+# monotonic tmp+mv, removal of the sentinel ONLY if its gate_id matches.
+# Idempotent: repeated completion is a no-op, the original metadata is not overwritten.
 #
-# Авторизация (Codex review r1-r2: capability не декоративен и без флагов
-# обхода): завершение ВСЕГДА требует token (4-й аргумент) — сверка sha256 с
-# записанным в state (в state только хэш; preimage — у инициатора). Stop-хук
-# рантайма этот helper НЕ вызывает — он выполняет переход сам (флага
-# --trusted-stop не существует, попытка его передать — обычная ошибка
-# capability). reason=manual-recovery без token — только с подтверждением с
-# терминала пилота (/dev/tty); из скрипта/агента без tty — отказ.
+# Authorization (Codex review r1-r2: the capability is not decorative and has no
+# bypass flags): completion ALWAYS requires a token (4th argument) — checked by sha256 against
+# the one recorded in state (state holds only the hash; the preimage is with the initiator). The runtime
+# Stop hook does NOT call this helper — it performs the transition itself (the
+# --trusted-stop flag does not exist, trying to pass it is an ordinary capability
+# error). reason=manual-recovery without a token — only with confirmation from
+# the pilot's terminal (/dev/tty); from a script/agent without a tty — refusal.
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -30,8 +30,8 @@ command -v jq >/dev/null 2>&1 || { echo "dry-run-complete: jq required" >&2; exi
 
 SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
 DRY_DIR="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-# Единый резолвер путей (Codex r2): override действует только с маркером
-# тест-режима — иначе все компоненты смотрели бы в разные места.
+# A single path resolver (Codex r2): the override works only with a test-mode
+# marker — otherwise all components would look in different places.
 if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
     [ -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ] || {
         DRY_DIR="/tmp/iwe-dry-run-$(id -u)"
@@ -43,8 +43,8 @@ SP="$DRY_DIR/gate-$GATE_ID.state"
 
 fail() { echo "dry-run-complete: $*" >&2; exit 2; }
 
-# Каталог: те же lstat-инварианты, что у гейта (Codex r1: helper обязан
-# повторять их, не только комментировать).
+# Directory: the same lstat invariants as the gate (Codex r1: the helper must
+# repeat them, not just comment on them).
 [ -L "$DRY_DIR" ] && fail "dir $DRY_DIR is a symlink — refusing"
 [ -d "$DRY_DIR" ] || fail "no dry-run dir $DRY_DIR (gate_id неизвестен)"
 case "$(uname)" in
@@ -66,8 +66,8 @@ while ! mkdir "$LOCK_DIR" 2>/dev/null; do
         lock_start=$(sed -n '3p' "$LOCK_DIR/pid" 2>/dev/null || true)
         cur_start=$(ps -o lstart= -p "$lock_pid" 2>/dev/null || true)
         if [ -n "$lock_pid" ] && { ! kill -0 "$lock_pid" 2>/dev/null || { [ -n "$lock_start" ] && [ -n "$cur_start" ] && [ "$lock_start" != "$cur_start" ]; }; }; then
-            # ABA-защита: уносим устаревший замок уникальным именем, удаляем
-            # именно его — не потенциально новый замок другого процесса.
+            # ABA protection: we move the stale lock away under a unique name and delete
+            # exactly that one — not a potentially new lock of another process.
             mv "$LOCK_DIR" "$DRY_DIR/.stale-lock-$$-$(date +%s)" 2>/dev/null || true
             rm -rf "$DRY_DIR"/.stale-lock-* 2>/dev/null || true
             mkdir "$LOCK_DIR" 2>/dev/null && break
@@ -77,16 +77,16 @@ while ! mkdir "$LOCK_DIR" 2>/dev/null; do
     sleep 0.1 2>/dev/null || sleep 1
 done
 NONCE=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
-# Ошибка записи owner-файла = замок не захвачен (Codex r3: единый протокол
-# замка во всех компонентах — pid + nonce + lstart).
+# An owner-file write error = the lock is not acquired (Codex r3: a single lock
+# protocol across all components — pid + nonce + lstart).
 if ! { echo "$$"; echo "$NONCE"; ps -o lstart= -p $$ 2>/dev/null || echo "unknown"; } > "$LOCK_DIR/pid" 2>/dev/null; then
     rm -rf "$LOCK_DIR" 2>/dev/null || true
     fail "cannot record lock owner"
 fi
-# Освобождение — только свой замок (сверка nonce).
+# Release — only our own lock (nonce check).
 trap 'if [ "$(sed -n "2p" "$LOCK_DIR/pid" 2>/dev/null)" = "$NONCE" ]; then rm -rf "$LOCK_DIR" 2>/dev/null; fi' EXIT
 
-# Строгая schema-проверка state.
+# Strict schema check of state.
 [ -f "$SP" ] || fail "state file not found: $SP"
 jq -e . "$SP" >/dev/null 2>&1 || fail "state file corrupted (invalid JSON): $SP"
 RECORDED_GID=$(jq -r '.gate_id // empty' "$SP" 2>/dev/null || true)
@@ -103,8 +103,8 @@ case "$CURRENT" in
             recorded=$(jq -r '.owner_session_id // empty' "$SP" 2>/dev/null || true)
             [ "$recorded" = "$OWNER_SID" ] || fail "owner_session_id mismatch for gate_id=$GATE_ID (recorded=$recorded) — refusing to complete чужой gate"
         fi
-        # Авторизация перехода: token всегда (исключение — manual-recovery
-        # с живым подтверждением пилота с терминала).
+        # Transition authorization: a token always (the exception is manual-recovery
+        # with live confirmation from the pilot's terminal).
         recorded_sha=$(jq -r '.owner_token_sha256 // empty' "$SP" 2>/dev/null || true)
         if [ -n "$TOKEN" ] && [ -n "$recorded_sha" ]; then
             given_sha=$(printf '%s' "$TOKEN" | shasum -a 256 | awk '{print $1}')
@@ -127,8 +127,8 @@ case "$CURRENT" in
         ;;
 esac
 
-# Sentinel снимается ТОЛЬКО после completed и ТОЛЬКО если он ссылается на
-# этот же gate_id — и это обычный файл того же владельца (lstat, Codex r1).
+# The sentinel is removed ONLY after completed and ONLY if it refers to
+# this same gate_id — and it is a regular file of the same owner (lstat, Codex r1).
 if [ -f "$SENTINEL" ] && [ ! -L "$SENTINEL" ]; then
     case "$(uname)" in
     Darwin) S_UID=$(stat -f %u "$SENTINEL" 2>/dev/null || true) ;;

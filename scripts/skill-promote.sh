@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# skill-promote.sh — промоция скилла в платформенный шаблон IWE (v2.1)
+# skill-promote.sh — promote a skill into the IWE platform template (v2.1)
 # see DP.SC.153, DP.ROLE.056
 #
-# Поток:
-#   1. validate-skill.sh (gate: SKILL.md v2 обязателен)
-#   2. Копирует <skill>/ → FMT/.claude/skills/<skill>/
-#      - исключает мусор (.DS_Store, .git, .tmp)
-#      - делает резервную копию перед перезаписью
-#   3. Подстановки путей (HOME/IWE → env vars)
-#   4. Устанавливает layer: L1 в FMT-копии SKILL.md
-#   5. Запускает validate-fmt-scripts.sh на FMT (ловит хардкоды путей)
-#   6. Регенерирует skills-catalog.yaml
+# Flow:
+#   1. validate-skill.sh (gate: SKILL.md v2 is mandatory)
+#   2. Copies <skill>/ → FMT/.claude/skills/<skill>/
+#      - excludes junk (.DS_Store, .git, .tmp)
+#      - makes a backup before overwriting
+#   3. Path substitutions (HOME/IWE → env vars)
+#   4. Sets layer: L1 in the FMT copy of SKILL.md
+#   5. Runs validate-fmt-scripts.sh on FMT (catches hardcoded paths)
+#   6. Regenerates skills-catalog.yaml
 #
-# Использование:
-#   bash skill-promote.sh <путь-к-папке-скилла> [--dry-run]
+# Usage:
+#   bash skill-promote.sh <path-to-skill-folder> [--dry-run]
 
 set -euo pipefail
 
@@ -57,7 +57,7 @@ else
     sed_inplace() { sed -i '' "$@"; }
 fi
 
-# Откат при ошибке
+# Rollback on error
 rollback() {
     local backup_path="${1:-}"
     echo "🔄 Откат изменений..." >&2
@@ -68,7 +68,7 @@ rollback() {
     fi
 }
 
-# Подстановка путей в файле
+# Path substitution in a file
 substitute_file() {
     local file="$1"
     local tmp
@@ -88,7 +88,7 @@ substitute_file() {
     mv "$tmp" "$file"
 }
 
-# ── Шаг 1. Валидация (gate) ──────────────────────────────────────────────────
+# ── Step 1. Validation (gate) ──────────────────────────────────────────────────
 VALIDATE_SCRIPT="$FMT_DIR/scripts/validate-skill.sh"
 if [[ -f "$VALIDATE_SCRIPT" ]]; then
     echo "--- validate-skill.sh ---"
@@ -126,7 +126,7 @@ if [[ -d "$FMT_DIR/.git" ]]; then
     fi
 fi
 
-# ── Шаг 2. Резервная копия ───────────────────────────────────────────────────
+# ── Step 2. Backup ───────────────────────────────────────────────────
 backup_path=""
 if [[ -d "$DEST" && -n "$(ls -A "$DEST" 2>/dev/null)" ]]; then
     backup_path="$BACKUP_DIR/${skill_name}-$(date +%Y%m%d-%H%M%S)"
@@ -135,7 +135,7 @@ if [[ -d "$DEST" && -n "$(ls -A "$DEST" 2>/dev/null)" ]]; then
     echo "📦 Резервная копия: $backup_path"
 fi
 
-# ── Шаг 3. Копирование директории ────────────────────────────────────────────
+# ── Step 3. Copying the directory ────────────────────────────────────────────
 rm -rf "$DEST"
 mkdir -p "$DEST"
 # "$SRC"/. (not "$SRC"/) so the CONTENTS land in $DEST on both BSD (macOS) and GNU (Linux/CI)
@@ -143,14 +143,14 @@ mkdir -p "$DEST"
 # and the later substitute_file "$DEST/SKILL.md" then fails with "No such file" (CI-only).
 cp -a "$SRC"/. "$DEST"/
 
-# ── Шаг 4. Удаление мусора ───────────────────────────────────────────────────
+# ── Step 4. Removing junk ───────────────────────────────────────────────────
 find "$DEST" -type f \( \
     -name ".DS_Store" -o \
     -name "*.bak" -o \
     -name "*.tmp" \
 \) -delete 2>/dev/null || true
 
-# ── Шаг 5. Подстановки путей + layer: L1 ─────────────────────────────────────
+# ── Step 5. Path substitutions + layer: L1 ─────────────────────────────────────
 substitute_file "$DEST/SKILL.md"
 
 # -- Blank USER-SPACE block content on promote (keep markers, clear inner content)
@@ -172,8 +172,8 @@ if [ -n "$IC_BLOCK" ]; then
     done <<< "$IC_BLOCK"
 fi
 
-# -- Replace L3-author marker values with {{PLACEHOLDER}} (WP-5 L1/L3-разделение в скиллах)
-# Marker syntax: <!-- L3-author: KEY=value, в шаблоне → {{PLACEHOLDER}} -->
+# -- Replace L3-author marker values with {{PLACEHOLDER}} (WP-5 L1/L3 separation in skills)
+# Marker syntax: <!-- L3-author: KEY=value, in the template → {{PLACEHOLDER}} -->
 # Only quoted occurrences ("value") are substituted — a bare value elsewhere in the file
 # (e.g. an illustrative example) is left untouched. Each marker is processed by line number
 # (not `|`-joined fields) because `value` itself may legitimately contain `|`; substitution
@@ -191,14 +191,14 @@ while IFS=: read -r lineno marker; do
     fi
 done < <(grep -noE '<!-- L3-author: [A-Za-z_][A-Za-z0-9_]*=[^,]+, в шаблоне → \{\{[A-Za-z0-9_]+\}\} -->' "$DEST/SKILL.md" 2>/dev/null)
 
-# Подстановки в .sh скрипты скилла (рекурсивно)
+# Substitutions in the skill's .sh scripts (recursively)
 while IFS= read -r -d '' f; do
     substitute_file "$f"
 done < <(find "$DEST" -type f -name "*.sh" -print0 2>/dev/null)
 
 echo "✅ Промотирован: FMT/.claude/skills/$skill_name/ (layer: L1)"
 
-# ── Шаг 6. Валидация FMT на хардкоды путей ───────────────────────────────────
+# ── Step 6. FMT validation for hardcoded paths ───────────────────────────────────
 FMT_VALIDATE_SCRIPT="$FMT_DIR/scripts/validate-fmt-scripts.sh"
 if [[ -f "$FMT_VALIDATE_SCRIPT" ]]; then
     echo "--- validate-fmt-scripts.sh ---"
@@ -213,7 +213,7 @@ else
     echo "⚠️  validate-fmt-scripts.sh не найден — пропускаю FMT-валидацию"
 fi
 
-# ── Шаг 7. Регенерация каталогов (author + FMT) ──────────────────────────────
+# ── Step 7. Catalog regeneration (author + FMT) ──────────────────────────────
 CATALOG_SCRIPT="$FMT_DIR/scripts/generate-skills-catalog.sh"
 if [[ -f "$CATALOG_SCRIPT" ]]; then
     echo "🔄 Регенерация skills-catalog.yaml (author)..."
@@ -231,7 +231,7 @@ fi
 CHANGELOG_SCRIPT="$FMT_DIR/scripts/changelog-append.sh"
 if [[ -f "$CHANGELOG_SCRIPT" ]]; then IWE_TEMPLATE="$FMT_DIR" bash "$CHANGELOG_SCRIPT"; fi
 
-# ── Шаг 8. Запись в promotion-status.yaml (WP-7/PZ-6) ────────────────────────
+# ── Step 8. Write to promotion-status.yaml (WP-7/PZ-6) ────────────────────────
 PROMOTE_COMMON="$FMT_DIR/scripts/promote-common.sh"
 if [[ -f "$PROMOTE_COMMON" ]]; then
     # shellcheck source=./promote-common.sh
@@ -239,7 +239,7 @@ if [[ -f "$PROMOTE_COMMON" ]]; then
     record_promotion ".claude/skills/$skill_name" "skill" "" "" "na"
 fi
 
-# ── Шаг 9. Пересборка манифеста ──────────────────────────────────────────────
+# ── Step 9. Manifest rebuild ──────────────────────────────────────────────
 MANIFEST_SCRIPT="$FMT_DIR/generate-manifest.sh"
 if [[ -f "$MANIFEST_SCRIPT" ]]; then
     echo "🔄 Пересборка update-manifest.json..."

@@ -1,7 +1,7 @@
 #!/bin/bash
 # day-open-hooks-runner.sh — runs extensions/day-open.<hook>*.md bash-block
 # hooks for the "before" and "after" points of the Day Open pipeline
-# (WP-529 Ф11). "checks" stays on its own dedicated day-open-checks-runner.sh
+# (WP-529 Phase 11). "checks" stays on its own dedicated day-open-checks-runner.sh
 # — its exact CLI/output is depended on by existing tests and the pipeline's
 # commit gate, and unlike before/after it always ships a default extension
 # file, so an absent one is an error there, not here (see below).

@@ -4,7 +4,7 @@
 #   connect.sh          interactive: `claude setup-token` → paste token → save → verify
 #   connect.sh --check  verify the already-saved token only (no browser login)
 #
-# WP-5 Ф46: for a regular template user (no personal server infra like the
+# WP-5 Phase 46: for a regular template user (no personal server infra like the
 # platform author's sops-nix setup) this must be one command + one interactive
 # browser login, no manual system-file editing.
 #

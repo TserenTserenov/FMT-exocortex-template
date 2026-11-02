@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# validate-fmt-scripts.sh — проверка FMT на личные хардкоды и нарушения конвенций
-# Запускается автоматически из template-sync.sh и вручную при подозрении.
+# validate-fmt-scripts.sh — check FMT for personal hardcodes and convention violations
+# Runs automatically from template-sync.sh and manually when in doubt.
 #
-# Использование:
+# Usage:
 #   bash validate-fmt-scripts.sh [scripts-dir] [--scripts|--settings-json|--all]
 #
-#   --scripts       проверить только скрипты (1, 2, 4) — по умолчанию вместе с --all
-#   --settings-json проверить только .claude/settings.json (проверка 3)
-#   --all           полная проверка [умолчание]
+#   --scripts       check scripts only (1, 2, 4) — together with --all by default
+#   --settings-json check only .claude/settings.json (check 3)
+#   --all           full check [default]
 #
-# Что проверяет:
-#   1. *.sh/*.py: абсолютный домашний путь пользователя (/Users/<name> или /home/<name>)
-#   2. *.sh/*.py: голое имя авторского governance-репо без ${VAR:-default} защиты
-#   3. .claude/settings.json: хук-команды на .claude/hooks/X.sh должны иметь префикс
-#      $CLAUDE_PROJECT_DIR/ (иначе ломаются при сдвиге cwd: subagent/worktree/MCP)
-#   4. *.sh под set -e: ((VAR++)) без || true → silent exit при VAR==0 (B8 gap)
-#   5. .claude/skills/*/SKILL.md: $HOME/IWE/<author-repo>/ и ~/IWE/<author-repo>/
-#      без env-fallback ${IWE_GOVERNANCE_REPO:-...} (WP-337 З-Ф6, 1 июня 2026)
-#   6. .claude/skills/*/SKILL.md: L1 layer без маркера <!-- USER-SPACE -->
-#   7. .claude/skills/*/SKILL.md: L1 layer с незамещённым <!-- L3-author: KEY=value --> (WP-5)
+# What it checks:
+#   1. *.sh/*.py: the user's absolute home path (/Users/<name> or /home/<name>)
+#   2. *.sh/*.py: bare name of the author's governance repo without ${VAR:-default} protection
+#   3. .claude/settings.json: hook commands on .claude/hooks/X.sh must have the prefix
+#      $CLAUDE_PROJECT_DIR/ (otherwise they break when cwd shifts: subagent/worktree/MCP)
+#   4. *.sh under set -e: ((VAR++)) without || true → silent exit when VAR==0 (B8 gap)
+#   5. .claude/skills/*/SKILL.md: $HOME/IWE/<author-repo>/ and ~/IWE/<author-repo>/
+#      without env-fallback ${IWE_GOVERNANCE_REPO:-...} (WP-337 Z-Phase6, June 1, 2026)
+#   6. .claude/skills/*/SKILL.md: L1 layer without the <!-- USER-SPACE --> marker
+#   7. .claude/skills/*/SKILL.md: L1 layer with an unresolved <!-- L3-author: KEY=value --> (WP-5)
 
 set -uo pipefail
 
@@ -61,7 +61,7 @@ errors=0
 checked=0
 
 if [[ "$MODE" != "settings-json" ]]; then
-    # FMT7: переданы конкретные файлы (--files) → проверять только их, иначе весь каталог
+    # FMT7: specific files passed (--files) → check only them, otherwise the whole directory
     if [ ${#FILES[@]} -gt 0 ]; then
         TARGETS=("${FILES[@]}")
     else
@@ -70,61 +70,61 @@ if [[ "$MODE" != "settings-json" ]]; then
     for f in "${TARGETS[@]}"; do
         [[ -f "$f" ]] || continue
         fname=$(basename "$f")
-        # Не проверять сам себя
+        # Do not check itself
         [[ "$fname" == "validate-fmt-scripts.sh" ]] && continue
         checked=$((checked + 1))
 
-        # Проверка 1: абсолютный личный путь (resolved $HOME, не переменная)
+        # Check 1: absolute personal path (resolved $HOME, not a variable)
         if grep -qE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" 2>/dev/null; then
             echo "  ❌ $fname: содержит '$AUTHOR_HOME'" >&2
             grep -nE "(^|[^[:alnum:]_])${AUTHOR_HOME_ESCAPED}(/|[^[:alnum:]_]|\$)" "$f" | head -3 | sed 's/^/     /' >&2
             errors=$((errors + 1))
         fi
 
-        # Проверка 2: голое имя авторского governance-репо (без env-var fallback)
-        # Допустимо:
+        # Check 2: bare name of the author's governance repo (without env-var fallback)
+        # Allowed:
         #   - ${IWE_GOVERNANCE_REPO:-DS-strategy}  (bash default)
         #   - ${IWE_GOVERNANCE_REPO:?...}          (bash required)
         #   - os.environ.get("GOVERNANCE_REPO", "DS-strategy")  (python fallback)
         #   - os.environ.get("IWE_GOVERNANCE_REPO") or "DS-strategy"
         #     (python fallback for unset AND empty values, issue #1038)
         #   - GOV_REPO_TMPL="DS-strategy"          (template identity literal)
-        #   - VAR="DS-strategy" \                  (env override в команде, line cont)
-        #   - cmd || echo "DS-strategy"            (bare fallback после ||, issue #275)
-        #   - if [ -d "$DIR/DS-strategy" ]; ... case DS-strategy)  (auto-detect идиома,
-        #     физическая проверка существования репо, не хардкод-протечка, issue #275)
-        #   - строка со ссылкой на переменную $IWE_GOVERNANCE_REPO или её dict-ключом
-        #     "IWE_GOVERNANCE_REPO": — структурно демонстрирует переопределение, не
-        #     просто содержит имя переменной где-то в комментарии (issues #446/#450)
-        #   - файл лежит в scripts/tests/ — тестовая фикстура легитимно использует литерал
-        #     дефолтного имени как значение, не как утечку личного репо (issues #446/#450)
-        # Запрещено: буквальное имя governance-репо вне fallback-паттерна в исполняемых строках
-        # Комментарии (#) пропускаются — документация не влияет на поведение
+        #   - VAR="DS-strategy" \                  (env override in the command, line cont)
+        #   - cmd || echo "DS-strategy"            (bare fallback after ||, issue #275)
+        #   - if [ -d "$DIR/DS-strategy" ]; ... case DS-strategy)  (auto-detect idiom,
+        #     physical check of repo existence, not a hardcode leak, issue #275)
+        #   - a line referencing the variable $IWE_GOVERNANCE_REPO or its dict key
+        #     "IWE_GOVERNANCE_REPO": — structurally demonstrates an override, not
+        #     merely contains the variable name somewhere in a comment (issues #446/#450)
+        #   - the file lies in scripts/tests/ — a test fixture legitimately uses the literal
+        #     default name as a value, not as a leak of a personal repo (issues #446/#450)
+        # Forbidden: the literal governance repo name outside the fallback pattern in executable lines
+        # Comments (#) are skipped — documentation does not affect behavior
         #
-        # issue #275: паттерны "|| echo <literal>" и "if [ -d .../<literal> ]" исключаются
-        # только когда <литерал> встречается на строке РОВНО ОДИН раз — иначе, например,
-        # `cd ".../DS-strategy" || echo "DS-strategy"` (реальный хардкод в cd, замаскированный
-        # безопасным fallback-хвостом) прошёл бы незамеченным, т.к. хвост строки матчит
-        # safe-паттерн, даже когда начало строки содержит отдельный, опасный хардкод.
-        # issue #759: было `case ... *) <проверка> ;; esac` — три ветки-исключения
-        # no-op'или через `:`, дефолтная ветка несла всю проверку. Добавление
-        # четвёртой ветки вынесено в флаг, проверка осталась одна, ниже case.
+        # issue #275: patterns "|| echo <literal>" and "if [ -d .../<literal> ]" are excluded
+        # only when <literal> occurs on the line EXACTLY ONCE — otherwise, e.g.,
+        # `cd ".../DS-strategy" || echo "DS-strategy"` (a real hardcode in cd, masked by a
+        # safe fallback tail) would pass unnoticed, since the line tail matches the
+        # safe pattern even when the line start contains a separate, dangerous hardcode.
+        # issue #759: it was `case ... *) <check> ;; esac` — three exception branches
+        # were no-ops via `:`, the default branch carried the whole check. Adding a
+        # fourth branch is moved to a flag, the check stayed single, below the case.
         #
-        # Guard по shebang/+x (обсуждался при закрытии issue) здесь не работает:
-        # файлы .claude/hooks/tests/*.sh — сами настоящие исполняемые тест-
-        # харнессы с shebang (запускаются напрямую), а не фикстуры-как-файл.
-        # Фикстура — это СТРОКОВЫЙ ЛИТЕРАЛ внутри `expect "..." pass '...'`
-        # (аргумент вызова), а не файл целиком; file-level guard не может
-        # отличить литерал от кода внутри одного реального исполняемого файла.
-        # Поэтому исключение здесь — то же безусловное path-based, что и
-        # scripts/tests/* (issues #446/#450): каталог целиком — тестовая
-        # обвязка по конвенции, её содержимое не сканируется.
+        # A guard by shebang/+x (discussed when closing the issue) does not work here:
+        # the .claude/hooks/tests/*.sh files are themselves real executable test
+        # harnesses with a shebang (run directly), not fixtures-as-files.
+        # A fixture is a STRING LITERAL inside `expect "..." pass '...'`
+        # (a call argument), not the whole file; a file-level guard cannot
+        # tell a literal from code inside a single real executable file.
+        # Therefore the exception here is the same unconditional path-based one as for
+        # scripts/tests/* (issues #446/#450): the whole directory is test
+        # scaffolding by convention, its contents are not scanned.
         skip_hardcode_check=0
         case "$f" in
             scripts/tests/*|*/scripts/tests/*) skip_hardcode_check=1 ;;  # issues #446/#450: фикстуры конвенции scripts/tests/ — не сканировать. Уже, чем */tests/* — другие tests/-каталоги репо (.claude/skills/*/tests/, guide-kit/tests/) продолжают проверяться как обычно.
-            setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) skip_hardcode_check=1 ;;  # issue #499: тест-обвязки setup/ по именной конвенции — их fail-сообщения и grep-паттерны СОДЕРЖАТ литерал как предмет собственной проверки; классовое путевое исключение (не эвристика по строке), остальной setup/ сканируется как прежде.
-            setup/validate-template.sh|*/setup/validate-template.sh) skip_hardcode_check=1 ;;  # WP-544 Д28: тот же класс, что #499 — этот файл сам сканирует репо на автор-специфичные литералы (проверка [1/5]) через строковой массив в for-цикле; свой собственный список паттернов — предмет проверки, не хардкод. Не цитировать литералы буквально в этом комментарии — это же ловит [1/5] в самом validate-fmt-scripts.sh.
-            .claude/hooks/tests/*|*/.claude/hooks/tests/*) skip_hardcode_check=1 ;;  # issue #759: фикстуры хук-тестов — тот же класс, что scripts/tests/.
+            setup/test-*|*/setup/test-*|setup/smoke-test-*|*/setup/smoke-test-*) skip_hardcode_check=1 ;;  # issue #499: setup/ test harnesses by naming convention — their fail messages and grep patterns CONTAIN the literal as the subject of their own check; a class-based path exception (not a per-line heuristic), the rest of setup/ is scanned as before.
+            setup/validate-template.sh|*/setup/validate-template.sh) skip_hardcode_check=1 ;;  # WP-544 D28: same class as #499 — this file itself scans the repo for author-specific literals (check [1/5]) via a string array in a for loop; its own pattern list is the subject of the check, not a hardcode. Do not quote the literals verbatim in this comment — [1/5] in validate-fmt-scripts.sh itself would catch it.
+            .claude/hooks/tests/*|*/.claude/hooks/tests/*) skip_hardcode_check=1 ;;  # issue #759: hook-test fixtures — same class as scripts/tests/.
         esac
         if [ "$skip_hardcode_check" != "1" ]; then
         if grep -q "$AUTHOR_GOV_REPO" "$f" 2>/dev/null; then
@@ -157,12 +157,12 @@ if [[ "$MODE" != "settings-json" ]]; then
                         if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*[A-Za-z0-9_*|-]*\|?'"$AUTHOR_GOV_REPO"'\)[[:space:]]*$'; then
                             continue
                         fi
-                        # auto-detect идиома, продолжение (issue #450): follow-up
-                        # присваивание ВНУТРИ уже безопасного `if [ -d .../LITERAL" ]; then`
-                        # (сам if строкой выше уже matчит паттерн на 2 проверки раньше) — тот
-                        # же физический detect, не отдельный хардкод. Безопасно только для
-                        # голого `VAR="LITERAL"` без хвоста — не расширяет паттерн на строки
-                        # с чем-то ещё после литерала.
+                        # auto-detect idiom, continuation (issue #450): a follow-up
+                        # assignment INSIDE an already safe `if [ -d .../LITERAL" ]; then`
+                        # (the if itself on the line above already matches the pattern 2 checks earlier) — the same
+                        # physical detect, not a separate hardcode. Safe only for
+                        # a bare `VAR="LITERAL"` with no tail — does not extend the pattern to lines
+                        # with anything else after the literal.
                         if echo "$bl" | grep -qE '^[0-9]*:[[:space:]]*[A-Z_][A-Z0-9_]*="'"$AUTHOR_GOV_REPO"'"[[:space:]]*$'; then
                             lineno="${bl%%:*}"
                             prev_line=$(sed -n "$((lineno - 1))p" "$f" 2>/dev/null)
@@ -240,9 +240,9 @@ if [[ "$MODE" != "settings-json" ]]; then
         fi
         fi
 
-        # Проверка 4: set -e + ((VAR++)) без || true → silent exit при VAR==0 (B8 gap)
-        # $((VAR + 1)) — безопасно (арифметика, не команда).
-        # ((VAR++)) без || true — опасно: при VAR=0 команда возвращает 0 → set -e прерывает скрипт.
+        # Check 4: set -e + ((VAR++)) without || true → silent exit when VAR==0 (B8 gap)
+        # $((VAR + 1)) — safe (arithmetic, not a command).
+        # ((VAR++)) without || true — dangerous: at VAR=0 the command returns 0 → set -e aborts the script.
         if grep -qE 'set -[a-z]*e|set -e' "$f" 2>/dev/null; then
             bad_arith=$(grep -nE '^\s*\(\([^)]+(\+\+|--|\+=|-=)[^)]*\)\)\s*$' "$f" \
                 | grep -v '|| true' \
@@ -262,10 +262,10 @@ if [[ "$MODE" != "settings-json" ]]; then
 fi
 
 if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
-    # Проверка 5: .claude/skills/*/SKILL.md — буквальные хардкоды путей к файлам
-    # Ловит: $HOME/IWE/<author-repo>/scripts/... и ~/IWE/<author-repo>/scripts/...
-    # Допустимо: $HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/... (env-fallback)
-    # Допустимо: голое DS-strategy в комментариях/документации
+    # Check 5: .claude/skills/*/SKILL.md — literal hardcoded file paths
+    # Catches: $HOME/IWE/<author-repo>/scripts/... and ~/IWE/<author-repo>/scripts/...
+    # Allowed: $HOME/IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/... (env-fallback)
+    # Allowed: bare DS-strategy in comments/documentation
     SKILLS_DIR="$FMT_ROOT/.claude/skills"
     if [[ -d "$SKILLS_DIR" ]]; then
         skills_checked=0
@@ -273,8 +273,8 @@ if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
             skills_checked=$((skills_checked + 1))
             fname=${md_file#$FMT_ROOT/}
 
-            # Паттерн 1: $HOME/IWE/<author-repo-name>/(scripts|sessions|docs|current)/
-            # БЕЗ env-fallback ${...:-...}. Исключаем: # comments, echo, printf, export
+            # Pattern 1: $HOME/IWE/<author-repo-name>/(scripts|sessions|docs|current)/
+            # WITHOUT env-fallback ${...:-...}. Excluded: # comments, echo, printf, export
             bad_home=$(grep -nE '\$HOME/IWE/[A-Za-z][A-Za-z0-9_-]+/(scripts|sessions|docs|current)/' "$md_file" 2>/dev/null \
                 | grep -v ':\s*#' \
                 | grep -v ':\s*>' \
@@ -287,7 +287,7 @@ if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
                 errors=$((errors + 1))
             fi
 
-            # Паттерн 2: ~/IWE/<author-repo>/(scripts|sessions|docs|current)/  (Python expanduser)
+            # Pattern 2: ~/IWE/<author-repo>/(scripts|sessions|docs|current)/  (Python expanduser)
             bad_tilde=$(grep -nE '~/IWE/[A-Za-z][A-Za-z0-9_-]+/(scripts|sessions|docs|current)/' "$md_file" 2>/dev/null \
                 | grep -v ':\s*#' \
                 | grep -v ':\s*>' \
@@ -305,8 +305,8 @@ if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
             checked=$((checked + skills_checked))
         fi
 
-        # Проверка 6: L1 SKILL.md files must carry USER-SPACE marker block
-        # Проверка 7: L1 SKILL.md must not carry an unresolved L3-author value (WP-5 L1/L3-разделение)
+        # Check 6: L1 SKILL.md files must carry USER-SPACE marker block
+        # Check 7: L1 SKILL.md must not carry an unresolved L3-author value (WP-5 L1/L3 separation)
         # Checks BOTH marker forms — unresolved (skill-promote.sh never ran) AND resolved
         # (skill-promote.sh ran but the substitution silently failed, e.g. a sed-special
         # character in `value` broke the replacement) — a resolved marker whose placeholder
@@ -351,11 +351,11 @@ if [[ "$MODE" != "scripts" && "$MODE" != "settings-json" ]]; then
 fi
 
 if [[ "$MODE" != "scripts" ]]; then
-    # Проверка 3: .claude/settings.json — хук-команды должны идти с префиксом $CLAUDE_PROJECT_DIR/
+    # Check 3: .claude/settings.json — hook commands must come with the $CLAUDE_PROJECT_DIR/ prefix
     SETTINGS_JSON="$FMT_ROOT/.claude/settings.json"
     if [[ -f "$SETTINGS_JSON" ]]; then
         if command -v jq >/dev/null 2>&1; then
-            # Достаём все .hooks.*[].hooks[].command, ищем те, что упоминают .claude/hooks/
+            # Collect all .hooks.*[].hooks[].command, look for those mentioning .claude/hooks/
             bad_cmds=$(jq -r '.hooks // {} | to_entries[] | .value[] | .hooks[]? | .command // empty' "$SETTINGS_JSON" \
                 | grep -E '\.claude/hooks/' \
                 | grep -vE '^\$CLAUDE_PROJECT_DIR/' || true)

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # routing: helper  skill=wp-close  called-by=agent
-# Закрытие РП: зачёркивает строку в REGISTRY, дописывает ## Закрытие в archive/wp-contexts/
+# WP closure: strikes through the row in REGISTRY, appends ## Closure to archive/wp-contexts/
 # see DP.SC.159, DP.ROLE.037
 #
-# Использование:
+# Usage:
 #   bash close-wp.sh --wp 374 --summary "Итог: AR.3+AR.4 готовы, 39 тестов PASS"
 #   bash close-wp.sh --wp 374 --summary "..." --reason "Завершены все фазы"
 #
-# Совместимость: bash 3.2+ (macOS), bash 4+ (Linux)
+# Compatibility: bash 3.2+ (macOS), bash 4+ (Linux)
 
 set -uo pipefail
 
@@ -27,7 +27,7 @@ _WPN_OPTIONAL=""
 # IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
 # just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
 # The library is mandatory: not finding it is an installation error, not "WP not found",
-# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "WP not found").
 # A consumer that must keep working without the library (session-guard: its hypothesis gate
 # warns and checks the exact card names, it never blocks a session over a missing library)
 # sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
@@ -95,7 +95,7 @@ CELL_RE=$(wp_num_registry_cell_regex "$WP_NUM")
 
 TODAY=$(date +%Y-%m-%d)
 
-# --- Шаг 1: зачеркнуть строку в REGISTRY ---
+# --- Step 1: strike through the row in REGISTRY ---
 echo "1/3 Обновляю REGISTRY..."
 
 python3 - "$REGISTRY" "$WP_NUM" "$CELL_RE" <<'PYEOF'
@@ -158,16 +158,16 @@ with open(registry_path, "w", encoding="utf-8") as f:
 print(f"   ✅ REGISTRY: WP-{wp_num} зачёркнут")
 PYEOF
 
-# --- Шаг 2: создать archive/wp-contexts файл ---
-# issue #280: раньше здесь искали существующий stub от create-wp.sh (Шаг 2/6,
-# убран после TIF7) — с ним close-wp.sh дописывал резюме сюда, а git mv из
-# protocol-close.md падал на "destination exists". Stub больше не создаётся —
-# файл в archive/wp-contexts всегда создаётся здесь, заново, при закрытии.
+# --- Step 2: create the archive/wp-contexts file ---
+# issue #280: previously this looked for an existing stub from create-wp.sh (Step 2/6,
+# removed after TIF7) — with it close-wp.sh appended the summary there, and git mv from
+# protocol-close.md failed on "destination exists". The stub is no longer created —
+# the file in archive/wp-contexts is always created here, anew, at closure.
 echo "2/3 Создаю archive/wp-contexts..."
 
 mkdir -p "$ARCHIVE_DIR"
 
-# Определить slug из REGISTRY
+# Determine the slug from REGISTRY
 SLUG=$(python3 - "$REGISTRY" "$WP_NUM" "$CELL_RE" <<'PYEOF2'
 import sys, re
 registry_path, wp_num, cell_re = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -214,7 +214,7 @@ CTXEOF
   echo "   ✅ Создан новый файл: $(basename "$CONTEXT_FILE")"
 fi
 
-# Определить язык файла (русский если есть кириллица в заголовках)
+# Determine the file language (Russian if there is Cyrillic in the headings)
 LANG_HEADER="## Закрытие"
 if python3 -c "
 import sys
@@ -231,10 +231,10 @@ else
   LANG_HEADER="## Closure"
 fi
 
-# Проверить, есть ли уже секция Закрытие/Closure
+# Check whether a Закрытие/Closure section already exists
 if grep -q "^## Закрытие\|^## Closure" "$CONTEXT_FILE" 2>/dev/null; then
   echo "   ℹ️  Секция '${LANG_HEADER}' уже есть, дописываю..."
-  # Дописать к существующей секции
+  # Append to the existing section
   python3 - "$CONTEXT_FILE" "$TODAY" "$SUMMARY" "$REASON" <<'PYEOF3'
 import sys
 path, today, summary, reason = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
@@ -256,7 +256,7 @@ with open(path, "w", encoding="utf-8") as f:
 print("   ✅ Дописано в существующую секцию")
 PYEOF3
 else
-  # Дописать секцию в конец файла
+  # Append a section to the end of the file
   {
     echo ""
     echo "${LANG_HEADER}"
@@ -269,7 +269,7 @@ else
   echo "   ✅ Добавлена секция '${LANG_HEADER}'"
 fi
 
-# --- Шаг 3: обновить статус в inbox/WP-NNN*.md ---
+# --- Step 3: update the status in inbox/WP-NNN*.md ---
 echo "3/3 Обновляю inbox/WP-${WP_ID}..."
 
 # The folder card in either spelling (WP-044/ is canonical, WP-44/ legacy), else a flat legacy

@@ -539,11 +539,11 @@ def _prepare_database(paths: ProfilePaths, *, create: bool) -> bool:
 def _connect(paths: ProfilePaths, *, create: bool) -> sqlite3.Connection | None:
     if not _prepare_database(paths, create=create):
         return None
-    # 30s (было 5s): десятки параллельных писателей (хуки нескольких агентов
-    # одновременно) на нагруженном хосте периодически превышали 5s очереди на
-    # блокировке — "database is locked" и в проде, и в CI (issue-tests 533,
-    # мерцал на каждом втором прогоне). busy_timeout остаётся ограничением
-    # ожидания, не бесконечным зависанием.
+    # 30s (was 5s): dozens of parallel writers (hooks of several agents
+    # at once) on a loaded host periodically exceeded the 5s queue wait on
+    # the lock — "database is locked" both in prod and in CI (issue-tests 533,
+    # flickered on every second run). busy_timeout remains a limit on
+    # waiting, not an infinite hang.
     connection = sqlite3.connect(paths.database, timeout=30)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout=30000")
@@ -870,18 +870,18 @@ def _post_m15_practiced_fact(paths: ProfilePaths, fault: str) -> None:
     if not writer.is_file():
         return
     try:
-        # Короткий таймаут (не 10с, как у самого writer'а — код-ревью 31.08,
-        # High): запись косяка не должна заметно виснуть на медленной сети
-        # ради best-effort побочного отчёта.
+        # A short timeout (not 10s, like the writer itself — code review 31.08,
+        # High): recording a fault must not visibly hang on a slow network
+        # for the sake of a best-effort side report.
         subprocess.run(
             [sys.executable, str(writer), "--element", "M15", "--mode", "record", "--evidence", fault],
             timeout=3,
             check=False,
         )
     except subprocess.TimeoutExpired:
-        # Code review 31.08 (Critical): `str(TimeoutExpired)` включает полный
-        # cmd, а значит и `fault` (может нести чувствительные детали
-        # инцидента) — логировать только тип и таймаут, не текст исключения.
+        # Code review 31.08 (Critical): `str(TimeoutExpired)` includes the full
+        # cmd, and therefore `fault` (which may carry sensitive incident
+        # details) — log only the type and the timeout, not the exception text.
         print("culture_element_practiced (M15): writer call timed out", file=sys.stderr)
     except (OSError, subprocess.SubprocessError) as e:
         print(f"culture_element_practiced (M15): writer call failed: {type(e).__name__}", file=sys.stderr)

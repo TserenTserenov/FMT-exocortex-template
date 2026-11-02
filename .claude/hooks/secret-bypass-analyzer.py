@@ -198,9 +198,9 @@ MCP_TOOL_NAME = re.compile(r"mcp__[A-Za-z0-9_.-]+__[A-Za-z0-9_.-]+\Z")
 # store in cleartext, independent of any recognizable value shape - a
 # shape-based PATTERNS/ASSIGNMENT_PATTERNS scan cannot catch what it has never
 # seen before (app-specific tokens, arbitrary passwords), so this class is
-# blocked by command identity instead (WP-482 Ф7, agent_fault ids 43/49).
+# blocked by command identity instead (WP-482 Phase 7, agent_fault ids 43/49).
 BULK_ENV_DUMP_EXECUTABLES = frozenset(("env", "printenv"))
-# Опции env, которые забирают следующее слово себе.
+# env options that take the next word for themselves.
 ENV_OPTIONS_WITH_ARGUMENT = frozenset(("-u", "--unset", "-C", "--chdir", "-S", "--split-string"))
 RAILWAY_SECRET_LIST_SUBCOMMANDS = frozenset(("variables", "variable"))
 
@@ -1059,9 +1059,9 @@ def strip_structural_keywords(segment):
 REDIRECT_TOKENS = frozenset(
     ("<", "<<", "<<<", "<>", ">", ">>", ">|", "<&", ">&", "&>")
 )
-# Начало перенаправления в одном токене: необязательный номер дескриптора или
-# амперсанд, затем оператор. Покрывает и слитную цель (">out.txt", "2>&1"), где
-# REDIRECT_TOKENS не совпадает с токеном целиком.
+# The start of a redirection in a single token: an optional descriptor number or
+# an ampersand, then the operator. Also covers a fused target (">out.txt", "2>&1"), where
+# REDIRECT_TOKENS does not match the token as a whole.
 REDIRECT_PREFIX_RE = re.compile(r"\A(?:[0-9]+|&)?(?:>>|>\||>&|<<<|<<|<>|<&|>|<)")
 SHELL_TOOLS = frozenset(("bash", "sh", "zsh", "dash", "ksh"))
 COMMAND_WRAPPERS = frozenset(("command", "builtin", "exec", "nohup"))
@@ -1097,11 +1097,11 @@ def executable_index(segment):
     index = 0
     while index < len(segment):
         token = segment[index]
-        # Точное совпадение с REDIRECT_TOKENS не видело номер дескриптора,
-        # который токенайзер отделяет в свой токен: в "2>&1 cat ~/.ssh/id_rsa"
-        # исполняемым объявлялась цифра, и разбор команды на этом кончался --
-        # мимо проходило и чтение секретного файла, и дамп окружения
-        # (холодное ревью 06.09).
+        # An exact match against REDIRECT_TOKENS did not see the descriptor number,
+        # which the tokenizer splits into its own token: in "2>&1 cat ~/.ssh/id_rsa"
+        # the digit was declared the executable, and the command parsing ended there --
+        # both reading the secret file and dumping the environment slipped through
+        # (cold review 06.09).
         span = redirection_span(segment, index)
         if span:
             index += span
@@ -1415,9 +1415,9 @@ def env_wrapped_command_offset(arguments):
         argument = arguments[index]
         span = redirection_span(arguments, index)
         if span:
-            # Перенаправление не обёрнутая команда: `env > out.txt` печатает всё
-            # окружение ровно так же, как голый `env`, и раньше проходило мимо
-            # проверки, потому что ">" считался началом команды (ревью 06.09).
+            # A redirection is not a wrapped command: `env > out.txt` prints the whole
+            # environment exactly like a bare `env`, and used to slip past
+            # the check because ">" was considered the start of a command (review 06.09).
             index += span
         elif ASSIGNMENT.fullmatch(argument):
             index += 1
@@ -1476,9 +1476,9 @@ def analyze_shell_variant(command, depth=0, inherited_variables=None):
         if loop_words and any(
             value_has_sensitive_path(word) for word in loop_words
         ):
-            # `for f in ~/.config/aist/env; do cat "$f"; done` - привязка к
-            # переменной цикла моделью не отслеживается, поэтому чувствительный
-            # путь в самом списке слов считается обращением к файлу.
+            # `for f in ~/.config/aist/env; do cat "$f"; done` - the binding to the
+            # loop variable is not tracked by the model, so a sensitive
+            # path in the word list itself is counted as a file access.
             direct_read = True
         if not segment:
             return
@@ -1720,7 +1720,7 @@ def analyze_bash(raw):
             # The literal-value scan already ran and needs no shell model at
             # all (see the comment above it) -- that stays the primary
             # defense. secret-leak-block.sh already surfaces a visible
-            # "разобрано не полностью" notice whenever shell_model != complete,
+            # "not fully parsed" notice whenever shell_model != complete,
             # so silently answering "unknown" here for the path/upload
             # heuristic is not a silent degradation for the user.
             scaffold_tokens = None
@@ -2026,8 +2026,8 @@ def self_test():
         "F=.env; (F=safe); cat $F",
         "F=.env; env F=safe true; cat $F",
         "export F=.env; cat $F",
-        # Перенаправление с номером дескриптора перед командой снимало и эту
-        # проверку: исполняемым становилась цифра (холодное ревью 06.09).
+        # A redirection with a descriptor number before the command also removed this
+        # check: the digit became the executable (cold review 06.09).
         "2>&1 cat config.env",
         "2> /dev/null cat .proxy-env",
     )
@@ -2047,8 +2047,8 @@ def self_test():
         "railway variables --service example-service --kv",
         "railway variable list",
         "bash -c \"env\"",
-        # Перенаправление вместо конвейера: тот же дамп, и это первый обходной
-        # путь, который приходит в голову после отказа (холодное ревью 06.09).
+        # A redirection instead of a pipeline: the same dump, and this is the first workaround
+        # that comes to mind after a refusal (cold review 06.09).
         "env > out.txt",
         "env >> out.txt",
         "env >/tmp/x",
@@ -2060,8 +2060,8 @@ def self_test():
         "printenv 2>&1",
         "printenv 1> /tmp/x",
         "railway variables 2>&1",
-        # Перенаправление ПЕРЕД командой, включая номер дескриптора: раньше
-        # исполняемым объявлялась цифра и разбор кончался, не дойдя до команды.
+        # A redirection BEFORE the command, including the descriptor number: previously
+        # the digit was declared the executable and the parsing ended before reaching the command.
         "> out.txt env",
         "2>&1 env",
         "2> /dev/null env",
@@ -2082,7 +2082,7 @@ def self_test():
         "railway deploy",
         "railway run --service example-service -- python3 script.py",
         "printf %s \"env | sort\"",
-        # Перенаправление у чужой команды остаётся обычным перенаправлением.
+        # A redirection on someone else's command remains an ordinary redirection.
         "sort file.txt > out.txt",
         "cat a.txt 2>&1",
         "env FOO=bar somecommand > out.txt",

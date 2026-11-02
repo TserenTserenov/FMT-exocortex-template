@@ -14,8 +14,8 @@
 # constructs with no safe runtime pattern at all (readlink -f, grep -P,
 # mktemp -d -t), any occurrence fails — the checklist's own advice is "avoid".
 #
-# Использование: bash scripts/check-platform-compat.sh [DIR]
-# Exit 0 = чисто. Exit 1 = найдены необёрнутые конструкции.
+# Usage: bash scripts/check-platform-compat.sh [DIR]
+# Exit 0 = clean. Exit 1 = unwrapped constructs found.
 
 set -uo pipefail
 

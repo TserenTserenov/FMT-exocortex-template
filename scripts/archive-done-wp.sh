@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # routing: helper  called-by=day-close  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# archive-done-wp.sh — атомарная архивация завершённого РП
+# archive-done-wp.sh — atomic archiving of a completed WP
 # see DP.M.010, DP.SC.033 (WP-297)
-# see WP-5 (фаза «Проверка полноты переноса перед архивацией inbox/WP-N»,
-# 2026-07-10) — переписан под папочную конвенцию WP-434 + подключён
+# see WP-5 (phase "Transfer completeness check before archiving inbox/WP-N",
+# 2026-07-10) — rewritten for the WP-434 folder convention + hooked up
 # check-wp-transfer-completeness.sh
 #
-# Шаги:
-#   1. Найти inbox/WP-{N}/WP-{N}.md (папочная конвенция WP-434);
-#      fallback — устаревший плоский inbox/WP-{N}-*.md.
-#   2. Прогнать check-wp-transfer-completeness.sh (warn-not-block).
-#   3. Обновить frontmatter: status → done.
-#   4. git mv папку (или файл) inbox/ → archive/wp-contexts/.
+# Steps:
+#   1. Find inbox/WP-{N}/WP-{N}.md (WP-434 folder convention);
+#      fallback — the legacy flat inbox/WP-{N}-*.md.
+#   2. Run check-wp-transfer-completeness.sh (warn-not-block).
+#   3. Update frontmatter: status → done.
+#   4. git mv the folder (or file) inbox/ → archive/wp-contexts/.
 #
-# Использование:
+# Usage:
 #   bash archive-done-wp.sh <WP_NUM> [IWE_ROOT]
 #
-# Совместимость: bash 3.2+ (macOS), bash 4+ (Linux)
+# Compatibility: bash 3.2+ (macOS), bash 4+ (Linux)
 
 set -uo pipefail
 
@@ -42,7 +42,7 @@ _WPN_OPTIONAL=""
 # IWE_TEMPLATE. <root> is _WPN_ROOT_UP above the file's directory (set by each consumer
 # just above this block: the only per-file difference, checked by test_issue_954_locate.sh).
 # The library is mandatory: not finding it is an installation error, not "WP not found",
-# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "РП не найден").
+# hence exit 4 and not 1 (memory/protocol-open.md reads exit 1 as "WP not found").
 # A consumer that must keep working without the library (session-guard: its hypothesis gate
 # warns and checks the exact card names, it never blocks a session over a missing library)
 # sets _WPN_OPTIONAL=1 next to _WPN_ROOT_UP: WP_NUM_LIB then stays empty and nothing is sourced.
@@ -83,21 +83,21 @@ if [[ -z "$WP_NUM" ]]; then
   exit 1
 fi
 
-# WP-044, 044, wp-044 и 44 — один и тот же РП (#954): дальше работаем с голым числом,
-# а имя папки берём у реально найденной карточки.
+# WP-044, 044, wp-044 and 44 are one and the same WP (#954): from here on we work with the bare number,
+# and take the folder name from the card that was actually found.
 if ! WP_NUM=$(wp_num_normalize "$WP_NUM"); then
   echo "❌ Некорректный номер РП: '$1' — используйте число или WP-N" >&2
   exit 1
 fi
 
-# issue #298: wp-list.py — единая точка, где закодирована двуформатная раскладка
-# (папочная WP-434 + устаревшая плоская) — этот скрипт раньше отдельно реализовывал
-# тот же поиск (WP_FILE_FOLDER/WP_FILE_FLAT). Fallback на старую glob-логику, если
-# wp-list.py ещё не доставлен на этой установке (переходный период).
-# issue #954: папочная карточка ищется по обоим написаниям — WP-044/ (так её заводит
-# create-wp.sh) и старому WP-44/ — и берётся путь, который реально существует. Раньше
-# путь собирался из номера «как введён» (WP-44/), сравнение с ответом wp-list.py не
-# проходило, и папочная карточка принималась за плоский файл.
+# issue #298: wp-list.py is the single place where the two-format layout is encoded
+# (WP-434 folder + legacy flat) — this script used to implement
+# the same search separately (WP_FILE_FOLDER/WP_FILE_FLAT). Fallback to the old glob logic if
+# wp-list.py has not yet been delivered to this installation (transition period).
+# issue #954: the folder card is searched by both spellings — WP-044/ (how
+# create-wp.sh creates it) and the old WP-44/ — and the path that actually exists is taken. Previously
+# the path was assembled from the number "as entered" (WP-44/), the comparison with wp-list.py's answer
+# failed, and the folder card was taken for a flat file.
 WP_LIST_SCRIPT="$SCRIPT_DIR/wp-list.py"
 WP_CARD=$(wp_num_card_path "$INBOX" "$WP_NUM" || true)
 if [[ -z "$WP_CARD" ]] && [[ -f "$WP_LIST_SCRIPT" ]]; then
@@ -106,7 +106,7 @@ if [[ -z "$WP_CARD" ]] && [[ -f "$WP_LIST_SCRIPT" ]]; then
     | awk -F'\t' -v n="$WP_NUM" '$1==n {print $2; exit}')
 fi
 if [[ -z "$WP_CARD" ]] && [[ ! -f "$WP_LIST_SCRIPT" ]]; then
-  # Fallback: старая прямая glob-логика (wp-list.py отсутствует на этой установке).
+  # Fallback: the old direct glob logic (wp-list.py is absent on this installation).
   WP_CARD=$(find "$INBOX" -maxdepth 1 \( -name "WP-${WP_NUM}-*.md" -o -name "WP-$(wp_num_padded "$WP_NUM")-*.md" \) 2>/dev/null | head -1)
 fi
 
@@ -118,8 +118,8 @@ WP_FILE="$WP_CARD"
 FILENAME=$(basename "$WP_FILE")
 CARD_DIR=$(dirname "$WP_FILE")
 
-# Папочная конвенция WP-434 — по устройству пути, не по сравнению строк: карточка лежит
-# в папке inbox/WP-<N>/ и называется так же, как папка.
+# WP-434 folder convention — by path structure, not by string comparison: the card lies
+# in the folder inbox/WP-<N>/ and is named the same as the folder.
 if [[ "$FILENAME" == "$(basename "$CARD_DIR").md" ]] && [[ "$(dirname "$CARD_DIR")" -ef "$INBOX" ]]; then
   MODE="folder"
   FOLDER_NAME=$(basename "$CARD_DIR")
@@ -140,19 +140,19 @@ fi
 
 echo "📦 Архивирую WP-${WP_NUM} ($MODE): $FILENAME"
 
-# Проверка полноты переноса (warn-not-block) — WP-5, 2026-07-10
+# Transfer completeness check (warn-not-block) — WP-5, 2026-07-10
 if [[ -x "$CHECK_SCRIPT" ]]; then
   bash "$CHECK_SCRIPT" "$WP_NUM" "$IWE" || true
 fi
 
-# Guard (issue #224, issue #280): create-wp.sh больше не создаёт archive-stub
-# при заведении РП (issue #280 вариант А) — ветка ниже остаётся на случай
-# stub'ов, оставшихся от старых РП, заведённых до этого фикса, и на случай
-# повторного/ручного запуска этого же скрипта. Перезаписываем только саму
-# pending-заготовку, не случайный уже-заполненный §Закрытие. Проверка ДО
-# правки inbox-файла — иначе при отказе inbox остаётся тронутым (frontmatter
-# уже переписан), а archive нет: смоук-тест 2026-07-05 поймал именно этот
-# порядок как баг.
+# Guard (issue #224, issue #280): create-wp.sh no longer creates an archive stub
+# when registering a WP (issue #280 option A) — the branch below remains for the case of
+# stubs left over from old WPs created before this fix, and for the case of
+# a repeated/manual run of this same script. We overwrite only the pending
+# placeholder itself, not an accidentally already filled §Closure. The check is BEFORE
+# editing the inbox file — otherwise on refusal the inbox stays touched (frontmatter
+# already rewritten) while the archive is not: the smoke test of 2026-07-05 caught exactly this
+# order as a bug.
 if [[ -e "$ARCHIVE_TARGET" ]]; then
   STUB_FILE="$ARCHIVE_TARGET"
   [[ -d "$ARCHIVE_TARGET" ]] && STUB_FILE="$ARCHIVE_TARGET/$(basename "$ARCHIVE_TARGET").md"
@@ -160,12 +160,12 @@ if [[ -e "$ARCHIVE_TARGET" ]]; then
     echo "❌ $ARCHIVE_TARGET уже существует и не помечен status: pending — не перезаписываю, проверьте вручную" >&2
     exit 1
   fi
-  # Это pending-заготовка — безопасно освободить путь под git mv.
+  # This is a pending placeholder — safe to free the path for git mv.
   rm -rf "$ARCHIVE_TARGET"
 fi
 
-# 1. Обновить frontmatter status → done
-# Ищем первый фронтматтер (между --- и ---)
+# 1. Update frontmatter status → done
+# We look for the first frontmatter (between --- and ---)
 TMP=$(mktemp)
 python3 - "$WP_FILE" "$TMP" <<'PYEOF'
 import sys, re
@@ -204,7 +204,7 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
-# Проверить что статус изменился
+# Check that the status changed
 if ! grep -q "^status: done" "$TMP" 2>/dev/null; then
   echo "⚠️  frontmatter status уже done или не найден — продолжаю"
 fi
@@ -212,13 +212,13 @@ fi
 cp "$TMP" "$WP_FILE"
 rm -f "$TMP"
 
-# 2. git mv (из STRATEGY_REPO); -f — см. guard-комментарий выше (issue #224)
+# 2. git mv (from STRATEGY_REPO); -f — see the guard comment above (issue #224)
 if ! git -C "$STRATEGY_REPO" mv -f "$MOVE_SRC" "$MOVE_DST" 2>/dev/null; then
   echo "⚠️  git mv -f не удался — пробую обычный mv + ручной re-stage"
-  # issue #954: код возврата mkdir/mv раньше не проверялся, и строка успеха печаталась,
-  # даже когда ничего не перенесено. Теперь честный отказ: ненулевой код, без «✅».
-  # status: done в карточке уже записан (это правда о РП) — не откатываем, а называем,
-  # где она осталась и как перенести руками.
+  # issue #954: the mkdir/mv return code used to be unchecked, and the success line was printed
+  # even when nothing was moved. Now an honest refusal: nonzero code, without "✅".
+  # status: done is already written in the card (this is true about the WP) — we do not roll it back, but name
+  # where it stayed and how to move it by hand.
   if ! mkdir -p "$(dirname "$STRATEGY_REPO/$MOVE_DST")" || ! mv "$STRATEGY_REPO/$MOVE_SRC" "$STRATEGY_REPO/$MOVE_DST"; then
     echo "❌ WP-${WP_NUM}: не удалось перенести $MOVE_SRC → $MOVE_DST; карточка осталась в $MOVE_SRC (status: done уже записан). Перенесите вручную: git -C $STRATEGY_REPO mv $MOVE_SRC $MOVE_DST" >&2
     exit 1
@@ -234,7 +234,7 @@ fi
 echo "✅ WP-${WP_NUM} → $MOVE_DST"
 echo "   Следующий шаг: сверить WP-REGISTRY.md (если статус там ещё не done) + коммит"
 
-# ОПТ-7: уведомление related.enables
+# OPT-7: related.enables notification
 ARCHIVED_FILE="$STRATEGY_REPO/$MOVE_DST"
 [[ "$MODE" == "folder" ]] && ARCHIVED_FILE="$STRATEGY_REPO/$MOVE_DST/$FOLDER_NAME.md"
 

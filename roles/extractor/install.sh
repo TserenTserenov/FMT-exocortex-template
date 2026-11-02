@@ -1,7 +1,7 @@
 #!/bin/bash
-# Extractor: установка launchd-агента для inbox-check
-# Запускает inbox-check каждые 3 часа.
-# WP-273 Этап 2: plist берётся из $IWE_RUNTIME (Generated runtime, F).
+# Extractor: installation of the launchd agent for inbox-check
+# Runs inbox-check every 3 hours.
+# WP-273 Stage 2: the plist is taken from $IWE_RUNTIME (Generated runtime, F).
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -21,7 +21,7 @@ else
     echo "  ⚠ Legacy mode: используются плейсхолдеры из FMT-substituted (запустите setup.sh ≥0.29.0 для архитектуры F)"
 fi
 
-# WP-5 Ф46: the scheduled run is headless — warn now (not blocking) if Claude
+# WP-5 Phase 46: the scheduled run is headless — warn now (not blocking) if Claude
 # Code has no login at all, instead of a silent failure at the first 3h tick.
 # The saved subscription token is picked up by extractor.sh load_env, so its
 # presence counts even though `claude auth status` here does not see it.
@@ -35,13 +35,13 @@ fi
 echo "Installing Extractor launchd agent..."
 echo "  PLIST_SRC: $PLIST_SRC"
 
-# Проверяем что plist существует
+# Check that the plist exists
 if [ ! -f "$PLIST_SRC" ]; then
     echo "ERROR: $PLIST_SRC not found"
     exit 1
 fi
 
-# WP-273 R5 fix: fail-fast если plist содержит literal {{...}}
+# WP-273 R5 fix: fail-fast if the plist contains a literal {{...}}
 if grep -qE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" 2>/dev/null; then
     echo "ERROR: $PLIST_SRC содержит незаменённые плейсхолдеры:" >&2
     grep -oE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" | sort -u | sed 's/^/  /' >&2
@@ -53,7 +53,7 @@ if grep -qE '\{\{[A-Z_]+\}\}' "$PLIST_SRC" 2>/dev/null; then
     exit 2
 fi
 
-# Делаем скрипт исполняемым (runtime path)
+# Make the script executable (runtime path)
 if [ -f "$SCRIPT_TARGET" ]; then
     chmod +x "$SCRIPT_TARGET"
 fi
@@ -125,10 +125,10 @@ if [ -z "${SETUP_CI:-}" ]; then
     launchctl unload "$PLIST_DST" 2>/dev/null || true
 fi
 
-# Копируем plist
+# Copy the plist
 cp "$PLIST_SRC" "$PLIST_DST"
 
-# Загружаем агент
+# Load the agent
 if [ -n "${SETUP_CI:-}" ]; then
     echo "  ⊠ SETUP_CI: plist copied, launchctl activation skipped"
 elif [ -n "${IWE_SKIP_LOAD:-}" ]; then

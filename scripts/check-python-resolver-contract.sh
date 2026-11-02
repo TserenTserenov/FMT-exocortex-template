@@ -1,7 +1,7 @@
 #!/bin/bash
-# check-python-resolver-contract.sh — WP-529 Ф9 (Evgenii 20.08): anti-
+# check-python-resolver-contract.sh — WP-529 Phase 9 (Evgenii 20.08): anti-
 # regression ratchet for the "invoke repo-owned .py via find-python3.sh, not
-# bare python3/python" contract (WP-529 Ф6, #453/#463).
+# bare python3/python" contract (WP-529 Phase 6, #453/#463).
 #
 # NOT a proof of compliance: on 20.08 a real scan of scripts/**/*.sh,
 # setup/**/*.sh, roles/**/*.sh found pre-existing bare-python3 call sites

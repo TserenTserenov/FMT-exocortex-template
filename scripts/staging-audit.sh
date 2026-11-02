@@ -1,20 +1,20 @@
 #!/bin/bash
 # routing: helper  skill=week-close,day-close  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# staging-audit.sh — детектор B12e Decay drift в STAGING.md
+# staging-audit.sh — B12e Decay drift detector in STAGING.md
 #
-# Парсит STAGING.md (inline таблица S-NN | name | files | status | date | criteria),
-# выявляет записи со статусом `testing` старше N дней (default 30) и записи
-# с пройденными prose-дедлайнами (формат «при Week Close WNN» / «до D мая»).
+# Parses STAGING.md (inline table S-NN | name | files | status | date | criteria),
+# finds entries with status `testing` older than N days (default 30) and entries
+# with elapsed prose deadlines (format «при Week Close WNN» / «до D мая»).
 #
-# Использование:
-#   bash staging-audit.sh                     # отчёт по умолчанию (testing >30d)
-#   bash staging-audit.sh --threshold 14      # порог в днях
-#   bash staging-audit.sh --check             # exit 1 если найдены zombies
-#   bash staging-audit.sh --staging <path>    # путь к STAGING.md (default $IWE/STAGING.md)
+# Usage:
+#   bash staging-audit.sh                     # default report (testing >30d)
+#   bash staging-audit.sh --threshold 14      # threshold in days
+#   bash staging-audit.sh --check             # exit 1 if zombies are found
+#   bash staging-audit.sh --staging <path>    # path to STAGING.md (default $IWE/STAGING.md)
 #
-# MVP-cut: machine-readable per-row frontmatter (decay_after, ready_signals) отложено
-# в полную версию. Сейчас работает с inline-таблицей через regex по дате 5-й колонки.
+# MVP-cut: machine-readable per-row frontmatter (decay_after, ready_signals) deferred
+# to the full version. For now it works with the inline table via regex on the date of the 5th column.
 
 set -uo pipefail
 
@@ -42,7 +42,7 @@ TODAY=$(date +%Y-%m-%d)
 TODAY_EPOCH=$(date +%s)
 threshold_epoch=$((TODAY_EPOCH - THRESHOLD * 86400))
 
-# Подсчёт глобальных метрик
+# Count global metrics
 total=$(grep -cE "^\| S-[0-9]+ " "$STAGING" || echo 0)
 promoted=$(grep -cE "^\| S-[0-9]+ .*\| promoted " "$STAGING" || echo 0)
 testing=$(grep -cE "^\| S-[0-9]+ .*\| testing " "$STAGING" || echo 0)
@@ -57,17 +57,17 @@ echo "  testing:  $testing"
 echo "  rejected: $rejected"
 echo ""
 
-# Поиск zombies — testing-записей с датой 5-й колонки старше порога
+# Search for zombies — testing entries with the 5th-column date older than the threshold
 zombies=0
 echo "=== Zombie кандидаты (testing >${THRESHOLD}d) ==="
 
 while IFS= read -r line; do
-    # Извлечь S-NN, status, date (формат YYYY-MM-DD в 5-й колонке)
+    # Extract S-NN, status, date (format YYYY-MM-DD in the 5th column)
     id=$(echo "$line" | grep -oE "^\| S-[0-9]+" | tr -d '| ')
     [[ -z "$id" ]] && continue
     status=$(echo "$line" | awk -F'|' '{ for(i=1;i<=NF;i++) if($i ~ /testing|promoted|rejected/) { gsub(/ /,"",$i); print $i; break }}')
     [[ "$status" != "testing" ]] && continue
-    # Дата — первый матч YYYY-MM-DD в строке после статуса
+    # Date — the first YYYY-MM-DD match in the line after the status
     date=$(echo "$line" | grep -oE "20[0-9]{2}-[0-9]{2}-[0-9]{2}" | head -1)
     [[ -z "$date" ]] && { echo "  $id: testing (нет даты в строке) — нужен ручной аудит"; ((zombies++)); continue; }
     if [[ "$(uname)" == "Darwin" ]]; then
@@ -78,7 +78,7 @@ while IFS= read -r line; do
     [[ "$date_epoch" -eq 0 ]] && continue
     if [[ "$date_epoch" -lt "$threshold_epoch" ]]; then
         age_days=$(( (TODAY_EPOCH - date_epoch) / 86400 ))
-        # Извлечь короткое описание (2-я колонка, первые 50 символов)
+        # Extract a short description (2nd column, first 50 characters)
         desc=$(echo "$line" | awk -F'|' '{print $3}' | sed 's/^ *//;s/ *$//' | cut -c1-50)
         echo "  $id (${age_days}d): $desc..."
         ((zombies++))
@@ -88,7 +88,7 @@ done < <(grep -E "^\| S-[0-9]+ " "$STAGING")
 echo ""
 echo "Найдено zombies: $zombies"
 
-# Gap-check нумерации
+# Numbering gap-check
 echo ""
 echo "=== Gap-check нумерации S-* ==="
 nums=$(grep -oE "^\| S-[0-9]+" "$STAGING" | grep -oE "[0-9]+" | sort -n | uniq)
@@ -111,7 +111,7 @@ echo "=== Прозаичные дедлайны проверь вручную ==
 prose_deadlines=$(grep -cE "Week Close W[0-9]+|до [0-9]+ мая|до [0-9]+ июн" "$STAGING" || echo 0)
 echo "Записей с prose-deadline: $prose_deadlines (требуют машинных критериев — см. B12e)"
 
-# Exit-код в check mode
+# Exit code in check mode
 if $check_mode; then
     if [[ $zombies -gt 0 ]]; then
         echo ""

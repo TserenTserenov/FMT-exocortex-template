@@ -1,23 +1,23 @@
 #!/bin/bash
-# pull-on-touch.sh — PreToolUse hook: ленивая подтяжка git-репо при первом касании за сессию.
+# pull-on-touch.sh — PreToolUse hook: lazy pull of a git repo on first touch per session.
 #
-# Реализует правило Pull-on-Touch (CLAUDE.md §2 п.4) детерминированно, а не "по памяти агента".
-# Причина: правило поведенческое → системно пропускается (инцидент 5 мая 2026 и 14 июня 2026 —
-# ложный диагноз "Day Open пропущен" из-за чтения устаревшей локальной копии).
+# Implements the Pull-on-Touch rule (CLAUDE.md §2 item 4) deterministically, not "from the agent's memory".
+# Reason: the rule is behavioral → systematically skipped (incident of May 5, 2026 and June 14, 2026 —
+# a false diagnosis "Day Open skipped" caused by reading a stale local copy).
 #
-# Контракт:
-#   Триггер: первое за сессию касание пути под ~/IWE/<repo> любым из инструментов
+# Contract:
+#   Trigger: the first touch per session of a path under ~/IWE/<repo> by any tool
 #            Read | Write | Edit | MultiEdit | NotebookEdit | Bash.
-#   Вход:    stdin JSON {tool_name, tool_input, session_id}.
-#   Действие: классификация read-only (scripts/lib/git-sync-status.sh, ls-remote,
-#             никогда не трогает stash/rebase/refs) + на заведомо чистом дереве —
-#             `git merge --ff-only --no-autostash` — один раз на репо на сессию.
-#             НИКОГДА не делает autostash: issue #1245 (16.10.2026, рецидив
-#             bug-2026-07-17) — конфликт при возврате стеша тихо топил несохранённые
-#             правки, предупреждение было видно только в additionalContext одной сессии.
-#   Отказы:  НИКОГДА не блокирует (exit 0 всегда). Грязное дерево / сетевой сбой / история
-#            разошлась → подтяжка пропущена, в additionalContext пометка "данные potentially stale".
-#   Состояние: ~/.claude/state/repo-pulled-<session>.txt (одно имя репо на строку).
+#   Input:   stdin JSON {tool_name, tool_input, session_id}.
+#   Action: read-only classification (scripts/lib/git-sync-status.sh, ls-remote,
+#             never touches stash/rebase/refs) + on a clearly clean tree —
+#             `git merge --ff-only --no-autostash` — once per repo per session.
+#             NEVER does autostash: issue #1245 (16.10.2026, recurrence of
+#             bug-2026-07-17) — a conflict on stash restore silently drowned unsaved
+#             edits, the warning was visible only in the additionalContext of a single session.
+#   Refusals: NEVER blocks (always exit 0). Dirty tree / network failure / history
+#            diverged → pull skipped, a "data potentially stale" note in additionalContext.
+#   State: ~/.claude/state/repo-pulled-<session>.txt (one repo name per line).
 
 set -uo pipefail
 
@@ -29,12 +29,12 @@ set -uo pipefail
 INPUT=$(cat)
 [ -z "$INPUT" ] && exit 0
 
-# Быстрый отсев: нет упоминания репо под IWE → нечего тянуть.
+# Quick filter: no mention of a repo under IWE → nothing to pull.
 echo "$INPUT" | grep -q "IWE/" || exit 0
 
 IWE_ROOT="${IWE_WORKSPACE:-$HOME/IWE}"
 
-# Имя сессии для файла состояния.
+# Session name for the state file.
 SESSION_ID=$(echo "$INPUT" | python3 -c 'import sys,json; print(json.loads(sys.stdin.read()).get("session_id",""))' 2>/dev/null)
 [ -z "$SESSION_ID" ] && SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 
@@ -43,7 +43,7 @@ STATE_FILE="$STATE_DIR/repo-pulled-${SESSION_ID}.txt"
 mkdir -p "$STATE_DIR"
 touch "$STATE_FILE"
 
-# Извлечь имена репо (первый сегмент под IWE/) из пути (Read/Edit) или команды (Bash).
+# Extract repo names (the first segment under IWE/) from a path (Read/Edit) or a command (Bash).
 REPOS=$(INPUT="$INPUT" IWE_ROOT="$IWE_ROOT" python3 -c '
 import sys, json, re, os
 d = json.loads(os.environ["INPUT"])
@@ -73,15 +73,15 @@ warns=""
 pulled=""
 while IFS= read -r repo; do
     [ -z "$repo" ] && continue
-    grep -qxF "$repo" "$STATE_FILE" && continue   # уже трогали этот репо в сессии
-    echo "$repo" >> "$STATE_FILE"                  # пометить ДО pull (lazy: одна попытка на сессию)
+    grep -qxF "$repo" "$STATE_FILE" && continue   # this repo was already touched in the session
+    echo "$repo" >> "$STATE_FILE"                  # mark BEFORE pull (lazy: one attempt per session)
 
     dir="$IWE_ROOT/$repo"
     branch=$(git -C "$dir" symbolic-ref --quiet --short HEAD 2>/dev/null)
 
-    # Больше никогда не стешит (issue #1245, рецидив bug-2026-07-17): autostash
-    # мог конфликтовать на возврате и тихо топить несохранённые правки — в stash,
-    # с предупреждением, видимым только в additionalContext этого тул-колла.
+    # Never stashes anymore (issue #1245, recurrence of bug-2026-07-17): autostash
+    # could conflict on restore and silently drown unsaved edits — in the stash,
+    # with a warning visible only in the additionalContext of this tool call.
     # Include untracked files even when status.showUntrackedFiles=no is set.
     # A failed status query is not proof of a clean tree. Optional locks are
     # disabled so inspecting another session's index does not refresh it.
@@ -132,7 +132,7 @@ while IFS= read -r repo; do
     esac
 done <<< "$REPOS"
 
-# Сообщить агенту только если есть что сказать (свежие данные или пометка stale).
+# Tell the agent only if there is something to say (fresh data or a stale note).
 msg=""
 [ -n "$pulled" ] && msg="🔄 Подтянул свежее: ${pulled}"
 [ -n "$warns" ] && msg="${msg}⚠️ ${warns}"

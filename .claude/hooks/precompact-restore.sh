@@ -1,9 +1,9 @@
 #!/bin/bash
 # PreCompact Restore Hook (issue #1183)
-# Event: SessionStart, matcher "compact" (срабатывает после ручного и авто-сжатия)
-# Возвращает агенту слепок, который перед сжатием записал precompact-checkpoint.sh.
-# Для SessionStart обычный stdout попадает в контекст модели
-# (https://code.claude.com/docs/en/hooks), JSON собирать не нужно.
+# Event: SessionStart, matcher "compact" (fires after both manual and auto compaction)
+# Returns to the agent the snapshot that precompact-checkpoint.sh recorded before compaction.
+# For SessionStart, plain stdout goes into the model context
+# (https://code.claude.com/docs/en/hooks), no need to build JSON.
 export LC_ALL=C
 
 INPUT=$(cat)
@@ -25,6 +25,6 @@ if [ "$(wc -c < "$CHECKPOINT_FILE")" -gt 6000 ]; then
   echo "> (слепок обрезан до 6000 байт, часть реплик не показана)"
 fi
 echo "----- КОНЕЦ СЛЕПКА -----"
-# Слепок одноразовый: устаревший не должен вернуться после следующего сжатия, если новый не записался.
+# The snapshot is one-time: a stale one must not come back after the next compaction if a new one was not recorded.
 rm -f "$CHECKPOINT_FILE"
 exit 0

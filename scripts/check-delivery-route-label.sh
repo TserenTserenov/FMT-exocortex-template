@@ -1,5 +1,5 @@
 #!/bin/bash
-# check-delivery-route-label.sh — WP-529 Ф2: a commit range that adds or
+# check-delivery-route-label.sh — WP-529 Phase 2: a commit range that adds or
 # removes a file from a manually-curated delivery category (the arrays in
 # generate-manifest.sh backing docs/critical-files-map.yaml's *-explicit-*
 # and dev-only-excluded/user-space-excluded categories, or update-manifest.json's
@@ -92,10 +92,10 @@ done
 # soft skip like day-open-scaffold.sh's best-effort sites).
 RESOLVED_PYTHON3=$("$SCRIPT_DIR/scripts/lib/find-python3.sh" 2>/dev/null) || RESOLVED_PYTHON3=""
 [ -n "$RESOLVED_PYTHON3" ] || { echo "ERROR: python3 с библиотекой PyYAML не найден (pip install pyyaml)"; exit 2; }
-# WP-529 Ф9 (Evgenii 20.08, bash 3.2 finding): было `declare -A` — Bash 3.2
-# (stock macOS /bin/bash) не умеет ассоциативные массивы. CURATED_ARRAYS
-# короткий (7 записей), и лукап идёт только внутри его цикла, не на каждый
-# git-tracked файл — лукап через awk по TSV-файлу вместо hash.
+# WP-529 Phase 9 (Evgenii 20.08, bash 3.2 finding): was `declare -A` — Bash 3.2
+# (stock macOS /bin/bash) does not support associative arrays. CURATED_ARRAYS
+# is short (7 entries), and the lookup happens only inside its loop, not for every
+# git-tracked file — a lookup via awk over a TSV file instead of a hash.
 "$RESOLVED_PYTHON3" - "$MAP" > "$TMP_ARRAY_MAP" <<'PY'
 import re
 import sys
@@ -118,10 +118,10 @@ IMPLICATED=()
 for arr in "${CURATED_ARRAYS[@]}"; do
     old_var="OLD_$arr"
     new_var="NEW_$arr"
-    # WP-529 Ф9 (found live by this job's own first real run on system
+    # WP-529 Phase 9 (found live by this job's own first real run on system
     # /bin/bash, 20.08): `"${!ref}"` indirect array expansion (ref holding
     # "VAR[@]") crashed with "unbound variable" under Bash 3.2 — pre-existing
-    # since Ф2, never exercised on real macOS before this CI job started
+    # since Phase 2, never exercised on real macOS before this CI job started
     # actually running these two scripts there. `eval` is the traditional,
     # maximally-portable indirect-array-access idiom (works since Bash 2).
     # `:-` guard is load-bearing, not defensive fluff: under `set -u`, Bash
@@ -146,7 +146,7 @@ done
 # and both map to dev-only-excluded. That is one route decision, not two;
 # dedupe so the same category is not reported/required twice.
 if [ "${#IMPLICATED[@]}" -gt 0 ]; then
-    # WP-529 Ф9 (Evgenii 20.08, bash 3.2 finding): mapfile — bash4-only.
+    # WP-529 Phase 9 (Evgenii 20.08, bash 3.2 finding): mapfile — bash4-only.
     IMPLICATED_DEDUP=()
     while IFS= read -r cat_id; do
         IMPLICATED_DEDUP+=("$cat_id")

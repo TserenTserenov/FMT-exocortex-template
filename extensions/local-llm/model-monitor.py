@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# see ADR-001-local-llm-stack.md (РП404, Ф2)
-# Конвейер поиска: раз в две недели сверяет каталог с трендами mlx-community.
-# Выводит дайджест кандидатов, которых ещё нет в каталоге. Read-only, без side effects.
-# Запуск: python3 model-monitor.py [--catalog model-catalog.yaml]
+# see ADR-001-local-llm-stack.md (WP-404, Phase 2)
+# Search pipeline: once every two weeks it checks the catalog against mlx-community trends.
+# Outputs a digest of candidates that are not yet in the catalog. Read-only, no side effects.
+# Run: python3 model-monitor.py [--catalog model-catalog.yaml]
 import argparse
 import json
 import os
@@ -66,7 +66,7 @@ def main():
         print(f"\n[potentially stale] источник недоступен или вернул мусор ({e}) — дайджест не собран", file=sys.stderr)
         return 1
 
-    if not isinstance(trending, list):   # 200 + объект ошибки вместо массива (rate-limit/смена API)
+    if not isinstance(trending, list):   # 200 + an error object instead of an array (rate-limit / API change)
         print(f"\n[potentially stale] источник вернул не список ({type(trending).__name__}) — дайджест не собран", file=sys.stderr)
         return 1
 

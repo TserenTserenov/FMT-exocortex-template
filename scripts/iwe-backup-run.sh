@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# iwe-backup-run.sh — регулярный зашифрованный бэкап источников по расписанию
+# iwe-backup-run.sh — regular scheduled encrypted backup of the sources
 #
-# WP-7 Ф237в, 2026-10-16 (пир-сессия 2026-10-16-18-iwe-template-backup).
+# WP-7 Phase 237в, 2026-10-16 (peer-session 2026-10-16-18-iwe-template-backup).
 #
-# ОБЕЩАНИЕ: снять снимок всех источников из iwe-backup-sources.yaml (tier0 +
-# tier1 всегда; tier2 — при --with-optional) в то же зашифрованное хранилище,
-# что использует iwe-backup-protect.sh (общий репозиторий = дедупликация
-# между регулярными и защитными снимками), затем применить политику хранения
-# (согласована пир-сессией: 7 дневных / 4 недельных / 6 месячных для тега
-# `scheduled`; тег `protect` не трогается этим скриптом вовсе).
+# PROMISE: take a snapshot of all sources from iwe-backup-sources.yaml (tier0 +
+# tier1 always; tier2 — with --with-optional) into the same encrypted store
+# used by iwe-backup-protect.sh (a shared repository = deduplication
+# between regular and protective snapshots), then apply the retention policy
+# (agreed by the peer session: 7 daily / 4 weekly / 6 monthly for the tag
+# `scheduled`; the `protect` tag is not touched by this script at all).
 #
-# Расписание — вне этого скрипта: ежедневный запуск делает планировщик роли
-# Synchronizer (roles/synchronizer/scripts/scheduler.sh) через scripts/iwe-backup.sh,
-# отдельного файла расписания у restic нет. Без установленной роли — только вручную.
-# Выбор движка (tar/restic) и договор бэкапа — в scripts/iwe-backup.sh.
+# The schedule lives outside this script: the daily run is done by the Synchronizer
+# role's scheduler (roles/synchronizer/scripts/scheduler.sh) via scripts/iwe-backup.sh,
+# restic has no separate schedule file. Without the installed role — manual only.
+# Engine choice (tar/restic) and the backup contract are in scripts/iwe-backup.sh.
 #
 # USAGE:
 #   iwe-backup-run.sh [--with-optional]
 #
 # EXIT CODES:
-#   0 — снимок снят и подтверждён (ротация могла частично не удаться — см. stderr)
-#   1 — снимок не удался/не подтверждён
+#   0 — snapshot taken and confirmed (rotation may have partially failed — see stderr)
+#   1 — snapshot failed/not confirmed
 
 set -euo pipefail
 
@@ -60,8 +60,8 @@ if [ ! -f "$SOURCES_FILE" ]; then
     exit 1
 fi
 
-# Тот же разбор, что в iwe-backup-check.sh (раздел 4) — печатает только
-# существующие пути, т.к. restic backup отказывает на несуществующем пути.
+# The same parsing as in iwe-backup-check.sh (section 4) — prints only
+# existing paths, since restic backup refuses on a nonexistent path.
 PATHS_TSV=$(HOME="$HOME" WORKSPACE_ROOT="$IWE_ROOT" SOURCES_FILE="$SOURCES_FILE" SOURCES_OVERRIDE="$SOURCES_OVERRIDE" WITH_OPTIONAL="$WITH_OPTIONAL" python3 <<'PYEOF'
 import os
 import yaml
@@ -215,10 +215,10 @@ fi
 
 echo "✅ [backup-run] снимок $SNAPSHOT_ID подтверждён" >&2
 
-# Ротация — только по тегу `scheduled`: снимки protect (тег `protect`)
-# этим вызовом не затрагиваются (другая политика хранения, Ф237б).
-# Отказ ротации не отменяет уже успешный снимок — сообщить и выйти 0:
-# политика хранения это гигиена места, не гарантия сохранности данных.
+# Rotation — only by the `scheduled` tag: protect snapshots (the `protect` tag)
+# are not affected by this call (a different retention policy, Phase 237б).
+# A rotation failure does not cancel an already successful snapshot — report and exit 0:
+# the retention policy is storage hygiene, not a data-safety guarantee.
 FORGET_LOG="$(mktemp)" || FORGET_LOG="/dev/null"
 if ! restic forget --tag scheduled --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune >"$FORGET_LOG" 2>&1; then
     echo "⚠️  [backup-run] ротация (forget --prune) не удалась — снимок всё равно подтверждён, место не освобождено" >&2

@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
-# check-orphan-hooks.sh — каждый хук в .claude/hooks/ действительно вызывается
+# check-orphan-hooks.sh — every hook in .claude/hooks/ is actually invoked
 #
-# Класс дефекта (issue #310, #323): скрипт-страж лежит в .claude/hooks/, объявлен в
-# CLAUDE.md блокирующим, но не зарегистрирован ни в одном событии settings.json и не
-# вызывается ни из одного другого хука. Он не срабатывает никогда — и об этом никто
-# не узнаёт, потому что «не сработал» выглядит ровно как «нарушений не было».
-# Так прожили IntegrationGate (rule-engine.sh) и ResidencyGate (residency-gate-*.sh).
+# Defect class (issue #310, #323): a guard script lies in .claude/hooks/, is declared
+# blocking in CLAUDE.md, but is not registered in any settings.json event and is
+# not called from any other hook. It never fires — and nobody finds out,
+# because "did not fire" looks exactly like "there were no violations".
+# That is how IntegrationGate (rule-engine.sh) and ResidencyGate (residency-gate-*.sh) lived.
 #
-# Достижимость считается транзитивно: хук из settings.json может запускать другие
-# (capture-bus.sh → детекторы), такие вызовы тоже считаются подключением.
+# Reachability is computed transitively: a hook from settings.json may launch others
+# (capture-bus.sh → detectors), such calls also count as wiring.
 #
-# Осознанно не подключённые хуки перечисляются в .claude/hooks/.orphan-allowlist
-# (одна строка = имя файла, `#` — комментарий с причиной). Файл в allowlist остаётся
-# видимым в отчёте, но не роняет проверку: цель сторожа — чтобы «не подключён»
-# было решением, а не случайностью.
+# Deliberately unwired hooks are listed in .claude/hooks/.orphan-allowlist
+# (one line = file name, `#` — a comment with the reason). A file in the allowlist stays
+# visible in the report but does not fail the check: the watchdog's goal is for "not wired"
+# to be a decision, not an accident.
 #
-# Обратная проверка (issue #360): каждый именованный [[gate:...]] из
-# memory/protocol-*.md обязан присутствовать в enforcement-инвентаре.
-# Использование: bash scripts/check-orphan-hooks.sh [FMT_DIR]
+# Reverse check (issue #360): every named [[gate:...]] from
+# memory/protocol-*.md must be present in the enforcement inventory.
+# Usage: bash scripts/check-orphan-hooks.sh [FMT_DIR]
 
 set -uo pipefail
 
@@ -37,14 +37,14 @@ if [ ! -f "$SETTINGS" ]; then
     exit 0
 fi
 
-# Стартовое множество: всё, на что ссылается settings.json.
-# Разделитель — пробел, а не перевод строки: членство проверяется шаблоном
-# `*" $name "*`, и на переводах строк он не совпадал бы ни с чем (все хуки
-# отчитывались как неподключённые при первом же прогоне).
+# Starting set: everything referenced by settings.json.
+# The separator is a space, not a newline: membership is checked by the pattern
+# `*" $name "*`, and on newlines it would not match anything (all hooks
+# reported as unwired on the very first run).
 reachable=" $(grep -oE '[A-Za-z0-9_.-]+\.sh' "$SETTINGS" | sort -u | tr '\n' ' ')"
 
-# Транзитивное замыкание: хук, уже признанный достижимым, подтягивает те, что вызывает.
-# Итераций ровно столько, сколько хуков — больше цепочка быть не может.
+# Transitive closure: a hook already recognized as reachable pulls in those it invokes.
+# Iterations exactly as many as there are hooks — the chain cannot be longer.
 hook_count=$(find "$HOOKS_DIR" -maxdepth 1 -name '*.sh' | wc -l | tr -d ' ')
 for _ in $(seq 1 "$hook_count"); do
     added=""
@@ -62,8 +62,8 @@ for _ in $(seq 1 "$hook_count"); do
     reachable="$reachable $added"
 done
 
-# Причина живёт в той же строке после `#`, поэтому имя — первое поле до комментария.
-# `tr -d ' '` по всей строке склеивал бы имя с причиной и allowlist не срабатывал.
+# The reason lives on the same line after `#`, so the name is the first field before the comment.
+# `tr -d ' '` over the whole line would glue the name to the reason and the allowlist would not work.
 allow=" "
 if [ -f "$ALLOWLIST" ]; then
     allow=" $(sed 's/#.*//' "$ALLOWLIST" | awk 'NF {print $1}' | tr '\n' ' ')"

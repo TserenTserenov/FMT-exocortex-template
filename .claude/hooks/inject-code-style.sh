@@ -1,24 +1,24 @@
 #!/bin/bash
 # inject-code-style.sh
 # Event: PreToolUse (matcher: Edit|Write)
-# see DP.SC.172 (обещание «База инженерного стиля кода»), WP-408 Ф3
+# see DP.SC.172 (promise «База инженерного стиля кода»), WP-408 Phase 3
 #
-# Назначение: впрыснуть ядро L0 (P0-P5) + L1-надстройки в контекст агента ПЕРЕД
-#   правкой код-файла. Зеркало inject-communication-style.sh, но ось — код и
-#   событие — PreToolUse (правится код), а не UserPromptSubmit (любой ответ).
+# Purpose: inject the L0 core (P0-P5) + L1 add-ons into the agent context BEFORE
+#   editing a code file. A mirror of inject-communication-style.sh, but the axis is code and
+#   the event is PreToolUse (code is being edited), not UserPromptSubmit (any reply).
 #
-# Контракт композиции хуков стиля (delta-ArchGate WP-408, инвариант):
-#   1. Хуки стиля не знают друг о друге.
-#   2. State-файл с ПРЕФИКСОМ code-style-injected-* (НЕ comm-style-injected-*).
-#   3. Контексты аддитивны — только добавляем additionalContext.
+# Style hook composition contract (delta-ArchGate WP-408, invariant):
+#   1. Style hooks do not know about each other.
+#   2. State file with the PREFIX code-style-injected-* (NOT comm-style-injected-*).
+#   3. Contexts are additive — we only add additionalContext.
 #
-# Поведение:
-# - Фильтр по расширению: только код-файлы (.py/.ts/.js/.tsx/.jsx/.sh/.go/.rs/...).
-#   Доки (.md/.txt/.yaml/.json/.toml) → silent skip (echo '{}').
-# - Впрыск ТОЛЬКО ядра между маркерами CODE-STYLE-INJECT-START/END (лимит
-#   PreToolUse additionalContext = 10000 симв; хард-кап 9500 на склейку L0+L1).
-# - Density-reinject: первый code-touch + по росту переписки/ходов (как comm-хук).
-# - L0 отсутствует → silent skip. L1 отсутствует → только L0.
+# Behavior:
+# - Extension filter: code files only (.py/.ts/.js/.tsx/.jsx/.sh/.go/.rs/...).
+#   Docs (.md/.txt/.yaml/.json/.toml) -> silent skip (echo '{}').
+# - Inject ONLY the core between the CODE-STYLE-INJECT-START/END markers (the
+#   PreToolUse additionalContext limit = 10000 chars; hard cap 9500 for the L0+L1 concatenation).
+# - Density-reinject: first code-touch + by growth of the conversation/turns (like the comm hook).
+# - L0 missing -> silent skip. L1 missing -> L0 only.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -27,11 +27,11 @@ command -v jq >/dev/null 2>&1 || { echo '{}'; exit 0; }
 
 INPUT=$(cat 2>/dev/null || echo '{}')
 
-# Фильтр по расширению: впрыск только при правке КОД-файла
+# Extension filter: inject only when a CODE file is edited
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo "")
 case "$FILE_PATH" in
   *.py|*.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.sh|*.bash|*.go|*.rs|*.rb|*.java|*.kt|*.c|*.h|*.cpp|*.hpp|*.sql) : ;;
-  *) echo '{}'; exit 0 ;;   # не код — не впрыскиваем
+  *) echo '{}'; exit 0 ;;   # not code — do not inject
 esac
 
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null)
@@ -41,11 +41,11 @@ SESSION_ID=$(printf '%s' "$SESSION_ID" | tr -cd 'A-Za-z0-9._-')
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$HOME/IWE}"
 STATE_DIR="$PROJECT_DIR/.claude/state"
-STATE_FILE="$STATE_DIR/code-style-injected-$SESSION_ID"   # префикс ≠ comm-style
+STATE_FILE="$STATE_DIR/code-style-injected-$SESSION_ID"   # prefix != comm-style
 
 REINJECT_EVERY_TURNS="${CODE_STYLE_REINJECT_TURNS:-12}"
 REINJECT_BYTES="${CODE_STYLE_REINJECT_BYTES:-60000}"
-HARD_CAP="${CODE_STYLE_INJECT_CAP:-9500}"   # запас под лимит PreToolUse 10000
+HARD_CAP="${CODE_STYLE_INJECT_CAP:-9500}"   # headroom under the PreToolUse limit of 10000
 
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || echo "")
 CUR_BYTES=0
@@ -60,14 +60,14 @@ if [ -f "$STATE_FILE" ]; then
   [ -n "${TURN:-}" ] || TURN=0
   [ -n "${LAST_INJECT_TURN:-}" ] || LAST_INJECT_TURN=0
   [ -n "${LAST_INJECT_BYTES:-}" ] || LAST_INJECT_BYTES=0
-  # битый/подделанный state (нечисло) под set -u уронил бы $(( )) с пустым stdout
+  # broken/forged state (non-number) under set -u would crash $(( )) with empty stdout
   case "$TURN$LAST_INJECT_TURN$LAST_INJECT_BYTES" in *[!0-9]*) TURN=0; LAST_INJECT_TURN=0; LAST_INJECT_BYTES=0 ;; esac
 fi
 TURN=$((TURN + 1))
 
 DO_INJECT=0
 if [ ! -f "$STATE_FILE" ]; then
-  DO_INJECT=1                                                     # первый code-touch
+  DO_INJECT=1                                                     # first code-touch
 elif [ $((TURN - LAST_INJECT_TURN)) -ge "$REINJECT_EVERY_TURNS" ]; then
   DO_INJECT=1
 elif [ "$CUR_BYTES" -gt 0 ] && [ $((CUR_BYTES - LAST_INJECT_BYTES)) -ge "$REINJECT_BYTES" ]; then
@@ -81,10 +81,10 @@ if [ "$DO_INJECT" -eq 0 ]; then
   exit 0
 fi
 
-# Контент: диспетчер реестра (если доступен) → файл-снимок p05-core.md → пропуск.
-# Диспетчер: WP-412 Ф6 (тонкий хук с каскадом L0+L1). Путь к нему через PROJECT_DIR.
-# Файл-снимок: WP-412 Ф11 (FMT-fallback, самодостаточен). Путь через BASH_SOURCE — работает в env -i.
-# Рантайм-механика (переинъекция, кап, state, silent-skip) остаётся в хуке. Откат: git revert.
+# Content: registry dispatcher (if available) -> snapshot file p05-core.md -> skip.
+# Dispatcher: WP-412 Phase 6 (thin hook with an L0+L1 cascade). The path to it goes through PROJECT_DIR.
+# Snapshot file: WP-412 Phase 11 (FMT fallback, self-sufficient). Path via BASH_SOURCE — works in env -i.
+# Runtime mechanics (reinjection, cap, state, silent-skip) stay in the hook. Rollback: git revert.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 P05_CORE="$HOOK_DIR/../styles/p05-core.md"
 
@@ -93,12 +93,12 @@ if [ -f "$DISPATCHER" ]; then
   FRAGMENT=$(python3 "$DISPATCHER" --event pretooluse-edit --quiet --no-cache 2>/dev/null)
 fi
 
-# Если диспетчер не дал контент — читаем файл-снимок (обрезаем frontmatter между --- --- )
+# If the dispatcher gave no content — read the snapshot file (strip frontmatter between --- --- )
 if [ -z "${FRAGMENT:-}" ] && [ -f "$P05_CORE" ]; then
   FRAGMENT=$(awk '/^---/{n++; if(n==2){found=1; next}} found' "$P05_CORE" 2>/dev/null)
 fi
 
-[ -n "${FRAGMENT:-}" ] || { echo '{}'; exit 0; }   # оба источника пусты/упали → пропуск (safe)
+[ -n "${FRAGMENT:-}" ] || { echo '{}'; exit 0; }   # both sources empty/failed -> skip (safe)
 
 CONTEXT="## 🔧 Инженерный стиль кода IWE (L0 база + L1 автор) — применять при написании/правке кода
 
@@ -106,11 +106,11 @@ CONTEXT="## 🔧 Инженерный стиль кода IWE (L0 база + L1 
 
 $FRAGMENT"
 
-# Хард-кап: считаем и обрезаем в Unicode-символах. `wc -c` считал байты,
-# тогда как Python ниже срезает символы: на кириллице это давало ложное
-# превышение капа и добавляло маркер обрезки к уже допустимому контексту.
-# (За пределами этого блока CUR_BYTES намеренно остаётся байтовым счётчиком:
-# это отдельный порог роста transcript для переинъекции.)
+# Hard cap: count and truncate in Unicode characters. `wc -c` counted bytes,
+# whereas the Python below slices characters: on Cyrillic this gave a false
+# cap excess and appended the truncation marker to an already acceptable context.
+# (Outside this block CUR_BYTES intentionally remains a byte counter:
+# it is a separate transcript growth threshold for reinjection.)
 if ! CTX_LEN=$(printf '%s' "$CONTEXT" | python3 -c 'import sys; print(len(sys.stdin.read()))'); then
   echo '{}'
   exit 0

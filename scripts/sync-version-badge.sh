@@ -2,12 +2,12 @@
 # routing: utility  deterministic=true
 # see VR.SC.006 (release-verification-protocol)
 #
-# sync-version-badge.sh — синхронизация version badge в README.md с CHANGELOG.md
+# sync-version-badge.sh — sync of the version badge in README.md with CHANGELOG.md
 #
-# Использование:
-#   bash sync-version-badge.sh --check    # проверка drift (CI gate)
-#   bash sync-version-badge.sh --fix      # исправление drift (локально / pre-commit)
-#   bash sync-version-badge.sh            # --fix по умолчанию
+# Usage:
+#   bash sync-version-badge.sh --check    # drift check (CI gate)
+#   bash sync-version-badge.sh --fix      # drift fix (locally / pre-commit)
+#   bash sync-version-badge.sh            # --fix by default
 
 set -uo pipefail
 
@@ -28,7 +28,7 @@ if [[ ! -f "$README" ]]; then
     exit 1
 fi
 
-# Извлекаем последнюю версию из CHANGELOG (первая строка ## [X.Y.Z])
+# Extract the latest version from CHANGELOG (first line ## [X.Y.Z])
 CHANGELOG_VERSION=$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' "$CHANGELOG" \
     | sed 's/^## \[//;s/\]$//' || true)
 
@@ -37,13 +37,13 @@ if [[ -z "$CHANGELOG_VERSION" ]]; then
     exit 1
 fi
 
-# Извлекаем версию из README badge
+# Extract the version from the README badge
 README_VERSION=$(grep -oE 'version-[0-9]+\.[0-9]+\.[0-9]+' "$README" \
     | sed 's/version-//' | head -n1 || true)
 
 if [[ -z "$README_VERSION" ]]; then
     echo "WARN: version badge не найден в README.md" >&2
-    # Если бейджа нет — это не ошибка в режиме check, но и не PASS
+    # If there is no badge — not an error in check mode, but not a PASS either
     exit 0
 fi
 
@@ -62,8 +62,8 @@ if [[ "$MODE" == "--check" ]]; then
 fi
 
 if [[ "$MODE" == "--fix" ]]; then
-    # Обновляем бейдж в README
-    # -E (не BRE \+): BSD sed на macOS не поддерживает \+ — молча не матчит, 0 замен без ошибки.
+    # Update the badge in README
+    # -E (not BRE \+): BSD sed on macOS does not support \+ — silently does not match, 0 replacements without an error.
     sed -E -i.bak \
         -e "s/version-[0-9]+\.[0-9]+\.[0-9]+/version-$CHANGELOG_VERSION/g" \
         "$README"

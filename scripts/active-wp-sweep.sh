@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # routing: helper  called-by=day-open,session-prep  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# active-wp-sweep.sh — heartbeat sweep активных РП
-# see WP-283 Шаг E (${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-283-server-day-open-crossplatform.md)
+# active-wp-sweep.sh — heartbeat sweep of active WPs
+# see WP-283 Step E (${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-283-server-day-open-crossplatform.md)
 #
-# Обходит ${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-*.md, находит файлы с status: in_progress | active | awaiting-batch,
-# плюс union с WP-IDs из текущего WeekPlan (для pending-РП, которые в плане недели),
-# кросс-чекает с git activity, выводит markdown-таблицу кандидатов.
+# Walks ${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox/WP-*.md, finds files with status: in_progress | active | awaiting-batch,
+# plus a union with WP-IDs from the current WeekPlan (for pending WPs that are in the week plan),
+# cross-checks with git activity, outputs a markdown table of candidates.
 #
-# Совместимость: bash 3.2+ (macOS), bash 4+ (Linux/NixOS)
+# Compatibility: bash 3.2+ (macOS), bash 4+ (Linux/NixOS)
 #
-# Использование:
+# Usage:
 #   bash active-wp-sweep.sh [INBOX_DIR] [IWE_ROOT]
 
 set -uo pipefail
@@ -28,7 +28,7 @@ IWE="${2:-$IWE_ROOT}"
 INBOX="${1:-$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/inbox}"
 GIT_DAYS="${WP_SWEEP_GIT_DAYS:-7}"
 
-# WP-484 Ф8 (2026-07-24): the O(WP x repo) git-log scan below hung for minutes
+# WP-484 Phase 8 (2026-07-24): the O(WP x repo) git-log scan below hung for minutes
 # once the active-WP count crossed ~100 across ~67 repos. Parallelism/caching
 # are deliberately out of scope for this pass (need real design work) — this
 # is just a deadline so a stall degrades to an honest PENDING marker instead
@@ -60,7 +60,7 @@ if ! command -v timeout &>/dev/null; then
     }
 fi
 
-# --- Найти python3 с yaml (общий резолвер, WP-529 F6 / #463) ---
+# --- Find python3 with yaml (shared resolver, WP-529 F6 / #463) ---
 RESOLVER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
 if ! PYTHON=$("$RESOLVER"); then
   # Sweep degrades to an explicit comment (callers embed stdout into
@@ -106,7 +106,7 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-# --format json + jq, не --format tsv: bash `IFS=$'\t' read` COLLAPSES an
+# --format json + jq, not --format tsv: bash `IFS=$'\t' read` COLLAPSES an
 # empty field sitting between two tabs — tab is always "IFS whitespace" in
 # bash's field-splitting rules regardless of what IFS is explicitly set to,
 # so a card with no title (WP-401 has `name:`, not `title:`, in this
@@ -125,8 +125,8 @@ _wp_list_row() {
   printf '%s\n' "$WP_LIST_US" | awk -F'\x1f' -v n="$1" '$1==n {print; exit}'
 }
 
-# --- Union: WP-IDs из текущего WeekPlan (для pending-РП в плане недели) ---
-# Находит первый файл WeekPlan W*.md в current/ и извлекает все WP-NNN из него.
+# --- Union: WP-IDs from the current WeekPlan (for pending WPs in the week plan) ---
+# Finds the first WeekPlan W*.md file in current/ and extracts all WP-NNN from it.
 _weekplan_wp_ids() {
   local weekplan
   weekplan=$(ls -t "$IWE/${IWE_GOVERNANCE_REPO:-DS-strategy}/current/WeekPlan"*.md 2>/dev/null | head -1)
@@ -136,7 +136,7 @@ _weekplan_wp_ids() {
 
 WEEKPLAN_IDS=$(_weekplan_wp_ids)
 
-# --- Собрать WP-файлы с in_progress, active или awaiting-batch ---
+# --- Collect WP files with in_progress, active or awaiting-batch ---
 FOUND=0
 DRIFT_ROWS=""
 OUTPUT_ROWS=""
@@ -145,7 +145,7 @@ SEEN_WP_NUMS=""
 _git_activity_cell() {
   local wp_num="$1" git_info="" git_dir repo_dir hit
   while IFS= read -r git_dir; do
-    # WP-484 Ф8 (cold-review 2026-07-24): the outer while-loops only check
+    # WP-484 Phase 8 (cold-review 2026-07-24): the outer while-loops only check
     # SWEEP_DEADLINE between WPs — with ~67 repos and a 5s per-repo timeout,
     # ONE slow WP could otherwise burn up to repo_count*5s here before control
     # ever returns there, blowing well past the stated budget. Check the same
@@ -155,7 +155,7 @@ _git_activity_cell() {
       break
     fi
     repo_dir="$(dirname "$git_dir")"
-    # WP-484 Ф8: defense-in-depth — a single stuck/corrupt repo shouldn't hang
+    # WP-484 Phase 8: defense-in-depth — a single stuck/corrupt repo shouldn't hang
     # the whole sweep on top of the overall SWEEP_DEADLINE above.
     hit=$(timeout 5 git -C "$repo_dir" log \
       --since="${GIT_DAYS} days ago" --oneline --grep="WP-${wp_num}" --all 2>/dev/null | head -1)
@@ -184,7 +184,7 @@ while IFS=$'\x1f' read -r WP_NUM WP_TITLE STATUS_RAW REGISTRY_DONE WP_FILE; do
   # full titles for other consumers, truncation belongs here at display time.
   WP_TITLE="${WP_TITLE:0:60}"
 
-  # Drift-check: если в REGISTRY помечен ✅ — это zombie, вывести предупреждение
+  # Drift-check: if marked ✅ in REGISTRY — it is a zombie, print a warning
   if [[ "$REGISTRY_DONE" == "true" ]]; then
     DRIFT_ROWS="${DRIFT_ROWS}| ⚠️ **${WP_LABEL}** ${WP_TITLE} | frontmatter=active, REGISTRY=✅ done — archive: \`mv inbox/ → archive/wp-contexts/\` |
 "
@@ -192,7 +192,7 @@ while IFS=$'\x1f' read -r WP_NUM WP_TITLE STATUS_RAW REGISTRY_DONE WP_FILE; do
   fi
 
   FOUND=$((FOUND + 1))
-  # Запомнить номер — чтобы не дублировать в union-блоке
+  # Remember the number — so as not to duplicate in the union block
   SEEN_WP_NUMS="${SEEN_WP_NUMS} ${WP_NUM} "
 
   GIT_CELL=$(_git_activity_cell "$WP_NUM")
@@ -200,7 +200,7 @@ while IFS=$'\x1f' read -r WP_NUM WP_TITLE STATUS_RAW REGISTRY_DONE WP_FILE; do
 "
 done <<< "$WP_LIST_US"
 
-# --- Union: добавить pending-РП из WeekPlan, которых ещё нет в результатах ---
+# --- Union: add pending WPs from WeekPlan that are not yet in the results ---
 if [[ -n "$WEEKPLAN_IDS" ]]; then
   while IFS= read -r WP_NUM; do
     [[ -z "$WP_NUM" ]] && continue
@@ -210,12 +210,12 @@ if [[ -n "$WEEKPLAN_IDS" ]]; then
       break
     fi
 
-    # Пропустить если уже найден через inbox-статус
+    # Skip if already found via inbox status
     [[ " $SEEN_WP_NUMS " == *" $WP_NUM "* ]] && continue
     ROW=$(_wp_list_row "$WP_NUM")
     [[ -n "$ROW" ]] || continue
     IFS=$'\x1f' read -r _ WP_TITLE _ REGISTRY_DONE _ <<< "$ROW"
-    # Пропустить если помечен ✅ в REGISTRY
+    # Skip if marked ✅ in REGISTRY
     [[ "$REGISTRY_DONE" == "true" ]] && continue
     [[ -z "$WP_TITLE" ]] && WP_TITLE="WP-${WP_NUM}"
     WP_TITLE="${WP_TITLE:0:60}"
@@ -227,8 +227,8 @@ if [[ -n "$WEEKPLAN_IDS" ]]; then
   done <<< "$WEEKPLAN_IDS"
 fi
 
-# --- Вывод ---
-# WP-484 Ф8: a timed-out sweep with zero results so far is NOT the same as
+# --- Output ---
+# WP-484 Phase 8: a timed-out sweep with zero results so far is NOT the same as
 # "no active WPs" — the empty-result exit belongs only to the honest case
 # where the scan actually completed and found nothing (invariant: no data →
 # explicit marker, never a silent pass).

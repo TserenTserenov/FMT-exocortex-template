@@ -32,8 +32,8 @@ UPSTREAM="$TEST_ROOT/upstream"
 mkdir -p "$UPSTREAM/scripts" "$UPSTREAM/setup/lib"
 printf '# Template CLAUDE.md\n' > "$UPSTREAM/CLAUDE.md"
 printf '#!/bin/bash\necho v2\n' > "$UPSTREAM/scripts/dummy-new.sh"
-# WP-529 Ф245: Step 5 пишет через исполнитель setup/lib/apply-op.sh — фикстурный
-# манифест доставляет его, как это делает настоящий генератор.
+# WP-529 Phase 245: Step 5 writes via the executor setup/lib/apply-op.sh — the fixture
+# manifest delivers it, as the real generator does.
 cp "$ROOT/setup/lib/apply-op.sh" "$UPSTREAM/setup/lib/apply-op.sh"
 python3 - "$UPSTREAM" <<'PY'
 import hashlib, json, sys
@@ -59,8 +59,8 @@ cp "$ROOT/scripts/lib/common.sh" "$SCRIPT_DIR/scripts/lib/common.sh"
 chmod +x "$SCRIPT_DIR/update.sh"
 cp "$UPSTREAM/CLAUDE.md" "$SCRIPT_DIR/CLAUDE.md"
 cp "$SCRIPT_DIR/CLAUDE.md" "$SCRIPT_DIR/.claude.md.base"
-# Исполнитель и в установке: прогоны восстановления («всё актуально») его не
-# скачивают — update.sh берёт копию из клона.
+# The executor is also part of the installation: restore runs ("everything is current") do not
+# download it — update.sh takes a copy from the clone.
 mkdir -p "$SCRIPT_DIR/setup/lib"
 cp "$ROOT/setup/lib/apply-op.sh" "$SCRIPT_DIR/setup/lib/apply-op.sh"
 

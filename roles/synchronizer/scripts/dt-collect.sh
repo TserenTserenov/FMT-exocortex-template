@@ -1,24 +1,24 @@
 #!/bin/bash
-# dt-collect.sh — сбор данных активности для ЦД (WP-106, WP-139)
+# dt-collect.sh — collect activity data for the DT (WP-106, WP-139)
 #
-# Архитектура: ядро (L3, шаблон) + плагины (L4, personal)
-#   Ядро: WakaTime, git, sessions, WP, health, multiplier, registry, Pack, notes, scheduler reports
-#   Плагины: collectors.d/*.sh — персональные коллекторы (Scout, QA бота, публикации и др.)
+# Architecture: core (L3, template) + plugins (L4, personal)
+#   Core: WakaTime, git, sessions, WP, health, multiplier, registry, Pack, notes, scheduler reports
+#   Plugins: collectors.d/*.sh — personal collectors (Scout, bot QA, publications, etc.)
 #
-# Плагин = bash-файл с функцией collect_NAME() → stdout JSON + комментарий TARGET
+# Plugin = a bash file with a function collect_NAME() → stdout JSON + a TARGET comment
 #   # COLLECTOR: name
 #   # TARGET: 2_7_iwe | 2_8_ecosystem | 2_9_knowledge
 #   collect_name() { echo '{"key": "value"}' }
 #
-# Использование:
-#   dt-collect.sh           # собрать и записать
-#   dt-collect.sh --dry-run # показать JSON, не записывать
+# Usage:
+#   dt-collect.sh           # collect and write
+#   dt-collect.sh --dry-run # show JSON, do not write
 #
-# Триггер: scheduler.sh dispatch dt-collect (ежедневно, после code-scan)
-# Зависимости:
-#   WAKATIME_API_KEY  — в ~/.config/aist/env
-#   NEON_URL          — в ~/.config/aist/env (connection string)
-#   DT_USER_ID        — в ~/.config/aist/env (Ory UUID)
+# Trigger: scheduler.sh dispatch dt-collect (daily, after code-scan)
+# Dependencies:
+#   WAKATIME_API_KEY  — in ~/.config/aist/env
+#   NEON_URL          — in ~/.config/aist/env (connection string)
+#   DT_USER_ID        — in ~/.config/aist/env (Ory UUID)
 
 set -euo pipefail
 
@@ -57,13 +57,13 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 log() {
-    # tee → stderr, чтобы лог не попадал в $(collect_*) и не ломал JSON.
+    # tee → stderr, so the log does not end up in $(collect_*) and does not break JSON.
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [dt-collect] $1" | tee -a "$LOG_FILE" >&2
 }
 
 log "=== DT Collect Started ==="
 
-# Проверка обязательных env vars (skip при --dry-run)
+# Check of required env vars (skip with --dry-run)
 if [ "$DRY_RUN" = false ]; then
     if [ -z "${NEON_URL:-}" ]; then
         log "NEON_URL not set — skipping"
@@ -152,7 +152,7 @@ print(json.dumps(result))
 }
 
 # ============================================================
-# 2. Git Stats (все репо в $WORKSPACE/)
+# 2. Git Stats (all repos in $WORKSPACE/)
 # ============================================================
 
 collect_git() {
@@ -304,9 +304,9 @@ print(json.dumps(result))
 # ============================================================
 
 collect_wp() {
-    # Источник: WP-REGISTRY.md (после ОПТ-4/WP-297 Ф6.3 таблица РП удалена из MEMORY.md).
-    # Формат строки: | <NNN> | <P> | <Название> | <Ст> | <Репо> | <Бюджет> |
-    # Статусы: ✅ done · 🔄 in_progress · ⏳ pending · 📦 archived · ↗️ merged · 🧪 testing
+    # Source: WP-REGISTRY.md (after OPT-4/WP-297 Phase 6.3 the WP table was removed from MEMORY.md).
+    # Row format: | <NNN> | <P> | <Title> | <St> | <Repo> | <Budget> |
+    # Statuses: ✅ done · 🔄 in_progress · ⏳ pending · 📦 archived · ↗️ merged · 🧪 testing
     local REGISTRY_FILE="$GOVERNANCE_DIR/docs/WP-REGISTRY.md"
     # issue #875: was "$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/...", which
     # assumes the folder is literally named IWE and read a foreign workspace's

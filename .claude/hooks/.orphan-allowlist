@@ -1,14 +1,14 @@
-# Хуки, осознанно не зарегистрированные в шаблонном .claude/settings.json.
-# Формат: одно имя файла в строке; всё после # — причина.
-# Проверяет: scripts/check-orphan-hooks.sh (issue #310, #323).
+# Hooks deliberately not registered in the template .claude/settings.json.
+# Format: one file name per line; everything after # is the reason.
+# Checked by: scripts/check-orphan-hooks.sh (issue #310, #323).
 #
-# Список — не место, где дефекты становятся невидимыми. Каждая строка обязана
-# называть причину и следующий шаг. Пустая причина = дефект, а не исключение.
+# The list is not a place where defects become invisible. Each line must
+# name the reason and the next step. An empty reason = a defect, not an exception.
 #
-# Библиотеки и CLI, лежащие рядом с хуками (rule-engine.sh, residency-gate-*.sh,
-# agent-trace-uploader.sh), в этот список НЕ вносятся: они несут маркер
-# `# claude-hook: false — …` в шапке, и сторож распознаёт его сам (2026-08-04,
-# пир-сессия по issues #310/#321/#323).
+# Libraries and CLIs located next to the hooks (rule-engine.sh, residency-gate-*.sh,
+# agent-trace-uploader.sh) are NOT added to this list: they carry the marker
+# `# claude-hook: false — …` in the header, and the watchdog recognizes it itself (2026-08-04,
+# peer session on issues #310/#321/#323).
 #
-agent-trace-recorder.sh     # локальная телеметрия (трассы инструментов в домашнем каталоге): включается осознанным opt-in пользователя, retention-контракт не определён — по умолчанию в шаблоне выключен. Включение: добавить в settings.json Stop+PostToolUse.
-pack-creator-spf-guard.sh   # хук работоспособен, но контракта активации нет: PACK_CREATOR_ACTIVE=1 в рантайме шаблона никто не выставляет (env хук-процессу скилл передать не может). Следующий шаг: активация через state-файл от скилла pack-creator + 3 теста (обычная сессия / активный запрет / активное разрешение).
+agent-trace-recorder.sh     # local telemetry (tool traces in the home directory): enabled by the user's deliberate opt-in, the retention contract is not defined — off by default in the template. To enable: add to settings.json Stop+PostToolUse.
+pack-creator-spf-guard.sh   # the hook works, but there is no activation contract: nobody sets PACK_CREATOR_ACTIVE=1 in the template runtime (a skill cannot pass env to the hook process). Next step: activation via a state file from the pack-creator skill + 3 tests (normal session / active deny / active allow).

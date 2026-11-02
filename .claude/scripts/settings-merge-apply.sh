@@ -6,7 +6,7 @@
 #
 # Safety order: build candidate → backup current → replace → post-validate →
 # restore backup on any failure. The workspace file is either untouched or
-# fully replaced by a parse-validated merge; никогда не остаётся в рваном виде.
+# fully replaced by a parse-validated merge; never left in a torn state.
 #
 # Usage: settings-merge-apply.sh <template_settings> <workspace_settings> [py_bin]
 # Exit: 0 = applied; 1 = failure, workspace settings.json untouched/restored.

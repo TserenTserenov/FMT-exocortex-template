@@ -62,10 +62,10 @@ def test_subprocess_failure_is_caught_and_logged(tmp_path, capsys):
 
 
 def test_subprocess_timeout_is_caught_and_logged_without_leaking_fault_text(tmp_path, capsys):
-    # Код-ревью 31.08 (Critical): str(TimeoutExpired) включает полный cmd —
-    # значит и сам текст --evidence (fault может нести чувствительные детали
-    # инцидента). Реалистичный argv с фактическим fault — тест обязан
-    # поймать утечку, если она вернётся, не только формально пройти.
+    # Code review 31.08 (Critical): str(TimeoutExpired) includes the full cmd —
+    # meaning the --evidence text itself too (a fault may carry sensitive details
+    # of the incident). A realistic argv with an actual fault — the test must
+    # catch the leak if it returns, not just formally pass.
     governance = tmp_path / "governance-repo"
     (governance / "scripts").mkdir(parents=True)
     writer = governance / "scripts" / "post-culture-fact.py"

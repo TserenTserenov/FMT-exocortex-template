@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# create-skill.sh — создать scaffold нового скилла IWE (SKILL.md v2)
+# create-skill.sh — create a scaffold of a new IWE skill (SKILL.md v2)
 # see DP.SC.153, DP.ROLE.057
 #
-# Использование:
+# Usage:
 #   bash create-skill.sh <skill-id> [--layer L1|L3] [--owner-role R6] [--skills-dir <path>]
 #
-# После создания:
-#   1. Заполнить SKILL.md v2 (обещание, алгоритм, режим отказа)
+# After creation:
+#   1. Fill in SKILL.md v2 (promise, algorithm, failure mode)
 #   2. bash validate-skill.sh <skill-id>
 #   3. Smoke-test
-#   4. Если L1 → bash skill-promote.sh ...
+#   4. If L1 → bash skill-promote.sh ...
 
 set -uo pipefail
 
@@ -36,19 +36,19 @@ if [[ -z "$skill_id" ]]; then
     exit 1
 fi
 
-# Валидация skill-id: kebab-case, только строчные
+# Validate skill-id: kebab-case, lowercase only
 if ! echo "$skill_id" | grep -qE '^[a-z][a-z0-9-]*$'; then
     echo "❌ skill-id должен быть kebab-case (строчные буквы, цифры, дефис): $skill_id" >&2
     exit 1
 fi
 
-# Валидация layer
+# Validate layer
 if [[ "$layer" != "L1" && "$layer" != "L3" ]]; then
     echo "❌ --layer должен быть L1 или L3 (получено: $layer)" >&2
     exit 1
 fi
 
-# Проверить что скилл не существует
+# Check that the skill does not exist
 skill_dir="${SKILLS_DIR}/${skill_id}"
 if [[ -d "$skill_dir" ]]; then
     echo "❌ Скилл уже существует: $skill_dir" >&2
@@ -56,7 +56,7 @@ if [[ -d "$skill_dir" ]]; then
     exit 1
 fi
 
-# Проверить дубликат имени в skills-catalog.yaml
+# Check for a duplicate name in skills-catalog.yaml
 catalog="${IWE}/.claude/skills-catalog.yaml"
 if [[ -f "$catalog" ]]; then
     if grep -q "^  - id: ${skill_id}$" "$catalog" 2>/dev/null; then
@@ -65,10 +65,10 @@ if [[ -f "$catalog" ]]; then
     fi
 fi
 
-# Создать директорию и SKILL.md v2
+# Create the directory and SKILL.md v2
 mkdir -p "$skill_dir"
 
-# Опциональная строка owner_role
+# Optional owner_role line
 owner_line=""
 [[ -n "$owner_role" ]] && owner_line="
 owner_role: ${owner_role}               # роль-носитель скилла"

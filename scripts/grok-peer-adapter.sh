@@ -7,10 +7,10 @@
 # Read-only-by-design: --sandbox read-only + --tools "" + --disable-web-search
 # + --no-subagents strip file/shell/web/subagent capability. No --agent flag
 # is registered for Grok in session-guard.sh — it never opens/commits sessions,
-# only participates as a peer-conversation vendor (ArchGate WP-530 Ф51: pilot
+# only participates as a peer-conversation vendor (ArchGate WP-530 Phase 51: pilot
 # narrowed scope to read-only; broader session-guard integration deferred).
 #
-# Known gap (ArchGate WP-530 Ф51, accepted mitigation, not yet automated):
+# Known gap (ArchGate WP-530 Phase 51, accepted mitigation, not yet automated):
 # callers should label Grok's replies as an "unverified critic" for its first
 # sessions and pass minimal per-turn context, same as the other vendors already
 # receive — this adapter enforces the transport/sandbox side of that, not the
@@ -34,7 +34,7 @@
 # built-in denies). Do not silently fall back to a weaker profile
 # ("workspace"/"none") to route around it: fail loudly instead (see below).
 #
-# Second upstream limitation found live 25.10 (WP-7 Ф259, grok-4.7-build):
+# Second upstream limitation found live 25.10 (WP-7 Phase 259, grok-4.7-build):
 # if the model decides to request a tool call anyway (e.g. run_terminal_command
 # to "find the branch first"), the headless session has no permission UI —
 # the call is answered PermissionCancelled and the WHOLE session ends after
@@ -87,9 +87,9 @@ done
 ADD_DIRS=()
 MODEL_ARG=()
 
-# WP-516 Ф5 (§0в.1): межвендорский whitelist = {-p, --model, --add-dir}.
-# Неизвестный флаг — явная ошибка, не молчаливый игнор.
-# --permission-mode исключён намеренно: grok has no such flag anyway, but
+# WP-516 Phase 5 (§0в.1): cross-vendor whitelist = {-p, --model, --add-dir}.
+# An unknown flag is an explicit error, not a silent ignore.
+# --permission-mode excluded intentionally: grok has no such flag anyway, but
 # even its closest equivalents (--sandbox, --tools) are NOT accepted from the
 # caller here — this adapter hardcodes the read-only posture below, the same
 # way claude-peer-adapter.sh refuses --permission-mode.
@@ -109,7 +109,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# === Фильтрация --add-dir через .agentigore + PII sanity-check (соседние копии) ===
+# === Filtering --add-dir via .agentigore + PII sanity-check (neighboring copies) ===
 
 FILTERED_DIRS=()
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/grok-peer-XXXXXX")
@@ -125,7 +125,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ -f "$ADD_DIR/.agentigore" ] && cat "$ADD_DIR/.agentigore" >> "$MERGED_AGENTIGORE"
 done
 
-# === Fail-fast на размер ===
+# === Fail-fast on size ===
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   SIZE_MB=$(du -sm "$ADD_DIR" 2>/dev/null | awk '{print $1}')
@@ -136,7 +136,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   fi
 done
 
-# === Фильтрация через Python fnmatch + PII sanity-check (локальный peer-adapter-filter.py) ===
+# === Filtering via Python fnmatch + PII sanity-check (local peer-adapter-filter.py) ===
 for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   [ ! -d "$ADD_DIR" ] && continue
   CLEAN_DIR="$TMP_ROOT/$(basename "$ADD_DIR")"
@@ -155,7 +155,7 @@ for ADD_DIR in "${ADD_DIRS[@]+"${ADD_DIRS[@]}"}"; do
   FILTERED_DIRS+=("--add-dir" "$CLEAN_DIR")
 done
 
-# === Content-filter guard (локальная копия content-filter-map.txt) ===
+# === Content-filter guard (local copy of content-filter-map.txt) ===
 PROMPT_FILE="$TMP_ROOT/peer-prompt.in"
 cat > "$PROMPT_FILE"
 
@@ -193,7 +193,7 @@ PYEOF
     PROMPT_FILE="$PROMPT_FILE.clean"
 fi
 
-# === Pidfile lock: предотвращаем параллельные/зависшие копии одной peer-сессии ===
+# === Pidfile lock: prevent parallel/hung copies of one peer session ===
 GROK_TASK="$(basename "${ADD_DIRS[0]:-}" 2>/dev/null)"
 if [ -z "$GROK_TASK" ]; then GROK_TASK="grok-peer-ppid-${PPID:-$$}"; fi
 GROK_SESSION_ID="$GROK_TASK"
@@ -218,7 +218,7 @@ cleanup_peer() {
 }
 trap cleanup_peer EXIT INT TERM
 
-# === Запуск Grok headless: `-p`/`--prompt-file`, read-only sandbox, tools stripped ===
+# === Run Grok headless: `-p`/`--prompt-file`, read-only sandbox, tools stripped ===
 #
 # --sandbox read-only: filesystem enforcement (not just an instruction to the
 # model) — same posture as codex's `-s read-only`. Refusal (e.g. this host's
@@ -226,7 +226,7 @@ trap cleanup_peer EXIT INT TERM
 # to weaken around: propagate as exit 1, do not retry with a laxer profile.
 # --tools "" / --disable-web-search / --no-subagents: no file/shell/web/
 # subagent capability, same posture as claude-peer-adapter.sh's "text-only,
-# no tools" contract for Grok's "read-only commentator" role (WP-530 Ф51).
+# no tools" contract for Grok's "read-only commentator" role (WP-530 Phase 51).
 # --cwd: sandbox root. Without --add-dir this is an empty temp dir (no
 # implicit exposure of the writer's working tree) — same invariant as codex.
 if [ ${#FILTERED_DIRS[@]} -ge 2 ]; then
@@ -298,9 +298,9 @@ fi
 
 GROK_OUTPUT=$(cat "$OUT_FILE")
 
-# WP-516 Ф5 (§0в.1): stdout обязан начинаться с frontmatter; ответ без
-# frontmatter = нарушение формата → exit 1 с диагностикой. Служебные вызовы
-# писателя (не peer-реплика) отключают проверку через IWE_PEER_PLAIN=1.
+# WP-516 Phase 5 (§0в.1): stdout must begin with frontmatter; an answer without
+# frontmatter = format violation → exit 1 with diagnostics. Writer service calls
+# (not a peer turn) disable the check via IWE_PEER_PLAIN=1.
 if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   _FIRST_LINE=$(printf '%s\n' "$GROK_OUTPUT" | awk 'length { print; exit }')
   _FM_FENCES=$(printf '%s\n' "$GROK_OUTPUT" | grep -c '^---$' || true)
@@ -309,8 +309,8 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
     exit 1
   fi
 
-  # WP-484 Ф89: alert-only self-check — доля кириллицы в ответе. Никогда не
-  # блокирует вывод, только предупреждает в stderr.
+  # WP-484 Phase 89: alert-only self-check — share of Cyrillic in the answer. Never
+  # blocks output, only warns on stderr.
   _LANG_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/language-check.py"
   if [ -f "$_LANG_CHECK" ]; then
     _LANG_RESULT=$(printf '%s' "$GROK_OUTPUT" | python3 "$_LANG_CHECK" 2>/dev/null || true)
@@ -320,5 +320,5 @@ if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   fi
 fi
 
-# cleanup_peer() через trap удалит lock и temp
+# cleanup_peer() via trap will remove the lock and temp
 echo "$GROK_OUTPUT"

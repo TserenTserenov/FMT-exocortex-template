@@ -342,7 +342,7 @@ T10="$TMP/sched"; mkdir -p "$T10/ps"
     echo 'log() { echo "$1" >> "$LOG_FILE"; }'
     echo 'timeout() { shift; "$@"; }'
     sed -n '/^mark_done() {/,/^}/p;/^mark_interval() {/,/^}/p' "$SCHED"
-    sed -n '/^# === Бэкап и возможности установки/,/^# === Очистка старых маркеров/p' "$SCHED" | sed '$d'
+    sed -n '/^# === Backup and install capabilities/,/^# === Cleanup of old markers/p' "$SCHED" | sed '$d'
     echo 'case "$1" in backup) run_backup_task ;; regress) run_capability_regress_task ;; esac'
 } > "$T10/harness.sh"
 for s in iwe-backup.sh iwe-capabilities.sh; do printf '#!/bin/bash\nexit "${STUB_RC:-0}"\n' > "$T10/ps/$s"; done

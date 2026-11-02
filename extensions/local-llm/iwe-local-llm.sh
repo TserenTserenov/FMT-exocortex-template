@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# see ADR-001-local-llm-stack.md (РП404)
-# Обёртка локального LLM-стека (MLX). JOB: приватность + fallback.
-# Сервер биндится только на localhost (B7.3).
-# Активная модель и жизненный цикл — в каталоге через model-lifecycle.py.
-# Команды: start | test | stop | status | models | pull <m> | use <m> | archive <m>
+# see ADR-001-local-llm-stack.md (WP-404)
+# Wrapper of the local LLM stack (MLX). JOB: privacy + fallback.
+# The server binds to localhost only (B7.3).
+# The active model and lifecycle are in the catalog via model-lifecycle.py.
+# Commands: start | test | stop | status | models | pull <m> | use <m> | archive <m>
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,7 @@ LOGFILE="$LLM_HOME/server.log"
 die() { echo "error: $*" >&2; exit 1; }
 [ -x "$PY" ] || die "venv не найден ($PY). Сначала установщик: install-local-llm.sh"
 
-# Активная модель: env переопределяет каталог
+# Active model: env overrides the catalog
 active_model() {
   if [ -n "${IWE_LLM_MODEL:-}" ]; then echo "$IWE_LLM_MODEL"
   else "$PY" "$LIFECYCLE" active; fi
@@ -43,7 +43,7 @@ start() {
     fi
     sleep 1
   done
-  kill "$(cat "$PIDFILE")" 2>/dev/null || true   # не оставлять осиротевший mlx_lm и мёртвый PID
+  kill "$(cat "$PIDFILE")" 2>/dev/null || true   # do not leave an orphaned mlx_lm and a dead PID
   rm -f "$PIDFILE"
   die "сервер не поднялся за 30с, см. $LOGFILE"
 }
@@ -82,7 +82,7 @@ restart_if_running() {
   if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then stop; start; fi
 }
 
-# Скачать модель для тестирования (status -> testing, если в каталоге)
+# Download a model for testing (status -> testing, if in the catalog)
 pull() {
   local model="${1:?usage: pull <model-id>}"
   download "$model"
@@ -92,7 +92,7 @@ pull() {
   echo "готово: $model скачана"
 }
 
-# Поставить модель в работу: скачать + сделать активной (прежняя active -> testing) + перезапуск
+# Put a model into service: download + make active (the previous active -> testing) + restart
 use() {
   local model="${1:?usage: use <model-id>}"
   download "$model"

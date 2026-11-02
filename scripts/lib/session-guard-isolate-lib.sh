@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# session-guard-isolate-lib.sh — thin isolate helpers for FMT session-guard (WP-485 Ф14, а∩г)
+# session-guard-isolate-lib.sh — thin isolate helpers for FMT session-guard (WP-485 Phase 14, а∩г)
 # Sourced by scripts/session-guard.sh. Requires: fail(), IWE_ROOT, ISOLATE_LOCK_DIR, ISOLATE_LOCK_TTL_SEC.
 # Do not hardcode personal governance repo names.
 

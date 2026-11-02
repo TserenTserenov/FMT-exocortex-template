@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # routing: helper  skill=week-close  called-by=sonnet
 # see DP.SC.159, DP.ROLE.059
-# week-draft-init.sh — создать пустой черновик недельного поста для новой недели.
+# week-draft-init.sh -- create an empty weekly post draft for a new week.
 #
-# Использование:
-#   week-draft-init.sh              # текущая неделя
-#   week-draft-init.sh --week 17    # явная неделя
+# Usage:
+#   week-draft-init.sh              # current week
+#   week-draft-init.sh --week 17    # explicit week
 #
-# Запускается на Пн Day Close (первая запись дня недели).
-# Если черновик уже существует — выходит без изменений.
+# Runs on Monday Day Close (first entry of the week day).
+# If the draft already exists -- exits without changes.
 #
-# Параметры (params.yaml):
-#   knowledge_repo: <path относительно WORKSPACE_DIR>  # путь к knowledge-index репо
-# Если не задан — скрипт пропускается с подсказкой.
+# Parameters (params.yaml):
+#   knowledge_repo: <path relative to WORKSPACE_DIR>  # path to the knowledge-index repo
+# If not set -- the script is skipped with a hint.
 
 set -euo pipefail
 
@@ -64,28 +64,28 @@ fi
 
 mkdir -p "$DRAFT_DIR"
 
-# Вычисляем даты Пн-Вс текущей ISO-недели
-# Баг-фикс 24.07: "monday this week"/"sunday this week" в GNU date не якорятся на текущую
-# календарную неделю — это "следующее вхождение дня недели", которое зависит от того, прошёл
-# ли этот день недели уже сегодня. В пятницу (%u=5) Пн (день 1) уже прошёл → "monday this week"
-# прыгает на СЛЕДУЮЩИЙ понедельник, а Вс (день 7) ещё не наступило → "sunday this week" остаётся
-# в ТЕКУЩЕЙ неделе — на выходе несогласованный диапазон (напр. «27-26 июля», Пн из будущей недели
-# + Вс из текущей). Фикс: то же смещение в днях от сегодня, что уже верно работает в ветке -v (BSD).
+# Compute the Mon-Sun dates of the current ISO week
+# Bug fix 24.07: "monday this week"/"sunday this week" in GNU date do not anchor to the current
+# calendar week -- it is "the next occurrence of the weekday", which depends on whether
+# that weekday has already passed today. On Friday (%u=5) Mon (day 1) has already passed → "monday this week"
+# jumps to the NEXT Monday, while Sun (day 7) has not yet come → "sunday this week" stays
+# in the CURRENT week -- the output is an inconsistent range (e.g. "27-26 July", Mon from a future week
+# + Sun from the current). Fix: the same offset in days from today that already works correctly in the -v branch (BSD).
 MON_DATE=$(date -v-$(($(date +%u)-1))d +%Y-%m-%d 2>/dev/null || date -d "today - $(($(date +%u)-1)) days" +%Y-%m-%d)
 SUN_DATE=$(date -v+$((7-$(date +%u)))d +%Y-%m-%d 2>/dev/null || date -d "today + $((7-$(date +%u))) days" +%Y-%m-%d)
 
-# issue #155: || fallback на GNU date (Linux) — иначе date -j падает, 2>/dev/null глушит, день пустой
+# issue #155: || fallback to GNU date (Linux) -- otherwise date -j fails, 2>/dev/null silences it, the day is empty
 MON_DAY=$(date -j -f %Y-%m-%d "$MON_DATE" +%d 2>/dev/null || date -d "$MON_DATE" +%d 2>/dev/null); MON_DAY=${MON_DAY#0}
 SUN_DAY=$(date -j -f %Y-%m-%d "$SUN_DATE" +%d 2>/dev/null || date -d "$SUN_DATE" +%d 2>/dev/null); SUN_DAY=${SUN_DAY#0}
 MONTH_FOR_DATES="${MONTH_NAME:0:3}"
 
-# Генерируем строки таблицы метрик с датами Пн-Вс (WD1 fix: совместимость с week-draft-append.sh)
+# Generate the metrics table rows with Mon-Sun dates (WD1 fix: compatibility with week-draft-append.sh)
 DOW_RU=("Пн" "Вт" "Ср" "Чт" "Пт" "Сб" "Вс")
 TABLE_ROWS=""
 for i in 0 1 2 3 4 5 6; do
   day_date=$(date -v+${i}d -j -f %Y-%m-%d "$MON_DATE" +%Y-%m-%d 2>/dev/null || date -d "$MON_DATE + $i days" +%Y-%m-%d)
-  # issue #245: `||` за пайпом на sed не срабатывал, если падал только `date -j` (GNU date) —
-  # sed на пустом вводе завершается успешно, поэтому фолбэк никогда не запускался.
+  # issue #245: `||` after a pipe into sed did not fire if only `date -j` (GNU date) failed --
+  # sed on empty input succeeds, so the fallback never ran.
   day_num=$(date -j -f %Y-%m-%d "$day_date" +%d 2>/dev/null || date -d "$day_date" +%d 2>/dev/null); day_num=${day_num#0}
   TABLE_ROWS="${TABLE_ROWS}| ${DOW_RU[$i]} ${day_num} | | | | | |"$'\n'
 done

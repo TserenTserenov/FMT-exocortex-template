@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # routing: helper  skill=week-close  called-by=sonnet
 # see DP.SC.159, DP.ROLE.059
-# week-draft-append.sh — обновить метрики текущего дня в черновике недельного поста.
+# week-draft-append.sh — update the current day's metrics in the weekly post draft.
 #
-# Собирает за закрываемый день: WakaTime (summaries API, запасной путь —
-# wakatime-cli --today, только если день = сегодня), коммиты (все репо, в
-# границах дня), закрытые РП (из коммитов "close/done WP-NNN").
+# Collects for the day being closed: WakaTime (summaries API, fallback —
+# wakatime-cli --today, only if the day = today), commits (all repos, within
+# the day's bounds), closed WPs (from commits "close/done WP-NNN").
 #
-# Использование:
-#   week-draft-append.sh                       # сегодня, неделя этого дня
-#   week-draft-append.sh --date 2026-10-28     # закрываемый день (Day Close после полуночи)
-#   week-draft-append.sh --week 16             # явная неделя
-#   week-draft-append.sh --dry-run             # показать, но не писать
+# Usage:
+#   week-draft-append.sh                       # today, the week of this day
+#   week-draft-append.sh --date 2026-10-28     # the day being closed (Day Close after midnight)
+#   week-draft-append.sh --week 16             # explicit week
+#   week-draft-append.sh --dry-run             # show, but do not write
 #
-# Параметры (params.yaml):
-#   knowledge_repo: <path относительно WORKSPACE_DIR>  # путь к knowledge-index репо
-# Если не задан — скрипт пропускается с подсказкой.
+# Parameters (params.yaml):
+#   knowledge_repo: <path relative to WORKSPACE_DIR>  # path to the knowledge-index repo
+# If not set — the script is skipped with a hint.
 
 set -euo pipefail
 
@@ -139,9 +139,9 @@ else
   echo "ℹ️ WakaTime: нет значения за ${DAY_ISO} (${WAKA_SECONDS})" >&2
 fi
 
-# iwe_repo_dirs — печатает поддиректории с .git, дедуплицированные по реальному
-# физическому пути (repo-symlink алиас иначе считается отдельным репозиторием
-# наравне с оригиналом — завышенный счётчик коммитов, найдено 2026-07-17).
+# iwe_repo_dirs — prints subdirectories with .git, deduplicated by real
+# physical path (a repo-symlink alias would otherwise be counted as a separate repository
+# on a par with the original — an inflated commit count, found 2026-07-17).
 iwe_repo_dirs() {
   local repo real seen=""
   for repo in "$@"; do
@@ -169,7 +169,7 @@ while IFS= read -r repo; do
   WPS_CLOSED=$((WPS_CLOSED + count))
 done < <(iwe_repo_dirs "$WORKSPACE"/*/)
 
-# Поля «Бюджет закрыт» и «Прогресс месяца» — для ручного заполнения
+# The fields "Бюджет закрыт" and "Прогресс месяца" are for manual filling
 BUDGET="—"
 PROGRESS="—"
 

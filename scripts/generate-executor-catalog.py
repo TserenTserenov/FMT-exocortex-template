@@ -30,9 +30,9 @@ from typing import Optional
 
 import yaml
 
-# issue #222: таксономия де-факто — нормативного источника в docs/ нет,
-# список описывает реально используемые режимы исполнения скиллов.
-# agent = прогон как subagent; script+judgment = скрипт с LLM-слоем суждения.
+# issue #222: a de-facto taxonomy -- there is no normative source in docs/,
+# the list describes the skill execution modes actually in use.
+# agent = run as a subagent; script+judgment = a script with an LLM judgment layer.
 # issue #894: every executor value belongs to one of three classes — "script"
 # (no model call at run time), "model" (a model does the work) and
 # "script+model" (code does the formal part, a model the judgment). Skills keep

@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # routing: guard  deterministic=true
-# validate-staged-artifacts.sh — корректностная граница pre-commit для
-# протокольных артефактов governance-репо (issue #544).
+# validate-staged-artifacts.sh — the correctness boundary of pre-commit for
+# protocol artifacts of the governance repo (issue #544).
 #
-# PreToolUse-хук protocol-artifact-validate.sh — ранний слой быстрой обратной
-# связи, но он читает индекс ДО выполнения команды, поэтому на слитной форме
-# `git add … && git commit` молчит. Этот скрипт вызывается НАСТОЯЩИМ git-хуком
-# pre-commit — он видит индекс после любой формы add (маски, -A/-u, слитные
-# команды) и читает staged blob (`git show :path`), а не рабочее дерево:
-# при частичном стейджинге проверяется именно то содержимое, что попадёт в
-# коммит. Проверяются ВСЕ staged-артефакты каждого типа, не один
-# лексикографически последний.
+# The PreToolUse hook protocol-artifact-validate.sh is an early fast-feedback
+# layer, but it reads the index BEFORE the command runs, so on the chained form
+# `git add … && git commit` it stays silent. This script is called by a REAL git
+# pre-commit hook — it sees the index after any form of add (globs, -A/-u, chained
+# commands) and reads the staged blob (`git show :path`), not the working tree:
+# with partial staging exactly the content that will go into the
+# commit is checked. ALL staged artifacts of each type are checked, not just the one
+# lexicographically last.
 #
-# Запуск: из .githooks/pre-commit governance-репо (cwd = корень репо).
-# Весь вывод — в stderr: stdout git-хука не гарантированно виден пользователю.
-# Exit 0 — коммит разрешён; exit 1 — блок с человекочитаемым разбором.
+# Run: from .githooks/pre-commit of the governance repo (cwd = repo root).
+# All output goes to stderr: a git hook's stdout is not guaranteed to be visible to the user.
+# Exit 0 — commit allowed; exit 1 — block with a human-readable breakdown.
 set -uo pipefail
 
 TMPDIR_OWN=$(mktemp -d "${TMPDIR:-/tmp}/staged-artifacts.XXXXXX")
@@ -45,7 +45,7 @@ resolve_find_python3() {
 
 err() { ERRORS+=("$1"); }
 
-# staged_to_tmp <path> — staged blob во временный файл; печатает путь.
+# staged_to_tmp <path> — staged blob to a temp file; prints the path.
 staged_to_tmp() {
     local p="$1" tmp
     tmp=$(mktemp "$TMPDIR_OWN/blob.XXXXXX")
@@ -93,18 +93,18 @@ validate_dayplan() { # <staged-path> <tmpfile>
         err "DayPlan $rel: мультипликатор не найден — нужен '~N.Nx' в строке бюджета или явная оговорка «мультипликатор не считаю»"
     fi
 
-    # Mandatory check — только если сконфигурирован. Конфиг существует, но
-    # не читается (битый YAML) ИЛИ python3 не резолвится — оба одинаково
-    # fail-closed (issue #765): обязательная граница не вправе молча
-    # пропустить проверку из-за инфраструктурной ошибки, резолвер python3
-    # не более надёжен, чем сам YAML.
+    # Mandatory check — only if configured. The config exists but
+    # is unreadable (broken YAML) OR python3 does not resolve — both equally
+    # fail-closed (issue #765): a mandatory boundary has no right to silently
+    # skip the check because of an infrastructure error, the python3 resolver
+    # is no more reliable than the YAML itself.
     local config="$WORKSPACE/memory/day-rhythm-config.yaml"
-    # issue #773 — я предложил свой резолвер, но пока эта сессия шла,
-    # тот же баг независимо закрыла параллельная сессия как issue #764/#765
-    # (PR #769): resolve_find_python3() ниже — уже смёрженная версия,
-    # дополнительно делает mandatory-проверку fail-closed (не WARN-skip,
-    # как предлагал я). Беру их версию, не держу дублирующую реализацию
-    # одного и того же факта (OwnerIntegrity) — см. issue-комментарий #773.
+    # issue #773 — I proposed my own resolver, but while this session was running
+    # the same bug was independently closed by a parallel session as issue #764/#765
+    # (PR #769): resolve_find_python3() below is the already merged version,
+    # it additionally makes the mandatory check fail-closed (not a WARN-skip,
+    # as I proposed). I take their version, I do not keep a duplicate implementation
+    # of the same fact (OwnerIntegrity) — see the issue comment #773.
     local py="" py_resolver=""
     py_resolver=$(resolve_find_python3) || py_resolver=""
     if [ -n "$py_resolver" ]; then
@@ -114,9 +114,9 @@ validate_dayplan() { # <staged-path> <tmpfile>
         if [ -z "$py" ]; then
             err "DayPlan $rel: day-rhythm-config.yaml есть, но python3 не резолвится (find-python3.sh не найден или не вернул интерпретатор) — mandatory-проверка невозможна, fail-closed"
         else
-            # Коды: 0 = mandatory сконфигурирован; 1 = валидный конфиг (map)
-            # без mandatory; 2 = любая ошибка (нет PyYAML, битый YAML, корень
-            # не map, включая пустой файл/null) — fail-closed (ревью #544).
+            # Codes: 0 = mandatory configured; 1 = valid config (map)
+            # without mandatory; 2 = any error (no PyYAML, broken YAML, root
+            # not a map, including an empty file/null) — fail-closed (review #544).
             local py_rc=0
             "$py" -c "
 import sys
@@ -134,12 +134,12 @@ sys.exit(0 if d.get('mandatory_daily_wps') else 1)
                     grep -qi "mandatory" "$f" || err "DayPlan $rel: mandatory check не найден (mandatory_daily_wps сконфигурирован)"
                     ;;
                 1)
-                    : # валидный конфиг без mandatory — проверка не требуется
+                    : # valid config without mandatory — the check is not required
                     ;;
                 *)
-                    # 2 — ошибки чтения/схемы; прочие коды (126/127/сигнал) —
-                    # тоже fail-closed: неизвестный исход проверки ≠ «не
-                    # сконфигурирован».
+                    # 2 — read/schema errors; other codes (126/127/signal) —
+                    # also fail-closed: an unknown outcome of the check ≠ "not
+                    # configured".
                     err "DayPlan $rel: day-rhythm-config.yaml существует, но не читается (нет PyYAML / битый или пустой YAML / корень не map / интерпретатор упал rc=$py_rc) — mandatory-проверка невозможна, fail-closed"
                     ;;
             esac
@@ -150,8 +150,8 @@ sys.exit(0 if d.get('mandatory_daily_wps') else 1)
         err "DayPlan $rel: бюджет дня не в формате '~Xч РП / ~Yч физ'"
     fi
 
-    # Carry-over: предыдущий DayPlan ищется на диске (другие файлы — не часть
-    # индекса, это нормально), сам артефакт проверен из staged blob выше.
+    # Carry-over: the previous DayPlan is looked up on disk (other files are not part of
+    # the index, that is normal), the artifact itself was checked from the staged blob above.
     local prev
     prev=$(ls "$GOV_ROOT"/current/DayPlan\ *.md 2>/dev/null | sort | tail -2 | head -1)
     if [ -n "$prev" ] && [ "$prev" != "$GOV_ROOT/$rel" ]; then
@@ -175,12 +175,12 @@ validate_weekreport() { # <staged-path> <tmpfile>
     grep -q "Итоги" "$f" || err "WeekReport $rel: нет секции «Итоги»"
 }
 
-# Обход ВСЕХ staged-артефактов каждого типа (а не одного sort|tail -1):
-# коммит с двумя WeekPlan не должен прятать невалидный за валидным.
-# -z + --diff-filter=ACMRT: имена с пробелами/юникодом не ломают разбор;
-# удалённые файлы не проверяются (проверять нечего), type-change (файл стал
-# симлинком) — проверяется. Перечисление индекса — fail-closed: не смогли
-# прочитать индекс → блок, а не молчаливый пропуск (ревью #544, раунд 2).
+# Walk ALL staged artifacts of each type (not a single sort|tail -1):
+# a commit with two WeekPlans must not hide an invalid one behind a valid one.
+# -z + --diff-filter=ACMRT: names with spaces/unicode do not break parsing;
+# deleted files are not checked (nothing to check), type-change (a file became
+# a symlink) — is checked. Index enumeration is fail-closed: could not
+# read the index → block, not a silent skip (review #544, round 2).
 STAGED_FILE="$TMPDIR_OWN/staged.list"
 if ! git diff --cached --name-only -z --diff-filter=ACMRT > "$STAGED_FILE" 2>"$TMPDIR_OWN/staged.err"; then
     echo "⛔ Не удалось перечислить индекс (git diff --cached) — коммит заблокирован (fail-closed):" >&2

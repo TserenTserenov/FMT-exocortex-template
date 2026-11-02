@@ -1,29 +1,29 @@
-# Runtime Overlay Registry — архитектура F (Generated runtime, WP-273 Этап 2)
+# Runtime Overlay Registry — architecture F (Generated runtime, WP-273 Stage 2)
 #
-# Source-of-truth: настоящий файл в FMT-exocortex-template (immutable).
-# Output: $WORKSPACE_DIR/.iwe-runtime/ — пересоздаётся build-runtime.sh idempotent'но.
+# Source-of-truth: this file in FMT-exocortex-template (immutable).
+# Output: $WORKSPACE_DIR/.iwe-runtime/ — recreated idempotently by build-runtime.sh.
 #
-# КОНТРАКТ:
-#   1. FMT остаётся clean upstream (git pull-able, никаких substituted значений).
-#   2. .exocortex.env = единственный source пользовательских значений.
-#   3. .iwe-runtime/ regenerable: удалили → setup.sh / update.sh / build-runtime.sh
-#      воссоздадут identical, без потери данных.
+# CONTRACT:
+#   1. FMT stays a clean upstream (git pull-able, no substituted values).
+#   2. .exocortex.env = the only source of user values.
+#   3. .iwe-runtime/ is regenerable: if deleted → setup.sh / update.sh / build-runtime.sh
+#      will recreate it identical, without data loss.
 #
-# Когда добавлять файл сюда:
-#   - В файле есть хотя бы один {{PLACEHOLDER}} ИЛИ
-#   - Файл должен жить в $WORKSPACE_DIR/, а не в FMT (BUG-1 class).
+# When to add a file here:
+#   - The file has at least one {{PLACEHOLDER}} OR
+#   - The file must live in $WORKSPACE_DIR/, not in FMT (BUG-1 class).
 #
-# Когда НЕ добавлять:
-#   - Read-only код (skills, hooks, lib, scripts/*.sh без плейсхолдеров) — читается из FMT
-#     через $IWE_TEMPLATE / $IWE_SCRIPTS.
-#   - Документация (README.md, *.md в docs/, prompts/) — read-only из FMT.
+# When NOT to add:
+#   - Read-only code (skills, hooks, lib, scripts/*.sh without placeholders) — read from FMT
+#     via $IWE_TEMPLATE / $IWE_SCRIPTS.
+#   - Documentation (README.md, *.md in docs/, prompts/) — read-only from FMT.
 
 version: 1
 
-# === SUBSTITUTED: FMT → .iwe-runtime/<path> с подстановкой плейсхолдеров ===
-# Запускаемые файлы и launchd-плисты, которым нужны абсолютные пути.
+# === SUBSTITUTED: FMT → .iwe-runtime/<path> with placeholder substitution ===
+# Runnable files and launchd plists that need absolute paths.
 substituted:
-  # Strategist (стратегические сессии, планирование)
+  # Strategist (strategic sessions, planning)
   - roles/strategist/scripts/launchd/com.strategist.morning.plist
   - roles/strategist/scripts/launchd/com.strategist.weekreview.plist
   # Migration source for an existing note-review job; never installed by default.
@@ -35,7 +35,7 @@ substituted:
   - roles/strategist/scripts/systemd/iwe-strategist-weekreview.timer
   - roles/strategist/scripts/strategist.sh
 
-  # Extractor (извлечение знаний)
+  # Extractor (knowledge extraction)
   - roles/extractor/scripts/launchd/com.extractor.inbox-check.plist
   - roles/extractor/scripts/systemd/iwe-extractor-inbox-check.service
   - roles/extractor/scripts/systemd/iwe-extractor-inbox-check.timer
@@ -44,7 +44,7 @@ substituted:
   - roles/extractor/scripts/wp429-extractor-prefilters.py
   - roles/extractor/config/routing.md
 
-  # Synchronizer (фоновая синхронизация, scheduler)
+  # Synchronizer (background synchronization, scheduler)
   - roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist
   - roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.service
   - roles/synchronizer/scripts/systemd/iwe-exocortex-scheduler.timer
@@ -59,26 +59,26 @@ substituted:
   - roles/synchronizer/scripts/templates/capabilities.sh
   - roles/synchronizer/config.yaml
 
-# === COPIED_TO_WORKSPACE: FMT → $WORKSPACE_DIR/<path> (без substitution) ===
-# Файлы, которые скрипты ищут в $WORKSPACE_DIR/ (BUG-1 fix). Без substitution
-# просто копируются. При update.sh — пересопируются если изменились в FMT,
-# КРОМЕ файлов из is_protected_user_file() (build-runtime.sh) — те сеются
-# только при отсутствии, существующая пользовательская копия не трогается
-# (issue #327: params.yaml затирался при каждом update.sh).
+# === COPIED_TO_WORKSPACE: FMT → $WORKSPACE_DIR/<path> (without substitution) ===
+# Files that scripts look for in $WORKSPACE_DIR/ (BUG-1 fix). Without substitution
+# they are simply copied. On update.sh — re-copied if changed in FMT,
+# EXCEPT files from is_protected_user_file() (build-runtime.sh) — those are seeded
+# only when absent, an existing user copy is not touched
+# (issue #327: params.yaml was overwritten on every update.sh).
 copied_to_workspace:
   - .claude/sync-manifest.yaml
   - params.yaml
 
-# === COPIED_SUBSTITUTED: FMT → $WORKSPACE_DIR/<path> с substitution ===
-# Файлы, которые должны быть в $WORKSPACE_DIR/ С подставленными плейсхолдерами.
-# CLAUDE.md имеет особую логику (3-way merge), не идёт через build-runtime.
+# === COPIED_SUBSTITUTED: FMT → $WORKSPACE_DIR/<path> with substitution ===
+# Files that must be in $WORKSPACE_DIR/ WITH placeholders substituted.
+# CLAUDE.md has special logic (3-way merge), does not go through build-runtime.
 copied_substituted:
-  # CLAUDE.md обрабатывается отдельно через 3-way merge в setup.sh / update.sh,
-  # НЕ через build-runtime.sh. Сохранение USER-SPACE / merge-conflicts критично.
+  # CLAUDE.md is handled separately via 3-way merge in setup.sh / update.sh,
+  # NOT through build-runtime.sh. Preserving USER-SPACE / merge-conflicts is critical.
 
-# === PLACEHOLDERS: ключи, читаемые из .exocortex.env ===
-# Все значения берутся из $WORKSPACE_DIR/.exocortex.env (после WP-273 Ф19,
-# раньше — из $TEMPLATE_DIR/.exocortex.env, миграция при первом build).
+# === PLACEHOLDERS: keys read from .exocortex.env ===
+# All values are taken from $WORKSPACE_DIR/.exocortex.env (after WP-273 Phase 19,
+# previously — from $TEMPLATE_DIR/.exocortex.env, migration on the first build).
 placeholders:
   - HOME_DIR
   - USER_NAME
@@ -91,24 +91,24 @@ placeholders:
   - GOVERNANCE_REPO   # launchd env var is named IWE_GOVERNANCE_REPO — same
                       # value, deliberately different key name, not a separate
                       # placeholder (peer-session 2026-09-08-32)
-  - IWE_TEMPLATE      # путь к FMT (read-only upstream)
-  - IWE_RUNTIME       # путь к $WORKSPACE_DIR/.iwe-runtime/ (writable substituted)
+  - IWE_TEMPLATE      # path to FMT (read-only upstream)
+  - IWE_RUNTIME       # path to $WORKSPACE_DIR/.iwe-runtime/ (writable substituted)
   - IWE_SCRIPTS       # $IWE_TEMPLATE/scripts — shared scripts read-only from FMT
                       # (peer-session 2026-09-08-32: missing here meant no
                       # generated plist could ever carry it, so the launchd
                       # jobs silently ran without it — issue found via Evgenii)
 
-# === Runtime layout (что появляется в $WORKSPACE_DIR/ после build-runtime.sh) ===
+# === Runtime layout (what appears in $WORKSPACE_DIR/ after build-runtime.sh) ===
 #
 # $WORKSPACE_DIR/
 #   ├── .exocortex.env                            ← user state (writable)
 #   ├── .iwe-runtime/                             ← derived (regenerable)
-#   │   ├── .build-hash                           ← stamp для drift detection
+#   │   ├── .build-hash                           ← stamp for drift detection
 #   │   ├── .build-version                        ← FMT version + overlay version
 #   │   ├── roles/strategist/scripts/...
 #   │   ├── roles/extractor/scripts/...
 #   │   └── roles/synchronizer/...
-#   ├── .claude/sync-manifest.yaml                ← copied (не substituted)
-#   ├── params.yaml                               ← copied (не substituted)
-#   ├── CLAUDE.md                                 ← 3-way merge (отдельная логика)
-#   └── ... (governance repos, личные репо)
+#   ├── .claude/sync-manifest.yaml                ← copied (not substituted)
+#   ├── params.yaml                               ← copied (not substituted)
+#   ├── CLAUDE.md                                 ← 3-way merge (separate logic)
+#   └── ... (governance repos, personal repos)

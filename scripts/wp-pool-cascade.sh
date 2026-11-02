@@ -1,25 +1,25 @@
 #!/bin/bash
-# wp-pool-cascade.sh — каскад бинарных фильтров предодобренного пула (WP-503 Ф8)
+# wp-pool-cascade.sh — cascade of binary filters of the pre-approved pool (WP-503 Phase 8)
 #
-# Отбирает из портфеля РП кандидатов на автономный headless-запуск конвейером.
-# Реализует физическую точку гейта из AR.001 §«Headless-конвейер и предодобренный
-# пул» (WP-503 Ф7): headless-конвейер не может взять РП в работу без pool: true.
+# Selects from the WP portfolio candidates for an autonomous headless run by the pipeline.
+# Implements the physical gate point from AR.001 §"Headless pipeline and the pre-approved
+# pool" (WP-503 Phase 7): the headless pipeline cannot take a WP into work without pool: true.
 #
-# Фильтры по порядку (бинарные, без LLM — сама классификация pool/verification_class
-# уже машиночитаема через wp-list.py):
-#   1. pool == true                                  (AR.001, явное действие пилота)
-#   2. status not in {blocked, pending-pilot-decision} (не блокер — иначе в очередь Секретаря)
-#   3. verification_class in {trivial, closed-loop}  (open-loop/problem-framing — не автономно, HD #32)
+# Filters in order (binary, no LLM — the pool/verification_class classification itself
+# is already machine-readable via wp-list.py):
+#   1. pool == true                                  (AR.001, explicit pilot action)
+#   2. status not in {blocked, pending-pilot-decision} (not a blocker — otherwise to the Secretary's queue)
+#   3. verification_class in {trivial, closed-loop}  (open-loop/problem-framing — not autonomous, HD #32)
 #
-# Tie-break: НАСТОЯЩИЙ tie-break — /bottleneck-pick (LLM-скилл, DP.ROLE.054),
-# физически не может быть вызван из bash-скрипта без LLM-сессии. Временный
-# дефолт-порядок ниже (priority, затем created) — честный placeholder до Ф9,
-# где headless-агент со своей LLM-сессией сможет вызвать /bottleneck-pick.
-# Это открытый пункт, не готовое решение — см. WP-503 карточка Ф8.
+# Tie-break: the REAL tie-break is /bottleneck-pick (an LLM skill, DP.ROLE.054),
+# which physically cannot be called from a bash script without an LLM session. The temporary
+# default order below (priority, then created) is an honest placeholder until Phase 9,
+# where a headless agent with its own LLM session will be able to call /bottleneck-pick.
+# This is an open item, not a finished solution — see the WP-503 card Phase 8.
 #
 # Usage: wp-pool-cascade.sh [--dry-run] [--probe [--date YYYY-MM-DD]]
-# --probe: тот же паттерн, что wp-sync-bundle-batch.sh/wp-secretary-queue.sh —
-# IWE_LEDGER_DIR уводится в изолированный temp, TG подавлен, heartbeat не в боевой файл.
+# --probe: the same pattern as wp-sync-bundle-batch.sh/wp-secretary-queue.sh —
+# IWE_LEDGER_DIR is redirected to an isolated temp, TG is suppressed, the heartbeat does not go to the live file.
 set -euo pipefail
 
 IWE_WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
@@ -132,8 +132,8 @@ WP_LIST_OUT=$(python3 "$WP_LIST_SCRIPT" --list-cards --governance-repo "$GOV_REP
   --iwe-root "$WP_PIPELINE_CARDS_ROOT" \
   --format json --fields wp,status,pool,verification_class,priority,created 2>/dev/null)
 
-# Три бинарных фильтра в один проход — сортировка (priority затем created) как
-# временный tie-break, см. комментарий вверху файла про /bottleneck-pick.
+# Three binary filters in one pass — sorting (priority then created) as
+# a temporary tie-break, see the comment at the top of the file about /bottleneck-pick.
 CANDIDATES=$(echo "$WP_LIST_OUT" | python3 -c "
 import json, sys
 
@@ -156,9 +156,9 @@ for c in candidates:
     print(json.dumps(c))
 ")
 
-# Сколько карточек вообще имеют pool:true — нужно только для heartbeat-сообщения
-# (COUNT показывает выживших после ВСЕХ фильтров, разница = сколько отсеяно
-# status/verification_class фильтрами, не только pool-фильтром).
+# How many cards have pool:true at all — needed only for the heartbeat message
+# (COUNT shows the survivors after ALL filters, the difference = how many were filtered out by
+# the status/verification_class filters, not only by the pool filter).
 POOL_TRUE_COUNT=$(echo "$WP_LIST_OUT" | python3 -c "
 import json, sys
 cards = json.load(sys.stdin)
@@ -167,12 +167,12 @@ print(sum(1 for c in cards if c.get('pool') == 'true'))
 
 touch "$HEARTBEAT_FILE" 2>/dev/null || true
 
-# Heartbeat (2026-08-05, WP-503 находка пир-сессии с Codex): «0 кандидатов»
-# и «конвейер не запустился вовсе» выглядели для пилота неразличимо — оба
-# молчание. tg_fail (ERR trap выше) уже покрывает падение с ненулевым exit;
-# этот сигнал закрывает случай «отработал штатно, просто нечего исполнять».
-# PROBE/DRY_RUN подавляют реальную отправку тем же принципом, что и остальные
-# TG-вызовы в этом файле.
+# Heartbeat (2026-08-05, WP-503 finding of the peer session with Codex): "0 candidates"
+# and "the pipeline did not start at all" looked indistinguishable to the pilot — both
+# silence. tg_fail (the ERR trap above) already covers a failure with a nonzero exit;
+# this signal covers the case "ran normally, just nothing to execute".
+# PROBE/DRY_RUN suppress the real sending by the same principle as the other
+# TG calls in this file.
 send_pool_heartbeat() {
   local count="$1" pool_true="$2"
   local filtered=$(( pool_true - count ))

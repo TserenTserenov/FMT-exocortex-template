@@ -16,7 +16,7 @@
 #   - every dirty TRACKED file byte-identical to origin/<branch>  → stale mirror, safe to
 #     `git reset --hard origin/<branch>` (untracked files are never touched — reset --hard
 #     doesn't remove them, and they're exactly the shape of real new work found live on
-#     2026-07-18/19: WP-406 Ф22, WP-455 Ф11, WP-493 Ф7, none yet on origin).
+#     2026-07-18/19: WP-406 Phase 22, WP-455 Phase 11, WP-493 Phase 7, none yet on origin).
 #   - any dirty tracked file DIFFERS from origin/<branch>          → real uncommitted work,
 #     never touched automatically — loud Telegram alert instead, caller must skip pull
 #     this round rather than attempt a doomed rebase.

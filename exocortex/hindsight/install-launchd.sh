@@ -42,7 +42,7 @@ else
     esac
 fi
 
-# WP-5 Ubuntu-audit факт #4: this used to write a macOS plist unconditionally
+# WP-5 Ubuntu-audit fact #4: this used to write a macOS plist unconditionally
 # on any OS, then `launchctl load ... || true` swallowed the "command not
 # found" (launchctl doesn't exist on Linux) and printed "Installed" anyway —
 # a false success with no autostart actually configured.

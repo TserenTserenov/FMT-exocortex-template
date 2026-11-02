@@ -50,7 +50,7 @@ def main() -> int:
         rb"(mongodb|postgres|mysql|redis)(\+srv)?://[^:]+:[^@/\s]+@",
         rb"https?://[^:/\s]+:[^@/\s]+@",  # Basic Auth URL
         rb"M[A-Za-z0-9_-]{23}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}",  # Discord
-        rb"(^|[^0-9-])[0-9]{3}-[0-9]{3}-[0-9]{3}\s[0-9]{2}([^0-9]|$)",  # СНИЛС (с boundary)
+        rb"(^|[^0-9-])[0-9]{3}-[0-9]{3}-[0-9]{3}\s[0-9]{2}([^0-9]|$)",  # SNILS (Russian insurance number, with boundary)
     ]
     high_content_re = [re.compile(p) for p in high_content]
 
@@ -113,7 +113,7 @@ def main() -> int:
 
     pii_count_medium = 0
 
-    MAX_CONTENT_SCAN = 10 * 1024 * 1024  # 10MB (vs prev 1MB — снижает padding-bypass)
+    MAX_CONTENT_SCAN = 10 * 1024 * 1024  # 10MB (vs prev 1MB — reduces padding-bypass)
 
     for root, _dirs, files in os.walk(src, followlinks=False):
         rel_root = os.path.relpath(root, src)
@@ -128,7 +128,7 @@ def main() -> int:
                 print(f"SKIP: path traversal in rel_path: {rel_path}", file=sys.stderr)
                 continue
 
-            # 0a) Symlink guard (Critical fix — не следуем за symlink-файлами)
+            # 0a) Symlink guard (Critical fix — do not follow symlinked files)
             if os.path.islink(full_path):
                 print(f"SKIP: symlink: {rel_path}", file=sys.stderr)
                 continue
@@ -137,7 +137,7 @@ def main() -> int:
             if is_ignored(rel_path):
                 continue
 
-            # 2) Filename PII check (HARD BLOCK) — re.search (не match — basename anywhere)
+            # 2) Filename PII check (HARD BLOCK) — re.search (not match — basename anywhere)
             for rx in high_filename_re:
                 if rx.search(f):
                     print(
@@ -146,11 +146,11 @@ def main() -> int:
                     )
                     return 3
 
-            # 3) Content PII check (HARD BLOCK) — текстовые файлы, до 10MB
+            # 3) Content PII check (HARD BLOCK) — text files, up to 10MB
             try:
                 file_size = os.path.getsize(full_path)
                 if file_size > MAX_CONTENT_SCAN:
-                    # Файл >10MB и не binary-extension (binaries уже в .agentigore) → reject
+                    # File >10MB and not a binary extension (binaries are already in .agentigore) -> reject
                     print(
                         f"ABORT: file >{MAX_CONTENT_SCAN // (1024*1024)}MB unscannable: {rel_path}",
                         file=sys.stderr,
@@ -165,15 +165,15 @@ def main() -> int:
                             file=sys.stderr,
                         )
                         return 3
-                # Medium: IP с пост-фильтром приватных
+                # Medium: IP with a post-filter for private ranges
                 for m in ip_pattern.finditer(content):
                     ip = m.group(2)
                     if not private_ip.match(ip):
                         pii_count_medium += 1
             except (OSError, IOError):
-                pass  # бинарник / unreadable — filename уже проверен
+                pass  # binary / unreadable — filename already checked
 
-            # 4) Copy clean file (с safety check: realpath внутри dst)
+            # 4) Copy clean file (with safety check: realpath inside dst)
             dst_path = os.path.join(dst, rel_path)
             if not os.path.realpath(dst_path).startswith(os.path.realpath(dst) + os.sep):
                 print(f"SKIP: dst escape attempt: {rel_path}", file=sys.stderr)

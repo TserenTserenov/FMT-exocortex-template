@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# route-task.sh — Маршрутизатор задач IWE (DP.ROLE.059)
+# route-task.sh — IWE task router (DP.ROLE.059)
 # routing: executor=script  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 #
-# Получает routing-tag из WP Gate или Артефактора → lookup в executor-catalog.yaml →
-# запускает нужный исполнитель (script | haiku | sonnet | opus | mcp-direct | agent | script+judgment).
+# Receives a routing-tag from WP Gate or Artifactor → lookup in executor-catalog.yaml →
+# launches the needed executor (script | haiku | sonnet | opus | mcp-direct | agent | script+judgment).
 #
 # Usage:
 #   route-task.sh --skill <skill-name> [--args "..."]   # strict: no fallback
 #   route-task.sh --tag  <routing-tag>  [--args "..."]   # flex: fallback to Sonnet on miss
-#   route-task.sh --list                                 # показать каталог
-#   route-task.sh --validate                             # проверить каталог
+#   route-task.sh --list                                 # show the catalog
+#   route-task.sh --validate                             # validate the catalog
 #   route-task.sh --json                                 # machine-readable JSON output
 #
 # Exit: 0=OK, 1=error, 2=script_path not found, 3=unknown skill, 4=unsupported executor
@@ -286,20 +286,20 @@ run_script() {
     fi
     local script_exit=0
     if [[ -n "$args" ]]; then
-        # issue #679: `read -r -a` splits только по IFS — не понимает кавычки
-        # внутри $args, поэтому `--fault "текст с пробелами"` рассыпался на 4
-        # элемента массива вместо 2. Первая попытка фикса (`eval`) отклонена
-        # на ревью: исполняет ЛЮБОЙ shell-синтаксис в $args ($(...), `` ` ``,
-        # ;, &&), а $args может прийти из agent-fault SKILL.md, где --fault —
-        # свободный текст описания косяка агента, не фиксированный литерал.
-        # Вторая попытка (shlex.split + newline-delimited + mapfile) тоже
-        # отклонена: mapfile — bash4+, системный /bin/bash на macOS без
-        # Homebrew — 3.2; и newline-разделитель ломает токен с буквальным
-        # переносом строки внутри (многоабзацное --fault-описание).
-        # NUL — единственный байт, которого не бывает ни в одном bash-токене
-        # и который shlex-токен тоже не может содержать, поэтому безопасен
-        # как разделитель; временный файл (не $()) — NUL не переживает
-        # command substitution. `while read -d ''` — bash3.2-совместимо.
+        # issue #679: `read -r -a` splits only by IFS — it does not understand quotes
+        # inside $args, so `--fault "text with spaces"` fell apart into 4
+        # array elements instead of 2. The first fix attempt (`eval`) was rejected
+        # in review: it executes ANY shell syntax in $args ($(...), `` ` ``,
+        # ;, &&), and $args may come from agent-fault SKILL.md, where --fault is
+        # free text describing the agent's fault, not a fixed literal.
+        # The second attempt (shlex.split + newline-delimited + mapfile) was also
+        # rejected: mapfile is bash4+, the system /bin/bash on macOS without
+        # Homebrew is 3.2; and a newline delimiter breaks a token with a literal
+        # line break inside (a multi-paragraph --fault description).
+        # NUL is the only byte that occurs in no bash token
+        # and that a shlex token cannot contain either, so it is safe
+        # as a delimiter; a temp file (not $()) — NUL does not survive
+        # command substitution. `while read -d ''` is bash3.2-compatible.
         local ARGS_ARRAY=() shlex_tmp shlex_err
         shlex_tmp=$(mktemp "${TMPDIR:-/tmp}/route-task-args.XXXXXX") || die "mktemp failed"
         if ! shlex_err=$("$RESOLVED_PYTHON3" -c '
@@ -426,11 +426,11 @@ dispatch_skill() {
     deterministic=$(echo "$lookup_result" | grep "^deterministic=" | cut -d= -f2- || true)
     routing_path="${routing_path}${executor}"
 
-    # issue #679: deterministic:true в каталоге раньше ничего не решал — LLM-
-    # фоллбек при ненайденном скрипте зависел только от того, каким флагом
-    # вызвали роутер (--skill/--tag), не от контракта самого skill-а. Запись,
-    # обещающая "без LLM", могла тихо получить LLM-подмену, если её позвали
-    # через --tag. Каталог теперь важнее выбора вызывающего.
+    # issue #679: deterministic:true in the catalog used to decide nothing — the LLM
+    # fallback when a script was not found depended only on which flag
+    # the router was called with (--skill/--tag), not on the skill's own contract. An entry
+    # promising "no LLM" could quietly get an LLM substitution if it was called
+    # via --tag. The catalog now takes precedence over the caller's choice.
     if [[ "$deterministic" == "true" ]]; then
         allow_fallback="false"
     fi

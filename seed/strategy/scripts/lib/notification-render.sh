@@ -1,22 +1,22 @@
 #!/bin/bash
 # SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
-# notification-render.sh — перевод машинного статуса публикации в человекочитаемую
-# фразу для Telegram-уведомлений (WP-538).
+# notification-render.sh — translating a machine publication status into a human-readable
+# phrase for Telegram notifications (WP-538).
 #
-# Разговорный стиль (DP.SC.050) обычно применяется LLM-агентом на генерации
-# ответа; у скриптов публикации (ds-publish.sh, ledger-publish.sh) LLM в цепочке
-# нет — этот файл переносит те же правила (без служебных меток, без жаргона,
-# короткая фраза) в bash, для конечного набора канонических статусов.
-# Техническая деталь (exit code, путь, git-вывод) остаётся в stderr/audit-логе
-# у вызывающего скрипта — сюда не передаётся и в Telegram не уходит.
+# The conversational style (DP.SC.050) is usually applied by an LLM agent when generating
+# a reply; the publication scripts (ds-publish.sh, ledger-publish.sh) have no LLM
+# in the chain — this file carries over the same rules (no service labels, no jargon,
+# a short phrase) into bash, for a finite set of canonical statuses.
+# Technical detail (exit code, path, git output) stays in stderr/the audit log
+# of the calling script — it is not passed here and does not go to Telegram.
 #
-# Использование: . "$SCRIPT_DIR/lib/notification-render.sh" && notify_translate <status> <label>
-# status: ok | fail | conflict | manual_action_required | retry — конечный
-#   алфавит; неизвестный статус не считается ошибкой вызова, попадает в
-#   fallback-ветку ниже.
-# label: короткое человеческое название процесса ("публикация журнала событий").
+# Usage: . "$SCRIPT_DIR/lib/notification-render.sh" && notify_translate <status> <label>
+# status: ok | fail | conflict | manual_action_required | retry — a finite
+#   alphabet; an unknown status is not a call error, it falls into the
+#   fallback branch below.
+# label: a short human name of the process ("публикация журнала событий").
 #
-# Архитектура выбрана в пир-сессии с Codex (консенсус, 3 хода, без эскалаций):
+# The architecture was chosen in a peer session with Codex (consensus, 3 turns, no escalations):
 # sessions/2026-08/17/2026-08-17-07-wp538-notification-architecture/report.md
 
 notify_translate() {

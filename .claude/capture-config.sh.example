@@ -1,19 +1,19 @@
 #!/bin/bash
-# capture-config.sh.example — шаблон пользовательской конфигурации capture_writer.sh.
+# capture-config.sh.example — template of the user configuration for capture_writer.sh.
 #
-# Чтобы активировать: скопируйте в `.claude/capture-config.sh` (без `.example`)
-# и адаптируйте под свою структуру репо. Файл вне FMT-обновлений (update.sh не
-# трогает) — это локальный override.
+# To activate: copy to `.claude/capture-config.sh` (without `.example`)
+# and adapt to your repo structure. The file is outside FMT updates (update.sh does not
+# touch it) — it is a local override.
 #
-# Поведение по умолчанию (без файла):
-#   agent_incident → пишется в `<target_repo>/inbox/incident-log-YYYY-MM.md`,
-#   где target_repo определяется детектором (HD «Лог рядом с исполнителем»,
-#   DP.D.049). Это значит инциденты разбросаны по тем репо, где случились.
+# Default behavior (without the file):
+#   agent_incident → written to `<target_repo>/inbox/incident-log-YYYY-MM.md`,
+#   where target_repo is determined by the detector (HD "Log next to the executor",
+#   DP.D.049). This means incidents are scattered across the repos where they happened.
 #
-# Зачем override: если у вас есть отдельный governance-репо для агрегации
-# инцидентов (мониторинг паттернов, ретроспективы), задайте путь — и все
-# agent_incident потекут туда.
+# Why override: if you have a separate governance repo for aggregating
+# incidents (pattern monitoring, retrospectives), set the path — and all
+# agent_incident entries will flow there.
 
-# Пример: агрегация в собственный governance-репо (адаптируйте путь).
+# Example: aggregation into your own governance repo (adapt the path).
 # export INCIDENT_TARGET_REPO="${IWE_ROOT:-$HOME/IWE}/<your-governance-repo>"
 # export INCIDENT_REL_DIR="incidents"

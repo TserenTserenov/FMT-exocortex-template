@@ -1,8 +1,8 @@
 #!/bin/bash
 # capture_writer.sh
-# see DP.SC.025 (capture-bus service clause), DP.ROLE.001#R47 (Детектор)
-# Writer: принимает JSON event из stdin, пишет в целевой репо (файл) + raw_events (если включён).
-# НЕТ fallback — если target_repo не разрешён, событие отклоняется (инвариант OwnerIntegrity).
+# see DP.SC.025 (capture-bus service clause), DP.ROLE.001#R47 (Detector)
+# Writer: accepts a JSON event from stdin, writes to the target repo (file) + raw_events (if enabled).
+# NO fallback — if target_repo is not resolved, the event is rejected (OwnerIntegrity invariant).
 #
 # Input (stdin): JSON
 #   {
@@ -10,12 +10,12 @@
 #     "payload": {...},
 #     "repo_ctx": {"target_repo_hint": "..."}
 #   }
-# Плюс переменные среды (опционально) от dispatcher:
+# Plus environment variables (optional) from the dispatcher:
 #   CAPTURE_CWD, CAPTURE_TOOL_FILE, CAPTURE_SESSION_ID, CAPTURE_DETECTOR_NAME
 #
 # Exit:
-#   0 — записано
-#   1 — отклонено (target_repo_unresolved или другая ошибка)
+#   0 — written
+#   1 — rejected (target_repo_unresolved or another error)
 
 set -euo pipefail
 
@@ -27,9 +27,9 @@ source "$SCRIPT_DIR/../../scripts/lib/common.sh"
 
 LOG_FILE="${CAPTURE_LOG_FILE:-$HOME/IWE/.claude/logs/capture_log.jsonl}"
 
-# Опциональная пользовательская конфигурация: путь и REL_DIR для агрегации
-# инцидентов (если пользователь хочет аккумулировать agent_incident в отдельный
-# governance-репо вместо target_repo детектора). Файл вне git (FMT-default — нет файла).
+# Optional user configuration: path and REL_DIR for aggregating
+# incidents (if the user wants to accumulate agent_incident in a separate
+# governance repo instead of the detector's target_repo). File is outside git (FMT-default — no file).
 CAPTURE_CONFIG="${CAPTURE_CONFIG:-${IWE_ROOT:-$HOME/IWE}/.claude/capture-config.sh}"
 # shellcheck disable=SC1090
 [ -f "$CAPTURE_CONFIG" ] && source "$CAPTURE_CONFIG"
@@ -37,7 +37,7 @@ CAPTURE_CONFIG="${CAPTURE_CONFIG:-${IWE_ROOT:-$HOME/IWE}/.claude/capture-config.
 EVENT=$(cat)
 
 if [ -z "$EVENT" ]; then
-  exit 0  # пустое событие = skip (детектор не обнаружил)
+  exit 0  # empty event = skip (the detector found nothing)
 fi
 
 EVENT_TYPE=$(echo "$EVENT" | jq -r '.event_type // empty')
@@ -53,8 +53,8 @@ HINT=$(echo "$EVENT" | jq -r '.repo_ctx.target_repo_hint // empty')
 FILE_CTX="${CAPTURE_TOOL_FILE:-}"
 CWD_CTX="${CAPTURE_CWD:-$PWD}"
 
-# Override: agent_incident с INCIDENT_TARGET_REPO в capture-config.sh пропускает
-# resolve_target_repo (агрегация в governance-хаб не зависит от исполнителя).
+# Override: agent_incident with INCIDENT_TARGET_REPO in capture-config.sh skips
+# resolve_target_repo (aggregation into the governance hub does not depend on the executor).
 if [ "$EVENT_TYPE" = "agent_incident" ] && [ -n "${INCIDENT_TARGET_REPO:-}" ]; then
   TARGET_REPO="$INCIDENT_TARGET_REPO"
 elif TARGET_REPO=$("$SCRIPT_DIR/resolve_target_repo.sh" --hint="$HINT" --file="$FILE_CTX" --cwd="$CWD_CTX" 2>/tmp/capture_resolve_err); then
@@ -70,14 +70,14 @@ else
   exit 1
 fi
 
-# Routing: event_type → target_path внутри репо
+# Routing: event_type → target_path inside the repo
 YYYY_MM=$(date +%Y-%m)
 case "$EVENT_TYPE" in
   agent_incident)
-    # HD «Лог ≠ Инцидент ≠ State file» (DP.D.049): по умолчанию инцидент пишется
-    # в target_repo детектора (рядом с исполнителем). Override через capture-config.sh:
-    #   INCIDENT_TARGET_REPO — абсолютный путь к governance-репо для агрегации.
-    #   INCIDENT_REL_DIR     — префикс директории внутри репо (default: "inbox").
+    # HD "Log ≠ Incident ≠ State file" (DP.D.049): by default an incident is written
+    # to the detector's target_repo (next to the executor). Override via capture-config.sh:
+    #   INCIDENT_TARGET_REPO — absolute path to the governance repo for aggregation.
+    #   INCIDENT_REL_DIR     — directory prefix inside the repo (default: "inbox").
     if [ -n "${INCIDENT_TARGET_REPO:-}" ]; then
       TARGET_REPO="$INCIDENT_TARGET_REPO"
     fi
@@ -136,9 +136,9 @@ else
   } >> "$TARGET_PATH"
 fi
 
-# raw_events INSERT (WP-109 Ф7b, Ф8.4 DONE → разблокировано)
-# Гейт: CAPTURE_RAW_EVENTS=1 + IWE_DATABASE_URL задан + psql доступен.
-# Graceful degradation: если что-то из этого отсутствует — молча пропускаем.
+# raw_events INSERT (WP-109 Phase 7b, Phase 8.4 DONE → unblocked)
+# Gate: CAPTURE_RAW_EVENTS=1 + IWE_DATABASE_URL set + psql available.
+# Graceful degradation: if any of this is missing — skip silently.
 if [ "${CAPTURE_RAW_EVENTS:-0}" = "1" ]; then
   DB_URL="${IWE_DATABASE_URL:-}"
   if [ -z "$DB_URL" ] && [ -n "${IWE_DB_ENV_FILE:-}" ] && [ -f "$IWE_DB_ENV_FILE" ]; then
@@ -148,7 +148,7 @@ if [ "${CAPTURE_RAW_EVENTS:-0}" = "1" ]; then
   PSQL_BIN=$(which psql 2>/dev/null || true)
 
   if [ -n "$DB_URL" ] && [ -n "$PSQL_BIN" ]; then
-    # external_id: хэш от event_type + session_id + ts (idempotency key).
+    # external_id: hash of event_type + session_id + ts (idempotency key).
     # iwe_md5 (scripts/lib/common.sh) — bare md5sum is GNU-only, no md5/macOS
     # fallback (issue #1108).
     EXT_ID=$(echo "${EVENT_TYPE}:${SESSION_ID:-no-session}:${TS_ISO}" | iwe_md5)

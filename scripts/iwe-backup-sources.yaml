@@ -1,48 +1,48 @@
-# iwe-backup-sources.yaml — дефолты источников бэкапа вне ${HOME}/IWE
+# iwe-backup-sources.yaml — default backup sources outside ${HOME}/IWE
 #
-# WP-7 Ф233а, 2026-10-16 (пир-сессия 2026-10-16-18-iwe-template-backup,
+# WP-7 Phase 233a, 2026-10-16 (peer-session 2026-10-16-18-iwe-template-backup,
 # Claude+Kimi+Codex, round-loop, consensus reached).
 #
-# Проблема: единственный существующий механизм (backup-icloud.sh) покрывает
-# только ${HOME}/IWE. Runtime-каталоги ИИ-агентов (память, история диалогов,
-# конфиги) лежат вне IWE и ничем не защищены — найдено на инциденте потери
-# ~/.claude/logs/style-violations.log без возможности восстановить примеры
-# нарушений.
+# Problem: the only existing mechanism (backup-icloud.sh) covers
+# only ${HOME}/IWE. The AI agents' runtime directories (memory, conversation history,
+# configs) lie outside IWE and are not protected by anything — found in the incident of losing
+# ~/.claude/logs/style-violations.log with no way to restore the examples
+# of violations.
 #
-# Классификация по ВОССТАНОВИМОСТИ, не по расположению (находка пир-сессии:
-# деление "logs=восстановимо" было неверным — конкретный инцидент прямо его
-# опровергает). Три уровня:
+# Classification by RECOVERABILITY, not by location (a peer-session finding:
+# the division "logs=recoverable" was wrong — the specific incident directly
+# refutes it). Three tiers:
 #
-#   tier0_unique       — уникальные данные, нет второй копии где-либо.
-#                         Бэкапить ВСЕГДА, с первой фазы реализации.
-#   tier1_scheduled     — восстановимо с усилием (время/ручная работа), но
-#                         не автоматически. Бэкапить по расписанию.
-#   tier2_optional      — воспроизводимо автоматически (переустановка,
-#                         повторная загрузка) или малоценно. Бэкапить
-#                         опционально, по явному включению пользователем.
+#   tier0_unique       — unique data, no second copy anywhere.
+#                         Back up ALWAYS, from the first implementation phase.
+#   tier1_scheduled     — recoverable with effort (time/manual work), but
+#                         not automatically. Back up on a schedule.
+#   tier2_optional      — reproducible automatically (reinstall,
+#                         re-download) or of low value. Back up
+#                         optionally, when explicitly enabled by the user.
 #
-# Новый, неизвестный скрипту runtime-подкаталог ПО УМОЛЧАНИЮ включается в
-# tier1 с пометкой unknown=true — не исключается молчаливо (решение
-# пир-сессии: "по умолчанию включать и сигнализировать о росте, не
-# молчаливо исключать").
+# A new runtime subdirectory unknown to the script is included in tier1 BY DEFAULT
+# with the mark unknown=true — it is not silently excluded (peer-session
+# decision: "include by default and signal growth, do not
+# silently exclude").
 #
-# Локальный override пользователя: ${HOME}/.iwe-backup-sources.local.yaml —
-# этот файл НЕ трогается обновлением шаблона (update.sh). Значения оттуда
-# дополняют дефолты ниже; запись с тем же (раскрытым) путём заменяет
-# дефолтную — так источник можно, например, пометить optional: true.
-# Формат override — та же схема.
+# User's local override: ${HOME}/.iwe-backup-sources.local.yaml —
+# this file is NOT touched by a template update (update.sh). Values from there
+# supplement the defaults below; an entry with the same (expanded) path replaces
+# the default one — this way a source can, for example, be marked optional: true.
+# Override format — the same schema.
 #
-# optional: true — источник есть только при установленном агенте или
-# выбранном способе хранения; его отсутствие не критично (issue #1351).
-# Рабочее дерево ${WORKSPACE_DIR} обязательно всегда, override это не
-# меняет.
+# optional: true — the source exists only when the agent is installed or
+# the storage method is chosen; its absence is not critical (issue #1351).
+# The working tree ${WORKSPACE_DIR} is always required, override does not
+# change this.
 
 schema_version: 1
 
 tier0_unique:
-  # Рабочее дерево — единственный путь, который ДОЛЖЕН существовать у
-  # любого пользователя шаблона (с учётом нестандартного WORKSPACE_DIR);
-  # остальные — опциональны по факту установки конкретных агентов.
+  # The working tree is the only path that MUST exist for
+  # any template user (accounting for a non-standard WORKSPACE_DIR);
+  # the others are optional depending on whether specific agents are installed.
   - path: "${WORKSPACE_DIR}"
     agent: "core"
     note: "рабочее дерево платформы — git-репозитории включаются ЦЕЛИКОМ, включая .git/ (пир-сессия отозвала исключение .git: непушнутые коммиты/stash/локальные ветки не восстановимы из remote)"
@@ -97,9 +97,9 @@ tier2_optional:
     agent: "core"
     note: "расширения VS Code — восстановимы переустановкой"
 
-# Known-but-excluded — НЕ бэкапим и не предупреждаем об отсутствии (SSH/GPG/
-# Keychain). Отдельный follow-up (Ф233д): собственный защищённый механизм,
-# не общий tar/restic-снэпшот без доп. защиты приватных ключей.
+# Known-but-excluded — NOT backed up and no warning about absence (SSH/GPG/
+# Keychain). A separate follow-up (Phase 233d): its own protected mechanism,
+# not a general tar/restic snapshot without extra protection of private keys.
 known_excluded:
   - path: "${HOME}/.ssh"
     reason: "приватные ключи — отдельный защищённый механизм (Ф233д), не этот конвейер"

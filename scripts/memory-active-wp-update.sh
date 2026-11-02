@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # routing: helper  skill=day-close,week-close  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# memory-active-wp-update.sh — обновление секции «Текущие РП» в MEMORY.md
-# из результатов active-wp-sweep.sh.
-# see WP-283 Ф8 (DS-strategy/inbox/WP-283-server-day-open-crossplatform.md)
+# memory-active-wp-update.sh — update the "Current WPs" section in MEMORY.md
+# from the results of active-wp-sweep.sh.
+# see WP-283 Phase 8 (DS-strategy/inbox/WP-283-server-day-open-crossplatform.md)
 #
-# Использование:
+# Usage:
 #   bash memory-active-wp-update.sh [IWE_ROOT]
 #
-# Ищет маркеры <!-- ACTIVE-WP-START --> и <!-- ACTIVE-WP-END --> в MEMORY.md,
-# заменяет содержимое между ними на свежий sweep-output.
-# Идемпотентно: повторный запуск не меняет файл, если состояние не изменилось.
+# Looks for markers <!-- ACTIVE-WP-START --> and <!-- ACTIVE-WP-END --> in MEMORY.md,
+# replaces the content between them with fresh sweep-output.
+# Idempotent: a repeated run does not change the file if the state has not changed.
 #
-# Совместимость: bash 3.2+ (macOS), bash 4+ (Linux/NixOS)
+# Compatibility: bash 3.2+ (macOS), bash 4+ (Linux/NixOS)
 
 set -uo pipefail
 
@@ -28,7 +28,7 @@ INBOX_DIR="$IWE/$GOV_REPO/inbox"
 START_MARKER="<!-- ACTIVE-WP-START -->"
 END_MARKER="<!-- ACTIVE-WP-END -->"
 
-# --- Проверки ---
+# --- Checks ---
 if [[ ! -f "$MEMORY_FILE" ]]; then
   echo "ERROR: MEMORY.md не найден: $MEMORY_FILE" >&2
   exit 1
@@ -44,21 +44,21 @@ if ! grep -qF "$START_MARKER" "$MEMORY_FILE"; then
   exit 0
 fi
 
-# --- Запустить sweep ---
+# --- Run sweep ---
 SWEEP_OUT=$(bash "$SWEEP_SCRIPT" "$INBOX_DIR" "$IWE" 2>/dev/null) || true
 
 if [[ -z "$SWEEP_OUT" ]]; then
   SWEEP_OUT="<!-- active-wp-sweep: нет активных РП или python3+yaml не найден -->"
 fi
 
-# --- Сформировать новый блок ---
+# --- Build the new block ---
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M" 2>/dev/null || echo "?")
 NEW_BLOCK="${START_MARKER}
 ${SWEEP_OUT}
 > _Обновлено: ${TIMESTAMP} (memory-active-wp-update.sh)_
 ${END_MARKER}"
 
-# --- Проверка идемпотентности: сравнить текущий блок с новым ---
+# --- Idempotency check: compare the current block with the new one ---
 CURRENT_BLOCK=$(awk "/$START_MARKER/{found=1} found{print} /$END_MARKER/{found=0}" "$MEMORY_FILE" 2>/dev/null)
 
 if [[ "$CURRENT_BLOCK" == *"${SWEEP_OUT}"* ]]; then
@@ -66,10 +66,10 @@ if [[ "$CURRENT_BLOCK" == *"${SWEEP_OUT}"* ]]; then
   exit 0
 fi
 
-# --- Заменить блок через Python (безопасная многострочная замена) ---
-# Передаём данные через env-vars с quoted heredoc <<'PYEOF' — bash НЕ раскрывает
-# спецсимволы (`backticks`, $(...), \n, """) внутри NEW_BLOCK. Защита от
-# heredoc-инъекции при странных WP-title (Opus review WP-283 #1).
+# --- Replace the block via Python (safe multi-line replacement) ---
+# Pass data via env-vars with a quoted heredoc <<'PYEOF' — bash does NOT expand
+# special characters (`backticks`, $(...), \n, """) inside NEW_BLOCK. Protects against
+# heredoc injection on odd WP titles (Opus review WP-283 #1).
 export MEMORY_PATH="$MEMORY_FILE"
 export START_MARKER_ENV="$START_MARKER"
 export END_MARKER_ENV="$END_MARKER"

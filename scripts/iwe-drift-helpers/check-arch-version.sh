@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# check-arch-version.sh — детектор рассогласования ARCH-версий и downstream `derived_from:` якорей
-# Owner: WP-217 (механизм sync). Активирован WP-263 (child) после WP-253 Ф1 ArchGate.
-# Принцип: детектор отчитывается, не правит (см. iwe-drift.sh:11).
+# check-arch-version.sh — detector of mismatch between ARCH versions and downstream `derived_from:` anchors
+# Owner: WP-217 (sync mechanism). Activated by WP-263 (child) after WP-253 Phase 1 ArchGate.
+# Principle: the detector reports, does not fix (see iwe-drift.sh:11).
 #
-# Что делает:
-#   1. Сканирует PACK-*/pack/*/02-domain-entities/DP.ARCH.*.md → извлекает (id, version) из frontmatter.
-#   2. Сканирует PACK-*/**/*.md и $IWE_GOVERNANCE_REPO/inbox/*.md → ищет `derived_from:` якоря с DP.ARCH.NNN@vX.Y.
-#   3. Сравнивает: если downstream ссылается на версию, отличную от current → DRIFT.
-#   4. Печатает markdown-отчёт.
+# What it does:
+#   1. Scans PACK-*/pack/*/02-domain-entities/DP.ARCH.*.md → extracts (id, version) from frontmatter.
+#   2. Scans PACK-*/**/*.md and $IWE_GOVERNANCE_REPO/inbox/*.md → looks for `derived_from:` anchors with DP.ARCH.NNN@vX.Y.
+#   3. Compares: if downstream references a version different from current → DRIFT.
+#   4. Prints a markdown report.
 #
 # Usage:
-#   bash check-arch-version.sh                    # полный отчёт
-#   bash check-arch-version.sh --critical-only    # только drift (без OK)
-#   IWE_ROOT=/path bash check-arch-version.sh     # альтернативный корень
+#   bash check-arch-version.sh                    # full report
+#   bash check-arch-version.sh --critical-only    # drift only (without OK)
+#   IWE_ROOT=/path bash check-arch-version.sh     # alternative root
 #
-# Не зависит от iwe-drift.sh — может быть запущен отдельно. Когда iwe-drift.sh научится
-# диспатчить `check: script:...` пары, он будет вызывать этот скрипт автоматически.
+# Does not depend on iwe-drift.sh — can be run separately. When iwe-drift.sh learns to
+# dispatch `check: script:...` pairs, it will call this script automatically.
 
 set -eu
 
@@ -35,8 +35,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Извлечь version из frontmatter ARCH-документа.
-# Возвращает нормализованную версию (v1 → v1.0; v2.3 → v2.3) или "?" если не нашли.
+# Extract version from the frontmatter of an ARCH document.
+# Returns the normalized version (v1 → v1.0; v2.3 → v2.3) or "?" if not found.
 extract_arch_version() {
     local file="$1"
     local v
@@ -53,14 +53,14 @@ extract_arch_version() {
         echo "?"
         return
     fi
-    # Нормализация: v1 → v1.0, оставить v2.3 как есть
+    # Normalization: v1 → v1.0, leave v2.3 as is
     case "$v" in
         v[0-9]) echo "${v}.0" ;;
         *) echo "$v" ;;
     esac
 }
 
-# Извлечь id из frontmatter
+# Extract id from frontmatter
 extract_arch_id() {
     local file="$1"
     awk '
@@ -74,7 +74,7 @@ extract_arch_id() {
     ' "$file"
 }
 
-# Нормализовать версию из downstream-якоря (@v1 → v1.0)
+# Normalize the version from a downstream anchor (@v1 → v1.0)
 normalize_ver() {
     local v="$1"
     case "$v" in
@@ -83,7 +83,7 @@ normalize_ver() {
     esac
 }
 
-# Шаг 1: построить таблицу current_version по ARCH-документам
+# Step 1: build the current_version table from ARCH documents
 TMP_ARCH=$(mktemp)
 TMP_DRIFT=$(mktemp)
 TMP_OK=$(mktemp)
@@ -94,13 +94,13 @@ for f in $ARCH_GLOB; do
     [ -f "$f" ] || continue
     id=$(extract_arch_id "$f")
     ver=$(extract_arch_version "$f")
-    # id может быть "DP.ARCH.004" или "DP.ARCH.004-decisions" — оба валидны
+    # id may be "DP.ARCH.004" or "DP.ARCH.004-decisions" — both are valid
     [ -z "$id" ] && continue
     printf "%s\t%s\t%s\n" "$id" "$ver" "$f" >> "$TMP_ARCH"
 done
 
-# Шаг 2: пройти downstream-документы и найти якоря
-# Глобы: все PACK-* + governance inbox (env IWE_GOVERNANCE_REPO)
+# Step 2: walk downstream documents and find anchors
+# Globs: all PACK-* + governance inbox (env IWE_GOVERNANCE_REPO)
 DOWNSTREAM_DIRS=()
 for pack in "$IWE_ROOT"/PACK-*/; do
     [ -d "$pack" ] && DOWNSTREAM_DIRS+=("${pack%/}")
@@ -109,7 +109,7 @@ if [ -n "${IWE_GOVERNANCE_REPO:-}" ] && [ -d "$IWE_ROOT/$IWE_GOVERNANCE_REPO/inb
     DOWNSTREAM_DIRS+=("$IWE_ROOT/$IWE_GOVERNANCE_REPO/inbox")
 fi
 
-# Нет downstream-директорий — нечего проверять (свежий пользователь без PACK-репо)
+# No downstream directories — nothing to check (a fresh user without a PACK repo)
 if [ "${#DOWNSTREAM_DIRS[@]}" -eq 0 ]; then
     echo "[check-arch-version] no PACK-* repos and IWE_GOVERNANCE_REPO not set — skipping"
     exit 0
@@ -122,10 +122,10 @@ missing_arch_version=0
 
 for dir in "${DOWNSTREAM_DIRS[@]}"; do
     [ -d "$dir" ] || continue
-    # Все .md с derived_from в frontmatter
+    # All .md with derived_from in frontmatter
     while IFS= read -r downstream_file; do
-        # Извлечь все DP.ARCH.NNN@vX.Y якоря из frontmatter (первые 30 строк файла достаточно)
-        # Поддержка одиночной ссылки и списка [DP.ARCH.004@v2.3, DP.ARCH.005@v1]
+        # Extract all DP.ARCH.NNN@vX.Y anchors from frontmatter (the first 30 lines of the file are enough)
+        # Support for a single reference and a list [DP.ARCH.004@v2.3, DP.ARCH.005@v1]
         anchors=$(awk '
             /^---$/ { fm++; if (fm == 2) exit }
             fm == 1 && /derived_from:/ { capture = 1 }
@@ -147,7 +147,7 @@ for dir in "${DOWNSTREAM_DIRS[@]}"; do
             arch_ver_raw="${anchor#*@}"
             arch_ver=$(normalize_ver "$arch_ver_raw")
 
-            # Найти current version для arch_id
+            # Find the current version for arch_id
             current=$(awk -F'\t' -v id="$arch_id" '$1 == id { print $2; exit }' "$TMP_ARCH")
 
             relpath="${downstream_file#$IWE_ROOT/}"
@@ -173,13 +173,13 @@ for dir in "${DOWNSTREAM_DIRS[@]}"; do
     done < <(grep -rl "^derived_from:" "$dir" 2>/dev/null | grep '\.md$' || true)
 done
 
-# Шаг 3: вывод
+# Step 3: output
 echo "## ARCH-version drift report ($(date +%Y-%m-%d))"
 echo ""
 echo "Source: WP-263 child WP-217. Manifest pair: \`arch-version-drift\`."
 echo ""
 
-# Реестр найденных ARCH
+# Registry of found ARCHes
 echo "### ARCH-документы (current versions)"
 echo ""
 echo "| ID | version | файл |"
@@ -200,7 +200,7 @@ if [ -s "$TMP_DRIFT" ]; then
     echo ""
 fi
 
-# OK — только в полном режиме
+# OK — in full mode only
 if [ "$MODE" != "critical" ] && [ -s "$TMP_OK" ]; then
     echo "### OK (синхронизировано)"
     echo ""
@@ -210,7 +210,7 @@ if [ "$MODE" != "critical" ] && [ -s "$TMP_OK" ]; then
     echo ""
 fi
 
-# Сводка
+# Summary
 echo "### Сводка"
 echo ""
 echo "- ✅ OK: $ok_count"

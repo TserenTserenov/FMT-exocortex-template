@@ -192,7 +192,7 @@ TREE_ALLOWLIST = {
     # right next to this reference, same "documented, not shipped by
     # design" shape as the two entries above.
     "scripts/sync-communication-style.yaml",
-    # communication-style-personal-template.md's own prose (WP-412 Ф13)
+    # communication-style-personal-template.md's own prose (WP-412 Phase 13)
     # names this as the file the USER creates by copying the template under
     # this name — it is never shipped, by the same "documented extension
     # point, absent until created" shape as the entries above. The hook

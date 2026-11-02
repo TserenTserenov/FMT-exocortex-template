@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# style-promote.sh — промоция файла-снимка стиля в платформенный шаблон IWE
+# style-promote.sh — promote a style snapshot file to the IWE platform template
 #
-# Поток: личная папка/.claude/styles/<file>.md → подстановки → FMT/.claude/styles/<file>.md
+# Flow: personal folder/.claude/styles/<file>.md → substitutions → FMT/.claude/styles/<file>.md
 #
-# Использование:
-#   bash style-promote.sh <путь-к-файлу-стиля> [--dry-run]
+# Usage:
+#   bash style-promote.sh <path-to-style-file> [--dry-run]
 #
-# Файлы стилей: markdown с YAML frontmatter, контент после второго ---.
-# Отличие от hook-promote: нет chmod +x; smoke — проверка frontmatter + непустой контент.
+# Style files: markdown with YAML frontmatter, content after the second ---.
+# Difference from hook-promote: no chmod +x; smoke test — frontmatter check + non-empty content.
 
 set -uo pipefail
 
@@ -34,7 +34,7 @@ echo "   Откуда: $SRC"
 echo "   Куда:   $DEST"
 echo ""
 
-# Подстановки личных путей → шаблонные переменные
+# Substitutions of personal paths → template variables
 GOV_REPO_AUTHOR="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 GOV_REPO_TMPL="DS-strategy"
 
@@ -51,9 +51,9 @@ if $dry_run; then
     exit 0
 fi
 
-# Smoke-проверка файла стиля:
-# 1. Должно быть минимум 2 строки с "---" (frontmatter)
-# 2. Контент после frontmatter не пустой (>100 символов)
+# Style file smoke check:
+# 1. There must be at least 2 lines with "---" (frontmatter)
+# 2. Content after the frontmatter is not empty (>100 characters)
 frontmatter_count=$(printf '%s\n' "$result" | grep -c "^---$" || true)
 content_after=$(printf '%s\n' "$result" | awk '/^---$/{n++; if(n==2){found=1; next}} found' 2>/dev/null)
 content_len=${#content_after}
@@ -69,15 +69,15 @@ if [[ "$content_len" -lt 100 ]]; then
 fi
 echo "   smoke-check: OK (frontmatter: ${frontmatter_count}×---, контент: ${content_len} символов)"
 
-# Создать директорию если нет
+# Create the directory if missing
 mkdir -p "$FMT_DIR/.claude/styles"
 
-# Записать файл
+# Write the file
 printf '%s\n' "$result" > "$DEST"
 
 echo "✅ Промотирован: FMT/.claude/styles/$fname"
 
-# Запись в promotion-status.yaml через общую библиотеку
+# Write to promotion-status.yaml via the shared library
 COMMON="$SCRIPT_DIR/promote-common.sh"
 if [[ -f "$COMMON" ]]; then
     # shellcheck source=promote-common.sh

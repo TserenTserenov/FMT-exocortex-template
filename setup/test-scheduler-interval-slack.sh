@@ -58,7 +58,7 @@ BLOCK="$(mktemp)"
 trap 'rm -f "$SNIPPET" "$BLOCK"' EXIT
 {
     echo 'run_inbox_block() {'
-    sed -n '/# --- Экстрактор: inbox-check/,/^    if \[ "\$ran" -eq 0 \]; then/p' "$SCHEDULER" | sed '$d'
+    sed -n '/# --- Extractor: inbox-check/,/^    if \[ "\$ran" -eq 0 \]; then/p' "$SCHEDULER" | sed '$d'
     echo '}'
 } > "$BLOCK"
 if ! grep -q 'EXTRACTOR_SH" inbox-check' "$BLOCK"; then

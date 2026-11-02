@@ -2,8 +2,8 @@
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
 #
-# check-setup-update-parity.sh — статический анализ парных скриптов
-# Проверяет что setup.sh ↔ update.sh ↔ migrate-*.sh содержат ключевые паттерны.
+# check-setup-update-parity.sh — static analysis of paired scripts
+# Checks that setup.sh <-> update.sh <-> migrate-*.sh contain the key patterns.
 #
 # macOS-compatible: bash 3.x (no associative arrays).
 #
@@ -11,12 +11,12 @@
 #   bash check-setup-update-parity.sh [--config path/to/parity-contract.yaml]
 #
 # Exit codes:
-#   0 — все пары OK
+#   0 — all pairs OK
 #   3 — parity mismatch
 #   2 — config error
 #   1 — usage error
 #
-# Related: WP-315 Ф4, DP.SC.125
+# Related: WP-315 Phase 4, DP.SC.125
 
 set -euo pipefail
 
@@ -66,9 +66,9 @@ fi
 TMPDIR=$(mktemp -d)
 trap "rm -rf '$TMPDIR'" EXIT
 
-# Храним данные в файлах:
-# $TMPDIR/pairs/<name>/scripts — список скриптов
-# $TMPDIR/pairs/<name>/patterns — список паттернов
+# We keep data in files:
+# $TMPDIR/pairs/<name>/scripts — list of scripts
+# $TMPDIR/pairs/<name>/patterns — list of patterns
 # $TMPDIR/patterns/<id>/regex — regex
 # $TMPDIR/patterns/<id>/required — true/false
 
@@ -163,7 +163,7 @@ for pair_dir in "$TMPDIR/pairs/"*; do
     continue
   fi
 
-  # Читаем скрипты в массив (bash 3 compatible)
+  # Read scripts into an array (bash 3 compatible)
   scripts=()
   while IFS= read -r s; do
     [[ -n "$s" ]] && scripts+=("$s")
@@ -175,7 +175,7 @@ for pair_dir in "$TMPDIR/pairs/"*; do
     continue
   fi
 
-  # Читаем паттерны
+  # Read patterns
   patterns=()
   while IFS= read -r p; do
     [[ -n "$p" ]] && patterns+=("$p")

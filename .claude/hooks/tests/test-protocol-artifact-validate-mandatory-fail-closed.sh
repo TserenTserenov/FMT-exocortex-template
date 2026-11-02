@@ -26,7 +26,7 @@ FAIL=0
 ok()  { PASS=$((PASS+1)); echo "PASS: $1"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL: $1"; }
 
-# --- Fixture: isolated workspace + governance-репо ---
+# --- Fixture: isolated workspace + governance repo ---
 # day-rhythm-config.yaml lives at $WORKSPACE/memory/ (workspace root, a
 # symlink to auto-memory on a real install) — NOT inside the governance-repo.
 WS="$TMP/ws"
@@ -73,7 +73,7 @@ run_hook() { # <fixture-dir-with-hook-copy>
     bash "$1/protocol-artifact-validate.sh" < "$TMP/envelope.json"
 }
 
-# --- 1. Резолвер отсутствует целиком: копия хука без соседнего ../lib/ ---
+# --- 1. The resolver is entirely absent: a copy of the hook without the neighboring ../lib/ ---
 NO_RESOLVER_DIR="$TMP/no-resolver/.claude/hooks"
 mkdir -p "$NO_RESOLVER_DIR"
 cp "$HOOK_DIR/protocol-artifact-validate.sh" "$NO_RESOLVER_DIR/"
@@ -88,7 +88,7 @@ echo "$OUT" | grep -qF 'python3 не резолвится' \
   && ok "причина блокировки названа явно" \
   || bad "причина блокировки названа явно (получено: $OUT)"
 
-# --- 2. Тот же конфиг, резолвер присутствует рядом (self-relative ../lib/) ---
+# --- 2. The same config, the resolver is present nearby (self-relative ../lib/) ---
 WITH_RESOLVER_DIR="$TMP/with-resolver/.claude/hooks"
 mkdir -p "$WITH_RESOLVER_DIR" "$TMP/with-resolver/.claude/lib"
 cp "$HOOK_DIR/protocol-artifact-validate.sh" "$WITH_RESOLVER_DIR/"

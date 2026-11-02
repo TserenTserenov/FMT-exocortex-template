@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Optional
 
 GOVERNANCE_REPO = os.environ.get('IWE_GOVERNANCE_REPO', 'DS-strategy')
-# WP-530 Ф72: an isolated run points the script at its throwaway copy of the governance repo.
+# WP-530 Phase 72: an isolated run points the script at its throwaway copy of the governance repo.
 _REPO_DIR_OVERRIDE = os.environ.get('IWE_CLEANUP_REPO_DIR')
 _CANON_DIR = Path.home() / "IWE" / GOVERNANCE_REPO
 # IWE_CLEANUP_ISOLATED=1 (set by strategist.sh in an isolated run) forbids the silent fallback to

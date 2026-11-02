@@ -2,7 +2,7 @@
 # claude-hook: false — standalone wrapper called directly by peer adapter
 # scripts (not a settings.json hook event); see check-orphan-hooks.sh.
 # style-check-text.sh <agent> <text-file> — thin wrapper feeding one agent's
-# reply text through the shared response-clarity-hook.sh core (РП-388 Ф17).
+# reply text through the shared response-clarity-hook.sh core (WP-388 Phase 17).
 #
 # One core, two wrappers: Kimi and Codex route through this instead of a
 # separate per-agent reimplementation (the dead style-check-post-run.sh had

@@ -1,9 +1,9 @@
 #!/bin/bash
 # test_issue_1340_step_caps.sh — issue #1340:
-# в Git Bash на Windows (LC_CTYPE=C.UTF-8) grep -i не сводит кириллицу к одному
-# регистру, поэтому форма «Шаг N из M» с заглавной буквы в начале предложения
-# не находилась признаком явной нумерации и гейт блокировал честный ход.
-# Хук перечисляет регистровые классы явно; здесь это закреплено.
+# in Git Bash on Windows (LC_CTYPE=C.UTF-8) grep -i does not fold Cyrillic to a single
+# case, so the form "Шаг N из M" with a capital letter at the start of a sentence
+# was not found by the explicit-numbering marker and the gate blocked an honest turn.
+# The hook lists the case classes explicitly; this is pinned here.
 
 set -uo pipefail
 

@@ -1,33 +1,33 @@
 name: IWE Cloud Scheduler (базовый)
 
-# Облачный планировщик IWE — базовый уровень (без LLM).
-# Выполняет задачи, которые не требуют Claude API:
-# - Backup memory/ в exocortex/ (CLAUDE.md — НЕ здесь, см. #172: корневой CLAUDE.md бэкапит day-close.sh локально)
-# - Health check ночной автоматики
+# IWE cloud scheduler — baseline level (no LLM).
+# Runs tasks that do not require the Claude API:
+# - Backup memory/ into exocortex/ (CLAUDE.md — NOT here, see #172: the root CLAUDE.md is backed up locally by day-close.sh)
+# - Health check of the nightly automation
 #
-# Для пользователей шаблона FMT-exocortex-template.
-# Подробности: DP.SC.019 (PACK-digital-platform/08-service-clauses/)
+# For users of the FMT-exocortex-template template.
+# Details: DP.SC.019 (PACK-digital-platform/08-service-clauses/)
 #
-# Настройка:
-# 1. Скопируйте этот файл в СВОЙ DS-strategy репозиторий (не форк FMT-exocortex-template — см. docs/CLOUD-SCHEDULER.md)
-# 2. Создайте GitHub Secret: STRATEGY_REPO_TOKEN (PAT с доступом к DS-strategy)
-# 3. Укажите STRATEGY_REPO в Settings → Variables вашего репозитория
+# Setup:
+# 1. Copy this file into YOUR OWN DS-strategy repository (not a fork of FMT-exocortex-template — see docs/CLOUD-SCHEDULER.md)
+# 2. Create a GitHub Secret: STRATEGY_REPO_TOKEN (a PAT with access to DS-strategy)
+# 3. Set STRATEGY_REPO in Settings → Variables of your repository
 #
-# issue #454: раньше здесь стоял `if: github.repository == 'TserenTserenov/FMT-exocortex-template'`
-# на уровне job — идея была не гонять расписание по случайным форкам шаблона, но
-# условие проверяло ИМЯ АПСТРИМ-РЕПОЗИТОРИЯ, а не факт форка — и поэтому так же
-# ломало и единственный документированный сценарий (шаг 1 выше): в СВОЁМ отдельном
-# DS-strategy репозитории github.repository тоже никогда не равен
-# TserenTserenov/FMT-exocortex-template, так что workflow не запускался НИГДЕ,
-# кроме самого upstream-репозитория шаблона, где STRATEGY_REPO в принципе не
-# настроен. Ниже — не «дополнительная защита от форков», а восстановление
-# единственной проверки, которая и нужна: настроен ли STRATEGY_REPO. Не настроен
-# (обычный форк шаблона, который никто не подключал) → шаг "Skip" ниже печатает
-# причину, не тихо проваливается.
+# issue #454: there used to be `if: github.repository == 'TserenTserenov/FMT-exocortex-template'`
+# at the job level — the idea was not to run the schedule on random forks of the template, but
+# the condition checked the NAME OF THE UPSTREAM REPOSITORY, not the fact of a fork — and so it equally
+# broke the only documented scenario (step 1 above): in YOUR OWN separate
+# DS-strategy repository github.repository is also never equal to
+# TserenTserenov/FMT-exocortex-template, so the workflow did not run ANYWHERE
+# except the template's upstream repository itself, where STRATEGY_REPO is not
+# configured in principle. Below is not an "extra protection against forks" but a restoration
+# of the only check that is actually needed: is STRATEGY_REPO configured. Not configured
+# (an ordinary fork of the template that nobody connected) → the "Skip" step below prints the
+# reason instead of failing silently.
 
 on:
   schedule:
-    # 01:00 UTC (04:00 MSK) — ночной цикл
+    # 01:00 UTC (04:00 MSK) — nightly cycle
     - cron: '0 1 * * *'
   workflow_dispatch:
     inputs:
@@ -42,7 +42,7 @@ on:
           - health-check
 
 env:
-  # Пользователь должен указать свой DS-strategy репо
+  # The user must specify their own DS-strategy repo
   STRATEGY_REPO: ${{ vars.STRATEGY_REPO || '' }}
   TZ: Europe/Moscow
 
@@ -143,7 +143,7 @@ jobs:
         if: env.STRATEGY_REPO != ''
         env:
           GH_TOKEN: ${{ secrets.STRATEGY_REPO_TOKEN }}
-          # Через запятую: owner/repo. Пользователь указывает свои репо.
+          # Comma-separated: owner/repo. The user specifies their own repos.
           HEALTH_CHECK_REPOS: ${{ vars.HEALTH_CHECK_REPOS || '' }}
         run: |
           mkdir -p /tmp/repos

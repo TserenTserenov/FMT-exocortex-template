@@ -1,22 +1,22 @@
 #!/bin/bash
-# load-extensions.sh — unified loader для suffix extensions (R4.4 fix, WP-273 Этап 2).
+# load-extensions.sh — unified loader for suffix extensions (R4.4 fix, WP-273 Stage 2).
 #
-# Раньше каждый skill/loader читал точное имя файла (`extensions/day-close.after.md`,
-# `extensions/protocol-close.checks.md`). Документация (extensions/README.md) обещает
+# Previously each skill/loader read an exact file name (`extensions/day-close.after.md`,
+# `extensions/protocol-close.checks.md`). The documentation (extensions/README.md) promises
 # wildcard suffix loading (`day-close.after.health.md`, `day-close.after.linear.md`),
-# но кода под это нет. Этот helper закрывает контракт: возвращает sorted list файлов
-# по паттерну `<protocol>.<hook>*.md`.
+# but there was no code for it. This helper closes the contract: it returns a sorted list of files
+# by the pattern `<protocol>.<hook>*.md`.
 #
 # Usage:
 #   bash load-extensions.sh <protocol> <hook>
 #   bash load-extensions.sh day-close after
 #   bash load-extensions.sh protocol-close checks
 #
-# Output: абсолютные пути к extension-файлам, по одному на строку, sorted.
-# Exit: 0 — есть extensions; 1 — совпадений нет; 2 — неверный вызов;
-#       3 — loader/workspace/extension повреждён или недоступен.
+# Output: absolute paths to extension files, one per line, sorted.
+# Exit: 0 — extensions found; 1 — no matches; 2 — invalid call;
+#       3 — loader/workspace/extension is corrupted or unavailable.
 #
-# Реализует contract из extensions/README.md:
+# Implements the contract from extensions/README.md:
 #   "Suffix extensions (e.g. day-close.after.health.md, day-close.after.linear.md)
 #    загружаются в алфавитном порядке."
 
@@ -43,9 +43,9 @@ case "$HOOK" in
         ;;
 esac
 
-# Resolve workspace — пробуем несколько переменных, проверяя существование директории.
-# Фикс bug-2026-05-14: ранее IWE_WORKSPACE мог указывать на несуществующую tmp-директорию
-# (остаток smoke-test), и fallback не срабатывал из-за лишнего dirname.
+# Resolve workspace — try several variables, checking that the directory exists.
+# Fix of bug-2026-05-14: previously IWE_WORKSPACE could point to a nonexistent tmp directory
+# (a leftover of a smoke test), and the fallback did not fire because of an extra dirname.
 resolve_workspace() {
     local candidates=("${IWE_WORKSPACE:-}" "${WORKSPACE_DIR:-}" "${IWE_ROOT:-}" "${IWE:-}")
     for c in "${candidates[@]}"; do
@@ -59,7 +59,7 @@ resolve_workspace() {
         fi
     done
 
-    # Fallback: определяем директорию скрипта через BASH_SOURCE[0] (надёжнее $0).
+    # Fallback: determine the script directory via BASH_SOURCE[0] (more reliable than $0).
     local script_source="${BASH_SOURCE[0]:-$0}"
     local script_dir
     script_dir="$(cd "$(dirname "$script_source")" && pwd)"

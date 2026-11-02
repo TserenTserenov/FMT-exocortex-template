@@ -1,19 +1,19 @@
 #!/bin/bash
-# claude-peer-adapter.sh — адаптер Claude для peer-conversation (роль напарника)
-# see DP.SC.154 (симметричный аналог kimi-peer-adapter.sh)
+# claude-peer-adapter.sh — Claude adapter for peer-conversation (partner role)
+# see DP.SC.154 (symmetric analog of kimi-peer-adapter.sh)
 #
-# Вызывается агентом-ПИСАТЕЛЕМ (Kimi или другим) когда Claude выступает НАПАРНИКОМ.
-# Принимает аргументы в стиле kimi-peer-adapter.sh, читает промпт из stdin,
-# передаёт Claude headless (-p), возвращает ответ в stdout.
+# Called by the WRITER agent (Kimi or another) when Claude acts as the PARTNER.
+# Accepts kimi-peer-adapter.sh-style arguments, reads the prompt from stdin,
+# passes it to Claude headless (-p), returns the answer on stdout.
 #
-# Контракт безопасности (WP-458, WP-510): адаптер принимает только текстовую
-# проекцию через stdin. Он не получает рабочих каталогов и не даёт Claude
-# файловые или shell-инструменты.
-# Использование:
+# Security contract (WP-458, WP-510): the adapter accepts only a text
+# projection via stdin. It receives no working directories and gives Claude
+# no file or shell tools.
+# Usage:
 #   bash scripts/claude-peer-adapter.sh < peer-prompt.md > peer.md 2> peer.err
-# Промпт передаётся файлом, не inline `echo "$peer_prompt" | ...` — иначе текст
-# промпта попадает в командную строку и хук B7.7c ложно блокирует повторные
-# вызовы (bug-2026-06-30-peer-adapter-b77c-block).
+# The prompt is passed as a file, not inline `echo "$peer_prompt" | ...` — otherwise the prompt
+# text ends up on the command line and the B7.7c hook falsely blocks repeated
+# calls (bug-2026-06-30-peer-adapter-b77c-block).
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/peer-adapter-common.sh"
 
 # The reply is read by this adapter, not by the pilot: the style guard inside the
-# vendor CLI must not ask for a rewrite (WP-388 Ф24). Same line in kimi/codex adapters.
+# vendor CLI must not ask for a rewrite (WP-388 Phase 24). Same line in kimi/codex adapters.
 export IWE_STYLE_CONTEXT=peer
 
 # Claude Code can access its macOS Keychain credentials only outside Codex's
@@ -38,14 +38,14 @@ fi
 peer_adapter_check_sandbox_network "Claude CLI" 69
 
 # CLAUDE_BIN auto-detect: env override → PATH → user-local fallbacks.
-# Системные пути (homebrew, /usr/local/bin) обычно в PATH и подхватываются через command -v.
+# System paths (homebrew, /usr/local/bin) are usually in PATH and are picked up via command -v.
 CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude 2>/dev/null || true)}"
 if [ -z "$CLAUDE_BIN" ]; then
   for candidate in \
     "$HOME/.local/bin/claude" \
     "$HOME/.npm-global/bin/claude" \
     "$HOME/.nvm/versions/node/*/bin/claude"; do
-    # Expand glob (для nvm-paths)
+    # Expand glob (for nvm-paths)
     for resolved in $candidate; do
       [ -x "$resolved" ] && CLAUDE_BIN="$resolved" && break 2
     done
@@ -57,9 +57,9 @@ if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
   exit 1
 fi
 
-# Модель не выбирает адаптер: без явного --model Claude CLI применяет свою
-# настроенную по умолчанию модель. Это сохраняет разделение между личностью,
-# каналом и конструктивной реализацией.
+# The model does not choose the adapter: without an explicit --model the Claude CLI applies its
+# default configured model. This preserves the separation between identity,
+# channel and constructive implementation.
 MODEL_ARG=()
 
 while [[ $# -gt 0 ]]; do
@@ -76,8 +76,8 @@ while [[ $# -gt 0 ]]; do
       echo "ERROR: permission mode is fixed to dontAsk for claude-peer-adapter.sh." >&2
       exit 64
       ;;
-    # WP-516 Ф5: неизвестный флаг — явная ошибка (§0в.1 whitelist: -p, --model,
-    # --add-dir; у claude --add-dir и --permission-mode запрещены отдельно, выше).
+    # WP-516 Phase 5: an unknown flag is an explicit error (§0в.1 whitelist: -p, --model,
+    # --add-dir; for claude --add-dir and --permission-mode are forbidden separately, above).
     *)
       echo "ERROR: unknown flag '$1'. Known: -p, --model" >&2
       exit 1
@@ -85,17 +85,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Модель передаётся только при явном выборе вызывающего агента. Адаптер не
-# назначает и не подменяет конструктивную реализацию напарника.
+# The model is passed only on an explicit choice by the calling agent. The adapter does not
+# assign or substitute the partner's constructive implementation.
 
-# WP-510 Ф17: text-only must be fail-closed. `plan` plus a deny-list did not
+# WP-510 Phase 17: text-only must be fail-closed. `plan` plus a deny-list did not
 # provide that boundary: Claude could still call Agent, whose child discovered
 # ToolSearch and MCP, then the parent timed out without stdout. `--safe-mode`
 # removes project customizations/hooks/MCP (verified live 12.08: no mcp__*
 # entries in the init event under safe-mode), while `--tools ""` disables the
 # built-in tool set entirely (including future tools not known today).
 #
-# WP-7 Ф66 (12.08, claude 2.1.226): `--allowedTools ""` used to stand in for
+# WP-7 Phase 66 (12.08, claude 2.1.226): `--allowedTools ""` used to stand in for
 # that availability switch, but it is only a permission allow-list — in
 # 2.1.226 the session started with all 30 built-in tools live, the model
 # explored the filesystem on substantive prompts and burned every turn
@@ -131,8 +131,8 @@ esac
 
 # run_with_deadline() — see scripts/lib/peer-adapter-common.sh (sourced above).
 #
-# WP-7 Ф64 (12.08, six independent reproductions across sessions, root-caused
-# live in WP-524 Ф3): the old default of 2 assumed one turn for internal
+# WP-7 Phase 64 (12.08, six independent reproductions across sessions, root-caused
+# live in WP-524 Phase 3): the old default of 2 assumed one turn for internal
 # planning + one for delivery is always enough — DISPROVEN by direct bisection
 # against the exact failing prompt from sessions/2026-08/12/.../wp520-witness-
 # race-index-null/00-writer.md (recovered via git history, original session
@@ -141,10 +141,10 @@ esac
 # ~54s with a full, on-topic multi-part answer. Also ruled out by the same
 # bisection: disabling all tools is NOT the cause (removing the flag entirely
 # reproduces the identical failure) — the original "empty toolset confuses the
-# model" hypothesis (WP-7 Ф64 "Гипотеза") does not hold. The real bottleneck is
+# model" hypothesis (WP-7 Phase 64 "Hypothesis") does not hold. The real bottleneck is
 # turn budget on multi-part diagnostic/structured prompts, not tool access or
 # content policy. Trivial prompts still exit in 1-2 turns (verified earlier in
-# Ф64) — raising the ceiling costs nothing on the easy path.
+# Phase 64) — raising the ceiling costs nothing on the easy path.
 CLAUDE_PEER_MAX_TURNS="${CLAUDE_PEER_MAX_TURNS:-40}"
 case "$CLAUDE_PEER_MAX_TURNS" in
   ''|*[!0-9]*)
@@ -160,7 +160,7 @@ esac
 CLAUDE_STDERR="$(mktemp)"
 trap 'rm -f "$CLAUDE_STDERR"' EXIT
 
-# WP-524 (Codex, Ф66 review): log the CLI version in every diagnostic — the
+# WP-524 (Codex, Phase 66 review): log the CLI version in every diagnostic — the
 # 2.1.226 semantics break above was silent precisely because failures carried
 # no version marker. Cheap local call, no network. `</dev/null`: the probe
 # must not eat the prompt from the adapter's stdin; `|| true`: a fake/odd
@@ -204,8 +204,8 @@ if grep -qE "$AUTH_PATTERN" "$CLAUDE_STDERR" 2>/dev/null || \
     tail -20 "$CLAUDE_STDERR" >&2
   fi
   adapter_diagnostic "$CLAUDE_EXIT"
-  # WP-516 Ф5: канонический код 6 = auth failure (§0в.1); ранее был 4,
-  # что конфликтовало с фактическим «add-dir error» у kimi/codex-адаптеров.
+  # WP-516 Phase 5: canonical code 6 = auth failure (§0в.1); formerly 4,
+  # which conflicted with the actual "add-dir error" in the kimi/codex adapters.
   exit 6
 fi
 
@@ -237,16 +237,16 @@ if ! printf '%s' "$CLAUDE_OUTPUT" | grep -q '[[:alnum:]]'; then
   echo "ERROR: Claude peer call returned no substantive response." >&2
   [ -s "$CLAUDE_STDERR" ] && tail -20 "$CLAUDE_STDERR" >&2
   adapter_diagnostic "$CLAUDE_EXIT"
-  # WP-516 Ф5: канонический код 7 = empty response after trimming (§0в.1);
-  # ранее был 5, что переопределяло каноническое «pidfile lock».
+  # WP-516 Phase 5: canonical code 7 = empty response after trimming (§0в.1);
+  # formerly 5, which overrode the canonical "pidfile lock".
   exit 7
 fi
 
-# WP-516 Ф5 (§0в.1): stdout обязан начинаться с frontmatter; ответ без
-# frontmatter = нарушение формата → exit 1 с диагностикой.
-# Проверка — для peer-реплик turn-loop. Служебные вызовы писателя
-# (review/verify/synth), чей вывод — НЕ peer-реплика, отключают её
-# через IWE_PEER_PLAIN=1 (слой IWE-интеграции, §0в.1).
+# WP-516 Phase 5 (§0в.1): stdout must begin with frontmatter; a response without
+# frontmatter = format violation → exit 1 with diagnostics.
+# The check is for turn-loop peer replies. The writer's service calls
+# (review/verify/synth), whose output is NOT a peer reply, disable it
+# via IWE_PEER_PLAIN=1 (IWE integration layer, §0в.1).
 if [ "${IWE_PEER_PLAIN:-0}" != "1" ]; then
   peer_adapter_check_frontmatter "$CLAUDE_OUTPUT"
   peer_adapter_check_language "$CLAUDE_OUTPUT"

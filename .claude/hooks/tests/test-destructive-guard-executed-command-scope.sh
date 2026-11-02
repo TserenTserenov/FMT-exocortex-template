@@ -21,7 +21,7 @@
 # in this test's own shell commands (same isolation reasoning as the
 # neighbouring suites: this guard runs on the test runner's own Bash calls).
 #
-# Запуск: bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
+# Run: bash .claude/hooks/tests/test-destructive-guard-executed-command-scope.sh
 
 set -uo pipefail
 

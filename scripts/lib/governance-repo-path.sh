@@ -15,7 +15,7 @@
 # already carries a comment (line ~1779) acknowledging the pattern as known,
 # unfixed debt. Confirmed live: session-index.sh writing sessions/00-index.md
 # into the canonical checkout while the calling session ran from a worktree
-# (WP-537 Находка 1) and close_obligation.py's cards_dir walking upward past
+# (WP-537 Finding 1) and close_obligation.py's cards_dir walking upward past
 # the intended repo into {{WORKSPACE_DIR}} itself (WP-484, bug-2026-08-14... cd-restores-
 # to-parent class).
 
@@ -52,7 +52,7 @@ resolve_canonical_checkout() {
 }
 
 # iwe_sessions_root — prints the local checkout path for session content
-# (peer-conversation / quick-close transcripts). WP-526 Ф2: this content
+# (peer-conversation / quick-close transcripts). WP-526 Phase 2: this content
 # moved out of DS-strategy into its own repo (MC-sessions) so the
 # governance repo stops growing on every agent session. No longer takes
 # a repo_dir argument -- MC-sessions isn't a subfolder of any governance

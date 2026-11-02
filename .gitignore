@@ -12,12 +12,12 @@ DS-exocortex-setup/
 # Transaction marker retained only while an update needs recovery (#389)
 .update-incomplete
 
-# Claude Code — персональные файлы (не входят в шаблон)
+# Claude Code — personal files (not part of the template)
 .claude/settings.local.json
 .claude/checkpoint.md
 .claude/logs/
 
-# Runtime state агента (consent-sentinel'ы WP Gate, пишет create-wp.sh) — issue #250
+# Agent runtime state (WP Gate consent sentinels, written by create-wp.sh) — issue #250
 .claude/state/
 
 # Author-local downstream config for sync-communication-style.py (WP-388)
@@ -34,12 +34,12 @@ scripts/*.log
 __pycache__/
 *.pyc
 
-# issue #348: params.yaml — пространство настройки пользователя, а не файл шаблона.
-# В репозитории живёт только образец params.yaml.example; рабочий файл создаётся
-# при установке и никогда не приезжает из git.
+# issue #348: params.yaml is the user's configuration space, not a template file.
+# The repository holds only the sample params.yaml.example; the working file is created
+# at installation and never arrives from git.
 /params.yaml
 
-# WP-529 Ф3: release-receipt.sh output — generated per-run in CI (uploaded as
+# WP-529 Phase 3: release-receipt.sh output — generated per-run in CI (uploaded as
 # an artifact, not committed) and by any local dry-run of the script.
 /release-receipt.json
 

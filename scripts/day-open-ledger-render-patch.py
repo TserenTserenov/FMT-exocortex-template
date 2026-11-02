@@ -237,7 +237,7 @@ def main():
     if not blocks:
         # The graceful no-op invariant this whole script exists to protect: no
         # facts_digest/blocked_question/pilot_answer for yesterday yet (expected
-        # for the next several nights, until day-close-prepare.sh, WP-484 Ф16.2 2a,
+        # for the next several nights, until day-close-prepare.sh, WP-484 Phase 16.2 2a,
         # starts landing facts_digest events) — leave the DayPlan untouched, don't
         # inject an empty or PENDING-looking section.
         if had_marker:

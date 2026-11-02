@@ -70,8 +70,8 @@ def _heredoc_after(marker_pattern: str) -> str:
     return text[start:text.index("\nPYEOF", start)]
 
 
-WEEKPLAN_WRITER_SRC = _heredoc_after(r"^# --- Шаг \d+: WeekPlan ---$")
-REGISTRY_WRITER_SRC = _heredoc_after(r"^# --- Шаг \d+: WP-REGISTRY\.md ---$")
+WEEKPLAN_WRITER_SRC = _heredoc_after(r"^# --- Step \d+: WeekPlan ---$")
+REGISTRY_WRITER_SRC = _heredoc_after(r"^# --- Step \d+: WP-REGISTRY\.md ---$")
 
 
 def _run_block(src: str, *args) -> subprocess.CompletedProcess:

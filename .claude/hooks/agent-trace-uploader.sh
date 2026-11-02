@@ -1,18 +1,18 @@
 #!/bin/bash
-# claude-hook: false — standalone uploader; запускается one-shot/планировщиком, не событием Claude
-# WP-295 Ф1 шаг 5: agent-trace async uploader.
-# Читает NDJSON-файлы из ~/.claude/logs/agent-trace/, POST'ит каждую строку
-# в event-gateway (с idempotency по external_id). Успешно отправленные строки
-# помечаются (rotation), при network fail — оставляются для retry.
+# claude-hook: false — standalone uploader; run one-shot/by a scheduler, not by a Claude event
+# WP-295 Phase 1 step 5: agent-trace async uploader.
+# Reads NDJSON files from ~/.claude/logs/agent-trace/, POSTs each line
+# to the event-gateway (with idempotency by external_id). Successfully sent lines
+# are marked (rotation), on a network fail they are left for retry.
 #
-# Запуск:
-#   ~/.claude/hooks/agent-trace-uploader.sh          # один проход
-#   ~/.claude/hooks/agent-trace-uploader.sh --watch  # loop каждые 30s
+# Run:
+#   ~/.claude/hooks/agent-trace-uploader.sh          # one pass
+#   ~/.claude/hooks/agent-trace-uploader.sh --watch  # loop every 30s
 #
 # see DP.SC.037 (agent-trace store), DP.ROLE.047 (Trace Recorder).
 #
-# Эта часть writer'а — fire-and-forget путь от локального NDJSON в Neon через
-# event-gateway. Schedule (cron / launchd) — отдельная фаза Ф4.5 / Ф6.
+# This part of the writer is a fire-and-forget path from the local NDJSON to Neon via
+# the event-gateway. Schedule (cron / launchd) — a separate phase Phase 4.5 / Phase 6.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -58,7 +58,7 @@ upload_line() {
     local occurred_at
     occurred_at=$(echo "$line" | jq -r '.emitted_at // empty')
 
-    # external_id для idempotency: session_uuid + line_idx + event_type
+    # external_id for idempotency: session_uuid + line_idx + event_type
     local external_id="${session_uuid}-${line_idx}-${event_type}"
 
     local body
@@ -76,8 +76,8 @@ upload_line() {
         return 1
     fi
 
-    # 200 (idempotent) или 201 (new) — event-gateway returns {inserted: bool} or {inserted: false, idempotent: true}
-    # jq -r '.inserted // empty' bug: jq treats `false` как falsy для //. Используем `has()`:
+    # 200 (idempotent) or 201 (new) — event-gateway returns {inserted: bool} or {inserted: false, idempotent: true}
+    # jq -r '.inserted // empty' bug: jq treats `false` as falsy for //. We use `has()`:
     local accepted
     accepted=$(echo "$response" | jq -r 'if has("inserted") or has("idempotent") then "yes" else empty end' 2>/dev/null)
     if [ "$accepted" == "yes" ]; then
@@ -128,7 +128,7 @@ upload_file() {
         mv "$file" "${MALFORMED_DIR}/${session_uuid}.ndjson"
         echo "session $session_uuid: $sent/$total sent, $malformed malformed → quarantine"
     elif [ $sent -gt 0 ]; then
-        # Все успешно — переносим в uploaded/ (audit trail).
+        # All succeeded — move to uploaded/ (audit trail).
         mv "$file" "${UPLOADED_DIR}/${session_uuid}.ndjson"
         echo "session $session_uuid: $sent/$total ✓ (moved to uploaded/)"
     else

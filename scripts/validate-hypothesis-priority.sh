@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# validate-hypothesis-priority.sh — проверка поля p= в записях журнала гипотез
+# validate-hypothesis-priority.sh — check of the p= field in hypothesis log entries
 # see memory/lpf-hypothesis-log.md «Шкала приоритета»
 #
-# Проверяет, что каждый машинный контракт вида
+# Checks that every machine contract of the form
 #   <!-- h id=H-NNN p=<value> due=... status=... -->
-# использует значение p= из допустимого множества (П1, П2, П3, П4).
-# Не проверяет остальные поля контракта — только приоритет.
+# uses a p= value from the allowed set (П1, П2, П3, П4).
+# Does not check the other contract fields — only priority.
 #
-# Граница парсера (cold-context review): контракт ищется через
-# `[^>]*-->` — это ломается, если ЛЮБОЕ поле содержит буквальную подстроку
-# "-->" (парсинг обрежется на этом внутреннем совпадении раньше настоящего
-# терминатора). Сейчас недостижимо: грамматика контракта (см.
-# «События и машинный контракт» в lpf-hypothesis-log.md) — только плоские
-# key=value без свободного текста. Если контракт когда-нибудь получит
-# текстовое поле (например note=/reason=) — эта граница станет реальной.
+# Parser boundary (cold-context review): the contract is searched via
+# `[^>]*-->` — this breaks if ANY field contains the literal substring
+# "-->" (parsing would cut at this inner match before the real
+# terminator). Currently unreachable: the contract grammar (see
+# «События и машинный контракт» in lpf-hypothesis-log.md) is only flat
+# key=value without free text. If the contract ever gets
+# a text field (e.g. note=/reason=) — this boundary becomes real.
 #
-# Использование:
+# Usage:
 #   bash validate-hypothesis-priority.sh <path-to-hypothesis-log-file>
 #
-# Exit 0 = все найденные значения p= допустимы (или контрактов в файле нет)
-# Exit 1 = найдено хотя бы одно недопустимое значение p=
+# Exit 0 = all found p= values are valid (or there are no contracts in the file)
+# Exit 1 = at least one invalid p= value found
 
 set -euo pipefail
 

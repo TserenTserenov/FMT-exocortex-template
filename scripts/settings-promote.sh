@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# settings-promote.sh — регистрация хука в .claude/settings.json шаблона
+# settings-promote.sh — registering a hook in the template's .claude/settings.json
 #
-# Добавляет запись hook в нужный event с правильным $CLAUDE_PROJECT_DIR/ префиксом.
-# Идемпотентен: если хук уже зарегистрирован — не дублирует.
+# Adds a hook entry to the needed event with the correct $CLAUDE_PROJECT_DIR/ prefix.
+# Idempotent: if the hook is already registered — does not duplicate.
 #
-# Использование:
+# Usage:
 #   bash settings-promote.sh <hook-name.sh> <event> [--matcher <pattern>] [--dry-run]
 #
-# Примеры:
+# Examples:
 #   bash settings-promote.sh my-hook.sh Stop
 #   bash settings-promote.sh my-hook.sh PreToolUse --matcher "Bash"
 #   bash settings-promote.sh my-hook.sh UserPromptSubmit --dry-run
 #
-# События: Stop | PreToolUse | PostToolUse | UserPromptSubmit | PreCompact
+# Events: Stop | PreToolUse | PostToolUse | UserPromptSubmit | PreCompact
 
 set -uo pipefail
 
@@ -56,9 +56,9 @@ fi
 
 echo "📌 Регистрация хука: $HOOK_NAME → $EVENT${MATCHER:+ [matcher: $MATCHER]}"
 
-# Проверка: хук-файл существует в FMT?
-# В режиме --dry-run отсутствие — warning (skip side-effect check, контракт dry-run).
-# Без dry-run — fail: реальная регистрация хука без тела бессмысленна.
+# Check: does the hook file exist in FMT?
+# In --dry-run mode absence is a warning (skip side-effect check, dry-run contract).
+# Without dry-run — fail: registering a hook with no body for real is pointless.
 if [[ ! -f "$HOOK_FILE" ]]; then
     if $DRY_RUN; then
         echo "ℹ️  dry-run: файл хука $HOOK_FILE отсутствует (warning, проверка пропущена)"
@@ -69,7 +69,7 @@ if [[ ! -f "$HOOK_FILE" ]]; then
     fi
 fi
 
-# Идемпотентность: уже зарегистрирован?
+# Idempotency: already registered?
 existing=$(jq -r \
     --arg event "$EVENT" \
     --arg cmd "$HOOK_PATH" \
@@ -80,7 +80,7 @@ if [[ -n "$existing" ]]; then
     exit 0
 fi
 
-# Формируем новую запись
+# Build the new entry
 if [[ -n "$MATCHER" ]]; then
     NEW_ENTRY=$(jq -n \
         --arg cmd "$HOOK_PATH" \
@@ -92,7 +92,7 @@ else
         '{"hooks": [{"type": "command", "command": $cmd}]}')
 fi
 
-# Добавляем в нужный event (создаём массив если нет)
+# Add to the needed event (create the array if absent)
 UPDATED=$(jq \
     --arg event "$EVENT" \
     --argjson entry "$NEW_ENTRY" \
@@ -106,11 +106,11 @@ if $DRY_RUN; then
     exit 0
 fi
 
-# Валидация JSON перед записью
+# Validate JSON before writing
 echo "$UPDATED" | jq . > /dev/null 2>&1 || { echo "❌ Результат невалидный JSON" >&2; exit 1; }
 
-# Проверка hook-path конвенции через validate-fmt-scripts.sh --settings-json.
-# --settings-json запускает только проверку 3 (settings.json) — не затрагивает скрипты.
+# Check the hook-path convention via validate-fmt-scripts.sh --settings-json.
+# --settings-json runs only check 3 (settings.json) — does not touch scripts.
 if ! bash "$FMT_DIR/scripts/validate-fmt-scripts.sh" --settings-json; then
     exit 1
 fi

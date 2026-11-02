@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# memory-bleed.sh — детектор нарушений memory/ (WP-217 Ф10.2)
+# memory-bleed.sh — detector of memory/ violations (WP-217 Phase 10.2)
 #
-# Обнаруживает: файлы без frontmatter, HOT-переполнение,
-# missing superseded_by, кандидаты на понижение горизонта.
-# НЕ применяет исправления — только отчёт (R23-детектор, не R8-оператор).
+# Detects: files without frontmatter, HOT overflow,
+# missing superseded_by, candidates for horizon demotion.
+# Does NOT apply fixes — report only (R23 detector, not an R8 operator).
 #
 # Usage:
-#   bash scripts/memory-bleed.sh              # все проверки
-#   bash scripts/memory-bleed.sh --hot-only   # только HOT-лимит
-#   bash scripts/memory-bleed.sh --dir PATH   # другая директория
+#   bash scripts/memory-bleed.sh              # all checks
+#   bash scripts/memory-bleed.sh --hot-only   # HOT limit only
+#   bash scripts/memory-bleed.sh --dir PATH   # another directory
 #
-# Exit code: 0 = нет нарушений, 1 = есть нарушения.
-# Spec: memory/memory-lifecycle-spec.md §5 (WP-217 Ф10.1)
+# Exit code: 0 = no violations, 1 = there are violations.
+# Spec: memory/memory-lifecycle-spec.md §5 (WP-217 Phase 10.1)
 
 set -eu
 
@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 MEMORY_DIR="$IWE_ROOT/memory"
 HOT_LIMIT=150
-HOT_DOWNGRADE_DAYS=14   # HOT → WARM если не упоминался N дней
+HOT_DOWNGRADE_DAYS=14   # HOT → WARM if not mentioned for N days
 WARM_DOWNGRADE_DAYS=30  # WARM → COLD
 COLD_ARCHIVE_DAYS=90    # COLD → archive
 HOT_ONLY=0
@@ -42,19 +42,19 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# #513: единый reader вместо локальной копии — общий .claude/lib/frontmatter.sh
-# уже нормализует обе формы (плоскую и вложенную metadata:), локальный awk видел
-# только плоскую и молча возвращал пустоту на файлах, записанных харнессом.
+# #513: a single reader instead of a local copy — the shared .claude/lib/frontmatter.sh
+# already normalizes both forms (flat and nested metadata:), the local awk saw
+# only the flat one and silently returned nothing on files written by the harness.
 _MEMORY_BLEED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../.claude/lib/frontmatter.sh
 source "$_MEMORY_BLEED_DIR/../.claude/lib/frontmatter.sh"
 
-# #515: file mtime, портируемо. GNU stat (Linux) первым, BSD (macOS) фоллбеком;
-# stderr первой формы подавлен — на macOS она шумела ошибкой в отчёт.
+# #515: file mtime, portable. GNU stat (Linux) first, BSD (macOS) as a fallback;
+# stderr of the first form is suppressed — on macOS it spammed an error into the report.
 file_mtime_ymd() {
-    # epoch двумя формами stat (GNU/BSD), дата — python'ом: смешанный тулчейн
-    # macOS (brew GNU stat + системный BSD date) ломал парную комбинацию
-    # stat+date (ревью Ф14, Medium-6)
+    # epoch via two stat forms (GNU/BSD), the date via python: a mixed macOS
+    # toolchain (brew GNU stat + system BSD date) broke the paired combination
+    # stat+date (review of Phase 14, Medium-6)
     local f="$1" e
     e=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)
     [ -n "$e" ] || return 1
@@ -77,7 +77,7 @@ violations=0
 echo "## Memory Bleed Report — $today"
 echo ""
 
-# ── Нарушение 1: файлы без frontmatter ──────────────────────────────────────
+# ── Violation 1: files without frontmatter ──────────────────────────────────────
 orphans=""
 for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     [ -f "$f" ] || continue
@@ -95,7 +95,7 @@ if [ -n "$orphans" ]; then
 fi
 
 [ $HOT_ONLY -eq 1 ] && {
-    # ── HOT-лимит ────────────────────────────────────────────────────────────
+    # ── HOT limit ────────────────────────────────────────────────────────────
     hot_lines=0
     hot_list=""
     for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
@@ -118,7 +118,7 @@ fi
     [ $violations -eq 0 ] && exit 0 || exit 1
 }
 
-# ── Нарушение 2: HOT-лимит ──────────────────────────────────────────────────
+# ── Violation 2: HOT limit ──────────────────────────────────────────────────
 hot_lines=0
 hot_files_list=""
 for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
@@ -142,7 +142,7 @@ else
     echo ""
 fi
 
-# ── Нарушение 3: superseded без superseded_by ────────────────────────────────
+# ── Violation 3: superseded without superseded_by ────────────────────────────────
 missing_sb=""
 for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     [ -f "$f" ] || continue
@@ -160,7 +160,7 @@ if [ -n "$missing_sb" ]; then
     echo ""
 fi
 
-# ── Предупреждение: кандидаты на понижение горизонта ────────────────────────
+# ── Warning: candidates for horizon demotion ────────────────────────────────
 echo "### Кандидаты на понижение горизонта"
 echo ""
 echo "| Файл | Горизонт | valid_from | Дней | Рекомендация |"
@@ -174,7 +174,7 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     vf=$(get_field "$f" "valid_from")
     [ -z "$vf" ] && continue
 
-    # Используем mtime как прокси для "последнего обращения"
+    # We use mtime as a proxy for "last access"
     mtime=$(file_mtime_ymd "$f" || true); [ -n "$mtime" ] || mtime="$vf"
     age=$(days_since "$mtime")
 
@@ -208,7 +208,7 @@ echo ""
 echo "_Действие: агент предлагает — пользователь подтверждает. Не выполнять автономно._"
 echo ""
 
-# ── Итог ─────────────────────────────────────────────────────────────────────
+# ── Summary ─────────────────────────────────────────────────────────────────────
 if [ $violations -eq 0 ]; then
     echo "✅ Нарушений не найдено"
     exit 0

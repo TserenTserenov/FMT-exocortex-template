@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # routing: helper  skill=audit-installation  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# memory-health.sh — метрики здоровья memory/ (WP-217 Ф10.2)
+# memory-health.sh — memory/ health metrics (WP-217 Phase 10.2)
 #
-# Показывает: распределение по горизонтам, HOT-лимит, orphans, age-distribution.
-# Вывод: markdown-таблица для вставки в DayPlan/Week Report.
+# Shows: distribution by horizon, HOT limit, orphans, age distribution.
+# Output: a markdown table to paste into DayPlan/Week Report.
 #
 # Usage:
-#   bash scripts/memory-health.sh             # полный отчёт
-#   bash scripts/memory-health.sh --summary   # только ключевые метрики
-#   bash scripts/memory-health.sh --dir PATH  # другая директория
+#   bash scripts/memory-health.sh             # full report
+#   bash scripts/memory-health.sh --summary   # key metrics only
+#   bash scripts/memory-health.sh --dir PATH  # another directory
 #
-# Spec: memory/memory-lifecycle-spec.md §2 (WP-217 Ф10.1)
+# Spec: memory/memory-lifecycle-spec.md §2 (WP-217 Phase 10.1)
 
 set -eu
 
@@ -48,7 +48,7 @@ has_frontmatter() {
     head -1 "$1" | grep -q '^---$'
 }
 
-# Счётчики
+# Counters
 total=0; orphans=0
 hot_files=0; warm_files=0; cold_files=0; archive_files=0
 hot_lines=0
@@ -72,7 +72,7 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     status=$(get_field "$f" "status")
     valid_from=$(get_field "$f" "valid_from")
 
-    # Подсчёт строк файла без frontmatter (убрать блок ---)
+    # Count file lines without frontmatter (strip the --- block)
     file_lines=$(awk '/^---/{f++; next} f>=2{print}' "$f" | wc -l | tr -d ' ')
 
     case "$horizon" in
@@ -102,7 +102,7 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     fi
 done
 
-# HOT-статус
+# HOT status
 if [ $hot_lines -le $HOT_LIMIT ]; then
     hot_status="✅ ${hot_lines}/${HOT_LIMIT} строк"
 else
@@ -149,11 +149,11 @@ if [ $orphans -gt 0 ]; then
     echo "⚠️  $orphans файлов без frontmatter — запустить \`memory-validate.sh\` для деталей"
 fi
 
-# issue #735: memory-validate.sh существовал и работал, но не вызывался ни
-# из одного рабочего пути — только упоминался в тексте этого предупреждения.
-# Fail-soft (WARN, не блок): memory-health.sh сам используется в нескольких
-# местах (day-close, audit-installation), падать из-за отсутствующего/
-# неисполняемого validate-скрипта на чужой установке нельзя.
+# issue #735: memory-validate.sh existed and worked, but was not called from
+# any working path — it was only mentioned in the text of this warning.
+# Fail-soft (WARN, not a block): memory-health.sh itself is used in several
+# places (day-close, audit-installation), it must not fail because of a missing/
+# non-executable validate script on someone else's install.
 _VALIDATE_SCRIPT="$_MEMORY_HEALTH_DIR/memory-validate.sh"
 if [ -x "$_VALIDATE_SCRIPT" ]; then
     _validate_fails=$(bash "$_VALIDATE_SCRIPT" --quiet --dir "$MEMORY_DIR" 2>/dev/null | grep -c '^FAIL' || true)

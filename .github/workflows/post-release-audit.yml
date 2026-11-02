@@ -1,35 +1,35 @@
 name: Post-Release Adversarial Audit
 
-# see VR.SC.006 (release-verification-protocol), VR.M.006 (6 уровней верификации, слой 5)
+# see VR.SC.006 (release-verification-protocol), VR.M.006 (6 verification levels, layer 5)
 # see AR.203 (release verification trigger)
 #
-# Триггеры:
-#   1. Manual: workflow_dispatch — автор запускает после релиза.
-#   2. Auto: push update-manifest.json, НО только когда patch=0 (x.y.0 —
-#      minor/major). Re-enabled 2026-08-10 (WP-7 Ф62) после того, как безусловный
-#      триггер на КАЖДЫЙ push (включая еженедельный авто-бамп patch-версии)
-#      вырубили 2026-06-01: 22 issue накопились нечитанными, потому что частота
-#      сама по себе (1-7 дней) не оставляла шанса разобрать. Запуск по расписанию
-#      бампает patch — этот фильтр не даёт рутинным patch-релизам создавать
-#      issue, но ловит любой minor/major bump (они всегда осознанные, не авто-cron).
-#      Чувствительный patch-релиз получает ту же площадку через workflow_dispatch.
+# Triggers:
+#   1. Manual: workflow_dispatch — the author runs it after a release.
+#   2. Auto: push of update-manifest.json, BUT only when patch=0 (x.y.0 —
+#      minor/major). Re-enabled 2026-08-10 (WP-7 Phase 62) after the unconditional
+#      trigger on EVERY push (including the weekly auto-bump of the patch version)
+#      was turned off on 2026-06-01: 22 issues piled up unread, because the frequency
+#      itself (1-7 days) left no chance to work through them. The scheduled run
+#      bumps patch — this filter keeps routine patch releases from creating
+#      an issue, but catches any minor/major bump (they are always deliberate, not auto-cron).
+#      A sensitive patch release gets the same venue via workflow_dispatch.
 #
-# Цель: создать reminder с adversarial-промптом → автор прогоняет в Claude session
-# → находит классы регрессий, которые detectors не ловят.
+# Goal: create a reminder with an adversarial prompt → the author runs it in a Claude session
+# → finds classes of regressions that detectors do not catch.
 #
-# Одно напоминание на версию: уже существующее обращение с тем же заголовком (открытое ИЛИ закрытое) шаг
-# не пересоздаёт; ищет по метке `release-audit` и точному заголовку среди всех страниц списка (снятая метка или
-# переименованное обращение допускают повторное создание). Пока ловился только открытый issue, закрытие
-# обращения после аудита приводило к тому, что следующий push update-manifest.json при той же версии x.y.0
-# (она остаётся до очередного бампа) создавал его заново: после закрытия #748 появился #783 для v0.40.0, и он
-# висел открытым.
+# One reminder per version: an issue that already exists with the same title (open OR closed) is not
+# recreated by the step; it searches by the `release-audit` label and the exact title across all pages of the list (a removed label or
+# a renamed issue allows re-creation). While only an open issue was caught, closing
+# the issue after the audit led to the next push of update-manifest.json at the same version x.y.0
+# (it stays until the next bump) creating it again: after #748 was closed, #783 appeared for v0.40.0, and it
+# hung open.
 #
-# Уведомление автору: только сам issue (GitHub пришлёт письмо и push). Раньше после создания issue шаг слал
-# напоминание в `/api/template-update` бота. Это тот же вход, что и рассылка о выпуске подписчикам: служебное
-# «Нужна независимая проверка (red team)» ушло всем подписчикам обновлений (35 человек при 0.41.0) под заголовком
-# «Обновление шаблона IWE» и с подписью «1 коммит(ов) за последние 24ч» (число зашито в шаге). Адресной отправки
-# только автору у бота нет: пока она не появится, шаг не возвращать. Когда появится, подключить её по образцу
-# release-watchdog.yml (необязательный шаг через vars.PILOT_NOTICE_ENDPOINT, получатель только пилот).
+# Notifying the author: only the issue itself (GitHub will send an email and a push). Previously, after creating the issue the step sent a
+# reminder to the bot's `/api/template-update`. That is the same entry as the release mailing to subscribers: the service message
+# "Independent check needed (red team)" went to all update subscribers (35 people at 0.41.0) under the title
+# "IWE template update" and with the signature "1 commit(s) in the last 24h" (the number is hard-coded in the step). The bot has no addressed sending
+# to the author alone: until it appears, do not bring the step back. When it appears, hook it up following the pattern of
+# release-watchdog.yml (an optional step via vars.PILOT_NOTICE_ENDPOINT, recipient only the pilot).
 
 on:
   push:

@@ -1,6 +1,6 @@
 #!/bin/bash
 # SNAPSHOT — synced manually via script-promote.sh from FMT-exocortex-template/scripts/. Do not edit here directly.
-# llm-proxy-launcher.sh — обёртка для запуска llm-proxy.py с OpenRouter secrets (WP-366 Ф4.A)
+# llm-proxy-launcher.sh — wrapper for launching llm-proxy.py with OpenRouter secrets (WP-366 Phase 4.A)
 set -euo pipefail
 
 OPENROUTER_ENV="$HOME/.secrets/openrouter_key.env"

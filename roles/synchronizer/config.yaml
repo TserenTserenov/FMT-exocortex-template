@@ -1,6 +1,6 @@
-# Расписание агентов экзокортекса
-# Reference config — scheduler.sh использует hardcoded логику,
-# этот файл для документации и будущей миграции на config-driven dispatch.
+# Schedule of the exocortex agents
+# Reference config — scheduler.sh uses hardcoded logic,
+# this file is for documentation and a future migration to config-driven dispatch.
 
 schedules:
   strategist:
@@ -9,7 +9,7 @@ schedules:
       morning:
         type: daily
         hour: "{{TIMEZONE_HOUR}}"     # Mon=session-prep, Tue-Sun=day-plan
-        window: "4-21"                # После 22:00 бесполезен
+        window: "4-21"                # useless after 22:00
       # note-review has no scheduled run (template owner's decision, July 2026): notes are reviewed
       # only by hand, in a live session with the pilot (e.g. the Day Open "Разбор заметок" section).
       week-review:

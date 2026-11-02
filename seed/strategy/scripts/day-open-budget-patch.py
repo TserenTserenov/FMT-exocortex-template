@@ -20,10 +20,10 @@ except ImportError:
 
 
 BUDGET_RE = re.compile(
-    # BUGFIX (2026-07-11): матчить всю строку, не только уже-корректный шаблон — иначе
-    # свободный текст от LLM-заполнения ("45-52h всего / ~7-8×") не находит совпадения,
-    # и patch_budget() тихо пропускает замену (main(): "budget line not found — skipping").
-    # RELABEL (2026-09-01, Ф148): matches BOTH the old "Бюджет дня" label (still what
+    # BUGFIX (2026-07-11): match the whole line, not only the already-correct template — otherwise
+    # free text from LLM filling ("45-52h всего / ~7-8×") finds no match,
+    # and patch_budget() silently skips the replacement (main(): "budget line not found — skipping").
+    # RELABEL (2026-09-01, Phase 148): matches BOTH the old "Бюджет дня" label (still what
     # cached/pre-fix LLM output and the day-open-scaffold.sh placeholder may contain
     # until every producer is migrated) and the new "Портфель в работе" label this
     # script now writes — the two-name window is exactly the kind of silent decoupling
@@ -32,13 +32,13 @@ BUDGET_RE = re.compile(
     r"\*\*(?:Бюджет дня|Портфель в работе):\*\*.*"
 )
 
-# BUGFIX (2026-09-01, Ф148/WP-484): реальные ячейки колонки "h" пишутся с суффиксом
-# ("6h", "46h"), не голыми числами — прежний regex `^\d+(\.\d+)?$` не совпадал ни
-# с одной такой ячейкой, sum_plan_hours() всегда возвращала 0.0, и патч молча
-# "skipping"-ал КАЖДЫЙ день (day-open-pipeline.sh глушит любой exit кодом `|| true`,
-# ни разу не заметно ни в логах, ни в самом DayPlan). Живой пример: DayPlan
-# 2026-09-01 осталась с голым "103h" от LLM-заполнителя вместо декорированной
-# детерминированной строки.
+# BUGFIX (2026-09-01, Phase 148/WP-484): real cells of column "h" are written with a suffix
+# ("6h", "46h"), not bare numbers — the previous regex `^\d+(\.\d+)?$` matched not a single
+# such cell, sum_plan_hours() always returned 0.0, and the patch silently
+# "skipping"-ed EVERY day (day-open-pipeline.sh mutes any exit code with `|| true`,
+# never visible either in logs or in the DayPlan itself). Live example: DayPlan
+# 2026-09-01 was left with the bare "103h" from the LLM filler instead of the decorated
+# deterministic line.
 H_CELL_RE = re.compile(r"^(\d+(?:\.\d+)?)h?$")
 
 ATTENTION_HEADER_RE = re.compile(r"(<summary><b>Требует внимания</b></summary>\s*\n)")
@@ -179,7 +179,7 @@ def append_attention_finding(text, finding):
 
 
 def patch_budget(text, h_rp, h_phys, today_h=None):
-    # RELABEL (2026-09-01, Ф148/WP-484, peer-session consensus with Codex):
+    # RELABEL (2026-09-01, Phase 148/WP-484, peer-session consensus with Codex):
     # h_rp is the sum of remaining-effort estimates across every in-flight WP
     # in the plan table — a portfolio-load figure, not a day's capacity (a
     # day physically caps out around 20-24h; this number reproducibly lands

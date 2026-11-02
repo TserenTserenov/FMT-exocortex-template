@@ -1,5 +1,5 @@
 #!/bin/bash
-# attestation-build-statement.sh — WP-529 Ф21 in-toto Statement builder.
+# attestation-build-statement.sh — WP-529 Phase 21 in-toto Statement builder.
 #
 # Builds the JSON payload that attestation-sign.sh wraps in a DSSE envelope
 # and signs. Schema: attestation-statement.schema.json (same directory).

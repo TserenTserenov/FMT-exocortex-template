@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Regression test for bug #338: create-wp.sh должен записать РП во ВСЕ локальные места.
-# Проверка (5 пунктов): inbox, WeekPlan, Strategy.md, WP-REGISTRY, build-active-wp.py.
-# Внешний трекер сюда не входит — он условный пост-шаг (issue #321), не локальная запись.
+# Regression test for bug #338: create-wp.sh must record the WP in ALL local places.
+# Check (5 items): inbox, WeekPlan, Strategy.md, WP-REGISTRY, build-active-wp.py.
+# The external tracker is not included — it is a conditional post-step (issue #321), not a local record.
 
 set -euo pipefail
 
-# Fixture: временный repо-скелет
+# Fixture: a temporary repo skeleton
 # Template root comes from this file's own location, never from $HOME (CI checks
 # the repository out elsewhere); HOME and TMPDIR stay inside the test's temp dir.
 TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -26,11 +26,11 @@ cp -R "$TEMPLATE_ROOT/seed/strategy" "$TMPDIR/strategy"
 source "$TEMPLATE_ROOT/scripts/tests/lib/seed_strategy_fixture.sh"
 ensure_weekplan_fixture "$TMPDIR/strategy"
 
-# IWE_GOVERNANCE_REPO — имя подпапки ПОД IWE_ROOT (create-wp.sh:26-30), а не
-# произвольный относительный путь. "." без выставленного IWE_ROOT резолвился
-# в $HOME/IWE/. — реальный домашний каталог, а не эту песочницу (найдено 03.08,
-# живьём создало мусорный inbox/WP-001/ в ~/IWE). IWE_ROOT=$TMPDIR + имя
-# каталога делают IWE/$GOV_REPO = $TMPDIR/strategy — ровно то, что скопировано.
+# IWE_GOVERNANCE_REPO — the name of a subfolder UNDER IWE_ROOT (create-wp.sh:26-30), not an
+# arbitrary relative path. "." without IWE_ROOT set resolved
+# to $HOME/IWE/. — the real home directory, not this sandbox (found 03.08,
+# it created a junk inbox/WP-001/ in ~/IWE live). IWE_ROOT=$TMPDIR + the directory
+# name make IWE/$GOV_REPO = $TMPDIR/strategy — exactly what was copied.
 export IWE_TEMPLATE="$TEMPLATE_ROOT"
 export IWE_ROOT="$TMPDIR"
 export IWE_GOVERNANCE_REPO="strategy"
@@ -50,7 +50,7 @@ case "$PWD" in
     ;;
 esac
 
-# Запустить create-wp.sh
+# Run create-wp.sh
 # --no-artifactor-check: the Artifactor Gate is covered by
 # test_create_wp_artifactor_gate.sh; this test is about the five write targets.
 TITLE="Тестовый РП"
@@ -62,7 +62,7 @@ bash "$IWE_TEMPLATE/scripts/create-wp.sh" \
   --no-consent-check \
   --no-artifactor-check
 
-# Извлечь WP номер из созданного файла
+# Extract the WP number from the created file
 WP_NUM=""
 for wp_dir in inbox/WP-*; do
   [ -d "$wp_dir" ] || continue
@@ -75,7 +75,7 @@ WP_ID="WP-$(printf '%03d' "$WP_NUM")"
 
 echo "Created: $WP_ID"
 
-# Проверка 5 мест
+# Check the 5 places
 echo "Checking 5 locations..."
 
 # 1. inbox/WP-N/WP-N.md
@@ -83,28 +83,28 @@ echo "Checking 5 locations..."
 grep -q "^title:" "inbox/$WP_ID/$WP_ID.md" || { echo "FAIL: title not in inbox"; exit 1; }
 echo "✓ inbox/$WP_ID/$WP_ID.md"
 
-# 2. WeekPlan W{N}.md (якорь должен быть)
-# Якорь — заголовок RП, не $WP_ID: create-wp.sh:166-168 документирует, что
-# колонка «#» в WeekPlan/REGISTRY намеренно хранит bare-число (issue #338 п.4),
-# паддинг только в путях/заголовках. WeekPlan-строка не содержит пути, поэтому
-# "WP-001" в ней в принципе не появляется — нашёл grep'ая за $WP_ID вхолостую,
-# пока эта фикстура наконец не заработала целиком (03.08).
+# 2. WeekPlan W{N}.md (the anchor must be present)
+# The anchor is the WP heading, not $WP_ID: create-wp.sh:166-168 documents that the
+# "#" column in WeekPlan/REGISTRY deliberately holds a bare number (issue #338 item 4),
+# padding only in paths/headings. A WeekPlan line contains no path, so
+# "WP-001" never appears in it in principle — grep for $WP_ID was running idle
+# until this fixture finally worked in full (03.08).
 WEEKPLAN=$(ls -1 current/WeekPlan*.md | sed -n 1p)
 [ -n "$WEEKPLAN" ] || { echo "FAIL: no WeekPlan found"; exit 1; }
 grep -q "$TITLE" "$WEEKPLAN" || { echo "FAIL: $WP_ID (title: $TITLE) not in WeekPlan"; exit 1; }
 echo "✓ WeekPlan ($WEEKPLAN)"
 
-# 3. Strategy.md (якорь в ## Текущая неделя)
+# 3. Strategy.md (the anchor in ## Current week)
 [ -f "docs/Strategy.md" ] || { echo "FAIL: Strategy.md not found"; exit 1; }
 grep -q "$WP_ID" "docs/Strategy.md" || { echo "WARN: $WP_ID not in Strategy.md (may be intentional)"; }
 echo "✓ Strategy.md (checked)"
 
-# 4. WP-REGISTRY.md (должен быть с паддингом WP-NNN)
+# 4. WP-REGISTRY.md (must be with WP-NNN padding)
 [ -f "docs/WP-REGISTRY.md" ] || { echo "FAIL: WP-REGISTRY.md not found"; exit 1; }
 grep -q "$WP_ID" "docs/WP-REGISTRY.md" || { echo "FAIL: $WP_ID not in WP-REGISTRY"; exit 1; }
 echo "✓ WP-REGISTRY.md"
 
-# 5. build-active-wp.py доступен (проверка пути)
+# 5. build-active-wp.py is available (path check)
 # Resolved from the template root, not $HOME/IWE/scripts: that author layout does
 # not exist in CI, and a WARN-only check could never fail.
 BUILD_SCRIPT="$TEMPLATE_ROOT/scripts/build-active-wp.py"

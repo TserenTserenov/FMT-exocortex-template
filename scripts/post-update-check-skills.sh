@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# post-update-check-skills.sh — post-update detector for SKILL.md routing blocks (WP-350 Ф18)
+# post-update-check-skills.sh — post-update detector for SKILL.md routing blocks (WP-350 Phase 18)
 # routing: executor=script deterministic=true
 # see DP.SC.159, DP.ROLE.059
 #

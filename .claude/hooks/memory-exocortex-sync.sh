@@ -1,64 +1,64 @@
 #!/bin/bash
-# memory-exocortex-sync.sh — зеркалит изменённый файл memory/* или extensions/* → exocortex/ (WP-033)
+# memory-exocortex-sync.sh — mirrors a changed memory/* or extensions/* file → exocortex/ (WP-033)
 # Event: PostToolUse (matcher: Write|Edit|MultiEdit|Bash)
-# see TserenTserenov/FMT-exocortex-template#125 (restore — вторая половина истории портируемости)
-# see TserenTserenov/FMT-exocortex-template#235 (extensions/ добавлен — DATA-POLICY.md
-#   обещает ему ту же защиту, что memory/, а хук раньше проверял только memory/)
-# see TserenTserenov/FMT-exocortex-template#411 (Bash-вызовы не имеют .tool_input.file_path
-#   и раньше проходили мимо хука незамеченными — команду не парсим (ненадёжно), вместо
-#   этого после Bash-события сверяем mtime всего дерева memory/extensions с зеркалом)
+# see TserenTserenov/FMT-exocortex-template#125 (restore — the second half of the portability story)
+# see TserenTserenov/FMT-exocortex-template#235 (extensions/ added — DATA-POLICY.md
+#   promises it the same protection as memory/, while the hook used to check only memory/)
+# see TserenTserenov/FMT-exocortex-template#411 (Bash calls have no .tool_input.file_path
+#   and used to slip past the hook unnoticed — we do not parse the command (unreliable), instead
+#   after a Bash event we compare the mtime of the whole memory/extensions tree with the mirror)
 #
-# Назначение: при каждом изменении файла памяти/расширения держать exocortex/ его
-# зеркалом, чтобы переезд на другое устройство / сбой не терял правки, сделанные среди дня.
-# Раньше это был ручной `cp + commit` (правило feedback_exocortex_sync) — теперь авто.
+# Purpose: on every change of a memory/extension file keep exocortex/ its
+# mirror, so that moving to another device / a crash does not lose edits made mid-day.
+# This used to be a manual `cp + commit` (the feedback_exocortex_sync rule) — now automatic.
 #
-# Инвариант: exocortex/ ⊇ актуальное состояние memory/ и extensions/ в любой момент,
-# кроме day-rhythm-config.yaml: его конфликт-aware синхронизацию откладываем до Day Close.
-# extensions/ зеркалится в exocortex/extensions/ (отдельная подпапка — предотвращает
-# коллизии имён с memory/, если когда-нибудь совпадут).
-# Принципы:
-#   - НИКОГДА не блокирует операцию (exit 0 всегда; зеркалирование — побочный эффект).
-#   - Дёшево: ранний выход для не-memory/не-extensions файлов до любых тяжёлых операций.
-#   - Commit/push сам НЕ делает — это происходит при Close (day-close backup + dirty-repo handling).
-#     Хук отвечает только за файловое зеркало, не за git-транспорт. Исключение — канон
-#     под freeze (issue #1279): хук лишь запускает в фоне scripts/exocortex-publish.sh.
+# Invariant: exocortex/ ⊇ the current state of memory/ and extensions/ at any moment,
+# except day-rhythm-config.yaml: its conflict-aware synchronization is deferred to Day Close.
+# extensions/ is mirrored into exocortex/extensions/ (a separate subfolder — prevents
+# name collisions with memory/, should they ever coincide).
+# Principles:
+#   - NEVER blocks the operation (always exit 0; mirroring is a side effect).
+#   - Cheap: early exit for non-memory/non-extensions files before any heavy operations.
+#   - Does NOT commit/push itself — that happens at Close (day-close backup + dirty-repo handling).
+#     The hook is responsible only for the file mirror, not for git transport. The exception is the canon
+#     under freeze (issue #1279): the hook merely launches scripts/exocortex-publish.sh in the background.
 
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${PATH:-}"
 
-# jq нужен для парсинга stdin; нет jq — молча выходим (хук не критичен для операции)
+# jq is needed for parsing stdin; no jq — exit silently (the hook is not critical for the operation)
 command -v jq >/dev/null 2>&1 || exit 0
 
 INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
-# Bash-вызов не даёт .tool_input.file_path — какой именно файл под memory/extensions
-# он мог тронуть (heredoc, sed -i, cp, mv), надёжно не распарсить из текста команды.
-# Вместо угадывания — сверяем mtime всего дерева memory/ и extensions/ с зеркалом
-# (обе папки плоские и малочисленные по политике CLAUDE.md §4, дёшево).
+# A Bash call gives no .tool_input.file_path — which exact file under memory/extensions
+# it may have touched (heredoc, sed -i, cp, mv) cannot be reliably parsed from the command text.
+# Instead of guessing — compare the mtime of the whole memory/ and extensions/ tree with the mirror
+# (both folders are flat and small by the CLAUDE.md §4 policy, cheap).
 if [ "$TOOL_NAME" = "Bash" ] && [ -z "$FILE_PATH" ]; then
     RECONCILE_BASH=1
 elif [ -z "$FILE_PATH" ]; then
     exit 0
 else
-    # Только .md / .yaml / .yml (memory/ и extensions/ оба состоят из таких файлов). Ранний выход для кода/прочего.
+    # Only .md / .yaml / .yml (memory/ and extensions/ both consist of such files). Early exit for code/other.
     case "$FILE_PATH" in
         *.md|*.yaml|*.yml) ;;
         *) exit 0 ;;
     esac
 fi
 
-# Path-схема: override через env > симлинк $WORKSPACE_DIR/memory > пересборка slug.
-# ВАЖНО: Claude Code слугифицирует путь проекта, заменяя на '-' не только '/', но и
-# '_' и '.'. Если в $HOME есть '_' (напр. username john_doe), реальная папка проекта —
-# '-home-john-doe-IWE', а 'tr / -' даёт фантом '-home-john_doe-IWE' → зеркало не пишется.
-# Поэтому slug = tr '/_.' '-', а первичный источник — симлинк (не зависит от слугификации).
-# issue #1336: резолвим workspace как остальные скрипты конвейера (canon из
+# Path scheme: override via env > symlink $WORKSPACE_DIR/memory > slug reassembly.
+# IMPORTANT: Claude Code slugifies the project path, replacing with '-' not only '/', but also
+# '_' and '.'. If $HOME contains '_' (e.g. username john_doe), the real project folder is
+# '-home-john-doe-IWE', while 'tr / -' yields the phantom '-home-john_doe-IWE' → the mirror is not written.
+# Hence slug = tr '/_.' '-', and the primary source is the symlink (independent of slugification).
+# issue #1336: resolve the workspace like the other pipeline scripts (canon from
 # memory/dry-run-contract.md, issues #1233/#784/#785): env WORKSPACE_DIR >
-# .iwe-paths (IWE_WORKSPACE) > $HOME/IWE. Раньше хук читал только env/$HOME
-# и на установке с нестандартным workspace молча зеркалировал в несуществующий
-# путь. Однострочная форма цепочки — байт-в-байт из вайтлиста dry-run-gate.sh.
+# .iwe-paths (IWE_WORKSPACE) > $HOME/IWE. Previously the hook read only env/$HOME
+# and on an installation with a non-standard workspace silently mirrored into a non-existent
+# path. The one-line form of the chain is byte-for-byte from the dry-run-gate.sh whitelist.
 IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS"
 WORKSPACE_DIR="${WORKSPACE_DIR:-${IWE_WORKSPACE:-$HOME/IWE}}"
 GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
@@ -136,8 +136,8 @@ trigger_frozen_publish() {
     echo "memory-exocortex-sync: $GOVERNANCE_REPO под freeze — снимок памяти обновляется и публикуется в фоне через изолированную копию (issue #1279), канон не пишется" >&2
 }
 
-# Канонический реальный путь memory/. Приоритет — симлинк $WORKSPACE_DIR/memory
-# (указывает на auto-memory независимо от правил слугификации); fallback — MEMORY_SRC.
+# Canonical real path of memory/. Priority — the symlink $WORKSPACE_DIR/memory
+# (points to auto-memory regardless of slugification rules); fallback — MEMORY_SRC.
 if [ -z "${IWE_MEMORY_SRC:-}" ] && [ -d "$WORKSPACE_DIR/memory" ]; then
     MEMORY_REAL=$(cd "$WORKSPACE_DIR/memory" 2>/dev/null && pwd -P) || exit 0
 else
@@ -194,11 +194,11 @@ if [ -n "${RECONCILE_BASH:-}" ]; then
     exit 0
 fi
 
-# Реальный каталог изменённого файла (резолвим возможный симлинк-путь)
+# Real directory of the changed file (resolve a possible symlink path)
 FILE_DIR=$(cd "$(dirname "$FILE_PATH")" 2>/dev/null && pwd -P) || exit 0
 FNAME=$(basename "$FILE_PATH")
 
-# Файл должен лежать ПРЯМО в memory/ или в extensions/ (плоская структура обеих папок)
+# The file must lie DIRECTLY in memory/ or in extensions/ (both folders have a flat structure)
 if [ -n "$CANON_FROZEN" ]; then
     if [ "$FILE_DIR" = "$MEMORY_REAL" ] || { [ -n "$EXTENSIONS_REAL" ] && [ "$FILE_DIR" = "$EXTENSIONS_REAL" ]; }; then
         trigger_frozen_publish

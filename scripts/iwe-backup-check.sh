@@ -1,45 +1,45 @@
 #!/usr/bin/env bash
 # routing: helper  skill=week-close  called-by=sonnet  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# iwe-backup-check.sh — Проверка здоровья системы резервного копирования IWE
+# iwe-backup-check.sh — IWE backup system health check
 #
 # WP-317 supplement, 2026-05-18.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
-# ОБЕЩАНИЕ
+# PROMISE
 # ═══════════════════════════════════════════════════════════════════════════════
-# За ≤3 секунды проверить 4 уровня резервирования IWE и выдать markdown-отчёт:
-#   1. Архивы бэкапа (основной оффлайн-канал: backup_dir из params.yaml
-#      на любой ОС либо iCloud Drive на macOS по умолчанию)
-#   2. Локальные копии .backups/ (legacy / fallback)
-#   3. Git-hygiene (удалённые репо на GitHub как живой backup-код)
-#   4. Runtime-каталоги агентов вне ${HOME}/IWE (WP-7 Ф233а) — покрытие
-#      источников из iwe-backup-sources.yaml: что существует, что
-#      пропущено (с явной причиной), сколько весит.
+# In ≤3 seconds check 4 levels of IWE backup and produce a markdown report:
+#   1. Backup archives (main offline channel: backup_dir from params.yaml
+#      on any OS, or iCloud Drive on macOS by default)
+#   2. Local .backups/ copies (legacy / fallback)
+#   3. Git hygiene (remote repos on GitHub as a live code backup)
+#   4. Agent runtime directories outside ${HOME}/IWE (WP-7 Phase 233a) — coverage
+#      of sources from iwe-backup-sources.yaml: what exists, what is
+#      skipped (with an explicit reason), how much it weighs.
 #
-# Verdict: ✅ / ⚠️ / ❌ с конкретным списком действий.
-# Скрипт ТОЛЬКО детектит. Никаких автофиксов, никаких write-операций в git.
+# Verdict: ✅ / ⚠️ / ❌ with a concrete list of actions.
+# The script ONLY detects. No autofixes, no write operations in git.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
-# СЦЕНАРИИ ИСПОЛЬЗОВАНИЯ
+# USAGE SCENARIOS
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. Ручная сверка перед Week Close (step 7a в week-close протоколе).
+# 1. Manual check before Week Close (step 7a in the week-close protocol).
 #    bash ~/IWE/scripts/iwe-backup-check.sh
 #
-# 2. Ежедневный healthcheck через launchd / cron (macOS).
-#    Добавить в crontab: 0 9 * * * bash $HOME/IWE/scripts/iwe-backup-check.sh
+# 2. Daily healthcheck via launchd / cron (macOS).
+#    Add to crontab: 0 9 * * * bash $HOME/IWE/scripts/iwe-backup-check.sh
 #
-# 3. Интеграция в iwe-audit.sh (future): вызов как подпроцесс для раздела Backup.
+# 3. Integration into iwe-audit.sh (future): call as a subprocess for the Backup section.
 #
-# 4. Pre-backup gate: запускать ПЕРЕД backup-icloud.sh, чтобы убедиться что
-#    нет грязных репо, которые не попадут в архив.
+# 4. Pre-backup gate: run BEFORE backup-icloud.sh to make sure
+#    there are no dirty repos that will not make it into the archive.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
-# ЗАВИСИМОСТИ
+# DEPENDENCIES
 # ═══════════════════════════════════════════════════════════════════════════════
-#   bash, git, stat, date, find, du, wc, cut, sort (всё POSIX / macOS-совместимо)
-#   Платформа: любая ОС с заданной целью бэкапа (backup_dir в params.yaml);
-#   без него — iCloud Drive на macOS, на других ОС секция архивов будет N/A.
+#   bash, git, stat, date, find, du, wc, cut, sort (all POSIX / macOS-compatible)
+#   Platform: any OS with a configured backup target (backup_dir in params.yaml);
+#   without it — iCloud Drive on macOS, on other OSes the archives section will be N/A.
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 # USAGE
@@ -47,19 +47,19 @@
 #   bash iwe-backup-check.sh [OPTIONS]
 #
 # OPTIONS:
-#   --root PATH         Корень IWE (default: $HOME/IWE)
-#   --warn-days N       Порог "предупреждения" для бэкапа в днях (default: 7)
-#   --critical-days N   Порог "критично" для бэкапа в днях (default: 14)
-#   --no-icloud         Пропустить проверку архивов бэкапа (headless / свой бэкап)
-#   --reset-baseline    Установить baseline (число файлов в архиве) для проверки
-#                       целостности ротации. Требует локально доступный (не
-#                       iCloud-заглушку) архив. Коммитит + пушит baseline-файл.
-#   -h, --help          Показать эту справку
+#   --root PATH         IWE root (default: $HOME/IWE)
+#   --warn-days N       "warning" threshold for the backup in days (default: 7)
+#   --critical-days N   "critical" threshold for the backup in days (default: 14)
+#   --no-icloud         Skip the backup archives check (headless / own backup)
+#   --reset-baseline    Set the baseline (number of files in the archive) for the
+#                       rotation integrity check. Requires a locally available (not an
+#                       iCloud stub) archive. Commits + pushes the baseline file.
+#   -h, --help          Show this help
 #
 # EXIT CODES:
-#   0 — всё ОК (backup свежий, git чистый)
-#   1 — warnings (backup 7–14 дней, или ≤2 dirty repos, или stale .backups/)
-#   2 — critical (backup >14 дней, или цель бэкапа недоступна, или >2 dirty repos)
+#   0 — all OK (backup fresh, git clean)
+#   1 — warnings (backup 7–14 days old, or ≤2 dirty repos, or stale .backups/)
+#   2 — critical (backup >14 days old, or backup target unavailable, or >2 dirty repos)
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -69,7 +69,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../.claude/lib/iwe-env-bootstrap.sh" || exit 1
 
-# ---------- Конфигурация ----------
+# ---------- Configuration ----------
 WARN_DAYS=7
 CRITICAL_DAYS=14
 MODE="check"
@@ -91,7 +91,7 @@ if [ "$ENGINE_EXPLICIT" -eq 1 ] && [ "$BACKUP_ENGINE" = restic ]; then
     ARCHIVES_SKIP_REASON="движок бэкапа restic (backup_engine в params.yaml)"
 fi
 
-# ---------- Аргументы ----------
+# ---------- Arguments ----------
 while [ $# -gt 0 ]; do
     case "$1" in
         --root) IWE_ROOT="$2"; shift 2 ;;
@@ -109,11 +109,11 @@ if [ ! -d "$IWE_ROOT" ]; then
     exit 2
 fi
 
-# Baseline — локальный runtime-счётчик, не пилот-читаемый артефакт и не в git
-# (2026-07-20: current/ зарезервирована под ежедневное чтение пилотом). Путь
-# абсолютный, от IWE_ROOT (не от SCRIPT_DIR — тот перезаписывается
-# iwe-env-bootstrap.sh на своё расположение при source выше; вычислен ПОСЛЕ
-# парсинга аргументов, чтобы --root учитывался).
+# Baseline is a local runtime counter, not a pilot-readable artifact and not in git
+# (2026-07-20: current/ is reserved for daily reading by the pilot). The path is
+# absolute, from IWE_ROOT (not from SCRIPT_DIR — that one is overwritten by
+# iwe-env-bootstrap.sh with its own location on the source above; computed AFTER
+# argument parsing so that --root is honored).
 REPO_DIR="${IWE_DS_MY_STRATEGY:-$IWE_ROOT/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
 BASELINE_FILE="$REPO_DIR/.state/backup-baseline.json"
 BASELINE_THRESHOLD_PCT=80
@@ -139,21 +139,21 @@ stat_mtime() {
     fi
 }
 
-# Последний архив IWE-backup-*.tar.gz в цели бэкапа (пусто, если директории/архивов нет)
+# Latest IWE-backup-*.tar.gz archive in the backup target (empty if no directory/archives)
 find_latest_icloud_archive() {
     [ -d "$ICLOUD_DIR" ] || return 0
     find "$ICLOUD_DIR" -maxdepth 1 -name 'IWE-backup-*.tar.gz' -type f 2>/dev/null | sort | tail -1
 }
 
-# du -k возвращает 0 для iCloud-заглушки (Optimize Mac Storage — файл не
-# скачан локально). Отличаем "заглушка" от "реально пустой/битый файл".
+# du -k returns 0 for an iCloud stub (Optimize Mac Storage — the file is not
+# downloaded locally). We distinguish a "stub" from a "really empty/broken file".
 archive_local_size_kb() {
     du -k "$1" 2>/dev/null | cut -f1
 }
 
-# Установка baseline: сколько файлов "нормально" содержит архив ротации.
-# Требует локально доступный (не заглушку) архив. Идемпотентна — повторный
-# вызов без изменений сообщает об этом и завершается штатно (ход 20 BAK1).
+# Baseline setup: how many files a rotation archive "normally" contains.
+# Requires a locally available (not a stub) archive. Idempotent — a repeated
+# call without changes reports that and exits normally (turn 20 BAK1).
 reset_baseline() {
     local latest size_kb file_count existing_count
 
@@ -199,12 +199,12 @@ if [ "$MODE" = "reset-baseline" ]; then
     exit $?
 fi
 
-# ---------- Состояние ----------
+# ---------- State ----------
 EXIT_CODE=0
 WARNINGS=0
 CRITICALS=0
 
-# ---------- Раздел 1: Архивы бэкапа ----------
+# ---------- Section 1: Backup archives ----------
 
 # Writable = a probe file can be created and removed in the directory: this
 # catches read-only mounts and root-owned mount points of an unplugged volume.
@@ -308,7 +308,7 @@ if [ "$CHECK_ARCHIVES" -eq 1 ]; then
 
         # du -k == 0 inside iCloud → a stub (Optimize Mac Storage, not downloaded
         # locally): integrity and file count cannot be checked there — N/A, not
-        # an error (ход 22 BAK1). Outside iCloud a 0 KB archive is just broken,
+        # an error (turn 22 BAK1). Outside iCloud a 0 KB archive is just broken,
         # so it goes through the smoke test below.
         LATEST_SIZE_KB=$(archive_local_size_kb "$LATEST")
         if [ "$TARGET_IS_ICLOUD" -eq 1 ] && { [ -z "$LATEST_SIZE_KB" ] || [ "$LATEST_SIZE_KB" -eq 0 ]; }; then
@@ -351,7 +351,7 @@ else
 fi
 echo ""
 
-# ---------- Раздел 2: Локальные .backups/ ----------
+# ---------- Section 2: Local .backups/ ----------
 
 LOCAL_BACKUP_DIR="$IWE_ROOT/.backups"
 
@@ -377,7 +377,7 @@ else
         done <<< "$BACKUP_FOLDERS"
         echo ""
 
-        # Проверим, есть ли очень старые (>30 дней)
+        # Check whether there are very old ones (>30 days)
         STALE=0
         while IFS= read -r folder; do
             # Archives update.sh keeps on purpose (retired files, replaced
@@ -400,7 +400,7 @@ else
 fi
 echo ""
 
-# ---------- Раздел 3: Git-hygiene ----------
+# ---------- Section 3: Git hygiene ----------
 
 echo "## 3. Git-hygiene (24 репо)"
 echo ""
@@ -414,7 +414,7 @@ for gitdir in $(find "$IWE_ROOT" -maxdepth 2 -name ".git" -type d 2>/dev/null); 
     repo_dir=$(dirname "$gitdir")
     repo_name=$(basename "$repo_dir")
 
-    # Пропускаем node_modules / .venv вложенные .git
+    # Skip node_modules / .venv nested .git
     if echo "$repo_dir" | grep -qE '(node_modules|\.venv)'; then
         continue
     fi
@@ -457,7 +457,7 @@ else
 fi
 echo ""
 
-# ---------- Раздел 4: Runtime-каталоги агентов (WP-7 Ф233а) ----------
+# ---------- Section 4: Agent runtime directories (WP-7 Phase 233a) ----------
 
 echo "## 4. Runtime-каталоги агентов вне \`\$HOME/IWE\`"
 echo ""
@@ -469,13 +469,13 @@ if [ ! -f "$SOURCES_FILE" ]; then
     info "Файл дефолтов не найден ($SOURCES_FILE) — раздел пропущен"
     echo ""
 else
-    # python3 выдаёт один TSV-ряд на источник: tier, path, exists(0/1), note.
-    # Разбор YAML — здесь, не в bash: избегаем ручного парсинга
-    # структурированного формата (P9) и пишем ряд раз. Размер НЕ считаем
-    # здесь: `du -sh` на крупных источниках (например ~/IWE целиком, сотни
-    # ГБ) занимает минуты и ломает заявленное «≤3 секунды» этого скрипта
-    # (найдено живым прогоном при реализации, WP-7 Ф233а) — для статуса
-    # покрытия размер не нужен, только факт наличия.
+    # python3 emits one TSV row per source: tier, path, exists(0/1), note.
+    # YAML parsing is here, not in bash: we avoid hand-parsing
+    # a structured format (P9) and write the row once. We do NOT compute size
+    # here: `du -sh` on large sources (e.g. all of ~/IWE, hundreds
+    # of GB) takes minutes and breaks this script's stated "≤3 seconds"
+    # (found by a live run during implementation, WP-7 Phase 233a) — the coverage
+    # status does not need size, only the fact of presence.
     # Only the workspace itself is mandatory: other tier0 sources exist only if
     # that agent / credential helper is installed (issue #1351). An entry may
     # say `optional: true`; a local override with the same expanded path
@@ -555,7 +555,7 @@ PYEOF
     echo ""
 fi
 
-# ---------- Раздел 5: Свежесть регулярного бэкапа (WP-7 Ф237в) ----------
+# ---------- Section 5: Regular backup freshness (WP-7 Phase 237c) ----------
 
 echo "## 5. Регулярный зашифрованный бэкап (restic)"
 echo ""
@@ -571,18 +571,18 @@ elif ! command -v restic >/dev/null 2>&1; then
 elif [ ! -d "$PROTECT_REPO_DIR" ]; then
     info "Хранилище $PROTECT_REPO_DIR ещё не создано — запустите scripts/iwe-backup-run.sh хотя бы раз"
 else
-    # Возраст считаем в python3: restic отдаёт ISO8601 с реальным offset
-    # (например +03:00) — bash/date-разбор без учёта offset (найдено живым
-    # прогоном: naive "взять часть до точки" давало отрицательный возраст,
-    # т.к. локальное время интерпретировалось как UTC).
+    # We compute age in python3: restic returns ISO8601 with a real offset
+    # (e.g. +03:00) — bash/date parsing without regard to the offset (found by a live
+    # run: naive "take the part before the dot" gave a negative age,
+    # because local time was interpreted as UTC).
     #
-    # stderr restic (не python3) НЕ глушим: поломанный/отсутствующий ключ,
-    # устаревший lock или битый репозиторий дают ненулевой код restic с
-    # пустым stdout — тогда python ветка "snapshots=[]" ложно репортует
-    # «бэкап ни разу не выполнялся» вместо настоящей причины (нужен другой
-    # ремонт: ключ/репозиторий, не повторный запуск) — найдено холодным
-    # ревью. Сохраняем вывод restic отдельно и показываем его при пустом
-    # результате, если он непуст.
+    # We do NOT silence restic's stderr (not python3's): a broken/missing key,
+    # a stale lock or a corrupted repository give a non-zero restic exit code with
+    # empty stdout — then the python branch "snapshots=[]" falsely reports
+    # "backup never ran" instead of the real cause (a different
+    # repair is needed: key/repository, not a rerun) — found by cold
+    # review. We save restic's output separately and show it on an empty
+    # result if it is non-empty.
     RESTIC_SNAPSHOTS_ERR="$(mktemp)"
     SNAPSHOTS_JSON=$(RESTIC_REPOSITORY="$PROTECT_REPO_DIR" RESTIC_PASSWORD_FILE="$PROTECT_KEY_FILE" \
         restic snapshots --tag scheduled --json 2>"$RESTIC_SNAPSHOTS_ERR") || true
@@ -621,7 +621,7 @@ print(int(age.total_seconds() // 3600))
 fi
 echo ""
 
-# ---------- Итог ----------
+# ---------- Summary ----------
 
 echo "---"
 echo ""

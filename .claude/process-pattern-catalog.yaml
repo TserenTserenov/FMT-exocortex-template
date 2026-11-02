@@ -1,23 +1,23 @@
-# process-pattern-catalog.yaml — процессный TPF IWE
+# process-pattern-catalog.yaml — process TPF of IWE
 #
-# Каталог индексирует паттерны процесса (как агент работает), не дублирует их тела.
-# Тело паттерна живёт в CLAUDE.md / distinctions.md / protocol-*.md / .claude/rules/ — этот файл только указывает.
+# The catalog indexes process patterns (how the agent works), it does not duplicate their bodies.
+# A pattern's body lives in CLAUDE.md / distinctions.md / protocol-*.md / .claude/rules/ — this file only points to it.
 #
-# Схема записи:
-#   description:      однострочный интент — зачем паттерн существует
-#   discoverability:   как агент понимает, что паттерн применим сейчас
-#   first_move:        что делать первым
-#   exit:               что считается завершением
-#   boundary:            когда паттерн НЕ применяется
-#   linked_artifact:   список ссылок на реализацию в других каталогах, формат "<catalog>:<id>"; [] если каталог-записи нет
-#   source_ref:          текстовые первоисточники (файл + секция) — происхождение, не интеграция
+# Entry schema:
+#   description:      one-line intent — why the pattern exists
+#   discoverability:   how the agent understands the pattern applies right now
+#   first_move:        what to do first
+#   exit:               what counts as completion
+#   boundary:            when the pattern does NOT apply
+#   linked_artifact:   list of links to the implementation in other catalogs, format "<catalog>:<id>"; [] if there is no catalog entry
+#   source_ref:          textual primary sources (file + section) — origin, not integration
 
 schema_version: 1
-wp: WP-N  # заменить при внедрении в конкретный РП
+wp: WP-N  # replace on adoption in a specific WP
 
 patterns:
 
-  # --- Гейты (точка решения впускать/не впускать) ---
+  # --- Gates (decision point: let in / do not let in) ---
 
   WPGate:
     description: "Любое задание проходит протокол Открытия до начала работы — предотвращает незапланированную работу."
@@ -80,7 +80,7 @@ patterns:
       - file: "CLAUDE.md"
         section: "§5 АрхГейт"
 
-  # --- Проходы (контрольная точка с критерием) ---
+  # --- Passes (checkpoint with a criterion) ---
 
   QualityReviewPass:
     description: "Контрольный проход перед фиксацией результата — проверка кода на баги и качество независимым взглядом."
@@ -115,7 +115,7 @@ patterns:
     source_ref:
       - file: "<governance-repo>/CLAUDE.md"
 
-  # --- Процедуры (протокол верхнего уровня) ---
+  # --- Procedures (top-level protocol) ---
 
   CloseProtocol:
     description: "Каждый масштаб работы (сессия/день/неделя/месяц) закрывается зафиксированным протоколом — предотвращает незафиксированный результат."

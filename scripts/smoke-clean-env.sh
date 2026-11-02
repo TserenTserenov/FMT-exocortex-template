@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Smoke-test для новых scripts/*.sh в FMT. see WP-347 PD-1.
+# Smoke test for new scripts/*.sh in FMT. see WP-347 PD-1.
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <path-to-script>"

@@ -1,9 +1,9 @@
 #!/bin/bash
 # routing: helper  skill=week-close,day-close  called-by=haiku
 # see DP.SC.159, DP.ROLE.059
-# check-dirty-repos.sh — Скан всех IWE репо на незакоммиченные изменения
-# Использование: ./scripts/check-dirty-repos.sh
-# Вызывается из Day Close для обнаружения "забытых" файлов.
+# check-dirty-repos.sh — scan all IWE repos for uncommitted changes
+# Usage: ./scripts/check-dirty-repos.sh
+# Called from Day Close to detect "forgotten" files.
 
 set -euo pipefail
 

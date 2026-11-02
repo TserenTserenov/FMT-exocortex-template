@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Fresh seed-template smoke test / reproduction-gate (Ф-script-contract-gate,
-# Этап 2). Two independent checks against an isolated tmpdir — nothing carried
+# Fresh seed-template smoke test / reproduction-gate (Phase script-contract-gate,
+# Stage 2). Two independent checks against an isolated tmpdir — nothing carried
 # over from the real installation:
 #   1. seed/strategy + create-wp.sh work end-to-end (WP Gate is usable).
 #   2. setup.sh --dry-run runs the real install flow to completion, touching

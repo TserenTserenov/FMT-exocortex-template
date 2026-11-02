@@ -1,12 +1,12 @@
-# Parity Contract — парные скрипты FMT-exocortex-template
-# Контракт: каждый «ключевой паттерн» присутствует в обоих парных скриптах
-# (или ни в одном — если паттерн неприменим к скрипту).
+# Parity Contract — paired scripts of FMT-exocortex-template
+# Contract: each «key pattern» is present in both paired scripts
+# (or in neither — if the pattern is not applicable to the script).
 #
 # Regex: Extended Regular Expressions (grep -E), macOS-compatible.
-# Не используйте: \d, \w, lookahead, PCRE-специфичные конструкции.
-# Для regex начинающихся с `-` используйте обёртку (grep -E -e).
+# Do not use: \d, \w, lookahead, PCRE-specific constructs.
+# For regexes starting with `-` use a wrapper (grep -E -e).
 #
-# Related: WP-315 Ф4, DP.SC.125, AR.205
+# Related: WP-315 Phase 4, DP.SC.125, AR.205
 
 version: "1.2"
 
@@ -81,8 +81,8 @@ pairs:
         regex: "SCRIPT_DIR="
         required_in_both: true
 
-# Правила парсинга:
-# - regex ищется в каждом скрипте пары
-# - required_in_both: true → должен матчаться в обоих
-# - required_in_both: false → достаточно хотя бы в одном (или ни в одном)
-# - Скрипты ищутся относительно корня репо (FMT-exocortex-template/)
+# Parsing rules:
+# - the regex is searched in each script of the pair
+# - required_in_both: true → must match in both
+# - required_in_both: false → at least one is enough (or none)
+# - Scripts are searched relative to the repo root (FMT-exocortex-template/)

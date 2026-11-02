@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# skills-pull.sh — синхронизация L1 скиллов из FMT в личный IWE
+# skills-pull.sh — synchronization of L1 skills from FMT into the personal IWE
 # see DP.SC.153, DP.ROLE.056
 #
-# Политика:
-#   - L1 скилл в FMT, нет в IWE               → копировать (новый)
-#   - L1 скилл в FMT, в IWE layer: L3          → ПРОПУСТИТЬ (авторская кастомизация)
-#   - L1 скилл в FMT, в IWE layer: L1, без изм → обновить
-#   - L1 скилл в FMT, в IWE layer: L1, есть изм → ПАУЗА + отчёт пользователю
+# Policy:
+#   - L1 skill in FMT, absent in IWE               → copy (new)
+#   - L1 skill in FMT, in IWE layer: L3          → SKIP (author's customization)
+#   - L1 skill in FMT, in IWE layer: L1, unchanged → update
+#   - L1 skill in FMT, in IWE layer: L1, changed → PAUSE + report to the user
 #
-# Использование:
+# Usage:
 #   bash skills-pull.sh [--dry-run] [--force]
-#   --force: обновлять L1-скиллы даже с локальными изменениями (применять FMT версию)
+#   --force: update L1 skills even with local changes (apply the FMT version)
 
 set -uo pipefail
 
@@ -40,7 +40,7 @@ fi
 
 mkdir -p "$IWE_SKILLS"
 
-# Вспомогательная функция: получить layer из SKILL.md
+# Helper function: get layer from SKILL.md
 get_layer() {
     local skill_md="$1"
     sed -n '/^---$/,/^---$/p' "$skill_md" 2>/dev/null \
@@ -48,8 +48,8 @@ get_layer() {
         | sed 's/^layer: *//' | tr -d '\r'
 }
 
-# Применить подстановки при копировании из FMT → IWE
-# (разворачиваем ${IWE:-...} → реальный путь пользователя)
+# Apply substitutions when copying from FMT → IWE
+# (expand ${IWE:-...} → the user's real path)
 apply_iwe_substitutions() {
     local src="$1" dst="$2"
     sed \
@@ -83,20 +83,20 @@ for fmt_skill_dir in "$FMT_SKILLS"/*/; do
 
     fmt_layer=$(get_layer "$fmt_skill_md")
     if [[ "$fmt_layer" != "L1" ]]; then
-        continue  # Нас интересуют только L1 скиллы из FMT
+        continue  # We are only interested in L1 skills from FMT
     fi
 
     iwe_skill_dir="${IWE_SKILLS}/${skill_id}"
     iwe_skill_md="${iwe_skill_dir}/SKILL.md"
 
-    # ── Кейс 1: скилл отсутствует в IWE → копировать ─────────────────────────
+    # ── Case 1: the skill is absent in IWE → copy ───────────────────────────
     if [[ ! -d "$iwe_skill_dir" ]]; then
         if $dry_run; then
             log "  📥 [$skill_id] НОВЫЙ — скопировать из FMT"
         else
             mkdir -p "$iwe_skill_dir"
             cp -r "$fmt_skill_dir"/. "$iwe_skill_dir/"
-            # Развернуть подстановки в SKILL.md
+            # Expand substitutions in SKILL.md
             tmp=$(mktemp)
             apply_iwe_substitutions "$iwe_skill_md" "$tmp"
             mv "$tmp" "$iwe_skill_md"
@@ -106,7 +106,7 @@ for fmt_skill_dir in "$FMT_SKILLS"/*/; do
         continue
     fi
 
-    # Скилл есть в IWE — смотрим layer
+    # The skill exists in IWE — look at layer
     if [[ ! -f "$iwe_skill_md" ]]; then
         log "  ⚠️  [$skill_id] директория есть, SKILL.md нет — пропуск"
         (( errors++ )) || true
@@ -115,26 +115,26 @@ for fmt_skill_dir in "$FMT_SKILLS"/*/; do
 
     iwe_layer=$(get_layer "$iwe_skill_md")
 
-    # ── Кейс 2: IWE layer: L3 → пропустить (авторская кастомизация) ──────────
+    # ── Case 2: IWE layer: L3 → skip (author's customization) ───────────────
     if [[ "$iwe_layer" == "L3" ]]; then
         log "  🛡️  [$skill_id] layer: L3 — пропуск (авторская кастомизация)"
         (( skipped_l3++ )) || true
         continue
     fi
 
-    # ── Кейс 3/4: IWE layer: L1 — проверить на изменения ────────────────────
-    # Развернуть FMT версию во временный файл для сравнения
+    # ── Case 3/4: IWE layer: L1 — check for changes ────────────────────────
+    # Expand the FMT version into a temporary file for comparison
     tmp_fmt=$(mktemp)
     apply_iwe_substitutions "$fmt_skill_md" "$tmp_fmt"
 
     if diff -q "$tmp_fmt" "$iwe_skill_md" > /dev/null 2>&1; then
-        # Кейс 3: идентичны → ничего делать не нужно
+        # Case 3: identical → nothing to do
         log "  ✅ [$skill_id] актуален (L1)"
         rm -f "$tmp_fmt"
         continue
     fi
 
-    # Кейс 4: есть отличия
+    # Case 4: there are differences
     if $force; then
         if $dry_run; then
             log "  🔄 [$skill_id] обновить (--force, L1)"

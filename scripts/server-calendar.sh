@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # routing: server  deterministic=true
 # see DP.SC.159, DP.ROLE.059
-# server-calendar.sh — кросс-платформенная замена mcp__ext-google-calendar для server-mode
+# server-calendar.sh — cross-platform replacement for mcp__ext-google-calendar in server-mode
 # see WP-283 (DS-strategy/inbox/WP-283-server-day-open-crossplatform.md)
 #
-# Выводит готовую markdown-секцию «Календарь» для DayPlan или WeekPlan.
+# Prints a ready markdown "Calendar" section for a DayPlan or WeekPlan.
 #
-# Возможности:
-#   - Режим дня (default): события на 1 день, свободные блоки, статусы ⏳/🔄/✅
-#   - Режим недели (--week): события на 7 дней, сводка по дням
-#   - Классификация: meeting (встречи) vs task (напоминания, тех-операции)
+# Features:
+#   - Day mode (default): events for 1 day, free blocks, statuses ⏳/🔄/✅
+#   - Week mode (--week): events for 7 days, per-day summary
+#   - Classification: meeting (meetings) vs task (reminders, technical operations)
 #
-# Требует:
+# Requires:
 #   env: GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-#   или файл ~/.secrets/google-calendar (строки KEY=VALUE)
-#   config: day-rhythm-config.yaml → calendar_ids (пустой список = все
-#     доступные календари через calendarList, отсутствующий ключ = ошибка)
+#   or the file ~/.secrets/google-calendar (KEY=VALUE lines)
+#   config: day-rhythm-config.yaml → calendar_ids (empty list = all
+#     available calendars via calendarList, missing key = error)
 #
-# Использование:
+# Usage:
 #   bash server-calendar.sh YYYY-MM-DD [CONFIG_PATH]
 #   bash server-calendar.sh --week [YYYY-MM-DD] [CONFIG_PATH]
 #   bash server-calendar.sh 2026-05-19
@@ -28,26 +28,26 @@
 #   a literal UTC day (unchanged default, every existing caller). With it,
 #   the window is the true local day/week in that zone, converted to UTC.
 #
-# --json: вместо markdown-секции печатает один JSON-объект на stdout —
+# --json: instead of a markdown section prints a single JSON object to stdout —
 #   {schema_version, source_version, generated_at, window_start, window_end,
-#    events[], errors[], status}. events[] — та же структура, что строит
-#   markdown-режим (summary/start/duration/...), плюс id/updated_at/end для
-#   машинного потребителя (WP-389 Ф6, bounded-источник календаря для
-#   Секретаря). Контракт: generated_at — когда ИМЕННО вызван Google API
-#   (давность снимка должна считаться от него, не от времени чтения
-#   downstream-модулем); на любом раннем выходе (нет credentials, нет
-#   calendar_ids, OAuth error) events=[] и status="pending" с причиной в
-#   errors[] — тот же "всегда рендерится" принцип, что уже держит markdown-
-#   режим, только в машинной форме вместо текста-заглушки.
+#    events[], errors[], status}. events[] is the same structure that the
+#   markdown mode builds (summary/start/duration/...), plus id/updated_at/end for
+#   the machine consumer (WP-389 Phase 6, a bounded calendar source for the
+#   Secretary). Contract: generated_at — when EXACTLY the Google API was called
+#   (snapshot staleness must be counted from it, not from the time the
+#   downstream module read it); on any early exit (no credentials, no
+#   calendar_ids, OAuth error) events=[] and status="pending" with the reason in
+#   errors[] — the same "always renders" principle that the markdown
+#   mode already holds, only in machine form instead of placeholder text.
 
 set -uo pipefail
 
 SCRIPT_SOURCE_VERSION=1
 
-# Общий выход для каждого раннего "не могу продолжить" (python3/credentials/
-# OAuth/config отсутствуют). $reason идёт и в markdown-текст, и в JSON
-# errors[]; downstream-читателю из WP-389 Ф6 не нужно парсить markdown,
-# чтобы отличить "pending" от реального списка событий.
+# A common exit for every early "cannot continue" (python3/credentials/
+# OAuth/config missing). $reason goes both into the markdown text and the JSON
+# errors[]; the downstream reader from WP-389 Phase 6 does not need to parse markdown
+# to tell "pending" from a real list of events.
 report_pending() {
   local reason="$1"
   if [[ "$JSON_MODE" == true ]]; then
@@ -79,14 +79,14 @@ print(json.dumps({
   exit 0
 }
 
-# --- Разбор аргументов ---
+# --- Argument parsing ---
 WEEK_MODE=false
 JSON_MODE=false
 DATE_ARG=""
 CONFIG_ARG=""
 # --tz <IANA name>: only --json honors this (see TIME_MIN/TIME_MAX below) —
 # markdown/day-open-pipeline.sh callers keep the UTC-day window unchanged,
-# a deliberate backward-compat boundary, not an oversight (WP-389 Ф6).
+# a deliberate backward-compat boundary, not an oversight (WP-389 Phase 6).
 TZ_ARG=""
 
 while [ "$#" -gt 0 ]; do
@@ -116,7 +116,7 @@ IWE="${IWE_ROOT:-$HOME/IWE}"
 CONFIG="${CONFIG_ARG:-$IWE/.iwe-runtime/day-rhythm-config.yaml}"
 SECRETS_FILE="${HOME}/.secrets/google-calendar"
 
-# --- Выбираем python3 с PyYAML (общий резолвер, WP-529 F6 / #453 #463) ---
+# --- Pick a python3 with PyYAML (common resolver, WP-529 F6 / #453 #463) ---
 RESOLVER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/find-python3.sh"
 if ! PYTHON3=$("$RESOLVER"); then
   # Explicit dependency error instead of the old lie: a yaml-less interpreter
@@ -126,7 +126,7 @@ if ! PYTHON3=$("$RESOLVER"); then
   report_pending "не найден python3 с библиотекой PyYAML. Установить: pip3 install pyyaml (или sudo apt install python3-yaml); см. requirements.txt"
 fi
 
-# --- Загружаем credentials ---
+# --- Load credentials ---
 if [[ -f "$SECRETS_FILE" ]]; then
   set -a; source "$SECRETS_FILE"; set +a
 fi
@@ -139,7 +139,7 @@ if [[ -z "$REFRESH_TOKEN" || -z "$CLIENT_ID" || -z "$CLIENT_SECRET" ]]; then
   report_pending "Google credentials не настроены. Установить: ~/.secrets/google-calendar (GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)"
 fi
 
-# --- Получаем access token ---
+# --- Get access token ---
 TOKEN_RESPONSE=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
   -d "client_id=${CLIENT_ID}" \
   -d "client_secret=${CLIENT_SECRET}" \
@@ -153,10 +153,10 @@ if [[ -z "$ACCESS_TOKEN" ]]; then
   report_pending "OAuth error: $ERROR"
 fi
 
-# --- Читаем calendar_ids из конфига ---
-# issue #489: пустой calendar_ids документирован как "все доступные календари",
-# не как "не настроено" — sentinel различает отсутствие ключа (MISSING) от
-# явного пустого списка (пустой stdout, но не MISSING).
+# --- Read calendar_ids from the config ---
+# issue #489: an empty calendar_ids is documented as "all available calendars",
+# not as "not configured" — the sentinel distinguishes a missing key (MISSING) from
+# an explicit empty list (empty stdout, but not MISSING).
 CONFIG_READ=$($PYTHON3 -c "
 import yaml, sys
 try:
@@ -182,8 +182,8 @@ fi
 CALENDAR_IDS="$CONFIG_READ"
 
 if [[ -z "$CALENDAR_IDS" ]]; then
-  # Пустой список = документированное "все доступные календари" (day-rhythm-config.yaml
-  # комментарий), не ошибка конфигурации — запрашиваем полный список у Google.
+  # Empty list = the documented "all available calendars" (day-rhythm-config.yaml
+  # comment), not a configuration error — request the full list from Google.
   CALENDAR_IDS=$($PYTHON3 << PYEOF
 import subprocess, urllib.parse, json, sys
 access_token = "${ACCESS_TOKEN}"
@@ -223,11 +223,11 @@ PYEOF
   fi
 fi
 
-# --- Временной диапазон ---
+# --- Time range ---
 if [[ -n "$TZ_ARG" && "$JSON_MODE" == true ]]; then
     # True local-day (or local-week) boundary converted to UTC, not a
     # literal UTC-day window — scoped to --json: markdown/day-open-
-    # pipeline.sh callers keep today's UTC-day window unchanged (WP-389 Ф6,
+    # pipeline.sh callers keep today's UTC-day window unchanged (WP-389 Phase 6,
     # code review 2026-10-05: treating DATE as a UTC day silently shifts the
     # queried window by the zone's UTC offset — e.g. for a UTC+3 zone, events
     # in the first ~3h of true local today fall outside it, and the window
@@ -256,7 +256,7 @@ print(start_local.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
     if [[ "$WEEK_MODE" == true ]]; then MODE_LABEL="неделю"; else MODE_LABEL="день"; fi
 elif [[ "$WEEK_MODE" == true ]]; then
     TIME_MIN="${DATE}T00:00:00Z"
-    # +6 дней = неделя
+    # +6 days = a week
     TIME_MAX=$($PYTHON3 -c "from datetime import datetime, timedelta; d=datetime.strptime('$DATE','%Y-%m-%d')+timedelta(days=6); print(d.strftime('%Y-%m-%dT23:59:59Z'))")
     MODE_LABEL="неделю"
 else
@@ -265,7 +265,7 @@ else
     MODE_LABEL="день"
 fi
 
-# --- Запрашиваем каждый календарь ---
+# --- Query each calendar ---
 EVENTS_JSON=$($PYTHON3 << PYEOF
 # -*- coding: utf-8 -*-
 import json, subprocess, urllib.parse, sys, re
@@ -456,7 +456,7 @@ print(json.dumps({"events": all_events, "errors": errors}, ensure_ascii=False))
 PYEOF
 )
 
-# --- Машинный вывод (--json): конверт с давностью снимка вместо markdown ---
+# --- Machine output (--json): an envelope with snapshot staleness instead of markdown ---
 if [[ "$JSON_MODE" == true ]]; then
   $PYTHON3 << PYEOF
 # -*- coding: utf-8 -*-
@@ -489,7 +489,7 @@ PYEOF
   exit $?
 fi
 
-# --- Формируем markdown ---
+# --- Build markdown ---
 $PYTHON3 << PYEOF
 # -*- coding: utf-8 -*-
 import json, sys

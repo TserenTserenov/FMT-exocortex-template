@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # optional-deps: ffmpeg openai-whisper  (see docs/PLATFORM-COMPAT.md — not required for core IWE)
 #
-# kimi-whisper-safe.sh — безопасная обёртка для whisper с защитой от
-# foreground-зависаний на длинных аудио (WP-7 KHP2).
+# kimi-whisper-safe.sh — a safe wrapper for whisper with protection against
+# foreground hangs on long audio (WP-7 KHP2).
 #
-# Протокол:
-#   - Перед запуском всегда измеряем длину файла через ffprobe.
-#   - ≤ 60 с  → foreground с hard timeout 120 с.
-#   - > 60 с  → foreground-запуск запрещён; выводим предупреждение и
-#               команды для фонового/API-запуска. Если передан флаг
-#               --background (или env IWE_WHISPER_BACKGROUND=1), запускаем
-#               whisper в фоне через nohup.
+# Protocol:
+#   - Before running, always measure the file length via ffprobe.
+#   - ≤ 60 s  → foreground with a hard timeout of 120 s.
+#   - > 60 s  → foreground launch is forbidden; print a warning and
+#               commands for a background/API launch. If the --background flag is passed
+#               (or env IWE_WHISPER_BACKGROUND=1), run
+#               whisper in the background via nohup.
 #
 # Usage:
 #   bash scripts/kimi-whisper-safe.sh /path/to/audio.mp3 [whisper-args...]

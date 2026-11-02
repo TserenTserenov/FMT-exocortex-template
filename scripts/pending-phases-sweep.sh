@@ -1,46 +1,46 @@
 #!/usr/bin/env bash
 # routing: utility  deterministic=true
 # see Backlog B-005 (Week Close §5b helper)
-# pending-phases-sweep.sh — обходит активные WP-context файлы и выводит pending фазы
+# pending-phases-sweep.sh — walks active WP-context files and prints pending phases
 #
-# Использование:
-#   bash pending-phases-sweep.sh                  # обход активных РП в DS-strategy/inbox/
-#   bash pending-phases-sweep.sh --all            # включить файлы без status
-#   bash pending-phases-sweep.sh --repo <path>    # указать другой governance-репо
+# Usage:
+#   bash pending-phases-sweep.sh                  # sweep active WPs in DS-strategy/inbox/
+#   bash pending-phases-sweep.sh --all            # include files without status
+#   bash pending-phases-sweep.sh --repo <path>    # point to another governance repo
 #
-# Поддерживаемые форматы фаз:
-#   | Ф1 | описание | pending |
-#   - [ ] Ф1: описание
-#   ## Ф1: описание   (заголовок любого уровня 2-6, номер — любой суффикс:
-#                       Ф10.5, Ф7b, Ф2а, "Ф0. Текст")
+# Supported phase formats:
+#   | Ф1 | description | pending |
+#   - [ ] Ф1: description
+#   ## Ф1: description   (heading of any level 2-6, the number may have any suffix:
+#                       Ф10.5, Ф7b, Ф2а, "Ф0. Text")
 #
-# Заголовок сам по себе — только кандидат на фазу, не источник ошибки.
-# Checklist-статус: "[ ]" = pending, "[x]"/"[X]" = закрыто, любое другое
-# непустое содержимое ("[~]", emoji-маркеры) = тоже "не готово" — реальный
-# репозиторий использует эти обозначения повсеместно. UNSUPPORTED эмитится
-# только для действительно нераспознаваемого — пустых скобок "[]" в
-# checklist. Голый заголовок без табличного тела или чекбокса рядом
-# (журнальная запись прошедшего события, ретроспектива) не считается фазой
-# вообще и молча игнорируется — issue #458 живым прогоном на реальном
-# inbox/ нашёл сотни ложных UNSUPPORTED при более строгих версиях
-# (заголовки только 3 уровня, только чисто числовой номер, любая строка
-# "ФN..." считалась кандидатом, только "[ ]"/"[x]"/"[X]" как валидные
-# чекбоксы), что сделало sweep практически бесполезным на настоящих данных
-# репозитория. Финальная версия: 378 pending-фаз, 0 ложных срабатываний на
-# 91 карточке.
+# A heading on its own is only a phase candidate, not a source of error.
+# Checklist status: "[ ]" = pending, "[x]"/"[X]" = closed, any other
+# non-empty content ("[~]", emoji markers) = also "not done" — the real
+# repository uses these notations everywhere. UNSUPPORTED is emitted
+# only for truly unrecognizable input — empty brackets "[]" in a
+# checklist. A bare heading without a table body or checkbox nearby
+# (a journal entry of a past event, a retrospective) is not considered a phase
+# at all and is silently ignored — issue #458: a live run on the real
+# inbox/ found hundreds of false UNSUPPORTED with stricter versions
+# (headings of level 3 only, only a purely numeric number, any line
+# "ФN..." treated as a candidate, only "[ ]"/"[x]"/"[X]" as valid
+# checkboxes), which made the sweep practically useless on real data
+# of the repository. Final version: 378 pending phases, 0 false positives on
+# 91 cards.
 #
-# issue #541 (регрессия #458, найдена внешним ревью 26.08.2026): "### ФN"
-# заголовок с телом из нескольких пунктов — незакрытый "- [ ]" где угодно
-# внутри секции теперь безусловно считается pending, даже если в заголовке
-# уже стоит "✅ DONE" или рядом есть другой уже закрытый "[x]"-пункт. Раньше
-# любое "закрыто"-слово в секции гасило pending навсегда (одноразовая
-# защёлка) — реальные карточки регулярно смешивают закрытые пункты с одним
-# забытым в той же секции, живой пример: WP-529 "### Ф2 — ... ✅ DONE" с
-# незакрытым "- [ ] Acceptance-критерий" внутри.
+# issue #541 (regression of #458, found by external review on 26.08.2026): a "### ФN"
+# heading with a multi-item body — an unclosed "- [ ]" anywhere
+# inside the section is now unconditionally considered pending, even if the heading
+# already says "✅ DONE" or there is another already-closed "[x]" item nearby. Previously
+# any "closed" word in the section silenced pending forever (a one-shot
+# latch) — real cards regularly mix closed items with one
+# forgotten item in the same section, live example: WP-529 "### Ф2 — ... ✅ DONE" with
+# an unclosed "- [ ] Acceptance-критерий" inside.
 #
-# Output: для каждого активного WP с pending-фазами — заголовок + список фаз
+# Output: for each active WP with pending phases — a heading + a list of phases
 #
-# Совместимость: macOS bash 3.2 (без mapfile, без assoc-arrays)
+# Compatibility: macOS bash 3.2 (no mapfile, no assoc-arrays)
 
 set -uo pipefail
 
