@@ -1,0 +1,44 @@
+name: No-Cyrillic Gate
+
+# English-only distribution: no Cyrillic in any tracked file, file name or
+# commit message. The range is written as a hex escape so this file never
+# trips its own check.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  no-cyrillic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tracked files and file names
+        run: |
+          pattern='[\x{0400}-\x{052F}\x{1C80}-\x{1C8F}\x{2DE0}-\x{2DFF}\x{A640}-\x{A69F}]'
+          if git ls-files | grep -P "$pattern"; then
+            echo '::error::Cyrillic in a file name.'
+            exit 1
+          fi
+          if git grep -nIP "$pattern" -- . ':!.github/workflows/no-cyrillic-gate.yml'; then
+            echo '::error::Cyrillic in tracked files. This repository is English-only.'
+            exit 1
+          fi
+          echo 'PASS: tree contains no Cyrillic.'
+
+      - name: Commit messages
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            before="${{ github.event.before }}"
+            case "$before" in ""|0000000000000000000000000000000000000000) range="${{ github.event.after }}" ;; *) range="$before..${{ github.event.after }}" ;; esac
+          fi
+          if git log "$range" --format=%B | grep -qP '[\x{0400}-\x{052F}]'; then
+            echo '::error::Commit message contains Cyrillic.'
+            exit 1
+          fi
+          echo 'PASS: commit messages contain no Cyrillic.'
