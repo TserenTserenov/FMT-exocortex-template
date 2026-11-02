@@ -80,6 +80,7 @@ EXCLUDED_SCRIPTS=(
     "scripts/export-glossary-snapshot.py"       # CI-only: снимок терминов графа для перевода (WP-5 Ф67)
     "scripts/fetch-glossary-concepts.py"        # CI-only: обход concept_list для снимка терминов (WP-5 Ф67)
     "scripts/delivery_checks.py"                # CI-only: translate-sync.yml
+    "scripts/assemble_distribution.py"          # CI-only: translate-sync.yml (сборка состава английской версии, WP-610 Ф10)
     "scripts/release-notice-build.py"           # CI-only: notify-update.yml (анонс выпуска, WP-529)
     "scripts/audit-ad-hoc-roles.py"             # нет ссылок ни из одного доставляемого артефакта
     "scripts/agent-dashboard.py"                # только scripts/tests/, нет ссылок из доставляемого

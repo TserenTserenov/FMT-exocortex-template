@@ -14,16 +14,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "README.md"
-      - "docs/**"
-      - "CODE_OF_CONDUCT.md"
-      - "SECURITY.md"
-      - "PRIVACY.md"
-      - "LICENSE"
-      - "CODEOWNERS"
-      - "CITATION.cff"
-      - "CHANGELOG.md"
 
 concurrency:
   group: translate-sync-${{ github.ref }}
@@ -65,7 +55,8 @@ jobs:
           pytest scripts/tests/test_delivery_formal.py \
                  scripts/tests/test_delivery_content.py \
                  scripts/tests/test_translate_delta.py \
-                 scripts/tests/test_normalize_en_phase_labels.py -q
+                 scripts/tests/test_normalize_en_phase_labels.py \
+                 scripts/tests/test_assemble_distribution.py -q
 
       - name: Fetch or create en-draft staging branch
         id: en_draft
@@ -143,6 +134,20 @@ jobs:
             mkdir -p "../en-draft/docs/assets"
             cp "docs/assets/orz-cycle.svg" "../en-draft/docs/assets/orz-cycle.svg"
           fi
+
+      - name: Assemble the English distribution set (EN_DISTRIBUTION_ASSEMBLE)
+        # Pilot decision 2026-11-02 (WP-610): the English version ships only what
+        # installation and use need = the update manifest minus guide-kit/. Code is
+        # copied verbatim, markdown keeps its translation, everything else is
+        # removed. Switched on by the repository variable once the shipped code is
+        # free of Cyrillic; until then the step is skipped and the old behaviour
+        # stays. Exit 2 (untranslated markdown or Cyrillic left) fails the job so
+        # that publish-to-iwesys never runs on a tree the gate would reject.
+        if: always() && steps.en_draft.outcome == 'success' && vars.EN_DISTRIBUTION_ASSEMBLE == 'true'
+        run: |
+          python3 scripts/assemble_distribution.py . ../en-draft
+          mkdir -p ../en-draft/.github/workflows
+          cp templates/en-distribution/no-cyrillic-gate.yml ../en-draft/.github/workflows/no-cyrillic-gate.yml
 
       - name: Strip RU-source references from the EN-side README
         # Pilot decision (WP-401 Ф5, 2026-07-10): the EN distribution must
