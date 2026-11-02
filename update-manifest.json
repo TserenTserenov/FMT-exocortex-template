@@ -3309,7 +3309,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "c7234a152ff31ee656ea8645188d0dab029fe6fd5a2f481dd58830bf5586360b"
+      "sha256": "d8a259a40883116982e0b9144e03af8edc1470e340e288f99a6a636a6d280e55"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
