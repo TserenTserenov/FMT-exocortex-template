@@ -6,6 +6,9 @@
 # version: a strictly newer release is a normal update; equal/newer installs stay blocked.
 # Drives the real functions extracted from update.sh against throwaway git repos (no network).
 set -uo pipefail
+# Clones below get no repo-level identity; CI runners have no global one.
+export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com
+export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 UPDATE_SH="$ROOT/update.sh"
