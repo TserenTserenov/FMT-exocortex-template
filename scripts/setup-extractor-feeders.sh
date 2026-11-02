@@ -72,6 +72,15 @@ PLATFORM=$(uname -s)
 case "$PLATFORM" in
     Darwin)  log "Платформа: macOS (используем launchd)";;
     Linux)   log "Платформа: Linux (используем systemd --user)";;
+    MINGW*|MSYS*|CYGWIN*)
+        # issue #1411: no launchd/systemd on native Windows. Not an error —
+        # say what does not happen and what to run instead.
+        warn "Windows ($PLATFORM): автоматическое расписание экстрактора не ставится — ни launchd, ни systemd здесь нет."
+        log "Альтернативы:"
+        log " - WSL2: запустите этот скрипт внутри WSL2, там работает ветка Linux (systemd --user);"
+        log " - вручную в Git Bash, раз в день или из Планировщика заданий Windows:"
+        log "     bash \"$EXTRACTOR_SH\" git-diff-feed \"13 hours ago\""
+        exit 0;;
     *)       fail "Неподдерживаемая платформа: $PLATFORM"; exit 1;;
 esac
 

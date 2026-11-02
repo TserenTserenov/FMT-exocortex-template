@@ -16,7 +16,7 @@ shopt -s nullglob
 # Many tests swap HOME for a fake one. A `pip install --user` PyYAML lives under
 # the real HOME and vanished with it, so those tests failed only on machines
 # with a user-site install (issues #1342, #1343). Pin it once for every test.
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 
 fail=0
@@ -41,6 +41,9 @@ ADDITIONAL_ISSUE_TESTS=(
     "scripts/tests/test_changelog_append_blank_lines.sh"
     "scripts/tests/test_update_drop_dead_railway_mcp.sh"
     "scripts/tests/test_template_hygiene_checks.sh"
+    "scripts/tests/test-issue-1411-secret-scan-fp.sh"
+    "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh"
+    ".claude/hooks/tests/test-issue-1411-stop-gate-blocked-skill.sh"
 )
 
 run_shell_test() {

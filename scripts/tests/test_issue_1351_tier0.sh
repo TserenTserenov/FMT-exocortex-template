@@ -14,7 +14,7 @@ fail() { echo "  ❌ FAIL: $*"; FAIL=$((FAIL + 1)); }
 
 # The check runs under a fake HOME; keep the real user site-packages visible
 # so a `pip install --user` PyYAML is still importable (same trap as #1342).
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 
 TMP="$(mktemp -d)"

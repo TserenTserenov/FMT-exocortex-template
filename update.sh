@@ -13,6 +13,10 @@
 #
 set -e
 
+# issue #1411: Python helpers print "→", "✅" and Cyrillic; a Windows console in
+# cp1251 cannot encode them and the helper crashed after doing its work.
+export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
+
 # Named exit codes (issue #31): improve diagnostics for non-obvious failures.
 EXIT_OK=0
 EXIT_USAGE=1
@@ -1196,6 +1200,28 @@ rollback_by_version() {
     [ "$cmp" = "-1" ]
 }
 
+# rollback_without_release_commit — issue #1411: the release commit is neither in the local
+# object store nor fetchable from origin. An install made with GitHub "Use this template" has
+# an origin of its own that holds no template commit, so the fetch can never succeed there.
+# In a complete (non-shallow) clone a commit that is absent locally cannot be an ancestor of
+# HEAD, so ancestry cannot show a rollback; order by manifest version instead. A network
+# failure looks the same as "not in this remote" here, so only a strictly newer release
+# counts as a normal update; equal or unreadable versions stay "cannot determine".
+# Exit codes (the same contract as detect_release_rollback): 0 - release older (a rollback),
+# 1 - release strictly newer, 2 - cannot tell (shallow clone, no manifest, equal/bad version).
+rollback_without_release_commit() {
+    local installed cmp
+    [ "$(git -C "$SCRIPT_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "false" ] || return 2
+    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 2
+    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
+    cmp=$(version_compare "${UPSTREAM_VERSION:-}" "$installed") || return 2
+    case "$cmp" in
+        1) return 1 ;;
+        -1) return 0 ;;
+        *) return 2 ;;
+    esac
+}
+
 # issue #863: detect when the default release channel would roll back an install
 # that is already newer than the latest published release. Fires in release
 # channel when SCRIPT_DIR is a git repo and local HEAD contains commits that are
@@ -1208,6 +1234,8 @@ rollback_by_version() {
 #   1 - no rollback (release is HEAD, ahead, or, with no common ancestor, not older by version)
 #   2 - cannot determine (network/history missing, unreadable versions, a shallow clone with
 #       no visible common ancestor) -> caller must block --yes
+# A release commit that cannot be fetched from origin (#1411) is ordered by version too, see
+# rollback_without_release_commit.
 detect_release_rollback() {
     [ "$UPDATE_CHANNEL" = "release" ] || return 1
     [ -n "$RELEASE_SHA" ] || return 1
@@ -1249,7 +1277,8 @@ print(sha)') || return 2
     # Ensure the release commit object is available locally for merge-base.
     if ! git -C "$SCRIPT_DIR" cat-file -e "$release_sha" 2>/dev/null; then
         if ! git -C "$SCRIPT_DIR" fetch --quiet origin "$release_sha" 2>/dev/null; then
-            return 2
+            rollback_without_release_commit
+            return $?
         fi
     fi
 
