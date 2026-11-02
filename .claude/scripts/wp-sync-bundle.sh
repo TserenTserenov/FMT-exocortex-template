@@ -1113,6 +1113,26 @@ main() {
     echo ""
   fi
 
+  # WP-5 Phase 69: inbound context mailbox next to the card
+  # (inbox/WP-N/INBOX.md, written by scripts/wp-inbox.sh). «новое» entries are a
+  # drift signal: they switch on the non-trivial branch even with zero related WPs.
+  # Read via the same path as the card, so it also works in origin-pinned mode.
+  local inbox_box inbox_new
+  inbox_box="$(dirname "$wp_file")/INBOX.md"
+  inbox_new=0
+  if [[ -f "$inbox_box" ]]; then
+    inbox_new=$(grep -c -E '^## И-[0-9]+ · .* · новое$' "$inbox_box" || true)
+  fi
+  echo "## Входящие (ящик РП, Ф69)"
+  if [[ "$inbox_new" -gt 0 ]]; then
+    echo "- Неразобранных записей: ${inbox_new}"
+    awk '/^## И-[0-9]+ · /{p = ($0 ~ / · новое$/)} p' "$inbox_box" | sed 's/^/  /'
+    echo "DRIFT: inbox_unprocessed — ${inbox_new} записей в ${inbox_box}" >> "$drift_file"
+  else
+    echo "- Нет неразобранных записей."
+  fi
+  echo ""
+
   # ---------------------------------------------------------------------------
   # Related WPs
   # ---------------------------------------------------------------------------
