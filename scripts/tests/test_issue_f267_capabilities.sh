@@ -24,7 +24,7 @@ FAIL=0
 pass() { echo "  ✅ PASS: $*"; }
 fail() { echo "  ❌ FAIL: $*"; FAIL=$((FAIL + 1)); }
 
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 export PYTHONUSERBASE
 
 TMP="$(mktemp -d)"

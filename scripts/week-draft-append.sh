@@ -3,13 +3,15 @@
 # see DP.SC.159, DP.ROLE.059
 # week-draft-append.sh — обновить метрики текущего дня в черновике недельного поста.
 #
-# Собирает: WakaTime (--today), коммиты (all repos, since today 00:00),
-# закрытые РП (из коммитов "close/done WP-NNN").
+# Собирает за закрываемый день: WakaTime (summaries API, запасной путь —
+# wakatime-cli --today, только если день = сегодня), коммиты (все репо, в
+# границах дня), закрытые РП (из коммитов "close/done WP-NNN").
 #
 # Использование:
-#   week-draft-append.sh              # текущий день, текущая неделя
-#   week-draft-append.sh --week 16    # явная неделя
-#   week-draft-append.sh --dry-run    # показать, но не писать
+#   week-draft-append.sh                       # сегодня, неделя этого дня
+#   week-draft-append.sh --date 2026-10-28     # закрываемый день (Day Close после полуночи)
+#   week-draft-append.sh --week 16             # явная неделя
+#   week-draft-append.sh --dry-run             # показать, но не писать
 #
 # Параметры (params.yaml):
 #   knowledge_repo: <path относительно WORKSPACE_DIR>  # путь к knowledge-index репо
@@ -45,24 +47,39 @@ fi
 
 DRY_RUN=0
 WEEK_ARG=""
+DATE_ARG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --week) WEEK_ARG="$2"; shift 2 ;;
+    --date) DATE_ARG="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
+# issue #1398: every date field comes from the closed day, not the clock —
+# a Day Close after midnight used to write the next day's row and commits.
 TODAY_ISO=$(date +%Y-%m-%d)
-DOW=$(date +%u)
-DOM=$(date +%d)
-MONTH_NUM=$(date +%m)
-YEAR=$(date +%Y)
+DAY_ISO="${DATE_ARG:-$TODAY_ISO}"
+if ! DAY_FIELDS=$(python3 -c '
+import sys
+from datetime import date, timedelta
+d = date.fromisoformat(sys.argv[1])
+monday = d - timedelta(days=d.isoweekday() - 1)
+print(d.isoweekday(), d.day, monday.month, monday.year, d.isocalendar()[1])
+' "$DAY_ISO" 2>/dev/null); then
+  echo "ERR: --date ожидает YYYY-MM-DD, получено: $DAY_ISO" >&2
+  exit 2
+fi
+# MONTH_NUM/YEAR are the week's Monday: week-draft-init.sh creates the draft
+# on Monday in that month's folder, so a week across a month boundary keeps
+# one draft.
+read -r DOW DOM MONTH_NUM YEAR ISO_WEEK <<< "$DAY_FIELDS"
 
 DOW_RU=("Пн" "Вт" "Ср" "Чт" "Пт" "Сб" "Вс")
-DOW_LABEL="${DOW_RU[$((DOW-1))]} ${DOM#0}"
+DOW_LABEL="${DOW_RU[$((DOW-1))]} ${DOM}"
 
-WEEK=${WEEK_ARG:-$(date +%V)}
+WEEK=${WEEK_ARG:-$(printf "%02d" "$ISO_WEEK")}
 
 MONTH_REVERSE=$((13 - 10#$MONTH_NUM))
 MONTH_REVERSE_PADDED=$(printf "%02d" "$MONTH_REVERSE")
@@ -78,19 +95,48 @@ if [[ ! -f "$DRAFT_FILE" ]]; then
   exit 1
 fi
 
-# 1. WakaTime
-WAKA="—"
-if [[ -x "$WAKATIME_CLI" ]]; then
-  WAKA=$("$WAKATIME_CLI" --today 2>/dev/null | awk -F'[ ,]' '{
-    total=0
-    for(i=1;i<=NF;i++){
-      if($i=="hrs"||$i=="hr") total += $(i-2)*60 + ($(i-1)=="and"?0:$(i-1))
-      else if($i=="mins"||$i=="min") total += $(i-1)
+# 1. WakaTime. Summaries API for the closed day; the CLI answers only for the
+# current day and returns an empty line on some installs (issue #1414).
+# No value is shown as "—", never as a fabricated 0min (issue #1398).
+waka_format() {
+  local mins=$1
+  if (( mins >= 60 )); then
+    printf "%dh %02dmin" $((mins / 60)) $((mins % 60))
+  else
+    printf "%dmin" "$mins"
+  fi
+}
+
+# Minutes from `wakatime-cli --today` text such as "4 hrs 22 mins" or
+# "Today: 1 hr 5 mins": take the number right before each unit word.
+waka_cli_minutes() {
+  awk '{
+    total = 0
+    for (i = 2; i <= NF; i++) {
+      unit = $i; gsub(/[^a-z]/, "", unit)
+      if (unit == "hrs" || unit == "hr") total += $(i-1) * 60
+      else if (unit == "mins" || unit == "min") total += $(i-1)
     }
-    if(total>=60) printf "%dh %02dmin", int(total/60), total%60
-    else printf "%dmin", total
-  }')
-  [[ -z "$WAKA" ]] && WAKA="—"
+    print total
+  }'
+}
+
+WAKA="—"
+WAKA_SECONDS="python3 not found"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if WAKA_PY=$(bash "$SCRIPT_DIR/lib/find-python3.sh" --stdlib-only 2>/dev/null) \
+   && WAKA_SECONDS=$("$WAKA_PY" "$SCRIPT_DIR/wakatime-day-total.py" "$DAY_ISO"); then
+  WAKA=$(waka_format $((WAKA_SECONDS / 60)))
+elif [[ "$DAY_ISO" == "$TODAY_ISO" && -x "$WAKATIME_CLI" ]]; then
+  WAKA_RAW=$("$WAKATIME_CLI" --today 2>/dev/null || true)
+  WAKA_MIN=$(printf '%s\n' "$WAKA_RAW" | waka_cli_minutes)
+  if [[ "${WAKA_MIN:-0}" -gt 0 ]]; then
+    WAKA=$(waka_format "$WAKA_MIN")
+  else
+    echo "ℹ️ WakaTime: нет значения (API: ${WAKA_SECONDS}; CLI: «${WAKA_RAW}»)" >&2
+  fi
+else
+  echo "ℹ️ WakaTime: нет значения за ${DAY_ISO} (${WAKA_SECONDS})" >&2
 fi
 
 # iwe_repo_dirs — печатает поддиректории с .git, дедуплицированные по реальному
@@ -109,17 +155,17 @@ iwe_repo_dirs() {
   done
 }
 
-# 2. Commits across all repos since today 00:00
+# 2. Commits across all repos within the closed day
 COMMITS=0
 while IFS= read -r repo; do
-  count=$(git -C "$repo" log --since="today 00:00" --oneline --no-merges 2>/dev/null | wc -l | tr -d ' ')
+  count=$(git -C "$repo" log --since="$DAY_ISO 00:00:00" --until="$DAY_ISO 23:59:59" --oneline --no-merges 2>/dev/null | wc -l | tr -d ' ')
   COMMITS=$((COMMITS + count))
 done < <(iwe_repo_dirs "$WORKSPACE"/*/)
 
-# 3. Closed WPs today (best effort — by commit message)
+# 3. Closed WPs that day (best effort — by commit message)
 WPS_CLOSED=0
 while IFS= read -r repo; do
-  count=$(git -C "$repo" log --since="today 00:00" --pretty=%s 2>/dev/null | grep -ciE "(close|done|complete).*(wp-|WP-)[0-9]+" || true)
+  count=$(git -C "$repo" log --since="$DAY_ISO 00:00:00" --until="$DAY_ISO 23:59:59" --pretty=%s 2>/dev/null | grep -ciE "(close|done|complete).*(wp-|WP-)[0-9]+" || true)
   WPS_CLOSED=$((WPS_CLOSED + count))
 done < <(iwe_repo_dirs "$WORKSPACE"/*/)
 

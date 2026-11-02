@@ -73,13 +73,13 @@ check(
     "rc=%s ids=%s stderr=%r" % (rc, result.get("pattern_ids"), err),
 )
 
-# A bare occurrence with no protecting context must still redact -- the fix
-# widens which segments count as identifier-shaped, it must not disable the
-# context requirement itself.
+# issue #1411 (item 2) superseded the context requirement for this shape:
+# lowercase underscore-joined words are an identifier in any context, so a
+# bare occurrence now passes too (it blocked a template update commit).
 rc, result, err = detect(digit_led_name)
 check(
-    "bare occurrence (no context) still redacts",
-    rc == 0 and not err and bool(result.get("pattern_ids")),
+    "bare lowercase word identifier passes (#1411)",
+    rc == 0 and not err and not result.get("pattern_ids"),
     "rc=%s ids=%s stderr=%r" % (rc, result.get("pattern_ids"), err),
 )
 

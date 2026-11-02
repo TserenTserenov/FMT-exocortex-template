@@ -58,6 +58,23 @@ iwe_claude_project_slug() {
 # regardless of workspace location. Override via IWE_MEMORY_SRC if needed.
 WORKSPACE_SLUG=$(iwe_claude_project_slug "$WORKSPACE_DIR")
 MEMORY_SRC="${IWE_MEMORY_SRC:-$HOME/.claude/projects/${WORKSPACE_SLUG}/memory}"
+# issue #1401: the backup reads the same memory the agents write. Agents and
+# .claude/hooks/memory-exocortex-sync.sh go through the $WORKSPACE_DIR/memory
+# link (CLAUDE.md §4); when the slug guess points at a different, stale
+# project folder, the backup used to copy that folder's old files over the
+# fresh mirror. The link wins, as in the hook; a disagreement is reported.
+MEMORY_SRC_MISMATCH=""
+if [ -z "${IWE_MEMORY_SRC:-}" ] && [ -d "$WORKSPACE_DIR/memory" ]; then
+  _link_memory=$(cd -P -- "$WORKSPACE_DIR/memory" 2>/dev/null && pwd -P) || _link_memory=""
+  _slug_memory=$(cd -P -- "$MEMORY_SRC" 2>/dev/null && pwd -P) || _slug_memory=""
+  if [ -n "$_link_memory" ]; then
+    if [ -n "$_slug_memory" ] && [ "$_slug_memory" != "$_link_memory" ]; then
+      MEMORY_SRC_MISMATCH="$_slug_memory"
+    fi
+    MEMORY_SRC="$_link_memory"
+  fi
+  unset _link_memory _slug_memory
+fi
 EXOCORTEX_DST="$DS_STRATEGY/exocortex"
 # MCP reindex — опциональный компонент (WP-187 iwe-knowledge Gateway заменяет локальный knowledge-mcp).
 # Переопределить путь можно через env IWE_SELECTIVE_REINDEX.
@@ -1714,6 +1731,11 @@ do_backup() {
       warn "Memory source not found: $MEMORY_SRC (no unambiguous fallback either) — backup skipped"
       return "$RC_STEP_SKIPPED"
     fi
+  fi
+
+  if [ -n "$MEMORY_SRC_MISMATCH" ]; then
+    warn "  memory source: беру $MEMORY_SRC (ссылка memory/ рабочей установки), а не $MEMORY_SRC_MISMATCH (папка по имени проекта) — они разошлись, проверьте, какая из них устарела (issue #1401)"
+    BACKUP_WARNING=true
   fi
 
   mkdir -p "$EXOCORTEX_DST"

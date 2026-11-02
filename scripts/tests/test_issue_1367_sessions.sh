@@ -65,7 +65,7 @@ wp: ""
 # Нет РП
 EOF
 
-PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null || true)}"
 env -i PATH="$PATH" HOME="$TMP/home" PYTHONUSERBASE="$PYTHONUSERBASE" \
   WORKSPACE_DIR="$WS" IWE_ROOT="$WS" \
   IWE_WORKSPACE="$WS" IWE_GOVERNANCE_REPO=DS-strategy \
