@@ -889,7 +889,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "0b883ff009652770253df9ef7fcbddd65e07248a323924faa34a5dce16e8941d"
+      "sha256": "1be3308f8fa3f8814096606deaa51118b4f86f3b98de3835039a886cccd68555"
     },
     {
       "path": ".gitignore",
@@ -917,7 +917,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f1b881e31d0cbc2b484149b6cd7f902782a9186ad5f7a0f34962b4e00c6bebb0"
+      "sha256": "8fdc6d218c4433df1633a58b807ab516d29cc3412efebc4da2ad271b5c1ff505"
     },
     {
       "path": "CLAUDE.md",
