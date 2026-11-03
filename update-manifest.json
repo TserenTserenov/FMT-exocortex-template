@@ -925,7 +925,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bb1313167d3951c655140d2509c9cd6f9ffe96603e6ab1a4a29aef6a3946d7cb"
+      "sha256": "03140b9cf6d126d72fadbf8bd2827825197defb27dd8e35d04ac79ad64e9ce68"
     },
     {
       "path": "CLAUDE.md",
@@ -3333,7 +3333,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "8855ece02118e39a97443164967c9deffb9e8d8a4567bd2c5d1f705f0a75bd12"
+      "sha256": "8e5f0f9c6082a942fb699922c674dcd853b86e02254b66faa5ed6844a96e23f8"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
