@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a688a85478de57dc36ddac226aa74919ccc27ec9b45bafa8a75f14ffa37a4e2f"
+      "sha256": "e7d93a88d2bc36feec9547076121c50cd8864ab2cdc57cab8ec9112cf51a50e6"
     },
     {
       "path": "CLAUDE.md",
@@ -1685,7 +1685,7 @@
     },
     {
       "path": "memory/protocol-open.md",
-      "sha256": "425db723b686419756cb6dce46de7585350a0a72970b6d789f211457916c4123"
+      "sha256": "42116d039c96f150eb9b22b4a95541291923543b9dd12bc6dd835e743c934cd9"
     },
     {
       "path": "memory/protocol-work.md",
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/test-wp-inbox.sh",
-      "sha256": "e5d7db6da10510994c9fa4a906c6a88ab37f6f3f2b5cdb1822a36eb97ac6305c"
+      "sha256": "a50bb574263d201b5f2c8cd4d45823964b6cadd3229403ef488e6d6cdcc12840"
     },
     {
       "path": "scripts/test_archive_cadence_sweep.py",
@@ -3233,7 +3233,7 @@
     },
     {
       "path": "scripts/wp-inbox.sh",
-      "sha256": "7f677d5b75656cedc9dc7dcbbb7b2038373d37ee7c093dcc2a7ba0cd4c729499"
+      "sha256": "0fae259ca02e1f981e60182c782331075df6c6cf309eca15cb106e8c692edf19"
     },
     {
       "path": "scripts/wp-list.py",

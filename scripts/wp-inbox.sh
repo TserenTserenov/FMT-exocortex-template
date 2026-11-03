@@ -11,7 +11,11 @@
 #   wp-inbox.sh count  --wp WP-N               number of «новое» entries
 #   wp-inbox.sh digest --wp WP-N               fingerprint of «новое» entries (empty if none)
 #   wp-inbox.sh mark   --wp WP-N --id K --by "<who/what processed it>"   «новое» → «учтено», idempotent
+#   wp-inbox.sh pending                        every WP with «новое» entries, oldest first: «WP-N<TAB>count<TAB>oldest date»
 # Common flag: --repo DIR (default $IWE_WORKSPACE/$IWE_GOVERNANCE_REPO).
+# Read commands (list, count, digest, pending) also take --rev REF: read the
+# mailbox as committed at REF (e.g. origin/main after a fetch) instead of the
+# working tree, which lags behind origin while the canonical checkout is frozen.
 #
 # Exit codes: 0 success · 1 refused by condition (no card, no entry) · 2 usage error.
 # Compatible: bash 3.2+
@@ -40,10 +44,10 @@ one_line() {
 }
 
 cmd="${1:-}"
-[[ -n "$cmd" ]] || die "команда не указана (add|list|count|digest|mark)"
+[[ -n "$cmd" ]] || die "команда не указана (add|list|count|digest|mark|pending)"
 shift
 
-to="" wp="" from="" pointer="" summary="" id="" by="" all=0
+to="" wp="" from="" pointer="" summary="" id="" by="" rev="" all=0
 repo="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,10 +59,53 @@ while [[ $# -gt 0 ]]; do
     --id) id="${2:-}"; shift 2 ;;
     --by) by="${2:-}"; shift 2 ;;
     --repo) repo="${2:-}"; shift 2 ;;
+    --rev) rev="${2:-}"; shift 2 ;;
     --all) all=1; shift ;;
     *) die "неизвестный флаг: $1" ;;
   esac
 done
+
+if [[ -n "$rev" ]]; then
+  case "$cmd" in
+    add|mark) die "--rev только для чтения (list|count|digest|pending): $cmd пишет в рабочую копию" ;;
+  esac
+  git -C "$repo" rev-parse --verify --quiet "$rev^{commit}" >/dev/null \
+    || die "ревизия '$rev' не найдена в $repo (для origin/main сначала git fetch)" 1
+fi
+
+# Mailbox text of WP number $1: from the working tree, or as committed at --rev.
+box_text() {
+  local rel="inbox/WP-$1/INBOX.md"
+  if [[ -n "$rev" ]]; then
+    git -C "$repo" cat-file -e "$rev:$rel" 2>/dev/null || return 0
+    git -C "$repo" show "$rev:$rel"
+  elif [[ -f "$repo/$rel" ]]; then
+    cat "$repo/$rel"
+  fi
+}
+
+# Entries with status $2 of WP number $1 as one stream: header plus body up to the next header.
+entries_with_status() {
+  box_text "$1" | awk -v want="$2" '/^## И-[0-9]+ · / { p = ($0 ~ (" · " want "$")) } p'
+}
+
+if [[ "$cmd" == "pending" ]]; then
+  if [[ -n "$rev" ]]; then
+    boxes=$(git -C "$repo" ls-tree -r --name-only "$rev" -- inbox | grep -E '^inbox/WP-[0-9]+/INBOX\.md$' || true)
+  else
+    boxes=$(cd "$repo" && find inbox -mindepth 2 -maxdepth 2 -path 'inbox/WP-*/INBOX.md' 2>/dev/null || true)
+  fi
+  while IFS= read -r rel; do
+    [[ -n "$rel" ]] || continue
+    num=$(printf '%s' "$rel" | sed -E 's|^inbox/WP-([0-9]+)/INBOX\.md$|\1|')
+    [[ "$num" =~ ^[0-9]+$ ]] || continue
+    headers=$(entries_with_status "$num" "новое" | grep -E '^## И-[0-9]+ · ' || true)
+    [[ -n "$headers" ]] || continue
+    oldest=$(printf '%s\n' "$headers" | sed -E 's/^## И-[0-9]+ · ([0-9-]+) · .*/\1/' | sort | head -1)
+    printf '%s\t%s\t%s\n' "$oldest" "$num" "$(printf '%s\n' "$headers" | wc -l | tr -d ' ')"
+  done <<< "$boxes" | sort -k1,1 -k2,2n | awk -F '\t' '{ printf "WP-%s\t%s\t%s\n", $2, $3, $1 }'
+  exit 0
+fi
 
 target="${to:-$wp}"
 [[ -n "$target" ]] || die "укажите --to (add) или --wp (остальные команды)"
@@ -66,12 +113,6 @@ n=$(normalize_wp "$target")
 dir="$repo/inbox/WP-$n"
 card="$dir/WP-$n.md"
 box="$dir/INBOX.md"
-
-# «новое» entries as one stream: header plus body up to the next header.
-entries_with_status() {
-  [[ -f "$box" ]] || return 0
-  awk -v want="$1" '/^## И-[0-9]+ · / { p = ($0 ~ (" · " want "$")) } p' "$box"
-}
 
 case "$cmd" in
   add)
@@ -105,16 +146,16 @@ case "$cmd" in
     ;;
   list)
     if [[ "$all" -eq 1 ]]; then
-      [[ ! -f "$box" ]] || awk '/^## И-[0-9]+ · /{p=1} p' "$box"
+      box_text "$n" | awk '/^## И-[0-9]+ · /{p=1} p'
     else
-      entries_with_status "новое"
+      entries_with_status "$n" "новое"
     fi
     ;;
   count)
-    entries_with_status "новое" | grep -c -E '^## И-[0-9]+ · ' || true
+    entries_with_status "$n" "новое" | grep -c -E '^## И-[0-9]+ · ' || true
     ;;
   digest)
-    out=$(entries_with_status "новое")
+    out=$(entries_with_status "$n" "новое")
     [[ -z "$out" ]] || printf '%s\n' "$out" | sha256_stdin
     ;;
   mark)
