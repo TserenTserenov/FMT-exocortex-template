@@ -11,7 +11,6 @@ schema_version: 1
 
 name: "hard-distinctions"
 description: "Операционный файл памяти IWE"
-modified: 2026-08-24T14:30:00.000Z
 ---
 # Жёсткие различения (Hard Distinctions)
 
@@ -557,6 +556,7 @@ modified: 2026-08-24T14:30:00.000Z
 - Предлагаемая целостная система → A.1.SCR, без подмены способностью или человеком
 
 **Подробно:** FPF A.1.SCR §§0, 4–5; R9:43; `.claude/rules/distinctions.md` (Мастерство ≠ Степень мастерства)
+
 ---
 
 ## 33. `primary_program` в profile.md — input ≠ output (peer-session 2026-05-31-31)
