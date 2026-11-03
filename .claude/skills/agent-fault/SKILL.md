@@ -10,7 +10,11 @@ agents: none
 interaction: one-shot
 triggers:
   slash: [/agent-fault]
-  phrases: []
+  phrases:
+    - "зафиксируй косяк агента"
+    - "запиши ошибку агента в реестр"
+    - "это нужно занести в профиль ошибок агента"
+    - "скилл регистрация косяка агента"
 gates_required: []
 gates_enforced: []
 gates_rationale: "детерминированный script-executor; WP Gate и IntegrationGate не применимы"
