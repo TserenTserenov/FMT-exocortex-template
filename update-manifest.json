@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e7535da1b9de26e1b673db7bf6c548fa9f084f1ef4266b28316df1d15714f0bb"
+      "sha256": "9fb8d7a0a8365eeef8657f2c017bf17cba7a101796e55e9ae5f0ad6f95056a08"
     },
     {
       "path": "CLAUDE.md",
@@ -1653,7 +1653,7 @@
     },
     {
       "path": "memory/hard-distinctions.md",
-      "sha256": "8e088e05d3748bcabb83881826853e7f268de41ad94d3693c94652365fc80112"
+      "sha256": "c0aa13ce92665a898208989c7a8ccbcccf2ee4a7fff514c9cd60906dafa1e821"
     },
     {
       "path": "memory/hooks-design.md",
