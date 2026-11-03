@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "532e1ae4dc87cfbf4f5b888919acb139ab4cd8b1d91e60864df25fbe8774ac3d"
+      "sha256": "34fda5a5336dac85dbfe6c93da82096cf3af6c2992508cde962bc1a03c44a63d"
     },
     {
       "path": "CLAUDE.md",
@@ -2649,7 +2649,7 @@
     },
     {
       "path": "scripts/kimi-peer-adapter.sh",
-      "sha256": "0cc2c5f5fc6b2b50b850d46417a9e08525ad20410a9de85a6f7aa8f5e8af619e"
+      "sha256": "f618c464cb6f5c2dc8db49985038a16d8554a182824ff55e0a995df5bb7baaf2"
     },
     {
       "path": "scripts/kimi-session-watchdog.sh",
@@ -2721,7 +2721,7 @@
     },
     {
       "path": "scripts/lib/peer-adapter-common.sh",
-      "sha256": "edcae15bb9b456db9b03f0a585ee4246e83c7e97c491328aafd063366382ec57"
+      "sha256": "782d0316b8ef223c41d74e8c6c8293c41be3f4ed7dda2561985b72894f341f67"
     },
     {
       "path": "scripts/lib/runtime-placeholder-count.sh",
