@@ -86,18 +86,19 @@ bash "$AUDIT_SCRIPT" $([ "${ARGUMENTS:-}" = "--critical" ] && echo "--critical")
 
 ## Шаг 2. MCP healthcheck (если не `--skip-mcp`)
 
-Параллельно вызвать 4 MCP tool'а с минимальной нагрузкой, замерить латентность:
+Параллельно вызвать 5 MCP tool'ов с минимальной нагрузкой, замерить латентность. Имена даны без префикса: полное имя инструмента зависит от того, как назван коннектор MCP в этой установке (например `mcp__claude_ai_IWE__…` или `mcp__claude_ai_Aisystant_MCP__…`) — взять тот префикс, под которым инструменты реально видны (issue #1440).
 
 | Tool | Параметры | Уровень | Что считаем |
 |------|-----------|---------|-------------|
-| `mcp__claude_ai_IWE__knowledge_search` | `query: "test"`, `limit: 1` | бесплатный | ✅ если ответ <15s |
-| `mcp__claude_ai_IWE__github_status` | (без параметров) | бесплатный | ✅ если ответ |
-| `mcp__claude_ai_IWE__personal_search` | `query: "ping"`, `limit: 1` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
-| `mcp__claude_ai_IWE__dt_read_digital_twin` | `path: "/"` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
+| `knowledge_search` | `query: "test"`, `limit: 1` | бесплатный | ✅ если ответ <15s |
+| `knowledge_list_sources` | (без параметров) | бесплатный | ✅ если ответ |
+| `github_status` | (без параметров) | **подписочный** | ✅ если ответ; **отказ подписки → ⏸️** (не считать failure) |
+| `personal_search` | `query: "ping"`, `limit: 1` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
+| `dt_read_digital_twin` | `path: "/"` | **подписочный** | ✅ если ответ; **403/subscription_required → ⏸️** (не считать failure) |
 
 Двойник проверяется по корню `/`, а не по разделу: незаполненная категория метамодели (например `1_declarative`) отвечает `Path not found`, и исправная установка получала ложный ❌ (#932).
 
-**Подписочное гейтование (DP.SC.112).** `personal_*` и `dt_*` требуют активной БР в `subscription_grants`. Без подписки — это **не сбой инсталляции**, а ожидаемый отказ. Помечать как ⏸️ subscription_required, не ❌. Coverage считать только по доступным для пользователя tool'ам.
+**Подписочное гейтование (DP.SC.112).** `personal_*`, `dt_*` и `github_status` требуют активной БР в `subscription_grants`; бесплатно доступны только `knowledge_search`, `knowledge_get_document`, `knowledge_list_sources`. Отказ приходит либо кодом 403/subscription_required, либо текстом «требуется активная подписка» — оба случая одинаково ⏸️. Без подписки — это **не сбой инсталляции**, а ожидаемый отказ. Помечать как ⏸️ subscription_required, не ❌. Coverage считать только по доступным для пользователя tool'ам.
 
 Сформировать markdown-секцию `## 4. MCP healthcheck`:
 
@@ -110,10 +111,11 @@ bash "$AUDIT_SCRIPT" $([ "${ARGUMENTS:-}" = "--critical" ] && echo "--critical")
 |------|--------|-------------|------------|
 | personal_search | ✅/❌ | Nms | ... |
 | knowledge_search | ✅/❌ | Nms | ... |
-| github_status | ✅/❌ | Nms | ... |
+| knowledge_list_sources | ✅/❌ | Nms | ... |
+| github_status | ✅/❌/⏸️ | Nms | ... |
 | dt_read_digital_twin | ✅/❌ | Nms | ... |
 
-Coverage: N/4
+Coverage: N/5
 ```
 
 Если `--skip-mcp` → секция «⏸️ MCP healthcheck — пропущен по флагу».
@@ -126,8 +128,9 @@ Coverage: N/4
 
 1. **Создать репетицию через begin-helper** (issue #549 stage 2 — эксклюзивное создание под транзакционным замком; token печатается один раз в stdout):
    ```bash
-   bash "$IWE_SCRIPTS/dry-run-begin.sh" audit-installation "${CLAUDE_SESSION_ID:-}" hold
+   IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS"; bash "$IWE_SCRIPTS/dry-run-begin.sh" audit-installation "${CLAUDE_SESSION_ID:-}" hold
    ```
+   `$IWE_SCRIPTS` в неинтерактивном вызове не задана (#688), поэтому команда сначала подключает `.iwe-paths` стандартной цепочкой — той же, что в `/day-close`; под активной репетицией гейт пропускает именно эту форму, а `. <произвольный путь>` блокирует (issue #1439). Цепочку не сокращать и не менять.
    Третий аргумент `hold` (issue #1435): Stop-хук не завершит репетицию, даже если подагент уйдёт в фон и ход закончится раньше него — завершает только шаг 4; ограничитель — TTL флага. Helper печатает `gate_id=`, `owner_token=`, `owner_session_id=`. **Запомни все три значения из вывода tool-call'а** — shell-переменные между твоими Bash-вызовами не живут (Codex r2), а token хранить в файле нельзя (его прочитает репетиция). Активная чужая репетиция → helper завершится ошибкой с её gate_id.
 2. **Запустить subagent** через Agent tool (subagent_type=general-purpose, модель Sonnet) в переднем плане — не фоновым запуском, — с промптом:
 
@@ -149,7 +152,7 @@ Coverage: N/4
 3. **Дождаться завершения subagent'а.** Если среда всё же запустила его в фоне и сразу вернула управление — не заканчивать ход финальным текстом и не переходить к шагу 4, пока не пришло уведомление о его завершении (issue #1435).
 4. **Завершить репетицию** (атомарный переход active→completed с capability token; sentinel снимается самим helper'ом после completed — Stop-хук теперь только идемпотентный fallback). Подставь значения, запомненные на шаге 1:
    ```bash
-   bash "$IWE_SCRIPTS/dry-run-complete.sh" "<gate_id из шага 1>" rehearsal-finished "<owner_session_id из шага 1>" "<owner_token из шага 1>"
+   IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" "${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS"; bash "$IWE_SCRIPTS/dry-run-complete.sh" "<gate_id из шага 1>" rehearsal-finished "<owner_session_id из шага 1>" "<owner_token из шага 1>"
    ```
 5. **Сформировать секцию 6 отчёта:**
    ```markdown
