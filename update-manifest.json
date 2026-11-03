@@ -76,8 +76,12 @@
       "sha256": "635f36ed1142aa109cf20400ad23df1782dac7d33a1f31e3dbde820a5450e23e"
     },
     {
+      "path": ".claude/hooks/dry-run-cmd-parse.pl",
+      "sha256": "2830ad863d0d2b8010823debf9ad443081080896af23e6e65014b907ce2287e9"
+    },
+    {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "df96a68efd0e001c26fd861736d073494797440ffe379a432d27198a4e9fef6e"
+      "sha256": "76b0793aa5341105510a3d2624908f1cab422ee292d24a2c6d9a79c68de80491"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -133,7 +137,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "59fb3166519e6cab78cdb5c718e00b903bb99ae05144a9b0c4f1c116a67bc720"
+      "sha256": "afbf6ddcb8a933e4948ef01ee3187d921b98924317756ef7f7cb1709eeee869c"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -469,7 +473,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "9fa20f64a36b43d1f9b751eb5526405360a4003c21022a514804dbef661033d1"
+      "sha256": "252844d66251600a05860aadd16175b36872854dbbe6cf84d01549384e69b07f"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -925,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7e31582b390023ed2bd4cccf69d2c31f8e7a9d264eb50b196bf5483e4772c2d8"
+      "sha256": "28aec3007d54dcaffaa22209449b5f5e5b50a9f8690cf11266257c31ca555f6e"
     },
     {
       "path": "CLAUDE.md",
@@ -1625,7 +1629,7 @@
     },
     {
       "path": "memory/dry-run-contract.md",
-      "sha256": "716e971af4d4a8bddc74f9bcf831372a2e2295bc00faca8c4b4946a870eb47bf"
+      "sha256": "402956fdf190044b078f63b2e49242db9d4311761adbd476b3c762353b949558"
     },
     {
       "path": "memory/feedback_community_communication_style.md",
@@ -1849,7 +1853,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "28092b252926275b4858809481a82fb44a62fc4d80d10747c7fe2b66725343e0"
+      "sha256": "d99cdc671b20fc68cb3fd3466ed1ff5ea5999cdb8cb2a7b00185da38a9be8c83"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2449,7 +2453,7 @@
     },
     {
       "path": "scripts/dry-run-begin.sh",
-      "sha256": "7d09b9d0a4b8b1439ec56e3627416f24848766a338f436cb5768d69fd3c5e5f1"
+      "sha256": "c632c0f59dfb95e36b7217488ccaf4e4c5bd522d8b43bd4e51fe19cb3aefb98d"
     },
     {
       "path": "scripts/dry-run-complete.sh",
@@ -3580,6 +3584,7 @@
     "scripts/tests/test_issue_1419_hk_reopen.sh",
     "scripts/tests/test_issue_1425_bleed_fields.sh",
     "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
+    "scripts/tests/test_issue_1433_gov_branch.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

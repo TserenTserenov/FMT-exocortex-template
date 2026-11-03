@@ -487,3 +487,217 @@ class TestStopOwnership:
         )
         assert result.returncode == 0, result.stderr
         assert "unbound variable" not in result.stderr
+
+
+
+@pytest.fixture
+def isolated_gate(tmp_path):
+    """A rehearsal sentinel in a test-mode dir: the global /tmp/iwe-dry-run.flag stays untouched."""
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    flag = dry_dir / "sentinel.flag"
+    flag.write_text(json.dumps({"initiator": "pytest", "created_at": "test", "session_id": "s"}), encoding="utf-8")
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(flag))
+
+    def run(command):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        return subprocess.run(["bash", str(HOOK)], input=payload, capture_output=True, text=True, timeout=10, env=env)
+
+    return run
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        '"$IWE_SCRIPTS/day-close.sh"',
+        "$IWE_SCRIPTS/day-close.sh",
+        "./day-close.sh",
+        "./day-close",
+        "../x",
+        "/tmp/day-close.sh --flag",
+        "~/IWE/scripts/day-close.sh",
+        "/usr/bin/../../tmp/x.sh",
+        'scripts"/"x.sh',
+        '. "$HOME/.iwe-paths"; "$IWE_SCRIPTS/day-close.sh"',
+        '/usr/bin/env "$IWE_SCRIPTS/day-close.sh"',
+        "env -i ./x.sh",
+        "sudo -u u ./x.sh",
+        "command -p ./x.sh",
+        "time -p ./x.sh",
+        "exec ./x.sh",
+        "timeout 5 ./x.sh",
+        "nohup ./day-close.sh",
+        "if ./x.sh; then echo; fi",
+        "! ./x.sh",
+        'echo "$(./x.sh)"',
+        "PATH=$IWE_SCRIPTS:$PATH day-close.sh",
+        "cat <<EOF\ntext\nEOF\n./evil.sh",
+        "echo hi # it's\n./x.sh",
+        "cat <<<EOF\n./x.sh",
+        "x=$((1<<EOF))\n./x.sh",
+        "cat <<EOF\r\nb\r\nEOF\r\n./x.sh",
+        "cat <<'E F'\nb\nE F\n./x",
+        "cat <<$'EOF'\nb\nEOF\n./x.sh",
+        "$'\\x2e/x'",
+        "echo $'it\\'s'\n./x.sh",
+        "${X:-./x.sh}",
+        "${X:-x.sh}",
+        "echo ${x:-'}'}; ./x.sh",
+        "2>/dev/null ./x.sh",
+        "0<&- ./x.sh",
+        "exec 3>&1 ./x.sh",
+        "builtin exec ./x.sh",
+        "command -- ./x.sh",
+        "sudo -iu u ./x.sh",
+        "sudo -uu ./x.sh",
+        "env --split-string=./x.sh",
+        "$HOME/bin/x",
+        '"$PWD"/x',
+        "case a in a) ./x.sh;; esac",
+        "f(){ ./x.sh; }; f",
+    ],
+)
+def test_program_run_by_path_blocked(isolated_gate, command):
+    """#1434: a script run by its own path is indirect execution, like `bash x.sh`."""
+    r = isolated_gate(command)
+    assert r.returncode == 2, f"{command!r} passed the gate: {r.stderr}"
+    assert "indirect execution" in r.stderr
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "env -i git commit -m x",
+        "sudo -u u git push",
+        "if bash x.sh; then :; fi",
+        "/usr/bin/git commit -m x",
+        'IWE_SCRIPTS=/tmp/evil; "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'IWE_SCRIPTS=/tmp/evil; bash "$IWE_SCRIPTS/dry-run-complete.sh" g r s t',
+        "cd /tmp/evil && scripts/dry-run-complete.sh a b c d",
+        'printf -v IWE_SCRIPTS /e; "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'for IWE_SCRIPTS in /e; do bash "$IWE_SCRIPTS/dry-run-complete.sh" g r s t; done',
+        "popd; scripts/day-close-prepare.sh",
+        "</dev/null git commit -m x",
+        "echo $(echo a)#; git commit -m x",
+        "echo `echo a`#; git commit -m x",
+        "echo }#; git commit -m x",
+        "x=$(echo)#; bash x.sh",
+        "a=(1)#; bash x.sh",
+        "echo <(true)#; bash x.sh",
+        "echo $(echo a)#; ./x",
+        "echo $[1<<2]\ngit commit -m x",
+        "cat <<$'A\\x41'\nAA\nbash x.sh\nA\\x41\n",
+        "echo $((./x) )",
+    ],
+)
+def test_wrapper_options_keywords_and_tampering_blocked(isolated_gate, command):
+    """#1434 (cold review): wrapper options, keywords and a reassigned IWE_SCRIPTS no longer hide a write."""
+    r = isolated_gate(command)
+    assert r.returncode == 2, f"{command!r} passed the gate: {r.stderr}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "/usr/bin/grep -n x README.md",
+        "/bin/ls -la",
+        f"{IWE_ROOT}/FMT-exocortex-template/scripts/dry-run-complete.sh gid reason sid token",
+        '"$IWE_SCRIPTS/dry-run-complete.sh" gid reason sid token',
+        '"$IWE_SCRIPTS/day-close-prepare.sh"',
+        'echo "see ./x.sh"',
+        "command -v rm",
+        "cat <<'EOF'\nsrc/foo.py:12 failed\n./run.sh is the entry\nEOF",
+        "jq '.items[]\n | .a/2' data.json",
+        'grep -nE "ждёт|блокер" \\\n  $HOME/.claude/projects/*/memory/MEMORY.md 2>/dev/null',
+        'T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; PY3="$(bash "$T/.claude/lib/find-python3.sh")" && "$PY3" "$T/.claude/scripts/memory-drift-scan.py"',
+        "cat <<EOF\nthen rm the old notes\nEOF",
+        "cat <<'EOF'\nif git push fails, retry\nEOF",
+        "cat <<EOF\nenv -i git commit\nEOF",
+        "jq -n '\n  if .a then\n    .b\n  else rm\n  end'",
+        "awk '\n  { if ($1) print }\n  else rm x\n'",
+        "case x in\n  ./*) echo rel ;;\n  *.sh) echo sh ;;\nesac",
+        "command -v ./x.sh",
+        "echo {a,b}.sh",
+        "ls # see; ./setup.sh",
+        "git status # then (./x.sh)",
+        "${IWE_SCRIPTS}/check-dirty-repos.sh",
+        "x=$(( 1 << 3 ))\ngit status",
+    ],
+)
+def test_reads_and_whitelisted_paths_allowed(isolated_gate, command):
+    """#1434: reads, heredoc bodies, multi-line filters and the rehearsal's own helpers still pass."""
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"
+
+BEGIN = HOOK.parent.parent.parent / "scripts" / "dry-run-begin.sh"
+
+
+def _begin_and_stop(tmp_path, *begin_args):
+    """Start a rehearsal through the real helper in a test-mode dir, then fire Stop for its session."""
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    sentinel_path = dry_dir / "sentinel.flag"
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(sentinel_path))
+    begin = subprocess.run(
+        ["bash", str(BEGIN), "pytest-initiator", "hold-session", *begin_args],
+        capture_output=True, text=True, timeout=10, env=env,
+    )
+    assert begin.returncode == 0, begin.stderr
+    gate_id = dict(line.split("=", 1) for line in begin.stdout.splitlines())["gate_id"]
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("", encoding="utf-8")
+    stop = subprocess.run(
+        ["bash", str(STOP_HOOK)],
+        input=json.dumps({"session_id": "hold-session", "transcript_path": str(transcript)}),
+        capture_output=True, text=True, timeout=10, env=env,
+    )
+    assert stop.returncode == 0, stop.stderr
+    state = json.loads((dry_dir / f"gate-{gate_id}.state").read_text(encoding="utf-8"))
+    return state, sentinel_path
+
+
+def test_stop_hook_keeps_held_rehearsal(tmp_path):
+    """#1435: a rehearsal begun with `hold` survives the owner's Stop (background subagent)."""
+    state, sentinel_path = _begin_and_stop(tmp_path, "hold")
+    assert state["stop_fallback"] == "hold"
+    assert state["state"] == "active"
+    assert sentinel_path.exists()
+    assert json.loads(sentinel_path.read_text(encoding="utf-8"))["initiator"] == "pytest-initiator"
+
+
+def test_stop_hook_still_completes_plain_rehearsal(tmp_path):
+    """#1435: without `hold` the Stop fallback keeps completing the owner's rehearsal."""
+    state, sentinel_path = _begin_and_stop(tmp_path)
+    assert state["state"] == "completed"
+    assert state["completion_reason"] == "stop-hook-fallback"
+    assert not sentinel_path.exists()
+
+
+def test_begin_rejects_unknown_third_argument(tmp_path):
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "sentinel.flag"))
+    r = subprocess.run(["bash", str(BEGIN), "x", "s", "hlod"], capture_output=True, text=True, timeout=10, env=env)
+    assert r.returncode == 2
+    assert not (dry_dir / "sentinel.flag").exists()
+
+
+
+def test_missing_command_reader_fails_closed(tmp_path):
+    """#1434: without its command reader the gate blocks instead of allowing."""
+    hooks = tmp_path / ".claude" / "hooks"
+    hooks.mkdir(parents=True)
+    shutil.copy(HOOK, hooks / HOOK.name)
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    flag = dry_dir / "sentinel.flag"
+    flag.write_text(json.dumps({"initiator": "pytest", "created_at": "test", "session_id": "s"}), encoding="utf-8")
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(flag))
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git status"}})
+    r = subprocess.run(["bash", str(hooks / HOOK.name)], input=payload, capture_output=True, text=True, timeout=10, env=env)
+    assert r.returncode == 2, r.stderr
+    assert "cannot classify" in r.stderr

@@ -669,11 +669,46 @@ resolve_governance_branch() {
         printf '%s\n' "${ref#origin/}"
         return 0
     fi
+    # #1433: a repo created via `git init` + `gh repo create --push` has no
+    # origin/HEAD. An isolated worktree then sits on its throwaway
+    # extractor/* branch, whose upstream is the governance branch.
+    # Read the tracked ref from config, not `<remote>/<branch>` text: a remote
+    # name may itself contain `/`.
+    local cur merge
+    if cur=$(git -C "$repo" symbolic-ref --short -q HEAD 2>/dev/null) \
+        && merge=$(git -C "$repo" config --get "branch.$cur.merge" 2>/dev/null) \
+        && [ "$(git -C "$repo" config --get "branch.$cur.remote" 2>/dev/null)" != "." ]; then
+        ref="${merge#refs/heads/}"
+        case "$ref" in
+            ''|extractor/*) ;;
+            *) printf '%s\n' "$ref"; return 0 ;;
+        esac
+    fi
+    # A throwaway extractor/* branch is never the governance branch.
     if ref=$(git -C "$repo" branch --show-current 2>/dev/null) && [ -n "$ref" ]; then
-        printf '%s\n' "$ref"
-        return 0
+        case "$ref" in
+            extractor/*) ;;
+            *) printf '%s\n' "$ref"; return 0 ;;
+        esac
     fi
     printf '%s\n' "main"
+}
+
+# #1433: the publish gate comes from the canonical governance repo. update.sh
+# delivers the gate there (possibly uncommitted), next to the canonical
+# ds-publish.sh the gate always runs; an isolated worktree checked out from
+# origin/main may still hold an older gate without --branch support.
+# Prints the path; empty when neither copy exists.
+resolve_publish_gate() {  # <strategy_dir>
+    local strategy_dir="$1" gate
+    for gate in "${IWE_ROOT:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/lib/publish-gate.sh" \
+                "$strategy_dir/scripts/lib/publish-gate.sh"; do
+        if [ -f "$gate" ]; then
+            printf '%s\n' "$gate"
+            return 0
+        fi
+    done
+    return 0
 }
 
 commit_extractor_changes() {
@@ -773,8 +808,12 @@ commit_extractor_changes() {
                 done
                 if [ "$is_extractor_commit" -eq 1 ]; then
                     log "Found unpublished extractor commit ($latest_local) already on HEAD"
-                    local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
-                    if [ ! -f "$publish_gate" ]; then
+                    local publish_gate
+                    publish_gate=$(resolve_publish_gate "$strategy_dir")
+                    if [ -z "$publish_gate" ]; then
+                        # Repos without the gate (fixtures, pre-gate installs) push directly;
+                        # resolve_governance_branch never yields a throwaway branch here (#1433).
+                        log "WARN: publish-gate.sh not found; pushing extractor commit $latest_local directly to $gov_branch"
                         if git -C "$strategy_dir" push origin "$latest_local:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
                             log "Pushed pre-existing extractor commit $latest_local"
                             EXTRACTOR_COMMIT_RESULT="published"
@@ -872,9 +911,12 @@ commit_extractor_changes() {
     # housekeeping registration above stays open through this step (its
     # repo-relative paths cover the cherry-picked commit too, not just this
     # worktree's own) and is closed once, right after, regardless of outcome.
-    local publish_gate="$strategy_dir/scripts/lib/publish-gate.sh"
-    if [ ! -f "$publish_gate" ]; then
-        log "WARN: publish-gate.sh not found at $publish_gate; falling back to raw push for $repo_name"
+    local publish_gate
+    publish_gate=$(resolve_publish_gate "$strategy_dir")
+    if [ -z "$publish_gate" ]; then
+        # Repos without the gate (fixtures, pre-gate installs) push directly;
+        # resolve_governance_branch never yields a throwaway branch here (#1433).
+        log "WARN: publish-gate.sh not found; falling back to raw push of $repo_name to $gov_branch"
         if git -C "$strategy_dir" push origin "$head_after:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
             log "Pushed $repo_name ($head_after)"
             EXTRACTOR_COMMIT_RESULT="published"

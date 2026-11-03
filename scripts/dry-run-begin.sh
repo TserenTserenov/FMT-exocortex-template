@@ -20,12 +20,22 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PA
 # in validate-fmt-scripts.sh took such an exit 0 as proof of safety.
 [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && {
     echo "dry-run-begin.sh — эксклюзивное создание dry-run репетиции (issue #549 stage 2)"
-    echo "Использование: dry-run-begin.sh [initiator] [session_id]"
+    echo "Использование: dry-run-begin.sh [initiator] [session_id] [hold]"
+    echo "  hold — Stop-хук не завершает репетицию (подагент в фоне); завершить dry-run-complete.sh"
     exit 0
 }
 
 INITIATOR="${1:-audit-installation}"
 SID="${2:-${CLAUDE_SESSION_ID:-dry-$(date +%s)-$$}}"
+# issue #1435: a background subagent outlives the owner's turn, and the Stop
+# hook would complete the rehearsal under it. "hold" leaves completion to
+# dry-run-complete.sh only; the sentinel TTL still bounds a forgotten one.
+STOP_FALLBACK="owner-stop"
+case "${3:-}" in
+    "") ;;
+    hold) STOP_FALLBACK="hold" ;;
+    *) echo "dry-run-begin: unknown third argument '${3}' (expected: hold)" >&2; exit 2 ;;
+esac
 command -v jq >/dev/null 2>&1 || { echo "dry-run-begin: jq required" >&2; exit 2; }
 
 SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
@@ -115,14 +125,14 @@ umask 077
 TMP=$(mktemp "$DRY_DIR/.begin.XXXXXX") || fail "mktemp failed"
 jq -nc --arg gid "$GID" --arg sid "$SID" --arg tsha "$TOKEN_SHA" \
   --argjson pid "$OWNER_PID" --arg pstart "$OWNER_PID_START" --argjson pgid "$OWNER_PGID" \
-  --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg init "$INITIATOR" \
-  '{version:2,gate_id:$gid,owner_session_id:$sid,owner_pid:$pid,owner_pgid:$pgid,owner_pid_start:$pstart,owner_token_sha256:$tsha,state:"active",created_at:$created,initiator:$init}' \
+  --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg init "$INITIATOR" --arg stopfb "$STOP_FALLBACK" \
+  '{version:2,gate_id:$gid,owner_session_id:$sid,owner_pid:$pid,owner_pgid:$pgid,owner_pid_start:$pstart,owner_token_sha256:$tsha,state:"active",created_at:$created,initiator:$init,stop_fallback:$stopfb}' \
   > "$TMP" && mv -f "$TMP" "$DRY_DIR/gate-$GID.state" || { rm -f "$TMP"; fail "atomic state create failed"; }
 
 # The sentinel is an exclusive creation, only after state. On a race (someone
 # created it after our check) — roll back exactly our own state.
-if ! ( set -C; jq -nc --arg gid "$GID" --arg sid "$SID" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{gate_id:$gid,created_at:$created,session_id:$sid,initiator:"audit-installation"}' \
+if ! ( set -C; jq -nc --arg gid "$GID" --arg sid "$SID" --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg init "$INITIATOR" \
+    '{gate_id:$gid,created_at:$created,session_id:$sid,initiator:$init}' \
     > "$SENTINEL" ) 2>/dev/null; then
     rm -f "$DRY_DIR/gate-$GID.state" 2>/dev/null || true
     fail "sentinel $SENTINEL already exists — refusing to overwrite (state rolled back)"
