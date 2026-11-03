@@ -55,4 +55,28 @@ check "всё учтено: новых 0" "0" "$(inbox count --wp 7)"
 check "всё учтено: отпечаток пуст" "" "$(inbox digest --wp 7)"
 check "list --all показывает учтённые" "3" "$(inbox list --wp 7 --all | grep -c -E '^## И-')"
 
+# 7. --rev reads the committed mailbox, not the lagging working tree.
+mkdir -p "$REPO/inbox/WP-8"
+printf -- '---\nwp: 8\n---\n' > "$REPO/inbox/WP-8/WP-8.md"
+git -C "$REPO" init -q
+git -C "$REPO" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm base
+inbox add --to WP-8 --from "РП-2000" --pointer "p" --summary "в рабочей копии, не закоммичено" >/dev/null
+check "--rev HEAD: незакоммиченная запись не видна" "0" "$(inbox count --wp 8 --rev HEAD)"
+check "без --rev: рабочая копия видит запись" "1" "$(inbox count --wp 8)"
+check "--rev HEAD: отпечаток пуст" "" "$(inbox digest --wp 8 --rev HEAD)"
+git -C "$REPO" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm entry
+check "--rev HEAD после коммита: отпечаток как у рабочей копии" "$(inbox digest --wp 8)" "$(inbox digest --wp 8 --rev HEAD)"
+rc=0; inbox add --to WP-8 --from "x" --pointer "p" --summary "s" --rev HEAD >/dev/null 2>&1 || rc=$?
+check "add с --rev отклонён: код 2" "2" "$rc"
+rc=0; inbox count --wp 8 --rev no-such-ref >/dev/null 2>&1 || rc=$?
+check "несуществующая ревизия: код 1" "1" "$rc"
+
+# 8. pending: only WPs with «новое» entries, oldest first.
+check "pending: только РП с новыми записями" "WP-8	1" "$(inbox pending | cut -f1,2)"
+inbox add --to WP-7 --from "РП-3000" --pointer "p" --summary "ещё" >/dev/null
+check "pending: два РП" "2" "$(inbox pending | wc -l | tr -d ' ')"
+check "pending --rev HEAD: незакоммиченный WP-7 не виден" "WP-8" "$(inbox pending --rev HEAD | cut -f1)"
+
 exit "$fail"
