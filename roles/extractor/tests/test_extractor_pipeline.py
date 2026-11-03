@@ -15,6 +15,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 RUNNER = ROOT / "roles/extractor/scripts/extractor.sh"
 PREFILTER = ROOT / "roles/extractor/scripts/wp429-extractor-prefilters.py"
+SEED_SCRIPTS = ROOT / "seed/strategy/scripts"
+PUBLISH_GATE_SCRIPTS = ("ds-publish.sh", "lib/publish-gate.sh")
 spec = importlib.util.spec_from_file_location("prefilter", PREFILTER)
 prefilter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prefilter)
@@ -58,7 +60,7 @@ class ExtractorPipelineTests(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
-    def published_repo(self, name, files):
+    def published_repo(self, name, files, *, with_gate=True):
         remote = self.base / (name + ".git")
         publisher = self.base / (name + "-publisher")
         canonical = self.workspace / name
@@ -66,7 +68,16 @@ class ExtractorPipelineTests(unittest.TestCase):
         self.run_command(["git", "clone", str(remote), str(publisher)])
         for path, content in files.items():
             self.write(publisher / path, content)
-        self.git(publisher, "add", "--", *files)
+        paths = list(files)
+        if name == "DS-fixture" and with_gate:
+            # The real publish gate, as seeded into every governance repo, so the
+            # extractor <-> publish_commit contract is exercised end to end.
+            for script in PUBLISH_GATE_SCRIPTS:
+                target = publisher / "scripts" / script
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(SEED_SCRIPTS / script, target)
+                paths.append(f"scripts/{script}")
+        self.git(publisher, "add", "--", *paths)
         self.git(publisher, "commit", "-m", "fixture")
         self.git(publisher, "push", "origin", "main")
         self.run_command(["git", "clone", str(remote), str(canonical)])
@@ -78,6 +89,7 @@ class ExtractorPipelineTests(unittest.TestCase):
         values = {
             "WORKSPACE": str(self.workspace),
             "IWE_WORKSPACE": str(self.workspace),
+            "IWE_ROOT": str(self.workspace),
             "IWE_GOVERNANCE_REPO": "DS-fixture",
             "IWE_GOVERNANCE_BRANCH": "main",
             "IWE_TEMPLATE": str(ROOT),
@@ -434,12 +446,12 @@ reports.mkdir()
                 self.shell(command)
                 self.assertEqual(report.read_text(), first)
 
-    def inbox_fixture(self):
+    def inbox_fixture(self, *, with_gate=True):
         self.make_pack()
         governance, _, remote = self.published_repo("DS-fixture", {
             "inbox/fleeting-notes.md": "### Thought\nBody\n",
             "inbox/captures/pattern_helper.md": "helper must remain\n",
-        })
+        }, with_gate=with_gate)
         cli = self.write(self.base / "fake-cli", f"#!{sys.executable}\n" + '''from pathlib import Path
 import sys
 assert "inbox/fleeting-notes.md" in sys.argv[-1]
@@ -566,10 +578,52 @@ reports.mkdir()
         before = self.git(remote, "rev-parse", "main")
         result = self.run_inbox(cli, check=False)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("git push failed", result.stdout)
+        self.assertIn("publish failed for DS-fixture", result.stdout)
         self.assertNotIn("Completed process:", result.stdout)
         self.assertEqual(self.git(remote, "rev-parse", "main"), before)
         self.assertTrue(list((self.base / "runs").rglob("2026-09-12-inbox-check.md")))
+        self.assertEqual(self.unpublished_commit_count(result), 1)
+
+    def preserved_worktree(self, result):
+        match = re.search(r"worktree preserved for review: (\S+)", result.stdout)
+        self.assertIsNotNone(match, result.stdout)
+        return Path(match.group(1))
+
+    def unpublished_commit_count(self, result):
+        worktree = self.preserved_worktree(result)
+        return int(self.git(worktree, "rev-list", "--count", "origin/main..HEAD"))
+
+    def test_missing_publish_gate_refuses_push_and_keeps_commit_local(self):
+        _, remote, cli = self.inbox_fixture(with_gate=False)
+        before = self.git(remote, "for-each-ref")
+        result = self.run_inbox(cli, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ERROR: publish-gate.sh not found for DS-fixture", result.stdout)
+        self.assertNotIn("Completed process:", result.stdout)
+        self.assertEqual(self.git(remote, "for-each-ref"), before)
+        self.assertEqual(self.unpublished_commit_count(result), 1)
+
+    def test_publish_gate_receives_exact_commit_and_governance_branch(self):
+        governance, remote, cli = self.inbox_fixture()
+        calls = self.base / "gate-calls"
+        # A substitute canonical gate: records the publish_commit contract and
+        # refuses, so the extractor's handling of a gate failure is visible too.
+        self.write(governance / "scripts/lib/publish-gate.sh", f"""
+is_ds_repo_by_origin() {{ return 0; }}
+push_branch() {{ echo push_branch >> {shlex.quote(str(calls))}; return 0; }}
+publish_commit() {{ printf '%s\\n' "$@" >> {shlex.quote(str(calls))}; return 1; }}
+""")
+        before = self.git(remote, "rev-parse", "main")
+        result = self.run_inbox(cli, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        committed = re.search(r"Committed DS-fixture \(([0-9a-f]{40})\)", result.stdout)
+        self.assertIsNotNone(committed, result.stdout)
+        args = calls.read_text().splitlines()
+        self.assertEqual(args[1], committed.group(1))
+        self.assertEqual(args[2], "normal")
+        self.assertEqual(args[4], "main")
+        self.assertNotIn("push_branch", args)
+        self.assertEqual(self.git(remote, "rev-parse", "main"), before)
 
     def test_cross_report_warning_contains_no_source_quote(self):
         self.make_pack()

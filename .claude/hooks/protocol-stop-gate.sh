@@ -47,14 +47,29 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 # fail-closed TTL in dry-run-gate.sh (path 3) as the crash fallback. The
 # owner-file is still cleared here, but only once it's confirmed residue
 # (sentinel already gone) — never while the sentinel it points at is live.
+# Single path resolver (Codex r3), shared with dry-run-gate/begin/complete:
+# ANY override without the test-mode marker resets BOTH paths to production.
+# Owner tokens live next to the sentinel (production: /tmp).
+resolve_dry_run_paths() {
+  DRY_RUN_DIR_RESOLVED="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
+  DRY_RUN_SENTINEL_RESOLVED="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
+  if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
+    if [ ! -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ]; then
+      DRY_RUN_DIR_RESOLVED="/tmp/iwe-dry-run-$(id -u)"
+      DRY_RUN_SENTINEL_RESOLVED="/tmp/iwe-dry-run.flag"
+    fi
+  fi
+}
+resolve_dry_run_paths
+
 cleanup_owned_dry_run_sentinel() {
   local sid="$1" safe_sid owner_file
   [ -n "$sid" ] || return 0
   safe_sid=$(printf '%s' "$sid" | tr -cd 'A-Za-z0-9._-')
   [ -n "$safe_sid" ] || return 0
-  owner_file="/tmp/iwe-dry-run-owner-${safe_sid}.token"
+  owner_file="$(dirname "$DRY_RUN_SENTINEL_RESOLVED")/iwe-dry-run-owner-${safe_sid}.token"
   [ -f "$owner_file" ] || return 0
-  [ -f /tmp/iwe-dry-run.flag ] && return 0
+  [ -f "$DRY_RUN_SENTINEL_RESOLVED" ] && return 0
   rm -f "$owner_file" 2>/dev/null || true
 }
 
@@ -71,16 +86,8 @@ complete_dry_run_on_stop() {
   local sid="$1" dry_dir lock_dir sf gid recorded tmp nonce tries lock_pid lock_start cur_start
   local active_file="" active_gid="" corrupted=0 active_count=0
   [ -n "$sid" ] || return 0
-  dry_dir="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-  local sentinel="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
-  # Single path resolver (Codex r3): ANY override without a marker resets
-  # BOTH paths to production -- as in gate/begin/complete.
-  if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
-    if [ ! -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ]; then
-      dry_dir="/tmp/iwe-dry-run-$(id -u)"
-      sentinel="/tmp/iwe-dry-run.flag"
-    fi
-  fi
+  dry_dir="$DRY_RUN_DIR_RESOLVED"
+  local sentinel="$DRY_RUN_SENTINEL_RESOLVED"
   [ -d "$dry_dir" ] && [ ! -L "$dry_dir" ] || return 0
   lock_dir="$dry_dir/transaction.lock"
 

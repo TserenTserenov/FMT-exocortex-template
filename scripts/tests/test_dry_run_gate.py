@@ -5,9 +5,10 @@
   exit 2 = block (sentinel активен/протух/owner-residue, команда write/индиректная)
   exit 0 = allow (никакой репетиции не объявлено, команда read-only или whitelisted)
 
-Sentinel — единый /tmp/iwe-dry-run.flag. Если файл существует до теста
-(живой dry-run прямо сейчас) — весь модуль skip, чтобы не снимать чужой
-sentinel. После тестов sentinel удаляется (созданный нами).
+Sentinel и owner-файлы лежат в личном каталоге тестового режима
+(маркер .iwe-dry-run-test-mode, переменные IWE_DRY_RUN_DIR/IWE_DRY_RUN_SENTINEL
+только в окружении вызова хука): общий /tmp/iwe-dry-run.flag живой репетиции
+тесты не создают и не удаляют.
 
 Сценарии #237: subshell-обход `(git commit)`, кавычный false-positive
 `echo "git commit"`. Сценарий #264: read-only helper
@@ -15,10 +16,12 @@ sentinel. После тестов sentinel удаляется (созданны�
 `bash script.sh` по-прежнему блокируется.
 """
 
+import atexit
 import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -30,8 +33,14 @@ STOP_HOOK = Path(__file__).parent.parent.parent / ".claude" / "hooks" / "protoco
 # location (`$HOOK_DIR/../..`, `pwd -P`), not under $HOME/IWE. Derive the same
 # root here so the whitelist tests pass in any checkout, including CI.
 IWE_ROOT = HOOK.parent.parent.parent.resolve()
-SENTINEL = Path("/tmp/iwe-dry-run.flag")
-OWNER = Path("/tmp/iwe-dry-run-owner-pytest-session.token")
+# Private test-mode dir (0700 from mkdtemp): the hooks honour the override
+# paths only when the marker is inside IWE_DRY_RUN_DIR.
+DRY_DIR = Path(tempfile.mkdtemp(prefix="iwe-drg-"))
+atexit.register(shutil.rmtree, DRY_DIR, ignore_errors=True)
+(DRY_DIR / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+SENTINEL = DRY_DIR / "iwe-dry-run.flag"
+OWNER = DRY_DIR / "iwe-dry-run-owner-pytest-session.token"
+HOOK_ENV = dict(os.environ, IWE_DRY_RUN_DIR=str(DRY_DIR), IWE_DRY_RUN_SENTINEL=str(SENTINEL))
 
 pytestmark = pytest.mark.skipif(
     not shutil.which("jq"), reason="dry-run-gate требует jq (setup requirement)"
@@ -46,13 +55,14 @@ def _run_hook(command: str) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         timeout=10,
+        env=HOOK_ENV,
     )
 
 
 @pytest.fixture
 def sentinel():
     if SENTINEL.exists():
-        pytest.skip("живой dry-run sentinel активен — не трогаем чужой")
+        pytest.fail("sentinel leaked from a prior test")
     OWNER.write_text("pytest-capability", encoding="utf-8")
     SENTINEL.write_text(
         json.dumps(
@@ -161,7 +171,7 @@ class TestSentinelActive:
 
     def test_own_sentinel_cleanup_allowed(self, sentinel):
         """Единственное rm-исключение — собственный sentinel."""
-        r = _run_hook("rm -f /tmp/iwe-dry-run.flag")
+        r = _run_hook(f"rm -f {SENTINEL}")
         assert r.returncode == 0, r.stderr
 
     def test_python_script_blocked(self, sentinel):
@@ -258,9 +268,9 @@ class TestIwePathsChainWhitelist:
         the pre-existing #784/#785 HOME_OR_IWE_PATHS_TAMPERED check) must
         still be rejected even though the chain text itself matches
         verbatim -- this is a different sentinel per-test to avoid clashing
-        with the fixture's shared /tmp/iwe-dry-run.flag mid-assertion."""
+        with the fixture's sentinel mid-assertion."""
         if SENTINEL.exists():
-            pytest.skip("живой dry-run sentinel активен — не трогаем чужой")
+            pytest.fail("sentinel leaked from a prior test")
         OWNER.write_text("pytest-capability", encoding="utf-8")
         SENTINEL.write_text(
             json.dumps(
@@ -329,7 +339,7 @@ class TestSentinelInactive:
     def test_no_sentinel_allows_everything(self):
         """No sentinel AND no owner-file: nothing claims a rehearsal is active."""
         if SENTINEL.exists():
-            pytest.skip("живой dry-run sentinel активен")
+            pytest.fail("sentinel leaked from a prior test")
         assert not OWNER.exists(), "test owner-file leaked from a prior test"
         r = _run_hook("git commit -m x")
         assert r.returncode == 0, r.stderr
@@ -338,7 +348,7 @@ class TestSentinelInactive:
         """issue #460 path 2: sentinel gone but owner-file still claims an
         active rehearsal — fail-CLOSED instead of the old silent allow."""
         if SENTINEL.exists():
-            pytest.skip("живой dry-run sentinel активен")
+            pytest.fail("sentinel leaked from a prior test")
         OWNER.write_text("pytest-capability", encoding="utf-8")
         try:
             r = _run_hook("git commit -m x")
@@ -351,7 +361,7 @@ class TestSentinelInactive:
         """issue #460 path 3: TTL expiry used to rm+allow — now fail-closed,
         sentinel kept in place (not deleted) for manual inspection."""
         if SENTINEL.exists():
-            pytest.skip("живой dry-run sentinel активен")
+            pytest.fail("sentinel leaked from a prior test")
         SENTINEL.write_text("{}", encoding="utf-8")
         stale = time.time() - 2500  # > TTL_SECONDS (2400) in dry-run-gate.sh
         os.utime(SENTINEL, (stale, stale))
@@ -366,7 +376,7 @@ class TestSentinelInactive:
         """TTL raised from 600s to 2400s (issue #460 path 3) so a live
         rehearsal at the old 700s mark keeps protecting, not falls through."""
         if SENTINEL.exists():
-            pytest.skip("живой dry-run sentinel активен")
+            pytest.fail("sentinel leaked from a prior test")
         SENTINEL.write_text("{}", encoding="utf-8")
         aged = time.time() - 700
         os.utime(SENTINEL, (aged, aged))
@@ -402,7 +412,8 @@ class TestJqMissing:
         try:
             payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}})
             r = subprocess.run(
-                ["/bin/bash", str(stub_hook)], input=payload, capture_output=True, text=True, timeout=10
+                ["/bin/bash", str(stub_hook)], input=payload, capture_output=True, text=True, timeout=10,
+                env=HOOK_ENV,
             )
             assert r.returncode == 2, r.stderr
             assert "FAIL-CLOSED" in r.stderr
@@ -421,6 +432,7 @@ class TestStopOwnership:
             capture_output=True,
             text=True,
             timeout=10,
+            env=HOOK_ENV,
         )
 
     def test_foreign_stop_cannot_remove_sentinel(self, sentinel):
@@ -444,7 +456,7 @@ class TestStopOwnership:
         confirmed already removed (explicit rm by the owning procedure) —
         not as a side effect of the same-session Stop that used to delete both."""
         if SENTINEL.exists():
-            pytest.skip("живой dry-run sentinel активен")
+            pytest.fail("sentinel leaked from a prior test")
         OWNER.write_text("pytest-capability", encoding="utf-8")
         try:
             result = self._run_stop("pytest-session")

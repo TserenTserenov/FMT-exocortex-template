@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "76b0793aa5341105510a3d2624908f1cab422ee292d24a2c6d9a79c68de80491"
+      "sha256": "639d0bf71cf1233b81dfeb1caaf492a8ce4b13c05af264e789068871d9379d95"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -137,7 +137,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "afbf6ddcb8a933e4948ef01ee3187d921b98924317756ef7f7cb1709eeee869c"
+      "sha256": "3634a96d77d5b35d0c5cb801eedc294915df0f623f03dc9e55e91de36c3b0e51"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -901,7 +901,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "21dda11bdebfd934d1987e324b91b00e03d2c9d20dacf225abeb6c9e1f0b8c80"
+      "sha256": "f53ebd43cb11e0494872153fc61465088c4e5e1de3bcf2a66298263280599ea0"
     },
     {
       "path": ".gitignore",
@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e7535da1b9de26e1b673db7bf6c548fa9f084f1ef4266b28316df1d15714f0bb"
+      "sha256": "821bc1202c1ee80f769ea394562bf4c071abacd050e4abe09a819eb4e4a1bec7"
     },
     {
       "path": "CLAUDE.md",
@@ -1805,7 +1805,7 @@
     },
     {
       "path": "roles/extractor/README.md",
-      "sha256": "b2104256caf200c8c04901adfdc0ca93b2eac5789e7b006cc95cebc77f5521c0"
+      "sha256": "002a188c830c17091d5b454dfca9d292bbf954701a010688ea29c7fa5fc2ccb7"
     },
     {
       "path": "roles/extractor/config/feedback-log.md",
@@ -1852,8 +1852,12 @@
       "sha256": "21c0aa7fb9f6da803d5e214bcd646fab6dfc3c4d324f84b8d4766bc987f8d863"
     },
     {
+      "path": "roles/extractor/scripts/extractor-branches-prune.sh",
+      "sha256": "770f5fb5a432fe846d6048811522e5e732cb5395dee63f3930960ce7a1d68008"
+    },
+    {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "d99cdc671b20fc68cb3fd3466ed1ff5ea5999cdb8cb2a7b00185da38a9be8c83"
+      "sha256": "6263a3d0c36e5608aa53763322e4e45a7df1f8a7fe63c33f7cfccb99687203fc"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -1872,8 +1876,12 @@
       "sha256": "17d30e9599f9bc0b30a2c2e1adecbeb20514698fc5f1ff6555562c202848d6d4"
     },
     {
+      "path": "roles/extractor/tests/test_extractor_branches_prune.py",
+      "sha256": "2a532df075856b501a0dfa7446585c11b58dc1d55717c6237731f0725c312a1f"
+    },
+    {
       "path": "roles/extractor/tests/test_extractor_pipeline.py",
-      "sha256": "7625aec11be46c4097769fa4085958620ef3d81fffc02f3a359a572019b041e4"
+      "sha256": "822fdd2d8ffb37fe3183ee4fadba4d7b00a11e8c395a7d4b637235b1494db620"
     },
     {
       "path": "roles/lib/scheduler-cron.sh",

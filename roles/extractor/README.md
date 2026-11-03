@@ -99,7 +99,20 @@ Knowledge Extraction Pipeline:
 | `prompts/inbox-check.md` | Промпт: headless проверка inbox |
 | `prompts/knowledge-audit.md` | Промпт: аудит Pack'ов |
 | `scripts/extractor.sh` | Скрипт запуска (аналог strategist.sh) |
+| `scripts/extractor-branches-prune.sh` | Отчёт о брошенных ветках `extractor/*` прошлых прогонов; удаление — только по флагу |
 | `scripts/launchd/` | launchd plist для inbox-check |
+
+### Публикация и брошенные ветки
+
+Экстрактор публикует коммит только через гейт публикации (`scripts/lib/publish-gate.sh` в governance-репозитории, его доставляет `update.sh`). Гейта нет — коммит остаётся локальным, в логе ошибка «publish-gate.sh not found». После `update.sh`: в режимах, работающих в основной копии (`session-close`, `on-demand`), следующий прогон опубликует этот же коммит; в изолированных режимах (`inbox-check`, `session-close-feed`, `git-diff-feed`) коммит остаётся в ветке `extractor/*`, а исходные заметки на сервере остаются неразобранными и будут разобраны заново.
+
+Прошлые прогоны могли оставить ветки `extractor/*` локально и на origin. Отчёт без изменений:
+
+```bash
+bash "$IWE_TEMPLATE/roles/extractor/scripts/extractor-branches-prune.sh"
+```
+
+Сравнение идёт с `origin/HEAD` (другую ветку задаёт `--base`). Ветка помечается `published`, если каждый её коммит уже есть в управляющей ветке (перенесён cherry-pick или ветка — её предок); `KEEP` — в ней есть неопубликованные коммиты, коммиты слияния или проверка не удалась; такие ветки скрипт не удаляет никогда. `--apply` удаляет опубликованные локальные ветки, `--apply-remote --yes` — опубликованные ветки на origin. Решение об удалении за владельцем установки.
 
 ## Принципы
 
