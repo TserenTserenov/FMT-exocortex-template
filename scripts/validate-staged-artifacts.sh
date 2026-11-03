@@ -45,6 +45,17 @@ resolve_find_python3() {
 
 err() { ERRORS+=("$1"); }
 
+# Section headings come from the language catalogs (WP-610 F9): the template
+# copy finds them under its own .claude/; a copy promoted to <workspace>/<governance
+# repo>/scripts/ under the workspace, which git hooks reach without IWE_* set.
+VALIDATOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for I18N_LIB in "$VALIDATOR_DIR/../.claude/lib/i18n.sh" "$VALIDATOR_DIR/../../.claude/lib/i18n.sh" \
+                "${IWE_WORKSPACE:-${IWE_ROOT:-}}/.claude/lib/i18n.sh"; do
+    [ -f "$I18N_LIB" ] && break
+done
+# shellcheck source=../.claude/lib/i18n.sh
+. "$I18N_LIB" 2>/dev/null || i18n_pattern() { echo "i18n: cannot load $I18N_LIB" >&2; return 3; }
+
 # staged_to_tmp <path> — staged blob to a temp file; prints the path.
 staged_to_tmp() {
     local p="$1" tmp
@@ -59,15 +70,10 @@ staged_to_tmp() {
 
 validate_dayplan() { # <staged-path> <tmpfile>
     local rel="$1" f="$2"
-    local section
-    local SECTIONS=(
-      "План на сегодня|Plan for Today|Today.s Plan"
-      "Календарь|Calendar"
-      "IWE за ночь|IWE Overnight"
-      "Разбор заметок|Notes Review"
-      "Итоги вчера|Yesterday"
-    )
-    for section in "${SECTIONS[@]}"; do
+    local section section_id calendar_re
+    for section_id in plan_today calendar overnight notes_review yesterday; do
+        section=$(i18n_pattern "recognition.dayplan.section.$section_id") \
+            || { err "DayPlan $rel: нет шаблона секции $section_id в языковом каталоге"; continue; }
         grep -qE "$section" "$f" || err "DayPlan $rel: пропущена секция «${section}»"
     done
 
@@ -78,7 +84,10 @@ validate_dayplan() { # <staged-path> <tmpfile>
     fi
 
     local calendar_lines
-    calendar_lines=$(awk 'f && /^## /{exit} /Календарь|Calendar/{f=1} f' "$f" 2>/dev/null | wc -l | tr -d ' ')
+    # No pattern: the missing-template error above already blocks the commit.
+    calendar_re=$(i18n_pattern recognition.dayplan.section.calendar 2>/dev/null) || return 0
+    # ENVIRON, not awk -v: -v would rewrite backslash escapes in the pattern.
+    calendar_lines=$(CALENDAR_RE="$calendar_re" awk 'f && /^## /{exit} $0 ~ ENVIRON["CALENDAR_RE"] {f=1} f' "$f" 2>/dev/null | wc -l | tr -d ' ')
     if [ "${calendar_lines:-0}" -lt 3 ]; then
         err "DayPlan $rel: секция «Календарь» пустая или слишком короткая (${calendar_lines:-0} строк)"
     fi

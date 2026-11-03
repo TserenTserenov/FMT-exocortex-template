@@ -2,8 +2,8 @@
 """Assemble the English distribution tree from the Russian source.
 
 The set of shipped files is the source's update-manifest.json (what a user's
-installation receives) minus guide-kit/ (published as iwesys/guide-kit) plus
-the product-page files. Code and configuration are copied verbatim; markdown
+installation receives) minus guide-kit/ (published as iwesys/guide-kit) and
+the Russian language catalog, plus the product-page files. Code and configuration are copied verbatim; markdown
 is never copied from the source: it keeps the translated version already in
 the output tree. Files outside the set are removed from the output tree.
 
@@ -23,7 +23,9 @@ from pathlib import Path
 import yaml
 
 CYRILLIC = re.compile("[\u0400-\u052f\u1c80-\u1c8f\u2de0-\u2dff\ua640-\ua69f]")
-EXCLUDED_PREFIXES = ("guide-kit/",)
+# The Russian language catalog stays in the Russian version only: each version
+# ships the catalogs of its own language (WP-610 F8/F9, pilot decision 03.11).
+EXCLUDED_PREFIXES = ("guide-kit/", ".claude/lib/locale/ru.json")
 PAGE_FILES = (
     "README.md", "LICENSE", "SECURITY.md", "CODE_OF_CONDUCT.md",
     "PRIVACY.md", "CITATION.cff", "CODEOWNERS", "params.yaml.example",

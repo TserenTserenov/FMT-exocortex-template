@@ -106,6 +106,10 @@ git -C "$WS/DS-strategy" config user.name Fixture
 git -C "$WS/DS-strategy" config user.email fixture@example.invalid
 printf 'seed\n' > "$WS/DS-strategy/README.md"
 mkdir -p "$WS/DS-strategy/exocortex"
+# An installed workspace carries .claude/lib (setup.sh step 4b); the seed copy of
+# day-open-scaffold.sh reads its language catalogs from there (WP-610 F9).
+mkdir -p "$WS/.claude"
+cp -R "$ROOT/.claude/lib" "$WS/.claude/"
 printf 'strategy_day: monday\n' > "$WS/DS-strategy/exocortex/day-rhythm-config.yaml"
 git -C "$WS/DS-strategy" add README.md exocortex/day-rhythm-config.yaml
 git -C "$WS/DS-strategy" -c commit.gpgsign=false commit -qm seed
