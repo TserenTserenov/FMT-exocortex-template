@@ -3573,6 +3573,7 @@
     "scripts/tests/test_issue_1401_memory_divergence.sh",
     "scripts/tests/test_issue_1401_memory_source.sh",
     "scripts/tests/test_issue_1410_timezone_param.sh",
+    "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

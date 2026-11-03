@@ -29,6 +29,10 @@ Refs: WP-NNN
 
 - [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены scripts/wp-inbox.sh, scripts/test-wp-inbox.sh (#1428).
 
+### Fixed
+
+- [behavior] `iwe_resolve_root` (`scripts/lib/common.sh`) из копии библиотеки в `<рабочий каталог>/scripts/lib/` больше не возвращает родительский каталог: без `IWE_WORKSPACE`/`IWE_ROOT` он тихо выбирал каталог уровнем выше, если там лежали свои `.iwe-runtime/` или `.exocortex.env`. Копии в шаблоне и в governance-репозитории работают как раньше. Заодно `route-task.sh --help` печатает только шапку, а несуществующий `IWE_DIR` сразу даёт понятную ошибку вместо «catalog not found» (#1431).
+
 ## [0.41.11] — 2026-11-02
 
 ### Added
