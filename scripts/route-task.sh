@@ -31,6 +31,9 @@ source "$SCRIPT_DIR/lib/common.sh"
 # accepting that candidate, and fails closed with a clear message instead of
 # guessing. IWE_DIR itself stays the highest-priority override.
 IWE_DIR="$(iwe_resolve_root "${IWE_DIR:-}")" || exit 1
+# issue #1431: an explicit IWE_DIR is returned by the resolver as is; a typo
+# surfaced only later as "catalog not found".
+[[ -d "$IWE_DIR" ]] || { echo "ERROR: workspace root is not a directory: $IWE_DIR" >&2; exit 1; }
 IWE_TEMPLATE="${IWE_TEMPLATE:-$IWE_DIR/FMT-exocortex-template}"
 GOV_REPO="${IWE_GOVERNANCE_REPO:-DS-strategy}"
 CATALOG="${IWE_EXECUTOR_CATALOG:-${IWE_DIR}/${GOV_REPO}/scripts/executor-catalog.yaml}"
@@ -596,7 +599,9 @@ main() {
         list)     show_list ;;
         validate) validate_catalog ;;
         help)
-            grep "^# " "$0" | head -20 | sed 's/^# //'
+            # The header comment ends at the first blank line; below it are
+            # implementation comments, not usage (issue #1431).
+            awk 'NR == 1 { next } /^$/ { exit } { sub(/^# ?/, ""); print }' "$0"
             ;;
         dispatch)
             [[ -z "$skill_name" && "$allow_fallback" == "false" ]] && die "required: --skill <name>"

@@ -925,7 +925,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5b3c0758c1a2cc8b25451ac59a313ba565b96761b964c66c1e49fe4f9b55a861"
+      "sha256": "03140b9cf6d126d72fadbf8bd2827825197defb27dd8e35d04ac79ad64e9ce68"
     },
     {
       "path": "CLAUDE.md",
@@ -2657,7 +2657,7 @@
     },
     {
       "path": "scripts/lib/common.sh",
-      "sha256": "74ea2d29c1da9837043cd33308b3e838f0ee886a8bff9ed10d12d228ec5c40cd"
+      "sha256": "db7edc4b804bd9ca0520bcadad68d5d2486db8795f282f82c53e5025ee20aabf"
     },
     {
       "path": "scripts/lib/day-open-hooks.sh",
@@ -2821,7 +2821,7 @@
     },
     {
       "path": "scripts/route-task.sh",
-      "sha256": "16603696e0f50237c22591281e035f6037230affe8d6fde0d9d363c4f765eb5f"
+      "sha256": "ccc8dc65f3d26b6d7dd128baeafbb2e25ac22f79d7da07c9e29ebed8cbb79fbc"
     },
     {
       "path": "scripts/run-regression-tests.sh",
@@ -3333,7 +3333,7 @@
     },
     {
       "path": "seed/strategy/scripts/lib/common.sh",
-      "sha256": "8855ece02118e39a97443164967c9deffb9e8d8a4567bd2c5d1f705f0a75bd12"
+      "sha256": "8e5f0f9c6082a942fb699922c674dcd853b86e02254b66faa5ed6844a96e23f8"
     },
     {
       "path": "seed/strategy/scripts/lib/day-open-hooks.sh",
@@ -3573,6 +3573,7 @@
     "scripts/tests/test_issue_1401_memory_divergence.sh",
     "scripts/tests/test_issue_1401_memory_source.sh",
     "scripts/tests/test_issue_1410_timezone_param.sh",
+    "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

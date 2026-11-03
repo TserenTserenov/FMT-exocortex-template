@@ -39,11 +39,28 @@ iwe_env_get() {
 # (IWE_ROOT_ARG, a third variant seen in some scripts, is intentionally NOT
 # consulted here — callers that need a positional-arg override should pass
 # it as EXPLICIT instead of adding a 4th env var to this precedence chain.)
+#
+# The library is installed at two depths. Three levels up is the root for
+# <root>/FMT-exocortex-template/scripts/lib and <root>/<governance>/scripts/lib.
+# Two levels up is the root for the workspace copy <root>/scripts/lib; there
+# three levels up is the root's parent, which may carry its own .iwe-runtime
+# and .exocortex.env (issue #1431). The two-level candidate is accepted only by
+# the strict FMT-exocortex-template/ marker and never reads .exocortex.env: in
+# the template layout that candidate is the template checkout, whose own
+# .exocortex.env must not override the workspace root.
 iwe_resolve_root() {
   local explicit="${1:-}" library_root configured
   [ -n "$explicit" ] && { printf '%s\n' "$explicit"; return 0; }
   [ -n "${IWE_WORKSPACE:-}" ] && { printf '%s\n' "$IWE_WORKSPACE"; return 0; }
   [ -n "${IWE_ROOT:-}" ] && { printf '%s\n' "$IWE_ROOT"; return 0; }
+
+  # Both candidates climb the logical path the library was sourced from: a
+  # physical lib/ first would move them when lib/ itself is a symlink.
+  library_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd -P) || return 1
+  if [ -d "$library_root/FMT-exocortex-template" ]; then
+    printf '%s\n' "$library_root"
+    return 0
+  fi
 
   library_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P) || return 1
   if [ -f "$library_root/.exocortex.env" ]; then
