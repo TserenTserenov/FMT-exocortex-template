@@ -123,15 +123,18 @@ ERRORS=()
 
 if [ -n "$DAYPLAN" ] && [ -f "$DAYPLAN" ]; then
 
-# Required sections (parameterized — update this list when format changes).
+# Required sections, by stable id; each id accepts the heading in any shipped
+# language (recognition.dayplan.section.<id> in .claude/lib/locale/*.json).
 # The Scout section is optional: checked separately below (see the "Scout" block).
-SECTIONS=(
-  "План на сегодня|Plan for Today|Today.s Plan"
-  "Календарь|Calendar"
-  "IWE за ночь|IWE Overnight"
-  "Разбор заметок|Notes Review"
-  "Итоги вчера|Yesterday"
-)
+SECTIONS=()
+if . "$(dirname "${BASH_SOURCE[0]}")/../lib/i18n.sh"; then
+  for section_id in plan_today calendar overnight notes_review yesterday; do
+    section=$(i18n_pattern "recognition.dayplan.section.$section_id") || { ERRORS+=("i18n: нет шаблона секции $section_id"); continue; }
+    SECTIONS+=("$section")
+  done
+else
+  ERRORS+=("i18n: не загружается .claude/lib/i18n.sh")
+fi
 
 for section in "${SECTIONS[@]}"; do
   if ! grep -qE "$section" "$DAYPLAN"; then

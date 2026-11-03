@@ -29,6 +29,12 @@ def test_set_drops_guide_kit_and_adds_page_files(tmp_path):
     assert ad.distribution_set(src) == {"scripts/a.sh", "README.md", "LICENSE"}
 
 
+def test_set_ships_only_the_english_language_catalog(tmp_path):
+    catalogs = [".claude/lib/locale/en.json", ".claude/lib/locale/ru.json"]
+    src = make_source(tmp_path / "src", {c: "{}" for c in catalogs}, catalogs)
+    assert ad.distribution_set(src) == {".claude/lib/locale/en.json"}
+
+
 def test_code_copied_markdown_kept_and_extras_removed(tmp_path):
     src = make_source(tmp_path / "src", {"scripts/a.sh": "echo hi\n", "docs/a.md": "RU"}, ["scripts/a.sh", "docs/a.md"])
     out = tmp_path / "out"

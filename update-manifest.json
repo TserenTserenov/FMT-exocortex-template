@@ -65,7 +65,7 @@
     },
     {
       "path": ".claude/hooks/close-gate-reminder.sh",
-      "sha256": "281171efca08b7045a4577196c2d2746aeb1a04e56847019ee5f4b171f94127e"
+      "sha256": "3b47daa1eae96d27c32cab9bb2e54041752458b1419e09d56093011b76e78463"
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
@@ -125,7 +125,7 @@
     },
     {
       "path": ".claude/hooks/protocol-artifact-validate.sh",
-      "sha256": "75c296d0de7213b79b6ca568b2b8b581dce6cbb6b2e3a683f2286bd3ff0c5206"
+      "sha256": "441fa6ce6c05387afac650cc7d1095dee7291f798c9487b7c2344b199adb7467"
     },
     {
       "path": ".claude/hooks/protocol-completion-reminder.sh",
@@ -300,8 +300,20 @@
       "sha256": "c9040a9bd64b139be4933ecc78802db3d444dc5254049e5a096da7512b329b96"
     },
     {
+      "path": ".claude/lib/i18n.sh",
+      "sha256": "01682887fa9445c157e3e705f5ea282ebf53590f80465de41a61c2a58f1266f3"
+    },
+    {
       "path": ".claude/lib/iwe-env-bootstrap.sh",
       "sha256": "ba5a04328388f1bdade46bf0e35774c897f67945c0f5ff243c63d32d2a08af8d"
+    },
+    {
+      "path": ".claude/lib/locale/en.json",
+      "sha256": "c0d081f0ec07d3e8e79a61631703f7883ae0a2c52f1a727c5e2a3ff1a33d674f"
+    },
+    {
+      "path": ".claude/lib/locale/ru.json",
+      "sha256": "67eee130b6360fbbabb115c4b1a893f37612fb7207184fff7e0d84f631c800df"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -885,7 +897,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "ab1947bc74c151bda213c65521675e9695e2042983bd52975a3ee8e006827e29"
+      "sha256": "05b44ef523a127d207b707c31c43584c11ffdb2944d31b92c99eeb36657a0e7c"
     },
     {
       "path": ".gitignore",
@@ -913,7 +925,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3a2f1717bf2e9e41e436062016b5148081ebc49f5632c720b5e7f60945fcfd58"
+      "sha256": "5b3c0758c1a2cc8b25451ac59a313ba565b96761b964c66c1e49fe4f9b55a861"
     },
     {
       "path": "CLAUDE.md",
@@ -2264,6 +2276,10 @@
       "sha256": "009826d01fd743a100c3c7f389b425df540fda3a741395bca1ea61b557fd592a"
     },
     {
+      "path": "scripts/check-locale-catalogs.py",
+      "sha256": "7db2929b21373e92f6e62f759f16471464cde39230f06d65904bbfa63d722205"
+    },
+    {
       "path": "scripts/check-manifest-coverage.py",
       "sha256": "370509839b7c07eda90029f08e6fa4d6430fc51ac8402ef10071d14408842bba"
     },
@@ -2413,7 +2429,7 @@
     },
     {
       "path": "scripts/day-open-scaffold.sh",
-      "sha256": "94f468ef14ead3bae9520ef54daa588361143ba6dce69cdaecc6ac030144bcb0"
+      "sha256": "bf6bd2153240c4cdaf378751a48070ef4c4b010cbab400f15f00285181cdc6ce"
     },
     {
       "path": "scripts/day-open-smoke-extended.sh",
@@ -3177,7 +3193,7 @@
     },
     {
       "path": "scripts/validate-staged-artifacts.sh",
-      "sha256": "780a82fe4e0e52ac643390741fc10ce1f8bb12979b24039bcb550fbf5c7909ba"
+      "sha256": "87914a30cc798eff81d18d0e6b72383b7896af974279a6e6755ac4dbaca95c5e"
     },
     {
       "path": "scripts/verify-context-budget.sh",
@@ -3281,7 +3297,7 @@
     },
     {
       "path": "seed/strategy/scripts/day-open-scaffold.sh",
-      "sha256": "94f468ef14ead3bae9520ef54daa588361143ba6dce69cdaecc6ac030144bcb0"
+      "sha256": "bf6bd2153240c4cdaf378751a48070ef4c4b010cbab400f15f00285181cdc6ce"
     },
     {
       "path": "seed/strategy/scripts/day-open-sync-banner-patch.py",
@@ -3691,6 +3707,26 @@
     "setup/detector-fixtures/detector_07/positive_tilde_path.sh",
     "setup/detector-fixtures/detector_07/positive_uppercase.sh",
     "setup/detector-regex.sh",
+    "setup/i18n-fixtures/close-gate-reminder/01.expected",
+    "setup/i18n-fixtures/close-gate-reminder/01.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/03.expected",
+    "setup/i18n-fixtures/close-gate-reminder/03.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/04.expected",
+    "setup/i18n-fixtures/close-gate-reminder/04.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/05.expected",
+    "setup/i18n-fixtures/close-gate-reminder/05.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/06.expected",
+    "setup/i18n-fixtures/close-gate-reminder/06.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/08.expected",
+    "setup/i18n-fixtures/close-gate-reminder/08.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/09.expected",
+    "setup/i18n-fixtures/close-gate-reminder/09.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/10.expected",
+    "setup/i18n-fixtures/close-gate-reminder/10.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/11.expected",
+    "setup/i18n-fixtures/close-gate-reminder/11.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/12.expected",
+    "setup/i18n-fixtures/close-gate-reminder/12.prompt",
     "setup/integration-contract-validator.sh",
     "setup/optional/COVER-IMAGES.md",
     "setup/optional/README.md",
@@ -3718,6 +3754,7 @@
     "setup/test-ds-publish.sh",
     "setup/test-extractor-subscription-env.sh",
     "setup/test-hook-dayplan-validator.sh",
+    "setup/test-i18n.sh",
     "setup/test-issue-1216-env-merge-and-seed.sh",
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
     "setup/test-next-rc-tag.sh",

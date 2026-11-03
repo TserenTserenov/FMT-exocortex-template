@@ -26,6 +26,9 @@ bad()  { echo "FAIL: $1"; fail=$((fail + 1)); }
 WS="$TMP/ws"
 mkdir -p "$WS/FMT-exocortex-template/scripts"
 cp "$ROOT/scripts/validate-staged-artifacts.sh" "$WS/FMT-exocortex-template/scripts/"
+# The validator reads DayPlan section headings from the language catalogs (WP-610 F9).
+mkdir -p "$WS/FMT-exocortex-template/.claude"
+cp -R "$ROOT/.claude/lib" "$WS/FMT-exocortex-template/.claude/"
 GOV="$WS/${GOVERNANCE_REPO:-DS-strategy}"
 mkdir -p "$GOV/.githooks" "$GOV/current"
 cp "$ROOT/seed/strategy/.githooks/pre-commit" "$GOV/.githooks/pre-commit"

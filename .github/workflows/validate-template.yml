@@ -195,6 +195,8 @@ jobs:
         run: bash setup/test-detectors.sh
       - name: Run DayPlan-validator hook regression (trigger gap guard)
         run: bash setup/test-hook-dayplan-validator.sh
+      - name: Run WP-610 F9 language catalog tests
+        run: bash setup/test-i18n.sh
       - name: Ensure jsonschema available (attestation statement test contract)
         run: |
           python3 -c "import jsonschema" 2>/dev/null && exit 0
@@ -315,6 +317,8 @@ jobs:
         run: bash setup/smoke-test-fresh-install.sh
       - name: Run detector regression fixtures (regex gap guard)
         run: bash setup/test-detectors.sh
+      - name: Run WP-610 F9 language catalog tests on system /bin/bash (3.2)
+        run: /bin/bash setup/test-i18n.sh
 
       # WP-529 Phase 9 (Evgenii 20.08): these two scripts used to hard-fail on
       # stock macOS /bin/bash (3.2, `declare -A`/`mapfile`) — the `validate`
