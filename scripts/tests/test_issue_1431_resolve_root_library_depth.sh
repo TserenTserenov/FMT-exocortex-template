@@ -27,18 +27,23 @@ trap cleanup EXIT INT TERM
 # install_lib DIR — copy the library under test into DIR.
 install_lib() { mkdir -p "$1" && cp "$LIB" "$1/common.sh"; }
 
-# resolve LIBRARY [EXPLICIT] — run the resolver with no root variables at all.
+# resolve LIBRARY EXPLICIT [VAR=VALUE...] — run the resolver in a clean
+# environment: only the listed root variables are set.
 # The inner script expands its own positional parameters: single quotes intended.
 # shellcheck disable=SC2016
 resolve() {
-    env -i HOME="$TEST_ROOT/home" PATH="$PATH" /bin/bash -c \
-        'source "$1"; iwe_resolve_root "${2:-}"' _ "$1" "${2:-}" 2>/dev/null
+    local library="$1" explicit="$2"
+    shift 2
+    env -i HOME="$TEST_ROOT/home" PATH="$PATH" "$@" /bin/bash -c \
+        'source "$1"; iwe_resolve_root "$2"' _ "$library" "$explicit" 2>/dev/null
 }
 
-# expect NAME LIBRARY EXPECTED_STDOUT EXPECTED_RC [EXPLICIT]
+# expect NAME LIBRARY EXPECTED_STDOUT EXPECTED_RC [EXPLICIT [VAR=VALUE...]]
 expect() {
-    local name="$1" library="$2" want="$3" want_rc="$4" got rc
-    got=$(resolve "$library" "${5:-}")
+    local name="$1" library="$2" want="$3" want_rc="$4" explicit="${5:-}" got rc
+    shift 4
+    [ "$#" -gt 0 ] && shift
+    got=$(resolve "$library" "$explicit" "$@")
     rc=$?
     if [ "$got" = "$want" ] && [ "$rc" -eq "$want_rc" ]; then
         pass "$name"
@@ -83,6 +88,16 @@ ln -s "$LIB" "$R4/FMT-exocortex-template/scripts/lib/common.sh"
 expect "symlinked template copy resolves to the link's workspace" \
     "$R4/FMT-exocortex-template/scripts/lib/common.sh" "$R4" 0
 
+echo "=== 4b. lib/ itself is a symlink to a directory outside the workspace ==="
+# Both candidates must climb the path the library was sourced from, not the
+# physical location of lib/.
+R4B="$TEST_ROOT/t4b/IWE"
+install_lib "$TEST_ROOT/t4b/shared/package/lib"
+mkdir -p "$R4B/FMT-exocortex-template/scripts"
+ln -s "$TEST_ROOT/t4b/shared/package/lib" "$R4B/FMT-exocortex-template/scripts/lib"
+expect "symlinked lib/ directory resolves to the sourcing workspace" \
+    "$R4B/FMT-exocortex-template/scripts/lib/common.sh" "$R4B" 0
+
 echo "=== 5. three-level candidate keeps reading .exocortex.env ==="
 R5="$TEST_ROOT/t5/IWE"
 install_lib "$R5/DS-strategy/scripts/lib"
@@ -96,17 +111,16 @@ install_lib "$R6/DS-strategy/scripts/lib"
 expect "unresolvable layout fails with empty stdout" \
     "$R6/DS-strategy/scripts/lib/common.sh" "" 1
 
-echo "=== 7. precedence ==="
-expect "explicit argument wins over the library location" \
-    "$R3/scripts/lib/common.sh" "$DECOY" 0 "$DECOY"
-# shellcheck disable=SC2016
-got=$(env -i HOME="$TEST_ROOT/home" PATH="$PATH" IWE_WORKSPACE="$DECOY" /bin/bash -c \
-    'source "$1"; iwe_resolve_root' _ "$R3/scripts/lib/common.sh")
-if [ "$got" = "$DECOY" ]; then
-    pass "IWE_WORKSPACE wins over the library location"
-else
-    fail "IWE_WORKSPACE: expected '$DECOY', got '$got'"
-fi
+echo "=== 7. precedence: explicit > IWE_WORKSPACE > IWE_ROOT > location ==="
+P_ARG="$TEST_ROOT/p-arg" P_WS="$TEST_ROOT/p-workspace" P_ROOT="$TEST_ROOT/p-root"
+mkdir -p "$P_ARG" "$P_WS" "$P_ROOT"
+L3="$R3/scripts/lib/common.sh"
+expect "explicit argument wins over both variables" \
+    "$L3" "$P_ARG" 0 "$P_ARG" IWE_WORKSPACE="$P_WS" IWE_ROOT="$P_ROOT"
+expect "IWE_WORKSPACE wins over IWE_ROOT" \
+    "$L3" "$P_WS" 0 "" IWE_WORKSPACE="$P_WS" IWE_ROOT="$P_ROOT"
+expect "IWE_ROOT wins over the library location" \
+    "$L3" "$P_ROOT" 0 "" IWE_ROOT="$P_ROOT"
 
 echo "=== 8. route-task.sh: explicit IWE_DIR and --help ==="
 out=$(IWE_DIR="$TEST_ROOT/does-not-exist" bash "$ROUTER" --list 2>&1)

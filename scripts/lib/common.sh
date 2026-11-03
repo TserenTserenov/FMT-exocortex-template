@@ -49,19 +49,20 @@ iwe_env_get() {
 # the template layout that candidate is the template checkout, whose own
 # .exocortex.env must not override the workspace root.
 iwe_resolve_root() {
-  local explicit="${1:-}" library_dir library_root configured
+  local explicit="${1:-}" library_root configured
   [ -n "$explicit" ] && { printf '%s\n' "$explicit"; return 0; }
   [ -n "${IWE_WORKSPACE:-}" ] && { printf '%s\n' "$IWE_WORKSPACE"; return 0; }
   [ -n "${IWE_ROOT:-}" ] && { printf '%s\n' "$IWE_ROOT"; return 0; }
 
-  library_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P) || return 1
-  library_root=$(cd "$library_dir/../.." 2>/dev/null && pwd -P) || return 1
+  # Both candidates climb the logical path the library was sourced from: a
+  # physical lib/ first would move them when lib/ itself is a symlink.
+  library_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd -P) || return 1
   if [ -d "$library_root/FMT-exocortex-template" ]; then
     printf '%s\n' "$library_root"
     return 0
   fi
 
-  library_root=$(cd "$library_dir/../../.." 2>/dev/null && pwd -P) || return 1
+  library_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P) || return 1
   if [ -f "$library_root/.exocortex.env" ]; then
     configured=$(iwe_env_get "$library_root/.exocortex.env" WORKSPACE_DIR 2>/dev/null || true)
     if [ -n "$configured" ] && [ -d "$configured" ]; then
