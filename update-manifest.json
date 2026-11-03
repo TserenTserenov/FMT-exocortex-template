@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a89ca46afc7c185e12e82553a710d6bc7c27c44f0d52a31945999493ad558c64"
+      "sha256": "532e1ae4dc87cfbf4f5b888919acb139ab4cd8b1d91e60864df25fbe8774ac3d"
     },
     {
       "path": "CLAUDE.md",
@@ -1701,7 +1701,7 @@
     },
     {
       "path": "memory/repo-type-rules.md",
-      "sha256": "0b940e57bce6359c528a70fa34f8334c112aed8a1d5266c8d4a4ca6946aed504"
+      "sha256": "cadef3d477169027700ded1f34b768950354424dc69900ae73434136c5481a9b"
     },
     {
       "path": "memory/roles-detail.md",
