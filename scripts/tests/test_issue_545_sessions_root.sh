@@ -161,6 +161,8 @@ cp "$ROOT/scripts/day-open-scaffold.sh" "$WSS/FMT-exocortex-template/scripts/"
 cp "$ROOT/scripts/lib/common.sh" "$ROOT/scripts/lib/find-python3.sh" \
    "$WSS/FMT-exocortex-template/scripts/lib/"
 cp "$ROOT/.claude/lib/iwe-env-bootstrap.sh" "$WSS/FMT-exocortex-template/.claude/lib/"
+# Language catalogs for month names and headings (WP-610 F9).
+cp -R "$ROOT/.claude/lib/i18n.sh" "$ROOT/.claude/lib/locale" "$WSS/FMT-exocortex-template/.claude/lib/"
 # Скелет по дизайну НЕ генерирует DayPlan в strategy_day (exit 2) — дефолт
 # monday. Фикстура обязана ставить strategy_day на заведомо НЕ сегодняшний
 # будний день, иначе тест падает каждый понедельник (поймано 31.08).

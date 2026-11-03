@@ -79,6 +79,9 @@ assert_contains "triage report cannot mask a scheduler failure" "$(row "$out" 'S
 INSTALLED_SCRIPTS="$TMP/s919/ws/FMT-exocortex-template/scripts"
 mkdir -p "$(dirname "$INSTALLED_SCRIPTS")"
 cp -R "$ROOT/scripts" "$INSTALLED_SCRIPTS"
+# The template clone carries .claude/lib; the scaffold reads its language catalogs there (WP-610 F9).
+mkdir -p "$(dirname "$INSTALLED_SCRIPTS")/.claude"
+cp -R "$ROOT/.claude/lib" "$(dirname "$INSTALLED_SCRIPTS")/.claude/"
 DAYPLAN="$TMP/s919/ws/DS-strategy/current/DayPlan $TODAY.md"
 scaffold s919 "$TODAY" "$INSTALLED_SCRIPTS/day-open-scaffold.sh" > "$DAYPLAN"
 assert_contains "installed DayPlan records scheduler failure" "$(row "$(cat "$DAYPLAN")" 'Scheduler/триаж')" "🔴"
