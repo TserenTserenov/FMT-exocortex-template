@@ -1281,7 +1281,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "ad4e3eff1f9e9d140c7b4128471cc53421c05eb51f606ce309adc4568a4363e0"
+      "sha256": "bdee229b3b81f60fad907b955a67f35de9c07c7b6213e4516ef22d82d5d7f4d0"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3441,6 +3441,10 @@
     }
   ],
   "excluded_paths": [
+    ".github/author-sourced-paths.txt",
+    ".github/scripts/author-source-gate.sh",
+    ".github/scripts/test-author-source-gate.sh",
+    ".github/workflows/author-source-gate.yml",
     ".github/workflows/nightly-template-audit.yml",
     "docs/developer/README.md",
     "docs/developer/card-template.md",
