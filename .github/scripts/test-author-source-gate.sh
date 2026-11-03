@@ -29,7 +29,7 @@ run_case() {  # name expected_rc commit_subject pr_body list_content changed_pat
 
 LIST=$'scripts/sourced.sh\n'
 run_case sourced-file-no-trailer      1 "fix: edit"                         ""                          "$LIST" scripts/sourced.sh
-run_case sourced-file-trailer-in-body 0 "fix: edit"                         "Author-Source: DS-my-strategy#42" "$LIST" scripts/sourced.sh
+run_case sourced-file-trailer-in-body 0 "fix: edit"                         "Author-Source: author-repo#42" "$LIST" scripts/sourced.sh
 run_case sourced-file-trailer-sha     0 "fix: edit"                         "Author-Source: 8a453cf525"        "$LIST" scripts/sourced.sh
 run_case sourced-file-pending         0 "fix: edit"                         "Author-Source: pending #7"        "$LIST" scripts/sourced.sh
 run_case sourced-file-bad-trailer     1 "fix: edit"                         "Author-Source: later"             "$LIST" scripts/sourced.sh
