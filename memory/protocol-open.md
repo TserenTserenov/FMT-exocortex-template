@@ -97,7 +97,8 @@ python3 "${IWE_SCRIPTS:-$HOME/IWE/scripts}/artifactor.py" "$REQUEST"
    | 1 | РП не найден | перейти к Ритуалу с пометкой «контекст не найден» |
    | 2 | ошибка парсинга frontmatter | перейти к Ритуалу, поднять stderr в «Требует внимания» |
    | 3 | `GIT_SYNC_STATUS: fetch_failed\|checker_unavailable`, ЛИБО `STALE\|DIVERGED` при отстающем remote-tracking ref (`refs/remotes/origin/<branch>` ≠ OID ls-remote — брокер Ф66 РП-530 ещё не подтянул) — свежесть данных не доказана, bundle читать нечего (WP-561 Ф20/Ф24) | см. ниже, НЕ переходить к 3b/3c молча |
-   | 4 | не найдена библиотека `scripts/lib/wp-num.sh` — ошибка установки, не «РП не найден» | сообщить пилоту и обновить шаблон |
+
+   Exit 4 → не найдена библиотека wp-num.sh: ошибка установки, не «РП не найден»; сообщить пилоту и обновить шаблон.
 
    **`CARD_SOURCE` (третья машинная строка, WP-561 Ф24):** `worktree` — читалась рабочая копия (статус OK/NO_UPSTREAM); `origin-pinned oid=…` — читался снимок origin (рабочая копия STALE/DIVERGED, ref свежий); `worktree-forced` — `--force-sync`, читалась заведомо устаревшая копия. Sub-agent `wp-sync-actualizer` при `origin-pinned` работает как обычно (данные легитимны), diff применяется только в изолированной копии.
 
