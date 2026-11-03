@@ -126,10 +126,10 @@ Coverage: N/4
 
 1. **Создать репетицию через begin-helper** (issue #549 stage 2 — эксклюзивное создание под транзакционным замком; token печатается один раз в stdout):
    ```bash
-   bash "$IWE_SCRIPTS/dry-run-begin.sh" audit-installation "${CLAUDE_SESSION_ID:-}"
+   bash "$IWE_SCRIPTS/dry-run-begin.sh" audit-installation "${CLAUDE_SESSION_ID:-}" hold
    ```
-   Helper печатает `gate_id=`, `owner_token=`, `owner_session_id=`. **Запомни все три значения из вывода tool-call'а** — shell-переменные между твоими Bash-вызовами не живут (Codex r2), а token хранить в файле нельзя (его прочитает репетиция). Активная чужая репетиция → helper завершится ошибкой с её gate_id.
-2. **Запустить subagent** через Agent tool (subagent_type=general-purpose, модель Sonnet) с промптом:
+   Третий аргумент `hold` (issue #1435): Stop-хук не завершит репетицию, даже если подагент уйдёт в фон и ход закончится раньше него — завершает только шаг 4; ограничитель — TTL флага. Helper печатает `gate_id=`, `owner_token=`, `owner_session_id=`. **Запомни все три значения из вывода tool-call'а** — shell-переменные между твоими Bash-вызовами не живут (Codex r2), а token хранить в файле нельзя (его прочитает репетиция). Активная чужая репетиция → helper завершится ошибкой с её gate_id.
+2. **Запустить subagent** через Agent tool (subagent_type=general-purpose, модель Sonnet) в переднем плане — не фоновым запуском, — с промптом:
 
    ```
    Запусти ритуал /run-protocol close day по обычной процедуре. Не изобретай — следуй SKILL.md как написано.
@@ -146,7 +146,7 @@ Coverage: N/4
    - Заключение: ✅/⚠️/❌
    ```
 
-3. **Дождаться завершения subagent'а.**
+3. **Дождаться завершения subagent'а.** Если среда всё же запустила его в фоне и сразу вернула управление — не заканчивать ход финальным текстом и не переходить к шагу 4, пока не пришло уведомление о его завершении (issue #1435).
 4. **Завершить репетицию** (атомарный переход active→completed с capability token; sentinel снимается самим helper'ом после completed — Stop-хук теперь только идемпотентный fallback). Подставь значения, запомненные на шаге 1:
    ```bash
    bash "$IWE_SCRIPTS/dry-run-complete.sh" "<gate_id из шага 1>" rehearsal-finished "<owner_session_id из шага 1>" "<owner_token из шага 1>"

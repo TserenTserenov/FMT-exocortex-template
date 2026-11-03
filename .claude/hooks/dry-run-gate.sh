@@ -389,6 +389,7 @@ if [ $((NOW - MTIME)) -gt $TTL_SECONDS ]; then
         echo "[dry-run-gate] BLOCKED: sentinel stale (older than ${TTL_SECONDS}s, mtime $MTIME)"
         echo "Reason: TTL expired without cleanup — owner likely crashed, protection kept fail-closed"
         echo "If the rehearsal really ended: rm -f $SENTINEL"
+        echo "A rehearsal begun with hold (issue #1435) stays active after that: then run dry-run-complete.sh <gate_id> manual-recovery"
     } >&2
     exit 2
 fi
@@ -519,6 +520,15 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     CMD=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
     [ -z "$CMD" ] && exit 0
 
+    # issue #1434: the rules below read the command as code, so heredoc bodies
+    # and comments (data, not commands) are removed first. A reader failure
+    # fails closed, like a missing jq.
+    CMD_PARSER="$HOOK_DIR/dry-run-cmd-parse.pl"
+    command -v perl >/dev/null 2>&1 || fail_closed "perl not found — cannot classify command"
+    [ -r "$CMD_PARSER" ] || fail_closed "$CMD_PARSER missing — cannot classify command"
+    CMD_CODE=$(printf '%s' "$CMD" | perl "$CMD_PARSER" strip) \
+        || fail_closed "command reader failed — cannot classify command"
+
     # Step 1: remove quoted spans and harmless redirects to null.
     # issue #315-fix2: the only real (documented in day-close/SKILL.md,
     # day-close-details.md) form of invoking day-close-prepare.sh is a quoted var-expansion
@@ -596,7 +606,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # TestIwePathsChainWhitelist failed with the block pattern listed last.
     GATE_NONCE=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
     [ -n "$GATE_NONCE" ] || GATE_NONCE="$$-$(date +%s%N 2>/dev/null || date +%s)"
-    NORM=$(printf '%s' "$CMD" | sed -E \
+    NORM=$(printf '%s' "$CMD_CODE" | sed -E \
         -e "s@IWE_PATHS=\"\\\$\\{IWE_PATHS_FILE:-\\}\"; if \\[ -z \"\\\$IWE_PATHS\" \\]; then for _c in \"\\\$PWD/\\.iwe-paths\" \"\\\$\\{IWE_WORKSPACE:-\\\$HOME/IWE\\}/\\.iwe-paths\" \"\\\$HOME/\\.iwe-paths\"; do \\[ -r \"\\\$_c\" \\] && \\{ IWE_PATHS=\"\\\$_c\"; break; \\}; done; fi; \\[ -n \"\\\$IWE_PATHS\" \\] && \\. \"\\\$IWE_PATHS\"@ __WL_IWE_PATHS_CHAIN_${GATE_NONCE}__ @g" \
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
         -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
@@ -635,7 +645,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # quoted span to the literal text "QSTR") -- a quoted/escaped command
     # name like "cd" or \cd needs its quoting intact to tell it apart from
     # QSTR by the time the cd/pushd check below runs.
-    SPLIT_RAW=$(printf '%s\n' "$CMD" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+    SPLIT_RAW=$(printf '%s\n' "$CMD_CODE" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
 
     # Live-review finding (Fable, 2026-09-14): the .iwe-paths whitelist matches the
     # LITERAL TEXT "$HOME/.iwe-paths"/"${IWE_PATHS_FILE:-...}", not the
@@ -757,13 +767,37 @@ if [ "$TOOL_NAME" = "Bash" ]; then
           next unless @w;
           my $i = 0;
           $i++ if $i < @w && ($w[$i] eq "builtin" || $w[$i] eq "command");
-          exit 0 if $i < @w && ($w[$i] eq "cd" || $w[$i] eq "pushd");
+          exit 0 if $i < @w && ($w[$i] eq "cd" || $w[$i] eq "pushd" || $w[$i] eq "popd");
         }
         exit 1;
     '; then
         CD_PUSHD_TOKEN_DETECTED=1
     fi
     [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
+
+    # issue #1434: whitelisted helpers called by `$IWE_SCRIPTS/...` lose the
+    # whitelist when the same command reassigns IWE_SCRIPTS.
+    IWE_SCRIPTS_TAMPERED=0
+    if printf '%s\n' "$SPLIT" | grep -qE '(^|[[:space:]])IWE_SCRIPTS=|(^|[[:space:]])(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+IWE_SCRIPTS=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+IWE_SCRIPTS([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*([[:space:]]+[A-Za-z_][A-Za-z0-9_]*)*[[:space:]]+IWE_SCRIPTS([[:space:]]|$)|(^|[[:space:]])for[[:space:]]+IWE_SCRIPTS([[:space:]]|$)'; then
+        IWE_SCRIPTS_TAMPERED=1
+    fi
+
+    # issue #1434: a program run by its own path (./x, ../x, $DIR/x.sh) or a
+    # script name through PATH (x.sh) is indirect execution, like `bash x.sh`.
+    # The quote-stripping NORM hides such a command word, so the raw command
+    # goes through the quote-aware reader. Outside: extensionless absolute
+    # paths (/tmp/x) — by text they look like system programs.
+    RUN_BY_PATH=$(printf '%s' "$CMD" | \
+        WL_ROOT="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts" \
+        WL_IWE_SCRIPTS_OK=$([ "$IWE_SCRIPTS_TAMPERED" = "0" ] && echo 1 || echo 0) \
+        WL_RELATIVE_OK=$([ "$CD_PUSHD_TOKEN_DETECTED" = "0" ] && echo 1 || echo 0) \
+        perl "$CMD_PARSER" run-by-path) \
+        || fail_closed "command reader failed — cannot classify command"
+    case "$RUN_BY_PATH" in
+        OK) ;;
+        "BLOCK "*) block "$CMD (indirect execution under dry-run: program run by path: ${RUN_BY_PATH#BLOCK })" ;;
+        *) fail_closed "command reader returned '$RUN_BY_PATH' — cannot classify command" ;;
+    esac
 
     while IFS= read -r SEG; do
         [ -z "$SEG" ] && continue
@@ -780,12 +814,80 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         # those compare the SECOND token — the path to the script argument — for ALLOW,
         # and stay literal; here only the BLOCKING arm that
         # the command falls into changes).
+        # issue #1434 (cold review): wrapper options (`env -i`, `sudo -u u`,
+        # `command -p`, `time -p`, `timeout 5`, `exec -a n`) and compound-command
+        # keywords (`if`, `while`, `!`, ...) used to stop this loop on a word no
+        # arm matches, so `if bash x.sh; then` or `env -i git commit` passed.
         while [ $# -gt 0 ]; do
             case "$1" in
                 *=*) shift ;;
+                [0-9]'<'*|[0-9]'>'*|'<'*|'>'*|'&>'*)
+                    # a redirection before the command word: drop it and a detached target
+                    case "$1" in *'<'|*'>'|*'>>'|*'<<<'|*'>&'|*'<&') shift; [ $# -gt 0 ] && shift ;; *) shift ;; esac
+                    ;;
                 *)
                     case "${1##*/}" in
-                        command|env|nohup|time|sudo) shift ;;
+                        if|then|elif|else|while|until|do|'!'|coproc|nohup|setsid|builtin|--) shift ;;
+                        command)
+                            shift
+                            [ "${1:-}" = "-p" ] && shift
+                            ;;
+                        time)
+                            shift
+                            [ "${1:-}" = "-p" ] && shift
+                            ;;
+                        exec)
+                            shift
+                            while [ $# -gt 0 ]; do
+                                case "$1" in
+                                    -a) [ $# -ge 2 ] && shift 2 || shift ;;
+                                    -c|-l|-cl|-lc) shift ;;
+                                    *) break ;;
+                                esac
+                            done
+                            ;;
+                        env)
+                            shift
+                            while [ $# -gt 0 ]; do
+                                case "$1" in
+                                    -u|-C|--unset|--chdir) [ $# -ge 2 ] && shift 2 || shift ;;
+                                    -|-i|-0|--ignore-environment|--null|--unset=*|--chdir=*|-u?*|-C?*) shift ;;
+                                    *) break ;;
+                                esac
+                            done
+                            ;;
+                        sudo)
+                            shift
+                            while [ $# -gt 0 ]; do
+                                case "$1" in
+                                    -u|-g|-C|-D|-h|-p|-r|-t|-U|-T) [ $# -ge 2 ] && shift 2 || shift ;;
+                                    --) shift; break ;;
+                                    -*) shift ;;
+                                    *) break ;;
+                                esac
+                            done
+                            ;;
+                        timeout)
+                            shift
+                            while [ $# -gt 0 ]; do
+                                case "$1" in
+                                    -k|-s|--kill-after|--signal) [ $# -ge 2 ] && shift 2 || shift ;;
+                                    -*) shift ;;
+                                    *) break ;;
+                                esac
+                            done
+                            [ $# -gt 0 ] && shift  # duration
+                            ;;
+                        stdbuf|ionice)
+                            shift
+                            while [ $# -gt 0 ]; do
+                                case "$1" in
+                                    -i|-o|-e|-c|-n|--input|--output|--error|--class|--classdata) [ $# -ge 2 ] && shift 2 || shift ;;
+                                    -*) shift ;;
+                                    *) break ;;
+                                esac
+                            done
+                            ;;
                         nice)
                             shift
                             # nice itself accepts an optional priority
@@ -884,6 +986,15 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # its internal `rm -f "$SENTINEL"` is covered by the cleanup exception
                 # of the rm branch above).
                 WL_ABS3="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts/dry-run-complete.sh"
+                # issue #1434: the `$IWE_SCRIPTS/...` markers and the relative
+                # forms trust the environment; a same-command reassignment of
+                # IWE_SCRIPTS or a cd/pushd revokes them.
+                case "${1:-}" in
+                    __WL_DAY_CLOSE_PREPARE__|__WL_DRY_RUN_COMPLETE__)
+                        [ "$IWE_SCRIPTS_TAMPERED" = "1" ] && block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)" ;;
+                    scripts/day-close-prepare.sh|scripts/dry-run-complete.sh)
+                        [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && block "$CMD (relative whitelisted path after cd/pushd)" ;;
+                esac
                 case "${1:-}" in
                     .claude/scripts/load-extensions.sh|"$WL_ABS") ;;
                     scripts/day-close-prepare.sh|"$WL_ABS2"|__WL_DAY_CLOSE_PREPARE__) ;;

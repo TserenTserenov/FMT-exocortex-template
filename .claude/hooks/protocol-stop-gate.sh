@@ -128,7 +128,10 @@ complete_dry_run_on_stop() {
 
   if [ "$corrupted" = "0" ] && [ "$active_count" -le 1 ] && [ -n "$active_file" ]; then
     # Exactly one valid active, and it is ours -- a safe transition.
-    if [ "$(jq -r '.state // empty' "$active_file" 2>/dev/null)" = "active" ]; then
+    # issue #1435: a held rehearsal (background subagent) is completed only by
+    # dry-run-complete.sh; the sentinel TTL bounds a forgotten one.
+    if [ "$(jq -r '.state // empty' "$active_file" 2>/dev/null)" = "active" ] && \
+       [ "$(jq -r '.stop_fallback // empty' "$active_file" 2>/dev/null)" != "hold" ]; then
       tmp=$(mktemp "$dry_dir/.complete.XXXXXX" 2>/dev/null || true)
       if [ -n "$tmp" ] && \
          jq --arg completed "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
