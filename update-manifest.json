@@ -473,7 +473,7 @@
     },
     {
       "path": ".claude/skills/audit-installation/SKILL.md",
-      "sha256": "252844d66251600a05860aadd16175b36872854dbbe6cf84d01549384e69b07f"
+      "sha256": "169d1807288d18ff0a3411c32a1aedb6e2991aa826f130ebffe0411ba2ef33dd"
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
@@ -901,7 +901,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "05b44ef523a127d207b707c31c43584c11ffdb2944d31b92c99eeb36657a0e7c"
+      "sha256": "21dda11bdebfd934d1987e324b91b00e03d2c9d20dacf225abeb6c9e1f0b8c80"
     },
     {
       "path": ".gitignore",
@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "eb99f7bf945c1f68ee1244f0f5bd24709032bcba038d260f96e382ab4336488d"
+      "sha256": "1e94cb7240194825f7674a107d7c252983e15f4dabb4ce4534d70df3ffe6dbb9"
     },
     {
       "path": "CLAUDE.md",
@@ -1885,7 +1885,7 @@
     },
     {
       "path": "roles/strategist/README.md",
-      "sha256": "42587ef4ec2ec829b4aa3f1258ac4bb38717844a46f5d43f0a0d3610f144e139"
+      "sha256": "d15114d6fa71e939f11ae301b5acc7adfd774d6efe5e3bbdb832553f755c7b10"
     },
     {
       "path": "roles/strategist/install.sh",
@@ -3397,7 +3397,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "9afbae52b3c3ec7042b46e92ded057402cb0824d35fb6fd3d078106094465364"
+      "sha256": "3fb0fac3723558c082329f441ef58cf518923d0154c8d39ff951898288b7fa7c"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3769,6 +3769,7 @@
     "setup/test-i18n.sh",
     "setup/test-issue-1216-env-merge-and-seed.sh",
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
+    "setup/test-issue-1441-roles-on-linux.sh",
     "setup/test-next-rc-tag.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",

@@ -197,6 +197,8 @@ jobs:
         run: bash setup/test-hook-dayplan-validator.sh
       - name: Run WP-610 F9 language catalog tests
         run: bash setup/test-i18n.sh
+      - name: Run issue-1441 roles-on-Linux regression (setup step 5)
+        run: bash setup/test-issue-1441-roles-on-linux.sh
       - name: Ensure jsonschema available (attestation statement test contract)
         run: |
           python3 -c "import jsonschema" 2>/dev/null && exit 0

@@ -1137,11 +1137,18 @@ else
 fi
 
 # === 5. Install roles (autodiscovery via role.yaml) ===
+# Role install.sh scripts pick their own scheduler: launchd on macOS,
+# systemd --user or cron on Linux (WSL2 included, #454). Issue #1441: this
+# step used to require launchctl, so Linux installs silently got no roles.
+setup_roles_supported() {
+    [ "$(uname -s)" = "Linux" ] || command -v launchctl >/dev/null 2>&1
+}
+
 if $CORE_ONLY; then
     echo "[5/6] Автоматизация... пропущена (core mode)"
-elif ! command -v launchctl >/dev/null 2>&1; then
-    echo "[5/6] Автоматизация... пропущена (launchd не найден — не macOS)"
-    echo "  Роли используют launchd (macOS). На Linux используйте cron/systemd вручную."
+elif ! setup_roles_supported; then
+    echo "[5/6] Автоматизация... пропущена: нет ни launchd (macOS), ни Linux"
+    echo "  Роли можно поставить вручную: bash $TEMPLATE_DIR/roles/<роль>/install.sh"
     echo "  См. $TEMPLATE_DIR/roles/ROLE-CONTRACT.md"
 else
     echo "[5/6] Installing roles..."
@@ -1176,8 +1183,15 @@ else
                     chmod +x "$role_dir/install.sh"
                     runner=$(grep '^runner:' "$role_yaml" | sed 's/runner: *//' | tr -d '"' | tr -d "'")
                     [ -n "$runner" ] && chmod +x "$role_dir/$runner" 2>/dev/null || true
-                    bash "$role_dir/install.sh"
-                    echo "  ✓ $role_name installed"
+                    # A host without a scheduler (no systemd user bus, no
+                    # crontab — containers, minimal WSL2) fails one role, not
+                    # the whole setup (#1441).
+                    if bash "$role_dir/install.sh"; then
+                        echo "  ✓ $role_name installed"
+                    else
+                        echo "  ⚠ $role_name не установлена (нет планировщика?) — повторите позже: bash $role_dir/install.sh"
+                        MANUAL_ROLES+=("  - $role_name: bash $role_dir/install.sh")
+                    fi
                 fi
             else
                 echo "  WARN: $role_name/install.sh not found, skipping."

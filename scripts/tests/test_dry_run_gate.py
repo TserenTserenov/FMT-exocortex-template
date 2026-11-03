@@ -701,3 +701,34 @@ def test_missing_command_reader_fails_closed(tmp_path):
     r = subprocess.run(["bash", str(hooks / HOOK.name)], input=payload, capture_output=True, text=True, timeout=10, env=env)
     assert r.returncode == 2, r.stderr
     assert "cannot classify" in r.stderr
+
+
+SKILL = HOOK.parent.parent / "skills" / "audit-installation" / "SKILL.md"
+
+
+def _skill_command(helper):
+    """The step 2.5 command line of audit-installation/SKILL.md that calls `helper`."""
+    lines = [line.strip() for line in SKILL.read_text(encoding="utf-8").splitlines() if f"$IWE_SCRIPTS/{helper}" in line and not line.lstrip().startswith(("#", "-", "`", ">"))]
+    assert len(lines) == 1, f"expected one {helper} command in {SKILL}: {lines}"
+    return lines[0]
+
+
+@pytest.mark.parametrize("helper", ["dry-run-begin.sh", "dry-run-complete.sh"])
+def test_audit_loads_paths(helper):
+    """#1439: $IWE_SCRIPTS is unset in a non-interactive call (#688), so both commands load .iwe-paths themselves."""
+    assert '. "$IWE_PATHS"' in _skill_command(helper)
+
+
+def test_audit_complete_passes(isolated_gate):
+    """#1439: the skill's completion command, exactly as written, passes under the active rehearsal it ends."""
+    command = _skill_command("dry-run-complete.sh")
+    for placeholder in ("<gate_id из шага 1>", "<owner_session_id из шага 1>", "<owner_token из шага 1>"):
+        command = command.replace(placeholder, "x")
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"completion command from SKILL.md blocked: {r.stderr}"
+
+
+def test_arbitrary_paths_blocked(isolated_gate):
+    """#1439: sourcing an arbitrary file path stays blocked; the skill uses the standard chain instead."""
+    r = isolated_gate('. /home/u/IWE/.iwe-paths; bash "$IWE_SCRIPTS/dry-run-complete.sh" g r s t')
+    assert r.returncode == 2, r.stderr
