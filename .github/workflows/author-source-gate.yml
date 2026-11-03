@@ -1,0 +1,30 @@
+name: Author Source Gate
+
+# WP-529 Ф248: a pull request that changes a template file with an author source must name the
+# source change (Author-Source trailer) - see .github/scripts/author-source-gate.sh.
+# Template-sync deliveries ("template-sync: propagate ...") pass without a trailer.
+# The job is advisory until it is added to the required checks of main.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  author-source-gate:
+    runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Gate behaviour test
+        run: bash .github/scripts/test-author-source-gate.sh
+      - name: Check changed files against the author-sourced list
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash .github/scripts/author-source-gate.sh "$BASE_SHA" "$HEAD_SHA"

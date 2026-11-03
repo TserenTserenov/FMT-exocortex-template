@@ -925,7 +925,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "800aaa65e162660dd66c82789ba8b970b9ece3af932e25eac311db93f6b9b908"
+      "sha256": "7e31582b390023ed2bd4cccf69d2c31f8e7a9d264eb50b196bf5483e4772c2d8"
     },
     {
       "path": "CLAUDE.md",
@@ -1281,7 +1281,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "ad4e3eff1f9e9d140c7b4128471cc53421c05eb51f606ce309adc4568a4363e0"
+      "sha256": "3aca53ef8f65f895e2d953ab9cfad50466007bf1c2fc9921aa31ead1f2b475fd"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3441,6 +3441,10 @@
     }
   ],
   "excluded_paths": [
+    ".github/author-sourced-paths.txt",
+    ".github/scripts/author-source-gate.sh",
+    ".github/scripts/test-author-source-gate.sh",
+    ".github/workflows/author-source-gate.yml",
     ".github/workflows/nightly-template-audit.yml",
     "docs/developer/README.md",
     "docs/developer/card-template.md",

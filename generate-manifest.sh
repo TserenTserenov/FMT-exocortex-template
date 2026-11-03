@@ -142,6 +142,13 @@ GITHUB_EXPLICIT_INCLUDE=(
 )
 GITHUB_CI_ONLY_EXCLUDE=(
     ".github/workflows/nightly-template-audit.yml"
+    # WP-529 Ф248: author-source gate is CI of this repository only; the list of paths is
+    # rewritten by the author-side template-sync.sh and means nothing in a user installation
+    # (delivery route: github-ci-only-exclude).
+    ".github/workflows/author-source-gate.yml"
+    ".github/scripts/author-source-gate.sh"
+    ".github/scripts/test-author-source-gate.sh"
+    ".github/author-sourced-paths.txt"
 )
 SETUP_EXPLICIT_INCLUDE=(
     "setup/build-runtime.sh"
