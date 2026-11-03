@@ -46,6 +46,10 @@ if ! source "$SCRIPT_DIR/lib/peer-adapter-common.sh"; then
   exit 1
 fi
 
+# The reply is read by this adapter, not by the pilot: the style guard inside the
+# vendor CLI must not ask for a rewrite (WP-388 Ф24). Same line in claude/codex adapters.
+export IWE_STYLE_CONTEXT=peer
+
 # Where the peer lock root (and with it the immutable OAuth v4 fence) lives.
 # A fixed /tmp path lost the fence whenever macOS wiped /tmp (reboot, 3-day
 # sweep), and every Kimi call then failed with "cutover required" (bug

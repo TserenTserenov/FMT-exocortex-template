@@ -256,7 +256,7 @@ peer_adapter_check_style() {
   # deliberately source-side-effect-free (see file header); if a 5th inline
   # copy of this guard appears elsewhere, that's the signal to migrate.
   if command -v timeout >/dev/null 2>&1; then
-    timeout 10 bash "$wrapper" "$agent_name" "$tmp_file" >/dev/null 2>&1 || true
+    timeout 10 bash "$wrapper" "$agent_name" "$tmp_file" peer >/dev/null 2>&1 || true
   fi
   rm -f "$tmp_file"
 }
