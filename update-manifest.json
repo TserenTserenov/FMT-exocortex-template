@@ -389,7 +389,7 @@
     },
     {
       "path": ".claude/rules/wp-scope.md",
-      "sha256": "8727d8c0c447afe12b46a5cfcc08d4cff6af9108721442e04f7e6570eeb266ce"
+      "sha256": "51fad9e336a2d4a9d2772ffaeaef5cc04bd28dc3ccd3adac00bf92b02074cafe"
     },
     {
       "path": ".claude/runtime-overlay.yaml",
@@ -449,7 +449,7 @@
     },
     {
       "path": ".claude/skills/agent-fault/SKILL.md",
-      "sha256": "96df4d6ab5350568cb82908b64d742f2994fee07b5ec4784d0b287ec47037620"
+      "sha256": "1e9d804054438f26d4be4aaf498bcd6743d77828348aaede3f25f6837460dbdf"
     },
     {
       "path": ".claude/skills/apply-captures/SKILL.md",
@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "34fda5a5336dac85dbfe6c93da82096cf3af6c2992508cde962bc1a03c44a63d"
+      "sha256": "0c1307683d2fcb5c6a5b0e213f5323c60b374273bcac30919a9fcd530236e633"
     },
     {
       "path": "CLAUDE.md",
