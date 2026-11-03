@@ -925,7 +925,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "03140b9cf6d126d72fadbf8bd2827825197defb27dd8e35d04ac79ad64e9ce68"
+      "sha256": "800aaa65e162660dd66c82789ba8b970b9ece3af932e25eac311db93f6b9b908"
     },
     {
       "path": "CLAUDE.md",
@@ -2749,7 +2749,7 @@
     },
     {
       "path": "scripts/memory-bleed.sh",
-      "sha256": "cf75a1a11cc75c7f1bb900fd2020df144fac3ea00b012ec7820a326e90396290"
+      "sha256": "30459ad635417fe0b9b294be27d292dc5908a52c153a6c79cf6c9c33f678e55c"
     },
     {
       "path": "scripts/memory-health.sh",
@@ -2845,7 +2845,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "35998d5a2751e9d692d2ce04bdcf0e05b853bbdfba38873852412407e3d3b2eb"
+      "sha256": "acd357c3ee157800f9964b61549ac6c9babb281942b78e4f3f06a17ae0e0f641"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3573,6 +3573,8 @@
     "scripts/tests/test_issue_1401_memory_divergence.sh",
     "scripts/tests/test_issue_1401_memory_source.sh",
     "scripts/tests/test_issue_1410_timezone_param.sh",
+    "scripts/tests/test_issue_1419_hk_reopen.sh",
+    "scripts/tests/test_issue_1425_bleed_fields.sh",
     "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",

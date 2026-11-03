@@ -167,14 +167,38 @@ echo "| Файл | Горизонт | valid_from | Дней | Рекоменда
 echo "|------|----------|-----------|------|-------------|"
 
 found_candidates=0
+missing_lifecycle=""
+missing_lifecycle_count=0
 for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     [ -f "$f" ] || continue
     has_frontmatter "$f" || continue
     h=$(get_field "$f" "horizon")
     vf=$(get_field "$f" "valid_from")
-    [ -z "$vf" ] && continue
 
-    # We use mtime as a proxy for "last access"
+    # #1425: Claude Code auto-memory writes only name/description/metadata.type,
+    # so these fields are absent from birth. Report them instead of dropping the
+    # file from the demotion cycle.
+    missing=""
+    for field in horizon valid_from status; do
+        [ -n "$(get_field "$f" "$field")" ] || missing="$missing $field"
+    done
+    if [ -n "$missing" ]; then
+        missing_lifecycle="$missing_lifecycle\n- $(basename "$f"): нет${missing}"
+        missing_lifecycle_count=$((missing_lifecycle_count + 1))
+    fi
+
+    # No horizon: the default for the type from memory-lifecycle-spec.md §4
+    # (axis 1). Without a known type the horizon is not guessed.
+    h_label="$h"
+    if [ -z "$h" ]; then
+        case "$(get_field "$f" "type")" in
+            user|feedback) h="hot" ;;
+            project|reference|lesson|protocol) h="warm" ;;
+        esac
+        [ -n "$h" ] && h_label="$h (по умолч.)"
+    fi
+
+    # We use mtime as a proxy for "last access"; valid_from is only a fallback
     mtime=$(file_mtime_ymd "$f" || true); [ -n "$mtime" ] || mtime="$vf"
     age=$(days_since "$mtime")
 
@@ -200,7 +224,7 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
             ;;
     esac
 
-    [ -n "$rec" ] && echo "| $(basename $f) | $h | $vf | $age | $rec |"
+    [ -n "$rec" ] && echo "| $(basename $f) | $h_label | ${vf:-—} | $age | $rec |"
 done
 
 [ $found_candidates -eq 0 ] && echo "| — | — | — | — | нет кандидатов |"
@@ -208,9 +232,27 @@ echo ""
 echo "_Действие: агент предлагает — пользователь подтверждает. Не выполнять автономно._"
 echo ""
 
+# ── Warning: files without lifecycle fields (#1425) ──────────────────────────
+# A warning, not a violation: these files are usually written by the harness,
+# and failing every close on them would hide real violations behind noise.
+MISSING_LIST_LIMIT=20  # the close protocols hand the whole report to the agent
+if [ $missing_lifecycle_count -gt 0 ]; then
+    echo "### ⚠️ Файлы без полей жизненного цикла (memory-lifecycle-spec.md §3, §6)"
+    printf "%b\n" "$missing_lifecycle" | sed '/^$/d' | head -n "$MISSING_LIST_LIMIT"
+    [ $missing_lifecycle_count -gt $MISSING_LIST_LIMIT ] \
+        && echo "- … и ещё $((missing_lifecycle_count - MISSING_LIST_LIMIT)) (всего $missing_lifecycle_count)"
+    echo ""
+    echo "_Горизонт для понижения взят по type (§4); HOT-лимит такие файлы пока не учитывает. Дописать поля — с подтверждения пользователя._"
+    echo ""
+fi
+
 # ── Summary ─────────────────────────────────────────────────────────────────────
 if [ $violations -eq 0 ]; then
-    echo "✅ Нарушений не найдено"
+    if [ $missing_lifecycle_count -gt 0 ]; then
+        echo "⚠️ Предупреждений: $missing_lifecycle_count файлов без полей жизненного цикла (см. секцию выше) — нарушением не считается"
+    else
+        echo "✅ Нарушений не найдено"
+    fi
     exit 0
 else
     echo "❌ Нарушений: $violations — исправить перед следующим коммитом"

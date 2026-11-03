@@ -91,6 +91,23 @@ _gb_semaphore_trusted() { # <path> <agent> <session id>
   [ "$(grep -c '^session_id: ' "$1")" = 1 ] && [ "$(grep '^session_id: ' "$1")" = "session_id: $3" ] || return 1
 }
 
+# Issue #1419, degraded counterpart of _archive_previous_terminal: move an
+# earlier run's .closed/.stale to a unique name. Weaker than the full version
+# (no inode/mode check, no directory fsync): mv -n refuses to overwrite, and a
+# source still present afterwards means the name was taken — refuse.
+_gb_archive_previous() { # <terminal path> <its .open path>
+  local terminal="$1" open="$2" archive
+  [ -e "$terminal" ] || [ -L "$terminal" ] || return 0
+  [ -f "$terminal" ] && [ ! -L "$terminal" ] && [ -O "$terminal" ] \
+    || { echo "session-guard: прошлый '$terminal' не прошёл проверку; оставлен на месте" >&2; return 1; }
+  [ -e "$open" ] && [ "$terminal" -ef "$open" ] && return 0
+  archive="${terminal}.$(date -u +%Y%m%dT%H%M%SZ).$$.${RANDOM}${RANDOM}"
+  mv -n "$terminal" "$archive"
+  [ ! -e "$terminal" ] && [ -e "$archive" ] \
+    || { echo "session-guard: прошлый '$terminal' не удалось перенести в архив" >&2; return 1; }
+  echo "housekeeping: previous $(basename "$terminal") archived as $(basename "$archive")" >&2
+}
+
 _gb_main() {
   local cmd="${1:-}" agent="${IWE_AGENT:-}" housekeeping="" slug="" path="" personality="" owner_pid=""
   shift || true
@@ -149,10 +166,12 @@ _gb_main() {
           echo "session-guard: open --housekeeping: уже есть активная housekeeping-сессия '$reason' (возраст ${age}s). Закрой её или дождись TTL 1800s" >&2
           exit 1
         fi
+        _gb_archive_previous "${file}.stale" "$file" || exit 1
         [ ! -e "${file}.stale" ] || { echo "session-guard: open --housekeeping: .stale destination collision; существующий open сохранён" >&2; exit 1; }
         mv "$file" "${file}.stale"
         echo "WARNING: housekeeping semaphore '$reason' stale (${age}s), renamed to .stale" >&2
       fi
+      _gb_archive_previous "${file}.closed" "$file" || exit 1
       tmp="$(mktemp "$dir/.session-open.XXXXXX")"
       {
         echo "---"
@@ -179,6 +198,7 @@ _gb_main() {
     close)
       [ -f "$file" ] || { echo "session-guard: close --housekeeping: нет активной housekeeping-сессии '$reason' для $agent" >&2; exit 3; }
       _gb_semaphore_trusted "$file" "$agent" "$session_id" || { echo "session-guard: close --housekeeping: семафор не прошёл проверку подлинности" >&2; exit 1; }
+      _gb_archive_previous "${file}.closed" "$file" || exit 1
       [ ! -e "${file}.closed" ] || { echo "session-guard: close --housekeeping: terminal destination занят; open сохранён" >&2; exit 1; }
       grep -q '^close_protocol: ' "$file" && { echo "session-guard: close --housekeeping: закрытие уже начато другой реализацией; завершите его там (WSL2)" >&2; exit 1; }
       { echo "close_protocol: degraded-gitbash-v1"; echo "closed_at: $now"; } >> "$file"
@@ -999,6 +1019,85 @@ finally:
 PY
 }
 
+_archive_previous_terminal() { # <terminal path> <its .open path>
+  # Issue #1419: a housekeeping semaphore keeps the same name on every open, so
+  # the .closed/.stale left by an earlier run blocks this run's close and stale
+  # rename. Move such a leftover to a unique archive name. A terminal file that
+  # shares the inode with the live .open is this run's own staged close: kept.
+  # Runs under the caller's transition lock.
+  python3 - "$1" "$2" <<'PY'
+import datetime
+import os
+import stat
+import sys
+import uuid
+
+terminal_path, open_path = sys.argv[1:]
+try:
+    terminal = os.lstat(terminal_path)
+except FileNotFoundError:
+    raise SystemExit(0)
+if (
+    not stat.S_ISREG(terminal.st_mode)
+    or terminal.st_uid != os.getuid()
+    or stat.S_IMODE(terminal.st_mode) & 0o022
+):
+    raise SystemExit("previous terminal file is not trusted")
+try:
+    live = os.lstat(open_path)
+except FileNotFoundError:
+    live = None
+if live is not None and (live.st_dev, live.st_ino) == (terminal.st_dev, terminal.st_ino):
+    raise SystemExit(0)
+
+dirname = os.path.dirname(terminal_path)
+terminal_name = os.path.basename(terminal_path)
+family = os.path.basename(open_path) + "."
+# Extra links are trusted only when every name of the inode belongs to this
+# semaphore: an interrupted archive (<terminal>.<stamp>.<id>) or a half-done
+# close later renamed to .stale (.closed and .stale share the inode).
+siblings = []
+for name in os.listdir(dirname):
+    if name == terminal_name or not name.startswith(family):
+        continue
+    try:
+        other = os.lstat(os.path.join(dirname, name))
+    except FileNotFoundError:
+        continue
+    if (other.st_dev, other.st_ino) == (terminal.st_dev, terminal.st_ino):
+        siblings.append(name)
+if terminal.st_nlink != 1 + len(siblings):
+    raise SystemExit("previous terminal file has links outside this semaphore")
+
+
+def fsync_dir():
+    directory = os.open(dirname, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+if any(name.startswith(terminal_name + ".") for name in siblings):
+    # A previous archive of this very file stopped before the unlink: finish it.
+    os.unlink(terminal_path)
+    fsync_dir()
+    raise SystemExit(0)
+stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+archive_path = f"{terminal_path}.{stamp}.{uuid.uuid4().hex[:12]}"
+# os.link refuses an existing name: the archive name is never overwritten.
+os.link(terminal_path, archive_path, follow_symlinks=False)
+fsync_dir()
+current = os.lstat(terminal_path)
+if (current.st_dev, current.st_ino) != (terminal.st_dev, terminal.st_ino):
+    os.unlink(archive_path)
+    raise SystemExit("previous terminal name changed during archive")
+os.unlink(terminal_path)
+fsync_dir()
+print(f"housekeeping: previous {terminal_name} archived as {os.path.basename(archive_path)}", file=sys.stderr)
+PY
+}
+
 _closed_receipt_identity() { # <closed path> <agent> <session-id>
   python3 - "$1" "$2" "$3" <<'PY'
 import os
@@ -1549,6 +1648,8 @@ if [ "$CMD" = "open" ]; then
         if [ -n "$HK_CREATED_EPOCH" ]; then
           HK_AGE=$(( NOW_EPOCH - HK_CREATED_EPOCH ))
           if [ "$HK_AGE" -gt "$HK_MAX_AGE" ]; then
+            _archive_previous_terminal "${HK_FILE}.stale" "$HK_FILE" \
+              || fail "open --housekeeping: прошлый .stale не удалось перенести в архив; существующий open сохранён" 1
             _terminal_move_no_clobber "$HK_FILE" "${HK_FILE}.stale" \
               || fail "open --housekeeping: .stale destination collision; существующий open сохранён" 1
             rm -f "${HK_FILE}.lease"
@@ -1559,6 +1660,8 @@ if [ "$CMD" = "open" ]; then
         fi
       fi
     fi
+    _archive_previous_terminal "${HK_FILE}.closed" "$HK_FILE" \
+      || fail "open --housekeeping: прошлый .closed не удалось перенести в архив" 1
     HK_TMP=$(mktemp "$SESSION_DIR/.session-open.XXXXXX")
     chmod 600 "$HK_TMP"
     {
@@ -2255,6 +2358,13 @@ if [ "$CMD" = "close" ]; then
       fail "close --housekeeping: нет активной housekeeping-сессии '${HOUSEKEEPING}' для $AGENT" 3
     fi
     _ensure_session_transition_lock "$HK_FILE" "$HK_SESSION_ID"
+    # Installations opened before the #1419 fix still hold an earlier run's
+    # .closed next to today's open; the helper keeps this run's own staged one.
+    # Identity first, so a foreign .open changes nothing.
+    grep -qx "agent: $AGENT" "$HK_FILE" && grep -qx "session_id: $HK_SESSION_ID" "$HK_FILE" \
+      || fail "close --housekeeping: exact identity/terminal state не прошли проверку" 1
+    _archive_previous_terminal "${HK_FILE}.closed" "$HK_FILE" \
+      || fail "close --housekeeping: прошлый .closed не удалось перенести в архив; open сохранён" 1
     _locked_open_identity "$HK_FILE" "$AGENT" "$HK_SESSION_ID" 1 \
       || fail "close --housekeeping: exact identity/terminal state не прошли проверку" 1
     HK_CLOSE_ATTEMPT=$(_atomic_append_open "$HK_FILE" "$AGENT" "$HK_SESSION_ID" \
