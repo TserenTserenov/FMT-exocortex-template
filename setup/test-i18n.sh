@@ -6,7 +6,9 @@
 # captured by running the hook from origin/main 557e8bfe BEFORE it moved to the
 # catalogs; they are an independent reference, not derived from the catalogs.
 # Fixture 08 ("не закрывай пока" -> session close) records known behaviour,
-# not a desired one: negation is a separate change.
+# not a desired one: negation is a separate change. There is no fixture with
+# capital Cyrillic letters: the hook lowercases with tr, which folds them on
+# macOS but not with GNU tr, so the old hook already differed between platforms.
 #
 # Usage: bash setup/test-i18n.sh
 # Exit:  0 all checks passed, 1 a check failed.
@@ -178,12 +180,13 @@ check "promoted copy finds the workspace library" "$PROMOTED/DS-strategy/scripts
 
 echo "== scripts/check-locale-catalogs.py =="
 CHECKER="$REPO_ROOT/scripts/check-locale-catalogs.py"
-python3 "$CHECKER" "$REPO_ROOT" > "$TMP/check.out"
+PYTHON=$("$REPO_ROOT/scripts/lib/find-python3.sh" --stdlib-only) || { echo "FAIL: no python3 for the catalog checker"; exit 1; }
+"$PYTHON" "$CHECKER" "$REPO_ROOT" > "$TMP/check.out"
 check "the shipped catalogs are clean" "0" "$?"
 # check_offence <name> <expected line> — run the checker on a copy of the catalogs
 # after the caller damaged $DAMAGED/.claude/lib/locale.
 check_offence() {
-  python3 "$CHECKER" "$DAMAGED" > "$TMP/check.out"
+  "$PYTHON" "$CHECKER" "$DAMAGED" > "$TMP/check.out"
   local rc=$?
   if [ "$rc" -eq 1 ] && grep -qF -- "$2" "$TMP/check.out"; then ok "$1"; else fail "$1: rc=$rc, output: $(head -3 "$TMP/check.out")"; fi
 }

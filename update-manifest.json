@@ -925,7 +925,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4f91062fa361e83794694f765f680374ad39d9c2956b1736ca0d175cc79d67e4"
+      "sha256": "5b3c0758c1a2cc8b25451ac59a313ba565b96761b964c66c1e49fe4f9b55a861"
     },
     {
       "path": "CLAUDE.md",
@@ -3709,8 +3709,6 @@
     "setup/detector-regex.sh",
     "setup/i18n-fixtures/close-gate-reminder/01.expected",
     "setup/i18n-fixtures/close-gate-reminder/01.prompt",
-    "setup/i18n-fixtures/close-gate-reminder/02.expected",
-    "setup/i18n-fixtures/close-gate-reminder/02.prompt",
     "setup/i18n-fixtures/close-gate-reminder/03.expected",
     "setup/i18n-fixtures/close-gate-reminder/03.prompt",
     "setup/i18n-fixtures/close-gate-reminder/04.expected",
@@ -3719,8 +3717,6 @@
     "setup/i18n-fixtures/close-gate-reminder/05.prompt",
     "setup/i18n-fixtures/close-gate-reminder/06.expected",
     "setup/i18n-fixtures/close-gate-reminder/06.prompt",
-    "setup/i18n-fixtures/close-gate-reminder/07.expected",
-    "setup/i18n-fixtures/close-gate-reminder/07.prompt",
     "setup/i18n-fixtures/close-gate-reminder/08.expected",
     "setup/i18n-fixtures/close-gate-reminder/08.prompt",
     "setup/i18n-fixtures/close-gate-reminder/09.expected",
