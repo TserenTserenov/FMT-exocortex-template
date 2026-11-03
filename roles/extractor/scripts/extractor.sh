@@ -711,6 +711,19 @@ resolve_publish_gate() {  # <strategy_dir>
     return 0
 }
 
+# Without the gate there is no publication at all (#1433 follow-up): a raw push
+# skips the fresh-origin/main retry and the coordination lock. No env override.
+# Canonical modes (session-close, on-demand): the next run after update.sh
+# publishes the same commit via the "pre-existing extractor commit" branch.
+# Isolated modes (inbox-check, feeders): the commit stays on the preserved
+# extractor/* branch; its inputs stay unmarked on origin and are re-extracted.
+refuse_publish_without_gate() {  # <repo_name> <sha>
+    local repo_name="$1" sha="$2"
+    log "ERROR: publish-gate.sh not found for $repo_name; extractor commit $sha stays local, nothing pushed. Run update.sh to install scripts/lib/publish-gate.sh"
+    notify "Экстрактор" "Гейт публикации не найден: коммит $repo_name остался локальным. Запустите update.sh."
+    EXTRACTOR_COMMIT_RESULT="failed"
+}
+
 commit_extractor_changes() {
     local strategy_dir="$1"
     local repo_name="$2"
@@ -811,17 +824,8 @@ commit_extractor_changes() {
                     local publish_gate
                     publish_gate=$(resolve_publish_gate "$strategy_dir")
                     if [ -z "$publish_gate" ]; then
-                        # Repos without the gate (fixtures, pre-gate installs) push directly;
-                        # resolve_governance_branch never yields a throwaway branch here (#1433).
-                        log "WARN: publish-gate.sh not found; pushing extractor commit $latest_local directly to $gov_branch"
-                        if git -C "$strategy_dir" push origin "$latest_local:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
-                            log "Pushed pre-existing extractor commit $latest_local"
-                            EXTRACTOR_COMMIT_RESULT="published"
-                        else
-                            log "WARN: git push failed for pre-existing extractor commit $latest_local"
-                            EXTRACTOR_COMMIT_RESULT="failed"
-                            return 1
-                        fi
+                        refuse_publish_without_gate "$repo_name" "$latest_local"
+                        return 1
                     else
                         # shellcheck source=/dev/null
                         . "$publish_gate"
@@ -914,18 +918,9 @@ commit_extractor_changes() {
     local publish_gate
     publish_gate=$(resolve_publish_gate "$strategy_dir")
     if [ -z "$publish_gate" ]; then
-        # Repos without the gate (fixtures, pre-gate installs) push directly;
-        # resolve_governance_branch never yields a throwaway branch here (#1433).
-        log "WARN: publish-gate.sh not found; falling back to raw push of $repo_name to $gov_branch"
-        if git -C "$strategy_dir" push origin "$head_after:refs/heads/$gov_branch" >> "$LOG_FILE" 2>&1; then
-            log "Pushed $repo_name ($head_after)"
-            EXTRACTOR_COMMIT_RESULT="published"
-        else
-            log "WARN: git push failed; only the extractor commit was offered"
-            EXTRACTOR_COMMIT_RESULT="failed"
-        fi
+        refuse_publish_without_gate "$repo_name" "$head_after"
         [ "$scope_opened" -eq 1 ] && extractor_scope_close "$strategy_dir" "$scope_agent" "$scope_reason"
-        [ "$EXTRACTOR_COMMIT_RESULT" = "published" ] && return 0 || return 1
+        return 1
     fi
     # shellcheck source=/dev/null
     . "$publish_gate"

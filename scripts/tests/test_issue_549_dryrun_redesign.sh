@@ -13,7 +13,8 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 GATE="$ROOT/.claude/hooks/dry-run-gate.sh"
 BEGIN="$ROOT/scripts/dry-run-begin.sh"
 COMPLETE="$ROOT/scripts/dry-run-complete.sh"
-TMP=$(mktemp -d)
+# Under /tmp on purpose: case 17 hides it behind a private tmpfs.
+TMP=$(mktemp -d /tmp/iwe-549-test.XXXXXX)
 
 export IWE_DRY_RUN_DIR="$TMP/dry"
 export IWE_DRY_RUN_SENTINEL="$TMP/sentinel.flag"
@@ -26,7 +27,6 @@ cleanup() {
     [ -n "$SLEEP_PID" ] && kill "$SLEEP_PID" 2>/dev/null || true
     rm -rf "$TMP"
     rm -rf "$ROOT/.claude/logs" 2>/dev/null || true
-    rm -f /tmp/iwe-dry-run-owner-legacytest.token 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -117,9 +117,10 @@ expect_allow "доказуемое сиротство: sweep, write разреш
 clear_all
 
 # --- 8. Legacy owner-token → вечная ветка ---
-printf 'tok' > /tmp/iwe-dry-run-owner-legacytest.token
+# Owner tokens live next to the sentinel, so the legacy token stays in $TMP.
+printf 'tok' > "$(dirname "$IWE_DRY_RUN_SENTINEL")/iwe-dry-run-owner-legacytest.token"
 expect_block "legacy owner-token: вечный блок" "$WRITE_JSON"
-rm -f /tmp/iwe-dry-run-owner-legacytest.token
+rm -f "$(dirname "$IWE_DRY_RUN_SENTINEL")/iwe-dry-run-owner-legacytest.token"
 
 # --- 9. Два active-state → corruption ---
 mkstate "g-a1" "active" "$SLEEP_PID" "$SLEEP_PGID" "s1"
@@ -201,26 +202,50 @@ clear_all
 
 # --- 17. Единый резолвер путей БЕЗ маркера: begin/gate/complete смотрят
 # одинаково (production-пути). Codex r2: раньше begin писал в override, gate
-# смотрел production — репетиция не защищала. NB: кейс осознанно использует
-# production-пути и убирает за собой. ---
-rm -f "$IWE_DRY_RUN_DIR/.iwe-dry-run-test-mode"
-PROD_DIR="/tmp/iwe-dry-run-$(id -u)"
-PROD_SENTINEL="/tmp/iwe-dry-run.flag"
-[ ! -f "$PROD_SENTINEL" ] || { echo "SKIP 17: production sentinel занят"; }
-if [ ! -f "$PROD_SENTINEL" ]; then
-    OUT17=$(/bin/bash "$BEGIN" test-prod "sid-prod" 2>&1) \
-        && ok "без маркера: begin на production-путях" || bad "без маркера: begin на production-путях ($OUT17)"
-    PGID17=$(printf '%s\n' "$OUT17" | sed -n 's/^gate_id=//p')
-    PTOK17=$(printf '%s\n' "$OUT17" | sed -n 's/^owner_token=//p')
-    [ -f "$PROD_SENTINEL" ] && ok "без маркера: production sentinel создан" || bad "без маркера: production sentinel создан"
-    expect_block "без маркера: gate видит репетицию (пути согласованы)" "$WRITE_JSON"
-    /bin/bash "$COMPLETE" "$PGID17" "cleanup" "sid-prod" "$PTOK17" >/dev/null 2>&1 \
-        && ok "без маркера: complete на production-путях" || bad "без маркера: complete на production-путях"
-    [ ! -f "$PROD_SENTINEL" ] && ok "без маркера: production sentinel снят" || bad "без маркера: production sentinel снят"
-    rm -f "$PROD_DIR/gate-$PGID17.state" 2>/dev/null || true
-    expect_allow "без маркера: после цикла write разрешён" "$WRITE_JSON"
+# смотрел production — репетиция не защищала. Production-пути общие для всех
+# сессий машины, поэтому кейс идёт только внутри своего пространства имён с
+# личным tmpfs на /tmp; без unshare — SKIP с причиной (РП-7 Ф288). ---
+case17() {  # runs inside the namespace: private /tmp, uid 0 mapped to us
+    set -u
+    mount -t tmpfs tmpfs /tmp || { echo "FAIL: tmpfs на /tmp"; return 1; }
+    # The override dir (and its test-mode marker) must be hidden, not deleted.
+    [ ! -e "$IWE_DRY_RUN_DIR" ] || { echo "FAIL: тестовый каталог виден под личным /tmp"; return 1; }
+    local out gid tok rc
+    out=$(/bin/bash "$BEGIN" test-prod "sid-prod" 2>&1) \
+        && echo "PASS: без маркера: begin на production-путях" \
+        || echo "FAIL: без маркера: begin на production-путях ($out)"
+    gid=$(printf '%s\n' "$out" | sed -n 's/^gate_id=//p')
+    tok=$(printf '%s\n' "$out" | sed -n 's/^owner_token=//p')
+    [ -f /tmp/iwe-dry-run.flag ] && echo "PASS: без маркера: production sentinel создан" \
+        || echo "FAIL: без маркера: production sentinel создан"
+    rc=$(printf '%s' "$WRITE_JSON" | /bin/bash "$GATE" >/dev/null 2>&1; echo $?)
+    [ "$rc" = "2" ] && echo "PASS: без маркера: gate видит репетицию (пути согласованы)" \
+        || echo "FAIL: без маркера: gate видит репетицию (rc=$rc)"
+    /bin/bash "$COMPLETE" "$gid" "cleanup" "sid-prod" "$tok" >/dev/null 2>&1 \
+        && echo "PASS: без маркера: complete на production-путях" \
+        || echo "FAIL: без маркера: complete на production-путях"
+    [ ! -f /tmp/iwe-dry-run.flag ] && echo "PASS: без маркера: production sentinel снят" \
+        || echo "FAIL: без маркера: production sentinel снят"
+    rc=$(printf '%s' "$WRITE_JSON" | /bin/bash "$GATE" >/dev/null 2>&1; echo $?)
+    [ "$rc" = "0" ] && echo "PASS: без маркера: после цикла write разрешён" \
+        || echo "FAIL: без маркера: после цикла write разрешён (rc=$rc)"
+}
+case "$ROOT/" in
+    /tmp/*) SKIP17="шаблон лежит под /tmp и скрылся бы под личным tmpfs" ;;
+    *) if unshare --user --map-root-user --mount true 2>/dev/null; then SKIP17=""
+       else SKIP17="unshare --user --mount недоступен (macOS или ограниченный CI)"; fi ;;
+esac
+if [ -n "$SKIP17" ]; then
+    echo "SKIP 17: $SKIP17"
+else
+    # $TMP (test-mode dir) is hidden by the private tmpfs, as intended: the case
+    # must not see any override, only the production paths.
+    OUT17=$(export BEGIN GATE COMPLETE WRITE_JSON IWE_DRY_RUN_DIR IWE_DRY_RUN_SENTINEL
+            unshare --user --map-root-user --mount /bin/bash -c "$(declare -f case17); case17" 2>&1) || true
+    printf '%s\n' "$OUT17"
+    printf '%s\n' "$OUT17" | grep -c '^PASS:' | grep -qx 6 || { bad "кейс 17: не все 6 проверок прошли"; }
+    printf '%s\n' "$OUT17" | grep -q '^FAIL:' && fail=$((fail + 1))
 fi
-touch "$IWE_DRY_RUN_DIR/.iwe-dry-run-test-mode"
 
 # --- 18. Begin при уже существующем sentinel: отказ БЕЗ хвоста active-state ---
 clear_all

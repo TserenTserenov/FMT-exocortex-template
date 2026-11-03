@@ -293,7 +293,7 @@ if [ ! -f "$SENTINEL" ]; then
     fi
     # Legacy branch of the old format (owner-*.token without a state file) — unchanged:
     # eternal fail-closed with the exact recovery command.
-    OWNER_FILE=$(find -L /tmp -maxdepth 1 -name 'iwe-dry-run-owner-*.token' -type f -print -quit 2>/dev/null || true)
+    OWNER_FILE=$(find -L "$(dirname "$SENTINEL")" -maxdepth 1 -name 'iwe-dry-run-owner-*.token' -type f -print -quit 2>/dev/null || true)
     if [ -n "$OWNER_FILE" ]; then
         gate_log_event "sentinel_missing" "owner_file=$(basename "$OWNER_FILE")"
         {

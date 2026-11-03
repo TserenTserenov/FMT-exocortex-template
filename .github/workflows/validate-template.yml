@@ -1061,7 +1061,8 @@ jobs:
             scripts/tests/test_skill_promote.py \
             scripts/tests/test_residency_gate_skill_adapter.py \
             scripts/tests/test_release_notice_build.py \
-            roles/extractor/tests/test_extractor_pipeline.py
+            roles/extractor/tests/test_extractor_pipeline.py \
+            roles/extractor/tests/test_extractor_branches_prune.py
           # The skill directory contains a hyphen, so pytest cannot import it
           # as a package reliably; both files are executable unit suites.
           python3 .claude/skills/residency-gate/tests/test_parser.py
