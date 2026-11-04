@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e8f911963cec52c1ca779d82747df530d628b919bb79f83a7b813196b123a2cb"
+      "sha256": "56ebe94131c21870ea1c5ac16220d31c8a9b2b1f0c152515c55ef56713b18cdd"
     },
     {
       "path": "CLAUDE.md",
@@ -3417,7 +3417,7 @@
     },
     {
       "path": "setup/lib/apply-op.sh",
-      "sha256": "1830a34fd6089dcfc56624c5a96732dc248519b51842a7020e6c2688b4e4b8a1"
+      "sha256": "0224efbaa8f682584e9d76d365964363db7e1a575d9a53fe2c6d8fae5b64dee6"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3429,7 +3429,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "d9535a8e83a189fb9028606a048879dbe6b0e372f81d9e79979655a3c59aae08"
+      "sha256": "5a77e7631cd19dccfaf52b84352c443db500fdcef8d32efe7c33db43bc789e37"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3593,7 +3593,7 @@
     "scripts/tests/test_issue_1425_bleed_fields.sh",
     "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_1433_gov_branch.sh",
-    "scripts/tests/test_issue_1457_staged_scan_cost.sh",
+    "scripts/tests/test_issue_1451_wakatime_403.py",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
