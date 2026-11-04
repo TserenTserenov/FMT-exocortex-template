@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e6e0164f472bd0b3a2fbfe1d2ae4186dfb91397ece3023c555a3b344e3445efa"
+      "sha256": "8628b4db5f801f4bd1e2d40ab90a901e310056c2fed1363fec5de248cba585ce"
     },
     {
       "path": "CLAUDE.md",
@@ -1597,7 +1597,7 @@
     },
     {
       "path": "memory/agent-architecture-framework.md",
-      "sha256": "2a2546ed0992bbc4e3cd511159c796a1100afc19fd0af9ba476efc3fda8bc5e9"
+      "sha256": "a8680ca3c1cb0f1181454efa464915ca32e066c90d83292580dffd4e36b6ec4f"
     },
     {
       "path": "memory/agent-vendor-connect-pattern.md",
@@ -1669,7 +1669,7 @@
     },
     {
       "path": "memory/navigation.md",
-      "sha256": "98da1ab941fc3662fdfbd6f501442248f4994edbd0116b07af181dd4355fefcc"
+      "sha256": "a07ba9c2796b9d8b8203ed3c1c61120c6dbbe27ae1f5666a16d7b95edb710803"
     },
     {
       "path": "memory/protocol-close.md",
