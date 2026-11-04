@@ -109,4 +109,21 @@ grep -qF "$BULK_DIR/brew.md:1:tool: $HOMEBREW/bin/private-tool" <<<"$output" \
 if grep -qF "$SNAPSHOT_TMP" <<<"$output"; then fail "snapshot path leaked into the report"; fi
 pass "checks 2/3 scan the staged snapshot and report repo-relative paths"
 
+# A staged rename carries content out of an excluded path (review-01 H3):
+# R100 must be scanned at its new path like an added file.
+git -C "$REPO" reset --quiet --hard
+cp "$ROOT/setup/validate-template.sh" "$REPO/setup/validate-template.sh"  # the version under test, unstaged
+printf '\nexcluded mention: %s\n' "$TOKEN" >> "$REPO/$excluded"
+git -C "$REPO" add -- "$excluded"
+fixture_commit=$(git -C "$REPO" commit-tree "$(git -C "$REPO" write-tree)" -p HEAD -m "fixture: token in an excluded path")
+git -C "$REPO" update-ref HEAD "$fixture_commit"
+mkdir -p "$REPO/$BULK_DIR"
+moved="$BULK_DIR/moved-out.md"
+git -C "$REPO" mv -- "$excluded" "$moved"
+git -C "$REPO" diff --cached --name-status | grep -q "^R100" || fail "fixture is not a pure rename"
+run_staged
+[ "$rc" -ne 0 ] || fail "staged rename out of an excluded path accepted"
+grep -qF "$moved:" <<<"$output" || fail "renamed file not reported at its new path"
+pass "a staged rename out of an excluded path is scanned at its new path"
+
 echo "PASS: issue 1457 staged scan cost ($pass_count checks)"

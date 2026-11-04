@@ -75,8 +75,13 @@ echo "=== Validating: $TEMPLATE_DIR (mode=$MODE) ==="
 # check below scans: the worktree (pristine/installed) or the exported index
 # snapshot (staged).
 SCAN_ROOT="$TEMPLATE_DIR"
+# Both listings use the same filter: every staged path whose new content
+# ships — added, copied, modified, renamed (a move out of an excluded path,
+# e.g. `git mv docs/adr/x.md docs/x.md`, is R100 and carries its content
+# along) and type-changed (a symlink replaced by a file). Only deletions and
+# unmerged entries are left out.
 if [ "$MODE" = "staged" ]; then
-    staged_count=$(cd "$TEMPLATE_DIR" && git diff --cached --name-only --diff-filter=ACM 2>/dev/null | wc -l | tr -d ' ' || true)
+    staged_count=$(cd "$TEMPLATE_DIR" && git diff --cached --name-only --diff-filter=ACMRT 2>/dev/null | wc -l | tr -d ' ' || true)
     if [ "${staged_count:-0}" -eq 0 ]; then
         echo "=== staged mode: нет staged файлов — skip ==="
         exit 0
@@ -85,7 +90,7 @@ if [ "$MODE" = "staged" ]; then
     trap 'rm -rf -- "$STAGE_TMP"' EXIT
     chmod 700 "$STAGE_TMP"
     # -z on both ends keeps paths with spaces or newlines intact.
-    if ! (cd "$TEMPLATE_DIR" && git diff --cached --name-only -z --diff-filter=ACM \
+    if ! (cd "$TEMPLATE_DIR" && git diff --cached --name-only -z --diff-filter=ACMRT \
             | git checkout-index -z --stdin --prefix="$STAGE_TMP/"); then
         echo "ERROR: не удалось выгрузить staged-содержимое во временный каталог $STAGE_TMP" >&2
         exit 2
