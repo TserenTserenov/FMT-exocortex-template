@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "639d0bf71cf1233b81dfeb1caaf492a8ce4b13c05af264e789068871d9379d95"
+      "sha256": "c77f5b1bf715f5d7e92d3a1e2b7d18598586ea622bb37683144ca6de38944a70"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -137,7 +137,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "3634a96d77d5b35d0c5cb801eedc294915df0f623f03dc9e55e91de36c3b0e51"
+      "sha256": "56736b568e426e2f9ffedb984a91a313a93b8330d6fa4a9dd5154d3118131790"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -294,6 +294,10 @@
     {
       "path": ".claude/lib/capture_writer.sh",
       "sha256": "52a4e52f5952522fcdefb5214ba291cdfcbda3303f036c780883fbb9cc933d29"
+    },
+    {
+      "path": ".claude/lib/dry-run-dir.sh",
+      "sha256": "364d003bc3a4f9a53d02e67296b1075de2d34c306a5c018c30861c77508f139b"
     },
     {
       "path": ".claude/lib/find-python3.sh",
@@ -497,7 +501,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "3a65a6979728e7478da27daaae6cd5b09976fd30e8ed5157abb9b9155790fe05"
+      "sha256": "903b45ca94b88fb3bca00e022844b9e76c1f4eab514587d5151fdd58163794e4"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -757,7 +761,7 @@
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
-      "sha256": "242356373e1c2c791e9316e5a98043d80f83d902d36bdb7fc76f043089a80859"
+      "sha256": "7b9443da046537dec7f638ac998bd3a50bc63704a51df3ccbcb4ba573dab2a15"
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
@@ -929,7 +933,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "994b8ec78454234f6d193372bd11bb16eb42cd125c636b9e97af545f287d5ad5"
+      "sha256": "2daca6226daa1a6cacbe82a0cd839c6b560cec24600f89261d10fd7cf6e20dc8"
     },
     {
       "path": "CLAUDE.md",
@@ -1629,7 +1633,7 @@
     },
     {
       "path": "memory/dry-run-contract.md",
-      "sha256": "402956fdf190044b078f63b2e49242db9d4311761adbd476b3c762353b949558"
+      "sha256": "245de67b45b55f6bcb8e9dd219065f17206422f94cf784a9e65bcc8cf9a1b725"
     },
     {
       "path": "memory/feedback_community_communication_style.md",
@@ -1857,7 +1861,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "6263a3d0c36e5608aa53763322e4e45a7df1f8a7fe63c33f7cfccb99687203fc"
+      "sha256": "e2c2dabdad5aea90dd2624c02bd5b4fcfc2e043638087f7cfd39d0102a5f32ef"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2461,11 +2465,11 @@
     },
     {
       "path": "scripts/dry-run-begin.sh",
-      "sha256": "c632c0f59dfb95e36b7217488ccaf4e4c5bd522d8b43bd4e51fe19cb3aefb98d"
+      "sha256": "9d348a474de3c43b7fabbe835e199ec3b09da28eda3302beb54b988c80270ac6"
     },
     {
       "path": "scripts/dry-run-complete.sh",
-      "sha256": "e653df94b901eefd24a4218a12c195906c82516ccf63e95acf09335807902ef9"
+      "sha256": "1e0e62bdb28be6aaa19f3b082881eac2d217babdba56f4723bfcc46cb73294e7"
     },
     {
       "path": "scripts/exocortex-publish.sh",
@@ -2857,7 +2861,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "883c7e94da07649d83f9f6e13249eec85aa98d2210ae60a5c127aca506fef176"
+      "sha256": "5dd94408b73e0b2466ec1d2f8cac756a0288813714404814e8c4ac2eb2dcbef4"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3217,7 +3221,7 @@
     },
     {
       "path": "scripts/wakatime-day-total.py",
-      "sha256": "8ca5a84bd53d2b494d6bfb50fd92a7f4353888521d2ffd26945c9b5ec53c59b1"
+      "sha256": "adcafcc921cd902b1f559a9dac9746b6510b3d8cf0869eb5630e118829d530af"
     },
     {
       "path": "scripts/week-draft-append.sh",
@@ -3417,7 +3421,7 @@
     },
     {
       "path": "setup/lib/apply-op.sh",
-      "sha256": "0224efbaa8f682584e9d76d365964363db7e1a575d9a53fe2c6d8fae5b64dee6"
+      "sha256": "8a1581183b032029442c1db60b27f0f01a3c1a6df72f19684aeb0e515e8e44ef"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3429,7 +3433,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "5a77e7631cd19dccfaf52b84352c443db500fdcef8d32efe7c33db43bc789e37"
+      "sha256": "00a9574f06b35b5aa56d124c6532963babba63ce8d593ad8f935956fada94cce"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3593,6 +3597,9 @@
     "scripts/tests/test_issue_1425_bleed_fields.sh",
     "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_1433_gov_branch.sh",
+    "scripts/tests/test_issue_1451_wakatime_403.py",
+    "scripts/tests/test_issue_1457_staged_scan_cost.sh",
+    "scripts/tests/test_issue_1458_extractor_config_lock.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

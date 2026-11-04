@@ -17,6 +17,8 @@
 #   id  type  path  arg  before  after
 # Fingerprint of a path (before / after):
 #   absent | file:MODE:SHA256 | dir:MODE | link:TARGET
+# MODE is "*" where chmod has no effect (Git Bash, see apply_op__modes_trusted):
+# there the type and the sha256 are verified, the mode is not.
 # Types: write, replace, remove, mkdir, rmdir_if_empty, move.
 #   write    path absent -> file from staging file ARG
 #   replace  path file  -> file from staging file ARG
@@ -87,9 +89,123 @@ apply_op__norm_mode() {
     esac
 }
 
+# Directory that holds PATH (paths are absolute and normalised).
+apply_op__parent() {
+    local d=${1%/*}
+    printf '%s\n' "${d:-/}"
+}
+
+# Mode trust (issue #1455). On Git Bash (MSYS2/MinGW) chmod succeeds but does
+# nothing: a file keeps the mode the runtime infers from it (644, or 755 for a
+# script), so a planned 755 never verified and update.sh aborted after its
+# first write. Modes are left out of fingerprints ("*") only where BOTH hold:
+# uname -s is MINGW*/MSYS* AND a behavioural probe in that directory shows
+# chmod has no effect. Linux, macOS, Cygwin and Windows mounts that honour
+# chmod stay strict. There is deliberately no environment switch.
+# Results are cached per probed directory for the life of the process (not
+# reset with the plan); bash 3.2 has no associative arrays, so the cache is a
+# newline-separated list of "<state> <dir>". Fingerprints are taken in
+# command substitutions, whose cache updates are lost, so every entry point
+# that runs in the caller's shell probes first (see apply_op__warm_modes).
+APPLY_OP__UNAME=""
+APPLY_OP__MODE_CACHE=$'\n'
+APPLY_OP__MODE_LOGGED=""
+
+# Behavioural probe in directory $1, in a subshell so its EXIT trap removes
+# the temporary file without touching the caller's traps. Prints "trusted" or
+# "untrusted". A directory or probe that is a symlink, a probe that cannot be
+# created, a chmod that reports an error, or a mode that cannot be read back
+# is not evidence of a no-op chmod: it prints "trusted", so the strict check
+# and the normal write error stay.
+apply_op__chmod_probe() {
+    (
+        local dir=$1 probe first second
+        if [ -L "$dir" ] || [ ! -d "$dir" ]; then
+            echo trusted
+            exit 0
+        fi
+        probe=$(mktemp "$dir/.apply-op-probe.XXXXXX" 2>/dev/null) || {
+            echo trusted
+            exit 0
+        }
+        trap 'rm -f "$probe"' EXIT
+        if [ -L "$probe" ] || [ ! -f "$probe" ]; then
+            echo trusted
+            exit 0
+        fi
+        if ! chmod 0700 "$probe" 2>/dev/null; then
+            echo trusted
+            exit 0
+        fi
+        first=$(apply_op__mode_of "$probe" 2>/dev/null) && [ -n "$first" ] || {
+            echo trusted
+            exit 0
+        }
+        if ! chmod 0644 "$probe" 2>/dev/null; then
+            echo trusted
+            exit 0
+        fi
+        second=$(apply_op__mode_of "$probe" 2>/dev/null) && [ -n "$second" ] || {
+            echo trusted
+            exit 0
+        }
+        if [ "$(apply_op__norm_mode "$first")" = 700 ] && [ "$(apply_op__norm_mode "$second")" = 644 ]; then
+            echo trusted
+        else
+            echo untrusted
+        fi
+    )
+}
+
+# Returns 0 when modes can be verified in directory $1, 1 when chmod has no
+# effect there. A directory that does not exist yet (a planned mkdir) is
+# probed at its nearest existing ancestor: it will live on the same mount.
+# A relative path has no ancestor to climb to (the parent of "foo" is "foo"):
+# it is answered "trusted" and left to the path validation that rejects it.
+apply_op__modes_trusted() {
+    local dir=$1 state parent
+    if [ -z "$APPLY_OP__UNAME" ]; then
+        APPLY_OP__UNAME=$(uname -s 2>/dev/null) || APPLY_OP__UNAME=unknown
+    fi
+    case "$APPLY_OP__UNAME" in
+        MINGW* | MSYS*) ;;
+        *) return 0 ;;
+    esac
+    case $dir in
+        /*) ;;
+        *) return 0 ;;
+    esac
+    while [ ! -e "$dir" ] && [ ! -L "$dir" ]; do
+        parent=$(apply_op__parent "$dir")
+        [ "$parent" != "$dir" ] || return 0
+        dir=$parent
+    done
+    case "$APPLY_OP__MODE_CACHE" in
+        *$'\n'"trusted $dir"$'\n'*) return 0 ;;
+        *$'\n'"untrusted $dir"$'\n'*) return 1 ;;
+    esac
+    state=$(apply_op__chmod_probe "$dir")
+    APPLY_OP__MODE_CACHE="${APPLY_OP__MODE_CACHE}${state} ${dir}"$'\n'
+    [ "$state" = untrusted ] || return 0
+    if [ -z "$APPLY_OP__MODE_LOGGED" ]; then
+        APPLY_OP__MODE_LOGGED=1
+        apply_op__msg "chmod не меняет права в $dir (Git Bash): права файлов не сверяются, сверяются тип и sha256"
+    fi
+    return 1
+}
+
+# Fills the mode-trust cache for the directory holding PATH in the caller's
+# shell, so the fingerprints taken later in subshells reuse the result. The
+# answer itself is read where it matters (apply_op_fingerprint, the builder).
+apply_op__warm_modes() {
+    apply_op__modes_trusted "$(apply_op__parent "$1")" || return 0
+}
+
 # Prints the fingerprint of PATH without following a final symlink.
 apply_op_fingerprint() {
-    local p=$1 mode hash target
+    local p=$1 mode hash target parent
+    parent=${p%/*}
+    parent=${parent:-/}
     if [ -L "$p" ]; then
         target=$(readlink "$p"; printf x) || return 1
         target=${target%x}
@@ -102,11 +218,20 @@ apply_op_fingerprint() {
         esac
         printf 'link:%s\n' "$target"
     elif [ -d "$p" ]; then
-        mode=$(apply_op__mode_of "$p") || return 1
-        printf 'dir:%s\n' "$(apply_op__norm_mode "$mode")"
+        if apply_op__modes_trusted "$parent"; then
+            mode=$(apply_op__mode_of "$p") || return 1
+            mode=$(apply_op__norm_mode "$mode")
+        else
+            mode='*'
+        fi
+        printf 'dir:%s\n' "$mode"
     elif [ -f "$p" ]; then
-        mode=$(apply_op__mode_of "$p") || return 1
-        mode=$(apply_op__norm_mode "$mode")
+        if apply_op__modes_trusted "$parent"; then
+            mode=$(apply_op__mode_of "$p") || return 1
+            mode=$(apply_op__norm_mode "$mode")
+        else
+            mode='*'
+        fi
         hash=$(apply_op__sha256 "$p") || {
             apply_op__msg "нет инструмента sha256 (shasum или sha256sum)"
             return 1
@@ -123,13 +248,13 @@ apply_op__fp_valid() {
     local fp=$1 hash
     case "$fp" in
         absent | other) return 0 ;;
-        file:[0-7][0-7][0-7]:* | file:[0-7][0-7][0-7][0-7]:*)
+        file:[0-7][0-7][0-7]:* | file:[0-7][0-7][0-7][0-7]:* | file:\*:*)
             hash=${fp#file:*:}
             [ "${#hash}" -eq 64 ] || return 1
             case "$hash" in *[!0-9a-f]*) return 1 ;; esac
             return 0
             ;;
-        dir:[0-7][0-7][0-7] | dir:[0-7][0-7][0-7][0-7]) return 0 ;;
+        dir:[0-7][0-7][0-7] | dir:[0-7][0-7][0-7][0-7] | dir:\*) return 0 ;;
         link:?*) return 0 ;;
     esac
     return 1
@@ -226,7 +351,7 @@ apply_op__load() {
 }
 
 apply_op__check_row() {
-    local i=$1 type path arg before after src_hash
+    local i=$1 type path arg before after src_hash fp
     type=${AO_TYPE[$i]}
     path=${AO_PATH[$i]}
     arg=${AO_ARG[$i]}
@@ -259,8 +384,23 @@ apply_op__check_row() {
             ;;
     esac
 
+    apply_op__warm_modes "$path"
+    if [ "$type" = move ]; then
+        apply_op__warm_modes "$arg"
+    fi
+    for fp in "$before" "$after"; do
+        case "$fp" in
+            'file:*:'* | 'dir:*')
+                if apply_op__modes_trusted "$(apply_op__parent "$path")"; then
+                    apply_op__msg "операция $i: режим «*» допустим только там, где chmod не меняет права: $path"
+                    return 1
+                fi
+                ;;
+        esac
+    done
     case "$after" in
         file:[0-7][0-7][0-7]:* | dir:[0-7][0-7][0-7]) ;;
+        file:\*:* | dir:\*) ;;
         absent) ;;
         *)
             apply_op__msg "операция $i: режим со спецбитами не поддерживается: «${after}»"
@@ -429,7 +569,7 @@ apply_op__install_file() {
         apply_op__refuse "$id" "источник изменился во время копирования: $src"
         return 1
     fi
-    if ! chmod "0$mode" "$tmp"; then
+    if [ "$mode" != '*' ] && ! chmod "0$mode" "$tmp"; then
         rm -f "$tmp"
         apply_op__refuse "$id" "не выставить права временного файла для $path"
         return 1
@@ -475,6 +615,10 @@ apply_op() {
         apply_op__refuse "$id" "родитель $path не существует или содержит ссылку"
         return 1
     fi
+    apply_op__warm_modes "$path"
+    if [ "$type" = move ]; then
+        apply_op__warm_modes "$arg"
+    fi
     live=$(apply_op_fingerprint "$path") || {
         apply_op__refuse "$id" "не снять отпечаток $path"
         return 1
@@ -497,7 +641,7 @@ apply_op() {
                 apply_op__refuse "$id" "не создать каталог $path"
                 return 1
             fi
-            if ! chmod "0${after#dir:}" "$path"; then
+            if [ "$after" != 'dir:*' ] && ! chmod "0${after#dir:}" "$path"; then
                 apply_op__fail "$id" "не выставить права каталога $path"
                 return 2
             fi
@@ -590,6 +734,14 @@ apply_op_plan_add() {
         esac
     done
     apply_op__load "$file" || return 1
+    if [ "$type" = move ]; then
+        apply_op__warm_modes "$arg"
+    fi
+    # Where chmod has no effect the planned mode is "*", as in the fingerprint
+    # (this call also fills the cache for the fingerprint of "before" below).
+    if ! apply_op__modes_trusted "$(apply_op__parent "$path")"; then
+        mode='*'
+    fi
     apply_op__chain "$path" "$APPLY_OP_TOTAL"
     if [ -n "$AO_CHAIN" ]; then
         before=$AO_CHAIN

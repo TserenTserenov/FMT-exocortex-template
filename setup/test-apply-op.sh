@@ -9,6 +9,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/apply-op.sh
 . "$SCRIPT_DIR/setup/lib/apply-op.sh"
+# shellcheck source=../scripts/lib/common.sh
+. "$SCRIPT_DIR/scripts/lib/common.sh"  # iwe_timeout: stock macOS has no timeout(1)
 
 # mktemp may return a path through a symlink (/var -> /private/var on macOS);
 # the executor works on canonical paths only.
@@ -405,6 +407,133 @@ unset APPLY_OP_ROOTS
 run apply_op_begin "$PLAN"
 assert_rc "переменная корней не задана" "$RC" 1
 assert_err_has "корни не заданы" "APPLY_OP_ROOTS пуст"
+
+# --- 14. Git Bash: chmod succeeds but changes nothing (issue #1455) -----------
+# The executor caches uname and the probe result for the life of the process;
+# every case starts from an empty cache and removes its stubs afterwards.
+reset_mode_trust() {
+    APPLY_OP__UNAME=""
+    APPLY_OP__MODE_CACHE=$'\n'
+    APPLY_OP__MODE_LOGGED=""
+}
+uname_mingw() { echo MINGW64_NT-10.0-19045; }
+uname_linux() { echo Linux; }
+# Git Bash chmod: exit 0, mode unchanged.
+chmod_noop() { return 0; }
+# chmod honoured by the probe only: the probe sees a working chmod, the real
+# install then leaves a mode that differs from the plan.
+chmod_probe_only() {
+    case "$2" in
+        */.apply-op-probe.*) command chmod "$@" ;;
+        *) return 0 ;;
+    esac
+}
+
+# 14a. MINGW + no-op chmod: a 755-planned script and a new directory are
+# written; type and content are verified, the mode is not.
+new_install 24
+reset_mode_trust
+uname() { uname_mingw; }
+chmod() { chmod_noop "$@"; }
+run apply_op_plan_add "$PLAN" replace "$INSTALL/scripts/tool.sh" "$STAGING/tool.sh" 755
+assert_rc "Git Bash: построение плана" "$RC" 0
+assert_err_has "Git Bash: одна строка с каталогом" "chmod не меняет права в $INSTALL/scripts"
+apply_op_plan_add "$PLAN" write "$INSTALL/scripts/new-tool.sh" "$STAGING/tool.sh" 755 2>/dev/null
+apply_op_plan_add "$PLAN" mkdir "$INSTALL/newdir" - 755 2>/dev/null
+apply_op_plan_add "$PLAN" write "$INSTALL/newdir/added.md" "$STAGING/added.md" 644 2>/dev/null
+run apply_op_run "$PLAN"
+unset -f uname chmod
+assert_rc "Git Bash: запись скрипта с планом 755" "$RC" 0
+assert_eq "Git Bash: содержимое скрипта" "$(cat "$INSTALL/scripts/new-tool.sh")" "tool v2"
+assert_eq "Git Bash: файл в новом каталоге" "$(cat "$INSTALL/newdir/added.md")" "added"
+assert_eq "Git Bash: в плане нет числовых режимов" "$(grep -cE '(file|dir):[0-7]' "$PLAN" | tr -d ' ')" 0
+assert_eq "Git Bash: режимы в плане — «*»" "$(grep -oE '(file|dir):\*' "$PLAN" | wc -l | tr -d ' ')" 5
+assert_eq "Git Bash: пробных файлов не осталось" "$(find "$INSTALL" -name '.apply-op-probe.*' | wc -l | tr -d ' ')" 0
+
+# 14b. MINGW, but the probe finds chmod working: modes stay part of the
+# fingerprint and a mode that did not stick still stops the run.
+new_install 25
+reset_mode_trust
+uname() { uname_mingw; }
+chmod() { chmod_probe_only "$@"; }
+apply_op_plan_add "$PLAN" write "$INSTALL/scripts/new-tool.sh" "$STAGING/tool.sh" 755
+run apply_op_run "$PLAN"
+unset -f uname chmod
+assert_eq "chmod работает: режим остался в плане" "$(cut -f6 "$PLAN" | tail -1 | cut -d: -f1,2)" "file:755"
+assert_rc "chmod работает: расхождение режима" "$RC" 2
+assert_err_has "chmod работает: расхождение режима" "ожидалось «file:755:"
+
+# 14c. Linux with a no-op chmod: no probe at all, the strict check fails.
+new_install 26
+reset_mode_trust
+uname() { uname_linux; }
+chmod() { chmod_noop "$@"; }
+run apply_op_plan_add "$PLAN" write "$INSTALL/scripts/new-tool.sh" "$STAGING/tool.sh" 755
+assert_eq "Linux: без строки про Git Bash" "$LAST_ERR" ""
+run apply_op_run "$PLAN"
+unset -f uname chmod
+assert_rc "Linux: режим не выставлен" "$RC" 2
+assert_err_has "Linux: режим не выставлен" "ожидалось «file:755:"
+
+# 14d. A plan with mode "*" is refused where chmod works.
+new_install 27
+reset_mode_trust
+printf '%s\n1\twrite\t%s\t%s\tabsent\tfile:*:%s\n' "$APPLY_OP_HEADER" "$INSTALL/star.md" \
+    "$STAGING/added.md" "$(apply_op__sha256 "$STAGING/added.md")" > "$PLAN"
+before_tree=$(snapshot "$INSTALL")
+run apply_op_begin "$PLAN"
+assert_rc "режим «*» при работающем chmod" "$RC" 1
+assert_err_has "режим «*» при работающем chmod" "режим «*» допустим только"
+assert_eq "режим «*»: дерево не тронуто" "$(snapshot "$INSTALL")" "$before_tree"
+
+# 14e. MINGW, the probe cannot create its file (read-only directory): that is
+# a write error, not "modes untrusted" — the plan keeps the mode and the write
+# is refused. Root ignores directory permissions, so the case needs a user.
+if [ "$(id -u)" -ne 0 ]; then
+    new_install 28
+    reset_mode_trust
+    mkdir "$INSTALL/locked"
+    chmod 555 "$INSTALL/locked"
+    uname() { uname_mingw; }
+    run apply_op_plan_add "$PLAN" write "$INSTALL/locked/x.md" "$STAGING/added.md" 644
+    assert_eq "нет пробного файла: режим остался" "$(cut -f6 "$PLAN" | tail -1 | cut -d: -f1,2)" "file:644"
+    assert_eq "нет пробного файла: без строки про Git Bash" "$LAST_ERR" ""
+    run apply_op_run "$PLAN"
+    unset -f uname
+    assert_rc "нет пробного файла: запись отклонена" "$RC" 1
+    assert_err_has "нет пробного файла: запись отклонена" "не создать временный файл"
+    chmod 755 "$INSTALL/locked"
+fi
+reset_mode_trust
+
+# 14f. MINGW, a relative or bare path (review-01 M1): the ancestor walk used
+# to loop forever (the parent of "foo" is "foo"). It must return; the relative
+# path is left to the validation in apply_op_begin.
+mingw_trust() { # <path> → "rc=<n>" from a fresh process, bounded by timeout
+    iwe_timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }; apply_op__modes_trusted "$2"; echo "rc=$?"' \
+        _ "$SCRIPT_DIR/setup/lib/apply-op.sh" "$1" 2>/dev/null || echo "rc=hang-or-error"
+}
+assert_eq "относительный путь: проверка прав завершается" "$(mingw_trust no-such-dir/x)" "rc=0"
+assert_eq "голое имя: проверка прав завершается" "$(mingw_trust no-such-name)" "rc=0"
+new_install 29
+plan_rc=$(iwe_timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }
+    APPLY_OP_ROOTS=("$2"); apply_op_plan_add "$3" write rel/x.md "$4" 644 >/dev/null 2>&1; echo returned' \
+    _ "$SCRIPT_DIR/setup/lib/apply-op.sh" "$INSTALL" "$PLAN" "$STAGING/added.md") || plan_rc=hang
+assert_eq "относительный путь в плане: построитель не зависает" "$plan_rc" returned
+
+# 14g. MINGW, the probe cannot read the mode back (review-01 M2): no evidence
+# of a no-op chmod, so modes stay verified.
+new_install 30
+reset_mode_trust
+uname() { uname_mingw; }
+apply_op__mode_of_saved=$(declare -f apply_op__mode_of)
+apply_op__mode_of() { case "$1" in */.apply-op-probe.*) return 1 ;; *) stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" ;; esac; }
+assert_eq "режим пробного файла не прочитан: «trusted»" "$(apply_op__chmod_probe "$INSTALL")" trusted
+apply_op__mode_of() { case "$1" in */.apply-op-probe.*) printf '' ;; *) stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" ;; esac; }
+assert_eq "пустой режим пробного файла: «trusted»" "$(apply_op__chmod_probe "$INSTALL")" trusted
+eval "$apply_op__mode_of_saved"
+unset -f uname
+reset_mode_trust
 
 echo "apply-op: $PASS проверок прошли, $FAIL не прошли"
 [ "$FAIL" -eq 0 ]

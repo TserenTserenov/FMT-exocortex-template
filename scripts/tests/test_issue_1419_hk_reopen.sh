@@ -126,6 +126,74 @@ check_crash_recovery() {
   echo "ok: crash recovery"
 }
 
+# Issue #1461: the orphan sweep (audit --cleanup-orphans -> __quarantine-dead)
+# must also clear a pre-fix wedged pair (housekeeping .open with a dead owner
+# next to an earlier run's .closed), and must never move the .closed of a
+# non-housekeeping session or of a file that only claims a housekeeping id.
+dead_pid() {
+  local pid
+  sleep 300 &
+  pid=$!
+  kill "$pid"
+  wait "$pid" 2>/dev/null || true
+  echo "$pid"
+}
+
+write_semaphore() { # <file> <agent> <session id> <pid>
+  printf -- '---\nagent: %s\nsession_id: %s\ncreated_at: 2026-11-03T08:00:00Z\npid: %s\n---\n' \
+    "$2" "$3" "$4" > "$1"
+  chmod 600 "$1"
+}
+
+check_quarantine_sweep() {
+  local root="$TMP_DIR/quarantine" sessions sem owner other lookalike before
+  sessions="$root/.iwe-runtime/sessions"
+  mkdir -p "$root/DS-strategy"
+  sem="$sessions/kimi-housekeeping-day-open.open"
+
+  # Pre-fix wedged pair: yesterday's receipt next to today's open, owner dead.
+  sleep 300 &
+  owner=$!
+  guard "$root" "" open --housekeeping day-open --agent kimi --owner-pid "$owner"
+  [ "$rc" -eq 0 ] || fail "quarantine: setup open rc=$rc: $out"
+  guard "$root" "" close --housekeeping day-open --agent kimi
+  [ "$rc" -eq 0 ] || fail "quarantine: setup close rc=$rc: $out"
+  cp -p "$sem.closed" "$TMP_DIR/q-old.closed"
+  guard "$root" "" open --housekeeping day-open --agent kimi --owner-pid "$owner"
+  [ "$rc" -eq 0 ] || fail "quarantine: reopen rc=$rc: $out"
+  find "$sessions" -maxdepth 1 -name 'kimi-housekeeping-day-open.open.closed.*' -delete
+  cp -p "$TMP_DIR/q-old.closed" "$sem.closed"
+  kill "$owner"
+  wait "$owner" 2>/dev/null || true
+
+  # A regular session and a lookalike claiming a housekeeping id, both with a
+  # dead pid and a foreign .closed: neither receipt may be moved.
+  other="$sessions/kimi-2026-11-03-01-regular.open"
+  write_semaphore "$other" kimi 2026-11-03-01-regular "$(dead_pid)"
+  echo "regular receipt" > "$other.closed"
+  lookalike="$sessions/kimi-renamed.open"
+  write_semaphore "$lookalike" kimi housekeeping-day-close "$(dead_pid)"
+  echo "lookalike receipt" > "$lookalike.closed"
+  before=$(cat "$other.closed" "$lookalike.closed")
+
+  guard "$root" "" audit --cleanup-orphans
+  echo "$out" >&2
+  [ ! -e "$sem" ] || fail "quarantine: wedged housekeeping open not quarantined (bug #1461): $out"
+  [ -f "$sem.orphaned-dead-pid" ] || fail "quarantine: no .orphaned-dead-pid for the housekeeping open"
+  [ ! -e "$sem.closed" ] || fail "quarantine: old .closed left in place"
+  [ "$(archives "$sessions" closed)" = 1 ] || fail "quarantine: old .closed not archived exactly once"
+  cmp -s "$TMP_DIR/q-old.closed" "$(find "$sessions" -maxdepth 1 -name 'kimi-housekeeping-day-open.open.closed.*')" \
+    || fail "quarantine: archived receipt differs from the old .closed"
+
+  [ -f "$other" ] && [ -f "$lookalike" ] || fail "quarantine: a non-housekeeping open was moved"
+  [ "$(cat "$other.closed" "$lookalike.closed")" = "$before" ] || fail "quarantine: a foreign .closed changed"
+  [ -z "$(find "$sessions" -maxdepth 1 \( -name 'kimi-2026-11-03-01-regular.open.closed.*' -o -name 'kimi-renamed.open.closed.*' \))" ] \
+    || fail "quarantine: a foreign .closed was archived"
+  printf '%s\n' "$out" | grep -q 'kimi-2026-11-03-01-regular.open changed or could not be locked; kept for review' \
+    || fail "quarantine: regular session not reported as kept: $out"
+  echo "ok: quarantine sweep"
+}
+
 check_mode full ""
 check_crash_recovery
 
@@ -136,4 +204,5 @@ chmod +x "$STUBS/uname"
 check_mode gitbash "$STUBS"
 
 check_legacy_state
+check_quarantine_sweep
 echo "PASS: issue #1419 housekeeping reopen"

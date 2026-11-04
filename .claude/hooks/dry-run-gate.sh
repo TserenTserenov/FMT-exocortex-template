@@ -24,29 +24,10 @@
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
 TTL_SECONDS=2400
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IWE_ROOT_GUESS="$(cd "$HOOK_DIR/../.." 2>/dev/null && pwd -P)"
 GATE_LOG="$IWE_ROOT_GUESS/.claude/logs/gate_log.jsonl"
-
-# issue #549 stage 2: canonical rehearsal state record (redesign).
-# The sentinel remains the marker of the active mode (the whitelist
-# machinery below depends on it), but the blocking decision is made from the state file.
-# The directory is private (this uid only): symlink/foreign owner/group
-# write = tampering attempt → fail-closed.
-DRY_DIR="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-# Env overrides of paths — explicit test mode only (Codex r1: ambient
-# IWE_DRY_RUN_DIR/IWE_DRY_RUN_SENTINEL from the launch configuration must not
-# disable production protection). The test creates the marker inside the override
-# directory; without it the production paths apply.
-if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
-    if [ ! -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ]; then
-        DRY_DIR="/tmp/iwe-dry-run-$(id -u)"
-        SENTINEL="/tmp/iwe-dry-run.flag"
-    fi
-fi
-LOCK_DIR="$DRY_DIR/transaction.lock"
 
 fail_closed() { # <message...> — single point of permanent blocking with diagnostics
     {
@@ -56,38 +37,88 @@ fail_closed() { # <message...> — single point of permanent blocking with diagn
     exit 2
 }
 
+# jq is needed to parse the payload. Per contract (memory/dry-run-contract.md
+# §Fail-safe): a broken gate must fail-CLOSED, not open — a gate that can't
+# see its own state has no basis to allow (issue #460 path 1; this used to
+# exit 0, contradicting the fail-CLOSED example already documented in the
+# contract).
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[dry-run-gate] FAIL-CLOSED: jq missing, blocking by default (install jq to restore normal operation)" >&2
+    exit 2
+fi
+
+# issue #549 stage 2: canonical rehearsal state record (redesign).
+# The sentinel remains the marker of the active mode (the whitelist
+# machinery below depends on it), but the blocking decision is made from the state file.
+# The directory is private to this user: symlink/foreign owner/open access =
+# tampering attempt → fail-closed. Path and privacy criterion come from the
+# one shared library (issue #1447: on Git Bash the criterion is the NTFS ACL,
+# not the mode bits); env overrides of the paths work in explicit test mode only.
+#
+# Without the library (an update interrupted between .claude/hooks and
+# .claude/lib) or without a resolvable path (Git Bash with LOCALAPPDATA unset
+# or cygpath failing) the gate cannot read the canonical state. It then fails
+# closed only when a rehearsal may be running, judged by evidence found at
+# fixed locations without the library; otherwise it warns and allows, so a
+# user who is not rehearsing is never locked out of the tool that repairs it.
+rehearsal_may_be_active() {
+    local f d sf st cand
+    for f in /tmp/iwe-dry-run.flag "${IWE_DRY_RUN_SENTINEL:-}"; do
+        [ -n "$f" ] || continue
+        { [ -e "$f" ] || [ -L "$f" ]; } && return 0
+    done
+    for d in /tmp "$(dirname "${IWE_DRY_RUN_SENTINEL:-/tmp/x}")"; do
+        for f in "$d"/iwe-dry-run-owner-*.token; do
+            [ -e "$f" ] && return 0
+        done
+    done
+    # Active state records in every directory a resolver could have chosen.
+    # A completed rehearsal leaves its directory behind, so the directory alone
+    # is not evidence; an active or unreadable state record is.
+    cand=("/tmp/iwe-dry-run-$(id -u)")  # evidence scan, not a resolver
+    [ -n "${IWE_DRY_RUN_DIR:-}" ] && cand+=("$IWE_DRY_RUN_DIR")  # evidence scan, not a resolver
+    if [ -n "${LOCALAPPDATA:-}" ]; then
+        cand+=("${LOCALAPPDATA%[\\/]}/iwe-dry-run")
+        d=$(cygpath -u "$LOCALAPPDATA" 2>/dev/null) && [ -n "$d" ] && cand+=("${d%/}/iwe-dry-run")
+    fi
+    for d in "${cand[@]}"; do
+        [ -L "$d" ] && return 0
+        [ -d "$d" ] || continue
+        for sf in "$d"/gate-*.state; do
+            [ -e "$sf" ] || continue
+            st=$(jq -r '.state // empty' "$sf" 2>/dev/null) || return 0
+            [ "$st" = "active" ] && return 0
+        done
+    done
+    return 1
+}
+dry_run_state_unavailable() { # <reason>
+    if rehearsal_may_be_active; then
+        fail_closed "$1 (a rehearsal may be active)"
+    fi
+    echo "[dry-run-gate] WARNING: $1 — no rehearsal is active, allowing; reinstall .claude/lib/dry-run-dir.sh (update.sh) before the next dry-run" >&2
+    exit 0
+}
+DRY_RUN_LIB="$HOOK_DIR/../lib/dry-run-dir.sh"
+# shellcheck source=../lib/dry-run-dir.sh
+{ [ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB"; } || dry_run_state_unavailable "$DRY_RUN_LIB missing — cannot locate dry-run state"
+dry_run_resolve_paths || dry_run_state_unavailable "$DRY_RUN_ERR"
+DRY_DIR="$DRY_RUN_DIR"
+SENTINEL="$DRY_RUN_SENTINEL"
+LOCK_DIR="$DRY_DIR/transaction.lock"
+
 gate_log_event() { # <event> <detail>
     mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
     printf '{"ts":"%s","gate":"dry-run-gate","event":"%s","detail":"%s"}\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >> "$GATE_LOG" 2>/dev/null || true
 }
 
-# lstat check of the private directory (Codex design review: /tmp without a protected
-# directory allows substitution and symlink attacks). Called lazily — only when
-# dry-run is actually in use, to avoid creating the directory on every tool call.
+# lstat/owner/privacy check of the private directory (Codex design review: /tmp
+# without a protected directory allows substitution and symlink attacks).
+# Called lazily — only when dry-run is actually in use, to avoid creating the
+# directory on every tool call.
 dry_dir_ensure() {
-    if [ -L "$DRY_DIR" ]; then
-        fail_closed "dry-run dir $DRY_DIR is a symlink — refusing (possible attack)"
-    fi
-    if [ ! -d "$DRY_DIR" ]; then
-        mkdir -m 0700 "$DRY_DIR" 2>/dev/null || fail_closed "cannot create $DRY_DIR with 0700"
-    fi
-    local owner
-    case "$(uname)" in
-        Darwin) owner=$(stat -f %u "$DRY_DIR" 2>/dev/null) ;;
-        *)      owner=$(stat -c %u "$DRY_DIR" 2>/dev/null) ;;
-    esac
-    [ "$owner" = "$(id -u)" ] || fail_closed "dry-run dir $DRY_DIR owned by uid $owner, expected $(id -u)"
-    # group/other write forbidden (lstat form without following symlink — the directory is already checked above)
-    local perms
-    case "$(uname)" in
-        Darwin) perms=$(stat -f %Lp "$DRY_DIR" 2>/dev/null) ;;
-        *)      perms=$(stat -c %a "$DRY_DIR" 2>/dev/null) ;;
-    esac
-    [ -n "$perms" ] || fail_closed "cannot stat permissions of $DRY_DIR"
-    # perms — a string of octal digits ("700"); interpret as octal.
-    # bash 3.2: ${var:-default} inside $(( )) is not parsed — default is set separately above.
-    [ $(( 8#$perms & 077 )) -eq 0 ] || fail_closed "dry-run dir $DRY_DIR has group/other write permissions ($perms)"
+    dry_run_dir_check create || fail_closed "$DRY_RUN_ERR"
 }
 
 # Transactional lock via mkdir (portable; flock(1) is absent on macOS).
@@ -215,15 +246,6 @@ orphan_proven() { # <pid> <pid_start> <pgid>
     return 0
 }
 
-# jq is needed to parse the payload. Per contract (memory/dry-run-contract.md
-# §Fail-safe): a broken gate must fail-CLOSED, not open — a gate that can't
-# see its own state has no basis to allow (issue #460 path 1; this used to
-# exit 0, contradicting the fail-CLOSED example already documented in the
-# contract).
-if ! command -v jq >/dev/null 2>&1; then
-    echo "[dry-run-gate] FAIL-CLOSED: jq missing, blocking by default (install jq to restore normal operation)" >&2
-    exit 2
-fi
 
 # A sentinel symlink is a tampering attempt, not a state (lstat check,
 # Codex design review: a dangling symlink would give a false "sentinel missing").
@@ -440,8 +462,13 @@ esac
 # *_search_by_name/backlinks/whoami/get_instructions), everything else is blocked.
 # If a new read-only tool does not fall under the pattern — a false BLOCK
 # (the safe direction of error), not a false ALLOW.
+#
+# issue #1447: Kimi Code names the same IWE server `aisystant` (no "iwe" or
+# "knowledge" in it), so its writes passed. It joins as an exact server-name
+# PREFIX `mcp__aisystant__` — not a substring, so another server that merely
+# contains "aisystant" is not pulled in.
 case "$TOOL_NAME" in
-    mcp__*iwe*__*|mcp__*knowledge*__*|mcp__*IWE*__*)
+    mcp__*iwe*__*|mcp__*knowledge*__*|mcp__*IWE*__*|mcp__aisystant__*)
         ACTION="${TOOL_NAME##*__}"
         # Substring patterns (`*get_*`, not just `get_*`): for half of the
         # read tools the action does not start with a verb but contains it
@@ -464,6 +491,10 @@ case "$TOOL_NAME" in
 esac
 
 # === MCP-write whitelist (exact tool_name matches, other servers) ===
+# Every name below is BLOCKED during a rehearsal (the list is of write tools;
+# read tools of the same servers are absent and pass). issue #1447: Kimi Code
+# names the calendar server `google-calendar` — its write tools are listed
+# explicitly next to the ext-/claude_ai_ variants.
 case "$TOOL_NAME" in
     mcp__claude_ai_Gmail__create_draft|\
     mcp__claude_ai_Gmail__create_label|\
@@ -481,6 +512,11 @@ case "$TOOL_NAME" in
     mcp__ext-google-calendar__delete-event|\
     mcp__ext-google-calendar__update-event|\
     mcp__ext-google-calendar__respond-to-event|\
+    mcp__google-calendar__create-event|\
+    mcp__google-calendar__create-events|\
+    mcp__google-calendar__delete-event|\
+    mcp__google-calendar__update-event|\
+    mcp__google-calendar__respond-to-event|\
     mcp__ext-google-drive__copy_file|\
     mcp__ext-google-drive__create_file|\
     mcp__ext-google-drive__create_folder|\
@@ -563,6 +599,10 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # are injectable by the caller's environment — the very bypass that
     # review-01/review-02 closed by dropping the env default in this whitelist).
     WL_TEMPLATE_ABS="$IWE_ROOT_GUESS/FMT-exocortex-template"
+    # The path is embedded in sed EREs below: every metacharacter (and the
+    # `@` delimiter) is escaped, so a workspace under e.g. "a+b (c)" neither
+    # widens the approved span nor stops matching the legitimate form.
+    WL_TEMPLATE_RE=$(printf '%s' "$WL_TEMPLATE_ABS" | sed 's/[][\.*^$+?(){}|/@]/\\&/g')
     # Cold-review finding (Codex, 2026-09-14): a STATIC marker string in a
     # NORM whitelist is spoofable — an attacker can type the marker text
     # literally as the command's own bare argument and bypass the gate by
@@ -610,8 +650,9 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         -e "s@IWE_PATHS=\"\\\$\\{IWE_PATHS_FILE:-\\}\"; if \\[ -z \"\\\$IWE_PATHS\" \\]; then for _c in \"\\\$PWD/\\.iwe-paths\" \"\\\$\\{IWE_WORKSPACE:-\\\$HOME/IWE\\}/\\.iwe-paths\" \"\\\$HOME/\\.iwe-paths\"; do \\[ -r \"\\\$_c\" \\] && \\{ IWE_PATHS=\"\\\$_c\"; break; \\}; done; fi; \\[ -n \"\\\$IWE_PATHS\" \\] && \\. \"\\\$IWE_PATHS\"@ __WL_IWE_PATHS_CHAIN_${GATE_NONCE}__ @g" \
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
         -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
-        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
-        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
+        -e "s@\"\\\$IWE_SCRIPTS/memory-bleed\\.sh\"@ __WL_MEMORY_BLEED_${GATE_NONCE}__ @g" \
+        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
+        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
         -e "s@\"\\\$HOME/\\.iwe-paths\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
         -e "s@\"\\\$\\{IWE_PATHS_FILE:-\\\$HOME/\\.iwe-paths\\}\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
         -e "s/'[^']*'/ QSTR /g" \
@@ -639,13 +680,24 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     fi
 
     # Step 2: split into simple commands.
-    SPLIT=$(printf '%s\n' "$NORM" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+    # review-03 M3: the split used `sed 's/.../\n/g'`; BSD sed (macOS) may
+    # print a literal "n" for "\n" in the replacement, which glues segments
+    # together. Bash parameter expansion behaves the same everywhere. `$(`
+    # goes first so its `(` does not leave a stray `$` behind; `||`/`&&`
+    # give empty segments, which every reader below skips.
+    split_segments() { # <text> — one simple command per line
+        local s=$1 sep='[`(){}&;|]'
+        s=${s//'$('/$'\n'}
+        s=${s//$sep/$'\n'}
+        printf '%s\n' "$s"
+    }
+    SPLIT=$(split_segments "$NORM")
 
     # issue #1258: same split, but from $CMD (before $NORM collapses every
     # quoted span to the literal text "QSTR") -- a quoted/escaped command
     # name like "cd" or \cd needs its quoting intact to tell it apart from
     # QSTR by the time the cd/pushd check below runs.
-    SPLIT_RAW=$(printf '%s\n' "$CMD_CODE" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+    SPLIT_RAW=$(split_segments "$CMD_CODE")
 
     # Live-review finding (Fable, 2026-09-14): the .iwe-paths whitelist matches the
     # LITERAL TEXT "$HOME/.iwe-paths"/"${IWE_PATHS_FILE:-...}", not the
@@ -683,9 +735,120 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # not covered, a documented residual boundary (memory/dry-run-contract.md).
     HOME_OR_IWE_PATHS_TAMPERED=0
     if printf '%s\n' "$SPLIT" | grep -qE \
-        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)' \
+        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)(\[[^]]*\])?\+?=|(^|[[:space:]])(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)(\[[^]]*\])?\+?=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)' \
     ; then
         HOME_OR_IWE_PATHS_TAMPERED=1
+    fi
+    HOME_ASSIGNED=$HOME_OR_IWE_PATHS_TAMPERED
+
+    # issue #1454 review-01: the regexes above read assignments written out
+    # literally. A builtin can also assign a variable whose name is computed,
+    # quoted or indirect, which no list of spellings covers: `declare -n r=HOME;
+    # r=/x`, `declare "$v=/x"`, `printf -v "$v"`, `read "$v"`, `unset PWD`,
+    # `(( $v = 1 ))`, `let "$v=1"`, `$'...'` escapes, and so on. Any
+    # assignment-capable builtin, arithmetic evaluation or ANSI-C quoting in the
+    # command therefore revokes every trust placed in a variable's value
+    # (IWE_SCRIPTS, IWE_TEMPLATE, HOME, IWE_PATHS_FILE, IWE_WORKSPACE, PWD).
+    # Quotes and backslashes are removed first, the way the shell joins a word.
+    # review-02: builtins and definitions that rebind a command word or run
+    # code around it join the list — hash, enable, alias/unalias, trap (DEBUG
+    # runs before every command), set/shopt (xtrace, expand_aliases, ...) and
+    # any function definition (`bash() { ...; }` shadows the helper's
+    # interpreter) — and DYNAMIC_ASSIGN now revokes every helper whitelist,
+    # relative and absolute paths included (HELPER_TRUST_REVOKED below): a
+    # computed name (`a=BASH; export ${a}_ENV=...`) can set any variable.
+    CMD_JOINED=$(printf '%s' "$CMD_CODE" | tr -d "\"'\\\\")
+    # review-03 H1: a word whose name part (before the first `=`) holds `$`,
+    # a backtick or a brace builds the variable name at run time (`env
+    # {BASH,X}_ENV=...`, `env BASH${u}ENV=...`), so it is a dynamic
+    # assignment too.
+    DYNAMIC_ASSIGN=0
+    if printf '%s' "$CMD_CODE" | grep -qF "\$'" \
+        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.-])(declare|typeset|local|readonly|export|read|mapfile|readarray|unset|getopts|let|wait|printf|hash|enable|alias|unalias|trap|set|shopt|function)([^A-Za-z0-9_.-]|$)|\(\(|\$\[|[A-Za-z0-9_.:-][[:space:]]*\([[:space:]]*\)' \
+        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[[:space:];&|(])[^[:space:]=]*[$`{}][^[:space:]=]*='; then
+        DYNAMIC_ASSIGN=1
+    fi
+    [ "$DYNAMIC_ASSIGN" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
+    # review-03 H1: `env` is an external program that takes NAME=VALUE
+    # arguments, computed names included, and no rehearsal step uses it, so
+    # its presence as a word revokes every helper whitelist outright.
+    ENV_WORD=0
+    printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.=-])env([^A-Za-z0-9_.=-]|$)' && ENV_WORD=1
+    HELPER_TRUST_REVOKED=0
+    [ "$DYNAMIC_ASSIGN" = "1" ] || [ "$HOME_ASSIGNED" = "1" ] || [ "$ENV_WORD" = "1" ] && HELPER_TRUST_REVOKED=1
+    # The segment loop below applies the revocation only when it reaches the
+    # helper's arm, and a quoted assignment value before it (`PS4='$(x)'`
+    # becomes `PS4= QSTR`) stops the loop on the word QSTR first. With trust
+    # revoked, any helper named anywhere in the command blocks it.
+    if [ "$HELPER_TRUST_REVOKED" = "1" ] && printf '%s\n' "$CMD_JOINED" | grep -qE \
+        '(load-extensions\.sh|day-close-prepare\.sh|dry-run-complete\.sh|memory-bleed\.sh|memory-drift-scan\.py|check-index-health\.py|\.iwe-paths)'; then
+        block "$CMD (whitelisted helper after a dynamic assignment, env, rebinding builtin, function definition or HOME change)"
+    fi
+
+    # review-03 M2: removing every quote let separators and `NAME=` inside
+    # plain quoted text count as code (`echo "done; hash it"`, `grep -n
+    # "PATH=" README.md`). join_quoted <all> rebuilds the command the way the
+    # shell joins words, but turns a quoted span into the word QSTR when it
+    # holds a space or a separator (all=0) or always (all=1). A double-quoted
+    # span with `$(` or a backtick runs code and is always kept.
+    join_quoted() {
+        printf '%s' "$CMD_CODE" | perl -e '
+            my $all = shift; local $/; my $s = <STDIN> // ""; my $o = "";
+            my ($i, $n) = (0, length $s);
+            while ($i < $n) {
+                my $c = substr($s, $i, 1);
+                if ($c eq "\\") { $o .= substr($s, $i + 1, 1); $i += 2; next; }
+                if ($c ne "\x27" && $c ne "\"") { $o .= $c; $i++; next; }
+                my ($j, $t) = ($i + 1, "");
+                while ($j < $n && substr($s, $j, 1) ne $c) {
+                    if ($c eq "\"" && substr($s, $j, 1) eq "\\") { $j++; }
+                    $t .= substr($s, $j, 1); $j++;
+                }
+                my $live = $c eq "\"" && $t =~ /\$\(|`/;
+                $o .= (!$live && ($all || $t =~ /[\s;&|(){}<>`]/)) ? " QSTR " : $t;
+                $i = $j + 1;
+            }
+            print $o;' "$1"
+    }
+    # Command words: a quoted word without spaces (`"hash"`) still counts.
+    CMD_WORDS=$(join_quoted 0) || fail_closed "quote reader failed — cannot classify command"
+    JOINED_SPLIT=$(split_segments "$CMD_WORDS")
+    # Assignments: a quoted word is never a shell assignment; only `env` or
+    # an assignment builtin (export, declare, ...) reads NAME=VALUE out of
+    # quoted text, so with neither present quoted text is data.
+    if [ "$ENV_WORD" = "1" ] || [ "$DYNAMIC_ASSIGN" = "1" ]; then
+        ASSIGN_SPLIT=$(split_segments "$CMD_JOINED")
+    else
+        CMD_DATA=$(join_quoted 1) || fail_closed "quote reader failed — cannot classify command"
+        ASSIGN_SPLIT=$(split_segments "$CMD_DATA")
+    fi
+
+    # hash -p / enable -f|-n point a command word (bash, python3, git, ...) at
+    # any program; a PATH change does the same for every word. No rehearsal
+    # step needs them: block the whole command when one is in command position
+    # or PATH is assigned anywhere.
+    REBIND_PREFIX='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+|(builtin|command|exec|env|nohup|time|sudo|if|then|elif|else|do|while|until|!)[[:space:]]+)*'
+    if printf '%s\n' "$JOINED_SPLIT" | grep -qE "${REBIND_PREFIX}(hash|enable)([[:space:]]|\$)"; then
+        block "$CMD (indirect execution under dry-run: hash/enable rebinds a command word)"
+    fi
+    if printf '%s\n' "$ASSIGN_SPLIT" | grep -qE '(^|[[:space:]])PATH(\[[^]]*\])?\+?='; then
+        block "$CMD (indirect execution under dry-run: a PATH change rebinds every command word)"
+    fi
+
+    # Variables that make bash or python run code from a file or a quoted
+    # string the gate never reads (BASH_ENV, an exported function passed as
+    # BASH_FUNC_*, xtrace PS4 via SHELLOPTS, the python import path) would
+    # turn any whitelisted helper — absolute paths included — into arbitrary
+    # code, and `env 'BASH_FUNC_x%%=...' ...` hides even the command word. No
+    # rehearsal step needs them: block the whole command. Only an assignment
+    # (plain, `export`/`declare -x`, or an `env` argument) counts, so reading
+    # the names (`grep -r PYTHONPATH .`) still passes; a computed name cannot
+    # be written here and revokes every helper whitelist (DYNAMIC_ASSIGN).
+    # review-03 H2: the dynamic loader variables (LD_PRELOAD, LD_AUDIT,
+    # LD_LIBRARY_PATH, DYLD_*) load a library into any program, helpers and
+    # git included.
+    if printf '%s\n' "$ASSIGN_SPLIT" | grep -qE '(^|[[:space:]])([A-Za-z_]*(BASH_ENV|BASH_FUNC_|SHELLOPTS|BASHOPTS|PYTHONPATH|PYTHONHOME|PYTHONSTARTUP|PYTHONUSERBASE)[^[:space:]]*|(LD|DYLD)_[A-Za-z0-9_]*(\[[^]]*\])?\+?)='; then
+        block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH/PYTHONUSERBASE/LD_*/DYLD_* would run code the gate cannot see)"
     fi
 
     # issue #1258 (independent red-team audit, 2026-10-17): the `cd|pushd`
@@ -776,11 +939,21 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
 
     # issue #1434: whitelisted helpers called by `$IWE_SCRIPTS/...` lose the
-    # whitelist when the same command reassigns IWE_SCRIPTS.
-    IWE_SCRIPTS_TAMPERED=0
-    if printf '%s\n' "$SPLIT" | grep -qE '(^|[[:space:]])IWE_SCRIPTS=|(^|[[:space:]])(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+IWE_SCRIPTS=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+IWE_SCRIPTS([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*([[:space:]]+[A-Za-z_][A-Za-z0-9_]*)*[[:space:]]+IWE_SCRIPTS([[:space:]]|$)|(^|[[:space:]])for[[:space:]]+IWE_SCRIPTS([[:space:]]|$)'; then
-        IWE_SCRIPTS_TAMPERED=1
-    fi
+    # whitelist when the same command reassigns IWE_SCRIPTS. issue #1454
+    # review-01: a list of assignment spellings kept missing forms (`+=`,
+    # namerefs, `IWE_SCRIPTS[0]=`), so the rule is now by absence: the value is
+    # trusted only when the command names IWE_SCRIPTS nowhere except in the
+    # helper paths themselves and has no dynamic assignment (above). The same
+    # rule covers IWE_TEMPLATE in the two python helper paths.
+    var_named_elsewhere() { # <var> <ERE of the approved spans>
+        printf '%s' "$CMD_CODE" | sed -E "s@$2@ @g" | tr -d "\"'\\\\" | grep -q "$1"
+    }
+    IWE_SCRIPTS_TAMPERED=$DYNAMIC_ASSIGN
+    var_named_elsewhere IWE_SCRIPTS '\$(IWE_SCRIPTS|\{IWE_SCRIPTS\})/(day-close-prepare|dry-run-complete|memory-bleed|check-dirty-repos)\.sh' \
+        && IWE_SCRIPTS_TAMPERED=1
+    IWE_TEMPLATE_TAMPERED=$DYNAMIC_ASSIGN
+    var_named_elsewhere IWE_TEMPLATE "\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/(memory-drift-scan|check-index-health)\\.py" \
+        && IWE_TEMPLATE_TAMPERED=1
 
     # issue #1434: a program run by its own path (./x, ../x, $DIR/x.sh) or a
     # script name through PATH (x.sh) is indirect execution, like `bash x.sh`.
@@ -788,9 +961,9 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # goes through the quote-aware reader. Outside: extensionless absolute
     # paths (/tmp/x) — by text they look like system programs.
     RUN_BY_PATH=$(printf '%s' "$CMD" | \
-        WL_ROOT="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts" \
-        WL_IWE_SCRIPTS_OK=$([ "$IWE_SCRIPTS_TAMPERED" = "0" ] && echo 1 || echo 0) \
-        WL_RELATIVE_OK=$([ "$CD_PUSHD_TOKEN_DETECTED" = "0" ] && echo 1 || echo 0) \
+        WL_ROOT=$([ "$HELPER_TRUST_REVOKED" = "0" ] && echo "$IWE_ROOT_GUESS/FMT-exocortex-template/scripts") \
+        WL_IWE_SCRIPTS_OK=$([ "$IWE_SCRIPTS_TAMPERED" = "0" ] && [ "$HELPER_TRUST_REVOKED" = "0" ] && echo 1 || echo 0) \
+        WL_RELATIVE_OK=$([ "$CD_PUSHD_TOKEN_DETECTED" = "0" ] && [ "$HELPER_TRUST_REVOKED" = "0" ] && echo 1 || echo 0) \
         perl "$CMD_PARSER" run-by-path) \
         || fail_closed "command reader failed — cannot classify command"
     case "$RUN_BY_PATH" in
@@ -989,10 +1162,37 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # issue #1434: the `$IWE_SCRIPTS/...` markers and the relative
                 # forms trust the environment; a same-command reassignment of
                 # IWE_SCRIPTS or a cd/pushd revokes them.
+                # issue #1454: day-close step 4 runs memory-bleed.sh --hot-only,
+                # a report-only HOT-limit count (it exits before any other
+                # section; the script itself never writes). Only that exact argv
+                # is whitelisted — the full mode is not part of the rehearsal.
+                # The path comes either from the per-call nonce marker for the
+                # literal "$IWE_SCRIPTS/memory-bleed.sh" (its value comes from
+                # .iwe-paths, trusted like the other helpers above; revoked when
+                # the same command reassigns IWE_SCRIPTS) or from the absolute
+                # path in the trusted scripts dir, which must resolve to a file
+                # inside that dir (a symlink out of it is refused).
+                WL_MB_DIR="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts"
+                WL_ABS4="$WL_MB_DIR/memory-bleed.sh"
+                # review-02: every form below — marker, relative, absolute —
+                # runs in an environment the command may have altered.
+                [ "$HELPER_TRUST_REVOKED" = "1" ] \
+                    && block "$CMD (whitelisted helper after a dynamic assignment, rebinding builtin, function definition or HOME change)"
+                if [ "${1:-}" = "__WL_MEMORY_BLEED_${GATE_NONCE}__" ] || [ "${1:-}" = "$WL_ABS4" ]; then
+                    if [ "$1" != "$WL_ABS4" ] && [ "$IWE_SCRIPTS_TAMPERED" = "1" ]; then
+                        block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)"
+                    fi
+                    if [ $# -ne 2 ] || [ "$2" != "--hot-only" ]; then
+                        block "$CMD (memory-bleed.sh is read-only only as: memory-bleed.sh --hot-only)"
+                    fi
+                    [ "$1" = "$WL_ABS4" ] && { perl -MCwd=abs_path -e 'my ($f, $d) = map { abs_path($_) } @ARGV; exit(defined $f && defined $d && -f $f && index($f, "$d/") == 0 ? 0 : 1)' "$WL_ABS4" "$WL_MB_DIR" 2>/dev/null \
+                        || block "$CMD (memory-bleed.sh does not resolve to a file inside $WL_MB_DIR)"; }
+                    continue
+                fi
                 case "${1:-}" in
                     __WL_DAY_CLOSE_PREPARE__|__WL_DRY_RUN_COMPLETE__)
                         [ "$IWE_SCRIPTS_TAMPERED" = "1" ] && block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)" ;;
-                    scripts/day-close-prepare.sh|scripts/dry-run-complete.sh)
+                    scripts/day-close-prepare.sh|scripts/dry-run-complete.sh|.claude/scripts/load-extensions.sh)
                         [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && block "$CMD (relative whitelisted path after cd/pushd)" ;;
                 esac
                 case "${1:-}" in
@@ -1070,7 +1270,10 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     # `python -c 'open(...,"w")'` was always an accepted gap); exempting
                     # read-only inline snippets doesn't remove protection that existed.
                     -c) ;;
-                    __WL_PY_MDS__|__WL_PY_CIH__) ;;
+                    __WL_PY_MDS__|__WL_PY_CIH__)
+                        [ "$IWE_TEMPLATE_TAMPERED" = "1" ] && block "$CMD (IWE_TEMPLATE reassigned earlier in the same command)"
+                        [ "$HELPER_TRUST_REVOKED" = "1" ] \
+                            && block "$CMD (whitelisted helper after a dynamic assignment, rebinding builtin, function definition or HOME change)" ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;

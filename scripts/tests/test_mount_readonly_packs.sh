@@ -110,7 +110,7 @@ mkdir -p "$TMP/run_root"
 git -C "$GOV_REPO" worktree add -q -b extractor/inbox-check-test "$GOV_WORKTREE" main
 
 cleanup_isolated_inbox_worktree "$GOV_REPO" "$GOV_WORKTREE" "extractor/inbox-check-test" \
-    "$ISOLATED" "$GOVERNANCE_REPO" "$TMP/run_root"
+    "$ISOLATED" "$GOVERNANCE_REPO" "$TMP/run_root" main
 
 if [ -d "$ISOLATED/PACK-test" ]; then
     echo "FAIL: cleanup_isolated_inbox_worktree() left the read-only Pack clone behind"

@@ -28,35 +28,28 @@ if [ -z "$GATE_ID" ]; then
 fi
 command -v jq >/dev/null 2>&1 || { echo "dry-run-complete: jq required" >&2; exit 2; }
 
-SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
-DRY_DIR="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-# A single path resolver (Codex r2): the override works only with a test-mode
-# marker — otherwise all components would look in different places.
-if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
-    [ -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ] || {
-        DRY_DIR="/tmp/iwe-dry-run-$(id -u)"
-        SENTINEL="/tmp/iwe-dry-run.flag"
-    }
-fi
-LOCK_DIR="$DRY_DIR/transaction.lock"
-SP="$DRY_DIR/gate-$GATE_ID.state"
-
 fail() { echo "dry-run-complete: $*" >&2; exit 2; }
 
-# Directory: the same lstat invariants as the gate (Codex r1: the helper must
-# repeat them, not just comment on them).
-[ -L "$DRY_DIR" ] && fail "dir $DRY_DIR is a symlink — refusing"
-[ -d "$DRY_DIR" ] || fail "no dry-run dir $DRY_DIR (gate_id неизвестен)"
-case "$(uname)" in
-    Darwin) OWNER_UID=$(stat -f %u "$DRY_DIR" 2>/dev/null || true) ;;
-    *)      OWNER_UID=$(stat -c %u "$DRY_DIR" 2>/dev/null || true) ;;
-esac
-[ "$OWNER_UID" = "$(id -u)" ] || fail "dir $DRY_DIR owned by uid $OWNER_UID"
-case "$(uname)" in
-    Darwin) PERMS=$(stat -f %Lp "$DRY_DIR" 2>/dev/null || true) ;;
-    *)      PERMS=$(stat -c %a "$DRY_DIR" 2>/dev/null || true) ;;
-esac
-[ -n "$PERMS" ] && [ $(( 8#$PERMS & 077 )) -eq 0 ] || fail "dir $DRY_DIR has group/other write permissions ($PERMS)"
+# Path and privacy check come from the one shared library (also used by the
+# gate, the Stop hook and dry-run-begin.sh — issue #1447), so all components
+# look in the same place and apply the same criterion.
+# The gate's own copy (<ws>/.claude/lib in a workspace) first, so completion
+# applies the gate's criteria; the template copy is only a fallback for the
+# template checkout itself and for a workspace whose library went missing in
+# a partial update — completing the rehearsal is what lets the gate open again.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DRY_RUN_LIB="$SCRIPT_DIR/../../.claude/lib/dry-run-dir.sh"
+[ -f "$SCRIPT_DIR/../../.claude/hooks/dry-run-gate.sh" ] && [ -r "$DRY_RUN_LIB" ] \
+    || DRY_RUN_LIB="$SCRIPT_DIR/../.claude/lib/dry-run-dir.sh"
+# shellcheck source=../.claude/lib/dry-run-dir.sh
+{ [ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB"; } || fail "$DRY_RUN_LIB missing — cannot locate dry-run state"
+dry_run_resolve_paths || fail "$DRY_RUN_ERR"
+DRY_DIR="$DRY_RUN_DIR"
+SENTINEL="$DRY_RUN_SENTINEL"
+LOCK_DIR="$DRY_DIR/transaction.lock"
+SP="$DRY_DIR/gate-$GATE_ID.state"
+[ -d "$DRY_DIR" ] || [ -L "$DRY_DIR" ] || fail "no dry-run dir $DRY_DIR (gate_id неизвестен)"
+dry_run_dir_check existing || fail "$DRY_RUN_ERR"
 
 tries=0
 while ! mkdir "$LOCK_DIR" 2>/dev/null; do
