@@ -3682,6 +3682,7 @@
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
+    "scripts/tests/test_memory_bleed_age_batch.sh",
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_normalize_en_phase_labels.py",
     "scripts/tests/test_notify_optional_gate.sh",
