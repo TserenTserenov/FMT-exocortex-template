@@ -933,7 +933,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2daca6226daa1a6cacbe82a0cd839c6b560cec24600f89261d10fd7cf6e20dc8"
+      "sha256": "5b5c58afd3e97e25a6084d138f32c1f13c4f5a688ab0ba3eb6591ff55bddc437"
     },
     {
       "path": "CLAUDE.md",
@@ -2693,7 +2693,7 @@
     },
     {
       "path": "scripts/lib/governance-repo-path.sh",
-      "sha256": "8da425a984e8b164589923a94a5ca8bac2203d76d732ba1b516c924748b9e9c8"
+      "sha256": "db3c23c5d099f113bb59e4698d9ab29a378db07be8c298c184ca204989382efc"
     },
     {
       "path": "scripts/lib/iwe-capabilities.sh",
