@@ -297,7 +297,7 @@
     },
     {
       "path": ".claude/lib/dry-run-dir.sh",
-      "sha256": "ed24f3f2a086d944264d9ba48323acf73ccdb27bab4a046bb2bc47138e210cfe"
+      "sha256": "364d003bc3a4f9a53d02e67296b1075de2d34c306a5c018c30861c77508f139b"
     },
     {
       "path": ".claude/lib/find-python3.sh",

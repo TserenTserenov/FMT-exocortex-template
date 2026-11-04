@@ -987,10 +987,10 @@ def win(tmp_path):
                 input=stdin, capture_output=True, text=True, timeout=30, env=self.env,
             )
 
-        def lib(self, mode="existing"):
+        def lib(self, mode="existing", prefix=""):
             """Resolve + check through the shared library; returns (rc, dir, err), rc None = not resolved."""
             script = (
-                f'. "{DRY_RUN_LIB}"; dry_run_resolve_paths || {{ printf "RES:1\\nERR:%s\\n" "$DRY_RUN_ERR"; exit 0; }}; '
+                f'{prefix}. "{DRY_RUN_LIB}"; dry_run_resolve_paths || {{ printf "RES:1\\nERR:%s\\n" "$DRY_RUN_ERR"; exit 0; }}; '
                 f'dry_run_dir_check {mode}; printf "RC:%s\\nDIR:%s\\nERR:%s\\n" "$?" "$DRY_RUN_DIR" "$DRY_RUN_ERR"'
             )
             f = tmp_path / "lib-call.sh"
@@ -1376,3 +1376,45 @@ def test_trusted_variable_tampering_blocked(isolated_gate, command):
 def test_untampered_helpers_still_pass(isolated_gate, command):
     r = isolated_gate(command)
     assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"
+
+
+# --- review-01 M3: Git Bash accounts the first version refused ---------------
+
+ENTRA_SID = "S-1-12-1-1111111111-2222222222-3333333333-4444444444"
+
+
+def test_win_entra_id_account_accepted(win):
+    """An Entra ID (Azure AD) account has an S-1-12-1-* SID, not S-1-5-21-*."""
+    whoami = win.sysroot / "System32" / "whoami.exe"
+    whoami.write_text(WHOAMI_STUB.replace(USER_SID, ENTRA_SID), encoding="utf-8")
+    win.dir.mkdir()
+    win.acl(f"D:PAI(A;OICI;FA;;;{ENTRA_SID})(A;OICI;FA;;;SY)")
+    rc, _, err = win.lib()
+    assert rc == 0, err
+    win.acl(GOOD_SDDL)  # the S-1-5-21 user is someone else for this account
+    rc, _, err = win.lib()
+    assert rc == 1 and "права доступа не закрыты" in err
+
+
+FOREIGN_UID = 'id() { if [ "${1:-}" = -u ]; then echo 4242; else command id "$@"; fi; }; '
+
+
+def test_win_owner_uid_not_checked(win):
+    """On Git Bash the mapped owner uid is not evidence (admin dirs belong to Administrators): the ACL decides."""
+    win.dir.mkdir()
+    rc, _, err = win.lib(prefix=FOREIGN_UID)
+    assert rc == 0, err
+    win.acl(f"D:AI(A;OICI;FA;;;{USER_SID})(A;OICIID;FA;;;BU)")
+    rc, _, err = win.lib(prefix=FOREIGN_UID)
+    assert rc == 1 and "права доступа не закрыты" in err
+
+
+def test_owner_uid_still_checked_off_windows(win, tmp_path):
+    """Everywhere else the owner uid check stays."""
+    win.env["FAKE_UNAME"] = "Linux"
+    dry_dir = tmp_path / "td"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    win.env.update(IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "flag"))
+    rc, _, err = win.lib(prefix=FOREIGN_UID)
+    assert rc == 1 and "expected 4242" in err

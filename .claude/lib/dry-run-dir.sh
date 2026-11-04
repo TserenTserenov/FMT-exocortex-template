@@ -19,7 +19,8 @@
 # "private" depends on the platform:
 # - Linux, macOS, Cygwin: owner uid + no group/other mode bits (0700).
 # - Git Bash (uname -s MINGW*/MSYS*): chmod is a no-op there and the mode
-#   always reads 755, so the 0700 check could never pass (issue #1447). The
+#   always reads 755, so the 0700 check could never pass (issue #1447), and
+#   the mapped owner uid is not reliable either (it is not checked). The
 #   directory is %LOCALAPPDATA%\iwe-dry-run and its NTFS ACL is checked with
 #   %SYSTEMROOT%\System32\icacls.exe (absolute path, never from PATH): a
 #   protected DACL whose only entries are Allow for the current user (full
@@ -105,16 +106,21 @@ dry_run_dir_check() { # <create|existing>
         mkdir -m 0700 "$dir" 2>/dev/null || { DRY_RUN_ERR="cannot create $dir with 0700"; return 1; }
         created=1
     fi
-    owner=$(_dry_run_stat uid "$dir")
-    if [ "$owner" != "$(id -u)" ]; then
-        DRY_RUN_ERR="dry-run dir $dir owned by uid ${owner:-unknown}, expected $(id -u)"
-        [ "$created" = 1 ] && rmdir "$dir" 2>/dev/null
-        return 1
-    fi
     if dry_run_is_windows; then
+        # No POSIX owner check here: Git Bash maps the NTFS owner to a uid,
+        # and under the "owner = Administrators" policy an elevated admin's
+        # directory is owned by BUILTIN\Administrators, so the check refused
+        # valid accounts. The SDDL allow-list below already proves that only
+        # this user (and SYSTEM) can open the directory.
         _dry_run_win_acl "$dir" "$created" && return 0
         # Only a directory this call created, and only while empty (rmdir
         # refuses otherwise); an existing directory is refused, never deleted.
+        [ "$created" = 1 ] && rmdir "$dir" 2>/dev/null
+        return 1
+    fi
+    owner=$(_dry_run_stat uid "$dir")
+    if [ "$owner" != "$(id -u)" ]; then
+        DRY_RUN_ERR="dry-run dir $dir owned by uid ${owner:-unknown}, expected $(id -u)"
         [ "$created" = 1 ] && rmdir "$dir" 2>/dev/null
         return 1
     fi
@@ -223,7 +229,8 @@ _dry_run_win_acl_in() { # <dir> <created> <tmpdir>
         DRY_RUN_ERR="каталог репетиции $dir: whoami.exe /user завершился с кодом $rc: $(_dry_run_trim "$tmpd/whoami.err"). $(_dry_run_manual_hint "$dir" "$icacls")"
         return 1
     fi
-    sids=$(printf '%s\n' "$out" | tr -d '\r' | grep -oE 'S-1-5-21(-[0-9]+)+' | sort -u)
+    # A local or domain account (S-1-5-21-*) or an Entra ID account (S-1-12-1-*).
+    sids=$(printf '%s\n' "$out" | tr -d '\r' | grep -oE 'S-1-5-21(-[0-9]+)+|S-1-12-1(-[0-9]+)+' | sort -u)
     if [ -z "$sids" ] || [ "$(printf '%s\n' "$sids" | wc -l | tr -d ' ')" != 1 ]; then
         DRY_RUN_ERR="каталог репетиции $dir: не удалось определить SID текущего пользователя из вывода whoami.exe /user"
         return 1
