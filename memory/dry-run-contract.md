@@ -129,6 +129,12 @@ ${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-close-prepare.sh # абсолютный (�
                                                         # путь резолвится через $IWE_SCRIPTS, issue #315)
 "$IWE_SCRIPTS/day-close-prepare.sh"                    # реальная документированная форма (день. вызов
                                                         # из day-close/SKILL.md) — маркер __WL_DAY_CLOSE_PREPARE__
+"$IWE_SCRIPTS/memory-bleed.sh" --hot-only             # issue #1454, шаг 4 day-close: только ровно этот
+<каталог scripts/ шаблона>/memory-bleed.sh --hot-only  # абсолютный путь
+                                                        # argv (подсчёт HOT-лимита, отчёт без записи);
+                                                        # маркер с nonce, отзывается переприсваиванием
+                                                        # IWE_SCRIPTS; файл должен резолвиться внутри
+                                                        # каталога scripts/ шаблона (не symlink наружу)
 ```
 
 Python-whitelist (issue #460 путь 5, добавлен после того как code review поймал, что

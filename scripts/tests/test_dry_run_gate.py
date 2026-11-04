@@ -744,3 +744,113 @@ def test_arbitrary_paths_blocked(isolated_gate):
     """#1439: sourcing an arbitrary file path stays blocked; the skill uses the standard chain instead."""
     r = isolated_gate('. /home/u/IWE/.iwe-paths; bash "$IWE_SCRIPTS/dry-run-complete.sh" g r s t')
     assert r.returncode == 2, r.stderr
+
+
+DAY_CLOSE_SKILL = HOOK.parent.parent / "skills" / "day-close" / "SKILL.md"
+
+
+def _day_close_step_command(helper):
+    """The backticked day-close/SKILL.md step command that runs `$IWE_SCRIPTS/<helper>`."""
+    found = []
+    for line in DAY_CLOSE_SKILL.read_text(encoding="utf-8").splitlines():
+        if f"$IWE_SCRIPTS/{helper}" in line and line.startswith("`"):
+            found.append(line.split("`")[1])
+    assert len(found) == 1, f"expected one {helper} step command in {DAY_CLOSE_SKILL}: {found}"
+    return found[0]
+
+
+def test_day_close_lesson_hygiene_step_passes(isolated_gate):
+    """#1454: step 4 (memory-bleed.sh --hot-only), exactly as SKILL.md writes it, passes under a rehearsal."""
+    command = _day_close_step_command("memory-bleed.sh")
+    assert command.endswith('bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only'), command
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"step 4 command from SKILL.md blocked: {r.stderr}"
+
+
+def test_day_close_write_step_still_blocked(isolated_gate):
+    """#1454: step 5 (day-close.sh: backup, reindex, writes) stays blocked in its SKILL.md form."""
+    command = _day_close_step_command("day-close.sh")
+    r = isolated_gate(command)
+    assert r.returncode == 2, r.stderr
+
+
+CHAIN = (
+    'IWE_PATHS="${IWE_PATHS_FILE:-}"; if [ -z "$IWE_PATHS" ]; then for _c in "$PWD/.iwe-paths" '
+    '"${IWE_WORKSPACE:-$HOME/IWE}/.iwe-paths" "$HOME/.iwe-paths"; do [ -r "$_c" ] && { IWE_PATHS="$_c"; break; }; '
+    'done; fi; [ -n "$IWE_PATHS" ] && . "$IWE_PATHS" 2>/dev/null; '
+)
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        'T="${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}"; bash "$T/scripts/memory-bleed.sh" --hot-only',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh"',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --dir /tmp/x',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only --dir /tmp/x',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only --hot-only',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-onlyx',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" "--hot-only;touch /tmp/x"',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only;bash /tmp/x.sh',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only > /tmp/report',
+        'bash "$IWE_SCRIPTS/memory-bleed.sh.evil" --hot-only',
+        'bash "$IWE_SCRIPTS/x/memory-bleed.sh" --hot-only',
+        'bash "$IWE_SCRIPTS/../memory-bleed.sh" --hot-only',
+        'IWE_SCRIPTS=/tmp/evil; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'export IWE_SCRIPTS=/tmp/evil; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'bash /tmp/scripts/memory-bleed.sh --hot-only',
+        'bash scripts/memory-bleed.sh --hot-only',
+        "bash __WL_MEMORY_BLEED__ --hot-only",
+        'sh -c "memory-bleed.sh --hot-only"',
+    ],
+)
+def test_memory_bleed_other_forms_blocked(isolated_gate, tail):
+    """#1454: only the exact argv is whitelisted — no literal $T, no extra args, no substring or foreign path."""
+    r = isolated_gate(CHAIN + tail)
+    assert r.returncode == 2, f"{tail!r} allowed"
+
+
+def _gate_tree(tmp_path, bleed_target=None):
+    """A copy of the hook under <root>/.claude/hooks with <root>/FMT-exocortex-template/scripts/memory-bleed.sh."""
+    root = tmp_path / "iwe"
+    hooks = root / ".claude" / "hooks"
+    hooks.mkdir(parents=True)
+    for name in (HOOK.name, "dry-run-cmd-parse.pl"):
+        shutil.copy(HOOK.parent / name, hooks / name)
+    scripts = root / "FMT-exocortex-template" / "scripts"
+    scripts.mkdir(parents=True)
+    bleed = scripts / "memory-bleed.sh"
+    if bleed_target is None:
+        bleed.write_text("#!/bin/bash\n", encoding="utf-8")
+    else:
+        bleed.symlink_to(bleed_target)
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    flag = dry_dir / "sentinel.flag"
+    flag.write_text(json.dumps({"initiator": "pytest", "created_at": "test", "session_id": "s"}), encoding="utf-8")
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(flag))
+
+    def run(command):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        return subprocess.run(["bash", str(hooks / HOOK.name)], input=payload, capture_output=True, text=True, timeout=10, env=env)
+
+    return run, bleed.parent.resolve() / "memory-bleed.sh"
+
+
+def test_memory_bleed_trusted_absolute_path_passes(tmp_path):
+    """#1454: the trusted absolute path with exactly --hot-only passes; extra arguments do not."""
+    run, bleed = _gate_tree(tmp_path)
+    assert run(f"bash {bleed} --hot-only").returncode == 0
+    assert run(f"bash {bleed} --hot-only --dir /tmp").returncode == 2
+    assert run(f"bash {bleed}").returncode == 2
+
+
+def test_memory_bleed_symlink_outside_blocked(tmp_path):
+    """#1454: a trusted-path memory-bleed.sh that is a symlink out of the scripts dir is refused."""
+    evil = tmp_path / "evil.sh"
+    evil.write_text("#!/bin/bash\ntouch /tmp/pwned\n", encoding="utf-8")
+    run, bleed = _gate_tree(tmp_path, bleed_target=evil)
+    r = run(f"bash {bleed} --hot-only")
+    assert r.returncode == 2
+    assert "does not resolve to a file inside" in r.stderr

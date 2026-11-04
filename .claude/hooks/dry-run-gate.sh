@@ -610,6 +610,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         -e "s@IWE_PATHS=\"\\\$\\{IWE_PATHS_FILE:-\\}\"; if \\[ -z \"\\\$IWE_PATHS\" \\]; then for _c in \"\\\$PWD/\\.iwe-paths\" \"\\\$\\{IWE_WORKSPACE:-\\\$HOME/IWE\\}/\\.iwe-paths\" \"\\\$HOME/\\.iwe-paths\"; do \\[ -r \"\\\$_c\" \\] && \\{ IWE_PATHS=\"\\\$_c\"; break; \\}; done; fi; \\[ -n \"\\\$IWE_PATHS\" \\] && \\. \"\\\$IWE_PATHS\"@ __WL_IWE_PATHS_CHAIN_${GATE_NONCE}__ @g" \
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
         -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
+        -e "s@\"\\\$IWE_SCRIPTS/memory-bleed\\.sh\"@ __WL_MEMORY_BLEED_${GATE_NONCE}__ @g" \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
         -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
         -e "s@\"\\\$HOME/\\.iwe-paths\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
@@ -989,6 +990,29 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # issue #1434: the `$IWE_SCRIPTS/...` markers and the relative
                 # forms trust the environment; a same-command reassignment of
                 # IWE_SCRIPTS or a cd/pushd revokes them.
+                # issue #1454: day-close step 4 runs memory-bleed.sh --hot-only,
+                # a report-only HOT-limit count (it exits before any other
+                # section; the script itself never writes). Only that exact argv
+                # is whitelisted — the full mode is not part of the rehearsal.
+                # The path comes either from the per-call nonce marker for the
+                # literal "$IWE_SCRIPTS/memory-bleed.sh" (its value comes from
+                # .iwe-paths, trusted like the other helpers above; revoked when
+                # the same command reassigns IWE_SCRIPTS) or from the absolute
+                # path in the trusted scripts dir, which must resolve to a file
+                # inside that dir (a symlink out of it is refused).
+                WL_MB_DIR="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts"
+                WL_ABS4="$WL_MB_DIR/memory-bleed.sh"
+                if [ "${1:-}" = "__WL_MEMORY_BLEED_${GATE_NONCE}__" ] || [ "${1:-}" = "$WL_ABS4" ]; then
+                    if [ "$1" != "$WL_ABS4" ] && [ "$IWE_SCRIPTS_TAMPERED" = "1" ]; then
+                        block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)"
+                    fi
+                    if [ $# -ne 2 ] || [ "$2" != "--hot-only" ]; then
+                        block "$CMD (memory-bleed.sh is read-only only as: memory-bleed.sh --hot-only)"
+                    fi
+                    [ "$1" = "$WL_ABS4" ] && { perl -MCwd=abs_path -e 'my ($f, $d) = map { abs_path($_) } @ARGV; exit(defined $f && defined $d && -f $f && index($f, "$d/") == 0 ? 0 : 1)' "$WL_ABS4" "$WL_MB_DIR" 2>/dev/null \
+                        || block "$CMD (memory-bleed.sh does not resolve to a file inside $WL_MB_DIR)"; }
+                    continue
+                fi
                 case "${1:-}" in
                     __WL_DAY_CLOSE_PREPARE__|__WL_DRY_RUN_COMPLETE__)
                         [ "$IWE_SCRIPTS_TAMPERED" = "1" ] && block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)" ;;
