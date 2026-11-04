@@ -51,6 +51,46 @@ resolve_canonical_checkout() {
   echo "$root/$repo"
 }
 
+# WP-484 Phase 274: an interactive shell exports the live IWE_SESSIONS_ROOT, and a test that
+# swaps only IWE_ROOT inherits it: the semaphore lands in the sandbox, the report in the
+# live repository. A temporary IWE_ROOT never belongs with a non-temporary sessions root,
+# so the inherited value is dropped and the normal resolution from IWE_ROOT applies.
+# A session-guard.sh that resolves the sessions root itself needs the same check; it does
+# not source this file, so a copy there has to be changed together with this one.
+_iwe_physical_path() {
+  local path="$1" rest=""
+  case "$path" in /*) ;; *) path="$PWD/$path" ;; esac
+  path="${path%/}"
+  while [ -n "$path" ] && [ ! -d "$path" ]; do
+    rest="/${path##*/}$rest"
+    path="${path%/*}"
+  done
+  printf '%s%s\n' "$(cd -P -- "${path:-/}" 2>/dev/null && pwd -P)" "$rest"
+}
+
+_iwe_is_temp_path() {
+  local physical temp_root
+  physical=$(_iwe_physical_path "$1")
+  for temp_root in "${TMPDIR:-}" /tmp /var/folders; do
+    [ -n "$temp_root" ] || continue
+    temp_root=$(_iwe_physical_path "$temp_root")
+    # An unreachable TMPDIR resolves to nothing; an empty prefix would match every path.
+    [ -n "$temp_root" ] || continue
+    case "$physical/" in "$temp_root"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+iwe_drop_inherited_live_sessions_root() {
+  [ -n "${IWE_SESSIONS_ROOT:-}" ] || return 0
+  _iwe_is_temp_path "${IWE_ROOT:-$HOME/IWE}" || return 0
+  _iwe_is_temp_path "$IWE_SESSIONS_ROOT" && return 0
+  printf 'SESSIONS_SPLIT_BLOCKED: IWE_ROOT=%s is temporary, ignoring inherited IWE_SESSIONS_ROOT=%s\n' \
+    "${IWE_ROOT:-}" "$IWE_SESSIONS_ROOT" >&2
+  [ -z "${IWE_SESSIONS_SPLIT_LOG:-}" ] || printf '%s\n' "$IWE_SESSIONS_ROOT" >>"$IWE_SESSIONS_SPLIT_LOG" || true
+  unset IWE_SESSIONS_ROOT
+}
+
 # iwe_sessions_root — prints the local checkout path for session content
 # (peer-conversation / quick-close transcripts). WP-526 Phase 2: this content
 # moved out of DS-strategy into its own repo (MC-sessions) so the
@@ -62,6 +102,7 @@ resolve_canonical_checkout() {
 # falling back to writing inside DS-strategy again (that fallback is
 # exactly the split-brain this move exists to close).
 iwe_sessions_root() {
+  iwe_drop_inherited_live_sessions_root
   local root="${IWE_SESSIONS_ROOT:-${IWE_ROOT:-$HOME/IWE}/MC-sessions}"
   [ -d "$root" ] || { echo "iwe_sessions_root: $root не найден (MC-sessions не клонирован?)" >&2; return 1; }
   echo "$root"
