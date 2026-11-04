@@ -1516,3 +1516,68 @@ def test_review2_workspace_path_with_regex_metacharacters(tmp_path):
     # Unescaped, "ws+(x)" is the ERE ws+(x) and would also approve ".../wssx/...".
     widened = good.replace(str(real), str(real.parent / "wssx"))
     assert run(widened).returncode == 2
+
+
+# --- review-03 (#1454): env with computed names, loader variables, quoted data -
+
+_REL_LOADEXT = "bash .claude/scripts/load-extensions.sh day-close before"
+_MARKER_BLEED = 'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only'
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # H1: `env` with a brace, substituted or computed variable name
+        f"env {{BASH,X}}_ENV=/tmp/evil {_REL_LOADEXT}",
+        f"env BASH_EN{{V,}}=/tmp/evil bash {_ABS_LOADEXT} day-close before",
+        f"env {{BASH,X}}_ENV=/tmp/evil {_MARKER_BLEED}",
+        f"u=_; env BASH${{u}}ENV=/tmp/evil {_REL_LOADEXT}",
+        f"u=_ENV; env BASH$u=/tmp/evil {_REL_LOADEXT}",
+        f"env $(echo BASH_ENV)=/tmp/evil {_REL_LOADEXT}",
+        f"env `echo BASH_ENV`=/tmp/evil {_REL_LOADEXT}",
+        f"u=PATH; env PYTHON$u=/tmp/evil python3 {_PY_HELPER}",
+        f"x=SHELLOPTS; env \"${{x}}=xtrace\" PS4='$(git push)' {_REL_LOADEXT}",
+        f"env {{SHELL,X}}OPTS=xtrace PS4='$(git push)' bash {_ABS_LOADEXT}",
+        # H1: `env` alone revokes helper trust
+        f"env bash {_ABS_LOADEXT} day-close before",
+        f"/usr/bin/env {_MARKER_BLEED}",
+        # H2: dynamic loader variables
+        f"LD_PRELOAD=/tmp/evil.so {_REL_LOADEXT}",
+        "LD_PRELOAD=/tmp/evil.so git status",
+        "LD_AUDIT=/tmp/evil.so git status",
+        "LD_LIBRARY_PATH=/tmp/evil git status",
+        "DYLD_INSERT_LIBRARIES=/tmp/evil.dylib git status",
+        "DYLD_LIBRARY_PATH=/tmp/evil ls",
+        "export LD_PRELOAD=/tmp/evil.so; git status",
+        "env LD_PRELOAD=/tmp/evil.so git status",
+        # M2: quoted command words and live substitutions still count
+        '"hash" -p /tmp/evil git; git status',
+        'echo "$(hash -p /tmp/evil git)"; git status',
+        "env 'BASH_FUNC_git%%=() { git push; }' git status",
+        "env 'PATH=/tmp/evil' git status",
+        # M3: separators without spaces
+        "true;hash -p /tmp/evil git; git status",
+        "true&&PATH=/tmp/evil git status",
+    ],
+)
+def test_review3_bypass_blocked(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 2, f"{command!r} passed the gate: {r.stderr}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # M2: plain quoted text is data
+        'grep -n "PATH=" README.md',
+        'echo "done; hash it"',
+        "grep -rn 'BASH_ENV=' docs",
+        "grep -rn 'LD_PRELOAD=' docs",
+        "BUILD_DIR=x ls",
+        _REL_LOADEXT,
+        _MARKER_BLEED,
+    ],
+)
+def test_review3_quoted_data_passes(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"

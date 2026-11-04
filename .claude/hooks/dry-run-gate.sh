@@ -680,13 +680,24 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     fi
 
     # Step 2: split into simple commands.
-    SPLIT=$(printf '%s\n' "$NORM" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+    # review-03 M3: the split used `sed 's/.../\n/g'`; BSD sed (macOS) may
+    # print a literal "n" for "\n" in the replacement, which glues segments
+    # together. Bash parameter expansion behaves the same everywhere. `$(`
+    # goes first so its `(` does not leave a stray `$` behind; `||`/`&&`
+    # give empty segments, which every reader below skips.
+    split_segments() { # <text> — one simple command per line
+        local s=$1 sep='[`(){}&;|]'
+        s=${s//'$('/$'\n'}
+        s=${s//$sep/$'\n'}
+        printf '%s\n' "$s"
+    }
+    SPLIT=$(split_segments "$NORM")
 
     # issue #1258: same split, but from $CMD (before $NORM collapses every
     # quoted span to the literal text "QSTR") -- a quoted/escaped command
     # name like "cd" or \cd needs its quoting intact to tell it apart from
     # QSTR by the time the cd/pushd check below runs.
-    SPLIT_RAW=$(printf '%s\n' "$CMD_CODE" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+    SPLIT_RAW=$(split_segments "$CMD_CODE")
 
     # Live-review finding (Fable, 2026-09-14): the .iwe-paths whitelist matches the
     # LITERAL TEXT "$HOME/.iwe-paths"/"${IWE_PATHS_FILE:-...}", not the
@@ -747,15 +758,70 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # relative and absolute paths included (HELPER_TRUST_REVOKED below): a
     # computed name (`a=BASH; export ${a}_ENV=...`) can set any variable.
     CMD_JOINED=$(printf '%s' "$CMD_CODE" | tr -d "\"'\\\\")
-    JOINED_SPLIT=$(printf '%s\n' "$CMD_JOINED" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
+    # review-03 H1: a word whose name part (before the first `=`) holds `$`,
+    # a backtick or a brace builds the variable name at run time (`env
+    # {BASH,X}_ENV=...`, `env BASH${u}ENV=...`), so it is a dynamic
+    # assignment too.
     DYNAMIC_ASSIGN=0
     if printf '%s' "$CMD_CODE" | grep -qF "\$'" \
-        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.-])(declare|typeset|local|readonly|export|read|mapfile|readarray|unset|getopts|let|wait|printf|hash|enable|alias|unalias|trap|set|shopt|function)([^A-Za-z0-9_.-]|$)|\(\(|\$\[|[A-Za-z0-9_.:-][[:space:]]*\([[:space:]]*\)'; then
+        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.-])(declare|typeset|local|readonly|export|read|mapfile|readarray|unset|getopts|let|wait|printf|hash|enable|alias|unalias|trap|set|shopt|function)([^A-Za-z0-9_.-]|$)|\(\(|\$\[|[A-Za-z0-9_.:-][[:space:]]*\([[:space:]]*\)' \
+        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[[:space:];&|(])[^[:space:]=]*[$`{}][^[:space:]=]*='; then
         DYNAMIC_ASSIGN=1
     fi
     [ "$DYNAMIC_ASSIGN" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
+    # review-03 H1: `env` is an external program that takes NAME=VALUE
+    # arguments, computed names included, and no rehearsal step uses it, so
+    # its presence as a word revokes every helper whitelist outright.
+    ENV_WORD=0
+    printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.=-])env([^A-Za-z0-9_.=-]|$)' && ENV_WORD=1
     HELPER_TRUST_REVOKED=0
-    [ "$DYNAMIC_ASSIGN" = "1" ] || [ "$HOME_ASSIGNED" = "1" ] && HELPER_TRUST_REVOKED=1
+    [ "$DYNAMIC_ASSIGN" = "1" ] || [ "$HOME_ASSIGNED" = "1" ] || [ "$ENV_WORD" = "1" ] && HELPER_TRUST_REVOKED=1
+    # The segment loop below applies the revocation only when it reaches the
+    # helper's arm, and a quoted assignment value before it (`PS4='$(x)'`
+    # becomes `PS4= QSTR`) stops the loop on the word QSTR first. With trust
+    # revoked, any helper named anywhere in the command blocks it.
+    if [ "$HELPER_TRUST_REVOKED" = "1" ] && printf '%s\n' "$CMD_JOINED" | grep -qE \
+        '(load-extensions\.sh|day-close-prepare\.sh|dry-run-complete\.sh|memory-bleed\.sh|memory-drift-scan\.py|check-index-health\.py|\.iwe-paths)'; then
+        block "$CMD (whitelisted helper after a dynamic assignment, env, rebinding builtin, function definition or HOME change)"
+    fi
+
+    # review-03 M2: removing every quote let separators and `NAME=` inside
+    # plain quoted text count as code (`echo "done; hash it"`, `grep -n
+    # "PATH=" README.md`). join_quoted <all> rebuilds the command the way the
+    # shell joins words, but turns a quoted span into the word QSTR when it
+    # holds a space or a separator (all=0) or always (all=1). A double-quoted
+    # span with `$(` or a backtick runs code and is always kept.
+    join_quoted() {
+        printf '%s' "$CMD_CODE" | perl -e '
+            my $all = shift; local $/; my $s = <STDIN> // ""; my $o = "";
+            my ($i, $n) = (0, length $s);
+            while ($i < $n) {
+                my $c = substr($s, $i, 1);
+                if ($c eq "\\") { $o .= substr($s, $i + 1, 1); $i += 2; next; }
+                if ($c ne "\x27" && $c ne "\"") { $o .= $c; $i++; next; }
+                my ($j, $t) = ($i + 1, "");
+                while ($j < $n && substr($s, $j, 1) ne $c) {
+                    if ($c eq "\"" && substr($s, $j, 1) eq "\\") { $j++; }
+                    $t .= substr($s, $j, 1); $j++;
+                }
+                my $live = $c eq "\"" && $t =~ /\$\(|`/;
+                $o .= (!$live && ($all || $t =~ /[\s;&|(){}<>`]/)) ? " QSTR " : $t;
+                $i = $j + 1;
+            }
+            print $o;' "$1"
+    }
+    # Command words: a quoted word without spaces (`"hash"`) still counts.
+    CMD_WORDS=$(join_quoted 0) || fail_closed "quote reader failed — cannot classify command"
+    JOINED_SPLIT=$(split_segments "$CMD_WORDS")
+    # Assignments: a quoted word is never a shell assignment; only `env` or
+    # an assignment builtin (export, declare, ...) reads NAME=VALUE out of
+    # quoted text, so with neither present quoted text is data.
+    if [ "$ENV_WORD" = "1" ] || [ "$DYNAMIC_ASSIGN" = "1" ]; then
+        ASSIGN_SPLIT=$(split_segments "$CMD_JOINED")
+    else
+        CMD_DATA=$(join_quoted 1) || fail_closed "quote reader failed — cannot classify command"
+        ASSIGN_SPLIT=$(split_segments "$CMD_DATA")
+    fi
 
     # hash -p / enable -f|-n point a command word (bash, python3, git, ...) at
     # any program; a PATH change does the same for every word. No rehearsal
@@ -765,7 +831,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     if printf '%s\n' "$JOINED_SPLIT" | grep -qE "${REBIND_PREFIX}(hash|enable)([[:space:]]|\$)"; then
         block "$CMD (indirect execution under dry-run: hash/enable rebinds a command word)"
     fi
-    if printf '%s\n' "$JOINED_SPLIT" | grep -qE '(^|[[:space:]])PATH(\[[^]]*\])?\+?='; then
+    if printf '%s\n' "$ASSIGN_SPLIT" | grep -qE '(^|[[:space:]])PATH(\[[^]]*\])?\+?='; then
         block "$CMD (indirect execution under dry-run: a PATH change rebinds every command word)"
     fi
 
@@ -778,8 +844,11 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # (plain, `export`/`declare -x`, or an `env` argument) counts, so reading
     # the names (`grep -r PYTHONPATH .`) still passes; a computed name cannot
     # be written here and revokes every helper whitelist (DYNAMIC_ASSIGN).
-    if printf '%s\n' "$JOINED_SPLIT" | grep -qE '(^|[[:space:]])[A-Za-z_]*(BASH_ENV|BASH_FUNC_|SHELLOPTS|BASHOPTS|PYTHONPATH|PYTHONHOME|PYTHONSTARTUP|PYTHONUSERBASE)[^[:space:]]*='; then
-        block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH/PYTHONUSERBASE would run code the gate cannot see)"
+    # review-03 H2: the dynamic loader variables (LD_PRELOAD, LD_AUDIT,
+    # LD_LIBRARY_PATH, DYLD_*) load a library into any program, helpers and
+    # git included.
+    if printf '%s\n' "$ASSIGN_SPLIT" | grep -qE '(^|[[:space:]])([A-Za-z_]*(BASH_ENV|BASH_FUNC_|SHELLOPTS|BASHOPTS|PYTHONPATH|PYTHONHOME|PYTHONSTARTUP|PYTHONUSERBASE)[^[:space:]]*|(LD|DYLD)_[A-Za-z0-9_]*(\[[^]]*\])?\+?)='; then
+        block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH/PYTHONUSERBASE/LD_*/DYLD_* would run code the gate cannot see)"
     fi
 
     # issue #1258 (independent red-team audit, 2026-10-17): the `cd|pushd`
