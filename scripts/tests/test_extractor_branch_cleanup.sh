@@ -35,7 +35,9 @@ git clone -q "$TMP/origin.git" "$TMP/publisher"
 run_case() {  # <name> <published: yes|no>
     local name="$1" published="$2" branch="extractor/feed-$1" wt="$TMP/wt-$1" iso="$TMP/iso-$1"
     mkdir -p "$iso"
-    git -C "$TMP/canon" worktree add -q -b "$branch" "$wt" origin/main
+    # No upstream config: cleanup must compare with origin/<gov_branch> passed
+    # in explicitly, not with @{upstream} (#1458).
+    git -C "$TMP/canon" worktree add -q --no-track -b "$branch" "$wt" origin/main
     echo "$name" > "$wt/feed-$name.md"
     git -C "$wt" add "feed-$name.md"
     git -C "$wt" "${GIT_ID[@]}" commit -q -m "feed $name"
@@ -46,7 +48,7 @@ run_case() {  # <name> <published: yes|no>
         git -C "$TMP/publisher" "${GIT_ID[@]}" cherry-pick FETCH_HEAD >/dev/null
         git -C "$TMP/publisher" push -q origin main
     fi
-    cleanup_isolated_inbox_worktree "$TMP/canon" "$wt" "$branch" "$iso" canon "$iso"
+    cleanup_isolated_inbox_worktree "$TMP/canon" "$wt" "$branch" "$iso" canon "$iso" main
     if git -C "$TMP/canon" rev-parse --verify -q "refs/heads/$branch" >/dev/null; then
         echo present
     else
