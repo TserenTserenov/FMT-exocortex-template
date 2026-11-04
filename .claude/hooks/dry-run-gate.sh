@@ -24,29 +24,10 @@
 set -uo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
-SENTINEL="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
 TTL_SECONDS=2400
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IWE_ROOT_GUESS="$(cd "$HOOK_DIR/../.." 2>/dev/null && pwd -P)"
 GATE_LOG="$IWE_ROOT_GUESS/.claude/logs/gate_log.jsonl"
-
-# issue #549 stage 2: canonical rehearsal state record (redesign).
-# The sentinel remains the marker of the active mode (the whitelist
-# machinery below depends on it), but the blocking decision is made from the state file.
-# The directory is private (this uid only): symlink/foreign owner/group
-# write = tampering attempt → fail-closed.
-DRY_DIR="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-# Env overrides of paths — explicit test mode only (Codex r1: ambient
-# IWE_DRY_RUN_DIR/IWE_DRY_RUN_SENTINEL from the launch configuration must not
-# disable production protection). The test creates the marker inside the override
-# directory; without it the production paths apply.
-if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
-    if [ ! -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ]; then
-        DRY_DIR="/tmp/iwe-dry-run-$(id -u)"
-        SENTINEL="/tmp/iwe-dry-run.flag"
-    fi
-fi
-LOCK_DIR="$DRY_DIR/transaction.lock"
 
 fail_closed() { # <message...> — single point of permanent blocking with diagnostics
     {
@@ -56,38 +37,43 @@ fail_closed() { # <message...> — single point of permanent blocking with diagn
     exit 2
 }
 
+# jq is needed to parse the payload. Per contract (memory/dry-run-contract.md
+# §Fail-safe): a broken gate must fail-CLOSED, not open — a gate that can't
+# see its own state has no basis to allow (issue #460 path 1; this used to
+# exit 0, contradicting the fail-CLOSED example already documented in the
+# contract).
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[dry-run-gate] FAIL-CLOSED: jq missing, blocking by default (install jq to restore normal operation)" >&2
+    exit 2
+fi
+
+# issue #549 stage 2: canonical rehearsal state record (redesign).
+# The sentinel remains the marker of the active mode (the whitelist
+# machinery below depends on it), but the blocking decision is made from the state file.
+# The directory is private to this user: symlink/foreign owner/open access =
+# tampering attempt → fail-closed. Path and privacy criterion come from the
+# one shared library (issue #1447: on Git Bash the criterion is the NTFS ACL,
+# not the mode bits); env overrides of the paths work in explicit test mode only.
+DRY_RUN_LIB="$HOOK_DIR/../lib/dry-run-dir.sh"
+# shellcheck source=../lib/dry-run-dir.sh
+[ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB" || fail_closed "$DRY_RUN_LIB missing — cannot locate dry-run state"
+dry_run_resolve_paths || fail_closed "$DRY_RUN_ERR"
+DRY_DIR="$DRY_RUN_DIR"
+SENTINEL="$DRY_RUN_SENTINEL"
+LOCK_DIR="$DRY_DIR/transaction.lock"
+
 gate_log_event() { # <event> <detail>
     mkdir -p "$(dirname "$GATE_LOG")" 2>/dev/null || true
     printf '{"ts":"%s","gate":"dry-run-gate","event":"%s","detail":"%s"}\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >> "$GATE_LOG" 2>/dev/null || true
 }
 
-# lstat check of the private directory (Codex design review: /tmp without a protected
-# directory allows substitution and symlink attacks). Called lazily — only when
-# dry-run is actually in use, to avoid creating the directory on every tool call.
+# lstat/owner/privacy check of the private directory (Codex design review: /tmp
+# without a protected directory allows substitution and symlink attacks).
+# Called lazily — only when dry-run is actually in use, to avoid creating the
+# directory on every tool call.
 dry_dir_ensure() {
-    if [ -L "$DRY_DIR" ]; then
-        fail_closed "dry-run dir $DRY_DIR is a symlink — refusing (possible attack)"
-    fi
-    if [ ! -d "$DRY_DIR" ]; then
-        mkdir -m 0700 "$DRY_DIR" 2>/dev/null || fail_closed "cannot create $DRY_DIR with 0700"
-    fi
-    local owner
-    case "$(uname)" in
-        Darwin) owner=$(stat -f %u "$DRY_DIR" 2>/dev/null) ;;
-        *)      owner=$(stat -c %u "$DRY_DIR" 2>/dev/null) ;;
-    esac
-    [ "$owner" = "$(id -u)" ] || fail_closed "dry-run dir $DRY_DIR owned by uid $owner, expected $(id -u)"
-    # group/other write forbidden (lstat form without following symlink — the directory is already checked above)
-    local perms
-    case "$(uname)" in
-        Darwin) perms=$(stat -f %Lp "$DRY_DIR" 2>/dev/null) ;;
-        *)      perms=$(stat -c %a "$DRY_DIR" 2>/dev/null) ;;
-    esac
-    [ -n "$perms" ] || fail_closed "cannot stat permissions of $DRY_DIR"
-    # perms — a string of octal digits ("700"); interpret as octal.
-    # bash 3.2: ${var:-default} inside $(( )) is not parsed — default is set separately above.
-    [ $(( 8#$perms & 077 )) -eq 0 ] || fail_closed "dry-run dir $DRY_DIR has group/other write permissions ($perms)"
+    dry_run_dir_check create || fail_closed "$DRY_RUN_ERR"
 }
 
 # Transactional lock via mkdir (portable; flock(1) is absent on macOS).
@@ -215,15 +201,6 @@ orphan_proven() { # <pid> <pid_start> <pgid>
     return 0
 }
 
-# jq is needed to parse the payload. Per contract (memory/dry-run-contract.md
-# §Fail-safe): a broken gate must fail-CLOSED, not open — a gate that can't
-# see its own state has no basis to allow (issue #460 path 1; this used to
-# exit 0, contradicting the fail-CLOSED example already documented in the
-# contract).
-if ! command -v jq >/dev/null 2>&1; then
-    echo "[dry-run-gate] FAIL-CLOSED: jq missing, blocking by default (install jq to restore normal operation)" >&2
-    exit 2
-fi
 
 # A sentinel symlink is a tampering attempt, not a state (lstat check,
 # Codex design review: a dangling symlink would give a false "sentinel missing").

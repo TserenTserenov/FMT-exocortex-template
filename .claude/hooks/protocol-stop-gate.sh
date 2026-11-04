@@ -50,15 +50,20 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 # Single path resolver (Codex r3), shared with dry-run-gate/begin/complete:
 # ANY override without the test-mode marker resets BOTH paths to production.
 # Owner tokens live next to the sentinel (production: /tmp).
+# issue #1447: the resolver itself lives in the shared library. If it is
+# missing or cannot resolve (Git Bash without LOCALAPPDATA), the fallback below
+# does nothing (an empty dir is skipped) — the gate fails closed on its own.
 resolve_dry_run_paths() {
-  DRY_RUN_DIR_RESOLVED="${IWE_DRY_RUN_DIR:-/tmp/iwe-dry-run-$(id -u)}"
-  DRY_RUN_SENTINEL_RESOLVED="${IWE_DRY_RUN_SENTINEL:-/tmp/iwe-dry-run.flag}"
-  if [ -n "${IWE_DRY_RUN_DIR:-}" ] || [ -n "${IWE_DRY_RUN_SENTINEL:-}" ]; then
-    if [ ! -f "${IWE_DRY_RUN_DIR:-/nonexistent}/.iwe-dry-run-test-mode" ]; then
-      DRY_RUN_DIR_RESOLVED="/tmp/iwe-dry-run-$(id -u)"
-      DRY_RUN_SENTINEL_RESOLVED="/tmp/iwe-dry-run.flag"
-    fi
-  fi
+  DRY_RUN_DIR_RESOLVED=""
+  DRY_RUN_SENTINEL_RESOLVED="/tmp/iwe-dry-run.flag"
+  local lib
+  lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/dry-run-dir.sh"
+  [ -r "$lib" ] || return 0
+  # shellcheck source=../lib/dry-run-dir.sh
+  . "$lib" || return 0
+  dry_run_resolve_paths || return 0
+  DRY_RUN_DIR_RESOLVED="$DRY_RUN_DIR"
+  DRY_RUN_SENTINEL_RESOLVED="$DRY_RUN_SENTINEL"
 }
 resolve_dry_run_paths
 

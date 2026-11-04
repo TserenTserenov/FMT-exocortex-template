@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "c52edfce497126c558f6de6c98aa30f7a959467a528427811007ad3874863bdf"
+      "sha256": "9f2f1a3fad1156a02d4e7f6c9b390042ebd9cbe5081571accd79f75ddc1df478"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -137,7 +137,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "3634a96d77d5b35d0c5cb801eedc294915df0f623f03dc9e55e91de36c3b0e51"
+      "sha256": "c62aa8beea09a4610197bb1122b7821f35ebace55c29923990ba43192b2803fc"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -294,6 +294,10 @@
     {
       "path": ".claude/lib/capture_writer.sh",
       "sha256": "52a4e52f5952522fcdefb5214ba291cdfcbda3303f036c780883fbb9cc933d29"
+    },
+    {
+      "path": ".claude/lib/dry-run-dir.sh",
+      "sha256": "95337c5cb458fe4c6850f3bdded5be86314f1fee8747a474252ae14205e9ba3b"
     },
     {
       "path": ".claude/lib/find-python3.sh",
@@ -929,7 +933,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e2a545c6f12d66844583527d1cc112fff5d90dcaa7193ff655311dde40830a40"
+      "sha256": "ba4b9252e4e8e34e0b5024d35de1245ff9a87189d386d03e2adbef4f5f361850"
     },
     {
       "path": "CLAUDE.md",
@@ -1629,7 +1633,7 @@
     },
     {
       "path": "memory/dry-run-contract.md",
-      "sha256": "c9db4cf91745a2fa74b906853745e3638abcbe394dd4c51effa1f0a0dd6c1a14"
+      "sha256": "10ca4238d76f600f306c1dd58e5a9662c1a7e311244b6684e8a641699be23761"
     },
     {
       "path": "memory/feedback_community_communication_style.md",
@@ -2461,11 +2465,11 @@
     },
     {
       "path": "scripts/dry-run-begin.sh",
-      "sha256": "c632c0f59dfb95e36b7217488ccaf4e4c5bd522d8b43bd4e51fe19cb3aefb98d"
+      "sha256": "cd9880984a6670520f2c59536fca0cce55f958cb94d9affc800dbd8841ee10d3"
     },
     {
       "path": "scripts/dry-run-complete.sh",
-      "sha256": "e653df94b901eefd24a4218a12c195906c82516ccf63e95acf09335807902ef9"
+      "sha256": "28ecff3da279f3c4ef0a5f008fa4ed4e14fd5beb024616099310c89ecaecaaa9"
     },
     {
       "path": "scripts/exocortex-publish.sh",

@@ -29,6 +29,7 @@ import pytest
 
 HOOK = Path(__file__).parent.parent.parent / ".claude" / "hooks" / "dry-run-gate.sh"
 STOP_HOOK = Path(__file__).parent.parent.parent / ".claude" / "hooks" / "protocol-stop-gate.sh"
+DRY_RUN_LIB = Path(__file__).parent.parent.parent / ".claude" / "lib" / "dry-run-dir.sh"
 # The hook whitelists absolute paths under the IWE root it derives from its own
 # location (`$HOOK_DIR/../..`, `pwd -P`), not under $HOME/IWE. Derive the same
 # root here so the whitelist tests pass in any checkout, including CI.
@@ -703,6 +704,8 @@ def test_missing_command_reader_fails_closed(tmp_path):
     hooks = tmp_path / ".claude" / "hooks"
     hooks.mkdir(parents=True)
     shutil.copy(HOOK, hooks / HOOK.name)
+    (tmp_path / ".claude" / "lib").mkdir()
+    shutil.copy(DRY_RUN_LIB, tmp_path / ".claude" / "lib" / DRY_RUN_LIB.name)
     dry_dir = tmp_path / "dry-dir"
     dry_dir.mkdir(mode=0o700)
     (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
@@ -817,6 +820,8 @@ def _gate_tree(tmp_path, bleed_target=None):
     hooks.mkdir(parents=True)
     for name in (HOOK.name, "dry-run-cmd-parse.pl"):
         shutil.copy(HOOK.parent / name, hooks / name)
+    (root / ".claude" / "lib").mkdir()
+    shutil.copy(DRY_RUN_LIB, root / ".claude" / "lib" / DRY_RUN_LIB.name)
     scripts = root / "FMT-exocortex-template" / "scripts"
     scripts.mkdir(parents=True)
     bleed = scripts / "memory-bleed.sh"
@@ -893,3 +898,306 @@ def test_mcp_aisystant_write_allowed_without_rehearsal():
     """#1447(b): without a rehearsal the new prefix changes nothing."""
     assert not SENTINEL.exists()
     assert _run_tool("mcp__aisystant__personal_write").returncode == 0
+
+
+# --- #1447(a): Git Bash (MINGW/MSYS) — NTFS ACL instead of 0700 ------------------
+#
+# No Windows here: `uname` is an exported bash function (it wins over the
+# PATH the scripts pin), cygpath/icacls.exe/whoami.exe are stub scripts. The
+# icacls stub writes the fixture DACL to its /save target in UTF-16LE, like
+# the real tool, and logs every call.
+
+COMPLETE = HOOK.parent.parent.parent / "scripts" / "dry-run-complete.sh"
+USER_SID = "S-1-5-21-111-222-333-1001"
+GOOD_SDDL = f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;SY)"
+UNAME_SHIM = 'uname() { printf "%s\\n" "$FAKE_UNAME"; }; export -f uname; exec bash "$@"'
+
+ICACLS_STUB = r"""#!/bin/bash
+{ printf 'ARGS:%s\n' "$*"; printf 'CONV:%s\n' "${MSYS2_ARG_CONV_EXCL:-}"; } >> "$FAKE_LOG"
+case " $* " in
+    *" /save "*)
+        if [ -n "${FAKE_SAVE_RC:-}" ]; then echo "Access is denied." >&2; exit "$FAKE_SAVE_RC"; fi
+        out="${@: -1}"
+        if [ -n "${FAKE_RAW:-}" ]; then cp "$FAKE_SDDL_FILE" "$out"; else
+            python3 -c 'import sys; open(sys.argv[2], "wb").write(open(sys.argv[1], encoding="utf-8").read().encode("utf-16-le"))' "$FAKE_SDDL_FILE" "$out"
+        fi
+        ;;
+    *" /inheritance:r "*)
+        if [ -n "${FAKE_SETUP_RC:-}" ]; then echo "The parameter is incorrect." >&2; exit "$FAKE_SETUP_RC"; fi
+        ;;
+esac
+exit 0
+"""
+
+WHOAMI_STUB = f"""#!/bin/bash
+printf 'USER INFORMATION\\r\\n----------------\\r\\n\\r\\nUser Name     SID\\r\\n============= ==============\\r\\ndesktop\\\\me   {USER_SID}\\r\\n'
+"""
+
+CYGPATH_STUB = """#!/bin/bash
+# -u / -w: the fixture paths are already POSIX paths; only the flag is checked.
+case "$1" in -u|-w) printf '%s\\n' "$2" ;; *) exit 1 ;; esac
+"""
+
+
+@pytest.fixture
+def win(tmp_path):
+    """A fake Git Bash host: env + helpers to run scripts or the library under it."""
+    stub_bin = tmp_path / "bin"
+    stub_bin.mkdir()
+    (stub_bin / "cygpath").write_text(CYGPATH_STUB, encoding="utf-8")
+    sysroot = tmp_path / "Win Dir"
+    (sysroot / "System32").mkdir(parents=True)
+    (sysroot / "System32" / "icacls.exe").write_text(ICACLS_STUB, encoding="utf-8")
+    (sysroot / "System32" / "whoami.exe").write_text(WHOAMI_STUB, encoding="utf-8")
+    for p in (stub_bin / "cygpath", sysroot / "System32" / "icacls.exe", sysroot / "System32" / "whoami.exe"):
+        p.chmod(0o755)
+    local = tmp_path / "Local App Data"
+    local.mkdir()
+    sddl_file = tmp_path / "acl.fixture"
+    log = tmp_path / "icacls.log"
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("IWE_DRY_RUN", "FAKE_"))}
+    env.update(
+        PATH=f"{stub_bin}:{os.environ['PATH']}",
+        FAKE_UNAME="MINGW64_NT-10.0-19045",
+        LOCALAPPDATA=str(local),
+        SYSTEMROOT=str(sysroot),
+        FAKE_SDDL_FILE=str(sddl_file),
+        FAKE_LOG=str(log),
+    )
+
+    class Win:
+        dir = local / "iwe-dry-run"
+
+        def __init__(self):
+            self.env = env
+            self.sysroot = sysroot
+            self.log = log
+            self.acl(GOOD_SDDL)
+
+        def acl(self, sddl):
+            sddl_file.write_text(f"iwe-dry-run\r\n{sddl}\r\n", encoding="utf-8")
+
+        def run(self, *args, stdin=""):
+            return subprocess.run(
+                ["bash", "-c", UNAME_SHIM, "_", *map(str, args)],
+                input=stdin, capture_output=True, text=True, timeout=30, env=self.env,
+            )
+
+        def lib(self, mode="existing"):
+            """Resolve + check through the shared library; returns (rc, dir, err), rc None = not resolved."""
+            script = (
+                f'. "{DRY_RUN_LIB}"; dry_run_resolve_paths || {{ printf "RES:1\\nERR:%s\\n" "$DRY_RUN_ERR"; exit 0; }}; '
+                f'dry_run_dir_check {mode}; printf "RC:%s\\nDIR:%s\\nERR:%s\\n" "$?" "$DRY_RUN_DIR" "$DRY_RUN_ERR"'
+            )
+            f = tmp_path / "lib-call.sh"
+            f.write_text(script, encoding="utf-8")
+            out = dict(line.split(":", 1) for line in self.run(f).stdout.splitlines() if ":" in line)
+            if "RES" in out:
+                return None, None, out.get("ERR", "")
+            return int(out["RC"]), out["DIR"], out["ERR"]
+
+    return Win()
+
+
+def test_win_creates_dir_with_private_acl(win):
+    """Begin path: a new dir gets inheritance removed and grants for the user and SYSTEM only."""
+    rc, d, err = win.lib("create")
+    assert rc == 0, err
+    assert d == str(win.dir) and win.dir.is_dir()
+    log = win.log.read_text(encoding="utf-8")
+    assert f"/inheritance:r /grant:r *{USER_SID}:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F" in log
+    assert "/save" in log
+    assert "CONV:*" in log  # MSYS must not rewrite /grant:r as a path
+
+
+@pytest.mark.parametrize(
+    "sddl",
+    [
+        GOOD_SDDL,
+        f"D:P(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;S-1-5-18)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})",
+    ],
+)
+def test_win_private_acl_passes(win, sddl):
+    win.dir.mkdir()
+    win.acl(sddl)
+    rc, _, err = win.lib()
+    assert rc == 0, err
+
+
+@pytest.mark.parametrize(
+    "sddl",
+    [
+        # inherited BU/WD, not protected — the default of a dir under a shared parent
+        f"D:AI(A;OICI;FA;;;{USER_SID})(A;OICIID;FA;;;BU)(A;OICIID;FA;;;WD)",
+        f"D:(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;SY)",
+        f"D:AI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;SY)",  # right entries, but not protected
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;S-1-5-21-999-888-777-1002)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;WD)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;AC)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;BA)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;AU)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;AN)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;CO)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(A;OICI;FA;;;S-1-15-2-1)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})(D;OICI;FA;;;WD)",
+        f"D:PAI(A;;FA;;;{USER_SID})(A;OICI;FA;;;SY)",
+        f"D:PAI(A;OICI;FR;;;{USER_SID})(A;OICI;FA;;;SY)",
+        f"D:PAI(A;OICIIO;FA;;;{USER_SID})(A;OICI;FA;;;SY)",
+        "D:PAI(A;OICI;FA;;;SY)",
+        f"D:PAI(A;OICI;FA;;;{USER_SID})garbage",
+        "garbage",
+        "",
+    ],
+)
+def test_win_open_or_unparsable_acl_fails(win, sddl):
+    """Anything but a protected user+SYSTEM full-access DACL is refused; the existing dir is kept."""
+    win.dir.mkdir()
+    win.acl(sddl)
+    rc, _, err = win.lib()
+    assert rc == 1
+    assert "права доступа не закрыты" in err and str(win.dir) in err
+    assert win.dir.is_dir()
+
+
+def test_win_non_utf16_output_fails(win):
+    win.dir.mkdir()
+    win.env["FAKE_RAW"] = "1"
+    rc, _, err = win.lib()
+    assert rc == 1, err
+
+
+def test_win_icacls_error_fails_with_code_and_hint(win):
+    win.dir.mkdir()
+    win.env["FAKE_SAVE_RC"] = "5"
+    rc, _, err = win.lib()
+    assert rc == 1
+    assert "код 5" in err and "Access is denied." in err
+    assert "System32/icacls.exe" in err and "удалите каталог" in err
+
+
+def test_win_setup_failure_removes_only_our_new_dir(win):
+    """A dir we just created and could not secure is removed again."""
+    win.env["FAKE_SETUP_RC"] = "87"
+    rc, _, err = win.lib("create")
+    assert rc == 1
+    assert "код 87" in err and "The parameter is incorrect." in err
+    assert not win.dir.exists()
+
+
+def test_win_missing_icacls_fails_without_mode_fallback(win):
+    """No icacls.exe → refused even for a 0700 dir: the mode bits are not a fallback on Git Bash."""
+    win.dir.mkdir(mode=0o700)
+    (win.sysroot / "System32" / "icacls.exe").unlink()
+    rc, _, err = win.lib()
+    assert rc == 1
+    assert "icacls.exe" in err
+
+
+def test_win_icacls_from_path_is_not_used(win, tmp_path):
+    """Only %SYSTEMROOT%\\System32\\icacls.exe counts — an icacls.exe on PATH is never called."""
+    win.dir.mkdir()
+    (win.sysroot / "System32" / "icacls.exe").unlink()
+    on_path = tmp_path / "bin" / "icacls.exe"
+    on_path.write_text(ICACLS_STUB, encoding="utf-8")
+    on_path.chmod(0o755)
+    rc, _, _ = win.lib()
+    assert rc == 1
+    assert not win.log.exists()
+
+
+@pytest.mark.parametrize("var", ["LOCALAPPDATA", "SYSTEMROOT"])
+def test_win_empty_env_fails(win, var):
+    win.env[var] = ""
+    rc, _, err = win.lib("create")
+    assert rc in (None, 1)
+    assert var in err
+    assert not win.dir.exists()
+
+
+def test_win_empty_localappdata_gate_and_begin_fail_closed(win):
+    win.env["LOCALAPPDATA"] = ""
+    gate = win.run(HOOK, stdin=json.dumps({"tool_name": "Read", "tool_input": {}}))
+    assert gate.returncode == 2 and "LOCALAPPDATA" in gate.stderr
+    begin = win.run(BEGIN, "pytest", "s")
+    assert begin.returncode == 1 and "LOCALAPPDATA" in begin.stderr
+
+
+def _production_sentinel_clear():
+    return not Path("/tmp/iwe-dry-run.flag").exists() and not list(Path("/tmp").glob("iwe-dry-run-owner-*.token"))
+
+
+@pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
+def test_win_begin_gate_complete_resolve_same_dir(win):
+    """All three components resolve %LOCALAPPDATA%\\iwe-dry-run and refuse the same open dir."""
+    win.dir.mkdir()
+    win.acl(f"D:AI(A;OICI;FA;;;{USER_SID})(A;OICIID;FA;;;BU)")
+    begin = win.run(BEGIN, "pytest", "s")
+    gate = win.run(HOOK, stdin=json.dumps({"tool_name": "Read", "tool_input": {}}))
+    complete = win.run(COMPLETE, "g", "rehearsal-finished", "s", "t")
+    expected = f"каталог репетиции {win.dir}:"
+    for name, r in (("begin", begin), ("gate", gate), ("complete", complete)):
+        assert r.returncode != 0, name
+        assert expected in r.stderr, f"{name}: {r.stderr}"
+    assert win.dir.is_dir() and not any(win.dir.iterdir())
+
+
+@pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
+def test_win_gate_without_rehearsal_allows_tools(win):
+    """#1447 paralysis: an existing, correctly secured dir and no rehearsal → ordinary tool calls pass."""
+    win.dir.mkdir()
+    for tool in ({"tool_name": "Read", "tool_input": {}}, {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}):
+        r = win.run(HOOK, stdin=json.dumps(tool))
+        assert r.returncode == 0, r.stderr
+    win.acl(f"D:AI(A;OICI;FA;;;{USER_SID})(A;OICIID;FA;;;WD)")
+    assert win.run(HOOK, stdin=json.dumps({"tool_name": "Read", "tool_input": {}})).returncode == 2
+
+
+def test_win_rehearsal_in_secured_test_dir(win, tmp_path):
+    """A full begin → gate blocks a write → complete cycle on a secured dir (test-mode override)."""
+    dry_dir = tmp_path / "td"
+    dry_dir.mkdir()
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    win.env.update(IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "flag"))
+    begin = win.run(BEGIN, "pytest", "s")
+    assert begin.returncode == 0, begin.stderr
+    out = dict(line.split("=", 1) for line in begin.stdout.splitlines())
+    blocked = win.run(HOOK, stdin=json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}))
+    assert blocked.returncode == 2
+    done = win.run(COMPLETE, out["gate_id"], "rehearsal-finished", "s", out["owner_token"])
+    assert done.returncode == 0, done.stderr
+    assert not (dry_dir / "flag").exists()
+
+
+@pytest.mark.parametrize("uname", ["Linux", "CYGWIN_NT-10.0-19045"])
+def test_posix_and_cygwin_still_require_0700(win, tmp_path, uname):
+    """Outside MINGW/MSYS the 0700 criterion is unchanged — and icacls is never consulted."""
+    win.env["FAKE_UNAME"] = uname
+    dry_dir = tmp_path / "td"
+    dry_dir.mkdir()
+    dry_dir.chmod(0o755)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    win.env.update(IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "flag"))
+    r = win.run(BEGIN, "pytest", "s")
+    assert r.returncode == 1 and "group/other write permissions (755)" in r.stderr
+    dry_dir.chmod(0o700)
+    r = win.run(BEGIN, "pytest", "s")
+    assert r.returncode == 0, r.stderr
+    assert not win.log.exists()
+
+
+def test_single_dry_run_dir_resolver():
+    """#1447: path resolution lives only in the shared library; the four consumers source it."""
+    repo = HOOK.parent.parent.parent
+    files = subprocess.run(["git", "-C", str(repo), "ls-files", "*.sh"], capture_output=True, text=True, check=True).stdout.split()
+    offenders = []
+    for rel in files:
+        if rel.startswith("scripts/tests/") or rel == ".claude/lib/dry-run-dir.sh":
+            continue
+        for n, line in enumerate((repo / rel).read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            code = "" if line.lstrip().startswith("#") else line
+            if "/tmp/iwe-dry-run-" in code or "IWE_DRY_RUN_DIR:-" in code:
+                offenders.append(f"{rel}:{n}: {line.strip()}")
+    assert not offenders, "second dry-run dir resolver:\n" + "\n".join(offenders)
+    for consumer in (HOOK, STOP_HOOK, BEGIN, COMPLETE):
+        assert "dry-run-dir.sh" in consumer.read_text(encoding="utf-8"), consumer
