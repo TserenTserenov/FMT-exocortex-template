@@ -144,15 +144,33 @@ IWE_TEMPLATE в двух python-помощниках. Все формы помо
 пути, цепочка `.iwe-paths`, python-помощники — блокируются, если в команде есть: встроенная команда,
 которая присваивает переменную по вычисляемому имени или переопределяет команду (declare, typeset,
 local, readonly, export, read, mapfile, readarray, unset, getopts, let, wait, printf, hash, enable,
-alias, unalias, trap, set, shopt), определение функции, арифметика `((`/`$[`, кавычки `$'…'` или
-присваивание HOME. Через вычисляемое имя (`a=BASH; export ${a}_ENV=…`) можно задать любую
+alias, unalias, trap, set, shopt), определение функции, арифметика `((`/`$[`, кавычки `$'…'`,
+присваивание HOME, слово `env` (ни один шаг репетиции его не использует) или слово вида
+`ИМЯ=…`, в имени которого есть `$`, обратная кавычка, `{` или `}` (`env {BASH,X}_ENV=…`,
+`env BASH${u}ENV=…`). Через вычисляемое имя (`a=BASH; export ${a}_ENV=…`) можно задать любую
 переменную, поэтому одного списка имён недостаточно. Команда целиком блокируется, если в ней
 `hash` или `enable` стоят на месте команды, присваивается PATH, или BASH_ENV, BASH_FUNC_*,
-SHELLOPTS, BASHOPTS, PYTHONPATH, PYTHONHOME, PYTHONSTARTUP, PYTHONUSERBASE стоят в позиции
-присваивания (в том числе аргументом `env`); простое упоминание имени (`grep -r PYTHONPATH .`)
-проходит. Относительные пути помощников, включая `.claude/scripts/load-extensions.sh`, после
-cd/pushd/popd не доверяются. Вне защиты остаются переменные загрузчика (LD_PRELOAD,
-LD_LIBRARY_PATH, DYLD_*): они действуют на любую разрешённую программу, а не только на помощников.
+SHELLOPTS, BASHOPTS, PYTHONPATH, PYTHONHOME, PYTHONSTARTUP, PYTHONUSERBASE, переменные загрузчика
+LD_* и DYLD_* (LD_PRELOAD, LD_AUDIT, LD_LIBRARY_PATH, DYLD_INSERT_LIBRARIES…) стоят в позиции
+присваивания (в том числе аргументом `env` или `export`). Текст в кавычках считается данными:
+`grep -n "PATH=" README.md`, `echo "done; hash it"`, `grep -rn 'BASH_ENV=' docs` проходят;
+слово в кавычках без пробелов (`"hash"`) и `$(…)` внутри двойных кавычек по-прежнему читаются
+как код, а при `env` или встроенной команде присваивания текст в кавычках проверяется как
+присваивание. Простое упоминание имени (`grep -r PYTHONPATH .`) проходит. Относительные пути
+помощников, включая `.claude/scripts/load-extensions.sh`, после cd/pushd/popd не доверяются.
+
+Известные пределы гейта (issue #1454, ревью 3). Гейт — список запрещённых форм команд
+(denylist), а не песочница: форма, которой нет в списке, проходит, даже если исполняет запись.
+Сейчас под репетицией проходят, в частности:
+- `git -c core.fsmonitor='git push' status` и другие ключи `-c`, которые запускают команду
+  (core.pager, diff.external, alias.*, *.textconv, core.sshCommand);
+- переменные GIT_CONFIG_COUNT/GIT_CONFIG_KEY_*/GIT_CONFIG_VALUE_*, GIT_EXTERNAL_DIFF, GIT_PAGER;
+- команды, которые исполняют строку-аргумент: `find -exec`/`-ok`, `awk '…system(…)…'`,
+  команда `e` в sed, `python3 -c '…'`;
+- индекс массива в арифметике, который подставляет команду
+  (`[[ 1 -eq 'a[$(…)]' ]]`, `x='a[$(…)]'; echo $((x))`);
+- присваивание со значением в кавычках перед командой (`X='a' git push`): гейт не доходит
+  до слова команды после такого присваивания.
 
 Python-whitelist (issue #460 путь 5, добавлен после того как code review поймал, что
 безусловный block ломает `close day` на первом же шаге):
