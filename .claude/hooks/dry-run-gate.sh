@@ -440,8 +440,13 @@ esac
 # *_search_by_name/backlinks/whoami/get_instructions), everything else is blocked.
 # If a new read-only tool does not fall under the pattern — a false BLOCK
 # (the safe direction of error), not a false ALLOW.
+#
+# issue #1447: Kimi Code names the same IWE server `aisystant` (no "iwe" or
+# "knowledge" in it), so its writes passed. It joins as an exact server-name
+# PREFIX `mcp__aisystant__` — not a substring, so another server that merely
+# contains "aisystant" is not pulled in.
 case "$TOOL_NAME" in
-    mcp__*iwe*__*|mcp__*knowledge*__*|mcp__*IWE*__*)
+    mcp__*iwe*__*|mcp__*knowledge*__*|mcp__*IWE*__*|mcp__aisystant__*)
         ACTION="${TOOL_NAME##*__}"
         # Substring patterns (`*get_*`, not just `get_*`): for half of the
         # read tools the action does not start with a verb but contains it
@@ -464,6 +469,10 @@ case "$TOOL_NAME" in
 esac
 
 # === MCP-write whitelist (exact tool_name matches, other servers) ===
+# Every name below is BLOCKED during a rehearsal (the list is of write tools;
+# read tools of the same servers are absent and pass). issue #1447: Kimi Code
+# names the calendar server `google-calendar` — its write tools are listed
+# explicitly next to the ext-/claude_ai_ variants.
 case "$TOOL_NAME" in
     mcp__claude_ai_Gmail__create_draft|\
     mcp__claude_ai_Gmail__create_label|\
@@ -481,6 +490,11 @@ case "$TOOL_NAME" in
     mcp__ext-google-calendar__delete-event|\
     mcp__ext-google-calendar__update-event|\
     mcp__ext-google-calendar__respond-to-event|\
+    mcp__google-calendar__create-event|\
+    mcp__google-calendar__create-events|\
+    mcp__google-calendar__delete-event|\
+    mcp__google-calendar__update-event|\
+    mcp__google-calendar__respond-to-event|\
     mcp__ext-google-drive__copy_file|\
     mcp__ext-google-drive__create_file|\
     mcp__ext-google-drive__create_folder|\

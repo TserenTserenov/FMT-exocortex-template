@@ -854,3 +854,42 @@ def test_memory_bleed_symlink_outside_blocked(tmp_path):
     r = run(f"bash {bleed} --hot-only")
     assert r.returncode == 2
     assert "does not resolve to a file inside" in r.stderr
+
+
+def _run_tool(tool_name):
+    payload = json.dumps({"tool_name": tool_name, "tool_input": {}})
+    return subprocess.run(["bash", str(HOOK)], input=payload, capture_output=True, text=True, timeout=10, env=HOOK_ENV)
+
+
+@pytest.mark.parametrize(
+    "tool_name, expected",
+    [
+        # Kimi Code names the IWE server `aisystant` (#1447): same write-verb rule as iwe-knowledge.
+        ("mcp__aisystant__personal_write", 2),
+        ("mcp__aisystant__dt_write_digital_twin", 2),
+        ("mcp__aisystant__send_telegram_message", 2),
+        ("mcp__aisystant__personal_search", 0),
+        ("mcp__aisystant__knowledge_get_document", 0),
+        # Kimi Code calendar server `google-calendar`: writes blocked, reads pass.
+        ("mcp__google-calendar__create-event", 2),
+        ("mcp__google-calendar__create-events", 2),
+        ("mcp__google-calendar__update-event", 2),
+        ("mcp__google-calendar__delete-event", 2),
+        ("mcp__google-calendar__respond-to-event", 2),
+        ("mcp__google-calendar__list-events", 0),
+        ("mcp__google-calendar__get-event", 0),
+        # The prefix is exact: another server that merely contains "aisystant" is not pulled in.
+        ("mcp__my-aisystant-mirror__personal_write", 0),
+        ("mcp__aisystantx__personal_write", 0),
+    ],
+)
+def test_mcp_server_names_of_other_channels(sentinel, tool_name, expected):
+    """#1447(b): MCP write tools are blocked under a rehearsal whatever the channel names the server."""
+    r = _run_tool(tool_name)
+    assert r.returncode == expected, f"{tool_name}: rc={r.returncode} {r.stderr}"
+
+
+def test_mcp_aisystant_write_allowed_without_rehearsal():
+    """#1447(b): without a rehearsal the new prefix changes nothing."""
+    assert not SENTINEL.exists()
+    assert _run_tool("mcp__aisystant__personal_write").returncode == 0

@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "bc3ec3c019f4d62a7f136e89db189b3b506a79db9425558f06a59c5ab6f93804"
+      "sha256": "c52edfce497126c558f6de6c98aa30f7a959467a528427811007ad3874863bdf"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4c861ac906234493621f823a9c05a4dce59a1fd1e8ae620a205840fd5118eed8"
+      "sha256": "e2a545c6f12d66844583527d1cc112fff5d90dcaa7193ff655311dde40830a40"
     },
     {
       "path": "CLAUDE.md",
@@ -1629,7 +1629,7 @@
     },
     {
       "path": "memory/dry-run-contract.md",
-      "sha256": "0894bb1e7a099431bc307fcc3538997cdc73aba0b5ad1d265d15abe42885b64a"
+      "sha256": "c9db4cf91745a2fa74b906853745e3638abcbe394dd4c51effa1f0a0dd6c1a14"
     },
     {
       "path": "memory/feedback_community_communication_style.md",

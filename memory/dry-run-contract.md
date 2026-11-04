@@ -300,6 +300,11 @@ mcp__ext-google-calendar__create-events
 mcp__ext-google-calendar__delete-event
 mcp__ext-google-calendar__update-event
 mcp__ext-google-calendar__respond-to-event
+mcp__google-calendar__create-event        # issue #1447: имя сервера в Kimi Code
+mcp__google-calendar__create-events
+mcp__google-calendar__delete-event
+mcp__google-calendar__update-event
+mcp__google-calendar__respond-to-event
 mcp__ext-google-drive__copy_file
 mcp__ext-google-drive__create_file
 mcp__ext-google-drive__create_folder
