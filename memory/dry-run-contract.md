@@ -138,6 +138,18 @@ ${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-close-prepare.sh # абсолютный (�
                                                         # каталога scripts/ шаблона (не symlink наружу)
 ```
 
+Доверие значению переменной (issue #1454, ревью 1). Маркер `$IWE_SCRIPTS/…` действует, только
+если команда больше нигде не называет IWE_SCRIPTS (после снятия кавычек и обратных слэшей);
+то же для IWE_TEMPLATE в двух python-помощниках. Любая встроенная команда, которая может
+присвоить переменную по вычисляемому имени (declare, typeset, local, readonly, export, read,
+mapfile, readarray, unset, getopts, let, wait, printf), арифметика `((`/`$[` и кавычки `$'…'`
+отзывают доверие ко всем таким переменным, включая HOME, IWE_PATHS_FILE, IWE_WORKSPACE и PWD.
+BASH_ENV, BASH_FUNC_*, SHELLOPTS, BASHOPTS, PYTHONPATH, PYTHONHOME, PYTHONSTARTUP в команде
+блокируют её целиком: через них помощник выполнил бы код, которого гейт не видит.
+Относительные пути помощников, включая `.claude/scripts/load-extensions.sh`, после cd/pushd/popd
+не доверяются. Вне защиты остаются LD_PRELOAD и подобные переменные загрузчика: они действуют
+на любую разрешённую программу, а не только на помощников.
+
 Python-whitelist (issue #460 путь 5, добавлен после того как code review поймал, что
 безусловный block ломает `close day` на первом же шаге):
 

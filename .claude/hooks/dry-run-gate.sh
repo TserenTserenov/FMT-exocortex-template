@@ -720,9 +720,36 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # not covered, a documented residual boundary (memory/dry-run-contract.md).
     HOME_OR_IWE_PATHS_TAMPERED=0
     if printf '%s\n' "$SPLIT" | grep -qE \
-        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)' \
+        '(^|[[:space:]])(builtin[[:space:]]+|command[[:space:]]+)?(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)(\[[^]]*\])?\+?=|(^|[[:space:]])(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)(\[[^]]*\])?\+?=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*[[:space:]]+(HOME|IWE_PATHS_FILE|IWE_WORKSPACE|PWD)([[:space:]]|$)' \
     ; then
         HOME_OR_IWE_PATHS_TAMPERED=1
+    fi
+
+    # issue #1454 review-01: the regexes above read assignments written out
+    # literally. A builtin can also assign a variable whose name is computed,
+    # quoted or indirect, which no list of spellings covers: `declare -n r=HOME;
+    # r=/x`, `declare "$v=/x"`, `printf -v "$v"`, `read "$v"`, `unset PWD`,
+    # `(( $v = 1 ))`, `let "$v=1"`, `$'...'` escapes, and so on. Any
+    # assignment-capable builtin, arithmetic evaluation or ANSI-C quoting in the
+    # command therefore revokes every trust placed in a variable's value
+    # (IWE_SCRIPTS, IWE_TEMPLATE, HOME, IWE_PATHS_FILE, IWE_WORKSPACE, PWD).
+    # Quotes and backslashes are removed first, the way the shell joins a word.
+    CMD_JOINED=$(printf '%s' "$CMD_CODE" | tr -d "\"'\\\\")
+    DYNAMIC_ASSIGN=0
+    if printf '%s' "$CMD_CODE" | grep -qF "\$'" \
+        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.-])(declare|typeset|local|readonly|export|read|mapfile|readarray|unset|getopts|let|wait|printf)([^A-Za-z0-9_.-]|$)|\(\(|\$\['; then
+        DYNAMIC_ASSIGN=1
+    fi
+    [ "$DYNAMIC_ASSIGN" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
+
+    # Variables that make bash or python run code from a file or a quoted
+    # string the gate never reads (BASH_ENV, an exported function passed as
+    # BASH_FUNC_*, xtrace PS4 via SHELLOPTS, the python import path) would
+    # turn any whitelisted helper — absolute paths included — into arbitrary
+    # code, and `env 'BASH_FUNC_x%%=...' ...` hides even the command word. No
+    # rehearsal step needs them: block the whole command.
+    if printf '%s\n' "$CMD_JOINED" | grep -qE 'BASH_ENV|BASH_FUNC_|SHELLOPTS|BASHOPTS|PYTHONPATH|PYTHONHOME|PYTHONSTARTUP'; then
+        block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH would run code the gate cannot see)"
     fi
 
     # issue #1258 (independent red-team audit, 2026-10-17): the `cd|pushd`
@@ -813,11 +840,21 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
 
     # issue #1434: whitelisted helpers called by `$IWE_SCRIPTS/...` lose the
-    # whitelist when the same command reassigns IWE_SCRIPTS.
-    IWE_SCRIPTS_TAMPERED=0
-    if printf '%s\n' "$SPLIT" | grep -qE '(^|[[:space:]])IWE_SCRIPTS=|(^|[[:space:]])(export|readonly|declare|typeset|local)([[:space:]]+-[A-Za-z]+)*[[:space:]]+IWE_SCRIPTS=|(^|[[:space:]])printf([[:space:]]+[^[:space:]]*)*[[:space:]]+-v[[:space:]]+IWE_SCRIPTS([[:space:]]|$)|(^|[[:space:]])read([[:space:]]+-[A-Za-z]+)*([[:space:]]+[A-Za-z_][A-Za-z0-9_]*)*[[:space:]]+IWE_SCRIPTS([[:space:]]|$)|(^|[[:space:]])for[[:space:]]+IWE_SCRIPTS([[:space:]]|$)'; then
-        IWE_SCRIPTS_TAMPERED=1
-    fi
+    # whitelist when the same command reassigns IWE_SCRIPTS. issue #1454
+    # review-01: a list of assignment spellings kept missing forms (`+=`,
+    # namerefs, `IWE_SCRIPTS[0]=`), so the rule is now by absence: the value is
+    # trusted only when the command names IWE_SCRIPTS nowhere except in the
+    # helper paths themselves and has no dynamic assignment (above). The same
+    # rule covers IWE_TEMPLATE in the two python helper paths.
+    var_named_elsewhere() { # <var> <ERE of the approved spans>
+        printf '%s' "$CMD_CODE" | sed -E "s@$2@ @g" | tr -d "\"'\\\\" | grep -q "$1"
+    }
+    IWE_SCRIPTS_TAMPERED=$DYNAMIC_ASSIGN
+    var_named_elsewhere IWE_SCRIPTS '\$(IWE_SCRIPTS|\{IWE_SCRIPTS\})/(day-close-prepare|dry-run-complete|memory-bleed|check-dirty-repos)\.sh' \
+        && IWE_SCRIPTS_TAMPERED=1
+    IWE_TEMPLATE_TAMPERED=$DYNAMIC_ASSIGN
+    var_named_elsewhere IWE_TEMPLATE "\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/(memory-drift-scan|check-index-health)\\.py" \
+        && IWE_TEMPLATE_TAMPERED=1
 
     # issue #1434: a program run by its own path (./x, ../x, $DIR/x.sh) or a
     # script name through PATH (x.sh) is indirect execution, like `bash x.sh`.
@@ -1052,7 +1089,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 case "${1:-}" in
                     __WL_DAY_CLOSE_PREPARE__|__WL_DRY_RUN_COMPLETE__)
                         [ "$IWE_SCRIPTS_TAMPERED" = "1" ] && block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)" ;;
-                    scripts/day-close-prepare.sh|scripts/dry-run-complete.sh)
+                    scripts/day-close-prepare.sh|scripts/dry-run-complete.sh|.claude/scripts/load-extensions.sh)
                         [ "$CD_PUSHD_TOKEN_DETECTED" = "1" ] && block "$CMD (relative whitelisted path after cd/pushd)" ;;
                 esac
                 case "${1:-}" in
@@ -1130,7 +1167,8 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     # `python -c 'open(...,"w")'` was always an accepted gap); exempting
                     # read-only inline snippets doesn't remove protection that existed.
                     -c) ;;
-                    __WL_PY_MDS__|__WL_PY_CIH__) ;;
+                    __WL_PY_MDS__|__WL_PY_CIH__)
+                        [ "$IWE_TEMPLATE_TAMPERED" = "1" ] && block "$CMD (IWE_TEMPLATE reassigned earlier in the same command)" ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;

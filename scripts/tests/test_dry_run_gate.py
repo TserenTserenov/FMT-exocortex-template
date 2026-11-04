@@ -1304,3 +1304,75 @@ def test_begin_refuses_workspace_without_library_complete_falls_back(tmp_path):
     assert begin.returncode == 1 and "dry-run-dir.sh missing" in begin.stderr, begin.stderr
     complete = _script(tpl / "scripts" / COMPLETE.name, "no-such-gate", "r", "s", "t", env=env)
     assert complete.returncode != 0 and "dry-run-dir.sh missing" not in complete.stderr, complete.stderr
+
+
+# --- review-01 H2 (#1454): a trusted variable changed in any spelling --------
+
+_PY_HELPER = "${IWE_TEMPLATE:-%s/FMT-exocortex-template}/.claude/scripts/memory-drift-scan.py" % IWE_ROOT
+_ABS_PREPARE = f"{IWE_ROOT}/FMT-exocortex-template/scripts/day-close-prepare.sh"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # IWE_SCRIPTS, every helper that trusts it
+        'IWE_SCRIPTS+=/../../tmp/evil; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'IWE_SCRIPTS+=/x; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'IWE_SCRIPTS[0]=/tmp/evil; bash "$IWE_SCRIPTS/dry-run-complete.sh" g r s t',
+        'declare -n r=IWE_SCRIPTS; r=/tmp/evil; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'local -n r=IWE_SCRIPTS; r=/tmp/evil; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'typeset -n r=IWE_SCRIPTS; r=/tmp/evil; "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'v=IWE_; declare -n r=${v}SCRIPTS; r=/tmp/evil; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'v=IWE_SCRIPTS; declare "$v=/tmp/evil"; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'read IWE_SCRIPTS <<< /tmp/evil; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'read -r IWE_SCRIPTS < /tmp/p; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'printf -v "IWE_SC""RIPTS" /tmp/evil; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'v=IWE_SCRIPTS; printf -v "$v" /tmp/evil; "${IWE_SCRIPTS}/check-dirty-repos.sh"',
+        'export IWE_SCRIPTS=/tmp/evil; bash "$IWE_SCRIPTS/dry-run-complete.sh" g r s t',
+        'export IWE_SCRIPTS+=/x; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'unset IWE_SCRIPTS; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'mapfile -t IWE_SCRIPTS < /tmp/p; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        'v=IWE_SCRIPTS; (( $v = 1 )); bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'let "IWE_SCRIPTS=1"; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        ': ${IWE_SCRIPTS:=/tmp/evil}; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        "declare $'IWE_SCRIPTS=/tmp/evil'; bash \"$IWE_SCRIPTS/day-close-prepare.sh\"",
+        # IWE_TEMPLATE in the two python helper paths
+        f"IWE_TEMPLATE=/tmp/evil; python3 {_PY_HELPER}",
+        f"export IWE_TEMPLATE=/tmp/evil; python3 {_PY_HELPER}",
+        f"declare -n t=IWE_TEMPLATE; t=/tmp/evil; python3 {_PY_HELPER}",
+        # HOME / IWE_PATHS_FILE behind the .iwe-paths whitelist
+        'HOME+=/../tmp/evil; . "$HOME/.iwe-paths"',
+        'HOME[0]=/tmp/evil; . "$HOME/.iwe-paths"',
+        'export HOME+=/x; . "$HOME/.iwe-paths"',
+        'declare -n h=HOME; h=/tmp/evil; . "$HOME/.iwe-paths"',
+        'v=HOME; printf -v "$v" /tmp/evil; . "$HOME/.iwe-paths"',
+        'IWE_PATHS_FILE+=x; . "${IWE_PATHS_FILE:-$HOME/.iwe-paths}"',
+        # a relative whitelisted path after cd, the pre-existing load-extensions entry included
+        "cd /tmp/evil && bash .claude/scripts/load-extensions.sh",
+        # code the gate cannot read, run by a whitelisted helper
+        'BASH_ENV=/tmp/evil bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        f"BASH_ENV=/tmp/evil bash {_ABS_PREPARE}",
+        f"env 'BASH_FUNC_cat%%=() {{ :; }}' bash {_ABS_PREPARE}",
+        f"SHELLOPTS=xtrace PS4='$(x)' bash {_ABS_PREPARE}",
+        f"PYTHONPATH=/tmp/evil python3 {_PY_HELPER}",
+    ],
+)
+def test_trusted_variable_tampering_blocked(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 2, f"{command!r} passed the gate: {r.stderr}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        'bash "$IWE_SCRIPTS/day-close-prepare.sh" --verify',
+        '. "$HOME/.iwe-paths"; bash "$IWE_SCRIPTS/day-close-prepare.sh"',
+        f"python3 {_PY_HELPER}",
+        "bash .claude/scripts/load-extensions.sh day-close before",
+        f"bash {_ABS_PREPARE}",
+    ],
+)
+def test_untampered_helpers_still_pass(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"
