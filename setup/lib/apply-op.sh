@@ -114,8 +114,9 @@ APPLY_OP__MODE_LOGGED=""
 # Behavioural probe in directory $1, in a subshell so its EXIT trap removes
 # the temporary file without touching the caller's traps. Prints "trusted" or
 # "untrusted". A directory or probe that is a symlink, a probe that cannot be
-# created, or a chmod that reports an error is not evidence of a no-op chmod:
-# it prints "trusted", so the strict check and the normal write error stay.
+# created, a chmod that reports an error, or a mode that cannot be read back
+# is not evidence of a no-op chmod: it prints "trusted", so the strict check
+# and the normal write error stay.
 apply_op__chmod_probe() {
     (
         local dir=$1 probe first second
@@ -136,12 +137,18 @@ apply_op__chmod_probe() {
             echo trusted
             exit 0
         fi
-        first=$(apply_op__mode_of "$probe" 2>/dev/null) || first=""
+        first=$(apply_op__mode_of "$probe" 2>/dev/null) && [ -n "$first" ] || {
+            echo trusted
+            exit 0
+        }
         if ! chmod 0644 "$probe" 2>/dev/null; then
             echo trusted
             exit 0
         fi
-        second=$(apply_op__mode_of "$probe" 2>/dev/null) || second=""
+        second=$(apply_op__mode_of "$probe" 2>/dev/null) && [ -n "$second" ] || {
+            echo trusted
+            exit 0
+        }
         if [ "$(apply_op__norm_mode "$first")" = 700 ] && [ "$(apply_op__norm_mode "$second")" = 644 ]; then
             echo trusted
         else
@@ -153,8 +160,10 @@ apply_op__chmod_probe() {
 # Returns 0 when modes can be verified in directory $1, 1 when chmod has no
 # effect there. A directory that does not exist yet (a planned mkdir) is
 # probed at its nearest existing ancestor: it will live on the same mount.
+# A relative path has no ancestor to climb to (the parent of "foo" is "foo"):
+# it is answered "trusted" and left to the path validation that rejects it.
 apply_op__modes_trusted() {
-    local dir=$1 state
+    local dir=$1 state parent
     if [ -z "$APPLY_OP__UNAME" ]; then
         APPLY_OP__UNAME=$(uname -s 2>/dev/null) || APPLY_OP__UNAME=unknown
     fi
@@ -162,8 +171,14 @@ apply_op__modes_trusted() {
         MINGW* | MSYS*) ;;
         *) return 0 ;;
     esac
+    case $dir in
+        /*) ;;
+        *) return 0 ;;
+    esac
     while [ ! -e "$dir" ] && [ ! -L "$dir" ]; do
-        dir=$(apply_op__parent "$dir")
+        parent=$(apply_op__parent "$dir")
+        [ "$parent" != "$dir" ] || return 0
+        dir=$parent
     done
     case "$APPLY_OP__MODE_CACHE" in
         *$'\n'"trusted $dir"$'\n'*) return 0 ;;

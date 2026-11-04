@@ -504,5 +504,34 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 reset_mode_trust
 
+# 14f. MINGW, a relative or bare path (review-01 M1): the ancestor walk used
+# to loop forever (the parent of "foo" is "foo"). It must return; the relative
+# path is left to the validation in apply_op_begin.
+mingw_trust() { # <path> → "rc=<n>" from a fresh process, bounded by timeout
+    timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }; apply_op__modes_trusted "$2"; echo "rc=$?"' \
+        _ "$SCRIPT_DIR/setup/lib/apply-op.sh" "$1" 2>/dev/null || echo "rc=hang-or-error"
+}
+assert_eq "относительный путь: проверка прав завершается" "$(mingw_trust no-such-dir/x)" "rc=0"
+assert_eq "голое имя: проверка прав завершается" "$(mingw_trust no-such-name)" "rc=0"
+new_install 29
+plan_rc=$(timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }
+    APPLY_OP_ROOTS=("$2"); apply_op_plan_add "$3" write rel/x.md "$4" 644 >/dev/null 2>&1; echo returned' \
+    _ "$SCRIPT_DIR/setup/lib/apply-op.sh" "$INSTALL" "$PLAN" "$STAGING/added.md") || plan_rc=hang
+assert_eq "относительный путь в плане: построитель не зависает" "$plan_rc" returned
+
+# 14g. MINGW, the probe cannot read the mode back (review-01 M2): no evidence
+# of a no-op chmod, so modes stay verified.
+new_install 30
+reset_mode_trust
+uname() { uname_mingw; }
+apply_op__mode_of_saved=$(declare -f apply_op__mode_of)
+apply_op__mode_of() { case "$1" in */.apply-op-probe.*) return 1 ;; *) stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" ;; esac; }
+assert_eq "режим пробного файла не прочитан: «trusted»" "$(apply_op__chmod_probe "$INSTALL")" trusted
+apply_op__mode_of() { case "$1" in */.apply-op-probe.*) printf '' ;; *) stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" ;; esac; }
+assert_eq "пустой режим пробного файла: «trusted»" "$(apply_op__chmod_probe "$INSTALL")" trusted
+eval "$apply_op__mode_of_saved"
+unset -f uname
+reset_mode_trust
+
 echo "apply-op: $PASS проверок прошли, $FAIL не прошли"
 [ "$FAIL" -eq 0 ]

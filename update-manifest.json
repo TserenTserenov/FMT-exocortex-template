@@ -3421,7 +3421,7 @@
     },
     {
       "path": "setup/lib/apply-op.sh",
-      "sha256": "1830a34fd6089dcfc56624c5a96732dc248519b51842a7020e6c2688b4e4b8a1"
+      "sha256": "8a1581183b032029442c1db60b27f0f01a3c1a6df72f19684aeb0e515e8e44ef"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
