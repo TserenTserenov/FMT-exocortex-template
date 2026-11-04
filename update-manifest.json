@@ -2857,7 +2857,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "acd357c3ee157800f9964b61549ac6c9babb281942b78e4f3f06a17ae0e0f641"
+      "sha256": "883c7e94da07649d83f9f6e13249eec85aa98d2210ae60a5c127aca506fef176"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3692,6 +3692,7 @@
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
     "scripts/tests/test_session_guard_gitbash.sh",
+    "scripts/tests/test_session_guard_open_log_path.sh",
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
