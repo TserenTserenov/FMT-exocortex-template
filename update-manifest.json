@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6394e4b055d232837878601eac70bb09556cd3e1ec80580cd4cb95890b7a5937"
+      "sha256": "7abf5515a73fda39196e2c29ddb58ebf2f45b05e659d65e3acaad4e3d068e33d"
     },
     {
       "path": "CLAUDE.md",
@@ -2109,7 +2109,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
-      "sha256": "12db85ef27b3564613560302a2e2781a8efb1e053d83f6602b2fa40958d90232"
+      "sha256": "612dbe2925906c807b204221a00e83c8a924278cdd9b56a3e1954622a28440cb"
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
@@ -3684,6 +3684,7 @@
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_normalize_en_phase_labels.py",
+    "scripts/tests/test_notify_optional_gate.sh",
     "scripts/tests/test_pending_lock.py",
     "scripts/tests/test_pending_phases_sweep.sh",
     "scripts/tests/test_release_notice_build.py",

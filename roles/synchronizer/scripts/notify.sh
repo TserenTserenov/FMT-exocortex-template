@@ -72,6 +72,29 @@ send_telegram() {
 
     text="${text:0:4000}"
 
+    # Optional notification gate (WP-568). Plain messages (no buttons) go through
+    # the workspace's own `iwe-tg` when the workspace opted in, so a workspace with
+    # a digest can keep routine reports out of the chat. Opt-in is explicit: either
+    # IWE_TG_BIN names the gate, or IWE_GOVERNANCE_REPO is set and that repo ships
+    # scripts/iwe-tg. PATH is never searched. The gate must exit 0 only once the
+    # message is accepted into its own durable queue. No gate, a gate that refuses,
+    # buttons, the pulse chat and callers that require chat delivery all use the
+    # direct send below, exactly as before.
+    if [ "$buttons" = "[]" ] && [ "$AGENT" != "pulse" ] && [ "$REQUIRE_DELIVERY" -eq 0 ]; then
+        local iwe_tg="${IWE_TG_BIN:-}" plain
+        if [ -z "$iwe_tg" ] && [ -n "${IWE_GOVERNANCE_REPO:-}" ]; then
+            iwe_tg="${IWE_WORKSPACE:-$HOME/IWE}/$IWE_GOVERNANCE_REPO/scripts/iwe-tg"
+        fi
+        if [ -n "$iwe_tg" ] && [ -x "$iwe_tg" ]; then
+            plain=$(printf '%s' "$text" | sed -e 's/<[^>]*>//g' -e 's/&lt;/</g' -e 's/&gt;/>/g' -e 's/&amp;/\&/g')
+            if "$iwe_tg" --source synchronizer-notify -- "$plain"; then
+                echo "Notification routed through the gate: $AGENT/$SCENARIO"
+                return 0
+            fi
+            echo "WARN: gate did not take $AGENT/$SCENARIO, falling back to direct send" >&2
+        fi
+    fi
+
     local escaped_text
     escaped_text=$(printf '%s' "$text" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
 
