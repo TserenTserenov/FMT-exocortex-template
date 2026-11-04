@@ -761,7 +761,7 @@
     },
     {
       "path": ".claude/skills/setup-wakatime/SKILL.md",
-      "sha256": "242356373e1c2c791e9316e5a98043d80f83d902d36bdb7fc76f043089a80859"
+      "sha256": "7b9443da046537dec7f638ac998bd3a50bc63704a51df3ccbcb4ba573dab2a15"
     },
     {
       "path": ".claude/skills/skill-creator/SKILL.md",
@@ -933,7 +933,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ba4b9252e4e8e34e0b5024d35de1245ff9a87189d386d03e2adbef4f5f361850"
+      "sha256": "6414ba85e1f2e0912e5e659477fa2101af0586d291fc3504e140a87d13289edc"
     },
     {
       "path": "CLAUDE.md",
@@ -1861,7 +1861,7 @@
     },
     {
       "path": "roles/extractor/scripts/extractor.sh",
-      "sha256": "6263a3d0c36e5608aa53763322e4e45a7df1f8a7fe63c33f7cfccb99687203fc"
+      "sha256": "e2c2dabdad5aea90dd2624c02bd5b4fcfc2e043638087f7cfd39d0102a5f32ef"
     },
     {
       "path": "roles/extractor/scripts/launchd/com.extractor.inbox-check.plist",
@@ -2861,7 +2861,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "acd357c3ee157800f9964b61549ac6c9babb281942b78e4f3f06a17ae0e0f641"
+      "sha256": "e318a7840c1c02c2135be19616e284bf9f464e5c9ff45ad07d231d31325380e2"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3221,7 +3221,7 @@
     },
     {
       "path": "scripts/wakatime-day-total.py",
-      "sha256": "8ca5a84bd53d2b494d6bfb50fd92a7f4353888521d2ffd26945c9b5ec53c59b1"
+      "sha256": "adcafcc921cd902b1f559a9dac9746b6510b3d8cf0869eb5630e118829d530af"
     },
     {
       "path": "scripts/week-draft-append.sh",
@@ -3421,7 +3421,7 @@
     },
     {
       "path": "setup/lib/apply-op.sh",
-      "sha256": "0224efbaa8f682584e9d76d365964363db7e1a575d9a53fe2c6d8fae5b64dee6"
+      "sha256": "1830a34fd6089dcfc56624c5a96732dc248519b51842a7020e6c2688b4e4b8a1"
     },
     {
       "path": "setup/optional/setup-cloud-scheduler.sh",
@@ -3433,7 +3433,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "5a77e7631cd19dccfaf52b84352c443db500fdcef8d32efe7c33db43bc789e37"
+      "sha256": "d9535a8e83a189fb9028606a048879dbe6b0e372f81d9e79979655a3c59aae08"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3598,6 +3598,8 @@
     "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_1433_gov_branch.sh",
     "scripts/tests/test_issue_1451_wakatime_403.py",
+    "scripts/tests/test_issue_1457_staged_scan_cost.sh",
+    "scripts/tests/test_issue_1458_extractor_config_lock.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
@@ -3687,6 +3689,7 @@
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
+    "scripts/tests/test_memory_bleed_age_batch.sh",
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_normalize_en_phase_labels.py",
     "scripts/tests/test_notify_optional_gate.sh",
