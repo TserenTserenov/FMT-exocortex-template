@@ -5,6 +5,8 @@
 # the same: planted author tokens are reported with repo-relative paths,
 # excluded paths stay excluded, unstaged-only content only warns.
 set -euo pipefail
+# commit-tree needs an identity; CI runners have none configured.
+export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.invalid
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TEST_ROOT=$(mktemp -d)
