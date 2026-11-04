@@ -161,7 +161,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "0e50d57ec92c830bb11d8a3058001b842b0b1be1f42fe14415389f49c052f7ad"
+      "sha256": "383b5d69a4bdd99f5315709e0a6d25b7a53cbb4111c663500c057b8c2d50047d"
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
@@ -197,7 +197,7 @@
     },
     {
       "path": ".claude/hooks/sql-pii-guard.sh",
-      "sha256": "4c567c88d1590531060cd09e19897ef31c91d2c26be3258410d03fc0b95b294d"
+      "sha256": "1849dfb49390af06bab96a801d3b1c283db226f87b3d99bb883e934b66389ec0"
     },
     {
       "path": ".claude/hooks/style-check-text.sh",
@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8628b4db5f801f4bd1e2d40ab90a901e310056c2fed1363fec5de248cba585ce"
+      "sha256": "6394e4b055d232837878601eac70bb09556cd3e1ec80580cd4cb95890b7a5937"
     },
     {
       "path": "CLAUDE.md",

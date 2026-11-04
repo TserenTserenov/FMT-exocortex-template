@@ -96,9 +96,11 @@ emit_verdict() {
 # Parse YAML via python (bash has no stdlib yaml)
 load_rules_for_event() {
     local event="$1"
-    if [ ! -f "$REGISTRY" ]; then
-        echo "[]"
-        return
+    # A missing or unreadable registry is a failure, not "no rules": an empty list here
+    # silently disabled every registry-driven check (WP-544, 04.11).
+    if [ ! -r "$REGISTRY" ]; then
+        printf 'rule-engine: rules registry not found: %s\n' "$REGISTRY" >&2
+        return 1
     fi
     # WP-529 (continuation, 19.08): resolved here, inside the existing REGISTRY
     # existence check — same lazy-placement rationale as the other sites in
@@ -107,8 +109,8 @@ load_rules_for_event() {
     # bare `python3` from PATH.
     local _resolved_python3
     _resolved_python3=$("${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/find-python3.sh" 2>/dev/null) || _resolved_python3=""
-    [ -n "$_resolved_python3" ] || { echo "[]"; return; }
-    _LRE_EVENT="$event" _LRE_REG="$REGISTRY" "$_resolved_python3" - << 'PYEOF' 2>/dev/null || echo "[]"
+    [ -n "$_resolved_python3" ] || { printf 'rule-engine: python3 not found, cannot read %s\n' "$REGISTRY" >&2; return 1; }
+    _LRE_EVENT="$event" _LRE_REG="$REGISTRY" "$_resolved_python3" - << 'PYEOF' || { printf 'rule-engine: cannot parse rules registry %s (python3/yaml)\n' "$REGISTRY" >&2; return 1; }
 import yaml, json, os
 with open(os.environ['_LRE_REG']) as f:
     reg = yaml.safe_load(f)
@@ -1335,7 +1337,10 @@ dispatch_event() {
     local event="${RULE_EVENT:?error: RULE_EVENT required}"
 
     local matches
-    matches=$(load_rules_for_event "$event")
+    if ! matches=$(load_rules_for_event "$event"); then
+        emit_verdict "block" "none" "rules registry unavailable: $REGISTRY — registry-driven checks cannot run"
+        return 1
+    fi
 
     local count
     count=$(echo "$matches" | python3 -c 'import sys,json; print(len(json.loads(sys.stdin.read() or "[]")))')

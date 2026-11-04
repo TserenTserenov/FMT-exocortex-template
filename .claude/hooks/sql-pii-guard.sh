@@ -36,6 +36,9 @@ self_test() {
     temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/sql-pii-guard.XXXXXX") || return 1
     SQL_PII_TEST_TMP="$temp_dir"
     trap 'rm -rf "$SQL_PII_TEST_TMP"' EXIT
+    # HOME is replaced per case to isolate the journal; keep user site-packages (PyYAML) importable.
+    local user_base
+    user_base=$(python3 -m site --user-base 2>/dev/null)
     registry="${SQL_PII_TEST_REGISTRY:-$HOOK_DIR/../rules-registry.yaml}"
     unsafe="$temp_dir/unsafe.sql"
     uppercase="$temp_dir/unsafe.SQL"
@@ -59,7 +62,7 @@ self_test() {
         engine="$4"
         registry_path="$5"
         payload=$(make_payload "$file") || return 1
-        printf '%s' "$payload" | HOME="$temp_dir" RULE_REGISTRY="$registry_path" SQL_PII_RULE_ENGINE="$engine" "$0" >/dev/null 2>&1
+        printf '%s' "$payload" | HOME="$temp_dir" PYTHONUSERBASE="${PYTHONUSERBASE:-$user_base}" RULE_REGISTRY="$registry_path" SQL_PII_RULE_ENGINE="$engine" "$0" >/dev/null 2>&1
         rc=$?
         if [ "$rc" -eq "$expected" ]; then
             printf 'PASS %s\n' "$name"
