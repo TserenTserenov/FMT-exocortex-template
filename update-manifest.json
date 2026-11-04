@@ -81,7 +81,7 @@
     },
     {
       "path": ".claude/hooks/dry-run-gate.sh",
-      "sha256": "9f2f1a3fad1156a02d4e7f6c9b390042ebd9cbe5081571accd79f75ddc1df478"
+      "sha256": "3d957c2b9d74af9e7a155ccfd2a385db635b1da487b204f59b6c80bbc68e9a41"
     },
     {
       "path": ".claude/hooks/extensions-gate.sh",
@@ -137,7 +137,7 @@
     },
     {
       "path": ".claude/hooks/protocol-stop-gate.sh",
-      "sha256": "c62aa8beea09a4610197bb1122b7821f35ebace55c29923990ba43192b2803fc"
+      "sha256": "56736b568e426e2f9ffedb984a91a313a93b8330d6fa4a9dd5154d3118131790"
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
@@ -297,7 +297,7 @@
     },
     {
       "path": ".claude/lib/dry-run-dir.sh",
-      "sha256": "95337c5cb458fe4c6850f3bdded5be86314f1fee8747a474252ae14205e9ba3b"
+      "sha256": "ed24f3f2a086d944264d9ba48323acf73ccdb27bab4a046bb2bc47138e210cfe"
     },
     {
       "path": ".claude/lib/find-python3.sh",
@@ -2465,11 +2465,11 @@
     },
     {
       "path": "scripts/dry-run-begin.sh",
-      "sha256": "cd9880984a6670520f2c59536fca0cce55f958cb94d9affc800dbd8841ee10d3"
+      "sha256": "9d348a474de3c43b7fabbe835e199ec3b09da28eda3302beb54b988c80270ac6"
     },
     {
       "path": "scripts/dry-run-complete.sh",
-      "sha256": "28ecff3da279f3c4ef0a5f008fa4ed4e14fd5beb024616099310c89ecaecaaa9"
+      "sha256": "1e0e62bdb28be6aaa19f3b082881eac2d217babdba56f4723bfcc46cb73294e7"
     },
     {
       "path": "scripts/exocortex-publish.sh",

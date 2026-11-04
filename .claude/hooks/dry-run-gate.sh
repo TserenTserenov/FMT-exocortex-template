@@ -54,10 +54,55 @@ fi
 # tampering attempt → fail-closed. Path and privacy criterion come from the
 # one shared library (issue #1447: on Git Bash the criterion is the NTFS ACL,
 # not the mode bits); env overrides of the paths work in explicit test mode only.
+#
+# Without the library (an update interrupted between .claude/hooks and
+# .claude/lib) or without a resolvable path (Git Bash with LOCALAPPDATA unset
+# or cygpath failing) the gate cannot read the canonical state. It then fails
+# closed only when a rehearsal may be running, judged by evidence found at
+# fixed locations without the library; otherwise it warns and allows, so a
+# user who is not rehearsing is never locked out of the tool that repairs it.
+rehearsal_may_be_active() {
+    local f d sf st cand
+    for f in /tmp/iwe-dry-run.flag "${IWE_DRY_RUN_SENTINEL:-}"; do
+        [ -n "$f" ] || continue
+        { [ -e "$f" ] || [ -L "$f" ]; } && return 0
+    done
+    for d in /tmp "$(dirname "${IWE_DRY_RUN_SENTINEL:-/tmp/x}")"; do
+        for f in "$d"/iwe-dry-run-owner-*.token; do
+            [ -e "$f" ] && return 0
+        done
+    done
+    # Active state records in every directory a resolver could have chosen.
+    # A completed rehearsal leaves its directory behind, so the directory alone
+    # is not evidence; an active or unreadable state record is.
+    cand=("/tmp/iwe-dry-run-$(id -u)")  # evidence scan, not a resolver
+    [ -n "${IWE_DRY_RUN_DIR:-}" ] && cand+=("$IWE_DRY_RUN_DIR")  # evidence scan, not a resolver
+    if [ -n "${LOCALAPPDATA:-}" ]; then
+        cand+=("${LOCALAPPDATA%[\\/]}/iwe-dry-run")
+        d=$(cygpath -u "$LOCALAPPDATA" 2>/dev/null) && [ -n "$d" ] && cand+=("${d%/}/iwe-dry-run")
+    fi
+    for d in "${cand[@]}"; do
+        [ -L "$d" ] && return 0
+        [ -d "$d" ] || continue
+        for sf in "$d"/gate-*.state; do
+            [ -e "$sf" ] || continue
+            st=$(jq -r '.state // empty' "$sf" 2>/dev/null) || return 0
+            [ "$st" = "active" ] && return 0
+        done
+    done
+    return 1
+}
+dry_run_state_unavailable() { # <reason>
+    if rehearsal_may_be_active; then
+        fail_closed "$1 (a rehearsal may be active)"
+    fi
+    echo "[dry-run-gate] WARNING: $1 — no rehearsal is active, allowing; reinstall .claude/lib/dry-run-dir.sh (update.sh) before the next dry-run" >&2
+    exit 0
+}
 DRY_RUN_LIB="$HOOK_DIR/../lib/dry-run-dir.sh"
 # shellcheck source=../lib/dry-run-dir.sh
-[ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB" || fail_closed "$DRY_RUN_LIB missing — cannot locate dry-run state"
-dry_run_resolve_paths || fail_closed "$DRY_RUN_ERR"
+{ [ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB"; } || dry_run_state_unavailable "$DRY_RUN_LIB missing — cannot locate dry-run state"
+dry_run_resolve_paths || dry_run_state_unavailable "$DRY_RUN_ERR"
 DRY_DIR="$DRY_RUN_DIR"
 SENTINEL="$DRY_RUN_SENTINEL"
 LOCK_DIR="$DRY_DIR/transaction.lock"

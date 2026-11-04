@@ -33,9 +33,16 @@ fail() { echo "dry-run-complete: $*" >&2; exit 2; }
 # Path and privacy check come from the one shared library (also used by the
 # gate, the Stop hook and dry-run-begin.sh — issue #1447), so all components
 # look in the same place and apply the same criterion.
-DRY_RUN_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../.claude/lib/dry-run-dir.sh"
+# The gate's own copy (<ws>/.claude/lib in a workspace) first, so completion
+# applies the gate's criteria; the template copy is only a fallback for the
+# template checkout itself and for a workspace whose library went missing in
+# a partial update — completing the rehearsal is what lets the gate open again.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DRY_RUN_LIB="$SCRIPT_DIR/../../.claude/lib/dry-run-dir.sh"
+[ -f "$SCRIPT_DIR/../../.claude/hooks/dry-run-gate.sh" ] && [ -r "$DRY_RUN_LIB" ] \
+    || DRY_RUN_LIB="$SCRIPT_DIR/../.claude/lib/dry-run-dir.sh"
 # shellcheck source=../.claude/lib/dry-run-dir.sh
-[ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB" || fail "$DRY_RUN_LIB missing — cannot locate dry-run state"
+{ [ -r "$DRY_RUN_LIB" ] && . "$DRY_RUN_LIB"; } || fail "$DRY_RUN_LIB missing — cannot locate dry-run state"
 dry_run_resolve_paths || fail "$DRY_RUN_ERR"
 DRY_DIR="$DRY_RUN_DIR"
 SENTINEL="$DRY_RUN_SENTINEL"

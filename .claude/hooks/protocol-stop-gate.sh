@@ -52,7 +52,8 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 # Owner tokens live next to the sentinel (production: /tmp).
 # issue #1447: the resolver itself lives in the shared library. If it is
 # missing or cannot resolve (Git Bash without LOCALAPPDATA), the fallback below
-# does nothing (an empty dir is skipped) — the gate fails closed on its own.
+# does nothing (an empty dir is skipped) — the gate fails closed on its own
+# while a rehearsal may be active and only warns otherwise.
 resolve_dry_run_paths() {
   DRY_RUN_DIR_RESOLVED=""
   DRY_RUN_SENTINEL_RESOLVED="/tmp/iwe-dry-run.flag"

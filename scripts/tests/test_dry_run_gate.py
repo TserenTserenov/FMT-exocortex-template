@@ -933,6 +933,10 @@ WHOAMI_STUB = f"""#!/bin/bash
 printf 'USER INFORMATION\\r\\n----------------\\r\\n\\r\\nUser Name     SID\\r\\n============= ==============\\r\\ndesktop\\\\me   {USER_SID}\\r\\n'
 """
 
+def _production_sentinel_clear():
+    return not Path("/tmp/iwe-dry-run.flag").exists() and not list(Path("/tmp").glob("iwe-dry-run-owner-*.token"))
+
+
 CYGPATH_STUB = """#!/bin/bash
 # -u / -w: the fixture paths are already POSIX paths; only the flag is checked.
 case "$1" in -u|-w) printf '%s\\n' "$2" ;; *) exit 1 ;; esac
@@ -1115,16 +1119,20 @@ def test_win_empty_env_fails(win, var):
     assert not win.dir.exists()
 
 
-def test_win_empty_localappdata_gate_and_begin_fail_closed(win):
+@pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
+def test_win_empty_localappdata_gate_warns_begin_fails_closed(win, tmp_path):
+    """Review-01 H1: an unresolvable path blocks only while a rehearsal may run; begin always refuses."""
     win.env["LOCALAPPDATA"] = ""
-    gate = win.run(HOOK, stdin=json.dumps({"tool_name": "Read", "tool_input": {}}))
+    read = json.dumps({"tool_name": "Read", "tool_input": {}})
+    gate = win.run(HOOK, stdin=read)
+    assert gate.returncode == 0 and "LOCALAPPDATA" in gate.stderr and "WARNING" in gate.stderr
+    flag = tmp_path / "flag"
+    flag.write_text("{}", encoding="utf-8")
+    win.env["IWE_DRY_RUN_SENTINEL"] = str(flag)
+    gate = win.run(HOOK, stdin=read)
     assert gate.returncode == 2 and "LOCALAPPDATA" in gate.stderr
     begin = win.run(BEGIN, "pytest", "s")
     assert begin.returncode == 1 and "LOCALAPPDATA" in begin.stderr
-
-
-def _production_sentinel_clear():
-    return not Path("/tmp/iwe-dry-run.flag").exists() and not list(Path("/tmp").glob("iwe-dry-run-owner-*.token"))
 
 
 @pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
@@ -1196,8 +1204,103 @@ def test_single_dry_run_dir_resolver():
             continue
         for n, line in enumerate((repo / rel).read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             code = "" if line.lstrip().startswith("#") else line
+            # The gate's no-library fallback only looks for evidence of a
+            # rehearsal there (H1, review-01); it never picks a directory.
+            if rel == ".claude/hooks/dry-run-gate.sh" and code.rstrip().endswith("# evidence scan, not a resolver"):
+                continue
             if "/tmp/iwe-dry-run-" in code or "IWE_DRY_RUN_DIR:-" in code:
                 offenders.append(f"{rel}:{n}: {line.strip()}")
     assert not offenders, "second dry-run dir resolver:\n" + "\n".join(offenders)
     for consumer in (HOOK, STOP_HOOK, BEGIN, COMPLETE):
         assert "dry-run-dir.sh" in consumer.read_text(encoding="utf-8"), consumer
+
+
+# --- review-01 H1: the gate without its library -----------------------------
+
+
+def _gate_without_lib(tmp_path):
+    """A workspace copy of the gate whose .claude/lib was never delivered (interrupted update)."""
+    hooks = tmp_path / "ws" / ".claude" / "hooks"
+    hooks.mkdir(parents=True)
+    for name in ("dry-run-gate.sh", "dry-run-cmd-parse.pl"):
+        shutil.copy2(HOOK.parent / name, hooks / name)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("IWE_DRY_RUN")}
+
+    def run(tool="Read", command=None, **extra):
+        payload = {"tool_name": tool, "tool_input": {"command": command} if command else {}}
+        return subprocess.run(["bash", str(hooks / "dry-run-gate.sh")], input=json.dumps(payload),
+                              capture_output=True, text=True, timeout=10, env=dict(env, **extra))
+
+    return run
+
+
+@pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
+def test_missing_library_without_rehearsal_warns_and_allows(tmp_path):
+    run = _gate_without_lib(tmp_path)
+    for r in (run(), run("Bash", "git status")):
+        assert r.returncode == 0, r.stderr
+        assert "WARNING" in r.stderr and "dry-run-dir.sh missing" in r.stderr
+
+
+def test_missing_library_with_sentinel_blocks(tmp_path):
+    run = _gate_without_lib(tmp_path)
+    flag = tmp_path / "flag"
+    flag.write_text("{}", encoding="utf-8")
+    r = run(IWE_DRY_RUN_SENTINEL=str(flag))
+    assert r.returncode == 2 and "dry-run-dir.sh missing" in r.stderr
+
+
+@pytest.mark.skipif(not _production_sentinel_clear(), reason="a live rehearsal on this host owns /tmp/iwe-dry-run.flag")
+@pytest.mark.parametrize("state,expected", [("active", 2), ("completed", 0), (None, 2)])
+def test_missing_library_judges_state_records(tmp_path, state, expected):
+    """An active (or unreadable) state record without a sentinel still blocks; a completed one does not."""
+    run = _gate_without_lib(tmp_path)
+    d = tmp_path / "dd"
+    d.mkdir(mode=0o700)
+    (d / "gate-g1.state").write_text(json.dumps({"state": state}) if state else "{not json", encoding="utf-8")
+    assert run(IWE_DRY_RUN_DIR=str(d)).returncode == expected
+
+
+# --- review-01 M4: begin/complete load the library copy the gate loads ------
+
+
+def _workspace_with_scripts(tmp_path):
+    ws = tmp_path / "ws"
+    (ws / ".claude" / "hooks").mkdir(parents=True)
+    (ws / ".claude" / "hooks" / "dry-run-gate.sh").write_text("#!/bin/bash\n", encoding="utf-8")
+    (ws / ".claude" / "lib").mkdir()
+    (ws / ".claude" / "lib" / "dry-run-dir.sh").write_text(
+        'dry_run_resolve_paths() { DRY_RUN_ERR="WORKSPACE-COPY"; return 1; }\n', encoding="utf-8")
+    tpl = ws / "FMT-exocortex-template"
+    (tpl / "scripts").mkdir(parents=True)
+    (tpl / ".claude" / "lib").mkdir(parents=True)
+    for s in (BEGIN, COMPLETE):
+        shutil.copy2(s, tpl / "scripts" / s.name)
+    shutil.copy2(DRY_RUN_LIB, tpl / ".claude" / "lib" / "dry-run-dir.sh")
+    # Whatever copy a script ends up loading, it must never reach the host's
+    # production rehearsal paths: a test-mode dir catches it.
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "flag"))
+    return ws, tpl, env
+
+
+def _script(path, *args, env):
+    return subprocess.run(["bash", str(path), *args], capture_output=True, text=True, timeout=10, env=env)
+
+
+def test_begin_and_complete_use_the_gate_library_copy(tmp_path):
+    _, tpl, env = _workspace_with_scripts(tmp_path)
+    for r in (_script(tpl / "scripts" / BEGIN.name, "p", "s", env=env),
+              _script(tpl / "scripts" / COMPLETE.name, "g", "r", "s", "t", env=env)):
+        assert r.returncode != 0 and "WORKSPACE-COPY" in r.stderr, r.stderr
+
+
+def test_begin_refuses_workspace_without_library_complete_falls_back(tmp_path):
+    ws, tpl, env = _workspace_with_scripts(tmp_path)
+    (ws / ".claude" / "lib" / "dry-run-dir.sh").unlink()
+    begin = _script(tpl / "scripts" / BEGIN.name, "p", "s", env=env)
+    assert begin.returncode == 1 and "dry-run-dir.sh missing" in begin.stderr, begin.stderr
+    complete = _script(tpl / "scripts" / COMPLETE.name, "no-such-gate", "r", "s", "t", env=env)
+    assert complete.returncode != 0 and "dry-run-dir.sh missing" not in complete.stderr, complete.stderr

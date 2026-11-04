@@ -6,6 +6,14 @@
 # computes the path or judges its safety on its own, so they cannot look in
 # different places or apply different criteria.
 #
+# Which copy: the hooks load the workspace copy (<ws>/.claude/lib, installed
+# by update.sh from the manifest); the template scripts dry-run-begin.sh and
+# dry-run-complete.sh load the same workspace copy when they run inside a
+# workspace (<ws>/FMT-exocortex-template/scripts) and fall back to the
+# template's own copy only outside one (complete also when the workspace copy
+# is missing, so a rehearsal can still be finished). If the workspace copy is
+# missing the gate fails closed only while a rehearsal may be active.
+#
 # Policy is the same on every platform: a directory that is not provably
 # private is refused and the caller fails closed. Only the CRITERION of
 # "private" depends on the platform:
