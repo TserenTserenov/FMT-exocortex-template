@@ -31,7 +31,7 @@ portable_date_offset() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # issue #875: the workspace comes from the environment, not from a folder name
-# guessed under $HOME - an install outside ~/IWE otherwise reads another
+# guessed under $HOME - an install outside the default folder otherwise reads another
 # workspace's data without a single error.
 WORKSPACE="${IWE_WORKSPACE:-$HOME/IWE}"
 # issue #1106: this fell back to the literal "DS-strategy" directly,
@@ -243,8 +243,24 @@ print(json.dumps(result))
 # 3. Claude Code Sessions
 # ============================================================
 
+# The log of session opens belongs to session-guard.sh, and the author's guard
+# and the template's guard keep it in different places: ask the guard next to
+# this script (the template layout), then the workspace one (WP-529 F248).
+session_open_log() {
+    local guard
+    for guard in "$SCRIPT_DIR/../../../scripts/session-guard.sh" "$WORKSPACE/scripts/session-guard.sh"; do
+        [ -f "$guard" ] || continue
+        IWE_ROOT="$WORKSPACE" IWE_GOVERNANCE_REPO="$(basename "$GOVERNANCE_DIR")" \
+            bash "$guard" open-log-path 2>/dev/null && return 0
+    done
+    echo "dt-collect: no session-guard.sh answered open-log-path, session opens not counted" >&2
+    return 1
+}
+
 collect_sessions() {
-    local SESSION_LOG="$GOVERNANCE_DIR/inbox/open-sessions.log"
+    # This metric counts opens over time, so read the guard's append-only history.
+    local SESSION_LOG
+    SESSION_LOG=$(session_open_log) || SESSION_LOG=""
 
     python3 -c "
 import json, os, re

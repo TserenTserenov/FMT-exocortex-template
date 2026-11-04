@@ -933,7 +933,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8dc43c77c32b0f53e54a66d4a38bcbafc2e72d75d9d2ee96082540f8807f1269"
+      "sha256": "2daca6226daa1a6cacbe82a0cd839c6b560cec24600f89261d10fd7cf6e20dc8"
     },
     {
       "path": "CLAUDE.md",
@@ -2105,7 +2105,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect.sh",
-      "sha256": "8773c1e3b794907d093cef4c8f823e85a0e8b44cadd4c2a026b2a775821ffe54"
+      "sha256": "bf279acd78090ab9503eefffdada4a9b6d951a5bd2787327ad96cfb1ba21d4aa"
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
@@ -2285,7 +2285,7 @@
     },
     {
       "path": "scripts/check-dirty-repos.sh",
-      "sha256": "d3e5e8f308ca5d6d57049e744283dbf64346b663f6c944aade42f40ff28fd15a"
+      "sha256": "1b35a940123fffaf28146547e2e6b49d7f8fda49b1ec46810413f92462c021e8"
     },
     {
       "path": "scripts/check-hardcoded-workspace-md.py",

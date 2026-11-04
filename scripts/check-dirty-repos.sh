@@ -4,6 +4,9 @@
 # check-dirty-repos.sh — scan all IWE repos for uncommitted changes
 # Usage: ./scripts/check-dirty-repos.sh
 # Called from Day Close to detect "forgotten" files.
+# IWE_DIRTY_SKIP_REPOS (e.g. in .exocortex.env): colon-separated repo paths
+# relative to the workspace that are not scanned, compared literally; unset or
+# empty means every repo is scanned.
 
 set -euo pipefail
 
@@ -26,11 +29,21 @@ UNPUSHED=0
 # 3.2 on macOS, which has no associative arrays.
 SEEN_TOPLEVELS="|"
 
+# Repos whose state is known and permanent (e.g. an archived read-only remote
+# that can never take a push), so flagging them every day is noise, not a
+# signal. "|a|b|" form for a literal match below (WP-529 F248).
+SKIP_REPOS="|${IWE_DIRTY_SKIP_REPOS:-}|"
+SKIP_REPOS="${SKIP_REPOS//:/|}"
+
 check_repo() {
     local dir="$1"
     local name="$2"
 
     if [ ! -d "$dir/.git" ]; then return; fi
+
+    case "$SKIP_REPOS" in
+        *"|$name|"*) return ;;
+    esac
 
     local toplevel
     toplevel=$(cd "$dir" && git rev-parse --show-toplevel 2>/dev/null) || toplevel="${dir%/}"
