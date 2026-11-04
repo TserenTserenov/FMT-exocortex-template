@@ -9,6 +9,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/apply-op.sh
 . "$SCRIPT_DIR/setup/lib/apply-op.sh"
+# shellcheck source=../scripts/lib/common.sh
+. "$SCRIPT_DIR/scripts/lib/common.sh"  # iwe_timeout: stock macOS has no timeout(1)
 
 # mktemp may return a path through a symlink (/var -> /private/var on macOS);
 # the executor works on canonical paths only.
@@ -508,13 +510,13 @@ reset_mode_trust
 # to loop forever (the parent of "foo" is "foo"). It must return; the relative
 # path is left to the validation in apply_op_begin.
 mingw_trust() { # <path> → "rc=<n>" from a fresh process, bounded by timeout
-    timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }; apply_op__modes_trusted "$2"; echo "rc=$?"' \
+    iwe_timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }; apply_op__modes_trusted "$2"; echo "rc=$?"' \
         _ "$SCRIPT_DIR/setup/lib/apply-op.sh" "$1" 2>/dev/null || echo "rc=hang-or-error"
 }
 assert_eq "относительный путь: проверка прав завершается" "$(mingw_trust no-such-dir/x)" "rc=0"
 assert_eq "голое имя: проверка прав завершается" "$(mingw_trust no-such-name)" "rc=0"
 new_install 29
-plan_rc=$(timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }
+plan_rc=$(iwe_timeout 10 bash -c '. "$1"; uname() { echo MINGW64_NT-10.0-19045; }
     APPLY_OP_ROOTS=("$2"); apply_op_plan_add "$3" write rel/x.md "$4" 644 >/dev/null 2>&1; echo returned' \
     _ "$SCRIPT_DIR/setup/lib/apply-op.sh" "$INSTALL" "$PLAN" "$STAGING/added.md") || plan_rc=hang
 assert_eq "относительный путь в плане: построитель не зависает" "$plan_rc" returned
