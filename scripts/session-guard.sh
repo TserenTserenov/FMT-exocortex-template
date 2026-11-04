@@ -1597,6 +1597,17 @@ if [ "$CMD" = "__quarantine-dead" ]; then
   _safe_session_token "$QUARANTINE_AGENT" || fail "internal quarantine: invalid agent identity" 1
   _safe_session_token "$QUARANTINE_SESSION" || fail "internal quarantine: no exact session identity" 1
   _ensure_session_transition_lock "$QUARANTINE_SEM" "$QUARANTINE_SESSION"
+  # Issue #1461: a housekeeping open made before the #1419 fix can sit next to
+  # an earlier run's .closed, which makes the identity check below refuse
+  # forever. Archive that leftover first, but only for a housekeeping
+  # semaphore whose file name (already confined to SESSION_DIR above) is
+  # exactly the one open --housekeeping builds for this agent and session:
+  # no other session's terminal file is moved.
+  if [[ "$QUARANTINE_SESSION" == housekeeping-* ]] \
+    && [ "$(basename "$QUARANTINE_SEM")" = "${QUARANTINE_AGENT}-${QUARANTINE_SESSION}.open" ]; then
+    _archive_previous_terminal "${QUARANTINE_SEM}.closed" "$QUARANTINE_SEM" \
+      || fail "internal quarantine: previous .closed could not be archived" 1
+  fi
   _locked_open_identity "$QUARANTINE_SEM" "$QUARANTINE_AGENT" "$QUARANTINE_SESSION" 0 \
     || fail "internal quarantine: identity changed or close already staged" 1
   [ "$(grep '^pid: ' "$QUARANTINE_SEM" | head -1 | cut -d' ' -f2- || true)" = "$QUARANTINE_PID" ] \
