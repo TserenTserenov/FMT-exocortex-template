@@ -933,7 +933,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "174f3baa06a21c95513586e5f0f37b197e0751a270addbed800cd10d8dc6d74d"
+      "sha256": "8dc43c77c32b0f53e54a66d4a38bcbafc2e72d75d9d2ee96082540f8807f1269"
     },
     {
       "path": "CLAUDE.md",
@@ -2861,7 +2861,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "e318a7840c1c02c2135be19616e284bf9f464e5c9ff45ad07d231d31325380e2"
+      "sha256": "5dd94408b73e0b2466ec1d2f8cac756a0288813714404814e8c4ac2eb2dcbef4"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3699,6 +3699,7 @@
     "scripts/tests/test_release_receipt.sh",
     "scripts/tests/test_residency_gate_skill_adapter.py",
     "scripts/tests/test_session_guard_gitbash.sh",
+    "scripts/tests/test_session_guard_open_log_path.sh",
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",

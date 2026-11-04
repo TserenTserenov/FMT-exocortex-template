@@ -8,6 +8,7 @@
 # Commands:
 #   open --wp WP-N [--task "..."] [--files "a,b"] [--slug "..."] [--agent claude-code|kimi|hermes|grok] [--personality <unassigned|UUID>] [--isolate]
 #   open --housekeeping <reason> [--agent ...]        # background housekeeping session without ORZ
+#   open-log-path                                      # print the session-open log path (for readers such as dt-collect.sh)
 #   close [--wp WP-N] [--slug "..."] [--agent ...]
 #   close ... --force-no-reflection "<reason>"       # close without answering the reflection —
 #                                                      # only if the runner is stopped exactly on
@@ -267,6 +268,15 @@ now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_date() { date +"%Y-%m-%d"; }
 now_month() { date +"%Y-%m"; }
 fail() { echo "session-guard: $1" >&2; exit "${2:-1}"; }
+
+# Read-only: where this guard appends the history of session opens. Readers
+# such as dt-collect.sh ask here instead of hardcoding a path, so they stay
+# correct whichever guard they run next to (WP-529 F248).
+if [ "$CMD" = "open-log-path" ]; then
+  [ $# -eq 0 ] || fail "open-log-path: no arguments accepted" 1
+  printf '%s\n' "$OPEN_LOG"
+  exit 0
+fi
 
 # WP-485 Phase 14 (a∩g): thin isolate helpers
 ISOLATE_LOCK_DIR="$IWE_ROOT/.iwe-runtime/isolate-locks"
