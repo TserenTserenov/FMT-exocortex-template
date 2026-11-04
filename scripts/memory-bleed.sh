@@ -49,16 +49,27 @@ _MEMORY_BLEED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../.claude/lib/frontmatter.sh
 source "$_MEMORY_BLEED_DIR/../.claude/lib/frontmatter.sh"
 
-# #515: file mtime, portable. GNU stat (Linux) first, BSD (macOS) as a fallback;
-# stderr of the first form is suppressed — on macOS it spammed an error into the report.
-file_mtime_ymd() {
-    # epoch via two stat forms (GNU/BSD), the date via python: a mixed macOS
-    # toolchain (brew GNU stat + system BSD date) broke the paired combination
-    # stat+date (review of Phase 14, Medium-6)
-    local f="$1" e
-    e=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null)
-    [ -n "$e" ] || return 1
-    python3 -c "import datetime,sys; print(datetime.date.fromtimestamp(int(sys.argv[1])))" "$e" 2>/dev/null
+# Age in calendar days since mtime, for every file at once: prints "<age>\t<path>"
+# per path read from stdin, age "-" when it cannot be computed (an empty field
+# would be eaten by `read`, tab is IFS whitespace; such a file falls back to
+# days_since valid_from). One python process for all files whose mtime reads —
+# two per file made the run on ~1700 memory files exceed the 180 s handler
+# timeout of month-close (WP-529 F248). Same expression as the former per-file
+# pair: date.today() - date.fromtimestamp(int(mtime)). Paths are passed as bytes
+# so a name that is not valid UTF-8 cannot stop the stream; names containing a
+# newline or ending in a tab are not supported (one record per line).
+file_ages_days() {
+    python3 -c '
+import datetime, os, sys
+today = datetime.date.today()
+for raw in sys.stdin.buffer:
+    path = raw.rstrip(b"\n")
+    try:
+        age = str((today - datetime.date.fromtimestamp(int(os.stat(path).st_mtime))).days).encode()
+    except Exception:
+        age = b"-"
+    sys.stdout.buffer.write(age + b"\t" + path + b"\n")
+'
 }
 
 has_frontmatter() {
@@ -169,7 +180,9 @@ echo "|------|----------|-----------|------|-------------|"
 found_candidates=0
 missing_lifecycle=""
 missing_lifecycle_count=0
-for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
+ages_seen=0
+while IFS=$'\t' read -r age f; do
+    ages_seen=$((ages_seen + 1))
     [ -f "$f" ] || continue
     has_frontmatter "$f" || continue
     h=$(get_field "$f" "horizon")
@@ -199,8 +212,7 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
     fi
 
     # We use mtime as a proxy for "last access"; valid_from is only a fallback
-    mtime=$(file_mtime_ymd "$f" || true); [ -n "$mtime" ] || mtime="$vf"
-    age=$(days_since "$mtime")
+    [ "$age" != "-" ] || age=$(days_since "$vf")
 
     rec=""
     case "$h" in
@@ -224,10 +236,18 @@ for f in $(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort); do
             ;;
     esac
 
-    [ -n "$rec" ] && echo "| $(basename $f) | $h_label | ${vf:-—} | $age | $rec |"
-done
+    [ -n "$rec" ] && echo "| $(basename "$f") | $h_label | ${vf:-—} | $age | $rec |"
+done < <(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | sort | file_ages_days)
 
 [ $found_candidates -eq 0 ] && echo "| — | — | — | — | нет кандидатов |"
+# The ages come from one python process: if it is missing or dies midway the
+# loop just ends early, so a short count must not read as a clean report.
+ages_expected=$(find "$MEMORY_DIR/" -maxdepth 1 -name "*.md" | wc -l | tr -d ' ')
+if [ "$ages_seen" -ne "$ages_expected" ]; then
+    echo ""
+    echo "❌ Возраст посчитан для $ages_seen из $ages_expected файлов (python3 недоступен или прервался) — таблица выше неполная"
+    violations=$((violations + 1))
+fi
 echo ""
 echo "_Действие: агент предлагает — пользователь подтверждает. Не выполнять автономно._"
 echo ""
