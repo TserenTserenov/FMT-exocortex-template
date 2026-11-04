@@ -599,6 +599,10 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # are injectable by the caller's environment — the very bypass that
     # review-01/review-02 closed by dropping the env default in this whitelist).
     WL_TEMPLATE_ABS="$IWE_ROOT_GUESS/FMT-exocortex-template"
+    # The path is embedded in sed EREs below: every metacharacter (and the
+    # `@` delimiter) is escaped, so a workspace under e.g. "a+b (c)" neither
+    # widens the approved span nor stops matching the legitimate form.
+    WL_TEMPLATE_RE=$(printf '%s' "$WL_TEMPLATE_ABS" | sed 's/[][\.*^$+?(){}|/@]/\\&/g')
     # Cold-review finding (Codex, 2026-09-14): a STATIC marker string in a
     # NORM whitelist is spoofable — an attacker can type the marker text
     # literally as the command's own bare argument and bypass the gate by
@@ -647,8 +651,8 @@ if [ "$TOOL_NAME" = "Bash" ]; then
         -e 's@"\$IWE_SCRIPTS/day-close-prepare\.sh"@ __WL_DAY_CLOSE_PREPARE__ @g' \
         -e 's@"\$IWE_SCRIPTS/dry-run-complete\.sh"@ __WL_DRY_RUN_COMPLETE__ @g' \
         -e "s@\"\\\$IWE_SCRIPTS/memory-bleed\\.sh\"@ __WL_MEMORY_BLEED_${GATE_NONCE}__ @g" \
-        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
-        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
+        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/memory-drift-scan\\.py@ __WL_PY_MDS__ @g" \
+        -e "s@\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/check-index-health\\.py@ __WL_PY_CIH__ @g" \
         -e "s@\"\\\$HOME/\\.iwe-paths\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
         -e "s@\"\\\$\\{IWE_PATHS_FILE:-\\\$HOME/\\.iwe-paths\\}\"@ __WL_IWE_PATHS_${GATE_NONCE}__ @g" \
         -e "s/'[^']*'/ QSTR /g" \
@@ -724,6 +728,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     ; then
         HOME_OR_IWE_PATHS_TAMPERED=1
     fi
+    HOME_ASSIGNED=$HOME_OR_IWE_PATHS_TAMPERED
 
     # issue #1454 review-01: the regexes above read assignments written out
     # literally. A builtin can also assign a variable whose name is computed,
@@ -734,22 +739,47 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # command therefore revokes every trust placed in a variable's value
     # (IWE_SCRIPTS, IWE_TEMPLATE, HOME, IWE_PATHS_FILE, IWE_WORKSPACE, PWD).
     # Quotes and backslashes are removed first, the way the shell joins a word.
+    # review-02: builtins and definitions that rebind a command word or run
+    # code around it join the list — hash, enable, alias/unalias, trap (DEBUG
+    # runs before every command), set/shopt (xtrace, expand_aliases, ...) and
+    # any function definition (`bash() { ...; }` shadows the helper's
+    # interpreter) — and DYNAMIC_ASSIGN now revokes every helper whitelist,
+    # relative and absolute paths included (HELPER_TRUST_REVOKED below): a
+    # computed name (`a=BASH; export ${a}_ENV=...`) can set any variable.
     CMD_JOINED=$(printf '%s' "$CMD_CODE" | tr -d "\"'\\\\")
+    JOINED_SPLIT=$(printf '%s\n' "$CMD_JOINED" | sed -E 's/\$\(|`|[(){}&;]|\|\|?|&&/\n/g')
     DYNAMIC_ASSIGN=0
     if printf '%s' "$CMD_CODE" | grep -qF "\$'" \
-        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.-])(declare|typeset|local|readonly|export|read|mapfile|readarray|unset|getopts|let|wait|printf)([^A-Za-z0-9_.-]|$)|\(\(|\$\['; then
+        || printf '%s\n' "$CMD_JOINED" | grep -qE '(^|[^A-Za-z0-9_.-])(declare|typeset|local|readonly|export|read|mapfile|readarray|unset|getopts|let|wait|printf|hash|enable|alias|unalias|trap|set|shopt|function)([^A-Za-z0-9_.-]|$)|\(\(|\$\[|[A-Za-z0-9_.:-][[:space:]]*\([[:space:]]*\)'; then
         DYNAMIC_ASSIGN=1
     fi
     [ "$DYNAMIC_ASSIGN" = "1" ] && HOME_OR_IWE_PATHS_TAMPERED=1
+    HELPER_TRUST_REVOKED=0
+    [ "$DYNAMIC_ASSIGN" = "1" ] || [ "$HOME_ASSIGNED" = "1" ] && HELPER_TRUST_REVOKED=1
+
+    # hash -p / enable -f|-n point a command word (bash, python3, git, ...) at
+    # any program; a PATH change does the same for every word. No rehearsal
+    # step needs them: block the whole command when one is in command position
+    # or PATH is assigned anywhere.
+    REBIND_PREFIX='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+|(builtin|command|exec|env|nohup|time|sudo|if|then|elif|else|do|while|until|!)[[:space:]]+)*'
+    if printf '%s\n' "$JOINED_SPLIT" | grep -qE "${REBIND_PREFIX}(hash|enable)([[:space:]]|\$)"; then
+        block "$CMD (indirect execution under dry-run: hash/enable rebinds a command word)"
+    fi
+    if printf '%s\n' "$JOINED_SPLIT" | grep -qE '(^|[[:space:]])PATH(\[[^]]*\])?\+?='; then
+        block "$CMD (indirect execution under dry-run: a PATH change rebinds every command word)"
+    fi
 
     # Variables that make bash or python run code from a file or a quoted
     # string the gate never reads (BASH_ENV, an exported function passed as
     # BASH_FUNC_*, xtrace PS4 via SHELLOPTS, the python import path) would
     # turn any whitelisted helper — absolute paths included — into arbitrary
     # code, and `env 'BASH_FUNC_x%%=...' ...` hides even the command word. No
-    # rehearsal step needs them: block the whole command.
-    if printf '%s\n' "$CMD_JOINED" | grep -qE 'BASH_ENV|BASH_FUNC_|SHELLOPTS|BASHOPTS|PYTHONPATH|PYTHONHOME|PYTHONSTARTUP'; then
-        block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH would run code the gate cannot see)"
+    # rehearsal step needs them: block the whole command. Only an assignment
+    # (plain, `export`/`declare -x`, or an `env` argument) counts, so reading
+    # the names (`grep -r PYTHONPATH .`) still passes; a computed name cannot
+    # be written here and revokes every helper whitelist (DYNAMIC_ASSIGN).
+    if printf '%s\n' "$JOINED_SPLIT" | grep -qE '(^|[[:space:]])[A-Za-z_]*(BASH_ENV|BASH_FUNC_|SHELLOPTS|BASHOPTS|PYTHONPATH|PYTHONHOME|PYTHONSTARTUP|PYTHONUSERBASE)[^[:space:]]*='; then
+        block "$CMD (BASH_ENV/BASH_FUNC_/SHELLOPTS/PYTHONPATH/PYTHONUSERBASE would run code the gate cannot see)"
     fi
 
     # issue #1258 (independent red-team audit, 2026-10-17): the `cd|pushd`
@@ -853,7 +883,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     var_named_elsewhere IWE_SCRIPTS '\$(IWE_SCRIPTS|\{IWE_SCRIPTS\})/(day-close-prepare|dry-run-complete|memory-bleed|check-dirty-repos)\.sh' \
         && IWE_SCRIPTS_TAMPERED=1
     IWE_TEMPLATE_TAMPERED=$DYNAMIC_ASSIGN
-    var_named_elsewhere IWE_TEMPLATE "\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_ABS//\//\\/}\\}/\\.claude/scripts/(memory-drift-scan|check-index-health)\\.py" \
+    var_named_elsewhere IWE_TEMPLATE "\\\$\\{IWE_TEMPLATE:-${WL_TEMPLATE_RE}\\}/\\.claude/scripts/(memory-drift-scan|check-index-health)\\.py" \
         && IWE_TEMPLATE_TAMPERED=1
 
     # issue #1434: a program run by its own path (./x, ../x, $DIR/x.sh) or a
@@ -862,9 +892,9 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     # goes through the quote-aware reader. Outside: extensionless absolute
     # paths (/tmp/x) — by text they look like system programs.
     RUN_BY_PATH=$(printf '%s' "$CMD" | \
-        WL_ROOT="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts" \
-        WL_IWE_SCRIPTS_OK=$([ "$IWE_SCRIPTS_TAMPERED" = "0" ] && echo 1 || echo 0) \
-        WL_RELATIVE_OK=$([ "$CD_PUSHD_TOKEN_DETECTED" = "0" ] && echo 1 || echo 0) \
+        WL_ROOT=$([ "$HELPER_TRUST_REVOKED" = "0" ] && echo "$IWE_ROOT_GUESS/FMT-exocortex-template/scripts") \
+        WL_IWE_SCRIPTS_OK=$([ "$IWE_SCRIPTS_TAMPERED" = "0" ] && [ "$HELPER_TRUST_REVOKED" = "0" ] && echo 1 || echo 0) \
+        WL_RELATIVE_OK=$([ "$CD_PUSHD_TOKEN_DETECTED" = "0" ] && [ "$HELPER_TRUST_REVOKED" = "0" ] && echo 1 || echo 0) \
         perl "$CMD_PARSER" run-by-path) \
         || fail_closed "command reader failed — cannot classify command"
     case "$RUN_BY_PATH" in
@@ -1075,6 +1105,10 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                 # inside that dir (a symlink out of it is refused).
                 WL_MB_DIR="$IWE_ROOT_GUESS/FMT-exocortex-template/scripts"
                 WL_ABS4="$WL_MB_DIR/memory-bleed.sh"
+                # review-02: every form below — marker, relative, absolute —
+                # runs in an environment the command may have altered.
+                [ "$HELPER_TRUST_REVOKED" = "1" ] \
+                    && block "$CMD (whitelisted helper after a dynamic assignment, rebinding builtin, function definition or HOME change)"
                 if [ "${1:-}" = "__WL_MEMORY_BLEED_${GATE_NONCE}__" ] || [ "${1:-}" = "$WL_ABS4" ]; then
                     if [ "$1" != "$WL_ABS4" ] && [ "$IWE_SCRIPTS_TAMPERED" = "1" ]; then
                         block "$CMD (IWE_SCRIPTS reassigned earlier in the same command)"
@@ -1168,7 +1202,9 @@ if [ "$TOOL_NAME" = "Bash" ]; then
                     # read-only inline snippets doesn't remove protection that existed.
                     -c) ;;
                     __WL_PY_MDS__|__WL_PY_CIH__)
-                        [ "$IWE_TEMPLATE_TAMPERED" = "1" ] && block "$CMD (IWE_TEMPLATE reassigned earlier in the same command)" ;;
+                        [ "$IWE_TEMPLATE_TAMPERED" = "1" ] && block "$CMD (IWE_TEMPLATE reassigned earlier in the same command)"
+                        [ "$HELPER_TRUST_REVOKED" = "1" ] \
+                            && block "$CMD (whitelisted helper after a dynamic assignment, rebinding builtin, function definition or HOME change)" ;;
                     *) block "$CMD (indirect execution under dry-run)" ;;
                 esac
                 ;;

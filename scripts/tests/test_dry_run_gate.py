@@ -1418,3 +1418,101 @@ def test_owner_uid_still_checked_off_windows(win, tmp_path):
     win.env.update(IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(dry_dir / "flag"))
     rc, _, err = win.lib(prefix=FOREIGN_UID)
     assert rc == 1 and "expected 4242" in err
+
+
+# --- review-02 (#1454): helper trust against computed names and rebinding ----
+
+_ABS_LOADEXT = f"{IWE_ROOT}/.claude/scripts/load-extensions.sh"
+_ABS_BLEED = f"{IWE_ROOT}/FMT-exocortex-template/scripts/memory-bleed.sh"
+_CHAIN = TestIwePathsChainWhitelist.CHAIN
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # H-a: a computed variable name reaches every helper form
+        "a=BASH; export ${a}_ENV=/tmp/evil; bash .claude/scripts/load-extensions.sh day-close before",
+        f"a=BASH; export ${{a}}_ENV=/tmp/evil; bash {_ABS_LOADEXT} day-close before",
+        f"a=BASH; declare -x ${{a}}_ENV=/tmp/evil; bash {_ABS_LOADEXT}",
+        f"a=BASH; typeset -x ${{a}}_ENV=/tmp/evil; bash {_ABS_LOADEXT}",
+        f"a=BASH; printf -v ${{a}}_ENV /tmp/evil; export ${{a}}_ENV; bash {_ABS_PREPARE}",
+        f"a=SHELL; b=OPTS; export $a$b=xtrace PS4='$(x)'; bash {_ABS_LOADEXT}",
+        f"a=PYTHON; export ${{a}}PATH=/tmp/evil; python3 {_PY_HELPER}",
+        f"a=BASH; export ${{a}}_ENV=/tmp/evil; bash {_ABS_BLEED} --hot-only",
+        'a=BASH; export ${a}_ENV=/tmp/evil; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        f"a=BASH; export ${{a}}_ENV=/tmp/evil; {_ABS_PREPARE}",
+        f"a=BASH; export ${{a}}_ENV=/tmp/evil; {_CHAIN}",
+        # H-b: builtins that rebind a command word
+        'hash -p /tmp/evil bash; bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+        "hash -p /tmp/evil bash; bash .claude/scripts/load-extensions.sh day-close before",
+        "hash -p /tmp/evil python3; python3 -c 'print(1)'",
+        "\\hash -p /tmp/evil git; git status",
+        '"hash" -p /tmp/evil git; git status',
+        "command hash -p /tmp/evil ls; ls",
+        "enable -f /tmp/evil.so bash; bash .claude/scripts/load-extensions.sh",
+        "enable -n echo; echo x",
+        # generalised: definitions, aliases, traps, shell options, PATH, HOME
+        "bash() { /tmp/evil \"$@\"; }; bash .claude/scripts/load-extensions.sh",
+        f"function python3 {{ /tmp/evil; }}; python3 {_PY_HELPER}",
+        f"shopt -s expand_aliases; alias bash=/tmp/evil; bash {_ABS_LOADEXT}",
+        f"trap 'touch /tmp/x' DEBUG; bash {_ABS_LOADEXT}",
+        f"set -o allexport; bash {_ABS_LOADEXT}",
+        "PATH=/tmp/evil:$PATH git status",
+        "PATH+=:/tmp/evil; ls",
+        "export PATH=/tmp/evil; python3 -c 'print(1)'",
+        f"HOME=/tmp/evil python3 {_PY_HELPER}",
+        f"HOME=/tmp/evil bash {_ABS_LOADEXT}",
+        f"PYTHONUSERBASE=/tmp/evil python3 {_PY_HELPER}",
+        # M-a: an assignment still blocks
+        "export PYTHONPATH=/tmp/evil; ls",
+        "env PYTHONPATH=/tmp/evil ls",
+        "x=1 BASH_ENV=/tmp/evil ls",
+    ],
+)
+def test_review2_helper_trust_blocked(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 2, f"{command!r} passed the gate: {r.stderr}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "grep -r PYTHONPATH .",
+        "grep -rn BASH_ENV docs",
+        "git hash-object README.md",
+        f"bash {_ABS_LOADEXT} day-close before",
+        'bash "$IWE_SCRIPTS/memory-bleed.sh" --hot-only',
+    ],
+)
+def test_review2_reads_and_helpers_still_pass(isolated_gate, command):
+    r = isolated_gate(command)
+    assert r.returncode == 0, f"{command!r} blocked: {r.stderr}"
+
+
+def test_review2_workspace_path_with_regex_metacharacters(tmp_path):
+    """The workspace path is escaped before it goes into sed: `+` and `(` neither break nor widen the match."""
+    ws = tmp_path / "ws+(x)"
+    (ws / ".claude" / "hooks").mkdir(parents=True)
+    (ws / ".claude" / "lib").mkdir()
+    for name in ("dry-run-gate.sh", "dry-run-cmd-parse.pl"):
+        shutil.copy2(HOOK.parent / name, ws / ".claude" / "hooks" / name)
+    shutil.copy2(DRY_RUN_LIB, ws / ".claude" / "lib" / "dry-run-dir.sh")
+    dry_dir = tmp_path / "dry-dir"
+    dry_dir.mkdir(mode=0o700)
+    (dry_dir / ".iwe-dry-run-test-mode").write_text("1", encoding="utf-8")
+    flag = dry_dir / "flag"
+    flag.write_text(json.dumps({"initiator": "pytest", "created_at": "test"}), encoding="utf-8")
+    env = dict(os.environ, IWE_DRY_RUN_DIR=str(dry_dir), IWE_DRY_RUN_SENTINEL=str(flag))
+
+    def run(command):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+        return subprocess.run(["bash", str(ws / ".claude" / "hooks" / "dry-run-gate.sh")], input=payload,
+                              capture_output=True, text=True, timeout=10, env=env)
+
+    real = ws.resolve()
+    good = "python3 ${IWE_TEMPLATE:-%s/FMT-exocortex-template}/.claude/scripts/memory-drift-scan.py" % real
+    r = run(good)
+    assert r.returncode == 0, r.stderr
+    # Unescaped, "ws+(x)" is the ERE ws+(x) and would also approve ".../wssx/...".
+    widened = good.replace(str(real), str(real.parent / "wssx"))
+    assert run(widened).returncode == 2
