@@ -41,7 +41,13 @@ STAMP="2026110409"  # fixed run-id prefix, see fake_date below
 
 extractor_branches() { git -C "$CANON" for-each-ref --format='%(refname:short)' 'refs/heads/extractor/*'; }
 run_dirs() { find "$TMPDIR" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' '; }
-registered() { git -C "$CANON" worktree list --porcelain | grep -qx "worktree $1"; }
+# git prints the physical path (macOS: /var -> /private/var); resolve the parent,
+# which exists even after the worktree itself was removed.
+registered() {
+    local phys
+    phys="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
+    git -C "$CANON" worktree list --porcelain | grep -qxF "worktree $phys"
+}
 
 # (a) Another run holds .git/config.lock for the whole attempt.
 touch "$CANON/.git/config.lock"
