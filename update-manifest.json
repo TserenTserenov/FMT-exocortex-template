@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7abf5515a73fda39196e2c29ddb58ebf2f45b05e659d65e3acaad4e3d068e33d"
+      "sha256": "179fc198e12a4649c812a8ac9b15e3533bfbf1ea4aca9cde2362e26a293b85b1"
     },
     {
       "path": "CLAUDE.md",
@@ -2761,7 +2761,7 @@
     },
     {
       "path": "scripts/memory-bleed.sh",
-      "sha256": "30459ad635417fe0b9b294be27d292dc5908a52c153a6c79cf6c9c33f678e55c"
+      "sha256": "df3e7b147cddf5843972e80d1856471da5b77954706967ab8f56f35a7b9de8c1"
     },
     {
       "path": "scripts/memory-health.sh",
