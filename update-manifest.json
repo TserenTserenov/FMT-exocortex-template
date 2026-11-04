@@ -929,7 +929,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "44dd049230b767092decf857d19c72acea5203f2061b0adcd618ad32f43517d6"
+      "sha256": "89732993301239e1ad066081766810d1ee269189b92b4a5304c219fcab4504b2"
     },
     {
       "path": "CLAUDE.md",
@@ -3429,7 +3429,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "5a77e7631cd19dccfaf52b84352c443db500fdcef8d32efe7c33db43bc789e37"
+      "sha256": "d9535a8e83a189fb9028606a048879dbe6b0e372f81d9e79979655a3c59aae08"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3593,7 +3593,7 @@
     "scripts/tests/test_issue_1425_bleed_fields.sh",
     "scripts/tests/test_issue_1431_resolve_root_library_depth.sh",
     "scripts/tests/test_issue_1433_gov_branch.sh",
-    "scripts/tests/test_issue_1458_extractor_config_lock.sh",
+    "scripts/tests/test_issue_1457_staged_scan_cost.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
@@ -3683,7 +3683,6 @@
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
     "scripts/tests/test_manifest_coverage_local.py",
-    "scripts/tests/test_memory_bleed_age_batch.sh",
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_normalize_en_phase_labels.py",
     "scripts/tests/test_notify_optional_gate.sh",

@@ -67,22 +67,67 @@ fi
 
 echo "=== Validating: $TEMPLATE_DIR (mode=$MODE) ==="
 
-# Utility: count grep matches (safe with pipefail)
-grep_count() {
-    local pattern="$1"
-    shift
-    grep -rn "$pattern" "$@" 2>/dev/null | wc -l | tr -d ' ' || true
-}
-
-# Staged mode: list of staged files (relative paths). Empty if not in git or nothing staged.
-STAGED_FILES=""
+# Staged mode (issue #1457): export the staged blobs ONCE into a private
+# directory outside the worktree and run the very same recursive grep
+# pipelines as pristine mode against it. The former per-file loop forked
+# ~8 processes per (pattern x staged file) — tens of thousands of forks on a
+# large commit, 35+ minutes on Git Bash. SCAN_ROOT is the tree every content
+# check below scans: the worktree (pristine/installed) or the exported index
+# snapshot (staged).
+SCAN_ROOT="$TEMPLATE_DIR"
 if [ "$MODE" = "staged" ]; then
-    STAGED_FILES=$(cd "$TEMPLATE_DIR" && git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
-    if [ -z "$STAGED_FILES" ]; then
+    staged_count=$(cd "$TEMPLATE_DIR" && git diff --cached --name-only --diff-filter=ACM 2>/dev/null | wc -l | tr -d ' ' || true)
+    if [ "${staged_count:-0}" -eq 0 ]; then
         echo "=== staged mode: нет staged файлов — skip ==="
         exit 0
     fi
+    STAGE_TMP=$(mktemp -d)
+    trap 'rm -rf -- "$STAGE_TMP"' EXIT
+    chmod 700 "$STAGE_TMP"
+    # -z on both ends keeps paths with spaces or newlines intact.
+    if ! (cd "$TEMPLATE_DIR" && git diff --cached --name-only -z --diff-filter=ACM \
+            | git checkout-index -z --stdin --prefix="$STAGE_TMP/"); then
+        echo "ERROR: не удалось выгрузить staged-содержимое во временный каталог $STAGE_TMP" >&2
+        exit 2
+    fi
+    SCAN_ROOT="$STAGE_TMP"
 fi
+
+# Staged hits are reported relative to the repo root: the snapshot path is a
+# private temp dir that means nothing to the reader. Pristine keeps the
+# absolute paths it always printed.
+display_hits() {
+    local line
+    if [ "$MODE" != "staged" ]; then
+        cat
+        return
+    fi
+    while IFS= read -r line; do
+        printf '%s\n' "${line#"$SCAN_ROOT"/}"
+    done
+}
+
+# Drop grep -r hits "<root>/<rel>:<line>:<text>" whose <rel> matches the ERE
+# $2 — path-scoped exceptions shared by every mode, so a same-named file in
+# another directory is still scanned.
+drop_hits_in_paths() {
+    local root="$1" skip_re="$2" line abs rel
+    while IFS= read -r line; do
+        abs="${line%%:*}"
+        rel="${abs#"$root"/}"
+        [[ "$rel" =~ $skip_re ]] && continue
+        printf '%s\n' "$line"
+    done
+}
+
+# Number of lines in a hit list held in a variable (0 for an empty list).
+count_hits() {
+    if [ -z "$1" ]; then
+        echo 0
+        return
+    fi
+    printf '%s\n' "$1" | wc -l | tr -d ' '
+}
 
 # issue #547: paths the manifest deliberately freezes out of delivery
 # (excluded_paths) never get refreshed on forks — an author-content hit there
@@ -152,27 +197,14 @@ is_author_context_exception() {
     esac
     return 1
 }
-filter_staged_author_hits() {
-    local rel="$1" entry key seen=$'\n'
-    while IFS= read -r entry; do
-        if is_author_context_exception "$rel" "${entry#*:}"; then
-            key="$rel:${entry#*:}"
-            key="${key%$'\r'}"
-            case "$seen" in
-                *$'\n'"$key"$'\n'*) ;;
-                *) seen="${seen}${key}"$'\n'; continue ;;
-            esac
-        fi
-        printf '%s\n' "$entry"
-    done
-}
 filter_excluded_hits() {
-    # stdin: grep -r output "<abs-path>:<line>:<text>" — drop excluded_paths
+    # $1: scanned root (worktree or staged snapshot); stdin: grep -r output
+    # "<root>/<rel>:<line>:<text>" — drop excluded_paths
     # and exact workflow-context exceptions, retaining every other .yml hit.
-    local line abs rel numbered key seen=$'\n'
+    local root="$1" line abs rel numbered key seen=$'\n'
     while IFS= read -r line; do
         abs="${line%%:*}"
-        rel="${abs#"$TEMPLATE_DIR"/}"
+        rel="${abs#"$root"/}"
         is_excluded_path "$rel" && continue
         # Local runtime directories are not template content: backups that update.sh,
         # skill-promote and friends leave next to the files they replaced hold copies
@@ -197,66 +229,32 @@ echo -n "[1/5] Author-specific content... "
 CHECK1_FAIL=0
 
 # Global (forbidden everywhere except CHANGELOG and GitHub URLs)
-# grep -i below (all calls of this pattern): "tserentserenov" always appeared in the
-# code as "TserenTserenov" (mixed-case) — case-sensitive grep never caught
-# it, it was caught only by the paired pattern "DS-my-strategy" on the same lines (2026-07-27).
+# grep -i below: "tserentserenov" always appeared in the code as
+# "TserenTserenov" (mixed-case) — case-sensitive grep never caught it, it was
+# caught only by the paired pattern "DS-my-strategy" on the same lines (2026-07-27).
+# One pipeline for every mode (issue #1457): docs/adr/ — historical ADR docs
+# describing the past authorial install (issue #308), same exemption class as
+# LEARNING-PATH.md/CHANGELOG.md.
+author_global_hits() {
+    grep -rin "$1" "$SCAN_ROOT" --include="*.md" --include="*.sh" \
+        --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
+        --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+        --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
+        --exclude='translation-manifest.yaml' 2>/dev/null \
+        | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
+        | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
+        | filter_excluded_hits "$SCAN_ROOT" || true
+}
 for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" \
                "DS-Knowledge-Index" "DS-IT-systems" "DS-ai-systems" \
                "DS-my-strategy" "engines/tailor" "tsekh" "DS-ecosystem-development" \
                "tseren" "aist_pilot_bot"; do
-    if [ "$MODE" = "staged" ]; then
-        # staged mode: check only the content of staged files (git show :path)
-        count=0
-        hits=""
-        while IFS= read -r f; do
-            is_excluded_path "$f" && continue  # frozen out of delivery (#547)
-            case "$f" in
-                *.md|*.sh|*.py|*.json|*.plist|*.yaml|*.yml) ;;
-                *) continue ;;
-            esac
-            case "$(basename "$f")" in
-                validate-template.sh|LEARNING-PATH.md|CHANGELOG.md|aisystant-sync-targets.yaml|translation-manifest.yaml) continue ;;
-            esac
-            # issue #308: docs/adr/* — historical ADR docs describing the past
-            # authorial install, same exemption class as LEARNING-PATH.md/CHANGELOG.md above.
-            case "$f" in
-                docs/adr/*) continue ;;
-            esac
-            file_hits=$(cd "$TEMPLATE_DIR" && git show ":$f" 2>/dev/null \
-                | grep -in "$pattern" | grep -v 'github.com/' | grep -v 'docs/adr/' \
-                | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
-                | filter_staged_author_hits "$f" || true)
-            if [ -n "$file_hits" ]; then
-                count=$((count + $(echo "$file_hits" | wc -l | tr -d ' ')))
-                hits="${hits}${f}:"$'\n'"${file_hits}"$'\n'
-            fi
-        done <<< "$STAGED_FILES"
-    else
-        count=$(grep -rin "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
-                --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
-                --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
-                --exclude='translation-manifest.yaml' 2>/dev/null \
-                | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
-                | filter_excluded_hits | wc -l | tr -d ' ' || true)
-    fi
+    hits=$(author_global_hits "$pattern")
+    count=$(count_hits "$hits")
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
         echo "  Found '$pattern' (global) in $count locations:"
-        if [ "$MODE" = "staged" ]; then
-            echo "$hits" | head -3 || true
-        else
-            grep -rin "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
-                --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
-                --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
-                --exclude='translation-manifest.yaml' 2>/dev/null \
-                | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
-                | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
-                | filter_excluded_hits | head -3 || true
-        fi
+        printf '%s\n' "$hits" | head -3 | display_hits || true
         CHECK1_FAIL=1
         FAIL=1
     fi
@@ -265,53 +263,37 @@ done
 # Protocol-only — forbidden in protocols/skills/hooks/CLAUDE.md (allowed in README/docs/onboarding as a product mention)
 for pattern in "@aist_me_bot" "digital-twin" "content-pipeline" \
                "knowledge-mcp" "gateway-mcp" "DS-agent-workspace/scheduler"; do
-    if [ "$MODE" = "staged" ]; then
-        count=0
-        hits=""
-        while IFS= read -r f; do
-            case "$f" in
-                .claude/skills/*|.claude/hooks/*|.claude/rules/*|memory/*|CLAUDE.md) ;;
-                *) continue ;;
-            esac
-            case "$(basename "$f")" in CHANGELOG.md) continue ;; esac
-            file_hits=$(cd "$TEMPLATE_DIR" && git show ":$f" 2>/dev/null | grep -n "$pattern" || true)
-            if [ -n "$file_hits" ]; then
-                count=$((count + $(echo "$file_hits" | wc -l | tr -d ' ')))
-                hits="${hits}${f}:"$'\n'"${file_hits}"$'\n'
-            fi
-        done <<< "$STAGED_FILES"
-    else
-        count=$(cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
-                .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
-                | grep -v 'CHANGELOG.md' | wc -l | tr -d ' ' || true)
-    fi
+    hits=$(cd "$SCAN_ROOT" && grep -rn "$pattern" \
+            .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null \
+            | grep -v 'CHANGELOG.md' || true)
+    count=$(count_hits "$hits")
     if [ "$count" -gt 0 ]; then
         [ "$CHECK1_FAIL" -eq 0 ] && echo "FAIL"
         echo "  Found '$pattern' (protocol-only) in $count locations:"
-        if [ "$MODE" = "staged" ]; then
-            echo "$hits" | head -3 || true
-        else
-            (cd "$TEMPLATE_DIR" && grep -rn "$pattern" \
-                .claude/skills .claude/hooks .claude/rules memory CLAUDE.md 2>/dev/null | head -3) || true
-        fi
+        printf '%s\n' "$hits" | head -3 || true
         CHECK1_FAIL=1
         FAIL=1
     fi
 done
 
-# staged mode: WARN about unstaged forbidden content (does not block — parallel agents)
-if [ "$MODE" = "staged" ] && [ "$(cd "$TEMPLATE_DIR" && git status --porcelain 2>/dev/null | grep -c '^.M')" -gt 0 ]; then
-    UNSTAGED_WARN=0
-    for pattern in "tserentserenov" "PACK-MIM" "aist_bot_newarchitecture" "DS-IT-systems"; do
-        warn_count=$(grep -rin "$pattern" "$TEMPLATE_DIR" --include="*.md" --include="*.sh" \
-                     --include="*.py" --include="*.yaml" --include="*.yml" \
-                     --exclude='validate-template.sh' --exclude='CHANGELOG.md' 2>/dev/null \
-                     | grep -v 'github.com/' | wc -l | tr -d ' ' || true)
-        if [ "$warn_count" -gt 0 ]; then
-            [ "$UNSTAGED_WARN" -eq 0 ] && echo "  WARN (staged mode): unstaged files contain forbidden patterns — OK for parallel-agent workflow, review before next commit"
-            UNSTAGED_WARN=1
+# staged mode: WARN about forbidden content in unstaged changes (does not
+# block — parallel agents). Only the files `git diff` reports as changed in
+# the worktree are read, not the whole tree (issue #1457).
+if [ "$MODE" = "staged" ]; then
+    UNSTAGED_FILES=()
+    while IFS= read -r -d '' f; do
+        case "$f" in *.md|*.sh|*.py|*.yaml|*.yml) ;; *) continue ;; esac
+        case "${f##*/}" in validate-template.sh|CHANGELOG.md) continue ;; esac
+        [ -f "$TEMPLATE_DIR/$f" ] && UNSTAGED_FILES+=("$f")
+    done < <(cd "$TEMPLATE_DIR" && git diff --name-only -z 2>/dev/null || true)
+    if [ "${#UNSTAGED_FILES[@]}" -gt 0 ]; then
+        warn_hits=$(cd "$TEMPLATE_DIR" && grep -in -e "tserentserenov" -e "PACK-MIM" \
+                    -e "aist_bot_newarchitecture" -e "DS-IT-systems" -- "${UNSTAGED_FILES[@]}" 2>/dev/null \
+                    | grep -v 'github.com/' || true)
+        if [ -n "$warn_hits" ]; then
+            echo "  WARN (staged mode): unstaged files contain forbidden patterns — OK for parallel-agent workflow, review before next commit"
         fi
-    done
+    fi
 fi
 [ "$CHECK1_FAIL" -eq 0 ] && echo "PASS"
 
@@ -322,40 +304,6 @@ fi
 # the CI drift gate forbids in-place edits, so scanning it here would deadlock
 # two blocking gates; its own upstream CI is responsible for content checks.
 HARDCODE_SCAN_INCLUDES=(--include="*.md" --include="*.sh" --include="*.json" --include="*.plist" --exclude-dir="guide-kit")
-
-# Staged mode for checks 2/3: scan only the staged content of the files listed
-# in STAGED_FILES (git show ":$f"), not the whole $TEMPLATE_DIR — the same fix
-# already applied to check 1 above (issue #330: staged claimed "checks ONLY staged
-# files" in its --help, but actually scanned the whole repository).
-# Prints the match count to stdout, line-by-line hits to file $3.
-hardcode_scan_staged() {
-    # $4 (optional): regex of file PATHS to skip for this scan only — the
-    # $2 exclude_re filters content lines (no filename in them), so per-file
-    # exceptions cannot be expressed there (WP-529 F6).
-    local pattern="$1" exclude_re="$2" hits_file="$3" skip_files_re="${4:-}"
-    local f file_hits count=0
-    : > "$hits_file"
-    while IFS= read -r f; do
-        case "$f" in
-            */validate-template.sh|validate-template.sh|*/setup.sh|setup.sh|CHANGELOG.md) continue ;;
-        esac
-        if [ -n "$skip_files_re" ] && echo "$f" | grep -qE "$skip_files_re"; then
-            continue
-        fi
-        case "$f" in
-            *.md|*.sh|*.json|*.plist) ;;
-            *) continue ;;
-        esac
-        case "$f" in guide-kit/*) continue ;; esac
-        file_hits=$(cd "$TEMPLATE_DIR" && git show ":$f" 2>/dev/null | grep -n "$pattern" \
-            | { [ -n "$exclude_re" ] && grep -vE "$exclude_re" || cat; } || true)
-        if [ -n "$file_hits" ]; then
-            count=$((count + $(echo "$file_hits" | wc -l | tr -d ' ')))
-            { echo "${f}:"; echo "$file_hits"; } >> "$hits_file"
-        fi
-    done <<< "$STAGED_FILES"
-    echo "$count"
-}
 
 # 2. No hardcoded /Users/ or C:\Users\ paths [pristine + staged; skip
 # only installed]. In installed mode setup.sh legitimately substituted
@@ -371,45 +319,31 @@ HARDCODE_USER_PATH_EXCLUDE_RE='/Users/\.\.\./|C:\\Users\\\.\.\.|# .*(/Users/|C:\
 # Files where /Users/ is not a hardcoded path but a search pattern for such paths
 # (the default settings guard WP-7 and its test). Exclusion by file, not by
 # line: a line exclusion would let the same text pass in any other file.
-# One list of paths from the template root for both modes: staged matches the whole
-# path (^...$), pristine drops grep lines of exactly these files, not of
+# One list of paths from the template root for both modes, matched against
+# the whole relative path (^...$): exactly these files are dropped, not
 # any files with the same name in other directories.
 HARDCODE_USER_PATH_SKIP_FILES=(scripts/check-shipped-config-secrets.sh scripts/tests/test_template_hygiene_checks.sh)
 HARDCODE_USER_PATH_SKIP_FILES_RE=''
-HARDCODE_USER_PATH_SKIP_GREP=()
 for _skip in "${HARDCODE_USER_PATH_SKIP_FILES[@]}"; do
     HARDCODE_USER_PATH_SKIP_FILES_RE="${HARDCODE_USER_PATH_SKIP_FILES_RE:+$HARDCODE_USER_PATH_SKIP_FILES_RE|}^$(printf '%s' "$_skip" | sed 's/[.]/\\./g')\$"
-    HARDCODE_USER_PATH_SKIP_GREP+=(-e "$TEMPLATE_DIR/$_skip:")
 done
 unset _skip
+hardcode_user_path_hits() {
+    grep -rn "$HARDCODE_USER_PATH_RE" "$SCAN_ROOT" "${HARDCODE_SCAN_INCLUDES[@]}" \
+        --exclude='validate-template.sh' --exclude='setup.sh' \
+        --exclude='CHANGELOG.md' 2>/dev/null \
+        | drop_hits_in_paths "$SCAN_ROOT" "$HARDCODE_USER_PATH_SKIP_FILES_RE" \
+        | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" || true
+}
 echo -n "[2/5] Hardcoded /Users/ or C:\\Users\\ paths... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — путь подставлен setup'ом)"
-elif [ "$MODE" = "staged" ]; then
-    TMPDIR_CHECK2_HITS_FILE="$(mktemp)"
-    count=$(hardcode_scan_staged "$HARDCODE_USER_PATH_RE" "$HARDCODE_USER_PATH_EXCLUDE_RE" "$TMPDIR_CHECK2_HITS_FILE" "$HARDCODE_USER_PATH_SKIP_FILES_RE")
-    if [ "$count" -gt 0 ]; then
-        echo "FAIL ($count hits)"
-        head -3 "$TMPDIR_CHECK2_HITS_FILE" || true
-        FAIL=1
-    else
-        echo "PASS"
-    fi
-    rm -f "$TMPDIR_CHECK2_HITS_FILE"
 else
-    count=$(grep -rn "$HARDCODE_USER_PATH_RE" "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
-            --exclude='validate-template.sh' --exclude='setup.sh' \
-            --exclude='CHANGELOG.md' 2>/dev/null \
-            | grep -vF "${HARDCODE_USER_PATH_SKIP_GREP[@]}" \
-            | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" \
-            | wc -l | tr -d ' ' || true)
+    hits=$(hardcode_user_path_hits)
+    count=$(count_hits "$hits")
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
-        grep -rn "$HARDCODE_USER_PATH_RE" "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
-            --exclude='validate-template.sh' --exclude='setup.sh' \
-            --exclude='CHANGELOG.md' 2>/dev/null \
-            | grep -vF "${HARDCODE_USER_PATH_SKIP_GREP[@]}" \
-            | grep -vE "$HARDCODE_USER_PATH_EXCLUDE_RE" | head -3 || true
+        printf '%s\n' "$hits" | head -3 | display_hits || true
         FAIL=1
     else
         echo "PASS"
@@ -418,53 +352,35 @@ fi
 
 # 3. No hardcoded /opt/homebrew paths [pristine + staged; skip only installed]
 # In installed mode CLAUDE_PATH=/opt/homebrew/bin/claude is a legitimate substitution.
+#
+# Path-scoped exceptions, one list for every mode (issue #1457): README.md,
+# PLATFORM-COMPAT.md and the CI workflow document the standard prefix (#530).
+# The shipped resolver copies are sanctioned exceptions (WP-529 F6,
+# #453/#463): their job is enumerating STANDARD system Python locations
+# (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
+# secret-bypass-lib.sh (WP-544 D28) is the same class: it resolves
+# jq/python3 across the standard FHS locations on macOS (both Intel
+# /usr/local/bin and Apple Silicon /opt/homebrew/bin) and Linux (/usr/bin,
+# /bin), falling back to PATH-based `command -v` only for non-standard
+# layouts (NixOS) — an absolute-path-first resolver by design, not a
+# hardcoded personal path.
+HOMEBREW_SKIP_FILES_RE='^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^\.claude/hooks/secret-bypass-lib\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$'
+homebrew_hits() {
+    grep -rn '/opt/homebrew' "$SCAN_ROOT" "${HARDCODE_SCAN_INCLUDES[@]}" \
+        --exclude='validate-template.sh' --exclude='setup.sh' \
+        --exclude='CHANGELOG.md' 2>/dev/null \
+        | drop_hits_in_paths "$SCAN_ROOT" "$HOMEBREW_SKIP_FILES_RE" \
+        | grep -v '/usr/local/bin.*:/opt/homebrew' || true
+}
 echo -n "[3/5] Hardcoded /opt/homebrew paths... "
 if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — CLAUDE_PATH может быть /opt/homebrew/...)"
-elif [ "$MODE" = "staged" ]; then
-    TMPDIR_CHECK3_HITS_FILE="$(mktemp)"
-    # The shipped resolver copies are sanctioned exceptions (WP-529 F6,
-    # #453/#463): their job is enumerating STANDARD system Python locations
-    # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    # secret-bypass-lib.sh (WP-544 D28) is the same class: it resolves
-    # jq/python3 across the standard FHS locations on macOS (both Intel
-    # /usr/local/bin and Apple Silicon /opt/homebrew/bin) and Linux (/usr/bin,
-    # /bin), falling back to PATH-based `command -v` only for non-standard
-    # layouts (NixOS) — an absolute-path-first resolver by design, not a
-    # hardcoded personal path.
-    count=$(hardcode_scan_staged '/opt/homebrew' '/usr/local/bin.*:/opt/homebrew' "$TMPDIR_CHECK3_HITS_FILE" '^README\.md$|^docs/PLATFORM-COMPAT\.md$|^\.github/workflows/validate-template\.yml$|^\.claude/lib/find-python3\.sh$|^scripts/lib/find-python3\.sh$|^seed/strategy/scripts/lib/find-python3\.sh$|^\.claude/hooks/secret-bypass-lib\.sh$|^scripts/tests/test_issue_463_setup_reuses_resolved_python3\.sh$')
-    if [ "$count" -gt 0 ]; then
-        echo "FAIL ($count hits)"
-        head -3 "$TMPDIR_CHECK3_HITS_FILE" || true
-        FAIL=1
-    else
-        echo "PASS"
-    fi
-    rm -f "$TMPDIR_CHECK3_HITS_FILE"
 else
-    # scripts/lib/find-python3.sh: sanctioned exception (WP-529 F6, #453/#463) —
-    # the resolver's whole job is enumerating STANDARD system python locations
-    # (/opt/homebrew is stock macOS Apple Silicon), not an author-machine leak.
-    count=$(grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
-            --exclude='validate-template.sh' --exclude='setup.sh' \
-            --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
-            --exclude='secret-bypass-lib.sh' \
-            --exclude='CHANGELOG.md' 2>/dev/null \
-            | grep -v 'README.md' \
-            | grep -v 'PLATFORM-COMPAT.md' \
-            | grep -v 'validate-template.yml' \
-            | grep -v '/usr/local/bin.*:/opt/homebrew' \
-            | wc -l | tr -d ' ' || true)
+    hits=$(homebrew_hits)
+    count=$(count_hits "$hits")
     if [ "$count" -gt 0 ]; then
         echo "FAIL ($count hits)"
-        grep -rn '/opt/homebrew' "$TEMPLATE_DIR" "${HARDCODE_SCAN_INCLUDES[@]}" \
-            --exclude='validate-template.sh' --exclude='setup.sh' \
-            --exclude='find-python3.sh' --exclude='test_issue_463_setup_reuses_resolved_python3.sh' \
-            --exclude='secret-bypass-lib.sh' \
-            --exclude='CHANGELOG.md' 2>/dev/null \
-            | grep -v 'README.md' | grep -v 'PLATFORM-COMPAT.md' \
-            | grep -v 'validate-template.yml' \
-            | grep -v '/usr/local/bin.*:/opt/homebrew' | head -3 || true
+        printf '%s\n' "$hits" | head -3 | display_hits || true
         FAIL=1
     else
         echo "PASS"
@@ -604,27 +520,13 @@ if [ "$MODE" = "installed" ]; then
     echo "SKIP (installed mode — пользовательская память может содержать исторические цитаты)"
 else
     FPF_STALE_PATTERN='A\.6\.8|(mastery|мастерство).*A\.2([^0-9.]|$)'
-    FPF_STALE_HITS=""
-    if [ "$MODE" = "staged" ]; then
-        while IFS= read -r f; do
-            case "$f" in
-                memory/*.md|.claude/*.md|.claude/*/*.md|.claude/*/*/*.md|docs/*.md)
-                    hits=$(git -C "$TEMPLATE_DIR" show ":$f" 2>/dev/null \
-                        | grep -niE "$FPF_STALE_PATTERN" \
-                        | sed "s#^#$f:#" || true)
-                    [ -n "$hits" ] && FPF_STALE_HITS="${FPF_STALE_HITS}${FPF_STALE_HITS:+$'\n'}$hits"
-                    ;;
-            esac
-        done <<<"$STAGED_FILES"
-    else
-        FPF_STALE_HITS=$(grep -rniE "$FPF_STALE_PATTERN" \
-            "$TEMPLATE_DIR/memory" "$TEMPLATE_DIR/.claude" "$TEMPLATE_DIR/docs" \
-            --include='*.md' 2>/dev/null || true)
-    fi
+    FPF_STALE_HITS=$(grep -rniE "$FPF_STALE_PATTERN" \
+        "$SCAN_ROOT/memory" "$SCAN_ROOT/.claude" "$SCAN_ROOT/docs" \
+        --include='*.md' 2>/dev/null || true)
 
     if [ -n "$FPF_STALE_HITS" ]; then
         echo "FAIL"
-        echo "$FPF_STALE_HITS" | sed 's/^/  /'
+        printf '%s\n' "$FPF_STALE_HITS" | display_hits | sed 's/^/  /'
         FAIL=1
     else
         echo "PASS"
