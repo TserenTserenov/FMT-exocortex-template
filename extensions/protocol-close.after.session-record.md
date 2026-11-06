@@ -31,7 +31,7 @@ if [ -n "${IWE_SESSIONS_ROOT:-}" ] && [ ! -d "$IWE_SESSIONS_ROOT" ]; then
 fi
 SESSIONS_DIR=$(
   GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-{{GOVERNANCE_REPO}}}}"
-  source "${IWE_SCRIPTS:-${IWE_TEMPLATE:-{{IWE_TEMPLATE}}}/scripts}/lib/common.sh" 2>/dev/null \
+  source "${IWE_SCRIPTS:-${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts}/lib/common.sh" 2>/dev/null \
     || source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null \
     || exit 1
   iwe_sessions_dir "$GOV_WT"

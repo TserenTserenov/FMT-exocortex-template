@@ -164,7 +164,7 @@ if [ -n "${IWE_SESSIONS_ROOT:-}" ] && [ ! -d "$IWE_SESSIONS_ROOT" ]; then
 fi
 SESSIONS_DIR=$(
   GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-{{GOVERNANCE_REPO}}}}"
-  source "${IWE_SCRIPTS:-${IWE_TEMPLATE:-{{IWE_TEMPLATE}}}/scripts}/lib/common.sh" 2>/dev/null \
+  source "${IWE_SCRIPTS:-${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts}/lib/common.sh" 2>/dev/null \
     || source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null \
     || exit 1
   iwe_sessions_dir "$GOV_WT"
@@ -289,7 +289,7 @@ grep -rlE 'strategy-session|Strategy Session|^session_type:[[:space:]]*strategy[
 
 Если режим = weekly:
 
-Загрузи `${IWE_TEMPLATE:-{{IWE_TEMPLATE}}}/roles/strategist/prompts/strategy-session-weekly.md`
+Загрузи `$IWE_TEMPLATE/roles/strategist/prompts/strategy-session-weekly.md`
 (если файл отсутствует → `bash update.sh`) и следуй ему целиком — начни с его
 собственного гейта «Обзор сессии»; состав этапов он берёт из канонической
 таблицы «Этапы сессии» полного варианта.

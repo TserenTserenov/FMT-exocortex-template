@@ -92,7 +92,7 @@ bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d
 
 ### 2. Headless week-review (если включён launchd Пн 00:00)
 
-> **Условный шаг:** если запущен через `strategist.sh week-review` (Пн 00:00 launchd) — алгоритм идёт через `${IWE_TEMPLATE:-{{IWE_TEMPLATE}}}/roles/strategist/prompts/week-review.md`. В интерактивном режиме `/week-close` (вечер Вс) — выполнять следующие шаги вручную.
+> **Условный шаг:** если запущен через `strategist.sh week-review` (Пн 00:00 launchd) — алгоритм идёт через `$IWE_TEMPLATE/roles/strategist/prompts/week-review.md`. В интерактивном режиме `/week-close` (вечер Вс) — выполнять следующие шаги вручную.
 
 ### 3. Ретро (closed/partial/not_started/blocked)
 
