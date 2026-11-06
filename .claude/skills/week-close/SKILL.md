@@ -2,7 +2,7 @@
 name: week-close
 description: "Протокол закрытия недели (Week Close). Ретро 7 дней + carry-over в новую неделю + платформенные шаги (бэкап, dirty repos)."
 argument-hint: ""
-version: 1.2.0
+version: 1.2.1
 layer: L1
 status: active
 browser_safe: false
@@ -92,7 +92,7 @@ bash {{WORKSPACE_DIR}}/scripts/server-calendar.sh --week $(date -v-mon +%Y-%m-%d
 
 ### 2. Headless week-review (если включён launchd Пн 00:00)
 
-> **Условный шаг:** если запущен через `strategist.sh week-review` (Пн 00:00 launchd) — алгоритм идёт через `{{IWE_TEMPLATE}}/roles/strategist/prompts/week-review.md`. В интерактивном режиме `/week-close` (вечер Вс) — выполнять следующие шаги вручную.
+> **Условный шаг:** если запущен через `strategist.sh week-review` (Пн 00:00 launchd) — алгоритм идёт через `${IWE_TEMPLATE:-{{IWE_TEMPLATE}}}/roles/strategist/prompts/week-review.md`. В интерактивном режиме `/week-close` (вечер Вс) — выполнять следующие шаги вручную.
 
 ### 3. Ретро (closed/partial/not_started/blocked)
 

@@ -801,7 +801,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "3d0cf7e7c0ccf3f1fb18e1ff566a2e5aa505cf7606447b271625b84d9d2b0c6d"
+      "sha256": "ae62a13a42de99937b1d82f1d5b020bce31cdfe1770d3fc56481a19d923a1aa8"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -849,7 +849,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "946e65993ebfc3b3470e19a281837f4185ebbe617e3b3460bcff6dd937fd16bb"
+      "sha256": "1d3243860b823ffd1c512560382719e6cb459d4ef9c92f26f2b74f4f2518e3c9"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -1265,7 +1265,7 @@
     },
     {
       "path": "extensions/protocol-close.after.session-record.md",
-      "sha256": "99563973bf0d5083db2ebcd31cb789073fe567f9c20bf43767553399e4244cb0"
+      "sha256": "570eefbc4280285a5bd8ef50f46dba746da151e0ebf137d5df868c0cc5616976"
     },
     {
       "path": "extensions/protocol-close.checks.fault.md",
