@@ -16,6 +16,11 @@
 # through MCP tools only, flip it back and note why.
 
 skills:
+  - name: onboarding
+    browser: false
+    keywords: ["onboarding", "онбординг", "с чего начать", "что ты умеешь", "разбери мою задачу"]
+    description: "Light onboarding: one conversation to a small result on the person's own task with a method from the local library; before/after receipt. No account, no subscription MCP. Requires local FS."
+
   - name: day-open
     browser: false
     keywords: ["day open", "открытие дня", "утро", "план на день", "day plan"]

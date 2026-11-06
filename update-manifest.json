@@ -445,7 +445,7 @@
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
-      "sha256": "370751a0a060d409b076b8a684f4361801f447979ccd185f79a7ae3a37e7e21c"
+      "sha256": "0996c9effca99e3be2db9feda8f1689f63557f226f65329706aff6485b650eb9"
     },
     {
       "path": ".claude/skills/_template/SKILL.md",
@@ -529,7 +529,7 @@
     },
     {
       "path": ".claude/skills/diagnose/SKILL.md",
-      "sha256": "c9a3d9e5fb1ad86c1a68a1e3c9cd36d830c2208dd3b9508e012e860b3b843ed6"
+      "sha256": "5e47f2f0cbcedbd5a71308a31d696341646af1c93848eac9913fbb417e670071"
     },
     {
       "path": ".claude/skills/discovery-session/SKILL.md",
@@ -658,6 +658,10 @@
     {
       "path": ".claude/skills/month-close/SKILL.md",
       "sha256": "a38900fc18c2a503e699b16906cf104854f540e6376586faec80198eeef89073"
+    },
+    {
+      "path": ".claude/skills/onboarding/SKILL.md",
+      "sha256": "8bc2be64571b7f10fc03a20c9308c323c2db39348228ad592d1113d429500abe"
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
@@ -933,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5b5c58afd3e97e25a6084d138f32c1f13c4f5a688ab0ba3eb6591ff55bddc437"
+      "sha256": "83641c5093e4980a6dd76f2e36bfe115eedb1e3b8e59e4a4f88e2cc8d0086339"
     },
     {
       "path": "CLAUDE.md",
@@ -1021,7 +1025,7 @@
     },
     {
       "path": "docs/QUICK-START.md",
-      "sha256": "66d8037c86370dd02aef648928fa4a3362429379cf0c7eac1fceffc381b9bae3"
+      "sha256": "c55a96f945dc1ddf1fb918342c56415bc6c4902ca6d56ff64355711e5e7459fd"
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
@@ -1037,7 +1041,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "1105c2530faae77482d18c3ee0d18af784bd0e3b39164fd424edf47c85240d53"
+      "sha256": "a669827d98d45682014521ec9ded33975638d84f8c83c933dbcecd07b84f28fa"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1092,8 +1096,16 @@
       "sha256": "192afd4dfa5a2ab33da5cec90c66e01da5f88053ee5ad037c098de7b9b9b26fd"
     },
     {
+      "path": "docs/onboarding/archive/web-onboarding-v2.md",
+      "sha256": "31a1f3f30e16c4e0707a4e70d594a543cceabf8de1dbbcab720916ee5d0fcedb"
+    },
+    {
       "path": "docs/onboarding/iwe-layers.md",
       "sha256": "7ae6b208267d301083c0ea6591c19018db31bc98f98eae2defb7b9017d5c45f0"
+    },
+    {
+      "path": "docs/onboarding/light-onboarding.md",
+      "sha256": "9d9d972881861fe98b8af127c0323f1b2f2d015e69656e8c174984e50c80492b"
     },
     {
       "path": "docs/onboarding/onboarding-diagrams.md",
@@ -1101,19 +1113,15 @@
     },
     {
       "path": "docs/onboarding/onboarding-guide.md",
-      "sha256": "cef88560d5c8afc182532a7a03d7fbf6aa0b447faca8abd45b70c03a3e994ca5"
+      "sha256": "d6322b656cc3b521c373491bcf217f86c944ffbb17e4adb981a57488a0e8004f"
     },
     {
       "path": "docs/onboarding/onboarding-slides.md",
-      "sha256": "58985e3d7fd2338b6815c777b834bdeb55bf8826c9fce43efc2d8afbb1a5492e"
+      "sha256": "61a39487b36920e26f297e0c35f7cbfbd9160a6b7618124839c2bf46cc62836a"
     },
     {
       "path": "docs/onboarding/web-connect-guide.md",
-      "sha256": "72d6a628e8c05c8159ac2a3c5b8918e92b43709c48c953f15d731bd2c8dcd915"
-    },
-    {
-      "path": "docs/onboarding/web-onboarding.md",
-      "sha256": "eee5fe90a126eb40c3a6e2d8c928b81748c3a7067716625ffad286f2eb3d1b4b"
+      "sha256": "99bff7469b833764ca68ffc391690d35c4803bb15c2977e837cf3cc4ea9e7460"
     },
     {
       "path": "docs/principles-vs-skills.md",
@@ -3945,6 +3953,10 @@
     {
       "path": ".claude/skills/week-close/week-close/SKILL.md",
       "reason": "issue #1415: stale v1.0.0 alias nested inside the week-close skill folder; recursive SKILL.md scanners (OpenCode) reported duplicate skill name week-close. The top-level .claude/skills/week-close/SKILL.md is the only skill."
+    },
+    {
+      "path": "docs/onboarding/web-onboarding.md",
+      "reason": "moved to docs/onboarding/archive/web-onboarding-v2.md (WP-406 Ф40): replaced by light onboarding — docs/onboarding/light-onboarding.md + /onboarding skill"
     }
   ]
 }
