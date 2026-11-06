@@ -19,8 +19,8 @@
 2. Определить каталог тем же `iwe_sessions_dir`, что использует диспетчер `/strategy-session`. `GOV_WT` — активная рабочая копия governance-репозитория, выбранная протоколом; если копия не создавалась, использовать корень governance-репозитория установки. Не подставлять репозиторий шаблона вместо governance.
 
 ```bash
-GOV_WT="${GOV_WT:-{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}}"
-IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-{{WORKSPACE_DIR}}}}"
+GOV_WT="${GOV_WT:-${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}"
+IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-$HOME/IWE}}"
 case "${IWE_SESSIONS_ROOT:-}" in
   ""|/*) ;;
   *) IWE_SESSIONS_ROOT="$IWE_ROOT/$IWE_SESSIONS_ROOT" ;;
@@ -30,9 +30,9 @@ if [ -n "${IWE_SESSIONS_ROOT:-}" ] && [ ! -d "$IWE_SESSIONS_ROOT" ]; then
   exit 1
 fi
 SESSIONS_DIR=$(
-  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-{{GOVERNANCE_REPO}}}}"
+  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
   source "${IWE_SCRIPTS:-${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts}/lib/common.sh" 2>/dev/null \
-    || source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null \
+    || source "${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh" 2>/dev/null \
     || exit 1
   iwe_sessions_dir "$GOV_WT"
 ) || SESSIONS_DIR="${IWE_SESSIONS_ROOT:-$GOV_WT/sessions}"

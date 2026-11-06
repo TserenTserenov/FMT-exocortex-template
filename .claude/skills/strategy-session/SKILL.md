@@ -153,7 +153,7 @@ fi
 ```bash
 GOV_WT="<записанный путь>"; : "${GOV_WT:?}"
 (cd -- "$GOV_WT" || exit 1
-IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-{{WORKSPACE_DIR}}}}"
+IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-$HOME/IWE}}"
 case "${IWE_SESSIONS_ROOT:-}" in
   ""|/*) ;;
   *) IWE_SESSIONS_ROOT="$IWE_ROOT/$IWE_SESSIONS_ROOT" ;;
@@ -163,9 +163,9 @@ if [ -n "${IWE_SESSIONS_ROOT:-}" ] && [ ! -d "$IWE_SESSIONS_ROOT" ]; then
   exit 1
 fi
 SESSIONS_DIR=$(
-  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-{{GOVERNANCE_REPO}}}}"
+  GOVERNANCE_REPO="${GOVERNANCE_REPO:-${IWE_GOVERNANCE_REPO:-DS-strategy}}"
   source "${IWE_SCRIPTS:-${IWE_TEMPLATE:-$HOME/IWE/FMT-exocortex-template}/scripts}/lib/common.sh" 2>/dev/null \
-    || source "{{WORKSPACE_DIR}}/scripts/lib/common.sh" 2>/dev/null \
+    || source "${IWE_WORKSPACE:-$HOME/IWE}/scripts/lib/common.sh" 2>/dev/null \
     || exit 1
   iwe_sessions_dir "$GOV_WT"
 ) || SESSIONS_DIR="${IWE_SESSIONS_ROOT:-$GOV_WT/sessions}"
