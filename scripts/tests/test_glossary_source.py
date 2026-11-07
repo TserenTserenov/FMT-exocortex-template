@@ -149,7 +149,16 @@ GRAPH_MARKERS = (
     "fetch-glossary-concepts",
     "glossary_supplier",
 )
-PROCESS_CALLS = {"run", "call", "check_call", "check_output", "Popen", "system", "popen"}
+PROCESS_FUNCS = {
+    "subprocess": {"run", "call", "check_call", "check_output", "Popen", "getoutput", "getstatusoutput"},
+    "os": {"system", "popen", "posix_spawn", "posix_spawnp"},
+    "asyncio": {"create_subprocess_exec", "create_subprocess_shell"},
+}
+PROCESS_PREFIXES = {"os": ("exec", "spawn")}
+
+
+def _is_process_func(module: str, name: str) -> bool:
+    return name in PROCESS_FUNCS.get(module, ()) or name.startswith(PROCESS_PREFIXES.get(module, ("\0",)))
 
 
 def _import_closure(entry: Path) -> set[Path]:
@@ -172,20 +181,41 @@ def _import_closure(entry: Path) -> set[Path]:
     return seen
 
 
+def _process_callees(tree: ast.AST) -> tuple[dict[str, str], dict[str, str]]:
+    """Local names bound to process modules (aliases) and to process functions (from-imports)."""
+    modules: dict[str, str] = {}
+    funcs: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in PROCESS_FUNCS:
+                    modules[alias.asname or alias.name] = alias.name
+        elif isinstance(node, ast.ImportFrom) and node.module in PROCESS_FUNCS:
+            for alias in node.names:
+                if _is_process_func(node.module, alias.name):
+                    funcs[alias.asname or alias.name] = node.module
+    return modules, funcs
+
+
 def _started_programs(path: Path) -> list[str]:
-    """First argument of each subprocess/os call; '<dynamic>' when it is not a literal."""
+    """First argument of each process start; '<dynamic>' when it is not a literal."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    modules, funcs = _process_callees(tree)
     programs = []
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
             continue
-        owner = node.func.value
-        is_process = isinstance(owner, ast.Name) and (
-            (owner.id == "subprocess" and node.func.attr in PROCESS_CALLS)
-            or (owner.id == "os" and (node.func.attr in PROCESS_CALLS or node.func.attr.startswith("exec")))
-        )
-        if not is_process or not node.args:
+        func = node.func
+        is_process = (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id in modules
+            and _is_process_func(modules[func.value.id], func.attr)
+        ) or (isinstance(func, ast.Name) and func.id in funcs)
+        if not is_process:
             continue
-        first = node.args[0]
+        keyword_args = [k.value for k in node.keywords if k.arg in ("args", "cmd", "program", "path")]
+        first = node.args[0] if node.args else (keyword_args[0] if keyword_args else None)
         if isinstance(first, (ast.List, ast.Tuple)) and first.elts and isinstance(first.elts[0], ast.Constant):
             programs.append(str(first.elts[0].value))
         elif isinstance(first, ast.Constant):
@@ -218,16 +248,22 @@ def test_allowed_scripts_and_their_imports_never_reach_the_graph():
         assert set(_started_programs(path)) <= ALLOWED_PROGRAMS, (path.name, _started_programs(path))
 
 
-def test_process_scan_sees_dynamic_and_script_calls(tmp_path):
+def test_process_scan_sees_every_way_to_start_a_program(tmp_path):
     probe = tmp_path / "probe.py"
     probe.write_text(
-        "import os, subprocess, sys\n"
-        "subprocess.run([sys.executable, 'scripts/fetch-glossary-concepts.py'])\n"
-        "subprocess.run(['git', 'status'])\n"
-        "os.system('curl x')\n",
+        "import os, sys, asyncio\n"
+        "import subprocess as sp\n"
+        "from subprocess import run as go\n"
+        "sp.run([sys.executable, 'scripts/fetch-glossary-concepts.py'])\n"
+        "sp.check_output(args=['git', 'status'])\n"
+        "go(['curl', 'x'])\n"
+        "os.system('wget x')\n"
+        "os.execvp('nc', ['nc'])\n"
+        "asyncio.create_subprocess_exec('ssh')\n"
+        "os.path.join('a', 'b')\n",
         encoding="utf-8",
     )
-    assert _started_programs(probe) == ["<dynamic>", "git", "curl"]
+    assert sorted(_started_programs(probe)) == sorted(["<dynamic>", "git", "curl", "wget", "nc", "ssh"])
 
 
 def test_supplier_workflow_is_not_started_by_a_push():

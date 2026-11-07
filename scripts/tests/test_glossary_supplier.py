@@ -185,3 +185,52 @@ def test_changelog_creates_changed_subsection_when_missing():
 def test_changelog_without_unreleased_fails():
     with pytest.raises(SUP.SupplierError):
         SUP.add_changelog_entry("## [0.40.0]\n", 7)
+
+
+# Findings of the cold review, peer-session 2026-11-07-07.
+
+
+def test_same_russian_name_in_two_concepts_keeps_the_local_row_while_one_conflicts(root):
+    local = root / "translation" / "glossary-local.csv"
+    local.write_text(local.read_text(encoding="utf-8") + "Модель,Model,,,3\n", encoding="utf-8")
+    result = run(root, *BASE_ROWS, concept("DP.X.1", "Модель", "Model"), concept("DP.X.2", "Модель", "Mold"))
+    assert [c["code"] for c in result.conflicts] == ["DP.X.2"]
+    assert "Модель,Model" in local.read_text(encoding="utf-8")
+    assert "Убрано из ручного словаря" not in result.body
+    assert {"DP.X.1", "DP.X.2"}.isdisjoint(snapshot_terms(root))  # the whole name waits for the pilot
+    terms = load_glossary(yaml.safe_load((root / "translation-manifest.yaml").read_text(encoding="utf-8")), root)
+    assert terms.as_mapping()["Модель"] == "Model"
+
+
+def test_row_removal_keeps_records_with_line_breaks_inside_quotes():
+    text = LOCAL_HEADER + 'Пак,Pack,,"a\nb",3\nРоль,Role,,"x y",3\nМетод,Method,,,3\n'
+    assert SUP.without_local_rows(text, ["Роль"]) == LOCAL_HEADER + 'Пак,Pack,,"a\nb",3\nМетод,Method,,,3\n'
+    assert SUP.without_local_rows(text, ["Пак"]) == LOCAL_HEADER + 'Роль,Role,,"x y",3\nМетод,Method,,,3\n'
+
+
+def test_local_row_without_english_is_not_a_conflict():
+    included = [{"code": "DP.M.1", "term_ru": "Метод", "term_en": "Method"}]
+    assert SUP.local_conflicts(included, [{"term_ru": "Метод", "term_en": ""}, {"term_ru": "Метод"}]) == []
+
+
+def test_glossary_that_would_not_load_writes_nothing(root):
+    before = files(root)
+    manifest_path = root / "translation-manifest.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    manifest["glossary"]["tier_by_level"].pop("zp")  # the loader refuses a level without a tier
+    manifest_path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+    with pytest.raises(SUP.GlossaryError):
+        run(root, concept("DP.M.1", "Метод", "Way of working"), *BASE_ROWS[1:])
+    assert files(root) == before
+
+
+def test_conflict_is_announced_once_per_open_request(root):
+    first = run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"))
+    assert first.announce is True
+    open_request_meta = json.loads((root / "translation" / "glossary-snapshot.meta.json").read_text(encoding="utf-8"))
+    # Next day: a new term arrives, the conflict is the same one the open request already showed the pilot.
+    again = SUP.refresh(
+        root, payload(*BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"), concept("DP.M.6", "Роль", "Role")),
+        root / "allowlist.yaml", open_request_meta,
+    )
+    assert again.changed is True and again.announce is False

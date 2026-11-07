@@ -10,7 +10,8 @@ Never runs in translate-sync.yml: publication reads files only (decision D').
     agreed in peer-session 2026-11-07-07:
 
     * a graph term whose English name differs from a local row is left out of the
-      snapshot and listed under ``conflict_local`` in the passport — the local row
+      snapshot (with every concept of the same Russian name) and listed under
+      ``conflict_local`` in the passport — the local row
       may be a pilot decision not yet moved to the graph, so the graph does not
       silently win; the rest of the update is not held back;
     * a local row the snapshot now covers with the same English name is removed,
@@ -29,6 +30,7 @@ from __future__ import annotations
 import argparse
 import csv
 import importlib.util
+import io
 import json
 import sys
 import tempfile
@@ -68,6 +70,8 @@ class Refresh:
     changed: bool
     conflicts: list[dict] = field(default_factory=list)
     body: str = ""
+    # True when the conflict list is not the one the pilot was already told about.
+    announce: bool = False
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -77,7 +81,12 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
 def local_conflicts(included: list[dict], local_rows: list[dict[str, str]]) -> list[dict]:
     """Graph rows whose Russian name is in the local glossary under another English name."""
-    local_en = {_key(r["term_ru"]): r["term_en"].strip() for r in local_rows if r.get("term_ru", "").strip()}
+    # Same reading as the loader: a local row without both names is not a term and cannot conflict.
+    local_en = {}
+    for row in local_rows:
+        ru, en = (row.get("term_ru") or "").strip(), (row.get("term_en") or "").strip()
+        if ru and en:
+            local_en[_key(ru)] = en
     conflicts = []
     for item in included:
         local = local_en.get(_key(item["term_ru"]))
@@ -105,16 +114,22 @@ def local_rows_to_drop(snapshot_rows: list[dict], local_rows: list[dict[str, str
 
 
 def without_local_rows(text: str, drop: list[str]) -> str:
-    """Remove rows by Russian name, keeping every other line byte for byte (csv rewriting would requote them)."""
-    lines = text.splitlines(keepends=True)
+    """Remove rows by Russian name, keeping every other line byte for byte (csv rewriting would requote them).
+
+    Physical lines are split on newline only; the csv reader reports how many of them each record used,
+    so a quoted line break or an exotic separator inside a field never leaves a fragment behind.
+    """
     keys = {_key(ru) for ru in drop}
-    kept = lines[:1]
-    for line in lines[1:]:
-        parsed = list(csv.reader([line]))
-        if len(parsed) != 1:
-            raise SupplierError(f"local glossary row spans several lines: {line[:60]!r}")
-        if not parsed[0] or _key(parsed[0][0]) not in keys:
-            kept.append(line)
+    lines = io.StringIO(text, newline="").readlines()
+    reader = csv.reader(iter(lines))
+    kept: list[str] = []
+    consumed = 0
+    for index, record in enumerate(reader):
+        span = lines[consumed : reader.line_num]
+        consumed = reader.line_num
+        if index == 0 or not record or _key(record[0]) not in keys:
+            kept.extend(span)
+    kept.extend(lines[consumed:])
     return "".join(kept)
 
 
@@ -167,7 +182,20 @@ def render_body(diff: dict, conflicts: list[dict], dropped: list[str], old_meta:
     return "\n".join(lines) + "\n"
 
 
-def refresh(root: Path, payload: dict, allowlist_path: Path) -> Refresh:
+def _check_loads(manifest: dict, staged_snapshot: Path, staged_local: Path) -> None:
+    """The merge request must not break translation: same loader, same rules, run on the staged files."""
+    staged_manifest = {
+        **manifest,
+        "glossary": {**manifest["glossary"], "snapshot": staged_snapshot.name, "local": staged_local.name},
+    }
+    load_glossary(staged_manifest, staged_snapshot.parent)
+
+
+def refresh(root: Path, payload: dict, allowlist_path: Path, announced_meta: dict | None = None) -> Refresh:
+    """Rebuild snapshot and local glossary; write them only if they changed and still load.
+
+    ``announced_meta`` is the passport the pilot last saw in an open merge request; without it, main's.
+    """
     manifest = yaml.safe_load((root / "translation-manifest.yaml").read_text(encoding="utf-8"))
     cfg = manifest["glossary"]
     snapshot_path, local_path = root / cfg["snapshot"], root / cfg["local"]
@@ -182,19 +210,26 @@ def refresh(root: Path, payload: dict, allowlist_path: Path) -> Refresh:
     allowlist = EXPORTER.load_allowlist(allowlist_path)
     included, excluded, as_of = EXPORTER.build_rows(payload, allowlist)
     conflicts = local_conflicts(included, local_rows)
-    conflict_codes = {c["code"] for c in conflicts}
-    included = [item for item in included if item["code"] not in conflict_codes]
-    if conflicts:
-        excluded["conflict-local"] += len(conflicts)
+    # The whole Russian name waits for the pilot, not only the disagreeing concept: a second concept with the
+    # same name and the local English would make the local row a duplicate the loader refuses.
+    conflict_keys = {_key(c["term_ru"]) for c in conflicts}
+    held = [item for item in included if _key(item["term_ru"]) in conflict_keys]
+    included = [item for item in included if _key(item["term_ru"]) not in conflict_keys]
+    if held:
+        excluded["conflict-local"] += len(held)
     meta = EXPORTER.build_meta(payload, included, excluded, as_of, allowlist_path)
     if conflicts:
         meta["conflict_local"] = conflicts
 
     dropped = local_rows_to_drop(included, local_rows, tier_by_level)
     new_local_text = without_local_rows(local_text, dropped)
-    with tempfile.TemporaryDirectory() as tmp:
+    announce = bool(conflicts) and conflicts != (announced_meta or old_meta).get("conflict_local", [])
+    # Staged next to the target: os.replace cannot cross filesystems.
+    with tempfile.TemporaryDirectory(dir=snapshot_path.parent) as tmp:
         staged = Path(tmp) / snapshot_path.name
+        staged_local = Path(tmp) / local_path.name
         EXPORTER.write_snapshot(included, meta, staged)
+        staged_local.write_text(new_local_text, encoding="utf-8")
         # A new conflict may leave the snapshot rows untouched (the concept never was in it);
         # it still has to reach the pilot, so a changed conflict list is a change too.
         unchanged = (
@@ -204,14 +239,13 @@ def refresh(root: Path, payload: dict, allowlist_path: Path) -> Refresh:
         )
         if unchanged:
             return Refresh(changed=False, conflicts=conflicts)
+        _check_loads(manifest, staged, staged_local)
         staged.replace(snapshot_path)
         staged.with_suffix(".meta.json").replace(meta_path)
-    local_path.write_text(new_local_text, encoding="utf-8")
+        staged_local.replace(local_path)
 
-    # The merge request must not break translation: same loader, same rules as the pipeline.
-    load_glossary(manifest, root)
-    body = render_body(snapshot_diff(old_rows, read_rows(snapshot_path)), conflicts, dropped, old_meta, meta)
-    return Refresh(changed=True, conflicts=conflicts, body=body)
+    body = render_body(snapshot_diff(old_rows, included), conflicts, dropped, old_meta, meta)
+    return Refresh(changed=True, conflicts=conflicts, body=body, announce=announce)
 
 
 def add_changelog_entry(text: str, pr: int) -> str:
@@ -236,7 +270,10 @@ def add_changelog_entry(text: str, pr: int) -> str:
 def _cmd_refresh(args: argparse.Namespace) -> int:
     try:
         payload = json.loads(args.input.read_text(encoding="utf-8"))
-        result = refresh(args.root, payload, args.allowlist)
+        announced = None
+        if args.announced_meta and args.announced_meta.is_file():
+            announced = json.loads(args.announced_meta.read_text(encoding="utf-8"))
+        result = refresh(args.root, payload, args.allowlist, announced)
     except (OSError, json.JSONDecodeError, yaml.YAMLError, KeyError, EXPORTER.SnapshotError, GlossaryError, SupplierError) as exc:
         print(f"glossary-supplier: {exc}", file=sys.stderr)
         return 2
@@ -244,6 +281,7 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
         args.body_out.write_text(result.body, encoding="utf-8")
     print(f"changed={'true' if result.changed else 'false'}")
     print(f"conflicts={len(result.conflicts)}")
+    print(f"announce={'true' if result.announce else 'false'}")
     return 0
 
 
@@ -265,6 +303,9 @@ def main(argv: list[str] | None = None) -> int:
     p_refresh.add_argument("--input", required=True, type=Path, help="вывод fetch-glossary-concepts.py")
     p_refresh.add_argument("--allowlist", type=Path, default=SCRIPTS.parent / "translation" / "glossary-snapshot-allowlist.yaml")
     p_refresh.add_argument("--body-out", required=True, type=Path)
+    p_refresh.add_argument(
+        "--announced-meta", type=Path, help="паспорт снимка из открытого запроса: о его конфликтах пилот уже знает"
+    )
     p_refresh.set_defaults(handler=_cmd_refresh)
     p_log = sub.add_parser("changelog", help="добавить запись [Unreleased] со ссылкой на запрос")
     p_log.add_argument("--pr", required=True, type=int)

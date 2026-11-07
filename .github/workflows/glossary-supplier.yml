@@ -36,6 +36,10 @@ jobs:
   supply:
     runs-on: ubuntu-latest
     if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    defaults:
+      run:
+        # Explicit bash = -eo pipefail: a failed refresh piped into tee must turn the run red.
+        shell: bash
     steps:
       - name: App token (canon-sync)
         id: app_token
@@ -63,12 +67,30 @@ jobs:
           GLOSSARY_EXPORTER_SERVICE_SECRET: ${{ secrets.GLOSSARY_EXPORTER_SERVICE_SECRET }}
         run: python3 scripts/fetch-glossary-concepts.py --output "$RUNNER_TEMP/concepts.json"
 
+      - name: Passport of the open merge request (conflicts the pilot already knows about)
+        run: |
+          if git fetch --quiet origin "$BRANCH" 2>/dev/null; then
+            git show "FETCH_HEAD:translation/glossary-snapshot.meta.json" > "$RUNNER_TEMP/announced-meta.json"
+          fi
+
       - name: Rebuild the snapshot and the local glossary
         id: refresh
         run: |
           python3 scripts/glossary_supplier.py refresh \
             --input "$RUNNER_TEMP/concepts.json" \
+            --announced-meta "$RUNNER_TEMP/announced-meta.json" \
             --body-out "$RUNNER_TEMP/pr-body.md" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Close an outdated merge request
+        # The graph is back to what main has: yesterday's request would apply a stale snapshot.
+        if: steps.refresh.outputs.changed == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$PR" ]; then
+            gh pr close "$PR" --delete-branch --comment "Граф снова совпадает со снимком в main — запрос устарел, закрыт поставщиком."
+          fi
 
       - name: Commit the snapshot onto the supplier branch
         if: steps.refresh.outputs.changed == 'true'
@@ -126,15 +148,17 @@ jobs:
 
       - name: Notice to the pilot channel (optional, fail-open)
         # Same channel as release-watchdog.yml: off until PILOT_NOTICE_ENDPOINT is set.
-        # A conflict is announced once, when it enters the request — not every day it stays unresolved.
-        if: always() && vars.PILOT_NOTICE_ENDPOINT != '' && (failure() || (steps.refresh.outputs.changed == 'true' && steps.refresh.outputs.conflicts != '0'))
+        # A conflict is announced once: when the list differs from the one in the open request (or main).
+        if: always() && vars.PILOT_NOTICE_ENDPOINT != '' && (failure() || steps.refresh.outputs.announce == 'true')
         continue-on-error: true
         env:
           ENDPOINT: ${{ vars.PILOT_NOTICE_ENDPOINT }}
           WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
-          KIND: ${{ failure() && 'glossary-supplier-failed' || 'glossary-conflict' }}
+          JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          KIND=glossary-conflict
+          [ "$JOB_STATUS" = "success" ] || KIND=glossary-supplier-failed
           curl -sS --max-time 10 -X POST "$ENDPOINT" \
             -H "Content-Type: application/json" \
             -H "X-Webhook-Secret: $WEBHOOK_SECRET" \

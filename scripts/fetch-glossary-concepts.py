@@ -48,6 +48,10 @@ class FetchError(Exception):
     """Обход не дал проверенного входа. Файл не пишется."""
 
 
+class WalkError(FetchError):
+    """Обход страниц сорвался (курсор, потолок страниц); граф мог измениться во время обхода — обход повторяется."""
+
+
 def http_transport(secret: str, endpoint: str = ENDPOINT) -> Transport:
     def post(payload: dict) -> dict:
         request = urllib.request.Request(
@@ -95,9 +99,9 @@ def walk_pages(post: Transport, max_pages: int) -> tuple[list[dict], str]:
             return rows, as_of
         # A cursor that does not move forward would loop forever over the same page.
         if next_after_id <= after_id:
-            raise FetchError(f"курсор обхода не растёт: after_id={after_id}, next_after_id={next_after_id}")
+            raise WalkError(f"курсор обхода не растёт: after_id={after_id}, next_after_id={next_after_id}")
         after_id = next_after_id
-    raise FetchError(f"обход не закончился за {max_pages} страниц")
+    raise WalkError(f"обход не закончился за {max_pages} страниц")
 
 
 def check_controls(rows: list[dict]) -> None:
@@ -134,7 +138,11 @@ def fetch_payload(post: Transport) -> dict:
     last_error = ""
     for _ in range(MAX_ATTEMPTS):
         stats_before = call_tool(post, "graph_stats", {})
-        rows, as_of = walk_pages(post, page_ceiling(stats_before))
+        try:
+            rows, as_of = walk_pages(post, page_ceiling(stats_before))
+        except WalkError as exc:
+            last_error = str(exc)
+            continue
         check_controls(rows)
         stats_after = call_tool(post, "graph_stats", {})
         last_error = completeness_error(rows, stats_before) or completeness_error(rows, stats_after) or ""

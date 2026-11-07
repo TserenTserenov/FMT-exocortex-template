@@ -119,7 +119,7 @@ def test_cursor_that_does_not_grow_stops_the_walk():
     gateway = StuckCursorGateway(rows, [stats_for(rows)])
     with pytest.raises(MOD.FetchError, match="курсор обхода не растёт"):
         MOD.fetch_payload(gateway)
-    assert gateway.list_calls == 2
+    assert gateway.list_calls == 2 * MOD.MAX_ATTEMPTS  # each attempt stops at the second page
 
 
 def test_walk_longer_than_the_graph_allows_stops(monkeypatch):
@@ -129,7 +129,7 @@ def test_walk_longer_than_the_graph_allows_stops(monkeypatch):
     gateway = FakeGateway(rows, [stats_for(rows, concepts=4)])
     with pytest.raises(MOD.FetchError, match="не закончился за 4 страниц"):
         MOD.fetch_payload(gateway)
-    assert gateway.list_calls == 4
+    assert gateway.list_calls == 4 * MOD.MAX_ATTEMPTS  # a walk cut by the ceiling is retried like a changed graph
 
 
 def test_missing_row_gives_incomplete_snapshot_after_all_attempts():
