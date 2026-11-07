@@ -67,7 +67,20 @@ jobs:
           GLOSSARY_EXPORTER_SERVICE_SECRET: ${{ secrets.GLOSSARY_EXPORTER_SERVICE_SECRET }}
         run: python3 scripts/fetch-glossary-concepts.py --output "$RUNNER_TEMP/concepts.json"
 
+      - name: Find the open merge request of the supplier
+        # Filtered by the head repository owner: a fork may have a branch of the same name (public repo, many forks).
+        id: open
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          PR=$(gh pr list --head "$BRANCH" --state open --json number,headRepositoryOwner \
+            --jq "[.[] | select(.headRepositoryOwner.login == \"$OWNER\")][0].number // empty")
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+
       - name: Passport of the open merge request (conflicts the pilot already knows about)
+        # Only an open request counts as announced; a closed one leaves its branch behind, which tells nobody anything.
+        if: steps.open.outputs.number != ''
         run: |
           if git fetch --quiet origin "$BRANCH" 2>/dev/null; then
             # No passport on the branch → nothing announced yet; refresh then compares with main.
@@ -85,14 +98,12 @@ jobs:
 
       - name: Close an outdated merge request
         # The graph is back to what main has: yesterday's request would apply a stale snapshot.
-        if: steps.refresh.outputs.changed == 'false'
+        if: steps.refresh.outputs.changed == 'false' && steps.open.outputs.number != ''
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          PR: ${{ steps.open.outputs.number }}
         run: |
-          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$PR" ]; then
-            gh pr close "$PR" --delete-branch --comment "Граф снова совпадает со снимком в main — запрос устарел, закрыт поставщиком."
-          fi
+          gh pr close "$PR" --delete-branch --comment "Граф снова совпадает со снимком в main — запрос устарел, закрыт поставщиком."
 
       - name: Commit the snapshot onto the supplier branch
         if: steps.refresh.outputs.changed == 'true'
@@ -105,15 +116,17 @@ jobs:
           git commit -m "chore(glossary): refresh terms snapshot from the concept graph (WP-617 Ф4)" \
             -m "Changelog-Tag: optional"
 
-      - name: Open or reuse the merge request
+      - name: Open the merge request when there is none
         id: pr
         if: steps.refresh.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          OPEN: ${{ steps.open.outputs.number }}
         run: |
-          git push --force origin "$BRANCH"
-          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          PR="$OPEN"
           if [ -z "$PR" ]; then
+            # The number is needed for the changelog entry, so the request exists before the final push.
+            git push --force origin "$BRANCH"
             URL=$(gh pr create --base main --head "$BRANCH" \
               --title "Снимок терминов перевода из графа понятий" \
               --body-file "$RUNNER_TEMP/pr-body.md")
@@ -131,16 +144,36 @@ jobs:
           bash generate-manifest.sh
           git add CHANGELOG.md update-manifest.json
           git commit -m "docs(changelog): glossary snapshot refresh (#$PR)" -m "Changelog-Tag: optional"
-          git push --force origin "$BRANCH"
 
-      - name: Description and conflict label
+      - name: Publish the branch when its content differs
+        # An identical tree is not pushed: every push restarts the checks of the open request and
+        # dismisses a stale approval, and the job runs daily.
         if: steps.refresh.outputs.changed == 'true'
+        run: |
+          if git fetch --quiet origin "$BRANCH" 2>/dev/null \
+            && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'FETCH_HEAD^{tree}')" ]; then
+            echo "Ветка уже содержит тот же результат: пуш не нужен."
+          else
+            git push --force origin "$BRANCH"
+          fi
+
+      - name: Description of the merge request
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: gh pr edit "$PR" --body-file "$RUNNER_TEMP/pr-body.md"
+
+      - name: Conflict label
+        # Cosmetic: the label needs the app's issues permission, which the conflict path has not exercised yet.
+        # The conflict itself is already in the request body, so a failure here must not turn the run red.
+        if: steps.refresh.outputs.changed == 'true'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
           PR: ${{ steps.pr.outputs.number }}
           CONFLICTS: ${{ steps.refresh.outputs.conflicts }}
         run: |
-          gh pr edit "$PR" --body-file "$RUNNER_TEMP/pr-body.md"
           gh label create glossary-conflict --description "Graph and local glossary disagree on an English name" --color D93F0B 2>/dev/null || true
           if [ "$CONFLICTS" != "0" ]; then
             gh pr edit "$PR" --add-label glossary-conflict

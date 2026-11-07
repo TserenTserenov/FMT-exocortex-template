@@ -100,7 +100,9 @@ def test_payload_walks_all_pages_and_renames_name_to_name_ru(monkeypatch):
 def test_payload_carries_graph_counters_for_the_passport():
     rows = control_rows()
     result = MOD.fetch_payload(FakeGateway(rows, [stats_for(rows)]))
-    assert result["graph_stats"] == stats_for(rows)
+    # Only what the public filter lets through: totals would reveal the size of the closed sources.
+    assert result["graph_stats"] == {"visible_concepts": len(rows), "visible_publishable": 3}
+    assert "hidden_by_closed_sources_count" not in json.dumps(result)
 
 
 class StuckCursorGateway(FakeGateway):
@@ -173,10 +175,11 @@ def test_unexpected_rules_version_stops():
 
 def test_gateway_error_is_reported_with_tool_name():
     def failing(payload):
-        return {"error": {"message": "concept_list requires a platform service credential"}}
+        return {"error": {"code": -32001, "message": "internal detail that must not reach a public log"}}
 
-    with pytest.raises(MOD.FetchError, match="graph_stats: concept_list requires"):
+    with pytest.raises(MOD.FetchError, match=r"graph_stats: ошибка шлюза \(код -32001\)") as caught:
         MOD.fetch_payload(failing)
+    assert "internal detail" not in str(caught.value)
 
 
 def test_cli_without_secret_writes_nothing(tmp_path: Path, monkeypatch, capsys):
@@ -185,3 +188,18 @@ def test_cli_without_secret_writes_nothing(tmp_path: Path, monkeypatch, capsys):
     assert MOD.main(["--output", str(out)]) == 2
     assert not out.exists()
     assert MOD.SECRET_ENV in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("cursor", ["5", 5.5, True, {"id": 5}])
+def test_cursor_that_is_not_an_integer_is_a_walk_error_not_a_traceback(cursor):
+    rows = control_rows()
+
+    class OddCursor(FakeGateway):
+        def __call__(self, payload):
+            if payload["params"]["name"] == "graph_stats":
+                return super().__call__(payload)
+            body = {"as_of": "2026-11-01T20:00:00.000Z", "rows": self.rows[:1], "next_after_id": cursor}
+            return {"result": {"content": [{"text": json.dumps(body)}]}}
+
+    with pytest.raises(MOD.FetchError, match="курсор обхода не число"):
+        MOD.fetch_payload(OddCursor(rows, [stats_for(rows)]))

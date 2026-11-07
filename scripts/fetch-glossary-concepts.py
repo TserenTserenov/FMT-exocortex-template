@@ -25,12 +25,6 @@ USER_AGENT = "iwe-glossary-exporter/1"
 PAGE_LIMIT = 500
 MAX_ATTEMPTS = 3
 RULES_VERSION = "name-en-publishable/1"
-GRAPH_STAT_KEYS = (
-    "concepts",
-    "hidden_by_closed_sources_count",
-    "name_en_publishable_count",
-    "name_en_publishable_hidden_count",
-)
 
 # Эталон набора приёмки: код -> (name_en, name_en_publishable) либо None, если в графе его нет.
 CONTROLS: dict[str, tuple[str | None, bool] | None] = {
@@ -76,7 +70,8 @@ def call_tool(post: Transport, name: str, arguments: dict) -> dict:
         {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": name, "arguments": arguments}}
     )
     if response.get("error"):
-        raise FetchError(f"{name}: {response['error'].get('message')}")
+        # The run log of this repository is public: the gateway's text is not echoed, only its error code.
+        raise FetchError(f"{name}: ошибка шлюза (код {response['error'].get('code', 'нет')})")
     return json.loads(response["result"]["content"][0]["text"])
 
 
@@ -97,6 +92,8 @@ def walk_pages(post: Transport, max_pages: int) -> tuple[list[dict], str]:
         next_after_id = page["next_after_id"]
         if next_after_id is None:
             return rows, as_of
+        if not isinstance(next_after_id, int) or isinstance(next_after_id, bool):
+            raise WalkError(f"курсор обхода не число: {type(next_after_id).__name__}")
         # A cursor that does not move forward would loop forever over the same page.
         if next_after_id <= after_id:
             raise WalkError(f"курсор обхода не растёт: after_id={after_id}, next_after_id={next_after_id}")
@@ -149,8 +146,13 @@ def fetch_payload(post: Transport) -> dict:
         if not last_error:
             return {
                 "as_of": as_of,
-                # Informational: the snapshot passport records the graph counters (not a gate, WP-617 Ф4).
-                "graph_stats": {key: stats_after[key] for key in GRAPH_STAT_KEYS},
+                # Informational passport counters (not a gate). Only what the public filter lets through:
+                # the totals would reveal the size of the closed sources, and this repository is public.
+                "graph_stats": {
+                    "visible_concepts": stats_after["concepts"] - stats_after["hidden_by_closed_sources_count"],
+                    "visible_publishable": stats_after["name_en_publishable_count"]
+                    - stats_after["name_en_publishable_hidden_count"],
+                },
                 "rows": [{**{k: v for k, v in row.items() if k != "name"}, "name_ru": row["name"]} for row in rows],
             }
     raise FetchError(f"снимок неполный после {MAX_ATTEMPTS} обходов: {last_error}")
