@@ -25,6 +25,12 @@ USER_AGENT = "iwe-glossary-exporter/1"
 PAGE_LIMIT = 500
 MAX_ATTEMPTS = 3
 RULES_VERSION = "name-en-publishable/1"
+GRAPH_STAT_KEYS = (
+    "concepts",
+    "hidden_by_closed_sources_count",
+    "name_en_publishable_count",
+    "name_en_publishable_hidden_count",
+)
 
 # Эталон набора приёмки: код -> (name_en, name_en_publishable) либо None, если в графе его нет.
 CONTROLS: dict[str, tuple[str | None, bool] | None] = {
@@ -70,17 +76,28 @@ def call_tool(post: Transport, name: str, arguments: dict) -> dict:
     return json.loads(response["result"]["content"][0]["text"])
 
 
-def walk_pages(post: Transport) -> tuple[list[dict], str]:
+def page_ceiling(stats: dict) -> int:
+    """Most pages a full walk may take: expected rows from graph_stats plus slack for growth mid-walk."""
+    expected_rows = stats["concepts"] - stats["hidden_by_closed_sources_count"]
+    return -(-expected_rows // PAGE_LIMIT) + 2
+
+
+def walk_pages(post: Transport, max_pages: int) -> tuple[list[dict], str]:
     rows: list[dict] = []
     as_of = ""
     after_id = 0
-    while True:
+    for _ in range(max_pages):
         page = call_tool(post, "concept_list", {"after_id": after_id, "limit": PAGE_LIMIT})
         rows.extend(page["rows"])
         as_of = page["as_of"]
-        after_id = page["next_after_id"]
-        if after_id is None:
+        next_after_id = page["next_after_id"]
+        if next_after_id is None:
             return rows, as_of
+        # A cursor that does not move forward would loop forever over the same page.
+        if next_after_id <= after_id:
+            raise FetchError(f"курсор обхода не растёт: after_id={after_id}, next_after_id={next_after_id}")
+        after_id = next_after_id
+    raise FetchError(f"обход не закончился за {max_pages} страниц")
 
 
 def check_controls(rows: list[dict]) -> None:
@@ -117,13 +134,15 @@ def fetch_payload(post: Transport) -> dict:
     last_error = ""
     for _ in range(MAX_ATTEMPTS):
         stats_before = call_tool(post, "graph_stats", {})
-        rows, as_of = walk_pages(post)
+        rows, as_of = walk_pages(post, page_ceiling(stats_before))
         check_controls(rows)
         stats_after = call_tool(post, "graph_stats", {})
         last_error = completeness_error(rows, stats_before) or completeness_error(rows, stats_after) or ""
         if not last_error:
             return {
                 "as_of": as_of,
+                # Informational: the snapshot passport records the graph counters (not a gate, WP-617 Ф4).
+                "graph_stats": {key: stats_after[key] for key in GRAPH_STAT_KEYS},
                 "rows": [{**{k: v for k, v in row.items() if k != "name"}, "name_ru": row["name"]} for row in rows],
             }
     raise FetchError(f"снимок неполный после {MAX_ATTEMPTS} обходов: {last_error}")

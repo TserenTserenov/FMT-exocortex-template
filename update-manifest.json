@@ -909,7 +909,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "83e3dd1591839924917be9056525a4103739b389e0495fafad0a16d7e11946ba"
+      "sha256": "d49efe95a0ec6328bbebf55e466a64923d6250906dbb066e639d84799f29abd3"
     },
     {
       "path": ".gitignore",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "4cde14d42f94252c0e0e363b33a0a5b2fff8304e5554e500315a1f512aec6859"
+      "sha256": "d10a8b41c3d3aaa2badbb8bb413fabe3a62267a0887290bae3188ddc8fa69bfc"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3487,6 +3487,7 @@
     "scripts/fetch-glossary-concepts.py",
     "scripts/generate-helper-catalog.py",
     "scripts/glossary_source.py",
+    "scripts/glossary_supplier.py",
     "scripts/guide-kit-sync-state.yaml",
     "scripts/guide-kit-sync.sh",
     "scripts/iwe-catalog-list.py",
@@ -3542,6 +3543,7 @@
     "scripts/tests/test_fetch_glossary_concepts.py",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
     "scripts/tests/test_glossary_source.py",
+    "scripts/tests/test_glossary_supplier.py",
     "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_issue_1003_ds_publish.sh",
     "scripts/tests/test_issue_1004_claude_md_backup.sh",
