@@ -49,6 +49,8 @@ from glossary_source import (
 SCRIPTS = Path(__file__).resolve().parent
 EXPORTER_PATH = SCRIPTS / "export-glossary-snapshot.py"
 CHANGELOG_MARKER = "WP-617, #"
+# GitHub rejects a pull request body over 65 536 characters; a long list is cut, the files hold the rest.
+MAX_LISTED_ROWS = 100
 
 
 def _load_exporter():
@@ -156,6 +158,13 @@ def _stats_line(old_meta: dict, new_meta: dict) -> str:
     return "Счётчики графа (было → стало): " + "; ".join(parts) + "."
 
 
+def _listed(lines: list[str]) -> list[str]:
+    """First MAX_LISTED_ROWS lines of a section, then how many were left out."""
+    if len(lines) <= MAX_LISTED_ROWS:
+        return lines
+    return lines[:MAX_LISTED_ROWS] + [f"- … и ещё {len(lines) - MAX_LISTED_ROWS} (полный список — в файлах запроса)"]
+
+
 def render_body(diff: dict, conflicts: list[dict], dropped: list[str], old_meta: dict, new_meta: dict) -> str:
     lines = [
         "Ежедневное обновление снимка терминов перевода из графа понятий (WP-617 Ф4).",
@@ -166,19 +175,28 @@ def render_body(diff: dict, conflicts: list[dict], dropped: list[str], old_meta:
     ]
     if conflicts:
         lines += ["## Требует решения", "", "Английское имя в графе расходится с ручным словарём. Понятие не вошло в снимок, перевод пока берёт имя из ручного словаря. Поправьте имя в графе или удалите строку ручного словаря — понятие войдёт в следующий снимок.", ""]
-        lines += [f"- `{c['code']}` «{c['term_ru']}»: граф `{c['term_en_graph']}`, ручной словарь `{c['term_en_local']}`" for c in conflicts]
+        lines += _listed(
+            [f"- `{c['code']}` «{c['term_ru']}»: граф `{c['term_en_graph']}`, ручной словарь `{c['term_en_local']}`" for c in conflicts]
+        )
         lines.append("")
     for title, rows in (("Появились", diff["added"]), ("Исчезли", diff["removed"])):
         if rows:
-            lines += [f"## {title} ({len(rows)})", ""] + [f"- `{r['code']}` «{r['term_ru']}» → {r['term_en']}" for r in rows] + [""]
+            listed = _listed([f"- `{r['code']}` «{r['term_ru']}» → {r['term_en']}" for r in rows])
+            lines += [f"## {title} ({len(rows)})", ""] + listed + [""]
     if diff["changed"]:
         lines += [f"## Изменились ({len(diff['changed'])})", ""]
-        lines += [f"- `{new['code']}` «{old['term_ru']}» → {old['term_en']} ⇒ «{new['term_ru']}» → {new['term_en']}" for old, new in diff["changed"]]
+        lines += _listed(
+            [f"- `{new['code']}` «{old['term_ru']}» → {old['term_en']} ⇒ «{new['term_ru']}» → {new['term_en']}" for old, new in diff["changed"]]
+        )
         lines.append("")
     if dropped:
         lines += [f"## Убрано из ручного словаря ({len(dropped)})", "", "Граф даёт то же английское имя и не мягче по проверке.", ""]
-        lines += [f"- «{ru}»" for ru in dropped] + [""]
+        lines += _listed([f"- «{ru}»" for ru in dropped]) + [""]
     lines.append("Слияние — решение приёмщика; без него перевод продолжает работать на прежнем снимке.")
+    lines.append(
+        "Если после слияния другого запроса этот стал конфликтным, запустите задание вручную (Run workflow): "
+        "оно пересоберёт ветку от свежего main."
+    )
     return "\n".join(lines) + "\n"
 
 

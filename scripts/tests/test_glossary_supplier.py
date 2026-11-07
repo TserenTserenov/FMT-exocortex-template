@@ -19,12 +19,7 @@ from glossary_source import load_glossary  # noqa: E402
 
 ALLOWLIST = REPO / "translation" / "glossary-snapshot-allowlist.yaml"
 LOCAL_HEADER = "term_ru,term_en,context,notes,tier\n"
-STATS = {
-    "concepts": 10,
-    "hidden_by_closed_sources_count": 1,
-    "name_en_publishable_count": 6,
-    "name_en_publishable_hidden_count": 0,
-}
+STATS = {"visible_concepts": 9, "visible_publishable": 6}
 
 
 def concept(code, name_ru, name_en, level="pack", domain="DP"):
@@ -246,3 +241,18 @@ def test_crlf_local_glossary_keeps_its_line_endings(root):
     before = local.read_bytes()
     run(root, concept("DP.M.1", "Метод", "Way of working"), *BASE_ROWS[1:], concept("DP.M.3", "Роль", "Role"))
     assert local.read_bytes() == before
+
+
+def test_long_sections_of_the_request_body_are_cut():
+    rows = [{"code": f"DP.X.{i}", "term_ru": f"Термин {i}", "term_en": f"Term {i}"} for i in range(SUP.MAX_LISTED_ROWS + 40)]
+    diff = {"added": rows, "removed": [], "changed": []}
+    body = SUP.render_body(diff, [], [], {"included": 0}, {"as_of": "2026-11-08T02:00:00Z", "included": len(rows)})
+    assert body.count("- `DP.X.") == SUP.MAX_LISTED_ROWS
+    assert "и ещё 40" in body
+    assert len(body) < 65536
+    assert f"## Появились ({len(rows)})" in body  # the heading keeps the true count
+
+
+def test_body_tells_what_to_do_when_the_request_became_conflicting():
+    body = SUP.render_body({"added": [], "removed": [], "changed": []}, [], [], {}, {"as_of": "x", "included": 1})
+    assert "Run workflow" in body

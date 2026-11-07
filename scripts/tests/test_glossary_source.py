@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import csv
 import re
 import sys
 from pathlib import Path
@@ -114,9 +115,16 @@ def test_missing_manifest_block_and_missing_file_fail(tmp_path):
 
 def test_template_glossary_loads_and_keeps_strict_local_terms():
     manifest = yaml.safe_load((REPO / "translation-manifest.yaml").read_text(encoding="utf-8"))
-    terms = _by_ru(load_glossary(manifest, REPO))
-    assert terms["Пак"].tier == 1  # tier-1 local terms survive the switch to the snapshot
-    assert terms["Практика"].term_en == "Practice"  # removed from local, now served by the graph
+    glossary = load_glossary(manifest, REPO)
+    terms = _by_ru(glossary)
+    assert terms
+    # Structural, not live data: the daily supplier may rename or drop any graph term, and its own merge
+    # request must not fail here. Every local row stays loaded and never gets weaker than it is written.
+    with (REPO / manifest["glossary"]["local"]).open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            term = terms[row["term_ru"].strip()]
+            if row["tier"].strip().isdigit():
+                assert term.tier <= int(row["tier"])
 
 
 # Contract for the live graph lookup (decision D', WP-617 Ф4): translation never reaches the graph.
@@ -280,3 +288,72 @@ def test_glossary_loader_has_no_network_imports():
         for alias in (node.names if isinstance(node, ast.Import) else [ast.alias(node.module or "")])
     }
     assert not imported & {"urllib", "http", "socket", "requests", "httpx"}
+
+
+# Second line of the isolation contract (Fable review, WP-617 Ф4b): what the import scan cannot see.
+
+ALLOWED_URL_HOSTS = {"github.com", "openrouter.ai", "raw.githubusercontent.com"}
+ALLOWED_WORKFLOW_REFERENCES = {
+    "secrets.CANON_SYNC_APP_KEY",
+    "secrets.OPENROUTER_API_KEY",
+    "vars.CANON_SYNC_APP_ID",
+    "vars.EN_DISTRIBUTION_ASSEMBLE",
+}
+# The optional user:password@ part may hold a workflow expression with spaces: ${{ steps.x.outputs.token }}.
+URL_HOST_RE = re.compile(r"https?://(?:[^/@'\"\n]*@)?([A-Za-z0-9.-]+)")
+REFERENCE_RE = re.compile(r"\b(secrets|vars)\.([A-Za-z0-9_]+)")
+NETWORK_TOOL_RE = re.compile(r"\b(curl|wget|ncat|telnet|ssh)\b")
+NETWORK_IMPORT_RE = re.compile(r"import (requests|urllib|socket|httpx)|from urllib|http\.client")
+DYNAMIC_CODE_NAMES = {"__import__", "exec", "eval", "import_module", "spec_from_file_location", "run_path"}
+
+
+def _closure_files() -> set[Path]:
+    entries = [REPO / p for p in TRANSLATE_ALLOWED_SCRIPTS if p.endswith(".py") and "/tests/" not in p]
+    return set().union(*(_import_closure(e) for e in entries))
+
+
+def test_hosts_named_by_translation_are_allowlisted():
+    # A graph endpoint has to come from somewhere: a literal URL in the scripts or the workflow,
+    # or a repository variable/secret. All three routes are closed here.
+    texts = [p.read_text(encoding="utf-8") for p in _closure_files()] + [TRANSLATE_WORKFLOW.read_text(encoding="utf-8")]
+    hosts = {host for text in texts for host in URL_HOST_RE.findall(text)}
+    assert hosts <= ALLOWED_URL_HOSTS, sorted(hosts - ALLOWED_URL_HOSTS)
+
+
+def test_translation_workflow_uses_only_allowlisted_secrets_and_variables():
+    text = TRANSLATE_WORKFLOW.read_text(encoding="utf-8")
+    used = {f"{kind}.{name}" for kind, name in REFERENCE_RE.findall(text)}
+    assert used <= ALLOWED_WORKFLOW_REFERENCES, sorted(used - ALLOWED_WORKFLOW_REFERENCES)
+
+
+def test_translation_workflow_run_steps_start_no_network_tools():
+    workflow = yaml.safe_load(TRANSLATE_WORKFLOW.read_text(encoding="utf-8"))
+    for job_name, job in workflow["jobs"].items():
+        for step in job["steps"]:
+            body = step.get("run") or ""
+            where = (job_name, step.get("name"))
+            assert not NETWORK_TOOL_RE.search(body), where
+            assert not NETWORK_IMPORT_RE.search(body), where
+
+
+def test_allowed_scripts_load_no_code_dynamically():
+    for path in _closure_files():
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            name = node.id if isinstance(node, ast.Name) else node.attr if isinstance(node, ast.Attribute) else None
+            assert name not in DYNAMIC_CODE_NAMES, (path.name, name)
+
+
+def test_contract_scans_catch_realistic_regressions(tmp_path):
+    assert URL_HOST_RE.findall("https://x-access-token:${TOKEN}@github.com/o/r") == ["github.com"]
+    assert URL_HOST_RE.findall("https://x-access-token:${{ steps.a.outputs.token }}@github.com/o/r") == ["github.com"]
+    assert set(URL_HOST_RE.findall("urlopen('https://knowledge-mcp.example.workers.dev/mcp')")) - ALLOWED_URL_HOSTS
+    assert REFERENCE_RE.findall("${{ secrets.GRAPH_TOKEN }} ${{ vars.GRAPH_ENDPOINT }}") == [
+        ("secrets", "GRAPH_TOKEN"),
+        ("vars", "GRAPH_ENDPOINT"),
+    ]
+    assert NETWORK_TOOL_RE.search('curl "$GRAPH_ENDPOINT"')
+    assert NETWORK_IMPORT_RE.search("python3 - <<PYEOF\nimport urllib.request\nPYEOF")
+    probe = tmp_path / "probe.py"
+    probe.write_text("import importlib\nimportlib.import_module('glossary_' + 'live')\n", encoding="utf-8")
+    names = {n.attr for n in ast.walk(ast.parse(probe.read_text(encoding="utf-8"))) if isinstance(n, ast.Attribute)}
+    assert names & DYNAMIC_CODE_NAMES
