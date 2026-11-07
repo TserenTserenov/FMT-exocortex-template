@@ -72,6 +72,8 @@ _EXCLUDED_EXACT_PATHS = frozenset({
     ".github/workflows/release.yml",
     ".github/workflows/stale.yml",
     ".github/workflows/translate-sync.yml",
+    # WP-617 Phase 4: daily supplier of translation terms for translate-sync.yml — same maintainer-only category.
+    ".github/workflows/glossary-supplier.yml",
     ".github/workflows/validate-template.yml",
     ".github/workflows/weekly-release.yml",
     # WP-529 (29.09.2026): release-pipeline guards of this repo (stale release

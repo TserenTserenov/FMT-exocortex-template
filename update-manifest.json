@@ -2305,7 +2305,7 @@
     },
     {
       "path": "scripts/check-manifest-coverage.py",
-      "sha256": "370509839b7c07eda90029f08e6fa4d6430fc51ac8402ef10071d14408842bba"
+      "sha256": "cc6ca0a9404b5cd42c395812d39582e03fd58c263ffb42ed88877b21c48c8d56"
     },
     {
       "path": "scripts/check-open-sessions.sh",
