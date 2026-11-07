@@ -234,3 +234,15 @@ def test_conflict_is_announced_once_per_open_request(root):
         root / "allowlist.yaml", open_request_meta,
     )
     assert again.changed is True and again.announce is False
+
+
+def test_crlf_local_glossary_keeps_its_line_endings(root):
+    # The template's glossary-local.csv is stored with CRLF; a refresh must not rewrite every line.
+    local = root / "translation" / "glossary-local.csv"
+    crlf = (LOCAL_HEADER + "Пак,Pack,,,1\nРоль,Role,,,3\n").replace("\n", "\r\n").encode("utf-8")
+    local.write_bytes(crlf)
+    run(root, *BASE_ROWS, concept("DP.M.3", "Роль", "Role"))
+    assert local.read_bytes() == (LOCAL_HEADER + "Пак,Pack,,,1\n").replace("\n", "\r\n").encode("utf-8")
+    before = local.read_bytes()
+    run(root, concept("DP.M.1", "Метод", "Way of working"), *BASE_ROWS[1:], concept("DP.M.3", "Роль", "Role"))
+    assert local.read_bytes() == before

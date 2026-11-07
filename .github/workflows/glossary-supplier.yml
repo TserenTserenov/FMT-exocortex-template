@@ -70,7 +70,9 @@ jobs:
       - name: Passport of the open merge request (conflicts the pilot already knows about)
         run: |
           if git fetch --quiet origin "$BRANCH" 2>/dev/null; then
-            git show "FETCH_HEAD:translation/glossary-snapshot.meta.json" > "$RUNNER_TEMP/announced-meta.json"
+            # No passport on the branch → nothing announced yet; refresh then compares with main.
+            git show "FETCH_HEAD:translation/glossary-snapshot.meta.json" > "$RUNNER_TEMP/announced-meta.json" \
+              || rm -f "$RUNNER_TEMP/announced-meta.json"
           fi
 
       - name: Rebuild the snapshot and the local glossary

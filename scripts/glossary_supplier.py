@@ -204,7 +204,9 @@ def refresh(root: Path, payload: dict, allowlist_path: Path, announced_meta: dic
 
     old_rows = read_rows(snapshot_path)
     old_meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    local_text = local_path.read_text(encoding="utf-8")
+    # newline="": the local file keeps its own line endings (the template file is CRLF).
+    with local_path.open(encoding="utf-8", newline="") as handle:
+        local_text = handle.read()
     local_rows = read_rows(local_path)
 
     allowlist = EXPORTER.load_allowlist(allowlist_path)
@@ -229,7 +231,8 @@ def refresh(root: Path, payload: dict, allowlist_path: Path, announced_meta: dic
         staged = Path(tmp) / snapshot_path.name
         staged_local = Path(tmp) / local_path.name
         EXPORTER.write_snapshot(included, meta, staged)
-        staged_local.write_text(new_local_text, encoding="utf-8")
+        with staged_local.open("w", encoding="utf-8", newline="") as handle:
+            handle.write(new_local_text)
         # A new conflict may leave the snapshot rows untouched (the concept never was in it);
         # it still has to reach the pilot, so a changed conflict list is a change too.
         unchanged = (
