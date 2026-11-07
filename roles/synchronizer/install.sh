@@ -128,8 +128,22 @@ mkdir -p "$(dirname "$PLIST_DST")"
 if [ -z "${SETUP_CI:-}" ]; then
     # Unload old agents and legacy Strategist agents (if any)
     launchctl unload "$PLIST_DST" 2>/dev/null || true
-    launchctl unload "$HOME/Library/LaunchAgents/com.strategist.morning.plist" 2>/dev/null || true
-    launchctl unload "$HOME/Library/LaunchAgents/com.strategist.weekreview.plist" 2>/dev/null || true
+    # The scheduler runs the Strategist morning/week-review scenarios itself.
+    # Unloading alone was undone on every update: strategist/install.sh (run
+    # earlier, alphabetical order) copied the plists back, and day-open then
+    # reported them "not loaded" (issue #1474). Rename to <label>.plist.disabled
+    # — the opt-out marker strategist/install.sh already honours (#285).
+    for label in com.strategist.morning com.strategist.weekreview; do
+        legacy_plist="$HOME/Library/LaunchAgents/$label.plist"
+        if launchctl list "$label" >/dev/null 2>&1; then
+            launchctl unload "$legacy_plist" 2>/dev/null \
+                || echo "  ⚠️  $label: launchctl unload не удался, агент может остаться загруженным" >&2
+        fi
+        if [ -e "$legacy_plist" ]; then
+            mv -f "$legacy_plist" "$legacy_plist.disabled" \
+                && echo "  ⊘ $label — сценарий ведёт планировщик, plist переименован в $label.plist.disabled"
+        fi
+    done
 fi
 
 # Create state directories

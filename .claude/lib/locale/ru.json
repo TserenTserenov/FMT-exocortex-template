@@ -1,5 +1,6 @@
 {
   "agent.close_gate.day": "⛔ БЛОКИРУЮЩЕЕ: Day Close выполняется ТОЛЬКО через skill /run-protocol с аргументом 'day-close'. ПЕРВОЕ И ЕДИНСТВЕННОЕ действие = вызвать Skill tool: skill='run-protocol', args='day-close'. НЕ читать protocol-close.md вручную. НЕ выполнять шаги самостоятельно. НЕ писать итоги без /run-protocol. Причина: 5 инцидентов пропуска шагов при ручном исполнении (15, 18, 19, 27 мар). /run-protocol гарантирует пошаговый TodoList + верификацию Haiku R23.",
+  "agent.close_gate.push": "Пилот просит залить (CLAUDE.md §2, правило 2): commit + push только файлов этой сессии, без вопросов. Закрытие сессии НЕ запускать — о нём не просили; закрывать только по явному «закрывай».",
   "agent.close_gate.session": "⛔ БЛОКИРУЮЩЕЕ: Session Close выполняется ТОЛЬКО через skill /run-protocol с аргументом 'close'. ПЕРВОЕ И ЕДИНСТВЕННОЕ действие = вызвать Skill tool: skill='run-protocol', args='close'. НЕ выполнять шаги самостоятельно. /run-protocol гарантирует пошаговый TodoList + верификацию.",
   "format.dayplan.yesterday": "Итоги вчера (%s %s)",
   "format.month_genitive.1": "января",
@@ -15,10 +16,11 @@
   "format.month_genitive.8": "августа",
   "format.month_genitive.9": "сентября",
   "recognition.close_day": "итоги дня|закрываю день|закрывай день",
-  "recognition.close_session": "закрывай|закрываю|заливай|запуши|закрывай сессию",
+  "recognition.close_session": "закрывай|закрываю|закрывай сессию",
   "recognition.dayplan.section.calendar": "Календарь",
   "recognition.dayplan.section.notes_review": "Разбор заметок",
   "recognition.dayplan.section.overnight": "IWE за ночь",
   "recognition.dayplan.section.plan_today": "План на сегодня",
-  "recognition.dayplan.section.yesterday": "Итоги вчера"
+  "recognition.dayplan.section.yesterday": "Итоги вчера",
+  "recognition.push_only": "заливай|запуши"
 }

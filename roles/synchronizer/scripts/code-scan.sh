@@ -50,6 +50,9 @@ discover_repos() {
         repos+=("$dir")
     done
 
+    # bash < 4.4 treats "${repos[@]}" of an empty array as unbound under set -u
+    # (issue #1471); an empty set is a normal state, not an error.
+    [ "${#repos[@]}" -eq 0 ] && return 0
     printf '%s\n' "${repos[@]}"
 }
 
@@ -58,9 +61,11 @@ discover_repos() {
 scan_repos() {
     local total_repos=0
     local total_commits=0
+    local discovered=0
 
     while IFS= read -r repo_dir; do
         repo_dir="${repo_dir%/}"
+        discovered=$((discovered + 1))
         local repo_name
         repo_name=$(basename "$repo_dir")
 
@@ -80,6 +85,11 @@ scan_repos() {
         total_commits=$((total_commits + count))
 
     done < <(discover_repos)
+
+    if [ "$discovered" -eq 0 ]; then
+        log "Нет репозиториев для сканирования (DS-* с .git, кроме репозитория управления)"
+        return 0
+    fi
 
     log "Итого: $total_repos репо, $total_commits коммитов"
 
