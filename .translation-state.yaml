@@ -1,4 +1,10 @@
-files_translated: []
-last_run_utc: '2026-11-04T18:53:44Z'
-last_synced_sha: 1a4b9afc47d5a186a875fe3c9ac1a45aace059cb
+files_translated:
+- docs/QUICK-START.md
+- docs/SETUP-GUIDE.md
+- docs/onboarding/archive/web-onboarding-v2.md
+- docs/onboarding/light-onboarding.md
+- docs/onboarding/onboarding-guide.md
+- docs/onboarding/onboarding-slides.md
+last_run_utc: '2026-11-07T11:46:40Z'
+last_synced_sha: 8aae43ed859cfc93d9a46bf9892b5057c5506f87
 schema_version: 1

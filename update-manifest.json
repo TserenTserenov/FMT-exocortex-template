@@ -909,7 +909,7 @@
     },
     {
       "path": "docs/QUICK-START.md",
-      "sha256": "2d29dff0e1d9f767fb4ed4c595f4ebeaff7131a7199d52b265976a0759e1b45e"
+      "sha256": "16671df2086cabbfc1ae840b8c550434f4445103722ead91a5ec410d5d6ee440"
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
@@ -925,7 +925,7 @@
     },
     {
       "path": "docs/SETUP-GUIDE.md",
-      "sha256": "ba05f72cba83a30c30137cf8ff85e24b65ec83c7e0d91aabfc0e22784a3554a8"
+      "sha256": "fae5224b5e93c9067b2bb9804fae23c58f230ea305fff3686b19bd27bf2b0f7a"
     },
     {
       "path": "docs/VERIFY-KNOWLEDGE-MCP.md",
@@ -1004,8 +1004,16 @@
       "sha256": "cd12a4b55e07eee5fd8301b0c8379d04d3cd8215313aa36f7cbc9db632370414"
     },
     {
+      "path": "docs/onboarding/archive/web-onboarding-v2.md",
+      "sha256": "0738eef9cffc99c70b5374df80ff9000653ea330c9e6beadb0980747bb251275"
+    },
+    {
       "path": "docs/onboarding/iwe-layers.md",
       "sha256": "c6a3a552afa1dc5011723c0299c1f1673e8bafbba205cae019e4e0d2366d0b7a"
+    },
+    {
+      "path": "docs/onboarding/light-onboarding.md",
+      "sha256": "ade81079b40c94d19738dbc941353e430048f23f39f7455833f12c554eba2145"
     },
     {
       "path": "docs/onboarding/onboarding-diagrams.md",
@@ -1013,11 +1021,11 @@
     },
     {
       "path": "docs/onboarding/onboarding-guide.md",
-      "sha256": "680b9c500387f9962e63ea9f3cdf389feead076a152478a02545dcb2f073c3da"
+      "sha256": "ad63ade0533fe93b596c3d2940b5c78f54ba8eddc566ea142ea3fc464aa4802a"
     },
     {
       "path": "docs/onboarding/onboarding-slides.md",
-      "sha256": "9fa1d15312e8323d38b7ac36c4720738991a6006a8d22b02708eb145b6a8ad63"
+      "sha256": "1d063413c77d9d6095a4765ff9eb39c5f03e3bbf1180f7d786f9dee542f46e96"
     },
     {
       "path": "docs/onboarding/web-connect-guide.md",
