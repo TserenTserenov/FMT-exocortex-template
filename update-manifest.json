@@ -65,7 +65,7 @@
     },
     {
       "path": ".claude/hooks/close-gate-reminder.sh",
-      "sha256": "3b47daa1eae96d27c32cab9bb2e54041752458b1419e09d56093011b76e78463"
+      "sha256": "fcfabb7eafcd288c29d210bca041fae9a86d68fcc0fb771f31333bfde1397961"
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
@@ -141,7 +141,7 @@
     },
     {
       "path": ".claude/hooks/pull-on-touch.sh",
-      "sha256": "b9a89b578b79392c6e33be8eb00d171c3d46d5cda52c1544407b8df4671d742e"
+      "sha256": "b4e186d47265424b1b1cfb53c3d04367ace1e5a8b2d088196f6a52d519377989"
     },
     {
       "path": ".claude/hooks/residency-gate-init.sh",
@@ -317,11 +317,11 @@
     },
     {
       "path": ".claude/lib/locale/en.json",
-      "sha256": "c0d081f0ec07d3e8e79a61631703f7883ae0a2c52f1a727c5e2a3ff1a33d674f"
+      "sha256": "c7a18f316bd8898eedc0a8a30b2b6bcec5629372abd43da700ef764a532157b1"
     },
     {
       "path": ".claude/lib/locale/ru.json",
-      "sha256": "67eee130b6360fbbabb115c4b1a893f37612fb7207184fff7e0d84f631c800df"
+      "sha256": "c3cf753864ed1cbc562dab16179459b8c33a16d5c386c9110547e2fb53af3f2b"
     },
     {
       "path": ".claude/lib/log_formatter.sh",
@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7294a2a62fd846d51cc62b90d8f5f92bc6b7c0bd0cb798fcb85db80edf13f79f"
+      "sha256": "eba0f1fd6f6f769a9504205909a8db0c8f9ea76cc323242c7aeecd00bf277a3f"
     },
     {
       "path": "CLAUDE.md",
@@ -2089,7 +2089,7 @@
     },
     {
       "path": "roles/synchronizer/install.sh",
-      "sha256": "68e57d7a2f46f86b3d9096925b16792073248506c4152f82161b509af77d6691"
+      "sha256": "371fdc5c6f8f6908ab202a64daafb28eef21203417b238b1ef75664319886a0e"
     },
     {
       "path": "roles/synchronizer/role.yaml",
@@ -2097,7 +2097,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/code-scan.sh",
-      "sha256": "c0a78df743b051ebf067e61fd8b6757c76fa53a5994f41b8d6077a26ec71ea31"
+      "sha256": "cd18dbf5c671b74676caf9d2c214fbe79c7bb9ef4746a97f04c04b627431d467"
     },
     {
       "path": "roles/synchronizer/scripts/collectors.d/README.md",
@@ -2561,7 +2561,7 @@
     },
     {
       "path": "scripts/isolate-push.sh",
-      "sha256": "4d8601ff7bc1febb6fe70f58f040cf041163ec046dae9e27c0b763a2e5136a12"
+      "sha256": "61dd3895644069daed5cf0b13478fe48d1903fedc431668d1ba9882e962bd0c5"
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
@@ -3345,7 +3345,7 @@
     },
     {
       "path": "seed/strategy/scripts/isolate-push.sh",
-      "sha256": "4d8601ff7bc1febb6fe70f58f040cf041163ec046dae9e27c0b763a2e5136a12"
+      "sha256": "61dd3895644069daed5cf0b13478fe48d1903fedc431668d1ba9882e962bd0c5"
     },
     {
       "path": "seed/strategy/scripts/iwe_checklist_memory.py",
@@ -3606,6 +3606,9 @@
     "scripts/tests/test_issue_1451_wakatime_403.py",
     "scripts/tests/test_issue_1457_staged_scan_cost.sh",
     "scripts/tests/test_issue_1458_extractor_config_lock.sh",
+    "scripts/tests/test_issue_1470_isolate_range_delivered.sh",
+    "scripts/tests/test_issue_1471_1474_synchronizer.sh",
+    "scripts/tests/test_issue_1475_pull_on_touch_lib.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
@@ -3763,6 +3766,16 @@
     "setup/i18n-fixtures/close-gate-reminder/11.prompt",
     "setup/i18n-fixtures/close-gate-reminder/12.expected",
     "setup/i18n-fixtures/close-gate-reminder/12.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/13.expected",
+    "setup/i18n-fixtures/close-gate-reminder/13.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/14.expected",
+    "setup/i18n-fixtures/close-gate-reminder/14.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/15.expected",
+    "setup/i18n-fixtures/close-gate-reminder/15.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/16.expected",
+    "setup/i18n-fixtures/close-gate-reminder/16.prompt",
+    "setup/i18n-fixtures/close-gate-reminder/17.expected",
+    "setup/i18n-fixtures/close-gate-reminder/17.prompt",
     "setup/integration-contract-validator.sh",
     "setup/optional/COVER-IMAGES.md",
     "setup/optional/README.md",

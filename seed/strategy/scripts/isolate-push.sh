@@ -759,6 +759,46 @@ content_equivalent_to_head() {  # <commit> -- true only if every file the commit
   return 0
 }
 
+# Issue #1470: the per-commit checks above cannot see a chain that is already on
+# origin. When a session publishes its isolate commits one by one (ds-publish
+# --from-commit) and close then runs this script, every intermediate commit of a
+# chain that edits the same files (registry, card) differs from origin both by
+# patch-id (the publisher resolved conflicts) and by content (origin holds the
+# chain's FINAL version), so the cherry-pick stopped on a conflict although
+# nothing was missing. This compares the range as a whole: every path the range
+# changes (net) must already match <target> in mode and content. Any difference,
+# a range with no net change, or a git error keeps the old per-commit path.
+# Design: peer-session 2026-11-07-05-fmt-issues-wave-2 (Claude + Kimi).
+range_already_delivered() {  # <base> <tip> <target-ref>
+  local base="$1" tip="$2" target="$3" paths_file rc
+  paths_file=$(mktemp) || return 1
+  # Plumbing (diff-tree), not porcelain diff: user config such as
+  # diff.ignoreSubmodules or textconv must not hide a difference.
+  git -C "$SOURCE_WORKTREE" diff-tree -r --name-only -z --no-renames "$base" "$tip" > "$paths_file" 2>/dev/null
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ -s "$paths_file" ]; then
+    # xargs exits 0 only if every batch reports "no difference" (diff --quiet rc 0).
+    xargs -0 git -C "$SOURCE_WORKTREE" --literal-pathspecs diff-tree -r --quiet --no-renames "$target" "$tip" -- \
+      < "$paths_file" >/dev/null 2>&1
+    rc=$?
+  else
+    rc=1
+  fi
+  rm -f "$paths_file"
+  return "$rc"
+}
+
+# Exit 0 when the range is already on origin. Runs post_publish_reconcile as a
+# real publish would: the canonical checkout still points at the session's own
+# SHAs, and nothing else realigns it (WP-530 Phase 38).
+exit_if_range_delivered() {  # <base>
+  [ -z "$EXACT_COMMIT" ] && [ -n "$1" ] || return 0
+  range_already_delivered "$1" "$SOURCE_BRANCH" "origin/$TARGET_BRANCH" || return 0
+  echo "isolate-push: всё, что меняет диапазон $1..$SOURCE_BRANCH, уже есть на origin/$TARGET_BRANCH (файлы совпадают по содержимому и режиму) — перенос не нужен"
+  post_publish_reconcile "$(git -C "$SOURCE_WORKTREE" rev-parse "origin/$TARGET_BRANCH")"
+  exit 0
+}
+
 # --- Resumability (WP-484 Phase 132/Phase 133 ← WP-530, peer-session 2026-08-30-01) ---
 # Previously, re-running after a conflict always replayed the transfer from scratch in a
 # NEW worktree — manual conflict resolution in the saved copy was silently
@@ -785,6 +825,10 @@ elif [ -n "$RESUME_BASE" ]; then
 else
   RESUME_KEY_COMMITS=""
 fi
+# Before claiming a saved conflict attempt: a range stuck by #1470 has such a
+# passport, and resuming it would stop on the same conflict again. Its temp
+# worktree is left untouched (it may hold manual work).
+exit_if_range_delivered "$RESUME_BASE"
 RESUME_INFO=""
 if [ -n "$RESUME_KEY_COMMITS" ]; then
   # Selecting and claiming the passport -- atomically under the registry lock (cold review
@@ -975,6 +1019,8 @@ while [ "$attempt" -le "$MAX_RETRIES" ]; do
     echo "$MERGE_COMMITS" >&2
     exit 2
   fi
+
+  exit_if_range_delivered "$BASE"
 
   mkdir -p "$TEMP_STORE_DIR"
   ATTEMPT_ID="attempt-${attempt}-$$-${ATTEMPT_UUID}"

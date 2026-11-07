@@ -5,6 +5,10 @@
 # The expected outputs of close-gate-reminder.sh in setup/i18n-fixtures/ were
 # captured by running the hook from origin/main 557e8bfe BEFORE it moved to the
 # catalogs; they are an independent reference, not derived from the catalogs.
+# Exception: 06 and 12 were re-captured for issue #1472 — "запуши"/"заливай"
+# now get the commit + push reminder, not the session-close instruction;
+# 13-17 pin that change (push only, quoted words stay silent, "закрывай?"
+# still closes).
 # Fixture 08 ("не закрывай пока" -> session close) records known behaviour,
 # not a desired one: negation is a separate change. There is no fixture with
 # capital Cyrillic letters: the hook lowercases with tr, which folds them on

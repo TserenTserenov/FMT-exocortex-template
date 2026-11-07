@@ -66,8 +66,24 @@ TO=""
 command -v timeout >/dev/null 2>&1 && TO="timeout 20"
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../../scripts/lib/git-sync-status.sh
-. "$HOOK_DIR/../../scripts/lib/git-sync-status.sh"
+# Issue #1475: the self-relative path exists only when the hook runs from the
+# template checkout itself. In an installed workspace the hook lives in
+# $WORKSPACE/.claude/hooks and the library stays in the template's scripts/lib.
+# Same resolution order as .claude/scripts/wp-sync-bundle.sh, plus the
+# template locations; nothing found → a stale note per repo, never a failure.
+SYNC_LIB_LOADED=false
+for sync_lib in \
+    "$HOOK_DIR/../../scripts/lib/git-sync-status.sh" \
+    "${IWE_SCRIPTS:+$IWE_SCRIPTS/lib/git-sync-status.sh}" \
+    "${IWE_TEMPLATE:+$IWE_TEMPLATE/scripts/lib/git-sync-status.sh}" \
+    "$IWE_ROOT/FMT-exocortex-template/scripts/lib/git-sync-status.sh"; do
+    [ -n "$sync_lib" ] && [ -r "$sync_lib" ] || continue
+    # shellcheck source=../../scripts/lib/git-sync-status.sh
+    if . "$sync_lib"; then
+        SYNC_LIB_LOADED=true
+        break
+    fi
+done
 
 warns=""
 pulled=""
@@ -75,6 +91,11 @@ while IFS= read -r repo; do
     [ -z "$repo" ] && continue
     grep -qxF "$repo" "$STATE_FILE" && continue   # this repo was already touched in the session
     echo "$repo" >> "$STATE_FILE"                  # mark BEFORE pull (lazy: one attempt per session)
+
+    if [ "$SYNC_LIB_LOADED" != true ]; then
+        warns="${warns}${repo}: проверка свежести недоступна (не найдена библиотека git-sync-status.sh ни рядом с хуком, ни в \$IWE_SCRIPTS/lib, ни в шаблоне), данные potentially stale. "
+        continue
+    fi
 
     dir="$IWE_ROOT/$repo"
     branch=$(git -C "$dir" symbolic-ref --quiet --short HEAD 2>/dev/null)
