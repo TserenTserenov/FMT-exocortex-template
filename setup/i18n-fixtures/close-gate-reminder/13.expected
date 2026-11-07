@@ -1,0 +1,6 @@
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "Пилот просит залить (CLAUDE.md §2, правило 2): commit + push только файлов этой сессии, без вопросов. Закрытие сессии НЕ запускать — о нём не просили; закрывать только по явному «закрывай»."
+  }
+}
