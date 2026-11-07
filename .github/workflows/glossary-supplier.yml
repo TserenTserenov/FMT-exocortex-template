@@ -1,0 +1,167 @@
+name: Glossary Supplier (graph terms snapshot)
+
+# WP-617 Ф4: the supplier of translation terms. Once a day it walks the concept
+# graph, rebuilds translation/glossary-snapshot.csv and, when the terms changed,
+# opens (or refreshes) one merge request with the difference. The pilot merges it;
+# until then translation keeps using the previous snapshot.
+# Design: peer-session 2026-11-07-07-wp617-f4-snapshot-schedule (Claude + Kimi).
+#
+# - Only this workflow talks to the graph. translate-sync.yml never does
+#   (decision D'; enforced by scripts/tests/test_glossary_source.py).
+# - Not started by push: a merged snapshot must not trigger another walk.
+# - Failure (no key, gateway down, control code, completeness, canary, stuck
+#   cursor) = red run, nothing is written; GitHub mails the failure of a
+#   scheduled run. The log carries the reason code only — this repo is public.
+# - The merge request is opened with the canon-sync app token: a request opened
+#   with GITHUB_TOKEN does not start the required checks (release-receipt,
+#   changelog-entry). If the app lacks the pull-request permission the run goes
+#   red; fallback agreed with the pilot: a narrow repository key (07.11).
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 05:00 MSK
+  workflow_dispatch:
+
+concurrency:
+  group: glossary-supplier
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BRANCH: glossary/snapshot-refresh
+
+jobs:
+  supply:
+    runs-on: ubuntu-latest
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template'
+    defaults:
+      run:
+        # Explicit bash = -eo pipefail: a failed refresh piped into tee must turn the run red.
+        shell: bash
+    steps:
+      - name: App token (canon-sync)
+        id: app_token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.CANON_SYNC_APP_ID }}
+          private-key: ${{ secrets.CANON_SYNC_APP_KEY }}
+
+      - name: Checkout main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          token: ${{ steps.app_token.outputs.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Walk the concept graph
+        env:
+          GLOSSARY_EXPORTER_SERVICE_SECRET: ${{ secrets.GLOSSARY_EXPORTER_SERVICE_SECRET }}
+        run: python3 scripts/fetch-glossary-concepts.py --output "$RUNNER_TEMP/concepts.json"
+
+      - name: Passport of the open merge request (conflicts the pilot already knows about)
+        run: |
+          if git fetch --quiet origin "$BRANCH" 2>/dev/null; then
+            # No passport on the branch → nothing announced yet; refresh then compares with main.
+            git show "FETCH_HEAD:translation/glossary-snapshot.meta.json" > "$RUNNER_TEMP/announced-meta.json" \
+              || rm -f "$RUNNER_TEMP/announced-meta.json"
+          fi
+
+      - name: Rebuild the snapshot and the local glossary
+        id: refresh
+        run: |
+          python3 scripts/glossary_supplier.py refresh \
+            --input "$RUNNER_TEMP/concepts.json" \
+            --announced-meta "$RUNNER_TEMP/announced-meta.json" \
+            --body-out "$RUNNER_TEMP/pr-body.md" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Close an outdated merge request
+        # The graph is back to what main has: yesterday's request would apply a stale snapshot.
+        if: steps.refresh.outputs.changed == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$PR" ]; then
+            gh pr close "$PR" --delete-branch --comment "Граф снова совпадает со снимком в main — запрос устарел, закрыт поставщиком."
+          fi
+
+      - name: Commit the snapshot onto the supplier branch
+        if: steps.refresh.outputs.changed == 'true'
+        run: |
+          git config user.name "canon-sync[bot]"
+          git config user.email "canon-sync[bot]@users.noreply.github.com"
+          # The branch is rebuilt from main every run: yesterday's unmerged request is refreshed, not stacked.
+          git checkout -B "$BRANCH"
+          git add translation/glossary-snapshot.csv translation/glossary-snapshot.meta.json translation/glossary-local.csv
+          git commit -m "chore(glossary): refresh terms snapshot from the concept graph (WP-617 Ф4)" \
+            -m "Changelog-Tag: optional"
+
+      - name: Open or reuse the merge request
+        id: pr
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          git push --force origin "$BRANCH"
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            URL=$(gh pr create --base main --head "$BRANCH" \
+              --title "Снимок терминов перевода из графа понятий" \
+              --body-file "$RUNNER_TEMP/pr-body.md")
+            PR="${URL##*/}"
+          fi
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+
+      - name: Changelog entry and delivery manifest
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          python3 scripts/glossary_supplier.py changelog --pr "$PR"
+          # CHANGELOG.md is a delivered file: its checksum lives in update-manifest.json.
+          bash generate-manifest.sh
+          git add CHANGELOG.md update-manifest.json
+          git commit -m "docs(changelog): glossary snapshot refresh (#$PR)" -m "Changelog-Tag: optional"
+          git push --force origin "$BRANCH"
+
+      - name: Description and conflict label
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          PR: ${{ steps.pr.outputs.number }}
+          CONFLICTS: ${{ steps.refresh.outputs.conflicts }}
+        run: |
+          gh pr edit "$PR" --body-file "$RUNNER_TEMP/pr-body.md"
+          gh label create glossary-conflict --description "Graph and local glossary disagree on an English name" --color D93F0B 2>/dev/null || true
+          if [ "$CONFLICTS" != "0" ]; then
+            gh pr edit "$PR" --add-label glossary-conflict
+          else
+            gh pr edit "$PR" --remove-label glossary-conflict 2>/dev/null || true
+          fi
+
+      - name: Notice to the pilot channel (optional, fail-open)
+        # Same channel as release-watchdog.yml: off until PILOT_NOTICE_ENDPOINT is set.
+        # A conflict is announced once: when the list differs from the one in the open request (or main).
+        if: always() && vars.PILOT_NOTICE_ENDPOINT != '' && (failure() || steps.refresh.outputs.announce == 'true')
+        continue-on-error: true
+        env:
+          ENDPOINT: ${{ vars.PILOT_NOTICE_ENDPOINT }}
+          WEBHOOK_SECRET: ${{ secrets.TEMPLATE_WEBHOOK_SECRET }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          KIND=glossary-conflict
+          [ "$JOB_STATUS" = "success" ] || KIND=glossary-supplier-failed
+          curl -sS --max-time 10 -X POST "$ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
+            -d "{\"recipient\":\"pilot\",\"kind\":\"$KIND\",\"run\":\"$RUN_URL\"}"

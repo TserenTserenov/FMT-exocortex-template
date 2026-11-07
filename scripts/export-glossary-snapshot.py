@@ -232,8 +232,7 @@ def write_snapshot(included: list[dict], meta: dict, output_csv: Path) -> None:
         tmp_meta.replace(meta_path)
 
 
-def export_snapshot(payload: dict, allowlist: dict, allowlist_path: Path, output_csv: Path) -> dict:
-    included, excluded, as_of = build_rows(payload, allowlist)
+def build_meta(payload: dict, included: list[dict], excluded: Counter, as_of: str, allowlist_path: Path) -> dict:
     meta = {
         "as_of": as_of,
         "allowlist_sha256": _sha256(allowlist_path),
@@ -243,6 +242,15 @@ def export_snapshot(payload: dict, allowlist: dict, allowlist_path: Path, output
         "rules_version": included[0]["rules_version"],
         "schema": SCHEMA,
     }
+    if isinstance(payload.get("graph_stats"), dict):
+        # Graph counters at walk time — information for the reviewer, not a gate (WP-617 Ф4).
+        meta["graph_stats"] = dict(sorted(payload["graph_stats"].items()))
+    return meta
+
+
+def export_snapshot(payload: dict, allowlist: dict, allowlist_path: Path, output_csv: Path) -> dict:
+    included, excluded, as_of = build_rows(payload, allowlist)
+    meta = build_meta(payload, included, excluded, as_of, allowlist_path)
     write_snapshot(included, meta, output_csv)
     return meta
 

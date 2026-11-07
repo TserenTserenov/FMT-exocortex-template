@@ -97,6 +97,41 @@ def test_payload_walks_all_pages_and_renames_name_to_name_ru(monkeypatch):
     assert result["as_of"] == "2026-11-01T20:00:00.000Z"
 
 
+def test_payload_carries_graph_counters_for_the_passport():
+    rows = control_rows()
+    result = MOD.fetch_payload(FakeGateway(rows, [stats_for(rows)]))
+    assert result["graph_stats"] == stats_for(rows)
+
+
+class StuckCursorGateway(FakeGateway):
+    """Answers every concept_list page with the same cursor — a gateway bug that would loop forever."""
+
+    def __call__(self, payload):
+        if payload["params"]["name"] == "graph_stats":
+            return super().__call__(payload)
+        self.list_calls += 1
+        body = {"as_of": "2026-11-01T20:00:00.000Z", "rows": self.rows[:1], "next_after_id": 1}
+        return {"result": {"content": [{"text": json.dumps(body)}]}}
+
+
+def test_cursor_that_does_not_grow_stops_the_walk():
+    rows = control_rows()
+    gateway = StuckCursorGateway(rows, [stats_for(rows)])
+    with pytest.raises(MOD.FetchError, match="курсор обхода не растёт"):
+        MOD.fetch_payload(gateway)
+    assert gateway.list_calls == 2 * MOD.MAX_ATTEMPTS  # each attempt stops at the second page
+
+
+def test_walk_longer_than_the_graph_allows_stops(monkeypatch):
+    monkeypatch.setattr(MOD, "PAGE_LIMIT", 1)
+    rows = control_rows() + [concept(i, f"DP.M.{i}", f"Term {i}", True) for i in range(5, 15)]
+    # graph_stats claims 2 visible rows → ceiling 4 pages, the walk needs 14.
+    gateway = FakeGateway(rows, [stats_for(rows, concepts=4)])
+    with pytest.raises(MOD.FetchError, match="не закончился за 4 страниц"):
+        MOD.fetch_payload(gateway)
+    assert gateway.list_calls == 4 * MOD.MAX_ATTEMPTS  # a walk cut by the ceiling is retried like a changed graph
+
+
 def test_missing_row_gives_incomplete_snapshot_after_all_attempts():
     rows = control_rows()
     gateway = FakeGateway(rows, [stats_for(rows, concepts=len(rows) + 3)])

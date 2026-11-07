@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -118,21 +119,159 @@ def test_template_glossary_loads_and_keeps_strict_local_terms():
     assert terms["Практика"].term_en == "Practice"  # removed from local, now served by the graph
 
 
-# Contract for the live graph lookup (decision D', WP-617 Ф4): never in publication.
+# Contract for the live graph lookup (decision D', WP-617 Ф4): translation never reaches the graph.
+# Only the supplier workflow (glossary-supplier.yml) talks to the graph; translate-sync.yml may run
+# an explicit allowlist of scripts, and nothing those scripts import or start may reach the graph.
+# The flag live_lookup_enabled is introduced together with the live lookup on the draft branch (pilot, 07.11).
 
-LIVE_LOOKUP_MARKERS = ("GLOSSARY_LIVE_LOOKUP", "knowledge-mcp")
+TRANSLATE_WORKFLOW = REPO / ".github/workflows/translate-sync.yml"
+SUPPLIER_WORKFLOW = REPO / ".github/workflows/glossary-supplier.yml"
+SCRIPT_PATH_RE = re.compile(r"(?:\./)?((?:scripts|setup|\.github/scripts)/[A-Za-z0-9_./-]+\.(?:py|sh))")
+TRANSLATE_ALLOWED_SCRIPTS = {
+    "scripts/translate.py",
+    "scripts/delivery_checks.py",
+    "scripts/assemble_distribution.py",
+    "scripts/normalize_en_phase_labels.py",
+    "scripts/tests/test_assemble_distribution.py",
+    "scripts/tests/test_delivery_content.py",
+    "scripts/tests/test_delivery_formal.py",
+    "scripts/tests/test_glossary_source.py",
+    "scripts/tests/test_normalize_en_phase_labels.py",
+    "scripts/tests/test_translate_delta.py",
+}
+# Programs the allowed scripts may start as subprocesses.
+ALLOWED_PROGRAMS = {"git"}
+GRAPH_MARKERS = (
+    "knowledge-mcp",
+    "GLOSSARY_LIVE_LOOKUP",
+    "GLOSSARY_EXPORTER_SERVICE_SECRET",
+    "X-IWE-Service-Auth",
+    "fetch-glossary-concepts",
+    "glossary_supplier",
+)
+PROCESS_FUNCS = {
+    "subprocess": {"run", "call", "check_call", "check_output", "Popen", "getoutput", "getstatusoutput"},
+    "os": {"system", "popen", "posix_spawn", "posix_spawnp"},
+    "asyncio": {"create_subprocess_exec", "create_subprocess_shell"},
+}
+PROCESS_PREFIXES = {"os": ("exec", "spawn")}
 
 
-def test_publication_job_never_reaches_the_graph():
-    workflow = yaml.safe_load((REPO / ".github/workflows/translate-sync.yml").read_text(encoding="utf-8"))
-    publish_job = yaml.safe_dump(workflow["jobs"]["publish-to-iwesys"], allow_unicode=True)
-    for marker in LIVE_LOOKUP_MARKERS:
-        assert marker not in publish_job
+def _is_process_func(module: str, name: str) -> bool:
+    return name in PROCESS_FUNCS.get(module, ()) or name.startswith(PROCESS_PREFIXES.get(module, ("\0",)))
 
 
-def test_translation_engine_reads_terms_from_files_only():
-    for name in ("translate.py", "glossary_source.py", "delivery_checks.py"):
-        assert not any(m in (SCRIPTS / name).read_text(encoding="utf-8") for m in LIVE_LOOKUP_MARKERS), name
+def _import_closure(entry: Path) -> set[Path]:
+    """The entry script and every scripts/ module it imports, transitively."""
+    seen: set[Path] = set()
+    todo = [entry]
+    while todo:
+        path = todo.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = [a.name for a in node.names] if isinstance(node, ast.Import) else []
+            if isinstance(node, ast.ImportFrom) and node.module:
+                names = [node.module]
+            for name in names:
+                local = SCRIPTS / (name.split(".")[0] + ".py")
+                if local.is_file():
+                    todo.append(local)
+    return seen
+
+
+def _process_callees(tree: ast.AST) -> tuple[dict[str, str], dict[str, str]]:
+    """Local names bound to process modules (aliases) and to process functions (from-imports)."""
+    modules: dict[str, str] = {}
+    funcs: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in PROCESS_FUNCS:
+                    modules[alias.asname or alias.name] = alias.name
+        elif isinstance(node, ast.ImportFrom) and node.module in PROCESS_FUNCS:
+            for alias in node.names:
+                if _is_process_func(node.module, alias.name):
+                    funcs[alias.asname or alias.name] = node.module
+    return modules, funcs
+
+
+def _started_programs(path: Path) -> list[str]:
+    """First argument of each process start; '<dynamic>' when it is not a literal."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    modules, funcs = _process_callees(tree)
+    programs = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_process = (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id in modules
+            and _is_process_func(modules[func.value.id], func.attr)
+        ) or (isinstance(func, ast.Name) and func.id in funcs)
+        if not is_process:
+            continue
+        keyword_args = [k.value for k in node.keywords if k.arg in ("args", "cmd", "program", "path")]
+        first = node.args[0] if node.args else (keyword_args[0] if keyword_args else None)
+        if isinstance(first, (ast.List, ast.Tuple)) and first.elts and isinstance(first.elts[0], ast.Constant):
+            programs.append(str(first.elts[0].value))
+        elif isinstance(first, ast.Constant):
+            programs.append(str(first.value).split()[0])
+        else:
+            programs.append("<dynamic>")
+    return programs
+
+
+def test_translation_workflow_runs_only_allowed_scripts():
+    referenced = set(SCRIPT_PATH_RE.findall(TRANSLATE_WORKFLOW.read_text(encoding="utf-8")))
+    assert referenced == TRANSLATE_ALLOWED_SCRIPTS, (
+        "translate-sync.yml runs a script outside the allowlist (or the allowlist is stale): "
+        f"new {sorted(referenced - TRANSLATE_ALLOWED_SCRIPTS)}, gone {sorted(TRANSLATE_ALLOWED_SCRIPTS - referenced)}"
+    )
+
+
+def test_translation_workflow_text_never_names_the_graph():
+    text = TRANSLATE_WORKFLOW.read_text(encoding="utf-8")
+    assert [m for m in GRAPH_MARKERS if m in text] == []
+
+
+def test_allowed_scripts_and_their_imports_never_reach_the_graph():
+    entries = [REPO / p for p in TRANSLATE_ALLOWED_SCRIPTS if p.endswith(".py") and "/tests/" not in p]
+    closure = set().union(*(_import_closure(e) for e in entries))
+    assert SCRIPTS / "glossary_source.py" in closure  # the scan really follows imports
+    for path in closure:
+        text = path.read_text(encoding="utf-8")
+        assert [m for m in GRAPH_MARKERS if m in text] == [], path.name
+        assert set(_started_programs(path)) <= ALLOWED_PROGRAMS, (path.name, _started_programs(path))
+
+
+def test_process_scan_sees_every_way_to_start_a_program(tmp_path):
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "import os, sys, asyncio\n"
+        "import subprocess as sp\n"
+        "from subprocess import run as go\n"
+        "sp.run([sys.executable, 'scripts/fetch-glossary-concepts.py'])\n"
+        "sp.check_output(args=['git', 'status'])\n"
+        "go(['curl', 'x'])\n"
+        "os.system('wget x')\n"
+        "os.execvp('nc', ['nc'])\n"
+        "asyncio.create_subprocess_exec('ssh')\n"
+        "os.path.join('a', 'b')\n",
+        encoding="utf-8",
+    )
+    assert sorted(_started_programs(probe)) == sorted(["<dynamic>", "git", "curl", "wget", "nc", "ssh"])
+
+
+def test_supplier_workflow_is_not_started_by_a_push():
+    triggers = yaml.safe_load(SUPPLIER_WORKFLOW.read_text(encoding="utf-8"))[True]  # YAML 1.1 reads "on" as True
+    assert set(triggers) == {"schedule", "workflow_dispatch"}
+
+
+def test_glossary_loader_has_no_network_imports():
     tree = ast.parse((SCRIPTS / "glossary_source.py").read_text(encoding="utf-8"))
     imported = {
         alias.name.split(".")[0]
