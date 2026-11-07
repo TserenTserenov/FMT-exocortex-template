@@ -9,8 +9,7 @@ name_en_publishable_rules_version). Скрипт не ходит в базу и 
 снимок — файл не пишется. Английское имя, равное коду или похожее на код,
 в снимок не берётся и считается среди отсеянных; из-за такой строки файл пишется.
 
-Пока боевой снимок не зафиксирован коммитом, translate.py читает
-translation/glossary-v0.1.csv.
+translate.py и delivery_checks.py читают снимок через scripts/glossary_source.py (WP-617 Ф3).
 """
 
 from __future__ import annotations

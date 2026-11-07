@@ -1050,6 +1050,7 @@ jobs:
             scripts/tests/test_dry_run_gate.py \
             scripts/tests/test_export_glossary_snapshot.py \
             scripts/tests/test_fetch_glossary_concepts.py \
+            scripts/tests/test_glossary_source.py \
             scripts/tests/test_manifest_coverage_local.py \
             scripts/tests/test_pending_lock.py \
             scripts/tests/test_sync_banner.py \

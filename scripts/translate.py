@@ -31,6 +31,8 @@ from pathlib import Path
 
 import yaml
 
+from glossary_source import GlossaryError, load_glossary
+
 DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"
 # claude-sonnet-4.6 supports up to 128K completion tokens on OpenRouter
 # (verified via /api/v1/models); 16K turned out to be an arbitrary self-
@@ -50,7 +52,6 @@ OPENROUTER_HEADERS = {
 _SCRIPT_ROOT = Path(__file__).parent.parent  # FMT-exocortex-template root
 DEFAULT_STYLE = _SCRIPT_ROOT / "translation" / "en-doc-style.md"
 DEFAULT_MANIFEST = _SCRIPT_ROOT / "translation-manifest.yaml"
-DEFAULT_GLOSSARY = _SCRIPT_ROOT / "translation" / "glossary-v0.1.csv"
 
 # ~180K tokens at 4 chars/token — skip files above this
 MAX_PROMPT_CHARS = 720_000
@@ -349,21 +350,6 @@ def _find_repo_root(start: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def _load_glossary(glossary_path: Path) -> dict[str, str]:
-    """Load CSV glossary. Returns {ru_term: en_term}."""
-    glossary: dict[str, str] = {}
-    if not glossary_path.exists():
-        return glossary
-    with glossary_path.open(encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            ru = (row.get("term_ru") or "").strip()
-            en = (row.get("term_en") or "").strip()
-            if ru and en:
-                glossary[ru] = en
-    return glossary
-
-
 def _build_system_prompt(style_path: Path, glossary: dict, manifest: dict) -> str:
     """Assemble three-layer system prompt: style + glossary + exclusions."""
     style_text = style_path.read_text(encoding="utf-8") if style_path.exists() else ""
@@ -646,11 +632,6 @@ def main() -> int:
         help="Path to translation-manifest.yaml",
     )
     parser.add_argument(
-        "--glossary",
-        default=str(DEFAULT_GLOSSARY),
-        help="Path to glossary CSV (term_ru, term_en columns)",
-    )
-    parser.add_argument(
         "--style",
         default=str(DEFAULT_STYLE),
         help="Path to EN doc style rules markdown",
@@ -689,7 +670,15 @@ def main() -> int:
     with manifest_path.open(encoding="utf-8") as f:
         manifest = yaml.safe_load(f) or {}
 
-    glossary = _load_glossary(Path(args.glossary))
+    # Glossary paths in the manifest are relative to the manifest's directory (template root).
+    try:
+        loaded = load_glossary(manifest, manifest_path.parent)
+    except GlossaryError as exc:
+        print(f"ERROR: glossary: {exc}", file=sys.stderr)
+        return 1
+    for note in loaded.notes:
+        print(f"GLOSSARY NOTE: {note}", file=sys.stderr)
+    glossary = loaded.as_mapping()
 
     if args.mode == "discover":
         return run_discover(args, manifest, glossary)

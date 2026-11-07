@@ -909,7 +909,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "f53ebd43cb11e0494872153fc61465088c4e5e1de3bcf2a66298263280599ea0"
+      "sha256": "83e3dd1591839924917be9056525a4103739b389e0495fafad0a16d7e11946ba"
     },
     {
       "path": ".gitignore",
@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0002c62635a9af347cad2b390b6e25a9c0ae4a2042b51adc359f50b6ada910e0"
+      "sha256": "eba0f1fd6f6f769a9504205909a8db0c8f9ea76cc323242c7aeecd00bf277a3f"
     },
     {
       "path": "CLAUDE.md",
@@ -1297,7 +1297,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "3aca53ef8f65f895e2d953ab9cfad50466007bf1c2fc9921aa31ead1f2b475fd"
+      "sha256": "4cde14d42f94252c0e0e363b33a0a5b2fff8304e5554e500315a1f512aec6859"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3449,15 +3449,11 @@
     },
     {
       "path": "translation-manifest.yaml",
-      "sha256": "f287e479731e38da7e3d66eaec304c294c2424fbe0dc766536a1b5d3fe3a0bae"
+      "sha256": "6e5e5709629b275f7598904e4cebfcb9fb09997abbdd8d29496a84429f6bb8d4"
     },
     {
       "path": "translation/en-doc-style.md",
       "sha256": "eb404961303d4d48cefef78ddf543edc6effc03b8f07e25ac30eae36070c39c9"
-    },
-    {
-      "path": "translation/glossary-v0.1.csv",
-      "sha256": "e3fee071150469b7b649a757e0bdd4305f205017014cce77bf7d97d09cbc4dcc"
     },
     {
       "path": "update.sh",
@@ -3490,6 +3486,7 @@
     "scripts/export-glossary-snapshot.py",
     "scripts/fetch-glossary-concepts.py",
     "scripts/generate-helper-catalog.py",
+    "scripts/glossary_source.py",
     "scripts/guide-kit-sync-state.yaml",
     "scripts/guide-kit-sync.sh",
     "scripts/iwe-catalog-list.py",
@@ -3544,6 +3541,7 @@
     "scripts/tests/test_extractor_notify_repeat.sh",
     "scripts/tests/test_fetch_glossary_concepts.py",
     "scripts/tests/test_generate_manifest_deprecated_excluded.sh",
+    "scripts/tests/test_glossary_source.py",
     "scripts/tests/test_governance_ambiguity.sh",
     "scripts/tests/test_issue_1003_ds_publish.sh",
     "scripts/tests/test_issue_1004_claude_md_backup.sh",
@@ -3837,6 +3835,7 @@
     "setup/update-write-sites.tsv",
     "setup/ux-walkthrough-prompt.md",
     "setup/wp529-f21-toggle-required-review.sh",
+    "translation/glossary-local.csv",
     "translation/glossary-snapshot-allowlist.yaml",
     "translation/glossary-snapshot.csv",
     "translation/glossary-snapshot.meta.json"
@@ -3970,6 +3969,10 @@
     {
       "path": "docs/onboarding/web-onboarding.md",
       "reason": "moved to docs/onboarding/archive/web-onboarding-v2.md (WP-406 Ф40): replaced by light onboarding — docs/onboarding/light-onboarding.md + /onboarding skill"
+    },
+    {
+      "path": "translation/glossary-v0.1.csv",
+      "reason": "renamed to translation/glossary-local.csv and made CI-only (WP-617 Phase 3): the translation pipeline now reads the graph terms snapshot; the file was never used outside translate-sync"
     }
   ]
 }

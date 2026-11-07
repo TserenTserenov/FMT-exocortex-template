@@ -61,11 +61,28 @@ frontmatter_translate_keys:
 # Г — Hybrid: treat as И on MVP; body/frontmatter split deferred
 # Н — No touch: code, config, secrets, workflows
 
+# GLOSSARY (WP-617 Ф3) — read by scripts/glossary_source.py for translate.py and delivery_checks.py.
+# snapshot: English names of graph concepts — the source of truth for terms.
+# local: terms the graph does not have yet — a queue for moving them into the graph
+#   (WP-617 Ф5). Do not add new terms here; add them to the graph. A local row that is
+#   already in the snapshot fails the load, unless it only raises the check tier.
+# tier_by_level: check tier for graph terms by concept level (1 = a leftover Russian term
+#   fails the en-draft delivery checks, 2 = warning). Provisional, pending the pilot's decision.
+#   A snapshot level missing here fails the load.
+# A live graph lookup on a miss (GLOSSARY_LIVE_LOOKUP, WP-617 Ф4) is allowed in the sync job
+#   (en-draft) only, never in publish-to-iwesys; scripts/tests/test_glossary_source.py guards it.
+glossary:
+  snapshot: translation/glossary-snapshot.csv
+  local: translation/glossary-local.csv
+  tier_by_level:
+    zp: 1
+    fpf: 1
+    pack: 2
+
 categories:
   D:
     policy: auto_translate
-    description: "User-facing documentation — auto pipeline with glossary"
-    glossary: translation/glossary-v0.1.csv
+    description: "User-facing documentation — auto pipeline with glossary (see glossary: below)"
     files:
       - README.md
       - CODE_OF_CONDUCT.md
