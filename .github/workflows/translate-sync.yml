@@ -54,6 +54,7 @@ jobs:
         run: |
           pytest scripts/tests/test_delivery_formal.py \
                  scripts/tests/test_delivery_content.py \
+                 scripts/tests/test_glossary_source.py \
                  scripts/tests/test_translate_delta.py \
                  scripts/tests/test_normalize_en_phase_labels.py \
                  scripts/tests/test_assemble_distribution.py -q
@@ -433,8 +434,7 @@ jobs:
           while IFS= read -r rel; do
             [ -z "$rel" ] && continue
             if ! python3 scripts/delivery_checks.py \
-                --source "$rel" --output "../en-draft/$rel" \
-                --glossary translation/glossary-v0.1.csv; then
+                --source "$rel" --output "../en-draft/$rel"; then
               status=failed
             fi
           done <<< "$files"

@@ -1,5 +1,4 @@
 term_ru,term_en,context,notes,tier
-3 контекста стиля жизни,Three Lifestyle Development Contexts,personal development model,learning beyond formal education; pending_review=true,3
 Dual-mode setup script,Dual-mode setup script,Environment configuration,SETUP_CI flag support; pending_review=true,3
 Headless-адаптер,Headless adapter,Agent inbox runtime,IWE dispatcher implementation; pending_review=true,3
 bearer-заголовок как третий auth-mode,Bearer Header Authentication Mode,authentication protocol extension,backward-compatible multi-channel auth; pending_review=true,3
@@ -17,7 +16,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Веха,Milestone,marking key project checkpoint,standard PM term,2
 Диагностика устаревания ЦД,Digital twin staleness diagnosis,State verification,IWE-specific freshness check; pending_review=true,3
 Дисциплина,Discipline,Engineering methodology / IWE,Standard methodology term,2
-Дисциплинированный,Disciplined,describing rigorous engineering practice,adj; also rigorous in some contexts,2
 Дорожная карта,Roadmap,strategic planning timeline document,compound noun; no hyphen preferred,2
 Заинтересованная сторона,Stakeholder,requirements and systems engineering,Standard SE/BABOK term,2
 Закрытие,Closing,ORZ Closing phase,,1
@@ -30,8 +28,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Исполнитель роли,Role Performer,IWE / organizational modeling,Also Actor in some frameworks,2
 Итерация,Iteration,agile development cycle unit,standard agile term,2
 Карта контекстов,Context Map,DDD strategic design,Core DDD term,2
-Карта роста созидателя,Creator Growth Map,professional development framework,3×2 matrix plus contextual factors; pending_review=true,3
-Карточки практик саморазвития,Self-Development Practice Cards,professional development framework,8 practices × 4 mastery levels; pending_review=true,3
 Компетенция,Competency,HR and capability frameworks,broader than Skill,2
 Компонент,Component,system decomposition and design,Standard SysML/UML term,2
 Конвейер,Pipeline,Automated pipeline,,1
@@ -42,7 +38,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Культура безопасности пилота,Pilot security culture,Data protection habits,IWE-specific practice framework; pending_review=true,3
 Манифест,Manifest,deployment or package declaration files,e.g. Kubernetes manifest,2
 Мастерство,Mastery,competency and skill development models,implies high-level expertise,2
-Матрица нормативных состояний по ступеням,Normative State Matrix By Level,maturity framework definition,target state specification; pending_review=true,3
 Машина IWE,IWE machine,Infrastructure substrate,IWE-specific platform instance; pending_review=true,3
 Метод,Method,Engineering practice / methodology,General term; context-dependent,2
 Миграция,Migration,data or schema migration processes,straightforward,2
@@ -56,7 +51,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Общий язык,Ubiquitous Language,DDD strategic design,Not Universal Language,2
 Ограничение,Constraint,design and requirements engineering,"Also ""limitation"" in some contexts",2
 Ограниченный контекст,Bounded Context,DDD strategic design,Core DDD term,2
-Онбординг платформы — зонтичное обещание,Platform Onboarding Umbrella Promise,platform adoption framework,two-axis maturation model; pending_review=true,3
 Онтология,Ontology,formal knowledge representation model,Used in semantic/conceptual modeling,2
 Операция,Operation,unit of work or system action,"context-dependent; also ""procedure""",2
 Опыт,Experience,practitioner background and expertise,also can mean experiment in sci context,2
@@ -71,8 +65,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Постмортем,Postmortem,analysis after incident or failure,"also ""post-incident review""",2
 Поток,Flow/Stream,Learning or work stream,,1
 Потребность,Need,stakeholder needs before requirements,"Distinct from ""requirement""; higher level",2
-Практика,Practice,Engineering methodology / IWE,Standard methodology term,2
-Практикующий,Practitioner,domain expert in active practice,e.g. DDD practitioner,2
 Предметная область,Domain,DDD modeling and design,Core DDD term,2
 Принцип BYOB,BYOB principle,Infrastructure ownership,Bring Your Own Base; pending_review=true,3
 Приоритет,Priority,task/backlog item ordering,straightforward,2
@@ -85,14 +77,12 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Рабочий ход,Work turn,Turn in peer session,,1
 Развёртывание,Deployment,releasing software to environment,straightforward,2
 Различение,Distinction,Key conceptual distinction,,1
-Различение: Персона / Память / Контекст,Distinction: Persona/Memory/Context,Ontological decomposition,IWE-specific framework; pending_review=true,3
 Ревью,Review,code review or document review,informal borrowing from English,2
 Реестр,Registry,centralized repository or catalog,"Not ""register""; context-dependent",2
 Резервная копия,Backup,Data persistence method,IWE-specific critical data; pending_review=true,3
 Репозиторий,Repository,DDD tactical patterns,Core DDD term,2
 Ретроспектива,Retrospective,agile ceremony after iteration ends,standard Scrum ceremony,2
 Рефакторинг,Refactoring,code restructuring without behavior change,straightforward,2
-Ролевая траектория созидателя,Creator Role Trajectory Model,professional development path,five-role progression framework; pending_review=true,3
 Ролевой префикс,Role prefix,Role activation prefix,,1
 Роль,Role,IWE / organizational modeling,Context-dependent term,2
 Рубеж работы,Work milestone,Decision point in workflow,,1
@@ -100,7 +90,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Сервис,Service,SOA DDD and microservices design,Standard DDD/SOA term,2
 Сервис предметной области,Domain Service,DDD tactical patterns,Distinct from Application Service,2
 Сессия,Session,runtime interaction and state management,Standard software/networking term,2
-Систематический,Systematic,describing methodical process approach,adj; methodical/structured also valid,2
 Системное мышление,Systems Thinking,Systems engineering / IWE,Discipline/methodology term,2
 Скилл,Skill,Agent skill/capability,,1
 Скрипт,Script,automation or build scripting,straightforward,2
@@ -115,7 +104,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Траектория,Trajectory,describing path of system or project evolution,"also ""path"" in some contexts",2
 Траектория развития,Development Trajectory,describing planned growth or evolution path,"also ""growth path"" or ""roadmap""",2
 Требование,Requirement,systems and software requirements,Core SE/SysML/INCOSE term,2
-Уровни деятельностного охвата созидателя,Creator Activity Scope Levels,professional development scale,system mastery scale; pending_review=true,3
 Фабрика,Factory,DDD tactical patterns / creational patterns,Can also be Abstract Factory,2
 Фаза,Phase,project lifecycle and process modeling,Standard PM/SE lifecycle term,2
 Форматирование,Formatting,Document formatting,,1

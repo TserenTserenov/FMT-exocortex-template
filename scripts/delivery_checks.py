@@ -8,19 +8,21 @@ tier (Tier-1 leftovers are a hard failure, Tier-2/3 are a warning).
 
 Usage (CLI, called by the sync workflow):
     python3 scripts/delivery_checks.py --source docs/README.md \\
-        --output ../en-out/docs/README.md --glossary translation/glossary-v0.1.csv
+        --output ../en-out/docs/README.md
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).parent))
+from glossary_source import GlossaryError, load_glossary  # noqa: E402
 from translate import parse_frontmatter, strip_code_for_guard  # noqa: E402
 
 
@@ -40,21 +42,12 @@ class ContentReport:
         return not self.tier1_violations
 
 
-def load_glossary_terms(glossary_path: Path) -> list[GlossaryTerm]:
-    """Load glossary CSV with tier column. Missing/blank tier defaults to 3."""
-    terms: list[GlossaryTerm] = []
-    if not glossary_path.exists():
-        return terms
-    with glossary_path.open(encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            ru = (row.get("term_ru") or "").strip()
-            if not ru:
-                continue
-            tier_raw = (row.get("tier") or "").strip()
-            tier = int(tier_raw) if tier_raw.isdigit() else 3
-            terms.append(GlossaryTerm(term_ru=ru, tier=tier))
-    return terms
+def load_glossary_terms(manifest_path: Path) -> list[GlossaryTerm]:
+    """Glossary terms with their check tier, from the same loader translate.py uses."""
+    with manifest_path.open(encoding="utf-8") as f:
+        manifest = yaml.safe_load(f) or {}
+    glossary = load_glossary(manifest, manifest_path.parent)
+    return [GlossaryTerm(term_ru=t.term_ru, tier=t.tier) for t in glossary.terms]
 
 
 def check_formal(source_path: Path, output_path: Path) -> list[str]:
@@ -117,7 +110,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Delivery checks for translated documents.")
     parser.add_argument("--source", required=True, help="Path to RU source file")
     parser.add_argument("--output", required=True, help="Path to translated EN output file")
-    parser.add_argument("--glossary", required=True, help="Path to glossary CSV (with tier column)")
+    parser.add_argument(
+        "--manifest",
+        default=str(Path(__file__).parent.parent / "translation-manifest.yaml"),
+        help="Path to translation-manifest.yaml (its glossary: block names the term files)",
+    )
     args = parser.parse_args()
 
     source_path = Path(args.source)
@@ -129,7 +126,11 @@ def main() -> int:
             print(f"FORMAL FAIL: {v}", file=sys.stderr)
         return 1
 
-    glossary_terms = load_glossary_terms(Path(args.glossary))
+    try:
+        glossary_terms = load_glossary_terms(Path(args.manifest))
+    except GlossaryError as exc:
+        print(f"GLOSSARY FAIL: {exc}", file=sys.stderr)
+        return 1
     content_report = check_content(output_path.read_text(encoding="utf-8"), glossary_terms)
 
     for w in content_report.warnings:
