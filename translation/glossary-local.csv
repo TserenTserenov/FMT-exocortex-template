@@ -113,3 +113,14 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Шаблон,Template,document or code generation patterns,also means Pattern in some contexts,2
 Шаг,Step,process workflow and procedure design,"Also ""stage"" depending on context",2
 Шифрование,Encryption,Data protection method,Standard security technique; pending_review=true,3
+Обещание платформы и IWE,Platform and IWE Promise,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Изменение,Change,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Фича,Feature,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Улучшение,Improvement,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Исправление,Fix,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Релиз,Release,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Выпускающий,Release Owner,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+IWE по шаблону,Template-based IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+IWE у вендора,Vendor-hosted IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+IWE у разработчика,Developer IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Система,System,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2

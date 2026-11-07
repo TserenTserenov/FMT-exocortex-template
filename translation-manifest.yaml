@@ -54,6 +54,8 @@ frontmatter_translate_keys:
   - description
   - summary
   - name
+  - readers
+  - rule
 
 # FILE CATEGORIES
 # Д — Documentation: auto-translate via LLM pipeline + glossary
