@@ -155,7 +155,9 @@ printf 'TELEGRAM_BOT_TOKEN=t\nTELEGRAM_CHAT_ID=1\n' > "$TMP/nhome/.config/aist/e
 rc=$(notify_rc '{"ok":true}' 'text' --require-delivery)
 if [ "$rc" = 0 ] && grep -q 'notification sent' "$TMP/notify.out"; then pass "flag, ok=true → exit 0 and a sent line"; else fail "confirmed delivery: rc=$rc out=$(cat "$TMP/notify.out")"; fi
 printf '#!/bin/sh\nexit 28\n' > "$TMP/nbin/curl"
-[ "$(notify_rc '' 'text')" = 28 ] && pass "no flag, curl itself fails → curl's exit code, exactly as before the change" || fail "default exit code for a curl failure changed: $(notify_rc '' 'text')"
+# Since WP-568 Ф12 С4 (iwe-notify) a failed send without the flag is exit 0,
+# like a missing token or ok:false; only --require-delivery reports it.
+[ "$(notify_rc '' 'text')" = 0 ] && pass "no flag, curl itself fails → exit 0, failure only in stdout" || fail "default exit code for a curl failure: $(notify_rc '' 'text')"
 [ "$(notify_rc '' 'text' --require-delivery)" = 4 ] && pass "flag, curl itself fails → exit 4" || fail "curl failure with the flag: $(notify_rc '' 'text' --require-delivery)"
 printf '#!/bin/sh\nprintf "%%s" "$FAKE_CURL_BODY"\n' > "$TMP/nbin/curl"
 [ "$(notify_rc '{"ok":true}' '' --require-delivery)" = 5 ] && pass "flag, empty message → exit 5" || fail "empty message with the flag"

@@ -43,6 +43,11 @@
 #       not-sent         no gateway delivery and no credentials / test mode
 #     Exit codes are unchanged. Live callers treat only sent/direct-sent as
 #     delivered; the rest keep their own exit code and log the line.
+#   - --html: the text is Telegram HTML (<b>, <a>, &amp;). The direct send
+#     uses parse_mode=HTML; the gateway gets plain text (tags removed,
+#     entities decoded), as it sends plain text.
+#   - Direct send: through TELEGRAM_PROXY (else ALL_PROXY) when set, and only
+#     a reply with "ok":true counts as sent (a 200 with ok:false is failed).
 #   - --reply-markup <json>: inline buttons. The gateway cannot carry them,
 #     so with a gateway the text goes through it WITHOUT buttons (its verdict
 #     stays final, quarantine included); only without a gateway the single
@@ -52,19 +57,22 @@
 # $IWE_ROOT/$IWE_GOVERNANCE_REPO, DS-strategy, DS-my-strategy (first found).
 set -uo pipefail
 
-IWE_ROOT="${IWE_ROOT:-$HOME/IWE}"
+# Template workspaces name their root IWE_WORKSPACE; the author host IWE_ROOT.
+IWE_ROOT="${IWE_ROOT:-${IWE_WORKSPACE:-$HOME/IWE}}"
 LOG_DIR="${DS_PUBLISH_ADMISSION_DIR:-$IWE_ROOT/.claude/state/notify-admission}"
 
 die_usage() { echo "iwe-notify: $1" >&2; exit 1; }
 
 source_id=""
 reply_markup=""
+html=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --source)
       [ -n "${2:-}" ] || die_usage "--source requires a value"
       source_id="$2"; shift 2 ;;
     --source=*) source_id="${1#--source=}"; shift ;;
+    --html) html=1; shift ;;
     --reply-markup)
       [ -n "${2:-}" ] || die_usage "--reply-markup requires a value"
       reply_markup="$2"; shift 2 ;;
@@ -77,6 +85,11 @@ done
 [[ "$source_id" =~ ^[A-Za-z0-9._-]+$ ]] || die_usage "--source must match [A-Za-z0-9._-]+"
 if [ $# -ge 1 ]; then msg="$1"; else msg="$(cat)"; fi
 [ -n "$msg" ] || die_usage "empty message"
+
+# plain_text: the HTML message as the gateway's plain text.
+plain_text() {
+  printf '%s' "$msg" | sed -e 's/<[^>]*>//g' -e 's/&lt;/</g' -e 's/&gt;/>/g' -e 's/&quot;/"/g' -e 's/&amp;/\&/g'
+}
 
 find_gateway() {
   if [ -n "${IWE_NOTIFY_GATEWAY:-}" ]; then
@@ -118,11 +131,19 @@ send_direct() {
     report not-sent
     return 0
   fi
-  local markup_args=()
-  [ -z "$reply_markup" ] || markup_args=(--data-urlencode "reply_markup=$reply_markup")
-  curl -sS --fail --max-time 10 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-    -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" ${markup_args[@]+"${markup_args[@]}"} > /dev/null \
-    || outcome=failed
+  local extra=() proxy="${TELEGRAM_PROXY:-${ALL_PROXY:-}}" reply
+  [ -z "$reply_markup" ] || extra+=(--data-urlencode "reply_markup=$reply_markup")
+  [ "$html" -eq 0 ] || extra+=(-d "parse_mode=HTML" -d "disable_web_page_preview=true")
+  [ -z "$proxy" ] || extra+=(--proxy "$proxy")
+  # ${extra[@]+...}: an empty array under set -u stops bash 3.2 (macOS /bin/bash).
+  reply=$(curl -sS --connect-timeout 5 --max-time 10 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=$msg" ${extra[@]+"${extra[@]}"}) || outcome=failed
+  case "$reply" in
+    *'"ok":true'*) ;;
+    *) outcome=failed
+       # Telegram's own reason (e.g. an HTML parse error); the reply holds no token.
+       [ -z "$reply" ] || echo "iwe-notify: Telegram reply: ${reply:0:300}" >&2 ;;
+  esac
   log_row "$reason" "$outcome"
   report "direct-$outcome"
   [ "$outcome" = sent ]
@@ -144,7 +165,9 @@ trap '[ -z "$stage_file" ] || rm -f "$stage_file"' EXIT
   || echo "iwe-notify: buttons not passed — the gateway cannot carry them; text only" >&2
 # "--" before the text: a message starting with "-" is text, not a flag.
 # Gateway stdout goes to stderr: our stdout carries only the outcome line.
-IWE_NOTIFY_STAGE_FILE="$stage_file" "$gateway" --source "$source_id" -- "$msg" >&2
+gateway_text="$msg"
+[ "$html" -eq 0 ] || gateway_text="$(plain_text)"
+IWE_NOTIFY_STAGE_FILE="$stage_file" "$gateway" --source "$source_id" -- "$gateway_text" >&2
 rc=$?
 if [ -n "$stage_file" ]; then
   stage="$(head -n 1 "$stage_file" 2>/dev/null)"

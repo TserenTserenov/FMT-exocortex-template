@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5359a09448a446fa840d613c4d5f43da57b1e8904860951e690681653d1af7da"
+      "sha256": "7965acd07de933bcf4c8694d4b2fda1589c6dcc694268ced192ca1a5e09c05e0"
     },
     {
       "path": "CLAUDE.md",
@@ -2061,7 +2061,7 @@
     },
     {
       "path": "roles/strategist/scripts/strategist.sh",
-      "sha256": "134adace9d91b00e2f6fc88253f2dea14a3992d1fe498e4b7017721023258150"
+      "sha256": "4054c2b8d09667540eb62d3d16cf1b2a03d01d4f48cd7299e3d0e3ad2e6c9900"
     },
     {
       "path": "roles/strategist/scripts/systemd/iwe-strategist-morning.service",
@@ -2121,7 +2121,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/notify.sh",
-      "sha256": "612dbe2925906c807b204221a00e83c8a924278cdd9b56a3e1954622a28440cb"
+      "sha256": "8961957024fa5f17949319b0f70bbd38bbf97fddc998e7f9ba1451b35b2076b5"
     },
     {
       "path": "roles/synchronizer/scripts/scheduler.sh",
@@ -2625,7 +2625,7 @@
     },
     {
       "path": "scripts/iwe-notify",
-      "sha256": "beba003d049d539d0cf67b1bee1f90e886458f69d6c77ef8f60b20d3129f8047"
+      "sha256": "b486dc60586f39a4f130e5e2e72de1f2fcbadb198595c7d7a69e916836961e19"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",

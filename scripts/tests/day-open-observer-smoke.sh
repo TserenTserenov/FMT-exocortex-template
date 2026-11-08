@@ -83,10 +83,13 @@ fi
 body=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        -d) body="$2"; shift 2 ;;
+        -d) case "$2" in \{*) body="$2" ;; esac; shift 2 ;;
+        --data-urlencode) case "$2" in text=*) text="${2#text=}" ;; esac; shift 2 ;;
         *) shift ;;
     esac
 done
+# iwe-notify sends the text url-encoded, not as a JSON body: record it the same way.
+[ -n "$body" ] || body=$(printf '%s' "$text" | python3 -c 'import json, sys; print(json.dumps({"text": sys.stdin.read()}, ensure_ascii=False))')
 printf '%s\n' "$body" >> "$CURL_LOG"
 printf '{"ok":true}'
 EOF
@@ -112,6 +115,7 @@ TPL="$TMP/template"
 mkdir -p "$TPL/roles/strategist" "$TPL/roles/synchronizer/scripts"
 ln -s "$ROOT/roles/strategist/prompts" "$TPL/roles/strategist/prompts"
 cp "$ROOT/roles/synchronizer/scripts/notify.sh" "$TPL/roles/synchronizer/scripts/notify.sh"
+mkdir -p "$TPL/scripts" && cp "$ROOT/scripts/iwe-notify" "$TPL/scripts/iwe-notify"
 ln -s "$ROOT/roles/synchronizer/scripts/templates" "$TPL/roles/synchronizer/scripts/templates"
 
 # --- a fresh case: workspace with a governance repo (a clone of a local bare origin),
