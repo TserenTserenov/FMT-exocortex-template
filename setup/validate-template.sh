@@ -603,8 +603,26 @@ sys.exit(1)
         done
         [ "$registered_pretooluse" -eq 1 ] && continue
         esc_name=$(printf '%s' "$hookname" | sed 's/\./\\./g')
-        hits=$(grep -rnEi "$esc_name" "$TEMPLATE_DIR/.claude/skills" --include=SKILL.md 2>/dev/null \
-            | grep -Ei 'hook|хук' | grep -E "$ENFORCE_RE" || true)
+        # One SKILL.md at a time, so the filters below see only the line text.
+        # A recursive grep prints "path:line:text" and the hook/verb filters
+        # then also matched the checkout path: a worktree named "…hardening…"
+        # (contains "deni") or a path through "…/hooks/…" failed this check on
+        # someone else's file (WP-617 Ф4, 08.11). Splitting "path:line:text"
+        # on ":" is no fix either: a path may contain a colon.
+        # find fails without .claude/skills; under pipefail that would end the
+        # whole validator here with no verdict, hence "|| true" on find.
+        hits=$(
+            { find "$TEMPLATE_DIR/.claude/skills" -type f -name SKILL.md -print0 2>/dev/null || true; } |
+            while IFS= read -r -d '' skill_file; do
+                { grep -nEi -- "$esc_name" "$skill_file" 2>/dev/null || true; } |
+                while IFS= read -r rec; do
+                    text=${rec#*:}
+                    printf '%s\n' "$text" | grep -qEi 'hook|хук' || continue
+                    printf '%s\n' "$text" | grep -qE "$ENFORCE_RE" || continue
+                    printf '%s:%s\n' "$skill_file" "$rec"
+                done
+            done
+        )
         if [ -n "$hits" ]; then
             [ "$CHECK9_FAIL" -eq 0 ] && echo "FAIL"
             echo "  $hookname: SKILL.md заявляет активную защиту (хук + блокирующий глагол в одной строке), но хук не зарегистрирован под PreToolUse ни в одном settings.json:"
