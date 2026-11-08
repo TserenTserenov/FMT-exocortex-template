@@ -19,7 +19,10 @@ name: Glossary Supplier (graph terms snapshot)
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 05:00 MSK
+    # 00:17 MSK. Scheduled runs in this repo start 3-7 h late (validate-template
+    # on '0 2' started 08:29-09:09 UTC every day of 02-07.11), so an evening
+    # slot off the top of the hour keeps the request ready by the morning.
+    - cron: '17 21 * * *'
   workflow_dispatch:
 
 concurrency:
