@@ -9,9 +9,10 @@
 # ROLE: helper for the day-open / week-close skills. Requests from GitHub
 # open issues with the critical/deadline label in FMT-exocortex-template and:
 #   - prints a markdown table to stdout (for the DayPlan/WeekClose report)
-#   - sends a Telegram notification if there are critical issues and
-#     TG_BOT_TOKEN+TG_CHAT_ID are in the environment (MVP detection chain — closes
-#     the gap for weekend P0).
+#   - sends a Telegram notification if there are critical issues, through
+#     iwe-notify (the only place allowed to call the Bot API; WP-568 Ф12 С4
+#     stage 2, peer-session 2026-11-08-06). This is a live source: exit 0 only
+#     when the message reached the phone (outcome sent/direct-sent).
 #
 # Principle «the detector reports, the operator acts»: the script ONLY detects,
 # no autofixes.
@@ -23,12 +24,15 @@
 #   bash fmt-critical-alert.sh -h | --help
 #
 # Exit code:
-#   0 — no critical/deadline issues (or they exist and the notification was sent)
-#   1 — there are critical issues, but TG_BOT_TOKEN/TG_CHAT_ID are not configured (warning in stdout only)
+#   0 — no critical/deadline issues (or they exist and the notification reached the phone)
+#   1 — there are critical issues, but the notification did not reach the phone:
+#       iwe-notify not found, no credentials, transport failure, or the gateway
+#       kept it for the digest / quarantined it (warning in stdout only)
 #   2 — gh call error (no auth, repo unavailable, issue tracker disabled)
 #      or the issue tracker is disabled (issue #340 — distinguished from «0 issues»).
 #
-# Requirements: bash, gh, curl, jq. No external dependencies.
+# Requirements: bash, gh, curl, jq; iwe-notify for the Telegram leg (the IWE
+# root scripts, $IWE_NOTIFY_BIN, or the copy next to this script).
 
 set -eu
 
@@ -202,41 +206,42 @@ echo "$ISSUES_JSON" | jq -r '.[] | "| #\(.number) | [\(.title)](\(.url)) | \(.la
 echo ""
 
 # Telegram alert (MVP)
-if $SEND_TG; then
-    # Fallback chain: TG_BOT_TOKEN → TELEGRAM_BOT_TOKEN (legacy/IWE-standard name from ~/.exocortex.env)
-    TG_TOKEN="${TG_BOT_TOKEN:-${TELEGRAM_BOT_TOKEN:-}}"
-    TG_CHAT="${TG_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
-    if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
-        echo "_TG alert skipped:_ TG_BOT_TOKEN/TELEGRAM_BOT_TOKEN or TG_CHAT_ID/TELEGRAM_CHAT_ID not set in environment."
-        exit 1
-    fi
+# iwe-notify lookup without PATH: explicit override, the IWE root scripts, the
+# template copy next to this script.
+find_iwe_notify() {
+    local candidate
+    for candidate in "${IWE_NOTIFY_BIN:-}" "$HOME/IWE/scripts/iwe-notify" "$SCRIPT_DIR/iwe-notify"; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
 
-    # Build message
+if $SEND_TG; then
+    # Legacy names TG_BOT_TOKEN/TG_CHAT_ID still work: iwe-notify reads TELEGRAM_*.
+    export TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-${TG_BOT_TOKEN:-}}"
+    export TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-${TG_CHAT_ID:-}}"
+
     TG_MSG="🔴 FMT issues требуют внимания ($COUNT):"$'\n'
     while IFS= read -r line; do
         TG_MSG="$TG_MSG"$'\n'"$line"
     done < <(echo "$ISSUES_JSON" | jq -r '.[] | "  #\(.number): \(.title)\n    \(.url)"')
 
-    # Send
+    if ! NOTIFY_BIN=$(find_iwe_notify); then
+        echo "_TG alert skipped:_ iwe-notify not found (\$IWE_NOTIFY_BIN, ~/IWE/scripts, next to this script)."
+        exit 1
+    fi
     set +e
-    TG_RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-        -d "chat_id=${TG_CHAT}" \
-        --data-urlencode "text=${TG_MSG}" 2>&1)
-    CURL_RC=$?
+    OUTCOME=$("$NOTIFY_BIN" --source fmt-critical-alert -- "$TG_MSG" 2>/dev/null)
     set -e
-
-    if [ $CURL_RC -ne 0 ]; then
-        echo "_TG alert failed:_ curl exit $CURL_RC"
-        exit 1
-    fi
-
-    OK=$(echo "$TG_RESPONSE" | jq -r '.ok // false' 2>/dev/null)
-    if [ "$OK" = "true" ]; then
-        # Mask chat_id in STDOUT (DayPlan/WeekReport are committed to Git — a PII signal).
-        TG_CHAT_MASKED="${TG_CHAT:0:3}***"
-        echo "_TG alert sent:_ chat ${TG_CHAT_MASKED}"
-    else
-        echo "_TG alert response:_ $TG_RESPONSE"
-        exit 1
-    fi
+    OUTCOME="${OUTCOME#iwe-notify: outcome=}"
+    case "$OUTCOME" in
+        sent|direct-sent) echo "_TG alert sent:_ $OUTCOME" ;;
+        *)
+            echo "_TG alert not delivered to the phone:_ ${OUTCOME:-unknown}"
+            exit 1
+            ;;
+    esac
 fi
