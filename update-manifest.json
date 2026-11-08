@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "33c5063efdb47532c35ed1fedbb9cdc6a7bed3895a09c9aa0a04cf92e6c422a5"
+      "sha256": "620cece70d11dc09b191b20fad14438ab995d7de80a3812cd22040b4996cfd39"
     },
     {
       "path": "CLAUDE.md",
@@ -3441,7 +3441,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "00a9574f06b35b5aa56d124c6532963babba63ce8d593ad8f935956fada94cce"
+      "sha256": "56715f5787f8ba2dd4d358948b38a215a25d6f7a97f080a75218050b52716077"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3724,6 +3724,7 @@
     "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
     "scripts/tests/test_update_verify_batch_integrity_hash_mismatch_failclosed.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",
+    "scripts/tests/test_validate_skill_hook_claims_path.sh",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
     "scripts/tests/test_wp_inbox_bundle_signal.sh",
     "scripts/tests/wp-sync-bundle-origin-pinned-smoke.sh",
