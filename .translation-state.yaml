@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-11-08T13:43:56Z'
-last_synced_sha: 79612cd127cecca24bc0f54a6a4160a5938d9d33
+files_translated:
+- docs/onboarding/light-onboarding.md
+last_run_utc: '2026-11-08T17:11:26Z'
+last_synced_sha: be40dd996e2c5ad2ebd7c87ea6526c6ed24e3196
 schema_version: 1
