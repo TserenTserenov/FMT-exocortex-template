@@ -280,6 +280,22 @@ notify() {
         || true
 }
 
+# iwe-notify lookup without PATH (WP-568 Ф12 С4): the template's copy first
+# (this script runs from .iwe-runtime, so not next to it), then the override and
+# the other known places.
+find_iwe_notify() {
+    local candidate
+    for candidate in "${IWE_TEMPLATE:+$IWE_TEMPLATE/scripts/iwe-notify}" \
+        "${IWE_WORKSPACE:-$HOME/IWE}/FMT-exocortex-template/scripts/iwe-notify" "${IWE_NOTIFY_BIN:-}" \
+        "${IWE_SCRIPTS:+$IWE_SCRIPTS/iwe-notify}" "${IWE_WORKSPACE:-$HOME/IWE}/scripts/iwe-notify"; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 notify_telegram() {
     local scenario="$1"
     # WP-273 R5: notify.sh is read-only from FMT, not substituted (no placeholders).
@@ -2048,10 +2064,12 @@ case "$1" in
             if [ -f "$ENV_FILE" ]; then
                 set -a; source "$ENV_FILE"; set +a
                 ALERT_TEXT="⚠️ <b>Note-Review canary</b>: разбор не пометил новые заметки ✅предложено ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER новых жирных). Заметки остаются в inbox до решения пилота."
-                ALERT_JSON=$(printf '%s' "$ALERT_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
-                curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-                    -H "Content-Type: application/json" \
-                    -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":${ALERT_JSON},\"parse_mode\":\"HTML\"}" >> "$LOG_FILE" 2>&1 || true
+                # WP-568 Ф12 С4: through iwe-notify, the one place that calls the Bot API.
+                if NOTIFY_BIN=$(find_iwe_notify); then
+                    "$NOTIFY_BIN" --source strategist --html -- "$ALERT_TEXT" >> "$LOG_FILE" 2>&1 || true
+                else
+                    log "WARN: Note-Review alert не отправлен: нет программы отправки iwe-notify (update.sh)"
+                fi
             fi
         fi
 

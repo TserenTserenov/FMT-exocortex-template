@@ -111,13 +111,16 @@ out=""; body=""; url=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -o) out="$2"; shift 2 ;;
-        -d) body="$2"; shift 2 ;;
+        -d) case "$2" in \{*) body="$2" ;; esac; shift 2 ;;
+        --data-urlencode) case "$2" in text=*) text="${2#text=}" ;; esac; shift 2 ;;
         -w|-X|-H|-m) shift 2 ;;
         http*) url="$1"; shift ;;
         *) shift ;;
     esac
 done
 printf '%s\n' "$url" > "$CURL_LOG_DIR/call-$$.url"
+# iwe-notify sends the text url-encoded, not as a JSON body: record it the same way.
+[ -n "$body" ] || body=$(printf '%s' "$text" | "$REAL_PYTHON3" -c 'import json, sys; print(json.dumps({"text": sys.stdin.read()}, ensure_ascii=False))')
 printf '%s' "$body" > "$CURL_LOG_DIR/call-$$.json"
 if [ -n "$out" ]; then
     printf '{"ok":true}' > "$out"
