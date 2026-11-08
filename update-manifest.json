@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "249e24204199be8241bd9a59d1fba5dfea9afd606be03af1948fe62f2e6eaad6"
+      "sha256": "5359a09448a446fa840d613c4d5f43da57b1e8904860951e690681653d1af7da"
     },
     {
       "path": "CLAUDE.md",
@@ -2489,7 +2489,7 @@
     },
     {
       "path": "scripts/fmt-critical-alert.sh",
-      "sha256": "17c1c7250bc80446f320305b506d792d9b1881578a0922dfdc35bfdb8c4e4b68"
+      "sha256": "369bdc410ee869c0329a1df12d7dc05be8d6b2eb6c06bf0b6879aa16c11837fb"
     },
     {
       "path": "scripts/gate-metrics.sh",
@@ -2622,6 +2622,10 @@
     {
       "path": "scripts/iwe-multipath.py",
       "sha256": "2bc20bf869195220748b1b0961a1219aab328279df5b36d48c092dcdaef6f631"
+    },
+    {
+      "path": "scripts/iwe-notify",
+      "sha256": "beba003d049d539d0cf67b1bee1f90e886458f69d6c77ef8f60b20d3129f8047"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
@@ -3530,6 +3534,7 @@
     "scripts/tests/test_assemble_distribution.py",
     "scripts/tests/test_changelog_append_blank_lines.sh",
     "scripts/tests/test_copy_to_aisystant.py",
+    "scripts/tests/test_critical_alert_notify_outcome.sh",
     "scripts/tests/test_day_close_prepare.py",
     "scripts/tests/test_day_open_checks_runner_false_positive.sh",
     "scripts/tests/test_day_open_preflight_calendar_path.sh",
