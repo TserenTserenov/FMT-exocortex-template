@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2b6a2e8a72d93524abbaa629db6baf9bfe38ed2296744d8c21227371cfe5dd93"
+      "sha256": "9bb41365fae3009ab390890022d4e5b9beca5db92ab77ae027f4e1896522bb9f"
     },
     {
       "path": "CLAUDE.md",
@@ -1105,7 +1105,7 @@
     },
     {
       "path": "docs/onboarding/light-onboarding.md",
-      "sha256": "9d9d972881861fe98b8af127c0323f1b2f2d015e69656e8c174984e50c80492b"
+      "sha256": "ab6a04de321e382e7e9982edf469e3835303e9fc71fa6255f37bf21977dfd2ad"
     },
     {
       "path": "docs/onboarding/onboarding-diagrams.md",
@@ -3449,7 +3449,7 @@
     },
     {
       "path": "shared/rubrics/form-089.yaml",
-      "sha256": "b0482a0f72a9edad419bee89d57b328d23068575988562949f7ccc74bfd32404"
+      "sha256": "2c272b39ddd44df57c5585f766c688263ab6d2d023eb93a07b0db07f23328a4a"
     },
     {
       "path": "translation-manifest.yaml",
