@@ -960,6 +960,11 @@ jobs:
       - name: Test the orphan-hook guard itself (marker + allowlist + real orphan)
         run: bash scripts/tests/test_check_orphan_hooks.sh
 
+      # WP-406 (light onboarding v1.0.2): a new person is led by /onboarding, the WP Gate
+      # reminder only applies once onboarding is passed or work state exists.
+      - name: Test the light onboarding new-person predicate and its hook branch
+        run: bash scripts/tests/test_light_onboarding_state.sh
+
       # ArchGate 03.09 (WP-5): the isolated inbox-check sandbox now
       # mounts the Pack repositories for duplicate checking -- read-only must be
       # real (file system), not just prompt text, otherwise the same

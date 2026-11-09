@@ -33,7 +33,10 @@
       "Bash(bash ~/IWE/scripts/session-guard.sh renew:*)",
       "Bash(bash ~/IWE/scripts/session-guard.sh note-file:*)",
       "Bash(bash ~/IWE/scripts/session-guard.sh audit:*)",
-      "Bash(bash ~/IWE/scripts/agent-heartbeat.sh:*)"
+      "Bash(bash ~/IWE/scripts/agent-heartbeat.sh:*)",
+      "Bash(bash .claude/scripts/light-onboarding-state.sh status:*)",
+      "Bash(bash .claude/scripts/light-onboarding-state.sh done)",
+      "Bash(bash .claude/scripts/light-onboarding-state.sh reset)"
     ],
     "additionalDirectories": []
   },
