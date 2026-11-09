@@ -465,7 +465,7 @@
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
-      "sha256": "5015e4d68df8b357f808c1e8e2b62f9615aab57830970b2ed449cfa4f785271e"
+      "sha256": "ea92a1de7d19450a44f1adb1dd25897bb8d2f366f31f7c729d06bb727e46f555"
     },
     {
       "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e8784509914db64842b8172792093a69c3b9ba866de591cf928ba1890a1eecdb"
+      "sha256": "d9706d605414e35e8d0dbfffd2fbc8f54315a2a78e34e0e2de492706399f1b4d"
     },
     {
       "path": "CLAUDE.md",
