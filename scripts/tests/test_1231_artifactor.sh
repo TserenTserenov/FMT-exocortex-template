@@ -45,5 +45,24 @@ else
     fail_test "Pack present, registry missing: no CONFIG_ERROR message: $err"
 fi
 
+# --- 3. --check-registry (name check against the concept-kinds registry, WP-575):
+# the registry lives in the same author-only Pack, so the same split applies.
+RESULT="$TMP/result.json"
+printf '%s\n' '{"artifact": "Платформа обучения", "result_type": "system"}' > "$RESULT"
+out=$(env -u CONCEPT_KINDS_REGISTRY IWE_ROOT="$TMP/no-pack-here" python3 -I "$SCRIPT" --check-registry "$RESULT" 2>/dev/null)
+rc=$?
+if [ "$rc" -eq 0 ]; then pass "check-registry, Pack absent: exit 0"; else fail_test "check-registry, Pack absent: expected exit 0, got $rc ($out)"; fi
+case "$out" in
+    "REGISTRY_OK no-pack "*) pass "check-registry, Pack absent: REGISTRY_OK no-pack" ;;
+    *) fail_test "check-registry, Pack absent: expected 'REGISTRY_OK no-pack', got: $out" ;;
+esac
+out=$(env -u CONCEPT_KINDS_REGISTRY IWE_ROOT="$TMP/pack-no-registry" python3 -I "$SCRIPT" --check-registry "$RESULT" 2>/dev/null)
+rc=$?
+if [ "$rc" -eq 4 ]; then pass "check-registry, Pack present without registry: exit 4"; else fail_test "check-registry, Pack present without registry: expected exit 4, got $rc ($out)"; fi
+case "$out" in
+    REGISTRY_BLOCK*) pass "check-registry, Pack present without registry: REGISTRY_BLOCK" ;;
+    *) fail_test "check-registry, Pack present without registry: expected REGISTRY_BLOCK, got: $out" ;;
+esac
+
 [ "$fail" -eq 0 ] && echo "test_1231_artifactor: ALL PASS" || echo "test_1231_artifactor: FAILURES ABOVE"
 exit "$fail"
