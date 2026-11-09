@@ -124,3 +124,18 @@ IWE по шаблону,Template-based IWE,change accounting (WP-611),approved b
 IWE у вендора,Vendor-hosted IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
 IWE у разработчика,Developer IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
 Система,System,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
+Конфликтное облако,Evaporating Cloud,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Общая цель,Common objective,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Необходимость,Requirement,"Evaporating Cloud method (TOC, MIM.M.015); elements B and C","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Действие D/D' конфликтного облака,Prerequisite,"Evaporating Cloud method (TOC, MIM.M.015); the Russian card says «действие»","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Допущение,Assumption,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Инъекция,Injection,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Ложное допущение,False assumption,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Беспокойство,Concern,"Unpacking a Concern method (DP.METHOD.053)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Проблема,Problem,"Unpacking a Concern method (DP.METHOD.053); gap for a role","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Неудовлетворённость,Dissatisfaction,"Unpacking a Concern method (DP.METHOD.053); state of the person","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Эмоция,Emotion,"Unpacking a Concern method (DP.METHOD.053); minutes","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Чувство,Feeling,"Unpacking a Concern method (DP.METHOD.053); weeks to years","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Сила,Strength,"Unpacking a Concern method (DP.METHOD.053); of a dissatisfaction, 1-5","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Ошибка предсказания,Prediction error,"Unpacking a Concern method (DP.METHOD.053)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
+Ближайшее действие,Nearest action,"Unpacking a Concern method (DP.METHOD.053)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
