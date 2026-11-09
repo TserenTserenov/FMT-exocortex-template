@@ -23,6 +23,10 @@
 #              on-disk entry already equals the target's (mode+blob) or the
 #              path is deleted here and absent there (WP-561 Phase 24: point-
 #              installed published bytes must not freeze the canon forever) ·
+#              a live ledger journal (machine/ledger/**/*.yaml) is tolerated when,
+#              under the journal lock ledger-append.sh uses (wait <= 30 s), every
+#              event on disk is already on the target (whole-event comparison by
+#              ledger-event-diff.py), else refused naming the events (ts, kind) ·
 #              every local-only commit patch-equivalent to the target (`git
 #              cherry` has no `+`) OR content-superseded (every path it touched
 #              has the same tree entry in HEAD and target; no local merge
@@ -168,6 +172,40 @@ ALERT_MIN_COUNT=$(num_or_default "${CANON_RECONCILE_ALERT_MIN_COUNT:-}" 3)
 TMP_FILES=()
 cleanup() { rm -f "${TMP_FILES[@]+"${TMP_FILES[@]}"}"; }
 trap cleanup EXIT
+
+# Live append-only ledger journals (machine/ledger/**/*.yaml), step 2 below. The journal lock is the one
+# DS-strategy/scripts/ledger-append.sh takes before every write: `<file>.lock` through flock when flock
+# exists, else the `<file>.lockdir` mkdir lock with an owner record. Taking it here keeps writers out between the
+# comparison and the reset; it is NEVER taken while a publisher is run (the publisher does not take it, and this
+# script does not start one: a journal event that is not on the target yet is a refusal, the publisher drains it).
+LEDGER_LOCK_WAIT_S="${CANON_LEDGER_LOCK_WAIT_S:-30}"
+printf '%s' "$LEDGER_LOCK_WAIT_S" | grep -Eq '^([1-9]|[12][0-9]|30)$' || { echo "canon-reconcile-published: CANON_LEDGER_LOCK_WAIT_S must be a whole number of seconds from 1 to 30, got '$LEDGER_LOCK_WAIT_S'" >&2; exit 2; }
+LEDGER_HELD=(); LEDGER_FDS=(); LEDGER_LOCKDIRS=()
+ledger_lock_take() {  # <journal path> -- 0 = lock held (kept until ledger_locks_release / exit), 1 = not taken within the wait
+  local f="$1" h fd lockdir left="$LEDGER_LOCK_WAIT_S"
+  for h in "${LEDGER_HELD[@]+"${LEDGER_HELD[@]}"}"; do [ "$h" = "$f" ] && return 0; done
+  if command -v flock >/dev/null 2>&1; then
+    fd=$((201 + ${#LEDGER_FDS[@]}))
+    eval "exec $fd<>\"\${f}.lock\"" || return 1   # fd number is computed here, bash 3.2 has no {var} redirection
+    if ! flock -x -w "$LEDGER_LOCK_WAIT_S" "$fd"; then eval "exec $fd>&-"; return 1; fi
+    LEDGER_FDS+=("$fd")
+  else
+    lockdir="${f}.lockdir"
+    while ! mkdir "$lockdir" 2>/dev/null; do
+      left=$((left - 1)); [ "$left" -gt 0 ] || return 1
+      sleep 1
+    done
+    LEDGER_LOCKDIRS+=("$lockdir")
+    printf 'host=%s\npid=%s\n' "${HOSTNAME:-$(uname -n)}" "$$" > "$lockdir/owner"
+  fi
+  LEDGER_HELD+=("$f")
+}
+ledger_locks_release() {
+  local fd d
+  for fd in "${LEDGER_FDS[@]+"${LEDGER_FDS[@]}"}"; do eval "exec $fd>&-"; done
+  for d in "${LEDGER_LOCKDIRS[@]+"${LEDGER_LOCKDIRS[@]}"}"; do rm -rf "$d"; done
+  LEDGER_HELD=(); LEDGER_FDS=(); LEDGER_LOCKDIRS=()
+}
 
 log_line() {  # <status> <text> -- append-only log outside the repository; written only when the directory chain and the log file are trusted (the message is on stderr anyway)
   if [ -z "${LOG_TRUST:-}" ]; then if runtime_chain_ok && plain_file_ok "$LOG_FILE"; then LOG_TRUST=yes; else LOG_TRUST=no; fi; fi
@@ -367,7 +405,17 @@ refuse_report() {  # <reason> -- the whole report of one refusal: message, strea
   [ -z "$warn" ] || echo "$warn" >&2
   log_line "${REPORT_WORD:-refused}" "$reason"
   if [ "$due" -eq 1 ]; then
-    echo "canon-reconcile-published: ALERT canon $(oneline "$REPO") not reconciled for $((a_age / 60)) min: $a_count refusals '$class', $dirty dirty tracked path(s) -- an owner must clear the blocking state; next alert in $((ALERT_REPEAT_SEC / 60)) min" >&2
+    # The class is cut at the first colon so the streak key stays stable; what
+    # follows it (for "live canonical writer(s)" -- the semaphore names) is
+    # what the pilot needs to act, so it rides along as an optional tail
+    # (WP-568, peer-session 2026-10-24-07). Readers must accept its absence.
+    local detail="" detail_tail=""
+    if [ "$reason" != "$class" ]; then
+      detail="${reason#*:}"; detail="${detail%% -- *}"; detail="${detail# }"
+      [ "${#detail}" -le 1000 ] || { detail="${detail:0:1000}"; detail="${detail% *}"; }   # never a half name
+      [ -z "$detail" ] || detail_tail=" -- detail: $detail"
+    fi
+    echo "canon-reconcile-published: ALERT canon $(oneline "$REPO") not reconciled for $((a_age / 60)) min: $a_count refusals '$class', $dirty dirty tracked path(s) -- an owner must clear the blocking state; next alert in $((ALERT_REPEAT_SEC / 60)) min$detail_tail" >&2
     log_line alert "class=$class count=$a_count age_s=$a_age dirty=$dirty"
   fi
   return 0
@@ -416,7 +464,7 @@ busy_report() {  # the lock is held: say so, and let a lock that stays held beco
   fi
   ( STREAK_FILE="$RUNTIME_PHYS/$BUSY_NAME"; REPORT_WORD=skipped; refuse_report "dirty-guard lock cannot be taken [$DGLOCK_ID]: $1" ) || true
 }
-trap 'cleanup || :; dglock_release' EXIT   # set BEFORE the lock is asked for: a signal that arrives between the library's mkdir and its owner record must still remove the empty directory
+trap 'cleanup || :; ledger_locks_release; dglock_release' EXIT  # set BEFORE the lock is asked for: a signal that arrives between the library's mkdir and its owner record must still remove the empty directory
 rc=0; dglock_acquire "$GIT_DIR" canon-reconcile-published || rc=$?
 case "$rc" in
   0) ;;
@@ -461,12 +509,28 @@ pidless_semaphore_lease_expired() {  # <semaphore> -- 0 (expired, safe to not co
   [ -n "$renewed_epoch" ] && [ "$renewed_epoch" -gt "$base_epoch" ] && base_epoch="$renewed_epoch"
   [ "$(date +%s)" -ge $(( base_epoch + lease_sec )) ]
 }
+# WP-484 Phase 250 (measure 2): a hand-made copy opened without --isolate records
+# `governance_worktree:` but no `isolated_worktree:`, so the check below used to
+# count it as a canonical writer and fence reconcile for as long as it lived.
+# Its writes land in its own checkout when that checkout is a worktree
+# registered in THIS repository (same criterion as _root_route_registered in
+# process-runner.py: exact, unique entry in `git worktree list`) and is not the
+# canon itself. Stricter than the unconditional trust in `isolated_worktree:`.
+registered_noncanon_worktree() {  # <semaphore> -- 0 when its governance_worktree is a registered worktree other than the canon
+  local gw gw_real
+  gw=$(awk '$1=="governance_worktree:"{sub(/^governance_worktree:[ ]*/, ""); print; exit}' "$1")
+  [ -n "$gw" ] && [ -d "$gw" ] || return 1
+  gw_real=$(cd "$gw" 2>/dev/null && pwd -P) || return 1
+  [ "$gw_real" != "$REPO_TOP" ] || return 1
+  [ "$(git worktree list --porcelain 2>/dev/null | grep -cFx "worktree $gw_real")" = "1" ]
+}
 live_canonical_writers() {  # prints " name name ..." or nothing
   local sem sem_pid sem_host out=""
   local self_pid="${OWNER_PID:-${CLAUDE_PID:-}}" self_host="$(uname -n)"
   for sem in "$RUNTIME_DIR"/sessions/*.open; do
     [ -f "$sem" ] || continue
     grep -q '^isolated_worktree:' "$sem" && continue
+    registered_noncanon_worktree "$sem" && continue
     sem_pid=$(awk '$1=="pid:"{print $2; exit}' "$sem")
     sem_host=$(awk '$1=="host:"{print $2; exit}' "$sem")
     # Same pid as ours (OWNER_PID/CLAUDE_PID, the env var session-guard wrote
@@ -565,17 +629,68 @@ dirty_signature() {  # "<path>\t<disk entry>" per dirty tracked path, sorted -- 
     printf '%s\t%s\n' "$p" "$(disk_entry "$p")"
   done | LC_ALL=C sort
 }
-DIRTY_BLOCKING=""; DIRTY_TOLERATED=0; DIRTY_ANCESTRAL=0; COMMIT_ANCESTRAL=0
-while IFS= read -r -d '' p; do
-  [ -n "$p" ] || continue
-  t_entry=$(git ls-tree "$PINNED" -- "$p" | awk 'NR==1{print $1" "$3}')
-  on_disk=$(disk_entry "$p")
-  if [ -z "$on_disk" ] && [ -z "$t_entry" ]; then DIRTY_TOLERATED=$((DIRTY_TOLERATED+1)); continue; fi   # deleted here, absent on target
-  if [ -n "$on_disk" ] && [ "$on_disk" != "dir" ] && [ "$on_disk" = "$t_entry" ]; then DIRTY_TOLERATED=$((DIRTY_TOLERATED+1)); continue; fi
-  if ancestral_path "$p" "$on_disk"; then DIRTY_ANCESTRAL=$((DIRTY_ANCESTRAL+1)); continue; fi
-  DIRTY_BLOCKING="$DIRTY_BLOCKING $p"
-done < <(git diff --name-only -z 2>/dev/null)
+
+# LEDGER_JOURNAL criterion (live append-only journals machine/ledger/**/*.yaml; every session appends to them through
+# ledger-append.sh and ledger-publish.sh carries them to origin by a union merge of whole events, so the bytes on disk
+# equal neither the target nor any point of its history, and the checks above refuse the same file forever). What
+# `git reset --hard` would destroy is the events, not the bytes: the path is tolerated when, UNDER THE JOURNAL LOCK,
+# every event on disk (compared as a whole record with its multiplicity, by the same ledger-event-diff.py the publisher
+# uses) is already in the target; the reset then rewrites the file with the target's version and nothing is lost. An
+# event not on the target refuses with its ts and kind, and the file is not touched. The lock stays held until the
+# swap is done, so no writer slips an event in between the comparison and the reset.
+COMMIT_ANCESTRAL=0; LEDGER_DIFF_TOOL=""; LEDGER_PYTHON=""; LEDGER_REFUSAL=""
+ledger_dirty_ok() {  # <path> -- 0 = every event on disk is in the target (journal lock held); 1 = LEDGER_REFUSAL says why
+  local p="$1" ref tip snap tgt err out rc n lines line ts
+  if ! ledger_lock_take "$p"; then
+    LEDGER_REFUSAL="ledger lock busy or publish not responding: could not take the journal lock of $p within ${LEDGER_LOCK_WAIT_S}s -- a writer holds it (nothing was changed)"
+    return 1
+  fi
+  git fetch origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" --quiet 2>/dev/null || { LEDGER_REFUSAL="git fetch origin $BRANCH failed under the journal lock of $p"; return 1; }
+  ref="$PINNED"; tip=$(git rev-parse "origin/$BRANCH")
+  # events published after the pin are on origin too, and reset never loses what origin has
+  if [ "$tip" != "$PINNED" ] && git merge-base --is-ancestor "$PINNED" "$tip"; then ref="$tip"; fi
+  if [ -z "$LEDGER_DIFF_TOOL" ]; then
+    # the comparison tool imports yaml: the shared resolver picks a python3 that has it (a bare python3 may not)
+    LEDGER_PYTHON=$("$SCRIPT_DIR/lib/find-python3.sh" 2>/dev/null) || { LEDGER_REFUSAL="no python3 with PyYAML found by $SCRIPT_DIR/lib/find-python3.sh: $p cannot be compared"; return 1; }
+    LEDGER_DIFF_TOOL=$(mktemp); TMP_FILES+=("$LEDGER_DIFF_TOOL")
+    git show "$PINNED:scripts/lib/ledger-event-diff.py" > "$LEDGER_DIFF_TOOL" 2>/dev/null || { LEDGER_REFUSAL="ledger comparison tool scripts/lib/ledger-event-diff.py is not in the target: $p cannot be compared"; return 1; }
+  fi
+  snap=$(mktemp); tgt=$(mktemp); err=$(mktemp); TMP_FILES+=("$snap" "$tgt" "$err")
+  if ! cp "$p" "$snap" || ! git show "$ref:$p" > "$tgt" 2>/dev/null; then LEDGER_REFUSAL="cannot read $p from the disk or from the target"; return 1; fi
+  rc=0; out=$("$LEDGER_PYTHON" "$LEDGER_DIFF_TOOL" --missing-by-field kind "$snap" "$tgt" 2>"$err") || rc=$?
+  if [ "$rc" -ne 0 ]; then LEDGER_REFUSAL="ledger events cannot be compared: $p ($(tr '\n' ' ' < "$err" | cut -c1-200))"; return 1; fi
+  [ -n "$out" ] || return 0
+  n=$(printf '%s\n' "$out" | wc -l | tr -d ' '); lines=""
+  while IFS= read -r line; do   # "<kind>\t<canonical json>"; keys are sorted, so the last "ts" is the event's own
+    ts=$(printf '%s' "$line" | sed -n 's/.*"ts": "\([^"]*\)".*/\1/p')
+    lines="$lines ${ts:-?} ${line%%$'\t'*};"
+  done < <(printf '%s\n' "$out" | head -10)
+  LEDGER_REFUSAL="ledger events not yet published: $p has $n event(s) that are not on the target (ts kind):$lines (the file is untouched; the publisher will carry them, retry after that)"
+  return 1
+}
+classify_dirty() {  # tolerated / ancestral / ledger counts and DIRTY_BLOCKING / LEDGER_REFUSAL, computed afresh
+  DIRTY_BLOCKING=""; DIRTY_TOLERATED=0; DIRTY_ANCESTRAL=0; DIRTY_LEDGER=0; LEDGER_REFUSAL=""
+  while IFS= read -r -d '' p; do
+    [ -n "$p" ] || continue
+    t_entry=$(git ls-tree "$PINNED" -- "$p" | awk 'NR==1{print $1" "$3}')
+    on_disk=$(disk_entry "$p")
+    if [ -z "$on_disk" ] && [ -z "$t_entry" ]; then DIRTY_TOLERATED=$((DIRTY_TOLERATED+1)); continue; fi   # deleted here, absent on target
+    if [ -n "$on_disk" ] && [ "$on_disk" != "dir" ] && [ "$on_disk" = "$t_entry" ]; then DIRTY_TOLERATED=$((DIRTY_TOLERATED+1)); continue; fi
+    if ancestral_path "$p" "$on_disk"; then DIRTY_ANCESTRAL=$((DIRTY_ANCESTRAL+1)); continue; fi
+    case "$p" in
+      machine/ledger/*.yaml)
+        case "${on_disk%% *}/${t_entry%% *}" in
+          100644/100644|100755/100644)   # a regular file here, a regular blob there; the first refusal ends the ledger checks of this pass
+            if [ -z "$LEDGER_REFUSAL" ] && ledger_dirty_ok "$p"; then DIRTY_LEDGER=$((DIRTY_LEDGER+1)); fi
+            continue ;;
+        esac ;;
+    esac
+    DIRTY_BLOCKING="$DIRTY_BLOCKING $p"
+  done < <(git diff --name-only -z 2>/dev/null)
+}
+classify_dirty
 [ -z "$DIRTY_BLOCKING" ] || refuse "tracked changes differ from target:$DIRTY_BLOCKING"
+[ -z "$LEDGER_REFUSAL" ] || refuse "$LEDGER_REFUSAL"
 DIRTY_SIG_BEFORE=$(dirty_signature)
 
 # 3. every local-only commit must already be on the target as an equivalent patch.
@@ -641,6 +756,7 @@ done < <(git diff-tree -r -z --name-status --no-renames "$OLD_HEAD" "$PINNED")
 
 untracked_inventory() {  # "<mode> <hash> <path>" per untracked (non-ignored) file, sorted
   git ls-files --others --exclude-standard -z | while IFS= read -r -d '' p; do
+    case "$p" in machine/ledger/*.lockdir/*) continue ;; esac   # the journal's mkdir lock (ours, gone after the swap) is not content
     printf '%s %s\n' "$(disk_entry "$p")" "$p"
   done | LC_ALL=C sort -k3
 }
@@ -653,7 +769,16 @@ untracked_inventory > "$UNTRACKED_BEFORE"
 # is TOCTOU; this re-check narrows the window, a shared open/reconcile lock
 # in session-guard.sh is the follow-up that closes it -- WP-530).
 [ -z "$(git diff --cached --name-only -z 2>/dev/null)" ] || refuse "index changed during preflight"
-[ "$(dirty_signature)" = "$DIRTY_SIG_BEFORE" ] || refuse "tracked tree changed during preflight"
+if [ "$(dirty_signature)" != "$DIRTY_SIG_BEFORE" ]; then
+  # a journal may have been appended to by a writer that does not take the journal lock: compare its events once more
+  # (the locks are still held, so a second change cannot come from a writer that follows the rule); then refuse
+  [ "$DIRTY_LEDGER" -gt 0 ] || refuse "tracked tree changed during preflight"
+  classify_dirty
+  [ -z "$DIRTY_BLOCKING" ] || refuse "tracked tree changed during preflight; now differs from target:$DIRTY_BLOCKING"
+  [ -z "$LEDGER_REFUSAL" ] || refuse "$LEDGER_REFUSAL"
+  DIRTY_SIG_BEFORE=$(dirty_signature)
+  [ "$(dirty_signature)" = "$DIRTY_SIG_BEFORE" ] || refuse "tracked tree changed during preflight"
+fi
 LIVE_WRITERS=$(live_canonical_writers)
 [ -z "$LIVE_WRITERS" ] || refuse "live canonical writer(s) appeared during preflight:$LIVE_WRITERS"
 
@@ -667,6 +792,7 @@ git reset --hard --quiet || fail_after_swap "git reset --hard failed -- index/tr
 # 6. post-check.
 [ "$(git rev-parse HEAD)" = "$PINNED" ] || fail_after_swap "HEAD is not the pinned oid"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || fail_after_swap "tracked tree not clean"
+ledger_locks_release   # the journals were rewritten with the target's version; writers may append again
 UNTRACKED_AFTER=$(mktemp); TMP_FILES+=("$UNTRACKED_AFTER"); untracked_inventory > "$UNTRACKED_AFTER"
 # expected after-set = before-set minus paths the target now tracks (proven identical in 4)
 EXPECTED=$(mktemp); TMP_FILES+=("$EXPECTED")
@@ -678,7 +804,7 @@ done < "$UNTRACKED_BEFORE" > "$EXPECTED"
 DIFF=$(diff "$EXPECTED" "$UNTRACKED_AFTER" | grep '^[<>]' | head -3)
 [ -z "$DIFF" ] || fail_after_swap "untracked set changed during the operation (< expected / > actual): $(printf '%s' "$DIFF" | tr '\n' ';')"
 
-echo "canon-reconcile-published: $REPO refs/heads/$BRANCH ${OLD_HEAD:0:12} -> ${PINNED:0:12} (dropped commits: patch-equivalent or content-superseded=$CONTENT_SUPERSEDED; tolerated identical dirty paths=$DIRTY_TOLERATED; ancestral-path dirty=$DIRTY_ANCESTRAL commit-paths=$COMMIT_ANCESTRAL; untracked intact)"
-log_line replaced "$OLD_HEAD -> $PINNED content_superseded=$CONTENT_SUPERSEDED dirty_tolerated=$DIRTY_TOLERATED ancestral_dirty=$DIRTY_ANCESTRAL ancestral_commit_paths=$COMMIT_ANCESTRAL"
+echo "canon-reconcile-published: $REPO refs/heads/$BRANCH ${OLD_HEAD:0:12} -> ${PINNED:0:12} (dropped commits: patch-equivalent or content-superseded=$CONTENT_SUPERSEDED; tolerated identical dirty paths=$DIRTY_TOLERATED; ancestral-path dirty=$DIRTY_ANCESTRAL commit-paths=$COMMIT_ANCESTRAL; ledger journals with all events on target=$DIRTY_LEDGER; untracked intact)"
+log_line replaced "$OLD_HEAD -> $PINNED content_superseded=$CONTENT_SUPERSEDED dirty_tolerated=$DIRTY_TOLERATED ancestral_dirty=$DIRTY_ANCESTRAL ancestral_commit_paths=$COMMIT_ANCESTRAL ledger_dirty=$DIRTY_LEDGER"
 healthy
 exit 0

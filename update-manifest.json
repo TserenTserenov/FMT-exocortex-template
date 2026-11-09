@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9bb41365fae3009ab390890022d4e5b9beca5db92ab77ae027f4e1896522bb9f"
+      "sha256": "571aae8196051ceba68416ffae5279d11ec846fc256b04d4e09e35db63873c28"
     },
     {
       "path": "CLAUDE.md",
@@ -2261,7 +2261,7 @@
     },
     {
       "path": "scripts/canon-reconcile-published.sh",
-      "sha256": "2727d67667c6b176a034dcf5be1a8d1289d865937b218a9cb77140b1f096ef10"
+      "sha256": "1cb2b88c436ce491d9cddfe0454c3cdd3feb5c3dcd7ae9e83c3884d292a2d2d5"
     },
     {
       "path": "scripts/changelog-append.sh",
@@ -3507,6 +3507,7 @@
     "scripts/tests/day-open-world-fill-smoke.sh",
     "scripts/tests/dryrun-gate-knowledge-namespace-regression.sh",
     "scripts/tests/fixtures/ds-publish-637a526.sh",
+    "scripts/tests/fixtures/ledger-event-diff-5b7307ed78.py",
     "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
