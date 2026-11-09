@@ -638,7 +638,7 @@ dirty_signature() {  # "<path>\t<disk entry>" per dirty tracked path, sorted -- 
 # uses) is already in the target; the reset then rewrites the file with the target's version and nothing is lost. An
 # event not on the target refuses with its ts and kind, and the file is not touched. The lock stays held until the
 # swap is done, so no writer slips an event in between the comparison and the reset.
-COMMIT_ANCESTRAL=0; LEDGER_DIFF_TOOL=""; LEDGER_REFUSAL=""
+COMMIT_ANCESTRAL=0; LEDGER_DIFF_TOOL=""; LEDGER_PYTHON=""; LEDGER_REFUSAL=""
 ledger_dirty_ok() {  # <path> -- 0 = every event on disk is in the target (journal lock held); 1 = LEDGER_REFUSAL says why
   local p="$1" ref tip snap tgt err out rc n lines line ts
   if ! ledger_lock_take "$p"; then
@@ -650,12 +650,14 @@ ledger_dirty_ok() {  # <path> -- 0 = every event on disk is in the target (journ
   # events published after the pin are on origin too, and reset never loses what origin has
   if [ "$tip" != "$PINNED" ] && git merge-base --is-ancestor "$PINNED" "$tip"; then ref="$tip"; fi
   if [ -z "$LEDGER_DIFF_TOOL" ]; then
+    # the comparison tool imports yaml: the shared resolver picks a python3 that has it (a bare python3 may not)
+    LEDGER_PYTHON=$("$SCRIPT_DIR/lib/find-python3.sh" 2>/dev/null) || { LEDGER_REFUSAL="no python3 with PyYAML found by $SCRIPT_DIR/lib/find-python3.sh: $p cannot be compared"; return 1; }
     LEDGER_DIFF_TOOL=$(mktemp); TMP_FILES+=("$LEDGER_DIFF_TOOL")
     git show "$PINNED:scripts/lib/ledger-event-diff.py" > "$LEDGER_DIFF_TOOL" 2>/dev/null || { LEDGER_REFUSAL="ledger comparison tool scripts/lib/ledger-event-diff.py is not in the target: $p cannot be compared"; return 1; }
   fi
   snap=$(mktemp); tgt=$(mktemp); err=$(mktemp); TMP_FILES+=("$snap" "$tgt" "$err")
   if ! cp "$p" "$snap" || ! git show "$ref:$p" > "$tgt" 2>/dev/null; then LEDGER_REFUSAL="cannot read $p from the disk or from the target"; return 1; fi
-  rc=0; out=$(python3 "$LEDGER_DIFF_TOOL" --missing-by-field kind "$snap" "$tgt" 2>"$err") || rc=$?
+  rc=0; out=$("$LEDGER_PYTHON" "$LEDGER_DIFF_TOOL" --missing-by-field kind "$snap" "$tgt" 2>"$err") || rc=$?
   if [ "$rc" -ne 0 ]; then LEDGER_REFUSAL="ledger events cannot be compared: $p ($(tr '\n' ' ' < "$err" | cut -c1-200))"; return 1; fi
   [ -n "$out" ] || return 0
   n=$(printf '%s\n' "$out" | wc -l | tr -d ' '); lines=""
