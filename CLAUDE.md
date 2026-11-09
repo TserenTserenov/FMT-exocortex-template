@@ -16,10 +16,12 @@
 > Пропуск Открытия = незапланированная работа. Пропуск Закрытия = незафиксированный результат.
 > **Сессия:** `memory/protocol-open.md § Сессия` → `memory/protocol-work.md` → `/run-protocol close` · **День:** `/day-open` («открывай») → `/run-protocol day-close` · **Неделя:** `/run-protocol week-close` · **Месяц:** `/month-close` (первый Пн, до Strategy Session).
 
+<!-- TEMPLATE-ONLY: new-person-light-onboarding -->
 ### Новый человек — лёгкий онбординг (выше всех правил ниже)
 
 Если `bash .claude/scripts/light-onboarding-state.sh status` печатает `active` (онбординг не пройден и в рабочей папке ещё нет признаков работы: РП, карточек РП, планов дня), каждый ход ведёт навык `/onboarding` по `docs/onboarding/light-onboarding.md`. Пока так: WP Gate, Ритуал, протоколы ОРЗ и служебные команды не применяются; о среде не рассказывать, РП не заводить, файлы рабочей папки не писать, вход в подписочный сервер не предлагать. Снимать (`bash .claude/scripts/light-onboarding-state.sh done` — ровно так, коротким путём из рабочей папки: так команда разрешена заранее) только после квитанции или когда человек сам просит работу в среде (команда среды вроде `/day-open`, `/wp-new` или прямая просьба); `/onboarding`, `/help`, `/clear`, `/compact`, `/mcp` не снимают. Вернуть онбординг — `… light-onboarding-state.sh reset`.
 
+<!-- /TEMPLATE-ONLY: new-person-light-onboarding -->
 ### Блокирующие правила
 
 > **SoT (WP-272 Ф1):** `PACK-agent-rules/rules/AR.NNN.md` (реестр `.claude/rules-registry.yaml`) — авторский источник, не шипится в шаблон (генератор `.claude/scripts/generate-rules-registry.py` требует `PACK-agent-rules`, которого у пользователя нет). На пользовательской установке — шипящаяся выжимка тех же 10 правил → `.claude/rules-lazy/blocking-rules-full.md`. **Приоритет = нумерация:** структурное (1-5) перевешивает поведенческое (6-10).
