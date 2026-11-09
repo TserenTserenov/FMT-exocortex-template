@@ -25,6 +25,8 @@ Refs: WP-NNN
 
 ### Changed
 
+- [optional] `translation/glossary-local.csv`: 15 терминов двух первых методов Библиотеки методов (конфликтное облако и разбор беспокойства — английские карточки в aisystant/method-library PR #3), утверждены пилотом 09.11: Evaporating Cloud, Common objective, Requirement, Prerequisite, Assumption, Injection, False assumption, Concern, Problem, Dissatisfaction, Emotion, Feeling, Strength, Prediction error, Nearest action. «Потребность → Need» и «Роль → Role» уже были в словаре. Временно здесь — до записи английских имён в граф понятий (WP-617 Ф5) (WP-581 Ф28).
+
 - [optional] `.github/author-sourced-paths.txt`: убраны `roles/strategist/prompts/week-review.md` и `roles/strategist/prompts/strategy-session.md` — оба запроса Стратега развиваются только в шаблоне (strategy-session.md с 03.11, week-review.md с 09.11; WP-529 Ф248, #1501), из авторского репозитория больше не доставляются, и проверка авторского источника перестаёт требовать для их правок ссылку на авторскую правку. Список обновляется синхронизацией только при доставке хотя бы одного файла, поэтому исключённая 03.11 строка оставалась в нём. Текст запросов не меняется.
 
 - [optional] `CLAUDE.md`: раздел «Новый человек — лёгкий онбординг» обрамлён зоной `<!-- TEMPLATE-ONLY: new-person-light-onboarding -->`; текст не меняется. Доставка ядра из авторского источника ставит зону на место одноимённого слота `<!-- TEMPLATE-ONLY-SLOT: … -->`, расхождение останавливает доставку файла (WP-406, #1499, #1500).
