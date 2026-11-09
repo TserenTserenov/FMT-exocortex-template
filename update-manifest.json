@@ -281,7 +281,7 @@
     },
     {
       "path": ".claude/hooks/wp-gate-reminder.sh",
-      "sha256": "2682401e08d075f6aed5e8b3192f2be50f2403cfd0c9face06d6d22ea831bda1"
+      "sha256": "3709cd4934a50419c26fc3f43941c8cdd854e90babe0f0a574e08f1568344109"
     },
     {
       "path": ".claude/lib/behaviour-report.sh",
@@ -412,6 +412,10 @@
       "sha256": "f9784c2ac2aa91f566ef3fc8abcbadddc889917d72b5f205c3d000fabd729e60"
     },
     {
+      "path": ".claude/scripts/light-onboarding-state.sh",
+      "sha256": "2e16f21e05de9263bb7ddcd5e853d1d4dab00e9762a3d9e3c167d2b8b0f8ef1b"
+    },
+    {
       "path": ".claude/scripts/load-extensions.sh",
       "sha256": "bc8b6aff32530851f7d032581792e628680c10b5f4fac0da6c21fdf6dab83f79"
     },
@@ -437,7 +441,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "11c7b4023e21a4de8cc04273d4f3ec15646715d1d174612405f589050cbd59b9"
+      "sha256": "f5c4d70b1af42007206ba031ba532fbd795abc1ad2365182928eee3b9226d010"
     },
     {
       "path": ".claude/skills-catalog.yaml",
@@ -661,7 +665,7 @@
     },
     {
       "path": ".claude/skills/onboarding/SKILL.md",
-      "sha256": "8bc2be64571b7f10fc03a20c9308c323c2db39348228ad592d1113d429500abe"
+      "sha256": "66c2a4d7d3018c73b9e286dc8ac5b0ffaf3d8f2cb8a813ffb31f65e56f3e7d65"
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
@@ -909,7 +913,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "d49efe95a0ec6328bbebf55e466a64923d6250906dbb066e639d84799f29abd3"
+      "sha256": "f7a12bf0d6421dc68a9b94d560cb4191f87f3c48f1d637a1652c721570c19e58"
     },
     {
       "path": ".gitignore",
@@ -937,11 +941,11 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d9706d605414e35e8d0dbfffd2fbc8f54315a2a78e34e0e2de492706399f1b4d"
+      "sha256": "d15cd19c4711efcba6e95e3b8a3a1a10a9ef14058d9f0b8d2ef03d4cd0a802ea"
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "f24291cdfd237369e438002dfd0a3a6c317fd513ec8d6c57b34360b7ec0a5d72"
+      "sha256": "5f537127647731f0a2422a147dc7e77cebd599c69d8be1f21a4d5cf6d5c2b481"
     },
     {
       "path": "ONTOLOGY.md",
@@ -1105,7 +1109,7 @@
     },
     {
       "path": "docs/onboarding/light-onboarding.md",
-      "sha256": "ab6a04de321e382e7e9982edf469e3835303e9fc71fa6255f37bf21977dfd2ad"
+      "sha256": "27c9eba928accd1cdad3c5b89cfbb9e25f5322c767a4b83295c1c0817198d920"
     },
     {
       "path": "docs/onboarding/onboarding-diagrams.md",
@@ -3705,6 +3709,7 @@
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
+    "scripts/tests/test_light_onboarding_state.sh",
     "scripts/tests/test_manifest_coverage_local.py",
     "scripts/tests/test_memory_bleed_age_batch.sh",
     "scripts/tests/test_mount_readonly_packs.sh",
