@@ -941,11 +941,11 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d15cd19c4711efcba6e95e3b8a3a1a10a9ef14058d9f0b8d2ef03d4cd0a802ea"
+      "sha256": "75580f96b4d9dd25ced29d0ed3b44c94c9e5c76506df50f1eb490af6c91dd63e"
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "5f537127647731f0a2422a147dc7e77cebd599c69d8be1f21a4d5cf6d5c2b481"
+      "sha256": "1d60d3dde68151c3bf203df47e29502e8b718da4e6989ba69fcd2bf343fbef18"
     },
     {
       "path": "ONTOLOGY.md",
