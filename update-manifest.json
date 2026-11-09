@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "571aae8196051ceba68416ffae5279d11ec846fc256b04d4e09e35db63873c28"
+      "sha256": "40ef6840a390820f22bdd2110b4749ced66303e29c33c4f43fb756d60fb94a46"
     },
     {
       "path": "CLAUDE.md",
@@ -3445,7 +3445,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "56715f5787f8ba2dd4d358948b38a215a25d6f7a97f080a75218050b52716077"
+      "sha256": "c10bcb59756674d0e2ef199adaca5eb748d5b0c3882e3433e0f2e1e4ca36f1d6"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3729,6 +3729,7 @@
     "scripts/tests/test_update_drop_dead_railway_mcp.sh",
     "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
     "scripts/tests/test_update_verify_batch_integrity_hash_mismatch_failclosed.sh",
+    "scripts/tests/test_validate_filters.sh",
     "scripts/tests/test_validate_hypothesis_priority.sh",
     "scripts/tests/test_validate_skill_hook_claims_path.sh",
     "scripts/tests/test_wp568_strategist_auth_and_retry_message.sh",
