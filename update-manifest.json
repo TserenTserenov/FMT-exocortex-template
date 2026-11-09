@@ -465,7 +465,7 @@
     },
     {
       "path": ".claude/skills/artifactor/SKILL.md",
-      "sha256": "bc98efbc68146e657827a9bb96989a3ab9bcf9334d18beb96491837963648147"
+      "sha256": "5015e4d68df8b357f808c1e8e2b62f9615aab57830970b2ed449cfa4f785271e"
     },
     {
       "path": ".claude/skills/audit-docs/.audit-context.yaml.example",
@@ -937,7 +937,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "40ef6840a390820f22bdd2110b4749ced66303e29c33c4f43fb756d60fb94a46"
+      "sha256": "e8784509914db64842b8172792093a69c3b9ba866de591cf928ba1890a1eecdb"
     },
     {
       "path": "CLAUDE.md",
@@ -2229,7 +2229,7 @@
     },
     {
       "path": "scripts/artifactor.py",
-      "sha256": "9c9b08cb05096523e124f6d557cbf3536b0df39767a7f559e0268d96f37d428a"
+      "sha256": "ebb245a2f9bf83b85ac02c59a8ccae38ed20333e662c9885f49920cfbd1d25cd"
     },
     {
       "path": "scripts/attestation-build-statement.sh",
