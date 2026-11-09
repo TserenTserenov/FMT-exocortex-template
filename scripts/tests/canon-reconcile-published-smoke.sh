@@ -157,6 +157,11 @@ fresh s8; echo one > "$CANON/b.txt"; commit_in "$CANON" "local"; C=$(git -C "$CA
 printf 'agent: claude-code\npid: %s\n' "$$" > "$IWE_RUNTIME/sessions/claude-code-writer.open"; H=$(git -C "$CANON" rev-parse HEAD)
 bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
 assert "$rc" "1" "exit 1 with live writer"; assert "$(git -C "$CANON" rev-parse HEAD)" "$H" "HEAD unchanged"
+# WP-568: the ALERT names the writer in a detail tail; the class (streak key) stays without it
+o8=$(env CANON_RECONCILE_ALERT_AFTER_SEC=0 CANON_RECONCILE_ALERT_MIN_COUNT=1 CANON_RECONCILE_ALERT_REPEAT_SEC=0 bash "$SCRIPT" "$CANON" main 2>&1)
+assert "$(printf '%s' "$o8" | grep -c "refusals 'live canonical writer(s)', .* -- detail: claude-code-writer$")" "1" "the ALERT carries the writer's semaphore name as detail, outside the class"
+rm -f "$IWE_RUNTIME"/canon-reconcile-published.*.streak   # the refusal streak is keyed by the canon path, which later scenarios reuse: do not let it leak into them
+rm -f "$IWE_RUNTIME/sessions/claude-code-writer.open"   # only the pid-less semaphore may count from here (otherwise the previous live one would satisfy the check)
 printf 'agent: codex\n' > "$IWE_RUNTIME/sessions/codex-nopid.open"; H=$(git -C "$CANON" rev-parse HEAD)
 bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
 assert "$rc" "1" "semaphore without pid counts as a live writer"; assert "$(git -C "$CANON" rev-parse HEAD)" "$H" "HEAD unchanged"; rm -f "$IWE_RUNTIME/sessions/codex-nopid.open"
@@ -164,6 +169,21 @@ printf 'agent: claude-code\npid: %s\nisolated_worktree: /tmp/x\n' "$$" > "$IWE_R
 bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
 git -C "$CANON" fetch -q origin
 assert "$rc" "0" "isolated session does not block"; assert "$(git -C "$CANON" rev-parse HEAD)" "$(git -C "$CANON" rev-parse origin/main)" "replaced once only isolated sessions are live"
+rm -f "$IWE_RUNTIME/sessions/claude-code-writer.open"
+
+echo "scenario 8b: hand-made registered worktree copy (governance_worktree, no isolated_worktree) is not a canonical writer; the canon itself and an unregistered path still are"
+fresh s8b; echo one > "$CANON/b.txt"; commit_in "$CANON" "local"; C=$(git -C "$CANON" rev-parse HEAD); republish_on_origin "$CANON" "$C"
+HAND="$SANDBOX/s8b-hand-copy"; git -C "$CANON" worktree add -q --detach "$HAND"
+printf 'agent: claude-code\npid: %s\ngovernance_worktree: %s\n' "$$" "$CANON" > "$IWE_RUNTIME/sessions/claude-code-writer.open"; H=$(git -C "$CANON" rev-parse HEAD)
+bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
+assert "$rc" "1" "governance_worktree equal to the canon still blocks"; assert "$(git -C "$CANON" rev-parse HEAD)" "$H" "HEAD unchanged (canon as governance_worktree)"
+printf 'agent: claude-code\npid: %s\ngovernance_worktree: %s\n' "$$" "$SANDBOX/s8b-not-a-worktree" > "$IWE_RUNTIME/sessions/claude-code-writer.open"; mkdir -p "$SANDBOX/s8b-not-a-worktree"
+bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
+assert "$rc" "1" "an existing directory that is not a registered worktree still blocks"; assert "$(git -C "$CANON" rev-parse HEAD)" "$H" "HEAD unchanged (unregistered path)"
+printf 'agent: claude-code\npid: %s\ngovernance_worktree: %s\n' "$$" "$HAND" > "$IWE_RUNTIME/sessions/claude-code-writer.open"
+bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
+git -C "$CANON" fetch -q origin
+assert "$rc" "0" "a registered non-canon worktree does not block"; assert "$(git -C "$CANON" rev-parse HEAD)" "$(git -C "$CANON" rev-parse origin/main)" "replaced once only a registered worktree copy is live"
 rm -f "$IWE_RUNTIME/sessions/claude-code-writer.open"
 
 echo "scenario 9: origin advanced past the caller's pinned oid -> targets the live tip"
@@ -432,5 +452,80 @@ assert "$(GIT_NO_REPLACE_OBJECTS=1 git -C "$CANON" ls-tree origin/main -- victim
 out=$(bash "$SCRIPT" "$CANON" main 2>&1); rc=$?
 assert "$rc" "1" "exit 1"; assert "$(git -C "$CANON" rev-parse HEAD)" "$U" "HEAD unchanged"
 assert "$(printf '%s' "$out" | grep -c 'end state differs from the target')" "1" "refused by the end-state proof"
+
+# --- live ledger journal (machine/ledger/**): events on disk compared with the target under the journal lock ---
+# The comparison tool lives in the governance repository the canon belongs to (scripts/lib/ledger-event-diff.py);
+# the template does not ship it, so the scenarios use a pinned verbatim copy from the author repository.
+# A missing tool, PyYAML or flock is a FAIL, not a skip: a green run must have executed the ledger branch.
+LEDGER_REL="machine/ledger/day/2026/10/day-2026-10-27.yaml"
+LEDGER_TOOL_SRC="${LEDGER_EVENT_DIFF_SRC:-$(cd "$(dirname "$0")" && pwd)/fixtures/ledger-event-diff-5b7307ed78.py}"
+mk_ledger() {  # <file> <seq:kind>... -- a ledger/v1 day journal in the shape ledger-append.sh writes
+  local f="$1" e; shift; mkdir -p "$(dirname "$f")"
+  { printf 'schema: ledger/v1\nscale: day\nperiod: "2026-10-27"\nevents:\n'
+    for e in "$@"; do printf '%s\n' "- ts: '2026-10-27T10:00:0${e%%:*}Z'" "  source: test" "  kind: ${e#*:}" "  data:" "    n: ${e%%:*}"; done; } > "$f"
+}
+fresh_ledger() {  # <name> <origin events...> -- diverged canon (patch-equivalent local commit) whose origin holds the given journal; sets CANON
+  local name="$1"; shift; fresh "$name"
+  printf '%s\n' 'machine/ledger/**/*.lock' > "$CANON/.gitignore"   # the flock handle is not content
+  mkdir -p "$CANON/scripts/lib"; cp "$LEDGER_TOOL_SRC" "$CANON/scripts/lib/ledger-event-diff.py"; mk_ledger "$CANON/$LEDGER_REL" "0:base"
+  commit_in "$CANON" "tool and journal"; git -C "$CANON" push -q origin main
+  echo one > "$CANON/b.txt"; commit_in "$CANON" "local"; republish_on_origin "$CANON" "$(git -C "$CANON" rev-parse HEAD)"
+  local pub="$SANDBOX/pub-ledger-$name"; git clone -q "$ORIGIN" "$pub"; mk_ledger "$pub/$LEDGER_REL" "0:base" "$@"; commit_in "$pub" "publisher carries the journal"; git -C "$pub" push -q origin main
+}
+ledger_prereqs=ok
+[ -r "$LEDGER_TOOL_SRC" ] || { echo "  FAIL ledger scenarios need ledger-event-diff.py at $LEDGER_TOOL_SRC"; ledger_prereqs=missing; }
+python3 -c 'import yaml' 2>/dev/null || { echo "  FAIL ledger scenarios need python3 with PyYAML"; ledger_prereqs=missing; }
+command -v flock >/dev/null 2>&1 || { echo "  FAIL ledger scenarios 88-89 need flock on PATH"; ledger_prereqs=missing; }
+if [ "$ledger_prereqs" != ok ]; then
+  fails=$((fails+1))
+else
+echo "scenario 86 (ledger A): 3 events on disk, all already on the target (which also has another host's event) -> replaced, exit 0, journal clean"
+fresh_ledger s86 "1:alpha" "2:beta" "3:gamma" "9:other-host"
+mk_ledger "$CANON/$LEDGER_REL" "0:base" "1:alpha" "3:gamma" "2:beta"   # same events, other order and no foreign one: bytes equal neither the target nor history
+bash "$SCRIPT" "$CANON" main >/dev/null 2>&1; rc=$?
+git -C "$CANON" fetch -q origin
+assert "$rc" "0" "exit 0"; assert "$(git -C "$CANON" rev-parse HEAD)" "$(git -C "$CANON" rev-parse origin/main)" "HEAD == origin/main"
+assert "$(git -C "$CANON" status --porcelain -- machine/ledger | wc -l | tr -d ' ')" "0" "git status of machine/ledger is clean"
+
+echo "scenario 87 (ledger B): one event on disk is not on the target -> refused with the event named, the file is byte-for-byte untouched"
+fresh_ledger s87 "1:alpha" "2:beta"
+mk_ledger "$CANON/$LEDGER_REL" "0:base" "1:alpha" "2:beta" "3:gamma"; BEFORE=$(git hash-object "$CANON/$LEDGER_REL"); H=$(git -C "$CANON" rev-parse HEAD)
+OUT=$(bash "$SCRIPT" "$CANON" main 2>&1); rc=$?
+assert "$rc" "1" "exit 1"; assert "$(printf '%s' "$OUT" | grep -c "ledger events not yet published.*2026-10-27T10:00:03Z gamma")" "1" "the refusal names ts and kind of the unpublished event"
+assert "$(printf '%s' "$OUT" | grep -c "2026-10-27T10:00:0[12]Z")" "0" "published events are not listed"
+assert "$(git hash-object "$CANON/$LEDGER_REL")" "$BEFORE" "journal untouched byte-for-byte"; assert "$(git -C "$CANON" rev-parse HEAD)" "$H" "HEAD unchanged"
+
+echo "scenario 88 (ledger C): journal lock held by another process -> refusal on timeout with a diagnosis, no hang, journal untouched"
+fresh_ledger s88 "1:alpha" "2:beta"
+mk_ledger "$CANON/$LEDGER_REL" "0:base" "1:alpha"; BEFORE=$(git hash-object "$CANON/$LEDGER_REL"); H=$(git -C "$CANON" rev-parse HEAD)
+flock -x "$CANON/$LEDGER_REL.lock" sleep 60 & HOLDER=$!
+sleep 1; T0=$SECONDS
+OUT=$(CANON_LEDGER_LOCK_WAIT_S=2 bash "$SCRIPT" "$CANON" main 2>&1); rc=$?; ELAPSED=$((SECONDS - T0))
+kill "$HOLDER" 2>/dev/null; wait "$HOLDER" 2>/dev/null
+assert "$rc" "1" "exit 1"; assert "$(printf '%s' "$OUT" | grep -c "ledger lock busy or publish not responding")" "1" "diagnosis names the busy journal lock"
+assert "$([ "$ELAPSED" -le 10 ] && echo bounded)" "bounded" "returned within the wait budget (${ELAPSED}s), did not hang"
+assert "$(git hash-object "$CANON/$LEDGER_REL")" "$BEFORE" "journal untouched"; assert "$(git -C "$CANON" rev-parse HEAD)" "$H" "HEAD unchanged"
+
+echo "scenario 89 (ledger D): a writer appends under the journal lock while the guard waits for it -> the new event is not lost (still on disk) and the guard refuses"
+fresh_ledger s89 "1:alpha" "2:beta"
+mk_ledger "$CANON/$LEDGER_REL" "0:base" "1:alpha"; READY="$SANDBOX/s89-ready"
+( flock -x 9; : > "$READY"; sleep 2; printf '%s\n' "- ts: '2026-10-27T10:00:07Z'" "  source: test" "  kind: late" "  data:" "    n: 7" >> "$CANON/$LEDGER_REL" ) 9>"$CANON/$LEDGER_REL.lock" &
+HOLDER=$!; for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$READY" ] && break; sleep 1; done
+OUT=$(bash "$SCRIPT" "$CANON" main 2>&1); rc=$?; wait "$HOLDER"
+git -C "$CANON" fetch -q origin
+assert "$(grep -c "kind: late" "$CANON/$LEDGER_REL")" "1" "the appended event is on disk after the operation"
+assert "$rc" "1" "exit 1 (the late event is not on the target)"; assert "$(printf '%s' "$OUT" | grep -c "2026-10-27T10:00:07Z late")" "1" "the late event is named"
+
+echo "scenario 90 (ledger A, no flock on PATH): the mkdir lock of ledger-append.sh is used and released -> replaced, no lock directory left"
+fresh_ledger s90 "1:alpha" "2:beta" "9:other-host"
+mk_ledger "$CANON/$LEDGER_REL" "0:base" "2:beta" "1:alpha"
+NOFLOCK="$SANDBOX/noflock-bin"; mkdir -p "$NOFLOCK"
+for d in $(printf '%s' "$PATH" | tr ':' ' '); do for x in "$d"/*; do b="${x##*/}"; [ "$b" = flock ] || [ -e "$NOFLOCK/$b" ] || { [ -x "$x" ] && ln -s "$x" "$NOFLOCK/$b"; }; done; done
+OUT=$(PATH="$NOFLOCK" bash "$SCRIPT" "$CANON" main 2>&1); rc=$?
+git -C "$CANON" fetch -q origin
+assert "$rc" "0" "exit 0 without flock"; assert "$(git -C "$CANON" rev-parse HEAD)" "$(git -C "$CANON" rev-parse origin/main)" "HEAD == origin/main"
+assert "$([ -e "$CANON/$LEDGER_REL.lockdir" ] && echo left || echo gone)" "gone" "mkdir lock released"
+assert "$(git -C "$CANON" status --porcelain -- machine/ledger | wc -l | tr -d ' ')" "0" "journal clean"
+fi
 
 [ "$fails" = 0 ] && echo "PASS: all scenarios" || { echo "FAIL: $fails assertion(s)"; exit 1; }

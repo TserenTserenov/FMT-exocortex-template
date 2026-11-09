@@ -3507,6 +3507,7 @@
     "scripts/tests/day-open-world-fill-smoke.sh",
     "scripts/tests/dryrun-gate-knowledge-namespace-regression.sh",
     "scripts/tests/fixtures/ds-publish-637a526.sh",
+    "scripts/tests/fixtures/ledger-event-diff-5b7307ed78.py",
     "scripts/tests/git-sync-status-smoke.sh",
     "scripts/tests/iwe-paths-scripts-resolution-smoke.sh",
     "scripts/tests/lib/extract-update-download-batch.sh",
