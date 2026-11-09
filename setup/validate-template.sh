@@ -43,6 +43,12 @@ for arg in "$@"; do
     esac
 done
 TEMPLATE_DIR="${TEMPLATE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+# grep -r prints "dir/x" even for the argument "dir/", while the path filters
+# strip "$root/" — a trailing slash would leave "dir//" and skip every
+# path-based exemption.
+while [ "${#TEMPLATE_DIR}" -gt 1 ] && [ "${TEMPLATE_DIR%/}" != "$TEMPLATE_DIR" ]; do
+    TEMPLATE_DIR="${TEMPLATE_DIR%/}"
+done
 FAIL=0
 
 # Guard: post-setup state + default pristine mode -> suggest installed mode and exit.
@@ -239,14 +245,17 @@ CHECK1_FAIL=0
 # caught only by the paired pattern "DS-my-strategy" on the same lines (2026-07-27).
 # One pipeline for every mode (issue #1457): docs/adr/ — historical ADR docs
 # describing the past authorial install (issue #308), same exemption class as
-# LEARNING-PATH.md/CHANGELOG.md.
+# LEARNING-PATH.md/CHANGELOG.md. The exemption is by path: a plain
+# `grep -v 'docs/adr/'` ran over "path:line:text" and also dropped any line in
+# any other file whose text merely mentioned docs/adr/ (WP-617 Ф4, 09.11).
 author_global_hits() {
     grep -rin "$1" "$SCAN_ROOT" --include="*.md" --include="*.sh" \
         --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
         --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
         --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
         --exclude='translation-manifest.yaml' 2>/dev/null \
-        | grep -v 'github.com/' | grep -v 'docs/adr/' | grep -v 'githubusercontent\.com' \
+        | drop_hits_in_paths "$SCAN_ROOT" '^docs/adr/' \
+        | grep -v 'github.com/' | grep -v 'githubusercontent\.com' \
         | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \
         | filter_excluded_hits "$SCAN_ROOT" || true
 }
@@ -569,7 +578,10 @@ if [ ${#SETTINGS_FILES[@]} -eq 0 ] || [ ! -d "$HOOKS_DIR" ]; then
     echo "SKIP (no settings.json or hooks/ dir)"
 else
     CHECK9_FAIL=0
-    ENFORCE_RE='block|Block|блокир|Блокир|guard|Guard|защища|Защища|запрещ|Запрещ|prevent|Prevent|enforc|Enforc|deni|Deni|отказ|Отказ|stop|Stop'
+    # deny/denies/denied/denial only as a word start: the former bare "deni"
+    # matched "hardening" (WP-617 Ф4, 09.11). No \b — BSD grep -E does not
+    # reliably support it.
+    ENFORCE_RE='block|Block|блокир|Блокир|guard|Guard|защища|Защища|запрещ|Запрещ|prevent|Prevent|enforc|Enforc|(^|[^[:alpha:]])[Dd]en(y|ies|ied|ial)|отказ|Отказ|stop|Stop'
     for hook_path in "$HOOKS_DIR"/*.sh; do
         [ -f "$hook_path" ] || continue
         hookname=$(basename "$hook_path")
