@@ -819,6 +819,13 @@ class Executor:
     def build_cmd(self, prompt: str, model: str) -> list[str]:
         raise NotImplementedError
 
+    def env_overrides(self) -> dict[str, str]:
+        """Extra environment variables for this runtime's child process.
+
+        Empty by default: runtimes inherit the dispatcher environment.
+        """
+        return {}
+
 
 class ClaudeCodeExecutor(Executor):
     """Claude Code CLI (`claude -p`). Streaming run → emits heartbeats."""
@@ -872,6 +879,45 @@ class KimiCliExecutor(Executor):
         ]
 
 
+class DshExecutor(Executor):
+    """DeepSeek Harness headless (`dsh headless --json`). Synchronous → no heartbeat.
+
+    `--json` makes DSH emit newline-delimited run events; the final answer arrives
+    in the `{"type": "final", "text": ...}` event and is extracted by the capture
+    layer (gate_launch_usage.PipeCapture). Without `--json` the reasoning trace
+    would land in the task result together with the answer.
+
+    The DSH profile owns its model, so the Claude model string is ignored here,
+    the same as for Kimi.
+    """
+
+    name = "dsh"
+    supports_heartbeat = False
+
+    def build_cmd(self, prompt: str, model: str) -> list[str]:
+        dsh_bin = os.environ.get("IWE_DSH_BIN") or shutil.which("dsh") or "dsh"
+        return [dsh_bin, "headless", "--json", prompt]
+
+    def env_overrides(self) -> dict[str, str]:
+        """DSH headless needs a DeepSeek key; fall back to the secrets file.
+
+        The dispatcher runs from cron/systemd, where DEEPSEEK_API_KEY is usually
+        absent, while the installation keeps the key in `.secrets/`.
+        """
+        if os.environ.get("DEEPSEEK_API_KEY"):
+            return {}
+        key_file = (
+            Path(os.environ.get("IWE_ROOT", str(Path.home() / "IWE")))
+            / ".secrets"
+            / "deepseek-api-key"
+        )
+        try:
+            key = key_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            return {}
+        return {"DEEPSEEK_API_KEY": key} if key else {}
+
+
 # Registry of agentic runtimes reachable through the bot SESSION path.
 # Note: `hermes` is intentionally absent — in Phase 5 it is a conversational
 # bot-side route to hermes_chat and never reaches the dispatcher. Full agentic
@@ -879,8 +925,11 @@ class KimiCliExecutor(Executor):
 EXECUTORS: dict[str, "Executor"] = {
     "claude": ClaudeCodeExecutor(),
     "kimi": KimiCliExecutor(),
+    "dsh": DshExecutor(),
 }
-DEFAULT_EXECUTOR = "claude"
+# WP-53: the default runtime is configurable so a DeepSeek-run installation can
+# stop depending on the Claude CLI without editing this file.
+DEFAULT_EXECUTOR = os.environ.get("IWE_DISPATCHER_DEFAULT_EXECUTOR", "claude")
 
 
 def resolve_executor(executor_key: str | None) -> "Executor":
@@ -931,7 +980,7 @@ def invoke_claude_with_heartbeat(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=str(repo_dir) if repo_dir else None,
-            env=usage.child_env(),
+            env={**usage.child_env(), **executor.env_overrides()},
             start_new_session=True,
         )
         log(f"[RC5] dispatch executor={executor.name} pid={proc.pid} cwd={repo_dir}")
@@ -1024,6 +1073,9 @@ def invoke_claude_with_heartbeat(
     elif executor.name == "claude" and usage.result is None and ok:
         ok, status, reason = False, "incomplete", "missing_result"
         stdout = "Claude CLI returned no final text result"
+    elif executor.name == "dsh" and usage.result is None and ok:
+        ok, status, reason = False, "incomplete", "missing_result"
+        stdout = "DSH headless returned no final text result"
     usage.finish(status, reason, exit_code=proc.returncode)
     output = (stdout or "") + (("\n" + stderr) if stderr else "")
 
