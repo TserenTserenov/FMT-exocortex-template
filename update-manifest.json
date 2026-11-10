@@ -945,7 +945,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a60b2642be55e5cd625e1d98038394a6461a90f34e2e73f3f42ca4fad2836c79"
+      "sha256": "f9c9bac35432b9a6180115a0f32d493301f06cb62a9ef3a5d3e216353e736a55"
     },
     {
       "path": "CLAUDE.md",
@@ -1305,7 +1305,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "d10a8b41c3d3aaa2badbb8bb413fabe3a62267a0887290bae3188ddc8fa69bfc"
+      "sha256": "b39b98dfdf9281ffef936008c99631154956419bf209a49ab3f73232967b1f40"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3514,6 +3514,7 @@
     "scripts/agent-dashboard.py",
     "scripts/assemble_distribution.py",
     "scripts/audit-ad-hoc-roles.py",
+    "scripts/check-card-terms.py",
     "scripts/check-component-parity.sh",
     "scripts/check-copy-pairs.sh",
     "scripts/check-manifest-rename-coverage.py",
@@ -3569,6 +3570,7 @@
     "scripts/tests/test_ar293_ai_cli_override.sh",
     "scripts/tests/test_assemble_distribution.py",
     "scripts/tests/test_changelog_append_blank_lines.sh",
+    "scripts/tests/test_check_card_terms.py",
     "scripts/tests/test_check_changelog_fields.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_critical_alert_notify_outcome.sh",
@@ -3767,6 +3769,7 @@
     "scripts/tests/test_template_hygiene_checks.sh",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",
+    "scripts/tests/test_translate_unapproved_report.py",
     "scripts/tests/test_update_download_batch_network_failure_failclosed.sh",
     "scripts/tests/test_update_drop_dead_railway_mcp.sh",
     "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
