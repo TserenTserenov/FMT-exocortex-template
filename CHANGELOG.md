@@ -25,6 +25,11 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] Копия `guide-kit/` обновлена до iwesys/guide-kit v0.1.5. Поддельные ключи AWS и заголовок закрытого ключа в `guide-kit/structurer/test_quarantine.py` теперь записаны по частям, поэтому собственная проверка секретов шаблона (`scripts/pre-commit-secret-scan.sh`) больше не останавливает коммит файлов, доставленных `update.sh`; это вторая половина исправления #1492 (первая — `rule-engine.sh`, #1509). Со сменой версии пришли также реестр жизненного цикла рекомендаций (`guide-kit/generator/recommendation_registry.py`, к шаблону не подключён) и исправление теста «gh отсутствует» в `guide-kit/scripts/test_publish_snapshot.sh` (WP-7 Ф304, #1492, iwesys/guide-kit#9, #1515).
+  - Цель: 77 · Результат: Ц77-02
+  - Как проверить: в пустом репозитории добавить все пути из `update-manifest.json` и запустить `bash scripts/pre-commit-secret-scan.sh` — срабатываний нет; на прежних тестовых файлах guide-kit — блок (aws-access-key 6, private-key-header 1)
+  - Как откатить: git revert слияния PR и `bash scripts/guide-kit-sync.sh --tag v0.1.4`
+
 - [optional] Граница «Разработчик → Выпускающий»: запись CHANGELOG передана в выпуск, только если под ней три подпункта с четырьмя полями — «Цель: <номер потребности> · Результат: <код ЦNN-NN или служебное — причина>», «Как проверить:», «Как откатить:». Новый `scripts/check-changelog-fields.py` проверяет их: Changelog Gate — у записей, которые добавляет PR в `main`; Release Candidate в режиме `next-rc` — у всех записей раздела версии перед меткой кандидата (нет полей — метки нет); локально и рецензентом выпуска — тем же скриптом. Режим `cut` больше не ставит `rc.1`: поля накопленных записей дописываются на ветке выпуска, первую метку ставит `next-rc`. Генератор анонса (`scripts/release-notice-build.py`) эти три подпункта в текст для пользователей не берёт. Порядок и формат — `docs/RELEASE-PROCESS.md`, «Поля записи». Тесты `scripts/tests/test_check_changelog_fields.py`, `scripts/tests/test_release_notice_build.py` (WP-529 Ф252, #1512).
   - Цель: 77, 84 · Результат: служебное — граница передачи доработок Выпускающему; пользователь шаблона её не видит
   - Как проверить: python3 scripts/tests/test_check_changelog_fields.py; в PR без полей у новой записи Changelog Gate падает с перечнем недостающих полей
