@@ -941,7 +941,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2a0e1246ce168aa15ddf2187320a7ab1bdc72c9e8aa4001f1aafa39e4dd7ca6a"
+      "sha256": "539e65860e85f172287ce3128757d11477020cd1e8fc4cb4d1695c087a0372bf"
     },
     {
       "path": "CLAUDE.md",
@@ -1408,6 +1408,10 @@
       "sha256": "42934f34efb28906f25266411c767a2527bf531de11e29237686ae7ef11e7b8b"
     },
     {
+      "path": "guide-kit/generator/recommendation_registry.py",
+      "sha256": "1f6f9a9f8004def0a7b375ff4b18d716475cc9b72fbb5da32c35783291486cba"
+    },
+    {
       "path": "guide-kit/generator/render_work_section_runner.py",
       "sha256": "141c62d63b5d42e7e9f298de9b6c1cc4571a69d0fa3d72312e840a7622faf9b3"
     },
@@ -1464,6 +1468,10 @@
       "sha256": "5bda893cd250d1f467e110356b3b4c3285382ddab9f0ed5aa50bb7bfbf956be8"
     },
     {
+      "path": "guide-kit/generator/test_recommendation_registry.py",
+      "sha256": "f0cddb528b124303ed093b906bace50fffef8b14b4c30e9863e1833d75f616fb"
+    },
+    {
       "path": "guide-kit/generator/test_work_section.py",
       "sha256": "efbccaae8a80e48d6f845a8316640805e1edf2568811a986ce6721195850bdf4"
     },
@@ -1501,7 +1509,7 @@
     },
     {
       "path": "guide-kit/scripts/test_publish_snapshot.sh",
-      "sha256": "ae0dbb401eda9a338cbd1b3d39a32f6b3ccca25672ddd853e1a7c2d2081de445"
+      "sha256": "f06646ec7317c21b59bbab4699dffad881945d5b6b8ce6531799c3960399bae6"
     },
     {
       "path": "guide-kit/scripts/test_snapshot_allowlist.py",
@@ -1565,7 +1573,7 @@
     },
     {
       "path": "guide-kit/structurer/test_quarantine.py",
-      "sha256": "61e8b572bbfb9886bb8269ce89317549798bc2bf2d191aa648352f5b8e8bbab3"
+      "sha256": "fa466636bd433a0abca4e8df17ae4bd028b6af45db814ae802c21dd8490add43"
     },
     {
       "path": "guide-kit/structurer/test_residency.py",
