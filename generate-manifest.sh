@@ -82,6 +82,7 @@ EXCLUDED_SCRIPTS=(
     "scripts/delivery_checks.py"                # CI-only: translate-sync.yml
     "scripts/glossary_source.py"                # CI-only: translate-sync.yml (glossary loader, WP-617 Phase 3)
     "scripts/glossary_supplier.py"              # CI-only: glossary-supplier.yml (daily terms snapshot refresh, WP-617 Phase 4)
+    "scripts/check-card-terms.py"               # author-only: English method card vs approved pack terms (WP-620 Phase 4, D2)
     "scripts/assemble_distribution.py"          # CI-only: translate-sync.yml (assembling the composition of the English version, WP-610 Phase 10)
     "scripts/release-notice-build.py"           # CI-only: notify-update.yml (release announcement, WP-529)
     "scripts/audit-ad-hoc-roles.py"             # no references from any delivered artifact
