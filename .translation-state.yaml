@@ -1,4 +1,5 @@
-files_translated: []
-last_run_utc: '2026-11-10T11:33:39Z'
-last_synced_sha: 7d05f403a9700aed8ff82b4deff12ac1145b0177
+files_translated:
+- docs/RELEASE-PROCESS.md
+last_run_utc: '2026-11-10T12:16:48Z'
+last_synced_sha: 57e73c188e84ae918b9455e02340d1d4acc81b9d
 schema_version: 1
