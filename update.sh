@@ -5916,6 +5916,7 @@ for f in "${UPDATED_FILES[@]}"; do
     # from staging, outcome diagnostics are printed right here, the apply phase silently
     # executes (the line "  ~ ..." — after a successful apply_op).
     if [ "$f" = "CLAUDE.md" ] && [ -f "$SCRIPT_DIR/$f" ]; then
+        CLAUDE_PLAN_COUNT_BEFORE=$UPDATE_PLAN_COUNT
         BASE_FILE="$SCRIPT_DIR/.claude.md.base"
         NEW_FILE="$TMPDIR_UPDATE/files/$f"
         CURRENT_FILE="$SCRIPT_DIR/$f"
@@ -6014,6 +6015,13 @@ for f in "${UPDATED_FILES[@]}"; do
                     echo "    База в рабочей папке есть, но копия в каталоге шаблона не совпадает ни с файлом прошлого обновления (update-manifest.json), ни с закоммиченным в клоне, ни с записанным при последней замене: похоже, её правили вручную."
                 fi
             fi
+        fi
+        # issue #1493: every "НЕ тронут" outcome above adds no plan operation.
+        # APPLIED_PATHS means "this run wrote the file", so an untouched CLAUDE.md
+        # must leave it, or the install-paths guard reads its old install-time
+        # lines as new additions and aborts the update.
+        if [ "$UPDATE_PLAN_COUNT" -eq "$CLAUDE_PLAN_COUNT_BEFORE" ]; then
+            unset "APPLIED_PATHS[$((${#APPLIED_PATHS[@]} - 1))]"
         fi
     elif [[ "$f" == .claude/skills/*/SKILL.md ]]; then
         # USER-SPACE preserve for L1 skill spec files (no install_constants in SCRIPT_DIR — already {{KEY}})
