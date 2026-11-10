@@ -25,7 +25,7 @@ Refs: WP-NNN
 
 ### Changed
 
-- [behavior] Копия `guide-kit/` обновлена до iwesys/guide-kit v0.1.5. Поддельные ключи AWS и заголовок закрытого ключа в `guide-kit/structurer/test_quarantine.py` теперь записаны по частям, поэтому собственная проверка секретов шаблона (`scripts/pre-commit-secret-scan.sh`) больше не останавливает коммит файлов, доставленных `update.sh`; это вторая половина исправления #1492 (первая — `rule-engine.sh`, #1509). Со сменой версии пришли также реестр жизненного цикла рекомендаций (`guide-kit/generator/recommendation_registry.py`, к шаблону не подключён) и исправление теста «gh отсутствует» в `guide-kit/scripts/test_publish_snapshot.sh` (WP-7 Ф304, #1492, iwesys/guide-kit#9).
+- [behavior] Копия `guide-kit/` обновлена до iwesys/guide-kit v0.1.5. Поддельные ключи AWS и заголовок закрытого ключа в `guide-kit/structurer/test_quarantine.py` теперь записаны по частям, поэтому собственная проверка секретов шаблона (`scripts/pre-commit-secret-scan.sh`) больше не останавливает коммит файлов, доставленных `update.sh`; это вторая половина исправления #1492 (первая — `rule-engine.sh`, #1509). Со сменой версии пришли также реестр жизненного цикла рекомендаций (`guide-kit/generator/recommendation_registry.py`, к шаблону не подключён) и исправление теста «gh отсутствует» в `guide-kit/scripts/test_publish_snapshot.sh` (WP-7 Ф304, #1492, iwesys/guide-kit#9, #1515).
   - Цель: 77 · Результат: Ц77-02
   - Как проверить: в пустом репозитории добавить все пути из `update-manifest.json` и запустить `bash scripts/pre-commit-secret-scan.sh` — срабатываний нет; на прежних тестовых файлах guide-kit — блок (aws-access-key 6, private-key-header 1)
   - Как откатить: git revert слияния PR и `bash scripts/guide-kit-sync.sh --tag v0.1.4`
