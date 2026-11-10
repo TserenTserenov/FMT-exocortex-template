@@ -93,6 +93,24 @@ class FileModeTests(unittest.TestCase):
         self.assertIn("Entry without rollback", released.stdout)
 
 
+    def test_missing_section_is_an_error_not_an_empty_pass(self) -> None:
+        result = self.check(changelog(GOOD), "--section", "0.43.0")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("нет раздела [0.43.0]", result.stderr)
+
+    def test_empty_version_section_fails(self) -> None:
+        text = changelog(GOOD).replace("## [0.41.11]", "## [0.42.0] — 2026-11-20\n\n## [0.41.11]")
+        result = self.check(text, "--section", "0.42.0")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("нет ни одной записи", result.stdout)
+
+    def test_plain_paragraph_closes_the_entry(self) -> None:
+        text = changelog(BARE + "Обычный абзац между записями.\n" + GOOD.split("\n", 1)[1])
+        result = self.check(text)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("нет поля «Как откатить»", result.stdout)
+
+
 class OnlyAddedTests(unittest.TestCase):
     def test_old_bare_entries_are_ignored_new_ones_checked(self) -> None:
         with tempfile.TemporaryDirectory() as repo:

@@ -82,6 +82,7 @@ def test_parse_entries_drops_handoff_fields_keeps_other_subitems():
         "  - Цель: 77 · Результат: Ц77-03\n"
         "  - Как проверить: bash scripts/tests/test_x.sh\n"
         "  - Как откатить: git revert слияния #1\n"
+        "    и затем перезапустить update.sh\n"
         "  - Содержательный подпункт остаётся.\n"
     )
     assert rnb.parse_entries(text) == ["[behavior] Запись с полями передачи. - Содержательный подпункт остаётся."]

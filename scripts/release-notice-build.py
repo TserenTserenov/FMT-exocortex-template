@@ -126,12 +126,18 @@ HANDOFF_FIELD = re.compile(r"^\s+[-*]\s+(Цель:|Как проверить:|К
 def parse_entries(text: str) -> list[str]:
     """Top-level CHANGELOG bullets ("- " / "* "), continuation lines joined."""
     entries: list[str] = []
+    in_field = False  # inside a handoff field, including its wrapped lines
     for line in text.splitlines():
         if re.match(r"^[-*]\s+", line):
             entries.append(re.sub(r"^[-*]\s+", "", line).strip())
+            in_field = False
         elif HANDOFF_FIELD.match(line):
-            continue
-        elif entries and line.startswith((" ", "\t")) and line.strip():
+            in_field = True
+        elif re.match(r"^\s+[-*]\s+", line):
+            in_field = False
+            if entries:
+                entries[-1] += " " + line.strip()
+        elif entries and not in_field and line.startswith((" ", "\t")) and line.strip():
             entries[-1] += " " + line.strip()
     return [entry for entry in entries if entry]
 

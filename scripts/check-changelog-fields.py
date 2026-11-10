@@ -51,20 +51,21 @@ class Entry:
     subitems: list[str] = field(default_factory=list)
 
 
-def section_lines(text: str, section: str) -> list[str]:
-    """Lines between "## [<section>]" and the next "## [" header."""
+def section_lines(text: str, section: str) -> list[str] | None:
+    """Lines between "## [<section>]" and the next "## [" header; None if absent."""
     header = re.compile(r"^## \[" + re.escape(section) + r"\]")
     lines: list[str] = []
-    inside = False
+    found = inside = False
     for line in text.splitlines():
         if line.startswith("## ["):
             if inside:
                 break
             inside = bool(header.match(line))
+            found = found or inside
             continue
         if inside:
             lines.append(line)
-    return lines
+    return lines if found else None
 
 
 def parse_entries(lines: list[str]) -> list[Entry]:
@@ -74,8 +75,8 @@ def parse_entries(lines: list[str]) -> list[Entry]:
         if re.match(r"^[-*]\s+", line):
             current = Entry(top=line.strip())
             entries.append(current)
-        elif line.startswith("#"):
-            current = None  # a subsection heading closes the previous entry
+        elif line.strip() and not line[0].isspace():
+            current = None  # a heading or plain paragraph closes the previous entry
         elif current is not None and (match := SUBITEM.match(line)):
             current.subitems.append(match.group(1).strip())
     return entries
@@ -141,13 +142,24 @@ def main(argv: list[str]) -> int:
 
     ref = args.ref or ("HEAD" if not args.file else None)
     try:
-        entries = parse_entries(section_lines(read_changelog(ref, args.file), args.section))
+        lines = section_lines(read_changelog(ref, args.file), args.section)
+        if lines is None:
+            # A missing section must not read as "no entries, all fine": next-rc
+            # would then tag a candidate whose fields were never checked.
+            raise OSError(f"в CHANGELOG.md нет раздела [{args.section}]")
+        entries = parse_entries(lines)
         if args.base:
-            known = {e.top for e in parse_entries(section_lines(read_changelog(args.base, None), args.section))}
+            # The base may lack [Unreleased] (right after a release): nothing known yet.
+            base_lines = section_lines(read_changelog(args.base, None), args.section) or []
+            known = {e.top for e in parse_entries(base_lines)}
             entries = [e for e in entries if e.top not in known]
     except OSError as error:
         print(f"check-changelog-fields: {error}", file=sys.stderr)
         return 2
+
+    if not entries and not args.base:
+        print(f"FAIL: в разделе [{args.section}] нет ни одной записи")
+        return 1
 
     failed = 0
     for entry in entries:

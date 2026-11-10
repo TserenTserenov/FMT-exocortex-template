@@ -2285,7 +2285,7 @@
     },
     {
       "path": "scripts/check-changelog-fields.py",
-      "sha256": "961081c40582d90335312c41d63a0ca4c50bf8ed22a55540e50e0cebe03fa644"
+      "sha256": "1aabc378af51a0c05167cf45582f492ae7739546207f10b1efef3de998dd6381"
     },
     {
       "path": "scripts/check-claude-md-links.py",
