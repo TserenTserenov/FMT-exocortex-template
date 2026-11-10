@@ -221,7 +221,7 @@ ESCALATE_TO_USER: <причина> — если писатель игнорир�
 Вызов Claude через Bash:
 ```bash
 PEER_FILE="${SESSION_DIR}/$(printf '%02d' $TURN)-peer.md"
-echo "<промпт>" | bash "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
+echo "<промпт>" | bash "${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}/claude-peer-adapter.sh" \
   > "$PEER_FILE" 2> "${PEER_FILE%.md}.err"
 ```
 
@@ -393,7 +393,7 @@ Cold-context code review результатов peer-сессии <SESSION_ID>.
 EOF
 )
 
-echo "$REVIEW_PROMPT" | bash "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
+echo "$REVIEW_PROMPT" | bash "${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}/claude-peer-adapter.sh" \
   > "$REVIEW_FILE" 2> "${REVIEW_FILE%.md}.err"
 ```
 
@@ -441,7 +441,7 @@ VERIFY_PROMPT=$(cat <<EOF
 EOF
 )
 
-echo "$VERIFY_PROMPT" | bash "${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}/scripts/claude-peer-adapter.sh" \
+echo "$VERIFY_PROMPT" | bash "${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}/claude-peer-adapter.sh" \
   > "$VERIFY_FILE" 2> "${VERIFY_FILE%.md}.err"
 ```
 
@@ -717,8 +717,12 @@ with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding
     tmp_path = tmp.name
 
 report_file = os.path.join(session_dir, 'report-draft.md')
-gov_repo = os.environ.get('IWE_GOVERNANCE_REPO', 'DS-strategy')
-adapter = os.path.expanduser(f'~/IWE/{gov_repo}/scripts/claude-peer-adapter.sh')
+# Adapters ship in the template's scripts/, not in the governance repo (issue #1513).
+scripts_dir = os.environ.get('IWE_SCRIPTS') or os.path.join(
+    os.environ.get('IWE_TEMPLATE')
+    or os.path.join(os.environ.get('IWE_ROOT') or os.path.expanduser('~/IWE'), 'FMT-exocortex-template'),
+    'scripts')
+adapter = os.path.join(scripts_dir, 'claude-peer-adapter.sh')
 
 # synth_prompt above already inlines the full transcript, meta.yaml fields and
 # _outcome.md into stdin — claude-peer-adapter.sh is a text-only reviewer by

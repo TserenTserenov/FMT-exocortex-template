@@ -25,6 +25,10 @@
 #   bypassing the Artifactor result). Mandatory for ANY task class (no
 #   exception for trivial/closed-loop, pilot go-ahead 2026-09-11) --
 #   emergency bypass: --no-artifactor-check.
+# --no-weekplan (issue #1503): do not add the WP row to the WeekPlan «План» table — the
+#   WP lands only in the card and the registry. --weekplan forces the row (a strategy
+#   session approving the WP into the week). Precedence: --no-weekplan / --weekplan >
+#   params.yaml `wp_new_add_to_weekplan: false` > default (row is added); both flags → error.
 # --state (WP-505): target state transition (WP-457 State-Transition Gate).
 #   REQUIRED when <governance>/docs/state-axes-registry.yaml exists (author install);
 #   optional otherwise (typical user install — gate inactive per template contract).
@@ -73,6 +77,8 @@ SKIP_CONSENT=0
 ARTIFACTOR_RESULT_FILE=""
 PILOT_REVISION=""
 SKIP_ARTIFACTOR=0
+NO_WEEKPLAN_FLAG=0
+WEEKPLAN_FLAG=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -91,9 +97,25 @@ while [[ $# -gt 0 ]]; do
     --artifactor-result) ARTIFACTOR_RESULT_FILE="$2"; shift 2 ;;
     --pilot-revision) PILOT_REVISION="$2"; shift 2 ;;
     --no-artifactor-check) SKIP_ARTIFACTOR=1; shift ;;
+    --no-weekplan) NO_WEEKPLAN_FLAG=1; shift ;;
+    --weekplan) WEEKPLAN_FLAG=1; shift ;;
     *) echo "Неизвестный флаг: $1" >&2; exit 1 ;;
   esac
 done
+
+# --- WeekPlan row: on unless the pilot turned it off (issue #1503) ---
+if [[ "$NO_WEEKPLAN_FLAG" == 1 && "$WEEKPLAN_FLAG" == 1 ]]; then
+  echo "ERROR: --weekplan и --no-weekplan взаимоисключающие" >&2
+  exit 1
+fi
+# Empty reason = the row is added.
+WEEKPLAN_OFF_REASON=""
+if [[ "$NO_WEEKPLAN_FLAG" == 1 ]]; then
+  WEEKPLAN_OFF_REASON="--no-weekplan"
+elif [[ "$WEEKPLAN_FLAG" == 0 && -f "$IWE/params.yaml" ]] \
+  && grep -qE '^wp_new_add_to_weekplan:[[:space:]]*false([[:space:]]*(#.*)?)?$' "$IWE/params.yaml"; then
+  WEEKPLAN_OFF_REASON="params.yaml wp_new_add_to_weekplan: false"
+fi
 
 # --- Artefactor Gate (WP-7 Phase 142, 2026-09-11) ---
 # Title must come from the Artifactor result, not be invented by the agent
@@ -760,7 +782,9 @@ echo "3/5 WeekPlan..."
 
 # WEEKPLAN was already found above (snapshot for rollback, issue WP-507 about the file name format
 # applied there too) — the same path is used here, no repeated search.
-if [[ -n "$WEEKPLAN" ]]; then
+if [[ -n "$WEEKPLAN_OFF_REASON" ]]; then
+  echo "   ⏭️  WeekPlan: строка не добавляется ($WEEKPLAN_OFF_REASON)"
+elif [[ -n "$WEEKPLAN" ]]; then
   if ! python3 - "$WEEKPLAN" "$WP_NUM" "$TITLE" "$PRIORITY" "$BUDGET" "$REPO" "$STAKE_CELL" <<'PYEOF'
 import sys, re
 weekplan_path, wp_num, title, priority, budget = sys.argv[1:6]

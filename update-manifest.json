@@ -461,7 +461,7 @@
     },
     {
       "path": ".claude/skills/apply-captures/SKILL.md",
-      "sha256": "3d3a209c9b84478cbe6e3c220dcff7c960d7f93e97cc8e2015efe629b6959092"
+      "sha256": "1f974bed8eed56b0b14a58ec3604121f9a67a285f6fdc75364b98849c8ebf129"
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "f61b95a60e12aabfb0128307c1b132e2927d55e2c0ca865b73f666e755aa96b6"
+      "sha256": "4a2bf6ebca47d8e004a1bcb17f13924ad4543b00d6c7ad3c277736f1f6b8a40b"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -649,7 +649,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "34bbbdbe7cf271f0b7a819c8aaa68764e8dd94c893c3b10cb2edabe3eae87768"
+      "sha256": "4b51700b52bcecd3370c99028298044e514883b7e992d4d2f1406d72892b72dd"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -805,7 +805,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "3d0cf7e7c0ccf3f1fb18e1ff566a2e5aa505cf7606447b271625b84d9d2b0c6d"
+      "sha256": "f8e8a3ae69c2f1e8e8194f4c000dbd27fa81979f0c3582a722007ab418d5502c"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -857,7 +857,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "0d15fc0d61f14750e4c3bc8bfcfb81553ceb17572057d65e2f5116674bda5ddb"
+      "sha256": "725c096f0316f8b8f66212e16193b72109e12e12119323e40ad50c65660d0a55"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -941,7 +941,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "5faf2d83758b4e3ae575f0f64650438322fa77272ce942ad9f55fe86b382a581"
+      "sha256": "8f9df17d4d94473f73b743fd5771b69c5304b4885ba3c7ac8119493f952955a8"
     },
     {
       "path": "CLAUDE.md",
@@ -2365,7 +2365,7 @@
     },
     {
       "path": "scripts/check-wp-registered.sh",
-      "sha256": "638e9503095615892896e84c3a0a056c74c0185537c8f1d21a485588fc9f484e"
+      "sha256": "440c0b4a272050a6771ea168663318a0dd3f069b9ad36f4242bd6c282dbc2ee7"
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
@@ -2409,7 +2409,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "aa0f25bc00cf5aab2c706204da60d5e40b4a9eaf73c94f1ed38cb7ef84ac51c3"
+      "sha256": "1e53be55f1b61c919e96202f02162eee9dd887f8139736be8b0387a387af49b7"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2830,6 +2830,10 @@
     {
       "path": "scripts/pack-ci-install.sh",
       "sha256": "a9b555b402095553e92c15d7f8af72d20b513b1b963c768899d3e5e6775cf942"
+    },
+    {
+      "path": "scripts/pack-duplicate-check.py",
+      "sha256": "58fa5281b6bb1e6754c611b34eb3c6a7d9b23e0f6ca51f131e2095e2815313c9"
     },
     {
       "path": "scripts/peer-adapter-filter.py",
@@ -3638,6 +3642,10 @@
     "scripts/tests/test_issue_1470_isolate_range_delivered.sh",
     "scripts/tests/test_issue_1471_1474_synchronizer.sh",
     "scripts/tests/test_issue_1475_pull_on_touch_lib.sh",
+    "scripts/tests/test_issue_1488_dayplan_contract.sh",
+    "scripts/tests/test_issue_1503_no_weekplan.sh",
+    "scripts/tests/test_issue_1513_skill_paths.sh",
+    "scripts/tests/test_issue_1514_pack_duplicates.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",

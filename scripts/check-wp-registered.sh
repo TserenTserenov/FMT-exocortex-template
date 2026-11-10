@@ -14,20 +14,30 @@
 #      header: "Status…" and ("#" or "Work"), the number is in the "#" column, otherwise "WP");
 #   4. the title column in both rows contains the first 80 characters of the title from the card
 #      (create-wp.sh cuts the title in the registry to 80 characters).
+# --no-weekplan (issue #1503): skip check 3 and the WeekPlan half of check 4 — for a WP
+#   created with `create-wp.sh --no-weekplan` / `wp_new_add_to_weekplan: false`. The WeekPlan
+#   argument is still required (callers keep one command line) but is not read.
 # Code 2 — wrong arguments or unreadable files.
 set -uo pipefail
 
+CHECK_WEEKPLAN=1
+if [ "${1:-}" = "--no-weekplan" ]; then
+  CHECK_WEEKPLAN=0
+  shift
+fi
+
 if [ "$#" -ne 3 ]; then
-  echo "Использование: $0 <номер РП> <каталог governance> <файл WeekPlan>" >&2
+  echo "Использование: $0 [--no-weekplan] <номер РП> <каталог governance> <файл WeekPlan>" >&2
   exit 2
 fi
 
-exec python3 - "$1" "$2" "$3" <<'PY'
+exec python3 - "$1" "$2" "$3" "$CHECK_WEEKPLAN" <<'PY'
 import re
 import sys
 from pathlib import Path
 
-raw_number, governance, weekplan = sys.argv[1:4]
+raw_number, governance, weekplan, check_weekplan = sys.argv[1:5]
+check_weekplan = check_weekplan == '1'
 match = re.fullmatch(r'(?:WP-)?0*(\d+)', raw_number.strip())
 if not match:
     print(f'Неверный номер РП: {raw_number!r}', file=sys.stderr)
@@ -123,6 +133,20 @@ if len(registry_rows) != 1:
 else:
     check_title('реестре', registry_rows[0])
 
+
+def finish(ok_message):
+    if errors:
+        print(f'РП {number}: регистрация не согласована:', file=sys.stderr)
+        for e in errors:
+            print(f'  - {e}', file=sys.stderr)
+        sys.exit(1)
+    print(f'РП {number}: {ok_message}')
+    sys.exit(0)
+
+
+if not check_weekplan:
+    finish('карточка и реестр согласованы (план недели не проверялся: --no-weekplan)')
+
 # 3. WeekPlan: таблицы с ячейками «РП», «#» и «Статус…», не под заголовками фактов
 FACTS = re.compile(r'итог|сводк|summary', re.IGNORECASE)
 PLAN = re.compile(r'план', re.IGNORECASE)
@@ -197,10 +221,5 @@ if len(plan_rows) != 1:
 else:
     check_title('плане недели', plan_rows[0])
 
-if errors:
-    print(f'РП {number}: регистрация не согласована:', file=sys.stderr)
-    for e in errors:
-        print(f'  - {e}', file=sys.stderr)
-    sys.exit(1)
-print(f'РП {number}: карточка, реестр и план недели согласованы')
+finish('карточка, реестр и план недели согласованы')
 PY
