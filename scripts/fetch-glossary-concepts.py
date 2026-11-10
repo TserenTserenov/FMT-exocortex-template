@@ -2,7 +2,7 @@
 """Обойти инструмент concept_list шлюза и записать вход для export-glossary-snapshot.py (WP-5 Ф67).
 
 Секрет сервисного ключа читается из переменной окружения GLOSSARY_EXPORTER_SERVICE_SECRET.
-После обхода проверяются контрольные коды из эталона (inbox/WP-5/f67-nabor-priemki-shluza.md)
+После обхода проверяются контрольные коды из эталона (inbox/WP-617/f67-nabor-priemki-shluza.md)
 и полнота: число строк равно concepts - hidden_by_closed_sources_count из graph_stats.
 Расхождение — обход повторяется (граф мог измениться), после исчерпания попыток файл не пишется.
 """
@@ -32,7 +32,11 @@ CONTROLS: dict[str, tuple[str | None, bool] | None] = {
     "U.Entity": ("Entity", True),
     "ECO.FM.001": ("ECO.FM.001", True),
     "MIM.M.024": (None, False),
-    "ECO.PRIN.001": None,
+    # ECO.PRIN.001 was absent while the graph stood still (2026-09-04..11-09); it is a public
+    # PACK-ecosystem concept and has been indexed since 2026-11-10 (WP-620 Ф3).
+    "ECO.PRIN.001": ("Intelligence Development Ecosystem Principles", True),
+    # Absent control: a code of the closed PACK-agent-rules that must never be visible here.
+    "AR.D.005": None,
 }
 
 Transport = Callable[[dict], dict]
