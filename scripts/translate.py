@@ -63,6 +63,13 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 # Discover-mode patterns: ALL-CAPS 2+ chars (High fix #1) and mixed-case 4+
 CYRILLIC_ALL_CAPS_RE = re.compile(r"[А-ЯЁ]{2,}")
 CYRILLIC_MIXED_RE = re.compile(r"[а-яёА-ЯЁ]{4,}")
+# WP-620 Ф4: the model lists system terms it translated without a glossary entry
+UNLISTED_BLOCK_RE = re.compile(r"<unlisted_terms>(.*?)</unlisted_terms>", re.DOTALL)
+UNLISTED_LINE_RE = re.compile(r"^\s*[-*]?\s*(.+?)\s*(?:→|->)\s*(.+?)\s*$")
+CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
+# Report sources (WP-620 Ф4): where an unapproved English name came from
+REPORT_SOURCE_LOCAL = "local-glossary"
+REPORT_SOURCE_MODEL = "model"
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +244,8 @@ def _parse_translation_response(
     shortcut here skipped it, leaking the literal `<body>` tag into every
     frontmatter-less file's output (caught 2026-07-06, 13/38 files affected).
     """
+    # The <unlisted_terms> block is a report, never part of the document.
+    response = UNLISTED_BLOCK_RE.sub("", response)
     fm_translated: dict[str, str] = {}
     if fm_values:
         fm_match = re.search(
@@ -268,16 +277,34 @@ def _parse_translation_response(
 # ---------------------------------------------------------------------------
 
 
+def parse_unlisted_terms(response: str) -> list[tuple[str, str]]:
+    """Pairs (RU, EN) the model declared in <unlisted_terms>: terms it translated
+    without a glossary entry. Lines that are not «Russian → English» are ignored."""
+    pairs: list[tuple[str, str]] = []
+    for block in UNLISTED_BLOCK_RE.findall(response):
+        for line in block.splitlines():
+            m = UNLISTED_LINE_RE.match(line)
+            if not m:
+                continue
+            ru, en = m.group(1).strip(), m.group(2).strip()
+            if CYRILLIC_RE.search(ru) and en and not CYRILLIC_RE.search(en):
+                pairs.append((ru, en))
+    return pairs
+
+
 def translate_file(
     file_path: Path,
     system_prompt: str,
     translate_keys: list[str],
     client: OpenRouterClient,
     model: str,
+    unlisted: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[str]]:
     """Translate a single file. Returns (translated_text, violations).
 
     violations is empty on success, or contains 'file_too_large: ...' on overflow.
+    If ``unlisted`` is given, the (RU, EN) pairs the model declared for terms
+    outside the glossary are appended to it (WP-620 Ф4).
     """
     text = file_path.read_text(encoding="utf-8")
     meta, body = parse_frontmatter(text)
@@ -315,6 +342,8 @@ def translate_file(
         raw = translate_with_retry(client, system_prompt, user_content, model)
     except TranslationTruncated as e:
         return "", [f"translation_truncated: {e}"]
+    if unlisted is not None:
+        unlisted.extend(parse_unlisted_terms(raw))
     fm_translated, en_body = _parse_translation_response(raw, fm_values, translate_keys)
 
     en_meta = dict(meta)
@@ -373,10 +402,15 @@ def _build_system_prompt(style_path: Path, glossary: dict, manifest: dict) -> st
         "The published English output must contain no Cyrillic characters. "
         "Translate natural-language text even when it appears in an inline code example; "
         "only the identifier patterns and proper nouns above remain verbatim.\n\n"
+        "# Terms outside the glossary\n"
+        "If you translate a Russian system term (a named concept, method, role, artifact "
+        "or step of the platform) that is not in the Glossary, list it after the body in an "
+        "<unlisted_terms> block, one per line as `Russian term → English name you used`. "
+        "Do not list ordinary words. Leave the block empty if there are none.\n\n"
         "# Output Format\n"
-        "When given <frontmatter_values> and <body> sections, "
-        "return them in the same XML-tag structure.\n"
-        "When given only a <body> section, return only the translated body (no XML tags).\n"
+        "Return the translation in the same XML-tag structure you were given "
+        "(<frontmatter_values> if present, then <body>), followed by the "
+        "<unlisted_terms> block.\n"
         "Do not add explanations or commentary — return only the translated content."
     )
 
@@ -452,8 +486,73 @@ def run_discover(args: argparse.Namespace, manifest: dict, glossary: dict) -> in
 # ---------------------------------------------------------------------------
 
 
-def run_translate(args: argparse.Namespace, manifest: dict, glossary: dict) -> int:
-    """Translate files and write output to --output-dir."""
+def local_terms_used(text: str, unapproved: dict[str, str]) -> list[tuple[str, str]]:
+    """Local-glossary candidates whose Russian form occurs in the source text.
+
+    Exact case-insensitive match outside code; an inflected form is not caught
+    (known limit — the model is also asked to list terms it had to name itself).
+    """
+    haystack = strip_code_for_guard(text).casefold()
+    return [(ru, en) for ru, en in unapproved.items() if ru.casefold() in haystack]
+
+
+def unapproved_report_items(
+    rel: str,
+    source_text: str,
+    glossary: dict[str, str],
+    unapproved: dict[str, str],
+    unlisted: list[tuple[str, str]],
+) -> list[dict[str, str]]:
+    """Report rows for one file: every unapproved English name that may appear in its translation."""
+    items = [
+        {"file": rel, "term_ru": ru, "term_en": en, "source": REPORT_SOURCE_LOCAL}
+        for ru, en in local_terms_used(source_text, unapproved)
+    ]
+    known = {ru.casefold() for ru in glossary}
+    seen: set[str] = set()
+    for ru, en in unlisted:
+        key = ru.casefold()
+        if key in known or key in seen:
+            continue  # the model listed a glossary term anyway, or repeated itself
+        seen.add(key)
+        items.append({"file": rel, "term_ru": ru, "term_en": en, "source": REPORT_SOURCE_MODEL})
+    return items
+
+
+def print_unapproved_report(items: list[dict[str, str]]) -> None:
+    """Show the report in the run log and, on GitHub Actions, in the job summary."""
+    if not items:
+        print("Unapproved terms: none", file=sys.stderr)
+        return
+    print(f"Unapproved terms ({len(items)}): Russian term → name used [source] — file", file=sys.stderr)
+    for it in items:
+        print(f"  {it['term_ru']} → {it['term_en']} [{it['source']}] — {it['file']}", file=sys.stderr)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        lines = [
+            "### Unapproved terms (WP-620)",
+            "",
+            "| Russian term | Name used | Source | File |",
+            "|---|---|---|---|",
+        ]
+        lines += [f"| {it['term_ru']} | {it['term_en']} | {it['source']} | {it['file']} |" for it in items]
+        with open(summary, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+
+
+def run_translate(
+    args: argparse.Namespace,
+    manifest: dict,
+    glossary: dict,
+    unapproved: dict[str, str] | None = None,
+    report: list[dict[str, str]] | None = None,
+) -> int:
+    """Translate files and write output to --output-dir.
+
+    Every unapproved English name that may appear in the output (local-glossary
+    candidate or a name the model chose for a term outside the glossary) is
+    printed and, if ``report`` is given, appended to it (WP-620 Ф4).
+    """
     if not args.output_dir:
         print("ERROR: --output-dir is required for translate mode", file=sys.stderr)
         return 1
@@ -468,6 +567,7 @@ def run_translate(args: argparse.Namespace, manifest: dict, glossary: dict) -> i
 
     repo_root = _find_repo_root(Path.cwd())
     exit_code = 0
+    run_items: list[dict[str, str]] = []
 
     for file_arg in args.files:
         file_path = Path(file_arg).resolve()
@@ -481,8 +581,9 @@ def run_translate(args: argparse.Namespace, manifest: dict, glossary: dict) -> i
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         print(f"Translating: {rel}", file=sys.stderr)
+        unlisted: list[tuple[str, str]] = []
         translated, violations = translate_file(
-            file_path, system_prompt, translate_keys, client, model
+            file_path, system_prompt, translate_keys, client, model, unlisted=unlisted
         )
 
         if violations and violations[0].startswith(("file_too_large", "translation_truncated")):
@@ -498,6 +599,9 @@ def run_translate(args: argparse.Namespace, manifest: dict, glossary: dict) -> i
             continue
 
         out_path.write_text(translated, encoding="utf-8")
+        run_items += unapproved_report_items(
+            str(rel), file_path.read_text(encoding="utf-8"), glossary, unapproved or {}, unlisted
+        )
 
         if violations:
             print(f"  WARN ASCII-guard violations in {rel}:", file=sys.stderr)
@@ -507,6 +611,9 @@ def run_translate(args: argparse.Namespace, manifest: dict, glossary: dict) -> i
         else:
             print(f"  OK", file=sys.stderr)
 
+    print_unapproved_report(run_items)
+    if report is not None:
+        report.extend(run_items)
     return exit_code
 
 
@@ -553,20 +660,32 @@ def _git_head_sha(repo_root: Path) -> str:
     return result.stdout.strip()
 
 
-def _write_state_file(state_path: Path, sha: str, files_translated: list[str]) -> None:
+def _write_state_file(
+    state_path: Path,
+    sha: str,
+    files_translated: list[str],
+    unapproved_terms: list[dict[str, str]] | None = None,
+) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state = {
         "schema_version": 1,
         "last_synced_sha": sha,
         "last_run_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "files_translated": files_translated,
+        # WP-620 Ф4: unapproved English names used in this run, for review
+        "unapproved_terms": unapproved_terms or [],
     }
     state_path.write_text(
         yaml.dump(state, allow_unicode=True, default_flow_style=False), encoding="utf-8"
     )
 
 
-def run_delta(args: argparse.Namespace, manifest: dict, glossary: dict) -> int:
+def run_delta(
+    args: argparse.Namespace,
+    manifest: dict,
+    glossary: dict,
+    unapproved: dict[str, str] | None = None,
+) -> int:
     """Translate only category-D files changed since `.translation-state.yaml`.
 
     First run (no state file / no last_synced_sha) translates the full
@@ -602,10 +721,11 @@ def run_delta(args: argparse.Namespace, manifest: dict, glossary: dict) -> int:
         return 0
 
     args.files = [str(f) for f in targets]
-    exit_code = run_translate(args, manifest, glossary)
+    report: list[dict[str, str]] = []
+    exit_code = run_translate(args, manifest, glossary, unapproved, report)
 
     rel_targets = [str(f.relative_to(repo_root)) for f in targets]
-    _write_state_file(output_dir / ".translation-state.yaml", head_sha, rel_targets)
+    _write_state_file(output_dir / ".translation-state.yaml", head_sha, rel_targets, report)
     return exit_code
 
 
@@ -679,12 +799,13 @@ def main() -> int:
     for note in loaded.notes:
         print(f"GLOSSARY NOTE: {note}", file=sys.stderr)
     glossary = loaded.as_mapping()
+    unapproved = loaded.unapproved_mapping()
 
     if args.mode == "discover":
         return run_discover(args, manifest, glossary)
     if args.mode == "delta":
-        return run_delta(args, manifest, glossary)
-    return run_translate(args, manifest, glossary)
+        return run_delta(args, manifest, glossary, unapproved)
+    return run_translate(args, manifest, glossary, unapproved)
 
 
 if __name__ == "__main__":
