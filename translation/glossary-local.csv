@@ -64,7 +64,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Понимание,Understanding,learning outcomes and comprehension,deeper than Knowledge,2
 Постмортем,Postmortem,analysis after incident or failure,"also ""post-incident review""",2
 Поток,Flow/Stream,Learning or work stream,,1
-Потребность,Need,stakeholder needs before requirements,"Distinct from ""requirement""; higher level",2
 Предметная область,Domain,DDD modeling and design,Core DDD term,2
 Принцип BYOB,BYOB principle,Infrastructure ownership,Bring Your Own Base; pending_review=true,3
 Приоритет,Priority,task/backlog item ordering,straightforward,2
@@ -84,7 +83,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Ретроспектива,Retrospective,agile ceremony after iteration ends,standard Scrum ceremony,2
 Рефакторинг,Refactoring,code restructuring without behavior change,straightforward,2
 Ролевой префикс,Role prefix,Role activation prefix,,1
-Роль,Role,IWE / organizational modeling,Context-dependent term,2
 Рубеж работы,Work milestone,Decision point in workflow,,1
 Семантика-сначала,Semantics-first integration,Layered runtime integration,IWE-specific sequencing priority; pending_review=true,3
 Сервис,Service,SOA DDD and microservices design,Standard DDD/SOA term,2
@@ -109,7 +107,6 @@ bearer-заголовок как третий auth-mode,Bearer Header Authentica
 Форматирование,Formatting,Document formatting,,1
 Функциональное место,Functional Position,IWE / organizational design,uncertain,2
 Хук,Hook,event-driven or lifecycle callbacks,e.g. Git hooks or framework hooks,2
-Целевая система,System of Interest,Systems engineering / IWE,Also Target System in some texts,2
 Шаблон,Template,document or code generation patterns,also means Pattern in some contexts,2
 Шаг,Step,process workflow and procedure design,"Also ""stage"" depending on context",2
 Шифрование,Encryption,Data protection method,Standard security technique; pending_review=true,3
@@ -124,16 +121,8 @@ IWE по шаблону,Template-based IWE,change accounting (WP-611),approved b
 IWE у вендора,Vendor-hosted IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
 IWE у разработчика,Developer IWE,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
 Система,System,change accounting (WP-611),approved by pilot 2026-11-07; move to the graph (WP-617 Phase 5),2
-Конфликтное облако,Evaporating Cloud,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Общая цель,Common objective,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Необходимость,Requirement,"Evaporating Cloud method (TOC, MIM.M.015); elements B and C","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Действие D/D' конфликтного облака,Prerequisite,"Evaporating Cloud method (TOC, MIM.M.015); the Russian card says «действие»","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Допущение,Assumption,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Инъекция,Injection,"Evaporating Cloud method (TOC, MIM.M.015)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Проблема,Problem,"Unpacking a Concern method (DP.METHOD.053); gap for a role","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Неудовлетворённость,Dissatisfaction,"Unpacking a Concern method (DP.METHOD.053); state of the person","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Эмоция,Emotion,"Unpacking a Concern method (DP.METHOD.053); minutes","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Чувство,Feeling,"Unpacking a Concern method (DP.METHOD.053); weeks to years","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Сила,Strength,"Unpacking a Concern method (DP.METHOD.053); of a dissatisfaction, 1-5","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
-Ошибка предсказания,Prediction error,"Unpacking a Concern method (DP.METHOD.053)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
 Ближайшее действие,Nearest action,"Unpacking a Concern method (DP.METHOD.053)","approved by pilot 2026-11-09 (WP-581 Phase 28; method-library PR #3); move to the graph (WP-617 Phase 5)",2
