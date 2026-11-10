@@ -913,7 +913,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "4f5c8ae6f313dd801a5ddfab4d51e1611ed3a07d86fa209bb6518550f74cf7b8"
+      "sha256": "b93f0fe59b014410aad579bea789d627ac5e544bfe8910d5ca53efe1368f1a6f"
     },
     {
       "path": ".gitignore",
@@ -941,7 +941,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3830ccfe5595d9180e90da16853c8be0351aac32b24631e4fac31234a750c0fe"
+      "sha256": "2a0e1246ce168aa15ddf2187320a7ab1bdc72c9e8aa4001f1aafa39e4dd7ca6a"
     },
     {
       "path": "CLAUDE.md",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "064d282196b5c41603b8c929c46cb97f241b16b6bad40b568f588c22428c12b7"
+      "sha256": "83e3f2a43254a5523f828774673c68093bacadabbd03a6873b3b59e754f67ac7"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -2282,6 +2282,10 @@
     {
       "path": "scripts/check-changelog-entry.sh",
       "sha256": "fa367b8bb3137c87ababa117debca231d90c874c26237f3585e2cc0bf36b5b57"
+    },
+    {
+      "path": "scripts/check-changelog-fields.py",
+      "sha256": "1aabc378af51a0c05167cf45582f492ae7739546207f10b1efef3de998dd6381"
     },
     {
       "path": "scripts/check-claude-md-links.py",
@@ -3542,6 +3546,7 @@
     "scripts/tests/test_ar293_ai_cli_override.sh",
     "scripts/tests/test_assemble_distribution.py",
     "scripts/tests/test_changelog_append_blank_lines.sh",
+    "scripts/tests/test_check_changelog_fields.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_critical_alert_notify_outcome.sh",
     "scripts/tests/test_day_close_prepare.py",

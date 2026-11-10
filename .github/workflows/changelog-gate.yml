@@ -8,7 +8,7 @@ name: Changelog Gate
 # и setup/test-check-changelog-entry.sh).
 #
 # Исключения:
-#   - PR из веток release/* (недельный релиз переносит записи из
+#   - PR из веток release/* (ветка выпуска переносит записи из
 #     [Unreleased] в версию, новой записи в нём быть не должно);
 #   - метка no-changelog, поставленная участником из NO_CHANGELOG_ALLOWED.
 #     Ограничение: все агенты пилота работают под его учёткой, поэтому
@@ -72,3 +72,11 @@ jobs:
       - name: Require a CHANGELOG entry
         if: steps.release.outputs.skip == 'false' && steps.label.outputs.exempt == 'false'
         run: bash scripts/check-changelog-entry.sh "$BASE_SHA" "$HEAD_SHA" "$PR_NUMBER"
+
+      # WP-529 Phase 252: an entry is handed over to the Release Lead only with
+      # its four fields (goal, result code, how to check, how to roll back).
+      # Only entries added by this PR are checked; older entries get their
+      # fields on the release branch before the first rc tag.
+      - name: Require handoff fields in new entries
+        if: steps.release.outputs.skip == 'false' && steps.label.outputs.exempt == 'false'
+        run: python3 scripts/check-changelog-fields.py --ref "$HEAD_SHA" --only-added "$BASE_SHA"
