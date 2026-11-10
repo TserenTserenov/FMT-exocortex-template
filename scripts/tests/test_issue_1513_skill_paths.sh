@@ -15,6 +15,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
+PY=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || { echo "FAIL: python3 not found (find-python3.sh)" >&2; exit 1; }
 
 # --- Part 1: guard ---------------------------------------------------------
 cat > "$TMP/guard.py" <<'PY'
@@ -40,7 +41,7 @@ for skill in sorted((root / ".claude/skills").rglob("*.md")):
                 out.append(f"{skill.relative_to(root)}:{n}: {name}")
 print("\n".join(out))
 PY
-violations=$(python3 "$TMP/guard.py" "$ROOT")
+violations=$("$PY" "$TMP/guard.py" "$ROOT")
 [ -z "$violations" ] || fail "skills call template-only scripts via the governance repo:
 $violations"
 
@@ -54,7 +55,7 @@ printf '%s\n' 'bash "$GOV_DIR/scripts/ke-queue-stats.sh" --list' \
     'bash "$IWE_ROOT/${IWE_GOVERNANCE_REPO:-${GOVERNANCE_REPO:-DS-strategy}}/scripts/codex-peer-adapter.sh"' \
     'bash ~/IWE/DS-strategy/scripts/grok-peer-adapter.sh' \
     > "$fixture/.claude/skills/x/SKILL.md"
-hit=$(python3 "$TMP/guard.py" "$fixture")
+hit=$("$PY" "$TMP/guard.py" "$fixture")
 for name in ke-queue-stats.sh claude-peer-adapter.sh kimi-peer-adapter.sh codex-peer-adapter.sh grok-peer-adapter.sh; do
     grep -q "$name" <<<"$hit" || fail "guard misses the pre-fix spelling of $name: '$hit'"
 done

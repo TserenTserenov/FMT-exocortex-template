@@ -11,6 +11,7 @@ SKILL="$ROOT/.claude/skills/apply-captures/SKILL.md"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
+PY=$("$ROOT/scripts/lib/find-python3.sh" --stdlib-only) || { echo "FAIL: python3 not found (find-python3.sh)" >&2; exit 1; }
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
@@ -36,7 +37,7 @@ commit_card "$user" "pack/03-methods/DP.METHOD.200-build-number.md" \
 commit_card "$user" "pack/03-methods/DP.METHOD.184-build-number-old.md" \
     "# DP.METHOD.184 Конвейер выдаёт номер сборки"
 
-run() { python3 "$CHECK" --pack "$user" "$@"; }
+run() { "$PY" "$CHECK" --pack "$user" "$@"; }
 
 # 1. Keyword search finds the user's own card (the platform index did not).
 out=$(run "конвейер" "номер сборки") || fail "keyword run failed"
@@ -79,12 +80,12 @@ grep -q '^ID_UPSTREAM' <<<"$out" && fail "stale upstream data shown after a fail
 git -C "$user" remote remove upstream
 grep -q $'^UPSTREAM\tno-remote$' <<<"$(run --id DP.METHOD.184)" || fail "no-remote not reported"
 mkdir -p "$TMP/plain/pack" && printf '# DP.X.1\n' > "$TMP/plain/pack/a.md"
-grep -q $'^UPSTREAM\tnot-a-git-repo$' <<<"$(python3 "$CHECK" --pack "$TMP/plain" --id DP.X.1)" \
+grep -q $'^UPSTREAM\tnot-a-git-repo$' <<<"$("$PY" "$CHECK" --pack "$TMP/plain" --id DP.X.1)" \
     || fail "non-git Pack not reported"
 
 # 5. Bad arguments are refused.
-python3 "$CHECK" --pack "$TMP/missing" --id X >/dev/null 2>&1; [ $? -eq 2 ] || fail "missing Pack not refused"
-python3 "$CHECK" --pack "$user" >/dev/null 2>&1; [ $? -eq 2 ] || fail "no id and no keywords not refused"
+"$PY" "$CHECK" --pack "$TMP/missing" --id X >/dev/null 2>&1; [ $? -eq 2 ] || fail "missing Pack not refused"
+"$PY" "$CHECK" --pack "$user" >/dev/null 2>&1; [ $? -eq 2 ] || fail "no id and no keywords not refused"
 
 # 6. The skill uses the helper and says whose base knowledge_search sees.
 grep -q 'pack-duplicate-check.py" --pack' "$SKILL" || fail "skill does not call the helper"

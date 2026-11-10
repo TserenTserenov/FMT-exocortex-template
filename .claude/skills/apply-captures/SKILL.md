@@ -185,7 +185,7 @@ ID из отчёта предварительный, резервировани�
 
 ```bash
 KE_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}"
-python3 "$KE_SCRIPTS/pack-duplicate-check.py" --pack "<корень Pack>" --id "<ID>" [--fetch]
+"$(bash "$KE_SCRIPTS/lib/find-python3.sh" --stdlib-only)" "$KE_SCRIPTS/pack-duplicate-check.py" --pack "<корень Pack>" --id "<ID>" [--fetch]
 ```
 
 `ID_LOCAL` — номер занят в Pack пользователя; `ID_UPSTREAM` — занят в авторской
@@ -257,7 +257,7 @@ ls <target_dir>/ | sort | grep -A5 -B5 "<ID-slug>"
 **Шаг 2 — поиск ключевых существительных по файлам Pack пользователя**. Взять 2-3 ключевых существительных из имени кандидата. Искать в файлах целевого Pack, не в индексе платформы (issue #1514: индекс платформы может не видеть Pack пользователя):
 ```bash
 KE_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}"
-python3 "$KE_SCRIPTS/pack-duplicate-check.py" --pack "${IWE_WORKSPACE:-$HOME/IWE}/<PACK-repo>" \
+"$(bash "$KE_SCRIPTS/lib/find-python3.sh" --stdlib-only)" "$KE_SCRIPTS/pack-duplicate-check.py" --pack "${IWE_WORKSPACE:-$HOME/IWE}/<PACK-repo>" \
   --id "<ID>" "<ключевое_слово_1>" "<ключевое_слово_2>"
 ```
 Строки `KEYWORD_MATCH <n> <файл>` — файлы с n совпавшими словами, лучшие первыми. Совпадение номера (`ID_LOCAL`) — не дубль, пока содержание не сверено. Если найдено совпадение: прочитать файл. Проверить:
