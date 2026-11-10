@@ -1,0 +1,214 @@
+name: Release Candidate
+
+# WP-529 Ф251 (10.11.2026): manual-only path to a release candidate.
+#
+# The weekly scheduled release was cancelled by the owner on 03.11.2026 (its
+# workflow was disabled manually, which also disabled the only place that
+# created rc tags). A release is now cut when the Release Lead says "cut":
+#
+#   mode=cut      — take the main commit named by the Release Lead (snapshot),
+#                   bump the version, flush [Unreleased] into the new section,
+#                   push branch release/vX.Y.Z, tag vX.Y.Z-rc.1 on it and open
+#                   the release PR. The snapshot is explicit, not "tip of main
+#                   at run time": main may move between the decision and the run.
+#   mode=next-rc  — after deferred changes were reverted on the release branch
+#                   (or a fix was added there), tag the branch tip as the next
+#                   vX.Y.Z-rc.N. Testers install exactly that tag
+#                   (IWE_UPDATE_CHANNEL=rc). A tip whose tree equals the latest
+#                   rc is refused: it would be the same candidate under a new name.
+#
+# No schedule: re-enabling a schedule would bring back the cancelled weekly
+# cadence. Releasing the merged PR stays with release.yml, which refuses a
+# release whose tree differs from the latest rc.
+#
+# PR merge mechanics are unchanged from the weekly workflow: a PR opened via
+# GITHUB_TOKEN waits for "Approve workflows to run"; the owner merges only
+# after Validate Template (release-receipt) passes on the PR commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'cut — новая ветка выпуска и rc.1; next-rc — следующий rc на ветке выпуска'
+        required: true
+        type: choice
+        options: [cut, next-rc]
+        default: cut
+      snapshot_sha:
+        description: 'cut: коммит основной ветки, от которого режем выпуск (полный SHA)'
+        required: false
+        default: ''
+      release_type:
+        description: 'cut: patch — исправления, minor — новая функция'
+        required: false
+        type: choice
+        options: [patch, minor]
+        default: minor
+      version:
+        description: 'next-rc: версия выпуска, например 0.42.0 (ветка release/v<version>)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template' && github.event.inputs.mode == 'cut'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the snapshot commit
+        env:
+          SNAPSHOT: ${{ github.event.inputs.snapshot_sha }}
+        run: |
+          if [[ ! "$SNAPSHOT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::snapshot_sha должен быть полным SHA коммита основной ветки (40 символов), получено: '$SNAPSHOT'"
+            exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$SNAPSHOT" origin/main; then
+            echo "::error::Коммит $SNAPSHOT не входит в основную ветку — выпуск режется только от main."
+            exit 1
+          fi
+          git checkout --detach "$SNAPSHOT"
+
+      - name: Check that Unreleased has content
+        run: |
+          BODY=$(awk '/^## \[Unreleased\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md)
+          if [ -z "$(echo "$BODY" | sed '/^\s*$/d')" ]; then
+            echo "::error::[Unreleased] в CHANGELOG.md на снимке пуст — выпускать нечего."
+            exit 1
+          fi
+
+      - name: Bump selected version in manifest
+        id: bump
+        env:
+          RELEASE_TYPE: ${{ github.event.inputs.release_type }}
+        run: |
+          CURRENT=$(grep -m1 '"version"' update-manifest.json \
+            | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+          if [[ ! "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid manifest version: $CURRENT" >&2
+            exit 1
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case "$RELEASE_TYPE" in
+            patch) NEW="$MAJOR.$MINOR.$((10#$PATCH + 1))" ;;
+            minor) NEW="$MAJOR.$((10#$MINOR + 1)).0" ;;
+            *) echo "Unsupported release_type: $RELEASE_TYPE" >&2; exit 1 ;;
+          esac
+          if git ls-remote --exit-code --heads origin "release/v$NEW" >/dev/null; then
+            echo "::error::Ветка release/v$NEW уже есть. Следующий кандидат на ней — режим next-rc с version=$NEW."
+            exit 1
+          fi
+          python3 - "$NEW" <<'EOF'
+          import json, sys
+          with open('update-manifest.json', encoding='utf-8') as f:
+              m = json.load(f)
+          m['version'] = sys.argv[1]
+          with open('update-manifest.json', 'w', encoding='utf-8') as f:
+              json.dump(m, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+          EOF
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Version bumped ($RELEASE_TYPE): $CURRENT -> $NEW"
+
+      - name: Flush Unreleased section to new version
+        run: bash scripts/changelog-flush.sh --version "${{ steps.bump.outputs.version }}"
+
+      # The bump commit must carry the README badge and a manifest rebuilt
+      # after the flush, or Validate Template fails on it (WP-529, 20.08).
+      - name: Sync version badge and rebuild manifest for the bump commit
+        run: |
+          bash scripts/sync-version-badge.sh --fix
+          bash generate-manifest.sh
+
+      - name: Commit to the release branch
+        id: commit
+        run: |
+          BRANCH="release/v${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add update-manifest.json CHANGELOG.md README.md
+          git commit -m "chore(release): v${{ steps.bump.outputs.version }} from snapshot ${{ github.event.inputs.snapshot_sha }}"
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the first release candidate
+        id: rc
+        run: bash scripts/tag-release-candidate.sh "${{ steps.bump.outputs.version }}" origin >> "$GITHUB_OUTPUT"
+
+      - name: Open release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY="Выпуск v${{ steps.bump.outputs.version }}, снимок основной ветки ${{ github.event.inputs.snapshot_sha }} (WP-529 Ф251)."
+          BODY="$BODY"$'\n\n'"Кандидат: ${{ steps.rc.outputs.rc_tag }}"
+          BODY="$BODY"$'\n'"commit: ${{ steps.rc.outputs.rc_commit }}"
+          BODY="$BODY"$'\n'"tree: ${{ steps.rc.outputs.rc_tree }}"
+          BODY="$BODY"$'\n\n'"Отложить уже влитое — откат (git revert) на этой ветке до проверки; затем Release Candidate в режиме next-rc. Основную ветку до слияния этого PR не двигать."
+          BODY="$BODY"$'\n'"Установка кандидата тестировщиком: IWE_UPDATE_CHANNEL=rc bash update.sh"
+          BODY="$BODY"$'\n'"Слияние: одобрить запуск проверок (Approve workflows to run), дождаться Validate Template с release-receipt. Релиз остановится, если его дерево разойдётся с последним кандидатом."
+          gh pr create \
+            --title "chore(release): v${{ steps.bump.outputs.version }}" \
+            --body "$BODY" \
+            --base main \
+            --head "${{ steps.commit.outputs.branch }}"
+
+  next-rc:
+    if: github.repository == 'TserenTserenov/FMT-exocortex-template' && github.event.inputs.mode == 'next-rc'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the version input
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version должна быть вида X.Y.Z, получено: '$VERSION'"
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: release/v${{ github.event.inputs.version }}
+          fetch-depth: 0
+
+      - name: Check the branch carries this version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          MANIFEST=$(grep -m1 '"version"' update-manifest.json \
+            | sed 's/.*"version"[[:space:]]*:[[:space:]]*"//;s/".*//')
+          if [ "$MANIFEST" != "$VERSION" ]; then
+            echo "::error::На ветке release/v$VERSION в update-manifest.json версия $MANIFEST — ветка не того выпуска."
+            exit 1
+          fi
+
+      - name: Tag the next release candidate
+        id: rc
+        run: bash scripts/tag-release-candidate.sh "${{ github.event.inputs.version }}" origin >> "$GITHUB_OUTPUT"
+
+      - name: Note the candidate on the release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          PR=$(gh pr list --head "release/v$VERSION" --base main --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "::warning::Открытого PR для release/v$VERSION нет — кандидат ${{ steps.rc.outputs.rc_tag }} поставлен без комментария."
+            exit 0
+          fi
+          gh pr comment "$PR" --body "Новый кандидат: ${{ steps.rc.outputs.rc_tag }}
+          commit: ${{ steps.rc.outputs.rc_commit }}
+          tree: ${{ steps.rc.outputs.rc_tree }}
+          Проверку повторить на этом кандидате."

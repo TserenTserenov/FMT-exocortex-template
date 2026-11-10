@@ -75,16 +75,16 @@ _EXCLUDED_EXACT_PATHS = frozenset({
     # WP-617 Phase 4: daily supplier of translation terms for translate-sync.yml — same maintainer-only category.
     ".github/workflows/glossary-supplier.yml",
     ".github/workflows/validate-template.yml",
-    ".github/workflows/weekly-release.yml",
+    ".github/workflows/release-candidate.yml",
     # WP-529 (29.09.2026): release-pipeline guards of this repo (stale release
     # PR notice, CHANGELOG entry gate) - maintainer-only, same category as
-    # weekly-release.yml above.
+    # release-candidate.yml above.
     ".github/workflows/changelog-gate.yml",
     ".github/workflows/release-watchdog.yml",
     # WP-529 Phase 21: this repo's own red-team attestation pipeline (compute
     # digest + sign via GitHub Attestations API) — references THIS repo's
     # specific red-team-auditors environment and policy file, same
-    # maintainer-only category as release.yml/weekly-release.yml above, not
+    # maintainer-only category as release.yml/release-candidate.yml above, not
     # something a fork should get delivered via update.sh.
     ".github/workflows/attestation-compute.yml",
     ".github/workflows/attestation-sign.yml",

@@ -39,7 +39,7 @@ jobs:
     # workflow_run fires for EVERY completed run of Validate Template
     # (push, pull_request, schedule, workflow_dispatch) — gate on conclusion
     # and on it being either a push or an explicit workflow_dispatch (the
-    # only way weekly-release.yml's bot-commit gets validated at all, since
+    # only way the release-candidate.yml bot commit gets validated at all, since
     # GitHub's anti-recursion policy blocks its own push from auto-triggering
     # Validate Template — see that workflow's `on:` comment). schedule/PR runs
     # never carry a version bump worth releasing; excluding them isn't a
@@ -55,7 +55,7 @@ jobs:
         with:
           # workflow_run: pin to the exact commit Validate Template just
           # verified — this is what makes the gate actually mean something.
-          # workflow_dispatch with explicit sha (weekly-release.yml closes the
+          # workflow_dispatch with explicit sha (the release-PR flow closes the
           # chain this way): pin to that validated commit — a bare ref tip
           # could have moved past what Validate saw.
           # workflow_dispatch without sha (manual override): github.sha is the

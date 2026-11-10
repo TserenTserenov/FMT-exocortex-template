@@ -3669,8 +3669,8 @@ resolve_delivery_ref() {
     local resolved_ref release_tag release_json commit_json api_status
     local rc_tag refs_json latest_tag
     if [ "$UPDATE_CHANNEL" = "rc" ]; then
-        # WP-529 Phase 239: release-candidate channel. weekly-release.yml puts an
-        # immutable tag vX.Y.Z-rc.N on the bump commit of the release branch. A tag without a
+        # WP-529 Phase 239: release-candidate channel. release-candidate.yml (Phase 251)
+        # puts an immutable tag vX.Y.Z-rc.N on the release branch (bump commit or its later tip). A tag without a
         # GitHub Release is invisible to /releases — resolve via the git refs API,
         # pick the maximum by (X,Y,Z,N). Fail-closed like #501: no candidate,
         # API failure or an unpinned SHA — refuse, never silently fall back to
@@ -3715,7 +3715,7 @@ print(best[1])') || rc_tag=""
         if [ -z "$rc_tag" ]; then
             echo "ОШИБКА: кандидатов в выпуск (теги v*-rc.N) нет, либо список тегов не поместился в один ответ API." >&2
             echo "  Канал rc работает только от опубликованного кандидата (fail-closed)." >&2
-            echo "  Дождитесь кандидата от Weekly Release или выберите другой канал (release/main)." >&2
+            echo "  Дождитесь кандидата (Release Candidate) или выберите другой канал (release/main)." >&2
             exit "$EXIT_NETWORK"
         fi
         commit_json=""

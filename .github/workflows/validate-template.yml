@@ -17,7 +17,7 @@ on:
   # not within minutes of a push nobody's about to release from unreviewed.
   schedule:
     - cron: '0 2 * * *'  # 05:00 MSK
-  # WP-529: weekly-release.yml opens a PR via GITHUB_TOKEN; its
+  # WP-529: release-candidate.yml opens a PR via GITHUB_TOKEN; its
   # pull_request runs wait for approval from an owner with write access.
   # workflow_dispatch is kept for manual diagnostics, but its jobs do not
   # satisfy the required release-receipt PR even on the same head.
