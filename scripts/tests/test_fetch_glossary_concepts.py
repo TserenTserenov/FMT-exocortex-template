@@ -45,6 +45,7 @@ def control_rows():
         concept(2, "U.Entity", "Entity", True),
         concept(3, "ECO.FM.001", "ECO.FM.001", True),
         concept(4, "MIM.M.024", None, False),
+        concept(5, "ECO.PRIN.001", "Intelligence Development Ecosystem Principles", True),
     ]
 
 
@@ -87,11 +88,11 @@ class FakeGateway:
 
 def test_payload_walks_all_pages_and_renames_name_to_name_ru(monkeypatch):
     monkeypatch.setattr(MOD, "PAGE_LIMIT", 2)
-    rows = control_rows() + [concept(5, "DP.M.1", "Method", True)]
+    rows = control_rows() + [concept(6, "DP.M.1", "Method", True)]
     gateway = FakeGateway(rows, [stats_for(rows)])
     result = MOD.fetch_payload(gateway)
     assert gateway.list_calls == 3
-    assert [r["code"] for r in result["rows"]] == ["ZP.1", "U.Entity", "ECO.FM.001", "MIM.M.024", "DP.M.1"]
+    assert [r["code"] for r in result["rows"]] == ["ZP.1", "U.Entity", "ECO.FM.001", "MIM.M.024", "ECO.PRIN.001", "DP.M.1"]
     assert result["rows"][0]["name_ru"] == "Понятие 1"
     assert all("name" not in r for r in result["rows"])
     assert result["as_of"] == "2026-11-01T20:00:00.000Z"
@@ -101,7 +102,7 @@ def test_payload_carries_graph_counters_for_the_passport():
     rows = control_rows()
     result = MOD.fetch_payload(FakeGateway(rows, [stats_for(rows)]))
     # Only what the public filter lets through: totals would reveal the size of the closed sources.
-    assert result["graph_stats"] == {"visible_concepts": len(rows), "visible_publishable": 3}
+    assert result["graph_stats"] == {"visible_concepts": len(rows), "visible_publishable": 4}
     assert "hidden_by_closed_sources_count" not in json.dumps(result)
 
 
@@ -161,8 +162,8 @@ def test_changed_control_row_stops_without_payload():
 
 
 def test_control_visible_in_graph_but_absent_in_etalon_stops():
-    rows = control_rows() + [concept(9, "ECO.PRIN.001", "Principle", True)]
-    with pytest.raises(MOD.FetchError, match="ECO.PRIN.001"):
+    rows = control_rows() + [concept(9, "AR.D.005", "Principle", True)]
+    with pytest.raises(MOD.FetchError, match="AR.D.005"):
         MOD.fetch_payload(FakeGateway(rows, [stats_for(rows)]))
 
 
