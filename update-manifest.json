@@ -641,7 +641,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "3fd3a2768e9f9e7ef2335f2b58e1251b41e4b0e40289dd93fc1531d5cc0bdc78"
+      "sha256": "e3c2bfb29b1f69f454760002f9db34740e0929d9c5c0c9b8d5ba4bf50f918e45"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -941,7 +941,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c13da308b3d00d7f6dd7885da5b02bb49af6b742cc6d880e2fadabef90081a75"
+      "sha256": "f0fb40f2d0b7067133a310cb901aa62a901fec2c3f7964ea1afcd1a616b34bea"
     },
     {
       "path": "CLAUDE.md",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "83e3f2a43254a5523f828774673c68093bacadabbd03a6873b3b59e754f67ac7"
+      "sha256": "62ebae284425b15c4531926e539e32d1509371ba4b0cf95f92284591ea32bced"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
