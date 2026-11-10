@@ -161,7 +161,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "383b5d69a4bdd99f5315709e0a6d25b7a53cbb4111c663500c057b8c2d50047d"
+      "sha256": "b86045faac1b0dac432102e3271eb753ce03adaaf1fd143cd379531e952a44f8"
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
@@ -505,7 +505,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "903b45ca94b88fb3bca00e022844b9e76c1f4eab514587d5151fdd58163794e4"
+      "sha256": "bda852f86c80b8ec5318d075d79a273abba0c28bed3d9d303f964b3bd88cf012"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "d92986a5c3a290c56deff3a4f70b8cc219c22255ffcf6b6b5d71722b0201817e"
+      "sha256": "f61b95a60e12aabfb0128307c1b132e2927d55e2c0ca865b73f666e755aa96b6"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -941,7 +941,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9d359f9be9f900a25e8ed9c6d3a75bd36932d28090e163ad80441d922d50186d"
+      "sha256": "2a0e1246ce168aa15ddf2187320a7ab1bdc72c9e8aa4001f1aafa39e4dd7ca6a"
     },
     {
       "path": "CLAUDE.md",
@@ -2881,7 +2881,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "5dd94408b73e0b2466ec1d2f8cac756a0288813714404814e8c4ac2eb2dcbef4"
+      "sha256": "ae4ef07395a2450f2970b133995dd12ba6869b40a02ef7b9ccf08b2c043869e7"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3473,7 +3473,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8d4349af7bf78ed912e12d4873833bd70db8cb517e2801d92f3725ce937e0eba"
+      "sha256": "b86a0924dc83dd266415ede98d44539b038ae8a1c4b7c640967c9fc63ca15736"
     }
   ],
   "excluded_paths": [
