@@ -23,6 +23,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.42.0] — 2026-11-10
+
 ### Changed
 
 - [optional] (#1523) Описание процесса выпуска называет вердикт независимой атаки словами навыка `iwe-platform-redteam`: GO / CAUTION / BLOCKED, а `cannot_verify` — не пройдено (было STABLE, которого навык не выдаёт).
