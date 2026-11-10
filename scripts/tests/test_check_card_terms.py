@@ -91,3 +91,38 @@ def test_cli_exit_codes(tmp_path, capsys):
     assert cct.main([str(good), "--terms", str(tmp_path / "missing.md")]) == 2
     no_table = _write(tmp_path, "plain.md", "# no table\n")
     assert cct.main([str(good), "--terms", str(no_table)]) == 2
+
+
+def test_escaped_pipe_stays_in_its_cell():
+    table = (
+        "| Термин (RU) | Term (EN) | Не использовать / альтернативы | Где | Утвердил |\n"
+        "|---|---|---|---|---|\n"
+        "| Пак | Pack \\| P | Packet, Bundle — не основные | X | пилот |\n"
+    )
+    (row,) = cct.parse_tables(table)
+
+    assert (row.term_en, row.forbidden, row.approved_by) == (
+        "Pack | P",
+        ("Packet", "Bundle"),
+        "пилот",
+    )
+
+
+def test_row_with_empty_english_name_does_not_fail_every_card():
+    table = "| Термин (RU) | Term (EN) | Не использовать / альтернативы | Где | Утвердил |\n|---|---|---|---|---|\n| Пусто | — | — | X | — |\n"
+
+    assert cct.check_card("Pack is a Package.\n", cct.parse_tables(table)) == []
+
+
+def test_table_without_approver_column_is_not_all_unapproved():
+    table = "| Термин (RU) | Term (EN) | Не использовать / альтернативы |\n|---|---|---|\n| Беспокойство | Worry | Concern — не основное |\n"
+
+    assert cct.check_card("A worry.\n", cct.parse_tables(table)) == []
+
+
+def test_plural_of_a_forbidden_word_is_found():
+    rows = cct.parse_tables(TABLE)
+
+    findings = cct.check_card("Two concerns here.\n", rows)
+
+    assert [f.found for f in findings] == ["concerns"]

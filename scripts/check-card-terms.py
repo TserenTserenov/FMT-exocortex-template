@@ -46,7 +46,7 @@ class TermRow:
     term_en: str
     forbidden: tuple[str, ...]
     not_checkable: tuple[str, ...]
-    approved_by: str
+    approved_by: str | None
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,9 @@ class Finding:
 
 
 def _cells(line: str) -> list[str]:
-    return [c.strip() for c in line.strip().strip("|").split("|")]
+    """Table cells; an escaped pipe (\\|) stays inside its cell."""
+    inner = line.strip().removeprefix("|").removesuffix("|")
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", inner)]
 
 
 def _is_latin_phrase(text: str) -> bool:
@@ -109,7 +111,7 @@ def parse_tables(text: str) -> list[TermRow]:
                 approved_by = (
                     cells[approver_col]
                     if approver_col is not None and approver_col < len(cells)
-                    else ""
+                    else None
                 )
                 rows.append(
                     TermRow(
@@ -135,8 +137,9 @@ def card_body(text: str) -> tuple[str, int]:
 
 
 def _phrase_re(phrase: str) -> re.Pattern[str]:
+    """Whole-word, case-insensitive; a plural ending (-s, -es) also matches."""
     return re.compile(
-        r"(?<![A-Za-z])" + re.escape(phrase) + r"(?![A-Za-z])", re.IGNORECASE
+        r"(?<![A-Za-z])" + re.escape(phrase) + r"(?:e?s)?(?![A-Za-z])", re.IGNORECASE
     )
 
 
@@ -156,8 +159,12 @@ def check_card(card_text: str, rows: list[TermRow]) -> list[Finding]:
                             "forbidden",
                         )
                     )
-            if row.approved_by in ("", "—", "-") and _phrase_re(row.term_en).search(
-                line
+            # No approver column at all (None) means unknown, not unapproved; an empty
+            # English name cannot be searched for.
+            if (
+                row.approved_by in ("", "—", "-")
+                and _is_latin_phrase(row.term_en)
+                and _phrase_re(row.term_en).search(line)
             ):
                 findings.append(
                     Finding(

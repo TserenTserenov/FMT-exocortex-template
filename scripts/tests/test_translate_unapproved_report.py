@@ -192,3 +192,40 @@ def test_report_goes_to_the_github_job_summary(monkeypatch, tmp_path):
 
     text = summary.read_text(encoding="utf-8")
     assert "| Сила | Strength | model | a.md |" in text
+
+
+def test_unclosed_or_self_closed_block_never_reaches_the_document():
+    cut = "<body>\nHello.\n<unlisted_terms>\nПак → Pack\n</body>"
+    no_markers = "Hello.\n<unlisted_terms>\nПак → Pack"
+    empty = "Hello.\n<unlisted_terms/>"
+
+    assert translate._parse_translation_response(cut, {}, [])[1] == "Hello.\n"
+    assert (
+        translate._parse_translation_response(no_markers, {}, [])[1].strip() == "Hello."
+    )
+    assert translate._parse_translation_response(empty, {}, [])[1].strip() == "Hello."
+    assert translate.parse_unlisted_terms(no_markers) == [("Пак", "Pack")]
+
+
+def test_quoted_pairs_are_unwrapped_before_the_glossary_check():
+    response = "<unlisted_terms>\n`Пак → Pack`\n«Сила» → “Strength”\n</unlisted_terms>"
+
+    assert translate.parse_unlisted_terms(response) == [
+        ("Пак", "Pack"),
+        ("Сила", "Strength"),
+    ]
+
+
+def test_local_candidate_only_in_untranslated_frontmatter_is_not_reported(tmp_path):
+    src = tmp_path / "a.md"
+    src.write_text(
+        "---\naliases: Ближайшее действие\ntitle: Заголовок\n---\nТекст.\n",
+        encoding="utf-8",
+    )
+
+    text = translate._translatable_text(src, ["title"])
+
+    assert (
+        translate.local_terms_used(text, {"Ближайшее действие": "Nearest action"}) == []
+    )
+    assert "Заголовок" in text

@@ -64,8 +64,14 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 CYRILLIC_ALL_CAPS_RE = re.compile(r"[А-ЯЁ]{2,}")
 CYRILLIC_MIXED_RE = re.compile(r"[а-яёА-ЯЁ]{4,}")
 # WP-620 Ф4: the model lists system terms it translated without a glossary entry
-UNLISTED_BLOCK_RE = re.compile(r"<unlisted_terms>(.*?)</unlisted_terms>", re.DOTALL)
+# An unclosed block (forgotten tag, cut answer) ends at </body> or at the end of the
+# answer, so it can never leak into the document; <unlisted_terms/> is an empty block.
+UNLISTED_BLOCK_RE = re.compile(
+    r"<unlisted_terms\s*/>|<unlisted_terms>(.*?)(?:</unlisted_terms>|(?=</body>)|\Z)", re.DOTALL
+)
 UNLISTED_LINE_RE = re.compile(r"^\s*[-*]?\s*(.+?)\s*(?:→|->)\s*(.+?)\s*$")
+# Quotes a model may wrap around a term: backticks, guillemets, straight and curly quotes
+TERM_QUOTES = "`«»\"'“”"
 CYRILLIC_RE = re.compile(r"[а-яёА-ЯЁ]")
 # Report sources (WP-620 Ф4): where an unapproved English name came from
 REPORT_SOURCE_LOCAL = "local-glossary"
@@ -286,7 +292,7 @@ def parse_unlisted_terms(response: str) -> list[tuple[str, str]]:
             m = UNLISTED_LINE_RE.match(line)
             if not m:
                 continue
-            ru, en = m.group(1).strip(), m.group(2).strip()
+            ru, en = m.group(1).strip(TERM_QUOTES + " "), m.group(2).strip(TERM_QUOTES + " ")
             if CYRILLIC_RE.search(ru) and en and not CYRILLIC_RE.search(en):
                 pairs.append((ru, en))
     return pairs
@@ -486,6 +492,13 @@ def run_discover(args: argparse.Namespace, manifest: dict, glossary: dict) -> in
 # ---------------------------------------------------------------------------
 
 
+def _translatable_text(file_path: Path, translate_keys: list[str]) -> str:
+    """Body plus the translated frontmatter values: other keys (aliases, ids) are not translated."""
+    meta, body = parse_frontmatter(file_path.read_text(encoding="utf-8"))
+    values = [meta[k] for k in translate_keys if isinstance(meta.get(k), str)]
+    return "\n".join([*values, body])
+
+
 def local_terms_used(text: str, unapproved: dict[str, str]) -> list[tuple[str, str]]:
     """Local-glossary candidates whose Russian form occurs in the source text.
 
@@ -600,7 +613,7 @@ def run_translate(
 
         out_path.write_text(translated, encoding="utf-8")
         run_items += unapproved_report_items(
-            str(rel), file_path.read_text(encoding="utf-8"), glossary, unapproved or {}, unlisted
+            str(rel), _translatable_text(file_path, translate_keys), glossary, unapproved or {}, unlisted
         )
 
         if violations:
