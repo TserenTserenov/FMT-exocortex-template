@@ -941,7 +941,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8f9df17d4d94473f73b743fd5771b69c5304b4885ba3c7ac8119493f952955a8"
+      "sha256": "2681a3e57fea28ffb57fd13d2cde0de88111aeb7457bc1b46aedc710173ab21a"
     },
     {
       "path": "CLAUDE.md",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "62ebae284425b15c4531926e539e32d1509371ba4b0cf95f92284591ea32bced"
+      "sha256": "16abd759b9a98289779ad137903ae16eaeb8c6a7ba763919d16304813b5be86a"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -2277,7 +2277,7 @@
     },
     {
       "path": "scripts/changelog-append.sh",
-      "sha256": "504ee3c3e694b33cdd23e0c2d0f4eb6e80b66db6c7f337e354433c6a9090e875"
+      "sha256": "24152500610d60e0b4ef6129b7c088d8c32d460a658b87695ad9d4eddc4648a6"
     },
     {
       "path": "scripts/changelog-diff-lines.sh",
@@ -2346,6 +2346,10 @@
     {
       "path": "scripts/check-python-resolver-contract.sh",
       "sha256": "8dbcdd7be778bc5d5a5dcda30292a5442a0b962561d34d8bfc42a9266098aebe"
+    },
+    {
+      "path": "scripts/check-release-branch-base.sh",
+      "sha256": "1b5bd16ed3c7e39dd161023d5e062b9e9a088eac137587717ea06e58d644a132"
     },
     {
       "path": "scripts/check-script-collisions.sh",
@@ -3005,7 +3009,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "8a38eef33955b1b9df593a2989e3800dba3b4abd50ede397102b6edb81bae320"
+      "sha256": "9d71fbe0223c3cd753d0cc55bf215ca18f141ea33f4201bc71f7883cbf46a18e"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3485,7 +3489,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "b86a0924dc83dd266415ede98d44539b038ae8a1c4b7c640967c9fc63ca15736"
+      "sha256": "f1f42f01aaf7ef67e1913aa7447bb519a39bd5147aa657907a1db6ed304728a1"
     }
   ],
   "excluded_paths": [
@@ -3548,6 +3552,9 @@
     "scripts/tests/test-setup-git-identity-precheck.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test-update-fpf-refresh.sh",
+    "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
+    "scripts/tests/test-wp529-f261-release-branch-base.sh",
+    "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
     "scripts/tests/test_1231_artifactor.sh",

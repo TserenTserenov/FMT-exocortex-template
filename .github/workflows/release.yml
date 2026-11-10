@@ -63,6 +63,17 @@ jobs:
           ref: ${{ github.event.inputs.sha || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.sha }}
           fetch-depth: 0  # full history to check existing tags
 
+      # WP-529 Ф261 (finding 7 of the 10.11 pipeline review): a manual run with an explicit
+      # sha used to tag any commit, including one outside main (a branch tip, a fork commit).
+      # A release is only ever a commit of main.
+      - name: Check the release commit belongs to main
+        run: |
+          git fetch -q origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Коммит $(git rev-parse HEAD) не входит в основную ветку — выпускается только коммит main."
+            exit 1
+          fi
+
       - name: Determine version
         id: version
         run: |

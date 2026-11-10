@@ -43,6 +43,9 @@ ADDITIONAL_ISSUE_TESTS=(
     "scripts/tests/test_template_hygiene_checks.sh"
     "scripts/tests/test-issue-1411-secret-scan-fp.sh"
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh"
+    "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh"
+    "scripts/tests/test-wp529-f261-release-branch-base.sh"
+    "scripts/tests/test-wp529-f261-changelog-append-fields.sh"
     ".claude/hooks/tests/test-issue-1411-stop-gate-blocked-skill.sh"
 )
 

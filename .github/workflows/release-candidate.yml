@@ -84,6 +84,15 @@ jobs:
             echo "::error::Коммит $SNAPSHOT не входит в основную ветку — выпуск режется только от main."
             exit 1
           fi
+          # WP-529 Ф261 (finding 2): the snapshot must be the tip of main right now. A
+          # snapshot behind the tip means main already moved: merging the release PR would
+          # add those commits, the tree would differ from the candidate and release.yml
+          # would stop the release at the end. Name the current tip and cut again.
+          MAIN_TIP=$(git rev-parse origin/main)
+          if [ "$SNAPSHOT" != "$MAIN_TIP" ]; then
+            echo "::error::Снимок $SNAPSHOT — не вершина основной ветки (сейчас $MAIN_TIP): основная ветка сдвинулась. Назовите актуальную вершину и повторите нарезку."
+            exit 1
+          fi
           git checkout --detach "$SNAPSHOT"
 
       - name: Check that Unreleased has content
@@ -155,7 +164,7 @@ jobs:
         run: |
           BODY="Выпуск v${{ steps.bump.outputs.version }}, снимок основной ветки ${{ github.event.inputs.snapshot_sha }} (WP-529 Ф251)."
           BODY="$BODY"$'\n\n'"Метки кандидата ещё нет. На этой ветке: дописать четыре поля всем записям раздела [${{ steps.bump.outputs.version }}] (python3 scripts/check-changelog-fields.py --section ${{ steps.bump.outputs.version }}), отложенное снять откатом (git revert). Затем Release Candidate в режиме next-rc ставит rc.1."
-          BODY="$BODY"$'\n'"Основную ветку до слияния этого PR не двигать."
+          BODY="$BODY"$'\n'"Основную ветку до слияния этого PR не двигать. Если она всё же сдвинулась, Release Candidate (next-rc) откажет; порядок: влить main в эту ветку, затем next-rc, заново пройти строки протокола. Перед слиянием: bash scripts/check-release-branch-base.sh ${{ steps.bump.outputs.version }}."
           BODY="$BODY"$'\n'"Установка кандидата тестировщиком: IWE_UPDATE_CHANNEL=rc bash update.sh"
           BODY="$BODY"$'\n'"Слияние: одобрить запуск проверок (Approve workflows to run), дождаться Validate Template с release-receipt. Релиз остановится, если его дерево разойдётся с последним кандидатом."
           gh pr create \
@@ -192,6 +201,11 @@ jobs:
             echo "::error::На ветке release/v$VERSION в update-manifest.json версия $MANIFEST — ветка не того выпуска."
             exit 1
           fi
+
+      # WP-529 Ф261 (finding 2): a candidate is only meaningful while main is part of the
+      # branch, otherwise merging the PR changes the tree and the release stops.
+      - name: Check that main is part of the release branch
+        run: bash scripts/check-release-branch-base.sh "${{ github.event.inputs.version }}" origin --head
 
       - name: Check handoff fields of the version section (WP-529 Ф252)
         run: python3 scripts/check-changelog-fields.py --ref HEAD --section "${{ github.event.inputs.version }}"

@@ -1239,6 +1239,20 @@ rollback_without_release_commit() {
 detect_release_rollback() {
     [ "$UPDATE_CHANNEL" = "release" ] || return 1
     [ -n "$RELEASE_SHA" ] || return 1
+    # WP-529 Ф261 (finding 3 of the 10.11 pipeline review): an installed manifest newer than
+    # the release is a rollback whatever git ancestry says. update.sh never moves HEAD of the
+    # template folder, so a clone checked out at v0.41.11 can carry 0.42 files and a 0.42
+    # manifest; ancestry then reads "release == HEAD" and reports no rollback, and the files
+    # are rewritten without ROLLBACK. Versions are compared first, ancestry stays the second
+    # signal (equal versions, local commits ahead of the release: #863).
+    local installed_version version_order
+    if [ -f "$SCRIPT_DIR/update-manifest.json" ]; then
+        installed_version=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
+        if version_order=$(version_compare "${UPSTREAM_VERSION:-}" "$installed_version") \
+           && [ "$version_order" = "-1" ]; then
+            return 0
+        fi
+    fi
     git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
     local local_sha release_sha merge_base commit_json
     local_sha=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null) || return 1
