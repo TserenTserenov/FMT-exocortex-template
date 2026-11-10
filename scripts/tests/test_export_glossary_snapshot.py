@@ -182,6 +182,20 @@ def test_english_name_that_looks_like_a_code_is_dropped():
     assert excluded["looks-like-code"] == 1
 
 
+def test_sentence_long_english_name_is_dropped_not_aborted():
+    allowlist = MOD.load_allowlist(ALLOWLIST)
+    included, excluded, _ = MOD.build_rows(
+        payload(
+            row(),
+            row(code="DP.D.355", name_ru="Длинное различение", name_en="Long claim " + "x" * 200),
+            canary_row(),
+        ),
+        allowlist,
+    )
+    assert [item["code"] for item in included] == ["DP.METHOD.049"]
+    assert excluded["too-long"] == 1
+
+
 def test_cyrillic_english_name_aborts():
     allowlist = MOD.load_allowlist(ALLOWLIST)
     with pytest.raises(MOD.SnapshotError, match="cyrillic"):
