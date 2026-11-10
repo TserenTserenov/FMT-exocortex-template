@@ -945,7 +945,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f9c9bac35432b9a6180115a0f32d493301f06cb62a9ef3a5d3e216353e736a55"
+      "sha256": "de23bbb26493943bfb4495624b2cfc70d1e77745a3e23ac808727844f4800c0f"
     },
     {
       "path": "CLAUDE.md",
@@ -1037,7 +1037,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "16abd759b9a98289779ad137903ae16eaeb8c6a7ba763919d16304813b5be86a"
+      "sha256": "b3264e61e2faf005648bf19194638328dcaaad319f825d736bf0e1b174c92dbf"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
