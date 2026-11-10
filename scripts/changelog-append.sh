@@ -135,6 +135,21 @@ new_block="## [Unreleased] — обновлено $today"$'\n'$'\n'
 [[ -n "$changed" ]] && new_block+="### Changed"$'\n'$'\n'"${changed}"$'\n'
 [[ -n "$fixed"   ]] && new_block+="### Fixed"$'\n'$'\n'"${fixed}"$'\n'
 
+# WP-529 Ф261 (finding 4 of the 10.11 pipeline review): the block below is rebuilt from commit
+# subjects and replaces the whole [Unreleased] section. Entries written by hand carry the four
+# handoff fields ("  - Цель: / Как проверить: / Как откатить:") that commits cannot restore, and
+# the Changelog Gate (--only-added) does not see a loss. Such a section is left untouched.
+handoff_lines=$(awk '
+    /^## \[Unreleased\]/ { in_block=1; next }
+    in_block && /^## \[/ { exit }
+    in_block && /^[[:space:]]+-[[:space:]]+(Цель|Как проверить|Как откатить):/ { n++ }
+    END { print n + 0 }
+' "$CHANGELOG")
+if (( handoff_lines > 0 )); then
+    echo "⚠️  [Unreleased] содержит записи с полями передачи ($handoff_lines строк «Цель/Как проверить/Как откатить») — раздел не пересобираю: коммиты их не восстановят. Новую запись допишите вручную вместе с тремя полями." >&2
+    exit 0
+fi
+
 if $dry_run; then
     echo "--- dry-run: блок [Unreleased] ---"
     printf '%s\n' "$new_block"
