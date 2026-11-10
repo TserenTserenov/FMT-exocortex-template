@@ -117,12 +117,20 @@ class NoticeError(Exception):
     """Generation or editing failed; the caller falls back to the short notice."""
 
 
+# Handoff fields under an entry (WP-529 Phase 252, scripts/check-changelog-fields.py):
+# goal/result codes, check and rollback commands are for testers, not for the
+# user-facing notice, so they never reach the generator or the editor.
+HANDOFF_FIELD = re.compile(r"^\s+[-*]\s+(Цель:|Как проверить:|Как откатить:)")
+
+
 def parse_entries(text: str) -> list[str]:
     """Top-level CHANGELOG bullets ("- " / "* "), continuation lines joined."""
     entries: list[str] = []
     for line in text.splitlines():
         if re.match(r"^[-*]\s+", line):
             entries.append(re.sub(r"^[-*]\s+", "", line).strip())
+        elif HANDOFF_FIELD.match(line):
+            continue
         elif entries and line.startswith((" ", "\t")) and line.strip():
             entries[-1] += " " + line.strip()
     return [entry for entry in entries if entry]

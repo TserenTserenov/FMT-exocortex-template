@@ -76,6 +76,17 @@ def test_parse_entries_joins_continuations_and_accepts_both_bullets():
     assert ENTRIES[4].startswith("[optional]")
 
 
+def test_parse_entries_drops_handoff_fields_keeps_other_subitems():
+    text = (
+        "- [behavior] Запись с полями передачи.\n"
+        "  - Цель: 77 · Результат: Ц77-03\n"
+        "  - Как проверить: bash scripts/tests/test_x.sh\n"
+        "  - Как откатить: git revert слияния #1\n"
+        "  - Содержательный подпункт остаётся.\n"
+    )
+    assert rnb.parse_entries(text) == ["[behavior] Запись с полями передачи. - Содержательный подпункт остаётся."]
+
+
 def test_happy_path_builds_escaped_html_from_items():
     items = [dict(GOOD_ITEMS[0], text="Если данные <не> обновились & т.п., будет предупреждение.")] + GOOD_ITEMS[1:]
     client = FakeClient(response({"items": items}), response(editor_ok()))

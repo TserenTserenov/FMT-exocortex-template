@@ -8,14 +8,19 @@ name: Release Candidate
 #
 #   mode=cut      — take the main commit named by the Release Lead (snapshot),
 #                   bump the version, flush [Unreleased] into the new section,
-#                   push branch release/vX.Y.Z, tag vX.Y.Z-rc.1 on it and open
-#                   the release PR. The snapshot is explicit, not "tip of main
-#                   at run time": main may move between the decision and the run.
-#   mode=next-rc  — after deferred changes were reverted on the release branch
-#                   (or a fix was added there), tag the branch tip as the next
-#                   vX.Y.Z-rc.N. Testers install exactly that tag
-#                   (IWE_UPDATE_CHANNEL=rc). A tip whose tree equals the latest
-#                   rc is refused: it would be the same candidate under a new name.
+#                   push branch release/vX.Y.Z and open the release PR. No tag
+#                   yet: the Developer first adds the handoff fields to the
+#                   accumulated entries on this branch (WP-529 Ф252), so the
+#                   snapshot does not move. The snapshot is explicit, not "tip
+#                   of main at run time": main may move between the decision
+#                   and the run.
+#   mode=next-rc  — tag the branch tip as the next vX.Y.Z-rc.N (rc.1 included),
+#                   after deferred changes were reverted or fields/fixes added.
+#                   Every entry of the version section must carry its four
+#                   fields (scripts/check-changelog-fields.py), otherwise no tag.
+#                   Testers install exactly that tag (IWE_UPDATE_CHANNEL=rc). A
+#                   tip whose tree equals the latest rc is refused: it would be
+#                   the same candidate under a new name.
 #
 # No schedule: re-enabling a schedule would bring back the cancelled weekly
 # cadence. Releasing the merged PR stays with release.yml, which refuses a
@@ -29,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'cut — новая ветка выпуска и rc.1; next-rc — следующий rc на ветке выпуска'
+        description: 'cut — новая ветка выпуска и PR (без метки); next-rc — метка кандидата rc.N на ветке выпуска'
         required: true
         type: choice
         options: [cut, next-rc]
@@ -144,19 +149,13 @@ jobs:
           git push origin "$BRANCH"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
-      - name: Tag the first release candidate
-        id: rc
-        run: bash scripts/tag-release-candidate.sh "${{ steps.bump.outputs.version }}" origin >> "$GITHUB_OUTPUT"
-
       - name: Open release PR
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           BODY="Выпуск v${{ steps.bump.outputs.version }}, снимок основной ветки ${{ github.event.inputs.snapshot_sha }} (WP-529 Ф251)."
-          BODY="$BODY"$'\n\n'"Кандидат: ${{ steps.rc.outputs.rc_tag }}"
-          BODY="$BODY"$'\n'"commit: ${{ steps.rc.outputs.rc_commit }}"
-          BODY="$BODY"$'\n'"tree: ${{ steps.rc.outputs.rc_tree }}"
-          BODY="$BODY"$'\n\n'"Отложить уже влитое — откат (git revert) на этой ветке до проверки; затем Release Candidate в режиме next-rc. Основную ветку до слияния этого PR не двигать."
+          BODY="$BODY"$'\n\n'"Метки кандидата ещё нет. На этой ветке: дописать четыре поля всем записям раздела [${{ steps.bump.outputs.version }}] (python3 scripts/check-changelog-fields.py --section ${{ steps.bump.outputs.version }}), отложенное снять откатом (git revert). Затем Release Candidate в режиме next-rc ставит rc.1."
+          BODY="$BODY"$'\n'"Основную ветку до слияния этого PR не двигать."
           BODY="$BODY"$'\n'"Установка кандидата тестировщиком: IWE_UPDATE_CHANNEL=rc bash update.sh"
           BODY="$BODY"$'\n'"Слияние: одобрить запуск проверок (Approve workflows to run), дождаться Validate Template с release-receipt. Релиз остановится, если его дерево разойдётся с последним кандидатом."
           gh pr create \
@@ -193,6 +192,9 @@ jobs:
             echo "::error::На ветке release/v$VERSION в update-manifest.json версия $MANIFEST — ветка не того выпуска."
             exit 1
           fi
+
+      - name: Check handoff fields of the version section (WP-529 Ф252)
+        run: python3 scripts/check-changelog-fields.py --ref HEAD --section "${{ github.event.inputs.version }}"
 
       - name: Tag the next release candidate
         id: rc
