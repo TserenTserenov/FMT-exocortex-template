@@ -25,6 +25,8 @@ Refs: WP-NNN
 
 ### Changed
 
+- [optional] `scripts/export-glossary-snapshot.py`: понятие с английским именем длиннее 200 знаков больше не останавливает снимок словаря, а исключается из него и считается в отчёте (`too-long`), как имя, совпадающее с кодом. В графе 18 таких понятий: различения и типовые ошибки пака названы целым утверждением, это не термины. Раньше первое же такое имя роняло поставщика терминов перевода (прогон 10.11). Тест `scripts/tests/test_export_glossary_snapshot.py` (WP-620 Ф3, #PRNUM).
+
 - [optional] `scripts/fetch-glossary-concepts.py`: эталон проверки полноты поставщика терминов перевода обновлён после пополнения графа понятий 09-10.11 — у ECO.PRIN.001 теперь есть публикуемое английское имя «Intelligence Development Ecosystem Principles», а AR.D.005 из графа ушло (ожидается отсутствие). Без этой правки ночной прогон поставщика падал на сверке эталона и запрос на слияние со снимком словаря не появлялся. Тест `scripts/tests/test_fetch_glossary_concepts.py` (WP-620 Ф3, #1505).
 
 - [optional] `translation/glossary-local.csv`: 15 терминов двух первых методов Библиотеки методов (конфликтное облако и разбор беспокойства — английские карточки в aisystant/method-library PR #3), утверждены пилотом 09.11: Evaporating Cloud, Common objective, Requirement, Prerequisite, Assumption, Injection, False assumption, Concern, Problem, Dissatisfaction, Emotion, Feeling, Strength, Prediction error, Nearest action. «Потребность → Need» и «Роль → Role» уже были в словаре. Временно здесь — до записи английских имён в граф понятий (WP-617 Ф5) (WP-581 Ф28, #1502).

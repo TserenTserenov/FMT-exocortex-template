@@ -127,7 +127,10 @@ def classify_row(row: dict, allowlist: dict) -> tuple[str, str]:
     if row["name_en_status_raw"] != PUBLISHABLE_STATUS:
         return "reject", "publishable-contradiction"
     name_error = english_name_error(row["name_en"], code)
-    if name_error in ("equals-code", "looks-like-code"):
+    # A sentence-long English name (pack distinctions and failure modes are often titled
+    # with a whole claim) is legitimate pack content but not a glossary term: drop the
+    # row and count it instead of aborting the whole snapshot.
+    if name_error in ("equals-code", "looks-like-code", "too-long"):
         return "exclude", name_error
     if name_error:
         return "reject", "english:" + name_error
