@@ -1610,7 +1610,7 @@ for r in reg.get('rules', []):
         # AR.111 Secret In Chat
         run_test 29 "PostgreSQL URL с паролем в чате → block" "block" \
             RULE_EVENT="secret_in_chat_detected" \
-            RULE_CONTEXT='{"user_message":"postgresql://user:supersecretpass123@ep-xyz.neon.tech/db","tool_input":""}'
+            RULE_CONTEXT='{"user_message":"postgresql:''//user:supersecretpass123@ep-xyz.neon.tech/db","tool_input":""}'
         run_test 30 "обычное сообщение → ok (no secret)" "ok" \
             RULE_EVENT="secret_in_chat_detected" \
             RULE_CONTEXT='{"user_message":"запусти psql и покажи таблицы","tool_input":""}'

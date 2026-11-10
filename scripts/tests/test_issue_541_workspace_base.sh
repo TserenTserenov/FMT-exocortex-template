@@ -903,6 +903,16 @@ check "28 the message tells the edit stays in the clone's history" log_has "ос
 check "28 the template copy is upstream's v2" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
 check "28 the pilot's commit is untouched: HEAD still holds the edit" test -n "$(git -C "$SD" show HEAD:CLAUDE.md | grep -xF -- "$EDIT_LINE")"
 
+echo "=== case 29: an untouched template copy with install-time paths does not trip the install-path guard (#1493) ==="
+build_case bakedpath modern
+printf 'Working directory baked at install time: %s/\n' "$WS" >> "$SD/CLAUDE.md"
+cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+run_update
+check "29 exit 49 (the refusal, not the guard abort)" rc_is 49
+check "29 the refusal is reported" log_has "$REFUSAL_LINE"
+check "29 the template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+check "29 the install-path guard does not stop the update" log_lacks "чтобы не оставить install paths"
+
 echo
 echo "Result: $PASS_COUNT PASS, $FAIL_COUNT FAIL"
 [ "$FAIL_COUNT" -eq 0 ]

@@ -125,6 +125,12 @@ fi
 **7b.** `bash .claude/scripts/load-extensions.sh day-open checks` → Exit 0: выполнить верификацию. БЛОКИРУЮЩЕЕ: commit запрещён до прохождения всех checks.
 **7c.** `git commit` + `git push`.
 **7d.** Compact dashboard → вывести в VS Code по шаблону «Шаблон compact dashboard» из `templates.md`.
+**7e.** Снять служебную отметку шага 0а (issue #1506): без этого она остаётся в `.iwe-runtime/sessions/` до следующего дня, и каждое `session-guard.sh open` предупреждает о сессии без прав на коммит. Закрывается только отметка `day-open`, записанная этим же разговором (строка `harness_session_id` совпадает; `--only-own-harness` сверяет её внутри `session-guard.sh` под блокировкой, код 3 — отметка не наша): если шаг 0а не открыл свою отметку, потому что её уже держала параллельная сессия того же агента, чужая отметка не трогается. Нет отметки — команда ничего не делает; отметка чужая или нет номера разговора — `session-guard.sh` отказывает с кодом 3 и ничего не меняет:
+```bash
+AGENT="${IWE_AGENT:-claude-code}"
+HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-open.open"
+[ ! -f "$HK_SEM" ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" close --housekeeping day-open --agent "$AGENT" --only-own-harness
+```
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->

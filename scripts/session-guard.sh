@@ -15,6 +15,8 @@
 #                                                      # blocked-witness-unavailable AND the push is already
 #                                                      # confirmed (all_pushed: true)
 #   close --housekeeping <reason> [--agent ...]       # close a housekeeping session
+#   close --housekeeping <reason> --only-own-harness  # close it only if this conversation
+#                                                      # (CLAUDE_CODE_SESSION_ID) opened it; else exit 3
 #   audit [--since YYYY-MM-DD] [--cleanup-orphans]
 #   renew [--wp WP-N] [--slug "..."] [--agent ...]    # extend the right to commit
 #   heartbeat --agent <agent> --session-id <id> --owner-pid <pid>
@@ -110,7 +112,7 @@ _gb_archive_previous() { # <terminal path> <its .open path>
 }
 
 _gb_main() {
-  local cmd="${1:-}" agent="${IWE_AGENT:-}" housekeeping="" slug="" path="" personality="" owner_pid=""
+  local cmd="${1:-}" agent="${IWE_AGENT:-}" housekeeping="" slug="" path="" personality="" owner_pid="" only_own_harness=0
   shift || true
   case "$cmd" in
     open|close|note-file) ;;
@@ -123,6 +125,7 @@ _gb_main() {
       --slug) slug="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
       --personality) personality="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
       --owner-pid) owner_pid="${2:-}"; shift 2 || _gb_refuse "$cmd" ;;
+      --only-own-harness) [ "$cmd" = close ] || _gb_refuse "$cmd $1"; only_own_harness=1; shift ;;
       --*) _gb_refuse "$cmd $1" ;;
       *) [ -z "$path" ] || _gb_refuse "$cmd"; path="$1"; shift ;;
     esac
@@ -199,6 +202,10 @@ _gb_main() {
     close)
       [ -f "$file" ] || { echo "session-guard: close --housekeeping: нет активной housekeeping-сессии '$reason' для $agent" >&2; exit 3; }
       _gb_semaphore_trusted "$file" "$agent" "$session_id" || { echo "session-guard: close --housekeeping: семафор не прошёл проверку подлинности" >&2; exit 1; }
+      # issue #1506: checked under the lock, so a marker swapped in after the caller's check is not closed.
+      if [ "$only_own_harness" = 1 ] && ! { [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] && grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$file"; }; then
+        echo "session-guard: close --housekeeping: отметку '$reason' открыл другой разговор; не трогаю" >&2; exit 3
+      fi
       _gb_archive_previous "${file}.closed" "$file" || exit 1
       [ ! -e "${file}.closed" ] || { echo "session-guard: close --housekeeping: terminal destination занят; open сохранён" >&2; exit 1; }
       grep -q '^close_protocol: ' "$file" && { echo "session-guard: close --housekeeping: закрытие уже начато другой реализацией; завершите его там (WSL2)" >&2; exit 1; }
@@ -1560,6 +1567,7 @@ ISOLATED_WORKTREE_BRANCH=""
 FORCE_FLAG=0
 UNFREEZE_REASON=""
 CANONICAL_OWNER=""
+ONLY_OWN_HARNESS=0
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -1574,6 +1582,7 @@ while [[ $# -gt 0 ]]; do
     --reason) UNFREEZE_REASON="$2"; shift 2 ;;
     --canonical-owner) CANONICAL_OWNER="$2"; shift 2 ;;
     --housekeeping) HOUSEKEEPING="$2"; shift 2 ;;
+    --only-own-harness) ONLY_OWN_HARNESS=1; shift ;;
     --personality) PERSONALITY="$2"; shift 2 ;;
     --session-id) SESSION_ID_ARG="$2"; shift 2 ;;
     --owner-pid) OWNER_PID="$2"; shift 2 ;;
@@ -1825,8 +1834,15 @@ if [ "$CMD" = "open" ]; then
       if lease_valid "$STALE"; then
         echo "NOTE: у агента открыта долгая сессия $(basename "$STALE") (WP: $STALE_WP, возраст ${STALE_AGE}s) — права на коммит действуют, не трогаю" >&2
       else
+        STALE_HK=$(grep "^housekeeping: " "$STALE" | cut -d' ' -f2- || true)
         echo "WARNING: сессия $(basename "$STALE") (WP: $STALE_WP, возраст ${STALE_AGE}s) потеряла права на коммит." >&2
-        echo "         Закрой её (close --wp $STALE_WP) или продли: renew --wp $STALE_WP" >&2
+        if [ -n "$STALE_HK" ]; then
+          # issue #1506: a housekeeping semaphore has no wp, so "close --wp unknown"
+          # cannot close it; point at the command that does.
+          echo "         Закрой её: close --housekeeping $STALE_HK --agent $AGENT" >&2
+        else
+          echo "         Закрой её (close --wp $STALE_WP) или продли: renew --wp $STALE_WP" >&2
+        fi
       fi
     fi
   done < <(ls -t "$SESSION_DIR/${AGENT}"-*.open 2>/dev/null || true)
@@ -2384,6 +2400,12 @@ if [ "$CMD" = "close" ]; then
     # Identity first, so a foreign .open changes nothing.
     grep -qx "agent: $AGENT" "$HK_FILE" && grep -qx "session_id: $HK_SESSION_ID" "$HK_FILE" \
       || fail "close --housekeeping: exact identity/terminal state не прошли проверку" 1
+    # issue #1506: checked under the transition lock, so a marker swapped in
+    # after the caller's own check is not closed.
+    if [ "$ONLY_OWN_HARNESS" = 1 ] && ! { [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] \
+        && grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$HK_FILE"; }; then
+      fail "close --housekeeping: отметку '${HOUSEKEEPING}' открыл другой разговор; не трогаю" 3
+    fi
     _archive_previous_terminal "${HK_FILE}.closed" "$HK_FILE" \
       || fail "close --housekeeping: прошлый .closed не удалось перенести в архив; open сохранён" 1
     _locked_open_identity "$HK_FILE" "$AGENT" "$HK_SESSION_ID" 1 \

@@ -194,14 +194,49 @@ check_quarantine_sweep() {
   echo "ok: quarantine sweep"
 }
 
+# Like guard(), but as the conversation <harness id> ("" = none).
+guard_as() { # <harness id> <root> <extra PATH prefix or ""> <args...>
+  local hid="$1" root="$2" prefix="$3"; shift 3
+  rc=0
+  out=$(PATH="${prefix:+$prefix:}$PATH" IWE_ROOT="$root" IWE_GOVERNANCE_REPO=DS-strategy \
+    IWE_SG_GITBASH_LOCK_TRIES=2 CLAUDE_CODE_SESSION_ID="$hid" bash "$GUARD" "$@" 2>&1) || rc=$?
+}
+
+# Issue #1506: day-open/day-close close their marker with --only-own-harness,
+# which must leave a marker opened by another conversation alone.
+check_only_own_harness() { # <label> <PATH prefix for the mode>
+  local label="own-$1" prefix="$2" root sem
+  root="$TMP_DIR/$label"
+  mkdir -p "$root/DS-strategy"
+  sem="$root/.iwe-runtime/sessions/kimi-housekeeping-day-open.open"
+  guard_as conv-a "$root" "$prefix" open --housekeeping day-open --agent kimi
+  [ "$rc" -eq 0 ] || fail "$label: open rc=$rc: $out"
+  grep -qx 'harness_session_id: conv-a' "$sem" || fail "$label: open did not record the conversation"
+
+  guard_as conv-b "$root" "$prefix" close --housekeeping day-open --agent kimi --only-own-harness
+  [ "$rc" -eq 3 ] || fail "$label: another conversation's close rc=$rc, want 3: $out"
+  [ -f "$sem" ] && [ ! -e "$sem.closed" ] || fail "$label: another conversation closed the marker"
+
+  guard_as "" "$root" "$prefix" close --housekeeping day-open --agent kimi --only-own-harness
+  [ "$rc" -eq 3 ] || fail "$label: close without a conversation id rc=$rc, want 3: $out"
+  [ -f "$sem" ] || fail "$label: close without a conversation id removed the marker"
+
+  guard_as conv-a "$root" "$prefix" close --housekeeping day-open --agent kimi --only-own-harness
+  [ "$rc" -eq 0 ] || fail "$label: own close rc=$rc: $out"
+  [ ! -e "$sem" ] && [ -f "$sem.closed" ] || fail "$label: own close left the marker open"
+  echo "ok: $label"
+}
+
 check_mode full ""
 check_crash_recovery
+check_only_own_harness full ""
 
 STUBS="$TMP_DIR/stubs"
 mkdir -p "$STUBS"
 printf '#!/bin/sh\necho MINGW64_NT-10.0-22631\n' > "$STUBS/uname"
 chmod +x "$STUBS/uname"
 check_mode gitbash "$STUBS"
+check_only_own_harness gitbash "$STUBS"
 
 check_legacy_state
 check_quarantine_sweep
