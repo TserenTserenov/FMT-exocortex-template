@@ -1219,6 +1219,16 @@ if [ -n "$RM_INVOCATIONS" ]; then
   block "rm с -r и -f запрещён — удаление необратимо. Удаляй той же командой через $GUARDED_RM (те же ключи и цели): он при выполнении проверит настоящие пути и удалит только внутри временных каталогов из реестра $WORKSPACE_ROOT/.claude/config/guarded-rm-roots.txt. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
+# find that deletes what it walks: `-delete`, or `-exec`/`-execdir`/`-ok`/`-okdir` running rm,
+# unlink or shred (any path, with or without -r/-f). It is the recursive deletion of the rm rule
+# above without its flags: `find ~ -delete` and `find "$HOME" -exec rm -f {} +` passed
+# (WP-529 Ф270, RT-2 of the v0.42.0-rc.1 red team). The walked tree is only known at run time,
+# so a temporary root in the text does not exempt it, as with rm.
+FIND_DELETE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-delete( |$)|(^| )-(exec|execdir|ok|okdir) ([^ ]*/)?(rm|unlink|shred)(\.exe)?( |$)' || true)
+if [ -n "$FIND_DELETE_INVOCATIONS" ]; then
+  block "find с удалением (-delete или -exec rm/unlink/shred) запрещён — удаляет всё найденное в дереве, необратимо. Найди файлы без удаления, проверь список и удаляй через $GUARDED_RM конкретные цели. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
 if matches "$CMD_EXEC" -iE '\b(psql|mysql|sqlite3)\b' && matches "$CMD_EXEC" -iE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
   block "DROP/TRUNCATE через SQL-клиент запрещён — необратимая потеря данных. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."

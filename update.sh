@@ -3948,6 +3948,22 @@ step0_integrity_check() {
     return 0
 }
 
+# step0_release_is_older — 0 when the release this run delivers is strictly older than the
+# installed copy (WP-529 Ф270, RT-1 of the v0.42.0-rc.1 red team): replacing the updater
+# here would exec the older update.sh, which predates the rollback guard of Step 1, and the
+# files were rolled back without ROLLBACK. 1 when newer, equal or not known (no installed
+# manifest, no answer, unreadable versions): the self-update then runs as before.
+step0_release_is_older() {
+    local remote="$TMPDIR_UPDATE/step0-manifest.json" installed upstream order
+    [ -f "$SCRIPT_DIR/update-manifest.json" ] || return 1
+    # shellcheck disable=SC2086  # CURL_BASE_OPTS/_CURL_SSL_OPT intentionally unquoted (multi-token flags)
+    curl $CURL_BASE_OPTS $_CURL_SSL_OPT -sSfL "$RAW_BASE/update-manifest.json" -o "$remote" 2>/dev/null || return 1
+    installed=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
+    upstream=$(manifest_version "$remote")
+    order=$(version_compare "$upstream" "$installed") || return 1
+    [ "$order" = "-1" ]
+}
+
 # === Step 0: Self-update (bootstrap) ===
 # issue #505 root, part 1: the channel must be resolved BEFORE self-update.
 # Step 0 used to fetch update.sh from the DEFAULT moving main while Step 1
@@ -3994,10 +4010,17 @@ else
     REMOTE_HASH=$(hash_file "$REMOTE_UPDATE")
     if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
         echo "  update.sh актуален."
+    elif $CHECK_ONLY && step0_release_is_older; then
+        # The real run keeps this updater (see below), so the verdict is not "made by an older updater".
+        echo "  ⚠ update.sh выпуска старше установленного — настоящий запуск его не заменит до решения об откате."
     elif $CHECK_ONLY; then
         # In --check mode: report available update without touching the file
         echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
         CHECK_UPDATER_OUTDATED=true
+    elif step0_release_is_older; then
+        # The older updater must not replace this one before Step 1 asks for ROLLBACK; after a
+        # confirmed rollback the next run's Step 0 sees equal versions and installs it.
+        echo "  ⚠ update.sh выпуска старше установленного — не заменяю его: сначала решение об откате."
     else
         echo "  Найдена новая версия update.sh — обновляю..."
         # issue #505 class (residual, found in the same sweep): replace
