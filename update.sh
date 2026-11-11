@@ -4031,9 +4031,10 @@ else
         echo "  ⚠ Новая версия update.sh доступна. Запустите без --check для обновления."
         CHECK_UPDATER_OUTDATED=true
     elif step0_release_is_older; then
-        # The older updater must not replace this one before Step 1 asks for ROLLBACK; after a
-        # confirmed rollback the next run's Step 0 sees equal versions and installs it.
+        # The older updater must not replace this one before Step 1 asks for ROLLBACK; a confirmed
+        # rollback installs it at the end of this run (replace_updater_after_rollback).
         echo "  ⚠ update.sh выпуска старше установленного — не заменяю его: сначала решение об откате."
+        STEP0_OLDER_UPDATER="$REMOTE_UPDATE"
     else
         echo "  Найдена новая версия update.sh — обновляю..."
         # issue #505 class (residual, found in the same sweep): replace
@@ -5293,32 +5294,39 @@ DEPRECATED_FOUND=()
 DEPRECATED_REASONS=()
 DEPRECATED_TRACKED_KEPT=()
 
-if is_upstream_git_mirror; then
-    echo "  ⚠ Каталог шаблона — git-зеркало с remote upstream: удаление устаревших файлов пропущено. Их должен удалить сам канон."
-else
-while IFS='|' read -r fpath freason; do
-    [ -z "$fpath" ] && continue
+# queue_deprecated PATH REASON — queue a template file for the move to the run's backup, under
+# the guards every removal shares; also used for the files a confirmed rollback leaves behind.
+queue_deprecated() {
+    local fpath="$1" freason="$2"
+    [ -z "$fpath" ] && return 0
     # Same guard as the download loop above: a protected user file must never be
     # deleted either, even if a future manifest lists it as deprecated by mistake
     # (bug found 2026-07-23 — sessions/00-index.md was listed, protection didn't apply).
-    is_protected_user_file "$fpath" && continue
+    is_protected_user_file "$fpath" && return 0
     # issue #660 (cold-context review finding): without this, a fork-declared
     # excluded_paths entry protected a file from being silently OVERWRITTEN
     # but not from being silently DELETED if a future upstream manifest
     # listed the same path under deprecated_files — defeating the guarantee
     # this whole feature exists to give.
-    is_fork_owned_path "$fpath" && continue
+    is_fork_owned_path "$fpath" && return 0
     # issue #1010 F9: a path the local template clone still tracks in git is
     # part of that checkout; deleting it leaves the clone with a tracked
     # deletion after a clean update. Keep it and say so once.
     if [ -f "$SCRIPT_DIR/$fpath" ] && git -C "$SCRIPT_DIR" ls-files --error-unmatch -- "$fpath" >/dev/null 2>&1; then
         DEPRECATED_TRACKED_KEPT+=("$fpath")
-        continue
+        return 0
     fi
     if [ -f "$SCRIPT_DIR/$fpath" ]; then
         DEPRECATED_FOUND+=("$fpath")
         DEPRECATED_REASONS+=("${freason:-устарел}")
     fi
+}
+
+if is_upstream_git_mirror; then
+    echo "  ⚠ Каталог шаблона — git-зеркало с remote upstream: удаление устаревших файлов пропущено. Их должен удалить сам канон."
+else
+while IFS='|' read -r fpath freason; do
+    queue_deprecated "$fpath" "$freason"
 done < <(
     if py_available; then
         $PY_BIN -c "
@@ -5340,6 +5348,43 @@ for entry in data.get('deprecated_files', []):
 " "$MANIFEST" || true
     fi)
 fi
+
+# queue_rollback_leftovers — after a confirmed ROLLBACK, queue the files that only the newer
+# installed release delivered: absent from the target manifest, still byte-identical to the
+# installed manifest (an edited file is the user's and stays). Before this a rollback 0.42 → 0.41.11
+# left 24 files of 0.42 behind (WP-529 Ф270, F4 of the v0.42.0-rc.4 red team).
+queue_rollback_leftovers() {
+    local installed="$SCRIPT_DIR/update-manifest.json" fpath state kept=()
+    # The program goes through -c, not a heredoc inside <( ): bash 3.2 of macOS cannot parse the latter.
+    local scan='
+import hashlib, json, os, sys
+
+def files(path):
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    return {e["path"]: e.get("sha256", "") for e in data.get("files", []) if isinstance(e, dict)}
+
+installed, target, root = files(sys.argv[1]), files(sys.argv[2]), sys.argv[3]
+for path in sorted(set(installed) - set(target)):
+    full = os.path.join(root, path)
+    if not os.path.isfile(full) or os.path.islink(full):
+        continue
+    with open(full, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()
+    print(path + "|" + ("same" if digest == installed[path] else "edited"))
+'
+    is_upstream_git_mirror && return 0
+    py_available && [ -f "$installed" ] || return 0
+    while IFS='|' read -r fpath state; do
+        case "$state" in
+            same) queue_deprecated "$fpath" "есть только в установленном выпуске, откат" ;;
+            edited) kept+=("$fpath") ;;
+        esac
+    done < <($PY_BIN -c "$scan" "$installed" "$MANIFEST" "$SCRIPT_DIR")
+    if [ "${#kept[@]}" -gt 0 ]; then
+        echo "  ○ Файлы установленного выпуска, которых нет в $UPSTREAM_VERSION, изменены вами — оставлены: ${kept[*]}"
+    fi
+}
 
 if [ "${#DEPRECATED_TRACKED_KEPT[@]}" -gt 0 ]; then
     echo "  ○ Устаревшие по манифесту, но отслеживаются git этой копии шаблона — оставлены: ${DEPRECATED_TRACKED_KEPT[*]}"
@@ -5719,6 +5764,7 @@ if [ "$ROLLBACK_DETECTED" = true ]; then
         echo "Отменено."
         exit 0
     fi
+    queue_rollback_leftovers
 elif [ "$ROLLBACK_UNCERTAIN" = true ]; then
     # issue #863: history could not be verified; require explicit manual approval.
     if $AUTO_YES; then
@@ -7524,6 +7570,23 @@ fi
 if ! run_post_apply_backfills_or_die; then
     exit "$EXIT_RUNTIME"
 fi
+
+# replace_updater_after_rollback — a confirmed rollback ran on the newer updater (Step 0 kept it);
+# leaving it in place mixed the candidate's update.sh with the 0.41.11 manifest until the next run
+# (WP-529 Ф270, F4 of the v0.42.0-rc.4 red team). Same rename as Step 0: this process keeps its
+# open inode.
+replace_updater_after_rollback() {
+    [ "$ROLLBACK_DETECTED" = true ] && [ -n "${STEP0_OLDER_UPDATER:-}" ] && [ -f "$STEP0_OLDER_UPDATER" ] \
+        || return 0
+    local staged="$SCRIPT_DIR/.update.sh.staged.$$"
+    if cp "$STEP0_OLDER_UPDATER" "$staged" && chmod +x "$staged" && mv -f "$staged" "$SCRIPT_DIR/update.sh"; then
+        echo "  • update.sh: заменён версией выпуска v$UPSTREAM_VERSION (откат)"
+    else
+        rm -f "$staged"
+        echo "  ⚠ update.sh: не удалось заменить версией v$UPSTREAM_VERSION — её поставит следующий запуск."
+    fi
+}
+replace_updater_after_rollback
 
 # === Done ===
 echo ""

@@ -51,6 +51,7 @@ fn:copy_platform_file_preserving_user_space	A	plan	copies a platform file and re
 fn:run_sync_canary	R	none	runs the sync bundle self-test, reads only
 fn:cleanup_update	T	none	removes the temp directory on exit
 top:Step 0	A	plan	self-update: staged copy, chmod, rename over update.sh, then exec; the plan holds update.sh as a sibling rename only, and the lock is taken before this step
+fn:replace_updater_after_rollback	A	plan	after a confirmed ROLLBACK installs the target release's update.sh the same way as Step 0: staged copy, chmod, rename over update.sh; this process keeps its open inode (WP-529 Ф270)
 fn:sync_workspace_agents	A	plan	writes the workspace AGENTS.md through a temp file and rename
 fn:repair_pass	A	plan	re-copies critical runtime files and memory; also runs when nothing changed, so the plan has two sources
 fn:sync_workspace_claude_md	A	plan	workspace CLAUDE.md three-way merge and its base, backup and conflict-pending files; service files are ordinary plan elements
