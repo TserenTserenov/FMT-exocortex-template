@@ -1305,7 +1305,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "b39b98dfdf9281ffef936008c99631154956419bf209a49ab3f73232967b1f40"
+      "sha256": "9dbf69fc130abed992d5a3e3ac78d87217e1017e2dbda54cf5219936ab61acd2"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -3453,11 +3453,15 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "3fb0fac3723558c082329f441ef58cf518923d0154c8d39ff951898288b7fa7c"
+      "sha256": "d5d59cb3cf33c9e0932052ce54d59494e04b3ac48c621ddce2fc099f17a34074"
     },
     {
       "path": "setup/build-runtime.sh",
       "sha256": "33c7872d3421f192ad7a18d6e288e019a14dfa03e49521d6cfffa1eb443ac47a"
+    },
+    {
+      "path": "setup/install-dsh-skills.sh",
+      "sha256": "ec650c8b151265ce0fb3e5f763181956f1f5c9959e80f9caf0be38b2bf25d987"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -3493,7 +3497,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "f1f42f01aaf7ef67e1913aa7447bb519a39bd5147aa657907a1db6ed304728a1"
+      "sha256": "b06ca3107dc7635d93228fa9fd9b2a849d102d8bab32a66485d8821604f14fd5"
     }
   ],
   "excluded_paths": [
@@ -3580,6 +3584,7 @@
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
     "scripts/tests/test_dry_run_gate.py",
+    "scripts/tests/test_dsh_skills_install.sh",
     "scripts/tests/test_export_glossary_snapshot.py",
     "scripts/tests/test_extractor_branch_cleanup.sh",
     "scripts/tests/test_extractor_feed_quiet_on_empty.sh",

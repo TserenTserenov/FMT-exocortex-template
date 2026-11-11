@@ -2952,6 +2952,17 @@ run_post_apply_backfills_or_die() {
         echo "  ⚠ install-iwe-paths.sh завершился с ошибкой (exit $install_paths_status). Запустите вручную: bash $SCRIPT_DIR/setup/install-iwe-paths.sh --workspace $WORKSPACE_DIR --governance $EFFECTIVE_GOVERNANCE_REPO"
     fi
 
+    # Skills for DeepSeek Harness: they live in $WORKSPACE_DIR/.claude/skills and
+    # DSH scans .dsh/skills and .agents/skills only, so an upgrade re-asserts the
+    # home-level patch entry (idempotent; stays silent without DSH).
+    local dsh_skills_output
+    if dsh_skills_output=$(bash "$SCRIPT_DIR/setup/install-dsh-skills.sh" --workspace "$WORKSPACE_DIR" --quiet 2>&1); then
+        [ -n "$dsh_skills_output" ] && printf '%s\n' "$dsh_skills_output" | sed 's/^/  /'
+    else
+        printf '%s\n' "$dsh_skills_output" | sed 's/^/  /'
+        echo "  ⚠ навыки для DSH не подключены — запустите вручную: bash $SCRIPT_DIR/setup/install-dsh-skills.sh --workspace $WORKSPACE_DIR"
+    fi
+
     # scripts/day-open-llm-fill.py is no longer backfilled here (WP-485 Phase 17,
     # 2026-10-05): the Day Open pipeline runs it from $IWE_SCRIPTS (the template's
     # own copy, confirmed on a live installation -- ~/.iwe-paths resolves
