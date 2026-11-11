@@ -945,7 +945,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "de23bbb26493943bfb4495624b2cfc70d1e77745a3e23ac808727844f4800c0f"
+      "sha256": "7b89d515c107db02b4053c4260bf379e24476211977de5d55fdc1f1c6b62ce4a"
     },
     {
       "path": "CLAUDE.md",
@@ -2901,7 +2901,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "ae4ef07395a2450f2970b133995dd12ba6869b40a02ef7b9ccf08b2c043869e7"
+      "sha256": "b7e0cae6a66ddf5c77d55431164470b6703f52aafd6f1b1be237fa2222099403"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3548,6 +3548,7 @@
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
+    "scripts/tests/session-guard-second-open-warning-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
