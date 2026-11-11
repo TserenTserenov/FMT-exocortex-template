@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "8020b275af0369f68b45c91e9a42891a2b9be88b3520625320424263c64706f2"
+      "sha256": "f7ef01c57ebb0f4e645cc621a6813c3490f017b1cf0de839464bedea5fa113fb"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -229,7 +229,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
-      "sha256": "cc4a827445da761aed333ea7c4e56fb48221572c7847db2421229b81853c449c"
+      "sha256": "e38f3e658ebc862d17ddad84c47a9cd23f3ae0388201a50289112402391dd588"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -953,7 +953,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2f05b10e3c8f348942a28226c20a0e6629d9f23fce03327f7e64a36fa3f0917c"
+      "sha256": "d0caa95e864b8209d7afe4ff05fc49a604659410a5bed338822b9827d062a61b"
     },
     {
       "path": "CLAUDE.md",
@@ -1009,7 +1009,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "26bf3b50279217c10e8d9e5044bf3891bc7a37a07cc576b70034bbc5ce2a92d9"
+      "sha256": "d33a1cdbcb3a7559e39cf425f8da1dbef0fe0b1cfccb9ec1629a809f6d51cda5"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -3501,7 +3501,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "62c4c19a17e7012167946604032562c9681abe35a2a8d1785296e5578d623753"
+      "sha256": "382002bab3008e6d7ced8276ff5dd6e9024e5c7614f43f7235b75558a202ccc9"
     }
   ],
   "excluded_paths": [
@@ -3568,6 +3568,7 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f270-exec-bit.sh",
     "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",

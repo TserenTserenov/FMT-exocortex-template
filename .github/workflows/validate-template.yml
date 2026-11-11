@@ -383,6 +383,17 @@ jobs:
           /bin/bash scripts/tests/test_changelog_append_blank_lines.sh
           /bin/bash scripts/tests/test_template_hygiene_checks.sh
 
+      # WP-529 Ф270: regressions for the red-team findings on the 0.42 candidates (rollback
+      # on every channel, Step 0 keeps the newer updater, +x for delivered programs). They
+      # drive functions extracted from update.sh, so run them under the system bash 3.2 that
+      # macOS users have.
+      - name: Run WP-529 Ф270 update.sh regressions on system /bin/bash (3.2)
+        run: |
+          /bin/bash scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh
+          /bin/bash scripts/tests/test-wp529-f261-rollback-by-installed-version.sh
+          /bin/bash scripts/tests/test-wp529-f270-step0-no-downgrade.sh
+          /bin/bash scripts/tests/test-wp529-f270-exec-bit.sh
+
   # Upgrade-flow regression test (0.29.18).
   # Root of the bug (0.29.13): template-sync overwrote FMT files -- the fresh
   # build smoke test does not catch this, because build-runtime creates `.iwe-runtime` from scratch,
