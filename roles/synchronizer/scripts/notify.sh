@@ -2,7 +2,7 @@
 # notify.sh — single dispatch of exocortex notifications
 #
 # Usage:
-#   notify.sh [--require-delivery] <agent> <scenario>
+#   notify.sh [--require-delivery] [--force] <agent> <scenario>
 #
 # --require-delivery: exit 0 ONLY if Telegram confirmed delivery. Without the flag
 # behavior is as before (no token or a not-ok response - exit 0, text only in stdout),
@@ -10,6 +10,19 @@
 #   3 - TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not configured
 #   4 - Telegram did not confirm sending
 #   5 - message is empty, nothing to send
+#
+# --force: send even if the same text was already sent today for this <agent>/<scenario>.
+#
+# Duplicate guard (issue found 11.11.2026: the day-plan digest arrived 2-3 times a
+# morning): for a scenario listed in IWE_NOTIFY_DEDUPE (default `strategist/day-plan`)
+# the same text is sent at most once per calendar day. Two legitimate senders of one
+# digest (the scenario runner and the prompt that tells the model to run this script)
+# then produce one message instead of two. The guard is an allowlist, not a blanket:
+# a scenario may legitimately repeat identical text (a re-run after a fix, a pulse),
+# so only the named ones are suppressed. Entries are `<agent>/<scenario>`, or
+# `<agent>/*`, or `all`. The marker is written only after a confirmed send, so a
+# failed delivery is retried instead of being suppressed. A changed text (new plan,
+# new report) sends normally; --force bypasses the check for a deliberate resend.
 #
 # Examples:
 #   notify.sh strategist day-plan
@@ -42,10 +55,14 @@ fi
 ENV_FILE="$HOME/.config/aist/env"
 
 REQUIRE_DELIVERY=0
-if [ "${1:-}" = "--require-delivery" ]; then
-    REQUIRE_DELIVERY=1
-    shift
-fi
+FORCE_SEND=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --require-delivery) REQUIRE_DELIVERY=1; shift ;;
+        --force) FORCE_SEND=1; shift ;;
+        *) break ;;
+    esac
+done
 
 AVAILABLE=$(ls "$TEMPLATES_DIR"/*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' '|' | sed 's/|$//')
 AGENT="${1:?Ошибка: укажи агента (${AVAILABLE:-нет шаблонов})}"
@@ -92,6 +109,7 @@ find_iwe_notify() {
 # Without --require-delivery: always 0, the outcome only in stdout (as before).
 # With it: 0 = delivered to the chat, 3 = no credentials, 4 = not delivered
 # (failed, kept for a digest, quarantined, or iwe-notify missing).
+SEND_OUTCOME=""
 send_telegram() {
     local text="$1"
     local buttons="${2:-[]}"
@@ -118,17 +136,82 @@ send_telegram() {
     echo "notify.sh: $AGENT/$SCENARIO outcome=${outcome:-unknown}" >&2
     case "$outcome" in
         sent|direct-sent)
+            SEND_OUTCOME=sent
             echo "Telegram notification sent: $AGENT/$SCENARIO"
             return 0 ;;
         deferred|quarantined)
+            SEND_OUTCOME=deferred
             echo "Notification routed through the gate: $AGENT/$SCENARIO" ;;
         not-sent)
+            SEND_OUTCOME=not-sent
             echo "Telegram send FAILED: $AGENT/$SCENARIO (not configured)"
             [ "$REQUIRE_DELIVERY" -eq 1 ] && return 3 ;;
         *)
+            SEND_OUTCOME=failed
             echo "Telegram send FAILED: $AGENT/$SCENARIO (${outcome:-unknown})" ;;
     esac
     [ "$REQUIRE_DELIVERY" -eq 1 ] && return 4
+    return 0
+}
+
+# --- duplicate guard -------------------------------------------------------
+# One message per <agent>/<scenario> per calendar day while the text is identical.
+# The marker lives next to the other runtime state, never in the repo: the same
+# text sent tomorrow is a new message, not a duplicate.
+NOTIFY_STATE_DIR="${IWE_RUNTIME:-${IWE_WORKSPACE:-$HOME/IWE}/.iwe-runtime}/state/notify-sent"
+
+notify_marker() {  # path of this <agent>/<scenario> marker, sanitised for the filesystem
+    printf '%s/%s-%s.last' "$NOTIFY_STATE_DIR" \
+        "$(printf '%s' "$AGENT" | tr -c 'A-Za-z0-9._-' '_')" \
+        "$(printf '%s' "$SCENARIO" | tr -c 'A-Za-z0-9._-' '_')"
+}
+
+notify_hash() {  # <text> -> sha256 (empty when no hashing tool: the guard then stays out of the way)
+    local text="$1" h=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        h=$(printf '%s' "$text" | sha256sum | cut -d' ' -f1)
+    elif command -v shasum >/dev/null 2>&1; then
+        h=$(printf '%s' "$text" | shasum -a 256 | cut -d' ' -f1)
+    elif command -v md5sum >/dev/null 2>&1; then
+        h=$(printf '%s' "$text" | md5sum | cut -d' ' -f1)
+    fi
+    printf '%s' "$h"
+}
+
+notify_is_duplicate() {  # <text> -> 0 when the same text was already sent today
+    local text="$1" marker hash stored_date stored_hash
+    marker=$(notify_marker)
+    [ -f "$marker" ] || return 1
+    hash=$(notify_hash "$text")
+    [ -n "$hash" ] || return 1
+    stored_date=$(sed -n '1p' "$marker" 2>/dev/null)
+    stored_hash=$(sed -n '2p' "$marker" 2>/dev/null)
+    [ "$stored_date" = "$(date +%F)" ] && [ "$stored_hash" = "$hash" ]
+}
+
+# The guard is an allowlist: a scenario that is not named keeps the old behaviour
+# (send every time), because identical repeats are legitimate for most of them.
+NOTIFY_DEDUPE_SCOPES="${IWE_NOTIFY_DEDUPE:-strategist/day-plan}"
+
+notify_dedupe_enabled() {
+    local item
+    for item in $NOTIFY_DEDUPE_SCOPES; do
+        case "$item" in
+            all|"$AGENT/$SCENARIO"|"$AGENT/*"|"*/$SCENARIO") return 0 ;;
+        esac
+    done
+    return 1
+}
+
+notify_mark_sent() {  # <text>; a marker that cannot be written never blocks the next send
+    local text="$1" hash marker
+    hash=$(notify_hash "$text")
+    [ -n "$hash" ] || return 0
+    marker=$(notify_marker)
+    mkdir -p "$NOTIFY_STATE_DIR" 2>/dev/null \
+        || { echo "WARN: cannot create $NOTIFY_STATE_DIR (duplicate guard off)" >&2; return 0; }
+    printf '%s\n%s\n' "$(date +%F)" "$hash" > "$marker" 2>/dev/null \
+        || echo "WARN: cannot write $marker (duplicate guard off)" >&2
     return 0
 }
 
@@ -145,6 +228,13 @@ MESSAGE=$(build_message "$SCENARIO")
 BUTTONS=$(build_buttons "$SCENARIO" 2>/dev/null || echo "[]")
 
 if [ -n "$MESSAGE" ]; then
+    # Duplicate guard: for the named scenarios, a message whose text is unchanged
+    # since a confirmed send today is not sent again. Exit 0 with the flag: the
+    # owner has the message, so "delivered" stays true; the SKIP line names why.
+    if [ "$FORCE_SEND" -eq 0 ] && notify_dedupe_enabled && notify_is_duplicate "$MESSAGE"; then
+        echo "SKIP: duplicate notification $AGENT/$SCENARIO (same text already sent today; --force to resend)"
+        exit 0
+    fi
     # Without the flag send_telegram stays a plain command, so `set -e` behaves as it
     # always did (a curl failure ends the script with curl's code). With the flag the
     # `||` is deliberate: the failure must reach the exit code as 4, not as curl's code.
@@ -152,6 +242,9 @@ if [ -n "$MESSAGE" ]; then
         send_telegram "$MESSAGE" "$BUTTONS" || exit $?
     else
         send_telegram "$MESSAGE" "$BUTTONS"
+    fi
+    if [ "$SEND_OUTCOME" = sent ]; then
+        notify_mark_sent "$MESSAGE"
     fi
 else
     echo "Empty message for $AGENT/$SCENARIO, skip"

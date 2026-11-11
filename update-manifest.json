@@ -3715,6 +3715,7 @@
     "scripts/tests/test_memory_bleed_age_batch.sh",
     "scripts/tests/test_mount_readonly_packs.sh",
     "scripts/tests/test_normalize_en_phase_labels.py",
+    "scripts/tests/test_notify_duplicate_guard.sh",
     "scripts/tests/test_notify_optional_gate.sh",
     "scripts/tests/test_pending_lock.py",
     "scripts/tests/test_pending_phases_sweep.sh",
