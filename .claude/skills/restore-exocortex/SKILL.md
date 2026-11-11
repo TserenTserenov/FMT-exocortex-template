@@ -37,7 +37,7 @@ routing:
 ## Алгоритм
 
 ### Шаг 1. Резолв скрипта и пути
-- Скрипт: `$IWE_SCRIPTS/restore-from-exocortex.sh` → fallback `$WORKSPACE_DIR/FMT-exocortex-template/scripts/restore-from-exocortex.sh`. Нет файла → см. Режим отказа.
+- Скрипт: `restore-from-exocortex.sh` из `$IWE_SCRIPTS` (при пустой переменной — `${IWE_SCRIPTS:-$HOME/IWE/scripts}`), иначе `$WORKSPACE_DIR/FMT-exocortex-template/scripts/restore-from-exocortex.sh`. Нет файла → см. Режим отказа.
 - Governance-репо: аргумент пользователя, иначе `$WORKSPACE_DIR/${GOVERNANCE_REPO:-DS-strategy}`. Убедиться, что `<gov>/exocortex/` существует.
 
 ### Шаг 2. Pre-flight (judgment — здесь LLM уместен)

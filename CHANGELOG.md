@@ -25,6 +25,11 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] (#1535) Девять навыков снова находят скрипты шаблона, когда оболочка не подгрузила пути: 16 вызовов вида `$IWE_SCRIPTS/script.sh` переведены на запасной путь `"${IWE_SCRIPTS:-$HOME/IWE/scripts}/script.sh"` (`author-mode`, `check-secret`, `consent`, `day-open`, `restore-exocortex`, `strategy-session`, `transcribe`, `w-reflection`, `wp-new`). Раньше в окне DeepSeek `/wp-new` не мог запустить `create-wp.sh` — переменная пуста, а запасного пути не было; `day-close` и `audit-installation` уже грузят `.iwe-paths` и не менялись. Сторож `scripts/tests/test_skills_script_paths.sh` не даёт вернуть голый вызов и сверяет, что названные навыками скрипты есть в шаблоне (WP-53, issue #688).
+  - Цель: 77 · Результат: в оболочке без подгруженных путей навыки запускают скрипты; при подгруженных путях поведение не меняется
+  - Как проверить: `bash scripts/tests/test_skills_script_paths.sh` — три проверки; вернуть голый вызов в любом навыке — тест падает
+  - Как откатить: git revert слияния этого PR
+
 - [optional] (#1523) Описание процесса выпуска называет вердикт независимой атаки словами навыка `iwe-platform-redteam`: GO / CAUTION / BLOCKED, а `cannot_verify` — не пройдено (было STABLE, которого навык не выдаёт).
   - Цель: 77 · Результат: служебное — согласование слов вердикта в документации выпуска; пользователь его не видит
   - Как проверить: `grep -n 'GO / CAUTION' docs/RELEASE-PROCESS.md` находит строку, `grep -c STABLE docs/RELEASE-PROCESS.md` даёт 0

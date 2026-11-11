@@ -96,9 +96,9 @@ gates_rationale: "операционный скилл; WP Gate применим 
 
 Прочитай текущий бюджет недели из WeekPlan. Предупреди если превышение.
 
-## Шаг 4. Запись — запустить `$IWE_SCRIPTS/create-wp.sh`
+## Шаг 4. Запись — запустить `create-wp.sh`
 
-Все шаги ниже автоматизированы скриптом `$IWE_SCRIPTS/create-wp.sh`. Скрипт пишет в 4 места:
+Все шаги ниже автоматизированы скриптом `create-wp.sh` (путь в команде ниже — с запасным вариантом). Скрипт пишет в 4 места:
 
 1. **`inbox/WP-{N}/WP-{N}.md`** → context file (всегда папка — WP-434, см. INBOX-CONVENTION)
 2. **`docs/WP-REGISTRY.md`** → новая строка таблицы
@@ -132,7 +132,7 @@ fi
 
 ```bash
 touch "${IWE_ROOT:-$HOME/IWE}/.claude/state/wp-consent-{N}"   # WP Gate — обязательно перед запуском (тот же путь, что проверяет create-wp.sh, — НЕ ~/.claude, issue #556)
-IWE_GOVERNANCE_REPO="$WP_GOVERNANCE_REPO" bash "$IWE_SCRIPTS/create-wp.sh" \
+IWE_GOVERNANCE_REPO="$WP_GOVERNANCE_REPO" bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/create-wp.sh" \
   --artifactor-result "$STATE_DIR/artifactor-result-{slug}.json" \
   --budget 5h \
   --priority P2 \
@@ -187,7 +187,7 @@ result_type: {system|episteme}
 WEEKPLAN_PATH="<путь WeekPlan, в который скрипт записал строку>"   # задай явно
 WEEKPLAN_CHECK=""   # или --no-weekplan, если create-wp.sh строку не добавлял
 : "${WEEKPLAN_PATH:?путь WeekPlan не задан}"
-bash "$IWE_SCRIPTS/check-wp-registered.sh" $WEEKPLAN_CHECK "{N}" "${GOV_WT:-${IWE_ROOT:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}" "$WEEKPLAN_PATH" || { echo "регистрация не согласована" >&2; false; }
+bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/check-wp-registered.sh" $WEEKPLAN_CHECK "{N}" "${GOV_WT:-${IWE_ROOT:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}}" "$WEEKPLAN_PATH" || { echo "регистрация не согласована" >&2; false; }
 ```
 
 При пропущенной записи не подтверждай создание: сохрани уже записанное, сообщи конкретную неполноту и восстанови регистрацию с тем же номером. Для стратегической сессии действуют также проверка повторного вызова и итоговая синхронизация MEMORY из раздела «Регистрация РП перед утверждением» скилла `strategy-session`.

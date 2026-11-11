@@ -43,7 +43,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 ### Шаг 1. Вызвать скрипт маршрутизации
 
 ```bash
-bash "$IWE_SCRIPTS/route-task.sh" --skill consent --args "$ARGUMENTS"
+bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/route-task.sh" --skill consent --args "$ARGUMENTS"
 ```
 
 Скрипт читает `IWE_OWNER_ORY_UUID` из окружения. Пишет через роль `consent_writer` (миграция 113); fallback на `DATABASE_URL_LEARNING_DIRECT`.
