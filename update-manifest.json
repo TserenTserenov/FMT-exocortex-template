@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "13469388174665fbcefb97fc973cb73518f76ecddfffe788cae96afa1a43f6b6"
+      "sha256": "78cd758ea2a3d9c7d45c7852bbf549a0a64e4ead1c8be4d01bb0b0fbebebda34"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -222,6 +222,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "a4275e5385da0de8455de40de3445d21a8368c38f000531bb5e5c8cb5a0ddb10"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
+      "sha256": "f5847b9cf4e952bf0da7ced39b82b7007b803471f40a93200d2cabbbf9d0e5cd"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -545,7 +549,7 @@
     },
     {
       "path": ".claude/skills/find-method/SKILL.md",
-      "sha256": "23e6e20a7999c9c46deeb5e75e6e30e6db48beaf35341828943c432df382c336"
+      "sha256": "ccf44044e4f9bfbab670dea449d4f6d6d0b4c77f07b8ecd0b8c43b4024281bdb"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -917,7 +921,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "b93f0fe59b014410aad579bea789d627ac5e544bfe8910d5ca53efe1368f1a6f"
+      "sha256": "e045416aa4d5f4ef1cc0dd3ef49c6c82e7a2c65e0c2f194c3e3ac9027161a253"
     },
     {
       "path": ".gitignore",
@@ -945,7 +949,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7effad3f1b24dba7e20e487b10a56d6c27cedd2e6b0b5cefa9954744ef6e6adf"
+      "sha256": "01551898dc86c7206329d07a962655c7c60fc00af889f6d61c2521c5287f8838"
     },
     {
       "path": "CLAUDE.md",
@@ -1001,7 +1005,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "f62ef3f32baf53bb3f6dfdbbe02d3c66421681f664ac1d17f9f271b5727576f0"
+      "sha256": "553853137d34c407bdfab2f756b8b745c943a6885d9b8728aae427fbe1859966"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -3493,7 +3497,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "f1f42f01aaf7ef67e1913aa7447bb519a39bd5147aa657907a1db6ed304728a1"
+      "sha256": "09a3d33693f5cd2e77d1321f9edead0ec02fa48f3eaa079eacea2b27cddca669"
     }
   ],
   "excluded_paths": [
@@ -3560,6 +3564,7 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
     "scripts/tests/test_1231_artifactor.sh",
