@@ -60,7 +60,7 @@ fi
 <!-- Детали (адресное чтение, fallback): day-open-details.md § Шаг 1 -->
 
 ### 1b. GitHub Issues
-`day-open-scaffold.sh` (`render_repo_issues`) делает свип. Скрипт печатает в stdout весь скелет DayPlan, не только задачи: запускать его в шаге 7a с перенаправлением в файл плана, а не отдельно ради свипа (issue #1488). Critical FMT issues: `bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram`.
+`day-open-scaffold.sh` (`render_repo_issues`) делает свип. Скрипт печатает в stdout весь скелет DayPlan, не только задачи: запускать его в шаге 7a с перенаправлением в файл плана, а не отдельно ради свипа (issue #1488). Critical FMT issues: `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/fmt-critical-alert.sh --no-telegram`.
 <!-- Детали (фильтры, кэш): day-open-details.md § Шаг 1b -->
 
 ### 1c. Inbox Triage
@@ -82,7 +82,7 @@ fi
 
 ### 4c. Календарь
 Единый источник — подключённый календарный коннектор (MCP-инструменты календаря; имена зависят от установки, имя содержит «calendar» без учёта регистра, напр. `mcp__claude_ai_Google_Calendar__*`): список календарей → события каждого за день → секция «Календарь» для DayPlan (Встречи + Напоминания).
-Если коннектора нет — фоллбэк: `bash $IWE_SCRIPTS/server-calendar.sh YYYY-MM-DD`. NB: его ответ «Google credentials не настроены» — факт о скрипте (он ходит за собственным файлом ключей `~/.secrets/google-calendar`), не о календаре; при работающем коннекторе скрипт не нужен (issue #581).
+Если коннектора нет — фоллбэк: `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/server-calendar.sh YYYY-MM-DD`. NB: его ответ «Google credentials не настроены» — факт о скрипте (он ходит за собственным файлом ключей `~/.secrets/google-calendar`), не о календаре; при работающем коннекторе скрипт не нужен (issue #581).
 Если `strategy_day`: та же логика для недели (у фоллбэка — `--week YYYY-MM-DD`) → секция «Календарь недели» в WeekPlan.
 <!-- Детали (алгоритм классификации, формат): day-open-details.md § Шаг 4c -->
 
@@ -126,7 +126,7 @@ if [ -e "$DAYPLAN" ]; then
   echo "DayPlan уже есть, не перезаписываю: $DAYPLAN" >&2
 else
   PLAN_TMP=$(mktemp)
-  if bash "$IWE_SCRIPTS/day-open-scaffold.sh" YYYY-MM-DD > "$PLAN_TMP" && test -s "$PLAN_TMP"; then
+  if bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/day-open-scaffold.sh" YYYY-MM-DD > "$PLAN_TMP" && test -s "$PLAN_TMP"; then
     mv "$PLAN_TMP" "$DAYPLAN"
   else
     rm -f "$PLAN_TMP"

@@ -35,7 +35,7 @@ routing:
 ## Шаг 2. Запустить проверку
 
 ```bash
-bash "$IWE_SCRIPTS/route-task.sh" --skill check-secret --args "$ARGUMENTS"
+bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/route-task.sh" --skill check-secret --args "$ARGUMENTS"
 ```
 
 Скрипт принимает либо путь либо текст. Возвращает:
@@ -62,7 +62,7 @@ bash "$IWE_SCRIPTS/route-task.sh" --skill check-secret --args "$ARGUMENTS"
 - **Слои защиты (issue #410, актуализировано 2026-08-12):** ровно два, не три — pre-commit хук (`scripts/pre-commit-secret-scan.sh`, автоматический) и этот скилл (ручной, до вставки в чат/публикацию). B7.7a (блок Bash) и B7.7b (PostToolUse redact) в поставке не существуют — если появятся, дописать сюда третьим слоем.
 - **Правило поведения:** secrets никогда не публикуются в чат как плейнтекст (если ведётся персональный журнал поведенческих правил — зафиксировать там же).
 - **Runbook:** `DP.RUNBOOK.003-cascade-secret-rotation.md` для процедуры reactive ротации.
-- **Канон паттернов:** `$IWE_SCRIPTS/pre-commit-secret-scan.sh` — единая точка для regex-паттернов; check.sh использует тот же набор.
+- **Канон паттернов:** `${IWE_SCRIPTS:-$HOME/IWE/scripts}/pre-commit-secret-scan.sh` — единая точка для regex-паттернов; check.sh использует тот же набор.
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->

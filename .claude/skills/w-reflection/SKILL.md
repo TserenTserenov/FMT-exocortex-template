@@ -49,7 +49,7 @@ gates_rationale: "операционный скилл; WP Gate применим 
 ### Шаг 1. Вызвать скрипт маршрутизации
 
 ```bash
-bash "$IWE_SCRIPTS/route-task.sh" --skill w-reflection --args "$ARGUMENTS"
+bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/route-task.sh" --skill w-reflection --args "$ARGUMENTS"
 ```
 
 Скрипт читает `IWE_OWNER_ORY_UUID` из окружения (account_id) и пишет в `learning.w_reflections` через роль `w_reflection_writer` (миграция 112). При отсутствии writer-URL — fallback на `DATABASE_URL_LEARNING_DIRECT`.

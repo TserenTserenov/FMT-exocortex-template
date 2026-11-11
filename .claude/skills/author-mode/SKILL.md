@@ -61,8 +61,8 @@ routing:
 Разделение: платформенное → `FMT-exocortex-template` → `update.sh`. Пользовательское → `extensions/` + `params.yaml`.
 
 **Автор (author_mode: true):** прямое редактирование L1 РАЗРЕШЕНО.  
-Delivery в FMT: `bash $IWE_SCRIPTS/{script|hook|skill}-promote.sh <файл> [--dry-run]`  
-CLAUDE.md: `bash $IWE_SCRIPTS/template-sync.sh` (sync / `--dry-run` / `--check`)
+Delivery в FMT: `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/{script|hook|skill}-promote.sh <файл> [--dry-run]`  
+CLAUDE.md: `bash ${IWE_SCRIPTS:-$HOME/IWE/scripts}/template-sync.sh` (sync / `--dry-run` / `--check`)
 
 ### Именование (плейсхолдеры)
 

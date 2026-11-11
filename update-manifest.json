@@ -485,7 +485,7 @@
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
-      "sha256": "8e75dbc690e313a88e730d8696ff10046331f206b766b34e16fc4441c0bf30f8"
+      "sha256": "165ddbf18d3dad39ae2ccf5f6eaed87429b246492895828bd9010b5098175ed2"
     },
     {
       "path": ".claude/skills/bottleneck-pick/SKILL.md",
@@ -493,7 +493,7 @@
     },
     {
       "path": ".claude/skills/check-secret/SKILL.md",
-      "sha256": "1ba3e58fc60e926e1d6692f0fa51b1423fdbc7ff9e78fb75b010f7ffee42b65a"
+      "sha256": "af288092b026a800367ffe1eebffb1940dd9c3270b4a3896118fbf19d90361d9"
     },
     {
       "path": ".claude/skills/check-secret/check.sh",
@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills/consent/SKILL.md",
-      "sha256": "8aa4e4a2ec887c370513720cdac6ba931a9647047bdab4d38f50b9b76e0250a9"
+      "sha256": "219851610b6dc58c733db2483709fee511fe77899c484f74cdafef71a4fc1fb9"
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "4a2bf6ebca47d8e004a1bcb17f13924ad4543b00d6c7ad3c277736f1f6b8a40b"
+      "sha256": "b78d63936c6bc832b3e007b9eaa179ff926bcc94896922222b09de3140af3ad1"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -765,7 +765,7 @@
     },
     {
       "path": ".claude/skills/restore-exocortex/SKILL.md",
-      "sha256": "02bcaf876952111f8f2ee1582f5716f863e33c671e7ab5cfae7dd19ab24f4e93"
+      "sha256": "98e6a018ec252c4db646d14ba37a903df269ba819a799023ba3a04429c64a969"
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
@@ -809,7 +809,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "f8e8a3ae69c2f1e8e8194f4c000dbd27fa81979f0c3582a722007ab418d5502c"
+      "sha256": "7a6f434716453ea89ae3db8dffc1cd7eb895cbbaa55aba61ac4c5e3714a34aa3"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -817,7 +817,7 @@
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
-      "sha256": "48f4a9639071fc2e0bcb24ce5162c02a5551982914a12a0e895f48d8956a4fd3"
+      "sha256": "49ae8876582005710909cbe76db36dccfa2a81dd79429b7bd67ed812f9dd44ca"
     },
     {
       "path": ".claude/skills/vdv/SKILL.md",
@@ -849,7 +849,7 @@
     },
     {
       "path": ".claude/skills/w-reflection/SKILL.md",
-      "sha256": "9f4128ce42f08312bc6fc3b1f7b2158becc5dd5209aca5b5f57185be59bc03b7"
+      "sha256": "ffbf529d5716e3af70c49ec481f0c46247339061ac6e8679c82eaf5200b564e6"
     },
     {
       "path": ".claude/skills/week-close-pilot/SKILL.md",
@@ -861,7 +861,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "725c096f0316f8b8f66212e16193b72109e12e12119323e40ad50c65660d0a55"
+      "sha256": "e78ed15d1fba3d241bb1042e158040d3d203da95bc72d2e72c207cb2e79ed1a8"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -3763,6 +3763,7 @@
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
+    "scripts/tests/test_skills_script_paths.sh",
     "scripts/tests/test_sync_banner.py",
     "scripts/tests/test_sync_code_scan_quiet.sh",
     "scripts/tests/test_tag_release_candidate.sh",
