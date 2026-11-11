@@ -128,6 +128,18 @@ while IFS= read -r line || [ -n "$line" ]; do
       *) refuse "корень реестра — корень файловой системы или диска: $line → $root" ;;
     esac
   fi
+  # {TMPDIR} comes from the caller's environment: `TMPDIR=$HOME guarded-rm -rf "$HOME/IWE"` turned
+  # any folder into a deletion root (WP-529 Ф270, RT2-2 of the v0.42.0-rc.2 red team). Accept it
+  # only where a system puts temporary directories; anywhere else the entry is skipped, so its
+  # targets are refused as outside the roots.
+  if [ "$line" = "{TMPDIR}" ]; then
+    case "$root" in
+      /tmp|/tmp/*|/var/tmp|/var/tmp/*|/private/tmp|/private/tmp/*|/private/var/tmp|/private/var/tmp/*) ;;
+      /var/folders/*|/private/var/folders/*|/run/user/*) ;;
+      [a-z]:/users/*/appdata/local/temp|[a-z]:/users/*/appdata/local/temp/*|[a-z]:/windows/temp|[a-z]:/windows/temp/*) ;;
+      *) echo "guarded-rm: TMPDIR=$root — не системный временный каталог, запись {TMPDIR} пропущена" >&2; continue ;;
+    esac
+  fi
   ROOTS+=("$root")
 done < "$REGISTRY"
 [ "${#ROOTS[@]}" -gt 0 ] || refuse "реестр корней пуст"

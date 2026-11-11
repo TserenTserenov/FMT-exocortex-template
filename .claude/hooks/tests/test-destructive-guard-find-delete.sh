@@ -1,5 +1,6 @@
 #!/bin/bash
-# test-destructive-guard-find-delete.sh — WP-529 Ф270, RT-2 of the v0.42.0-rc.1 red team:
+# test-destructive-guard-find-delete.sh — WP-529 Ф270, RT-2 of the v0.42.0-rc.1 red team
+# (and RT2-1 of rc.2: a wrapper after -exec, deletion carried by xargs):
 # destructive-guard.sh let `find` delete what it walks (`find ~ -delete`,
 # `find "$HOME" -exec rm -f {} +`) because only `rm -r -f` was refused. A find that
 # deletes must be refused; a find that only lists, or runs a non-deleting command, passes.
@@ -50,12 +51,26 @@ expect "sudo find -delete" block 'sudo find / -delete'
 expect "bash -c with find -delete" block 'bash -c "find ~ -delete"'
 expect "find -delete after another command" block 'ls ~ && find ~/x -delete'
 
+# === rc.2 red team (RT2-1): wrappers after -exec and deletion carried by xargs ===
+expect "find -exec env rm" block 'find ~ -type f -exec env rm {} +'
+expect "find -exec command rm" block 'find . -exec command rm {} \;'
+expect "find -exec nice -n 5 rm" block 'find . -exec nice -n 5 rm {} +'
+expect "find -exec busybox rm" block 'find . -exec busybox rm {} +'
+expect "find -exec sudo -u x unlink" block 'find . -exec sudo -u x unlink {} \;'
+expect "find | xargs -0 rm" block 'find ~ -type f -print0 | xargs -0 rm'
+expect "find | xargs -n 1 /bin/rm" block 'find . -name x | xargs -n 1 /bin/rm'
+expect "xargs env rm" block 'ls | xargs env rm'
+expect "bash -c with find -exec env rm" block "bash -c 'find ~ -exec env rm {} +'"
+
 # === non-deleting finds stay allowed ===
 expect "find -name -print" pass "find . -name '*.sh' -print"
 expect "find -exec grep" pass 'find . -type f -exec grep -l rm {} +'
 expect "find whose name pattern mentions delete" pass "find . -name '-delete-me.txt'"
 expect "grep for the text find -delete" pass "grep -rn 'find -delete' docs/"
 expect "find -newer and -empty, no delete" pass 'find /tmp -empty -newer x'
+expect "find -exec env grep" pass 'find . -exec env grep -l rm {} +'
+expect "xargs grep for rm" pass "git ls-files | xargs grep -n 'rm -f'"
+expect "xargs echo" pass 'find . -name x | xargs echo'
 
 echo "find-delete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

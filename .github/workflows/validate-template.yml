@@ -847,6 +847,7 @@ jobs:
           bash .claude/hooks/tests/test-destructive-guard-isolated-commit-and-deploy-key.sh
           bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
           bash .claude/hooks/tests/test-destructive-guard-find-delete.sh
+          bash .claude/hooks/tests/test-destructive-guard-file-writers.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the

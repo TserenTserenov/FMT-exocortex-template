@@ -778,6 +778,27 @@ SEGMENTER_PL='
     return @indices;
   }
 
+  sub carried_indices {
+    # Positions of the commands that find or xargs run once per found item: the command
+    # after -exec/-execdir/-ok/-okdir of find, or the command behind xargs, each past
+    # wrappers (`find ~ -exec env rm {} +`, `xargs -0 nice rm`, `busybox rm`). Such a
+    # command needs no -r to delete a whole tree: the walk supplies every file (WP-529 Ф270,
+    # RT2-1 of the v0.42.0-rc.2 red team).
+    my @tokens = @_;
+    my ($first) = command_indices(@tokens);
+    return () unless defined $first;
+    my @carried;
+    push @carried, $first if grep { command_base($tokens[$_]) eq "xargs" } 0 .. $first - 1;
+    if (command_base($tokens[$first]) eq "find") {
+      for (my $j = $first + 1; $j < $#tokens; $j++) {
+        next unless $tokens[$j] =~ /^-(?:exec|execdir|ok|okdir)$/;
+        my ($inner) = command_indices(@tokens[$j + 1 .. $#tokens]);
+        push @carried, $j + 1 + $inner if defined $inner;
+      }
+    }
+    return map { command_base($tokens[$_]) eq "busybox" && $_ < $#tokens ? $_ + 1 : $_ } @carried;
+  }
+
   sub shell_reads_stdin {
     my @args = @_;
     my $stdin_script = 0;
@@ -901,10 +922,16 @@ SEGMENTER_PL='
   # A string handed to a shell (`bash -c "..."`, `eval "..."`) is commands too; it goes back
   # into the queue, a few levels deep.
   my @queue = map { [$_, 0] } grep { /\S/ } inspected_segments($cmd_scan);
+  my $carried = $ENV{"CARRIED"} // q{};
   while (my $item = shift @queue) {
     my ($segment, $depth) = @$item;
     my @tokens = words($segment);
     next unless @tokens;
+    if (length $carried) {
+      # CARRIED=<regex>: print the segment when find/xargs carries a command matching it.
+      # The rest of the loop still runs, so shell strings inside are unpacked and checked too.
+      print join(" ", @tokens), "\n" if grep { command_base($tokens[$_]) =~ /$carried/ } carried_indices(@tokens);
+    }
     for my $index (command_indices(@tokens)) {
       next unless $index <= $#tokens;
       my $base = command_base($tokens[$index]);
@@ -1224,9 +1251,25 @@ fi
 # above without its flags: `find ~ -delete` and `find "$HOME" -exec rm -f {} +` passed
 # (WP-529 Ф270, RT-2 of the v0.42.0-rc.1 red team). The walked tree is only known at run time,
 # so a temporary root in the text does not exempt it, as with rm.
-FIND_DELETE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-delete( |$)|(^| )-(exec|execdir|ok|okdir) ([^ ]*/)?(rm|unlink|shred)(\.exe)?( |$)' || true)
-if [ -n "$FIND_DELETE_INVOCATIONS" ]; then
-  block "find с удалением (-delete или -exec rm/unlink/shred) запрещён — удаляет всё найденное в дереве, необратимо. Найди файлы без удаления, проверь список и удаляй через $GUARDED_RM конкретные цели. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+# rc.2 red team (RT2-1): a wrapper between -exec and rm (`-exec env rm`, `nice rm`, `busybox rm`)
+# and `find … | xargs rm` passed; the carried command is now found past wrappers by the segmenter.
+FIND_DELETE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-delete( |$)' || true)
+CARRIED_DELETE_INVOCATIONS=$(printf '%s' "$CMD_EXEC" | MODE=match NAME=iwe-no-such-command CARRIED='^(?:rm|unlink|shred)$' perl -e "$SEGMENTER_PL")
+if [ -n "$FIND_DELETE_INVOCATIONS$CARRIED_DELETE_INVOCATIONS" ]; then
+  block "find или xargs с удалением (-delete, -exec rm/unlink/shred, xargs rm — в том числе через env, nice, busybox) запрещён — удаляет всё найденное в дереве, необратимо. Найди файлы без удаления, проверь список и удаляй через $GUARDED_RM конкретные цели. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# Commands that write a file named in their arguments rather than through a shell redirection:
+# `git diff --output=<file>` (also log, show and the other diff family) and find's
+# -fprint/-fprint0/-fprintf/-fls. Both programs are pre-approved in settings.json, so the write
+# runs without a prompt, and the red team zeroed .claude/hooks/destructive-guard.sh with one and
+# switched every check off (WP-529 Ф270, RT2-3 of the v0.42.0-rc.2 red team). The target is often
+# a variable, so it is the option that is refused, on any path; write through `>` instead.
+# git also accepts the abbreviations --outp/--outpu; --output-indicator-* is a different option.
+GIT_OUTPUT_INVOCATIONS=$(shell_invocations git | grep -E -- '(^| )--outpu?t?(=| |$)' || true)
+FIND_WRITE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-(fprint0?|fprintf|fls)( |$)' || true)
+if [ -n "$GIT_OUTPUT_INVOCATIONS$FIND_WRITE_INVOCATIONS" ]; then
+  block "git --output и find -fprint/-fprintf/-fls запрещены — пишут в файл из аргумента без запроса и уже затирали защитные проверки. Пиши через перенаправление: git diff > файл, find … > файл. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
