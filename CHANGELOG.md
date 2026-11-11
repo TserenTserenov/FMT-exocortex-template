@@ -25,6 +25,10 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] `scripts/iwe-agent-dispatcher.py`: в реестр исполнителей добавлен третий рантайм `dsh` (`dsh headless --json`) — синхронный, без канала heartbeat, ключ `DEEPSEEK_API_KEY` подставляется из `.secrets/deepseek-api-key`, если переменной нет в окружении (диспетчер запускается из cron). Исполнитель по умолчанию читается из `IWE_DISPATCHER_DEFAULT_EXECUTOR` и проверяется при загрузке: неизвестное значение (опечатка вроде `deepseek` вместо `dsh`) пишется предупреждением `WARN` и заменяется на `claude` — иначе откат `resolve_executor()` падал бы с `KeyError` и задача не выполнялась бы вовсе. `scripts/gate_launch_usage.py` разбирает машинный вывод DSH: ответ берётся из события `final`, незавершённый `reason` помечает прогон ошибкой, прогон без финального события получает `missing_result`. Копии в `extensions/agent-inbox/scripts` синхронизированы, тесты — `scripts/tests/test_dispatcher_dsh_executor.py` (WP-53, #1504).
+  - Цель: 77 · Результат: служебное — фоновые роли IWE могут исполняться на DeepSeek (`dsh headless`) без правки кода; по умолчанию остаётся `claude`, набор файлов у пользователя не меняется
+  - Как проверить: `python3 -m pytest scripts/tests/test_dispatcher_dsh_executor.py` — 21 проверка (событие `final`, откат `resolve_executor`, `env_overrides`, `build_cmd`)
+  - Как откатить: git revert слияния этого PR
 - [optional] (#1523) Описание процесса выпуска называет вердикт независимой атаки словами навыка `iwe-platform-redteam`: GO / CAUTION / BLOCKED, а `cannot_verify` — не пройдено (было STABLE, которого навык не выдаёт).
   - Цель: 77 · Результат: служебное — согласование слов вердикта в документации выпуска; пользователь его не видит
   - Как проверить: `grep -n 'GO / CAUTION' docs/RELEASE-PROCESS.md` находит строку, `grep -c STABLE docs/RELEASE-PROCESS.md` даёт 0

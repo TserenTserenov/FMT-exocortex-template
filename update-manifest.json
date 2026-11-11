@@ -917,7 +917,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "b93f0fe59b014410aad579bea789d627ac5e544bfe8910d5ca53efe1368f1a6f"
+      "sha256": "fdd5ba10f7f64bb45c05c1877101b284bb017fe6b8e2a0a39a79864539a0ba9b"
     },
     {
       "path": ".gitignore",
@@ -945,7 +945,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "de23bbb26493943bfb4495624b2cfc70d1e77745a3e23ac808727844f4800c0f"
+      "sha256": "926c9b89a4495b637e23414f72ab6d9572c11da358ce291c3665aba1399429a1"
     },
     {
       "path": "CLAUDE.md",
@@ -1193,11 +1193,11 @@
     },
     {
       "path": "extensions/agent-inbox/scripts/gate_launch_usage.py",
-      "sha256": "6fdd28758c5d681203a8be0ac9a2a7176b36c14a8278eb318662cbfa04fe0c26"
+      "sha256": "541023e45633ce740c05775ea23a24392927e5f5c6632ee720e4872e1bb097c2"
     },
     {
       "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
-      "sha256": "56f68d9a3ed2ab84824f5988fc5c45beb32bc9db866fb7223c5beea7cfdbf6d0"
+      "sha256": "32860f1cd392b14d9de515b678d1c9f5fab7283cfe2668eae58aa81631dc5db5"
     },
     {
       "path": "extensions/agent-inbox/templates/_template.md",
@@ -2521,7 +2521,7 @@
     },
     {
       "path": "scripts/gate_launch_usage.py",
-      "sha256": "6fdd28758c5d681203a8be0ac9a2a7176b36c14a8278eb318662cbfa04fe0c26"
+      "sha256": "541023e45633ce740c05775ea23a24392927e5f5c6632ee720e4872e1bb097c2"
     },
     {
       "path": "scripts/generate-catalogs.py",
@@ -2589,7 +2589,7 @@
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
-      "sha256": "56f68d9a3ed2ab84824f5988fc5c45beb32bc9db866fb7223c5beea7cfdbf6d0"
+      "sha256": "32860f1cd392b14d9de515b678d1c9f5fab7283cfe2668eae58aa81631dc5db5"
     },
     {
       "path": "scripts/iwe-audit.sh",
@@ -3579,6 +3579,7 @@
     "scripts/tests/test_day_open_preflight_calendar_path.sh",
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
+    "scripts/tests/test_dispatcher_dsh_executor.py",
     "scripts/tests/test_dry_run_gate.py",
     "scripts/tests/test_export_glossary_snapshot.py",
     "scripts/tests/test_extractor_branch_cleanup.sh",

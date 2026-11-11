@@ -929,7 +929,19 @@ EXECUTORS: dict[str, "Executor"] = {
 }
 # WP-53: the default runtime is configurable so a DeepSeek-run installation can
 # stop depending on the Claude CLI without editing this file.
-DEFAULT_EXECUTOR = os.environ.get("IWE_DISPATCHER_DEFAULT_EXECUTOR", "claude")
+# The value is validated here, at load: an unknown name (a typo such as
+# `deepseek` instead of `dsh`) must never reach EXECUTORS[...] below, because
+# the fallback plan in resolve_executor() would then raise KeyError and the task
+# would not run at all instead of falling back to Claude.
+_DEFAULT_EXECUTOR_ENV = os.environ.get("IWE_DISPATCHER_DEFAULT_EXECUTOR", "claude")
+DEFAULT_EXECUTOR = (_DEFAULT_EXECUTOR_ENV or "").strip().lower() or "claude"
+if DEFAULT_EXECUTOR not in EXECUTORS:
+    log(
+        f"Unknown IWE_DISPATCHER_DEFAULT_EXECUTOR={_DEFAULT_EXECUTOR_ENV!r} — "
+        "using 'claude'",
+        "WARN",
+    )
+    DEFAULT_EXECUTOR = "claude"
 
 
 def resolve_executor(executor_key: str | None) -> "Executor":
