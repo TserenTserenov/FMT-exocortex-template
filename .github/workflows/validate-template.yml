@@ -394,6 +394,8 @@ jobs:
           /bin/bash scripts/tests/test-wp529-f270-step0-no-downgrade.sh
           /bin/bash scripts/tests/test-wp529-f270-exec-bit.sh
           /bin/bash scripts/tests/test-wp529-f270-rollback-cleanup.sh
+          /bin/bash scripts/tests/test-wp529-f270-settings-merge-report.sh
+          /bin/bash scripts/tests/test-wp529-f270-core-mode-feeders.sh
 
   # Upgrade-flow regression test (0.29.18).
   # Root of the bug (0.29.13): template-sync overwrote FMT files -- the fresh

@@ -71,6 +71,22 @@ expect "> settings.local.json" block 'echo {} >.claude/settings.local.json'
 expect "tee onto bin" block 'echo x | tee .claude/bin/guarded-rm'
 expect "tee -a onto hook" block 'echo x | tee -a "$HOME/IWE/.claude/hooks/x.sh"'
 
+# === rc.5 red team (RT5-3): tracking config, pruning, emptying files with readers ===
+expect "branch --unset-upstream" block 'git branch --unset-upstream'
+expect "branch -u" block 'git branch -u origin/main'
+expect "branch --set-upstream-to" block 'git branch --set-upstream-to=origin/main'
+expect "remote update --prune" block 'git remote update --prune'
+expect "remote update -p" block 'git remote update origin -p'
+expect "remote update" pass 'git remote update'
+expect "cat /dev/null > WeekPlan" block 'cat /dev/null > DS-strategy/current/WeekPlan.md'
+expect "head -c0 > params" block 'head -c0 /dev/null > params.yaml'
+expect "head -c 0 > file" block 'head -c 0 README.md > notes.md'
+expect "tail -n0 > file" block 'tail -n0 x > memory/a.md'
+expect "cat /dev/null > tmp" pass 'cat /dev/null > /tmp/empty.txt'
+expect "cat /dev/null > TMPDIR" pass 'cat /dev/null > "$TMPDIR/empty.txt"'
+expect "cat with 2>/dev/null" pass 'cat README.md 2>/dev/null | head -5'
+expect "head -n 20" pass 'head -n 20 README.md'
+
 # === listing and harmless forms pass ===
 expect "branch list" pass 'git branch'
 expect "branch -a -vv" pass 'git branch -a -vv'

@@ -209,6 +209,14 @@ if [ -n "\${SHIM_MIDMARKER_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; t
     [ -n "\$out" ] && printf '#!/bin/bash\n# update-sh-integrity: end-marker-required\n# --- end of update.sh ---\necho cut-off tail\n' > "\$out"
     exit 0
 fi
+# SHIM_FLIP_UPDATE_SH (WP-529 Ф270, RT5-1 of the rc.5 red team): every fetch serves a DIFFERENT
+# whole update.sh (a counter comment before the end marker), like a channel whose tag moves on each
+# request. Without a guard Step 0 replaced and re-executed forever.
+if [ -n "\${SHIM_FLIP_UPDATE_SH:-}" ] && [ "\${url##*/}" = "update.sh" ]; then
+    n=\$(( \$(cat "\$SHIM_FLIP_UPDATE_SH" 2>/dev/null || echo 0) + 1 )); echo "\$n" > "\$SHIM_FLIP_UPDATE_SH"
+    [ -n "\$out" ] && { sed '\$d' "$UPSTREAM/update.sh"; echo "# flip \$n"; tail -n 1 "$UPSTREAM/update.sh"; } > "\$out"
+    exit 0
+fi
 [ -z "\$out" ] && exit 0
 serve "\$url" "\$out"
 SHIMEOF
@@ -459,6 +467,40 @@ if [ -z "$STEP0_LEFTOVERS" ]; then
   pass "no temp directory left behind by the Step 0 re-exec"
 else
   fail "Step 0 re-exec left temp files behind: $(printf '%s' "$STEP0_LEFTOVERS" | tr '\n' ' ')"
+fi
+
+# --- A channel that serves a new update.sh on every request (RT5-1) -------------
+echo "--- update.sh changes again right after the re-exec: stop, no loop ---"
+FLIP_REPO="$TEST_ROOT/repo-flip"
+cp -R "$TEST_ROOT/repo" "$FLIP_REPO"
+FLIP_COUNT="$TEST_ROOT/flip-count"
+: > "$FLIP_COUNT"
+set +e
+# A watchdog instead of timeout(1), which macOS lacks: a loop is killed after 120 s, not run forever.
+PATH="$SHIM_DIR:$PATH" HOME="$FAKE_HOME" IWE_UPDATE_CHANNEL=main SHIM_FLIP_UPDATE_SH="$FLIP_COUNT" \
+    bash "$FLIP_REPO/FMT-exocortex-template/update.sh" --yes > "$TEST_ROOT/flip.log" 2>&1 &
+FLIP_PID=$!
+( sleep 120; kill "$FLIP_PID" 2>/dev/null ) &
+FLIP_WATCHDOG=$!
+wait "$FLIP_PID"
+FLIP_RC=$?
+kill "$FLIP_WATCHDOG" 2>/dev/null
+wait "$FLIP_WATCHDOG" 2>/dev/null
+set -e
+if [ "$FLIP_RC" -eq 2 ] && grep -q "снова изменился сразу после перезапуска" "$TEST_ROOT/flip.log"; then
+  pass "second change after the re-exec stops the run (exit 2)"
+else
+  fail "flip channel: exit $FLIP_RC, tail: $(tail -3 "$TEST_ROOT/flip.log" | tr '\n' ' ')"
+fi
+if [ "$(cat "$FLIP_COUNT")" = "2" ]; then
+  pass "update.sh fetched exactly twice (one replacement, one re-check)"
+else
+  fail "update.sh fetched $(cat "$FLIP_COUNT") times — the re-exec loop is back"
+fi
+if grep -q "^# flip 1$" "$FLIP_REPO/FMT-exocortex-template/update.sh"; then
+  pass "the first replacement stays; the second one was not applied"
+else
+  fail "update.sh after the stop is not the first replacement"
 fi
 
 echo
