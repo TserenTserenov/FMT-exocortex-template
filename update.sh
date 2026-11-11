@@ -1474,10 +1474,15 @@ apply_settings_merge_if_requested() {
         echo "  ⚠ --apply-settings-merge: python3 или $applier недоступны — слияние не применено"
         return 0
     fi
-    local apply_rc=0 apply_out
+    local apply_rc=0 apply_out dst_before
+    dst_before=$(hash_file "$dst")
     apply_out=$(bash "$applier" "$src" "$dst" "$PY_BIN" 2>&1) || apply_rc=$?
     printf '%s\n' "$apply_out" | sed 's/^/    /'
-    if [ "$apply_rc" -eq 0 ]; then
+    if [ "$apply_rc" -eq 0 ] && [ "$(hash_file "$dst")" = "$dst_before" ]; then
+        # Own hooks keep the file different from the template while the merge adds nothing; the
+        # line said "обновлён" after every rollback re-run (WP-529 Ф270, RT5-4 of the rc.5 red team).
+        echo "  .claude/settings.json — слияние ничего не изменило, файл прежний"
+    elif [ "$apply_rc" -eq 0 ]; then
         echo "  ✓ .claude/settings.json — обновлён слиянием (--apply-settings-merge)"
     else
         echo "  ⚠ .claude/settings.json — слияние не применено (см. причину выше), workspace-копия цела"
@@ -3048,6 +3053,13 @@ backfill_extractor_feeders() {
         echo "  ○ Экстрактор: пропущен (IWE_SKIP_EXTRACTOR_FEEDERS=1)."
         return 0
     fi
+    # setup.sh --core leaves automation out and records it; an update must not add it behind the
+    # user's back (WP-529 Ф270, RT5-2 of the rc.5 red team).
+    if [ "$(head -n 1 "$WORKSPACE_DIR/.iwe-install-mode" 2>/dev/null)" = "core" ]; then
+        echo "  ○ Экстрактор: установка в урезанном режиме (--core) — расписание не заводим."
+        echo "    Включить: bash $feeders"
+        return 0
+    fi
     # issue #768: the feeders script schedules a real launchd job under the
     # current user's real $HOME — a foreign/unowned host-global state must
     # not have that job's workspace pointer rewritten onto this copy.
@@ -3707,29 +3719,47 @@ resolve_delivery_ref() {
             echo "  Повторите на машине с python3 или выберите другой канал (release/main)." >&2
             exit "$EXIT_NETWORK"
         fi
+        # The API returns at most 100 refs per page; the template passed 48 tags at 0.42, so read
+        # page by page until a short page (WP-529 Ф270, RT5-5 of the rc.5 red team). A page that
+        # fails, or 20 full pages, is fail-closed: a partial list could hide the newest candidate.
         refs_json=""
-        if refs_json=$(github_api_get "$API_BASE/git/matching-refs/tags/v"); then
-            api_status=0
-        else
-            api_status=$?
-        fi
-        if [ "$api_status" -ne 0 ]; then
-            echo "ОШИБКА: не удалось получить список rc-тегов (API недоступен)." >&2
-            echo "  Канал rc fail-closed: без списка кандидатов обновление не выполняется." >&2
-            exit "$EXIT_NETWORK"
-        fi
-        rc_tag=$(printf '%s\n' "$refs_json" | "$PY_BIN" -c '
+        local page=1 page_json page_count
+        while :; do
+            if page_json=$(github_api_get "$API_BASE/git/matching-refs/tags/v?per_page=100&page=$page"); then
+                api_status=0
+            else
+                api_status=$?
+            fi
+            if [ "$api_status" -ne 0 ]; then
+                echo "ОШИБКА: не удалось получить список rc-тегов (API недоступен, страница $page)." >&2
+                echo "  Канал rc fail-closed: без списка кандидатов обновление не выполняется." >&2
+                exit "$EXIT_NETWORK"
+            fi
+            # One compact line per page: the API pretty-prints, the parser below reads line by line.
+            page_json=$(printf '%s\n' "$page_json" | "$PY_BIN" -c 'import json, sys; print(json.dumps(json.load(sys.stdin)))' 2>/dev/null) || page_json=""
+            page_count=$(printf '%s\n' "$page_json" | "$PY_BIN" -c 'import json, sys; print(len(json.load(sys.stdin)))' 2>/dev/null) || page_count=""
+            if [ -z "$page_count" ]; then
+                echo "ОШИБКА: список rc-тегов не распознан (страница $page)." >&2
+                exit "$EXIT_NETWORK"
+            fi
+            refs_json="$refs_json$page_json"$'\n'
+            [ "$page_count" -lt 100 ] && break
+            page=$((page + 1))
+            if [ "$page" -gt 20 ]; then
+                echo "ОШИБКА: rc-тегов больше 2000 — список не дочитан, канал rc fail-closed." >&2
+                exit "$EXIT_NETWORK"
+            fi
+        done
+        rc_tag=$(printf '%s' "$refs_json" | "$PY_BIN" -c '
 import json, re, sys
 best = None
+items = []
 try:
-    items = json.load(sys.stdin)
+    for line in sys.stdin.read().splitlines():
+        if line.strip():
+            items.extend(json.loads(line))
 except ValueError:
     raise SystemExit(1)
-# Full page (100) means the answer may be truncated — the true maximum could
-# sit on the next page. Fail closed instead of picking a stale candidate.
-if len(items) >= 100:
-    print("too many tags, pagination required", file=sys.stderr)
-    raise SystemExit(2)
 for item in items:
     m = re.fullmatch(r"refs/tags/v(\d+)\.(\d+)\.(\d+)-rc\.(\d+)", item.get("ref", ""))
     if m:
@@ -3740,7 +3770,7 @@ if best is None:
     raise SystemExit(1)
 print(best[1])') || rc_tag=""
         if [ -z "$rc_tag" ]; then
-            echo "ОШИБКА: кандидатов в выпуск (теги v*-rc.N) нет, либо список тегов не поместился в один ответ API." >&2
+            echo "ОШИБКА: кандидатов в выпуск (теги v*-rc.N) нет." >&2
             echo "  Канал rc работает только от опубликованного кандидата (fail-closed)." >&2
             echo "  Дождитесь кандидата (Release Candidate) или выберите другой канал (release/main)." >&2
             exit "$EXIT_NETWORK"
@@ -4035,6 +4065,14 @@ else
         # rollback installs it at the end of this run (replace_updater_after_rollback).
         echo "  ⚠ update.sh выпуска старше установленного — не заменяю его: сначала решение об откате."
         STEP0_OLDER_UPDATER="$REMOTE_UPDATE"
+    elif [ -n "${IWE_UPDATE_STEP0_REEXECED:-}" ]; then
+        # This process is already the re-executed new updater, and the server serves yet another
+        # update.sh: the channel answers inconsistently (a tag moving right now, a flapping API).
+        # Replacing again looped forever — 401 re-execs in 240 s on the rc.5 red team (WP-529 Ф270,
+        # RT5-1). Stop before touching anything; a later run sees a settled channel.
+        echo "ОШИБКА: update.sh на сервере снова изменился сразу после перезапуска — версия меняется прямо сейчас." >&2
+        echo "  Обновление остановлено, файлы не тронуты. Повторите через несколько минут." >&2
+        exit "$EXIT_NETWORK"
     else
         echo "  Найдена новая версия update.sh — обновляю..."
         # issue #505 class (residual, found in the same sweep): replace
@@ -4051,6 +4089,7 @@ else
         # #1010 F17: exec replaces the process, so the EXIT trap never runs and the temp
         # directory (update.sh.new, update.sh.err) would stay behind: remove it first.
         rm -rf "$TMPDIR_UPDATE"
+        export IWE_UPDATE_STEP0_REEXECED=1
         exec bash "$SCRIPT_DIR/update.sh" "$@"
     fi
 fi

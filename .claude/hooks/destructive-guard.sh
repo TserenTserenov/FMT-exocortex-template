@@ -1304,10 +1304,12 @@ fi
 # set-url/remove/add` points origin elsewhere (WP-529 Ф270, F2 of the v0.42.0-rc.4 red team).
 # Short options cluster (`-Dr`), and git accepts any unambiguous prefix of a long option
 # (`--del`, `--forc`, `--mo`). Creating a branch and every listing form stay allowed.
-GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMC][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move))( |=|$)' || true)
-GIT_REMOTE_WRITE=$(git_segment remote | grep -E -- ' remote( -v| --verbose)* (add|rename|remove|rm|set-head|set-branches|set-url|prune)( |$)' || true)
+# rc.5 red team (RT5-3): `git branch --unset-upstream`/`-u` rewrites the tracking config and
+# `git remote update --prune` deletes remote-tracking branches; both passed the same way.
+GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMCu][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move|unset-upstream|set-upstream-to|set-upstream))( |=|$)' || true)
+GIT_REMOTE_WRITE=$(git_segment remote | grep -E -- ' remote( -v| --verbose)* ((add|rename|remove|rm|set-head|set-branches|set-url|prune)( |$)|update( .*)? (--prune|-p)( |$))' || true)
 if [ -n "$GIT_BRANCH_WRITE$GIT_REMOTE_WRITE" ]; then
-  block "git branch -d/-D/-f/-m/-M/-C и git remote add/rename/remove/set-url/set-head/set-branches/prune запрещены — разрешены без запроса только для просмотра, а эти формы удаляют ветку или меняют адрес хранилища. Просмотр (git branch, git branch -a -vv, git remote -v, git remote get-url) работает; удаление ветки и смену адреса делает пилот сам. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+  block "git branch -d/-D/-f/-m/-M/-C/-u, --unset-upstream и git remote add/rename/remove/set-url/set-head/set-branches/prune, git remote update --prune запрещены — разрешены без запроса только для просмотра, а эти формы удаляют ветку или меняют адрес хранилища. Просмотр (git branch, git branch -a -vv, git remote -v, git remote get-url) работает; удаление ветки и смену адреса делает пилот сам. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # rg reads extra options, --pre among them, from the file named by RIPGREP_CONFIG_PATH; with rg
@@ -1317,6 +1319,16 @@ fi
 # literal-text checks: a path held in a variable is not seen (docs/DESTRUCTIVE-GUARD.md).
 if matches "$CMD_EXEC" -E 'RIPGREP_CONFIG_PATH'; then
   block "RIPGREP_CONFIG_PATH запрещён — файл настроек rg может включить --pre, который запускает программу на каждом найденном файле. Ищи обычным rg с ключами в самой команде. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+# Emptying a file with a pre-approved reader: `cat /dev/null > F`, `head -c0 F2 > F` (rc.5 red
+# team, RT5-3: WeekPlan.md and params.yaml zeroed without a prompt). The reader's input is
+# /dev/null or a zero count; a target in a temporary directory stays allowed. `2>/dev/null` is a
+# redirection, not an input, and does not count.
+if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:space:]])?[[:space:]]+/dev/null|(head|tail)[[:space:]][^;&|>]*-[cn][[:space:]]*0([[:space:]]|$))[^;&|]*[^0-9&>]>[[:space:]]*[^&>[:space:]]' \
+  && printf '%s' "$CMD_EXEC" | grep -oE '[^0-9&>]>[[:space:]]*["'"'"']?[^&>[:space:];|"'"'"']+' \
+     | sed -E 's/^.>[[:space:]]*["'"'"']?//' \
+     | grep -vqE '^(/dev/null$|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR|\$\{TMPDIR)'; then
+  block "обнуление файла читающей командой (cat /dev/null > файл, head -c0 … > файл) запрещено — так без запроса стирают планы и настройки. Пустой файл во временной папке создавать можно; удалять содержимое рабочих файлов — правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 if matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
   block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
