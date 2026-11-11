@@ -78,7 +78,7 @@ expect "find -exec ln -sf" block 'find . -maxdepth 0 -exec ln -sf /dev/null .cla
 expect "rg --pre rm" block 'rg --pre rm x .'
 expect "rg --pre=script" block 'rg --pre=./p.sh x'
 expect "find -exec cat" pass 'find . -name "*.md" -exec cat {} +'
-expect "find -exec sha256sum" pass 'find . -type f -exec sha256sum {} +'
+expect "find -exec cksum" pass 'find . -type f -exec cksum {} +'
 expect "find -exec env grep" pass 'find . -exec env grep -l x {} +'
 expect "rg plain search" pass "rg -n 'pre' docs/"
 

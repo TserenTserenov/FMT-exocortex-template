@@ -229,7 +229,7 @@
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
-      "sha256": "e38f3e658ebc862d17ddad84c47a9cd23f3ae0388201a50289112402391dd588"
+      "sha256": "3c4a58b580efba5525c713e190fffab9835e7b023cbde0f0dfdb9e10c4be70f0"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -925,7 +925,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "99eeb30c03000bb6097461c332c51b850a3a35799e993ed9cf8545a9cb7b1cc0"
+      "sha256": "8fd89ed2eba27e47c4ead067111e18d9a4a6df764b0b5d903fd42b509edc9c50"
     },
     {
       "path": ".gitignore",
