@@ -5836,11 +5836,15 @@ update_mode_plus_x() {
 # `curl -o` without permissions, so +x is set at delivery (on a temporary
 # file before rename). issue #308: .githooks/* is not cosmetic (git silently skips a
 # non-executable hook); wp-list.py/check-claude-md-links.py — 755 in git upstream.
+# WP-529 Ф270 (F1 of the rc.3 red team): 54 programs that are 755 in git matched no pattern and
+# arrived non-executable on upgrade (scripts/iwe-notify among them: notify.sh looks it up with
+# `[ -x ]`, so every Telegram notification stopped). A delivered file that starts with `#!` is
+# a program meant to be run directly, so it gets +x too; SRC is the downloaded payload.
 update_needs_exec_bit() {
     case "$1" in
         *.sh | .githooks/* | .claude/bin/* | scripts/wp-list.py | scripts/check-claude-md-links.py) return 0 ;;
-        *) return 1 ;;
     esac
+    [ -n "${2:-}" ] && [ -f "$2" ] && [ "$(head -c 2 "$2")" = "#!" ]
 }
 
 # update_dest_mode REL — current permissions of the target in the clone: cp into an existing file
@@ -5899,14 +5903,14 @@ update_plan_add_file() {
             echo "ОШИБКА: не прочитать права цели $_rel; прогон остановлен до первой записи." >&2
             exit "$EXIT_RUNTIME"
         }
-        if update_needs_exec_bit "$_rel"; then
+        if update_needs_exec_bit "$_rel" "$_src"; then
             _mode=$(update_mode_plus_x "$_mode")
         fi
         update_plan_add replace "$_rel" "$_src" "$_mode"
     else
         update_plan_mkdirs_for "$_rel"
         _mode=$(update_mode_umask 666)
-        if update_needs_exec_bit "$_rel"; then
+        if update_needs_exec_bit "$_rel" "$_src"; then
             _mode=$(update_mode_plus_x "$_mode")
         fi
         update_plan_add write "$_rel" "$_src" "$_mode"

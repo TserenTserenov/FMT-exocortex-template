@@ -789,12 +789,20 @@ SEGMENTER_PL='
     return () unless defined $first;
     my @carried;
     push @carried, $first if grep { command_base($tokens[$_]) eq "xargs" } 0 .. $first - 1;
-    if (command_base($tokens[$first]) eq "find") {
-      for (my $j = $first + 1; $j < $#tokens; $j++) {
-        next unless $tokens[$j] =~ /^-(?:exec|execdir|ok|okdir)$/;
-        my ($inner) = command_indices(@tokens[$j + 1 .. $#tokens]);
-        push @carried, $j + 1 + $inner if defined $inner;
-      }
+    push @carried, find_carried_indices(@tokens);
+    return map { command_base($tokens[$_]) eq "busybox" && $_ < $#tokens ? $_ + 1 : $_ } @carried;
+  }
+
+  sub find_carried_indices {
+    # Positions of the commands find runs per item (-exec/-execdir/-ok/-okdir), past wrappers.
+    my @tokens = @_;
+    my ($first) = command_indices(@tokens);
+    return () unless defined $first && command_base($tokens[$first]) eq "find";
+    my @carried;
+    for (my $j = $first + 1; $j < $#tokens; $j++) {
+      next unless $tokens[$j] =~ /^-(?:exec|execdir|ok|okdir)$/;
+      my ($inner) = command_indices(@tokens[$j + 1 .. $#tokens]);
+      push @carried, $j + 1 + $inner if defined $inner;
     }
     return map { command_base($tokens[$_]) eq "busybox" && $_ < $#tokens ? $_ + 1 : $_ } @carried;
   }
@@ -923,6 +931,7 @@ SEGMENTER_PL='
   # into the queue, a few levels deep.
   my @queue = map { [$_, 0] } grep { /\S/ } inspected_segments($cmd_scan);
   my $carried = $ENV{"CARRIED"} // q{};
+  my $find_allowed = $ENV{"FIND_ALLOWED"} // q{};
   while (my $item = shift @queue) {
     my ($segment, $depth) = @$item;
     my @tokens = words($segment);
@@ -931,6 +940,10 @@ SEGMENTER_PL='
       # CARRIED=<regex>: print the segment when find/xargs carries a command matching it.
       # The rest of the loop still runs, so shell strings inside are unpacked and checked too.
       print join(" ", @tokens), "\n" if grep { command_base($tokens[$_]) =~ /$carried/ } carried_indices(@tokens);
+    }
+    if (length $find_allowed) {
+      # FIND_ALLOWED=<regex>: print the segment when find runs a command NOT matching it.
+      print join(" ", @tokens), "\n" if grep { command_base($tokens[$_]) !~ /$find_allowed/ } find_carried_indices(@tokens);
     }
     for my $index (command_indices(@tokens)) {
       next unless $index <= $#tokens;
@@ -1257,6 +1270,20 @@ FIND_DELETE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-delete( |$)
 CARRIED_DELETE_INVOCATIONS=$(printf '%s' "$CMD_EXEC" | MODE=match NAME=iwe-no-such-command CARRIED='^(?:rm|unlink|shred)$' perl -e "$SEGMENTER_PL")
 if [ -n "$FIND_DELETE_INVOCATIONS$CARRIED_DELETE_INVOCATIONS" ]; then
   block "find или xargs с удалением (-delete, -exec rm/unlink/shred, xargs rm — в том числе через env, nice, busybox) запрещён — удаляет всё найденное в дереве, необратимо. Найди файлы без удаления, проверь список и удаляй через $GUARDED_RM конкретные цели. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# find is pre-approved in settings.json, so whatever it runs per item runs without a prompt:
+# `-exec sh -c 'rm "$1"'`, `-exec truncate -s0`, `-exec cp /dev/null {}` (zeroes this hook, after
+# which `rm -rf ~/IWE` passes), `-exec mv`, `-exec sed -i d`, `-exec python3`, `-exec tee` (WP-529
+# Ф270, F2 of the v0.42.0-rc.3 red team). A list of forbidden commands is never complete, so find
+# may run only commands that read: anything else is refused. The same holds for rg --pre, which
+# runs its argument on every searched file.
+FIND_RUNS_WRITER=$(printf '%s' "$CMD_EXEC" | MODE=match NAME=iwe-no-such-command \
+  FIND_ALLOWED='^(?:grep|egrep|fgrep|rg|cat|head|tail|wc|ls|stat|file|basename|dirname|echo|printf|test|\[|true|false|readlink|realpath|sha256sum|sha1sum|sha512sum|md5sum|md5|shasum|cksum|du|cmp|diff)$' \
+  perl -e "$SEGMENTER_PL")
+RG_PRE_INVOCATIONS=$(shell_invocations rg | grep -E -- '(^| )--pre(-glob)?(=| |$)' || true)
+if [ -n "$FIND_RUNS_WRITER$RG_PRE_INVOCATIONS" ]; then
+  block "find -exec/-execdir/-ok может запускать только читающие команды (grep, cat, head, wc, stat, sha256sum …), rg --pre запрещён: оба разрешены без запроса, и через них удаляли файлы и затирали защитные проверки. Найди файлы без -exec, проверь список и меняй их отдельной командой. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # Commands that write a file named in their arguments rather than through a shell redirection:

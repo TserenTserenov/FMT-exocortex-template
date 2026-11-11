@@ -1,6 +1,7 @@
 #!/bin/bash
 # test-destructive-guard-find-delete.sh — WP-529 Ф270, RT-2 of the v0.42.0-rc.1 red team
-# (and RT2-1 of rc.2: a wrapper after -exec, deletion carried by xargs):
+# (and RT2-1 of rc.2: a wrapper after -exec, deletion carried by xargs; F2 of rc.3: find runs
+# only commands that read, rg --pre is refused):
 # destructive-guard.sh let `find` delete what it walks (`find ~ -delete`,
 # `find "$HOME" -exec rm -f {} +`) because only `rm -r -f` was refused. A find that
 # deletes must be refused; a find that only lists, or runs a non-deleting command, passes.
@@ -61,6 +62,25 @@ expect "find | xargs -0 rm" block 'find ~ -type f -print0 | xargs -0 rm'
 expect "find | xargs -n 1 /bin/rm" block 'find . -name x | xargs -n 1 /bin/rm'
 expect "xargs env rm" block 'ls | xargs env rm'
 expect "bash -c with find -exec env rm" block "bash -c 'find ~ -exec env rm {} +'"
+
+# === rc.3 red team (F2): find runs only commands that read; rg --pre is refused ===
+expect "find -exec sh -c rm" block "find ~ -type f -exec sh -c 'rm \"\$1\"' _ {} \;"
+expect "find -exec bash -c" block "find . -exec bash -c 'true' \;"
+expect "find -exec chrt rm" block 'find . -exec chrt -i 0 rm {} \;'
+expect "find -exec truncate" block 'find . -exec truncate -s0 {} \;'
+expect "find -exec cp /dev/null over the hook" block 'find . -maxdepth 0 -exec cp /dev/null .claude/hooks/destructive-guard.sh \;'
+expect "find -exec mv" block 'find . -name x -exec mv {} /tmp/y \;'
+expect "find -exec sed -i" block 'find . -name x -exec sed -i d {} +'
+expect "find -exec sort -o" block 'find . -maxdepth 0 -exec sort -o .claude/hooks/destructive-guard.sh /dev/null \;'
+expect "find -exec tee" block 'find . -maxdepth 0 -exec tee .claude/hooks/destructive-guard.sh \;'
+expect "find -exec python3" block "find . -maxdepth 0 -exec python3 -c 'pass' \;"
+expect "find -exec ln -sf" block 'find . -maxdepth 0 -exec ln -sf /dev/null .claude/hooks/destructive-guard.sh \;'
+expect "rg --pre rm" block 'rg --pre rm x .'
+expect "rg --pre=script" block 'rg --pre=./p.sh x'
+expect "find -exec cat" pass 'find . -name "*.md" -exec cat {} +'
+expect "find -exec sha256sum" pass 'find . -type f -exec sha256sum {} +'
+expect "find -exec env grep" pass 'find . -exec env grep -l x {} +'
+expect "rg plain search" pass "rg -n 'pre' docs/"
 
 # === non-deleting finds stay allowed ===
 expect "find -name -print" pass "find . -name '*.sh' -print"
