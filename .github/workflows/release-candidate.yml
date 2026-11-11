@@ -176,6 +176,8 @@ jobs:
   next-rc:
     if: github.repository == 'TserenTserenov/FMT-exocortex-template' && github.event.inputs.mode == 'next-rc'
     runs-on: ubuntu-latest
+    outputs:
+      rc_tag: ${{ steps.rc.outputs.rc_tag }}
     steps:
       - name: Check the version input
         env:
@@ -228,3 +230,24 @@ jobs:
           commit: ${{ steps.rc.outputs.rc_commit }}
           tree: ${{ steps.rc.outputs.rc_tree }}
           Проверку повторить на этом кандидате."
+
+  # WP-529 Ф270, F3 of the v0.42.0-rc.4 red team: no check ran update.sh from the published
+  # release to the candidate, so the path every user takes was proven only by hand. update.sh
+  # downloads by tag, so this runs once the candidate tag is pushed. A failure here means the
+  # candidate must not go to testers.
+  upgrade-from-release:
+    needs: next-rc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.next-rc.outputs.rc_tag }}
+          fetch-depth: 0
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3 jq
+      - name: Upgrade the last published release to the candidate with update.sh
+        run: |
+          PREV_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -v -- '-rc\.' | head -1)
+          [ -n "$PREV_TAG" ] || { echo "::error::нет опубликованного выпуска v*"; exit 1; }
+          bash setup/test-rc-upgrade-from-release.sh "${{ needs.next-rc.outputs.rc_tag }}" "$PREV_TAG" \
+            "https://github.com/${{ github.repository }}.git"

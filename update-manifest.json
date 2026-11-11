@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "f7ef01c57ebb0f4e645cc621a6813c3490f017b1cf0de839464bedea5fa113fb"
+      "sha256": "9479f3348982fa7452d9d5dc70616e6506083c05f0fe23a1ba7ce3a71a29ffd7"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -230,6 +230,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
       "sha256": "3c4a58b580efba5525c713e190fffab9835e7b023cbde0f0dfdb9e10c4be70f0"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-git-branch-remote.sh",
+      "sha256": "8d644b506797755b77b6f9e9251fa48ab3caa4a00d851a4231e5d83a4f191b29"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -653,7 +657,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "e3c2bfb29b1f69f454760002f9db34740e0929d9c5c0c9b8d5ba4bf50f918e45"
+      "sha256": "13d1e2b1edca44fa48c4e2406531ff34205af2f2766ae9bf920f283fefc6b5c4"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -925,7 +929,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "8fd89ed2eba27e47c4ead067111e18d9a4a6df764b0b5d903fd42b509edc9c50"
+      "sha256": "0d60e7f124dfb4c9a480e6dbc745ac26129f612b6c843742e95bef4f1209cad2"
     },
     {
       "path": ".gitignore",
@@ -953,7 +957,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d0caa95e864b8209d7afe4ff05fc49a604659410a5bed338822b9827d062a61b"
+      "sha256": "8e2de5581aa9cebd3c1f9ca723524f40138691346c74a2c6ad8a8ef48d6e1c49"
     },
     {
       "path": "CLAUDE.md",
@@ -1009,7 +1013,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "d33a1cdbcb3a7559e39cf425f8da1dbef0fe0b1cfccb9ec1629a809f6d51cda5"
+      "sha256": "79eedd2582484c91bb79ed80273cc81800dd328cf3ea4fa760ceaa410e66e84e"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -1146,6 +1150,10 @@
     {
       "path": "docs/release-audit-log.md",
       "sha256": "f7af94f354cae5edd59a32d2b2eb1f4ebaa3191fdc5f30ad6fa8f667c5494c01"
+    },
+    {
+      "path": "docs/releases/0.42/README.md",
+      "sha256": "dd0c3ea8d1ed8a26351fe78e9185971580d08d71c338a7e0d443c0b2770f4977"
     },
     {
       "path": "docs/response-clarity-catalog.md",
@@ -3501,7 +3509,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "382002bab3008e6d7ced8276ff5dd6e9024e5c7614f43f7235b75558a202ccc9"
+      "sha256": "e0b6b2355aad4cfe95d4fb4509f732ebe0de320af1722c2a247328705da4e086"
     }
   ],
   "excluded_paths": [
@@ -3569,6 +3577,7 @@
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
     "scripts/tests/test-wp529-f270-exec-bit.sh",
+    "scripts/tests/test-wp529-f270-rollback-cleanup.sh",
     "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
@@ -3873,6 +3882,7 @@
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
     "setup/test-issue-1441-roles-on-linux.sh",
     "setup/test-next-rc-tag.sh",
+    "setup/test-rc-upgrade-from-release.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",

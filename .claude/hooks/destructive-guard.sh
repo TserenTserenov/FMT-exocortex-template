@@ -1299,6 +1299,29 @@ if [ -n "$GIT_OUTPUT_INVOCATIONS$FIND_WRITE_INVOCATIONS" ]; then
   block "git --output и find -fprint/-fprintf/-fls запрещены — пишут в файл из аргумента без запроса и уже затирали защитные проверки. Пиши через перенаправление: git diff > файл, find … > файл. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
+# `git branch` and `git remote` are pre-approved in settings.json for listing, so their writing
+# forms ran without a prompt: `git branch -D/-f/-M` deletes or moves a branch, `git remote
+# set-url/remove/add` points origin elsewhere (WP-529 Ф270, F2 of the v0.42.0-rc.4 red team).
+# Short options cluster (`-Dr`), and git accepts any unambiguous prefix of a long option
+# (`--del`, `--forc`, `--mo`). Creating a branch and every listing form stay allowed.
+GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMC][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move))( |=|$)' || true)
+GIT_REMOTE_WRITE=$(git_segment remote | grep -E -- ' remote( -v| --verbose)* (add|rename|remove|rm|set-head|set-branches|set-url|prune)( |$)' || true)
+if [ -n "$GIT_BRANCH_WRITE$GIT_REMOTE_WRITE" ]; then
+  block "git branch -d/-D/-f/-m/-M/-C и git remote add/rename/remove/set-url/set-head/set-branches/prune запрещены — разрешены без запроса только для просмотра, а эти формы удаляют ветку или меняют адрес хранилища. Просмотр (git branch, git branch -a -vv, git remote -v, git remote get-url) работает; удаление ветки и смену адреса делает пилот сам. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# rg reads extra options, --pre among them, from the file named by RIPGREP_CONFIG_PATH; with rg
+# pre-approved that is `rg --pre` without the word on the command line. A shell redirection or
+# tee onto a protective file (.claude/hooks, .claude/bin, settings*.json) zeroes a check the way
+# the writes above did, after any pre-approved reader (`find … > .claude/hooks/x.sh`). Both are
+# literal-text checks: a path held in a variable is not seen (docs/DESTRUCTIVE-GUARD.md).
+if matches "$CMD_EXEC" -E 'RIPGREP_CONFIG_PATH'; then
+  block "RIPGREP_CONFIG_PATH запрещён — файл настроек rg может включить --pre, который запускает программу на каждом найденном файле. Ищи обычным rg с ключами в самой команде. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+if matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+  block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
 if matches "$CMD_EXEC" -iE '\b(psql|mysql|sqlite3)\b' && matches "$CMD_EXEC" -iE '\b(DROP[[:space:]]+(TABLE|SCHEMA|DATABASE)|TRUNCATE)\b'; then
   block "DROP/TRUNCATE через SQL-клиент запрещён — необратимая потеря данных. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."

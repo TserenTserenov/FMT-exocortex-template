@@ -393,6 +393,7 @@ jobs:
           /bin/bash scripts/tests/test-wp529-f261-rollback-by-installed-version.sh
           /bin/bash scripts/tests/test-wp529-f270-step0-no-downgrade.sh
           /bin/bash scripts/tests/test-wp529-f270-exec-bit.sh
+          /bin/bash scripts/tests/test-wp529-f270-rollback-cleanup.sh
 
   # Upgrade-flow regression test (0.29.18).
   # Root of the bug (0.29.13): template-sync overwrote FMT files -- the fresh
@@ -413,12 +414,18 @@ jobs:
       - name: Determine previous version
         id: prev
         run: |
-          # Найти предыдущий коммит, поднявший version в update-manifest.json.
-          # Логика: git log -p update-manifest.json → найти второй "version" bump
-          # → его commit hash. Это предыдущая опубликованная версия.
-          PREV_SHA=$(git log --format=%H -- update-manifest.json | sed -n '2p')
+          # Previous = the last published release tag other than HEAD itself. The second commit
+          # touching update-manifest.json was an internal commit of the candidate on a release
+          # branch (WP-529 Ф270, F3 of the rc.4 red team). The real update.sh run from the release
+          # to a candidate is release-candidate.yml, job upgrade-from-release.
+          HEAD_SHA=$(git rev-parse HEAD)
+          PREV_SHA=""
+          for t in $(git tag --merged HEAD --list 'v[0-9]*' --sort=-v:refname | grep -v -- '-rc\.'); do
+            c=$(git rev-list -n1 "$t")
+            [ "$c" != "$HEAD_SHA" ] && { PREV_SHA=$c; break; }
+          done
           if [ -z "$PREV_SHA" ]; then
-            echo "SKIP: нет предыдущей версии в истории update-manifest.json"
+            echo "SKIP: нет предыдущей опубликованной метки выпуска"
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -859,6 +866,7 @@ jobs:
           bash .claude/hooks/tests/test-destructive-guard-malformed-json.sh
           bash .claude/hooks/tests/test-destructive-guard-find-delete.sh
           bash .claude/hooks/tests/test-destructive-guard-file-writers.sh
+          bash .claude/hooks/tests/test-destructive-guard-git-branch-remote.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
