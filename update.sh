@@ -1222,6 +1222,15 @@ rollback_without_release_commit() {
     esac
 }
 
+# rollback_channel_hint — WP-529 Ф270 (RT2-4): the rollback warning used to send everyone to
+# IWE_UPDATE_CHANNEL=main, which from a candidate install is itself a rollback. Name the channel
+# that matches what is installed; every channel now asks for ROLLBACK when it would go back.
+rollback_channel_hint() {
+    echo "   Ставили кандидат выпуска — обновляйтесь его каналом: IWE_UPDATE_CHANNEL=rc bash update.sh"
+    echo "   Следите за основной веткой — её каналом: IWE_UPDATE_CHANNEL=main bash update.sh"
+    echo "   Любой канал, который вернёт установку назад, тоже спросит ROLLBACK."
+}
+
 # issue #863: detect when the default release channel would roll back an install
 # that is already newer than the latest published release. Fires in release
 # channel when SCRIPT_DIR is a git repo and local HEAD contains commits that are
@@ -1237,14 +1246,15 @@ rollback_without_release_commit() {
 # A release commit that cannot be fetched from origin (#1411) is ordered by version too, see
 # rollback_without_release_commit.
 detect_release_rollback() {
-    [ "$UPDATE_CHANNEL" = "release" ] || return 1
-    [ -n "$RELEASE_SHA" ] || return 1
     # WP-529 Ф261 (finding 3 of the 10.11 pipeline review): an installed manifest newer than
     # the release is a rollback whatever git ancestry says. update.sh never moves HEAD of the
     # template folder, so a clone checked out at v0.41.11 can carry 0.42 files and a 0.42
     # manifest; ancestry then reads "release == HEAD" and reports no rollback, and the files
     # are rewritten without ROLLBACK. Versions are compared first, ancestry stays the second
     # signal (equal versions, local commits ahead of the release: #863).
+    # WP-529 Ф270 (RT2-4 of the rc.2 red team): the version comparison runs on every channel.
+    # From a candidate install, IWE_UPDATE_CHANNEL=main (main still at 0.41.11 until the
+    # release merge) rewrote the files to 0.41.11 without ROLLBACK and left a mixed state.
     local installed_version version_order
     if [ -f "$SCRIPT_DIR/update-manifest.json" ]; then
         installed_version=$(manifest_version "$SCRIPT_DIR/update-manifest.json")
@@ -1253,6 +1263,9 @@ detect_release_rollback() {
             return 0
         fi
     fi
+    # Ancestry is a release-channel signal only: main and rc move ahead of the release by design.
+    [ "$UPDATE_CHANNEL" = "release" ] || return 1
+    [ -n "$RELEASE_SHA" ] || return 1
     git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
     local local_sha release_sha merge_base commit_json
     local_sha=$(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null) || return 1
@@ -4119,13 +4132,13 @@ if $CHECK_ONLY && $FAST_CHECK; then
         [ "$_fast_last_rc" -eq 2 ] && _fast_rollback_code=2
     fi
     if [ "$_fast_rollback_code" -eq 0 ]; then
-        echo "🔴 ВНИМАНИЕ: локальная установка новее последнего релиза."
-        echo "   Применение обновления release-каналом ОТКАТИТ установку на более старый снимок."
-        echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+        echo "🔴 ВНИМАНИЕ: локальная установка новее того, что доставит этот канал."
+        echo "   Применение этого обновления ОТКАТИТ установку на более старый снимок."
+        rollback_channel_hint
         echo ""
     elif [ "$_fast_rollback_code" -eq 2 ]; then
         echo "⚠️ ВНИМАНИЕ: не удалось проверить историю релиза; автоматическое применение с --yes заблокировано."
-        echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+        rollback_channel_hint
         echo ""
     fi
 
@@ -5531,14 +5544,14 @@ else
 fi
 if [ "$_rollback_code" -eq 0 ]; then
     ROLLBACK_DETECTED=true
-    echo "🔴 ВНИМАНИЕ: локальная установка новее последнего релиза."
-    echo "   Применение обновления release-каналом ОТКАТИТ установку на более старый снимок."
-    echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+    echo "🔴 ВНИМАНИЕ: локальная установка новее того, что доставит этот канал."
+    echo "   Применение этого обновления ОТКАТИТ установку на более старый снимок."
+    rollback_channel_hint
     echo ""
 elif [ "$_rollback_code" -eq 2 ]; then
     ROLLBACK_UNCERTAIN=true
     echo "⚠️ ВНИМАНИЕ: не удалось проверить историю релиза; автоматическое применение с --yes заблокировано."
-    echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh"
+    rollback_channel_hint
     echo ""
 fi
 
@@ -5696,7 +5709,7 @@ if [ "$ROLLBACK_DETECTED" = true ]; then
     if $AUTO_YES; then
         echo "🔴 Остановлено: обнаружен откат на более старый релиз, а --yes запрещает интерактивное подтверждение." >&2
         echo "   Для явного отката запустите без --yes и введите ROLLBACK на запрос подтверждения." >&2
-        echo "   Чтобы получить актуальную main, запустите: IWE_UPDATE_CHANNEL=main bash update.sh" >&2
+        rollback_channel_hint >&2
         exit "$EXIT_USAGE"
     fi
     echo "🔴 Это ОТКАТ на более старый релиз. Чтобы продолжить, введите ROLLBACK явно."

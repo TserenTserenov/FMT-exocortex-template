@@ -32,9 +32,24 @@ Refs: WP-NNN
   - Как проверить: `bash scripts/tests/test-wp529-f270-step0-no-downgrade.sh`; на установке кандидата обычный `bash update.sh` пишет «update.sh выпуска старше установленного» и просит `ROLLBACK`
   - Как откатить: git revert слияния этого PR
 
-- [security] Проверка опасных команд агента (`.claude/hooks/destructive-guard.sh`) запрещает `find`, который удаляет найденное: `-delete` или `-exec`/`-execdir`/`-ok`/`-okdir` с `rm`, `unlink`, `shred` — с ключами и без, на любом пути. Раньше `find ~ -delete` и `find "$HOME" -exec rm -f {} +` проходили (запрещался только `rm -r -f`); дыра была и в 0.41.11. Поиск без удаления и `-exec` с другими командами по-прежнему разрешены. Описание — `docs/DESTRUCTIVE-GUARD.md`. Тест `.claude/hooks/tests/test-destructive-guard-find-delete.sh` (WP-529 Ф270, находка атаки на кандидат 0.42-rc.1).
+- [security] Проверка опасных команд агента (`.claude/hooks/destructive-guard.sh`) запрещает удаление всего найденного: `find -delete`, `find` с `-exec`/`-execdir`/`-ok`/`-okdir` и `rm`, `unlink`, `shred`, а также `xargs rm` — с ключами и без, на любом пути, в том числе через обёртки `env`, `command`, `nice`, `sudo`, `busybox`. Раньше `find ~ -delete`, `find "$HOME" -exec rm -f {} +`, `find ~ -exec env rm {} +` и `find ~ -print0 | xargs -0 rm` проходили (запрещался только `rm -r -f`); дыра была и в 0.41.11, обходы через обёртку и `xargs` нашла атака на кандидат rc.2. Поиск без удаления и `-exec`/`xargs` с другими командами по-прежнему разрешены. Описание — `docs/DESTRUCTIVE-GUARD.md`. Тест `.claude/hooks/tests/test-destructive-guard-find-delete.sh` (WP-529 Ф270, находки атак на кандидаты 0.42-rc.1 и rc.2).
   - Цель: 84 · Результат: служебное — защита рабочей папки от удаления агентом; разрешённые команды не меняются
   - Как проверить: `bash .claude/hooks/tests/test-destructive-guard-find-delete.sh` и `python3 .claude/hooks/tests/destructive-guard/hook_cases.py`
+  - Как откатить: git revert слияния этого PR
+
+- [security] Проверка опасных команд агента запрещает команды, которые пишут в файл из своего аргумента: `git diff --output=<файл>` (и `log`, `show`, сокращения `--outp`) и `find -fprint`/`-fprint0`/`-fprintf`/`-fls`. Обе программы заранее разрешены в `settings.json`, поэтому запись шла без запроса: атака на кандидат rc.2 затёрла так саму проверку опасных команд, и после этого проходило `rm -rf`; дыра была и в 0.41.11. Тот же вывод через перенаправление (`git diff > файл`) разрешён. Тест `.claude/hooks/tests/test-destructive-guard-file-writers.sh` (WP-529 Ф270).
+  - Цель: 84 · Результат: служебное — защита проверок агента от затирания; разрешённые команды без записи в файл не меняются
+  - Как проверить: `bash .claude/hooks/tests/test-destructive-guard-file-writers.sh`
+  - Как откатить: git revert слияния этого PR
+
+- [security] Безопасное удаление (`.claude/bin/guarded-rm`) принимает `$TMPDIR` корнем удаления, только если это системный временный каталог (`/tmp`, `/var/tmp`, `/var/folders/…` на macOS, `/run/user/…`, временный каталог пользователя Windows). Раньше вызов `TMPDIR=$HOME .claude/bin/guarded-rm -rf "$HOME/IWE"` удалял любую папку: запись `{TMPDIR}` реестра брала значение из окружения вызывающего; дыра была и в 0.41.11 (находка атаки на кандидат rc.2). Иначе запись пропускается с предупреждением, и цель получает отказ «вне разрешённых корней». Тест — `.claude/hooks/tests/destructive-guard/guarded_rm_cases.py` (WP-529 Ф270).
+  - Цель: 84 · Результат: служебное — защита рабочей папки от удаления через подменённый временный каталог; удаление во временных каталогах не меняется
+  - Как проверить: `python3 .claude/hooks/tests/destructive-guard/guarded_rm_cases.py .claude/bin/guarded-rm`
+  - Как откатить: git revert слияния этого PR
+
+- [behavior] `update.sh`: проверка отката сравнивает версии на любом канале обновления. Раньше она работала только на обычном канале, и с установки кандидата `IWE_UPDATE_CHANNEL=main bash update.sh --yes` молча возвращал файлы к 0.41.11 (основная ветка до выхода выпуска) и оставлял смесь версий; само сообщение об откате советовало этот канал. Теперь основная ветка и канал кандидатов тоже называют такой запуск откатом и ждут `ROLLBACK`, а сообщение подсказывает канал по тому, что установлено (находка атаки на кандидат rc.2). Тест `scripts/tests/test-wp529-f261-rollback-by-installed-version.sh` (WP-529 Ф270).
+  - Цель: 77 · Результат: служебное — защита установленного состояния при смене канала; обновление вперёд на любом канале не меняется
+  - Как проверить: `bash scripts/tests/test-wp529-f261-rollback-by-installed-version.sh`; на установке кандидата `IWE_UPDATE_CHANNEL=main bash update.sh` называет запуск откатом и просит `ROLLBACK`
   - Как откатить: git revert слияния этого PR
 
 - [optional] Навык `/find-method` 0.2.1: шаги карточки показываются все сразу и дословно на языке источника — английский текст свода не переводится и не пересказывается, русское пояснение идёт после цитаты. На проверке кандидата 0.42-rc.1 агент пересказал 8 шагов `RMP.1:4.1` по-русски и дословно привёл только первый (WP-529 Ф270).

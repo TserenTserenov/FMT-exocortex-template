@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "99ed841969692e38261bbddea1172cf8aa7976af6b8697ba510dfea8606a5a9f"
+      "sha256": "ca6763f7200855d11e67ff77a5ba8db5bc9b4e530a7497bf156ba3fad312ca6a"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "78cd758ea2a3d9c7d45c7852bbf549a0a64e4ead1c8be4d01bb0b0fbebebda34"
+      "sha256": "8020b275af0369f68b45c91e9a42891a2b9be88b3520625320424263c64706f2"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -205,7 +205,7 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
-      "sha256": "a84b32f08cd9277fc64c8f8913d90ccbc935cf30b297f42910f888b9a4b7dfc3"
+      "sha256": "6de5b47924d90efb26f6b5b516cc4bd2dc2fdf37b6fc124a766be1f68b0e8652"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
@@ -224,8 +224,12 @@
       "sha256": "a4275e5385da0de8455de40de3445d21a8368c38f000531bb5e5c8cb5a0ddb10"
     },
     {
+      "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
+      "sha256": "84943f75d2e94012381eafcadeaace23e35f1907154a5cbb20c14d8e8e56a122"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
-      "sha256": "f5847b9cf4e952bf0da7ced39b82b7007b803471f40a93200d2cabbbf9d0e5cd"
+      "sha256": "cc4a827445da761aed333ea7c4e56fb48221572c7847db2421229b81853c449c"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -921,7 +925,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "e045416aa4d5f4ef1cc0dd3ef49c6c82e7a2c65e0c2f194c3e3ac9027161a253"
+      "sha256": "99eeb30c03000bb6097461c332c51b850a3a35799e993ed9cf8545a9cb7b1cc0"
     },
     {
       "path": ".gitignore",
@@ -949,7 +953,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "01551898dc86c7206329d07a962655c7c60fc00af889f6d61c2521c5287f8838"
+      "sha256": "2f05b10e3c8f348942a28226c20a0e6629d9f23fce03327f7e64a36fa3f0917c"
     },
     {
       "path": "CLAUDE.md",
@@ -1005,7 +1009,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "553853137d34c407bdfab2f756b8b745c943a6885d9b8728aae427fbe1859966"
+      "sha256": "26bf3b50279217c10e8d9e5044bf3891bc7a37a07cc576b70034bbc5ce2a92d9"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -3497,7 +3501,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "09a3d33693f5cd2e77d1321f9edead0ec02fa48f3eaa079eacea2b27cddca669"
+      "sha256": "62c4c19a17e7012167946604032562c9681abe35a2a8d1785296e5578d623753"
     }
   ],
   "excluded_paths": [
