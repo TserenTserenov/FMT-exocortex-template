@@ -25,6 +25,11 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] (#1534) Навыки шаблона подключены к DeepSeek Harness: `setup/install-dsh-skills.sh` дописывает в домашний слой DSH (`$DSH_HOME/cordis.patch.yml`, действует поверх каждого профиля) запись `skill-filesystem` с `customSkillDirs = <workspace>/.claude/skills`. Раньше агент в окне `dsh web`/`dsh headless` не видел ни одного навыка шаблона — их искали только в `.dsh/skills` и `.agents/skills`, — и протоколы, начинающиеся со навыка (`day-open`, `wp-new`, `artifactor`), вырождались в ручное чтение файлов. Скрипт идемпотентен, без установленного DSH ничего не создаёт и не трогает уже заданный руками `customSkillDirs`; вызывается из `setup.sh` (шаг [4g]) и `update.sh` после `install-iwe-paths.sh` (WP-53).
+  - Цель: 77 · Результат: пользователь шаблона, работающий в DeepSeek Harness, видит в каталоге сессии все навыки шаблона; у Claude Code поведение не меняется
+  - Как проверить: `bash scripts/tests/test_dsh_skills_install.sh` — 17 наблюдений, и `bash setup/install-dsh-skills.sh --workspace "$PWD" --dry-run` печатает путь, который будет добавлен
+  - Как откатить: git revert слияния этого PR; у обновлённых установок запись в `$DSH_HOME/cordis.patch.yml` помечена комментарием `IWE skills bridge` и удаляется вручную
+
 - [optional] (#1523) Описание процесса выпуска называет вердикт независимой атаки словами навыка `iwe-platform-redteam`: GO / CAUTION / BLOCKED, а `cannot_verify` — не пройдено (было STABLE, которого навык не выдаёт).
   - Цель: 77 · Результат: служебное — согласование слов вердикта в документации выпуска; пользователь его не видит
   - Как проверить: `grep -n 'GO / CAUTION' docs/RELEASE-PROCESS.md` находит строку, `grep -c STABLE docs/RELEASE-PROCESS.md` даёт 0

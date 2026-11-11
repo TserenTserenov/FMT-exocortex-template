@@ -157,6 +157,7 @@ GITHUB_CI_ONLY_EXCLUDE=(
 SETUP_EXPLICIT_INCLUDE=(
     "setup/build-runtime.sh"
     "setup/install-iwe-paths.sh"
+    "setup/install-dsh-skills.sh"                # update.sh re-asserts the DSH skills entry on every upgrade — without delivery the call has no target
     "setup/validate-template.sh"
     "setup/lib/apply-op.sh"                     # WP-529 Phase 245: Step 5 of update.sh writes through this executor; without delivery the update will stop
     "setup/optional/setup-cloud-scheduler.sh"   # install-time, but requires one-time delivery — issue #325

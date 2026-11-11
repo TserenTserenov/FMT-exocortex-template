@@ -1136,6 +1136,27 @@ else
     fi
 fi
 
+# === 4g. Skills for DeepSeek Harness (DSH) ===
+# Skills live in <workspace>/.claude/skills. Claude Code reads that directory by
+# itself; DSH discovers skills only in .dsh/skills and .agents/skills, so without
+# this step a DSH agent sees none of the template's skills and every protocol that
+# starts with a skill (day-open, wp-new, artifactor) degrades to reading files.
+# Source-of-truth: setup/install-dsh-skills.sh. Idempotent, and a no-op when DSH
+# is not installed — an installation without DSH must not grow a ~/.dsh.
+if $DRY_RUN; then
+    bash "$TEMPLATE_DIR/setup/install-dsh-skills.sh" \
+        --workspace "$WORKSPACE_DIR" --dry-run 2>&1 | sed 's/^/  /'
+else
+    echo "[4g] Connecting template skills to DeepSeek Harness..."
+    if DSH_SKILLS_OUTPUT=$(bash "$TEMPLATE_DIR/setup/install-dsh-skills.sh" --workspace "$WORKSPACE_DIR" 2>&1); then
+        printf '%s\n' "$DSH_SKILLS_OUTPUT" | sed 's/^/  /'
+    else
+        printf '%s\n' "$DSH_SKILLS_OUTPUT" | sed 's/^/  /'
+        echo "  ⚠ навыки для DSH не подключены — запусти вручную:"
+        echo "    bash $TEMPLATE_DIR/setup/install-dsh-skills.sh --workspace $WORKSPACE_DIR"
+    fi
+fi
+
 # === 5. Install roles (autodiscovery via role.yaml) ===
 # Role install.sh scripts pick their own scheduler: launchd on macOS,
 # systemd --user or cron on Linux (WSL2 included, #454). Issue #1441: this
