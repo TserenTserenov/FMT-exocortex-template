@@ -613,6 +613,36 @@ remember_untouched_memory_before_apply() {
     return 0
 }
 
+# backup_clone_memory_edits_before_apply — WP-529 Ф270, F3 of the v0.42.0-rc.6 red team: Step 5
+# replaces a memory file in the template clone with the new template version, and an edit the
+# pilot made right there was gone; the Step 6 line pointed at the backup of the deployed copy,
+# which never held it. A clone memory file whose hash differs from the previous release's
+# manifest is an edit: it is copied into this run's memory backup under template-clone/ first, and
+# the line names the copy. An unreadable manifest backs up every replaced memory file (cheap,
+# and an edit is never lost on a guess). author_mode skips: the author's clone is their git work.
+backup_clone_memory_edits_before_apply() {
+    local f src released backup
+    is_author_mode && return 0
+    for f in ${UPDATED_FILES[@]+"${UPDATED_FILES[@]}"}; do
+        case "$f" in memory/*.md|memory/*.yaml|memory/*.yml) ;; *) continue ;; esac
+        src="$SCRIPT_DIR/$f"
+        [ -f "$src" ] || continue
+        released=$(manifest_sha256_of "$SCRIPT_DIR/update-manifest.json" "$f" 2>/dev/null) || released=""
+        [ -n "$released" ] && [ "$(hash_file "$src")" = "$released" ] && continue
+        if [ -z "$MEMORY_BACKUP_RUN" ]; then
+            MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+        fi
+        backup="$MEMORY_BACKUP_RUN/template-clone/${f#memory/}"
+        if mkdir -p "$(dirname "$backup")" && cp -p "$src" "$backup"; then
+            echo "  ⚠ $f — в папке шаблона была ваша правка; файл шаблона заменяется новой версией, правка сохранена: $backup"
+        else
+            echo "  ⚠ $f — в папке шаблона была ваша правка, сохранить её копию не удалось; обновление не начато, файлы не менялись" >&2
+            return 1
+        fi
+    done
+    return 0
+}
+
 # memory_decided_once FPATH — true the first time FPATH comes up in this run, false after it: Step 6
 # and the repair pass after it walk the same paths, and a file gets one decision and one line per run.
 memory_decided_once() {
@@ -5831,6 +5861,7 @@ echo ""
 echo "Применяю обновления..."
 require_backup_root_writable
 require_env_before_update
+backup_clone_memory_edits_before_apply || exit "$EXIT_RUNTIME"
 begin_update_transaction
 remember_untouched_memory_before_apply
 

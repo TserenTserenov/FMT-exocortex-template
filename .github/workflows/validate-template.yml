@@ -396,6 +396,7 @@ jobs:
           /bin/bash scripts/tests/test-wp529-f270-rollback-cleanup.sh
           /bin/bash scripts/tests/test-wp529-f270-settings-merge-report.sh
           /bin/bash scripts/tests/test-wp529-f270-core-mode-feeders.sh
+          /bin/bash scripts/tests/test-wp529-f270-clone-memory-backup.sh
 
   # Upgrade-flow regression test (0.29.18).
   # Root of the bug (0.29.13): template-sync overwrote FMT files -- the fresh
@@ -869,6 +870,7 @@ jobs:
           bash .claude/hooks/tests/test-destructive-guard-find-delete.sh
           bash .claude/hooks/tests/test-destructive-guard-file-writers.sh
           bash .claude/hooks/tests/test-destructive-guard-git-branch-remote.sh
+          bash .claude/hooks/tests/test-destructive-guard-find-chain.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the

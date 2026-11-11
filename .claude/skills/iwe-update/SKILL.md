@@ -3,7 +3,7 @@ name: iwe-update
 description: "Update IWE with change explanations. Agent calls update.sh, parses CHANGELOG, explains what changed, helps adapt updates to user customizations."
 argument-hint: ""
 user_invocable: true
-version: 1.1.0
+version: 1.1.1
 browser_safe: false
 routing:
   executor: haiku
@@ -93,6 +93,12 @@ curl -fsSL "https://raw.githubusercontent.com/TserenTserenov/FMT-exocortex-templ
 
 Найти записи между текущей и новой версией. Подпункты «Цель:», «Как проверить:»,
 «Как откатить:» под записью предназначены Выпускающему; пользователю их не пересказывать.
+
+Выпуск или кандидат — только по строке `Канал поставки` (`релиз <метка>` или
+`кандидат <метка>`). Строки нет (новый разговор после обновления) — называть установленное
+по версии («у вас 0.42.0»), не утверждая, что выпуск вышел. Дата в заголовке раздела
+`CHANGELOG.md` — день, когда выпуск отделили для проверки, а не день выхода; датой выхода её
+не называть.
 
 **Объяснить пользователю на человеческом языке:**
 - Что добавлено и зачем (не список файлов, а **польза**)
