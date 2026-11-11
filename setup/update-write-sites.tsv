@@ -75,3 +75,4 @@ fn:drop_dead_railway_mcp	A	plan	removes the stale template ext-railway entry fro
 top:Step 6d	B	not-covered	role install.sh scripts write launchd plists and call launchctl; generate-hot-files-list.sh writes the hot list; the update summary lists scheduler changes as not covered
 top:Step 6e	A	plan	replaces the local manifest with the downloaded one
 top:Step 7	B	not-covered	iwe-capabilities.sh probe --announce, same as Step 3
+fn:backup_clone_memory_edits_before_apply	A	not-covered	copy of a pilot-edited template-clone memory file into .backups/memory-pre-update/<run>/template-clone before Step 5 replaces it; runs before the transaction, rollback leaves the copy (it only ever adds a backup)

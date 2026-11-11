@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "1225062ff6449fd7fe8bc43bfe783e34a9b44f341aad08e0de41c0c7bb22bea6"
+      "sha256": "6ebaac15d251981e6a1cb5ff8c3b4dd3c462190742601b203899a651d5d6a835"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -226,6 +226,10 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
       "sha256": "84943f75d2e94012381eafcadeaace23e35f1907154a5cbb20c14d8e8e56a122"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-find-chain.sh",
+      "sha256": "03caafdce112cc45c11fcc54b11a2d0c70e4af14c1883d030d4b804edd8916a9"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
@@ -657,7 +661,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "13d1e2b1edca44fa48c4e2406531ff34205af2f2766ae9bf920f283fefc6b5c4"
+      "sha256": "6a0a126a80ccacb9963ffe65f27e2e67fcb1b3890ae9acc272bc7ef8ea078d2b"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -929,7 +933,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "da958d23729fcb36d0ef6b9546e90b4d68a0f36a24383ad6f002532c1cf55ea9"
+      "sha256": "e5d51c54604b9f0b276ab789a1a5c475a2331d3c7c53ac1d9502145ebe84105f"
     },
     {
       "path": ".gitignore",
@@ -957,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fdc26969c22336e43982e547832cefba2237ed8421252064487da031d4fa15d2"
+      "sha256": "fe6db02d05c8a56d842166f380a44351a17d9296254f3bc792d5bfd321420b48"
     },
     {
       "path": "CLAUDE.md",
@@ -1013,7 +1017,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "f2b166e29b6a1cb2fd69457b087f251ce5599965be2215f077c9fb18211f62d8"
+      "sha256": "9afa65211aaca764c3270a58f686f318e618402304dc358add5d3994ecbcf0ae"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -3509,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "914408d536a34ba8bdc2c1dedb7798ae12068b7ccd5be6a3943a4d3818fe6da0"
+      "sha256": "df38696f7770eadd2eb75469e50c15f48c39ce3e92911c26a2e14e1d9fddb2c8"
     }
   ],
   "excluded_paths": [
@@ -3576,6 +3580,7 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f270-clone-memory-backup.sh",
     "scripts/tests/test-wp529-f270-core-mode-feeders.sh",
     "scripts/tests/test-wp529-f270-exec-bit.sh",
     "scripts/tests/test-wp529-f270-rollback-cleanup.sh",
