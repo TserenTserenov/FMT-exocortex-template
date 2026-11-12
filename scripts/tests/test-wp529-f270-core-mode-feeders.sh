@@ -3,8 +3,11 @@
 # WP-529 Ф270, RT5-2 of the v0.42.0-rc.5 red team: `setup.sh --core` skips the extractor feeders,
 # but the first `update.sh --yes` scheduled them anyway — the install mode was not remembered.
 # Contract: setup.sh records the mode in <workspace>/.iwe-install-mode; update.sh does not schedule
-# the feeders when it says "core", and still does for a full install or an old install without the
-# file. Drives the real function extracted from update.sh with a stub feeders script.
+# the feeders when it says "core", and still does for a full install.
+# RT8-1 of the v0.42.0-rc.8 red team: an install made by 0.41.11 has no such file, so a 0.41.11
+# --core install still got the schedule on its first update. Without the file update.sh refreshes
+# a schedule that already exists and never adds one.
+# Drives the real function extracted from update.sh with a stub feeders script and a disposable HOME.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -29,25 +32,39 @@ printf '#!/bin/bash\necho "FEEDERS SCHEDULED"\n' > "$TPL/scripts/setup-extractor
 printf '#!/bin/bash\nexit 0\n' > "$TMP/bin/claude"
 chmod +x "$TMP/bin/claude"
 
-# run_backfill MODE_FILE_CONTENT (empty = no file) -> prints the function's output
+FAKE_HOME="$TMP/home"
+SCHEDULE_FILE="$FAKE_HOME/.config/systemd/user/extractor-git-diff-feed.timer"
+[ "$(uname -s)" = "Darwin" ] && SCHEDULE_FILE="$FAKE_HOME/Library/LaunchAgents/com.extractor.git-diff-feed.plist"
+
+# run_backfill MODE_FILE_CONTENT (empty = no file) SCHEDULE(present|absent) -> the function's output
 run_backfill() (
-  rm -f "$WS/.iwe-install-mode"
+  rm -rf "$WS/.iwe-install-mode" "$FAKE_HOME"
+  mkdir -p "$(dirname "$SCHEDULE_FILE")"
   [ -n "$1" ] && printf '%s\n' "$1" > "$WS/.iwe-install-mode"
+  [ "$2" = "present" ] && : > "$SCHEDULE_FILE"
   # shellcheck disable=SC1090
   . "$FUNCS"
+  HOME="$FAKE_HOME"
   PATH="$TMP/bin:$PATH" SCRIPT_DIR="$TPL" WORKSPACE_DIR="$WS" EFFECTIVE_GOVERNANCE_REPO=DS-strategy
   HOST_GLOBAL_OWNER_CONFLICT=false
   backfill_extractor_feeders 2>&1
 )
 
 echo "== update.sh honours the recorded install mode =="
-out=$(run_backfill core)
+out=$(run_backfill core absent)
 grep -q 'FEEDERS SCHEDULED' <<<"$out" && fail "core install: feeders scheduled ($out)" || ok "core install: feeders not scheduled"
 grep -q 'урезанном режиме' <<<"$out" && ok "core install: the skip is explained" || fail "core install: no explanation ($out)"
-out=$(run_backfill full)
+out=$(run_backfill full absent)
 grep -q 'FEEDERS SCHEDULED' <<<"$out" && ok "full install: feeders scheduled" || fail "full install: $out"
-out=$(run_backfill "")
-grep -q 'FEEDERS SCHEDULED' <<<"$out" && ok "old install without the file: feeders scheduled as before" || fail "no file: $out"
+
+echo "== an install without the recorded mode (made by 0.41.11) =="
+out=$(run_backfill "" absent)
+grep -q 'FEEDERS SCHEDULED' <<<"$out" && fail "no file, no schedule: feeders scheduled ($out)" || ok "no file, no schedule: nothing is added"
+grep -q 'режим установки не записан' <<<"$out" && grep -q 'Включить: bash' <<<"$out" \
+  && ok "no file, no schedule: the skip names the command to enable" || fail "no file, no schedule: no explanation ($out)"
+[ -f "$WS/.iwe-install-mode" ] && fail "no file, no schedule: update wrote the mode file" || ok "no file, no schedule: the mode file is not invented"
+out=$(run_backfill "" present)
+grep -q 'FEEDERS SCHEDULED' <<<"$out" && ok "no file, schedule exists: it is refreshed as before" || fail "no file, schedule exists: $out"
 
 echo "== setup.sh records the mode =="
 grep -q "printf 'core\\\\n' > \"\$WORKSPACE_DIR/.iwe-install-mode\"" "$SETUP_SH" \
