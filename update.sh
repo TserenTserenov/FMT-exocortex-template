@@ -3090,6 +3090,18 @@ backfill_extractor_feeders() {
         echo "    Включить: bash $feeders"
         return 0
     fi
+    # An install made before the mode was recorded has no file, and a 0.41.11 --core install looks
+    # exactly like a full one. So without the file an update only refreshes a schedule that already
+    # exists and never adds one (WP-529 Ф270, RT8-1 of the rc.8 red team).
+    local schedule_file="$HOME/.config/systemd/user/extractor-git-diff-feed.timer"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        schedule_file="$HOME/Library/LaunchAgents/com.extractor.git-diff-feed.plist"
+    fi
+    if [ ! -f "$WORKSPACE_DIR/.iwe-install-mode" ] && [ ! -f "$schedule_file" ]; then
+        echo "  ○ Экстрактор: расписания на этой установке нет, а режим установки не записан — расписание не заводим."
+        echo "    Включить: bash $feeders"
+        return 0
+    fi
     # issue #768: the feeders script schedules a real launchd job under the
     # current user's real $HOME — a foreign/unowned host-global state must
     # not have that job's workspace pointer rewritten onto this copy.
