@@ -269,6 +269,9 @@ jobs:
           python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
           python3 -m pip install --user --break-system-packages pyyaml && python3 -c "import yaml"
       - name: Upgrade ${{ matrix.prev }} to the candidate with update.sh (${{ matrix.os }})
+        env:
+          # Four legs list tags at once: anonymous API calls hit the rate limit (403 on rc.10, macOS).
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
             # The image puts Homebrew bash 5 first; most Macs run the system /bin/bash 3.2, and

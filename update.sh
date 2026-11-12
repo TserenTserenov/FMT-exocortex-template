@@ -4693,6 +4693,36 @@ claude_template_copy_is_pristine() {
     CLAUDE_PROVEN_COPY_HASH="$CLAUDE_PROVEN_COPY_HASH_CANDIDATE"
 }
 
+# claude_template_copy_matches_legacy_base COPY BASE — proof for an install made by setup.sh up to 0.36, whose
+# manifest lists paths without sha256 (rc.10 CI: the delivered-proof never held there). That setup wrote BASE as
+# COPY with the install's .exocortex.env values put in place of its {{KEYS}}, so COPY substituted the same way
+# equals BASE byte for byte only while COPY is unedited since BASE was written. Sets CLAUDE_PROVEN_COPY_HASH.
+claude_template_copy_matches_legacy_base() {
+    local copy="$1" base="$2" env_file=""
+    py_available || return 1
+    [ -f "${WORKSPACE_DIR:-}/.exocortex.env" ] && env_file="$WORKSPACE_DIR/.exocortex.env"
+    [ -z "$env_file" ] && [ -f "$SCRIPT_DIR/.exocortex.env" ] && env_file="$SCRIPT_DIR/.exocortex.env"
+    [ -n "$env_file" ] || return 1
+    # shellcheck disable=SC2086 # PY_BIN may be "py -3"
+    $PY_BIN - "$copy" "$base" "$env_file" <<'PY' || return 1
+import re
+import sys
+
+copy, base, env = (open(path, encoding="utf-8").read() for path in sys.argv[1:4])
+values = {}
+for line in env.splitlines():
+    match = re.match(r"^([A-Z_][A-Z0-9_]*)=(.*)$", line)
+    if match:
+        value = match.group(2).strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        values[match.group(1)] = value
+substituted = re.sub(r"\{\{([A-Z_][A-Z0-9_]*)\}\}", lambda m: values.get(m.group(1), m.group(0)), copy)
+sys.exit(0 if substituted == base else 1)
+PY
+    CLAUDE_PROVEN_COPY_HASH=$(hash_file "$copy" 2>/dev/null) || CLAUDE_PROVEN_COPY_HASH=""
+}
+
 # claude_template_copy_is_delivered FILE — the first two proofs above only: FILE is what the installed
 # manifest lists or what update.sh itself wrote last time. The HEAD proof is left out on purpose: update.sh
 # up to 0.36 committed the whole template clone after every run, so a pilot's edit made before that is in
@@ -6143,7 +6173,8 @@ for f in "${UPDATED_FILES[@]}"; do
         NEW_FILE="$TMPDIR_UPDATE/files/$f"
         CURRENT_FILE="$SCRIPT_DIR/$f"
 
-        if [ -f "$BASE_FILE" ] && [ -s "$CURRENT_FILE" ] && claude_template_copy_is_delivered "$CURRENT_FILE"; then
+        if [ -f "$BASE_FILE" ] && [ -s "$CURRENT_FILE" ] && { claude_template_copy_is_delivered "$CURRENT_FILE" \
+                || claude_template_copy_matches_legacy_base "$CURRENT_FILE" "$BASE_FILE"; }; then
             # setup.sh up to 0.36 wrote this template base from the SUBSTITUTED workspace copy, and
             # restore_claude_placeholders cannot undo every key (GOVERNANCE_REPO among them): merging
             # the raw copy against it conflicted on each such line the release changed (0.42 rc.9, row 3).
