@@ -176,7 +176,11 @@ for arg in "$@"; do
   options=0
 done
 
-REAL_RM=/usr/bin/rm
-[ -x "$REAL_RM" ] || REAL_RM=/bin/rm
-[ -x "$REAL_RM" ] || refuse "не найден rm"
+# Fixed system locations only, never a PATH lookup: a planted rm earlier in PATH must not run.
+# NixOS keeps rm in the system profile, not in /usr/bin or /bin (0.42 rc.9 red team, Н1).
+REAL_RM=""
+for candidate in /usr/bin/rm /bin/rm /run/current-system/sw/bin/rm; do
+  [ -x "$candidate" ] && { REAL_RM=$candidate; break; }
+done
+[ -n "$REAL_RM" ] || refuse "не найден rm"
 exec "$REAL_RM" "$@"

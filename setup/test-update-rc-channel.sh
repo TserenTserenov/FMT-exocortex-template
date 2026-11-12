@@ -25,6 +25,10 @@ trap 'rm -rf "$TEST_ROOT"' EXIT INT TERM
 
 STUB_DIR="$TEST_ROOT/stub"
 mkdir -p "$STUB_DIR"
+# A logged-in gh on the host made update.sh call the real GitHub API instead of the curl stub
+# (0.42 rc.9 red team, Н5). This gh is never logged in, so the API path always goes through curl.
+printf '#!/bin/sh\nexit 1\n' > "$STUB_DIR/gh"
+chmod +x "$STUB_DIR/gh"
 
 # WP-529 F244: --check now runs the install preflight (.exocortex.env, .backups/)
 # before channel resolution, exactly where the real run stops. Run a copy of the

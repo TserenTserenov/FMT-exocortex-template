@@ -939,6 +939,12 @@ jobs:
       - name: Run update.sh Step 0 staged-rename test
         run: bash setup/test-update-step0-staged-rename.sh
 
+      # WP-529 Ф270, 0.42 rc.9 row 3: an install made by setup.sh 0.36 keeps a substituted template
+      # merge base; an unedited template CLAUDE.md must update without a conflict, and a retry over a
+      # conflicted copy must stop instead of reporting "Всё актуально".
+      - name: Run update.sh legacy template base test
+        run: bash setup/test-update-legacy-template-base.sh
+
       # PR #385: cloud install paths may occur legitimately in old tracked text;
       # only additions made by the current updater run are publication blockers.
       - name: Test staged install-path guard

@@ -3968,8 +3968,8 @@ TMPDIR_UPDATE=$(mktemp -d 2>/dev/null || { mkdir -p "/tmp/exocortex-update-$$"; 
 # issues #965/#967: Step 2 records here the version of each changed memory file that this run
 # is about to replace (record_memory_old_hash); Step 6 reads it (apply_memory_policy, proof 1).
 MEMORY_OLD_HASHES="$TMPDIR_UPDATE/memory-old-hashes.tsv"
-cleanup_update() {
-    local status=$?
+cleanup_update() {  # $1 = the exit status, captured by the trap action before it clears ERR
+    local status="${1:-$?}"
     rm -rf "$TMPDIR_UPDATE"
     if [ "$UPDATE_TRANSACTION_STARTED" = true ] && [ "$status" -ne 0 ] && [ -f "$UPDATE_INCOMPLETE_MARKER" ]; then
         echo "⚠ Обновление завершилось не полностью; маркер сохранён: $UPDATE_INCOMPLETE_MARKER" >&2
@@ -3978,7 +3978,11 @@ cleanup_update() {
     fi
     return "$status"
 }
-trap cleanup_update EXIT
+# The ERR trap is cleared in the trap action itself: cleanup_update returns the exit status, and a
+# non-zero action fired ERR, printing "прервался на строке …: exit …" after every deliberate
+# refusal (RT8-3 of the 0.42 rc.8 red team). Clearing it inside the function does not help, and
+# the status is taken before `trap - ERR`, which would otherwise reset $? to 0.
+trap 'update_exit_status=$?; trap - ERR; cleanup_update "$update_exit_status"' EXIT
 
 echo "=========================================="
 echo "  Exocortex Update v$VERSION"
@@ -4680,12 +4684,29 @@ claude_record_usable() {
 #     is read only when claude_record_usable accepts it).
 # A copy edited and then committed by hand passes the second test; its text stays in the history.
 claude_template_copy_is_pristine() {
-    local copy="$1" delivered committed copy_hash record
+    local copy="$1" committed
+    claude_template_copy_is_delivered "$copy" && return 0
+    [ -n "$CLAUDE_PROVEN_COPY_HASH_CANDIDATE" ] || return 1
+    command -v git >/dev/null 2>&1 || return 1
+    committed=$(git -C "$SCRIPT_DIR" rev-parse --verify -q "HEAD:CLAUDE.md" 2>/dev/null) || return 1
+    [ "$(git -C "$SCRIPT_DIR" hash-object -- "$copy" 2>/dev/null)" = "$committed" ] || return 1
+    CLAUDE_PROVEN_COPY_HASH="$CLAUDE_PROVEN_COPY_HASH_CANDIDATE"
+}
+
+# claude_template_copy_is_delivered FILE — the first two proofs above only: FILE is what the installed
+# manifest lists or what update.sh itself wrote last time. The HEAD proof is left out on purpose: update.sh
+# up to 0.36 committed the whole template clone after every run, so a pilot's edit made before that is in
+# HEAD too (cold review of the 0.42 rc.10 fix). Sets CLAUDE_PROVEN_COPY_HASH on success and leaves the
+# copy's hash in CLAUDE_PROVEN_COPY_HASH_CANDIDATE for the HEAD proof.
+claude_template_copy_is_delivered() {
+    local copy="$1" delivered copy_hash record
     CLAUDE_PROVEN_COPY_HASH=""
+    CLAUDE_PROVEN_COPY_HASH_CANDIDATE=""
     # One read: the hash the proof is about is the one the record keeps (the copy must not be edited while
     # update.sh runs; an editor saving between two reads is outside what this can promise).
     copy_hash=$(hash_file "$copy" 2>/dev/null) || copy_hash=""
     [ -n "$copy_hash" ] || return 1
+    CLAUDE_PROVEN_COPY_HASH_CANDIDATE="$copy_hash"
     delivered=$(manifest_sha256_of "$SCRIPT_DIR/update-manifest.json" "CLAUDE.md" 2>/dev/null) || delivered=""
     if [ -n "$delivered" ] && [ "$copy_hash" = "$delivered" ]; then
         CLAUDE_PROVEN_COPY_HASH="$copy_hash"
@@ -4696,10 +4717,7 @@ claude_template_copy_is_pristine() {
         CLAUDE_PROVEN_COPY_HASH="$copy_hash"
         return 0
     fi
-    command -v git >/dev/null 2>&1 || return 1
-    committed=$(git -C "$SCRIPT_DIR" rev-parse --verify -q "HEAD:CLAUDE.md" 2>/dev/null) || return 1
-    [ "$(git -C "$SCRIPT_DIR" hash-object -- "$copy" 2>/dev/null)" = "$committed" ] || return 1
-    CLAUDE_PROVEN_COPY_HASH="$copy_hash"
+    return 1
 }
 
 # claude_record_delivered NEWFILE — remember two sha256 values: the template copy about to be replaced, as
@@ -4762,6 +4780,22 @@ claude_conflict_gate() {
         echo "  ⚠ Workspace-копия CLAUDE.md требует ручной сверки (см. предупреждения выше)."
         exit "$EXIT_CONFLICT"
     fi
+}
+
+# claude_nested_markers_gate — exit EXIT_CONFLICT while either CLAUDE.md still carries <<<<<<< markers.
+# Both the apply path and the "nothing to update" path call it: a run interrupted on a conflict leaves the
+# conflicted copy delivered, so the retry finds nothing to download and used to report "Всё актуально".
+claude_nested_markers_gate() {
+    local cf conflict_marker_files=()
+    for cf in "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"; do
+        [ -f "$cf" ] && grep -q '^<<<<<<<' "$cf" && conflict_marker_files+=("$cf")
+    done
+    [ "${#conflict_marker_files[@]}" -gt 0 ] || return 0
+    echo ""
+    echo "ОШИБКА: обнаружены неразрешённые конфликты слияния (вложенные маркеры):"
+    for cf in "${conflict_marker_files[@]}"; do echo "  - $cf"; done
+    echo "  Разрешите их вручную и перезапустите update.sh."
+    exit "$EXIT_CONFLICT"
 }
 
 # === Step 2: Download and compare files ===
@@ -5556,6 +5590,9 @@ if [ "$TOTAL_CHANGES" -eq 0 ] && [ ${#SKIPPED_DOWNLOAD[@]} -gt 0 ]; then
         # Same three calls, same order, as the branch below.
         require_env_before_update
         begin_update_transaction
+        # Before repair_pass and the workspace sync: they would carry the template copy's <<<<<<< markers
+        # into the workspace CLAUDE.md and its base. After begin, so .update-incomplete stays.
+        claude_nested_markers_gate
         repair_pass
         # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
         # this early-exit branch, so the workspace CLAUDE.md/.claude.md.base
@@ -5599,6 +5636,9 @@ if [ "$TOTAL_CHANGES" -eq 0 ]; then
         # not the message).
         require_env_before_update
         begin_update_transaction
+        # Before repair_pass and the workspace sync: they would carry the template copy's <<<<<<< markers
+        # into the workspace CLAUDE.md and its base. After begin, so .update-incomplete stays.
+        claude_nested_markers_gate
         repair_pass
         # issue #541 hvost 2 (#540): Step 6 (main apply-path) never runs from
         # this early-exit branch, so the workspace CLAUDE.md/.claude.md.base
@@ -6103,7 +6143,17 @@ for f in "${UPDATED_FILES[@]}"; do
         NEW_FILE="$TMPDIR_UPDATE/files/$f"
         CURRENT_FILE="$SCRIPT_DIR/$f"
 
-        if [ -f "$BASE_FILE" ] && command -v git >/dev/null 2>&1; then
+        if [ -f "$BASE_FILE" ] && [ -s "$CURRENT_FILE" ] && claude_template_copy_is_delivered "$CURRENT_FILE"; then
+            # setup.sh up to 0.36 wrote this template base from the SUBSTITUTED workspace copy, and
+            # restore_claude_placeholders cannot undo every key (GOVERNANCE_REPO among them): merging
+            # the raw copy against it conflicted on each such line the release changed (0.42 rc.9, row 3).
+            # A copy proven to be the delivered one has nothing to keep, so it is replaced and the base
+            # realigned; a copy vouched for only by HEAD still goes through the merge below.
+            claude_record_delivered "$NEW_FILE"
+            update_plan_add_file "CLAUDE.md" "$NEW_FILE"
+            UPDATE_PLAN_MSG[UPDATE_PLAN_COUNT]="  ~ $f обновлён (копия в каталоге шаблона не правилась, слияние не нужно)"
+            update_plan_add_file ".claude.md.base" "$NEW_FILE"
+        elif [ -f "$BASE_FILE" ] && command -v git >/dev/null 2>&1; then
             # Migrate any legacy substituted base/current to raw placeholders before
             # merging. Both persisted template files remain safe for public forks.
             RAW_BASE_FILE="$TMPDIR_UPDATE/claude-base-raw.md"
@@ -6320,17 +6370,7 @@ source "$SCRIPT_DIR/.claude/lib/frontmatter.sh" || {
 
 # Detect pre-existing nested conflict markers before we propagate merged files.
 # This prevents stacking new 3-way merges on top of unresolved ones (issue #31).
-conflict_marker_files=()
-for cf in "$SCRIPT_DIR/CLAUDE.md" "$WORKSPACE_DIR/CLAUDE.md"; do
-    [ -f "$cf" ] && grep -q '^<<<<<<<' "$cf" && conflict_marker_files+=("$cf")
-done
-if [ "${#conflict_marker_files[@]}" -gt 0 ]; then
-    echo ""
-    echo "ОШИБКА: обнаружены неразрешённые конфликты слияния (вложенные маркеры):"
-    for cf in "${conflict_marker_files[@]}"; do echo "  - $cf"; done
-    echo "  Разрешите их вручную и перезапустите update.sh."
-    exit "$EXIT_CONFLICT"
-fi
+claude_nested_markers_gate
 
 # CLAUDE.md conflict (issue #226): warn and remember, but keep going — propagation
 # and commit of everything else must not be blocked by one unresolved merge.

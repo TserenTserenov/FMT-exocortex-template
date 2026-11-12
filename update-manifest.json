@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "ca6763f7200855d11e67ff77a5ba8db5bc9b4e530a7497bf156ba3fad312ca6a"
+      "sha256": "ff7304c02a977a13b8787a469cddb9faf310cda0bda404dc9e16efd0807df8a0"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -933,7 +933,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "e5d51c54604b9f0b276ab789a1a5c475a2331d3c7c53ac1d9502145ebe84105f"
+      "sha256": "b99352571be31af4e987c37795370b7570ab9501951961f8caa25df0040f145d"
     },
     {
       "path": ".gitignore",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e72d16c5a8794d26448796c84e76fa0362082e95e6a64d70127631076dfd0b4b"
+      "sha256": "e186e1118c50f709441fc2bc012594c91385f28b7151a30a41d409e79cf45514"
     },
     {
       "path": "CLAUDE.md",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "3a1b60bdf58509c4d148dfcc0280148dcaa4172bc68eee545780e848ebe2abf6"
+      "sha256": "705e532f4ed1e96c5814dcc974585f22c36c544626eab082683cc88f06e5bb1b"
     }
   ],
   "excluded_paths": [
@@ -3903,6 +3903,7 @@
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-1143.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-legacy-template-base.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-modified-hook.sh",
