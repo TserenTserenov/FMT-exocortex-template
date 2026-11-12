@@ -568,13 +568,13 @@ SEGMENTER_PL='
       } elsif ($char eq "\\" && $next eq "\n") {
         # A backslash before a newline joins the lines and both vanish: r-backslash-newline-m is rm.
         $i++;
-      } elsif ($char eq "\\" && $i + 1 < $n
-               && ($next !~ /[;&|(){}\n`]/ || ($next eq q{;} && $segment =~ /(?:^|[\s\/])find\s/))) {
-        # An escaped character is literal: an escaped quote opens no quote. Inside a find command
-        # an escaped `;` is the terminator of `-exec … \;`; splitting there hid the rest of the
-        # expression (`-exec cat {} \; -delete`, a second `-exec rm`, `-fprint` onto a hook) from
-        # every find rule (WP-529 Ф270, F1 of the v0.42.0-rc.6 red team). Elsewhere an escaped
-        # separator still splits (conservative: `eval` turns it back into a separator).
+      } elsif ($char eq "\\" && $i + 1 < $n) {
+        # An escaped character is literal, as in bash: an escaped quote opens no quote and an
+        # escaped separator separates nothing. Splitting at one ("conservative" until rc.7) hid
+        # the rest of the command from the rule for its name: `find … -exec cat {} \; -delete`
+        # (rc.6 red team, F1), `find \( -name v \) -delete` (rc.7 Linux check), `git add a\;b -A`.
+        # A string that a shell re-reads (`eval echo a\; rm -rf x`) is re-split by the eval branch
+        # of inspected_segments from its unescaped words.
         $segment .= $char . $next;
         $escaped_at = length $segment;
         $i++;
@@ -1327,10 +1327,11 @@ fi
 # Emptying a file with a pre-approved reader: `cat /dev/null > F`, `head -c0 F2 > F` (rc.5 red
 # team, RT5-3: WeekPlan.md and params.yaml zeroed without a prompt). The reader's input is
 # /dev/null or a zero count; a target in a temporary directory stays allowed. `2>/dev/null` is a
-# redirection, not an input, and does not count. `>|` (overrides noclobber) is a redirection too.
-if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:space:]])?[[:space:]]+/dev/null|(head|tail)[[:space:]][^;&|>]*-[cn][[:space:]]*0([[:space:]]|$))[^;&|]*[^0-9&>]>[[:space:]]*[^&>[:space:]]' \
-  && printf '%s' "$CMD_EXEC" | grep -oE '[^0-9&>]>[|]?[[:space:]]*["'"'"']?[^&>[:space:];|"'"'"']+' \
-     | sed -E 's/^.>[|]?[[:space:]]*["'"'"']?//' \
+# redirection, not an input, and does not count. Every truncating redirection counts: `>`, `>|`,
+# with a descriptor number (`1>`, `2>`, `&>`) and without blanks (`cat /dev/null>F`, rc.7 Linux check).
+if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:space:]])?[[:space:]]+/dev/null|(head|tail)[[:space:]][^;&|>]*-[cn][[:space:]]*0)([[:space:]][^;|]*)?>' \
+  && printf '%s' "$CMD_EXEC" | grep -oE '(^|[^>])>[|]?[[:space:]]*["'"'"']?[^&>[:space:];|"'"'"']+' \
+     | sed -E 's/^[^>]?>[|]?[[:space:]]*["'"'"']?//' \
      | grep -vqE '^(/dev/null$|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR|\$\{TMPDIR)'; then
   block "обнуление файла читающей командой (cat /dev/null > файл, head -c0 … > файл) запрещено — так без запроса стирают планы и настройки. Пустой файл во временной папке создавать можно; удалять содержимое рабочих файлов — правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi

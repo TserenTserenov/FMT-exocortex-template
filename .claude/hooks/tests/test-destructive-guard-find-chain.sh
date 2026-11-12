@@ -62,5 +62,63 @@ expect "reader then -print" pass 'find . -exec grep -q x {} \; -print'
 expect "escaped ; in echo" pass 'echo a\; b'
 expect "reader then next command" pass 'find . -exec cat {} \; ; ls'
 
+# === rc.7 Linux check: any escaped separator hid the rest of the command ===
+# Every way of writing the search expression, crossed with every writing action: all refused.
+FIND_HEADS=(
+  'find d \( -name v \)'
+  'find d \( -name v -o -name w \)'
+  "find d '(' -name v ')'"
+  'find d "(" -name v ")"'
+  'find d \! -name x'
+  'find d -name a\&b'
+  'find d -name a\|b'
+  'find d -name v -exec cat {} +'
+  'find d \( -name v \) -exec cat {} \;'
+  'command find d \( -name v \)'
+  '"find" d \( -name v \)'
+  '/usr/bin/find d \( -name v \)'
+)
+FIND_WRITES=(
+  '-delete'
+  '-exec rm {} +'
+  '-exec rm -f {} \;'
+  '-execdir unlink {} \;'
+  '-ok rm {} \;'
+  "-exec sh -c 'echo x > \"\$0\"' {} \\;"
+  '-exec cp /dev/null {} \;'
+  '-fprint .claude/hooks/destructive-guard.sh'
+  '-fprintf out.txt %p'
+  '-fls out.txt'
+)
+for head in "${FIND_HEADS[@]}"; do
+  for write in "${FIND_WRITES[@]}"; do
+    expect "$head + $write" block "$head $write"
+  done
+done
+expect "parens, reading only" pass 'find d \( -name v -o -name w \) -print'
+expect "parens, reader" pass "find . \\( -name '*.md' -o -name '*.txt' \\) -exec grep -l foo {} \\;"
+expect "negation, reading only" pass 'find d \! -name x -type f'
+
+# An escaped separator is literal for every command, not only find.
+expect "git add a\\;b -A" block 'git add a\;b -A'
+expect "git add a\\&b -A" block 'git add a\&b -A'
+expect "eval re-reads an escaped ;" block 'eval echo a\; git add -A'
+expect "echo of an escaped ;" pass 'echo a\; git add -A'
+
+# === rc.7 Linux check: truncating redirections with a descriptor number or without blanks ===
+expect "1> file" block 'cat /dev/null 1> params.yaml'
+expect "1>file" block 'cat /dev/null 1>params.yaml'
+expect "/dev/null>file" block 'cat /dev/null>params.yaml'
+expect "1>| file" block 'cat /dev/null 1>| params.yaml'
+expect "head -c0 1>| file" block 'head -c0 /dev/null 1>| params.yaml'
+expect "2> file" block 'cat /dev/null 2> params.yaml'
+expect "&> file" block 'cat /dev/null &> params.yaml'
+expect "head -c0>file" block 'head -c0>params.yaml README.md'
+expect "1> tmp" pass 'cat /dev/null 1> /tmp/x'
+expect "reader 2>/dev/null" pass 'cat README.md 2>/dev/null'
+expect "reader 2> /dev/null piped" pass 'cat README.md 2> /dev/null | head -5'
+expect "/dev/null 2>&1" pass 'cat /dev/null 2>&1'
+expect "append is not emptying" pass 'cat /dev/null >> notes.md'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
