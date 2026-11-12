@@ -271,8 +271,21 @@ jobs:
       - name: Upgrade ${{ matrix.prev }} to the candidate with update.sh (${{ matrix.os }})
         env:
           # Four legs list tags at once: anonymous API calls hit the rate limit (403 on rc.10, macOS).
-          GH_TOKEN: ${{ github.token }}
+          # Not GH_TOKEN: update.sh of 0.41.11 and later rejects the Actions token by its format (rc.11),
+          # and old releases cannot be changed. They all fall back to a logged-in gh, so log gh in instead.
+          RC_GH_TOKEN: ${{ github.token }}
         run: |
+          export GH_CONFIG_DIR="$RUNNER_TEMP/gh-config"
+          mkdir -p "$GH_CONFIG_DIR"
+          printf 'github.com:\n    oauth_token: %s\n    git_protocol: https\n' "$RC_GH_TOKEN" > "$GH_CONFIG_DIR/hosts.yml"
+          unset RC_GH_TOKEN
+          if gh auth status --hostname github.com >/dev/null 2>&1; then
+            echo "gh: logged in for the API calls of update.sh"
+          else
+            echo "::warning::gh login with the Actions token failed; update.sh will call the API anonymously"
+            rm -rf "$GH_CONFIG_DIR"
+            unset GH_CONFIG_DIR
+          fi
           if [ "$RUNNER_OS" = macOS ]; then
             # The image puts Homebrew bash 5 first; most Macs run the system /bin/bash 3.2, and
             # update.sh re-execs plain `bash`, so shadow it for the whole run.
