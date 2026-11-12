@@ -70,12 +70,14 @@ install_036() {
     cp "$REPO_ROOT/scripts/lib/common.sh" "$tpl/scripts/lib/common.sh"
     cp "$SELF_DIR/lib/apply-op.sh" "$tpl/setup/lib/apply-op.sh"
     printf '%s\n' "$OLD_CLAUDE" > "$tpl/CLAUDE.md"
-    write_manifest "$tpl" 0.36.3 CLAUDE.md setup/lib/apply-op.sh
-    [ -z "${2:-}" ] || printf '%s\n' "$2" >> "$tpl/CLAUDE.md"
+    # The 0.36.3 manifest lists paths only, no sha256 (the delivered-proof cannot hold; rc.10 CI).
+    printf '{"version": "0.36.3", "files": [{"path": "CLAUDE.md"}, {"path": "setup/lib/apply-op.sh"}]}\n' \
+        > "$tpl/update-manifest.json"
     printf 'GOVERNANCE_REPO="%s"\nWORKSPACE_DIR="%s"\n' "$GOV" "$ws" > "$ws/.exocortex.env"
     sed "s|{{GOVERNANCE_REPO}}|$GOV|g" "$tpl/CLAUDE.md" > "$ws/CLAUDE.md"
     cp "$ws/CLAUDE.md" "$ws/.claude.md.base"
     cp "$ws/CLAUDE.md" "$tpl/.claude.md.base"   # the legacy substituted template base
+    [ -z "${2:-}" ] || printf '%s\n' "$2" >> "$tpl/CLAUDE.md"   # the pilot edits after setup
     git -C "$tpl" init -q
     git -C "$tpl" -c user.email=t@t -c user.name=t add -A
     git -C "$tpl" -c user.email=t@t -c user.name=t commit -q -m "chore: update from upstream template (0.36)"
