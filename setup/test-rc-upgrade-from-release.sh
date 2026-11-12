@@ -61,13 +61,16 @@ for line in subprocess.run(["git", "-C", root, "ls-tree", "-r", tag], capture_ou
     modes[path] = meta.split()[0]
 with open(os.path.join(root, "update-manifest.json"), encoding="utf-8") as fh:
     print("VERSION", json.load(fh)["version"] == want["version"])
+# update.sh never rewrites these once seeded (is_protected_user_file): they hold what the install wrote, so an
+# older release's seed legitimately differs from the candidate's (0.36.3 -> rc.11: MEMORY.md, 00-index.md).
+protected = {"params.yaml", "memory/MEMORY.md", ".claude/settings.local.json", "sessions/00-index.md"}
 for entry in want["files"]:
     full = os.path.join(root, entry["path"])
     if not os.path.isfile(full):
         print("MISSING", entry["path"])
         continue
     with open(full, "rb") as fh:
-        if hashlib.sha256(fh.read()).hexdigest() != entry["sha256"]:
+        if entry["path"] not in protected and hashlib.sha256(fh.read()).hexdigest() != entry["sha256"]:
             print("DIFFERS", entry["path"])
     if modes.get(entry["path"]) == "100755" and not os.access(full, os.X_OK):
         print("NOEXEC", entry["path"])
