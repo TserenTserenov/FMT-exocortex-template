@@ -162,9 +162,16 @@ from datetime import datetime, timedelta
 
 workspace = os.path.expanduser('$WORKSPACE')
 repos = []
+seen_real = set()
 for name in sorted(os.listdir(workspace)):
     path = os.path.join(workspace, name)
+    # A symlink alias (DS-strategy -> DS-strategy on the Mac) is the same repo:
+    # count it once, otherwise commits_7d/30d double (WP-5 F74).
+    real = os.path.realpath(path)
+    if real in seen_real:
+        continue
     if os.path.isdir(os.path.join(path, '.git')):
+        seen_real.add(real)
         repos.append((name, path))
 
 def git_count(path, since):
@@ -293,9 +300,14 @@ if os.path.exists(log_path):
 import subprocess
 workspace = os.path.expanduser('$WORKSPACE')
 git_sessions_7d = 0
-for name in os.listdir(workspace):
+seen_real = set()
+for name in sorted(os.listdir(workspace)):
     path = os.path.join(workspace, name)
+    real = os.path.realpath(path)  # symlink alias = same repo, count once (WP-5 F74)
+    if real in seen_real:
+        continue
     if os.path.isdir(os.path.join(path, '.git')):
+        seen_real.add(real)
         try:
             out = subprocess.check_output(
                 ['git', '-C', path, 'log', '--since=7 days ago', '--format=%aI', '--no-merges'],

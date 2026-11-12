@@ -25,6 +25,7 @@ Refs: WP-NNN
 
 ### Changed
 
+- [behavior] Автоматическая доставка из авторского источника (template-sync.sh): обновлены roles/synchronizer/scripts/dt-collect.sh (#1549).
 - [optional] (#1523) Описание процесса выпуска называет вердикт независимой атаки словами навыка `iwe-platform-redteam`: GO / CAUTION / BLOCKED, а `cannot_verify` — не пройдено (было STABLE, которого навык не выдаёт).
   - Цель: 77 · Результат: служебное — согласование слов вердикта в документации выпуска; пользователь его не видит
   - Как проверить: `grep -n 'GO / CAUTION' docs/RELEASE-PROCESS.md` находит строку, `grep -c STABLE docs/RELEASE-PROCESS.md` даёт 0
