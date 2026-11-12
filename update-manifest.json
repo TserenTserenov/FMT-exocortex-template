@@ -945,7 +945,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "de23bbb26493943bfb4495624b2cfc70d1e77745a3e23ac808727844f4800c0f"
+      "sha256": "4cf7b3a59739bdc2e168be63127689d6a9ec417b3bc2b1f71d47c21b0434c98d"
     },
     {
       "path": "CLAUDE.md",
@@ -2129,7 +2129,7 @@
     },
     {
       "path": "roles/synchronizer/scripts/dt-collect.sh",
-      "sha256": "bf279acd78090ab9503eefffdada4a9b6d951a5bd2787327ad96cfb1ba21d4aa"
+      "sha256": "eaa45ee5b3d31fb0fc3fb68e489ab90c0809c37e14dff950182a0818a2a69297"
     },
     {
       "path": "roles/synchronizer/scripts/launchd/com.exocortex.scheduler.plist",
