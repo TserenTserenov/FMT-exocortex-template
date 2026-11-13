@@ -16,7 +16,7 @@ ok()   { echo "  ok: $1"; }
 fail() { echo "  FAIL: $1"; FAILS=$((FAILS + 1)); }
 
 FUNCS="$TMP/funcs.sh"
-for fn in hash_file apply_settings_merge_if_requested; do
+for fn in hash_file apply_settings_merge_if_requested explain_applied_settings_merge; do
   awk -v signature="$fn() {" '$0 == signature { found=1 } found { print } found && /^}$/ { exit }' \
     "$UPDATE_SH" >> "$FUNCS"
   grep -q "^$fn() {" "$FUNCS" || { echo "FATAL: $fn not found in update.sh" >&2; exit 2; }
@@ -46,6 +46,15 @@ grep -q 'обновлён слиянием' <<<"$out" && fail "unchanged file st
 echo "== merge changes the file =="
 out=$(run_merge 'echo "{\"template\": 1, \"own_hook\": 1, \"new\": 1}" > "$2"')
 grep -q 'обновлён слиянием' <<<"$out" && ok "changed file reported as updated" || fail "output: $out"
+
+# WP-529 Ф270, finding 1 of the rc.14 red team: a withdrawn platform mode replaced by the merge is
+# explained in plain words, even when the applier prints a line before its JSON report.
+echo "== merge replaces the withdrawn acceptEdits mode =="
+out=$(run_merge 'echo "note"; echo "{\"retired_defaults_replaced\": [\"permissions.defaultMode: acceptEdits -> default\"]}"; echo "{\"x\": 2}" > "$2"')
+grep -q 'агент снова спрашивает подтверждение' <<<"$out" && ok "mode change explained" || fail "output: $out"
+grep -q 'settings.local.json' <<<"$out" && ok "explanation names where to keep the mode" || fail "output: $out"
+out=$(run_merge 'echo "{\"retired_defaults_replaced\": []}"; echo "{\"x\": 3}" > "$2"')
+grep -q 'Режим правок агента' <<<"$out" && fail "mode line printed without a replacement" || ok "no mode line when nothing was replaced"
 
 echo
 if [ "$FAILS" -gt 0 ]; then

@@ -445,7 +445,7 @@
     },
     {
       "path": ".claude/scripts/settings-merge-preview.py",
-      "sha256": "5b8c26c50f5d4c26bdf746dd6ce478e03501cfba936462cdfb06c3d0f07a9f9c"
+      "sha256": "d2be2fec789c86c14692403b41d2b5e4235efe29600bf080ccf03e4a17c82b25"
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "899a6b6be64f3d26d6e54d85a03ff65a2516bfafab390adfd07d6ee697bc79f1"
+      "sha256": "7a3880c2ce4aa70e2ea33386af3bb7ed99d9ee7814b2e5afd4e9800b944146e2"
     },
     {
       "path": "CLAUDE.md",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "13dd5be914d122e80b15acd8e0c76eb2c610220c953d487514e03f8bdd1c1871"
+      "sha256": "82c96da2c0f0e5c2e1c53915c7fabf40e66b1dc5a132b7d005b5481f51866eda"
     }
   ],
   "excluded_paths": [
@@ -3770,6 +3770,7 @@
     "scripts/tests/test_issue_f267_capability_guard.sh",
     "scripts/tests/test_issue_f267_stage2.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
+    "scripts/tests/test_issue_rc14_merge.py",
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",

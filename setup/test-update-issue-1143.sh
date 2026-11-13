@@ -201,11 +201,21 @@ for s in e f; do
     fi
 done
 if grep -q "role-e: установка в урезанном режиме (--core) — роль не трогаем" "$TEST_ROOT/e/stdout.log" \
-   && grep -q "Включить или обновить: bash $TEST_ROOT/e/roles/role-e/install.sh" "$TEST_ROOT/e/stdout.log"; then
+   && grep -q "Включить или обновить: bash \"$TEST_ROOT/e/roles/role-e/install.sh\"" "$TEST_ROOT/e/stdout.log"; then
     pass "e: core install: the skip names the command to enable the role"
 else
     fail "e: core install: no explanation: $(cat "$TEST_ROOT/e/stdout.log")"
 fi
+
+# j: a hand-edited mode file ("core" with a Windows line end and a trailing blank) is still core.
+INSTALL_MODE=$'core \r'
+run_scenario j role-j true no no
+if [ ! -f "$TEST_ROOT/j/call.log" ] && grep -q "role-j: установка в урезанном режиме (--core)" "$TEST_ROOT/j/stdout.log"; then
+    pass "j: core with CRLF and a trailing blank is recognized"
+else
+    fail "j: hand-edited core mode file not recognized: $(cat "$TEST_ROOT/j/stdout.log")"
+fi
+INSTALL_MODE=core
 
 # g: core + an auto:false role the user installed and loaded — still refreshed.
 run_scenario g role-g false yes yes
@@ -234,7 +244,7 @@ if [ "$(cat "$TEST_ROOT/i/exit.code")" = 0 ]; then
 else
     fail "i: loop aborted (exit $(cat "$TEST_ROOT/i/exit.code"))"
 fi
-if grep -q "role-i: переустановка не удалась (код 3). Повторить: bash $TEST_ROOT/i/roles/role-i/install.sh" "$TEST_ROOT/i/stdout.log" \
+if grep -q "role-i: переустановка не удалась (код 3). Повторить: bash \"$TEST_ROOT/i/roles/role-i/install.sh\"" "$TEST_ROOT/i/stdout.log" \
    && grep -q "^    plist template not found$" "$TEST_ROOT/i/stdout.log" \
    && ! grep -q "first diagnostic line" "$TEST_ROOT/i/stdout.log"; then
     pass "i: the failure shows the exit code, the retry command and the last stderr line"

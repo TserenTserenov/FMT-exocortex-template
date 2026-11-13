@@ -241,9 +241,10 @@ done
 # automatic `update.sh --yes` delivered new hook files into .claude/hooks/
 # but did not register them in settings.json — the blocking protective hooks
 # (destructive-guard.sh, pull-on-touch.sh) silently stayed disabled.
-# The merge is provably additive only (settings-merge-preview.py: union over
-# hooks/permissions, on conflict the user's value wins, nothing
-# existing is overwritten or deleted) — no riskier
+# The merge is additive for everything the user owns (settings-merge-preview.py: union over
+# hooks/permissions, on conflict the user's value wins); it replaces only what the platform
+# itself shipped and withdrew (a retired permission value, a hook regrouped by the template),
+# and says so in plain words (WP-529 Ф270, rc.14 red team) — no riskier
 # than everything else that --yes already applies without confirmation. An explicit
 # --apply-settings-merge remains a separate knob for running the merge without
 # the rest of the --yes pipeline (e.g. a re-run after --check).
@@ -618,10 +619,13 @@ remember_untouched_memory_before_apply() {
 # pilot made right there was gone; the Step 6 line pointed at the backup of the deployed copy,
 # which never held it. A clone memory file whose hash differs from the previous release's
 # manifest is an edit: it is copied into this run's memory backup under template-clone/ first, and
-# the line names the copy. An unreadable manifest backs up every replaced memory file (cheap,
-# and an edit is never lost on a guess). author_mode skips: the author's clone is their git work.
+# the line names the copy. A manifest without a fingerprint for the file (0.36 manifests carry
+# none, finding 3 of the v0.42.0-rc.14 red team) cannot tell an edit from the delivered version:
+# such files are still backed up (cheap, and an edit is never lost on a guess), but are not each
+# called "your edit" — one line says how many were kept and where.
+# author_mode skips: the author's clone is their git work.
 backup_clone_memory_edits_before_apply() {
-    local f src released backup
+    local f src released backup unproven=0
     is_author_mode && return 0
     for f in ${UPDATED_FILES[@]+"${UPDATED_FILES[@]}"}; do
         case "$f" in memory/*.md|memory/*.yaml|memory/*.yml) ;; *) continue ;; esac
@@ -633,13 +637,19 @@ backup_clone_memory_edits_before_apply() {
             MEMORY_BACKUP_RUN="$WORKSPACE_DIR/.backups/memory-pre-update/$(date -u +%Y%m%dT%H%M%SZ)-$$"
         fi
         backup="$MEMORY_BACKUP_RUN/template-clone/${f#memory/}"
-        if mkdir -p "$(dirname "$backup")" && cp -p "$src" "$backup"; then
-            echo "  ⚠ $f — в папке шаблона была ваша правка; файл шаблона заменяется новой версией, правка сохранена: $backup"
-        else
-            echo "  ⚠ $f — в папке шаблона была ваша правка, сохранить её копию не удалось; обновление не начато, файлы не менялись" >&2
+        if ! { mkdir -p "$(dirname "$backup")" && cp -p "$src" "$backup"; }; then
+            echo "  ⚠ $f — копию файла памяти из папки шаблона сохранить не удалось; обновление не начато, файлы не менялись" >&2
             return 1
         fi
+        if [ -n "$released" ]; then
+            echo "  ⚠ $f — в папке шаблона была ваша правка; файл шаблона заменяется новой версией, правка сохранена: $backup"
+        else
+            unproven=$((unproven + 1))
+        fi
     done
+    if [ "$unproven" -gt 0 ]; then
+        echo "  ℹ️  файлов памяти в папке шаблона заменяется новой версией: $unproven. Отпечатков прежней версии для них нет, поэтому правку от доставленной версии не отличить, и прежние копии сохранены на случай, если вы их правили: $MEMORY_BACKUP_RUN/template-clone/"
+    fi
     return 0
 }
 
@@ -1514,6 +1524,7 @@ apply_settings_merge_if_requested() {
         echo "  .claude/settings.json — слияние ничего не изменило, файл прежний"
     elif [ "$apply_rc" -eq 0 ]; then
         echo "  ✓ .claude/settings.json — обновлён слиянием (--apply-settings-merge)"
+        explain_applied_settings_merge "$apply_out"
     else
         echo "  ⚠ .claude/settings.json — слияние не применено (см. причину выше), workspace-копия цела"
         report_settings_merge_preview "$src" "$dst"
@@ -1559,9 +1570,38 @@ print(f"    → предпросмотр слияния: {r['preview']}")
 print(f"    + из шаблона: ключей {r['keys_added_from_template']}, hook-записей {r['hooks_added_from_template']}, permissions {r['permissions_added_from_template']}")
 if r.get("hooks_only_in_workspace"):
     print(f"    ℹ️  в вашей копии есть {r['hooks_only_in_workspace']} hook-записей, которых сейчас нет в шаблоне (может быть обычной личной настройкой)")
+if r.get("retired_defaults_replaced"):
+    print("    ⚠ режим правок агента: старая установка разрешала агенту менять файлы без вашего подтверждения"
+          " (так её настраивала платформа до 0.38.4); слияние вернёт обычный режим с подтверждением:"
+          " bash update.sh --apply-settings-merge")
+if r.get("hooks_regrouped"):
+    print(f"    + хуков, которые шаблон перенёс в другую группу: {r['hooks_regrouped']} (дубль не появится)")
 if r["conflicts"]:
     print(f"    ⚠ конфликты (оставлено ваше значение): {', '.join(r['conflicts'])}")
 PY
+}
+
+# explain_applied_settings_merge APPLY_OUTPUT — after the merge was applied, the plain-words line for
+# a permission value the platform withdrew (WP-529 Ф270, finding 1 of the rc.14 red team: an install
+# made by 0.36–0.38.3 kept acceptEdits after the update, and the only trace was the machine word
+# "conflicts"). The applier prints the merger's JSON report as its first line.
+explain_applied_settings_merge() {
+    printf '%s\n' "$1" | "$PY_BIN" -c '
+import json, sys
+r = {}
+for line in sys.stdin:
+    if line.lstrip().startswith("{"):
+        try:
+            r = json.loads(line)
+            break
+        except ValueError:
+            continue
+if r.get("retired_defaults_replaced"):
+    print("  ✓ Режим правок агента: агент снова спрашивает подтверждение перед изменением файлов."
+          " В общих настройках стоял режим правок без подтверждения — платформа ставила его сама до 0.38.4.")
+    print("    Если этот режим нужен вам, держите его в личных настройках .claude/settings.local.json"
+          " (обновление их не трогает): \"defaultMode\": \"acceptEdits\" в разделе permissions.")
+' 2>/dev/null || true
 }
 
 report_settings_merge_preview() {
@@ -1594,6 +1634,8 @@ quiet = (
     and r["hooks_added_from_template"] == 0
     and r["permissions_added_from_template"] == 0
     and r.get("hooks_only_in_workspace", 0) == 0
+    and not r.get("retired_defaults_replaced")
+    and r.get("hooks_regrouped", 0) == 0
     and not r["conflicts"]
 )
 sys.exit(0 if quiet else 1)
@@ -7410,7 +7452,7 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
     # loop installed them anyway. Kept apart from is_auto: the role still
     # wants to run on its own, the user just did not allow it here.
     core_mode=false
-    [ "$(head -n 1 "$WORKSPACE_DIR/.iwe-install-mode" 2>/dev/null)" = "core" ] && core_mode=true
+    [ "$(head -n 1 "$WORKSPACE_DIR/.iwe-install-mode" 2>/dev/null | tr -d '\r\t ')" = "core" ] && core_mode=true
     for role_dir in "$SCRIPT_DIR"/roles/*/; do
         [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
         role_name="$(basename "$role_dir")"
@@ -7423,7 +7465,7 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
         # by hand (peer session 2026-11-12-16, Kimi and Codex).
         if $core_mode && $is_auto; then
             echo "  ○ $role_name: установка в урезанном режиме (--core) — роль не трогаем."
-            echo "    Включить или обновить: bash ${role_dir}install.sh"
+            echo "    Включить или обновить: bash \"${role_dir}install.sh\""
             continue
         fi
 
@@ -7474,7 +7516,7 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
                 echo "  ✓ $role_name переустановлен"
             else
                 installer_rc=$?
-                echo "  ○ $role_name: переустановка не удалась (код $installer_rc). Повторить: bash ${role_dir}install.sh"
+                echo "  ○ $role_name: переустановка не удалась (код $installer_rc). Повторить: bash \"${role_dir}install.sh\""
                 [ -z "$installer_stderr" ] || printf '    %s\n' "${installer_stderr##*$'\n'}"
             fi
         fi
