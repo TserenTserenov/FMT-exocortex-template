@@ -271,9 +271,17 @@ def refresh(root: Path, payload: dict, allowlist_path: Path, announced_meta: dic
 
 def add_changelog_entry(text: str, pr: int) -> str:
     """Insert the supplier entry under [Unreleased] → ### Changed; unchanged if already there."""
+    # The three sub-bullets are the handoff fields required by scripts/check-changelog-fields.py
+    # (Changelog Gate, WP-529 Ф252); need 93 is the one the translation glossary entries already use.
     entry = (
         "- [optional] Снимок терминов графа понятий для перевода шаблона на английский обновлён "
         f"поставщиком терминов перевода (`translation/glossary-snapshot.csv`; {CHANGELOG_MARKER}{pr}).\n"
+        "  - Цель: 93 · Результат: служебное — словарь перевода обновлён из графа понятий; "
+        "у пользователя шаблона поведение не меняется\n"
+        "  - Как проверить: `python3 -m pytest scripts/tests/test_glossary_source.py` проходит на ветке запроса; "
+        f"разница по терминам — в описании запроса #{pr}\n"
+        f"  - Как откатить: не сливать запрос #{pr} или git revert его слияния; "
+        "перевод продолжает работать на прежнем снимке\n"
     )
     lines = text.splitlines(keepends=True)
     start = next((i for i, line in enumerate(lines) if line.startswith("## [Unreleased]")), None)
