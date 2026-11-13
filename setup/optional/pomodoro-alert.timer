@@ -1,0 +1,12 @@
+[Unit]
+Description=Pomodoro break reminder, checked every five minutes
+
+[Timer]
+# Interval timer, not a calendar one: the reminder is checked, not scheduled,
+# so a five-minute step is enough and misses cost nothing.
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

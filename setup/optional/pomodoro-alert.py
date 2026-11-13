@@ -3,18 +3,30 @@
 
 Checks WakaTime durations API for continuous coding blocks.
 If active block > session_alert_minutes (from day-rhythm-config.yaml),
-sends a macOS notification to take a break.
+sends a desktop notification (macOS ``osascript`` or Linux ``notify-send``)
+to take a break.
 
-Designed to run via launchd every 5 minutes during working hours.
+Designed to run via launchd (macOS) or a systemd user timer (Linux) every
+5 minutes during working hours.
 
 Prerequisites:
   - WakaTime installed and configured (~/.wakatime.cfg with api_key)
-  - macOS (uses osascript for notifications)
+  - Statistics access: since 01.11.2026 WakaTime answers 403 to API keys used
+    for anything but heartbeats ("API Keys are only for plugins, use your
+    personal oauth token"). Reading therefore prefers the personal OAuth token
+    from ``~/.wakatime/oauth_token`` and falls back to the api_key only when
+    that file is absent. See ``~/.wakatime/wakatime-set-oauth.sh``.
+  - Python 3
 
-Install:
+Install (Linux):
   1. Copy this script to your workspace
-  2. Install the launchd plist (see setup/optional/pomodoro-alert.plist)
+  2. Install the systemd units: ``setup/optional/pomodoro-alert.timer`` and
+     ``setup/optional/pomodoro-alert.service`` — replace ``{{WORKSPACE_DIR}}``
+     and copy to ``~/.config/systemd/user/``, then
+     ``systemctl --user enable --now pomodoro-alert.timer``
   3. Adjust memory/day-rhythm-config.yaml → pomodoro section
+
+Install (macOS): as before, via ``setup/optional/pomodoro-alert.plist``.
 """
 
 import json
@@ -30,6 +42,7 @@ from urllib.request import Request, urlopen
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = WORKSPACE_ROOT / "memory" / "day-rhythm-config.yaml"
 WAKATIME_CFG = Path.home() / ".wakatime.cfg"
+OAUTH_TOKEN_PATH = Path.home() / ".wakatime" / "oauth_token"
 STATE_FILE = Path(__file__).parent / ".pomodoro-state.json"
 
 # Gap threshold: if no heartbeat for this many seconds, session resets
@@ -63,21 +76,39 @@ def load_config() -> dict:
     return {**defaults, **result}
 
 
+def get_auth_header() -> dict:
+    """Build the Authorization header for statistics requests.
+
+    Since 01.11.2026 WakaTime rejects API keys on read endpoints, so the
+    personal OAuth token wins when it is present. The api_key path stays as a
+    fallback for installations that still have a readable key.
+    """
+    if OAUTH_TOKEN_PATH.exists():
+        token = OAUTH_TOKEN_PATH.read_text().strip()
+        if token:
+            return {"Authorization": f"Bearer {token}"}
+    api_key = get_api_key()
+    return {"Authorization": f"Basic {b64encode(api_key.encode()).decode()}"}
+
+
 def get_api_key() -> str:
     """Read WakaTime API key from ~/.wakatime.cfg."""
     for line in WAKATIME_CFG.read_text().splitlines():
         line = line.strip()
         if line.startswith("api_key"):
             return line.split("=", 1)[1].strip()
-    raise SystemExit("WakaTime API key not found in ~/.wakatime.cfg")
+    raise SystemExit(
+        "WakaTime credentials not found: no ~/.wakatime/oauth_token and no api_key in "
+        "~/.wakatime.cfg. Since 01.11.2026 statistics need a personal OAuth token — "
+        "issue one via ~/.wakatime/wakatime-set-oauth.sh"
+    )
 
 
-def fetch_durations(api_key: str) -> list:
+def fetch_durations(auth_header: dict) -> list:
     """Fetch today's durations from WakaTime API."""
     today = time.strftime("%Y-%m-%d")
     url = f"https://wakatime.com/api/v1/users/current/durations?date={today}"
-    token = b64encode(api_key.encode()).decode()
-    req = Request(url, headers={"Authorization": f"Basic {token}"})
+    req = Request(url, headers=auth_header)
     with urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())["data"]
 
@@ -149,8 +180,7 @@ def main():
     alert_minutes = config["session_alert_minutes"]
     break_minutes = config["break_minutes"]
 
-    api_key = get_api_key()
-    durations = fetch_durations(api_key)
+    durations = fetch_durations(get_auth_header())
     block_minutes = find_current_block(durations)
 
     state = load_state()

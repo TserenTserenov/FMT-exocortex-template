@@ -4,15 +4,19 @@ Optional features that enhance IWE but are not required for core functionality.
 
 ## Pomodoro Break Reminders
 
-Monitors your coding activity via WakaTime and sends a macOS notification when you've been working continuously for too long.
+Monitors your coding activity via WakaTime and sends a desktop notification (macOS `osascript` or Linux `notify-send`) when you've been working continuously for too long.
 
 ### Prerequisites
 
 - **WakaTime** installed and configured (`~/.wakatime.cfg` with `api_key`)
-- **macOS** (uses `osascript` for notifications)
-- **Python 3** (pre-installed on macOS)
+- **Personal WakaTime OAuth token** in `~/.wakatime/oauth_token` (install: `~/.wakatime/wakatime-set-oauth.sh`).
+  Since 01.11.2026 WakaTime rejects API keys on statistics endpoints with HTTP 403 («API Keys are only for
+  plugins, use your personal oauth token»), so the key alone is no longer enough. The script falls back to
+  the key only when the token file is absent.
+- **Python 3**
+- **macOS** (launchd) or **Linux with systemd user units**
 
-### Installation
+### Installation (macOS)
 
 ```bash
 # 1. Replace placeholder with your workspace path
@@ -24,6 +28,23 @@ launchctl load ~/Library/LaunchAgents/com.exocortex.pomodoro-alert.plist
 
 # 3. Verify it's running
 launchctl list | grep pomodoro
+```
+
+### Installation (Linux)
+
+```bash
+# 1. Copy the units into the user scope, replacing the workspace placeholder
+mkdir -p ~/.config/systemd/user
+for unit in pomodoro-alert.service pomodoro-alert.timer; do
+  sed "s|{{WORKSPACE_DIR}}|$HOME/IWE|g" "setup/optional/$unit" > ~/.config/systemd/user/$unit
+done
+
+# 2. Enable and start the five-minute check
+systemctl --user daemon-reload
+systemctl --user enable --now pomodoro-alert.timer
+
+# 3. Verify: the next run must not be «infinity»
+systemctl --user list-timers pomodoro-alert.timer
 ```
 
 ### Configuration
@@ -41,24 +62,30 @@ pomodoro:
 
 ### How it works
 
-1. Every 5 minutes, the script calls WakaTime Durations API
+1. Every 5 minutes, the script calls WakaTime Durations API (personal OAuth token, key as fallback)
 2. It calculates the current continuous work block (gaps > 5 min reset the counter)
-3. If continuous work exceeds `session_alert_minutes`, a macOS notification appears
+3. If continuous work exceeds `session_alert_minutes`, a desktop notification appears
 4. Alerts are suppressed for 10 minutes after each notification (no spam)
 
 ### Uninstall
 
 ```bash
+# macOS
 launchctl unload ~/Library/LaunchAgents/com.exocortex.pomodoro-alert.plist
 rm ~/Library/LaunchAgents/com.exocortex.pomodoro-alert.plist
+
+# Linux
+systemctl --user disable --now pomodoro-alert.timer
+rm ~/.config/systemd/user/pomodoro-alert.timer ~/.config/systemd/user/pomodoro-alert.service
 ```
 
 ### Files
 
 | File | Purpose |
 |------|---------|
-| `pomodoro-alert.py` | Python script (WakaTime API + macOS notification) |
-| `pomodoro-alert.plist` | launchd agent template (replace `{{WORKSPACE_DIR}}`) |
+| `pomodoro-alert.py` | Python script (WakaTime API + desktop notification) |
+| `pomodoro-alert.plist` | launchd agent template for macOS (replace `{{WORKSPACE_DIR}}`) |
+| `pomodoro-alert.service` / `.timer` | systemd user units for Linux (replace `{{WORKSPACE_DIR}}`) |
 
 ---
 
