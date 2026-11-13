@@ -402,7 +402,7 @@ expect_one_verdict() {
 }
 
 # the reason that put the run into each rollback state — "detected" must not pass as "uncertain"
-ROLLBACK_DETECTED_MSG='^🔴 ВНИМАНИЕ: локальная установка новее последнего релиза'
+ROLLBACK_DETECTED_MSG='^🔴 ВНИМАНИЕ: локальная установка новее того, что доставит этот канал'
 ROLLBACK_UNCERTAIN_MSG='^⚠️ ВНИМАНИЕ: не удалось проверить историю релиза'
 # rollback_msg KIND — the warning line of that rollback state
 rollback_msg() { if [ "$1" = detected ]; then echo "$ROLLBACK_DETECTED_MSG"; else echo "$ROLLBACK_UNCERTAIN_MSG"; fi; }

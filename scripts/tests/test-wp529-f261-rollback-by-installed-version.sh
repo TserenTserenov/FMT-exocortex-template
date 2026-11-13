@@ -34,12 +34,12 @@ done
 
 set_manifest() { printf '{"version": "%s", "files": []}\n' "$2" > "$1/update-manifest.json"; }
 
-# rollback_rc INSTALL RELEASE_SHA UPSTREAM_VERSION -> prints detect_release_rollback's code
+# rollback_rc INSTALL RELEASE_SHA UPSTREAM_VERSION [CHANNEL] -> prints detect_release_rollback's code
 rollback_rc() {
   (
     # shellcheck disable=SC1090
     . "$FUNCS"
-    UPDATE_CHANNEL=release
+    UPDATE_CHANNEL="${4:-release}"
     SCRIPT_DIR="$1"
     RELEASE_SHA="$2"
     UPSTREAM_VERSION="$3"
@@ -92,6 +92,22 @@ git -C "$REPO" checkout -q "$RELEASE"
 rc=$(rollback_rc "$REPO" "$RELEASE" 0.41.11)
 [ "$rc" = "1" ] && ok "unreadable version, HEAD == release -> ancestry decides (1)" \
   || fail "unreadable version: expected 1, got $rc"
+
+echo "== main and rc channels compare versions too (Ф270, RT2-4 of the rc.2 red team) =="
+git -C "$REPO" checkout -q "$RELEASE"
+set_manifest "$REPO" 0.42.0
+rc=$(rollback_rc "$REPO" "" 0.41.11 main)
+[ "$rc" = "0" ] && ok "main channel, installed 0.42.0 > main 0.41.11 -> rollback (0)" \
+  || fail "main channel downgrade: expected 0, got $rc"
+rc=$(rollback_rc "$REPO" "" 0.41.11 rc)
+[ "$rc" = "0" ] && ok "rc channel, installed 0.42.0 > delivered 0.41.11 -> rollback (0)" \
+  || fail "rc channel downgrade: expected 0, got $rc"
+rc=$(rollback_rc "$REPO" "" 0.42.0 main)
+[ "$rc" = "1" ] && ok "main channel, equal versions -> no rollback (1)" \
+  || fail "main channel equal: expected 1, got $rc"
+rc=$(rollback_rc "$REPO" "" 0.42.1 rc)
+[ "$rc" = "1" ] && ok "rc channel, newer candidate -> no rollback (1)" \
+  || fail "rc channel forward: expected 1, got $rc"
 
 echo
 if [ "$FAILS" -gt 0 ]; then

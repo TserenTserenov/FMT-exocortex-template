@@ -568,9 +568,13 @@ SEGMENTER_PL='
       } elsif ($char eq "\\" && $next eq "\n") {
         # A backslash before a newline joins the lines and both vanish: r-backslash-newline-m is rm.
         $i++;
-      } elsif ($char eq "\\" && $i + 1 < $n && $next !~ /[;&|(){}\n`]/) {
-        # An escaped character is literal: an escaped quote opens no quote. An escaped separator
-        # still splits (conservative: the next iteration sees it as the separator it looks like).
+      } elsif ($char eq "\\" && $i + 1 < $n) {
+        # An escaped character is literal, as in bash: an escaped quote opens no quote and an
+        # escaped separator separates nothing. Splitting at one ("conservative" until rc.7) hid
+        # the rest of the command from the rule for its name: `find … -exec cat {} \; -delete`
+        # (rc.6 red team, F1), `find \( -name v \) -delete` (rc.7 Linux check), `git add a\;b -A`.
+        # A string that a shell re-reads (`eval echo a\; rm -rf x`) is re-split by the eval branch
+        # of inspected_segments from its unescaped words.
         $segment .= $char . $next;
         $escaped_at = length $segment;
         $i++;
@@ -778,6 +782,35 @@ SEGMENTER_PL='
     return @indices;
   }
 
+  sub carried_indices {
+    # Positions of the commands that find or xargs run once per found item: the command
+    # after -exec/-execdir/-ok/-okdir of find, or the command behind xargs, each past
+    # wrappers (`find ~ -exec env rm {} +`, `xargs -0 nice rm`, `busybox rm`). Such a
+    # command needs no -r to delete a whole tree: the walk supplies every file (WP-529 Ф270,
+    # RT2-1 of the v0.42.0-rc.2 red team).
+    my @tokens = @_;
+    my ($first) = command_indices(@tokens);
+    return () unless defined $first;
+    my @carried;
+    push @carried, $first if grep { command_base($tokens[$_]) eq "xargs" } 0 .. $first - 1;
+    push @carried, find_carried_indices(@tokens);
+    return map { command_base($tokens[$_]) eq "busybox" && $_ < $#tokens ? $_ + 1 : $_ } @carried;
+  }
+
+  sub find_carried_indices {
+    # Positions of the commands find runs per item (-exec/-execdir/-ok/-okdir), past wrappers.
+    my @tokens = @_;
+    my ($first) = command_indices(@tokens);
+    return () unless defined $first && command_base($tokens[$first]) eq "find";
+    my @carried;
+    for (my $j = $first + 1; $j < $#tokens; $j++) {
+      next unless $tokens[$j] =~ /^-(?:exec|execdir|ok|okdir)$/;
+      my ($inner) = command_indices(@tokens[$j + 1 .. $#tokens]);
+      push @carried, $j + 1 + $inner if defined $inner;
+    }
+    return map { command_base($tokens[$_]) eq "busybox" && $_ < $#tokens ? $_ + 1 : $_ } @carried;
+  }
+
   sub shell_reads_stdin {
     my @args = @_;
     my $stdin_script = 0;
@@ -901,10 +934,21 @@ SEGMENTER_PL='
   # A string handed to a shell (`bash -c "..."`, `eval "..."`) is commands too; it goes back
   # into the queue, a few levels deep.
   my @queue = map { [$_, 0] } grep { /\S/ } inspected_segments($cmd_scan);
+  my $carried = $ENV{"CARRIED"} // q{};
+  my $find_allowed = $ENV{"FIND_ALLOWED"} // q{};
   while (my $item = shift @queue) {
     my ($segment, $depth) = @$item;
     my @tokens = words($segment);
     next unless @tokens;
+    if (length $carried) {
+      # CARRIED=<regex>: print the segment when find/xargs carries a command matching it.
+      # The rest of the loop still runs, so shell strings inside are unpacked and checked too.
+      print join(" ", @tokens), "\n" if grep { command_base($tokens[$_]) =~ /$carried/ } carried_indices(@tokens);
+    }
+    if (length $find_allowed) {
+      # FIND_ALLOWED=<regex>: print the segment when find runs a command NOT matching it.
+      print join(" ", @tokens), "\n" if grep { command_base($tokens[$_]) !~ /$find_allowed/ } find_carried_indices(@tokens);
+    }
     for my $index (command_indices(@tokens)) {
       next unless $index <= $#tokens;
       my $base = command_base($tokens[$index]);
@@ -1217,6 +1261,82 @@ fi
 RM_INVOCATIONS=$(shell_invocations rm)
 if [ -n "$RM_INVOCATIONS" ]; then
   block "rm с -r и -f запрещён — удаление необратимо. Удаляй той же командой через $GUARDED_RM (те же ключи и цели): он при выполнении проверит настоящие пути и удалит только внутри временных каталогов из реестра $WORKSPACE_ROOT/.claude/config/guarded-rm-roots.txt. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# find that deletes what it walks: `-delete`, or `-exec`/`-execdir`/`-ok`/`-okdir` running rm,
+# unlink or shred (any path, with or without -r/-f). It is the recursive deletion of the rm rule
+# above without its flags: `find ~ -delete` and `find "$HOME" -exec rm -f {} +` passed
+# (WP-529 Ф270, RT-2 of the v0.42.0-rc.1 red team). The walked tree is only known at run time,
+# so a temporary root in the text does not exempt it, as with rm.
+# rc.2 red team (RT2-1): a wrapper between -exec and rm (`-exec env rm`, `nice rm`, `busybox rm`)
+# and `find … | xargs rm` passed; the carried command is now found past wrappers by the segmenter.
+FIND_DELETE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-delete( |$)' || true)
+CARRIED_DELETE_INVOCATIONS=$(printf '%s' "$CMD_EXEC" | MODE=match NAME=iwe-no-such-command CARRIED='^(?:rm|unlink|shred)$' perl -e "$SEGMENTER_PL")
+if [ -n "$FIND_DELETE_INVOCATIONS$CARRIED_DELETE_INVOCATIONS" ]; then
+  block "find или xargs с удалением (-delete, -exec rm/unlink/shred, xargs rm — в том числе через env, nice, busybox) запрещён — удаляет всё найденное в дереве, необратимо. Найди файлы без удаления, проверь список и удаляй через $GUARDED_RM конкретные цели. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# find is pre-approved in settings.json, so whatever it runs per item runs without a prompt:
+# `-exec sh -c 'rm "$1"'`, `-exec truncate -s0`, `-exec cp /dev/null {}` (zeroes this hook, after
+# which `rm -rf ~/IWE` passes), `-exec mv`, `-exec sed -i d`, `-exec python3`, `-exec tee` (WP-529
+# Ф270, F2 of the v0.42.0-rc.3 red team). A list of forbidden commands is never complete, so find
+# may run only commands that read: anything else is refused. The same holds for rg --pre, which
+# runs its argument on every searched file.
+FIND_RUNS_WRITER=$(printf '%s' "$CMD_EXEC" | MODE=match NAME=iwe-no-such-command \
+  FIND_ALLOWED='^(?:grep|egrep|fgrep|rg|cat|head|tail|wc|ls|stat|file|basename|dirname|echo|printf|test|\[|true|false|readlink|realpath|sha256sum|sha1sum|sha512sum|md5sum|md5|shasum|cksum|du|cmp|diff)$' \
+  perl -e "$SEGMENTER_PL")
+RG_PRE_INVOCATIONS=$(shell_invocations rg | grep -E -- '(^| )--pre(-glob)?(=| |$)' || true)
+if [ -n "$FIND_RUNS_WRITER$RG_PRE_INVOCATIONS" ]; then
+  block "find -exec/-execdir/-ok может запускать только читающие команды (grep, cat, head, wc, stat, sha256sum …), rg --pre запрещён: оба разрешены без запроса, и через них удаляли файлы и затирали защитные проверки. Найди файлы без -exec, проверь список и меняй их отдельной командой. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# Commands that write a file named in their arguments rather than through a shell redirection:
+# `git diff --output=<file>` (also log, show and the other diff family) and find's
+# -fprint/-fprint0/-fprintf/-fls. Both programs are pre-approved in settings.json, so the write
+# runs without a prompt, and the red team zeroed .claude/hooks/destructive-guard.sh with one and
+# switched every check off (WP-529 Ф270, RT2-3 of the v0.42.0-rc.2 red team). The target is often
+# a variable, so it is the option that is refused, on any path; write through `>` instead.
+# git also accepts the abbreviations --outp/--outpu; --output-indicator-* is a different option.
+GIT_OUTPUT_INVOCATIONS=$(shell_invocations git | grep -E -- '(^| )--outpu?t?(=| |$)' || true)
+FIND_WRITE_INVOCATIONS=$(shell_invocations find | grep -E -- '(^| )-(fprint0?|fprintf|fls)( |$)' || true)
+if [ -n "$GIT_OUTPUT_INVOCATIONS$FIND_WRITE_INVOCATIONS" ]; then
+  block "git --output и find -fprint/-fprintf/-fls запрещены — пишут в файл из аргумента без запроса и уже затирали защитные проверки. Пиши через перенаправление: git diff > файл, find … > файл. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# `git branch` and `git remote` are pre-approved in settings.json for listing, so their writing
+# forms ran without a prompt: `git branch -D/-f/-M` deletes or moves a branch, `git remote
+# set-url/remove/add` points origin elsewhere (WP-529 Ф270, F2 of the v0.42.0-rc.4 red team).
+# Short options cluster (`-Dr`), and git accepts any unambiguous prefix of a long option
+# (`--del`, `--forc`, `--mo`). Creating a branch and every listing form stay allowed.
+# rc.5 red team (RT5-3): `git branch --unset-upstream`/`-u` rewrites the tracking config and
+# `git remote update --prune` deletes remote-tracking branches; both passed the same way.
+GIT_BRANCH_WRITE=$(git_segment branch | grep -E -- ' branch( .*)? (-[a-zA-Z]*[dDfmMCu][a-zA-Z]*|--(d[a-z]*|forc|force|mo|mov|move|unset-upstream|set-upstream-to|set-upstream))( |=|$)' || true)
+GIT_REMOTE_WRITE=$(git_segment remote | grep -E -- ' remote( -v| --verbose)* ((add|rename|remove|rm|set-head|set-branches|set-url|prune)( |$)|update( .*)? (--prune|-p)( |$))' || true)
+if [ -n "$GIT_BRANCH_WRITE$GIT_REMOTE_WRITE" ]; then
+  block "git branch -d/-D/-f/-m/-M/-C/-u, --unset-upstream и git remote add/rename/remove/set-url/set-head/set-branches/prune, git remote update --prune запрещены — разрешены без запроса только для просмотра, а эти формы удаляют ветку или меняют адрес хранилища. Просмотр (git branch, git branch -a -vv, git remote -v, git remote get-url) работает; удаление ветки и смену адреса делает пилот сам. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# rg reads extra options, --pre among them, from the file named by RIPGREP_CONFIG_PATH; with rg
+# pre-approved that is `rg --pre` without the word on the command line. A shell redirection or
+# tee onto a protective file (.claude/hooks, .claude/bin, settings*.json) zeroes a check the way
+# the writes above did, after any pre-approved reader (`find … > .claude/hooks/x.sh`). Both are
+# literal-text checks: a path held in a variable is not seen (docs/DESTRUCTIVE-GUARD.md).
+if matches "$CMD_EXEC" -E 'RIPGREP_CONFIG_PATH'; then
+  block "RIPGREP_CONFIG_PATH запрещён — файл настроек rg может включить --pre, который запускает программу на каждом найденном файле. Ищи обычным rg с ключами в самой команде. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+# Emptying a file with a pre-approved reader: `cat /dev/null > F`, `head -c0 F2 > F` (rc.5 red
+# team, RT5-3: WeekPlan.md and params.yaml zeroed without a prompt). The reader's input is
+# /dev/null or a zero count; a target in a temporary directory stays allowed. `2>/dev/null` is a
+# redirection, not an input, and does not count. Every truncating redirection counts: `>`, `>|`,
+# with a descriptor number (`1>`, `2>`, `&>`) and without blanks (`cat /dev/null>F`, rc.7 Linux check).
+if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:space:]])?[[:space:]]+/dev/null|(head|tail)[[:space:]][^;&|>]*-[cn][[:space:]]*0)([[:space:]][^;|]*)?>' \
+  && printf '%s' "$CMD_EXEC" | grep -oE '(^|[^>])>[|]?[[:space:]]*["'"'"']?[^&>[:space:];|"'"'"']+' \
+     | sed -E 's/^[^>]?>[|]?[[:space:]]*["'"'"']?//' \
+     | grep -vqE '^(/dev/null$|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR|\$\{TMPDIR)'; then
+  block "обнуление файла читающей командой (cat /dev/null > файл, head -c0 … > файл) запрещено — так без запроса стирают планы и настройки. Пустой файл во временной папке создавать можно; удалять содержимое рабочих файлов — правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+if matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+  block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.

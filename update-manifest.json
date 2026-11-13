@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.41.11",
+  "version": "0.42.0",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "99ed841969692e38261bbddea1172cf8aa7976af6b8697ba510dfea8606a5a9f"
+      "sha256": "ff7304c02a977a13b8787a469cddb9faf310cda0bda404dc9e16efd0807df8a0"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "13469388174665fbcefb97fc973cb73518f76ecddfffe788cae96afa1a43f6b6"
+      "sha256": "a378db8d642ed1815acf5b58abbb9c06471d0eeb1c588252119c7c19e5ef22d9"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -205,11 +205,11 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
-      "sha256": "a84b32f08cd9277fc64c8f8913d90ccbc935cf30b297f42910f888b9a4b7dfc3"
+      "sha256": "6de5b47924d90efb26f6b5b516cc4bd2dc2fdf37b6fc124a766be1f68b0e8652"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "2d82c7b7c3a9e617c5339ef8ec397204faeb6bcdcd1ef53af91b69f21a171ac9"
+      "sha256": "6ec469aab733dc512e1c418c96f9541eedd533f29a2008dbb9c75bc78ffe412b"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -222,6 +222,22 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "a4275e5385da0de8455de40de3445d21a8368c38f000531bb5e5c8cb5a0ddb10"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
+      "sha256": "84943f75d2e94012381eafcadeaace23e35f1907154a5cbb20c14d8e8e56a122"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-find-chain.sh",
+      "sha256": "2757ccbb561a153241d00d95de49ba0ef301e51285795129fc642e5153f2aedf"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
+      "sha256": "3c4a58b580efba5525c713e190fffab9835e7b023cbde0f0dfdb9e10c4be70f0"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-git-branch-remote.sh",
+      "sha256": "c24c07fd8fceba090d5b0234d212d5cec1fa4c5345019096a17963449ca1f510"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -429,7 +445,7 @@
     },
     {
       "path": ".claude/scripts/settings-merge-preview.py",
-      "sha256": "5b8c26c50f5d4c26bdf746dd6ce478e03501cfba936462cdfb06c3d0f07a9f9c"
+      "sha256": "d2be2fec789c86c14692403b41d2b5e4235efe29600bf080ccf03e4a17c82b25"
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
@@ -545,7 +561,7 @@
     },
     {
       "path": ".claude/skills/find-method/SKILL.md",
-      "sha256": "23e6e20a7999c9c46deeb5e75e6e30e6db48beaf35341828943c432df382c336"
+      "sha256": "ccf44044e4f9bfbab670dea449d4f6d6d0b4c77f07b8ecd0b8c43b4024281bdb"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -645,7 +661,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "e3c2bfb29b1f69f454760002f9db34740e0929d9c5c0c9b8d5ba4bf50f918e45"
+      "sha256": "6a0a126a80ccacb9963ffe65f27e2e67fcb1b3890ae9acc272bc7ef8ea078d2b"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -917,7 +933,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "b93f0fe59b014410aad579bea789d627ac5e544bfe8910d5ca53efe1368f1a6f"
+      "sha256": "b99352571be31af4e987c37795370b7570ab9501951961f8caa25df0040f145d"
     },
     {
       "path": ".gitignore",
@@ -945,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "de23bbb26493943bfb4495624b2cfc70d1e77745a3e23ac808727844f4800c0f"
+      "sha256": "7a3880c2ce4aa70e2ea33386af3bb7ed99d9ee7814b2e5afd4e9800b944146e2"
     },
     {
       "path": "CLAUDE.md",
@@ -1001,7 +1017,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "f62ef3f32baf53bb3f6dfdbbe02d3c66421681f664ac1d17f9f271b5727576f0"
+      "sha256": "1db2ca64fe273bdc0f2fa3f67ac0d4df24ca90d834660b90ecd310db8bf5cd12"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -1138,6 +1154,10 @@
     {
       "path": "docs/release-audit-log.md",
       "sha256": "f7af94f354cae5edd59a32d2b2eb1f4ebaa3191fdc5f30ad6fa8f667c5494c01"
+    },
+    {
+      "path": "docs/releases/0.42/README.md",
+      "sha256": "dd0c3ea8d1ed8a26351fe78e9185971580d08d71c338a7e0d443c0b2770f4977"
     },
     {
       "path": "docs/response-clarity-catalog.md",
@@ -3453,7 +3473,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "3fb0fac3723558c082329f441ef58cf518923d0154c8d39ff951898288b7fa7c"
+      "sha256": "5d2b341257265ce0673fcf7731b3ab28f078a503a662275a4e21eb46d9ebe275"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3493,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "f1f42f01aaf7ef67e1913aa7447bb519a39bd5147aa657907a1db6ed304728a1"
+      "sha256": "82c96da2c0f0e5c2e1c53915c7fabf40e66b1dc5a132b7d005b5481f51866eda"
     }
   ],
   "excluded_paths": [
@@ -3560,6 +3580,12 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f270-clone-memory-backup.sh",
+    "scripts/tests/test-wp529-f270-core-mode-feeders.sh",
+    "scripts/tests/test-wp529-f270-exec-bit.sh",
+    "scripts/tests/test-wp529-f270-rollback-cleanup.sh",
+    "scripts/tests/test-wp529-f270-settings-merge-report.sh",
+    "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
     "scripts/tests/test_1231_artifactor.sh",
@@ -3744,6 +3770,7 @@
     "scripts/tests/test_issue_f267_capability_guard.sh",
     "scripts/tests/test_issue_f267_stage2.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
+    "scripts/tests/test_issue_rc14_merge.py",
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
@@ -3863,6 +3890,7 @@
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
     "setup/test-issue-1441-roles-on-linux.sh",
     "setup/test-next-rc-tag.sh",
+    "setup/test-rc-upgrade-from-release.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
@@ -3876,6 +3904,7 @@
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-1143.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-legacy-template-base.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-modified-hook.sh",

@@ -1144,6 +1144,15 @@ setup_roles_supported() {
     [ "$(uname -s)" = "Linux" ] || command -v launchctl >/dev/null 2>&1
 }
 
+# The install mode outlives this run: update.sh must not schedule what --core left out (WP-529
+# Ф270, RT5-2 of the rc.5 red team: the first update installed the extractor feeders). Kept in
+# the workspace root, not .iwe-runtime/, which every update rebuilds.
+if $CORE_ONLY; then
+    printf 'core\n' > "$WORKSPACE_DIR/.iwe-install-mode"
+else
+    printf 'full\n' > "$WORKSPACE_DIR/.iwe-install-mode"
+fi
+
 if $CORE_ONLY; then
     echo "[5/6] Автоматизация... пропущена (core mode)"
 elif ! setup_roles_supported; then
