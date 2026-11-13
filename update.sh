@@ -7405,11 +7405,27 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
     # extracts exactly this block by these two sentinel comments and evals
     # it in a sandbox — keep the sentinels on their own line, verbatim, if
     # this block moves or is edited).
+    # WP-529 Ф270, finding M1 (rc.13 Mac check): setup.sh --core leaves the
+    # auto:true roles out and records that in .iwe-install-mode, but this
+    # loop installed them anyway. Kept apart from is_auto: the role still
+    # wants to run on its own, the user just did not allow it here.
+    core_mode=false
+    [ "$(head -n 1 "$WORKSPACE_DIR/.iwe-install-mode" 2>/dev/null)" = "core" ] && core_mode=true
     for role_dir in "$SCRIPT_DIR"/roles/*/; do
         [ -f "$role_dir/install.sh" ] && [ -f "$role_dir/role.yaml" ] || continue
         role_name="$(basename "$role_dir")"
         is_auto=false
         grep -q 'auto:.*true' "$role_dir/role.yaml" 2>/dev/null && is_auto=true
+
+        # An auto:true role is not touched at all on a core install, even if
+        # some of its jobs are on disk: install.sh (strategist) loads every
+        # job it has, and no file on disk proves which ones the user loaded
+        # by hand (peer session 2026-11-12-16, Kimi and Codex).
+        if $core_mode && $is_auto; then
+            echo "  ○ $role_name: установка в урезанном режиме (--core) — роль не трогаем."
+            echo "    Включить или обновить: bash ${role_dir}install.sh"
+            continue
+        fi
 
         # issue #1143: a role with auto:false (synchronizer, extractor) is
         # never reinstalled here, so a user who installed it before the
@@ -7446,15 +7462,21 @@ if $ROLES_CHANGED && [ "$(uname -s)" != Linux ] && command -v launchctl >/dev/nu
                 $was_loaded || skip_load=1
             fi
 
-            IWE_WORKSPACE="$WORKSPACE_DIR" \
-            IWE_TEMPLATE="$SCRIPT_DIR" \
-            IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
-            IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
-            IWE_GOVERNANCE_REPO="$ROLE_REINSTALL_GOV" \
-            IWE_SKIP_LOAD="$skip_load" \
-            bash "$role_dir/install.sh" 2>/dev/null && \
-                echo "  ✓ $role_name переустановлен" || \
-                echo "  ○ $role_name: переустановите вручную"
+            # Only stderr is captured (2>&1 then 1>/dev/null): its last line
+            # tells the user why the installer failed.
+            if installer_stderr="$(IWE_WORKSPACE="$WORKSPACE_DIR" \
+                IWE_TEMPLATE="$SCRIPT_DIR" \
+                IWE_SCRIPTS="$SCRIPT_DIR/scripts" \
+                IWE_RUNTIME="$WORKSPACE_DIR/.iwe-runtime" \
+                IWE_GOVERNANCE_REPO="$ROLE_REINSTALL_GOV" \
+                IWE_SKIP_LOAD="$skip_load" \
+                bash "$role_dir/install.sh" 2>&1 1>/dev/null)"; then
+                echo "  ✓ $role_name переустановлен"
+            else
+                installer_rc=$?
+                echo "  ○ $role_name: переустановка не удалась (код $installer_rc). Повторить: bash ${role_dir}install.sh"
+                [ -z "$installer_stderr" ] || printf '    %s\n' "${installer_stderr##*$'\n'}"
+            fi
         fi
     done
     # END-TESTABLE: role-reinstall-loop

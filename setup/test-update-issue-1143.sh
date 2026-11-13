@@ -44,6 +44,11 @@ fi
 # auto:true role with NO PLIST_DST= line at all (regression guard for the
 # set -e/grep bug: a role lacking that line must not abort the whole loop),
 # then evals the extracted block and reports what the fake install.sh saw.
+# Globals read per call (WP-529 Ф270, M1): INSTALL_MODE — content of
+# .iwe-install-mode (empty = no file, an install made before 0.42);
+# INSTALL_FAIL=1 — the role's install.sh fails with two stderr lines.
+INSTALL_MODE=""
+INSTALL_FAIL=0
 run_scenario() {
     local name="$1" role_name="$2" auto="$3" plist_exists="$4" was_loaded="$5"
     local scenario_dir="$TEST_ROOT/$name"
@@ -62,6 +67,11 @@ EOF
 PLIST_DST="$FAKE_HOME/Library/LaunchAgents/com.test.role.plist"
 echo "IWE_SKIP_LOAD=${IWE_SKIP_LOAD:-}" > "$CALL_LOG"
 echo "called" >> "$CALL_LOG"
+if [ "${INSTALL_FAIL:-0}" = 1 ]; then
+    echo "first diagnostic line" >&2
+    echo "plist template not found" >&2
+    exit 3
+fi
 touch "$PLIST_DST"
 exit 0
 INSTALLEOF
@@ -80,6 +90,9 @@ exit 0
 INSTALLEOF
     chmod +x "$scenario_dir/roles/no-plist-role/install.sh"
 
+    if [ -n "$INSTALL_MODE" ]; then
+        printf '%s\n' "$INSTALL_MODE" > "$scenario_dir/fake-home/.iwe-install-mode"
+    fi
     if [ "$plist_exists" = "yes" ]; then
         touch "$scenario_dir/fake-home/Library/LaunchAgents/com.test.role.plist"
     fi
@@ -104,7 +117,7 @@ EOF
     (
         export HOME="$scenario_dir/fake-home"
         export FAKE_HOME="$scenario_dir/fake-home"
-        export CALL_LOG NO_PLIST_LOG
+        export CALL_LOG NO_PLIST_LOG INSTALL_FAIL
         export PATH="$scenario_dir:$PATH"
         export SCRIPT_DIR="$scenario_dir"
         export WORKSPACE_DIR="$scenario_dir/fake-home"
@@ -167,6 +180,71 @@ if grep -q "no-plist-role called" "$TEST_ROOT/d/no-plist.log" 2>/dev/null; then
     pass "d: the no-PLIST_DST= auto:true role was still reached and reinstalled"
 else
     fail "d: the no-PLIST_DST= role was never reached"
+fi
+
+# --- WP-529 Ф270, M1: a --core install keeps auto:true roles out --------
+# e/f/g: core + auto:true role (no plist; all plist on disk and loaded) and
+# the extra no-PLIST_DST= auto:true role — none of their installers may run.
+INSTALL_MODE=core
+run_scenario e role-e true no no
+run_scenario f role-f true yes yes
+for s in e f; do
+    if [ "$(cat "$TEST_ROOT/$s/exit.code")" = 0 ]; then
+        pass "$s: loop did not abort on a core install"
+    else
+        fail "$s: loop aborted (exit $(cat "$TEST_ROOT/$s/exit.code")), stdout: $(cat "$TEST_ROOT/$s/stdout.log")"
+    fi
+    if [ -f "$TEST_ROOT/$s/call.log" ] || [ -f "$TEST_ROOT/$s/no-plist.log" ]; then
+        fail "$s: core install: an auto:true installer ran: $(cat "$TEST_ROOT/$s/call.log" "$TEST_ROOT/$s/no-plist.log" 2>/dev/null)"
+    else
+        pass "$s: core install: no auto:true installer ran"
+    fi
+done
+if grep -q "role-e: установка в урезанном режиме (--core) — роль не трогаем" "$TEST_ROOT/e/stdout.log" \
+   && grep -q "Включить или обновить: bash $TEST_ROOT/e/roles/role-e/install.sh" "$TEST_ROOT/e/stdout.log"; then
+    pass "e: core install: the skip names the command to enable the role"
+else
+    fail "e: core install: no explanation: $(cat "$TEST_ROOT/e/stdout.log")"
+fi
+
+# g: core + an auto:false role the user installed and loaded — still refreshed.
+run_scenario g role-g false yes yes
+if grep -q "^called$" "$TEST_ROOT/g/call.log" 2>/dev/null && grep -q "^IWE_SKIP_LOAD=$" "$TEST_ROOT/g/call.log"; then
+    pass "g: core install: an installed auto:false role is refreshed as before"
+else
+    fail "g: core install: installed auto:false role not refreshed: $(cat "$TEST_ROOT/g/call.log" 2>/dev/null)"
+fi
+
+# h: full install — auto:true role installed as before.
+INSTALL_MODE=full
+run_scenario h role-h true no no
+if grep -q "^called$" "$TEST_ROOT/h/call.log" 2>/dev/null && grep -q "no-plist-role called" "$TEST_ROOT/h/no-plist.log" 2>/dev/null; then
+    pass "h: full install: auto:true roles installed"
+else
+    fail "h: full install: auto:true role not installed: $(cat "$TEST_ROOT/h/stdout.log")"
+fi
+
+# i: installer failure — exit code and its last stderr line are shown.
+INSTALL_MODE=""
+INSTALL_FAIL=1
+run_scenario i role-i true no no
+INSTALL_FAIL=0
+if [ "$(cat "$TEST_ROOT/i/exit.code")" = 0 ]; then
+    pass "i: a failing installer does not abort the loop"
+else
+    fail "i: loop aborted (exit $(cat "$TEST_ROOT/i/exit.code"))"
+fi
+if grep -q "role-i: переустановка не удалась (код 3). Повторить: bash $TEST_ROOT/i/roles/role-i/install.sh" "$TEST_ROOT/i/stdout.log" \
+   && grep -q "^    plist template not found$" "$TEST_ROOT/i/stdout.log" \
+   && ! grep -q "first diagnostic line" "$TEST_ROOT/i/stdout.log"; then
+    pass "i: the failure shows the exit code, the retry command and the last stderr line"
+else
+    fail "i: failure report wrong: $(cat "$TEST_ROOT/i/stdout.log")"
+fi
+if grep -q "переустановите вручную" "$UPDATE_SH_REAL"; then
+    fail "update.sh still prints the vague 'переустановите вручную'"
+else
+    pass "update.sh no longer prints the vague 'переустановите вручную'"
 fi
 
 echo ""

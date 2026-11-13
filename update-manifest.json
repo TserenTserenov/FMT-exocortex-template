@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "77c308125ace8a14c7c582e36dfd1a22bbaa80ee8dc230d4156815697f4a9386"
+      "sha256": "899a6b6be64f3d26d6e54d85a03ff65a2516bfafab390adfd07d6ee697bc79f1"
     },
     {
       "path": "CLAUDE.md",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "99ab27915e07772736b9208a04182edb3da584dfa349eeef87b6fcbf58abd6c8"
+      "sha256": "13dd5be914d122e80b15acd8e0c76eb2c610220c953d487514e03f8bdd1c1871"
     }
   ],
   "excluded_paths": [
