@@ -104,8 +104,50 @@ def _reconcile_matcher(merged, idx, template_entry, event, report):
     return "conflict"
 
 
+def _plain_command_set(entry):
+    """Normalized commands of an entry made only of command hooks, else None."""
+    inner = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(inner, list) or not inner:
+        return None
+    commands = set()
+    for hook in inner:
+        if not (isinstance(hook, dict) and hook.get("type") == "command" and isinstance(hook.get("command"), str)):
+            return None
+        commands.add(_normalize_command(hook["command"]))
+    return commands
+
+
+def _absorb_regrouped_entries(merged, template_entry):
+    """WP-529 Ф270, finding 2 of the v0.42.0-rc.14 red team: the template regrouped a hook
+    (0.36.3 shipped check-trash.sh alone under SessionStart, 0.42 ships it in one group with
+    session-start-hooks-bootstrap.sh). Group identity is the whole command tuple, so the new
+    group was appended next to the old one and check-trash.sh ran twice. A user entry with the
+    same matcher whose commands are all inside the template group is that same platform hook:
+    the first one is replaced by the template group, the rest are dropped. Entries carrying any
+    command of the user's own stay untouched. Returns True when something was absorbed."""
+    template_commands = _plain_command_set(template_entry)
+    if not template_commands:
+        return False
+    template_matcher = canonical(template_entry.get("matcher"))
+    covered = [
+        idx for idx, entry in enumerate(merged)
+        if canonical(entry.get("matcher") if isinstance(entry, dict) else None) == template_matcher
+        and (_plain_command_set(entry) or {None}) <= template_commands
+    ]
+    if not covered:
+        return False
+    merged[covered[0]] = template_entry
+    for idx in reversed(covered[1:]):
+        del merged[idx]
+    return True
+
+
 def merge_hook_entries(user_entries, template_entries, report, event):
     merged = list(user_entries)
+    for template_entry in template_entries:
+        if _hook_commands_key(template_entry) not in {_hook_commands_key(e) for e in merged}:
+            if _absorb_regrouped_entries(merged, template_entry):
+                report["hooks_regrouped"] = report.get("hooks_regrouped", 0) + 1
     by_key = {}
     for idx, entry in enumerate(merged):
         by_key.setdefault(_hook_commands_key(entry), []).append(idx)
@@ -161,10 +203,22 @@ def merge_hooks(user_hooks, template_hooks, report):
     return merged
 
 
+# WP-529 Ф270, finding 1 of the v0.42.0-rc.14 red team: values the platform itself shipped in
+# older releases and later withdrew. A workspace holding one of them never chose it — the old
+# setup.sh wrote it — so the merge takes the current template value instead of keeping it as a
+# "user value". 0.36.0–0.38.3 shipped permissions.defaultMode "acceptEdits" (file edits without
+# confirmation); 0.38.4 replaced it with "default" as a security fix.
+RETIRED_PLATFORM_PERMISSIONS = {"defaultMode": ("acceptEdits",)}
+
+
 def merge_permissions(user_perms, template_perms, report):
     merged = dict(user_perms)
     for key, template_value in template_perms.items():
         user_value = merged.get(key)
+        if user_value in RETIRED_PLATFORM_PERMISSIONS.get(key, ()) and user_value != template_value:
+            merged[key] = template_value
+            report.setdefault("retired_defaults_replaced", []).append(f"permissions.{key}: {user_value} -> {template_value}")
+            continue
         if isinstance(template_value, list) and isinstance(user_value, list):
             merged[key], added, _ = union_list(user_value, template_value)
             report["permissions_added_from_template"] += added
@@ -252,6 +306,8 @@ def main(argv):
         "hooks_deduped": 0,
         "hooks_only_in_workspace": 0,
         "permissions_added_from_template": 0,
+        "hooks_regrouped": 0,
+        "retired_defaults_replaced": [],
         "conflicts": [],
     }
     merged = merge_settings(template, workspace, report)
