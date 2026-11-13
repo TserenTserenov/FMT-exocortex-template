@@ -42,8 +42,8 @@ def payload(*rows, stats=STATS):
 
 
 BASE_ROWS = (
-    concept("DP.M.1", "Метод", "Method"),
-    concept("DP.M.2", "Практика", "Practice"),
+    concept("DP.MAP.1", "Метод", "Method"),
+    concept("DP.MAP.2", "Практика", "Practice"),
     concept("ZP.1", "Аксиоматичность", "Axiomaticity", level="zp", domain=None),
 )
 
@@ -89,9 +89,9 @@ def test_unchanged_graph_writes_nothing_even_with_a_new_as_of(root):
 
 
 def test_renamed_english_name_is_a_change_and_reaches_the_body(root):
-    result = run(root, concept("DP.M.1", "Метод", "Way of working"), *BASE_ROWS[1:])
+    result = run(root, concept("DP.MAP.1", "Метод", "Way of working"), *BASE_ROWS[1:])
     assert result.changed is True
-    assert snapshot_terms(root)["DP.M.1"] == "Way of working"
+    assert snapshot_terms(root)["DP.MAP.1"] == "Way of working"
     assert "## Изменились (1)" in result.body
     assert "Way of working" in result.body
     meta = json.loads((root / "translation" / "glossary-snapshot.meta.json").read_text(encoding="utf-8"))
@@ -99,15 +99,15 @@ def test_renamed_english_name_is_a_change_and_reaches_the_body(root):
 
 
 def test_added_and_removed_concepts_are_listed(root):
-    result = run(root, *BASE_ROWS[:2], concept("DP.M.3", "Роль", "Role"))
-    assert "## Появились (1)" in result.body and "`DP.M.3`" in result.body
+    result = run(root, *BASE_ROWS[:2], concept("DP.MAP.3", "Роль", "Role"))
+    assert "## Появились (1)" in result.body and "`DP.MAP.3`" in result.body
     assert "## Исчезли (1)" in result.body and "`ZP.1`" in result.body
 
 
 def test_local_row_now_served_by_graph_is_removed_other_lines_kept_byte_for_byte(root):
     local = root / "translation" / "glossary-local.csv"
     local.write_text(local.read_text(encoding="utf-8") + "Роль,Role,,,3\n", encoding="utf-8")
-    result = run(root, *BASE_ROWS, concept("DP.M.3", "Роль", "Role"))
+    result = run(root, *BASE_ROWS, concept("DP.MAP.3", "Роль", "Role"))
     assert result.changed is True
     assert local.read_text(encoding="utf-8") == LOCAL_HEADER + 'Пак,Pack,,"note, with comma",1\nНапарник,Peer,,,1\n'
     assert "## Убрано из ручного словаря (1)" in result.body
@@ -115,20 +115,20 @@ def test_local_row_now_served_by_graph_is_removed_other_lines_kept_byte_for_byte
 
 
 def test_stricter_local_row_with_same_name_stays(root):
-    result = run(root, *BASE_ROWS, concept("DP.M.4", "Пак", "Pack"))
+    result = run(root, *BASE_ROWS, concept("DP.MAP.4", "Пак", "Pack"))
     assert "Пак,Pack" in (root / "translation" / "glossary-local.csv").read_text(encoding="utf-8")
-    assert snapshot_terms(root)["DP.M.4"] == "Pack"
+    assert snapshot_terms(root)["DP.MAP.4"] == "Pack"
     assert "Убрано из ручного словаря" not in result.body
 
 
 def test_conflicting_english_name_keeps_local_row_and_leaves_concept_out(root):
-    result = run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"))
+    result = run(root, *BASE_ROWS, concept("DP.MAP.5", "Напарник", "Partner"))
     assert result.changed is True
-    assert "DP.M.5" not in snapshot_terms(root)
+    assert "DP.MAP.5" not in snapshot_terms(root)
     assert "Напарник,Peer" in (root / "translation" / "glossary-local.csv").read_text(encoding="utf-8")
     meta = json.loads((root / "translation" / "glossary-snapshot.meta.json").read_text(encoding="utf-8"))
     assert meta["conflict_local"] == [
-        {"code": "DP.M.5", "term_ru": "Напарник", "term_en_graph": "Partner", "term_en_local": "Peer"}
+        {"code": "DP.MAP.5", "term_ru": "Напарник", "term_en_graph": "Partner", "term_en_local": "Peer"}
     ]
     assert meta["excluded"]["conflict-local"] == 1
     assert "## Требует решения" in result.body
@@ -137,15 +137,15 @@ def test_conflicting_english_name_keeps_local_row_and_leaves_concept_out(root):
 
 
 def test_same_conflict_next_day_is_not_a_new_change(root):
-    run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"))
-    assert run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Partner")).changed is False
+    run(root, *BASE_ROWS, concept("DP.MAP.5", "Напарник", "Partner"))
+    assert run(root, *BASE_ROWS, concept("DP.MAP.5", "Напарник", "Partner")).changed is False
 
 
 def test_resolved_conflict_brings_the_concept_back(root):
-    run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"))
-    result = run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Peer"))
+    run(root, *BASE_ROWS, concept("DP.MAP.5", "Напарник", "Partner"))
+    result = run(root, *BASE_ROWS, concept("DP.MAP.5", "Напарник", "Peer"))
     assert result.changed is True
-    assert snapshot_terms(root)["DP.M.5"] == "Peer"
+    assert snapshot_terms(root)["DP.MAP.5"] == "Peer"
     assert "conflict_local" not in json.loads(
         (root / "translation" / "glossary-snapshot.meta.json").read_text(encoding="utf-8")
     )
@@ -204,7 +204,7 @@ def test_row_removal_keeps_records_with_line_breaks_inside_quotes():
 
 
 def test_local_row_without_english_is_not_a_conflict():
-    included = [{"code": "DP.M.1", "term_ru": "Метод", "term_en": "Method"}]
+    included = [{"code": "DP.MAP.1", "term_ru": "Метод", "term_en": "Method"}]
     assert SUP.local_conflicts(included, [{"term_ru": "Метод", "term_en": ""}, {"term_ru": "Метод"}]) == []
 
 
@@ -215,17 +215,17 @@ def test_glossary_that_would_not_load_writes_nothing(root):
     manifest["glossary"]["tier_by_level"].pop("zp")  # the loader refuses a level without a tier
     manifest_path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
     with pytest.raises(SUP.GlossaryError):
-        run(root, concept("DP.M.1", "Метод", "Way of working"), *BASE_ROWS[1:])
+        run(root, concept("DP.MAP.1", "Метод", "Way of working"), *BASE_ROWS[1:])
     assert files(root) == before
 
 
 def test_conflict_is_announced_once_per_open_request(root):
-    first = run(root, *BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"))
+    first = run(root, *BASE_ROWS, concept("DP.MAP.5", "Напарник", "Partner"))
     assert first.announce is True
     open_request_meta = json.loads((root / "translation" / "glossary-snapshot.meta.json").read_text(encoding="utf-8"))
     # Next day: a new term arrives, the conflict is the same one the open request already showed the pilot.
     again = SUP.refresh(
-        root, payload(*BASE_ROWS, concept("DP.M.5", "Напарник", "Partner"), concept("DP.M.6", "Роль", "Role")),
+        root, payload(*BASE_ROWS, concept("DP.MAP.5", "Напарник", "Partner"), concept("DP.MAP.6", "Роль", "Role")),
         root / "allowlist.yaml", open_request_meta,
     )
     assert again.changed is True and again.announce is False
@@ -236,10 +236,10 @@ def test_crlf_local_glossary_keeps_its_line_endings(root):
     local = root / "translation" / "glossary-local.csv"
     crlf = (LOCAL_HEADER + "Пак,Pack,,,1\nРоль,Role,,,3\n").replace("\n", "\r\n").encode("utf-8")
     local.write_bytes(crlf)
-    run(root, *BASE_ROWS, concept("DP.M.3", "Роль", "Role"))
+    run(root, *BASE_ROWS, concept("DP.MAP.3", "Роль", "Role"))
     assert local.read_bytes() == (LOCAL_HEADER + "Пак,Pack,,,1\n").replace("\n", "\r\n").encode("utf-8")
     before = local.read_bytes()
-    run(root, concept("DP.M.1", "Метод", "Way of working"), *BASE_ROWS[1:], concept("DP.M.3", "Роль", "Role"))
+    run(root, concept("DP.MAP.1", "Метод", "Way of working"), *BASE_ROWS[1:], concept("DP.MAP.3", "Роль", "Role"))
     assert local.read_bytes() == before
 
 
