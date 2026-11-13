@@ -81,6 +81,32 @@ def test_public_row_is_included_and_closed_levels_are_not(tmp_path: Path):
     assert "GUIDE.33" not in text
 
 
+def test_excluded_kinds_drop_failure_modes_and_methods_but_not_other_kinds():
+    # Pilot decision 13.11 (WP-617 Ф4): DP.FM and DP.M titles are sentences, not terms.
+    allowlist = MOD.load_allowlist(ALLOWLIST)
+    included, excluded, _ = MOD.build_rows(
+        payload(
+            row(),
+            canary_row(),
+            row(code="DP.FM.730", name_ru="Расписание без пояса", name_en="Schedule without timezone"),
+            row(code="DP.M.005", name_ru="АрхГейт", name_en="ArchGate"),
+            row(code="DP.MAP.002", name_ru="Карта", name_en="Map"),
+            row(code="DP.TERM.роль", name_ru="Роль", name_en="Role"),
+        ),
+        allowlist,
+    )
+    assert [item["code"] for item in included] == ["DP.MAP.002", "DP.METHOD.049", "DP.TERM.роль"]
+    assert excluded["kind"] == 2
+
+
+def test_excluded_kind_without_trailing_dot_is_refused(tmp_path: Path):
+    # "DP.M" without the dot would also swallow DP.MAP and DP.METHOD.
+    bad = tmp_path / "allowlist.yaml"
+    bad.write_text(ALLOWLIST.read_text(encoding="utf-8").replace('"DP.M."', '"DP.M"'), encoding="utf-8")
+    with pytest.raises(MOD.SnapshotError, match="excluded_kinds"):
+        MOD.load_allowlist(bad)
+
+
 def _run_cli(source: Path, allowlist: Path, out: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [

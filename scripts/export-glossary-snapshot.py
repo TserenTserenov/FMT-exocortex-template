@@ -53,9 +53,12 @@ def load_allowlist(path: Path) -> dict:
         raise SnapshotError(f"белый список не объект: {path}")
     if data.get("schema") != "glossary-snapshot-allowlist/1":
         raise SnapshotError(f"неизвестная схема белого списка: {data.get('schema')}")
-    for key in ("levels", "pack_domains", "foundation", "canary_codes"):
+    for key in ("levels", "pack_domains", "excluded_kinds", "foundation", "canary_codes"):
         if key not in data:
             raise SnapshotError(f"в белом списке нет поля {key}")
+    kinds = data["excluded_kinds"]
+    if not isinstance(kinds, list) or not all(isinstance(kind, str) and kind.endswith(".") for kind in kinds):
+        raise SnapshotError("excluded_kinds: каждый вид — префикс кода с точкой на конце (DP.FM.)")
     if not data["canary_codes"]:
         raise SnapshotError("канарейка обязательна: пустой canary_codes")
     return data
@@ -122,6 +125,8 @@ def classify_row(row: dict, allowlist: dict) -> tuple[str, str]:
         return "exclude", "level"
     if not _domain_ok(row, allowlist):
         return "exclude", "domain"
+    if code.startswith(tuple(allowlist["excluded_kinds"])):
+        return "exclude", "kind"
     if row["name_en_publishable"] is not True:
         return "exclude", "not-publishable"
     if row["name_en_status_raw"] != PUBLISHABLE_STATUS:
