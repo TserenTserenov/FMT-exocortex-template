@@ -278,7 +278,7 @@ def add_changelog_entry(text: str, pr: int) -> str:
         f"поставщиком терминов перевода (`translation/glossary-snapshot.csv`; {CHANGELOG_MARKER}{pr}).\n"
         "  - Цель: 93 · Результат: служебное — словарь перевода обновлён из графа понятий; "
         "у пользователя шаблона поведение не меняется\n"
-        "  - Как проверить: `python3 -m pytest scripts/tests/test_glossary_source.py` проходит на снимке; "
+        "  - Как проверить: `python3 -m pytest scripts/tests/test_glossary_source.py` проходит на ветке запроса; "
         f"разница по терминам — в описании запроса #{pr}\n"
         f"  - Как откатить: не сливать запрос #{pr} или git revert его слияния; "
         "перевод продолжает работать на прежнем снимке\n"
