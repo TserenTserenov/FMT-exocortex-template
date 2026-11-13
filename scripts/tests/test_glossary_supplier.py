@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import shutil
 import sys
@@ -169,6 +170,25 @@ def test_changelog_entry_goes_first_under_unreleased_changed_and_is_idempotent()
     assert lines[lines.index("### Changed") + 2].endswith("(`translation/glossary-snapshot.csv`; WP-617, #1500).")
     assert SUP.add_changelog_entry(once, 1500) == once
     assert once.count("WP-617, #1500") == 1
+
+
+def _load_changelog_fields_checker():
+    spec = importlib.util.spec_from_file_location("check_changelog_fields", SCRIPTS / "check-changelog-fields.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # @dataclass resolves its module through sys.modules
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_changelog_entry_passes_the_changelog_gate_field_check():
+    # The Changelog Gate rejected #1527 (13.11) because the entry had no handoff fields.
+    checker = _load_changelog_fields_checker()
+    text = SUP.add_changelog_entry(CHANGELOG, 1527)
+    entries = checker.parse_entries(checker.section_lines(text, "Unreleased"))
+    ours = [e for e in entries if "WP-617, #1527)" in e.top]
+    assert len(ours) == 1
+    assert checker.field_problems(ours[0]) == []
+    assert any(s.startswith("Как откатить:") and "#1527" in s for s in ours[0].subitems)
 
 
 def test_changelog_creates_changed_subsection_when_missing():
