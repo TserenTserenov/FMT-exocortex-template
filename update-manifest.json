@@ -445,7 +445,7 @@
     },
     {
       "path": ".claude/scripts/settings-merge-preview.py",
-      "sha256": "57707614fc4b45d46318906211269a2e6c3de3cb313af927d5e8cff8c8657e97"
+      "sha256": "d2be2fec789c86c14692403b41d2b5e4235efe29600bf080ccf03e4a17c82b25"
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3cdf177fec6d7d56e0ffafd75eb19cfcdc6070e33a9a28184c9b567b9206d32f"
+      "sha256": "7a3880c2ce4aa70e2ea33386af3bb7ed99d9ee7814b2e5afd4e9800b944146e2"
     },
     {
       "path": "CLAUDE.md",
@@ -3513,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "a638ac92eae84f618fab57404940656aaf39d701e88390a25e42fc3b86e1e095"
+      "sha256": "82c96da2c0f0e5c2e1c53915c7fabf40e66b1dc5a132b7d005b5481f51866eda"
     }
   ],
   "excluded_paths": [

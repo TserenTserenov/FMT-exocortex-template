@@ -648,7 +648,7 @@ backup_clone_memory_edits_before_apply() {
         fi
     done
     if [ "$unproven" -gt 0 ]; then
-        echo "  ℹ️  файлов памяти в папке шаблона заменяется новой версией: $unproven. Старая установка не хранит их отпечатков, поэтому прежние копии сохранены на случай, если вы их правили: $MEMORY_BACKUP_RUN/template-clone/"
+        echo "  ℹ️  файлов памяти в папке шаблона заменяется новой версией: $unproven. Отпечатков прежней версии для них нет, поэтому правку от доставленной версии не отличить, и прежние копии сохранены на случай, если вы их правили: $MEMORY_BACKUP_RUN/template-clone/"
     fi
     return 0
 }
@@ -1572,7 +1572,8 @@ if r.get("hooks_only_in_workspace"):
     print(f"    ℹ️  в вашей копии есть {r['hooks_only_in_workspace']} hook-записей, которых сейчас нет в шаблоне (может быть обычной личной настройкой)")
 if r.get("retired_defaults_replaced"):
     print("    ⚠ режим правок агента: старая установка разрешала агенту менять файлы без вашего подтверждения"
-          " (так её настраивала платформа до 0.38.4); слияние вернёт обычный режим с подтверждением")
+          " (так её настраивала платформа до 0.38.4); слияние вернёт обычный режим с подтверждением:"
+          " bash update.sh --apply-settings-merge")
 if r.get("hooks_regrouped"):
     print(f"    + хуков, которые шаблон перенёс в другую группу: {r['hooks_regrouped']} (дубль не появится)")
 if r["conflicts"]:
@@ -1585,16 +1586,21 @@ PY
 # made by 0.36–0.38.3 kept acceptEdits after the update, and the only trace was the machine word
 # "conflicts"). The applier prints the merger's JSON report as its first line.
 explain_applied_settings_merge() {
-    printf '%s\n' "$1" | head -n 1 | "$PY_BIN" -c '
+    printf '%s\n' "$1" | "$PY_BIN" -c '
 import json, sys
-try:
-    r = json.loads(sys.stdin.read())
-except ValueError:
-    sys.exit(0)
+r = {}
+for line in sys.stdin:
+    if line.lstrip().startswith("{"):
+        try:
+            r = json.loads(line)
+            break
+        except ValueError:
+            continue
 if r.get("retired_defaults_replaced"):
     print("  ✓ Режим правок агента: агент снова спрашивает подтверждение перед изменением файлов."
-          " Старая установка разрешала правки без подтверждения — так её настраивала платформа до 0.38.4.")
-    print("    Вернуть прежний режим: в .claude/settings.json поставить \"defaultMode\": \"acceptEdits\" в разделе permissions.")
+          " В общих настройках стоял режим правок без подтверждения — платформа ставила его сама до 0.38.4.")
+    print("    Если этот режим нужен вам, держите его в личных настройках .claude/settings.local.json"
+          " (обновление их не трогает): \"defaultMode\": \"acceptEdits\" в разделе permissions.")
 ' 2>/dev/null || true
 }
 

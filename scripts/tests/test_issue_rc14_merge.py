@@ -76,6 +76,37 @@ def test_hook_regrouped_by_template_is_not_duplicated(tmp_path: Path):
     assert report["hooks_regrouped"] == 1
 
 
+def test_duplicate_left_by_an_earlier_update_is_healed(tmp_path: Path):
+    # 0.36 install already updated by 0.39.2..rc.14: both the old and the new group are present.
+    report, merged = run_merge(
+        tmp_path,
+        {"hooks": {"SessionStart": [group(TRASH, BOOTSTRAP)]}},
+        {"hooks": {"SessionStart": [group(TRASH), group(TRASH, BOOTSTRAP)]}},
+    )
+    assert merged["hooks"]["SessionStart"] == [group(TRASH, BOOTSTRAP)]
+    assert report["hooks_regrouped"] == 1
+    again, merged_again = run_merge(tmp_path, {"hooks": {"SessionStart": [group(TRASH, BOOTSTRAP)]}}, merged)
+    assert merged_again == merged and again["hooks_regrouped"] == 0
+
+
+def test_entry_with_own_fields_is_not_absorbed():
+    module = load_module()
+    report = {"conflicts": [], "hooks_added_from_template": 0, "hooks_deduped": 0}
+    user = [{"hooks": [{"type": "command", "command": TRASH, "timeout": 5}]}]
+    merged, _added, _deduped, _orphaned = module.merge_hook_entries(user, [group(TRASH, BOOTSTRAP)], report, "SessionStart")
+    assert merged[0] == user[0]
+    assert len(merged) == 2
+
+
+def test_empty_matcher_counts_as_absent():
+    module = load_module()
+    report = {"conflicts": [], "hooks_added_from_template": 0, "hooks_deduped": 0}
+    merged, _added, _deduped, _orphaned = module.merge_hook_entries(
+        [group(TRASH, matcher="")], [group(TRASH, BOOTSTRAP)], report, "SessionStart"
+    )
+    assert merged == [group(TRASH, BOOTSTRAP)]
+
+
 def test_user_group_with_own_command_is_left_alone():
     module = load_module()
     report = {"conflicts": [], "hooks_added_from_template": 0, "hooks_deduped": 0}
