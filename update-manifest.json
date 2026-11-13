@@ -3837,6 +3837,8 @@
     "setup/optional/generate-post-image.py",
     "setup/optional/pomodoro-alert.plist",
     "setup/optional/pomodoro-alert.py",
+    "setup/optional/pomodoro-alert.service",
+    "setup/optional/pomodoro-alert.timer",
     "setup/optional/setup-agent-workspace.sh",
     "setup/optional/setup-calendar.sh",
     "setup/promote-fixtures/README.md",

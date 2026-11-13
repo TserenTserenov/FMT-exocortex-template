@@ -1,0 +1,7 @@
+[Unit]
+Description=Pomodoro break reminder (WakaTime continuous work)
+
+[Service]
+Type=oneshot
+# Replace {{WORKSPACE_DIR}} with your workspace path, as for the launchd plist.
+ExecStart=/usr/bin/python3 {{WORKSPACE_DIR}}/setup/optional/pomodoro-alert.py
