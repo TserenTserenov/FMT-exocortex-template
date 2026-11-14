@@ -25,6 +25,8 @@ Refs: WP-NNN
 
 ### Changed
 
+- [optional] Снимок терминов графа понятий для перевода шаблона на английский обновлён поставщиком терминов перевода (`translation/glossary-snapshot.csv`; WP-617, #1527).
+
 - [optional] (#1523) Описание процесса выпуска называет вердикт независимой атаки словами навыка `iwe-platform-redteam`: GO / CAUTION / BLOCKED, а `cannot_verify` — не пройдено (было STABLE, которого навык не выдаёт).
   - Цель: 77 · Результат: служебное — согласование слов вердикта в документации выпуска; пользователь его не видит
   - Как проверить: `grep -n 'GO / CAUTION' docs/RELEASE-PROCESS.md` находит строку, `grep -c STABLE docs/RELEASE-PROCESS.md` даёт 0
