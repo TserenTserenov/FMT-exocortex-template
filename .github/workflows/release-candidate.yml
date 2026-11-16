@@ -176,6 +176,8 @@ jobs:
   next-rc:
     if: github.repository == 'TserenTserenov/FMT-exocortex-template' && github.event.inputs.mode == 'next-rc'
     runs-on: ubuntu-latest
+    outputs:
+      rc_tag: ${{ steps.rc.outputs.rc_tag }}
     steps:
       - name: Check the version input
         env:
@@ -228,3 +230,74 @@ jobs:
           commit: ${{ steps.rc.outputs.rc_commit }}
           tree: ${{ steps.rc.outputs.rc_tree }}
           Проверку повторить на этом кандидате."
+
+  # WP-529 Ф270, F3 of the v0.42.0-rc.4 red team: no check ran update.sh from the published
+  # release to the candidate, so the path every user takes was proven only by hand. update.sh
+  # downloads by tag, so this runs once the candidate tag is pushed. A failure here means the
+  # candidate must not go to testers. Dispatch next-rc on the release branch
+  # (gh workflow run release-candidate.yml --ref release/vX.Y.Z -f mode=next-rc -f version=X.Y.Z):
+  # workflow_dispatch runs the workflow file of the ref it is dispatched on, and until this
+  # release merges main has no copy of this job (F2 of the v0.42.0-rc.6 red team: dispatched
+  # from main, the job never ran for rc.5 and rc.6).
+  # WP-529 Ф270, row 3 of 0.42 rc.9: the upgrade from 0.36.3 (an install made by the old setup.sh,
+  # still in use) failed while the latest-release path passed, and the macOS path was left to the
+  # human tester. Every candidate now upgrades from both releases on Linux and on macOS; the macOS
+  # runner is disposable, so the launchd jobs an upgrade may add touch nothing real.
+  upgrade-from-release:
+    needs: next-rc
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        prev: [latest, v0.36.3]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.next-rc.outputs.rc_tag }}
+          fetch-depth: 0
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3 jq
+      # Same preparation as integration-contract-macos in validate-template.yml: jq is not on the
+      # image and Homebrew's python3 is PEP 668-managed.
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install jq
+          python3 -c "import yaml" 2>/dev/null && exit 0
+          python3 -m pip install --user pyyaml 2>/dev/null && python3 -c "import yaml" 2>/dev/null && exit 0
+          python3 -m pip install --user --break-system-packages pyyaml && python3 -c "import yaml"
+      - name: Upgrade ${{ matrix.prev }} to the candidate with update.sh (${{ matrix.os }})
+        env:
+          # Four legs list tags at once: anonymous API calls hit the rate limit (403 on rc.10, macOS).
+          # Not GH_TOKEN: update.sh of 0.41.11 and later rejects the Actions token by its format (rc.11),
+          # and old releases cannot be changed. They all fall back to a logged-in gh, so log gh in instead.
+          RC_GH_TOKEN: ${{ github.token }}
+        run: |
+          export GH_CONFIG_DIR="$RUNNER_TEMP/gh-config"
+          mkdir -p "$GH_CONFIG_DIR"
+          printf 'github.com:\n    oauth_token: %s\n    git_protocol: https\n' "$RC_GH_TOKEN" > "$GH_CONFIG_DIR/hosts.yml"
+          unset RC_GH_TOKEN
+          if gh auth status --hostname github.com >/dev/null 2>&1; then
+            echo "gh: logged in for the API calls of update.sh"
+          else
+            echo "::warning::gh login with the Actions token failed; update.sh will call the API anonymously"
+            rm -rf "$GH_CONFIG_DIR"
+            unset GH_CONFIG_DIR
+          fi
+          if [ "$RUNNER_OS" = macOS ]; then
+            # The image puts Homebrew bash 5 first; most Macs run the system /bin/bash 3.2, and
+            # update.sh re-execs plain `bash`, so shadow it for the whole run.
+            mkdir -p "$RUNNER_TEMP/system-bash"
+            ln -sf /bin/bash "$RUNNER_TEMP/system-bash/bash"
+            export PATH="$RUNNER_TEMP/system-bash:$PATH"
+            bash --version | head -1
+          fi
+          PREV_TAG="${{ matrix.prev }}"
+          if [ "$PREV_TAG" = latest ]; then
+            PREV_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -v -- '-rc\.' | head -1)
+          fi
+          [ -n "$PREV_TAG" ] || { echo "::error::нет опубликованного выпуска v*"; exit 1; }
+          bash setup/test-rc-upgrade-from-release.sh "${{ needs.next-rc.outputs.rc_tag }}" "$PREV_TAG" \
+            "https://github.com/${{ github.repository }}.git"

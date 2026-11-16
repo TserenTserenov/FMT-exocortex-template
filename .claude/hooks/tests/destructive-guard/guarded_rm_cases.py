@@ -303,6 +303,15 @@ def main():
             check("{TMPDIR}=/tmp: цель внутри удаляется", code == 0 and not os.path.exists(inside), err)
             code, err = run_linux("-rf", "/tmp/dg-guarded-rm-absent-target", extra_env={"TMPDIR": "/"})
             check("{TMPDIR}=/ — корень ФС в реестре: отказ", code == 1 and "корень файловой системы" in err, err)
+            # WP-529 Ф270, RT2-2 of the rc.2 red team: the caller's TMPDIR made any folder a root
+            # (`TMPDIR=$HOME guarded-rm -rf "$HOME/IWE"`). Outside system temp locations it is skipped.
+            w.registry("{TMP}\n{TMPDIR}\n")
+            for hostile in ("/opt/dg-hostile-tmp", "/home/dg-hostile-user"):
+                code, err = run_linux("-rf", hostile + "/IWE", extra_env={"TMPDIR": hostile})
+                check(f"{{TMPDIR}}={hostile} — не временный каталог: отказ",
+                      code == 1 and "не системный временный каталог" in err and "вне разрешённых" in err, err)
+            code, err = run_linux("-rf", "/var/tmp/dg-guarded-rm-absent-target", extra_env={"TMPDIR": "/var/tmp"})
+            check("{TMPDIR}=/var/tmp — системный временный каталог: принят", code == 0, err)
             shutil.rmtree(stub, ignore_errors=True)
     finally:
         w.close()
