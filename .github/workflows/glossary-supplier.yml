@@ -186,10 +186,13 @@ jobs:
 
       - name: Open or update an issue for a failed run
         # WP-617 Ф4: the GitHub mail for a failed scheduled run does not reach
-        # the pilot (checked 12.11). An issue assigned to the pilot is a second,
-        # independent channel: GitHub notifies the assignee on creation, no bot
-        # endpoint needed. Honest caveat (peer-session 2026-11-16, Claude+Kimi+Codex):
-        # delivery is not proven — it depends on the pilot's own GitHub notification
+        # the pilot (checked 12.11). An issue assigned to the pilot (repository
+        # variable PILOT_GITHUB_LOGIN — this is a public template, no login is
+        # hardcoded; off until the variable is set, same fail-open convention
+        # as PILOT_NOTICE_ENDPOINT below) is a second, independent channel:
+        # GitHub notifies the assignee on creation, no bot endpoint needed.
+        # Honest caveat (peer-session 2026-11-16, Claude+Kimi+Codex): delivery
+        # is not proven — it depends on the pilot's own GitHub notification
         # settings, and this channel has never been exercised by a real failure yet.
         # Dedup is by exact run id in the title (not a substring match, which could
         # confuse "run 123" with "run 1234"): a retry of the same run comments on
@@ -207,6 +210,7 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
           SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ASSIGNEE: ${{ vars.PILOT_GITHUB_LOGIN }}
         run: |
           gh label create glossary-supplier-failed --description "Scheduled glossary-supplier run failed" --color B60205 2>/dev/null || true
           KEY="(run $RUN_ID)"
@@ -215,7 +219,9 @@ jobs:
           EXISTING=$(gh issue list --label glossary-supplier-failed --state open --limit 200 --json number,title \
             --jq --arg key "$KEY" '[.[] | select(.title | endswith($key))][0].number // empty')
           if [ -z "$EXISTING" ]; then
-            gh issue create --label glossary-supplier-failed --assignee TserenTserenov \
+            ASSIGN_ARGS=()
+            [ -n "$ASSIGNEE" ] && ASSIGN_ARGS=(--assignee "$ASSIGNEE")
+            gh issue create --label glossary-supplier-failed "${ASSIGN_ARGS[@]}" \
               --title "Glossary supplier failed $KEY" \
               --body "Прогон упал: $RUN_URL (коммит ${SHA:0:7}, попытка $RUN_ATTEMPT). Старый снимок остаётся в силе. Если видишь это сообщение — закрой issue, когда разберёшься: следующий сбой этого же запуска допишется сюда комментарием, а новый запуск заведёт отдельный issue."
           else
