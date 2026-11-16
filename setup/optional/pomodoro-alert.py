@@ -100,7 +100,7 @@ def get_api_key() -> str:
     raise SystemExit(
         "WakaTime credentials not found: no ~/.wakatime/oauth_token and no api_key in "
         "~/.wakatime.cfg. Since 01.11.2026 statistics need a personal OAuth token — "
-        "issue one via ~/.wakatime/wakatime-set-oauth.sh"
+        "issue one in your WakaTime account settings and save it to ~/.wakatime/oauth_token"
     )
 
 

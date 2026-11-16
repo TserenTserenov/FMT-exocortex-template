@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7a3880c2ce4aa70e2ea33386af3bb7ed99d9ee7814b2e5afd4e9800b944146e2"
+      "sha256": "68267dd93a905dedb5bd37ca7c3f5ba7b5db376095e631179d1fad7ce86f9700"
     },
     {
       "path": "CLAUDE.md",
@@ -3580,12 +3580,6 @@
     "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
     "scripts/tests/test-wp529-f261-release-branch-base.sh",
     "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
-    "scripts/tests/test-wp529-f270-clone-memory-backup.sh",
-    "scripts/tests/test-wp529-f270-core-mode-feeders.sh",
-    "scripts/tests/test-wp529-f270-exec-bit.sh",
-    "scripts/tests/test-wp529-f270-rollback-cleanup.sh",
-    "scripts/tests/test-wp529-f270-settings-merge-report.sh",
-    "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
     "scripts/tests/test_1231_artifactor.sh",
@@ -3770,7 +3764,6 @@
     "scripts/tests/test_issue_f267_capability_guard.sh",
     "scripts/tests/test_issue_f267_stage2.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
-    "scripts/tests/test_issue_rc14_merge.py",
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
@@ -3892,7 +3885,6 @@
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
     "setup/test-issue-1441-roles-on-linux.sh",
     "setup/test-next-rc-tag.sh",
-    "setup/test-rc-upgrade-from-release.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
@@ -3906,7 +3898,6 @@
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-1143.sh",
     "setup/test-update-issue-226.sh",
-    "setup/test-update-legacy-template-base.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-modified-hook.sh",

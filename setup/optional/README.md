@@ -9,7 +9,7 @@ Monitors your coding activity via WakaTime and sends a desktop notification (mac
 ### Prerequisites
 
 - **WakaTime** installed and configured (`~/.wakatime.cfg` with `api_key`)
-- **Personal WakaTime OAuth token** in `~/.wakatime/oauth_token` (install: `~/.wakatime/wakatime-set-oauth.sh`).
+- **Personal WakaTime OAuth token** in `~/.wakatime/oauth_token` (issue it in your WakaTime account settings and save only the token in this file).
   Since 01.11.2026 WakaTime rejects API keys on statistics endpoints with HTTP 403 («API Keys are only for
   plugins, use your personal oauth token»), so the key alone is no longer enough. The script falls back to
   the key only when the token file is absent.
