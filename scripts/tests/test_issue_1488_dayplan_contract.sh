@@ -57,7 +57,7 @@ rm -f "$plan"
 # 4. Empty output or a failing scaffold: the step fails and leaves no plan file.
 for fake in 'true' 'printf "partial\\n"; exit 1'; do
     printf '#!/bin/bash\n%s\n' "$fake" > "$TMP/fake-scaffold.sh"
-    sed "s#bash \"\$IWE_SCRIPTS/day-open-scaffold.sh\"#bash \"$TMP/fake-scaffold.sh\"#" \
+    sed -E "s#bash \"[^\"]*day-open-scaffold.sh\"#bash \"$TMP/fake-scaffold.sh\"#" \
         "$TMP/step7a.sh" > "$TMP/step7a-bad.sh"
     grep -q 'fake-scaffold' "$TMP/step7a-bad.sh" || fail "could not swap the scaffold in the block"
     if in_install bash "$TMP/step7a-bad.sh" 2>"$TMP/bad.err"; then
