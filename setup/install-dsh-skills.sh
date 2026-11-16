@@ -133,7 +133,8 @@ fi
     printf -- '- id: skill-filesystem\n'
     printf '  config:\n'
     printf '    customSkillDirs:\n'
-    printf '      - %s\n' "$SKILLS_DIR"
+    SKILLS_DIR_YAML=$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$SKILLS_DIR")
+    printf '      - %s\n' "$SKILLS_DIR_YAML"
 } >> "$PATCH_FILE" || {
     echo "ERROR: не удалось записать $PATCH_FILE" >&2
     exit 2

@@ -17,6 +17,10 @@ on:
         description: 'Только собрать анонс и показать артефакт, без предпросмотра и рассылки'
         type: boolean
         default: true
+      version:
+        description: 'Версия выпуска, чей анонс собрать независимо от даты заголовка в CHANGELOG (например 0.42.0). Пусто — обычное окно «сегодня и вчера»'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -36,9 +40,11 @@ jobs:
 
       - name: Check for recent commits
         id: check
+        env:
+          FORCE_VERSION: ${{ inputs.version }}
         run: |
           COMMITS=$(git log --since="24 hours ago" --oneline 2>/dev/null)
-          if [ -z "$COMMITS" ]; then
+          if [ -z "$COMMITS" ] && [ -z "$FORCE_VERSION" ]; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             echo "No commits in the last 24 hours"
           else
@@ -51,7 +57,16 @@ jobs:
       - name: Extract changelog entries for recent dates
         if: steps.check.outputs.has_changes == 'true'
         id: changelog
+        env:
+          FORCE_VERSION: ${{ inputs.version }}
         run: |
+          # Явно названная версия (ручной запуск) берёт свой раздел независимо от даты заголовка:
+          # выпуск 0.42.0 вышел 16.11, а заголовок раздела датирован днём нарезки (10.11) — окно
+          # «сегодня и вчера» его не видело и подписчики остались бы без анонса.
+          if [ -n "$FORCE_VERSION" ] && ! printf '%s' "$FORCE_VERSION" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
+            echo "::error::version must look like 0.42.0"
+            exit 1
+          fi
           if [ ! -f CHANGELOG.md ]; then
             echo "entry=Нет CHANGELOG.md" >> "$GITHUB_OUTPUT"
             exit 0
@@ -77,6 +92,9 @@ jobs:
               break
             fi
           done < <(grep '^## \[' CHANGELOG.md | sed 's/## //')
+          if [ -n "$FORCE_VERSION" ]; then
+            VERSION=$(grep -m1 "^## \[$FORCE_VERSION\]" CHANGELOG.md | sed 's/## //')
+          fi
 
           # Все записи с датами today или yesterday
           # Собираем все блоки между ## [...] заголовками, фильтруя по дате
@@ -84,6 +102,7 @@ jobs:
           import sys
           today = '$TODAY'
           yesterday = '$YESTERDAY'
+          force = '$FORCE_VERSION'
           entries = []
           current_block = []
           current_date = None
@@ -98,7 +117,7 @@ jobs:
           with open('CHANGELOG.md') as f:
               for line in f:
                   if line.startswith('## ['):
-                      if current_block and current_date in (today, yesterday) and released(current_ver):
+                      if current_block and (current_date in (today, yesterday) or (force and current_ver == force)) and released(current_ver):
                           entries.extend(current_block)
                       current_block = []
                       # Extract date from '## [0.8.7] — 2026-03-17'
@@ -108,7 +127,7 @@ jobs:
                   elif current_date is not None:
                       current_block.append(line)
               # Last block
-              if current_block and current_date in (today, yesterday) and released(current_ver):
+              if current_block and (current_date in (today, yesterday) or (force and current_ver == force)) and released(current_ver):
                   entries.extend(current_block)
           # Полный текст: обрыв на 50 строках выбрасывал пункты из анонса (WP-529).
           print(''.join(entries).strip())
