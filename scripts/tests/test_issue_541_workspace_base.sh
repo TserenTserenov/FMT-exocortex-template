@@ -23,7 +23,8 @@
 #     heals on the next run without any manual step; the run after that is a no-op
 #   3 template copy edited and no base in the template repo: refusal as before
 #   4 no merge base anywhere: refusal as before
-#   5 old layout (base in the template repo): 3-way merge as before
+#   5 old layout (base in the template repo), unedited template copy: replaced without a merge
+#     (0.42 rc.10: the legacy base is substituted, a merge conflicted on every placeholder line)
 #   6 the pilot edited a line upstream also changed: conflict markers, exit 49
 #   7 author_mode with an unpromoted edit of the template copy: the author guard
 #     still runs first, the file stays untouched
@@ -34,7 +35,8 @@
 #     one, the installed manifest vouches for it
 #  10 a broken git (macOS after an update: "xcrun: error", exit 1 for everything) must not
 #     empty the workspace copy: git merge-file failed without a conflict, so no merge result
-#  11 the same in the old layout, for the template copy
+#  11 the same in the old layout: the unedited template copy is replaced without git, never emptied;
+#     the workspace merge still fails on the broken git and keeps the marker
 #  12 an empty template copy equal to an empty base is not "unedited"
 #  13 the heal run ends in a workspace conflict, the pilot resolves it, the next release changes
 #     CLAUDE.md again: the template copy still follows (post-release audit of v0.41.0)
@@ -507,7 +509,7 @@ build_case legacy legacy
 expected_workspace_copy "$CASE_DIR/expected-ws.md" yes
 run_update
 check "5 exit 0" rc_is 0
-check "5 the template copy goes through the 3-way merge" log_has "(3-way merge, чисто)"
+check "5 the unedited template copy is replaced without a merge" log_has "слияние не нужно"
 check "5 the new shortcut is not used when a template base exists" log_lacks "$B1_LINE"
 check "5 the template copy is upstream's CLAUDE.md" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
 check "5 the template base advances to upstream" same "$SD/.claude.md.base" "$UP/CLAUDE.md"
@@ -598,13 +600,12 @@ check "10 git repaired: the workspace copy is merged with the pilot line kept" s
 
 echo "=== case 11: a broken git must not empty the template copy either (old layout) ==="
 build_case brokenlegacy legacy
-cp "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
-cp "$SD/.claude.md.base" "$CASE_DIR/template-base-before.md"
 EXTRA_PATH="$BROKEN_GIT_DIR" run_update
 check "11 broken git: exit 49" rc_is 49
-check "11 broken git: the template copy is untouched" same "$SD/CLAUDE.md" "$CASE_DIR/template-before.md"
+check "11 broken git: the unedited template copy is upstream's, no git needed" same "$SD/CLAUDE.md" "$UP/CLAUDE.md"
 check "11 broken git: the template copy is not empty" test -s "$SD/CLAUDE.md"
-check "11 broken git: the template base does not advance" same "$SD/.claude.md.base" "$CASE_DIR/template-base-before.md"
+check "11 broken git: the template base follows the replaced copy" same "$SD/.claude.md.base" "$UP/CLAUDE.md"
+check "11 broken git: the marker stays" test -f "$SD/.update-incomplete"
 check "11 broken git: the failure is reported as a git failure" log_has "git merge-file не выдал слияния"
 
 echo "=== case 12: an empty template copy equal to an empty base is not unedited ==="
