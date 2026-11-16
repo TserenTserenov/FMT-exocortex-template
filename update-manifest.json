@@ -501,7 +501,7 @@
     },
     {
       "path": ".claude/skills/author-mode/SKILL.md",
-      "sha256": "8e75dbc690e313a88e730d8696ff10046331f206b766b34e16fc4441c0bf30f8"
+      "sha256": "35fe3b7ad1561f08b50d309137744fc7c79e634bd681f92df1fb02a30f8f4717"
     },
     {
       "path": ".claude/skills/bottleneck-pick/SKILL.md",
@@ -509,7 +509,7 @@
     },
     {
       "path": ".claude/skills/check-secret/SKILL.md",
-      "sha256": "1ba3e58fc60e926e1d6692f0fa51b1423fdbc7ff9e78fb75b010f7ffee42b65a"
+      "sha256": "af288092b026a800367ffe1eebffb1940dd9c3270b4a3896118fbf19d90361d9"
     },
     {
       "path": ".claude/skills/check-secret/check.sh",
@@ -517,7 +517,7 @@
     },
     {
       "path": ".claude/skills/consent/SKILL.md",
-      "sha256": "8aa4e4a2ec887c370513720cdac6ba931a9647047bdab4d38f50b9b76e0250a9"
+      "sha256": "219851610b6dc58c733db2483709fee511fe77899c484f74cdafef71a4fc1fb9"
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
@@ -533,7 +533,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "4a2bf6ebca47d8e004a1bcb17f13924ad4543b00d6c7ad3c277736f1f6b8a40b"
+      "sha256": "b78d63936c6bc832b3e007b9eaa179ff926bcc94896922222b09de3140af3ad1"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -781,7 +781,7 @@
     },
     {
       "path": ".claude/skills/restore-exocortex/SKILL.md",
-      "sha256": "02bcaf876952111f8f2ee1582f5716f863e33c671e7ab5cfae7dd19ab24f4e93"
+      "sha256": "98e6a018ec252c4db646d14ba37a903df269ba819a799023ba3a04429c64a969"
     },
     {
       "path": ".claude/skills/run-protocol/SKILL.md",
@@ -825,7 +825,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "f8e8a3ae69c2f1e8e8194f4c000dbd27fa81979f0c3582a722007ab418d5502c"
+      "sha256": "7a6f434716453ea89ae3db8dffc1cd7eb895cbbaa55aba61ac4c5e3714a34aa3"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -833,7 +833,7 @@
     },
     {
       "path": ".claude/skills/transcribe/SKILL.md",
-      "sha256": "48f4a9639071fc2e0bcb24ce5162c02a5551982914a12a0e895f48d8956a4fd3"
+      "sha256": "49ae8876582005710909cbe76db36dccfa2a81dd79429b7bd67ed812f9dd44ca"
     },
     {
       "path": ".claude/skills/vdv/SKILL.md",
@@ -865,7 +865,7 @@
     },
     {
       "path": ".claude/skills/w-reflection/SKILL.md",
-      "sha256": "9f4128ce42f08312bc6fc3b1f7b2158becc5dd5209aca5b5f57185be59bc03b7"
+      "sha256": "ffbf529d5716e3af70c49ec481f0c46247339061ac6e8679c82eaf5200b564e6"
     },
     {
       "path": ".claude/skills/week-close-pilot/SKILL.md",
@@ -877,7 +877,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "725c096f0316f8b8f66212e16193b72109e12e12119323e40ad50c65660d0a55"
+      "sha256": "e78ed15d1fba3d241bb1042e158040d3d203da95bc72d2e72c207cb2e79ed1a8"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -933,7 +933,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "b99352571be31af4e987c37795370b7570ab9501951961f8caa25df0040f145d"
+      "sha256": "0fa8f63ad76ab9a7a61d48deed85983667dec378f75f084a610526b2773b009e"
     },
     {
       "path": ".gitignore",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0f18cc6ae4409a74b8fdcc4e03f2d6b22bea9e6f90a13bf9881e2106e14734e9"
+      "sha256": "1d28f528fac44b88717f4b4ae1eb882ff4db2d88c7494b19a7724eaf863c9457"
     },
     {
       "path": "CLAUDE.md",
@@ -1213,11 +1213,11 @@
     },
     {
       "path": "extensions/agent-inbox/scripts/gate_launch_usage.py",
-      "sha256": "6fdd28758c5d681203a8be0ac9a2a7176b36c14a8278eb318662cbfa04fe0c26"
+      "sha256": "541023e45633ce740c05775ea23a24392927e5f5c6632ee720e4872e1bb097c2"
     },
     {
       "path": "extensions/agent-inbox/scripts/iwe-agent-dispatcher.py",
-      "sha256": "56f68d9a3ed2ab84824f5988fc5c45beb32bc9db866fb7223c5beea7cfdbf6d0"
+      "sha256": "32860f1cd392b14d9de515b678d1c9f5fab7283cfe2668eae58aa81631dc5db5"
     },
     {
       "path": "extensions/agent-inbox/templates/_template.md",
@@ -1325,7 +1325,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "b39b98dfdf9281ffef936008c99631154956419bf209a49ab3f73232967b1f40"
+      "sha256": "9dbf69fc130abed992d5a3e3ac78d87217e1017e2dbda54cf5219936ab61acd2"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -2541,7 +2541,7 @@
     },
     {
       "path": "scripts/gate_launch_usage.py",
-      "sha256": "6fdd28758c5d681203a8be0ac9a2a7176b36c14a8278eb318662cbfa04fe0c26"
+      "sha256": "541023e45633ce740c05775ea23a24392927e5f5c6632ee720e4872e1bb097c2"
     },
     {
       "path": "scripts/generate-catalogs.py",
@@ -2609,7 +2609,7 @@
     },
     {
       "path": "scripts/iwe-agent-dispatcher.py",
-      "sha256": "56f68d9a3ed2ab84824f5988fc5c45beb32bc9db866fb7223c5beea7cfdbf6d0"
+      "sha256": "32860f1cd392b14d9de515b678d1c9f5fab7283cfe2668eae58aa81631dc5db5"
     },
     {
       "path": "scripts/iwe-audit.sh",
@@ -2921,7 +2921,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "ae4ef07395a2450f2970b133995dd12ba6869b40a02ef7b9ccf08b2c043869e7"
+      "sha256": "b7e0cae6a66ddf5c77d55431164470b6703f52aafd6f1b1be237fa2222099403"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -3473,11 +3473,15 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "5d2b341257265ce0673fcf7731b3ab28f078a503a662275a4e21eb46d9ebe275"
+      "sha256": "b8aa43f2648e3a6a054dc2507c8ba7d8f80e811de375735ad3fde77cffb6b728"
     },
     {
       "path": "setup/build-runtime.sh",
       "sha256": "33c7872d3421f192ad7a18d6e288e019a14dfa03e49521d6cfffa1eb443ac47a"
+    },
+    {
+      "path": "setup/install-dsh-skills.sh",
+      "sha256": "2810ceccfb99cf0a512822b5835acc70947b7a396c348a8b8ffaf24dcd9eb966"
     },
     {
       "path": "setup/install-iwe-paths.sh",
@@ -3513,7 +3517,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "82c96da2c0f0e5c2e1c53915c7fabf40e66b1dc5a132b7d005b5481f51866eda"
+      "sha256": "b074427c350f3357d630366d2b80d2fe8f23dc8e5697257a356fe447723a5c74"
     }
   ],
   "excluded_paths": [
@@ -3568,6 +3572,7 @@
     "scripts/tests/session-guard-audit-validate-orz-batch-smoke.sh",
     "scripts/tests/session-guard-isolate-minimal-smoke.sh",
     "scripts/tests/session-guard-isolate-t1-t20-smoke.sh",
+    "scripts/tests/session-guard-second-open-warning-smoke.sh",
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
@@ -3605,7 +3610,9 @@
     "scripts/tests/test_day_open_preflight_calendar_path.sh",
     "scripts/tests/test_delivery_content.py",
     "scripts/tests/test_delivery_formal.py",
+    "scripts/tests/test_dispatcher_dsh_executor.py",
     "scripts/tests/test_dry_run_gate.py",
+    "scripts/tests/test_dsh_skills_install.sh",
     "scripts/tests/test_export_glossary_snapshot.py",
     "scripts/tests/test_extractor_branch_cleanup.sh",
     "scripts/tests/test_extractor_feed_quiet_on_empty.sh",
@@ -3790,6 +3797,7 @@
     "scripts/tests/test_session_guard_unknown_flag.sh",
     "scripts/tests/test_setup_runtime_isolation.sh",
     "scripts/tests/test_skill_promote.py",
+    "scripts/tests/test_skills_script_paths.sh",
     "scripts/tests/test_sync_banner.py",
     "scripts/tests/test_sync_code_scan_quiet.sh",
     "scripts/tests/test_tag_release_candidate.sh",
@@ -3864,6 +3872,8 @@
     "setup/optional/generate-post-image.py",
     "setup/optional/pomodoro-alert.plist",
     "setup/optional/pomodoro-alert.py",
+    "setup/optional/pomodoro-alert.service",
+    "setup/optional/pomodoro-alert.timer",
     "setup/optional/setup-agent-workspace.sh",
     "setup/optional/setup-calendar.sh",
     "setup/promote-fixtures/README.md",

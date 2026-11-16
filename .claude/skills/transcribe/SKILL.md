@@ -49,7 +49,7 @@ python3 -m venv ~/.local/share/mlx-whisper/.venv-whisper
 ### Шаг 3: Транскрипция
 
 ```bash
-bash "$IWE_SCRIPTS/route-task.sh" --skill transcribe --args "<путь_к_файлу>"
+bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/route-task.sh" --skill transcribe --args "<путь_к_файлу>"
 ```
 
 Если язык не русский — пользователь укажет, или скрипт автоматически детектирует.

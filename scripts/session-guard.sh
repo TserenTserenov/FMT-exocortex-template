@@ -1424,6 +1424,40 @@ orz_agent_name() {
 #   1 — no open semaphore at all for this agent
 #   2 — ambiguous or requested --wp/--slug matched nothing; candidate list
 #       already printed to stderr, caller should just propagate a failure
+# WP-484 Ф301 (И-11), adapted from the author's source 11.11: a second live semaphore
+# for the same work in the same conversation is how a session ends up with a mark
+# nobody closes. Opening stays allowed (the peer skill legitimately opens its own
+# after the WP Gate); the sibling is named at open, not discovered later. Only the
+# harness conversation id can tell "same conversation", so without it nothing is said.
+_wp_key() { # <wp> — comparable form: WP-44, 044 and 44 name one card
+  local n
+  if type wp_num_normalize >/dev/null 2>&1 && n=$(wp_num_normalize "$1" 2>/dev/null) && [ -n "$n" ]; then
+    printf '%s\n' "$n"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+warn_sibling_semaphores() { # <agent> <wp> <slug> <own .open path>
+  local agent="$1" wp_key slug="$3" own="$4" file other_wp other_slug
+  [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] || return 0
+  wp_key=$(_wp_key "$2")
+  # Same agent only: `close --slug` selects among this agent's semaphores, so the
+  # printed exit must address one of them.
+  for file in "$SESSION_DIR/$agent"-*.open; do
+    [ -f "$file" ] && [ "$file" != "$own" ] || continue
+    grep -qxF "harness_session_id: $CLAUDE_CODE_SESSION_ID" "$file" || continue
+    # Housekeeping semaphores carry no wp: line; a file may vanish between reads.
+    # Under `set -euo pipefail` a failed read must skip the file, not abort open.
+    other_wp=$(grep -m1 '^wp: ' "$file" | cut -d' ' -f2-) || continue
+    [ -n "$other_wp" ] && [ "$(_wp_key "$other_wp")" = "$wp_key" ] || continue
+    other_slug=$(grep -m1 '^slug: ' "$file" | cut -d' ' -f2-) || continue
+    [ -n "$other_slug" ] && [ "$other_slug" != "$slug" ] || continue
+    printf "open: ПРЕДУПРЕЖДЕНИЕ: в этой беседе на тот же РП уже есть живая отметка '%s' (%s). Когда её работа закончена, закрой её: session-guard.sh close --agent %q --slug %q\n" \
+      "$other_slug" "$(basename "$file")" "$agent" "$other_slug" >&2
+  done
+}
+
 list_candidates() { # list_candidates <agent> — one path per line, newest first
   ls -t "$SESSION_DIR/${1}"-*.open 2>/dev/null || true
 }
@@ -1866,6 +1900,7 @@ if [ "$CMD" = "open" ]; then
       -name "$(basename "$SEM_FILE").*" -print -quit 2>/dev/null | grep -q .; then
     fail "open: для exact session_id '$SESSION_ID' уже есть terminal/lease state; выбери новый идентификатор" 1
   fi
+  warn_sibling_semaphores "$AGENT" "$WP" "${SLUG:-$WP}" "$SEM_FILE"
   # WP-484 (31.07, data-pipeline-audit-2026-07-30.md §3.3): a caller-supplied slug
   # sometimes already carries today's date (Kimi free-text `--slug`, human habit) —
   # confirmed live on real files, e.g. sessions/2026-07/2026-07-31-2026-07-31-wp510-*.md.
