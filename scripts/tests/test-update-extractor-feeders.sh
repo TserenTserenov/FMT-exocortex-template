@@ -37,6 +37,12 @@ SCRIPT_DIR="$TMP/template"
 WORKSPACE_DIR="$TMP/workspace"
 EFFECTIVE_GOVERNANCE_REPO="DS-strategy"
 mkdir -p "$SCRIPT_DIR/scripts" "$WORKSPACE_DIR" "$TMP/bin"
+# The cases below describe a full install made by 0.42 (mode recorded). Without the file the
+# function only refreshes an existing schedule (WP-529 F270, RT8-1) — that branch is covered in
+# test-wp529-f270-core-mode-feeders.sh. HOME is disposable so the host's own schedule plays no part.
+printf 'full\n' > "$WORKSPACE_DIR/.iwe-install-mode"
+HOME="$TMP/home"
+mkdir -p "$HOME"
 
 FEEDERS="$SCRIPT_DIR/scripts/setup-extractor-feeders.sh"
 write_feeders() {  # $1 = exit code the stub reports
