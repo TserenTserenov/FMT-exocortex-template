@@ -25,6 +25,10 @@ trap 'rm -rf "$TEST_ROOT"' EXIT INT TERM
 
 STUB_DIR="$TEST_ROOT/stub"
 mkdir -p "$STUB_DIR"
+# A logged-in gh on the host made update.sh call the real GitHub API instead of the curl stub
+# (0.42 rc.9 red team, Н5). This gh is never logged in, so the API path always goes through curl.
+printf '#!/bin/sh\nexit 1\n' > "$STUB_DIR/gh"
+chmod +x "$STUB_DIR/gh"
 
 # WP-529 F244: --check now runs the install preflight (.exocortex.env, .backups/)
 # before channel resolution, exactly where the real run stops. Run a copy of the
@@ -133,7 +137,7 @@ STUB
 chmod +x "$STUB_DIR/curl"
 OUT=$(run_rc)
 RC=$?
-if [ "$RC" -eq 2 ] && echo "$OUT" | grep -q "кандидатов в выпуск"; then
+if [ "$RC" -eq 2 ] && echo "$OUT" | grep -q "список rc-тегов не распознан"; then
     pass "malformed refs JSON fails closed"
 else
     fail "malformed refs JSON: rc=$RC out=$OUT"
@@ -161,6 +165,35 @@ if echo "$OUT" | grep -q "Канал поставки"; then
     fail "failed commit lookup still picked a delivery channel: $OUT"
 else
     pass "failed commit lookup delivers nothing"
+fi
+
+echo "--- More than 100 tags: the second page is read (RT5-5 of the rc.5 red team) ---"
+# Page 1: 100 release tags without a candidate; page 2: the candidate. The old single-page read
+# failed closed at 100 refs; the paged read must find v0.43.0-rc.1 on page 2.
+python3 - "$TEST_ROOT/page1.json" <<'PYG'
+import json, sys
+json.dump([{"ref": f"refs/tags/v0.30.{i}", "object": {"sha": "a" * 40}} for i in range(100)],
+          open(sys.argv[1], "w"), indent=2)
+PYG
+printf '%s' '[{"ref":"refs/tags/v0.43.0-rc.1","object":{"sha":"dddddddddddddddddddddddddddddddddddddddd"}}]' > "$TEST_ROOT/page2.json"
+printf '{"tag_name":"v0.42.0"}' > "$TEST_ROOT/latest-paged.json"
+cat > "$STUB_DIR/curl" <<STUB
+#!/bin/bash
+for last; do :; done
+case "\$last" in
+    *api.github.com*matching-refs*page=1) cat "$TEST_ROOT/page1.json" ;;
+    *api.github.com*matching-refs*page=2) cat "$TEST_ROOT/page2.json" ;;
+    *api.github.com*commits/v0.43.0-rc.1) printf '%s' '$COMMIT_FIXTURE' ;;
+    *api.github.com*releases/latest) cat "$TEST_ROOT/latest-paged.json" ;;
+    *) exit 1 ;;
+esac
+STUB
+chmod +x "$STUB_DIR/curl"
+OUT=$(run_rc)
+if echo "$OUT" | grep -q "Канал поставки: кандидат v0.43.0-rc.1 (снимок f9f9f9f9f9f9)"; then
+    pass "candidate on the second page of tags found"
+else
+    fail "paged tag list: $OUT"
 fi
 
 echo
