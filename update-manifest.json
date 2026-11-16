@@ -925,7 +925,7 @@
     },
     {
       "path": ".github/workflows/notify-update.yml",
-      "sha256": "304dbc69a74c34a2fef4df52ccc26a716f5b93fde1655c0ce35aa045e9beac5c"
+      "sha256": "fce71ac341f2d93a9011553745da09a56e1fe2ad5e2dce2e91773793f53d889a"
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "7a3880c2ce4aa70e2ea33386af3bb7ed99d9ee7814b2e5afd4e9800b944146e2"
+      "sha256": "d64a619943555e7a146e3ace7383e2d5bbe509e5ddc59549f2e10dbf522ecd36"
     },
     {
       "path": "CLAUDE.md",
@@ -1157,7 +1157,7 @@
     },
     {
       "path": "docs/releases/0.42/README.md",
-      "sha256": "dd0c3ea8d1ed8a26351fe78e9185971580d08d71c338a7e0d443c0b2770f4977"
+      "sha256": "e956702f90374c2a734566d600901ade3a624c5432661deabd561c821395495e"
     },
     {
       "path": "docs/response-clarity-catalog.md",
