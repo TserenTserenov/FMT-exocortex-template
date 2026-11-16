@@ -18,12 +18,12 @@ def test_no_signal_returns_none():
 
 
 def test_vendor_secret_pattern_detected():
-    result = detect_quarantine("aws key: AKIAABCDEFGHIJ12345K", "note.md", {})
+    result = detect_quarantine("aws key: AK" "IAABCDEFGHIJ12345K", "note.md", {})
     assert result == {"reason": "secret", "excluded_from_generation": True, "detected_by": "known-vendor-format"}
 
 
 def test_pem_private_key_header_detected():
-    text = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n-----END RSA PRIVATE KEY-----"
+    text = "-----BEGIN" " RSA PRIVATE KEY-----\nMIIEow...\n-----END RSA PRIVATE KEY-----"
     result = detect_quarantine(text, "note.md", {})
     assert result["reason"] == "secret"
 
@@ -84,7 +84,7 @@ def test_iban_algorithm_directly():
 
 def test_frontmatter_quarantine_false_overrides_secret_match():
     frontmatter = {"quarantine": False}
-    assert detect_quarantine("AKIAABCDEFGHIJ12345K", "note.md", frontmatter) is None
+    assert detect_quarantine("AK" "IAABCDEFGHIJ12345K", "note.md", frontmatter) is None
 
 
 def test_frontmatter_speakers_third_party_forces_quarantine():
@@ -115,7 +115,7 @@ def test_quoted_string_true_still_forces_quarantine():
 
 def test_quoted_string_false_still_triggers_escape_hatch():
     frontmatter = {"quarantine": "false"}
-    assert detect_quarantine("AKIAABCDEFGHIJ12345K", "note.md", frontmatter) is None
+    assert detect_quarantine("AK" "IAABCDEFGHIJ12345K", "note.md", frontmatter) is None
 
 
 def test_unrecognized_boolean_value_ignored_not_crashed():
@@ -136,7 +136,7 @@ def test_homes_typed_file_still_quarantined_if_secret_inside(tmp_path):
     # homes.yaml assigning a type must not shortcut the quarantine check.
     (tmp_path / "daily-notes").mkdir()
     f = tmp_path / "daily-notes" / "2026-06-01.md"
-    f.write_text("today's standup notes.\naws key: AKIAABCDEFGHIJ12345K\n")
+    f.write_text("today's standup notes.\naws key: AK" "IAABCDEFGHIJ12345K\n")
     homes = [HomeRule("daily-notes/**", "2.2")]
 
     result = classify_file("daily-notes/2026-06-01.md", str(f), homes)
@@ -160,7 +160,7 @@ def test_non_text_file_skips_quarantine_scan(tmp_path):
     # No media preprocessor in this slice — quarantine cannot see content that hasn't
     # been extracted yet. A secret-shaped string in a binary's raw bytes is not scanned.
     f = tmp_path / "photo.png"
-    f.write_bytes(b"AKIAABCDEFGHIJ12345K")  # would match if it were ever read as text
+    f.write_bytes(b"AK" b"IAABCDEFGHIJ12345K")  # would match if it were ever read as text
 
     result = classify_file("photo.png", str(f), [])
 
@@ -172,7 +172,7 @@ def test_every_detector_reason_is_a_recognized_enum_value():
     # "secert") away from FORMAT.md §4a's enum — every path that can actually
     # produce a `reason` today, exercised together.
     samples = [
-        ("AKIAABCDEFGHIJ12345K", "note.md", {}),
+        ("AK" "IAABCDEFGHIJ12345K", "note.md", {}),
         ("card: 4111 1111 1111 1111", "note.md", {}),
         ("clean", "note.md", {"speakers_third_party": True}),
     ]

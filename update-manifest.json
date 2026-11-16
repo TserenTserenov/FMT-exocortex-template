@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.41.11",
+  "version": "0.42.0",
   "description": "Манифест платформенных файлов FMT-exocortex-template. Используется update.sh для доставки обновлений.",
   "files": [
     {
@@ -13,7 +13,7 @@
     },
     {
       "path": ".claude/bin/guarded-rm",
-      "sha256": "99ed841969692e38261bbddea1172cf8aa7976af6b8697ba510dfea8606a5a9f"
+      "sha256": "ff7304c02a977a13b8787a469cddb9faf310cda0bda404dc9e16efd0807df8a0"
     },
     {
       "path": ".claude/capture-config.sh.example",
@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "13469388174665fbcefb97fc973cb73518f76ecddfffe788cae96afa1a43f6b6"
+      "sha256": "a378db8d642ed1815acf5b58abbb9c06471d0eeb1c588252119c7c19e5ef22d9"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -161,7 +161,7 @@
     },
     {
       "path": ".claude/hooks/rule-engine.sh",
-      "sha256": "383b5d69a4bdd99f5315709e0a6d25b7a53cbb4111c663500c057b8c2d50047d"
+      "sha256": "b86045faac1b0dac432102e3271eb753ce03adaaf1fd143cd379531e952a44f8"
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
@@ -205,11 +205,11 @@
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/guarded_rm_cases.py",
-      "sha256": "a84b32f08cd9277fc64c8f8913d90ccbc935cf30b297f42910f888b9a4b7dfc3"
+      "sha256": "6de5b47924d90efb26f6b5b516cc4bd2dc2fdf37b6fc124a766be1f68b0e8652"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/hook_cases.py",
-      "sha256": "2d82c7b7c3a9e617c5339ef8ec397204faeb6bcdcd1ef53af91b69f21a171ac9"
+      "sha256": "6ec469aab733dc512e1c418c96f9541eedd533f29a2008dbb9c75bc78ffe412b"
     },
     {
       "path": ".claude/hooks/tests/destructive-guard/long_cases.py",
@@ -222,6 +222,22 @@
     {
       "path": ".claude/hooks/tests/test-destructive-guard-executed-command-scope.sh",
       "sha256": "a4275e5385da0de8455de40de3445d21a8368c38f000531bb5e5c8cb5a0ddb10"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-file-writers.sh",
+      "sha256": "84943f75d2e94012381eafcadeaace23e35f1907154a5cbb20c14d8e8e56a122"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-find-chain.sh",
+      "sha256": "2757ccbb561a153241d00d95de49ba0ef301e51285795129fc642e5153f2aedf"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-find-delete.sh",
+      "sha256": "3c4a58b580efba5525c713e190fffab9835e7b023cbde0f0dfdb9e10c4be70f0"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-git-branch-remote.sh",
+      "sha256": "c24c07fd8fceba090d5b0234d212d5cec1fa4c5345019096a17963449ca1f510"
     },
     {
       "path": ".claude/hooks/tests/test-destructive-guard-indirect-input.sh",
@@ -429,7 +445,7 @@
     },
     {
       "path": ".claude/scripts/settings-merge-preview.py",
-      "sha256": "5b8c26c50f5d4c26bdf746dd6ce478e03501cfba936462cdfb06c3d0f07a9f9c"
+      "sha256": "d2be2fec789c86c14692403b41d2b5e4235efe29600bf080ccf03e4a17c82b25"
     },
     {
       "path": ".claude/scripts/wp-phase-digest.sh",
@@ -449,7 +465,7 @@
     },
     {
       "path": ".claude/skills/SKILL-INDEX.yaml",
-      "sha256": "0996c9effca99e3be2db9feda8f1689f63557f226f65329706aff6485b650eb9"
+      "sha256": "d1482b44fb1a8ed982d1f8de202d32562c6f8e470c4b7c77fc0ca3ff871d0c18"
     },
     {
       "path": ".claude/skills/_template/SKILL.md",
@@ -461,7 +477,7 @@
     },
     {
       "path": ".claude/skills/apply-captures/SKILL.md",
-      "sha256": "3d3a209c9b84478cbe6e3c220dcff7c960d7f93e97cc8e2015efe629b6959092"
+      "sha256": "1f974bed8eed56b0b14a58ec3604121f9a67a285f6fdc75364b98849c8ebf129"
     },
     {
       "path": ".claude/skills/archgate/SKILL.md",
@@ -505,7 +521,7 @@
     },
     {
       "path": ".claude/skills/day-close/SKILL.md",
-      "sha256": "903b45ca94b88fb3bca00e022844b9e76c1f4eab514587d5151fdd58163794e4"
+      "sha256": "bda852f86c80b8ec5318d075d79a273abba0c28bed3d9d303f964b3bd88cf012"
     },
     {
       "path": ".claude/skills/day-close/day-close-details.md",
@@ -517,7 +533,7 @@
     },
     {
       "path": ".claude/skills/day-open/SKILL.md",
-      "sha256": "d92986a5c3a290c56deff3a4f70b8cc219c22255ffcf6b6b5d71722b0201817e"
+      "sha256": "4a2bf6ebca47d8e004a1bcb17f13924ad4543b00d6c7ad3c277736f1f6b8a40b"
     },
     {
       "path": ".claude/skills/day-open/day-open-details.md",
@@ -542,6 +558,10 @@
     {
       "path": ".claude/skills/extend/SKILL.md",
       "sha256": "8898aeac400947ddc29425249d66c82315f06c11e7152cd5d1125e5499e170e4"
+    },
+    {
+      "path": ".claude/skills/find-method/SKILL.md",
+      "sha256": "ccf44044e4f9bfbab670dea449d4f6d6d0b4c77f07b8ecd0b8c43b4024281bdb"
     },
     {
       "path": ".claude/skills/fpf/SKILL.md",
@@ -641,7 +661,7 @@
     },
     {
       "path": ".claude/skills/iwe-update/SKILL.md",
-      "sha256": "3fd3a2768e9f9e7ef2335f2b58e1251b41e4b0e40289dd93fc1531d5cc0bdc78"
+      "sha256": "6a0a126a80ccacb9963ffe65f27e2e67fcb1b3890ae9acc272bc7ef8ea078d2b"
     },
     {
       "path": ".claude/skills/ke/SKILL.md",
@@ -649,7 +669,7 @@
     },
     {
       "path": ".claude/skills/kimi-peer-writer/SKILL.md",
-      "sha256": "34bbbdbe7cf271f0b7a819c8aaa68764e8dd94c893c3b10cb2edabe3eae87768"
+      "sha256": "4b51700b52bcecd3370c99028298044e514883b7e992d4d2f1406d72892b72dd"
     },
     {
       "path": ".claude/skills/local-llm/SKILL.md",
@@ -805,7 +825,7 @@
     },
     {
       "path": ".claude/skills/strategy-session/SKILL.md",
-      "sha256": "3d0cf7e7c0ccf3f1fb18e1ff566a2e5aa505cf7606447b271625b84d9d2b0c6d"
+      "sha256": "f8e8a3ae69c2f1e8e8194f4c000dbd27fa81979f0c3582a722007ab418d5502c"
     },
     {
       "path": ".claude/skills/think/SKILL.md",
@@ -857,7 +877,7 @@
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
-      "sha256": "0d15fc0d61f14750e4c3bc8bfcfb81553ceb17572057d65e2f5116674bda5ddb"
+      "sha256": "725c096f0316f8b8f66212e16193b72109e12e12119323e40ad50c65660d0a55"
     },
     {
       "path": ".claude/styles/genre-template/guide.md",
@@ -905,7 +925,7 @@
     },
     {
       "path": ".github/workflows/notify-update.yml",
-      "sha256": "304dbc69a74c34a2fef4df52ccc26a716f5b93fde1655c0ce35aa045e9beac5c"
+      "sha256": "fce71ac341f2d93a9011553745da09a56e1fe2ad5e2dce2e91773793f53d889a"
     },
     {
       "path": ".github/workflows/post-release-audit.yml",
@@ -913,7 +933,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "4f5c8ae6f313dd801a5ddfab4d51e1611ed3a07d86fa209bb6518550f74cf7b8"
+      "sha256": "b99352571be31af4e987c37795370b7570ab9501951961f8caa25df0040f145d"
     },
     {
       "path": ".gitignore",
@@ -941,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2c5bac8941ef4e37e3d77b24b19cc68b8e5661d7d3e675ee8f959352d730128"
+      "sha256": "d64a619943555e7a146e3ace7383e2d5bbe509e5ddc59549f2e10dbf522ecd36"
     },
     {
       "path": "CLAUDE.md",
@@ -997,7 +1017,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "f62ef3f32baf53bb3f6dfdbbe02d3c66421681f664ac1d17f9f271b5727576f0"
+      "sha256": "1db2ca64fe273bdc0f2fa3f67ac0d4df24ca90d834660b90ecd310db8bf5cd12"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -1033,7 +1053,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "064d282196b5c41603b8c929c46cb97f241b16b6bad40b568f588c22428c12b7"
+      "sha256": "b3264e61e2faf005648bf19194638328dcaaad319f825d736bf0e1b174c92dbf"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -1134,6 +1154,10 @@
     {
       "path": "docs/release-audit-log.md",
       "sha256": "f7af94f354cae5edd59a32d2b2eb1f4ebaa3191fdc5f30ad6fa8f667c5494c01"
+    },
+    {
+      "path": "docs/releases/0.42/README.md",
+      "sha256": "e956702f90374c2a734566d600901ade3a624c5432661deabd561c821395495e"
     },
     {
       "path": "docs/response-clarity-catalog.md",
@@ -1301,7 +1325,7 @@
     },
     {
       "path": "generate-manifest.sh",
-      "sha256": "d10a8b41c3d3aaa2badbb8bb413fabe3a62267a0887290bae3188ddc8fa69bfc"
+      "sha256": "b39b98dfdf9281ffef936008c99631154956419bf209a49ab3f73232967b1f40"
     },
     {
       "path": "guide-kit/.gitignore",
@@ -1408,6 +1432,10 @@
       "sha256": "42934f34efb28906f25266411c767a2527bf531de11e29237686ae7ef11e7b8b"
     },
     {
+      "path": "guide-kit/generator/recommendation_registry.py",
+      "sha256": "1f6f9a9f8004def0a7b375ff4b18d716475cc9b72fbb5da32c35783291486cba"
+    },
+    {
       "path": "guide-kit/generator/render_work_section_runner.py",
       "sha256": "141c62d63b5d42e7e9f298de9b6c1cc4571a69d0fa3d72312e840a7622faf9b3"
     },
@@ -1464,6 +1492,10 @@
       "sha256": "5bda893cd250d1f467e110356b3b4c3285382ddab9f0ed5aa50bb7bfbf956be8"
     },
     {
+      "path": "guide-kit/generator/test_recommendation_registry.py",
+      "sha256": "f0cddb528b124303ed093b906bace50fffef8b14b4c30e9863e1833d75f616fb"
+    },
+    {
       "path": "guide-kit/generator/test_work_section.py",
       "sha256": "efbccaae8a80e48d6f845a8316640805e1edf2568811a986ce6721195850bdf4"
     },
@@ -1501,7 +1533,7 @@
     },
     {
       "path": "guide-kit/scripts/test_publish_snapshot.sh",
-      "sha256": "ae0dbb401eda9a338cbd1b3d39a32f6b3ccca25672ddd853e1a7c2d2081de445"
+      "sha256": "f06646ec7317c21b59bbab4699dffad881945d5b6b8ce6531799c3960399bae6"
     },
     {
       "path": "guide-kit/scripts/test_snapshot_allowlist.py",
@@ -1565,7 +1597,7 @@
     },
     {
       "path": "guide-kit/structurer/test_quarantine.py",
-      "sha256": "61e8b572bbfb9886bb8269ce89317549798bc2bf2d191aa648352f5b8e8bbab3"
+      "sha256": "fa466636bd433a0abca4e8df17ae4bd028b6af45db814ae802c21dd8490add43"
     },
     {
       "path": "guide-kit/structurer/test_residency.py",
@@ -2269,7 +2301,7 @@
     },
     {
       "path": "scripts/changelog-append.sh",
-      "sha256": "504ee3c3e694b33cdd23e0c2d0f4eb6e80b66db6c7f337e354433c6a9090e875"
+      "sha256": "24152500610d60e0b4ef6129b7c088d8c32d460a658b87695ad9d4eddc4648a6"
     },
     {
       "path": "scripts/changelog-diff-lines.sh",
@@ -2282,6 +2314,10 @@
     {
       "path": "scripts/check-changelog-entry.sh",
       "sha256": "fa367b8bb3137c87ababa117debca231d90c874c26237f3585e2cc0bf36b5b57"
+    },
+    {
+      "path": "scripts/check-changelog-fields.py",
+      "sha256": "1aabc378af51a0c05167cf45582f492ae7739546207f10b1efef3de998dd6381"
     },
     {
       "path": "scripts/check-claude-md-links.py",
@@ -2336,6 +2372,10 @@
       "sha256": "8dbcdd7be778bc5d5a5dcda30292a5442a0b962561d34d8bfc42a9266098aebe"
     },
     {
+      "path": "scripts/check-release-branch-base.sh",
+      "sha256": "1b5bd16ed3c7e39dd161023d5e062b9e9a088eac137587717ea06e58d644a132"
+    },
+    {
       "path": "scripts/check-script-collisions.sh",
       "sha256": "7cdf22d4b83e752188a437200fbc873b5456faac20f2a7605fa7153696210b36"
     },
@@ -2353,7 +2393,7 @@
     },
     {
       "path": "scripts/check-wp-registered.sh",
-      "sha256": "638e9503095615892896e84c3a0a056c74c0185537c8f1d21a485588fc9f484e"
+      "sha256": "440c0b4a272050a6771ea168663318a0dd3f069b9ad36f4242bd6c282dbc2ee7"
     },
     {
       "path": "scripts/check-wp-transfer-completeness.sh",
@@ -2397,7 +2437,7 @@
     },
     {
       "path": "scripts/create-wp.sh",
-      "sha256": "aa0f25bc00cf5aab2c706204da60d5e40b4a9eaf73c94f1ed38cb7ef84ac51c3"
+      "sha256": "1e53be55f1b61c919e96202f02162eee9dd887f8139736be8b0387a387af49b7"
     },
     {
       "path": "scripts/day-close-lock.sh",
@@ -2820,6 +2860,10 @@
       "sha256": "a9b555b402095553e92c15d7f8af72d20b513b1b963c768899d3e5e6775cf942"
     },
     {
+      "path": "scripts/pack-duplicate-check.py",
+      "sha256": "58fa5281b6bb1e6754c611b34eb3c6a7d9b23e0f6ca51f131e2095e2815313c9"
+    },
+    {
       "path": "scripts/peer-adapter-filter.py",
       "sha256": "bdbd68e19c8ad197e177ecc4f4817f7f4d0376c5f9e7f1610060c40a7fa54e75"
     },
@@ -2877,7 +2921,7 @@
     },
     {
       "path": "scripts/session-guard.sh",
-      "sha256": "5dd94408b73e0b2466ec1d2f8cac756a0288813714404814e8c4ac2eb2dcbef4"
+      "sha256": "ae4ef07395a2450f2970b133995dd12ba6869b40a02ef7b9ccf08b2c043869e7"
     },
     {
       "path": "scripts/session-manifest-write.sh",
@@ -2989,7 +3033,7 @@
     },
     {
       "path": "scripts/tests/run-issue-tests.sh",
-      "sha256": "8a38eef33955b1b9df593a2989e3800dba3b4abd50ede397102b6edb81bae320"
+      "sha256": "9d71fbe0223c3cd753d0cc55bf215ca18f141ea33f4201bc71f7883cbf46a18e"
     },
     {
       "path": "scripts/tests/test_capture_bus_contract.sh",
@@ -3429,7 +3473,7 @@
     },
     {
       "path": "setup.sh",
-      "sha256": "3fb0fac3723558c082329f441ef58cf518923d0154c8d39ff951898288b7fa7c"
+      "sha256": "5d2b341257265ce0673fcf7731b3ab28f078a503a662275a4e21eb46d9ebe275"
     },
     {
       "path": "setup/build-runtime.sh",
@@ -3469,7 +3513,7 @@
     },
     {
       "path": "update.sh",
-      "sha256": "8d4349af7bf78ed912e12d4873833bd70db8cb517e2801d92f3725ce937e0eba"
+      "sha256": "82c96da2c0f0e5c2e1c53915c7fabf40e66b1dc5a132b7d005b5481f51866eda"
     }
   ],
   "excluded_paths": [
@@ -3490,6 +3534,7 @@
     "scripts/agent-dashboard.py",
     "scripts/assemble_distribution.py",
     "scripts/audit-ad-hoc-roles.py",
+    "scripts/check-card-terms.py",
     "scripts/check-component-parity.sh",
     "scripts/check-copy-pairs.sh",
     "scripts/check-manifest-rename-coverage.py",
@@ -3532,6 +3577,15 @@
     "scripts/tests/test-setup-git-identity-precheck.sh",
     "scripts/tests/test-update-extractor-feeders.sh",
     "scripts/tests/test-update-fpf-refresh.sh",
+    "scripts/tests/test-wp529-f261-changelog-append-fields.sh",
+    "scripts/tests/test-wp529-f261-release-branch-base.sh",
+    "scripts/tests/test-wp529-f261-rollback-by-installed-version.sh",
+    "scripts/tests/test-wp529-f270-clone-memory-backup.sh",
+    "scripts/tests/test-wp529-f270-core-mode-feeders.sh",
+    "scripts/tests/test-wp529-f270-exec-bit.sh",
+    "scripts/tests/test-wp529-f270-rollback-cleanup.sh",
+    "scripts/tests/test-wp529-f270-settings-merge-report.sh",
+    "scripts/tests/test-wp529-f270-step0-no-downgrade.sh",
     "scripts/tests/test_1229_sync_bundle.sh",
     "scripts/tests/test_1230_publish.sh",
     "scripts/tests/test_1231_artifactor.sh",
@@ -3542,6 +3596,8 @@
     "scripts/tests/test_ar293_ai_cli_override.sh",
     "scripts/tests/test_assemble_distribution.py",
     "scripts/tests/test_changelog_append_blank_lines.sh",
+    "scripts/tests/test_check_card_terms.py",
+    "scripts/tests/test_check_changelog_fields.py",
     "scripts/tests/test_copy_to_aisystant.py",
     "scripts/tests/test_critical_alert_notify_outcome.sh",
     "scripts/tests/test_day_close_prepare.py",
@@ -3625,6 +3681,10 @@
     "scripts/tests/test_issue_1470_isolate_range_delivered.sh",
     "scripts/tests/test_issue_1471_1474_synchronizer.sh",
     "scripts/tests/test_issue_1475_pull_on_touch_lib.sh",
+    "scripts/tests/test_issue_1488_dayplan_contract.sh",
+    "scripts/tests/test_issue_1503_no_weekplan.sh",
+    "scripts/tests/test_issue_1513_skill_paths.sh",
+    "scripts/tests/test_issue_1514_pack_duplicates.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
@@ -3710,6 +3770,7 @@
     "scripts/tests/test_issue_f267_capability_guard.sh",
     "scripts/tests/test_issue_f267_stage2.sh",
     "scripts/tests/test_issue_python_resolver_contract.sh",
+    "scripts/tests/test_issue_rc14_merge.py",
     "scripts/tests/test_issue_wp516_verify_skill.py",
     "scripts/tests/test_issues_919_920_929_day_open.sh",
     "scripts/tests/test_issues_942_944_day_open.sh",
@@ -3735,6 +3796,7 @@
     "scripts/tests/test_template_hygiene_checks.sh",
     "scripts/tests/test_translate_delta.py",
     "scripts/tests/test_translate_parse.py",
+    "scripts/tests/test_translate_unapproved_report.py",
     "scripts/tests/test_update_download_batch_network_failure_failclosed.sh",
     "scripts/tests/test_update_drop_dead_railway_mcp.sh",
     "scripts/tests/test_update_retry_and_classify_undeliverable_file.sh",
@@ -3828,6 +3890,7 @@
     "setup/test-issue-1217-download-batch-curl-k-path.sh",
     "setup/test-issue-1441-roles-on-linux.sh",
     "setup/test-next-rc-tag.sh",
+    "setup/test-rc-upgrade-from-release.sh",
     "setup/test-scheduler-interval-slack.sh",
     "setup/test-strategist-isolated-scenarios.sh",
     "setup/test-strategist-mark-done.sh",
@@ -3841,6 +3904,7 @@
     "setup/test-update-install-path-provenance.sh",
     "setup/test-update-issue-1143.sh",
     "setup/test-update-issue-226.sh",
+    "setup/test-update-legacy-template-base.sh",
     "setup/test-update-linux-scheduler.sh",
     "setup/test-update-manifest-fetch.sh",
     "setup/test-update-modified-hook.sh",

@@ -110,10 +110,16 @@ echo "$OUTPUT" | grep -q "already exists" || fail "expected an 'already exists' 
 
 # ---------------------------------------------------------------------------
 step "missing gh binary exits 1 with a clear message"
+# The PATH holds only what the script runs before its gh check (dirname).
+# Keeping /usr/bin on it is not enough: GitHub-hosted runners ship a real gh
+# there, which then answers "not logged in" with exit 4 instead of the
+# script's "gh CLI not found" with exit 1.
 EMPTY_PATH_BIN="$FIXTURE_DIR/empty-bin"
 mkdir -p "$EMPTY_PATH_BIN"
+ln -s "$(command -v dirname)" "$EMPTY_PATH_BIN/dirname"
+BASH_BIN="$(command -v bash)"
 set +e
-OUTPUT="$(PATH="$EMPTY_PATH_BIN:/usr/bin:/bin" bash "$SCRIPT" --curriculum-path "$CURRICULUM" --snapshot-date 2026-07-21 2>&1)"
+OUTPUT="$(PATH="$EMPTY_PATH_BIN" "$BASH_BIN" "$SCRIPT" --curriculum-path "$CURRICULUM" --snapshot-date 2026-07-21 2>&1)"
 STATUS=$?
 set -e
 [ "$STATUS" -eq 1 ] || fail "expected exit 1 when gh is absent, got $STATUS"

@@ -164,6 +164,14 @@ jq -n \
   > ~/.claude/state/day-close-last-success.json
 ```
 
+### 10d. Снять служебную отметку шага 0г (issue #1506)
+После push шага 10b коммитов в этом протоколе больше нет. Отметка `day-close` этого агента, открытая на шаге 0г, иначе остаётся в `.iwe-runtime/sessions/`, и следующее `session-guard.sh open` предупреждает о сессии без прав на коммит. Закрывается только отметка, записанная этим же разговором (строка `harness_session_id` совпадает; `--only-own-harness` сверяет её внутри `session-guard.sh` под блокировкой, код 3 — отметка не наша), чтобы не снять отметку параллельной сессии того же агента. Нет отметки — команда ничего не делает; отметка чужая или нет номера разговора — `session-guard.sh` отказывает с кодом 3 и ничего не меняет:
+```bash
+AGENT="${IWE_AGENT:-claude-code}"
+HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-close.open"
+[ ! -f "$HK_SEM" ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" close --housekeeping day-close --agent "$AGENT" --only-own-harness
+```
+
 ### 11. Верификация (Haiku R23)
 Sub-agent Haiku R23 (context isolation): передать чеклист + черновик итогов + список обновлённых файлов. По ❌ — исправить до показа пользователю.
 

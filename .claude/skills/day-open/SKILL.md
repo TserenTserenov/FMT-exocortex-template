@@ -60,7 +60,7 @@ fi
 <!-- Детали (адресное чтение, fallback): day-open-details.md § Шаг 1 -->
 
 ### 1b. GitHub Issues
-`day-open-scaffold.sh` (`render_repo_issues`) делает свип. Critical FMT issues: `bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram`.
+`day-open-scaffold.sh` (`render_repo_issues`) делает свип. Скрипт печатает в stdout весь скелет DayPlan, не только задачи: запускать его в шаге 7a с перенаправлением в файл плана, а не отдельно ради свипа (issue #1488). Critical FMT issues: `bash $IWE_SCRIPTS/fmt-critical-alert.sh --no-telegram`.
 <!-- Детали (фильтры, кэш): day-open-details.md § Шаг 1b -->
 
 ### 1c. Inbox Triage
@@ -119,12 +119,34 @@ fi
 > `false` выбрать только ветки `multiplier:off`: не выводить физическое время,
 > WakaTime, плановый/фактический мультипликатор и соответствующую подсекцию Week Close.
 
-**7a.** DayPlan: `<governance-repo>/current/DayPlan YYYY-MM-DD.md` по шаблону из `templates.md`. Предыдущий → `archive/day-plans/`.
+**7a.** DayPlan: `<governance-repo>/current/DayPlan YYYY-MM-DD.md`. Основа файла — скелет генератора (issue #1488). Скрипт только печатает скелет в stdout и сам файл не создаёт, сохраняет вызывающий. Уже существующий план дня (повторное открытие) не перезаписывается — дописывать в него; сбой генератора или пустой вывод останавливают шаг:
+```bash
+DAYPLAN="<governance-repo>/current/DayPlan YYYY-MM-DD.md"
+if [ -e "$DAYPLAN" ]; then
+  echo "DayPlan уже есть, не перезаписываю: $DAYPLAN" >&2
+else
+  PLAN_TMP=$(mktemp)
+  if bash "$IWE_SCRIPTS/day-open-scaffold.sh" YYYY-MM-DD > "$PLAN_TMP" && test -s "$PLAN_TMP"; then
+    mv "$PLAN_TMP" "$DAYPLAN"
+  else
+    rm -f "$PLAN_TMP"
+    echo "DayPlan не записан: шаг 7a не выполнен" >&2
+    false
+  fi
+fi
+```
+Строки, которые напечатал генератор (статусы платформы, задачи, Scout), не переписывать своими словами. По `templates.md` дописываются только содержательные разделы: план дня, разбор заметок, «Требует внимания». Если наборы секций скелета и `templates.md` расходятся, основой остаётся скелет. Предыдущий DayPlan → `archive/day-plans/`.
 **7a2.** Session Log: `<governance-repo>/sessions/YYYY-MM-DD.md`. Если существует — не перезаписывать.
 <!-- Шаблон Session Log: day-open-details.md § Шаг 7a2 -->
 **7b.** `bash .claude/scripts/load-extensions.sh day-open checks` → Exit 0: выполнить верификацию. БЛОКИРУЮЩЕЕ: commit запрещён до прохождения всех checks.
 **7c.** `git commit` + `git push`.
 **7d.** Compact dashboard → вывести в VS Code по шаблону «Шаблон compact dashboard» из `templates.md`.
+**7e.** Снять служебную отметку шага 0а (issue #1506): без этого она остаётся в `.iwe-runtime/sessions/` до следующего дня, и каждое `session-guard.sh open` предупреждает о сессии без прав на коммит. Закрывается только отметка `day-open`, записанная этим же разговором (строка `harness_session_id` совпадает; `--only-own-harness` сверяет её внутри `session-guard.sh` под блокировкой, код 3 — отметка не наша): если шаг 0а не открыл свою отметку, потому что её уже держала параллельная сессия того же агента, чужая отметка не трогается. Нет отметки — команда ничего не делает; отметка чужая или нет номера разговора — `session-guard.sh` отказывает с кодом 3 и ничего не меняет:
+```bash
+AGENT="${IWE_AGENT:-claude-code}"
+HK_SEM="${IWE_ROOT:-$HOME/IWE}/.iwe-runtime/sessions/${AGENT}-housekeeping-day-open.open"
+[ ! -f "$HK_SEM" ] || bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/session-guard.sh" close --housekeeping day-open --agent "$AGENT" --only-own-harness
+```
 
 <!-- USER-SPACE -->
 <!-- /USER-SPACE -->

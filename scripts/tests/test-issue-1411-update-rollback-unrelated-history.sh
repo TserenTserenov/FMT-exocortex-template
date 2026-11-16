@@ -118,7 +118,7 @@ rc=$(rollback_rc "$SHALLOW" "$TEMPLATE_RELEASE" 0.41.10)
 [ "$rc" = "2" ] && ok "shallow clone, installed older -> cannot determine (2)" \
   || fail "shallow clone: expected 2, got $rc"
 
-echo "== shared history (ancestry decides, versions ignored) =="
+echo "== shared history (a newer installed manifest is a rollback; otherwise ancestry decides) =="
 SHARED_SRC="$TMP/shared-src"
 new_repo "$SHARED_SRC"
 commit_file "$SHARED_SRC" f "v1" "release"
@@ -139,11 +139,19 @@ commit_file "$SHARED_SRC" f "v3" "next release"
 NEXT_RELEASE=$(git -C "$SHARED_SRC" rev-parse HEAD)
 git -C "$SHARED_SRC" push -q "$TMP/shared-origin.git" HEAD:refs/heads/next 2>/dev/null \
   || git -C "$TMP/shared-origin.git" fetch -q "$SHARED_SRC" "HEAD:refs/heads/next"
-# A version saying "newer" must not override ancestry that proves a normal update.
+# An older (or equal) installed version leaves the decision to ancestry: release ahead -> update.
+set_manifest "$BEHIND" 0.0.1
+rc=$(rollback_rc "$BEHIND" "$NEXT_RELEASE" 0.1.0)
+[ "$rc" = "1" ] && ok "release fetched from origin and ahead, installed older -> no rollback (1)" \
+  || fail "shared, release ahead: expected 1, got $rc"
+# WP-529 Ф261 (finding 3): update.sh never moves HEAD of the template folder, so the manifest of
+# the installed files is the only honest "what is installed" signal. A newer installed manifest
+# is a rollback even when ancestry says the release is ahead of the folder's HEAD (#963 used to
+# let ancestry win here; that is how a 0.42 install was rewritten to 0.41.11 without ROLLBACK).
 set_manifest "$BEHIND" 9.9.9
 rc=$(rollback_rc "$BEHIND" "$NEXT_RELEASE" 0.1.0)
-[ "$rc" = "1" ] && ok "release fetched from origin and ahead -> no rollback (1) despite newer version" \
-  || fail "shared, release ahead: expected 1, got $rc"
+[ "$rc" = "0" ] && ok "release ahead of HEAD but installed manifest newer -> rollback (0)" \
+  || fail "shared, release ahead, installed newer: expected 0, got $rc"
 
 echo
 if [ "$FAILS" -eq 0 ]; then

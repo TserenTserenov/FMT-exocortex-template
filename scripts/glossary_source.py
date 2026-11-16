@@ -31,11 +31,19 @@ class GlossaryError(Exception):
     """The glossary inputs contradict each other; the pipeline must stop."""
 
 
+# Where a term's English name comes from. Only GRAPH names are approved; a LOCAL
+# name is a candidate awaiting approval and must be reported whenever it is used
+# (WP-620 Ф4: an unapproved name never appears silently).
+SOURCE_GRAPH = "graph"
+SOURCE_LOCAL = "local"
+
+
 @dataclass(frozen=True)
 class Term:
     term_ru: str
     term_en: str
     tier: int
+    source: str = SOURCE_GRAPH
 
 
 @dataclass
@@ -45,6 +53,10 @@ class Glossary:
 
     def as_mapping(self) -> dict[str, str]:
         return {t.term_ru: t.term_en for t in self.terms}
+
+    def unapproved_mapping(self) -> dict[str, str]:
+        """Local-glossary candidates (not approved in the graph): RU → EN."""
+        return {t.term_ru: t.term_en for t in self.terms if t.source == SOURCE_LOCAL}
 
 
 def _key(term_ru: str) -> str:
@@ -111,7 +123,7 @@ def _local_terms(rows: list[dict[str, str]]) -> dict[str, Term]:
         tier = int(tier_raw) if tier_raw.isdigit() else LOCAL_DEFAULT_TIER
         if _key(ru) in terms:
             raise GlossaryError(f"local glossary lists «{ru}» twice")
-        terms[_key(ru)] = Term(ru, en, tier)
+        terms[_key(ru)] = Term(ru, en, tier, SOURCE_LOCAL)
     return terms
 
 

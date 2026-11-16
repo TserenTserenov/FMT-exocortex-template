@@ -107,7 +107,10 @@ defer_until: "после WP-245 Ф22"     # ОБЯЗАТЕЛЬНО — дата 
 
 ```bash
 GOV_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
-bash "$GOV_DIR/scripts/ke-queue-stats.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --list
+# ke-*.sh ship in the template's scripts/, not in <governance>/scripts/ (issue #1513).
+# IWE_TEMPLATE (not the installer-local IWE_TEMPLATE_PATH) is what .iwe-paths exports.
+KE_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}"
+bash "$KE_SCRIPTS/ke-queue-stats.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --list
 ```
 
 Если `$ARGUMENTS` задан путь — работать только с ним.
@@ -176,6 +179,22 @@ ID из отчёта предварительный, резервировани�
 ссылки и связь `candidate_id → target_path`. Коллизия номера сама по себе не
 основание для `reject`. Содержательный дубль проверить по Шагу 4г и решению пилота.
 
+**Ответвление авторского Pack (issue #1514).** Если у Pack пользователя есть remote
+`upstream` (собственная копия авторского Pack), номера двух баз ведутся независимо
+и при слиянии столкнутся. Проверить номер и в авторской ветке:
+
+```bash
+KE_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}"
+"$(bash "$KE_SCRIPTS/lib/find-python3.sh" --stdlib-only)" "$KE_SCRIPTS/pack-duplicate-check.py" --pack "<корень Pack>" --id "<ID>" [--fetch]
+```
+
+`ID_LOCAL` — номер занят в Pack пользователя; `ID_UPSTREAM` — занят в авторской
+ветке (сообщить пилоту о будущей коллизии и выбрать свободный в обеих базах);
+`UPSTREAM no-ref` без `--fetch` — авторской ветки нет локально, повторить один раз
+с `--fetch`; `no-ref` или `fetch-failed` после `--fetch` — сверка не выполнена,
+сказать пилоту и не повторять; `UPSTREAM no-remote` — Pack не ответвление, сверка не нужна. Имя remote, если оно
+другое, — флаг `--remote`.
+
 Перед публикацией, в том числе после переноса коммита, повторить проверку на
 свежей целевой ветке. Новая коллизия требует повторного назначения ID и проверки
 ссылок; чужую карточку не перезаписывать. Критерий приёмки: два параллельных
@@ -235,11 +254,13 @@ ls <target_dir>/ | sort | grep -A5 -B5 "<ID-slug>"
 ```
 Для каждого соседнего файла: прочитать `summary:` или первые 3 строки тела — проверить на пересечение.
 
-**Шаг 2 — grep ключевых существительных**. Взять 2-3 ключевых существительных из имени кандидата. Искать в целевом Pack-репо:
+**Шаг 2 — поиск ключевых существительных по файлам Pack пользователя**. Взять 2-3 ключевых существительных из имени кандидата. Искать в файлах целевого Pack, не в индексе платформы (issue #1514: индекс платформы может не видеть Pack пользователя):
 ```bash
-grep -ri "<ключевое_слово>" ${IWE_WORKSPACE:-$HOME/IWE}/<PACK-repo>/pack/ --include="*.md" -l | head -10
+KE_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}"
+"$(bash "$KE_SCRIPTS/lib/find-python3.sh" --stdlib-only)" "$KE_SCRIPTS/pack-duplicate-check.py" --pack "${IWE_WORKSPACE:-$HOME/IWE}/<PACK-repo>" \
+  --id "<ID>" "<ключевое_слово_1>" "<ключевое_слово_2>"
 ```
-Если найдено совпадение: прочитать файл. Проверить:
+Строки `KEYWORD_MATCH <n> <файл>` — файлы с n совпавшими словами, лучшие первыми. Совпадение номера (`ID_LOCAL`) — не дубль, пока содержание не сверено. Если найдено совпадение: прочитать файл. Проверить:
 - **Перекрытие**: кандидат описывает то же самое другими словами → reject (дубликат), паттерн для R2.
 - **Противоречие**: кандидат утверждает обратное существующему → выяснить, какой новее/точнее; если новый кандидат вытесняет старый — accept + пометить в отчёте `supersedes: <ID>`.
 - **Уточнение**: кандидат добавляет деталь без конфликта → accept, добавить `see_also: [<ID>]` в frontmatter.
@@ -266,6 +287,11 @@ knowledge_search(query=<первые 400 символов текста канд�
 
 Отфильтровать из результатов: только сущности с ID типа `DP.*` или `PD.*` (game концепты, не гайды).
 Взять top-3 с наибольшей близостью.
+
+**Чью базу видит поиск (issue #1514).** `knowledge_search` ищет по базе, которую индексирует платформа. Для Pack, который пользователь ведёт как свою копию авторского, это обычно авторская база: ссылка `github_url` в выдаче ведёт не в хранилище пользователя. Тогда:
+- пустая выдача не значит «дублей нет» — основой остаётся проверка по файлам из Шага 4г;
+- совпавший номер с другим содержанием — коллизия номеров (Шаг 4б), не дубль;
+- в отчёте пометить `semantic_gate: skipped (индекс ≠ Pack пользователя)`, если ни одна находка не ведёт в хранилище пользователя и его источник не подключён к личному поиску (`personal_list_sources` пуст).
 
 **Шаг 2 — inline LLM-оценка** каждой пары (кандидат × сосед):
 
@@ -429,8 +455,11 @@ SHA, а не SHA до переноса коммита, и `blob` из `git rev-p
 Статус и служебную проекцию меняет только реконсилер, адресно по выбранному отчёту:
 
 ```bash
-bash "$GOV_DIR/scripts/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md" --dry-run
-bash "$GOV_DIR/scripts/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md"
+# Each step runs as a separate shell call: resolve both paths again (issue #1513).
+GOV_DIR="${IWE_WORKSPACE:-$HOME/IWE}/${IWE_GOVERNANCE_REPO:-DS-strategy}"
+KE_SCRIPTS="${IWE_SCRIPTS:-${IWE_TEMPLATE:-${IWE_ROOT:-$HOME/IWE}/FMT-exocortex-template}/scripts}"
+bash "$KE_SCRIPTS/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md" --dry-run
+bash "$KE_SCRIPTS/ke-report-reconcile.sh" --reports-dir "$GOV_DIR/inbox/extraction-reports" --report "<имя отчёта>.md"
 ```
 
 `--report` можно повторить. Запись всей очереди требует отдельного явного `--all`;
