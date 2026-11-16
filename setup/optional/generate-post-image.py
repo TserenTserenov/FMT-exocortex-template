@@ -50,7 +50,7 @@ log = logging.getLogger("image-gen")
 _WORKSPACE = Path(__file__).resolve().parent.parent.parent  # setup/optional/ → workspace root
 SECRETS_PATH = _WORKSPACE / ".secrets" / "openai-api-key"
 API_URL = "https://api.openai.com/v1/images/generations"
-MODEL = "gpt-image-1.5"
+MODEL = "gpt-image-2.6-sunburst"
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)", re.DOTALL)
 
 

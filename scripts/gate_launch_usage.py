@@ -110,6 +110,18 @@ class LaunchUsage:
                 ).startswith("error")
         elif kind == "assistant":
             self._observe_assistant(event)
+        elif kind == "final" and self.provider == "dsh":
+            # WP-53: `dsh headless --json` reports the answer in the `final`
+            # event, not in Claude's `result` shape. A non-completed reason
+            # marks the run failed, so a partial answer is never accepted.
+            text = event.get("text")
+            self.result = text if isinstance(text, str) else None
+            reason = event.get("reason")
+            if isinstance(reason, dict) and reason.get("kind") not in (
+                None,
+                "completed",
+            ):
+                self.result_error = True
         elif kind == "stream_event":
             # Partial deltas are not complete per-call usage observations.
             self.issues.add("partial_usage")
@@ -226,7 +238,7 @@ class PipeCapture:
                 # Error output remains bounded and is returned only to the caller.
                 self.errors.extend(chunk)
                 del self.errors[:-MAX_TEXT_BYTES]
-            elif self.usage.provider == "claude":
+            elif self.usage.provider in ("claude", "dsh"):
                 self._consume_json(chunk)
             else:
                 remaining = MAX_TEXT_BYTES - len(self.text)
@@ -262,7 +274,7 @@ class PipeCapture:
     def output(self) -> tuple[str, str]:
         text = (
             self.usage.result
-            if self.usage.provider == "claude"
+            if self.usage.provider in ("claude", "dsh")
             else self.text.decode("utf-8", "replace")
         )
         return text or "", self.errors.decode("utf-8", "replace")
