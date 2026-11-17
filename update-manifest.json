@@ -165,7 +165,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "9a530629cab56bc88c8f40b537d4676cdfbfe230eb63a41eedb60d3255b0a3ac"
+      "sha256": "89d4a2ab9eaa3ffaf9ebd45f3d597cef5c4305aac8debe8bb8f352469249aa3e"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "80fe66b66cde037b4b2066b81a8735dee3542453ded4603d716d6eca26e0bb60"
+      "sha256": "ca9bc49d9f8a6fc1130f4983d69a12cac08b279a9088a0b1480b6ab6c3199a20"
     },
     {
       "path": "CLAUDE.md",
