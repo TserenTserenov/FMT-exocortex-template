@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "version": "0.41.11",
+  "version": "0.42.0",
   "description": "Manifest of files in the standalone English IWE distribution. Used by update.sh.",
   "files": [
     {
@@ -797,7 +797,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "dcce70d76bd6755c9977d6724f5fe62ca4612361815ff8b9bd81c04c4286bc95"
+      "sha256": "9216f8ccb916cdddecde3fcf58677fd6d0b7c8a2ebaa70b5e4b6225674cda86d"
     },
     {
       "path": "CITATION.cff",
@@ -829,7 +829,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "0a1454f573fb8fda8fc661e2251bc8a1d1ae47202ce60cd7470142927eb68e67"
+      "sha256": "3fd68707d02f90b4ee7a0d88a08bf40496b6e4f1e5d8bb59f9c6eb986f3eb839"
     },
     {
       "path": "REPO-TYPE.md",
@@ -877,7 +877,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "9240050425e119d7354f2e88a465212e58d6d6f3fca4075778b20bdda207f852"
+      "sha256": "e19a613a4ba53a09e3ca219fa7cf149976fb131f19bf3158bc3d91ff1219f6c2"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -893,7 +893,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "dfd3e894c3cc3373e1511eee4e9023875642d55f5407e7840ef4b8819737db7a"
+      "sha256": "c3e592f80ab6b123fd1f3ee1f49c7bbf9f1f095427f5048206d94b52a49fdcfe"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -913,7 +913,7 @@
     },
     {
       "path": "docs/RELEASE-PROCESS.md",
-      "sha256": "e5b98241757db5796c11d72d0f90cc06daeea9bd93830ba5e9dd61698641f770"
+      "sha256": "6174c7c5a7c111e13af6569e77fd0df929550cde3c9a818a08fcf1009c91cf8d"
     },
     {
       "path": "docs/RESIDENCY-GATE-USAGE.md",
@@ -1037,11 +1037,15 @@
     },
     {
       "path": "docs/principles-vs-skills.md",
-      "sha256": "9caafb58174123a729e932df707781eed55143690a02f3101767f78c96e051ea"
+      "sha256": "2761f187e6e08580b2827fb99d24149e34da3ebeab41cb1fb5157d799350e4b3"
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "aa11cf3acf836347d67723e7777988ca0d7b8d13947bf2df5c2c87ea3ad0e2ff"
+      "sha256": "9178e043497669fa9bec8272c2a5d14ce2820ee12e32f92c91ff109e790ddcb4"
+    },
+    {
+      "path": "docs/releases/0.42/README.md",
+      "sha256": "97bda860cde16098c13f69ce92695922cd1914732dffa241f8682588d6ab2d78"
     },
     {
       "path": "docs/response-clarity-catalog.md",
