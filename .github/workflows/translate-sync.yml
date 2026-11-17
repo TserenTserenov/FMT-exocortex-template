@@ -397,7 +397,13 @@ jobs:
           # translator has just created (not yet `git add`-ed) slipped through
           # this gate, was committed by `git add -A` below, and only the publish
           # gate caught it (found 2026-10-27, run of 26.10 16:08).
-          if git -C ../en-draft grep --untracked -nP '[А-Яа-яЁё]' -- .; then
+          # .translation-state.yaml is excluded: it is pipeline state, never
+          # published (publish-to-iwesys untracks it, the manifest step skips
+          # it), and since WP-620 F4 (10.11) it carries the Russian source of
+          # each unapproved term (term_ru) on purpose. Without the exclusion
+          # every run failed here and iwesys/IWE stopped updating at 0.41
+          # (found 2026-11-17, WP-529 F274).
+          if git -C ../en-draft grep --untracked -nP '[А-Яа-яЁё]' -- . ':!.translation-state.yaml'; then
             echo '::error::Cyrillic remains in en-draft; fix the translation before staging it.'
             exit 1
           fi

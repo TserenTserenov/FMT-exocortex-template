@@ -165,7 +165,7 @@
     },
     {
       "path": ".claude/hooks/secret-bypass-analyzer.py",
-      "sha256": "9a530629cab56bc88c8f40b537d4676cdfbfe230eb63a41eedb60d3255b0a3ac"
+      "sha256": "89d4a2ab9eaa3ffaf9ebd45f3d597cef5c4305aac8debe8bb8f352469249aa3e"
     },
     {
       "path": ".claude/hooks/secret-bypass-lib.sh",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "466a83c249c1bb324d2d7f45088108919e8b76326b6932745ef7569062bccdb5"
+      "sha256": "2c333f144936c8c6a76622e7c3014e6f984490fc3f055bca37591d1c2e3ec689"
     },
     {
       "path": "CLAUDE.md",
@@ -1153,7 +1153,7 @@
     },
     {
       "path": "docs/release-audit-log.md",
-      "sha256": "f7af94f354cae5edd59a32d2b2eb1f4ebaa3191fdc5f30ad6fa8f667c5494c01"
+      "sha256": "1c0fd4fcffcbdda0e206dd8e69de578fe7fcccb9d9fdf6e0b1d2daccbb5ef8c4"
     },
     {
       "path": "docs/releases/0.42/README.md",

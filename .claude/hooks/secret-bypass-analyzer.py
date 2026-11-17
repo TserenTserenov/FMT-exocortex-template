@@ -1869,7 +1869,7 @@ def self_test():
         "yookassa-dense": "test_" + "9" * 32,
         # issue #1411: a base64url-shaped key (mixed case, no word
         # structure) and a lowercase blob too few segments to be words.
-        "yookassa-mixed-case-key": "test_Fh8hUAVVBGUGbjmlzba6TB0iyUbos_lueTHE-axOwM0",
+        "yookassa-mixed-case-key": "test_Fh8hUAVVBGUGbjmlzba6TB0iyUbos_lueTHE-axOwM0",  # gitleaks:allow (fake fixture, issue #1411)
         "yookassa-lowercase-two-segment-blob": "test_q8w2e7r1t6y3u9i4o0p5a2s8d7f1g6h3_j9k4l0",
         "yookassa-uppercase-segment": "test_issue_1411_foo_bar_bazQuxQuuxCorgeGrault",
         # issue #1220 follow-up (cold-review subagent, 2026-10-13): the new

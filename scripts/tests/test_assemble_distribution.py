@@ -65,6 +65,19 @@ def test_missing_translation_and_cyrillic_are_reported(tmp_path):
     assert report["cyrillic"] == ["scripts/a.sh"]
 
 
+def test_pipeline_state_with_russian_terms_is_not_reported(tmp_path):
+    russian = "term_ru: Протокол\n"
+    src = make_source(tmp_path / "src", {"scripts/a.sh": russian}, ["scripts/a.sh"])
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / ".translation-state.yaml").write_text(russian, encoding="utf-8")
+
+    report = ad.assemble(src, out)
+
+    assert (out / ".translation-state.yaml").is_file()
+    assert report["cyrillic"] == ["scripts/a.sh"]
+
+
 def test_check_mode_writes_nothing(tmp_path):
     src = make_source(tmp_path / "src", {"scripts/a.sh": "x"}, ["scripts/a.sh"])
     out = tmp_path / "out"
