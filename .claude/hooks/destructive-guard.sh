@@ -1319,8 +1319,8 @@ fi
 # rg reads extra options, --pre among them, from the file named by RIPGREP_CONFIG_PATH; with rg
 # pre-approved that is `rg --pre` without the word on the command line. A shell redirection or
 # tee onto a protective file (.claude/hooks, .claude/bin, settings*.json) zeroes a check the way
-# the writes above did, after any pre-approved reader (`find … > .claude/hooks/x.sh`). Both are
-# literal-text checks: a path held in a variable is not seen (docs/DESTRUCTIVE-GUARD.md).
+# the writes above did, after any pre-approved reader (`find … > .claude/hooks/x.sh`); the
+# redirection check is REDIRECT_PL below (docs/DESTRUCTIVE-GUARD.md).
 if matches "$CMD_EXEC" -E 'RIPGREP_CONFIG_PATH'; then
   block "RIPGREP_CONFIG_PATH запрещён — файл настроек rg может включить --pre, который запускает программу на каждом найденном файле. Ищи обычным rg с ключами в самой команде. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
@@ -1335,129 +1335,633 @@ if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:sp
      | grep -vqE '^(/dev/null$|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR|\$\{TMPDIR)'; then
   block "обнуление файла читающей командой (cat /dev/null > файл, head -c0 … > файл) запрещено — так без запроса стирают планы и настройки. Пустой файл во временной папке создавать можно; удалять содержимое рабочих файлов — правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
-# Write targets of the call, one per line: "<command>\t<kind>\t<target>\t<input>". <command> is
-# the word the segment runs (basename; "git <subcommand>" for git), <kind> is T (truncating
-# redirection: >, >|, N>, &>, >&file), A (append: >>, &>>) or E (a file argument of tee); <input>
-# is H when the segment reads a here-doc or here-string (<<, <<-, <<<), else "-". Quotes are
-# removed from the target, variables are left as written. `bash|sh|zsh -c '…'` is read recursively.
-# Only redirections that write are reported: input (<, <<, <<<), descriptor copies (2>&1, >&-)
-# are not.
-WRITE_TARGETS_PL='
+# Writes into files by redirection or tee (WP-529 Ф275; issues #1567, #1568 and the review of #1576).
+# Every check of this kind used to look at the call through a home-made scanner or a regex over
+# the raw text, and each one was fooled differently: an apostrophe in a `#` comment or a quote
+# nested in `$(…)` desynchronised it and hid the next command, `(grep …) > f`, `{ …; } > f`,
+# `! grep`, `time/env/command grep`, `noglob/exec tee` and `>!` were not seen as the reader they
+# are, quoted prose in a PR body (`--body "… > .claude/hooks/x"`) was taken for a redirection.
+# REDIRECT_PL reads the call the way the shell does (quotes, $'…', comments, $(…)/`…` with their
+# own quoting, ${…}, $((…)), [[ … ]], here-doc bodies, subshells, groups, if/for/while/case) and
+# decides per write:
+#   * BLOCK — the target names .claude/hooks, .claude/bin or settings*.json in any spelling (`//`,
+#     `./`, `..`, globs, POSIX classes, comma braces, any letter case), or the target cannot be
+#     resolved from the text (a variable, `$(…)`, a brace range, extglob, zsh alternation) and
+#     mentions claude or hook. Literal assignments in the same call are substituted first
+#     (`D=.claude; … > $D/hooks/x`).
+#   * ASK — a truncating write (`>`, `>|`, `>!`, `N>`, `&>`) after a reader that settings.json
+#     pre-approves (ls, cat, head, tail, wc, grep, rg, find, diff, git status/log/diff/show/
+#     branch/remote), also inside a subshell, group or compound command, after a bare redirection
+#     with no command, or after a command whose name is an expansion — into anything that is not a
+#     temporary directory, /dev/null or a fresh mktemp file. An empty output of such a reader
+#     erases the file. Exempt only: `cat`/`tee` without file operands whose stdin is a here-doc or
+#     here-string with a non-empty body — their output is the text given in the call. Any
+#     command writing to a target known only at run time, outside temporary directories, asks too.
+#   * UNCERTAIN — the text cannot be read with confidence (unterminated quote, $(…) or here-doc, a
+#     stray closing word, a target or command known only at run time): any `>` in the call asks;
+#     a call with `>` or tee that mentions claude or hook anywhere blocks.
+# Keep the reader list in step with the Bash(...) allow rules of .claude/settings.json.
+REDIRECT_PL='
   use strict; use warnings;
-  my %wrapper = map { $_ => 1 } qw(env nice nohup command sudo stdbuf time timeout xargs);
+  # A shell lexer for redirection targets (WP-529 Ф275). It reads the call the way bash/zsh do:
+  # quotes (dollar-quote decoded), comments, $(…) and `…` with their own quoting, ${…}, $((…)), [[ … ]],
+  # here-doc bodies, subshells, brace groups, if/for/while/until/case. Output, one per line:
+  #   BLOCK <target>  a write into .claude/hooks, .claude/bin or settings*.json, or an
+  #                   unresolvable target that mentions claude/hook;
+  #   ASK <target>    a truncating write after a pre-approved reader into a working file;
+  #   UNCERTAIN       the text could not be read with confidence (unterminated quote, $( or
+  #                   here-doc, a stray closing word): the caller fails closed.
+  our ($S, $N, $p) = (q{}, 0, 0);
+  our $depth = 0;
+  our (@pending, @name_stack);
+  our $prev_heredocs = [];
+  our $prev_cmd;
+  my $uncertain = 0;
+  my (@writes, %assign, %assign_raw);
+  my %wrapper = map { $_ => 1 } qw(env nice nohup command builtin exec noglob nocorrect sudo doas stdbuf time timeout xargs ionice setsid flock watch -);
+  # Options that take a value, per wrapper (env -i and command -p take none).
+  my %wrapper_arg = (
+    env => qr/^(?:-u|-C|-S|--unset|--chdir|--split-string)$/,
+    sudo => qr/^(?:-u|-g|-h|-p|-C|-r|-t|-U|-D|--user|--group|--host|--prompt|--close-from|--role|--type|--chdir)$/,
+    doas => qr/^(?:-u|-C)$/,
+    timeout => qr/^(?:-s|-k|--signal|--kill-after)$/,
+    nice => qr/^(?:-n|--adjustment)$/,
+    ionice => qr/^(?:-c|-n|-p|-P|-u)$/,
+    stdbuf => qr/^(?:-i|-o|-e|--input|--output|--error)$/,
+    xargs => qr/^(?:-n|-P|-I|-L|-s|-E|-d|-a|--max-args|--max-procs|--max-chars|--delimiter|--arg-file)$/,
+    flock => qr/^(?:-w|-E|--timeout|--conflict-exit-code)$/,
+    watch => qr/^(?:-n|-d|--interval|--differences)$/,
+  );
+  our (@cd_args, $cd_dynamic);
   my %shell = map { $_ => 1 } qw(bash sh zsh dash ksh);
-  sub base { my $w = shift; $w =~ s{.*/}{}; return $w; }
-  sub scan {
-    my ($s, $depth) = @_;
-    return if $depth > 3;
-    my @segments; my @words; my @redirs; my $word; my $in_word = 0;
-    my $flush_word = sub { if ($in_word) { push @words, $word; $word = q{}; $in_word = 0; } };
-    my $here = 0;  # the segment reads a here-doc or here-string: its input is given in the text
-    my $flush_seg = sub { $flush_word->(); push @segments, [ [@words], [@redirs], $here ]; @words = (); @redirs = (); $here = 0; };
-    my $pending;   # kind of a redirection whose target is the next word
-    my $skip_next; # an input redirection: its next word is data, not a target
-    my $i = 0; my $n = length $s;
-    # Anchored \G matches at $i: copying the rest of the text at every step made this quadratic.
-    # Returns the capture groups (captures do not outlive the sub) or nothing.
-    my $at = sub { my $re = shift; pos($s) = $i; return unless $s =~ /\G$re/gc; return [ $1, $2 ]; };
-    while ($i < $n) {
-      my $c = substr($s, $i, 1);
-      if (!$in_word) {
-        if ($c =~ /[ \t]/) { $i++; next; }
-        if (my $m = $at->(qr/(\d*|&)(>>|>\||>&|>)/)) {
-          my $op = $m->[1];
-          $i = pos($s);
-          if ($op eq ">&") {
-            # >&2, 1>&2, >&- copy a descriptor; >&file (no fd) writes the file like &>.
-            if ($at->(qr/\s*(?:\d+|-)(?![^\s;&|()<>])/)) { $skip_next = 1; next; }
-            $pending = "T"; next;
-          }
-          $pending = $op eq ">>" ? "A" : "T";
-          next;
-        }
-        if (my $m = $at->(qr/\d*(<<<|<<-?|<>|<&|<)/)) {
-          $i = pos($s);
-          $here = 1 if $m->[0] =~ /^<</;
-          if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
-          $skip_next = 1; next;
-        }
-        if ($at->(qr/&&|\|\||;;|[;&|()\n`]|\$\(/)) { $flush_seg->(); $i = pos($s); next; }
-      }
-      # Inside or at the start of a word.
-      if ($in_word && ($c =~ /[ \t\n;&|()<>`]/)) {
-        my $w = $word; $word = q{}; $in_word = 0;
-        if ($skip_next) { $skip_next = 0; }
-        elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; }
-        else { push @words, $w; }
-        next;
-      }
-      $in_word = 1;
-      if ($c eq "\x27") {
-        my $j = index($s, "\x27", $i + 1); $j = $n if $j < 0;
-        $word .= substr($s, $i + 1, $j - $i - 1); $i = $j + 1; next;
-      }
-      if ($c eq q{"}) {
-        my $j = $i + 1;
-        while ($j < $n && substr($s, $j, 1) ne q{"}) {
-          if (substr($s, $j, 1) eq "\\" && $j + 1 < $n) { $word .= substr($s, $j + 1, 1); $j += 2; next; }
-          $word .= substr($s, $j, 1); $j++;
-        }
-        $i = $j + 1; next;
-      }
-      if ($c eq "\\" && $i + 1 < $n) { $word .= substr($s, $i + 1, 1); $i += 2; next; }
-      if ($c eq q{$} && substr($s, $i + 1, 1) eq "(") {
-        # $( inside a word starts a nested command: end the word here.
-        my $w = $word; $word = q{}; $in_word = 0;
-        if ($w ne q{}) {
-          if ($skip_next) { $skip_next = 0; } elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; } else { push @words, $w; }
-        }
-        $flush_seg->(); $i += 2; next;
-      }
-      $word .= $c; $i++;
-    }
-    if ($in_word) {
-      if ($skip_next) { } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
-      $in_word = 0; $word = q{};
-    }
-    $flush_seg->();
-    for my $seg (@segments) {
-      my ($w, $r, $seg_here) = @$seg;
-      my @w = @$w;
-      shift @w while @w && $w[0] =~ /^[A-Za-z_][A-Za-z0-9_]*=/;
-      my $cmd = @w ? base($w[0]) : q{};
-      if ($cmd eq "git") {
-        my $k = 1;
-        while ($k < @w && $w[$k] =~ /^-/) { $k += ($w[$k] =~ /^-[Cc]$/) ? 2 : 1; }
-        $cmd = "git " . ($w[$k] // q{});
-      }
-      my $input = $seg_here ? "H" : "-";
-      print "$cmd\t$_->[0]\t$_->[1]\t$input\n" for @$r;
-      # tee after wrappers (env, nice, sudo …): its file arguments are written.
-      my $k = 0;
-      while ($k < @w && ($wrapper{base($w[$k])} || $w[$k] =~ /^-/ || $w[$k] =~ /^[A-Za-z_][A-Za-z0-9_]*=/ || $w[$k] =~ /^\d+[smhd]?$/)) { $k++; }
-      if ($k < @w && base($w[$k]) eq "tee") {
-        print "tee\tE\t$_\n" for grep { !/^-/ } @w[$k + 1 .. $#w];
-      }
-      if ($k < @w && $shell{base($w[$k])}) {
-        for my $a ($k + 1 .. $#w - 1) {
-          if ($w[$a] =~ /^-[a-z]*c[a-z]*$/) { scan($w[$a + 1], $depth + 1); last; }
-        }
-      }
+  my %skip_kw = map { $_ => 1 } qw(then else elif do !);
+  my %declare = map { $_ => 1 } qw(export local declare readonly typeset);
+  my %reader = map { $_ => 1 } qw(ls cat head tail wc grep egrep fgrep rg find diff),
+    map { "git $_" } qw(status log diff show branch remote);
+
+  sub ch { return $p < $N ? substr($S, $p, 1) : q{}; }
+  sub at { my $re = shift; pos($S) = $p; return $S =~ /\G$re/gc ? [ $1, $2, pos($S) ] : undef; }
+  sub skip_blanks {
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      if ($c eq q{ } || $c eq "\t") { $p++; }
+      elsif ($c eq "\\" && substr($S, $p + 1, 1) eq "\n") { $p += 2; }
+      else { last; }
     }
   }
-  my $text = do { local $/; <STDIN> };
-  scan($text, 0);
-'
-WRITE_TARGETS=$(printf '%s' "$CMD_EXEC" | perl -e "$WRITE_TARGETS_PL") || fail_check "perl, разбор целей записи"
+  sub peek_bareword {
+    my $m = at(qr/([^\s;&|()<>\x27"`\\\$]+)(?=[\s;&|()<>]|\z)/);
+    return $m ? $m->[0] : undef;
+  }
+  sub base {
+    my $w = lc shift;
+    $w =~ s{^.*/}{};
+    $w =~ s/\.exe$//;
+    return $w;
+  }
 
-# Protective files (.claude/hooks, .claude/bin, settings*.json) by any spelling of their path
-# (issue #1567, F1 of the v0.42.0 red team): `.claude//hooks/x`, `./.claude/./hooks/x`,
-# `.claude/x/../hooks/x`, `.claude/hook?/x`, `.claude/{hooks,x}/x` named the same file and passed a
-# literal match. The target is normalised before the comparison: braces expanded, empty and `.`
-# components dropped, `..` resolved; then every component is compared as a glob, so a pattern
-# that can name a protective file counts as naming it.
-PROTECTED_TARGET_PL='
-  use strict; use warnings;
+  sub scan_text {
+    my ($text) = @_;
+    if ($depth >= 4) { $uncertain = 1; return; }
+    local ($S, $N, $p) = ($text, length $text, 0);
+    local $depth = $depth + 1;
+    local @pending = ();
+    local @name_stack = ();
+    local $prev_heredocs = [];
+    local $prev_cmd;
+    my $stop = parse_seq({});
+    $uncertain = 1 if defined $stop || @pending;
+  }
+  # Text where only expansions run: an unquoted here-doc body.
+  sub scan_dq_text {
+    my ($text) = @_;
+    if ($depth >= 4) { $uncertain = 1; return; }
+    local ($S, $N, $p) = ($text, length $text, 0);
+    local $depth = $depth + 1;
+    local @pending = ();
+    local @name_stack = ();
+    read_dq(undef);
+  }
+
+  sub read_bodies {
+    while (my $h = shift @pending) {
+      my ($body, $done) = (q{}, 0);
+      while ($p < $N) {
+        my $e = index($S, "\n", $p);
+        my $line = $e < 0 ? substr($S, $p) : substr($S, $p, $e - $p);
+        $p = $e < 0 ? $N : $e + 1;
+        my $probe = $line;
+        $probe =~ s/^\t+// if $h->{strip};
+        if ($probe eq $h->{delim}) { $done = 1; last; }
+        $body .= $line . "\n";
+      }
+      $uncertain = 1 unless $done;
+      $h->{body} = $body;
+      if ($h->{shell}) { scan_text($body); }
+      elsif (!$h->{quoted}) { scan_dq_text($body); }
+    }
+  }
+  sub consume_newline { $p++; read_bodies(); }
+
+  sub skip_arith {
+    # $p at the first "(" of "((": skip to the matching "))".
+    my $level = 0;
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      $p++;
+      if ($c eq "(") { $level++; }
+      elsif ($c eq ")") { $level--; return if $level == 0; }
+    }
+    $uncertain = 1;
+  }
+
+  sub sub_command {
+    # $p just past "$(" or "<(": the nested list runs to its ")".
+    local @name_stack = ();
+    local $prev_heredocs = [];
+    my $stop = parse_seq({ ")" => 1 });
+    $uncertain = 1 unless defined $stop && $stop eq ")";
+  }
+
+  sub skip_param {
+    # $p just past "${".
+    my $level = 1;
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      if ($c eq "\\") { $p += 2; next; }
+      if ($c eq "\x27") { my $e = index($S, "\x27", $p + 1); if ($e < 0) { $uncertain = 1; $p = $N; return; } $p = $e + 1; next; }
+      if ($c eq q{"}) { $p++; read_dq(q{"}); next; }
+      if ($c eq q{$}) { read_dollar(); next; }
+      if ($c eq "`") { read_backtick(); next; }
+      $p++;
+      if ($c eq "{") { $level++; }
+      elsif ($c eq "}") { $level--; return if $level == 0; }
+    }
+    $uncertain = 1;
+  }
+
+  sub read_dollar {
+    # $p at "$". Returns (text, dynamic).
+    my $start = $p;
+    my $d = substr($S, $p + 1, 1);
+    if (substr($S, $p + 1, 2) eq "((") { $p++; skip_arith(); return (substr($S, $start, $p - $start), 1); }
+    if ($d eq "(") { $p += 2; sub_command(); return (substr($S, $start, $p - $start), 1); }
+    if ($d eq "{") { $p += 2; skip_param(); return (substr($S, $start, $p - $start), 1); }
+    if (my $m = at(qr/\$([A-Za-z_][A-Za-z0-9_]*)/)) { $p = $m->[2]; return (q{$} . $m->[0], 1); }
+    if ($d =~ /^[0-9@*#?\$!-]$/) { $p += 2; return (q{$} . $d, 1); }
+    $p++;
+    return (q{$}, 0);
+  }
+
+  sub read_backtick {
+    # $p at "`". The inner text is a command list with one level of backslashes removed.
+    my $j = $p + 1;
+    while ($j < $N) {
+      my $c = substr($S, $j, 1);
+      if ($c eq "\\") { $j += 2; next; }
+      last if $c eq "`";
+      $j++;
+    }
+    if ($j >= $N) { $uncertain = 1; my $raw = substr($S, $p); $p = $N; return $raw; }
+    my $inner = substr($S, $p + 1, $j - $p - 1);
+    my $raw = substr($S, $p, $j - $p + 1);
+    $p = $j + 1;
+    $inner =~ s/\\([\\`\$])/$1/g;
+    scan_text($inner);
+    return $raw;
+  }
+
+  sub read_dq {
+    # $p just past the opening quote; $term is the closing quote, or undef for "to the end".
+    my ($term) = @_;
+    my ($t, $dyn) = (q{}, 0);
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      if (defined $term && $c eq $term) { $p++; return ($t, $dyn); }
+      if ($c eq "\\" && $p + 1 < $N) {
+        my $d = substr($S, $p + 1, 1);
+        if ($d eq "\n") { $p += 2; next; }
+        if ($d =~ /[\$`"\\]/) { $t .= $d; $p += 2; next; }
+        $t .= $c; $p++; next;
+      }
+      if ($c eq q{$}) { my ($x, $dy) = read_dollar(); $t .= $x; $dyn ||= $dy; next; }
+      if ($c eq "`") { $t .= read_backtick(); $dyn = 1; next; }
+      $t .= $c; $p++;
+    }
+    $uncertain = 1 if defined $term;
+    return ($t, $dyn);
+  }
+
+  sub read_ansi {
+    # $p just past the opening quote of a dollar-quote.
+    my $t = q{};
+    my %simple = (a => "\a", b => "\b", e => chr(27), E => chr(27), f => "\f", n => "\n", r => "\r", t => "\t", v => chr(11));
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      if ($c eq "\x27") { $p++; return $t; }
+      if ($c eq "\\" && $p + 1 < $N) {
+        my $tail = substr($S, $p + 1, 12);
+        my $e = substr($tail, 0, 1);
+        if ($tail =~ /^x([0-9A-Fa-f]{1,2})/) { $t .= chr(hex $1); $p += 2 + length $1; }
+        elsif ($tail =~ /^([0-7]{1,3})/) { $t .= chr(oct($1) & 255); $p += 1 + length $1; }
+        elsif ($tail =~ /^u([0-9A-Fa-f]{1,4})/ || $tail =~ /^U([0-9A-Fa-f]{1,8})/) { $t .= chr(hex $1); $p += 2 + length $1; }
+        elsif (exists $simple{$e}) { $t .= $simple{$e}; $p += 2; }
+        elsif ($e eq "c" && $p + 2 < $N) { $t .= chr(ord(substr($S, $p + 2, 1)) & 31); $p += 3; }
+        else { $t .= $e; $p += 2; }
+        next;
+      }
+      $t .= $c; $p++;
+    }
+    $uncertain = 1;
+    return $t;
+  }
+
+  sub read_group_glob {
+    # $p at "(" inside a word: zsh alternation (a|b) or extglob @(…): consumed as a pattern.
+    my $level = 0;
+    my $start = $p;
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      if ($c eq "\\") { $p += 2; next; }
+      $p++;
+      if ($c eq "(") { $level++; }
+      elsif ($c eq ")") { $level--; return substr($S, $start, $p - $start) if $level == 0; }
+      elsif ($c eq "\n") { last; }
+    }
+    $uncertain = 1;
+    return substr($S, $start, $p - $start);
+  }
+
+  sub read_word {
+    my $start = $p;
+    my ($t, $dyn, $quoted) = (q{}, 0, 0);
+    while ($p < $N) {
+      my $c = substr($S, $p, 1);
+      if ($c eq "\\") {
+        if ($p + 1 >= $N) { $p++; last; }
+        my $d = substr($S, $p + 1, 1);
+        $p += 2;
+        next if $d eq "\n";
+        $t .= $d; $quoted = 1; next;
+      }
+      if ($c eq "\x27") {
+        my $e = index($S, "\x27", $p + 1);
+        if ($e < 0) { $uncertain = 1; $t .= substr($S, $p + 1); $p = $N; last; }
+        $t .= substr($S, $p + 1, $e - $p - 1); $p = $e + 1; $quoted = 1; next;
+      }
+      if ($c eq q{"}) { $p++; my ($x, $dy) = read_dq(q{"}); $t .= $x; $dyn ||= $dy; $quoted = 1; next; }
+      if ($c eq q{$}) {
+        my $d = substr($S, $p + 1, 1);
+        if ($d eq "\x27") { $p += 2; $t .= read_ansi(); $quoted = 1; next; }
+        if ($d eq q{"}) { $p++; next; }
+        my ($x, $dy) = read_dollar(); $t .= $x; $dyn ||= $dy; next;
+      }
+      if ($c eq "`") { $t .= read_backtick(); $dyn = 1; next; }
+      last if $c =~ /[\s;&|<>)]/;
+      if ($c eq "(") {
+        last if $p == $start || substr($S, $p + 1, 1) eq ")";
+        $t .= read_group_glob(); $dyn = 1; next;
+      }
+      $t .= $c; $p++;
+    }
+    return { t => $t, dyn => $dyn, quoted => $quoted, raw => substr($S, $start, $p - $start) };
+  }
+
+  sub read_procsubst {
+    # $p at "<(" or ">(".
+    $p += 2;
+    sub_command();
+    return { t => q{}, dyn => 1, quoted => 0, raw => q{}, procsubst => 1 };
+  }
+
+  sub at_word_end { my $c = ch(); return $p >= $N || $c =~ /[;&|\n)]/; }
+
+  sub try_redirect {
+    my ($names, $cmd) = @_;
+    return 0 if substr($S, $p, 2) eq "<(" || substr($S, $p, 2) eq ">(";
+    if (my $m = at(qr/(\d*|&)(>>\||>>!|>>|>\||>!|>&|>)/)) {
+      my ($fdtxt, $op) = ($m->[0], $m->[1]);
+      $p = $m->[2];
+      if ($op eq ">&" && (my $d = at(qr/[ \t]*(?:\d+|-)(?=[\s;&|()<>]|\z)/))) { $p = $d->[2]; return 1; }
+      skip_blanks();
+      if (at_word_end()) { $uncertain = 1; return 1; }
+      return 1 if substr($S, $p, 2) =~ /^[<>]\($/ && read_procsubst();
+      my $w = read_word();
+      my $fd = ($fdtxt eq q{&} || $op eq ">&") ? q{&} : ($fdtxt eq q{} ? 1 : $fdtxt);
+      push @writes, { names => $names, cmd => $cmd, kind => ($op =~ /^>>/ ? "A" : "T"), fd => $fd, w => $w };
+      return 1;
+    }
+    if (my $m = at(qr/(\d*)(<<<|<<-|<<|<>|<&|<)/)) {
+      my ($fd, $op) = ($m->[0] eq q{} ? 0 : $m->[0], $m->[1]);
+      $p = $m->[2];
+      skip_blanks();
+      if (at_word_end()) { $uncertain = 1; return 1; }
+      return 1 if substr($S, $p, 2) =~ /^[<>]\($/ && read_procsubst();
+      my $w = read_word();
+      if ($op eq "<<" || $op eq "<<-") {
+        my $h = { delim => $w->{t}, strip => $op eq "<<-", quoted => ($w->{raw} =~ /[\x27"\\]/ ? 1 : 0), body => undef };
+        push @pending, $h;
+        push @{ $cmd->{inputs} }, { fd => $fd, here => $h } if $cmd;
+        push @{ $cmd->{heredocs} }, $h if $cmd;
+      } elsif ($op eq "<<<") {
+        push @{ $cmd->{inputs} }, { fd => $fd, str => $w } if $cmd;
+      } elsif ($op eq "<>") {
+        # Opened for writing without truncation: `cat F 1<> hook` overwrites the file in place.
+        push @writes, { names => $names, cmd => $cmd, kind => ($fd eq "0" ? "P" : "T"), fd => $fd, w => $w };
+        push @{ $cmd->{inputs} }, { fd => $fd, file => $w } if $cmd;
+      } elsif ($cmd) {
+        push @{ $cmd->{inputs} }, { fd => $fd, file => $w };
+      }
+      return 1;
+    }
+    return 0;
+  }
+
+  sub parse_redirect_tail {
+    my ($names) = @_;
+    while (1) {
+      skip_blanks();
+      last unless $p < $N && try_redirect($names, undef);
+    }
+  }
+
+  sub compound {
+    my ($stops, $end) = @_;
+    push @name_stack, [];
+    my $stop = parse_seq($stops);
+    my $names = pop @name_stack;
+    $uncertain = 1 unless defined $stop && $stop eq $end;
+    parse_redirect_tail($names);
+  }
+
+  sub skip_dbracket {
+    $p += 2;
+    while (1) {
+      skip_blanks();
+      if ($p >= $N) { $uncertain = 1; return; }
+      my $bw = peek_bareword();
+      if (defined $bw && $bw eq "]]") { $p += 2; return; }
+      if (ch() eq "\n") { consume_newline(); next; }
+      if (ch() =~ /[<>()&|;!]/) { $p++; next; }
+      my $s = $p;
+      read_word();
+      $p++ if $p == $s;
+    }
+  }
+
+  sub parse_case {
+    $p += 4;
+    skip_blanks();
+    read_word();
+    while (1) {
+      skip_blanks();
+      if (ch() eq "\n") { consume_newline(); next; }
+      last;
+    }
+    my $bw = peek_bareword();
+    unless (defined $bw && $bw eq "in") { $uncertain = 1; return; }
+    $p += 2;
+    push @name_stack, [];
+    my $closed = 0;
+    ITEM: while (1) {
+      while (1) {
+        skip_blanks();
+        if (ch() eq "\n") { consume_newline(); next; }
+        last;
+      }
+      last if $p >= $N;
+      my $w = peek_bareword();
+      if (defined $w && $w eq "esac") { $p += 4; $closed = 1; last; }
+      $p++ if ch() eq "(";
+      while (1) {
+        skip_blanks();
+        last ITEM if $p >= $N;
+        my $c = ch();
+        if ($c eq ")") { $p++; last; }
+        if ($c eq "|") { $p++; next; }
+        my $s = $p;
+        read_word();
+        if ($p == $s) { $p++; $uncertain = 1; }
+      }
+      my $stop = parse_seq({ ";;" => 1, esac => 1 });
+      last unless defined $stop;
+      if ($stop eq "esac") { $closed = 1; last; }
+    }
+    my $names = pop @name_stack;
+    $uncertain = 1 unless $closed;
+    parse_redirect_tail($names);
+  }
+
+  sub parse_seq {
+    my ($stops) = @_;
+    my $prev_sep = q{};
+    while (1) {
+      skip_blanks();
+      return undef if $p >= $N;
+      my $c = ch();
+      if ($c eq "#") { my $e = index($S, "\n", $p); $p = $e < 0 ? $N : $e; next; }
+      if ($c eq "\n") { consume_newline(); $prev_sep = q{;}; next; }
+      if (my $m = at(qr/(;;&|;;|;&)/)) {
+        $p = $m->[2];
+        return ";;" if $stops->{";;"};
+        $uncertain = 1; next;
+      }
+      if (my $m = at(qr/(&&|\|\||\|&|[;&|])(?!>)/)) { $p = $m->[2]; $prev_sep = $m->[0]; next; }
+      if ($c eq ")") {
+        $p++;
+        return ")" if $stops->{")"};
+        $uncertain = 1; next;
+      }
+      if (substr($S, $p, 2) eq "((") { skip_arith(); parse_redirect_tail([]); $prev_sep = q{}; next; }
+      if ($c eq "(") { $p++; compound({ ")" => 1 }, ")"); $prev_sep = q{}; next; }
+      my $bw = peek_bareword();
+      if (defined $bw) {
+        if ($stops->{$bw}) { $p += length $bw; return $bw; }
+        if ($skip_kw{$bw}) { $p += length $bw; next; }
+        if ($bw eq "{") { $p++; compound({ "}" => 1 }, "}"); $prev_sep = q{}; next; }
+        if ($bw eq "if") { $p += 2; compound({ fi => 1 }, "fi"); $prev_sep = q{}; next; }
+        if ($bw eq "while" || $bw eq "until") { $p += length $bw; compound({ done => 1 }, "done"); $prev_sep = q{}; next; }
+        if ($bw eq "for" || $bw eq "select") {
+          $p += length $bw;
+          skip_blanks();
+          if (substr($S, $p, 2) eq "((") { skip_arith(); }
+          else {
+            my @header;
+            while (1) {
+              skip_blanks();
+              last if $p >= $N || ch() =~ /[;\n&|]/;
+              my $s = $p; push @header, read_word(); $p++ if $p == $s;
+            }
+            # for NAME in WORDS: NAME takes each word in turn.
+            if (@header >= 2 && $header[0]{t} =~ /^[A-Za-z_][A-Za-z0-9_]*$/ && $header[1]{t} eq "in") {
+              set_var($header[0]{t}, $_) for @header[2 .. $#header];
+            }
+          }
+          compound({ done => 1 }, "done");
+          $prev_sep = q{};
+          next;
+        }
+        if ($bw eq "case") { parse_case(); $prev_sep = q{}; next; }
+        if ($bw eq "[[") { skip_dbracket(); next; }
+        if ($bw eq "function") { $p += length $bw; skip_blanks(); read_word(); skip_blanks(); $p += 2 if substr($S, $p, 2) eq "()"; next; }
+        if ($bw =~ /^(?:fi|done|esac|\}|\]\])$/) { $uncertain = 1; $p += length $bw; next; }
+      }
+      parse_simple($prev_sep);
+      $prev_sep = q{};
+    }
+  }
+
+  sub parse_simple {
+    my ($prev_sep) = @_;
+    my $cmd = { words => [], inputs => [], heredocs => [] };
+    while (1) {
+      skip_blanks();
+      last if $p >= $N;
+      my $c = ch();
+      if ($c eq "#") { my $e = index($S, "\n", $p); $p = $e < 0 ? $N : $e; last; }
+      next if try_redirect(undef, $cmd);
+      last if $c =~ /[;&|\n)]/;
+      if (substr($S, $p, 2) eq "<(" || substr($S, $p, 2) eq ">(") { push @{ $cmd->{words} }, read_procsubst(); next; }
+      if ($c eq "(") {
+        if (@{ $cmd->{words} } == 1 && at(qr/\(\s*\)/)) { $p = pos($S); last; }   # name() { …; }
+        push @{ $cmd->{words} }, { t => read_group_glob(), dyn => 1, quoted => 0, raw => q{} };
+        next;
+      }
+      my $s = $p;
+      my $w = read_word();
+      if ($p == $s) { $p++; $uncertain = 1; next; }
+      push @{ $cmd->{words} }, $w;
+    }
+    finish_command($cmd, $prev_sep);
+  }
+
+  sub record_assign {
+    my ($w) = @_;
+    return 0 unless $w->{raw} =~ /^[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=/;
+    my ($name, $value) = $w->{t} =~ /^([A-Za-z_][A-Za-z0-9_]*)[^=]*=(.*)$/s;
+    return 1 unless defined $name;
+    # A fresh file from mktemp: overwriting it destroys nothing.
+    $value = "/tmp/iwe-mktemp" if $w->{raw} =~ /=["]?\$\(\s*mktemp\b/;
+    set_var($name, { t => $value, dyn => ($w->{dyn} && $value ne "/tmp/iwe-mktemp"), raw => $w->{raw} });
+    return 1;
+  }
+  # A literal value is substituted into targets later; a computed one is kept as raw text, so
+  # a target built from it can still be recognised by the words claude/hook.
+  sub set_var {
+    my ($name, $w) = @_;
+    if ($w->{dyn}) { $assign{$name}{"\x00dynamic"} = 1; $assign_raw{$name} .= " " . $w->{raw}; }
+    else { $assign{$name}{ $w->{t} } = 1; }
+  }
+
+  sub finish_command {
+    my ($cmd, $prev_sep) = @_;
+    my @w = @{ $cmd->{words} };
+    shift @w while @w && record_assign($w[0]);
+    my $i = 0;
+    my $name;
+    while ($i < @w) {
+      if ($w[$i]{raw} =~ /^[A-Za-z_][A-Za-z0-9_]*=/) { record_assign($w[$i]); $i++; next; }
+      last if $w[$i]{dyn};
+      my $b = base($w[$i]{t});
+      last unless $wrapper{$b};
+      if ($b eq "command" && $i + 1 < @w && $w[$i + 1]{t} =~ /^-[vV]+$/) { $name = "command -v"; last; }
+      $i++;
+      while ($i < @w && $w[$i]{t} =~ /^-./) {
+        my $o = $w[$i]{t};
+        $i++;
+        $i++ if $wrapper_arg{$b} && $o =~ $wrapper_arg{$b} && $i < @w;
+      }
+      $i++ if $b eq "timeout" && $i < @w && $w[$i]{t} =~ /^[0-9.]+[smhd]?$/;
+      $i++ if $b eq "flock" && $i < @w;   # the lock file
+    }
+    if (!defined $name) {
+      if ($i >= @w) { $name = q{}; }
+      elsif ($w[$i]{dyn}) { $name = q{$DYN}; }
+      else {
+        $name = base($w[$i]{t});
+        if ($name eq "git") {
+          my $j = $i + 1;
+          while ($j < @w && $w[$j]{t} =~ /^-/) { $j += ($w[$j]{t} =~ /^(?:-C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env)$/) ? 2 : 1; }
+          $name = "git " . ($j < @w ? $w[$j]{t} : q{});
+        }
+      }
+    }
+    # A command word with blanks (watch with one quoted command line) is run by a shell.
+    scan_text($w[$i]{t}) if $i < @w && !$w[$i]{dyn} && $w[$i]{t} =~ /\s/;
+    my @args = $i < @w ? @w[$i + 1 .. $#w] : ();
+    my @operands = grep { $_->{t} !~ /^-./ && $_->{t} ne q{-} } @args;
+    $cmd->{name} = $name;
+    $cmd->{operands} = scalar @operands;
+    push @$_, $name for @name_stack;
+    if ($declare{$name}) { record_assign($_) for @args; }
+    if ($name eq "tee") {
+      my $append = grep { $_->{t} =~ /^-[A-Za-z]*a|^--append$/ } @args;
+      push @writes, { cmd => $cmd, kind => ($append ? "A" : "T"), fd => "E", w => $_ } for @operands;
+    }
+    if ($shell{$name}) {
+      my ($has_c, $file) = (0, 0);
+      for (my $j = 0; $j < @args; $j++) {
+        my $a = $args[$j]{t};
+        if ($a =~ /^-[A-Za-z]*c[A-Za-z]*$/) {
+          my $k = $j + 1;
+          $k++ if $k < @args && $args[$k]{t} eq "--";
+          scan_text($args[$k]{t}) if $k < @args;
+          $has_c = 1; last;
+        }
+        if ($a =~ /^(?:[-+][oO]|--rcfile|--init-file)$/) { $j++; next; }
+        next if $a =~ /^[-+]/;
+        $file = 1; last;
+      }
+      if (!$has_c && !$file) {
+        for my $in (@{ $cmd->{inputs} }) {
+          next unless $in->{fd} eq "0";
+          $in->{here}{shell} = 1 if $in->{here};
+          scan_text($in->{str}{t}) if $in->{str};
+        }
+        if ($prev_sep eq q{|}) {
+          $_->{shell} = 1 for @$prev_heredocs;
+          # A program piped into the shell: literal echo/printf text is read, anything else is unknown.
+          if ($prev_cmd && $prev_cmd->{name} =~ /^(?:echo|printf)$/) { scan_text(join(q{ }, map { $_->{t} } @{ $prev_cmd->{args} })); }
+          elsif (!@$prev_heredocs) { $uncertain = 1; }
+        }
+      }
+    }
+    # The shell or source reading a process substitution runs text this lexer did not see as code.
+    $uncertain = 1 if ($shell{$name} || $name eq "source" || $name eq ".") && grep { $_->{procsubst} } @args;
+    if ($name eq "eval" && @args) {
+      $uncertain = 1 if grep { $_->{dyn} } @args;
+      scan_text(join(q{ }, map { $_->{t} } @args));
+    }
+    # A command name from an expansion may be any program, a redirection included.
+    $uncertain = 1 if $name eq q{$DYN};
+    # `-c STRING` of any other program (su -c, runuser -c, flock … -c) is a shell command line.
+    if (!$shell{$name}) {
+      for my $j (0 .. $#args - 1) { scan_text($args[$j + 1]{t}) if $args[$j]{t} eq "-c" && !$args[$j + 1]{dyn}; }
+    }
+    # find -exec/-execdir/-ok/-okdir: the words up to ; or + are a command, with their quoting.
+    if ($name eq "find") {
+      for (my $j = 0; $j < @args; $j++) {
+        next unless $args[$j]{t} =~ /^-(?:exec|execdir|ok|okdir)$/;
+        my @inner;
+        for ($j++; $j < @args && $args[$j]{t} !~ /^[;+]$/; $j++) { push @inner, $args[$j]{raw}; }
+        scan_text(join(q{ }, @inner)) if @inner;
+      }
+    }
+    if ($name eq "read") {
+      my @vars = grep { $_->{t} =~ /^[A-Za-z_][A-Za-z0-9_]*$/ } @args;
+      my ($str) = map { $_->{str} } grep { $_->{fd} eq "0" && $_->{str} } @{ $cmd->{inputs} };
+      set_var($_->{t}, $str && !$str->{dyn} ? $str : { t => q{}, dyn => 1, raw => ($str ? $str->{raw} : q{}) }) for @vars;
+    }
+    if ($name =~ /^(?:cd|pushd)$/) {
+      my ($target) = grep { $_->{t} !~ /^-./ } @args;
+      if (!$target || $target->{dyn}) { $cd_dynamic = 1; } else { push @cd_args, $target->{t}; }
+    }
+    $cmd->{args} = \@args;
+    $prev_cmd = $cmd;
+    $prev_heredocs = $cmd->{heredocs};
+  }
+
+  # --- decisions -----------------------------------------------------------------------------
   sub braces {
     my $s = shift;
     return ($s) unless $s =~ /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/s;
@@ -1465,67 +1969,147 @@ PROTECTED_TARGET_PL='
     return map { braces($pre . $_ . $post) } split /,/, $mid, -1;
   }
   sub glob_re {
+    # A component as a shell pattern: * ? […] (POSIX classes [[:alpha:]] inside) match like the
+    # shell; a pattern perl cannot compile matches anything (fail closed).
     my $g = shift; my $re = q{};
-    while ($g =~ /\G(\*+|\?|\[!?[^\]]*\]|.)/gs) {
+    while ($g =~ /\G(\*+|\?|\[!?\]?(?:\[:[a-z]+:\]|[^\]])*\]|.)/gs) {
       my $t = $1;
       if ($t =~ /^\*/) { $re .= ".*"; }
       elsif ($t eq "?") { $re .= "."; }
       elsif ($t =~ /^\[(!?)(.*)\]$/s && length($t) > 2) { my ($neg, $set) = ($1, $2); $set =~ s/\\/\\\\/g; $re .= "[" . ($neg ? "^" : q{}) . $set . "]"; }
       else { $re .= quotemeta $t; }
     }
-    return qr/^(?:$re)$/s;
+    my $qr = eval { qr/^(?:$re)$/si };
+    return $qr // qr/^/;
   }
   sub names { my ($comp, $name) = @_; return $name =~ glob_re($comp); }
-  my $hit = 0;
-  while (my $line = <STDIN>) {
-    chomp $line;
-    my (undef, undef, $target) = split /\t/, $line, 4;
-    next unless defined $target;
-    for my $path (braces($target)) {
+  sub protected {
+    my ($target) = @_;
+    my $count = 1;
+    $count *= 1 + (() = $1 =~ /,/g) while $target =~ /\{([^{}]*,[^{}]*)\}/g && $count <= 256;
+    # Too many alternatives to expand: every comma brace stands for any name instead.
+    if ($count > 256) { (my $wild = $target) =~ s/\{[^{}]*,[^{}]*\}/*/g; return protected($wild); }
+    my @paths = braces($target);
+    for my $path (@paths) {
       my @parts;
-      for my $p (split m{/+}, $path) {
-        next if $p eq q{} || $p eq ".";
-        if ($p eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
-        push @parts, $p;
+      for my $part (split m{/+}, $path) {
+        next if $part eq q{} || $part eq ".";
+        if ($part eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
+        push @parts, $part;
       }
       for my $k (0 .. $#parts - 1) {
         next unless names($parts[$k], ".claude");
         my $next = $parts[$k + 1];
-        if (($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
-            || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")))) {
-          $hit = 1;
-        }
+        return 1 if ($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
+          || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")));
       }
     }
+    return 0;
   }
-  print $hit ? "HIT" : "MISS";
-'
-PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
-if [ "$PROTECTED_TARGET" = "HIT" ] \
-  || matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
-  block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны и фигурные скобки). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
-fi
+  sub substitute {
+    my ($t) = @_;
+    my @out = ($t);
+    my %seen;
+    while (1) {
+      my @next;
+      my $changed = 0;
+      for my $s (@out) {
+        if ($s =~ /\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))/ && !$seen{$s}++) {
+          my $var = defined $1 ? $1 : $2;
+          my ($pre, $post) = (substr($s, 0, $-[0]), substr($s, $+[0]));
+          my @vals = grep { $_ ne "\x00dynamic" } keys %{ $assign{$var} || {} };
+          if (@vals && !exists $assign{$var}{"\x00dynamic"}) { push @next, map { $pre . $_ . $post } @vals; $changed = 1; next; }
+        }
+        push @next, $s;
+      }
+      @out = @next;
+      last if !$changed || @out > 64;
+    }
+    return @out;
+  }
+  sub temp_target {
+    my ($t) = @_;
+    return 0 if $t =~ m{(^|/)\.\.(/|$)};
+    return 1 if $t =~ m{^/dev/(?:null|stdout|stderr|tty|fd/[0-9]+)$};
+    return 1 if $t =~ m{^(?:/tmp/|/private/tmp/|/var/folders/|/private/var/folders/)};
+    return 1 if $t =~ m#^\$(?:TMPDIR|\{TMPDIR\}|\{TMPDIR:-[^}]*\})/#;
+    return 0;
+  }
+  sub unresolved {
+    my ($t) = @_;
+    return $t =~ /[\$`]|\{[^{}]*\.\.[^{}]*\}|[()|]/;
+  }
+  sub stripped_expansions {
+    my ($s) = @_;
+    $s =~ s/\$\{[^}]*\}|\$\([^)]*\)|\$[A-Za-z_0-9@*#?\$!-]+|`[^`]*`//g;
+    return $s;
+  }
+  sub exempt {
+    my ($wr) = @_;
+    my $cmd = $wr->{cmd};
+    return 0 if $wr->{names} || !$cmd;
+    return 0 unless $cmd->{name} =~ /^(?:cat|tee)$/ && !$cmd->{operands};
+    return 0 unless $wr->{fd} eq "1" || $wr->{fd} eq q{&};
+    my @in = grep { $_->{fd} eq "0" } @{ $cmd->{inputs} };
+    return 0 unless @in;
+    my $last = $in[-1];
+    if (my $h = $last->{here}) {
+      my $body = $h->{body} // q{};
+      $body = stripped_expansions($body) unless $h->{quoted};
+      return $body =~ /\S/ ? 1 : 0;
+    }
+    if (my $str = $last->{str}) {
+      my $s = $str->{dyn} ? stripped_expansions($str->{t}) : $str->{t};
+      return $s =~ /\S/ ? 1 : 0;
+    }
+    return 0;
+  }
 
-# A truncating redirection after a pre-approved reader (issue #1568, F2 of the v0.42.0 red team).
-# settings.json lets ls, cat, head, tail, wc, grep, rg, find, diff and git status/log/diff/show/
-# branch/remote run without a prompt, so `grep nomatch F > params.yaml`, `ls /nonexistent > f`,
-# `head -0 F > f`, `tail -n +999999 F > f` and `diff F F > f` emptied or overwrote a working file
-# silently; the block above only knows /dev/null and zero counts, and such a list is never
-# complete. The class: a `>` into anything outside temporary directories and /dev, run by one of
-# those readers, goes through a prompt. Append (>>) does not destroy content and stays allowed, and
-# so does a reader fed a here-doc or here-string (`cat > notes.md <<'EOF'`, `cat <<< x > f`): its
-# content is in the call itself, so the output is not the empty one this rule is about. The blocks
-# above (protective files, /dev/null) still apply to it.
-# Keep the reader list in step with the Bash(...) allow rules of .claude/settings.json.
-READER_OVERWRITE=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' '
-  $2 == "T" && $4 != "H" && $1 ~ /^(ls|cat|head|tail|wc|grep|egrep|fgrep|rg|find|diff|git (status|log|diff|show|branch|remote))$/ {
-    t = $3
-    if (t ~ /^(\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|\$TMPDIR\/|\$\{TMPDIR\}\/|\$\{TMPDIR:-[^}]*\}\/)/ && t !~ /\/\.\.(\/|$)/) next
-    if (t ~ /^\/dev\/(null|stdout|stderr|tty|fd\/[0-9]+)$/) next
-    print t
-  }')
+  my $text = do { local $/; <STDIN> };
+  ($S, $N, $p) = ($text, length $text, 0);
+  my $stop = parse_seq({});
+  $uncertain = 1 if defined $stop || @pending;
+  for my $wr (@writes) {
+    my $w = $wr->{w};
+    next if $w->{procsubst};
+    my $t = $w->{t};
+    my @cands = $w->{dyn} || unresolved($t) ? substitute($t) : ($t);
+    # A relative target after cd/pushd in the same call is also read from those directories.
+    if ($t !~ m{^[/~\$]}) {
+      my ($joined, @base) = (q{}, @cands);
+      for my $dir (@cd_args) {
+        $joined = $dir =~ m{^/} ? $dir : ($joined eq q{} ? $dir : "$joined/$dir");
+        push @cands, map { ("$dir/$_", "$joined/$_") } @base;
+      }
+      push @cands, q{$CD/} . $t if $cd_dynamic;
+    }
+    my $unres = grep { unresolved($_) } @cands;
+    my @mention = ($t, @cands, map { stripped_expansions($_) } $t, @cands);
+    while ($t =~ /\$\{?([A-Za-z_][A-Za-z0-9_]*)/g) { push @mention, $assign_raw{$1} if defined $assign_raw{$1}; }
+    if (grep { protected($_) } ($t, @cands)) { print "BLOCK\t$t\n"; next; }
+    if ($unres && grep { /claude|hook/i } @mention) { print "BLOCK\t$t\n"; next; }
+    # A target only known at run time (a variable without a literal value here, $(…), a range,
+    # a pattern group, a relative path after cd to such a place) is not a known safe place: ask.
+    if ($unres && $wr->{kind} ne "P" && grep { !temp_target($_) } @cands) { print "ASK\t$t\n"; next; }
+    next unless $wr->{kind} eq "T" && $wr->{fd} ne "E";
+    my @names = $wr->{names} ? @{ $wr->{names} } : ($wr->{cmd}{name});
+    next unless !@names || grep { $_ eq q{} || $_ eq q{$DYN} || $reader{$_} } @names;
+    next if exempt($wr);
+    next unless grep { !temp_target($_) } @cands;
+    print "ASK\t$t\n";
+  }
+  print "UNCERTAIN\n" if $uncertain;
+'
+REDIRECT_VERDICT=$(printf '%s' "$CMD" | perl -e "$REDIRECT_PL") || fail_check "perl, разбор перенаправлений"
+if matches "$REDIRECT_VERDICT" -E '^BLOCK' \
+  || { matches "$REDIRECT_VERDICT" -E '^UNCERTAIN' && matches "$CMD" -E '>|tee' && matches "$CMD" -iE 'claude|hook'; }; then
+  block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны, фигурные скобки, путь через переменную или подстановку). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+READER_OVERWRITE=$(printf '%s\n' "$REDIRECT_VERDICT" | awk -F'\t' '$1 == "ASK" { print $2; exit }')
 if [ -n "$READER_OVERWRITE" ]; then
-  ASK_REASON="перенаправление «>» после читающей команды перезапишет файл ($(printf '%s' "$READER_OVERWRITE" | head -1)) — такие команды разрешены без запроса, а пустой вывод (grep без совпадений, ls несуществующего, head -0) стирает файл. Подтверди запись, если она нужна; рабочие файлы правят правкой файла."
+  ASK_REASON="перенаправление «>» после читающей команды перезапишет файл ($READER_OVERWRITE) — такие команды разрешены без запроса, а пустой вывод (grep без совпадений, ls несуществующего, head -0) стирает файл. Подтверди запись, если она нужна; рабочие файлы правят правкой файла."
+elif matches "$REDIRECT_VERDICT" -E '^UNCERTAIN' && matches "$CMD" -E '>'; then
+  ASK_REASON="не удалось надёжно разобрать команду (незакрытая кавычка, подстановка или heredoc), а в ней есть перенаправление «>» — проверь, какой файл она перезапишет, и подтверди запись."
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.

@@ -99,5 +99,66 @@ a
 EOF"
 expect "here-string onto settings still blocked" block 'cat <<< "{}" > ./.claude/./settings.json'
 
+# === review of #1576: the here-doc exemption only for cat/tee writing a non-empty stdin ===
+expect "empty here-doc body zeroes the file" ask "cat > params.yaml <<EOF
+EOF"
+expect "grep with a file operand ignores the here-doc" ask "grep zzz README.md > params.yaml <<EOF
+x
+EOF"
+expect "ls ignores a here-string" ask 'ls /nonexistent > params.yaml <<< x'
+expect "head with a file ignores a here-string" ask 'head -0 F > params.yaml <<< x'
+expect "git show ignores a here-string" ask 'git show HEAD:README.md > README.md <<< x'
+expect "cat with a file operand ignores a here-string" ask 'cat README.md > DS-strategy/current/WeekPlan.md <<< x'
+expect "empty here-string" ask "cat <<< '' > params.yaml"
+expect "stderr of cat with a here-doc" ask "cat <<'EOF' 2> params.yaml
+a
+EOF"
+expect "tee with a here-doc body" pass "tee <<'EOF' > notes.md
+a
+EOF"
+
+# === review of #1576: an apostrophe in a comment or nested quotes no longer hide the next command ===
+expect "apostrophe in a comment" ask "ls # don't
+grep zzz README.md > params.yaml"
+expect "apostrophe in a here-doc body" ask "cat <<EOF > /tmp/x
+it's
+EOF
+grep zzz README.md > params.yaml"
+
+# === review of #1576: the reader behind grouping, keywords and wrappers ===
+expect "subshell" ask '(grep zzz README.md) > params.yaml'
+expect "brace group" ask '{ grep zzz README.md; } > params.yaml'
+expect "if … fi" ask 'if true; then grep zzz README.md; fi > params.yaml'
+expect "while … done" ask 'while false; do :; done; for f in a; do grep zzz "$f"; done > params.yaml'
+expect "negation" ask '! grep zzz README.md > params.yaml'
+expect "time" ask 'time grep zzz README.md > params.yaml'
+expect "env" ask 'env grep zzz README.md > params.yaml'
+expect "command" ask 'command grep zzz README.md > params.yaml'
+expect "zsh >!" ask 'grep zzz README.md >! params.yaml'
+expect "target via command substitution" ask 'grep zzz README.md > $(echo params.yaml)'
+expect "target via an unknown variable" ask 'grep zzz README.md > "$OUT"'
+expect "bare redirection" ask '> params.yaml < /dev/null'
+expect "exec redirection" ask 'exec > params.yaml'
+expect "command name from a variable" ask '$READER zzz README.md > params.yaml'
+expect "inside \$( )" ask 'x=$(grep zzz README.md > params.yaml)'
+expect "unquoted > inside a word is a redirection" ask 'git log --format=%h->%s -3'
+expect "unquoted => is a redirection" ask 'grep -rn foo=>bar src'
+
+# === review of #1576: not a redirection, stays silent ===
+expect "> in a comment" pass 'grep -rn foo . # old -> new'
+expect "tag in a comment" pass 'ls docs # see <details> usage'
+expect "quoted > in a pattern" pass 'grep -rn "=>" src | head'
+expect "arithmetic" pass 'head -n $((3>2?3:2)) README.md'
+expect "[[ comparison ]]" pass '[[ a > b ]] && ls'
+expect "escaped >" pass 'grep -n a\>b README.md'
+expect "process substitution" pass 'diff <(ls a) <(ls b)'
+expect "fresh mktemp file" pass 'T=$(mktemp); git diff > "$T"'
+expect "known literal temp variable" pass 'D=/tmp/x; git diff > "$D/a.diff"'
+expect "> in a here-doc body of a commit message" pass "git commit -m \"\$(cat <<'EOF'
+fix: a -> b
+grep foo bar > out.txt
+EOF
+)\""
+
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
