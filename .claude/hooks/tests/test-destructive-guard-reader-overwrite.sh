@@ -80,5 +80,24 @@ expect "heredoc body is data" pass "grep x <<'EOF'
 a > params.yaml
 EOF"
 
+# === input given in the call: here-doc / here-string is not an empty-output reader ===
+expect "cat > file <<'EOF'" pass "cat > notes.md <<'EOF'
+a line
+EOF"
+expect "cat <<-EOF > file" pass "cat <<-EOF > notes.md
+	a line
+	EOF"
+expect "here-string" pass 'cat <<< "x" > f'
+expect "input from /dev/null still asks" ask 'cat > params.yaml < /dev/null'
+expect "plain reader still asks" ask 'grep zzz README.md > params.yaml'
+expect "here-doc in another segment does not exempt" ask "cat <<'EOF' > /tmp/x
+a
+EOF
+grep zzz README.md > params.yaml"
+expect "here-doc onto a protective file still blocked" block "cat > .claude//hooks/x.sh <<'EOF'
+a
+EOF"
+expect "here-string onto settings still blocked" block 'cat <<< "{}" > ./.claude/./settings.json'
+
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

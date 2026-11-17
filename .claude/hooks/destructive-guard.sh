@@ -1335,10 +1335,11 @@ if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:sp
      | grep -vqE '^(/dev/null$|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR|\$\{TMPDIR)'; then
   block "обнуление файла читающей командой (cat /dev/null > файл, head -c0 … > файл) запрещено — так без запроса стирают планы и настройки. Пустой файл во временной папке создавать можно; удалять содержимое рабочих файлов — правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
-# Write targets of the call, one per line: "<command>\t<kind>\t<target>". <command> is the word
-# the segment runs (basename; "git <subcommand>" for git), <kind> is T (truncating redirection:
-# >, >|, N>, &>, >&file), A (append: >>, &>>) or E (a file argument of tee). Quotes are removed from
-# the target, variables are left as written. `bash|sh|zsh -c '…'` is read recursively.
+# Write targets of the call, one per line: "<command>\t<kind>\t<target>\t<input>". <command> is
+# the word the segment runs (basename; "git <subcommand>" for git), <kind> is T (truncating
+# redirection: >, >|, N>, &>, >&file), A (append: >>, &>>) or E (a file argument of tee); <input>
+# is H when the segment reads a here-doc or here-string (<<, <<-, <<<), else "-". Quotes are
+# removed from the target, variables are left as written. `bash|sh|zsh -c '…'` is read recursively.
 # Only redirections that write are reported: input (<, <<, <<<), descriptor copies (2>&1, >&-)
 # are not.
 WRITE_TARGETS_PL='
@@ -1351,7 +1352,8 @@ WRITE_TARGETS_PL='
     return if $depth > 3;
     my @segments; my @words; my @redirs; my $word; my $in_word = 0;
     my $flush_word = sub { if ($in_word) { push @words, $word; $word = q{}; $in_word = 0; } };
-    my $flush_seg = sub { $flush_word->(); push @segments, [ [@words], [@redirs] ]; @words = (); @redirs = (); };
+    my $here = 0;  # the segment reads a here-doc or here-string: its input is given in the text
+    my $flush_seg = sub { $flush_word->(); push @segments, [ [@words], [@redirs], $here ]; @words = (); @redirs = (); $here = 0; };
     my $pending;   # kind of a redirection whose target is the next word
     my $skip_next; # an input redirection: its next word is data, not a target
     my $i = 0; my $n = length $s;
@@ -1373,8 +1375,9 @@ WRITE_TARGETS_PL='
           $pending = $op eq ">>" ? "A" : "T";
           next;
         }
-        if ($at->(qr/\d*(?:<<<|<<-?|<>|<&|<)/)) {
+        if (my $m = $at->(qr/\d*(<<<|<<-?|<>|<&|<)/)) {
           $i = pos($s);
+          $here = 1 if $m->[0] =~ /^<</;
           if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
           $skip_next = 1; next;
         }
@@ -1418,7 +1421,7 @@ WRITE_TARGETS_PL='
     }
     $flush_seg->();
     for my $seg (@segments) {
-      my ($w, $r) = @$seg;
+      my ($w, $r, $seg_here) = @$seg;
       my @w = @$w;
       shift @w while @w && $w[0] =~ /^[A-Za-z_][A-Za-z0-9_]*=/;
       my $cmd = @w ? base($w[0]) : q{};
@@ -1427,7 +1430,8 @@ WRITE_TARGETS_PL='
         while ($k < @w && $w[$k] =~ /^-/) { $k += ($w[$k] =~ /^-[Cc]$/) ? 2 : 1; }
         $cmd = "git " . ($w[$k] // q{});
       }
-      print "$cmd\t$_->[0]\t$_->[1]\n" for @$r;
+      my $input = $seg_here ? "H" : "-";
+      print "$cmd\t$_->[0]\t$_->[1]\t$input\n" for @$r;
       # tee after wrappers (env, nice, sudo …): its file arguments are written.
       my $k = 0;
       while ($k < @w && ($wrapper{base($w[$k])} || $w[$k] =~ /^-/ || $w[$k] =~ /^[A-Za-z_][A-Za-z0-9_]*=/ || $w[$k] =~ /^\d+[smhd]?$/)) { $k++; }
@@ -1475,7 +1479,7 @@ PROTECTED_TARGET_PL='
   my $hit = 0;
   while (my $line = <STDIN>) {
     chomp $line;
-    my (undef, undef, $target) = split /\t/, $line, 3;
+    my (undef, undef, $target) = split /\t/, $line, 4;
     next unless defined $target;
     for my $path (braces($target)) {
       my @parts;
@@ -1508,10 +1512,13 @@ fi
 # `head -0 F > f`, `tail -n +999999 F > f` and `diff F F > f` emptied or overwrote a working file
 # silently; the block above only knows /dev/null and zero counts, and such a list is never
 # complete. The class: a `>` into anything outside temporary directories and /dev, run by one of
-# those readers, goes through a prompt. Append (>>) does not destroy content and stays allowed.
+# those readers, goes through a prompt. Append (>>) does not destroy content and stays allowed, and
+# so does a reader fed a here-doc or here-string (`cat > notes.md <<'EOF'`, `cat <<< x > f`): its
+# content is in the call itself, so the output is not the empty one this rule is about. The blocks
+# above (protective files, /dev/null) still apply to it.
 # Keep the reader list in step with the Bash(...) allow rules of .claude/settings.json.
 READER_OVERWRITE=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' '
-  $2 == "T" && $1 ~ /^(ls|cat|head|tail|wc|grep|egrep|fgrep|rg|find|diff|git (status|log|diff|show|branch|remote))$/ {
+  $2 == "T" && $4 != "H" && $1 ~ /^(ls|cat|head|tail|wc|grep|egrep|fgrep|rg|find|diff|git (status|log|diff|show|branch|remote))$/ {
     t = $3
     if (t ~ /^(\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|\$TMPDIR\/|\$\{TMPDIR\}\/|\$\{TMPDIR:-[^}]*\}\/)/ && t !~ /\/\.\.(\/|$)/) next
     if (t ~ /^\/dev\/(null|stdout|stderr|tty|fd\/[0-9]+)$/) next
