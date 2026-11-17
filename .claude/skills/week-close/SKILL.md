@@ -63,12 +63,19 @@ fi
 
 Сформировать JSON стандартной библиотекой Python (`json.dumps`, без ручной подстановки ответа в код или JSON-строку) с полями `subtype: preclose_retro`, `retro_worked` и `retro_failed`. После ответа пилота записать событие:
 
+Журнал пишется в ту копию governance-репо, из которой шаг 11 делает коммит (`WC_REPO`; по умолчанию основная копия, а если сессия работает в изолированной копии — её путь). Путь по умолчанию в `ledger-append.sh` указывает на основную копию, поэтому `IWE_LEDGER_DIR` задаётся явно (issue #1550):
+
 ```bash
 WEEK=$(date +%Y-W%V)
+WC_REPO="${WC_REPO:-{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}}"
+export IWE_LEDGER_DIR="$WC_REPO/machine/ledger"
 bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/ledger-append.sh" week "$WEEK" pilot_answer "$RETRO_JSON" week-close
+LEDGER_WEEK_REL="machine/ledger/$(. "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/ledger-path.sh" && ledger_path_rel week "$WEEK")"
 ```
 
-`RETRO_JSON` — сформированный выше JSON с ответами; не вызывать запись до получения ответа. Отказ записи останавливает Week Close, а не превращается в завершённую рефлексию. Проверить в недельном ledger, что событие `pilot_answer/preclose_retro` действительно записано, затем отметить шаг выполненным в списке шагов.
+`RETRO_JSON` — сформированный выше JSON с ответами; не вызывать запись до получения ответа. Отказ записи останавливает Week Close, а не превращается в завершённую рефлексию. Проверить в недельном ledger (`$WC_REPO/$LEDGER_WEEK_REL`), что событие `pilot_answer/preclose_retro` действительно записано.
+
+**Шаг 0б здесь ещё не выполнен** — он выполнен только после шага 11, когда файл журнала вошёл в коммит закрытия недели и этот коммит опубликован. Строка `PUBLISH_TRIGGER_FAIL` после записи на обычной установке ожидаема: службы-отправщика журнала (`ledger-publish.service`) в поставке шаблона нет, её вызов из `scripts/lib/ledger-publish-kick.sh` срабатывает только там, где служба установлена отдельно. Сохранение журнала делает шаг 11, не служба.
 
 ### 1. Сбор данных за 7 дней
 
@@ -292,11 +299,14 @@ fi
 ### 11. Закоммитить governance-репо
 
 ```bash
-(cd {{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}
+WEEK=$(date +%Y-W%V)  # shell variables of step 0б do not survive between calls: recompute
+WC_REPO="${WC_REPO:-{{WORKSPACE_DIR}}/{{GOVERNANCE_REPO}}}"
+LEDGER_WEEK_REL="machine/ledger/$(. "${IWE_SCRIPTS:-$HOME/IWE/scripts}/lib/ledger-path.sh" && ledger_path_rel week "$WEEK")"
+(cd "$WC_REPO"
 git status --short
 # НЕ git add -A/git add ./git add -u — AGENTS.md CRITICAL (может захватить работу других агентов)
 # Стейджить ТОЛЬКО файлы, изменённые в шагах 1-10 (в массив для pathspec):
-WC_FILES=(<каждый файл явным путём: WeekPlan, WeekReport, WP-REGISTRY, inbox/WP-*.md и т.д.>)
+WC_FILES=(<каждый файл явным путём: WeekPlan, WeekReport, WP-REGISTRY, inbox/WP-*.md и т.д.> "$LEDGER_WEEK_REL")
 git add "${WC_FILES[@]}"
 git diff --cached --name-only  # проверить scope — только week-close файлы
 # pathspec после `--`: commit ТОЛЬКО свои файлы, не подметаем чужой индекс
@@ -304,6 +314,24 @@ git commit -m "week-close: W{N} итоги q:{score}" -- "${WC_FILES[@]}"
 git push
 )
 ```
+
+Команды выше выполняются в `$WC_REPO` (та же копия, что в шаге 0б). Если правки идут через изолированную копию и публикацию (`ds-publish.sh`), файл журнала публикуется вместе с остальными файлами закрытия тем же вызовом.
+
+**Проверка шага 0б (issue #1550).** После публикации:
+
+```bash
+git -C "$WC_REPO" fetch -q origin main
+WC_SHA=$(git -C "$WC_REPO" log -1 --format=%H -- "$LEDGER_WEEK_REL")
+if [ -n "$WC_SHA" ] \
+   && git -C "$WC_REPO" show --name-only --format= "$WC_SHA" | grep -Fxq "$LEDGER_WEEK_REL" \
+   && git -C "$WC_REPO" merge-base --is-ancestor "$WC_SHA" origin/main; then
+  echo "0б: журнал недели сохранён ($WC_SHA)"
+else
+  echo "0б: ЖУРНАЛ НЕДЕЛИ НЕ СОХРАНЁН: $WC_REPO/$LEDGER_WEEK_REL"
+fi
+```
+
+Только при первом исходе отметить шаг 0б выполненным. При втором шаг 0б остаётся невыполненным, а итоговая сводка закрытия недели прямо говорит пилоту, что журнал ретро не сохранён, и печатает полный путь файла — его можно сохранить отдельным коммитом. Если коммит после публикации перестроен (rebase), проверка ищет последний коммит с этим файлом, поэтому перестроенная публикация тоже засчитывается.
 
 ### 12. Верификация (Haiku R23)
 

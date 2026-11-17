@@ -25,7 +25,7 @@
 
 **Source-of-truth:** `docs/WP-REGISTRY.md` (реестр) + `inbox/WP-*.md` (контексты со `status: in_progress|active`).
 
-**Агрегация:** `bash ~/IWE/scripts/active-wp-sweep.sh` обходит `inbox/WP-*.md`, кросс-проверяет git-активность 7 дней, выдаёт markdown-таблицу активных РП. Используется в session-prep и `memory-active-wp-update.sh`.
+**Агрегация:** `bash "${IWE_SCRIPTS:-$HOME/IWE/scripts}/active-wp-sweep.sh"` обходит `inbox/WP-*.md`, кросс-проверяет git-активность 7 дней, выдаёт markdown-таблицу активных РП. Используется в session-prep и `memory-active-wp-update.sh`.
 
 **Антипаттерн:** WORKPLAN.md hub-and-spoke отменён WP-283 Ф-H (май 2026): дубликат WP-REGISTRY → drift.
 
