@@ -171,6 +171,25 @@ expect "pr body from a cat here-doc with markdown quotes" pass "gh pr create --t
 EOF
 )\""
 
+# === WP-529 F275, rc.2 red team A: line continuations are joined before any pass ===
+expect "comment quote, reader target after a continuation" ask "ls # don't
+grep zz README.md > \\
+params.yaml"
+expect "comment opener after the continued target" ask "grep zz README.md > \\
+params.yaml # <<EOF"
+expect "continuation before the operator" ask "ls # don't
+grep zz README.md \\
+> params.yaml"
+expect "continuation in a comment ends with the line" pass "ls # note \\
+git log --oneline -3"
+expect "multi-line git log with continuations" pass "git log \\
+  --oneline \\
+  -5 2>/dev/null"
+expect "continuation inside a quoted here-doc body stays data" pass "cat > /tmp/notes.md <<'EOF'
+line one \\
+> quoted
+EOF"
+
 # === every input terminates: the new passes walk each line once ===
 # finishes $1=desc $2=seconds $3=python expression building the command: the hook must answer
 # (exit 0 or 2) within the limit. Python builds the text so a 200 KB command needs no shell variable.

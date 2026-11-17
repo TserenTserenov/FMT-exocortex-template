@@ -96,6 +96,24 @@ fix: a -> b
 EOF
 )\" 2>&1 | tail -2"
 
+# === WP-529 F275, rc.2 red team A: a redirection split by a line continuation ===
+expect "here-doc opener in a comment, target after a continuation" block "ls # <<EOF
+cat README.md > \\
+.claude/hooks/x"
+expect "comment quote, double slash after a continuation" block "ls # don't
+grep zz README.md > \\
+.claude//hooks/x.sh"
+expect "comment quote, glob after an indented continuation" block "ls # don't
+cat README.md > \\
+ .claud?//hooks/x"
+expect "comment opener after the continued target" block "cat README.md > \\
+.claude/hooks/x # <<EOF"
+expect "continuation inside the operator word" block "cat README.md \\
+> .claude//hooks/x # <<EOF"
+expect "tee split by a continuation after a comment quote" block "ls # don't
+cat README.md | tee \\
+.claud?/hooks/x"
+
 # === look-alikes stay allowed ===
 expect "read a hook" pass 'cat .claude//hooks/destructive-guard.sh'
 expect "grep hooks dir" pass 'grep -rn x ./.claude/./hooks 2>/dev/null'

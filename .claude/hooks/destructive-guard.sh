@@ -100,6 +100,130 @@ fi
 # to not make.
 CMD=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command') || block "jq отказал при извлечении команды после успешной валидации — блокирую."
 CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // .tool_input.cwd // empty' 2>/dev/null || true)
+
+# Line continuations are removed first, the way bash does before it reads the words (rc.2 red team,
+# finding A): `ls # don't` + `grep zz F > \` + `params.yaml` ran `grep zz F > params.yaml`, while the
+# passes below, which know no comments, read the quote of the comment as an open string and never
+# joined the split redirection. A backslash-newline goes away everywhere except inside single quotes,
+# `$'…'`, a `#` comment (it ends at the newline) and the body of a here-doc with a quoted delimiter;
+# an unquoted-delimiter body is joined as bash joins it, before the delimiter is compared. Inside a
+# quoted body a continuation is joined too unless the next line closes the body: a body fed to an
+# interpreter is joined by that interpreter, and a data body is dropped below anyway. A here-doc
+# whose body never closes was not one (an arithmetic `<<`): the text is then joined everywhere
+# outside quotes and comments. Every pass below reads only the joined text.
+JOIN_CONTINUATIONS_PL='
+  use strict; use warnings;
+  my $text = do { local $/; <STDIN> };
+  sub body_lines {
+    # Reads the bodies of @$pending from $$i; returns 0 when a body is not closed.
+    my ($s, $i, $pending, $out) = @_;
+    my $n = length $s;
+    for my $h (@$pending) {
+      my ($delim, $quoted, $dash) = @$h;
+      my $closed = 0;
+      while ($$i < $n) {
+        my $e = index($s, "\n", $$i); $e = $n if $e < 0;
+        my $line = substr($s, $$i, $e - $$i);
+        $$i = $e < $n ? $e + 1 : $n;
+        my $probe_of = sub { my $p = shift; $p =~ s/^\t+// if $dash; return $p; };
+        while ($line =~ /(?<!\\)(?:\\\\)*\\$/ && $$i < $n) {
+          my $e2 = index($s, "\n", $$i); $e2 = $n if $e2 < 0;
+          my $next = substr($s, $$i, $e2 - $$i);
+          last if $quoted && $probe_of->($next) eq $delim;
+          chop $line;
+          $line .= $next;
+          $$i = $e2 < $n ? $e2 + 1 : $n;
+        }
+        $$out .= $line . "\n";
+        if ($probe_of->($line) eq $delim) { $closed = 1; last; }
+      }
+      return 0 unless $closed;
+    }
+    @$pending = ();
+    return 1;
+  }
+  sub join_text {
+    my ($s, $heredocs) = @_;
+    my $out = q{};
+    my @stack = (q{N});   # N code, S single quote, A $quote, D double quote, B backtick, P $( … )
+    my @depth;            # parentheses open inside each P frame
+    my @pending;          # here-docs whose bodies start at the next code newline
+    my $word_start = 1;
+    my $n = length $s;
+    pos($s) = 0;
+    while (pos($s) < $n) {
+      my $top = $stack[-1];
+      if ($top eq q{S}) {
+        $s =~ /\G[^\x27]*\x27?/gc; $out .= $&; pop @stack if substr($&, -1) eq "\x27"; next;
+      }
+      if ($top eq q{A}) {
+        $s =~ /\G(?:[^\x27\\]|\\.)*(?:\\\z)?(\x27?)/gcs; $out .= $&; pop @stack if length $1; next;
+      }
+      if ($s =~ /\G\\\n/gc) { next; }
+      if ($s =~ /\G\\(.)/gcs) { $out .= $&; $word_start = 0; next; }
+      if ($top eq q{D}) {
+        if ($s =~ /\G[^"\\`\$]+/gc) { $out .= $&; next; }
+        if ($s =~ /\G"/gc) { $out .= q{"}; pop @stack; next; }
+        if ($s =~ /\G`/gc) { $out .= "`"; push @stack, q{B}; $word_start = 1; next; }
+        if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
+        $s =~ /\G./gcs; $out .= $&; next;
+      }
+      if ($s =~ /\G\n/gc) {
+        $out .= "\n"; $word_start = 1;
+        if (@pending) {
+          my $i = pos($s);
+          return undef unless body_lines($s, \$i, \@pending, \$out);
+          pos($s) = $i;
+        }
+        next;
+      }
+      if ($word_start && $s =~ /\G#[^\n]*/gc) { $out .= $&; next; }
+      if ($s =~ /\G\x27/gc) { $out .= "\x27"; push @stack, q{S}; $word_start = 0; next; }
+      if ($s =~ /\G\$\x27/gc) { $out .= "\$\x27"; push @stack, q{A}; $word_start = 0; next; }
+      if ($s =~ /\G"/gc) { $out .= q{"}; push @stack, q{D}; $word_start = 0; next; }
+      if ($s =~ /\G\$\(/gc) { $out .= q{$(}; push @stack, q{P}; push @depth, 0; $word_start = 1; next; }
+      if ($s =~ /\G`/gc) {
+        $out .= "`";
+        if ($top eq q{B}) { pop @stack; $word_start = 0; } else { push @stack, q{B}; $word_start = 1; }
+        next;
+      }
+      if ($top eq q{P} && $s =~ /\G([()])/gc) {
+        $out .= $1;
+        if ($1 eq "(") { $depth[-1]++; $word_start = 1; next; }
+        if ($depth[-1]) { $depth[-1]--; } else { pop @stack; pop @depth; }
+        $word_start = 0; next;
+      }
+      if ($heredocs && $s =~ /\G<<(?!<)(-?)[ \t]*/gc) {
+        my $dash = $1 eq q{-};
+        $out .= $&;
+        # The delimiter word: quotes and backslashes make it quoted; a continuation inside is joined.
+        my ($delim, $quoted) = (q{}, 0);
+        while (pos($s) < $n) {
+          if ($s =~ /\G\\\n/gc) { next; }
+          if ($s =~ /\G\\(.)/gcs) { $out .= $&; $delim .= $1; $quoted = 1; next; }
+          if ($s =~ /\G\$?\x27([^\x27]*)\x27?/gc) { $out .= $&; $delim .= $1; $quoted = 1; next; }
+          if ($s =~ /\G"((?:[^"\\]|\\.)*)"?/gcs) { $out .= $&; $delim .= $1; $quoted = 1; next; }
+          if ($s =~ /\G[^\s;&|()<>\\\x27"]+/gc) { $out .= $&; $delim .= $&; next; }
+          last;
+        }
+        push @pending, [ $delim, $quoted, $dash ];
+        $word_start = 0; next;
+      }
+      if ($s =~ /\G[^\\\n#\x27"`\$()<]+/gc) {
+        $out .= $&; $word_start = $& =~ /[\s;&|()<>]$/ ? 1 : 0; next;
+      }
+      $s =~ /\G./gcs; $out .= $&; $word_start = $& =~ /[\s;&|()<>]/ ? 1 : 0;
+    }
+    return undef if @pending;
+    return $out;
+  }
+  # Most calls have no continuation at all: nothing to join.
+  if (index($text, "\\\n") < 0) { print $text; exit 0; }
+  my $joined = join_text($text, 1);
+  $joined = join_text($text, 0) unless defined $joined;
+  print $joined;
+'
+CMD=$(printf '%s' "$CMD" | perl -e "$JOIN_CONTINUATIONS_PL") || fail_check "perl, склейка переносов строк"
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 WORKSPACE_ROOT="$(cd "$HOOK_DIR/../.." && pwd -P)"
 GUARDED_RM="$WORKSPACE_ROOT/.claude/bin/guarded-rm"
