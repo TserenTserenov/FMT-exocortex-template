@@ -23,6 +23,8 @@ Refs: WP-NNN
 
 ## [Unreleased]
 
+## [0.42.1] — 2026-11-17
+
 ### Changed
 
 - [security] (#1582) Проверка опасных команд агента (`.claude/hooks/destructive-guard.sh`) больше не пропускает без запроса перезапись файла читающей командой только потому, что в вызове есть `<<`. Без запроса идёт лишь `cat` без файла-аргумента, которому дан непустой текст (`cat > notes.md <<'EOF'` с текстом, `cat <<< "x" > f`); пустое тело (`cat > params.yaml <<EOF` и сразу `EOF`, `cat > params.yaml <<< ""`) и другие команды (`grep zzz README.md > params.yaml <<EOF`, `ls /nonexistent > f <<< x`, `git show HEAD:README.md > README.md <<< x`, `cat README.md > WeekPlan.md <<< x`) теперь идут через запрос. Кроме того, комментарий `#` с непарной кавычкой или с `<<` больше не прячет следующие строки: запись после него в `.claude/hooks`, `.claude/bin` или `settings.json` запрещается, в рабочий файл — идёт через запрос (issue #1568, WP-529 Ф275).
