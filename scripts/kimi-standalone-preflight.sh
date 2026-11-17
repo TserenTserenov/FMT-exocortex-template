@@ -17,7 +17,7 @@ SEM_FILE=$(ls -t "$SESSION_DIR/kimi"-*.open 2>/dev/null | head -1 || true)
 if [ -z "$SEM_FILE" ]; then
   echo "ERROR: Kimi standalone session is NOT OPEN." >&2
   echo "Run first:" >&2
-  echo "  bash ~/IWE/scripts/session-guard.sh open --wp WP-N --task \"...\" --agent kimi" >&2
+  echo "  bash \"\${IWE_SCRIPTS:-\$HOME/IWE/scripts}/session-guard.sh\" open --wp WP-N --task \"...\" --agent kimi" >&2
   exit 1
 fi
 

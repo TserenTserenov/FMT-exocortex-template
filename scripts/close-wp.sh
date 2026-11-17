@@ -95,6 +95,65 @@ CELL_RE=$(wp_num_registry_cell_regex "$WP_NUM")
 
 TODAY=$(date +%Y-%m-%d)
 
+# --- Step 0: resolve the archive slug BEFORE the registry is touched ---
+# issue #1558: the slug used to be read from a fixed position (parts[3], "3rd column").
+# create-wp.sh writes rows by the table HEADER, so a registry whose columns are ordered
+# differently (| # | Название | Статус | P | ...) gave a slug built from the status cell and
+# the closure landed in a stray archive file. The name column is now found by the header
+# of the table that holds the row; a missing column or an empty name is an error raised
+# here, before step 1 strikes the row, so a failed close leaves the registry untouched.
+# Exit codes of the helper: 0 = slug printed, 2 = active row not found (step 1 reports it),
+# 3 = no name column / empty name (abort).
+SLUG=$(python3 - "$REGISTRY" "$CELL_RE" <<'PYEOF2'
+import sys, re
+registry_path, cell_re = sys.argv[1], sys.argv[2]
+NAME_COLUMNS = ("Название", "Name", "Title")
+SEPARATOR = re.compile(r"^\|\s*:?-{3,}")
+
+def cells(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+with open(registry_path, "r", encoding="utf-8") as f:
+    lines = f.readlines()
+
+header = None
+for i, line in enumerate(lines):
+    nxt = lines[i + 1] if i + 1 < len(lines) else ""
+    if line.lstrip().startswith("|") and SEPARATOR.match(nxt.lstrip()):
+        header = cells(line)
+        continue
+    if not line.lstrip().startswith("|"):
+        header = None
+        continue
+    row = re.match(r"^\|\s*(" + cell_re + r")\s*\|", line)
+    if not row or "~~" in row.group(1):
+        continue
+    idx = next((header.index(n) for n in NAME_COLUMNS if header and n in header), None)
+    if idx is None:
+        print("колонка «Название» не найдена в заголовке таблицы реестра", file=sys.stderr)
+        sys.exit(3)
+    row_cells = cells(line)
+    name = row_cells[idx].strip("~").strip("*").strip() if idx < len(row_cells) else ""
+    if not name:
+        print("пустое название РП в колонке «Название»", file=sys.stderr)
+        sys.exit(3)
+    slug = re.sub(r"[^a-zа-яёА-ЯЁ0-9\s-]", "", name.lower())
+    slug = re.sub(r"\s+", "-", slug.strip())[:40].strip("-")
+    print(slug or "context")
+    sys.exit(0)
+sys.exit(2)
+PYEOF2
+)
+SLUG_RC=$?
+if [[ $SLUG_RC -eq 3 ]]; then
+  echo "❌ REGISTRY: не могу определить название WP-${WP_NUM} (см. сообщение выше) — реестр не изменён, закрытие остановлено" >&2
+  exit 1
+fi
+if [[ $SLUG_RC -ne 0 && $SLUG_RC -ne 2 ]]; then
+  echo "❌ REGISTRY: ошибка чтения $REGISTRY (код $SLUG_RC) — реестр не изменён" >&2
+  exit 1
+fi
+
 # --- Step 1: strike through the row in REGISTRY ---
 echo "1/3 Обновляю REGISTRY..."
 
@@ -167,27 +226,6 @@ echo "2/3 Создаю archive/wp-contexts..."
 
 mkdir -p "$ARCHIVE_DIR"
 
-# Determine the slug from REGISTRY
-SLUG=$(python3 - "$REGISTRY" "$WP_NUM" "$CELL_RE" <<'PYEOF2'
-import sys, re
-registry_path, wp_num, cell_re = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(registry_path, "r", encoding="utf-8") as f:
-    for line in f:
-        # Ищем строку с этим WP (теперь уже зачёркнутую): ~~9~~, ~~WP-009~~ (#954)
-        row = re.match(r"^\|\s*(" + cell_re + r")\s*\|", line)
-        if row and "~~" in row.group(1):
-            # Извлечь название из колонки имени (3-я колонка)
-            parts = line.split("|")
-            if len(parts) >= 4:
-                name = parts[3].strip().strip("~").strip("*").strip()
-                # Сделать slug
-                slug = re.sub(r"[^a-zа-яёА-ЯЁ0-9\s-]", "", name.lower())
-                slug = re.sub(r"\s+", "-", slug.strip())[:40].strip("-")
-                print(slug or "context")
-                sys.exit(0)
-print("context")
-PYEOF2
-)
 CANONICAL_CONTEXT_FILE="$ARCHIVE_DIR/WP-${WP_ID}-${SLUG}.md"
 # An older context written under another title (or with the number spelled differently,
 # WP-044-old-title.md vs WP-44-old-title.md) is appended to, not shadowed by a second file (#954).

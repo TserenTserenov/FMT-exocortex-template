@@ -135,7 +135,7 @@ activity_checks:
     commit_pattern_regex: "([Ll]esson|[Mm]emory|lessons_|[Уу]рок|[Пп]амят).*(archive|rotate|clean|hygiene|[Аа]рхив|[Рр]отаци|[Сс]жат|[Оо]чист|[Гг]игиен)"
     dormant_after_periods: 3
     archive_after_periods: 1
-    notes: "Trigger: /week-close. Симптом мёртвости — MEMORY.md раздувается >100 строк."
+    notes: "Trigger: /week-close. Симптом мёртвости — MEMORY.md выходит за бюджет контекста (verify-context-budget.sh), issue #1555."
 
   # staging-promotion removed (issue #1098): same class as staging-validated-to-fmt
   # (#404) — source (STAGING.md, /author-mode) is author-only, author_mode: false
