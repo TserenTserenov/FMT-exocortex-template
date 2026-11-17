@@ -17,7 +17,8 @@
 # Usage:
 #   light-onboarding-state.sh status [--quiet]  prints active|inactive; exit 0 = active, 1 = inactive
 #   light-onboarding-state.sh done              onboarding passed: create done, remove force
-#   light-onboarding-state.sh reset             explicit reset: create force (work state is untouched)
+#   light-onboarding-state.sh reset [--confirm] explicit reset: create force (work state is untouched);
+#                                               with work state present it needs --confirm, else exit 3
 #
 # Workspace: $IWE_WORKSPACE, else $CLAUDE_PROJECT_DIR, else the current directory.
 # setup.sh and update.sh never create or delete the done/force files.
@@ -94,12 +95,21 @@ case "${1:-}" in
         echo "light onboarding: marked as passed"
         ;;
     reset)
+        # In a working install the onboarding switches the WP Gate reminder off, so a reset
+        # there is the person's explicit choice, never an agent's routine step (issue #1570,
+        # F4 of the v0.42.0 red team): without --confirm it is refused and changes nothing.
+        if workspace_has_work && [ "${2:-}" != "--confirm" ]; then
+            echo "light onboarding: not reset — this install already has work (WP, cards or day plans);" >&2
+            echo "  the onboarding would switch off the WP Gate reminder. If the person asked for it," >&2
+            echo "  run: light-onboarding-state.sh reset --confirm" >&2
+            exit 3
+        fi
         mkdir -p "$STATE_DIR" || exit 2
         date -u +%Y-%m-%dT%H:%M:%SZ > "$FORCE_FILE" || exit 2
         echo "light onboarding: will run again on the next message"
         ;;
     *)
-        echo "usage: light-onboarding-state.sh status [--quiet] | done | reset" >&2
+        echo "usage: light-onboarding-state.sh status [--quiet] | done | reset [--confirm]" >&2
         exit 2
         ;;
 esac

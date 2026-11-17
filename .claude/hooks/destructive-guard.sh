@@ -1335,8 +1335,197 @@ if matches "$CMD_EXEC" -E '((cat|head|tail|cp|dd)([[:space:]]+[^;&|>]*[^;&|>[:sp
      | grep -vqE '^(/dev/null$|/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR|\$\{TMPDIR)'; then
   block "обнуление файла читающей командой (cat /dev/null > файл, head -c0 … > файл) запрещено — так без запроса стирают планы и настройки. Пустой файл во временной папке создавать можно; удалять содержимое рабочих файлов — правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
-if matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
-  block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+# Write targets of the call, one per line: "<command>\t<kind>\t<target>\t<input>". <command> is
+# the word the segment runs (basename; "git <subcommand>" for git), <kind> is T (truncating
+# redirection: >, >|, N>, &>, >&file), A (append: >>, &>>) or E (a file argument of tee); <input>
+# is H when the segment reads a here-doc or here-string (<<, <<-, <<<), else "-". Quotes are
+# removed from the target, variables are left as written. `bash|sh|zsh -c '…'` is read recursively.
+# Only redirections that write are reported: input (<, <<, <<<), descriptor copies (2>&1, >&-)
+# are not.
+WRITE_TARGETS_PL='
+  use strict; use warnings;
+  my %wrapper = map { $_ => 1 } qw(env nice nohup command sudo stdbuf time timeout xargs);
+  my %shell = map { $_ => 1 } qw(bash sh zsh dash ksh);
+  sub base { my $w = shift; $w =~ s{.*/}{}; return $w; }
+  sub scan {
+    my ($s, $depth) = @_;
+    return if $depth > 3;
+    my @segments; my @words; my @redirs; my $word; my $in_word = 0;
+    my $flush_word = sub { if ($in_word) { push @words, $word; $word = q{}; $in_word = 0; } };
+    my $here = 0;  # the segment reads a here-doc or here-string: its input is given in the text
+    my $flush_seg = sub { $flush_word->(); push @segments, [ [@words], [@redirs], $here ]; @words = (); @redirs = (); $here = 0; };
+    my $pending;   # kind of a redirection whose target is the next word
+    my $skip_next; # an input redirection: its next word is data, not a target
+    my $i = 0; my $n = length $s;
+    # Anchored \G matches at $i: copying the rest of the text at every step made this quadratic.
+    # Returns the capture groups (captures do not outlive the sub) or nothing.
+    my $at = sub { my $re = shift; pos($s) = $i; return unless $s =~ /\G$re/gc; return [ $1, $2 ]; };
+    while ($i < $n) {
+      my $c = substr($s, $i, 1);
+      if (!$in_word) {
+        if ($c =~ /[ \t]/) { $i++; next; }
+        if (my $m = $at->(qr/(\d*|&)(>>|>\||>&|>)/)) {
+          my $op = $m->[1];
+          $i = pos($s);
+          if ($op eq ">&") {
+            # >&2, 1>&2, >&- copy a descriptor; >&file (no fd) writes the file like &>.
+            if ($at->(qr/\s*(?:\d+|-)(?![^\s;&|()<>])/)) { $skip_next = 1; next; }
+            $pending = "T"; next;
+          }
+          $pending = $op eq ">>" ? "A" : "T";
+          next;
+        }
+        if (my $m = $at->(qr/\d*(<<<|<<-?|<>|<&|<)/)) {
+          $i = pos($s);
+          $here = 1 if $m->[0] =~ /^<</;
+          if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
+          $skip_next = 1; next;
+        }
+        if ($at->(qr/&&|\|\||;;|[;&|()\n`]|\$\(/)) { $flush_seg->(); $i = pos($s); next; }
+      }
+      # Inside or at the start of a word.
+      if ($in_word && ($c =~ /[ \t\n;&|()<>`]/)) {
+        my $w = $word; $word = q{}; $in_word = 0;
+        if ($skip_next) { $skip_next = 0; }
+        elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; }
+        else { push @words, $w; }
+        next;
+      }
+      $in_word = 1;
+      if ($c eq "\x27") {
+        my $j = index($s, "\x27", $i + 1); $j = $n if $j < 0;
+        $word .= substr($s, $i + 1, $j - $i - 1); $i = $j + 1; next;
+      }
+      if ($c eq q{"}) {
+        my $j = $i + 1;
+        while ($j < $n && substr($s, $j, 1) ne q{"}) {
+          if (substr($s, $j, 1) eq "\\" && $j + 1 < $n) { $word .= substr($s, $j + 1, 1); $j += 2; next; }
+          $word .= substr($s, $j, 1); $j++;
+        }
+        $i = $j + 1; next;
+      }
+      if ($c eq "\\" && $i + 1 < $n) { $word .= substr($s, $i + 1, 1); $i += 2; next; }
+      if ($c eq q{$} && substr($s, $i + 1, 1) eq "(") {
+        # $( inside a word starts a nested command: end the word here.
+        my $w = $word; $word = q{}; $in_word = 0;
+        if ($w ne q{}) {
+          if ($skip_next) { $skip_next = 0; } elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; } else { push @words, $w; }
+        }
+        $flush_seg->(); $i += 2; next;
+      }
+      $word .= $c; $i++;
+    }
+    if ($in_word) {
+      if ($skip_next) { } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
+      $in_word = 0; $word = q{};
+    }
+    $flush_seg->();
+    for my $seg (@segments) {
+      my ($w, $r, $seg_here) = @$seg;
+      my @w = @$w;
+      shift @w while @w && $w[0] =~ /^[A-Za-z_][A-Za-z0-9_]*=/;
+      my $cmd = @w ? base($w[0]) : q{};
+      if ($cmd eq "git") {
+        my $k = 1;
+        while ($k < @w && $w[$k] =~ /^-/) { $k += ($w[$k] =~ /^-[Cc]$/) ? 2 : 1; }
+        $cmd = "git " . ($w[$k] // q{});
+      }
+      my $input = $seg_here ? "H" : "-";
+      print "$cmd\t$_->[0]\t$_->[1]\t$input\n" for @$r;
+      # tee after wrappers (env, nice, sudo …): its file arguments are written.
+      my $k = 0;
+      while ($k < @w && ($wrapper{base($w[$k])} || $w[$k] =~ /^-/ || $w[$k] =~ /^[A-Za-z_][A-Za-z0-9_]*=/ || $w[$k] =~ /^\d+[smhd]?$/)) { $k++; }
+      if ($k < @w && base($w[$k]) eq "tee") {
+        print "tee\tE\t$_\n" for grep { !/^-/ } @w[$k + 1 .. $#w];
+      }
+      if ($k < @w && $shell{base($w[$k])}) {
+        for my $a ($k + 1 .. $#w - 1) {
+          if ($w[$a] =~ /^-[a-z]*c[a-z]*$/) { scan($w[$a + 1], $depth + 1); last; }
+        }
+      }
+    }
+  }
+  my $text = do { local $/; <STDIN> };
+  scan($text, 0);
+'
+WRITE_TARGETS=$(printf '%s' "$CMD_EXEC" | perl -e "$WRITE_TARGETS_PL") || fail_check "perl, разбор целей записи"
+
+# Protective files (.claude/hooks, .claude/bin, settings*.json) by any spelling of their path
+# (issue #1567, F1 of the v0.42.0 red team): `.claude//hooks/x`, `./.claude/./hooks/x`,
+# `.claude/x/../hooks/x`, `.claude/hook?/x`, `.claude/{hooks,x}/x` named the same file and passed a
+# literal match. The target is normalised before the comparison: braces expanded, empty and `.`
+# components dropped, `..` resolved; then every component is compared as a glob, so a pattern
+# that can name a protective file counts as naming it.
+PROTECTED_TARGET_PL='
+  use strict; use warnings;
+  sub braces {
+    my $s = shift;
+    return ($s) unless $s =~ /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/s;
+    my ($pre, $mid, $post) = ($1, $2, $3);
+    return map { braces($pre . $_ . $post) } split /,/, $mid, -1;
+  }
+  sub glob_re {
+    my $g = shift; my $re = q{};
+    while ($g =~ /\G(\*+|\?|\[!?[^\]]*\]|.)/gs) {
+      my $t = $1;
+      if ($t =~ /^\*/) { $re .= ".*"; }
+      elsif ($t eq "?") { $re .= "."; }
+      elsif ($t =~ /^\[(!?)(.*)\]$/s && length($t) > 2) { my ($neg, $set) = ($1, $2); $set =~ s/\\/\\\\/g; $re .= "[" . ($neg ? "^" : q{}) . $set . "]"; }
+      else { $re .= quotemeta $t; }
+    }
+    return qr/^(?:$re)$/s;
+  }
+  sub names { my ($comp, $name) = @_; return $name =~ glob_re($comp); }
+  my $hit = 0;
+  while (my $line = <STDIN>) {
+    chomp $line;
+    my (undef, undef, $target) = split /\t/, $line, 4;
+    next unless defined $target;
+    for my $path (braces($target)) {
+      my @parts;
+      for my $p (split m{/+}, $path) {
+        next if $p eq q{} || $p eq ".";
+        if ($p eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
+        push @parts, $p;
+      }
+      for my $k (0 .. $#parts - 1) {
+        next unless names($parts[$k], ".claude");
+        my $next = $parts[$k + 1];
+        if (($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
+            || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")))) {
+          $hit = 1;
+        }
+      }
+    }
+  }
+  print $hit ? "HIT" : "MISS";
+'
+PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
+if [ "$PROTECTED_TARGET" = "HIT" ] \
+  || matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+  block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны и фигурные скобки). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
+fi
+
+# A truncating redirection after a pre-approved reader (issue #1568, F2 of the v0.42.0 red team).
+# settings.json lets ls, cat, head, tail, wc, grep, rg, find, diff and git status/log/diff/show/
+# branch/remote run without a prompt, so `grep nomatch F > params.yaml`, `ls /nonexistent > f`,
+# `head -0 F > f`, `tail -n +999999 F > f` and `diff F F > f` emptied or overwrote a working file
+# silently; the block above only knows /dev/null and zero counts, and such a list is never
+# complete. The class: a `>` into anything outside temporary directories and /dev, run by one of
+# those readers, goes through a prompt. Append (>>) does not destroy content and stays allowed, and
+# so does a reader fed a here-doc or here-string (`cat > notes.md <<'EOF'`, `cat <<< x > f`): its
+# content is in the call itself, so the output is not the empty one this rule is about. The blocks
+# above (protective files, /dev/null) still apply to it.
+# Keep the reader list in step with the Bash(...) allow rules of .claude/settings.json.
+READER_OVERWRITE=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' '
+  $2 == "T" && $4 != "H" && $1 ~ /^(ls|cat|head|tail|wc|grep|egrep|fgrep|rg|find|diff|git (status|log|diff|show|branch|remote))$/ {
+    t = $3
+    if (t ~ /^(\/tmp\/|\/private\/tmp\/|\/var\/folders\/|\/private\/var\/folders\/|\$TMPDIR\/|\$\{TMPDIR\}\/|\$\{TMPDIR:-[^}]*\}\/)/ && t !~ /\/\.\.(\/|$)/) next
+    if (t ~ /^\/dev\/(null|stdout|stderr|tty|fd\/[0-9]+)$/) next
+    print t
+  }')
+if [ -n "$READER_OVERWRITE" ]; then
+  ASK_REASON="перенаправление «>» после читающей команды перезапишет файл ($(printf '%s' "$READER_OVERWRITE" | head -1)) — такие команды разрешены без запроса, а пустой вывод (grep без совпадений, ls несуществующего, head -0) стирает файл. Подтверди запись, если она нужна; рабочие файлы правят правкой файла."
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
@@ -1389,6 +1578,14 @@ ISOLATED_COMMIT_TOTAL_SEGMENTS=$(echo "$ISOLATED_COMMIT_ANALYSIS" | awk '{print 
 ISOLATED_COMMIT_WRAPPER_HITS=$(echo "$ISOLATED_COMMIT_ANALYSIS" | awk '{print $2}')
 if [ "${ISOLATED_COMMIT_WRAPPER_HITS:-0}" -gt 0 ] && [ "${ISOLATED_COMMIT_TOTAL_SEGMENTS:-0}" -gt 1 ]; then
   block "iwe-commit-isolated.sh обязан быть единственной командой в вызове — обнаружены другие сегменты той же compound-команды (после ; & | или в скобках/backtick). Раздели на отдельные Bash-вызовы."
+fi
+
+# Not forbidden, but not for silent approval either: ask the person (issue #1568). Emitted last,
+# after every block above has had its say.
+if [ -n "${ASK_REASON:-}" ]; then
+  jq -n --arg reason "$ASK_REASON" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $reason}}' \
+    || fail_check "jq, ответ с запросом"
 fi
 
 exit 0

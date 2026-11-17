@@ -190,7 +190,7 @@ if [ -n "$STAGED_SETTINGS" ] && [ -x "scripts/validate-fmt-scripts.sh" ]; then
 fi
 
 # === Template validation (author-specific leaks, hardcoded paths, hooks cross-ref) ===
-# Root of the bug (Apr 26): the literal `DS-my-strategy` got into the new
+# Root of the bug (Apr 26): the author's own governance repo name got into the new
 # templates/strategy-skeleton/README.md (commit cb22aaa); the validator is called
 # only from template-sync.sh — manual commits to FMT bypassed validation.
 # Gate: if at least one staged file has an extension that validate-template.sh scans,

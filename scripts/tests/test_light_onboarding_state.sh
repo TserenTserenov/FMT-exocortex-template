@@ -4,8 +4,8 @@
 # branch of .claude/hooks/wp-gate-reminder.sh that uses it.
 #
 # Cases: fresh workspace -> active; working state (wp-numbers or a WP row in the
-# registry) -> inactive, also after deleting `done`; `reset` -> active even with
-# working state; `done` -> inactive and clears `force`; the hook injects the
+# registry) -> inactive, also after deleting `done`; with working state a bare `reset` is
+# refused and only `reset --confirm` -> active (issue #1570); `done` -> inactive and clears `force`; the hook injects the
 # onboarding reminder only while active and the WP Gate reminder otherwise.
 
 set -uo pipefail
@@ -55,13 +55,31 @@ WS=$(new_ws registry)
 printf '| 7 | P2 | Отчёт | 🔄 | DS-my-strategy | 2h |\n' >> "$WS/DS-my-strategy/docs/WP-REGISTRY.md"
 [ "$(status_of "$WS")" = inactive ] || fail "a registry row must make onboarding inactive"
 
-# 4. Deleting `done` with work state does not bring onboarding back; `reset` does.
+# 4. Deleting `done` with work state does not bring onboarding back. Neither does a bare
+#    `reset` (issue #1570): it is refused, and the hook keeps the WP Gate reminder;
+#    only `reset --confirm` (the person's explicit choice) reactivates it.
 run_state "$WS" "done"
 rm -f "$WS/.claude/state/light-onboarding-done"
 [ "$(status_of "$WS")" = inactive ] || fail "deleting done must not reactivate when work state exists"
-run_state "$WS" "reset"
-[ "$(status_of "$WS")" = active ] || fail "reset must reactivate onboarding even with work state"
+rc=0; run_state "$WS" "reset" 2>/dev/null || rc=$?
+[ "$rc" -eq 3 ] || fail "reset without --confirm must be refused with exit 3 when work state exists (got $rc)"
+[ "$(status_of "$WS")" = inactive ] || fail "reset without --confirm must not reactivate onboarding when work state exists"
+[ -e "$WS/.claude/state/light-onboarding-force" ] && fail "a refused reset must not create the force file"
+hook_ctx "$WS" "Что дальше?" | grep -q "WP GATE" || fail "after a refused reset the hook must keep the WP Gate reminder"
+(cd "$WS" && env -u IWE_GOVERNANCE_REPO IWE_WORKSPACE="$WS" bash .claude/scripts/light-onboarding-state.sh reset --confirm >/dev/null) \
+    || fail "reset --confirm must succeed with work state"
+[ "$(status_of "$WS")" = active ] || fail "reset --confirm must reactivate onboarding even with work state"
 grep -q "Отчёт" "$WS/DS-my-strategy/docs/WP-REGISTRY.md" || fail "reset must not touch the registry"
+
+# 4a. On a fresh install (no work) a bare reset still works, e.g. after `done`.
+WS_FRESH=$(new_ws freshreset)
+run_state "$WS_FRESH" "done"
+run_state "$WS_FRESH" "reset" || fail "reset without work state must succeed"
+[ "$(status_of "$WS_FRESH")" = active ] || fail "reset without work state must reactivate onboarding"
+
+# 4b. reset is not pre-approved: it must go through a prompt (issue #1570).
+grep -qF 'light-onboarding-state.sh reset' "$ROOT/.claude/settings.json" \
+    && fail "reset must not be in the pre-approved commands of .claude/settings.json"
 
 # 5. `done` ends onboarding and clears `force`.
 run_state "$WS" "done"

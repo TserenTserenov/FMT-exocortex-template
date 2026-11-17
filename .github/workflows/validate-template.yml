@@ -871,6 +871,8 @@ jobs:
           bash .claude/hooks/tests/test-destructive-guard-file-writers.sh
           bash .claude/hooks/tests/test-destructive-guard-git-branch-remote.sh
           bash .claude/hooks/tests/test-destructive-guard-find-chain.sh
+          bash .claude/hooks/tests/test-destructive-guard-path-spellings.sh
+          bash .claude/hooks/tests/test-destructive-guard-reader-overwrite.sh
           bash scripts/tests/test_issue_1010_memory_limit.sh
 
       # WP-529 F7 follow-up (pilot decision 2026-08-21): update.sh delivers the
@@ -995,6 +997,11 @@ jobs:
       # reminder only applies once onboarding is passed or work state exists.
       - name: Test the light onboarding new-person predicate and its hook branch
         run: bash scripts/tests/test_light_onboarding_state.sh
+
+      # Issue #1569: delivered files without an extension are scanned for author content,
+      # and iwe-notify takes the governance repo name from the workspace settings.
+      - name: Test the author-content scan of extension-less delivered files
+        run: bash scripts/tests/test-issue-1569-extensionless-author-scan.sh
 
       # ArchGate 03.09 (WP-5): the isolated inbox-check sandbox now
       # mounts the Pack repositories for duplicate checking -- read-only must be

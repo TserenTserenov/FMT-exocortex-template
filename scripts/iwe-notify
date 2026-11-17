@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # iwe-notify — one Telegram notification from a standalone IWE script
-# (WP-568 Ф12 С4, ArchGate 06.11.2026, DRR: DS-my-strategy inbox/WP-568/DRR-f12.md).
+# (WP-568 Ф12 С4, ArchGate 06.11.2026).
 #
 # Usage:
 #   iwe-notify --source <source-id> "text"
@@ -54,7 +54,8 @@
 #     direct send carries the buttons.
 #
 # Gateway lookup: IWE_NOTIFY_GATEWAY (explicit path), else scripts/iwe-tg in
-# $IWE_ROOT/$IWE_GOVERNANCE_REPO, DS-strategy, DS-my-strategy (first found).
+# the governance repo of $IWE_ROOT: $IWE_GOVERNANCE_REPO, else the GOVERNANCE_REPO= line of the
+# workspace settings file written by setup.sh (read with grep, never sourced), else DS-strategy.
 set -uo pipefail
 
 # Template workspaces name their root IWE_WORKSPACE; the author host IWE_ROOT.
@@ -97,14 +98,23 @@ find_gateway() {
     return 0
   fi
   local repo
-  for repo in "${IWE_GOVERNANCE_REPO:-}" DS-strategy DS-my-strategy; do
-    [ -n "$repo" ] || continue
-    if [ -f "$IWE_ROOT/$repo/scripts/iwe-tg" ]; then
-      printf '%s' "$IWE_ROOT/$repo/scripts/iwe-tg"
-      return 0
-    fi
-  done
+  repo=$(governance_repo)
+  if [ -f "$IWE_ROOT/$repo/scripts/iwe-tg" ]; then
+    printf '%s' "$IWE_ROOT/$repo/scripts/iwe-tg"
+    return 0
+  fi
   return 1
+}
+
+# governance_repo: the name setup.sh recorded for this workspace, resolved like the other
+# scripts do (light-onboarding-state.sh, generate-hot-files-list.sh).
+governance_repo() {
+  local name="${IWE_GOVERNANCE_REPO:-}"
+  if [ -z "$name" ] && [ -f "$IWE_ROOT/.exocortex.env" ]; then
+    name=$(grep '^GOVERNANCE_REPO=' "$IWE_ROOT/.exocortex.env" 2>/dev/null | tail -1 | cut -d= -f2-)
+    name="${name#\"}"; name="${name%\"}"
+  fi
+  printf '%s' "${name:-DS-strategy}"
 }
 
 # log_row <reason> <outcome> — one row per bypass of the gateway, written
