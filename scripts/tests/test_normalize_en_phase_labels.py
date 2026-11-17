@@ -45,6 +45,26 @@ def test_already_latin_label_is_unchanged():
     assert nl.normalize("F21 and Ф") == "F21 and Ф"
 
 
+def test_dashed_phase_label_becomes_latin_f():
+    # Regression 2026-11-17: docs/LEARNING-PATH.md kept "WP-283 Ф-H".
+    assert nl.normalize("superseded by WP-283 Ф-H (May)") == "superseded by WP-283 F-H (May)"
+
+
+def test_dash_without_latin_after_it_is_left_alone():
+    assert nl.normalize("Ф-фаза") == "Ф-фаза"
+
+
+def test_result_codes_become_latin_g():
+    # Regression 2026-11-17: docs/RELEASE-PROCESS.md kept "Ц77-03" and "ЦNN-NN".
+    text = "Result: Ц77-03, Ц84-1; format `ЦNN-NN`"
+    assert nl.normalize(text) == "Result: G77-03, G84-1; format `GNN-NN`"
+
+
+def test_letter_ts_outside_result_code_is_left_alone():
+    # "Ц3" (a cycle number) and words stay visible to the gate.
+    assert nl.normalize("Цель (Ц3) аЦ77-03") == "Цель (Ц3) аЦ77-03"
+
+
 def test_tree_rewrite_changes_only_files_with_labels(tmp_path):
     (tmp_path / "docs").mkdir()
     dirty = tmp_path / "docs" / "a.md"

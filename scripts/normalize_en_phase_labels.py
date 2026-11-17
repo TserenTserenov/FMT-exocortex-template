@@ -7,7 +7,13 @@ them as written, and the gate then fails on the single letter Ф (found
 2026-10-27: Translate Sync red on main because docs/BRANCH-PROTECTION-EMERGENCY.md
 carries "Ф21" in three lines).
 
-Only the letter Ф directly followed by a digit and not preceded by another
+The same holds for the dashed phase form "Ф-H" and for changelog result
+codes "Ц77-03" / "ЦNN-NN" (rewritten to G, as the English docs spell them;
+found 2026-11-17, WP-529 F274: Translate Sync red on main on
+docs/LEARNING-PATH.md and docs/RELEASE-PROCESS.md).
+
+Only the letter Ф directly followed by a digit (or by "-" and a Latin letter
+or digit) and not preceded by another
 Cyrillic letter is rewritten, so ordinary Russian words that happen to
 contain Ф are left to the translator and to the gate. A label glued to a
 Latin letter or digit ("WP-529Ф21") is still a label and is rewritten. Known
@@ -22,11 +28,15 @@ import re
 import sys
 from pathlib import Path
 
-PHASE_LABEL = re.compile(r"(?<![А-Яа-яЁё])Ф(?=\d)")
+# "Ф21" and the dashed form "Ф-H" (a lettered phase, e.g. "WP-283 Ф-H").
+PHASE_LABEL = re.compile(r"(?<![А-Яа-яЁё])Ф(?=\d|-[A-Za-z0-9])")
+# Changelog result codes "Ц77-03" and the format placeholder "ЦNN-NN";
+# the English docs already spell them "G77-03" / "GNN-NN" (Goal).
+RESULT_CODE = re.compile(r"(?<![А-Яа-яЁё])Ц(?=\d+-\d+|NN-NN)")
 
 
 def normalize(text: str) -> str:
-    return PHASE_LABEL.sub("F", text)
+    return RESULT_CODE.sub("G", PHASE_LABEL.sub("F", text))
 
 
 def normalize_tree(root: Path) -> list[Path]:
