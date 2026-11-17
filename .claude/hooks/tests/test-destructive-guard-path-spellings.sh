@@ -68,6 +68,34 @@ EOF"
 expect "comment quote, then tee into bin" block "ls # it's
 echo x | tee .claude/bin/guarded-rm"
 
+# === WP-529 F275, rc.1 red team F1: brace expansion is capped, an unresolvable target fails closed ===
+B40=$(printf '{a,b}%.0s' $(seq 40))
+expect "protected write before a 40-group brace target" block "cat README.md > .claude/hooks/destructive-guard.sh || ls > x$B40"
+expect "40-group brace target inside .claude/hooks" block "ls > .claude/h$B40/x"
+expect "tee with a 40-group brace target near hooks" block "echo a | tee .claude/hook?/$B40"
+expect "bad bracket class inside .claude/hooks" block 'cat README.md > .claude/[[:alpha:]]ooks/x.sh'
+expect "small brace target in /tmp still passes" pass 'ls > /tmp/x{a,b}{a,b}'
+
+# === WP-529 F275, rc.1 red team F3: any quote or backtick in a comment, a quote in a substitution ===
+expect "escaped apostrophe in a comment" block "ls # a\\'b'
+cat README.md > .claude//hooks/x.sh"
+expect "even mixed quotes in a comment" block "ls # a'b\"c'd\"
+cat README.md > .claude//hooks/x.sh"
+expect "comment inside backticks" block "ls \`#'\`
+cat README.md > .claude//hooks/x.sh"
+expect "quote nested in a substitution" block 'cat README.md "$(echo "'"'"'")" > .claude//hooks/x.sh'
+expect "comment, then &> with a glob" block "ls # don't
+cat README.md &> .claud?//hooks/x.sh"
+expect "comment, then >& with split quotes" block "ls # don't
+cat README.md >& .cl\"\"aude//hooks/x.sh"
+expect "comment, then tee with a glob" block "ls # don't
+cat README.md | tee .claud?//hooks/x.sh"
+expect "commit message from a cat here-doc stays allowed" pass "git commit -m \"\$(cat <<'EOF'
+fix: a -> b
+> quoted
+EOF
+)\" 2>&1 | tail -2"
+
 # === look-alikes stay allowed ===
 expect "read a hook" pass 'cat .claude//hooks/destructive-guard.sh'
 expect "grep hooks dir" pass 'grep -rn x ./.claude/./hooks 2>/dev/null'

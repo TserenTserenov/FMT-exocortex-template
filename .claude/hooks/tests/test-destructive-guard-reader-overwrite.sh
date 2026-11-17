@@ -127,6 +127,21 @@ expect "tee writes its non-empty here-doc" pass "tee notes.md <<'EOF' >/dev/null
 a line
 EOF"
 
+# === WP-529 F275, rc.1 red team F2: only the last stdin redirection, on fd 0, may be the here-doc ===
+expect "here-doc on fd 3 is not cat's input" ask "cat > params.yaml 3<<EOF
+x
+EOF"
+expect "here-string on fd 3 is not cat's input" ask 'cat 3<<< x > params.yaml'
+expect "stdin closed after the here-doc" ask "cat <<EOF > params.yaml <&-
+x
+EOF"
+expect "stdin from /dev/null after the here-string" ask 'cat <<< x > params.yaml < /dev/null'
+expect "stdin from a file after the here-string" ask 'cat <<< x > params.yaml 0< README.md'
+expect "empty here-string after a here-doc" ask "cat <<EOF <<< '' > params.yaml
+x
+EOF"
+expect "here-string on fd 0 explicitly" pass 'cat 0<<< x > notes.md'
+
 # === WP-529 F275: a quote or << inside a # comment must not hide the next lines ===
 expect "apostrophe in a comment, then a write" ask "ls # don't
 grep zzz README.md > params.yaml"
@@ -140,6 +155,21 @@ expect "markdown heading with a quote inside a here-doc body" pass "cat > notes.
 # Don't panic
 > a quote
 EOF"
+
+# === WP-529 F275, rc.1 red team F3: readers after a comment with a quote, all redirection forms ===
+expect "comment, then reader >" ask "ls # don't
+grep zzzqqq README.md > params.yaml"
+expect "comment, then reader &>" ask "ls # don't
+grep zzzqqq README.md &> params.yaml"
+expect "comment, then reader >&" ask "ls # don't
+grep zzzqqq README.md >& params.yaml"
+expect "quote nested in a substitution, then a workspace file" ask 'cat README.md "$(echo "'"'"'")" > params.yaml'
+expect "substitution without quotes stays quiet" pass 'echo "$(date)" > /tmp/x'
+expect "pr body from a cat here-doc with markdown quotes" pass "gh pr create --title t --body \"\$(cat <<'EOF'
+> a quote
+> another -> one
+EOF
+)\""
 
 # === every input terminates: the new passes walk each line once ===
 # finishes $1=desc $2=seconds $3=python expression building the command: the hook must answer
@@ -169,6 +199,15 @@ finishes "odd operators in a comment" 1.0 '"ls # ;> |> << \x27 \"\nls ;> |> x"'
 # such text), so the limit here is a termination bound, not the 1.0 s budget of perf_cases.py.
 finishes "200 KB here-doc body with quotes and >" 30 '"cat > notes.md <<\x27EOF\x27\n" + ("a > b it\x27s # c\n" * 13000)[:200000] + "\nEOF"'
 finishes "200 KB of ;> |> after a quoted comment" 30 '"ls # don\x27t\n" + ("x ;> |> # a\x27 <<E " * 12000)[:200000]'
+
+# === WP-529 F275, rc.1 red team F1: 2^40 brace words — the cap answers at once ===
+finishes "40 brace groups after a protected write" 2.0 '"cat README.md > .claude/hooks/destructive-guard.sh || ls > x" + "{a,b}" * 40'
+finishes "40 brace groups into /tmp" 2.0 '"ls > /tmp/x" + "{a,b}" * 40'
+finishes "40 brace groups after tee" 2.0 '"echo a | tee x" + "{a,b}" * 40'
+B40=$(printf '{a,b}%.0s' $(seq 40))
+expect "40 brace groups into /tmp ask (unresolvable)" ask "ls > /tmp/x$B40"
+expect "40 brace groups after tee ask (unresolvable)" ask "echo a | tee x$B40"
+expect "bad bracket class asks, not a raw perl error" ask 'cat README.md > a[[:alpha:]]/b'
 
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
