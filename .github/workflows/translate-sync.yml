@@ -281,7 +281,8 @@ jobs:
         # such lines). Same reason as the subsection step above: the fix has
         # to live in the pipeline, because a manual fix on en-draft does not
         # survive the next delta run. The rewrite is limited to "Ф" directly
-        # before a digit; see scripts/normalize_en_phase_labels.py.
+        # before a digit or "-<Latin>" and to result codes "Ц77-03"/"ЦNN-NN"
+        # (-> G, found 2026-11-17); see scripts/normalize_en_phase_labels.py.
         if: always() && steps.en_draft.outcome == 'success'
         run: python3 scripts/normalize_en_phase_labels.py ../en-draft
 
