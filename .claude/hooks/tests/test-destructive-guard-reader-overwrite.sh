@@ -156,6 +156,21 @@ expect "markdown heading with a quote inside a here-doc body" pass "cat > notes.
 > a quote
 EOF"
 
+# === WP-529 F275, rc.1 red team F3: readers after a comment with a quote, all redirection forms ===
+expect "comment, then reader >" ask "ls # don't
+grep zzzqqq README.md > params.yaml"
+expect "comment, then reader &>" ask "ls # don't
+grep zzzqqq README.md &> params.yaml"
+expect "comment, then reader >&" ask "ls # don't
+grep zzzqqq README.md >& params.yaml"
+expect "quote nested in a substitution, then a workspace file" ask 'cat README.md "$(echo "'"'"'")" > params.yaml'
+expect "substitution without quotes stays quiet" pass 'echo "$(date)" > /tmp/x'
+expect "pr body from a cat here-doc with markdown quotes" pass "gh pr create --title t --body \"\$(cat <<'EOF'
+> a quote
+> another -> one
+EOF
+)\""
+
 # === every input terminates: the new passes walk each line once ===
 # finishes $1=desc $2=seconds $3=python expression building the command: the hook must answer
 # (exit 0 or 2) within the limit. Python builds the text so a 200 KB command needs no shell variable.
