@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e990d271487e271652b85e5ef890810d28c221b5ac68f19cd8a9019cb7909bad"
+      "sha256": "466a83c249c1bb324d2d7f45088108919e8b76326b6932745ef7569062bccdb5"
     },
     {
       "path": "CLAUDE.md",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "e0c8c6d579821fa828ef80a464d2bb8f64c3a9544d00c703bfbf21f12cfb153f"
+      "sha256": "21f62931837b9fec7c5ae34fa88a3deb0916c6a2f66383f7fd43a4614ab6b29b"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -1149,7 +1149,7 @@
     },
     {
       "path": "docs/principles-vs-skills.md",
-      "sha256": "15aa82a39166853f2a8350691d54ebc46255dc4d2ab33c7aaa749b66da7953ed"
+      "sha256": "099ad5c7e76e4ace427e78c72d54fb871e19f554019e2d4b8291585a0f3ba009"
     },
     {
       "path": "docs/release-audit-log.md",
@@ -1205,7 +1205,7 @@
     },
     {
       "path": "extensions/agent-inbox/SPEC.md",
-      "sha256": "27751b8ae6013f3be5a77b68b0ce112686cfe8bd69794860596b0e0ec5080ab9"
+      "sha256": "97b8964b08a0cdd112b1058a87206f2fd154811d7886b4db263e445f8c01acff"
     },
     {
       "path": "extensions/agent-inbox/scripts/config/pipeline-security-whitelist.yaml",
@@ -1225,7 +1225,7 @@
     },
     {
       "path": "extensions/agent-inbox/templates/analyze-section.md",
-      "sha256": "9ce3944ae270f852fa016d8513dd8f653d0b02e42e05d28c366ad09a7802fe09"
+      "sha256": "6b2b0c6b39a4b834e7dc4d7a193b25a16d0424cc6f0cdf6a035e2ca80d1f6be6"
     },
     {
       "path": "extensions/agent-inbox/templates/evolution-cron.md",

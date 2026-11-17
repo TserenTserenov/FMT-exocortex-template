@@ -107,7 +107,7 @@ started_at: 2026-05-17T22:01:13+03:00
 completed_at: 2026-05-17T22:24:55+03:00
 model: claude-opus-4-7
 cost_usd: 0.42
-artifact_url: https://github.com/aisystant/DS-principles-curriculum/blob/main/specs/v4-reference/Проверка/раздел-11-замечания.md
+artifact_url: https://github.com/MimEcoSys/DS-principles-curriculum/blob/main/specs/v4-reference/Проверка/раздел-11-замечания.md
 ---
 
 # Result для TASK-2026-05-17-analyze-section-11
