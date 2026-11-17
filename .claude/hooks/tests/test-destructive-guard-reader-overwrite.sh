@@ -99,5 +99,76 @@ a
 EOF"
 expect "here-string onto settings still blocked" block 'cat <<< "{}" > ./.claude/./settings.json'
 
+# === WP-529 F275: the exemption is only for `cat` without a file operand and a non-empty body ===
+expect "empty here-doc body empties the file" ask "cat > params.yaml <<EOF
+EOF"
+expect "blank-only here-doc body" ask "cat > params.yaml <<'EOF'
+
+EOF"
+expect "empty here-string" ask 'cat > params.yaml <<< ""'
+expect "unterminated here-doc" ask 'cat > params.yaml <<EOF'
+expect "grep ignores its here-doc" ask "grep zzz README.md > params.yaml <<EOF
+a line
+EOF"
+expect "ls ignores a here-string" ask 'ls /nonexistent > params.yaml <<< x'
+expect "head -0 with a here-string" ask 'head -0 F > params.yaml <<< x'
+expect "git show with a here-string" ask 'git show HEAD:README.md > README.md <<< x'
+expect "cat with a file operand and a here-string" ask 'cat README.md > DS-strategy/current/WeekPlan.md <<< x'
+expect "here-string from a variable may be empty" ask 'cat > params.yaml <<< "$EMPTY"'
+expect "an empty body elsewhere in the call" ask "cat > /tmp/a <<EOF
+EOF
+cat > params.yaml <<'EOF'
+a line
+EOF"
+expect "cat - reads only stdin" pass "cat - > notes.md <<'EOF'
+a line
+EOF"
+expect "tee writes its non-empty here-doc" pass "tee notes.md <<'EOF' >/dev/null
+a line
+EOF"
+
+# === WP-529 F275: a quote or << inside a # comment must not hide the next lines ===
+expect "apostrophe in a comment, then a write" ask "ls # don't
+grep zzz README.md > params.yaml"
+expect "comment, then append into a plan" ask "ls # don't
+echo x >> DS-strategy/current/WeekPlan.md"
+expect "even quotes in a comment stay quiet" pass "ls # it is 'fine'
+grep x README.md > /tmp/out.txt"
+expect "comment with a quote, then /tmp" pass "ls # don't
+grep x README.md > /tmp/out.txt"
+expect "markdown heading with a quote inside a here-doc body" pass "cat > notes.md <<'EOF'
+# Don't panic
+> a quote
+EOF"
+
+# === every input terminates: the new passes walk each line once ===
+# finishes $1=desc $2=seconds $3=python expression building the command: the hook must answer
+# (exit 0 or 2) within the limit. Python builds the text so a 200 KB command needs no shell variable.
+finishes() {
+  local desc="$1" limit="$2" expr="$3" verdict
+  verdict=$(python3 - "$HOOK" "$WORKSPACE_ROOT" "$limit" "$expr" <<'PYEOF'
+import json, subprocess, sys, time
+hook, root, limit, expr = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4]
+payload = json.dumps({"tool_input": {"command": eval(expr)}, "cwd": root})
+started = time.monotonic()
+try:
+    proc = subprocess.run(["bash", hook], input=payload, capture_output=True, text=True, timeout=limit)
+except subprocess.TimeoutExpired:
+    print(f"timeout after {limit} s"); sys.exit()
+took = time.monotonic() - started
+print("ok" if proc.returncode in (0, 2) else f"exit {proc.returncode} after {took:.2f} s")
+PYEOF
+)
+  if [ "$verdict" = "ok" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: $desc ($verdict)"; fi
+}
+finishes "semicolon then redirect" 1.0 '"ls ;> params.yaml"'
+finishes "pipe then redirect" 1.0 '"ls |> params.yaml"'
+finishes "chained odd operators" 1.0 '"ls ;>;>;> |>|> >|>| params.yaml"'
+finishes "odd operators in a comment" 1.0 '"ls # ;> |> << \x27 \"\nls ;> |> x"'
+# 200 KB: the hook as a whole is not linear in every older pass (main takes a few seconds on
+# such text), so the limit here is a termination bound, not the 1.0 s budget of perf_cases.py.
+finishes "200 KB here-doc body with quotes and >" 30 '"cat > notes.md <<\x27EOF\x27\n" + ("a > b it\x27s # c\n" * 13000)[:200000] + "\nEOF"'
+finishes "200 KB of ;> |> after a quoted comment" 30 '"ls # don\x27t\n" + ("x ;> |> # a\x27 <<E " * 12000)[:200000]'
+
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

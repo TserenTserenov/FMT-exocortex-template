@@ -56,6 +56,18 @@ expect "tee, double slash" block 'echo x | tee .claude//bin/guarded-rm'
 expect "tee -a, dot component" block 'echo x | tee -a ./.claude/./hooks/x.sh'
 expect "inside bash -c" block "bash -c 'cat README.md > .claude//hooks/x.sh'"
 
+# === WP-529 F275: here-doc input and comments do not lift the block ===
+expect "empty here-doc onto a hook" block "cat > .claude//hooks/x.sh <<EOF
+EOF"
+expect "grep with a here-string onto settings" block 'grep x README.md > ./.claude/./settings.json <<< x'
+expect "apostrophe in a comment hides the next line" block "ls # don't
+cat README.md > .claude//hooks/x.sh"
+expect "here-doc opener in a comment hides the next lines" block "ls # <<EOF
+cat README.md > .claude//hooks/x.sh
+EOF"
+expect "comment quote, then tee into bin" block "ls # it's
+echo x | tee .claude/bin/guarded-rm"
+
 # === look-alikes stay allowed ===
 expect "read a hook" pass 'cat .claude//hooks/destructive-guard.sh'
 expect "grep hooks dir" pass 'grep -rn x ./.claude/./hooks 2>/dev/null'
