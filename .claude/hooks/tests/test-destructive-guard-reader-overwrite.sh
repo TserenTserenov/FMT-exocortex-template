@@ -190,6 +190,19 @@ line one \\
 > quoted
 EOF"
 
+# === WP-529 F275, rc.2 red team C: a later fd 0 redirection or an empty delimiter cancels the exemption ===
+expect "here-string, then fd 0 closed" ask 'cat <<< x > params.yaml 0>&-'
+expect "here-string, then fd 0 onto /dev/null" ask 'cat <<< x > params.yaml 0>/dev/null'
+expect "here-string, then fd 0 moved away" ask 'cat <<< x > params.yaml 3<&0-'
+expect "here-doc, then fd 0 moved by >&" ask "cat <<EOF > params.yaml 4>&0-
+text
+EOF"
+expect "empty delimiter here-doc" ask "cat <<'' > params.yaml
+
+"
+expect "fd 0 closed before the here-string keeps the exemption" pass 'cat 0>&- <<< x > params.yaml'
+expect "here-string with stderr to /dev/null keeps the exemption" pass 'cat <<< x > notes.md 2>/dev/null'
+
 # === every input terminates: the new passes walk each line once ===
 # finishes $1=desc $2=seconds $3=python expression building the command: the hook must answer
 # (exit 0 or 2) within the limit. Python builds the text so a 200 KB command needs no shell variable.

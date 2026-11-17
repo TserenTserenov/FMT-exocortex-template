@@ -1500,11 +1500,15 @@ WRITE_TARGETS_PL='
       if (!$in_word) {
         if ($c =~ /[ \t]/) { $i++; next; }
         if (my $m = $at->(qr/(\d*|&)(>>|>\||>&|>)/)) {
-          my $op = $m->[1];
+          my ($fd, $op) = @$m;
           $i = pos($s);
+          # Any later redirection of fd 0 (`0>&-`, `0>/dev/null`, `0>f`) replaces the here-doc or
+          # here-string as the input of cat (rc.2 red team, finding C).
+          $here = 0 if $fd eq "0";
           if ($op eq ">&") {
             # >&2, 1>&2, >&- copy a descriptor; >&file (no fd) writes the file like &>.
-            if ($at->(qr/\s*(?:\d+|-)(?![^\s;&|()<>])/)) { $skip_next = 1; next; }
+            # `n>&0-` moves fd 0 away: stdin is closed.
+            if (my $d = $at->(qr/\s*((?:\d+-?|-))(?![^\s;&|()<>])/)) { $here = 0 if $d->[0] eq "0-"; $skip_next = 1; next; }
             $pending = "T"; next;
           }
           $pending = $op eq ">>" ? "A" : "T";
@@ -1518,7 +1522,15 @@ WRITE_TARGETS_PL='
           my ($fd, $op) = @$m;
           my $stdin = $fd eq q{} || $fd eq "0";
           if ($op eq "<<<") { $herestr = $stdin ? 1 : 0; }
-          elsif ($op =~ /^<</) { $here = 1 if $stdin && ($ENV{HEREDOC_EMPTY} // q{}) eq "-"; }
+          elsif ($op =~ /^<</) {
+            # Only a delimiter the first pass can match (a name, maybe quoted) has a body known to be
+            # non-empty; `<<\x27\x27` ends at the first empty line and gives nothing (rc.2 red team, C).
+            my $named = $at->(qr/[ \t]*(?:(["\x27])[A-Za-z_][A-Za-z0-9_]*\1|[A-Za-z_][A-Za-z0-9_]*)(?![^\s;&|()<>])/);
+            $i = pos($s) if $named;
+            $here = ($named && ($ENV{HEREDOC_EMPTY} // q{}) eq "-") ? 1 : 0 if $stdin;
+            next if $named;
+          }
+          elsif ($op eq "<&" && $at->(qr/[ \t]*0-(?![^\s;&|()<>])/)) { $i = pos($s); $here = 0; next; }  # `n<&0-` closes fd 0
           elsif ($stdin) { $here = 0; }
           if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
           $skip_next = 1; next;
@@ -1629,7 +1641,8 @@ PROTECTED_TARGET_PL='
       elsif ($t =~ /^\[(!?)(.*)\]$/s && length($t) > 2) { my ($neg, $set) = ($1, $2); $set =~ s/\\/\\\\/g; $re .= "[" . ($neg ? "^" : q{}) . $set . "]"; }
       else { $re .= quotemeta $t; }
     }
-    return qr/^(?:$re)$/s;
+    # Case-insensitive: on the default macOS file system `.Claude/Hooks` is the same directory.
+    return qr/^(?:$re)$/si;
   }
   sub names { my ($comp, $name) = @_; return $name =~ glob_re($comp); }
   sub protected_path {
@@ -1687,7 +1700,7 @@ PROTECTED_TARGET_PL='
   else { print "MISS"; }
 '
 # The literal spelling is checked first, before the perl pass expands anything.
-if matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+if matches "$CMD_EXEC" -iE '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
   PROTECTED_TARGET=HIT
 else
   PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
@@ -1700,6 +1713,105 @@ if [ "$PROTECTED_TARGET" = "HIT" ]; then
   block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны и фигурные скобки). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
+# Write targets read from the text alone, fail-closed (rc.2 red team, finding B). The scanner above
+# ends a word at `$(` and ends a segment at `<(`, so `> $(pwd)/.claude//hooks/x`,
+# `tee <(true) .claude//hooks/x`, `tee $(pwd)/…` and `> .claude/$'hooks'/x` (all silent in v0.42.0,
+# rc.1, rc.2) never reached the comparison. Here every target of `>`, `>>`, `>|`, `&>`, `>&file` and
+# every non-option operand of tee (process substitutions skipped) is taken from the text as a shell
+# word, then normalised: `$'…'` decoded, quotes and backslashes removed, a leading `$(…)`, `${…}`,
+# `$VAR` or backtick substitution dropped (it can only expand to a directory in front), `//` and
+# `/./` collapsed. A protective path by the regular expression or by the glob comparison above blocks.
+TEXT_TARGETS_SUB='
+  sub ansi_decode {
+    my $s = shift;
+    my %e = (n => "\n", t => "\t", r => "\r", a => "\a", b => "\b", e => "\e", f => "\f", v => "\x0b");
+    $s =~ s{\\(x[0-9A-Fa-f]{1,2}|[0-7]{1,3}|.)}{
+      my $x = $1;
+      $x =~ /^x(.+)/ ? chr(hex $1) : $x =~ /^[0-7]+$/ ? chr(oct $x) : exists $e{$x} ? $e{$x} : $x
+    }gse;
+    return $s;
+  }
+  my $nest;
+  $nest = qr/\((?:[^()\x27"]++|\x27[^\x27]*\x27|"(?:[^"\\]|\\.)*"|(??{$nest}))*\)/s;
+  # One shell word from $$i on: quotes, $(…), ${…}, backticks and escapes are kept whole.
+  sub word_at {
+    my ($s, $i) = @_;
+    pos($$s) = $$i;
+    $$s =~ /\G(?:[^\s;&|<>()\x27"`\\\$]++|\\.|\$\x27(?:[^\x27\\]|\\.)*\x27?|\x27[^\x27]*\x27?|"(?:[^"\\]|\\.)*"?|\$$nest|\$\{[^}]*\}?|`[^`]*`?|\$)*/gcs;
+    $$i = pos($$s);
+    return $&;
+  }
+  sub normal_target {
+    my $w = shift;
+    $w =~ s{\$\x27((?:[^\x27\\]|\\.)*)\x27?}{ansi_decode($1)}gse;
+    my $strip = qr/^(?:\$$nest|\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9#?\$!@*-]|`[^`]*`|~[A-Za-z0-9_.-]*)/;
+    for (1 .. 2) {
+      1 while $w =~ s/$strip//;
+      $w =~ s/["\x27]//g;
+      $w =~ s/\\(.)/$1/gs;
+    }
+    1 while $w =~ s{/\.(?=/|$)}{}g;
+    $w =~ s{/+}{/}g;
+    $w =~ s{^\./}{};
+    return $w;
+  }
+  sub protected_text { return $_[0] =~ m{(?:^|/)\.claude/+(?:hooks|bin)(?:/|$)|(?:^|/)\.claude/+settings(?:\.local)?\.json$}i; }
+  sub text_targets {
+    my $s = shift;
+    my @t;
+    my $n = length $s;
+    while ($s =~ /(&>>?|\d*>>?|\d*>\||\d*>&)/g) {
+      my ($op, $i) = ($1, pos($s));
+      pos($s) = $i;
+      $s =~ /\G[ \t]*/gc;
+      $i = pos($s);
+      next if $op =~ /&$/ && substr($s, $i) =~ /^(?:\d+-?|-)(?![^\s;&|()<>])/;  # 2>&1, >&2, >&-
+      next if substr($s, $i, 1) eq "(";                                            # >(…)
+      my $w = word_at(\$s, \$i);
+      push @t, $w if length $w;
+      pos($s) = $i;
+    }
+    pos($s) = 0;
+    while ($s =~ /(?:^|[\s;&|(`\/])tee(?=[ \t]|$)/gm) {
+      my $i = pos($s);
+      my $opts = 1;
+      while ($i < $n) {
+        pos($s) = $i;
+        $s =~ /\G[ \t]*/gc; $i = pos($s);
+        my $c = substr($s, $i, 1);
+        last if $i >= $n || $c =~ /[;&|\n)]/;
+        if ($c =~ /[<>]/ && substr($s, $i + 1, 1) eq "(") {
+          pos($s) = $i + 1;
+          if ($s =~ /\G$nest/gc) { $i = pos($s); } else { last; }
+          next;
+        }
+        if ($s =~ /\G\d*(?:<<<|<<-?|<>|<&|>&|>>|>\||&>>?|>|<)[ \t]*/gc) { $i = pos($s); word_at(\$s, \$i); next; }
+        my $w = word_at(\$s, \$i);
+        if (!length $w) { $i++; next; }
+        if ($opts && $w eq "--") { $opts = 0; next; }
+        push @t, $w unless $opts && $w =~ /^-./;
+      }
+      pos($s) = $i;
+    }
+    return grep { length } map { normal_target($_) } @t;
+  }
+'
+TEXT_TARGETS_PL="$TEXT_TARGETS_SUB"'
+  use strict; use warnings;
+  my $text = do { local $/; <STDIN> };
+  my @t = text_targets($text);
+  print((grep { protected_text($_) } @t) ? "HIT\n" : q{});
+  print "x\tT\t$_\t-\n" for @t;
+'
+TEXT_TARGETS=$(printf '%s' "$CMD_EXEC" | perl -e "$TEXT_TARGETS_PL") || fail_check "perl, цели записи по тексту"
+case "$TEXT_TARGETS" in
+  HIT*) TEXT_PROTECTED=HIT ;;
+  *) TEXT_PROTECTED=$(printf '%s\n' "$TEXT_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей по тексту" ;;
+esac
+case "$TEXT_PROTECTED" in
+  HIT|BLOCK) block "запись в .claude/hooks, .claude/bin или settings.json запрещена в любом написании пути — и через подстановку перед ним (\$(pwd)/.claude//hooks, \`pwd\`/…, \$HOME/…), \$'…', tee после <(…). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
+esac
+
 # A `#` comment or a command substitution the scanners above do not understand (WP-529 F275). They
 # know no comments, so a quote or backtick inside one (`ls # don't`, `ls # a\'b'`) opens a string
 # that swallows the next lines, and a `<<WORD` inside one makes the first pass drop the next lines as
@@ -1711,7 +1823,7 @@ fi
 # Write targets of `>`, `>>`, `>|`, `&>`, `>&file` and tee are taken with quotes and backslashes
 # removed and go through the same path comparison as above (glob, braces, `//`, `..`): a
 # protective file blocks; any other target outside temporary directories and /dev asks.
-COMMENT_TAIL_PL='
+COMMENT_TAIL_PL="$TEXT_TARGETS_SUB"'
   use strict; use warnings;
   my ($exec, $raw) = split /\0/, do { local $/; <STDIN> }, 2;
   $exec //= q{}; $raw //= q{};
@@ -1772,6 +1884,11 @@ COMMENT_TAIL_PL='
     if (!defined $trigger && $line =~ /(?:^|[\s;&|(`])cat[ \t]*<<-?[ \t]*(["\x27]?)([A-Za-z_][A-Za-z0-9_]*)\1/) { $body_end = $2; }
     my $l = $line;
     $l =~ s/["\x27\\]//g;
+    # The same shell-word targets as the text pass over the whole call (rc.2 red team, finding B):
+    # compared as protective paths only; a stripped `$TMPDIR` prefix must not turn into an ask.
+    my @text = text_targets($line);
+    $block = 1 if grep { protected_text($_) } @text;
+    push @targets, @text;
     my @found;
     while ($l =~ /(&>>?|\d*>>?[|&]?)[ \t]*([^\s;&|<>()`]*)/g) {
       my ($op, $t) = ($1, $2);
