@@ -127,6 +127,21 @@ expect "tee writes its non-empty here-doc" pass "tee notes.md <<'EOF' >/dev/null
 a line
 EOF"
 
+# === WP-529 F275, rc.1 red team F2: only the last stdin redirection, on fd 0, may be the here-doc ===
+expect "here-doc on fd 3 is not cat's input" ask "cat > params.yaml 3<<EOF
+x
+EOF"
+expect "here-string on fd 3 is not cat's input" ask 'cat 3<<< x > params.yaml'
+expect "stdin closed after the here-doc" ask "cat <<EOF > params.yaml <&-
+x
+EOF"
+expect "stdin from /dev/null after the here-string" ask 'cat <<< x > params.yaml < /dev/null'
+expect "stdin from a file after the here-string" ask 'cat <<< x > params.yaml 0< README.md'
+expect "empty here-string after a here-doc" ask "cat <<EOF <<< '' > params.yaml
+x
+EOF"
+expect "here-string on fd 0 explicitly" pass 'cat 0<<< x > notes.md'
+
 # === WP-529 F275: a quote or << inside a # comment must not hide the next lines ===
 expect "apostrophe in a comment, then a write" ask "ls # don't
 grep zzz README.md > params.yaml"

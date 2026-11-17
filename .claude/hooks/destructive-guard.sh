@@ -1386,10 +1386,16 @@ WRITE_TARGETS_PL='
           $pending = $op eq ">>" ? "A" : "T";
           next;
         }
-        if (my $m = $at->(qr/\d*(<<<|<<-?|<>|<&|<)/)) {
+        if (my $m = $at->(qr/(\d*)(<<<|<<-?|<>|<&|<)/)) {
           $i = pos($s);
-          if ($m->[0] eq "<<<") { $herestr = 1; }
-          elsif ($m->[0] =~ /^<</) { $here = 1 if ($ENV{HEREDOC_EMPTY} // q{}) eq "-"; }
+          # Only stdin (no descriptor or 0) feeds cat, and only the LAST stdin redirection counts:
+          # `cat 3<<< x > f`, `cat <<EOF > f <&-` and `cat <<< x > f < /dev/null` read nothing
+          # from the given text (rc.1 red team F2).
+          my ($fd, $op) = @$m;
+          my $stdin = $fd eq q{} || $fd eq "0";
+          if ($op eq "<<<") { $herestr = $stdin ? 1 : 0; }
+          elsif ($op =~ /^<</) { $here = 1 if $stdin && ($ENV{HEREDOC_EMPTY} // q{}) eq "-"; }
+          elsif ($stdin) { $here = 0; }
           if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
           $skip_next = 1; next;
         }
@@ -1398,7 +1404,7 @@ WRITE_TARGETS_PL='
       # Inside or at the start of a word.
       if ($in_word && ($c =~ /[ \t\n;&|()<>`]/)) {
         my $w = $word; $word = q{}; $in_word = 0;
-        if ($skip_next) { $skip_next = 0; $here = 1 if $herestr && $w ne q{} && $w !~ /\$/; $herestr = undef; }
+        if ($skip_next) { $skip_next = 0; $here = ($w ne q{} && $w !~ /\$/) ? 1 : 0 if $herestr; $herestr = undef; }
         elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; }
         else { push @words, $w; }
         next;
@@ -1428,7 +1434,7 @@ WRITE_TARGETS_PL='
       $word .= $c; $i++;
     }
     if ($in_word) {
-      if ($skip_next) { $here = 1 if $herestr && $word ne q{} && $word !~ /\$/; } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
+      if ($skip_next) { $here = ($word ne q{} && $word !~ /\$/) ? 1 : 0 if $herestr; } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
       $in_word = 0; $word = q{};
     }
     $flush_seg->();
