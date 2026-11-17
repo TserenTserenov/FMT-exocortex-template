@@ -370,13 +370,17 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   }
 
   my ($header_quote, $header_group_depth, $group_source, @compound_frames) = (undef, 0, q{});
+  # Set when some here-doc body has no non-blank line (issue #1568): `cat > f <<EOF` + `EOF`
+  # empties f, so the reader-overwrite rule below must not exempt here-docs in this call.
+  my $empty_body = 0;
   for (my $line_no = 0; $line_no < @lines; $line_no++) {
     my $line = $lines[$line_no];
     if (@pending) {
       my $body = $pending[0];
       my $probe = $line;
       $probe =~ s/^\t+// if $body->{indent};
-      if ($probe eq $body->{delim}) { shift @pending; push @out, q{}; next; }
+      if ($probe eq $body->{delim}) { $empty_body = 1 unless $body->{text}; shift @pending; push @out, q{}; next; }
+      $body->{text} = 1 if $line =~ /\S/;
       push @out, $line if $body->{keep};
       next;
     }
@@ -406,12 +410,16 @@ CMD_EXEC=$(printf '%s' "$CMD" | perl -e '
   # shift, a quoted "<<" in prose): stripping there would hide real commands,
   # so the whole reduction is discarded rather than trusted.
   if (@pending) { print "UNTERMINATED"; exit 0; }
-  print "OK", join("\n", @out);
+  print "OK", ($empty_body ? "E" : "-"), join("\n", @out);
 ')
+# HEREDOC_EMPTY=E: a here-doc body is empty or could not be delimited; either way the
+# here-doc exemption of the reader-overwrite rule (issue #1568) does not apply.
 if [ "$CMD_EXEC" = "UNTERMINATED" ]; then
   CMD_EXEC="$CMD"
+  HEREDOC_EMPTY=E
 else
-  CMD_EXEC="${CMD_EXEC#OK}"
+  HEREDOC_EMPTY="${CMD_EXEC:2:1}"
+  CMD_EXEC="${CMD_EXEC:3}"
 fi
 
 # #362: a top-level `cd` persists between Bash calls in Claude Code. Strip
@@ -1338,7 +1346,9 @@ fi
 # Write targets of the call, one per line: "<command>\t<kind>\t<target>\t<input>". <command> is
 # the word the segment runs (basename; "git <subcommand>" for git), <kind> is T (truncating
 # redirection: >, >|, N>, &>, >&file), A (append: >>, &>>) or E (a file argument of tee); <input>
-# is H when the segment reads a here-doc or here-string (<<, <<-, <<<), else "-". Quotes are
+# is H when the segment is `cat` with no file operand whose input is given in the call: a
+# here-doc (<<, <<-) while no here-doc body of the call is empty, or a here-string (<<<) whose
+# word is non-empty and has no `$`; else "-". Quotes are
 # removed from the target, variables are left as written. `bash|sh|zsh -c '…'` is read recursively.
 # Only redirections that write are reported: input (<, <<, <<<), descriptor copies (2>&1, >&-)
 # are not.
@@ -1352,8 +1362,9 @@ WRITE_TARGETS_PL='
     return if $depth > 3;
     my @segments; my @words; my @redirs; my $word; my $in_word = 0;
     my $flush_word = sub { if ($in_word) { push @words, $word; $word = q{}; $in_word = 0; } };
-    my $here = 0;  # the segment reads a here-doc or here-string: its input is given in the text
-    my $flush_seg = sub { $flush_word->(); push @segments, [ [@words], [@redirs], $here ]; @words = (); @redirs = (); $here = 0; };
+    my $here = 0;  # the segment reads a non-empty here-doc or here-string: its input is given in the text
+    my $herestr;   # the next skipped word is the word of a here-string
+    my $flush_seg = sub { $flush_word->(); push @segments, [ [@words], [@redirs], $here ]; @words = (); @redirs = (); $here = 0; $herestr = undef; };
     my $pending;   # kind of a redirection whose target is the next word
     my $skip_next; # an input redirection: its next word is data, not a target
     my $i = 0; my $n = length $s;
@@ -1377,7 +1388,8 @@ WRITE_TARGETS_PL='
         }
         if (my $m = $at->(qr/\d*(<<<|<<-?|<>|<&|<)/)) {
           $i = pos($s);
-          $here = 1 if $m->[0] =~ /^<</;
+          if ($m->[0] eq "<<<") { $herestr = 1; }
+          elsif ($m->[0] =~ /^<</) { $here = 1 if ($ENV{HEREDOC_EMPTY} // q{}) eq "-"; }
           if (substr($s, $i, 1) eq "(") { $flush_seg->(); $i++; next; }  # <( … )
           $skip_next = 1; next;
         }
@@ -1386,7 +1398,7 @@ WRITE_TARGETS_PL='
       # Inside or at the start of a word.
       if ($in_word && ($c =~ /[ \t\n;&|()<>`]/)) {
         my $w = $word; $word = q{}; $in_word = 0;
-        if ($skip_next) { $skip_next = 0; }
+        if ($skip_next) { $skip_next = 0; $here = 1 if $herestr && $w ne q{} && $w !~ /\$/; $herestr = undef; }
         elsif ($pending) { push @redirs, [ $pending, $w ]; $pending = undef; }
         else { push @words, $w; }
         next;
@@ -1416,7 +1428,7 @@ WRITE_TARGETS_PL='
       $word .= $c; $i++;
     }
     if ($in_word) {
-      if ($skip_next) { } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
+      if ($skip_next) { $here = 1 if $herestr && $word ne q{} && $word !~ /\$/; } elsif ($pending) { push @redirs, [ $pending, $word ]; } else { push @words, $word; }
       $in_word = 0; $word = q{};
     }
     $flush_seg->();
@@ -1430,7 +1442,11 @@ WRITE_TARGETS_PL='
         while ($k < @w && $w[$k] =~ /^-/) { $k += ($w[$k] =~ /^-[Cc]$/) ? 2 : 1; }
         $cmd = "git " . ($w[$k] // q{});
       }
-      my $input = $seg_here ? "H" : "-";
+      # Only `cat` reading nothing but its stdin outputs exactly the given text; `cat F`, grep, ls,
+      # head, git show … ignore it or filter it, so their output may still be empty (#1568).
+      my $operand = 0;
+      for my $a (@w[1 .. $#w]) { $operand = 1 if $a eq "--" || ($a ne "-" && $a !~ /^-/); }
+      my $input = ($seg_here && $cmd eq "cat" && !$operand) ? "H" : "-";
       print "$cmd\t$_->[0]\t$_->[1]\t$input\n" for @$r;
       # tee after wrappers (env, nice, sudo …): its file arguments are written.
       my $k = 0;
@@ -1448,7 +1464,7 @@ WRITE_TARGETS_PL='
   my $text = do { local $/; <STDIN> };
   scan($text, 0);
 '
-WRITE_TARGETS=$(printf '%s' "$CMD_EXEC" | perl -e "$WRITE_TARGETS_PL") || fail_check "perl, разбор целей записи"
+WRITE_TARGETS=$(printf '%s' "$CMD_EXEC" | HEREDOC_EMPTY="$HEREDOC_EMPTY" perl -e "$WRITE_TARGETS_PL") || fail_check "perl, разбор целей записи"
 
 # Protective files (.claude/hooks, .claude/bin, settings*.json) by any spelling of their path
 # (issue #1567, F1 of the v0.42.0 red team): `.claude//hooks/x`, `./.claude/./hooks/x`,
@@ -1506,6 +1522,62 @@ if [ "$PROTECTED_TARGET" = "HIT" ] \
   block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны и фигурные скобки). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
+# A `#` comment the scanners above do not understand (WP-529 F275). They know no comments, so a
+# quote inside one (`ls # don't`) opens a string that swallows the next lines, and a `<<WORD` inside
+# one makes the first pass drop the next lines as a here-doc body; bash runs those lines. Teaching
+# every scanner comments is not a small change, so this fails closed instead: when a comment
+# (a `#` starting a word, in the text left after data here-doc bodies are removed) holds an odd
+# number of ' or " or a `<<`, every raw line after it is checked as text. A `>` or tee followed
+# by `.claude` and then hooks, bin or settings blocks; any other `>` into a path outside
+# temporary directories and /dev asks. Each pass walks a line once (no backtracking regex).
+COMMENT_TAIL_PL='
+  use strict; use warnings;
+  my ($exec, $raw) = split /\0/, do { local $/; <STDIN> }, 2;
+  $raw //= q{};
+  my $trigger;
+  for my $line (split /\n/, $exec // q{}) {
+    # Right to left, so the quotes after each "#" are counted once for the whole line.
+    my ($sq, $dq, $lt) = (0, 0, 0);
+    for (my $i = length($line) - 1; $i >= 0; $i--) {
+      my $c = substr($line, $i, 1);
+      if ($c eq "#" && ($i == 0 || substr($line, $i - 1, 1) =~ /[\s;&|()]/) && ($sq % 2 || $dq % 2 || $lt)) {
+        $trigger = substr($line, $i); last;
+      }
+      $sq++ if $c eq "\x27";
+      $dq++ if $c eq q{"};
+      $lt = 1 if $c eq "<" && substr($line, $i + 1, 1) eq "<";
+    }
+    last if defined $trigger;
+  }
+  exit 0 unless defined $trigger;
+  my $at = index($raw, $trigger);
+  my $tail = $at < 0 ? $raw : substr($raw, $at + length $trigger);
+  my $ask;
+  for my $line (split /\n/, $tail) {
+    my $w = index($line, ">");
+    my $t = index($line, "tee");
+    $w = $t if $w < 0 || ($t >= 0 && $t < $w);
+    next if $w < 0;
+    my $c = index($line, ".claude", $w);
+    if ($c >= 0 && substr($line, $c) =~ /hooks|bin|settings/) { print "BLOCK"; exit 0; }
+    while (!defined $ask && $line =~ /(?<![>&0-9])\d*>[>|]?\s*["\x27]?([^\s;&|"\x27<>()]+)/g) {
+      my $target = $1;
+      next if $target =~ m{^&} || $target =~ m{^/dev/(null|stdout|stderr|tty|fd/\d+)$};
+      next if $target =~ m{^(/tmp/|/private/tmp/|/var/folders/|/private/var/folders/|\$TMPDIR/|\$\{TMPDIR\}/)} && $target !~ m{/\.\.(/|$)};
+      $ask = $target;
+    }
+  }
+  print "ASK\t$ask" if defined $ask;
+'
+COMMENT_TAIL=
+case "$CMD_EXEC" in
+  *"#"*) COMMENT_TAIL=$(printf '%s\0%s' "$CMD_EXEC" "$CMD" | perl -e "$COMMENT_TAIL_PL") || fail_check "perl, строки после комментария" ;;
+esac
+case "$COMMENT_TAIL" in
+  BLOCK) block "после комментария с непарной кавычкой или << идёт запись в .claude/hooks, .claude/bin или settings.json — такой комментарий сбивает разбор команды, поэтому защитные файлы проверяются по тексту. Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
+  ASK*) COMMENT_ASK="перенаправление «>» после комментария с непарной кавычкой или << ($(printf '%s' "${COMMENT_TAIL#ASK?}" | head -1)): такой комментарий сбивает разбор команды, поэтому запись в рабочий файл подтверждается вручную." ;;
+esac
+
 # A truncating redirection after a pre-approved reader (issue #1568, F2 of the v0.42.0 red team).
 # settings.json lets ls, cat, head, tail, wc, grep, rg, find, diff and git status/log/diff/show/
 # branch/remote run without a prompt, so `grep nomatch F > params.yaml`, `ls /nonexistent > f`,
@@ -1513,9 +1585,11 @@ fi
 # silently; the block above only knows /dev/null and zero counts, and such a list is never
 # complete. The class: a `>` into anything outside temporary directories and /dev, run by one of
 # those readers, goes through a prompt. Append (>>) does not destroy content and stays allowed, and
-# so does a reader fed a here-doc or here-string (`cat > notes.md <<'EOF'`, `cat <<< x > f`): its
-# content is in the call itself, so the output is not the empty one this rule is about. The blocks
-# above (protective files, /dev/null) still apply to it.
+# so does `cat` with no file operand fed a non-empty here-doc or here-string (`cat > notes.md
+# <<'EOF'` + text, `cat <<< x > f`): its output is that text, not the empty one this rule is about.
+# An empty body (`cat > f <<EOF` + `EOF`, `cat > f <<< ""`) or another reader (`grep x F > f <<EOF`,
+# `cat F > f <<< x`) still asks (WP-529 F275). The blocks above (protective files, /dev/null)
+# still apply to it.
 # Keep the reader list in step with the Bash(...) allow rules of .claude/settings.json.
 READER_OVERWRITE=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' '
   $2 == "T" && $4 != "H" && $1 ~ /^(ls|cat|head|tail|wc|grep|egrep|fgrep|rg|find|diff|git (status|log|diff|show|branch|remote))$/ {
@@ -1526,6 +1600,9 @@ READER_OVERWRITE=$(printf '%s\n' "$WRITE_TARGETS" | awk -F'\t' '
   }')
 if [ -n "$READER_OVERWRITE" ]; then
   ASK_REASON="перенаправление «>» после читающей команды перезапишет файл ($(printf '%s' "$READER_OVERWRITE" | head -1)) — такие команды разрешены без запроса, а пустой вывод (grep без совпадений, ls несуществующего, head -0) стирает файл. Подтверди запись, если она нужна; рабочие файлы правят правкой файла."
+fi
+if [ -z "${ASK_REASON:-}" ] && [ -n "${COMMENT_ASK:-}" ]; then
+  ASK_REASON="$COMMENT_ASK"
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
