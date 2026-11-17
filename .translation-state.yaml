@@ -1,26 +1,5 @@
-files_translated:
-- docs/DESTRUCTIVE-GUARD.md
-last_run_utc: '2026-11-17T12:45:24Z'
-last_synced_sha: b5d108c70f2f6bfd6648dcf7ff4ed1890b13083a
+files_translated: []
+last_run_utc: '2026-11-17T13:52:35Z'
+last_synced_sha: 0af7cdf490d32ca9fa2306e2302f263b4705b565
 schema_version: 1
-unapproved_terms:
-- file: docs/DESTRUCTIVE-GUARD.md
-  source: local-glossary
-  term_en: Pipeline
-  term_ru: Конвейер
-- file: docs/DESTRUCTIVE-GUARD.md
-  source: local-glossary
-  term_en: Registry
-  term_ru: Реестр
-- file: docs/DESTRUCTIVE-GUARD.md
-  source: local-glossary
-  term_en: Script
-  term_ru: Скрипт
-- file: docs/DESTRUCTIVE-GUARD.md
-  source: local-glossary
-  term_en: Hook
-  term_ru: Хук
-- file: docs/DESTRUCTIVE-GUARD.md
-  source: local-glossary
-  term_en: Template
-  term_ru: Шаблон
+unapproved_terms: []
