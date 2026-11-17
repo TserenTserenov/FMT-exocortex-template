@@ -78,6 +78,13 @@ append_retro "$R"
 git -C "$R" add machine/ledger/week/2099/week-2099-W01.yaml && git -C "$R" commit -q -m "week-close: W01"
 expect_has "unpushed ledger: warning" "ЖУРНАЛ НЕДЕЛИ НЕ СОХРАНЁН" "$(run_check "$R")"
 
+echo "--- #1550 E: published earlier this week, new retro not committed -> warning ---"
+R=$(new_repo)
+append_retro "$R"
+git -C "$R" add machine/ledger/week/2099/week-2099-W01.yaml && git -C "$R" commit -q -m "ledger: earlier" && git -C "$R" push -q origin main
+append_retro "$R"
+expect_has "re-appended ledger: warning" "ЖУРНАЛ НЕДЕЛИ НЕ СОХРАНЁН" "$(run_check "$R")"
+
 echo
 echo "issue #1550: $PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

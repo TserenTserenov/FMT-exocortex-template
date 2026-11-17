@@ -321,17 +321,16 @@ git push
 
 ```bash
 git -C "$WC_REPO" fetch -q origin main
-WC_SHA=$(git -C "$WC_REPO" log -1 --format=%H -- "$LEDGER_WEEK_REL")
-if [ -n "$WC_SHA" ] \
-   && git -C "$WC_REPO" show --name-only --format= "$WC_SHA" | grep -Fxq "$LEDGER_WEEK_REL" \
-   && git -C "$WC_REPO" merge-base --is-ancestor "$WC_SHA" origin/main; then
-  echo "0б: журнал недели сохранён ($WC_SHA)"
+# Saved = the file in the working copy is byte-identical to the one on origin/main.
+# A ledger published earlier this week and appended again since does not count.
+if git -C "$WC_REPO" show "origin/main:$LEDGER_WEEK_REL" 2>/dev/null | cmp -s - "$WC_REPO/$LEDGER_WEEK_REL"; then
+  echo "0б: журнал недели сохранён ($(git -C "$WC_REPO" log -1 --format=%h origin/main -- "$LEDGER_WEEK_REL"))"
 else
   echo "0б: ЖУРНАЛ НЕДЕЛИ НЕ СОХРАНЁН: $WC_REPO/$LEDGER_WEEK_REL"
 fi
 ```
 
-Только при первом исходе отметить шаг 0б выполненным. При втором шаг 0б остаётся невыполненным, а итоговая сводка закрытия недели прямо говорит пилоту, что журнал ретро не сохранён, и печатает полный путь файла — его можно сохранить отдельным коммитом. Если коммит после публикации перестроен (rebase), проверка ищет последний коммит с этим файлом, поэтому перестроенная публикация тоже засчитывается.
+Только при первом исходе отметить шаг 0б выполненным. При втором шаг 0б остаётся невыполненным, а итоговая сводка закрытия недели прямо говорит пилоту, что журнал ретро не сохранён, и печатает полный путь файла — его можно сохранить отдельным коммитом. Проверка сравнивает файл в рабочей копии с версией на `origin/main`: перестроенная при публикации история (rebase) засчитывается, а журнал, опубликованный раньше на этой неделе и дописанный после, — нет.
 
 ### 12. Верификация (Haiku R23)
 
