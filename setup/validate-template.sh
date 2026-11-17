@@ -180,7 +180,9 @@ is_author_context_exception() {
     # (bug-2026-09-17-tsekh1-*) that the author cross-references outside this
     # repo — the ID's date+host encoding is disambiguating information, not
     # personal leakage, and no local bugs/ directory exists here to confirm a
-    # rename is even safe (issue #1107 triage).
+    # rename is even safe (issue #1107 triage); the copyright line of the
+    # vendored guide-kit licence, which must name its holder (seen once
+    # extension-less delivered files were scanned, issue #1569).
     # Match the whole line, never the whole file.
     local line="$2"
     line="${line%$'\r'}"  # grep preserves a final CR in Windows line endings.
@@ -204,7 +206,8 @@ is_author_context_exception() {
         'scripts/lib/find-python3.sh:# core scripts (artifactor.py, session-dispatcher-tsekh.py). Reject 3.9 early'|\
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort: under `set -eu`, a single'|\
         'setup/build-runtime.sh:# bug-2026-09-17-tsekh1-recovery-backups-abort (continuation): leftovers from'|\
-        'update.sh:# author_release_regression FPATH PAYLOAD — bug-2026-09-17-tsekh1-release-') return 0 ;;
+        'update.sh:# author_release_regression FPATH PAYLOAD — bug-2026-09-17-tsekh1-release-'|\
+        'guide-kit/LICENSE:Copyright (c) 2026 Tseren Tserenov') return 0 ;;
     esac
     return 1
 }
@@ -248,12 +251,26 @@ CHECK1_FAIL=0
 # LEARNING-PATH.md/CHANGELOG.md. The exemption is by path: a plain
 # `grep -v 'docs/adr/'` ran over "path:line:text" and also dropped any line in
 # any other file whose text merely mentioned docs/adr/ (WP-617 Ф4, 09.11).
+# Delivered files the extension filter below does not reach (issue #1569, F3 of the v0.42.0 red
+# team): scripts/iwe-notify has no extension and shipped an author repo name unseen. Every path
+# of update-manifest.json outside that filter is scanned as well (binary files are skipped by -I),
+# so what the scan sees is what update.sh delivers. The array holds absolute paths under $SCAN_ROOT.
+AUTHOR_SCAN_EXTRA=()
+while IFS= read -r rel; do
+    [ -n "$rel" ] && [ -f "$SCAN_ROOT/$rel" ] && AUTHOR_SCAN_EXTRA+=("$SCAN_ROOT/$rel")
+done < <(jq -r '.files[]?.path // empty' "$TEMPLATE_DIR/update-manifest.json" 2>/dev/null \
+            | grep -vE '\.(md|sh|py|json|plist|yaml|yml)$' || true)
 author_global_hits() {
-    grep -rin "$1" "$SCAN_ROOT" --include="*.md" --include="*.sh" \
-        --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
-        --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
-        --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
-        --exclude='translation-manifest.yaml' 2>/dev/null \
+    {
+        grep -rin "$1" "$SCAN_ROOT" --include="*.md" --include="*.sh" \
+            --include="*.py" --include="*.json" --include="*.plist" --include="*.yaml" --include="*.yml" \
+            --exclude='validate-template.sh' --exclude='LEARNING-PATH.md' \
+            --exclude='CHANGELOG.md' --exclude='aisystant-sync-targets.yaml' \
+            --exclude='translation-manifest.yaml' 2>/dev/null
+        if [ "${#AUTHOR_SCAN_EXTRA[@]}" -gt 0 ]; then
+            grep -inIH "$1" -- "${AUTHOR_SCAN_EXTRA[@]}" 2>/dev/null
+        fi
+    } \
         | drop_hits_in_paths "$SCAN_ROOT" '^docs/adr/' \
         | grep -v 'github.com/' | grep -v 'githubusercontent\.com' \
         | grep -viE 'TserenTserenov/(FMT-exocortex-template|ZP|SPF)' \

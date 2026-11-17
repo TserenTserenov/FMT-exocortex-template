@@ -69,7 +69,7 @@
     },
     {
       "path": ".claude/hooks/destructive-guard.sh",
-      "sha256": "a378db8d642ed1815acf5b58abbb9c06471d0eeb1c588252119c7c19e5ef22d9"
+      "sha256": "b732ab8ff0a1b6cdecc031fbe2a9c45d161e669832ab5d81238e6295a27c777e"
     },
     {
       "path": ".claude/hooks/destructive-mcp-guard.sh",
@@ -252,6 +252,14 @@
       "sha256": "639f5beded67e1fe9618cbfdd6105af6987a709f82790092b133bc9ad6fa1c20"
     },
     {
+      "path": ".claude/hooks/tests/test-destructive-guard-path-spellings.sh",
+      "sha256": "1c0a924ca1bb358a0b0d9cd8557cc92d7feb372b2f5923feee641b093dd4690d"
+    },
+    {
+      "path": ".claude/hooks/tests/test-destructive-guard-reader-overwrite.sh",
+      "sha256": "cc402481fcc68715f434658d61679db546b8e97191b7caf4fc5bf0dcf5fbe2cb"
+    },
+    {
       "path": ".claude/hooks/tests/test-destructive-mcp-guard-malformed-json.sh",
       "sha256": "2cde8950a400719a688132669aae108638e95ede9c59e37a916cc14bfa2e5f30"
     },
@@ -429,7 +437,7 @@
     },
     {
       "path": ".claude/scripts/light-onboarding-state.sh",
-      "sha256": "2e16f21e05de9263bb7ddcd5e853d1d4dab00e9762a3d9e3c167d2b8b0f8ef1b"
+      "sha256": "afa919acc131b8132e00081cd94749006d3d9c0acfd495463c019f869de5b856"
     },
     {
       "path": ".claude/scripts/load-extensions.sh",
@@ -457,7 +465,7 @@
     },
     {
       "path": ".claude/settings.json",
-      "sha256": "f5c4d70b1af42007206ba031ba532fbd795abc1ad2365182928eee3b9226d010"
+      "sha256": "175e65b41c6bd11ecf7590b14cc8cebf18847a7567bf7b1c10111954b6677c50"
     },
     {
       "path": ".claude/skills-catalog.yaml",
@@ -685,7 +693,7 @@
     },
     {
       "path": ".claude/skills/onboarding/SKILL.md",
-      "sha256": "66c2a4d7d3018c73b9e286dc8ac5b0ffaf3d8f2cb8a813ffb31f65e56f3e7d65"
+      "sha256": "94e5cec9c6a806f9821e03c7bb1030034b3694bc7b32bc663470b96db46d3650"
     },
     {
       "path": ".claude/skills/org-dev/SKILL.md",
@@ -913,7 +921,7 @@
     },
     {
       "path": ".githooks/pre-commit",
-      "sha256": "9ab4c980ab3f7484ef4dd3be062128a2326af0697aef80d34e422ac283d43ecb"
+      "sha256": "ab8d9a4265fb3ed2fa503b8891c831dacb8ae029f01715509eae34ad41208d86"
     },
     {
       "path": ".github/workflows/cloud-scheduler.yml",
@@ -933,7 +941,7 @@
     },
     {
       "path": ".github/workflows/validate-template.yml",
-      "sha256": "0fa8f63ad76ab9a7a61d48deed85983667dec378f75f084a610526b2773b009e"
+      "sha256": "bbee1e7dce690269b9bf41dcbbcf97a320e003ac6ce504bc216c258eac399f72"
     },
     {
       "path": ".gitignore",
@@ -965,7 +973,7 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "1d60d3dde68151c3bf203df47e29502e8b718da4e6989ba69fcd2bf343fbef18"
+      "sha256": "06c04d069c6c7bf08bc77af9c01dd14bc6b8cfd7d92c136165da3d3f33b751bf"
     },
     {
       "path": "ONTOLOGY.md",
@@ -1017,7 +1025,7 @@
     },
     {
       "path": "docs/DESTRUCTIVE-GUARD.md",
-      "sha256": "1db2ca64fe273bdc0f2fa3f67ac0d4df24ca90d834660b90ecd310db8bf5cd12"
+      "sha256": "1cfb30c1bc5fe4c052f2c68e03094769466f9f36d015c0fef7075ad8c30214c0"
     },
     {
       "path": "docs/IWE-HELP.md",
@@ -2669,7 +2677,7 @@
     },
     {
       "path": "scripts/iwe-notify",
-      "sha256": "b486dc60586f39a4f130e5e2e72de1f2fcbadb198595c7d7a69e916836961e19"
+      "sha256": "32044284abef78ec22b5d5ffacefada6a1ea6377a1161b3dc7f967efa36b135f"
     },
     {
       "path": "scripts/iwe-safe-pull.sh",
@@ -3501,7 +3509,7 @@
     },
     {
       "path": "setup/validate-template.sh",
-      "sha256": "c10bcb59756674d0e2ef199adaca5eb748d5b0c3882e3433e0f2e1e4ca36f1d6"
+      "sha256": "e8ad334bc7e2018dcf6d59e840d9072bb8613fc9fea07e1989dcc68fcff63f56"
     },
     {
       "path": "shared/rubrics/form-089.yaml",
@@ -3576,6 +3584,7 @@
     "scripts/tests/test-captures-write-lock-840.sh",
     "scripts/tests/test-issue-1411-secret-scan-fp.sh",
     "scripts/tests/test-issue-1411-update-rollback-unrelated-history.sh",
+    "scripts/tests/test-issue-1569-extensionless-author-scan.sh",
     "scripts/tests/test-iwe-audit-fpf-copy.sh",
     "scripts/tests/test-peer-session-finalize-index-lock.sh",
     "scripts/tests/test-setup-extractor-feeders-linux-env.sh",

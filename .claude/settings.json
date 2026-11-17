@@ -35,8 +35,7 @@
       "Bash(bash ~/IWE/scripts/session-guard.sh audit:*)",
       "Bash(bash ~/IWE/scripts/agent-heartbeat.sh:*)",
       "Bash(bash .claude/scripts/light-onboarding-state.sh status:*)",
-      "Bash(bash .claude/scripts/light-onboarding-state.sh done)",
-      "Bash(bash .claude/scripts/light-onboarding-state.sh reset)"
+      "Bash(bash .claude/scripts/light-onboarding-state.sh done)"
     ],
     "additionalDirectories": []
   },
