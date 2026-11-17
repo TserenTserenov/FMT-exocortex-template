@@ -68,6 +68,14 @@ EOF"
 expect "comment quote, then tee into bin" block "ls # it's
 echo x | tee .claude/bin/guarded-rm"
 
+# === WP-529 F275, rc.1 red team F1: brace expansion is capped, an unresolvable target fails closed ===
+B40=$(printf '{a,b}%.0s' $(seq 40))
+expect "protected write before a 40-group brace target" block "cat README.md > .claude/hooks/destructive-guard.sh || ls > x$B40"
+expect "40-group brace target inside .claude/hooks" block "ls > .claude/h$B40/x"
+expect "tee with a 40-group brace target near hooks" block "echo a | tee .claude/hook?/$B40"
+expect "bad bracket class inside .claude/hooks" block 'cat README.md > .claude/[[:alpha:]]ooks/x.sh'
+expect "small brace target in /tmp still passes" pass 'ls > /tmp/x{a,b}{a,b}'
+
 # === look-alikes stay allowed ===
 expect "read a hook" pass 'cat .claude//hooks/destructive-guard.sh'
 expect "grep hooks dir" pass 'grep -rn x ./.claude/./hooks 2>/dev/null'

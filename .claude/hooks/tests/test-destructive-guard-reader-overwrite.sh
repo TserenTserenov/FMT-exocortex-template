@@ -170,5 +170,14 @@ finishes "odd operators in a comment" 1.0 '"ls # ;> |> << \x27 \"\nls ;> |> x"'
 finishes "200 KB here-doc body with quotes and >" 30 '"cat > notes.md <<\x27EOF\x27\n" + ("a > b it\x27s # c\n" * 13000)[:200000] + "\nEOF"'
 finishes "200 KB of ;> |> after a quoted comment" 30 '"ls # don\x27t\n" + ("x ;> |> # a\x27 <<E " * 12000)[:200000]'
 
+# === WP-529 F275, rc.1 red team F1: 2^40 brace words — the cap answers at once ===
+finishes "40 brace groups after a protected write" 2.0 '"cat README.md > .claude/hooks/destructive-guard.sh || ls > x" + "{a,b}" * 40'
+finishes "40 brace groups into /tmp" 2.0 '"ls > /tmp/x" + "{a,b}" * 40'
+finishes "40 brace groups after tee" 2.0 '"echo a | tee x" + "{a,b}" * 40'
+B40=$(printf '{a,b}%.0s' $(seq 40))
+expect "40 brace groups into /tmp ask (unresolvable)" ask "ls > /tmp/x$B40"
+expect "40 brace groups after tee ask (unresolvable)" ask "echo a | tee x$B40"
+expect "bad bracket class asks, not a raw perl error" ask 'cat README.md > a[[:alpha:]]/b'
+
 echo "reader-overwrite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

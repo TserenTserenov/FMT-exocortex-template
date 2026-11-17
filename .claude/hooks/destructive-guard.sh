@@ -1474,11 +1474,21 @@ WRITE_TARGETS=$(printf '%s' "$CMD_EXEC" | HEREDOC_EMPTY="$HEREDOC_EMPTY" perl -e
 # that can name a protective file counts as naming it.
 PROTECTED_TARGET_PL='
   use strict; use warnings;
+  # Brace expansion is exponential in the number of brace groups (`x{a,b}` 40 times is 2^40 words:
+  # rc.1 red team, the hook hung with memory growing). Expansion is capped; a target over the cap,
+  # one whose glob cannot be compiled, or a run past the wall-clock limit is unresolvable and
+  # fails closed below.
+  my $cap = 256;
+  my $produced;
   sub braces {
-    my $s = shift;
-    return ($s) unless $s =~ /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/s;
+    my ($s, $depth) = @_;
+    die "brace nesting\n" if $depth > 16;
+    unless ($s =~ /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/s) {
+      die "brace cap\n" if ++$produced > $cap;
+      return ($s);
+    }
     my ($pre, $mid, $post) = ($1, $2, $3);
-    return map { braces($pre . $_ . $post) } split /,/, $mid, -1;
+    return map { braces($pre . $_ . $post, $depth + 1) } split /,/, $mid, -1;
   }
   sub glob_re {
     my $g = shift; my $re = q{};
@@ -1492,33 +1502,71 @@ PROTECTED_TARGET_PL='
     return qr/^(?:$re)$/s;
   }
   sub names { my ($comp, $name) = @_; return $name =~ glob_re($comp); }
-  my $hit = 0;
+  sub protected_path {
+    my ($path) = @_;
+    my @parts;
+    for my $p (split m{/+}, $path) {
+      next if $p eq q{} || $p eq ".";
+      if ($p eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
+      push @parts, $p;
+    }
+    for my $k (0 .. $#parts - 1) {
+      next unless names($parts[$k], ".claude");
+      my $next = $parts[$k + 1];
+      return 1 if ($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
+               || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")));
+    }
+    return 0;
+  }
+  # Raw-text test for an unresolvable target: does it mention claude or hook, case-insensitive,
+  # with quotes and brace punctuation removed and ?, *, [...] standing for any letter.
+  sub mentions_protected {
+    my $t = lc shift;
+    $t =~ s/["\x27{},\\]//g;
+    for my $word (qw(claude hook)) {
+      my $re = join q{}, map { "(?:\\*?(?:\Q$_\E|\\?|\\[[^\\]]*\\]))" } split //, $word;
+      return 1 if $t =~ /$re/ || $t =~ /\*/;
+    }
+    return 0;
+  }
+  my @targets;
   while (my $line = <STDIN>) {
     chomp $line;
     my (undef, undef, $target) = split /\t/, $line, 4;
-    next unless defined $target;
-    for my $path (braces($target)) {
-      my @parts;
-      for my $p (split m{/+}, $path) {
-        next if $p eq q{} || $p eq ".";
-        if ($p eq ".." && @parts && $parts[-1] ne "..") { pop @parts; next; }
-        push @parts, $p;
-      }
-      for my $k (0 .. $#parts - 1) {
-        next unless names($parts[$k], ".claude");
-        my $next = $parts[$k + 1];
-        if (($k + 1 < $#parts && (names($next, "hooks") || names($next, "bin")))
-            || ($k + 1 == $#parts && (names($next, "settings.json") || names($next, "settings.local.json")))) {
-          $hit = 1;
-        }
-      }
-    }
+    push @targets, $target if defined $target;
   }
-  print $hit ? "HIT" : "MISS";
+  my ($hit, @unresolved) = (0);
+  for my $target (@targets) {
+    my $ok = eval {
+      local $SIG{ALRM} = sub { die "time limit\n" };
+      alarm 3;
+      $produced = 0;
+      # The target as written is compared first, before any expansion.
+      $hit = 1 if protected_path($target);
+      unless ($hit) { for my $path (braces($target, 0)) { if (protected_path($path)) { $hit = 1; last; } } }
+      alarm 0;
+      1;
+    };
+    alarm 0;
+    last if $hit;
+    push @unresolved, $target unless $ok;
+  }
+  if ($hit) { print "HIT"; }
+  elsif (grep { mentions_protected($_) } @unresolved) { print "BLOCK"; }
+  elsif (@unresolved) { print "ASK\t$unresolved[0]"; }
+  else { print "MISS"; }
 '
-PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
-if [ "$PROTECTED_TARGET" = "HIT" ] \
-  || matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+# The literal spelling is checked first, before the perl pass expands anything.
+if matches "$CMD_EXEC" -E '(>|>>|>\||(^|[[:space:];|&])tee([[:space:]]+-[a-z]+)*)[[:space:]]*["'"'"']?[^[:space:];|&]*\.claude/(hooks/|bin/|settings(\.local)?\.json)'; then
+  PROTECTED_TARGET=HIT
+else
+  PROTECTED_TARGET=$(printf '%s' "$WRITE_TARGETS" | perl -e "$PROTECTED_TARGET_PL") || fail_check "perl, сравнение целей записи"
+fi
+case "$PROTECTED_TARGET" in
+  BLOCK) block "цель записи не удалось разобрать (слишком много вариантов в фигурных скобках, неверный шаблон или превышено время), и в её тексте есть claude или hook — защитный файл не исключён. Запиши путь буквально. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота." ;;
+  ASK*) UNRESOLVED_ASK="цель записи не удалось разобрать ($(printf '%s' "${PROTECTED_TARGET#ASK?}" | head -c 200)): слишком много вариантов в фигурных скобках, неверный шаблон или превышено время — подтверди запись вручную." ;;
+esac
+if [ "$PROTECTED_TARGET" = "HIT" ]; then
   block "запись перенаправлением или tee в .claude/hooks, .claude/bin или settings.json запрещена — так затирают защитные проверки (в любом написании пути: .claude//hooks, ./.claude/./hooks, шаблоны и фигурные скобки). Защитные файлы меняют правкой файла с согласия пилота. Разовая необходимость: CC_ALLOW_DESTRUCTIVE_INPUT=1 из реального шелла пилота."
 fi
 
@@ -1603,6 +1651,9 @@ if [ -n "$READER_OVERWRITE" ]; then
 fi
 if [ -z "${ASK_REASON:-}" ] && [ -n "${COMMENT_ASK:-}" ]; then
   ASK_REASON="$COMMENT_ASK"
+fi
+if [ -z "${ASK_REASON:-}" ] && [ -n "${UNRESOLVED_ASK:-}" ]; then
+  ASK_REASON="$UNRESOLVED_ASK"
 fi
 
 # SQL clients: DROP/TRUNCATE — irreversible loss of structure/data.
