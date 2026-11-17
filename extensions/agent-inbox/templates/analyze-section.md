@@ -9,7 +9,7 @@
 | `section_number` | int | 11 |
 | `guide_repo` | str | `aisystant/docs` |
 | `guide_path` | str | `ru/personal-new/1-1-systemic-self-development` |
-| `pipeline_repo` | str | `aisystant/DS-principles-curriculum` |
+| `pipeline_repo` | str | `MimEcoSys/DS-principles-curriculum` |
 | `pipeline_path` | str | `specs/v4-reference/WRITING-PIPELINE.md` |
 | `result_branch` | str | `main` |
 
