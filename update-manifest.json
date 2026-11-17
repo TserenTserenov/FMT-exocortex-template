@@ -189,7 +189,7 @@
     },
     {
       "path": ".claude/hooks/session-open-gate.sh",
-      "sha256": "a49d1e3cc514d663311af15bb5b138373cccbd061397001745c8b10a879e7e65"
+      "sha256": "a522a59d59298c84cd405b6e42694b8b60bacffeceeff4fec855c312a2a3b49b"
     },
     {
       "path": ".claude/hooks/session-start-hooks-bootstrap.sh",
@@ -873,7 +873,7 @@
     },
     {
       "path": ".claude/skills/week-close/SKILL.md",
-      "sha256": "946e65993ebfc3b3470e19a281837f4185ebbe617e3b3460bcff6dd937fd16bb"
+      "sha256": "ee596a348e584d399b2522326d2f6a921202459d647f1c8d1d93e172eacb98c2"
     },
     {
       "path": ".claude/skills/wp-new/SKILL.md",
@@ -897,7 +897,7 @@
     },
     {
       "path": ".claude/sync-manifest.yaml",
-      "sha256": "0dec80060ea0251ae07f3c04ad34feea9046b4ba444c48b9180459e7b5791626"
+      "sha256": "6ba479fa40c913bb377241abb1207f3294b0c37193025e3e6295a4626991e167"
     },
     {
       "path": ".claude/templates/drr-template.md",
@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6d81357963808163d5bf077f7ade492809fda9c02fe4962d9401eb8dacf77c27"
+      "sha256": "e990d271487e271652b85e5ef890810d28c221b5ac68f19cd8a9019cb7909bad"
     },
     {
       "path": "CLAUDE.md",
@@ -1033,7 +1033,7 @@
     },
     {
       "path": "docs/LEARNING-PATH.md",
-      "sha256": "4420b4c6e43a38ac22c8479ac2bfa887607f050bb9f7403e06c8d534bddccf69"
+      "sha256": "e0c8c6d579821fa828ef80a464d2bb8f64c3a9544d00c703bfbf21f12cfb153f"
     },
     {
       "path": "docs/PACK-CREATION.md",
@@ -1721,7 +1721,7 @@
     },
     {
       "path": "memory/protocol-close.md",
-      "sha256": "462894146d763c2dcef4691a836f2965b00826f0cb5cd583829df8470634e10a"
+      "sha256": "1580e3f2e2c578b02aeef1a199d14e3a4b84a4ebcc691ab41a3255c825325aa9"
     },
     {
       "path": "memory/protocol-dt-integration.md",
@@ -1733,7 +1733,7 @@
     },
     {
       "path": "memory/protocol-open.md",
-      "sha256": "42116d039c96f150eb9b22b4a95541291923543b9dd12bc6dd835e743c934cd9"
+      "sha256": "6b29d90cd33927459c88843140957a18b6342c010fdd60373054505f42159890"
     },
     {
       "path": "memory/protocol-work.md",
@@ -2069,7 +2069,7 @@
     },
     {
       "path": "roles/strategist/prompts/week-review.md",
-      "sha256": "54778678a5380197e1add4ecfe10e554fa70fe2fbdd18dd8602bfc3dc3391302"
+      "sha256": "d9437af1ba7e57672fa7f4cf9c3c093c1502492d584d926bf2e15216834cd785"
     },
     {
       "path": "roles/strategist/role.yaml",
@@ -2405,7 +2405,7 @@
     },
     {
       "path": "scripts/close-wp.sh",
-      "sha256": "b96af6a0367a67e791da6cbc19c5beb8298867a16f5b366837c0da68ca2d1a6b"
+      "sha256": "343deaae3b5ffcc588ec44a4177b34ade73f168727db6915c7ba3922609a15c9"
     },
     {
       "path": "scripts/codex-peer-adapter.sh",
@@ -2717,7 +2717,7 @@
     },
     {
       "path": "scripts/kimi-standalone-preflight.sh",
-      "sha256": "8ffb7e669efc72b7eaf01212d1619f2a25750b9314ee9560609f69b328a4a074"
+      "sha256": "b160dc2bfd0d4ba2f3c96f892a32478d72ecc518adb5659b9f593662f3792c6e"
     },
     {
       "path": "scripts/kimi-whisper-safe.sh",
@@ -3692,6 +3692,10 @@
     "scripts/tests/test_issue_1503_no_weekplan.sh",
     "scripts/tests/test_issue_1513_skill_paths.sh",
     "scripts/tests/test_issue_1514_pack_duplicates.sh",
+    "scripts/tests/test_issue_1542.sh",
+    "scripts/tests/test_issue_1550.sh",
+    "scripts/tests/test_issue_1555.sh",
+    "scripts/tests/test_issue_1558.sh",
     "scripts/tests/test_issue_496_heading_style.sh",
     "scripts/tests/test_issue_529_owner_integrity.sh",
     "scripts/tests/test_issue_530_staged_self_scan.sh",
