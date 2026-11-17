@@ -961,7 +961,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2c333f144936c8c6a76622e7c3014e6f984490fc3f055bca37591d1c2e3ec689"
+      "sha256": "bff8c55283ed9408dd3dc65ba07c5c0071a49e55be4a95acf0665677aacc580c"
     },
     {
       "path": "CLAUDE.md",
@@ -2853,7 +2853,7 @@
     },
     {
       "path": "scripts/normalize_en_phase_labels.py",
-      "sha256": "07ca409c06164b19abf22bb75f8a301bdd9730db0b5dd93c55c72a6ec9c3cd94"
+      "sha256": "38db2fbfe11796cc9015809155435a45f25c2852de2e0cb8ffc85e3190367864"
     },
     {
       "path": "scripts/pack-ci-install.sh",
