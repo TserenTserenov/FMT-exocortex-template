@@ -37,6 +37,10 @@ GENERATED = (
     ".github/workflows/no-cyrillic-gate.yml", "docs/assets/orz-cycle.svg",
     ".translation-state.yaml", "badge-data.json", ".git/",
 )
+# Pipeline state kept on en-draft but never published (publish-to-iwesys
+# untracks it). Since WP-620 F4 the translation state carries Russian source
+# terms on purpose, so it is skipped by the Cyrillic scan (WP-529 F274).
+PIPELINE_STATE = (".translation-state.yaml", "badge-data.json")
 
 
 def distribution_set(source: Path) -> set[str]:
@@ -97,6 +101,8 @@ def assemble(source: Path, output: Path, write: bool = True) -> dict[str, list[s
                 existing.unlink()
     for existing in sorted(p for p in output.rglob("*") if p.is_file() and ".git/" not in p.as_posix()):
         relative = existing.relative_to(output).as_posix()
+        if relative in PIPELINE_STATE:
+            continue
         if CYRILLIC.search(relative) or has_cyrillic(existing):
             report["cyrillic"].append(relative)
     return report
