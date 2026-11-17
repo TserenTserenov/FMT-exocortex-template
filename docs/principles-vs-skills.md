@@ -1,6 +1,6 @@
 # Почему навыков недостаточно: принципы и генеративная иерархия
 
-> **Source-of-truth:** [PD.FORM.047](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.047-generative-principles-hierarchy.md)
+> **Source-of-truth:** [PD.FORM.047](https://github.com/MimEcoSys/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.047-generative-principles-hierarchy.md)
 > **Иерархия принципов:** [ZP/hierarchy.md](https://github.com/TserenTserenov/ZP/blob/main/hierarchy.md)
 
 ---
@@ -83,9 +83,9 @@ IWE построена по этой иерархии:
 ## Дальнейшее чтение
 
 - [ZP/hierarchy.md](https://github.com/TserenTserenov/ZP/blob/main/hierarchy.md) — структура иерархии принципов
-- [PD.FORM.047](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.047-generative-principles-hierarchy.md) — полная формализация (source-of-truth)
-- [PD.D.014](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/01-domain-contract/01B-distinctions.md) — различение Knowledge vs. Skill
-- [PD.FORM.019](https://github.com/aisystant/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.019-intelligence-stack.md) — интеллект-стек (16 трансдисциплин)
+- [PD.FORM.047](https://github.com/MimEcoSys/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.047-generative-principles-hierarchy.md) — полная формализация (source-of-truth)
+- [PD.D.014](https://github.com/MimEcoSys/PACK-personal/blob/main/pack/personal-development/01-domain-contract/01B-distinctions.md) — различение Knowledge vs. Skill
+- [PD.FORM.019](https://github.com/MimEcoSys/PACK-personal/blob/main/pack/personal-development/02-domain-entities/formalizations/PD.FORM.019-intelligence-stack.md) — интеллект-стек (16 трансдисциплин)
 - [LEARNING-PATH.md](./LEARNING-PATH.md) — путь изучения IWE
 
 ---
